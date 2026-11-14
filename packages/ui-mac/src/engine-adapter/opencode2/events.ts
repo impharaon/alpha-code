@@ -2,7 +2,7 @@
 // (`data: {"directory", "payload": {"type", "properties"}}`)。
 //
 // 投影规则(方案 §2.3「事件流」):
-//   · 直通:pty.*、lsp.updated、vcs.branch.updated、mcp.*、reference.updated、server.connected、global.disposed;
+//   · 直通:pty.*、lsp.updated、vcs.branch.updated、mcp 的四种、reference.updated、server.connected、global.disposed;
 //     filesystem.changed → file.watcher.updated(另由回合改动补出项目文件的增删改,见 fileChanges);
 //   · 改名:location.shutdown → server.instance.disposed;agent/command/skill.updated → catalog.updated;
 //     project.updated(`canonical` → `worktree`;Code Puppy 自己的目录不发,`#1669` internal-projects.ts);
@@ -15,14 +15,15 @@
 //     内容以 2.x 存储为准。todowrite 工具的输入同时投影成 todo.updated(U1)。回退提交删掉的消息逐条发 message.removed
 //     (`#1669`,暂存时记下会被删的那些,见 staged)。收件箱里排着的用户输入照它落成后的样子先投影出来,投递时换成落成的那条
 //     (`#1669`,见 queued)。
-// 不认识的事件丢弃(它们在 v1 没有对应,冻结界面也不读)。
+// 不认识的事件丢弃(它们在 v1 没有对应,冻结界面也不读)。发出的事件只能是约定事件表里的类型(contract/events.ts,`#1697` I-04)。
 import type { OpenCodeClient, OpenCodeEvent, SessionMessageInfo } from "@opencode/client/promise"
-import type { Part } from "@opencode-ai/sdk/v2/client"
-import type { EngineInternalDirectories } from "../preload/types"
-import { normalizeSessionInfo } from "./frozen-shapes"
+import type { Part, Session } from "../contract/v1"
+import type { ContractEvent } from "../contract/events"
+import { toContractSession } from "../contract/session"
+import type { ReceiptLedger } from "../contract/receipts"
+import type { EngineInternalDirectories } from "../../preload/types"
 import { isListedProject, NO_INTERNAL_DIRECTORIES } from "./internal-projects"
-import type { PermissionReplies } from "./permission-replies"
-import type { RouteContext } from "./routes"
+import type { SharedContext } from "./routes"
 import { recentMessages, rememberSessionDirectory, sessionDirectory } from "./session-cache"
 import {
   baseID,
@@ -31,6 +32,7 @@ import {
   queuedUserMessage,
   todosOf,
   toV1Messages,
+  toV1PermissionRequest,
   toV1Project,
   toV1Queued,
   toV1Question,
@@ -39,7 +41,8 @@ import {
   withTurnDiffs,
 } from "./v1-shapes"
 
-export type V1Payload = { type: string; properties: unknown }
+/** 投影出的一个事件:类型与载荷都按约定的事件表(contract/events.ts)。 */
+export type V1Payload = ContractEvent
 type Emit = (directory: string, payload: V1Payload) => void
 
 /** 每个结构性事件之后按存储重取的最近一页(条数)。 */
@@ -122,7 +125,22 @@ const shellPreview = (text: string) => (text.length <= SHELL_PREVIEW_MAX ? text 
 /** 2.x 回合改动的 status → v1 文件监视事件(files-core.ts watcherRefreshTarget:add / unlink 重列父目录)。 */
 const WATCH_EVENTS: Record<string, "add" | "unlink" | "change"> = { added: "add", deleted: "unlink", modified: "change" }
 
-const PASS_THROUGH = new Set([
+type PassThroughType =
+  | "pty.created"
+  | "pty.updated"
+  | "pty.exited"
+  | "pty.deleted"
+  | "lsp.updated"
+  | "vcs.branch.updated"
+  | "reference.updated"
+  | "server.connected"
+  | "global.disposed"
+  | "mcp.status.changed"
+  | "mcp.resources.changed"
+  | "mcp.tools.changed"
+  | "mcp.prompts.changed"
+
+const PASS_THROUGH: ReadonlySet<string> = new Set<PassThroughType>([
   "pty.created",
   "pty.updated",
   "pty.exited",
@@ -134,17 +152,28 @@ const PASS_THROUGH = new Set([
   "global.disposed",
 ])
 
+/** 2.x 的 MCP 事件,两代同形直通。2.x 只定义这四种(schema/src/mcp-event.ts 三种、core/src/mcp/index.ts 的 prompts.changed)。 */
+const MCP_EVENTS: ReadonlySet<string> = new Set<PassThroughType>([
+  "mcp.status.changed",
+  "mcp.resources.changed",
+  "mcp.tools.changed",
+  "mcp.prompts.changed",
+])
+
+/** 两代同形的事件:2.x 的载荷原样作为约定载荷发出。 */
+const isPassThrough = (type: string): type is PassThroughType => PASS_THROUGH.has(type) || MCP_EVENTS.has(type)
+
 export function createProjector(
   api: OpenCodeClient,
   emit: Emit,
-  permissions: PermissionReplies,
+  receipts: ReceiptLedger,
   internalDirectories: () => Promise<EngineInternalDirectories> = async () => NO_INTERNAL_DIRECTORIES,
 ) {
   /** 助手消息 → content 块的语义键(按出现顺序 = content 下标),流式 part 的 id 由它定。 */
   const blocks = new Map<string, string[]>()
   /** 已发出的 v1 对象(按 id)的 JSON,用于只发变化。 */
   const emitted = new Map<string, string>()
-  const sessions = new Map<string, unknown>()
+  const sessions = new Map<string, Session>()
   /** 用户消息 → 它那个回合的改动(REQ-142),快照发 message.updated 时挂回去。 */
   const turnDiffs = new Map<string, readonly unknown[]>()
   /** F3:会话 → 当前回合已报给文件面板的改动(文件 → 状态 + 补丁),只报变化。 */
@@ -211,7 +240,7 @@ export function createProjector(
   async function snapshot(directory: string, sessionID: string, refreshTurnDiff = false) {
     const page = await recentMessages(api, sessionID, { limit: SNAPSHOT_WINDOW })
     for (const message of page.context) {
-      if (message.type === "assistant") blocks.set(message.id, contentKeys(message.content as never))
+      if (message.type === "assistant") blocks.set(message.id, contentKeys(message.content))
     }
     const listed = toV1Messages(sessionID, withProgress(page.context))
     // 回退暂存期间新落下的消息(用户的 shell、后台通知)排在边界之后,提交时一并被删。
@@ -284,8 +313,9 @@ export function createProjector(
         output = shellPreview(output + page.data.output)
         progress.set(callID, { ...progress.get(callID), output })
         const last = emitted.get(`part:${id}`)
-        const part = last ? (JSON.parse(last) as { state: { status: string; metadata?: Record<string, unknown> } }) : undefined
-        if (part?.state.status === "running") {
+        // 这个 id 只给过工具 part(streamPartID 的 `tool:` 键),发出时序列化过,读回仍是那个 v1 part
+        const part = last ? (JSON.parse(last) as Part) : undefined
+        if (part?.type === "tool" && part.state.status === "running") {
           part.state.metadata = { ...part.state.metadata, output }
           if (remember(`part:${id}`, part)) emit(directory, { type: "message.part.updated", properties: { part } })
         }
@@ -301,7 +331,7 @@ export function createProjector(
   }
 
   async function sessionInfo(directory: string, sessionID: string, type: "session.created" | "session.updated") {
-    const info = normalizeSessionInfo((await api.session.get({ sessionID })) as never)
+    const info = toContractSession((await api.session.get({ sessionID })))
     sessions.set(sessionID, info)
     emit(directory, { type, properties: { info } })
   }
@@ -312,7 +342,7 @@ export function createProjector(
     if (!keys) {
       const page = await recentMessages(api, sessionID, { through: messageID })
       const message = page.context.find((item) => item.id === messageID)
-      keys = message?.type === "assistant" ? contentKeys(message.content as never) : []
+      keys = message?.type === "assistant" ? contentKeys(message.content) : []
       blocks.set(messageID, keys)
     }
     let index = keys.indexOf(key)
@@ -328,7 +358,8 @@ export function createProjector(
       type: string
       created?: number
       location?: { directory?: string }
-      data: Record<string, any>
+      // 2.x 的事件载荷;按类型取用时各分支自己收窄(带类型的几支直接读 `event.data`)
+      data: any
     }
     const data = frame.data ?? {}
     const sessionID: string | undefined = typeof data.sessionID === "string" ? data.sessionID : undefined
@@ -337,32 +368,31 @@ export function createProjector(
       frame.location?.directory ?? (sessionID ? await sessionDirectory(api, sessionID).catch(() => "global") : "global")
     const type = frame.type
 
-    if (PASS_THROUGH.has(type)) return emit(directory, { type, properties: data })
-    if (type.startsWith("mcp.")) return emit(directory, { type, properties: data })
+    if (isPassThrough(type)) return emit(directory, { type, properties: data })
     if (type === "location.shutdown") return emit(directory, { type: "server.instance.disposed", properties: { directory } })
     if (type === "agent.updated" || type === "command.updated" || type === "skill.updated")
       return emit(directory, { type: "catalog.updated", properties: {} })
-    if (type === "project.updated") {
-      // `#1669`:Code Puppy 自己的目录不进冻结 app 的项目清单(event-reducer 收到就插入),与 GET /project 同一判定。
-      if (!(await isListedProject(api, data as never, await internalDirectories()))) return
-      return emit(directory, { type, properties: toV1Project(data as never) })
+    if (event.type === "project.updated") {
+      // `#1669`:项目列表与事件共用同一个目录判定。
+      if (!(await isListedProject(api, event.data, await internalDirectories()))) return
+      return emit(directory, { type: event.type, properties: toV1Project(event.data) })
     }
-    if (type === "permission.asked") return emit(directory, { type, properties: permissions.show(data as never) })
+    if (event.type === "permission.asked") return emit(directory, { type: event.type, properties: receipts.show(toV1PermissionRequest(event.data)) })
     if (type === "permission.replied") return emit(directory, { type, properties: data })
     if (type === "form.created") {
       const question = toV1Question(data.form)
       return question ? emit(directory, { type: "question.asked", properties: question }) : undefined
     }
-    if (type === "form.replied") {
-      const answer = data.answer as Record<string, string | string[]>
+    if (event.type === "form.replied") {
+      const answer = event.data.answer as Record<string, string | string[]>
       const answers = Object.keys(answer)
         .filter((key) => /^q\d+$/.test(key))
         .sort((a, b) => Number(a.slice(1)) - Number(b.slice(1)))
         .map((key) => (Array.isArray(answer[key]) ? answer[key] : [String(answer[key])]))
-      return emit(directory, { type: "question.replied", properties: { sessionID, requestID: data.id, answers } })
+      return emit(directory, { type: "question.replied", properties: { sessionID: event.data.sessionID, requestID: event.data.id, answers } })
     }
-    if (type === "form.cancelled")
-      return emit(directory, { type: "question.rejected", properties: { sessionID, requestID: data.id } })
+    if (event.type === "form.cancelled")
+      return emit(directory, { type: "question.rejected", properties: { sessionID: event.data.sessionID, requestID: event.data.id } })
     // F3:不带 sessionID,按帧的位置投到那个目录的频道(载荷两代同形:file + add/change/unlink)。
     if (type === "filesystem.changed")
       return emit(directory, { type: "file.watcher.updated", properties: { file: data.file, event: data.event } })
@@ -455,7 +485,7 @@ export function createProjector(
 }
 
 /** `GET /global/event` 的 handler:一个 SSE Response,订阅方中止即退订 2.x。 */
-export function projectEventStream(context: RouteContext): Response {
+export function projectEventStream(context: SharedContext): Response {
   const controller = new AbortController()
   const abort = () => controller.abort()
   context.signal.addEventListener("abort", abort)
@@ -466,7 +496,7 @@ export function projectEventStream(context: RouteContext): Response {
         if (controller.signal.aborted) return
         sink.enqueue(encoder.encode(`data: ${JSON.stringify({ directory, payload })}\n\n`))
       }
-      const project = createProjector(context.api, emit, context.permissions, context.internalDirectories)
+      const project = createProjector(context.api, emit, context.receipts, context.internalDirectories)
       void (async () => {
         try {
           for await (const event of context.api.event.subscribe({ signal: controller.signal })) {

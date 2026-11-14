@@ -26,7 +26,7 @@ import { buildAttachmentParts } from "../renderer/codepuppy-ui/composer-attachme
 import { projectTimelineRows, type TimelineRow } from "../renderer/codepuppy-ui/session-timeline/timeline-model"
 import type { TimelineAttachmentRead } from "../renderer/codepuppy-ui/session-timeline/timeline-attachments"
 import { createEngineFetch } from "./index"
-import type { V1Payload } from "./events"
+import type { V1Payload } from "./opencode2/events"
 
 const sandbox = engineSandbox()
 const ORIGIN = "http://127.0.0.1:47670"

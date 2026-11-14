@@ -6,7 +6,7 @@
 // 上下文 —— 与 files-view / terminal-rail-panel 同形制,于是能被真 Solid 挂载测试直接驱动。
 // C21 AC2 的 radiogroup 键盘契约(方向键、单一 Tab 落点、组名、单选不可取消)就靠那层测试咬住。
 
-import type { createOpencodeClient, QuestionRequest } from "@opencode-ai/sdk/v2/client"
+import type { createOpencodeClient, QuestionRequest } from "../../../engine-adapter/contract/v1"
 import { createMemo, createSignal, For, Show } from "solid-js"
 import { t } from "../../i18n"
 import { rovingKey, rovingTabIndex } from "../roving-focus"

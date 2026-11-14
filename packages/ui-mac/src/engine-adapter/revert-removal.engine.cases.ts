@@ -23,9 +23,9 @@ import { createCompatibleApi } from "../../../codepuppy-app/src/utils/server-com
 import { assertEngineSandboxed, engineSandbox } from "../../test-component/engine-sandbox"
 import { codepuppyEngine, scriptedModel, type Running } from "../../test-component/codepuppy-engine"
 import { createSessionEditUserMessageHandler } from "../renderer/codepuppy-ui/session-workspace/session-edit-user-message"
-import { SNAPSHOT_WINDOW } from "./events"
+import { SNAPSHOT_WINDOW } from "./opencode2/events"
 import { createEngineFetch } from "./index"
-import { recentMessages } from "./session-cache"
+import { recentMessages } from "./opencode2/session-cache"
 
 const sandbox = engineSandbox()
 const model = scriptedModel()

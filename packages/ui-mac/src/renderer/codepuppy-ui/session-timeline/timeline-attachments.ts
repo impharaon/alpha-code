@@ -12,7 +12,7 @@
 //   `#1669`:经 Code Mode 的读取(`execute` 部件里引擎记下的内层调用,同一工具、同一路径)同样算数,见 readCallsOf。
 //   没有调用时看本机读取工具的逐服务状态(引擎 mcp.status,当下重新取):不可用 ⇒「读取失败:没有启动」;
 //   回合还在跑 ⇒ 准备中「等待本机读取工具」/ 就绪「已存到本机,等助手读取」;回合结束 ⇒「这一轮助手没有读取」。
-import type { FilePart, Part } from "@opencode-ai/sdk/v2/client"
+import type { FilePart, Part } from "../../../engine-adapter/contract/v1"
 import {
   ATTACHMENT_READ_TOOL,
   attachmentAbsolutePath,

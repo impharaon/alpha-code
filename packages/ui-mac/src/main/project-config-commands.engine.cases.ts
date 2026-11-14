@@ -196,6 +196,7 @@ function fixture(arm: Arm, p1: string): Projects {
 
   // md 文件头:四个读取点各一个 `---javascript`(agent、命令、技能、Code Puppy 显式层的 `.codepuppy/skills`);
   // 写了 `system` 与无效 `{env:}` 模型的 agent;v1 `mode` 名字空间与 `.opencode/modes/` 目录各覆盖一个出厂 subagent(general、explore)。
+  write(path.join(p.frontmatter, ".opencode", "plugins", "x.js"), `import { appendFileSync } from "node:fs"\nappendFileSync(${JSON.stringify(path.join(markers(arm), "project-plugin"))}, "ran\\n")\nexport default { id: "cpi12.project", setup: async () => {} }\n`)
   write(path.join(p.frontmatter, ".opencode", "agents", "cpi12jsagent.md"), jsFrontmatter(arm, "frontmatter-agent", "{ description: 'i12 js agent' }", "I12-JS-AGENT-BODY"))
   write(path.join(p.frontmatter, ".opencode", "commands", "cpi12jscmd.md"), jsFrontmatter(arm, "frontmatter-command", "{ description: 'i12 js command' }", "I12-JS-COMMAND-BODY"))
   write(path.join(p.frontmatter, ".opencode", "skills", "cpi12jsskill", "SKILL.md"), jsFrontmatter(arm, "frontmatter-skill", "{ name: 'cpi12jsskill', description: 'i12 js skill' }", "I12-JS-SKILL-BODY"))
@@ -404,6 +405,8 @@ for (const arm of ARMS) {
       await open(p().frontmatter)
       const names = (route: string, key: "id" | "name") =>
         at(p().frontmatter, "GET", route).then((r) => ((r.json?.data ?? []) as Array<Record<string, string>>).map((item) => item[key]))
+      if (allowed) expect(ran(arm)).toContain("project-plugin")
+      else expect(ran(arm)).not.toContain("project-plugin")
       expect(await names("/api/agent", "id")).toContain("cpi12jsagent")
       expect(await names("/api/command", "name")).toContain("cpi12jscmd")
       expect(await names("/api/skill", "id")).toEqual(expect.arrayContaining(["cpi12jsskill", "cpi12cpskill"]))

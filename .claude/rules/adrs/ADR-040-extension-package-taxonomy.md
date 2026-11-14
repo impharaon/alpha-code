@@ -234,45 +234,16 @@ provider 的目录约定由 provider 定义、随时会变；正确做法是在�
       它会碰到 owner 此前裁的「不碰已冻结的信封合同」那条边界。
       **`aw#96`/`#98` 的方案基线必须给出这条路径的确切落点与它对信封合同的影响面**，
       这是基线的准入条件之一，不是实现期再想的事。
-4. **引擎对项目范围插件的自动加载：已由 `alpha-code#1708`（2026-11-13，INT-safety I-10）收口。**
-   原登记为「上游行为、已知边界」。现在：项目范围的引擎插件在 Code Puppy 里**一律不加载**，信任过也不加载 ——
-   项目目录及其每一级上级目录的 `.opencode/{plugin,plugins}/*.{ts,js}`、项目 `opencode.json(c)` / `.opencode/opencode.json(c)`
-   的 `plugins`（相对路径、绝对路径、`file://`、包名，任何写法）。项目要带插件，走 Code Puppy 自己的项目插件目录与它的信任确认（后果 5）。
-   机制是引擎已有的 `plugin.use` 策略，不改上游文件：显式文件层先写「拒绝全部」，再按**精确路径**放行 Code Puppy 的扩展与用户全局范围里
-   实际存在的来源（引擎全局配置目录、HOME 一级的 `~/.opencode/` 与 `~/opencode.json(c)`、用户的 `codepuppy.jsonc`）；
-   用户自己在 `codepuppy.jsonc` 或 HOME 一级文档里 deny 的来源不写 allow，用户的拒绝照旧生效。
-   显式文件比项目配置先加载，项目里写的 allow 盖不过它（`packages/ui-mac/src/main/engine-plugin-policy.ts`；
-   真引擎判据 `engine-plugin-policy.engine.cases.ts`）。同一组语句也写进内联文档作第二层（与 provider 白名单同法）。
+4. **项目来源的目录插件在信任闸门之后（`#1713`，2026-11-14，取代 `#1708` 的先拒全部）。**
+   项目自带的 OpenCode 插件跟随项目文件夹的同一个允许决定。未允许时，项目文档的 `plugins` / `plugin` 在校验前拿掉；
+   每个项目 `.opencode/plugin/`、`.opencode/plugins/` 的目录插件由引擎已有的 `plugin.use` 判定拒绝，闸门文档紧跟托管策略，
+   项目自写 allow 盖不过它。允许后，这些插件照 OpenCode 原样加载，包括相对路径、绝对路径、`file://` 与包名条目。
+   规则只有一份：`packages/core/src/config/codepuppy-project-gate.ts`；真引擎判据是 `engine-plugin-policy.engine.cases.ts` 的两臂。
 
-   **还剩什么**（如实登记）：
-   - **放行的来源照旧以引擎同等权限执行**：Code Puppy 的扩展与用户全局范围里的插件不受本条影响。`codepuppy.jsonc` 在进程围栏的可写集里，
-     引擎侧写进去的路径条目在下一次重算时同样被放行（与本条之前相同）。
-   - **排在显式文件之前的层能解除这道拒绝**：用户全局配置里的 `policies`（用户自己的范围，有意如此）；远程 wellknown 与集成文档
-     （今天在 Code Puppy 里只能经引擎 HTTP 接口 `integration.wellknown.add` 与 OpenCode Console 连接写入，界面不调用它们，
-     项目文件写不进去，围栏挡住智能体的命令连回引擎端口）—— 残余边界。
-   - **列不出或写不成精确语句的来源改为不加载**（无已知用户；owner 本机全局与 `codepuppy.jsonc` 都没有插件条目）：
-     用户全局的**包名**条目（引擎比较包时去掉 `@` 之后的部分，放行一个包名，项目就能用 `<名字>@file:<项目目录>` 借道，真引擎实测）、
-     含 `*` / `?` 的路径（引擎通配没有转义）、带 `{env:}` / `{file:}` 的条目、系统配置目录与 MDM 描述文件、wellknown / 集成文档带来的插件。
-   - **显式文件缺席时**（注入失败、读不到或被引擎整份拒掉）只剩内联那一层，它排在项目配置之后：没自写 allow 的项目插件仍被拒，
-     项目自写的 allow 能盖过它。
-   - **重算时机**：sidecar 启动注入时一次，之后每次显式文件被重写时再算；运行中新加的用户全局插件在下一次重算（最迟下次启动）后加载。
-
-   **如何让某个按包名安装的全局插件加载**（owner 2026-11-13：「这个是否可以做成配置项进行配置，后续不用改代码」）：
-   在**引擎的全局配置文件** `~/.config/opencode/opencode.json`（设了 `OPENCODE_CONFIG_DIR` 时是那个目录下的 `opencode.json`，
-   设了 `XDG_CONFIG_HOME` 时是 `$XDG_CONFIG_HOME/opencode/opencode.json`）里，给这个包名写一条 allow，`resource` 是**不带版本**的包名：
-
-   ```json
-   {
-     "plugins": ["some-plugin@1.2.3"],
-     "policies": [{ "action": "plugin.use", "resource": "some-plugin", "effect": "allow" }]
-   }
-   ```
-
-   这个文件比 Code Puppy 的显式文件先加载，它的 allow 胜过我们的「拒绝全部」。引擎监听全局配置目录，改完不用重启即生效
-   （真引擎实测；关了文件监听 `OPENCODE_EXPERIMENTAL_FILEWATCHER=false` 时重启 Code Puppy）。同一条写在 `codepuppy.jsonc` 的
-   `policies` 里**不起作用**：它在显式文件里排在「拒绝全部」之前，被盖过（实测）。
-   ⚠️ 代价：放行按名字比较 —— 此后**任何项目**都能用 `some-plugin@file:<项目里的目录>` 或 `some-plugin@npm:<别的包>`
-   以这个名字运行它自己的代码（`@file:` 那种真引擎实测）。只给你确实信任、并接受这一点的包这样做。
+   用户全局配置目录、HOME 一级 `~/.opencode/` 与 `~/opencode.json(c)`、用户的 `codepuppy.jsonc` 照 OpenCode 原样生效，
+   包名与含通配字符的路径不再由 Code Puppy 另加拒绝或精确路径放行。用户自己的 `plugin.use` deny 仍由引擎原样执行。
+   未允许项目的插件声明到不了包解析器，因此不再保留按包名借道的保护代码；原 `#1708` 的各种写法保留为未允许臂的回归样本。
+   信任与读取边界以 [项目 OpenCode 配置设计](../../../docs/specs/project-engine-config-takeover/design.md) 契约 A、§6 为准。
 
 5. **`.alpha/plugins/*.js` 项目级扇出是我们自己的第二注入点，处置另议。**
    `packages/ext/src/plugin-fanout.ts` 在引擎进程内 `import()` 它，`packages/ext` 是 alpha 自有包。

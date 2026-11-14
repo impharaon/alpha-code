@@ -285,6 +285,7 @@ spike 用例按顺序依赖前一条留下的标记;新加的三条放在最后,
 | A10 | 上游 `test/config/{agent,skill,command,command-subagent,markdown}.test.ts` 全绿 | 闸门在未安装时也作用 ⇒ 上游用例红 |
 
 ### 偏离记录
+- 2026-11-14 · 审查修复 4:依本轮裁决补 design 契约 B agent 行与 §10 R-14;新项目 agent 的明确 subagent 在文档 / md、v1 / v2 生效且不列,覆盖已有 agent 时用 transform 起始快照保留原模式,不复制内置名字。核心红臂为 mode 丢失,真引擎红臂为 subagent 变 primary;允许、primary / all、名字空间 / 目录反向臂一并验证。
 - 2026-11-14 · 审查修复 3:md 清单仅记录解码器真正接受的控制字段;agent 复用上游原有 v1 / v2 判定,命令 md 按原生解码规则处理。真引擎原码对 argument-hint / name / variant 列了三项而挂,修复后空清单;IPC 补空清单不弹框判据。
 - 2026-11-14 · 审查修复 2:已核实原型键使 rule.content 访问抛 TypeError。AGENT_MAPS / COMMAND_MAPS / DEFERRED_KEYS 改为只读自身属性;实际 JSON 输入 constructor、toString、__proto__ 红转绿,未知键不列。
 - 2026-11-14 · **A10 基线证据替换**:编排器复核 `test/config/command-subagent.test.ts` 在不含 #1713 的 `fed47ed022` 上同样为 1 pass / 3 fail:三条上游断言期望命令或 agent 的模型 `override` / `child`,而 Code Puppy `#1560` 已规定用户所选的父会话模型 `parent` 优先。本段不改该测试与 `#1560` 行为;A10 改由 `test/config/{agent,skill,command,markdown}.test.ts` 与 `test/codepuppy-command-model-priority.test.ts` 全绿,以及该上游文件保持相同三条名称、相同 expected / received 的 1 pass / 3 fail 共同证明。

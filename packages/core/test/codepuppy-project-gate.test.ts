@@ -84,6 +84,26 @@ const documentAt = (entries: Entry[], file: string) =>
 
 const run = <A>(body: () => Promise<A>) => Effect.promise(body)
 
+it.live("审查4:文档 v1 / v2 的 subagent 保留且不列,primary / all 与 mode 名字空间仍暂缓", () => run(async () => {
+  await using f = await fixture({ "home/work/project/opencode.json": {
+    agent: { legacy: { prompt: "body", mode: "subagent" } },
+    agents: { native: { system: "body", mode: "subagent" }, wide: { mode: "all" }, primary: { mode: "primary" } },
+    mode: { namespaced: { prompt: "body", mode: "subagent" } },
+  } })
+  CodePuppyProjectGate.install({ trusted: () => false })
+  const info = documentAt(await Effect.runPromise(entriesOf(f)), path.join(f.project, "opencode.json"))!.info
+  expect(info.agents?.legacy?.mode).toBe("subagent")
+  expect(info.agents?.native?.mode).toBe("subagent")
+  for (const id of ["wide", "primary", "namespaced"]) expect(info.agents?.[id]?.mode).toBeUndefined()
+  expect(CodePuppyProjectGate.view(f.project)!.withheld.map((item) => item.name).sort()).toEqual(["namespaced", "primary", "wide"])
+  CodePuppyProjectGate.install({ trusted: () => true })
+  const allowed = documentAt(await Effect.runPromise(entriesOf(f)), path.join(f.project, "opencode.json"))!.info
+  expect(allowed.agents?.legacy?.mode).toBe("subagent")
+  expect(allowed.agents?.native?.mode).toBe("subagent")
+  expect(allowed.agents?.wide?.mode).toBe("all")
+  expect(allowed.agents?.namespaced?.mode).toBe("primary")
+}))
+
 describe("#1713 项目 OpenCode 配置的装载闸", () => {
   // 样本来源:上游 test/config/markdown.test.ts 的 YAML/sanitize 写法,以及段 0 真引擎探针的 JS 文件头。
   it.live("文件头:同一份 YAML / JSON 在未允许与允许时 data、正文逐字相等,含 sanitize、CRLF 与无末尾换行", () =>
@@ -247,7 +267,7 @@ describe("#1713 项目 OpenCode 配置的装载闸", () => {
           kind: "command-run",
           name: "review",
           file: ".opencode/commands/review.md",
-          fields: ["agent", "model", "subtask", "variant", "shell"],
+          fields: ["agent", "model", "subtask", "shell"],
         })
         const directory = (p: string) => Skill.DirectorySource.make({ type: "directory", path: AbsolutePath.make(p) })
         const local = directory(path.join(f.project, ".opencode/skills"))

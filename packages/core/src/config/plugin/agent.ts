@@ -66,6 +66,7 @@ export const Plugin = define({
       reload: ctx.agent.reload(),
     })
     yield* ctx.agent.transform((editor) => {
+      const existingAgents = new Set(editor.list().map((agent) => agent.id)) // codepuppy(ADR-049):项目不能改动已有 agent 的模式。
       const permissions = expandPermissions(
         loaded.documents.flatMap((document) => document.info.permissions ?? []),
         global.home,
@@ -99,7 +100,7 @@ export const Plugin = define({
             }
             if (item.system !== undefined) agent.system = item.system
             if (item.description !== undefined) agent.description = item.description
-            if (item.mode !== undefined) agent.mode = item.mode
+            if (item.mode !== undefined && CodePuppyProjectGate.agentMode(document, existingAgents.has(agentID))) agent.mode = item.mode // codepuppy(ADR-049)
             if (item.hidden !== undefined) agent.hidden = item.hidden
             if (item.color !== undefined) agent.color = item.color
             if (item.steps !== undefined) agent.steps = item.steps

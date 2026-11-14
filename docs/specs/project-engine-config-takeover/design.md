@@ -125,7 +125,7 @@ last_reviewed: 2026-11-13
 | AGENTS.md(文件夹、上级目录;`~/AGENTS.md` 属用户全局) | 生效,照 OpenCode 原样读取 | 生效 | 编排器转达的 owner 要求;A9 |
 | `$schema` | 生效 | 生效 | 元数据 |
 | agent 内容字段:v2 `system`、`description`、`color`、`hidden`;v1 `prompt`、`description`、`color`、`hidden`;md 正文与这些文件头字段 | 生效 | 生效 | 说明类内容 |
-| agent 控制字段:v2 `permissions`、`model`、`request`、`mode`、`steps`、`disabled`;v1 `permission`、`tools`、`model`、`variant`、`temperature`、`top_p`、`options`、`mode`、`steps`、`maxSteps`、`disable`。文档与 md 文件头都算,也包括 `mode` 名字空间与 `mode/`、`modes/` 目录隐含生成的 `mode: "primary"` | 暂缓,校验前后都拿掉 | 生效 | 放宽权限、换模型、往模型请求里并请求头 / 体(`agent.ts:91-94`)、改模型参数与自主步数、把 subagent 变成主 agent;与 `.codepuppy` 控制字段同一口径(`AGENT_CONTROL_FIELDS`,`#1693`);F-23、F-24;真实样本 F-20 |
+| agent 控制字段:v2 `permissions`、`model`、`request`、`mode`、`steps`、`disabled`;v1 `permission`、`tools`、`model`、`variant`、`temperature`、`top_p`、`options`、`mode`、`steps`、`maxSteps`、`disable`。文档与 md 文件头都算,也包括 `mode` 名字空间与 `mode/`、`modes/` 目录隐含生成的 `mode: "primary"` | 暂缓,校验前后都拿掉;例外:`mode: "subagent"` 对项目自己定义的 agent 生效且不列清单,覆盖已有 agent 时沿用原模式 | 生效 | 放宽权限、换模型、往模型请求里并请求头 / 体(`agent.ts:91-94`)、改模型参数与自主步数、把 subagent 变成主 agent;与 `.codepuppy` 控制字段同一口径(`AGENT_CONTROL_FIELDS`,`#1693`);F-23、F-24;真实样本 F-20 |
 | 命令内容字段:`template`、`description`(含 `.opencode/command(s)/**/*.md` 的正文与 `description`) | 生效;`` !`…` `` 不执行,原文发出 | 生效,插值执行 | F-08;spike §3 user |
 | 命令控制字段:`agent`、`model`、`subagent`、`subtask` | 暂缓,校验前拿掉 | 生效 | 选择运行的 agent / 模型 / 委派;F-23 |
 | 与出厂同名的命令(`init`、`review`) | 以文字顶替 | 顶替,含插值 | OpenCode 原有能力;文字是内容 |
@@ -416,6 +416,7 @@ type ProjectConfigViewReply =
 | R-11 未允许时 md 文件头只按 YAML / JSON 解析,解析方式在解析前选定;已允许原样 | F-22;R1 F1 |
 | R-12 未允许时解码后再拿一次 agent 控制字段,去掉名字空间与目录约定隐含生成的 `mode: "primary"`,归在「Agent 的权限与模型设置」 | F-24;编排器裁决 B |
 | R-13 视图按作用点登记 `pending` / `done` / `failed`;未激活的作用点不登记,算「不适用、已完成」;只有失败或超时算不完整 | F-25;编排器裁决 C |
+| R-14 未允许时,明确写出的 `mode: "subagent"` 只对项目自己定义的 agent 生效且不列清单;覆盖已有 agent 时保留其模式。`primary` / `all` 继续暂缓,`mode` 名字空间与 `mode/`、`modes/` 隐含的 primary 不变;文档与 md、v1 / v2 同规则 | 编排器 2026-11-14 审查修复轮第 4 项裁决;真实样本 `.opencode/agent/translator.md`;`schema/agent.ts` 新 agent 默认 primary |
 
 | 轮/审查版本与范围 | 审计方 | finding 及处置 | 改了什么/验证证据 | 没改的及去向 |
 | --- | --- | --- | --- | --- |

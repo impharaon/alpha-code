@@ -112,6 +112,11 @@ export function projectEntry(entry: Entry): boolean {
   return installed !== undefined && projectEntries.has(entry)
 }
 
+/** 未允许项目只能给自己定义的 agent 收窄模式;覆盖现有 agent 时沿用其原模式。 */
+export function agentMode(document: Document, existing: boolean) {
+  return !projectEntry(document) || !existing
+}
+
 /** 某个 Location 最近一代的视图(契约 D)。没有记录 ⇒ undefined。 */
 export function view(directory: string): ProjectConfigView | undefined {
   const record = views.get(directory)
@@ -188,26 +193,26 @@ export const agent = Effect.fnUntraced(function* (
   if (text === undefined) return
   const document = yield* decode(file, text)
   if (!document || !projectEntry(entry)) return document
-  return new Document({
+  const filtered = new Document({
     ...document,
     info: new Info({
       ...document.info,
       agents: Object.fromEntries(
         Object.entries(document.info.agents ?? {}).map(([name, item]) => {
-          const fields = Object.keys(item).filter(
-            (key) => item[key as keyof typeof item] !== undefined && !AGENT_DECODED_CONTENT.includes(key as never),
-          )
+          const fields = agentFields(item)
           recordRead(directory, "agent", {
             kind: "agent-control",
             name,
             file: relativeFile(directory, file.filepath),
             fields,
           })
-          return [name, ConfigAgent.Info.make(pick(item, AGENT_DECODED_CONTENT))]
+          return [name, agentContent(item)]
         }),
       ),
     }),
   })
+  projectEntries.add(filtered)
+  return filtered
 })
 
 /** 只改文件头,正文逐字保留。parse 失败时复用上游 sanitize,仍失败则由读取点跳过该文件。 */
@@ -245,7 +250,7 @@ export function frontmatter(
         ? parsed.data
         : pick(
             parsed.data,
-            point === "agent" ? [...AGENT_DECODED_CONTENT, "prompt"] : COMMAND_DECODED_CONTENT,
+            point === "agent" ? [...AGENT_DECODED_CONTENT, "prompt", ...(parsed.data.mode === "subagent" ? ["mode"] : [])] : COMMAND_DECODED_CONTENT,
           )
     if (point !== "skill") {
       const rule = point === "command" ? COMMAND_MAPS.commands! : legacyAgent?.(parsed.data) === false ? AGENT_MAPS.agents! : AGENT_MAPS.agent!
@@ -391,9 +396,9 @@ export const begin = Effect.fnUntraced(function* (input: { readonly directory: s
           const agents = info.agents
             ? Object.fromEntries(
                 Object.entries(info.agents).map(([name, agent]) => {
-                  const fields = Object.keys(agent).filter((field) => agent[field as keyof typeof agent] !== undefined && !AGENT_DECODED_CONTENT.includes(field as never))
+                  const fields = agentFields(agent)
                   if (fields.length) withheld.push({ kind: "agent-control", name, file: file(filepath), fields })
-                  return [name, ConfigAgent.Info.make(pick(agent, AGENT_DECODED_CONTENT))]
+                  return [name, agentContent(agent)]
                 }),
               )
             : undefined
@@ -471,13 +476,21 @@ function keepEntries(value: unknown, rule: EntryRule, onRemoved: (name: string, 
     const kept: Record<string, unknown> = {}
     const removed: string[] = []
     for (const [field, item] of Object.entries(entry)) {
-      if (rule.content.has(field)) setOwn(kept, field, item)
+      if (rule.content.has(field) || (field === "mode" && item === "subagent" && (rule === AGENT_MAPS.agent || rule === AGENT_MAPS.agents))) setOwn(kept, field, item)
       else if (rule.listed(field)) removed.push(field)
     }
     setOwn(out, name, kept)
     if (removed.length) onRemoved(name, removed)
   }
   return out
+}
+
+function agentContent(agent: ConfigAgent.Info) {
+  return ConfigAgent.Info.make({ ...pick(agent, AGENT_DECODED_CONTENT), ...(agent.mode === "subagent" ? { mode: agent.mode } : {}) })
+}
+
+function agentFields(agent: ConfigAgent.Info) {
+  return Object.keys(agent).filter((field) => agent[field as keyof typeof agent] !== undefined && !AGENT_DECODED_CONTENT.includes(field as never) && !(field === "mode" && agent.mode === "subagent"))
 }
 
 /** 一个被拿掉的顶层键在视图里的条目。上游归一化认不出的键(单独归一化不产出任何东西)不列(编排器裁决 2026-11-13)。 */

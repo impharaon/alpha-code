@@ -441,9 +441,9 @@
 5	packages/ext	src/upstream-probes/plugins.test.ts	-	I-03 上游行为探针:插件激活顺序 pre → 包 → post、模型请求只经 context / compaction / generate / title 四个钩子(依赖方 ext plugin.ts / policy/index.ts、sidecar-ext-ready.ts)
 3	packages/ext	src/provider-allow.test.ts	-	`#1662` r2 供应商白名单(编排器裁决 2026-11-12)的纯函数与放置时序:放行集合没写 ⇒ 不治理、写坏 ⇒ 空集合;集合外的供应商一律拿掉并只报已配置的、集合外的请求抛错点名;清单变换在插件清单出现 opencode.config.policy 之前不登记、重放先登记新的再撤旧的、等不到就记一行。引擎里的端到端判据是 packages/ui-mac/src/main/custom-provider-derivation.test.ts 的宿主一条。
 
-1	packages/ui-mac	src/main/project-config-view.engine.test.ts	-	#1713 项目配置视图的真引擎宿主,钉住 6 pass / 0 fail:只有被引擎忽略的 md 字段不列清单、无变化重载保留 md 清单、九类暂缓条目、只有内容不暂缓、同一引擎两目录各自决定、已允许项目热重载启动 MCP、停用技能读取点仍完整。去掉目录发现或作用点登记 ⇒ 九类 / 完整性断言红。
+1	packages/ui-mac	src/main/project-config-view.engine.test.ts	-	#1713 项目配置视图的真引擎宿主,钉住 7 pass / 0 fail:subagent 收窄、只有被引擎忽略的 md 字段不列清单、无变化重载保留 md 清单、九类暂缓条目、只有内容不暂缓、同一引擎两目录各自决定、已允许项目热重载启动 MCP、停用技能读取点仍完整。去掉目录发现或作用点登记 ⇒ 九类 / 完整性断言红。
 3	packages/ui-mac	src/main/project-config-view-message.test.ts	-	#1713 视图消息 build/parse、请求簿与 sidecar 作答。错误形状 / id / 缺字段拒绝,超时 / 退出 / 发送失败答 undefined;目录不串,列表请求失败不返回完整视图。
 1	packages/ui-mac	src/renderer/codepuppy-ui/ext-trust-watcher.component.test.ts	-	#1713 happy-dom 真 ExtTrustWatcher 组件宿主,钉住 3 pass / 0 fail:incomplete 下次进入再查、已有决定只查一次、刚允许沿原路径 global 重载一次。去掉 checked.delete ⇒ 第一条红。
 
-13	packages/core	test/codepuppy-project-gate.test.ts	-	#1713 项目配置闸核心行为,未允许 / 允许 / 未安装、校验前后过滤、文件头保真与 JS 探针、技能来源、作用点状态;每条带反向臂。
+14	packages/core	test/codepuppy-project-gate.test.ts	-	#1713 项目配置闸核心行为,未允许 / 允许 / 未安装、校验前后过滤、文件头保真与 JS 探针、技能来源、作用点状态;每条带反向臂。
 5	packages/core	test/codepuppy-project-gate-upgrade.test.ts	-	#1713 / ADR-049 升级清点:实际 schema 与归一化键必须分类、隐含字段二次过滤、五个目录消费者 / 三个 Markdown 点、pending 与 failed 不完整;删分类键、多一个消费者、移除解码后过滤各转红。

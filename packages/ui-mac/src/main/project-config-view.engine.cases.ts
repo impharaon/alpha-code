@@ -128,6 +128,38 @@ test("AC-07 / AC-04:同一台引擎两个目录各自决定;已允许项目改�
   expect(other.ok && other.view.trusted).toBe(false)
   expect(other.ok && other.view.withheld.map((item) => item.kind)).toEqual(expect.arrayContaining([...WITHHELD_KINDS]))
 }, 30_000)
+test("审查4:新 agent 的 subagent 收窄在文档与 md 的 v1 / v2 生效,已有 agent 模式不变", async () => {
+  for (const allowed of [false, true]) {
+    const directory = path.join(sandbox.root, `narrow-agent-${allowed}`)
+    write(path.join(directory, "opencode.json"), JSON.stringify({
+      agent: { doc_v1: { prompt: "v1", mode: "subagent" } },
+      agents: { doc_v2: { system: "v2", mode: "subagent" }, build: { mode: "subagent" }, primary: { mode: "primary" }, every: { mode: "all" } },
+      mode: { general: { prompt: "namespace", mode: "subagent" } },
+    }))
+    write(path.join(directory, ".opencode/agents/md_v1.md"), "---\nmode: subagent\ntools: {}\n---\nv1")
+    write(path.join(directory, ".opencode/agents/md_v2.md"), "---\nmode: subagent\nsystem: ignored\n---\nv2")
+    write(path.join(directory, ".opencode/agents/explore.md"), "---\nmode: primary\n---\nwide")
+    write(path.join(directory, ".opencode/modes/dir_mode.md"), "---\nmode: subagent\n---\ndir")
+    if (allowed) allowProject(directory)
+    const reply = await read(directory)
+    const response = await engine.fetch(new Request("http://codepuppy-sidecar.invalid/api/agent", { headers: { "x-opencode-directory": encodeURIComponent(directory) } }))
+    const agents = (await response.json()).data as Array<{ id: string; mode: string }>
+    for (const id of ["doc_v1", "doc_v2", "md_v1", "md_v2"])
+      expect(agents.find((agent) => agent.id === id)?.mode, id).toBe("subagent")
+    expect(agents.find((agent) => agent.id === "build")?.mode).toBe(allowed ? "subagent" : "primary")
+    expect(agents.find((agent) => agent.id === "general")?.mode).toBe(allowed ? "primary" : "subagent")
+    expect(agents.find((agent) => agent.id === "explore")?.mode).toBe(allowed ? "primary" : "subagent")
+    expect(agents.find((agent) => agent.id === "dir_mode")?.mode).toBe("primary")
+    expect(agents.find((agent) => agent.id === "every")?.mode).toBe(allowed ? "all" : "primary")
+    expect(agents.find((agent) => agent.id === "primary")?.mode).toBe("primary")
+    if (reply.ok && !allowed) {
+      for (const id of ["doc_v1", "doc_v2", "md_v1", "md_v2", "build"])
+        expect(reply.view.withheld.filter((item) => item.name === id).flatMap((item) => item.fields ?? []), id).not.toContain("mode")
+      for (const id of ["primary", "every", "general", "explore", "dir_mode"])
+        expect(reply.view.withheld.filter((item) => item.name === id).flatMap((item) => item.fields ?? []), id).toContain("mode")
+    }
+  }
+})
 test("审查3:只有 md argument-hint 与 name 的项目清单为空", async () => {
   const directory = path.join(sandbox.root, "ignored-md-keys")
   write(path.join(directory, ".opencode/commands/x.md"), "---\nargument-hint: input\nvariant: high\n---\nTEXT")

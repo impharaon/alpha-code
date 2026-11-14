@@ -114,7 +114,7 @@ export function resolveCodePuppyStateBase(subject: string): CodePuppyStateBase {
     return { ok: false, reason: `alpha environment root unavailable (${error instanceof Error ? error.message : String(error)})` }
   }
   const derived = environmentFromMutableRoot(root)
-  if (!derived) return { ok: false, reason: `CODEPUPPY_GLOBAL_DIR ${root} is not of the form <base>/env/<prod|beta|dev>; the ${subject} location is unknown` }
+  if (!derived) return { ok: false, reason: `bootstrap.paths.globalRoot ${root} is not of the form <base>/env/<prod|beta|dev>; the ${subject} location is unknown` }
   return { ok: true, ...derived }
 }
 

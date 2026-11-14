@@ -127,10 +127,10 @@ describe("#1381 真源位置:sidecar(CODEPUPPY_GLOBAL_DIR 逆映射)与自定义
     try {
       const logs: string[] = []
       const location = resolveMcpServerTruthLocation()
-      expect(location).toEqual({ ok: false, reason: `CODEPUPPY_GLOBAL_DIR ${odd} is not of the form <base>/env/<prod|beta|dev>; the remote MCP server truth location is unknown` })
+      expect(location).toEqual({ ok: false, reason: `bootstrap.paths.globalRoot ${odd} is not of the form <base>/env/<prod|beta|dev>; the remote MCP server truth location is unknown` })
       expect(readMcpServerRecords((l) => void logs.push(l))).toEqual([])
       expect(logs).toEqual([
-        `remote MCP servers: truth location unresolved — CODEPUPPY_GLOBAL_DIR ${odd} is not of the form <base>/env/<prod|beta|dev>; the remote MCP server truth location is unknown; no remote MCP server is injected or authorized this generation`,
+        `remote MCP servers: truth location unresolved — bootstrap.paths.globalRoot ${odd} is not of the form <base>/env/<prod|beta|dev>; the remote MCP server truth location is unknown; no remote MCP server is injected or authorized this generation`,
       ])
     } finally {
       process.env.CODEPUPPY_GLOBAL_DIR = envRoot

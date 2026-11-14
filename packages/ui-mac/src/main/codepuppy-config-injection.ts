@@ -611,7 +611,7 @@ export function injectCodePuppyConfig(
     applyWebSearchDenies(config, { killSwitch, platformPays })
 
     // `#1381`(`#1383` 基线 §四 子票 4):用户自配的**远程 MCP 服务器**从 main 才写得了的真源注入(mcp-server-records.ts:
-    // `<appData>/codepuppy-state/mcp-servers/<env>.json`,位置由 CODEPUPPY_GLOBAL_DIR 逆映射,与自定义节点同一份解析)。整条注入
+    // `<appData>/codepuppy-state/mcp-servers/<env>.json`,位置由启动文档 paths.globalRoot 逆映射,与自定义节点同一份解析)。整条注入
     // (type / url / headers)并显式 `enabled:true`:引擎原生仍会合并 codepuppy.jsonc(OPENCODE_CONFIG),同名的配置文件条目若在,
     // later-wins 让真源的连接字段赢;账本 disabled 由紧接着的 injectDisabledOverrides 压回 `enabled:false`(它排在后面正是为此)。
     // 放进 injectedMcpNames ⇒ 对 injectMcpDefaultDeny 而言它们是治理来源;codepuppy.jsonc 里不在真源的远程条目由它压成

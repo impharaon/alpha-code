@@ -77,6 +77,7 @@ last_reviewed: 2026-11-12
 | AC-04(基线) | `bootstrap-launch-parity.engine.test.ts` | 本段只钉住今天的值;段 1–3 每段只改「sidecar 这一步」的接法,记录文件一字不改(评审看 `git diff <段0> <段n> -- src/main/bootstrap-launch-parity.record.json` 为空)。任何一组键在构建器里漏写或读错,记录里对应那一格就不同而红。已知的坏(实跑):把 `server.ts` 写 `CODEPUPPY_POLICY_ACCOUNT` 那一句改成不写 ⇒ 记录的 `engine.policyAccount` 从 `acct:956e…c48` 变成 `anonymous` 而红。 |
 
 ### 偏离记录
+- 2026-11-14 · r3 真实 shell 对照(基线 `3a8e25d6b8`,当前 `94c84d29d3`):临时测量脚本先运行 `engineSandbox` / `assertEngineSandboxed`,用各自树的生产 `createSidecarEnv` 过滤同一个合成全局根输入,各自的 `codepuppyEngine` 以生产注入 + 真 ext 装配真实引擎;模型桩发出一次真实 `shell` 工具调用 `printf "CP1698_SHELL=<%s>\n" "${CODEPUPPY_GLOBAL_DIR-}"`,再经消息接口读回 shell 工具的已完成结果。两边 shell 都 exit 0:基线输出 `CP1698_SHELL=<<sandbox>/shell-r3-state/codepuppy-state/env/dev>`(fork 环境有键),当前输出 `CP1698_SHELL=<>`(fork 环境无键)。断言「工具回显预期目录」在基线 1 pass / 0 fail,当前 0 pass / 1 fail,证实没有其它路给工具 shell 补这个值。基线由 `git archive 3a8e25d6b8` 解至临时快照,依赖从现有安装作 APFS 克隆(两树 bun.lock 无差异;workspace 解析逐项落在快照内),未创建 worktree、未安装依赖、未接触真实应用数据。测量不是新增闸门 · r3 文档 / 注释提交。
 - 2026-11-14 · r2 接入已批准的 #1708 行为:段 0 原命令首次核对为 0 pass / 1 fail(与另三个启动文档测试同跑时合计 23 pass / 1 fail),实跑差异只有 `injection.content.policies` 与 `injection.explicit.policies` 各新增 `plugin.use` 的 deny `*` / allow `<root>/parity-ext` 两条。按 `8dfd8956b0` 已有的两层插件策略保留行为,将这四条实际观察结果补入 `bootstrap-launch-parity.record.json`;其它字段及逐项比较断言不动。这是本轮安全修复的主线增量,不是 G1–G3 通道搬运改变决定 · r2 后续提交。
 - 2026-11-12 · 期望不写成 cases 里的手写字面量,而是钉在 `bootstrap-launch-parity.record.json`(约 620 行,由改动前的代码实跑产出,两次实跑逐字相同)· 记录太长,放进 cases 读不下去;文件形式让「各段记录不变」直接是这份文件的空 diff · 本段提交。
 - 2026-11-12 · 记录各格的观察方式按实际可观察的落定:① sidecar 收到的路径 / 通道 / ext 目录 / 围栏;② `start()` 选项;③ 内联文档(档位 agent 权限即在其中)、显式文件、模型底表内容、密钥文件名;④ 引擎里 ext 状态、`GET /api/provider`、云 MCP 状态、工具策略 RPC `inventory` 的账户分区、`engineNetFailurePath` 对 sidecar 整份 env 的归类;⑤ 两个桩收到的凭据头。原计划的「ext 外部目录规则」「出厂禁用技能不在技能表」「disabled-override 结果」三项没有单独成格:前两者的输入(全局根、出厂技能目录)已在 ③ 里,第三项在沙箱里没有已装扩展、产出为空,改记它的输入 `registryChannel` · 本段提交。
@@ -136,6 +137,12 @@ last_reviewed: 2026-11-12
 | §9 回滚(G1–G3) | 见段 3 | — |
 
 ### 偏离记录
+- 2026-11-14 · r3 **BLOCKED: design — §2.1 C1 / §4.5 / §6 S2 — 随包技能的工具 shell 仍需要 `CODEPUPPY_GLOBAL_DIR`,真实引擎对照显示退役后为空。** §4.5 明定 sidecar 的 `CODEPUPPY_*` 只剩 EXTRA,§2.1 C1 只描述子进程整份继承;§6 S2 规定文档不进环境、子进程拿不到。全文没有为「模型按随包技能运行的 shell 命令」规定文档字段到工具进程环境的通道。最小待补规则:允许在 **shell 工具子进程创建时** 从已发布的 `paths.globalRoot` 精确投影 `CODEPUPPY_GLOBAL_DIR`,只交给该工具子进程,不恢复 sidecar 的进程环境总线;规则确定后再沿确定的通道实现,使同一真实引擎用例转绿。本轮不改设计、不另造通道、不改技能命令。
+
+  随包内容扫描是递归扫描整个 `resources/factory-skills`、`resources/skills` 与 `resources/extension-seed`,不只 SKILL.md;seed 的 101 个文件为 47 个文本 / 54 个字体 blob,没有 zip / tar 档。另对 `codepuppy-prompts.ts`、`context-injection.ts` 与 main 的 identity / behavior / agents 五个源码模块作 TypeScript AST 字符串扫描(排除注释、变量标识符),命令 / 提示词实际字符串命中 none。清单:
+  - `resources/factory-skills/customize-codepuppy/SKILL.md:17,18,47`:全局配置 / 安装目录与根约定使用 `CODEPUPPY_GLOBAL_DIR`。
+  - `resources/factory-skills/agent-creator/SKILL.md:70`、`integrate-project/SKILL.md:22`:全局技能写入命令使用 `$CODEPUPPY_GLOBAL_DIR`。
+  - 唯一其它匹配:`integrate-project/SKILL.md:42` 的 `CODEPUPPY_ECOSYSTEM_INHERIT=1`,是 §4.4 保留的主进程启动开关说明,不是要求工具 shell 继承的路径。其它退役变量命中 **none**;`resources/skills`、seed 文本与命令 / 提示词字符串均 **none**。
 - 2026-11-14 · r2 语义修正:`codepuppy-environment.ts` 的 `resolveCodePuppyStateBase` 在快照缺席时,按字面取已发布文档的 `paths.globalRoot`,最后才走 R31 的无文档测试环境分支,保留 #1709 不经 realpath 的逆映射。`project-config.test.ts`、`project-trust-truth.test.ts`、`project-trust-truth-fence.test.ts` 的新信任用例全部改发文档;`project-config.ts` 与 `project-trust-truth.ts` 的路径通道注释同步。合并提交里的 ext 回归测试从 64 pass / 14 fail 转为 78 pass / 0 fail;真实围栏的 W2 根换软链攻击仍被正确处理(读的仍是真信任记录)。没有新增文档字段或另一份根解析 · r2 后续提交。
 - 2026-11-14 · r2 接入 batch B 与 #1708/#1709(`8dfd8956b0`):`packages/ext/src/project-config.ts` 组合文档全局根读取与 main 信任记录读取;`project-config.test.ts` 保留信任身份 / 冒充判据并加入文档夹具 import;`plugin-host.test.ts` 以文档发布代替环境通道,保留 #1700 的助手字段与 #1709 的生产记录写端、每条测试撤掉旧信任。首轮 `cd packages/ext && bun test src/project-config.test.ts src/plugin-host.test.ts src/plugin-setup-order.test.ts src/policy/authority-registry.test.ts src/provider-allow.test.ts` = exit 1,64 pass / 14 fail:复现 #1709 的新读链在 `resolveCodePuppyStateBase` 仍取已退役的 `CODEPUPPY_GLOBAL_DIR`,缺变量时决定无法读取 / 写入;后续提交修正该语义冲突 · r2 合并提交。
 - 2026-11-12 · 注入的测试接缝:`injectCodePuppyConfig` 加第 4 个参数 `userConfig?: string | null`,sidecar 传 `paths.userConfig ?? null`(null = 逃生阀置位);只有直接调注入的测试不传,取 `codepuppyJsoncPath()` · 不这样做要改约 45 个直接调用注入的测试点;注入自己不再读两个逃生阀 · 本段提交。
@@ -246,6 +253,18 @@ last_reviewed: 2026-11-12
 | §9 回滚 · 无数据后果 | 段 0 记录第 ⑦ 格(C4 显式文件、C5 模型底表、密钥文件名集合)两端逐字相同;启动文档不落盘(构建器与 sidecar 不新增写盘点:`process-fence-write-sites.test.ts` 的登记簿本段不变) | 若迁移改变了磁盘形状,第 ⑦ 格红;若新增写盘,写盘登记簿闸红。 |
 
 ### 偏离记录
+- 2026-11-14 · r3 独立完成 items 2–3:信任记录架构文档写明 `paths.globalRoot` 通道,保留按字面逆映射 / 不经 realpath 的原句,并按共享 `AGENT_CONTROL_FIELDS` 补 `steps` / `maxSteps`(执行预算);`mcp-server-records.ts`、`custom-provider-records.ts`、`codepuppy-config-injection.ts` 的通道注释同步。`codepuppy-environment.ts` 的拒绝原因只把通道名 `CODEPUPPY_GLOBAL_DIR` 换为 `bootstrap.paths.globalRoot`,意义与拓扑判定不变;MCP / 自定义节点测试各自的原字面期望同步,断言不变。未加入两个 OPTIONAL 测试,未加 gate 文件。相关检查如下 · r3 文档 / 注释提交。
+
+| 目录 | 命令 / 证据 | 结果 |
+| --- | --- | --- |
+| 当前树 `packages/ui-mac` | `bun test ./node_modules/.cache/bootstrap-r3/probe.test.ts`(最终测量脚本) | exit 1;0 pass / 1 fail。真实 shell exit 0,输出 `CP1698_SHELL=<>`;失败是「应含预期目录」断言。 |
+| `3a8e25d6b8` 临时快照的 `packages/ui-mac` | 同一测量脚本,相同 `bun test ./node_modules/.cache/bootstrap-r3/probe.test.ts` | exit 0;1 pass / 0 fail。真实 shell exit 0,输出预期沙箱目录。 |
+| 当前树 `packages/ui-mac` | `bun test src/main/codepuppy-environment.test.ts src/main/mcp-server-derivation.test.ts src/main/custom-provider-derivation.test.ts` | 首次 exit 1;45 pass / 1 fail,失败仅为自定义节点测试还期待旧日志通道名;同步该字面期望后整条原命令最终 exit 0,46 pass / 0 fail。 |
+| 当前树 `packages/ui-mac` | `bun test src/main/custom-provider-derivation.test.ts` | 同步该字符串期望后 exit 0;5 pass / 0 fail。 |
+| 当前树 `packages/ui-mac` | `bun typecheck` | exit 0;0 type errors。 |
+| 仓库根 | `git diff --check` | exit 0。 |
+
+命令均先 `export PATH=$HOME/.bun-versions/1.4.4/bin:$PATH`,Bun = 1.4.4,测试逐条串行。临时测量脚本与两次完整输出保留在当前树 `packages/ui-mac/node_modules/.cache/bootstrap-r3/{probe.test.ts,current-output.txt,baseline-output.txt}`;`baseline-path.txt` 指向 `/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/cp1698-r3-baseline-dtcja5b7`。不提交临时测量文件,未新增注册闸门。已核:Codex(GPT-6),items 2–3 通过;item 1 的真实回归已定位到冻结设计缺口,交编排器 / 设计阶段补上述最小规则。约 15 分钟,本次 8 个提交文件(指定文档 / 注释、两处日志字面期望、本计划) · r3 文档 / 注释提交。
 - 2026-11-14 · r2 验证收据:依据 `8dfd8956b0` + 已接受 `8059bdd64c`;合并 `902e04bf1a`。扫描另一侧 packages 的 69 个新增 / 改动路径、清单 31 键,同时检查新增 `process.env` / 环境常量别名 / 启动目录重算。结果如下;其余新增退役变量读写命中 **none**。冻结 design 与启动文档 schema 相对 `8059bdd64c` 无差异。未运行全套门,未复跑已被编排器确认的 `.invalid` DNS 环境问题。额外文件均为新读链 / 输入或它们的直接判据;这轮共 16 个自身改动文件(八处冲突、本计划、七个同链文件与记录),约 17 分钟。遗留:架构文档 `docs/architecture/2026-11-13-project-extension-trust-record.md:29` 仍将 ext 的根描述为环境传递,本次仅按指定范围在此记录文档通道,交编排器更新该架构文档 · r2 后续提交。
 
 | 另一侧新增命中 | 本轮处理 |

@@ -983,14 +983,15 @@ itWithPermission.live("权威 · 待批请求的回复(#1666 第 3 条):经 ext 
 // ── #1700 项目 agent 的其余字段 ─────────────────────────────────────────────────────────────────────────────────────
 
 /** 项目文档写下 `agents`(可选同意),装上 ext,回引擎 agent 表里的这些 agent(真 Agent 服务)。 */
-const projectAgents = (agents: Record<string, unknown>, consent: boolean, ...ids: string[]) =>
+const projectAgents = (agents: Record<string, unknown>, consent: boolean | "self-granted", ...ids: string[]) =>
   Effect.gen(function* () {
     env({})
     const directory = realpathSync((yield* Location.Service).directory)
     const root = join(directory, ".codepuppy")
     mkdirSync(root, { recursive: true })
     writeFileSync(join(root, "codepuppy.jsonc"), JSON.stringify({ agent: agents }))
-    if (consent) writeFileSync(join(root, "prefs.json"), JSON.stringify({ extensionsConsent: { version: 1, granted: true } }))
+    if (consent === true) decide(directory, true)
+    if (consent === "self-granted") writeFileSync(join(root, "prefs.json"), SELF_GRANTED)
     yield* activate(CodePuppyExt)
     const service = yield* Agent.Service
     const out: Record<string, Agent.Info | undefined> = {}
@@ -1004,7 +1005,7 @@ it.live("权威 · 项目 agent 的 disable(#1700 AC-04):已同意的项目里 e
     const directory = realpathSync((yield* Location.Service).directory)
     mkdirSync(join(directory, ".codepuppy"), { recursive: true })
     writeFileSync(join(directory, ".codepuppy", "codepuppy.jsonc"), JSON.stringify({ agent: { explore: { disable: true } } }))
-    writeFileSync(join(directory, ".codepuppy", "prefs.json"), JSON.stringify({ extensionsConsent: { version: 1, granted: true } }))
+    decide(directory, true)
     yield* registered("subagent")
     const ext = yield* activateExtUntilFinished
     yield* ext.finish(exploreState.pipe(Effect.map((state) => state === undefined)))
@@ -1071,7 +1072,7 @@ it.live("权威 · 项目 agent 的 disable 与后面的配置层(#1700 Codex R1
     const directory = realpathSync((yield* Location.Service).directory)
     mkdirSync(join(directory, ".codepuppy"), { recursive: true })
     writeFileSync(join(directory, ".codepuppy", "codepuppy.jsonc"), JSON.stringify({ agent: { explore: { disable: true } } }))
-    writeFileSync(join(directory, ".codepuppy", "prefs.json"), JSON.stringify({ extensionsConsent: { version: 1, granted: true } }))
+    decide(directory, true)
     yield* registered("subagent")
     const ext = yield* activateExtUntilFinished
     yield* configAgents({ agent: { explore: { description: "说明" } } })
@@ -1144,6 +1145,10 @@ it.live("项目 agent 的 steps 受同意门(#1700 Codex R1/1 M3):未同意的�
     const unconsented = yield* projectAgents({ budgeted: { steps: 100 }, legacy: { prompt: "l", maxSteps: 100 } }, false, "budgeted", "legacy")
     expect(unconsented.budgeted?.steps).toBe(3)
     expect(unconsented.legacy?.steps).toBeUndefined()
+    // #1709 的真实旧记录样本 SELF_GRANTED:项目自己带来的「已同意」同样不能提高预算。
+    const selfGranted = yield* projectAgents({ budgeted: { steps: 100 }, legacy: { prompt: "l", maxSteps: 100 } }, "self-granted", "budgeted", "legacy")
+    expect(selfGranted.budgeted?.steps).toBe(3)
+    expect(selfGranted.legacy?.steps).toBeUndefined()
   }),
 )
 

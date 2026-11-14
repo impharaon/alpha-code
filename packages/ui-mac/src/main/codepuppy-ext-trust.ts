@@ -23,9 +23,10 @@ export function extensionsGranted(entry: ProjectTrustEntry | undefined): boolean
   return entry?.version === EXTENSIONS_CONSENT_VERSION && entry.granted === true
 }
 
-/** agent 条目里受信任门管的字段:会改写权限 / 模型(REQ-236 P1、#1693;`tools` 与 `permission` 同样翻成权限规则)。
+/** agent 条目里受信任门管的字段:会改写权限 / 模型 / 执行预算(REQ-236 P1、#1693、#1700 BR-02a;
+ *  `tools` 与 `permission` 同样翻成权限规则,`steps` / `maxSteps` 决定一个回答最多调几次模型)。
  *  ext 在未同意时剥掉它们(project-config.ts stripAgentControl),确认框把写了它们的 agent 列出来 —— 同一份清单。 */
-export const AGENT_CONTROL_FIELDS = ["permission", "tools", "model", "disable", "mode"] as const
+export const AGENT_CONTROL_FIELDS = ["permission", "tools", "model", "disable", "mode", "steps", "maxSteps"] as const
 
 export type ProjectExecutables = { mcp: string[]; plugins: string[]; agents: Array<{ name: string; fields: string[] }> }
 

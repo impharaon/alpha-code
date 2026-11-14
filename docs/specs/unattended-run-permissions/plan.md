@@ -163,5 +163,17 @@ PLAN 验证只做文件/diff 的只读检查并提交本文件。实现后的全
 
 - 第 1/3 项的真实引擎回归在一次 Code Mode 调用中先停在测试工具,再向仍在册的同一会话发送 prompt 或 shell,释放后才执行每次询问的真实 MCP。用审批事件与运行结束竞争,没有秒数猜测。原「运行后续聊」更名为「注销后的续聊」,只声明其实际证明的范围。
 - 红证据:`cd packages/ui-mac && bun test --timeout 90000 ./src/main/unattended-run.engine.cases.ts` 在生产代码 `0a0862513a` 上退出 1,14 pass / 2 fail。shell 插话例预期 `asked` 实得 `finished`;未就绪记录形状例多出 `durationMs`、`sessionID`、`runDir`。prompt 插话例基点通过;临时去掉 `unattended.preparePrompt(event)` 后,同命令加 `-t '在册运行收到 prompt'` 为 0 pass / 1 fail、退出 1,也是 `asked` 实得 `finished`;已用 scoped `git restore` 恢复该唯一生产变异,回归断言保留。
-- 第 1 项的合同阻塞:已核实 `core/src/session/session.ts:211-235` 先发布 `session.shell.started`,然后才把结果经 synthetic 入队。但 `plugin/src/promise/event.ts:6-10` 只公开 AsyncIterable;`plugin/src/promise/adapter.ts:51-72,331-344` 经 Promise/异步迭代适配,`core/src/bus.ts:495-506,735-758` 向 unbounded PubSub 发布,不等待该 Promise 订阅者处理完成。扩展能异步观察已发布的启动事件,不能保证 I-9 所写的入队前同步退出。现有同步 `shell.create.before` 的输入(`plugin/src/promise/shell.ts:3-9`)不含 sessionID,无法准确退出目标会话。需要可等待且带 sessionID 的 shell 输入钩子,或方案方明确另定异步观察时点;本轮不改上游/公共合同、不用一个偶然通过的事件流用例代替排序保证。真实 shell 红例保留为这项未完成的证据。
+- 第 1 项的合同阻塞:已核实 `packages/core/src/session/session.ts:211-235` 先发布 `session.shell.started`,然后才把结果经 synthetic 入队。但 `packages/plugin/src/promise/event.ts:6-10` 只公开 AsyncIterable;`packages/plugin/src/promise/adapter.ts:51-72,331-344` 经 Promise/异步迭代适配,`packages/core/src/bus.ts:495-506,735-758` 向 unbounded PubSub 发布,不等待该 Promise 订阅者处理完成。扩展能异步观察已发布的启动事件,不能保证 I-9 所写的入队前同步退出。现有同步 `shell.create.before` 的输入(`packages/plugin/src/promise/shell.ts:3-9`)不含 sessionID,无法准确退出目标会话。需要可等待且带 sessionID 的 shell 输入钩子,或方案方明确另定异步观察时点;本轮不改上游/公共合同、不用一个偶然通过的事件流用例代替排序保证。真实 shell 红例保留为这项未完成的证据。
 - 第 4 项不等价证据:实际 `Permission.assert` 输入可带动作名 `unattended_write` 的会话 ask,同时身份轴 `mcp:unattended:write` 不 ask,于是 standard 的 T1 为 allow 而引擎原始 effect 为 ask。新增「T1 allow 对无工具调用的原始 ask 与直接 return 不等价」基点 1 pass、退出 0;只把对应分支改成直接 return 后,`cd packages/ext && bun test --only-failures src/policy/unattended-policy.test.ts -t 'T1 allow 对无工具调用'` 为 0 pass / 1 fail、退出 1(成功变成拒绝),已 scoped restore。按本轮第 4 项处置保留生产分支,不改变此可达输入的既有结果。
+
+
+R4 修正回执:
+
+- 第 2 项:握手失败分支尽力删空会话后,直接返回 `{at,status,summary,reasonCode}`,不经过运行目录写入或失败投影,`finally` 仍注销并清理 timer。上面未就绪形状红例不改断言,转为通过;同例还核对 `.codepuppy/runs` 目录未增加、会话列表未增加、解析 unavailable、不发模型请求、每日计数仍增加。本次只改既定 scheduler 调用链,没有新增界面限制。
+- 第 3 项:新增「AC-06 在册运行收到 prompt 插话后,下一个每次询问工具必须出卡」通过,并已证明删掉退出调用即红。旧的注销后续聊/分叉/子会话证据更名后仍通过,不再把它称为退出名单的证明。
+- 第 1 项仍 BLOCKED:保留真实 shell 插话红例,没有加入不具备入队前排序保证的异步观察实现。所需合同见上段。`cd packages/ui-mac && bun test --only-failures src/main/unattended-run.engine.test.ts` 退出 1;子进程 15 pass / 1 fail,唯一失败是该 shell 例(`asked` 实得 `finished`),宿主对应 0 pass / 1 fail。第 2/3 项均通过,没有将已知红例 skip 或改成较弱断言。
+- 第 4 项按不等价证据保留原分支;新增真实权限入口判据随 C4 通过。引擎进程插件直接调用 synthetic 仍在冻结边界之外,未增加入口或接管。
+- 相关检查(上方 C2—C9 索引的包工作目录,逐条 `bun test --only-failures <该文件>`):C2 `src/main/codepuppy-unattended.test.ts` 4 pass;C3 `src/policy/unattended.test.ts` 4 pass;C4 `src/policy/unattended-policy.test.ts` 20 pass;C6 `src/main/automation-run-outcome.test.ts` 5 pass;C7 `src/main/engine-session-turn.test.ts` 2 pass、`src/main/moderation-automation.test.ts` 1 pass;C8 `src/shared/automation-schedule.test.ts` 20 pass;C9 `src/policy/authority-registry.test.ts` 5 pass。以上退出均为 0。schema、ext、ui-mac 三包分别 `bun typecheck`,均退出 0;`git diff --check` 退出 0。未受本轮影响的检查继承已接受的单元 1—4。
+- 真实消息 JSON 随本轮同名沙箱用例重新导出,生产源码摘要已核对一致;没有手写协议输入。红例先提交 `177418ea5b`,修复提交不改该回归文件。文件均在原计划清单内,无上游文件或新 takeover。
+
+本轮截至 14:11 UTC,约 19 分钟;完成第 2/3 项及第 4 项解释,第 1 项交编排器处理合同阻塞。

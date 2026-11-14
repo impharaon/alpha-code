@@ -255,7 +255,6 @@ async function executeTask(task: AutomationTask): Promise<AutomationRunRecord> {
 
   let sessionID: string | undefined
   let timedOut = false
-  let notReady = false
   let elicitation: ReturnType<typeof watchAutomationElicitations> | undefined
   const controller = new AbortController()
   const killer = setTimeout(
@@ -290,9 +289,8 @@ async function executeTask(task: AutomationTask): Promise<AutomationRunRecord> {
 
     const promptID = SessionMessage.ID.create()
     if (!await unattendedRuns.register(sessionID, { agent: task.target.agent, promptID }, controller.signal)) {
-      notReady = true
       await client.session.remove({ sessionID }).catch(() => {})
-      throw new Error("automation run not ready")
+      return { at, status: "failed", summary: "automation run not ready", reasonCode: "automation-run-not-ready" }
     }
     elicitation = watchAutomationElicitations(client, directory)
     const reply = await promptAndWait(client, { sessionID, text: task.prompt, id: promptID }, controller.signal)
@@ -325,7 +323,7 @@ async function executeTask(task: AutomationTask): Promise<AutomationRunRecord> {
     }
   } catch (error) {
     await elicitation?.stop()
-    const denial = !timedOut && !notReady && sessionID ? await readAutomationDenial(client, sessionID, profile, controller.signal) : undefined
+    const denial = !timedOut && sessionID ? await readAutomationDenial(client, sessionID, profile, controller.signal) : undefined
     const status = timedOut ? "timeout" : "failed"
     const summary = timedOut
       ? `超过 ${task.budget.maxDurationMin} 分钟,已中断`
@@ -342,7 +340,6 @@ async function executeTask(task: AutomationTask): Promise<AutomationRunRecord> {
     return {
       at,
       status,
-      ...(notReady ? { reasonCode: "automation-run-not-ready" as const } : {}),
       durationMs: Date.now() - started,
       sessionID,
       runDir: saved.ok ? saved.dir : undefined,

@@ -188,6 +188,13 @@ M3 又会改 `opencode2/` 里引 v1 类型的文件,M4 最后统一改指,避免
 - Bun 1.4.4,`cd packages/ui-mac && bun test src/engine-adapter/`:exit 1,200 pass / 2 fail,31 文件、673 断言。① `unsupported.test.ts` 无法解析 `@opencode-ai/client`(Cannot find module);② `fixture-identity.test.ts` 点名 17 份夹具的 core / plugin / schema / util 身份落后于本底,需要用真实采样器重采,不直接改身份字段。
 - 按派发书「依赖缺失即停止」,未安装依赖、未重采、未继续 typecheck / 登记检查,也未开始单元 2(`#1713`)。先提交已协调的合并,由编排器刷新本工作树依赖后续派。启动 14:12 UTC,本次组装约 3 分钟。文档影响为实施证据,仅在本偏离记录落地;没有改冻结 spec / design 或界面文案。已核:Codex(GPT-6),仅上述已跑证据;结论 PARTIAL,遗留去向为编排器补依赖及续派余下验证与单元 2。
 
+
+##### batch F r2 — 单元 1 完成验证
+
+- 2026-11-14 · 接受 `271b1ae6aa`,编排器已刷新依赖。原命令完整运行采样器,exit 0,真实沙箱样本单独提交 `87cba65188`(17 份)。本底 core / plugin / schema / util 的身份变化对应 #1698 启动文档;未手改身份或样本。
+- 差异核对:路由状态与往返条数不变。ID / 时间 / 临时路径 / PID / ticket 随实跑变化;全量采样先跑 approval-actions,因此后续 catalog / passthrough 的会话列表带该剧本的 ask 权限,先跑 passthrough 的 fork 让 routes 的列表带原生 fork 字段;reference 剧本后的上下文 delta 多 core/reference-guidance。模型目录刷新带来条目数量与 cost tier 元数据变化(上游 models-dev 刷新);事件数量、顺序与帧后快照随时序变化。未见未解释的转换形状变化。
+- Bun 1.4.4,逐条检查:ui-mac `bun test src/engine-adapter/` exit 0,202 pass / 0 fail、676 断言;`bun typecheck` exit 0;`bun test src/main/gate-file-registry.test.ts src/main/old-name-scan.test.ts src/main/module-size-ratchet.test.ts` exit 0,50 pass / 0 fail;ext `bun test src/policy/authority-registry.test.ts` exit 0,5 pass / 0 fail。old-name 首次因真实 CLI 工作树路径与数量变化报两项,随后按共享 hitTokens 的实际 21 处同步原登记,无扫描豁免扩张。自身后续文件仅登记表与本记录。AC-01–04 本单元通过;下一步按派发开始单元 2,已审行为不重开。已核:Codex(GPT-6),组装自检;遗留去向 none。
+
 ## M1a — 翻译器搬进 `opencode2/`(纯搬家)
 
 - 依据:设计 §4.2 模块与依赖方向、§6 第 3 行、§9 M1「翻译器挪进 `opencode2/`」;Issue AC-03。

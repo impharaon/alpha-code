@@ -1,0 +1,3633 @@
+{
+ "_source": "Sampled by `bun packages/ui-mac/test-fixtures/engine-adapter-sampler/sample.ts` (alpha-code#1668 L6) at 5dc2e4d052: a real OpenCode 2 engine from this repo's packages/cli `serve`, isolated HOME/XDG, one git project, and the scripted OpenAI-compatible mock model next to the sampler. Event table cases: every /api/event frame (with the message page read right after it) from a sequence that creates, runs, renames and deletes sessions, renames the project, creates / renames / lets exit / deletes a pty, switches the git branch, connects the local mock-mcp.ts (oauth off), has it announce tools / resources / prompts list_changed and then disconnects it, adds a project reference and reloads the location, and cancels a question form. `sessions` = GET /api/session/:id for every session id seen, read at the end; `serverConnected` = the subscription's first frame. lsp.updated and global.disposed have no publisher in this engine and cannot be sampled.",
+ "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-x4jnE4/proj",
+ "serverConnected": {
+  "id": "evt_1da135030001Zvd7bHi0ClwiE1",
+  "type": "server.connected",
+  "data": {}
+ },
+ "announced": 1,
+ "mcpRequests": [
+  "POST initialize",
+  "POST notifications/initialized",
+  "GET /mcp",
+  "POST tools/list",
+  "POST prompts/list",
+  "POST tools/list",
+  "POST prompts/list"
+ ],
+ "sessions": {
+  "ses_e25eca1e0ffeQk5IZVq9mx5mIm": {
+   "id": "ses_e25eca1e0ffeQk5IZVq9mx5mIm",
+   "projectID": "d3314d63c18100fdff5fee0648c3b4d13acd2f70",
+   "cost": 0,
+   "tokens": {
+    "input": 8,
+    "output": 2,
+    "reasoning": 0,
+    "cache": {
+     "read": 0,
+     "write": 0
+    }
+   },
+   "outcome": "succeeded",
+   "time": {
+    "created": 1794660064835,
+    "updated": 1794660065144,
+    "busy": 1794660064941,
+    "idle": 1794660065084
+   },
+   "title": "sampler events",
+   "subpath": "../../../../../../../../var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-x4jnE4/proj",
+   "location": {
+    "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-x4jnE4/proj"
+   }
+  },
+  "ses_e25ec81f6ffe443AjygXD6xvDA": {
+   "id": "ses_e25ec81f6ffe443AjygXD6xvDA",
+   "projectID": "d3314d63c18100fdff5fee0648c3b4d13acd2f70",
+   "cost": 0,
+   "tokens": {
+    "input": 5,
+    "output": 5,
+    "reasoning": 0,
+    "cache": {
+     "read": 0,
+     "write": 0
+    }
+   },
+   "time": {
+    "created": 1794660072984,
+    "updated": 1794660073235,
+    "busy": 1794660072995
+   },
+   "title": "Mock title",
+   "subpath": "../../../../../../../../var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-x4jnE4/proj",
+   "location": {
+    "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-x4jnE4/proj"
+   }
+  }
+ },
+ "frames": [
+  {
+   "frame": {
+    "id": "evt_1da135e43001e6B23gdk3OtSdu",
+    "created": 1794660064835,
+    "type": "session.created",
+    "location": {
+     "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-x4jnE4/proj"
+    },
+    "data": {
+     "sessionID": "ses_e25eca1e0ffeQk5IZVq9mx5mIm",
+     "slug": "witty-harbor",
+     "version": "local",
+     "projectID": "d3314d63c18100fdff5fee0648c3b4d13acd2f70",
+     "location": {
+      "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-x4jnE4/proj"
+     },
+     "subpath": "../../../../../../../../var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-x4jnE4/proj"
+    },
+    "durable": {
+     "aggregateID": "ses_e25eca1e0ffeQk5IZVq9mx5mIm",
+     "seq": 0,
+     "version": 1
+    }
+   },
+   "snapshot": {
+    "data": [],
+    "cursor": {
+     "previous": null,
+     "next": null
+    }
+   }
+  },
+  {
+   "frame": {
+    "id": "evt_1da135e6e0015rR1O6nSgQ8lHJ",
+    "created": 1794660064878,
+    "type": "integration.updated",
+    "location": {
+     "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-x4jnE4/proj"
+    },
+    "data": {}
+   }
+  },
+  {
+   "frame": {
+    "id": "evt_1da135e70001A3z2OfvSDPzJXW",
+    "created": 1794660064880,
+    "type": "provider.updated",
+    "location": {
+     "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-x4jnE4/proj"
+    },
+    "data": {}
+   }
+  },
+  {
+   "frame": {
+    "id": "evt_1da135e73001ldxwHTOaj4UXno",
+    "created": 1794660064883,
+    "type": "model.updated",
+    "location": {
+     "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-x4jnE4/proj"
+    },
+    "data": {}
+   }
+  },
+  {
+   "frame": {
+    "id": "evt_1da135e77001usnxcOF8GYwXWa",
+    "created": 1794660064887,
+    "type": "integration.updated",
+    "location": {
+     "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-x4jnE4/plain"
+    },
+    "data": {}
+   }
+  },
+  {
+   "frame": {
+    "id": "evt_1da135e780010L1VUl5ze1IPiN",
+    "created": 1794660064888,
+    "type": "provider.updated",
+    "location": {
+     "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-x4jnE4/plain"
+    },
+    "data": {}
+   }
+  },
+  {
+   "frame": {
+    "id": "evt_1da135e7a001MmH1adWJ15O1m2",
+    "created": 1794660064890,
+    "type": "model.updated",
+    "location": {
+     "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-x4jnE4/plain"
+    },
+    "data": {}
+   }
+  },
+  {
+   "frame": {
+    "id": "evt_1da135e96001awMZxZ1IIsoQBl",
+    "created": 1794660064918,
+    "type": "vcs.branch.updated",
+    "location": {
+     "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-x4jnE4/plain"
+    },
+    "data": {
+     "branch": "main"
+    }
+   }
+  },
+  {
+   "frame": {
+    "id": "evt_1da135e9600223Vel7bp2IruB8",
+    "created": 1794660064918,
+    "type": "agent.updated",
+    "location": {
+     "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-x4jnE4/plain"
+    },
+    "data": {}
+   }
+  },
+  {
+   "frame": {
+    "id": "evt_1da135e96003kfXsVfUoxnPHf2",
+    "created": 1794660064918,
+    "type": "command.updated",
+    "location": {
+     "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-x4jnE4/plain"
+    },
+    "data": {}
+   }
+  },
+  {
+   "frame": {
+    "id": "evt_1da135e96004GY19fHitkQ9Uki",
+    "created": 1794660064918,
+    "type": "skill.updated",
+    "location": {
+     "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-x4jnE4/plain"
+    },
+    "data": {}
+   }
+  },
+  {
+   "frame": {
+    "id": "evt_1da135e97001r3p1pO17GYeKxc",
+    "created": 1794660064919,
+    "type": "websearch.updated",
+    "location": {
+     "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-x4jnE4/plain"
+    },
+    "data": {}
+   }
+  },
+  {
+   "frame": {
+    "id": "evt_1da135e9d001bNAmZA8w2gDM3D",
+    "created": 1794660064925,
+    "type": "reference.updated",
+    "location": {
+     "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-x4jnE4/plain"
+    },
+    "data": {}
+   }
+  },
+  {
+   "frame": {
+    "id": "evt_1da135e9f0010b2RoB8334nnsM",
+    "created": 1794660064927,
+    "type": "vcs.branch.updated",
+    "location": {
+     "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-x4jnE4/proj"
+    },
+    "data": {
+     "branch": "main"
+    }
+   }
+  },
+  {
+   "frame": {
+    "id": "evt_1da135e9f002heH6O7beVJedLw",
+    "created": 1794660064927,
+    "type": "agent.updated",
+    "location": {
+     "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-x4jnE4/proj"
+    },
+    "data": {}
+   }
+  },
+  {
+   "frame": {
+    "id": "evt_1da135e9f003rr4s42ysQBs3lI",
+    "created": 1794660064927,
+    "type": "command.updated",
+    "location": {
+     "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-x4jnE4/proj"
+    },
+    "data": {}
+   }
+  },
+  {
+   "frame": {
+    "id": "evt_1da135e9f004jYryQS7lOI7rEp",
+    "created": 1794660064927,
+    "type": "skill.updated",
+    "location": {
+     "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-x4jnE4/proj"
+    },
+    "data": {}
+   }
+  },
+  {
+   "frame": {
+    "id": "evt_1da135ea0001yXpwkeu6XOVY8P",
+    "created": 1794660064928,
+    "type": "websearch.updated",
+    "location": {
+     "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-x4jnE4/proj"
+    },
+    "data": {}
+   }
+  },
+  {
+   "frame": {
+    "id": "evt_1da135ea6001GovyM6iPR3E6O7",
+    "created": 1794660064934,
+    "type": "reference.updated",
+    "location": {
+     "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-x4jnE4/proj"
+    },
+    "data": {}
+   }
+  },
+  {
+   "frame": {
+    "id": "evt_1da135ea7001xib2tQgL7vNjwV",
+    "created": 1794660064935,
+    "type": "plugin.updated",
+    "location": {
+     "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-x4jnE4/plain"
+    },
+    "data": {}
+   }
+  },
+  {
+   "frame": {
+    "id": "evt_1da135eac0012EtiOb5evxhYGJ",
+    "created": 1794660064940,
+    "type": "plugin.updated",
+    "location": {
+     "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-x4jnE4/proj"
+    },
+    "data": {}
+   }
+  },
+  {
+   "frame": {
+    "id": "evt_1da135eac0027eF67QmgvvDibE",
+    "created": 1794660064940,
+    "type": "session.inbox.enqueued",
+    "location": {
+     "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-x4jnE4/proj"
+    },
+    "data": {
+     "inboxID": "msg_1da135e5a001aJhKND3yNvn13Y",
+     "sessionID": "ses_e25eca1e0ffeQk5IZVq9mx5mIm",
+     "item": {
+      "type": "user",
+      "payload": {
+       "text": "say hello plainly"
+      },
+      "delivery": "steer"
+     }
+    },
+    "durable": {
+     "aggregateID": "ses_e25eca1e0ffeQk5IZVq9mx5mIm",
+     "seq": 1,
+     "version": 1
+    }
+   },
+   "snapshot": {
+    "data": [
+     {
+      "id": "msg_1da135e5a001aJhKND3yNvn13Y",
+      "time": {
+       "created": 1794660064946
+      },
+      "text": "say hello plainly",
+      "type": "user"
+     }
+    ],
+    "cursor": {
+     "previous": "eyJpZCI6Im1zZ18xZGExMzVlNWEwMDFhSmhLTkQzeU52bjEzWSIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6InByZXZpb3VzIn0",
+     "next": "eyJpZCI6Im1zZ18xZGExMzVlNWEwMDFhSmhLTkQzeU52bjEzWSIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6Im5leHQifQ"
+    }
+   }
+  },
+  {
+   "frame": {
+    "id": "evt_1da135ead0017GL5z5UJdK64Hv",
+    "created": 1794660064941,
+    "type": "session.execution.started",
+    "data": {
+     "sessionID": "ses_e25eca1e0ffeQk5IZVq9mx5mIm"
+    },
+    "durable": {
+     "aggregateID": "ses_e25eca1e0ffeQk5IZVq9mx5mIm",
+     "seq": 2,
+     "version": 1
+    }
+   },
+   "snapshot": {
+    "data": [
+     {
+      "id": "msg_1da135e5a001aJhKND3yNvn13Y",
+      "time": {
+       "created": 1794660064946
+      },
+      "text": "say hello plainly",
+      "type": "user"
+     }
+    ],
+    "cursor": {
+     "previous": "eyJpZCI6Im1zZ18xZGExMzVlNWEwMDFhSmhLTkQzeU52bjEzWSIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6InByZXZpb3VzIn0",
+     "next": "eyJpZCI6Im1zZ18xZGExMzVlNWEwMDFhSmhLTkQzeU52bjEzWSIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6Im5leHQifQ"
+    }
+   }
+  },
+  {
+   "frame": {
+    "id": "evt_1da135eb1001sjDSB6hvfID7Lr",
+    "created": 1794660064945,
+    "metadata": {
+     "instructions": {
+      "initial": true
+     }
+    },
+    "type": "session.instructions.updated",
+    "location": {
+     "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-x4jnE4/proj"
+    },
+    "data": {
+     "sessionID": "ses_e25eca1e0ffeQk5IZVq9mx5mIm",
+     "delta": {
+      "core/codemode": "70364fb91a447e61e71df243f6e958f57fed40a08c42fdc97085c5c1764350c7",
+      "core/skill-guidance": "8394362d28c82fa4d13c7a9f5568c05680f6687e07db8f426a0e3c92f3027dc9",
+      "core/date": "7e11767d20af6d0a757fa2ef151926d9b692ac492d8199662599d0d5e2e86810",
+      "core/environment": "482a1d5bd945f18a2f044911443612d676478bc5283a81c2cf7065b7df1cdf58"
+     }
+    },
+    "durable": {
+     "aggregateID": "ses_e25eca1e0ffeQk5IZVq9mx5mIm",
+     "seq": 3,
+     "version": 2
+    }
+   },
+   "snapshot": {
+    "data": [
+     {
+      "id": "msg_1da135e5a001aJhKND3yNvn13Y",
+      "time": {
+       "created": 1794660064946
+      },
+      "text": "say hello plainly",
+      "type": "user"
+     }
+    ],
+    "cursor": {
+     "previous": "eyJpZCI6Im1zZ18xZGExMzVlNWEwMDFhSmhLTkQzeU52bjEzWSIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6InByZXZpb3VzIn0",
+     "next": "eyJpZCI6Im1zZ18xZGExMzVlNWEwMDFhSmhLTkQzeU52bjEzWSIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6Im5leHQifQ"
+    }
+   }
+  },
+  {
+   "frame": {
+    "id": "evt_1da135eb1002csjncAkOuV4p7m",
+    "created": 1794660064946,
+    "type": "session.inbox.delivered",
+    "location": {
+     "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-x4jnE4/proj"
+    },
+    "data": {
+     "sessionID": "ses_e25eca1e0ffeQk5IZVq9mx5mIm",
+     "inboxID": "msg_1da135e5a001aJhKND3yNvn13Y"
+    },
+    "durable": {
+     "aggregateID": "ses_e25eca1e0ffeQk5IZVq9mx5mIm",
+     "seq": 4,
+     "version": 1
+    }
+   },
+   "snapshot": {
+    "data": [
+     {
+      "id": "msg_1da135e5a001aJhKND3yNvn13Y",
+      "time": {
+       "created": 1794660064946
+      },
+      "text": "say hello plainly",
+      "type": "user"
+     }
+    ],
+    "cursor": {
+     "previous": "eyJpZCI6Im1zZ18xZGExMzVlNWEwMDFhSmhLTkQzeU52bjEzWSIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6InByZXZpb3VzIn0",
+     "next": "eyJpZCI6Im1zZ18xZGExMzVlNWEwMDFhSmhLTkQzeU52bjEzWSIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6Im5leHQifQ"
+    }
+   }
+  },
+  {
+   "frame": {
+    "id": "evt_1da135eca001W4WVqyfmD7RY80",
+    "created": 1794660064970,
+    "type": "integration.updated",
+    "location": {
+     "directory": "/Users/tide/app/wt/alpha-code-reland-1710-ui-contract/packages/cli"
+    },
+    "data": {}
+   }
+  },
+  {
+   "frame": {
+    "id": "evt_1da135ecc001Was7NYrbYZBhXL",
+    "created": 1794660064972,
+    "type": "provider.updated",
+    "location": {
+     "directory": "/Users/tide/app/wt/alpha-code-reland-1710-ui-contract/packages/cli"
+    },
+    "data": {}
+   }
+  },
+  {
+   "frame": {
+    "id": "evt_1da135ecf0013trtMj1fJuTg03",
+    "created": 1794660064975,
+    "type": "model.updated",
+    "location": {
+     "directory": "/Users/tide/app/wt/alpha-code-reland-1710-ui-contract/packages/cli"
+    },
+    "data": {}
+   }
+  },
+  {
+   "frame": {
+    "id": "evt_1da135eda001a4amTwMQJ8hKUG",
+    "created": 1794660064986,
+    "type": "session.step.started",
+    "location": {
+     "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-x4jnE4/proj"
+    },
+    "data": {
+     "sessionID": "ses_e25eca1e0ffeQk5IZVq9mx5mIm",
+     "agent": "build",
+     "model": {
+      "id": "m",
+      "providerID": "mock"
+     },
+     "assistantMessageID": "msg_1da135eb6001YKQZPMBOeQbLms",
+     "snapshot": "5d824330ef1d813b975b9475afe7d45f5e89b41c",
+     "started": 1794660064951
+    },
+    "durable": {
+     "aggregateID": "ses_e25eca1e0ffeQk5IZVq9mx5mIm",
+     "seq": 5,
+     "version": 1
+    }
+   },
+   "snapshot": {
+    "data": [
+     {
+      "id": "msg_1da135eb6001YKQZPMBOeQbLms",
+      "time": {
+       "created": 1794660064951
+      },
+      "type": "assistant",
+      "agent": "build",
+      "model": {
+       "id": "m",
+       "providerID": "mock"
+      },
+      "content": [
+       {
+        "type": "text",
+        "text": ""
+       }
+      ],
+      "snapshot": {
+       "start": "5d824330ef1d813b975b9475afe7d45f5e89b41c"
+      }
+     },
+     {
+      "id": "msg_1da135e5a001aJhKND3yNvn13Y",
+      "time": {
+       "created": 1794660064946
+      },
+      "text": "say hello plainly",
+      "type": "user"
+     }
+    ],
+    "cursor": {
+     "previous": "eyJpZCI6Im1zZ18xZGExMzVlYjYwMDFZS1FaUE1CT2VRYkxtcyIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6InByZXZpb3VzIn0",
+     "next": "eyJpZCI6Im1zZ18xZGExMzVlNWEwMDFhSmhLTkQzeU52bjEzWSIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6Im5leHQifQ"
+    }
+   }
+  },
+  {
+   "frame": {
+    "id": "evt_1da135ee1001gvm30K0Ll0tKUB",
+    "created": 1794660064993,
+    "type": "session.text.started",
+    "location": {
+     "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-x4jnE4/proj"
+    },
+    "data": {
+     "sessionID": "ses_e25eca1e0ffeQk5IZVq9mx5mIm",
+     "assistantMessageID": "msg_1da135eb6001YKQZPMBOeQbLms",
+     "ordinal": 0
+    },
+    "durable": {
+     "aggregateID": "ses_e25eca1e0ffeQk5IZVq9mx5mIm",
+     "seq": 6,
+     "version": 1
+    }
+   },
+   "snapshot": {
+    "data": [
+     {
+      "id": "msg_1da135eb6001YKQZPMBOeQbLms",
+      "time": {
+       "created": 1794660064951
+      },
+      "type": "assistant",
+      "agent": "build",
+      "model": {
+       "id": "m",
+       "providerID": "mock"
+      },
+      "content": [
+       {
+        "type": "text",
+        "text": ""
+       }
+      ],
+      "snapshot": {
+       "start": "5d824330ef1d813b975b9475afe7d45f5e89b41c"
+      }
+     },
+     {
+      "id": "msg_1da135e5a001aJhKND3yNvn13Y",
+      "time": {
+       "created": 1794660064946
+      },
+      "text": "say hello plainly",
+      "type": "user"
+     }
+    ],
+    "cursor": {
+     "previous": "eyJpZCI6Im1zZ18xZGExMzVlYjYwMDFZS1FaUE1CT2VRYkxtcyIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6InByZXZpb3VzIn0",
+     "next": "eyJpZCI6Im1zZ18xZGExMzVlNWEwMDFhSmhLTkQzeU52bjEzWSIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6Im5leHQifQ"
+    }
+   }
+  },
+  {
+   "frame": {
+    "id": "evt_1da135eec001NU4nR9q8NXo2ZN",
+    "created": 1794660065004,
+    "type": "vcs.branch.updated",
+    "location": {
+     "directory": "/Users/tide/app/wt/alpha-code-reland-1710-ui-contract/packages/cli"
+    },
+    "data": {
+     "branch": "reland/1710-ui-contract"
+    }
+   }
+  },
+  {
+   "frame": {
+    "id": "evt_1da135eed001di9FBpynkaXYhQ",
+    "created": 1794660065005,
+    "type": "agent.updated",
+    "location": {
+     "directory": "/Users/tide/app/wt/alpha-code-reland-1710-ui-contract/packages/cli"
+    },
+    "data": {}
+   }
+  },
+  {
+   "frame": {
+    "id": "evt_1da135eed002WWGAPzmBiM3P5i",
+    "created": 1794660065005,
+    "type": "command.updated",
+    "location": {
+     "directory": "/Users/tide/app/wt/alpha-code-reland-1710-ui-contract/packages/cli"
+    },
+    "data": {}
+   }
+  },
+  {
+   "frame": {
+    "id": "evt_1da135eed003bh26GRnCjIRz9m",
+    "created": 1794660065005,
+    "type": "skill.updated",
+    "location": {
+     "directory": "/Users/tide/app/wt/alpha-code-reland-1710-ui-contract/packages/cli"
+    },
+    "data": {}
+   }
+  },
+  {
+   "frame": {
+    "id": "evt_1da135eee001h86Zj71LWVpMXS",
+    "created": 1794660065006,
+    "type": "websearch.updated",
+    "location": {
+     "directory": "/Users/tide/app/wt/alpha-code-reland-1710-ui-contract/packages/cli"
+    },
+    "data": {}
+   }
+  },
+  {
+   "frame": {
+    "id": "evt_1da135ef3001EANkzZaHQQtqIo",
+    "created": 1794660065012,
+    "type": "reference.updated",
+    "location": {
+     "directory": "/Users/tide/app/wt/alpha-code-reland-1710-ui-contract/packages/cli"
+    },
+    "data": {}
+   }
+  },
+  {
+   "frame": {
+    "id": "evt_1da135ef6001BLCgC6cG9tj7nU",
+    "created": 1794660065014,
+    "type": "session.usage.updated",
+    "data": {
+     "sessionID": "ses_e25eca1e0ffeQk5IZVq9mx5mIm",
+     "cost": 0,
+     "tokens": {
+      "input": 0,
+      "output": 0,
+      "reasoning": 0,
+      "cache": {
+       "read": 0,
+       "write": 0
+      }
+     }
+    }
+   },
+   "snapshot": {
+    "data": [
+     {
+      "id": "msg_1da135eb6001YKQZPMBOeQbLms",
+      "time": {
+       "created": 1794660064951
+      },
+      "type": "assistant",
+      "agent": "build",
+      "model": {
+       "id": "m",
+       "providerID": "mock"
+      },
+      "content": [
+       {
+        "type": "text",
+        "text": ""
+       }
+      ],
+      "snapshot": {
+       "start": "5d824330ef1d813b975b9475afe7d45f5e89b41c"
+      }
+     },
+     {
+      "id": "msg_1da135e5a001aJhKND3yNvn13Y",
+      "time": {
+       "created": 1794660064946
+      },
+      "text": "say hello plainly",
+      "type": "user"
+     }
+    ],
+    "cursor": {
+     "previous": "eyJpZCI6Im1zZ18xZGExMzVlYjYwMDFZS1FaUE1CT2VRYkxtcyIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6InByZXZpb3VzIn0",
+     "next": "eyJpZCI6Im1zZ18xZGExMzVlNWEwMDFhSmhLTkQzeU52bjEzWSIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6Im5leHQifQ"
+    }
+   }
+  },
+  {
+   "frame": {
+    "id": "evt_1da135ef6002gSvvUM73ZmBbcl",
+    "created": 1794660065014,
+    "type": "session.renamed",
+    "location": {
+     "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-x4jnE4/proj"
+    },
+    "data": {
+     "sessionID": "ses_e25eca1e0ffeQk5IZVq9mx5mIm",
+     "title": "Mock title"
+    },
+    "durable": {
+     "aggregateID": "ses_e25eca1e0ffeQk5IZVq9mx5mIm",
+     "seq": 8,
+     "version": 1
+    }
+   },
+   "snapshot": {
+    "data": [
+     {
+      "id": "msg_1da135eb6001YKQZPMBOeQbLms",
+      "time": {
+       "created": 1794660064951
+      },
+      "type": "assistant",
+      "agent": "build",
+      "model": {
+       "id": "m",
+       "providerID": "mock"
+      },
+      "content": [
+       {
+        "type": "text",
+        "text": ""
+       }
+      ],
+      "snapshot": {
+       "start": "5d824330ef1d813b975b9475afe7d45f5e89b41c"
+      }
+     },
+     {
+      "id": "msg_1da135e5a001aJhKND3yNvn13Y",
+      "time": {
+       "created": 1794660064946
+      },
+      "text": "say hello plainly",
+      "type": "user"
+     }
+    ],
+    "cursor": {
+     "previous": "eyJpZCI6Im1zZ18xZGExMzVlYjYwMDFZS1FaUE1CT2VRYkxtcyIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6InByZXZpb3VzIn0",
+     "next": "eyJpZCI6Im1zZ18xZGExMzVlNWEwMDFhSmhLTkQzeU52bjEzWSIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6Im5leHQifQ"
+    }
+   }
+  },
+  {
+   "frame": {
+    "id": "evt_1da135efd001zuYCSZH349Qve3",
+    "created": 1794660065021,
+    "type": "plugin.updated",
+    "location": {
+     "directory": "/Users/tide/app/wt/alpha-code-reland-1710-ui-contract/packages/cli"
+    },
+    "data": {}
+   }
+  },
+  {
+   "frame": {
+    "id": "evt_1da135f32001PsyXX6JUll33rM",
+    "created": 1794660065074,
+    "type": "session.text.delta",
+    "location": {
+     "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-x4jnE4/proj"
+    },
+    "data": {
+     "sessionID": "ses_e25eca1e0ffeQk5IZVq9mx5mIm",
+     "assistantMessageID": "msg_1da135eb6001YKQZPMBOeQbLms",
+     "ordinal": 0,
+     "delta": "Hello."
+    }
+   },
+   "snapshot": {
+    "data": [
+     {
+      "id": "msg_1da135eb6001YKQZPMBOeQbLms",
+      "time": {
+       "created": 1794660064951,
+       "streamed": 1794660065075
+      },
+      "type": "assistant",
+      "agent": "build",
+      "model": {
+       "id": "m",
+       "providerID": "mock"
+      },
+      "content": [
+       {
+        "type": "text",
+        "text": "Hello."
+       }
+      ],
+      "snapshot": {
+       "start": "5d824330ef1d813b975b9475afe7d45f5e89b41c"
+      }
+     },
+     {
+      "id": "msg_1da135e5a001aJhKND3yNvn13Y",
+      "time": {
+       "created": 1794660064946
+      },
+      "text": "say hello plainly",
+      "type": "user"
+     }
+    ],
+    "cursor": {
+     "previous": "eyJpZCI6Im1zZ18xZGExMzVlYjYwMDFZS1FaUE1CT2VRYkxtcyIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6InByZXZpb3VzIn0",
+     "next": "eyJpZCI6Im1zZ18xZGExMzVlNWEwMDFhSmhLTkQzeU52bjEzWSIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6Im5leHQifQ"
+    }
+   }
+  },
+  {
+   "frame": {
+    "id": "evt_1da135f32002B1BgHhu6m64pBh",
+    "created": 1794660065074,
+    "type": "session.text.ended",
+    "location": {
+     "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-x4jnE4/proj"
+    },
+    "data": {
+     "sessionID": "ses_e25eca1e0ffeQk5IZVq9mx5mIm",
+     "assistantMessageID": "msg_1da135eb6001YKQZPMBOeQbLms",
+     "ordinal": 0,
+     "text": "Hello."
+    },
+    "durable": {
+     "aggregateID": "ses_e25eca1e0ffeQk5IZVq9mx5mIm",
+     "seq": 9,
+     "version": 1
+    }
+   },
+   "snapshot": {
+    "data": [
+     {
+      "id": "msg_1da135eb6001YKQZPMBOeQbLms",
+      "time": {
+       "created": 1794660064951,
+       "streamed": 1794660065075
+      },
+      "type": "assistant",
+      "agent": "build",
+      "model": {
+       "id": "m",
+       "providerID": "mock"
+      },
+      "content": [
+       {
+        "type": "text",
+        "text": "Hello."
+       }
+      ],
+      "snapshot": {
+       "start": "5d824330ef1d813b975b9475afe7d45f5e89b41c"
+      }
+     },
+     {
+      "id": "msg_1da135e5a001aJhKND3yNvn13Y",
+      "time": {
+       "created": 1794660064946
+      },
+      "text": "say hello plainly",
+      "type": "user"
+     }
+    ],
+    "cursor": {
+     "previous": "eyJpZCI6Im1zZ18xZGExMzVlYjYwMDFZS1FaUE1CT2VRYkxtcyIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6InByZXZpb3VzIn0",
+     "next": "eyJpZCI6Im1zZ18xZGExMzVlNWEwMDFhSmhLTkQzeU52bjEzWSIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6Im5leHQifQ"
+    }
+   }
+  },
+  {
+   "frame": {
+    "id": "evt_1da135f33001znXGO7w2Wat7uZ",
+    "created": 1794660065075,
+    "type": "session.step.streamed",
+    "location": {
+     "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-x4jnE4/proj"
+    },
+    "data": {
+     "sessionID": "ses_e25eca1e0ffeQk5IZVq9mx5mIm",
+     "assistantMessageID": "msg_1da135eb6001YKQZPMBOeQbLms"
+    },
+    "durable": {
+     "aggregateID": "ses_e25eca1e0ffeQk5IZVq9mx5mIm",
+     "seq": 10,
+     "version": 1
+    }
+   },
+   "snapshot": {
+    "data": [
+     {
+      "id": "msg_1da135eb6001YKQZPMBOeQbLms",
+      "time": {
+       "created": 1794660064951,
+       "streamed": 1794660065075
+      },
+      "type": "assistant",
+      "agent": "build",
+      "model": {
+       "id": "m",
+       "providerID": "mock"
+      },
+      "content": [
+       {
+        "type": "text",
+        "text": "Hello."
+       }
+      ],
+      "snapshot": {
+       "start": "5d824330ef1d813b975b9475afe7d45f5e89b41c"
+      }
+     },
+     {
+      "id": "msg_1da135e5a001aJhKND3yNvn13Y",
+      "time": {
+       "created": 1794660064946
+      },
+      "text": "say hello plainly",
+      "type": "user"
+     }
+    ],
+    "cursor": {
+     "previous": "eyJpZCI6Im1zZ18xZGExMzVlYjYwMDFZS1FaUE1CT2VRYkxtcyIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6InByZXZpb3VzIn0",
+     "next": "eyJpZCI6Im1zZ18xZGExMzVlNWEwMDFhSmhLTkQzeU52bjEzWSIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6Im5leHQifQ"
+    }
+   }
+  },
+  {
+   "frame": {
+    "id": "evt_1da135f3b001toQrZ756j86HT6",
+    "created": 1794660065083,
+    "type": "session.step.ended",
+    "location": {
+     "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-x4jnE4/proj"
+    },
+    "data": {
+     "sessionID": "ses_e25eca1e0ffeQk5IZVq9mx5mIm",
+     "assistantMessageID": "msg_1da135eb6001YKQZPMBOeQbLms",
+     "finish": "stop",
+     "rawFinish": "stop",
+     "tokens": {
+      "input": 8,
+      "output": 2,
+      "reasoning": 0,
+      "cache": {
+       "read": 0,
+       "write": 0
+      }
+     },
+     "cost": 0,
+     "snapshot": "5d824330ef1d813b975b9475afe7d45f5e89b41c",
+     "files": []
+    },
+    "durable": {
+     "aggregateID": "ses_e25eca1e0ffeQk5IZVq9mx5mIm",
+     "seq": 11,
+     "version": 1
+    }
+   },
+   "snapshot": {
+    "data": [
+     {
+      "id": "msg_1da135f3c002T0WeKUPIJ6QfBR",
+      "time": {
+       "created": 1794660065084
+      },
+      "type": "idle",
+      "outcome": "succeeded"
+     },
+     {
+      "id": "msg_1da135eb6001YKQZPMBOeQbLms",
+      "time": {
+       "created": 1794660064951,
+       "streamed": 1794660065075,
+       "completed": 1794660065083
+      },
+      "type": "assistant",
+      "agent": "build",
+      "model": {
+       "id": "m",
+       "providerID": "mock"
+      },
+      "content": [
+       {
+        "type": "text",
+        "text": "Hello."
+       }
+      ],
+      "snapshot": {
+       "start": "5d824330ef1d813b975b9475afe7d45f5e89b41c",
+       "end": "5d824330ef1d813b975b9475afe7d45f5e89b41c",
+       "files": []
+      },
+      "finish": "stop",
+      "rawFinish": "stop",
+      "cost": 0,
+      "tokens": {
+       "input": 8,
+       "output": 2,
+       "reasoning": 0,
+       "cache": {
+        "read": 0,
+        "write": 0
+       }
+      }
+     },
+     {
+      "id": "msg_1da135e5a001aJhKND3yNvn13Y",
+      "time": {
+       "created": 1794660064946
+      },
+      "text": "say hello plainly",
+      "type": "user"
+     }
+    ],
+    "cursor": {
+     "previous": "eyJpZCI6Im1zZ18xZGExMzVmM2MwMDJUMFdlS1VQSUo2UWZCUiIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6InByZXZpb3VzIn0",
+     "next": "eyJpZCI6Im1zZ18xZGExMzVlNWEwMDFhSmhLTkQzeU52bjEzWSIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6Im5leHQifQ"
+    }
+   }
+  },
+  {
+   "frame": {
+    "id": "evt_1da135f3c001ZsCFx0884gdm0w",
+    "created": 1794660065084,
+    "type": "session.usage.updated",
+    "data": {
+     "sessionID": "ses_e25eca1e0ffeQk5IZVq9mx5mIm",
+     "cost": 0,
+     "tokens": {
+      "input": 8,
+      "output": 2,
+      "reasoning": 0,
+      "cache": {
+       "read": 0,
+       "write": 0
+      }
+     }
+    }
+   },
+   "snapshot": {
+    "data": [
+     {
+      "id": "msg_1da135f3c002T0WeKUPIJ6QfBR",
+      "time": {
+       "created": 1794660065084
+      },
+      "type": "idle",
+      "outcome": "succeeded"
+     },
+     {
+      "id": "msg_1da135eb6001YKQZPMBOeQbLms",
+      "time": {
+       "created": 1794660064951,
+       "streamed": 1794660065075,
+       "completed": 1794660065083
+      },
+      "type": "assistant",
+      "agent": "build",
+      "model": {
+       "id": "m",
+       "providerID": "mock"
+      },
+      "content": [
+       {
+        "type": "text",
+        "text": "Hello."
+       }
+      ],
+      "snapshot": {
+       "start": "5d824330ef1d813b975b9475afe7d45f5e89b41c",
+       "end": "5d824330ef1d813b975b9475afe7d45f5e89b41c",
+       "files": []
+      },
+      "finish": "stop",
+      "rawFinish": "stop",
+      "cost": 0,
+      "tokens": {
+       "input": 8,
+       "output": 2,
+       "reasoning": 0,
+       "cache": {
+        "read": 0,
+        "write": 0
+       }
+      }
+     },
+     {
+      "id": "msg_1da135e5a001aJhKND3yNvn13Y",
+      "time": {
+       "created": 1794660064946
+      },
+      "text": "say hello plainly",
+      "type": "user"
+     }
+    ],
+    "cursor": {
+     "previous": "eyJpZCI6Im1zZ18xZGExMzVmM2MwMDJUMFdlS1VQSUo2UWZCUiIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6InByZXZpb3VzIn0",
+     "next": "eyJpZCI6Im1zZ18xZGExMzVlNWEwMDFhSmhLTkQzeU52bjEzWSIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6Im5leHQifQ"
+    }
+   }
+  },
+  {
+   "frame": {
+    "id": "evt_1da135f3c002T0WeKUPIJ6QfBR",
+    "created": 1794660065084,
+    "type": "session.execution.succeeded",
+    "data": {
+     "sessionID": "ses_e25eca1e0ffeQk5IZVq9mx5mIm"
+    },
+    "durable": {
+     "aggregateID": "ses_e25eca1e0ffeQk5IZVq9mx5mIm",
+     "seq": 12,
+     "version": 1
+    }
+   },
+   "snapshot": {
+    "data": [
+     {
+      "id": "msg_1da135f3c002T0WeKUPIJ6QfBR",
+      "time": {
+       "created": 1794660065084
+      },
+      "type": "idle",
+      "outcome": "succeeded"
+     },
+     {
+      "id": "msg_1da135eb6001YKQZPMBOeQbLms",
+      "time": {
+       "created": 1794660064951,
+       "streamed": 1794660065075,
+       "completed": 1794660065083
+      },
+      "type": "assistant",
+      "agent": "build",
+      "model": {
+       "id": "m",
+       "providerID": "mock"
+      },
+      "content": [
+       {
+        "type": "text",
+        "text": "Hello."
+       }
+      ],
+      "snapshot": {
+       "start": "5d824330ef1d813b975b9475afe7d45f5e89b41c",
+       "end": "5d824330ef1d813b975b9475afe7d45f5e89b41c",
+       "files": []
+      },
+      "finish": "stop",
+      "rawFinish": "stop",
+      "cost": 0,
+      "tokens": {
+       "input": 8,
+       "output": 2,
+       "reasoning": 0,
+       "cache": {
+        "read": 0,
+        "write": 0
+       }
+      }
+     },
+     {
+      "id": "msg_1da135e5a001aJhKND3yNvn13Y",
+      "time": {
+       "created": 1794660064946
+      },
+      "text": "say hello plainly",
+      "type": "user"
+     }
+    ],
+    "cursor": {
+     "previous": "eyJpZCI6Im1zZ18xZGExMzVmM2MwMDJUMFdlS1VQSUo2UWZCUiIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6InByZXZpb3VzIn0",
+     "next": "eyJpZCI6Im1zZ18xZGExMzVlNWEwMDFhSmhLTkQzeU52bjEzWSIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6Im5leHQifQ"
+    }
+   }
+  },
+  {
+   "frame": {
+    "id": "evt_1da135f780012pP6aFlDdfUYIM",
+    "created": 1794660065144,
+    "type": "session.renamed",
+    "data": {
+     "sessionID": "ses_e25eca1e0ffeQk5IZVq9mx5mIm",
+     "title": "sampler events"
+    },
+    "durable": {
+     "aggregateID": "ses_e25eca1e0ffeQk5IZVq9mx5mIm",
+     "seq": 13,
+     "version": 1
+    }
+   },
+   "snapshot": {
+    "data": [
+     {
+      "id": "msg_1da135f3c002T0WeKUPIJ6QfBR",
+      "time": {
+       "created": 1794660065084
+      },
+      "type": "idle",
+      "outcome": "succeeded"
+     },
+     {
+      "id": "msg_1da135eb6001YKQZPMBOeQbLms",
+      "time": {
+       "created": 1794660064951,
+       "streamed": 1794660065075,
+       "completed": 1794660065083
+      },
+      "type": "assistant",
+      "agent": "build",
+      "model": {
+       "id": "m",
+       "providerID": "mock"
+      },
+      "content": [
+       {
+        "type": "text",
+        "text": "Hello."
+       }
+      ],
+      "snapshot": {
+       "start": "5d824330ef1d813b975b9475afe7d45f5e89b41c",
+       "end": "5d824330ef1d813b975b9475afe7d45f5e89b41c",
+       "files": []
+      },
+      "finish": "stop",
+      "rawFinish": "stop",
+      "cost": 0,
+      "tokens": {
+       "input": 8,
+       "output": 2,
+       "reasoning": 0,
+       "cache": {
+        "read": 0,
+        "write": 0
+       }
+      }
+     },
+     {
+      "id": "msg_1da135e5a001aJhKND3yNvn13Y",
+      "time": {
+       "created": 1794660064946
+      },
+      "text": "say hello plainly",
+      "type": "user"
+     }
+    ],
+    "cursor": {
+     "previous": "eyJpZCI6Im1zZ18xZGExMzVmM2MwMDJUMFdlS1VQSUo2UWZCUiIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6InByZXZpb3VzIn0",
+     "next": "eyJpZCI6Im1zZ18xZGExMzVlNWEwMDFhSmhLTkQzeU52bjEzWSIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6Im5leHQifQ"
+    }
+   }
+  },
+  {
+   "frame": {
+    "id": "evt_1da135f79001n2BNBUe4ekBAIf",
+    "created": 1794660065145,
+    "type": "session.created",
+    "location": {
+     "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-x4jnE4/proj"
+    },
+    "data": {
+     "sessionID": "ses_e25eca087ffd4oP1SlB9uW7UGw",
+     "slug": "proud-moon",
+     "version": "local",
+     "projectID": "d3314d63c18100fdff5fee0648c3b4d13acd2f70",
+     "location": {
+      "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-x4jnE4/proj"
+     },
+     "subpath": "../../../../../../../../var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-x4jnE4/proj"
+    },
+    "durable": {
+     "aggregateID": "ses_e25eca087ffd4oP1SlB9uW7UGw",
+     "seq": 0,
+     "version": 1
+    }
+   },
+   "snapshot": {
+    "_tag": "SessionNotFoundError",
+    "sessionID": "ses_e25eca087ffd4oP1SlB9uW7UGw",
+    "message": "Session not found: ses_e25eca087ffd4oP1SlB9uW7UGw"
+   }
+  },
+  {
+   "frame": {
+    "id": "evt_1da135f7a001SV6cytPHsEZ6yH",
+    "created": 1794660065146,
+    "type": "session.deleted",
+    "data": {
+     "sessionID": "ses_e25eca087ffd4oP1SlB9uW7UGw"
+    },
+    "durable": {
+     "aggregateID": "ses_e25eca087ffd4oP1SlB9uW7UGw",
+     "seq": 1,
+     "version": 2
+    }
+   },
+   "snapshot": {
+    "_tag": "SessionNotFoundError",
+    "sessionID": "ses_e25eca087ffd4oP1SlB9uW7UGw",
+    "message": "Session not found: ses_e25eca087ffd4oP1SlB9uW7UGw"
+   }
+  },
+  {
+   "frame": {
+    "id": "evt_1da135f7c001cFx6VbGDnZr6Fl",
+    "created": 1794660065148,
+    "type": "project.updated",
+    "data": {
+     "id": "d3314d63c18100fdff5fee0648c3b4d13acd2f70",
+     "canonical": "/private/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-x4jnE4/proj",
+     "vcs": "git",
+     "name": "sampler events",
+     "time": {
+      "created": 1794660061663,
+      "updated": 1794660065148,
+      "active": 1794660061673
+     },
+     "sandboxes": []
+    }
+   }
+  },
+  {
+   "frame": {
+    "id": "evt_1da135f87001NWONvIQDtiO4Yu",
+    "created": 1794660065162,
+    "type": "pty.created",
+    "location": {
+     "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-x4jnE4/proj"
+    },
+    "data": {
+     "info": {
+      "id": "pty_1da135f7c002XqrP4sf1G2pKlW",
+      "title": "sampler",
+      "command": "/bin/sh",
+      "args": [
+       "-c",
+       "sleep 0.5; exit 0",
+       "-l"
+      ],
+      "cwd": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-x4jnE4/proj",
+      "status": "running",
+      "pid": 34157
+     }
+    }
+   }
+  },
+  {
+   "frame": {
+    "id": "evt_1da135f8b0010g87tuc8oOgwsY",
+    "created": 1794660065163,
+    "type": "pty.updated",
+    "location": {
+     "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-x4jnE4/proj"
+    },
+    "data": {
+     "info": {
+      "id": "pty_1da135f7c002XqrP4sf1G2pKlW",
+      "title": "sampler 2",
+      "command": "/bin/sh",
+      "args": [
+       "-c",
+       "sleep 0.5; exit 0",
+       "-l"
+      ],
+      "cwd": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-x4jnE4/proj",
+      "status": "running",
+      "pid": 34157
+     }
+    }
+   }
+  },
+  {
+   "frame": {
+    "id": "evt_1da1361a1001HoESsa5KDyZDcp",
+    "created": 1794660065697,
+    "type": "pty.exited",
+    "location": {
+     "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-x4jnE4/proj"
+    },
+    "data": {
+     "id": "pty_1da135f7c002XqrP4sf1G2pKlW",
+     "exitCode": 0
+    }
+   }
+  },
+  {
+   "frame": {
+    "id": "evt_1da13656a001WV09irNS2TDnHG",
+    "created": 1794660066666,
+    "type": "pty.deleted",
+    "location": {
+     "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-x4jnE4/proj"
+    },
+    "data": {
+     "id": "pty_1da135f7c002XqrP4sf1G2pKlW"
+    }
+   }
+  },
+  {
+   "frame": {
+    "id": "evt_1da136583001VdffbVejqDv4aF",
+    "created": 1794660066691,
+    "type": "filesystem.changed",
+    "location": {
+     "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-x4jnE4/proj"
+    },
+    "data": {
+     "file": "/private/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-x4jnE4/proj/.git/HEAD",
+     "event": "change"
+    }
+   }
+  },
+  {
+   "frame": {
+    "id": "evt_1da136594001JHLhVrJ012k2Xw",
+    "created": 1794660066708,
+    "type": "vcs.branch.updated",
+    "location": {
+     "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-x4jnE4/proj"
+    },
+    "data": {
+     "branch": "sampler-events"
+    }
+   }
+  },
+  {
+   "frame": {
+    "id": "evt_1da136b58001U46gLdNloE23jA",
+    "created": 1794660068184,
+    "type": "mcp.status.changed",
+    "location": {
+     "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-x4jnE4/proj"
+    },
+    "data": {
+     "server": "samplermcp"
+    }
+   }
+  },
+  {
+   "frame": {
+    "id": "evt_1da136b5d002X4b3vgAEerFls6",
+    "created": 1794660068189,
+    "type": "mcp.resources.changed",
+    "location": {
+     "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-x4jnE4/proj"
+    },
+    "data": {
+     "server": "samplermcp"
+    }
+   }
+  },
+  {
+   "frame": {
+    "id": "evt_1da136b5e001Da1mLPYBicoGjv",
+    "created": 1794660068190,
+    "type": "mcp.status.changed",
+    "location": {
+     "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-x4jnE4/proj"
+    },
+    "data": {
+     "server": "samplermcp"
+    }
+   }
+  },
+  {
+   "frame": {
+    "id": "evt_1da136d56002XCBDrN81Mfc7S6",
+    "created": 1794660068694,
+    "type": "mcp.resources.changed",
+    "location": {
+     "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-x4jnE4/proj"
+    },
+    "data": {
+     "server": "samplermcp"
+    }
+   }
+  },
+  {
+   "frame": {
+    "id": "evt_1da1371e1001m4NkIWs8Ru1e0l",
+    "created": 1794660069857,
+    "type": "models-dev.refreshed",
+    "data": {}
+   }
+  },
+  {
+   "frame": {
+    "id": "evt_1da13725a001v20FYNOB3UiirT",
+    "created": 1794660069978,
+    "type": "integration.updated",
+    "location": {
+     "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-x4jnE4/plain"
+    },
+    "data": {}
+   }
+  },
+  {
+   "frame": {
+    "id": "evt_1da137286001qlzvtpTeRCsbkA",
+    "created": 1794660070022,
+    "type": "provider.updated",
+    "location": {
+     "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-x4jnE4/plain"
+    },
+    "data": {}
+   }
+  },
+  {
+   "frame": {
+    "id": "evt_1da137289001oGmhg0VieCZRCw",
+    "created": 1794660070025,
+    "type": "model.updated",
+    "location": {
+     "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-x4jnE4/plain"
+    },
+    "data": {}
+   }
+  },
+  {
+   "frame": {
+    "id": "evt_1da13728a001PlIQGvPpZXLD19",
+    "created": 1794660070026,
+    "type": "integration.updated",
+    "location": {
+     "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-x4jnE4/proj"
+    },
+    "data": {}
+   }
+  },
+  {
+   "frame": {
+    "id": "evt_1da13728c001h1Jrl3C0PFBvNK",
+    "created": 1794660070028,
+    "type": "provider.updated",
+    "location": {
+     "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-x4jnE4/proj"
+    },
+    "data": {}
+   }
+  },
+  {
+   "frame": {
+    "id": "evt_1da13728e001pFeHXQU5e1rNok",
+    "created": 1794660070030,
+    "type": "model.updated",
+    "location": {
+     "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-x4jnE4/proj"
+    },
+    "data": {}
+   }
+  },
+  {
+   "frame": {
+    "id": "evt_1da13728f001yf4g4zKf5UvVGQ",
+    "created": 1794660070031,
+    "type": "integration.updated",
+    "location": {
+     "directory": "/Users/tide/app/wt/alpha-code-reland-1710-ui-contract/packages/cli"
+    },
+    "data": {}
+   }
+  },
+  {
+   "frame": {
+    "id": "evt_1da137291001oW4QL86kY0pu2y",
+    "created": 1794660070033,
+    "type": "provider.updated",
+    "location": {
+     "directory": "/Users/tide/app/wt/alpha-code-reland-1710-ui-contract/packages/cli"
+    },
+    "data": {}
+   }
+  },
+  {
+   "frame": {
+    "id": "evt_1da137294001jaoK6nqadl01Th",
+    "created": 1794660070036,
+    "type": "model.updated",
+    "location": {
+     "directory": "/Users/tide/app/wt/alpha-code-reland-1710-ui-contract/packages/cli"
+    },
+    "data": {}
+   }
+  },
+  {
+   "frame": {
+    "id": "evt_1da137332002SH23xQ6H2a2odE",
+    "created": 1794660070194,
+    "type": "mcp.resources.changed",
+    "location": {
+     "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-x4jnE4/proj"
+    },
+    "data": {
+     "server": "samplermcp"
+    }
+   }
+  },
+  {
+   "frame": {
+    "id": "evt_1da137332004OzZk00XS5gbICu",
+    "created": 1794660070194,
+    "type": "mcp.status.changed",
+    "location": {
+     "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-x4jnE4/proj"
+    },
+    "data": {
+     "server": "samplermcp"
+    }
+   }
+  },
+  {
+   "frame": {
+    "id": "evt_1da13771c001huG4iSCjmrTE9s",
+    "created": 1794660071196,
+    "type": "location.shutdown",
+    "location": {
+     "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-x4jnE4/proj"
+    },
+    "data": {}
+   }
+  },
+  {
+   "frame": {
+    "id": "evt_1da13771d001oL3JTNMo13WZJp",
+    "created": 1794660071197,
+    "type": "location.shutdown",
+    "location": {
+     "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-x4jnE4/plain"
+    },
+    "data": {}
+   }
+  },
+  {
+   "frame": {
+    "id": "evt_1da13771e001whM7lGaG6sO2i2",
+    "created": 1794660071198,
+    "type": "location.shutdown",
+    "location": {
+     "directory": "/Users/tide/app/wt/alpha-code-reland-1710-ui-contract/packages/cli"
+    },
+    "data": {}
+   }
+  },
+  {
+   "frame": {
+    "id": "evt_1da1378340012sqV5sloL18Yur",
+    "created": 1794660071476,
+    "type": "integration.updated",
+    "location": {
+     "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-x4jnE4/plain"
+    },
+    "data": {}
+   }
+  },
+  {
+   "frame": {
+    "id": "evt_1da137836001i4xc3LCYBaaklz",
+    "created": 1794660071478,
+    "type": "provider.updated",
+    "location": {
+     "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-x4jnE4/plain"
+    },
+    "data": {}
+   }
+  },
+  {
+   "frame": {
+    "id": "evt_1da1378380015k6k4igPzp35aX",
+    "created": 1794660071480,
+    "type": "model.updated",
+    "location": {
+     "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-x4jnE4/plain"
+    },
+    "data": {}
+   }
+  },
+  {
+   "frame": {
+    "id": "evt_1da137852001RyBwyR6TWCTtIy",
+    "created": 1794660071506,
+    "type": "vcs.branch.updated",
+    "location": {
+     "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-x4jnE4/plain"
+    },
+    "data": {
+     "branch": "main"
+    }
+   }
+  },
+  {
+   "frame": {
+    "id": "evt_1da137852002i1YSRYKGaEyUt7",
+    "created": 1794660071506,
+    "type": "agent.updated",
+    "location": {
+     "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-x4jnE4/plain"
+    },
+    "data": {}
+   }
+  },
+  {
+   "frame": {
+    "id": "evt_1da1378530013ROKYuCaTrnI3p",
+    "created": 1794660071507,
+    "type": "command.updated",
+    "location": {
+     "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-x4jnE4/plain"
+    },
+    "data": {}
+   }
+  },
+  {
+   "frame": {
+    "id": "evt_1da137853002VLB6548QVBiOcC",
+    "created": 1794660071507,
+    "type": "skill.updated",
+    "location": {
+     "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-x4jnE4/plain"
+    },
+    "data": {}
+   }
+  },
+  {
+   "frame": {
+    "id": "evt_1da13785300322xCsVZYMaV5V0",
+    "created": 1794660071507,
+    "type": "websearch.updated",
+    "location": {
+     "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-x4jnE4/plain"
+    },
+    "data": {}
+   }
+  },
+  {
+   "frame": {
+    "id": "evt_1da1378580017kDCmPmuVeYGjq",
+    "created": 1794660071512,
+    "type": "reference.updated",
+    "location": {
+     "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-x4jnE4/plain"
+    },
+    "data": {}
+   }
+  },
+  {
+   "frame": {
+    "id": "evt_1da13785c001aSdEeL3Ihp848z",
+    "created": 1794660071516,
+    "type": "integration.updated",
+    "location": {
+     "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-x4jnE4/proj"
+    },
+    "data": {}
+   }
+  },
+  {
+   "frame": {
+    "id": "evt_1da13785d0013n5wo0nj68nU3L",
+    "created": 1794660071517,
+    "type": "provider.updated",
+    "location": {
+     "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-x4jnE4/proj"
+    },
+    "data": {}
+   }
+  },
+  {
+   "frame": {
+    "id": "evt_1da13785f001Cr8R5D5enbo0IK",
+    "created": 1794660071520,
+    "type": "model.updated",
+    "location": {
+     "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-x4jnE4/proj"
+    },
+    "data": {}
+   }
+  },
+  {
+   "frame": {
+    "id": "evt_1da137862001MwD3RFuoFOvazi",
+    "created": 1794660071522,
+    "type": "plugin.updated",
+    "location": {
+     "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-x4jnE4/plain"
+    },
+    "data": {}
+   }
+  },
+  {
+   "frame": {
+    "id": "evt_1da137871001qhI2nyMh415PFt",
+    "created": 1794660071537,
+    "type": "integration.updated",
+    "location": {
+     "directory": "/Users/tide/app/wt/alpha-code-reland-1710-ui-contract/packages/cli"
+    },
+    "data": {}
+   }
+  },
+  {
+   "frame": {
+    "id": "evt_1da137873001K5MORUFrNjnzhn",
+    "created": 1794660071539,
+    "type": "provider.updated",
+    "location": {
+     "directory": "/Users/tide/app/wt/alpha-code-reland-1710-ui-contract/packages/cli"
+    },
+    "data": {}
+   }
+  },
+  {
+   "frame": {
+    "id": "evt_1da137875001W9ogH7xp6fX7HX",
+    "created": 1794660071541,
+    "type": "model.updated",
+    "location": {
+     "directory": "/Users/tide/app/wt/alpha-code-reland-1710-ui-contract/packages/cli"
+    },
+    "data": {}
+   }
+  },
+  {
+   "frame": {
+    "id": "evt_1da137878001mywpG6p9CkUwCh",
+    "created": 1794660071544,
+    "type": "vcs.branch.updated",
+    "location": {
+     "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-x4jnE4/proj"
+    },
+    "data": {
+     "branch": "sampler-events"
+    }
+   }
+  },
+  {
+   "frame": {
+    "id": "evt_1da137878002pmbg4DdYd5ia1K",
+    "created": 1794660071544,
+    "type": "agent.updated",
+    "location": {
+     "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-x4jnE4/proj"
+    },
+    "data": {}
+   }
+  },
+  {
+   "frame": {
+    "id": "evt_1da137878003tBgPjLwZuDL7a4",
+    "created": 1794660071544,
+    "type": "command.updated",
+    "location": {
+     "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-x4jnE4/proj"
+    },
+    "data": {}
+   }
+  },
+  {
+   "frame": {
+    "id": "evt_1da137878004Ri3ZonlJKUWZlx",
+    "created": 1794660071544,
+    "type": "skill.updated",
+    "location": {
+     "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-x4jnE4/proj"
+    },
+    "data": {}
+   }
+  },
+  {
+   "frame": {
+    "id": "evt_1da1378790017clYMEjrrcgfWF",
+    "created": 1794660071545,
+    "type": "websearch.updated",
+    "location": {
+     "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-x4jnE4/proj"
+    },
+    "data": {}
+   }
+  },
+  {
+   "frame": {
+    "id": "evt_1da13787d0014Xqo56NQaIbeMp",
+    "created": 1794660071549,
+    "type": "reference.updated",
+    "location": {
+     "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-x4jnE4/proj"
+    },
+    "data": {}
+   }
+  },
+  {
+   "frame": {
+    "id": "evt_1da137884001Fw6Lyy6Q5vumFe",
+    "created": 1794660071556,
+    "type": "plugin.updated",
+    "location": {
+     "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-x4jnE4/proj"
+    },
+    "data": {}
+   }
+  },
+  {
+   "frame": {
+    "id": "evt_1da13788400228J3IdoYEmnYzM",
+    "created": 1794660071556,
+    "type": "vcs.branch.updated",
+    "location": {
+     "directory": "/Users/tide/app/wt/alpha-code-reland-1710-ui-contract/packages/cli"
+    },
+    "data": {
+     "branch": "reland/1710-ui-contract"
+    }
+   }
+  },
+  {
+   "frame": {
+    "id": "evt_1da137884003T8xrKjTg5WFbFk",
+    "created": 1794660071556,
+    "type": "agent.updated",
+    "location": {
+     "directory": "/Users/tide/app/wt/alpha-code-reland-1710-ui-contract/packages/cli"
+    },
+    "data": {}
+   }
+  },
+  {
+   "frame": {
+    "id": "evt_1da137884004Mbl6DAWfVlwY6U",
+    "created": 1794660071556,
+    "type": "command.updated",
+    "location": {
+     "directory": "/Users/tide/app/wt/alpha-code-reland-1710-ui-contract/packages/cli"
+    },
+    "data": {}
+   }
+  },
+  {
+   "frame": {
+    "id": "evt_1da137885001G3Rx6Ab6zPmfTa",
+    "created": 1794660071557,
+    "type": "skill.updated",
+    "location": {
+     "directory": "/Users/tide/app/wt/alpha-code-reland-1710-ui-contract/packages/cli"
+    },
+    "data": {}
+   }
+  },
+  {
+   "frame": {
+    "id": "evt_1da137886001SMnEJUx5bHZll7",
+    "created": 1794660071558,
+    "type": "websearch.updated",
+    "location": {
+     "directory": "/Users/tide/app/wt/alpha-code-reland-1710-ui-contract/packages/cli"
+    },
+    "data": {}
+   }
+  },
+  {
+   "frame": {
+    "id": "evt_1da13788b001MpTts853AJZ1Zl",
+    "created": 1794660071563,
+    "type": "reference.updated",
+    "location": {
+     "directory": "/Users/tide/app/wt/alpha-code-reland-1710-ui-contract/packages/cli"
+    },
+    "data": {}
+   }
+  },
+  {
+   "frame": {
+    "id": "evt_1da137896001zJ8kqD3ENf64gb",
+    "created": 1794660071574,
+    "type": "plugin.updated",
+    "location": {
+     "directory": "/Users/tide/app/wt/alpha-code-reland-1710-ui-contract/packages/cli"
+    },
+    "data": {}
+   }
+  },
+  {
+   "frame": {
+    "id": "evt_1da137e18001afI1vY2EylkPSw",
+    "created": 1794660072984,
+    "type": "session.created",
+    "location": {
+     "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-x4jnE4/proj"
+    },
+    "data": {
+     "sessionID": "ses_e25ec81f6ffe443AjygXD6xvDA",
+     "slug": "stellar-river",
+     "version": "local",
+     "projectID": "d3314d63c18100fdff5fee0648c3b4d13acd2f70",
+     "location": {
+      "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-x4jnE4/proj"
+     },
+     "subpath": "../../../../../../../../var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-x4jnE4/proj"
+    },
+    "durable": {
+     "aggregateID": "ses_e25ec81f6ffe443AjygXD6xvDA",
+     "seq": 0,
+     "version": 1
+    }
+   },
+   "snapshot": {
+    "data": [
+     {
+      "id": "msg_1da137e1e001i4006Zk73gJ0Zu",
+      "time": {
+       "created": 1794660073008
+      },
+      "text": "ask me something",
+      "type": "user"
+     }
+    ],
+    "cursor": {
+     "previous": "eyJpZCI6Im1zZ18xZGExMzdlMWUwMDFpNDAwNlprNzNnSjBadSIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6InByZXZpb3VzIn0",
+     "next": "eyJpZCI6Im1zZ18xZGExMzdlMWUwMDFpNDAwNlprNzNnSjBadSIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6Im5leHQifQ"
+    }
+   }
+  },
+  {
+   "frame": {
+    "id": "evt_1da137e2000144i2c3DWrvycWl",
+    "created": 1794660072992,
+    "type": "session.inbox.enqueued",
+    "location": {
+     "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-x4jnE4/proj"
+    },
+    "data": {
+     "inboxID": "msg_1da137e1e001i4006Zk73gJ0Zu",
+     "sessionID": "ses_e25ec81f6ffe443AjygXD6xvDA",
+     "item": {
+      "type": "user",
+      "payload": {
+       "text": "ask me something"
+      },
+      "delivery": "steer"
+     }
+    },
+    "durable": {
+     "aggregateID": "ses_e25ec81f6ffe443AjygXD6xvDA",
+     "seq": 1,
+     "version": 1
+    }
+   },
+   "snapshot": {
+    "data": [
+     {
+      "id": "msg_1da137e1e001i4006Zk73gJ0Zu",
+      "time": {
+       "created": 1794660073008
+      },
+      "text": "ask me something",
+      "type": "user"
+     }
+    ],
+    "cursor": {
+     "previous": "eyJpZCI6Im1zZ18xZGExMzdlMWUwMDFpNDAwNlprNzNnSjBadSIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6InByZXZpb3VzIn0",
+     "next": "eyJpZCI6Im1zZ18xZGExMzdlMWUwMDFpNDAwNlprNzNnSjBadSIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6Im5leHQifQ"
+    }
+   }
+  },
+  {
+   "frame": {
+    "id": "evt_1da137e23001aXA6HjSrzieGPH",
+    "created": 1794660072995,
+    "type": "session.execution.started",
+    "data": {
+     "sessionID": "ses_e25ec81f6ffe443AjygXD6xvDA"
+    },
+    "durable": {
+     "aggregateID": "ses_e25ec81f6ffe443AjygXD6xvDA",
+     "seq": 2,
+     "version": 1
+    }
+   },
+   "snapshot": {
+    "data": [
+     {
+      "id": "msg_1da137e1e001i4006Zk73gJ0Zu",
+      "time": {
+       "created": 1794660073008
+      },
+      "text": "ask me something",
+      "type": "user"
+     }
+    ],
+    "cursor": {
+     "previous": "eyJpZCI6Im1zZ18xZGExMzdlMWUwMDFpNDAwNlprNzNnSjBadSIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6InByZXZpb3VzIn0",
+     "next": "eyJpZCI6Im1zZ18xZGExMzdlMWUwMDFpNDAwNlprNzNnSjBadSIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6Im5leHQifQ"
+    }
+   }
+  },
+  {
+   "frame": {
+    "id": "evt_1da137e2f001OjdOxsCs7pLFZk",
+    "created": 1794660073007,
+    "metadata": {
+     "instructions": {
+      "initial": true
+     }
+    },
+    "type": "session.instructions.updated",
+    "location": {
+     "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-x4jnE4/proj"
+    },
+    "data": {
+     "sessionID": "ses_e25ec81f6ffe443AjygXD6xvDA",
+     "delta": {
+      "core/codemode": "70364fb91a447e61e71df243f6e958f57fed40a08c42fdc97085c5c1764350c7",
+      "core/skill-guidance": "8394362d28c82fa4d13c7a9f5568c05680f6687e07db8f426a0e3c92f3027dc9",
+      "core/date": "7e11767d20af6d0a757fa2ef151926d9b692ac492d8199662599d0d5e2e86810",
+      "core/environment": "482a1d5bd945f18a2f044911443612d676478bc5283a81c2cf7065b7df1cdf58"
+     }
+    },
+    "durable": {
+     "aggregateID": "ses_e25ec81f6ffe443AjygXD6xvDA",
+     "seq": 3,
+     "version": 2
+    }
+   },
+   "snapshot": {
+    "data": [
+     {
+      "id": "msg_1da137e1e001i4006Zk73gJ0Zu",
+      "time": {
+       "created": 1794660073008
+      },
+      "text": "ask me something",
+      "type": "user"
+     }
+    ],
+    "cursor": {
+     "previous": "eyJpZCI6Im1zZ18xZGExMzdlMWUwMDFpNDAwNlprNzNnSjBadSIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6InByZXZpb3VzIn0",
+     "next": "eyJpZCI6Im1zZ18xZGExMzdlMWUwMDFpNDAwNlprNzNnSjBadSIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6Im5leHQifQ"
+    }
+   }
+  },
+  {
+   "frame": {
+    "id": "evt_1da137e30001lxGyifkK3nGCh6",
+    "created": 1794660073008,
+    "type": "session.inbox.delivered",
+    "location": {
+     "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-x4jnE4/proj"
+    },
+    "data": {
+     "sessionID": "ses_e25ec81f6ffe443AjygXD6xvDA",
+     "inboxID": "msg_1da137e1e001i4006Zk73gJ0Zu"
+    },
+    "durable": {
+     "aggregateID": "ses_e25ec81f6ffe443AjygXD6xvDA",
+     "seq": 4,
+     "version": 1
+    }
+   },
+   "snapshot": {
+    "data": [
+     {
+      "id": "msg_1da137e1e001i4006Zk73gJ0Zu",
+      "time": {
+       "created": 1794660073008
+      },
+      "text": "ask me something",
+      "type": "user"
+     }
+    ],
+    "cursor": {
+     "previous": "eyJpZCI6Im1zZ18xZGExMzdlMWUwMDFpNDAwNlprNzNnSjBadSIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6InByZXZpb3VzIn0",
+     "next": "eyJpZCI6Im1zZ18xZGExMzdlMWUwMDFpNDAwNlprNzNnSjBadSIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6Im5leHQifQ"
+    }
+   }
+  },
+  {
+   "frame": {
+    "id": "evt_1da137e62001O0OccCI8YsjZsu",
+    "created": 1794660073058,
+    "type": "session.step.started",
+    "location": {
+     "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-x4jnE4/proj"
+    },
+    "data": {
+     "sessionID": "ses_e25ec81f6ffe443AjygXD6xvDA",
+     "agent": "build",
+     "model": {
+      "id": "m",
+      "providerID": "mock"
+     },
+     "assistantMessageID": "msg_1da137e36001n1TJVDNLbth8T8",
+     "snapshot": "4eaa0f4ed9196e08d9142486ccbf2a9a303124e8",
+     "started": 1794660073015
+    },
+    "durable": {
+     "aggregateID": "ses_e25ec81f6ffe443AjygXD6xvDA",
+     "seq": 5,
+     "version": 1
+    }
+   },
+   "snapshot": {
+    "data": [
+     {
+      "id": "msg_1da137e36001n1TJVDNLbth8T8",
+      "time": {
+       "created": 1794660073015
+      },
+      "type": "assistant",
+      "agent": "build",
+      "model": {
+       "id": "m",
+       "providerID": "mock"
+      },
+      "content": [
+       {
+        "type": "text",
+        "text": ""
+       }
+      ],
+      "snapshot": {
+       "start": "4eaa0f4ed9196e08d9142486ccbf2a9a303124e8"
+      }
+     },
+     {
+      "id": "msg_1da137e1e001i4006Zk73gJ0Zu",
+      "time": {
+       "created": 1794660073008
+      },
+      "text": "ask me something",
+      "type": "user"
+     }
+    ],
+    "cursor": {
+     "previous": "eyJpZCI6Im1zZ18xZGExMzdlMzYwMDFuMVRKVkROTGJ0aDhUOCIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6InByZXZpb3VzIn0",
+     "next": "eyJpZCI6Im1zZ18xZGExMzdlMWUwMDFpNDAwNlprNzNnSjBadSIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6Im5leHQifQ"
+    }
+   }
+  },
+  {
+   "frame": {
+    "id": "evt_1da137e630016ROzP399vd58Y0",
+    "created": 1794660073059,
+    "type": "session.text.started",
+    "location": {
+     "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-x4jnE4/proj"
+    },
+    "data": {
+     "sessionID": "ses_e25ec81f6ffe443AjygXD6xvDA",
+     "assistantMessageID": "msg_1da137e36001n1TJVDNLbth8T8",
+     "ordinal": 0
+    },
+    "durable": {
+     "aggregateID": "ses_e25ec81f6ffe443AjygXD6xvDA",
+     "seq": 6,
+     "version": 1
+    }
+   },
+   "snapshot": {
+    "data": [
+     {
+      "id": "msg_1da137e36001n1TJVDNLbth8T8",
+      "time": {
+       "created": 1794660073015
+      },
+      "type": "assistant",
+      "agent": "build",
+      "model": {
+       "id": "m",
+       "providerID": "mock"
+      },
+      "content": [
+       {
+        "type": "text",
+        "text": ""
+       }
+      ],
+      "snapshot": {
+       "start": "4eaa0f4ed9196e08d9142486ccbf2a9a303124e8"
+      }
+     },
+     {
+      "id": "msg_1da137e1e001i4006Zk73gJ0Zu",
+      "time": {
+       "created": 1794660073008
+      },
+      "text": "ask me something",
+      "type": "user"
+     }
+    ],
+    "cursor": {
+     "previous": "eyJpZCI6Im1zZ18xZGExMzdlMzYwMDFuMVRKVkROTGJ0aDhUOCIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6InByZXZpb3VzIn0",
+     "next": "eyJpZCI6Im1zZ18xZGExMzdlMWUwMDFpNDAwNlprNzNnSjBadSIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6Im5leHQifQ"
+    }
+   }
+  },
+  {
+   "frame": {
+    "id": "evt_1da137e74002wls5pfdxZQuv44",
+    "created": 1794660073076,
+    "type": "session.usage.updated",
+    "data": {
+     "sessionID": "ses_e25ec81f6ffe443AjygXD6xvDA",
+     "cost": 0,
+     "tokens": {
+      "input": 0,
+      "output": 0,
+      "reasoning": 0,
+      "cache": {
+       "read": 0,
+       "write": 0
+      }
+     }
+    }
+   },
+   "snapshot": {
+    "data": [
+     {
+      "id": "msg_1da137e36001n1TJVDNLbth8T8",
+      "time": {
+       "created": 1794660073015
+      },
+      "type": "assistant",
+      "agent": "build",
+      "model": {
+       "id": "m",
+       "providerID": "mock"
+      },
+      "content": [
+       {
+        "type": "text",
+        "text": ""
+       },
+       {
+        "type": "tool",
+        "id": "call_mock_question_1",
+        "name": "question",
+        "state": {
+         "status": "streaming",
+         "input": ""
+        },
+        "time": {
+         "created": 1794660073077
+        }
+       }
+      ],
+      "snapshot": {
+       "start": "4eaa0f4ed9196e08d9142486ccbf2a9a303124e8"
+      }
+     },
+     {
+      "id": "msg_1da137e1e001i4006Zk73gJ0Zu",
+      "time": {
+       "created": 1794660073008
+      },
+      "text": "ask me something",
+      "type": "user"
+     }
+    ],
+    "cursor": {
+     "previous": "eyJpZCI6Im1zZ18xZGExMzdlMzYwMDFuMVRKVkROTGJ0aDhUOCIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6InByZXZpb3VzIn0",
+     "next": "eyJpZCI6Im1zZ18xZGExMzdlMWUwMDFpNDAwNlprNzNnSjBadSIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6Im5leHQifQ"
+    }
+   }
+  },
+  {
+   "frame": {
+    "id": "evt_1da137e74003wo3AfKmIMD5RMY",
+    "created": 1794660073076,
+    "type": "session.renamed",
+    "location": {
+     "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-x4jnE4/proj"
+    },
+    "data": {
+     "sessionID": "ses_e25ec81f6ffe443AjygXD6xvDA",
+     "title": "Mock title"
+    },
+    "durable": {
+     "aggregateID": "ses_e25ec81f6ffe443AjygXD6xvDA",
+     "seq": 8,
+     "version": 1
+    }
+   },
+   "snapshot": {
+    "data": [
+     {
+      "id": "msg_1da137e36001n1TJVDNLbth8T8",
+      "time": {
+       "created": 1794660073015
+      },
+      "type": "assistant",
+      "agent": "build",
+      "model": {
+       "id": "m",
+       "providerID": "mock"
+      },
+      "content": [
+       {
+        "type": "text",
+        "text": ""
+       },
+       {
+        "type": "tool",
+        "id": "call_mock_question_1",
+        "name": "question",
+        "state": {
+         "status": "streaming",
+         "input": ""
+        },
+        "time": {
+         "created": 1794660073077
+        }
+       }
+      ],
+      "snapshot": {
+       "start": "4eaa0f4ed9196e08d9142486ccbf2a9a303124e8"
+      }
+     },
+     {
+      "id": "msg_1da137e1e001i4006Zk73gJ0Zu",
+      "time": {
+       "created": 1794660073008
+      },
+      "text": "ask me something",
+      "type": "user"
+     }
+    ],
+    "cursor": {
+     "previous": "eyJpZCI6Im1zZ18xZGExMzdlMzYwMDFuMVRKVkROTGJ0aDhUOCIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6InByZXZpb3VzIn0",
+     "next": "eyJpZCI6Im1zZ18xZGExMzdlMWUwMDFpNDAwNlprNzNnSjBadSIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6Im5leHQifQ"
+    }
+   }
+  },
+  {
+   "frame": {
+    "id": "evt_1da137e75001sDRixdmbQF4SRK",
+    "created": 1794660073077,
+    "type": "session.text.delta",
+    "location": {
+     "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-x4jnE4/proj"
+    },
+    "data": {
+     "sessionID": "ses_e25ec81f6ffe443AjygXD6xvDA",
+     "assistantMessageID": "msg_1da137e36001n1TJVDNLbth8T8",
+     "ordinal": 0,
+     "delta": "Calling question."
+    }
+   },
+   "snapshot": {
+    "data": [
+     {
+      "id": "msg_1da137e36001n1TJVDNLbth8T8",
+      "time": {
+       "created": 1794660073015
+      },
+      "type": "assistant",
+      "agent": "build",
+      "model": {
+       "id": "m",
+       "providerID": "mock"
+      },
+      "content": [
+       {
+        "type": "text",
+        "text": ""
+       },
+       {
+        "type": "tool",
+        "id": "call_mock_question_1",
+        "name": "question",
+        "state": {
+         "status": "streaming",
+         "input": ""
+        },
+        "time": {
+         "created": 1794660073077
+        }
+       }
+      ],
+      "snapshot": {
+       "start": "4eaa0f4ed9196e08d9142486ccbf2a9a303124e8"
+      }
+     },
+     {
+      "id": "msg_1da137e1e001i4006Zk73gJ0Zu",
+      "time": {
+       "created": 1794660073008
+      },
+      "text": "ask me something",
+      "type": "user"
+     }
+    ],
+    "cursor": {
+     "previous": "eyJpZCI6Im1zZ18xZGExMzdlMzYwMDFuMVRKVkROTGJ0aDhUOCIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6InByZXZpb3VzIn0",
+     "next": "eyJpZCI6Im1zZ18xZGExMzdlMWUwMDFpNDAwNlprNzNnSjBadSIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6Im5leHQifQ"
+    }
+   }
+  },
+  {
+   "frame": {
+    "id": "evt_1da137e75002RVNjIi4ofYXpAj",
+    "created": 1794660073077,
+    "type": "session.tool.input.started",
+    "location": {
+     "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-x4jnE4/proj"
+    },
+    "data": {
+     "sessionID": "ses_e25ec81f6ffe443AjygXD6xvDA",
+     "assistantMessageID": "msg_1da137e36001n1TJVDNLbth8T8",
+     "id": "call_mock_question_1",
+     "name": "question"
+    },
+    "durable": {
+     "aggregateID": "ses_e25ec81f6ffe443AjygXD6xvDA",
+     "seq": 9,
+     "version": 1
+    }
+   },
+   "snapshot": {
+    "data": [
+     {
+      "id": "msg_1da137e36001n1TJVDNLbth8T8",
+      "time": {
+       "created": 1794660073015
+      },
+      "type": "assistant",
+      "agent": "build",
+      "model": {
+       "id": "m",
+       "providerID": "mock"
+      },
+      "content": [
+       {
+        "type": "text",
+        "text": ""
+       },
+       {
+        "type": "tool",
+        "id": "call_mock_question_1",
+        "name": "question",
+        "state": {
+         "status": "streaming",
+         "input": ""
+        },
+        "time": {
+         "created": 1794660073077
+        }
+       }
+      ],
+      "snapshot": {
+       "start": "4eaa0f4ed9196e08d9142486ccbf2a9a303124e8"
+      }
+     },
+     {
+      "id": "msg_1da137e1e001i4006Zk73gJ0Zu",
+      "time": {
+       "created": 1794660073008
+      },
+      "text": "ask me something",
+      "type": "user"
+     }
+    ],
+    "cursor": {
+     "previous": "eyJpZCI6Im1zZ18xZGExMzdlMzYwMDFuMVRKVkROTGJ0aDhUOCIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6InByZXZpb3VzIn0",
+     "next": "eyJpZCI6Im1zZ18xZGExMzdlMWUwMDFpNDAwNlprNzNnSjBadSIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6Im5leHQifQ"
+    }
+   }
+  },
+  {
+   "frame": {
+    "id": "evt_1da137ef2001cUMFKaXC0MoYcV",
+    "created": 1794660073202,
+    "type": "session.tool.input.ended",
+    "location": {
+     "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-x4jnE4/proj"
+    },
+    "data": {
+     "sessionID": "ses_e25ec81f6ffe443AjygXD6xvDA",
+     "assistantMessageID": "msg_1da137e36001n1TJVDNLbth8T8",
+     "id": "call_mock_question_1",
+     "text": "{\"questions\":[{\"question\":\"Which color?\",\"header\":\"Color\",\"options\":[{\"label\":\"Red\",\"description\":\"warm\"},{\"label\":\"Blue\",\"description\":\"cool\"}],\"multiple\":false}]}"
+    },
+    "durable": {
+     "aggregateID": "ses_e25ec81f6ffe443AjygXD6xvDA",
+     "seq": 10,
+     "version": 1
+    }
+   },
+   "snapshot": {
+    "data": [
+     {
+      "id": "msg_1da137e36001n1TJVDNLbth8T8",
+      "time": {
+       "created": 1794660073015,
+       "streamed": 1794660073207
+      },
+      "type": "assistant",
+      "agent": "build",
+      "model": {
+       "id": "m",
+       "providerID": "mock"
+      },
+      "content": [
+       {
+        "type": "text",
+        "text": "Calling question."
+       },
+       {
+        "type": "tool",
+        "id": "call_mock_question_1",
+        "name": "question",
+        "executed": false,
+        "state": {
+         "status": "running",
+         "input": {
+          "questions": [
+           {
+            "question": "Which color?",
+            "header": "Color",
+            "options": [
+             {
+              "label": "Red",
+              "description": "warm"
+             },
+             {
+              "label": "Blue",
+              "description": "cool"
+             }
+            ],
+            "multiple": false
+           }
+          ]
+         },
+         "metadata": {}
+        },
+        "time": {
+         "created": 1794660073077,
+         "ran": 1794660073204
+        }
+       }
+      ],
+      "snapshot": {
+       "start": "4eaa0f4ed9196e08d9142486ccbf2a9a303124e8"
+      }
+     },
+     {
+      "id": "msg_1da137e1e001i4006Zk73gJ0Zu",
+      "time": {
+       "created": 1794660073008
+      },
+      "text": "ask me something",
+      "type": "user"
+     }
+    ],
+    "cursor": {
+     "previous": "eyJpZCI6Im1zZ18xZGExMzdlMzYwMDFuMVRKVkROTGJ0aDhUOCIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6InByZXZpb3VzIn0",
+     "next": "eyJpZCI6Im1zZ18xZGExMzdlMWUwMDFpNDAwNlprNzNnSjBadSIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6Im5leHQifQ"
+    }
+   }
+  },
+  {
+   "frame": {
+    "id": "evt_1da137ef4001Ji6yinLxU96Jwn",
+    "created": 1794660073204,
+    "type": "session.tool.called",
+    "location": {
+     "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-x4jnE4/proj"
+    },
+    "data": {
+     "sessionID": "ses_e25ec81f6ffe443AjygXD6xvDA",
+     "assistantMessageID": "msg_1da137e36001n1TJVDNLbth8T8",
+     "id": "call_mock_question_1",
+     "input": {
+      "questions": [
+       {
+        "question": "Which color?",
+        "header": "Color",
+        "options": [
+         {
+          "label": "Red",
+          "description": "warm"
+         },
+         {
+          "label": "Blue",
+          "description": "cool"
+         }
+        ],
+        "multiple": false
+       }
+      ]
+     },
+     "executed": false
+    },
+    "durable": {
+     "aggregateID": "ses_e25ec81f6ffe443AjygXD6xvDA",
+     "seq": 11,
+     "version": 1
+    }
+   },
+   "snapshot": {
+    "data": [
+     {
+      "id": "msg_1da137e36001n1TJVDNLbth8T8",
+      "time": {
+       "created": 1794660073015,
+       "streamed": 1794660073207
+      },
+      "type": "assistant",
+      "agent": "build",
+      "model": {
+       "id": "m",
+       "providerID": "mock"
+      },
+      "content": [
+       {
+        "type": "text",
+        "text": "Calling question."
+       },
+       {
+        "type": "tool",
+        "id": "call_mock_question_1",
+        "name": "question",
+        "executed": false,
+        "state": {
+         "status": "running",
+         "input": {
+          "questions": [
+           {
+            "question": "Which color?",
+            "header": "Color",
+            "options": [
+             {
+              "label": "Red",
+              "description": "warm"
+             },
+             {
+              "label": "Blue",
+              "description": "cool"
+             }
+            ],
+            "multiple": false
+           }
+          ]
+         },
+         "metadata": {}
+        },
+        "time": {
+         "created": 1794660073077,
+         "ran": 1794660073204
+        }
+       }
+      ],
+      "snapshot": {
+       "start": "4eaa0f4ed9196e08d9142486ccbf2a9a303124e8"
+      }
+     },
+     {
+      "id": "msg_1da137e1e001i4006Zk73gJ0Zu",
+      "time": {
+       "created": 1794660073008
+      },
+      "text": "ask me something",
+      "type": "user"
+     }
+    ],
+    "cursor": {
+     "previous": "eyJpZCI6Im1zZ18xZGExMzdlMzYwMDFuMVRKVkROTGJ0aDhUOCIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6InByZXZpb3VzIn0",
+     "next": "eyJpZCI6Im1zZ18xZGExMzdlMWUwMDFpNDAwNlprNzNnSjBadSIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6Im5leHQifQ"
+    }
+   }
+  },
+  {
+   "frame": {
+    "id": "evt_1da137ef6001yj1sNjfxJxHW5l",
+    "created": 1794660073206,
+    "type": "session.text.ended",
+    "location": {
+     "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-x4jnE4/proj"
+    },
+    "data": {
+     "sessionID": "ses_e25ec81f6ffe443AjygXD6xvDA",
+     "assistantMessageID": "msg_1da137e36001n1TJVDNLbth8T8",
+     "ordinal": 0,
+     "text": "Calling question."
+    },
+    "durable": {
+     "aggregateID": "ses_e25ec81f6ffe443AjygXD6xvDA",
+     "seq": 12,
+     "version": 1
+    }
+   },
+   "snapshot": {
+    "data": [
+     {
+      "id": "msg_1da137e36001n1TJVDNLbth8T8",
+      "time": {
+       "created": 1794660073015,
+       "streamed": 1794660073207
+      },
+      "type": "assistant",
+      "agent": "build",
+      "model": {
+       "id": "m",
+       "providerID": "mock"
+      },
+      "content": [
+       {
+        "type": "text",
+        "text": "Calling question."
+       },
+       {
+        "type": "tool",
+        "id": "call_mock_question_1",
+        "name": "question",
+        "executed": false,
+        "state": {
+         "status": "running",
+         "input": {
+          "questions": [
+           {
+            "question": "Which color?",
+            "header": "Color",
+            "options": [
+             {
+              "label": "Red",
+              "description": "warm"
+             },
+             {
+              "label": "Blue",
+              "description": "cool"
+             }
+            ],
+            "multiple": false
+           }
+          ]
+         },
+         "metadata": {}
+        },
+        "time": {
+         "created": 1794660073077,
+         "ran": 1794660073204
+        }
+       }
+      ],
+      "snapshot": {
+       "start": "4eaa0f4ed9196e08d9142486ccbf2a9a303124e8"
+      }
+     },
+     {
+      "id": "msg_1da137e1e001i4006Zk73gJ0Zu",
+      "time": {
+       "created": 1794660073008
+      },
+      "text": "ask me something",
+      "type": "user"
+     }
+    ],
+    "cursor": {
+     "previous": "eyJpZCI6Im1zZ18xZGExMzdlMzYwMDFuMVRKVkROTGJ0aDhUOCIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6InByZXZpb3VzIn0",
+     "next": "eyJpZCI6Im1zZ18xZGExMzdlMWUwMDFpNDAwNlprNzNnSjBadSIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6Im5leHQifQ"
+    }
+   }
+  },
+  {
+   "frame": {
+    "id": "evt_1da137ef7001Sq33WfuyZAAsKw",
+    "created": 1794660073207,
+    "type": "session.step.streamed",
+    "location": {
+     "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-x4jnE4/proj"
+    },
+    "data": {
+     "sessionID": "ses_e25ec81f6ffe443AjygXD6xvDA",
+     "assistantMessageID": "msg_1da137e36001n1TJVDNLbth8T8"
+    },
+    "durable": {
+     "aggregateID": "ses_e25ec81f6ffe443AjygXD6xvDA",
+     "seq": 13,
+     "version": 1
+    }
+   },
+   "snapshot": {
+    "data": [
+     {
+      "id": "msg_1da137e36001n1TJVDNLbth8T8",
+      "time": {
+       "created": 1794660073015,
+       "streamed": 1794660073207
+      },
+      "type": "assistant",
+      "agent": "build",
+      "model": {
+       "id": "m",
+       "providerID": "mock"
+      },
+      "content": [
+       {
+        "type": "text",
+        "text": "Calling question."
+       },
+       {
+        "type": "tool",
+        "id": "call_mock_question_1",
+        "name": "question",
+        "executed": false,
+        "state": {
+         "status": "running",
+         "input": {
+          "questions": [
+           {
+            "question": "Which color?",
+            "header": "Color",
+            "options": [
+             {
+              "label": "Red",
+              "description": "warm"
+             },
+             {
+              "label": "Blue",
+              "description": "cool"
+             }
+            ],
+            "multiple": false
+           }
+          ]
+         },
+         "metadata": {}
+        },
+        "time": {
+         "created": 1794660073077,
+         "ran": 1794660073204
+        }
+       }
+      ],
+      "snapshot": {
+       "start": "4eaa0f4ed9196e08d9142486ccbf2a9a303124e8"
+      }
+     },
+     {
+      "id": "msg_1da137e1e001i4006Zk73gJ0Zu",
+      "time": {
+       "created": 1794660073008
+      },
+      "text": "ask me something",
+      "type": "user"
+     }
+    ],
+    "cursor": {
+     "previous": "eyJpZCI6Im1zZ18xZGExMzdlMzYwMDFuMVRKVkROTGJ0aDhUOCIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6InByZXZpb3VzIn0",
+     "next": "eyJpZCI6Im1zZ18xZGExMzdlMWUwMDFpNDAwNlprNzNnSjBadSIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6Im5leHQifQ"
+    }
+   }
+  },
+  {
+   "frame": {
+    "id": "evt_1da137efa002Z57C0BQlWdnis6",
+    "created": 1794660073210,
+    "type": "form.created",
+    "location": {
+     "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-x4jnE4/proj"
+    },
+    "data": {
+     "form": {
+      "id": "frm_1da137efa001q6QzoZm0oEuDLT",
+      "sessionID": "ses_e25ec81f6ffe443AjygXD6xvDA",
+      "title": "Questions",
+      "metadata": {
+       "kind": "question",
+       "tool": {
+        "messageID": "msg_1da137e36001n1TJVDNLbth8T8",
+        "id": "call_mock_question_1"
+       }
+      },
+      "fields": [
+       {
+        "key": "q0",
+        "title": "Color",
+        "description": "Which color?",
+        "type": "string",
+        "options": [
+         {
+          "value": "Red",
+          "label": "Red",
+          "description": "warm"
+         },
+         {
+          "value": "Blue",
+          "label": "Blue",
+          "description": "cool"
+         }
+        ],
+        "custom": true
+       }
+      ]
+     }
+    }
+   }
+  },
+  {
+   "frame": {
+    "id": "evt_1da137f04001BsTCTD5o1KAIfZ",
+    "created": 1794660073220,
+    "type": "form.cancelled",
+    "location": {
+     "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-x4jnE4/proj"
+    },
+    "data": {
+     "id": "frm_1da137efa001q6QzoZm0oEuDLT",
+     "sessionID": "ses_e25ec81f6ffe443AjygXD6xvDA"
+    }
+   },
+   "snapshot": {
+    "data": [
+     {
+      "id": "msg_1da137e36001n1TJVDNLbth8T8",
+      "time": {
+       "created": 1794660073015,
+       "streamed": 1794660073207
+      },
+      "type": "assistant",
+      "agent": "build",
+      "model": {
+       "id": "m",
+       "providerID": "mock"
+      },
+      "content": [
+       {
+        "type": "text",
+        "text": "Calling question."
+       },
+       {
+        "type": "tool",
+        "id": "call_mock_question_1",
+        "name": "question",
+        "executed": false,
+        "state": {
+         "status": "error",
+         "input": {
+          "questions": [
+           {
+            "question": "Which color?",
+            "header": "Color",
+            "options": [
+             {
+              "label": "Red",
+              "description": "warm"
+             },
+             {
+              "label": "Blue",
+              "description": "cool"
+             }
+            ],
+            "multiple": false
+           }
+          ]
+         },
+         "error": {
+          "type": "aborted",
+          "message": "The user dismissed this question"
+         }
+        },
+        "time": {
+         "created": 1794660073077,
+         "ran": 1794660073204,
+         "completed": 1794660073220
+        }
+       }
+      ],
+      "snapshot": {
+       "start": "4eaa0f4ed9196e08d9142486ccbf2a9a303124e8"
+      }
+     },
+     {
+      "id": "msg_1da137e1e001i4006Zk73gJ0Zu",
+      "time": {
+       "created": 1794660073008
+      },
+      "text": "ask me something",
+      "type": "user"
+     }
+    ],
+    "cursor": {
+     "previous": "eyJpZCI6Im1zZ18xZGExMzdlMzYwMDFuMVRKVkROTGJ0aDhUOCIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6InByZXZpb3VzIn0",
+     "next": "eyJpZCI6Im1zZ18xZGExMzdlMWUwMDFpNDAwNlprNzNnSjBadSIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6Im5leHQifQ"
+    }
+   }
+  },
+  {
+   "frame": {
+    "id": "evt_1da137f040022aLLwEX909GIXh",
+    "created": 1794660073220,
+    "type": "session.tool.failed",
+    "location": {
+     "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-x4jnE4/proj"
+    },
+    "data": {
+     "sessionID": "ses_e25ec81f6ffe443AjygXD6xvDA",
+     "assistantMessageID": "msg_1da137e36001n1TJVDNLbth8T8",
+     "id": "call_mock_question_1",
+     "error": {
+      "type": "aborted",
+      "message": "The user dismissed this question"
+     },
+     "executed": false
+    },
+    "durable": {
+     "aggregateID": "ses_e25ec81f6ffe443AjygXD6xvDA",
+     "seq": 14,
+     "version": 2
+    }
+   },
+   "snapshot": {
+    "data": [
+     {
+      "id": "msg_1da137e36001n1TJVDNLbth8T8",
+      "time": {
+       "created": 1794660073015,
+       "streamed": 1794660073207
+      },
+      "type": "assistant",
+      "agent": "build",
+      "model": {
+       "id": "m",
+       "providerID": "mock"
+      },
+      "content": [
+       {
+        "type": "text",
+        "text": "Calling question."
+       },
+       {
+        "type": "tool",
+        "id": "call_mock_question_1",
+        "name": "question",
+        "executed": false,
+        "state": {
+         "status": "error",
+         "input": {
+          "questions": [
+           {
+            "question": "Which color?",
+            "header": "Color",
+            "options": [
+             {
+              "label": "Red",
+              "description": "warm"
+             },
+             {
+              "label": "Blue",
+              "description": "cool"
+             }
+            ],
+            "multiple": false
+           }
+          ]
+         },
+         "error": {
+          "type": "aborted",
+          "message": "The user dismissed this question"
+         }
+        },
+        "time": {
+         "created": 1794660073077,
+         "ran": 1794660073204,
+         "completed": 1794660073220
+        }
+       }
+      ],
+      "snapshot": {
+       "start": "4eaa0f4ed9196e08d9142486ccbf2a9a303124e8"
+      }
+     },
+     {
+      "id": "msg_1da137e1e001i4006Zk73gJ0Zu",
+      "time": {
+       "created": 1794660073008
+      },
+      "text": "ask me something",
+      "type": "user"
+     }
+    ],
+    "cursor": {
+     "previous": "eyJpZCI6Im1zZ18xZGExMzdlMzYwMDFuMVRKVkROTGJ0aDhUOCIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6InByZXZpb3VzIn0",
+     "next": "eyJpZCI6Im1zZ18xZGExMzdlMWUwMDFpNDAwNlprNzNnSjBadSIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6Im5leHQifQ"
+    }
+   }
+  },
+  {
+   "frame": {
+    "id": "evt_1da137f13001tx5bMK5zwR3gKi",
+    "created": 1794660073235,
+    "type": "session.step.failed",
+    "location": {
+     "directory": "/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/codepuppy-sampler-x4jnE4/proj"
+    },
+    "data": {
+     "sessionID": "ses_e25ec81f6ffe443AjygXD6xvDA",
+     "assistantMessageID": "msg_1da137e36001n1TJVDNLbth8T8",
+     "error": {
+      "type": "aborted",
+      "message": "Step interrupted"
+     },
+     "rawFinish": "tool_calls",
+     "tokens": {
+      "input": 5,
+      "output": 5,
+      "reasoning": 0,
+      "cache": {
+       "read": 0,
+       "write": 0
+      }
+     },
+     "cost": 0,
+     "snapshot": "4eaa0f4ed9196e08d9142486ccbf2a9a303124e8",
+     "files": []
+    },
+    "durable": {
+     "aggregateID": "ses_e25ec81f6ffe443AjygXD6xvDA",
+     "seq": 15,
+     "version": 1
+    }
+   },
+   "snapshot": {
+    "data": [
+     {
+      "id": "msg_1da137e36001n1TJVDNLbth8T8",
+      "time": {
+       "created": 1794660073015,
+       "streamed": 1794660073207,
+       "completed": 1794660073235
+      },
+      "type": "assistant",
+      "agent": "build",
+      "model": {
+       "id": "m",
+       "providerID": "mock"
+      },
+      "content": [
+       {
+        "type": "text",
+        "text": "Calling question."
+       },
+       {
+        "type": "tool",
+        "id": "call_mock_question_1",
+        "name": "question",
+        "executed": false,
+        "state": {
+         "status": "error",
+         "input": {
+          "questions": [
+           {
+            "question": "Which color?",
+            "header": "Color",
+            "options": [
+             {
+              "label": "Red",
+              "description": "warm"
+             },
+             {
+              "label": "Blue",
+              "description": "cool"
+             }
+            ],
+            "multiple": false
+           }
+          ]
+         },
+         "error": {
+          "type": "aborted",
+          "message": "The user dismissed this question"
+         }
+        },
+        "time": {
+         "created": 1794660073077,
+         "ran": 1794660073204,
+         "completed": 1794660073220
+        }
+       }
+      ],
+      "snapshot": {
+       "start": "4eaa0f4ed9196e08d9142486ccbf2a9a303124e8",
+       "end": "4eaa0f4ed9196e08d9142486ccbf2a9a303124e8",
+       "files": []
+      },
+      "finish": "error",
+      "rawFinish": "tool_calls",
+      "cost": 0,
+      "tokens": {
+       "input": 5,
+       "output": 5,
+       "reasoning": 0,
+       "cache": {
+        "read": 0,
+        "write": 0
+       }
+      },
+      "error": {
+       "type": "aborted",
+       "message": "Step interrupted"
+      }
+     },
+     {
+      "id": "msg_1da137e1e001i4006Zk73gJ0Zu",
+      "time": {
+       "created": 1794660073008
+      },
+      "text": "ask me something",
+      "type": "user"
+     }
+    ],
+    "cursor": {
+     "previous": "eyJpZCI6Im1zZ18xZGExMzdlMzYwMDFuMVRKVkROTGJ0aDhUOCIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6InByZXZpb3VzIn0",
+     "next": "eyJpZCI6Im1zZ18xZGExMzdlMWUwMDFpNDAwNlprNzNnSjBadSIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6Im5leHQifQ"
+    }
+   }
+  },
+  {
+   "frame": {
+    "id": "evt_1da137f15001wZkBVj42r3mKH7",
+    "created": 1794660073237,
+    "type": "session.usage.updated",
+    "data": {
+     "sessionID": "ses_e25ec81f6ffe443AjygXD6xvDA",
+     "cost": 0,
+     "tokens": {
+      "input": 5,
+      "output": 5,
+      "reasoning": 0,
+      "cache": {
+       "read": 0,
+       "write": 0
+      }
+     }
+    }
+   },
+   "snapshot": {
+    "data": [
+     {
+      "id": "msg_1da137e36001n1TJVDNLbth8T8",
+      "time": {
+       "created": 1794660073015,
+       "streamed": 1794660073207,
+       "completed": 1794660073235
+      },
+      "type": "assistant",
+      "agent": "build",
+      "model": {
+       "id": "m",
+       "providerID": "mock"
+      },
+      "content": [
+       {
+        "type": "text",
+        "text": "Calling question."
+       },
+       {
+        "type": "tool",
+        "id": "call_mock_question_1",
+        "name": "question",
+        "executed": false,
+        "state": {
+         "status": "error",
+         "input": {
+          "questions": [
+           {
+            "question": "Which color?",
+            "header": "Color",
+            "options": [
+             {
+              "label": "Red",
+              "description": "warm"
+             },
+             {
+              "label": "Blue",
+              "description": "cool"
+             }
+            ],
+            "multiple": false
+           }
+          ]
+         },
+         "error": {
+          "type": "aborted",
+          "message": "The user dismissed this question"
+         }
+        },
+        "time": {
+         "created": 1794660073077,
+         "ran": 1794660073204,
+         "completed": 1794660073220
+        }
+       }
+      ],
+      "snapshot": {
+       "start": "4eaa0f4ed9196e08d9142486ccbf2a9a303124e8",
+       "end": "4eaa0f4ed9196e08d9142486ccbf2a9a303124e8",
+       "files": []
+      },
+      "finish": "error",
+      "rawFinish": "tool_calls",
+      "cost": 0,
+      "tokens": {
+       "input": 5,
+       "output": 5,
+       "reasoning": 0,
+       "cache": {
+        "read": 0,
+        "write": 0
+       }
+      },
+      "error": {
+       "type": "aborted",
+       "message": "Step interrupted"
+      }
+     },
+     {
+      "id": "msg_1da137e1e001i4006Zk73gJ0Zu",
+      "time": {
+       "created": 1794660073008
+      },
+      "text": "ask me something",
+      "type": "user"
+     }
+    ],
+    "cursor": {
+     "previous": "eyJpZCI6Im1zZ18xZGExMzdlMzYwMDFuMVRKVkROTGJ0aDhUOCIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6InByZXZpb3VzIn0",
+     "next": "eyJpZCI6Im1zZ18xZGExMzdlMWUwMDFpNDAwNlprNzNnSjBadSIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6Im5leHQifQ"
+    }
+   }
+  },
+  {
+   "frame": {
+    "id": "evt_1da137f15002aiyF4E74nyf4hK",
+    "created": 1794660073237,
+    "type": "session.execution.interrupted",
+    "data": {
+     "sessionID": "ses_e25ec81f6ffe443AjygXD6xvDA",
+     "reason": "shutdown"
+    },
+    "durable": {
+     "aggregateID": "ses_e25ec81f6ffe443AjygXD6xvDA",
+     "seq": 16,
+     "version": 1
+    }
+   },
+   "snapshot": {
+    "data": [
+     {
+      "id": "msg_1da137e36001n1TJVDNLbth8T8",
+      "time": {
+       "created": 1794660073015,
+       "streamed": 1794660073207,
+       "completed": 1794660073235
+      },
+      "type": "assistant",
+      "agent": "build",
+      "model": {
+       "id": "m",
+       "providerID": "mock"
+      },
+      "content": [
+       {
+        "type": "text",
+        "text": "Calling question."
+       },
+       {
+        "type": "tool",
+        "id": "call_mock_question_1",
+        "name": "question",
+        "executed": false,
+        "state": {
+         "status": "error",
+         "input": {
+          "questions": [
+           {
+            "question": "Which color?",
+            "header": "Color",
+            "options": [
+             {
+              "label": "Red",
+              "description": "warm"
+             },
+             {
+              "label": "Blue",
+              "description": "cool"
+             }
+            ],
+            "multiple": false
+           }
+          ]
+         },
+         "error": {
+          "type": "aborted",
+          "message": "The user dismissed this question"
+         }
+        },
+        "time": {
+         "created": 1794660073077,
+         "ran": 1794660073204,
+         "completed": 1794660073220
+        }
+       }
+      ],
+      "snapshot": {
+       "start": "4eaa0f4ed9196e08d9142486ccbf2a9a303124e8",
+       "end": "4eaa0f4ed9196e08d9142486ccbf2a9a303124e8",
+       "files": []
+      },
+      "finish": "error",
+      "rawFinish": "tool_calls",
+      "cost": 0,
+      "tokens": {
+       "input": 5,
+       "output": 5,
+       "reasoning": 0,
+       "cache": {
+        "read": 0,
+        "write": 0
+       }
+      },
+      "error": {
+       "type": "aborted",
+       "message": "Step interrupted"
+      }
+     },
+     {
+      "id": "msg_1da137e1e001i4006Zk73gJ0Zu",
+      "time": {
+       "created": 1794660073008
+      },
+      "text": "ask me something",
+      "type": "user"
+     }
+    ],
+    "cursor": {
+     "previous": "eyJpZCI6Im1zZ18xZGExMzdlMzYwMDFuMVRKVkROTGJ0aDhUOCIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6InByZXZpb3VzIn0",
+     "next": "eyJpZCI6Im1zZ18xZGExMzdlMWUwMDFpNDAwNlprNzNnSjBadSIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6Im5leHQifQ"
+    }
+   }
+  }
+ ],
+ "_engine": {
+  "entry": "packages/cli",
+  "packages": {
+   "packages/ai": "de02ecdffd895482b57d9ec16e640b8c4e1d427c",
+   "packages/cli": "544883d154af3d90d64f2638bef467852fe252aa",
+   "packages/client": "3d3c95581389d702c46e0fe7ccdadbcce295872b",
+   "packages/codemode": "eb7ca2279c0d93a2e967709e18346f3aa31a8e23",
+   "packages/core": "ed40aaecc1970bf94cf05789569c42e42e075716",
+   "packages/latex": "abcd38e17eb09d996d975964f46be0a2e758fdf4",
+   "packages/merman": "3feaef89d940956096deb30e2b9f85f3fabdfe15",
+   "packages/plugin": "edac39a272e0ae30627c47135697bb79f2ab004b",
+   "packages/plugin-browser": "a3fd121205a803d1a82d97514cc09245010656cb",
+   "packages/protocol": "3117071f374c96909ccc2250cd5333a11d521854",
+   "packages/schema": "d2fb83a65f20c756833e9756a606b9ee2429f940",
+   "packages/server": "48bfa1e931af6e4c7d973119e173d28124aaa53d",
+   "packages/simulation": "7b707eb9b69aa826e91677a8416cfb8cda3efcf5",
+   "packages/theme": "0afba31d85d03fa7e34f8a98a38ccf355d6ec6c5",
+   "packages/tui": "ceda52b2e7ba2f5d9c2a74814879eca606586a56",
+   "packages/ui": "f2726368d2f8590af83a2101579f38be14d3497f",
+   "packages/util": "35c030bb0849b25ae9e10309ff9b185ee18b7ee3"
+  }
+ }
+}

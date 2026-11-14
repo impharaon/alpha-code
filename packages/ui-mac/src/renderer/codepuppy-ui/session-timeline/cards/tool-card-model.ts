@@ -11,7 +11,7 @@
 // 命中规则的卡,字段先走类别 allowlist 与 typed
 // normalization(I2 防御读取),再过共享 redactor(tool-redactor);redactor
 // 任一步失败即隐藏整字段(AC5),不回退 raw string。
-import type { ToolPart, ToolState } from "@opencode-ai/sdk/v2/client"
+import type { ToolPart, ToolState } from "../../../../engine-adapter/contract/v1"
 // seams I6:身份类型取自契约模块本身,不再借 SDK 生成类型。
 import type { ToolAuthority, ToolIdentity, ToolLocation } from "@opencode/schema/tool-identity"
 import { isNetFailureLayer, type NetFailureLayer } from "@opencode/schema/codepuppy-net-failure"

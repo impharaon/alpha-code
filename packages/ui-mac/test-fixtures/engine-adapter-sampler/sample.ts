@@ -8,19 +8,34 @@ import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join, resolve } from "node:path"
 import { createEngineFetch } from "../../src/engine-adapter/index"
-import { requestFingerprint } from "../../src/engine-adapter/permission-replies"
+import { requestFingerprint } from "../../src/engine-adapter/contract/receipts"
+import { OpenCode } from "@opencode-ai/client"
+import { createOpencodeClient } from "@opencode-ai/sdk/v2/client"
+import { matchServed } from "../../src/engine-adapter/contract/routes"
+import { dirtyEnginePaths, engineIdentity } from "./engine-identity"
 import { startMockModel } from "./mock-model"
+import { startMockMcp } from "./mock-mcp"
+import { startMockOAuth } from "./mock-oauth"
 
 const REPO = resolve(import.meta.dir, "../../../..")
 const OUT = resolve(import.meta.dir, "../../src/engine-adapter/fixtures")
 const SOURCE_PATH = "packages/ui-mac/test-fixtures/engine-adapter-sampler/sample.ts"
 const ENGINE_PORT = Number(process.env.SAMPLER_ENGINE_PORT ?? 47911)
 const MODEL_PORT = Number(process.env.SAMPLER_MODEL_PORT ?? 47920)
+const OAUTH_PORT = Number(process.env.SAMPLER_OAUTH_PORT ?? 47930)
+const MCP_PORT = Number(process.env.SAMPLER_MCP_PORT ?? 47940)
 
 // 只跑点名的剧本:`bun sample.ts tools continue files command`;不点名 = 全部。
 const only = new Set(process.argv.slice(2))
 const run = (name: string) => only.size === 0 || only.has(name)
 
+// `#1697` I-04(设计 §4.10 e):夹具记下引擎源码身份;引擎包有未提交改动时不采(那样的样本对不上任何一个提交)。
+const dirty = dirtyEnginePaths(REPO)
+if (dirty.length) {
+  console.error(`engine sources have uncommitted changes; commit or stash them before sampling:\n${dirty.join("\n")}`)
+  process.exit(1)
+}
+const ENGINE = engineIdentity(REPO)
 const commit = Bun.spawnSync(["git", "-C", REPO, "rev-parse", "--short=10", "HEAD"]).stdout.toString().trim()
 const source = (what: string) =>
   `Sampled by \`bun ${SOURCE_PATH}\` (alpha-code#1668 L6) at ${commit}: a real OpenCode 2 engine from this repo's packages/cli \`serve\`, ` +
@@ -186,9 +201,51 @@ const recordsOf = (sessionID: string) =>
   }))
 const create = async () => (await call("POST", "/api/session", { location: { directory: project } })).data.id as string
 const finalOf = async (sessionID: string) => (await call("GET", `/api/session/${sessionID}/message?order=asc&limit=200`)).data
-const write = (name: string, value: unknown) => writeFileSync(join(OUT, name), JSON.stringify(value, null, 1))
+const write = (name: string, value: Record<string, unknown>) =>
+  writeFileSync(join(OUT, name), JSON.stringify({ ...value, _engine: ENGINE }, null, 1))
 
 try {
+  // `#1697` 放回 r4:与 permission-reply 剧本同样走真引擎公开的创建/读取审批 API,不手写上游响应。
+  if (run("approval-actions")) {
+    const sessionID = (await call("POST", "/api/session", {
+      location: { directory: project },
+      permissions: [{ action: "*", resource: "*", effect: "ask" }],
+    })).data.id as string
+    const cases = [
+      { name: "shell", action: "shell", resources: ["echo parity"], save: ["echo *"] },
+      { name: "subagent", action: "subagent", resources: ["general"], save: ["general"] },
+      {
+        name: "policy",
+        action: "shell",
+        resources: ["echo policy"],
+        save: ["echo *"],
+        metadata: {
+          identity: { kind: "builtin", name: "shell" },
+          authority: { kind: "engine" },
+          policy: { canonical: "shell", askedBy: "policy" },
+          codepuppyRisk: "low",
+        },
+      },
+    ]
+    const sampled = []
+    for (const { name, ...payload } of cases) {
+      const created = await exchange("POST", `/api/session/${sessionID}/permission`, payload)
+      if (created.status !== 200 || created.body.data.effect !== "ask")
+        throw new Error(`approval-actions ${name}: ${created.status} ${JSON.stringify(created.body)}`)
+      const current = await exchange("GET", `/api/session/${sessionID}/permission/${created.body.data.id}`)
+      if (current.status !== 200) throw new Error(`approval-actions ${name}: GET ${current.status}`)
+      sampled.push({ name, request: current.body.data })
+    }
+    write("approval-actions.json", {
+      _source: source(
+        "Approval action parity: a fresh session has a wildcard ask ruleset. POST /api/session/:id/permission creates shell and subagent capability requests without policy metadata, plus a shell request with the frozen I7a metadata.policy keys supplied to the public API; each request here is the raw GET /api/session/:id/permission/:requestID response. " +
+          "This samples the engine's public permission API, as permission-reply does, not a model/tool invocation; no ext runs here. The comparison's expected v1 actions come from the Code Puppy command/delegation cards, never from the translator's response.",
+      ),
+      cases: sampled,
+    })
+    await call("POST", `/api/session/${sessionID}/permission/${sampled[0]!.request.id}/reply`, { decision: "reject" })
+  }
+
   if (run("base")) {
     // 1. read-tool:思考 + 正文 + 读文件;用户消息带一个 I11' 暂存附件条目(data: URI 声明自定义 mime,引擎嗅探成 text/plain)
     const meta = { v: 1, name: "x.pdf", mime: "application/pdf", size: 3, path: "attachments/00000000-0000-4000-8000-000000000000/x.pdf", reader: "pdf" }
@@ -309,8 +366,10 @@ try {
     await Bun.sleep(300)
     const pendingA = await exchange("GET", `/api/session/${sessionA}/permission`)
     const getA1 = await exchange("GET", `/api/session/${sessionA}/permission/${a1}`)
-    await viaAdapter("GET", `/permission?directory=${encodeURIComponent(project)}`)
-    const command = { requestFingerprint: await requestFingerprint(getA1.body.data), decisionID: "pdec_sampler_reject", decision: "reject" }
+    // 指纹按适配器交给界面的那份 v1 请求、用回执账本导出的同一个函数算(设计 §4.8)
+    const shown = async (id: string) =>
+      ((await viaAdapter("GET", `/permission?directory=${encodeURIComponent(project)}`)).body as any[]).find((request) => request.id === id)
+    const command = { requestFingerprint: await requestFingerprint(await shown(a1)), decisionID: "pdec_sampler_reject", decision: "reject" }
     const rejected = await viaAdapter("POST", `/api/session/${sessionA}/permission/${a1}/reply`, command)
     const replay = await viaAdapter("POST", `/api/session/${sessionA}/permission/${a1}/reply`, command)
     const replyAgain = await exchange("POST", `/api/session/${sessionA}/permission/${a1}/reply`, { decision: "once" })
@@ -325,10 +384,8 @@ try {
     const sessionD = await create()
     const [c1, c2] = [await askSaving(sessionC, "a.env"), await askSaving(sessionC, "ab.env")].map((item) => item.body.data.id as string)
     await Bun.sleep(300)
-    await viaAdapter("GET", `/permission?directory=${encodeURIComponent(project)}`)
-    const getC1 = await exchange("GET", `/api/session/${sessionC}/permission/${c1}`)
     const alwaysCommand = {
-      requestFingerprint: await requestFingerprint(getC1.body.data),
+      requestFingerprint: await requestFingerprint(await shown(c1)),
       decisionID: "pdec_sampler_always",
       decision: "always",
       grantScope: { kind: "project", projectID: "unused-by-the-adapter" },
@@ -352,7 +409,7 @@ try {
       _source: source(
         "Three asks created with POST /api/session/:id/permission (agent build, read, save [\"*\"]): A1 .env and A2 other.env in session A, B1 .env in session B. " +
           "`frames` = every permission.asked / permission.replied frame of A and B in arrival order. `pendingA` / `getA1` are the raw engine reads before replying; " +
-          "`rejected` / `replay` are the adapter's v2 reply route for A1 (reject, then the same command again); `replyAgain` is a raw second engine reply to A1; " +
+          "`rejected` / `replay` are the adapter's v2 reply route for A1 (reject, then the same command again; the command's fingerprint is computed over the request as the adapter's GET /permission displays it); `replyAgain` is a raw second engine reply to A1; " +
           "`pendingB` is B's list after the reject; `settled` is the raw once reply to B1. " +
           "`sessionAlways`: C1 a.env and C2 ab.env (save [\"a*\"]) in session C; `allowed` is the adapter's v2 reply route for C1 with decision always; " +
           "`pendingAfter` / `rules` are C's pending list and session rules right after; `askSame` / `askOther` are fresh POST /api/session/:id/permission for a.env / b.env in C, " +
@@ -580,6 +637,387 @@ try {
       createdFrames,
       unlinkFrames: fsFrames(unlinkFrom),
     })
+  }
+
+  // ── `#1697` I-04 M2a:目录类的原始 2.x 响应(适配器 GET /agent、GET /provider 的输入),给翻译器自有投影的等价核对 ──
+  if (run("catalog")) {
+    const fresh = await create() // 新建、还没提问的会话:2.x 不给标题
+    write("catalog.json", {
+      _source: source(
+        "Raw 2.x catalog responses for the project location, as the adapter's GET /agent and GET /provider read them: GET /api/agent, GET /api/provider, GET /api/model, GET /api/model/default; and GET /api/session (what GET /session translates and what the /api/session passthrough returns) right after creating freshSessionID, which has no prompt and so no title. 2.x provider config takes no model status (a declared status deprecated comes back active), so no deprecated model can be sampled here; the parity test derives one by flipping a sampled model's status.",
+      ),
+      directory: project,
+      agents: await call("GET", `/api/agent?${loc}`),
+      providers: await call("GET", `/api/provider?${loc}`),
+      models: await call("GET", `/api/model?${loc}`),
+      defaultModel: await call("GET", `/api/model/default?${loc}`),
+      freshSessionID: fresh,
+      sessions: await call("GET", `/api/session?${loc}&limit=200`),
+    })
+  }
+
+  // ── `#1697` I-04 M2a:消息谱系里其余几种(切档位、`!` shell、压缩),给翻译器自有消息投影的等价核对 ──
+  if (run("lineage")) {
+    autoAllow = true
+    const sessionID = await create()
+    const at = `?directory=${encodeURIComponent(project)}`
+    const settled = async (done: (messages: any[]) => boolean) => {
+      for (let attempt = 0; attempt < 300; attempt++) {
+        if (done(await finalOf(sessionID))) return
+        await Bun.sleep(100)
+      }
+      throw new Error(`session ${sessionID} did not settle`)
+    }
+    // 经适配器发(与界面同一条路):带档位的发送 ⇒ 2.x 先切档位再提问;「压缩对话」;composer 的 `!` 命令
+    const sent = async (path: string, body: unknown) => {
+      const response = await viaAdapter("POST", `/session/${sessionID}/${path}${at}`, body)
+      if (response.status >= 300) throw new Error(`${path} via the adapter: ${response.status} ${JSON.stringify(response.body)}`)
+    }
+    await sent("prompt_async", { agent: "build", parts: [{ type: "text", text: "say hello plainly" }] })
+    await idle(sessionID)
+    // 压缩在 shell 之前:消息投影把压缩挂在最近一条用户消息上,shell 之后没有可挂的
+    await sent("summarize", {})
+    await settled((messages) => messages.some((message) => message.type === "compaction" && message.status !== "running"))
+    await sent("shell", { command: "echo lineage" })
+    await settled((messages) => messages.some((message) => message.type === "shell" && message.status !== "running"))
+    write("lineage.json", {
+      _source: source(
+        "Message lineage: via the adapter, a prompt with agent build (2.x records agent-switched first; permission asks answered once), then summarize (compaction), then a composer shell command echo lineage. `final` = order=asc once the compaction settled and the shell exited.",
+      ),
+      directory: project,
+      sessionID,
+      final: await finalOf(sessionID),
+    })
+    autoAllow = false
+  }
+
+  // ── `#1697` I-04 M5b(设计 §4.10 d):每条直通路由经冻结界面自己的客户端实调一次,记下适配器交回的状态码与响应体 ──
+  if (run("passthrough")) {
+    autoAllow = true
+    const oauth = startMockOAuth(OAUTH_PORT)
+    try {
+      // 经适配器的每个往返都记下(只记第一条命中的约定路由)
+      const exchanges: Record<string, { request: string; status: number; body: unknown }> = {}
+      const recordingFetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+        const request = new Request(input, init)
+        const response = await adapterFetch(request)
+        const url = new URL(request.url)
+        const key = matchServed(request.method, url.pathname)?.key
+        if (key && !(key in exchanges)) {
+          const text = await response.clone().text()
+          let body: unknown = text
+          try {
+            body = text ? JSON.parse(text) : null
+          } catch {}
+          exchanges[key] = { request: `${request.method} ${url.pathname}${url.search}`, status: response.status, body }
+        }
+        return response
+      }) as typeof fetch
+      // 两个冻结客户端,调用形状照冻结界面的发出点(routes-coverage 扫出的那些)
+      const legacy = OpenCode.make({ baseUrl: BASE, fetch: recordingFetch })
+      const v1 = createOpencodeClient({ baseUrl: BASE, directory: project, fetch: recordingFetch })
+      // 项目里登记一条本地参考目录(GET /api/reference 才有元素可核),再按界面的做法让引擎重载这个目录
+      writeFileSync(join(project, "opencode.json"), JSON.stringify({ references: { notes: { path: join(project, "sub"), description: "sampler notes" } } }))
+      await viaAdapter("POST", `/instance/dispose?directory=${encodeURIComponent(project)}`)
+      const location = { directory: project }
+      const model = { id: "m", providerID: "mock" }
+      const quietly = async (what: string, call: () => Promise<unknown>) =>
+        call().catch((error) => console.error(`passthrough ${what}:`, error instanceof Error ? error.message : error))
+
+      const sessionID = await create()
+      await call("POST", `/api/session/${sessionID}/prompt`, { text: "say hello plainly" })
+      await idle(sessionID)
+      const userID = ((await finalOf(sessionID)) as any[]).find((message) => message.type === "user").id as string
+      // 会话正在跑时读 active(假模型的 slow shell 剧本跑 1.2 秒)
+      const busy = await create()
+      await call("POST", `/api/session/${busy}/prompt`, { text: "run a slow shell" })
+      for (let attempt = 0; attempt < 50 && !(busy in ((await call("GET", "/api/session/active")).data ?? {})); attempt++) await Bun.sleep(50)
+      await quietly("session.active", () => legacy.session.active())
+      await idle(busy)
+
+      await quietly("v2.agent.list", () => v1.v2.agent.list({ location }))
+      await quietly("v2.provider.get", () => v1.v2.provider.get({ providerID: "mock", location }))
+      await quietly("v2.reference.list", () => v1.v2.reference.list())
+      await quietly("session.list", () => legacy.session.list({ location }))
+      await quietly("session.get", () => legacy.session.get({ sessionID }))
+      await quietly("v2.session.switchModel", () => v1.v2.session.switchModel({ sessionID, model }))
+      await quietly("session.fork", () => legacy.session.fork({ sessionID, messageID: userID }))
+      await quietly("session.shell", () => legacy.session.shell({ sessionID, command: "echo passthrough" }))
+      await Bun.sleep(500)
+      await quietly("session.compact", () => legacy.session.compact({ sessionID }))
+      await Bun.sleep(500)
+      const doomed = await quietly("session.create", () => legacy.session.create({ agent: "build", model, location }))
+      await quietly("session.remove", () => legacy.session.remove({ sessionID: (doomed as { id: string }).id }))
+      await quietly("file.find", () => legacy.file.find({ location, query: "a", type: "file", limit: 10 }))
+      await quietly("vcs.status", () => legacy.vcs.status({ location }))
+      await quietly("vcs.diff", () => legacy.vcs.diff({ location, mode: "working" }))
+      // 1.17.13 客户端交回 location 信封(冻结的 context/terminal.tsx 读 `.data.id`)
+      const pty = ((await quietly("pty.create", () => legacy.pty.create({ location, title: "sampler" }))) as { data?: { id: string } } | undefined)?.data
+      if (pty) {
+        await quietly("pty.get", () => legacy.pty.get({ ptyID: pty.id, location }))
+        await quietly("pty.update", () => legacy.pty.update({ ptyID: pty.id, location, title: "sampler 2", size: { rows: 24, cols: 80 } }))
+        await quietly("pty.remove", () => legacy.pty.remove({ ptyID: pty.id, location }))
+      }
+
+      // 集成:一台要 OAuth 的远端 MCP(本机假服务器);引擎把每台远端 MCP 登记成一个 OAuth 集成
+      await call("PUT", `/api/experimental/mcp/oauthprobe?${loc}`, { config: { type: "remote", url: `${oauth.origin}/mcp` } })
+      const integrations = (await call("GET", `/api/integration?${loc}`)).data as any[]
+      const mcp = integrations.find((item) => item.metadata?.source === "mcp" && item.name === "oauthprobe")
+      const keyed = integrations.find((item) => item.methods?.some((method: any) => method.type === "key"))
+      const detail = ((await quietly("integration.get", () => legacy.integration.get({ integrationID: mcp.id, location }))) as any)?.data
+      const methodID = detail?.methods?.find((method: any) => method.type === "oauth")?.id
+      const attempt = (
+        (await quietly("integration.oauth.connect", () =>
+          legacy.integration.oauth.connect({ integrationID: mcp.id, methodID, inputs: {}, location } as never),
+        )) as { data?: { attemptID: string; url: string } } | undefined
+      )?.data
+      if (attempt) {
+        await quietly("integration.oauth.status", () => legacy.integration.oauth.status({ integrationID: mcp.id, attemptID: attempt.attemptID, location }))
+        // 授权页由用户在浏览器里点;这里照引擎交回的授权地址拼回调(state 与 redirect_uri 原样),交给 complete
+        const authorize = new URL(attempt.url)
+        const callback = new URL(authorize.searchParams.get("redirect_uri")!)
+        callback.searchParams.set("code", "sampler-code")
+        callback.searchParams.set("state", authorize.searchParams.get("state")!)
+        await quietly("integration.oauth.complete", () =>
+          legacy.integration.oauth.complete({ integrationID: mcp.id, attemptID: attempt.attemptID, location, code: callback.toString() }),
+        )
+      }
+      if (keyed)
+        await quietly("integration.connect.key", () => legacy.integration.connect.key({ integrationID: keyed.id, location, key: "sampler-key" }))
+
+      write("passthrough.json", {
+        _source: source(
+          "Every passthrough route called once through the adapter by the frozen client that sends it (OpenCode.make for the 1.17.13 client, createOpencodeClient for the v1 SDK), with the call shapes of the frozen call sites; `exchanges` keeps, per contract route, the first request and the adapter's status and body. " +
+            "session.active is read while a second session runs the mock's slow shell. The integration routes use a remote MCP added at runtime (PUT /api/experimental/mcp/oauthprobe) whose OAuth server is the local mock-oauth.ts next to the sampler; the engine runs the real MCP SDK flow against it (401 + resource metadata, authorization server metadata, dynamic registration, token exchange). " +
+            "The authorization page is not visited: the sampler builds the callback URL from the attempt's own redirect_uri and state with code sampler-code and passes it to complete. connect/key uses the first integration that offers a key method.",
+        ),
+        directory: project,
+        integrations: { mcp: mcp?.id, keyed: keyed?.id, oauthRequests: oauth.requests },
+        exchanges,
+      })
+    } finally {
+      oauth.stop()
+      autoAllow = false
+    }
+  }
+
+  // ── `#1697` I-04 M5c(设计 §4.10 c):每条翻译路由经适配器发一次冻结界面会发的 v1 请求,记下翻译器为它向 2.x 发出的每个往返 ──
+  if (run("routes")) {
+    autoAllow = true
+    const oauth = startMockOAuth(OAUTH_PORT)
+    try {
+      type Upstream = { method: string; path: string; status: number; contentType: string | null; body: unknown }
+      let bucket: Upstream[] = []
+      const routesFetch = createEngineFetch({
+        isEngineOrigin: (origin) => origin === BASE,
+        fetch: (async (input: RequestInfo | URL, init?: RequestInit) => {
+          const request = new Request(input, init)
+          request.headers.set("authorization", HEADERS.authorization)
+          const response = await fetch(request)
+          const url = new URL(request.url)
+          const contentType = response.headers.get("content-type")
+          // SSE 不记(事件流归事件用例)
+          if (!contentType?.includes("text/event-stream")) {
+            const text = await response.clone().text()
+            let body: unknown = text
+            try {
+              body = text ? JSON.parse(text) : null
+            } catch {}
+            bucket.push({ method: request.method, path: `${url.pathname}${url.search}`, status: response.status, contentType, body })
+          }
+          return response
+        }) as typeof fetch,
+      }) as typeof fetch
+      const cases: Record<string, { request: { method: string; path: string; body?: unknown; headers?: Record<string, string> }; upstream: Upstream[]; status: number }> = {}
+      const at = `directory=${encodeURIComponent(project)}`
+      const hit = async (method: string, path: string, body?: unknown, headers?: Record<string, string>) => {
+        bucket = []
+        const response = await routesFetch(`${BASE}${path}`, {
+          method,
+          headers: { "content-type": "application/json", ...headers },
+          ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+        })
+        const text = await response.text()
+        let parsed: unknown = text
+        try {
+          parsed = text ? JSON.parse(text) : null
+        } catch {}
+        const key = matchServed(method, new URL(`${BASE}${path}`).pathname)?.key
+        if (key && !(key in cases)) cases[key] = { request: { method, path, ...(body === undefined ? {} : { body }), ...(headers ? { headers } : {}) }, upstream: bucket, status: response.status }
+        return parsed as any
+      }
+
+      // 准备:一个有对话的会话、一个挂着提问表单的会话、一台远端 MCP(本机假 OAuth)
+      const chat = await create()
+      await call("POST", `/api/session/${chat}/prompt`, { text: "say hello plainly" })
+      await idle(chat)
+      const userID = ((await finalOf(chat)) as any[]).find((message) => message.type === "user").id as string
+      const asking = async () => {
+        const sessionID = await create()
+        await call("POST", `/api/session/${sessionID}/prompt`, { text: "ask me something" })
+        for (let attempt = 0; attempt < 100; attempt++) {
+          const forms = (await call("GET", `/api/form?${loc}`)).data as any[]
+          const form = forms.find((item) => item.sessionID === sessionID)
+          if (form) return { sessionID, formID: form.id as string }
+          await Bun.sleep(100)
+        }
+        throw new Error("the mock did not ask")
+      }
+      const replied = await asking()
+      const rejected = await asking()
+      await call("PUT", `/api/experimental/mcp/oauthprobe?${loc}`, { config: { type: "remote", url: `${oauth.origin}/mcp` } })
+
+      await hit("GET", "/global/health")
+      // 0.2.0 的固定协议答复也走真入口采样;应当没有任何引擎往返。
+      await hit("GET", "/api/health")
+      await hit("GET", `/path?${at}`)
+      await hit("GET", `/project?${at}`)
+      const current = await hit("GET", `/project/current?${at}`)
+      await hit("GET", `/api/project/current?location%5Bdirectory%5D=${encodeURIComponent(project)}`)
+      await hit("PATCH", `/project/${current.id}?${at}`, { name: "sampler" })
+      // git init 要一个还不是仓库的目录(项目本身已是 git 仓库,引擎回 409)
+      const plain = join(root, "plain")
+      mkdirSync(plain, { recursive: true })
+      await hit("POST", `/project/git/init?directory=${encodeURIComponent(plain)}`)
+      await hit("GET", `/session?${at}`)
+      await hit("GET", `/experimental/session?roots=true`)
+      const created = await hit("POST", `/session?${at}`, { title: "sampler created" })
+      await hit("GET", `/session/status?${at}`)
+      await hit("GET", `/session/${chat}?${at}`)
+      await hit("PATCH", `/session/${created.id}?${at}`, { title: "sampler renamed" })
+      await hit("POST", `/session/${chat}/fork?${at}`, { messageID: userID })
+      await hit("POST", `/session/${chat}/abort?${at}`)
+      const prompted = await create()
+      await hit("POST", `/session/${prompted}/prompt_async?${at}`, { parts: [{ type: "text", text: "say hello plainly" }] })
+      await idle(prompted)
+      const shelled = await create()
+      await hit("POST", `/session/${shelled}/shell?${at}`, { command: "echo routes", agent: "build" })
+      await Bun.sleep(500)
+      await hit("GET", `/session/${chat}/message/${userID}?${at}`)
+      await hit("POST", `/session/${chat}/revert?${at}`, { messageID: userID })
+      await hit("POST", `/session/${chat}/unrevert?${at}`)
+      await hit("POST", `/session/${prompted}/summarize?${at}`, {})
+      await Bun.sleep(500)
+      await hit("POST", `/api/session/${created.id}/rename`, { title: "sampler rename" })
+      await hit("DELETE", `/session/${created.id}?${at}`)
+      await hit("GET", `/agent?${at}`)
+      await hit("GET", `/command?${at}`)
+      await hit("GET", `/mcp?${at}`)
+      await hit("GET", `/experimental/resource?${at}`)
+      await hit("POST", `/mcp/oauthprobe/disconnect?${at}`)
+      await hit("POST", `/mcp/oauthprobe/connect?${at}`)
+      await hit("POST", `/api/mcp/oauthprobe/disconnect?location%5Bdirectory%5D=${encodeURIComponent(project)}`)
+      await hit("POST", `/api/mcp/oauthprobe/connect?location%5Bdirectory%5D=${encodeURIComponent(project)}`)
+      await hit("GET", `/vcs?${at}`)
+      await hit("GET", `/vcs/status?${at}`)
+      await hit("GET", `/vcs/diff?${at}&mode=working`)
+      await hit("GET", `/file?${at}&path=`)
+      await hit("GET", `/file/content?${at}&path=a.txt`)
+      await hit("GET", `/find/file?${at}&query=a&dirs=false`)
+      await hit("GET", `/question?${at}`)
+      await hit("POST", `/question/${replied.formID}/reply?${at}`, { answers: [["Red"]] })
+      await hit("POST", `/question/${rejected.formID}/reject?${at}`)
+      await idle(replied.sessionID)
+      const pty = await hit("POST", `/pty?${at}`, { title: "sampler" })
+      await hit("GET", `/pty?${at}`)
+      await hit("GET", `/pty/shells?${at}`)
+      await hit("GET", `/pty/${pty.id}?${at}`)
+      await hit("PUT", `/pty/${pty.id}?${at}`, { title: "sampler 2", size: { rows: 24, cols: 80 } })
+      await hit("POST", `/pty/${pty.id}/connect-token?${at}`, undefined, { "x-opencode-ticket": "1" })
+      await hit("DELETE", `/pty/${pty.id}?${at}`)
+      await hit("GET", `/api/model?location%5Bdirectory%5D=${encodeURIComponent(project)}`)
+      await hit("POST", `/instance/dispose?${at}`)
+
+      write("routes.json", {
+        _source: source(
+          "Translated routes: each v1 request a frozen caller sends, once through the adapter; `cases` keeps per contract route the v1 request, every 2.x exchange the translator made for it (method, path with query, status, content type, body) and the adapter's status. " +
+            "Setup: a session with one plain turn (chat), two sessions with a pending question form (the mock's ask script), a remote MCP oauthprobe on the local mock-oauth.ts, and a plain non-git directory for git init. The expectations of the test come from these upstream bodies, the frozen consumers and the UC invariants, never from a recorded adapter body.",
+        ),
+        directory: project,
+        cases,
+      })
+    } finally {
+      oauth.stop()
+      autoAllow = false
+    }
+  }
+
+  // ── `#1697` I-04 M5d(设计 §4.10 c):事件表里其余几种在真引擎上的帧(会话、项目、PTY、分支、MCP、参考目录、提问取消、目录重载)──
+  if (run("events")) {
+    autoAllow = true
+    const mcp = startMockMcp(MCP_PORT)
+    try {
+      const from = records.length
+      const settle = (ms = 1_000) => Bun.sleep(ms)
+      // 会话:建、跑一轮(用量)、改名、删
+      const chat = await create()
+      await call("POST", `/api/session/${chat}/prompt`, { text: "say hello plainly" })
+      await idle(chat)
+      await call("PATCH", `/api/session/${chat}`, { title: "sampler events" })
+      const doomed = await create()
+      await call("DELETE", `/api/session/${doomed}`)
+      // 项目改名
+      const location = (await call("GET", `/api/location?${loc}`)) as { project: { id: string } }
+      await call("PATCH", `/api/project/${location.project.id}`, { name: "sampler events" })
+      // PTY:建、改名、进程自己退出、删
+      const pty = (await call("POST", `/api/pty?${loc}`, { command: "/bin/sh", args: ["-c", "sleep 0.5; exit 0"], title: "sampler" })).data as { id: string }
+      await call("PUT", `/api/pty/${pty.id}?${loc}`, { title: "sampler 2" })
+      await settle(1_500)
+      await call("DELETE", `/api/pty/${pty.id}?${loc}`)
+      // 分支:在项目里切一个新分支(引擎监听 HEAD)
+      Bun.spawnSync(["git", "checkout", "-q", "-b", "sampler-events"], { cwd: project })
+      await settle(1_500)
+      // MCP:本机假 MCP 连上之后推三种 list_changed
+      await call("PUT", `/api/experimental/mcp/samplermcp?${loc}`, { config: { type: "remote", url: `${mcp.origin}/mcp`, oauth: false } })
+      for (let attempt = 0; attempt < 50; attempt++) {
+        const servers = (await call("GET", `/api/mcp?${loc}`)).data as any[]
+        if (servers.find((server) => server.name === "samplermcp")?.status.status === "connected") break
+        await Bun.sleep(100)
+      }
+      await settle(500)
+      const announced = mcp.announce()
+      await settle(1_500)
+      // 断开时引擎对三种清单各发一次变化(connection.ts stop)
+      await call("POST", `/api/experimental/mcp/samplermcp/disconnect?${loc}`)
+      await settle(1_000)
+      // 参考目录与目录重载:项目配置里加一条参考目录,让引擎重载这个目录
+      writeFileSync(join(project, "opencode.json"), JSON.stringify({ references: { notes: { path: join(project, "sub") } } }))
+      await call("POST", `/api/location/reload?${loc}`)
+      await settle(1_500)
+      // 提问被取消
+      const asking = await create()
+      await call("POST", `/api/session/${asking}/prompt`, { text: "ask me something" })
+      let form: { id: string } | undefined
+      for (let attempt = 0; attempt < 100 && !form; attempt++) {
+        form = ((await call("GET", `/api/form?${loc}`)).data as any[]).find((item) => item.sessionID === asking)
+        if (!form) await Bun.sleep(100)
+      }
+      if (form) await call("DELETE", `/api/session/${asking}/form/${form.id}`)
+      await settle(1_000)
+
+      const frames = records.slice(from).map(({ frame, snapshot }) => ({ frame, ...(snapshot !== undefined ? { snapshot } : {}) }))
+      const sessionIDs = [...new Set(frames.map((item) => item.frame.data?.sessionID).filter((id): id is string => typeof id === "string"))]
+      const sessions: Record<string, unknown> = {}
+      for (const sessionID of sessionIDs) {
+        const found = await exchange("GET", `/api/session/${sessionID}`)
+        if (found.status === 200) sessions[sessionID] = found.body.data
+      }
+      write("events.json", {
+        _source: source(
+          "Event table cases: every /api/event frame (with the message page read right after it) from a sequence that creates, runs, renames and deletes sessions, renames the project, creates / renames / lets exit / deletes a pty, switches the git branch, connects the local mock-mcp.ts (oauth off), has it announce tools / resources / prompts list_changed and then disconnects it, adds a project reference and reloads the location, and cancels a question form. " +
+            "`sessions` = GET /api/session/:id for every session id seen, read at the end; `serverConnected` = the subscription's first frame. lsp.updated and global.disposed have no publisher in this engine and cannot be sampled.",
+        ),
+        directory: project,
+        serverConnected: records.find((record) => record.frame.type === "server.connected")?.frame,
+        announced,
+        mcpRequests: mcp.requests,
+        sessions,
+        frames,
+      })
+    } finally {
+      mcp.stop()
+      autoAllow = false
+    }
   }
 
   console.log(`fixtures written to ${OUT}`)

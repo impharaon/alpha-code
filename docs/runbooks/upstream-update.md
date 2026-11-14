@@ -69,7 +69,17 @@ review_after: 2027-11-09
 
    上游新界面不直接进;新工具未登记就让它对用户可用,按 ADR-041 是未知身份。
 
-5. **握不住就停。** 任何一项在新上游上握不住(钩子没了、接口不给、只能改上游文件而阶梯又上不去),立即停下,把这一项交 owner:
+5. **界面数据约定在新样本上重新核一遍。** 界面只认 Code Puppy 自己的数据约定(`packages/ui-mac/src/engine-adapter/contract/`),
+   引擎每进一次,翻译器(`engine-adapter/opencode2/`)都要在新引擎上重新证明:
+   - 重跑采样器 `~/.bun-versions/1.4.4/bin/bun packages/ui-mac/test-fixtures/engine-adapter-sampler/sample.ts`(约 30 秒,用法见同目录
+     README.md;引擎包有未提交改动时它拒绝运行),把重采的夹具与上游改动放进同一个 PR —— `fixture-identity.test.ts` 在引擎源码身份
+     对不上时逐个点名过时的夹具;
+   - 在新样本上跑 `cd packages/ui-mac && bun test src/engine-adapter/contract-cases.test.ts src/engine-adapter/passthrough-reads.test.ts
+     src/engine-adapter/projection-parity.test.ts src/engine-adapter/routes-coverage.test.ts src/engine-adapter/boundary.test.ts`,
+     全绿才算这一项握住(c:每条翻译路由与每种事件的用例;d:直通的状态码与消费字段)。红了先分清是引擎改了形状(改翻译器)
+     还是界面多了调用(改约定目录,用户可见的部分交 owner,ADR-048)。
+
+6. **握不住就停。** 任何一项在新上游上握不住(钩子没了、接口不给、只能改上游文件而阶梯又上不去),立即停下,把这一项交 owner:
    哪项权威、为什么握不住、可选做法与用户看到的差别。不先合、不写「后续再补」、不在登记册里自己标退役。
 
 ## 后:合并前必须成立

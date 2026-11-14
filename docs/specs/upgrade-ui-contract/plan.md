@@ -643,3 +643,7 @@ M3 又会改 `opencode2/` 里引 v1 类型的文件,M4 最后统一改指,避免
 - 2026-11-13 · 变异证明:`server.instance.disposed` 的 directory 置空、`reference.updated` 拿出直通集合 ⇒ 对应两条事件回放红。
 - 2026-11-13 · **R17 已落(设计 §10)**:上面那条待设计裁决按编排器裁定处置 —— 四种从 `ContractEventMap` 与 `PASS_THROUGH` / `MCP_EVENTS` 拿掉,事件表 33 → 29 种(17 种回放 + 12 种已有测试)。`UNDELIVERED` 不再是台账的一栏,改为 `ENGINE_DOES_NOT_EMIT` 守卫:四种都不在引擎的 `Server` 清单里(对照 `mcp.status.changed`、`pty.created` 在),也不在 `ContractEventMap` 里;测试条数仍是 70。冻结 app 里收它们的五处处理今天就不触发(见 R17 行),没改冻结树。顺带改正两处注释:`mock-mcp.ts` 头注释原说引擎会发 tools / prompts 两种,`contract/routes.ts` 里 `GET /lsp` 的理由原说 2.x「只有 lsp.updated 事件」。
 - 2026-11-13 · R17 变异证明:守卫清单加进 `mcp.status.changed` ⇒ 守卫红;`lsp.updated` 加回 `ContractEventMap` ⇒ 台账红。
+
+##### batch F r2 — 单元 2 后再次核对
+
+- #1713 合并 `3338d86d0e` 后按新 core / schema 身份完整重采,真实沙箱样本单独提交 `54db12bb52`。核对没有字段形状的新增 / 删除、路由状态码或往返条数变化;仅易变值、OAuth 随机值、路径对应的 diff hash 与流式快照时序变化。`cd packages/ui-mac && bun test src/engine-adapter/`:exit 0,202 pass / 0 fail、676 断言。无手改样本或断言放宽。R33 与问题卡两处后加入的旧 v1-shapes import 改指 opencode2 同一实现;全部组合证据见 project-engine-config-takeover/plan.md batch F r2 记录。

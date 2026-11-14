@@ -495,4 +495,12 @@ spike 用例按顺序依赖前一条留下的标记;新加的三条放在最后,
 
 - 最终七文件命令(与上表第一行相同)在所有协调完成后重跑:exit 0,11 pass / 0 fail,39 断言;commands 28、插件 6、view 9、IPC 14、consent 2、R33 1 的宿主精确计数均成立,custom provider 5 条通过,无宿主 allowance。
 - `cd packages/ui-mac && bun run build`:exit 0,已生成引擎、ext、main、preload、renderer 与围栏原生模块,未启动应用。根目录 `python3 scripts/check-doc-links.py <本单元 11 个变更 Markdown>`:exit 0,438 个相对链接存在;canonical docs_index.py --check exit 0。
-- 遗留去向(文档治理,不在本次 AC):canonical check_docs_contract.py 按 Alpha profile 只调用本仓 check_repo、基准 origin/alpha,结果 exit 1、86 errors / 196 warnings;错误涉及历史路径、元数据、旧目录与跨仓 INT 引用。已核对错误路径均继承自已接受底座或输入分支,唯一重生成的 docs/README.md 的 INT-upstream-upgrade-readiness 引用在底座已存在。不修改冻结或保护资产,交编排器的文档治理任务。另有既存注释/测试标签仍写搬家前的 engine-adapter 路径(如 ext/src/upstream-probes/{turn.test.ts:6,config.test.ts:13},ui-mac/src/main/codepuppy-models.ts:304),只记录不改。
+- 遗留去向(文档治理,不在本次 AC):canonical check_docs_contract.py 按已解析的组合 profile 只调用本仓 check_repo、基准 origin/alpha,结果 exit 1、86 errors / 196 warnings;错误涉及历史路径、元数据、旧目录与跨仓 INT 引用。已核对错误路径均继承自已接受底座或输入分支,唯一重生成的 docs/README.md 的 INT-upstream-upgrade-readiness 引用在底座已存在。不修改冻结或保护资产,交编排器的文档治理任务。另有既存注释/测试标签仍写搬家前的 engine-adapter 路径(如 ext/src/upstream-probes/{turn.test.ts:6,config.test.ts:13},ui-mac/src/main/codepuppy-models.ts:304),只记录不改。
+
+### 最终收据
+
+- 合并提交 `3338d86d0e`,第二父为指定 `88dbc9a030`;随后完整运行采样器 exit 0,17 份夹具单独提交 `54db12bb52`。本次 core / schema 身份变化来自 #1713;CLI 未安装桌面信任闸,原生行为不变。逐份核对未出现字段形状的新增 / 删除,路由状态码和引擎往返条数不变;其余差异为 ID(含 form / OAuth attempt)、时间、根路径、内容路径导致的 git blob hash、PKCE 随机值和快照时序。parity shell 页多一次 size 0 的早期轮询,后续完整输出不变。没有不明的转换形状变化,没有手改样本。
+- 合并与重采后 `cd packages/ui-mac && bun test src/engine-adapter/`:exit 0,202 pass / 0 fail、676 断言,31 文件。turn-failure 宿主精确核对 9 pass / 0 fail;没有任何宿主 allowance。old-name 的 events CLI 路径仍为同一工作树 21 处,不需再次调整登记。
+- 核对冻结输入:本轮的 spec / design 相对 `88dbc9a030`、bootstrap design / util schema 相对 `d59bb3d786` 无差异;确认框原有文案、上游接管标记保留。未运行全套门,未安装依赖,未启动应用、推送或创建 PR。
+- 已核:Codex(GPT-6),依据 r2 IMPLEMENT 派发及两个固定输入提交,单元 1 / 2 组装自检通过;已定勿重开为两票及本底各票已审行为。下一步由编排器负责独立审查、发布边界检查、推送 / PR / 合并。遗留去向:已声明的 command-subagent 三条、DNS 两条与 DBHub 运行环境问题归编排器;通用文档契约的存量问题与旧路径注释归独立文档治理,不在本轮修复。没有新增设计疑虑或限制提案,OPTIONAL 无新增行为项。
+- 最终重采与收据写入后登记复核:ui-mac `bun test src/main/gate-file-registry.test.ts src/main/old-name-scan.test.ts src/main/module-size-ratchet.test.ts` exit 0,50 pass / 0 fail、2526 断言;docs_index.py --check、git diff --check 均通过。本轮 r2 用时约 24 分钟(14:35–14:59 UTC);单元 2 自身协调为 13 个冲突文件 + 7 个同链文件 + 三份计划与生成索引,真实重采的 17 份产物另计,没有范围扩张到新能力。

@@ -1,0 +1,322 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Code Puppy · 定制中心 · 导入预览增加连接器 · 增量稿(待审)</title>
+<!-- 帧内样式全部取自定制中心活稿,本稿不另立样式。 -->
+<link rel="stylesheet" href="../current/customization-center/design.css">
+<style>
+/* 文本输入:逐字取自 current/settings/design.css 第 225–229 行(定制中心「新建技能」表单的字段)。
+   代码对应 extension-hub.css 的 .codepuppy-ext-field / -flabel / -opt / -input(自定义连接器窗口同款)。
+   值与 settings 那份一致,改一处要同步另一处。 */
+.field{margin-bottom:15px}
+.field label{display:block;font-size:var(--a-text-sm);font-weight:var(--a-weight-medium);margin-bottom:6px}
+.field label .opt{color:var(--a-text-tertiary);font-weight:var(--a-weight-normal);margin-left:6px}
+.inp{width:100%;height:36px;padding:0 12px;border:1px solid var(--a-border);border-radius:var(--a-radius-md);background:var(--a-surface);color:var(--a-text);font-size:var(--a-text-md);font-family:inherit;outline:none}
+.inp:focus{border-color:var(--a-accent);box-shadow:var(--a-ring-focus)}
+/* 底栏两键靠右,照现役 Dialog(dialog.css .a-dialog-footer:justify-content:flex-end)。
+   活稿里 .add 自带 margin-left:auto,在 .dlg-f 中把「取消」挤到了左边,与上线不符;本稿在弹窗底栏内取消这一项。 */
+.dlg-f .add{margin-left:0}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="brand">定制中心 · 导入预览 · 增量稿(待审)</div>
+  <div class="spacer"></div>
+  <nav><a href="#overview">与上一稿的关系</a><a href="#s1-codex-package">一 · Codex 插件</a><a href="#s2-floating-version">二 · 最新版本</a><a href="#s3-secret">三 · 含密钥</a><a href="#s4-nothing-installable">四 · 没有可装的</a><a href="#component-map">元素与组件</a><a href="#self-check">渲染自查</a></nav>
+  <div class="seg" id="themeSeg"><button data-t="light" class="on">浅色</button><button data-t="dark">深色</button></div>
+</div>
+
+<div class="wrap">
+
+<!-- ═══ 与上一稿的关系 ═══ -->
+<section class="sec" id="overview">
+  <div class="sec-kicker">增量稿 · 只改导入预览屏 · 与规格草稿一并审</div>
+  <h2>导入预览:连接器进「会安装」</h2>
+  <p class="lede">每组左边是今天的样子,右边是改后。弹窗、各段、行和按钮都是现有的,只多了连接器行、行内一句提示和一个选填输入框。</p>
+  <div class="note"><b>与上一稿的关系</b>:改前取自活稿 <a href="../current/customization-center/design.html#import-preview"><code>current/customization-center/design.html#import-preview</code></a>,数据换成用当前代码对本机真实插件实跑的判定(supabase、build-ios-apps、github、plugin-dev;receipts 沿用活稿数据)。<b>沿用</b>:弹窗骨架、首行、未经审核提示、四段标题、逐条行、原因文案、取消说明、右侧两键。<b>改动</b>:①认出 Codex 插件,首行加类型标签;②连接器行排在「会安装」的技能行之后,行上类型标「连接器」;③连接器行里需要时写一句提示(最新版本 / 密钥转存),最新版本时加「固定版本(选填)」;④整屏装不了时只写一句原因,不再出现「可以装 N 个」,也不列「会安装」;不装的行去掉内部原因码标签;⑤按钮写装几个技能、几个连接器,装不了时写「没有可安装的内容」。<b>活稿与上线的两处差,本稿两边都按上线画</b>:①未经审核那句活稿是旧文案,本稿用上线文案;②活稿底栏「取消」被挤到左边,上线弹窗两键都在右边。</div>
+  <div class="note"><b>连接器部分可整块拿掉</b>:若首批只装技能,删掉连接器行、行内提示和输入框,首行与按钮里的「、N 个连接器」随之消失,其余各帧不变。</div>
+</section>
+
+<!-- ═══ 一 · Codex 插件:技能 + 一个连接器 ═══ -->
+<section class="sec" id="s1-codex-package">
+  <div class="sec-kicker">状态一 · Codex 插件 · 可装技能 + 一个标准连接器</div>
+  <h2>认出 Codex 插件,连接器跟技能一起装</h2>
+  <div class="duo" style="margin-top:6px">
+    <div>
+      <div class="sec-kicker" style="margin-top:14px"><span class="tag zero">改前</span> 今天的样子</div>
+      <div class="frame"><div class="dlg-stage" style="padding:18px 14px"><div class="dlg">
+        <div class="dlg-h"><b>导入扩展包</b><button class="x">✕</button></div>
+        <div class="dlg-b" style="max-height:none">
+          <p class="dlg-lead"><b>supabase</b> · 未提供版本 · 找到 2 个技能</p>
+          <div class="vnote"><p>这些内容来自你选择的本地文件夹，尚未经过审核。安装前，请逐项查看下面哪些内容会安装、哪些不会。</p></div>
+          <p class="imperr">这是一个 Claude 插件目录「supabase」:共 2 个技能,其中 2 个本版本可以装。这个文件夹的插件说明我们读不出来,认不出它是哪个插件</p>
+          <div class="secrow"><span class="ov">会安装 · 2</span></div>
+          <div class="pv"><div class="bd"><div class="nm">supabase<span class="chip" data-src="type">技能</span></div></div></div>
+          <div class="pv"><div class="bd"><div class="nm">supabase-postgres-best-practices<span class="chip" data-src="type">技能</span></div></div></div>
+          <div class="secrow"><span class="ov">这一版还不认识的摆放方式 · 1</span></div>
+          <div class="pv" data-dim><div class="bd"><div class="nm">supabase</div><p class="why">这个文件夹没有插件说明文件,我们这一版还不认识这种摆法</p></div></div>
+          <div class="secrow"><span class="ov">这一版不安装的内容 · 1</span></div>
+          <div class="pv" data-dim style="margin-bottom:0"><div class="bd"><div class="nm">.mcp.json</div><p class="why">这个插件带了 MCP 服务配置,本版本不安装</p></div></div>
+          <p class="dnote">取消不会在这台电脑上留下任何东西。</p>
+        </div>
+        <div class="dlg-f"><button class="ghost-btn">取消</button><button class="add" disabled>没有可安装的技能</button></div>
+      </div></div></div>
+      <div class="cap">今天 Codex 插件被当成没有说明文件的 Claude 插件:上面说可以装 2 个,按钮却装不了。</div>
+    </div>
+    <div>
+      <div class="sec-kicker" style="margin-top:14px"><span class="tag new">改后</span></div>
+      <div class="frame"><div class="dlg-stage" style="padding:18px 14px"><div class="dlg">
+        <div class="dlg-h"><b>导入扩展包</b><button class="x">✕</button></div>
+        <div class="dlg-b" style="max-height:none">
+          <p class="dlg-lead"><b>supabase</b> <span class="chip" data-src="type">Codex 插件</span> · v1.0.0 · 找到 2 个技能、1 个连接器</p>
+          <div class="vnote"><p>这些内容来自你选择的本地文件夹，尚未经过审核。安装前，请逐项查看下面哪些内容会安装、哪些不会。</p></div>
+          <div class="secrow"><span class="ov">会安装 · 3</span></div>
+          <div class="pv"><div class="bd"><div class="nm">supabase<span class="chip" data-src="type">技能</span></div></div></div>
+          <div class="pv"><div class="bd"><div class="nm">supabase-postgres-best-practices<span class="chip" data-src="type">技能</span></div></div></div>
+          <div class="pv"><div class="bd"><div class="nm">supabase<span class="chip" data-src="type">连接器</span></div></div></div>
+          <div class="secrow"><span class="ov">这一版不安装的内容 · 1</span></div>
+          <div class="pv" data-dim style="margin-bottom:0"><div class="bd"><div class="nm">.app.json</div><p class="why">这个插件带了连接器授权文件,本版本不安装</p></div></div>
+          <p class="dnote">取消不会在这台电脑上留下任何东西。</p>
+        </div>
+        <div class="dlg-f"><button class="ghost-btn">取消</button><button class="add">安装 2 个技能、1 个连接器</button></div>
+      </div></div></div>
+      <div class="cap">连接器地址固定,没有要提示的事,行上只有名字和类型。版本已固定的本机连接器同样只有这一行。「会安装 · 3」= 按钮上的 2 + 1。</div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ 二 · 连接器要获取最新版本 ═══ -->
+<section class="sec" id="s2-floating-version">
+  <div class="sec-kicker">状态二 · 连接器启动时获取最新版本</div>
+  <h2>一句提示 + 选填的固定版本</h2>
+  <div class="duo" style="margin-top:6px">
+    <div>
+      <div class="sec-kicker" style="margin-top:14px"><span class="tag zero">改前</span> 今天的样子</div>
+      <div class="frame"><div class="dlg-stage" style="padding:18px 14px"><div class="dlg">
+        <div class="dlg-h"><b>导入扩展包</b><button class="x">✕</button></div>
+        <div class="dlg-b" style="max-height:none">
+          <p class="dlg-lead"><b>build-ios-apps</b> · 未提供版本 · 找到 9 个技能</p>
+          <div class="vnote"><p>这些内容来自你选择的本地文件夹，尚未经过审核。安装前，请逐项查看下面哪些内容会安装、哪些不会。</p></div>
+          <p class="imperr">这是一个 Claude 插件目录「build-ios-apps」:共 9 个技能,其中 6 个本版本可以装。这个文件夹的插件说明我们读不出来,认不出它是哪个插件</p>
+          <div class="secrow"><span class="ov">会安装 · 6</span></div>
+          <div class="pv"><div class="bd"><div class="nm">ios-app-intents<span class="chip" data-src="type">技能</span></div></div></div>
+          <div class="pv"><div class="bd"><div class="nm">ios-debugger-agent<span class="chip" data-src="type">技能</span></div></div></div>
+          <div class="secrow"><span class="ov">不会安装 · 3</span></div>
+          <div class="pv" data-dim><div class="bd"><div class="nm">ios-ettrace-performance<span class="chip" data-src="off">not-self-contained-executable-bit</span><span class="chip" data-src="off">not-self-contained-parent-reference</span></div><p class="why">这个技能带了可执行脚本,装过去不会保留执行权限</p><p class="why">这个技能引用了同一插件里的别的技能,装过去会缺件</p></div></div>
+          <div class="secrow"><span class="ov">这一版还不认识的摆放方式 · 1</span></div>
+          <div class="pv" data-dim><div class="bd"><div class="nm">build-ios-apps</div><p class="why">这个文件夹没有插件说明文件,我们这一版还不认识这种摆法</p></div></div>
+          <div class="secrow"><span class="ov">这一版不安装的内容 · 2</span></div>
+          <div class="pv" data-dim><div class="bd"><div class="nm">agents</div><p class="why">这个插件带了子 agent,本版本不安装</p></div></div>
+          <div class="pv" data-dim style="margin-bottom:0"><div class="bd"><div class="nm">.mcp.json</div><p class="why">这个插件带了 MCP 服务配置,本版本不安装</p></div></div>
+          <p class="dnote">取消不会在这台电脑上留下任何东西。</p>
+        </div>
+        <div class="dlg-f"><button class="ghost-btn">取消</button><button class="add" disabled>没有可安装的技能</button></div>
+      </div></div></div>
+      <div class="cap">「会安装」示 2 条 / 共 6 条,「不会安装」示 1 条 / 共 3 条。</div>
+    </div>
+    <div>
+      <div class="sec-kicker" style="margin-top:14px"><span class="tag new">改后</span> 预填建议版本</div>
+      <div class="frame"><div class="dlg-stage" style="padding:18px 14px"><div class="dlg">
+        <div class="dlg-h"><b>导入扩展包</b><button class="x">✕</button></div>
+        <div class="dlg-b" style="max-height:none">
+          <p class="dlg-lead"><b>build-ios-apps</b> <span class="chip" data-src="type">Codex 插件</span> · v0.1.2 · 找到 9 个技能、1 个连接器</p>
+          <div class="vnote"><p>这些内容来自你选择的本地文件夹，尚未经过审核。安装前，请逐项查看下面哪些内容会安装、哪些不会。</p></div>
+          <div class="secrow"><span class="ov">会安装 · 7</span></div>
+          <div class="pv"><div class="bd"><div class="nm">ios-app-intents<span class="chip" data-src="type">技能</span></div></div></div>
+          <div class="pv"><div class="bd"><div class="nm">ios-debugger-agent<span class="chip" data-src="type">技能</span></div></div></div>
+          <div class="pv" id="s2-connector-row"><div class="bd"><div class="nm">xcodebuildmcp<span class="chip" data-src="type">连接器</span></div><p class="why">这个连接器每次启动都会获取当时的最新版本。</p><div class="field" style="margin:10px 0 2px"><label>固定版本<span class="opt">(选填)</span></label><input class="inp" value="2.7.0" /></div></div></div>
+          <div class="secrow"><span class="ov">不会安装 · 3</span></div>
+          <div class="pv" data-dim><div class="bd"><div class="nm">ios-ettrace-performance</div><p class="why">这个技能带了可执行脚本,装过去不会保留执行权限</p><p class="why">这个技能引用了同一插件里的别的技能,装过去会缺件</p></div></div>
+          <div class="secrow"><span class="ov">这一版不安装的内容 · 1</span></div>
+          <div class="pv" data-dim style="margin-bottom:0"><div class="bd"><div class="nm">agents</div><p class="why">这个插件带了子 agent,本版本不安装</p></div></div>
+          <p class="dnote">取消不会在这台电脑上留下任何东西。</p>
+        </div>
+        <div class="dlg-f"><button class="ghost-btn">取消</button><button class="add">安装 6 个技能、1 个连接器</button></div>
+      </div></div></div>
+      <div class="cap">建议版本能取到时预填;用户可以照用、改成别的版本或清空。填了就按所填版本装,留空就按原命令装。</div>
+    </div>
+  </div>
+
+  <div class="duo" style="margin-top:18px">
+    <div>
+      <div class="sec-kicker" style="margin-top:14px"><span class="tag new">改后</span> 已清空 / 取不到建议版本</div>
+      <div class="frame"><div class="dlg-stage" style="padding:18px 14px"><div class="dlg">
+        <div class="dlg-h"><b>导入扩展包</b><button class="x">✕</button></div>
+        <div class="dlg-b" style="max-height:none">
+          <p class="dlg-lead"><b>build-ios-apps</b> <span class="chip" data-src="type">Codex 插件</span> · v0.1.2 · 找到 9 个技能、1 个连接器</p>
+          <div class="secrow"><span class="ov">会安装 · 7</span></div>
+          <div class="pv" style="margin-bottom:0" id="s2-connector-row-empty"><div class="bd"><div class="nm">xcodebuildmcp<span class="chip" data-src="type">连接器</span></div><p class="why">这个连接器每次启动都会获取当时的最新版本。</p><div class="field" style="margin:10px 0 2px"><label>固定版本<span class="opt">(选填)</span></label><input class="inp" value="" /></div></div></div>
+        </div>
+        <div class="dlg-f"><button class="ghost-btn">取消</button><button class="add">安装 6 个技能、1 个连接器</button></div>
+      </div></div></div>
+      <div class="cap">只示连接器行与底栏,其余同上。空着时按钮照常可按,没有额外确认。</div>
+    </div>
+    <div></div>
+  </div>
+</section>
+
+<!-- ═══ 三 · 连接器配置里有明文密钥 ═══ -->
+<section class="sec" id="s3-secret">
+  <div class="sec-kicker">状态三 · 连接器配置里有明文密钥</div>
+  <h2>照常可装,预览只说一句转存,不显示密钥</h2>
+  <div class="duo" style="margin-top:6px">
+    <div>
+      <div class="sec-kicker" style="margin-top:14px"><span class="tag zero">改前</span> 今天的样子</div>
+      <div class="frame"><div class="dlg-stage" style="padding:18px 14px"><div class="dlg">
+        <div class="dlg-h"><b>导入扩展包</b><button class="x">✕</button></div>
+        <div class="dlg-b" style="max-height:none">
+          <p class="dlg-lead"><b>github</b> · 未提供版本 · 找到 0 个技能</p>
+          <div class="vnote"><p>这些内容来自你选择的本地文件夹，尚未经过审核。安装前，请逐项查看下面哪些内容会安装、哪些不会。</p></div>
+          <p class="imperr">这是一个 Claude 插件目录「github」:共 0 个技能,其中 0 个本版本可以装。这个插件里没有本版本能装的技能</p>
+          <div class="secrow"><span class="ov">这一版不安装的内容 · 1</span></div>
+          <div class="pv" data-dim style="margin-bottom:0"><div class="bd"><div class="nm">.mcp.json</div><p class="why">这个插件带了 MCP 服务配置,本版本不安装</p></div></div>
+          <p class="dnote">取消不会在这台电脑上留下任何东西。</p>
+        </div>
+        <div class="dlg-f"><button class="ghost-btn">取消</button><button class="add" disabled>没有可安装的技能</button></div>
+      </div></div></div>
+      <div class="cap">只带连接器的插件今天整包装不了。</div>
+    </div>
+    <div>
+      <div class="sec-kicker" style="margin-top:14px"><span class="tag new">改后</span></div>
+      <div class="frame"><div class="dlg-stage" style="padding:18px 14px"><div class="dlg">
+        <div class="dlg-h"><b>导入扩展包</b><button class="x">✕</button></div>
+        <div class="dlg-b" style="max-height:none">
+          <p class="dlg-lead"><b>github</b> <span class="chip" data-src="type">Claude Code 插件</span> · 未提供版本 · 找到 1 个连接器</p>
+          <div class="vnote"><p>这些内容来自你选择的本地文件夹，尚未经过审核。安装前，请逐项查看下面哪些内容会安装、哪些不会。</p></div>
+          <div class="secrow"><span class="ov">会安装 · 1</span></div>
+          <div class="pv" style="margin-bottom:0"><div class="bd"><div class="nm">github<span class="chip" data-src="type">连接器</span></div><p class="why">安装时会将密钥转存到连接器的专用密钥存储。</p></div></div>
+          <p class="dnote">取消不会在这台电脑上留下任何东西。</p>
+        </div>
+        <div class="dlg-f"><button class="ghost-btn">取消</button><button class="add">安装 1 个连接器</button></div>
+      </div></div></div>
+      <div class="cap">数据:真实 github 插件的副本,认证请求头里放了测试值。预览里不出现密钥值,也不出现字段名。一个连接器同时要最新版本又含密钥时,两句提示上下排、输入框在最后。</div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ 四 · 没有可安装的内容 ═══ -->
+<section class="sec" id="s4-nothing-installable">
+  <div class="sec-kicker">状态四 · 没有可安装的内容</div>
+  <h2>一句原因;数量和按钮说同一件事</h2>
+  <div class="duo" style="margin-top:6px" id="s4a-all-skipped">
+    <div>
+      <div class="sec-kicker" style="margin-top:14px"><span class="tag zero">改前</span> 全部不能装 · 今天的样子</div>
+      <div class="frame"><div class="dlg-stage" style="padding:18px 14px"><div class="dlg">
+        <div class="dlg-h"><b>导入扩展包</b><button class="x">✕</button></div>
+        <div class="dlg-b" style="max-height:none">
+          <p class="dlg-lead"><b>plugin-dev</b> · v0.1.2 · 找到 7 个技能</p>
+          <div class="vnote"><p>这些内容来自你选择的本地文件夹，尚未经过审核。安装前，请逐项查看下面哪些内容会安装、哪些不会。</p></div>
+          <p class="imperr">这是一个 Claude 插件目录「plugin-dev」:共 7 个技能,其中 0 个本版本可以装。这个插件里没有本版本能装的技能</p>
+          <div class="secrow"><span class="ov">不会安装 · 7</span></div>
+          <div class="pv" data-dim><div class="bd"><div class="nm">agent-development<span class="chip" data-src="off">not-self-contained-executable-bit</span></div><p class="why">这个技能带了可执行脚本,装过去不会保留执行权限</p></div></div>
+          <div class="pv" data-dim><div class="bd"><div class="nm">command-development<span class="chip" data-src="off">not-self-contained-plugin-root-variable</span></div><p class="why">这个技能要用到整个插件目录里的东西,单独装过去会缺件</p></div></div>
+          <div class="pv" data-dim><div class="bd"><div class="nm">skill-development<span class="chip" data-src="off">not-self-contained-parent-reference</span></div><p class="why">这个技能引用了同一插件里的别的技能,装过去会缺件</p></div></div>
+          <div class="secrow"><span class="ov">这一版不安装的内容 · 2</span></div>
+          <div class="pv" data-dim><div class="bd"><div class="nm">commands</div><p class="why">这个插件带了斜杠命令,本版本不安装</p></div></div>
+          <div class="pv" data-dim style="margin-bottom:0"><div class="bd"><div class="nm">agents</div><p class="why">这个插件带了子 agent,本版本不安装</p></div></div>
+          <p class="dnote">取消不会在这台电脑上留下任何东西。</p>
+        </div>
+        <div class="dlg-f"><button class="ghost-btn">取消</button><button class="add" disabled>没有可安装的技能</button></div>
+      </div></div></div>
+      <div class="cap">「不会安装」示 3 条 / 共 7 条。灰标是内部原因码。</div>
+    </div>
+    <div>
+      <div class="sec-kicker" style="margin-top:14px"><span class="tag new">改后</span> 全部不能装</div>
+      <div class="frame"><div class="dlg-stage" style="padding:18px 14px"><div class="dlg">
+        <div class="dlg-h"><b>导入扩展包</b><button class="x">✕</button></div>
+        <div class="dlg-b" style="max-height:none">
+          <p class="dlg-lead"><b>plugin-dev</b> <span class="chip" data-src="type">Claude Code 插件</span> · v0.1.2 · 找到 7 个技能</p>
+          <div class="vnote"><p>这些内容来自你选择的本地文件夹，尚未经过审核。安装前，请逐项查看下面哪些内容会安装、哪些不会。</p></div>
+          <p class="imperr">这个插件里没有本版本能装的内容</p>
+          <div class="secrow"><span class="ov">不会安装 · 7</span></div>
+          <div class="pv" data-dim><div class="bd"><div class="nm">agent-development</div><p class="why">这个技能带了可执行脚本,装过去不会保留执行权限</p></div></div>
+          <div class="pv" data-dim><div class="bd"><div class="nm">command-development</div><p class="why">这个技能要用到整个插件目录里的东西,单独装过去会缺件</p></div></div>
+          <div class="pv" data-dim><div class="bd"><div class="nm">skill-development</div><p class="why">这个技能引用了同一插件里的别的技能,装过去会缺件</p></div></div>
+          <div class="secrow"><span class="ov">这一版不安装的内容 · 2</span></div>
+          <div class="pv" data-dim><div class="bd"><div class="nm">commands</div><p class="why">这个插件带了斜杠命令,本版本不安装</p></div></div>
+          <div class="pv" data-dim style="margin-bottom:0"><div class="bd"><div class="nm">agents</div><p class="why">这个插件带了子 agent,本版本不安装</p></div></div>
+          <p class="dnote">取消不会在这台电脑上留下任何东西。</p>
+        </div>
+        <div class="dlg-f"><button class="ghost-btn">取消</button><button class="add" disabled>没有可安装的内容</button></div>
+      </div></div></div>
+      <div class="cap">红字只剩原因一句;每行只留中文原因。</div>
+    </div>
+  </div>
+
+  <div class="duo" style="margin-top:18px" id="s4b-unrecognized">
+    <div>
+      <div class="sec-kicker" style="margin-top:14px"><span class="tag zero">改前</span> 认不出插件 · 今天的样子</div>
+      <div class="frame"><div class="dlg-stage" style="padding:18px 14px"><div class="dlg">
+        <div class="dlg-h"><b>导入扩展包</b><button class="x">✕</button></div>
+        <div class="dlg-b" style="max-height:none">
+          <p class="dlg-lead"><b>receipts</b> · 未提供版本 · 找到 1 个技能</p>
+          <div class="vnote"><p>这些内容来自你选择的本地文件夹，尚未经过审核。安装前，请逐项查看下面哪些内容会安装、哪些不会。</p></div>
+          <p class="imperr">这是一个 Claude 插件目录「receipts」:共 1 个技能,其中 1 个本版本可以装。这个文件夹的插件说明我们读不出来,认不出它是哪个插件</p>
+          <div class="secrow"><span class="ov">会安装 · 1</span></div>
+          <div class="pv"><div class="bd"><div class="nm">receipts<span class="chip" data-src="type">技能</span></div></div></div>
+          <div class="secrow"><span class="ov">这一版还不认识的摆放方式 · 1</span></div>
+          <div class="pv" data-dim style="margin-bottom:0"><div class="bd"><div class="nm">receipts</div><p class="why">这个文件夹没有插件说明文件,我们这一版还不认识这种摆法</p></div></div>
+          <p class="dnote">取消不会在这台电脑上留下任何东西。</p>
+        </div>
+        <div class="dlg-f"><button class="ghost-btn">取消</button><button class="add" disabled>没有可安装的技能</button></div>
+      </div></div></div>
+      <div class="cap">上面说可以装 1 个、列在「会安装」里,按钮却装不了。</div>
+    </div>
+    <div>
+      <div class="sec-kicker" style="margin-top:14px"><span class="tag new">改后</span> 认不出插件</div>
+      <div class="frame"><div class="dlg-stage" style="padding:18px 14px"><div class="dlg">
+        <div class="dlg-h"><b>导入扩展包</b><button class="x">✕</button></div>
+        <div class="dlg-b" style="max-height:none">
+          <p class="dlg-lead"><b>receipts</b> · 未提供版本 · 找到 1 个技能</p>
+          <div class="vnote"><p>这些内容来自你选择的本地文件夹，尚未经过审核。安装前，请逐项查看下面哪些内容会安装、哪些不会。</p></div>
+          <p class="imperr">这个文件夹的插件说明我们读不出来,认不出它是哪个插件</p>
+          <div class="secrow"><span class="ov">这一版还不认识的摆放方式 · 1</span></div>
+          <div class="pv" data-dim style="margin-bottom:0"><div class="bd"><div class="nm">receipts</div><p class="why">这个文件夹没有插件说明文件,我们这一版还不认识这种摆法</p></div></div>
+          <p class="dnote">取消不会在这台电脑上留下任何东西。</p>
+        </div>
+        <div class="dlg-f"><button class="ghost-btn">取消</button><button class="add" disabled>没有可安装的内容</button></div>
+      </div></div></div>
+      <div class="cap">认不出就不标类型,也不列「会安装」;没有任何一处说能装。</div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ 元素与组件 ═══ -->
+<section class="sec" id="component-map">
+  <div class="sec-kicker">帧外 · 给评审和实现看</div>
+  <h2>每个元素用的现有组件</h2>
+  <div class="matrix-scroll"><table class="matrix">
+    <tr><th>元素</th><th>稿内组件</th><th>出处</th><th>代码对应</th></tr>
+    <tr><td>弹窗、标题、关闭、底栏</td><td><code>.dlg</code> <code>.dlg-h</code> <code>.dlg-b</code> <code>.dlg-f</code></td><td>活稿 <code>design.css</code>「弹窗骨架」· <code>#import-preview</code></td><td>组件库 Dialog(<code>size=lg</code>)</td></tr>
+    <tr><td>首行:名称 · 版本 · 找到 N</td><td><code>.dlg-lead</code></td><td>同上</td><td><code>.codepuppy-ext-confirm-desc</code></td></tr>
+    <tr><td>插件类型「Codex 插件 / Claude Code 插件」</td><td><code>.chip[data-src="type"]</code></td><td>活稿 <code>design.css</code> chip;同页 <code>#installed-packs</code> 包头「扩展包」</td><td><code>.codepuppy-ext-type-pill</code></td></tr>
+    <tr><td>未经审核提示</td><td><code>.vnote</code></td><td>活稿「提示条」</td><td><code>.codepuppy-ext-verify-note</code></td></tr>
+    <tr><td>整屏原因一句</td><td><code>.imperr</code></td><td>活稿「屏内红字」</td><td><code>.codepuppy-ext-import-err</code></td></tr>
+    <tr><td>段标题「会安装 · N」等</td><td><code>.secrow .ov</code></td><td>活稿「区段标题行」</td><td><code>SecRow</code></td></tr>
+    <tr><td>技能行、连接器行</td><td><code>.pv</code> + <code>.chip[data-src="type"]</code>「技能 / 连接器」</td><td>活稿「预览逐条行」</td><td><code>.codepuppy-ext-man</code> + <code>typeLabel</code>(连接器 = 现有「连接器」标签)</td></tr>
+    <tr><td>连接器行内一句提示</td><td><code>.pv .why</code></td><td>同上(行的说明行)</td><td><code>.codepuppy-ext-man-st</code></td></tr>
+    <tr><td>固定版本(选填)</td><td><code>.field</code> + <code>label</code> + <code>.opt</code> + <code>.inp</code></td><td>活稿 <code>current/settings/design.css</code> 第 225–229 行(逐字摘入本稿)</td><td><code>.codepuppy-ext-field / -flabel / -opt / -input</code>(自定义连接器窗口同款)</td></tr>
+    <tr><td>不会安装的行与原因</td><td><code>.pv[data-dim]</code> + <code>.why</code></td><td>活稿「预览逐条行」</td><td><code>.codepuppy-ext-man[data-dim]</code></td></tr>
+    <tr><td>取消说明</td><td><code>.dnote</code></td><td>活稿 <code>design.css</code></td><td><code>.codepuppy-ext-key-hint</code></td></tr>
+    <tr><td>取消 / 安装(右侧)</td><td><code>.ghost-btn</code> + <code>.add</code>(含 <code>:disabled</code>)</td><td>活稿 <code>design.css</code>;<code>.dlg-f</code> 右对齐</td><td>组件库 Button(ghost / primary)</td></tr>
+  </table></div>
+  <div class="cap">没有新组件。连接器分组不另加小标题:同一段里技能行在前、连接器行在后,行上的类型标签区分;段标题的数量 = 两者之和。</div>
+</section>
+
+<!-- ═══ 渲染自查 ═══ -->
+<section class="sec" id="self-check">
+  <div class="sec-kicker">帧外 · 渲染自查</div>
+  <h2>渲染自查</h2>
+  <div class="note">无头 Chromium 按 1440 × 900、1280 × 800 两种窗口宽度,浅色与深色各渲染一遍,逐帧量了四件事:①弹窗内没有元素越出弹窗,页面没有横向滚动;②两键都在底栏右侧,主按钮距右缘 18px;③首行、提示、红字、段标题、行的左缘对齐(取消说明照活稿多缩进 2px);④改后各帧「会安装 · N」等于按钮上的数,装不了时为 0;改后没有内部原因码标签。截图:<a href="shots/s1-codex-package-light-1440.png"><code>s1</code></a> · <a href="shots/s2-floating-version-light-1440.png"><code>s2</code></a> · <a href="shots/s2-floating-version-light-1280.png"><code>s2 · 1280</code></a> · <a href="shots/s2-floating-version-dark-1440.png"><code>s2 · 深色</code></a> · <a href="shots/s3-secret-light-1440.png"><code>s3</code></a> · <a href="shots/s4-nothing-installable-light-1440.png"><code>s4</code></a>。</div>
+</section>
+
+</div>
+
+<script>
+document.querySelectorAll("#themeSeg button").forEach(function(b){b.addEventListener("click",function(){document.querySelectorAll("#themeSeg button").forEach(function(x){x.classList.remove("on")});b.classList.add("on");document.documentElement.dataset.theme=b.dataset.t})});
+</script>
+</body>
+</html>

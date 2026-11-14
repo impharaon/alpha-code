@@ -24,7 +24,8 @@ review_after: 2027-01-16
   早于本层存在,实现票已不可靠追溯。
 - **`设计中` 的行,锚是已约定但尚未存在的 id** —— 增量帧获批并入活稿的那一刻
   才写进 `design.html`。这是 README 增量五步序的第 2 步(先定锚再画),不是断链。
-  本文件目前的 `设计中` 行都来自 `2026-10-30-req236-ux-config-pages/`。
+  本文件目前的 `设计中` 行来自 `2026-10-30-req236-ux-config-pages/` 与
+  `2026-11-14-local-plugin-install-preview/`(后者随规格待审)。
 
 ## 组件
 
@@ -42,6 +43,7 @@ review_after: 2027-01-16
 | 页签与列表结构(三页签:连接器 / 技能 / 助手;单行列表 = 图标 + 名称 + 一行描述 + 一个动作;「添加 ▾」取代「导入」;每页顶部「已安装」、技能与助手页「推荐 / 系统」分段;子锚 `#hub-connectors` `#hub-add` `#hub-skills` `#hub-agents`) | `#hub-tabs` | [`2026-10-30-req236-ux-config-pages/`](../../2026-10-30-req236-ux-config-pages/frame.html) | 2026-10-31 | ac#1594 | 2026-10-31 | `renderer/extensions/extension-hub.tsx`(`TABS`、`InstalledRow`、`EntryRow`、`PackageRow`、`CloudConnectorRow`、`addItems`、`Segments`)、`builtin-controls-panel.tsx`(「系统」分段) | 已落地(与批准稿的 7 处差异按代码画,列在 `design.html#hub-tabs` 末尾) |
 | 云能力 · 云端任务详情(首屏「做什么 / 最长运行 / 发送内容 / 结果 / 费用」,其余收进开发者详情) | `#cloud-task` | [`2026-10-30-req236-ux-config-pages/`](../../2026-10-30-req236-ux-config-pages/frame.html) | — | —(待开票) | — | 现状:`renderer/extensions/extension-detail.tsx`(`cloudSpec` 段);条目文字 `renderer/extensions/codepuppy-catalog.json` | 设计中 |
 | 云能力 · 云连接器详情(工具先写自然语言名称,技术名进折叠;状态写下一步) | `#cloud-connector` | [`2026-10-30-req236-ux-config-pages/`](../../2026-10-30-req236-ux-config-pages/frame.html) | — | —(待开票) | — | 现状:`renderer/extensions/extension-detail.tsx`(`isCloudConnector` 段)、`extension-hub.tsx`(云能力页卡) | 设计中 |
+| 导入预览 · 插件类型标签、连接器行(行内最新版本 / 密钥转存提示、「固定版本(选填)」)、装不了时一句原因 | `#import-preview-connectors` | [`2026-11-14-local-plugin-install-preview/`](../../2026-11-14-local-plugin-install-preview/frame.html) | — | —(待开票) | — | 现状:`renderer/extensions/extension-hub.tsx`(`localPlugin` 预览弹窗)· 判定与文案真源 `main/claude-plugin-intake.ts` | 设计中(待审) |
 | 添加确认框一句话(不写配置文件路径;未完成审核的写默认关闭)与「待生效」状态词 | `#enable-flow` | [`2026-10-30-req236-ux-config-pages/`](../../2026-10-30-req236-ux-config-pages/frame.html) | — | —(待开票) | — | 现状:`renderer/extensions/install-confirm.tsx`、`use-extensions.ts`(生效状态) | 设计中 |
 
 ## 登记时记下的两处现状 —— 已随本次实现闭合

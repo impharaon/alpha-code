@@ -799,3 +799,26 @@ html[data-theme="dark"]{--a-perm-allow:#818cf8;--a-perm-ask:#fafafa;--a-perm-rea
 /* 读取中:时间线既有转圈(顶边强调色) */
 .read-sp{display:inline-block;width:12px;height:12px;border:1.5px solid var(--a-border-strong);border-top-color:var(--a-accent);border-radius:50%;vertical-align:-2px;margin-right:8px}
 .sess-empty .cont{color:var(--a-accent);font-weight:var(--a-weight-medium);font-size:var(--a-text-sm);cursor:pointer}
+
+/* ── 8.6.2 批准面板的风险档位(2026-11-13 并入,锚 #permission-risk)── */
+/* 本页缺的四个令牌。--a-leading-snug、--a-error-on-subtle 的值同 tokens.css;
+   --a-warning-on-subtle、--a-success-on-subtle 是风险标签组件提议的新令牌(docs/design/system/tokens.md 待定表)。 */
+:root{--a-leading-snug:1.4;--a-error-on-subtle:#b91c1c;--a-warning-on-subtle:#92400e;--a-success-on-subtle:#166534}
+html[data-theme="dark"]{--a-error-on-subtle:#f87171;--a-warning-on-subtle:#fbbf24;--a-success-on-subtle:#4ade80}
+/* 风险标签:共享组件,定义见 ../../2026-11-13-1314-risk-tag/frame.html */
+.a-risk-tag{flex:none;padding:2px 7px;border-radius:var(--a-radius-full);font-size:var(--a-text-2xs);font-weight:var(--a-weight-medium);line-height:var(--a-leading-snug);letter-spacing:var(--a-tracking-wide);white-space:nowrap}
+.a-risk-tag[data-level="low"]{background:var(--a-success-subtle);color:var(--a-success-on-subtle)}
+.a-risk-tag[data-level="medium"]{background:var(--a-bg-muted);color:var(--a-text-tertiary)}
+.a-risk-tag[data-level="high"]{background:var(--a-warning-subtle);color:var(--a-warning-on-subtle)}
+.a-risk-tag[data-level="critical"]{background:var(--a-error-subtle);color:var(--a-error-on-subtle)}
+.a-risk-tag[data-level="unknown"]{background:transparent;color:var(--a-text-secondary);box-shadow:inset 0 0 0 1px var(--a-border-strong)}
+/* 面板说明位(PermissionPanel 的 .a-permission-panel-description):极高风险的原因句 */
+.pc-desc{font-size:var(--a-text-sm);color:var(--a-text-secondary)}
+/* 面板最高 560,正文内滚动(同 .a-permission-panel / -body) */
+.pc-panel.scroll{display:flex;flex-direction:column;max-height:560px}
+.pc-panel.scroll .pc-body{min-height:0;overflow-y:auto}
+/* 窄会话栏:输入框宽 440 */
+.pc-stage.pc-row{display:flex;flex-wrap:wrap;gap:22px;justify-content:center;align-items:flex-start}
+.pc-row .pc-col{flex:none;width:440px}
+.pc-col .pc-panel{margin:0}
+.pc-col .pc-cap{margin:8px 0 0;text-align:center;font-size:var(--a-text-xs);color:var(--a-text-tertiary)}

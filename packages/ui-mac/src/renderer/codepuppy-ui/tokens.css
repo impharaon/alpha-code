@@ -74,6 +74,12 @@
      红 700 在同一层底色上 5.37:1。判据:contrast-ratchet.test.ts 的 TINTED_TEXT(三个主题
      块各判一次,半透明 tint 先合成到它所在的那层底上再算)。 */
   --a-error-on-subtle: #b91c1c;
+  /* `#1314`:琥珀 / 绿色**文字**落在各自的 -subtle 上时用这两支(风险标签「低风险」「高风险」、
+     能力授权框「新增」「将收回」)。--a-warning / --a-success 在自己的 tint 上浅色只有 2.80:1 / 2.88:1;
+     这两支 6.2:1。红色早有 --a-error-on-subtle,这是缺的两支。判据同 --a-error-on-subtle:
+     contrast-ratchet.test.ts 的 TINTED_TEXT(三个主题块各判一次)。 */
+  --a-warning-on-subtle: #92400e;
+  --a-success-on-subtle: #166534;
   --a-purple: #7c3aed;
   --a-purple-subtle: rgba(124, 58, 237, 0.12);
   --a-orange: #ea7317;
@@ -246,6 +252,8 @@
      已经是 5.56:1,不需要另择色。仍然显式写出来,是因为棘轮三个主题块都要判 ——
      不写就会继承浅色块的 #b91c1c,落在这层深底上只有 2.66:1。 */
   --a-error-on-subtle: #f87171;
+  --a-warning-on-subtle: #fbbf24;   /* #1314:深色 = --a-warning / --a-success 本身(7.9:1 / 7.6:1);仍显式写,三个主题块都要判 */
+  --a-success-on-subtle: #4ade80;
   --a-purple: #a78bfa;
   --a-purple-subtle: rgba(167, 139, 250, 0.16);
   --a-orange: #fb923c;
@@ -305,6 +313,8 @@
        在这里合成出来是 rgb(42,21,24);#f87171 落在其上 6.23:1。这一支必须显式写 ——
        少了它,继承来的 #b91c1c 落在那层深底上只有 2.66:1,而这正是本块历史上漏改过的那类。 */
     --a-error-on-subtle: #f87171;
+    --a-warning-on-subtle: #fbbf24;   /* #1314:同 --a-error-on-subtle,少写会继承浅色的深琥珀,落在这层深底上不可读 */
+    --a-success-on-subtle: #4ade80;
     --a-purple: #a78bfa;
     --a-purple-subtle: rgba(167, 139, 250, 0.16);
     --a-orange: #fb923c;

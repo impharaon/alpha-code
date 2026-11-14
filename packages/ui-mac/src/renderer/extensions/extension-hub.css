@@ -1479,10 +1479,11 @@ body[data-codepuppy-sidebar="open"] .codepuppy-ext-page {
   border-radius: var(--a-radius-full);
   letter-spacing: var(--a-tracking-wide);
 }
-.codepuppy-ext-authz-chip[data-kind="new"],
-.codepuppy-ext-authz-chip[data-kind="risk"] {
+/* 「高风险」标签已改用共享组件 RiskTag(codepuppy-ui/risk-tag.css);这里只剩三种变化标签。
+   「新增」「将收回」的文字落在各自 tint 上,浅色下用 -on-subtle(#1314)。 */
+.codepuppy-ext-authz-chip[data-kind="new"] {
   background: var(--a-warning-subtle);
-  color: var(--a-warning);
+  color: var(--a-warning-on-subtle);
 }
 .codepuppy-ext-authz-chip[data-kind="granted"] {
   background: var(--a-bg-muted);
@@ -1490,7 +1491,7 @@ body[data-codepuppy-sidebar="open"] .codepuppy-ext-page {
 }
 .codepuppy-ext-authz-chip[data-kind="removed"] {
   background: var(--a-success-subtle);
-  color: var(--a-success);
+  color: var(--a-success-on-subtle);
 }
 .codepuppy-ext-authz-item {
   display: flex;

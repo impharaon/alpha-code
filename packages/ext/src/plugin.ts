@@ -46,6 +46,7 @@ import { createAttachmentReaderHooks } from "./attachment-reader-hooks"
 import { createAgentMentionHooks } from "./agent-mention-hooks"
 import { providerAllowList, providerAllowTail, refuseOutsideProviderAllowList } from "./provider-allow"
 import { inProcessEngine } from "../../ui-mac/src/main/in-process-engine"
+import { PROJECT_HIDDEN_DIR } from "../../ui-mac/src/shared/project-hidden-dir"
 
 // ── `#1665` I2:进程级对象(定制中心桥 + 重载调度器)──────────────────────────────────────────────
 // OpenCode 2 给**每个 Location** 各求值一次本模块(开工实测:两个目录 ⇒ 求值 2 次、setup 2 次;重载后再各 1 次;Node 下
@@ -194,7 +195,7 @@ export const CodePuppyExt: Plugin.Plugin = {
         // 按最终状态判(Codex R1/1 M1):尾巴还没放上去时它还在,照常派发。
         const agent = (event.input as { agent?: unknown } | undefined)?.agent
         if (event.tool === "subagent" && typeof agent === "string" && disabledAgents.has(agent) && !(await agentRegistered(agent)))
-          throw new Error(`Agent "${agent}" is disabled in this project (.codepuppy/codepuppy.jsonc sets "disable": true)`)
+          throw new Error(`Agent "${agent}" is disabled in this project (${PROJECT_HIDDEN_DIR}/codepuppy.jsonc sets "disable": true)`)
       })
       await context.tool.hook("execute.after", (event) => {
         if (event.status === "error") {

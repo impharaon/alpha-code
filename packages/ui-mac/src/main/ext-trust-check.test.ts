@@ -3,7 +3,7 @@
 import { resolve } from "node:path"
 import { expect, test } from "bun:test"
 
-test("项目扩展信任确认:升级后弹一次、只记进 main 的记录、文案只少那个括号、身份一变再问(ext-trust-check.ipc.cases.ts,12 条)", () => {
+test("项目扩展信任确认:升级后弹一次、只记进 main 的记录、文案只少那个括号、身份一变再问(ext-trust-check.ipc.cases.ts,13 条)", () => {
   const result = Bun.spawnSync({
     cmd: [process.execPath, "test", resolve(import.meta.dir, "../../test-component/ext-trust-check.ipc.cases.ts")],
     cwd: resolve(import.meta.dir, "../.."),
@@ -11,8 +11,8 @@ test("项目扩展信任确认:升级后弹一次、只记进 main 的记录、�
   })
   const output = `${result.stdout.toString()}${result.stderr.toString()}`
   if (result.exitCode !== 0) throw new Error(output)
-  // 用词边界而非 toContain:`"112 pass"` 含 `"12 pass"`
-  expect(output).toMatch(/\b12 pass\b/)
+  // 用词边界而非 toContain:`"113 pass"` 含 `"13 pass"`
+  expect(output).toMatch(/\b13 pass\b/)
   expect(output).toMatch(/\b0 fail\b/)
-  expect(output).toMatch(/Ran 12 tests across 1 file/)
+  expect(output).toMatch(/Ran 13 tests across 1 file/)
 }, 180_000)

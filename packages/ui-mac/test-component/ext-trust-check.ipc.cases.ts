@@ -295,3 +295,14 @@ test("#1713 已有允许或拒绝决定 ⇒ 不请求视图、不弹框", async 
     expect(shown).toHaveLength(before)
   }
 })
+
+test("审查3:只有引擎忽略的 md 字段且视图为空 ⇒ 不弹确认框", async () => {
+  const dir = makeProject({ plugin: false })
+  mkdirSync(join(dir, ".opencode/commands"), { recursive: true })
+  writeFileSync(join(dir, ".opencode/commands/x.md"), "---\nargument-hint: input\n---\nTEXT")
+  mkdirSync(join(dir, ".opencode/agents"), { recursive: true })
+  writeFileSync(join(dir, ".opencode/agents/a.md"), "---\nname: ignored\n---\nTEXT")
+  expect(await trustCheck(dir)).toEqual({ prompted: false, granted: false })
+  expect(shown).toEqual([])
+  expect(recorded(dir)).toBeUndefined()
+})

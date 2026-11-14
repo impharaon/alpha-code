@@ -47,7 +47,7 @@ export const Plugin = define({
       const files = yield* discover(fs, entry.path)
       return yield* Effect.forEach(files, (file) =>
         fs.readFileStringSafe(file.filepath).pipe(
-          Effect.flatMap((content) => CodePuppyProjectGate.agent(ctx.location.directory, entry, file, content, decode)),
+          Effect.flatMap((content) => CodePuppyProjectGate.agent(ctx.location.directory, entry, file, content, decode, legacyAgent)),
           Effect.orElseSucceed(() => undefined),
         ),
       ).pipe(Effect.map((documents) => documents.filter((document): document is Document => document !== undefined)))
@@ -163,7 +163,7 @@ const decode = Effect.fnUntraced(function* (
   const body = markdown.content.trim()
   const keys = Object.keys(markdown.data)
   const unsupported = keys.filter((key) => !agentKeys.has(key))
-  const legacy = unsupported.length > 0 && !keys.some((key) => nativeKeys.includes(key))
+  const legacy = legacyAgent(markdown.data) // codepuppy(ADR-049):清单复用同一份代际判定。
   if (!legacy && unsupported.length > 0)
     yield* Effect.logWarning("ignored unsupported agent fields", { path: file.filepath, fields: unsupported })
   // Join legacy model + variant without sending native request/permissions through migration.
@@ -189,3 +189,10 @@ const decode = Effect.fnUntraced(function* (
   })
   return new Document({ type: "document", path: AbsolutePath.make(file.filepath), info })
 })
+
+// codepuppy(ADR-049) ── 文件头清单与上游解码选择共用此判定。
+function legacyAgent(data: Record<string, unknown>) {
+  const keys = Object.keys(data)
+  return keys.some((key) => !agentKeys.has(key)) && !keys.some((key) => nativeKeys.includes(key))
+}
+// codepuppy ── end

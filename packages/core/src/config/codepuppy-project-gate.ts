@@ -167,9 +167,9 @@ export function skillSources(directory: string, current: readonly Skill.Source[]
 }
 
 /** 给目录读取点用的文件头函数;用户全局与未安装时原样交出。 */
-export function markdown(directory: string, entry: Entry, point: "agent" | "command") {
+export function markdown(directory: string, entry: Entry, point: "agent" | "command", legacyAgent?: (data: Record<string, unknown>) => boolean) {
   return (filepath: string, content: string) =>
-    projectEntry(entry) ? frontmatter(directory, filepath, content, point, entry.path) : content
+    projectEntry(entry) ? frontmatter(directory, filepath, content, point, entry.path, legacyAgent) : content
 }
 
 export const agent = Effect.fnUntraced(function* (
@@ -181,9 +181,10 @@ export const agent = Effect.fnUntraced(function* (
     file: { directory: string; filepath: string; primary: boolean },
     content: string,
   ) => Effect.Effect<Document | undefined>,
+  legacyAgent: (data: Record<string, unknown>) => boolean,
 ) {
   if (!content) return
-  const text = markdown(directory, entry, "agent")(file.filepath, content)
+  const text = markdown(directory, entry, "agent", legacyAgent)(file.filepath, content)
   if (text === undefined) return
   const document = yield* decode(file, text)
   if (!document || !projectEntry(entry)) return document
@@ -216,6 +217,7 @@ export function frontmatter(
   content: string,
   point: ReadPoint,
   root?: string,
+  legacyAgent?: (data: Record<string, unknown>) => boolean,
 ): string | undefined {
   if (!installed || views.get(directory)?.trusted !== false) return content
   const file = relativeFile(directory, filepath)
@@ -246,7 +248,8 @@ export function frontmatter(
             point === "agent" ? [...AGENT_DECODED_CONTENT, "prompt"] : COMMAND_DECODED_CONTENT,
           )
     if (point !== "skill") {
-      const fields = Object.keys(parsed.data).filter((key) => !Object.hasOwn(data, key))
+      const rule = point === "command" ? COMMAND_MAPS.commands! : legacyAgent?.(parsed.data) === false ? AGENT_MAPS.agents! : AGENT_MAPS.agent!
+      const fields = Object.keys(parsed.data).filter((key) => !Object.hasOwn(data, key) && rule.listed(key))
       recordRead(directory, point, { kind: point === "agent" ? "agent-control" : "command-run", name, file, fields })
     }
     // stringify 会给正文补换行,因此只让它写空正文的头部,再拼回原正文。空头也保留分隔符,防止正文被当成另一个可执行文件头。

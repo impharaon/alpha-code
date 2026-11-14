@@ -128,6 +128,12 @@ test("AC-07 / AC-04:同一台引擎两个目录各自决定;已允许项目改�
   expect(other.ok && other.view.trusted).toBe(false)
   expect(other.ok && other.view.withheld.map((item) => item.kind)).toEqual(expect.arrayContaining([...WITHHELD_KINDS]))
 }, 30_000)
+test("审查3:只有 md argument-hint 与 name 的项目清单为空", async () => {
+  const directory = path.join(sandbox.root, "ignored-md-keys")
+  write(path.join(directory, ".opencode/commands/x.md"), "---\nargument-hint: input\nvariant: high\n---\nTEXT")
+  write(path.join(directory, ".opencode/agents/a.md"), "---\nname: ignored\n---\nTEXT")
+  expect(await read(directory)).toMatchObject({ ok: true, view: { complete: true, withheld: [] } })
+})
 test("审查1:无变化重载后 md 文件头、控制字段与插值仍在视图里", async () => {
   const directory = path.join(sandbox.root, "noop-view")
   const file = path.join(directory, "opencode.json")

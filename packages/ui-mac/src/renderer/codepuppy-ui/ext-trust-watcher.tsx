@@ -44,6 +44,9 @@ export function ExtTrustWatcher(props: { server: Accessor<ServerInfo | undefined
     void (async () => {
       try {
         const r = await extIpc.trustCheck(dir)
+        if (r.incomplete) {
+          checked.delete(dir)
+        }
         if (r.persistError) {
           pushToast({ kind: "error", title: t("codepuppy.ext.trustPersistFailed"), detail: t("codepuppy.ext.trustPersistDetail"), action: viewIn("connectors") })
           checked.delete(dir) // 未留痕 = 未决,允许本会话稍后重试

@@ -443,3 +443,4 @@
 
 1	packages/ui-mac	src/main/project-config-view.engine.test.ts	-	#1713 项目配置视图的真引擎宿主,钉住 4 pass / 0 fail:九类暂缓条目、只有内容不暂缓、同一引擎两目录各自决定、已允许项目热重载启动 MCP、停用技能读取点仍完整。去掉目录发现或作用点登记 ⇒ 九类 / 完整性断言红。
 3	packages/ui-mac	src/main/project-config-view-message.test.ts	-	#1713 视图消息 build/parse、请求簿与 sidecar 作答。错误形状 / id / 缺字段拒绝,超时 / 退出 / 发送失败答 undefined;目录不串,列表请求失败不返回完整视图。
+1	packages/ui-mac	src/renderer/codepuppy-ui/ext-trust-watcher.component.test.ts	-	#1713 happy-dom 真 ExtTrustWatcher 组件宿主,钉住 3 pass / 0 fail:incomplete 下次进入再查、已有决定只查一次、刚允许沿原路径 global 重载一次。去掉 checked.delete ⇒ 第一条红。

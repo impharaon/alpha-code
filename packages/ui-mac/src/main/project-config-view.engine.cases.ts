@@ -13,6 +13,7 @@ import {
 let projectConfigView: (typeof import("../../engine/engine-embed"))["projectConfigView"]
 import { answerProjectConfigView } from "./sidecar-project-config-view"
 import { buildProjectConfigViewRequest } from "./project-config-view-message"
+import { projectExecutableRows } from "./codepuppy-ext-trust"
 import { WITHHELD_KINDS } from "@opencode/schema/codepuppy-project-config"
 const sandbox = engineSandbox()
 const model = scriptedModel()
@@ -41,8 +42,7 @@ beforeAll(async () => {
     path.join(unallowed, "opencode.json"),
     JSON.stringify({
       mcp: { servers: { github: { type: "local", command: [process.execPath, MCP_FIXTURE] } } },
-      plugins: ["./notify"],
-      agents: { translator: { mode: "primary", model: "test/m", system: "text" } },
+        agents: { translator: { mode: "primary", model: "test/m", system: "text" } },
       commands: { commit: { template: "commit !`printf probe`", model: "test/m", subtask: true } },
       formatter: { prettier: { command: ["prettier"], extensions: [".ts"] } },
       shell: "/opt/homebrew/bin/fish",
@@ -92,6 +92,11 @@ test("AC-05 ①:只有 OpenCode 配置也给出九类,名字 / 出处 / 字段�
     file: ".opencode/agents/helper.md",
   })
   expect(JSON.stringify(reply.view)).not.toContain("file:///missing.mjs")
+  expect(projectExecutableRows({ mcp: [], plugins: [], agents: [] }, reply.view.withheld)).toEqual([
+    "· 连接器(MCP):github", "· 插件:.opencode/plugins/notify.js", "· Agent 的权限与模型设置:translator(模式、模型)",
+    "· 命令的运行设置:/commit(运行程序、模型、子任务)", "· 文件开头的脚本:.opencode/agents/helper.md",
+    "· 写文件后自动运行的格式化程序:prettier", "· 终端与 shell 使用的程序:/opt/homebrew/bin/fish", "· 模型的接入设置:openai", "· 其他 OpenCode 设置:references、experimental",
+  ])
 })
 test("AC-05 ②:只有 AGENTS.md 与技能 ⇒ 空清单且完整", async () => {
   expect(await read(content)).toMatchObject({ ok: true, view: { trusted: false, complete: true, withheld: [] } })

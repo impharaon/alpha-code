@@ -15,7 +15,7 @@ last_reviewed: 2026-11-14
 ## 无人值守运行的即时裁决与记录
 
 - 依据:[alpha-code#1699](https://github.com/impharaon/alpha-code/issues/1699) 当前正文;[规格 v2 @ 8573c17dd8](https://github.com/impharaon/alpha-code/blob/8573c17dd8/docs/specs/unattended-run-permissions/spec.md),AC-01 至 AC-08;[冻结设计 @ a00ed8792f](https://github.com/impharaon/alpha-code/blob/a00ed8792f/docs/specs/unattended-run-permissions/design.md) §4.1—§4.5、§5、§6、§8、§10。
-- 核对:待编排器核对计划提交;恢复实施后的第一个实现提交从续派 brief 的 `Phase:` 行补入提交、核对者/模型及结论。
+- 核对:`3cd17472e3` · 编排器(Claude Fable 5.2)· 通过。
 
 一个交付段足够。名单、裁决和记录共用同一次运行及同一拒绝合同,拆成独立交付会留下无法独立验收的中间状态;段内按下列提交单元顺序实施,不另拆 Issue。下文仅定文件、私有实现落点、顺序与证据;契约、规则表和边界直接消费上述设计。
 
@@ -123,6 +123,11 @@ last_reviewed: 2026-11-14
 | 包检查 | 依次为 `packages/schema`、`packages/ext`、`packages/ui-mac` | 各执行 `bun typecheck`。 |
 
 PLAN 验证只做文件/diff 的只读检查并提交本文件。实现后的全量 gate、推送、PR、合并和打包版核对归编排器;本段不提前运行这些动作。
+
+实施证据(2026-11-14,本次实施从 12:30 UTC 计时):
+
+- 单元 1 基线:C2 的消息合同 9 pass、hub-view 18 pass 沿用 r2;sidecar wiring 6 pass 沿用编排器 r3 回执。C3 既有 hub-bridge 5 pass;C4 既有 register-policy 68、RPC 5、risk 22、inventory 5、ask-deadline 5、setup-order 1 pass;C7 turn 2、moderation 1、注入 25、注入引擎 1 pass;C8 19 pass。上述对应索引命令退出均为 0(本轮加 `--only-failures` 抑制通过行)。三个包 `bun typecheck` 均退出 0。
+- 单元 1 红证据:`cd packages/ui-mac && bun test src/main/unattended-run.engine.test.ts` 退出 1;子进程 AC-01、AC-02、AC-07 共 3 fail,三者都在 `withoutApproval` 的零 Asked 断言收到 `["mcp:probe:echo"]`。没有缺导出、加载或依赖错误。生产运行/解析入口、真实 ext 与真实 MCP 已走通;测试收到请求后立即拒掉,未改审批期限。
 
 ### 偏离记录
 

@@ -20,6 +20,7 @@ import type { Context } from "@opencode/plugin/promise/plugin"
 import type { FormInfo } from "@opencode/client"
 import type { AutomationTask } from "../shared/automation-types"
 import type { CodePuppySidecarHost } from "./hub-view"
+import { parseUnattendedLive } from "./codepuppy-sidecar-messages"
 
 const sandbox = engineSandbox()
 mock.module("electron", () => ({
@@ -46,7 +47,11 @@ const { startAutomationScheduler, runAutomationNow } = await import("./automatio
 const { initAutomationLlm, llmParseAutomation } = await import("./automation-llm")
 const listeners: Array<(event: { data: unknown }) => void> = []
 let mainHost: CodePuppySidecarHost
-const post = (data: unknown) => listeners.forEach((listener) => listener({ data }))
+let live: ReturnType<typeof parseUnattendedLive>
+const post = (data: unknown) => {
+  live = parseUnattendedLive(data) ?? live
+  listeners.forEach((listener) => listener({ data }))
+}
 // 唯一替代的是 Electron 的进程传输,两侧仍用生产 host/bridge 与生产消息解析器。
 ;(process as unknown as { parentPort: unknown }).parentPort = {
   on: (_event: string, listener: (event: { data: unknown }) => void) => listeners.push(listener),
@@ -351,10 +356,13 @@ test("AC-06 注销后的续聊、真实分叉和子会话不继承无人值守�
   }
 }, 60_000)
 
-// 同一次真实 Code Mode 调用先停在工具内,外来输入到达后才执行下一个询问工具。
-// 用审批事件和运行结束竞争,坏例立即报红,不靠等待 300 秒。
-for (const outside of ["prompt", "shell"] as const)
-  test(`AC-06 在册运行收到 ${outside} 插话后,下一个每次询问工具必须出卡`, async () => {
+// 同一次真实 Code Mode 调用先停在工具内,再分别发送消息和 shell 命令。
+// owner 2026-11-14「不算,发消息才算」:消息转有人在场,shell 保持无人值守。
+for (const outside of ["prompt", "shell"] as const) {
+  const name = outside === "prompt"
+    ? "AC-06 消息插话使在册运行退出名单,每次询问工具出卡"
+    : "AC-06 shell 命令不接管在册运行,每次询问工具直接执行且零 Asked"
+  test(name, async () => {
     await store.setRecord({ selector: { level: "tool", canonical: "mcp:probe:echo" }, state: "ask" })
     const entered = Promise.withResolvers<string>()
     const release = Promise.withResolvers<void>()
@@ -395,11 +403,21 @@ for (const outside of ["prompt", "shell"] as const)
       activeSession = await entered.promise
       const before = readFileSync(callLog, "utf8")
       if (outside === "prompt") await client.session.prompt({ sessionID: activeSession, text: "请继续这次运行。" })
-      if (outside === "shell")
+      if (outside === "shell") {
         await client.session.shell({ sessionID: activeSession, command: "printf shell-interjection" })
+        expect(live?.sessions.map((entry) => entry.sessionID)).toContain(activeSession)
+      }
       release.resolve()
       const result = await Promise.race([asked.promise.then(() => "asked"), run.then(() => "finished")])
-      expect(result, "外来输入之后工具仍按无人值守放行").toBe("asked")
+      if (outside === "shell") {
+        expect(result, "shell 命令不把运行转为有人在场").toBe("finished")
+        expect(pending).toBeUndefined()
+        expect(await client.permission.list({ sessionID: activeSession })).toEqual([])
+        expect(getAutomation(job.id)!.lastRun!.status).toBe("ok")
+        expect(readFileSync(callLog, "utf8")).toBe(`${before}echo\n`)
+        return
+      }
+      expect(result, "消息插话之后工具仍按无人值守放行").toBe("asked")
       expect(readFileSync(callLog, "utf8")).toBe(before)
       const request = await asked.promise
       expect((await client.permission.list({ sessionID: activeSession })).map((item) => item.id)).toContain(request.id)
@@ -417,6 +435,7 @@ for (const outside of ["prompt", "shell"] as const)
       await hold.dispose()
     }
   }, 60_000)
+}
 
 test("AC-03 回合失败仍投影先前拒绝,优先于模型错误", async () => {
   await store.removeRecord({ level: "tool", canonical: "mcp:probe:echo" })

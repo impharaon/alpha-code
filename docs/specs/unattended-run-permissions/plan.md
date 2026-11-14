@@ -177,3 +177,15 @@ R4 修正回执:
 - 真实消息 JSON 随本轮同名沙箱用例重新导出,生产源码摘要已核对一致;没有手写协议输入。红例先提交 `177418ea5b`,修复提交不改该回归文件。文件均在原计划清单内,无上游文件或新 takeover。
 
 本轮截至 14:11 UTC,约 19 分钟;完成第 2/3 项及第 4 项解释,第 1 项交编排器处理合同阻塞。
+
+
+2026-11-14 · R6 owner 边界裁决及回执(基点 `6878b33344`,从 14:35 UTC 计时):
+
+- 依据 owner 2026-11-14 所选选项原文「不算,发消息才算」,设计 §10 增补独立审查 finding、r4/r5 合同证据及裁决;§4.2、§5、§6 的对应表述与摘要明确区分 prompt 输入和会话内 shell 命令。prompt 仍在准备阶段退出名单;shell 不触发退出,其输出可进入仍按无人值守执行的回合。r5 的适配器机制已撤回,r4/r5 的阻塞按本轮裁决关闭。两处登记入口、T1/T2、其余威胁边界和已接受的第 2/3/4 项保持。
+- C5 同一真实运行先暂停在工具内,再分别发送消息和 shell。用例明确命名为「AC-06 消息插话使在册运行退出名单,每次询问工具出卡」与「AC-06 shell 命令不接管在册运行,每次询问工具直接执行且零 Asked」。前者保留原审批事件、工具等待、人工批准后才执行的断言;后者按 owner 新边界重钉原 shell 红例,增加命令后 main 实际快照仍包含该会话、无审批事件/待批请求、真实 MCP 调用日志增加和运行状态 ok 的判据。生产代码未修改。
+- `cd packages/ui-mac && bun test --timeout 90000 ./src/main/unattended-run.engine.cases.ts` → 16 pass / 0 fail,101 个断言,退出 0。C5 索引命令 `bun test --only-failures src/main/unattended-run.engine.test.ts` → 宿主 1 pass / 0 fail,退出 0。原 AC-01/02/07 三条红回归断言逐项比对未改。真实消息夹具的生产源码摘要仍一致,本轮无需重写 JSON。
+- 本轮相关命令(沿用 C2—C9 的包工作目录,逐条 `bun test --only-failures <文件>`):C2 `src/main/codepuppy-sidecar-messages.test.ts` 10 pass、`src/main/codepuppy-unattended.test.ts` 4 pass;C3 `src/policy/unattended.test.ts` 4 pass;C4 `src/policy/unattended-policy.test.ts` 20 pass;C9 `src/policy/authority-registry.test.ts` 5 pass。以上均退出 0。schema、ext、ui-mac 三包各执行 `bun typecheck`,均退出 0。未受本轮影响的 C6—C8 等检查继承 r4 已接受回执;没有运行全量 gate/bin/check。
+- 文档实际差异核对:owner 日期与引文按本轮原文记录;没有采用已撤回的 r5 写入口。`git diff --check` 退出 0。本轮除原清单内用例、plan 与新授权 design 外,仅多改 `docs/README.md` 中该 DESIGN 的一条生成索引摘要,机械同步实际变化的权威摘要;不改其他索引条目。这也是与其他文档更新线可能交叉的文件,合并时保留各自条目。
+- 遗留去向:本轮无新增项;此前交编排器的既有意图项保持原去向。不新增通道、生产限制或接管。
+
+本轮截至 14:41 UTC,约 6 分钟;本轮改动仅文档和真实引擎用例。

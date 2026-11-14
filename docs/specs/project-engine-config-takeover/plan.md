@@ -446,5 +446,6 @@ spike 用例按顺序依赖前一条留下的标记;新加的三条放在最后,
 | 文档 | `scripts/check-doc-links.py` 与 `docs-gates.sh` 的链接检查;ADR 与登记册逐项核对 | 链接断 ⇒ 红 |
 
 ### 偏离记录
+- 2026-11-14 · 审查修复 7:核实 ADR-047 的三行前有两个空行,使其脱离接管表;仅移除该断行,人工查看差异与表格连续性确认三行归表,不加文案断言测试。
 - 2026-11-14 · 审查修复 5:升级检查不再绑定 entry 变量名,按配置消费者的类型判断清点;Markdown 同时数 ConfigMarkdown.parse(Option) 与 SkillFile.parse 的六个实际调用,含 compatibility 与 provider。改名副本在旧检查漏报而红;新增实际文件的暂存变异也点名红,恢复后绿。ADR-049 的计数同步为六处。
 - 2026-11-14 · 同调用链必要文件 `packages/core/src/config/codepuppy-project-gate.ts` 增加 `classificationsForTest()` 副本读取口:内容类复用实际名单,具名暂缓键的类别由 `deferredItems()` 共用一张表;未知新键仍默认暂缓。用于升级判据的删键反向臂,不增加用户配置或公共契约。

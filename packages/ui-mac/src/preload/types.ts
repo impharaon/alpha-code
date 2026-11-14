@@ -84,6 +84,12 @@ export type {
  */
 export type ServerReadyData = { url: string }
 
+/**
+ * `#1669`:main 持有的两个引擎目录(main/engine-internal-directories.ts),每项是引擎可能记下的几种写法。引擎适配器据此
+ * 把它们从项目清单里拿掉:`scratch` 永远不是项目;`defaultWorkspace` 有对话之后才是。
+ */
+export type EngineInternalDirectories = { scratch: string[]; defaultWorkspace: string[] }
+
 export type SidecarGenerationReason = "boot" | "structural"
 
 /** REQ-159 `#1322`:工作区写探针的回答(合同本体在 main/workspace-write-probe.ts,这里是 renderer 可见的形状)。 */
@@ -752,6 +758,8 @@ export type ElectronAPI = {
   workspaceDefaultDir: () => Promise<string>
   /** lazy 供给:dir 省略或等于默认工作目录时创建并返回;其他路径 no-op(ok:false)。 */
   workspaceEnsureDefault: (dir?: string) => Promise<{ ok: boolean; dir?: string }>
+  /** `#1669`:引擎适配器认 Code Puppy 自己的目录用(见 `EngineInternalDirectories`)。 */
+  engineInternalDirectories: () => Promise<EngineInternalDirectories>
   /**
    * REQ-159 `#1322`:「这个目录现在写得进去吗」—— 由**被围栏的引擎进程**在该目录真写一次再删。
    * writable / denied(围栏 EPERM)/ unknown(引擎不在 / 超时 / 别的失败)。呈现层只在 denied 时标记。

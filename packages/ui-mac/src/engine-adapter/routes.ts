@@ -12,11 +12,15 @@ import type {
   PermissionV2DecisionReceipt,
   QuestionRequest,
 } from "@opencode-ai/sdk/v2/client"
+import type { EngineInternalDirectories } from "../preload/types"
 import { normalizeAgentList, normalizeSessionInfo } from "./frozen-shapes"
 import { projectEventStream } from "./events"
+import { isListedProject } from "./internal-projects"
 import { v1DecisionID, type DecisionInput, type DecisionOutcome, type PermissionReplies } from "./permission-replies"
 import { MESSAGE_PAGE, recentMessages, sessionDirectory } from "./session-cache"
 import {
+  baseID,
+  queuedUserMessage,
   syntheticText,
   toFormAnswer,
   toPrompt,
@@ -29,6 +33,7 @@ import {
   toV1Project,
   toV1ModelList,
   toV1ProviderList,
+  toV1Queued,
   toV1Question,
   todosOf,
   turnAnchor,
@@ -48,6 +53,8 @@ export type RouteContext = {
   origin: string
   /** 这个引擎源的审批快照与收据(permission-replies.ts)。 */
   permissions: PermissionReplies
+  /** `#1669`:main 持有的 Code Puppy 自己的目录(internal-projects.ts 据此筛项目)。 */
+  internalDirectories: () => Promise<EngineInternalDirectories>
   /** 对引擎源地址发一个原始请求(SSE、二进制读文件这类不经类型化客户端的)。 */
   upstream: (path: string, init?: RequestInit) => Promise<Response>
   /** 把这次请求原样转给引擎(2.x 上路径与形状都没变的那些)。 */
@@ -111,11 +118,28 @@ async function questionOf(context: RouteContext, requestID: string) {
   return form ? { sessionID: form.sessionID, question: toV1Question(form) } : undefined
 }
 
+/**
+ * v1 的档位随每条消息走;2.x 落在会话上 —— 发送前切到这条消息要的档位。`#1669`:v1 里不带 agent = 默认助手(0.1.26
+ * prompt.ts createUserMessage 的 `agents.defaultInfo()`,命令 `cmd.agent ?? input.agent` 同),界面据此在「全部批准」+
+ * 默认助手时不带 agent;所以不带时把会话切回默认助手,否则沿用上一条的只读 / 请求审批 / 手选助手。默认助手取会话目录的
+ * 助手列表第一项(引擎 Agent.list 把默认排第一,与会话没选过助手时引擎选的是同一个);会话没选过或已经是它就不切。
+ */
+async function selectAgent(context: RouteContext, sessionID: string, agent: string | undefined) {
+  if (agent) {
+    await context.api.session.switchAgent({ sessionID, agent })
+    return
+  }
+  const session = await context.api.session.get({ sessionID })
+  if (!session.agent) return
+  const [fallback] = (await context.api.agent.list({ location: { directory: session.location.directory } })).data
+  if (fallback && fallback.id !== session.agent) await context.api.session.switchAgent({ sessionID, agent: fallback.id })
+}
+
 async function prompt(context: RouteContext) {
   const sessionID = context.params.sessionID!
   const body = context.body as V1PromptBody
   // v1 的档位与模型随每条消息走;2.x 落在会话上 —— 发送前切到这条消息要的档位与模型。
-  if (body.agent) await context.api.session.switchAgent({ sessionID, agent: body.agent })
+  await selectAgent(context, sessionID, body.agent)
   if (body.model)
     await context.api.session.switchModel({
       sessionID,
@@ -151,6 +175,16 @@ async function messages(context: RouteContext) {
   const before = context.query.get("before") ?? undefined
   const page = await recentMessages(context.api, sessionID, { limit, cursor: before })
   const listed = toV1Messages(sessionID, page.context).filter((item) => page.ids.has(baseID(item.info.id)))
+  // `#1669`:最新一页带上收件箱里排着的用户输入(落成之前不是消息),与事件流投影的是同一条(events.ts queued)。取不到收件箱
+  // 不让整个会话打不开:记下,消息照回。
+  const inbox = before
+    ? []
+    : await context.api.session.inbox.list({ sessionID }).catch((error) => {
+        if (context.signal.aborted) throw error
+        console.error("[engine-adapter] inbox read failed", sessionID, error)
+        return []
+      })
+  const queued = toV1Queued(sessionID, page.context, inbox.flatMap((item) => queuedUserMessage(item) ?? []))
   // REQ-142:最近一个回合的改动挂回它的用户消息(只在最新一页取,turnDiffsOf 只读最近一个回合)。取不到改动不让整个会话
   // 打不开:记下(不静默),消息照回。
   const anchor = before ? undefined : turnAnchor(listed, page.context)
@@ -161,12 +195,10 @@ async function messages(context: RouteContext) {
         return undefined
       })
     : undefined
-  const response = json(anchor && diff ? withTurnDiffs(listed, new Map([[anchor.attach, diff]])) : listed)
+  const response = json([...(anchor && diff ? withTurnDiffs(listed, new Map([[anchor.attach, diff]])) : listed), ...queued])
   if (page.next) response.headers.set("x-next-cursor", page.next)
   return response
 }
-
-const baseID = (id: string) => id.replace(/:assistant$/, "")
 
 const COMMAND_POLL_MS = 200
 
@@ -198,6 +230,11 @@ export const ROUTES: readonly Route[] = [
     const info = await context.api.server.info()
     return json({ healthy: true, version: info.version })
   }),
+  // `#1669`:冻结界面每个服务器上下文只判一次协议(server-sdk.tsx 建上下文时调 detectServerProtocol,之后不再重判)。首探
+  // `/global/health` 失败(引擎这一刻报错或 5 秒内没答)就来探这里,这里也不成立 ⇒ 判 v2,而 v2 的事件流与清单这里一律 501,
+  // 界面在这个上下文里再也收不到事件。适配器只说 v1,与引擎此刻答不答无关,所以这里不问引擎,恒答 v1 的形状。
+  // 代价:checkServerHealth 先读这里(utils/server-health.ts),启动闸与每 10 秒的健康轮询因此不再经它探引擎。
+  route("GET", "/api/health", async () => json({ healthy: true })),
   route("POST", "/instance/dispose", async (context) => {
     // 2.x 的重载重建**全部** Location(seams Q5),v1 的 instance.dispose 只释放一个目录;语义更宽、方向安全。
     await context.api.location.reload()
@@ -213,7 +250,11 @@ export const ROUTES: readonly Route[] = [
   route("GET", "/config", async () => json({})),
 
   // ── 项目(U2 选 A:2.x 自己有项目清单,`canonical` 改名 `worktree`)──
-  route("GET", "/project", async (context) => json((await context.api.project.list()).map((p) => toV1Project(p as never)))),
+  route("GET", "/project", async (context) => {
+    const [projects, internal] = await Promise.all([context.api.project.list(), context.internalDirectories()])
+    const listed = await Promise.all(projects.map((project) => isListedProject(context.api, project, internal)))
+    return json(projects.filter((_, index) => listed[index]).map((p) => toV1Project(p as never)))
+  }),
   route("GET", "/project/current", async (context) => json(await currentProject(context))),
   route("GET", "/api/project/current", async (context) => {
     const project = await currentProject(context)
@@ -301,7 +342,7 @@ export const ROUTES: readonly Route[] = [
   route("POST", "/session/:sessionID/command", async (context) => {
     const sessionID = context.params.sessionID!
     const body = (context.body ?? {}) as { command: string; arguments?: string; agent?: string; model?: string; variant?: string }
-    if (body.agent) await context.api.session.switchAgent({ sessionID, agent: body.agent })
+    await selectAgent(context, sessionID, body.agent)
     const [providerID, ...rest] = body.model?.split("/") ?? []
     if (providerID && rest.length)
       await context.api.session.switchModel({
@@ -321,7 +362,7 @@ export const ROUTES: readonly Route[] = [
   route("POST", "/session/:sessionID/shell", async (context) => {
     const body = (context.body ?? {}) as { command: string; agent?: string }
     const sessionID = context.params.sessionID!
-    if (body.agent) await context.api.session.switchAgent({ sessionID, agent: body.agent })
+    await selectAgent(context, sessionID, body.agent)
     await context.api.session.shell({ sessionID, command: body.command })
     return json({})
   }),
@@ -602,7 +643,7 @@ export const UNSUPPORTED: ReadonlyArray<{ method: string; path: string; reason: 
   { method: "POST", path: "/api/session/:sessionID/question/:requestID/reply", reason: "v1 模式下 createCompatibleApi 改走 v1 的 /question/:id/reply(server-compat.ts:508);2.2.x 已删" },
   { method: "POST", path: "/api/session/:sessionID/question/:requestID/reject", reason: "v1 模式下改走 /question/:id/reject(server-compat.ts:514);2.2.x 已删" },
   // `#1662`:扫描改成不依赖排版(跨行写的链)之后才扫出的五条,都只在冻结 app 判定引擎是 v2 协议时发出;适配器的 /global/health 答
-  // healthy:true(本表首条),detectServerProtocol 因此恒判 v1(utils/server-protocol.ts:29)。
+  // healthy:true(本表首条),首探失败时 `/api/health` 同样答 healthy:true(`#1669`),detectServerProtocol 因此恒判 v1(utils/server-protocol.ts)。
   { method: "GET", path: "/api/event", reason: "v2 支路:server-sdk.tsx:268-272 只在协议不是 v1 时订阅 1.17.13 的 /api/event,v1 走 /global/event(已接)" },
   { method: "GET", path: "/api/permission/request", reason: "v2 支路:permission.tsx:264-269 与 global-sync/bootstrap.ts:447-450 在 v1 协议下改走 v1 的 GET /permission(已接)" },
   { method: "GET", path: "/api/question/request", reason: "v2 支路:global-sync/bootstrap.ts:483-486 在 v1 协议下改走 v1 的 GET /question(已接)" },

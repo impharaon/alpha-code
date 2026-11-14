@@ -5,26 +5,34 @@
 //   · 直通:pty.*、lsp.updated、vcs.branch.updated、mcp.*、reference.updated、server.connected、global.disposed;
 //     filesystem.changed → file.watcher.updated(另由回合改动补出项目文件的增删改,见 fileChanges);
 //   · 改名:location.shutdown → server.instance.disposed;agent/command/skill.updated → catalog.updated;
-//     project.updated(`canonical` → `worktree`);permission.asked(I7a 字段映射)/ replied;
+//     project.updated(`canonical` → `worktree`;Code Puppy 自己的目录不发,`#1669` internal-projects.ts);
+//     permission.asked(I7a 字段映射)/ replied;
 //     form.*(`metadata.kind === "question"`)→ question.asked / replied / rejected;
 //   · 派生:session.execution.* → session.status / session.idle / session.error;retry → session.status retry;
 //     会话属性变化 → 重取会话发 session.created / updated;
 //   · 消息:流式增量(text / reasoning)直接转 message.part.delta;其余每个结构性事件之后重取最近一页消息,
 //     经 toV1Messages 投影,**只发有变化的** message.updated / message.part.updated —— 增量只用来让字一个个出来,
-//     内容以 2.x 存储为准。todowrite 工具的输入同时投影成 todo.updated(U1)。
+//     内容以 2.x 存储为准。todowrite 工具的输入同时投影成 todo.updated(U1)。回退提交删掉的消息逐条发 message.removed
+//     (`#1669`,暂存时记下会被删的那些,见 staged)。收件箱里排着的用户输入照它落成后的样子先投影出来,投递时换成落成的那条
+//     (`#1669`,见 queued)。
 // 不认识的事件丢弃(它们在 v1 没有对应,冻结界面也不读)。
 import type { OpenCodeClient, OpenCodeEvent, SessionMessageInfo } from "@opencode/client/promise"
 import type { Part } from "@opencode-ai/sdk/v2/client"
+import type { EngineInternalDirectories } from "../preload/types"
 import { normalizeSessionInfo } from "./frozen-shapes"
+import { isListedProject, NO_INTERNAL_DIRECTORIES } from "./internal-projects"
 import type { PermissionReplies } from "./permission-replies"
 import type { RouteContext } from "./routes"
 import { recentMessages, rememberSessionDirectory, sessionDirectory } from "./session-cache"
 import {
+  baseID,
   contentKeys,
   partID,
+  queuedUserMessage,
   todosOf,
   toV1Messages,
   toV1Project,
+  toV1Queued,
   toV1Question,
   turnAnchor,
   v1ErrorData,
@@ -34,10 +42,12 @@ import {
 export type V1Payload = { type: string; properties: unknown }
 type Emit = (directory: string, payload: V1Payload) => void
 
-const SNAPSHOT_WINDOW = 20
+/** 每个结构性事件之后按存储重取的最近一页(条数)。 */
+export const SNAPSHOT_WINDOW = 20
 
 /** 结构性的消息事件:之后按存储重取最近一页并发出变化。 */
 export const SNAPSHOT_EVENTS = new Set([
+  "session.inbox.enqueued",
   "session.inbox.delivered",
   "session.step.started",
   "session.step.streamed",
@@ -124,7 +134,12 @@ const PASS_THROUGH = new Set([
   "global.disposed",
 ])
 
-export function createProjector(api: OpenCodeClient, emit: Emit, permissions: PermissionReplies) {
+export function createProjector(
+  api: OpenCodeClient,
+  emit: Emit,
+  permissions: PermissionReplies,
+  internalDirectories: () => Promise<EngineInternalDirectories> = async () => NO_INTERNAL_DIRECTORIES,
+) {
   /** 助手消息 → content 块的语义键(按出现顺序 = content 下标),流式 part 的 id 由它定。 */
   const blocks = new Map<string, string[]>()
   /** 已发出的 v1 对象(按 id)的 JSON,用于只发变化。 */
@@ -156,6 +171,35 @@ export function createProjector(api: OpenCodeClient, emit: Emit, permissions: Pe
               } as SessionMessageInfo),
         )
 
+  /**
+   * `#1669`:暂存的回退(会话 → 边界消息、边界起的 2.x 消息、它们投影出的 v1 id)。2.x 提交回退时把边界起的消息全删掉
+   * (core session/projector.ts RevertEvent.Committed),事件里只有边界、删掉的再也读不回来;冻结界面只在 `message.removed`
+   * 上删消息(server-session.ts),0.1.26 的 revert cleanup 逐条发它。所以暂存时记下会被删的,提交时照发。
+   * 按引擎顺序,边界或任何一条已记下的消息之后的都会被删;读到的上下文里一条也看不见(已提交)就不记,
+   * 不把「不在最近一页」当成删除。
+   */
+  const staged = new Map<string, { boundary: string; doomed: Set<string>; ids: Set<string> }>()
+  const noteStaged = (sessionID: string, context: readonly SessionMessageInfo[], listed: ReturnType<typeof toV1Messages>) => {
+    const pending = staged.get(sessionID)
+    const from = pending ? context.findIndex((message) => message.id === pending.boundary || pending.doomed.has(message.id)) : -1
+    if (!pending || from < 0) return
+    for (const message of context.slice(from)) pending.doomed.add(message.id)
+    for (const { info } of listed) if (pending.doomed.has(baseID(info.id))) pending.ids.add(info.id)
+  }
+
+  /**
+   * `#1669`:会话 → 收件箱里排着的用户输入(inbox id = 落成后的消息 id)。0.1.26 一发出就是用户消息;2.x 回合停在审批上时,
+   * 追加的一句要等审批回答才落成消息。快照把排着的接在最近一页后面投影(v1-shapes.ts toV1Queued),投递即丢(停止不取消它,
+   * 留在收件箱等下一次投递;Code Puppy 没有取消收件箱的入口)。
+   */
+  const queued = new Map<string, Map<string, SessionMessageInfo>>()
+  /**
+   * 已投递、还没在快照里换成落成那条的 inbox id(按会话)。落成的那条时间是投递时间,与界面上排着的那条不同;冻结 store 按
+   * 「时间 + id」定位消息(event-reducer / server-session 的 message.updated),直接发会多出一条 —— 所以先 message.removed 再发。
+   * 不认得的也换:这个投影器之前打开的会话,排着的那条来自 `GET /session/:id/message`。
+   */
+  const delivered = new Map<string, Set<string>>()
+
   const remember = (key: string, value: unknown) => {
     const encoded = JSON.stringify(value)
     if (emitted.get(key) === encoded) return false
@@ -170,6 +214,8 @@ export function createProjector(api: OpenCodeClient, emit: Emit, permissions: Pe
       if (message.type === "assistant") blocks.set(message.id, contentKeys(message.content as never))
     }
     const listed = toV1Messages(sessionID, withProgress(page.context))
+    // 回退暂存期间新落下的消息(用户的 shell、后台通知)排在边界之后,提交时一并被删。
+    noteStaged(sessionID, page.context, listed)
     const anchor = turnAnchor(listed, page.context)
     if (refreshTurnDiff && anchor) {
       // 取不到这一步的回合改动不该让消息也停更:记下(不静默),消息照发,下一个边界再取。
@@ -182,10 +228,15 @@ export function createProjector(api: OpenCodeClient, emit: Emit, permissions: Pe
         fileChanges(directory, sessionID, anchor.from, diff)
       }
     }
-    for (const { info, parts } of withTurnDiffs(listed, turnDiffs)) {
-      if (remember(`message:${info.id}`, info)) emit(directory, { type: "message.updated", properties: { info } })
+    const pending = toV1Queued(sessionID, page.context, [...(queued.get(sessionID)?.values() ?? [])])
+    const replaced = delivered.get(sessionID)
+    delivered.delete(sessionID)
+    for (const { info, parts } of [...withTurnDiffs(listed, turnDiffs), ...pending]) {
+      const replacing = !!replaced?.has(info.id)
+      if (replacing) emit(directory, { type: "message.removed", properties: { sessionID, messageID: info.id } })
+      if (remember(`message:${info.id}`, info) || replacing) emit(directory, { type: "message.updated", properties: { info } })
       for (const part of parts) {
-        if (remember(`part:${part.id}`, part)) emit(directory, { type: "message.part.updated", properties: { part } })
+        if (remember(`part:${part.id}`, part) || replacing) emit(directory, { type: "message.part.updated", properties: { part } })
         todo(directory, sessionID, part)
       }
     }
@@ -291,7 +342,11 @@ export function createProjector(api: OpenCodeClient, emit: Emit, permissions: Pe
     if (type === "location.shutdown") return emit(directory, { type: "server.instance.disposed", properties: { directory } })
     if (type === "agent.updated" || type === "command.updated" || type === "skill.updated")
       return emit(directory, { type: "catalog.updated", properties: {} })
-    if (type === "project.updated") return emit(directory, { type, properties: toV1Project(data as never) })
+    if (type === "project.updated") {
+      // `#1669`:Code Puppy 自己的目录不进冻结 app 的项目清单(event-reducer 收到就插入),与 GET /project 同一判定。
+      if (!(await isListedProject(api, data as never, await internalDirectories()))) return
+      return emit(directory, { type, properties: toV1Project(data as never) })
+    }
     if (type === "permission.asked") return emit(directory, { type, properties: permissions.show(data as never) })
     if (type === "permission.replied") return emit(directory, { type, properties: data })
     if (type === "form.created") {
@@ -352,6 +407,29 @@ export function createProjector(api: OpenCodeClient, emit: Emit, permissions: Pe
         void streamShell(directory, sessionID, data.assistantMessageID, data.id, data.metadata.shellID)
     }
     if (type === "session.tool.success" || type === "session.tool.failed") progress.delete(data.id)
+    if (type === "session.revert.staged") {
+      // 边界可能在很早的那页(长对话中间):往前翻到它为止,记下它与之后的全部。
+      const boundary = data.revert.messageID as string
+      staged.set(sessionID, { boundary, doomed: new Set(), ids: new Set() })
+      const page = await recentMessages(api, sessionID, { through: boundary })
+      noteStaged(sessionID, page.context, toV1Messages(sessionID, page.context))
+    }
+    if (type === "session.inbox.enqueued") {
+      const message = queuedUserMessage({ ...data.item, id: data.inboxID, sessionID, time: { created: frame.created ?? Date.now() } })
+      if (message) queued.set(sessionID, (queued.get(sessionID) ?? new Map()).set(message.id, message))
+    }
+    if (type === "session.inbox.delivered") {
+      queued.get(sessionID)?.delete(data.inboxID)
+      if (queued.get(sessionID)?.size === 0) queued.delete(sessionID)
+      delivered.set(sessionID, (delivered.get(sessionID) ?? new Set()).add(data.inboxID))
+    }
+    if (type === "session.revert.cleared") staged.delete(sessionID)
+    if (type === "session.revert.committed") {
+      const pending = staged.get(sessionID)
+      staged.delete(sessionID)
+      if (pending && pending.boundary === data.to)
+        for (const messageID of pending.ids) emit(directory, { type: "message.removed", properties: { sessionID, messageID } })
+    }
     if (SNAPSHOT_EVENTS.has(type) || TURN_DIFF_EVENTS.has(type)) await snapshot(directory, sessionID, TURN_DIFF_EVENTS.has(type))
     if (SESSION_INFO_EVENTS.has(type)) await sessionInfo(directory, sessionID, "session.updated")
 
@@ -388,7 +466,7 @@ export function projectEventStream(context: RouteContext): Response {
         if (controller.signal.aborted) return
         sink.enqueue(encoder.encode(`data: ${JSON.stringify({ directory, payload })}\n\n`))
       }
-      const project = createProjector(context.api, emit, context.permissions)
+      const project = createProjector(context.api, emit, context.permissions, context.internalDirectories)
       void (async () => {
         try {
           for await (const event of context.api.event.subscribe({ signal: controller.signal })) {

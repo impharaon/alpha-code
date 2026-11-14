@@ -189,6 +189,7 @@ last_reviewed: 2026-11-12
 | AC-04 · 决定不变 | 段 0 记录(期望不改);`websearch-account-tool-table.engine.test.ts` 三种账户态期望不改 | 构建器漏写 `policy.account` ⇒ 记录第 ④ 格变成 `anonymous` 而红;漏写 `cloudMcp` ⇒ 第 ⑤ 格无云 MCP 而红。 |
 
 ### 偏离记录
+- 2026-11-14 · 接回 0.2.0 主线 `3a8e25d6b8` 的合并冲突:`packages/core/src/session/to-session-error.ts` 同时保留主线 `LoadAPIKeyError` → `provider.auth` 与本段从启动文档读取代理路径的分类,两个 import 并存 · 本次合并提交。
 - 2026-11-12 · `buildCodePuppyModelConfig(userDataPath, platform: PlatformInputs = {})`:平台地址与默认模型覆盖改为参数,模块不再读环境。注入传文档的 `platform.modelProxyBaseURL` / `defaultModelOverride`;main 的出网目的地派生(`server.ts`)照旧传 main 自己环境里的值(main 一侧,语义不变)· 本段提交。
 - 2026-11-12 · 没有文档时的注入(只剩直接调注入、不发布文档的测试)按「未登录、无云 MCP、kill-switch 关」走,与段 1 的环境回退同一处理;生产里 sidecar 在注入之前发布,到不了这一支 · 本段提交。
 - 2026-11-12 · 测试夹具加 `publishMainBootstrap()`:用生产构建器从 `process.env`(单进程测试里它就是 main 的环境)造文档并发布,G2 各键的判法只在构建器一处;`unpublishTestBootstrap()` 同时撤掉注入发布的供应商白名单(R30),不留给同进程的其它文件 · 本段提交。
@@ -240,6 +241,7 @@ last_reviewed: 2026-11-12
 | §9 回滚 · 无数据后果 | 段 0 记录第 ⑦ 格(C4 显式文件、C5 模型底表、密钥文件名集合)两端逐字相同;启动文档不落盘(构建器与 sidecar 不新增写盘点:`process-fence-write-sites.test.ts` 的登记簿本段不变) | 若迁移改变了磁盘形状,第 ⑦ 格红;若新增写盘,写盘登记簿闸红。 |
 
 ### 偏离记录
+- 2026-11-14 · 接回 0.2.0 主线 `3a8e25d6b8` 的合并冲突:`packages/ext/src/plugin.ts` 保留主线助手点名钩子,供应商白名单与开关仍读本段的进程内发布 / 启动文档;`packages/ui-mac/test-component/codepuppy-engine.ts` 保留主线可选 MCP 合并、监听地址与授权值,配置写到本段局部 `globalRoot`,不恢复环境通道;`packages/ui-mac/test-fixtures/net-failure/engine-driver.ts` 保留本段文档发布与引擎关口,注释同步主线生产 main 构建的 engine chunk 来源 · 本次合并提交。
 - 2026-11-13 · 模型配置的逃生开关也成了调用方给的输入:`buildCodePuppyModelConfig(userDataPath, ModelConfigInputs)`(段 2 的 `PlatformInputs` 改名并加 `disabled`)。注入传文档的 `switches.modelsDisabled`;main 的出网派生照旧传 main 自己环境里的 `CODEPUPPY_MODELS_DISABLE === "1"`(main 一侧,语义不变)· 本段提交。
 - 2026-11-13 · 出厂技能目录交给构建器的方式:`factory-skills.ts` 加 `setFactorySkillDirsForFork` / `factorySkillDirsForFork`,index.ts 在 boot 对账成功后记下(原来写环境变量的同一处),`spawnLocalServer` 每次 fork 取出交给构建器;没对账或对账失败 ⇒ 空,与原来「没写变量」同一结果 · 本段提交。
 - 2026-11-13 · ext 侧签名随通道去掉 JSON 解码:`injectFactorySkillPaths` / `externalDirectoryRules` 收数组;`applyFactoryDeny(cfg, names = FACTORY_DENIED_SKILLS)`、`factoryDeniedSkills()` 无参。main 的 `codepuppy-builtin-policy.ts` 转出 ext 的常量(R7);「main 与 ext 同一个常量」的判据放在 ui-mac `codepuppy-builtin-policy.test.ts`(ext 的测试 import main 模块会把 main 的依赖带进 ext 测试)· 本段提交。

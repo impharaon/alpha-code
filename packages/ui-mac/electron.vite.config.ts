@@ -2,6 +2,7 @@ import { sentryVitePlugin } from "@sentry/vite-plugin"
 import { defineConfig } from "electron-vite"
 import appPlugin from "@opencode-ai/app/vite"
 import * as fs from "node:fs/promises"
+import * as path from "node:path"
 import { brandI18nPlugin } from "./scripts/brand-i18n"
 import { patchUpstreamPlugin } from "./scripts/patch-upstream"
 import { UPSTREAM_LOGO_ALIAS } from "./scripts/upstream-logo-alias"
@@ -56,6 +57,7 @@ export default defineConfig({
         // Keep this identical to electron-vite's Node 20.11+ shim. Its regex insertion can
         // corrupt bundled TypeScript, while a Rollup banner places the shim safely.
         // (镜像上游 desktop 修复 f63a451b/#35270;2026-07-07 sync 后 ui-mac build 实锤同款损坏)
+        // 引擎 chunk 的这四个名字也只由它提供:scripts/build-engine.ts 去掉了上游 banner 里同样的四句(#1662,两份并存 = 重复声明)。
         output: {
           banner: `
 // -- CommonJS Shims --
@@ -92,8 +94,8 @@ const require = __cjs_mod__.createRequire(import.meta.url);
       {
         // 引擎包被打进 out/main/chunks 的某个 chunk,它的 `import.meta.url` 随之落在 chunks/,所以 assets/ 跟着拷到那里。
         name: "opencode:copy-server-assets",
-        async writeBundle() {
-          await fs.cp(`${ENGINE_DIST}/assets`, "./out/main/chunks/assets", { recursive: true })
+        async writeBundle(options) {
+          await fs.cp(`${ENGINE_DIST}/assets`, path.join(options.dir!, "chunks", "assets"), { recursive: true })
         },
       },
     ],

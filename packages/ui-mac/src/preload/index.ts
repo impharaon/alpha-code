@@ -164,6 +164,7 @@ const api: ElectronAPI = {
   openDirectoryPicker: (opts) => ipcRenderer.invoke("open-directory-picker", opts),
   workspaceDefaultDir: () => ipcRenderer.invoke("codepuppy-workspace-default"),
   workspaceEnsureDefault: (dir) => ipcRenderer.invoke("codepuppy-workspace-ensure", dir),
+  engineInternalDirectories: () => ipcRenderer.invoke("codepuppy-engine-internal-directories"),
   workspaceWriteProbe: (directory) => ipcRenderer.invoke("workspace-write-probe", directory),
   openFilePicker: (opts) => ipcRenderer.invoke("open-file-picker", opts),
   readPickedFile: (token, path) => ipcRenderer.invoke("read-picked-file", token, path),

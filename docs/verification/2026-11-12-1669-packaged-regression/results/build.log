@@ -1,0 +1,64 @@
+$ bun ./scripts/prebuild.ts
+Copied prod icons from ./icons/prod to resources/icons
+Generated metainfo for prod at resources/ai.opencode.desktop.metainfo.xml
+gen-db-expected: 59 ids + 2 retired → resources/db-expected-migrations.json (latest 20261030054400_job)
+✓ office-preview → out/office-preview/ app.js 1344KB · host.html 4KB · pptx.worker.js 566KB · sheet.worker.js 1KB
+[alpha:fence-addon] built ~/app/wt/alpha-code-verify-1669-packaged-regression/packages/ui-mac/native/codepuppy-fence/build/codepuppy_fence.node archs=x86_64+arm64 buildId=fence-20261113T013304094Z
+[alpha:office-runtime] arm64: 111.2 MB (4750 files, 48 Mach-O, 11 top-level modules imported, 4 formats round-tripped) at ~/app/wt/alpha-code-verify-1669-packaged-regression/packages/ui-mac/native/office-runtime/build/arm64
+$ bun ./scripts/build.ts
+[@codepuppy/ext] bundled → dist/server.js, dist/server.js.map, dist/photon_rs_bg-bq08arze.wasm, dist/bundled-tools.json
+vite v7.3.7 building ssr environment for production...
+transforming...
+../../node_modules/.bun/zod@4.6.7/node_modules/zod/v4/core/regexes.js (74:0): A comment
+
+"/** Anchors a pattern source. The interpolation lives here rather than at the call site because
+ * esbuild will not drop a `@__PURE__` call whose own argument interpolates a variable, but it
+ * will drop `anchor(dateSource)`. Keeping it inline pinned `date` into every bundle. */"
+
+in "../../node_modules/.bun/zod@4.6.7/node_modules/zod/v4/core/regexes.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+../../node_modules/.bun/zod@4.6.7/node_modules/zod/v4/core/util.js (400:0): A comment
+
+"// Wrapped in a `@__PURE__` IIFE: esbuild never tree-shakes a top-level initializer that contains a member access on `Number`, so the bare object literal survived into every bundle."
+
+in "../../node_modules/.bun/zod@4.6.7/node_modules/zod/v4/core/util.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+"parse" is imported from external module "path" but never used in "../../node_modules/.bun/@anthropic-ai+claude-agent-sdk@0.3.301+ddb411d2a89f02e9/node_modules/@anthropic-ai/claude-agent-sdk/sdk.mjs".
+"fchmodSync", "ftruncateSync", "renameSync", "unlinkSync" and "writeFileSync" are imported from external module "fs" but never used in "../../node_modules/.bun/@anthropic-ai+claude-agent-sdk@0.3.301+ddb411d2a89f02e9/node_modules/@anthropic-ai/claude-agent-sdk/sdk.mjs".
+✓ 5338 modules transformed.
+../../node_modules/.bun/gray-matter@4.0.3/node_modules/gray-matter/lib/engines.js (43:13): Use of eval in "../../node_modules/.bun/gray-matter@4.0.3/node_modules/gray-matter/lib/engines.js" is strongly discouraged as it poses security risks and may cause issues with minification.
+rendering chunks...
+../ui-mac/dist-engine/engine.mjs  23,605.80 kB
+✓ built in 7.14s
+built dist-engine/engine.mjs (OpenCode 2.2.5, node24, 38 native assets)
+$ electron-vite build
+vite v7.3.7 building ssr environment for production...
+transforming...
+"Types" is imported from external module "effect" but never used in "../schema/src/tool-identity.ts", "../schema/src/codepuppy-tool-inventory.ts" and "../schema/src/codepuppy-tool-policy.ts".
+✓ 516 modules transformed.
+dist-engine/engine.mjs (128131:17): Use of eval in "dist-engine/engine.mjs" is strongly discouraged as it poses security risks and may cause issues with minification.
+rendering chunks...
+✗ Build failed in 6.47s
+error during build:
+[vite:esbuild-transpile] Transform failed with 1 error:
+chunks/engine-!~{004}~.js:8:7: ERROR: The symbol "__cjs_mod__" has already been declared
+file: chunks/engine-!~{004}~.js:8:7
+
+The symbol "__cjs_mod__" has already been declared
+6  |  const require = __cjs_mod__.createRequire(import.meta.url);
+7  |  
+8  |  import __cjs_mod__, { createRequire, registerHooks } from 'node:module';
+   |         ^
+9  |  import * as fs$2 from 'node:fs';
+10 |  import fs__default, { mkdirSync, existsSync, lstatSync, chmodSync, writeFileSync, renameSync, rmSync, watch as watch$...
+
+    at failureErrorWithLog (~/app/wt/alpha-code-verify-1669-packaged-regression/node_modules/.bun/esbuild@0.25.12/node_modules/esbuild/lib/main.js:1467:15)
+    at ~/app/wt/alpha-code-verify-1669-packaged-regression/node_modules/.bun/esbuild@0.25.12/node_modules/esbuild/lib/main.js:736:50
+    at responseCallbacks.<computed> (~/app/wt/alpha-code-verify-1669-packaged-regression/node_modules/.bun/esbuild@0.25.12/node_modules/esbuild/lib/main.js:603:9)
+    at handleIncomingPacket (~/app/wt/alpha-code-verify-1669-packaged-regression/node_modules/.bun/esbuild@0.25.12/node_modules/esbuild/lib/main.js:658:12)
+    at Socket.readFromStdout (~/app/wt/alpha-code-verify-1669-packaged-regression/node_modules/.bun/esbuild@0.25.12/node_modules/esbuild/lib/main.js:581:7)
+    at Socket.emit (node:events:519:28)
+    at addChunk (node:internal/streams/readable:561:12)
+    at readableAddChunkPushByteMode (node:internal/streams/readable:512:3)
+    at Readable.push (node:internal/streams/readable:392:5)
+    at Pipe.onStreamRead (node:internal/stream_base_commons:189:23)
+error: script "build" exited with code 1
+exit=1

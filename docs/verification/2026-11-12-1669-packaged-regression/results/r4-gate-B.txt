@@ -1,0 +1,14 @@
+gate root=<root> break=none guard-lines=10
+GATE PASS [guard-files] real ~/Library/Keychains: outside ls exit 0, inside ls refused
+  outside: com.apple.authd kr=0 reachable
+  outside: com.apple.security.agent kr=0 reachable
+  outside: com.apple.security.agent.login kr=0 reachable
+  inside:  com.apple.authd kr=1100 unreachable
+  inside:  com.apple.security.agent kr=1100 unreachable
+  inside:  com.apple.security.agent.login kr=1100 unreachable
+GATE PASS [guard-agent] authd + security.agent reachable outside, all three unreachable inside
+  search list (inside, redirected): 1 entry: <root>/home/Library/Keychains/l7-1669.keychain-db
+GATE PASS [keychain] search list = [<root>/home/Library/Keychains/l7-1669.keychain-db], default = same, unlocked, no auto-lock
+GATE PASS [real-domain] real user-domain search list + default unchanged (sha256/16 e2e17521e301cac7)
+GATE PASS [app-env] unsandboxed app-env: search list = [temporary keychain], sentinel found there
+GATE RESULT: OK (exit 0)

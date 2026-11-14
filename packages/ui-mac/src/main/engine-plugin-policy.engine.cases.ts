@@ -34,6 +34,7 @@ import { customProviderSecretName, secretFilePath } from "./codepuppy-secret-fil
 import { engineGlobalConfigDirectory } from "./engine-paths"
 import { assertExtPluginActive } from "./sidecar-ext-ready"
 import type { EngineFetch } from "./in-process-engine"
+import { engineProjectTrust } from "./engine-project-trust"
 
 const sandbox = engineSandbox()
 const PASSWORD = "cp-1708-plugin-policy"
@@ -166,11 +167,18 @@ afterAll(async () => {
   llm.stop(true)
 })
 
+/**
+ * `#1713`:未允许的项目,它的插件声明在配置装载时就被拿掉(DESIGN-project-engine-config-takeover 契约 A4),到不了 #1708 的 plugin.use。
+ * 下面三条判的是 #1708 自己的机制(去掉它 / 只放内联 / 按包名放行时会发生什么),只有声明到得了引擎时才有意义 —— 用全部允许的项目跑。
+ * 第一条(生产注入)仍用生产读法:项目未允许。这一组在 #1713 段 3 退役 #1708 时整体改写。
+ */
+const allowEverything = () => true
+
 async function engineWith(
   name: string,
   config: CodePuppyConfigInjectionResult["config"],
   modelsFile?: string,
-  options: { configDirectory?: string; filewatcher?: boolean } = {},
+  options: { configDirectory?: string; filewatcher?: boolean; projectTrust?: (directory: string) => boolean } = {},
 ) {
   const markers = path.join(root, "markers", name)
   fs.mkdirSync(markers, { recursive: true })
@@ -191,7 +199,7 @@ async function engineWith(
       filewatcher: options.filewatcher ?? false,
       platform: process.platform,
     }),
-    { onDispatch: (dispatch) => (fetch = withEngineAuthorization(dispatch, PASSWORD)) },
+    { onDispatch: (dispatch) => (fetch = withEngineAuthorization(dispatch, PASSWORD)), projectTrust: options.projectTrust ?? engineProjectTrust },
   )
   engines.push(engine)
   const request = (directory: string, method: string, route: string, body?: unknown) =>
@@ -259,6 +267,7 @@ describe("alpha-code#1708 项目范围的引擎插件在 Code Puppy 里一律不
         file: explicitWithoutOurPluginPolicies(injection, "explicit-without-plugin-policies"),
       },
       injection.models.file,
+      { projectTrust: allowEverything },
     )
     await engine.open(p1)
     await engine.open(p2)
@@ -278,6 +287,7 @@ describe("alpha-code#1708 项目范围的引擎插件在 Code Puppy 里一律不
         file: explicitWithoutOurPluginPolicies(injection, "explicit-plugins-inline-only"),
       },
       injection.models.file,
+      { projectTrust: allowEverything },
     )
     await engine.open(p2)
     await engine.open(p1)
@@ -302,7 +312,7 @@ describe("alpha-code#1708 项目范围的引擎插件在 Code Puppy 里一律不
     process.env.OPENCODE_CONFIG_DIR = optinGlobal
     try {
       const optin = injectCodePuppyConfig(userData, ext, "stable")
-      const engine = await engineWith("optin", optin.config, optin.models.file, { configDirectory: optinGlobal, filewatcher: true })
+      const engine = await engineWith("optin", optin.config, optin.models.file, { configDirectory: optinGlobal, filewatcher: true, projectTrust: allowEverything })
       await engine.open(neutral)
       await sleep(1_000)
       // 今天的行为:按包名的全局条目不加载;codepuppy.jsonc 里的 allow 不起作用

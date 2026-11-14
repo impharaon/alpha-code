@@ -19,6 +19,7 @@ import { ConfigDiscovery } from "./config/discovery.js"
 import { ConfigWatch } from "./config/watch.js"
 import { ConfigIntegration } from "./config/integration.js"
 import { ConfigManaged } from "./config/managed.js"
+import { CodePuppyProjectGate } from "./config/codepuppy-project-gate.js" // codepuppy(ADR-049)
 import { ManagedPolicy } from "./managed-policy.js"
 import { Connection } from "@opencode/schema/connection"
 import { WellKnown } from "./wellknown.js"
@@ -165,13 +166,13 @@ export const layer = (options?: Options) =>
         })
       })
 
-      const loadFile = Effect.fnUntraced(function* (filepath: string) {
+      const loadFile = Effect.fnUntraced(function* (filepath: string, gate?: CodePuppyProjectGate.Filter) { // codepuppy(ADR-049)
         const text = yield* fs.readFileStringSafe(filepath)
         if (text === undefined) return
         const substituted = yield* ConfigVariable.substitute({ type: "path", path: filepath, text })
-        const info = yield* parseInfo(substituted, filepath)
+        const info = yield* parseInfo(gate ? gate.raw(substituted, filepath) : substituted, filepath) // codepuppy(ADR-049)
         if (!info) return
-        return new Document({ type: "document", path: AbsolutePath.make(filepath), info })
+        return new Document({ type: "document", path: AbsolutePath.make(filepath), info: gate ? gate.decoded(info, filepath) : info }) // codepuppy(ADR-049)
       })
 
       const loadWellknownEntry = Effect.fnUntraced(function* (entry: WellKnown.Entry) {
@@ -263,9 +264,9 @@ export const layer = (options?: Options) =>
         return info ? [new Document({ type: "document", path: plist, info })] : []
       })
 
-      const loadDirectory = Effect.fnUntraced(function* (directory: AbsolutePath) {
+      const loadDirectory = Effect.fnUntraced(function* (directory: AbsolutePath, gate?: CodePuppyProjectGate.Filter) { // codepuppy(ADR-049)
         return [
-          ...(yield* Effect.forEach(ConfigDiscovery.names, (file) => loadFile(path.join(directory, file))).pipe(
+          ...(yield* Effect.forEach(ConfigDiscovery.names, (file) => loadFile(path.join(directory, file), gate)).pipe( // codepuppy(ADR-049)
             Effect.map((configs) => configs.filter((config): config is Document => config !== undefined)),
           )),
           new Directory({ type: "directory", path: directory }),
@@ -273,7 +274,11 @@ export const layer = (options?: Options) =>
       })
 
       const load = Effect.fn("Config.load")(function* (sources: ConfigDiscovery.Sources) {
-        const direct = yield* Effect.forEach(sources.direct, (filepath) => loadFile(filepath)).pipe(
+        // codepuppy(ADR-049) ── project config behind the #1709 trust record: one trust read per load; project documents are
+        // filtered before normalization, project .opencode plugin directories are denied by a document right after managed policies
+        const gate = yield* CodePuppyProjectGate.begin({ directory: location.directory, home: globalService.home })
+        // codepuppy ── end
+        const direct = yield* Effect.forEach(sources.direct, (filepath) => loadFile(filepath, gate.document(filepath))).pipe( // codepuppy(ADR-049)
           Effect.orDie,
           Effect.map((entries) => entries.filter((entry): entry is Document => entry !== undefined)),
         )
@@ -330,7 +335,7 @@ export const layer = (options?: Options) =>
         const globalSupplementary = sources.global ? yield* loadDirectory(sources.global).pipe(Effect.orDie) : []
         const projectSupplementary = yield* Effect.forEach(
           sources.project.filter((root) => root.present),
-          (root) => loadDirectory(root.path),
+          (root) => loadDirectory(root.path, gate.directory(root.path)), // codepuppy(ADR-049)
         ).pipe(
           Effect.orDie,
           Effect.map((entries) => entries.flat()),
@@ -360,8 +365,9 @@ export const layer = (options?: Options) =>
             ),
           ),
         )
-        return [
+        return yield* gate.finish([ // codepuppy(ADR-049)
           ...managedPolicies,
+          ...gate.documents(), // codepuppy(ADR-049)
           ...integrated,
           ...wellknownDocuments.flat(),
           ...globalSupplementary,
@@ -370,7 +376,7 @@ export const layer = (options?: Options) =>
           ...projectSupplementary,
           ...content,
           ...managedSettings,
-        ]
+        ]) // codepuppy(ADR-049)
       })
 
       const initial = yield* ConfigDiscovery.discover(options)

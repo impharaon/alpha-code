@@ -27,7 +27,7 @@ import { afterAll, beforeAll, describe, expect, test } from "bun:test"
 import fs from "node:fs"
 import path from "node:path"
 import { assertEngineSandboxed, engineSandbox } from "../../test-component/engine-sandbox"
-import { codepuppyEngine, policyStore, probe, scriptedModel, textOf, type Running } from "../../test-component/codepuppy-engine"
+import { allowProject, codepuppyEngine, policyStore, probe, scriptedModel, textOf, type Running } from "../../test-component/codepuppy-engine"
 import { explicitSkillDirs } from "./codepuppy-config-injection"
 import { watchExplicitSources } from "./engine-explicit-config"
 
@@ -73,6 +73,8 @@ beforeAll(async () => {
     },
   })
   projectDirectory = host.projectDirectory
+  // `#1713`:R6c / R6d 的命令写了 agent / subtask —— 这是一个用户已允许的项目(未允许时这两个字段暂缓)
+  allowProject(projectDirectory)
   running = await host.start()
   expect(probe()).toBeDefined()
   await firstTurn(running, projectDirectory)
@@ -492,6 +494,8 @@ describe("R2:用户在四处写的 external_directory 放行照 v1 胜出(全部
             ? { "opencode.json": JSON.stringify({ agent: { [BUILD]: userRule, [ASK]: userRule, [READONLY]: userRule } }) }
             : {}
       const host = codepuppyEngine({ sandbox, name, modelBaseURL: model.baseURL, projectFiles })
+      // `#1713`:规则写在项目 opencode.json 里的两种放法,判的是用户已允许的项目里自己写的规则
+      allowProject(host.projectDirectory)
       if (place === "全局 opencode.json 顶层") fs.writeFileSync(path.join(host.slot.configDirectory, "opencode.json"), JSON.stringify(userRule))
       const engine = await host.start()
       try {

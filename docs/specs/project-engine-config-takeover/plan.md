@@ -80,7 +80,7 @@ spike 用例按顺序依赖前一条留下的标记;新加的三条放在最后,
 | AC-01(前提) | `project-config-commands.engine.test.ts` 的 14 条在 `a0abf011c8` 全绿 | 这一段只钉现状。各条后面依次翻转;哪一段的修复不起作用,它负责的那几条就保持「出现」,翻转后的断言因此变红 |
 
 ### 偏离记录
-暂无
+- 2026-11-13 · 段 0 的第 ③ 条(`mode` 名字空间与 `.opencode/modes/`)用的是新建 agent,而新建 agent 默认就是 `primary`(`packages/schema/src/agent.ts:44`),钉不住 F-24 说的「已有的 subagent 被变成主 agent」。段 1 的提交改为覆盖出厂 subagent:名字空间覆盖 `general`,目录覆盖 `explore`(`packages/core/src/plugin/agent.ts:63`、`:74`)· 段 1 提交
 
 ---
 
@@ -198,7 +198,29 @@ spike 用例按顺序依赖前一条留下的标记;新加的三条放在最后,
 | 契约 C | 判据「`trusted` 抛错 ⇒ 未允许,并记一行」「未安装 ⇒ 与上游 `Config.layer` 的条目深度相等」;`sidecar-engine-host.cases.ts` 加一条「不传 `projectTrust` ⇒ `startEngine` 拒绝」 | 抛错时放行 ⇒ 第一条红;未安装时也改条目 ⇒ 第二条红;钩子缺失照常起 ⇒ 第三条红 |
 
 ### 偏离记录
-暂无
+- 2026-11-13 · **一个提交**:按编排器的裁决(每段一个提交),原计划的提交 A / B / C 合成一个。
+- 2026-11-13 · **`config.ts` 插入点实际落位**(全部带 `codepuppy(ADR-049)`):
+  - import `:22`;
+  - `loadFile` `:169`(签名)、`:173`(校验前)、`:175`(解码后);
+  - `loadDirectory` `:267`、`:269`;
+  - `load()` 开头的标注块 `:277-280`(`begin`);
+  - `direct` `:281`;`projectSupplementary` `:338`;
+  - 返回 `:368`(`gate.finish`)、`:370`(`gate.documents()`)、`:379`。
+
+  与 1.1 的七处一致。`finish` 是一个 Effect(要记日志),交回同一份条目。
+- 2026-11-13 · **design §4 契约 B 表补四行**(编排器裁决):`attachment` 与 `media` 一样生效;七个 v1 写法暂缓,列「其他 OpenCode 设置」;v1 `plugin` 归「插件」行;命令 `variant` 归「命令的运行设置」。闸门的名单与视图分类照此实现。引擎完全不认的键(如 `logLevel`、`layout`)拿掉、不列,由上游归一化判定。
+- 2026-11-13 · **记允许的四套用例**:
+  - `composer-tier-matrix`:主宿主一处,加「规则写在项目 opencode.json」两种放法那一处;
+  - `websearch-honest`:不装 ext 那一臂;
+  - `codepuppy-config-injection-engine`:只有 C7 两臂经引擎装载项目文档。flags 那一臂是在内存里拼条目的,不经闸门,不改;
+  - `use-extensions-recovery`:直接调 `startEngine`,钩子只对它自己的项目回 true。
+
+  测试宿主新增 `allowProject(directory)`,走生产写端。
+- 2026-11-13 · **允许臂多证明一件事**:`.codepuppy/codepuppy.jsonc` 的 MCP 与 OpenCode 配置跟着同一个决定一起放开(BR-04)。未允许臂仍不启动它。
+- 2026-11-13 · **#1708 引擎用例的过渡改动**(本来计划在段 3):其中三条判的是 #1708 自己的机制(显式文件去掉 plugin.use、只放内联、按包名放行),依赖项目的插件声明到得了引擎。闸门在未允许时把这些声明拿掉了,所以这三条改用全部允许的项目跑;第一条(生产注入)仍用生产读法。段 3 退役 #1708 时这一组整体改写。
+- 2026-11-13 · **上游探针**(`packages/ext/src/upstream-probes/engine.cases.ts`)的钩子改成 `() => true`。探针量的是上游对项目文档的行为,也就是已允许项目拿到的行为(A8 只差两条内置移除指令)。若用生产读法,P3「项目 deny 生效」那一臂会红,因为项目的 `policies` 被暂缓了。
+- 2026-11-13 · 契约 C 的「不传 `projectTrust` ⇒ 拒绝」放在 `sidecar-engine-host.cases.ts`(宿主条数 6 → 7)。变异实测:去掉 `engine-embed.ts` 里的检查,这一条变红。
+- 2026-11-13 · **视图登记只有配置点**(按计划)。核心判据 `packages/core/test/codepuppy-project-gate.test.ts` 共 7 条,每条带反向臂;另对闸门模块做了六处变异,各自让对应用例变红(见交回报告)。
 
 ---
 

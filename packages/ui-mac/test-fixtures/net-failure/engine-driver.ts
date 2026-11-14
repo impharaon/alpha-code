@@ -11,6 +11,7 @@ import { withEngineAuthorization } from "../../src/main/engine-authorization"
 import { buildEngineServerOptions } from "../../src/main/engine-server-options"
 import { assertExtPluginActive } from "../../src/main/sidecar-ext-ready"
 import type { EngineFetch } from "../../src/main/in-process-engine"
+import { engineProjectTrust } from "../../src/main/engine-project-trust"
 
 export type DriverInput = {
   engine: string
@@ -44,7 +45,7 @@ const engine = await startEngine(
     filewatcher: false,
     platform: process.platform,
   }),
-  { onDispatch: (dispatch) => (fetch = withEngineAuthorization(dispatch, input.password)) },
+  { onDispatch: (dispatch) => (fetch = withEngineAuthorization(dispatch, input.password)), projectTrust: engineProjectTrust },
 )
 await assertExtPluginActive(fetch!, input.workspace, input.ext)
 console.log(`LISTENING ${engine.url} node=${process.versions.node} electron=${process.versions.electron}`)

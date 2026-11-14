@@ -14,6 +14,6 @@ declare module "virtual:opencode-server" {
   export const ENGINE_VERSION: string
   export function startEngine(
     options: import("./engine-server-options").EngineServerOptions,
-    hooks?: { onDispatch?: (dispatch: (request: Request) => Promise<Response>) => void },
+    hooks: { onDispatch?: (dispatch: (request: Request) => Promise<Response>) => void; projectTrust: (directory: string) => boolean },
   ): Promise<{ url: string; dispatch: (request: Request) => Promise<Response>; close: () => Promise<void> }>
 }

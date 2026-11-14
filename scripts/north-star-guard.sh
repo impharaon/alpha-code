@@ -168,6 +168,11 @@ UPSTREAM_EXCLUDES=(
   # 用户真实数据目录隔离。bun 只读当前目录的 bunfig,core 的测试预载只能写在这里;接管面只有预载列表前插共享预载
   # scripts/test-isolation/preload.ts 那一行,上游自己的 test/preload.ts 照旧跟在后面。判据 packages/core/test/codepuppy-test-isolation.test.ts。
   ':(exclude)packages/core/bunfig.toml'
+  # #1713 / ADR-049(owner 2026-11-13 经编排器转达:「要做。」):项目自带的 OpenCode 配置按 #1709 的项目信任放行。config.ts 是每个消费方
+  # 拿项目配置的唯一汇合点,上游只有全局开关 project、插件接口没有配置编辑器、托管策略忽略不了单个键;接管面只在 load() 一条链上的
+  # `codepuppy(ADR-049)` 标注(读一次信任、项目文档校验前过滤与解码后再拿一次、托管策略之后插闸门文档),规则本体在 Code Puppy 自有的
+  # config/codepuppy-project-gate.ts。判据 packages/core/test/codepuppy-project-gate.test.ts 与 packages/ui-mac/src/main/project-config-commands.engine.test.ts。
+  ':(exclude)packages/core/src/config.ts'
 )
 
 # ── UPSTREAM_PATHS 里住着的 Code Puppy 自有文件:结构性谓词,不是逐文件清单(`#1085` / ADR-043)──

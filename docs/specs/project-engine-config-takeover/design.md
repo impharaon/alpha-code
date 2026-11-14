@@ -155,6 +155,10 @@ last_reviewed: 2026-11-13
 | `update` | 暂缓 | 生效 | 引擎更新行为 |
 | `experimental`(全部子键,含已弃用的 `experimental.policies`) | 暂缓 | 生效 | 实验开关(ADR-048:上游实验默认关);项目打开等同用户在全局配置里打开 |
 | `compaction`、`tool_output`、`media`、`watcher`、`timezone`、`username` | 生效 | 生效 | 只调阈值或显示 |
+| `attachment`(`media` 的 v1 写法) | 生效 | 生效 | 与 `media` 同;编排器 2026-11-13 核对 plan `027f8f41a3` 时裁决 |
+| v1 写法 `snapshot`、`autoupdate`、`autoshare`、`small_model`、`tools`、`enabled_providers`、`disabled_providers` | 暂缓(清单「其他 OpenCode 设置」,按键名) | 生效 | 归一化成 `snapshots` / `update` / `share` / title agent 的模型 / `permissions` / `policies`(`config/normalize.ts`);同一裁决 |
+| `plugin`(`plugins` 的 v1 写法) | 暂缓(清单「插件」行) | 生效 | 同「`plugins`:新增条目」;同一裁决 |
+| 命令字段 `variant`(v1,并进 `model`) | 暂缓(清单「命令的运行设置」) | 生效 | 同命令控制字段;同一裁决 |
 | 允许名单之外的任何键或字段(含上游升级新增、只有 v1 写法认得的) | 暂缓(视图里记作「其他 OpenCode 设置」) | 生效 | 未分类默认暂缓;升级时由 §6 的升级检查要求补分类 |
 | 引擎认不出的键 | 不生效 | 不生效 | 引擎解码时丢弃(F-11),与信任无关 |
 | `.claude/`、`.agents/` 兼容目录;`CLAUDE.md`、`.cursorrules` | 不生效 | 不生效 | 兼容读取不可达(F-26);引擎只认 AGENTS.md(spike §8 [实测])。本设计不改 |

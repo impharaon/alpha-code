@@ -23,6 +23,8 @@ import { publishInProcessEngine, type EngineFetch } from "./in-process-engine"
 import { buildEngineServerOptions, engineDesktopToggles } from "./engine-server-options"
 import { withEngineAuthorization } from "./engine-authorization"
 import { assertExtPluginActive } from "./sidecar-ext-ready"
+// `#1713` 契约 C:引擎配置闸门问「这个项目文件夹用户允许过没有」,读法是 #1709 的同一个。
+import { engineProjectTrust } from "./engine-project-trust"
 // REQ-159 `#1321`:进程围栏。本进程在 import 引擎之前把自己关进 seatbelt,之后派生的一切继承。
 // profile 由 main 渲染 + 试编译(process-fence-plan.ts),这里原样 apply;装不上 = 本进程不起
 // (fail-closed,原因经 error IPC 报给 main)。判据在 process-fence-apply.test.ts(真 .node / 真 seatbelt /
@@ -186,6 +188,7 @@ async function start(command: StartCommand) {
           inProcess = withEngineAuthorization(dispatch, command.password)
           publishInProcessEngine(inProcess)
         },
+        projectTrust: engineProjectTrust,
       },
     )
     engine = started

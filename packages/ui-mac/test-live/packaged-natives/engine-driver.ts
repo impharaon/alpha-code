@@ -7,6 +7,7 @@ import { readdirSync } from "node:fs"
 import path from "node:path"
 import { pathToFileURL } from "node:url"
 import { buildEngineServerOptions } from "../../src/main/engine-server-options"
+import { engineProjectTrust } from "../../src/main/engine-project-trust"
 
 export type DriverInput = {
   app: string
@@ -33,5 +34,6 @@ const engine = await startEngine(
     filewatcher: true,
     platform: process.platform,
   }),
+  { projectTrust: engineProjectTrust },
 )
 console.log(`LISTENING ${engine.url} node=${process.versions.node} electron=${process.versions.electron}`)

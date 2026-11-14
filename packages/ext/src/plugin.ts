@@ -40,6 +40,7 @@ import { applyAgents, applyProjectMcp, commandDefinitions } from "./engine-trans
 import { modelFacts } from "./model-facts"
 import { createCloudVisionHooks } from "./cloud-vision-hooks"
 import { createAttachmentReaderHooks } from "./attachment-reader-hooks"
+import { createAgentMentionHooks } from "./agent-mention-hooks"
 import { providerAllowTail, refuseOutsideProviderAllowList } from "./provider-allow"
 import { inProcessEngine } from "../../ui-mac/src/main/in-process-engine"
 
@@ -157,6 +158,12 @@ export const CodePuppyExt: Plugin.Plugin = {
         error,
       })
 
+      // `#1669` R17:从 @ 菜单点名的助手 ⇒ 用户消息后面追加派发指令(0.1.26 的 synthetic 那一句);点名从会话存下的消息现读。
+      const mentions = createAgentMentionHooks({
+        storedMessages: (sessionID) => context.session.context({ sessionID }),
+        error,
+      })
+
       // ── 执行钩子(P7)────────────────────────────────────────────────────────────────────────
       await context.tool.hook("execute.before", async (event) => {
         // #223 R3→R5 / L5r:web search 主权判决 —— 抛出即拒掉这次调用(2.x 只有 execute.before 允许失败,抛出被转成
@@ -212,6 +219,8 @@ export const CodePuppyExt: Plugin.Plugin = {
         await vision.context(event)
         // I11':暂存附件部件换成登记过的读取指令(绝不抛)。
         await attachments.context(event)
+        // `#1669` R17:点名过助手的用户消息后面追加登记过的派发指令(绝不抛)。
+        await mentions.context(event)
         // 输出上限两条腿,都只改这一次请求:平台代理节点**不发** max tokens(网关按 route 上限填,REQ-153);
         // 直连 BYOK 节点按逐模型实读上限抬(REQ-156);其余原样(上游算的那个数)。
         try {

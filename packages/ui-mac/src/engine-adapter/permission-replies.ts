@@ -80,7 +80,7 @@ type Replied = { requestID: string; sessionID: string; reply: string; afterSend:
 
 /**
  * 规格第 3 条的事件窗口:订上(`server.connected` 到了)才返回;关掉即退订。客户端的事件流是同一引擎源共享的一条
- * 连接(SharedEvents):已经连着时,缓存的 `server.connected` 立刻交给新订阅者,而它此刻已挂在活连接上。
+ * 连接(SharedEvents,index.ts 的 eventsFor —— 不另占 renderer 的连接,`#1669` G2):已经连着时,缓存的 `server.connected` 立刻交给新订阅者,而它此刻已挂在活连接上。
  */
 async function openRepliedWindow(api: OpenCodeClient) {
   const controller = new AbortController()

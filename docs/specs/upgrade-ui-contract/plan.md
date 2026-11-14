@@ -128,6 +128,8 @@ M3 又会改 `opencode2/` 里引 v1 类型的文件,M4 最后统一改指,避免
 
 - 单元 1 核验完成(r2):`bun test src/engine-adapter/` 127 pass / 0 fail(exit 0);`bun test src/renderer/codepuppy-ui/attachment-cards.component.test.ts src/renderer/codepuppy-ui/session-timeline/timeline-model.test.ts` 71 pass / 0 fail(exit 0,附件卡宿主另核子进程 15 条)。`bun typecheck` 首次因约定漏登已迁入的 `message.removed` 报两处 TS2322;补登这个现有事件后 exit 0。`bun test src/engine-adapter/revert-removal.engine.test.ts src/engine-adapter/queued-prompt.engine.test.ts src/engine-adapter/boundary.test.ts` 9 pass / 0 fail(exit 0)。`bun test src/main/gate-file-registry.test.ts src/main/old-name-scan.test.ts` 33 pass / 0 fail(exit 0);`packages/ext` 的 `bun test src/policy/authority-registry.test.ts` 5 pass / 0 fail(exit 0)。所有 ui-mac 命令从包目录运行,Bun 均为 1.4.4;未跑全门。
 
+- 单元 2 红例(先提交测试,生产未改):`bun test src/engine-adapter/command-approval.engine.test.ts` exit 1,宿主 0 pass / 1 fail,子进程 1 pass / 1 fail。真实 `shell` 能力请求在列表/事件一致,DOM 却是 `{verb: "使用工具", remembered: "将记住:本会话内的同类操作:echo *"}`,期望 `{verb: "运行命令", remembered: "将记住:以 echo 开头的命令"}`。实际 `patch` 调用问的是 `edit`(`core/src/tool/plugin/patch.ts:212`),卡片已是「改文件」且记住所有修改,本次不增加 patch 名字映射。两例还钉住 policy 身份轴的 canonical 与 metadata 原样。用例来源是真引擎执行与已核截图,没有手写上游请求夹具;新宿主已登记。
+
 - 额外范围:无。测试宿主导入路径随搬家调整,断言未改;冻结包零字节改动。遗留去向:依赖刷新与余下实现交编排器续派,OPTIONAL 无。
 
 ## M1a — 翻译器搬进 `opencode2/`(纯搬家)

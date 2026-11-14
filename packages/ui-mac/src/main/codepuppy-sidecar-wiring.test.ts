@@ -305,4 +305,17 @@ test("ANCHOR (not a gate): sidecar.ts 在 start() 之前预载 ext 的目录入�
   expect(handoff).toBeGreaterThan(started)
   expect(joined).toBeGreaterThan(handoff)
   expect(ready).toBeGreaterThan(joined)
+  // 审查 6:原文件顶层不能 import;执行锚定的真实监听 / 解析片段,不复制分支。
+  const { answerProjectConfigView } = await import("./sidecar-project-config-view")
+  const { buildProjectConfigViewRequest, parseProjectConfigViewRequest } = await import("./project-config-view-message")
+  const listener = source.slice(source.indexOf('parentPort.on("message"'), source.indexOf("\nasync function start("))
+  const parser = source.slice(source.indexOf("function parseCommand("), source.indexOf("\n/** 形状不对"))
+  const replies: unknown[] = []
+  let receive: (event: { data: unknown }) => void = () => { throw new Error("listener not registered") }
+  const view = { directory: "/ws", trusted: false, complete: true, points: { config: "done" as const }, withheld: [] }
+  const run = new Function("parentPort", "engine", "inProcessEngine", "readProjectConfigView", "answerProjectConfigView", "parseProjectConfigViewRequest", new Bun.Transpiler({ loader: "ts" }).transformSync(listener + "\n" + parser))
+  run({ on: (_: string, handler: typeof receive) => { receive = handler }, postMessage: (reply: unknown) => replies.push(reply) }, {}, () => async () => Response.json({ data: [] }), () => view, answerProjectConfigView, parseProjectConfigViewRequest)
+  receive({ data: buildProjectConfigViewRequest("review-6", "/ws") })
+  for (let i = 0; i < 10 && replies.length === 0; i++) await Bun.sleep(1)
+  expect(replies).toEqual([{ type: "project-config-view-reply", id: "review-6", ok: true, view }])
 })

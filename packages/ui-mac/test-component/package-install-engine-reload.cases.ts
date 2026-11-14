@@ -812,4 +812,6 @@ test("#1652 audit: a refused ledger write sends no permission rejection", async 
     expect(permissionReplies).toEqual([])
     expect(permissions[projectA]).toHaveLength(1)
   } finally { refuseState = false; permissions = {} }
+}),
+})  async () => undefined,
 })

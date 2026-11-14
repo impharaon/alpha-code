@@ -757,6 +757,7 @@ test("real IPC previews/cancels without secrets, installs both recipes, stops be
         }
       },
     },
+    async () => undefined,
   )
   await ready.ledgerReady
   let busy = true

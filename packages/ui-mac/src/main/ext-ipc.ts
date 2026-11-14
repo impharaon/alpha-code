@@ -117,8 +117,8 @@ export function registerExtIpcHandlers(
   registryChannel: "stable" | "preview" | "dev",
   awaitServer: () => Promise<EngineConnection>,
   homeDir: string = homedir(),
-  officialRuntime?: { stop(): Promise<void>; refresh(): Promise<boolean> },
-  projectConfigView?: (directory: string) => Promise<ProjectConfigView | undefined>,
+  officialRuntime: { stop(): Promise<void>; refresh(): Promise<boolean> } | undefined,
+  projectConfigView: (directory: string) => Promise<ProjectConfigView | undefined>,
 ) {
   assertCodePuppyEnvironmentIdentity()
   const resolveProjectEntry = (projectDir: unknown) => resolveProjectIpcEntry(projectDir, homeDir)
@@ -594,7 +594,7 @@ export function registerExtIpcHandlers(
 
     const view = await (async () => {
       for (let attempt = 0; attempt < 2; attempt++) {
-        const current = await projectConfigView?.(directory).catch(() => undefined)
+        const current = await projectConfigView(directory).catch(() => undefined)
         if (current?.directory === directory && current.complete) return current
       }
       return undefined

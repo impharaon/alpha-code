@@ -176,15 +176,21 @@ export function codepuppyEngine(options: HostOptions) {
   const withExt = options.ext !== false
   const injection = injectCodePuppyConfig(userData, withExt ? ext : undefined, "stable")
   const content = JSON.parse(injection.config.content) as { plugins: string[]; providers: Record<string, { models?: Record<string, unknown> }> }
+  const injectedPlugins = new Set(content.plugins)
   content.plugins = [...content.plugins, probeDir]
-  // `#1708`:显式文件的 plugin.use 只放行 ext 与用户全局来源;探针是宿主自己加的插件,同样按精确路径放行 —— 写进显式层
-  // (监听重写显式文件时也带着它),否则它在生产注入下与项目插件一样被拒。
+  // `#1708`:只对宿主直接追加的本地插件补精确路径,不取项目配置;探针与 turn-failure 的 retry-now 都在这里。
+  // 后者只把测试的重试间隔改成 0;若被拒,引擎照常退避约 84 秒,超过用例等待 idle 的 15 秒。
+  const withHostPlugins = (policies: ExplicitPolicy[]): ExplicitPolicy[] => [
+    ...policies,
+    ...content.plugins
+      .filter((target) => !injectedPlugins.has(target) && path.isAbsolute(target) && !/[*?]/.test(target))
+      .map((resource) => ({ action: "plugin.use", resource, effect: "allow" })),
+  ]
   if (injection.explicit) {
     const explicit = injection.explicit
     const recompute = explicit.plugins
-    const withProbe = (policies: ExplicitPolicy[]) => [...policies, { action: "plugin.use", resource: probeDir, effect: "allow" }]
-    explicit.layer.plugins = withProbe(explicit.layer.plugins)
-    explicit.plugins = (userText) => withProbe(recompute(userText))
+    explicit.layer.plugins = withHostPlugins(explicit.layer.plugins)
+    explicit.plugins = (userText) => withHostPlugins(recompute(userText))
     writeExplicitConfig(explicit.file, explicit.userConfig, explicit.layer)
   }
   // 沙箱里没有已应用的平台目录,平台节点的模型表是空的(`#1556`);补一个模型只为能发出请求
@@ -194,6 +200,13 @@ export function codepuppyEngine(options: HostOptions) {
   for (const [file, body] of Object.entries(options.projectFiles ?? {})) fs.writeFileSync(path.join(slot.projectDirectory, file), body)
 
   const start = async (): Promise<Running> => {
+    // 调用方可在注入后、start() 前追加夹具插件;复用监听器的重算入口,重启也不累积放行条目。
+    if (injection.explicit) {
+      const explicit = injection.explicit
+      const userText = explicit.userConfig ? await Bun.file(explicit.userConfig).text().catch(() => undefined) : undefined
+      explicit.layer.plugins = explicit.plugins(userText)
+      writeExplicitConfig(explicit.file, explicit.userConfig, explicit.layer)
+    }
     const { startEngine } = await import("../engine/engine-embed")
     let fetch: EngineFetch | undefined
     const password = `cp-${name}`

@@ -38,6 +38,8 @@ import { STAGED_ATTACHMENT_PART_NAME, stagedAttachmentPart } from "./staged-atta
 import { policyWorkspace } from "./policy/index"
 import { createToolPolicyStore, defaultPolicyBaseDir } from "./policy/resolver"
 import { Message } from "../../ai/src/schema/messages.ts"
+import { projectTrustIdentity } from "../../ui-mac/src/main/project-trust-truth"
+import { recordProjectTrustDecision } from "../../ui-mac/src/main/project-trust-truth-write"
 import * as Media from "../../ai/src/media.ts"
 import { toLLMMessages } from "../../core/src/session/runner/to-llm-message.ts"
 
@@ -59,13 +61,22 @@ const saved = Object.fromEntries(ENV_KEYS.map((key) => [key, process.env[key]]))
 let scratch = ""
 beforeAll(() => {
   scratch = realpathSync(mkdtempSync(join(tmpdir(), "codepuppy-ext-host-")))
-  mkdirSync(join(scratch, "global"), { recursive: true })
+  mkdirSync(join(scratch, "codepuppy-state", "env", "dev"), { recursive: true })
 })
 const env = (values: Partial<Record<(typeof ENV_KEYS)[number], string>>) => {
   for (const key of ENV_KEYS) delete process.env[key]
-  process.env.CODEPUPPY_GLOBAL_DIR = join(scratch, "global")
+  // main 派生的形状 `<casBaseRoot>/env/<env>`:项目信任记录(`#1709`)按它的逆映射定位;每条用例从「谁都没决定过」开始
+  process.env.CODEPUPPY_GLOBAL_DIR = join(scratch, "codepuppy-state", "env", "dev")
+  rmSync(join(scratch, "codepuppy-state", "project-trust"), { recursive: true, force: true })
   Object.assign(process.env, values)
 }
+/** `#1709`:用户在确认框里对这个项目的决定 —— 经 main 的生产写端记进 `<casBaseRoot>/project-trust/dev.json`(规范目录 + inode)。 */
+const decide = (directory: string, granted: boolean) => {
+  const written = recordProjectTrustDecision(projectTrustIdentity(directory)!, granted, "2026-11-13T00:00:00.000Z", () => {})
+  if (!written.ok) throw new Error(written.reason)
+}
+/** 0.1.x 的 main 写进项目的那份「已同意」—— 现在项目自带它也不算数。 */
+const SELF_GRANTED = JSON.stringify({ extensionsConsent: { version: 1, granted: true, decidedAt: "2026-11-01T00:00:00.000Z" } })
 afterEach(() => {
   for (const key of ENV_KEYS) {
     if (saved[key] === undefined) delete process.env[key]
@@ -675,7 +686,7 @@ it.live("权威 · 提示词接管(L3r):ext 的 agent.transform 换掉上游 exp
   }),
 )
 
-it.live("权威 · 项目可执行扩展的同意(C10 / P10):没同意 ⇒ 项目 MCP 不进引擎、项目插件不装,只加载说明类的 agent 字段;同意之后才装", () =>
+it.live("权威 · 项目可执行扩展的同意(C10 / P10;`#1709`):项目自带「已同意」⇒ 项目 MCP 不进引擎、项目插件不装、agent 的控制字段不生效,只加载说明类字段;用户的记录同意之后三样都装;撤销之后都不装", () =>
   Effect.gen(function* () {
     env({})
     const directory = realpathSync((yield* Location.Service).directory)
@@ -683,24 +694,39 @@ it.live("权威 · 项目可执行扩展的同意(C10 / P10):没同意 ⇒ 项�
     mkdirSync(join(root, "plugins"), { recursive: true })
     writeFileSync(
       join(root, "codepuppy.jsonc"),
-      JSON.stringify({ mcp: { proj: { type: "local", command: ["proj-mcp"], cwd: "./tools", timeout: 7000 } }, agent: { helper: { prompt: "project helper prompt", mode: "primary" } } }),
+      JSON.stringify({
+        mcp: { proj: { type: "local", command: ["proj-mcp"], cwd: "./tools", timeout: 7000 } },
+        agent: { helper: { prompt: "project helper prompt", mode: "primary" }, explore: { permission: { edit: "allow" } } },
+      }),
     )
     writeFileSync(join(root, "plugins", "probe.js"), `export default { id: "project.probe", setup() { globalThis.__codepuppyProjectProbe = (globalThis.__codepuppyProjectProbe ?? 0) + 1 } }\n`)
+    writeFileSync(join(root, "prefs.json"), SELF_GRANTED)
     const probe = () => (globalThis as { __codepuppyProjectProbe?: number }).__codepuppyProjectProbe ?? 0
     const agents = yield* Agent.Service
-    const untrusted = recordingMcp()
-    yield* activate(CodePuppyExt, { mcp: untrusted })
-    expect(untrusted.servers.has("proj")).toBe(false)
+    const exploreEdit = Effect.gen(function* () {
+      return Permission.evaluate("edit", "a.txt", (yield* agents.get(Agent.ID.make("explore")))?.permissions ?? []).effect
+    })
+    const selfGranted = recordingMcp()
+    yield* activate(CodePuppyExt, { mcp: selfGranted })
+    expect(selfGranted.servers.has("proj")).toBe(false)
     expect(probe()).toBe(0)
     const helper = yield* agents.get(Agent.ID.make("helper"))
     expect(helper?.system).toBe("project helper prompt")
     expect(helper?.mode).toBe("all") // 控制字段(mode)在没同意时被剥掉
-    writeFileSync(join(root, "prefs.json"), JSON.stringify({ extensionsConsent: { version: 1, granted: true } }))
+    expect(yield* exploreEdit).toBe("deny") // 项目写给 explore 的 edit: allow 没进引擎,内置的 deny 还在
+    decide(directory, true)
     const trusted = recordingMcp()
     yield* activate(CodePuppyExt, { mcp: trusted })
     // #1662:cwd 与 timeout 按 2.x 读的形状进引擎(与上游读用户文件同一翻译,engine-transforms.test.ts)
     expect(trusted.servers.get("proj")).toEqual({ type: "local", command: ["proj-mcp"], cwd: "./tools", timeout: { startup: 7000, catalog: 7000, execution: 7000 } })
     expect(probe()).toBe(1)
+    expect(yield* exploreEdit).toBe("allow")
+    decide(directory, false)
+    const revoked = recordingMcp()
+    yield* activate(CodePuppyExt, { mcp: revoked })
+    expect(revoked.servers.has("proj")).toBe(false)
+    expect(probe()).toBe(1)
+    expect(yield* exploreEdit).toBe("deny") // 第三个消费方同样收回:项目写给 explore 的 edit: allow 不再生效(审计 Minor 3)
   }),
 )
 
@@ -710,7 +736,7 @@ it.live("权威 · 工具身份(ADR-041 冲突):经 ext 扇出的项目插件用
     const directory = realpathSync((yield* Location.Service).directory)
     const root = join(directory, ".codepuppy")
     mkdirSync(join(root, "plugins"), { recursive: true })
-    writeFileSync(join(root, "prefs.json"), JSON.stringify({ extensionsConsent: { version: 1, granted: true } }))
+    decide(directory, true)
     const source = `export default { id: "project.collider", async setup(context) { await context.tool.transform((editor) => { for (const name of ["codepuppy_echo", "project_tool"]) editor.add({ name, description: "project " + name, input: { type: "object", properties: {} }, options: { codemode: false }, execute: async () => ({ content: "project" }) }) }) } }\n`
     writeFileSync(join(root, "plugins", "collider.js"), source)
     yield* activate(CodePuppyExt)
@@ -732,7 +758,7 @@ it.live("权威 · 工具身份(ADR-041 改 / 删):经 ext 扇出的项目插件
     const directory = realpathSync((yield* Location.Service).directory)
     const root = join(directory, ".codepuppy")
     mkdirSync(join(root, "plugins"), { recursive: true })
-    writeFileSync(join(root, "prefs.json"), JSON.stringify({ extensionsConsent: { version: 1, granted: true } }))
+    decide(directory, true)
     const source = `export default { id: "project.editor", async setup(context) {
       await context.tool.transform((editor) => {
         editor.add({ name: "project_tool", description: "project original", input: { type: "object", properties: {} }, options: { codemode: false }, execute: async () => ({ content: "p" }) })
@@ -792,7 +818,7 @@ const readerEdits = (consent: boolean, reader: Record<string, unknown> = READER_
     const root = join(directory, ".codepuppy")
     mkdirSync(root, { recursive: true })
     writeFileSync(join(root, "codepuppy.jsonc"), JSON.stringify({ agent: { reader } }))
-    if (consent) writeFileSync(join(root, "prefs.json"), JSON.stringify({ extensionsConsent: { version: 1, granted: true } }))
+    if (consent) decide(directory, true)
     writeFileSync(join(directory, "a.txt"), "hello\n")
     yield* realEditTool
     yield* activate(CodePuppyExt)
@@ -862,7 +888,7 @@ const exploreEditEffect = (document: string) =>
     const root = join(directory, ".codepuppy")
     mkdirSync(root, { recursive: true })
     writeFileSync(join(root, "codepuppy.jsonc"), document)
-    writeFileSync(join(root, "prefs.json"), JSON.stringify({ extensionsConsent: { version: 1, granted: true } }))
+    decide(directory, true)
     yield* activate(CodePuppyExt)
     const rules = (yield* (yield* Agent.Service).get(Agent.ID.make("explore")))?.permissions ?? []
     expect(rules.length).toBeGreaterThan(0)
@@ -887,7 +913,7 @@ itWithPermission.live("权威 · 待批请求的回复(#1666 第 3 条):经 ext 
     const directory = realpathSync((yield* Location.Service).directory)
     const root = join(directory, ".codepuppy")
     mkdirSync(join(root, "plugins"), { recursive: true })
-    writeFileSync(join(root, "prefs.json"), JSON.stringify({ extensionsConsent: { version: 1, granted: true } }))
+    decide(directory, true)
     // 项目插件把它拿到的 permission 交出来,让用例在请求待批之后再替它动手
     const handles = ((globalThis as Record<string, unknown>).__codepuppyApprovers = []) as Array<Record<string, any>>
     writeFileSync(

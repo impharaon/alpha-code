@@ -888,7 +888,7 @@ packages/ui-mac/src/main/codepuppy-bridge.ts	audits/2026-07-03-req004-alpha-brid
 packages/ui-mac/src/main/codepuppy-cloud-jobs.ts	alpha-platform	3	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/ui-mac/src/main/codepuppy-cloud-jobs.ts	alpha-web	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/ui-mac/src/main/codepuppy-cloud-schedules.ts	/Alpha	1	historical	ADR-025 历史目录名 Alpha 的路径字面量或原名记录，本票冻结路径名，不作为现行品牌改写
-packages/ui-mac/src/main/codepuppy-config-injection.ts	alpha-code	6	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+packages/ui-mac/src/main/codepuppy-config-injection.ts	alpha-code	7	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/ui-mac/src/main/codepuppy-config-injection.ts	alpha-web	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/ui-mac/src/main/codepuppy-config-injection.ts	alpha-platform	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/ui-mac/src/main/codepuppy-endpoints.ts	alpha-gateway.tidelabs.click	1	external-anchor	Cloudflare worker / 主机名(alpha-gateway / alpha-cloud.tidelabs.click),owner D2 未裁,不改

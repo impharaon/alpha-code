@@ -257,19 +257,29 @@ describe("injectCodePuppyConfig —— 注入组合体的执行级闸门(#607)",
     assertNativeV2(fs.readFileSync(result.config.file!, "utf8"))
   })
 
-  test("C7(重裁):provider 白名单的 policies 写进显式文件(第一层),与内联文档里那份(第二层)逐条相同、出自同一次计算", () => {
+  test("C7(重裁):provider 白名单的 policies 写进显式文件(第一层),与内联文档里那份(第二层)逐条相同、出自同一次计算;`#1708` 的 plugin.use 同样两层、逐条相同,模型治理关着也在", () => {
     givenLoggedInWithByok()
     const { config, explicit } = inject(EXT_DIR)
-    expect(explicit?.policies).toEqual(config.policies)
+    const byAction = (rules: Rule[] | undefined, action: string) => (rules ?? []).filter((rule) => rule.action === action)
+    expect(byAction(explicit?.policies, "provider.use")).toEqual(byAction(config.policies, "provider.use"))
+    expect(byAction(config.policies, "provider.use").length).toBeGreaterThan(1)
     expect(explicit?.policies?.[0]).toEqual({ action: "provider.use", resource: "*", effect: "deny" })
+    const plugins = [
+      { action: "plugin.use", resource: "*", effect: "deny" },
+      { action: "plugin.use", resource: EXT_DIR, effect: "allow" },
+    ]
+    expect(byAction(explicit?.policies, "plugin.use")).toEqual(plugins)
+    expect(byAction(config.policies, "plugin.use")).toEqual(plugins)
     process.env.CODEPUPPY_MODELS_DISABLE = "1"
-    expect(inject(EXT_DIR).explicit?.policies).toBeUndefined()
+    const disabled = inject(EXT_DIR)
+    expect(disabled.explicit?.policies).toEqual(plugins)
+    expect(disabled.config.policies).toEqual(plugins)
   })
 
   test("`#1662` 供应商白名单交给 ext:写进本进程 CODEPUPPY_PROVIDER_ALLOW 的集合逐条等于策略里放行的那些(同一次计算);注入关着 ⇒ 撤掉", () => {
     givenLoggedInWithByok()
     const { config } = inject(EXT_DIR)
-    const allowed = (config.policies ?? []).filter((policy) => policy.effect === "allow").map((policy) => policy.resource)
+    const allowed = (config.policies ?? []).filter((policy) => policy.action === "provider.use" && policy.effect === "allow").map((policy) => policy.resource)
     expect(allowed.length).toBeGreaterThan(1)
     expect(JSON.parse(process.env[PROVIDER_ALLOW_ENV]!)).toEqual(allowed)
     process.env.CODEPUPPY_MODELS_DISABLE = "1"
@@ -353,12 +363,12 @@ describe("injectCodePuppyConfig —— 注入组合体的执行级闸门(#607)",
     expect(inject(EXT_DIR).explicit?.commands).toBeUndefined()
   })
 
-  test("CODEPUPPY_MODELS_DISABLE:不写 providers / policies,也不给 models.file", () => {
+  test("CODEPUPPY_MODELS_DISABLE:不写 providers / provider.use 语句,也不给 models.file", () => {
     process.env.CODEPUPPY_MODELS_DISABLE = "1"
     const { result, config } = inject(EXT_DIR)
     expect(result.ok).toBe(true)
     expect(config.providers).toBeUndefined()
-    expect(config.policies).toBeUndefined()
+    expect((config.policies ?? []).filter((policy) => policy.action === "provider.use")).toEqual([])
     expect(result.models.file).toBeUndefined()
     expect(fs.existsSync(path.join(userData, "codepuppy-engine-config", "models.json"))).toBe(false)
   })
@@ -450,6 +460,11 @@ describe("injectCodePuppyConfig —— 注入组合体的执行级闸门(#607)",
     const floor = JSON.parse(result.config.content) as Injected
     expect(floor.plugins).toEqual([EXT_DIR, `-${ECOSYSTEM_COMPATIBILITY_PLUGIN}`])
     expect(floor.experimental).toEqual({ ...ENGINE_EXPERIMENTAL_FLAGS })
+    // `#1708`:没有显式文件时 plugin.use 也写进内联文档(拒绝全部、只放行 ext)
+    expect(floor.policies).toEqual([
+      { action: "plugin.use", resource: "*", effect: "deny" },
+      { action: "plugin.use", resource: EXT_DIR, effect: "allow" },
+    ])
     assertNativeV2(result.config.content)
     // 把正向闸门的断言体对着这条被吞掉的路径再跑一遍,它**必须**转红。
     expect(() => assertInjectedFacts(result.config.content, brokenUserData)).toThrow()

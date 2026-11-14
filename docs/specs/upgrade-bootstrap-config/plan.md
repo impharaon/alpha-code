@@ -77,6 +77,7 @@ last_reviewed: 2026-11-12
 | AC-04(基线) | `bootstrap-launch-parity.engine.test.ts` | 本段只钉住今天的值;段 1–3 每段只改「sidecar 这一步」的接法,记录文件一字不改(评审看 `git diff <段0> <段n> -- src/main/bootstrap-launch-parity.record.json` 为空)。任何一组键在构建器里漏写或读错,记录里对应那一格就不同而红。已知的坏(实跑):把 `server.ts` 写 `CODEPUPPY_POLICY_ACCOUNT` 那一句改成不写 ⇒ 记录的 `engine.policyAccount` 从 `acct:956e…c48` 变成 `anonymous` 而红。 |
 
 ### 偏离记录
+- 2026-11-14 · r4 红灯提交 `a75a8920bc` 后加入 R33 投影,原封不动的永久 shell 用例转绿。四行真实输出分别等于沙箱全局根、同根的 `codepuppy.jsonc`、`skills/probe/SKILL.md` 与 `skills/probe/`,对应三份技能原有命令的路径展开;r3 已核的 0.2.0 根布局不变。反向臂两处都成立:原 `bootstrap-launch-parity.engine.cases.ts:306` 继续检查 fork 环境无键,新用例另检查同进程在真实 shell 调用前后仍无键。相对红灯提交,两份新测试文件空 diff,没有修改断言使其转绿 · r4 实现提交。
 - 2026-11-14 · r4 将 r3 的真实 shell 测量固化为永久 `bootstrap-shell-env.engine.cases.ts` / `.test.ts`,新增 gate-files 宿主登记 1 条。夹具路径直接取三份随包技能的实际样本(文件头逐一注明),同一个 shell 工具调用回显根、customize 的配置文件、agent-creator 的技能文件与 integrate-project 的技能目录;并断言 fork 环境与引擎 / ext 所在进程前后都没有该键。按 r4 派发书的 R33 裁决先红:在 `5e46a8a0ec` 的未修实现上,`cd packages/ui-mac && bun test src/main/bootstrap-shell-env.engine.test.ts` = exit 1,0 pass / 1 fail;真实 shell exit 0,但 ROOT 为空,三个路径分别是 `/codepuppy.jsonc`、`/skills/probe/SKILL.md`、`/skills/probe/`,逐字比较失败。测试断言与夹具将在后续实现提交保持不变 · r4 红灯测试提交。
 - 2026-11-14 · r3 真实 shell 对照(基线 `3a8e25d6b8`,当前 `94c84d29d3`):临时测量脚本先运行 `engineSandbox` / `assertEngineSandboxed`,用各自树的生产 `createSidecarEnv` 过滤同一个合成全局根输入,各自的 `codepuppyEngine` 以生产注入 + 真 ext 装配真实引擎;模型桩发出一次真实 `shell` 工具调用 `printf "CP1698_SHELL=<%s>\n" "${CODEPUPPY_GLOBAL_DIR-}"`,再经消息接口读回 shell 工具的已完成结果。两边 shell 都 exit 0:基线输出 `CP1698_SHELL=<<sandbox>/shell-r3-state/codepuppy-state/env/dev>`(fork 环境有键),当前输出 `CP1698_SHELL=<>`(fork 环境无键)。断言「工具回显预期目录」在基线 1 pass / 0 fail,当前 0 pass / 1 fail,证实没有其它路给工具 shell 补这个值。基线由 `git archive 3a8e25d6b8` 解至临时快照,依赖从现有安装作 APFS 克隆(两树 bun.lock 无差异;workspace 解析逐项落在快照内),未创建 worktree、未安装依赖、未接触真实应用数据。测量不是新增闸门 · r3 文档 / 注释提交。
 - 2026-11-14 · r2 接入已批准的 #1708 行为:段 0 原命令首次核对为 0 pass / 1 fail(与另三个启动文档测试同跑时合计 23 pass / 1 fail),实跑差异只有 `injection.content.policies` 与 `injection.explicit.policies` 各新增 `plugin.use` 的 deny `*` / allow `<root>/parity-ext` 两条。按 `8dfd8956b0` 已有的两层插件策略保留行为,将这四条实际观察结果补入 `bootstrap-launch-parity.record.json`;其它字段及逐项比较断言不动。这是本轮安全修复的主线增量,不是 G1–G3 通道搬运改变决定 · r2 后续提交。
@@ -138,6 +139,7 @@ last_reviewed: 2026-11-12
 | §9 回滚(G1–G3) | 见段 3 | — |
 
 ### 偏离记录
+- 2026-11-14 · r4 按派发书裁决将 R33 写入 design §10,只限定 §4.5 与 §6 S2 的对应句;裁决归编排器(Claude Fable 5.2),2026-11-14,无需设计审查的理由沿派发书。r3 的设计阻塞由此解除。落点事实:`packages/plugin/src/promise/shell.ts` 的 `ShellCreateBefore.env` 与 `ShellDomain.hook` 已存在,`core/src/shell.ts:284` 在复制子进程环境后触发 `shell.create.before`,`:313` 将事件 env 交给真实 spawner;`core/src/tool/plugin/shell.ts:190` 的 shell 工具走这条链。仅改自有 `ext/src/plugin.ts`:在原 setup 的 registerPolicy 之后、seal 之前登记该钩子,每次构建 shell 子进程环境时现读已发布文档,唯一一行枚举 `event.env.CODEPUPPY_GLOBAL_DIR = codepuppyBootstrap().paths.globalRoot`。无上游改动、新模块、schema 字段或 MCP / formatter 通道。AC-02 扫描仅豁免该文件 / 该键 / `event.env` 的普通赋值,同文件变量读取、process.env 读写、其它键与其它文件仍报出,扫描器用正反样本证明;未加整文件例外 · r4 实现提交。
 - 2026-11-14 · r3 **BLOCKED: design — §2.1 C1 / §4.5 / §6 S2 — 随包技能的工具 shell 仍需要 `CODEPUPPY_GLOBAL_DIR`,真实引擎对照显示退役后为空。** §4.5 明定 sidecar 的 `CODEPUPPY_*` 只剩 EXTRA,§2.1 C1 只描述子进程整份继承;§6 S2 规定文档不进环境、子进程拿不到。全文没有为「模型按随包技能运行的 shell 命令」规定文档字段到工具进程环境的通道。最小待补规则:允许在 **shell 工具子进程创建时** 从已发布的 `paths.globalRoot` 精确投影 `CODEPUPPY_GLOBAL_DIR`,只交给该工具子进程,不恢复 sidecar 的进程环境总线;规则确定后再沿确定的通道实现,使同一真实引擎用例转绿。本轮不改设计、不另造通道、不改技能命令。
 
   随包内容扫描是递归扫描整个 `resources/factory-skills`、`resources/skills` 与 `resources/extension-seed`,不只 SKILL.md;seed 的 101 个文件为 47 个文本 / 54 个字体 blob,没有 zip / tar 档。另对 `codepuppy-prompts.ts`、`context-injection.ts` 与 main 的 identity / behavior / agents 五个源码模块作 TypeScript AST 字符串扫描(排除注释、变量标识符),命令 / 提示词实际字符串命中 none。清单:
@@ -254,6 +256,23 @@ last_reviewed: 2026-11-12
 | §9 回滚 · 无数据后果 | 段 0 记录第 ⑦ 格(C4 显式文件、C5 模型底表、密钥文件名集合)两端逐字相同;启动文档不落盘(构建器与 sidecar 不新增写盘点:`process-fence-write-sites.test.ts` 的登记簿本段不变) | 若迁移改变了磁盘形状,第 ⑦ 格红;若新增写盘,写盘登记簿闸红。 |
 
 ### 偏离记录
+- 2026-11-14 · r4 同链判据同步:旧 `codepuppy-ext-no-shell-layer.test.ts` 将「没有任何 shell 钩子」当作不包 shell 的证据,新增 R33 钩子后首次相关命令为 1 pass / 1 fail。改为在真宿主里触发真实钩子链,逐字段判命令 / shell / cwd / timeout 不变、env 仅多 R33 的根,保留 wrapper 两键缺席与不产出 bin/、sandbox/ 的断言;控制组实际把 shell 改成 wrapper,同一调用样本能检出。调用样本来自已实跑的 r3 / r4 shell 与引擎的 invocation 形状,没有另造 shell 协议。gate-files 的这条说明同步、条数仍 2;bootstrap-env-readers 仍 3 条、说明补 R33;新增永久宿主为 1 条。只改与新裁决直接冲突的机制断言,不撤掉旧的能力判据 · r4 实现提交。
+
+r4 相关验证(全部先 `export PATH=$HOME/.bun-versions/1.4.4/bin:$PATH`,Bun 1.4.4;一条命令结束后再跑下一条):
+
+| 目录 | 精确命令 | 结果 |
+| --- | --- | --- |
+| `packages/ui-mac` | `bun test src/main/bootstrap-shell-env.engine.test.ts` | 未加投影时 exit 1;0 pass / 1 fail,真实 shell exit 0 但 ROOT 为空,三份技能路径落到 `/`。红灯测试提交 `a75a8920bc`。 |
+| `packages/ui-mac` | `bun test src/main/bootstrap-shell-env.engine.test.ts src/main/bootstrap-launch-parity.engine.test.ts src/main/bootstrap-env-readers.test.ts` | 投影后 exit 0;5 pass / 0 fail。新宿主在子进程里另核对真实引擎用例 1 pass / 0 fail。 |
+| `packages/ext` | `bun test src/codepuppy-ext-no-shell-layer.test.ts` | 初次 1 pass / 1 fail,只因旧的「没有任何 shell 钩子」断言与 R33 冲突;按上面的行为判据同步后由下一条命令复核。 |
+| `packages/ext` | `bun test src/plugin-host.test.ts src/plugin-setup-order.test.ts src/context-injection.test.ts src/codepuppy-ext-no-shell-layer.test.ts src/policy/authority-registry.test.ts` | exit 0;92 pass / 0 fail。含钩子次序、上下文咽喉、无 wrapper 与权威登记。 |
+| `packages/ui-mac` | `bun test src/main/gate-file-registry.test.ts src/main/old-name-scan.test.ts` | exit 0;33 pass / 0 fail。 |
+| `packages/ext` | `bun typecheck` | exit 0;0 type errors。 |
+| `packages/ui-mac` | `bun typecheck` | exit 0;0 type errors。 |
+| 仓库根 | `git diff --exit-code a75a8920bc -- packages/ui-mac/src/main/bootstrap-shell-env.engine.cases.ts packages/ui-mac/src/main/bootstrap-shell-env.engine.test.ts packages/util/src/codepuppy-bootstrap.ts` | exit 0;两份红灯测试与 bootstrap schema 均无改动。 |
+| 仓库根 | `git diff --check` | exit 0。 |
+
+已核:Codex(GPT-6),依据 r4 派发书的 R33 裁决;AC-01 / AC-02 / AC-04 本轮通过。下一步交编排器审查,遗留去向 none。红灯提交后本轮生产改动只有 ext 的四行钩子;另有精确扫描器、旧判据及登记说明同步。共 8 个自身改动文件,约 14 分钟,无 G4 / 兼容 / 全套门 · r4 实现提交。
 - 2026-11-14 · r3 独立完成 items 2–3:信任记录架构文档写明 `paths.globalRoot` 通道,保留按字面逆映射 / 不经 realpath 的原句,并按共享 `AGENT_CONTROL_FIELDS` 补 `steps` / `maxSteps`(执行预算);`mcp-server-records.ts`、`custom-provider-records.ts`、`codepuppy-config-injection.ts` 的通道注释同步。`codepuppy-environment.ts` 的拒绝原因只把通道名 `CODEPUPPY_GLOBAL_DIR` 换为 `bootstrap.paths.globalRoot`,意义与拓扑判定不变;MCP / 自定义节点测试各自的原字面期望同步,断言不变。未加入两个 OPTIONAL 测试,未加 gate 文件。相关检查如下 · r3 文档 / 注释提交。
 
 | 目录 | 命令 / 证据 | 结果 |

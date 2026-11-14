@@ -425,7 +425,7 @@ sidecar `start()` 的顺序(全部在同一个 try 里,任一步失败 ⇒ error
 
 #### 4.5 留在进程环境里的
 
-规则:**sidecar 环境里不再有 `CODEPUPPY_*`,只剩用户的 `CODEPUPPY_ENV_ALLOWLIST_EXTRA` 本身**;其余都是非 Code Puppy 读者要的:
+规则:**sidecar 与 ext 的进程环境里不再有退役的 `CODEPUPPY_*`,只剩用户的 `CODEPUPPY_ENV_ALLOWLIST_EXTRA` 本身**。R33 的例外是向 shell 工具子进程输出:在构建该子进程环境时从已发布的启动文档派生,精确集合只在 ext 的 shell 环境钩子一处枚举,当前仅 `CODEPUPPY_GLOBAL_DIR` = `paths.globalRoot`;Code Puppy 自身进程不读回投影变量,不扩到 MCP / formatter 等其它子进程。其余都是非 Code Puppy 读者要的项:
 
 | 项 | 为什么留在环境 |
 | --- | --- |
@@ -689,7 +689,7 @@ G4 后用户层在后、用户胜。这与命令一致,也是 `engine-explicit-c
   ⑤坏文档以具名错误 `CodePuppyBootstrapError` 失败,构建器与解析器的日志只写字段路径或变量名,不写值。
 - **安全面**:威胁边界是「sidecar 环境被第三方子进程整份继承」与「进程内插件共用 `globalThis`」。不变量:
   S1 启动文档里没有任何密钥值:两处引用字段只容得下 `{file:}` 引用,两个 URL 字段只容得下无凭据 URL(无 userinfo、无查询串、无片段),其余字段没有能装凭据的形状;
-  S2 启动文档不进环境,子进程拿不到;S3 每个进程只发布一次、深冻结、读方不改;S4 引擎口令只在 `StartCommand`;
+  S2 启动文档本身不进环境,子进程拿不到整份文档;R33 仅允许随包内容需要的精确字段在 shell 工具子进程建环境时派生为输出,不成为 Code Puppy 进程的输入通道;S3 每个进程只发布一次、深冻结、读方不改;S4 引擎口令只在 `StartCommand`;
   S5 sidecar 环境里没有 `CODEPUPPY_*`(EXTRA 也放不回)。
   G4 另加三条:S6 独立 OpenCode 的内容不在引擎的任何配置层里 —— 全局层换根、项目发现排除它的别名、共享库里别人登录带来的 integrated / wellknown 文档不装载;
   它的策略、命令、插件都碰不到 Code Puppy(P-13 测到今天的洞);
@@ -802,6 +802,7 @@ G4 后用户层在后、用户胜。这与命令一致,也是 `engine-explicit-c
 | R30（编排者裁决，2026-11-12，来自 #1698 计划阶段）`CODEPUPPY_PROVIDER_ALLOW`（基线之后由 87b7e280e3 新增）不进启动文档也不留在环境里：sidecar 注入阶段算出放行集合后，按进程内交接（C10）的同一形状发布一份冻结的集合，ext 读它 | 该值是注入阶段算出的，不是 main 的决定，启动文档在注入之前发布、装不下它；留在环境里与本设计「决定不走零散环境变量」相悖；改由 main 计算会搬动供应商白名单的权威。读者：`packages/ext/src/provider-allow.ts:19,26`；写者：`packages/ui-mac/src/main/codepuppy-config-injection.ts:329-330,673` |
 | R31（同上）共用模块的读取顺序为「快照 → 已发布文档 → 环境」，环境这一支只服务没有快照的单元测试；生产启动里它必须不可达，由决定记录测试断言 | 55 个既有测试依赖环境回退，逐个改写不产生价值；「已迁走的键没有剩余读者」的检查覆盖生产源码 |
 | R32（同上）P-13 的反向臂改在不装 ext 的真引擎上判；G4 可分 4a、4b（新增而未接入的文件）与 4c（一次切换）三个提交 | #1662 之后 ext 也拦白名单外的供应商，装着 ext 时「变可用」的反向臂红不了；4a、4b 不接入任何生产路径，回滚仍只需还原 4c |
+| R33（编排器(Claude Fable 5.2)裁决,2026-11-14）随包内容(出厂技能、命令、提示词)让模型在工具 shell 中使用的值属于 0.2.0 的既有行为,在 shell 子进程构建环境时从已发布启动文档派生为环境输出。集合精确、只枚举一处,当前只有 `CODEPUPPY_GLOBAL_DIR` = `paths.globalRoot`;sidecar / ext 的进程环境仍不含退役变量,Code Puppy 自身不读回投影变量;不扩到 MCP / formatter 等其它子进程 | r3 两树真实 shell 测量(3a8e25d6b8 有全局根、94c84d29d3 为空)与随包内容扫描,见 plan 段 0 / 段 1;AC-04「现有启动与权限行为与换代后主线逐项一致」。无需设计审查:通过启动文档恢复既有行为,没有新增模块、用户可见变化或输入通道;AC-02 保持。 |
 
 **本设计带来的 owner 可见变化**(按派发书「行为变了必须点名」):
 

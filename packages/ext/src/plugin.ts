@@ -125,6 +125,10 @@ export const CodePuppyExt: Plugin.Plugin = {
       if (bootstrap.switches.extVerbose) log(`[@codepuppy/ext] context injections:\n${renderInventory()}`)
       // sidecar 初始化批次先复验 main 派生 root 的 canonical 身份;缺失、相对、退休根或 alias 都拒绝(环境错 = 结构性失败,让本插件 failed)。
       requireCodePuppyGlobalRoot(bootstrap.paths.globalRoot)
+      // `#1698` R33:随包内容需要的工具 shell 输出只在这里逐项列出;每次建子进程时从文档派生,不写本进程环境。
+      await context.shell.hook("create.before", (event) => {
+        event.env.CODEPUPPY_GLOBAL_DIR = codepuppyBootstrap().paths.globalRoot
+      })
       const projectRootFor = (target: string): ProjectRoot | null => {
         const identity = projectDirectoryIdentity(target)
         return identity.status === "project" ? identity : null

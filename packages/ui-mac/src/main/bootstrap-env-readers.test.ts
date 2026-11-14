@@ -89,7 +89,14 @@ function trackedNamesIn(file: string, source: string, names: readonly string[]):
   const found: string[] = []
   const visit = (node: ts.Node) => {
     if ((ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) && wanted.has(node.text)) found.push(node.text)
-    if (ts.isPropertyAccessExpression(node) && wanted.has(node.name.text)) found.push(node.name.text)
+    if (ts.isPropertyAccessExpression(node) && wanted.has(node.name.text)) {
+      // R33 的唯一子进程输出赋值不算读方;同文件的读取、process.env 写入或别的键仍照常被扫描。
+      const output = file === "packages/ext/src/plugin.ts" && node.name.text === "CODEPUPPY_GLOBAL_DIR" &&
+        ts.isPropertyAccessExpression(node.expression) && node.expression.name.text === "env" &&
+        ts.isIdentifier(node.expression.expression) && node.expression.expression.text === "event" &&
+        ts.isBinaryExpression(node.parent) && node.parent.left === node && node.parent.operatorToken.kind === ts.SyntaxKind.EqualsToken
+      if (!output) found.push(node.name.text)
+    }
     if ((ts.isPropertyAssignment(node) || ts.isShorthandPropertyAssignment(node)) && ts.isIdentifier(node.name) && wanted.has(node.name.text)) found.push(node.name.text)
     ts.forEachChild(node, visit)
   }
@@ -120,6 +127,14 @@ describe("#1698 迁进启动文档的键没有剩下的读者", () => {
       "const c = { CODEPUPPY_X: 1 }",
     ].join("\n")
     expect(trackedNamesIn("probe.ts", source, ["CODEPUPPY_X"])).toEqual(["CODEPUPPY_X", "CODEPUPPY_X", "CODEPUPPY_X", "CODEPUPPY_X"])
+    const output = "event.env.CODEPUPPY_GLOBAL_DIR = codepuppyBootstrap().paths.globalRoot"
+    expect(trackedNamesIn("packages/ext/src/plugin.ts", output, ["CODEPUPPY_GLOBAL_DIR"])).toEqual([])
+    expect(trackedNamesIn("other.ts", output, ["CODEPUPPY_GLOBAL_DIR"])).toEqual(["CODEPUPPY_GLOBAL_DIR"])
+    expect(trackedNamesIn("packages/ext/src/plugin.ts", "const root = event.env.CODEPUPPY_GLOBAL_DIR", ["CODEPUPPY_GLOBAL_DIR"])).toEqual(["CODEPUPPY_GLOBAL_DIR"])
+    expect(trackedNamesIn("packages/ext/src/plugin.ts", "process.env.CODEPUPPY_GLOBAL_DIR = root", ["CODEPUPPY_GLOBAL_DIR"])).toEqual(["CODEPUPPY_GLOBAL_DIR"])
+    expect(trackedNamesIn("packages/ext/src/plugin.ts", "const root = process.env.CODEPUPPY_GLOBAL_DIR", ["CODEPUPPY_GLOBAL_DIR"])).toEqual(["CODEPUPPY_GLOBAL_DIR"])
+    expect(trackedNamesIn("packages/ext/src/plugin.ts", "event.env.CODEPUPPY_FACTORY_SKILL_DIRS = dirs", ["CODEPUPPY_FACTORY_SKILL_DIRS"])).toEqual(["CODEPUPPY_FACTORY_SKILL_DIRS"])
+
   })
 
   test("① 已无写方的键:全部生产源码里一处都没有", () => {

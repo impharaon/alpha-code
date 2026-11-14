@@ -345,6 +345,7 @@ const { codepuppySidecar } = registerExtIpcHandlers(
       return true
     },
   },
+  async () => undefined,
 )
 const globalRoot = codepuppyGlobalRoot()
 /** `#1529`:main 发往 ext 调度器的重载请求 —— 「装完有没有让引擎重扫」的判据。 */
@@ -812,6 +813,4 @@ test("#1652 audit: a refused ledger write sends no permission rejection", async 
     expect(permissionReplies).toEqual([])
     expect(permissions[projectA]).toHaveLength(1)
   } finally { refuseState = false; permissions = {} }
-}),
-})  async () => undefined,
 })

@@ -143,7 +143,7 @@ PLAN 验证只做文件/diff 的只读检查并提交本文件。实现后的全
 | AC-03 | C4 readonly 默认/每次询问两条即时拒绝;C5「AC-03 只读拒绝后模型正常收尾,运行仍记失败且保留报告」「AC-03 回合失败仍投影先前拒绝,优先于模型错误」。 | 同 C4/C5 命令,均退出 0;D1,磁盘 error 与 summary 同值。 |
 | AC-04 | C4「AC-04 配置禁止的读文件、子任务和项目外目录无计时等待」;C5「AC-04 敏感文件、子任务、项目外目录维持拒绝并写入原因」。 | 同 C4/C5 命令,均退出 0;D1 与三条真实工具 `permission.rejected`/磁盘原因互证。 |
 | AC-05 | C6「最不利轮询相位仍在虚拟 250 ms 取消表单,global 请求带项目位置」;C5「AC-05 项目 MCP form 和 URL 补充信息均收到真实 cancel,任务继续」「AC-05 取消后回合失败时用连接器名写运行原因」。 | C6 `bun test --only-failures src/main/automation-elicitation.test.ts` 5 pass,退出 0;同 C5 命令退出 0;D2 在逻辑 250 ms 取消完成,真实 SDK 返回 cancel。 |
-| AC-06 | C4「未登记的询问档产生 Asked 并保持等待,人工批准后才执行」「外来输入退出后旧快照不能重新授予自动化语义」「在册会话切换 agent 后仅按 none 拒绝,缺省 agent 也读真实当前会话」;C5 询问档与「AC-06 运行后续聊、真实分叉和子会话不继承无人值守权限」。 | 同 C4/C5 命令均退出 0;`bun test --only-failures src/policy/ask-deadline.test.ts` 5 pass,退出 0。 |
+| AC-06 | C4「未登记的询问档产生 Asked 并保持等待,人工批准后才执行」「外来输入退出后旧快照不能重新授予自动化语义」「在册会话切换 agent 后仅按 none 拒绝,缺省 agent 也读真实当前会话」;C5 询问档与「AC-06 注销后的续聊、真实分叉和子会话不继承无人值守权限」。 | 同 C4/C5 命令均退出 0;`bun test --only-failures src/policy/ask-deadline.test.ts` 5 pass,退出 0。 |
 | AC-07 | C4「none 档初值 allow 被后续钩子改 ask 仍立即拒绝,无工具调用的断言同样不等人」;C5 原 AC-07 红例、无通道时解析 unavailable 且不发 prompt/删空会话。 | 同 C4/C5 命令均退出 0;D1。C2 登记簿的错误 seq/nonce、20 s 虚拟超时与 abort 判据 4 pass,退出 0。 |
 
 ### 偏离记录
@@ -157,3 +157,11 @@ PLAN 验证只做文件/diff 的只读检查并提交本文件。实现后的全
 遗留去向:`packages/ext/src/policy/index.ts:123` — 未登记分支沿用原 `.data.permissions` 读取,而 `session.get` 实际直接返回会话;本票按 I-4 保留原行为,建议编排器转原意图项另行核对,不在本票修复。
 
 实际交付规模:39 个文件(其中真实消息/表单 JSON 约 1,200 行,新增测试占主要篇幅);实施 12:30—13:33 UTC,约 63 分钟,在 100 分钟预算内。不涉及迁移。最终采用单段、四个顺序提交单元,没有增加设计分片。
+
+
+2026-11-14 · R4 独立审查修正(依据编排器本轮回执,基点 `0a0862513a`;从 13:52 UTC 计时):
+
+- 第 1/3 项的真实引擎回归在一次 Code Mode 调用中先停在测试工具,再向仍在册的同一会话发送 prompt 或 shell,释放后才执行每次询问的真实 MCP。用审批事件与运行结束竞争,没有秒数猜测。原「运行后续聊」更名为「注销后的续聊」,只声明其实际证明的范围。
+- 红证据:`cd packages/ui-mac && bun test --timeout 90000 ./src/main/unattended-run.engine.cases.ts` 在生产代码 `0a0862513a` 上退出 1,14 pass / 2 fail。shell 插话例预期 `asked` 实得 `finished`;未就绪记录形状例多出 `durationMs`、`sessionID`、`runDir`。prompt 插话例基点通过;临时去掉 `unattended.preparePrompt(event)` 后,同命令加 `-t '在册运行收到 prompt'` 为 0 pass / 1 fail、退出 1,也是 `asked` 实得 `finished`;已用 scoped `git restore` 恢复该唯一生产变异,回归断言保留。
+- 第 1 项的合同阻塞:已核实 `core/src/session/session.ts:211-235` 先发布 `session.shell.started`,然后才把结果经 synthetic 入队。但 `plugin/src/promise/event.ts:6-10` 只公开 AsyncIterable;`plugin/src/promise/adapter.ts:51-72,331-344` 经 Promise/异步迭代适配,`core/src/bus.ts:495-506,735-758` 向 unbounded PubSub 发布,不等待该 Promise 订阅者处理完成。扩展能异步观察已发布的启动事件,不能保证 I-9 所写的入队前同步退出。现有同步 `shell.create.before` 的输入(`plugin/src/promise/shell.ts:3-9`)不含 sessionID,无法准确退出目标会话。需要可等待且带 sessionID 的 shell 输入钩子,或方案方明确另定异步观察时点;本轮不改上游/公共合同、不用一个偶然通过的事件流用例代替排序保证。真实 shell 红例保留为这项未完成的证据。
+- 第 4 项不等价证据:实际 `Permission.assert` 输入可带动作名 `unattended_write` 的会话 ask,同时身份轴 `mcp:unattended:write` 不 ask,于是 standard 的 T1 为 allow 而引擎原始 effect 为 ask。新增「T1 allow 对无工具调用的原始 ask 与直接 return 不等价」基点 1 pass、退出 0;只把对应分支改成直接 return 后,`cd packages/ext && bun test --only-failures src/policy/unattended-policy.test.ts -t 'T1 allow 对无工具调用'` 为 0 pass / 1 fail、退出 1(成功变成拒绝),已 scoped restore。按本轮第 4 项处置保留生产分支,不改变此可达输入的既有结果。

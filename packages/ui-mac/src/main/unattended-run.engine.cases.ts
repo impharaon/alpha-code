@@ -3,7 +3,7 @@
 import { canonicalJsonDigest } from "../../../ext/src/policy/store"
 import { mcpBindingEvidence } from "../../../ext/src/policy/resolver"
 import { afterAll, beforeAll, expect, mock, test } from "bun:test"
-import { readFileSync, writeFileSync } from "node:fs"
+import { readFileSync, readdirSync, writeFileSync } from "node:fs"
 import { createHash } from "node:crypto"
 import { join } from "node:path"
 import { assertEngineSandboxed, engineSandbox } from "../../test-component/engine-sandbox"
@@ -115,6 +115,7 @@ server.setRequestHandler("tools/call", async (request) => {
 await server.connect(new StdioServerTransport())
 `,
   )
+  writeFileSync(callLog, "")
   const host = codepuppyEngine({
     sandbox,
     name: "unattended",
@@ -316,7 +317,7 @@ test("AC-06 未登记的询问档对同一工具出卡,人工答复后才执行"
   }
 }, 60_000)
 
-test("AC-06 运行后续聊、真实分叉和子会话不继承无人值守权限", async () => {
+test("AC-06 注销后的续聊、真实分叉和子会话不继承无人值守权限", async () => {
   const source = getAutomation("unattended-ask")!.lastRun!.sessionID!
   await client.session.update({ sessionID: source, metadata: { unattended: true } })
   const fork = await client.session.fork({ sessionID: source })
@@ -349,6 +350,73 @@ test("AC-06 运行后续聊、真实分叉和子会话不继承无人值守权�
     }
   }
 }, 60_000)
+
+// 同一次真实 Code Mode 调用先停在工具内,外来输入到达后才执行下一个询问工具。
+// 用审批事件和运行结束竞争,坏例立即报红,不靠等待 300 秒。
+for (const outside of ["prompt", "shell"] as const)
+  test(`AC-06 在册运行收到 ${outside} 插话后,下一个每次询问工具必须出卡`, async () => {
+    await store.setRecord({ selector: { level: "tool", canonical: "mcp:probe:echo" }, state: "ask" })
+    const entered = Promise.withResolvers<string>()
+    const release = Promise.withResolvers<void>()
+    const context: Context = probe().ctx
+    const hold = await context.tool.transform((editor) =>
+      editor.add({
+        name: "hold",
+        description: "暂停此测试的运行,由外来输入用例释放",
+        input: { type: "object", properties: {} },
+        options: { namespace: "unattended", codemode: true },
+        execute: async (_input, tool) => {
+          entered.resolve(tool.sessionID)
+          await release.promise
+          return { content: "released" }
+        },
+      }),
+    )
+    const controller = new AbortController()
+    const connected = Promise.withResolvers<void>()
+    const asked = Promise.withResolvers<{ id: string; sessionID: string }>()
+    let activeSession: string | undefined
+    let pending: { id: string; sessionID: string } | undefined
+    const reader = (async () => {
+      for await (const event of client.event.subscribe({ types: ["permission.asked"], signal: controller.signal })) {
+        if (event.type === "server.connected") connected.resolve()
+        if (event.type === "permission.asked" && event.data.sessionID === activeSession) {
+          pending = event.data
+          asked.resolve(event.data)
+        }
+      }
+    })()
+    await connected.promise
+    const job = task(`unattended-outside-${outside}`)
+    job.prompt = `CP-CALL ${JSON.stringify({ name: "execute", args: { code: 'await tools.unattended.hold({}); return await tools.probe.echo({text: "after-outside-input"})' } })}`
+    expect(saveAutomation(job).ok).toBe(true)
+    const run = runAutomationNow(job.id)
+    try {
+      activeSession = await entered.promise
+      const before = readFileSync(callLog, "utf8")
+      if (outside === "prompt") await client.session.prompt({ sessionID: activeSession, text: "请继续这次运行。" })
+      if (outside === "shell")
+        await client.session.shell({ sessionID: activeSession, command: "printf shell-interjection" })
+      release.resolve()
+      const result = await Promise.race([asked.promise.then(() => "asked"), run.then(() => "finished")])
+      expect(result, "外来输入之后工具仍按无人值守放行").toBe("asked")
+      expect(readFileSync(callLog, "utf8")).toBe(before)
+      const request = await asked.promise
+      expect((await client.permission.list({ sessionID: activeSession })).map((item) => item.id)).toContain(request.id)
+      await client.permission.reply({ sessionID: activeSession, requestID: request.id, decision: "once" })
+      pending = undefined
+      await run
+      expect(readFileSync(callLog, "utf8")).toBe(`${before}echo\n`)
+    } finally {
+      release.resolve()
+      if (pending)
+        await client.permission.reply({ sessionID: pending.sessionID, requestID: pending.id, decision: "reject" })
+      await run
+      controller.abort()
+      await reader
+      await hold.dispose()
+    }
+  }, 60_000)
 
 test("AC-03 回合失败仍投影先前拒绝,优先于模型错误", async () => {
   await store.removeRecord({ level: "tool", canonical: "mcp:probe:echo" })
@@ -416,6 +484,7 @@ test("AC-05 取消后回合失败时用连接器名写运行原因", async () =>
 test("无通道时不发 prompt,删空会话并记未就绪,每日计数照旧", async () => {
   const before = model.requests.length
   const count = readAutomationState().runCount.count
+  const runDirs = readdirSync(join(directory, ".codepuppy", "runs")).toSorted()
   const sessions = (await client.session.list({ directory })).data.map((session) => session.id).toSorted()
   const job = task("unattended-not-ready")
   expect(saveAutomation(job).ok).toBe(true)
@@ -423,7 +492,13 @@ test("无通道时不发 prompt,删空会话并记未就绪,每日计数照旧",
   try {
     await withoutApproval(() => runAutomationNow(job.id))
     const record = getAutomation(job.id)!.lastRun!
-    expect(record).toMatchObject({ status: "failed", reasonCode: "automation-run-not-ready" })
+    expect(record).toEqual({
+      at: expect.any(String),
+      status: "failed",
+      summary: expect.any(String),
+      reasonCode: "automation-run-not-ready",
+    })
+    expect(readdirSync(join(directory, ".codepuppy", "runs")).toSorted()).toEqual(runDirs)
     expect(model.requests.length).toBe(before)
     expect(readAutomationState().runCount.count).toBe(count + 1)
     expect(await llmParseAutomation("每天执行", directory)).toMatchObject({
@@ -432,9 +507,6 @@ test("无通道时不发 prompt,删空会话并记未就绪,每日计数照旧",
     })
     expect(model.requests.length).toBe(before)
     expect((await client.session.list({ directory })).data.map((session) => session.id).toSorted()).toEqual(sessions)
-    await expect(client.session.get({ sessionID: record.sessionID! })).rejects.toMatchObject({
-      name: "SessionNotFoundError",
-    })
   } finally {
     detach = mainHost.attach(post)
   }

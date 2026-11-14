@@ -353,3 +353,29 @@ it.effect("在册会话切换 agent 后仅按 none 拒绝,缺省 agent 也读真
     expect(host.counts.writes).toBe(0)
   }),
 )
+
+it.effect("T1 allow 对无工具调用的原始 ask 与直接 return 不等价", () =>
+  Effect.gen(function* () {
+    const host = yield* setup("standard", { ask: true })
+    const sessions = yield* Session.Service
+    yield* sessions.setPermissions({
+      sessionID: host.session.id,
+      permissions: [{ action: "unattended_write", resource: "*", effect: "ask" }],
+    })
+    const permission = yield* Permission.Service
+    const result = yield* host.immediate(
+      permission
+        .assert({
+          sessionID: host.session.id,
+          action: "unattended_write",
+          resources: ["*"],
+          save: [],
+          metadata: {},
+        })
+        .pipe(Effect.exit),
+    )
+    expect(result).not.toBe("asked")
+    expect(Exit.isSuccess(result)).toBe(true)
+    expect(host.counts.writes).toBe(0)
+  }),
+)

@@ -14,8 +14,10 @@ import * as fs from "node:fs"
 import { homedir } from "node:os"
 import * as path from "node:path"
 import { toolProbe } from "./platform"
-import { extensionsGranted, hasExtensionsDecision, listProjectExecutables, withExtensionsConsent } from "./codepuppy-ext-trust"
+import { extensionsGranted, hasExtensionsDecision, listProjectExecutables } from "./codepuppy-ext-trust"
 import { readProjectPrefs, writeProjectPrefs } from "./codepuppy-workdir"
+import { projectTrustIdentity, readProjectTrustEntry } from "./project-trust-truth"
+import { recordProjectTrustDecision } from "./project-trust-truth-write"
 import { projectIpcHandler, resolveProjectIpcEntry, withProjectIpcEntryIdentity } from "./ext-project-entry"
 import type { InstalledPackagesResultV1, InstallTarget, ProjectMcpState } from "../preload/types"
 import type { EngineConnection } from "./engine-authorization"
@@ -118,9 +120,11 @@ export function registerExtIpcHandlers(
   assertCodePuppyEnvironmentIdentity()
   const resolveProjectEntry = (projectDir: unknown) => resolveProjectIpcEntry(projectDir, homeDir)
   const projectMcpState = async (name: string, projectDir: string, disabled: boolean): Promise<ProjectMcpState> => {
-    const prefs = readProjectPrefs(projectDir)
-    if (!hasExtensionsDecision(prefs)) return "awaiting-consent"
-    if (!extensionsGranted(prefs)) return "consent-denied"
+    // `#1709`:与 ext 同一份记录(project-trust-truth.ts),不读项目 prefs
+    const identity = projectTrustIdentity(projectDir)
+    const decision = identity ? readProjectTrustEntry(identity, (line) => getLogger().warn(line)) : undefined
+    if (!hasExtensionsDecision(decision)) return "awaiting-consent"
+    if (!extensionsGranted(decision)) return "consent-denied"
     if (disabled) return "disabled"
     return probeProjectMcpActivation(name, projectDir, awaitServer)
   }
@@ -525,11 +529,12 @@ export function registerExtIpcHandlers(
   // REQ-018 T3:存量迁移(旧 XDG 根 → .codepuppy)。scan 报告 + removeLegacy 删旧位;新位由 renderer
   // 复用既有 installer 重装(顺带 A2 钉版 + secret file 化)。用户面触发受 CODEPUPPY_MIGRATE_ENABLE 门控
   // (A6 真机验证后开,S12 T8)。
-  // REQ-060 信任门 UI:renderer 打开项目时调用。项目 `.codepuppy` 含可执行扩展(mcp/plugins)且无当前
-  // 版本决策 → 弹 per-project 原生确认(B16/ADR-021 同款);granted/denied 都写 `.codepuppy/prefs.json`
-  // 的 extensionsConsent(@codepuppy/ext 信任门读同一字段)。granted 后由 renderer 调 dispose 免重启
-  // 生效(链路已真机证通,audits/2026-07-07-req060-fanout-realmachine)。写盘失败不静默放行(反 placebo):
-  // 不落决策 + 返回 denied,下次仍会弹。
+  // REQ-060 信任门 UI:renderer 打开项目时调用。项目 `.codepuppy` 含受信任门管的内容(mcp / plugins / agent 的控制字段)且无当前
+  // 版本决策 → 弹 per-project 原生确认(B16/ADR-021 同款);granted/denied 都记进 main 写、引擎写不到的
+  // `<casBaseRoot>/project-trust/<env>.json`(`#1709`,按规范项目目录 + inode;@codepuppy/ext 信任门读同一条)。项目目录里的
+  // 任何文件都不算 —— 旧的 `.codepuppy/prefs.json` extensionsConsent 不读、不写、不删。granted 后由 renderer 请 ext 重载生效。
+  // 写盘失败不静默放行(反 placebo):不落决策 + 返回 denied,下次仍会弹。本 handler 是这份记录唯一的写入点,且只在用户于
+  // 模态确认框里做出决定之后写。
   ipcMain.handle("ext-trust-check", projectIpcHandler(
     homeDir,
     (reason, code) => {
@@ -575,13 +580,19 @@ export function registerExtIpcHandlers(
     const jsoncText = configRead.value
     const pluginFiles = pluginsRead.value
     const exec = listProjectExecutables(jsoncText, pluginFiles)
-    if (exec.mcp.length === 0 && exec.plugins.length === 0) return { prompted: false, granted: false }
-    const prefs = readProjectPrefs(directory)
-    if (hasExtensionsDecision(prefs)) return { prompted: false, granted: extensionsGranted(prefs) }
+    if (exec.mcp.length === 0 && exec.plugins.length === 0 && exec.agents.length === 0) return { prompted: false, granted: false }
+    // `#1709`:身份 = 规范项目目录 + 目录 inode;在弹框前取下,写入前复核。
+    const identityRead = withProjectIpcEntryIdentity(project, homeDir, (current) => projectTrustIdentity(current.projectDir))
+    if (!identityRead.ok) return { prompted: false, granted: false, reason: identityRead.reason }
+    const identity = identityRead.value
+    if (!identity) return { prompted: false, granted: false, reason: "fail closed: project directory identity cannot be confirmed" }
+    const decision = readProjectTrustEntry(identity, (line) => getLogger().warn(line))
+    if (hasExtensionsDecision(decision)) return { prompted: false, granted: extensionsGranted(decision) }
 
     const items = [
       ...exec.mcp.map((n) => `· 连接器(MCP):${n}`),
       ...exec.plugins.map((f) => `· 插件:${PROJECT_HIDDEN_DIR}/plugins/${f}`),
+      ...exec.agents.map((a) => `· Agent 的权限与模型设置:${a.name}(${a.fields.join("、")})`),
     ].join("\n")
     const parent = BrowserWindow.fromWebContents(event.sender) ?? undefined
     const opts = {
@@ -592,7 +603,7 @@ export function registerExtIpcHandlers(
         `发现以下可执行扩展:\n${items}\n\n` +
         "允许加载 = 在本机运行该项目提供的程序代码。若这不是你信任的项目,请选择「仅文本扩展」——\n" +
         "技能 / Agent / 命令等文本类扩展不受影响,仍正常生效。\n\n" +
-        `本决定按项目记录一次(存于本项目 ${PROJECT_HIDDEN_DIR}/prefs.json),之后不再重复询问。`,
+        "本决定按项目记录一次,之后不再重复询问。",
       buttons: ["允许加载", "仅文本扩展(不加载)"],
       defaultId: 1,
       cancelId: 1,
@@ -606,7 +617,12 @@ export function registerExtIpcHandlers(
       getLogger().log(`[req060-trust] allow clicked without acknowledgement — treated as undecided: ${directory}`)
       return { prompted: true, granted: false }
     }
-    const written = writeProjectPrefs(directory, withExtensionsConsent(readProjectPrefs(directory), granted, new Date().toISOString()))
+    // 确认框开着期间目录被换掉(改名 / 删掉后重建)⇒ 这次决定不落到另一个目录上
+    const still = withProjectIpcEntryIdentity(project, homeDir, (current) => projectTrustIdentity(current.projectDir))
+    const written =
+      still.ok && still.value?.ino === identity.ino
+        ? recordProjectTrustDecision(identity, granted, new Date().toISOString(), (line) => getLogger().warn(line))
+        : { ok: false as const, reason: "project directory identity changed while the dialog was open" }
     if (!written.ok) {
       getLogger().error(`[req060-trust] failed to persist decision: ${written.reason}`)
       return { prompted: true, granted: false, persistError: written.reason }

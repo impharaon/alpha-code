@@ -8,6 +8,7 @@ import { engineSlot, type EngineSandbox } from "./engine-sandbox"
 import { buildEngineServerOptions } from "../src/main/engine-server-options"
 import { engineAuthorization, withEngineAuthorization } from "../src/main/engine-authorization"
 import { injectCodePuppyConfig } from "../src/main/codepuppy-config-injection"
+import { writeExplicitConfig, type ExplicitPolicy } from "../src/main/engine-explicit-config"
 import { secretFilePath, secretFileRef } from "../src/main/codepuppy-secret-files"
 import { buildHubRequestReply, buildHubViewReply } from "../src/main/codepuppy-sidecar-messages"
 import type { EngineFetch } from "../src/main/in-process-engine"
@@ -175,7 +176,24 @@ export function codepuppyEngine(options: HostOptions) {
   const withExt = options.ext !== false
   const injection = injectCodePuppyConfig(userData, withExt ? ext : undefined, "stable")
   const content = JSON.parse(injection.config.content) as { plugins: string[]; providers: Record<string, { models?: Record<string, unknown> }> }
+  const injectedPlugins = new Set(content.plugins)
   content.plugins = [...content.plugins, probeDir]
+  // `#1708`:只对宿主直接追加的本地插件补精确路径,不取项目配置;探针与 turn-failure 的 retry-now 都在这里。
+  // 后者只把测试的重试间隔改成 0;若被拒,引擎照常退避约 84 秒,超过用例等待 idle 的 15 秒。
+  const withHostPlugins = (policies: ExplicitPolicy[]): ExplicitPolicy[] => [
+    ...policies,
+    ...content.plugins
+      .filter((target) => !injectedPlugins.has(target) && path.isAbsolute(target) && !/[*?]/.test(target))
+      .filter((target) => !policies.some((policy) => policy?.action === "plugin.use" && policy.resource === target && policy.effect === "allow"))
+      .map((resource) => ({ action: "plugin.use", resource, effect: "allow" })),
+  ]
+  if (injection.explicit) {
+    const explicit = injection.explicit
+    const recompute = explicit.plugins
+    explicit.layer.plugins = withHostPlugins(explicit.layer.plugins)
+    explicit.plugins = (userText) => withHostPlugins(recompute(userText))
+    writeExplicitConfig(explicit.file, explicit.userConfig, explicit.layer)
+  }
   // 沙箱里没有已应用的平台目录,平台节点的模型表是空的(`#1556`);补一个模型只为能发出请求
   if (options.platformModels !== null) content.providers.codepuppy!.models = options.platformModels ?? { m: { name: "m" } }
 
@@ -183,6 +201,19 @@ export function codepuppyEngine(options: HostOptions) {
   for (const [file, body] of Object.entries(options.projectFiles ?? {})) fs.writeFileSync(path.join(slot.projectDirectory, file), body)
 
   const start = async (): Promise<Running> => {
+    // 调用方可在注入后修改显式文档;只补宿主插件的精确放行,保留原字段与策略顺序。
+    if (injection.explicit) {
+      const document: unknown = await Bun.file(injection.explicit.file).json().catch(() => undefined)
+      // 无效文档仍交给引擎按原契约处理,宿主不把它重建成另一份有效配置。
+      if (document && typeof document === "object" && !Array.isArray(document)) {
+        const current = document as { policies?: ExplicitPolicy[] }
+        if (current.policies === undefined || Array.isArray(current.policies)) {
+          const policies = withHostPlugins(current.policies ?? [])
+          if (policies.length !== (current.policies?.length ?? 0))
+            await Bun.write(injection.explicit.file, `${JSON.stringify({ ...document, policies }, null, 2)}\n`)
+        }
+      }
+    }
     const { startEngine } = await import("../engine/engine-embed")
     let fetch: EngineFetch | undefined
     const password = `cp-${name}`

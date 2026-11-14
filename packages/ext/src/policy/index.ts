@@ -1,5 +1,3 @@
-import { type UnattendedDenial } from "../../../schema/src/codepuppy-unattended"
-import type { UnattendedState } from "./unattended"
 // Code Puppy tool policy inside the extension (lane seams I3): everything L4 hangs on the OpenCode 2 plugin Context
 // goes through `registerPolicy`. The extension's `setup` awaits it first and awaits `seal()` last (L3 owns the call
 // sites; `plugin-setup-order.test.ts`).
@@ -13,6 +11,8 @@ import type { UnattendedState } from "./unattended"
 //                                               layer on a failed call (#1572 AC4)
 //   permission.hook  risk facts on every ask; Code Puppy's own asks held against later hooks
 //   rpc              codepuppy.tool-policy (I5)
+import { type UnattendedDenial, type UnattendedProfile } from "../../../schema/src/codepuppy-unattended"
+import type { UnattendedState } from "./unattended"
 import os from "node:os"
 import path from "node:path"
 import type { Plugin } from "@opencode/plugin"
@@ -113,12 +113,16 @@ export async function registerPolicy(context: Plugin.Context, unattended: Unatte
     log: (message) => console.info(`[codepuppy-policy] ${message}`),
   })
 
-  const ruleset = async (sessionID: string, agent: string): Promise<readonly PermissionRule[]> => {
+  const ruleset = async (sessionID: string, agent: string, selected?: UnattendedProfile): Promise<readonly PermissionRule[]> => {
     const configured =
       catalog.configured(agent) ??
       (await context.agent.get({ agentID: agent } as never)).data.permissions ?? []
     const session = await context.session.get({ sessionID } as never).catch(() => undefined)
-    return [...configured, ...(session?.permissions ?? [])]
+    // AC-06:交互分支的既有读取路径保持不变;在册 T1 才消费当前会话字段。
+    const permissions = selected === undefined
+      ? (session as { data?: { permissions?: PermissionRule[] } } | undefined)?.data?.permissions
+      : session?.permissions
+    return [...configured, ...(permissions ?? [])]
   }
 
   const deps: GateDeps = {
@@ -175,7 +179,7 @@ export async function registerPolicy(context: Plugin.Context, unattended: Unatte
     if (selected !== undefined) {
       if (event.source === undefined) {
         const facts = (await allFacts()).find((item) => item.permission === event.action)
-        if (facts) await gateWithoutToolCall(deps, event as never, facts, "build")
+        if (facts) await gateWithoutToolCall(deps, event as never, facts, "build", selected)
       }
       return holdUnattendedDeny(event, selected, event.action, (denial) => denied(event.source?.type === "tool" ? event.source.id : undefined, denial))
     }

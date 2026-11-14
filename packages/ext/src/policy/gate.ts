@@ -1,4 +1,3 @@
-import { UNATTENDED_DENIAL_KEY, unattendedDenialCopy, type UnattendedDenial, type UnattendedProfile } from "../../../schema/src/codepuppy-unattended"
 // Code Puppy execution gate on OpenCode 2 (#725 group B, baseline S1): every tool call passes Code Puppy's decision in
 // `tool.hook["execute.before"]`, the only path to `Tool.execute` (packages/core/src/tool.ts `beforeExecute`).
 // Replaces the v1 takeovers of session/tools.ts and the policy gate in permission/codepuppy-tool-policy-gate.ts.
@@ -17,6 +16,7 @@ import { UNATTENDED_DENIAL_KEY, unattendedDenialCopy, type UnattendedDenial, typ
 // hook; `confirm` runs at `seal()`, after the extension's hooks and the project plugin fan-out, asks with the input the
 // implementation will receive, re-decides after the answer, and then pins `tool` and `input` so any later rewrite
 // rejects the call (S1, option 2: plugins activated after the extension cannot be ordered behind it).
+import { UNATTENDED_DENIAL_KEY, unattendedDenialCopy, type UnattendedDenial, type UnattendedProfile } from "../../../schema/src/codepuppy-unattended"
 import { Error as ToolError } from "@opencode/plugin/promise/tool"
 import { canonicalToolIdentity } from "../../../schema/src/tool-identity"
 import { TOOL_POLICY_REQUEST_KEY } from "../../../schema/src/codepuppy-tool-policy"
@@ -101,7 +101,7 @@ export interface GateDeps {
   /** Identity facts for the effective tool name, from the current registry; undefined = unknown identity. */
   readonly facts: (tool: string) => Promise<ToolFacts | undefined>
   /** Configured rules for this call: the agent's rules before Code Puppy's own, then the session's. */
-  readonly ruleset: (sessionID: string, agent: string) => Promise<readonly PermissionRule[]>
+  readonly ruleset: (sessionID: string, agent: string, profile?: UnattendedProfile) => Promise<readonly PermissionRule[]>
   readonly directory: () => string
   readonly assert: (input: {
     sessionID: string
@@ -125,9 +125,9 @@ export interface GateDecision {
 export async function decide(deps: GateDeps, call: Pick<GateCall, "tool" | "sessionID" | "agent"> & { id?: string }): Promise<GateDecision> {
   const facts = await deps.facts(call.tool)
   if (!facts) throw namedDeny(call.tool, undefined, "unknown-tool-identity")
-  const [snapshot, ruleset] = await Promise.all([deps.store.snapshot(), deps.ruleset(call.sessionID, call.agent)])
-  const effective = effectiveFor(facts, snapshot, ruleset)
   const profile = await deps.profile(call.sessionID, call.agent)
+  const [snapshot, ruleset] = await Promise.all([deps.store.snapshot(), deps.ruleset(call.sessionID, call.agent, profile)])
+  const effective = effectiveFor(facts, snapshot, ruleset)
   if (profile !== undefined) {
     const verdict = unattendedGateVerdict(profile, { effective, rulesetAsks: effective.action !== "deny" && rulesetIdentityEffect(canonicalToolIdentity(facts.identity), ruleset) === "ask", tool: facts.identity.name })
     if (verdict.kind === "deny") {
@@ -203,10 +203,10 @@ export async function gateWithoutToolCall(
   },
   facts: ToolFacts,
   agent: string,
+  profile?: UnattendedProfile,
 ): Promise<void> {
-  const [snapshot, ruleset] = await Promise.all([deps.store.snapshot(), deps.ruleset(event.sessionID, event.agent ?? agent)])
+  const [snapshot, ruleset] = await Promise.all([deps.store.snapshot(), deps.ruleset(event.sessionID, event.agent ?? agent, profile)])
   const effective = effectiveFor(facts, snapshot, ruleset)
-  const profile = await deps.profile(event.sessionID, event.agent)
   if (profile !== undefined) {
     const verdict = unattendedGateVerdict(profile, { effective, rulesetAsks: effective.action !== "deny" && rulesetIdentityEffect(canonicalToolIdentity(facts.identity), ruleset) === "ask", tool: facts.identity.name })
     if (verdict.kind === "deny") {

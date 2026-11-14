@@ -1,4 +1,3 @@
-import { createUnattendedState } from "./policy/unattended"
 // hub-bridge — REQ-234 `#1531`(基线 docs/design/2026-10-14-req234-hub-agent-install-baseline.md §2.2 / §2.6)。
 //
 // ext 这一侧的 parentPort 请求簿记:agent 的三个定制中心工具经它向 main 问「这个目录的三档视图」与「某次安装请求走到哪一步」,
@@ -12,6 +11,7 @@ import { createUnattendedState } from "./policy/unattended"
 //   · 应答形状不对 = 丢弃 + 记一行,请求按超时结算 —— 不带着半个视图去回答 agent。
 // 取不到 parentPort(CLI / 测试宿主)⇒ `available: false`,三个工具如实说「本宿主不可用」,不猜。
 
+import { createUnattendedState } from "./policy/unattended"
 import {
   buildUnattendedAck,
   parseUnattendedLive,

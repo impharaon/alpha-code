@@ -1,4 +1,8 @@
-import { AUTOMATION_PROFILES, type AutomationAgentID, type UnattendedProfile } from "../../../schema/src/codepuppy-unattended"
+import {
+  AUTOMATION_PROFILES,
+  type AutomationAgentID,
+  type UnattendedProfile,
+} from "../../../schema/src/codepuppy-unattended"
 import type { UnattendedLive } from "../../../ui-mac/src/main/codepuppy-sidecar-messages"
 
 /** 由进程级 hubBridge 持有,Location 和插件重载共同消费这一份。 */
@@ -20,10 +24,14 @@ export function createUnattendedState() {
       exited.add(entry.promptID)
       live.delete(event.sessionID)
     },
-    async unattendedProfile(sessionID: string, requestAgent: string | undefined, sessionAgent: () => Promise<string>): Promise<UnattendedProfile | undefined> {
+    async unattendedProfile(
+      sessionID: string,
+      requestAgent: string | undefined,
+      sessionAgent: () => Promise<string>,
+    ): Promise<UnattendedProfile | undefined> {
       const entry = live.get(sessionID)
       if (!entry) return
-      const agent = requestAgent ?? await sessionAgent()
+      const agent = requestAgent ?? (await sessionAgent())
       return entry.agent !== undefined && entry.agent === agent && Object.hasOwn(AUTOMATION_PROFILES, agent)
         ? AUTOMATION_PROFILES[agent as AutomationAgentID]
         : "none"

@@ -1,4 +1,3 @@
-import { UNATTENDED_DENIAL_KEY, type UnattendedDenial } from "../../../schema/src/codepuppy-unattended"
 // ADR-041 display snapshot on OpenCode 2 (lane seams I7b): `state.metadata.codepuppyDisplay` on a tool call.
 // Replaces packages/opencode/src/session/tool-display.ts and the processor.ts takeover that wrote `part.display`.
 //
@@ -9,6 +8,7 @@ import { UNATTENDED_DENIAL_KEY, type UnattendedDenial } from "../../../schema/sr
 //   · error     — a `Tool.Error`'s `metadata` (a denied call's error, or `execute.after` replacing `error`), merged
 //                 with the last progress snapshot by the session publisher.
 // The snapshot is written once per call from the facts at decision time and never overwritten (ADR-041 §4).
+import { UNATTENDED_DENIAL_KEY, type UnattendedDenial } from "../../../schema/src/codepuppy-unattended"
 import { Error as ToolError } from "@opencode/plugin/promise/tool"
 import { parseToolDisplaySnapshot, type ToolDisplaySnapshotV1 } from "../../../schema/src/tool-identity"
 import { classifyNetFailure, engineNetFailurePath } from "../../../schema/src/codepuppy-net-failure"

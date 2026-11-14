@@ -45,6 +45,7 @@ mock.module("./codepuppy-workdir", () => ({
 // engine-session-turn.ts 从 prompt → wait → 消息列表(新的在前)里读。替身照这个形状。
 mock.module("./engine-client", () => ({
   engineClient: () => ({
+    form: { list: async () => ({ data: [] }) },
     session: {
       create: async (args: unknown) => {
         // [#1592] 引擎建不出临时会话(2.x 客户端对非 2xx 抛 ClientError)。

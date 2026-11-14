@@ -1,19 +1,49 @@
 // #1699:真实权限服务、Promise 适配器与执行链;逻辑时钟不前进,Asked 事件与结局竞争。
+import { canonicalJsonDigest } from "./store"
 import { beforeAll, expect } from "bun:test"
 import path from "node:path"
 import type { Context } from "@opencode/plugin/promise/plugin"
-import { AUTOMATION_PROFILES, UNATTENDED_DENIAL_KEY, type UnattendedProfile } from "../../../schema/src/codepuppy-unattended"
+import {
+  AUTOMATION_PROFILES,
+  UNATTENDED_DENIAL_KEY,
+  type UnattendedProfile,
+} from "../../../schema/src/codepuppy-unattended"
 import { buildUnattendedLive } from "../../../ui-mac/src/main/codepuppy-sidecar-messages"
 import { registerPolicy } from "./index"
 import { createUnattendedState } from "./unattended"
-import { createToolPolicyStore, defaultPolicyBaseDir } from "./resolver"
-import { Bus, E, isolate, it, Location, Permission, Plugin, PluginHooks, promisePlugin, ROOT, seedProject, Session, Tool, mcpToolMark } from "./policy-host.cases"
+import { createToolPolicyStore, defaultPolicyBaseDir, mcpBindingEvidence } from "./resolver"
+import {
+  Bus,
+  E,
+  isolate,
+  it,
+  Location,
+  Permission,
+  Plugin,
+  PluginHooks,
+  promisePlugin,
+  ROOT,
+  seedProject,
+  Session,
+  Tool,
+  mcpToolMark,
+} from "./policy-host.cases"
 
 const { Effect, Exit, Cause, Deferred, Fiber } = E
 beforeAll(isolate)
 const allow = { action: "*", resource: "*", effect: "allow" as const }
 
-const setup = (selected: UnattendedProfile | undefined, options: { ask?: boolean; disabled?: boolean; changed?: boolean; sessionAsk?: boolean; laterAsk?: boolean; fixedDeny?: boolean } = {}) =>
+const setup = (
+  selected: UnattendedProfile | undefined,
+  options: {
+    ask?: boolean
+    disabled?: boolean
+    changed?: boolean
+    sessionAsk?: boolean
+    laterAsk?: boolean
+    fixedDeny?: boolean
+  } = {},
+) =>
   Effect.gen(function* () {
     const location = yield* Location.Service
     const plugins = yield* Plugin.Service
@@ -36,57 +66,112 @@ const setup = (selected: UnattendedProfile | undefined, options: { ask?: boolean
       }),
       promisePlugin("unattended-mcp", async (ctx: Context) => {
         await ctx.tool.transform((editor) => {
-          for (const name of ["write", "code_write"]) editor.add({
-            name, description: "真实副作用计数", input: { type: "object", properties: {} },
-            options: { namespace: "unattended", codemode: name === "code_write" },
-            ...mcpToolMark("unattended", name),
-            execute: async () => { counts.writes++; return { content: "written" } },
-          })
+          for (const name of ["write", "code_write"])
+            editor.add({
+              name,
+              description: "真实副作用计数",
+              input: { type: "object", properties: {} },
+              options: { namespace: "unattended", codemode: name === "code_write" },
+              ...mcpToolMark("unattended", name),
+              execute: async () => {
+                counts.writes++
+                return { content: "written" }
+              },
+            })
         })
-        if (options.laterAsk) await ctx.permission.hook("evaluate", (event) => { if (event.action === "later-ask") event.effect = "ask" })
+        if (options.laterAsk)
+          await ctx.permission.hook("evaluate", (event) => {
+            if (event.action === "later-ask") event.effect = "ask"
+          })
       }),
     ])
     yield* plugins.awaitActivation
     yield* seedProject
     const sessions = yield* Session.Service
-    const session = yield* sessions.create({ location: { directory: location.directory }, agent,
-      ...(options.sessionAsk ? { permissions: [{ action: "mcp:unattended:write", resource: "*", effect: "ask" }] } : {}),
-      ...(options.fixedDeny ? { permissions: ["read", "subagent", "external_directory"].map((action) => ({ action, resource: "*", effect: "deny" })) } : {}),
+    const session = yield* sessions.create({
+      location: { directory: location.directory },
+      agent,
+      ...(options.sessionAsk
+        ? { permissions: [{ action: "mcp:unattended:write", resource: "*", effect: "ask" }] }
+        : {}),
+      ...(options.fixedDeny
+        ? {
+            permissions: ["read", "subagent", "external_directory"].map((action) => ({
+              action,
+              resource: "*",
+              effect: "deny",
+            })),
+          }
+        : {}),
     } as never)
-    const store = createToolPolicyStore({ baseDir: defaultPolicyBaseDir(path.join(ROOT, "data", "opencode")), account: () => account, workspace: () => location.directory })
-    if (options.ask || options.disabled || options.changed) yield* Effect.promise(() => store.setRecord({
-      selector: { level: "service", source: "mcp", origin: "unattended" },
-      state: options.disabled ? "disabled" : options.changed ? "enabled" : "ask",
-      ...(options.changed ? { bindingDigest: `sha256:${"0".repeat(64)}` } : {}),
-    }))
-    if (selected !== undefined) state.install(buildUnattendedLive({ seq: 1, nonce: "host-nonce", sessions: [{ sessionID: session.id, promptID: "msg_owned", ...(selected === "none" ? {} : { agent }) }] }))
+    const store = createToolPolicyStore({
+      baseDir: defaultPolicyBaseDir(path.join(ROOT, "data", "opencode")),
+      account: () => account,
+      workspace: () => location.directory,
+    })
+    if (selected !== undefined)
+      state.install(
+        buildUnattendedLive({
+          seq: 1,
+          nonce: "host-nonce",
+          sessions: [{ sessionID: session.id, promptID: "msg_owned", ...(selected === "none" ? {} : { agent }) }],
+        }),
+      )
     const hooks = yield* PluginHooks.Service
-    yield* hooks.trigger("session", "prompt", { sessionID: session.id, messageID: "msg_owned", prompt: { text: "go" }, delivery: "queue" } as never)
+    yield* hooks.trigger("session", "prompt", {
+      sessionID: session.id,
+      messageID: "msg_owned",
+      prompt: { text: "go" },
+      delivery: "queue",
+    } as never)
     const asked = yield* Deferred.make()
     const bus = yield* Bus.Service
-    const unsubscribe = yield* bus.listen((event: { type: string }) => event.type === "permission.asked" ? Deferred.succeed(asked, "asked").pipe(Effect.asVoid) : Effect.void)
+    const unsubscribe = yield* bus.listen((event: { type: string }) =>
+      event.type === "permission.asked" ? Deferred.succeed(asked, "asked").pipe(Effect.asVoid) : Effect.void,
+    )
     yield* Effect.addFinalizer(() => unsubscribe)
     const registry = yield* Tool.Service
     const snapshot = yield* registry.snapshot([allow])
-    const execute = (name = "unattended_write", input: unknown = {}) => snapshot.execute({
-      sessionID: session.id, agent, messageID: "msg_owned",
-      call: { type: "tool-call", id: `call_${crypto.randomUUID()}`, name, input },
-    }).pipe(Effect.exit)
+    // 先拿到真实工具清单再改策略,覆盖已选出工具随后被停用的竞态。
+    if (options.ask || options.disabled || options.changed)
+      yield* Effect.promise(() =>
+        store.setRecord({
+          selector: { level: "service", source: "mcp", origin: "unattended" },
+          state: options.disabled ? "disabled" : options.changed ? "enabled" : "ask",
+          ...(options.changed
+            ? {
+                bindingDigest: canonicalJsonDigest(
+                  mcpBindingEvidence("unattended", { type: "remote", url: "http://127.0.0.1:2/mcp" }),
+                ),
+              }
+            : {}),
+        }),
+      )
+    const execute = (name = "unattended_write", input: unknown = {}) =>
+      snapshot
+        .execute({
+          sessionID: session.id,
+          agent,
+          messageID: "msg_owned",
+          call: { type: "tool-call", id: `call_${crypto.randomUUID()}`, name, input },
+        })
+        .pipe(Effect.exit)
     const immediate = (operation = execute()) => Effect.raceFirst(operation, Deferred.await(asked))
     return { session, agent, counts, execute, immediate, store, snapshot, state, asked }
   })
 
-for (const ask of [false, true]) it.effect(`标准档${ask ? "每次询问" : "默认询问"}的 MCP 工具直接执行,零 Asked`, () =>
-  Effect.gen(function* () {
-    const host = yield* setup("standard", { ask })
-    const result = yield* host.immediate()
-    expect(result).not.toBe("asked")
-    expect(Exit.isSuccess(result)).toBe(true)
-    expect(host.counts.writes).toBe(1)
-    const permission = yield* Permission.Service
-    expect(yield* permission.list()).toEqual([])
-  }),
-)
+for (const ask of [false, true])
+  it.effect(`标准档${ask ? "每次询问" : "默认询问"}的 MCP 工具直接执行,零 Asked`, () =>
+    Effect.gen(function* () {
+      const host = yield* setup("standard", { ask })
+      const result = yield* host.immediate()
+      expect(result).not.toBe("asked")
+      expect(Exit.isSuccess(result)).toBe(true)
+      expect(host.counts.writes).toBe(1)
+      const permission = yield* Permission.Service
+      expect(yield* permission.list()).toEqual([])
+    }),
+  )
 
 for (const item of [
   { profile: "readonly" as const, options: {}, reason: "readonly" },
@@ -95,23 +180,32 @@ for (const item of [
   { profile: "standard" as const, options: { changed: true }, reason: "needs-confirmation" },
   { profile: "standard" as const, options: { sessionAsk: true }, reason: "refused" },
   { profile: "none" as const, options: { ask: true }, reason: "refused" },
-]) it.effect(`${item.profile} ${JSON.stringify(item.options)} 立即具名拒绝,没有计时器推进或副作用`, () =>
-  Effect.gen(function* () {
-    const host = yield* setup(item.profile, item.options)
-    const result = yield* host.immediate()
-    expect(result).not.toBe("asked")
-    expect(Exit.isFailure(result)).toBe(true)
-    const failure = Cause.squash(result.cause) as InstanceType<typeof Tool.Error>
-    expect(failure.metadata?.[UNATTENDED_DENIAL_KEY]).toMatchObject({ version: 1, reason: item.reason, tool: "write" })
-    expect(host.counts.writes).toBe(0)
-  }),
-)
+])
+  it.effect(`${item.profile} ${JSON.stringify(item.options)} 立即具名拒绝,没有计时器推进或副作用`, () =>
+    Effect.gen(function* () {
+      const host = yield* setup(item.profile, item.options)
+      const result = yield* host.immediate()
+      expect(result).not.toBe("asked")
+      expect(Exit.isFailure(result)).toBe(true)
+      const failure = Cause.squash(result.cause) as InstanceType<typeof Tool.Error>
+      expect(failure.metadata?.[UNATTENDED_DENIAL_KEY]).toMatchObject({
+        version: 1,
+        reason: item.reason,
+        tool: "write",
+      })
+      expect(host.counts.writes).toBe(0)
+    }),
+  )
 
 it.effect("none 档初值 allow 被后续钩子改 ask 仍立即拒绝,无工具调用的断言同样不等人", () =>
   Effect.gen(function* () {
     const host = yield* setup("none", { laterAsk: true })
     const permission = yield* Permission.Service
-    const result = yield* host.immediate(permission.assert({ sessionID: host.session.id, action: "later-ask", resources: ["*"], save: [], metadata: {} }).pipe(Effect.exit))
+    const result = yield* host.immediate(
+      permission
+        .assert({ sessionID: host.session.id, action: "later-ask", resources: ["*"], save: [], metadata: {} })
+        .pipe(Effect.exit),
+    )
     expect(result).not.toBe("asked")
     expect(Exit.isFailure(result)).toBe(true)
     expect(yield* permission.list()).toEqual([])
@@ -121,7 +215,9 @@ it.effect("none 档初值 allow 被后续钩子改 ask 仍立即拒绝,无工具
 it.effect("Code Mode 子调用的第一条拒绝补在外层成功终态上", () =>
   Effect.gen(function* () {
     const host = yield* setup("readonly")
-    const result = yield* host.immediate(host.execute("execute", { code: "return await tools.unattended.code_write({})" }))
+    const result = yield* host.immediate(
+      host.execute("execute", { code: "return await tools.unattended.code_write({})" }),
+    )
     expect(result).not.toBe("asked")
     expect(Exit.isSuccess(result)).toBe(true)
     expect(result.value.metadata?.[UNATTENDED_DENIAL_KEY]).toMatchObject({ reason: "readonly", tool: "code_write" })
@@ -147,8 +243,20 @@ it.effect("未登记的询问档产生 Asked 并保持等待,人工批准后才�
 it.effect("外来输入退出后旧快照不能重新授予自动化语义", () =>
   Effect.gen(function* () {
     const host = yield* setup("standard", { ask: true })
-    host.state.preparePrompt({ sessionID: host.session.id, messageID: "msg_foreign" })
-    host.state.install(buildUnattendedLive({ seq: 2, nonce: "next", sessions: [{ sessionID: host.session.id, agent: host.agent, promptID: "msg_owned" }] }))
+    const hooks = yield* PluginHooks.Service
+    yield* hooks.trigger("session", "prompt", {
+      sessionID: host.session.id,
+      messageID: "msg_foreign",
+      prompt: { text: "foreign input" },
+      delivery: "queue",
+    } as never)
+    host.state.install(
+      buildUnattendedLive({
+        seq: 2,
+        nonce: "next",
+        sessions: [{ sessionID: host.session.id, agent: host.agent, promptID: "msg_owned" }],
+      }),
+    )
     const result = yield* host.immediate()
     expect(result).toBe("asked")
     const permission = yield* Permission.Service
@@ -158,24 +266,90 @@ it.effect("外来输入退出后旧快照不能重新授予自动化语义", () 
   }),
 )
 
-it.effect("只读档已启用工具照旧执行;配置 deny 在不推进时钟时拒绝", () =>
-  Effect.gen(function* () {
-    const readonly = yield* setup("readonly")
-    yield* Effect.promise(() => readonly.store.setRecord({ selector: { level: "class", class: "third-party-mcp" }, state: "enabled" }))
-    expect(Exit.isSuccess(yield* readonly.immediate())).toBe(true)
-    expect(readonly.counts.writes).toBe(1)
-  }),
-)
+for (const selected of ["readonly", "standard"] as const)
+  it.effect(`${selected} 已启用的 MCP 工具照旧执行`, () =>
+    Effect.gen(function* () {
+      const host = yield* setup(selected)
+      yield* Effect.promise(() =>
+        host.store.setRecord({ selector: { level: "class", class: "third-party-mcp" }, state: "enabled" }),
+      )
+      expect(Exit.isSuccess(yield* host.immediate())).toBe(true)
+      expect(host.counts.writes).toBe(1)
+    }),
+  )
 
 it.effect("AC-04 配置禁止的读文件、子任务和项目外目录无计时等待", () =>
   Effect.gen(function* () {
     const host = yield* setup("standard", { fixedDeny: true })
     const permission = yield* Permission.Service
-    for (const [action, resource] of [["read", ".env"], ["subagent", "general"], ["external_directory", "/outside/*"]]) {
-      const result = yield* host.immediate(permission.assert({ sessionID: host.session.id, action, resources: [resource], save: [], metadata: {} }).pipe(Effect.exit))
+    for (const [action, resource] of [
+      ["read", ".env"],
+      ["subagent", "general"],
+      ["external_directory", "/outside/*"],
+    ]) {
+      const result = yield* host.immediate(
+        permission
+          .assert({ sessionID: host.session.id, action, resources: [resource], save: [], metadata: {} })
+          .pipe(Effect.exit),
+      )
       expect(result).not.toBe("asked")
       expect(Exit.isFailure(result)).toBe(true)
     }
+    expect(host.counts.writes).toBe(0)
+  }),
+)
+
+for (const selected of ["standard", "readonly", "none"] as const)
+  it.effect(`${selected} 无工具调用的同类断言复用 T1,零 Asked`, () =>
+    Effect.gen(function* () {
+      const host = yield* setup(selected, { ask: true })
+      const permission = yield* Permission.Service
+      const result = yield* host.immediate(
+        permission
+          .assert({ sessionID: host.session.id, action: "unattended_write", resources: ["*"], save: [], metadata: {} })
+          .pipe(Effect.exit),
+      )
+      expect(result).not.toBe("asked")
+      expect(Exit.isSuccess(result)).toBe(selected === "standard")
+      expect(host.counts.writes).toBe(0)
+    }),
+  )
+
+it.effect("在册会话切换 agent 后仅按 none 拒绝,缺省 agent 也读真实当前会话", () =>
+  Effect.gen(function* () {
+    const host = yield* setup("standard", { ask: true })
+    const sessions = yield* Session.Service
+    yield* sessions.switchAgent({ sessionID: host.session.id, agent: "build" })
+    const current = yield* sessions.get(host.session.id)
+    const result = yield* host.immediate(
+      host.snapshot
+        .execute({
+          sessionID: host.session.id,
+          agent: current.agent,
+          messageID: "msg_owned",
+          call: { type: "tool-call", id: "call_switched", name: "unattended_write", input: {} },
+        })
+        .pipe(Effect.exit),
+    )
+    expect(result).not.toBe("asked")
+    expect(Exit.isFailure(result)).toBe(true)
+    expect(
+      (Cause.squash(result.cause) as InstanceType<typeof Tool.Error>).metadata?.[UNATTENDED_DENIAL_KEY],
+    ).toMatchObject({ reason: "refused" })
+    const permission = yield* Permission.Service
+    const noAgent = yield* host.immediate(
+      permission
+        .assert({
+          sessionID: host.session.id,
+          action: "unattended_write",
+          resources: ["*"],
+          save: [],
+          metadata: {},
+        })
+        .pipe(Effect.exit),
+    )
+    expect(noAgent).not.toBe("asked")
+    expect(Exit.isFailure(noAgent)).toBe(true)
     expect(host.counts.writes).toBe(0)
   }),
 )

@@ -381,9 +381,16 @@ export type UnattendedLive = {
 export type UnattendedAck = { type: "codepuppy.unattended.ack"; seq: number; nonce: string }
 
 export function buildUnattendedLive(input: Omit<UnattendedLive, "type">): UnattendedLive {
-  return { type: "codepuppy.unattended.live", seq: input.seq, nonce: input.nonce, sessions: input.sessions.map((entry) => ({
-    sessionID: entry.sessionID, promptID: entry.promptID, ...(entry.agent === undefined ? {} : { agent: entry.agent }),
-  })) }
+  return {
+    type: "codepuppy.unattended.live",
+    seq: input.seq,
+    nonce: input.nonce,
+    sessions: input.sessions.map((entry) => ({
+      sessionID: entry.sessionID,
+      promptID: entry.promptID,
+      ...(entry.agent === undefined ? {} : { agent: entry.agent }),
+    })),
+  }
 }
 export function parseUnattendedLive(value: unknown): UnattendedLive | undefined {
   if (!isRecord(value) || value.type !== "codepuppy.unattended.live" || !isId(value.seq) || !isText(value.nonce)) return
@@ -392,7 +399,11 @@ export function parseUnattendedLive(value: unknown): UnattendedLive | undefined 
   for (const entry of value.sessions) {
     if (!isRecord(entry) || !isText(entry.sessionID) || !isText(entry.promptID)) return
     if (entry.agent !== undefined && !isText(entry.agent)) return
-    sessions.push({ sessionID: entry.sessionID, promptID: entry.promptID, ...(typeof entry.agent === "string" ? { agent: entry.agent } : {}) })
+    sessions.push({
+      sessionID: entry.sessionID,
+      promptID: entry.promptID,
+      ...(typeof entry.agent === "string" ? { agent: entry.agent } : {}),
+    })
   }
   return buildUnattendedLive({ seq: value.seq, nonce: value.nonce, sessions })
 }

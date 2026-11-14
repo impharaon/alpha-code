@@ -1,4 +1,3 @@
-import { AUTOMATION_DEFAULTS } from "../shared/automation-types"
 // #607:注入组合体的执行级可测面。injectCodePuppyConfig 与 materializeV2EngineConfig 从
 // sidecar.ts 逐字搬来(含那层函数级 catch)。#613:catch 仍在(裸崩溃是票面明令禁止的另一种谎),
 // 但失败不再只是进程内一行 warn —— 结果作为返回值交给 sidecar.ts,随 ready IPC 上报 main,
@@ -13,6 +12,7 @@ import { AUTOMATION_DEFAULTS } from "../shared/automation-types"
 // 正向闸门锁 model/enabled_providers/provider/三个 alpha agent/{file:} ref,反向闸门锁 catch 的
 // 真实爆炸半径 + 失败必须出声)。
 
+import { AUTOMATION_DEFAULTS } from "../shared/automation-types"
 import * as fs from "node:fs"
 import * as path from "node:path"
 // `#1299`(REQ-157):三个 alpha agent 的 description / prompt 是 alpha 的字,住在零依赖的

@@ -1,7 +1,3 @@
-import { AUTOMATION_PROFILES, type AutomationAgentID } from "@opencode/schema/codepuppy-unattended"
-import { readAutomationDenial } from "./automation-run-outcome"
-import { SessionMessage } from "@opencode/schema/session-message"
-import { unattendedRuns } from "./codepuppy-unattended"
 // 自动化调度器(REQ-021 A1.3/A1.4/A1.6,ADR-022)—— Electron 主进程,每任务单 timer:
 // 算下次触发 → setTimeout → 执行 → 重排。应用未运行不执行(UI 明示,不装后台常驻);
 // powerMonitor resume + 半小时兜底 tick 重算(睡眠错过按 catchUpPolicy:skip 丢弃);
@@ -11,6 +7,11 @@ import { unattendedRuns } from "./codepuppy-unattended"
 // (agent=codepuppy-automation readonly 档,阻塞到回复完成)→ 最终回复落 report.md + status.json
 // 进目标项目 .codepuppy/runs/auto-<id>-<ts>/(codepuppy-workdir 守卫)。超 maxDurationMin 中断(abort)。
 
+import { AUTOMATION_PROFILES, elicitationCopy, type AutomationAgentID } from "@opencode/schema/codepuppy-unattended"
+import { readAutomationDenial } from "./automation-run-outcome"
+import { watchAutomationElicitations } from "./automation-elicitation"
+import { SessionMessage } from "@opencode/schema/session-message"
+import { unattendedRuns } from "./codepuppy-unattended"
 import { join } from "node:path"
 import { BrowserWindow, Notification, powerMonitor } from "electron"
 // CLIENT subpath(纯 fetch,main 的 Node 环境同样适用;v2 barrel 的 Node-only 依赖问题是 renderer 限定)
@@ -255,6 +256,7 @@ async function executeTask(task: AutomationTask): Promise<AutomationRunRecord> {
   let sessionID: string | undefined
   let timedOut = false
   let notReady = false
+  let elicitation: ReturnType<typeof watchAutomationElicitations> | undefined
   const controller = new AbortController()
   const killer = setTimeout(
     () => {
@@ -292,9 +294,12 @@ async function executeTask(task: AutomationTask): Promise<AutomationRunRecord> {
       await client.session.remove({ sessionID }).catch(() => {})
       throw new Error("automation run not ready")
     }
+    elicitation = watchAutomationElicitations(client, directory)
     const reply = await promptAndWait(client, { sessionID, text: task.prompt, id: promptID }, controller.signal)
 
-    const denial = await readAutomationDenial(client, sessionID, profile)
+    await elicitation.stop()
+    const denial = await readAutomationDenial(client, sessionID, profile, controller.signal)
+    controller.signal.throwIfAborted()
     const status = denial ? "failed" as const : "ok" as const
     const finishedAt = new Date().toISOString()
     const runId = `auto-${task.id}-${runTimestamp(new Date(started))}`
@@ -319,11 +324,12 @@ async function executeTask(task: AutomationTask): Promise<AutomationRunRecord> {
       summary: denial ?? firstLine.slice(0, 120),
     }
   } catch (error) {
+    await elicitation?.stop()
+    const denial = !timedOut && !notReady && sessionID ? await readAutomationDenial(client, sessionID, profile, controller.signal) : undefined
     const status = timedOut ? "timeout" : "failed"
-    const denial = !timedOut && !notReady && sessionID ? await readAutomationDenial(client, sessionID, profile) : undefined
     const summary = timedOut
       ? `超过 ${task.budget.maxDurationMin} 分钟,已中断`
-      : denial ?? (error instanceof Error ? error.message.slice(0, 300) : String(error).slice(0, 300))
+      : denial ?? (elicitation?.connector ? elicitationCopy(elicitation.connector) : error instanceof Error ? error.message.slice(0, 300) : String(error).slice(0, 300))
     // 失败也留痕(best-effort):status.json 进 run 目录,方便详情页回溯。
     const runId = `auto-${task.id}-${runTimestamp(new Date(started))}`
     const saved = writeRunFiles(directory, runId, {
@@ -343,6 +349,7 @@ async function executeTask(task: AutomationTask): Promise<AutomationRunRecord> {
       summary,
     }
   } finally {
+    await elicitation?.stop()
     if (sessionID) unattendedRuns.unregister(sessionID)
     clearTimeout(killer)
   }

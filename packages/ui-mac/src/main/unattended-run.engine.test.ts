@@ -10,7 +10,11 @@ test("无人值守运行的真实入口证据(unattended-run.engine.cases.ts)", 
     stdout: "pipe",
     stderr: "pipe",
   })
-  const [stdout, stderr, code] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
+  const [stdout, stderr, code] = await Promise.all([
+    new Response(child.stdout).text(),
+    new Response(child.stderr).text(),
+    child.exited,
+  ])
   const output = `${stdout}${stderr}`
   if (code !== 0) throw new Error(output)
   expect(output.match(/(\d+) fail\b/)?.[1], output).toBe("0")

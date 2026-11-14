@@ -1,9 +1,9 @@
-import { SessionMessage } from "@opencode/schema/session-message"
-import { unattendedRuns } from "./codepuppy-unattended"
 // REQ-024(A2)—— LLM 辅助解析:一句话 → {name, schedule, prompt}。只在确定性规则
 // (shared/automation-nl.ts)解析不出时由用户显式点击触发(省 token);临时会话一次抽取后即删,
 // 不污染会话列表。执行链只走 SDK(ADR-002);预览确认流不变 —— LLM 产物只是填表,存前仍过
 // 存储层硬校验(interval 下限/档位白名单)。
+import { SessionMessage } from "@opencode/schema/session-message"
+import { unattendedRuns } from "./codepuppy-unattended"
 import { engineClient } from "./engine-client"
 import { promptAndWait } from "./engine-session-turn"
 import type { AutomationParseErrorCode, AutomationSchedule } from "../shared/automation-types"

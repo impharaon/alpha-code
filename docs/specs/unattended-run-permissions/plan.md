@@ -131,8 +131,29 @@ PLAN 验证只做文件/diff 的只读检查并提交本文件。实现后的全
 - 单元 2:C1 2、C2 消息 10 / 登记簿 4 / hub-view 18 / wiring 6、C3 bridge 6 / state+T2 3、C4 现有策略 68 / RPC 5 / risk 22 / inventory 5 / setup 1、C7 turn 2 / moderation 1 / 注入 25 / 注入引擎 1、C8 20 pass,均退出 0。AC-07 单独运行 `cd packages/ui-mac && bun test --only-failures ./src/main/unattended-run.engine.cases.ts -t AC-07` 为 1 pass / 0 fail(2 filtered out),退出 0,红例断言未改。三个包 typecheck 均退出 0;schema 的新测试曾因 `.js` 后缀和字面量推断报类型错误,已在本单元修正。AC-01/02 的 T1 放行留给单元 3。
 - 单元 3:C4 新策略 14、既有策略 68 / RPC 5 / risk 22 / inventory 5、C3 state/终态 4、C6 outcome 4、C5 宿主 1(子进程 9)、C7 moderation 1 pass,索引命令加 `--only-failures`,均退出 0;ext/ui-mac `bun typecheck` 退出 0。C5 的 AC-01/02/07 原红断言未改,新增 AC-03/04/06/08 和 U-3 的持久化证据;D1 在 TestClock 不前进时通过。真实消息样本含 8 个场景及实际游标,已固化为同段 JSON 夹具。分页请求误带 order 的中间失败已修正,跨页测试会直接拒绝该已知坏请求。
 
+- 单元 4:C1 2、C2 消息 10 / 登记簿 4、C3 bridge 6 / state+T2+外层错误 4、C4 新策略 19 / 既有策略 68 / ask-deadline 5、C5 宿主 1(子进程 14,89 个断言)、C6 outcome 5 / elicitation 5、C7 moderation 1、C9 registry 5 pass,相应索引命令退出均为 0;本单元未影响的 C2/C4/C7/C8 证据继承单元 2/3。三个包最终 `bun typecheck` 均退出 0。另用 `cd packages/ui-mac && bun test --timeout 90000 ./src/main/unattended-run.engine.cases.ts` 捕获真实消息/表单,退出 0;JSON 含 8 个运行场景、3 个实际表单及与最终生产文件一致的 SHA-256。原 AC-01/02/07 红例除排版外逐项比对相同。`git diff --check` 退出 0,实际差异核对无上游/新 takeover/排除文件改动。
+
+逐 AC 的最终执行回执(下面 C4/C5/C6 均使用上方命令索引的包工作目录;实际测试命令加 `--only-failures`,不改变选择范围):
+
+| AC | 实际测试名称与证据 | 命令及结果 |
+| --- | --- | --- |
+| AC-01 | C4「标准档默认询问的 MCP 工具直接执行,零 Asked」「standard 已启用的 MCP 工具照旧执行」;C5「AC-01 标准档默认询问的连接器成功写入运行记录,零 Asked」。 | C4 `bun test --only-failures src/policy/unattended-policy.test.ts` 19 pass,退出 0;C5 `bun test --only-failures src/main/unattended-run.engine.test.ts` 1 pass(子进程 14 pass),退出 0。 |
+| AC-02 | C4「标准档每次询问的 MCP 工具直接执行,零 Asked」;C5「AC-02 每次询问的同一连接器在自动化里成功,零 Asked」。 | 同 C4/C5 命令,均退出 0。 |
+| AC-08 | C4「standard {"disabled":true} 立即具名拒绝,没有计时器推进或副作用」「standard {"changed":true} 立即具名拒绝,没有计时器推进或副作用」,工具先选出再改 store;C5「AC-08 来源变化拒绝经过 Code Mode 外层成功终态进入运行记录」。 | 同 C4/C5 命令,均退出 0;D1 不推进 TestClock,实际 MCP 日志无新增。 |
+| AC-03 | C4 readonly 默认/每次询问两条即时拒绝;C5「AC-03 只读拒绝后模型正常收尾,运行仍记失败且保留报告」「AC-03 回合失败仍投影先前拒绝,优先于模型错误」。 | 同 C4/C5 命令,均退出 0;D1,磁盘 error 与 summary 同值。 |
+| AC-04 | C4「AC-04 配置禁止的读文件、子任务和项目外目录无计时等待」;C5「AC-04 敏感文件、子任务、项目外目录维持拒绝并写入原因」。 | 同 C4/C5 命令,均退出 0;D1 与三条真实工具 `permission.rejected`/磁盘原因互证。 |
+| AC-05 | C6「最不利轮询相位仍在虚拟 250 ms 取消表单,global 请求带项目位置」;C5「AC-05 项目 MCP form 和 URL 补充信息均收到真实 cancel,任务继续」「AC-05 取消后回合失败时用连接器名写运行原因」。 | C6 `bun test --only-failures src/main/automation-elicitation.test.ts` 5 pass,退出 0;同 C5 命令退出 0;D2 在逻辑 250 ms 取消完成,真实 SDK 返回 cancel。 |
+| AC-06 | C4「未登记的询问档产生 Asked 并保持等待,人工批准后才执行」「外来输入退出后旧快照不能重新授予自动化语义」「在册会话切换 agent 后仅按 none 拒绝,缺省 agent 也读真实当前会话」;C5 询问档与「AC-06 运行后续聊、真实分叉和子会话不继承无人值守权限」。 | 同 C4/C5 命令均退出 0;`bun test --only-failures src/policy/ask-deadline.test.ts` 5 pass,退出 0。 |
+| AC-07 | C4「none 档初值 allow 被后续钩子改 ask 仍立即拒绝,无工具调用的断言同样不等人」;C5 原 AC-07 红例、无通道时解析 unavailable 且不发 prompt/删空会话。 | 同 C4/C5 命令均退出 0;D1。C2 登记簿的错误 seq/nonce、20 s 虚拟超时与 abort 判据 4 pass,退出 0。 |
+
 ### 偏离记录
 
-2026-11-14 · 单元 3 在既定 `policy/index.ts` 内同步 `session.get` 的实际返回形状:该方法直接返回会话,原 `.data.permissions` 会漏掉会话配置的 ask;agent.get 仍使用它实际具有的 `.data` 外壳。新增的「sessionAsk 立即拒绝」真实策略测试证明此读取属于本票调用链所必需,不改合同或上游文件。
+2026-11-14 · 在既定 `policy/index.ts` 内同步在册 T1 的 `session.get` 实际返回形状:该方法直接返回会话,原 `.data.permissions` 会漏掉会话配置的 ask;agent.get 仍使用它实际具有的 `.data` 外壳。单元 4 将这次读取限定于在册分支,未登记分支保留原读取路径,遵守 I-4/AC-06。新增的「standard {"sessionAsk":true} 立即具名拒绝」与真实切换 agent 测试证明本票路径需要实际会话字段,不改合同或上游文件。
 
 2026-11-14 · AC-04 的 subagent 真实引擎夹具仅将工具清单筛选动作改为测试名,使已被清单隐藏的真实 SubagentTool 到达其原始 `subagent` 权限断言;自动化载体 deny 和工具实现均未改,断言未放宽。与 C4 的无计时器权限断言共同证明 AC-04。原红回归的三条用例和断言保持不变,同一 `.cases.ts` 只追加证据和沙箱样本导出。
+
+2026-11-14 · 单元 4 给消息投影传入本次既有 AbortSignal,并在投影完成后再判定超时优先级,避免新增读取拖过任务期限;没有新期限或配置。补充信息测试使用真实 SDK 的 form/URL 和真实取消回执;模型 400 仅在沙箱内制造回合失败。新增/修改文件均在原「改动」表,其余变化为本票新增代码的排版与导入位置整理。
+
+遗留去向:`packages/ext/src/policy/index.ts:123` — 未登记分支沿用原 `.data.permissions` 读取,而 `session.get` 实际直接返回会话;本票按 I-4 保留原行为,建议编排器转原意图项另行核对,不在本票修复。
+
+实际交付规模:39 个文件(其中真实消息/表单 JSON 约 1,200 行,新增测试占主要篇幅);实施 12:30—13:33 UTC,约 63 分钟,在 100 分钟预算内。不涉及迁移。最终采用单段、四个顺序提交单元,没有增加设计分片。

@@ -34,6 +34,7 @@ import {
 } from "@opencode/schema/codepuppy-project-config"
 import { ConfigNormalize } from "./normalize.js"
 import { ConfigMarkdown } from "./markdown.js"
+import { PluginSourceDirectory } from "../plugin/source-directory.js"
 
 // ── 契约 B 的名单(只有名字;v1 / v2 两种写法都按名字认)──────────────────────────────────────────────────────
 // 未允许也生效的顶层键。`attachment` 是 `media` 的 v1 写法(编排器裁决 2026-11-13,随 design §4 表补行)。
@@ -248,7 +249,7 @@ export function interpolation(
     kind: "command-run",
     name,
     file: filepath === undefined ? "" : relativeFile(directory, filepath),
-    fields: ["!`…`"],
+    fields: ["shell"],
   })
   return true
 }
@@ -298,6 +299,7 @@ const passThrough: Generation = {
 export const begin = Effect.fnUntraced(function* (input: { readonly directory: string; readonly home: string }) {
   const hook = installed
   if (!hook) return passThrough
+  const fs = yield* FSUtil.Service
   const directory = realpathOr(input.directory)
   const home = realpathOr(input.home)
   let trusted = false
@@ -405,6 +407,14 @@ export const begin = Effect.fnUntraced(function* (input: { readonly directory: s
       return [gateDocument]
     },
     finish: Effect.fnUntraced(function* (entries: Entry[]) {
+      if (!trusted) {
+        for (const root of roots) {
+          for (const target of yield* PluginSourceDirectory.discover(fs, root)) {
+            const relative = file(target)
+            withheld.push({ kind: "plugin", name: relative, file: relative })
+          }
+        }
+      }
       if (!trusted)
         for (const entry of entries)
           if ((entry.type === "document" && entry.path !== undefined && processed.has(entry.path)) || (entry.type === "directory" && roots.includes(entry.path)))

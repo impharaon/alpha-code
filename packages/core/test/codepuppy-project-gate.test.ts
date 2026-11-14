@@ -247,7 +247,7 @@ describe("#1713 项目 OpenCode 配置的装载闸", () => {
           kind: "command-run",
           name: "review",
           file: ".opencode/commands/review.md",
-          fields: ["agent", "model", "subtask", "variant", "!`…`"],
+          fields: ["agent", "model", "subtask", "variant", "shell"],
         })
         const directory = (p: string) => Skill.DirectorySource.make({ type: "directory", path: AbsolutePath.make(p) })
         const local = directory(path.join(f.project, ".opencode/skills"))

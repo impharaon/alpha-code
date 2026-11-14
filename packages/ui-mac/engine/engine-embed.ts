@@ -30,6 +30,8 @@ declare const OPENCODE_VERSION: string | undefined
 /** 引擎包的版本:构建期由上游 Node 构建配置的 `define` 写入;bun 直接跑源码(测试)时没有。 */
 export const ENGINE_VERSION = typeof OPENCODE_VERSION === "string" ? OPENCODE_VERSION : "local"
 
+export const projectConfigView = CodePuppyProjectGate.view
+
 export type EngineServerOptions = Parameters<typeof start>[0]
 
 export type EmbeddedEngine = {

@@ -47,6 +47,10 @@ class RecordingChild extends EventEmitter {
     const type = (message as { type?: unknown }).type
     if (type === "start") queueMicrotask(() => this.emit("message", { type: "ready" }))
     if (type === "stop") queueMicrotask(() => this.emit("exit", 0))
+    if (type === "project-config-view") {
+      const command = message as { id: string; directory: string }
+      queueMicrotask(() => this.emit("message", { type: "project-config-view-reply", id: command.id, ok: true, view: { directory: command.directory, trusted: false, complete: true, points: { config: "done" }, withheld: [] } }))
+    }
     if (type === "write-probe") {
       const { id } = message as { id: number }
       queueMicrotask(() => this.emit("message", { type: "write-probe-result", id, outcome: "writable" }))
@@ -108,6 +112,7 @@ test("alpha.* 进 codepuppySidecar、应答回同一子进程;ready 之后才 at
   expect(child.wire.at(-1)).toEqual({ type: "codepuppy.hub.request.reply", id: 9, record: null })
 
   expect((await result.listener.probeWrite("/ws")).outcome).toBe("writable")
+  expect(await result.listener.projectConfigView("/ws")).toMatchObject({ directory: "/ws", complete: true })
   expect(received).toHaveLength(1)
 
   await result.listener.stop()
@@ -287,7 +292,7 @@ test("ANCHOR (not a gate): #1578 server.ts 写进 sidecar env 的随包扩展清
 // 引擎 import → 预载 ext 的目录入口 `server.js` → `start()`(Transform 里同步发布进程内 fetch)→ await 预载 → ready。
 test("ANCHOR (not a gate): sidecar.ts 在 start() 之前预载 ext 的目录入口,Transform 里发布进程内 fetch,ready 之前 await 预载", async () => {
   const source = await Bun.file(join(import.meta.dir, "sidecar.ts")).text()
-  const engine = source.indexOf('const { startEngine, ENGINE_VERSION } = await import("virtual:opencode-server")')
+  const engine = source.indexOf('const { startEngine, ENGINE_VERSION, projectConfigView } = await import("virtual:opencode-server")')
   const preload = source.indexOf('import(pathToFileURL(join(command.extPluginPath, "server.js")).href)')
   const started = source.indexOf("const started = await startEngine(")
   const handoff = source.indexOf("publishInProcessEngine(inProcess)")

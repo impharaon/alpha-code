@@ -47,7 +47,6 @@ import { publishProviderAllowList } from "../../../ext/src/provider-allow"
 import { skillGenerationLiveDirs } from "../../../ext/src/gen-skill-paths"
 import { explicitConfigPath, writeExplicitConfig, type ExplicitLayer, type ExplicitPolicy } from "./engine-explicit-config"
 import { enginePluginPolicies } from "./engine-plugin-policy"
-import { engineGlobalConfigDirectory } from "./engine-paths"
 import { applyPromptTakeover } from "../../../ext/src/codepuppy-prompts"
 
 // Inject alpha-code's customizations into opencode via OPENCODE_CONFIG_CONTENT. This env var is
@@ -669,7 +668,7 @@ export function injectCodePuppyConfig(
     const pluginPolicies = (userText: string | undefined) =>
       enginePluginPolicies({
         extPluginPath,
-        globalDirectory: engineGlobalConfigDirectory(process.env, os.homedir()),
+        globalDirectory: bootstrap.paths.engineConfigDirectory,
         home: engineHome(),
         ...(userText === undefined ? {} : { userConfig: { text: userText, directory: path.dirname(explicitFile) } }),
       })
@@ -708,7 +707,7 @@ export function injectCodePuppyConfig(
           ...governanceFloor(extPluginPath, bootstrap.switches.ecosystemInherit),
           policies: enginePluginPolicies({
             extPluginPath,
-            globalDirectory: engineGlobalConfigDirectory(process.env, os.homedir()),
+            globalDirectory: bootstrap.paths.engineConfigDirectory,
             home: engineHome(),
             ...(file && userText !== undefined ? { userConfig: { text: userText, directory: path.dirname(file) } } : {}),
           }).policies,

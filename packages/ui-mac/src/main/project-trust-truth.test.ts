@@ -3,6 +3,7 @@
 // import 闭包;以及项目里指向记录的符号链接不能让 main 往记录里写。真文件系统(临时目录),期望值手写字面量。
 
 import { afterEach, beforeEach, describe, expect, test } from "bun:test"
+import { publishTestBootstrap, unpublishTestBootstrap } from "../../test-component/codepuppy-bootstrap-fixture"
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join, resolve } from "node:path"
@@ -23,20 +24,17 @@ import { relativeImportClosure } from "./process-fence-write-sites"
 let root = ""
 let stateRoot = ""
 let record = ""
-let saved: string | undefined
 
 beforeEach(() => {
   __resetCodePuppyEnvironmentForTests()
-  saved = process.env.CODEPUPPY_GLOBAL_DIR
   root = realpathSync(mkdtempSync(join(tmpdir(), "project-trust-")))
   stateRoot = join(root, "codepuppy-state")
   mkdirSync(join(stateRoot, "env", "dev"), { recursive: true })
-  process.env.CODEPUPPY_GLOBAL_DIR = join(stateRoot, "env", "dev")
+  publishTestBootstrap({ globalRoot: join(stateRoot, "env", "dev") })
   record = join(stateRoot, "project-trust", "dev.json")
 })
 afterEach(() => {
-  if (saved === undefined) delete process.env.CODEPUPPY_GLOBAL_DIR
-  else process.env.CODEPUPPY_GLOBAL_DIR = saved
+  unpublishTestBootstrap()
   rmSync(root, { recursive: true, force: true })
 })
 
@@ -48,19 +46,19 @@ const project = (name: string) => {
 const quiet = () => {}
 
 describe("位置:只由 main 派生的根算出", () => {
-  test("`<casBaseRoot>/project-trust/<env>.json`;sidecar 的处境(无快照)由 CODEPUPPY_GLOBAL_DIR 逆映射,逐字等于手写路径", () => {
+  test("`<casBaseRoot>/project-trust/<env>.json`;sidecar 的处境(无快照)由启动文档 paths.globalRoot 逆映射,逐字等于手写路径", () => {
     expect(projectTrustTruthPath("/Users/u/Library/Application Support/codepuppy-state", "prod")).toBe(
       "/Users/u/Library/Application Support/codepuppy-state/project-trust/prod.json",
     )
     expect(locateProjectTrustTruth()).toEqual({ ok: true, path: record })
   })
 
-  test("CODEPUPPY_GLOBAL_DIR 不是 `<base>/env/<env>` ⇒ 位置未知:不读、不写,读出来就是一个项目都不信任", () => {
+  test("文档 paths.globalRoot 不是 `<base>/env/<env>` ⇒ 位置未知:不读、不写,读出来就是一个项目都不信任", () => {
     const me = project("p")
     expect(recordProjectTrustDecision(me, true, "2026-11-13T00:00:00.000Z", quiet)).toEqual({ ok: true })
     const odd = join(root, "odd-root")
     mkdirSync(odd)
-    process.env.CODEPUPPY_GLOBAL_DIR = odd
+    publishTestBootstrap({ globalRoot: odd })
     expect(locateProjectTrustTruth().ok).toBe(false)
     const lines: string[] = []
     expect(readProjectTrustEntry(me, (line) => lines.push(line))).toBeUndefined()

@@ -76,7 +76,7 @@ export function environmentMutableRoot(env: AppEnvironment, baseRoot: string): s
 }
 
 /**
- * `environmentMutableRoot` 的逆映射(`#1392`):sidecar 进程没有冻结快照,手里只有 main 派生给它的 `CODEPUPPY_GLOBAL_DIR`
+ * `environmentMutableRoot` 的逆映射(`#1392`):sidecar 进程没有冻结快照,从启动文档拿到 main 派生的 `paths.globalRoot`
  * = `<baseRoot>/env/<env>`;需要「状态根 + 环境名」的消费者(自定义节点真源 custom-provider-records.ts)从这里拿回来。
  * 形状不对(父目录不叫 `env`、末段不是三个环境名之一)⇒ undefined,不猜 —— 调用方按「位置未知」fail-closed。
  * 拓扑的文法只住在本文件:这里改了,上面那条也得跟着改。
@@ -95,7 +95,7 @@ export function environmentFromMutableRoot(mutableRoot: string): { environment: 
 export type CodePuppyStateBase = { ok: true; casBaseRoot: string; environment: AppEnvironment } | { ok: false; reason: string }
 
 /**
- * 「这个进程的状态根 + 环境名」(`#1392` / `#1381`):main 走冻结快照;sidecar(无快照)走 `CODEPUPPY_GLOBAL_DIR` 的逆映射
+ * 「这个进程的状态根 + 环境名」(`#1392` / `#1381`):main 走冻结快照;sidecar(无快照)走启动文档 `paths.globalRoot` 的逆映射
  * (environmentFromMutableRoot)。形状不对 ⇒ ok:false 且不猜 —— 调用方按「位置未知」fail-closed。`subject` 只进拒绝理由
  * (哪个真源的位置未知),两个真源(custom-providers / mcp-servers)共用这一份解析,不各自抄一遍。
  */
@@ -109,7 +109,7 @@ export function resolveCodePuppyStateBase(subject: string): CodePuppyStateBase {
     // (project-trust-truth-fence.test.ts 实测);沿 realpath 推出的状态根就落进伪造的那一份。main 派生的值本来就是 canonical,
     // 按字面推出的 `<casBaseRoot>/<真源>/<env>.json` 不经过 `env/<env>`,每一级祖先都不在可写集里。
     resolveCodePuppyGlobalRoot()
-    root = normalize(process.env.CODEPUPPY_GLOBAL_DIR!.trim())
+    root = normalize(tryCodePuppyBootstrap()?.paths.globalRoot ?? process.env.CODEPUPPY_GLOBAL_DIR!.trim())
   } catch (error) {
     return { ok: false, reason: `alpha environment root unavailable (${error instanceof Error ? error.message : String(error)})` }
   }

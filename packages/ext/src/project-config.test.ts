@@ -343,18 +343,15 @@ describe("project/root identity fail-closed", () => {
 describe("#1709 项目扩展的信任只认 main 的记录", () => {
   let root = ""
   let stateRoot = ""
-  let previous: string | undefined
 
   beforeEach(() => {
-    previous = process.env.CODEPUPPY_GLOBAL_DIR
     root = realpathSync(mkdtempSync(join(tmpdir(), "codepuppy-ext-trust-")))
     stateRoot = join(root, "codepuppy-state")
     mkdirSync(join(stateRoot, "env", "dev"), { recursive: true })
-    process.env.CODEPUPPY_GLOBAL_DIR = join(stateRoot, "env", "dev")
+    publishTestBootstrap({ globalRoot: join(stateRoot, "env", "dev") })
   })
   afterEach(() => {
-    if (previous === undefined) delete process.env.CODEPUPPY_GLOBAL_DIR
-    else process.env.CODEPUPPY_GLOBAL_DIR = previous
+    unpublishTestBootstrap()
     rmSync(root, { recursive: true, force: true })
   })
 
@@ -397,7 +394,7 @@ describe("#1709 项目扩展的信任只认 main 的记录", () => {
     expect(consent(c)).toBe(false)
   })
 
-  test("记录本身:当前告知版本以外的条目不算;拒绝不算;位置只由 main 派生的根算出 —— CODEPUPPY_GLOBAL_DIR 不是 `<base>/env/<env>` ⇒ 一个都不信任", () => {
+  test("记录本身:当前告知版本以外的条目不算;拒绝不算;位置只由 main 派生的根算出 —— 文档 paths.globalRoot 不是 `<base>/env/<env>` ⇒ 一个都不信任", () => {
     const a = makeProject("a")
     const own = projectTrustIdentity(identityOf(a).directory)!
     mkdirSync(join(stateRoot, "project-trust"), { recursive: true })
@@ -409,7 +406,7 @@ describe("#1709 项目扩展的信任只认 main 的记录", () => {
     expect(consent(a)).toBe(true)
     const odd = join(root, "odd-root")
     mkdirSync(odd)
-    process.env.CODEPUPPY_GLOBAL_DIR = odd
+    publishTestBootstrap({ globalRoot: odd })
     expect(consent(a)).toBe(false)
   })
 

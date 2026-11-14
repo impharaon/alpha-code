@@ -57,7 +57,7 @@ import {
   WEB_SEARCH_OFF_TEMPLATES,
 } from "./context-injection"
 import { CodePuppyWebSearchFailure, WEB_SEARCH_FAILURE_LABEL, codePuppyWebSearchFailureOf, searchExa } from "./exa-websearch"
-import { assertWebSearchToolAllowed, CLOUD_WEBSEARCH_DENY_ENV, LOCAL_WEBSEARCH_DENY_ENV } from "./cloud-websearch-kill"
+import { assertWebSearchToolAllowed } from "./cloud-websearch-kill"
 import { namedDeny, type PolicyDenyReason } from "./policy/gate"
 import { ToolFailure } from "../../ai/src/schema/errors.ts"
 import { REBRAND_RULES } from "./prompt-rebrand"
@@ -653,16 +653,17 @@ describe("③k 工具失败咽喉:失败时交回模型的话都由登记簿解�
   )
 
   test("AC-02:web search 总开关的两种拒绝句(治理云工具 / 其余)都由登记簿解释;改一个字即解释不了", () => {
-    const thrown = (tool: string, env: Record<string, string>, ownership: { governed: string[]; foreign: string[] }) => {
+    const bootstrap = republish({ killSwitch: true })
+    const thrown = (tool: string, ownership: { governed: string[]; foreign: string[] }) => {
       try {
-        assertWebSearchToolAllowed(tool, env, ownership)
+        assertWebSearchToolAllowed(tool, bootstrap, ownership)
       } catch (error) {
         return (error as Error).message
       }
       throw new Error(`${tool} was not refused`)
     }
-    const cloud = thrown("cloud_web_search", { [CLOUD_WEBSEARCH_DENY_ENV]: "1" }, { governed: ["cloud"], foreign: [] })
-    const local = thrown("websearch", { [LOCAL_WEBSEARCH_DENY_ENV]: "1" }, { governed: [], foreign: [] })
+    const cloud = thrown("cloud_web_search", { governed: ["cloud"], foreign: [] })
+    const local = thrown("websearch", { governed: [], foreign: [] })
     expect(cloud).not.toBe(local)
     expect(explainToolFailure(cloud)).toMatchObject({ ok: true, id: "tool-failure.websearch-off.cloud" })
     expect(explainToolFailure(local)).toMatchObject({ ok: true, id: "tool-failure.websearch-off.local" })
@@ -680,7 +681,7 @@ describe("③k 工具失败咽喉:失败时交回模型的话都由登记簿解�
 
   it.live("AC-04:真宿主 tool.execute.before 抛出的拒绝(总开关 / 未知工具身份)回到模型时都由登记簿解释", () =>
     Effect.gen(function* () {
-      process.env[LOCAL_WEBSEARCH_DENY_ENV] = "1"
+      republish({ killSwitch: true })
       yield* activate({
         id: "test.registered-websearch",
         async setup(context) {
@@ -701,7 +702,7 @@ describe("③k 工具失败咽喉:失败时交回模型的话都由登记簿解�
       expect(offSwitch).toContain("websearch is unavailable")
       expect(unknown).toContain("(unknown-tool-identity)")
       expect(unexplained([offSwitch, unknown])).toEqual([])
-    }).pipe(Effect.ensuring(Effect.sync(() => delete process.env[LOCAL_WEBSEARCH_DENY_ENV]))),
+    }),
   )
 })
 

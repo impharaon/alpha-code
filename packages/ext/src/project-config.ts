@@ -230,7 +230,7 @@ function isRealDirectory(path: string): boolean {
 }
 
 /** 项目扩展信任门 consent(REQ-060;`#1709`):只认用户在确认框里的决定 —— main 写进 `<casBaseRoot>/project-trust/<env>.json`、
- *  按规范项目目录 + 目录 inode 登记的那一条(project-trust-truth.ts;位置只由 main 派生的 CODEPUPPY_GLOBAL_DIR 算出)。
+ *  按规范项目目录 + 目录 inode 登记的那一条(project-trust-truth.ts;位置只由启动文档 paths.globalRoot 中 main 派生的根算出)。
  *  项目目录里的任何文件都不算,包括旧的 `.codepuppy/prefs.json` 里的 `extensionsConsent`。
  *  没有记录 / 读不出 / 拒绝 / 旧版本 = 不信任(默认拒绝可执行物,安全红线);身份漂移 = null。 */
 export function readProjectExtensionsConsent(project: ProjectRoot): boolean | null {

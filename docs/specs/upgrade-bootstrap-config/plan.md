@@ -77,6 +77,7 @@ last_reviewed: 2026-11-12
 | AC-04(基线) | `bootstrap-launch-parity.engine.test.ts` | 本段只钉住今天的值;段 1–3 每段只改「sidecar 这一步」的接法,记录文件一字不改(评审看 `git diff <段0> <段n> -- src/main/bootstrap-launch-parity.record.json` 为空)。任何一组键在构建器里漏写或读错,记录里对应那一格就不同而红。已知的坏(实跑):把 `server.ts` 写 `CODEPUPPY_POLICY_ACCOUNT` 那一句改成不写 ⇒ 记录的 `engine.policyAccount` 从 `acct:956e…c48` 变成 `anonymous` 而红。 |
 
 ### 偏离记录
+- 2026-11-14 · r2 接入已批准的 #1708 行为:段 0 原命令首次核对为 0 pass / 1 fail(与另三个启动文档测试同跑时合计 23 pass / 1 fail),实跑差异只有 `injection.content.policies` 与 `injection.explicit.policies` 各新增 `plugin.use` 的 deny `*` / allow `<root>/parity-ext` 两条。按 `8dfd8956b0` 已有的两层插件策略保留行为,将这四条实际观察结果补入 `bootstrap-launch-parity.record.json`;其它字段及逐项比较断言不动。这是本轮安全修复的主线增量,不是 G1–G3 通道搬运改变决定 · r2 后续提交。
 - 2026-11-12 · 期望不写成 cases 里的手写字面量,而是钉在 `bootstrap-launch-parity.record.json`(约 620 行,由改动前的代码实跑产出,两次实跑逐字相同)· 记录太长,放进 cases 读不下去;文件形式让「各段记录不变」直接是这份文件的空 diff · 本段提交。
 - 2026-11-12 · 记录各格的观察方式按实际可观察的落定:① sidecar 收到的路径 / 通道 / ext 目录 / 围栏;② `start()` 选项;③ 内联文档(档位 agent 权限即在其中)、显式文件、模型底表内容、密钥文件名;④ 引擎里 ext 状态、`GET /api/provider`、云 MCP 状态、工具策略 RPC `inventory` 的账户分区、`engineNetFailurePath` 对 sidecar 整份 env 的归类;⑤ 两个桩收到的凭据头。原计划的「ext 外部目录规则」「出厂禁用技能不在技能表」「disabled-override 结果」三项没有单独成格:前两者的输入(全局根、出厂技能目录)已在 ③ 里,第三项在沙箱里没有已装扩展、产出为空,改记它的输入 `registryChannel` · 本段提交。
 - 2026-11-12 · 通道:非打包构建的环境快照固定解析为 dev,记录里 `registryChannel` 是 `dev`,不是计划写的 `stable` · 本段提交。
@@ -135,6 +136,7 @@ last_reviewed: 2026-11-12
 | §9 回滚(G1–G3) | 见段 3 | — |
 
 ### 偏离记录
+- 2026-11-14 · r2 语义修正:`codepuppy-environment.ts` 的 `resolveCodePuppyStateBase` 在快照缺席时,按字面取已发布文档的 `paths.globalRoot`,最后才走 R31 的无文档测试环境分支,保留 #1709 不经 realpath 的逆映射。`project-config.test.ts`、`project-trust-truth.test.ts`、`project-trust-truth-fence.test.ts` 的新信任用例全部改发文档;`project-config.ts` 与 `project-trust-truth.ts` 的路径通道注释同步。合并提交里的 ext 回归测试从 64 pass / 14 fail 转为 78 pass / 0 fail;真实围栏的 W2 根换软链攻击仍被正确处理(读的仍是真信任记录)。没有新增文档字段或另一份根解析 · r2 后续提交。
 - 2026-11-14 · r2 接入 batch B 与 #1708/#1709(`8dfd8956b0`):`packages/ext/src/project-config.ts` 组合文档全局根读取与 main 信任记录读取;`project-config.test.ts` 保留信任身份 / 冒充判据并加入文档夹具 import;`plugin-host.test.ts` 以文档发布代替环境通道,保留 #1700 的助手字段与 #1709 的生产记录写端、每条测试撤掉旧信任。首轮 `cd packages/ext && bun test src/project-config.test.ts src/plugin-host.test.ts src/plugin-setup-order.test.ts src/policy/authority-registry.test.ts src/provider-allow.test.ts` = exit 1,64 pass / 14 fail:复现 #1709 的新读链在 `resolveCodePuppyStateBase` 仍取已退役的 `CODEPUPPY_GLOBAL_DIR`,缺变量时决定无法读取 / 写入;后续提交修正该语义冲突 · r2 合并提交。
 - 2026-11-12 · 注入的测试接缝:`injectCodePuppyConfig` 加第 4 个参数 `userConfig?: string | null`,sidecar 传 `paths.userConfig ?? null`(null = 逃生阀置位);只有直接调注入的测试不传,取 `codepuppyJsoncPath()` · 不这样做要改约 45 个直接调用注入的测试点;注入自己不再读两个逃生阀 · 本段提交。
 - 2026-11-12 · `mcp-default-deny.ts` 的目录取法:显式选项 → 已发布文档的 `paths.engineConfigDirectory` → 按环境的旧推导(只剩直接调注入、没有文档的测试)。环境那一支读的是 `OPENCODE_CONFIG_DIR` / `XDG_CONFIG_HOME`,不是 Code Puppy 的键,在 sidecar 里到不了(与 R31 同一读法)· 本段提交。
@@ -190,6 +192,7 @@ last_reviewed: 2026-11-12
 | AC-04 · 决定不变 | 段 0 记录(期望不改);`websearch-account-tool-table.engine.test.ts` 三种账户态期望不改 | 构建器漏写 `policy.account` ⇒ 记录第 ④ 格变成 `anonymous` 而红;漏写 `cloudMcp` ⇒ 第 ⑤ 格无云 MCP 而红。 |
 
 ### 偏离记录
+- 2026-11-14 · r2 别名扫描补到 #1702 新加的 `packages/ext/src/context-injection.test.ts`:仍 import `CLOUD_WEBSEARCH_DENY_ENV` / `LOCAL_WEBSEARCH_DENY_ENV`,并经前者 / 后者造直接拒绝输入、经后者写环境。原命令 `cd packages/ext && bun test src/context-injection.test.ts` = exit 1,0 pass / 1 fail / 1 error,缺少已退役导出 `CLOUD_WEBSEARCH_DENY_ENV`。这些输入改由现有 `republish({ killSwitch: true })` 发布,直接判据传同一文档,宿主用例同样在激活插件前发布;登记句子、拒绝结果与上下文咽喉断言原样保留,修后 43 pass / 0 fail · r2 后续提交。
 - 2026-11-14 · r2 冲突组合:`packages/ext/src/provider-allow.ts` 保留 batch B 的 `postActivationTail` 单一时序权威,集合输入改用本段 `allowed()` / 进程内发布,不恢复 `PROVIDER_ALLOW_ENV`;`plugin.ts` 同时保留项目停用助手的 post-activation 尾巴与供应商白名单尾巴,共用 `activePlugins`,白名单读本段发布值 · r2 合并提交。
 - 2026-11-14 · 接回 0.2.0 主线 `3a8e25d6b8` 的合并冲突:`packages/core/src/session/to-session-error.ts` 同时保留主线 `LoadAPIKeyError` → `provider.auth` 与本段从启动文档读取代理路径的分类,两个 import 并存 · 本次合并提交。
 - 2026-11-12 · `buildCodePuppyModelConfig(userDataPath, platform: PlatformInputs = {})`:平台地址与默认模型覆盖改为参数,模块不再读环境。注入传文档的 `platform.modelProxyBaseURL` / `defaultModelOverride`;main 的出网目的地派生(`server.ts`)照旧传 main 自己环境里的值(main 一侧,语义不变)· 本段提交。
@@ -243,6 +246,37 @@ last_reviewed: 2026-11-12
 | §9 回滚 · 无数据后果 | 段 0 记录第 ⑦ 格(C4 显式文件、C5 模型底表、密钥文件名集合)两端逐字相同;启动文档不落盘(构建器与 sidecar 不新增写盘点:`process-fence-write-sites.test.ts` 的登记簿本段不变) | 若迁移改变了磁盘形状,第 ⑦ 格红;若新增写盘,写盘登记簿闸红。 |
 
 ### 偏离记录
+- 2026-11-14 · r2 验证收据:依据 `8dfd8956b0` + 已接受 `8059bdd64c`;合并 `902e04bf1a`。扫描另一侧 packages 的 69 个新增 / 改动路径、清单 31 键,同时检查新增 `process.env` / 环境常量别名 / 启动目录重算。结果如下;其余新增退役变量读写命中 **none**。冻结 design 与启动文档 schema 相对 `8059bdd64c` 无差异。未运行全套门,未复跑已被编排器确认的 `.invalid` DNS 环境问题。额外文件均为新读链 / 输入或它们的直接判据;这轮共 16 个自身改动文件(八处冲突、本计划、七个同链文件与记录),约 17 分钟。遗留:架构文档 `docs/architecture/2026-11-13-project-extension-trust-record.md:29` 仍将 ext 的根描述为环境传递,本次仅按指定范围在此记录文档通道,交编排器更新该架构文档 · r2 后续提交。
+
+| 另一侧新增命中 | 本轮处理 |
+| --- | --- |
+| `CODEPUPPY_GLOBAL_DIR`:生产 `codepuppy-environment.ts:resolveCodePuppyStateBase`(ext → `readProjectExtensionsConsent` → `readProjectTrustEntry` → `locateProjectTrustTruth`);`plugin-host.test.ts`、`project-config.test.ts`、`project-trust-truth.test.ts`、`project-trust-truth-fence.test.ts`、`engine-plugin-policy.engine.cases.ts` 的 setup / 读路径 / 清理 | 生产按已有文档根逆映射,不经 realpath;五组侧重 ext / 引擎的测试均改发文档。生产共用模块的无文档测试分支仍按 R31 保留,生产 sidecar 不到这支。 |
+| `CODEPUPPY_FACTORY_SKILL_DIRS`:新 `engine-plugin-policy.engine.cases.ts` 的写方 | 改发 `skills.factoryDirs`;原来在标题 / 注释里的名字随通道同步。 |
+| `CODEPUPPY_LOCAL_WEBSEARCH_DENY` / `CODEPUPPY_CLOUD_WEBSEARCH_DENY`:新 `context-injection.test.ts` 用 `LOCAL_WEBSEARCH_DENY_ENV` / `CLOUD_WEBSEARCH_DENY_ENV` 别名读取、组输入与置位 / 清理 | 删除旧导出引用,改用文档 `webSearch.killSwitch`,直接函数与真宿主两条路都保留。 |
+| `CODEPUPPY_MODELS_DISABLE`:注入测试新标题提名 | 不构成读写;该用例置位经文档 `switches.modelsDisabled`,并保留 #1708「模型治理关着也有插件策略」的断言。 |
+| `CODEPUPPY_GLOBAL_DIR`:新 `test-component/ext-trust-check.ipc.cases.ts` 删除进程环境里的旧值 | 这是 main composition root 初始化前清理自己的环境,没有传给 sidecar;原样保留。 |
+| `project-config.ts` / `project-trust-truth.ts` 的新根通道注释 | 改为文档 `paths.globalRoot`;生产读方没有环境回退副本。 |
+| #1708 正常与 catch 的 `engineGlobalConfigDirectory(process.env, ...)` | 目录使用已有文档字段。`OPENCODE_CONFIG_DIR` 未新增通道;引擎测试也改在文档里切目录。 |
+| #237 的 `CODEPUPPY_BUILD_COMMIT` / `_DATE` / `_ORIGIN` 与 `CODEPUPPY_SIGN` | 构建期 define 与 main IPC 的输入,不经过 main → sidecar;不属于清单退役键,没有新增跨界环境读写。 |
+
+所有命令均先 `export PATH=$HOME/.bun-versions/1.4.4/bin:$PATH`,已确认 `bun --version` = `1.4.4`;从对应目录串行运行。数量按宿主输出,宿主另核对子进程 cases 条数。
+
+| 目录 | 精确命令 | 结果 |
+| --- | --- | --- |
+| `packages/ext` | `bun test src/project-config.test.ts src/plugin-host.test.ts src/plugin-setup-order.test.ts src/policy/authority-registry.test.ts src/provider-allow.test.ts` | 合并后首次 exit 1,64 pass / 14 fail;修正根通道后 exit 0,78 pass / 0 fail |
+| `packages/ui-mac` | `bun test src/main/codepuppy-config-injection.test.ts src/main/config-injection-throat.test.ts src/main/engine-explicit-config.test.ts src/main/project-consent-store.engine.test.ts src/main/engine-plugin-policy.engine.test.ts src/main/gate-file-registry.test.ts src/main/old-name-scan.test.ts` | exit 0;84 pass / 0 fail |
+| `packages/ui-mac` | `bun test src/main/bootstrap-launch-parity.engine.test.ts src/main/codepuppy-bootstrap-build.test.ts src/main/sidecar-bootstrap-gate.test.ts src/main/bootstrap-env-readers.test.ts` | 补 #1708 记录增量前 exit 1;23 pass / 1 fail,失败只在决定记录的四条新策略 |
+| `packages/ui-mac` | `bun test src/main/bootstrap-launch-parity.engine.test.ts` | 补上真实观察到的 #1708 增量后 exit 0;1 pass / 0 fail |
+| `packages/ui-mac` | `bun test src/main/project-trust-truth.test.ts src/main/project-trust-truth-fence.test.ts src/main/codepuppy-environment.test.ts src/main/engine-plugin-policy.test.ts` | exit 0;57 pass / 0 fail;W2 根换软链控制臂实际执行 |
+| `packages/util` | `bun test src/codepuppy-bootstrap.test.ts` | exit 0;16 pass / 0 fail |
+| `packages/ext` | `bun test src/context-injection.test.ts` | 改写输入前 exit 1,0 pass / 1 fail / 1 error(退役导出不存在);改写后 exit 0,43 pass / 0 fail |
+| `packages/ui-mac` | `bun test src/main/gate-file-registry.test.ts src/main/old-name-scan.test.ts` | 追加夹具改写后复核 exit 0;33 pass / 0 fail |
+| `packages/ui-mac` | `bun test src/main/engine-plugin-seal.test.ts` | exit 0;23 pass / 0 fail(`#1703` 的 plugins 封口) |
+| `packages/core` | `bun typecheck` | exit 0;2,035 文件 / 2 项目,0 type errors |
+| `packages/ext` | `bun typecheck` | exit 0;0 type errors |
+| `packages/ui-mac` | `bun typecheck` | exit 0;0 type errors |
+
+- 2026-11-14 · r2 的 #1708 两处策略输入(正常 / catch)都从 `bootstrap.paths.engineConfigDirectory` 取 main 已定的目录,不在 sidecar 按环境重算;HOME / `OPENCODE_TEST_HOME` 仍是 Node / 上游运行时输入(§4.5)。新 `engine-plugin-policy.engine.cases.ts` 的全局根与出厂技能从环境改发文档,局部文件路径用同一个根变量,两次注入显式传文档 `userConfig`;更换测试引擎配置目录与监听选项时重发同一形状文档。项目插件策略的语句、计算时机、重新写显式文件行为均保留 · r2 后续提交。
 - 2026-11-14 · r2 冲突组合:`codepuppy-config-injection.ts` 保留 #1708 的 `layer.plugins`、两层 `plugin.use` 与失败分支策略,模型与开关仍读文档、失败时撤掉进程内白名单;`codepuppy-config-injection.test.ts` 保留「模型治理关仍有插件策略」断言,置位改发文档 switches,保留 R6 用例;`scripts/gate-files.tsv` 合并双方条目,保留 #1700 的 engine-transforms / agent-request 登记,plugin-host 39 + 2 = 41,provider-allow 描述按文档通道更新 · r2 合并提交。
 - 2026-11-14 · 本次接回主线的验证收据(开始 12:01 UTC,复核 12:09 UTC,约 9 分钟):AC-01 / AC-02 通过;AC-04 的段 0 决定记录通过且文件与 `32f6cb99fb` 无差异,但网络真栈的 DNS 两项在原命令重跑一次后仍失败,交编排器处置。`ac1572-nx.invalid` 在本机被解析为 `2001:2::4e`,代理回 200 而非预期 503,最终分类为 `tls-failed/ECONNRESET` 而非 `dns/503`;未改断言、未排查其它网络实现。扫描覆盖主线新增 / 改动的 58 个 packages 路径与清单 31 键,除本段记录的单一新增写方外,其余新增读写命中均为 **none**。冻结 design、util schema 与决定记录相对 `eb4cccc5b3` 均无差异;合并提交第二父节点是 `3a8e25d6b8`。本次自身改动 7 个文件(4 处冲突、2 个同链打包夹具、本计划),未做 G4 / #1697 / #1710 · 后续提交。
 

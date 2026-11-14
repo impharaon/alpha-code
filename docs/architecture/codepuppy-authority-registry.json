@@ -10,6 +10,29 @@
   },
   "entries": [
     {
+      "id": "unattended-run-permissions",
+      "decision": "无人值守运行按 main 在册名单即时裁决,标准档的默认询问与每次询问可执行,拒绝具名进入运行记录;交互会话保持审批,补充信息按项目立即取消(#1699)。",
+      "lane": "#1699",
+      "mechanism": {
+        "file": "packages/ext/src/policy/gate.ts",
+        "ladder": "L0 (plugin hooks + existing parentPort bridge)"
+      },
+      "tests": [
+        {
+          "file": "packages/ext/src/policy/unattended-policy.test.ts",
+          "name": "Code Mode 子调用的第一条拒绝补在外层成功终态上"
+        },
+        {
+          "file": "packages/ui-mac/src/main/unattended-run.engine.test.ts",
+          "name": "无人值守运行的真实入口证据(unattended-run.engine.cases.ts)"
+        },
+        {
+          "file": "packages/ui-mac/src/main/automation-elicitation.test.ts",
+          "name": "最不利轮询相位仍在虚拟 250 ms 取消表单,global 请求带项目位置"
+        }
+      ]
+    },
+    {
       "id": "tool-policy-execution-gate",
       "decision": "Every tool call passes Code Puppy's tool policy before it runs; a deny is a named refusal decided before any other hook or side effect (#725 B, #1129).",
       "adr": [

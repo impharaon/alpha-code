@@ -7,6 +7,11 @@
 // (agent=codepuppy-automation readonly 档,阻塞到回复完成)→ 最终回复落 report.md + status.json
 // 进目标项目 .codepuppy/runs/auto-<id>-<ts>/(codepuppy-workdir 守卫)。超 maxDurationMin 中断(abort)。
 
+import { AUTOMATION_PROFILES, elicitationCopy, type AutomationAgentID } from "@opencode/schema/codepuppy-unattended"
+import { readAutomationDenial } from "./automation-run-outcome"
+import { watchAutomationElicitations } from "./automation-elicitation"
+import { SessionMessage } from "@opencode/schema/session-message"
+import { unattendedRuns } from "./codepuppy-unattended"
 import { join } from "node:path"
 import { BrowserWindow, Notification, powerMonitor } from "electron"
 // CLIENT subpath(纯 fetch,main 的 Node 环境同样适用;v2 barrel 的 Node-only 依赖问题是 renderer 限定)
@@ -246,9 +251,11 @@ async function executeTask(task: AutomationTask): Promise<AutomationRunRecord> {
   // `#1667`(清点表 S6 / S9):OpenCode 2 的客户端;口令由 engineClient 补成 Basic 头(I8:只在 main 里)。
   const client = engineClient(server)
   const directory = task.target.projectDir
+  const profile = AUTOMATION_PROFILES[task.target.agent as AutomationAgentID] ?? "none"
 
   let sessionID: string | undefined
   let timedOut = false
+  let elicitation: ReturnType<typeof watchAutomationElicitations> | undefined
   const controller = new AbortController()
   const killer = setTimeout(
     () => {
@@ -280,14 +287,24 @@ async function executeTask(task: AutomationTask): Promise<AutomationRunRecord> {
     )
     sessionID = created.id
 
-    const reply = await promptAndWait(client, { sessionID, text: task.prompt }, controller.signal)
+    const promptID = SessionMessage.ID.create()
+    if (!await unattendedRuns.register(sessionID, { agent: task.target.agent, promptID }, controller.signal)) {
+      await client.session.remove({ sessionID }).catch(() => {})
+      return { at, status: "failed", summary: "automation run not ready", reasonCode: "automation-run-not-ready" }
+    }
+    elicitation = watchAutomationElicitations(client, directory)
+    const reply = await promptAndWait(client, { sessionID, text: task.prompt, id: promptID }, controller.signal)
 
+    await elicitation.stop()
+    const denial = await readAutomationDenial(client, sessionID, profile, controller.signal)
+    controller.signal.throwIfAborted()
+    const status = denial ? "failed" as const : "ok" as const
     const finishedAt = new Date().toISOString()
     const runId = `auto-${task.id}-${runTimestamp(new Date(started))}`
     const saved = writeRunFiles(directory, runId, {
       "report.md": reply || "(空回复)",
       "status.json": JSON.stringify(
-        { taskId: task.id, name: task.name, sessionID, at, finishedAt, status: "ok", schedule: task.schedule, prompt: task.prompt },
+        { taskId: task.id, name: task.name, sessionID, at, finishedAt, status, ...(denial ? { error: denial } : {}), schedule: task.schedule, prompt: task.prompt },
         null,
         2,
       ),
@@ -298,19 +315,19 @@ async function executeTask(task: AutomationTask): Promise<AutomationRunRecord> {
     const firstLine = reply.split("\n").find((l) => l.trim()) ?? ""
     return {
       at,
-      status: "ok",
+      status,
       durationMs: Date.now() - started,
       sessionID,
       runDir: saved.ok ? saved.dir : undefined,
-      summary: firstLine.slice(0, 120),
+      summary: denial ?? firstLine.slice(0, 120),
     }
   } catch (error) {
+    await elicitation?.stop()
+    const denial = !timedOut && sessionID ? await readAutomationDenial(client, sessionID, profile, controller.signal) : undefined
     const status = timedOut ? "timeout" : "failed"
     const summary = timedOut
       ? `超过 ${task.budget.maxDurationMin} 分钟,已中断`
-      : error instanceof Error
-        ? error.message.slice(0, 300)
-        : String(error).slice(0, 300)
+      : denial ?? (elicitation?.connector ? elicitationCopy(elicitation.connector) : error instanceof Error ? error.message.slice(0, 300) : String(error).slice(0, 300))
     // 失败也留痕(best-effort):status.json 进 run 目录,方便详情页回溯。
     const runId = `auto-${task.id}-${runTimestamp(new Date(started))}`
     const saved = writeRunFiles(directory, runId, {
@@ -329,6 +346,8 @@ async function executeTask(task: AutomationTask): Promise<AutomationRunRecord> {
       summary,
     }
   } finally {
+    await elicitation?.stop()
+    if (sessionID) unattendedRuns.unregister(sessionID)
     clearTimeout(killer)
   }
 }

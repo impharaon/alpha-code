@@ -13,6 +13,7 @@
 // 真实爆炸半径 + 失败必须出声)。
 
 import { codepuppyBootstrap } from "@opencode/util/codepuppy-bootstrap"
+import { AUTOMATION_DEFAULTS } from "../shared/automation-types"
 import * as fs from "node:fs"
 import * as path from "node:path"
 // `#1299`(REQ-157):三个 alpha agent 的 description / prompt 是 alpha 的字,住在零依赖的
@@ -366,12 +367,12 @@ export function injectCodePuppyConfig(
     if (!switches.automationDisabled) {
       config.agents = {
         ...config.agents,
-        "codepuppy-automation": {
-          description: CODEPUPPY_AGENT_TEXT["codepuppy-automation"].description,
+        [AUTOMATION_DEFAULTS.agent]: {
+          description: CODEPUPPY_AGENT_TEXT[AUTOMATION_DEFAULTS.agent].description,
           // REQ-055:对选择器隐藏(上游 agent 原生 hidden 字段,仅影响可见列表;调度器按名 prompt 不受影响)
           hidden: true,
           mode: "primary",
-          system: CODEPUPPY_AGENT_TEXT["codepuppy-automation"].prompt,
+          system: CODEPUPPY_AGENT_TEXT[AUTOMATION_DEFAULTS.agent].prompt,
           permissions: rules([
             ["tool-policy-default", "ask"],
             ["read", { "*": "allow", "*.env*": "deny" }],
@@ -474,12 +475,12 @@ export function injectCodePuppyConfig(
     if (!switches.automationDisabled) {
       config.agents = {
         ...config.agents,
-        "codepuppy-automation-standard": {
-          description: CODEPUPPY_AGENT_TEXT["codepuppy-automation-standard"].description,
+        [AUTOMATION_DEFAULTS.agentStandard]: {
+          description: CODEPUPPY_AGENT_TEXT[AUTOMATION_DEFAULTS.agentStandard].description,
           // REQ-055:对选择器隐藏(同 codepuppy-automation)
           hidden: true,
           mode: "primary",
-          system: CODEPUPPY_AGENT_TEXT["codepuppy-automation-standard"].prompt,
+          system: CODEPUPPY_AGENT_TEXT[AUTOMATION_DEFAULTS.agentStandard].prompt,
           permissions: rules([
             ["tool-policy-default", "ask"],
             ["read", { "*": "allow", "*.env*": "deny" }],

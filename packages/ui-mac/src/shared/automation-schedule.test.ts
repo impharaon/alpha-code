@@ -115,6 +115,13 @@ describe("describeSchedule — 人话周期", () => {
 // ── A2(REQ-024):连败熔断判定 ──
 import { shouldTripBreaker } from "./automation-schedule"
 
+test("未开始的运行不计连败,不会截断其它真实尝试", () => {
+  const notReady = { status: "failed", reasonCode: "automation-run-not-ready" }
+  expect(shouldTripBreaker([notReady, notReady, notReady], 3)).toBe(false)
+  expect(shouldTripBreaker([notReady, { status: "failed" }, notReady, { status: "timeout" }, { status: "failed" }], 3)).toBe(true)
+  expect(shouldTripBreaker([notReady, { status: "ok" }, { status: "failed" }, { status: "failed" }], 3)).toBe(false)
+})
+
 describe("shouldTripBreaker (A2 熔断)", () => {
   const F = { status: "failed" }, T = { status: "timeout" }, OK = { status: "ok" }, SK = { status: "skipped-overlap" }
   test("连续 3 次 failed/timeout(skip 不算尝试)→ 触发", () => {

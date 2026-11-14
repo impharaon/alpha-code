@@ -1,6 +1,8 @@
 // 自动化(定时任务)实体 —— REQ-021 全期共用形状(A1 只消费其中本地只读子集)。
 // 落盘:<current-environment-root>/automations/<id>.json(main/codepuppy-automations.ts);运行记录写目标项目
-// .codepuppy/runs/auto-<id>-<ts>/(ADR-019 schema)。跨 bundle 纯类型,零运行时依赖。
+// .codepuppy/runs/auto-<id>-<ts>/(ADR-019 schema)。跨 bundle 共享类型与默认值,载体消费 schema 权威。
+
+import { AUTOMATION_PROFILES, type AutomationAgentID } from "@opencode/schema/codepuppy-unattended"
 
 /** 调度形状。tz 字段 A1 只存不算(计算用系统本地时区,ADR-022 §边界)。 */
 export type AutomationSchedule =
@@ -96,15 +98,17 @@ export interface AutomationGlobalState {
   runCount: { date: string; count: number }
 }
 
+const automationAgents = Object.keys(AUTOMATION_PROFILES) as AutomationAgentID[]
+
 export const AUTOMATION_DEFAULTS = {
   maxDurationMin: 15,
   dailyRunCap: 24,
   historyKeep: 30,
   /** interval 下限(防打点风暴;cap 之外的第二道)。 */
   minIntervalMinutes: 5,
-  agent: "codepuppy-automation",
+  agent: automationAgents.find((agent) => AUTOMATION_PROFILES[agent] === "readonly")!,
   /** A2:standard(可写)档 agent。 */
-  agentStandard: "codepuppy-automation-standard",
+  agentStandard: automationAgents.find((agent) => AUTOMATION_PROFILES[agent] === "standard")!,
   /** A2:连败熔断阈值(连续 failed/timeout 次数)。 */
   failureBreaker: 3,
 } as const

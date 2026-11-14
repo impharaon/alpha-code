@@ -461,3 +461,4 @@
 1	packages/ui-mac	src/renderer/codepuppy-ui/ext-trust-watcher.component.test.ts	-	#1713 happy-dom 真 ExtTrustWatcher 组件宿主,钉住 3 pass / 0 fail:incomplete 下次进入再查、已有决定只查一次、刚允许沿原路径 global 重载一次。去掉 checked.delete ⇒ 第一条红。
 15	packages/core	test/codepuppy-project-gate.test.ts	-	#1713 项目配置闸核心行为,未允许 / 允许 / 未安装、校验前后过滤、文件头保真与 JS 探针、技能来源、作用点状态;每条带反向臂。
 5	packages/core	test/codepuppy-project-gate-upgrade.test.ts	-	#1713 / ADR-049 升级清点:实际 schema 与归一化键必须分类、隐含字段二次过滤、五个目录消费者 / 三个 Markdown 点、pending 与 failed 不完整;删分类键、多一个消费者、移除解码后过滤各转红。
+1	packages/ui-mac	src/main/unattended-run.engine.test.ts	-	#1699 无人值守运行的真实入口宿主:独立 bun test 子进程跑 unattended-run.engine.cases.ts;本轮直接实跑 16 pass / 0 fail、101 断言。生产调度/手动运行/一句话解析、握手与退出名单、即时工具裁决、Code Mode 终态原因、MCP 补充信息取消;消息插话退出而 shell 命令不接管。宿主自身精确条数=1,子进程用例不在整包计数里,删宿主会丢失这组证据。

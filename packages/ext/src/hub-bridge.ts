@@ -11,7 +11,10 @@
 //   · 应答形状不对 = 丢弃 + 记一行,请求按超时结算 —— 不带着半个视图去回答 agent。
 // 取不到 parentPort(CLI / 测试宿主)⇒ `available: false`,三个工具如实说「本宿主不可用」,不猜。
 
+import { createUnattendedState } from "./policy/unattended"
 import {
+  buildUnattendedAck,
+  parseUnattendedLive,
   buildHubRequestQuery,
   buildHubViewRequest,
   buildReloadReport,
@@ -35,6 +38,7 @@ export type HubPort = {
 export type BridgeFailure = { ok: false; reason: "unavailable" | "timeout" | "error"; detail: string }
 
 export type HubBridge = {
+  readonly unattended: ReturnType<typeof createUnattendedState>
   readonly available: boolean
   view(input: { directory: string; sessionID?: string; agent?: string; query?: string }): Promise<{ ok: true; view: HubView } | BridgeFailure>
   request(requestId: string): Promise<{ ok: true; record: HubRequestRecord | null } | BridgeFailure>
@@ -55,11 +59,18 @@ export function createHubBridge(
   const early: ReloadRequestMessage[] = []
   let reloadHandler: ((message: ReloadRequestMessage) => void) | undefined
   let seq = 0
+  const unattended = createUnattendedState()
 
   port?.on("message", (event) => {
     const message = event?.data
     if (!isCodePuppySidecarMessage(message)) return
     const type = (message as { type: string }).type
+    if (type === "codepuppy.unattended.live") {
+      const parsed = parseUnattendedLive(message)
+      if (!parsed) return log(`[@codepuppy/ext] dropped a malformed unattended snapshot`)
+      if (unattended.install(parsed)) port?.postMessage(buildUnattendedAck(parsed.seq, parsed.nonce))
+      return
+    }
     if (type === "codepuppy.reload.request") {
       const parsed = parseReloadRequest(message)
       if (!parsed) return log(`[@codepuppy/ext] hub bridge: dropped a malformed reload request`)
@@ -106,6 +117,7 @@ export function createHubBridge(
   }
 
   return {
+    unattended,
     available: !!port,
     view: (input) =>
       ask(

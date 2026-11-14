@@ -1304,9 +1304,23 @@ body[data-codepuppy-sidebar="open"] .codepuppy-ext-page {
 .codepuppy-ext-cloudrun {
   display: flex;
   align-items: center;
+  /* #1686 定案 B:主按钮在按钮行最右(同 .a-dialog-footer),状态字与「取消任务」在它左边。 */
+  justify-content: flex-end;
   gap: 10px;
   flex-wrap: wrap;
   margin-top: 6px;
+}
+/* #1686:提交前预检的卡片与提示条在按钮行里各占一整行(批准稿 width:100%)。 */
+.codepuppy-ext-cloudrun > :is(.a-card, .a-banner) {
+  width: 100%;
+}
+/* #1686 R1 m5:视觉上主按钮最右、代码审查的「发送 Git 代码改动」紧挨在它左边;DOM(即键盘 Tab)顺序
+   保持原样 —— 主按钮在前、次按钮其次、状态字与「取消任务」在后。 */
+.codepuppy-ext-cloudrun > [data-cloud-secondary] {
+  order: 1;
+}
+.codepuppy-ext-cloudrun > [data-variant="primary"] {
+  order: 2;
 }
 .codepuppy-ext-cloudrun .codepuppy-ext-meta[data-live] {
   color: var(--a-text-secondary);

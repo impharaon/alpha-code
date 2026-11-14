@@ -26,10 +26,20 @@ the authority for exact behavior.
 | **Tooltip** | `Tooltip.tsx` + `tooltip.css` | hover hint | positioned popover, four placements |
 | **Banner** | `Banner.tsx` + `banner.css` | inline persistent notice | `info` / `success` / `warning` / `error`, with inline actions |
 | **RiskTag** (风险标签) | `RiskTag.tsx` + `risk-tag.css` | read-only pill naming how risky an action or capability is; shared by the tool-approval panel header (`PermissionDialog.tsx`) and the capability-authorize rows (`extensions/ext-authz.tsx`); draft [`2026-11-13-1314-risk-tag/`](../2026-11-13-1314-risk-tag/frame.html) | `data-level` = `low` / `medium` / `high` / `critical` / `unknown`; one size; static only (not focusable, no hover); text is fixed to five words chosen by the component; tokens `--a-success/warning/error-subtle`, `--a-bg-muted`, `--a-text-tertiary`, `--a-text-secondary`, `--a-border-strong`, `--a-success/warning/error-on-subtle` |
+| **Card** | `Card.tsx` + `card.css` | bounded block of read-only facts; no buttons inside — related actions go after it, right-aligned (same rule as `.a-dialog-footer`). Users: account popover balance card, cloud send boxes (#1686) | one variant: `--a-bg-subtle` fill, `--a-border-faint` 1px, `--a-radius-lg`, padding `--a-space-3`; no own margin; static only; optional `label` → `aria-label` |
+| **KeyValueList** | `KeyValueList.tsx` + `key-value-list.css` | `<dl>` of rows, label left / value right, inside a Card | one size (`--a-text-sm`, `--a-leading-snug`, row padding `--a-space-1`); value states: value · pending「…」· unavailable「—」(`--a-text-tertiary`, `--a-text-xs`, screen-reader text for both glyphs) |
 | **Base** | `base.css` | element resets / shared primitives for codepuppy-ui | — |
 
 > Verify exact variants/states against the component CSS and `gallery.html`
 > before relying on them — the table names the axes, the code is authoritative.
+
+## Pending — designed, not yet in code
+
+Approved designs whose component does not exist in `codepuppy-ui/` yet. When the
+implementation lands, move the row into the table above and add its gallery swatch.
+
+| Component | Design | Role | Variants · states |
+| --- | --- | --- | --- |
 
 ## Composition surfaces (page-level, not primitives)
 

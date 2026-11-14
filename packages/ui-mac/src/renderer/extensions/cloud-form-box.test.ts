@@ -23,7 +23,18 @@ const directory = mkdtempSync(join(tmpdir(), "codepuppy-cloud-form-render-"))
 await build({
   configFile: false,
   logLevel: "silent",
-  plugins: [appPlugin.at(-1)!],
+  plugins: [
+    {
+      // alpha-code#1686:Banner 的 providers 转口整棵前端,换成只含 useContractHealth 的替身。
+      name: "codepuppy-test:banner-providers-stub",
+      enforce: "pre",
+      resolveId: (id: string, importer?: string) =>
+        id === "./providers" && importer?.endsWith("/codepuppy-ui/Banner.tsx")
+          ? join(import.meta.dir, "banner-providers-test-stub.ts")
+          : undefined,
+    },
+    appPlugin.at(-1)!,
+  ],
   build: {
     outDir: directory,
     lib: {
@@ -41,6 +52,14 @@ const runtime = (await import(pathToFileURL(join(directory, "runtime.js")).href)
   CloudFormBox: typeof CloudFormBox
 }
 const disposers: (() => void)[] = []
+
+// alpha-code#1686:发送框以 ready=true 挂载时会订阅登录现值并取提交前预检。本文件的用例不测预检:
+// 登录现值给一个已登录态,预检一律回「查不到」(不显示任何东西,预留行照旧),既有断言的语义不变。
+const withPreflightStubs = <T extends { auth?: object; cloud?: object }>(api: T) => ({
+  ...api,
+  auth: { subscribe: () => () => {}, getState: async () => ({ status: "logged-in", mode: "platform", platformStatus: "ready" }), ...api.auth },
+  cloud: { accountStatus: async () => ({ error: "network" }), ...api.cloud },
+})
 afterEach(() => {
   disposers.splice(0).forEach((dispose) => dispose())
   document.body.replaceChildren()
@@ -78,7 +97,7 @@ function mount(options: {
   let event: ((payload: { jobId: string } & CloudJobEvent) => void) | undefined
   Object.defineProperty(window, "api", {
     configurable: true,
-    value: {
+    value: withPreflightStubs({
       openDirectoryPicker: async () => options.picked ?? ["/synthetic/results"],
       openPath: async () => {},
       auth: { start: async () => actions.push("login") },
@@ -105,7 +124,7 @@ function mount(options: {
         },
         openBillingPage: async (page: string) => actions.push(page),
       },
-    },
+    }),
   })
   const host = document.createElement("div")
   document.body.append(host)

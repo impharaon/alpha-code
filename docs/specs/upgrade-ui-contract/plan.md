@@ -7,7 +7,7 @@ status: active
 spec: ""
 design: DESIGN-upgrade-ui-contract
 owners: [alpha-code desktop maintainers]
-last_reviewed: 2026-11-12
+last_reviewed: 2026-11-14
 ---
 
 # PLAN-upgrade-ui-contract｜界面只认 Code Puppy 自己的数据约定 实施计划
@@ -102,7 +102,7 @@ M3 又会改 `opencode2/` 里引 v1 类型的文件,M4 最后统一改指,避免
 
 - 依据:本次 `Phase: IMPLEMENT` 派发书;基线 `3a8e25d6b8`(0.2.0),撤销 `fed47ed022` 恢复 #1710 的前八片。沿用已核计划,不重开设计;不带第二部分 M5c / M5d。
 - 核对:本次派发明确为「IMPLEMENT — this resumes the checked implementation of #1697 on a moved base」;编排器负责复核、推送、PR 与合并。
-- 本轮 2026-11-14 11:57–12:03 UTC,执行者 Codex(GPT-6)。下表路径均相对 `packages/ui-mac/src/`。
+- 实施时段:2026-11-14 r1 11:57–12:03 UTC、r2 12:15–12:29 UTC,合计约 20 分钟(不含两轮间等待);执行者 Codex(GPT-6)。下表路径均相对 `packages/ui-mac/src/`。
 
 | 适配项 | 旧位置 → 新位置 | 证明 |
 | --- | --- | --- |
@@ -116,12 +116,14 @@ M3 又会改 `opencode2/` 里引 v1 类型的文件,M4 最后统一改指,避免
 | 协议探针固定答 v1 | `engine-adapter/routes.ts` 的 `GET /api/health` → `contract/routes.ts` 的 `SERVED` / `FIXED`,不问引擎;`PROBE_FALLBACK` 清空 | `protocol-probe.engine.test.ts` 通过;`unsupported.test.ts` 两条旧 501 断言改为 0.2.0 的固定健康答复,覆盖测试按服务路由核对。依派发书保留 #1712 修复,设计 §10 R15 原文冻结不改 |
 | Code Mode 读取附件 | `renderer/codepuppy-ui/session-timeline/timeline-attachments.ts` 原读取判定不动,类型导入从 SDK 改经 `engine-adapter/contract/v1` | `attachment-codemode-read.engine.test.ts` 通过;r2 的 renderer 附件卡与 timeline-model 两文件 71 pass / 0 fail |
 | 原生资源解包 | `packages/ui-mac/electron-builder.config.ts`、`packages/ui-mac/scripts/target-arch.ts` → 原位不动 | `git diff 3a8e25d6b8 -- packages/ui-mac/electron-builder.config.ts packages/ui-mac/scripts/target-arch.ts` 为空 |
+| 夹具重采 | #1710 的 `engine-adapter/fixtures/*.json`(core `584f4421a2`) → 同路径按 0.2.0 真引擎重采(core `ed40aaecc1`),14 份均保留来源 | 现有采样器 exit 0;`fixture-identity.test.ts` 与全部适配器测试通过,差异分类见下文 |
+| 命令 / patch 审批卡(单元 2) | `engine-adapter/opencode2/v1-shapes.ts` 原样交出能力动作 `shell` → 同处 `toV1PermissionRequest` 将非 policy 的 `shell` 交为 `bash`;patch 的能力动作仍为 `edit`,不增加映射 | `command-approval.engine.cases.ts` 真引擎 + 列表/事件 + DOM 两例:红例提交 `5805414227` 时 shell 红、patch 绿,修后两例绿且测试零改动;policy canonical 与 metadata 原样 |
 
 - 锁文件由 Git 文本合并:只恢复 ui-mac 的 `@opencode-ai/client` 类型依赖及其包记录(3 行),0.2.0 版本保留;未运行 `bun install`。
-- 检查:均先设置 Bun 1.4.4 PATH 并确认版本。在 `packages/ui-mac` 跑 `bun test src/engine-adapter/`:恢复前 91 pass / 0 fail(exit 0);恢复后 125 pass / 2 fail(exit 1)。原有修复测试与边界检查均通过,两项失败如下。
-- `BLOCKED: dependencies — Cannot find module '@opencode-ai/client' from 'packages/ui-mac/src/engine-adapter/unsupported.test.ts'`。按派发书停止,由编排器刷新依赖,本轮仅提交可恢复的 unit 1 检查点,不声称完成验证。
-- 另一项失败为 `fixture-identity.test.ts`:14 份 #1710 夹具记录的 core tree `584f4421a2` 与 0.2.0 的 `ed40aaecc1` 不同。依赖刷新后须用现有采样器对当前引擎全量重采,不能只改身份字段或放松断言。
-- 尚未执行:重采后重跑适配器、renderer 附件测试、ui-mac typecheck、两包登记检查,以及 unit 2 的红例提交与审批翻译修复。unit 2 尚未开始,没有确认 shell / patch 原因。
+- r1 检查:均先设置 Bun 1.4.4 PATH 并确认版本。在 `packages/ui-mac` 跑 `bun test src/engine-adapter/`:恢复前 91 pass / 0 fail(exit 0);恢复后 125 pass / 2 fail(exit 1)。原有修复测试与边界检查均通过,两项失败如下。
+- r1 阻塞(已由 r2 解除):`BLOCKED: dependencies — Cannot find module '@opencode-ai/client' from 'packages/ui-mac/src/engine-adapter/unsupported.test.ts'`。按派发书停止,由编排器刷新依赖,本轮仅提交可恢复的 unit 1 检查点,不声称完成验证。
+- r1 的另一项失败为 `fixture-identity.test.ts`:14 份 #1710 夹具记录的 core tree `584f4421a2` 与 0.2.0 的 `ed40aaecc1` 不同。依赖刷新后须用现有采样器对当前引擎全量重采,不能只改身份字段或放松断言。
+- r1 结束时尚未执行:重采后重跑适配器、renderer 附件测试、ui-mac typecheck、两包登记检查,以及 unit 2 的红例提交与审批翻译修复。unit 2 尚未开始,没有确认 shell / patch 原因。
 - r2(2026-11-14):依赖由编排器刷新成功,接受 `7c5a152e73` 为续接点。执行 `bun packages/ui-mac/test-fixtures/engine-adapter-sampler/sample.ts`(Bun 1.4.4) exit 0,14 份夹具由真引擎重新生成,单独提交。全程临时 HOME/XDG + 本地假模型/OAuth,没有账户或 owner 数据访问。
 - 重采核对:core 身份 `584f4421a2` → `ed40aaecc1` 来自 #1712 的 `LoadAPIKeyError` → `provider.auth` 修复(该分支不被正常假模型剧本触发);没有新增转换形状。去掉来源、时间/ID、临时路径、游标、slug、端口等易变值后,`catalog` / `command` / `files` / `permission-*` / `tools` / `turn-diff` 无实质差异;`lineage` 只换 shell id;其余差异是异步帧之后快照取到的流式阶段、标题/用量事件顺序、shell 空页轮询时点。`passthrough` 上次单跑,本次全跑,清单多出前序剧本写的文件和会话(仍为原结构)。最终消息与原断言保持一致,重采后适配器 127 pass / 0 fail。
 - inbox 日志核对: `turn-diffs.test.ts:77,119` 的假上游只答消息页/diff,未答 `/inbox`,三次正向读取落入其 `500 "unexpected"`;日志确实来自被容错的失败路径,不是 0.2.0 路由漂移。客户端 `session.inbox.list` 的成功码为 200(`client.ts:886–897`),协议定义一致(`protocol/src/groups/session.ts:540–543`);真引擎 `queued-prompt.engine.cases.ts` 的 `engineInbox` 也断言 200,并验证重开会话的排队气泡。定向 `bun test src/engine-adapter/turn-diffs.test.ts src/engine-adapter/queued-prompt.engine.test.ts` 11 pass / 0 fail,复现恰好三条日志,未改生产错误处理或旧断言。
@@ -130,7 +132,8 @@ M3 又会改 `opencode2/` 里引 v1 类型的文件,M4 最后统一改指,避免
 
 - 单元 2 红例(先提交测试,生产未改):`bun test src/engine-adapter/command-approval.engine.test.ts` exit 1,宿主 0 pass / 1 fail,子进程 1 pass / 1 fail。真实 `shell` 能力请求在列表/事件一致,DOM 却是 `{verb: "使用工具", remembered: "将记住:本会话内的同类操作:echo *"}`,期望 `{verb: "运行命令", remembered: "将记住:以 echo 开头的命令"}`。实际 `patch` 调用问的是 `edit`(`core/src/tool/plugin/patch.ts:212`),卡片已是「改文件」且记住所有修改,本次不增加 patch 名字映射。两例还钉住 policy 身份轴的 canonical 与 metadata 原样。用例来源是真引擎执行与已核截图,没有手写上游请求夹具;新宿主已登记。
 
-- 额外范围:无。测试宿主导入路径随搬家调整,断言未改;冻结包零字节改动。遗留去向:依赖刷新与余下实现交编排器续派,OPTIONAL 无。
+- 单元 2 绿例:只改审批翻译的能力轴 `shell` → `bash`,保留现有 `subagent` → `task` 与身份轴原样;不改 renderer 组件、布局、文案。`git diff 5805414227 -- packages/ui-mac/src/engine-adapter/command-approval.engine.{test,cases}.ts` 为空。`bun test src/engine-adapter/command-approval.engine.test.ts src/engine-adapter/permission-shape.test.ts` 6 pass / 0 fail(exit 0,新宿主子进程 2 pass / 0 fail);最终 `bun test src/engine-adapter/` 128 pass / 0 fail,30 文件(exit 0);`bun typecheck` exit 0;新宿主登记后重跑 `bun test src/main/gate-file-registry.test.ts src/main/old-name-scan.test.ts` 33 pass / 0 fail(exit 0)。与前述 renderer 71 条、ext 登记 5 条合并构成两单元的相关检查证据,未跑 gate/bin/check。
+- 额外范围:无。测试宿主导入路径随搬家调整,原有修复断言未改;冻结包与设计相对 #1710 零字节改动,0.2.0 的原生资源解包和 ext 点名指令也零字节改动。r2 新增两个审批卡测试文件(宿主 + 真引擎/DOM 用例),重采的 14 份夹具为生成变化,均在允许范围。没有迁移 ID。遗留去向:无;下一步由编排器独立审查、推送、PR 与合并。OPTIONAL 无。
 
 ## M1a — 翻译器搬进 `opencode2/`(纯搬家)
 

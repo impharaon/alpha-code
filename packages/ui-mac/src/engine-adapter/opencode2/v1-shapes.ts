@@ -597,13 +597,21 @@ export function todosOf(part: Part) {
 /**
  * I7a:2.x 审批请求 → v1(UC-10)。action → permission、resources → patterns、save → always(缺省 [])、metadata 原样
  * (缺省 {});工具来源 `{ type: "tool", messageID, id }` → `tool: { messageID, callID }`。
- * `#1669` R17:能力轴(没有 metadata.policy)的 subagent → task,审批卡据此画委派卡;身份轴的 canonical 原样。
+ * 能力轴(没有 metadata.policy)的 subagent → task(`#1669` R17)、shell → bash(`#1697` 放回单元 2),
+ * 审批卡据此画委派卡与命令卡;身份轴的 canonical 原样。
  */
 export function toV1PermissionRequest(request: EnginePermissionRequest): PermissionRequest {
   return {
     id: request.id,
     sessionID: request.sessionID,
-    permission: request.action === "subagent" && request.metadata?.policy === undefined ? "task" : request.action,
+    permission:
+      request.metadata?.policy !== undefined
+        ? request.action
+        : request.action === "subagent"
+          ? "task"
+          : request.action === "shell"
+            ? "bash"
+            : request.action,
     patterns: request.resources,
     always: request.save ?? [],
     metadata: request.metadata ?? {},

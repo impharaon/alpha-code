@@ -42,7 +42,8 @@
    交给 complete。项目里写一个 `opencode.json` 登记一条本地参考目录,`GET /api/reference` 才有元素可核;
 9. `routes.json`(`#1697` I-04,设计 §4.10 c):每条翻译路由经适配器发一次冻结界面会发的 v1 请求,记下翻译器为它向 2.x 发出的每个
    往返(方法、带查询串的路径、状态码、内容类型、响应体)与适配器的状态码。准备:一个跑过一轮的会话、两个挂着提问表单的会话、
-   一台本机假 OAuth 的远端 MCP、一个还不是 git 仓库的目录(git init 用)。`src/engine-adapter/contract-cases.test.ts` 回放它;
+   一台本机假 OAuth 的远端 MCP、一个还不是 git 仓库的目录(git init 用)。0.2.0 的固定 `GET /api/health` 也采一条,
+   这条的引擎往返为空。`src/engine-adapter/contract-cases.test.ts` 回放它;
 10. `events.json`(`#1697` I-04,设计 §4.10 c):事件表里其余几种在真引擎上的帧(每帧之后读的消息页一并记下)—— 建、跑、改名、删会话,
     项目改名,PTY 建 / 改名 / 进程自己退出 / 删,切 git 分支,连上同目录的 `mock-mcp.ts`(本机假 MCP,不走 OAuth)后让它推三种
     list_changed 再断开,项目里加参考目录并重载目录,取消一张提问表单;外加最后读一次各会话(`sessions`)与订阅的第一帧

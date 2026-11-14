@@ -1,7 +1,7 @@
 // `#1697`(I-04 M5c,设计 §4.10 c、R11):约定里每条**翻译**路由(非直通、非固定答复)都至少有一个经真入口的用例,输入来自
 // 本代采样器对真引擎的采样,期望来自翻译器之外 —— UC 不变量、冻结消费方自己的归一函数(只在测试里 import)、或样本里的
 // 引擎原值;不拿被测翻译器算出来的值当期望。
-//   · 台账(LEDGER):每条翻译路由 → 这里的回放用例,或已有的、经 createEngineFetch 的那条测试(文件 + 测试名);少一条、
+//   · 台账(LEDGER):每条翻译路由及 0.2.0 的固定健康探针 → 这里的回放用例,或已有的、经 createEngineFetch 的那条测试(文件 + 测试名);少一条、
 //     多一条、指向不存在的测试都红。
 //   · 回放:fixtures/routes.json(采样器 `routes` 剧本)里每条路由的 v1 请求原样经 createEngineFetch 发出,假 2.x 上游按记下的
 //     往返逐个作答,并记下适配器这次实际发给引擎的请求(方法、路径、请求体、头)。
@@ -68,6 +68,11 @@ const sessionsOf = (raw: any) => (raw.data as any[]).map((session) => normalizeS
 /** 每条采样路由的期望:只用 v1 请求、采样里的引擎原值、UC 与冻结消费方。 */
 const CHECKS: Record<string, (r: Replayed) => void> = {
   "GET /global/health": (r) => expect(r.body).toEqual({ healthy: true, version: r.raw(0).version }), // UC-01
+  // 0.2.0:约定侧固定答 v1,期望是冻结探协议消费方认的形状,不从适配器录下的响应取。
+  "GET /api/health": (r) => {
+    expect(r.body).toEqual({ healthy: true })
+    expect(r.sent).toEqual([])
+  },
   "GET /path": (r) => expect(r.body).toEqual({ home: "", state: "", config: "", worktree: r.raw(0).project.canonical, directory: r.raw(0).directory }),
   "GET /project": (r) =>
     expect(r.body.map((project: any) => [project.id, project.worktree])).toEqual(r.raw(0).map((project: any) => [project.id, project.canonical])),
@@ -224,11 +229,11 @@ const CHECKS: Record<string, (r: Replayed) => void> = {
   },
 }
 
-/** 已有测试证明的翻译路由(都经 createEngineFetch,输入来自采样夹具)。 */
+/** 已有测试证明的翻译路由(都经 createEngineFetch,输入来自采样夹具或沙箱真引擎)。 */
 const EXISTING: Record<string, { file: string; test: string }> = {
   "GET /global/event": { file: "event-projection.test.ts", test: "v1 SDK 订阅的 /global/event 是 2.x /api/event 的投影:SSE 帧为 {directory, payload},订阅方中止即退订" },
   "POST /session/:sessionID/command": { file: "command-reply.test.ts", test: "v1 响应的 info.id = 这条命令那个回合的助手消息,命令来源 chip 对得上回合" },
-  "GET /session/:sessionID/message": { file: "turn-diffs.test.ts", test: "打开会话 → GET /session/:id/message → turnDiffsOf:最新回合的用户消息带着同一份改动" },
+  "GET /session/:sessionID/message": { file: "turn-failure.engine.test.ts", test: "模型不可用 / BYOK 401 / 平台 401 / 402 两种 / 429 / 平台凭据读不到(开头 / 两步之间)/ 拒连,两条入口的回合错误行(turn-failure.engine.cases.ts,9 条)" },
   "GET /session/:sessionID/todo": { file: "todo-route.test.ts", test: "AC-01 2000+ 条消息、写过多次清单:只读最近一段(≤ 两页),结果 = 最后一次写入" },
   "GET /provider": { file: "projection-parity.test.ts", test: "provider 经真入口:createEngineFetch 的 GET /provider 回的就是这份转换(deprecated 模型在 HTTP 输出里)" },
   "POST /mcp/:name/auth/authenticate": { file: "mcp-auth.test.ts", test: "complete ⇒ 回 connected;紧接着的 /mcp 也是 connected(定制中心判成功)" },
@@ -240,6 +245,8 @@ const EXISTING: Record<string, { file: string; test: string }> = {
 
 /** 约定里的翻译路由(非直通、非固定答复)。 */
 const TRANSLATED = (Object.keys(SERVED) as TranslatedKey[]).filter((key) => !(key in FIXED) && ROUTES[key] !== passthrough).sort()
+/** 翻译路由之外,也核 0.2.0 新增的固定健康探针;其余固定答复仍由 unsupported.test.ts 核。 */
+const CASE_ROUTES = [...TRANSLATED, "GET /api/health"].sort()
 
 /** 台账核对:交回缺口(空 = 每条翻译路由都有用例)。 */
 export function ledgerProblems(translated: readonly string[], checks: Record<string, unknown>, existing: Record<string, { file: string; test: string }>, cases: Record<string, unknown>) {
@@ -261,16 +268,16 @@ export function ledgerProblems(translated: readonly string[], checks: Record<str
 describe("#1697 每条翻译路由都有经真入口的采样用例(设计 §4.10 c)", () => {
   test("台账:每条翻译路由恰好登记一次 —— 回放用例或已有测试", () => {
     expect(TRANSLATED.length).toBeGreaterThanOrEqual(59)
-    expect(ledgerProblems(TRANSLATED, CHECKS, EXISTING, CASES)).toEqual([])
+    expect(ledgerProblems(CASE_ROUTES, CHECKS, EXISTING, CASES)).toEqual([])
   })
 
   test("反向臂:台账少一条、指向不存在的测试名、多一条目录外的键 —— 各被点名", () => {
     const { "GET /vcs": _dropped, ...fewer } = CHECKS
-    expect(ledgerProblems(TRANSLATED, fewer, EXISTING, CASES)).toEqual(["GET /vcs: 没有用例"])
+    expect(ledgerProblems(CASE_ROUTES, fewer, EXISTING, CASES)).toEqual(["GET /vcs: 没有用例"])
     const renamed = { ...EXISTING, "GET /provider": { file: "projection-parity.test.ts", test: "no such test" } }
-    expect(ledgerProblems(TRANSLATED, CHECKS, renamed, CASES)).toEqual(["GET /provider: projection-parity.test.ts 里没有「no such test」"])
-    expect(ledgerProblems([...TRANSLATED, "GET /brand-new"], CHECKS, EXISTING, CASES)).toEqual(["GET /brand-new: 没有用例"])
-    expect(ledgerProblems(TRANSLATED, { ...CHECKS, "GET /not-in-catalog": () => {} }, EXISTING, CASES)).toEqual(["GET /not-in-catalog: 不是约定里的翻译路由"])
+    expect(ledgerProblems(CASE_ROUTES, CHECKS, renamed, CASES)).toEqual(["GET /provider: projection-parity.test.ts 里没有「no such test」"])
+    expect(ledgerProblems([...CASE_ROUTES, "GET /brand-new"], CHECKS, EXISTING, CASES)).toEqual(["GET /brand-new: 没有用例"])
+    expect(ledgerProblems(CASE_ROUTES, { ...CHECKS, "GET /not-in-catalog": () => {} }, EXISTING, CASES)).toEqual(["GET /not-in-catalog: 不是约定里的翻译路由"])
   })
 
   for (const key of Object.keys(CHECKS).sort())
@@ -386,9 +393,10 @@ const EVENT_CHECKS: Partial<Record<ContractEventType, () => Promise<void>>> = {
   },
 }
 
-/** 已有测试证明的事件(真采样帧喂投影器,交冻结 app 的归约 / 冻结消费方判)。 */
+/** 已有测试证明的事件(记录或现场采集的真引擎帧,交冻结 app 的归约 / 冻结消费方判)。 */
 const EXISTING_EVENTS: Partial<Record<ContractEventType, { file: string; test: string }>> = {
-  "message.updated": { file: "event-projection.test.ts", test: "读文件回合:事件流归约出的消息与 part,与重新加载这个会话的投影逐字相同" },
+  "message.updated": { file: "queued-prompt.engine.test.ts", test: "#1669 审批等待中追加一句:回答前两个窗口与重新加载都有这条用户消息、反向臂(去掉 session.inbox.enqueued)没有、允许一次后一条气泡 = 引擎 = 重新加载、停止后留在收件箱气泡留着(queued-prompt.engine.cases.ts,4 条)" },
+  "message.removed": { file: "revert-removal.engine.test.ts", test: "#1669 长对话编辑重发:暂存不删、重发后两个窗口 = 引擎 = 重新加载、暂存期间落下的消息一并删、反向臂(去掉 message.removed)旧问答残留(revert-removal.engine.cases.ts,5 条)" },
   "message.part.updated": { file: "event-projection.test.ts", test: "读文件回合:事件流归约出的消息与 part,与重新加载这个会话的投影逐字相同" },
   "message.part.delta": { file: "event-projection.test.ts", test: "流式增量:正文先以 message.part.delta 一段段到达,part id 与最终快照同一个号" },
   "session.status": { file: "event-projection.test.ts", test: "会话状态:execution.started ⇒ busy,succeeded ⇒ idle + session.idle" },
@@ -398,7 +406,7 @@ const EXISTING_EVENTS: Partial<Record<ContractEventType, { file: string; test: s
   "question.asked": { file: "event-projection.test.ts", test: "提问:2.x 表单 ⇒ question.asked(v1 形状),回答后 question.replied 把它从待答里拿掉" },
   "question.replied": { file: "event-projection.test.ts", test: "提问:2.x 表单 ⇒ question.asked(v1 形状),回答后 question.replied 把它从待答里拿掉" },
   "file.watcher.updated": { file: "file-watcher.test.ts", test: "filesystem.changed(不带 sessionID)→ 那个目录频道上的 file.watcher.updated,面板照原样收下" },
-  "permission.asked": { file: "permission-shape.test.ts", test: "事件流:action/resources/save/source 映射回 v1 的 permission/patterns/always/tool,metadata 四键原样透传" },
+  "permission.asked": { file: "command-approval.engine.test.ts", test: "命令卡标题与记忆范围、patch 改文件卡(command-approval.engine.cases.ts,2 条)" },
   "permission.replied": { file: "permission-reply.test.ts", test: "v1 通道:连带的 replied 帧经投影器成为 v1 permission.replied,冻结 feed 逐条收卡" },
 }
 
@@ -414,7 +422,7 @@ const EVENT_TYPES: ContractEventType[] = [
   "server.connected", "mcp.status.changed", "mcp.resources.changed", "server.instance.disposed", "catalog.updated",
   "project.updated", "permission.asked",
   "permission.replied", "question.asked", "question.replied", "question.rejected", "file.watcher.updated",
-  "session.created", "session.updated", "session.deleted", "session.usage.updated", "message.updated",
+  "session.created", "session.updated", "session.deleted", "session.usage.updated", "message.updated", "message.removed",
   "message.part.updated", "message.part.delta", "todo.updated", "session.status", "session.error", "session.idle",
 ] satisfies ContractEventType[]
 
@@ -428,7 +436,7 @@ function declaredEventTypes() {
 describe("#1697 事件表里每种事件都有用例(设计 §4.10 c)", () => {
   test("台账:事件表里每种事件恰好一处 —— 回放用例或已有测试;引擎不发的四种不在表里", async () => {
     expect([...EVENT_TYPES].sort()).toEqual(declaredEventTypes())
-    expect(EVENT_TYPES.length).toBe(29)
+    expect(EVENT_TYPES.length).toBe(30)
     expect(declaredEventTypes().filter((type) => (ENGINE_DOES_NOT_EMIT as readonly string[]).includes(type))).toEqual([])
     const covered = (type: ContractEventType) => [type in EVENT_CHECKS, type in EXISTING_EVENTS].filter(Boolean).length
     expect(EVENT_TYPES.filter((type) => covered(type) !== 1)).toEqual([])

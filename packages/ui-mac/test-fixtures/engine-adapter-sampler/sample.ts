@@ -827,6 +827,8 @@ try {
       await call("PUT", `/api/experimental/mcp/oauthprobe?${loc}`, { config: { type: "remote", url: `${oauth.origin}/mcp` } })
 
       await hit("GET", "/global/health")
+      // 0.2.0 的固定协议答复也走真入口采样;应当没有任何引擎往返。
+      await hit("GET", "/api/health")
       await hit("GET", `/path?${at}`)
       await hit("GET", `/project?${at}`)
       const current = await hit("GET", `/project/current?${at}`)

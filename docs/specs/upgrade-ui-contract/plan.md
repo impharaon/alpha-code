@@ -135,6 +135,34 @@ M3 又会改 `opencode2/` 里引 v1 类型的文件,M4 最后统一改指,避免
 - 单元 2 绿例:只改审批翻译的能力轴 `shell` → `bash`,保留现有 `subagent` → `task` 与身份轴原样;不改 renderer 组件、布局、文案。`git diff 5805414227 -- packages/ui-mac/src/engine-adapter/command-approval.engine.{test,cases}.ts` 为空。`bun test src/engine-adapter/command-approval.engine.test.ts src/engine-adapter/permission-shape.test.ts` 6 pass / 0 fail(exit 0,新宿主子进程 2 pass / 0 fail);最终 `bun test src/engine-adapter/` 128 pass / 0 fail,30 文件(exit 0);`bun typecheck` exit 0;新宿主登记后重跑 `bun test src/main/gate-file-registry.test.ts src/main/old-name-scan.test.ts` 33 pass / 0 fail(exit 0)。与前述 renderer 71 条、ext 登记 5 条合并构成两单元的相关检查证据,未跑 gate/bin/check。
 - 额外范围:无。测试宿主导入路径随搬家调整,原有修复断言未改;冻结包与设计相对 #1710 零字节改动,0.2.0 的原生资源解包和 ext 点名指令也零字节改动。r2 新增两个审批卡测试文件(宿主 + 真引擎/DOM 用例),重采的 14 份夹具为生成变化,均在允许范围。没有迁移 ID。遗留去向:无;下一步由编排器独立审查、推送、PR 与合并。OPTIONAL 无。
 
+##### 单元 3 — 第二部分放回
+
+- r3 依据:续派接受单元 1–2 的 `0973f0bc8f`,授权下列四个 cherry-pick 及必要的一次跟进,不重开设计。四次均无冲突;R17 只移除公开事件流不发的四种,不影响 0.2.0 的 `message.removed` 与收件箱投影。
+
+| 放回项 | 来源 → 本分支 | 本次适配 / 证明 |
+| --- | --- | --- |
+| M5c 逐转换路由采样 | `4e35120f4f` → `fe4a00a439` | `contract-cases.test.ts` 路由账目与真入口回放、`routes.json`、采样器 routes 剧本 |
+| M5d 逐事件采样与升级手册 | `5ae8dc335a` → `d28e481697` | 事件账目与真入口回放、`events.json`、本机假 MCP、runbook 的升级后重证步骤;ADR-047 的两处机制路径随原提交改指 |
+| R17 四种从未发出的事件 | `38c5c148b6` → `c1cfa26d62` | 约定/直通均移除 `lsp.updated`、`global.disposed`、`mcp.tools.changed`、`mcp.prompts.changed`;引擎 Server 清单守卫通过,设计只带入原 R17 裁决 |
+| 账目所指测试的登记 | `f3a630f391` → `5dc2e4d052` | 原有受托测试登记恢复,本次新增引用也逐一登记 |
+| 固定健康探针 | 单元 1 的 `contract/routes.ts` 固定答复 → 采样器 routes 剧本 / `CHECKS` / `CASE_ROUTES` | 新采 `GET /api/health`:状态 200、`upstream: []`;真入口断言 `{healthy:true}` 与零引擎请求,期望来自冻结协议消费方 |
+| 默认助手发送前的读取 | 单元 1 的 `selectAgent` → 新 `routes.json` 的 prompt_async 往返 | 重采增加 `GET /api/session/:id` 后再 prompt,原发送语义断言不改 |
+| 失败回合 | 单元 1 的 `withFailedTurns` / `v1TurnError` → `GET /session/:id/message` 的已有用例账目 | 指向 `turn-failure.engine.test.ts`(9 条真引擎用例,事件流/重开入口均用冻结归约器与回合错误行判) |
+| 排队消息 | 单元 1 的收件箱投影 → `message.updated` 的已有用例账目 | 指向 `queued-prompt.engine.test.ts`(4 条真引擎用例,冻结会话 store 对照引擎与重开结果) |
+| 消息删除 | 单元 1 新登记的 `message.removed` → 30 种事件账目与既有真引擎用例 | 指向 `revert-removal.engine.test.ts`(5 条,冻结 store 与引擎/重开相同,去掉删除帧的反向臂残留旧消息) |
+| 命令审批翻译 | 单元 2 的 `shell` → `bash` → `permission.asked` 已有用例账目 | 指向 `command-approval.engine.test.ts`(2 条真引擎审批 + 列表/事件 + 生产 DOM;身份轴与 patch 对照不变) |
+
+- 初跑 `bun test src/engine-adapter/contract-cases.test.ts src/engine-adapter/fixture-identity.test.ts`:72 pass / 3 fail。失败分别是旧发送样本缺新增读取、事件账目缺 `message.removed`、新带入的 routes/events 两份 core 身份仍为 `584f4421a2`。前十四份夹具身份正确,未重采。
+- 按一致性检查提示执行 `bun packages/ui-mac/test-fixtures/engine-adapter-sampler/sample.ts routes events`,采样器输出完成标记,仅两份夹具更新为当前 core `ed40aaecc1`。全程隔离 HOME/XDG、本地假模型/MCP/OAuth,无需账户或 owner 应用数据。
+- 夹具差异核对:健康探针是新增用例且无引擎往返;prompt_async 多一次会话读取,对应单元 1。其余往返的变化为 ID/时间/临时路径/PID/ticket 等易变值,以及原始模型目录成员与档位数据(引擎 models-dev 源可刷新,`models-dev.refreshed` / `plugin/models-dev.ts:68–80` 会重载目录),回放继续按本次原始模型值判。事件差异为单跑 events 改成 routes 后接 events 后,已有 plain/项目/CLI 目录重载引出的目录事件数量与顺序,以及每帧后读到的流式快照时点;没有未解释的转换形状变化。MCP 仍只采到 status/resources 两种,R17 不变。
+- 新增/修改的证明只引用真实采样、真实引擎输入与冻结消费方,不复制翻译器的期望。覆盖现为 59 条翻译路由 + 1 条固定健康探针、30 种事件;消息类/审批类复用已有真引擎宿主,没有再写第二份投影。
+- 已知坏例:暂存正确测试后,只从 `EXISTING_EVENTS` 移除 `message.removed` 用例登记,执行 `bun test src/engine-adapter/contract-cases.test.ts -t '台账:事件表'`:0 pass / 1 fail、70 filtered out(exit 1),明确报 `["message.removed"]`;随后仅用 `git restore --worktree -- packages/ui-mac/src/engine-adapter/contract-cases.test.ts` 从暂存区恢复该文件,全适配器重跑全绿。
+- 已跑检查(Bun 1.4.4,ui-mac 命令均从包目录):覆盖与身份定向 76 pass / 0 fail(exit 0);`bun test src/engine-adapter/` 199 pass / 0 fail,31 文件(exit 0);`bun typecheck` exit 0。r2 已解释的三条假上游 inbox 日志仍在,没有新的生产缺陷。
+- 登记同步:contract-cases 的精确条数 70 → 71,委派名单跟随新增真引擎宿主与固定答复单位检查;`unsupported.test.ts` 单跑 9 pass / 0 fail,登记为受托方。新 events 夹具内实际 CLI 工作目录词元 24 行由既有 `hitTokens` 算出后按 external-anchor 登记,未改采样原文或放松扫描。
+- 最终登记检查:`packages/ui-mac` 的 `bun test src/main/gate-file-registry.test.ts src/main/old-name-scan.test.ts` 33 pass / 0 fail(exit 0);`packages/ext` 的 `bun test src/policy/authority-registry.test.ts` 5 pass / 0 fail(exit 0)。首次登记检查的两个红项(新增受托测试未登记、重采目录词元未登记)均按实际事实补行,没有删引用或减扫描面。`git diff --check` 通过。
+- r3 实施约 11 分钟(2026-11-14 12:37 起)。四个原提交各自一条提交,另一个跟进提交只涉及 8 个允许文件(两份生成夹具占主要行数);没有冲突或范围扩张。冻结设计除原 R17 带入外不动;单元 1–2 的真引擎修复断言、命令卡红例、原生解包文件、界面不动。遗留去向:无。已核:Codex(GPT-6),本单元实现自检通过;独立审查与推送/PR/合并交编排器。OPTIONAL 无。
+
+
 ## M1a — 翻译器搬进 `opencode2/`(纯搬家)
 
 - 依据:设计 §4.2 模块与依赖方向、§6 第 3 行、§9 M1「翻译器挪进 `opencode2/`」;Issue AC-03。

@@ -110,11 +110,11 @@ M3 又会改 `opencode2/` 里引 v1 类型的文件,M4 最后统一改指,避免
 | 内部目录不列项目 | `engine-adapter/internal-projects.ts` → `engine-adapter/opencode2/internal-projects.ts`;`index.ts` 保留 main 目录入口,经翻译器私有初始化参数给项目列表和事件,不改冻结的 `Translator` 接口 | `internal-projects.engine.test.ts`、`internal-projects.test.ts` 通过;列表与事件共用唯一判定 |
 | 失败回合可见 | `engine-adapter/v1-shapes.ts` 的 `withFailedTurns` / `v1TurnError` → `engine-adapter/opencode2/v1-shapes.ts`;改为喂自有 `projectSessionMessages`,不再借冻结转换 | `turn-failure.engine.test.ts` 通过 |
 | 未指定助手时回默认 | `engine-adapter/routes.ts` 的 `selectAgent` → `engine-adapter/opencode2/routes.ts`,共用于发送、继续、命令与 shell | `default-agent.engine.test.ts` 通过;`turn-diffs.test.ts` 的原断言保留 |
-| 编辑重发逐条删除 | `engine-adapter/events.ts` 的暂存边界与 `message.removed`、`v1-shapes.ts` 的 `baseID` → `opencode2/` 下同名模块 | `revert-removal.engine.test.ts` 通过;测试只改导入路径 |
+| 编辑重发逐条删除 | `engine-adapter/events.ts` 的暂存边界与 `message.removed`、`v1-shapes.ts` 的 `baseID` → `opencode2/` 下同名模块 | `revert-removal.engine.test.ts` 通过;测试只改导入路径;r2 补上 `contract/events.ts` 的 `message.removed`(引用 v1 已有类型),供撤回删除与收件箱投递共用 |
 | 排队输入立即可见 | `engine-adapter/{events,routes,v1-shapes}.ts` 的收件箱投影 → `opencode2/` 下同名模块;列表成功体继续经约定 `reply` | `queued-prompt.engine.test.ts` 通过 |
 | 点名委派审批卡 | `engine-adapter/v1-shapes.ts` 的非 policy 请求 `subagent` → `task` → `opencode2/v1-shapes.ts` 的自有审批转换;ext 的点名指令保持 0.2.0 原样 | `agent-mention.engine.test.ts`、`permission-shape.test.ts` 通过,断言不改 |
 | 协议探针固定答 v1 | `engine-adapter/routes.ts` 的 `GET /api/health` → `contract/routes.ts` 的 `SERVED` / `FIXED`,不问引擎;`PROBE_FALLBACK` 清空 | `protocol-probe.engine.test.ts` 通过;`unsupported.test.ts` 两条旧 501 断言改为 0.2.0 的固定健康答复,覆盖测试按服务路由核对。依派发书保留 #1712 修复,设计 §10 R15 原文冻结不改 |
-| Code Mode 读取附件 | `renderer/codepuppy-ui/session-timeline/timeline-attachments.ts` 原读取判定不动,类型导入从 SDK 改经 `engine-adapter/contract/v1` | `attachment-codemode-read.engine.test.ts` 通过;renderer 组件测试因依赖阻塞尚未跑 |
+| Code Mode 读取附件 | `renderer/codepuppy-ui/session-timeline/timeline-attachments.ts` 原读取判定不动,类型导入从 SDK 改经 `engine-adapter/contract/v1` | `attachment-codemode-read.engine.test.ts` 通过;r2 的 renderer 附件卡与 timeline-model 两文件 71 pass / 0 fail |
 | 原生资源解包 | `packages/ui-mac/electron-builder.config.ts`、`packages/ui-mac/scripts/target-arch.ts` → 原位不动 | `git diff 3a8e25d6b8 -- packages/ui-mac/electron-builder.config.ts packages/ui-mac/scripts/target-arch.ts` 为空 |
 
 - 锁文件由 Git 文本合并:只恢复 ui-mac 的 `@opencode-ai/client` 类型依赖及其包记录(3 行),0.2.0 版本保留;未运行 `bun install`。
@@ -125,6 +125,8 @@ M3 又会改 `opencode2/` 里引 v1 类型的文件,M4 最后统一改指,避免
 - r2(2026-11-14):依赖由编排器刷新成功,接受 `7c5a152e73` 为续接点。执行 `bun packages/ui-mac/test-fixtures/engine-adapter-sampler/sample.ts`(Bun 1.4.4) exit 0,14 份夹具由真引擎重新生成,单独提交。全程临时 HOME/XDG + 本地假模型/OAuth,没有账户或 owner 数据访问。
 - 重采核对:core 身份 `584f4421a2` → `ed40aaecc1` 来自 #1712 的 `LoadAPIKeyError` → `provider.auth` 修复(该分支不被正常假模型剧本触发);没有新增转换形状。去掉来源、时间/ID、临时路径、游标、slug、端口等易变值后,`catalog` / `command` / `files` / `permission-*` / `tools` / `turn-diff` 无实质差异;`lineage` 只换 shell id;其余差异是异步帧之后快照取到的流式阶段、标题/用量事件顺序、shell 空页轮询时点。`passthrough` 上次单跑,本次全跑,清单多出前序剧本写的文件和会话(仍为原结构)。最终消息与原断言保持一致,重采后适配器 127 pass / 0 fail。
 - inbox 日志核对: `turn-diffs.test.ts:77,119` 的假上游只答消息页/diff,未答 `/inbox`,三次正向读取落入其 `500 "unexpected"`;日志确实来自被容错的失败路径,不是 0.2.0 路由漂移。客户端 `session.inbox.list` 的成功码为 200(`client.ts:886–897`),协议定义一致(`protocol/src/groups/session.ts:540–543`);真引擎 `queued-prompt.engine.cases.ts` 的 `engineInbox` 也断言 200,并验证重开会话的排队气泡。定向 `bun test src/engine-adapter/turn-diffs.test.ts src/engine-adapter/queued-prompt.engine.test.ts` 11 pass / 0 fail,复现恰好三条日志,未改生产错误处理或旧断言。
+
+- 单元 1 核验完成(r2):`bun test src/engine-adapter/` 127 pass / 0 fail(exit 0);`bun test src/renderer/codepuppy-ui/attachment-cards.component.test.ts src/renderer/codepuppy-ui/session-timeline/timeline-model.test.ts` 71 pass / 0 fail(exit 0,附件卡宿主另核子进程 15 条)。`bun typecheck` 首次因约定漏登已迁入的 `message.removed` 报两处 TS2322;补登这个现有事件后 exit 0。`bun test src/engine-adapter/revert-removal.engine.test.ts src/engine-adapter/queued-prompt.engine.test.ts src/engine-adapter/boundary.test.ts` 9 pass / 0 fail(exit 0)。`bun test src/main/gate-file-registry.test.ts src/main/old-name-scan.test.ts` 33 pass / 0 fail(exit 0);`packages/ext` 的 `bun test src/policy/authority-registry.test.ts` 5 pass / 0 fail(exit 0)。所有 ui-mac 命令从包目录运行,Bun 均为 1.4.4;未跑全门。
 
 - 额外范围:无。测试宿主导入路径随搬家调整,断言未改;冻结包零字节改动。遗留去向:依赖刷新与余下实现交编排器续派,OPTIONAL 无。
 

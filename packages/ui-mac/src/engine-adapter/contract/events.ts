@@ -41,6 +41,8 @@ export type ContractEventMap = {
   "session.usage.updated": Legacy.SessionUsageUpdated["data"]
   // 只发 info(归约只读 info)
   "message.updated": Pick<V1.EventMessageUpdated["properties"], "info">
+  // `#1669`:编辑重发删除旧消息,收件箱投递也用它先移除受理时间版本。
+  "message.removed": V1.EventMessageRemoved["properties"]
   // ContractPart = V1.Part:UC-09 的 `display` 已在 Code Puppy 自有的 sdk-v1 里声明,其余细化在开放的 `state.metadata` 里
   "message.part.updated": { part: V1.Part }
   "message.part.delta": V1.EventMessagePartDelta["properties"]

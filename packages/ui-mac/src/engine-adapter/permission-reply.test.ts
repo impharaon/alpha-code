@@ -1,4 +1,4 @@
-// `#1668` I7a:审批回复与回执(L4 推导规格;`#1697` 起回执账本在 contract/receipts.ts,引擎一侧在 opencode2/approvals.ts)。
+// `#1668` I7a:审批回复与回执(permission-replies.ts,L4 推导规格)。
 //
 // 每一条都从冻结界面的消费形状走进适配器:v1 SDK(`throwOnError`,与 DirectorySDK 同配)经 engineFetch 发请求,
 // 回执交给冻结的 replyPermissionV1 / createPermissionV2Feed / permissionDecisionSubmitError /
@@ -17,12 +17,10 @@ import {
 } from "../../../codepuppy-app/src/context/permission-v1-adapter"
 import { createPermissionDecisionCommand, permissionDecisionSubmitError } from "../renderer/codepuppy-ui/PermissionDialog"
 import { createPermissionV2Feed } from "../renderer/codepuppy-ui/session-workspace/session-permission-feed"
-import askedSample from "./fixtures/permission-asked.json"
 import fixture from "./fixtures/permission-reply.json"
-import { createProjector, type V1Payload } from "./opencode2/events"
+import { createProjector, type V1Payload } from "./events"
 import { createEngineFetch } from "./index"
-import { createReceiptLedger, requestFingerprint } from "./contract/receipts"
-import { toV1PermissionRequest } from "./opencode2/v1-shapes"
+import { createPermissionReplies, requestFingerprint } from "./permission-replies"
 // 假引擎的规则判定直接用引擎原件(测试进程有 `process`)。
 import { evaluate as engineEvaluate } from "../../../core/src/permission"
 
@@ -184,8 +182,7 @@ function setup(options?: { repliedAfterResponse?: boolean }) {
         if (!result.data) throw new Error("Permission reply response is missing DecisionReceipt")
         return result.data.data as PermissionV2DecisionReceipt
       })
-  /** 设计 §4.8:指纹按交给界面的那份 v1 请求算(与 GET /permission、permission.asked 同一个投影)。 */
-  const fingerprint = (id: string) => requestFingerprint(toV1PermissionRequest(engine.pending.get(id)! as never))
+  const fingerprint = (id: string) => requestFingerprint(engine.pending.get(id)! as never)
   return { engine, engineFetch, client, cards, replyV1, replyV2, fingerprint }
 }
 
@@ -281,68 +278,6 @@ describe("#1668 审批回执:陈旧快照 409、过期 404", () => {
   })
 })
 
-describe("#1697 审批回执:指纹按所显示的请求(设计 §4.8)", () => {
-  /** 测试自己的序列化(键排序、丢 undefined)与 sha256,不用被测账本的函数。 */
-  const sorted = (value: unknown): unknown =>
-    Array.isArray(value)
-      ? value.map(sorted)
-      : value && typeof value === "object"
-        ? Object.fromEntries(
-            Object.keys(value)
-              .sort()
-              .filter((key) => (value as Record<string, unknown>)[key] !== undefined)
-              .map((key) => [key, sorted((value as Record<string, unknown>)[key])]),
-          )
-        : value
-  const sha256 = async (value: unknown) =>
-    Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(JSON.stringify(sorted(value))))), (byte) =>
-      byte.toString(16).padStart(2, "0"),
-    ).join("")
-  const displayedFacts = (request: { sessionID: string; permission: string; patterns: string[]; always: string[]; metadata: unknown; tool?: unknown }) => ({
-    sessionID: request.sessionID,
-    permission: request.permission,
-    patterns: request.patterns,
-    always: request.always,
-    metadata: request.metadata,
-    tool: request.tool,
-  })
-
-  test("收据指纹 = GET /permission 交出的 v1 请求的 sessionID / permission / patterns / always / metadata / tool 的 sha256;真引擎采样的命令与收据也是这个值", async () => {
-    const { engine, client, replyV2 } = setup()
-    const displayed = ((await client.permission.list()).data ?? []).find((request) => request.id === a1)!
-    const expected = await sha256(displayedFacts(displayed))
-    const receipt = await replyV2(sessionA)(a1, { requestFingerprint: expected, decisionID: "pdec_displayed", decision: "once" })
-    expect(receipt.requestFingerprint).toBe(expected)
-    expect(engine.replies).toEqual([{ requestID: a1, decision: "once" }])
-    // 采样器对真 2.x 引擎:命令的指纹按适配器交出的那份算,适配器照收,收据交回同一个值
-    const sampled = await sha256(displayedFacts(toV1PermissionRequest(fixture.getA1.body.data as never)))
-    expect(fixture.command.requestFingerprint).toBe(sampled)
-    expect(fixture.rejected.body.data.requestFingerprint).toBe(sampled)
-    // 带工具来源的真请求(permission-asked.json):`tool` 也在指纹里。经 v1 入口(不带指纹)取账本在交出时记下的那一个
-    const withTool = toV1PermissionRequest(askedSample.frame.data as never)
-    expect(withTool.tool).toBeDefined()
-    const ledger = createReceiptLedger()
-    ledger.show(withTool)
-    const outcome = await ledger.decide(
-      { current: async () => withTool, decide: async ({ requestID }) => [requestID] },
-      { requestID: withTool.id, decision: "once", decisionID: "pdec_tool" },
-    )
-    expect(outcome.type === "receipt" && outcome.receipt.requestFingerprint).toBe(await sha256(displayedFacts(withTool)))
-  })
-
-  test("反向臂:按引擎原始字段算的旧指纹(`#1668` 的算法)走 v2 入口 ⇒ 409,引擎一个字节的回复都没收到", async () => {
-    const { engine, client, replyV2 } = setup()
-    await client.permission.list()
-    const raw = engine.pending.get(a1)!
-    const old = await sha256({ sessionID: raw.sessionID, action: raw.action, resources: raw.resources, save: raw.save, metadata: raw.metadata, source: (raw as { source?: unknown }).source })
-    const displayed = await sha256(displayedFacts(toV1PermissionRequest(raw as never)))
-    expect(old).not.toBe(displayed)
-    const error = await replyV2(sessionA)(a1, { requestFingerprint: old, decisionID: "pdec_old", decision: "once" }).catch((caught) => caught)
-    expect(permissionDecisionSubmitError(error).kind).toBe("conflict")
-    expect(engine.replies).toEqual([])
-  })
-})
-
 describe("#1668 审批回执:幂等重放", () => {
   test("同一命令再来一次 ⇒ 同一张收据,引擎只收到一次;反向臂:真引擎对同一 id 的第二次回复是 404(采样)", async () => {
     const { engine, client, cards, replyV2, fingerprint } = setup()
@@ -404,12 +339,12 @@ describe("#1668 审批回执:reject 的连带", () => {
   })
 
   test("v1 通道:连带的 replied 帧经投影器成为 v1 permission.replied,冻结 feed 逐条收卡", async () => {
-    const replies = createReceiptLedger()
+    const replies = createPermissionReplies()
     const events: V1Payload[] = []
     const api = { session: { get: async () => ({ location: { directory: "/proj" } }) } }
     const projector = createProjector(api as never, (_directory, payload) => events.push(payload), replies)
     const feed = await loadedFeed(
-      async () => ASKED.filter((request) => request.sessionID === sessionA).map((request) => adaptPermissionV1Request(replies.show(toV1PermissionRequest(request as never)) as never, "build")),
+      async () => ASKED.filter((request) => request.sessionID === sessionA).map((request) => adaptPermissionV1Request(replies.show(request as never) as never, "build")),
       async () => {
         throw new Error("unused")
       },
@@ -463,7 +398,7 @@ describe("#1662 I-05 「本次会话内允许」:原样发 always,内核记本�
     const { engine, replyV2 } = setup()
     engine.pending.set(BASH.id, { ...structuredClone(BASH), save: [] })
     const command = {
-      requestFingerprint: await requestFingerprint(toV1PermissionRequest(engine.pending.get(BASH.id)! as never)),
+      requestFingerprint: await requestFingerprint(engine.pending.get(BASH.id)! as never),
       decisionID: "pdec_nosave",
       decision: "always" as const,
       grantScope: { kind: "project" as const, projectID: "proj_1" },

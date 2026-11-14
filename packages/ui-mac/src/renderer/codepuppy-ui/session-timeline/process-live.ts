@@ -7,7 +7,7 @@
 //   · 思考进行中不露原文,只在开头给了明确小标题(且标题那一行已经写完)时附在「正在思考」后;
 //   · 正在跑的命令在其下方露最后 3 行输出,结束即收起。
 // 视图(process-fold.tsx)只负责把这里的结论变成 DOM;每条结论在 process-live.test.ts 里单测。
-import type { ToolPart } from "../../../engine-adapter/contract/v1"
+import type { ToolPart } from "@opencode-ai/sdk/v2/client"
 import { toolCardBodyOf, toolCardDispatchOf, toolTitleKeyOf } from "./cards/tool-card-model"
 import {
   PROCESS_STEP_DURATION_MIN_MS,

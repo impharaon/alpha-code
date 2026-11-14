@@ -5,7 +5,7 @@ import { describe, expect, test } from "bun:test"
 import { slashOriginForTurn } from "../renderer/codepuppy-ui/session-timeline/timeline-model"
 import command from "./fixtures/command.json"
 import { createEngineFetch } from "./index"
-import { toV1Messages } from "./opencode2/v1-shapes"
+import { toV1Messages } from "./v1-shapes"
 
 const fixture = command as unknown as {
   directory: string

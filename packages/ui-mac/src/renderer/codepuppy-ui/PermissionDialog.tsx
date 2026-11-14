@@ -3,7 +3,7 @@ import type {
   PermissionV2DecisionCommand,
   PermissionV2DecisionReceipt,
   PermissionV2Request,
-} from "../../engine-adapter/contract/v1"
+} from "@opencode-ai/sdk/v2/client"
 import { createSignal, createUniqueId, For, type JSX, onCleanup, onMount, Show } from "solid-js"
 import { createStore } from "solid-js/store"
 import { Portal } from "solid-js/web"

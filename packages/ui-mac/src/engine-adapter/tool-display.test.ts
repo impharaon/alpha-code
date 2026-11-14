@@ -3,7 +3,7 @@
 import { describe, expect, test } from "bun:test"
 import { toolCardDispatchOf } from "../renderer/codepuppy-ui/session-timeline/cards/tool-card-model"
 import readTool from "./fixtures/read-tool.json"
-import { toV1Messages } from "./opencode2/v1-shapes"
+import { toV1Messages } from "./v1-shapes"
 
 const display = {
   identity: { source: "builtin", origin: "", name: "read" },

@@ -1,4 +1,4 @@
-import type { ModelRef, ModelV2Info, createOpencodeClient } from "../../engine-adapter/contract/v1"
+import type { ModelRef, ModelV2Info, createOpencodeClient } from "@opencode-ai/sdk/v2/client"
 import { CODEPUPPY_V2_CATALOG_READY_PROVIDER_ID } from "../../shared/codepuppy-config"
 import { subscribeCatalogUpdated } from "../runtime-recovery"
 import { ENGINE_FETCH_TIMEOUT_MS } from "./model-picker-logic"

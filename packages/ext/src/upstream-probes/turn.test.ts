@@ -16,7 +16,7 @@
 //
 // Each probe also feeds its checker a known-bad copy of the real sample, so a checker that cannot fail is caught here.
 import { afterAll, beforeAll, describe, expect, test } from "bun:test"
-import { toV1Messages } from "../../../ui-mac/src/engine-adapter/opencode2/v1-shapes"
+import { toV1Messages } from "../../../ui-mac/src/engine-adapter/v1-shapes"
 import { ATTACHMENT_METADATA_KEY } from "../../../ui-mac/src/shared/attachment-path"
 import { stagedAttachmentOfText } from "../attachment-reader-hooks"
 import { stagedAttachmentPart } from "../staged-attachment-part"

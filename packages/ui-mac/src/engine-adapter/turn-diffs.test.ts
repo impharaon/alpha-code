@@ -11,10 +11,10 @@ import fixture from "./fixtures/turn-diff.json"
 import continued from "./fixtures/continue.json"
 import parity from "./fixtures/parity.json"
 import tools from "./fixtures/tools.json"
-import { createProjector, TURN_DIFF_EVENTS, type V1Payload } from "./opencode2/events"
-import { createReceiptLedger } from "./contract/receipts"
+import { createProjector, TURN_DIFF_EVENTS, type V1Payload } from "./events"
+import { createPermissionReplies } from "./permission-replies"
 import { createEngineFetch } from "./index"
-import { CONTINUE_METADATA_KEY, toV1Messages } from "./opencode2/v1-shapes"
+import { CONTINUE_METADATA_KEY, toV1Messages } from "./v1-shapes"
 
 type Record_ = { frame: { type: string; data: Record<string, any> }; snapshot?: { data: any[] }; diff?: { data: unknown[] } }
 const records = fixture.records as unknown as Record_[]
@@ -45,7 +45,7 @@ async function viaEvents() {
     (directory, payload) => {
       if (directory === fixture.directory) events.push(payload)
     },
-    createReceiptLedger(),
+    createPermissionReplies(),
   )
   for (const record of records) {
     current = record
@@ -137,7 +137,7 @@ describe("#1668 F2 「继续」之后的回合改动", () => {
       },
     }
     const events: V1Payload[] = []
-    const projector = createProjector(api as never, (directory, payload) => directory === source.directory && events.push(payload), createReceiptLedger())
+    const projector = createProjector(api as never, (directory, payload) => directory === source.directory && events.push(payload), createPermissionReplies())
     for (const record of source.records) {
       current = record
       await projector(record.frame as never)
@@ -179,7 +179,11 @@ describe("#1668 F2 「继续」之后的回合改动", () => {
       body: JSON.stringify({ parts: [{ type: "text", text: "Continue", synthetic: true }] }),
     })
     expect(response.status).toBe(204)
-    expect(calls).toEqual([{ path: "/api/session/ses_1/prompt", body: { text: "Continue", metadata: { [CONTINUE_METADATA_KEY]: true } } }])
+    // `#1669`:不带 agent 先读会话 —— 它没选过助手(这里的应答没有 agent)就不切,直接落 prompt。
+    expect(calls).toEqual([
+      { path: "/api/session/ses_1", body: undefined },
+      { path: "/api/session/ses_1/prompt", body: { text: "Continue", metadata: { [CONTINUE_METADATA_KEY]: true } } },
+    ])
   })
 
   test("最新回合由引擎的 synthetic 在 idle 之后开启(legacy 续写)⇒ 从 synthetic 取 diff,面板读得到;diff 真失败时记下错误、消息照回", async () => {
@@ -233,6 +237,8 @@ describe("#1668 后台子代理完成通知之后的回合改动", () => {
           froms.push(url.searchParams.get("from"))
           return Response.json({ data: [change] })
         }
+        // `#1669`:打开会话时也读收件箱(排着的输入);这个回合早已结束,引擎回空。
+        if (url.pathname.endsWith("/inbox")) return Response.json({ data: [] })
         return Response.json({ data: [...session.final].reverse(), cursor: {} })
       }) as typeof fetch,
     })
@@ -265,6 +271,8 @@ describe("#1668 后台子代理完成通知之后的回合改动", () => {
           froms.push(url.searchParams.get("from"))
           return Response.json({ data: [change] })
         }
+        // `#1669`:打开会话时也读收件箱(排着的输入);这个回合早已结束,引擎回空。
+        if (url.pathname.endsWith("/inbox")) return Response.json({ data: [] })
         return Response.json({ data: [...background.final].reverse(), cursor: {} })
       }) as typeof fetch,
     })

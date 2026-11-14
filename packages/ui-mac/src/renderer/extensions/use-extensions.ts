@@ -15,7 +15,7 @@
 import { createStore } from "solid-js/store"
 import { createEffect, createSignal, onCleanup, untrack, type Accessor } from "solid-js"
 // CLIENT subpath only — the v2 barrel pulls Node-only deps that break the renderer (see ADR-008).
-import { createOpencodeClient } from "../../engine-adapter/contract/v1"
+import { createOpencodeClient } from "@opencode-ai/sdk/v2/client"
 import type { ServerInfo } from "../sidebar/use-projects"
 import type { CatalogEntry, InstalledState, McpConfig, McpInstallSpec, RuntimeCheck } from "./catalog-types"
 import type { CatalogPackageViewV1 } from "../../shared/catalog-package-view"

@@ -7,7 +7,7 @@
 
 import { createEffect, onCleanup, type Accessor } from "solid-js"
 // CLIENT subpath only — the v2 barrel pulls Node-only deps that break the renderer (see ADR-008).
-import { createOpencodeClient } from "../../engine-adapter/contract/v1"
+import { createOpencodeClient } from "@opencode-ai/sdk/v2/client"
 import type { CodePuppyProjectsApi, ServerInfo } from "../sidebar/use-projects"
 import { extractCloudRunHit, runStateToast } from "./cloud-run-core"
 import { pushToast, reportProblem, resolveProblem } from "./Toast"

@@ -15,9 +15,14 @@ const LAYER: ExplicitLayer = {
     { action: "provider.use", resource: "*", effect: "deny" },
     { action: "provider.use", resource: "codepuppy", effect: "allow" },
   ],
+  plugins: [
+    { action: "plugin.use", resource: "*", effect: "deny" },
+    { action: "plugin.use", resource: "/app/codepuppy-ext", effect: "allow" },
+  ],
   commands: { init: { template: "factory init", description: "guided" }, review: { template: "factory review", subagent: true } },
   skills: ["/factory/a", "/root/ext-store/skill--a/generations/gen-000001-aaaaaa"],
 }
+const OURS = [...LAYER.policies, ...LAYER.plugins]
 
 const dirs: string[] = []
 afterEach(() => {
@@ -33,7 +38,7 @@ describe("显式文件的合成", () => {
   test("没有用户文件:就是我们这一层,2.x 原生键,上游 normalize 零诊断、过 Config.Info 解码", () => {
     const { document, userError } = composeExplicitDocument(undefined, LAYER)
     expect(userError).toBeUndefined()
-    expect(document).toEqual({ $schema: "https://opencode.ai/config.json", skills: LAYER.skills, commands: LAYER.commands, policies: LAYER.policies })
+    expect(document).toEqual({ $schema: "https://opencode.ai/config.json", skills: LAYER.skills, commands: LAYER.commands, policies: OURS })
     const normalized = ConfigNormalize.normalize(document)
     expect(normalized.type).toBe("normalized")
     if (normalized.type === "normalized") expect(normalized.diagnostics).toEqual([])
@@ -54,7 +59,7 @@ describe("显式文件的合成", () => {
     expect(document.command).toEqual({ init: { template: "my own init" } })
     expect(document.commands).toEqual({ review: LAYER.commands.review, deploy: { template: "ship it" } })
     expect(document.skills).toEqual(["/user/skills", ...LAYER.skills])
-    expect(document.policies).toEqual([{ action: "provider.use", resource: "rogue", effect: "allow" }, ...LAYER.policies])
+    expect(document.policies).toEqual([{ action: "provider.use", resource: "rogue", effect: "allow" }, ...OURS])
     expect(document.mcp).toEqual({ "local-tool": { type: "local", command: ["tool"] } })
   })
 
@@ -76,11 +81,12 @@ describe("显式文件的合成", () => {
   test("用户文件解析不了 ⇒ 只放我们这一层并给出原因(不把半份坏文件交给引擎)", () => {
     const { document, userError } = composeExplicitDocument("{ not json", LAYER)
     expect(userError).toContain("JSONC parse error")
-    expect(document).toEqual({ $schema: "https://opencode.ai/config.json", skills: LAYER.skills, commands: LAYER.commands, policies: LAYER.policies })
+    expect(document).toEqual({ $schema: "https://opencode.ai/config.json", skills: LAYER.skills, commands: LAYER.commands, policies: OURS })
   })
 
-  test("没有 policies(模型治理关着)⇒ 显式文件里不写 policies", () => {
-    expect(composeExplicitDocument(undefined, { ...LAYER, policies: [] }).document.policies).toBeUndefined()
+  test("没有 provider policies(模型治理关着)⇒ 只写 `#1708` 的 plugin.use 语句;两样都没有 ⇒ 不写 policies", () => {
+    expect(composeExplicitDocument(undefined, { ...LAYER, policies: [] }).document.policies).toEqual(LAYER.plugins)
+    expect(composeExplicitDocument(undefined, { ...LAYER, policies: [], plugins: [] }).document.policies).toBeUndefined()
   })
 })
 
@@ -101,22 +107,24 @@ describe("运行中:输入一变就重写显式文件", () => {
     fs.renameSync(`${file}.tmp`, file)
   }
 
-  test("codepuppy.jsonc 原子改写 ⇒ 显式文件跟着变;改坏 ⇒ 保留上一份好的;停止之后不再跟", async () => {
+  test("codepuppy.jsonc 原子改写 ⇒ 显式文件跟着变(`#1708` 的 plugin.use 按改后的原文重算);改坏 ⇒ 保留上一份好的;停止之后不再跟", async () => {
     const root = tempDir()
     const userConfig = path.join(root, "codepuppy.jsonc")
     const file = path.join(root, "..", `${path.basename(root)}-engine`, "codepuppy-explicit.json")
     dirs.push(path.dirname(file))
     fs.writeFileSync(userConfig, `{ "commands": { "one": { "template": "1" } } }`)
     writeExplicitConfig(file, userConfig, LAYER)
-    const read = () => JSON.parse(fs.readFileSync(file, "utf8")) as { commands?: Record<string, unknown> }
+    const read = () => JSON.parse(fs.readFileSync(file, "utf8")) as { commands?: Record<string, unknown>; policies?: Array<{ resource: string }> }
     expect(Object.keys(read().commands!).sort()).toEqual(["init", "one", "review"])
     const logs: string[] = []
-    const stop = watchExplicitSources({ file, root, userConfig, layer: LAYER, skills: () => LAYER.skills, log: (line) => logs.push(line) })
+    const plugins = (text: string | undefined) => [{ action: "plugin.use", resource: text?.includes('"two"') ? "/seen/two" : "/seen/other", effect: "allow" }]
+    const stop = watchExplicitSources({ file, root, userConfig, layer: LAYER, skills: () => LAYER.skills, plugins, log: (line) => logs.push(line) })
     await settle()
     try {
       atomic(userConfig, `{ "commands": { "two": { "template": "2" } } }`)
       expect(await waitFor(() => "two" in (read().commands ?? {}))).toBe(true)
       expect("one" in read().commands!).toBe(false)
+      expect(read().policies?.at(-1)?.resource).toBe("/seen/two")
 
       atomic(userConfig, "{ broken")
       expect(await waitFor(() => logs.some((line) => line.includes("keeping the previous engine config")))).toBe(true)
@@ -136,7 +144,7 @@ describe("运行中:输入一变就重写显式文件", () => {
     let skills = ["/gen/one"]
     writeExplicitConfig(file, undefined, { ...LAYER, skills })
     const read = () => (JSON.parse(fs.readFileSync(file, "utf8")) as { skills: string[] }).skills
-    const stop = watchExplicitSources({ file, root, layer: LAYER, skills: () => skills, log: () => {} })
+    const stop = watchExplicitSources({ file, root, layer: LAYER, skills: () => skills, plugins: () => LAYER.plugins, log: () => {} })
     await settle()
     try {
       skills = ["/gen/two"]

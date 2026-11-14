@@ -16,7 +16,7 @@ import type {
   PermissionV2DecisionCommand,
   PermissionV2DecisionReceipt,
   PermissionV2Request,
-} from "../../../engine-adapter/contract/v1"
+} from "@opencode-ai/sdk/v2/client"
 import { createStore, type Store } from "solid-js/store"
 
 export type PermissionFeedDelta =

@@ -15,7 +15,7 @@
 //
 // 开合状态住在视图级的信号里(按回合 / 步骤键),不住在行对象上:步骤状态翻转会换行对象,
 // 用户手动开或关过的不能因此被系统重置(design §3「你手动开或关过的,本回合内系统不再替你开关」)。
-import type { ReasoningPart, ToolPart } from "../../../engine-adapter/contract/v1"
+import type { ReasoningPart, ToolPart } from "@opencode-ai/sdk/v2/client"
 import {
   type Accessor,
   createContext,

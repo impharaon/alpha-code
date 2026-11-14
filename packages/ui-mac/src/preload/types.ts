@@ -3,6 +3,7 @@ import type { WslServersPlatform } from "@opencode-ai/app/wsl/types"
 import type { UpdaterState } from "@opencode-ai/app/updater"
 import type { CodePuppyEndpoints } from "../shared/codepuppy-config"
 import type { BuildIdentity } from "../shared/build-identity"
+import type { CodePuppyEnvironmentInfo } from "../main/codepuppy-environment"
 // Type-only (erased at build): the IPC row must not restate the wire's kind enum and drift from it.
 import type { LedgerFactKindV1 } from "@codepuppy/contracts-consumer"
 import type {
@@ -84,6 +85,12 @@ export type {
  * 的 `EngineConnection`,不经 IPC 出去。
  */
 export type ServerReadyData = { url: string }
+
+/**
+ * `#1669`:main 持有的两个引擎目录(main/engine-internal-directories.ts),每项是引擎可能记下的几种写法。引擎适配器据此
+ * 把它们从项目清单里拿掉:`scratch` 永远不是项目;`defaultWorkspace` 有对话之后才是。
+ */
+export type EngineInternalDirectories = { scratch: string[]; defaultWorkspace: string[] }
 
 export type SidecarGenerationReason = "boot" | "structural"
 
@@ -667,20 +674,9 @@ export type {
   WorkspaceFileOpenResult,
 } from "../shared/file-viewer"
 
-/** REQ-098:App 运行环境快照(main 启动时由打包状态 + 构建渠道解析后冻结;renderer 只读,无写面)。 */
-export type CodePuppyEnvironmentInfo = {
-  environment: "prod" | "beta" | "dev"
-  registryChannel: "stable" | "preview" | "dev"
-  buildChannel: "dev" | "beta" | "prod"
-  packaged: boolean
-  /** 本环境的可变状态根(config/receipts/grants/secret refs/enabled state 的分域落点)。 */
-  mutableRoot: string
-  /** 共享 canonical 基根(REQ-102:CAS 落 <casBaseRoot>/cas,三环境 mutable root 落 env/ 下)。 */
-  casBaseRoot: string
-  /** base 由 unpackaged override 或内部 onboarding 隔离参数提供。 */
-  rootOverridden: boolean
-  updaterFeedChannel: "latest" | "beta" | null
-}
+/** REQ-098:App 运行环境快照,定义在 codepuppy-environment.ts(`#1709`:那份环境模块被 sidecar 里的 ext 引用,不能反过来
+ *  拖进本文件的整张 IPC 类型图)。 */
+export type { CodePuppyEnvironmentInfo }
 
 export type ElectronAPI = {
   killSidecar: () => Promise<void>
@@ -753,6 +749,8 @@ export type ElectronAPI = {
   workspaceDefaultDir: () => Promise<string>
   /** lazy 供给:dir 省略或等于默认工作目录时创建并返回;其他路径 no-op(ok:false)。 */
   workspaceEnsureDefault: (dir?: string) => Promise<{ ok: boolean; dir?: string }>
+  /** `#1669`:引擎适配器认 Code Puppy 自己的目录用(见 `EngineInternalDirectories`)。 */
+  engineInternalDirectories: () => Promise<EngineInternalDirectories>
   /**
    * REQ-159 `#1322`:「这个目录现在写得进去吗」—— 由**被围栏的引擎进程**在该目录真写一次再删。
    * writable / denied(围栏 EPERM)/ unknown(引擎不在 / 超时 / 别的失败)。呈现层只在 denied 时标记。

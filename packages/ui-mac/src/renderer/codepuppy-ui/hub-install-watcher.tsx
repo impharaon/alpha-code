@@ -32,7 +32,7 @@
 
 import { createEffect, createSignal, onMount, Show, untrack, type Accessor } from "solid-js"
 import { useLocation } from "@solidjs/router"
-import type { PermissionV2Request } from "../../engine-adapter/contract/v1"
+import type { PermissionV2Request } from "@opencode-ai/sdk/v2/client"
 import { parseRoute } from "../../shared/route-manifest"
 import { t } from "../i18n"
 import { Dialog } from "./Dialog"

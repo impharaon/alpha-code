@@ -141,6 +141,7 @@ status.
 | `⚠️ 缺 id` | [architecture/2026-11-09-1662-l1-engine-host-spike.md](architecture/2026-11-09-1662-l1-engine-host-spike.md) | ⚠️ 缺 summary | ? |
 | `⚠️ 缺 id` | [architecture/2026-11-09-1662-permission-reply-measurements.md](architecture/2026-11-09-1662-permission-reply-measurements.md) | ⚠️ 缺 summary | active |
 | `⚠️ 缺 id` | [architecture/2026-11-12-1662-takeover-candidates.md](architecture/2026-11-12-1662-takeover-candidates.md) | ⚠️ 缺 summary | ? |
+| `ARCH-codepuppy-2026-11-13-project-extension-trust-record` | [architecture/2026-11-13-project-extension-trust-record.md](architecture/2026-11-13-project-extension-trust-record.md) | 项目插件、项目 MCP 与项目 agent 的控制字段只在用户于确认框里同意后加载;记录在 Code Puppy 的状态目录,按规范目录 + inode 认项目,项目目录里的文件不算 | active |
 | `ARCH-alpha-code-claude-plugin-corpus-component-scale` | [architecture/claude-plugin-corpus-component-scale.md](architecture/claude-plugin-corpus-component-scale.md) | 真实 Claude 插件语料的组件规模(勘破) | active |
 | `ARCH-alpha-code-codepuppy-connection-lifetime` | [architecture/codepuppy-connection-lifetime.md](architecture/codepuppy-connection-lifetime.md) | Code Puppy Connection record lifetime | active |
 | `ARCH-alpha-code-constraints` | [architecture/constraints.md](architecture/constraints.md) | Architecture constraints and known deviations | active |
@@ -402,6 +403,7 @@ status.
 | `SPEC-permission-risk-display` | [specs/permission-risk-display/spec.md](specs/permission-risk-display/spec.md) | 用户在授权时能看出动作的风险档位，保留历史条款、有效裁决和交付证据边界。 | draft |
 | `PLAN-project-agent-fields` | [specs/project-agent-fields/plan.md](specs/project-agent-fields/plan.md) | alpha-code#1700 一段 —— 项目助手的 disable、temperature、top_p、steps(maxSteps)、hidden、color、variant 在 OpenCode 2 上生效,用不上的字段记一行日志,写坏的条目整条不装(tools 已由 | active |
 | `SPEC-project-agent-fields` | [specs/project-agent-fields/spec.md](specs/project-agent-fields/spec.md) | 项目文档里给 agent 写的 disable、tools、temperature 等字段在新引擎上重新生效,用不上的字段有记录可查 | approved |
+| `PLAN-project-consent-store` | [specs/project-consent-store/plan.md](specs/project-consent-store/plan.md) | #1709 一段:项目扩展的信任只认用户在确认框里的决定,记录存在 Code Puppy 自己的状态目录,项目目录里的任何文件都不再算数 | active |
 | `SPEC-project-mcp-installation` | [specs/project-mcp-installation/spec.md](specs/project-mcp-installation/spec.md) | 连接器可装到全局或当前项目并保持隔离，保留历史条款、有效裁决和交付证据边界。 | approved |
 | `SPEC-puppy-brand-icons` | [specs/puppy-brand-icons/spec.md](specs/puppy-brand-icons/spec.md) | 应用和各渠道使用一致的小狗标志，保留历史条款、有效裁决和交付证据边界。 | approved |
 | `DESIGN-remote-database-connector` | [specs/remote-database-connector/design.md](specs/remote-database-connector/design.md) | 用户在连接器窗口填写并确认的「地址:端口」写进只有主进程能写的目标真源,作为动态半场的成员进入策略代理的放行集合;连接器进程里的隧道垫片把数据库驱动的 TCP 连接改走现有 CONNECT 代理,seatbelt 围栏一字不改;只读靠 DBHub 只读配置加只读事务,能约束整棵进程树的只有数据库账号权限;密码沿用官方连接器密钥保管;Windows/Linux 本期不交付 | draft |

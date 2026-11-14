@@ -22,7 +22,7 @@
 // visually the alpha popover family. Zero upstream edits (ADR-005/016).
 
 import { createEffect, createMemo, createResource, createSignal, For, on, onCleanup, Show, type Accessor, type JSX } from "solid-js"
-import type { createOpencodeClient } from "../../engine-adapter/contract/v1"
+import type { createOpencodeClient } from "@opencode-ai/sdk/v2/client"
 import { useCommand } from "./providers"
 import { claimOverlay, releaseOverlay } from "./overlay-stack"
 import { Tooltip } from "./Tooltip"

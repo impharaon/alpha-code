@@ -10,7 +10,7 @@
 // - 一切异步结果绑定 serverKey+directory+sessionID(C1 live context 原语,I8)。
 
 import { createPermissionChannelSource, useServerSDK, useServerSync } from "@opencode-ai/app"
-import type { ModelV2Info, Todo } from "../../../engine-adapter/contract/v1"
+import type { ModelV2Info, Todo } from "@opencode-ai/sdk/v2/client"
 import { useNavigate } from "@solidjs/router"
 import { createEffect, createMemo, createSignal, For, on, onCleanup, Show } from "solid-js"
 import { hrefFor } from "../../../shared/route-manifest"

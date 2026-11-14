@@ -15,6 +15,7 @@ import { withEngineAuthorization } from "./engine-authorization"
 import { injectCodePuppyConfig } from "./codepuppy-config-injection"
 import { publishMainBootstrap } from "../../test-component/codepuppy-bootstrap-fixture"
 import type { EngineFetch } from "./in-process-engine"
+import { engineProjectTrust } from "./engine-project-trust"
 
 const sandbox = engineSandbox()
 const GLOBAL_DIR = process.env.CP840_GLOBAL_DIR
@@ -56,7 +57,7 @@ test(`#840 engine read on OpenCode 2: the package command is ${EXPECT}`, async (
       filewatcher: false,
       platform: process.platform,
     }),
-    { onDispatch: (dispatch) => (fetch = withEngineAuthorization(dispatch, PASSWORD)) },
+    { onDispatch: (dispatch) => (fetch = withEngineAuthorization(dispatch, PASSWORD)), projectTrust: engineProjectTrust },
   )
   const send = async (method: string, route: string, body?: unknown) => {
     const response = await fetch!(

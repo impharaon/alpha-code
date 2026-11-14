@@ -8,6 +8,7 @@ import path from "node:path"
 import { pathToFileURL } from "node:url"
 import { buildEngineServerOptions } from "../../src/main/engine-server-options"
 import { acceptCodePuppyBootstrap, assertEngineReadsBootstrap } from "../../src/main/sidecar-bootstrap-gate"
+import { engineProjectTrust } from "../../src/main/engine-project-trust"
 
 export type DriverInput = {
   app: string
@@ -36,5 +37,6 @@ const engine = await startEngine(
     filewatcher: bootstrap.engine.filewatcher,
     platform: process.platform,
   }),
+  { projectTrust: engineProjectTrust },
 )
 console.log(`LISTENING ${engine.url} node=${process.versions.node} electron=${process.versions.electron}`)

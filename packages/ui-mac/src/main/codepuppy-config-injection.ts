@@ -14,7 +14,6 @@
 
 import { codepuppyBootstrap } from "@opencode/util/codepuppy-bootstrap"
 import * as fs from "node:fs"
-import os from "node:os"
 import * as path from "node:path"
 // `#1299`(REQ-157):三个 alpha agent 的 description / prompt 是 alpha 的字,住在零依赖的
 // codepuppy-agents.ts,由 packages/ext 的登记簿 import 并声明上限;这里只取,不再内联字面量。
@@ -45,8 +44,7 @@ import { USER_DATA_LAYOUT } from "./user-data-layout"
 import { factorySkillPaths } from "../../../ext/src/factory-paths"
 import { publishProviderAllowList } from "../../../ext/src/provider-allow"
 import { skillGenerationLiveDirs } from "../../../ext/src/gen-skill-paths"
-import { explicitConfigPath, writeExplicitConfig, type ExplicitLayer, type ExplicitPolicy } from "./engine-explicit-config"
-import { enginePluginPolicies } from "./engine-plugin-policy"
+import { explicitConfigPath, writeExplicitConfig, type ExplicitLayer } from "./engine-explicit-config"
 import { applyPromptTakeover } from "../../../ext/src/codepuppy-prompts"
 
 // Inject alpha-code's customizations into opencode via OPENCODE_CONFIG_CONTENT. This env var is
@@ -90,7 +88,7 @@ export type CodePuppyConfigInjectionOutput = {
    * `#1667`(编排器裁决 r1 第 2 条、C7 重裁):`config.file` 是 main 每次启动合成的显式文件(engine-explicit-config.ts)。
    * sidecar 据此监听用户的 `codepuppy.jsonc`,它一变就重写合成文件。注入失败时没有这一项(显式槽直接给用户文件)。
    */
-  explicit?: { file: string; root: string; userConfig?: string; layer: ExplicitLayer; plugins: (userText: string | undefined) => ExplicitPolicy[] }
+  explicit?: { file: string; root: string; userConfig?: string; layer: ExplicitLayer }
 }
 
 /**
@@ -325,7 +323,7 @@ export function injectCodePuppyConfig(
     }
 
     // `#1667`(C7 重裁):显式文件层要写的三样,出自这一次计算(engine-explicit-config.ts 抬头讲层序)。
-    const layer: ExplicitLayer = { policies: [], plugins: [], commands: {}, skills: [] }
+    const layer: ExplicitLayer = { policies: [], commands: {}, skills: [] }
     const models = buildCodePuppyModelConfig(userDataPath, {
       baseURL: bootstrap.platform.modelProxyBaseURL,
       defaultModel: bootstrap.platform.defaultModelOverride,
@@ -661,31 +659,13 @@ export function injectCodePuppyConfig(
     const modelsFile = models ? materializeGovernedModelsBase(userDataPath, models) : undefined
     // 显式槽:用户的 codepuppy.jsonc(有的话)+ 上面那一层,合成一份写进 Code Puppy 自己的 userData(engine-explicit-config.ts)。
     const explicitFile = explicitConfigPath(userDataPath)
-    //   4d. `#1708`:引擎插件只放行 Code Puppy 的扩展与用户全局范围里现有的来源,项目范围的一律拒(engine-plugin-policy.ts)。
-    //       用户文件里的相对条目在合成后按显式文件所在目录解析;sidecar 的监听每次重写显式文件时按当时的原文重算。
-    //       与 provider 的 policies 一样写两层:显式文件那份比项目配置先加载(第一层,它的「拒绝全部」总是先命中);内联这份是
-    //       第二层 —— 显式文件读不到或被引擎整份拒掉时,没自写 allow 的项目插件仍被拒(项目自写的 allow 盖得过这一层)。
-    const pluginPolicies = (userText: string | undefined) =>
-      enginePluginPolicies({
-        extPluginPath,
-        globalDirectory: bootstrap.paths.engineConfigDirectory,
-        home: engineHome(),
-        ...(userText === undefined ? {} : { userConfig: { text: userText, directory: path.dirname(explicitFile) } }),
-      })
-    const plugins = pluginPolicies(readTextSafe(file))
-    layer.plugins = plugins.policies
-    config.policies = [...(config.policies ?? []), ...plugins.policies]
-    if (plugins.refused.length)
-      console.warn(
-        `[alpha-code#1708] user-global engine plugin entries not loaded — an allow can only name a plain absolute path (package entries are checked by their bare name, which a project can reuse; * and ? are wildcards; {env:} / {file:} and ~/ are not resolved here; to load a package plugin anyway see ADR-040 consequence 4 「如何让某个按包名安装的全局插件加载」): ${JSON.stringify(plugins.refused)}`,
-      )
     const written = writeExplicitConfig(explicitFile, file, layer)
     if (written.userError) console.warn(`[alpha-code#1667] ${file} is not valid (${written.userError}); the engine sees only Code Puppy's explicit layer`)
     return {
       ok: true,
       config: { content: JSON.stringify(config), file: explicitFile },
       models: modelsFile ? { file: modelsFile } : {},
-      explicit: { file: explicitFile, root: codepuppyGlobalRoot(), ...(file ? { userConfig: file } : {}), layer, plugins: (userText) => pluginPolicies(userText).policies },
+      explicit: { file: explicitFile, root: codepuppyGlobalRoot(), ...(file ? { userConfig: file } : {}), layer },
     }
   } catch (error) {
     // #613:catch 保留(sidecar 照常起,候选形态③),但失败必须离开本进程:
@@ -693,24 +673,15 @@ export function injectCodePuppyConfig(
     console.warn("failed to inject alpha config", error)
     // 失败的配置里没有注入的供应商与策略:放行集合跟着撤掉,ext 与它同口径(provider-allow.ts:没发布 = 本代没治理)。
     publishProviderAllowList(undefined)
-    const userText = readTextSafe(file)
     return {
       ok: false,
       error: error instanceof Error ? { message: error.message, stack: error.stack } : { message: String(error) },
       // 注入失败也不让治理底线跟着丢:ext 目录、外部技能移除指令、五个实验开关照样写进去(governanceFloor)。
       // 没有 ext 的话 sidecar 的 I4 判定会拒绝 ready,而不是带着一个没有执行闸的引擎上线。
-      // `#1708`:`plugin.use` 语句也写进去。这时没有显式文件,内联文档排在项目配置之后 —— 项目自己写的 allow 能盖过它,
-      // 只挡得住没写 allow 的项目插件;显式槽此时直接是用户文件,其中的相对条目按它自己的目录解析。
       config: {
         content: JSON.stringify({
           $schema: "https://opencode.ai/config.json",
           ...governanceFloor(extPluginPath, bootstrap.switches.ecosystemInherit),
-          policies: enginePluginPolicies({
-            extPluginPath,
-            globalDirectory: bootstrap.paths.engineConfigDirectory,
-            home: engineHome(),
-            ...(file && userText !== undefined ? { userConfig: { text: userText, directory: path.dirname(file) } } : {}),
-          }).policies,
         }),
         ...(file ? { file } : {}),
       },
@@ -810,21 +781,4 @@ function materializeGovernedModelsBase(userDataPath: string, config: CodePuppyMo
   fs.mkdirSync(dir, { recursive: true, mode: 0o700 })
   fs.writeFileSync(modelsPath, `${JSON.stringify(base, null, 2)}\n`, { mode: 0o600 })
   return modelsPath
-}
-
-function readTextSafe(file: string | undefined): string | undefined {
-  if (!file) return undefined
-  try {
-    return fs.readFileSync(file, "utf8")
-  } catch {
-    return undefined
-  }
-}
-
-/**
- * `#1708`:HOME 一级来源用引擎自己的家目录 —— 与上游 `packages/util/src/global.ts` 的 `Global.Path.home` 同一写法
- * (`OPENCODE_TEST_HOME` 优先,`node:os` 默认导出的 `homedir`,测试隔离预载钉的正是它)。
- */
-function engineHome(): string {
-  return process.env.OPENCODE_TEST_HOME ?? os.homedir()
 }

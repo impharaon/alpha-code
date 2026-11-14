@@ -1826,6 +1826,66 @@
         }
       ],
       "note": "Residual window: between the end of plugin activation and the transform being placed (one poll of the plugin list, about 20 ms) GET /api/provider can still list such a provider; OpenCode's own provider.use policy is likewise not in effect before activation ends. A request in that window is refused by the model.request hook. Egress (measured 2026-11-12, before this fix): a request to a non-whitelisted provider's host does not leave through the egress proxy (403 unregistered, zero dials) unless the user grants the host in the #1412 prompt or the block points at a host that is already authorized."
+    },
+    {
+      "id": "project-opencode-config-trust",
+      "decision": "项目 OpenCode 配置的内容直接可用;会运行程序、加载代码、换程序或扩大 agent 权限的设置随同一项目允许决定放行,清单不完整不产生决定。",
+      "adr": [
+        "ADR-049",
+        "ADR-047",
+        "ADR-048"
+      ],
+      "lane": "#1713",
+      "takeovers": [
+        "packages/core/src/config.ts",
+        "packages/core/src/config/plugin/skill.ts",
+        "packages/core/src/config/plugin/agent.ts",
+        "packages/core/src/config/plugin/command.ts"
+      ],
+      "approval": {
+        "quote": "要做。",
+        "date": "2026-11-13",
+        "by": "owner (编排器转达)",
+        "reason": "冻结规格 v1 与设计 1256efc047 的项目配置接管。"
+      },
+      "mechanism": {
+        "file": "packages/core/src/config/codepuppy-project-gate.ts",
+        "ladder": "L3 (四个读取点只调用同一项目配置闸门)"
+      },
+      "tests": [
+        {
+          "file": "packages/core/test/codepuppy-project-gate.test.ts",
+          "name": "未允许:暂缓的顶层键"
+        },
+        {
+          "file": "packages/core/test/codepuppy-project-gate-upgrade.test.ts",
+          "name": "字段分类:上游 v1 / v2"
+        },
+        {
+          "file": "packages/ui-mac/src/main/project-config-commands.engine.test.ts",
+          "name": "I-12 / #1713 未允许与允许两臂"
+        },
+        {
+          "file": "packages/ui-mac/src/main/engine-plugin-policy.engine.test.ts",
+          "name": "项目插件按生产信任放行"
+        },
+        {
+          "file": "packages/ui-mac/src/main/project-config-view.engine.test.ts",
+          "name": "项目配置视图:九类"
+        },
+        {
+          "file": "packages/ui-mac/src/main/project-config-view-message.test.ts",
+          "name": "消息合同:build / parse 往返"
+        },
+        {
+          "file": "packages/ui-mac/src/main/ext-trust-check.test.ts",
+          "name": "项目扩展信任确认:"
+        },
+        {
+          "file": "packages/ui-mac/src/renderer/codepuppy-ui/ext-trust-watcher.component.test.ts",
+          "name": "项目信任组件:不完整下次再查"
+        }
+      ]
     }
   ]
 }

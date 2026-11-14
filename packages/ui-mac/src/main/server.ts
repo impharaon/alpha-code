@@ -66,6 +66,8 @@ import { configureEgressGrantApproval, setUserEgressGrants } from "./network-egr
 import { persistEgressGrantRecord, readEgressGrantRecords } from "./egress-grant-records"
 import { askUserForEgressGrant } from "./egress-approval-dialog"
 // REQ-159 `#1322`:工作区写探针的 main 半场 —— 请求/应答簿记住在 workspace-write-probe.ts,这里只接线到子进程。
+import { createProjectConfigViewRequester } from "./project-config-view-message"
+import type { ProjectConfigView } from "@opencode/schema/codepuppy-project-config"
 import { createWriteProbeRequester, type WorkspaceWriteProbeResult } from "./workspace-write-probe"
 import { codepuppyGlobalRoot, codepuppyJsoncPath } from "./engine-config-truth"
 import { ensureUserWorkspaceDir } from "./codepuppy-user-workspace"
@@ -90,6 +92,7 @@ type SidecarMessage =
   | { type: "error"; error: { message: string; stack?: string } }
 
 export type SidecarListener = {
+  projectConfigView: (directory: string) => Promise<ProjectConfigView | undefined>
   stop: () => Promise<void>
   kill: () => void
   /**
@@ -577,10 +580,12 @@ export async function spawnLocalServer(
   electronNs.app.on("child-process-gone", onProcessGone)
   // REQ-159 `#1322`:探针请求簿。sidecar 收到 write-probe 命令即同步回一条 write-probe-result;这里按 id 对号。
   // 子进程退出 ⇒ 在途请求全部答 unknown(不是「拒绝」,也不是「可写」)。
+  const projectConfigViews = createProjectConfigViewRequester((command) => child.postMessage(command))
   const writeProbes = createWriteProbeRequester((command) => child.postMessage(command))
   // REQ-234 `#1529`:`codepuppy.*` 分发与探针应答并列;不是本族的消息原样交还(返回 false)。
   const postCodePuppy = (message: CodePuppySidecarOutbound) => child.postMessage(message)
   child.on("message", (message: unknown) => {
+    if (projectConfigViews.receive(message)) return
     if (writeProbes.receive(message)) return
     options.codepuppySidecar?.receive(message, postCodePuppy)
   })
@@ -589,6 +594,7 @@ export async function spawnLocalServer(
     clearOfficialConnectorRuntimeOnExit(runtimeGeneration)
     exited = true
     electronNs.app.off("child-process-gone", onProcessGone)
+    projectConfigViews.close()
     writeProbes.close(`sidecar exited with code ${code}`)
     detachCodePuppy?.(`sidecar exited with code ${code}`)
     options.onExit?.(code)
@@ -695,6 +701,7 @@ export async function spawnLocalServer(
       kill: () => {
         if (!exited) child.kill()
       },
+      projectConfigView: (directory: string) => projectConfigViews.request(directory),
       probeWrite: (directory: string) => writeProbes.request(directory),
       stop: () => {
         if (stopping) return stopping

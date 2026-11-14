@@ -12,7 +12,7 @@ import { pathToFileURL } from "node:url"
 import { build } from "vite"
 import type * as Runtime from "./toast-lifetime-test-runtime"
 import { dict as zh } from "../i18n/zh"
-import { toV1Messages } from "../../engine-adapter/v1-shapes"
+import { toV1Messages } from "../../engine-adapter/opencode2/v1-shapes"
 import { projectTimelineRows } from "./session-timeline/timeline-model"
 
 const runtimeDirectory = mkdtempSync(join(tmpdir(), "codepuppy-problems-entry-"))

@@ -138,6 +138,7 @@ const { codepuppySidecar } = registerExtIpcHandlers(
     password: "route-password",
   }),
   join(root, "home"),
+  undefined, async () => undefined,
 )
 // `#1529`:像 server.ts 在 sidecar ready 时那样接上发送口 —— 装完之后发往 ext 的东西都落在这里。
 const toSidecar: Array<Record<string, unknown>> = []

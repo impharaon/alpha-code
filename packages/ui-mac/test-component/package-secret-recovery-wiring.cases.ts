@@ -156,6 +156,7 @@ registerExtIpcHandlers(
   "dev",
   async () => ({ url: "http://127.0.0.1:39119", username: "opencode", password: "route-password" }),
   join(tmp, "home"),
+  undefined, async () => undefined,
 )
 
 afterAll(() => {

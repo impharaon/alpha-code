@@ -62,3 +62,8 @@ describe("listProjectExecutables — 可执行物清单派生", () => {
     expect(AGENT_CONTROL_FIELDS).toEqual(["permission", "tools", "model", "disable", "mode", "steps", "maxSteps"])
   })
 })
+
+test("#1713 原生 agent 控制字段用中文叫法并去重,同类只占一行", async () => {
+  const { projectExecutableRows } = await import("./codepuppy-ext-trust")
+  expect(projectExecutableRows({ mcp: ["one", "two"], plugins: [], agents: [{ name: "a", fields: ["permission", "tools", "model", "mode", "steps", "disabled"] }] }, [{ kind: "mcp", name: "one", file: "opencode.json" }])).toEqual(["· 连接器(MCP):one、two", "· Agent 的权限与模型设置:a(权限、模型、模式、步数、停用)"])
+})

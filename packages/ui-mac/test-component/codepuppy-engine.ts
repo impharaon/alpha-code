@@ -12,10 +12,12 @@ import { engineGlobalConfigDirectory } from "../src/main/engine-paths"
 import { buildEngineServerOptions } from "../src/main/engine-server-options"
 import { engineAuthorization, withEngineAuthorization } from "../src/main/engine-authorization"
 import { injectCodePuppyConfig } from "../src/main/codepuppy-config-injection"
-import { writeExplicitConfig, type ExplicitPolicy } from "../src/main/engine-explicit-config"
 import { secretFilePath, secretFileRef } from "../src/main/codepuppy-secret-files"
 import { buildHubRequestReply, buildHubViewReply } from "../src/main/codepuppy-sidecar-messages"
 import type { EngineFetch } from "../src/main/in-process-engine"
+import { engineProjectTrust } from "../src/main/engine-project-trust"
+import { projectTrustIdentity } from "../src/main/project-trust-truth"
+import { recordProjectTrustDecision } from "../src/main/project-trust-truth-write"
 
 /** 真 stdio MCP 服务器(#1563 的夹具):列一个 `echo`,`CODEPUPPY_MCP_CALL_LOG` 记下每次 tools/call。 */
 export const MCP_FIXTURE = path.resolve(import.meta.dir, "../../core/test/fixture/codepuppy-mcp-startup-stdio.ts")
@@ -125,6 +127,20 @@ export type HostOptions = {
   askTimeoutMs?: number
   factoryDirs?: string[]
   switches?: TestBootstrapInput["switches"]
+  /** `#1713` 契约 C 的信任钩子;默认是 sidecar 用的生产读法(没有记录 ⇒ 未允许)。要一个已允许的项目,用 allowProject 记一条。 */
+  projectTrust?: (directory: string) => boolean
+}
+
+/**
+ * `#1713`:用户在确认框里对这个项目文件夹点了「允许加载」—— 经 main 的生产写端记进 `<casBaseRoot>/project-trust/<env>.json`
+ * (位置由宿主发布的 bootstrap.paths.globalRoot 推出,与 sidecar 读的是同一份)。在 codepuppyEngine() 之后、引擎装载这个目录之前调用。
+ */
+export function allowProject(directory: string): void {
+  fs.mkdirSync(directory, { recursive: true })
+  const identity = projectTrustIdentity(fs.realpathSync(directory))
+  if (!identity) throw new Error(`allowProject: ${directory} has no directory identity`)
+  const written = recordProjectTrustDecision(identity, true, new Date().toISOString(), () => {})
+  if (!written.ok) throw new Error(`allowProject: the trust record was not written — ${written.reason}`)
 }
 
 export type Running = {
@@ -200,23 +216,7 @@ export function codepuppyEngine(options: HostOptions) {
   const withExt = options.ext !== false
   const injection = injectCodePuppyConfig(userData, withExt ? ext : undefined, "stable", codepuppyBootstrap().paths.userConfig ?? null)
   const content = JSON.parse(injection.config.content) as { plugins: string[]; providers: Record<string, { models?: Record<string, unknown> }> }
-  const injectedPlugins = new Set(content.plugins)
   content.plugins = [...content.plugins, probeDir]
-  // `#1708`:只对宿主直接追加的本地插件补精确路径,不取项目配置;探针与 turn-failure 的 retry-now 都在这里。
-  // 后者只把测试的重试间隔改成 0;若被拒,引擎照常退避约 84 秒,超过用例等待 idle 的 15 秒。
-  const withHostPlugins = (policies: ExplicitPolicy[]): ExplicitPolicy[] => [
-    ...policies,
-    ...content.plugins
-      .filter((target) => !injectedPlugins.has(target) && path.isAbsolute(target) && !/[*?]/.test(target))
-      .map((resource) => ({ action: "plugin.use", resource, effect: "allow" })),
-  ]
-  if (injection.explicit) {
-    const explicit = injection.explicit
-    const recompute = explicit.plugins
-    explicit.layer.plugins = withHostPlugins(explicit.layer.plugins)
-    explicit.plugins = (userText) => withHostPlugins(recompute(userText))
-    writeExplicitConfig(explicit.file, explicit.userConfig, explicit.layer)
-  }
   // 沙箱里没有已应用的平台目录,平台节点的模型表是空的(`#1556`);补一个模型只为能发出请求
   if (options.platformModels !== null) content.providers.codepuppy!.models = options.platformModels ?? { m: { name: "m" } }
 
@@ -224,13 +224,6 @@ export function codepuppyEngine(options: HostOptions) {
   for (const [file, body] of Object.entries(options.projectFiles ?? {})) fs.writeFileSync(path.join(slot.projectDirectory, file), body)
 
   const start = async (): Promise<Running> => {
-    // 调用方可在注入后、start() 前追加夹具插件;复用监听器的重算入口,重启也不累积放行条目。
-    if (injection.explicit) {
-      const explicit = injection.explicit
-      const userText = explicit.userConfig ? await Bun.file(explicit.userConfig).text().catch(() => undefined) : undefined
-      explicit.layer.plugins = explicit.plugins(userText)
-      writeExplicitConfig(explicit.file, explicit.userConfig, explicit.layer)
-    }
     const { startEngine } = await import("../engine/engine-embed")
     let fetch: EngineFetch | undefined
     const password = `cp-${name}`
@@ -247,7 +240,7 @@ export function codepuppyEngine(options: HostOptions) {
         filewatcher: options.filewatcher ?? false,
         platform: process.platform,
       }),
-      { onDispatch: (dispatch) => (fetch = withEngineAuthorization(dispatch, password)) },
+      { onDispatch: (dispatch) => (fetch = withEngineAuthorization(dispatch, password)), projectTrust: options.projectTrust ?? engineProjectTrust },
     )
     const send = async (method: string, route: string, body?: unknown) => {
       const response = await fetch!(

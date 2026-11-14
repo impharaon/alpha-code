@@ -7,7 +7,7 @@ import path from "node:path"
 import { assertEngineSandboxed, engineSandbox } from "../../test-component/engine-sandbox"
 import { codepuppyEngine, scriptedModel } from "../../test-component/codepuppy-engine"
 import { createSidecarEnv } from "./sidecar-env"
-import { toV1Messages } from "../engine-adapter/v1-shapes"
+import { toV1Messages } from "../engine-adapter/opencode2/v1-shapes"
 
 const sandbox = engineSandbox()
 

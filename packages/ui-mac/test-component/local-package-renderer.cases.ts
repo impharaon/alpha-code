@@ -189,6 +189,7 @@ const { codepuppySidecar } = registerExtIpcHandlers(
   "dev",
   async () => ({ url: "http://127.0.0.1:39117", username: "opencode", password: "route-password" }),
   join(tmp, "home"),
+  undefined, async () => undefined,
 )
 /**
  * REQ-234 `#1529`:G20 的判据换了位置 —— 「引擎被要求重扫」= main 经 parentPort 发出一条 `codepuppy.reload.request`

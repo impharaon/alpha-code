@@ -15,6 +15,7 @@ import { engineClient } from "./engine-client"
 import { engineAuthorization } from "./engine-authorization"
 import { openChatArchiveCursor } from "./chat-archive-cursor"
 import { createChatArchiveUploader } from "./chat-archive-uploader"
+import { engineProjectTrust } from "./engine-project-trust"
 
 const sandbox = engineSandbox()
 const PASSWORD = "cp-l5-archive"
@@ -60,6 +61,7 @@ beforeAll(async () => {
       filewatcher: false,
       platform: process.platform,
     }),
+    { projectTrust: engineProjectTrust },
   )
   engines.push(engine)
   engineUrl = engine.url.replace(/\/$/, "")

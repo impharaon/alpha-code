@@ -19,6 +19,7 @@
 import { NodeServices } from "@effect/platform-node"
 import { start } from "@opencode/server/process"
 import { codepuppyBootstrap } from "@opencode/util/codepuppy-bootstrap"
+import { CodePuppyProjectGate } from "@opencode/core/config/codepuppy-project-gate"
 import { LayerNode } from "@opencode/util/effect/layer-node"
 import { Global } from "@opencode/util/global"
 import { AppProcess } from "@opencode/util/process"
@@ -29,6 +30,8 @@ declare const OPENCODE_VERSION: string | undefined
 
 /** 引擎包的版本:构建期由上游 Node 构建配置的 `define` 写入;bun 直接跑源码(测试)时没有。 */
 export const ENGINE_VERSION = typeof OPENCODE_VERSION === "string" ? OPENCODE_VERSION : "local"
+
+export const projectConfigView = CodePuppyProjectGate.view
 
 export type EngineServerOptions = Parameters<typeof start>[0]
 
@@ -61,11 +64,21 @@ const layers = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
 /**
  * `onDispatch` 在 `Transform` 回调里**同步**调用(接口文档 I1 第 3 条):那一刻早于任何 Location 启动,也早于 ext 的 `setup`,
  * 调用方在这里发布进程内 fetch,ext 在 `setup` 里一定取得到。
+ *
+ * `#1713`(DESIGN-project-engine-config-takeover 契约 C):`projectTrust` 必填 —— 回答「用户是否对这个项目文件夹点过允许」,
+ * 实现是 `#1709` 的同一个读法(src/main/engine-project-trust.ts)。在上游 `start()` 之前装进项目配置闸门;缺失就抛错,
+ * sidecar 走既有的失败路径,不报 ready。
  */
 export async function startEngine(
   options: EngineServerOptions,
-  hooks: { onDispatch?: (dispatch: EmbeddedEngine["dispatch"]) => void } = {},
+  hooks: {
+    onDispatch?: (dispatch: EmbeddedEngine["dispatch"]) => void
+    projectTrust: (directory: string) => boolean
+  },
 ): Promise<EmbeddedEngine> {
+  if (typeof hooks?.projectTrust !== "function")
+    throw new Error("startEngine: hooks.projectTrust is required — the project config gate cannot run without the trust reader (#1713)")
+  CodePuppyProjectGate.install({ trusted: hooks.projectTrust })
   const scope = Scope.makeUnsafe()
   let dispatch: EmbeddedEngine["dispatch"] | undefined
   try {

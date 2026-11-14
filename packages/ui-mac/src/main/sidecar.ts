@@ -17,13 +17,17 @@ import { buildReadyMessage, type SidecarReadyMessage } from "./sidecar-ready-mes
 import { parseSidecarStopCommand, stopSidecarEngine, type SidecarStopCommand, type StoppableEngine } from "./sidecar-stop"
 import type { CodePuppyBootstrap } from "@opencode/util/codepuppy-bootstrap"
 import { prewarmInitialLocation } from "./sidecar-location-prewarm"
-import { publishInProcessEngine, type EngineFetch } from "./in-process-engine"
+import { inProcessEngine, publishInProcessEngine, type EngineFetch } from "./in-process-engine"
 // `#1667`(#1662 L5):OpenCode 2 嵌入 —— 选项对象、口令包装、ext 就绪判定各住在可 import 的模块里(本文件顶层副作用让它
 // 无法被测试 import),真判据见 engine-server-options.test.ts、sidecar-engine-host.test.ts、sidecar-ext-ready.test.ts。
 import { buildEngineServerOptions } from "./engine-server-options"
 import { withEngineAuthorization } from "./engine-authorization"
 import { assertExtPluginActive } from "./sidecar-ext-ready"
 import { acceptCodePuppyBootstrap, assertEngineReadsBootstrap } from "./sidecar-bootstrap-gate"
+// `#1713` 契约 C:引擎配置闸门问「这个项目文件夹用户允许过没有」,读法是 #1709 的同一个。
+import { answerProjectConfigView } from "./sidecar-project-config-view"
+import { parseProjectConfigViewRequest, type ProjectConfigViewRequest, type ProjectConfigViewReply } from "./project-config-view-message"
+import { engineProjectTrust } from "./engine-project-trust"
 // REQ-159 `#1321`:进程围栏。本进程在 import 引擎之前把自己关进 seatbelt,之后派生的一切继承。
 // profile 由 main 渲染 + 试编译(process-fence-plan.ts),这里原样 apply;装不上 = 本进程不起
 // (fail-closed,原因经 error IPC 报给 main)。判据在 process-fence-apply.test.ts(真 .node / 真 seatbelt /
@@ -95,7 +99,7 @@ type StartCommand = {
 }
 
 type StopCommand = SidecarStopCommand
-type SidecarCommand = StartCommand | StopCommand | WorkspaceWriteProbeCommand
+type SidecarCommand = StartCommand | StopCommand | WorkspaceWriteProbeCommand | ProjectConfigViewRequest
 
 // #613:注入失败随 ready 上报(server.ts 持有同构镜像)——引擎照常起,但 main 必须知情。
 // ready 变体的形状与构造住在 sidecar-ready-message.ts(那里有真运行时闸门)。
@@ -104,6 +108,7 @@ type SidecarMessage =
   | { type: "stopped" }
   | { type: "error"; error: { message: string; stack?: string } }
   | WorkspaceWriteProbeReply
+  | ProjectConfigViewReply
 
 type ParentPort = {
   postMessage(message: SidecarMessage): void
@@ -112,6 +117,7 @@ type ParentPort = {
 
 const parentPort = getParentPort()
 let engine: StoppableEngine | undefined
+let readProjectConfigView: typeof import("virtual:opencode-server")["projectConfigView"] | undefined
 
 parentPort.on("message", (event) => {
   const command = parseCommand(event.data)
@@ -123,6 +129,10 @@ parentPort.on("message", (event) => {
   if (command.type === "write-probe") {
     // 同步、不等引擎:探针只依赖本进程的围栏,而围栏在 start() 第一句就装好了。
     parentPort.postMessage(buildWriteProbeReply(command.id, runWorkspaceWriteProbe(command.directory)))
+    return
+  }
+  if (command.type === "project-config-view") {
+    void answerProjectConfigView(command, { fetch: engine ? inProcessEngine() : undefined, view: readProjectConfigView }).then((reply) => parentPort.postMessage(reply))
     return
   }
   void start(command)
@@ -149,7 +159,8 @@ async function start(command: StartCommand) {
     const engineModule = await import("virtual:opencode-server")
     // `#1698`(§4.2 第 4 步):引擎 bundle 认不得这份文档(迁移前的 dist-engine,或另一提交构建)⇒ 不起。
     assertEngineReadsBootstrap(engineModule)
-    const { startEngine, ENGINE_VERSION } = engineModule
+    const { startEngine, ENGINE_VERSION, projectConfigView } = engineModule
+    readProjectConfigView = projectConfigView
     // REQ-234 `#1531`:@codepuppy/ext 在**模块装载时**挂 parentPort 监听(定制中心桥 + 重载调度器),而 main 只在 ready
     // 那一刻重发排队的重载代际。引擎要等某个 Location 装插件时才 import 它 —— 常常晚于 ready,那一批就丢了。所以在
     // `start()` 之前先预载 ext 的入口(I2;2.x 每个 Location 用带 `__opencode_reload` 的新 URL 各求值一次,进程级对象
@@ -184,6 +195,7 @@ async function start(command: StartCommand) {
           inProcess = withEngineAuthorization(dispatch, command.password)
           publishInProcessEngine(inProcess)
         },
+        projectTrust: engineProjectTrust,
       },
     )
     engine = started
@@ -281,9 +293,10 @@ function useEnvProxy() {
 
 function parseCommand(value: unknown): SidecarCommand | undefined {
   if (!value || typeof value !== "object") return
-  const command = value as Partial<StartCommand | StopCommand | WorkspaceWriteProbeCommand>
+  const command = value as Partial<StartCommand | StopCommand | WorkspaceWriteProbeCommand | ProjectConfigViewRequest>
   if (command.type === "stop") return parseSidecarStopCommand(value)
   if (command.type === "write-probe") return parseWriteProbeCommand(value)
+  if (command.type === "project-config-view") return parseProjectConfigViewRequest(value)
   if (command.type !== "start") return
   if (typeof command.hostname !== "string") return
   if (typeof command.port !== "number") return

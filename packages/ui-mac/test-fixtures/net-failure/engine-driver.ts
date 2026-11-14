@@ -13,6 +13,7 @@ import { buildEngineServerOptions } from "../../src/main/engine-server-options"
 import { assertExtPluginActive } from "../../src/main/sidecar-ext-ready"
 import { acceptCodePuppyBootstrap, assertEngineReadsBootstrap } from "../../src/main/sidecar-bootstrap-gate"
 import type { EngineFetch } from "../../src/main/in-process-engine"
+import { engineProjectTrust } from "../../src/main/engine-project-trust"
 
 export type DriverInput = {
   engine: string
@@ -46,7 +47,7 @@ const engine = await startEngine(
     filewatcher: false,
     platform: process.platform,
   }),
-  { onDispatch: (dispatch) => (fetch = withEngineAuthorization(dispatch, input.password)) },
+  { onDispatch: (dispatch) => (fetch = withEngineAuthorization(dispatch, input.password)), projectTrust: engineProjectTrust },
 )
 await assertExtPluginActive(fetch!, bootstrap.paths.initialDirectory, bootstrap.paths.extPlugin)
 console.log(`LISTENING ${engine.url} node=${process.versions.node} electron=${process.versions.electron}`)

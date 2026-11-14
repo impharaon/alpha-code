@@ -12,6 +12,7 @@ import { Location } from "../../location.js"
 import { AbsolutePath } from "../../schema.js"
 import { Skill } from "../../skill.js"
 import { SkillDiscovery } from "../../skill/discovery.js"
+import { CodePuppyProjectGate } from "../codepuppy-project-gate.js" // codepuppy(ADR-049)
 import { SkillFile } from "./skill-file.js"
 import { SkillScan } from "./skill-scan.js"
 
@@ -77,14 +78,14 @@ export const Plugin = define({
       return [target]
     })
 
-    const sources = () => {
+    const sources = (entries = loaded.entries) => { // codepuppy(ADR-049)
       const result: Source[] = []
       const add = (source: Source) => {
         if (result.some((item) => Skill.Source.equals(item, source))) return
         result.push(source)
       }
-      const directories = loaded.entries.flatMap((entry) => (entry.type === "directory" ? [entry.path] : []))
-      const items = loaded.entries.flatMap((entry) => (entry.type === "document" ? (entry.info.skills ?? []) : []))
+      const directories = entries.flatMap((entry) => (entry.type === "directory" ? [entry.path] : [])) // codepuppy(ADR-049)
+      const items = entries.flatMap((entry) => (entry.type === "document" ? (entry.info.skills ?? []) : [])) // codepuppy(ADR-049)
       for (const directory of directories) {
         add(Skill.DirectorySource.make({ type: "directory", path: AbsolutePath.make(path.join(directory, "skill")) }))
         add(Skill.DirectorySource.make({ type: "directory", path: AbsolutePath.make(path.join(directory, "skills")) }))
@@ -105,7 +106,7 @@ export const Plugin = define({
       return result
     }
 
-    const load = Effect.fn("ConfigSkillPlugin.load")(function* (source: Source) {
+    const load = Effect.fn("ConfigSkillPlugin.load")(function* (source: Source, gated: boolean) { // codepuppy(ADR-049)
       const directories =
         source.type === "directory"
           ? [source.path]
@@ -125,7 +126,11 @@ export const Plugin = define({
           if (!roots.some((root) => FSUtil.contains(root, resolved))) yield* watch(resolved, "file")
           const content = yield* fs.readFileStringSafe(filepath).pipe(Effect.orElseSucceed(() => undefined))
           if (!content) continue
-          const parsed = SkillFile.parse(directory, filepath, content)
+          // codepuppy(ADR-049) ── 项目技能只暂缓可执行文件头,正文逐字保留。
+          const text = gated ? CodePuppyProjectGate.frontmatter(location.directory, filepath, content, "skill") : content
+          if (text === undefined) continue
+          const parsed = SkillFile.parse(directory, filepath, text)
+          // codepuppy ── end
           if (parsed._tag === "Skipped") {
             yield* Effect.logDebug("skill file skipped", {
               filepath,
@@ -151,8 +156,9 @@ export const Plugin = define({
         yield* FiberMap.clear(watches)
         const skills = new Map<Skill.ID, Skill.Info>()
         const current = sources()
+        const gated = CodePuppyProjectGate.skillSources(location.directory, current, sources(loaded.entries.filter(CodePuppyProjectGate.projectEntry))) // codepuppy(ADR-049)
         for (const source of current) {
-          for (const skill of yield* load(source)) skills.set(skill.id, skill)
+          for (const skill of yield* load(source, gated.has(source))) skills.set(skill.id, skill) // codepuppy(ADR-049)
         }
         loaded.skills = Array.from(skills.values())
         if (file) {
@@ -163,7 +169,7 @@ export const Plugin = define({
           })
         }
       },
-      (effect, ..._args: [file?: string]) => lock.withPermit(effect),
+      (effect, ..._args: [file?: string]) => lock.withPermit(CodePuppyProjectGate.observe(location.directory, "skill", effect)), // codepuppy(ADR-049)
     )
 
     // Editor saves arrive as bursts of watcher events; settle before rescanning once. Subscribe

@@ -26,7 +26,7 @@ test("I4:ext 没装上时 sidecar 不报 ready —— 真引擎 + 桩插件(side
 // 分类与「这处锚守不住什么」登记在 ./source-text-anchors.ts。
 test("ANCHOR (not a gate): sidecar.ts 在发 ready 之前 await assertExtPluginActive(初始目录、ext 目录)", () => {
   const source = readFileSync(join(import.meta.dir, "sidecar.ts"), "utf8")
-  const gate = source.indexOf("await assertExtPluginActive(fetch, command.initialDirectory, command.extPluginPath)")
+  const gate = source.indexOf("await assertExtPluginActive(fetch, bootstrap.paths.initialDirectory, bootstrap.paths.extPlugin)")
   const ready = source.indexOf("parentPort.postMessage(buildReadyMessage(injection, prewarmResult))")
   expect(gate).toBeGreaterThan(-1)
   expect(ready).toBeGreaterThan(gate)

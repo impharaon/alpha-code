@@ -121,6 +121,8 @@ export async function startProbeEngine(options: { global?: Json; explicit?: Json
   const password = "upstream-probe"
   let fetch: ((request: Request) => Response | Promise<Response>) | undefined
   const toggles = engineDesktopToggles({})
+  // #1713:探针量的是上游对项目文档的行为,也就是已允许的项目拿到的行为(契约 A8:只差 -* / -opencode.*);项目信任本身由
+  // packages/ui-mac/src/main/project-config-commands.engine.test.ts 判。
   const engine = await startEngine(
     buildEngineServerOptions({
       hostname: "127.0.0.1",
@@ -134,7 +136,7 @@ export async function startProbeEngine(options: { global?: Json; explicit?: Json
       filewatcher: toggles.filewatcher,
       platform: process.platform,
     }),
-    { onDispatch: (dispatch) => (fetch = withEngineAuthorization(dispatch, password)) },
+    { onDispatch: (dispatch) => (fetch = withEngineAuthorization(dispatch, password)), projectTrust: () => true },
   )
 
   /** One request through the in-process dispatch app; `directory` picks the Location. */

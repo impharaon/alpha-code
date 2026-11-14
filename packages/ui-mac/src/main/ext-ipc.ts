@@ -1,3 +1,5 @@
+import type { ProjectConfigView } from "@opencode/schema/codepuppy-project-config"
+import { projectExecutableRows } from "./codepuppy-ext-trust"
 import { isCodePuppyOfficeCatalogId } from "../shared/office-advisories"
 import { isCloudMcpWithheld } from "./codepuppy-config-injection"
 import { isOfficialConnector } from "./official-connector-recipes"
@@ -116,7 +118,8 @@ export function registerExtIpcHandlers(
   registryChannel: "stable" | "preview" | "dev",
   awaitServer: () => Promise<EngineConnection>,
   homeDir: string = homedir(),
-  officialRuntime?: { stop(): Promise<void>; refresh(): Promise<boolean> },
+  officialRuntime: { stop(): Promise<void>; refresh(): Promise<boolean> } | undefined,
+  projectConfigView: (directory: string) => Promise<ProjectConfigView | undefined>,
 ) {
   assertCodePuppyEnvironmentIdentity()
   const resolveProjectEntry = (projectDir: unknown) => resolveProjectIpcEntry(projectDir, homeDir)
@@ -536,7 +539,7 @@ export function registerExtIpcHandlers(
   // 任何文件都不算 —— 旧的 `.codepuppy/prefs.json` extensionsConsent 不读、不写、不删。granted 后由 renderer 请 ext 重载生效。
   // 写盘失败不静默放行(反 placebo):不落决策 + 返回 denied,下次仍会弹。本 handler 是这份记录唯一的写入点,且只在用户于
   // 模态确认框里做出决定之后写。
-  ipcMain.handle("ext-trust-check", projectIpcHandler(
+  ipcMain.handle("ext-trust-check", (event: IpcMainInvokeEvent, requestedDirectory: unknown) => projectIpcHandler(
     homeDir,
     (reason, code) => {
       // #1569 AC7:项目里新旧两个隐藏目录并存 —— 不合并、不读旧目录;本会话对同一个项目只说一次
@@ -562,6 +565,14 @@ export function registerExtIpcHandlers(
     } catch (error) {
       getLogger().log(`[req099-adopt] adoption error (ledger untouched): ${error instanceof Error ? error.message : String(error)}`)
     }
+    // `#1709`:身份 = 规范项目目录 + 目录 inode;在弹框前取下,写入前复核。
+    const identityRead = withProjectIpcEntryIdentity(project, homeDir, (current) => projectTrustIdentity(current.projectDir))
+    if (!identityRead.ok) return { prompted: false, granted: false, reason: identityRead.reason }
+    const identity = identityRead.value
+    if (!identity) return { prompted: false, granted: false, reason: "fail closed: project directory identity cannot be confirmed" }
+    const decision = readProjectTrustEntry(identity, (line) => getLogger().warn(line))
+    if (hasExtensionsDecision(decision)) return { prompted: false, granted: extensionsGranted(decision) }
+
     const configRead = withProjectIpcEntryIdentity(project, homeDir, (current) => {
       try {
         return fs.readFileSync(path.join(current.root, "codepuppy.jsonc"), "utf8")
@@ -581,20 +592,22 @@ export function registerExtIpcHandlers(
     const jsoncText = configRead.value
     const pluginFiles = pluginsRead.value
     const exec = listProjectExecutables(jsoncText, pluginFiles)
-    if (exec.mcp.length === 0 && exec.plugins.length === 0 && exec.agents.length === 0) return { prompted: false, granted: false }
-    // `#1709`:身份 = 规范项目目录 + 目录 inode;在弹框前取下,写入前复核。
-    const identityRead = withProjectIpcEntryIdentity(project, homeDir, (current) => projectTrustIdentity(current.projectDir))
-    if (!identityRead.ok) return { prompted: false, granted: false, reason: identityRead.reason }
-    const identity = identityRead.value
-    if (!identity) return { prompted: false, granted: false, reason: "fail closed: project directory identity cannot be confirmed" }
-    const decision = readProjectTrustEntry(identity, (line) => getLogger().warn(line))
-    if (hasExtensionsDecision(decision)) return { prompted: false, granted: extensionsGranted(decision) }
 
-    const items = [
-      ...exec.mcp.map((n) => `· 连接器(MCP):${n}`),
-      ...exec.plugins.map((f) => `· 插件:${PROJECT_HIDDEN_DIR}/plugins/${f}`),
-      ...exec.agents.map((a) => `· Agent 的权限与模型设置:${a.name}(${a.fields.join("、")})`),
-    ].join("\n")
+    const view = await (async () => {
+      for (let attempt = 0; attempt < 2; attempt++) {
+        // Location 沿用会话路由拼写;回复里的规范身份仍与准入结果核对。
+        const current = await projectConfigView(requestedDirectory as string).catch(() => undefined)
+        if (current?.directory === directory && current.complete) return current
+      }
+      return undefined
+    })()
+    if (!view) {
+      getLogger().log(`[req060-trust] project config view incomplete: ${directory}`)
+      return { prompted: false, granted: false, incomplete: true }
+    }
+    const rows = projectExecutableRows(exec, view.withheld)
+    if (!rows.length) return { prompted: false, granted: false }
+    const items = rows.join("\n")
     const parent = BrowserWindow.fromWebContents(event.sender) ?? undefined
     const opts = {
       type: "warning" as const,
@@ -631,7 +644,7 @@ export function registerExtIpcHandlers(
     getLogger().log(`[req060-trust] ${granted ? "granted" : "denied"} for project: ${directory}`)
     return { prompted: true, granted }
     },
-  ))
+  )(event, requestedDirectory))
 
   // REQ-063(ADR-024):外部生态 consent 导入门(项目级)。default-deny 后引擎不再读项目自带的
   // `.claude`/`.agents` skills 与 CLAUDE.md;首次进入检测到外来内容 → 原生确认 → 「导入」= 安装期

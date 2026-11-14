@@ -345,6 +345,7 @@ const { codepuppySidecar } = registerExtIpcHandlers(
       return true
     },
   },
+  async () => undefined,
 )
 const globalRoot = codepuppyGlobalRoot()
 /** `#1529`:main 发往 ext 调度器的重载请求 —— 「装完有没有让引擎重扫」的判据。 */

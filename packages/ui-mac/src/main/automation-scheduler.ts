@@ -1,3 +1,5 @@
+import { AUTOMATION_PROFILES, type AutomationAgentID } from "@opencode/schema/codepuppy-unattended"
+import { readAutomationDenial } from "./automation-run-outcome"
 import { SessionMessage } from "@opencode/schema/session-message"
 import { unattendedRuns } from "./codepuppy-unattended"
 // 自动化调度器(REQ-021 A1.3/A1.4/A1.6,ADR-022)—— Electron 主进程,每任务单 timer:
@@ -248,6 +250,7 @@ async function executeTask(task: AutomationTask): Promise<AutomationRunRecord> {
   // `#1667`(清点表 S6 / S9):OpenCode 2 的客户端;口令由 engineClient 补成 Basic 头(I8:只在 main 里)。
   const client = engineClient(server)
   const directory = task.target.projectDir
+  const profile = AUTOMATION_PROFILES[task.target.agent as AutomationAgentID] ?? "none"
 
   let sessionID: string | undefined
   let timedOut = false
@@ -291,12 +294,14 @@ async function executeTask(task: AutomationTask): Promise<AutomationRunRecord> {
     }
     const reply = await promptAndWait(client, { sessionID, text: task.prompt, id: promptID }, controller.signal)
 
+    const denial = await readAutomationDenial(client, sessionID, profile)
+    const status = denial ? "failed" as const : "ok" as const
     const finishedAt = new Date().toISOString()
     const runId = `auto-${task.id}-${runTimestamp(new Date(started))}`
     const saved = writeRunFiles(directory, runId, {
       "report.md": reply || "(空回复)",
       "status.json": JSON.stringify(
-        { taskId: task.id, name: task.name, sessionID, at, finishedAt, status: "ok", schedule: task.schedule, prompt: task.prompt },
+        { taskId: task.id, name: task.name, sessionID, at, finishedAt, status, ...(denial ? { error: denial } : {}), schedule: task.schedule, prompt: task.prompt },
         null,
         2,
       ),
@@ -307,19 +312,18 @@ async function executeTask(task: AutomationTask): Promise<AutomationRunRecord> {
     const firstLine = reply.split("\n").find((l) => l.trim()) ?? ""
     return {
       at,
-      status: "ok",
+      status,
       durationMs: Date.now() - started,
       sessionID,
       runDir: saved.ok ? saved.dir : undefined,
-      summary: firstLine.slice(0, 120),
+      summary: denial ?? firstLine.slice(0, 120),
     }
   } catch (error) {
     const status = timedOut ? "timeout" : "failed"
+    const denial = !timedOut && !notReady && sessionID ? await readAutomationDenial(client, sessionID, profile) : undefined
     const summary = timedOut
       ? `超过 ${task.budget.maxDurationMin} 分钟,已中断`
-      : error instanceof Error
-        ? error.message.slice(0, 300)
-        : String(error).slice(0, 300)
+      : denial ?? (error instanceof Error ? error.message.slice(0, 300) : String(error).slice(0, 300))
     // 失败也留痕(best-effort):status.json 进 run 目录,方便详情页回溯。
     const runId = `auto-${task.id}-${runTimestamp(new Date(started))}`
     const saved = writeRunFiles(directory, runId, {

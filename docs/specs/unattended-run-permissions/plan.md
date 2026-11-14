@@ -129,7 +129,10 @@ PLAN 验证只做文件/diff 的只读检查并提交本文件。实现后的全
 - 单元 1 基线:C2 的消息合同 9 pass、hub-view 18 pass 沿用 r2;sidecar wiring 6 pass 沿用编排器 r3 回执。C3 既有 hub-bridge 5 pass;C4 既有 register-policy 68、RPC 5、risk 22、inventory 5、ask-deadline 5、setup-order 1 pass;C7 turn 2、moderation 1、注入 25、注入引擎 1 pass;C8 19 pass。上述对应索引命令退出均为 0(本轮加 `--only-failures` 抑制通过行)。三个包 `bun typecheck` 均退出 0。
 - 单元 1 红证据:`cd packages/ui-mac && bun test src/main/unattended-run.engine.test.ts` 退出 1;子进程 AC-01、AC-02、AC-07 共 3 fail,三者都在 `withoutApproval` 的零 Asked 断言收到 `["mcp:probe:echo"]`。没有缺导出、加载或依赖错误。生产运行/解析入口、真实 ext 与真实 MCP 已走通;测试收到请求后立即拒掉,未改审批期限。
 - 单元 2:C1 2、C2 消息 10 / 登记簿 4 / hub-view 18 / wiring 6、C3 bridge 6 / state+T2 3、C4 现有策略 68 / RPC 5 / risk 22 / inventory 5 / setup 1、C7 turn 2 / moderation 1 / 注入 25 / 注入引擎 1、C8 20 pass,均退出 0。AC-07 单独运行 `cd packages/ui-mac && bun test --only-failures ./src/main/unattended-run.engine.cases.ts -t AC-07` 为 1 pass / 0 fail(2 filtered out),退出 0,红例断言未改。三个包 typecheck 均退出 0;schema 的新测试曾因 `.js` 后缀和字面量推断报类型错误,已在本单元修正。AC-01/02 的 T1 放行留给单元 3。
+- 单元 3:C4 新策略 14、既有策略 68 / RPC 5 / risk 22 / inventory 5、C3 state/终态 4、C6 outcome 4、C5 宿主 1(子进程 9)、C7 moderation 1 pass,索引命令加 `--only-failures`,均退出 0;ext/ui-mac `bun typecheck` 退出 0。C5 的 AC-01/02/07 原红断言未改,新增 AC-03/04/06/08 和 U-3 的持久化证据;D1 在 TestClock 不前进时通过。真实消息样本含 8 个场景及实际游标,已固化为同段 JSON 夹具。分页请求误带 order 的中间失败已修正,跨页测试会直接拒绝该已知坏请求。
 
 ### 偏离记录
 
-暂无。
+2026-11-14 · 单元 3 在既定 `policy/index.ts` 内同步 `session.get` 的实际返回形状:该方法直接返回会话,原 `.data.permissions` 会漏掉会话配置的 ask;agent.get 仍使用它实际具有的 `.data` 外壳。新增的「sessionAsk 立即拒绝」真实策略测试证明此读取属于本票调用链所必需,不改合同或上游文件。
+
+2026-11-14 · AC-04 的 subagent 真实引擎夹具仅将工具清单筛选动作改为测试名,使已被清单隐藏的真实 SubagentTool 到达其原始 `subagent` 权限断言;自动化载体 deny 和工具实现均未改,断言未放宽。与 C4 的无计时器权限断言共同证明 AC-04。原红回归的三条用例和断言保持不变,同一 `.cases.ts` 只追加证据和沙箱样本导出。

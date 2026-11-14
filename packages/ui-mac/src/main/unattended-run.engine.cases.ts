@@ -1,10 +1,12 @@
 // #1699 AC-01/02/07 红回归:从生产自动化入口进入沙箱真引擎,审批事件一旦出现就由测试拒掉,
 // 以便立即报告缺失行为而不等 300 秒。模型/MCP 报文由既有真实宿主和 SDK 产生。
 import { afterAll, beforeAll, expect, mock, test } from "bun:test"
-import { readFileSync } from "node:fs"
+import { readFileSync, writeFileSync } from "node:fs"
+import { createHash } from "node:crypto"
 import { join } from "node:path"
 import { assertEngineSandboxed, engineSandbox } from "../../test-component/engine-sandbox"
-import { codepuppyEngine, policyStore, scriptedModel, type Running } from "../../test-component/codepuppy-engine"
+import { codepuppyEngine, policyStore, probe, scriptedModel, type Running } from "../../test-component/codepuppy-engine"
+import type { Context } from "@opencode/plugin/promise/plugin"
 import type { AutomationTask } from "../shared/automation-types"
 import type { CodePuppySidecarHost } from "./hub-view"
 
@@ -129,3 +131,118 @@ test("AC-07 一句话解析需要批准时立即拒绝且明确返回,零 Asked"
   const result = await withoutApproval(() => llmParseAutomation(`每天运行 ${echo}`, directory))
   expect(typeof result.ok).toBe("boolean")
 }, 60_000)
+
+test("AC-03 只读拒绝后模型正常收尾,运行仍记失败且保留报告", async () => {
+  await store.removeRecord({ level: "tool", canonical: "mcp:probe:echo" })
+  const job = task("unattended-readonly")
+  job.target.agent = "codepuppy-automation"
+  job.permissionProfile = "readonly"
+  expect(saveAutomation(job).ok).toBe(true)
+  await withoutApproval(() => runAutomationNow(job.id))
+  const record = getAutomation(job.id)!.lastRun!
+  expect(record.status).toBe("failed")
+  expect(record.summary).toBe("这个任务是只读档,不能使用「echo」。")
+  expect(JSON.parse(readFileSync(join(record.runDir!, "status.json"), "utf8")).error).toBe(record.summary)
+  expect(readFileSync(join(record.runDir!, "report.md"), "utf8")).toContain("done")
+}, 60_000)
+
+test("AC-08 来源变化拒绝经过 Code Mode 外层成功终态进入运行记录", async () => {
+  // 合法旧绑定摘要与当前真实 MCP 定义不同;格式由生产 store/schema 校验。
+  await store.setRecord({ selector: { level: "tool", canonical: "mcp:probe:echo" }, state: "enabled", bindingDigest: `sha256:${"0".repeat(64)}` })
+  const before = readFileSync(callLog, "utf8")
+  expect(saveAutomation(task("unattended-binding")).ok).toBe(true)
+  await withoutApproval(() => runAutomationNow("unattended-binding"))
+  const record = getAutomation("unattended-binding")!.lastRun!
+  expect(record.status).toBe("failed")
+  expect(record.summary).toContain("「echo」需要你先确认")
+  expect(record.summary).toContain("到 设置 → 工具 处理后")
+  expect(readFileSync(callLog, "utf8")).toBe(before)
+}, 60_000)
+
+test("AC-04 敏感文件、子任务、项目外目录维持拒绝并写入原因", async () => {
+  await store.removeRecord({ level: "tool", canonical: "mcp:probe:echo" })
+  writeFileSync(join(directory, ".env"), "TEST_SENTINEL=not-a-secret\n")
+  writeFileSync(join(sandbox.root, "outside.txt"), "outside sentinel\n")
+  // 模型清单平时已隐藏整个 subagent。让真实工具到达其体内的原始 subagent 断言,
+  // 只改这台测试引擎的清单筛选动作名,不改自动化 agent 的 deny 或真实工具实现。
+  const context: Context = probe().ctx
+  await context.tool.transform((editor) => editor.update("subagent", (tool) => {
+    tool.options = { ...tool.options, permission: "unattended_subagent_probe" }
+  }))
+  const cases = [
+    { id: "env", name: "read", args: { path: ".env" } },
+    { id: "subagent", name: "subagent", args: { agent: "general", description: "probe", prompt: "probe" } },
+    { id: "outside", name: "read", args: { path: join(sandbox.root, "outside.txt") } },
+  ]
+  for (const item of cases) {
+    const job = task(`unattended-${item.id}`)
+    job.prompt = `CP-CALL ${JSON.stringify({ name: item.name, args: item.args })}`
+    expect(saveAutomation(job).ok).toBe(true)
+    await withoutApproval(() => runAutomationNow(job.id))
+    const record = getAutomation(job.id)!.lastRun!
+    expect(record.status).toBe("failed")
+    expect(record.summary).toBe(`自动化任务不能使用「${item.name}」做这一步。`)
+    expect(JSON.parse(readFileSync(join(record.runDir!, "status.json"), "utf8")).error).toBe(record.summary)
+  }
+}, 60_000)
+
+test("AC-06 未登记的询问档对同一工具出卡,人工答复后才执行", async () => {
+  await store.setRecord({ selector: { level: "tool", canonical: "mcp:probe:echo" }, state: "ask" })
+  const owner = await client.session.create({ location: { directory }, agent: "codepuppy-ask", model: { id: "m", providerID: "codepuppy" }, metadata: { unattended: true } })
+  const controller = new AbortController()
+  const connected = Promise.withResolvers<void>()
+  const asked = Promise.withResolvers<{ id: string; sessionID: string }>()
+  const reader = (async () => {
+    for await (const event of client.event.subscribe({ types: ["permission.asked"], signal: controller.signal })) {
+      if (event.type === "server.connected") connected.resolve()
+      if (event.type === "permission.asked" && event.data.sessionID === owner.id) asked.resolve(event.data)
+    }
+  })()
+  await connected.promise
+  const before = readFileSync(callLog, "utf8")
+  try {
+    await client.session.prompt({ sessionID: owner.id, text: echo })
+    const request = await asked.promise
+    expect((await client.permission.list({ sessionID: owner.id })).map((item) => item.id)).toContain(request.id)
+    expect(readFileSync(callLog, "utf8")).toBe(before)
+    await client.permission.reply({ sessionID: owner.id, requestID: request.id, decision: "once" })
+    await client.experimental.session.wait({ sessionID: owner.id })
+    expect(readFileSync(callLog, "utf8")).toBe(`${before}echo\n`)
+  } finally {
+    controller.abort()
+    await reader
+  }
+}, 60_000)
+
+test("U-3 直接工具的 Tool.Error metadata 落到消息并投影", async () => {
+  const job = task("unattended-direct")
+  job.target.agent = "codepuppy-automation"
+  job.permissionProfile = "readonly"
+  job.prompt = `CP-CALL ${JSON.stringify({ name: "cp_probe", args: {} })}`
+  const before = probe().runs.cp_probe
+  expect(saveAutomation(job).ok).toBe(true)
+  await withoutApproval(() => runAutomationNow(job.id))
+  const record = getAutomation(job.id)!.lastRun!
+  expect(record.status).toBe("failed")
+  expect(record.summary).toBe("这个任务是只读档,不能使用「cp_probe」。")
+  expect(probe().runs.cp_probe).toBe(before)
+  const page = await client.message.list({ sessionID: record.sessionID!, order: "asc" })
+  const tools = page.data.flatMap((message) => message.type === "assistant" ? message.content.filter((part) => part.type === "tool") : [])
+  expect(tools[0]?.state).toMatchObject({ status: "error", metadata: { codepuppyUnattendedDenial: { reason: "readonly", tool: "cp_probe" } } })
+}, 60_000)
+
+test("投影夹具从上述真实运行消息导出,标注生产源码摘要", async () => {
+  const examples = []
+  for (const scenario of ["default", "ask", "readonly", "binding", "env", "subagent", "outside", "direct"]) {
+    const record = getAutomation(`unattended-${scenario}`)?.lastRun
+    if (!record) continue
+    const messages = await client.message.list({ sessionID: record.sessionID!, order: "asc", limit: 200 })
+    const emptyPage = await client.message.list({ sessionID: record.sessionID!, cursor: messages.cursor.next! })
+    examples.push({ scenario, messages: messages.data.filter((message) => message.type === "assistant" || message.type === "idle"), cursor: messages.cursor, emptyPage })
+  }
+  const sources = ["packages/ext/src/policy/gate.ts", "packages/ext/src/policy/index.ts", "packages/ext/src/policy/display.ts", "packages/ui-mac/src/main/automation-scheduler.ts"]
+  const sourceHashes = Object.fromEntries(sources.map((file) => [file, createHash("sha256").update(readFileSync(join(import.meta.dir, "../../../..", file))).digest("hex")]))
+  // 由宿主输出捕获;沙箱退出会清理目录,不让测试改写仓内夹具。
+  console.info(`1699_MESSAGE_FIXTURE=${JSON.stringify({ provenance: { command: "cd packages/ui-mac && bun test ./src/main/unattended-run.engine.cases.ts", selection: "真实消息中的 assistant 与 idle", sourceHashes }, examples })}`)
+  expect(examples).toHaveLength(8)
+})

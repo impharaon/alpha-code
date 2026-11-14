@@ -1,3 +1,4 @@
+import { type UnattendedDenial } from "../../../schema/src/codepuppy-unattended"
 import type { UnattendedState } from "./unattended"
 // Code Puppy tool policy inside the extension (lane seams I3): everything L4 hangs on the OpenCode 2 plugin Context
 // goes through `registerPolicy`. The extension's `setup` awaits it first and awaits `seal()` last (L3 owns the call
@@ -16,7 +17,7 @@ import os from "node:os"
 import path from "node:path"
 import type { Plugin } from "@opencode/plugin"
 import { createCatalog } from "./catalog"
-import { attachDirectoryDisplay, attachNetFailure, attachTerminal, displaySnapshot, wrapForDisplay } from "./display"
+import { attachDirectoryDisplay, attachUnattendedDenial, attachNetFailure, attachTerminal, displaySnapshot, wrapForDisplay } from "./display"
 import { confirm, decide, effectiveFor, gateWithoutToolCall, holdAsk, holdUnattendedDeny, pin, type GateDeps } from "./gate"
 import {
   codeModeFacts,
@@ -78,6 +79,11 @@ export async function registerPolicy(context: Plugin.Context, unattended: Unatte
   let early: ReadonlySet<string> | undefined
   const mcp = new Map<string, McpEntry & Record<string, unknown>>()
   const displays = new Map<string, ToolDisplaySnapshotV1>()
+  const codeModeDenials = new Map<string, UnattendedDenial | undefined>()
+  const profile = (sessionID: string, agent?: string) => unattended.unattendedProfile(sessionID, agent, async () => (await context.session.get({ sessionID })).agent ?? "")
+  const denied = (callID: string | undefined, denial: UnattendedDenial) => {
+    if (callID && codeModeDenials.has(callID) && !codeModeDenials.get(callID)) codeModeDenials.set(callID, denial)
+  }
 
   // A non-builtin plugin activating before the extension makes early tools ambiguous (identity.ts).
   const earlyAmbiguous = async () => {
@@ -110,16 +116,14 @@ export async function registerPolicy(context: Plugin.Context, unattended: Unatte
   const ruleset = async (sessionID: string, agent: string): Promise<readonly PermissionRule[]> => {
     const configured =
       catalog.configured(agent) ??
-      (((await context.agent.get({ agentID: agent } as never)) as { data?: { permissions?: PermissionRule[] } }).data
-        ?.permissions ??
-        [])
-    const session = (await context.session.get({ sessionID } as never).catch(() => undefined)) as
-      | { data?: { permissions?: PermissionRule[] } }
-      | undefined
-    return [...configured, ...(session?.data?.permissions ?? [])]
+      (await context.agent.get({ agentID: agent } as never)).data.permissions ?? []
+    const session = await context.session.get({ sessionID } as never).catch(() => undefined)
+    return [...configured, ...(session?.permissions ?? [])]
   }
 
   const deps: GateDeps = {
+    profile,
+    denied,
     store,
     facts: factsFor,
     ruleset,
@@ -167,8 +171,14 @@ export async function registerPolicy(context: Plugin.Context, unattended: Unatte
   // Code Puppy's own gate requests already carry theirs (`confirm`); their ask is held so no later evaluate hook can
   // turn it into allow (`holdAsk`).
   await context.permission.hook("evaluate", async (event) => {
-    const profile = await unattended.unattendedProfile(event.sessionID, event.agent, async () => (await context.session.get({ sessionID: event.sessionID })).agent ?? "")
-    if (profile !== undefined) return holdUnattendedDeny(event, profile, event.action)
+    const selected = await profile(event.sessionID, event.agent)
+    if (selected !== undefined) {
+      if (event.source === undefined) {
+        const facts = (await allFacts()).find((item) => item.permission === event.action)
+        if (facts) await gateWithoutToolCall(deps, event as never, facts, "build")
+      }
+      return holdUnattendedDeny(event, selected, event.action, (denial) => denied(event.source?.type === "tool" ? event.source.id : undefined, denial))
+    }
     if (isCodePuppyPolicyRequest(event.metadata)) return holdAsk(event)
     // A tool's permission action asserted without a tool call (a subtask command, review R1 #2) is decided like the
     // tool's call; a tool call's own assert already passed confirm() in execute.before.
@@ -213,6 +223,7 @@ export async function registerPolicy(context: Plugin.Context, unattended: Unatte
           if (!asksForItself(decision.facts)) await confirm(deps, decision, event)
           displays.set(event.id, displaySnapshot(decision.facts))
           pin(event)
+          if (event.tool === CODE_MODE_TOOL && await profile(event.sessionID, event.agent) !== undefined) codeModeDenials.set(event.id, undefined)
         } catch (error) {
           displays.delete(event.id)
           throw error
@@ -223,6 +234,10 @@ export async function registerPolicy(context: Plugin.Context, unattended: Unatte
         wrapForDisplay(editor as never, (callID) => displays.get(callID)),
       )
       await context.tool.hook("execute.after", (event) => {
+        if (event.tool === CODE_MODE_TOOL) {
+          attachUnattendedDenial(event as never, codeModeDenials.get(event.id))
+          codeModeDenials.delete(event.id)
+        }
         attachNetFailure(event as never)
         attachDirectoryDisplay(event as never)
         attachTerminal(event as never, displays.get(event.id))

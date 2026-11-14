@@ -1,3 +1,4 @@
+import { UNATTENDED_DENIAL_KEY, type UnattendedDenial } from "../../../schema/src/codepuppy-unattended"
 // ADR-041 display snapshot on OpenCode 2 (lane seams I7b): `state.metadata.codepuppyDisplay` on a tool call.
 // Replaces packages/opencode/src/session/tool-display.ts and the processor.ts takeover that wrote `part.display`.
 //
@@ -133,4 +134,22 @@ export function attachDirectoryDisplay(event: {
     ...(truncated ? {} : { totalEntries: offset - 1 + entries.length }),
   }
   event.result = { ...event.result, metadata: { ...event.result.metadata, display } }
+}
+
+
+/** Code Mode 外层成功也可能包含子调用拒绝,所以两种终态都附上同一份结构化原因。 */
+export function attachUnattendedDenial(
+  event: Parameters<typeof attachTerminal>[0],
+  denial: UnattendedDenial | undefined,
+) {
+  if (!denial) return
+  if (event.status === "completed") {
+    event.result = { ...event.result, metadata: { ...event.result.metadata, [UNATTENDED_DENIAL_KEY]: denial } }
+    return
+  }
+  event.error = new ToolError({
+    message: event.error.message,
+    ...(event.error.error === undefined ? {} : { error: event.error.error }),
+    metadata: { ...event.error.metadata, [UNATTENDED_DENIAL_KEY]: denial },
+  })
 }

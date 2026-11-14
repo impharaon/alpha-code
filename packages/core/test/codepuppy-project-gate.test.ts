@@ -532,3 +532,11 @@ it.live("审查1:无变化重载保留 md 清单与作用点,在途观察者仍�
   expect(CodePuppyProjectGate.view(f.project)?.points.agent).toBe("done")
   expect(CodePuppyProjectGate.view(f.project)?.withheld).toContainEqual({ kind: "frontmatter-code", name: "agents/a.md", file: "agents/a.md" })
 }))
+
+it.live("审查2:constructor / toString / __proto__ 顶层键按未知键丢弃,不崩溃、不列清单", () => run(async () => {
+  await using f = await fixture({ "home/work/project/opencode.json": '{"constructor":{"a":{"b":1}},"toString":{"x":1},"__proto__":{"x":1},"instructions":["NOTES.md"]}' })
+  CodePuppyProjectGate.install({ trusted: () => false })
+  const info = documentAt(await Effect.runPromise(entriesOf(f)), path.join(f.project, "opencode.json"))!.info
+  expect({ ...info }).toEqual({ instructions: ["NOTES.md"] })
+  expect(CodePuppyProjectGate.view(f.project)?.withheld).toEqual([])
+}))

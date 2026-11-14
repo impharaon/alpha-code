@@ -369,12 +369,12 @@ export const begin = Effect.fnUntraced(function* (input: { readonly directory: s
               setOwn(kept, key, value)
               continue
             }
-            const agentRule = AGENT_MAPS[key]
+            const agentRule = Object.hasOwn(AGENT_MAPS, key) ? AGENT_MAPS[key] : undefined
             if (agentRule) {
               setOwn(kept, key, keepEntries(value, agentRule, (name, fields) => withheld.push({ kind: "agent-control", name, file: file(filepath), fields })))
               continue
             }
-            const commandRule = COMMAND_MAPS[key]
+            const commandRule = Object.hasOwn(COMMAND_MAPS, key) ? COMMAND_MAPS[key] : undefined
             if (commandRule) {
               setOwn(kept, key, keepEntries(value, commandRule, (name, fields) => withheld.push({ kind: "command-run", name, file: file(filepath), fields })))
               continue
@@ -480,7 +480,7 @@ function keepEntries(value: unknown, rule: EntryRule, onRemoved: (name: string, 
 /** 一个被拿掉的顶层键在视图里的条目。上游归一化认不出的键(单独归一化不产出任何东西)不列(编排器裁决 2026-11-13)。 */
 function deferredItems(key: string, value: unknown, file: string): WithheldItem[] {
   if (!effective({ [key]: value })) return []
-  const kind = DEFERRED_KEYS[key] ?? "setting"
+  const kind = Object.hasOwn(DEFERRED_KEYS, key) ? DEFERRED_KEYS[key]! : "setting"
   const named = (kind: WithheldItem["kind"], names: string[]) => names.map((name) => ({ kind, name, file }))
   if (key === "mcp" && isRecord(value)) {
     const nested = isRecord(value.servers) ? Object.keys(value.servers).filter((name) => effective({ mcp: { servers: { [name]: (value.servers as Record<string, unknown>)[name] } } })) : []

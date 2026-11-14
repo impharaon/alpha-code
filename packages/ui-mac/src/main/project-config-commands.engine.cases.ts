@@ -111,7 +111,7 @@ async function session(directory: string, extra: Record<string, unknown> = {}) {
 
 // ── 夹具(每臂一套)──────────────────────────────────────────────────────────────────────────────────────────────────────────
 type Projects = Record<
-  "p1" | "ask" | "provider" | "model" | "shadow" | "nofmt" | "pluginOptions" | "removeAll" | "removeAgent" | "neutral" | "frontmatter",
+  "p1" | "ask" | "provider" | "model" | "shadow" | "nofmt" | "pluginOptions" | "removeAll" | "removeAgent" | "removeExt" | "neutral" | "frontmatter",
   string
 >
 const projects = {} as Record<Arm, Projects>
@@ -147,6 +147,7 @@ function fixture(arm: Arm, p1: string): Projects {
     pluginOptions: project(arm, "plugin-options"),
     removeAll: project(arm, "remove-all"),
     removeAgent: project(arm, "remove-agent"),
+    removeExt: project(arm, "remove-ext"),
     neutral: project(arm, "neutral"),
     frontmatter: project(arm, "frontmatter"),
   }
@@ -192,6 +193,7 @@ function fixture(arm: Arm, p1: string): Projects {
   write(path.join(p.pluginOptions, "opencode.json"), JSON.stringify({ plugins: [{ package: globalPlugin, options: { who: "project" } }] }))
   write(path.join(p.removeAll, "opencode.json"), JSON.stringify({ plugins: ["-*"] }))
   write(path.join(p.removeAgent, "opencode.json"), JSON.stringify({ plugins: ["-opencode.config.agent"] }))
+  write(path.join(p.removeExt, "opencode.json"), JSON.stringify({ plugins: ["-codepuppy.ext"] }))
   fs.mkdirSync(p.neutral, { recursive: true })
 
   // md 文件头:四个读取点各一个 `---javascript`(agent、命令、技能、Code Puppy 显式层的 `.codepuppy/skills`);
@@ -399,6 +401,12 @@ for (const arm of ARMS) {
       await turn(arm, p().removeAgent, id, call("shell", { command: mark(arm, "remove-agent-readonly-shell"), description: "probe" }))
       expect(model.requests.length).toBeGreaterThan(before)
       expect(ran(arm)).not.toContain("remove-agent-readonly-shell")
+      // 审查 8:真实扩展 id,项目不能撤掉 Code Puppy 的权限闸。
+      await open(p().removeExt)
+      expect(await plugins(p().removeExt)).toContain("codepuppy.ext")
+      const own = await session(p().removeExt, { agent: "codepuppy-readonly" })
+      await turn(arm, p().removeExt, own.id, call("shell", { command: mark(arm, "remove-ext-readonly-shell"), description: "probe" }))
+      expect(ran(arm)).not.toContain("remove-ext-readonly-shell")
     }, 60_000)
 
     test("md 文件头:四个读取点未允许不求值、允许后照旧求值;两臂条目与正文照常可用", async () => {

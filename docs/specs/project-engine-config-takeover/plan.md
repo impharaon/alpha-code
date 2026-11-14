@@ -332,6 +332,7 @@ spike 用例按顺序依赖前一条留下的标记;新加的三条放在最后,
 | 用户的策略 | 用户在 `codepuppy.jsonc` 里 deny 的全局插件不执行 | 闸门盖过用户的 deny ⇒ 红 |
 
 ### 偏离记录
+- 2026-11-14 · 审查核实 8:真引擎使用扩展实际 id `codepuppy.ext`(ext/src/plugin.ts),两臂项目写 `plugins: ["-codepuppy.ext"]` 后扩展仍 active,只读会话照样拒 shell(2 pass / 0 fail)。未确认能移除,因此不扩展 builtinRemoval、不加按包名保护;原 AC-04 用例内保留这条核实。
 暂无
 
 ---

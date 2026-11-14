@@ -163,6 +163,13 @@ M3 又会改 `opencode2/` 里引 v1 类型的文件,M4 最后统一改指,避免
 - r3 实施约 11 分钟(2026-11-14 12:37 起)。四个原提交各自一条提交,另一个跟进提交只涉及 8 个允许文件(两份生成夹具占主要行数);没有冲突或范围扩张。冻结设计除原 R17 带入外不动;单元 1–2 的真引擎修复断言、命令卡红例、原生解包文件、界面不动。遗留去向:无。已核:Codex(GPT-6),本单元实现自检通过;独立审查与推送/PR/合并交编排器。OPTIONAL 无。
 
 
+##### r4 — 独立审查采用的纠正
+
+- 依据:续派接受单元 3 的 `1288858681`;单位 1–2 的 Claude Opus 独立审查(`0973f0bc8f`,1/1)建议 MERGE、无 Blocker/Major/Minor,本轮仅处理编排器采用的三条说明/测试纠正及类型依赖补记。
+- 文档提交(第 1、4 项):设计 UC-19、固定答复节选、失败段、M1 与留档按 0.2.0 的固定 200 `{healthy:true}` 改正;§10 新增 R18 取代 R15 的 501 答复,历史决定保留注明取代,其他裁决不改。证据是续派转达的 0.2.0 打包回归/#1712 与真引擎协议探针。§4.2 补明 `index.ts`、`opencode2/internal-projects.ts` 等对 `preload/types` 的 `EngineInternalDirectories` 仅类型依赖。
+- 第 2 项前提核对:`PROBE_FALLBACK` 在设计 §4.3 是明确导出的冻结分类表,当前字面量空表且没有生产者填充;`routes-coverage.test.ts` 只用它核分类/不重叠,没有测试依赖管道的空表分支。因此保留表与覆盖核对,下一提交只删不可达分支及不用的 import,不删冻结分类面。
+- 对照代码/冻结消费方人工核对文档及链接,并跑 `bun test src/engine-adapter/protocol-probe.engine.test.ts src/engine-adapter/unsupported.test.ts src/engine-adapter/routes-coverage.test.ts src/engine-adapter/boundary.test.ts`:25 pass / 0 fail(exit 0,ui-mac/Bun 1.4.4),证明固定答复、首探失败后的 v1 协议与依赖边界。
+
 ## M1a — 翻译器搬进 `opencode2/`(纯搬家)
 
 - 依据:设计 §4.2 模块与依赖方向、§6 第 3 行、§9 M1「翻译器挪进 `opencode2/`」;Issue AC-03。

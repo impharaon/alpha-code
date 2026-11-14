@@ -72,4 +72,4 @@ last_reviewed: 2026-11-12
 
 ### 偏离记录
 2026-11-12 · 实施中增补三处,均为必要的同步,不改行为:(1)`src/main/release-source.test.ts` 的临时工作目录拷贝清单加 `scripts/build-identity.ts`(`electron-builder.config.ts` 现在 import 它,否则该测试 7 格全红);(2)注释里的议题引用写成 `ac#237` 而非 `alpha-code#237`(旧名扫描门把后者当旧名命中);(3)`src/preload/component-stub-parity.typecheck.ts` 不改,`test-component/preload-stub.ts` 的 `AbsentOnPurposeKey` 加 `buildIdentity`(③类:挂 composer 的用例到不了账户浮层)。· 本提交。
-- 2026-11-14 · 批次 B 接续 0.2.0 与 #1708/#1709:发布来源测试的临时副本同时复制构建身份脚本与 release-sbom.ts,preload 同时保留 BuildIdentity 与 CodePuppyEnvironmentInfo 类型;构建身份行为不变,不恢复已撤回的 #1710。· 本次合并提交。
+- 2026-11-14 · 批次 B 接续 0.2.0 与 #1708/#1709:发布来源测试的临时副本同时复制构建身份脚本与 release-sbom.ts,preload 同时保留 BuildIdentity 与 CodePuppyEnvironmentInfo 类型;后续本票提交仅同步旧名例外登记中本票新增计划摘要的外部仓库名引用计数,构建身份行为不变,不恢复已撤回的 #1710。· 合并提交与本票跟进提交。

@@ -4,7 +4,7 @@
 //
 // 同一台引擎、两组同样的夹具,同时打开(AC-07):
 //   · **未允许臂**:没有信任记录。原先钉在这里的「已知的坏」随修复按段翻转(DESIGN-project-engine-config-takeover 段 1:配置装载闸;
-//     段 2 才关掉命令插值与 md 文件头,所以那几条本段仍是「出现」);
+//     命令插值与 md 文件头在段 2 一并翻转);
 //   · **允许臂**:每个项目先经 main 的生产写端记一条「允许加载」。断言保持今天的样子(与在 OpenCode 里一样,AC-03),
 //     只有 `-*` 与 `-opencode.config.agent` 两条改成会话照常(契约 B 唯一的「从不」,AC-04)。
 // 时点:open(只打开位置)→ turn(一轮普通对话)→ tool(模型调写文件 / shell 工具)→ user(用户调斜杠命令、在输入框跑 shell、
@@ -70,7 +70,7 @@ async function at(directory: string, method: string, route: string, body?: unkno
 }
 const plugins = async (directory: string) =>
   (((await at(directory, "GET", "/api/plugin")).json?.data ?? []) as Array<{ id: string; state: { status: string } }>).filter((p) => p.state.status === "active").map((p) => p.id)
-const agentsAt = async (directory: string) => ((await at(directory, "GET", "/api/agent")).json?.data ?? []) as Array<{ id: string; mode?: string; system?: string }>
+const agentsAt = async (directory: string) => ((await at(directory, "GET", "/api/agent")).json?.data ?? []) as Array<{ id: string; mode?: string; system?: string; model?: { id: string; providerID: string }; permissions?: Array<{ action: string; resource: string; effect: string }> }>
 
 /** 打开一个位置(= 桌面端第一次带这个目录发请求):插件清单出现并连续两次不变。 */
 async function open(directory: string) {
@@ -208,6 +208,10 @@ function fixture(arm: Arm, p1: string): Projects {
     }),
   )
   write(path.join(p.frontmatter, ".opencode", "modes", "explore.md"), "---\ndescription: i12 dir mode explore\n---\nI12-DIRMODE-PROMPT\n")
+  // 同段 0 的实测文件头,加上原生控制字段与无效模型;目录覆盖已有 subagent,避免新 agent 默认 primary 干扰判据。
+  write(path.join(p.frontmatter, ".opencode", "agents", "general.md"), '---\nsystem: ignored header\nmodel: codepuppy/m\nmode: primary\npermissions:\n  - action: edit\n    resource: CP-I12-MD-CONTROL\n    effect: allow\n---\nI12-MODE-GENERAL-PROMPT\n')
+  write(path.join(p.frontmatter, ".opencode", "agents", "cpi12mdenvagent.md"), '---\nsystem: ignored header\nmodel: "{env:CP_I12_UNSET_MODEL}"\n---\nI12-MD-ENV-PROMPT\n')
+  write(path.join(p.frontmatter, ".opencode", "commands", "cpi12controlcmd.md"), '---\ndescription: i12 controlled command\nagent: general\nmodel: codepuppy/m\nsubtask: true\n---\nI12-CONTROL-COMMAND-BODY\n')
 
   if (arm === "allowed") for (const directory of Object.values(p)) allowProject(directory)
   return p
@@ -293,15 +297,22 @@ for (const arm of ARMS) {
       }
     }, 90_000)
 
-    test("user:斜杠命令(配置 / `.opencode/commands/`)照常列出并展开插值(段 2 才关);输入框 shell 与默认终端 ⇒ 允许臂项目 shell、未允许臂不是", async () => {
+    test("user:斜杠命令(配置 / `.opencode/commands/`)照常列出,未允许发模板原文、允许后插值;输入框 shell 与默认终端 ⇒ 允许臂项目 shell、未允许臂不是", async () => {
       const { id } = await session(p().p1)
       const names = (((await at(p().p1, "GET", "/api/command")).json?.data ?? []) as Array<{ name: string }>).map((command) => command.name)
       expect(names).toEqual(expect.arrayContaining(["cpi12cmd", "cpi12dir"]))
-      expect((await at(p().p1, "POST", `/api/session/${id}/command`, { name: "cpi12cmd", text: "" })).status).toBe(204)
-      await until(() => ran(arm).includes("command-config-template"))
-      expect((await at(p().p1, "POST", `/api/session/${id}/command`, { name: "cpi12dir", text: "" })).status).toBe(204)
-      await until(() => ran(arm).includes("command-dir-template"))
-      expect(ran(arm)).toEqual(expect.arrayContaining(["command-config-template", "command-dir-template"]))
+      for (const [name, marker] of [["cpi12cmd", "command-config-template"], ["cpi12dir", "command-dir-template"]]) {
+        const before = model.requests.length
+        expect((await at(p().p1, "POST", `/api/session/${id}/command`, { name, text: "" })).status).toBe(204)
+        await at(p().p1, "POST", `/api/experimental/session/${id}/wait`)
+        if (allowed) expect(ran(arm)).toContain(marker)
+        else {
+          expect(ran(arm)).not.toContain(marker)
+          const sent = JSON.stringify(model.requests.slice(before).map((request) => request.messages))
+          expect(sent).toContain("!`echo")
+          expect(sent).toContain(marker)
+        }
+      }
       expect((await at(p().p1, "POST", `/api/session/${id}/shell`, { command: "echo cp-user" })).status).toBe(204)
       if (allowed) await until(() => lines(arm, "shell-key").some((line) => line.endsWith("echo cp-user")))
       expect((await at(p().p1, "POST", "/api/pty", { cwd: p().p1 })).status).toBe(200)
@@ -316,12 +327,21 @@ for (const arm of ARMS) {
       await at(p().p1, "POST", `/api/session/${id}/abort`).catch(() => undefined)
     }, 90_000)
 
-    test("user:项目的 review / init 顶替出厂命令(文字是内容),用户敲 /review、/init 展开模板插值(段 2 才关)", async () => {
+    test("user:项目的 review / init 顶替出厂命令(文字是内容),未允许发模板原文、允许后插值", async () => {
       await open(p().shadow)
       const { id } = await session(p().shadow)
-      for (const name of ["review", "init"]) expect((await at(p().shadow, "POST", `/api/session/${id}/command`, { name, text: "" })).status).toBe(204)
-      await until(() => ran(arm).includes("command-shadow-review") && ran(arm).includes("command-shadow-init"))
-      expect(ran(arm)).toEqual(expect.arrayContaining(["command-shadow-review", "command-shadow-init"]))
+      for (const name of ["review", "init"]) {
+        const before = model.requests.length
+        expect((await at(p().shadow, "POST", `/api/session/${id}/command`, { name, text: "" })).status).toBe(204)
+        await at(p().shadow, "POST", `/api/experimental/session/${id}/wait`)
+        if (allowed) expect(ran(arm)).toContain(`command-shadow-${name}`)
+        else {
+          expect(ran(arm)).not.toContain(`command-shadow-${name}`)
+          const sent = JSON.stringify(model.requests.slice(before).map((request) => request.messages))
+          expect(sent).toContain("!`echo")
+          expect(sent).toContain(`command-shadow-${name}`)
+        }
+      }
       await at(p().shadow, "POST", `/api/session/${id}/abort`).catch(() => undefined)
     }, 60_000)
 
@@ -380,28 +400,69 @@ for (const arm of ARMS) {
       expect(ran(arm)).not.toContain("remove-agent-readonly-shell")
     }, 60_000)
 
-    test("md 文件头:四个读取点的 `---javascript` 在打开位置时求值(段 2 才关),条目照常出现", async () => {
+    test("md 文件头:四个读取点未允许不求值、允许后照旧求值;两臂条目与正文照常可用", async () => {
       await open(p().frontmatter)
       const names = (route: string, key: "id" | "name") =>
         at(p().frontmatter, "GET", route).then((r) => ((r.json?.data ?? []) as Array<Record<string, string>>).map((item) => item[key]))
       expect(await names("/api/agent", "id")).toContain("cpi12jsagent")
       expect(await names("/api/command", "name")).toContain("cpi12jscmd")
       expect(await names("/api/skill", "id")).toEqual(expect.arrayContaining(["cpi12jsskill", "cpi12cpskill"]))
-      for (const marker of ["frontmatter-agent", "frontmatter-command", "frontmatter-skill", "frontmatter-codepuppy-skill"]) expect(ran(arm)).toContain(marker)
+      for (const marker of ["frontmatter-agent", "frontmatter-command", "frontmatter-skill", "frontmatter-codepuppy-skill"]) {
+        if (allowed) expect(ran(arm)).toContain(marker)
+        else expect(ran(arm)).not.toContain(marker)
+      }
+      expect((await agentsAt(p().frontmatter)).find((agent) => agent.id === "cpi12jsagent")?.system).toBe("I12-JS-AGENT-BODY")
+      const skills = ((await at(p().frontmatter, "GET", "/api/skill")).json?.data ?? []) as Array<{ id: string; content: string }>
+      expect(skills.find((skill) => skill.id === "cpi12jsskill")?.content).toBe("I12-JS-SKILL-BODY\n")
+      expect(skills.find((skill) => skill.id === "cpi12cpskill")?.content).toBe("I12-CP-SKILL-BODY\n")
+      const { id } = await session(p().frontmatter)
+      const initial = (await at(p().frontmatter, "GET", `/api/session/${id}`)).json?.data
+      const before = model.requests.length
+      expect((await at(p().frontmatter, "POST", `/api/session/${id}/command`, { name: "cpi12jscmd", text: "" })).status).toBe(204)
+      await at(p().frontmatter, "POST", `/api/experimental/session/${id}/wait`)
+      expect(JSON.stringify(model.requests.slice(before).map((request) => request.messages))).toContain("I12-JS-COMMAND-BODY")
+      if (!allowed) {
+        // agent / model / subtask 暂缓后,命令仍在当前会话发送原正文,不切助手、不派子会话。
+        expect((await at(p().frontmatter, "POST", `/api/session/${id}/command`, { name: "cpi12controlcmd", text: "" })).status).toBe(204)
+        await at(p().frontmatter, "POST", `/api/experimental/session/${id}/wait`)
+        const current = (await at(p().frontmatter, "GET", `/api/session/${id}`)).json?.data
+        expect(current.agent).toBe(initial.agent)
+        expect(current.model).toMatchObject({ id: "m", providerID: "codepuppy" })
+        expect(JSON.stringify(model.requests.slice(before).map((request) => request.messages))).toContain("I12-CONTROL-COMMAND-BODY")
+        expect(((await at(p().frontmatter, "GET", `/api/session?parentID=${id}`)).json?.data ?? [])).toEqual([])
+      }
+      if (allowed) {
+        expect((await at(p().frontmatter, "POST", `/api/session/${id}/command`, { name: "cpi12controlcmd", text: "" })).status).toBe(204)
+        const children = (await at(p().frontmatter, "GET", `/api/session?parentID=${id}`)).json?.data as Array<{ id: string; agent?: string }>
+        expect(children).toHaveLength(1)
+        expect(children[0].agent).toBe("general")
+        await at(p().frontmatter, "POST", `/api/experimental/session/${children[0].id}/wait`)
+        expect(JSON.stringify(model.requests.slice(before).map((request) => request.messages))).toContain("I12-CONTROL-COMMAND-BODY")
+      }
     }, 60_000)
 
     test("agent:写了 `system` 又写了无效 `{env:}` 模型的 agent ⇒ 未允许臂:留下、用它的提示词;允许臂:与 OpenCode 一样整条不出现", async () => {
-      const agent = (await agentsAt(p().frontmatter)).find((item) => item.id === "cpi12envagent")
-      if (allowed) expect(agent).toBeUndefined()
-      else expect(agent?.system).toBe("I12-ENV-AGENT-PROMPT")
+      const agents = await agentsAt(p().frontmatter)
+      for (const [name, body] of [["cpi12envagent", "I12-ENV-AGENT-PROMPT"], ["cpi12mdenvagent", "I12-MD-ENV-PROMPT"]]) {
+        const agent = agents.find((item) => item.id === name)
+        if (allowed) expect(agent).toBeUndefined()
+        else expect(agent?.system).toBe(body)
+      }
     }, 60_000)
 
-    test("agent:v1 `mode` 名字空间覆盖出厂 subagent general ⇒ 未允许臂:仍是 subagent、提示词生效;允许臂:primary。`.opencode/modes/` 覆盖 explore ⇒ 两臂都 primary(段 2 才关)", async () => {
+    test("agent:v1 `mode` 名字空间覆盖出厂 subagent general ⇒ 未允许臂:仍是 subagent、提示词生效;允许臂:primary。md agent 的模型与权限、`.opencode/modes/` 的 primary 同样只在允许后生效", async () => {
       const agents = await agentsAt(p().frontmatter)
       const general = agents.find((agent) => agent.id === "general")
       expect(general?.mode).toBe(allowed ? "primary" : "subagent")
       expect(general?.system).toBe("I12-MODE-GENERAL-PROMPT")
-      expect(agents.find((agent) => agent.id === "explore")?.mode).toBe("primary")
+      expect(agents.find((agent) => agent.id === "explore")).toMatchObject({ mode: allowed ? "primary" : "subagent", system: "I12-DIRMODE-PROMPT" })
+      if (allowed) {
+        expect(general?.model).toMatchObject({ id: "m", providerID: "codepuppy" })
+        expect(general?.permissions).toContainEqual({ action: "edit", resource: "CP-I12-MD-CONTROL", effect: "allow" })
+      } else {
+        expect(general?.model).toBeUndefined()
+        expect(general?.permissions?.some((rule) => rule.resource === "CP-I12-MD-CONTROL")).toBe(false)
+      }
     }, 60_000)
   })
 }

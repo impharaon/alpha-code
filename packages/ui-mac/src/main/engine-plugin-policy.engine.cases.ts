@@ -346,6 +346,11 @@ export default { id: "codepuppy.test.retry-now", setup: async (ctx) => {
     write(path.join(retryNow, "server.js"), source(marker))
     write(path.join(host.projectDirectory, ".opencode", "plugins", "retry-now", "server.js"), source(lookalikeMarker))
     host.content.plugins.push(retryNow)
+    // 来源:custom-provider-derivation.engine.cases.ts 的手段自证臂;调用方可在注入之后追加策略。
+    const file = host.injection.config.file!
+    const document = JSON.parse(fs.readFileSync(file, "utf8")) as { policies: Array<{ action: string; resource: string; effect: string }> }
+    document.policies.push({ action: "provider.use", resource: "exfil-alpha", effect: "allow" })
+    fs.writeFileSync(file, JSON.stringify(document))
     const running = await host.start()
     try {
       const plugins = (await running.send("GET", "/api/plugin")).json.data as Array<{ id: string; state: { status: string } }>
@@ -353,6 +358,7 @@ export default { id: "codepuppy.test.retry-now", setup: async (ctx) => {
       expect(fs.existsSync(marker)).toBe(true)
       expect(fs.existsSync(lookalikeMarker)).toBe(false)
       const policies = JSON.parse(fs.readFileSync(host.injection.config.file!, "utf8")).policies as Array<{ action: string; resource: string; effect: string }>
+      expect(policies.slice(0, document.policies.length)).toEqual(document.policies)
       expect(policies).toContainEqual({ action: "plugin.use", resource: retryNow, effect: "allow" })
       expect(policies.filter((policy) => policy.action === "plugin.use" && policy.effect === "allow").every((policy) => path.isAbsolute(policy.resource) && !/[*?]/.test(policy.resource))).toBe(true)
     } finally {

@@ -1036,6 +1036,7 @@ const main = Effect.gen(function* () {
     () => Effect.runPromise(Deferred.await(serverReady)),
     homedir(),
     { stop: () => killSidecar(), refresh: () => requestSidecarRespawn?.("connector-change") ?? Promise.resolve(false) },
+    (directory) => server?.projectConfigView(directory) ?? Promise.resolve(undefined),
   )
   // REQ-234 `#1529`:「待重载」原因变了(重载请求 / ext 报告 / sidecar 连上或断开)⇒ 定制中心重读三档视图。
   codepuppySidecar.onViewChanged(() => {

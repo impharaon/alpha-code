@@ -1,3 +1,5 @@
+import type { ProjectConfigView } from "@opencode/schema/codepuppy-project-config"
+import { projectExecutableRows } from "./codepuppy-ext-trust"
 import { isCodePuppyOfficeCatalogId } from "../shared/office-advisories"
 import { isCloudMcpWithheld } from "./codepuppy-config-injection"
 import { isOfficialConnector } from "./official-connector-recipes"
@@ -116,6 +118,7 @@ export function registerExtIpcHandlers(
   awaitServer: () => Promise<EngineConnection>,
   homeDir: string = homedir(),
   officialRuntime?: { stop(): Promise<void>; refresh(): Promise<boolean> },
+  projectConfigView?: (directory: string) => Promise<ProjectConfigView | undefined>,
 ) {
   assertCodePuppyEnvironmentIdentity()
   const resolveProjectEntry = (projectDir: unknown) => resolveProjectIpcEntry(projectDir, homeDir)
@@ -561,6 +564,14 @@ export function registerExtIpcHandlers(
     } catch (error) {
       getLogger().log(`[req099-adopt] adoption error (ledger untouched): ${error instanceof Error ? error.message : String(error)}`)
     }
+    // `#1709`:身份 = 规范项目目录 + 目录 inode;在弹框前取下,写入前复核。
+    const identityRead = withProjectIpcEntryIdentity(project, homeDir, (current) => projectTrustIdentity(current.projectDir))
+    if (!identityRead.ok) return { prompted: false, granted: false, reason: identityRead.reason }
+    const identity = identityRead.value
+    if (!identity) return { prompted: false, granted: false, reason: "fail closed: project directory identity cannot be confirmed" }
+    const decision = readProjectTrustEntry(identity, (line) => getLogger().warn(line))
+    if (hasExtensionsDecision(decision)) return { prompted: false, granted: extensionsGranted(decision) }
+
     const configRead = withProjectIpcEntryIdentity(project, homeDir, (current) => {
       try {
         return fs.readFileSync(path.join(current.root, "codepuppy.jsonc"), "utf8")
@@ -580,20 +591,21 @@ export function registerExtIpcHandlers(
     const jsoncText = configRead.value
     const pluginFiles = pluginsRead.value
     const exec = listProjectExecutables(jsoncText, pluginFiles)
-    if (exec.mcp.length === 0 && exec.plugins.length === 0 && exec.agents.length === 0) return { prompted: false, granted: false }
-    // `#1709`:身份 = 规范项目目录 + 目录 inode;在弹框前取下,写入前复核。
-    const identityRead = withProjectIpcEntryIdentity(project, homeDir, (current) => projectTrustIdentity(current.projectDir))
-    if (!identityRead.ok) return { prompted: false, granted: false, reason: identityRead.reason }
-    const identity = identityRead.value
-    if (!identity) return { prompted: false, granted: false, reason: "fail closed: project directory identity cannot be confirmed" }
-    const decision = readProjectTrustEntry(identity, (line) => getLogger().warn(line))
-    if (hasExtensionsDecision(decision)) return { prompted: false, granted: extensionsGranted(decision) }
 
-    const items = [
-      ...exec.mcp.map((n) => `· 连接器(MCP):${n}`),
-      ...exec.plugins.map((f) => `· 插件:${PROJECT_HIDDEN_DIR}/plugins/${f}`),
-      ...exec.agents.map((a) => `· Agent 的权限与模型设置:${a.name}(${a.fields.join("、")})`),
-    ].join("\n")
+    const view = await (async () => {
+      for (let attempt = 0; attempt < 2; attempt++) {
+        const current = await projectConfigView?.(directory).catch(() => undefined)
+        if (current?.directory === directory && current.complete) return current
+      }
+      return undefined
+    })()
+    if (!view) {
+      getLogger().log(`[req060-trust] project config view incomplete: ${directory}`)
+      return { prompted: false, granted: false, incomplete: true }
+    }
+    const rows = projectExecutableRows(exec, view.withheld)
+    if (!rows.length) return { prompted: false, granted: false }
+    const items = rows.join("\n")
     const parent = BrowserWindow.fromWebContents(event.sender) ?? undefined
     const opts = {
       type: "warning" as const,

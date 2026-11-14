@@ -1139,7 +1139,7 @@ export type ElectronAPI = {
       name: string,
     ) => Promise<{ ok: true; removed: string[] } | { ok: false; reason: string }>
     /** REQ-060 信任门:项目含可执行扩展且未决策 → main 弹 per-project 确认;granted 后调用方 dispose 生效。 */
-    trustCheck: (directory: string) => Promise<{ prompted: boolean; granted: boolean; persistError?: string }>
+    trustCheck: (directory: string) => Promise<{ prompted: boolean; granted: boolean; persistError?: string; incomplete?: boolean }>
     /** REQ-063 外部生态导入门:项目含 .claude/.agents skills / CLAUDE.md 且未决策 → main 弹确认;
      *  「导入」= 转换落项目 .codepuppy(imported 后调用方 dispose 生效)。 */
     externalCheck: (directory: string) => Promise<{

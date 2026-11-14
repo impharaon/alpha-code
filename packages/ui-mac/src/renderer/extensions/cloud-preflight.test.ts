@@ -584,7 +584,7 @@ describe.each(["form", "legacy"] as const)("alpha-code#1686 R1 M3 preflight requ
       await micro()
     }
     expect(view.calls.length).toBe(20)
-    expect(Date.now() - new Date("2026-11-13T00:00:00Z").getTime()).toBeLessThan(60_000)
+    expect(Date.now()).toBe(new Date("2026-11-13T00:00:11.600Z").getTime())
     // 到上限:不显示卡片也不显示结论(同「查不到」);提交照常可用。
     expect(card()).toBeUndefined()
     expect(banner()).toBeUndefined()

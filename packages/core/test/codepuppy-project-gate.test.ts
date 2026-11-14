@@ -506,3 +506,29 @@ describe("#1713 项目 OpenCode 配置的装载闸", () => {
     }),
   )
 })
+
+it.live("审查1:无变化重载保留 md 清单与作用点,在途观察者仍写同一份记录", () => run(async () => {
+  await using f = await fixture({ "home/work/project/opencode.json": {} })
+  CodePuppyProjectGate.install({ trusted: () => false })
+  await Effect.runPromise(entriesOf(f))
+  await Effect.runPromise(CodePuppyProjectGate.observe(f.project, "command", Effect.sync(() => {
+    CodePuppyProjectGate.frontmatter(f.project, path.join(f.project, "commands/x.md"), "---\nagent: plan\n---\ntext", "command")
+    CodePuppyProjectGate.interpolation(f.project, "x", true, path.join(f.project, "commands/x.md"), true)
+  })))
+  const before = CodePuppyProjectGate.view(f.project)
+  await Effect.runPromise(entriesOf(f))
+  expect(CodePuppyProjectGate.view(f.project)).toEqual(before)
+  let release = () => {}
+  const waiting = new Promise<void>((resolve) => { release = resolve })
+  const active = Effect.runPromise(CodePuppyProjectGate.observe(f.project, "agent", Effect.promise(async () => {
+    await waiting
+    CodePuppyProjectGate.frontmatter(f.project, path.join(f.project, "agents/a.md"), "---javascript\n({})\n---\nbody", "agent")
+  })))
+  await Bun.sleep(1)
+  await Effect.runPromise(entriesOf(f))
+  expect(CodePuppyProjectGate.view(f.project)?.points.agent).toBe("pending")
+  release()
+  await active
+  expect(CodePuppyProjectGate.view(f.project)?.points.agent).toBe("done")
+  expect(CodePuppyProjectGate.view(f.project)?.withheld).toContainEqual({ kind: "frontmatter-code", name: "agents/a.md", file: "agents/a.md" })
+}))

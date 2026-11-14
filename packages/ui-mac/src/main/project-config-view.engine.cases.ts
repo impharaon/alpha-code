@@ -14,6 +14,8 @@ let projectConfigView: (typeof import("../../engine/engine-embed"))["projectConf
 import { answerProjectConfigView } from "./sidecar-project-config-view"
 import { buildProjectConfigViewRequest } from "./project-config-view-message"
 import { projectExecutableRows } from "./codepuppy-ext-trust"
+import { engineProjectTrust } from "./engine-project-trust"
+const trustReads = new Map<string, number>()
 import { WITHHELD_KINDS } from "@opencode/schema/codepuppy-project-config"
 const sandbox = engineSandbox()
 const model = scriptedModel()
@@ -35,7 +37,7 @@ beforeAll(async () => {
   await assertEngineSandboxed(sandbox)
   const embedded = await import("../../engine/engine-embed")
   projectConfigView = embedded.projectConfigView
-  const host = codepuppyEngine({ sandbox, name: "project-view", modelBaseURL: model.baseURL, filewatcher: true })
+  const host = codepuppyEngine({ sandbox, name: "project-view", modelBaseURL: model.baseURL, filewatcher: true, projectTrust: (directory) => { trustReads.set(directory, (trustReads.get(directory) ?? 0) + 1); return engineProjectTrust(directory) } })
   allowed = host.projectDirectory
   allowProject(allowed)
   write(
@@ -124,8 +126,26 @@ test("AC-07 / AC-04:同一台引擎两个目录各自决定;已允许项目改�
   expect(await read(allowed)).toMatchObject({ ok: true, view: { trusted: true, withheld: [] } })
   const other = await read(unallowed)
   expect(other.ok && other.view.trusted).toBe(false)
-  expect(other.ok && other.view.withheld.length > 0).toBe(true)
+  expect(other.ok && other.view.withheld.map((item) => item.kind)).toEqual(expect.arrayContaining([...WITHHELD_KINDS]))
 }, 30_000)
+test("审查1:无变化重载后 md 文件头、控制字段与插值仍在视图里", async () => {
+  const directory = path.join(sandbox.root, "noop-view")
+  const file = path.join(directory, "opencode.json")
+  write(file, "{}")
+  write(path.join(directory, ".opencode/agents/a.md"), "---\nmodel: test/m\n---\nBODY")
+  write(path.join(directory, ".opencode/commands/x.md"), "---\nagent: plan\n---\nhello !`printf probe`")
+  write(path.join(directory, ".opencode/skills/notes/SKILL.md"), "---javascript\n({})\n---\nBODY")
+  const before = await read(directory)
+  expect(before.ok).toBe(true)
+  if (!before.ok) return
+  expect(before.view.withheld.map((item) => item.kind)).toEqual(expect.arrayContaining(["agent-control", "command-run", "frontmatter-code"]))
+  const count = trustReads.get(directory) ?? 0
+  write(file, "{}")
+  for (let i = 0; i < 100 && (trustReads.get(directory) ?? 0) === count; i++) await Bun.sleep(20)
+  expect(trustReads.get(directory) ?? 0).toBeGreaterThan(count)
+  const after = await read(directory)
+  expect(after).toEqual(before)
+}, 15_000)
 test("AC-05 ④:用户停用技能读取点不算不完整,项目 MCP 仍列出", async () => {
   const host = codepuppyEngine({ sandbox, name: "view-disabled-skill", modelBaseURL: model.baseURL })
   write(path.join(host.slot.configDirectory, "opencode.json"), JSON.stringify({ plugins: ["-opencode.config.skill"] }))

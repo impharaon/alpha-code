@@ -386,6 +386,7 @@ spike 用例按顺序依赖前一条留下的标记;新加的三条放在最后,
 | 消息 | `project-config-view-message.test.ts`:类型错 / id 不是字符串 / 缺字段 ⇒ `undefined`;超时与子进程退出 ⇒ `undefined` | parse 宽松 ⇒ 半个应答也当真 |
 
 ### 偏离记录
+- 2026-11-14 · 审查修复 1:核实无变化重载丢 md 记录;同信任值时原地更新 config 点,保留其他作用点与 reads。核心新增在途 / 完成两种重载判据,真引擎新增保存原文触发重载后清单不丢的判据;AC-07 改为点名类别。红臂:核心 1 挂、真引擎 md / 类别断言挂。
 - 2026-11-14 · 视图的排序、去重与作用点状态已由段 1 / 2 实现。本段在 `finish()` 复用上游 `PluginSourceDirectory.discover` 补登记目录插件,不另写扫描器;把插值字段从段 2 的 `!` 写法统一成契约 D 的 `shell`。同调用链的 `packages/core/test/codepuppy-project-gate.test.ts` 同步该字段断言。`codepuppy-sidecar-wiring.test.ts` 在既有同一子进程接线判据里补视图往返,并同步动态 import 新导出的源码锚;不增加源码读取点。
 - 2026-11-14 · `codepuppy-ext-trust.test.ts` 属清单纯函数同调用链,补中文字段去重与同类合并的行为判据;原 IPC 用例两处原始字段名断言按契约 E 翻成中文。提交 C 补上真引擎视图经该纯函数生成九行的逐字断言,闭合 A 与 B 的证据链。
 

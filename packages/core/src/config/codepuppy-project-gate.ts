@@ -439,7 +439,13 @@ export const begin = Effect.fnUntraced(function* (input: { readonly directory: s
         for (const entry of entries)
           if ((entry.type === "document" && entry.path !== undefined && processed.has(entry.path)) || (entry.type === "directory" && roots.includes(entry.path)))
             projectEntries.add(entry)
-      views.set(input.directory, { directory, trusted, points: new Map([["config", "done"]]), withheld: trusted ? [] : withheld, reads: new Map() })
+      const previous = views.get(input.directory)
+      if (previous?.trusted === trusted) {
+        previous.withheld = trusted ? [] : withheld
+        previous.points.set("config", "done")
+      } else {
+        views.set(input.directory, { directory, trusted, points: new Map([["config", "done"]]), withheld: trusted ? [] : withheld, reads: new Map() })
+      }
       if (removedDirectives)
         yield* Effect.logWarning("project removal directives for built-in plugins are ignored", { directory, count: removedDirectives })
       if (!trusted && withheld.length)

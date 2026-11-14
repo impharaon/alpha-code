@@ -165,10 +165,21 @@ M3 又会改 `opencode2/` 里引 v1 类型的文件,M4 最后统一改指,避免
 
 ##### r4 — 独立审查采用的纠正
 
-- 依据:续派接受单元 3 的 `1288858681`;单位 1–2 的 Claude Opus 独立审查(`0973f0bc8f`,1/1)建议 MERGE、无 Blocker/Major/Minor,本轮仅处理编排器采用的三条说明/测试纠正及类型依赖补记。
+- 依据:续派接受单元 3 的 `1288858681`;单元 1–2 的 Claude Opus 独立审查(`0973f0bc8f`,1/1)建议 MERGE、无 Blocker/Major/Minor,本轮仅处理编排器采用的三条说明/测试纠正及类型依赖补记。
 - 文档提交(第 1、4 项):设计 UC-19、固定答复节选、失败段、M1 与留档按 0.2.0 的固定 200 `{healthy:true}` 改正;§10 新增 R18 取代 R15 的 501 答复,历史决定保留注明取代,其他裁决不改。证据是续派转达的 0.2.0 打包回归/#1712 与真引擎协议探针。§4.2 补明 `index.ts`、`opencode2/internal-projects.ts` 等对 `preload/types` 的 `EngineInternalDirectories` 仅类型依赖。
-- 第 2 项前提核对:`PROBE_FALLBACK` 在设计 §4.3 是明确导出的冻结分类表,当前字面量空表且没有生产者填充;`routes-coverage.test.ts` 只用它核分类/不重叠,没有测试依赖管道的空表分支。因此保留表与覆盖核对,下一提交只删不可达分支及不用的 import,不删冻结分类面。
+- 第 2 项前提核对:`PROBE_FALLBACK` 在设计 §4.3 是明确导出的冻结分类表,当前字面量空表且没有生产者填充;`routes-coverage.test.ts` 只用它核分类/不重叠,没有测试依赖管道的空表分支。因此保留表与覆盖核对,代码提交只删不可达分支及不用的 import,不删冻结分类面。
 - 对照代码/冻结消费方人工核对文档及链接,并跑 `bun test src/engine-adapter/protocol-probe.engine.test.ts src/engine-adapter/unsupported.test.ts src/engine-adapter/routes-coverage.test.ts src/engine-adapter/boundary.test.ts`:25 pass / 0 fail(exit 0,ui-mac/Bun 1.4.4),证明固定答复、首探失败后的 v1 协议与依赖边界。
+- 代码与测试提交(第 2、3 项)的落点:
+
+  | 原位置 → 新位置 | 证明 |
+  | --- | --- |
+  | `index.ts` 对空 `PROBE_FALLBACK` 的专属分支 → 删除该分支,未服务请求仍经 `unsupported`;`contract/routes.ts` 的冻结空分类表和匹配器保留给覆盖核对 | `protocol-probe.engine.test.ts`、`unsupported.test.ts`、`routes-coverage.test.ts` 及全适配层绿色 |
+  | `projection-parity.test.ts` 仅 read 样本的一概相等声明 → 明列无 policy 的 shell → bash、subagent → task;新增 `fixtures/approval-actions.json` 的三个公开 API 真样本,一条带 policy 的 shell 保留原名,其余字段逐个与冻结函数比较 | 新三例在该文件通过;临时去掉 shell 换名后新 shell 例独立失败,期望 bash / 实得 shell |
+
+- 采样来源:从仓库根运行 `bun packages/ui-mac/test-fixtures/engine-adapter-sampler/sample.ts approval-actions`(exit 0),沿既有 permission-reply 剧本的真引擎公开创建/读取审批 API,只用测试宿主的隔离 HOME/XDG 和临时项目,不运行 ext、不调用真实工具。新夹具逐字段读过:无 policy 两条确为 shell/subagent,policy 原样保存;预期动作由 Code Puppy 命令/委派卡约定给出,其他字段由冻结函数给出。没有重采或覆盖既有夹具。采样器、其 README 及新增夹具是第 3 项真输入证据的必要同链文件;两张登记表仅同步 9 → 12 条和真实来源词元的一处外部锚点。
+- 已知坏臂:临时仅取消 `opencode2/v1-shapes.ts` 的 shell → bash,从 ui-mac 跑 `bun test src/engine-adapter/projection-parity.test.ts -t '审批动作样本 shell'`:0 pass / 1 fail、11 filtered out(exit 1),明确报 permission 期望 bash、实际 shell;随后用限定文件的 `git restore --worktree` 还原,该翻译器文件最终没有差异。正向定向 `bun test src/engine-adapter/projection-parity.test.ts src/engine-adapter/fixture-identity.test.ts`:17 pass / 0 fail(exit 0)。
+- 最终检查(Bun 1.4.4,逐条前台完成):ui-mac 的 `bun test src/engine-adapter/`:202 pass / 0 fail,31 文件、676 断言(exit 0);`bun typecheck`:exit 0;`bun test src/main/gate-file-registry.test.ts src/main/old-name-scan.test.ts`:33 pass / 0 fail(exit 0);ext 的 `bun test src/policy/authority-registry.test.ts`:5 pass / 0 fail(exit 0)。此前已说明的 turn-diffs 假上游 500 日志仍在,本轮没有新增失败。没有跑 gate/bin/check 或安装依赖。
+- r4 实施约 13 分钟(2026-11-14 12:50 UTC 起),按续派分两个提交;代码与测试提交共 8 个必要文件(含生成夹具及计划记录),没有改 UI、现有十项修复断言或实际换名逻辑。已核:Codex(GPT-6),本轮实现自检通过;依据版本为 `1288858681` 及文档纠正 `8d99ca6f05`,已定设计和已验单元不重开。下一步由编排器接收并负责推送/PR/合并。遗留去向:无。OPTIONAL 无。
 
 ## M1a — 翻译器搬进 `opencode2/`(纯搬家)
 

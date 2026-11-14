@@ -205,6 +205,47 @@ const write = (name: string, value: Record<string, unknown>) =>
   writeFileSync(join(OUT, name), JSON.stringify({ ...value, _engine: ENGINE }, null, 1))
 
 try {
+  // `#1697` 放回 r4:与 permission-reply 剧本同样走真引擎公开的创建/读取审批 API,不手写上游响应。
+  if (run("approval-actions")) {
+    const sessionID = (await call("POST", "/api/session", {
+      location: { directory: project },
+      permissions: [{ action: "*", resource: "*", effect: "ask" }],
+    })).data.id as string
+    const cases = [
+      { name: "shell", action: "shell", resources: ["echo parity"], save: ["echo *"] },
+      { name: "subagent", action: "subagent", resources: ["general"], save: ["general"] },
+      {
+        name: "policy",
+        action: "shell",
+        resources: ["echo policy"],
+        save: ["echo *"],
+        metadata: {
+          identity: { kind: "builtin", name: "shell" },
+          authority: { kind: "engine" },
+          policy: { canonical: "shell", askedBy: "policy" },
+          codepuppyRisk: "low",
+        },
+      },
+    ]
+    const sampled = []
+    for (const { name, ...payload } of cases) {
+      const created = await exchange("POST", `/api/session/${sessionID}/permission`, payload)
+      if (created.status !== 200 || created.body.data.effect !== "ask")
+        throw new Error(`approval-actions ${name}: ${created.status} ${JSON.stringify(created.body)}`)
+      const current = await exchange("GET", `/api/session/${sessionID}/permission/${created.body.data.id}`)
+      if (current.status !== 200) throw new Error(`approval-actions ${name}: GET ${current.status}`)
+      sampled.push({ name, request: current.body.data })
+    }
+    write("approval-actions.json", {
+      _source: source(
+        "Approval action parity: a fresh session has a wildcard ask ruleset. POST /api/session/:id/permission creates shell and subagent capability requests without policy metadata, plus a shell request with the frozen I7a metadata.policy keys supplied to the public API; each request here is the raw GET /api/session/:id/permission/:requestID response. " +
+          "This samples the engine's public permission API, as permission-reply does, not a model/tool invocation; no ext runs here. The comparison's expected v1 actions come from the Code Puppy command/delegation cards, never from the translator's response.",
+      ),
+      cases: sampled,
+    })
+    await call("POST", `/api/session/${sessionID}/permission/${sampled[0]!.request.id}/reply`, { decision: "reject" })
+  }
+
   if (run("base")) {
     // 1. read-tool:思考 + 正文 + 读文件;用户消息带一个 I11' 暂存附件条目(data: URI 声明自定义 mime,引擎嗅探成 text/plain)
     const meta = { v: 1, name: "x.pdf", mime: "application/pdf", size: 3, path: "attachments/00000000-0000-4000-8000-000000000000/x.pdf", reader: "pdf" }

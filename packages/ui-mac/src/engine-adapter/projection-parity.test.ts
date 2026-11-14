@@ -1,9 +1,10 @@
-// `#1697`(I-04 M2a,设计 §4.3、§6 K2、§9 M2、R6):翻译器自有的代际转换与它取代的冻结原件逐个相等。
+// `#1697`(I-04 M2a,设计 §4.3、§6 K2、§9 M2、R6):除下列有意差异外,自有代际转换与冻结原件逐个相等。
 //
 // 迁移之前,翻译器借 `as never` 把 2.x 的值喂给冻结 app 的归一函数(codepuppy-app/src/utils/session-message.ts、
 // context/global-sync/utils.ts)。那些原件只在冻结 app 的 v2 支路里调用、保持逐字不变,在这里(只在测试里 import)当作
-// 独立的旧行为基准:输入全部是真 2.x 引擎采样(fixtures/*.json 的 `_source`),两边各跑一次,结果必须相等。
-// 唯一点名的例外(设计 §9 M2):`GET /provider` 的输出现在带上 deprecated 模型,所以 provider 在冻结 v1 分支归一之后比较。
+// 独立的旧行为基准:输入全部是真 2.x 引擎采样(fixtures/*.json 的 `_source`),除点名差异外两边结果必须相等。
+// 例外:provider 的 deprecated 模型在冻结 v1 分支归一后比较(设计 §9 M2);无 policy 的审批能力名按 Code Puppy 卡片
+// 约定 subagent → task、shell → bash,其余字段仍与冻结函数相等;有 policy 的身份动作不换名。
 import { describe, expect, test } from "bun:test"
 import { normalizeSessionInfo } from "../../../codepuppy-app/src/utils/session"
 import { normalizeSessionMessages } from "../../../codepuppy-app/src/utils/session-message"
@@ -20,6 +21,7 @@ import lineage from "./fixtures/lineage.json"
 import parity from "./fixtures/parity.json"
 import permissionAsked from "./fixtures/permission-asked.json"
 import permissionReply from "./fixtures/permission-reply.json"
+import approvalActions from "./fixtures/approval-actions.json"
 import question from "./fixtures/question.json"
 import readTool from "./fixtures/read-tool.json"
 import todo from "./fixtures/todo.json"
@@ -51,7 +53,7 @@ function messageSamples(): Sample[] {
 
 const SAMPLES = messageSamples()
 
-describe("#1697 翻译器自有投影 == 冻结原件(真 2.x 采样)", () => {
+describe("#1697 自有投影与冻结基准(真 2.x 采样,有意差异明列)", () => {
   test("自检:样本覆盖消息投影的每一支(用户 / 助手 / 切档位 / 切模型 / 带说明的 synthetic / shell / 压缩)", () => {
     const types = new Set(SAMPLES.flatMap((sample) => sample.messages.map((message) => message.type)))
     for (const type of ["user", "assistant", "agent-switched", "model-switched", "synthetic", "shell", "compaction"]) expect(types).toContain(type)
@@ -82,13 +84,28 @@ describe("#1697 翻译器自有投影 == 冻结原件(真 2.x 采样)", () => {
     expect(toV1Agents(catalog.agents.data as never)).toEqual(normalizeAgentList(catalog.agents.data as never))
   })
 
-  test("审批请求:permission.asked 帧与 GET /api/permission/request 列表(两份采样),自有转换与 #1668 的「冻结函数 + 补 source.id」逐个相等", () => {
+  test("审批 read 样本:permission.asked 帧与 GET /api/permission/request 列表,自有转换与 #1668 的「冻结函数 + 补 source.id」逐个相等", () => {
     const requests = [permissionAsked.frame.data, ...permissionAsked.list.data, ...permissionReply.pendingA.body.data, ...permissionReply.pendingB.body.data]
     expect(requests.length).toBeGreaterThan(3)
     for (const request of requests as any[]) {
       const source = request.source?.type === "tool" ? { ...request.source, callID: request.source.id } : request.source
       expect(toV1PermissionRequest(request)).toEqual(normalizePermissionRequest({ ...request, source } as never))
     }
+  })
+
+  // 输入来自真引擎创建/读取审批的公开 API,来源记在夹具 _source;两个能力动作的期望来自 Code Puppy 命令/委派卡。
+  // 只给冻结基准的 permission 指定这个有意差异,不拿翻译器的输出构造期望。
+  test.each([
+    { name: "shell", permission: "bash" },
+    { name: "subagent", permission: "task" },
+    { name: "policy", permission: "shell" },
+  ])("审批动作样本 $name:只应用约定的能力换名,其余字段与冻结函数相同", ({ name, permission }) => {
+    const request = approvalActions.cases.find((sample) => sample.name === name)!.request
+    expect(request.action).toBe(name === "policy" ? "shell" : name)
+    expect("metadata" in request ? request.metadata.policy : undefined).toEqual(name === "policy" ? { canonical: "shell", askedBy: "policy" } : undefined)
+    const frozen = normalizePermissionRequest(request as never)
+    expect(frozen.permission).toBe(request.action)
+    expect(toV1PermissionRequest(request as never)).toEqual({ ...frozen, permission })
   })
 
   // 2.x 的 provider 配置不收模型 status(采样器 catalog 剧本的 _source),沙箱里采不到 deprecated 模型:这里把真样本里

@@ -8,9 +8,9 @@
 //
 // 适配器不做任何决定(审批、档位、目录闸都在引擎与 ext),不持有口令(I8:`Authorization` 由 main 的
 // `onBeforeSendHeaders` 对引擎源补上)。
-import { errorResponse, probeFallback, unsupported } from "./contract/errors"
+import { errorResponse, unsupported } from "./contract/errors"
 import { createReceiptLedger, type ReceiptLedger } from "./contract/receipts"
-import { FIXED, isFixed, matchProbeFallback, matchServed, type TranslatedKey } from "./contract/routes"
+import { FIXED, isFixed, matchServed, type TranslatedKey } from "./contract/routes"
 import type { RouteContext } from "./contract/translator"
 import type { EngineInternalDirectories } from "../preload/types"
 import { createOpencode2Translator } from "./opencode2"
@@ -59,10 +59,7 @@ export function createEngineFetch(options: {
     // 与 fetch 同一约定:已取消的请求直接以取消原因拒绝,不碰引擎。
     request.signal.throwIfAborted()
     const matched = matchServed(request.method, url.pathname)
-    if (!matched) {
-      if (matchProbeFallback(request.method, url.pathname)) return probeFallback(request.method, url.pathname)
-      return unsupported(request.method, url.pathname)
-    }
+    if (!matched) return unsupported(request.method, url.pathname)
     if (isFixed(matched.key)) return Response.json(FIXED[matched.key]())
     const text = request.method === "GET" || request.method === "HEAD" ? "" : await request.clone().text()
     // 请求体的类型由约定目录给(BodyOf):管道只按 JSON 解析,解析失败保留原文,与 `#1668` 时相同。

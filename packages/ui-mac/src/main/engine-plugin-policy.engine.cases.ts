@@ -26,6 +26,7 @@ import * as fs from "node:fs"
 import { homedir } from "node:os"
 import * as path from "node:path"
 import { assertEngineSandboxed, engineSandbox, engineSlot } from "../../test-component/engine-sandbox"
+import { codepuppyEngine } from "../../test-component/codepuppy-engine"
 import { buildEngineServerOptions } from "./engine-server-options"
 import { withEngineAuthorization } from "./engine-authorization"
 import { injectCodePuppyConfig, type CodePuppyConfigInjectionResult } from "./codepuppy-config-injection"
@@ -328,4 +329,32 @@ describe("alpha-code#1708 项目范围的引擎插件在 Code Puppy 里一律不
       fs.writeFileSync(codepuppyJsonc, saved)
     }
   }, 120_000)
+
+  test("测试宿主在注入后追加的重试插件按精确路径加载,项目里同名同 id 的插件不执行", async () => {
+    const host = codepuppyEngine({ sandbox, name: "plugin-policy-host", modelBaseURL: `http://127.0.0.1:${llm.port}/v1`, ext: false })
+    const retryNow = path.join(sandbox.root, "plugin-policy-host", "retry-now")
+    const marker = path.join(sandbox.root, "host-retry-ran")
+    const lookalikeMarker = path.join(sandbox.root, "project-retry-ran")
+    // 来源:turn-failure.engine.cases.ts 的 retry-now 插件;仅加模块求值标记,证明项目的同 id 插件连第一行都没执行。
+    const source = (file: string) => `import { appendFileSync } from "node:fs"
+appendFileSync(${JSON.stringify(file)}, "ran\\n")
+export default { id: "codepuppy.test.retry-now", setup: async (ctx) => {
+  await ctx.session.hook("retry", (event) => { if (event.decision.retry) event.decision = { retry: true, delay: 0 } })
+} }\n`
+    write(path.join(retryNow, "server.js"), source(marker))
+    write(path.join(host.projectDirectory, ".opencode", "plugins", "retry-now", "server.js"), source(lookalikeMarker))
+    host.content.plugins.push(retryNow)
+    const running = await host.start()
+    try {
+      const plugins = (await running.send("GET", "/api/plugin")).json.data as Array<{ id: string; state: { status: string } }>
+      expect(plugins.find((plugin) => plugin.id === "codepuppy.test.retry-now")?.state.status).toBe("active")
+      expect(fs.existsSync(marker)).toBe(true)
+      expect(fs.existsSync(lookalikeMarker)).toBe(false)
+      const policies = JSON.parse(fs.readFileSync(host.injection.config.file!, "utf8")).policies as Array<{ action: string; resource: string; effect: string }>
+      expect(policies).toContainEqual({ action: "plugin.use", resource: retryNow, effect: "allow" })
+      expect(policies.filter((policy) => policy.action === "plugin.use" && policy.effect === "allow").every((policy) => path.isAbsolute(policy.resource) && !/[*?]/.test(policy.resource))).toBe(true)
+    } finally {
+      await running.close()
+    }
+  }, 60_000)
 })

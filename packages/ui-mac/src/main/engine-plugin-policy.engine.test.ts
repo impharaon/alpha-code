@@ -12,7 +12,7 @@ import { expect, test } from "bun:test"
 import { join } from "node:path"
 
 // 两条输出流并行读完再等退出(多台真引擎的日志会写满 stderr 管道,依次读会卡住子进程)。
-test("项目范围的引擎插件一个都不执行,ext 与用户全局的照常(engine-plugin-policy.engine.cases.ts,4 条)", async () => {
+test("项目范围的引擎插件一个都不执行,ext 与用户全局的照常(engine-plugin-policy.engine.cases.ts,5 条)", async () => {
   const child = Bun.spawn({
     cmd: [process.execPath, "test", "--timeout", "120000", join(import.meta.dir, "engine-plugin-policy.engine.cases.ts")],
     cwd: join(import.meta.dir, "../.."),
@@ -24,5 +24,5 @@ test("项目范围的引擎插件一个都不执行,ext 与用户全局的照常
   const output = `${stdout}${stderr}`
   if (exitCode !== 0) throw new Error(output)
   expect(output.match(/(\d+) fail\b/)?.[1], output).toBe("0")
-  expect(output.match(/(\d+) pass\b/)?.[1], output).toBe("4")
+  expect(output.match(/(\d+) pass\b/)?.[1], output).toBe("5")
 }, 300_000)

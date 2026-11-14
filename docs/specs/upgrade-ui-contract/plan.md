@@ -122,6 +122,10 @@ M3 又会改 `opencode2/` 里引 v1 类型的文件,M4 最后统一改指,避免
 - `BLOCKED: dependencies — Cannot find module '@opencode-ai/client' from 'packages/ui-mac/src/engine-adapter/unsupported.test.ts'`。按派发书停止,由编排器刷新依赖,本轮仅提交可恢复的 unit 1 检查点,不声称完成验证。
 - 另一项失败为 `fixture-identity.test.ts`:14 份 #1710 夹具记录的 core tree `584f4421a2` 与 0.2.0 的 `ed40aaecc1` 不同。依赖刷新后须用现有采样器对当前引擎全量重采,不能只改身份字段或放松断言。
 - 尚未执行:重采后重跑适配器、renderer 附件测试、ui-mac typecheck、两包登记检查,以及 unit 2 的红例提交与审批翻译修复。unit 2 尚未开始,没有确认 shell / patch 原因。
+- r2(2026-11-14):依赖由编排器刷新成功,接受 `7c5a152e73` 为续接点。执行 `bun packages/ui-mac/test-fixtures/engine-adapter-sampler/sample.ts`(Bun 1.4.4) exit 0,14 份夹具由真引擎重新生成,单独提交。全程临时 HOME/XDG + 本地假模型/OAuth,没有账户或 owner 数据访问。
+- 重采核对:core 身份 `584f4421a2` → `ed40aaecc1` 来自 #1712 的 `LoadAPIKeyError` → `provider.auth` 修复(该分支不被正常假模型剧本触发);没有新增转换形状。去掉来源、时间/ID、临时路径、游标、slug、端口等易变值后,`catalog` / `command` / `files` / `permission-*` / `tools` / `turn-diff` 无实质差异;`lineage` 只换 shell id;其余差异是异步帧之后快照取到的流式阶段、标题/用量事件顺序、shell 空页轮询时点。`passthrough` 上次单跑,本次全跑,清单多出前序剧本写的文件和会话(仍为原结构)。最终消息与原断言保持一致,重采后适配器 127 pass / 0 fail。
+- inbox 日志核对: `turn-diffs.test.ts:77,119` 的假上游只答消息页/diff,未答 `/inbox`,三次正向读取落入其 `500 "unexpected"`;日志确实来自被容错的失败路径,不是 0.2.0 路由漂移。客户端 `session.inbox.list` 的成功码为 200(`client.ts:886–897`),协议定义一致(`protocol/src/groups/session.ts:540–543`);真引擎 `queued-prompt.engine.cases.ts` 的 `engineInbox` 也断言 200,并验证重开会话的排队气泡。定向 `bun test src/engine-adapter/turn-diffs.test.ts src/engine-adapter/queued-prompt.engine.test.ts` 11 pass / 0 fail,复现恰好三条日志,未改生产错误处理或旧断言。
+
 - 额外范围:无。测试宿主导入路径随搬家调整,断言未改;冻结包零字节改动。遗留去向:依赖刷新与余下实现交编排器续派,OPTIONAL 无。
 
 ## M1a — 翻译器搬进 `opencode2/`(纯搬家)

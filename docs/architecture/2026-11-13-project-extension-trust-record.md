@@ -12,6 +12,8 @@ review_after: 2027-02-13
 
 # 项目扩展的信任记录
 
+#1713:同一条项目允许记录也放行项目自带的 OpenCode 配置,记录位置、形状与告知版本不变;内容与可执行设置的边界见 [冻结设计](../specs/project-engine-config-takeover/design.md)。
+
 *2026-11-13 · 票 `#1709` · 实施计划 [specs/project-consent-store/plan.md](../specs/project-consent-store/plan.md)*
 
 ## 它把住什么

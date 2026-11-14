@@ -355,7 +355,7 @@ status.
 | `RUNBOOK-alpha-code-naming-migration` | [runbooks/naming-migration.md](runbooks/naming-migration.md) | 升级到新名字:首次启动的数据迁移与回退 | active |
 | `RUNBOOK-alpha-code-settings-storage-recovery` | [runbooks/settings-storage-recovery.md](runbooks/settings-storage-recovery.md) | Settings storage recovery | active |
 | `RUNBOOK-alpha-code-uninstall` | [runbooks/uninstall.md](runbooks/uninstall.md) | 卸载 Code Puppy 与数据残留清单(C16) | active |
-| `⚠️ 缺 id` | [runbooks/upstream-update.md](runbooks/upstream-update.md) | ⚠️ 缺 summary | active |
+| `RUNBOOK-upstream-update` | [runbooks/upstream-update.md](runbooks/upstream-update.md) | 上游更新前后按登记册与升级判据保留 Code Puppy 权威,含项目配置闸门的逐文件复核清单 | active |
 
 ### specs
 
@@ -404,6 +404,7 @@ status.
 | `SPEC-project-agent-fields` | [specs/project-agent-fields/spec.md](specs/project-agent-fields/spec.md) | 项目文档里给 agent 写的 disable、tools、temperature 等字段在新引擎上重新生效,用不上的字段有记录可查 | approved |
 | `PLAN-project-consent-store` | [specs/project-consent-store/plan.md](specs/project-consent-store/plan.md) | #1709 一段:项目扩展的信任只认用户在确认框里的决定,记录存在 Code Puppy 自己的状态目录,项目目录里的任何文件都不再算数 | active |
 | `DESIGN-project-engine-config-takeover` | [specs/project-engine-config-takeover/design.md](specs/project-engine-config-takeover/design.md) | 引擎照旧自己读项目 opencode.json 与 .opencode/;未经允许的项目,它带来的东西不运行程序、不加载代码、不换掉所用程序、不放宽 agent 权限或换模型——Code Puppy 在引擎配置装载与 agent / 命令 / 技能的 md 读取点按 | approved |
+| `PLAN-project-engine-config-takeover` | [specs/project-engine-config-takeover/plan.md](specs/project-engine-config-takeover/plan.md) | #1713 六段:钉住今天的行为;配置装载闸;md 读取点(文件头、agent / 命令控制字段、命令插值);插件在允许后加载(退役 #1708 的先拒全部);确认框清单与主进程 ⇄ sidecar 视图消息;三个新接管的 ADR、权威登记册与升级检查 | active |
 | `SPEC-project-engine-config-takeover` | [specs/project-engine-config-takeover/spec.md](specs/project-engine-config-takeover/spec.md) | 打开项目时,项目 opencode.json 与 .opencode/ 里的 AGENTS.md、技能、命令文字、agent 说明照常可用;会运行程序、加载代码、换掉所用程序、放宽 agent 权限或换模型的设置,在你于现有确认框里允许这个项目后才生效,允许后与在 OpenCode 里一样全部可用 | approved |
 | `SPEC-project-mcp-installation` | [specs/project-mcp-installation/spec.md](specs/project-mcp-installation/spec.md) | 连接器可装到全局或当前项目并保持隔离，保留历史条款、有效裁决和交付证据边界。 | approved |
 | `SPEC-puppy-brand-icons` | [specs/puppy-brand-icons/spec.md](specs/puppy-brand-icons/spec.md) | 应用和各渠道使用一致的小狗标志，保留历史条款、有效裁决和交付证据边界。 | approved |

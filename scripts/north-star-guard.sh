@@ -171,9 +171,9 @@ UPSTREAM_EXCLUDES=(
   # #1713 / ADR-049(owner 2026-11-13 经编排器转达:「要做。」):项目自带的 OpenCode 配置按 #1709 的项目信任放行。config.ts 是每个消费方
   # 拿项目配置的唯一汇合点,上游只有全局开关 project、插件接口没有配置编辑器、托管策略忽略不了单个键;接管面只在 load() 一条链上的
   # `codepuppy(ADR-049)` 标注(读一次信任、项目文档校验前过滤与解码后再拿一次、托管策略之后插闸门文档),规则本体在 Code Puppy 自有的
-  # config/codepuppy-project-gate.ts。判据 packages/core/test/codepuppy-project-gate.test.ts 与 packages/ui-mac/src/main/project-config-commands.engine.test.ts。
+  # config/codepuppy-project-gate.ts。范围与逐文件复核见 ADR-049;判据 packages/core/test/codepuppy-project-gate{,-upgrade}.test.ts 与真引擎两臂。
   ':(exclude)packages/core/src/config.ts'
-  # #1713 / ADR-049:md 读取点只调用同一闸门;判据同上。
+  # #1713 / ADR-049:md 读取点只调用同一闸门;判据与复核清单同上。
   ':(exclude)packages/core/src/config/plugin/skill.ts'
   ':(exclude)packages/core/src/config/plugin/agent.ts'
 )

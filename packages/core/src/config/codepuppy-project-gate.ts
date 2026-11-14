@@ -63,12 +63,32 @@ const AGENT_MAPS: Record<string, EntryRule> = {
   agent: { content: new Set(["prompt", "description", "color", "hidden"]), listed: (field) => field !== "name" },
   mode: { content: new Set(["prompt", "description", "color", "hidden"]), listed: (field) => field !== "name" },
 }
+const V2_COMMAND_CONTROL = new Set(["agent", "model", "subagent", "subtask"])
+const V1_COMMAND_CONTROL = new Set(["agent", "model", "variant", "subtask"])
 const COMMAND_MAPS: Record<string, EntryRule> = {
-  commands: { content: new Set(["template", "description"]), listed: (field) => ["agent", "model", "subagent", "subtask"].includes(field) },
-  command: { content: new Set(["template", "description"]), listed: (field) => ["agent", "model", "variant", "subtask"].includes(field) },
+  commands: { content: new Set(["template", "description"]), listed: (field) => V2_COMMAND_CONTROL.has(field) },
+  command: { content: new Set(["template", "description"]), listed: (field) => V1_COMMAND_CONTROL.has(field) },
 }
 const AGENT_DECODED_CONTENT = ["system", "description", "color", "hidden"] as const
 const COMMAND_DECODED_CONTENT = ["template", "description"] as const
+
+// 已知的暂缓键用于逐键升级核对;未列入的新键仍按 effective() 的默认 setting 路径暂缓。
+const DEFERRED_KEYS: Record<string, WithheldItem["kind"]> = {
+  mcp: "mcp", plugin: "plugin", plugins: "plugin", formatter: "formatter", shell: "shell", provider: "provider", providers: "provider",
+  model: "setting", default_agent: "setting", update: "setting", share: "setting", enterprise: "setting", permissions: "setting", policies: "setting",
+  snapshots: "setting", lsp: "setting", references: "setting", reference: "setting", websearch: "setting", worktree: "setting", warming: "setting", experimental: "setting",
+  snapshot: "setting", autoupdate: "setting", autoshare: "setting", small_model: "setting", tools: "setting", enabled_providers: "setting", disabled_providers: "setting", permission: "setting",
+}
+/** 升级判据读取实际分类的副本,删键不会改动运行期名单。 */
+export function classificationsForTest() {
+  return {
+    top: new Set([...CONTENT_KEYS, ...Object.keys(AGENT_MAPS), ...Object.keys(COMMAND_MAPS), ...Object.keys(DEFERRED_KEYS), "logLevel", "server", "subagent_depth", "layout"]),
+    agent: new Set([...AGENT_MAPS.agents!.content, ...V2_AGENT_CONTROL]),
+    agentV1: new Set([...AGENT_MAPS.agent!.content, "model", "variant", "temperature", "top_p", "tools", "disable", "mode", "options", "steps", "maxSteps", "permission"]),
+    command: new Set([...COMMAND_DECODED_CONTENT, ...V2_COMMAND_CONTROL]),
+    commandV1: new Set([...COMMAND_DECODED_CONTENT, ...V1_COMMAND_CONTROL]),
+  }
+}
 
 // ── 安装与状态 ────────────────────────────────────────────────────────────────────────────────────────────────
 let installed: { readonly trusted: (directory: string) => boolean } | undefined
@@ -223,7 +243,7 @@ export function frontmatter(
         ? parsed.data
         : pick(
             parsed.data,
-            point === "agent" ? ["system", "prompt", "description", "color", "hidden"] : COMMAND_DECODED_CONTENT,
+            point === "agent" ? [...AGENT_DECODED_CONTENT, "prompt"] : COMMAND_DECODED_CONTENT,
           )
     if (point !== "skill") {
       const fields = Object.keys(parsed.data).filter((key) => !Object.hasOwn(data, key))
@@ -454,25 +474,26 @@ function keepEntries(value: unknown, rule: EntryRule, onRemoved: (name: string, 
 /** 一个被拿掉的顶层键在视图里的条目。上游归一化认不出的键(单独归一化不产出任何东西)不列(编排器裁决 2026-11-13)。 */
 function deferredItems(key: string, value: unknown, file: string): WithheldItem[] {
   if (!effective({ [key]: value })) return []
+  const kind = DEFERRED_KEYS[key] ?? "setting"
   const named = (kind: WithheldItem["kind"], names: string[]) => names.map((name) => ({ kind, name, file }))
   if (key === "mcp" && isRecord(value)) {
     const nested = isRecord(value.servers) ? Object.keys(value.servers).filter((name) => effective({ mcp: { servers: { [name]: (value.servers as Record<string, unknown>)[name] } } })) : []
     const direct = Object.keys(value).filter((name) => name !== "servers" && name !== "timeout" && effective({ mcp: { [name]: value[name] } }))
     const names = [...direct, ...nested]
-    return names.length ? named("mcp", names) : [{ kind: "setting", name: key, file }]
+    return names.length ? named(kind, names) : [{ kind: "setting", name: key, file }]
   }
   if ((key === "plugins" || key === "plugin") && Array.isArray(value)) {
     const names = value.flatMap((entry) => {
       const target = Array.isArray(entry) ? entry[0] : isRecord(entry) ? entry.package : entry
       return typeof target === "string" && target.length > 0 ? [target] : []
     })
-    return named("plugin", names)
+    return named(kind, names)
   }
-  if (key === "formatter") return isRecord(value) ? named("formatter", Object.keys(value)) : [{ kind: "formatter", name: key, file }]
+  if (key === "formatter") return isRecord(value) ? named(kind, Object.keys(value)) : [{ kind: "formatter", name: key, file }]
   if (key === "shell" && typeof value === "string") return [{ kind: "shell", name: value, file }]
   if ((key === "providers" || key === "provider") && isRecord(value))
-    return named("provider", Object.keys(value).filter((name) => effective({ [key]: { [name]: value[name] } })))
-  return [{ kind: "setting", name: key, file }]
+    return named(kind, Object.keys(value).filter((name) => effective({ [key]: { [name]: value[name] } })))
+  return [{ kind, name: key, file }]
 }
 
 /** 上游归一化对这份(只含一个键的)文档是否产出任何东西。 */

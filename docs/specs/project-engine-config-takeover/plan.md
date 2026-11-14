@@ -441,4 +441,4 @@ spike 用例按顺序依赖前一条留下的标记;新加的三条放在最后,
 | 文档 | `scripts/check-doc-links.py` 与 `docs-gates.sh` 的链接检查;ADR 与登记册逐项核对 | 链接断 ⇒ 红 |
 
 ### 偏离记录
-暂无
+- 2026-11-14 · 同调用链必要文件 `packages/core/src/config/codepuppy-project-gate.ts` 增加 `classificationsForTest()` 副本读取口:内容类复用实际名单,具名暂缓键的类别由 `deferredItems()` 共用一张表;未知新键仍默认暂缓。用于升级判据的删键反向臂,不增加用户配置或公共契约。

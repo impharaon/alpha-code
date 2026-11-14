@@ -7,6 +7,8 @@ summary: "陌生仓库的 opencode.json / .opencode/ 在 Code Puppy 里能让哪
 ---
 # 未授权项目的配置键能让哪些命令执行、在什么时点(INT-safety I-12 实测,2026-11-13)
 
+> 2026-11-14 更新:#1713 已修复下述未允许项目的执行面,回归用例已翻转为未允许 / 允许两臂。行为与范围见 [冻结设计](../specs/project-engine-config-takeover/design.md),具名证据见 `project-config-commands.engine.test.ts`、`engine-plugin-policy.engine.test.ts` 与升级判据。下文保留当时的实测基线。
+
 > 实测,不是方案。没有改任何产品代码。取舍交给 owner 与方案阶段。
 > 来源:INT-safety I-12,owner 2026-11-13 批准调查(「就必要就继续。继续吧。」)。
 > 基线:`origin/alpha` @ `fed47ed022`。`fix/project-engine-plugin-consent`(`#1708`,项目插件)当时还没合进来,本文的插件结论按 alpha 当时的状态写。

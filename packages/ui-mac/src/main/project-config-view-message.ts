@@ -75,7 +75,7 @@ export function createProjectConfigViewRequester(
 ) {
   const pending = new Map<
     string,
-    { directory: string; resolve: (view: ProjectConfigView | undefined) => void; timer: ReturnType<typeof setTimeout> }
+    { resolve: (view: ProjectConfigView | undefined) => void; timer: ReturnType<typeof setTimeout> }
   >()
   let sequence = 0
   let closed = false
@@ -84,7 +84,8 @@ export function createProjectConfigViewRequester(
     if (!entry) return false
     pending.delete(id)
     clearTimeout(entry.timer)
-    entry.resolve(view?.directory === entry.directory ? view : undefined)
+    // 请求用 Location 路由,回复用规范身份;IPC 在准入身份上核对目录,这里仅按 id 对号。
+    entry.resolve(view)
     return true
   }
   return {
@@ -93,7 +94,7 @@ export function createProjectConfigViewRequester(
       const id = String(++sequence)
       return new Promise((resolve) => {
         const timer = setTimeout(() => settle(id, undefined), options.timeoutMs ?? 10_000)
-        pending.set(id, { directory, resolve, timer })
+        pending.set(id, { resolve, timer })
         try {
           post(buildProjectConfigViewRequest(id, directory))
         } catch {

@@ -7,7 +7,7 @@
 //   · 确认框的外观与文案:除了删掉「存于本项目 .codepuppy/prefs.json」那个括号,一个字都不变。
 // 由 src/main/ext-trust-check.test.ts 起独立子进程跑(要先 mock 掉 electron 再 import 真的 ext-ipc)。
 
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from "node:fs"
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { afterAll, beforeEach, describe, expect, mock, test } from "bun:test"
@@ -305,4 +305,18 @@ test("审查3:只有引擎忽略的 md 字段且视图为空 ⇒ 不弹确认框
   expect(await trustCheck(dir)).toEqual({ prompted: false, granted: false })
   expect(shown).toEqual([])
   expect(recorded(dir)).toBeUndefined()
+})
+
+test("审查9:视图请求沿用会话路由的符号链接拼写,仍按规范目录核对回复", async () => {
+  const directory = makeProject({ plugin: false })
+  const route = join(tmp, "route-link")
+  symlinkSync(directory, route)
+  const requested: string[] = []
+  readView = async (input) => { requested.push(input); return withItems(directory, [{ kind: "mcp", name: "srv", file: "opencode.json" }]) }
+  expect(await trustCheck(route)).toMatchObject({ prompted: true })
+  expect(requested).toEqual([route])
+  const other = makeProject({ plugin: false })
+  readView = async () => withItems(directory, [])
+  expect(await trustCheck(other)).toEqual({ prompted: false, granted: false, incomplete: true })
+  expect(recorded(other)).toBeUndefined()
 })

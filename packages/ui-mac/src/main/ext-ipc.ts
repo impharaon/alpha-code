@@ -538,7 +538,7 @@ export function registerExtIpcHandlers(
   // 任何文件都不算 —— 旧的 `.codepuppy/prefs.json` extensionsConsent 不读、不写、不删。granted 后由 renderer 请 ext 重载生效。
   // 写盘失败不静默放行(反 placebo):不落决策 + 返回 denied,下次仍会弹。本 handler 是这份记录唯一的写入点,且只在用户于
   // 模态确认框里做出决定之后写。
-  ipcMain.handle("ext-trust-check", projectIpcHandler(
+  ipcMain.handle("ext-trust-check", (event: IpcMainInvokeEvent, requestedDirectory: unknown) => projectIpcHandler(
     homeDir,
     (reason, code) => {
       // #1569 AC7:项目里新旧两个隐藏目录并存 —— 不合并、不读旧目录;本会话对同一个项目只说一次
@@ -594,7 +594,8 @@ export function registerExtIpcHandlers(
 
     const view = await (async () => {
       for (let attempt = 0; attempt < 2; attempt++) {
-        const current = await projectConfigView(directory).catch(() => undefined)
+        // Location 沿用会话路由拼写;回复里的规范身份仍与准入结果核对。
+        const current = await projectConfigView(requestedDirectory as string).catch(() => undefined)
         if (current?.directory === directory && current.complete) return current
       }
       return undefined
@@ -642,7 +643,7 @@ export function registerExtIpcHandlers(
     getLogger().log(`[req060-trust] ${granted ? "granted" : "denied"} for project: ${directory}`)
     return { prompted: true, granted }
     },
-  ))
+  )(event, requestedDirectory))
 
   // REQ-063(ADR-024):外部生态 consent 导入门(项目级)。default-deny 后引擎不再读项目自带的
   // `.claude`/`.agents` skills 与 CLAUDE.md;首次进入检测到外来内容 → 原生确认 → 「导入」= 安装期

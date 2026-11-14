@@ -12,7 +12,7 @@ import {
 } from "../../test-component/codepuppy-engine"
 let projectConfigView: (typeof import("../../engine/engine-embed"))["projectConfigView"]
 import { answerProjectConfigView } from "./sidecar-project-config-view"
-import { buildProjectConfigViewRequest } from "./project-config-view-message"
+import { buildProjectConfigViewRequest, createProjectConfigViewRequester } from "./project-config-view-message"
 import { projectExecutableRows } from "./codepuppy-ext-trust"
 import { engineProjectTrust } from "./engine-project-trust"
 const trustReads = new Map<string, number>()
@@ -203,3 +203,34 @@ test("AC-05 ④:用户停用技能读取点不算不完整,项目 MCP 仍列出"
     await running.close()
   }
 })
+
+test("审查9:符号链接路由换 realpath 会多建 Location 并再启全局 MCP;原拼写请求不增加", async () => {
+  const host = codepuppyEngine({ sandbox, name: "symlink-view", modelBaseURL: model.baseURL })
+  const marker = path.join(sandbox.root, "symlink-mcp-starts")
+  write(path.join(host.slot.configDirectory, "opencode.json"), JSON.stringify({ mcp: { servers: { global: { type: "local", command: [process.execPath, MCP_FIXTURE], environment: { CODEPUPPY_MCP_STARTUP_LOG: marker } } } } }))
+  const running = await host.start()
+  const starts = () => fs.readFileSync(marker, "utf8").split("+").length - 1
+  const locations = async () => (await (await running.fetch(new Request("http://codepuppy-sidecar.invalid/api/debug/location"))).json()) as Array<{ directory: string }>
+  try {
+    const canonical = path.join(sandbox.root, "linked-project")
+    const route = path.join(sandbox.root, "linked-route")
+    write(path.join(canonical, "opencode.json"), JSON.stringify({ shell: "/bin/sh" }))
+    fs.symlinkSync(canonical, route)
+    expect((await read(route, running)).ok).toBe(true)
+    for (let i = 0; i < 100 && starts() < 2; i++) await Bun.sleep(20)
+    const before = starts()
+    const book = createProjectConfigViewRequester((request) => { void answerProjectConfigView(request, { fetch: running.fetch, view: projectConfigView }).then((reply) => book.receive(reply)) })
+    const view = await book.request(route)
+    const same = (await locations()).filter((item) => [route, canonical].includes(item.directory))
+    expect(same.map((item) => item.directory)).toEqual([route])
+    expect(starts()).toBe(before)
+    // 旧路径的反向臂:相同物理目录换拼写,引擎按路由新建第二个 Location。
+    expect((await read(canonical, running)).ok).toBe(true)
+    const both = (await locations()).filter((item) => [route, canonical].includes(item.directory))
+    expect(both).toHaveLength(2)
+    for (let i = 0; i < 100 && starts() < before + 1; i++) await Bun.sleep(20)
+    expect(starts()).toBe(before + 1)
+    expect(view).toMatchObject({ directory: canonical, complete: true })
+    book.close()
+  } finally { await running.close() }
+}, 30_000)

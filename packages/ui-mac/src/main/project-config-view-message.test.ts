@@ -44,16 +44,16 @@ test("消息合同:build / parse 往返;错误类型、非字符串 id 与缺字
     parseProjectConfigViewReply(buildProjectConfigViewReply("2", { ok: false, reason: "engine-not-ready" }))?.ok,
   ).toBe(false)
 })
-test("请求簿:按 id 对号、目录不串、超时 / 子进程退出 / post 失败答 undefined", async () => {
+test("请求簿:按 id 对号、路由可与规范身份不同、超时 / 子进程退出 / post 失败答 undefined", async () => {
   const wire: unknown[] = []
   const book = createProjectConfigViewRequester((request) => wire.push(request), { timeoutMs: 10 })
   const pending = book.request("/w")
   expect(book.receive(buildProjectConfigViewReply("1", { ok: true, view }))).toBe(true)
   expect(await pending).toEqual(view)
   expect(book.receive(wire[0])).toBe(false)
-  const wrongDirectory = book.request("/other")
+  const aliasedDirectory = book.request("/alias")
   book.receive(buildProjectConfigViewReply("2", { ok: true, view }))
-  expect(await wrongDirectory).toBeUndefined()
+  expect(await aliasedDirectory).toEqual(view)
   expect(await book.request("/timeout")).toBeUndefined()
   const exiting = book.request("/w")
   book.close()

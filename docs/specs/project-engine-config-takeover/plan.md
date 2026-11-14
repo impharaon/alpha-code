@@ -285,6 +285,7 @@ spike 用例按顺序依赖前一条留下的标记;新加的三条放在最后,
 | A10 | 上游 `test/config/{agent,skill,command,command-subagent,markdown}.test.ts` 全绿 | 闸门在未安装时也作用 ⇒ 上游用例红 |
 
 ### 偏离记录
+- 2026-11-14 · 审查修复 11:gray-matter 对无文件头返回空 matter,修正空值判断,不再给普通正文补空头。四个项目读取点用普通文本、四连横线、BOM / CRLF、空文件与无末尾换行的原字节断言;原码首条多出 11 字节而红,修复后绿。
 - 2026-11-14 · 审查核实 10:真实嵌入引擎接生产 createEngineFetch 与界面同一个 v2 SDK 的 session.create,不传 agent。未允许项目新增非隐藏、按名字排首的 md agent 确为 primary 且带自己的正文,新会话尚未固定 agent,首轮不传 agent 时助手消息为 build,没有自行采用该 agent;保留真实入口判据(绿),不设计额外限制。
 - 2026-11-14 · 审查修复 4:依本轮裁决补 design 契约 B agent 行与 §10 R-14;新项目 agent 的明确 subagent 在文档 / md、v1 / v2 生效且不列,覆盖已有 agent 时用 transform 起始快照保留原模式,不复制内置名字。核心红臂为 mode 丢失,真引擎红臂为 subagent 变 primary;允许、primary / all、名字空间 / 目录反向臂一并验证。
 - 2026-11-14 · 审查修复 3:md 清单仅记录解码器真正接受的控制字段;agent 复用上游原有 v1 / v2 判定,命令 md 按原生解码规则处理。真引擎原码对 argument-hint / name / variant 列了三项而挂,修复后空清单;IPC 补空清单不弹框判据。

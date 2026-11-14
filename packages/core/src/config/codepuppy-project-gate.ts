@@ -244,7 +244,7 @@ export function frontmatter(
   }
   try {
     const parsed = parseFrontmatter(content, options)
-    if (parsed.matter === undefined) return content
+    if (!parsed.matter) return content
     const data =
       point === "skill"
         ? parsed.data

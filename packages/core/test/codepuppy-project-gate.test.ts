@@ -104,6 +104,17 @@ it.live("审查4:文档 v1 / v2 的 subagent 保留且不列,primary / all 与 m
   expect(allowed.agents?.namespaced?.mode).toBe("primary")
 }))
 
+it.live("审查11:没有文件头的 md 在四个项目读取点逐字节交出", () => run(async () => {
+  await using f = await fixture({})
+  CodePuppyProjectGate.install({ trusted: () => false })
+  await Effect.runPromise(entriesOf(f))
+  for (const content of ["普通正文\n\n", "----\n正文", "\uFEFF正文\r\n末行  ", "", "无末尾换行"])
+    for (const [point, file] of [["agent", "agents/a.md"], ["command", "commands/x.md"], ["skill", "skills/x/SKILL.md"], ["skill", ".codepuppy/skills/x/SKILL.md"]] as const) {
+      const text = CodePuppyProjectGate.frontmatter(f.project, path.join(f.project, file), content, point)
+      expect(Buffer.from(text ?? "")).toEqual(Buffer.from(content))
+    }
+}))
+
 describe("#1713 项目 OpenCode 配置的装载闸", () => {
   // 样本来源:上游 test/config/markdown.test.ts 的 YAML/sanitize 写法,以及段 0 真引擎探针的 JS 文件头。
   it.live("文件头:同一份 YAML / JSON 在未允许与允许时 data、正文逐字相等,含 sanitize、CRLF 与无末尾换行", () =>

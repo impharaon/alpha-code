@@ -11,6 +11,11 @@ import path from "path"
 import fs from "fs/promises"
 import { afterEach, describe, expect } from "bun:test"
 import { Effect, Layer } from "effect"
+import { ConfigMarkdown } from "@opencode/core/config/markdown"
+import { ConfigAgentPlugin } from "@opencode/core/config/plugin/agent"
+import { Agent } from "@opencode/core/agent"
+import { FSUtil } from "@opencode/util/fs-util"
+import { Skill } from "@opencode/schema/skill"
 import { Config } from "@opencode/core/config"
 import { CodePuppyProjectGate } from "@opencode/core/config/codepuppy-project-gate"
 import { type Document, type Entry } from "@opencode/schema/config"
@@ -28,6 +33,7 @@ import { emptyCredentialNode, emptyWellknownNode } from "./fixture/config-nodes"
 import { location } from "./fixture/location"
 import { tmpdir } from "./fixture/tmpdir"
 import { testEffect } from "./lib/effect"
+import { agentHost, host } from "./plugin/host"
 
 const it = testEffect(Layer.empty)
 
@@ -79,6 +85,203 @@ const documentAt = (entries: Entry[], file: string) =>
 const run = <A>(body: () => Promise<A>) => Effect.promise(body)
 
 describe("#1713 项目 OpenCode 配置的装载闸", () => {
+  // 样本来源:上游 test/config/markdown.test.ts 的 YAML/sanitize 写法,以及段 0 真引擎探针的 JS 文件头。
+  it.live("文件头:同一份 YAML / JSON 在未允许与允许时 data、正文逐字相等,含 sanitize、CRLF 与无末尾换行", () =>
+    run(async () => {
+      await using f = await fixture({})
+      const samples = [
+        "---\nname: review\ndescription: 'hello: world'\nmetadata:\n  opencode/autoinvoke: true\n---\n\n# 正文  \n最后一行",
+        "---\ndescription: Review: carefully\n---\n  正文\n\n",
+        '---json\n{"name":"review","metadata":{"enabled":true}}\n---\n正文',
+        "---\r\nname: review\r\n---\r\n正文\r\n\r\n",
+        "---\n---\n---javascript\nthrow new Error('正文不能被当成文件头')\n---\nbody",
+        "普通正文\n\n",
+        "----\n普通正文",
+      ]
+      for (const content of samples) {
+        CodePuppyProjectGate.install({ trusted: () => false })
+        await Effect.runPromise(entriesOf(f))
+        const text = CodePuppyProjectGate.frontmatter(f.project, path.join(f.project, "SKILL.md"), content, "skill")
+        expect(text).toBeDefined()
+        const gated = ConfigMarkdown.parse(text!)
+        CodePuppyProjectGate.install({ trusted: () => true })
+        await Effect.runPromise(entriesOf(f))
+        expect(CodePuppyProjectGate.frontmatter(f.project, path.join(f.project, "SKILL.md"), content, "skill")).toBe(
+          content,
+        )
+        const upstream = ConfigMarkdown.parse(content)
+        expect(gated.data).toEqual(upstream.data)
+        expect(gated.content).toBe(upstream.content)
+      }
+    }),
+  )
+
+  it.live(
+    "文件头:javascript / js / JavaScript 不执行、记录 frontmatter-code、正文留下;允许与未安装反向臂照旧执行;未知语言跳过",
+    () =>
+      run(async () => {
+        await using f = await fixture({})
+        for (const language of ["javascript", "js", "JavaScript"]) {
+          for (const point of ["agent", "command", "skill"] as const) {
+            const marker = path.join(f.project, `${language}-${point}.ran`)
+            const filepath = path.join(f.project, `${language}-${point}.md`)
+            const content = `---${language}\n(require("node:fs").writeFileSync(${JSON.stringify(marker)}, "ran"), {description: "probe"})\n---\n\nBODY  `
+            CodePuppyProjectGate.install({ trusted: () => false })
+            await Effect.runPromise(entriesOf(f))
+            const text = await Effect.runPromise(
+              CodePuppyProjectGate.observe(
+                f.project,
+                point,
+                Effect.sync(() => CodePuppyProjectGate.frontmatter(f.project, filepath, content, point)),
+              ),
+            )
+            expect(ConfigMarkdown.parse(text!).content).toBe("\nBODY  ")
+            expect(await Bun.file(marker).exists()).toBe(false)
+            expect(CodePuppyProjectGate.view(f.project)!.withheld).toEqual([
+              { kind: "frontmatter-code", name: path.basename(filepath), file: path.basename(filepath) },
+            ])
+            for (const installed of [true, false]) {
+              CodePuppyProjectGate.resetForTest()
+              if (installed) {
+                CodePuppyProjectGate.install({ trusted: () => true })
+                await Effect.runPromise(entriesOf(f))
+              }
+              const allowed = CodePuppyProjectGate.frontmatter(f.project, filepath, content, point)
+              expect(allowed).toBe(content)
+              expect(ConfigMarkdown.parse(allowed!).data.description).toBe("probe")
+              expect(await Bun.file(marker).text()).toBe("ran")
+              await fs.unlink(marker)
+            }
+          }
+        }
+        CodePuppyProjectGate.install({ trusted: () => false })
+        await Effect.runPromise(entriesOf(f))
+        expect(
+          CodePuppyProjectGate.frontmatter(f.project, "x.md", "---coffee\nx = 1\n---\nbody", "skill"),
+        ).toBeUndefined()
+        expect(
+          CodePuppyProjectGate.frontmatter(f.project, "x.md", "---\nname: [broken\n---\nbody", "skill"),
+        ).toBeUndefined()
+      }),
+  )
+
+  it.live("md agent:校验前拿掉控制字段保住提示词,解码后拿掉 modes/ 隐含 primary;允许反向臂保留控制字段与 primary", () =>
+    run(async () => {
+      await using f = await fixture({
+        "home/work/project/.opencode/agents/envagent.md":
+          '---\nsystem: header\nmodel: "{env:CP_1713_UNSET_MODEL}"\npermissions:\n  - action: "*"\n    resource: "*"\n    effect: allow\nmode: primary\n---\nENV-BODY',
+        "home/work/project/.opencode/agents/reviewer.md":
+          "---\nmodel: test/model\nmode: primary\npermission:\n  bash: allow\ncolor: primary\n---\nREVIEW-BODY",
+        "home/work/project/.opencode/modes/explore.md": "---\ndescription: mode dir\n---\nMODE-BODY",
+      })
+      const read = (entries: Entry[]) =>
+        Effect.gen(function* () {
+          const agents = yield* Agent.Service
+          yield* agents.transform((editor) =>
+            editor.update(Agent.ID.make("explore"), (agent) => {
+              agent.mode = "subagent"
+            }),
+          )
+          yield* ConfigAgentPlugin.Plugin.effect(
+            host({
+              location: location({ directory: AbsolutePath.make(f.project) }),
+              agent: agentHost(agents),
+            }),
+          ).pipe(Effect.provide(Config.testLayer(entries)))
+          return Object.fromEntries((yield* agents.list()).map((item) => [item.id, item]))
+        }).pipe(
+          Effect.scoped,
+          Effect.provide(AppNodeBuilder.build(LayerNode.group([Agent.node, Bus.node, FSUtil.node, Global.node]))),
+        )
+      CodePuppyProjectGate.install({ trusted: () => false })
+      const gated = await Effect.runPromise(read(await Effect.runPromise(entriesOf(f))))
+      expect(gated.envagent?.system).toBe("ENV-BODY")
+      expect(gated.envagent?.model).toBeUndefined()
+      expect(gated.envagent?.permissions).toEqual(Agent.Info.default(Agent.ID.make("envagent")).permissions)
+      expect(gated.reviewer?.model).toBeUndefined()
+      // 去掉 v1 控制字段后按 v2 解码,主题色名按 v2 原样被忽略。
+      expect(gated.reviewer?.color).toBeUndefined()
+      expect(gated.explore).toMatchObject({ system: "MODE-BODY", mode: "subagent" })
+      expect(CodePuppyProjectGate.view(f.project)!.withheld).toContainEqual({
+        kind: "agent-control",
+        name: "explore",
+        file: ".opencode/modes/explore.md",
+        fields: ["mode"],
+      })
+      CodePuppyProjectGate.install({ trusted: () => true })
+      const allowed = await Effect.runPromise(read(await Effect.runPromise(entriesOf(f))))
+      expect(allowed.envagent).toBeUndefined()
+      expect(String(allowed.reviewer?.model?.providerID)).toBe("test")
+      expect(String(allowed.reviewer?.model?.id)).toBe("model")
+      expect(allowed.reviewer?.color).toBe("#aaaaaa")
+      expect(allowed.explore?.mode).toBe("primary")
+    }),
+  )
+
+  it.live(
+    "md 命令:只留模板与说明、控制字段与插值登记;技能来源含项目 URL 与 .codepuppy、不含全局;读取点记录 done / failed",
+    () =>
+      run(async () => {
+        await using f = await fixture({ "home/work/project/.opencode/commands/review.md": "body" })
+        CodePuppyProjectGate.install({ trusted: () => false })
+        const entries = await Effect.runPromise(entriesOf(f))
+        const entry = entries.find((item) => item.type === "directory" && CodePuppyProjectGate.projectEntry(item))!
+        const filepath = path.join(f.project, ".opencode/commands/review.md")
+        const content =
+          "---\ndescription: review\nagent: plan\nmodel: invalid\nsubtask: true\nvariant: high\n---\nhello !`printf probe` $ARGUMENTS"
+        await Effect.runPromise(
+          CodePuppyProjectGate.observe(
+            f.project,
+            "command",
+            Effect.sync(() => {
+              const parsed = ConfigMarkdown.parse(
+                CodePuppyProjectGate.markdown(f.project, entry, "command")(filepath, content)!,
+              )
+              expect(parsed.data).toEqual({ description: "review" })
+              expect(parsed.content).toBe("hello !`printf probe` $ARGUMENTS")
+              expect(CodePuppyProjectGate.interpolation(f.project, "review", true, filepath, true)).toBe(true)
+            }),
+          ),
+        )
+        expect(CodePuppyProjectGate.view(f.project)!.withheld).toContainEqual({
+          kind: "command-run",
+          name: "review",
+          file: ".opencode/commands/review.md",
+          fields: ["agent", "model", "subtask", "variant", "!`…`"],
+        })
+        const directory = (p: string) => Skill.DirectorySource.make({ type: "directory", path: AbsolutePath.make(p) })
+        const local = directory(path.join(f.project, ".opencode/skills"))
+        const explicit = directory(path.join(f.project, ".codepuppy/skills"))
+        const external = directory(path.join(f.root, "external"))
+        const url = Skill.UrlSource.make({ type: "url", url: "https://example.com/skills/index.json" })
+        const sources = [
+          local,
+          explicit,
+          external,
+          url,
+          directory(path.join(f.global, "skills")),
+          directory(path.join(f.home, ".opencode/skills")),
+        ]
+        expect([...CodePuppyProjectGate.skillSources(f.project, sources, [local, external, { ...url }])]).toEqual([
+          local,
+          explicit,
+          external,
+          url,
+        ])
+        expect(CodePuppyProjectGate.view(f.project)!.points.command).toBe("done")
+        await Effect.runPromise(
+          CodePuppyProjectGate.observe(f.project, "skill", Effect.fail(new Error("probe"))).pipe(Effect.ignore),
+        )
+        expect(CodePuppyProjectGate.view(f.project)!.points.skill).toBe("failed")
+        expect(CodePuppyProjectGate.view(f.project)!.complete).toBe(false)
+        CodePuppyProjectGate.install({ trusted: () => true })
+        await Effect.runPromise(entriesOf(f))
+        expect(CodePuppyProjectGate.interpolation(f.project, "review", false, filepath, true)).toBe(false)
+        expect(CodePuppyProjectGate.markdown(f.project, entry, "command")(filepath, content)).toBe(content)
+        expect([...CodePuppyProjectGate.skillSources(f.project, sources, sources)]).toEqual([])
+      }),
+  )
+
   it.live("未允许:暂缓的顶层键(v1 与 v2)在归一化之前拿掉,内容类照常;引擎认不出的键不列;反向臂:未安装 ⇒ 全部生效", () =>
     run(async () => {
       await using f = await fixture({

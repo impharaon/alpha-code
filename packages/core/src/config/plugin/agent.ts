@@ -7,6 +7,7 @@ import path from "path"
 import { Effect, Option, Schema } from "effect"
 import { Agent } from "../../agent.js"
 import { Config } from "../../config.js"
+import { CodePuppyProjectGate } from "../codepuppy-project-gate.js" // codepuppy(ADR-049)
 import { ConfigMarkdown } from "../markdown.js"
 import { ConfigEntryObserver } from "./entry-observer.js"
 import { FSUtil } from "@opencode/util/fs-util"
@@ -39,20 +40,24 @@ export const Plugin = define({
     const config = yield* Config.Service
     const fs = yield* FSUtil.Service
     const global = yield* Global.Service
+    // codepuppy(ADR-049) ── 项目 md 在校验前过滤文件头,解码后再拿掉目录隐含的 primary。
     const loadEntry = Effect.fnUntraced(function* (entry: Entry) {
       if (entry.type === "document") return [entry]
       if (entry.type !== "directory") return []
       const files = yield* discover(fs, entry.path)
       return yield* Effect.forEach(files, (file) =>
         fs.readFileStringSafe(file.filepath).pipe(
-          Effect.flatMap((content) => (content ? decode(file, content) : Effect.succeed(undefined))),
+          Effect.flatMap((content) => CodePuppyProjectGate.agent(ctx.location.directory, entry, file, content, decode)),
           Effect.orElseSucceed(() => undefined),
         ),
       ).pipe(Effect.map((documents) => documents.filter((document): document is Document => document !== undefined)))
     })
     const load = Effect.fn("ConfigAgentPlugin.load")(function* () {
-      return yield* Effect.forEach(yield* config.entries(), loadEntry).pipe(Effect.map((documents) => documents.flat()))
+      return yield* CodePuppyProjectGate.observe(ctx.location.directory, "agent",
+        Effect.forEach(yield* config.entries(), loadEntry).pipe(Effect.map((documents) => documents.flat())),
+      )
     })
+    // codepuppy ── end
     const loaded = yield* ConfigEntryObserver.observeSources({
       config,
       event: ctx.event,

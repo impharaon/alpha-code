@@ -18,7 +18,10 @@ export * as CodePuppyProjectGate from "./codepuppy-project-gate.js"
 
 import { realpathSync } from "node:fs"
 import path from "path"
-import { Effect } from "effect"
+import { Effect, Exit } from "effect"
+import matter from "gray-matter"
+import { Skill } from "@opencode/schema/skill"
+import { FSUtil } from "@opencode/util/fs-util"
 import { parse, type ParseError } from "jsonc-parser"
 import { Document, Info, type Entry } from "@opencode/schema/config"
 import { ConfigAgent } from "@opencode/schema/config/agent"
@@ -30,6 +33,7 @@ import {
   type WithheldItem,
 } from "@opencode/schema/codepuppy-project-config"
 import { ConfigNormalize } from "./normalize.js"
+import { ConfigMarkdown } from "./markdown.js"
 
 // ── 契约 B 的名单(只有名字;v1 / v2 两种写法都按名字认)──────────────────────────────────────────────────────
 // 未允许也生效的顶层键。`attachment` 是 `media` 的 v1 写法(编排器裁决 2026-11-13,随 design §4 表补行)。
@@ -68,7 +72,7 @@ const COMMAND_DECODED_CONTENT = ["template", "description"] as const
 // ── 安装与状态 ────────────────────────────────────────────────────────────────────────────────────────────────
 let installed: { readonly trusted: (directory: string) => boolean } | undefined
 /** 每个 Location(按 `location.directory`)最近一代的视图记录。 */
-const views = new Map<string, { directory: string; trusted: boolean; points: Map<string, GatePointState>; withheld: WithheldItem[] }>()
+const views = new Map<string, { directory: string; trusted: boolean; points: Map<string, GatePointState>; withheld: WithheldItem[]; reads: Map<ReadPoint, WithheldItem[]> }>()
 /** 未允许的一代里属于项目内容的条目(项目文档与项目 `.opencode` 目录)。 */
 const projectEntries = new WeakSet<Entry>()
 
@@ -84,7 +88,7 @@ export function resetForTest(): void {
 
 /** 这个条目是否是未允许的一代里的项目内容。 */
 export function projectEntry(entry: Entry): boolean {
-  return projectEntries.has(entry)
+  return installed !== undefined && projectEntries.has(entry)
 }
 
 /** 某个 Location 最近一代的视图(契约 D)。没有记录 ⇒ undefined。 */
@@ -97,8 +101,173 @@ export function view(directory: string): ProjectConfigView | undefined {
     trusted: record.trusted,
     points,
     complete: [...record.points.values()].every((state) => state === "done"),
-    withheld: record.trusted ? [] : normalizeWithheld(record.withheld),
+    withheld: record.trusted ? [] : normalizeWithheld([...record.withheld, ...[...record.reads.values()].flat()]),
   }
+}
+
+// ── md 读取点(同一代信任,不再次调用 trusted)────────────────────────────────────────────────────────────
+type ReadPoint = "agent" | "command" | "skill"
+
+export function observe<A, E, R>(
+  directory: string,
+  point: ReadPoint,
+  effect: Effect.Effect<A, E, R>,
+): Effect.Effect<A, E, R> {
+  return Effect.suspend(() => {
+    const record = views.get(directory)
+    if (!record) return effect
+    record.points.set(point, "pending")
+    record.reads.set(point, [])
+    return effect.pipe(
+      Effect.onExit((exit) => Effect.sync(() => record.points.set(point, Exit.isSuccess(exit) ? "done" : "failed"))),
+      Effect.tap(() => {
+        const items = record.reads.get(point) ?? []
+        return items.length
+          ? Effect.logWarning("project markdown settings withheld until the project is allowed", {
+              directory: record.directory,
+              kinds: countKinds(items),
+            })
+          : Effect.void
+      }),
+    )
+  })
+}
+
+/** 项目条目按上游 sources() 解析,再并上文件夹内的目录来源(含显式层 .codepuppy/skills)。 */
+export function skillSources(directory: string, current: readonly Skill.Source[], project: readonly Skill.Source[]) {
+  if (!installed || views.get(directory)?.trusted !== false) return new Set<Skill.Source>()
+  return new Set(
+    current.filter(
+      (source) =>
+        project.some((item) => Skill.Source.equals(item, source)) ||
+        (source.type === "directory" && FSUtil.contains(directory, source.path)),
+    ),
+  )
+}
+
+/** 给目录读取点用的文件头函数;用户全局与未安装时原样交出。 */
+export function markdown(directory: string, entry: Entry, point: "agent" | "command") {
+  return (filepath: string, content: string) =>
+    projectEntry(entry) ? frontmatter(directory, filepath, content, point, entry.path) : content
+}
+
+export const agent = Effect.fnUntraced(function* (
+  directory: string,
+  entry: Entry,
+  file: { directory: string; filepath: string; primary: boolean },
+  content: string | undefined,
+  decode: (
+    file: { directory: string; filepath: string; primary: boolean },
+    content: string,
+  ) => Effect.Effect<Document | undefined>,
+) {
+  if (!content) return
+  const text = markdown(directory, entry, "agent")(file.filepath, content)
+  if (text === undefined) return
+  const document = yield* decode(file, text)
+  if (!document || !projectEntry(entry)) return document
+  return new Document({
+    ...document,
+    info: new Info({
+      ...document.info,
+      agents: Object.fromEntries(
+        Object.entries(document.info.agents ?? {}).map(([name, item]) => {
+          const fields = Object.keys(item).filter(
+            (key) => item[key as keyof typeof item] !== undefined && !AGENT_DECODED_CONTENT.includes(key as never),
+          )
+          recordRead(directory, "agent", {
+            kind: "agent-control",
+            name,
+            file: relativeFile(directory, file.filepath),
+            fields,
+          })
+          return [name, ConfigAgent.Info.make(pick(item, AGENT_DECODED_CONTENT))]
+        }),
+      ),
+    }),
+  })
+})
+
+/** 只改文件头,正文逐字保留。parse 失败时复用上游 sanitize,仍失败则由读取点跳过该文件。 */
+export function frontmatter(
+  directory: string,
+  filepath: string,
+  content: string,
+  point: ReadPoint,
+  root?: string,
+): string | undefined {
+  if (!installed || views.get(directory)?.trusted !== false) return content
+  const file = relativeFile(directory, filepath)
+  const name =
+    root === undefined
+      ? file
+      : path
+          .relative(root, filepath)
+          .replaceAll("\\", "/")
+          .replace(/^(agent|agents|mode|modes|command|commands)\//, "")
+          .replace(/\.md$/, "")
+  const options = {
+    engines: {
+      javascript: () => {
+        recordRead(directory, point, { kind: "frontmatter-code", name: file, file })
+        return {}
+      },
+    },
+  }
+  try {
+    const parsed = parseFrontmatter(content, options)
+    if (parsed.matter === undefined) return content
+    const data =
+      point === "skill"
+        ? parsed.data
+        : pick(
+            parsed.data,
+            point === "agent" ? ["system", "prompt", "description", "color", "hidden"] : COMMAND_DECODED_CONTENT,
+          )
+    if (point !== "skill") {
+      const fields = Object.keys(parsed.data).filter((key) => !Object.hasOwn(data, key))
+      recordRead(directory, point, { kind: point === "agent" ? "agent-control" : "command-run", name, file, fields })
+    }
+    // stringify 会给正文补换行,因此只让它写空正文的头部,再拼回原正文。空头也保留分隔符,防止正文被当成另一个可执行文件头。
+    return (matter.stringify({ content: "" }, data).replace(/\n$/, "") || "---\n{}\n---\n") + parsed.content
+  } catch {
+    return undefined
+  }
+}
+
+/** A7 只暂缓 shell 插值;参数替换仍由上游 evaluateTemplate 负责。 */
+export function interpolation(
+  directory: string,
+  name: string,
+  gated: boolean,
+  filepath: string | undefined,
+  hasShell: boolean,
+): boolean {
+  if (!gated) return false
+  if (hasShell) recordRead(directory, "command", {
+    kind: "command-run",
+    name,
+    file: filepath === undefined ? "" : relativeFile(directory, filepath),
+    fields: ["!`…`"],
+  })
+  return true
+}
+
+function parseFrontmatter(content: string, options: Parameters<typeof matter>[1]) {
+  try {
+    return matter(content, options)
+  } catch {
+    return matter(ConfigMarkdown.sanitize(content), options)
+  }
+}
+
+function recordRead(directory: string, point: ReadPoint, item: WithheldItem) {
+  if (item.fields?.length === 0) return
+  views.get(directory)?.reads.get(point)?.push(item)
+}
+
+function relativeFile(directory: string, filepath: string) {
+  return path.relative(directory, filepath) || path.basename(filepath)
 }
 
 // ── 一代 ─────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -240,7 +409,7 @@ export const begin = Effect.fnUntraced(function* (input: { readonly directory: s
         for (const entry of entries)
           if ((entry.type === "document" && entry.path !== undefined && processed.has(entry.path)) || (entry.type === "directory" && roots.includes(entry.path)))
             projectEntries.add(entry)
-      views.set(input.directory, { directory, trusted, points: new Map([["config", "done"]]), withheld: trusted ? [] : withheld })
+      views.set(input.directory, { directory, trusted, points: new Map([["config", "done"]]), withheld: trusted ? [] : withheld, reads: new Map() })
       if (removedDirectives)
         yield* Effect.logWarning("project removal directives for built-in plugins are ignored", { directory, count: removedDirectives })
       if (!trusted && withheld.length)

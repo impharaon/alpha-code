@@ -15,6 +15,7 @@ import { SubagentJob } from "../../session/subagent-job.js"
 import { SubagentTool } from "../../tool/plugin/subagent.js" // codepuppy(#1129)
 import { ShellSelect } from "../../shell/select.js"
 import { FSUtil } from "@opencode/util/fs-util"
+import { CodePuppyProjectGate } from "../codepuppy-project-gate.js" // codepuppy(ADR-049)
 import { ConfigMarkdown } from "../markdown.js"
 import { ConfigEntryObserver } from "./entry-observer.js"
 
@@ -25,12 +26,15 @@ export const Plugin = define({
   effect: Effect.fn(function* (ctx) {
     const config = yield* Config.Service
     const fs = yield* FSUtil.Service
+    // codepuppy(ADR-049) ── 保留项目命令正文,文件头控制字段暂缓,执行时沿用本代来源标记。
     const loadEntry = Effect.fnUntraced(function* (entry: Entry) {
-      if (entry.type === "document") return [{ commands: entry.info.commands }]
+      const gated = CodePuppyProjectGate.projectEntry(entry)
+      if (entry.type === "document") return [{ commands: entry.info.commands, gated, file: entry.path }]
       if (entry.type !== "directory") return []
-      const commands = yield* loadDirectory(fs, entry.path)
-      return [{ commands: Object.fromEntries(commands.map((command) => [command.name, command.info])) }]
+      const commands = yield* loadDirectory(fs, entry.path, CodePuppyProjectGate.markdown(ctx.location.directory, entry, "command"))
+      return commands.map((command) => ({ commands: { [command.name]: command.info }, gated, file: command.filepath }))
     })
+    // codepuppy ── end
     const location = yield* Location.Service
     const processes = yield* AppProcess.Service
     const shell = yield* ShellSelect.Service
@@ -38,7 +42,9 @@ export const Plugin = define({
     const agents = yield* Agent.Service
     const subagents = yield* SubagentJob.Service
     const load = Effect.fn("ConfigCommandPlugin.load")(function* () {
-      return yield* Effect.forEach(yield* config.entries(), loadEntry).pipe(Effect.map((documents) => documents.flat()))
+      return yield* CodePuppyProjectGate.observe(ctx.location.directory, "command", // codepuppy(ADR-049)
+        Effect.forEach(yield* config.entries(), loadEntry).pipe(Effect.map((documents) => documents.flat())), // codepuppy(ADR-049)
+      ) // codepuppy(ADR-049)
     })
     const loaded = yield* ConfigEntryObserver.observeSources({
       config,
@@ -50,6 +56,7 @@ export const Plugin = define({
     yield* ctx.command.transform((editor) => {
       for (const document of loaded.documents) {
         for (const [name, command] of Object.entries(document.commands ?? {})) {
+          const gated = CodePuppyProjectGate.interpolation(ctx.location.directory, name, document.gated, document.file, command.template.match(shellRegex) !== null) // codepuppy(ADR-049)
           const subagent = command.subagent ?? command.subtask
           editor.add({
             name,
@@ -70,7 +77,7 @@ export const Plugin = define({
                   location,
                   processes,
                   shell,
-                })
+                }, gated) // codepuppy(ADR-049)
                 if (subagent ?? commandAgent?.mode === "subagent") {
                   const parent = yield* sessions.get(input.sessionID)
                   const selected = yield* agents.select(agent ?? parent.agent)
@@ -148,25 +155,27 @@ export const Plugin = define({
 // Keep in sync with the loadDirectory scan pattern and the name-strip regex in decode.
 const sourceDirectories = ["command", "commands"] as const
 
-function loadDirectory(fs: FSUtil.Interface, directory: string) {
+// codepuppy(ADR-049) ── 每份项目 md 先过同一闸门,再交上游解码器。
+function loadDirectory(fs: FSUtil.Interface, directory: string, frontmatter: (filepath: string, content: string) => string | undefined) {
   return Effect.gen(function* () {
     const files = yield* fs
       .scan("{command,commands}/**/*.md", { cwd: directory, absolute: true, dot: true, symlink: true })
       .pipe(Effect.orElseSucceed(() => [] as string[]))
     return yield* Effect.forEach(files.toSorted(), (filepath) =>
       fs.readFileStringSafe(filepath).pipe(
-        Effect.map((content) => (content === undefined ? undefined : decode(directory, filepath, content))),
+        Effect.map((content) => (content === undefined ? undefined : decode(directory, filepath, frontmatter(filepath, content)))),
         Effect.orElseSucceed(() => undefined),
       ),
     ).pipe(
       Effect.map((commands) =>
-        commands.filter((command): command is { name: string; info: ConfigCommand.Info } => command !== undefined),
+        commands.filter((command): command is { name: string; info: ConfigCommand.Info; filepath: string } => command !== undefined),
       ),
     )
   })
 }
 
-function decode(directory: string, filepath: string, content: string) {
+function decode(directory: string, filepath: string, content: string | undefined) {
+  if (content === undefined) return
   const markdown = ConfigMarkdown.parseOption(content)
   if (!markdown) return
   const info = Option.getOrUndefined(decodeCommand({ ...markdown.data, template: markdown.content.trim() }))
@@ -178,8 +187,10 @@ function decode(directory: string, filepath: string, content: string) {
       .replace(/^(command|commands)\//, "")
       .replace(/\.md$/, ""),
     info,
+    filepath,
   }
 }
+// codepuppy ── end
 
 function evaluateTemplate(
   template: string,
@@ -189,6 +200,7 @@ function evaluateTemplate(
     readonly processes: AppProcess.Interface
     readonly shell: ShellSelect.Interface
   },
+  gated = false, // codepuppy(ADR-049)
 ) {
   return Effect.gen(function* () {
     const args = parseArguments(input)
@@ -207,7 +219,7 @@ function evaluateTemplate(
         ? `${withArguments}\n\n${input}`.trim()
         : withArguments.trim()
     const matches = Array.from(text.matchAll(shellRegex))
-    if (matches.length === 0) return text
+    if (gated || matches.length === 0) return text // codepuppy(ADR-049)
     const shell = yield* services.shell.resolve({ priority: "config" })
     const outputs = yield* Effect.forEach(
       matches,

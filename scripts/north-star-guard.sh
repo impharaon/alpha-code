@@ -173,6 +173,9 @@ UPSTREAM_EXCLUDES=(
   # `codepuppy(ADR-049)` 标注(读一次信任、项目文档校验前过滤与解码后再拿一次、托管策略之后插闸门文档),规则本体在 Code Puppy 自有的
   # config/codepuppy-project-gate.ts。判据 packages/core/test/codepuppy-project-gate.test.ts 与 packages/ui-mac/src/main/project-config-commands.engine.test.ts。
   ':(exclude)packages/core/src/config.ts'
+  # #1713 / ADR-049:md 读取点只调用同一闸门;判据同上。
+  ':(exclude)packages/core/src/config/plugin/skill.ts'
+  ':(exclude)packages/core/src/config/plugin/agent.ts'
 )
 
 # ── UPSTREAM_PATHS 里住着的 Code Puppy 自有文件:结构性谓词,不是逐文件清单(`#1085` / ADR-043)──

@@ -123,7 +123,7 @@ it.live("md 隐含字段:agent / agents / mode / modes 四种目录都保留原 
   }),
 )
 
-it.live("读取点:上游目录消费者恰好五个、Markdown 解码恰好三个;多一个副本会红", () =>
+it.live("读取点:上游目录消费者恰好五个、Markdown 解码调用恰好六处;多一个副本会红", () =>
   Effect.gen(function* () {
     const fs = yield* FSUtil.Service
     const src = path.join(import.meta.dir, "../src")
@@ -134,20 +134,19 @@ it.live("读取点:上游目录消费者恰好五个、Markdown 解码恰好三�
     )
     const directoryCallers = (items: typeof contents) =>
       items
-        .filter((item) => item.file !== "config/codepuppy-project-gate.ts" && /entry\.type\s*[!=]==?\s*"directory"/.test(item.text))
+        .filter((item) => item.file !== "config/codepuppy-project-gate.ts" && /(?:@opencode\/schema\/config|\bConfig\.)/.test(item.text) && /\b\w+\??\.type\s*[!=]==?\s*"directory"/.test(item.text))
         .map((item) => item.file)
         .sort()
     const markdownCallers = (items: typeof contents) =>
       items
-        .filter((item) => /ConfigMarkdown\.parse(?:Option)?\(/.test(item.text))
-        .map((item) => item.file)
+        .flatMap((item) => Array.from(item.text.matchAll(/(?:ConfigMarkdown|SkillFile)\.parse(?:Option)?\(/g), () => item.file))
         .sort()
     const requireCallers = (actual: string[], expected: string[]) => {
       const changed = [
         ...actual.filter((file) => !expected.includes(file)),
         ...expected.filter((file) => !actual.includes(file)),
       ]
-      if (changed.length) throw new Error(`读取点变化:${changed.join("、")}`)
+      if (changed.length || actual.length !== expected.length) throw new Error(`读取点变化:${changed.join("、") || actual.join("、")}`)
     }
     const directories = [
       "config/plugin/agent.ts",
@@ -156,7 +155,7 @@ it.live("读取点:上游目录消费者恰好五个、Markdown 解码恰好三�
       "config/plugin/skill.ts",
       "config/plugin/source.ts",
     ]
-    const markdown = ["config/plugin/agent.ts", "config/plugin/command.ts", "config/plugin/skill-file.ts"]
+    const markdown = ["config/plugin/agent.ts", "config/plugin/command.ts", "config/plugin/compatibility.ts", "config/plugin/skill-file.ts", "config/plugin/skill.ts", "plugin/provider/opencode.ts"]
     expect(() => requireCallers(directoryCallers(contents), directories)).not.toThrow()
     expect(() => requireCallers(markdownCallers(contents), markdown)).not.toThrow()
     // 从真实上游源文件复制一个读取点,不手写替身格式;同一清点器必须点名新增消费者。
@@ -170,6 +169,16 @@ it.live("读取点:上游目录消费者恰好五个、Markdown 解码恰好三�
     ]
     expect(() => requireCallers(directoryCallers(directoryCopy), directories)).toThrow("unreviewed.ts")
     expect(() => requireCallers(markdownCallers(markdownCopy), markdown)).toThrow("unreviewed.ts")
+    const renamedDirectory = [...contents, {
+      file: "config/plugin/codepuppy-unreviewed.ts",
+      text: contents.find((item) => item.file === "config/plugin/command.ts")!.text.replaceAll("entry", "configItem"),
+    }]
+    const skillCopy = [...contents, {
+      file: "config/plugin/codepuppy-unreviewed.ts",
+      text: contents.find((item) => item.file === "config/plugin/compatibility.ts")!.text,
+    }]
+    expect(() => requireCallers(directoryCallers(renamedDirectory), directories)).toThrow("unreviewed.ts")
+    expect(() => requireCallers(markdownCallers(skillCopy), markdown)).toThrow("unreviewed.ts")
   }),
 )
 

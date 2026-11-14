@@ -39,7 +39,7 @@ related: [ADR-029, ADR-040, ADR-047, ADR-048]
 | `command.ts` | md 解码;`evaluateTemplate` 的插值正则与流程;命令有没有新的控制字段 |
 | `config/markdown.ts`、`plugin/module.ts`、`config/plugin/source.ts`、`plugin/internal.ts`(未接管) | gray-matter 的版本与引擎表;`sanitize` 仍然导出;`plugin.use` 判定点与它比较的目标串;目录插件的目标保留发现时的路径;受保护的内置插件集合 |
 
-机器判据:`packages/core/test/codepuppy-project-gate-upgrade.test.ts` 钉住 v1 / v2 字段分类、归一化与目录隐含字段、五个目录消费者与三个 Markdown 解码点,每条有已知坏。核心行为与真引擎两臂登记在 [权威登记册](../../../docs/architecture/codepuppy-authority-registry.json) 的 `project-opencode-config-trust`。
+机器判据:`packages/core/test/codepuppy-project-gate-upgrade.test.ts` 钉住 v1 / v2 字段分类、归一化与目录隐含字段、五个目录消费者与六处 Markdown 解码调用(含 `SkillFile.parse`),每条有已知坏。核心行为与真引擎两臂登记在 [权威登记册](../../../docs/architecture/codepuppy-authority-registry.json) 的 `project-opencode-config-trust`。
 
 ## 撤回与上游挂点需求
 

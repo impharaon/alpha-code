@@ -223,3 +223,15 @@ R4 修正回执:
 - ui-mac `bun test src/main/gate-file-registry.test.ts src/main/old-name-scan.test.ts`:宿主补漏与索引词元计数同步后 exit 0,33 pass / 0 fail。
 
 后续合并提交、适配器身份检查、生产构建与最终 HEAD 收据接在下方。
+
+### 合并后最终复核
+
+- 合并提交 `78bfbc4782`,父节点为已接受底座 `6b0c054e75` 与指定输入 `9dd7349975`。合并后适配器首次 201 pass / 1 fail,唯一失败是 17 份夹具的 schema 身份 `b1cacb270f → c24d8b246d`;core / plugin / util 身份不变。按身份测试提示只完整重采一次,exit 0,真实样本独立提交 `f566ed3dc6`。
+- 重采逐份核对:路由用例键、所有字段形状、路由状态码与往返条数不变,无新增表项。差异为 ID / 时间 / 临时根 / 分页游标、OAuth PKCE 与 state、回环回调的随机端口(同一 /callback)、模型目录刷新(原生 models-dev 数据里的模型成员/参数,非转换器变化)、流式快照时序;parity 少一次 size/cursor 0 的早期轮询,后续输出保持。没有未解释的转换形状变化,未手改任何样本或身份。
+- `cd packages/ui-mac && bun test src/engine-adapter/`:exit 0,202 pass / 0 fail、676 断言,31 文件;其中 turn-failure 宿主仍精确核对 9 pass / 0 fail。custom-provider 的 5 条已在 #1713 七文件组通过。重采 events 的 CLI 工作目录词元仍为原工作树 21 处,登记不需再改。
+- 冻结输入核对:#1699 spec / design 与 `9dd7349975` 无差异;#1713 spec / design、bootstrap design / util schema、决定记录与 `6b0c054e75` 无差异。没有修改 adapter 生产文件、合同表或账目,没有新增 launch 环境通道、用户限制、配置或依赖。未运行 gate/bin/check,未启动安装应用或接触真实数据。
+- 观察/遗留去向:`packages/ui-mac/src/main/unattended-run.engine.test.ts:21` 的既有宿主只断言子进程至少 3 条;本轮按派发直接验证实际 16/0,未在组装中改其已审断言。后续是否将计数钉为 16 交原票编排器,不影响本轮已实跑的 C5 结论。
+
+- 最终构建:`cd packages/ui-mac && bun run build` exit 0,引擎 / ext / main / preload / renderer 产物已生成,未启动应用。最终重采与记录补齐后,ui-mac 两项登记命令复核 exit 0,33 pass / 0 fail;ext authority-registry 的 C9 为 5 pass / 0 fail。docs_index.py --check、416 个本轮变更文档相对链接与 git diff --check 通过。
+- 已核:Codex(GPT-6),r3 IMPLEMENT 组装自检通过。依据版本为接受的 `6b0c054e75` 与 `9dd7349975`;AC-01–08 的 C1–C9 及两单元组合证据均通过,已审行为和 owner 的消息/shell 边界不重开。下一步交编排器独立审查及发布边界,未推送 / 开 PR。遗留去向仅上述 C5 计数观察交原票编排器;前两单元已登记的文档/环境问题沿原去向,本轮不扩查。无新增设计疑虑或限制提案。
+- 本轮约 19 分钟(15:03–15:23 UTC),自身协调 4 个冲突文件与 6 个必要测试/样本/登记/文档文件;适配器真实重采 17 份产物另计。未安装依赖、未改冻结合同、未扩大到其它能力。

@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test"
-import { readdirSync, readFileSync } from "node:fs"
+import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
+import { tmpdir } from "node:os"
 import { join, relative, resolve } from "node:path"
 import { frontendSurfaceById } from "../../shared/frontend-surface-manifest"
 
@@ -142,6 +143,20 @@ describe("审批决定提交入口:单一引用面白名单棘轮(#619 R3 Blocke
       yield p
     }
   }
+
+  test("测试宿主不算生产提交入口,同样内容落进生产文件仍被扫描", () => {
+    const directory = mkdtempSync(join(tmpdir(), "permission-scan-"))
+    // 来源:#1699 的真实引擎判据,通过 permission.reply 完成人工批准对照臂。
+    const source = readFileSync(resolve(root, "packages/ui-mac/src/main/unattended-run.engine.cases.ts"), "utf8")
+    try {
+      writeFileSync(join(directory, "caller.engine.cases.ts"), source)
+      writeFileSync(join(directory, "caller.ts"), source)
+      expect(normalize(source)).toContain("permission.reply")
+      expect([...walkProduction(directory)]).toEqual([join(directory, "caller.ts")])
+    } finally {
+      rmSync(directory, { recursive: true, force: true })
+    }
+  })
 
   /** 归一化:去空白、方括号字符串取值折算成点取值 —— `v2.session["permission"]['reply']`
    *  与 `v2.session.permission.reply` 落成同一形态,方括号等义改写不豁免。 */

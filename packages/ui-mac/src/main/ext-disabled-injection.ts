@@ -14,7 +14,8 @@ import { codepuppyGlobalRoot } from "./codepuppy-installs"
 import { readSessionGrantIdsSync, type SessionGrantOracle } from "./ext-curation-policy"
 import { readLedgerV2 } from "./ext-receipt-v2"
 import type { ChannelName } from "./catalog-channels"
-import { NEUTRALIZED_MCP_SERVER } from "./mcp-default-deny"
+import { NEUTRALIZED_MCP_SERVER, readCodePuppyMcpServers } from "./mcp-default-deny"
+import { tryCodePuppyBootstrap } from "@opencode/util/codepuppy-bootstrap"
 
 export function injectDisabledOverrides(
   config: { mcp?: { servers?: Record<string, unknown> }; agents?: Record<string, unknown> },
@@ -36,8 +37,10 @@ export function injectDisabledOverrides(
         `[req104-397] session-grant determination unavailable in injection (${oracle.reason}) — forcing only the bundled-recognizable subset (boot reconcile holds the fail-closed gate)`,
       )
     const sessionGrantIds = oracle.ok ? oracle.ids : oracle.partialIds
-    // `#1667`:OpenCode 2 形状。MCP 按名字整条替换(只写 `enabled:false` 叶子会被丢弃),所以写完整的中和条目
-    // (NEUTRALIZED_MCP_SERVER);agent 的字段全可选,`{ disabled: true }` 本身就是合法条目。2.x 没有 v1 的 `mode` 键,
+    const configured = readCodePuppyMcpServers(tryCodePuppyBootstrap()?.paths.userConfig)
+    // MCP 按名字整条替换,因此保留已注入的治理定义或治理文件里的本地定义,只加 disabled:true。
+    // 用远程端口 1 替换本地 command 会让随后显式 connect 连接占位地址。没有治理定义时仍用中和条目。
+    // agent 的字段全可选,`{ disabled: true }` 本身就是合法条目。2.x 没有 v1 的 `mode` 键,
     // 也就没有「mode 折叠回 agent 压掉 disable」那条路(Codex r12 B1 的那一面随之不再需要)。
     const disableAgent = (name: string) => {
       const map = config.agents
@@ -52,8 +55,15 @@ export function injectDisabledOverrides(
         console.error(
           `[req104-397] ${r.kind} "${r.name}" is session-grant per curation but the ledger says enabled — forcing disabled in injection (persistent enable is illegal; per-session activation = #408)`,
         )
-      if (r.kind === "mcp") config.mcp = { ...config.mcp, servers: { ...config.mcp?.servers, [r.name]: { ...NEUTRALIZED_MCP_SERVER } } }
-      else if (r.kind === "agent") disableAgent(r.name)
+      if (r.kind === "mcp") {
+        const injected = config.mcp?.servers?.[r.name]
+        const local = configured[r.name]
+        const definition = injected && typeof injected === "object" && !Array.isArray(injected)
+          ? injected
+          : local?.type === "local" ? local : NEUTRALIZED_MCP_SERVER
+        config.mcp = { ...config.mcp, servers: { ...config.mcp?.servers, [r.name]: { ...definition, disabled: true } } }
+      }
+      if (r.kind === "agent") disableAgent(r.name)
     }
   } catch (error) {
     console.warn("[req395] disabled-override injection skipped (ledger unreadable)", error)

@@ -90,6 +90,12 @@ export function injectMcpDefaultDeny(
   }
 }
 
+/** 同一份治理文件里的 MCP 定义;禁用覆盖也须保留本地连接参数,以便随后显式开启。 */
+export function readCodePuppyMcpServers(file: string | undefined): Record<string, Record<string, unknown>> {
+  if (!file) return {}
+  return engineMcpServers(readConfig(file, "alpha", (target) => readFileSync(target, "utf8"), (message) => console.error(message)))
+}
+
 function readConfig(
   file: string,
   role: "alpha" | "user-global",

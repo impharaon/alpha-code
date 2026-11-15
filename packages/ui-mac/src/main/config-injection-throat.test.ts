@@ -223,7 +223,6 @@ function judge(before: unknown, after: unknown, importedDir: string): Judgement 
     if (set.includes(l.value)) out.verbs++
     else out.bad.push({ pointer: l.pointer, reason: "not an engine verb" })
   }
-  const policies = ((after as Cfg).policies as Array<{ action?: unknown }> | undefined) ?? []
   const ruleSlot = (l: Leaf, slot: string | undefined) => {
     if (slot === "effect") return verb(l, PERMISSION_VERBS)
     if (slot === "action" && /^\S+$/.test(l.value)) return
@@ -285,7 +284,6 @@ function judge(before: unknown, after: unknown, importedDir: string): Judgement 
       verb(l, POLICY_VERBS)
       continue
     }
-    if (top === "policies" && segs.length === 3 && segs[2] === "resource" && policies[Number(segs[1])]?.action === "plugin.use") continue
     const r = explainConfigReference(registryPointer(segs))
     if (r.ok) refs.add(r.id)
     else out.bad.push({ pointer: l.pointer, reason: "unexplained string leaf" })
@@ -308,7 +306,7 @@ function run(extPluginPath?: string): Run {
   // 第一层 policies;显式文件里其余的是用户 codepuppy.jsonc 的字,按来源不判)。判官看两处合起来的那一份。
   const inline = JSON.parse(result.config.content) as Cfg
   const layer = result.explicit!.layer
-  expect([...layer.policies, ...layer.plugins]).toEqual((inline.policies as unknown[] | undefined) ?? [])
+  expect(layer.policies).toEqual((inline.policies as unknown[] | undefined) ?? [])
   const after: Cfg = {
     ...inline,
     ...(layer.skills.length ? { skills: layer.skills } : {}),

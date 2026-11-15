@@ -1,3 +1,4 @@
+import { createUnattendedState } from "./unattended"
 // #1662 L4 — lane seams I3 (`registerPolicy` / `seal`), I7, I9 and baseline S1 / S4 in a real OpenCode 2 plugin host
 // (policy-host.cases.ts: production plugin service, promise adapter, tool registry, permission engine, agents,
 // sessions, session context). The #725 discipline carries over: production entries only (`SessionContext.select` is
@@ -133,7 +134,7 @@ const setup = (options: Setup = {}) =>
         revision: `internal-${Math.random().toString(36).slice(2)}`,
       })),
       promisePlugin("codepuppy-ext", async (ctx: any) => {
-        const policy = options.policy === false ? undefined : await registerPolicy(ctx)
+        const policy = options.policy === false ? undefined : await registerPolicy(ctx, createUnattendedState())
         await ctx.tool.transform((editor: any) => editor.add(tool(ALIAS_PROBE, "probe")))
         await options.inside?.(ctx)
         await policy?.seal()

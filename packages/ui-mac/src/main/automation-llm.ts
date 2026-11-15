@@ -2,6 +2,8 @@
 // (shared/automation-nl.ts)解析不出时由用户显式点击触发(省 token);临时会话一次抽取后即删,
 // 不污染会话列表。执行链只走 SDK(ADR-002);预览确认流不变 —— LLM 产物只是填表,存前仍过
 // 存储层硬校验(interval 下限/档位白名单)。
+import { SessionMessage } from "@opencode/schema/session-message"
+import { unattendedRuns } from "./codepuppy-unattended"
 import { engineClient } from "./engine-client"
 import { promptAndWait } from "./engine-session-turn"
 import type { AutomationParseErrorCode, AutomationSchedule } from "../shared/automation-types"
@@ -49,13 +51,15 @@ export async function llmParseAutomation(text: string, projectDir: string): Prom
   let sessionID: string | undefined
   try {
     try {
-      sessionID = (await client.session.create({ location: { directory: projectDir }, title: "⏱ 自动化解析(临时)" })).id
+      sessionID = (await client.session.create({ location: { directory: projectDir }, title: "⏱ 自动化解析(临时)", permissions: [{ action: "subagent", resource: "*", effect: "deny" }] })).id
     } catch {
       return unavailable("临时会话创建失败")
     }
+    const promptID = SessionMessage.ID.create()
+    if (!await unattendedRuns.register(sessionID, { promptID })) return unavailable("引擎未确认无人值守会话")
     let reply: string
     try {
-      reply = await promptAndWait(client, { sessionID, text: EXTRACT_INSTRUCTION + text })
+      reply = await promptAndWait(client, { sessionID, text: EXTRACT_INSTRUCTION + text, id: promptID })
     } catch {
       return unavailable("模型调用失败")
     }
@@ -77,6 +81,7 @@ export async function llmParseAutomation(text: string, projectDir: string): Prom
   } finally {
     // 临时会话即删(best-effort;失败只留一条日志,不影响结果)
     if (sessionID) {
+      unattendedRuns.unregister(sessionID)
       const id = sessionID
       const del = () => client.session.remove({ sessionID: id })
       try {

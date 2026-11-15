@@ -150,7 +150,7 @@ beforeAll(async () => {
   initLogging()
   // 生产 composition root 本体 —— 这里注册的就是用户点「从文件夹导入」打到的那个 handler。
   const { registerExtIpcHandlers } = await import("../src/main/ext-ipc")
-  const registered = registerExtIpcHandlers(userData, "stable", async () => ({}) as never, path.join(sandbox, "home"))
+  const registered = registerExtIpcHandlers(userData, "stable", async () => ({}) as never, path.join(sandbox, "home"), undefined, async () => undefined)
   await registered.ledgerReady
 
   const handler = ipcHandlers.get(IMPORT_CHANNEL)

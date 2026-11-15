@@ -7,7 +7,7 @@
 // - 纯函数(buildPromptRequest / routeSlash / filterAgents)与 signals 分离,前者可直接单测。
 
 import { createSignal } from "solid-js"
-import type { ModelRef } from "@opencode-ai/sdk/v2/client"
+import type { ModelRef } from "../../engine-adapter/contract/v1"
 
 /* ── 类型 ─────────────────────────────────────────────────────────────────── */
 

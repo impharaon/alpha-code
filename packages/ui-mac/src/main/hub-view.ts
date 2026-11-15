@@ -1,3 +1,4 @@
+import { unattendedRuns } from "./codepuppy-unattended"
 // REQ-234 `#1529`(基线 §2.2 / §2.5,不变量 I4)—— 「已安装 / 待重载 / 可用」的**唯一权威**。
 //
 // 定制中心(经 IPC `ext-hub-view`)与 agent 工具(经 parentPort `codepuppy.hub.view.request`)读的都是本模块对同一个
@@ -561,11 +562,20 @@ export function createCodePuppySidecarHost(deps: {
         reply(post, buildHubRequestReply(inbound.id, { record: deps.requests.get(inbound.requestId) }))
         return true
       }
+      if (inbound.type === "codepuppy.unattended.ack") {
+        unattendedRuns.acknowledge(inbound)
+        return true
+      }
       deps.reloads.receiveReport(inbound)
       return true
     },
     attach(post) {
-      return deps.reloads.attach(post)
+      const detachUnattended = unattendedRuns.attach(post)
+      const detachReloads = deps.reloads.attach(post)
+      return (reason) => {
+        detachUnattended(reason)
+        detachReloads(reason)
+      }
     },
   }
 }

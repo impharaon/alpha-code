@@ -1148,7 +1148,7 @@ describe("#1314 批准面板的风险标签", () => {
     },
   ] as const
 
-  test.each(cases)("$name:标题行里标题之后恰有一个「$text」标签,没有说明句", async ({ level, text, req }) => {
+  test.each(cases)("$name:标题行里标题之后恰有一个风险标签,没有说明句", async ({ level, text, req }) => {
     mount(async (command) => receipt(command, req), "prj_alpha", req)
     await flush()
 

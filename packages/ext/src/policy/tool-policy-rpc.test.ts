@@ -1,3 +1,4 @@
+import { createUnattendedState } from "./unattended"
 // #1662 L4 — lane seams I5: the tool policy API over the OpenCode 2 plugin RPC, called through the engine's RPC
 // registry (`Rpc.Service.call`, what `POST /api/rpc/:rpcID/:method` runs after its activation wait;
 // packages/server/src/handlers/rpc.ts maps a returned error to HTTP 400 `RpcError { type }`).
@@ -31,7 +32,7 @@ const setup = Effect.gen(function* () {
       )
     }),
     promisePlugin("codepuppy-ext", async (ctx: any) => {
-      const policy = await registerPolicy(ctx)
+      const policy = await registerPolicy(ctx, createUnattendedState())
       await policy.seal()
     }),
   ])

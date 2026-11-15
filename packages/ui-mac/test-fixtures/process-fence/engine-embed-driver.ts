@@ -16,6 +16,7 @@ import { buildEngineServerOptions } from "../../src/main/engine-server-options"
 import { engineAuthorization, withEngineAuthorization } from "../../src/main/engine-authorization"
 import { publishInProcessEngine } from "../../src/main/in-process-engine"
 import { publishTestBootstrap } from "../../test-component/codepuppy-bootstrap-fixture"
+import { engineProjectTrust } from "../../src/main/engine-project-trust"
 
 const env = process.env
 const userData = env.CP1321_USER_DATA!
@@ -47,7 +48,7 @@ const engine = await startEngine(
     filewatcher: false,
     platform: process.platform,
   }),
-  { onDispatch: (dispatch) => void (mode === "in-process" && publishInProcessEngine(withEngineAuthorization(dispatch, password))) },
+  { onDispatch: (dispatch) => void (mode === "in-process" && publishInProcessEngine(withEngineAuthorization(dispatch, password))), projectTrust: engineProjectTrust },
 )
 if (mode === "tcp")
   publishInProcessEngine(async (request) => {

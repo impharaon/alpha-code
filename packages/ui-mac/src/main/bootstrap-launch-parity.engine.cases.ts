@@ -16,6 +16,7 @@
 //   ⑤ 两个桩收到的凭据头(平台模型请求经 ext 的请求钩子现读凭据文件;云 MCP 经 core 的治理凭据读取)。
 //
 // 本文件由同名 `.test.ts` 宿主起独立 `bun test` 子进程跑。HOME / XDG 全在临时沙箱里,绝不碰 owner 的数据目录。
+import { engineProjectTrust } from "./engine-project-trust"
 import { afterAll, beforeAll, describe, expect, mock, test } from "bun:test"
 import { createHash } from "node:crypto"
 import { EventEmitter } from "node:events"
@@ -230,6 +231,7 @@ async function observe(inputs: ReturnType<typeof sidecarStep>, fence: unknown) {
   let fetch: ((request: Request) => Promise<Response>) | undefined
   const engine = await startEngine({ ...options, config: { ...options.config, content: JSON.stringify(runnable) } }, {
     onDispatch: (dispatch) => (fetch = withEngineAuthorization(dispatch, "cp-parity")),
+    projectTrust: engineProjectTrust,
   })
   engines.push(engine)
   const send = async (method: string, route: string, body?: unknown) => {

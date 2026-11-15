@@ -22,6 +22,7 @@ import { assertEngineSandboxed, engineSandbox, engineSlot } from "../../test-com
 import { buildEngineServerOptions } from "./engine-server-options"
 import { withEngineAuthorization } from "./engine-authorization"
 import type { EngineFetch } from "./in-process-engine"
+import { engineProjectTrust } from "./engine-project-trust"
 
 const sandbox = engineSandbox()
 const PASSWORD = "cp-parity-memory"
@@ -83,7 +84,7 @@ async function engineWith(name: string, instructions: string[]) {
       filewatcher: true,
       platform: process.platform,
     }),
-    { onDispatch: (dispatch) => (fetch = withEngineAuthorization(dispatch, PASSWORD)) },
+    { onDispatch: (dispatch) => (fetch = withEngineAuthorization(dispatch, PASSWORD)), projectTrust: engineProjectTrust },
   )
   engines.push(engine)
   const send = (method: string, route: string, body?: unknown) =>

@@ -14,7 +14,7 @@
 //   3. 已配 KEY 的 BYOK provider → 其引擎注册的第一个模型(「上次使用」排序由第 1 级承担,MVP 不重复)。
 //   4. 全无 → none:composer 保持引导占位,picker 内登录/配 KEY 双出口,发送前 preflight 拦截。
 
-import type { ModelRef } from "@opencode-ai/sdk/v2/client"
+import type { ModelRef } from "../../engine-adapter/contract/v1"
 import type { ByokProvider } from "../../shared/codepuppy-model-types"
 import { byokModelMeta, isByokEngineId } from "../../shared/codepuppy-model-types"
 

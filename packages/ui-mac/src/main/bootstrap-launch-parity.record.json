@@ -76,16 +76,6 @@
           "action": "provider.use",
           "resource": "codepuppy-internal-catalog-ready",
           "effect": "allow"
-        },
-        {
-          "action": "plugin.use",
-          "resource": "*",
-          "effect": "deny"
-        },
-        {
-          "action": "plugin.use",
-          "resource": "<root>/parity-ext",
-          "effect": "allow"
         }
       ],
       "agents": {
@@ -585,16 +575,6 @@
         {
           "action": "provider.use",
           "resource": "codepuppy-internal-catalog-ready",
-          "effect": "allow"
-        },
-        {
-          "action": "plugin.use",
-          "resource": "*",
-          "effect": "deny"
-        },
-        {
-          "action": "plugin.use",
-          "resource": "<root>/parity-ext",
           "effect": "allow"
         }
       ]

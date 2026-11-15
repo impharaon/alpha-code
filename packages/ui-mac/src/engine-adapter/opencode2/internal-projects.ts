@@ -5,7 +5,7 @@
 //     (renderer/sidebar/project-display.ts),全新数据因此一个项目都没有。
 // 项目清单(GET /project)与事件流(project.updated)都经这里;按路径认,不按文件夹名猜。
 import type { OpenCodeClient } from "@opencode/client/promise"
-import type { EngineInternalDirectories } from "../preload/types"
+import type { EngineInternalDirectories } from "../../preload/types"
 
 export const NO_INTERNAL_DIRECTORIES: EngineInternalDirectories = { scratch: [], defaultWorkspace: [] }
 

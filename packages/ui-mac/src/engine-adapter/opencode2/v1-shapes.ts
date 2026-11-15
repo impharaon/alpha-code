@@ -1,7 +1,9 @@
-// `#1668`:2.x 结果 → 冻结界面要的 v1 形状。冻结 app 已有归一函数的形状(会话、消息、agent、权限、
-// provider/model、项目)复用 frozen-shapes.ts;这里只放冻结 app 里没有的那部分,以及适配器自己必须
-// 决定的两件事:part 的有序 id、暂存附件(I11)的往返。
+// `#1668`:2.x 结果 → 冻结界面要的 v1 形状。`#1697`(I-04,设计 §4.3、R6):代际转换由翻译器自有、入参按 2.x 类型写 ——
+// 消息投影在 messages.ts,agent、审批请求、provider 在这里;会话信息经约定的 toContractSession(规则 3);冻结 app 对 v1 形状
+// 做的现用界面归一(provider 的 v1 分支、normalizeProjectInfo)唯一权威留在冻结 app,这里不重做(规则 4)。
+// 另外是适配器自己必须决定的两件事:part 的有序 id、暂存附件(I11)的往返。
 import type {
+  AgentInfo,
   CommandInfo,
   FileSystemEntry,
   FormInfo,
@@ -9,6 +11,7 @@ import type {
   McpServer,
   ModelDefaultOutput,
   ModelListOutput,
+  PermissionRequest as EnginePermissionRequest,
   ProviderListOutput,
   SessionInboxInfo,
   SessionMessageAssistant,
@@ -17,27 +20,28 @@ import type {
 } from "@opencode/client/promise"
 import type {
   AssistantMessage,
+  Agent,
   Command,
   FileNode,
   Message,
   Part,
   Path,
+  PermissionRequest,
   Project,
+  Provider,
   ProviderListResponse,
   QuestionRequest,
-} from "@opencode-ai/sdk/v2/client"
+} from "../contract/v1"
 import { isNetFailureLayer, parseFailureCode } from "@opencode/schema/codepuppy-net-failure"
-import { STAGED_ATTACHMENT_PART_NAME, stagedAttachmentPart } from "../../../ext/src/staged-attachment-part"
-import { ATTACHMENT_METADATA_KEY, type StagedAttachmentMeta } from "../shared/attachment-path"
-import { TITLE_VARIANT_ALIAS } from "../shared/codepuppy-model-types"
-import { normalizePermissionRequest, normalizeProviderList, normalizeSessionMessages } from "./frozen-shapes"
-
-type FrozenSource = Parameters<typeof normalizeSessionMessages>[1]
+import { STAGED_ATTACHMENT_PART_NAME, stagedAttachmentPart } from "../../../../ext/src/staged-attachment-part"
+import { ATTACHMENT_METADATA_KEY, type StagedAttachmentMeta } from "../../shared/attachment-path"
+import { TITLE_VARIANT_ALIAS } from "../../shared/codepuppy-model-types"
+import { projectSessionMessages } from "./messages"
 
 // ── part 的有序 id ──────────────────────────────────────────────────────────────────────────────
 // 冻结 app 的 v1 store 按 part.id 排序(event-reducer 的 Binary.search、server-session 加载时 sort),时间线按
 // 这个顺序渲染。0.1.26 的 v1 引擎发的是按创建先后递增的 id,于是「思考 → 正文 → 工具」照内容顺序出现。
-// 冻结 app 的投影给 2.x 内容起的是语义 id(`<msg>:text:0`、`<msg>:reasoning:0`、工具 id 本身),按字典序排会
+// 消息投影(messages.ts)给 2.x 内容起的是语义 id(`<msg>:text:0`、`<msg>:reasoning:0`、工具 id 本身),按字典序排会
 // 把 `call_…` 工具排到正文前面、把多段正文挤在一起。所以适配器统一换成「消息 id + 四位序号」:助手消息的
 // 序号 = 2.x `content` 数组下标(空正文被投影丢掉也不错位,流式阶段与快照阶段同一个号),其余消息按投影顺序。
 export const partID = (messageID: string, index: number) => `${messageID}:${String(index).padStart(4, "0")}`
@@ -45,8 +49,8 @@ export const partID = (messageID: string, index: number) => `${messageID}:${Stri
 /** v1 消息 id → 投影出它的那条 2.x 消息:shell 消息投影成用户 + 助手两条,助手那条是 `<id>:assistant`(冻结 normalizeSessionMessages)。 */
 export const baseID = (id: string) => id.replace(/:assistant$/, "")
 
-/** 助手消息 content 下标 ⇄ 冻结投影的语义 id(text/reasoning 按各自序号,工具按工具 id)。 */
-export function contentKeys(content: ReadonlyArray<{ type: string; id?: string }>) {
+/** 助手消息 content 下标 ⇄ 消息投影的语义 id(text/reasoning 按各自序号,工具按工具 id)。 */
+export function contentKeys(content: SessionMessageAssistant["content"]) {
   const counters = { text: 0, reasoning: 0 }
   return content.map((item) => {
     if (item.type === "text") return `text:${counters.text++}`
@@ -163,18 +167,17 @@ export const CONTINUE_METADATA_KEY = "codepuppyContinue"
 export type V1MessageWithParts = { info: Message; parts: Part[] }
 
 /**
- * 2.x 的消息列表(时间升序)→ v1 `{info, parts}`。投影本身是冻结 app 的 normalizeSessionMessages;这里只把
- * part id 换成有序 id,把 I11 的暂存附件文件合成回 v1 的 synthetic part,并把回合失败交成 0.1.26 回合错误卡读的形状
- * (withFailedTurns、v1TurnError,`#1669`)。
+ * 2.x 的消息列表(时间升序)→ v1 `{info, parts}`。投影本身是 messages.ts 的 projectSessionMessages;这里把
+ * part id 换成有序 id,还原 I11 暂存附件,并把失败回合交成回合错误卡读的形状(withFailedTurns、v1TurnError,`#1669`)。
  */
 export function toV1Messages(sessionID: string, source: readonly SessionMessageInfo[]): V1MessageWithParts[] {
   const turns = withFailedTurns(source)
-  const normalized = normalizeSessionMessages(sessionID, turns as unknown as FrozenSource)
+  const normalized = projectSessionMessages(sessionID, turns)
   const assistantKeys = new Map<string, string[]>()
   const errors = new Map<string, SessionStructuredError>()
   const continued = new Set<string>()
   for (const message of turns) {
-    if (message.type === "assistant") assistantKeys.set(message.id, contentKeys(message.content as never))
+    if (message.type === "assistant") assistantKeys.set(message.id, contentKeys(message.content))
     if (message.type === "assistant" && message.error) errors.set(message.id, message.error)
     if (message.type === "user" && message.metadata?.[CONTINUE_METADATA_KEY] === true) continued.add(message.id)
   }
@@ -362,18 +365,97 @@ export function toV1Project(project: { id: string; canonical: string; vcs?: stri
   return { ...rest, worktree: canonical, vcs: project.vcs === "git" ? "git" : undefined } as Project
 }
 
-/** 冻结 app 的归一结果是 store 形状(`all` 为 Map);v1 HTTP 响应要数组。 */
+/**
+ * 2.x providers + models + default → v1 `ProviderListResponse`(数组形式)。只做代际转换(设计 §4.3 规则 4):全部模型连同
+ * `status` 都留着,deprecated 由冻结 app 的 v1 分支(`normalizeProviderList`,bootstrap.ts 唯一的现用消费方)丢掉 —— 那段是
+ * 现用界面归一的唯一权威,这里不重做。每个 provider 的 `default` 与冻结三参分支的选法相同:引擎的默认模型属于它就取它,
+ * 否则取它第一个非 deprecated 的模型。模型字段的映射照冻结三参分支(codepuppy-app/src/context/global-sync/utils.ts)。
+ */
 export function toV1ProviderList(
   providers: ProviderListOutput["data"],
   models: ModelListOutput["data"],
   defaultModel: ModelDefaultOutput["data"] | undefined,
 ): ProviderListResponse {
-  const normalized = normalizeProviderList(providers as never, withoutTitleAliases(models) as never, defaultModel as never)
+  const listed = withoutTitleAliases(models)
+  const all = new Map<string, Provider>()
+  for (const provider of providers)
+    all.set(provider.id, { id: provider.id, name: provider.name, source: "custom", env: [], options: provider.settings ?? {}, models: {} })
+  for (const model of listed) {
+    const provider = all.get(model.providerID)
+    if (!provider) continue
+    const cost = model.cost.find((item) => item.tier === undefined) ?? model.cost[0]
+    provider.models[model.id] = {
+      id: model.id,
+      providerID: model.providerID,
+      api: { id: model.modelID, url: "", npm: model.package ?? provider.id },
+      name: model.name,
+      family: model.family,
+      capabilities: {
+        temperature: false,
+        reasoning: false,
+        attachment: model.capabilities.input.some((item) => item !== "text"),
+        toolcall: model.capabilities.tools,
+        input: {
+          text: model.capabilities.input.includes("text"),
+          audio: model.capabilities.input.includes("audio"),
+          image: model.capabilities.input.includes("image"),
+          video: model.capabilities.input.includes("video"),
+          pdf: model.capabilities.input.includes("pdf"),
+        },
+        output: {
+          text: model.capabilities.output.includes("text"),
+          audio: model.capabilities.output.includes("audio"),
+          image: model.capabilities.output.includes("image"),
+          video: model.capabilities.output.includes("video"),
+          pdf: model.capabilities.output.includes("pdf"),
+        },
+        interleaved: false,
+      },
+      cost: {
+        input: cost?.input ?? 0,
+        output: cost?.output ?? 0,
+        cache: { read: cost?.cache.read ?? 0, write: cost?.cache.write ?? 0 },
+      },
+      limit: model.limit,
+      status: model.status,
+      options: model.settings ?? {},
+      headers: model.headers ?? {},
+      release_date: new Date(model.time.released).toISOString().slice(0, 10),
+      variants: Object.fromEntries(model.variants.map((variant) => [variant.id, variant.settings ?? {}])),
+    }
+  }
   return {
-    all: [...normalized.all.values()],
-    default: normalized.default,
-    connected: normalized.connected,
-  } as ProviderListResponse
+    all: [...all.values()],
+    default: Object.fromEntries(
+      providers.flatMap((provider) => {
+        const model =
+          defaultModel?.providerID === provider.id
+            ? defaultModel
+            : listed.find((item) => item.providerID === provider.id && item.status !== "deprecated")
+        return model ? [[provider.id, model.id]] : []
+      }),
+    ),
+    connected: providers.map((provider) => provider.id),
+  }
+}
+
+/** 2.x agent → v1 Agent(映射照冻结 app 的 normalizeAgentList 2.x 分支,codepuppy-app/src/context/global-sync/utils.ts)。 */
+export function toV1Agents(agents: readonly AgentInfo[]): Agent[] {
+  return agents.map((agent) => ({
+    name: agent.id,
+    description: agent.description,
+    mode: agent.mode,
+    hidden: agent.hidden,
+    temperature: typeof agent.request.settings.temperature === "number" ? agent.request.settings.temperature : undefined,
+    topP: typeof agent.request.settings.topP === "number" ? agent.request.settings.topP : undefined,
+    color: agent.color,
+    permission: agent.permissions.map((rule) => ({ permission: rule.action, pattern: rule.resource, action: rule.effect })),
+    model: agent.model && { providerID: agent.model.providerID, modelID: agent.model.id },
+    variant: agent.model?.variant,
+    prompt: agent.system,
+    options: agent.request.settings,
+    steps: agent.steps,
+  }))
 }
 
 /**
@@ -513,19 +595,28 @@ export function todosOf(part: Part) {
 }
 
 /**
- * I7a:2.x 审批请求 → v1。冻结 app 的 normalizePermissionRequest 按 1.17.13 的形状读工具来源(`source.callID`);
- * 2.x 的来源是 `{ type: "tool", messageID, id }`(真引擎采样 fixtures/permission-asked.json,seams I7a)。这里只补这一处
- * 漂移,其余字段(action → permission、resources → patterns、save → always、metadata 原样)仍由冻结函数映射。
- * `#1669` R17:能力轴(没有 `metadata.policy`)的委派动作名也漂了 —— 2.x 的 subagent 工具问 `subagent`(core
- * tool/plugin/subagent.ts),0.1.26 问 `task`;审批卡按 `task` 画委派卡(「派出子任务 / 交给助手 <名字> / 子任务里不再逐项询问」,
- * PermissionDialog.tsx),这里换回 v1 的名字。身份轴请求的 action 是 canonical(seams I7a 冻结),不动。
+ * I7a:2.x 审批请求 → v1(UC-10)。action → permission、resources → patterns、save → always(缺省 [])、metadata 原样
+ * (缺省 {});工具来源 `{ type: "tool", messageID, id }` → `tool: { messageID, callID }`。
+ * 能力轴(没有 metadata.policy)的 subagent → task(`#1669` R17)、shell → bash(`#1697` 放回单元 2),
+ * 审批卡据此画委派卡与命令卡;身份轴的 canonical 原样。
  */
-export function toV1PermissionRequest(
-  request: { action?: unknown; metadata?: { policy?: unknown }; source?: { type: string; messageID?: string; id?: string } } & Record<string, unknown>,
-) {
-  const source = request.source?.type === "tool" ? { ...request.source, callID: request.source.id } : request.source
-  const delegation = request.action === "subagent" && request.metadata?.policy === undefined
-  return normalizePermissionRequest({ ...request, ...(delegation ? { action: "task" } : {}), source } as never)
+export function toV1PermissionRequest(request: EnginePermissionRequest): PermissionRequest {
+  return {
+    id: request.id,
+    sessionID: request.sessionID,
+    permission:
+      request.metadata?.policy !== undefined
+        ? request.action
+        : request.action === "subagent"
+          ? "task"
+          : request.action === "shell"
+            ? "bash"
+            : request.action,
+    patterns: request.resources,
+    always: request.save ?? [],
+    metadata: request.metadata ?? {},
+    tool: request.source?.type === "tool" ? { messageID: request.source.messageID, callID: request.source.id } : undefined,
+  }
 }
 
 /**

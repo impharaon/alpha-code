@@ -15,6 +15,7 @@ import { buildEngineServerOptions } from "./engine-server-options"
 import { withEngineAuthorization } from "./engine-authorization"
 import { engineDataDirectory, legacyCredentialImportRefusal, LEGACY_CREDENTIAL_FILE, LEGACY_CREDENTIAL_IMPORT_MIGRATION } from "./engine-legacy-credentials"
 import type { EngineFetch } from "./in-process-engine"
+import { engineProjectTrust } from "./engine-project-trust"
 
 const sandbox = engineSandbox()
 const appEvents = new EventEmitter()
@@ -68,7 +69,7 @@ async function startOn(slot: ReturnType<typeof engineSlot>) {
       filewatcher: false,
       platform: process.platform,
     }),
-    { onDispatch: (dispatch) => (fetch = withEngineAuthorization(dispatch, "cp-l5-legacy")) },
+    { onDispatch: (dispatch) => (fetch = withEngineAuthorization(dispatch, "cp-l5-legacy")), projectTrust: engineProjectTrust },
   )
   const credentials = async () => {
     const response = await fetch!(new Request("http://codepuppy-sidecar.invalid/api/credential", { headers: { "x-opencode-directory": encodeURIComponent(slot.projectDirectory) } }))

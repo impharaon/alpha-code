@@ -1,4 +1,6 @@
 ---
+id: RUNBOOK-upstream-update
+summary: 上游更新前后按登记册与升级判据保留 Code Puppy 权威,含项目配置闸门的逐文件复核清单
 title: Upstream update — keep Code Puppy authority
 kind: runbook
 status: active
@@ -69,7 +71,17 @@ review_after: 2027-11-09
 
    上游新界面不直接进;新工具未登记就让它对用户可用,按 ADR-041 是未知身份。
 
-5. **握不住就停。** 任何一项在新上游上握不住(钩子没了、接口不给、只能改上游文件而阶梯又上不去),立即停下,把这一项交 owner:
+5. **界面数据约定在新样本上重新核一遍。** 界面只认 Code Puppy 自己的数据约定(`packages/ui-mac/src/engine-adapter/contract/`),
+   引擎每进一次,翻译器(`engine-adapter/opencode2/`)都要在新引擎上重新证明:
+   - 重跑采样器 `~/.bun-versions/1.4.4/bin/bun packages/ui-mac/test-fixtures/engine-adapter-sampler/sample.ts`(约 30 秒,用法见同目录
+     README.md;引擎包有未提交改动时它拒绝运行),把重采的夹具与上游改动放进同一个 PR —— `fixture-identity.test.ts` 在引擎源码身份
+     对不上时逐个点名过时的夹具;
+   - 在新样本上跑 `cd packages/ui-mac && bun test src/engine-adapter/contract-cases.test.ts src/engine-adapter/passthrough-reads.test.ts
+     src/engine-adapter/projection-parity.test.ts src/engine-adapter/routes-coverage.test.ts src/engine-adapter/boundary.test.ts`,
+     全绿才算这一项握住(c:每条翻译路由与每种事件的用例;d:直通的状态码与消费字段)。红了先分清是引擎改了形状(改翻译器)
+     还是界面多了调用(改约定目录,用户可见的部分交 owner,ADR-048)。
+
+6. **握不住就停。** 任何一项在新上游上握不住(钩子没了、接口不给、只能改上游文件而阶梯又上不去),立即停下,把这一项交 owner:
    哪项权威、为什么握不住、可选做法与用户看到的差别。不先合、不写「后续再补」、不在登记册里自己标退役。
 
 ## 后:合并前必须成立
@@ -102,3 +114,17 @@ review_after: 2027-11-09
   结果是用户界面换成上游新界面。正确做法:钉版与补丁保持当前正式版,只改让界面连上新引擎的数据与连接层。
 - **「能退回 L0 的退回」。** 方案里「先判能不能退回 L0」本意是换更轻的接法,被读成可以把权威交回上游默认,接管清单里的条目随之删除。
   正确做法:退回 L0 之后,这项决定仍由 Code Puppy 做,登记册条目保留,握法改写为 L0 机制,测试带反向臂。
+
+## 项目配置闸门升级复核(ADR-049)
+
+以下清单来自已冻结实施计划 §5.1;接管范围和边界见 [ADR-049](../../.claude/rules/adrs/ADR-049-project-opencode-config-behind-trust.md)。上游改到这些文件时逐项核对,运行核心升级判据和登记册里的相关证明,不得把字段或读取点交回默认放行。
+
+| 文件 | 复核什么 |
+| --- | --- |
+| `config.ts` | `load()` 返回的分类与顺序(托管策略最先;闸门文档插在其后);`loadFile` 的流程(读 → 替换 → `parseInfo` → `Document`);`reload()` 的发布条件(深度相等就丢弃,`:409`);`Options.project` 的语义;条目种类有没有新增 |
+| `config/discovery.ts`(未接管,依赖它) | 向上遍历与全局根排除(`:78-81`、`:121-126`);`direct` / `project` 两组的构成 |
+| `config/normalize.ts`(未接管) | v1 写法的读取点;隐含生成的字段(`:137-154`) |
+| `skill.ts` | `sources()` 的解析规则与签名;读取点是不是仍然只有 `SkillFile.parse` |
+| `agent.ts` | `legacySources` 的目录与 `primary`;`agentKeys` / `nativeKeys` 与 v1 / v2 的判定;解码输出的形状 |
+| `command.ts` | md 解码;`evaluateTemplate` 的插值正则与流程;命令有没有新的控制字段 |
+| `config/markdown.ts`、`plugin/module.ts`、`config/plugin/source.ts`、`plugin/internal.ts`(未接管) | gray-matter 的版本与引擎表;`sanitize` 仍然导出;`plugin.use` 判定点与它比较的目标串;目录插件的目标保留发现时的路径;受保护的内置插件集合 |

@@ -10,6 +10,7 @@ import { assertEngineSandboxed, engineSandbox, engineSlot } from "../../test-com
 import { buildEngineServerOptions } from "./engine-server-options"
 import { engineClient } from "./engine-client"
 import { promptAndWait } from "./engine-session-turn"
+import { engineProjectTrust } from "./engine-project-trust"
 
 const sandbox = engineSandbox()
 const PASSWORD = "cp-l5-turn"
@@ -60,6 +61,7 @@ beforeAll(async () => {
       filewatcher: false,
       platform: process.platform,
     }),
+    { projectTrust: engineProjectTrust },
   )
   engines.push(engine)
   client = engineClient({ url: engine.url, username: "opencode", password: PASSWORD })

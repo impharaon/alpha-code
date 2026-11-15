@@ -41,6 +41,8 @@ import { CODEPUPPY_INIT_TEMPLATE, CODEPUPPY_REVIEW_TEMPLATE } from "../../../ext
 import { publishMainBootstrap, unpublishTestBootstrap } from "../../test-component/codepuppy-bootstrap-fixture"
 import { engineGlobalConfigDirectory } from "./engine-paths"
 import { homedir } from "node:os"
+import { engineProjectTrust } from "./engine-project-trust"
+import { allowProject } from "../../test-component/codepuppy-engine"
 
 const sandbox = engineSandbox()
 const PASSWORD = "cp-l5-injection-engine"
@@ -113,12 +115,14 @@ async function engineWith(
   name: string,
   config: { content: string; file?: string },
   modelsFile?: string,
-  opts: { filewatcher?: boolean; globalConfig?: Record<string, unknown>; projectConfig?: Record<string, unknown> } = {},
+  opts: { filewatcher?: boolean; globalConfig?: Record<string, unknown>; projectConfig?: Record<string, unknown>; allowProject?: boolean } = {},
 ) {
   const { startEngine } = await import("../../engine/engine-embed")
   const slot = engineSlot(sandbox, name)
   if (opts.globalConfig) fs.writeFileSync(path.join(slot.configDirectory, "opencode.json"), JSON.stringify(opts.globalConfig))
   if (opts.projectConfig) fs.writeFileSync(path.join(slot.projectDirectory, "opencode.json"), JSON.stringify(opts.projectConfig))
+  // `#1713`:C7 判的是「已允许项目里写的 allow 也盖不过显式文件」,项目先经生产写端记一条允许
+  if (opts.allowProject) allowProject(slot.projectDirectory)
   let fetch: EngineFetch | undefined
   const engine = await startEngine(
     buildEngineServerOptions({
@@ -133,7 +137,7 @@ async function engineWith(
       filewatcher: opts.filewatcher ?? false,
       platform: process.platform,
     }),
-    { onDispatch: (dispatch) => (fetch = withEngineAuthorization(dispatch, PASSWORD)) },
+    { onDispatch: (dispatch) => (fetch = withEngineAuthorization(dispatch, PASSWORD)), projectTrust: engineProjectTrust },
   )
   engines.push(engine)
   const getAt = async (directory: string, route: string) => {
@@ -578,7 +582,7 @@ describe("C7(重裁):provider 白名单的第一层在显式文件里,项目里�
   test("项目 opencode.json 声明一个白名单外的 provider 并在 policies 里 allow 它 ⇒ 仍不可用", async () => {
     givenLoggedIn()
     const injection = injectCodePuppyConfig(userData, undefined, "stable", codepuppyBootstrap().paths.userConfig ?? null)
-    const engine = await engineWith("c7-project-allow", injection.config, injection.models.file, { projectConfig: rogue })
+    const engine = await engineWith("c7-project-allow", injection.config, injection.models.file, { projectConfig: rogue, allowProject: true })
     const ids = await settledIds(engine.get, "/api/provider")
     expect(ids).toContain("codepuppy")
     expect(ids).not.toContain("cp-l5-rogue")
@@ -590,7 +594,7 @@ describe("C7(重裁):provider 白名单的第一层在显式文件里,项目里�
     const { policies: _policies, ...explicit } = JSON.parse(fs.readFileSync(injection.config.file!, "utf8")) as Record<string, unknown>
     const file = path.join(sandbox.root, "explicit-without-policies.json")
     fs.writeFileSync(file, JSON.stringify(explicit))
-    const engine = await engineWith("c7-project-allow-bare", { content: injection.config.content, file }, injection.models.file, { projectConfig: rogue })
+    const engine = await engineWith("c7-project-allow-bare", { content: injection.config.content, file }, injection.models.file, { projectConfig: rogue, allowProject: true })
     const ids = await settledIds(engine.get, "/api/provider")
     expect(ids).toContain("cp-l5-rogue")
   }, 60_000)

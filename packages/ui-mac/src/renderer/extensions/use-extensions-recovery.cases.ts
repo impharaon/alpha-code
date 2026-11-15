@@ -2,6 +2,7 @@ import { GlobalRegistrator } from "@happy-dom/global-registrator"
 import { createOpencodeClient } from "@opencode-ai/sdk/v2/client"
 import { afterAll, afterEach, beforeAll, expect, test } from "bun:test"
 import { mkdtemp, mkdir, rm } from "node:fs/promises"
+import { realpathSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join, resolve } from "node:path"
 import { pathToFileURL } from "node:url"
@@ -117,7 +118,10 @@ beforeAll(async () => {
     hostname: "127.0.0.1", port: 0, password: PASSWORD, engineVersion: "test",
     databasePath: slot.databasePath, configDirectory: slot.configDirectory, config: { content: "{}" },
     models: { fetch: false }, filewatcher: false, platform: process.platform,
-  }))
+  }), {
+    // `#1713` 契约 C:这套用例读的是一个已允许项目的 MCP 状态形状,信任本身由 project-config-commands.engine.cases.ts 判。
+    projectTrust: (directory) => directory === realpathSync(projectDirectory),
+  })
   engineUrl = engine.url
   // The 2.x engine boots a Location (and loads its MCP configuration) on the first request for that directory: wait for
   // the project's server to be listed before capturing the shape the hook will be compared against.

@@ -47,6 +47,10 @@ class RecordingChild extends EventEmitter {
     const type = (message as { type?: unknown }).type
     if (type === "start") queueMicrotask(() => this.emit("message", { type: "ready" }))
     if (type === "stop") queueMicrotask(() => this.emit("exit", 0))
+    if (type === "project-config-view") {
+      const command = message as { id: string; directory: string }
+      queueMicrotask(() => this.emit("message", { type: "project-config-view-reply", id: command.id, ok: true, view: { directory: command.directory, trusted: false, complete: true, points: { config: "done" }, withheld: [] } }))
+    }
     if (type === "write-probe") {
       const { id } = message as { id: number }
       queueMicrotask(() => this.emit("message", { type: "write-probe-result", id, outcome: "writable" }))
@@ -109,6 +113,7 @@ test("alpha.* 进 codepuppySidecar、应答回同一子进程;ready 之后才 at
   expect(child.wire.at(-1)).toEqual({ type: "codepuppy.hub.request.reply", id: 9, record: null })
 
   expect((await result.listener.probeWrite("/ws")).outcome).toBe("writable")
+  expect(await result.listener.projectConfigView("/ws")).toMatchObject({ directory: "/ws", complete: true })
   expect(received).toHaveLength(1)
 
   await result.listener.stop()
@@ -290,6 +295,19 @@ test("ANCHOR (not a gate): sidecar.ts 在 start() 之前预载 ext 的目录入�
   expect(handoff).toBeGreaterThan(started)
   expect(joined).toBeGreaterThan(handoff)
   expect(ready).toBeGreaterThan(joined)
+  // 审查 6:原文件顶层不能 import;执行锚定的真实监听 / 解析片段,不复制分支。
+  const { answerProjectConfigView } = await import("./sidecar-project-config-view")
+  const { buildProjectConfigViewRequest, parseProjectConfigViewRequest } = await import("./project-config-view-message")
+  const listener = source.slice(source.indexOf('parentPort.on("message"'), source.indexOf("\nasync function start("))
+  const parser = source.slice(source.indexOf("function parseCommand("), source.indexOf("\n/** 形状不对"))
+  const replies: unknown[] = []
+  let receive: (event: { data: unknown }) => void = () => { throw new Error("listener not registered") }
+  const view = { directory: "/ws", trusted: false, complete: true, points: { config: "done" as const }, withheld: [] }
+  const run = new Function("parentPort", "engine", "inProcessEngine", "readProjectConfigView", "answerProjectConfigView", "parseProjectConfigViewRequest", new Bun.Transpiler({ loader: "ts" }).transformSync(listener + "\n" + parser))
+  run({ on: (_: string, handler: typeof receive) => { receive = handler }, postMessage: (reply: unknown) => replies.push(reply) }, {}, () => async () => Response.json({ data: [] }), () => view, answerProjectConfigView, parseProjectConfigViewRequest)
+  receive({ data: buildProjectConfigViewRequest("review-6", "/ws") })
+  for (let i = 0; i < 10 && replies.length === 0; i++) await Bun.sleep(1)
+  expect(replies).toEqual([{ type: "project-config-view-reply", id: "review-6", ok: true, view }])
 })
 
 // `#1698`(DESIGN-upgrade-bootstrap-config §4.2):sidecar.ts 的启动关口顺序 —— 装围栏 → 解析并发布启动文档 → 注入(读文档)→ import 引擎 →

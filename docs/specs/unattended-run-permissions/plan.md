@@ -244,3 +244,55 @@ R4 修正回执:
 - 三处装配修正:① `ext-project-adopt.test.ts` 的 #356 顺序锚同步 #1713 现有 rows 早退,不改顺序断言;② `permission-mount-ratchet.test.ts` 的生产扫描排除真实引擎宿主命名 `*.cases.*`,新增用真实 #1699 宿主源码生成的生产文件对照,证明生产同内容仍受扫描,先红提交 `ff5b92a2f4` 为 6 pass / 2 fail,修后 8 pass / 0 fail;③ ext `cloud-websearch-kill.test.ts` 的跨 Location 宿主补齐 #1699 所读 `agent.get` 的真实空权限返回形状,原断言不改,30 pass / 0 fail。前者单文件 9 pass / 0 fail。三处均为派发允许的组合破坏接缝,无生产行为或冻结合同变化。
 - 登记验证:94 个变更文件对应行逐条使用仓库 `bun-test-floor.sh` 的 CODEPUPPY_TEST_COUNT_FILE 测量路径,92 行通过;两行属已放行网络失败(net-failure-real-stack / schema codepuppy-net-failure),保留原期望值。唯一计数变化由计数器实测为审批扫描 7→8,按测量结果机械写回,没有手写计数或放宽地板。E 的 consumer contracts 行实测仍为 27。
 - 初次整包另外发现 core 15 条失败,逐文件在本树和只读基线 `alpha-code-probe-alpha-base` 单跑同红:tool-shell 56 pass / 11 skip / 3 fail、permission 114 pass / 8 fail、command-subagent 1 pass / 3 fail、compound-parity 576 pass / 1 fail。前 11 条要求 always 持久化,与已冻结会话内存授权相反;3 条要求子任务覆盖父模型,与 #1560 相反;最后 1 条为系统 /bin/bash 不支持样本语法。没有改未接管的上游测试或反改冻结生产语义,处置已向编排器提问,独立工作继续。
+
+### r4 全量失败归因(首轮 22 条,逐测试列示)
+
+本树的完整日志位于 `/tmp/batch-f-r4-*-wide.log`,单跑对照位于 `/tmp/batch-f-r4-alone-{1..5}-{here,base}.log`;本树源基点为 `7c8fcb5a3a`,基线只读 HEAD 为 `3a8e25d6b8`。网络失败只使用派发已有处置,未新增忽略清单。
+
+| 包 / 文件 | 首轮失败显示名 | 类别 | 原因、修复或单跑结果 |
+| --- | --- | --- | --- |
+| ui / `src/main/ext-project-adopt.test.ts` | #356 wiring:触发面在 trust-check 两个早退之前(源文本合同) > ANCHOR (not a gate): adoption 调用位置先于「无 executable 早退」与「已有决策早退」 | a | #1713 后旧字符串锚失效;9acc2ab81f 同步当前早退,单文件 9/0。 |
+| ui / `src/main/net-failure-real-stack.test.ts` | `#1572` AC4 真栈:Electron 内嵌 node + 真出网代理 + 真 webfetch ⇒ 持久化的工具记录带层 > 六个 webfetch 都经出网代理失败,并作为工具记录落库 | b | 派发已放行的网络/DNS 失败,不修改。 |
+| ui / `src/main/net-failure-real-stack.test.ts` | `#1572` AC4 真栈:Electron 内嵌 node + 真出网代理 + 真 webfetch ⇒ 持久化的工具记录带层 > 持久化记录的 metadata.codepuppyNetFailure:policy / dns / tcp / tcp / tls-silent | b | 派发已放行的网络/DNS 失败,不修改。 |
+| ui / `src/main/network-egress-proxy.test.ts` | 其它失败形态各自可辨,且都不转发 > 登记了但解析不了(.invalid)⇒ 503 dial-failed ENOTFOUND:DNS 在代理进程里发生,失败也在这里可读 | b | 派发已放行的网络/DNS 失败,不修改。 |
+| ui / `src/renderer/codepuppy-ui/permission-mount-ratchet.test.ts` | 审批决定提交入口:单一引用面白名单棘轮(#619 R3 Blocker-2) > permission 决定提交入口(reply/respond,含方括号等义形态)只出现在白名单接线点 | a | 真实引擎测试宿主误入生产扫描;ff5b92a2f4 先红,9acc2ab81f 修正扫描范围并保留生产对照,单文件 8/0。 |
+| ext / `src/cloud-websearch-kill.test.ts` | 跨 Location 隔离:治理归属按 setup 闭包,不串扰(#223 R7 Blocker) > B 记录一个 foreign `cloud_web` 后,A 的 cloud_web_search 仍按治理云工具判;反向同理 | c→a | 本树单跑 29/1、基线 30/0;测试宿主缺 agent.get 返回形状,9acc2ab81f 补齐,单文件 30/0。 |
+| schema / `test/codepuppy-net-failure.test.ts` | AC3 映射表:经出网代理 / 其它路径两列 > Proxy response (503) 与 ENOTFOUND / EAI_AGAIN / EAI_NONAME ⇒ dns(两列相同) | b | 派发已放行的网络/DNS 失败,不修改。 |
+| core / `test/tool-shell.test.ts` | ShellTool scanner permissions > declarations reuse approvals while substitutions retain reject/once/always behavior | c | 本树与基线单跑均 56 pass / 11 skip / 3 fail;未改冻结行为或未接管上游测试,待编排器处置。 |
+| core / `test/tool-shell.test.ts` | ShellTool conditional process substitution > conditional substitutions respect once | c | 本树与基线单跑均 56 pass / 11 skip / 3 fail;未改冻结行为或未接管上游测试,待编排器处置。 |
+| core / `test/tool-shell.test.ts` | ShellTool conditional process substitution > conditional substitutions respect always | c | 本树与基线单跑均 56 pass / 11 skip / 3 fail;未改冻结行为或未接管上游测试,待编排器处置。 |
+| core / `test/permission.test.ts` | Permission > stores and removes saved resources for a project | c | 本树与基线单跑均 114 pass / 8 fail;未改冻结行为或未接管上游测试,待编排器处置。 |
+| core / `test/permission.test.ts` | shell scanner permission impact > numeric npm script prefix: always allow covers repeat execution and narrows prefix scope | c | 本树与基线单跑均 114 pass / 8 fail;未改冻结行为或未接管上游测试,待编排器处置。 |
+| core / `test/permission.test.ts` | shell scanner permission impact > numeric AWS option prefix: always allow covers repeat execution and narrows prefix scope | c | 本树与基线单跑均 114 pass / 8 fail;未改冻结行为或未接管上游测试,待编排器处置。 |
+| core / `test/permission.test.ts` | shell scanner permission impact > substitution prefix: always allow covers repeat execution and narrows prefix scope | c | 本树与基线单跑均 114 pass / 8 fail;未改冻结行为或未接管上游测试,待编排器处置。 |
+| core / `test/permission.test.ts` | shell scanner permission impact > redirect prefix: always allow covers repeat execution and narrows prefix scope | c | 本树与基线单跑均 114 pass / 8 fail;未改冻结行为或未接管上游测试,待编排器处置。 |
+| core / `test/permission.test.ts` | shell scanner permission impact > assignment redirect prefix: always allow covers repeat execution and narrows prefix scope | c | 本树与基线单跑均 114 pass / 8 fail;未改冻结行为或未接管上游测试,待编排器处置。 |
+| core / `test/permission.test.ts` | shell scanner permission impact > PowerShell method prefix: always allow covers repeat execution and narrows prefix scope | c | 本树与基线单跑均 114 pass / 8 fail;未改冻结行为或未接管上游测试,待编排器处置。 |
+| core / `test/permission.test.ts` | shell scanner permission impact > PowerShell tab prefix: always allow covers repeat execution and narrows prefix scope | c | 本树与基线单跑均 114 pass / 8 fail;未改冻结行为或未接管上游测试,待编排器处置。 |
+| core / `test/config/command-subagent.test.ts` | command subagents > runs native JSON in the background without switching the parent | c | 本树与基线单跑均 1 pass / 3 fail;未改冻结行为或未接管上游测试,待编排器处置。 |
+| core / `test/config/command-subagent.test.ts` | command subagents > runs subagent mode by default in the background without switching the parent | c | 本树与基线单跑均 1 pass / 3 fail;未改冻结行为或未接管上游测试,待编排器处置。 |
+| core / `test/config/command-subagent.test.ts` | command subagents > subagent: false overrides subagent mode and the legacy alias | c | 本树与基线单跑均 1 pass / 3 fail;未改冻结行为或未接管上游测试,待编排器处置。 |
+| core / `test/shell-scan/compound-parity.test.ts` | real-shell compound syntax > bash: printf '%s' "$(probe() case value in value) scan_probe;; *) scan_other;; esac; probe)" | c | 本树与基线单跑均 576 pass / 1 fail;未改冻结行为或未接管上游测试,待编排器处置。 |
+
+### r4 整包最终结果与报告修复
+
+所有命令串行、Bun 1.4.4;整包输出保存在 `/tmp/batch-f-r4-<包>-wide.log`,ext 与 ui-mac 修复后输出另为 `*-final.log`。表中为末次完整包运行,没有用单文件通过冒充整包全绿。
+
+| 包 | gate 实际命令 / 对触及包使用的命令 | 最后整包 pass / skip / fail | 退出 / 处置 |
+| --- | --- | --- | --- |
+| codepuppy-contracts-consumer | `bun run --cwd packages/codepuppy-contracts-consumer check:vendor`;`bash scripts/bun-test-floor.sh 15 packages/codepuppy-contracts-consumer` | 65 / 0 / 0 | 均 exit 0;vendor 字节与 pin 一致,远端 provenance 未提供暂存源的既有提示不冒充已核。 |
+| ext | `bash scripts/bun-test-floor.sh 100 packages/ext` | 585 / 0 / 0 | 修复后 exit 0,地板通过;首轮 584/1。 |
+| ui-mac | gate 等价内层 `cd packages/ui-mac && bun test --timeout 120000 --reporter=junit --reporter-outfile=/tmp/batch-f-r4-ui-final.xml src` | 6653 / 1 / 3 | 修复锚与扫描后完整运行 1057.30s,exit 1,3 条均为 b;pass 高于地板 3000。首轮原 gate 包装命令为 6650/1/5。报告标题问题及后续单文件复核见下。 |
+| schema | `cd packages/schema && bun test --timeout 120000` | 119 / 0 / 1 | exit 1,唯一 DNS 用例为 b。 |
+| core | `cd packages/core && bun run test --timeout=120000` | 7339 / 37 / 15 | exit 1;全部 15 条在两树单跑同红,四文件结果见上表,处置待编排器。 |
+| plugin | `cd packages/plugin && bun test --timeout 120000` | 39 / 0 / 0 | exit 0。 |
+| util | `cd packages/util && bun test --timeout 120000 --preload ../../scripts/test-isolation/preload.ts` | 156 / 0 / 0 | exit 0。 |
+| codepuppy-sdk-v1 | `cd packages/codepuppy-sdk-v1 && bun test --timeout 120000 --preload ../../scripts/test-isolation/preload.ts` | 2 / 0 / 0 | exit 0。 |
+| app(gate 另行执行) | `bash scripts/bun-test-app.sh` | 725 / 0 / 0 | exit 0,地板 600;另行点名的 9 个补丁文件精确 72 条也全部通过。 |
+
+- 额外 a 类测量失败:首轮 gate 判官报 JUnit 非法 UTF-8,修复锚与扫描后的整包保留原报告,定位到 `PermissionDialog.test.ts:1151` 同一参数化标题的四个用例,原始 XML 第 8729–8732 行。`$name` 后含多字节中文的第二个 `$text` 插值让 Bun 1.4.4 输出坏字节;本树单文件 76/0 但 XML 解析失败,基线单文件 65/0 且 XML 有效。仅去掉第二个标题插值,没有改输入、产品文案或任何行为断言。修后同文件 76/0,真实 JUnit 严格解析出 76 个 testcase,原 known-fails-compare.py exit 0。完整原报告的坏字节均在这四个标题,诊断未见其它 XML 语法问题;没有改解析器、静默清洗报告或追加忽略项。整包计数保持上述实测值,标题修复后按派发仅复跑该文件。
+
+- 收尾检查:`cd packages/ui-mac && bun test src/main/gate-file-registry.test.ts src/main/old-name-scan.test.ts` → 33 pass / 0 fail、exit 0;ext 整包包含 authority-registry 的全部既有判据并通过。docs_index.py --write 后索引没有文本差异,--check exit 0;git diff --check exit 0。
+- 已核:Codex(GPT-6),核对 r4 指定输入 `64a8355ee4` 与本轮两个测试修复提交。已知装配失败均已修复;整体回执为 PARTIAL,core 15 条双树同红的冻结语义/未接管上游测试冲突仍待编排器明确处置,不将它们改成放行项,也不把整包失败报为全绿。网络项沿派发 b 类原处置,不新增待办机制。
+- 已定勿重开:#1713 的策略删除、#1699 的已审权限与消息/shell 边界、#1698 的启动文档/R33、#1700 的字段和适配器合同均不改。没有新增生产限制、启动值、依赖、takeover 或协议转换。下一步:编排器处置 core 四个文件的 15 条基线失败后再决定 full gate。本轮没有 push/PR,没有运行 gate/bin/check。
+- 偏离与范围:冲突外必要测试文件为 ext-project-adopt(旧锚)、permission-mount-ratchet(真实测试宿主扫描范围及回归)、cloud-websearch-kill(缺 stub)、PermissionDialog(JUnit 标题编码);均由本轮装配验证直接证明,理由与结果见上。登记只同步计数器测得的 1 行;业务回执只续记本 plan,索引由 generator 检查。本轮约 65 分钟(03:25–04:30 UTC),含 ui-mac 两轮完整运行约 34.6 分钟,没有扩大到 core 冻结行为或上游测试接管。无新增 OPTIONAL 或设计限制提案。

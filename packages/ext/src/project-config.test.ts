@@ -9,6 +9,7 @@ import { Agent } from "../../schema/src/agent.ts"
 import { PROJECT_HIDDEN_DIR } from "../../ui-mac/src/shared/project-hidden-dir"
 import { projectTrustIdentity } from "../../ui-mac/src/main/project-trust-truth"
 import { recordProjectTrustDecision } from "../../ui-mac/src/main/project-trust-truth-write"
+import { publishTestBootstrap, unpublishTestBootstrap } from "../../ui-mac/test-component/codepuppy-bootstrap-fixture"
 
 const j = (o: unknown) => JSON.stringify(o)
 
@@ -134,6 +135,16 @@ describe("mergeProjectConfig — trust gate on executable mcp", () => {
     const cfg: Record<string, any> = {}
     mergeProjectConfig(cfg, j({ agent: { build: entry } }), { trustExecutable: true })
     expect(cfg.agent.build).toEqual(entry)
+  })
+
+  test("UNTRUSTED: agent steps / maxSteps stripped (an execution budget, the cost analogue of permission); hidden / color / temperature / top_p / variant kept; TRUSTED: kept verbatim (#1700 Codex R1/1 M3)", () => {
+    const entry = { prompt: "p", steps: 100, maxSteps: 100, hidden: true, color: "#112233", temperature: 0.2, top_p: 0.9, variant: "max" }
+    const untrusted: Record<string, any> = {}
+    mergeProjectConfig(untrusted, j({ agent: { budgeted: entry } }))
+    expect(untrusted.agent.budgeted).toEqual({ prompt: "p", hidden: true, color: "#112233", temperature: 0.2, top_p: 0.9, variant: "max" })
+    const trusted: Record<string, any> = {}
+    mergeProjectConfig(trusted, j({ agent: { budgeted: entry } }), { trustExecutable: true })
+    expect(trusted.agent.budgeted).toEqual(entry)
   })
 
   test("UNTRUSTED: agent tools stripped whole, true and false alike; TRUSTED: kept verbatim (#1693 AC-03)", () => {
@@ -286,8 +297,7 @@ describe("project/root identity fail-closed", () => {
 
     const global = join(root, "global", "env", "dev")
     mkdirSync(global, { recursive: true })
-    const previous = process.env.CODEPUPPY_GLOBAL_DIR
-    process.env.CODEPUPPY_GLOBAL_DIR = realpathSync(global)
+    publishTestBootstrap({ globalRoot: realpathSync(global) })
     try {
       // `#1665`:OpenCode 2 下 ext 按 Location 跑 setup —— 驱动它注册的 agent / tool transform 与执行钩子。
       const recorded = recordingContext(project)
@@ -323,8 +333,7 @@ describe("project/root identity fail-closed", () => {
       expect(readFileSync(join(retired, "codepuppy.jsonc"), "utf8")).toBe(config)
       expect(readFileSync(join(retired, "sentinel"), "utf8")).toBe("untouched")
     } finally {
-      if (previous === undefined) delete process.env.CODEPUPPY_GLOBAL_DIR
-      else process.env.CODEPUPPY_GLOBAL_DIR = previous
+      unpublishTestBootstrap()
     }
   })
 })
@@ -334,18 +343,15 @@ describe("project/root identity fail-closed", () => {
 describe("#1709 项目扩展的信任只认 main 的记录", () => {
   let root = ""
   let stateRoot = ""
-  let previous: string | undefined
 
   beforeEach(() => {
-    previous = process.env.CODEPUPPY_GLOBAL_DIR
     root = realpathSync(mkdtempSync(join(tmpdir(), "codepuppy-ext-trust-")))
     stateRoot = join(root, "codepuppy-state")
     mkdirSync(join(stateRoot, "env", "dev"), { recursive: true })
-    process.env.CODEPUPPY_GLOBAL_DIR = join(stateRoot, "env", "dev")
+    publishTestBootstrap({ globalRoot: join(stateRoot, "env", "dev") })
   })
   afterEach(() => {
-    if (previous === undefined) delete process.env.CODEPUPPY_GLOBAL_DIR
-    else process.env.CODEPUPPY_GLOBAL_DIR = previous
+    unpublishTestBootstrap()
     rmSync(root, { recursive: true, force: true })
   })
 
@@ -388,7 +394,7 @@ describe("#1709 项目扩展的信任只认 main 的记录", () => {
     expect(consent(c)).toBe(false)
   })
 
-  test("记录本身:当前告知版本以外的条目不算;拒绝不算;位置只由 main 派生的根算出 —— CODEPUPPY_GLOBAL_DIR 不是 `<base>/env/<env>` ⇒ 一个都不信任", () => {
+  test("记录本身:当前告知版本以外的条目不算;拒绝不算;位置只由 main 派生的根算出 —— 文档 paths.globalRoot 不是 `<base>/env/<env>` ⇒ 一个都不信任", () => {
     const a = makeProject("a")
     const own = projectTrustIdentity(identityOf(a).directory)!
     mkdirSync(join(stateRoot, "project-trust"), { recursive: true })
@@ -400,7 +406,7 @@ describe("#1709 项目扩展的信任只认 main 的记录", () => {
     expect(consent(a)).toBe(true)
     const odd = join(root, "odd-root")
     mkdirSync(odd)
-    process.env.CODEPUPPY_GLOBAL_DIR = odd
+    publishTestBootstrap({ globalRoot: odd })
     expect(consent(a)).toBe(false)
   })
 

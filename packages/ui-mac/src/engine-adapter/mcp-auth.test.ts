@@ -10,6 +10,7 @@ const RECONNECT_MS = 1_200
 
 function engine(terminal: "complete" | "failed") {
   let statusPolls = 0
+  let mcpReads = 0
   let completedAt: number | undefined
   const fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = new URL(new Request(input, init).url)
@@ -25,9 +26,14 @@ function engine(terminal: "complete" | "failed") {
       return Response.json({ data: { status: terminal } })
     }
     if (path === "/api/mcp") {
+      mcpReads++
+      // failed:第一次读到时这台仍在 pending(还在按旧凭证重连),之后才落到 needs_auth —— 适配器若在失败后也等它离开 pending,
+      // 就会多读几次、回 needs_auth;不等则只读这一次、原样回 pending。
       const status =
         terminal === "failed"
-          ? { status: "needs_auth", error: "Authorization required" }
+          ? mcpReads === 1
+            ? { status: "pending" }
+            : { status: "needs_auth", error: "Authorization required" }
           : completedAt !== undefined && Date.now() - completedAt >= RECONNECT_MS
             ? { status: "connected" }
             : { status: "pending" }
@@ -35,7 +41,10 @@ function engine(terminal: "complete" | "failed") {
     }
     return new Response(`unexpected ${path}`, { status: 500 })
   }) as typeof globalThis.fetch
-  return createEngineFetch({ isEngineOrigin: (origin) => origin === ENGINE, fetch })
+  return {
+    engineFetch: createEngineFetch({ isEngineOrigin: (origin) => origin === ENGINE, fetch }),
+    reads: () => ({ attemptStatus: statusPolls, mcp: mcpReads }),
+  }
 }
 
 const opened: string[] = []
@@ -51,7 +60,7 @@ describe("#1668 H1 MCP OAuth 完成后等 MCP 离开 pending", () => {
   test(
     "complete ⇒ 回 connected;紧接着的 /mcp 也是 connected(定制中心判成功)",
     async () => {
-      const engineFetch = engine("complete")
+      const { engineFetch } = engine("complete")
       const response = await engineFetch(`${ENGINE}/mcp/docs/auth/authenticate`, { method: "POST" })
       expect(response.status).toBe(200)
       expect(await response.json()).toEqual({ status: "connected" })
@@ -61,14 +70,15 @@ describe("#1668 H1 MCP OAuth 完成后等 MCP 离开 pending", () => {
     { timeout: 10_000 },
   )
 
+  // `#1705`:按假引擎收到的请求判「不等」,不判墙钟:授权尝试状态读两次(进行中、失败)后只读一次 MCP 状态就回,
+  // 读到的是 pending 也原样回 —— 进入「等 MCP 离开 pending」的轮询会多读、回 needs_auth。
   test(
-    "failed ⇒ 直接回这台 MCP 的当前状态(needs_auth),不等",
+    "failed ⇒ 直接回这台 MCP 的当前状态(读到 pending 也原样回),不等它离开 pending",
     async () => {
-      const engineFetch = engine("failed")
-      const started = Date.now()
+      const { engineFetch, reads } = engine("failed")
       const response = await engineFetch(`${ENGINE}/mcp/docs/auth/authenticate`, { method: "POST" })
-      expect(await response.json()).toEqual({ status: "needs_auth", error: "Authorization required" })
-      expect(Date.now() - started).toBeLessThan(2_800)
+      expect(await response.json()).toEqual({ status: "pending" })
+      expect(reads()).toEqual({ attemptStatus: 2, mcp: 1 })
     },
     { timeout: 10_000 },
   )

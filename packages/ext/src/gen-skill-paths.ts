@@ -4,7 +4,7 @@
 // 各 key 的 `current.json` 指针指定(main 侧 ext-transaction 原子写)。发现层不落磁盘配置:本模块在
 // ext config hook 里**从磁盘现读** current.json 并把 live generation 目录内存注入 skills.paths ——
 // 每次 config 重建(dispose→refresh,安装后触发)都反映最新 generation,current.json 是唯一原子真源。
-// 与 injectFactorySkillPaths 同通道(内存注入生效,磁盘零痕迹)。
+// 与出厂技能目录(factory-paths.ts)同一去处(写进 main 合成的显式文件,磁盘上不进用户配置)。
 
 import { readdirSync, readFileSync, statSync } from "node:fs"
 import { join } from "node:path"

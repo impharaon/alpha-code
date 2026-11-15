@@ -34,6 +34,8 @@ import { writeExplicitConfig } from "./engine-explicit-config"
 import { customProviderSecretName, secretFilePath } from "./codepuppy-secret-files"
 import { engineGlobalConfigDirectory } from "./engine-paths"
 import { assertExtPluginActive } from "./sidecar-ext-ready"
+import { codepuppyBootstrap } from "@opencode/util/codepuppy-bootstrap"
+import { publishTestBootstrap } from "../../test-component/codepuppy-bootstrap-fixture"
 import type { EngineFetch } from "./in-process-engine"
 
 const sandbox = engineSandbox()
@@ -42,6 +44,7 @@ const REPLY = "cp-1708 reply"
 const engines: Array<{ close: () => Promise<void> }> = []
 const root = path.join(sandbox.root, "cp-1708")
 const userData = path.join(root, "userdata")
+const globalRoot = path.join(root, "state", "codepuppy-state", "env", "dev")
 const ext = path.join(root, "app", "codepuppy-ext")
 const p1 = path.join(sandbox.home, "work", "p1")
 const p2 = path.join(root, "projects", "p2")
@@ -92,8 +95,7 @@ const USER_GLOBAL_MARKERS = ["ext", "global-file", "global-relative", "global-ab
 
 beforeAll(async () => {
   await assertEngineSandboxed(sandbox)
-  process.env.CODEPUPPY_GLOBAL_DIR = path.join(root, "state", "codepuppy-state", "env", "dev")
-  fs.mkdirSync(process.env.CODEPUPPY_GLOBAL_DIR, { recursive: true })
+  fs.mkdirSync(globalRoot, { recursive: true })
   fs.mkdirSync(userData, { recursive: true })
   // 生产 sidecar 用同一个函数算引擎的全局配置目录,并把它交给 start();这里同样。
   global = engineGlobalConfigDirectory(process.env, homedir())
@@ -114,7 +116,7 @@ beforeAll(async () => {
   // 用户自己在 codepuppy.jsonc 里 deny 的一个全局插件:改动前后都不加载
   write(path.join(global, "plugins", "denied.js"), probe("global-user-denied", "cp1708.global-user-denied"))
   write(
-    path.join(process.env.CODEPUPPY_GLOBAL_DIR, "codepuppy.jsonc"),
+    path.join(globalRoot, "codepuppy.jsonc"),
     JSON.stringify({ policies: [{ action: "plugin.use", resource: path.join(global, "plugins", "denied.js"), effect: "deny" }] }),
   )
   write(path.join(sandbox.home, ".opencode", "plugins", "h.js"), probe("home-file", "cp1708.home-file"))
@@ -152,11 +154,11 @@ beforeAll(async () => {
   write(path.join(p3, "opencode.json"), JSON.stringify({ plugins: [`cp-1708-optin-pkg@file:${path.join(p3, "evil")}`] }))
   fs.mkdirSync(neutral, { recursive: true })
 
-  // 出厂技能(经 CODEPUPPY_FACTORY_SKILL_DIRS 进显式文件的 skills)与一个可用的模型(自定义节点 → 本机桩)
+  // 出厂技能(经启动文档 skills.factoryDirs 进显式文件的 skills)与一个可用的模型(自定义节点 → 本机桩)
   write(path.join(root, "factory", "cp-1708-factory-skill", "SKILL.md"), "---\nname: cp-1708-factory-skill\ndescription: factory probe\n---\n\nprobe\n")
-  process.env.CODEPUPPY_FACTORY_SKILL_DIRS = JSON.stringify([path.join(root, "factory")])
+  publishTestBootstrap({ globalRoot, userData, engineConfigDirectory: global, engine: { filewatcher: false }, factoryDirs: [path.join(root, "factory")] })
   write(
-    path.join(process.env.CODEPUPPY_GLOBAL_DIR, "..", "..", "custom-providers", "dev.json"),
+    path.join(globalRoot, "..", "..", "custom-providers", "dev.json"),
     JSON.stringify({ v: 1, providers: [{ id: "cp-1708-model", name: "Probe", compat: "openai", baseURL: `http://127.0.0.1:${llm.port}/v1`, models: ["m"] }] }),
   )
   write(secretFilePath(userData, customProviderSecretName("cp-1708-model")), "sk-cp-1708-probe")
@@ -230,7 +232,7 @@ describe("alpha-code#1708 项目范围的引擎插件在 Code Puppy 里一律不
   let injection: CodePuppyConfigInjectionResult
 
   test("生产注入:项目插件一个都不执行(含自带「已同意」与自写 allow 的项目、上级目录、仿冒);ext 与用户全局的照常;发一轮对话拿到回复", async () => {
-    injection = injectCodePuppyConfig(userData, ext, "stable")
+    injection = injectCodePuppyConfig(userData, ext, "stable", codepuppyBootstrap().paths.userConfig ?? null)
     expect(injection.ok).toBe(true)
     const engine = await engineWith("after", injection.config, injection.models.file)
     await engine.open(p1)
@@ -296,13 +298,13 @@ describe("alpha-code#1708 项目范围的引擎插件在 Code Puppy 里一律不
     const plugins = ["cp-1708-optin-pkg@1.0.0", "cp-1708-cpjsonc-pkg@1.0.0"]
     const allow = (resource: string) => ({ action: "plugin.use", resource, effect: "allow" })
     const globalFile = path.join(optinGlobal, "opencode.json")
-    const codepuppyJsonc = path.join(process.env.CODEPUPPY_GLOBAL_DIR!, "codepuppy.jsonc")
+    const codepuppyJsonc = path.join(globalRoot, "codepuppy.jsonc")
     const saved = fs.readFileSync(codepuppyJsonc, "utf8")
     write(globalFile, JSON.stringify({ plugins }))
     write(codepuppyJsonc, JSON.stringify({ policies: [...(JSON.parse(saved) as { policies: unknown[] }).policies, allow("cp-1708-cpjsonc-pkg")] }))
-    process.env.OPENCODE_CONFIG_DIR = optinGlobal
+    publishTestBootstrap({ globalRoot, userData, engineConfigDirectory: optinGlobal, engine: { filewatcher: true }, factoryDirs: [path.join(root, "factory")] })
     try {
-      const optin = injectCodePuppyConfig(userData, ext, "stable")
+      const optin = injectCodePuppyConfig(userData, ext, "stable", codepuppyBootstrap().paths.userConfig ?? null)
       const engine = await engineWith("optin", optin.config, optin.models.file, { configDirectory: optinGlobal, filewatcher: true })
       await engine.open(neutral)
       await sleep(1_000)
@@ -325,7 +327,7 @@ describe("alpha-code#1708 项目范围的引擎插件在 Code Puppy 里一律不
       await until(() => engine.ran().includes("cpjsonc-allowed-package"))
       expect(engine.ran()).toContain("cpjsonc-allowed-package")
     } finally {
-      delete process.env.OPENCODE_CONFIG_DIR
+      publishTestBootstrap({ globalRoot, userData, engineConfigDirectory: global, engine: { filewatcher: false }, factoryDirs: [path.join(root, "factory")] })
       fs.writeFileSync(codepuppyJsonc, saved)
     }
   }, 120_000)

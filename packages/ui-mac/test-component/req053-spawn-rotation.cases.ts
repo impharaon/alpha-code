@@ -74,7 +74,7 @@ let xdgDataHome = ""
 /** 两个期望的日志根 —— **独立字面量**,不是从 serverLogRoots() 抄回来的。 */
 let expectedLogDirs: string[] = []
 const savedEnv: Record<string, string | undefined> = {}
-const ENV_KEYS = ["XDG_DATA_HOME", "CODEPUPPY_SECRETS_DISABLE", "SHELL"] as const
+const ENV_KEYS = ["XDG_DATA_HOME", "CODEPUPPY_SECRETS_DISABLE", "SHELL", "CODEPUPPY_GLOBAL_DIR"] as const
 
 /** 稀疏地造一个精确尺寸的大文件:头尾各一个可辨识 marker,中间空洞。 */
 function seedSizedFile(file: string, size: number, tag: string) {
@@ -120,6 +120,7 @@ beforeEach(() => {
   mkdirSync(xdgDataHome, { recursive: true })
   process.env.XDG_DATA_HOME = xdgDataHome
   process.env.CODEPUPPY_SECRETS_DISABLE = "1"
+  process.env.CODEPUPPY_GLOBAL_DIR = join(scratch, "codepuppy-state", "env", "dev") // #1698:无快照的单测经环境给全局根(design §10 R31),fork 时构建启动文档要它
   process.env.SHELL = "nu"
   expectedLogDirs = [join(xdgDataHome, "opencode", "log"), join(userDataPath, "opencode", "log")]
   expectedLogDirs.forEach((dir) => mkdirSync(dir, { recursive: true }))

@@ -11,7 +11,7 @@ import { BrowserWindow, dialog, ipcMain, shell, type IpcMainInvokeEvent, type Op
 import { execFile } from "node:child_process"
 import * as fs from "node:fs"
 import * as path from "node:path"
-import { dispatchCloudJob, dispatchExplicitCloudUpload, getCloudJobStatus, cancelCloudJob, listCloudArtifacts, downloadCloudArtifactTo } from "./codepuppy-cloud-jobs"
+import { dispatchCloudJob, dispatchExplicitCloudUpload, getCloudJobStatus, cancelCloudJob, listCloudArtifacts, downloadCloudArtifactTo, getCloudAccountStatus } from "./codepuppy-cloud-jobs"
 import { isTerminalCloudEvent, subscribeCloudJobEvents } from "./codepuppy-cloud-events"
 import { backoffMs } from "./codepuppy-cloud-events-core"
 import { createCloudRunTracker, type CloudRunOrigin } from "./cloud-run-tracker"
@@ -202,6 +202,10 @@ export function registerCloudIpcHandlers() {
   ipcMain.handle("cloud-status", (_e: IpcMainInvokeEvent, jobId: string) => getCloudJobStatus(jobId))
   ipcMain.handle("cloud-cancel", (_e: IpcMainInvokeEvent, jobId: string) => cancelCloudJob(jobId))
   ipcMain.handle("cloud-artifacts", (_e: IpcMainInvokeEvent, jobId: string) => listCloudArtifacts(jobId))
+  // #1686:表单提交前的只读预检;task 只收字符串,其余归 renderer 的「查不到」。
+  ipcMain.handle("cloud-account-status", (_e: IpcMainInvokeEvent, task: unknown) =>
+    typeof task === "string" && task ? getCloudAccountStatus(task) : { error: "invalid-task" },
+  )
 
   // REQ-092:descriptor-only IPC —— renderer 只送 descriptor(或旧部署 meta),main 流式写入
   // <directory>/.codepuppy/runs/<runId>/artifacts/(ADR-019 守卫复用:isSafeRunId + sanitizeArtifactName +

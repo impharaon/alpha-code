@@ -1,0 +1,7 @@
+prefs snapshot: size=250 keys=['AppleTextDirection', 'NSForceRightToLeftWritingDirection', 'NSNavPanelExpandedSizeForOpenMode', 'NSTreatUnknownArgumentsAsOpen', 'SKPurchaseIntentUpdatesLastChecked'] types={'AppleTextDirection': 'bool', 'NSForceRightToLeftWritingDirection': 'bool', 'NSNavPanelExpandedSizeForOpenMode': 'str', 'NSTreatUnknownArgumentsAsOpen': 'str', 'SKPurchaseIntentUpdatesLastChecked': 'float'}
+launched label=a10 pid/pgid=60509 mock=1 owner-app-pids-before=[]
+lsof: 5 processes, 252 open paths, 61 under <root>, leaks: 0
+single-instance lock: <root>/home/Library/Application Support/ai.opencode.desktop/SingletonLock -> tidedeMac-mini.local-60509
+prefs compare: size 250->250; changed=[]; unchanged=['AppleTextDirection', 'NSForceRightToLeftWritingDirection', 'NSNavPanelExpandedSizeForOpenMode', 'NSTreatUnknownArgumentsAsOpen', 'SKPurchaseIntentUpdatesLastChecked']; other-than-known-timestamp-changed=[]
+hidden check: pid 60509 bundle=com.tide.codepuppy hidden=yes active=no hide-calls=0
+LAUNCH GATE: OK — owner app pids unchanged, owner-side paths unchanged, mock keychain on the running process

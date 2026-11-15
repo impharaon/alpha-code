@@ -13,7 +13,7 @@ import { realpathSync } from "node:fs"
 import path from "node:path"
 import { Agent } from "../../schema/src/agent"
 import { Path } from "../../util/src/global"
-import { injectFactorySkillPaths } from "./factory-paths"
+import { factorySkillPaths } from "./factory-paths"
 import { skillGenerationLiveDirs } from "./gen-skill-paths"
 
 /** 只这两档追加;只读档与自动化档自己就是 deny,别的 agent 维持引擎原样。 */
@@ -29,14 +29,13 @@ const real = (dir: string) => {
   }
 }
 
-/** 这一刻的规则:先问,白名单放行。 */
-export function externalDirectoryRules(env: Record<string, string | undefined>): Rule[] {
-  const root = env.CODEPUPPY_GLOBAL_DIR
+/** 这一刻的规则:先问,白名单放行。`globalRoot` = 启动文档的 `paths.globalRoot`;`factorySkillDirs` = 启动文档的 `skills.factoryDirs`。 */
+export function externalDirectoryRules(globalRoot: string | undefined, factorySkillDirs: readonly string[]): Rule[] {
   const allowed = [
     path.join(Path.data, "tool-output"),
     path.join(real(Path.tmp)),
-    ...injectFactorySkillPaths({}, env.CODEPUPPY_FACTORY_SKILL_DIRS),
-    ...(root ? skillGenerationLiveDirs(real(root)) : []),
+    ...factorySkillPaths(factorySkillDirs),
+    ...(globalRoot ? skillGenerationLiveDirs(real(globalRoot)) : []),
   ].filter((dir) => path.isAbsolute(dir))
   return [
     { action: "external_directory", resource: "*", effect: "ask" },

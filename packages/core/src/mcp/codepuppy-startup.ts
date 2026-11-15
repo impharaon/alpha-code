@@ -14,6 +14,7 @@
 import { Semaphore } from "effect"
 import { PlatformError } from "effect"
 import { classifyNetFailure, engineNetFailurePath, type CodepuppyFailureCode } from "@opencode/schema/codepuppy-net-failure"
+import { tryCodePuppyBootstrap } from "@opencode/util/codepuppy-bootstrap"
 
 export const START_CONCURRENCY = 4
 /** Shared by every Location in the process, like v1's instance-wide limit. */
@@ -52,6 +53,7 @@ export function classifyStartFailure(
   config: { readonly type: string; readonly url?: string },
   hints: { readonly timedOut?: boolean; readonly httpStatus?: number } = {},
   env: Record<string, string | undefined> = process.env,
+  egressProxy: string | undefined = tryCodePuppyBootstrap()?.network.egressProxy,
 ): StartFailure {
   const remote = config.type === "remote"
   if (hints.timedOut) return { code: "handshake_timeout", reconnect: remote }
@@ -65,7 +67,7 @@ export function classifyStartFailure(
   }
   if (hints.httpStatus === 401 || hints.httpStatus === 403) return { code: "auth", reconnect: false }
   if (hints.httpStatus !== undefined) return { code: "http", reconnect: hints.httpStatus >= 500 }
-  const net = classifyNetFailure(error, engineNetFailurePath(config.url, env))
+  const net = classifyNetFailure(error, engineNetFailurePath(config.url, env, egressProxy))
   if (!net) return { code: "transport", reconnect: true }
   return { code: net.layer, reconnect: RECONNECT_CODES.has(net.layer) || (net.layer === "http" && Number(net.code) >= 500) }
 }

@@ -16,6 +16,8 @@ export default defineConfig({
       enforce: "pre",
       resolveId(id, importer) {
         if (id === "./providers" && importer?.includes("/codepuppy-ui/codepuppy-composer")) return providersStub
+        // #1686:Banner 的 providers 同样转口整棵前端;云预检场景只需 useContractHealth。
+        if (id === "./providers" && importer?.endsWith("/codepuppy-ui/Banner.tsx")) return providersStub
       },
     },
     solidPlugin(),

@@ -2,6 +2,7 @@ import { existsSync, readFileSync, readdirSync } from "node:fs"
 import { join } from "node:path"
 import { pathToFileURL } from "node:url"
 import type { Plugin } from "@opencode/plugin"
+import { codepuppyBootstrap } from "../../util/src/codepuppy-bootstrap"
 import { registerPolicy } from "./policy/index"
 import {
   projectDirectoryIdentity,
@@ -36,13 +37,16 @@ import { createHubBridge, processParentPort, type HubBridge } from "./hub-bridge
 import { createHubTools, hubInstallEvaluate } from "./hub-tools"
 import { createReloadScheduler, type ReloadScheduler } from "./reload-scheduler"
 import { createCodePuppyTools } from "./codepuppy-tools"
-import { applyAgents, applyProjectMcp, commandDefinitions } from "./engine-transforms"
+import { agentSampling, applyAgents, applyProjectMcp, commandDefinitions, removeAgents } from "./engine-transforms"
+import { postActivationTail } from "./post-activation-tail"
+import type { AgentEditor } from "@opencode/plugin/promise/agent"
 import { modelFacts } from "./model-facts"
 import { createCloudVisionHooks } from "./cloud-vision-hooks"
 import { createAttachmentReaderHooks } from "./attachment-reader-hooks"
 import { createAgentMentionHooks } from "./agent-mention-hooks"
-import { providerAllowTail, refuseOutsideProviderAllowList } from "./provider-allow"
+import { providerAllowList, providerAllowTail, refuseOutsideProviderAllowList } from "./provider-allow"
 import { inProcessEngine } from "../../ui-mac/src/main/in-process-engine"
+import { PROJECT_HIDDEN_DIR } from "../../ui-mac/src/shared/project-hidden-dir"
 
 // ── `#1665` I2:进程级对象(定制中心桥 + 重载调度器)──────────────────────────────────────────────
 // OpenCode 2 给**每个 Location** 各求值一次本模块(开工实测:两个目录 ⇒ 求值 2 次、setup 2 次;重载后再各 1 次;Node 下
@@ -99,6 +103,9 @@ const describe = (cause: unknown) => (cause instanceof Error ? cause.message : S
 export const CodePuppyExt: Plugin.Plugin = {
   id: "codepuppy.ext",
   async setup(context) {
+    // `#1698`(DESIGN-upgrade-bootstrap-config §4.2 第 5 步、§4.3):第一步用本 bundle 的解析器读 sidecar 发布的启动文档 —— 没有、
+    // 版本或形状不符 ⇒ 抛 ⇒ 本插件 failed ⇒ sidecar 拒报 ready。只读一份冻结的文档,不挂任何钩子,不改 I3 的挂钩次序。
+    const bootstrap = codepuppyBootstrap()
     const policy = await registerPolicy(context)
     const directory = context.location.directory
     const { hubBridge, reloads } = processState()
@@ -116,9 +123,13 @@ export const CodePuppyExt: Plugin.Plugin = {
     }
     try {
       // REQ-157 `#1284`:装载回执 —— 登记簿在 import 时已按上限校验过;这里只在 VERBOSE 下把库存打出来。
-      if (process.env.CODEPUPPY_EXT_VERBOSE) log(`[@codepuppy/ext] context injections:\n${renderInventory()}`)
+      if (bootstrap.switches.extVerbose) log(`[@codepuppy/ext] context injections:\n${renderInventory()}`)
       // sidecar 初始化批次先复验 main 派生 root 的 canonical 身份;缺失、相对、退休根或 alias 都拒绝(环境错 = 结构性失败,让本插件 failed)。
-      requireCodePuppyGlobalRoot()
+      requireCodePuppyGlobalRoot(bootstrap.paths.globalRoot)
+      // `#1698` R33:随包内容需要的工具 shell 输出只在这里逐项列出;每次建子进程时从文档派生,不写本进程环境。
+      await context.shell.hook("create.before", (event) => {
+        event.env.CODEPUPPY_GLOBAL_DIR = codepuppyBootstrap().paths.globalRoot
+      })
       const projectRootFor = (target: string): ProjectRoot | null => {
         const identity = projectDirectoryIdentity(target)
         return identity.status === "project" ? identity : null
@@ -128,6 +139,13 @@ export const CodePuppyExt: Plugin.Plugin = {
       // #223 R7:MCP 治理归属是**本 Location** 的状态 —— 由本 Location 的 mcp.transform 写、显式传给本 Location 的执行钩子;
       // 模块侧不留可变状态(I2 的进程级对象里只有桥与调度器)。没算出来 = 没有治理 server = 豁免不给(fail-closed)。
       let mcpOwnership: McpOwnership = UNVERIFIED_MCP_OWNERSHIP
+      // #1700:本 Location 的项目文档里停用(`disable: true`)的助手;由下面的 agent.transform 写,排在 post 段之后的 agent 尾巴移除它们。
+      let disabledAgents = new Set<string>()
+      const agentRegistered = (agentID: string) =>
+        context.agent.get({ agentID }).then(
+          (response) => (response as { data?: unknown }).data !== undefined,
+          () => false,
+        )
 
       // ── 工具表(P8)──────────────────────────────────────────────────────────────────────────
       await context.tool.transform((editor) => {
@@ -169,10 +187,15 @@ export const CodePuppyExt: Plugin.Plugin = {
         // #223 R3→R5 / L5r:web search 主权判决 —— 抛出即拒掉这次调用(2.x 只有 execute.before 允许失败,抛出被转成
         // Tool.Error,只结束这一次调用)。命中面:任何 MCP server 上看起来是 web search 的工具,以及 2.x 内置的 `websearch`;
         // 治理云 server 的豁免按本 Location 核验过的端点身份判。理由与边界见 cloud-websearch-kill.ts。
-        assertWebSearchToolAllowed(event.tool, process.env, mcpOwnership)
-        validateCloudToolInput(event.tool, event.input, process.env, mcpOwnership)
+        assertWebSearchToolAllowed(event.tool, bootstrap, mcpOwnership)
+        validateCloudToolInput(event.tool, event.input, bootstrap, mcpOwnership)
         // `#1419`:模型追问 —— `codepuppy_vision` 的 image 由引用换成压缩后的 base64。
         await vision.toolBefore(event)
+        // #1700 AC-04:派发项目里停用、引擎里也确实已经没有的助手 —— 引擎只会说 `Unknown agent`,这里说明它是被停用的。
+        // 按最终状态判(Codex R1/1 M1):尾巴还没放上去时它还在,照常派发。
+        const agent = (event.input as { agent?: unknown } | undefined)?.agent
+        if (event.tool === "subagent" && typeof agent === "string" && disabledAgents.has(agent) && !(await agentRegistered(agent)))
+          throw new Error(`Agent "${agent}" is disabled in this project (${PROJECT_HIDDEN_DIR}/codepuppy.jsonc sets "disable": true)`)
       })
       await context.tool.hook("execute.after", (event) => {
         if (event.status === "error") {
@@ -181,13 +204,17 @@ export const CodePuppyExt: Plugin.Plugin = {
           // 429 时供应商抛的是引擎认得出的 HttpClientError(random 才会换同伴),具名结局在它的 cause 里 —— 沿 cause 链找。
           const cause = event.tool === "websearch" ? codePuppyWebSearchFailureOf((event.error as { error?: unknown }).error) : undefined
           if (cause) (event.error as { message: string }).message = cause.message
+          // `#1702`:2.x 的 webfetch 把任何失败都包成「Unable to fetch <url>」,真正的原因是它的内层错误;交回那句原因
+          // (0.1.26 落库的原文,如「Request timed out」)。按工具与内层 Error 认,不看文案;没有内层原因时保持原样。
+          const inner = event.tool === "webfetch" ? (event.error as { error?: unknown }).error : undefined
+          if (inner instanceof Error && inner.message) (event.error as { message: string }).message = inner.message
           return
         }
         if (event.status !== "completed") return
         // 2.x 的 execute.after 不允许失败(`packages/core/src/plugin/hooks.ts:23`):契约不符时把结果换成一句响亮的拒绝,
         // 不让一份没核过的结果原样回到模型。
         try {
-          validateCloudToolOutput(event.tool, event.result, process.env, mcpOwnership)
+          validateCloudToolOutput(event.tool, event.result, bootstrap, mcpOwnership)
         } catch (cause) {
           error(`[@codepuppy/ext] cloud tool ${event.tool} result refused: ${describe(cause)}`)
           event.result = { content: renderTemplate(CLOUD_CONTRACT_REFUSED_ID, { name: event.tool }), metadata: { codepuppy: { contractRefused: true } } }
@@ -198,11 +225,12 @@ export const CodePuppyExt: Plugin.Plugin = {
       // 同一个回调挂在四条组装模型请求的钩子上:主循环(context)、压缩(compaction)、无工具生成(generate)、起标题(title)。
       // 2.x 这四种请求各走自己的钩子、互不经过(`session/model-request.ts`)—— v1 里 ext 的钩子每次 LLM 调用都跑,少挂一条
       // = 那种请求带着原样的图 / 暂存附件 JSON / 未转写的系统提示词、在平台节点上照发 max tokens(审计 R1 Major;title 编排器裁决)。
-      // 入参取四者的公共部分(`SessionRequest`:sessionID / model / system / messages / options);回调不读 agent / tools / result。
+      // 入参取四者的公共部分(`SessionRequest`:sessionID / model / system / messages / options);回调不读 tools / result,
+      // agent 只在带它的三条(context / compaction / generate)上读,给助手的采样参数用(#1700)。
       const rebrandWarned = new Set<string>()
       const assembleRequest = async (event: Omit<Parameters<Parameters<typeof context.session.hook<"title">>[1]>[0], "result">) => {
         // REQ-062 T1(路线A,ADR-015):系统提示词品牌转写 —— 精选子串对;失败 = 上游原样(外观级退化),绝不伤及请求。
-        if (process.env.CODEPUPPY_PROMPT_REBRAND_DISABLE !== "1") {
+        if (!bootstrap.switches.promptRebrandDisabled) {
           try {
             const r = rebrandSystem(event.system.map((part) => part.text))
             if (r.changed) event.system.splice(0, event.system.length, ...event.system.map((part, index) => ({ ...part, text: r.system[index]! })))
@@ -219,13 +247,24 @@ export const CodePuppyExt: Plugin.Plugin = {
         await vision.context(event)
         // I11':暂存附件部件换成登记过的读取指令(绝不抛)。
         await attachments.context(event)
+        // #1700 BR-04:助手自己的 temperature / top_p —— 引擎把它们存在 agent 的 `request.body`(项目助手由 applyAgents 写,用户全局配置里的
+        // v1 助手由引擎自己的迁移写),发请求时不读(upstream-probes/agent-request.test.ts)。模型不支持温度就不带温度;起标题的请求没有 agent,不补。
+        const agentID = (event as { agent?: string }).agent
+        if (agentID !== undefined) {
+          try {
+            const [agent, facts] = await Promise.all([context.agent.get({ agentID }), modelFacts(context, event.model)])
+            Object.assign(event.options, agentSampling(agent.data?.request.body, facts.temperature))
+          } catch (cause) {
+            error(`[@codepuppy/ext] agent sampling skipped: ${describe(cause)}`)
+          }
+        }
         // `#1669` R17:点名过助手的用户消息后面追加登记过的派发指令(绝不抛)。
         await mentions.context(event)
         // 输出上限两条腿,都只改这一次请求:平台代理节点**不发** max tokens(网关按 route 上限填,REQ-153);
         // 直连 BYOK 节点按逐模型实读上限抬(REQ-156);其余原样(上游算的那个数)。
         try {
           const facts = await modelFacts(context, event.model)
-          if (platformOutputCap({ providerBaseURL: facts.baseURL, codepuppyBaseURL: process.env.CODEPUPPY_BASE_URL }).omit) {
+          if (platformOutputCap({ providerBaseURL: facts.baseURL, codepuppyBaseURL: bootstrap.platform.modelProxyBaseURL }).omit) {
             delete event.options.maxTokens
             return
           }
@@ -245,11 +284,11 @@ export const CodePuppyExt: Plugin.Plugin = {
       // 写在 http.request:2.x 的路由层在 model.request 之后才按 apiKey 写 Authorization(packages/ai/src/route/auth.ts),
       // 那里加的头会被注入的占位 apiKey 盖掉;http.request 拿到的是鉴权之后、即将发出的请求(#1662 parity B4)。
       await context.session.hook("http.request", (event) => {
-        const authorization = platformRequestCredentialHeader({ requestURL: event.request.url, env: process.env })
+        const authorization = platformRequestCredentialHeader({ requestURL: event.request.url, platform: bootstrap.platform })
         if (authorization) event.request.headers.set("authorization", authorization)
       })
       // `#1662`:供应商白名单 · 请求这一道 —— 注入的放行集合之外的供应商,请求在发出之前拒掉(provider-allow.ts)。
-      await context.session.hook("model.request", (event) => refuseOutsideProviderAllowList(event, process.env))
+      await context.session.hook("model.request", (event) => refuseOutsideProviderAllowList(event, providerAllowList()))
 
       // ── 配置域(C10 / L3r / M3)────────────────────────────────────────────────────────────
       // 项目 `.codepuppy/codepuppy.jsonc` + 出厂禁项 + 提示词接管,算成一份 v1 形状的小对象(既有纯函数),再按域翻译。
@@ -270,16 +309,16 @@ export const CodePuppyExt: Plugin.Plugin = {
                 const { added, gatedExecutable } = mergeProjectConfig(cfg, configRead.value, { trustExecutable, directory: project.directory })
                 if (gatedExecutable.length)
                   log(`[@codepuppy/ext] project has UNTRUSTED executable extensions (${gatedExecutable.join(", ")}) — not loaded until consent: ${directory}`)
-                if (process.env.CODEPUPPY_EXT_VERBOSE && added.length) log(`[@codepuppy/ext] project config merged: ${added.join(", ")}`)
+                if (bootstrap.switches.extVerbose && added.length) log(`[@codepuppy/ext] project config merged: ${added.join(", ")}`)
               }
             }
           }
-          // REQ-067:上游默认禁项零明文 —— main 算 effective 名单经 env 传入;禁用由下面的 skill / permission 钩子执行。
-          applyFactoryDeny(cfg, process.env.CODEPUPPY_FACTORY_DENY_SKILLS)
+          // REQ-067:上游默认禁项零明文 —— 名单是本包的常量(`#1698` R7);禁用由下面的 skill / permission 钩子执行。
+          applyFactoryDeny(cfg)
           // REQ-062 T3/T6:alpha 内容层接管(general/explore/docs prompt),置于项目合并之后 ⇒ 项目同名让位。
           // 出厂 /init 与 /review 不在这里注册(编排器裁决 2026-11-09):L5 用同一个纯函数把它们写进主进程的内联配置文档,
           // 由上游 `opencode.config.command` 实现模板文法与 `review` 的子任务语义 —— 插件的 CommandEditor 给不了这两样。
-          if (process.env.CODEPUPPY_PROMPT_REBRAND_DISABLE !== "1")
+          if (!bootstrap.switches.promptRebrandDisabled)
             for (const applied of applyPromptTakeover(cfg).applied)
               if (applied.startsWith("command.")) delete (cfg.command as Record<string, unknown>)[applied.slice("command.".length)]
         } catch (cause) {
@@ -291,7 +330,7 @@ export const CodePuppyExt: Plugin.Plugin = {
       await context.mcp.transform((editor) => {
         // #223 R5 / M3:云 MCP 的完整定义只由 ext 在这里装 —— 本句能执行 = 本 Location 的 ext 已装上、上面的执行闸已注册。
         try {
-          const installed = installCloudMcp(editor)
+          const installed = installCloudMcp(editor, bootstrap)
           if (installed) log(`[@codepuppy/ext] cloud MCP server "${installed}" installed — the web search sovereignty gate is registered in this Location`)
         } catch (cause) {
           error(`[@codepuppy/ext] cloud MCP install failed: ${describe(cause)}`)
@@ -304,13 +343,13 @@ export const CodePuppyExt: Plugin.Plugin = {
           error(`[@codepuppy/ext] project MCP merge failed: ${describe(cause)}`)
         } finally {
           // #223 R6/R7:归属在本 Location 的 MCP 定义全部就位之后才算;合并中途出错 ⇒ fail-closed。
-          mcpOwnership = merged ? computeMcpOwnership({ mcp: Object.fromEntries(editor.list()) }) : UNVERIFIED_MCP_OWNERSHIP
-          if (process.env.CODEPUPPY_EXT_VERBOSE) log(`[@codepuppy/ext] MCP ownership (${directory}): ${JSON.stringify(mcpOwnership)}`)
+          mcpOwnership = merged ? computeMcpOwnership({ mcp: Object.fromEntries(editor.list()) }, bootstrap.cloudMcp) : UNVERIFIED_MCP_OWNERSHIP
+          if (bootstrap.switches.extVerbose) log(`[@codepuppy/ext] MCP ownership (${directory}): ${JSON.stringify(mcpOwnership)}`)
         }
       })
       await context.agent.transform((editor) => {
         try {
-          applyAgents(editor, extConfig().agent)
+          disabledAgents = new Set(applyAgents(editor, extConfig().agent, log).disabled)
         } catch (cause) {
           error(`[@codepuppy/ext] agent transform failed: ${describe(cause)}`)
         }
@@ -347,7 +386,7 @@ export const CodePuppyExt: Plugin.Plugin = {
       // 配置插件随后照常把顶层规则与它自己的字段加在后面 —— 顺序仍是「底座 → 这里 → 配置」。codepuppy-ask 由注入无条件写进配置
       // (ui-mac codepuppy-config-injection.ts 2d),ext 只随这份注入装载,不会多出一个配置里没有的 agent。
       await context.agent.transform((editor) => {
-        const rules = externalDirectoryRules(process.env)
+        const rules = externalDirectoryRules(bootstrap.paths.globalRoot, bootstrap.skills.factoryDirs)
         for (const id of EXTERNAL_DIRECTORY_AGENTS)
           editor.update(id as never, (agent) => {
             if (!placeAfterBase(id, agent.permissions as never, rules))
@@ -357,12 +396,12 @@ export const CodePuppyExt: Plugin.Plugin = {
       // REQ-067 / #1522:出厂禁用的技能 —— 从技能目录里拿掉(上游内置的那些在 ext 之前注册),并在权限评估里一律 deny
       // (覆盖之后才由配置目录装进来的同名技能)。
       await context.skill.transform((editor) => {
-        for (const id of factoryDeniedSkills(process.env.CODEPUPPY_FACTORY_DENY_SKILLS)) editor.remove(id)
+        for (const id of factoryDeniedSkills()) editor.remove(id)
       })
       await context.permission.hook("evaluate", (event) => {
         // I10:定制中心安装恒弹框(自动化 agent 恒拒)。注册在 registerPolicy 之后 ⇒ 按注册顺序它说了算。
         hubInstallEvaluate(event)
-        if (event.action === "skill" && event.resources.some((id) => factoryDeniedSkills(process.env.CODEPUPPY_FACTORY_DENY_SKILLS).includes(id)))
+        if (event.action === "skill" && event.resources.some((id) => factoryDeniedSkills().includes(id)))
           event.effect = "deny"
       })
 
@@ -371,7 +410,7 @@ export const CodePuppyExt: Plugin.Plugin = {
       cleanups.push(() => events.abort())
       void (async () => {
         for await (const event of context.event.subscribe({ types: [...RELOAD_POKE_EVENTS], signal: events.signal })) {
-          if (process.env.CODEPUPPY_EXT_VERBOSE) log(`[@codepuppy/ext] event: ${event.type}`)
+          if (bootstrap.switches.extVerbose) log(`[@codepuppy/ext] event: ${event.type}`)
           reloads.poke()
         }
       })().catch((cause) => {
@@ -406,16 +445,27 @@ export const CodePuppyExt: Plugin.Plugin = {
       // 所以变换等这一批激活结束才登记,之后每次插件重新激活都重新放到最后(provider-allow.ts)。
       const providerTail = new AbortController()
       cleanups.push(() => providerTail.abort())
+      const activePlugins = async () => (((await context.plugin.list()) as { data?: Array<{ id?: string }> }).data ?? []).map((plugin) => String(plugin.id))
+      // #1700(Codex R1/1 M1):项目停用的助手同样等这一批激活结束才移除 —— 早了会被 post 段的配置层按默认(全放行)重建。
+      const agentTail = postActivationTail<Pick<AgentEditor, "remove">>({
+        transform: (callback) => context.agent.transform(callback),
+        apply: (editor) => removeAgents(editor, disabledAgents),
+        activePlugins,
+        log,
+        unplaced: "project agents with disable: true stay registered",
+        signal: providerTail.signal,
+      })
+      void agentTail.settle().catch((cause) => error(`[@codepuppy/ext] disabled project agents not removed: ${describe(cause)}`))
       const tail = providerAllowTail({
         transform: (callback) => context.provider.transform(callback),
-        activePlugins: async () => (((await context.plugin.list()) as { data?: Array<{ id?: string }> }).data ?? []).map((plugin) => String(plugin.id)),
-        env: process.env,
+        activePlugins,
+        allowed: providerAllowList,
         log,
         signal: providerTail.signal,
       })
       void tail.settle().catch((cause) => error(`[@codepuppy/ext] provider allow list not placed: ${describe(cause)}`))
       void (async () => {
-        for await (const _ of context.event.subscribe({ types: ["plugin.updated"], signal: providerTail.signal })) await tail.place()
+        for await (const _ of context.event.subscribe({ types: ["plugin.updated"], signal: providerTail.signal })) await Promise.all([tail.place(), agentTail.place()])
       })().catch((cause) => {
         if (!providerTail.signal.aborted) error(`[@codepuppy/ext] plugin event subscription ended: ${describe(cause)}`)
       })

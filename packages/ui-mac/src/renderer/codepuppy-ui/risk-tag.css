@@ -1,0 +1,42 @@
+/* `#1314` 风险标签 —— 只读小胶囊,写这次操作或这项能力有多危险。工具批准面板标题行与能力授权框能力行共用。
+   定义与改前改后见 docs/design/2026-11-13-1314-risk-tag/frame.html;文字固定五个词,颜色从绿、灰、琥珀到红逐级加重,
+   判断不了的只描边不填色(不是绿、也不是红)。静态:不能点、不能聚焦,没有悬停 / 按下 / 禁用;行变淡时跟着变淡。 */
+
+.a-risk-tag {
+  flex: none;
+  padding: 2px 7px;
+  border-radius: var(--a-radius-full);
+  font-size: var(--a-text-2xs);
+  font-weight: var(--a-weight-medium);
+  /* 行高取 snug:标签比标题行矮,加上它之后标题行高度不变。 */
+  line-height: var(--a-leading-snug);
+  letter-spacing: var(--a-tracking-wide);
+  white-space: nowrap;
+}
+
+.a-risk-tag[data-level="low"] {
+  background: var(--a-success-subtle);
+  color: var(--a-success-on-subtle);
+}
+
+.a-risk-tag[data-level="medium"] {
+  background: var(--a-bg-muted);
+  color: var(--a-text-tertiary);
+}
+
+.a-risk-tag[data-level="high"] {
+  background: var(--a-warning-subtle);
+  color: var(--a-warning-on-subtle);
+}
+
+.a-risk-tag[data-level="critical"] {
+  background: var(--a-error-subtle);
+  color: var(--a-error-on-subtle);
+}
+
+/* 不填色、只描一圈边:不是绿(不假装安全),也不是琥珀 / 红(不吓人)。 */
+.a-risk-tag[data-level="unknown"] {
+  background: transparent;
+  color: var(--a-text-secondary);
+  box-shadow: inset 0 0 0 1px var(--a-border-strong);
+}

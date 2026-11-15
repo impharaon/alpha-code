@@ -22,7 +22,10 @@ beforeEach(() => {
 })
 afterEach(() => rmSync(root, { recursive: true, force: true }))
 
-const envWith = (ref: string | undefined) => ({ CODEPUPPY_BASE_URL: GW, CODEPUPPY_PLATFORM_AUTH_REF: ref })
+// `#1698`:平台节点地址与凭据引用来自启动文档的 platform(此前是两个环境变量)。坏形状(缺引用、字面令牌)解析器本来就收不进文档,
+// 这里直接构造对象,判这一层自己也不把它们当凭据。
+const platformWith = (ref: string | undefined, base: string | null = GW) =>
+  ({ credentialRef: ref, ...(base === null ? {} : { modelProxyBaseURL: base }) }) as never
 
 /** 抛出的必须是 LoadAPIKeyError(按 SDK 自己的 isInstance 认),且消息不带令牌、不带路径。 */
 function expectLoadApiKeyError(run: () => unknown) {
@@ -41,36 +44,36 @@ function expectLoadApiKeyError(run: () => unknown) {
 describe("platformCredentialHeader —— 判据", () => {
   test("平台节点 + 文件在 ⇒ 每次调用现读文件,换文件后立刻是新值", () => {
     writeFileSync(keyFile, `${SENTINEL}-A\n`)
-    const env = envWith(`{file:${keyFile}}`)
-    expect(platformCredentialHeader({ providerBaseURL: GW, env })).toBe(`Bearer ${SENTINEL}-A`)
+    const platform = platformWith(`{file:${keyFile}}`)
+    expect(platformCredentialHeader({ providerBaseURL: GW, platform })).toBe(`Bearer ${SENTINEL}-A`)
     writeFileSync(keyFile, `${SENTINEL}-B`)
-    expect(platformCredentialHeader({ providerBaseURL: GW, env })).toBe(`Bearer ${SENTINEL}-B`)
+    expect(platformCredentialHeader({ providerBaseURL: GW, platform })).toBe(`Bearer ${SENTINEL}-B`)
   })
 
   test("文件缺席 / 为空 ⇒ LoadAPIKeyError,不回落任何值", () => {
-    const env = envWith(`{file:${keyFile}}`)
-    expectLoadApiKeyError(() => platformCredentialHeader({ providerBaseURL: GW, env }))
+    const platform = platformWith(`{file:${keyFile}}`)
+    expectLoadApiKeyError(() => platformCredentialHeader({ providerBaseURL: GW, platform }))
     writeFileSync(keyFile, "  \n")
-    expectLoadApiKeyError(() => platformCredentialHeader({ providerBaseURL: GW, env }))
+    expectLoadApiKeyError(() => platformCredentialHeader({ providerBaseURL: GW, platform }))
   })
 
   test("引用缺席 / 不是 {file:} 形状(哪怕是一个字面令牌)⇒ LoadAPIKeyError,字面值绝不当凭据发出", () => {
     writeFileSync(keyFile, SENTINEL)
-    expectLoadApiKeyError(() => platformCredentialHeader({ providerBaseURL: GW, env: envWith(undefined) }))
-    expectLoadApiKeyError(() => platformCredentialHeader({ providerBaseURL: GW, env: envWith(SENTINEL) }))
-    expectLoadApiKeyError(() => platformCredentialHeader({ providerBaseURL: GW, env: envWith(`prefix {file:${keyFile}}`) }))
+    expectLoadApiKeyError(() => platformCredentialHeader({ providerBaseURL: GW, platform: platformWith(undefined) }))
+    expectLoadApiKeyError(() => platformCredentialHeader({ providerBaseURL: GW, platform: platformWith(SENTINEL) }))
+    expectLoadApiKeyError(() => platformCredentialHeader({ providerBaseURL: GW, platform: platformWith(`prefix {file:${keyFile}}`) }))
   })
 
-  test("非平台节点(BYOK / 自定义 / 无 CODEPUPPY_BASE_URL)⇒ 不动请求头,也不读文件", () => {
+  test("非平台节点(BYOK / 自定义 / 文档里没有平台节点地址)⇒ 不动请求头,也不读文件", () => {
     let reads = 0
     const readFile = () => {
       reads++
       return SENTINEL
     }
     const ref = `{file:${keyFile}}`
-    expect(platformCredentialHeader({ providerBaseURL: "https://api.deepseek.com/v1", env: envWith(ref), readFile })).toBeUndefined()
-    expect(platformCredentialHeader({ providerBaseURL: GW, env: { CODEPUPPY_PLATFORM_AUTH_REF: ref }, readFile })).toBeUndefined()
-    expect(platformCredentialHeader({ providerBaseURL: undefined, env: envWith(ref), readFile })).toBeUndefined()
+    expect(platformCredentialHeader({ providerBaseURL: "https://api.deepseek.com/v1", platform: platformWith(ref), readFile })).toBeUndefined()
+    expect(platformCredentialHeader({ providerBaseURL: GW, platform: platformWith(ref, null), readFile })).toBeUndefined()
+    expect(platformCredentialHeader({ providerBaseURL: undefined, platform: platformWith(ref), readFile })).toBeUndefined()
     expect(reads).toBe(0)
   })
 })
@@ -78,11 +81,11 @@ describe("platformCredentialHeader —— 判据", () => {
 describe("platformRequestCredentialHeader —— http.request 上按请求地址判平台节点", () => {
   test("地址在平台节点之下 ⇒ 与 platformCredentialHeader 同一结果;别的主机、只是前缀相同的路径段 ⇒ 不动", () => {
     const reads: string[] = []
-    const env = { CODEPUPPY_BASE_URL: GW, CODEPUPPY_PLATFORM_AUTH_REF: "{file:/token}" }
+    const platform = platformWith("{file:/token}")
     const readFile = (file: string) => (reads.push(file), "tok")
-    expect(platformRequestCredentialHeader({ requestURL: `${GW}/chat/completions`, env, readFile })).toBe("Bearer tok")
-    expect(platformRequestCredentialHeader({ requestURL: "https://api.deepseek.com/v1/chat/completions", env, readFile })).toBeUndefined()
-    expect(platformRequestCredentialHeader({ requestURL: `${GW}evil/chat/completions`, env, readFile })).toBeUndefined()
+    expect(platformRequestCredentialHeader({ requestURL: `${GW}/chat/completions`, platform, readFile })).toBe("Bearer tok")
+    expect(platformRequestCredentialHeader({ requestURL: "https://api.deepseek.com/v1/chat/completions", platform, readFile })).toBeUndefined()
+    expect(platformRequestCredentialHeader({ requestURL: `${GW}evil/chat/completions`, platform, readFile })).toBeUndefined()
     expect(reads).toEqual(["/token"])
   })
 
@@ -90,11 +93,11 @@ describe("platformRequestCredentialHeader —— http.request 上按请求地址
     const readFile = () => "tok"
     const request = "https://gw.example/v1/chat/completions"
     for (const base of ["https://GW.example/v1", "https://gw.example:443/v1", "https://gw.example/v1/", "https://gw.example./v1"]) {
-      const env = { CODEPUPPY_BASE_URL: base, CODEPUPPY_PLATFORM_AUTH_REF: "{file:/token}" }
-      expect([base, platformRequestCredentialHeader({ requestURL: new Request(base.replace(/\/?$/, "/chat/completions")).url, env, readFile })]).toEqual([base, "Bearer tok"])
-      expect([base, platformRequestCredentialHeader({ requestURL: request, env, readFile })]).toEqual([base, "Bearer tok"])
+      const platform = platformWith("{file:/token}", base)
+      expect([base, platformRequestCredentialHeader({ requestURL: new Request(base.replace(/\/?$/, "/chat/completions")).url, platform, readFile })]).toEqual([base, "Bearer tok"])
+      expect([base, platformRequestCredentialHeader({ requestURL: request, platform, readFile })]).toEqual([base, "Bearer tok"])
     }
-    const env = { CODEPUPPY_BASE_URL: GW, CODEPUPPY_PLATFORM_AUTH_REF: "{file:/token}" }
+    const platform = platformWith("{file:/token}")
     for (const requestURL of [
       "https://gw.example.evil/v1/chat/completions",
       new Request("https://gw.example@evil/v1/chat/completions").url,
@@ -103,7 +106,7 @@ describe("platformRequestCredentialHeader —— http.request 上按请求地址
       "https://gw.example:8443/v1/chat/completions",
       "not a url",
     ])
-      expect([requestURL, platformRequestCredentialHeader({ requestURL, env, readFile })]).toEqual([requestURL, undefined])
+      expect([requestURL, platformRequestCredentialHeader({ requestURL, platform, readFile })]).toEqual([requestURL, undefined])
   })
 })
 

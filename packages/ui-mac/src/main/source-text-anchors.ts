@@ -105,7 +105,7 @@ export const DOWNGRADED_ANCHORS: Record<string, SourceTextEntry> = {
     lines: 1,
   },
   "packages/ui-mac/src/main/codepuppy-sidecar-wiring.test.ts": {
-    why: "`#1531` 那一条锚 sidecar.ts 里「引擎 import → ext 目录入口预载开始 → start()(Transform 里发布进程内 fetch)→ await 预载 → ready 上报」的下标先后(`#1667`:2.x 每个 Location 用新 URL 各求值一次 ext,不再锚「同一个 URL」)。两个不会让它变红的变异:①把 onDispatch 里的 publishInProcessEngine 改成发布一个不相干的函数(文本里那一段仍在);②在 await extPreload 之前加一条早退 return。sidecar.ts 顶层有副作用,import 不得;同文件另两条(真 spawnLocalServer + 假子进程)是行为判据。`#1578` 第 3 处读 server.ts:写 sidecar env 随包扩展清单的那一句,键名必须等于读它的 packages/ext/src/policy/bundled-plugin.ts(`#1662` 前是 v1 引擎的 codepuppy-bundled-plugin.ts)的 EXT_BUNDLED_MANIFEST_ENV、值指向 bundled-tools.json —— 任一侧改名(一个字母)即红,这一半主语是跨包逐字一致。守不住的:①那一句被包进恒假分支或 ext.path 永远为空(键从不写,文本仍在);②main 写对了但 sidecar 之后又把这个键剥掉。行为判据要走 spawnLocalServer 看 fork env,而 dev 下 ext.path 依赖未入库的 packages/ext/dist,门不保证它在。",
+    why: "`#1531` 那一条锚 sidecar.ts 里「引擎 import → ext 目录入口预载开始 → start()(Transform 里发布进程内 fetch)→ await 预载 → ready 上报」的下标先后(`#1667`:2.x 每个 Location 用新 URL 各求值一次 ext,不再锚「同一个 URL」)。两个不会让它变红的变异:①把 onDispatch 里的 publishInProcessEngine 改成发布一个不相干的函数(文本里那一段仍在);②在 await extPreload 之前加一条早退 return。sidecar.ts 顶层有副作用,import 不得;同文件另两条(真 spawnLocalServer + 假子进程)是行为判据。`#1698` 那一条锚 sidecar.ts 的启动关口顺序(装围栏 → 解析并发布启动文档 → 注入 → import 引擎 → 引擎关口 → startEngine);两步本身的行为判据在 sidecar-bootstrap-gate.test.ts 与 sidecar-engine-host.cases.ts。守不住的:①关口调用被包进恒假分支(文本仍在);②在发布之前插进一个按环境读决定的读方。(原 `#1578` 那一条锚 server.ts 写 sidecar env 的随包清单键;`#1698` 起清单路径是启动文档的类型化字段,值由 codepuppy-bootstrap-build.test.ts 判。)",
     evidence: "#1531",
     lines: 2,
   },
@@ -289,9 +289,9 @@ export const KEPT_SOURCE_TEXT_READS: Record<string, SourceTextEntry> = {
     lines: 3,
   },
   "packages/ui-mac/src/main/websearch-copies.test.ts": {
-    why: "10 处里 6 处是普查 / 负全称 / 跨包逐字一致(文本即产物);另 4 条是位置锚(闸是出网出口的第一句等)。这 4 条按本票分类法是减速带,但目标模块都是**可 import 的**,换真判据做得到 —— 而这份文件的 describe 自称 #223 R4 主判据,降不降级是那份已批基线的题目,不是本票的边界。如实登记为已知减速带,裁决在 #985。`#1662` I-09:v1 两条传输与普查网随 OpenCode 2 换代退役,剩 9 处(跨包逐字一致与 ext 钩子 / transform 的位置锚)。",
+    why: "10 处里 6 处是普查 / 负全称 / 跨包逐字一致(文本即产物);另 4 条是位置锚(闸是出网出口的第一句等)。这 4 条按本票分类法是减速带,但目标模块都是**可 import 的**,换真判据做得到 —— 而这份文件的 describe 自称 #223 R4 主判据,降不降级是那份已批基线的题目,不是本票的边界。如实登记为已知减速带,裁决在 #985。`#1662` I-09:v1 两条传输与普查网随 OpenCode 2 换代退役,剩 9 处(跨包逐字一致与 ext 钩子 / transform 的位置锚)。`#1698` G2:信道名随启动文档退役,「跨包逐字一致」改判两条腿读同一个 killSwitch 与唯一核验源,「DEF / ARM 分支」一条换成行为判据退役,剩 6 处。",
     evidence: "#985",
-    lines: 9,
+    lines: 6,
   },
   "packages/ui-mac/test-component/local-package-renderer.cases.ts": {
     why: "主语是 preload 暴露的通道名与 main 侧常量**逐字一致**(写错一个字母 = 功能死掉且什么都不红)。跨进程的字符串相等只能对文本断言,没有更细的粒度。",

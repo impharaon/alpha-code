@@ -8,6 +8,7 @@
 // darwin-only;别的平台上整份 describe.skip(gate-files.tsv 按 [平台:darwin] 登记)。不需要 Electron 二进制。
 
 import { afterAll, beforeAll, describe, expect, test } from "bun:test"
+import { publishTestBootstrap, unpublishTestBootstrap } from "../../test-component/codepuppy-bootstrap-fixture"
 import { spawnSync } from "node:child_process"
 import { existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
 import { homedir } from "node:os"
@@ -39,7 +40,6 @@ describeSandbox("#1709 真围栏:project-trust/<env>.json 在生产 profile 下�
   let recordDir = ""
   let record = ""
   let profileFile = ""
-  let savedGlobalDir: string | undefined
 
   beforeAll(() => {
     scratch = mkdtempSync(join(homedir(), ".ac1709-fence-"))
@@ -56,14 +56,12 @@ describeSandbox("#1709 真围栏:project-trust/<env>.json 在生产 profile 下�
       // `#1337`:生产 profile 含网络行;这里不出网,给一个没人听的端口即可。
       renderProcessFenceProfile({ workspaces: [workspace], codepuppyGlobalRoot: envRoot, userDataPath: userData, stateHome: userData, roots: resolveEngineRoots({}, homedir()), egressProxyPort: 4443 }),
     )
-    savedGlobalDir = process.env.CODEPUPPY_GLOBAL_DIR
     __resetCodePuppyEnvironmentForTests()
-    process.env.CODEPUPPY_GLOBAL_DIR = envRoot
+    publishTestBootstrap({ globalRoot: envRoot })
   })
 
   afterAll(() => {
-    if (savedGlobalDir === undefined) delete process.env.CODEPUPPY_GLOBAL_DIR
-    else process.env.CODEPUPPY_GLOBAL_DIR = savedGlobalDir
+    unpublishTestBootstrap()
     rmSync(scratch, { recursive: true, force: true })
   })
 

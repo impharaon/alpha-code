@@ -43,8 +43,12 @@ const UPSTREAMS = [
     // 合入,SHA 保持可达)。字节上会动的只有 wire schema(TokenClaimsV1 各分支的 iss/aud const,外加
     // 9cf67bd 之后平台自己新增的 $defs —— 桌面不解码它们)、artifact-descriptor schema、以及
     // alpha-web-22 的令牌夹具;桌面 decoder 在同一提交里改成只认新值。
+    //
+    // #1686 / platform#582:前移到平台合并提交 491707f,拿到云任务表单预检的 `AccountStatusV1`
+    // 与它的 producer fixture(真路由 + 真 accountApp 采集)。3f2f0dd..491707f 之间已钉文件里只有 wire
+    // schema 变,且只增 $defs、不改既有定义 —— 桌面已经在解码的形状一个都没动。
     repo: "jinjunnn/alpha-platform",
-    commit: "3f2f0dda43066b42eac584d27e75844d42635369",
+    commit: "491707fc72694506ca9bd4af24f1daaeb06a2438",
     lock: "alpha-platform-contract.lock.json",
     vendor: "vendor/alpha-platform",
     sourceEnv: "CODEPUPPY_PLATFORM_CONTRACT_SOURCE",
@@ -60,6 +64,7 @@ const UPSTREAMS = [
       "contracts/v1/fixtures/producer/cloud-job-status.json",
       "contracts/v1/fixtures/producer/cloud-job-status-cancelling.json",
       "contracts/v1/fixtures/producer/ledger-page.json",
+      "contracts/v1/fixtures/producer/account-status.json",
       "contracts/v1/fixtures/consumers/alpha-code-224/cloud-and-artifact.json",
       "contracts/v1/fixtures/consumers/alpha-web-22/platform-access-claims.json",
       "contracts/v1/fixtures/invalid/artifact-inline-content.json",

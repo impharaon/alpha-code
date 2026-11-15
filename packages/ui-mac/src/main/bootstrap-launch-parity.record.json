@@ -1,0 +1,645 @@
+{
+  "sidecar": {
+    "userData": "<root>/parity-userdata",
+    "initialDirectory": "<root>/home/parity-workspace",
+    "database": "<root>/data/opencode/opencode-dev.db",
+    "engineConfigDirectory": "<root>/config/opencode",
+    "extPlugin": "<root>/parity-ext",
+    "registryChannel": "dev",
+    "fence": {
+      "profile": "(version 1)\n(allow default)\n(deny file-write*)\n",
+      "addonPath": "/nonexistent/codepuppy_fence.node"
+    }
+  },
+  "start": {
+    "database": {
+      "path": "<root>/data/opencode/opencode-dev.db"
+    },
+    "config": {
+      "directory": "<root>/config/opencode",
+      "file": "<root>/parity-userdata/codepuppy-engine-config/codepuppy-explicit.json"
+    },
+    "models": {
+      "file": "<root>/parity-userdata/codepuppy-engine-config/models.json",
+      "fetch": false
+    },
+    "fs": {
+      "filewatcher": true,
+      "fff": true
+    }
+  },
+  "injection": {
+    "content": {
+      "$schema": "https://opencode.ai/config.json",
+      "plugins": [
+        "<root>/parity-ext",
+        "-opencode.config.compatibility"
+      ],
+      "experimental": {
+        "todo": true,
+        "schedules": false,
+        "media_blob": false,
+        "artifacts": false,
+        "background_compaction": false
+      },
+      "instructions": [
+        "<root>/parity-userdata/codepuppy-identity.md",
+        "<root>/parity-userdata/codepuppy-behavior.md"
+      ],
+      "providers": {
+        "codepuppy": {
+          "name": "Code Puppy",
+          "package": "aisdk:@ai-sdk/openai-compatible",
+          "settings": {
+            "baseURL": "http://<model>/v1",
+            "apiKey": "codepuppy-platform-credential-from-request-header"
+          },
+          "models": {}
+        },
+        "codepuppy-internal-catalog-ready": {
+          "name": "Code Puppy catalog readiness marker",
+          "env": []
+        }
+      },
+      "policies": [
+        {
+          "action": "provider.use",
+          "resource": "*",
+          "effect": "deny"
+        },
+        {
+          "action": "provider.use",
+          "resource": "codepuppy",
+          "effect": "allow"
+        },
+        {
+          "action": "provider.use",
+          "resource": "codepuppy-internal-catalog-ready",
+          "effect": "allow"
+        },
+        {
+          "action": "plugin.use",
+          "resource": "*",
+          "effect": "deny"
+        },
+        {
+          "action": "plugin.use",
+          "resource": "<root>/parity-ext",
+          "effect": "allow"
+        }
+      ],
+      "agents": {
+        "codepuppy-automation": {
+          "description": "alpha 自动化定时任务专用只读 agent(无人值守;不能改文件、不能跑命令)",
+          "hidden": true,
+          "mode": "primary",
+          "system": "你是 Code Puppy 的自动化任务执行器,在无人值守的定时任务里运行。只读环境:你不能修改文件、不能执行 shell 命令;需要变更时,把建议写进最终答复。没有人会回答追问——绝不提问,基于可得信息直接完成任务。最终答复即任务报告:用 Markdown,先一行结论,再列依据与建议;如实标注做不到的部分。",
+          "permissions": [
+            {
+              "action": "tool-policy-default",
+              "resource": "*",
+              "effect": "ask"
+            },
+            {
+              "action": "read",
+              "resource": "*",
+              "effect": "allow"
+            },
+            {
+              "action": "read",
+              "resource": "*.env*",
+              "effect": "deny"
+            },
+            {
+              "action": "glob",
+              "resource": "*",
+              "effect": "allow"
+            },
+            {
+              "action": "grep",
+              "resource": "*",
+              "effect": "allow"
+            },
+            {
+              "action": "list",
+              "resource": "*",
+              "effect": "allow"
+            },
+            {
+              "action": "webfetch",
+              "resource": "*",
+              "effect": "allow"
+            },
+            {
+              "action": "websearch",
+              "resource": "*",
+              "effect": "allow"
+            },
+            {
+              "action": "skill",
+              "resource": "*",
+              "effect": "allow"
+            },
+            {
+              "action": "edit",
+              "resource": "*",
+              "effect": "deny"
+            },
+            {
+              "action": "shell",
+              "resource": "*",
+              "effect": "deny"
+            },
+            {
+              "action": "external_directory",
+              "resource": "*",
+              "effect": "deny"
+            },
+            {
+              "action": "doom_loop",
+              "resource": "*",
+              "effect": "deny"
+            },
+            {
+              "action": "question",
+              "resource": "*",
+              "effect": "deny"
+            },
+            {
+              "action": "subagent",
+              "resource": "*",
+              "effect": "deny"
+            }
+          ]
+        },
+        "codepuppy-readonly": {
+          "description": "只读模式:可读取/检索/联网,不能修改文件、不能执行命令(composer 权限档「只读」)",
+          "hidden": true,
+          "mode": "primary",
+          "system": "当前处于用户选择的只读模式:你不能修改文件、不能执行 shell 命令。可以读取、检索、联网调研与分析;需要变更时,给出明确的修改建议(含文件与位置),由用户切回可写模式执行。不要尝试绕过限制;做不到的部分如实说明。",
+          "permissions": [
+            {
+              "action": "read",
+              "resource": "*",
+              "effect": "allow"
+            },
+            {
+              "action": "read",
+              "resource": "*.env*",
+              "effect": "deny"
+            },
+            {
+              "action": "glob",
+              "resource": "*",
+              "effect": "allow"
+            },
+            {
+              "action": "grep",
+              "resource": "*",
+              "effect": "allow"
+            },
+            {
+              "action": "list",
+              "resource": "*",
+              "effect": "allow"
+            },
+            {
+              "action": "webfetch",
+              "resource": "*",
+              "effect": "allow"
+            },
+            {
+              "action": "websearch",
+              "resource": "*",
+              "effect": "allow"
+            },
+            {
+              "action": "skill",
+              "resource": "*",
+              "effect": "allow"
+            },
+            {
+              "action": "edit",
+              "resource": "*",
+              "effect": "deny"
+            },
+            {
+              "action": "shell",
+              "resource": "*",
+              "effect": "deny"
+            },
+            {
+              "action": "external_directory",
+              "resource": "*",
+              "effect": "deny"
+            },
+            {
+              "action": "subagent",
+              "resource": "*",
+              "effect": "deny"
+            },
+            {
+              "action": "subagent",
+              "resource": "codepuppy-readonly",
+              "effect": "allow"
+            },
+            {
+              "action": "mcp:*",
+              "resource": "*",
+              "effect": "ask"
+            },
+            {
+              "action": "plugin:*",
+              "resource": "*",
+              "effect": "ask"
+            }
+          ]
+        },
+        "codepuppy-ask": {
+          "description": "请求审批:与默认档相同,但修改文件、执行命令前先逐次征求用户批准(composer 权限档「请求审批」)",
+          "hidden": true,
+          "mode": "primary",
+          "permissions": [
+            {
+              "action": "tool-policy-default",
+              "resource": "*",
+              "effect": "ask"
+            },
+            {
+              "action": "question",
+              "resource": "*",
+              "effect": "allow"
+            },
+            {
+              "action": "plan_enter",
+              "resource": "*",
+              "effect": "allow"
+            },
+            {
+              "action": "websearch",
+              "resource": "*",
+              "effect": "allow"
+            },
+            {
+              "action": "edit",
+              "resource": "*",
+              "effect": "ask"
+            },
+            {
+              "action": "shell",
+              "resource": "*",
+              "effect": "ask"
+            },
+            {
+              "action": "subagent",
+              "resource": "*",
+              "effect": "ask"
+            },
+            {
+              "action": "subagent",
+              "resource": "codepuppy-ask",
+              "effect": "allow"
+            },
+            {
+              "action": "doom_loop",
+              "resource": "*",
+              "effect": "ask"
+            },
+            {
+              "action": "read",
+              "resource": "*.env",
+              "effect": "ask"
+            },
+            {
+              "action": "read",
+              "resource": "*.env.*",
+              "effect": "ask"
+            },
+            {
+              "action": "read",
+              "resource": "*.env.example",
+              "effect": "allow"
+            }
+          ]
+        },
+        "codepuppy-automation-standard": {
+          "description": "alpha 自动化 standard 档(可写:能改文件、能执行常规命令;破坏类命令仍被拦)",
+          "hidden": true,
+          "mode": "primary",
+          "system": "你是 Code Puppy 的自动化任务执行器,在无人值守的定时任务里运行(可写档)。可以修改文件与执行常规命令;破坏性操作(删除大量文件、系统级变更、对外发布)被权限拦截,也不要尝试。没有人会回答追问——绝不提问,基于可得信息直接完成任务。最终答复即任务报告:用 Markdown,先一行结论,再列所做变更与依据;如实标注做不到的部分。",
+          "permissions": [
+            {
+              "action": "tool-policy-default",
+              "resource": "*",
+              "effect": "ask"
+            },
+            {
+              "action": "read",
+              "resource": "*",
+              "effect": "allow"
+            },
+            {
+              "action": "read",
+              "resource": "*.env*",
+              "effect": "deny"
+            },
+            {
+              "action": "glob",
+              "resource": "*",
+              "effect": "allow"
+            },
+            {
+              "action": "grep",
+              "resource": "*",
+              "effect": "allow"
+            },
+            {
+              "action": "list",
+              "resource": "*",
+              "effect": "allow"
+            },
+            {
+              "action": "webfetch",
+              "resource": "*",
+              "effect": "allow"
+            },
+            {
+              "action": "websearch",
+              "resource": "*",
+              "effect": "allow"
+            },
+            {
+              "action": "skill",
+              "resource": "*",
+              "effect": "allow"
+            },
+            {
+              "action": "edit",
+              "resource": "*",
+              "effect": "allow"
+            },
+            {
+              "action": "shell",
+              "resource": "*",
+              "effect": "allow"
+            },
+            {
+              "action": "shell",
+              "resource": "rm *",
+              "effect": "deny"
+            },
+            {
+              "action": "shell",
+              "resource": "*/rm *",
+              "effect": "deny"
+            },
+            {
+              "action": "shell",
+              "resource": "command *",
+              "effect": "deny"
+            },
+            {
+              "action": "shell",
+              "resource": "exec *",
+              "effect": "deny"
+            },
+            {
+              "action": "shell",
+              "resource": "env *",
+              "effect": "deny"
+            },
+            {
+              "action": "shell",
+              "resource": "xargs *",
+              "effect": "deny"
+            },
+            {
+              "action": "shell",
+              "resource": "sh *",
+              "effect": "deny"
+            },
+            {
+              "action": "shell",
+              "resource": "bash *",
+              "effect": "deny"
+            },
+            {
+              "action": "shell",
+              "resource": "zsh *",
+              "effect": "deny"
+            },
+            {
+              "action": "shell",
+              "resource": "eval *",
+              "effect": "deny"
+            },
+            {
+              "action": "shell",
+              "resource": "find * -delete*",
+              "effect": "deny"
+            },
+            {
+              "action": "shell",
+              "resource": "find * -exec *",
+              "effect": "deny"
+            },
+            {
+              "action": "shell",
+              "resource": "git clean*",
+              "effect": "deny"
+            },
+            {
+              "action": "shell",
+              "resource": "git reset --hard*",
+              "effect": "deny"
+            },
+            {
+              "action": "shell",
+              "resource": "sudo *",
+              "effect": "deny"
+            },
+            {
+              "action": "shell",
+              "resource": "chmod *",
+              "effect": "deny"
+            },
+            {
+              "action": "shell",
+              "resource": "chown *",
+              "effect": "deny"
+            },
+            {
+              "action": "shell",
+              "resource": "dd *",
+              "effect": "deny"
+            },
+            {
+              "action": "shell",
+              "resource": "mkfs*",
+              "effect": "deny"
+            },
+            {
+              "action": "shell",
+              "resource": "shutdown*",
+              "effect": "deny"
+            },
+            {
+              "action": "shell",
+              "resource": "reboot*",
+              "effect": "deny"
+            },
+            {
+              "action": "shell",
+              "resource": "kill *",
+              "effect": "deny"
+            },
+            {
+              "action": "shell",
+              "resource": "killall *",
+              "effect": "deny"
+            },
+            {
+              "action": "shell",
+              "resource": "git push*",
+              "effect": "deny"
+            },
+            {
+              "action": "shell",
+              "resource": "npm publish*",
+              "effect": "deny"
+            },
+            {
+              "action": "shell",
+              "resource": "curl * | *",
+              "effect": "deny"
+            },
+            {
+              "action": "shell",
+              "resource": "wget * | *",
+              "effect": "deny"
+            },
+            {
+              "action": "external_directory",
+              "resource": "*",
+              "effect": "deny"
+            },
+            {
+              "action": "doom_loop",
+              "resource": "*",
+              "effect": "deny"
+            },
+            {
+              "action": "question",
+              "resource": "*",
+              "effect": "deny"
+            },
+            {
+              "action": "subagent",
+              "resource": "*",
+              "effect": "deny"
+            }
+          ]
+        }
+      },
+      "mcp": {
+        "servers": {
+          "codepuppy": {
+            "type": "remote",
+            "url": "http://<cloud>/mcp",
+            "headers": {
+              "Authorization": "Bearer {file:<root>/parity-userdata/codepuppy-secrets/CODEPUPPY_MCP_TOKEN}"
+            },
+            "oauth": false
+          }
+        }
+      }
+    },
+    "explicit": {
+      "$schema": "https://opencode.ai/config.json",
+      "skills": [
+        "<root>/parity-factory-skills",
+        "./.codepuppy/skills"
+      ],
+      "commands": {
+        "init": {
+          "template": "sha256:6368fc8ee8183e935f0a08a9968e80fe3240748435e44d1d7dc78eafb0da9bda",
+          "description": "guided AGENTS.md setup"
+        },
+        "review": {
+          "template": "sha256:e2a51212fa708bd54b23d82ef335d6b3f7565aeda8e6ee1fefa33859bcf23ed1",
+          "description": "review changes [commit|branch|pr], defaults to uncommitted",
+          "subagent": true
+        }
+      },
+      "policies": [
+        {
+          "action": "provider.use",
+          "resource": "*",
+          "effect": "deny"
+        },
+        {
+          "action": "provider.use",
+          "resource": "codepuppy",
+          "effect": "allow"
+        },
+        {
+          "action": "provider.use",
+          "resource": "codepuppy-internal-catalog-ready",
+          "effect": "allow"
+        },
+        {
+          "action": "plugin.use",
+          "resource": "*",
+          "effect": "deny"
+        },
+        {
+          "action": "plugin.use",
+          "resource": "<root>/parity-ext",
+          "effect": "allow"
+        }
+      ]
+    },
+    "models": {
+      "codepuppy": {
+        "id": "codepuppy",
+        "name": "Code Puppy",
+        "env": [],
+        "api": "http://<model>/v1",
+        "npm": "@ai-sdk/openai-compatible",
+        "models": {}
+      },
+      "codepuppy-internal-catalog-ready": {
+        "id": "codepuppy-internal-catalog-ready",
+        "name": "Code Puppy catalog readiness marker",
+        "env": [],
+        "models": {}
+      }
+    },
+    "secretFiles": [
+      "CODEPUPPY_API_KEY",
+      "CODEPUPPY_CLOUD_TOKEN",
+      "CODEPUPPY_MCP_TOKEN"
+    ]
+  },
+  "engine": {
+    "ext": "active",
+    "providers": [
+      "codepuppy",
+      "codepuppy-internal-catalog-ready"
+    ],
+    "cloudMcp": "connected",
+    "policyAccount": "acct:956e32ff805bb1629e105844f28d706c92b10334fbafa917a275e81b6fd70c48",
+    "proxiedFailure": {
+      "via": "egress-proxy",
+      "proxyOrigin": "http://127.0.0.1:4433"
+    }
+  },
+  "credentials": {
+    "model": [
+      "Bearer sk-cp-parity"
+    ],
+    "cloud": [
+      "Bearer synthetic-mcp-parity"
+    ]
+  }
+}

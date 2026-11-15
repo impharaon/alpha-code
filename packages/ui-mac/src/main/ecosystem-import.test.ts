@@ -1,4 +1,5 @@
 // REQ-063 — 外部生态继承 default-deny + consent 导入(检测/转换/记账纯逻辑,temp 目录)。
+import { codepuppyBootstrap } from "@opencode/util/codepuppy-bootstrap"
 import { afterEach, beforeEach, describe, expect, test } from "bun:test"
 import * as fs from "node:fs"
 import * as os from "node:os"
@@ -18,6 +19,7 @@ import {
 } from "./ecosystem-import"
 import { PROJECT_HIDDEN_DIR } from "../shared/project-hidden-dir"
 import { ECOSYSTEM_COMPATIBILITY_PLUGIN, injectCodePuppyConfig } from "./codepuppy-config-injection"
+import { publishMainBootstrap, unpublishTestBootstrap } from "../../test-component/codepuppy-bootstrap-fixture"
 
 let tmp: string
 const savedEnv: Record<string, string | undefined> = {}
@@ -32,6 +34,7 @@ beforeEach(() => {
   process.env.CODEPUPPY_GLOBAL_DIR = path.join(tmp, PROJECT_HIDDEN_DIR)
 })
 afterEach(() => {
+  unpublishTestBootstrap()
   for (const k of ENV_KEYS) {
     if (savedEnv[k] === undefined) delete process.env[k]
     else process.env[k] = savedEnv[k]
@@ -47,11 +50,14 @@ const mkSkill = (root: string, family: ".claude" | ".agents", name: string) => {
 }
 
 // `#1667`(裁决书 N3):default-deny 的唯一机制换成注入配置里的移除指令(v1 的两个进程级 flag 在 2.x 无读者,已删除);
-// 逃生开关 CODEPUPPY_ECOSYSTEM_INHERIT=1 仍是「整机恢复上游继承」。真引擎上的判据(三类技能根进不进 /api/skill)在
-// codepuppy-config-injection-engine.cases.ts。
+// 逃生开关 CODEPUPPY_ECOSYSTEM_INHERIT=1 仍是「整机恢复上游继承」(`#1698`:main 读它写进启动文档的 switches.ecosystemInherit,sidecar 在注入前
+// 发布;这里的 main 环境就是 process.env)。真引擎上的判据(三类技能根进不进 /api/skill)在 codepuppy-config-injection-engine.cases.ts。
 describe("外部生态 default-deny —— T1(注入的移除指令 + 逃生)", () => {
-  const plugins = () =>
-    (JSON.parse(injectCodePuppyConfig(path.join(tmp, "userdata"), undefined, "stable").config.content) as { plugins: string[] }).plugins
+  const plugins = () => {
+    const userData = path.join(tmp, "userdata")
+    publishMainBootstrap({ userData, engineConfigDirectory: path.join(tmp, "engine-config") })
+    return (JSON.parse(injectCodePuppyConfig(userData, undefined, "stable", codepuppyBootstrap().paths.userConfig ?? null).config.content) as { plugins: string[] }).plugins
+  }
   test("默认:注入配置的 plugins 里有 -opencode.config.compatibility(.claude / .agents 两类技能根的唯一装载者被移除)", () => {
     expect(plugins()).toContain(`-${ECOSYSTEM_COMPATIBILITY_PLUGIN}`)
   })

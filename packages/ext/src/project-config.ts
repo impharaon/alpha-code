@@ -6,6 +6,7 @@
 // (与全局 REQ-059 同一 schema 教训,数组会被引擎拒)。plugin 不在此(走 host fan-out,ADR-006 生 TS 雷)。
 // `#1665`(OpenCode 2):合并结果是一份 v1 形状的小对象,由 engine-transforms.ts 翻译进 2.x 的按域 transform。
 
+import { codepuppyBootstrap } from "../../util/src/codepuppy-bootstrap"
 import { lstatSync, realpathSync } from "node:fs"
 import { homedir } from "node:os"
 import { isAbsolute, join, normalize, relative, resolve } from "node:path"
@@ -83,18 +84,20 @@ export function withProjectDirectoryIdentity<T>(
   return { ok: true, value: operation(current.root) }
 }
 
-/** sidecar/ext 无 main 快照，必须只消费 main 已派生的 canonical root。 */
-export function requireCodePuppyGlobalRoot(value: string | undefined = process.env.CODEPUPPY_GLOBAL_DIR, homeDir: string = homedir()): string {
+const GLOBAL_ROOT = "bootstrap paths.globalRoot"
+
+/** sidecar/ext 无 main 快照，必须只消费 main 已派生的 canonical root(`#1698`:启动文档的 `paths.globalRoot`)。 */
+export function requireCodePuppyGlobalRoot(value: string | undefined = codepuppyBootstrap().paths.globalRoot, homeDir: string = homedir()): string {
   const raw = value?.trim()
-  if (!raw || !isAbsolute(raw)) throw new Error("CODEPUPPY_GLOBAL_DIR requires an absolute initialized root")
+  if (!raw || !isAbsolute(raw)) throw new Error(`${GLOBAL_ROOT} requires an absolute initialized root`)
   const candidate = normalize(raw)
   const retired = normalize(join(homeDir, ".alpha"))
-  if (related(candidate, retired)) throw new Error("CODEPUPPY_GLOBAL_DIR is related to the retired global root")
+  if (related(candidate, retired)) throw new Error(`${GLOBAL_ROOT} is related to the retired global root`)
   try {
     const canonical = normalize(realpathSync(candidate))
     const stat = lstatSync(candidate)
     if (stat.isSymbolicLink() || !stat.isDirectory() || canonical !== candidate)
-      throw new Error("CODEPUPPY_GLOBAL_DIR is not the canonical directory")
+      throw new Error(`${GLOBAL_ROOT} is not the canonical directory`)
     const home = normalize(realpathSync(homeDir))
     const retiredCanonical = (() => {
       try {
@@ -104,11 +107,11 @@ export function requireCodePuppyGlobalRoot(value: string | undefined = process.e
         return join(home, ".alpha")
       }
     })()
-    if (related(canonical, retiredCanonical)) throw new Error("CODEPUPPY_GLOBAL_DIR resolves to the retired global root")
+    if (related(canonical, retiredCanonical)) throw new Error(`${GLOBAL_ROOT} resolves to the retired global root`)
     return canonical
   } catch (error) {
-    if (error instanceof Error && error.message.startsWith("CODEPUPPY_GLOBAL_DIR")) throw error
-    throw new Error("CODEPUPPY_GLOBAL_DIR identity cannot be confirmed", { cause: error })
+    if (error instanceof Error && error.message.startsWith(GLOBAL_ROOT)) throw error
+    throw new Error(`${GLOBAL_ROOT} identity cannot be confirmed`, { cause: error })
   }
 }
 
@@ -128,7 +131,7 @@ export type MergeResult = {
   gatedExecutable: string[]
 }
 
-/** 信任门(REQ-060 §3):mcp = 可执行连接器,只在 trustExecutable 时加载;agent 的 permission/tools/model/disable/mode 同受此门(REQ-236 P1、#1693),其余 agent 字段、command、skills = 文本注入,恒加载。
+/** 信任门(REQ-060 §3):mcp = 可执行连接器,只在 trustExecutable 时加载;agent 的 permission/tools/model/disable/mode/steps/maxSteps 同受此门(REQ-236 P1、#1693、#1700),其余 agent 字段、command、skills = 文本注入,恒加载。
  *  opts.directory:项目根 —— skills.paths 的相对条目("./…")以此解析为绝对(项目可移动,codepuppy.jsonc 存相对)。 */
 export function mergeProjectConfig(
   cfg: Record<string, unknown>,
@@ -152,7 +155,7 @@ export function mergeProjectConfig(
     }
   }
 
-  // agent:说明类字段恒加载;permission/tools/model/disable/mode 会改写权限与模型(REQ-236 P1、#1693)→ 未信任时剥掉。
+  // agent:说明类字段恒加载;permission/tools/model/disable/mode/steps/maxSteps 会改写权限、模型与执行预算(REQ-236 P1、#1693、#1700)→ 未信任时剥掉。
   if (isObj(proj.agent)) {
     const src = trust ? (proj.agent as Record<string, unknown>) : stripAgentControl(proj.agent as Record<string, unknown>)
     if (mergeNamed(cfg, src, "agent")) added.push("agent.*")
@@ -185,7 +188,11 @@ export function mergeProjectConfig(
 
 const isObj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === "object" && !Array.isArray(v)
 
-/** 去掉每个 agent 条目里能改写权限/模型的字段,其余(prompt/description…)原样保留。 */
+// `tools`(#1693)与 `permission` 同样翻成权限规则(engine-transforms.ts `permissionRules`),所以同一条门。
+// `steps` / `maxSteps`(#1700 Codex R1/1 M3)是一个回答里最多调几次模型的预算 —— 提高它 = 多花钱,是权限之外的同一类控制,同一条门。
+// `variant` 不在这里:它只随同一条里合法的 `model` 生效(engine-transforms.ts `modelRef`),而 `model` 已被剥掉。
+
+/** 去掉每个 agent 条目里能改写权限/模型/执行预算的字段,其余(prompt/description…)原样保留。 */
 function stripAgentControl(agents: Record<string, unknown>): Record<string, unknown> {
   const out: Record<string, unknown> = {}
   for (const [name, entry] of Object.entries(agents)) {
@@ -223,7 +230,7 @@ function isRealDirectory(path: string): boolean {
 }
 
 /** 项目扩展信任门 consent(REQ-060;`#1709`):只认用户在确认框里的决定 —— main 写进 `<casBaseRoot>/project-trust/<env>.json`、
- *  按规范项目目录 + 目录 inode 登记的那一条(project-trust-truth.ts;位置只由 main 派生的 CODEPUPPY_GLOBAL_DIR 算出)。
+ *  按规范项目目录 + 目录 inode 登记的那一条(project-trust-truth.ts;位置只由启动文档 paths.globalRoot 中 main 派生的根算出)。
  *  项目目录里的任何文件都不算,包括旧的 `.codepuppy/prefs.json` 里的 `extensionsConsent`。
  *  没有记录 / 读不出 / 拒绝 / 旧版本 = 不信任(默认拒绝可执行物,安全红线);身份漂移 = null。 */
 export function readProjectExtensionsConsent(project: ProjectRoot): boolean | null {

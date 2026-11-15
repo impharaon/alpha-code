@@ -13,6 +13,7 @@ import {
   resolveMacTargetArch,
 } from "./scripts/target-arch"
 import { assertReleaseSource } from "./scripts/release-source"
+import { isReleaseBuild } from "./scripts/build-identity"
 
 // REQ-089 AC3: the OS protocol list has exactly one source. The installer metadata that makes a
 // cold-start deep link reach the app at all is derived from the same manifest the runtime
@@ -160,7 +161,7 @@ const getBase = (appId: string): Configuration => ({
       // 复制到 dist/ 并带哈希名)—— plugin.js 用 `import.meta.url` 相对解析它,所以两者必须落在同一目录。
       // 漏了它不会红在打包,会红在第一次识图(装 photon 时 ENOENT ⇒ 图片一律按「本机无法解码」处理)。
       // `#1578`(REQ-236 §2.6-7):bundled-tools.json = ext 构建写出的随包清单(plugin.js 的 sha256 + 自有工具名),
-      // main 经 CODEPUPPY_EXT_BUNDLED_MANIFEST 指给引擎;漏了它不会红在打包,而是自有工具全部按第三方插件显示。
+      // main 经启动文档的 paths.extBundledManifest 指给引擎(`#1698`);漏了它不会红在打包,而是自有工具全部按第三方插件显示。
       from: "../ext/dist/",
       to: "codepuppy-ext/",
       // `#1667`:2.x 只装目录形式的本地插件,目录入口是 `server.js`(L3 的构建产出);<resources>/codepuppy-ext 整个目录交给引擎。
@@ -230,7 +231,7 @@ const getBase = (appId: string): Configuration => ({
   // 任一不过即抛,宁可不出包,也不出一个终端打不开的包。
   beforePack: async (context) => {
     if (context.electronPlatformName !== "darwin") return
-    if (channel !== "dev" && shouldSign) assertReleaseSource(packageDir)
+    if (isReleaseBuild(channel, process.env)) assertReleaseSource(packageDir)
     assertMacTargetArch({ packingArch: Arch[context.arch], packageDir })
   },
   // `#1669`:装包后、签名前核对引擎原生资源在包里的落点 —— 每个都解包、加载点的目标在解包目录里、可执行的带执行位、

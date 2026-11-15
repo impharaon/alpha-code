@@ -20,8 +20,8 @@
 // ── 技能资产随包发出去之后,有**两条**装载通道(`#1250`,别只看一条就下结论)────────────
 //
 //   通道 A —— **出厂注入**(零用户动作):本文件的 `FACTORY_SKILL_IDS` + `factorySkillSources()`
-//     是唯一权威 → `reconcileFactorySkills().paths` → env `CODEPUPPY_FACTORY_SKILL_DIRS` →
-//     `packages/ext/src/factory-paths.ts` 内存注入 `cfg.skills.paths` → 引擎扫描。
+//     是唯一权威 → `reconcileFactorySkills().paths` → boot 时记下(`setFactorySkillDirsForFork`)→ 每次 fork 写进启动文档的
+//     `skills.factoryDirs`(`#1698`)→ sidecar 的注入写进显式文件的 `skills`、ext 的目录规则放行它们 → 引擎扫描。
 //   通道 B —— **定制中心按需安装**(Extension Hub E1b,ADR-014):catalog 条目的
 //     `installSpec.source === "builtin"` + `builtinAssetKey: "skills/<name>"` →
 //     `ext-install-planner.ts` 的 builtin 分支 → `ext-fs-installer.ts` 的
@@ -29,7 +29,7 @@
 //     `engine-config-truth.ts` 的 `ensureSkillsPath` 把那个目录写进 codepuppy.jsonc 的
 //     `skills.paths` → 同一个引擎扫描。
 //
-// 所以「某个目录不在 `CODEPUPPY_FACTORY_SKILL_DIRS` 里」**不等于**「它永不装载」——
+// 所以「某个目录不在启动文档的 `skills.factoryDirs` 里」**不等于**「它永不装载」——
 // `resources/skills/` 下的 `codepuppy-upstream-sync` / `safe-refactor` 走的正是通道 B
 // (`#1250` 的票面前提据此更正)。判据不写在这段散文里:
 // `codepuppy-skill-packaging-census.test.ts` 每次跑都从两条通道的**权威**重算一遍归属,
@@ -241,6 +241,20 @@ export function reconcileFactorySkills(
 
   lastActive = result.active
   return result
+}
+
+// `#1698`(design §4.4):boot 时那次对账的注入组,每次 fork 交给启动文档的 `skills.factoryDirs`。没对账(TEST_ONBOARDING)或对账失败 ⇒ 空,
+// 与此前「环境变量没写」同一结果。
+let forkFactorySkillDirs: readonly string[] = []
+
+/** boot 时出厂技能对账成功后调用一次。 */
+export function setFactorySkillDirsForFork(paths: readonly string[]): void {
+  forkFactorySkillDirs = Object.freeze([...paths])
+}
+
+/** 每次 fork 由 spawnLocalServer 交给构建器。 */
+export function factorySkillDirsForFork(): readonly string[] {
+  return forkFactorySkillDirs
 }
 
 /** renderer 侧「出厂内置」徽标真相:上次 reconcile 真正就位的名单(非常量、非纯开关;codex M4)。 */

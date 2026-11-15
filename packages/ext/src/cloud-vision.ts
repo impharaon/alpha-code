@@ -6,17 +6,17 @@
 //   · 模型追问:模型调 `codepuppy_vision` 时 `tool.execute.before` 把 `args.image` 原地换成压缩后的 base64。
 //
 // ── 凭据从哪来(2026-09-24 勘破)────────────────────────────────────────────────────
-// 引擎访问云端用的是登录铸的 `mcp_access` token:ui-mac 每次 fork 把云 MCP 定义经 `CODEPUPPY_CLOUD_MCP_DEF`
-// 交给本插件(`codepuppy-config-injection.ts:391`),定义里 `headers.Authorization = "Bearer {file:…CODEPUPPY_MCP_TOKEN}"`
+// 引擎访问云端用的是登录铸的 `mcp_access` token:ui-mac 每次 fork 把云 MCP 定义写进启动文档的 `cloudMcp.definition`
+// 交给本插件(`#1698` G2,`codepuppy-bootstrap-build.ts`),定义里 `headers.Authorization = "Bearer {file:…CODEPUPPY_MCP_TOKEN}"`
 // (`cloud-sidecar-config.ts`,`#1195`);`installCloudMcp()` 已经在解析这个 `{file:}`。gateway 的 vision 路由
 // 对**这一条封印路径**额外接受 `mcp_access`(alpha-platform `worker.ts` visionHandler:`FORWARDED_MCP_AUTH_OPTS`
 // 与 `actionAllowed(auth, "cloud.dispatch")`),而云 MCP 的 `vision` 也只是把同一个 Authorization 原样转发
 // 到同一条路由(`cloud-mcp.ts` mount)。所以这里用的**就是**引擎经 MCP 访问云端的那份凭据,不另铸、不回退。
-// 路由的主机:`CODEPUPPY_BASE_URL`(`codepuppy-auth.ts:301`,= `<platform>/v1`,platform 即 gateway 主机)的 origin。
+// 路由的主机:平台节点地址(启动文档 platform.modelProxyBaseURL,main 由 `codepuppy-auth.ts` 落定,= `<platform>/v1`,platform 即 gateway 主机)的 origin。
 // 凭据在每次调用时现读文件(令牌续期会重写文件;比引擎装配置时解析一次更新)。
 //
 // ── 「云端是否可用」(与 alpha-code#1411 同轴)──────────────────────────────────────
-// `#1411` / `#1442` 的判据是 `platformPays = CODEPUPPY_CLOUD_MCP_URL && CODEPUPPY_MCP_TOKEN 密钥文件在场`,桌面侧
+// `#1411` / `#1442` 的判据是 `platformPays = 文档里有云 MCP && CODEPUPPY_MCP_TOKEN 密钥文件在场`,桌面侧
 // 「登录+有额度」与「登录+无额度」**不可区分**(account 契约没有只读额度查询),额度只在调用时以 402 出面。
 // 这里同一根轴:DEF 缺席 / 定义无 Authorization(= 密钥文件缺席时 ui-mac 给的 `enabled:false` 形状)/ `{file:}`
 // 读不到 ⇒ 未登录;HTTP 401/403 ⇒ 凭据失效;402 ⇒ 无额度;5xx / 网络 ⇒ 上游故障 —— 每一种都给用户说得出原因的话。
@@ -31,10 +31,11 @@
 // (路径 / 文件名)。Read 那一步走的就是引擎自己的权限判定;没读过的路径在这里只会得到一句「先用 Read 读它」。
 // 登记簿按会话建,内容哈希去重;进程重启后由 `experimental.chat.messages.transform` 从历史消息里重建。
 
+import { codepuppyBootstrap, type CodePuppyBootstrap } from "../../util/src/codepuppy-bootstrap"
 import { createHash } from "node:crypto"
 import { readFileSync } from "node:fs"
 import path from "node:path"
-import { CLOUD_MCP_SERVER_ENV, mcpEngineToolId, resolveFileRefs } from "./cloud-websearch-kill"
+import { mcpEngineToolId, resolveFileRefs } from "./cloud-websearch-kill"
 import { cloudMcpAuthorization } from "./cloud-access"
 import {
   contextText,
@@ -60,14 +61,14 @@ export const CLOUD_VISION_TIMEOUT_MS = 90_000
 /** 每会话登记的图片上限(每张最多留一份原始 base64,≤ 5 MiB);超过丢最旧的。 */
 export const VISION_SESSION_MAX_IMAGES = 32
 
-export function cloudVisionToolId(env: Record<string, string | undefined> = process.env): string | undefined {
-  const server = env[CLOUD_MCP_SERVER_ENV]
+export function cloudVisionToolId(bootstrap: CodePuppyBootstrap = codepuppyBootstrap()): string | undefined {
+  const server = bootstrap.cloudMcp?.name
   return server ? mcpEngineToolId(server, CLOUD_VISION_REMOTE_TOOL) : undefined
 }
 
-/** `CODEPUPPY_BASE_URL`(`<platform>/v1`)的 origin + 识图路由;没有 = 未登录平台 / BYOK 态。 */
-export function cloudVisionEndpoint(env: Record<string, string | undefined> = process.env): string | undefined {
-  const base = env.CODEPUPPY_BASE_URL
+/** 平台节点地址(启动文档 platform.modelProxyBaseURL,`<platform>/v1`)的 origin + 识图路由;没有 = 未登录平台 / BYOK 态。 */
+export function cloudVisionEndpoint(bootstrap: CodePuppyBootstrap = codepuppyBootstrap()): string | undefined {
+  const base = bootstrap.platform.modelProxyBaseURL
   if (!base) return undefined
   try {
     return new URL(CLOUD_VISION_ROUTE, new URL(base).origin).toString()
@@ -86,11 +87,11 @@ export type CloudVisionAccess =
  * 判据与 `#1411` 的 platformPays 同轴:云 MCP 定义在场且带 Authorization、`{file:}` 读得到 ⇒ 可用。
  */
 export function cloudVisionAccess(
-  env: Record<string, string | undefined> = process.env,
+  bootstrap: CodePuppyBootstrap = codepuppyBootstrap(),
   readFile: (p: string) => string = (p) => readFileSync(p, "utf8"),
 ): CloudVisionAccess {
-  const endpoint = cloudVisionEndpoint(env)
-  const header = cloudMcpAuthorization(env)
+  const endpoint = cloudVisionEndpoint(bootstrap)
+  const header = cloudMcpAuthorization(bootstrap)
   // 密钥文件缺席时 ui-mac 给的是不带 headers 的 enabled:false 形状(cloud-sidecar-config.ts 文件头第 3 条)。
   if (!endpoint || !header) return { ok: false, reason: "not-logged-in" }
   try {

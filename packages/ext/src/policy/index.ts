@@ -11,6 +11,7 @@
 //                                               layer on a failed call (#1572 AC4)
 //   permission.hook  risk facts on every ask; Code Puppy's own asks held against later hooks
 //   rpc              codepuppy.tool-policy (I5)
+import { codepuppyBootstrap } from "../../../util/src/codepuppy-bootstrap"
 import os from "node:os"
 import path from "node:path"
 import type { Plugin } from "@opencode/plugin"
@@ -67,13 +68,16 @@ function asksForItself(facts: ToolFacts) {
 
 export async function registerPolicy(context: Plugin.Context): Promise<PolicyRegistration> {
   const env = process.env
+  // `#1698`:随包清单与 Office 清单的路径、云 MCP 定义、账户分区来自 sidecar 发布的启动文档(冻结,一代不变)
+  const bootstrap = codepuppyBootstrap()
   const store = createToolPolicyStore({
     baseDir: defaultPolicyBaseDir(dataRoot(env)),
-    account: () => env.CODEPUPPY_POLICY_ACCOUNT || "anonymous",
+    // `#1698` G2:账户分区来自启动文档(main 按当刻登录态算的哈希),缺席 = anonymous
+    account: () => bootstrap.policy.account ?? "anonymous",
     workspace: () => policyWorkspace(context.location),
   })
   const extOrigin = extModulePath(import.meta.url)
-  const bundled = loadBundledTools(import.meta.url, env)
+  const bundled = loadBundledTools(import.meta.url, bootstrap.paths.extBundledManifest)
   let early: ReadonlySet<string> | undefined
   const mcp = new Map<string, McpEntry & Record<string, unknown>>()
   const displays = new Map<string, ToolDisplaySnapshotV1>()
@@ -89,7 +93,7 @@ export async function registerPolicy(context: Plugin.Context): Promise<PolicyReg
 
   const allFacts = async (): Promise<ToolFacts[]> => {
     const tools = (await context.tool.list()) as readonly RegisteredTool[]
-    const input = { early, earlyAmbiguous: await earlyAmbiguous(), mcp, bundled, extOrigin, env }
+    const input = { early, earlyAmbiguous: await earlyAmbiguous(), mcp, bundled, extOrigin, cloudMcp: bootstrap.cloudMcp, officeMcpManifest: bootstrap.paths.officeMcpManifest }
     return tools.map((tool) => toolFacts(tool, input))
   }
 

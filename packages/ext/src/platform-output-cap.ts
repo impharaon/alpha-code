@@ -22,9 +22,9 @@
 //     只改这一次请求的 `maxOutputTokens`,overflow 算术不受影响。上游同款先例:`plugin/cloudflare.ts:64-74`。
 //
 // ── 判据:哪个节点是「平台代理」────────────────────────────────────────────────────────────
-//   注入侧(`ui-mac/src/main/codepuppy-models.ts`)只在 `CODEPUPPY_BASE_URL` 存在时创建平台节点,且把
-//   `options.baseURL` **逐字**写成该 env 值;`CODEPUPPY_BASE_URL` 在 sidecar env 白名单内(`sidecar-env.ts`)。
-//   于是「provider.options.baseURL === CODEPUPPY_BASE_URL」与注入侧是同一个事实,不需要第二份 id 清单。
+//   注入侧(`ui-mac/src/main/codepuppy-models.ts`)只在启动文档 `platform.modelProxyBaseURL` 存在时创建平台节点,且把
+//   `options.baseURL` **逐字**写成该值(`#1698` G2:main 写进文档,不再经 sidecar 环境)。
+//   于是「provider.options.baseURL === platform.modelProxyBaseURL」与注入侧是同一个事实,不需要第二份 id 清单。
 //   严格相等(不 normalize 尾斜杠):两边写的是同一个字符串,normalize 只会引入一格「看起来相等其实
 //   不是同一节点」的判断。直连 BYOK / 用户自定义节点 baseURL 不同 ⇒ 本模块不省略。
 //
@@ -35,7 +35,7 @@
 export type PlatformOutputCapInput = {
   /** `input.provider.options.baseURL`(chat.params 钩子拿到的 provider 配置)。 */
   providerBaseURL: unknown
-  /** `process.env.CODEPUPPY_BASE_URL`(引擎进程的 env)。 */
+  /** 启动文档的 `platform.modelProxyBaseURL`(与注入写平台节点的是同一个值)。 */
   codepuppyBaseURL: string | undefined
 }
 
@@ -51,7 +51,7 @@ export function platformOutputCap(input: PlatformOutputCapInput): PlatformOutput
   return { omit: true, reason: "platform-gateway" }
 }
 
-/** 「这个 provider 是平台代理节点」的唯一判据(上面文件头的「判据」一节):`CODEPUPPY_BASE_URL` 非空且
+/** 「这个 provider 是平台代理节点」的唯一判据(上面文件头的「判据」一节):`platform.modelProxyBaseURL` 非空且
  *  `provider.options.baseURL` 与它逐字相等。输出上限与平台凭据头(platform-credential-header.ts,REQ-236
  *  `#1562`)共用这一份,不各写一遍。 */
 export function isPlatformProvider(input: PlatformOutputCapInput): boolean {

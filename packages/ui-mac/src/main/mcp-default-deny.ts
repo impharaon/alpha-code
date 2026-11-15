@@ -10,10 +10,8 @@
 // loud 跳过自身,不得把 sidecar 上方已经完成的 provider/identity/permission 注入一起炸掉。
 
 import { readFileSync } from "node:fs"
-import { homedir } from "node:os"
 import { join } from "node:path"
 import { parse, type ParseError } from "jsonc-parser"
-import { engineGlobalConfigDirectory } from "./engine-paths"
 
 const GLOBAL_CONFIG_FILES = ["config.json", "opencode.json", "opencode.jsonc"]
 
@@ -36,8 +34,8 @@ export function injectMcpDefaultDeny(
   config: Config,
   options: {
     codepuppyConfigPath: string
-    /** 仅测试/隔离注入;生产缺省 = engineGlobalConfigDirectory(引擎真正读的全局配置目录)。 */
-    userConfigDir?: string
+    /** 引擎真正读的全局配置目录:注入传启动文档的 `paths.engineConfigDirectory`(main 算好的那一个,`#1698` design §4.3)。 */
+    userConfigDir: string
     /** 本轮 injectCodePuppyConfig 新放入 config.mcp 的名称;不得把继承 env 当成治理来源。 */
     injectedMcpNames?: Iterable<string>
     /** 仅测试注入;生产固定同步读盘,与 sidecar fork 注入时序一致。 */
@@ -52,7 +50,7 @@ export function injectMcpDefaultDeny(
     // 编排器 R1 跟进第 1 条:codepuppy.jsonc 经显式文件原样交给引擎,它的 server 名单与类型同样按上游归一化的规则取 ——
     // 否则原生 `mcp.servers.<name>` 里的远程条目绕过下面 `#1381` 的中和。
     const codepuppyMcp = engineMcpServers(alpha)
-    const userConfigDir = options.userConfigDir ?? engineGlobalConfigDirectory(process.env, homedir())
+    const userConfigDir = options.userConfigDir
     // 审计 R1 第 2 条:用户全局文件里的 server 名单按上游归一化的规则取 —— 2.x 原生的 `mcp.servers.<name>` 与 v1 的
     // `mcp.<name>` 都认(见 engineMcpServers)。
     const globalNames = new Set(

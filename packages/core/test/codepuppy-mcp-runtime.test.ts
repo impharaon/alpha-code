@@ -46,7 +46,8 @@ const { Location } = await import("@opencode/core/location")
 const { Mcp } = await import("@opencode/core/mcp/index")
 const { McpClient } = await import("@opencode/core/mcp/client")
 const { McpPool } = await import("@opencode/core/mcp/pool")
-const { OFFICE_MCP_MANIFEST_ENV, declaredListedTools, listsDeclaration } = await import("@opencode/core/mcp/codepuppy-first-party-mcp")
+const { declaredListedTools, listsDeclaration } = await import("@opencode/core/mcp/codepuppy-first-party-mcp")
+const { __resetCodePuppyBootstrapForTests, parseCodePuppyBootstrap, publishCodePuppyBootstrap, tryCodePuppyBootstrap } = await import("@opencode/util/codepuppy-bootstrap")
 const { parseFailureCode } = await import("@opencode/schema/codepuppy-net-failure")
 const { Server: McpServer, WebStandardStreamableHTTPServerTransport } = await import("@modelcontextprotocol/server")
 const { AbsolutePath } = await import("@opencode/core/schema")
@@ -126,7 +127,9 @@ const toolNames = Effect.gen(function* () {
 })
 
 // ── AC1 ──────────────────────────────────────────────────────────────────────────────────────────────────────────
-// Red if startup waited for every server: `ok` would stay pending behind the 30 s handshake timeout of `hang`.
+// Red if startup waited for every server: `ok` would stay pending behind the 30 s handshake timeout of `hang`, and
+// `connected("ok")` gives up after its own 10 s wait. `#1705`: no wall-clock ceiling on top — `hang` still pending and the
+// tool list holding only `ok` are the structural proof.
 // `hang` is killed once the assertions ran: before #1690 closing the layer waited for its handshake timeout (the teardown
 // time followed `timeout.startup`: 8 s ⇒ 10.3 s, the 30 s default ⇒ 32 s), which overran the 5 s test budget.
 describe("AC1: one server never answering does not hold back another", () => {
@@ -136,9 +139,7 @@ describe("AC1: one server never answering does not hold back another", () => {
   })
   testEffect(mcpLayer({ hang: local({ CODEPUPPY_MCP_HANG: "1", CODEPUPPY_MCP_PID_FILE: pidFile }), ok: local() })).live("ok is connected and listed while hang is still pending", () =>
     Effect.gen(function* () {
-      const started = Date.now()
       yield* connected("ok")
-      expect(Date.now() - started).toBeLessThan(5_000)
       expect((yield* statusOf("hang"))?.status).toBe("pending")
       expect(yield* toolNames).toEqual(["ok/echo"])
     }).pipe(Effect.ensuring(killHang)),
@@ -277,6 +278,30 @@ describe("AC5: at most four servers start at once", () => {
 })
 
 // ── #1565 ────────────────────────────────────────────────────────────────────────────────────────────────────────
+/**
+ * #1698: the engine reads the Office manifest path from Code Puppy's bootstrap document (the sidecar publishes it before the
+ * engine starts). The fixture goes through the production parser, so a wrong shape fails here.
+ */
+function publishOfficeManifest(officeMcpManifest: string) {
+  __resetCodePuppyBootstrapForTests()
+  publishCodePuppyBootstrap(
+    parseCodePuppyBootstrap({
+      v: 1,
+      paths: { userData: ROOT, globalRoot: ROOT, initialDirectory: ROOT, database: ":memory:", engineConfigDirectory: ROOT, officeMcpManifest },
+      // G2 / G3 fields are required in every document; this one carries no cloud MCP, no policy account, no egress proxy,
+      // the desktop's default engine toggles, no factory skills, the default ask deadline and every switch off.
+      platform: { credentialRef: `{file:${path.join(ROOT, "codepuppy-secrets", "CODEPUPPY_API_KEY")}}` },
+      webSearch: { killSwitch: false },
+      policy: {},
+      network: {},
+      engine: { modelsFetch: false, filewatcher: true },
+      skills: { factoryDirs: [] },
+      permission: {},
+      switches: { modelsDisabled: false, identityDisabled: false, behaviorDisabled: false, promptRebrandDisabled: false, automationDisabled: false, readonlyDisabled: false, ecosystemInherit: false, extVerbose: false },
+    }),
+  )
+}
+
 // Red if declarations are not offered while starting, survive a contradicting connection, or reach a third party.
 describe("#1565: bundled declarations while a first-party server starts", () => {
   const declaredTool = { name: "read_docx", description: "Read a Word document", inputSchema: { type: "object", properties: { path: { type: "string" } } } }
@@ -292,7 +317,7 @@ describe("#1565: bundled declarations while a first-party server starts", () => 
       formats: { docx: { command: [process.execPath, FIXTURE, "--office"], tools: [declaredTool] } },
     }),
   )
-  process.env[OFFICE_MCP_MANIFEST_ENV] = manifest
+  publishOfficeManifest(manifest)
   const office = (tools: unknown[]) =>
     new ConfigMCP.Local({
       type: "local",
@@ -588,12 +613,11 @@ describe("#1565: the shipped Office manifest and server", () => {
   // The bundled interpreter: this machine's python3 runs the real server.py.
   fs.writeFileSync(path.join(resources, "office-runtime", "bin", "python3"), '#!/bin/sh\nexec python3 "$@"\n', { mode: 0o755 })
   const manifest = path.join(resources, "office-mcp", "tools.json")
-  const env = { [OFFICE_MCP_MANIFEST_ENV]: manifest }
   const template: string[] = JSON.parse(fs.readFileSync(manifest, "utf8")).formats.word.command
   const asWritten = template.map((token) => token.split("{codepuppyResources}").join(resources))
   const afterExtension = asWritten.map((token) => (token === "{workspace}" ? ROOT : token))
   const word = (command: string[]) => new ConfigMCP.Local({ type: "local", command } as never)
-  const declaredNames = (command: unknown[]) => (declaredListedTools("codepuppy-word", { type: "local", command }, env, fs.readFileSync) ?? []).map((tool: any) => tool.name)
+  const declaredNames = (command: unknown[]) => (declaredListedTools("codepuppy-word", { type: "local", command }, manifest, fs.readFileSync) ?? []).map((tool: any) => tool.name)
 
   testEffect(Layer.empty).effect("the command main writes and the one after the folder substitution both get the declaration", () =>
     Effect.sync(() => {
@@ -607,16 +631,17 @@ describe("#1565: the shipped Office manifest and server", () => {
 
   let previous: string | undefined
   beforeAll(() => {
-    previous = process.env[OFFICE_MCP_MANIFEST_ENV]
-    process.env[OFFICE_MCP_MANIFEST_ENV] = manifest
+    previous = tryCodePuppyBootstrap()?.paths.officeMcpManifest
+    publishOfficeManifest(manifest)
   })
   afterAll(() => {
-    process.env[OFFICE_MCP_MANIFEST_ENV] = previous
+    if (previous) publishOfficeManifest(previous)
+    else __resetCodePuppyBootstrapForTests()
   })
   testEffect(mcpLayer({ "codepuppy-word": word(afterExtension) })).live("the real server.py, started as the engine starts it, lists exactly the shipped declaration", () =>
     Effect.gen(function* () {
       yield* connected("codepuppy-word")
-      const declared = declaredListedTools("codepuppy-word", word(afterExtension), env, fs.readFileSync)
+      const declared = declaredListedTools("codepuppy-word", word(afterExtension), manifest, fs.readFileSync)
       const listed = (yield* (yield* Mcp.Service).tools()).filter((tool: any) => tool.server === "codepuppy-word")
       expect(listed.map((tool: any) => tool.name)).toEqual(["read_docx", "write_docx"])
       expect(listsDeclaration(declared ?? [], listed)).toBe(true)

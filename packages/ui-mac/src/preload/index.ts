@@ -182,6 +182,7 @@ const api: ElectronAPI = {
   relaunch: () => ipcRenderer.send("relaunch"),
   endpoints: () => ipcRenderer.invoke("codepuppy-endpoints"),
   appVersion: () => ipcRenderer.invoke("app-version"),
+  buildIdentity: () => ipcRenderer.invoke("build-identity"),
   // REQ-098:环境快照只读通道 —— 刻意不传任何参数(环境由 main 从构建事实解析,renderer 零输入)。
   environment: () => ipcRenderer.invoke("codepuppy-environment"),
   surfaces: {
@@ -307,6 +308,7 @@ const api: ElectronAPI = {
     status: (jobId) => ipcRenderer.invoke("cloud-status", jobId),
     cancel: (jobId) => ipcRenderer.invoke("cloud-cancel", jobId),
     artifacts: (jobId) => ipcRenderer.invoke("cloud-artifacts", jobId),
+    accountStatus: (task) => ipcRenderer.invoke("cloud-account-status", task),
     // REQ-092:descriptor-only 下载通道(进度=事件订阅;内容字节永不过 IPC)。
     downloadArtifact: (directory, runId, artifact) =>
       ipcRenderer.invoke("cloud-artifact-download", directory, runId, artifact),

@@ -135,30 +135,10 @@
   color: var(--a-accent);
 }
 
-.codepuppy-acct-card {
+/* #1686:余额卡本体是组件库的 .a-card + .a-kv(codepuppy-ui/card.css、key-value-list.css);
+   组件不带外边距,弹层的左右 14、下 12 放在这一层,卡片位置与改前相同。 */
+.codepuppy-acct-card-slot {
   margin: 0 14px 12px;
-  padding: 12px;
-  border: 1px solid var(--a-border-faint);
-  border-radius: var(--a-radius-lg);
-  background: var(--a-bg-subtle);
-}
-.codepuppy-acct-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 3px 0;
-  font-size: 12.5px;
-}
-.codepuppy-acct-k {
-  color: var(--a-text-secondary);
-}
-.codepuppy-acct-v {
-  font-weight: 600;
-}
-.codepuppy-acct-pending {
-  font-weight: 500;
-  color: var(--a-text-tertiary);
-  font-size: 11px;
 }
 
 .codepuppy-acct-cta {
@@ -223,12 +203,34 @@
 }
 
 /* ac#1187: current app version, pinned at the popover's bottom (read-only, muted) */
+/* ac#237: the row is now a button — click copies the build identity; reset the button chrome, keep the look */
 .codepuppy-acct-version {
+  display: block;
+  width: 100%;
   padding: 6px 16px 2px;
+  border: none;
+  background: transparent;
+  font: inherit;
   font-size: 11px;
   color: var(--a-text-tertiary);
   text-align: center;
+  cursor: pointer;
   user-select: text;
+}
+.codepuppy-acct-version:hover {
+  color: var(--a-text-secondary);
+}
+/* Non-release marker next to the version; same values as the extension hub's small chip */
+.codepuppy-acct-version-tag {
+  margin-left: 6px;
+  font-size: var(--a-text-2xs);
+  font-weight: var(--a-weight-semibold);
+  letter-spacing: 0.01em;
+  padding: 1.5px 7px;
+  border-radius: var(--a-radius-full);
+  color: var(--a-text-secondary);
+  background: var(--a-bg-muted);
+  white-space: nowrap;
 }
 .codepuppy-acct-item {
   display: flex;

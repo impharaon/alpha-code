@@ -1,5 +1,9 @@
 interface ImportMetaEnv {
   readonly OPENCODE_CHANNEL: string
+  // #237:构建期 define 写入;缺失(源码直跑 / 无 git)为空串或 undefined,由读取端写「未知」。
+  readonly CODEPUPPY_BUILD_COMMIT?: string
+  readonly CODEPUPPY_BUILD_DATE?: string
+  readonly CODEPUPPY_BUILD_ORIGIN?: string
 }
 
 interface ImportMeta {
@@ -12,6 +16,8 @@ interface ImportMeta {
 // 选项对象与上游 `ServerOptions` 是否一致由 engine-server-options.test.ts 用上游 schema 解码判。
 declare module "virtual:opencode-server" {
   export const ENGINE_VERSION: string
+  /** `#1698`:引擎 bundle 用自己的解析器读一次已发布的启动文档;不符即抛(engine/engine-embed.ts)。 */
+  export function assertCodePuppyBootstrap(): void
   export function startEngine(
     options: import("./engine-server-options").EngineServerOptions,
     hooks?: { onDispatch?: (dispatch: (request: Request) => Promise<Response>) => void },

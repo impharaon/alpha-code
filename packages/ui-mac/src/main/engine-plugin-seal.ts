@@ -1,4 +1,5 @@
 // engine-plugin-seal — ADR-040 §决策三 的执行面:**往磁盘 `plugin[]` 加元素一律拒**。
+// `#1703`:OpenCode 2 的原生键 `plugins` 引擎同样加载(与 `plugin` 拼成同一张插件表),两个键同一判据、各自判。
 //
 // 为什么这是一道咽喉而不是一张黑名单:
 //   `codepuppy.jsonc` 的 `plugin[]` 是引擎把**任意第三方 JS 拉进自己进程、以同等权限执行**的通道。
@@ -52,10 +53,18 @@ import { parse, type ParseError } from "jsonc-parser"
 
 export type PluginSealVerdict = { ok: true } | { ok: false; reason: string }
 
-/** 该文件的 `plugin` 键读出来是什么 —— `present:false` = 键缺席(与「空数组」不同,要分得开)。 */
-type PluginKeyRead = { ok: true; value: unknown; present: boolean } | { ok: false; why: string }
+/** 引擎会从中加载插件的两个键:`plugin`(旧写法)与 `plugins`(OpenCode 2 的原生写法;`packages/core/src/config/normalize.ts`
+ *  把两者的条目拼成同一张插件表)。两个键各自判,所以把条目从一个键挪到另一个键也算新增(`#1703`)。 */
+const PLUGIN_KEYS = ["plugin", "plugins"] as const
+type PluginKey = (typeof PLUGIN_KEYS)[number]
 
-/** 稳定序列化(对象键排序):`plugin[]` 成员可以是 `string` 或 `[spec, options]` 元组,
+/** 整份文本解析出的根对象;`record:undefined` = 空文本 / 空文档。 */
+type ConfigRead = { ok: true; record: Record<string, unknown> | undefined } | { ok: false; why: string }
+
+/** 某个插件键读出来是什么 —— `present:false` = 键缺席(与「空数组」不同,要分得开)。 */
+type PluginKeyRead = { value: unknown; present: boolean }
+
+/** 稳定序列化(对象键排序):插件条目可以是 `string` 或 `[spec, options]` 元组,
  *  options 的键序是源文本顺序,不排序会把「同一个条目重排了一下」误判成「新增了一个条目」。 */
 function canonical(value: unknown): string {
   if (value === undefined) return "\u0000absent" // 转义写法:字面 NUL 会让 grep/rg 把整个文件判成二进制并静默返回空(#760)
@@ -65,22 +74,25 @@ function canonical(value: unknown): string {
   return `{${entries.map(([k, v]) => `${JSON.stringify(k)}:${canonical(v)}`).join(",")}}`
 }
 
-function readPluginKey(text: string): PluginKeyRead {
+function readConfig(text: string): ConfigRead {
   const source = text.trim() === "" ? "{}" : text
   const errors: ParseError[] = []
   const parsed: unknown = parse(source, errors, { allowTrailingComma: true })
   if (errors.length > 0) return { ok: false, why: `not valid jsonc (${errors.length} syntax error(s))` }
-  if (parsed === undefined) return { ok: true, value: undefined, present: false }
+  if (parsed === undefined) return { ok: true, record: undefined }
   if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return { ok: false, why: "root is not an object" }
-  const record = parsed as Record<string, unknown>
-  if (!Object.hasOwn(record, "plugin")) return { ok: true, value: undefined, present: false }
-  return { ok: true, value: record.plugin, present: true }
+  return { ok: true, record: parsed as Record<string, unknown> }
+}
+
+function readPluginKey(config: Extract<ConfigRead, { ok: true }>, key: PluginKey): PluginKeyRead {
+  if (!config.record || !Object.hasOwn(config.record, key)) return { value: undefined, present: false }
+  return { value: config.record[key], present: true }
 }
 
 /** 数组成员的 canonical 多重集;非数组 = 无法证明「没有新增」⇒ 交给调用方拒。 */
-function entriesOf(read: Extract<PluginKeyRead, { ok: true }>): { ok: true; entries: string[] } | { ok: false; why: string } {
+function entriesOf(read: PluginKeyRead, key: PluginKey): { ok: true; entries: string[] } | { ok: false; why: string } {
   if (!read.present || read.value === undefined) return { ok: true, entries: [] }
-  if (!Array.isArray(read.value)) return { ok: false, why: "plugin key is not an array" }
+  if (!Array.isArray(read.value)) return { ok: false, why: `${key} key is not an array` }
   return { ok: true, entries: read.value.map(canonical) }
 }
 
@@ -88,40 +100,44 @@ function entriesOf(read: Extract<PluginKeyRead, { ok: true }>): { ok: true; entr
  * 一次 `codepuppy.jsonc`(或任何引擎 config 文件)的整文本写入是否被 ADR-040 放行。
  *
  * `beforeText` = 写之前的 live 文本(文件缺席传 `"{}"` 或 `""`),`afterText` = 即将落盘的文本。
- * 判据是**元素级**的:`after` 的 `plugin[]` 每个成员都必须能在 `before` 的 `plugin[]` 里找到一份
- * (多重集包含)。找不到的第一个成员即具名拒绝理由。
+ * 判据是**元素级**的,对 `plugin` 与 `plugins` 两个键各判一次:`after` 里该键的每个成员都必须能在 `before`
+ * 同一个键里找到一份(多重集包含)。找不到的第一个成员即具名拒绝理由(点名是哪个键)。
  *
- * fail-closed 的三种「证不出来」都算拒:待写文本不可解析、既有文本不可解析而待写文本仍有条目、
- * 任一侧 `plugin` 键不是数组而两侧又不逐字相同。
+ * fail-closed 的三种「证不出来」都算拒:待写文本不可解析、既有文本不可解析而待写文本的该键仍有条目、
+ * 该键任一侧不是数组而两侧又不逐字相同。
  */
 export function sealEnginePluginAdditions(target: string, beforeText: string, afterText: string): PluginSealVerdict {
   const where = path.basename(target)
   const refuse = (why: string): PluginSealVerdict => ({
     ok: false,
-    reason: `refused by ADR-040 (extension installs must not write the engine plugin[]): ${why} — ${where}`,
+    reason: `refused by ADR-040 (extension installs must not write the engine plugin[] / plugins[]): ${why} — ${where}`,
   })
 
-  const after = readPluginKey(afterText)
+  const after = readConfig(afterText)
   if (!after.ok) return refuse(`cannot verify the write, the config being written is ${after.why}`)
-  const before = readPluginKey(beforeText)
-  // `plugin` 键逐字未变 ⇒ 这次写盘根本没碰它(mcp/provider/agent/治理键的写全部落这里)。
-  if (before.ok && canonical(before.value) === canonical(after.value)) return { ok: true }
+  const before = readConfig(beforeText)
+  for (const key of PLUGIN_KEYS) {
+    const afterKey = readPluginKey(after, key)
+    const beforeKey = before.ok ? readPluginKey(before, key) : undefined
+    // 该键逐字未变 ⇒ 这次写盘根本没碰它(mcp/provider/agent/治理键的写全部落这里)。
+    if (beforeKey && canonical(beforeKey.value) === canonical(afterKey.value)) continue
 
-  const afterEntries = entriesOf(after)
-  if (!afterEntries.ok) return refuse(`cannot verify the write, ${afterEntries.why} in the config being written`)
-  // 写完之后一个条目都没有 = 只可能是移除/清空,永远合法。
-  if (afterEntries.entries.length === 0) return { ok: true }
-  if (!before.ok) return refuse(`cannot verify the write, the existing config is ${before.why}`)
-  const beforeEntries = entriesOf(before)
-  if (!beforeEntries.ok) return refuse(`cannot verify the write, ${beforeEntries.why} in the existing config`)
+    const afterEntries = entriesOf(afterKey, key)
+    if (!afterEntries.ok) return refuse(`cannot verify the write, ${afterEntries.why} in the config being written`)
+    // 写完之后一个条目都没有 = 只可能是移除/清空,永远合法。
+    if (afterEntries.entries.length === 0) continue
+    if (!before.ok) return refuse(`cannot verify the write, the existing config is ${before.why}`)
+    const beforeEntries = entriesOf(readPluginKey(before, key), key)
+    if (!beforeEntries.ok) return refuse(`cannot verify the write, ${beforeEntries.why} in the existing config`)
 
-  const pool = new Map<string, number>()
-  for (const entry of beforeEntries.entries) pool.set(entry, (pool.get(entry) ?? 0) + 1)
-  for (const entry of afterEntries.entries) {
-    const left = pool.get(entry) ?? 0
-    if (left === 0)
-      return refuse(`this write would add ${entry.length > 200 ? `${entry.slice(0, 200)}…` : entry} to plugin[]`)
-    pool.set(entry, left - 1)
+    const pool = new Map<string, number>()
+    for (const entry of beforeEntries.entries) pool.set(entry, (pool.get(entry) ?? 0) + 1)
+    for (const entry of afterEntries.entries) {
+      const left = pool.get(entry) ?? 0
+      if (left === 0)
+        return refuse(`this write would add ${entry.length > 200 ? `${entry.slice(0, 200)}…` : entry} to ${key}[]`)
+      pool.set(entry, left - 1)
+    }
   }
   return { ok: true }
 }

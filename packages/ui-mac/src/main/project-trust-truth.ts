@@ -44,7 +44,7 @@ export function projectTrustTruthPath(casBaseRoot: string, environment: AppEnvir
   return resolve(casBaseRoot, PROJECT_TRUST_DIRNAME, `${environment}.json`)
 }
 
-/** 本进程的记录位置:main 走冻结快照,sidecar 走 main 派生的 `CODEPUPPY_GLOBAL_DIR` 的逆映射;形状不对 ⇒ ok:false,不猜。 */
+/** 本进程的记录位置:main 走冻结快照,sidecar 走启动文档 `paths.globalRoot` 的逆映射;形状不对 ⇒ ok:false,不猜。 */
 export function locateProjectTrustTruth(): { ok: true; path: string } | { ok: false; reason: string } {
   const base = resolveCodePuppyStateBase("project trust record")
   if (!base.ok) return base

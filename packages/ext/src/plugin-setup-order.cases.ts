@@ -4,6 +4,7 @@
 // 为什么在子进程:bun 1.4.4 的 `mock.module` 作用于同一次 `bun test` 里之后的所有文件,连已 import 的模块也被改绑(#1662 整合
 // 实测)—— 同进程跑,排在后面的 ext 测试拿到的就是这个空策略。
 // 反向臂:把 `seal()` 挪到扇出之前 ⇒ 项目插件的注册落在 seal 之后 ⇒ 红;把 registerPolicy 挪到任何注册之后 ⇒ 红。
+import { publishTestBootstrap, unpublishTestBootstrap } from "../../ui-mac/test-component/codepuppy-bootstrap-fixture"
 import { afterAll, expect, mock, test } from "bun:test"
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
@@ -46,10 +47,20 @@ function recordingContext(directory: string, label: () => string) {
   )
 }
 
+test("`#1698`:没有发布启动文档 ⇒ setup 第一步就抛(CodePuppyBootstrapError unpublished),一个钩子都不挂 —— sidecar 据此拒报 ready", async () => {
+  unpublishTestBootstrap()
+  const { default: ext } = await import("./plugin")
+  const directory = join(root, "unpublished")
+  mkdirSync(directory, { recursive: true })
+  await expect(ext.setup(recordingContext(directory, () => "ext") as never)).rejects.toMatchObject({ name: "CodePuppyBootstrapError", reason: "unpublished" })
+  expect(order).toEqual([])
+})
+
 test("registerPolicy 是 setup 里第一个被 await 的,seal 是最后一个;ext 自己的钩子与项目插件扇出都在两者之间", async () => {
   const globalRoot = join(root, "codepuppy-state", "env", "dev")
   mkdirSync(globalRoot, { recursive: true })
-  process.env.CODEPUPPY_GLOBAL_DIR = globalRoot
+  // R14:sidecar 在装 ext 之前发布启动文档;这里在 import ext 之前用生产解析器发布一份
+  publishTestBootstrap({ globalRoot })
   const project = join(root, "project")
   mkdirSync(join(project, ".codepuppy", "plugins"), { recursive: true })
   // `#1709`:项目已被用户信任 = main 的记录里有它(规范目录 + inode),经生产写端登记

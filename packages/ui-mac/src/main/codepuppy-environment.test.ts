@@ -2,6 +2,7 @@
 // updater feed 对齐 loud-fail 判定(AC#2)、跨环境不可见(AC#1)、renderer 不可伪造(AC#6,
 // 含 grep 守卫:CODEPUPPY_GLOBAL_DIR 赋值点收敛 + 环境 IPC 零参数只读)。
 
+import { publishTestBootstrap, unpublishTestBootstrap } from "../../test-component/codepuppy-bootstrap-fixture"
 import { afterEach, beforeEach, describe, expect, test } from "bun:test"
 import * as fs from "node:fs"
 import * as os from "node:os"
@@ -509,14 +510,25 @@ describe("AC#6 renderer 不可伪造环境", () => {
     expect(codepuppyGlobalRoot()).toBe(info.mutableRoot)
   })
 
-  test("sidecar env 白名单透传 CODEPUPPY_GLOBAL_DIR(引擎与 main 同根,路径非密钥)", () => {
+  // `#1698`(design §4.3、§10 R31):引擎与 main 同根靠启动文档的 paths.globalRoot,不靠环境 —— sidecar env 里没有这个键,
+  // sidecar(无快照)里读到的是已发布的文档,哪怕环境里摆着别的值。
+  test("sidecar env 不再带 CODEPUPPY_GLOBAL_DIR;sidecar 里无快照时读已发布文档的根,环境里的值读不到", () => {
     const env = createSidecarEnv({
       PATH: "/usr/bin",
       CODEPUPPY_GLOBAL_DIR: "/tmp/env root",
       CODEPUPPY_ENV_BASE_DIR: "/tmp/must-not-cross-sidecar",
     })
-    expect(env.CODEPUPPY_GLOBAL_DIR).toBe("/tmp/env root")
+    expect(env.CODEPUPPY_GLOBAL_DIR).toBeUndefined()
     expect(env.CODEPUPPY_ENV_BASE_DIR).toBeUndefined()
+    const documentRoot = path.join(base, "doc-root", "env", "dev")
+    publishTestBootstrap({ globalRoot: documentRoot })
+    try {
+      expect(resolveCodePuppyGlobalRoot({ CODEPUPPY_GLOBAL_DIR: path.join(base, "env-root", "env", "dev") })).toBe(documentRoot)
+    } finally {
+      unpublishTestBootstrap()
+    }
+    // 没有文档(只剩无快照的单测)才读环境
+    expect(resolveCodePuppyGlobalRoot({ CODEPUPPY_GLOBAL_DIR: path.join(base, "env-root", "env", "dev") })).toEndWith(path.join("env-root", "env", "dev"))
   })
 
   test("grep 守卫:CODEPUPPY_GLOBAL_DIR 赋值只允许在 codepuppy-environment.ts 与 index.ts(测试隔离入口)", () => {

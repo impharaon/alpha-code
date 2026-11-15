@@ -1,0 +1,72 @@
+# alpha-code#1669 round 7 — raw facts (final 0.2.0 candidate, root A, ad-hoc re-signed copy). Times EST 2026-11-13.
+build: alpha-code-fix-1669-g2-reject-hangs/packages/ui-mac/dist/mac-arm64/Code Puppy.app, built 03:50; worktree HEAD 942bad6a43, `git diff 3a8e25d6b8 HEAD` empty, worktree clean
+  0.2.0, com.tide.codepuppy, app.asar sha256 f49223d0d07e78b4f3774a353c2b2e4164bf3cd2692592939f9277a20782e2d3 (same before/after ad-hoc re-sign);
+  original copy fails codesign --verify ("code has no resources but signature indicates they must be present"); `codesign --force --deep --sign -` copy passes --verify --deep --strict
+state found: a8 (round-6 candidate) NOT running — its watchdog fired 02:28:17 on a new system SecurityAgent (pid 14131, parent launchd) and SIGKILLed it; not traceable to A (r7-stop-a8.txt)
+swap: stop-a a8 (after-checks only) -> <A>/app moved to <A>/app-old-a8/ -> new copy at <A>/app/ -> launch a9 03:55:08 (gate OK, hidden=yes active=no)
+login after swap: data-auth="in", 按量付费 shown, no 点此登录 (booleans only)
+
+## 1 start-up (a9)
+main.log: app starting {version:'0.2.0', packaged:true}; db-safety: watermark equal — proceed; codepuppy-ext: loading plugin bundle; server ready 03:55:09.299
+server.log: process fence applied: addon=fence-20261113T084935428Z profile=2038B
+netlog (tools/netreq.py, distinct request ids): GET /api/event = 1 request (source 14)
+
+## 2 R17 (model codepuppy/deepseek-v4-flash)
+(a) ask tier, @general picked (Enter on the mention popup "AGENT @general 通用子任务…"): user message agents:[{name:general,mention:@general}];
+    model reasoning starts "The user wants me to call the subagent tool with agent: general …" (it quotes the injected "Use the above message and context to generate a prompt and call the subagent tool with agent: general");
+    card 03:57:5x "允许这次操作吗? / 派出子任务 / 交给助手 general / 本次会话内允许 将记住:本会话内的同类操作:general / 子任务里不再逐项询问 / 拒绝 · 本次会话内允许 · 允许一次";
+    拒绝 03:58:42 -> subagent executed:false "The user declined this tool call"; UI "1 步没成功 · 这一轮已中断"; no l7r7-r17a.txt anywhere under <A>
+(b) 全部批准, @general picked: parent ses_e2bdd8ca6ffe… build: subagent completed -> child ses_e2bdd7e5bffd… (parent_id set, agent general): write completed (+2 shell checks);
+    file <A>/home/code-puppy/l7r7-r17b.txt = "hello"; timeline "子任务 1 次 · 读取 1 次 · 31 秒", expanded "子任务 Create hello file 21 秒"
+(c) "@general" typed, popup closed with Escape (composer value "@general 在当前文件夹新建文件 l7r7-r17c.txt,内容写 hello", popup:false):
+    user message has NO agents field; model reasoning: "…They addressed @general (a subagent). But this is a trivial task; I can just do it myself. Should I delegate? … I think honoring is fine and cheap…"
+    -> it called subagent itself (child ses_e2bdbbd44ffe…), file written by the child. Expected "written directly, no delegation": not observed; the delegation was the model's own choice.
+(d) 只读, @general picked: agent codepuppy-readonly; subagent error "Subagent denied: general"; no l7r7-r17d.txt; model then ran 5 execute + glob + 3 read and answered (English)
+    "…`general` is not a registered agent here…" — misleading (general exists; the tier denied it)
+
+## 3 follow-up during pending approval (ask tier, conversation ses_e2bd97070ffe…)
+(a) card "改文件 l7r7-fu1.txt" pending; follow-up "补充:内容改成 hello-follow-up" sent 04:04:35.8; at +1 s the bubble is on screen under "04:04 · 新一轮" above the card (r7-fu-a-bubble-1s.png); DOM leaf count 1
+(b) switched to "创建 l7r7-r17d.txt 文件" and back: bubble still there, count 1 (r7-fu-b-after-switch.png)
+(c) 允许一次 04:05:46 -> first write done; follow-up ran as the next turn, second card 改文件 l7r7-fu1.txt, 允许一次 04:06:03 -> file "hello-follow-up"; one bubble (r7-fu-c-done.png)
+(d) "新建 l7r7-fu2.txt" -> card (permission per_1d428ee43…, ~04:06:53); follow-up "补充:l7r7-fu2.txt 内容改成 second" -> bubble at once (count 1);
+    停止生成 04:07:18 -> "1 步没成功 · 已由你停止 · 继续生成"; the follow-up bubble stays (count 1, DOM; on screen it is behind the stale card); engine session_inbox keeps it (delivery=steer, seq 46);
+    the approval card stays after stop (known, same as 0.1.26 in round 6)
+    one more "只回复一个字:好" 04:08:39 -> engine seq 53/54: both queued user messages delivered; each has one bubble (fu2 request 1, follow-up 1, third 1)
+    the delivered follow-up asked for a new write (engine write running, new permission) — the screen still shows the stale card bound to per_1d428ee43;
+    拒绝 04:09:25 -> GET …/permission/per_1d428ee43… only, NO reply POST; card shows "未能提交你的选择 / 没有收到授权收据… / Permission request not found: per_1d428ee43… / 重试「拒绝」";
+    the new permission id never appears in the netlog (no GET, no reply); DOM has 1 approval card; engine write ended 04:13:42 (+300 s)
+    "审批请求等待 300 秒无人应答,已按 fail-closed 结束… permission=edit patterns=[\"l7r7-fu2.txt\"]"; no l7r7-fu2.txt; UI "1 步没成功 · 5 分 3 秒 · 这一轮已中断"
+0.1.26 (root B, b126r7, same sequence): shell card -> Stop generating -> "Stopped by you · Continue", card stays; new message "新建 l7r7-b2.txt" -> header "Waiting for your approval",
+    the visible card is still the old "Run a command echo l7r7-b > …" card, no card for the new write (r7-b126-after-stop-new-card.png); v1 part table: write status running until my
+    second stop ("Tool execution aborted" 04:27:26). Same behaviour as the candidate.
+
+## 4 N01 (Word connector enabled in A)
+rc.docx dropped via CDP Input.dispatchDragEvent onto the composer (768,409): file card "rc.docx 36 KB · 本机读取"
+"附件 rc.docx 里的口令是多少?只回答口令数字" -> execute: tools["codepuppy-word"].read_docx({path: <A>/home/code-puppy/.codepuppy/attachments/8e969721-…/rc.docx}) completed -> answer "7319"
+chip at end of turn: "rc.docx ✓ 已读取 · 36 KB" (r7-n01-answer.png); after switching away and back: "已读取" (r7-n01-reopened.png)
+non-read turn (new conversation, rc.docx attached, "不用看附件,只回复一个字:好"): no tool call, answer "好"; chip "这一轮助手没有读取 · 请助手读取" (r7-n01-notread.png)
+
+## 5 spot checks
+shell (ask tier, "用 shell 运行命令 echo l7r7-shell > l7r7-shell.txt"): timeline row "运行 echo l7r7-shell > l7r7-shell.txt"; CARD heading "使用工具", chip with the command,
+    "将记住:本会话内的同类操作:echo *" (r7-s5-shell-card.png). 0.1.26 same prompt: heading "Run a command", "Remembers: commands starting with echo" (r7-b126-shell-card.png).
+    拒绝 04:19:45 -> engine shell error "The user declined this tool call" at 04:19:45.814; no l7r7-shell.txt
+edit ("把 l7r7-r17b.txt 里的 hello 改成 hi,用编辑工具改"): card "改文件 / l7r7-r17b.txt / 将记住:本会话内的所有文件修改" (r7-s5-edit-card.png); 允许一次 04:21:08 -> read, edit completed; file "hi"
+write card (cell 3): "改文件 / <file>" — specific, same family as edit
+patch card: not produced (the model used edit; no apply_patch call) — NOT-RUN
+edit-and-resend (same conversation, last 编辑重发): bar "已回退到检查点 / 发送后将丢弃此后 1 条消息。"; resend "只回复一个字:行" 04:23:41 -> at +1 s old message 0, new 1, first 1;
+    engine user rows = 5 (shell msg) and 50 (行); after switching away and back the same (r7-s5-resend-reopened.png)
+只读 -> 全部批准 (one conversation): agent codepuppy-readonly answered "这一步在当前会话里做不到：本会话处于只读模式，不能写文件…", no file; switch to 全部批准 -> agent build, write completed, no card, file l7r7-ro.txt
+failed turn (root E, fresh data, fake DeepSeek key from round 6, logged out; new copy at <E>/app, old at <E>/app-old-r6, e3 hidden CDP 9223):
+    stored failed conversation opened from the sidebar -> "登录或 Key 无效 / 重新登录 / 去设置 / 开发者详情"; live send from home (401, unbilled) -> same card, bubble present; 0 "opening authorize" in e3 main.log
+
+## incident: all test instances quit at 04:29:22
+a9 (root A) and b126r7 (root B) both ended 04:29:22–23: A main.log "watcher stopped", "sidecar exited {code:0}" (normal shutdown, no crash report); watchdogs "target group gone; watchdog exits quietly".
+stop-a afterwards: B "OWNER APP PIDS CHANGED [55869]" (a process under /Applications/Code Puppy.app running at that moment; gone by 04:31);
+    A: owner-side path mtimes changed at 04:29:29–04:29:37: ~/Library/Application Support/ai.opencode.desktop, ~/.local/share/opencode, ~/code-puppy (consistent with the owner's app starting).
+my commands 04:28–04:29: a CDP click on B's "Stop generating", a read-only sqlite query on B's database, then stop-a on B (which found it already gone). None references /Applications or the owner's paths.
+front application at 04:32 (lsappinfo front): loginwindow. A notarytool wait from the release lane was running (started 04:18). Cause not determined.
+A relaunched as a10 04:33 (gate OK, owner pids [] and owner paths unchanged at launch), logged in (data-auth=in, 按量付费), hidden=yes active=no; background hide-app 10800 s.
+B launch note: right after launch hide-app reported B hidden=yes active=yes; 3 s later active=no, frontmost app 终端.
+
+## paid
+user messages on codepuppy/deepseek-v4-flash: A 16 (R17 4, follow-up 5, N01 2, spot checks 5), B 2 (0.1.26 reference) = 18 of 20; plus automatic title generation and the subagent child turns. Root E send: fake key, 401, unbilled.

@@ -181,4 +181,22 @@ describe("I1 进程内 fetch 的交接(start() + Transform)", () => {
     await expect(fetch(new URL("/api/info", engine.url), { headers: { authorization: engineAuthorization(PASSWORD) } })).rejects.toThrow()
   }, 30_000)
 
+  // `#1698`(DESIGN-upgrade-bootstrap-config §4.2 第 4 步):引擎入口用**它自己编进去的**解析器读 sidecar 发布的启动文档;sidecar 的
+  // 关口(sidecar-bootstrap-gate.ts)要求有这个导出并让它通过,否则不起这台引擎。
+  test("#1698 引擎入口导出 assertCodePuppyBootstrap:未发布 / 形状不符 ⇒ 抛,合格文档 ⇒ 通过;sidecar 关口照此放行或拒绝", async () => {
+    const { __resetCodePuppyBootstrapForTests } = await import("@opencode/util/codepuppy-bootstrap")
+    const { assertEngineReadsBootstrap } = await import("./sidecar-bootstrap-gate")
+    const { publishTestBootstrap } = await import("../../test-component/codepuppy-bootstrap-fixture")
+    __resetCodePuppyBootstrapForTests()
+    try {
+      expect(() => embed.assertCodePuppyBootstrap()).toThrow(expect.objectContaining({ reason: "unpublished" }))
+      ;(globalThis as Record<symbol, unknown>)[Symbol.for("codepuppy.bootstrap")] = Object.freeze({ v: 1, paths: {} })
+      expect(() => assertEngineReadsBootstrap(embed)).toThrow(expect.objectContaining({ reason: "invalid" }))
+      publishTestBootstrap({ globalRoot: join(sandbox.root, "bootstrap-root") })
+      expect(() => assertEngineReadsBootstrap(embed)).not.toThrow()
+    } finally {
+      __resetCodePuppyBootstrapForTests()
+    }
+  })
+
 })

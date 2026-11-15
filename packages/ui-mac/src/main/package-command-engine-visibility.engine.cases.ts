@@ -5,6 +5,7 @@
 //   → `GET /api/command` 有没有这条命令;有的话再真跑一次:它是子任务(`subtask: true` ⇒ 父会话下出现一个子会话),子会话的
 //   用户回合逐字是签名模板、`$ARGUMENTS` 由引擎代入(v1 那几格 template / subtask / hints 在 2.x 的列表里不再给出,改由真跑判)。
 // `CP840_EXPECT=present|absent`。引擎跑在临时 HOME/XDG 沙箱里(test-component/engine-sandbox.ts),绝不碰 owner 的数据目录。
+import { codepuppyBootstrap } from "@opencode/util/codepuppy-bootstrap"
 import { afterAll, beforeAll, expect, test } from "bun:test"
 import * as fs from "node:fs"
 import * as path from "node:path"
@@ -12,6 +13,7 @@ import { assertEngineSandboxed, engineSandbox, engineSlot } from "../../test-com
 import { buildEngineServerOptions } from "./engine-server-options"
 import { withEngineAuthorization } from "./engine-authorization"
 import { injectCodePuppyConfig } from "./codepuppy-config-injection"
+import { publishMainBootstrap } from "../../test-component/codepuppy-bootstrap-fixture"
 import type { EngineFetch } from "./in-process-engine"
 
 const sandbox = engineSandbox()
@@ -36,7 +38,8 @@ test(`#840 engine read on OpenCode 2: the package command is ${EXPECT}`, async (
   process.env.CODEPUPPY_GLOBAL_DIR = GLOBAL_DIR
   const userData = path.join(sandbox.root, "user-data")
   fs.mkdirSync(userData, { recursive: true })
-  const injection = injectCodePuppyConfig(userData, undefined, "stable")
+  publishMainBootstrap({ userData }) // sidecar 在注入之前发布启动文档(`#1698`)
+  const injection = injectCodePuppyConfig(userData, undefined, "stable", codepuppyBootstrap().paths.userConfig ?? null)
   const { startEngine } = await import("../../engine/engine-embed")
   const slot = engineSlot(sandbox, "req840")
   let fetch: EngineFetch | undefined

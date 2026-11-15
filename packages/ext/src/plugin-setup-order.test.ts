@@ -4,7 +4,7 @@ import { expect, test } from "bun:test"
 import path from "node:path"
 import { isolatedEnv } from "../../../scripts/test-isolation/env"
 
-test("registerPolicy 是 setup 里第一个被 await 的,seal 是最后一个;ext 自己的钩子与项目插件扇出都在两者之间(子进程)", () => {
+test("registerPolicy 是 setup 里第一个被 await 的,seal 是最后一个;ext 自己的钩子与项目插件扇出都在两者之间;没有启动文档 ⇒ setup 第一步就抛(子进程,2 条)", () => {
   const result = Bun.spawnSync({
     cmd: [process.execPath, "test", path.resolve(import.meta.dir, "plugin-setup-order.cases.ts")],
     cwd: path.resolve(import.meta.dir, ".."),
@@ -13,6 +13,6 @@ test("registerPolicy 是 setup 里第一个被 await 的,seal 是最后一个;ex
   })
   const output = `${result.stdout.toString()}${result.stderr.toString()}`
   if (result.exitCode !== 0) throw new Error(output)
-  expect(output).toMatch(/\b1 pass\b/)
+  expect(output).toMatch(/\b2 pass\b/)
   expect(output).toMatch(/\b0 fail\b/)
 }, 60_000)

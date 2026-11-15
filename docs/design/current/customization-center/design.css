@@ -265,3 +265,18 @@ table.matrix{width:100%;min-width:820px;border-collapse:separate;border-spacing:
 .hub3 .hub-menu div[data-disabled]{color:var(--a-text-disabled)}
 .hub3 .hub-govbar{display:flex;align-items:center;gap:10px;margin:14px 0 12px;font-size:var(--a-text-sm)}
 .hub3 .hub-govbar .act{margin-left:auto;color:var(--a-accent);font-weight:var(--a-weight-medium)}
+
+/* ── #cloud-preflight(2026-11-13 并入):发送云端任务前的额度与准入 ──
+   帧画在 shadow root 里,直接用正式代码的 base.css / banner.css / extension-hub.css,令牌从本页继承。 */
+/* 本页缺的四个令牌,值同 tokens.css */
+:root{--a-text-on-accent:#ffffff;--a-space-1:4px;--a-space-2:8px;--a-space-3:12px}
+/* 组件库新增:卡片 与 名称 — 值列表(定义见 ../../2026-11-13-library-card-kv/frame.html,实现时进 codepuppy-ui/) */
+.a-card{padding:var(--a-space-3);border:1px solid var(--a-border-faint);border-radius:var(--a-radius-lg);background:var(--a-bg-subtle)}
+.a-kv{margin:0}
+.a-kv-row{display:flex;align-items:center;justify-content:space-between;gap:var(--a-space-3);padding:var(--a-space-1) 0;font-size:var(--a-text-sm);line-height:var(--a-leading-snug)}
+.a-kv-k{margin:0;color:var(--a-text-secondary)}
+.a-kv-v{margin:0;min-width:0;color:var(--a-text);font-weight:var(--a-weight-semibold);text-align:right;font-variant-numeric:tabular-nums}
+.a-kv-v[data-state="pending"],.a-kv-v[data-state="unavailable"]{color:var(--a-text-tertiary);font-weight:var(--a-weight-medium);font-size:var(--a-text-xs)}
+/* 定案 B:两种发送框的按钮行靠右(实现时改 extension-hub.css 的 .codepuppy-ext-cloudrun) */
+.cp-host .codepuppy-ext-cloudrun{justify-content:flex-end}
+.cp-host{padding:6px 24px 22px;max-width:880px}

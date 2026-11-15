@@ -3,7 +3,7 @@
  *
  * The ext build writes `bundled-tools.json` next to `dist/plugin.js` (`packages/ext/scripts/build.ts`): the bundle's
  * sha256 and the names of the tools the bundle itself defines. Main points the engine at the packaged copy through
- * `CODEPUPPY_EXT_BUNDLED_MANIFEST` (sidecar env, the same trust channel as the Office manifest); nothing next to a loaded
+ * the bootstrap document's `paths.extBundledManifest` (#1698; the same trust channel as the Office manifest); nothing next to a loaded
  * plugin is ever consulted, so a plugin cannot vouch for itself.
  *
  * A loaded plugin's tools get `codepuppy-bundled` only when the loader resolved it as a file plugin (the structured
@@ -19,8 +19,6 @@ import { fileURLToPath } from "node:url"
 import { canonicalJsonDigest } from "./store"
 import type { ToolAuthority } from "../../../schema/src/tool-identity"
 
-export const EXT_BUNDLED_MANIFEST_ENV = "CODEPUPPY_EXT_BUNDLED_MANIFEST"
-
 export type BundledPluginTools = {
   readonly authority: Extract<ToolAuthority, { kind: "codepuppy-bundled" }>
   readonly tools: ReadonlySet<string>
@@ -28,12 +26,12 @@ export type BundledPluginTools = {
   readonly readable: ReadonlyMap<string, string>
 }
 
+/** `manifestPath` = 启动文档的 `paths.extBundledManifest`(`#1698`;main 只信 ext 构建写在插件旁边的那一份)。 */
 export function bundledPluginTools(
   load: { source: "file" | "npm"; entry: string },
-  env: Record<string, string | undefined>,
+  manifestPath: string | undefined,
   readFile: (file: string) => Uint8Array,
 ): BundledPluginTools | undefined {
-  const manifestPath = env[EXT_BUNDLED_MANIFEST_ENV]
   if (load.source !== "file" || !manifestPath) return undefined
   try {
     const manifest = JSON.parse(new TextDecoder().decode(readFile(manifestPath))) as {

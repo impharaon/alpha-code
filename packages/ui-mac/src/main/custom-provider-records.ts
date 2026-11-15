@@ -5,7 +5,7 @@
 // ── 真源在哪:两条路,同一个答案 ─────────────────────────────────────────────────────
 // `<casBaseRoot>/custom-providers/<env>.json`(customProviderTruthPath)。`casBaseRoot` 与 `environment` 在 main 里是
 // codepuppy-environment.ts 冻结快照的两个字段;**sidecar 里没有快照**(utilityProcess 不跑 initCodePuppyEnvironment),它手里只有
-// main 派生给它的 `CODEPUPPY_GLOBAL_DIR` = `<casBaseRoot>/env/<env>`(environmentMutableRoot)。所以第二条路是同一个模块给出的
+// main 经启动文档传给它的 `paths.globalRoot` = `<casBaseRoot>/env/<env>`(environmentMutableRoot)。所以第二条路是同一个模块给出的
 // **逆映射**(environmentFromMutableRoot):父目录必须叫 `env`、末段必须是 prod | beta | dev,否则不猜 —— 形状不对 ⇒ 「位置未知」
 // ⇒ 什么都不派生(fail-closed)并出一行原因。两条路给出的是同一个 baseRoot(快照的 mutableRoot 正是由它拼出来的),
 // 判据在 custom-provider-derivation.test.ts。两条路合在 codepuppy-environment.ts 的 resolveCodePuppyStateBase(`#1381` 起远程 MCP
@@ -28,7 +28,7 @@ export type CustomProviderTruthLocation =
   | { ok: true; path: string; casBaseRoot: string; environment: AppEnvironment }
   | { ok: false; reason: string }
 
-/** 真源文件的位置:main 走冻结快照;sidecar(无快照)走 `CODEPUPPY_GLOBAL_DIR` 的逆映射。形状不对 ⇒ ok:false,不猜。 */
+/** 真源文件的位置:main 走冻结快照;sidecar(无快照)走启动文档 `paths.globalRoot` 的逆映射。形状不对 ⇒ ok:false,不猜。 */
 export function resolveCustomProviderTruthLocation(): CustomProviderTruthLocation {
   const base = resolveCodePuppyStateBase("custom-provider truth")
   if (!base.ok) return base

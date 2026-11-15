@@ -44,7 +44,8 @@ import { randomUUID } from "node:crypto"
 import { pickedFiles } from "./ipc"
 import { factorySkillIds } from "./factory-skills"
 import { downloadRemoteAsset, refreshRemoteCatalog, registerPackageCatalogReadIpcHandlers } from "./remote-catalog"
-import { applyBuiltinPolicy, effectiveFactoryDenied, normalizeBuiltinPolicy, protectionInfo, readBuiltinPolicy, resetBuiltinPolicy } from "./codepuppy-builtin-policy"
+import { applyBuiltinPolicy, normalizeBuiltinPolicy, protectionInfo, readBuiltinPolicy, resetBuiltinPolicy } from "./codepuppy-builtin-policy"
+import { factoryDeniedSkills } from "../../../ext/src/factory-deny"
 import {
   detectExternal,
   ecosystemInheritEnabled,
@@ -204,7 +205,7 @@ export function registerExtIpcHandlers(
   // REQ-067:factoryDenied = 出厂默认禁的有效名单(出厂清单 − 用户解禁)—— 菜单过滤与治理面板共用
   ipcMain.handle("builtin-read", () => {
     const gov = readBuiltinPolicy()
-    return { gov, protection: protectionInfo(), factoryDenied: effectiveFactoryDenied(gov) }
+    return { gov, protection: protectionInfo(), factoryDenied: factoryDeniedSkills() }
   })
   ipcMain.handle("builtin-apply", (_event: IpcMainInvokeEvent, gov: unknown, visibleAgents: unknown, confirmBuildDisable?: boolean) => {
     const agents = Array.isArray(visibleAgents) ? visibleAgents.filter((a): a is string => typeof a === "string") : []

@@ -40,6 +40,7 @@ import { McpPool } from "./pool.js"
 // codepuppy(#1563, #1564, #1565, ADR-041) ── Code Puppy's startup rules, named causes, bundled declarations, refused name collisions.
 import { readFileSync } from "node:fs"
 import { withFailureCode } from "@opencode/schema/codepuppy-net-failure"
+import { tryCodePuppyBootstrap } from "@opencode/util/codepuppy-bootstrap"
 import { declaredListedTools, listsDeclaration, sameTool, type DeclaredTool } from "./codepuppy-first-party-mcp.js"
 import { reconnectDelay, type StartFailure } from "./codepuppy-startup.js"
 import { effectiveName, normalizedName } from "../tool/runtime.js"
@@ -449,7 +450,7 @@ export const layer = (options?: Options) =>
           })
         const entry: ServerEntry = {
           config,
-          declared: declaredListedTools(name, config, process.env, readFileSync), // codepuppy(#1565)
+          declared: declaredListedTools(name, config, tryCodePuppyBootstrap()?.paths.officeMcpManifest, readFileSync), // codepuppy(#1565)
           status: { status: "pending" },
           startup: Latch.makeUnsafe(),
           attempt: { started, settled: Latch.makeUnsafe() },

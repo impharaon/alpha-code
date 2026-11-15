@@ -85,6 +85,7 @@ mock.module("./artifact-service", () => ({
 }))
 mock.module("./codepuppy-cloud-jobs", () => ({
   dispatchCloudJob: async () => ({ error: "unused" }),
+  getCloudAccountStatus: async () => ({ error: "unused" }), // alpha-code#1686:只让 cloud-ipc 的 import 解析
   dispatchExplicitCloudUpload: async () => ({ error: "unused" }),
   getCloudJobStatus: () => statusImpl(),
   cancelCloudJob: async () => ({ error: "unused" }),

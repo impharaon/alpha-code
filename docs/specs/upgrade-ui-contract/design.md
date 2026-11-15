@@ -11,7 +11,7 @@ review:
   reviewed_sha: "205c6c969aab3285197bd174eb7b9d22089c5e62"
   verdict: pass-with-notes   # R1 = Codex gpt-6.1-sol,会话 01a1cedc,建议 FIX-THEN-MERGE;3 Major + 3 Minor 全部采纳,本版已修正(§10)
 owners: [owner]
-last_reviewed: 2026-11-12
+last_reviewed: 2026-11-14
 ---
 
 # DESIGN-upgrade-ui-contract｜界面只认 Code Puppy 自己的数据约定 技术设计
@@ -126,7 +126,7 @@ last_reviewed: 2026-11-12
 
 约定指界面与翻译器之间、经 `engineFetch` 的那一层 HTTP/SSE。这里的界面包括冻结界面和 Code Puppy 自己的界面。约定由五部分组成:
 
-1. **路由目录**:服务的 87 条、声明不支持的 18 条(E 的 17 条,加上扫描补出的 `GET /api/event`)、探活回退 1 条(`GET /api/health`,UC-19)。服务的成员就是今天的路由表,不增不减(R1)。
+1. **路由目录**:0.2.0 放回后的目录为服务 87 条、声明不支持 24 条(R16、R18);其中固定答复 4 条,包括 `GET /api/health`(UC-19)。冻结的 `PROBE_FALLBACK` 分类表保留为空表,管道没有该空表的专属答复分支。E 上的目录与旧探活分类见 §2、R1/R15 历史记录。
 2. **事件流**:`GET /global/event` 的帧格式与事件表。
 3. **错误信封**。
 4. **不变量** UC-01–UC-19:界面依赖、类型表达不出来的语义。
@@ -146,8 +146,8 @@ packages/ui-mac/src/engine-adapter/
 | 谁 | 可以依赖 | 不许依赖 |
 | --- | --- | --- |
 | `contract/` | `@opencode-ai/sdk` 的类型,外加唯一一个运行时绑定 `createOpencodeClient`(`codepuppy-sdk-v1/src/v2/client.ts:50`,原样转出给 renderer);冻结 app 自带的 1.17.13 包 `@opencode-ai/client`(仅类型);冻结 app 的 `utils/session.ts`(仅规则 3 那一个函数,§4.3) | `opencode2/`、任何 `@opencode/*`、冻结 app 的其它源码 |
-| `index.ts` | `contract/`、`opencode2/`(仅选用) | 冻结界面任何源码 |
-| `opencode2/` | `contract/`、`@opencode/client`、`@opencode/schema/codepuppy-*`、`ext/src/staged-attachment-part`(既有) | 冻结界面任何源码、任何 `@opencode-ai/*` |
+| `index.ts` | `contract/`、`opencode2/`(仅选用)、`ui-mac/src/preload/types` 的 `EngineInternalDirectories`(仅类型) | 冻结界面任何源码 |
+| `opencode2/` | `contract/`、`@opencode/client`、`@opencode/schema/codepuppy-*`、`ext/src/staged-attachment-part`(既有)、`ui-mac/src/preload/types` 的 `EngineInternalDirectories`(仅类型,含 `internal-projects.ts`) | 冻结界面任何源码、任何 `@opencode-ai/*` |
 | `ui-mac/src/renderer/**` | `contract/`(v1 类型与 `createOpencodeClient`)、`index.ts`(`engineFetch`、`registerEngineOrigin`) | `@opencode-ai/sdk`、`@opencode-ai/client` |
 
 renderer 对 `@opencode-ai/{app,ui,session-ui}` 的 import 是在挂载冻结界面,不受影响。ui-mac 为此增加一条对 1.17.13 包的仅类型依赖,指向 `codepuppy-session-ui` 已经在用的同一个 tgz。
@@ -166,7 +166,7 @@ renderer 对 `@opencode-ai/{app,ui,session-ui}` 的 import 是在挂载冻结界
 5. **原样直通的 26 条**:约定类型按规则 1 取发出它的客户端的响应类型。翻译器原样转发,编译期管不到响应体,所以约定另给每条登记消费方实际读的字段(`READS`,逐条写读点),或者登记一个冻结消费函数(如 `/api/session` 交给 `normalizeSessionInfo`)。一致性 d 在真引擎样本上逐项断言(§4.10)。
 
 ```ts
-// contract/routes.ts(节选;完整 87 条逐条取自 E:routes.ts:194-570,不增不减。生成类型名以 sdk-v1 types.gen.ts 为准)
+// contract/routes.ts(节选;完整目录按 §10 R16/R18 及当前登记。生成类型名以 sdk-v1 types.gen.ts 为准)
 import type * as V1 from "@opencode-ai/sdk/v2/client"
 import type * as Legacy from "@opencode-ai/client/promise"   // 冻结 app 自带的 1.17.13 客户端,仅类型
 
@@ -181,6 +181,7 @@ declare function entry<Response, Body = undefined>(): Served<Response, Body>
 
 export const SERVED = {
   "GET /global/health": entry<{ healthy: true; version: string }>(),                          // UC-01
+  "GET /api/health": entry<Pick<Legacy.HealthGetOutput, "healthy">>(),                       // UC-19/R18
   "GET /session": entry<V1.SessionListResponses[200]>(),
   "POST /session/:sessionID/prompt_async": entry<void, NonNullable<V1.SessionPromptAsyncData["body"]>>(),
   "GET /global/event": entry<ContractEventStream>(),                                         // §4.5
@@ -204,6 +205,7 @@ export type BodyOf<K extends ServedKey> = NonNullable<(typeof SERVED)[K]["__body
 
 /** 答复不依赖引擎的路由,由约定侧直接答(UC-14)。 */
 export const FIXED = {
+  "GET /api/health": () => ({ healthy: true }),
   "GET /global/config": () => ({}),
   "GET /config": () => ({}),
   "GET /api/session/:sessionID/permission": () => ({ data: [] }),
@@ -217,10 +219,8 @@ export const UNSUPPORTED = {
   // … 共 18 条:E:routes.ts:576-594 的 17 条理由原样,加上面这条
 } as const satisfies Record<RouteKey, string>
 
-/** 探活回退:冻结调用方先试它、失败即回退到已服务的路由;约定侧固定回 501 信封,不记错误日志(UC-19)。 */
-export const PROBE_FALLBACK = {
-  "GET /api/health": "codepuppy-app/src/utils/server-health.ts:88-109 失败后回退 GET /global/health;server-protocol.ts:31 只在 /global/health 失败后才探",
-} as const satisfies Record<RouteKey, string>
+/** 冻结的探活回退分类表;R18 将唯一一条 /api/health 移入 SERVED/FIXED,当前为空。 */
+export const PROBE_FALLBACK = {} as const satisfies Record<RouteKey, string>
 
 /** 规则 3:会话信息归一用冻结界面自己的那一条(冻结 app utils/session.ts)。 */
 export type SessionLineage = {
@@ -304,7 +304,7 @@ export type ContractError =
 | UC-16 | composer 的暂存附件 part(synthetic + `codepuppy.attachment` metadata)原样往返 | `v1-shapes.ts:52-90` |
 | UC-17 | `POST /session/:id/command` 回这条命令那个回合的助手消息 `{info, parts}`;命令没开回合时回 `{}` | `routes.ts:172-191` |
 | UC-18 | 任务清单(`GET /session/:id/todo` 与 `todo.updated`)取最近一次 todowrite 的输入,每项 `{content,status,priority:"medium"}` | `v1-shapes.ts:431-436`;`routes.ts:343-350` |
-| UC-19 | `GET /api/health` 恒回非 2xx(501 信封)。冻结的健康检查(启动时与每 10 秒一轮)先试它,失败即回退到 `GET /global/health`;探协议时只有 `/global/health` 失败才会探它 | `codepuppy-app/src/utils/server-health.ts:88-109,117-164`;`utils/server-protocol.ts:28-34`。E 上它是落在表外的 501,本设计改为约定侧登记的固定答复(R15) |
+| UC-19 | `GET /api/health` 由适配器恒回 200 `{healthy:true}`,不问引擎。冻结的探协议先试 `/global/health`,首探失败后仍能由这里判 v1;启动与每 10 秒一轮的健康检查先试这里,成功后不再经它探引擎,这条答复表示适配器协议,不是引擎实时健康 | `contract/routes.ts` 的 `SERVED`/`FIXED`;`codepuppy-app/src/utils/server-health.ts:88-109,117-164`、`utils/server-protocol.ts:28-34`;#1712 的 `protocol-probe.engine.test.ts`。R18 取代 R15 的 501 答复 |
 
 ### 4.8 翻译器接口、回执账本与不支持路由(A3、A6)
 
@@ -369,7 +369,7 @@ export interface ReceiptLedger {
   - R6 owner 裁定拿掉的分享,2 条;
   - v1 模式下改走 `/question/:id/*` 的两条 v2 提问回复;
   - 只有 v2 支路才订阅的 `GET /api/event`(扫描补出,P-03)。
-- **探活回退 1 条**:`GET /api/health`。它在现用路径上每 10 秒就会被发一次,失败本身就是约定(UC-19),所以不放进「不支持」。由约定侧固定回 501 信封、不记错误日志;E 上它每次都记一条表外错误,会淹没真正的未知请求。
+- **固定健康答复 1 条**:`GET /api/health` 属于 `SERVED`/`FIXED`,与另外三条固定答复一起由约定侧直答,不碰引擎(UC-19、R18)。`PROBE_FALLBACK` 是冻结的分类表名,当前保留为空表,不参与管道分支;覆盖核对仍认这个分类。
 - 声明清单随约定代际无关,下一代翻译器直接继承。renderer 的调用点不得命中声明清单(§4.10 a):今天的命中数是 0(P-03)。要让任何一条变成「服务」,需要改约定,并按 ADR-048 把用户可见的部分交 owner。
 
 ### 4.9 具名例外:终端 WebSocket
@@ -383,7 +383,7 @@ export interface ReceiptLedger {
     - 直接链在客户端构造调用上的调用,跨行、带嵌套括号也算;
     - 绑定到四个构造函数的任意变量。`OpenCode.make` 与 `createApiForServer` 构造的是 1.17.13 客户端,`createSdkForServer` 与 `createOpencodeClient` 构造的是 v1 SDK;
     - 把字面量引擎路径交给 `fetch`、`new URL` 或转发给 fetch 的本地函数(今天是 `server-protocol.ts` 的 `probe`)的原始请求。
-  - 在 E 上,这三种形式补出的调用是:`GET /api/health`(探活回退)、`GET /global/health`(已服务)、`GET /api/event`(登记为不支持)。
+  - 在 E 上,这三种形式补出的调用是:`GET /api/health`(E 上是探活回退,现按 R18 为固定服务)、`GET /global/health`(已服务)、`GET /api/event`(登记为不支持)。
   - 已知坏例:①往夹具源码写一个跨行的 `OpenCode.make({\n  baseUrl,\n}).health.get()`,必须扫成 `GET /api/health`;②往 renderer 加一个 `client.auth.set(...)` 调用,必须红。
 - **b 完整**(编译期):`Translator.routes` 是 `TranslatedKey` 上的映射类型,翻译器少一条、多一条都是类型错误。管道只按约定目录匹配,所以「服务的就是约定里的」在结构上成立。
 - **c 转换的路由与事件**(运行期,真引擎采样):每个 `TranslatedKey` 里非直通的路由、`ContractEventMap` 里的每种事件,都至少有一个用例。用例的输入来自本代采样器对真引擎的采样;断言写成 UC 不变量,或者交给冻结消费方自己的归一与归约函数去判(只在测试里 import,如 `event-reducer.ts`)。不许拿被测翻译器算出来的值当期望。迁移各片证明「行为没变」时,用全部夹具做前后差分(输出逐个相等)。这只证明等价,不证明正确。
@@ -420,7 +420,7 @@ export interface ReceiptLedger {
   - 单个事件投影失败 → 记日志,流继续;
   - 引擎事件流断开 → 记日志,关闭 SSE,冻结 app 照旧重连;
   - 回执等连带 replied 最多 `SETTLE_MS`;放行被覆盖的请求是尽力而为,失败的不进收据;
-  - `GET /api/health` 由约定侧回 501,冻结的健康检查回退到 `GET /global/health`,与 E 相同,只是少了每 10 秒一条的表外错误日志(UC-19)。
+  - `GET /api/health` 由约定侧恒回 200 `{healthy:true}`,不把引擎首探失败变成 v2 协议选择;健康检查在这里成功后不再回退到引擎探活(UC-19、R18)。
 - M3 之后,带旧指纹(按引擎字段算)的 v2 回复命令得到 409;生产路径上没有这样的调用方(§4.8)。
 - M2 拿掉类型断言时可能暴露类型不一致(实测一例:2.x `SessionInfo.title` 可选,1.17.13 要求必填)。这不是运行时状态,在编译期处理。其中若有真实的运行时差异,属于翻译器的既有缺陷:按当前正式版的表现修,并在那一片的 PR 里列给 owner(§9)。
 
@@ -450,7 +450,7 @@ export interface ReceiptLedger {
   分享入口仍是 501(R6),不会把会话发到外部。
 - 被否决的替代(各一句):
   - 把两个冻结客户端的类型复制进约定:同一形状出现第二份定义,是新的 K2 偏离;两边都冻结,复制换不来任何升级收益;而且去不掉 renderer 经 `createOpencodeClient` 对 sdk-v1 的运行时依赖(O-1)。
-  - 把 `GET /api/health` 改成真服务:会改变健康检查与探协议的请求序列(`server-protocol.ts:33` 遇到 `{healthy:true}` 会直接判 v1),不是本设计的验收点(§10 留档)。
+  - 送审时曾否决把 `GET /api/health` 改成服务:当时未证实首探失败会锁进 v2 支路;0.2.0 的新证据已使这一项由 R18 取代,当前为固定服务。
   - 从冻结的 1.x OpenAPI 子集生成约定的客户端与类型:为永不变化的形状加一条生成流水线和一批生成文件。
   - 生产路径上对翻译器输出做运行时形状校验:没有消费方需要;拦下来就是界面打不开,只记日志又是噪音;一致性由测试承担。
   - 单独立包 `@codepuppy/ui-contract`:ui-mac 之外没有消费方。
@@ -480,7 +480,7 @@ export interface ReceiptLedger {
 
 | 片 | 完成后成立的事 | 开工依赖 | 回滚 |
 | --- | --- | --- | --- |
-| M1 约定目录与管道分家 | `contract/` 有 `SERVED`(87)、`UNSUPPORTED`(18)、`PROBE_FALLBACK`(1)、事件表、错误信封、`FIXED`(3);管道只按约定匹配,探活回退不记错误日志;翻译器挪进 `opencode2/`,处理函数按 `TranslatedKey` 索引(b);覆盖测试改按约定目录,认出三种漏掉的调用形式,并加上 renderer 规则(a);夹具差分全等 | #1662 已合入 `alpha` | 回退该 PR |
+| M1 约定目录与管道分家 | `contract/` 有 `SERVED`(87)、`UNSUPPORTED`(24)、`PROBE_FALLBACK`(0)、事件表、错误信封、`FIXED`(4)(放回后的 R16/R18);管道只按约定匹配,健康探针固定答复不碰引擎;翻译器挪进 `opencode2/`,处理函数按 `TranslatedKey` 索引(b);覆盖测试改按约定目录,认出三种漏掉的调用形式,并加上 renderer 规则(a);夹具差分全等 | #1662 已合入 `alpha` | 回退该 PR |
 | M2 翻译器自有投影 | `frozen-shapes.ts` 删除;`opencode2/` 不引任何冻结源码;`toContractSession` 在约定里;翻译器只做代际转换,现用界面归一留给冻结 app(§4.3 规则 4);没人调用的 `normalizeProjectInfo` 转出删掉、不重写;JSON 路由经 `reply<K>`;引擎类型与约定类型之间没有 `as never`;差分全等,`GET /provider` 按上面的例外比较。发现的真实差异按 §5 处理并在 PR 列出;constraints.md 补登 §6 那一行 | M1 | 回退该 PR |
 | M3 回执账本归约定 | 账本在约定侧,行为按 UC-11;指纹按 §4.8 的序列化改制;同一片里迁移采样器的指纹算法、重采 `permission-reply.json`、改读夹具指纹的测试;差分全等,收据指纹与带旧指纹的 v2 命令按上面的例外;`opencode2/` 实现 `ApprovalEngine`;登记册 `adr033-decision-receipt` 的机制与证明测试改指账本及其测试(在 E 上它们指向 `permission-replies.ts` 与 `permission-reply.test.ts`) | M1;I-05(a) 已落地,或确定不做(R13) | 回退该 PR,连同采样器与夹具一起回退;账本只活在窗口寿命里,不留数据 |
 | M4 Code Puppy 界面只经约定 | renderer 的 v1 类型与 `createOpencodeClient` 只从 `contract/` 取(同一绑定的转出,运行时不变);边界扫描(f) | M1 | 回退该 PR |
@@ -514,7 +514,7 @@ export interface ReceiptLedger {
 | R12 Code Puppy 界面经约定模块取 v1 类型与 `createOpencodeClient`,不重写 renderer 的数据调用;`contract/` 对 sdk-v1 明确允许这一个运行时转出 | P-05:3 处运行时用法,转出的是同一绑定(`codepuppy-sdk-v1/src/v2/client.ts:50`);R1 审查第 5 项 |
 | R13 I-04 的约定不依赖 I-05 的结果:I-05 只改翻译器内部(会话内允许、目录卡、失败码读法),约定字段 UC-09、UC-11、UC-12 不变。M3 等 I-05(a) 落地再开工,以免搬动即将删除的代码 | 接管调查第 1 行、B1、H 第 1 行(读,E) |
 | R14 生产路径上不做运行时形状校验 | P-09:冻结客户端本来就不校验;没有消费方需要 |
-| R15 `GET /api/health` 登记为探活回退:约定侧固定回 501 信封,不记错误日志,不改为服务 | P-03、UC-19:两个调用方都在失败后回退或从不先探它;改成服务会改变请求序列(§6 被否决的替代);R1 审查第 2 项 |
+| R15 **历史决定,501 答复已由 R18 取代**。`GET /api/health` 登记为探活回退:约定侧固定回 501 信封,不记错误日志,不改为服务 | P-03、UC-19:两个调用方都在失败后回退或从不先探它;改成服务会改变请求序列(§6 被否决的替代);R1 审查第 2 项 |
 
 **owner 已裁决(2026-11-12)**:方案连同其中的推荐一并获批,O-1 取「引用」(按引用使用冻结客户端的类型,不复制)。下文是裁决前的原文。
 
@@ -522,6 +522,15 @@ export interface ReceiptLedger {
   - 引用(推荐):翻译器与 Code Puppy 自己的界面都不再直接碰这两个包,只经约定模块按引用使用它们的类型。不重复定义,换代时这两个包都不用动。
   - 复制:把用到的类型复制进约定,再加一个比对测试。代价是同一形状两份定义,是一条新的 K2 偏离;换来的只是字面上少了类型依赖,升级时没有任何收益。
   - 拖着不决的代价:M1–M3 不受影响(依赖方向一样);M4 里 renderer 改 import 的去向,以及 M5 加不加对 1.17.13 包的仅类型依赖,要等这个决定。
+
+**批准后的裁决**
+
+| 裁决 | 依据与适用版本 |
+| --- | --- |
+| R16 `POST /api/session/:sessionID/interrupt` 与 `POST /api/session/:sessionID/command` 从直通挪进声明不支持,与 #1662 补登的五条 v2 支路路由同样处理(编排器 2026-11-13 裁定)。目录基数随之从实施基线 A(`c01ea14919`)的 88 服务 / 22 不支持 / 26 直通变为 86 / 24 / 24;R1、R9 写的 87 / 18 是 E 上的数 | 只在冻结 app 判定引擎是 v2 协议时经 1.17.13 客户端发出;协议恒为 v1(UC-01),`createCompatibleApi` 把它们改写成 v1 的 `POST /session/:id/abort` 与 `POST /session/:id/command`(`codepuppy-app/src/utils/server-compat.ts:197-199,241-256`),Code Puppy 运行时不发。真引擎也答不上冻结客户端的形状(采样器 `passthrough` 剧本,feat/1697 `dc27c1dcaf`,测):interrupt 回 200 `{interrupted}`,客户端声明 204;command 客户端发 `{command, arguments}`,引擎要 `{name, text}`,回 400 |
+| 新证据(同一次采样与读码,测 + 读):26 条直通里只有 v1 SDK `v2.*` 命名空间发出的 6 条 —— `GET /api/agent`、`GET /api/provider/:providerID`、`GET /api/reference`、`GET /api/session`、`GET /api/session/:sessionID`、`POST /api/session/:sessionID/model` —— 在运行时真的经过适配器;其余 20 条只由 1.17.13 客户端发出,而冻结 app 的 `api` 是 `createCompatibleApi`,v1 协议下这些方法全被 createV1Api 改写成 v1 路由 | `codepuppy-app/src/utils/server-compat.ts:86-91,125-518`;P-05 的 6 条 `v2.*` 直通。留档里「把只从未挂载冻结组件发出的路由降为声明不支持」一行据此有了可达性证据;R16 只处置答不上真引擎的两条,其余 18 条真引擎答得上(d 绿),仍按 R1 服务 |
+| R17 `lsp.updated`、`global.disposed`、`mcp.tools.changed`、`mcp.prompts.changed` 从约定事件表(`contract/events.ts` 的 `ContractEventMap`)与直通集合(`opencode2/events.ts` 的 `PASS_THROUGH`、`MCP_EVENTS`)里拿掉(编排器 2026-11-13 裁定)。事件表随之从 33 种变为 29 种;`contract-cases.test.ts` 留一条守卫:引擎自己的清单哪天开始含其中任何一种就红,约定要有意识地扩(加进事件表、补采样用例) | 引擎的公开事件流 `/api/event` 只发 `ServerDefinitions`(`packages/protocol/src/groups/event.ts:80,86`;`packages/schema/src/event-manifest.ts:72-83`),其中 MCP 只有 `StatusChanged`、`ResourcesChanged`,没有 LSP 与 `global.disposed`(读)。采样器 `events` 剧本(feat/1697 `5ae8dc335a`,测)让本机假 MCP 推 tools / resources / prompts 三条 list_changed 再断开,`fixtures/events.json` 里只有 `mcp.status.changed` ×3、`mcp.resources.changed` ×3。冻结 app 里收它们的处理今天就不会触发,行为不变:`codepuppy-app/src/context/server-sync.tsx:565`、`global-sync/event-reducer.ts:43`、`global-sync/home-session-index.ts:80`(`global.disposed`),`server-sdk.tsx:60`、`global-sync/event-reducer.ts:470`(`lsp.updated`);两种 MCP 事件在冻结 app 与 renderer 里都没有专门的处理 |
+| R18 0.2.0 放回的健康探针按已交付修复执行:将 `GET /api/health` 从探活回退移入 `SERVED`/`FIXED`,恒回 200 `{healthy:true}`、不问引擎;固定答复为 4 条,冻结分类表 `PROBE_FALLBACK` 保留为空,管道删除不可达的专属分支。**取代 R15 对这条路由的 501 答复**,不改其他裁决。§4.2 同时补明 `index.ts` 与 `opencode2/internal-projects.ts` 等只从 `preload/types` 取 `EngineInternalDirectories` 类型,没有运行时 preload 依赖 | 编排器 2026-11-14 r4 据独立审查采用的纠正;依据为续派转达的 0.2.0 打包回归结论与 #1712(`3a8e25d6b8`)修复。[protocol-probe.engine.test.ts](../../../packages/ui-mac/src/engine-adapter/protocol-probe.engine.test.ts) 的沙箱真引擎两例表明首探传输错误或超过冻结探针 5 秒期限时仍判 v1、收到 `server.connected`;缺少健康固定答复时两例均落到 v2 并收不到事件。健康轮询不再经此探引擎的结果在 UC-19 明示;放回证明见 plan.md |
 
 **仍是推断、没跑过的断言**
 
@@ -545,5 +554,5 @@ export interface ReceiptLedger {
 | 把只从未挂载冻结组件发出的路由降为声明不支持 | 候选(按 P-03 的调用点,挂载与否未核实):`/api/integration/*` 5 条只来自 `dialog-connect-provider.tsx`;`GET /api/vcs/status` 只来自 `pages/layout.tsx`;`POST /api/session/:id/rename` 来自 `titlebar-tab-strip.tsx`、`message-timeline.tsx`;`POST /api/session`、`…/command`、`…/shell`、`…/interrupt` 来自 `prompt-input/submit.ts`;`GET /api/vcs/diff` 来自 `pages/session.tsx` | 要逐条拿出可达性证据;收错一条就会把用户动作变成 501;没有验收点需要它 | 某次换代让其中一条翻译起来变贵时 |
 | `GET /session/:id/todo` 每次读整个会话 | 接管调查记了这一条(E `docs/architecture/2026-11-12-1662-takeover-candidates.md:55`) | 是翻译器本地的性能问题,不属于约定 | 会话变长、打开变慢有了实测时 |
 | origin/alpha 的 modules.md 缺 #1662 新增的 `codepuppy-*` 冻结包 | 地图与包清单不一致 | 归 #1662 或文档治理回填 | #1662 合入时 |
-| 冻结 app 探协议时,`/global/health` 一失败,`/api/health` 的 501 就会让它落到默认的 v2,走 Code Puppy 从不运行的那一支 | `utils/server-protocol.ts:28-34`(读)。只在连接时 `/global/health` 恰好失败才会碰到,可达性没有核 | 本设计不改请求序列(R15);没有实测发生过 | 出现过连上引擎后界面数据全空、日志里有 v2 支路请求时 |
-| 把 `GET /api/health` 改为真服务(回 `{healthy:true, version}`) | 健康检查少一次请求;上一条的落点会变成 v1(`server-protocol.ts:33`) | 改变请求序列,不是本设计的验收点 | 上一条被证实可达时 |
+| 送审时留档:首探失败后可能落到默认 v2 | #1712 的 `protocol-probe.engine.test.ts` 已证实可达 | 已由 0.2.0 固定健康答复修复,R18 补记并取代 R15 | 已解决,不再作为未核实项 |
+| 送审时留档:把 `GET /api/health` 改为服务 | 当前固定回 `{healthy:true}`(不带 version/pid),首探失败后仍判 v1 | 0.2.0 已执行,R18 记录其证据与后果 | 已解决 |

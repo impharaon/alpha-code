@@ -14,7 +14,7 @@ import { afterAll, beforeAll, describe, expect, test } from "bun:test"
 import { readFileSync } from "node:fs"
 import path from "node:path"
 import { assertEngineSandboxed, engineSandbox } from "../../test-component/engine-sandbox"
-import { codepuppyEngine, scriptedModel, textOf, type Running } from "../../test-component/codepuppy-engine"
+import { allowProject, codepuppyEngine, scriptedModel, textOf, type Running } from "../../test-component/codepuppy-engine"
 
 // ── 网络桩(必须在起引擎之前)──────────────────────────────────────────────────────────────────
 const original = globalThis.fetch
@@ -63,6 +63,8 @@ async function engineWith(name: string, ext: boolean) {
     // 不装 ext 时没有 Code Puppy 的默认选择,由用户配置选 exa(同一个上游 opencode.config.websearch)
     projectFiles: ext ? {} : { "opencode.json": JSON.stringify({ websearch: { provider: "exa" } }) },
   })
+  // `#1713`:不装 ext 那一臂由项目 opencode.json 选 exa —— 那是一个用户已允许的项目(未允许时 websearch 键暂缓)
+  if (!ext) allowProject(host.projectDirectory)
   const engine = await host.start()
   engines.push(engine)
   return { engine, directory: host.projectDirectory }

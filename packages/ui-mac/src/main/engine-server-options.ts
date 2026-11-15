@@ -9,8 +9,10 @@
 //   · 渠道:`app.channel` 恒为发布渠道,不随 Code Puppy 自己的 dev 构建变成 `dev`/`local` —— 那两个值会默认打开
 //     `todo`/`schedules`/`media_blob`/`artifacts`/`background_compaction` 五个实验开关(`packages/core/src/flag.ts` 的 `onByDefault`)。
 //
-// 本模块零依赖、纯函数:测试断言**这个对象**(engine-server-options.test.ts),反向臂是「只把值设进环境变量」——
+// 本模块是纯函数(只用 util 的开关判法):测试断言**这个对象**(engine-server-options.test.ts),反向臂是「只把值设进环境变量」——
 // 引擎核心不读 `OPENCODE_CONFIG_CONTENT` 一类变量,那条路在 H1 下静默失效。
+
+import { exportedFlag } from "@opencode/util/codepuppy-bootstrap"
 
 /** 上游 CLI 发布构建用的渠道名;不在 `local`/`dev` 里,五个实验开关默认关(`packages/core/src/flag.ts` 的 `onByDefault`)。 */
 export const ENGINE_RELEASE_CHANNEL = "latest"
@@ -55,16 +57,14 @@ export function buildEngineServerOptions(input: EngineServerOptionsInput) {
   }
 }
 
-const truthy = (value: string | undefined) => value === "1" || value?.toLowerCase() === "true"
-
 /**
- * 两个仍由用户 shell 导出可调的桌面默认(v1 时代经同名环境变量进引擎):models.dev 远程拉取默认关
- * (`OPENCODE_DISABLE_MODELS_FETCH`,server.ts 的 preferAppEnv 设默认值 "1"),文件监听默认开
- * (`OPENCODE_EXPERIMENTAL_FILEWATCHER`,同处设默认值 "true")。H1 下引擎不读这两个名字,读它们的只有这里。
+ * 两个仍由用户 shell 导出可调的桌面默认:models.dev 远程拉取默认关(`OPENCODE_DISABLE_MODELS_FETCH` 没设 = 关拉取),文件监听默认开
+ * (`OPENCODE_EXPERIMENTAL_FILEWATCHER` 没设 = 开)。H1 下引擎不读这两个名字,读它们的只有这里。按开关的唯一判法 exportedFlag 判
+ * (空串就是没设)。`#1698`:main 的启动文档构建器每次 fork 调它一次(main 自己的环境),结果写进文档的 `engine`;sidecar 读文档。
  */
 export function engineDesktopToggles(env: Record<string, string | undefined>) {
   return {
-    modelsFetch: !truthy(env.OPENCODE_DISABLE_MODELS_FETCH ?? "1"),
-    filewatcher: env.OPENCODE_EXPERIMENTAL_FILEWATCHER === undefined || truthy(env.OPENCODE_EXPERIMENTAL_FILEWATCHER),
+    modelsFetch: !(exportedFlag(env.OPENCODE_DISABLE_MODELS_FETCH) ?? true),
+    filewatcher: exportedFlag(env.OPENCODE_EXPERIMENTAL_FILEWATCHER) ?? true,
   }
 }

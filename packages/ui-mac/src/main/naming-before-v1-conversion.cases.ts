@@ -25,6 +25,7 @@ import { dbUndo, runNamingMigrationDbStep } from "./naming-migration-db"
 import { createMigrationFs } from "./naming-migration-fs"
 import { openJournal } from "./naming-migration-journal"
 import type { EngineFetch } from "./in-process-engine"
+import { engineProjectTrust } from "./engine-project-trust"
 
 const sandbox = engineSandbox()
 const plugin = registerV1MigrationTransform()
@@ -75,7 +76,7 @@ async function startOn(slot: ReturnType<typeof engineSlot>) {
       filewatcher: false,
       platform: process.platform,
     }),
-    { onDispatch: (dispatch) => (fetch = withEngineAuthorization(dispatch, "cp-l5-naming")) },
+    { onDispatch: (dispatch) => (fetch = withEngineAuthorization(dispatch, "cp-l5-naming")), projectTrust: engineProjectTrust },
   )
   engines.push(engine)
   const get = async (route: string) => {

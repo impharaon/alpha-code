@@ -249,6 +249,7 @@ registerExtIpcHandlers(
   "dev",
   async () => ({ url: "http://127.0.0.1:39118", username: "opencode", password: "route-password" }),
   join(tmp, "home"),
+  undefined, async () => undefined,
 )
 const routerBuildsAtRegister = routerCalls.built - routerBuildsBeforeRegister
 

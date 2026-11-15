@@ -11,7 +11,8 @@ import { Location } from "../location.js"
 import { Plugin } from "../plugin.js"
 import { LocationWatcherPolicy } from "./location-watcher-policy.js"
 import { Watcher } from "./watcher.js"
-import { projectWatchEnabled, projectWatchIgnore } from "./codepuppy-project-watch.js" // codepuppy(UI parity)
+import { projectWatchIgnore } from "./codepuppy-project-watch.js" // codepuppy(UI parity)
+import { codepuppyEngineSettings } from "@opencode/util/codepuppy-bootstrap" // codepuppy(UI parity, #1698)
 
 export interface Interface {}
 
@@ -80,7 +81,7 @@ const layer = Layer.effect(
       )
     // codepuppy(UI parity) ── the whole project is watched too, as Code Puppy 0.1.26 did, when main turned it on
     // (codepuppy-project-watch.ts): files created, edited or deleted outside the app reach the file panel.
-    const projectWatch = projectWatchEnabled(process.env)
+    const projectWatch = codepuppyEngineSettings().projectWatch
     let project: { key: string; scope: Scope.Closeable } | undefined
     const reconcileProject = () =>
       lock.withPermit(

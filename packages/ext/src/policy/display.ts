@@ -8,6 +8,8 @@
 //   · error     — a `Tool.Error`'s `metadata` (a denied call's error, or `execute.after` replacing `error`), merged
 //                 with the last progress snapshot by the session publisher.
 // The snapshot is written once per call from the facts at decision time and never overwritten (ADR-041 §4).
+import { codepuppyBootstrap } from "../../../util/src/codepuppy-bootstrap"
+import { UNATTENDED_DENIAL_KEY, type UnattendedDenial } from "../../../schema/src/codepuppy-unattended"
 import { Error as ToolError } from "@opencode/plugin/promise/tool"
 import { parseToolDisplaySnapshot, type ToolDisplaySnapshotV1 } from "../../../schema/src/tool-identity"
 import { classifyNetFailure, engineNetFailurePath } from "../../../schema/src/codepuppy-net-failure"
@@ -91,10 +93,11 @@ export function attachNetFailure(
     | { status: "completed" }
     | { status: "error"; input: unknown; error: InstanceType<typeof ToolError> },
   env: Record<string, string | undefined> = process.env,
+  egressProxy: string | undefined = codepuppyBootstrap().network.egressProxy,
 ) {
   if (event.status !== "error" || event.error.metadata?.[NET_FAILURE_KEY] !== undefined) return
   const target = (event.input as { url?: unknown } | undefined)?.url
-  const net = classifyNetFailure(event.error.error ?? event.error, engineNetFailurePath(typeof target === "string" ? target : undefined, env))
+  const net = classifyNetFailure(event.error.error ?? event.error, engineNetFailurePath(typeof target === "string" ? target : undefined, env, egressProxy))
   if (!net) return
   event.error = new ToolError({
     message: event.error.message,
@@ -133,4 +136,22 @@ export function attachDirectoryDisplay(event: {
     ...(truncated ? {} : { totalEntries: offset - 1 + entries.length }),
   }
   event.result = { ...event.result, metadata: { ...event.result.metadata, display } }
+}
+
+
+/** Code Mode 外层成功也可能包含子调用拒绝,所以两种终态都附上同一份结构化原因。 */
+export function attachUnattendedDenial(
+  event: Parameters<typeof attachTerminal>[0],
+  denial: UnattendedDenial | undefined,
+) {
+  if (!denial) return
+  if (event.status === "completed") {
+    event.result = { ...event.result, metadata: { ...event.result.metadata, [UNATTENDED_DENIAL_KEY]: denial } }
+    return
+  }
+  event.error = new ToolError({
+    message: event.error.message,
+    ...(event.error.error === undefined ? {} : { error: event.error.error }),
+    metadata: { ...event.error.metadata, [UNATTENDED_DENIAL_KEY]: denial },
+  })
 }

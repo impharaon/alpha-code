@@ -1,6 +1,7 @@
 // `#1665`:ext 在 OpenCode 2 真插件宿主里(plugin-host.harness.ts)—— 每条用例装的是生产的默认导出 `CodePuppyExt`,
 // 经上游真的钩子链 / 工具注册表 / transform 服务判结果。「权威保持」类用例都带反向臂:同一个输入在**不装 ext** 的宿主里
 // 走上游默认,结论必须相反 —— 去掉我们的钩子 ⇒ 这条用例红。
+import { publishTestBootstrap, testCloudMcp, unpublishTestBootstrap, type TestBootstrapInput } from "../../ui-mac/test-component/codepuppy-bootstrap-fixture"
 import { afterEach, beforeAll, expect } from "bun:test"
 import { createHash } from "node:crypto"
 import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs"
@@ -38,37 +39,30 @@ import { STAGED_ATTACHMENT_PART_NAME, stagedAttachmentPart } from "./staged-atta
 import { policyWorkspace } from "./policy/index"
 import { createToolPolicyStore, defaultPolicyBaseDir } from "./policy/resolver"
 import { Message } from "../../ai/src/schema/messages.ts"
+import { ToolFailure } from "../../ai/src/schema/errors.ts"
 import { projectTrustIdentity } from "../../ui-mac/src/main/project-trust-truth"
 import { recordProjectTrustDecision } from "../../ui-mac/src/main/project-trust-truth-write"
 import * as Media from "../../ai/src/media.ts"
 import { toLLMMessages } from "../../core/src/session/runner/to-llm-message.ts"
+import { Config } from "../../core/src/config.ts"
+import { ConfigNormalize } from "../../core/src/config/normalize.ts"
+import { ConfigAgentPlugin } from "../../core/src/config/plugin/agent.ts"
+import { PluginPromise } from "../../core/src/plugin/promise.ts"
+import { Document as ConfigDocument, Info as ConfigInfo } from "../../schema/src/config.ts"
+import { Schema } from "effect"
 
-const ENV_KEYS = [
-  "CODEPUPPY_GLOBAL_DIR",
-  "CODEPUPPY_LOCAL_WEBSEARCH_DENY",
-  "CODEPUPPY_CLOUD_WEBSEARCH_DENY",
-  "CODEPUPPY_CLOUD_MCP_ARM",
-  "CODEPUPPY_CLOUD_MCP_DEF",
-  "CODEPUPPY_CLOUD_MCP_SERVER",
-  "CODEPUPPY_BASE_URL",
-  "CODEPUPPY_PLATFORM_AUTH_REF",
-  "CODEPUPPY_FACTORY_DENY_SKILLS",
-  "CODEPUPPY_PROMPT_REBRAND_DISABLE",
-  "CODEPUPPY_POLICY_ACCOUNT",
-  "CODEPUPPY_EXT_BUNDLED_MANIFEST",
-] as const
-const saved = Object.fromEntries(ENV_KEYS.map((key) => [key, process.env[key]]))
 let scratch = ""
 beforeAll(() => {
   scratch = realpathSync(mkdtempSync(join(tmpdir(), "codepuppy-ext-host-")))
   mkdirSync(join(scratch, "codepuppy-state", "env", "dev"), { recursive: true })
 })
-const env = (values: Partial<Record<(typeof ENV_KEYS)[number], string>>) => {
-  for (const key of ENV_KEYS) delete process.env[key]
-  // main 派生的形状 `<casBaseRoot>/env/<env>`:项目信任记录(`#1709`)按它的逆映射定位;每条用例从「谁都没决定过」开始
-  process.env.CODEPUPPY_GLOBAL_DIR = join(scratch, "codepuppy-state", "env", "dev")
+/**
+ * `#1698`:Code Puppy 交给 ext 的决定(全局根、平台节点地址与凭据引用、云 MCP、kill-switch、账户分区、开关、出厂技能目录)全部经 sidecar
+ * 发布的启动文档到 ext(R14:在装 ext 之前发布);ext 不读任何 Code Puppy 的环境变量。第一个参数留作调用点的形状,恒为空。
+ */
+const env = (_values: Record<string, never>, bootstrap: Omit<TestBootstrapInput, "globalRoot"> = {}) => {
   rmSync(join(scratch, "codepuppy-state", "project-trust"), { recursive: true, force: true })
-  Object.assign(process.env, values)
+  publishTestBootstrap({ globalRoot: join(scratch, "codepuppy-state", "env", "dev"), ...bootstrap })
 }
 /** `#1709`:用户在确认框里对这个项目的决定 —— 经 main 的生产写端记进 `<casBaseRoot>/project-trust/dev.json`(规范目录 + inode)。 */
 const decide = (directory: string, granted: boolean) => {
@@ -78,10 +72,7 @@ const decide = (directory: string, granted: boolean) => {
 /** 0.1.x 的 main 写进项目的那份「已同意」—— 现在项目自带它也不算数。 */
 const SELF_GRANTED = JSON.stringify({ extensionsConsent: { version: 1, granted: true, decidedAt: "2026-11-01T00:00:00.000Z" } })
 afterEach(() => {
-  for (const key of ENV_KEYS) {
-    if (saved[key] === undefined) delete process.env[key]
-    else process.env[key] = saved[key]
-  }
+  unpublishTestBootstrap()
 })
 
 const ids = {
@@ -121,12 +112,13 @@ const contextEvent = (system: string[], model = { providerID: "stub", id: "stub-
 
 it.live("权威 · 工具策略(I3):ext 的默认导出装上后,Code Puppy 策略停用的工具被具名拒绝、实现零执行;反向臂:不装 ext ⇒ 同一条停用记录下照样执行", () =>
   Effect.gen(function* () {
-    env({ CODEPUPPY_POLICY_ACCOUNT: `t-${Math.random().toString(36).slice(2)}` })
+    const account = `acct:${createHash("sha256").update(String(Math.random())).digest("hex")}`
+    env({}, { policyAccount: account })
     // 用户的停用记录经生产的策略存储写进 ext 读的那个位置(数据根 / 账户 / 工作区与 registerPolicy 同一套)
     const location = yield* Location.Service
     const store = createToolPolicyStore({
       baseDir: defaultPolicyBaseDir(join(process.env.XDG_DATA_HOME!, "opencode")),
-      account: () => process.env.CODEPUPPY_POLICY_ACCOUNT!,
+      account: () => account,
       workspace: () => policyWorkspace(location as never),
     })
     yield* Effect.promise(() => store.setRecord({ selector: { level: "tool", canonical: "builtin::probe_tool" }, state: "disabled" } as never))
@@ -185,7 +177,7 @@ it.live("P1 / P8:真宿主装上 ext 的默认导出 —— 八个 codepuppy 工
 
 it.live("权威 · 联网搜索准入(L5r):kill-switch 下 2.x 内置 websearch 与第三方 web search MCP 在 execute.before 被拒;反向臂:不装 ext ⇒ 放行", () =>
   Effect.gen(function* () {
-    env({ CODEPUPPY_LOCAL_WEBSEARCH_DENY: "1", CODEPUPPY_CLOUD_WEBSEARCH_DENY: "1" })
+    env({}, { killSwitch: true })
     yield* registered("websearch", "exa_web_search_exa", "codepuppy_dispatch")
     const baseline = yield* before("websearch", { query: "x" })
     expect(Exit.isSuccess(baseline)).toBe(true)
@@ -297,8 +289,7 @@ it.live("权威 · 云工具接入(M3):ARM+DEF 在场 ⇒ ext 的 mcp.transform 
   Effect.gen(function* () {
     const token = join(scratch, "mcp-token")
     writeFileSync(token, "secret-token\n")
-    const definition = { type: "remote", url: "https://cloud.example/mcp", oauth: false, headers: { Authorization: `Bearer {file:${token}}` } }
-    env({ CODEPUPPY_CLOUD_MCP_ARM: "codepuppy", CODEPUPPY_CLOUD_MCP_DEF: JSON.stringify(definition), CODEPUPPY_CLOUD_MCP_SERVER: "codepuppy" })
+    env({}, { killSwitch: true, cloudMcp: testCloudMcp("https://cloud.example/mcp", token) })
     const neutralised = { type: "remote", url: "http://127.0.0.1:1/withheld", disabled: true }
     const without = recordingMcp({ codepuppy: neutralised })
     expect(without.servers.get("codepuppy")).toEqual(neutralised)
@@ -315,8 +306,7 @@ it.live("权威 · 云工具接入(M3):ARM+DEF 在场 ⇒ ext 的 mcp.transform 
 
 it.live("云工具接入:{file:} 引用读不到 ⇒ 不装(fail-closed),中和条目留着", () =>
   Effect.gen(function* () {
-    const definition = { type: "remote", url: "https://cloud.example/mcp", headers: { Authorization: `Bearer {file:${join(scratch, "missing")}}` } }
-    env({ CODEPUPPY_CLOUD_MCP_ARM: "codepuppy", CODEPUPPY_CLOUD_MCP_DEF: JSON.stringify(definition) })
+    env({}, { killSwitch: true, cloudMcp: testCloudMcp("https://cloud.example/mcp", join(scratch, "missing")) })
     const neutralised = { type: "remote", url: "http://127.0.0.1:1/withheld", disabled: true }
     const mcp = recordingMcp({ codepuppy: neutralised })
     yield* activate(CodePuppyExt, { mcp })
@@ -324,19 +314,25 @@ it.live("云工具接入:{file:} 引用读不到 ⇒ 不装(fail-closed),中和�
   }),
 )
 
-it.live("权威 · 云工具准入:治理云 server 上的 web search 只按本 Location 核验过的端点身份豁免;冒名 server 上的同形工具照样被拒", () =>
+it.live("权威 · 云工具准入:治理云 server 上的 web search 只按本 Location 核验过的端点身份认;冒名 server 上的同形工具按第三方判", () =>
   Effect.gen(function* () {
-    const definition = { type: "remote", url: "https://cloud.example/mcp" }
-    // 只置 LOCAL:第三方 web search 关,治理云 server 的 web search 豁免(只有 CLOUD 信号关它)。
-    env({ CODEPUPPY_CLOUD_MCP_ARM: "cloud", CODEPUPPY_CLOUD_MCP_DEF: JSON.stringify(definition), CODEPUPPY_CLOUD_MCP_SERVER: "cloud", CODEPUPPY_LOCAL_WEBSEARCH_DENY: "1" })
+    const token = join(scratch, "mcp-token-admission")
+    writeFileSync(token, "secret-token\n")
+    // `#1698`:web search 的判决只有 kill-switch 一个信号(「只有本地信号」的漂移态不再存在);治理 / 冒名的区分体现在拒绝理由上 ——
+    // 治理云工具只拿 kill-switch 那一句,冒名的拿到点名「按名字认出的工具」的第三方那一句。
+    env({}, { killSwitch: true, cloudMcp: testCloudMcp("https://cloud.example/mcp", token, "cloud") })
     const mcp = recordingMcp({ cloud_attacker: { type: "remote", url: "https://evil.example/mcp" } })
     yield* registered("cloud_web_search", "cloud_attacker_web_search")
     yield* activate(CodePuppyExt, { mcp })
-    expect(Exit.isSuccess(yield* before("cloud_web_search"))).toBe(true)
+    const governed = yield* before("cloud_web_search")
+    expect(Exit.isFailure(governed)).toBe(true)
+    expect(JSON.stringify(governed)).toContain("is unavailable")
+    expect(JSON.stringify(governed)).not.toContain("by name")
     const attacker = yield* before("cloud_attacker_web_search")
     expect(Exit.isFailure(attacker)).toBe(true)
-    // 拒它的是联网搜索的主权闸,不是策略的「未知身份」
+    // 拒它的是联网搜索的主权闸,不是策略的「未知身份」;按第三方判
     expect(JSON.stringify(attacker)).toContain("is unavailable")
+    expect(JSON.stringify(attacker)).toContain("by name")
   }),
 )
 
@@ -366,7 +362,7 @@ it.live("P3 / L3r:session.hook.context 的品牌转写只换登记过的上游�
  */
 const assembledOn = (hook: "compaction" | "title") =>
   Effect.gen(function* () {
-    env({ CODEPUPPY_BASE_URL: "https://gateway.codepuppy.test/v1" })
+    env({}, { platform: { modelProxyBaseURL: "https://gateway.codepuppy.test/v1" } })
     // 平台代理节点上的纯文本模型:识图、附件、转写、输出上限四件事都该在这条请求上发生。
     yield* activate(providerPlugin("codepuppy", "https://gateway.codepuppy.test/v1", "route-a"))
     const hooks = yield* PluginHooks.Service
@@ -449,7 +445,7 @@ const providerPluginWith = (providerID: string, baseURL: string, input: string[]
 
 it.live("P5:平台代理节点 ⇒ 不发 maxTokens(网关按 route 上限填);别的节点 ⇒ 原样;反向臂:不装 ext ⇒ maxTokens 留着", () =>
   Effect.gen(function* () {
-    env({ CODEPUPPY_BASE_URL: "https://gateway.codepuppy.test/v1" })
+    env({}, { platform: { modelProxyBaseURL: "https://gateway.codepuppy.test/v1" } })
     yield* activate(providerPlugin("codepuppy", "https://gateway.codepuppy.test/v1", "route-a"))
     yield* activate(providerPlugin("other", "https://api.other.test/v1", "model-b"))
     const hooks = yield* PluginHooks.Service
@@ -463,7 +459,7 @@ it.live("P5:平台代理节点 ⇒ 不发 maxTokens(网关按 route 上限填);�
   }),
 )
 
-it.live("P5:直连 BYOK 节点按逐模型实读上限抬(同一 provider 的两个模型各拿各的数);无读数 / 端点不符 / 目录里查不到 ⇒ 原样;未登录(无 CODEPUPPY_BASE_URL)谁都不置空", () =>
+it.live("P5:直连 BYOK 节点按逐模型实读上限抬(同一 provider 的两个模型各拿各的数);无读数 / 端点不符 / 目录里查不到 ⇒ 原样;未登录(文档里没有平台节点地址)谁都不置空", () =>
   Effect.gen(function* () {
     env({})
     const ZHIPU = "https://open.bigmodel.cn/api/paas/v4"
@@ -486,7 +482,7 @@ it.live("P6 / S5:平台凭据头只对平台节点、每次现读;别的节点�
   Effect.gen(function* () {
     const ref = join(scratch, "platform-token")
     writeFileSync(ref, "plat-1\n")
-    env({ CODEPUPPY_BASE_URL: "https://gateway.codepuppy.test/v1", CODEPUPPY_PLATFORM_AUTH_REF: `{file:${ref}}` })
+    env({}, { platform: { modelProxyBaseURL: "https://gateway.codepuppy.test/v1", credentialRef: `{file:${ref}}` } })
     const hooks = yield* PluginHooks.Service
     // 2.x 的 http.request 拿到的是路由层鉴权之后、即将发出的请求(Authorization 已是注入的占位 apiKey)
     const request = (url: string) => ({
@@ -515,7 +511,7 @@ it.live("P6 / S5:平台凭据头只对平台节点、每次现读;别的节点�
 
 /**
  * 定制中心安装的宿主:main 由一个假 parentPort 扮演(目录里有 mcp:github;请求记录查不到 —— 结局不归这里判),ext 的进程级对象
- * 在本用例里按这个 port 重建、用完复原;`manifest` 时像打包版一样经 CODEPUPPY_EXT_BUNDLED_MANIFEST 核验 ext 自己的安装工具;
+ * 在本用例里按这个 port 重建、用完复原;`manifest` 时像打包版一样经启动文档的 `paths.extBundledManifest` 核验 ext 自己的安装工具;
  * main 注入的两个 Code Puppy agent 带上决定本用例的那条规则(codepuppy-config-injection.ts 的「tool-policy-default」ask)。
  * 之后再装 ext。
  */
@@ -551,7 +547,7 @@ const hubHost = (options: { manifest: boolean }) =>
       const manifest = join(scratch, `bundled-tools-${Math.random().toString(36).slice(2)}.json`)
       const moduleSha256 = createHash("sha256").update(readFileSync(join(import.meta.dir, "policy", "index.ts"))).digest("hex")
       writeFileSync(manifest, JSON.stringify({ moduleSha256, tools: ["codepuppy_hub_install"], readable: { codepuppy_hub_install: "codepuppy:hub_install" } }))
-      process.env.CODEPUPPY_EXT_BUNDLED_MANIFEST = manifest
+      publishTestBootstrap({ globalRoot: join(scratch, "codepuppy-state", "env", "dev"), extPlugin: scratch, extBundledManifest: manifest })
     }
     yield* activate({
       id: "test.injected-tier-agents",
@@ -640,9 +636,39 @@ itWithPermission.live("定制中心安装:没经随包清单核验的同名工�
   }),
 )
 
+/** 装一次 ext,收下这期间 ext 打进 console.log 的行(ext 的日志就是 console.log,plugin.ts 的 `log`)。 */
+const activationLog = (bootstrap: Omit<TestBootstrapInput, "globalRoot">) =>
+  Effect.gen(function* () {
+    env({}, bootstrap)
+    const lines: string[] = []
+    const original = console.log
+    console.log = (...args: unknown[]) => void lines.push(args.map(String).join(" "))
+    try {
+      yield* activate(CodePuppyExt)
+    } finally {
+      console.log = original
+    }
+    return lines
+  })
+
+it.live("`#1698` R6:启动文档的 switches.extVerbose 置位 ⇒ 装载回执把登记簿库存打进日志(此前这个开关被 sidecar 白名单丢掉,导出了也不生效)", () =>
+  Effect.gen(function* () {
+    const lines = yield* activationLog({ switches: { extVerbose: true } })
+    expect(lines.some((line) => line.startsWith("[@codepuppy/ext] context injections:"))).toBe(true)
+  }),
+)
+
+it.live("`#1698` R6 反向臂:switches.extVerbose 不置位 ⇒ 不打库存", () =>
+  Effect.gen(function* () {
+    const lines = yield* activationLog({})
+    expect(lines.filter((line) => line.startsWith("[@codepuppy/ext] context injections:"))).toEqual([])
+  }),
+)
+
 it.live("权威 · 出厂禁用技能(REQ-067):禁项的 skill 权限评估一律 deny,技能目录里拿掉;反向臂:不装 ext ⇒ allow、技能在", () =>
   Effect.gen(function* () {
-    env({ CODEPUPPY_FACTORY_DENY_SKILLS: JSON.stringify(["customize-opencode"]) })
+    // `#1698` R7:名单是 ext 的常量,不靠任何环境
+    env({})
     const hooks = yield* PluginHooks.Service
     const skills = yield* Skill.Service
     yield* activate({
@@ -970,5 +996,274 @@ itWithPermission.live("权威 · 待批请求的回复(#1666 第 3 条):经 ext 
     yield* Fiber.join(asking)
     expect(settled && Exit.isSuccess(settled)).toBe(true)
     expect(yield* permission.forSession(session.id)).toEqual([])
+  }),
+)
+
+// ── #1700 项目 agent 的其余字段 ─────────────────────────────────────────────────────────────────────────────────────
+
+/** 项目文档写下 `agents`(可选同意),装上 ext,回引擎 agent 表里的这些 agent(真 Agent 服务)。 */
+const projectAgents = (agents: Record<string, unknown>, consent: boolean | "self-granted", ...ids: string[]) =>
+  Effect.gen(function* () {
+    env({})
+    const directory = realpathSync((yield* Location.Service).directory)
+    const root = join(directory, ".codepuppy")
+    mkdirSync(root, { recursive: true })
+    writeFileSync(join(root, "codepuppy.jsonc"), JSON.stringify({ agent: agents }))
+    if (consent === true) decide(directory, true)
+    if (consent === "self-granted") writeFileSync(join(root, "prefs.json"), SELF_GRANTED)
+    yield* activate(CodePuppyExt)
+    const service = yield* Agent.Service
+    const out: Record<string, Agent.Info | undefined> = {}
+    for (const id of ids) out[id] = yield* service.get(Agent.ID.make(id))
+    return out
+  })
+
+it.live("权威 · 项目 agent 的 disable(#1700 AC-04):已同意的项目里 explore 写了 disable: true ⇒ 这一批激活结束后引擎 agent 表里没有它,派发它被拒且说明已停用;别的助手照常", () =>
+  Effect.gen(function* () {
+    env({})
+    const directory = realpathSync((yield* Location.Service).directory)
+    mkdirSync(join(directory, ".codepuppy"), { recursive: true })
+    writeFileSync(join(directory, ".codepuppy", "codepuppy.jsonc"), JSON.stringify({ agent: { explore: { disable: true } } }))
+    decide(directory, true)
+    yield* registered("subagent")
+    const ext = yield* activateExtUntilFinished
+    yield* ext.finish(exploreState.pipe(Effect.map((state) => state === undefined)))
+    expect(yield* exploreState).toBeUndefined()
+    expect((yield* (yield* Agent.Service).get(Agent.ID.make("general")))).toBeDefined()
+    const dispatched = yield* before("subagent", { agent: "explore", prompt: "look around" })
+    expect(Exit.isFailure(dispatched)).toBe(true)
+    expect(JSON.stringify(dispatched)).toContain('Agent \\"explore\\" is disabled in this project')
+    expect(Exit.isSuccess(yield* before("subagent", { agent: "general", prompt: "look around" }))).toBe(true)
+  }),
+)
+
+/**
+ * 装上 ext,ext 看到的插件清单由用例控制:生产里 opencode.config.policy 在 post 段最后激活,它进了清单 = 这一批激活结束,
+ * ext 排在 post 段之后的 transform(post-activation-tail.ts)这时才登记。`finish(done)` 翻过来之后等到 `done` 成立。
+ */
+const activateExtUntilFinished = Effect.gen(function* () {
+  let finished = false
+  const plugins = yield* Plugins.Service
+  const policy = { id: "opencode.config.policy", source: { type: "builtin" }, features: { server: true }, state: { status: "active" } }
+  const list = { list: () => (finished ? Effect.succeed([policy] as never) : plugins.list()) }
+  yield* activate({ id: "test.seed-builtins", async setup() {} })
+  yield* PluginPromise.fromPromise(CodePuppyExt).effect(yield* PluginHost.make(list, CodePuppyExt.id))
+  return {
+    finish: (done: Effect.Effect<boolean>) =>
+      Effect.gen(function* () {
+        finished = true
+        for (let waited = 0; waited < 3000 && !(yield* done); waited += 20) yield* Effect.sleep("20 millis")
+      }),
+  }
+})
+
+/** v1 文档 → 引擎的配置文档(引擎读用户配置文件那条路:ConfigNormalize,再按 2.x Info 解码)。 */
+const configDocument = (v1: Record<string, unknown>) => {
+  const result = ConfigNormalize.normalize(v1)
+  if (result.type !== "normalized") throw new Error("the engine rejected the document")
+  return new ConfigDocument({ type: "document", info: Schema.decodeUnknownSync(ConfigInfo)(result.encoded) })
+}
+/** 引擎真的配置 agent 插件(`opencode.config.agent`,生产里在 post 段、排在 ext 之后)读这几份文档(按给的先后)。 */
+const configAgents = (...documents: Array<Record<string, unknown>>) =>
+  Effect.gen(function* () {
+    const plugins = yield* Plugins.Service
+    yield* ConfigAgentPlugin.Plugin.effect(yield* PluginHost.make(plugins, ConfigAgentPlugin.Plugin.id)).pipe(
+      Effect.provide(Config.testLayer(documents.map(configDocument))),
+    )
+  })
+const exploreState = Effect.gen(function* () {
+  const explore = yield* (yield* Agent.Service).get(Agent.ID.make("explore"))
+  return explore && { mode: explore.mode, edit: Permission.evaluate("edit", "a.txt", explore.permissions).effect }
+})
+
+it.live("项目 agent 的 disable · 引擎自己的结果(#1700 Codex R1/1 M1 对照):用户文档写 explore 的说明、后一份文档写 disable: true ⇒ 引擎读完 explore 不在", () =>
+  Effect.gen(function* () {
+    yield* activate({ id: "test.seed-builtins", async setup() {} })
+    expect(yield* exploreState).toEqual({ mode: "subagent", edit: "deny" })
+    yield* configAgents({ agent: { explore: { description: "说明" } } }, { agent: { explore: { disable: true } } })
+    expect(yield* exploreState).toBeUndefined()
+  }),
+)
+
+it.live("权威 · 项目 agent 的 disable 与后面的配置层(#1700 Codex R1/1 M1):已同意项目停用 explore、用户全局配置之后又写了 explore 的说明 ⇒ 任何时刻都不比内置更宽(模式仍是 subagent、edit 仍是 deny),这一批激活结束后 explore 不在(与引擎读同两份文档一致),派发说明已停用", () =>
+  Effect.gen(function* () {
+    env({})
+    const directory = realpathSync((yield* Location.Service).directory)
+    mkdirSync(join(directory, ".codepuppy"), { recursive: true })
+    writeFileSync(join(directory, ".codepuppy", "codepuppy.jsonc"), JSON.stringify({ agent: { explore: { disable: true } } }))
+    decide(directory, true)
+    yield* registered("subagent")
+    const ext = yield* activateExtUntilFinished
+    yield* configAgents({ agent: { explore: { description: "说明" } } })
+    // 激活还没结束(尾巴没放上去):explore 还在,但不比内置更宽;此时派发照常(按最终状态判停用)
+    expect(yield* exploreState).toEqual({ mode: "subagent", edit: "deny" })
+    expect(Exit.isSuccess(yield* before("subagent", { agent: "explore", prompt: "look around" }))).toBe(true)
+    yield* ext.finish(exploreState.pipe(Effect.map((state) => state === undefined)))
+    expect(yield* exploreState).toBeUndefined()
+    const dispatched = yield* before("subagent", { agent: "explore", prompt: "look around" })
+    expect(JSON.stringify(dispatched)).toContain('Agent \\"explore\\" is disabled in this project')
+  }),
+)
+
+it.live("项目 agent 的 disable · 反向臂(#1700 BR-03 / BR-02):同一份文档、项目未同意 ⇒ explore 仍在,派发照常", () =>
+  Effect.gen(function* () {
+    yield* registered("subagent")
+    const agents = yield* projectAgents({ explore: { disable: true } }, false, "explore")
+    expect(agents.explore).toBeDefined()
+    expect(Exit.isSuccess(yield* before("subagent", { agent: "explore", prompt: "look around" }))).toBe(true)
+  }),
+)
+
+it.live("项目 agent 的 steps / hidden / color / variant(#1700 AC-07 / AC-08):已同意的项目里写了的值进了引擎的 agent 表(按 steps 收尾、hidden 不进选择器是引擎读这张表的既有行为)", () =>
+  Effect.gen(function* () {
+    const agents = yield* projectAgents(
+      {
+        stepper: { prompt: "s", steps: 3 },
+        quiet: { prompt: "q", mode: "subagent", hidden: true, color: "#FF5733", model: "openai/gpt-5", variant: "high" },
+        themed: { prompt: "t", color: "accent", maxSteps: 4 },
+      },
+      true,
+      "stepper",
+      "quiet",
+      "themed",
+    )
+    expect(agents.stepper?.steps).toBe(3)
+    expect(agents.quiet).toMatchObject({ hidden: true, color: "#FF5733", model: { providerID: "openai", id: "gpt-5", variant: "high" } })
+    expect(agents.themed).toMatchObject({ color: "#aaaaaa", steps: 4 })
+  }),
+)
+
+it.live("项目 agent 写坏的 mode / model(#1700 AC-10):已同意的项目里 explore 写了不合法的 mode 加放宽的 permission、另一个写了非字符串 model ⇒ 两条整条不装(explore 内置的规则对 edit 仍是 deny),同一文档里别的助手照常", () =>
+  Effect.gen(function* () {
+    const document = JSON.stringify({
+      agent: { explore: { mode: "sidekick", permission: { edit: "allow" } }, broken: { model: 42, prompt: "b" }, fine: { prompt: "f", steps: 2 } },
+    })
+    expect(yield* exploreEditEffect(document)).toBe("deny")
+    const service = yield* Agent.Service
+    expect(yield* service.get(Agent.ID.make("broken"))).toBeUndefined()
+    expect((yield* service.get(Agent.ID.make("fine")))?.steps).toBe(2)
+  }),
+)
+
+/** 用户全局插件先登记一个带执行预算(`steps: 3`)的助手(全局插件先于 ext 激活:core/src/config.ts、plugin/supervisor.ts)。 */
+const budgetedAgent: Plugin.Plugin = {
+  id: "test.global-budgeted-agent",
+  async setup(context) {
+    await context.agent.transform((editor) =>
+      editor.update("budgeted", (agent) => {
+        agent.mode = "subagent"
+        agent.steps = 3 as never
+      }),
+    )
+  },
+}
+
+it.live("项目 agent 的 steps 受同意门(#1700 Codex R1/1 M3):未同意的项目写 steps: 100 / maxSteps: 100 ⇒ 已有助手的执行预算仍是 3;已同意 ⇒ 100", () =>
+  Effect.gen(function* () {
+    yield* activate(budgetedAgent)
+    const unconsented = yield* projectAgents({ budgeted: { steps: 100 }, legacy: { prompt: "l", maxSteps: 100 } }, false, "budgeted", "legacy")
+    expect(unconsented.budgeted?.steps).toBe(3)
+    expect(unconsented.legacy?.steps).toBeUndefined()
+    // #1709 的真实旧记录样本 SELF_GRANTED:项目自己带来的「已同意」同样不能提高预算。
+    const selfGranted = yield* projectAgents({ budgeted: { steps: 100 }, legacy: { prompt: "l", maxSteps: 100 } }, "self-granted", "budgeted", "legacy")
+    expect(selfGranted.budgeted?.steps).toBe(3)
+    expect(selfGranted.legacy?.steps).toBeUndefined()
+  }),
+)
+
+it.live("项目 agent 的 steps 受同意门 · 已同意臂:同一份文档 ⇒ 预算按项目写的生效", () =>
+  Effect.gen(function* () {
+    yield* activate(budgetedAgent)
+    const consented = yield* projectAgents({ budgeted: { steps: 100 } }, true, "budgeted")
+    expect(consented.budgeted?.steps).toBe(100)
+  }),
+)
+
+/** 测试用旁路插件:一个 provider、一个模型,模型收不收温度由 `temperature` 定(引擎目录的 `capabilities.temperature`)。 */
+const samplingProvider = (providerID: string, temperature: boolean): Plugin.Plugin => ({
+  id: `test.sampling-provider.${providerID}`,
+  async setup(context) {
+    await context.provider.transform((editor) =>
+      editor.add({
+        info: { id: providerID, name: providerID, activation: "auto", package: "@opencode/ai/providers/openai-compatible", settings: { baseURL: `https://${providerID}.test/v1` } } as never,
+        models: [
+          {
+            id: "m",
+            modelID: "m",
+            providerID,
+            name: "m",
+            capabilities: { tools: true, input: ["text"], output: ["text"], temperature },
+            variants: [],
+            time: { released: 0 },
+            cost: [],
+            status: "active",
+            enabled: true,
+            limit: { context: 128000, output: 32000 },
+          } as never,
+        ],
+      }),
+    )
+  },
+})
+
+/**
+ * 用户全局配置里的 v1 助手:引擎自己的迁移把 temperature / top_p 放进 agent 的 `request.body`(真引擎上由 upstream-probes/agent-request.test.ts
+ * 判,那里读回的 `request.body` 就是这一份);这里的旁路插件按引擎 agent 配置插件的同一写法(`Object.assign(agent.request.body, …)`)把它放进真 Agent 服务。
+ */
+const globalSampler: Plugin.Plugin = {
+  id: "test.global-agent-sampler",
+  async setup(context) {
+    await context.agent.transform((editor) => editor.update("globalSampler", (agent) => void Object.assign(agent.request.body, { temperature: 0.4, top_p: 0.7 })))
+  },
+}
+
+it.live("权威 · 助手的 temperature / top_p(#1700 AC-05 / AC-06):项目助手与全局助手的值都进了本轮请求;模型不支持温度 ⇒ 不带温度、top_p 照带;反向臂:不装 ext ⇒ 都不带", () =>
+  Effect.gen(function* () {
+    env({})
+    const directory = realpathSync((yield* Location.Service).directory)
+    mkdirSync(join(directory, ".codepuppy"), { recursive: true })
+    // temperature / top_p 不改权限与模型,项目未同意也生效(project-config.ts 的同意门只剥权限与模型类字段)
+    writeFileSync(join(directory, ".codepuppy", "codepuppy.jsonc"), JSON.stringify({ agent: { sampler: { prompt: "s", temperature: 0.2, top_p: 0.9 } } }))
+    yield* activate(samplingProvider("warm", true))
+    yield* activate(samplingProvider("cold", false))
+    yield* activate(globalSampler)
+    const hooks = yield* PluginHooks.Service
+    const sampled = (agent: string, providerID: string) =>
+      hooks
+        .trigger("session", "context", { ...contextEvent([], { providerID, id: "m" }), agent: agent as never })
+        .pipe(Effect.map((event) => ({ temperature: event.options.temperature, topP: event.options.topP })))
+
+    // 反向臂:不装 ext,同一个全局助手在支持温度的模型上 —— 引擎自己什么都不带
+    expect(yield* sampled("globalSampler", "warm")).toEqual({ temperature: undefined, topP: undefined })
+
+    yield* activate(CodePuppyExt)
+    expect(yield* sampled("sampler", "warm")).toEqual({ temperature: 0.2, topP: 0.9 })
+    expect(yield* sampled("globalSampler", "warm")).toEqual({ temperature: 0.4, topP: 0.7 })
+    expect(yield* sampled("sampler", "cold")).toEqual({ temperature: undefined, topP: 0.9 })
+    expect(yield* sampled("build", "warm")).toEqual({ temperature: undefined, topP: undefined })
+  }),
+)
+
+// `#1702`:2.x 的 webfetch 把任何失败都包成 `ToolFailure("Unable to fetch <url>", 内层原因)`(packages/core/src/tool/plugin/webfetch.ts
+// 的 mapError)。装了 ext 的 execute.after 把消息换回内层原因(0.1.26 落库的原文);网络层失败的层码由同一链上的 attachNetFailure
+// 照旧写进 metadata。真机上的落库原文由 ui-mac net-failure-real-stack.test.ts 的 #1654 AC1 钉住。
+it.live("权威 · 网页抓取失败的原因(#1702):Unable to fetch 的失败交回内层原因、层码照旧;没有内层原因 ⇒ 原样;反向臂:不装 ext ⇒ 仍是 Unable to fetch", () =>
+  Effect.gen(function* () {
+    env({})
+    const url = "https://ac1702.test/page"
+    const after = (error: ToolFailure) =>
+      Effect.gen(function* () {
+        const hooks = yield* PluginHooks.Service
+        const event = yield* hooks.trigger("tool", "execute.after", { tool: "webfetch", ...ids, id: "call_1702" as never, input: { url }, status: "error", error })
+        return event as unknown as { error: { message: string; metadata?: Record<string, unknown> } }
+      })
+    const timedOut = () => new ToolFailure({ message: `Unable to fetch ${url}`, error: new Error("Request timed out") })
+    // 反向臂在前:不装 ext ⇒ 消息就是 webfetch 包的那句。
+    expect((yield* after(timedOut())).error.message).toBe(`Unable to fetch ${url}`)
+    yield* activate(CodePuppyExt)
+    const reason = (yield* after(timedOut())).error
+    expect(reason.message).toBe("Request timed out")
+    expect(reason.metadata?.codepuppyNetFailure).toEqual({ layer: "timeout", code: "timeout" })
+    expect((yield* after(new ToolFailure({ message: `Unable to fetch ${url}` }))).error.message).toBe(`Unable to fetch ${url}`)
   }),
 )

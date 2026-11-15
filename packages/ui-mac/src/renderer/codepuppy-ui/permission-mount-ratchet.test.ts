@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test"
-import { readdirSync, readFileSync } from "node:fs"
+import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
+import { tmpdir } from "node:os"
 import { join, relative, resolve } from "node:path"
 import { frontendSurfaceById } from "../../shared/frontend-surface-manifest"
 
@@ -128,7 +129,7 @@ describe("Alpha Permission unique-mount ratchet", () => {
 // renderer/preload/main/dock,不是在堵一个现存活漏洞。
 describe("审批决定提交入口:单一引用面白名单棘轮(#619 R3 Blocker-2)", () => {
   /** app + ui-mac 的全部生产 ts/tsx。排除仅测试文件与测试 harness 命名约定
-   *  (*.test.* / *-test-runtime.* / *-stub.*)—— harness 里的对抗探针刻意携带提交调用。 */
+   *  (*.test.* / *.cases.* / *-test-runtime.* / *-stub.*)—— harness 里的对抗探针刻意携带提交调用。 */
   function* walkProduction(dir: string): Generator<string> {
     for (const entry of readdirSync(dir, { withFileTypes: true })) {
       if (entry.name === "node_modules" || entry.name.startsWith(".")) continue
@@ -138,10 +139,24 @@ describe("审批决定提交入口:单一引用面白名单棘轮(#619 R3 Blocke
         continue
       }
       if (!/\.(ts|tsx)$/.test(entry.name)) continue
-      if (/\.test\.|-test-runtime\.|-stub\./.test(entry.name)) continue
+      if (/\.(test|cases)\.|-test-runtime\.|-stub\./.test(entry.name)) continue
       yield p
     }
   }
+
+  test("测试宿主不算生产提交入口,同样内容落进生产文件仍被扫描", () => {
+    const directory = mkdtempSync(join(tmpdir(), "permission-scan-"))
+    // 来源:#1699 的真实引擎判据,通过 permission.reply 完成人工批准对照臂。
+    const source = readFileSync(resolve(root, "packages/ui-mac/src/main/unattended-run.engine.cases.ts"), "utf8")
+    try {
+      writeFileSync(join(directory, "caller.engine.cases.ts"), source)
+      writeFileSync(join(directory, "caller.ts"), source)
+      expect(normalize(source)).toContain("permission.reply")
+      expect([...walkProduction(directory)]).toEqual([join(directory, "caller.ts")])
+    } finally {
+      rmSync(directory, { recursive: true, force: true })
+    }
+  })
 
   /** 归一化:去空白、方括号字符串取值折算成点取值 —— `v2.session["permission"]['reply']`
    *  与 `v2.session.permission.reply` 落成同一形态,方括号等义改写不豁免。 */
@@ -219,7 +234,7 @@ describe("审批决定提交入口:单一引用面白名单棘轮(#619 R3 Blocke
    *
    *  ── `#1662` 引擎 2.x 换代(`#1668` 适配器)显式更新 ──────────────────────────────────────
    *
-   *  6) 新增 `packages/ui-mac/src/engine-adapter/permission-replies.ts`(`permission.reply`):冻结的 0.1.26 界面不改,
+   *  6) 新增 `packages/ui-mac/src/engine-adapter/permission-replies.ts`(`permission.reply`;`#1697` 起回执账本归约定 `engine-adapter/contract/receipts.ts`,这个调用在审批端口 `engine-adapter/opencode2/approvals.ts`):冻结的 0.1.26 界面不改,
    *     它照旧经上面已登记的入口(permission-surface / permission-v1-adapter / use-extensions)发 v1 / v2 回复;这些请求
    *     经 engineFetch 进适配器的路由表(routes.ts),由这一个模块合成回执并把决定交给 2.x 引擎(2.x 客户端的
    *     `api.permission.reply`:目标请求一次,「本次会话内允许」时再给已被新规则覆盖的同会话待审请求各回 `once`)。
@@ -235,7 +250,7 @@ describe("审批决定提交入口:单一引用面白名单棘轮(#619 R3 Blocke
     { file: "packages/codepuppy-app/src/context/permission.tsx", token: "permission.reply" },
     { file: "packages/codepuppy-app/src/utils/server-compat.ts", token: "permission.reply" },
     { file: "packages/codepuppy-app/src/utils/server-compat.ts", token: "permission.respond" },
-    { file: "packages/ui-mac/src/engine-adapter/permission-replies.ts", token: "permission.reply" },
+    { file: "packages/ui-mac/src/engine-adapter/opencode2/approvals.ts", token: "permission.reply" },
   ] as const
 
   const sanctionedEntry = (file: string, token: string, source: string) =>

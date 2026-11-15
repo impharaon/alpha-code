@@ -35,6 +35,7 @@ import { McpStdio } from "./stdio.js"
 import { classifyStartFailure } from "./codepuppy-startup.js" // codepuppy(#1563)
 import { isCodepuppyFailureCode } from "@opencode/schema/codepuppy-net-failure" // codepuppy(#1564)
 import { governedCredentialFetch, isGovernedMcpEntry } from "@opencode/plugin/alpha-cloud-authority" // codepuppy(#1562)
+import { tryCodePuppyBootstrap } from "@opencode/util/codepuppy-bootstrap" // codepuppy(#1562, #1698)
 
 const DEFAULT_STARTUP_TIMEOUT = 30_000
 const DEFAULT_CATALOG_TIMEOUT = 30_000
@@ -371,8 +372,10 @@ export const connect = Effect.fnUntraced(function* (options: ConnectOptions) {
     const logged = yield* McpOAuth.loggedFetch({ server, directory: options.directory })
     // codepuppy(#1562) ── Code Puppy's governed cloud connector reads its credential file on every request (v1
     // mcp/index.ts did the same): the literal the config loader substituted is the old token after a hot renewal.
-    const fetch = isGovernedMcpEntry(server, config, process.env)
-      ? governedCredentialFetch(process.env, (file) => readFile(file, "utf8"), (input, init) => logged(input, init))
+    // #1698: the governed definition comes from Code Puppy's published bootstrap document, not the process environment.
+    const cloudMcp = tryCodePuppyBootstrap()?.cloudMcp
+    const fetch = isGovernedMcpEntry(server, config, cloudMcp)
+      ? governedCredentialFetch(cloudMcp, (file) => readFile(file, "utf8"), (input, init) => logged(input, init))
       : logged
     // codepuppy ── end
     // Servers that bundle their own Code Mode (Cloudflare and others) expose raw tools when asked

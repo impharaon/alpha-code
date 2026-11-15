@@ -7,7 +7,7 @@ import { expect, test } from "bun:test"
 import path from "node:path"
 
 test(
-  "账户浮层显示当前版本号(取值来自 window.api.appVersion,登录/登出两分支)",
+  "账户浮层显示当前版本号与构建身份(版本来自 window.api.appVersion、登录/登出两分支;#237 复制一行 + 三种包的标记 + 提交未知)",
   () => {
     const result = Bun.spawnSync({
       cmd: [process.execPath, "test", path.resolve(import.meta.dir, "../../../test-component/account-version.cases.ts")],
@@ -17,7 +17,7 @@ test(
     const output = `${result.stdout.toString()}${result.stderr.toString()}`
     if (result.exitCode !== 0) throw new Error(output)
     expect(output.match(/(\d+) fail\b/)?.[1], output).toBe("0")
-    expect(output.match(/(\d+) pass\b/)?.[1], output).toBe("2")
+    expect(output.match(/(\d+) pass\b/)?.[1], output).toBe("7")
   },
   120_000,
 )

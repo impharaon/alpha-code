@@ -20,14 +20,16 @@
 import * as fs from "node:fs"
 import * as path from "node:path"
 import { parse as parseJsonc } from "jsonc-parser"
+import { exportedFlag } from "@opencode/util/codepuppy-bootstrap"
 import { codepuppyGlobalRoot } from "./codepuppy-installs"
 import { importSkillFolder } from "./ext-fs-installer"
 import type { InstallTarget } from "../preload/types"
 
 export const EXTERNAL_IMPORT_VERSION = 1
 
+/** 与启动文档的 switches.ecosystemInherit 同一判法(开关的唯一判法 exportedFlag,`#1698`),main 的检测 / 弹窗与引擎侧不会各判各的。 */
 export function ecosystemInheritEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
-  return env.CODEPUPPY_ECOSYSTEM_INHERIT === "1"
+  return exportedFlag(env.CODEPUPPY_ECOSYSTEM_INHERIT) === true
 }
 
 export type ExternalSkill = { name: string; dir: string; source: "claude" | "agents" }

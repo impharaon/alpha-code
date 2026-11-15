@@ -47,6 +47,10 @@ class RecordingChild extends EventEmitter {
     const type = (message as { type?: unknown }).type
     if (type === "start") queueMicrotask(() => this.emit("message", { type: "ready" }))
     if (type === "stop") queueMicrotask(() => this.emit("exit", 0))
+    if (type === "project-config-view") {
+      const command = message as { id: string; directory: string }
+      queueMicrotask(() => this.emit("message", { type: "project-config-view-reply", id: command.id, ok: true, view: { directory: command.directory, trusted: false, complete: true, points: { config: "done" }, withheld: [] } }))
+    }
     if (type === "write-probe") {
       const { id } = message as { id: number }
       queueMicrotask(() => this.emit("message", { type: "write-probe-result", id, outcome: "writable" }))
@@ -61,9 +65,10 @@ const saved: Record<string, string | undefined> = {}
 beforeEach(() => {
   userDataPath = mkdtempSync(join(tmpdir(), "codepuppy-sidecar-wiring-"))
   resetDanglingSweepLatchForTests()
-  for (const key of ["SHELL", "CODEPUPPY_SECRETS_DISABLE"]) saved[key] = process.env[key]
+  for (const key of ["SHELL", "CODEPUPPY_SECRETS_DISABLE", "CODEPUPPY_GLOBAL_DIR"]) saved[key] = process.env[key]
   process.env.SHELL = "nu"
   process.env.CODEPUPPY_SECRETS_DISABLE = "1"
+  process.env.CODEPUPPY_GLOBAL_DIR = join(userDataPath, "codepuppy-state", "env", "dev") // #1698:无快照的单测经环境给全局根(design §10 R31),fork 时构建启动文档要它
 })
 afterEach(() => {
   for (const [key, value] of Object.entries(saved)) {
@@ -108,6 +113,7 @@ test("alpha.* 进 codepuppySidecar、应答回同一子进程;ready 之后才 at
   expect(child.wire.at(-1)).toEqual({ type: "codepuppy.hub.request.reply", id: 9, record: null })
 
   expect((await result.listener.probeWrite("/ws")).outcome).toBe("writable")
+  expect(await result.listener.projectConfigView("/ws")).toMatchObject({ directory: "/ws", complete: true })
   expect(received).toHaveLength(1)
 
   await result.listener.stop()
@@ -153,44 +159,43 @@ test("真 host + 真协调器:阶段查询经子进程往返;退出 ⇒ pendingF
   expect(reloads.pendingFor("/w")).toEqual({ code: "reload-waiting", detail: "sidecar exited with code 0" })
 })
 
-// #1565:生产 spawnLocalServer 在 fork 时把随包文档工具清单的路径交给引擎(名字取引擎读的那个常量),而引擎的判定
-// 拿这份 env 认得出 main 写策略写下的四条命令(两边对资源根的解析一致、清单与模板逐 token 对上)。
-// 删掉注入 ⇒ env 里没有这个键;注入的路径与写策略的资源根解析不一致 ⇒ 四条都拿不到声明定义。
-test("#1565: fork 注入 CODEPUPPY_OFFICE_MCP_MANIFEST,引擎据它认出写策略写下的四条文档工具命令", async () => {
-  const { OFFICE_MCP_MANIFEST_ENV, declaredFirstPartyTools } = await import("../../../core/src/mcp/codepuppy-first-party-mcp")
+// #1565:生产 spawnLocalServer 在 fork 时把随包文档工具清单的路径交给引擎(`#1698` 起在启动文档的 paths.officeMcpManifest),
+// 而引擎的判定拿这个路径认得出 main 写策略写下的四条命令(两边对资源根的解析一致、清单与模板逐 token 对上)。
+// 删掉这个字段 ⇒ 文档解析即失败;路径与写策略的资源根解析不一致 ⇒ 四条都拿不到声明定义。
+test("#1565 / #1698: fork 的启动文档带 paths.officeMcpManifest,引擎据它认出写策略写下的四条文档工具命令", async () => {
+  const { declaredFirstPartyTools } = await import("../../../core/src/mcp/codepuppy-first-party-mcp")
   const { applyMcpWritePolicy } = await import("./ext-mcp-policy")
   const { CODEPUPPY_OFFICE_CONNECTORS } = await import("../shared/office-advisories")
   const child = new RecordingChild()
-  let env: Record<string, string> = {}
   creditDanglingSweepForSpawn()
   const result = await spawnLocalServer("127.0.0.1", 4393, "password", {
     userDataPath,
     healthCheck: async () => true,
-    fork: ((_: string, __: string[], options: { env: Record<string, string> }) => {
-      env = options.env
-      return child
-    }) as unknown as typeof import("electron").utilityProcess.fork,
+    fork: (() => child) as unknown as typeof import("electron").utilityProcess.fork,
     egressProxy: async () => ({ port: 4433 }),
     planFence: () => ({ profile: "(version 1)\n(allow default)\n(deny file-write*)\n", addonPath: "/x/codepuppy_fence.node" }),
   })
   await result.health.wait
-  expect(env[OFFICE_MCP_MANIFEST_ENV]).toEndWith("/office-mcp/tools.json")
+  const start = child.wire.find((message) => (message as { type?: unknown }).type === "start") as { bootstrap: { paths: { officeMcpManifest: string } } }
+  const manifest = start.bootstrap.paths.officeMcpManifest
+  expect(manifest).toEndWith("/office-mcp/tools.json")
   for (const connector of CODEPUPPY_OFFICE_CONNECTORS) {
     const server: Record<string, unknown> = { type: "local", command: ["placeholder"] }
     expect(applyMcpWritePolicy(connector.name, server).ok).toBe(true)
-    const declared = declaredFirstPartyTools(connector.name, server, env, readFileSync) as Array<{ name: string }> | undefined
+    const declared = declaredFirstPartyTools(connector.name, server, manifest, readFileSync) as Array<{ name: string }> | undefined
     const extension = connector.extension.slice(1)
     expect(declared?.map((tool) => tool.name).sort()).toEqual([`read_${extension}`, `write_${extension}`])
   }
   await result.listener.stop()
 })
 
-// REQ-236 `#1575` AC4:生产 spawnLocalServer 在 fork 时按**当刻的登录账户**写 CODEPUPPY_POLICY_ACCOUNT(引擎据它选工具策略
-// 分区),未登录不写(引擎退回 anonymous)。登录态走真 codepuppy-auth:dev 短路令牌(未打包时 DEV_PLATFORM_TOKEN)的
-// `account.read` 的 sub。值里混入本安装的随机持久标识(artifact-service 的安装级 machine id,boot 时初始化):这个变量被
-// 第三方 MCP / LSP / shell 子进程继承,同一账户换一台安装就是另一个值,不能据它跨安装关联。期望值从 sub 与盘上的
-// machine id 文件独立算出,不调被测函数;取不到安装标识与未登录一样不写;shell 导出的同名变量选不了分区。
-test("#1575: fork 按登录账户 × 本安装写 CODEPUPPY_POLICY_ACCOUNT(同安装同账户相同、换安装或换账户不同、不含明文);取不到不写,导出的同名变量不透传", async () => {
+// REQ-236 `#1575` AC4:生产 spawnLocalServer 在 fork 时按**当刻的登录账户**写启动文档的 policy.account(ext 据它选工具策略
+// 分区),未登录不写(退回 anonymous)。登录态走真 codepuppy-auth:dev 短路令牌(未打包时 DEV_PLATFORM_TOKEN)的
+// `account.read` 的 sub。值里混入本安装的随机持久标识(artifact-service 的安装级 machine id,boot 时初始化):同一账户换一台
+// 安装就是另一个值,不能据它跨安装关联。`#1698` G2:它不再写进 sidecar 环境(第三方 MCP / LSP / shell 子进程从此拿不到),
+// 只在 start 消息的启动文档里。期望值从 sub 与盘上的 machine id 文件独立算出,不调被测函数;取不到安装标识与未登录一样不写;
+// shell 导出的旧同名变量选不了分区,也到不了 sidecar 环境。
+test("#1575: fork 按登录账户 × 本安装写启动文档的 policy.account(同安装同账户相同、换安装或换账户不同、不含明文);取不到不写,导出的旧同名变量不透传", async () => {
   const { initializeArtifactQuotaEnvironment, ARTIFACT_QUOTA_MACHINE_ID_FILE } = await import("./artifact-service")
   const { createHash } = await import("node:crypto")
   const sha256 = (value: string) => createHash("sha256").update(value).digest("hex")
@@ -209,7 +214,7 @@ test("#1575: fork 按登录账户 × 本安装写 CODEPUPPY_POLICY_ACCOUNT(同�
         jti: `jti-${sub}`,
       }),
     ).toString("base64url")}.signature`
-  const forkEnv = async (port: number) => {
+  const forkStart = async (port: number) => {
     const child = new RecordingChild()
     let env: Record<string, string> = {}
     creditDanglingSweepForSpawn()
@@ -225,7 +230,9 @@ test("#1575: fork 按登录账户 × 本安装写 CODEPUPPY_POLICY_ACCOUNT(同�
     })
     await result.health.wait
     await result.listener.stop()
-    return env
+    const start = child.wire.find((message) => (message as { type?: unknown }).type === "start") as { bootstrap: { policy: { account?: string } } }
+    expect(env).not.toHaveProperty("CODEPUPPY_POLICY_ACCOUNT")
+    return start.bootstrap.policy
   }
   const installation = async (dir: string) => {
     expect((await initializeArtifactQuotaEnvironment(dir)).ok).toBe(true)
@@ -237,14 +244,14 @@ test("#1575: fork 按登录账户 × 本安装写 CODEPUPPY_POLICY_ACCOUNT(同�
   try {
     const installA = await installation(userDataPath)
     process.env.DEV_PLATFORM_TOKEN = token("tenant-a")
-    const a = (await forkEnv(4394)).CODEPUPPY_POLICY_ACCOUNT
+    const a = (await forkStart(4394)).account
     expect(a).toBe(expected(installA, "tenant-a"))
     expect(a).not.toContain("tenant-a")
     // 同安装同账户再 fork 一次:分区键不变(换号重 fork 回来仍是同一分区)。
-    expect((await forkEnv(4397)).CODEPUPPY_POLICY_ACCOUNT).toBe(a)
+    expect((await forkStart(4397)).account).toBe(a)
 
     process.env.DEV_PLATFORM_TOKEN = token("tenant-b")
-    const b = (await forkEnv(4395)).CODEPUPPY_POLICY_ACCOUNT
+    const b = (await forkStart(4395)).account
     expect(b).toBe(expected(installA, "tenant-b"))
     expect(b).not.toBe(a)
 
@@ -252,33 +259,21 @@ test("#1575: fork 按登录账户 × 本安装写 CODEPUPPY_POLICY_ACCOUNT(同�
     const installB = await installation(otherInstall)
     expect(installB).not.toBe(installA)
     process.env.DEV_PLATFORM_TOKEN = token("tenant-a")
-    const elsewhere = (await forkEnv(4398)).CODEPUPPY_POLICY_ACCOUNT
+    const elsewhere = (await forkStart(4398)).account
     expect(elsewhere).toBe(expected(installB, "tenant-a"))
     expect(elsewhere).not.toBe(a)
 
     // 安装标识取不到(machine id 根不可用):与未登录同样不写。
     expect((await initializeArtifactQuotaEnvironment(join(otherInstall, "missing"))).ok).toBe(false)
-    expect(await forkEnv(4399)).not.toHaveProperty("CODEPUPPY_POLICY_ACCOUNT")
+    expect(await forkStart(4399)).not.toHaveProperty("account")
 
     await installation(userDataPath)
     delete process.env.DEV_PLATFORM_TOKEN
     process.env.CODEPUPPY_POLICY_ACCOUNT = "acct:exported-by-shell"
-    expect(await forkEnv(4396)).not.toHaveProperty("CODEPUPPY_POLICY_ACCOUNT")
+    expect(await forkStart(4396)).not.toHaveProperty("account")
   } finally {
     rmSync(otherInstall, { recursive: true, force: true })
   }
-})
-
-// #1578 AC5:main 写进 sidecar env 的随包扩展清单键必须就是引擎读的那个常量 —— 任一侧改名,线上 ext 自有工具全部静默回第三方,
-// 而 packages/ext/src/policy/bundled-plugin.test.ts(`#1662` 起读这个键的是 ext)自己给 env 赋值照样绿。dev 下 ext.path 取决于未入库的 packages/ext/dist
-// (门不保证它在,上面那条生产 spawn 里这个键可能根本不写),所以锚源码:server.ts 写这个键的那一句,键名取引擎常量,
-// 指向 plugin.js 旁边的 bundled-tools.json。任一侧字面量改一个字母 ⇒ 找不到这一句,当场红。
-test("ANCHOR (not a gate): #1578 server.ts 写进 sidecar env 的随包扩展清单键 = 引擎读的常量", async () => {
-  const { EXT_BUNDLED_MANIFEST_ENV } = await import("../../../ext/src/policy/bundled-plugin")
-  const source = await Bun.file(join(import.meta.dir, "server.ts")).text()
-  const line = source.split("\n").find((text) => text.includes(`sidecarEnv.${EXT_BUNDLED_MANIFEST_ENV} =`))
-  expect(line).toBeDefined()
-  expect(line).toContain(`"bundled-tools.json"`)
 })
 
 // `#1531`:ext 的 parentPort 监听必须在 ready **之前**挂上(main 只在 ready 那一刻重发在途代际)。sidecar.ts 顶层的 registerHooks /
@@ -287,8 +282,8 @@ test("ANCHOR (not a gate): #1578 server.ts 写进 sidecar env 的随包扩展清
 // 引擎 import → 预载 ext 的目录入口 `server.js` → `start()`(Transform 里同步发布进程内 fetch)→ await 预载 → ready。
 test("ANCHOR (not a gate): sidecar.ts 在 start() 之前预载 ext 的目录入口,Transform 里发布进程内 fetch,ready 之前 await 预载", async () => {
   const source = await Bun.file(join(import.meta.dir, "sidecar.ts")).text()
-  const engine = source.indexOf('const { startEngine, ENGINE_VERSION } = await import("virtual:opencode-server")')
-  const preload = source.indexOf('import(pathToFileURL(join(command.extPluginPath, "server.js")).href)')
+  const engine = source.indexOf('const engineModule = await import("virtual:opencode-server")')
+  const preload = source.indexOf('import(pathToFileURL(join(bootstrap.paths.extPlugin, "server.js")).href)')
   const started = source.indexOf("const started = await startEngine(")
   const handoff = source.indexOf("publishInProcessEngine(inProcess)")
   const joined = source.indexOf("await extPreload")
@@ -300,4 +295,34 @@ test("ANCHOR (not a gate): sidecar.ts 在 start() 之前预载 ext 的目录入�
   expect(handoff).toBeGreaterThan(started)
   expect(joined).toBeGreaterThan(handoff)
   expect(ready).toBeGreaterThan(joined)
+  // 审查 6:原文件顶层不能 import;执行锚定的真实监听 / 解析片段,不复制分支。
+  const { answerProjectConfigView } = await import("./sidecar-project-config-view")
+  const { buildProjectConfigViewRequest, parseProjectConfigViewRequest } = await import("./project-config-view-message")
+  const listener = source.slice(source.indexOf('parentPort.on("message"'), source.indexOf("\nasync function start("))
+  const parser = source.slice(source.indexOf("function parseCommand("), source.indexOf("\n/** 形状不对"))
+  const replies: unknown[] = []
+  let receive: (event: { data: unknown }) => void = () => { throw new Error("listener not registered") }
+  const view = { directory: "/ws", trusted: false, complete: true, points: { config: "done" as const }, withheld: [] }
+  const run = new Function("parentPort", "engine", "inProcessEngine", "readProjectConfigView", "answerProjectConfigView", "parseProjectConfigViewRequest", new Bun.Transpiler({ loader: "ts" }).transformSync(listener + "\n" + parser))
+  run({ on: (_: string, handler: typeof receive) => { receive = handler }, postMessage: (reply: unknown) => replies.push(reply) }, {}, () => async () => Response.json({ data: [] }), () => view, answerProjectConfigView, parseProjectConfigViewRequest)
+  receive({ data: buildProjectConfigViewRequest("review-6", "/ws") })
+  for (let i = 0; i < 10 && replies.length === 0; i++) await Bun.sleep(1)
+  expect(replies).toEqual([{ type: "project-config-view-reply", id: "review-6", ok: true, view }])
+})
+
+// `#1698`(DESIGN-upgrade-bootstrap-config §4.2):sidecar.ts 的启动关口顺序 —— 装围栏 → 解析并发布启动文档 → 注入(读文档)→ import 引擎 →
+// 引擎 bundle 用自己的解析器读一次文档(缺导出 / 不符即抛)→ startEngine。两步本身的判据在 sidecar-bootstrap-gate.test.ts 与
+// sidecar-engine-host.cases.ts;sidecar.ts 顶层有副作用、import 不得,先后只能锚源码。
+test("ANCHOR (not a gate): #1698 sidecar.ts 装围栏之后才发布启动文档,注入读文档,import 引擎之后、startEngine 之前过引擎关口", async () => {
+  const source = await Bun.file(join(import.meta.dir, "sidecar.ts")).text()
+  const order = [
+    "installProcessFence(command)",
+    "const bootstrap = acceptCodePuppyBootstrap(command.bootstrap)",
+    "const injection = prepareSidecarEnv(bootstrap)",
+    'const engineModule = await import("virtual:opencode-server")',
+    "assertEngineReadsBootstrap(engineModule)",
+    "const started = await startEngine(",
+  ].map((text) => source.indexOf(text))
+  expect(order[0]).toBeGreaterThan(0)
+  for (let i = 1; i < order.length; i++) expect(order[i]).toBeGreaterThan(order[i - 1]!)
 })

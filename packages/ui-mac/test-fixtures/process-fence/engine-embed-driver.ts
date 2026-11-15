@@ -8,12 +8,15 @@
 //   · `in-process` — the shipped wiring: the listening app's dispatch, wrapped with the password, published inside `Transform`;
 //   · `tcp`        — known-bad: a fetch that goes over loopback TCP to this engine's own listening port;
 //   · `none`       — nothing published.
+import { codepuppyBootstrap } from "@opencode/util/codepuppy-bootstrap"
 import { join } from "node:path"
 import { pathToFileURL } from "node:url"
 import { injectCodePuppyConfig } from "../../src/main/codepuppy-config-injection"
 import { buildEngineServerOptions } from "../../src/main/engine-server-options"
 import { engineAuthorization, withEngineAuthorization } from "../../src/main/engine-authorization"
 import { publishInProcessEngine } from "../../src/main/in-process-engine"
+import { publishTestBootstrap } from "../../test-component/codepuppy-bootstrap-fixture"
+import { engineProjectTrust } from "../../src/main/engine-project-trust"
 
 const env = process.env
 const userData = env.CP1321_USER_DATA!
@@ -21,7 +24,14 @@ const extDir = env.CP1321_EXT_DIR || undefined
 const password = env.CP1321_PASSWORD!
 const mode = env.CP1321_FETCH ?? "in-process"
 
-const injection = injectCodePuppyConfig(userData, extDir, "stable")
+// `#1698`:sidecar 在注入、装 ext 之前发布启动文档;这里照做(全局根是测试交下来的那一个,引擎全局配置目录取沙箱 HOME 下的 opencode)
+publishTestBootstrap({
+  globalRoot: env.CODEPUPPY_GLOBAL_DIR!,
+  userData,
+  ...(extDir ? { extPlugin: extDir, extBundledManifest: join(extDir, "bundled-tools.json") } : {}),
+  engineConfigDirectory: join(env.XDG_CONFIG_HOME!, "opencode"),
+})
+const injection = injectCodePuppyConfig(userData, extDir, "stable", codepuppyBootstrap().paths.userConfig ?? null)
 if (!injection.ok) console.error(`engine-embed-driver: injection failed: ${injection.error.message}`)
 if (extDir) await import(pathToFileURL(join(extDir, "server.js")).href)
 const { startEngine } = await import("../../engine/engine-embed")
@@ -38,7 +48,7 @@ const engine = await startEngine(
     filewatcher: false,
     platform: process.platform,
   }),
-  { onDispatch: (dispatch) => void (mode === "in-process" && publishInProcessEngine(withEngineAuthorization(dispatch, password))) },
+  { onDispatch: (dispatch) => void (mode === "in-process" && publishInProcessEngine(withEngineAuthorization(dispatch, password))), projectTrust: engineProjectTrust },
 )
 if (mode === "tcp")
   publishInProcessEngine(async (request) => {

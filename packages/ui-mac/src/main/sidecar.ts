@@ -15,14 +15,19 @@ import { buildReadyMessage, type SidecarReadyMessage } from "./sidecar-ready-mes
 // registerHooks / getParentPort() 让它无法被测试 import(与 #607 同因),真判据必须在可 import
 // 的模块里跑(见 sidecar-stop.test.ts)。
 import { parseSidecarStopCommand, stopSidecarEngine, type SidecarStopCommand, type StoppableEngine } from "./sidecar-stop"
-import type { ChannelName } from "./catalog-channels"
+import type { CodePuppyBootstrap } from "@opencode/util/codepuppy-bootstrap"
 import { prewarmInitialLocation } from "./sidecar-location-prewarm"
-import { publishInProcessEngine, type EngineFetch } from "./in-process-engine"
+import { inProcessEngine, publishInProcessEngine, type EngineFetch } from "./in-process-engine"
 // `#1667`(#1662 L5):OpenCode 2 嵌入 —— 选项对象、口令包装、ext 就绪判定各住在可 import 的模块里(本文件顶层副作用让它
 // 无法被测试 import),真判据见 engine-server-options.test.ts、sidecar-engine-host.test.ts、sidecar-ext-ready.test.ts。
-import { buildEngineServerOptions, engineDesktopToggles } from "./engine-server-options"
+import { buildEngineServerOptions } from "./engine-server-options"
 import { withEngineAuthorization } from "./engine-authorization"
 import { assertExtPluginActive } from "./sidecar-ext-ready"
+import { acceptCodePuppyBootstrap, assertEngineReadsBootstrap } from "./sidecar-bootstrap-gate"
+// `#1713` 契约 C:引擎配置闸门问「这个项目文件夹用户允许过没有」,读法是 #1709 的同一个。
+import { answerProjectConfigView } from "./sidecar-project-config-view"
+import { parseProjectConfigViewRequest, type ProjectConfigViewRequest, type ProjectConfigViewReply } from "./project-config-view-message"
+import { engineProjectTrust } from "./engine-project-trust"
 // REQ-159 `#1321`:进程围栏。本进程在 import 引擎之前把自己关进 seatbelt,之后派生的一切继承。
 // profile 由 main 渲染 + 试编译(process-fence-plan.ts),这里原样 apply;装不上 = 本进程不起
 // (fail-closed,原因经 error IPC 报给 main)。判据在 process-fence-apply.test.ts(真 .node / 真 seatbelt /
@@ -77,33 +82,24 @@ type StartCommand = {
   type: "start"
   hostname: string
   port: number
+  /** 密钥:只在这里,永不进启动文档,也不进本进程环境(I1)。 */
   password: string
-  userDataPath: string
-  /**
-   * B6(=G1):@codepuppy/ext 的插件**目录**绝对路径(main 解析,见 codepuppy-ext-plugin.ts;2.x 只装目录形式的本地插件,
-   * 入口 `server.js`)。缺席 = 不装 ext ⇒ sidecar 拒绝报 ready(I4,sidecar-ext-ready.ts)。
-   */
-  extPluginPath?: string
-  /** `#1667`:引擎会话库的绝对路径(main 用 engine-paths.ts 的 engineDatabasePath 算,与 db-safety 同一推导)。 */
-  databasePath: string
-  /** `#1667`:引擎全局配置目录(main 用 engine-paths.ts 的 engineGlobalConfigDirectory 算)。 */
-  configDirectory: string
-  /** #397 override 注入用的 catalog 通道。必须由 main 从冻结环境快照取好传入 —— 本进程从不跑
-   *  initCodePuppyEnvironment,在这里调 catalogRegistryChannel() 会抛,且曾把整个 injectCodePuppyConfig
-   *  连同 provider 注入一起炸掉(2026-07-23 打包端「全模型当前不可用」事故)。缺省 = loud 跳过
-   *  override 注入(fail-closed 权威在 boot reconcile,见 ext-disabled-injection.ts)。 */
-  registryChannel?: ChannelName
-  /** #857:the renderer home model contract's exact initial location (`~/Alpha`). */
-  initialDirectory: string
   /**
    * REQ-159 `#1321`:进程围栏 —— main 已试编译通过的 profile 全文 + 原生模块绝对路径。
    * darwin 上**必须**在场:缺席即拒绝启动(没有围栏的引擎不许起)。非 darwin 没有 seatbelt,不带。
+   * 在发布启动文档之前 apply;它不是给 ext / 引擎的决定。
    */
   fence?: ProcessFenceStartInput
+  /**
+   * `#1698`(DESIGN-upgrade-bootstrap-config §4.2):这一代的启动文档,main 用 codepuppy-bootstrap-build.ts 构建。路径(userData /
+   * 初始目录 / 会话库 / 引擎全局配置目录 / ext 目录)与 #397 的 catalog 通道都在里面。`parseCommand` 不看它;`start()` 里解析,
+   * 坏了走与「darwin 缺围栏」同一条响亮失败路。
+   */
+  bootstrap: unknown
 }
 
 type StopCommand = SidecarStopCommand
-type SidecarCommand = StartCommand | StopCommand | WorkspaceWriteProbeCommand
+type SidecarCommand = StartCommand | StopCommand | WorkspaceWriteProbeCommand | ProjectConfigViewRequest
 
 // #613:注入失败随 ready 上报(server.ts 持有同构镜像)——引擎照常起,但 main 必须知情。
 // ready 变体的形状与构造住在 sidecar-ready-message.ts(那里有真运行时闸门)。
@@ -112,6 +108,7 @@ type SidecarMessage =
   | { type: "stopped" }
   | { type: "error"; error: { message: string; stack?: string } }
   | WorkspaceWriteProbeReply
+  | ProjectConfigViewReply
 
 type ParentPort = {
   postMessage(message: SidecarMessage): void
@@ -120,6 +117,7 @@ type ParentPort = {
 
 const parentPort = getParentPort()
 let engine: StoppableEngine | undefined
+let readProjectConfigView: typeof import("virtual:opencode-server")["projectConfigView"] | undefined
 
 parentPort.on("message", (event) => {
   const command = parseCommand(event.data)
@@ -133,6 +131,10 @@ parentPort.on("message", (event) => {
     parentPort.postMessage(buildWriteProbeReply(command.id, runWorkspaceWriteProbe(command.directory)))
     return
   }
+  if (command.type === "project-config-view") {
+    void answerProjectConfigView(command, { fetch: engine ? inProcessEngine() : undefined, view: readProjectConfigView }).then((reply) => parentPort.postMessage(reply))
+    return
+  }
   void start(command)
 })
 
@@ -141,10 +143,12 @@ async function start(command: StartCommand) {
     // REQ-159:第一步就是把本进程关进围栏 —— 在写任何文件、import 引擎之前。装不上直接抛,
     // 走下面的 catch:error IPC + exit(1),main 据此宣告这一代失败(响亮,不静默降级成无围栏服务)。
     installProcessFence(command)
+    // `#1698`(§4.2 第 2 步):解析并发布启动文档 —— 之后本进程里的注入、ext 与引擎只从它读 main 的决定。
+    const bootstrap = acceptCodePuppyBootstrap(command.bootstrap)
     // #613:注入结果必须捕获并随 ready 上报 —— 注入失败 = 引擎起来了但整份 alpha 配置丢失
     // (模型全灰),不上报则 main/renderer 无从与「引擎未就绪」区分。`#1667`:注入不再经环境变量交给引擎
     // (H1 下引擎核心不读 `OPENCODE_CONFIG_CONTENT` 一类变量),结果里带着要放进 `start()` 选项的配置。
-    const injection = prepareSidecarEnv(command.userDataPath, command.extPluginPath, command.registryChannel)
+    const injection = prepareSidecarEnv(bootstrap)
     // `#1667`(编排器裁决 r1 第 2 条、r3 第 1 条):显式文件是合成的 —— 用户的 codepuppy.jsonc 运行中一变、技能翻代 / 新装 / 停用,
     // 就重写它,引擎对显式文件的监听再重载配置(都不用重启)。监听跟着本进程走,不需要单独停。
     if (injection.explicit) watchExplicitSources({ ...injection.explicit, skills: explicitSkillDirs, log: (line) => console.warn(line) })
@@ -152,13 +156,17 @@ async function start(command: StartCommand) {
     useSystemCertificates()
     // 裁决书 R15 ④ / L1a armC 对 armCraw:必须在 import 引擎之前,否则 2.x 的模型请求绕开 HTTPS_PROXY 直连,在围栏下 DNS 失败。
     useEnvProxy()
-    const { startEngine, ENGINE_VERSION } = await import("virtual:opencode-server")
+    const engineModule = await import("virtual:opencode-server")
+    // `#1698`(§4.2 第 4 步):引擎 bundle 认不得这份文档(迁移前的 dist-engine,或另一提交构建)⇒ 不起。
+    assertEngineReadsBootstrap(engineModule)
+    const { startEngine, ENGINE_VERSION, projectConfigView } = engineModule
+    readProjectConfigView = projectConfigView
     // REQ-234 `#1531`:@codepuppy/ext 在**模块装载时**挂 parentPort 监听(定制中心桥 + 重载调度器),而 main 只在 ready
     // 那一刻重发排队的重载代际。引擎要等某个 Location 装插件时才 import 它 —— 常常晚于 ready,那一批就丢了。所以在
     // `start()` 之前先预载 ext 的入口(I2;2.x 每个 Location 用带 `__opencode_reload` 的新 URL 各求值一次,进程级对象
     // 由 ext 挂在 globalThis 上复用,不靠同一个 URL)。失败只记一行:是否装上由下面的 I4 判定说了算。
-    const extPreload = command.extPluginPath
-      ? import(pathToFileURL(join(command.extPluginPath, "server.js")).href).then(
+    const extPreload = bootstrap.paths.extPlugin
+      ? import(pathToFileURL(join(bootstrap.paths.extPlugin, "server.js")).href).then(
           () => undefined,
           (error: unknown) => console.warn("@codepuppy/ext preload before ready failed — reload requests re-sent at ready may be lost", error),
         )
@@ -167,15 +175,16 @@ async function start(command: StartCommand) {
     // 裁决书 R13 / N1:`start()` + `Transform`,不传 lifecycle。REQ-234 `#1531`(I1):`Transform` 那一刻同步发布进程内 fetch
     // —— 监听端口那张应用图的 dispatch app,外面包一层补口令。围栏拒掉连自己回环端口的连接,ext 只能走这一条。
     let inProcess: EngineFetch | undefined
-    const toggles = engineDesktopToggles(process.env)
+    // `#1698` G3:两个引擎开关由 main 按 engineDesktopToggles 判一次写进启动文档(design §10 R9:sidecar 里只有这一个判法)
+    const toggles = bootstrap.engine
     const started = await startEngine(
       buildEngineServerOptions({
         hostname: command.hostname,
         port: command.port,
         password: command.password,
         engineVersion: ENGINE_VERSION,
-        databasePath: command.databasePath,
-        configDirectory: command.configDirectory,
+        databasePath: bootstrap.paths.database,
+        configDirectory: bootstrap.paths.engineConfigDirectory,
         config: injection.config,
         models: { file: injection.models.file, fetch: toggles.modelsFetch },
         filewatcher: toggles.filewatcher,
@@ -186,20 +195,21 @@ async function start(command: StartCommand) {
           inProcess = withEngineAuthorization(dispatch, command.password)
           publishInProcessEngine(inProcess)
         },
+        projectTrust: engineProjectTrust,
       },
     )
     engine = started
     const fetch = inProcess!
 
     // #857:在 renderer 第一次要模型之前,经进程内 fetch 把初始 Location 与模型目录拉起来;不论结局都随 ready 上报(#881)。
-    const prewarmResult = await prewarmInitialLocation({ request: fetch }, command.initialDirectory, {
+    const prewarmResult = await prewarmInitialLocation({ request: fetch }, bootstrap.paths.initialDirectory, {
       password: command.password,
     })
     await extPreload
     if (prewarmResult.outcome === "ready") console.log("initial governed catalog location prewarmed")
     else console.warn("initial governed catalog location prewarm did not become ready", prewarmResult)
     // I4(裁决书 R22):ext 在初始目录上没装上 = 那里没有 Code Puppy 的执行闸 ⇒ 不报 ready,走下面同一条 fail-closed 路。
-    await assertExtPluginActive(fetch, command.initialDirectory, command.extPluginPath)
+    await assertExtPluginActive(fetch, bootstrap.paths.initialDirectory, bootstrap.paths.extPlugin)
     parentPort.postMessage(buildReadyMessage(injection, prewarmResult))
   } catch (error) {
     parentPort.postMessage({ type: "error", error: serializeError(error) })
@@ -234,15 +244,12 @@ function installProcessFence(command: StartCommand) {
   )
 }
 
-function prepareSidecarEnv(
-  userDataPath: string,
-  extPluginPath?: string,
-  registryChannel?: ChannelName,
-): CodePuppyConfigInjectionResult {
+function prepareSidecarEnv(bootstrap: CodePuppyBootstrap): CodePuppyConfigInjectionResult {
   // `XDG_*` 必须在 import 引擎之前定好:上游在模块装载时就按它们算全局根目录(`@opencode/util/global-roots`,裁决书 N4)。
   // 口令不再进本进程环境(I1):ext 走进程内 fetch,包装层补口令;环境里的值会被引擎派生的每个 shell / MCP 子进程继承。
-  process.env.XDG_STATE_HOME = process.env.XDG_STATE_HOME ?? userDataPath
-  return injectCodePuppyConfig(userDataPath, extPluginPath, registryChannel)
+  process.env.XDG_STATE_HOME = process.env.XDG_STATE_HOME ?? bootstrap.paths.userData
+  // codepuppy.jsonc 缺席(null)= REQ-059 逃生阀置位,main 构建文档时已判过
+  return injectCodePuppyConfig(bootstrap.paths.userData, bootstrap.paths.extPlugin, bootstrap.registryChannel, bootstrap.paths.userConfig ?? null)
 }
 
 function ensureLoopbackNoProxy() {
@@ -286,34 +293,22 @@ function useEnvProxy() {
 
 function parseCommand(value: unknown): SidecarCommand | undefined {
   if (!value || typeof value !== "object") return
-  const command = value as Partial<StartCommand | StopCommand | WorkspaceWriteProbeCommand>
+  const command = value as Partial<StartCommand | StopCommand | WorkspaceWriteProbeCommand | ProjectConfigViewRequest>
   if (command.type === "stop") return parseSidecarStopCommand(value)
   if (command.type === "write-probe") return parseWriteProbeCommand(value)
+  if (command.type === "project-config-view") return parseProjectConfigViewRequest(value)
   if (command.type !== "start") return
   if (typeof command.hostname !== "string") return
   if (typeof command.port !== "number") return
   if (typeof command.password !== "string") return
-  if (typeof command.userDataPath !== "string") return
-  if (typeof command.initialDirectory !== "string") return
-  if (typeof command.databasePath !== "string") return
-  if (typeof command.configDirectory !== "string") return
   const fence = parseFence(command.fence)
   return {
     type: "start",
     hostname: command.hostname,
     port: command.port,
     password: command.password,
-    userDataPath: command.userDataPath,
-    initialDirectory: command.initialDirectory,
-    databasePath: command.databasePath,
-    configDirectory: command.configDirectory,
     ...(fence ? { fence } : {}),
-    ...(typeof command.extPluginPath === "string" ? { extPluginPath: command.extPluginPath } : {}),
-    ...(command.registryChannel === "stable" ||
-    command.registryChannel === "preview" ||
-    command.registryChannel === "dev"
-      ? { registryChannel: command.registryChannel }
-      : {}),
+    bootstrap: command.bootstrap,
   }
 }
 

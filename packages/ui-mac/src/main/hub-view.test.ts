@@ -572,7 +572,8 @@ describe("I6:main 侧 alpha.* 分发只做只读查询与重载记录", () => {
     const sent: CodePuppySidecarOutbound[] = []
     host.attach((m) => void sent.push(m))
     const { generation } = w.coordinator.request({ scope: "global", items: [], reason: "x" })
-    expect(sent.map((m) => m.type)).toEqual(["codepuppy.reload.request"])
+    expect(sent.map((m) => m.type)).toEqual(["codepuppy.unattended.live", "codepuppy.reload.request"])
+    expect(sent[0]).toMatchObject({ type: "codepuppy.unattended.live", sessions: [] })
     host.receive({ type: "codepuppy.reload.report", generation, scope: "global", outcome: "waiting", directories: [], error: "1 session(s) busy" }, post)
     expect(w.coordinator.pendingFor("/any")).toEqual({ code: "reload-waiting", detail: "1 session(s) busy" })
   })

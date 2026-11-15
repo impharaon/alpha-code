@@ -72,7 +72,7 @@ describe("sidecar initial location prewarm", () => {
   test("ANCHOR (not a gate): production prewarms through the in-process fetch after start() and withholds ready until it settles", () => {
     const source = readFileSync(import.meta.dir + "/sidecar.ts", "utf8")
     const started = source.indexOf("const started = await startEngine(")
-    const settled = source.indexOf("const prewarmResult = await prewarmInitialLocation({ request: fetch }, command.initialDirectory")
+    const settled = source.indexOf("const prewarmResult = await prewarmInitialLocation({ request: fetch }, bootstrap.paths.initialDirectory")
     // #881:prewarm 的结局整体随 ready 上车,所以锚跟着换成两参形态(值真的上车的判据在
     // sidecar-ready-message.test.ts,这里只锁 bun 跑不到的接线顺序)。
     const ready = source.indexOf("parentPort.postMessage(buildReadyMessage(injection, prewarmResult))")

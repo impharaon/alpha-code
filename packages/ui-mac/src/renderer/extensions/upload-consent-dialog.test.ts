@@ -30,7 +30,18 @@ const runtimeDirectory = mkdtempSync(join(tmpdir(), "codepuppy-upload-consent-re
 await build({
   configFile: false,
   logLevel: "silent",
-  plugins: [appPlugin.at(-1)!],
+  plugins: [
+    {
+      // alpha-code#1686:Banner 的 providers 转口整棵前端,换成只含 useContractHealth 的替身。
+      name: "codepuppy-test:banner-providers-stub",
+      enforce: "pre",
+      resolveId: (id: string, importer?: string) =>
+        id === "./providers" && importer?.endsWith("/codepuppy-ui/Banner.tsx")
+          ? join(import.meta.dir, "banner-providers-test-stub.ts")
+          : undefined,
+    },
+    appPlugin.at(-1)!,
+  ],
   build: {
     emptyOutDir: true,
     outDir: runtimeDirectory,
@@ -44,6 +55,14 @@ await build({
 })
 
 const disposers: Array<() => void> = []
+
+// alpha-code#1686:发送框以 ready=true 挂载时会订阅登录现值并取提交前预检。本文件的用例不测预检:
+// 登录现值给一个已登录态,预检一律回「查不到」(不显示任何东西,预留行照旧),既有断言的语义不变。
+const withPreflightStubs = <T extends { auth?: object; cloud?: object }>(api: T) => ({
+  ...api,
+  auth: { subscribe: () => () => {}, getState: async () => ({ status: "logged-in", mode: "platform", platformStatus: "ready" }), ...api.auth },
+  cloud: { accountStatus: async () => ({ error: "network" }), ...api.cloud },
+})
 GlobalRegistrator.register()
 const runtime = (await import(pathToFileURL(join(runtimeDirectory, "upload-consent-test-runtime.js")).href)) as Runtime
 
@@ -106,7 +125,7 @@ const spec: CloudPipelineSpec = {
 function mountDispatch(result: CloudUploadResult) {
   Object.defineProperty(window, "api", {
     configurable: true,
-    value: {
+    value: withPreflightStubs({
       cloud: {
         upload: async () => result,
         confirmUpload: async () => result,
@@ -116,7 +135,7 @@ function mountDispatch(result: CloudUploadResult) {
         onEvent: () => () => {},
         saveRun: async () => ({ ok: false, reason: "not reached" }),
       },
-    },
+    }),
   })
   const host = document.createElement("div")
   document.body.append(host)
@@ -188,7 +207,7 @@ function mountRunningJob(options: { cancel: () => Promise<CancelResult> }) {
   const cancelCalls: string[] = []
   Object.defineProperty(window, "api", {
     configurable: true,
-    value: {
+    value: withPreflightStubs({
       cloud: {
         upload: async () => ({
           status: "sent",
@@ -218,7 +237,7 @@ function mountRunningJob(options: { cancel: () => Promise<CancelResult> }) {
         },
         saveRun: async () => ({ ok: true, dir: "/project/.alpha/runs/job_cancelme", files: [], warnings: [], failures: [] }),
       },
-    },
+    }),
   })
   const host = document.createElement("div")
   document.body.append(host)
@@ -383,7 +402,7 @@ function mountCloudEntry(id: string, kind: CloudPipelineSpec["pipelineKind"], re
   let event: ((payload: { jobId: string; event: string; data: unknown }) => void) | undefined
   Object.defineProperty(window, "api", {
     configurable: true,
-    value: {
+    value: withPreflightStubs({
       openDirectoryPicker: async () => ["/results"],
       openPath: async (path: string) => { opened.push(path) },
       cloud: {
@@ -401,7 +420,7 @@ function mountCloudEntry(id: string, kind: CloudPipelineSpec["pipelineKind"], re
           return { ok: true, dir: "/results/.codepuppy/runs/job", files: kind === "office-report" ? [`artifacts/output.${id === "cloud:word" ? "docx" : id === "cloud:excel" ? "xlsx" : "pptx"}`] : [], warnings: [], failures: [] }
         },
       },
-    },
+    }),
   })
   const host = document.createElement("div")
   document.body.append(host)
@@ -492,7 +511,7 @@ describe("#1509 customization center cloud entries", () => {
 // ── #1595 定制中心详情页说人话(批准稿 docs/design/2026-10-30-req236-ux-config-pages #cloud-task / #cloud-connector)──
 
 function mountDetail(target: Parameters<typeof ExtensionDetail>[0]["target"], options: { cloudReady?: boolean; onLogin?: () => void } = {}) {
-  Object.defineProperty(window, "api", { configurable: true, value: { openDirectoryPicker: async () => [], cloud: {} } })
+  Object.defineProperty(window, "api", { configurable: true, value: withPreflightStubs({ openDirectoryPicker: async () => [], cloud: {} }) })
   const host = document.createElement("div")
   document.body.append(host)
   disposers.push(runtime.render(() => runtime.createComponent(runtime.ExtensionDetail, {

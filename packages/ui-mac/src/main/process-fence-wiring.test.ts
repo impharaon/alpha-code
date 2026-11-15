@@ -109,7 +109,7 @@ class RecordingChild extends EventEmitter {
 
 let userDataPath = ""
 const savedEnv: Record<string, string | undefined> = {}
-const managedEnv = ["SHELL", "CODEPUPPY_SECRETS_DISABLE", "HTTPS_PROXY", "HTTP_PROXY", "NO_PROXY", "https_proxy", "http_proxy", "no_proxy", "ALL_PROXY", "all_proxy"] as const
+const managedEnv = ["SHELL", "CODEPUPPY_SECRETS_DISABLE", "CODEPUPPY_GLOBAL_DIR", "HTTPS_PROXY", "HTTP_PROXY", "NO_PROXY", "https_proxy", "http_proxy", "no_proxy", "ALL_PROXY", "all_proxy"] as const
 
 beforeEach(() => {
   userDataPath = mkdtempSync(join(tmpdir(), "fence-wiring-"))
@@ -120,6 +120,7 @@ beforeEach(() => {
   }
   process.env.SHELL = "nu"
   process.env.CODEPUPPY_SECRETS_DISABLE = "1"
+  process.env.CODEPUPPY_GLOBAL_DIR = join(userDataPath, "codepuppy-state", "env", "dev") // #1698:无快照的单测经环境给全局根(design §10 R31),fork 时构建启动文档要它
 })
 
 afterEach(() => {

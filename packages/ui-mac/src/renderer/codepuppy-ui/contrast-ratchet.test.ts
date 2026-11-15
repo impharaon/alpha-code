@@ -40,7 +40,8 @@ const BACKGROUNDS = [
  * 先合成、再算。不合成就一条都判不了(本文件的 fail-closed 规则会把 rgba() 直接判红),
  * 于是这一类此前**结构性地不在任何闸门的射程内**。
  *
- * 今天只有一行:输入框提示槽那三条红提示(`.a-comp-model-alert`,`codepuppy-composer.css`)。
+ * 起点只有一行:输入框提示槽那三条红提示(`.a-comp-model-alert`,`codepuppy-composer.css`);`#1314` 补上风险标签与
+ * 能力授权框变化标签的两对(琥珀 / 绿文字落在各自 tint 上,底 = --a-surface-raised);「极高风险」的红字沿用上一行那对。
  * 全仓红字/底色配对的普查是另一件事(`#1375` out of scope 明写)。
  */
 const TINTED_TEXT = [
@@ -49,6 +50,19 @@ const TINTED_TEXT = [
     tint: "--a-error-subtle",
     base: "--a-surface",
     where: "输入框提示槽三条红提示(.a-comp-model-alert)",
+  },
+  // `#1314` 风险标签与能力授权框的变化标签:文字落在各自 tint 上,底 = 批准面板与对话框的实际底 --a-surface-raised。
+  {
+    fg: "--a-warning-on-subtle",
+    tint: "--a-warning-subtle",
+    base: "--a-surface-raised",
+    where: "风险标签「高风险」(.a-risk-tag[data-level=high])与能力授权框「新增」",
+  },
+  {
+    fg: "--a-success-on-subtle",
+    tint: "--a-success-subtle",
+    base: "--a-surface-raised",
+    where: "风险标签「低风险」(.a-risk-tag[data-level=low])与能力授权框「将收回」",
   },
   {
     fg: "--a-user-bubble-link",

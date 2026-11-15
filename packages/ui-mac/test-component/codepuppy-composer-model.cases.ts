@@ -1510,6 +1510,86 @@ describe("ModelPickPop production component", () => {
     mounted.dispose()
   })
 
+  // #1686 R1 M2:签发端不给 email / plan,不先退出就换号时推送里只有登录代(identityEpoch)在变。
+  // 选择器自己的去重签名漏掉它,就会把换号当成「同一身份」吞掉,继续显示上一个账号的余额与模型状态。
+  test("#1686 换号只差登录代:已打开的选择器必须重载,不得当成同一身份静默", async () => {
+    resetComposerModelProjection()
+    let authNow: AuthState = {
+      status: "logged-in",
+      mode: "platform",
+      platformStatus: "ready",
+      account: {},
+      expiresAt: Date.now() + 15 * 60_000,
+      identityEpoch: 1,
+    }
+    let authListener: ((state: AuthState) => void) | undefined
+    let listReads = 0
+    installApi({
+      auth: async () => authNow,
+      onAuthSubscribe: (listener) => {
+        authListener = listener
+      },
+    })
+    const mounted = mount(() =>
+      createComponent(ModelPickPop, {
+        contract: {
+          list: async () => {
+            listReads++
+            return platformModels
+          },
+          current: async () => undefined,
+          switch: async () => {},
+        },
+        directory: () => "/workspace",
+        selected: () => null,
+        onSelect: async () => {},
+        onPicked: () => {},
+      }),
+    )
+    await waitFor(() => expect(listReads).toBeGreaterThan(0))
+    await flush()
+    const settledListReads = listReads
+    authNow = { ...authNow, identityEpoch: 2 }
+    authListener?.(authNow)
+    await waitFor(() => expect(listReads).toBeGreaterThan(settledListReads))
+    mounted.dispose()
+  })
+
+  test("#1686 换号只差登录代:真 composer 的模型链按新身份重跑", async () => {
+    let authNow: AuthState = { status: "logged-in", mode: "platform", platformStatus: "ready", identityEpoch: 1 }
+    let authListener: ((state: AuthState) => void) | undefined
+    let listReads = 0
+    installApi({
+      auth: async () => authNow,
+      onAuthSubscribe: (listener) => {
+        authListener = listener
+      },
+    })
+    const mounted = mount(() =>
+      createComponent(CodePuppyComposerRuntime, {
+        mode: "home",
+        projects,
+        directory: () => "/workspace",
+        command,
+        modelContract: {
+          list: async () => {
+            listReads++
+            return platformModels
+          },
+          current: async () => undefined,
+          switch: async () => {},
+        },
+      }),
+    )
+    await waitFor(() => expect(listReads).toBeGreaterThan(0))
+    await new Promise((resolve) => setTimeout(resolve, 50))
+    const settledListReads = listReads
+    authNow = { ...authNow, identityEpoch: 2 }
+    authListener?.(authNow)
+    await waitFor(() => expect(listReads).toBeGreaterThan(settledListReads))
+    mounted.dispose()
+  })
+
   test("未登录只呈现统一登录入口，不渲染平台代理模型锁墙", async () => {
     resetComposerModelProjection()
     let logins = 0

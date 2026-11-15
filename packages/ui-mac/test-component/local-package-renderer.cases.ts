@@ -189,6 +189,7 @@ const { codepuppySidecar } = registerExtIpcHandlers(
   "dev",
   async () => ({ url: "http://127.0.0.1:39117", username: "opencode", password: "route-password" }),
   join(tmp, "home"),
+  undefined, async () => undefined,
 )
 /**
  * REQ-234 `#1529`:G20 的判据换了位置 —— 「引擎被要求重扫」= main 经 parentPort 发出一条 `codepuppy.reload.request`
@@ -448,6 +449,10 @@ function engineAllowSet(): string[] {
  * 目录在),结果写进显式配置文件的 `skills`,引擎的技能插件按它装载;ext 的 `config` hook 随 v1 一起没了。
  */
 async function engineInjectedSkillPaths(): Promise<string[]> {
+  // `#1698`:explicitSkillDirs 读 sidecar 发布的启动文档(出厂技能目录);这里按当前全局根发布一份(没有出厂技能)
+  const { publishTestBootstrap } = await import("./codepuppy-bootstrap-fixture")
+  const { codepuppyGlobalRoot } = await import("../src/main/codepuppy-installs")
+  publishTestBootstrap({ globalRoot: codepuppyGlobalRoot() })
   // 项目技能目录那一条(PROJECT_SKILLS_ENTRY,相对路径,每个会话按自己的项目解析)恒在,与扩展包无关;其余每一条都要被下面的断言认领。
   return explicitSkillDirs().filter((dir) => dir !== PROJECT_SKILLS_ENTRY)
 }

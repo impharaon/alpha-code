@@ -1,6 +1,7 @@
 // REQ-234 `#1529` I6:parentPort `codepuppy.*` 消息族封闭 —— 只认三种 ext → main 的形状,其余(含未知 alpha.* type、
 // main → ext 方向、形状不对)一律 undefined,由收方丢弃。
 import { describe, expect, test } from "bun:test"
+import { buildUnattendedLive, buildUnattendedAck, parseUnattendedLive, parseUnattendedAck } from "./codepuppy-sidecar-messages"
 import {
   buildHubRequestQuery,
   buildHubRequestReply,
@@ -16,6 +17,20 @@ import {
   parseReloadRequest,
   type HubView,
 } from "./codepuppy-sidecar-messages"
+
+test("无人值守快照和回执成对解析,坏输入与反方向消息被丢弃", () => {
+  const live = buildUnattendedLive({ seq: 1, nonce: "random-nonce", sessions: [{ sessionID: "ses_a", promptID: "msg_a" }] })
+  const ack = buildUnattendedAck(live.seq, live.nonce)
+  expect(parseUnattendedLive(live)).toEqual(live)
+  expect(parseUnattendedAck(ack)).toEqual(ack)
+  expect(parseCodePuppySidecarInbound(ack)).toEqual(ack)
+  expect(parseCodePuppySidecarInbound(live)).toBeUndefined()
+  expect(parseUnattendedLive(ack)).toBeUndefined()
+  for (const bad of [null, [], { ...live, seq: NaN }, { ...live, nonce: "" }, { ...live, sessions: [null] }, { ...live, sessions: [{ sessionID: "s", promptID: 1 }] }, { ...live, sessions: [{ sessionID: "s", promptID: "m", agent: false }] }])
+    expect(parseUnattendedLive(bad)).toBeUndefined()
+  expect(parseUnattendedAck({ ...ack, seq: 1.5 })).toBeUndefined()
+  expect(parseUnattendedAck({ ...ack, nonce: false })).toBeUndefined()
+})
 
 describe("codepuppy-sidecar-messages — 入站只认三种(I6)", () => {
   test("三种 ext → main 的消息按合同解析;多余字段不进结果", () => {

@@ -19,9 +19,11 @@ import { CHANNEL } from "./constants"
 import { getAuthIdentityTag } from "./codepuppy-auth"
 import { installationMachineId } from "./artifact-service"
 import { tryGetCodePuppyEnvironment } from "./codepuppy-environment"
-import { CLOUD_WEBSEARCH_DENY_ENV, LOCAL_WEBSEARCH_DENY_ENV } from "./cloud-web-search"
+import { buildCodePuppyBootstrap, usableExportedPaths } from "./codepuppy-bootstrap-build"
+import { exportedFlag } from "@opencode/util/codepuppy-bootstrap"
+import { factorySkillDirsForFork } from "./factory-skills"
 import { resourcesRoot } from "./ext-fs-installer"
-import { secretFileRef, syncSecretFiles } from "./codepuppy-secret-files"
+import { syncSecretFiles } from "./codepuppy-secret-files"
 import { customProviderSecretValues } from "./codepuppy-byok-keys"
 import { ignoredConfigProviderBlocks, ignoredConfigRemoteMcpEntries } from "./ext-config"
 import { readCustomProviderRecords } from "./custom-provider-records"
@@ -64,8 +66,10 @@ import { configureEgressGrantApproval, setUserEgressGrants } from "./network-egr
 import { persistEgressGrantRecord, readEgressGrantRecords } from "./egress-grant-records"
 import { askUserForEgressGrant } from "./egress-approval-dialog"
 // REQ-159 `#1322`:工作区写探针的 main 半场 —— 请求/应答簿记住在 workspace-write-probe.ts,这里只接线到子进程。
+import { createProjectConfigViewRequester } from "./project-config-view-message"
+import type { ProjectConfigView } from "@opencode/schema/codepuppy-project-config"
 import { createWriteProbeRequester, type WorkspaceWriteProbeResult } from "./workspace-write-probe"
-import { codepuppyGlobalRoot } from "./engine-config-truth"
+import { codepuppyGlobalRoot, codepuppyJsoncPath } from "./engine-config-truth"
 import { ensureUserWorkspaceDir } from "./codepuppy-user-workspace"
 import { fenceWorkspaceTruthPath, readWorkspaceTruthOrThrow } from "./process-fence-workspaces"
 import { homedir } from "node:os"
@@ -88,6 +92,7 @@ type SidecarMessage =
   | { type: "error"; error: { message: string; stack?: string } }
 
 export type SidecarListener = {
+  projectConfigView: (directory: string) => Promise<ProjectConfigView | undefined>
   stop: () => Promise<void>
   kill: () => void
   /**
@@ -232,7 +237,14 @@ function refreshConfiguredEgressDestinations(userDataPath: string): void {
   try {
     const mcpServers = tryGetCodePuppyEnvironment() || process.env.CODEPUPPY_GLOBAL_DIR ? readMcpServerRecords((line) => getLogger()?.warn(line)) : []
     const accepted = setConfiguredEgressDestinations([
-      ...deriveEgressDestinations(buildCodePuppyModelConfig(userDataPath)?.provider),
+      // main 自己的环境(applyAuthEnv 写的平台地址)—— sidecar 拿到的是同一个值经启动文档(`#1698`)
+      ...deriveEgressDestinations(
+        buildCodePuppyModelConfig(userDataPath, {
+          baseURL: process.env.CODEPUPPY_BASE_URL,
+          defaultModel: process.env.CODEPUPPY_DEFAULT_MODEL,
+          disabled: exportedFlag(process.env.CODEPUPPY_MODELS_DISABLE) === true,
+        })?.provider,
+      ),
       ...deriveMcpEgressDestinations(mcpServers),
     ])
     getLogger()?.log(
@@ -322,24 +334,6 @@ export function setDefaultServerUrl(url: string | null) {
   getStore().delete(DEFAULT_SERVER_URL_KEY)
 }
 
-/**
- * web search 主权判决,**幂等**、可反复重算,每次 fork 前落定;sidecar 只读不算。唯一能关掉两条腿的是 kill-switch
- * (`CODEPUPPY_WEBSEARCH_DISABLE`);`#1411`(owner 2026-09-23):账户信号只决定云腿在不在,不决定本地腿。
- * 判决经两个布尔 env 过河:`CODEPUPPY_CLOUD_WEBSEARCH_DENY` / `CODEPUPPY_LOCAL_WEBSEARCH_DENY`(两个方向都写)。
- *
- * `#1667`(#1662 L5,清点表 E2):v1 时代这里还把 4 个 keyless 专用 flag(`OPENCODE_ENABLE_EXA` /
- * `OPENCODE_EXPERIMENTAL_EXA` / `OPENCODE_ENABLE_PARALLEL` / `OPENCODE_EXPERIMENTAL_PARALLEL`)覆盖写 "0"、登出时还原基线、
- * 默认置 `OPENCODE_ENABLE_EXA=1`。这 4 个名字在 2.x 无读者(本地腿在 2.x 走 `websearch` 配置与插件 domain,处置归 L3),
- * 写它们只会让人以为它们还在管事 —— 整套删除。
- */
-export function applyWebSearchSovereignty() {
-  const killSwitch = Boolean(process.env.CODEPUPPY_WEBSEARCH_DISABLE)
-  if (killSwitch) process.env[CLOUD_WEBSEARCH_DENY_ENV] = "1"
-  else delete process.env[CLOUD_WEBSEARCH_DENY_ENV]
-  if (killSwitch) process.env[LOCAL_WEBSEARCH_DENY_ENV] = "1"
-  else delete process.env[LOCAL_WEBSEARCH_DENY_ENV]
-}
-
 export function preferAppEnv(userDataPath: string) {
   const logger = getLogger()
   const logShellEnvCache = (message: string, extra?: Record<string, unknown>) => write("main", message, extra)
@@ -366,7 +360,6 @@ export function preferAppEnv(userDataPath: string) {
             )
           writeShellEnvCache(userDataPath, shell, cleanFresh, logShellEnvCache)
           Object.assign(process.env, cleanFresh)
-          applyWebSearchSovereignty()
           logger.log(`[server] Shell env refreshed in background (${Object.keys(cleanFresh).length} vars)`)
         })
         .catch(() => {})
@@ -379,19 +372,12 @@ export function preferAppEnv(userDataPath: string) {
   // 2. Fill missing API keys (EXA_API_KEY, *_API_KEY, ...) from the codepuppy.env secrets file, so app
   //    users never have to touch ~/.zshrc. Never overrides anything already set in step 1.
   loadCodePuppySecrets(userDataPath, logger)
-  // 3. Desktop defaults(set-if-unset:用户 shell 的显式 export 优先)。`#1667`:H1 下引擎核心不读这两个名字,读它们的是
-  // sidecar 构造 `start()` 选项的 engineDesktopToggles(engine-server-options.ts)—— 它们从此是 Code Puppy 自己的开关:
-  //   · OPENCODE_EXPERIMENTAL_FILEWATCHER 默认开 → `fs.filewatcher`(B12 拍板,2026-07-05:「外部变更感知」);
-  //   · OPENCODE_DISABLE_MODELS_FETCH 默认 "1" → `models.fetch: false`(models.dev 在国内网络超时;随包快照够用,T1.7 / C4)。
-  // v1 时代这里另写的 OPENCODE_CLIENT=desktop(→ `app.name`)、OPENCODE_EXPERIMENTAL_ICON_DISCOVERY、OPENCODE_ENABLE_EXA 默认值、
-  // 外部生态的两个 flag(→ 注入的移除指令)在 2.x 无读者,已删除(清点表 E2)。
-  process.env.OPENCODE_EXPERIMENTAL_FILEWATCHER ??= "true"
-  Object.assign(process.env, {
-    XDG_STATE_HOME: process.env.XDG_STATE_HOME ?? userDataPath,
-    OPENCODE_DISABLE_MODELS_FETCH: process.env.OPENCODE_DISABLE_MODELS_FETCH ?? "1",
-  })
-  // `#1411` 起本闸只认 kill-switch(纯 env)。
-  applyWebSearchSovereignty()
+  // 3. Desktop defaults(set-if-unset:用户 shell 的显式 export 优先)。两个桌面开关(文件监听默认开,B12 拍板 2026-07-05「外部变更感知」;
+  // models.dev 拉取默认关,国内网络超时、随包快照够用,T1.7 / C4)的缺省 `#1698` 起只在 engineDesktopToggles(engine-server-options.ts,
+  // 启动文档构建器在 main 调,结果进文档的 `engine`)里:没设 = 缺省。这里不再把缺省值写进环境 —— 引擎内核不读这两个名字(H1),
+  // sidecar 读文档。v1 时代这里另写的 OPENCODE_CLIENT=desktop(→ `app.name`)、OPENCODE_EXPERIMENTAL_ICON_DISCOVERY、OPENCODE_ENABLE_EXA
+  // 默认值、外部生态的两个 flag(→ 注入的移除指令)在 2.x 无读者,已删除(清点表 E2)。
+  process.env.XDG_STATE_HOME = process.env.XDG_STATE_HOME ?? userDataPath
 }
 
 // REQ-236 §2.1-1(`#1562`):最近一次 fork 时写进 {file:} 通道的凭据名。续期热应用据它判「凭据在场性
@@ -458,10 +444,6 @@ export async function spawnLocalServer(
     throw new Error(`applied model catalog pin failed — sidecar fork refused: ${serializeError(error).message}`)
   }
 
-  // web search 本地腿的主权闸重算,**每次 fork 都跑**。`#1411` 之后唯一判据是 kill-switch(纯 env),
-  // 不再依赖 syncSecretFiles 的落盘结果;留在这里是因为它必须晚于 preferAppEnv 的基线还原。
-  applyWebSearchSovereignty()
-
   // B6(=G1):解析 @codepuppy/ext 插件目录,经 StartCommand 传 sidecar(不走 env,免动 A6 白名单)。
   // 缺文件 loud warn(anti-B11:否则表现为「codepuppy_ping 工具静默不在」);CODEPUPPY_EXT_DISABLE=1 静默跳过。
   const ext = resolveExtPluginPath({
@@ -481,26 +463,16 @@ export async function spawnLocalServer(
   // REQ-159:围栏计划在 fork **之前**做(试编译失败 / 模块缺失 / 默认工作区不在 ⇒ 抛 ⇒ 这一代被拒,
   // 与上面 codepuppy-secrets sync 失败同一条 fail-closed 路径)。env 先算好:计划要读的 XDG_* / HOME
   // 必须是 sidecar 将拿到的那一份,不是 main 自己的 process.env。
-  // REQ-236 §2.1-4(`#1562`):平台模型请求的凭据只从这份文件现读(ext `chat.headers`),注入的 provider
-  // 配置只有占位值。值是 `{file:}` 引用,不是凭据;经 sidecar env 白名单(sidecar-env.ts)进引擎进程。
-  process.env.CODEPUPPY_PLATFORM_AUTH_REF = secretFileRef(options.userDataPath, "CODEPUPPY_API_KEY")
   const sidecarEnv = createSidecarEnv()
   // uv's default ~/.cache/uv is outside the fence; keep Office dependencies under the existing W3 root.
   sidecarEnv.UV_CACHE_DIR = join(options.userDataPath, "uv-cache")
-  // #1565:引擎在四个文档工具连上之前,用这份随包清单给出它们的声明定义(packages/opencode/src/mcp/codepuppy-first-party-mcp.ts)。
-  // 与写策略(ext-mcp-policy)一样按资源根的 realpath 解析,配置里那四条命令才能逐 token 对上。路径不是秘密。
-  sidecarEnv.CODEPUPPY_OFFICE_MCP_MANIFEST = join(realpathSync(resourcesRoot()), "office-mcp", "tools.json")
-  // REQ-236 `#1575`(方案 §2.4 第 4 条):工具策略按登录账户分区。引擎读它选分区,缺席 = anonymous(未登录)。
-  // 值是「本安装随机标识 + 账户标记」的哈希,不是凭据:这个变量会被第三方 MCP / LSP / shell 子进程继承,混入安装标识后
-  // 同一账户在另一台安装上是另一个值,不能据它跨安装关联。只由这里按当刻登录态写 —— 不进白名单,shell 导出的同名变量
-  // 选不了分区;账户或安装标识取不到都不写。登录、登出、换号都会重新 fork(codepuppy-auth 的 identity-change),fork 时写一次即可。
-  const policyAccount = getAuthIdentityTag()
+  // REQ-236 `#1575`(方案 §2.4 第 4 条):工具策略按登录账户分区。ext 读启动文档的 policy.account 选分区,缺席 = anonymous(未登录)。
+  // 值是「本安装随机标识 + 账户标记」的哈希,不是凭据:混入安装标识后同一账户在另一台安装上是另一个值,不能据它跨安装关联。只由这里按
+  // 当刻登录态算 —— shell 导出的同名变量选不了分区;账户或安装标识取不到都不给。登录、登出、换号都会重新 fork(codepuppy-auth 的
+  // identity-change),fork 时算一次即可。`#1698`:不再写进 sidecar env(第三方 MCP / LSP / shell 子进程从此拿不到它)。
+  const accountTag = getAuthIdentityTag()
   const installation = installationMachineId()
-  if (policyAccount && installation)
-    sidecarEnv.CODEPUPPY_POLICY_ACCOUNT = `acct:${createHash("sha256").update(`${installation}:${policyAccount}`).digest("hex")}`
-  // #1578 AC5:随包扩展插件的清单(ext 构建写在 plugin.js 旁边:模块 sha256 + 自有工具名)。引擎只信这条 env 指的那份,
-  // 不看被装载插件旁边有什么(packages/opencode/src/plugin/codepuppy-bundled-plugin.ts)。路径不是秘密。
-  if (ext.path) sidecarEnv.CODEPUPPY_EXT_BUNDLED_MANIFEST = join(ext.path, "bundled-tools.json")
+  const policyAccount = accountTag && installation ? `acct:${createHash("sha256").update(`${installation}:${accountTag}`).digest("hex")}` : undefined
   // REQ-137 `#1379`:这一代的 BYOK 放行集合。平台无关(代理只在 darwin 起,但「放行集合 = 这一代的配置」
   // 这条不该长两个样子),排在密钥文件落定之后、fork 之前。
   refreshConfiguredEgressDestinations(options.userDataPath)
@@ -520,8 +492,20 @@ export async function spawnLocalServer(
   // 数据目录里的独立 OpenCode `auth.json` 会在 OpenCode 2 第一次跑导入迁移时进凭证表 ⇒ 拒 fork(fail-closed,原因可读)。
   // 每种运行形态都查,对着引擎这次真要打开的库与数据目录:非打包态(`bun run dev`)的引擎同样读真实数据目录,
   // `OPENCODE_DB=<旧库副本>` 时同样会补跑导入迁移(审计 R1 第 1 条)。
-  const databasePath = engineDatabasePath({ packaged: electronNs.app.isPackaged, env: sidecarEnv, home: homedir(), channel: CHANNEL })
-  const dataDir = engineDataDirectory(sidecarEnv, homedir())
+  // `#1698`(编排器 2026-11-13 裁决):文档的路径字段只收绝对路径 —— 用户导出的相对路径变量(含 `.`)与相对的 HOME 当没设、回到缺省
+  // 并记一行(codepuppy-bootstrap-build.ts 的 usableExportedPaths),不在 fork 前中止启动。会话库、数据根、全局配置目录、初始目录都按它推导。
+  const exported = usableExportedPaths({
+    env: { ...sidecarEnv, CODEPUPPY_USER_WORKSPACE_DIR: process.env.CODEPUPPY_USER_WORKSPACE_DIR },
+    home: homedir(),
+    log: (line) => getLogger()?.warn(line),
+  })
+  // 被忽略的变量在 sidecar 的环境里也当没设:引擎(上游在模块装载时按 XDG_* / HOME 算自己的根)与启动文档看到的是同一个「没设」。
+  // HOME 不留空(子进程 —— git、shell —— 要它),写成与文档同一个回退值(系统账户的主目录,Node 在 HOME 未设时的同一来源)。
+  for (const name of ["OPENCODE_CONFIG_DIR", "XDG_CONFIG_HOME", "XDG_DATA_HOME"])
+    if (sidecarEnv[name] !== undefined && exported.env[name] === undefined) delete sidecarEnv[name]
+  if (sidecarEnv.HOME !== undefined && sidecarEnv.HOME !== exported.home) sidecarEnv.HOME = exported.home
+  const databasePath = engineDatabasePath({ packaged: electronNs.app.isPackaged, env: exported.env, home: exported.home, channel: CHANNEL })
+  const dataDir = engineDataDirectory(exported.env, exported.home)
   const refusal = await legacyCredentialImportRefusal({ dataDir, databasePath })
   if (refusal) {
     getLogger()?.error(refusal)
@@ -541,6 +525,30 @@ export async function spawnLocalServer(
   }
   if (!fence && process.platform === "darwin")
     throw new Error("process fence plan returned nothing on darwin — sidecar fork refused (an unfenced engine must not start)")
+  // `#1698`(DESIGN-upgrade-bootstrap-config §4.2 / §4.4):这一代交给 sidecar、ext 与引擎的决定收成一份启动文档,随 start 消息走,
+  // 不进环境。构建失败(结构性缺陷,例如资源根 realpath 失败)⇒ 抛 ⇒ 与上面各项同一条拒 fork 路。
+  // #397:catalog 通道在 MAIN 侧从冻结快照取 —— sidecar 进程没有快照。tryGet 仅为纯单测兜底(缺省 → sidecar loud 跳过 override 注入)。
+  const registryChannel = tryGetCodePuppyEnvironment()?.registryChannel
+  if (!registryChannel)
+    getLogger()?.warn("alpha environment not initialized at sidecar spawn — disabled-override injection will be skipped")
+  const bootstrap = buildCodePuppyBootstrap({
+    userDataPath: options.userDataPath,
+    globalRoot: codepuppyGlobalRoot(),
+    userConfig: codepuppyJsoncPath(),
+    initialDirectory: codepuppyUserWorkspaceDir(exported.env, exported.home),
+    databasePath,
+    engineConfigDirectory: engineGlobalConfigDirectory(exported.env, exported.home),
+    extPluginPath: ext.path,
+    // #1565:引擎在四个文档工具连上之前,用这份随包清单给出它们的声明定义(packages/core/src/mcp/codepuppy-first-party-mcp.ts)。
+    // 与写策略(ext-mcp-policy)一样按资源根的 realpath 解析,配置里那四条命令才能逐 token 对上。
+    officeMcpManifest: join(realpathSync(resourcesRoot()), "office-mcp", "tools.json"),
+    registryChannel,
+    policyAccount,
+    egressProxyPort,
+    factorySkillDirs: factorySkillDirsForFork(),
+    env: process.env,
+    log: (line) => getLogger()?.warn(line),
+  })
 
   const sidecar = join(dirname(fileURLToPath(import.meta.url)), "sidecar.js")
   rotateServerLogs()
@@ -572,10 +580,12 @@ export async function spawnLocalServer(
   electronNs.app.on("child-process-gone", onProcessGone)
   // REQ-159 `#1322`:探针请求簿。sidecar 收到 write-probe 命令即同步回一条 write-probe-result;这里按 id 对号。
   // 子进程退出 ⇒ 在途请求全部答 unknown(不是「拒绝」,也不是「可写」)。
+  const projectConfigViews = createProjectConfigViewRequester((command) => child.postMessage(command))
   const writeProbes = createWriteProbeRequester((command) => child.postMessage(command))
   // REQ-234 `#1529`:`codepuppy.*` 分发与探针应答并列;不是本族的消息原样交还(返回 false)。
   const postCodePuppy = (message: CodePuppySidecarOutbound) => child.postMessage(message)
   child.on("message", (message: unknown) => {
+    if (projectConfigViews.receive(message)) return
     if (writeProbes.receive(message)) return
     options.codepuppySidecar?.receive(message, postCodePuppy)
   })
@@ -584,6 +594,7 @@ export async function spawnLocalServer(
     clearOfficialConnectorRuntimeOnExit(runtimeGeneration)
     exited = true
     electronNs.app.off("child-process-gone", onProcessGone)
+    projectConfigViews.close()
     writeProbes.close(`sidecar exited with code ${code}`)
     detachCodePuppy?.(`sidecar exited with code ${code}`)
     options.onExit?.(code)
@@ -649,25 +660,12 @@ export async function spawnLocalServer(
     child.on("message", onMessage)
     child.on("exit", onExit)
     refreshTimeout()
-    // #397:override 注入的 catalog 通道在 MAIN 侧从冻结快照取好随命令传入 —— sidecar 进程从不
-    // initCodePuppyEnvironment,自取必抛且曾整体炸掉 alpha 配置注入(2026-07-23)。boot 序保证 spawn 前
-    // 已 init;tryGet 仅为纯单测兜底(缺省 → sidecar loud 跳过 override 注入,boot reconcile 兜 fail-closed)。
-    const registryChannel = tryGetCodePuppyEnvironment()?.registryChannel
-    if (!registryChannel)
-      getLogger()?.warn(
-        "alpha environment not initialized at sidecar spawn — disabled-override injection will be skipped",
-      )
     child.postMessage({
       type: "start",
       hostname,
       port,
       password,
-      userDataPath: options.userDataPath,
-      initialDirectory: codepuppyUserWorkspaceDir(),
-      databasePath,
-      configDirectory: engineGlobalConfigDirectory(sidecarEnv, homedir()),
-      extPluginPath: ext.path,
-      registryChannel,
+      bootstrap,
       // REQ-159:profile 全文 + 模块路径。sidecar 在 import 引擎之前 apply;缺席(darwin)即拒绝启动。
       ...(fence ? { fence: { profile: fence.profile, addonPath: fence.addonPath } } : {}),
     })
@@ -703,6 +701,7 @@ export async function spawnLocalServer(
       kill: () => {
         if (!exited) child.kill()
       },
+      projectConfigView: (directory: string) => projectConfigViews.request(directory),
       probeWrite: (directory: string) => writeProbes.request(directory),
       stop: () => {
         if (stopping) return stopping

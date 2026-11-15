@@ -1,0 +1,2 @@
+prefs compare: size 250->250; changed=[]; unchanged=['AppleTextDirection', 'NSForceRightToLeftWritingDirection', 'NSNavPanelExpandedSizeForOpenMode', 'NSTreatUnknownArgumentsAsOpen', 'SKPurchaseIntentUpdatesLastChecked']; other-than-known-timestamp-changed=[]
+LAUNCH GATE: OK — owner app pids unchanged, owner-side paths unchanged, mock keychain on the running process

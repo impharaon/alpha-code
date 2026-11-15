@@ -2,9 +2,9 @@
 // packages/opencode/test/mcp/codepuppy-cloud-credential-hot.test.ts 随换代删除):Code Puppy 治理的云连接器**每个请求**现读凭据文件,
 // 同一身份续期热应用后不重启引擎、不重新连接,同一条连接上的下一个请求就带新凭据。
 //
-// 宿主:test-component/codepuppy-engine.ts(生产注入 + 真 ext);代付态 —— `CODEPUPPY_CLOUD_MCP_URL` 指向本文件的本机
-// streamable-HTTP MCP 端点、登录铸的 `CODEPUPPY_MCP_TOKEN` 文件在场 ⇒ 注入面写出带 `{file:}` 引用的云 MCP 定义,并在 sidecar
-// 环境里置 `CODEPUPPY_CLOUD_MCP_SERVER` / `CODEPUPPY_CLOUD_MCP_DEF`。凭据文件由生产 `syncSecretFiles`(fork 时)与
+// 宿主:test-component/codepuppy-engine.ts(生产注入 + 真 ext);代付态 —— 启动文档的云 MCP(`#1698` G2;main 按云地址用
+// materializeCloudMcpConfig 算的那份)指向本文件的本机 streamable-HTTP MCP 端点、登录铸的 `CODEPUPPY_MCP_TOKEN` 文件在场 ⇒ 注入面
+// 写出带 `{file:}` 引用的云 MCP 定义,core 与 ext 从同一份文档认出它是治理通道。凭据文件由生产 `syncSecretFiles`(fork 时)与
 // `applyPlatformCredentialsHot`(续期时)写。端点记下每个请求的方法、JSON-RPC 方法、会话 id 与 Authorization 是哪个合成令牌(用例输出只有判定)。
 //
 // 端点按 2.x 客户端认的「会话时代」应答(initialize 回 2025-06-18 并发 `Mcp-Session-Id`),所以 2.x 的三条请求路径都在:
@@ -25,6 +25,7 @@ import fs from "node:fs"
 import path from "node:path"
 import { assertEngineSandboxed, engineSandbox } from "../../test-component/engine-sandbox"
 import { codepuppyEngine, scriptedModel, type Running } from "../../test-component/codepuppy-engine"
+import { testCloudMcp } from "../../test-component/codepuppy-bootstrap-fixture"
 import { applyPlatformCredentialsHot, secretFilePath, syncSecretFiles } from "./codepuppy-secret-files"
 
 const sandbox = engineSandbox()
@@ -88,14 +89,13 @@ beforeAll(async () => {
   await assertEngineSandboxed(sandbox)
   // fork 时:生产 syncSecretFiles 物化登录铸的云 MCP 令牌 A(和平台凭据),记下 fork 时的凭据集合(server.ts 同形)
   forked = new Set(syncSecretFiles(userData, { CODEPUPPY_MCP_TOKEN: TOKEN_A, CODEPUPPY_API_KEY: API_KEY }).written)
-  process.env.CODEPUPPY_CLOUD_MCP_URL = `http://127.0.0.1:${endpoint.port}/mcp`
-  running = await codepuppyEngine({ sandbox, name: "cloud-hot", modelBaseURL: model.baseURL }).start()
+  const cloudMcp = testCloudMcp(`http://127.0.0.1:${endpoint.port}/mcp`, secretFilePath(userData, "CODEPUPPY_MCP_TOKEN"))
+  running = await codepuppyEngine({ sandbox, name: "cloud-hot", modelBaseURL: model.baseURL, cloudMcp }).start()
 }, 60_000)
 afterAll(async () => {
   await running?.close().catch(() => undefined)
   endpoint.stop(true)
   model.stop()
-  delete process.env.CODEPUPPY_CLOUD_MCP_URL
 })
 
 const status = async () =>

@@ -9,6 +9,8 @@
 // 决策(granted/denied)都落盘 —— 拒绝 = 该项目仅文本类(skill/agent 说明字段/command)生效,且不再重复弹。
 // 版本化:告知内容实质变更时 bump EXTENSIONS_CONSENT_VERSION → 旧决策失效、重新弹。
 
+import { WITHHELD_KINDS, type WithheldItem } from "@opencode/schema/codepuppy-project-config"
+import { PROJECT_HIDDEN_DIR } from "../shared/project-hidden-dir"
 import { parseProjectJsonc } from "../shared/project-jsonc"
 import type { ProjectTrustEntry } from "./project-trust-truth"
 
@@ -23,9 +25,10 @@ export function extensionsGranted(entry: ProjectTrustEntry | undefined): boolean
   return entry?.version === EXTENSIONS_CONSENT_VERSION && entry.granted === true
 }
 
-/** agent 条目里受信任门管的字段:会改写权限 / 模型(REQ-236 P1、#1693;`tools` 与 `permission` 同样翻成权限规则)。
+/** agent 条目里受信任门管的字段:会改写权限 / 模型 / 执行预算(REQ-236 P1、#1693、#1700 BR-02a;
+ *  `tools` 与 `permission` 同样翻成权限规则,`steps` / `maxSteps` 决定一个回答最多调几次模型)。
  *  ext 在未同意时剥掉它们(project-config.ts stripAgentControl),确认框把写了它们的 agent 列出来 —— 同一份清单。 */
-export const AGENT_CONTROL_FIELDS = ["permission", "tools", "model", "disable", "mode"] as const
+export const AGENT_CONTROL_FIELDS = ["permission", "tools", "model", "disable", "mode", "steps", "maxSteps"] as const
 
 export type ProjectExecutables = { mcp: string[]; plugins: string[]; agents: Array<{ name: string; fields: string[] }> }
 
@@ -55,3 +58,36 @@ export function listProjectExecutables(jsoncText: string | null | undefined, plu
 
 const isObj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === "object" && !Array.isArray(v)
 
+
+/** #1713 契约 E:引擎的暂缓条目与项目原生扩展合成九类清单,每类一行。 */
+export function projectExecutableRows(exec: ProjectExecutables, withheld: readonly WithheldItem[]): string[] {
+  const items: WithheldItem[] = [
+    ...withheld,
+    ...exec.mcp.map((name) => ({ kind: "mcp" as const, name, file: "" })),
+    ...exec.plugins.map((name) => ({ kind: "plugin" as const, name: `${PROJECT_HIDDEN_DIR}/plugins/${name}`, file: "" })),
+    ...exec.agents.map((agent) => ({ kind: "agent-control" as const, name: agent.name, fields: agent.fields, file: "" })),
+  ]
+  const labels = ["连接器(MCP)", "插件", "Agent 的权限与模型设置", "命令的运行设置", "文件开头的脚本", "写文件后自动运行的格式化程序", "终端与 shell 使用的程序", "模型的接入设置", "其他 OpenCode 设置"]
+  return WITHHELD_KINDS.flatMap((kind, index) => {
+    const entries = new Map<string, string[]>()
+    for (const item of items.filter((item) => item.kind === kind)) entries.set(item.name, [...new Set([...(entries.get(item.name) ?? []), ...(item.fields ?? [])])])
+    // 批准的完整示例中 references 在 experimental 前;其他键保持引擎视图给出的顺序。
+    if (kind === "setting" && entries.has("experimental")) {
+      const fields = entries.get("experimental")!
+      entries.delete("experimental")
+      entries.set("experimental", fields)
+    }
+    const names = [...entries].map(([name, fields]) => {
+      if (kind === "command-run") {
+        const mapped = new Set<string>(fields.map((field) => field === "shell" ? "运行程序" : field === "agent" ? "指定 Agent" : field === "subagent" || field === "subtask" ? "子任务" : "模型"))
+        return `/${name}(${["运行程序", "指定 Agent", "模型", "子任务"].filter((label) => mapped.has(label)).join("、")})`
+      }
+      if (kind === "agent-control") {
+        const mapped = fields.map((field) => ["permission", "permissions", "tools"].includes(field) ? "权限" : field === "mode" ? "模式" : ["steps", "maxSteps"].includes(field) ? "步数" : ["disable", "disabled"].includes(field) ? "停用" : "模型")
+        return `${name}(${[...new Set(mapped)].join("、")})`
+      }
+      return name
+    })
+    return names.length ? [`· ${labels[index]}:${names.join("、")}`] : []
+  })
+}

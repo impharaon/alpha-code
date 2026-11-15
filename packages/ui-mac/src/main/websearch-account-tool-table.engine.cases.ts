@@ -5,8 +5,9 @@
 //   · kill-switch:两条都不在。
 // 期望取自 ADR-046 D1 与 `#1411` 的退出条件,不从被测代码派生。
 //
-// 供数方全是生产的:main 的 `spawnLocalServer`(假 fork,记下它交给 sidecar 的 env;`applyWebSearchSovereignty` 与 `syncSecretFiles`
-// 都在里面跑)→ 那份 env 里 Code Puppy 自己的键原样放进本进程(sidecar 里就是这份 env)→ 生产 `injectCodePuppyConfig` → 嵌入式引擎 +
+// 供数方全是生产的:main 的 `spawnLocalServer`(假 fork,记下它交给 sidecar 的 env 与 start 消息;启动文档的构建与 `syncSecretFiles`
+// 都在里面跑)→ 那份 env 里 Code Puppy 自己的键原样放进本进程(sidecar 里就是这份 env),start 消息里启动文档的云 MCP 与 kill-switch
+// 交给宿主发布(`#1698` G2:它们不再经 env)→ 生产 `injectCodePuppyConfig` → 嵌入式引擎 +
 // 真 ext(test-component/codepuppy-engine.ts)→ 模型桩记下第一次模型请求。本地腿看直连工具表;云端那条是 MCP 工具,2.x 默认进 Code Mode,
 // 看这次请求里交给模型的 Code Mode 目录(云 server 的工具出现在请求里 = 模型拿得到)。云 MCP 端点是本机的 streamable-HTTP 桩,列的是
 // 平台 vendored 的真实工具名(fixtures/cloud-mcp-tools)。登录信封里的令牌都是合成值;钥匙串后端与 electron 一律 mock,不碰真机。
@@ -26,6 +27,7 @@ class FakeChild extends EventEmitter {
   stdout = new EventEmitter()
   stderr = new EventEmitter()
   postMessage(message: { type: string }) {
+    if (message.type === "start") starts.push(message as (typeof starts)[number])
     if (message.type === "start") queueMicrotask(() => this.emit("message", { type: "ready" }))
     if (message.type === "stop") queueMicrotask(() => this.emit("exit", 0))
   }
@@ -35,6 +37,7 @@ class FakeChild extends EventEmitter {
 }
 let userDataPath = ""
 const forkCalls: Array<{ options: Record<string, unknown> }> = []
+const starts: Array<{ bootstrap: import("@opencode/util/codepuppy-bootstrap").CodePuppyBootstrap }> = []
 mockElectron(() => ({
   app: { isPackaged: false, on: () => {}, off: () => {}, getPath: () => userDataPath },
   utilityProcess: { fork: () => { throw new Error("unexpected utilityProcess.fork") } },
@@ -103,6 +106,7 @@ async function toolTable(state: State, name: string, mutate?: (content: Record<s
   resetDanglingSweepLatchForTests()
   creditDanglingSweepForSpawn()
   forkCalls.length = 0
+  starts.length = 0
   const spawned = await spawnLocalServer("127.0.0.1", 4096, "password", { userDataPath, healthCheck: async () => true, planFence: fakePlanFence, fork: fakeFork })
   await spawned.health.wait
   await spawned.listener.stop()
@@ -111,7 +115,8 @@ async function toolTable(state: State, name: string, mutate?: (content: Record<s
   for (const key of Object.keys(process.env)) if (CODEPUPPY_KEYS.test(key)) delete process.env[key]
   for (const [key, value] of Object.entries(forkEnv)) if (CODEPUPPY_KEYS.test(key) && value !== undefined) process.env[key] = value
 
-  const host = codepuppyEngine({ sandbox, name, modelBaseURL: model.baseURL })
+  const forked = starts.at(-1)!.bootstrap
+  const host = codepuppyEngine({ sandbox, name, modelBaseURL: model.baseURL, cloudMcp: forked.cloudMcp, killSwitch: forked.webSearch.killSwitch })
   mutate?.(host.content as Record<string, any>)
   const engine = await host.start()
   try {

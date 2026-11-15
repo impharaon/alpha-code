@@ -1,0 +1,16 @@
+launched label=a1 pid/pgid=26599 mock=1 owner-app-pids-before=[]
+tools/launch-a.sh: line 83: 26599 Killed: 9               /usr/bin/python3 - "$EXE" "$OUT" "${ENVV[@]}" -- "${ARGS[@]}"  <<'PY'
+import os, sys
+exe, out = sys.argv[1], sys.argv[2]
+rest = sys.argv[3:]
+sep = rest.index("--")
+env = dict(kv.split("=", 1) for kv in rest[:sep])
+args = rest[sep + 1:]
+os.setsid()
+fd = os.open(out, os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o600)
+os.dup2(fd, 1); os.dup2(fd, 2)
+devnull = os.open("/dev/null", os.O_RDONLY); os.dup2(devnull, 0)
+os.execve(exe, [exe] + args, env)
+PY
+
+LAUNCH GATE RED: app exited during start-up (see <root>/A/logs/a1.out) — process group 26599 killed

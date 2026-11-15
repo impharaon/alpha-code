@@ -3,7 +3,7 @@
 // (ext-install-planner.ts)都从这里取记录 —— 一处真源、一处解析,不留镜像。与 custom-provider-records.ts 同形。
 //
 // 真源在哪:`<casBaseRoot>/mcp-servers/<env>.json`(mcpServerTruthPath);「状态根 + 环境名」由 codepuppy-environment.ts 的
-// resolveCodePuppyStateBase 给出(main 走冻结快照;sidecar 走 `CODEPUPPY_GLOBAL_DIR` 的逆映射;形状不对 ⇒ 位置未知 ⇒ 什么都不派生并出一行原因)。
+// resolveCodePuppyStateBase 给出(main 走冻结快照;sidecar 走启动文档 `paths.globalRoot` 的逆映射;形状不对 ⇒ 位置未知 ⇒ 什么都不派生并出一行原因)。
 //
 // 读不到 ≠ 没有:缺失 = 用户没加过远程连接器,正常,零日志。解析失败 / 形状不对 / 位置未知 ⇒ 返回空清单**并**出一行原因,
 // 消费者据此什么都不注入、什么都不放行 —— 与「没有记录」在**行为**上相同,在日志上可分辨(`#1387`)。
@@ -17,7 +17,7 @@ import { mcpServerTruthPath, readMcpServerTruth, type McpServerRecord, type McpS
 
 export type McpServerTruthLocation = { ok: true; path: string; casBaseRoot: string; environment: AppEnvironment } | { ok: false; reason: string }
 
-/** 真源文件的位置:main 走冻结快照;sidecar(无快照)走 `CODEPUPPY_GLOBAL_DIR` 的逆映射。形状不对 ⇒ ok:false,不猜。 */
+/** 真源文件的位置:main 走冻结快照;sidecar(无快照)走启动文档 `paths.globalRoot` 的逆映射。形状不对 ⇒ ok:false,不猜。 */
 export function resolveMcpServerTruthLocation(): McpServerTruthLocation {
   const base = resolveCodePuppyStateBase("remote MCP server truth")
   if (!base.ok) return base

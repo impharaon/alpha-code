@@ -16,12 +16,13 @@
 // hook; `confirm` runs at `seal()`, after the extension's hooks and the project plugin fan-out, asks with the input the
 // implementation will receive, re-decides after the answer, and then pins `tool` and `input` so any later rewrite
 // rejects the call (S1, option 2: plugins activated after the extension cannot be ordered behind it).
+import { UNATTENDED_DENIAL_KEY, unattendedDenialCopy, type UnattendedDenial, type UnattendedProfile } from "../../../schema/src/codepuppy-unattended"
 import { Error as ToolError } from "@opencode/plugin/promise/tool"
 import { canonicalToolIdentity } from "../../../schema/src/tool-identity"
 import { TOOL_POLICY_REQUEST_KEY } from "../../../schema/src/codepuppy-tool-policy"
 import { match } from "../../../core/src/util/wildcard"
 import type { PermissionRule } from "./managed"
-import { resolveToolPolicy, subjectBindingDigest, type EffectiveToolPolicy, type ToolPolicyStore } from "./resolver"
+import { resolveToolPolicy, subjectBindingDigest, type EffectiveToolPolicy, type EffectiveToolPolicyReason, type ToolPolicyStore } from "./resolver"
 import type { ToolFacts } from "./identity"
 import { classifyPermissionRequest, withRiskClassification } from "./risk"
 import { displaySnapshot } from "./display"
@@ -76,8 +77,11 @@ function describe(facts: ToolFacts | undefined, tool: string) {
   }
 }
 
+/** Every reason a named refusal can give (`#1704`: each one is registered with its sentence in context-injection.ts). */
+export type PolicyDenyReason = EffectiveToolPolicyReason["kind"] | "unknown-tool-identity" | "binding-changed-during-approval"
+
 /** A named, loud refusal: the user and the model read the same sentence. */
-export function namedDeny(tool: string, facts: ToolFacts | undefined, reason: string, detail?: string) {
+export function namedDeny(tool: string, facts: ToolFacts | undefined, reason: PolicyDenyReason, detail?: string) {
   return new ToolError({
     message: `Code Puppy tool policy denied ${describe(facts, tool)} (${reason})${detail ? `: ${detail}` : ""}`,
     ...(facts ? { metadata: { codepuppyDisplay: displaySnapshot(facts) } } : {}),
@@ -94,11 +98,13 @@ export interface GateCall {
 }
 
 export interface GateDeps {
+  readonly profile: (sessionID: string, agent?: string) => Promise<UnattendedProfile | undefined>
+  readonly denied: (callID: string | undefined, denial: UnattendedDenial) => void
   readonly store: ToolPolicyStore
   /** Identity facts for the effective tool name, from the current registry; undefined = unknown identity. */
   readonly facts: (tool: string) => Promise<ToolFacts | undefined>
   /** Configured rules for this call: the agent's rules before Code Puppy's own, then the session's. */
-  readonly ruleset: (sessionID: string, agent: string) => Promise<readonly PermissionRule[]>
+  readonly ruleset: (sessionID: string, agent: string, profile?: UnattendedProfile) => Promise<readonly PermissionRule[]>
   readonly directory: () => string
   readonly assert: (input: {
     sessionID: string
@@ -119,11 +125,19 @@ export interface GateDecision {
 }
 
 /** Head of the chain: re-read the document and the current binding on every call; deny before anything else runs. */
-export async function decide(deps: GateDeps, call: Pick<GateCall, "tool" | "sessionID" | "agent">): Promise<GateDecision> {
+export async function decide(deps: GateDeps, call: Pick<GateCall, "tool" | "sessionID" | "agent"> & { id?: string }): Promise<GateDecision> {
   const facts = await deps.facts(call.tool)
   if (!facts) throw namedDeny(call.tool, undefined, "unknown-tool-identity")
-  const [snapshot, ruleset] = await Promise.all([deps.store.snapshot(), deps.ruleset(call.sessionID, call.agent)])
+  const profile = await deps.profile(call.sessionID, call.agent)
+  const [snapshot, ruleset] = await Promise.all([deps.store.snapshot(), deps.ruleset(call.sessionID, call.agent, profile)])
   const effective = effectiveFor(facts, snapshot, ruleset)
+  if (profile !== undefined) {
+    const verdict = unattendedGateVerdict(profile, { effective, rulesetAsks: effective.action !== "deny" && rulesetIdentityEffect(canonicalToolIdentity(facts.identity), ruleset) === "ask", tool: facts.identity.name })
+    if (verdict.kind === "deny") {
+      deps.denied(call.id, verdict.denial)
+      throw unattendedToolError(facts, verdict.denial)
+    }
+  }
   if (effective.action === "deny") throw namedDeny(call.tool, facts, effective.reason.kind)
   return { facts, effective, revision: snapshot.revision, ruleset }
 }
@@ -135,6 +149,15 @@ export async function decide(deps: GateDeps, call: Pick<GateCall, "tool" | "sess
 export async function confirm(deps: GateDeps, decision: GateDecision, call: GateCall): Promise<void> {
   const { facts } = decision
   const canonical = canonicalToolIdentity(facts.identity)
+  const profile = await deps.profile(call.sessionID, call.agent)
+  if (profile !== undefined) {
+    const verdict = unattendedGateVerdict(profile, { effective: decision.effective, rulesetAsks: rulesetIdentityEffect(canonical, decision.ruleset) === "ask", tool: facts.identity.name })
+    if (verdict.kind === "deny") {
+      deps.denied(call.id, verdict.denial)
+      throw unattendedToolError(facts, verdict.denial)
+    }
+    if (verdict.kind === "allow") return
+  }
   const bindingDigest = subjectBindingDigest({ identity: facts.identity, authority: facts.authority, bindingDigest: facts.bindingDigest })
   const askedBy = rulesetIdentityEffect(canonical, decision.ruleset) === "ask" ? "ruleset" : "policy"
   const patterns = askedBy === "ruleset" ? [`call:${call.id}`] : [`${bindingDigest ?? "binding:unknown"}@${decision.revision}`]
@@ -183,9 +206,19 @@ export async function gateWithoutToolCall(
   },
   facts: ToolFacts,
   agent: string,
+  profile?: UnattendedProfile,
 ): Promise<void> {
-  const [snapshot, ruleset] = await Promise.all([deps.store.snapshot(), deps.ruleset(event.sessionID, event.agent ?? agent)])
+  const [snapshot, ruleset] = await Promise.all([deps.store.snapshot(), deps.ruleset(event.sessionID, event.agent ?? agent, profile)])
   const effective = effectiveFor(facts, snapshot, ruleset)
+  if (profile !== undefined) {
+    const verdict = unattendedGateVerdict(profile, { effective, rulesetAsks: effective.action !== "deny" && rulesetIdentityEffect(canonicalToolIdentity(facts.identity), ruleset) === "ask", tool: facts.identity.name })
+    if (verdict.kind === "deny") {
+      event.effect = "deny"
+      event.message = verdict.denial.message
+      return
+    }
+    if (verdict.kind === "allow") { event.effect = "allow"; return }
+  }
   if (effective.action === "deny") {
     event.effect = "deny"
     event.message = namedDeny(facts.technicalId, facts, effective.reason.kind).message
@@ -243,4 +276,47 @@ function deepFreeze<T>(value: T): T {
     for (const item of Object.values(value)) deepFreeze(item)
   }
   return value
+}
+
+
+/** 在册求值的属性钉法:后续钩子可以收紧,不能重新要求一个无人回答的审批。 */
+export function holdUnattendedDeny(event: { effect: string; message?: string }, profile: UnattendedProfile, action: string, denied: (denial: UnattendedDenial) => void) {
+  const message = unattendedDenialCopy(profile === "readonly" ? "readonly" : "refused", action)
+  let effect = event.effect === "ask" ? "deny" : event.effect
+  const denial: UnattendedDenial = { version: 1, reason: profile === "readonly" ? "readonly" : "refused", tool: action, message }
+  if (event.effect === "ask") { event.message = message; denied(denial) }
+  Object.defineProperty(event, "effect", {
+    get: () => effect,
+    set: (next: unknown) => {
+      if (next !== "ask" && next !== "deny") return
+      effect = "deny"
+      event.message = message
+      denied(denial)
+    },
+    enumerable: true,
+    configurable: false,
+  })
+}
+
+
+type GateSubject = { readonly effective: EffectiveToolPolicy; readonly rulesetAsks: boolean; readonly tool: string }
+type GateVerdict = { kind: "unchanged" } | { kind: "allow" } | { kind: "deny"; denial: UnattendedDenial }
+
+/** 冻结设计 §4.3 T1,同时用于真实工具调用和无工具调用断言。 */
+export function unattendedGateVerdict(profile: UnattendedProfile, subject: GateSubject): GateVerdict {
+  const effective = subject.effective
+  const deny = (reason: UnattendedDenial["reason"]): GateVerdict => ({
+    kind: "deny", denial: { version: 1, reason, tool: subject.tool, message: unattendedDenialCopy(reason, subject.tool) },
+  })
+  if (effective.action === "deny") return effective.reason.kind === "user" && profile !== "none" ? deny("needs-confirmation") : { kind: "unchanged" }
+  if (effective.action !== "ask" && !subject.rulesetAsks) return { kind: "unchanged" }
+  if (profile === "none") return deny("refused")
+  if (effective.action === "ask" && effective.reason.kind === "binding-changed") return deny("needs-confirmation")
+  if (profile === "readonly") return deny("readonly")
+  if (subject.rulesetAsks) return deny("refused")
+  return { kind: "allow" }
+}
+
+function unattendedToolError(facts: ToolFacts, denial: UnattendedDenial) {
+  return new ToolError({ message: denial.message, metadata: { codepuppyDisplay: displaySnapshot(facts), [UNATTENDED_DENIAL_KEY]: denial } })
 }

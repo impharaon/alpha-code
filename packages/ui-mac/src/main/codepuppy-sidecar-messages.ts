@@ -7,6 +7,8 @@
 //   ext → main   codepuppy.hub.view.request     { id, directory, sessionID?, agent?, query? }  只读:按目录算视图
 //   ext → main   codepuppy.hub.request.request  { id, requestId }                              只读:某次安装请求的阶段
 //   ext → main   codepuppy.reload.report        { generation, scope, outcome, directories, error? }  记录
+//   ext → main   codepuppy.unattended.ack       { seq, nonce }                                  名单已装上
+//   main → ext   codepuppy.unattended.live      { seq, nonce, sessions }                        完整名单
 //   main → ext   codepuppy.reload.request       { generation, scope, items, reason, force? }   ext 调度器入队
 //   main → ext   codepuppy.hub.view.reply / codepuppy.hub.request.reply                              对 id 的应答
 //
@@ -125,8 +127,8 @@ export type HubRequestReplyMessage =
   | { type: "codepuppy.hub.request.reply"; id: number; record: HubRequestRecord | null }
   | { type: "codepuppy.hub.request.reply"; id: number; error: string }
 
-export type CodePuppySidecarInbound = HubViewRequestMessage | HubRequestQueryMessage | ReloadReportMessage
-export type CodePuppySidecarOutbound = ReloadRequestMessage | HubViewReplyMessage | HubRequestReplyMessage
+export type CodePuppySidecarInbound = HubViewRequestMessage | HubRequestQueryMessage | ReloadReportMessage | UnattendedAck
+export type CodePuppySidecarOutbound = ReloadRequestMessage | HubViewReplyMessage | HubRequestReplyMessage | UnattendedLive
 
 const MAX_TEXT = 4_096
 
@@ -164,9 +166,10 @@ function parseReloadItems(value: unknown): ReloadItem[] | undefined {
   return items
 }
 
-/** main 侧:ext → main 的三种。别的一律 undefined(含 main → ext 的方向)。 */
+/** main 侧:ext → main 的封闭消息族。别的一律 undefined(含 main → ext 的方向)。 */
 export function parseCodePuppySidecarInbound(value: unknown): CodePuppySidecarInbound | undefined {
   if (!isRecord(value)) return
+  if (value.type === "codepuppy.unattended.ack") return parseUnattendedAck(value)
   if (value.type === "codepuppy.hub.view.request") {
     if (!isId(value.id) || !isText(value.directory)) return
     if (!isOptionalText(value.sessionID) || !isOptionalText(value.agent) || !isOptionalText(value.query)) return
@@ -365,4 +368,49 @@ export function parseHubRequestReply(value: unknown): HubRequestReplyMessage | u
       ...(typeof record.reason === "string" ? { reason: record.reason } : {}),
     },
   }
+}
+
+
+/** #1699:完整名单只从 main 推给 ext,回程只承认这一版的随机回执。 */
+export type UnattendedLive = {
+  type: "codepuppy.unattended.live"
+  seq: number
+  nonce: string
+  sessions: ReadonlyArray<{ sessionID: string; agent?: string; promptID: string }>
+}
+export type UnattendedAck = { type: "codepuppy.unattended.ack"; seq: number; nonce: string }
+
+export function buildUnattendedLive(input: Omit<UnattendedLive, "type">): UnattendedLive {
+  return {
+    type: "codepuppy.unattended.live",
+    seq: input.seq,
+    nonce: input.nonce,
+    sessions: input.sessions.map((entry) => ({
+      sessionID: entry.sessionID,
+      promptID: entry.promptID,
+      ...(entry.agent === undefined ? {} : { agent: entry.agent }),
+    })),
+  }
+}
+export function parseUnattendedLive(value: unknown): UnattendedLive | undefined {
+  if (!isRecord(value) || value.type !== "codepuppy.unattended.live" || !isId(value.seq) || !isText(value.nonce)) return
+  if (!Array.isArray(value.sessions)) return
+  const sessions: UnattendedLive["sessions"][number][] = []
+  for (const entry of value.sessions) {
+    if (!isRecord(entry) || !isText(entry.sessionID) || !isText(entry.promptID)) return
+    if (entry.agent !== undefined && !isText(entry.agent)) return
+    sessions.push({
+      sessionID: entry.sessionID,
+      promptID: entry.promptID,
+      ...(typeof entry.agent === "string" ? { agent: entry.agent } : {}),
+    })
+  }
+  return buildUnattendedLive({ seq: value.seq, nonce: value.nonce, sessions })
+}
+export function buildUnattendedAck(seq: number, nonce: string): UnattendedAck {
+  return { type: "codepuppy.unattended.ack", seq, nonce }
+}
+export function parseUnattendedAck(value: unknown): UnattendedAck | undefined {
+  if (!isRecord(value) || value.type !== "codepuppy.unattended.ack" || !isId(value.seq) || !isText(value.nonce)) return
+  return buildUnattendedAck(value.seq, value.nonce)
 }

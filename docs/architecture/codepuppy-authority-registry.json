@@ -10,6 +10,29 @@
   },
   "entries": [
     {
+      "id": "unattended-run-permissions",
+      "decision": "无人值守运行按 main 在册名单即时裁决,标准档的默认询问与每次询问可执行,拒绝具名进入运行记录;交互会话保持审批,补充信息按项目立即取消(#1699)。",
+      "lane": "#1699",
+      "mechanism": {
+        "file": "packages/ext/src/policy/gate.ts",
+        "ladder": "L0 (plugin hooks + existing parentPort bridge)"
+      },
+      "tests": [
+        {
+          "file": "packages/ext/src/policy/unattended-policy.test.ts",
+          "name": "Code Mode 子调用的第一条拒绝补在外层成功终态上"
+        },
+        {
+          "file": "packages/ui-mac/src/main/unattended-run.engine.test.ts",
+          "name": "无人值守运行的真实入口证据(unattended-run.engine.cases.ts)"
+        },
+        {
+          "file": "packages/ui-mac/src/main/automation-elicitation.test.ts",
+          "name": "最不利轮询相位仍在虚拟 250 ms 取消表单,global 请求带项目位置"
+        }
+      ]
+    },
+    {
       "id": "tool-policy-execution-gate",
       "decision": "Every tool call passes Code Puppy's tool policy before it runs; a deny is a named refusal decided before any other hook or side effect (#725 B, #1129).",
       "adr": [
@@ -294,7 +317,7 @@
         },
         {
           "file": "packages/ext/src/policy/resolver.test.ts",
-          "name": "VI1 the account partition follows CODEPUPPY_POLICY_ACCOUNT: account B never reads account A's enable"
+          "name": "VI1 the account partition follows the bootstrap policy.account: account B never reads account A's enable"
         }
       ]
     },
@@ -782,7 +805,7 @@
         "packages/client/src/generated/types.ts"
       ],
       "mechanism": {
-        "file": "packages/ui-mac/src/engine-adapter/permission-replies.ts",
+        "file": "packages/ui-mac/src/engine-adapter/contract/receipts.ts",
         "ladder": "L6 adapter (derivation per docs/architecture/2026-11-09-1662-permission-reply-measurements.md: the receipt is synthesized from the displayed snapshot's fingerprint, the replied events of the reply's cascade window and a decision cache; no kernel re-take)"
       },
       "tests": [
@@ -813,6 +836,14 @@
         {
           "file": "packages/ui-mac/src/engine-adapter/permission-reply.test.ts",
           "name": "反向臂:收据只列目标(没有事件窗口)⇒ 冻结 feed 里同会话的 A2 一直挂着"
+        },
+        {
+          "file": "packages/ui-mac/src/engine-adapter/permission-reply.test.ts",
+          "name": "收据指纹 = GET /permission 交出的 v1 请求的 sessionID / permission / patterns / always / metadata / tool 的 sha256;真引擎采样的命令与收据也是这个值"
+        },
+        {
+          "file": "packages/ui-mac/src/engine-adapter/permission-reply.test.ts",
+          "name": "反向臂:按引擎原始字段算的旧指纹(`#1668` 的算法)走 v2 入口 ⇒ 409,引擎一个字节的回复都没收到"
         }
       ]
     },
@@ -829,7 +860,7 @@
       ],
       "mechanism": {
         "file": "packages/core/src/permission.ts",
-        "ladder": "L3 (re-taken: the wait on the reply is inside the kernel; a plugin watchdog's reject cascades)"
+        "ladder": "L3 (re-taken: the wait on the reply is inside the kernel; a plugin watchdog's reject cascades). The override reaches the engine in Code Puppy's bootstrap document (permission.askTimeoutMs), which the desktop main process writes from CODEPUPPY_PERMISSION_ASK_TIMEOUT_MS; only a host without that document (the in-repo CLI) reads the variable itself, through the one compatibility reader codepuppyEngineSettings (#1698 design R6, R13)."
       },
       "tests": [
         {
@@ -847,6 +878,10 @@
         {
           "file": "packages/ui-mac/src/main/permission-ask-timeout.engine.test.ts",
           "name": "审批超时:到期的工具部件经桌面适配器被卡片分类为审批超时,模型读到同一句(permission-ask-timeout.engine.cases.ts,1 条)"
+        },
+        {
+          "file": "packages/util/src/codepuppy-bootstrap.test.ts",
+          "name": "codepuppyEngineSettings with a published document reads the document and ignores the environment"
         }
       ]
     },
@@ -1005,7 +1040,7 @@
         },
         {
           "file": "packages/ext/src/plugin-host.test.ts",
-          "name": "权威 · 云工具准入:治理云 server 上的 web search 只按本 Location 核验过的端点身份豁免;冒名 server 上的同形工具照样被拒"
+          "name": "权威 · 云工具准入:治理云 server 上的 web search 只按本 Location 核验过的端点身份认;冒名 server 上的同形工具按第三方判"
         },
         {
           "file": "packages/ext/src/cloud-websearch-kill.test.ts",
@@ -1114,7 +1149,7 @@
         },
         {
           "file": "packages/ext/src/plugin-host.test.ts",
-          "name": "P5:直连 BYOK 节点按逐模型实读上限抬(同一 provider 的两个模型各拿各的数);无读数 / 端点不符 / 目录里查不到 ⇒ 原样;未登录(无 CODEPUPPY_BASE_URL)谁都不置空"
+          "name": "P5:直连 BYOK 节点按逐模型实读上限抬(同一 provider 的两个模型各拿各的数);无读数 / 端点不符 / 目录里查不到 ⇒ 原样;未登录(文档里没有平台节点地址)谁都不置空"
         }
       ],
       "note": "Narrowed at integration (#1662 integration unit 1) to what the proofs show: the v1 wording also named temperature, which v1 only asserted to be left untouched; no OpenCode 2 test asserts that, so it is not claimed."
@@ -1296,7 +1331,7 @@
         "packages/opencode/src/session/prompt.ts"
       ],
       "mechanism": {
-        "file": "packages/ui-mac/src/engine-adapter/v1-shapes.ts",
+        "file": "packages/ui-mac/src/engine-adapter/opencode2/v1-shapes.ts",
         "ladder": "L6 adapter (at each turn boundary events.ts / routes.ts fetch GET /api/session/:id/diff?from=<turnAnchor> and attach it to the turn's v1 user message for turnDiffsOf)"
       },
       "tests": [
@@ -1714,7 +1749,7 @@
       },
       "mechanism": {
         "file": "packages/core/src/filesystem/codepuppy-project-watch.ts",
-        "ladder": "L3 (re-taken packages/core/src/filesystem/location-watcher.ts subscribes one recursive watch on the Location's folder when main's OPENCODE_EXPERIMENTAL_FILEWATCHER switch is on, with 0.1.26's ignore list plus configured watcher.ignore, and publishes filesystem.changed)"
+        "ladder": "L3 (re-taken packages/core/src/filesystem/location-watcher.ts subscribes one recursive watch on the Location's folder when the switch is on, with 0.1.26's ignore list plus configured watcher.ignore, and publishes filesystem.changed. The switch is Code Puppy's bootstrap document's engine.filewatcher, which main judges once from OPENCODE_EXPERIMENTAL_FILEWATCHER with the same rule as the engine's own watcher; a host without the document reads the variable through codepuppyEngineSettings, #1698 design R9, R13)"
       },
       "tests": [
         {
@@ -1724,6 +1759,10 @@
         {
           "file": "packages/core/test/codepuppy-project-watch.test.ts",
           "name": "with main's switch off, a project file publishes nothing"
+        },
+        {
+          "file": "packages/core/test/codepuppy-project-watch.test.ts",
+          "name": "in Code Puppy's sidecar the bootstrap document decides: the variable says on, the document says off, a project file publishes nothing"
         }
       ]
     },
@@ -1793,7 +1832,7 @@
       "takeovers": [],
       "mechanism": {
         "file": "packages/ext/src/provider-allow.ts",
-        "ladder": "L0 plugin hooks. The injection (packages/ui-mac/src/main/codepuppy-config-injection.ts) writes the provider.use policies (deny * then allow each injected id) into the explicit file and the inline document, and the same allow list into CODEPUPPY_PROVIDER_ALLOW in the sidecar process. The policies alone are outranked by the global folder: OpenCode 2 evaluates cross-document policies earliest-loaded first and loads the global folder before the explicit file (packages/core/src/config.ts). The extension therefore refuses a model request for any other provider in session.hook(\"model.request\"), and once plugin activation has settled (opencode.config.policy appears in the plugin list; config providers are added by that post-phase) registers a provider.transform that removes every other provider, re-placed last after each plugin re-activation. The managed-policy layer is not reachable from the embedding host: start() options carry no config.system (packages/server/src/options.ts, routes.ts)."
+        "ladder": "L0 plugin hooks. The injection (packages/ui-mac/src/main/codepuppy-config-injection.ts) writes the provider.use policies (deny * then allow each injected id) into the explicit file and the inline document, and publishes the same allow list in the sidecar process as a frozen in-process handoff (#1698 design R30: the in-process-engine.ts shape, not the environment, so engine-spawned children cannot read it and in-process code cannot rewrite it). The policies alone are outranked by the global folder: OpenCode 2 evaluates cross-document policies earliest-loaded first and loads the global folder before the explicit file (packages/core/src/config.ts). The extension therefore refuses a model request for any other provider in session.hook(\"model.request\"), and once plugin activation has settled (opencode.config.policy appears in the plugin list; config providers are added by that post-phase) registers a provider.transform that removes every other provider, re-placed last after each plugin re-activation. The managed-policy layer is not reachable from the embedding host: start() options carry no config.system (packages/server/src/options.ts, routes.ts)."
       },
       "tests": [
         {
@@ -1806,10 +1845,70 @@
         },
         {
           "file": "packages/ui-mac/src/main/codepuppy-config-injection.test.ts",
-          "name": "`#1662` 供应商白名单交给 ext:写进本进程 CODEPUPPY_PROVIDER_ALLOW 的集合逐条等于策略里放行的那些(同一次计算);注入关着 ⇒ 撤掉"
+          "name": "`#1662` / `#1698` 供应商白名单交给 ext:进程内发布的集合逐条等于策略里放行的那些(同一次计算),不进环境;注入关着 ⇒ 撤掉"
         }
       ],
       "note": "Residual window: between the end of plugin activation and the transform being placed (one poll of the plugin list, about 20 ms) GET /api/provider can still list such a provider; OpenCode's own provider.use policy is likewise not in effect before activation ends. A request in that window is refused by the model.request hook. Egress (measured 2026-11-12, before this fix): a request to a non-whitelisted provider's host does not leave through the egress proxy (403 unregistered, zero dials) unless the user grants the host in the #1412 prompt or the block points at a host that is already authorized."
+    },
+    {
+      "id": "project-opencode-config-trust",
+      "decision": "项目 OpenCode 配置的内容直接可用;会运行程序、加载代码、换程序或扩大 agent 权限的设置随同一项目允许决定放行,清单不完整不产生决定。",
+      "adr": [
+        "ADR-049",
+        "ADR-047",
+        "ADR-048"
+      ],
+      "lane": "#1713",
+      "takeovers": [
+        "packages/core/src/config.ts",
+        "packages/core/src/config/plugin/skill.ts",
+        "packages/core/src/config/plugin/agent.ts",
+        "packages/core/src/config/plugin/command.ts"
+      ],
+      "approval": {
+        "quote": "要做。",
+        "date": "2026-11-13",
+        "by": "owner (编排器转达)",
+        "reason": "冻结规格 v1 与设计 1256efc047 的项目配置接管。"
+      },
+      "mechanism": {
+        "file": "packages/core/src/config/codepuppy-project-gate.ts",
+        "ladder": "L3 (四个读取点只调用同一项目配置闸门)"
+      },
+      "tests": [
+        {
+          "file": "packages/core/test/codepuppy-project-gate.test.ts",
+          "name": "未允许:暂缓的顶层键"
+        },
+        {
+          "file": "packages/core/test/codepuppy-project-gate-upgrade.test.ts",
+          "name": "字段分类:上游 v1 / v2"
+        },
+        {
+          "file": "packages/ui-mac/src/main/project-config-commands.engine.test.ts",
+          "name": "I-12 / #1713 未允许与允许两臂"
+        },
+        {
+          "file": "packages/ui-mac/src/main/engine-plugin-policy.engine.test.ts",
+          "name": "项目插件按生产信任放行"
+        },
+        {
+          "file": "packages/ui-mac/src/main/project-config-view.engine.test.ts",
+          "name": "项目配置视图:九类"
+        },
+        {
+          "file": "packages/ui-mac/src/main/project-config-view-message.test.ts",
+          "name": "消息合同:build / parse 往返"
+        },
+        {
+          "file": "packages/ui-mac/src/main/ext-trust-check.test.ts",
+          "name": "项目扩展信任确认:"
+        },
+        {
+          "file": "packages/ui-mac/src/renderer/codepuppy-ui/ext-trust-watcher.component.test.ts",
+          "name": "项目信任组件:不完整下次再查"
+        }
+      ]
     }
   ]
 }

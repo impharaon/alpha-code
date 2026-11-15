@@ -27,7 +27,7 @@
 
   --a-text: #18181b;               /* primary text */
   --a-text-secondary: #52525b;     /* labels, secondary */
-  --a-text-tertiary: #7c7d85;      /* placeholder, meta */
+  --a-text-tertiary: #64656d;      /* placeholder, meta (synced with tokens.css, C21 AC4) */
   --a-text-disabled: #b3b6bd;
   --a-text-on-accent: #ffffff;
 
@@ -65,6 +65,10 @@
   --a-warning-subtle: rgba(217, 119, 6, 0.12);
   --a-error-subtle: rgba(220, 38, 38, 0.12);
   --a-info-subtle: rgba(37, 99, 235, 0.12);
+  /* text on its own -subtle tint (tokens.css; the two warning/success ones come with RiskTag, #1314) */
+  --a-error-on-subtle: #b91c1c;
+  --a-warning-on-subtle: #92400e;
+  --a-success-on-subtle: #166534;
 
   /* ── Typography ──────────────────────────────────────────────────────── */
   --a-font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif;
@@ -170,7 +174,7 @@
 
   --a-text: #fafafa;
   --a-text-secondary: #a1a1aa;
-  --a-text-tertiary: #71727a;
+  --a-text-tertiary: #86878f;
   --a-text-disabled: #4f5158;
   --a-text-on-accent: #ffffff;
 
@@ -197,6 +201,9 @@
   --a-warning-subtle: rgba(251, 191, 36, 0.14);
   --a-error-subtle: rgba(248, 113, 113, 0.14);
   --a-info-subtle: rgba(96, 165, 250, 0.14);
+  --a-error-on-subtle: #f87171;
+  --a-warning-on-subtle: #fbbf24;
+  --a-success-on-subtle: #4ade80;
 
   --a-shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.4);
   --a-shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.5), 0 1px 2px rgba(0, 0, 0, 0.4);
@@ -222,7 +229,7 @@
     --a-border-strong: #34363c;
     --a-text: #fafafa;
     --a-text-secondary: #a1a1aa;
-    --a-text-tertiary: #71727a;
+    --a-text-tertiary: #86878f;
     --a-text-disabled: #4f5158;
     --a-overlay-hover: rgba(255, 255, 255, 0.055);
     --a-overlay-active: rgba(255, 255, 255, 0.09);
@@ -240,6 +247,9 @@
     --a-warning: #fbbf24;
     --a-error: #f87171;
     --a-info: #60a5fa;
+    --a-error-on-subtle: #f87171;
+    --a-warning-on-subtle: #fbbf24;
+    --a-success-on-subtle: #4ade80;
     --a-shadow-md: 0 4px 12px rgba(0, 0, 0, 0.5), 0 2px 4px rgba(0, 0, 0, 0.4);
     --a-shadow-overlay: 0 24px 64px rgba(0, 0, 0, 0.7), 0 8px 16px rgba(0, 0, 0, 0.5);
   }
@@ -760,6 +770,55 @@
 }
 .a-banner-action:hover { background: color-mix(in srgb, currentColor 8%, transparent); }
 
+/* ── codepuppy-ui/risk-tag.css ───────────────────────────────────────────────── */
+.a-risk-tag {
+  flex: none;
+  padding: 2px 7px;
+  border-radius: var(--a-radius-full);
+  font-size: var(--a-text-2xs);
+  font-weight: var(--a-weight-medium);
+  /* 行高取 snug:标签比标题行矮,加上它之后标题行高度不变。 */
+  line-height: var(--a-leading-snug);
+  letter-spacing: var(--a-tracking-wide);
+  white-space: nowrap;
+}
+
+.a-risk-tag[data-level="low"] {
+  background: var(--a-success-subtle);
+  color: var(--a-success-on-subtle);
+}
+
+.a-risk-tag[data-level="medium"] {
+  background: var(--a-bg-muted);
+  color: var(--a-text-tertiary);
+}
+
+.a-risk-tag[data-level="high"] {
+  background: var(--a-warning-subtle);
+  color: var(--a-warning-on-subtle);
+}
+
+.a-risk-tag[data-level="critical"] {
+  background: var(--a-error-subtle);
+  color: var(--a-error-on-subtle);
+}
+
+/* 不填色、只描一圈边:不是绿(不假装安全),也不是琥珀 / 红(不吓人)。 */
+.a-risk-tag[data-level="unknown"] {
+  background: transparent;
+  color: var(--a-text-secondary);
+  box-shadow: inset 0 0 0 1px var(--a-border-strong);
+}
+
+/* ── codepuppy-ui/card.css + key-value-list.css (#1686) ──────────────── */
+.a-card { padding: var(--a-space-3); border: 1px solid var(--a-border-faint); border-radius: var(--a-radius-lg); background: var(--a-bg-subtle); }
+.a-kv { margin: 0; }
+.a-kv-row { display: flex; align-items: center; justify-content: space-between; gap: var(--a-space-3); padding: var(--a-space-1) 0; font-size: var(--a-text-sm); line-height: var(--a-leading-snug); }
+.a-kv-k { margin: 0; color: var(--a-text-secondary); }
+.a-kv-v { margin: 0; min-width: 0; color: var(--a-text); font-weight: var(--a-weight-semibold); text-align: right; font-variant-numeric: tabular-nums; }
+.a-kv-v[data-state="pending"], .a-kv-v[data-state="unavailable"] { color: var(--a-text-tertiary); font-weight: var(--a-weight-medium); font-size: var(--a-text-xs); }
+.a-kv-sr { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+
 /* ============================================================================
  * GALLERY CHROME — the styleguide's own layout. Tokens only (--a-*); no
  * hardcoded colors, sizes, or radii. This is documentation furniture, not a
@@ -1256,6 +1315,8 @@ section.doc { margin-bottom: var(--a-space-12); scroll-margin-top: calc(52px + v
     <a href="#toast">Toast</a>
     <a href="#tooltip">Tooltip</a>
     <a href="#banner">Banner</a>
+    <a href="#risk-tag">RiskTag</a>
+    <a href="#card">Card · KeyValueList</a>
   </nav>
 
   <main>
@@ -1274,7 +1335,7 @@ section.doc { margin-bottom: var(--a-space-12); scroll-margin-top: calc(52px + v
       </p>
       <div class="src">
         <code>packages/ui-mac/src/renderer/codepuppy-ui/tokens.css</code>
-        <code>codepuppy-ui/base.css · button · input · dialog · toast · tooltip · banner</code>
+        <code>codepuppy-ui/base.css · button · input · dialog · toast · tooltip · banner · risk-tag</code>
       </div>
     </div>
 
@@ -1597,6 +1658,43 @@ section.doc { margin-bottom: var(--a-space-12); scroll-margin-top: calc(52px + v
         </div>
       </div>
       <div class="note gap"><span class="ic">✕</span><span><b>Missing token.</b> <code>banner.css</code> sets the title color to <code>var(--a-text-primary, inherit)</code>, but <code>--a-text-primary</code> is <b>not defined</b> in <code>tokens.css</code> (the primary text token is <code>--a-text</code>). It silently falls back to <code>inherit</code>, so the title just inherits <code>--a-text</code> here — functional, but the reference should be renamed to <code>--a-text</code>.</span></div>
+    </section>
+
+    <!-- ================= RISK TAG ================= -->
+    <section class="doc" id="risk-tag">
+      <div class="sec-head">
+        <div class="a-overline">Components</div>
+        <h2>RiskTag</h2>
+        <p>Read-only pill naming how risky an action or capability is. One component for the tool-approval panel header (all five levels) and the capability-authorize rows (<code class="mono">high</code> only). Static: no icon, no hover, not focusable; one size. The text is fixed to five words and chosen by the component.</p>
+      </div>
+      <div class="subhead"><h3>Levels</h3><span class="rule"></span><span class="file">codepuppy-ui/risk-tag.css</span></div>
+      <div class="demo a-ui">
+        <div class="row">
+          <span class="a-risk-tag" data-level="low">低风险</span>
+          <span class="a-risk-tag" data-level="medium">中风险</span>
+          <span class="a-risk-tag" data-level="high">高风险</span>
+          <span class="a-risk-tag" data-level="critical">极高风险</span>
+          <span class="a-risk-tag" data-level="unknown">风险未知</span>
+        </div>
+      </div>
+      <div class="note"><span class="ic">i</span><span><code class="mono">low</code> green · <code class="mono">medium</code> neutral · <code class="mono">high</code> amber · <code class="mono">critical</code> red · <code class="mono">unknown</code> outline only — never green (it must not pretend to be safe) and never red (it says “cannot tell”, not “dangerous”). Light-theme text of low / high uses <code class="mono">--a-success-on-subtle</code> / <code class="mono">--a-warning-on-subtle</code> (6.2:1) instead of the tone itself (2.8:1). Switch the theme at the top to see dark.</span></div>
+    </section>
+
+    <section class="doc" id="card">
+      <div class="sec-head">
+        <div class="a-overline">Components</div>
+        <h2>Card · KeyValueList</h2>
+        <p>A Card frames a small set of read-only facts; a KeyValueList inside it puts one fact per row, label left, value right (<code class="mono">dl/dt/dd</code>). No buttons inside the card — related actions go after it, right-aligned. Used by the account popover and both cloud send boxes. Values have three states: value, pending (<code class="mono">…</code>) and unavailable (<code class="mono">—</code>); the two glyphs carry screen-reader text.</p>
+      </div>
+      <div class="subhead"><h3>States</h3><span class="rule"></span><span class="file">codepuppy-ui/card.css · key-value-list.css</span></div>
+      <div class="demo a-ui">
+        <div class="col" style="max-width:300px">
+          <div class="a-card"><dl class="a-kv"><div class="a-kv-row"><dt class="a-kv-k">Available balance</dt><dd class="a-kv-v">¥36.50</dd></div><div class="a-kv-row"><dt class="a-kv-k">5-hour quota</dt><dd class="a-kv-v">180 / 1,000</dd></div><div class="a-kv-row"><dt class="a-kv-k">7-day quota</dt><dd class="a-kv-v">2,400 / 10,000</dd></div><div class="a-kv-row"><dt class="a-kv-k">Pay with wallet after allowance runs out</dt><dd class="a-kv-v">Off</dd></div></dl></div>
+          <div class="a-card"><dl class="a-kv"><div class="a-kv-row"><dt class="a-kv-k">Available balance</dt><dd class="a-kv-v" data-state="pending"><span aria-hidden="true">…</span><span class="a-kv-sr">Loading</span></dd></div><div class="a-kv-row"><dt class="a-kv-k">5-hour quota</dt><dd class="a-kv-v" data-state="pending"><span aria-hidden="true">…</span><span class="a-kv-sr">Loading</span></dd></div><div class="a-kv-row"><dt class="a-kv-k">7-day quota</dt><dd class="a-kv-v" data-state="pending"><span aria-hidden="true">…</span><span class="a-kv-sr">Loading</span></dd></div><div class="a-kv-row"><dt class="a-kv-k">Pay with wallet after allowance runs out</dt><dd class="a-kv-v" data-state="pending"><span aria-hidden="true">…</span><span class="a-kv-sr">Loading</span></dd></div></dl></div>
+          <div class="a-card"><dl class="a-kv"><div class="a-kv-row"><dt class="a-kv-k">Available balance</dt><dd class="a-kv-v" data-state="unavailable"><span aria-hidden="true">—</span><span class="a-kv-sr">Unavailable right now</span></dd></div><div class="a-kv-row"><dt class="a-kv-k">Pay with wallet after allowance runs out</dt><dd class="a-kv-v" data-state="unavailable"><span aria-hidden="true">—</span><span class="a-kv-sr">Unavailable right now</span></dd></div></dl></div>
+          <div class="a-card"><dl class="a-kv"><div class="a-kv-row"><dt class="a-kv-k">Available balance</dt><dd class="a-kv-v">¥3.20</dd></div><div class="a-kv-row"><dt class="a-kv-k">Pay with wallet after allowance runs out</dt><dd class="a-kv-v">On</dd></div></dl></div>
+        </div>
+      </div>
     </section>
 
     <div class="foot">

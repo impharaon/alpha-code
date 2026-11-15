@@ -1,0 +1,271 @@
+<!doctype html>
+<html lang="zh-CN" data-color-scheme="light">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>风险标签 · 组件稿</title>
+<!-- 帧内样式直接引用正式代码(c01ea14919):令牌、基础、按钮、批准面板、能力授权框。本稿不复制它们。 -->
+<link rel="stylesheet" href="../../../packages/ui-mac/src/renderer/codepuppy-ui/permission-dialog.css" />
+<link rel="stylesheet" href="../../../packages/ui-mac/src/renderer/codepuppy-ui/button.css" />
+<link rel="stylesheet" href="../../../packages/ui-mac/src/renderer/extensions/extension-hub.css" />
+<style>
+/* ════════ 帧外排版(dz-):只用 --a-* ════════ */
+html,body{margin:0}
+body{background:var(--a-bg-subtle);color:var(--a-text);font-family:var(--a-font-sans);font-size:var(--a-text-base);line-height:var(--a-leading-normal);-webkit-font-smoothing:antialiased}
+.dz-bar{position:sticky;top:0;z-index:2000;display:flex;align-items:center;gap:16px;padding:10px 24px;border-bottom:1px solid var(--a-border);background:color-mix(in srgb,var(--a-bg-canvas) 92%,transparent);backdrop-filter:blur(14px)}
+.dz-bar b{font-size:var(--a-text-sm)}
+.dz-bar nav{display:flex;gap:12px;flex-wrap:wrap;font-size:var(--a-text-xs)}
+.dz-bar nav a{color:var(--a-text-secondary);text-decoration:none}
+.dz-bar nav a:hover{color:var(--a-accent)}
+.dz-grow{flex:1}
+.dz-seg{display:inline-flex;padding:2px;gap:2px;background:var(--a-bg-muted);border-radius:var(--a-radius-sm)}
+.dz-seg button{border:0;background:transparent;font:inherit;font-size:var(--a-text-xs);padding:3px 10px;border-radius:var(--a-radius-xs);color:var(--a-text-secondary);cursor:pointer}
+.dz-seg button[data-on]{background:var(--a-surface);color:var(--a-text);box-shadow:var(--a-shadow-xs)}
+.dz-wrap{max-width:1180px;margin:0 auto;padding:28px 24px 96px}
+.dz-intro h1{margin:0 0 8px;font-size:var(--a-text-2xl);letter-spacing:var(--a-tracking-tight)}
+.dz-intro p{margin:0 0 6px;max-width:84ch;color:var(--a-text-secondary);font-size:var(--a-text-md);line-height:1.65}
+.dz-sec{scroll-margin-top:64px;padding:4px 0}
+.dz-h2{margin:40px 0 4px;font-size:var(--a-text-xl);letter-spacing:var(--a-tracking-tight)}
+.dz-h2 small{margin-left:8px;font-size:var(--a-text-xs);font-weight:var(--a-weight-normal);color:var(--a-text-tertiary)}
+.dz-sub{margin:0 0 14px;max-width:96ch;color:var(--a-text-secondary);font-size:var(--a-text-sm);line-height:1.6}
+.dz-rel{margin:16px 0 0;padding:14px 16px;border:1px solid var(--a-border);border-left:3px solid var(--a-accent);border-radius:var(--a-radius-md);background:var(--a-bg-canvas);font-size:var(--a-text-sm);line-height:1.65;color:var(--a-text-secondary);max-width:110ch}
+.dz-rel h3{margin:0 0 6px;font-size:var(--a-text-md);color:var(--a-text)}
+.dz-rel b{color:var(--a-text)}
+.dz-rel ul,.dz-list{margin:4px 0 0;padding-left:18px}
+.dz-list{font-size:var(--a-text-sm);line-height:1.7;color:var(--a-text-secondary);max-width:100ch}
+.dz-list b{color:var(--a-text)}
+code{font-family:var(--a-font-mono);font-size:11px}
+.dz-table{border-collapse:collapse;font-size:var(--a-text-sm);background:var(--a-surface-raised);border:1px solid var(--a-border);max-width:110ch}
+.dz-table th{background:var(--a-bg-subtle);text-align:left;font-size:var(--a-text-xs);color:var(--a-text-tertiary);font-weight:var(--a-weight-semibold);padding:8px 12px}
+.dz-table td{padding:9px 12px;border-top:1px solid var(--a-border-faint);color:var(--a-text-secondary);vertical-align:middle;line-height:1.55}
+.dz-table td:first-child{white-space:nowrap}
+.dz-cr{font-family:var(--a-font-mono);font-size:11px;color:var(--a-text)}
+.dz-row{display:flex;flex-wrap:wrap;gap:20px 28px;align-items:flex-start}
+.dz-cap{margin:0 0 8px;font-size:var(--a-text-xs);color:var(--a-text-tertiary);line-height:1.5}
+.dz-cap b{display:block;font-size:var(--a-text-sm);color:var(--a-text);margin-bottom:1px}
+/* 放在一张浮起面上展示(标签在两处都落在 --a-surface-raised 上) */
+.dz-card{padding:18px 20px;background:var(--a-surface-raised);border:1px solid var(--a-border-faint);border-radius:var(--a-radius-lg);box-shadow:var(--a-shadow-sm)}
+.dz-tags{display:flex;flex-wrap:wrap;align-items:center;gap:10px}
+.dz-big{display:flex;align-items:center;gap:28px}
+.dz-spec{display:flex;flex-direction:column;align-items:flex-start;gap:10px;flex:none;width:220px}
+.dz-spec small{font-size:var(--a-text-2xs);color:var(--a-text-tertiary)}
+.dz-spec .dz-x3{display:inline-block;transform:scale(3);transform-origin:left top;margin-bottom:40px}
+.dz-ba{display:grid;grid-template-columns:120px 1fr;gap:12px 16px;align-items:center}
+.dz-ba > span{font-size:var(--a-text-xs);color:var(--a-text-tertiary)}
+/* 舞台:批准面板放回文档流 */
+.dz-stage .a-permission-panel-root{position:relative;left:auto;bottom:auto;transform:none;width:var(--w);z-index:auto}
+/* 能力授权框放在对话框正文的宽度里(默认 Dialog 正文约 480) */
+.dz-authz{width:520px}
+
+/* ════════ 本稿新增(提议;实现时进 tokens.css 三个主题块与 codepuppy-ui 的组件样式)════════ */
+/* 缺的两支文字色:琥珀、绿色文字落在同色浅底上时用,浅色主题过 4.5:1。红色已有 --a-error-on-subtle,同一写法。 */
+:root{--a-warning-on-subtle:#92400e;--a-success-on-subtle:#166534}
+:root[data-color-scheme="dark"]{--a-warning-on-subtle:#fbbf24;--a-success-on-subtle:#4ade80}
+/* 风险标签 */
+.a-risk-tag{flex:none;padding:2px 7px;border-radius:var(--a-radius-full);font-size:var(--a-text-2xs);font-weight:var(--a-weight-medium);line-height:var(--a-leading-snug);letter-spacing:var(--a-tracking-wide);white-space:nowrap}
+.a-risk-tag[data-level="low"]{background:var(--a-success-subtle);color:var(--a-success-on-subtle)}
+.a-risk-tag[data-level="medium"]{background:var(--a-bg-muted);color:var(--a-text-tertiary)}
+.a-risk-tag[data-level="high"]{background:var(--a-warning-subtle);color:var(--a-warning-on-subtle)}
+.a-risk-tag[data-level="critical"]{background:var(--a-error-subtle);color:var(--a-error-on-subtle)}
+.a-risk-tag[data-level="unknown"]{background:transparent;color:var(--a-text-secondary);box-shadow:inset 0 0 0 1px var(--a-border-strong)}
+/* 能力授权框同一行的「新增」「将收回」标签:同一处对比度问题,同样换文字色(只在「改后」帧里) */
+.dz-after .codepuppy-ext-authz-chip[data-kind="new"]{color:var(--a-warning-on-subtle)}
+.dz-after .codepuppy-ext-authz-chip[data-kind="removed"]{color:var(--a-success-on-subtle)}
+/* 「改前」:批准稿 2026-11-13 的两档文字色 */
+.a-risk-tag[data-was="low"]{color:var(--a-success)}
+.a-risk-tag[data-was="high"]{color:var(--a-warning)}
+</style>
+</head>
+<body>
+
+<div class="dz-bar">
+  <b>风险标签</b>
+  <nav><a href="#anatomy">长什么样</a><a href="#variants">五档</a><a href="#states">状态</a><a href="#placement">放在哪</a><a href="#before-after">改前改后</a><a href="#rules">用法</a><a href="#spec">给实现</a></nav>
+  <div class="dz-grow"></div>
+  <div class="dz-seg" id="themeSeg"><button data-theme="light" data-on>浅色</button><button data-theme="dark">深色</button></div>
+</div>
+
+<main class="dz-wrap">
+
+<section class="dz-intro">
+  <h1>风险标签</h1>
+  <p>一个只读的小标签,写这次操作或这项能力有多危险。工具批准面板和能力授权框用同一个:同样的形状、字号、颜色和文字。</p>
+  <div class="dz-rel">
+    <h3>与上一稿的关系</h3>
+    <ul>
+      <li><b>起点</b>:已批准的批准面板稿 <a href="../2026-11-13-permission-risk-display/frame.html#tiers"><code>2026-11-13-permission-risk-display/</code></a>(面板里的档位标签)和能力授权框上线代码里的「高风险」标签(<code>extension-hub.css</code> 的 <code>.codepuppy-ext-authz-chip</code>)。两者尺寸本来就一样,只是各写了一份样式。</li>
+      <li><b>合成一个</b>:形状、字号、字重、字距照旧;五档颜色照批准稿。能力授权框只用其中「高风险」一档,样子不变。</li>
+      <li><b>改了一处</b>:浅色主题下琥珀色和绿色文字落在同色浅底上只有 2.8:1 和 2.9:1,低于设计规范「正文 ≥ 4.5:1」。这两档换成更深的同色文字(6.2:1),深色主题不变。红色早就这样处理过(<code>--a-error-on-subtle</code>),这里补上缺的琥珀、绿两支。能力授权框同一行的「新增」「将收回」用的是同一对颜色,一起换,免得相邻两个琥珀深浅不一。</li>
+      <li><b>能力授权框的现行稿</b>:「高风险」以前只画在新增行上,上线代码在已授权行也标。现行稿改成和代码一致。</li>
+    </ul>
+  </div>
+</section>
+
+<section class="dz-sec" id="anatomy">
+  <h2 class="dz-h2">长什么样<small>一个胶囊 + 一段文字</small></h2>
+  <div class="dz-card dz-big"><div class="dz-spec a-ui"><small>放大 3 倍</small><span class="a-risk-tag dz-x3" data-level="high">高风险</span><small>实际大小</small><span class="a-risk-tag" data-level="high">高风险</span></div>
+    <table class="dz-table">
+      <tbody>
+        <tr><td>外形</td><td>胶囊,圆角 <code>--a-radius-full</code>,内边距上下 2、左右 7;不换行、不被挤窄</td></tr>
+        <tr><td>文字</td><td><code>--a-text-2xs</code>(10.5)· <code>--a-weight-medium</code> · <code>--a-tracking-wide</code> · 行高 <code>--a-leading-snug</code>;高约 19,比批准面板标题行矮</td></tr>
+        <tr><td>没有</td><td>图标、数字、关闭按钮、悬停提示</td></tr>
+        <tr><td>尺寸</td><td>只有这一种</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="dz-sec" id="variants">
+  <h2 class="dz-h2">五档<small>对比度是本页实时量的,切换浅色 / 深色会变</small></h2>
+  <p class="dz-sub">颜色从绿、灰、琥珀到红逐级加重;判断不了的只描边不填色。文字本身说清档位,颜色只是帮着一眼看出。</p>
+  <table class="dz-table a-ui" id="variant-table">
+    <thead><tr><th>标签</th><th>档位</th><th>底色</th><th>文字色</th><th>文字对比度</th></tr></thead>
+    <tbody>
+      <tr><td><span class="a-risk-tag" data-level="low">低风险</span></td><td><code>low</code></td><td><code>--a-success-subtle</code></td><td><code>--a-success-on-subtle</code>(新)</td><td class="dz-cr"></td></tr>
+      <tr><td><span class="a-risk-tag" data-level="medium">中风险</span></td><td><code>medium</code></td><td><code>--a-bg-muted</code></td><td><code>--a-text-tertiary</code></td><td class="dz-cr"></td></tr>
+      <tr><td><span class="a-risk-tag" data-level="high">高风险</span></td><td><code>high</code></td><td><code>--a-warning-subtle</code></td><td><code>--a-warning-on-subtle</code>(新)</td><td class="dz-cr"></td></tr>
+      <tr><td><span class="a-risk-tag" data-level="critical">极高风险</span></td><td><code>critical</code></td><td><code>--a-error-subtle</code></td><td><code>--a-error-on-subtle</code></td><td class="dz-cr"></td></tr>
+      <tr><td><span class="a-risk-tag" data-level="unknown">风险未知</span></td><td><code>unknown</code></td><td>不填色,内描边 <code>--a-border-strong</code></td><td><code>--a-text-secondary</code></td><td class="dz-cr"></td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section class="dz-sec" id="states">
+  <h2 class="dz-h2">状态<small>只有静态一种</small></h2>
+  <p class="dz-sub">标签不能点、不能聚焦,没有悬停、按下、禁用。所在的行被弱化时(能力授权框的已授权行),标签跟着整行一起变淡,不单独突出。</p>
+</section>
+
+<section class="dz-sec" id="placement">
+  <h2 class="dz-h2">放在哪</h2>
+  <div class="dz-row">
+    <div>
+      <p class="dz-cap"><b>工具批准面板 · 标题后面</b>每张卡一个,五档都会出现;没有分类结果时写「风险未知」。标题行不随正文滚动,标签一直看得见。</p>
+      <div class="dz-stage">
+        <div class="a-ui a-permission-panel-root" style="--w:440px">
+          <div class="a-permission-panel" role="dialog" tabindex="-1">
+            <header class="a-permission-panel-header">
+              <span class="a-permission-panel-icon" aria-hidden="true"><svg viewBox="0 0 16 16" width="16" height="16" fill="none"><circle cx="8" cy="8" r="6.25" stroke="currentColor" stroke-width="1.5" /><path d="M8 4.75V8l2.25 1.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" /></svg></span>
+              <div class="a-permission-panel-title">允许这次操作吗?</div><span class="a-risk-tag" data-level="high">高风险</span>
+            </header>
+            <div class="a-permission-panel-body">
+              <div class="a-permission-what"><p class="a-permission-verb">运行命令</p></div>
+              <div class="a-permission-what"><span class="a-permission-resources"><code>rm -rf dist .turbo node_modules/.cache</code></span></div>
+            </div>
+            <footer class="a-permission-panel-footer"><div class="a-permission-footer"><div class="a-permission-actions">
+              <button class="a-btn" type="button" data-variant="danger" data-size="md" data-permission-decision="reject">拒绝</button>
+              <button class="a-btn" type="button" data-variant="secondary" data-size="md">本次会话内允许</button>
+              <button class="a-btn" type="button" data-variant="primary" data-size="md">允许一次</button>
+            </div></div></footer>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div>
+      <p class="dz-cap"><b>能力授权框 · 能力行里,技术名之后、变化标签之前</b>只用「高风险」一档(中低风险不标);新增行和已授权行都标,将收回的不标。</p>
+      <div class="dz-card dz-authz a-ui dz-after" id="placement-authz">
+        <div class="codepuppy-ext-authz-box">
+          <div class="codepuppy-ext-authz-cap">
+            <span class="codepuppy-ext-authz-ic" data-tier="high"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1.8" y="2.8" width="12.4" height="10.4" rx="2"/><path d="M4.5 6l2 2-2 2M8.5 10.5h3" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+            <span class="codepuppy-ext-authz-nm"><b>启动本机子进程</b><small>在你的电脑上运行本地程序</small></span>
+            <span class="codepuppy-ext-authz-id">process:spawn</span><span class="a-risk-tag" data-level="high">高风险</span><span class="codepuppy-ext-authz-chip" data-kind="new">新增</span>
+          </div>
+          <div class="codepuppy-ext-authz-cap" data-muted>
+            <span class="codepuppy-ext-authz-ic" data-tier="high"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M5.5 4.5 2 8l3.5 3.5M10.5 4.5 14 8l-3.5 3.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+            <span class="codepuppy-ext-authz-nm"><b>在引擎进程内运行代码</b><small>与引擎同权限执行代码</small></span>
+            <span class="codepuppy-ext-authz-id">engine:plugin</span><span class="a-risk-tag" data-level="high">高风险</span><span class="codepuppy-ext-authz-chip" data-kind="granted">已授权</span>
+          </div>
+          <div class="codepuppy-ext-authz-cap" data-muted>
+            <span class="codepuppy-ext-authz-ic" data-tier="low"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="6.2"/><path d="M1.8 8h12.4M8 1.8c-3.6 3.4-3.6 9 0 12.4 3.6-3.4 3.6-9 0-12.4z"/></svg></span>
+            <span class="codepuppy-ext-authz-nm"><b><s>连接远程服务</s></b><small>与外部服务通信</small></span>
+            <span class="codepuppy-ext-authz-id">network:remote</span><span class="codepuppy-ext-authz-chip" data-kind="removed">将收回</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="dz-sec" id="before-after">
+  <h2 class="dz-h2">改前改后<small>只有浅色变了;切到深色两边一样</small></h2>
+  <p class="dz-cap"><b>工具批准面板的五档</b>改前 = 已批准的稿子;只有低风险、高风险两档的文字变深。</p>
+  <div class="dz-card a-ui dz-ba" id="ba-panel">
+    <span>改前</span><div class="dz-tags"><span class="a-risk-tag" data-level="low" data-was="low">低风险</span><span class="a-risk-tag" data-level="medium">中风险</span><span class="a-risk-tag" data-level="high" data-was="high">高风险</span><span class="a-risk-tag" data-level="critical">极高风险</span><span class="a-risk-tag" data-level="unknown">风险未知</span></div>
+    <span>改后</span><div class="dz-tags"><span class="a-risk-tag" data-level="low">低风险</span><span class="a-risk-tag" data-level="medium">中风险</span><span class="a-risk-tag" data-level="high">高风险</span><span class="a-risk-tag" data-level="critical">极高风险</span><span class="a-risk-tag" data-level="unknown">风险未知</span></div>
+  </div>
+
+  <p class="dz-cap" style="margin-top:22px"><b>能力授权框的一行</b>改前 = 上线代码原样。「高风险」换成风险标签,样子只差文字深浅;同一行的「新增」一起变深。</p>
+  <div class="dz-card a-ui dz-ba" id="ba-authz">
+    <span>改前</span>
+    <div class="dz-authz"><div class="codepuppy-ext-authz-box"><div class="codepuppy-ext-authz-cap">
+      <span class="codepuppy-ext-authz-ic" data-tier="high"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1.8" y="2.8" width="12.4" height="10.4" rx="2"/><path d="M4.5 6l2 2-2 2M8.5 10.5h3" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+      <span class="codepuppy-ext-authz-nm"><b>启动本机子进程</b><small>在你的电脑上运行本地程序</small></span>
+      <span class="codepuppy-ext-authz-id">process:spawn</span><span class="codepuppy-ext-authz-chip" data-kind="risk">高风险</span><span class="codepuppy-ext-authz-chip" data-kind="new">新增</span>
+    </div></div></div>
+    <span>改后</span>
+    <div class="dz-authz dz-after"><div class="codepuppy-ext-authz-box"><div class="codepuppy-ext-authz-cap">
+      <span class="codepuppy-ext-authz-ic" data-tier="high"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1.8" y="2.8" width="12.4" height="10.4" rx="2"/><path d="M4.5 6l2 2-2 2M8.5 10.5h3" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+      <span class="codepuppy-ext-authz-nm"><b>启动本机子进程</b><small>在你的电脑上运行本地程序</small></span>
+      <span class="codepuppy-ext-authz-id">process:spawn</span><span class="a-risk-tag" data-level="high">高风险</span><span class="codepuppy-ext-authz-chip" data-kind="new">新增</span>
+    </div></div></div>
+  </div>
+</section>
+
+<section class="dz-sec" id="rules">
+  <h2 class="dz-h2">用法</h2>
+  <ul class="dz-list">
+    <li><b>文字固定五个</b>:低风险、中风险、高风险、极高风险、风险未知。不加修饰,不加标点。</li>
+    <li><b>一处一个</b>:一张批准卡一个,一行能力一个。</li>
+    <li><b>放在不滚动的地方</b>:标题行或行尾,不放进会滚动的正文。</li>
+    <li><b>不做成按钮</b>:不加图标、悬停提示或点击。</li>
+    <li><b>读屏</b>:随所在的标题或能力名一起读出,例如「允许这次操作吗? 高风险」。</li>
+    <li><b>各处显示哪几档</b>:工具批准面板五档都显示;能力授权框只显示高风险。</li>
+  </ul>
+</section>
+
+<section class="dz-sec" id="spec">
+  <h2 class="dz-h2">给实现<small>帧外</small></h2>
+  <table class="dz-table">
+    <tbody>
+      <tr><td>组件</td><td>风险标签:<code>.a-risk-tag</code>,属性 <code>data-level</code> = <code>low</code> / <code>medium</code> / <code>high</code> / <code>critical</code> / <code>unknown</code>,放在 <code>codepuppy-ui/</code> 下,两处共用</td></tr>
+      <tr><td>取代</td><td>能力授权框的 <code>.codepuppy-ext-authz-chip[data-kind="risk"]</code>;批准面板稿里的 <code>.a-permission-tier</code>(只在稿里,未进代码)</td></tr>
+      <tr><td>新令牌</td><td><code>--a-warning-on-subtle</code>:浅 <code>#92400e</code> / 深同 <code>--a-warning</code>;<code>--a-success-on-subtle</code>:浅 <code>#166534</code>(与 <code>--a-perm-readonly</code> 同值)/ 深同 <code>--a-success</code>。进 <code>tokens.css</code> 三个主题块,对比度闸门的着色文字表补这两对</td></tr>
+      <tr><td>顺带</td><td>能力授权框「新增」「将收回」的文字色换成这两支</td></tr>
+      <tr><td>文字</td><td>中文见上;英文 Low risk / Medium risk / High risk(现有)/ Critical risk / Risk unknown</td></tr>
+      <tr><td>落地时</td><td>组件目录 <code>docs/design/system/components.md</code> 的待定行移进基础组件表,并在 <code>gallery.html</code> 补一格(五档,浅深两色)</td></tr>
+    </tbody>
+  </table>
+</section>
+
+</main>
+
+<script>
+/* 帧外:实时量标签文字对比度(背景按祖先逐层合成) */
+const rgba = (s) => { const m = s.match(/rgba?\(([^)]+)\)/); if (!m) return null; const p = m[1].split(/[ ,/]+/).filter(Boolean).map(Number); return { r: p[0], g: p[1], b: p[2], a: p.length > 3 ? p[3] : 1 } }
+const mix = (top, under) => ({ r: top.r * top.a + under.r * (1 - top.a), g: top.g * top.a + under.g * (1 - top.a), b: top.b * top.a + under.b * (1 - top.a), a: 1 })
+const lum = (c) => { const f = (v) => ((v /= 255) <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4); return 0.2126 * f(c.r) + 0.7152 * f(c.g) + 0.0722 * f(c.b) }
+const ratio = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((p, q) => q - p); return (x + 0.05) / (y + 0.05) }
+function backdrop(el) {
+  const chain = []
+  for (let n = el; n && n.nodeType === 1; n = n.parentElement) chain.unshift(n)
+  let c = { r: 255, g: 255, b: 255, a: 1 }
+  for (const n of chain) { const b = rgba(getComputedStyle(n).backgroundColor); if (b && b.a > 0) c = mix(b, c) }
+  return c
+}
+function measure() {
+  for (const row of document.querySelectorAll("#variant-table tbody tr")) {
+    const tag = row.querySelector(".a-risk-tag")
+    const fg = rgba(getComputedStyle(tag).color)
+    row.querySelector(".dz-cr").textContent = ratio(fg, backdrop(tag)).toFixed(2) + " : 1"
+  }
+}
+measure()
+for (const b of document.querySelectorAll("#themeSeg button")) {
+  b.addEventListener("click", () => {
+    document.documentElement.dataset.colorScheme = b.dataset.theme
+    for (const x of document.querySelectorAll("#themeSeg button")) x.toggleAttribute("data-on", x === b)
+    measure()
+  })
+}
+</script>
+</body>
+</html>

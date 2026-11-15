@@ -11,7 +11,17 @@ export function failureCopy(code: string) {
     return { text: t("codepuppy.ext.cloudErrWallet"), action: "recharge" as const }
   }
   if (code === "account_suspended") return { text: t("codepuppy.ext.cloudErrSuspended"), action: null }
+  // #1686:已停用的云能力(平台派发与预检同码同序拒绝)。没有下一步按钮 —— 本机生成不是一个入口。
+  if (code === "pipeline_kind_retired") return { text: t("codepuppy.ext.cloudErrRetired"), action: null }
   return null
+}
+
+/**
+ * #1686 决定点 D1(owner 2026-11-13):**提交前预检**的拒绝码没有专门文案时,给一句通用说明、没有按钮。
+ * 只用于预检;派发与运行中的失败仍走 failureCopy / dispatchError 各自现有的通用句。
+ */
+export function preflightRefusalCopy(code: string) {
+  return failureCopy(code) ?? { text: t("codepuppy.ext.preflightRefusedGeneric"), action: null }
 }
 
 export function failureCodeFromEvent(payload: { data: unknown }): string | undefined {

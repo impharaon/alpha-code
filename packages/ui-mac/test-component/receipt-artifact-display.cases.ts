@@ -22,6 +22,9 @@ const solidWeb = await import("solid-js/web/dist/web.js")
 mock.module("solid-js/web", () => solidWeb)
 const solidStore = await import("solid-js/store/dist/store.js")
 mock.module("solid-js/store", () => solidStore)
+// #1686 的发送框引入 Banner;只替换它的应用健康上下文,保留真实组件与详情页断言。
+const bannerProviders = await import("../src/renderer/extensions/banner-providers-test-stub")
+mock.module("../src/renderer/codepuppy-ui/providers", () => bannerProviders)
 
 Bun.plugin({
   name: "receipt-artifact-display-solid-components",

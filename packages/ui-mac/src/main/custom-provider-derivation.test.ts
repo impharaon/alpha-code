@@ -104,7 +104,7 @@ describe("#1392 真源位置:main(快照)与 sidecar(CODEPUPPY_GLOBAL_DIR 逆映
       const logs: string[] = []
       const location = resolveCustomProviderTruthLocation()
       expect(location.ok).toBe(false)
-      if (!location.ok) expect(location.reason).toBe(`CODEPUPPY_GLOBAL_DIR ${odd} is not of the form <base>/env/<prod|beta|dev>; the custom-provider truth location is unknown`)
+      if (!location.ok) expect(location.reason).toBe(`bootstrap.paths.globalRoot ${odd} is not of the form <base>/env/<prod|beta|dev>; the custom-provider truth location is unknown`)
       expect(readCustomProviderRecords((l) => void logs.push(l))).toEqual([])
       expect(logs).toEqual([`custom providers: truth location unresolved — ${location.ok ? "" : location.reason}; no custom provider is injected or authorized this generation`])
       expect(buildCodePuppyModelConfig(userData)!.enabled_providers).toEqual([])

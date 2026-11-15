@@ -7,10 +7,12 @@
 //   · 确认框的外观与文案:除了删掉「存于本项目 .codepuppy/prefs.json」那个括号,一个字都不变。
 // 由 src/main/ext-trust-check.test.ts 起独立子进程跑(要先 mock 掉 electron 再 import 真的 ext-ipc)。
 
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from "node:fs"
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { afterAll, beforeEach, describe, expect, mock, test } from "bun:test"
+
+import type { ProjectConfigView, WithheldItem } from "@opencode/schema/codepuppy-project-config"
 
 type IpcHandler = (event: { sender: { id: number } }, ...args: unknown[]) => unknown
 type DialogOptions = Record<string, unknown>
@@ -73,7 +75,9 @@ const { locateProjectTrustTruth, readProjectTrustTruth } = await import("../src/
 
 delete process.env.CODEPUPPY_GLOBAL_DIR
 initCodePuppyEnvironment({ isPackaged: false, channel: "dev", appDataDir: tmp, baseRoot: join(tmp, "codepuppy-state"), homeDir: home })
-registerExtIpcHandlers(userData, "dev", async () => ({ url: "http://127.0.0.1:39117", username: "opencode", password: "route-password" }), home)
+let viewCalls = 0
+let readView: (directory: string) => Promise<ProjectConfigView | undefined> = async (directory) => ({ directory, trusted: false, complete: true, points: { config: "done" }, withheld: [] })
+registerExtIpcHandlers(userData, "dev", async () => ({ url: "http://127.0.0.1:39117", username: "opencode", password: "route-password" }), home, undefined, (directory) => { viewCalls++; return readView(directory) })
 
 afterAll(() => rmSync(tmp, { recursive: true, force: true }))
 
@@ -101,7 +105,7 @@ function makeProject(options: { plugin?: boolean; dir?: string; jsonc?: unknown 
 }
 
 const trustCheck = async (directory: string) =>
-  (await handlers.get("ext-trust-check")!({ sender: { id: 1 } }, directory)) as { prompted: boolean; granted: boolean; persistError?: string; reason?: string }
+  (await handlers.get("ext-trust-check")!({ sender: { id: 1 } }, directory)) as { prompted: boolean; granted: boolean; persistError?: string; reason?: string; incomplete?: boolean }
 const recorded = (directory: string) => {
   const read = readProjectTrustTruth(recordPath)
   if (!read.ok) throw new Error(read.reason)
@@ -119,6 +123,8 @@ beforeEach(() => {
   shown.length = 0
   answer = { response: 1, checkboxChecked: false }
   whileOpen = null
+  viewCalls = 0
+  readView = async (directory) => ({ directory, trusted: false, complete: true, points: { config: "done" }, withheld: [] })
 })
 
 describe("#1709 生产 ext-trust-check:信任只来自用户在确认框里的决定", () => {
@@ -154,7 +160,7 @@ describe("#1709 生产 ext-trust-check:信任只来自用户在确认框里的�
     answer = { response: 0, checkboxChecked: true }
     expect(await trustCheck(dir)).toEqual({ prompted: true, granted: true })
     expect(shown).toHaveLength(1)
-    expect(shown[0]!.detail).toBe(detailFor(["· Agent 的权限与模型设置:reviewer(permission)"]))
+    expect(shown[0]!.detail).toBe(detailFor(["· Agent 的权限与模型设置:reviewer(权限)"]))
     expect(recorded(dir)).toMatchObject({ ino: inode(dir), granted: true })
   })
 
@@ -168,7 +174,7 @@ describe("#1709 生产 ext-trust-check:信任只来自用户在确认框里的�
     expect(await trustCheck(dir)).toEqual({ prompted: true, granted: false })
     expect(shown).toHaveLength(1)
     expect(shown[0]!.detail).toBe(
-      detailFor(["· 连接器(MCP):proj", "· 插件:.codepuppy/plugins/p.js", "· Agent 的权限与模型设置:reviewer(permission、model)"]),
+      detailFor(["· 连接器(MCP):proj", "· 插件:.codepuppy/plugins/p.js", "· Agent 的权限与模型设置:reviewer(权限、模型)"]),
     )
   })
 
@@ -219,4 +225,98 @@ describe("#1709 生产 ext-trust-check:信任只来自用户在确认框里的�
     expect(result.persistError).toBe("project directory identity changed while the dialog was open")
     expect(existsSync(recordPath) ? recorded(dir) : undefined).toBeUndefined()
   })
+})
+
+const withItems = (directory: string, withheld: WithheldItem[]): ProjectConfigView => ({ directory, trusted: false, complete: true, points: { config: "done" }, withheld })
+test("#1713 只有 OpenCode 可执行设置也弹框,正文逐字", async () => {
+  const dir = makeProject({ plugin: false })
+  rmSync(join(dir, ".codepuppy"), { recursive: true })
+  readView = async (directory) => withItems(directory, [{ kind: "mcp", name: "github", file: "opencode.json" }])
+  expect(await trustCheck(dir)).toEqual({ prompted: true, granted: false })
+  expect(shown[0]?.detail).toBe(detailFor(["· 连接器(MCP):github"]))
+})
+test("#1713 九类全有时 detail 与已批准完整样子逐字相等", async () => {
+  const dir = makeProject({ plugin: false })
+  mkdirSync(join(dir, ".codepuppy/plugins"), { recursive: true })
+  writeFileSync(join(dir, ".codepuppy/plugins/sync.js"), "export default {}")
+  readView = async (directory) => withItems(directory, [
+    { kind: "mcp", name: "github", file: "opencode.json" },
+    { kind: "plugin", name: ".opencode/plugins/notify.js", file: ".opencode/plugins/notify.js" },
+    { kind: "agent-control", name: "translator", fields: ["mode", "model"], file: "opencode.json" },
+    { kind: "command-run", name: "commit", fields: ["model", "shell", "subtask"], file: "opencode.json" },
+    { kind: "frontmatter-code", name: ".opencode/agents/helper.md", file: ".opencode/agents/helper.md" },
+    { kind: "formatter", name: "prettier", file: "opencode.json" },
+    { kind: "shell", name: "/opt/homebrew/bin/fish", file: "opencode.json" },
+    { kind: "provider", name: "openai", file: "opencode.json" },
+    { kind: "setting", name: "experimental", file: "opencode.json" },
+    { kind: "setting", name: "references", file: "opencode.json" },
+  ])
+  await trustCheck(dir)
+  expect(shown[0]?.detail).toBe(detailFor([
+    "· 连接器(MCP):github", "· 插件:.opencode/plugins/notify.js、.codepuppy/plugins/sync.js",
+    "· Agent 的权限与模型设置:translator(模式、模型)", "· 命令的运行设置:/commit(运行程序、模型、子任务)",
+    "· 文件开头的脚本:.opencode/agents/helper.md", "· 写文件后自动运行的格式化程序:prettier",
+    "· 终端与 shell 使用的程序:/opt/homebrew/bin/fish", "· 模型的接入设置:openai", "· 其他 OpenCode 设置:references、experimental",
+  ]))
+})
+test("#1713 空视图、无原生可执行物 ⇒ 不弹框、不写记录", async () => {
+  const dir = makeProject({ plugin: false })
+  expect(await trustCheck(dir)).toEqual({ prompted: false, granted: false })
+  expect(viewCalls).toBe(1)
+  expect(shown).toEqual([])
+  expect(recorded(dir)).toBeUndefined()
+})
+test("#1713 失败 / 不完整 / 超时视图不产生决定;之后完整就弹框", async () => {
+  for (const failure of ["failed", "incomplete", "timeout"]) {
+    const dir = makeProject()
+    readView = async (directory) => {
+      if (failure === "timeout") throw new Error("timed out")
+      return failure === "incomplete" ? { ...withItems(directory, []), complete: false, points: { config: "done", agent: "pending" } } : undefined
+    }
+    expect(await trustCheck(dir)).toEqual({ prompted: false, granted: false, incomplete: true })
+    expect(recorded(dir)).toBeUndefined()
+    expect(shown).toEqual([])
+    readView = async (directory) => withItems(directory, [])
+    expect(await trustCheck(dir)).toEqual({ prompted: true, granted: false })
+    shown.length = 0
+  }
+})
+test("#1713 已有允许或拒绝决定 ⇒ 不请求视图、不弹框", async () => {
+  for (const granted of [true, false]) {
+    const dir = makeProject()
+    answer = { response: granted ? 0 : 1, checkboxChecked: granted }
+    readView = async (directory) => withItems(directory, [])
+    await trustCheck(dir)
+    const before = shown.length
+    viewCalls = 0
+    readView = async () => { throw new Error("已有决定不应请求视图") }
+    expect(await trustCheck(dir)).toEqual({ prompted: false, granted })
+    expect(viewCalls).toBe(0)
+    expect(shown).toHaveLength(before)
+  }
+})
+
+test("审查3:只有引擎忽略的 md 字段且视图为空 ⇒ 不弹确认框", async () => {
+  const dir = makeProject({ plugin: false })
+  mkdirSync(join(dir, ".opencode/commands"), { recursive: true })
+  writeFileSync(join(dir, ".opencode/commands/x.md"), "---\nargument-hint: input\n---\nTEXT")
+  mkdirSync(join(dir, ".opencode/agents"), { recursive: true })
+  writeFileSync(join(dir, ".opencode/agents/a.md"), "---\nname: ignored\n---\nTEXT")
+  expect(await trustCheck(dir)).toEqual({ prompted: false, granted: false })
+  expect(shown).toEqual([])
+  expect(recorded(dir)).toBeUndefined()
+})
+
+test("审查9:视图请求沿用会话路由的符号链接拼写,仍按规范目录核对回复", async () => {
+  const directory = makeProject({ plugin: false })
+  const route = join(tmp, "route-link")
+  symlinkSync(directory, route)
+  const requested: string[] = []
+  readView = async (input) => { requested.push(input); return withItems(directory, [{ kind: "mcp", name: "srv", file: "opencode.json" }]) }
+  expect(await trustCheck(route)).toMatchObject({ prompted: true })
+  expect(requested).toEqual([route])
+  const other = makeProject({ plugin: false })
+  readView = async () => withItems(directory, [])
+  expect(await trustCheck(other)).toEqual({ prompted: false, granted: false, incomplete: true })
+  expect(recorded(other)).toBeUndefined()
 })

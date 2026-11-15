@@ -33,8 +33,9 @@ Code Puppy 的界面 = 上游 opencode 前端的一个**固定 pin** + alpha 前
 [`scripts/assert-frontend-patch-roundtrip.sh`](../scripts/assert-frontend-patch-roundtrip.sh) 执行。
 那个脚本同时是 `scripts/codepuppy-check.sh` 的一步 —— **这里跑的和门禁跑的是同一份字节**。`--binary` 不可省(见「载体」)。
 
-**补丁必须与源码改动进同一个提交**:判据锚在 HEAD,未提交的 `packages/codepuppy-{app,ui}` 改动不计入 ——
-脚本会把它们作为 dirty 清单打出来,但不拿它们判决。所以先提交源码改动,再跑下面这块(它把重生的补丁单独提交)。
+**源码改动一个提交,补丁另一个提交,两者在同一次推送里到达**:判据锚在 HEAD,未提交的 `packages/codepuppy-{app,ui}`
+改动不计入 —— 脚本会把它们作为 dirty 清单打出来,但不拿它们判决。所以先提交源码改动,再跑下面这块:它按 HEAD 重生补丁、
+把补丁单独提交,再跑自检。
 
 ```sh
 set -e

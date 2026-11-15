@@ -1,6 +1,6 @@
 // Unit tests for the sidecar-injected model config assembly (codepuppy-models.ts). This is the load-bearing
 // logic that decides which providers/models opencode sees: BYOK direct nodes (only when keyed), the
-// alpha platform gateway (only when CODEPUPPY_BASE_URL is set AND the key file exists), and user custom
+// alpha platform gateway (only when the platform base URL is given AND the key file exists), and user custom
 // providers merged into the hard allowlist. Since A6, "keyed" means the secret FILE exists under
 // <userData>/codepuppy-secrets (written by main's syncSecretFiles at fork) — env vars alone must NOT
 // activate a provider, and apiKey fields must be {file:} refs, never inlined values.
@@ -18,7 +18,7 @@ import {
 } from "./codepuppy-live-allowlist"
 import { BYOK_ADAPTERS } from "./byok-adapters"
 import bundledCatalog from "./codepuppy-models.json"
-import { buildCodePuppyModelConfig, engineModelConfig, getModelCatalog, PLATFORM_API_KEY_PLACEHOLDER } from "./codepuppy-models"
+import { buildCodePuppyModelConfig, engineModelConfig, getModelCatalog, PLATFORM_API_KEY_PLACEHOLDER, type ModelConfigInputs } from "./codepuppy-models"
 import type { EffectiveCatalog } from "../shared/codepuppy-model-types"
 import { buildModelPickerRows } from "../renderer/codepuppy-ui/model-picker-core"
 import { customProviderSecretName, secretFilePath, secretFileRef, syncSecretFiles } from "./codepuppy-secret-files"
@@ -55,9 +55,7 @@ const SECRET = "test-value-not-a-real-key-Zq81"
 // Every env var this module reads — snapshot + restore so tests don't leak into each other or the host.
 const MANAGED = [
   "CODEPUPPY_MODELS_DISABLE",
-  "CODEPUPPY_BASE_URL",
   "CODEPUPPY_API_KEY",
-  "CODEPUPPY_DEFAULT_MODEL",
   "DEEPSEEK_API_KEY",
   "ZHIPU_API_KEY",
   "MINIMAX_API_KEY",
@@ -69,6 +67,9 @@ const MANAGED = [
 const saved: Record<string, string | undefined> = {}
 let tmp = ""
 let userData = ""
+// `#1698` G2 / G3:平台地址、默认模型覆盖与逃生开关是注入从启动文档取来交进来的参数(main 写进文档),不再读环境。用例改这份,
+// 每次调用照它传。
+let platformInputs: ModelConfigInputs = {}
 /** `#1392`:自定义节点真源 = <casBaseRoot>/custom-providers/<env>.json;这里 CODEPUPPY_GLOBAL_DIR = <tmp>/codepuppy-state/env/dev。 */
 const truthPath = () => path.join(fs.realpathSync(tmp), "codepuppy-state", "custom-providers", "dev.json")
 const codepuppyJsonc = () => path.join(process.env.CODEPUPPY_GLOBAL_DIR!, "codepuppy.jsonc")
@@ -115,6 +116,7 @@ const pinByok = (mutate: (doc: ByokDoc) => void) => {
 }
 
 beforeEach(() => {
+  platformInputs = {}
   for (const k of MANAGED) {
     saved[k] = process.env[k]
     delete process.env[k]
@@ -161,9 +163,9 @@ describe("getModelCatalog", () => {
     expect(Object.keys(bundledCatalog)).not.toContain("platformModels")
     expect(Object.keys(bundledCatalog.platformProvider)).not.toContain("pico")
     expect(getModelCatalog(userData).platformModels).toEqual([])
-    process.env.CODEPUPPY_BASE_URL = "https://gw.example/v1"
+    platformInputs.baseURL = "https://gw.example/v1"
     plantSecret("CODEPUPPY_API_KEY", "jwt")
-    expect((buildCodePuppyModelConfig(userData)!.provider.codepuppy as any).models).toEqual({})
+    expect((buildCodePuppyModelConfig(userData, platformInputs)!.provider.codepuppy as any).models).toEqual({})
 
     seedPlatform()
     const platform = getModelCatalog(userData).platformModels
@@ -179,20 +181,20 @@ describe("getModelCatalog", () => {
         variants: row.display.variants,
       })
     }
-    const injected = (buildCodePuppyModelConfig(userData)!.provider.codepuppy as any).models
+    const injected = (buildCodePuppyModelConfig(userData, platformInputs)!.provider.codepuppy as any).models
     expect(injected["qwen3.7-max"].name).toBe("Qwen3.7 Max")
     expect(injected["claude-opus-4.8"].variants).toEqual(V3_ROWS.find((row) => row.id === "claude-opus-4.8")!.display.variants)
   })
 })
 
 describe("buildCodePuppyModelConfig — escape hatch + empty state", () => {
-  test("CODEPUPPY_MODELS_DISABLE=1 returns undefined (opencode uses its own defaults)", () => {
-    process.env.CODEPUPPY_MODELS_DISABLE = "1"
-    expect(buildCodePuppyModelConfig(userData)).toBeUndefined()
+  test("CODEPUPPY_MODELS_DISABLE=1 (passed in as `disabled`) returns undefined (opencode uses its own defaults)", () => {
+    platformInputs.disabled = true
+    expect(buildCodePuppyModelConfig(userData, platformInputs)).toBeUndefined()
   })
 
   test("no key files / no gateway / no user providers → empty allowlist, no forced default", () => {
-    const cfg = buildCodePuppyModelConfig(userData)
+    const cfg = buildCodePuppyModelConfig(userData, platformInputs)
     expect(cfg).toBeDefined()
     expect(cfg!.enabled_providers).toEqual([])
     expect(cfg!.provider).toEqual({})
@@ -204,7 +206,7 @@ describe("buildCodePuppyModelConfig — escape hatch + empty state", () => {
 describe("buildCodePuppyModelConfig — BYOK direct nodes (only when the key FILE exists)", () => {
   test("an openai-compat provider is injected only when its key file exists, with a {file:} ref", () => {
     plantSecret("DEEPSEEK_API_KEY", "sk-deepseek-123")
-    const cfg = buildCodePuppyModelConfig(userData)!
+    const cfg = buildCodePuppyModelConfig(userData, platformInputs)!
     expect(cfg.enabled_providers).toContain("deepseek-byok")
     const p = cfg.provider["deepseek-byok"] as any
     expect(p.npm).toBe("@ai-sdk/openai-compatible")
@@ -216,7 +218,7 @@ describe("buildCodePuppyModelConfig — BYOK direct nodes (only when the key FIL
 
   test("zhipuai (catalog BYOK) is openai-compat with the paas/v4 endpoint", () => {
     plantSecret("ZHIPU_API_KEY", "sk-zhipu-xyz")
-    const p = buildCodePuppyModelConfig(userData)!.provider["zhipuai-byok"] as any
+    const p = buildCodePuppyModelConfig(userData, platformInputs)!.provider["zhipuai-byok"] as any
     expect(p.npm).toBe("@ai-sdk/openai-compatible")
     expect(p.options.baseURL).toBe("https://open.bigmodel.cn/api/paas/v4")
     expect(p.options.apiKey).toBe(`{file:${secretFilePath(userData, "ZHIPU_API_KEY")}}`)
@@ -246,7 +248,7 @@ describe("buildCodePuppyModelConfig — BYOK direct nodes (only when the key FIL
       Object.assign(doc.providers[0]!, { baseURL: "https://evil.example/v1", keyEnv: "EVIL_API_KEY", compat: "anthropic" })
       doc.providers.push({ id: "evil", name: "Evil", brand: "openai", preset: true, models: [{ id: "m", name: "m", image_input: false }] } as never)
     })
-    const cfg = buildCodePuppyModelConfig(userData)!
+    const cfg = buildCodePuppyModelConfig(userData, platformInputs)!
     expect(cfg.provider["evil-byok"]).toBeUndefined()
     expect(cfg.enabled_providers).not.toContain("evil-byok")
     for (const adapter of BYOK_ADAPTERS) {
@@ -263,33 +265,33 @@ describe("buildCodePuppyModelConfig — BYOK direct nodes (only when the key FIL
 
   test("an env var ALONE no longer activates a provider (the sidecar env carries no keys, A6)", () => {
     process.env.DEEPSEEK_API_KEY = "sk-deepseek-123"
-    const cfg = buildCodePuppyModelConfig(userData)!
+    const cfg = buildCodePuppyModelConfig(userData, platformInputs)!
     expect(cfg.provider["deepseek-byok"]).toBeUndefined()
     expect(cfg.enabled_providers).not.toContain("deepseek-byok")
   })
 
   test("keyless catalog providers are NOT injected", () => {
-    const cfg = buildCodePuppyModelConfig(userData)!
+    const cfg = buildCodePuppyModelConfig(userData, platformInputs)!
     expect(cfg.provider["deepseek-byok"]).toBeUndefined()
     expect(cfg.provider["moonshot-byok"]).toBeUndefined()
   })
 
   test("syncSecretFiles(main) → buildCodePuppyModelConfig(sidecar) round-trips end to end", () => {
     syncSecretFiles(userData, { DEEPSEEK_API_KEY: "sk-rt" })
-    expect(buildCodePuppyModelConfig(userData)!.enabled_providers).toContain("deepseek-byok")
+    expect(buildCodePuppyModelConfig(userData, platformInputs)!.enabled_providers).toContain("deepseek-byok")
     // revocation flows through: key removed → file deleted → provider gone on next fork
     syncSecretFiles(userData, {})
-    expect(buildCodePuppyModelConfig(userData)!.enabled_providers).not.toContain("deepseek-byok")
+    expect(buildCodePuppyModelConfig(userData, platformInputs)!.enabled_providers).not.toContain("deepseek-byok")
   })
 })
 
 describe("buildCodePuppyModelConfig — platform gateway (代发)", () => {
-  test("the alpha platform provider joins the FRONT of the allowlist when CODEPUPPY_BASE_URL + key file are set", () => {
-    process.env.CODEPUPPY_BASE_URL = "https://gw.example/v1"
+  test("the alpha platform provider joins the FRONT of the allowlist when the platform base URL + key file are set", () => {
+    platformInputs.baseURL = "https://gw.example/v1"
     plantSecret("CODEPUPPY_API_KEY", "jwt-abc")
     plantSecret("DEEPSEEK_API_KEY", "sk-deepseek-123") // a BYOK node too, to prove ordering
     seedPlatform()
-    const cfg = buildCodePuppyModelConfig(userData)!
+    const cfg = buildCodePuppyModelConfig(userData, platformInputs)!
     expect(cfg.enabled_providers[0]).toBe("codepuppy") // unshifted to the front
     const p = cfg.provider.codepuppy as any
     expect(p.options.baseURL).toBe("https://gw.example/v1")
@@ -301,21 +303,21 @@ describe("buildCodePuppyModelConfig — platform gateway (代发)", () => {
     expect(Object.keys(p.models).length).toBeGreaterThan(0)
   })
 
-  test("without CODEPUPPY_BASE_URL there is no platform provider", () => {
+  test("without a platform base URL there is no platform provider", () => {
     plantSecret("CODEPUPPY_API_KEY", "jwt-abc")
-    expect(buildCodePuppyModelConfig(userData)!.provider.codepuppy).toBeUndefined()
+    expect(buildCodePuppyModelConfig(userData, platformInputs)!.provider.codepuppy).toBeUndefined()
   })
 
   test("without the CODEPUPPY_API_KEY file there is no platform provider (no doomed 401 node)", () => {
-    process.env.CODEPUPPY_BASE_URL = "https://gw.example/v1"
-    expect(buildCodePuppyModelConfig(userData)!.provider.codepuppy).toBeUndefined()
+    platformInputs.baseURL = "https://gw.example/v1"
+    expect(buildCodePuppyModelConfig(userData, platformInputs)!.provider.codepuppy).toBeUndefined()
   })
 })
 
 describe("buildCodePuppyModelConfig — default model + user providers", () => {
-  test("CODEPUPPY_DEFAULT_MODEL overrides the (null) catalog default", () => {
-    process.env.CODEPUPPY_DEFAULT_MODEL = "deepseek/deepseek-chat"
-    expect(buildCodePuppyModelConfig(userData)!.model).toBe("deepseek/deepseek-chat")
+  test("the default-model override (bootstrap platform.defaultModelOverride) overrides the (null) catalog default", () => {
+    platformInputs.defaultModel = "deepseek/deepseek-chat"
+    expect(buildCodePuppyModelConfig(userData, platformInputs)!.model).toBe("deepseek/deepseek-chat")
   })
 
   // `#1392`(基线 I1):配置文件里的 provider 块对 allowlist 与注入表**一概不算数**(那三条路径全在围栏的可写集里)。
@@ -324,7 +326,7 @@ describe("buildCodePuppyModelConfig — default model + user providers", () => {
     const full = (host: string) => ({ npm: "@ai-sdk/openai-compatible", options: { baseURL: `https://${host}/v1` }, models: { m: { name: "m" } } })
     fs.writeFileSync(path.join(tmp, "opencode.jsonc"), JSON.stringify({ provider: { myco: full("myco.invalid") } }))
     fs.writeFileSync(codepuppyJsonc(), JSON.stringify({ provider: { fromalpha: full("fromalpha.invalid") } }))
-    const cfg = buildCodePuppyModelConfig(userData)!
+    const cfg = buildCodePuppyModelConfig(userData, platformInputs)!
     expect(cfg.enabled_providers).toEqual([])
     expect(cfg.provider).toEqual({})
   })
@@ -334,11 +336,11 @@ describe("buildCodePuppyModelConfig — default model + user providers", () => {
     expect(resolveCustomProviderTruthLocation()).toEqual({ ok: true, path: truthPath(), casBaseRoot: path.join(fs.realpathSync(tmp), "codepuppy-state"), environment: "dev" })
     writeCustomProviderTruth(truthPath(), [{ id: "my-openai", name: "My OpenAI", compat: "openai", baseURL: "https://api.openai.com/v1", models: ["gpt-5.4", "gpt-5.4-mini"] }], fs)
     // `#1667`(裁决 r3 第 2 条):没有可用 key ⇒ 整个不注入(OpenCode 2 把空 key 当「不鉴权」,请求会不带凭据发出去)。
-    const before = buildCodePuppyModelConfig(userData)!
+    const before = buildCodePuppyModelConfig(userData, platformInputs)!
     expect(before.enabled_providers).toEqual([])
     expect(before.provider["my-openai"]).toBeUndefined()
     plantSecret(customProviderSecretName("my-openai"), SECRET)
-    const after = buildCodePuppyModelConfig(userData)!
+    const after = buildCodePuppyModelConfig(userData, platformInputs)!
     expect((after.provider["my-openai"] as { options: { apiKey: string } }).options.apiKey).toBe(secretFileRef(userData, customProviderSecretName("my-openai")))
     expect(JSON.stringify(after)).not.toContain(SECRET)
     // anthropic 兼容 ⇒ npm 换成 @ai-sdk/anthropic;两条记录都在,顺序 = 文件顺序
@@ -351,7 +353,7 @@ describe("buildCodePuppyModelConfig — default model + user providers", () => {
       fs,
     )
     plantSecret(customProviderSecretName("my-claude"), SECRET)
-    const two = buildCodePuppyModelConfig(userData)!
+    const two = buildCodePuppyModelConfig(userData, platformInputs)!
     expect(two.enabled_providers).toEqual(["my-openai", "my-claude"])
     expect((two.provider["my-claude"] as { npm: string }).npm).toBe("@ai-sdk/anthropic")
   })
@@ -366,7 +368,7 @@ describe("buildCodePuppyModelConfig — default model + user providers", () => {
       refreshRuntime: async () => {
         refreshes++
         syncSecretFiles(userData, {}, customProviderSecretValues(readCustomProviderRecords().map((record) => record.id)))
-        refreshed = buildCodePuppyModelConfig(userData)
+        refreshed = buildCodePuppyModelConfig(userData, platformInputs)
         return true
       },
     })
@@ -426,7 +428,7 @@ describe("buildCodePuppyModelConfig — default model + user providers", () => {
     expect(refreshes).toBe(0)
     expect(fs.existsSync(truthPath())).toBe(false)
     expect(fs.existsSync(codepuppyJsonc())).toBe(false)
-    expect(buildCodePuppyModelConfig(userData)!.enabled_providers).not.toContain("custom-node")
+    expect(buildCodePuppyModelConfig(userData, platformInputs)!.enabled_providers).not.toContain("custom-node")
   })
 
   // R1 finding 2:① 库写成功、② 真源写失败 ⇒ 库必须回到 ② 之前的样子 —— 首填不得留下一条自称「已配置」的孤儿条目;
@@ -572,7 +574,7 @@ describe("buildCodePuppyModelConfig — #1392 config files contribute nothing; t
   test("marker / bare / legacy plaintext / {file:} / {env:} blocks in codepuppy.jsonc: none reaches the injection map or the allowlist, even with key files present", () => {
     writeCodePuppy({ marked: block(PROVIDER_KEYCHAIN_MARKER), bare: block(undefined), legacy: block("legacy-plain-value-Ab12"), f: block("{file:/somewhere/key}"), e: block("{env:MY_VAR}") })
     for (const id of ["marked", "bare", "legacy"]) plantSecret(customProviderSecretName(id), SECRET)
-    const cfg = buildCodePuppyModelConfig(userData)!
+    const cfg = buildCodePuppyModelConfig(userData, platformInputs)!
     expect(cfg.enabled_providers).toEqual([])
     expect(cfg.provider).toEqual({})
     expect(JSON.stringify(cfg)).not.toContain("legacy-plain")
@@ -582,7 +584,7 @@ describe("buildCodePuppyModelConfig — #1392 config files contribute nothing; t
   test("a truth record whose id is alpha's own `<id>-byok` node does not override it (catalog node wins; add-time refuses such ids anyway)", () => {
     plantSecret("DEEPSEEK_API_KEY", "x")
     writeCustomProviderTruth(truthPath(), [{ id: "deepseek-byok", name: "Impostor", compat: "openai", baseURL: "https://impostor.invalid/v1", models: ["m"] }], fs)
-    const cfg = buildCodePuppyModelConfig(userData)!
+    const cfg = buildCodePuppyModelConfig(userData, platformInputs)!
     const node = cfg.provider["deepseek-byok"] as { name: string; options: { baseURL: string; apiKey: string } }
     expect(node.options.baseURL).toBe("https://api.deepseek.com/v1")
     expect(node.options.apiKey).toBe(secretFileRef(userData, "DEEPSEEK_API_KEY"))
@@ -594,7 +596,7 @@ describe("buildCodePuppyModelConfig — #1392 config files contribute nothing; t
     fs.mkdirSync(path.dirname(truthPath()), { recursive: true })
     fs.writeFileSync(truthPath(), '{"v":1,"providers":[{"id":"x","name":"X","compat":"openai","baseURL":"https://x.invalid/v1","models":["m"],"apiKey":"sk-nope"}]}')
     plantSecret(customProviderSecretName("x"), SECRET)
-    const cfg = buildCodePuppyModelConfig(userData)!
+    const cfg = buildCodePuppyModelConfig(userData, platformInputs)!
     expect(cfg.enabled_providers).toEqual([])
     expect(cfg.provider).toEqual({})
   })
@@ -611,7 +613,7 @@ describe("buildCodePuppyModelConfig — REQ-001 edition 白名单(catalog LKG)",
     plantSecret("ZHIPU_API_KEY", "sk-2")
     writeCatalogSnapshot(userData, { ...liveBase, models: [snapRow("deepseek-v4-flash", pair)] })
     pinAppliedCatalog(userData, 1) // `#1555`:引擎配置只读 fork 前钉住的已应用目录
-    const cfg = buildCodePuppyModelConfig(userData)!
+    const cfg = buildCodePuppyModelConfig(userData, platformInputs)!
     expect(cfg.enabled_providers).toContain("deepseek-byok")
     expect(cfg.provider["zhipuai-byok"]).toBeDefined()
     expect(cfg.enabled_providers).toContain("zhipuai-byok")
@@ -625,13 +627,13 @@ describe("buildCodePuppyModelConfig — REQ-001 edition 白名单(catalog LKG)",
       JSON.stringify({ ...liveBase, byokProviders: ["deepseek"], models: [] }),
     )
     pinAppliedCatalog(userData, 1) // `#1555`:引擎配置只读 fork 前钉住的已应用目录
-    const cfg = buildCodePuppyModelConfig(userData)!
+    const cfg = buildCodePuppyModelConfig(userData, platformInputs)!
     expect(cfg.enabled_providers).toContain("deepseek-byok")
     expect(cfg.enabled_providers).toContain("zhipuai-byok")
   })
 
   test("平台模型以已应用快照为准:清单与名称都来自网关(`#1556`:新模型不必等发版就有自己的名称)", () => {
-    process.env.CODEPUPPY_BASE_URL = "https://gw.example/v1"
+    platformInputs.baseURL = "https://gw.example/v1"
     plantSecret("CODEPUPPY_API_KEY", "jwt")
     writeCatalogSnapshot(userData, {
       ...liveBase,
@@ -641,17 +643,17 @@ describe("buildCodePuppyModelConfig — REQ-001 edition 白名单(catalog LKG)",
       ],
     })
     pinAppliedCatalog(userData, 1) // `#1555`:引擎配置只读 fork 前钉住的已应用目录
-    const p = buildCodePuppyModelConfig(userData)!.provider.codepuppy as any
+    const p = buildCodePuppyModelConfig(userData, platformInputs)!.provider.codepuppy as any
     expect(Object.keys(p.models).sort()).toEqual(["brand-new-model", "deepseek-v4-flash"])
     expect(p.models["deepseek-v4-flash"].name).toBe("DeepSeek V4 Flash")
     expect(p.models["brand-new-model"].name).toBe("Brand New Model")
   })
 
   test("REQ-029:variants(推理档)随 snapshot 下发到 provider config(echo 实验实锤 wire 形状)", () => {
-    process.env.CODEPUPPY_BASE_URL = "https://gw.example/v1"
+    platformInputs.baseURL = "https://gw.example/v1"
     plantSecret("CODEPUPPY_API_KEY", "jwt")
     seedPlatform()
-    const p = buildCodePuppyModelConfig(userData)!.provider.codepuppy as any
+    const p = buildCodePuppyModelConfig(userData, platformInputs)!.provider.codepuppy as any
     const opus = p.models["claude-opus-4.8"]
     expect(opus.variants["高"]).toEqual({ reasoning: { effort: "high" } }) // OR 统一 reasoning 对象
     const mini = p.models["gpt-5.4-mini"]
@@ -665,11 +667,11 @@ describe("buildCodePuppyModelConfig — REQ-001 edition 白名单(catalog LKG)",
   // #681:空清单在**写侧**就被拒(合法 LKG 不被覆盖),读侧因此看到「无快照」。`#1556` AC1 起「无快照」=
   // 平台段为空(随包平台清单已删除,不再回退)—— picker 与 sidecar 同一份判据,两侧同为空。
   test("live models 空数组 → 写侧拒绝 ⇒ 无快照 ⇒ 平台段为空(`#1556`:不回退随包清单)", () => {
-    process.env.CODEPUPPY_BASE_URL = "https://gw.example/v1"
+    platformInputs.baseURL = "https://gw.example/v1"
     plantSecret("CODEPUPPY_API_KEY", "jwt")
     writeCatalogSnapshot(userData, { ...liveBase, models: [] })
     pinAppliedCatalog(userData, 1) // `#1555`:引擎配置只读 fork 前钉住的已应用目录
-    const p = buildCodePuppyModelConfig(userData)!.provider.codepuppy as any
+    const p = buildCodePuppyModelConfig(userData, platformInputs)!.provider.codepuppy as any
     expect(p.models).toEqual({})
     expect(getModelCatalog(userData).platformModels).toEqual([])
   })
@@ -680,16 +682,16 @@ describe("buildCodePuppyModelConfig — REQ-001 edition 白名单(catalog LKG)",
     writeCustomProviderTruth(truthPath(), [{ id: "myco", name: "MyCo", compat: "openai", baseURL: "https://myco.invalid/v1", models: ["m"] }], fs)
     // `#1667`(裁决 r3 第 2 条,431ce4ba2e):没有可用 key 的自定义节点整个不注入;本条判的是白名单,先种 key。
     plantSecret(customProviderSecretName("myco"), SECRET)
-    expect(buildCodePuppyModelConfig(userData)!.enabled_providers).toContain("myco")
+    expect(buildCodePuppyModelConfig(userData, platformInputs)!.enabled_providers).toContain("myco")
   })
 
   // `#1555` AC4(方案 req236 I2):引擎配置**只**读 fork 前钉住的已应用目录。刷新器在钉住之后改写 LKG,
   // 这一代引擎的模型配置也不得跟着变;没有钉住文件时平台段为空(`#1556`),而不是去读 LKG。
   // 把 codepuppy-models.ts 改回 readCatalogSnapshot(读 LKG),本条转红。
   test("`#1555` AC4:只读钉住的已应用目录 —— 钉住后 LKG 再变,引擎配置不变;无钉住文件不读 LKG", () => {
-    process.env.CODEPUPPY_BASE_URL = "https://gw.example/v1"
+    platformInputs.baseURL = "https://gw.example/v1"
     plantSecret("CODEPUPPY_API_KEY", "jwt")
-    const ids = () => Object.keys((buildCodePuppyModelConfig(userData)!.provider.codepuppy as any).models).sort()
+    const ids = () => Object.keys((buildCodePuppyModelConfig(userData, platformInputs)!.provider.codepuppy as any).models).sort()
     writeCatalogSnapshot(userData, { ...liveBase, models: [snapRow("deepseek-v4-flash", pair)] })
     pinAppliedCatalog(userData, 7)
     writeCatalogSnapshot(userData, {
@@ -708,11 +710,11 @@ describe("buildCodePuppyModelConfig — REQ-001 edition 白名单(catalog LKG)",
   })
 
   test("缓存损坏 → 视同无缓存(平台段为空,不 throw)", () => {
-    process.env.CODEPUPPY_BASE_URL = "https://gw.example/v1"
+    platformInputs.baseURL = "https://gw.example/v1"
     plantSecret("CODEPUPPY_API_KEY", "jwt")
     fs.writeFileSync(path.join(userData, "codepuppy-live-models.json"), "{corrupt")
     pinAppliedCatalog(userData, 1) // `#1555`:引擎配置只读 fork 前钉住的已应用目录
-    const p = buildCodePuppyModelConfig(userData)!.provider.codepuppy as any
+    const p = buildCodePuppyModelConfig(userData, platformInputs)!.provider.codepuppy as any
     expect(p.models).toEqual({})
   })
 })
@@ -727,7 +729,7 @@ describe("REQ-153 #1236:目录 `reasoning` 转发进引擎配置,徽标与引擎
   const pair = { input: 1, output: 1 }
   const keyEverything = () => {
     for (const p of getModelCatalog(userData).byokProviders) plantSecret(p.keyEnv, `sk-${p.id}`)
-    process.env.CODEPUPPY_BASE_URL = "https://gw.example/v1"
+    platformInputs.baseURL = "https://gw.example/v1"
     plantSecret("CODEPUPPY_API_KEY", "jwt")
     seedPlatform() // `#1556`:平台段只来自已应用快照(上游 V3 producer fixture)
   }
@@ -743,7 +745,7 @@ describe("REQ-153 #1236:目录 `reasoning` 转发进引擎配置,徽标与引擎
 
   test("平台段:JSON 标 reasoning:true 的每个模型注入后带 reasoning:true;未标的**缺席**(不是 false)", () => {
     keyEverything()
-    const p = buildCodePuppyModelConfig(userData)!.provider.codepuppy as { models: Record<string, { reasoning?: boolean }> }
+    const p = buildCodePuppyModelConfig(userData, platformInputs)!.provider.codepuppy as { models: Record<string, { reasoning?: boolean }> }
     const flagged = getModelCatalog(userData).platformModels.filter((m) => m.reasoning).map((m) => m.id)
     // 空集会让下面的逐项断言空转 —— 先钉住集合非空,且含本票实打确认「默认即思考」的 glm-5.2。
     expect(flagged.length).toBeGreaterThan(0)
@@ -756,7 +758,7 @@ describe("REQ-153 #1236:目录 `reasoning` 转发进引擎配置,徽标与引擎
   test("BYOK 段:BYOK 目录标 reasoning 的模型注入后带 reasoning:true(与 picker 的 BYOK 徽标同一派生)", () => {
     plantSecret("DEEPSEEK_API_KEY", "sk-1")
     plantSecret("ZHIPU_API_KEY", "sk-2")
-    const cfg = buildCodePuppyModelConfig(userData)!
+    const cfg = buildCodePuppyModelConfig(userData, platformInputs)!
     const deepseek = (cfg.provider["deepseek-byok"] as { models: Record<string, { reasoning?: boolean }> }).models
     const zhipu = (cfg.provider["zhipuai-byok"] as { models: Record<string, { reasoning?: boolean }> }).models
     // #1266 起同名条目的 variants 也一并派生(见下一条),这里只看 reasoning 与「未标即缺席」。
@@ -776,7 +778,7 @@ describe("REQ-153 #1236:目录 `reasoning` 转发进引擎配置,徽标与引擎
   // 这里再钉 npm 与平台 provider 逐字相等。`#1556`:元数据只来自 BYOK 目录自己(下一条判「不借平台同名条目」)。
   test("BYOK 段:BYOK 目录自己的 variants 逐字注入;npm 与平台 provider 相同", () => {
     keyEverything()
-    const cfg = buildCodePuppyModelConfig(userData)!
+    const cfg = buildCodePuppyModelConfig(userData, platformInputs)!
     const platformNpm = getModelCatalog(userData).platformProvider.npm
     let own = 0
     for (const provider of getModelCatalog(userData).byokProviders) {
@@ -805,7 +807,7 @@ describe("REQ-153 #1236:目录 `reasoning` 转发进引擎配置,徽标与引擎
     const twin = catalog.platformModels.find((model) => model.id === "glm-5.2")!
     expect(twin.reasoning).toBe(true)
     expect(twin.variants).toBeDefined()
-    const injected = (buildCodePuppyModelConfig(userData)!.provider["zhipuai-byok"] as any).models["glm-5.2"]
+    const injected = (buildCodePuppyModelConfig(userData, platformInputs)!.provider["zhipuai-byok"] as any).models["glm-5.2"]
     expect(injected).toEqual({ name: "glm-5.2", modalities: { input: ["text"] } })
     const rows = buildModelPickerRows({
       catalog: { ...catalog, liveSync: { status: "cache" }, pricingBasisModelId: null, applied: { platformFetchedAt: null, byokVersion: 2 }, downloaded: { platformFetchedAt: null, byokVersion: 2 } },
@@ -830,7 +832,7 @@ describe("REQ-153 #1236:目录 `reasoning` 转发进引擎配置,徽标与引擎
   //   · 显式关闭档的 wire 值必须逐字 `disabled`:智谱 2026-09-06 实打,`type` 写错会被上游静默忽略并继续思考(HTTP 仍 200)。
   test("#1267:glm-4.5-air 的元数据逐字注入(reasoning:true + 开/关);元数据键恰好是 models;关档 wire 值逐字 disabled", () => {
     keyEverything()
-    const cfg = buildCodePuppyModelConfig(userData)!
+    const cfg = buildCodePuppyModelConfig(userData, platformInputs)!
     const catalog = getModelCatalog(userData)
     const zhipu = (cfg.provider["zhipuai-byok"] as { models: Record<string, { name: string; reasoning?: boolean; variants?: Record<string, Record<string, unknown>> }> }).models
     const slot = catalog.byokProviders.find((provider) => provider.id === "zhipuai")!.modelMeta["glm-4.5-air"]!
@@ -866,7 +868,7 @@ describe("REQ-153 #1236:目录 `reasoning` 转发进引擎配置,徽标与引擎
       models: [snapRow("glm-5.2", pair), snapRow("deepseek-v4-pro", pair), snapRow("claude-fable-5", pair)],
     })
     pinAppliedCatalog(userData, 1) // `#1555`:引擎配置只读 fork 前钉住的已应用目录
-    const cfg = buildCodePuppyModelConfig(userData)!
+    const cfg = buildCodePuppyModelConfig(userData, platformInputs)!
     const injected = injectedReasoning(cfg)
 
     const base = getModelCatalog(userData)
@@ -1030,7 +1032,7 @@ describe("REQ-153 #1237:档位形状逐腿取自实打表;未实打的模型钉�
   }
   const keyEverything = () => {
     for (const p of getModelCatalog(userData).byokProviders) plantSecret(p.keyEnv, `sk-${p.id}`)
-    process.env.CODEPUPPY_BASE_URL = "https://gw.example/v1"
+    platformInputs.baseURL = "https://gw.example/v1"
     plantSecret("CODEPUPPY_API_KEY", "jwt")
     seedPlatform() // `#1556`:平台段只来自已应用快照(上游 V3 producer fixture)
   }
@@ -1038,7 +1040,7 @@ describe("REQ-153 #1237:档位形状逐腿取自实打表;未实打的模型钉�
 
   test("出货目录:每个注入引擎的档位表逐字等于该腿的实打表;三个黑名单模型按各自那条腿的形状拿到开/关且关在第一位", () => {
     keyEverything()
-    const cfg = buildCodePuppyModelConfig(userData)! as unknown as Injected
+    const cfg = buildCodePuppyModelConfig(userData, platformInputs)! as unknown as Injected
     expect(judgeTierProvenance(cfg)).toEqual([])
     // 空表会让上面的判据空转:实打表至少覆盖本票三个模型 + #1266/#1267 已声明的那些。
     expect(Object.keys(VERIFIED_TIERS).length).toBeGreaterThanOrEqual(11)
@@ -1053,7 +1055,7 @@ describe("REQ-153 #1237:档位形状逐腿取自实打表;未实打的模型钉�
 
   test("未实打的直连模型(qwen / kimi / minimax)真的被注入、且无徽标无档 —— 「无档」有被测对象,不是空集", () => {
     keyEverything()
-    const cfg = buildCodePuppyModelConfig(userData)! as unknown as Injected
+    const cfg = buildCodePuppyModelConfig(userData, platformInputs)! as unknown as Injected
     let pinned = 0
     for (const key of Object.keys(UNVERIFIED_TIERLESS)) {
       const [providerID, modelID] = key.split(":") as [string, string]
@@ -1070,7 +1072,7 @@ describe("REQ-153 #1237:档位形状逐腿取自实打表;未实打的模型钉�
 
   test("手段自证:五种已知的坏各自变红并点名(v1 的 GLM 形状 / 给未验模型补档 / 关档写错值 / 关档不在第一位 / 实打表的档位从注入里消失)", () => {
     keyEverything()
-    const base = buildCodePuppyModelConfig(userData)! as unknown as Injected
+    const base = buildCodePuppyModelConfig(userData, platformInputs)! as unknown as Injected
     expect(judgeTierProvenance(base)).toEqual([])
 
     const v1 = clone(base) // v1 票面的形状:按 reasoningEffort 给 GLM turbo 声明档位 —— 直连腿 accepted-and-ignored
@@ -1145,7 +1147,7 @@ describe("REQ-153 #1237:档位形状逐腿取自实打表;未实打的模型钉�
 describe("REQ-228 #1420:直连 / 平台 / 自定义三段的图片输入能力", () => {
   const keyEverything = () => {
     for (const p of getModelCatalog(userData).byokProviders) plantSecret(p.keyEnv, `sk-${p.id}`)
-    process.env.CODEPUPPY_BASE_URL = "https://gw.example/v1"
+    platformInputs.baseURL = "https://gw.example/v1"
     plantSecret("CODEPUPPY_API_KEY", "jwt")
     seedPlatform() // `#1556`:平台段只来自已应用快照(上游 V3 producer fixture)
   }
@@ -1162,7 +1164,7 @@ describe("REQ-228 #1420:直连 / 平台 / 自定义三段的图片输入能力",
 
   test("注入:直连按目录、平台逐行只有 text(含上游本能看图的 claude-* / gpt-*)、每个模型都显式写 modalities", () => {
     keyEverything()
-    const cfg = buildCodePuppyModelConfig(userData)!
+    const cfg = buildCodePuppyModelConfig(userData, platformInputs)!
     const image: string[] = []
     let total = 0
     for (const [providerID, def] of Object.entries(cfg.provider as Record<string, { models: Models }>)) {
@@ -1191,7 +1193,7 @@ describe("REQ-228 #1420:直连 / 平台 / 自定义三段的图片输入能力",
       const moonshot = doc.providers.find((p) => p.id === "moonshot")!
       moonshot.models = moonshot.models.map((m) => ({ ...m, image_input: m.id === "kimi-k2.6" })) as never
     })
-    const models = (buildCodePuppyModelConfig(userData)!.provider["moonshot-byok"] as { models: Models }).models
+    const models = (buildCodePuppyModelConfig(userData, platformInputs)!.provider["moonshot-byok"] as { models: Models }).models
     expect(models["kimi-k3"]!.modalities).toEqual({ input: ["text"] })
     expect(models["kimi-k2.6"]!.modalities).toEqual({ input: ["text", "image"] })
   })
@@ -1201,7 +1203,7 @@ describe("REQ-228 #1420:直连 / 平台 / 自定义三段的图片输入能力",
     setProviderLifecycleDeps({
       refreshRuntime: async () => {
         syncSecretFiles(userData, {}, customProviderSecretValues(readCustomProviderRecords().map((record) => record.id)))
-        refreshed = buildCodePuppyModelConfig(userData)
+        refreshed = buildCodePuppyModelConfig(userData, platformInputs)
         return true
       },
     })

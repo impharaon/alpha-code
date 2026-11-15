@@ -2,7 +2,7 @@
  * #1565 (REQ-236 §2.3): the four first-party Office servers are discoverable before they are executable.
  *
  * Main points the engine at the bundled manifest (`<resources>/office-mcp/tools.json`, exported from server.py's
- * `tools_for()` at build time and checked in) through `CODEPUPPY_OFFICE_MCP_MANIFEST`. The manifest carries, per format,
+ * `tools_for()` at build time and checked in) through the bootstrap document's `paths.officeMcpManifest` (#1698). The manifest carries, per format,
  * the bundled command template (`{codepuppyResources}` slots) and its tool definitions, plus server.py's sha256.
  *
  * An MCP entry gets a format's declared definitions only when its command equals that format's bundled command token
@@ -20,8 +20,6 @@
 
 import { createHash } from "node:crypto"
 import path from "node:path"
-
-export const OFFICE_MCP_MANIFEST_ENV = "CODEPUPPY_OFFICE_MCP_MANIFEST"
 
 const RESOURCES_SLOT = "{codepuppyResources}"
 const WORKSPACE_SLOT = "{workspace}"
@@ -44,13 +42,13 @@ type Manifest = {
   formats: Record<string, { command: string[]; tools: unknown[] }>
 }
 
+/** `manifestPath` = Code Puppy 启动文档的 `paths.officeMcpManifest`(`#1698`;生产由调用方从已发布的文档取)。 */
 export function declaredFirstPartyTools(
   _name: string,
   entry: unknown,
-  env: Record<string, string | undefined>,
+  manifestPath: string | undefined,
   readFile: (file: string) => Uint8Array,
 ): unknown[] | undefined {
-  const manifestPath = env[OFFICE_MCP_MANIFEST_ENV]
   if (!manifestPath || !entry || typeof entry !== "object") return undefined
   const { type, command } = entry as { type?: unknown; command?: unknown }
   if (type !== "local" || !Array.isArray(command)) return undefined
@@ -86,10 +84,10 @@ const record = (value: unknown): value is Record<string, unknown> =>
 export function declaredListedTools(
   name: string,
   entry: unknown,
-  env: Record<string, string | undefined>,
+  manifestPath: string | undefined,
   readFile: (file: string) => Uint8Array,
 ): DeclaredTool[] | undefined {
-  const tools = declaredFirstPartyTools(name, entry, env, readFile)?.flatMap((tool): DeclaredTool[] => {
+  const tools = declaredFirstPartyTools(name, entry, manifestPath, readFile)?.flatMap((tool): DeclaredTool[] => {
     if (!record(tool) || typeof tool.name !== "string" || tool.name === "" || !record(tool.inputSchema)) return []
     return [
       {

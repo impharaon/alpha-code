@@ -16,6 +16,7 @@ import { assertEngineSandboxed } from "../../../ui-mac/test-component/engine-san
 import { startEngine } from "../../../ui-mac/engine/engine-embed"
 import { buildEngineServerOptions } from "../../../ui-mac/src/main/engine-server-options"
 import { withEngineAuthorization } from "../../../ui-mac/src/main/engine-authorization"
+import { engineProjectTrust } from "../../../ui-mac/src/main/engine-project-trust"
 
 const PASSWORD = "session-grant-restart"
 
@@ -34,7 +35,7 @@ async function boot(root: string, project: string) {
       filewatcher: false,
       platform: process.platform,
     }),
-    { onDispatch: (inner) => (dispatch = withEngineAuthorization(inner, PASSWORD)) },
+    { onDispatch: (inner) => (dispatch = withEngineAuthorization(inner, PASSWORD)), projectTrust: engineProjectTrust },
   )
   async function call(method: string, route: string, body?: unknown): Promise<{ status: number; body: any }> {
     const response = await dispatch!(

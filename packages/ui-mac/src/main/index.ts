@@ -71,6 +71,7 @@ import { applyPlatformCredentialsHot } from "./codepuppy-secret-files"
 import { setupAutoUpdater, showUpdaterDialog } from "./updater"
 import {
   createMainWindow,
+  productWindows,
   isRecoveryWebContents,
   registerRendererProtocol,
   setRelaunchHandler,
@@ -121,6 +122,7 @@ import type { SessionGrantsEndedEventWire } from "../shared/ext-session-grant-wi
 import { initEndpoints, resolveEndpoints } from "./codepuppy-endpoints"
 import { registerEndpointsIpcHandlers } from "./endpoints-ipc"
 import { registerAppVersionIpcHandler } from "./app-version-ipc"
+import { registerBuildIdentityIpcHandler } from "./build-identity-ipc"
 import { registerContractHealthIpcHandlers, reportContractFailure } from "./codepuppy-contract-health"
 import { registerCatalogHealthIpcHandlers } from "./codepuppy-catalog-health"
 import { registerSurfaceIpc } from "./codepuppy-surfaces"
@@ -152,9 +154,8 @@ import { sweepLegacyCloudMcpAuthEntry } from "./cloud-mcp-auth-sweep"
 import { reconcileDesiredStateAtBoot } from "./ext-install-planner"
 import { resolveBootExtensionSafety } from "./ext-boot-safety"
 import { codepuppyGlobalRoot } from "./codepuppy-installs"
-import { factorySkillSources, reconcileFactorySkills } from "./factory-skills"
+import { factorySkillSources, reconcileFactorySkills, setFactorySkillDirsForFork } from "./factory-skills"
 import { runGlobalEcosystemGate } from "./ecosystem-gate"
-import { effectiveFactoryDenied, readBuiltinPolicy } from "./codepuppy-builtin-policy"
 import {
   enableProxy,
   ensureFreshToken,
@@ -783,6 +784,8 @@ const main = Effect.gen(function* () {
   // 采用当前 generation 则自然消解,否则 respawn 入口建成后补一次 structural respawn。
   setAuthDeps({
     getWindow: () => mainWindow,
+    // #1686 R1 M1:身份变化送达每一个产品窗口(菜单「新建窗口」建的也算)。
+    getWindows: productWindows,
     respawn: (trigger) => {
       if (requestSidecarRespawn) {
         void requestSidecarRespawn(trigger)
@@ -839,8 +842,8 @@ const main = Effect.gen(function* () {
   // (copy-don't-delete,幂等,所有权判定 bail-out loud)。在 migrate() 之后(REQ-018 先把散落迁 ~/.opencode)、
   // 首个 sidecar fork 之前,使第一次 fork 即读到迁移后配置。~/.opencode 清理(拆桥+删目录)属 T3。
   // REQ-065(修订,用户拍板 2026-07-08):出厂技能先行 reconcile(拆存量 .alpha 出厂链 + 计算注入组);
-  // 注入组**不落盘** —— 经 CODEPUPPY_FACTORY_SKILL_DIRS(env,fork 继承)传引擎,由 @codepuppy/ext
-  // config hook 内存注入 skills.paths。codepuppy.jsonc 只承载用户自己的内容:truth reconcile 传 []
+  // 注入组**不落盘** —— `#1698` 起记在 factory-skills 里,每次 fork 写进启动文档的 skills.factoryDirs,由 sidecar 注入写进
+  // 显式文件的 skills。codepuppy.jsonc 只承载用户自己的内容:truth reconcile 传 []
   // 剥离历史版本写入的出厂条目(布局+名单判定,用户自加路径不动)。anti-B11:结果落日志。
   if (!TEST_ONBOARDING) {
     let stripFactory: string[] | undefined
@@ -852,10 +855,9 @@ const main = Effect.gen(function* () {
           moduleDir: dirname(fileURLToPath(import.meta.url)),
         }),
       )
-      process.env.CODEPUPPY_FACTORY_SKILL_DIRS = JSON.stringify(factory.paths)
+      setFactorySkillDirsForFork(factory.paths)
       stripFactory = [] // reconcile 成功 → 剥离 codepuppy.jsonc 里的存量出厂条目(它们改由内存注入)
-      // REQ-067:出厂默认禁项(− 用户治理解禁)同走 env → ext hook 内存注入,用户配置零明文
-      process.env.CODEPUPPY_FACTORY_DENY_SKILLS = JSON.stringify(effectiveFactoryDenied(readBuiltinPolicy()))
+      // REQ-067 的出厂默认禁项 `#1698` 起是 ext 持有的常量(design §10 R7),不再走任何通道
       if (factory.removed.length)
         logger.log(
           "[req065] factory-skills: stale .alpha links dismantled (factory content now served from app resources)",
@@ -1036,6 +1038,7 @@ const main = Effect.gen(function* () {
     () => Effect.runPromise(Deferred.await(serverReady)),
     homedir(),
     { stop: () => killSidecar(), refresh: () => requestSidecarRespawn?.("connector-change") ?? Promise.resolve(false) },
+    (directory) => server?.projectConfigView(directory) ?? Promise.resolve(undefined),
   )
   // REQ-234 `#1529`:「待重载」原因变了(重载请求 / ext 报告 / sidecar 连上或断开)⇒ 定制中心重读三档视图。
   codepuppySidecar.onViewChanged(() => {
@@ -1114,6 +1117,7 @@ const main = Effect.gen(function* () {
   registerProviderIpcHandlers()
   registerEndpointsIpcHandlers()
   registerAppVersionIpcHandler()
+  registerBuildIdentityIpcHandler()
   registerContractHealthIpcHandlers(() => mainWindow)
   // #1084:平台目录刷新失败的出口(启动那次刷新跑在本行之前 —— 所以它靠 invoke 取,不靠推送)。
   registerCatalogHealthIpcHandlers(() => mainWindow)

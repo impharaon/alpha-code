@@ -5,7 +5,7 @@
 // engine-authorization.ts) and every request goes through its in-process dispatch app, as the sidecar does. The model
 // behind it is the scripted OpenAI-compatible mock the adapter fixtures were sampled with
 // (packages/ui-mac/test-fixtures/engine-adapter-sampler/mock-model.ts), behind a local proxy that answers HTTP 400 to
-// a prompt containing FAIL_PROMPT. Every engine also loads a recorder package plugin (a directory plugin, the only
+// a prompt containing FAIL_PROMPT; the proxy keeps every request body (`bodies`). Every engine also loads a recorder package plugin (a directory plugin, the only
 // form 2.x loads) that records what plugins see: the four request hooks ext uses (`context`, `compaction`,
 // `generate`, `title`, with the request messages) and `model.request` — read them with `hookCalls()`.
 //
@@ -63,11 +63,15 @@ export async function startProbeEngine(options: { global?: Json; explicit?: Json
 
   const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), `upstream-probe-${++counter}-`)))
   const mock = startMockModel(0)
+  const bodies: Array<{ sessionID: string | null; body: Json }> = []
   const proxy = Bun.serve({
     port: 0,
     hostname: "127.0.0.1",
     async fetch(request) {
       const text = await request.text()
+      try {
+        if (text) bodies.push({ sessionID: request.headers.get("x-opencode-session-id"), body: JSON.parse(text) as Json })
+      } catch {}
       if (text.includes(FAIL_PROMPT)) return Response.json({ error: { message: "probe: rejected", type: "invalid_request_error" } }, { status: 400 })
       return mock.fetch(new Request(request.url, { method: request.method, headers: request.headers, body: text || undefined }))
     },
@@ -82,7 +86,7 @@ export async function startProbeEngine(options: { global?: Json; explicit?: Json
         name: "Mock",
         package: "@ai-sdk/openai-compatible",
         settings: { baseURL: `http://127.0.0.1:${proxy.port}/v1`, apiKey: "x" },
-        models: { m: { name: "Mock M", capabilities: { tools: true } } },
+        models: { m: { name: "Mock M", capabilities: { tools: true, temperature: true } } },
       },
     },
   }
@@ -117,6 +121,8 @@ export async function startProbeEngine(options: { global?: Json; explicit?: Json
   const password = "upstream-probe"
   let fetch: ((request: Request) => Response | Promise<Response>) | undefined
   const toggles = engineDesktopToggles({})
+  // #1713:探针量的是上游对项目文档的行为,也就是已允许的项目拿到的行为(契约 A8:只差 -* / -opencode.*);项目信任本身由
+  // packages/ui-mac/src/main/project-config-commands.engine.test.ts 判。
   const engine = await startEngine(
     buildEngineServerOptions({
       hostname: "127.0.0.1",
@@ -130,7 +136,7 @@ export async function startProbeEngine(options: { global?: Json; explicit?: Json
       filewatcher: toggles.filewatcher,
       platform: process.platform,
     }),
-    { onDispatch: (dispatch) => (fetch = withEngineAuthorization(dispatch, password)) },
+    { onDispatch: (dispatch) => (fetch = withEngineAuthorization(dispatch, password)), projectTrust: () => true },
   )
 
   /** One request through the in-process dispatch app; `directory` picks the Location. */
@@ -205,6 +211,8 @@ export async function startProbeEngine(options: { global?: Json; explicit?: Json
   return {
     root,
     frames,
+    /** Every JSON request body the model proxy received with its session id, in arrival order (what the engine put on the wire). */
+    bodies,
     /** Every hook invocation the recorder plugin saw, in order. */
     hookCalls: (): HookCall[] => ((globalThis as any)[RECORDER_KEY]?.[recorderID] ?? []) as HookCall[],
     listen: (listener: (frame: Frame) => void) => void listeners.push(listener),

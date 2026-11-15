@@ -150,6 +150,7 @@ registerExtIpcHandlers(
     password: "route-password",
   }),
   join(tmp, "home"),
+  undefined, async () => undefined,
 )
 
 afterAll(() => {

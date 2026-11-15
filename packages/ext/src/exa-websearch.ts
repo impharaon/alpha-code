@@ -33,7 +33,8 @@ const MAX_DETAIL = 1_000
 
 type Kind = "unauthorized" | "forbidden" | "bad_request" | "payment_required" | "upstream" | "unexpected_status" | "timeout" | "transport" | "provider_error" | "invalid_response" | "notice"
 
-const LABEL: Record<Exclude<Kind, "notice">, string> = {
+/** 失败说明里的类别词。`#1704`:每一种都按句式登记在 context-injection.ts(加一种而不登记,咽喉测试点名它)。 */
+export const WEB_SEARCH_FAILURE_LABEL: Record<Exclude<Kind, "notice">, string> = {
   unauthorized: "unauthorized",
   forbidden: "forbidden",
   bad_request: "bad request",
@@ -57,7 +58,7 @@ export class CodePuppyWebSearchFailure extends Error {
     super(
       kind === "notice"
         ? detail
-        : `Web search failed: ${LABEL[kind]}${status === undefined ? "" : ` (HTTP ${status})`}. Cause: ${detailOf(detail)}`,
+        : `Web search failed: ${WEB_SEARCH_FAILURE_LABEL[kind]}${status === undefined ? "" : ` (HTTP ${status})`}. Cause: ${detailOf(detail)}`,
     )
   }
 }

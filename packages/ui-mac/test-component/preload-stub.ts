@@ -155,6 +155,7 @@ export type AbsentOnPurposeKey =
   | "showWindow"
   | "relaunch"
   | "appVersion"
+  | "buildIdentity"
   | "environment"
   | "surfaces"
   | "getZoomFactor"

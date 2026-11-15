@@ -5,7 +5,7 @@
 // 供数方全是生产的:三档的规则来自真 `injectCodePuppyConfig`(内联文档 + 显式文件,原样交给 `start()`);引擎的底座规则、
 // agent 合成、Permission 服务都是引擎自己的;真 ext(`packages/ext/src/plugin.ts`,以本地目录插件装,与 sidecar 同一个入口形状)
 // 的策略与 evaluate 钩子都在。测试只加两样:一个探针插件(拿到插件上下文、注册两个插件工具),一个本机 OpenAI 兼容模型桩
-// (平台节点经 `CODEPUPPY_BASE_URL` 指向它;用户回合里写 `CP-CALL {json}` 就回一次那个工具调用)。
+// (平台节点经启动文档的 platform.modelProxyBaseURL 指向它;用户回合里写 `CP-CALL {json}` 就回一次那个工具调用)。
 //
 // 三种结局:放行(调用直接通过 / 工具真执行)、询问(引擎的待批列表里出现一条;经引擎自己的回复路由拒绝后零副作用)、
 // 拒绝(具名拒绝、没有待批请求、零副作用)。
@@ -27,7 +27,7 @@ import { afterAll, beforeAll, describe, expect, test } from "bun:test"
 import fs from "node:fs"
 import path from "node:path"
 import { assertEngineSandboxed, engineSandbox } from "../../test-component/engine-sandbox"
-import { codepuppyEngine, policyStore, probe, scriptedModel, textOf, type Running } from "../../test-component/codepuppy-engine"
+import { allowProject, codepuppyEngine, policyStore, probe, scriptedModel, textOf, type Running } from "../../test-component/codepuppy-engine"
 import { explicitSkillDirs } from "./codepuppy-config-injection"
 import { watchExplicitSources } from "./engine-explicit-config"
 
@@ -51,13 +51,13 @@ const send = (method: string, route: string, body?: unknown) => running!.send(me
 
 beforeAll(async () => {
   await assertEngineSandboxed(sandbox)
-  // R2:出厂技能目录(main 启动时算好、经这个变量交给注入)
+  // R2:出厂技能目录(main 启动时算好,`#1698` 起经启动文档的 skills.factoryDirs 交给注入与 ext)
   fs.mkdirSync(FACTORY_SKILLS, { recursive: true })
-  process.env.CODEPUPPY_FACTORY_SKILL_DIRS = JSON.stringify([FACTORY_SKILLS])
   const host = codepuppyEngine({
     sandbox,
     name: "tiers",
     modelBaseURL: model.baseURL,
+    factoryDirs: [FACTORY_SKILLS],
     // R10:用户在 Code Puppy 里加的本地 MCP,真 stdio MCP 服务器,只列一个 echo 工具
     mcpCallLog: MCP_CALLS,
     projectFiles: {
@@ -73,6 +73,8 @@ beforeAll(async () => {
     },
   })
   projectDirectory = host.projectDirectory
+  // `#1713`:R6c / R6d 的命令写了 agent / subtask —— 这是一个用户已允许的项目(未允许时这两个字段暂缓)
+  allowProject(projectDirectory)
   running = await host.start()
   expect(probe()).toBeDefined()
   await firstTurn(running, projectDirectory)
@@ -492,6 +494,8 @@ describe("R2:用户在四处写的 external_directory 放行照 v1 胜出(全部
             ? { "opencode.json": JSON.stringify({ agent: { [BUILD]: userRule, [ASK]: userRule, [READONLY]: userRule } }) }
             : {}
       const host = codepuppyEngine({ sandbox, name, modelBaseURL: model.baseURL, projectFiles })
+      // `#1713`:规则写在项目 opencode.json 里的两种放法,判的是用户已允许的项目里自己写的规则
+      allowProject(host.projectDirectory)
       if (place === "全局 opencode.json 顶层") fs.writeFileSync(path.join(host.slot.configDirectory, "opencode.json"), JSON.stringify(userRule))
       const engine = await host.start()
       try {

@@ -7,13 +7,14 @@
 // 不发且是 disabled;手段自证去掉中和条目 ⇒ 引擎真的去连 exfil。本文件的宿主一条钉住它 2 pass / 0 fail。v1 版跑的是已删的
 // `packages/opencode/src/index.ts debug config`。本文件其余各条判 main 侧:真源位置、注入面、放行集合。期望值手写字面量。
 
+import { codepuppyBootstrap } from "@opencode/util/codepuppy-bootstrap"
 import { afterAll, beforeAll, beforeEach, describe, expect, test } from "bun:test"
 import * as fs from "node:fs"
 import * as os from "node:os"
 import * as path from "node:path"
 import { injectCodePuppyConfig } from "./codepuppy-config-injection"
 import { NEUTRALIZED_MCP_SERVER } from "./mcp-default-deny"
-import { PROVIDER_ALLOW_ENV } from "../../../ext/src/provider-allow"
+import { publishMainBootstrap, unpublishTestBootstrap } from "../../test-component/codepuppy-bootstrap-fixture"
 import { environmentMutableRoot } from "./codepuppy-environment"
 import { readMcpServerRecords, resolveMcpServerTruthLocation } from "./mcp-server-records"
 import { writeMcpServerTruth } from "./mcp-server-truth-write"
@@ -42,7 +43,6 @@ const MANAGED = [
   "CODEPUPPY_OPENCODE_HOME",
   "XDG_CONFIG_HOME",
   "XDG_DATA_HOME",
-  PROVIDER_ALLOW_ENV,
 ]
 const saved: Record<string, string | undefined> = {}
 let root = ""
@@ -81,6 +81,7 @@ beforeAll(() => {
 
 afterAll(() => {
   setConfiguredEgressDestinations([])
+  unpublishTestBootstrap() // 注入发布的供应商白名单(§10 R30)不留给同进程的其它文件
   for (const key of MANAGED) {
     if (saved[key] === undefined) delete process.env[key]
     else process.env[key] = saved[key]
@@ -105,7 +106,8 @@ function injectedMcp(): { content: string; mcp: McpMap; stderr: string[] } {
   console.error = (...args: unknown[]) => void stderr.push(args.map(String).join(" "))
   let content: string
   try {
-    const result = injectCodePuppyConfig(userData, undefined, "stable")
+    publishMainBootstrap({ userData }) // sidecar 在注入之前发布启动文档
+    const result = injectCodePuppyConfig(userData, undefined, "stable", codepuppyBootstrap().paths.userConfig ?? null)
     expect(result.ok).toBe(true)
     content = result.config.content
   } finally {
@@ -125,10 +127,10 @@ describe("#1381 真源位置:sidecar(CODEPUPPY_GLOBAL_DIR 逆映射)与自定义
     try {
       const logs: string[] = []
       const location = resolveMcpServerTruthLocation()
-      expect(location).toEqual({ ok: false, reason: `CODEPUPPY_GLOBAL_DIR ${odd} is not of the form <base>/env/<prod|beta|dev>; the remote MCP server truth location is unknown` })
+      expect(location).toEqual({ ok: false, reason: `bootstrap.paths.globalRoot ${odd} is not of the form <base>/env/<prod|beta|dev>; the remote MCP server truth location is unknown` })
       expect(readMcpServerRecords((l) => void logs.push(l))).toEqual([])
       expect(logs).toEqual([
-        `remote MCP servers: truth location unresolved — CODEPUPPY_GLOBAL_DIR ${odd} is not of the form <base>/env/<prod|beta|dev>; the remote MCP server truth location is unknown; no remote MCP server is injected or authorized this generation`,
+        `remote MCP servers: truth location unresolved — bootstrap.paths.globalRoot ${odd} is not of the form <base>/env/<prod|beta|dev>; the remote MCP server truth location is unknown; no remote MCP server is injected or authorized this generation`,
       ])
     } finally {
       process.env.CODEPUPPY_GLOBAL_DIR = envRoot

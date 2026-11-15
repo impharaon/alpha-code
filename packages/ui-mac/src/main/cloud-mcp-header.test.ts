@@ -18,6 +18,8 @@
 //   ④ 仅 cloud 定义携带该文件引用(I4)。
 // `#1667`:定义是 OpenCode 2 的 `Mcp.RemoteConfig` 形状(v1 的 `enabled:false` → `disabled:true`,启用态不写),
 // 裁判换成上游 2.x 的 schema;注入产物从结果里读(不再经 OPENCODE_CONFIG_CONTENT 环境变量)。
+// `#1698` G2:云 MCP 的地址、名字、真定义与 kill-switch 由 main 的构建器写进启动文档(sidecar 在注入前发布),不再经环境的
+// URL / DEF / ARM 交接;这里的「main 环境」就是 process.env,每次注入前按它构建并发布一份。
 import { afterEach, beforeEach, describe, expect, test } from "bun:test"
 import fs from "node:fs"
 import os from "node:os"
@@ -27,10 +29,12 @@ import { Mcp } from "@opencode/schema/mcp"
 const EngineRemoteSchema = Mcp.RemoteConfig
 import { materializeCloudMcpConfig } from "./cloud-sidecar-config"
 import { injectCodePuppyConfig } from "./codepuppy-config-injection"
-import { CLOUD_MCP_ARM_ENV, CLOUD_MCP_DEF_ENV, WITHHELD_CLOUD_MCP } from "./cloud-web-search"
+import { WITHHELD_CLOUD_MCP } from "./cloud-web-search"
+import { cloudMcpArmed, type CodePuppyBootstrap, codepuppyBootstrap } from "@opencode/util/codepuppy-bootstrap"
+import { publishMainBootstrap, unpublishTestBootstrap } from "../../test-component/codepuppy-bootstrap-fixture"
 import { secretFilePath, secretFileRef } from "./codepuppy-secret-files"
 // kill-switch 下**最终**进配置的那一份不是注入面写的,是 ext 写回的(#733 审计 B1 的教训原样
-// 继承):只断 main 的 config / DEF = 断中间产物。这里 import 生产件本体,让最后一跳真的执行。
+// 继承):只断 main 的 config / 文档里的定义 = 断中间产物。这里 import 生产件本体,让最后一跳真的执行。
 import { installCloudMcp } from "../../../ext/src/cloud-websearch-kill"
 
 /** 2.x `mcp.transform` 编辑器的最小面(installCloudMcp 只用 set):起点是注入面写进配置的那几条。 */
@@ -114,14 +118,17 @@ describe("`#1195` 生产注入面", () => {
   })
 
   afterEach(() => {
+    unpublishTestBootstrap()
     for (const key of Object.keys(process.env)) if (!(key in saved)) delete process.env[key]
     Object.assign(process.env, saved)
     fs.rmSync(tmp, { recursive: true, force: true })
   })
 
   let lastContent = ""
+  let doc: CodePuppyBootstrap
   const inject = (extPluginPath?: string) => {
-    const result = injectCodePuppyConfig(userData, extPluginPath, "stable")
+    doc = publishMainBootstrap({ userData })
+    const result = injectCodePuppyConfig(userData, extPluginPath, "stable", codepuppyBootstrap().paths.userConfig ?? null)
     lastContent = result.config.content
     return result
   }
@@ -153,9 +160,9 @@ describe("`#1195` 生产注入面", () => {
     // `#1195` 起 CODEPUPPY_CLOUD_TOKEN 不再被任何定义引用。
     expect(content).not.toContain("CODEPUPPY_CLOUD_TOKEN")
 
-    // env 托管通道(DEF)= 同一份定义、同样零 token 值。
-    expect(JSON.parse(process.env[CLOUD_MCP_DEF_ENV]!)).toEqual(cloud)
-    expect(process.env[CLOUD_MCP_DEF_ENV]).not.toContain(MCP_SECRET)
+    // 启动文档里交给 ext / core 的那份(main 的构建器算的)= 同一份定义、同样零 token 值。
+    expect(doc.cloudMcp?.definition).toEqual(cloud as never)
+    expect(JSON.stringify(doc)).not.toContain(MCP_SECRET)
   })
 
   test("② 文件缺席 ⇒ disabled:true 且无任何回退(CODEPUPPY_CLOUD_TOKEN 在场也不回退;不回交互式 OAuth)", () => {
@@ -169,8 +176,8 @@ describe("`#1195` 生产注入面", () => {
     // 缺凭证 ⇒ 不代付 ⇒ 本地 keyless websearch 不被 deny(主权判据同轴,ADR-009 B1)。
     const config = JSON.parse(lastContent) as { permissions?: Array<{ action: string; effect: string }> }
     expect(config.permissions?.some((rule) => rule.action === "websearch" && rule.effect === "deny") ?? false).toBe(false)
-    // DEF 身份通道仍是真定义(带引用):ext 端 installCloudMcp 读不到文件会响亮不装(fail-closed)。
-    expect(process.env[CLOUD_MCP_DEF_ENV]).toContain("CODEPUPPY_MCP_TOKEN")
+    // 文档里的定义仍是真定义(带引用):ext 端 installCloudMcp 读不到文件会响亮不装(fail-closed)。
+    expect(JSON.stringify(doc.cloudMcp?.definition)).toContain("CODEPUPPY_MCP_TOKEN")
   })
 
   test("反向:旧轴文件 CODEPUPPY_CLOUD_TOKEN 缺席不再影响云 MCP(判据已整体换轴)", () => {
@@ -206,15 +213,16 @@ describe("`#1195` 生产注入面", () => {
     } finally {
       console.error = original
     }
-    expect(process.env[CLOUD_MCP_ARM_ENV]).toBe("codepuppy")
+    expect(cloudMcpArmed(doc)).toBe(true)
     // 注入面这一半:kill-switch 下配置里只有中和条目。
     expect(injectedMcp().codepuppy).toEqual({ ...WITHHELD_CLOUD_MCP })
 
     // ext 那一半:真 installCloudMcp + 真 readFileSync(默认参数)读**真密钥文件**。`#1667`(#1665 L3):2.x 里它写的是本 Location
     // `mcp.transform` 的编辑器(同名条目整条替换);这里给它一个装着注入面中和条目的编辑器。
     const servers = mcpEditor({ codepuppy: injectedMcp().codepuppy })
-    expect(installCloudMcp(servers.editor, process.env)).toBe("codepuppy")
-    // DEF 托管的是 2.x `Mcp.RemoteConfig` 形状:凭证解析成 Bearer 值、OAuth 不复活、端点就是 DEF 里那个,而且引擎自己的 schema 解得开。
+    // 缺省参数 = 本进程已发布的文档(生产 ext 读的就是它)
+    expect(installCloudMcp(servers.editor)).toBe("codepuppy")
+    // 文档里的是 2.x `Mcp.RemoteConfig` 形状:凭证解析成 Bearer 值、OAuth 不复活、端点就是文档里那个,而且引擎自己的 schema 解得开。
     expect(servers.get("codepuppy")).toEqual({
       type: "remote",
       url: CLOUD_URL,
@@ -236,7 +244,7 @@ describe("`#1195` 生产注入面", () => {
     try {
       expect(inject().ok).toBe(true)
       servers = mcpEditor({ codepuppy: injectedMcp().codepuppy })
-      installed = installCloudMcp(servers.editor, process.env)
+      installed = installCloudMcp(servers.editor)
     } finally {
       console.error = original
     }

@@ -1115,8 +1115,9 @@ export function CodePuppyComposerRuntime(props: CodePuppyComposerRuntimeProps) {
       }),
   })
   const accountRetryWakeup = createRetryWakeup()
+  // #1686:带登录代(identityEpoch),不先退出就换号时模型链按新身份重跑(同 auth-recovery 的不变量 G)。
   const authSignature = (state: AuthState) =>
-    `${state.status}\u0000${state.mode}\u0000${state.platformStatus ?? "ready"}\u0000${state.account?.email ?? ""}`
+    `${state.status}\u0000${state.mode}\u0000${state.platformStatus ?? "ready"}\u0000${state.account?.email ?? ""}\u0000${state.identityEpoch ?? ""}`
   const imageRoute = createMemo(() => {
     const model = composerModel()
     return imageRouteOf({

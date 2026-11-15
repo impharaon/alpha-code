@@ -11,12 +11,15 @@
 //                                               layer on a failed call (#1572 AC4)
 //   permission.hook  risk facts on every ask; Code Puppy's own asks held against later hooks
 //   rpc              codepuppy.tool-policy (I5)
+import { codepuppyBootstrap } from "../../../util/src/codepuppy-bootstrap"
+import { type UnattendedDenial, type UnattendedProfile } from "../../../schema/src/codepuppy-unattended"
+import type { UnattendedState } from "./unattended"
 import os from "node:os"
 import path from "node:path"
 import type { Plugin } from "@opencode/plugin"
 import { createCatalog } from "./catalog"
-import { attachDirectoryDisplay, attachNetFailure, attachTerminal, displaySnapshot, wrapForDisplay } from "./display"
-import { confirm, decide, effectiveFor, gateWithoutToolCall, holdAsk, pin, type GateDeps } from "./gate"
+import { attachDirectoryDisplay, attachUnattendedDenial, attachNetFailure, attachTerminal, displaySnapshot, wrapForDisplay } from "./display"
+import { confirm, decide, effectiveFor, gateWithoutToolCall, holdAsk, holdUnattendedDeny, pin, type GateDeps } from "./gate"
 import {
   codeModeFacts,
   CODE_MODE_TOOL,
@@ -65,18 +68,26 @@ function asksForItself(facts: ToolFacts) {
   return facts.technicalId === HUB_INSTALL_ACTION && facts.identity.source === "plugin" && facts.authority.kind === "codepuppy-bundled"
 }
 
-export async function registerPolicy(context: Plugin.Context): Promise<PolicyRegistration> {
+export async function registerPolicy(context: Plugin.Context, unattended: UnattendedState): Promise<PolicyRegistration> {
   const env = process.env
+  // `#1698`:随包清单与 Office 清单的路径、云 MCP 定义、账户分区来自 sidecar 发布的启动文档(冻结,一代不变)
+  const bootstrap = codepuppyBootstrap()
   const store = createToolPolicyStore({
     baseDir: defaultPolicyBaseDir(dataRoot(env)),
-    account: () => env.CODEPUPPY_POLICY_ACCOUNT || "anonymous",
+    // `#1698` G2:账户分区来自启动文档(main 按当刻登录态算的哈希),缺席 = anonymous
+    account: () => bootstrap.policy.account ?? "anonymous",
     workspace: () => policyWorkspace(context.location),
   })
   const extOrigin = extModulePath(import.meta.url)
-  const bundled = loadBundledTools(import.meta.url, env)
+  const bundled = loadBundledTools(import.meta.url, bootstrap.paths.extBundledManifest)
   let early: ReadonlySet<string> | undefined
   const mcp = new Map<string, McpEntry & Record<string, unknown>>()
   const displays = new Map<string, ToolDisplaySnapshotV1>()
+  const codeModeDenials = new Map<string, UnattendedDenial | undefined>()
+  const profile = (sessionID: string, agent?: string) => unattended.unattendedProfile(sessionID, agent, async () => (await context.session.get({ sessionID })).agent ?? "")
+  const denied = (callID: string | undefined, denial: UnattendedDenial) => {
+    if (callID && codeModeDenials.has(callID) && !codeModeDenials.get(callID)) codeModeDenials.set(callID, denial)
+  }
 
   // A non-builtin plugin activating before the extension makes early tools ambiguous (identity.ts).
   const earlyAmbiguous = async () => {
@@ -89,7 +100,7 @@ export async function registerPolicy(context: Plugin.Context): Promise<PolicyReg
 
   const allFacts = async (): Promise<ToolFacts[]> => {
     const tools = (await context.tool.list()) as readonly RegisteredTool[]
-    const input = { early, earlyAmbiguous: await earlyAmbiguous(), mcp, bundled, extOrigin, env }
+    const input = { early, earlyAmbiguous: await earlyAmbiguous(), mcp, bundled, extOrigin, cloudMcp: bootstrap.cloudMcp, officeMcpManifest: bootstrap.paths.officeMcpManifest }
     return tools.map((tool) => toolFacts(tool, input))
   }
 
@@ -106,19 +117,21 @@ export async function registerPolicy(context: Plugin.Context): Promise<PolicyReg
     log: (message) => console.info(`[codepuppy-policy] ${message}`),
   })
 
-  const ruleset = async (sessionID: string, agent: string): Promise<readonly PermissionRule[]> => {
+  const ruleset = async (sessionID: string, agent: string, selected?: UnattendedProfile): Promise<readonly PermissionRule[]> => {
     const configured =
       catalog.configured(agent) ??
-      (((await context.agent.get({ agentID: agent } as never)) as { data?: { permissions?: PermissionRule[] } }).data
-        ?.permissions ??
-        [])
-    const session = (await context.session.get({ sessionID } as never).catch(() => undefined)) as
-      | { data?: { permissions?: PermissionRule[] } }
-      | undefined
-    return [...configured, ...(session?.data?.permissions ?? [])]
+      (await context.agent.get({ agentID: agent } as never)).data.permissions ?? []
+    const session = await context.session.get({ sessionID } as never).catch(() => undefined)
+    // AC-06:交互分支的既有读取路径保持不变;在册 T1 才消费当前会话字段。
+    const permissions = selected === undefined
+      ? (session as { data?: { permissions?: PermissionRule[] } } | undefined)?.data?.permissions
+      : session?.permissions
+    return [...configured, ...(permissions ?? [])]
   }
 
   const deps: GateDeps = {
+    profile,
+    denied,
     store,
     facts: factsFor,
     ruleset,
@@ -148,7 +161,8 @@ export async function registerPolicy(context: Plugin.Context): Promise<PolicyReg
 
   // Prompts wait for plugin activation (packages/core/src/session/prompt.ts), so the tail rules registered here land
   // after every configured rule, including the ones OpenCode's post-activation config plugin appends.
-  await context.session.hook("prompt", async () => {
+  await context.session.hook("prompt", async (event) => {
+    unattended.preparePrompt(event)
     await catalog.ensureTail()
   })
 
@@ -165,6 +179,14 @@ export async function registerPolicy(context: Plugin.Context): Promise<PolicyReg
   // Code Puppy's own gate requests already carry theirs (`confirm`); their ask is held so no later evaluate hook can
   // turn it into allow (`holdAsk`).
   await context.permission.hook("evaluate", async (event) => {
+    const selected = await profile(event.sessionID, event.agent)
+    if (selected !== undefined) {
+      if (event.source === undefined) {
+        const facts = (await allFacts()).find((item) => item.permission === event.action)
+        if (facts) await gateWithoutToolCall(deps, event as never, facts, "build", selected)
+      }
+      return holdUnattendedDeny(event, selected, event.action, (denial) => denied(event.source?.type === "tool" ? event.source.id : undefined, denial))
+    }
     if (isCodePuppyPolicyRequest(event.metadata)) return holdAsk(event)
     // A tool's permission action asserted without a tool call (a subtask command, review R1 #2) is decided like the
     // tool's call; a tool call's own assert already passed confirm() in execute.before.
@@ -209,6 +231,7 @@ export async function registerPolicy(context: Plugin.Context): Promise<PolicyReg
           if (!asksForItself(decision.facts)) await confirm(deps, decision, event)
           displays.set(event.id, displaySnapshot(decision.facts))
           pin(event)
+          if (event.tool === CODE_MODE_TOOL && await profile(event.sessionID, event.agent) !== undefined) codeModeDenials.set(event.id, undefined)
         } catch (error) {
           displays.delete(event.id)
           throw error
@@ -219,6 +242,10 @@ export async function registerPolicy(context: Plugin.Context): Promise<PolicyReg
         wrapForDisplay(editor as never, (callID) => displays.get(callID)),
       )
       await context.tool.hook("execute.after", (event) => {
+        if (event.tool === CODE_MODE_TOOL) {
+          attachUnattendedDenial(event as never, codeModeDenials.get(event.id))
+          codeModeDenials.delete(event.id)
+        }
         attachNetFailure(event as never)
         attachDirectoryDisplay(event as never)
         attachTerminal(event as never, displays.get(event.id))

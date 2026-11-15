@@ -18,6 +18,7 @@ import { afterAll, afterEach, beforeEach, expect, mock, test } from "bun:test"
 import presetSolid from "babel-preset-solid"
 import type { CodePuppyProject, CodePuppyProjectsApi } from "../src/renderer/sidebar/use-projects"
 import { dict as zh } from "../src/renderer/i18n/zh"
+import { formatBuildIdentity, type BuildIdentity } from "../src/shared/build-identity"
 
 GlobalRegistrator.register()
 const solid = await import("solid-js/dist/solid.js")
@@ -75,12 +76,29 @@ function sdkStub(): unknown {
 
 /** 生产里不存在的哨兵版本号:字面量实现抄不到它,抄了真版本也匹配不上。 */
 const SENTINEL_VERSION = "9.9.9-ac1187-sentinel"
+/** ac#237:buildIdentity 桥的返回按用例切换;writeClipboard 把写入的文本记在 copied 里。 */
+const OFFICIAL: BuildIdentity = {
+  version: SENTINEL_VERSION,
+  channel: "prod",
+  commit: "5a5a5a5",
+  date: "2026-11-12",
+  origin: "release",
+  os: "macOS 15.3",
+  arch: "arm64",
+}
+let identity: BuildIdentity = OFFICIAL
+const copied: string[] = []
 /** 登录态按用例切换(登录/登出两分支都得有版本行)。 */
 let authStatus: "logged-in" | "logged-out" = "logged-out"
 
 // —— preload 桥替身:appVersion 是被测通路的 renderer 端,给哨兵值 ——————————————————
 const EXPLICIT: Record<string, (...args: unknown[]) => unknown> = {
   appVersion: async () => SENTINEL_VERSION,
+  buildIdentity: async () => identity,
+  writeClipboard: async (text: unknown) => {
+    copied.push(String(text))
+    return true
+  },
   "auth.getState": async () =>
     authStatus === "logged-in"
       ? { status: "logged-in", mode: "cloud", email: "tester@example.com" }
@@ -168,6 +186,14 @@ function click(el: Element) {
   el.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }))
 }
 
+async function openPop() {
+  authStatus = "logged-out"
+  await mount()
+  click(document.querySelector(".codepuppy-sidebar-account")!)
+  await flush()
+  return document.querySelector(".codepuppy-acct-pop")!
+}
+
 for (const status of ["logged-out", "logged-in"] as const) {
   test(`账户浮层(${status})显示当前版本号,值来自 window.api.appVersion`, async () => {
     authStatus = status
@@ -186,3 +212,57 @@ for (const status of ["logged-out", "logged-in"] as const) {
     expect(line!.textContent ?? "").toContain(zh["codepuppy.sidebar.version"])
   })
 }
+
+// ── ac#237:点版本行复制构建身份 + 非正式发布标记(SPEC-build-identity AC-01/02/03) ──────────────────
+beforeEach(() => {
+  identity = OFFICIAL
+  copied.length = 0
+})
+
+const FLAVOURS = [
+  { name: "开发渠道的包", id: { ...OFFICIAL, channel: "dev", origin: "local" }, marker: "dev", text: zh["codepuppy.sidebar.buildMarker.dev"] },
+  { name: "本机构建的正式渠道包", id: { ...OFFICIAL, origin: "local" }, marker: "local", text: zh["codepuppy.sidebar.buildMarker.local"] },
+  { name: "正式发布的包", id: OFFICIAL, marker: undefined, text: undefined },
+] as const
+
+for (const flavour of FLAVOURS) {
+  test(`AC-02:${flavour.name} ⇒ 版本行标记 ${flavour.text ?? "无"},且与复制内容一致`, async () => {
+    identity = flavour.id
+    const pop = await openPop()
+    const row = pop.querySelector(".codepuppy-acct-version")!
+    const tag = row.querySelector(".codepuppy-acct-version-tag")
+    if (flavour.text === undefined) expect(tag, "正式发布包不该带标记").toBeNull()
+    else {
+      expect(tag?.textContent).toBe(flavour.text)
+      expect(tag?.getAttribute("data-marker")).toBe(flavour.marker)
+    }
+    click(row)
+    await flush()
+    expect(copied).toEqual([formatBuildIdentity(flavour.id)])
+    expect(copied[0]).toContain(flavour.id.origin === "release" ? "正式发布" : "本机构建")
+    expect(copied[0]).toContain(flavour.id.channel === "dev" ? "开发" : "正式")
+  })
+}
+
+test("AC-01:点版本行 ⇒ 剪贴板是桥给的身份格式化出的一行,行内变「已复制」约 2 秒后恢复", async () => {
+  const pop = await openPop()
+  const row = pop.querySelector(".codepuppy-acct-version")!
+  expect(row.tagName).toBe("BUTTON")
+  click(row)
+  await flush()
+  expect(copied).toEqual(["Code Puppy 9.9.9-ac1187-sentinel · 正式 · 5a5a5a5 · 2026-11-12 · 正式发布 · macOS 15.3 arm64"])
+  expect(row.textContent).toBe(zh["codepuppy.common.copied"])
+  await new Promise((resolve) => setTimeout(resolve, 1500))
+  expect(row.textContent, "1.5 秒时「已复制」不该已经消失").toBe(zh["codepuppy.common.copied"])
+  await new Promise((resolve) => setTimeout(resolve, 800))
+  expect(row.textContent).toContain(SENTINEL_VERSION)
+  expect(row.textContent).not.toContain(zh["codepuppy.common.copied"])
+})
+
+test("AC-03:构建提交取不到 ⇒ 复制行该字段为「未知」,其余字段照常,行仍可点", async () => {
+  identity = { ...OFFICIAL, commit: "" }
+  const pop = await openPop()
+  click(pop.querySelector(".codepuppy-acct-version")!)
+  await flush()
+  expect(copied).toEqual(["Code Puppy 9.9.9-ac1187-sentinel · 正式 · 未知 · 2026-11-12 · 正式发布 · macOS 15.3 arm64"])
+})

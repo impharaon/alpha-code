@@ -177,7 +177,7 @@ fi
 if [ "$drift" -ne 0 ]; then
   echo "::error::packages/codepuppy-{app,ui} 与 SOT 不一致 —— 补丁是这两个冻结包唯一的改动记录,"
   echo "::error::  不重生它,上面点名的改动在下一次按 pin + 补丁重建时会被**静默删掉**。"
-  echo "::error::  修法(frontend/README.md 块 4,与源码改动放在**同一个提交**里):"
+  echo "::error::  修法(frontend/README.md 块 4:先提交源码改动,再重生补丁并单独提交,两个提交同一次推送):"
   echo "::error::    在临时 index 里把 pin 的 packages/{app,ui} 换成 HEAD 的 packages/codepuppy-{app,ui},"
   echo "::error::    再 git diff --binary ${PIN} <那棵树> -- packages/app packages/ui > ${PATCH}"
   echo "::error::  --binary 不可省:packages/app/vendor/*.tgz 被 packages/session-ui 以 file: 直接依赖,"

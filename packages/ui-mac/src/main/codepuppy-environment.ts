@@ -15,6 +15,7 @@
 //
 // electron-free:isPackaged/channel/appData 由 index.ts 注入,单测零 mock。
 
+import { tryCodePuppyBootstrap } from "@opencode/util/codepuppy-bootstrap"
 import { lstatSync, mkdirSync, readdirSync, realpathSync, rmdirSync, statSync } from "node:fs"
 import { homedir } from "node:os"
 import { basename, dirname, isAbsolute, join, normalize, relative, resolve } from "node:path"
@@ -75,7 +76,7 @@ export function environmentMutableRoot(env: AppEnvironment, baseRoot: string): s
 }
 
 /**
- * `environmentMutableRoot` 的逆映射(`#1392`):sidecar 进程没有冻结快照,手里只有 main 派生给它的 `CODEPUPPY_GLOBAL_DIR`
+ * `environmentMutableRoot` 的逆映射(`#1392`):sidecar 进程没有冻结快照,从启动文档拿到 main 派生的 `paths.globalRoot`
  * = `<baseRoot>/env/<env>`;需要「状态根 + 环境名」的消费者(自定义节点真源 custom-provider-records.ts)从这里拿回来。
  * 形状不对(父目录不叫 `env`、末段不是三个环境名之一)⇒ undefined,不猜 —— 调用方按「位置未知」fail-closed。
  * 拓扑的文法只住在本文件:这里改了,上面那条也得跟着改。
@@ -94,7 +95,7 @@ export function environmentFromMutableRoot(mutableRoot: string): { environment: 
 export type CodePuppyStateBase = { ok: true; casBaseRoot: string; environment: AppEnvironment } | { ok: false; reason: string }
 
 /**
- * 「这个进程的状态根 + 环境名」(`#1392` / `#1381`):main 走冻结快照;sidecar(无快照)走 `CODEPUPPY_GLOBAL_DIR` 的逆映射
+ * 「这个进程的状态根 + 环境名」(`#1392` / `#1381`):main 走冻结快照;sidecar(无快照)走启动文档 `paths.globalRoot` 的逆映射
  * (environmentFromMutableRoot)。形状不对 ⇒ ok:false 且不猜 —— 调用方按「位置未知」fail-closed。`subject` 只进拒绝理由
  * (哪个真源的位置未知),两个真源(custom-providers / mcp-servers)共用这一份解析,不各自抄一遍。
  */
@@ -108,12 +109,12 @@ export function resolveCodePuppyStateBase(subject: string): CodePuppyStateBase {
     // (project-trust-truth-fence.test.ts 实测);沿 realpath 推出的状态根就落进伪造的那一份。main 派生的值本来就是 canonical,
     // 按字面推出的 `<casBaseRoot>/<真源>/<env>.json` 不经过 `env/<env>`,每一级祖先都不在可写集里。
     resolveCodePuppyGlobalRoot()
-    root = normalize(process.env.CODEPUPPY_GLOBAL_DIR!.trim())
+    root = normalize(tryCodePuppyBootstrap()?.paths.globalRoot ?? process.env.CODEPUPPY_GLOBAL_DIR!.trim())
   } catch (error) {
     return { ok: false, reason: `alpha environment root unavailable (${error instanceof Error ? error.message : String(error)})` }
   }
   const derived = environmentFromMutableRoot(root)
-  if (!derived) return { ok: false, reason: `CODEPUPPY_GLOBAL_DIR ${root} is not of the form <base>/env/<prod|beta|dev>; the ${subject} location is unknown` }
+  if (!derived) return { ok: false, reason: `bootstrap.paths.globalRoot ${root} is not of the form <base>/env/<prod|beta|dev>; the ${subject} location is unknown` }
   return { ok: true, ...derived }
 }
 
@@ -204,9 +205,16 @@ export function initCodePuppyEnvironment(input: InitEnvironmentInput): CodePuppy
   return current
 }
 
-/** main 消费方的唯一根解析：快照优先；无快照只接受显式、绝对且不指向退休根的派生输出。 */
+/**
+ * 当前环境根的唯一解析(design §4.3、§10 R31):main 读冻结快照;sidecar 没有快照,读本进程已发布的启动文档
+ * (`paths.globalRoot`,main 由同一个快照算出);两样都没有的只剩不初始化快照的单元测试,才读环境里显式、绝对且不指向
+ * 退休根的派生值。生产启动里 sidecar 的环境没有这个键(sidecar-env.ts 的前缀拒绝),文档又先于一切读方发布,
+ * 环境这一支到不了(bootstrap-launch-parity.engine.cases.ts 断言)。
+ */
 export function resolveCodePuppyGlobalRoot(env: NodeJS.ProcessEnv = process.env, homeDir: string = homedir()): string {
   if (current) return current.mutableRoot
+  const published = tryCodePuppyBootstrap()
+  if (published) return published.paths.globalRoot
   const raw = env.CODEPUPPY_GLOBAL_DIR?.trim()
   if (!raw || !isAbsolute(raw)) throw new Error("CODEPUPPY_GLOBAL_DIR requires an absolute initialized root")
   assertOutsideRetiredRoot([normalize(raw)], homeDir, false)

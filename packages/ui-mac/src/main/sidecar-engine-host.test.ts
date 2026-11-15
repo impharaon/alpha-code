@@ -12,7 +12,7 @@ import { expect, test } from "bun:test"
 import { readFileSync } from "node:fs"
 import { join } from "node:path"
 
-test("I1:真引擎上的进程内 fetch 交接、口令包装、配置通道、库路径与关闭(sidecar-engine-host.cases.ts,6 条)", () => {
+test("I1:真引擎上的进程内 fetch 交接、口令包装、配置通道、库路径与关闭;`#1698` 引擎入口读启动文档(sidecar-engine-host.cases.ts,8 条;含 #1713 信任钩子必填)", () => {
   const result = Bun.spawnSync({
     cmd: [process.execPath, "test", "--timeout", "90000", join(import.meta.dir, "sidecar-engine-host.cases.ts")],
     cwd: join(import.meta.dir, "../.."),
@@ -21,7 +21,7 @@ test("I1:真引擎上的进程内 fetch 交接、口令包装、配置通道、�
   const output = `${result.stdout.toString()}${result.stderr.toString()}`
   if (result.exitCode !== 0) throw new Error(output)
   expect(output.match(/(\d+) fail\b/)?.[1], output).toBe("0")
-  expect(output.match(/(\d+) pass\b/)?.[1], output).toBe("6")
+  expect(output.match(/(\d+) pass\b/)?.[1], output).toBe("8")
 }, 300_000)
 
 // 分类与「这处锚守不住什么」登记在 ./source-text-anchors.ts。

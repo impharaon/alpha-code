@@ -20,6 +20,7 @@ import { ensureEngineScratchCwd } from "../main/engine-scratch-cwd"
 import { buildEngineServerOptions } from "../main/engine-server-options"
 import { prewarmInitialLocation } from "../main/sidecar-location-prewarm"
 import { createEngineFetch, type EngineFetch } from "./index"
+import { engineProjectTrust } from "../main/engine-project-trust"
 
 const sandbox = engineSandbox()
 const PASSWORD = "cp-1669-internal-projects"
@@ -129,7 +130,7 @@ beforeAll(async () => {
       filewatcher: false,
       platform: process.platform,
     }),
-    { onDispatch: (dispatch) => (published = withEngineAuthorization(dispatch, PASSWORD)) },
+    { onDispatch: (dispatch) => (published = withEngineAuthorization(dispatch, PASSWORD)), projectTrust: engineProjectTrust },
   )
   // sidecar:ready 之前对初始目录(main 给的 codepuppyUserWorkspaceDir())做预热。
   await prewarmInitialLocation({ request: published! }, codepuppyUserWorkspaceDir(), { password: PASSWORD })

@@ -14,6 +14,7 @@ import { engineAuthorization } from "./engine-authorization"
 import { buildEngineServerOptions } from "./engine-server-options"
 import { engineClient } from "./engine-client"
 import { createPackageMcpOauthEngineV1 } from "./package-mcp-oauth"
+import { engineProjectTrust } from "./engine-project-trust"
 
 const sandbox = engineSandbox()
 const PASSWORD = "cp-l5-mcp-oauth"
@@ -114,6 +115,7 @@ beforeAll(async () => {
       filewatcher: false,
       platform: process.platform,
     }),
+    { projectTrust: engineProjectTrust },
   )
   engines.push(engine)
   engineUrl = engine.url

@@ -16,6 +16,7 @@ import { join } from "node:path"
 import { assertEngineSandboxed, engineSandbox, engineSlot } from "../../test-component/engine-sandbox"
 import { buildEngineServerOptions } from "./engine-server-options"
 import { engineAuthorization, withEngineAuthorization } from "./engine-authorization"
+import { engineProjectTrust } from "./engine-project-trust"
 
 const sandbox = engineSandbox()
 const PASSWORD = "cp-l5-engine-host"
@@ -54,6 +55,7 @@ async function start(name: string, content = "{}") {
     onDispatch: (dispatch) => {
       published = withEngineAuthorization(dispatch, PASSWORD)
     },
+    projectTrust: engineProjectTrust,
   })
   engines.push(engine)
   if (!published) throw new Error("onDispatch was not called synchronously inside start()")
@@ -97,6 +99,16 @@ function createSession(fetch: (request: Request) => Response | Promise<Response>
 }
 
 const settle = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
+
+describe("#1713 契约 C:项目配置闸门的信任钩子是必填的", () => {
+  test("不传 projectTrust ⇒ startEngine 在起引擎之前就拒绝(sidecar 据此不报 ready);反向臂:传了就照常起来", async () => {
+    const slot = engineSlot(sandbox, "no-project-trust")
+    const missing = embed.startEngine(options(slot, "{}"), {} as Parameters<Embed["startEngine"]>[1])
+    await expect(missing).rejects.toThrow("hooks.projectTrust is required")
+    const { engine } = await start("with-project-trust")
+    expect(engine.url).toStartWith("http://127.0.0.1:")
+  })
+})
 
 describe("I1 进程内 fetch 的交接(start() + Transform)", () => {
   test("发布的 fetch 和监听端口是同一张应用图:进程内建的会话,监听端口的 /api/event 收得到", async () => {
@@ -180,5 +192,23 @@ describe("I1 进程内 fetch 的交接(start() + Transform)", () => {
     await engine.close()
     await expect(fetch(new URL("/api/info", engine.url), { headers: { authorization: engineAuthorization(PASSWORD) } })).rejects.toThrow()
   }, 30_000)
+
+  // `#1698`(DESIGN-upgrade-bootstrap-config §4.2 第 4 步):引擎入口用**它自己编进去的**解析器读 sidecar 发布的启动文档;sidecar 的
+  // 关口(sidecar-bootstrap-gate.ts)要求有这个导出并让它通过,否则不起这台引擎。
+  test("#1698 引擎入口导出 assertCodePuppyBootstrap:未发布 / 形状不符 ⇒ 抛,合格文档 ⇒ 通过;sidecar 关口照此放行或拒绝", async () => {
+    const { __resetCodePuppyBootstrapForTests } = await import("@opencode/util/codepuppy-bootstrap")
+    const { assertEngineReadsBootstrap } = await import("./sidecar-bootstrap-gate")
+    const { publishTestBootstrap } = await import("../../test-component/codepuppy-bootstrap-fixture")
+    __resetCodePuppyBootstrapForTests()
+    try {
+      expect(() => embed.assertCodePuppyBootstrap()).toThrow(expect.objectContaining({ reason: "unpublished" }))
+      ;(globalThis as Record<symbol, unknown>)[Symbol.for("codepuppy.bootstrap")] = Object.freeze({ v: 1, paths: {} })
+      expect(() => assertEngineReadsBootstrap(embed)).toThrow(expect.objectContaining({ reason: "invalid" }))
+      publishTestBootstrap({ globalRoot: join(sandbox.root, "bootstrap-root") })
+      expect(() => assertEngineReadsBootstrap(embed)).not.toThrow()
+    } finally {
+      __resetCodePuppyBootstrapForTests()
+    }
+  })
 
 })

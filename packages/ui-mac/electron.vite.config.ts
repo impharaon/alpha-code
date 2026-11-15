@@ -4,6 +4,7 @@ import appPlugin from "@opencode-ai/app/vite"
 import * as fs from "node:fs/promises"
 import * as path from "node:path"
 import { brandI18nPlugin } from "./scripts/brand-i18n"
+import { buildIdentityDefine } from "./scripts/build-identity"
 import { patchUpstreamPlugin } from "./scripts/patch-upstream"
 import { UPSTREAM_LOGO_ALIAS } from "./scripts/upstream-logo-alias"
 import { nodePtyPackage, resolveTargetArch } from "./scripts/target-arch"
@@ -45,6 +46,8 @@ export default defineConfig({
   main: {
     define: {
       "import.meta.env.OPENCODE_CHANNEL": JSON.stringify(channel),
+      // #237:提交 / 日期 / 来源(正式发布 or 本机构建)在构建期写入,账户浮层的「复制构建身份」读它们。
+      ...buildIdentityDefine(channel, process.env, process.cwd()),
     },
     build: {
       rollupOptions: {

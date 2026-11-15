@@ -1,4 +1,6 @@
 import { mkdtempSync, realpathSync } from "node:fs"
+import { publishTestBootstrap, testBootstrap, testCloudMcp, unpublishTestBootstrap } from "../../ui-mac/test-component/codepuppy-bootstrap-fixture"
+import { parseCodePuppyBootstrap, type CodePuppyBootstrap } from "../../util/src/codepuppy-bootstrap"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { afterEach, beforeEach, describe, expect, test } from "bun:test"
@@ -10,63 +12,35 @@ import CodePuppyExt from "./plugin"
 import { activate, it } from "./plugin-host.harness"
 import {
   assertWebSearchToolAllowed,
-  CLOUD_MCP_ARM_ENV,
-  CLOUD_MCP_DEF_ENV,
-  CLOUD_MCP_SERVER_ENV,
-  CLOUD_WEBSEARCH_DENY_ENV,
   cloudWebSearchDenied,
   computeMcpOwnership,
   installCloudMcp,
   isWebSearchToolId,
-  LOCAL_WEBSEARCH_DENY_ENV,
   localWebSearchDenied,
   type McpOwnership,
   WebSearchSovereigntyError,
   webSearchToolDenial,
 } from "./cloud-websearch-kill"
 
-/** alpha 自己写的那份云 server 定义的端点身份(注入面经 CODEPUPPY_CLOUD_MCP_DEF 过河)。 */
+/** alpha 自己写的那份云 server 定义的端点身份(`#1698` 起在启动文档的 cloudMcp 里;此前经 CODEPUPPY_CLOUD_MCP_DEF 过河)。 */
 const CLOUD_URL = "https://cloud.example/mcp"
-const CLOUD_DEF = JSON.stringify({
-  type: "remote",
-  url: CLOUD_URL,
-  enabled: true,
-  headers: { Authorization: "Bearer {file:/tmp/codepuppy-cloud-token}" },
-  oauth: false,
-})
 
-/** kill-switch:云侧与本地侧同时置位(main 的 applyWebSearchSovereignty 就是这么写的)。 */
-const ON = {
-  [CLOUD_WEBSEARCH_DENY_ENV]: "1",
-  [LOCAL_WEBSEARCH_DENY_ENV]: "1",
-  [CLOUD_MCP_SERVER_ENV]: "cloud",
-  [CLOUD_MCP_DEF_ENV]: CLOUD_DEF,
-}
 /**
- * **只有本地侧置位、云侧没置位**,云工具是权威通道。
- *
- * `#1411` 之前这正是「平台代付、无 kill-switch」的真实形状,本文件因此曾把它叫 `PLATFORM_PAYS`。
- * 之后 main 不再产生它 —— 代付态**两个信号都不置位**(`ui-mac/src/main/server.ts` 的
- * `applyWebSearchSovereignty`;真 fork 的判据是 `ui-mac/src/main/server.test.ts` 的「代付不再把
- * 本地拒绝判决送进 sidecar —— 两条腿的通道都保持干净」)。所以它现在只剩一个身份:**信号漂移**
- * (判决写了一半 / 继承来的 env),而闸对它必须仍然 fail-closed。`#1443` 只改了它叫什么、以及它
- * 代表哪一态;每一条用它的断言逐字未动(ADR-046「kill-switch 不得被削弱」)。
+ * `#1698`:web search 的主权判决只有一个信号 —— 启动文档的 `webSearch.killSwitch`(此前两个 deny 环境变量都恒等于它,`#1411`)。
+ * 「只有本地信号置位」的信号漂移从此结构上不存在(单一字段、发布后冻结);治理 / 冒名的区分仍在,体现在拒绝理由上:
+ * 治理云 server 的搜网工具拿到的是 GOVERNED_REASON,别的(冒名、第三方、归属有歧义)拿到点名「按名字认出的工具」的那一句。
  */
-const LOCAL_DENY_ONLY = {
-  [LOCAL_WEBSEARCH_DENY_ENV]: "1",
-  [CLOUD_MCP_SERVER_ENV]: "cloud",
-  [CLOUD_MCP_DEF_ENV]: CLOUD_DEF,
-}
-/**
- * 平台代付、无 kill-switch 的**今天**的真实形状(`#1411` / [[ADR-046]] D1 / D6):两个 deny 信号
- * 都缺席,云 server 的身份通道照常在场 —— 注入面在代付态置位 SERVER + DEF 并删掉 ARM
- * (`ui-mac/src/main/codepuppy-config-injection.ts:388-418`)。
- */
-const PLATFORM_PAYS = {
-  [CLOUD_MCP_SERVER_ENV]: "cloud",
-  [CLOUD_MCP_DEF_ENV]: CLOUD_DEF,
-}
-const OFF = {}
+const doc = (killSwitch: boolean, cloud: string | false = "cloud") =>
+  testBootstrap({ globalRoot: "/tmp/codepuppy-websearch-kill", killSwitch, ...(cloud ? { cloudMcp: testCloudMcp(CLOUD_URL, "/tmp/codepuppy-cloud-token", cloud) } : {}) })
+/** kill-switch 开、云 MCP 在场。 */
+const ON = doc(true)
+/** 平台代付、无 kill-switch(`#1411` / [[ADR-046]] D1 / D6):云 server 的身份照常在文档里。 */
+const PLATFORM_PAYS = doc(false)
+/** 登出 / BYOK:没有云 MCP,kill-switch 关。 */
+const OFF = doc(false, false)
+const GOVERNED_REASON = "the Code Puppy web search kill switch (ADR-009 B2) is set"
+/** kill-switch 下这个工具按治理云工具判(只拿 GOVERNED_REASON),还是按第三方判。 */
+const governedUnderKill = (tool: string, ownership: McpOwnership) => webSearchToolDenial(tool, ON, ownership) === GOVERNED_REASON
 
 /**
  * 引擎**合并完成后**的配置形状:alpha 注入的云 server + 用户自带的若干第三方 server。
@@ -81,8 +55,8 @@ const engineConfig = (servers: Record<string, unknown> = {}) => ({
 })
 
 /** 生产路径的归属快照(`config` 钩子里 `computeMcpOwnership(cfg)` 算出来、存进本实例闭包的同一个值)。 */
-const owned = (env: Record<string, string | undefined>, servers?: Record<string, unknown>): McpOwnership =>
-  computeMcpOwnership(engineConfig(servers), env)
+const owned = (bootstrap: CodePuppyBootstrap, servers?: Record<string, unknown>): McpOwnership =>
+  computeMcpOwnership(engineConfig(servers), bootstrap.cloudMcp)
 
 /** 治理云 server(本文件的测试 server 名 `cloud`)上平台公开的非搜网兄弟工具(alpha-code#1568:远端名只说动作)。 */
 const siblingCloudTools = [
@@ -103,15 +77,12 @@ describe("cloud web search kill switch", () => {
     expect(webSearchToolDenial("exa_web_search_exa", ON, owned(ON))).toStartWith("the Code Puppy web search kill switch (ADR-009 B2) is set; it turns off Code Puppy's own web search tools ")
   })
 
-  test("fail-closed:只有缺省/空串/\"0\" 放行(云侧与本地侧同一条规则)", () => {
-    for (const [denied, name] of [
-      [cloudWebSearchDenied, CLOUD_WEBSEARCH_DENY_ENV],
-      [localWebSearchDenied, LOCAL_WEBSEARCH_DENY_ENV],
-    ] as const) {
+  test("`#1698`:云侧与本地侧的判决都只看启动文档的 webSearch.killSwitch(取值规则在 main 的构建器:任意非空串即开)", () => {
+    for (const denied of [cloudWebSearchDenied, localWebSearchDenied]) {
       expect(denied(OFF)).toBe(false)
-      expect(denied({ [name]: "" })).toBe(false)
-      expect(denied({ [name]: "0" })).toBe(false)
-      for (const value of ["1", "true", "yes", "no", "off", "false", " "]) expect(denied({ [name]: value })).toBe(true)
+      expect(denied(PLATFORM_PAYS)).toBe(false)
+      expect(denied(ON)).toBe(true)
+      expect(denied(doc(true, false))).toBe(true)
     }
   })
 
@@ -202,19 +173,16 @@ describe("cloud web search kill switch", () => {
 describe("第三方 MCP 上的 web search 同受主权判决(R5 Blocker)", () => {
   const thirdParty = ["exa_web_search_exa", "brave_web_search", "tavily_websearch"]
 
-  // `#1443` 改的只有名字与它代表的态:这一组信号(本地置位、云没置位)从 `#1411` 起不再是「平台
-  // 代付」,而是**信号漂移**。断言逐字未动 —— 漂移时闸必须仍然把第三方关掉、且不误杀治理云工具。
-  test("信号漂移(只有本地信号置位):第三方全关,alpha 治理的云工具**不**关", () => {
+  // `#1443` 的「信号漂移」(只有本地信号置位)随 `#1698` 的单一 killSwitch 结构上消失;这里钉住 kill-switch 下两类工具各拿各的理由,
+  // 兄弟云工具不误杀。
+  test("kill-switch:第三方按第三方理由关(点名按名字认出),alpha 治理的云工具只拿治理理由;兄弟云工具不关", () => {
     for (const tool of thirdParty) {
-      expect(() => assertWebSearchToolAllowed(tool, LOCAL_DENY_ONLY, owned(LOCAL_DENY_ONLY))).toThrow(
-        WebSearchSovereigntyError,
-      )
-      expect(() => assertWebSearchToolAllowed(tool, LOCAL_DENY_ONLY, owned(LOCAL_DENY_ONLY))).toThrow(/do not retry/)
+      expect(() => assertWebSearchToolAllowed(tool, ON, owned(ON))).toThrow(WebSearchSovereigntyError)
+      expect(() => assertWebSearchToolAllowed(tool, ON, owned(ON))).toThrow(/do not retry/)
+      expect(governedUnderKill(tool, owned(ON))).toBe(false)
     }
-    // AC4:平台代付时云工具是权威通道,闸不许误杀它,也不许误杀兄弟工具。
-    expect(() => assertWebSearchToolAllowed("cloud_web_search", LOCAL_DENY_ONLY, owned(LOCAL_DENY_ONLY))).not.toThrow()
-    for (const tool of siblingCloudTools)
-      expect(() => assertWebSearchToolAllowed(tool, LOCAL_DENY_ONLY, owned(LOCAL_DENY_ONLY))).not.toThrow()
+    expect(governedUnderKill("cloud_web_search", owned(ON))).toBe(true)
+    for (const tool of siblingCloudTools) expect(() => assertWebSearchToolAllowed(tool, ON, owned(ON))).not.toThrow()
   })
 
   test("kill-switch:第三方与云工具一起关", () => {
@@ -300,19 +268,21 @@ describe("第三方 MCP 上的 web search 同受主权判决(R5 Blocker)", () =>
       expect(() => assertWebSearchToolAllowed(tool, PLATFORM_PAYS, owned(PLATFORM_PAYS))).not.toThrow()
   })
 
-  test("治理例外只认注入面点名的那个 server,不写死 \"cloud\" 字面量", () => {
-    const renamed = { ...LOCAL_DENY_ONLY, [CLOUD_MCP_SERVER_ENV]: "alphacloud" }
+  test("治理例外只认启动文档点名的那个 server,不写死 \"cloud\" 字面量", () => {
+    const renamed = doc(true, "alphacloud")
     const config = { mcp: { alphacloud: { type: "remote", url: CLOUD_URL }, cloud: { type: "remote", url: CLOUD_URL } } }
-    const ownership = computeMcpOwnership(config, renamed)
+    const ownership = computeMcpOwnership(config, renamed.cloudMcp)
     expect(ownership).toEqual({ governed: ["alphacloud"], foreign: ["cloud"] })
-    expect(() => assertWebSearchToolAllowed("alphacloud_web_search", renamed, ownership)).not.toThrow()
-    // 名字没对上就不是治理通道 —— 一个自称 cloud、甚至照抄了 alpha URL 的第三方 server 拿不到豁免。
+    expect(governedUnderKill("alphacloud_web_search", ownership)).toBe(true)
+    // 名字没对上就不是治理通道 —— 一个自称 cloud、甚至照抄了 alpha URL 的第三方 server 拿不到治理身份。
     expect(() => assertWebSearchToolAllowed("cloud_web_search", renamed, ownership)).toThrow(WebSearchSovereigntyError)
+    expect(governedUnderKill("cloud_web_search", ownership)).toBe(false)
   })
 
-  test("注入面没点名任何云 server 时(登出态误置信号)倒向 fail-closed", () => {
-    const env = { [LOCAL_WEBSEARCH_DENY_ENV]: "1" }
-    expect(() => assertWebSearchToolAllowed("cloud_web_search", env, owned(env))).toThrow(WebSearchSovereigntyError)
+  test("文档里没有云 server 时(登出态),kill-switch 下同名工具按第三方判,fail-closed", () => {
+    const loggedOutKill = doc(true, false)
+    expect(() => assertWebSearchToolAllowed("cloud_web_search", loggedOutKill, owned(loggedOutKill))).toThrow(WebSearchSovereigntyError)
+    expect(governedUnderKill("cloud_web_search", owned(loggedOutKill))).toBe(false)
   })
 })
 
@@ -326,62 +296,56 @@ describe("第三方 MCP 上的 web search 同受主权判决(R5 Blocker)", () =>
 // ─────────────────────────────────────────────────────────────────────────────
 describe("治理豁免绑定端点身份,名字伪造不了(R6 Blocker)", () => {
   test("端点身份核验:URL 对上才算治理 server", () => {
-    expect(owned(LOCAL_DENY_ONLY)).toEqual({ governed: ["cloud"], foreign: ["exa"] })
+    expect(owned(PLATFORM_PAYS)).toEqual({ governed: ["cloud"], foreign: ["exa"] })
     // 同名但换了 URL(managed / MDM 之类的后置来源覆盖回去)⇒ 不再是治理 server,fail-closed。
-    const hijacked = computeMcpOwnership(
-      { mcp: { cloud: { type: "remote", url: "https://attacker.example/mcp" } } },
-      LOCAL_DENY_ONLY,
-    )
+    const hijacked = computeMcpOwnership({ mcp: { cloud: { type: "remote", url: "https://attacker.example/mcp" } } }, ON.cloudMcp)
     expect(hijacked).toEqual({ governed: [], foreign: ["cloud"] })
-    expect(() => assertWebSearchToolAllowed("cloud_web_search", LOCAL_DENY_ONLY, hijacked)).toThrow(
-      WebSearchSovereigntyError,
-    )
-    // DEF 缺席 / 坏 JSON / 不是 remote ⇒ 没有可核验的身份,一个 server 都不治理。
-    for (const def of [undefined, "{not json", '"a string"', JSON.stringify({ type: "local", command: ["x"] })])
-      expect(owned({ ...LOCAL_DENY_ONLY, [CLOUD_MCP_DEF_ENV]: def }).governed).toEqual([])
+    expect(() => assertWebSearchToolAllowed("cloud_web_search", ON, hijacked)).toThrow(WebSearchSovereigntyError)
+    expect(governedUnderKill("cloud_web_search", hijacked)).toBe(false)
+    // 文档里没有云 MCP ⇒ 没有可核验的身份,一个 server 都不治理(坏形状的定义在解析文档时就被拒,进不了这一层)。
+    expect(owned(OFF).governed).toEqual([])
   })
 
   test("R6 回归:`cloud_attacker` 拿不到豁免(R5 下它被当成治理云工具放行)", () => {
     const servers = { cloud_attacker: { type: "remote", url: "https://attacker.example/mcp" } }
-    const ownership = owned(LOCAL_DENY_ONLY, servers)
+    const ownership = owned(ON, servers)
     expect(ownership.foreign).toContain("cloud_attacker")
-    expect(() => assertWebSearchToolAllowed("cloud_attacker_web_search", LOCAL_DENY_ONLY, ownership)).toThrow(
-      WebSearchSovereigntyError,
-    )
-    // 真的治理云工具照常放行(闸没有因此变成一刀切)。
-    expect(() => assertWebSearchToolAllowed("cloud_web_search", LOCAL_DENY_ONLY, ownership)).not.toThrow()
+    expect(() => assertWebSearchToolAllowed("cloud_attacker_web_search", ON, ownership)).toThrow(WebSearchSovereigntyError)
+    expect(governedUnderKill("cloud_attacker_web_search", ownership)).toBe(false)
+    // 真的治理云工具仍按治理云工具判(归属没有因此变成一刀切)。
+    expect(governedUnderKill("cloud_web_search", ownership)).toBe(true)
   })
 
   test("R6 回归:`<server>_<tool>` 边界歧义倒向 fail-closed(cloud_web + search)", () => {
     // 一个叫 `cloud_web` 的 server 上的 `search` 与治理 server 上的 `web_search` 拼出同一个 id。
-    const ownership = owned(LOCAL_DENY_ONLY, { cloud_web: { type: "remote", url: "https://attacker.example/mcp" } })
-    expect(() => assertWebSearchToolAllowed("cloud_web_search", LOCAL_DENY_ONLY, ownership)).toThrow(
-      WebSearchSovereigntyError,
-    )
+    const ownership = owned(ON, { cloud_web: { type: "remote", url: "https://attacker.example/mcp" } })
+    expect(() => assertWebSearchToolAllowed("cloud_web_search", ON, ownership)).toThrow(WebSearchSovereigntyError)
+    expect(governedUnderKill("cloud_web_search", ownership)).toBe(false)
   })
 
   test("R6 回归:运行时 `POST /mcp` 新装的 server(配置里没有)一律拿不到豁免", () => {
-    const ownership = owned(LOCAL_DENY_ONLY)
-    // 归属不在快照里 ⇒ 没有候选 ⇒ 豁免不给。
-    for (const tool of ["runtime_web_search", "cloudx_web_search", "cloud-2_web_search"])
-      expect(() => assertWebSearchToolAllowed(tool, LOCAL_DENY_ONLY, ownership)).toThrow(WebSearchSovereigntyError)
+    const ownership = owned(ON)
+    // 归属不在快照里 ⇒ 没有候选 ⇒ 治理身份不给。
+    for (const tool of ["runtime_web_search", "cloudx_web_search", "cloud-2_web_search"]) {
+      expect(() => assertWebSearchToolAllowed(tool, ON, ownership)).toThrow(WebSearchSovereigntyError)
+      expect(governedUnderKill(tool, ownership)).toBe(false)
+    }
   })
 
   // 诚实登记(R6 D-1 收窄后落在「用户自己新装的第三方 MCP」那一类):`POST /mcp` 用**同一个名字**
   // 替换掉已连的客户端后,上游没有任何接口把「当前活着的 server 定义」暴露给插件 —— 配置快照
   // 仍是 alpha 那份,ext 从名字上分辨不出来。收编它要动 handlers/mcp.ts / mcp/index.ts,不在本票范围。
   test("残留(登记,非闭合):同名 `POST /mcp` add 替换客户端后,豁免仍按配置快照给", () => {
-    const ownership = owned(LOCAL_DENY_ONLY)
-    expect(() => assertWebSearchToolAllowed("cloud_web_search", LOCAL_DENY_ONLY, ownership)).not.toThrow()
-    // 但 kill-switch 下它照样被关 —— 豁免的唯一效果是「代付态放行」,不是「越过 kill-switch」。
+    const ownership = owned(PLATFORM_PAYS)
+    expect(() => assertWebSearchToolAllowed("cloud_web_search", PLATFORM_PAYS, ownership)).not.toThrow()
+    // 但 kill-switch 下它照样被关 —— 治理身份不是「越过 kill-switch」。
     expect(() => assertWebSearchToolAllowed("cloud_web_search", ON, owned(ON))).toThrow(WebSearchSovereigntyError)
   })
 
   test("config 钩子没跑过 ⇒ 没有任何治理 server(模块默认值 fail-closed)", () => {
-    // 不传 ownership:本实例的 config 钩子还没算出归属时,豁免一律不给(默认实参 = UNVERIFIED)。
-    expect(() => assertWebSearchToolAllowed("cloud_web_search", LOCAL_DENY_ONLY, { governed: [], foreign: [] })).toThrow(
-      WebSearchSovereigntyError,
-    )
+    // 不传 ownership:本实例的 config 钩子还没算出归属时,治理身份一律不给(默认实参 = UNVERIFIED)。
+    expect(() => assertWebSearchToolAllowed("cloud_web_search", ON, { governed: [], foreign: [] })).toThrow(WebSearchSovereigntyError)
+    expect(governedUnderKill("cloud_web_search", { governed: [], foreign: [] })).toBe(false)
   })
 })
 
@@ -392,23 +356,16 @@ describe("治理豁免绑定端点身份,名字伪造不了(R6 Blocker)", () => 
 // 下面在**真宿主**里注册一个会先问权限再「打传输」的 MCP 形态工具,在最有利于绕过的权限状态(评估恒 allow)下判。
 // ─────────────────────────────────────────────────────────────────────────────
 describe("放行覆盖不了 kill-switch(2.x 真宿主)", () => {
-  const SAVED = ["CODEPUPPY_GLOBAL_DIR", LOCAL_WEBSEARCH_DENY_ENV, CLOUD_WEBSEARCH_DENY_ENV, CLOUD_MCP_SERVER_ENV, CLOUD_MCP_DEF_ENV] as const
-  const saved: Record<string, string | undefined> = {}
-  beforeEach(() => {
-    for (const key of SAVED) saved[key] = process.env[key]
-    for (const key of SAVED) delete process.env[key]
-    process.env.CODEPUPPY_GLOBAL_DIR = realpathSync(mkdtempSync(join(tmpdir(), "codepuppy-ext-allow-")))
-  })
-  afterEach(() => {
-    for (const [key, value] of Object.entries(saved)) {
-      if (value === undefined) delete process.env[key]
-      else process.env[key] = value
-    }
-  })
+  afterEach(() => unpublishTestBootstrap())
 
-  const run = (env: Record<string, string>) =>
+  /** sidecar 在装 ext 之前发布启动文档(R14);这一格的 kill-switch 与云 MCP 就在里面。 */
+  const run = (killSwitch: boolean) =>
     Effect.gen(function* () {
-      Object.assign(process.env, env)
+      publishTestBootstrap({
+        globalRoot: realpathSync(mkdtempSync(join(tmpdir(), "codepuppy-ext-allow-"))),
+        killSwitch,
+        cloudMcp: testCloudMcp(CLOUD_URL, "/tmp/codepuppy-cloud-token", "cloud"),
+      })
       const transport: string[] = []
       yield* activate({
         id: "test.mcp-shaped-tool",
@@ -446,7 +403,7 @@ describe("放行覆盖不了 kill-switch(2.x 真宿主)", () => {
 
   it.live("kill-switch 下 cloud_web_search 到不了传输(评估恒 allow 也一样);兄弟云工具照常执行", () =>
     Effect.gen(function* () {
-      const { transport, search, sibling } = yield* run(ON)
+      const { transport, search, sibling } = yield* run(true)
       expect(Exit.isFailure(search)).toBe(true)
       expect(JSON.stringify(search)).toContain("kill switch")
       expect(Exit.isSuccess(sibling)).toBe(true)
@@ -456,7 +413,7 @@ describe("放行覆盖不了 kill-switch(2.x 真宿主)", () => {
 
   it.live("闸关时 cloud_web_search 照常执行(不是永久禁用)", () =>
     Effect.gen(function* () {
-      const { transport, search } = yield* run({})
+      const { transport, search } = yield* run(false)
       expect(Exit.isSuccess(search)).toBe(true)
       expect(transport).toContain("callTool:cloud_web_search")
     }),
@@ -470,62 +427,40 @@ describe("installCloudMcp 单元判据", () => {
     const servers = new Map<string, unknown>(Object.entries(initial))
     return { servers, set: (name: string, config: unknown) => void servers.set(name, config) }
   }
-  // `#733` B1:云 server 走标准 MCP OAuth 时定义里没有任何凭证通道 —— 写回时不许凭空长出 headers。
-  const def = JSON.stringify({
-    type: "remote",
-    url: "https://cloud.example/mcp",
-    enabled: true,
-    oauth: {
-      clientId: "https://auth.tidelabs.click/oauth/clients/alpha-code-mcp.json",
-      redirectUri: "http://127.0.0.1:19876/callback",
-    },
-  })
-  const armed = { [CLOUD_MCP_ARM_ENV]: "cloud", [CLOUD_MCP_DEF_ENV]: def }
+  // `#1698`:要装的定义来自启动文档(main 用 materializeCloudMcpConfig 写的同一形状:`Bearer {file:…}` 认证头、`oauth:false`)。
+  const armed = doc(true)
   const readToken = () => "tok-live"
 
-  test("装的是完整定义(2.x 形状:没有 enabled 键),整条替换同名条目,别的条目不动;不凭空长凭证通道", () => {
+  test("装的是完整定义(2.x 形状:没有 enabled 键),{file:} 引用在这一层解析,整条替换同名条目,别的条目不动", () => {
     const target = editor({ cloud: { type: "remote", url: "http://127.0.0.1:1/withheld", disabled: true }, other: { type: "local", command: ["x"], disabled: true } })
     expect(installCloudMcp(target, armed, readToken)).toBe("cloud")
-    expect(target.servers.get("cloud")).toEqual({
-      type: "remote",
-      url: "https://cloud.example/mcp",
-      oauth: {
-        clientId: "https://auth.tidelabs.click/oauth/clients/alpha-code-mcp.json",
-        redirectUri: "http://127.0.0.1:19876/callback",
-      },
-    })
-    expect(Object.keys(target.servers.get("cloud") as object).sort()).toEqual(["oauth", "type", "url"])
+    expect(target.servers.get("cloud")).toEqual({ type: "remote", url: CLOUD_URL, headers: { Authorization: "Bearer tok-live" }, oauth: false })
+    expect(Object.keys(target.servers.get("cloud") as object).sort()).toEqual(["headers", "oauth", "type", "url"])
     expect(target.servers.get("other")).toEqual({ type: "local", command: ["x"], disabled: true })
   })
 
-  const genericRefDef = JSON.stringify({
-    type: "remote",
-    url: "https://third-party.example/mcp",
-    enabled: true,
-    headers: { "X-Api-Key": `{file:${tokenFile}}` },
-  })
-  const armedGeneric = { [CLOUD_MCP_ARM_ENV]: "cloud", [CLOUD_MCP_DEF_ENV]: genericRefDef }
-
-  test("通用能力:DEF 里的 {file:} 引用在这一层被解析", () => {
+  test("名字取启动文档点名的那个 server", () => {
     const target = editor()
-    expect(installCloudMcp(target, armedGeneric, readToken)).toBe("cloud")
-    expect(target.servers.get("cloud")).toEqual({ type: "remote", url: "https://third-party.example/mcp", headers: { "X-Api-Key": "tok-live" } })
+    expect(installCloudMcp(target, doc(true, "alphacloud"), readToken)).toBe("alphacloud")
+    expect(target.servers.has("alphacloud")).toBe(true)
   })
 
-  test("ARM 与 DEF 必须成对;缺一个就什么都不装", () => {
-    for (const env of [{ [CLOUD_MCP_ARM_ENV]: "cloud" }, { [CLOUD_MCP_DEF_ENV]: def }, {}]) {
+  test("只在 kill-switch 开且文档里有云 MCP 时装(cloudMcpArmed);缺一个就什么都不装", () => {
+    for (const bootstrap of [doc(true, false), doc(false), doc(false, false)]) {
       const target = editor()
-      expect(installCloudMcp(target, env, readToken)).toBeUndefined()
+      expect(installCloudMcp(target, bootstrap, readToken)).toBeUndefined()
       expect(target.servers.size).toBe(0)
     }
   })
 
-  test("坏 DEF(非 JSON / 非对象 / 不是 remote 定义)fail-closed:不装,也不抛", () => {
-    for (const raw of ["{not json", '"a string"', "[1,2]", "null", JSON.stringify({ type: "remote" })]) {
-      const target = editor()
-      expect(installCloudMcp(target, { [CLOUD_MCP_ARM_ENV]: "cloud", [CLOUD_MCP_DEF_ENV]: raw }, readToken)).toBeUndefined()
-      expect(target.servers.size).toBe(0)
-    }
+  test("坏定义(不是 remote / 认证头不是 {file:} 引用 / 多键)进不了启动文档:解析就拒,ext 装不到它", () => {
+    const base = { ...armed, cloudMcp: undefined } as Record<string, unknown>
+    for (const definition of [
+      { type: "local", url: CLOUD_URL, headers: { Authorization: "Bearer {file:/t}" }, oauth: false },
+      { type: "remote", url: CLOUD_URL, headers: { Authorization: "Bearer tok-literal" }, oauth: false },
+      { type: "remote", url: CLOUD_URL, headers: { Authorization: "Bearer {file:/t}" }, oauth: false, enabled: true },
+    ])
+      expect(() => parseCodePuppyBootstrap({ ...base, cloudMcp: { name: "cloud", definition } })).toThrow(expect.objectContaining({ reason: "invalid" }))
   })
 
   test("带 {file:} 的定义在密钥文件读不到时 fail-closed:不装一个没有凭据的 server", () => {
@@ -533,7 +468,7 @@ describe("installCloudMcp 单元判据", () => {
     const missing = () => {
       throw Object.assign(new Error("ENOENT"), { code: "ENOENT" })
     }
-    expect(installCloudMcp(target, armedGeneric, missing)).toBeUndefined()
+    expect(installCloudMcp(target, armed, missing)).toBeUndefined()
     expect(target.servers.size).toBe(0)
   })
 })
@@ -544,27 +479,18 @@ describe("installCloudMcp 单元判据", () => {
 // 下面跑的是真的 `CodePuppyExt.setup`,两个 Location 各一份记账的插件 Context。判据 = B 的 foreign server 改不动 A 的判决。
 // ─────────────────────────────────────────────────────────────────────────────
 describe("跨 Location 隔离:治理归属按 setup 闭包,不串扰(#223 R7 Blocker)", () => {
-  const saved: Record<string, string | undefined> = {}
   const GOVERNED = { type: "remote", url: CLOUD_URL } as const
   const FOREIGN = { type: "remote", url: "https://attacker.example/mcp" } as const
 
   beforeEach(() => {
-    for (const key of ["CODEPUPPY_GLOBAL_DIR", LOCAL_WEBSEARCH_DENY_ENV, CLOUD_WEBSEARCH_DENY_ENV, CLOUD_MCP_SERVER_ENV, CLOUD_MCP_DEF_ENV, CLOUD_MCP_ARM_ENV])
-      saved[key] = process.env[key]
-    delete process.env[CLOUD_WEBSEARCH_DENY_ENV]
-    delete process.env[CLOUD_MCP_ARM_ENV]
-    process.env.CODEPUPPY_GLOBAL_DIR = realpathSync(mkdtempSync(join(tmpdir(), "codepuppy-ext-xtalk-")))
-    // 信号漂移(只有本地信号):第三方 web search 关,治理云工具的 web search 豁免。
-    process.env[LOCAL_WEBSEARCH_DENY_ENV] = "1"
-    process.env[CLOUD_MCP_SERVER_ENV] = "cloud"
-    process.env[CLOUD_MCP_DEF_ENV] = CLOUD_DEF
+    // kill-switch 下:治理云工具拿治理理由,归属有歧义的按第三方理由(`#1698` 前用「只有本地信号」的漂移态区分放行 / 拒绝)。
+    publishTestBootstrap({
+      globalRoot: realpathSync(mkdtempSync(join(tmpdir(), "codepuppy-ext-xtalk-"))),
+      killSwitch: true,
+      cloudMcp: testCloudMcp(CLOUD_URL, "/tmp/codepuppy-cloud-token", "cloud"),
+    })
   })
-  afterEach(() => {
-    for (const [key, value] of Object.entries(saved)) {
-      if (value === undefined) delete process.env[key]
-      else process.env[key] = value
-    }
-  })
+  afterEach(() => unpublishTestBootstrap())
 
   /**
    * 一个 Location:记下注册的全部 execute.before 与 mcp.transform(ext 的 setup 先后装了 L4 策略的头与尾),其余注册吞掉。
@@ -579,6 +505,8 @@ describe("跨 Location 隔离:治理归属按 setup 闭包,不串扰(#223 R7 Blo
         get: (_t, method: string) => {
           if (name === "tool" && method === "hook") return async (hook: string, callback: never) => (hook === "execute.before" && befores.push(callback), { dispose: async () => {} })
           if (name === "tool" && method === "list") return async () => [{ id: "cloud_web_search", name: "cloud_web_search" }]
+          // #1699 的规则回退会读 agent.get 的真实返回形状;保留该宿主原先的空规则输入。
+          if (name === "agent" && method === "get") return async () => ({ data: { permissions: [] } })
           if (name === "plugin" && method === "list") return async () => ({ data: [] })
           if (name === "mcp" && method === "transform") return async (callback: never) => (mcpTransforms.push(callback), { dispose: async () => {} })
           if (name === "event" && method === "subscribe") return () => ({ [Symbol.asyncIterator]: () => ({ next: () => new Promise(() => {}) }) })
@@ -600,22 +528,23 @@ describe("跨 Location 隔离:治理归属按 setup 闭包,不串扰(#223 R7 Blo
           for (const before of befores) await before({ tool, input: {}, sessionID: "ses_xtalk", agent: "build", messageID: "msg_xtalk", id: "call_xtalk" })
           return null
         } catch (error) {
-          return error instanceof Error ? error.name : String(error)
+          // 治理云工具的拒绝理由只有那一句;第三方 / 有歧义的那一句点名「按名字认出的工具」
+          return error instanceof Error ? (error.message.includes("by name") ? "third-party" : "governed") : String(error)
         }
       },
     }
   }
 
-  test("B 记录一个 foreign `cloud_web` 后,A 的 cloud_web_search 仍然放行;反向同理", async () => {
+  test("B 记录一个 foreign `cloud_web` 后,A 的 cloud_web_search 仍按治理云工具判;反向同理", async () => {
     const a = await location(realpathSync(mkdtempSync(join(tmpdir(), "codepuppy-ext-projA-"))))
     const b = await location(realpathSync(mkdtempSync(join(tmpdir(), "codepuppy-ext-projB-"))))
     a.configure({ cloud: { ...GOVERNED } })
-    expect(await a.verdict("cloud_web_search")).toBeNull()
+    expect(await a.verdict("cloud_web_search")).toBe("governed")
     b.configure({ cloud: { ...GOVERNED }, cloud_web: { ...FOREIGN } })
-    expect(await b.verdict("cloud_web_search")).toBe("WebSearchSovereigntyError")
-    expect(await a.verdict("cloud_web_search")).toBeNull()
+    expect(await b.verdict("cloud_web_search")).toBe("third-party")
+    expect(await a.verdict("cloud_web_search")).toBe("governed")
     a.configure({ cloud: { ...GOVERNED } })
-    expect(await b.verdict("cloud_web_search")).toBe("WebSearchSovereigntyError")
-    expect(await a.verdict("cloud_web_search")).toBeNull()
+    expect(await b.verdict("cloud_web_search")).toBe("third-party")
+    expect(await a.verdict("cloud_web_search")).toBe("governed")
   })
 })

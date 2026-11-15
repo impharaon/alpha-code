@@ -9,8 +9,9 @@
 //     → import 引擎 → startEngine(生产选项)→ 生产 assertExtPluginActive。
 //   · 真 ext:生产 `packages/ext` 构建现打的 `dist/server.js`(dev 下 main 交给 sidecar 的就是这个目录);层由它的 execute.after
 //     (packages/ext/src/policy/display.ts attachNetFailure)写进失败工具的 metadata。
-//   · 真出网代理(生产 startEgressPolicyProxy;授权 / 拨号为测试注入,只认本文件的几个名字),env 由生产 sidecarEgressProxyEnv 给出;
-//   · 真 webfetch 入口(OpenCode 2 自己的 webfetch):一个本机 OpenAI 兼容替身(平台节点经 CODEPUPPY_BASE_URL 指向它)让模型一次调用
+//   · 真出网代理(生产 startEgressPolicyProxy;授权 / 拨号为测试注入,只认本文件的几个名字),env 由生产 sidecarEgressProxyEnv 给出,
+//     决定者标记(`#1698`)在生产构建器写的启动文档 network.egressProxy 里;
+//   · 真 webfetch 入口(OpenCode 2 自己的 webfetch):一个本机 OpenAI 兼容替身(平台节点经启动文档的 platform.modelProxyBaseURL 指向它)让模型一次调用
 //     六个 webfetch,引擎照常执行、照常结算、照常落库;本文件经引擎监听端口读回**持久化的消息**,再用桌面的生产适配层
 //     (engine-adapter/v1-shapes.ts toV1Messages)投影成时间线读的工具记录。
 // 五种靶 ⇒ metadata.codepuppyNetFailure.layer:代理 403 ⇒ policy、`.invalid` ⇒ dns(503)、拒连 ⇒ tcp(502)、拨号黑洞 ⇒ tcp(504)、
@@ -37,9 +38,10 @@ import { dirname, join, resolve } from "node:path"
 import { __resetEgressGrantsForTests } from "./network-egress-grants"
 import { startEgressPolicyProxy, type EgressLogRecord, type EgressProxyHandle } from "./network-egress-proxy"
 import { sidecarEgressProxyEnv } from "./sidecar-env"
-import { secretFilePath, secretFileRef } from "./codepuppy-secret-files"
+import { secretFilePath } from "./codepuppy-secret-files"
+import { buildCodePuppyBootstrap } from "./codepuppy-bootstrap-build"
 import { ISOLATED_KEYS, isInside, isolatedEnv, testRoot } from "../../../../scripts/test-isolation/env"
-import { toV1Messages } from "../engine-adapter/v1-shapes"
+import { toV1Messages } from "../engine-adapter/opencode2/v1-shapes"
 import type { ToolPart } from "@opencode-ai/sdk/v2/client"
 import { toolCardBodyOf } from "../renderer/codepuppy-ui/session-timeline/cards/tool-card-model"
 import { netFailureCopy } from "../renderer/codepuppy-ui/net-failure-copy"
@@ -186,22 +188,31 @@ describeDarwin("`#1572` AC4 真栈:Electron 内嵌 node + 真出网代理 + 真 
       XDG_STATE_HOME: join(home, ".local", "state"),
       ELECTRON_RUN_AS_NODE: "1",
       ...sidecarEgressProxyEnv(proxy.port),
-      CODEPUPPY_GLOBAL_DIR: globalDir,
-      CODEPUPPY_BASE_URL: `http://127.0.0.1:${llmPort}/v1`,
-      CODEPUPPY_PLATFORM_AUTH_REF: secretFileRef(userData, "CODEPUPPY_API_KEY"),
       NO_COLOR: "1",
     })
     const outside = ISOLATED_KEYS.filter((name) => env[name] !== undefined && !isInside(testRoot(), env[name]!))
     if (outside.length) throw new Error(`REFUSING TO RUN: engine env keys outside the test root: ${outside.join(", ")}`)
 
+    // `#1698`:路径、平台节点地址与凭据引用、出网代理标记经启动文档到 sidecar(这里是驱动),用 main 的生产构建器构建,与
+    // spawnLocalServer 放进 start 消息的是同一个函数(main 环境里 applyAuthEnv 写的平台地址在这里直接给)
     const input: DriverInput = {
       engine: engineBundle,
-      ext: extDir,
       password: PASSWORD,
-      userData,
-      workspace,
-      databasePath: join(scratch, "engine.db"),
-      configDirectory: join(scratch, "engine-config"),
+      bootstrap: buildCodePuppyBootstrap({
+        userDataPath: userData,
+        globalRoot: globalDir,
+        userConfig: join(globalDir, "codepuppy.jsonc"),
+        initialDirectory: workspace,
+        databasePath: join(scratch, "engine.db"),
+        engineConfigDirectory: join(scratch, "engine-config"),
+        extPluginPath: extDir,
+        officeMcpManifest: join(scratch, "office-mcp", "tools.json"),
+        registryChannel: "stable",
+        egressProxyPort: proxy.port,
+        factorySkillDirs: [],
+        env: { CODEPUPPY_BASE_URL: `http://127.0.0.1:${llmPort}/v1` },
+        log: (line) => engineLog.push(`${line}\n`),
+      }),
     }
     engine = spawn(electron, [join(driverDir, "engine-driver.js"), JSON.stringify(input)], { cwd: workspace, env, stdio: ["ignore", "pipe", "pipe"] })
     engine.stdout?.on("data", (c: Buffer) => engineLog.push(c.toString()))
@@ -277,11 +288,11 @@ describeDarwin("`#1572` AC4 真栈:Electron 内嵌 node + 真出网代理 + 真 
 
   // #1654 N11(a):同样由真实 webfetch 自己的期限(OpenCode 2 packages/core/src/tool/plugin/webfetch.ts 的 timeoutOrElse ⇒ 普通
   // Error("Request timed out")),仅缩短测试中的期限。0.1.26 落库的原文就是这句;OpenCode 2 的 webfetch 把它包成
-  // `Unable to fetch <url>` 落库(卡片原文行显示它,查询串由 redactText 隐藏),期限错误只作为原因交给 ext —— 层码 `timeout`
+  // `Unable to fetch <url>`,期限错误只作为原因交给 ext,ext 的 execute.after 把落库原文换回这句(`#1702`,卡片原文行显示它)—— 层码 `timeout`
   // 只由分类模块的「Error 且原文 Request timed out」一条给出(TimeoutError 给的是 TimeoutError),所以它就是「来自 webfetch 期限」的证据。
   test("#1654 AC1 real webfetch deadline persists timeout and the tool card names its host", () => {
     const record = recordFor(TARGETS.timeout)
-    expect(record.state.error).toBe(`Unable to fetch ${record.state.input.url}`)
+    expect(record.state.error).toBe("Request timed out")
     expect(record.state.metadata?.codepuppyNetFailure).toEqual({ layer: "timeout", code: "timeout" })
     const body = toolCardBodyOf(record as unknown as ToolPart)
     expect(body).toMatchObject({ type: "error", netLayer: "timeout", host: TARGETS.timeout })

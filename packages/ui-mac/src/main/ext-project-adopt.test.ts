@@ -159,7 +159,7 @@ describe("#356 wiring:触发面在 trust-check 两个早退之前(源文本合�
     expect(trustEnd).toBeGreaterThan(trustStart)
     const trust = src.slice(trustStart, trustEnd)
     const posAdopt = trust.indexOf("adoptProjectLedger(directory")
-    const posNoExec = trust.indexOf("exec.mcp.length === 0 && exec.plugins.length === 0 && exec.agents.length === 0")
+    const posNoExec = trust.indexOf("if (!rows.length)")
     const posDecision = trust.indexOf("hasExtensionsDecision(decision)")
     expect(posAdopt).toBeGreaterThan(0)
     expect(posNoExec).toBeGreaterThan(0)

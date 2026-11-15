@@ -27,8 +27,6 @@
 // DEBUG and LD_PRELOAD, which the old copy-everything implementation deleted case-by-case, now fall
 // out via default-deny like everything else.
 
-import { EGRESS_PROXY_MARKER_ENV } from "@opencode/schema/codepuppy-net-failure"
-
 const EXACT = new Set([
   // POSIX/system basics the server, node, git and package managers need
   "PATH",
@@ -52,52 +50,14 @@ const EXACT = new Set([
   "https_proxy",
   "all_proxy",
   "no_proxy",
-  // `#1572`:出网代理的决定者标记(值 = 出网代理 URL,非密钥)。只由下面的 sidecarEgressProxyEnv 写;
-  // 引擎据它判断代理变量是不是出网代理(@opencode/schema/codepuppy-net-failure 的 engineNetFailurePath)。
-  EGRESS_PROXY_MARKER_ENV,
   // node runtime knobs (non-secret)
   "NODE_ENV",
   "NODE_OPTIONS",
   "NODE_EXTRA_CA_CERTS",
   "NODE_TLS_REJECT_UNAUTHORIZED",
-  // alpha non-secret controls the SIDECAR reads (injectCodePuppyConfig/buildCodePuppyModelConfig).
+  // `#1698`(design §4.5 最终形态):Code Puppy 交给 sidecar 的决定(路径、平台、云、网络、开关、出厂技能、引擎设置)全部在启动文档里
+  // (codepuppy-bootstrap-build.ts),这里不再有任何 Code Puppy 的键 —— 只剩逃生门本身(sidecar 可以在诊断里报出它)。
   // NEVER add a token/key var here — that's what the {file:} channel is for (A6).
-  "CODEPUPPY_BASE_URL",
-  // REQ-236 `#1562`:平台模型凭据文件的 `{file:}` 引用(server.ts 在 fork 时置位)。是路径不是凭据 ——
-  // ext 的 `chat.headers` 每次请求按它现读文件,续期热应用不必重启引擎。
-  "CODEPUPPY_PLATFORM_AUTH_REF",
-  "CODEPUPPY_CLOUD_MCP_URL",
-  "CODEPUPPY_DEFAULT_MODEL",
-  "CODEPUPPY_MODELS_DISABLE",
-  "CODEPUPPY_IDENTITY_DISABLE",
-  "CODEPUPPY_BEHAVIOR_DISABLE",
-  "CODEPUPPY_WEBSEARCH_DISABLE",
-  // #223 R2:web search 主权判决(kill-switch 或平台代付)。sidecar 里的 websearch 工具读它做
-  // **最终**拒绝 —— permission 规则(agent wildcard / 持久 session permission / approved)覆盖不了。
-  // 非密钥:一个布尔判决,取值只有 1。
-  "CODEPUPPY_LOCAL_WEBSEARCH_DENY",
-  // #223 R3:云侧同一条通道(kill-switch 才置位)。@codepuppy/ext 的 tool.execute.before 钩子读它,
-  // 在 `ctx.ask` 之前拒掉 `cloud_web_search`(普通 MCP 与 code-mode 两条路都过这个钩子)——
-  // 远端 MCP 没有 per-tool 的注册期过滤,permission deny 又能被后置 allow 顶掉。同为布尔判决,非密钥。
-  "CODEPUPPY_CLOUD_WEBSEARCH_DENY",
-  // REQ-062 路线A 逃生门(ext 插件在引擎进程内读:T1 转写 + T3/T6 内容接管一键回退)
-  "CODEPUPPY_PROMPT_REBRAND_DISABLE",
-  // REQ-065 修订:出厂技能目录(main 启动时算好,ext config hook 内存注入 —— 不落用户配置文件)
-  "CODEPUPPY_FACTORY_SKILL_DIRS",
-  // REQ-067:出厂默认禁项(− 用户解禁),同为内存注入、零明文
-  "CODEPUPPY_FACTORY_DENY_SKILLS",
-  // REQ-098:环境 mutable root(main 启动时由唯一环境映射落定,路径非密钥)。sidecar 的
-  // injectCodePuppyConfig(codepuppy.jsonc 真源)与 @codepuppy/ext(全局根边界判定)必须与 main 同根,
-  // 否则引擎会读到另一环境的可变状态(AC#1 破)。
-  "CODEPUPPY_GLOBAL_DIR",
-  // REQ-059 / ADR-019 逃生阀。main 与 sidecar 必须同口径:main 侧读它们跳过 truth 迁移与
-  // desired-state 投影(index.ts / engine-config-truth-boot.ts)并把 mcp/plugin/provider 写回
-  // legacy 目标(ext-config.ts),sidecar 侧读它们跳过 OPENCODE_CONFIG 注入(sidecar.ts)。缺了这两项
-  // 时 sidecar 收不到它们,于是 main 走 legacy 而 sidecar 照旧注入 —— 正是 req053 设计稿 §风险8
-  // 「逃生舱错位」那一格,也让两个逃生阀在真出事故时按了没反应(#606)。布尔开关,非密钥。
-  "CODEPUPPY_JSONC_TRUTH_DISABLE",
-  "CODEPUPPY_LEGACY_INSTALL_ROOT",
-  // the escape hatch itself, so the sidecar can surface it in diagnostics
   "CODEPUPPY_ENV_ALLOWLIST_EXTRA",
 ])
 
@@ -106,6 +66,12 @@ const EXACT = new Set([
 // admitted it — a hypothetical OPENCODE_API_KEY under a prefix, a name listed in the escape hatch, or
 // a token var mistakenly added to EXACT.
 const PREFIXES = ["OPENCODE_", "XDG_", "LC_", "ELECTRON_"]
+
+// `#1698`(DESIGN-upgrade-bootstrap-config §4.5):Code Puppy 交给 sidecar 的决定走启动文档,不走环境 —— `CODEPUPPY_` 前缀
+// (不分大小写)一律拒,排在所有放行规则(含 EXTRA)之前:把已迁走的键写进 CODEPUPPY_ENV_ALLOWLIST_EXTRA 也放不回去。
+// 唯一的例外是 EXTRA 本身(迁移期的例外表随 G3 删除)。
+const CODEPUPPY_PREFIX = "CODEPUPPY_"
+const ALLOWLIST_EXTRA = "CODEPUPPY_ENV_ALLOWLIST_EXTRA"
 
 // The credential-NAME veto (#605). It used to be a bare substring match, which also vetoed innocent
 // names that merely contain one of the words (MONKEY_MODE, KEYBOARD_LAYOUT, TURKEY_REGION,
@@ -270,6 +236,7 @@ export function createSidecarEnv(source: NodeJS.ProcessEnv = process.env): Recor
     // clearing both DENY rules first, so no casing variant can bypass them (#603 R2).
     if (isSecretish(key)) continue
     if (NEVER_INHERIT.has(key.toLowerCase())) continue
+    if (key.toUpperCase().startsWith(CODEPUPPY_PREFIX) && key !== ALLOWLIST_EXTRA) continue
     const allowed = extra.has(key) || EXACT.has(key) || PREFIXES.some((prefix) => key.startsWith(prefix))
     if (!allowed) continue
     env[key] = String(value)
@@ -293,8 +260,8 @@ export const SIDECAR_EGRESS_NO_PROXY = "127.0.0.1,localhost,::1"
 
 /**
  * 给定策略代理端口,返回要**覆盖**进 sidecar env 的八个代理变量(纯函数;server.ts 在 fork 前 Object.assign)。
- * `#1572`:另写决定者标记 CODEPUPPY_EGRESS_PROXY(同一 URL)—— 引擎只在代理变量等于它时才把失败归到本机出网代理;
- * 非 darwin 不调本函数,代理变量是用户自己的,没有这个标记。
+ * `#1572` / `#1698`:决定者标记(同一 URL)在启动文档的 network.egressProxy 里 —— 引擎只在代理变量等于它时才把失败归到
+ * 本机出网代理;非 darwin 不调本函数,代理变量是用户自己的,文档里也没有这一项。
  */
 export function sidecarEgressProxyEnv(port: number): Record<string, string> {
   if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error(`sidecar egress proxy env: port must be an integer in 1..65535, got ${JSON.stringify(port)}`)
@@ -308,6 +275,5 @@ export function sidecarEgressProxyEnv(port: number): Record<string, string> {
     all_proxy: url,
     NO_PROXY: SIDECAR_EGRESS_NO_PROXY,
     no_proxy: SIDECAR_EGRESS_NO_PROXY,
-    [EGRESS_PROXY_MARKER_ENV]: url,
   }
 }

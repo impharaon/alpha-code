@@ -15,6 +15,7 @@
 //   ④ 整包卸载后**四条一起**:目录 / `plugin[]` / grants / **账本记录**。第四条走**生产卸载后
 //      重读账本**,不断言中间那份 mutation 的 `graphAfter === null`(那是自己拼等价链)。
 
+import { codepuppyBootstrap } from "@opencode/util/codepuppy-bootstrap"
 import { createHash } from "node:crypto"
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
@@ -162,6 +163,7 @@ registerExtIpcHandlers(
   "dev",
   async () => ({ url: "http://127.0.0.1:39121", username: "opencode", password: "route-password" }),
   join(tmp, "home"),
+  undefined, async () => undefined,
 )
 
 afterAll(() => {
@@ -431,7 +433,10 @@ test("@codepuppy/ext 不受影响:引擎侧接缝走 start() 的 config.content,
   const extPath = join(tmp, "codepuppy-ext")
   mkdirSync(extPath, { recursive: true })
   writeFileSync(join(extPath, "server.js"), "export default {}\n")
-  const injected = injectCodePuppyConfig(userData, extPath, "dev")
+  const { publishMainBootstrap, unpublishTestBootstrap } = await import("./codepuppy-bootstrap-fixture")
+  publishMainBootstrap({ userData }) // sidecar 在注入之前发布启动文档(`#1698`)
+  const injected = injectCodePuppyConfig(userData, extPath, "dev", codepuppyBootstrap().paths.userConfig ?? null)
+  unpublishTestBootstrap()
   expect(injected.ok).toBe(true)
   const engineConfig = JSON.parse(injected.config.content) as { plugins?: string[] }
   // ① alpha 自有 ext 确实进了引擎会读的那份配置(start() 的 config.content),且是唯一的插件;

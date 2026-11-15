@@ -1,0 +1,1200 @@
+{
+  "provenance": {
+    "command": "cd packages/ui-mac && bun test ./src/main/unattended-run.engine.cases.ts",
+    "selection": "真实消息中的 assistant 与 idle;真实 form.created 表单",
+    "sourceHashes": {
+      "packages/ext/src/policy/gate.ts": "009b652ae30284630b1b760ed45d3a7b80cee5d2b83d2b4137bf624e33ad4f14",
+      "packages/ext/src/policy/index.ts": "3e975077a38c8b9a5439bb5bc583f591e617d09ea17b12d30ec00738c320bc0e",
+      "packages/ext/src/policy/display.ts": "9df312dbebab7ff2205117e115caffddc013cacbb058b80408647863eccc7e38",
+      "packages/ui-mac/src/main/automation-scheduler.ts": "83c7eb08204b180fe9bad75bf45956352b2b6cfea714cf5369b04771465193ab",
+      "packages/ui-mac/src/main/automation-elicitation.ts": "51051611c66950b5c9ce9d7c51d47e62bd655d2d7f51a10b5be3b81ed7f979b9"
+    }
+  },
+  "examples": [
+    {
+      "scenario": "default",
+      "messages": [
+        {
+          "id": "msg_1da994bc400110WfLjd4JL1yZ9",
+          "time": {
+            "created": 1794668841940,
+            "streamed": 1794668841954,
+            "completed": 1794668841970
+          },
+          "type": "assistant",
+          "agent": "codepuppy-automation-standard",
+          "model": {
+            "id": "m",
+            "providerID": "codepuppy",
+            "variant": "default"
+          },
+          "content": [
+            {
+              "type": "tool",
+              "id": "call_cp_engine_1",
+              "name": "execute",
+              "executed": false,
+              "state": {
+                "status": "completed",
+                "input": {
+                  "code": "return await tools.probe.echo({text: \"unattended-proof\"})"
+                },
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "unattended-proof"
+                  }
+                ],
+                "metadata": {
+                  "toolCalls": [
+                    {
+                      "tool": "probe.echo",
+                      "status": "completed",
+                      "input": {
+                        "text": "unattended-proof"
+                      }
+                    }
+                  ],
+                  "truncated": false
+                }
+              },
+              "time": {
+                "created": 1794668841951,
+                "ran": 1794668841954,
+                "completed": 1794668841969
+              }
+            }
+          ],
+          "finish": "tool-calls",
+          "rawFinish": "tool_calls",
+          "cost": 0,
+          "tokens": {
+            "input": 0,
+            "output": 0,
+            "reasoning": 0,
+            "cache": {
+              "read": 0,
+              "write": 0
+            }
+          }
+        },
+        {
+          "id": "msg_1da994bf6001qwXWHd7A86tYQH",
+          "time": {
+            "created": 1794668841980,
+            "streamed": 1794668841985,
+            "completed": 1794668841985
+          },
+          "type": "assistant",
+          "agent": "codepuppy-automation-standard",
+          "model": {
+            "id": "m",
+            "providerID": "codepuppy",
+            "variant": "default"
+          },
+          "content": [
+            {
+              "type": "text",
+              "text": "done"
+            }
+          ],
+          "finish": "stop",
+          "rawFinish": "stop",
+          "cost": 0,
+          "tokens": {
+            "input": 0,
+            "output": 0,
+            "reasoning": 0,
+            "cache": {
+              "read": 0,
+              "write": 0
+            }
+          }
+        },
+        {
+          "id": "msg_1da994c03001L1HAUnpWsYF7zz",
+          "time": {
+            "created": 1794668841987
+          },
+          "type": "idle",
+          "outcome": "succeeded"
+        }
+      ],
+      "cursor": {
+        "previous": "eyJpZCI6Im1zZ18xZGE5OTRiN2QwMDFVeHpYd1NyUG8zMUVURiIsIm9yZGVyIjoiYXNjIiwiZGlyZWN0aW9uIjoicHJldmlvdXMifQ",
+        "next": "eyJpZCI6Im1zZ18xZGE5OTRjMDMwMDFMMUhBVW5wV3NZRjd6eiIsIm9yZGVyIjoiYXNjIiwiZGlyZWN0aW9uIjoibmV4dCJ9"
+      },
+      "emptyPage": {
+        "data": [],
+        "cursor": {
+          "previous": null,
+          "next": null
+        }
+      }
+    },
+    {
+      "scenario": "ask",
+      "messages": [
+        {
+          "id": "msg_1da994c18001JCExyiPVqsIVFp",
+          "time": {
+            "created": 1794668842018,
+            "streamed": 1794668842023,
+            "completed": 1794668842028
+          },
+          "type": "assistant",
+          "agent": "codepuppy-automation-standard",
+          "model": {
+            "id": "m",
+            "providerID": "codepuppy",
+            "variant": "default"
+          },
+          "content": [
+            {
+              "type": "tool",
+              "id": "call_cp_engine_2",
+              "name": "execute",
+              "executed": false,
+              "state": {
+                "status": "completed",
+                "input": {
+                  "code": "return await tools.probe.echo({text: \"unattended-proof\"})"
+                },
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "unattended-proof"
+                  }
+                ],
+                "metadata": {
+                  "toolCalls": [
+                    {
+                      "tool": "probe.echo",
+                      "status": "completed",
+                      "input": {
+                        "text": "unattended-proof"
+                      }
+                    }
+                  ],
+                  "truncated": false
+                }
+              },
+              "time": {
+                "created": 1794668842021,
+                "ran": 1794668842023,
+                "completed": 1794668842027
+              }
+            }
+          ],
+          "finish": "tool-calls",
+          "rawFinish": "tool_calls",
+          "cost": 0,
+          "tokens": {
+            "input": 0,
+            "output": 0,
+            "reasoning": 0,
+            "cache": {
+              "read": 0,
+              "write": 0
+            }
+          }
+        },
+        {
+          "id": "msg_1da994c2f001INgL18szno6MUI",
+          "time": {
+            "created": 1794668842036,
+            "streamed": 1794668842040,
+            "completed": 1794668842040
+          },
+          "type": "assistant",
+          "agent": "codepuppy-automation-standard",
+          "model": {
+            "id": "m",
+            "providerID": "codepuppy",
+            "variant": "default"
+          },
+          "content": [
+            {
+              "type": "text",
+              "text": "done"
+            }
+          ],
+          "finish": "stop",
+          "rawFinish": "stop",
+          "cost": 0,
+          "tokens": {
+            "input": 0,
+            "output": 0,
+            "reasoning": 0,
+            "cache": {
+              "read": 0,
+              "write": 0
+            }
+          }
+        },
+        {
+          "id": "msg_1da994c39001u2rcSu4IImQmM2",
+          "time": {
+            "created": 1794668842041
+          },
+          "type": "idle",
+          "outcome": "succeeded"
+        },
+        {
+          "id": "msg_1da994d85001bodl2plIfiTAbu",
+          "time": {
+            "created": 1794668842378,
+            "streamed": 1794668842382,
+            "completed": 1794668842387
+          },
+          "type": "assistant",
+          "agent": "codepuppy-automation-standard",
+          "model": {
+            "id": "m",
+            "providerID": "codepuppy",
+            "variant": "default"
+          },
+          "content": [
+            {
+              "type": "tool",
+              "id": "call_cp_engine_11",
+              "name": "execute",
+              "executed": false,
+              "state": {
+                "status": "completed",
+                "input": {
+                  "code": "return await tools.probe.echo({text: \"unattended-proof\"})"
+                },
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "unattended-proof"
+                  }
+                ],
+                "metadata": {
+                  "toolCalls": [
+                    {
+                      "tool": "probe.echo",
+                      "status": "completed",
+                      "input": {
+                        "text": "unattended-proof"
+                      }
+                    }
+                  ],
+                  "truncated": false
+                }
+              },
+              "time": {
+                "created": 1794668842381,
+                "ran": 1794668842381,
+                "completed": 1794668842387
+              }
+            }
+          ],
+          "finish": "tool-calls",
+          "rawFinish": "tool_calls",
+          "cost": 0,
+          "tokens": {
+            "input": 0,
+            "output": 0,
+            "reasoning": 0,
+            "cache": {
+              "read": 0,
+              "write": 0
+            }
+          }
+        },
+        {
+          "id": "msg_1da994d95001dIgQU4ZCjO1iN2",
+          "time": {
+            "created": 1794668842395,
+            "streamed": 1794668842398,
+            "completed": 1794668842398
+          },
+          "type": "assistant",
+          "agent": "codepuppy-automation-standard",
+          "model": {
+            "id": "m",
+            "providerID": "codepuppy",
+            "variant": "default"
+          },
+          "content": [
+            {
+              "type": "text",
+              "text": "done"
+            }
+          ],
+          "finish": "stop",
+          "rawFinish": "stop",
+          "cost": 0,
+          "tokens": {
+            "input": 0,
+            "output": 0,
+            "reasoning": 0,
+            "cache": {
+              "read": 0,
+              "write": 0
+            }
+          }
+        },
+        {
+          "id": "msg_1da994d9f002qiZKBDywAwWT3P",
+          "time": {
+            "created": 1794668842399
+          },
+          "type": "idle",
+          "outcome": "succeeded"
+        }
+      ],
+      "cursor": {
+        "previous": "eyJpZCI6Im1zZ18xZGE5OTRjMTIwMDE2dDVsRUJaQTBidGJINyIsIm9yZGVyIjoiYXNjIiwiZGlyZWN0aW9uIjoicHJldmlvdXMifQ",
+        "next": "eyJpZCI6Im1zZ18xZGE5OTRkOWYwMDJxaVpLQkR5d0F3V1QzUCIsIm9yZGVyIjoiYXNjIiwiZGlyZWN0aW9uIjoibmV4dCJ9"
+      },
+      "emptyPage": {
+        "data": [],
+        "cursor": {
+          "previous": null,
+          "next": null
+        }
+      }
+    },
+    {
+      "scenario": "readonly",
+      "messages": [
+        {
+          "id": "msg_1da994c77001fht4e7hJIBqCUl",
+          "time": {
+            "created": 1794668842112,
+            "streamed": 1794668842115,
+            "completed": 1794668842119
+          },
+          "type": "assistant",
+          "agent": "codepuppy-automation",
+          "model": {
+            "id": "m",
+            "providerID": "codepuppy",
+            "variant": "default"
+          },
+          "content": [
+            {
+              "type": "tool",
+              "id": "call_cp_engine_4",
+              "name": "execute",
+              "executed": false,
+              "state": {
+                "status": "completed",
+                "input": {
+                  "code": "return await tools.probe.echo({text: \"unattended-proof\"})"
+                },
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "这个任务是只读档,不能使用「echo」。"
+                  }
+                ],
+                "metadata": {
+                  "toolCalls": [
+                    {
+                      "tool": "probe.echo",
+                      "status": "error",
+                      "input": {
+                        "text": "unattended-proof"
+                      }
+                    }
+                  ],
+                  "error": true,
+                  "codepuppyUnattendedDenial": {
+                    "version": 1,
+                    "reason": "readonly",
+                    "tool": "echo",
+                    "message": "这个任务是只读档,不能使用「echo」。"
+                  },
+                  "codepuppyDisplay": {
+                    "identity": {
+                      "source": "builtin",
+                      "origin": "",
+                      "name": "execute"
+                    },
+                    "technicalId": "execute",
+                    "authority": {
+                      "kind": "not-asserted"
+                    },
+                    "location": {
+                      "kind": "local"
+                    }
+                  },
+                  "truncated": false
+                }
+              },
+              "time": {
+                "created": 1794668842114,
+                "ran": 1794668842115,
+                "completed": 1794668842118
+              }
+            }
+          ],
+          "finish": "tool-calls",
+          "rawFinish": "tool_calls",
+          "cost": 0,
+          "tokens": {
+            "input": 0,
+            "output": 0,
+            "reasoning": 0,
+            "cache": {
+              "read": 0,
+              "write": 0
+            }
+          }
+        },
+        {
+          "id": "msg_1da994c890019gahsx1I5bqaHP",
+          "time": {
+            "created": 1794668842126,
+            "streamed": 1794668842129,
+            "completed": 1794668842129
+          },
+          "type": "assistant",
+          "agent": "codepuppy-automation",
+          "model": {
+            "id": "m",
+            "providerID": "codepuppy",
+            "variant": "default"
+          },
+          "content": [
+            {
+              "type": "text",
+              "text": "done"
+            }
+          ],
+          "finish": "stop",
+          "rawFinish": "stop",
+          "cost": 0,
+          "tokens": {
+            "input": 0,
+            "output": 0,
+            "reasoning": 0,
+            "cache": {
+              "read": 0,
+              "write": 0
+            }
+          }
+        },
+        {
+          "id": "msg_1da994c92002wWz2KpsD5nNyKA",
+          "time": {
+            "created": 1794668842130
+          },
+          "type": "idle",
+          "outcome": "succeeded"
+        }
+      ],
+      "cursor": {
+        "previous": "eyJpZCI6Im1zZ18xZGE5OTRjNzEwMDJ2TzdjclVRTGVzN0RxZyIsIm9yZGVyIjoiYXNjIiwiZGlyZWN0aW9uIjoicHJldmlvdXMifQ",
+        "next": "eyJpZCI6Im1zZ18xZGE5OTRjOTIwMDJ3V3oyS3BzRDVuTnlLQSIsIm9yZGVyIjoiYXNjIiwiZGlyZWN0aW9uIjoibmV4dCJ9"
+      },
+      "emptyPage": {
+        "data": [],
+        "cursor": {
+          "previous": null,
+          "next": null
+        }
+      }
+    },
+    {
+      "scenario": "binding",
+      "messages": [
+        {
+          "id": "msg_1da994c9e001Cy7PTvHhXSoJZS",
+          "time": {
+            "created": 1794668842151,
+            "streamed": 1794668842155,
+            "completed": 1794668842157
+          },
+          "type": "assistant",
+          "agent": "codepuppy-automation-standard",
+          "model": {
+            "id": "m",
+            "providerID": "codepuppy",
+            "variant": "default"
+          },
+          "content": [
+            {
+              "type": "tool",
+              "id": "call_cp_engine_5",
+              "name": "execute",
+              "executed": false,
+              "state": {
+                "status": "completed",
+                "input": {
+                  "code": "return await tools.probe.echo({text: \"unattended-proof\"})"
+                },
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "「echo」需要你先确认(它的来源发生了变化或已被停用),自动化任务运行时没有人可以确认。到 设置 → 工具 处理后,下次运行即可使用。"
+                  }
+                ],
+                "metadata": {
+                  "toolCalls": [
+                    {
+                      "tool": "probe.echo",
+                      "status": "error",
+                      "input": {
+                        "text": "unattended-proof"
+                      }
+                    }
+                  ],
+                  "error": true,
+                  "codepuppyUnattendedDenial": {
+                    "version": 1,
+                    "reason": "needs-confirmation",
+                    "tool": "echo",
+                    "message": "「echo」需要你先确认(它的来源发生了变化或已被停用),自动化任务运行时没有人可以确认。到 设置 → 工具 处理后,下次运行即可使用。"
+                  },
+                  "codepuppyDisplay": {
+                    "identity": {
+                      "source": "builtin",
+                      "origin": "",
+                      "name": "execute"
+                    },
+                    "technicalId": "execute",
+                    "authority": {
+                      "kind": "not-asserted"
+                    },
+                    "location": {
+                      "kind": "local"
+                    }
+                  },
+                  "truncated": false
+                }
+              },
+              "time": {
+                "created": 1794668842154,
+                "ran": 1794668842154,
+                "completed": 1794668842157
+              }
+            }
+          ],
+          "finish": "tool-calls",
+          "rawFinish": "tool_calls",
+          "cost": 0,
+          "tokens": {
+            "input": 0,
+            "output": 0,
+            "reasoning": 0,
+            "cache": {
+              "read": 0,
+              "write": 0
+            }
+          }
+        },
+        {
+          "id": "msg_1da994cb0001jvsKIbTsypiI3B",
+          "time": {
+            "created": 1794668842165,
+            "streamed": 1794668842168,
+            "completed": 1794668842169
+          },
+          "type": "assistant",
+          "agent": "codepuppy-automation-standard",
+          "model": {
+            "id": "m",
+            "providerID": "codepuppy",
+            "variant": "default"
+          },
+          "content": [
+            {
+              "type": "text",
+              "text": "done"
+            }
+          ],
+          "finish": "stop",
+          "rawFinish": "stop",
+          "cost": 0,
+          "tokens": {
+            "input": 0,
+            "output": 0,
+            "reasoning": 0,
+            "cache": {
+              "read": 0,
+              "write": 0
+            }
+          }
+        },
+        {
+          "id": "msg_1da994cb90035M0Wul0KGTes0l",
+          "time": {
+            "created": 1794668842169
+          },
+          "type": "idle",
+          "outcome": "succeeded"
+        }
+      ],
+      "cursor": {
+        "previous": "eyJpZCI6Im1zZ18xZGE5OTRjOTkwMDF5dHZwZ3FWS2JpY1lMbSIsIm9yZGVyIjoiYXNjIiwiZGlyZWN0aW9uIjoicHJldmlvdXMifQ",
+        "next": "eyJpZCI6Im1zZ18xZGE5OTRjYjkwMDM1TTBXdWwwS0dUZXMwbCIsIm9yZGVyIjoiYXNjIiwiZGlyZWN0aW9uIjoibmV4dCJ9"
+      },
+      "emptyPage": {
+        "data": [],
+        "cursor": {
+          "previous": null,
+          "next": null
+        }
+      }
+    },
+    {
+      "scenario": "env",
+      "messages": [
+        {
+          "id": "msg_1da994cd1001OCYQNwHQeCQwFk",
+          "time": {
+            "created": 1794668842202,
+            "streamed": 1794668842206,
+            "completed": 1794668842210
+          },
+          "type": "assistant",
+          "agent": "codepuppy-automation-standard",
+          "model": {
+            "id": "m",
+            "providerID": "codepuppy",
+            "variant": "default"
+          },
+          "content": [
+            {
+              "type": "tool",
+              "id": "call_cp_engine_6",
+              "name": "read",
+              "executed": false,
+              "state": {
+                "status": "error",
+                "input": {
+                  "path": ".env"
+                },
+                "error": {
+                  "type": "permission.rejected",
+                  "message": "Permission denied: read"
+                },
+                "metadata": {
+                  "codepuppyDisplay": {
+                    "identity": {
+                      "source": "builtin",
+                      "origin": "",
+                      "name": "read"
+                    },
+                    "technicalId": "read",
+                    "authority": {
+                      "kind": "not-asserted"
+                    },
+                    "location": {
+                      "kind": "local"
+                    }
+                  }
+                }
+              },
+              "time": {
+                "created": 1794668842205,
+                "ran": 1794668842206,
+                "completed": 1794668842209
+              }
+            }
+          ],
+          "finish": "tool-calls",
+          "rawFinish": "tool_calls",
+          "cost": 0,
+          "tokens": {
+            "input": 0,
+            "output": 0,
+            "reasoning": 0,
+            "cache": {
+              "read": 0,
+              "write": 0
+            }
+          }
+        },
+        {
+          "id": "msg_1da994ce5001TZW3EEVHTTMWZk",
+          "time": {
+            "created": 1794668842218,
+            "streamed": 1794668842226,
+            "completed": 1794668842226
+          },
+          "type": "assistant",
+          "agent": "codepuppy-automation-standard",
+          "model": {
+            "id": "m",
+            "providerID": "codepuppy",
+            "variant": "default"
+          },
+          "content": [
+            {
+              "type": "text",
+              "text": "done"
+            }
+          ],
+          "finish": "stop",
+          "rawFinish": "stop",
+          "cost": 0,
+          "tokens": {
+            "input": 0,
+            "output": 0,
+            "reasoning": 0,
+            "cache": {
+              "read": 0,
+              "write": 0
+            }
+          }
+        },
+        {
+          "id": "msg_1da994cf3001RCThRVG5C3DO5i",
+          "time": {
+            "created": 1794668842227
+          },
+          "type": "idle",
+          "outcome": "succeeded"
+        }
+      ],
+      "cursor": {
+        "previous": "eyJpZCI6Im1zZ18xZGE5OTRjYzUwMDJjREpHR3BFcU9nMEV2QSIsIm9yZGVyIjoiYXNjIiwiZGlyZWN0aW9uIjoicHJldmlvdXMifQ",
+        "next": "eyJpZCI6Im1zZ18xZGE5OTRjZjMwMDFSQ1RoUlZHNUMzRE81aSIsIm9yZGVyIjoiYXNjIiwiZGlyZWN0aW9uIjoibmV4dCJ9"
+      },
+      "emptyPage": {
+        "data": [],
+        "cursor": {
+          "previous": null,
+          "next": null
+        }
+      }
+    },
+    {
+      "scenario": "subagent",
+      "messages": [
+        {
+          "id": "msg_1da994cfe001TI204yWzTcRi0c",
+          "time": {
+            "created": 1794668842243,
+            "streamed": 1794668842247,
+            "completed": 1794668842250
+          },
+          "type": "assistant",
+          "agent": "codepuppy-automation-standard",
+          "model": {
+            "id": "m",
+            "providerID": "codepuppy",
+            "variant": "default"
+          },
+          "content": [
+            {
+              "type": "tool",
+              "id": "call_cp_engine_7",
+              "name": "subagent",
+              "executed": false,
+              "state": {
+                "status": "error",
+                "input": {
+                  "agent": "general",
+                  "description": "probe",
+                  "prompt": "probe"
+                },
+                "error": {
+                  "type": "permission.rejected",
+                  "message": "Permission denied: subagent"
+                },
+                "metadata": {
+                  "codepuppyDisplay": {
+                    "identity": {
+                      "source": "builtin",
+                      "origin": "",
+                      "name": "subagent"
+                    },
+                    "technicalId": "subagent",
+                    "authority": {
+                      "kind": "not-asserted"
+                    },
+                    "location": {
+                      "kind": "local"
+                    }
+                  }
+                }
+              },
+              "time": {
+                "created": 1794668842246,
+                "ran": 1794668842246,
+                "completed": 1794668842249
+              }
+            }
+          ],
+          "finish": "tool-calls",
+          "rawFinish": "tool_calls",
+          "cost": 0,
+          "tokens": {
+            "input": 0,
+            "output": 0,
+            "reasoning": 0,
+            "cache": {
+              "read": 0,
+              "write": 0
+            }
+          }
+        },
+        {
+          "id": "msg_1da994d0c001gWFJyrP9pDbgYT",
+          "time": {
+            "created": 1794668842258,
+            "streamed": 1794668842261,
+            "completed": 1794668842261
+          },
+          "type": "assistant",
+          "agent": "codepuppy-automation-standard",
+          "model": {
+            "id": "m",
+            "providerID": "codepuppy",
+            "variant": "default"
+          },
+          "content": [
+            {
+              "type": "text",
+              "text": "done"
+            }
+          ],
+          "finish": "stop",
+          "rawFinish": "stop",
+          "cost": 0,
+          "tokens": {
+            "input": 0,
+            "output": 0,
+            "reasoning": 0,
+            "cache": {
+              "read": 0,
+              "write": 0
+            }
+          }
+        },
+        {
+          "id": "msg_1da994d16001wBIcOW2DXZliA6",
+          "time": {
+            "created": 1794668842262
+          },
+          "type": "idle",
+          "outcome": "succeeded"
+        }
+      ],
+      "cursor": {
+        "previous": "eyJpZCI6Im1zZ18xZGE5OTRjZjkwMDJSdWM2VXUydWhYeEI1UiIsIm9yZGVyIjoiYXNjIiwiZGlyZWN0aW9uIjoicHJldmlvdXMifQ",
+        "next": "eyJpZCI6Im1zZ18xZGE5OTRkMTYwMDF3QkljT1cyRFhabGlBNiIsIm9yZGVyIjoiYXNjIiwiZGlyZWN0aW9uIjoibmV4dCJ9"
+      },
+      "emptyPage": {
+        "data": [],
+        "cursor": {
+          "previous": null,
+          "next": null
+        }
+      }
+    },
+    {
+      "scenario": "outside",
+      "messages": [
+        {
+          "id": "msg_1da994d1f00104A6yhDHSGMm5O",
+          "time": {
+            "created": 1794668842276,
+            "streamed": 1794668842280,
+            "completed": 1794668842284
+          },
+          "type": "assistant",
+          "agent": "codepuppy-automation-standard",
+          "model": {
+            "id": "m",
+            "providerID": "codepuppy",
+            "variant": "default"
+          },
+          "content": [
+            {
+              "type": "tool",
+              "id": "call_cp_engine_8",
+              "name": "read",
+              "executed": false,
+              "state": {
+                "status": "error",
+                "input": {
+                  "path": "/private/var/folders/9m/lxt29cf574n04rxx3t6s3gs00000gn/T/cp-test-Omhj5B/tmp/cp-engine-sandbox-DnEZbl/outside.txt"
+                },
+                "error": {
+                  "type": "permission.rejected",
+                  "message": "Permission denied: external_directory"
+                },
+                "metadata": {
+                  "codepuppyDisplay": {
+                    "identity": {
+                      "source": "builtin",
+                      "origin": "",
+                      "name": "read"
+                    },
+                    "technicalId": "read",
+                    "authority": {
+                      "kind": "not-asserted"
+                    },
+                    "location": {
+                      "kind": "local"
+                    }
+                  }
+                }
+              },
+              "time": {
+                "created": 1794668842279,
+                "ran": 1794668842280,
+                "completed": 1794668842283
+              }
+            }
+          ],
+          "finish": "tool-calls",
+          "rawFinish": "tool_calls",
+          "cost": 0,
+          "tokens": {
+            "input": 0,
+            "output": 0,
+            "reasoning": 0,
+            "cache": {
+              "read": 0,
+              "write": 0
+            }
+          }
+        },
+        {
+          "id": "msg_1da994d2e001frm88YkcOaA8ZZ",
+          "time": {
+            "created": 1794668842291,
+            "streamed": 1794668842294,
+            "completed": 1794668842294
+          },
+          "type": "assistant",
+          "agent": "codepuppy-automation-standard",
+          "model": {
+            "id": "m",
+            "providerID": "codepuppy",
+            "variant": "default"
+          },
+          "content": [
+            {
+              "type": "text",
+              "text": "done"
+            }
+          ],
+          "finish": "stop",
+          "rawFinish": "stop",
+          "cost": 0,
+          "tokens": {
+            "input": 0,
+            "output": 0,
+            "reasoning": 0,
+            "cache": {
+              "read": 0,
+              "write": 0
+            }
+          }
+        },
+        {
+          "id": "msg_1da994d370027pZWI2E9F3KtG0",
+          "time": {
+            "created": 1794668842295
+          },
+          "type": "idle",
+          "outcome": "succeeded"
+        }
+      ],
+      "cursor": {
+        "previous": "eyJpZCI6Im1zZ18xZGE5OTRkMWIwMDF0UkpFZ0o5TXpCNDlkZSIsIm9yZGVyIjoiYXNjIiwiZGlyZWN0aW9uIjoicHJldmlvdXMifQ",
+        "next": "eyJpZCI6Im1zZ18xZGE5OTRkMzcwMDI3cFpXSTJFOUYzS3RHMCIsIm9yZGVyIjoiYXNjIiwiZGlyZWN0aW9uIjoibmV4dCJ9"
+      },
+      "emptyPage": {
+        "data": [],
+        "cursor": {
+          "previous": null,
+          "next": null
+        }
+      }
+    },
+    {
+      "scenario": "direct",
+      "messages": [
+        {
+          "id": "msg_1da994e88001sPHTjbzEhHqoD2",
+          "time": {
+            "created": 1794668842637,
+            "streamed": 1794668842640,
+            "completed": 1794668842641
+          },
+          "type": "assistant",
+          "agent": "codepuppy-automation",
+          "model": {
+            "id": "m",
+            "providerID": "codepuppy",
+            "variant": "default"
+          },
+          "content": [
+            {
+              "type": "tool",
+              "id": "call_cp_engine_17",
+              "name": "cp_probe",
+              "executed": false,
+              "state": {
+                "status": "error",
+                "input": {},
+                "error": {
+                  "type": "tool.execution",
+                  "message": "这个任务是只读档,不能使用「cp_probe」。"
+                },
+                "metadata": {
+                  "codepuppyDisplay": {
+                    "identity": {
+                      "source": "plugin",
+                      "origin": "",
+                      "name": "cp_probe"
+                    },
+                    "technicalId": "cp_probe",
+                    "authority": {
+                      "kind": "not-asserted"
+                    },
+                    "location": {
+                      "kind": "local"
+                    }
+                  },
+                  "codepuppyUnattendedDenial": {
+                    "version": 1,
+                    "reason": "readonly",
+                    "tool": "cp_probe",
+                    "message": "这个任务是只读档,不能使用「cp_probe」。"
+                  }
+                }
+              },
+              "time": {
+                "created": 1794668842639,
+                "ran": 1794668842640,
+                "completed": 1794668842641
+              }
+            }
+          ],
+          "finish": "tool-calls",
+          "rawFinish": "tool_calls",
+          "cost": 0,
+          "tokens": {
+            "input": 0,
+            "output": 0,
+            "reasoning": 0,
+            "cache": {
+              "read": 0,
+              "write": 0
+            }
+          }
+        },
+        {
+          "id": "msg_1da994e94001LV4simSRU0Ndqn",
+          "time": {
+            "created": 1794668842648,
+            "streamed": 1794668842657,
+            "completed": 1794668842657
+          },
+          "type": "assistant",
+          "agent": "codepuppy-automation",
+          "model": {
+            "id": "m",
+            "providerID": "codepuppy",
+            "variant": "default"
+          },
+          "content": [
+            {
+              "type": "text",
+              "text": "done"
+            }
+          ],
+          "finish": "stop",
+          "rawFinish": "stop",
+          "cost": 0,
+          "tokens": {
+            "input": 0,
+            "output": 0,
+            "reasoning": 0,
+            "cache": {
+              "read": 0,
+              "write": 0
+            }
+          }
+        },
+        {
+          "id": "msg_1da994ea2001fHtydiKmp3VfBS",
+          "time": {
+            "created": 1794668842658
+          },
+          "type": "idle",
+          "outcome": "succeeded"
+        }
+      ],
+      "cursor": {
+        "previous": "eyJpZCI6Im1zZ18xZGE5OTRlODQwMDIyM25SVWJrNlNXTVJUMSIsIm9yZGVyIjoiYXNjIiwiZGlyZWN0aW9uIjoicHJldmlvdXMifQ",
+        "next": "eyJpZCI6Im1zZ18xZGE5OTRlYTIwMDFmSHR5ZGlLbXAzVmZCUyIsIm9yZGVyIjoiYXNjIiwiZGlyZWN0aW9uIjoibmV4dCJ9"
+      },
+      "emptyPage": {
+        "data": [],
+        "cursor": {
+          "previous": null,
+          "next": null
+        }
+      }
+    }
+  ],
+  "forms": [
+    {
+      "id": "frm_1da994ebd001BqgXFW0kSTfpyI",
+      "sessionID": "global",
+      "title": "elicitor is requesting input",
+      "metadata": {
+        "kind": "mcp-elicitation",
+        "server": "elicitor",
+        "message": "More input"
+      },
+      "fields": [
+        {
+          "key": "answer",
+          "title": "answer",
+          "required": true,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "id": "frm_1da994fe80012siqAnXOnT2iuZ",
+      "sessionID": "global",
+      "title": "elicitor is requesting input",
+      "metadata": {
+        "kind": "mcp-elicitation",
+        "server": "elicitor",
+        "elicitationID": "05324565-5354-406a-a676-6fd65bcf900f",
+        "message": "Authorize"
+      },
+      "fields": [
+        {
+          "key": "elicitation",
+          "type": "external",
+          "url": "http://127.0.0.1:1/authorize"
+        }
+      ]
+    },
+    {
+      "id": "frm_1da99510e0016n5ZDKGCP2K7Ja",
+      "sessionID": "global",
+      "title": "elicitor is requesting input",
+      "metadata": {
+        "kind": "mcp-elicitation",
+        "server": "elicitor",
+        "message": "More input"
+      },
+      "fields": [
+        {
+          "key": "answer",
+          "title": "answer",
+          "required": true,
+          "type": "string"
+        }
+      ]
+    }
+  ]
+}

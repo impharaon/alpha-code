@@ -1,0 +1,6 @@
+pgrep: Regular expression evaluation error (illegal byte sequence)
+launched label=a2 pid/pgid=31703 mock=1 owner-app-pids-before=[]
+lsof: 5 processes, 162 open paths, 59 under <root>, leaks: 0
+single-instance lock: <root>/home/Library/Application Support/ai.opencode.desktop/SingletonLock -> tidedeMac-mini.local-31703
+pgrep: Regular expression evaluation error (illegal byte sequence)
+LAUNCH GATE RED: owner-side path metadata changed: 1c1 < 1794213192 250 Library/Preferences/com.tide.codepuppy.plist --- > 1794536476 250 Library/Preferences/com.tide.codepuppy.plist  — process group 31703 killed

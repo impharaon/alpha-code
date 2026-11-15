@@ -1,0 +1,7 @@
+tools/watchdog-proof.sh: line 37: 23195 Killed: 9               /usr/bin/python3 -c 'import os,sys; os.setsid(); os.execv("/bin/sleep", ["sleep", "60"])'
+arm=good decoy=SecurityAgent(compiled 3 s sleeper) caught=1 watchdog_exit=9 latency_ms=305
+  log: 1794538580.955 watchdog start pgid=23195 names=[SecurityAgent UserNotificationCenter coreautha] interval=0.1s baseline=[UserNotificationCenter:28035 coreautha:3523]
+  log: 1794538581.641 WATCHDOG FIRED: new prompt-class process(es) [SecurityAgent:23306] -> SIGKILL process group 23195
+  log:   ps: 23306 23170 Thu Nov 12 21:56:21 2026     <root>/B/watchdog-proof-good/decoy/SecurityAgent
+  log:   target group gone
+WATCHDOG PROOF: OK (exit 0)

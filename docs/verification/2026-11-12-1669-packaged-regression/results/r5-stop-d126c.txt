@@ -1,0 +1,5 @@
+stopped label=d126c group=30251
+prefs compare: size 250->250; changed=['SKPurchaseIntentUpdatesLastChecked']; unchanged=['AppleTextDirection', 'NSForceRightToLeftWritingDirection', 'NSNavPanelExpandedSizeForOpenMode', 'NSTreatUnknownArgumentsAsOpen']; other-than-known-timestamp-changed=[]
+owner-side paths unchanged
+owner app pids unchanged []
+LaunchServices entries under the root after cleanup: 0

@@ -79,8 +79,6 @@ beforeAll(() => {
   fs.mkdirSync(process.env.CODEPUPPY_GLOBAL_DIR, { recursive: true })
   process.env.OPENCODE_CONFIG_DIR = path.join(root, "config-dir")
   fs.mkdirSync(process.env.OPENCODE_CONFIG_DIR, { recursive: true })
-  // 平台节点要有地址才注入;本进程只判纯函数,这个地址从不被访问。
-  process.env.CODEPUPPY_BASE_URL = "http://127.0.0.1:9/v1"
 })
 
 afterAll(() => {
@@ -96,7 +94,8 @@ const rowKey = (row: ModelPickerRow) => `${row.model.providerID}:${row.model.id}
 /** 生产 picker 行:静态目录、全部 BYOK key 已配置、引擎清单 = 注入的那些模型(平台行的可用性需要它在册)。 */
 function pickerRows(): ModelPickerRow[] {
   const base = getModelCatalog(userData)
-  const cfg = buildCodePuppyModelConfig(userData)!
+  // 平台节点要有地址才注入(`#1698` G2:注入从启动文档取来交进来);本进程只判纯函数,这个地址从不被访问。
+  const cfg = buildCodePuppyModelConfig(userData, { baseURL: "http://127.0.0.1:9/v1" })!
   const models: ModelV2Info[] = Object.entries(cfg.provider as Record<string, { models: Record<string, unknown> }>).flatMap(
     ([providerID, provider]) =>
       Object.keys(provider.models).map(

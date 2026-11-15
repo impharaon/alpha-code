@@ -1,17 +1,23 @@
 // `#1662` parity:几份 `*.engine.cases.ts` 共用的宿主 —— 嵌进 sidecar 的那台 OpenCode 2,配置是生产 `injectCodePuppyConfig` 的产物
 // (内联文档 + 显式文件,原样交给 `start()`),装着真 ext(`packages/ext/src/plugin.ts`,以本地目录插件装,与 sidecar 同一个入口形状)、
-// 一个探针插件(拿到插件上下文、注册两个插件工具)与一个本机 OpenAI 兼容模型桩(平台节点经 `CODEPUPPY_BASE_URL` 指向它)。
+// 一个探针插件(拿到插件上下文、注册两个插件工具)与一个本机 OpenAI 兼容模型桩(平台节点经启动文档的 platform.modelProxyBaseURL 指向它)。
 // 调用方必须先 `engineSandbox()` 并在 beforeAll 里 `assertEngineSandboxed()`;本模块不碰沙箱之外的任何目录。
 import fs from "node:fs"
 import path from "node:path"
 import { engineSlot, type EngineSandbox } from "./engine-sandbox"
+import { createHash } from "node:crypto"
+import { tryCodePuppyBootstrap, codepuppyBootstrap } from "@opencode/util/codepuppy-bootstrap"
+import { publishTestBootstrap, type TestBootstrapInput } from "./codepuppy-bootstrap-fixture"
+import { engineGlobalConfigDirectory } from "../src/main/engine-paths"
 import { buildEngineServerOptions } from "../src/main/engine-server-options"
 import { engineAuthorization, withEngineAuthorization } from "../src/main/engine-authorization"
 import { injectCodePuppyConfig } from "../src/main/codepuppy-config-injection"
-import { writeExplicitConfig, type ExplicitPolicy } from "../src/main/engine-explicit-config"
 import { secretFilePath, secretFileRef } from "../src/main/codepuppy-secret-files"
 import { buildHubRequestReply, buildHubViewReply } from "../src/main/codepuppy-sidecar-messages"
 import type { EngineFetch } from "../src/main/in-process-engine"
+import { engineProjectTrust } from "../src/main/engine-project-trust"
+import { projectTrustIdentity } from "../src/main/project-trust-truth"
+import { recordProjectTrustDecision } from "../src/main/project-trust-truth-write"
 
 /** 真 stdio MCP 服务器(#1563 的夹具):列一个 `echo`,`CODEPUPPY_MCP_CALL_LOG` 记下每次 tools/call。 */
 export const MCP_FIXTURE = path.resolve(import.meta.dir, "../../core/test/fixture/codepuppy-mcp-startup-stdio.ts")
@@ -114,6 +120,27 @@ export type HostOptions = {
   ext?: boolean
   /** 引擎的文件监听(生产默认开;默认这里关,要判「不重启就生效」时打开)。 */
   filewatcher?: boolean
+  /** `#1698`:启动文档里的治理云 MCP 与 kill-switch(缺省:没有云 MCP、kill-switch 关)。 */
+  cloudMcp?: TestBootstrapInput["cloudMcp"]
+  killSwitch?: boolean
+  /** `#1698` G3:启动文档里的审批期限、出厂技能目录与运维开关(缺省:期限 300 s、没有出厂技能、开关全关)。 */
+  askTimeoutMs?: number
+  factoryDirs?: string[]
+  switches?: TestBootstrapInput["switches"]
+  /** `#1713` 契约 C 的信任钩子;默认是 sidecar 用的生产读法(没有记录 ⇒ 未允许)。要一个已允许的项目,用 allowProject 记一条。 */
+  projectTrust?: (directory: string) => boolean
+}
+
+/**
+ * `#1713`:用户在确认框里对这个项目文件夹点了「允许加载」—— 经 main 的生产写端记进 `<casBaseRoot>/project-trust/<env>.json`
+ * (位置由宿主发布的 bootstrap.paths.globalRoot 推出,与 sidecar 读的是同一份)。在 codepuppyEngine() 之后、引擎装载这个目录之前调用。
+ */
+export function allowProject(directory: string): void {
+  fs.mkdirSync(directory, { recursive: true })
+  const identity = projectTrustIdentity(fs.realpathSync(directory))
+  if (!identity) throw new Error(`allowProject: ${directory} has no directory identity`)
+  const written = recordProjectTrustDecision(identity, true, new Date().toISOString(), () => {})
+  if (!written.ok) throw new Error(`allowProject: the trust record was not written — ${written.reason}`)
 }
 
 export type Running = {
@@ -131,18 +158,31 @@ export type Running = {
 export function codepuppyEngine(options: HostOptions) {
   const { sandbox, name } = options
   const userData = path.join(sandbox.root, `${name}-userdata`)
-  process.env.CODEPUPPY_GLOBAL_DIR = path.join(sandbox.root, `${name}-state`, "codepuppy-state", "env", "dev")
-  fs.mkdirSync(process.env.CODEPUPPY_GLOBAL_DIR, { recursive: true })
+  const globalRoot = path.join(sandbox.root, `${name}-state`, "codepuppy-state", "env", "dev")
+  fs.mkdirSync(globalRoot, { recursive: true })
+  // `#1698`:sidecar 在注入、装 ext 之前发布启动文档(R14):全局根、平台节点地址(这里指向模型桩)与平台凭据的 {file:} 引用(ext 的
+  // 请求头每次现读它)、工具策略的账户分区、云 MCP 与 kill-switch 都经它到注入与 ext。引擎全局配置目录取 #1698 之前注入自己按环境
+  // 推的那一个(XDG 沙箱下的 opencode;注入的 MCP 默认拒绝枚举它),各 cases 的写法不变。
+  publishTestBootstrap({
+    globalRoot,
+    userData,
+    engineConfigDirectory: engineGlobalConfigDirectory(process.env, sandbox.home),
+    platform: { credentialRef: secretFileRef(userData, "CODEPUPPY_API_KEY"), modelProxyBaseURL: options.modelBaseURL },
+    policyAccount: `acct:${createHash("sha256").update(`${name}-${Math.random()}`).digest("hex")}`,
+    cloudMcp: options.cloudMcp,
+    killSwitch: options.killSwitch,
+    // 引擎开关与交给 start() 的同一份(生产里 sidecar 从文档取 start() 的两项,core 的项目监听读同一个 filewatcher)
+    engine: { modelsFetch: false, filewatcher: options.filewatcher ?? false },
+    askTimeoutMs: options.askTimeoutMs,
+    factoryDirs: options.factoryDirs,
+    switches: options.switches,
+  })
   const key = secretFilePath(userData, "CODEPUPPY_API_KEY")
   fs.mkdirSync(path.dirname(key), { recursive: true })
   fs.writeFileSync(key, `sk-cp-${name}`, { mode: 0o600 })
-  // sidecar 在 fork 时置的两样:平台节点地址(这里指向模型桩)与平台凭据的 {file:} 引用(ext 的请求头每次现读它)
-  process.env.CODEPUPPY_BASE_URL = options.modelBaseURL
-  process.env.CODEPUPPY_PLATFORM_AUTH_REF = secretFileRef(userData, "CODEPUPPY_API_KEY")
-  process.env.CODEPUPPY_POLICY_ACCOUNT = `t-${name}-${Math.random().toString(36).slice(2)}`
   if (options.mcpCallLog || options.mcp)
     fs.writeFileSync(
-      path.join(process.env.CODEPUPPY_GLOBAL_DIR, "codepuppy.jsonc"),
+      path.join(globalRoot, "codepuppy.jsonc"),
       JSON.stringify({
         mcp: {
           ...(options.mcpCallLog
@@ -174,26 +214,9 @@ export function codepuppyEngine(options: HostOptions) {
   )
 
   const withExt = options.ext !== false
-  const injection = injectCodePuppyConfig(userData, withExt ? ext : undefined, "stable")
+  const injection = injectCodePuppyConfig(userData, withExt ? ext : undefined, "stable", codepuppyBootstrap().paths.userConfig ?? null)
   const content = JSON.parse(injection.config.content) as { plugins: string[]; providers: Record<string, { models?: Record<string, unknown> }> }
-  const injectedPlugins = new Set(content.plugins)
   content.plugins = [...content.plugins, probeDir]
-  // `#1708`:只对宿主直接追加的本地插件补精确路径,不取项目配置;探针与 turn-failure 的 retry-now 都在这里。
-  // 后者只把测试的重试间隔改成 0;若被拒,引擎照常退避约 84 秒,超过用例等待 idle 的 15 秒。
-  const withHostPlugins = (policies: ExplicitPolicy[]): ExplicitPolicy[] => [
-    ...policies,
-    ...content.plugins
-      .filter((target) => !injectedPlugins.has(target) && path.isAbsolute(target) && !/[*?]/.test(target))
-      .filter((target) => !policies.some((policy) => policy?.action === "plugin.use" && policy.resource === target && policy.effect === "allow"))
-      .map((resource) => ({ action: "plugin.use", resource, effect: "allow" })),
-  ]
-  if (injection.explicit) {
-    const explicit = injection.explicit
-    const recompute = explicit.plugins
-    explicit.layer.plugins = withHostPlugins(explicit.layer.plugins)
-    explicit.plugins = (userText) => withHostPlugins(recompute(userText))
-    writeExplicitConfig(explicit.file, explicit.userConfig, explicit.layer)
-  }
   // 沙箱里没有已应用的平台目录,平台节点的模型表是空的(`#1556`);补一个模型只为能发出请求
   if (options.platformModels !== null) content.providers.codepuppy!.models = options.platformModels ?? { m: { name: "m" } }
 
@@ -201,19 +224,6 @@ export function codepuppyEngine(options: HostOptions) {
   for (const [file, body] of Object.entries(options.projectFiles ?? {})) fs.writeFileSync(path.join(slot.projectDirectory, file), body)
 
   const start = async (): Promise<Running> => {
-    // 调用方可在注入后修改显式文档;只补宿主插件的精确放行,保留原字段与策略顺序。
-    if (injection.explicit) {
-      const document: unknown = await Bun.file(injection.explicit.file).json().catch(() => undefined)
-      // 无效文档仍交给引擎按原契约处理,宿主不把它重建成另一份有效配置。
-      if (document && typeof document === "object" && !Array.isArray(document)) {
-        const current = document as { policies?: ExplicitPolicy[] }
-        if (current.policies === undefined || Array.isArray(current.policies)) {
-          const policies = withHostPlugins(current.policies ?? [])
-          if (policies.length !== (current.policies?.length ?? 0))
-            await Bun.write(injection.explicit.file, `${JSON.stringify({ ...document, policies }, null, 2)}\n`)
-        }
-      }
-    }
     const { startEngine } = await import("../engine/engine-embed")
     let fetch: EngineFetch | undefined
     const password = `cp-${name}`
@@ -230,7 +240,7 @@ export function codepuppyEngine(options: HostOptions) {
         filewatcher: options.filewatcher ?? false,
         platform: process.platform,
       }),
-      { onDispatch: (dispatch) => (fetch = withEngineAuthorization(dispatch, password)) },
+      { onDispatch: (dispatch) => (fetch = withEngineAuthorization(dispatch, password)), projectTrust: options.projectTrust ?? engineProjectTrust },
     )
     const send = async (method: string, route: string, body?: unknown) => {
       const response = await fetch!(
@@ -266,7 +276,7 @@ export async function policyStore() {
   const { policyWorkspace } = await import("../../ext/src/policy/index")
   return createToolPolicyStore({
     baseDir: defaultPolicyBaseDir(path.join(process.env.XDG_DATA_HOME!, "opencode")),
-    account: () => process.env.CODEPUPPY_POLICY_ACCOUNT!,
+    account: () => tryCodePuppyBootstrap()?.policy.account ?? "anonymous",
     workspace: () => policyWorkspace(probe().ctx.location),
   })
 }

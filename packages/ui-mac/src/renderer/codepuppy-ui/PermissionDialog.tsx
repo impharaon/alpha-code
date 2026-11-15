@@ -3,7 +3,7 @@ import type {
   PermissionV2DecisionCommand,
   PermissionV2DecisionReceipt,
   PermissionV2Request,
-} from "@opencode-ai/sdk/v2/client"
+} from "../../engine-adapter/contract/v1"
 import { createSignal, createUniqueId, For, type JSX, onCleanup, onMount, Show } from "solid-js"
 import { createStore } from "solid-js/store"
 import { Portal } from "solid-js/web"
@@ -13,6 +13,8 @@ import { isPermissionV1Fingerprint } from "../../../../codepuppy-app/src/context
 import type { ToolPolicyApi } from "../../shared/tool-policy-wire"
 import { approvalToolOf, PROVENANCE_SOURCE_KEYS } from "./session-timeline/cards/tool-card-model"
 import { Button } from "./Button"
+import { permissionRiskOf } from "./permission-risk"
+import { RiskTag, type RiskTagLevel } from "./RiskTag"
 import { t } from "../i18n"
 import "./permission-dialog.css"
 
@@ -60,6 +62,8 @@ export function PermissionDialog(props: {
   const approval = permissionApprovalOf(props.request)
   const saved = savedResources(props.request)
   const what = requestWhat(props.request, approval, facts)
+  // `#1314`:分类缺失或不认识时是「风险未知」,每张卡都有标签。
+  const risk = permissionRiskOf(props.request)
   const [state, setState] = createStore<{
     /** 正在提交的那个按钮(「在此项目中始终允许」从写设置起就算在途)。 */
     busy?: PermissionV2Decision
@@ -165,6 +169,8 @@ export function PermissionDialog(props: {
   return (
     <PermissionPanel
       title={t("codepuppy.permission.title")}
+      risk={risk.level}
+      description={risk.reason ? t(risk.reason) : undefined}
       busy={!!state.busy}
       footer={
         <div class="a-permission-footer">
@@ -352,6 +358,8 @@ type PanelAnchor = { bottom: number; left: number; width: number }
  */
 function PermissionPanel(props: {
   title: string
+  /** 风险档位标签,放在标题行里标题之后(不随正文滚动);读屏随标题一起念出。 */
+  risk?: RiskTagLevel
   description?: JSX.Element
   busy?: boolean
   footer: JSX.Element
@@ -359,6 +367,7 @@ function PermissionPanel(props: {
 }) {
   const titleId = createUniqueId()
   const descriptionId = createUniqueId()
+  const riskId = createUniqueId()
   const [anchor, setAnchor] = createSignal<PanelAnchor>()
   let panel!: HTMLDivElement
   const trigger = document.activeElement
@@ -426,7 +435,7 @@ function PermissionPanel(props: {
           ref={(element) => (panel = element)}
           class="a-permission-panel"
           role="dialog"
-          aria-labelledby={titleId}
+          aria-labelledby={props.risk ? `${titleId} ${riskId}` : titleId}
           aria-describedby={props.description ? descriptionId : undefined}
           aria-busy={props.busy ? "true" : undefined}
           tabIndex={-1}
@@ -449,6 +458,7 @@ function PermissionPanel(props: {
             <div id={titleId} class="a-permission-panel-title">
               {props.title}
             </div>
+            <Show when={props.risk}>{(level) => <RiskTag id={riskId} level={level()} />}</Show>
           </header>
           <div class="a-permission-panel-body">
             <Show when={props.description}>

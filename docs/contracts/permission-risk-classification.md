@@ -6,7 +6,7 @@ kind: contract
 status: active
 owners:
   - alpha-code
-last_reviewed: 2026-09-09
+last_reviewed: 2026-11-13
 review_after: 2027-03-09
 ---
 
@@ -27,7 +27,7 @@ review_after: 2027-03-09
 | --- | --- |
 | 每条 v1 授权请求都带 `metadata.codepuppyRisk`,且在动作被放行之前就带着 | **不产生任何否决/放行通道**:`evaluate()` 的 deny/allow/ask 判定在分类之前完成且不读它(`#1291` 决定书 §2.2:分类是输入、cap 是上限、审批是待裁决态) |
 | 未被任何规则覆盖的请求落在最保守档 `critical` / `unknown`(`rules: ["fallback:unknown"]`);分类器抛异常同样落到这一档 | 不保证分类**正确**到能替代人的判断 —— 它只用规则与上游已派生的事实,词法探针是 raise-only |
-| 入参 `metadata` 里的同名键被**无条件覆盖**(工具 / MCP 自报的低档不算数) | 不重画授权框:今天的 `PermissionDialog` 不读 `metadata`,呈现层改动另立票 |
+| 入参 `metadata` 里的同名键被**无条件覆盖**(工具 / MCP 自报的低档不算数) | 不决定怎么画:呈现在 `ui-mac` 的 `codepuppy-ui/permission-risk.ts`(读 `metadata.codepuppyRisk`,判「有效」用本契约的 `readRiskClassification`)与共享组件 `RiskTag`(#1314);缺失或不认识的形状显示「风险未知」,不是低风险 |
 | 远端 MCP 的身份轴提示上带 `args`(载荷)、`transport`(目的地)、`identity`、`authority` | v2 审批引擎(`PermissionV2`)那条通道**没有**分类 —— 今天产品到不了它(见「前提」) |
 
 ## 形状

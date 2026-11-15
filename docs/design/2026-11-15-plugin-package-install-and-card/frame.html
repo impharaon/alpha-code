@@ -1,0 +1,385 @@
+<!doctype html>
+<html lang="zh-CN" data-color-scheme="light">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>定制中心 · 简化:「+」装好即开启,「…」管全部 · 评审稿</title>
+<!-- 帧内样式全部引用正式代码:令牌与基础、组件库(按钮 / 对话框 / 提示 / 卡片 / 名称—值列表)、设置页分组行、定制中心。帧内不定义新的颜色、字号、间距或圆角。 -->
+<link rel="stylesheet" href="../../../packages/ui-mac/src/renderer/codepuppy-ui/base.css" />
+<link rel="stylesheet" href="../../../packages/ui-mac/src/renderer/codepuppy-ui/button.css" />
+<link rel="stylesheet" href="../../../packages/ui-mac/src/renderer/codepuppy-ui/dialog.css" />
+<link rel="stylesheet" href="../../../packages/ui-mac/src/renderer/codepuppy-ui/toast.css" />
+<link rel="stylesheet" href="../../../packages/ui-mac/src/renderer/codepuppy-ui/settings.css" />
+<link rel="stylesheet" href="../../../packages/ui-mac/src/renderer/extensions/extension-hub.css" />
+<style>
+/* ════════ 帧外排版(dz-):只用 --a-* ════════ */
+html,body{margin:0}
+body{background:var(--a-bg-subtle);color:var(--a-text);font-family:var(--a-font-sans);font-size:var(--a-text-base);line-height:var(--a-leading-normal);-webkit-font-smoothing:antialiased}
+.dz-bar{position:sticky;top:0;z-index:2000;display:flex;align-items:center;gap:16px;padding:10px 24px;border-bottom:1px solid var(--a-border);background:color-mix(in srgb,var(--a-bg-canvas) 92%,transparent);backdrop-filter:blur(14px)}
+.dz-bar b{font-size:var(--a-text-sm)}
+.dz-bar nav{display:flex;gap:12px;flex-wrap:wrap;font-size:var(--a-text-xs)}
+.dz-bar nav a{color:var(--a-text-secondary);text-decoration:none}
+.dz-grow{flex:1}
+.dz-seg{display:inline-flex;padding:2px;gap:2px;background:var(--a-bg-muted);border-radius:var(--a-radius-sm)}
+.dz-seg button{border:0;background:transparent;font:inherit;font-size:var(--a-text-xs);padding:3px 10px;border-radius:var(--a-radius-xs);color:var(--a-text-secondary);cursor:pointer}
+.dz-seg button[data-on]{background:var(--a-surface);color:var(--a-text);box-shadow:var(--a-shadow-xs)}
+.dz-wrap{max-width:1180px;margin:0 auto;padding:28px 24px 96px}
+.dz-intro h1{margin:0 0 8px;font-size:var(--a-text-2xl);letter-spacing:var(--a-tracking-tight)}
+.dz-intro p{margin:0 0 6px;max-width:90ch;color:var(--a-text-secondary);font-size:var(--a-text-md);line-height:1.65}
+.dz-sec{scroll-margin-top:64px}
+.dz-h2{margin:48px 0 4px;font-size:var(--a-text-xl);letter-spacing:var(--a-tracking-tight)}
+.dz-sub{margin:0 0 12px;max-width:100ch;color:var(--a-text-secondary);font-size:var(--a-text-sm);line-height:1.6}
+.dz-rel{margin:16px 0 0;padding:14px 16px;border:1px solid var(--a-border);border-left:3px solid var(--a-accent);border-radius:var(--a-radius-md);background:var(--a-bg-canvas);font-size:var(--a-text-sm);line-height:1.65;color:var(--a-text-secondary);max-width:120ch}
+.dz-rel h3{margin:0 0 6px;font-size:var(--a-text-md);color:var(--a-text)}
+.dz-rel b{color:var(--a-text)}
+.dz-rel ul{margin:4px 0 0;padding-left:18px}
+.dz-wrap code{font-family:var(--a-font-mono);font-size:11px}
+.dz-tag{display:inline-block;margin:18px 0 6px;font-size:var(--a-text-xs);font-weight:var(--a-weight-semibold);color:var(--a-text-tertiary);letter-spacing:var(--a-tracking-wide)}
+.dz-cap{margin:8px 0 0;font-size:var(--a-text-xs);color:var(--a-text-tertiary);line-height:1.5}
+.dz-table{border-collapse:collapse;font-size:var(--a-text-sm);background:var(--a-bg-canvas);border:1px solid var(--a-border);width:100%}
+.dz-table th{background:var(--a-bg-subtle);text-align:left;font-size:var(--a-text-xs);color:var(--a-text-tertiary);font-weight:var(--a-weight-semibold);padding:8px 12px}
+.dz-table td{padding:8px 12px;border-top:1px solid var(--a-border-faint);color:var(--a-text-secondary);vertical-align:top;line-height:1.55}
+.dz-table td:first-child{white-space:nowrap;color:var(--a-text)}
+.dz-duo{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px;align-items:start}
+/* 页面帧:定制中心整页(页签 + 居中 880 栏),与正式代码同一结构,只是不固定在窗口上 */
+.dz-page{border:1px solid var(--a-border-strong);border-radius:10px;overflow:hidden;background:var(--a-bg-canvas);box-shadow:var(--a-shadow-sm)}
+.dz-page .codepuppy-ext-tabs{position:relative}
+/* 对话框帧:正式对话框面板原样,只把「固定在窗口中央」改成画在台面上 */
+.dz-stage{display:flex;justify-content:center;align-items:flex-start;padding:28px 20px;background:var(--a-bg-inset);border:1px solid var(--a-border-strong);border-radius:10px}
+.dz-stage .a-dialog-panel{position:relative;inset:auto;margin:0;animation:none;max-height:none}
+.dz-stage .a-toast{animation:none;width:min(360px,100%)}
+/* 「…」菜单帧:让展开的菜单有地方落 */
+.dz-menu-room{padding-bottom:150px}
+
+/* ════════ 组合规则(实现时进 extension-hub.css;只排版,不带任何新的颜色 / 字号 / 间距值)════════ */
+/* ① 「…」菜单里的开关行 = 菜单项 + 定制中心现有开关,两端对齐 */
+.codepuppy-ext-menu-item[data-switch]{display:flex;align-items:center;justify-content:space-between;gap:var(--a-space-3)}
+/* ② 管理页头部:名称区撑开,「…」靠右 */
+.codepuppy-ext-dhead .codepuppy-ext-dhead-body{flex:1}
+</style>
+</head>
+<body>
+
+<div class="dz-bar">
+  <b>定制中心 · 简化评审稿</b>
+  <nav><a href="#map">每一块用哪个组件</a><a href="#list">列表</a><a href="#menu">「…」菜单</a><a href="#install">点「+」</a><a href="#manage">管理页</a><a href="#search">搜索</a><a href="#copy">文案</a><a href="#removed">去掉了什么</a></nav>
+  <div class="dz-grow"></div>
+  <div class="dz-seg" id="themeSeg"><button data-theme="light" data-on>浅色</button><button data-theme="dark">深色</button></div>
+</div>
+
+<main class="dz-wrap">
+
+<section class="dz-intro">
+  <h1>点「+」就装好能用,装好的只有一个「…」</h1>
+  <p>没装的点「+」,装好并直接开启;装好的只剩一个「…」,里面是开关、管理和移除。只有要登录或要令牌时才弹一个小窗,一句话、一个按钮。</p>
+  <div class="dz-rel">
+    <h3>与上一稿的关系</h3>
+    <ul>
+      <li><b>依据</b>:owner 2026-11-15 真机反馈与参照 ChatGPT 插件页后的要求(编排器转达):已装的只留「…」,没装的显示「+」,开关放进「…」,装完默认开启,要素、文案、流程都要大幅简化。本稿取代同日上一份派发里「卡片上放开关」的画法。</li>
+      <li><b>沿用活稿</b> <a href="../current/customization-center/design.html#hub-tabs"><code>current/customization-center/#hub-tabs</code></a>:页签、页头(标题 / 副标题 / 搜索 /「添加 ▾」)、列表行、分组、「…」菜单都不换样式;管理页沿用 <a href="../current/customization-center/design.html#detail"><code>#detail</code></a> 的面包屑与头部,下面的分组行取自设置页。</li>
+      <li><b>改了什么</b>:行上的动作只剩「+」或「…」;开关进菜单;安装不再有确认框;要登录 / 要令牌时各一个小窗;一个扩展包只占一行;管理页四块;搜索结果标出处。逐条见 <a href="#removed">去掉了什么</a>。</li>
+      <li><b>帧里怎么画的</b>:直接引用正式代码的样式表;只加两条排版组合(见 <a href="#map">组件表</a> 末行),没有新颜色、新字号、新组件。</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ═══ 组件表 ═══ -->
+<section class="dz-sec" id="map">
+  <h2 class="dz-h2">每一块用哪个组件</h2>
+  <table class="dz-table">
+    <tr><th>元素</th><th>现有组件</th><th>出处</th></tr>
+    <tr><td>页签、页头、搜索框、「添加 ▾」</td><td>定制中心页头(原样)</td><td><code>extension-hub.css</code> <code>.codepuppy-ext-tabs</code> / <code>-pagehd</code> / <code>-search</code>;活稿 <code>#hub-connectors</code></td></tr>
+    <tr><td>列表行(图标 + 名称 + 一行描述 + 一个动作)</td><td>定制中心列表行</td><td><code>.codepuppy-ext-kit</code>,双列 <code>.codepuppy-ext-grid</code></td></tr>
+    <tr><td>「+」</td><td>行上动作按钮(和「…」同一个按钮,只是字不同)</td><td><code>.codepuppy-ext-add</code></td></tr>
+    <tr><td>「…」与展开的菜单</td><td>定制中心「…」下拉</td><td><code>MoreMenu</code>:<code>.codepuppy-ext-more</code> / <code>-menu</code> / <code>-menu-item</code>(移除用 danger)</td></tr>
+    <tr><td>菜单里的开关</td><td>定制中心开关</td><td><code>.codepuppy-ext-sw</code>(详情页现用的那个)</td></tr>
+    <tr><td>「待登录」「待填令牌」</td><td>扩展包状态小标(需要处理)</td><td><code>.codepuppy-ext-package-state[data-prerequisite="required-action"]</code></td></tr>
+    <tr><td>出错时的一句原因</td><td>行描述的出错态</td><td><code>.codepuppy-ext-kit-desc[data-err]</code></td></tr>
+    <tr><td>搜索结果的出处「来自 Claude 插件市场」</td><td>定制中心小标签</td><td><code>.codepuppy-ext-chip</code>(无来源色)</td></tr>
+    <tr><td>登录小窗、令牌小窗</td><td>组件库对话框(小号)+ 按钮</td><td><code>Dialog size="sm"</code>;<code>Button</code> primary</td></tr>
+    <tr><td>令牌输入</td><td>定制中心表单字段(自定义连接器窗口在用)</td><td><code>.codepuppy-ext-flabel</code> + <code>.codepuppy-ext-input</code>,外层 <code>.codepuppy-ext-confirm-keys</code> / <code>-key-field</code> / <code>-key-hint</code></td></tr>
+    <tr><td>「去 GitHub 生成」</td><td>定制中心文字链接(「全部更新」那个)</td><td><code>.codepuppy-ext-link</code></td></tr>
+    <tr><td>「已添加 …」</td><td>组件库提示</td><td><code>Toast</code> success</td></tr>
+    <tr><td>管理页面包屑与头部</td><td>详情页头部</td><td><code>.codepuppy-ext-crumbs</code> / <code>-dhead</code>;活稿 <code>#detail</code></td></tr>
+    <tr><td>管理页的权限 / 账户 / 关于</td><td>设置页分组与行(左边名称 + 一行说明,右边按钮)</td><td><code>settings.css</code> <code>.codepuppy-settings-group</code> / <code>-row</code> / <code>-row-copy</code>;设置活稿 <code>.set-rw</code></td></tr>
+    <tr><td>组合(无新组件)</td><td>① 菜单项里放开关时两端对齐 ② 管理页头部「…」靠右</td><td>本页 <code>&lt;style&gt;</code>「组合规则」两行,只排版</td></tr>
+  </table>
+</section>
+
+<!-- ═══ 1 列表 ═══ -->
+<section class="dz-sec" id="list">
+  <h2 class="dz-h2">1 · 列表:没装的「+」,装好的「…」</h2>
+  <p class="dz-sub">以连接器页为例,技能页、助手页同样。</p>
+
+  <div class="dz-tag">改前(今天)</div>
+  <div class="a-ui dz-page">
+    <nav class="codepuppy-ext-tabs"><div class="codepuppy-ext-tabs-inner"><button class="codepuppy-ext-tab" data-active>连接器</button><button class="codepuppy-ext-tab">技能</button><button class="codepuppy-ext-tab">助手</button></div><button class="codepuppy-ext-close" aria-label="关闭"><svg class="codepuppy-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6l12 12M18 6L6 18"/></svg></button></nav>
+    <div class="codepuppy-ext-scroll"><div class="codepuppy-ext-center">
+      <header class="codepuppy-ext-pagehd">
+        <div class="codepuppy-ext-pagehd-t"><h1 class="codepuppy-ext-title">连接器</h1><p class="codepuppy-ext-sub">让助手使用外部工具和服务</p></div>
+        <div class="codepuppy-ext-search"><span class="codepuppy-ext-search-ic"><svg class="codepuppy-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg></span><input type="search" placeholder="搜索连接器" /></div>
+        <div class="codepuppy-ext-more"><button class="codepuppy-ext-add" data-variant="primary">添加 ▾</button></div>
+      </header>
+      <div class="codepuppy-ext-secrow"><span class="codepuppy-ext-overline">已安装</span><button class="codepuppy-ext-link">全部更新</button></div>
+      <div class="codepuppy-ext-grid">
+        <div class="codepuppy-ext-kit"><span class="codepuppy-ext-kit-ic" style="background:#18181b">GH</span><div class="codepuppy-ext-kit-body"><div class="codepuppy-ext-kit-ttl"><b>github</b></div><div class="codepuppy-ext-kit-desc">连接器 · 未开启</div></div><div class="codepuppy-ext-more"><button class="codepuppy-ext-add" aria-label="更多">…</button></div></div>
+        <div class="codepuppy-ext-kit"><span class="codepuppy-ext-kit-ic" style="background:#18181b">GH</span><div class="codepuppy-ext-kit-body"><div class="codepuppy-ext-kit-ttl"><b>github</b></div><div class="codepuppy-ext-kit-desc">未开启</div></div><button class="codepuppy-ext-add">开启</button></div>
+        <div class="codepuppy-ext-kit"><span class="codepuppy-ext-kit-ic" style="background:#3ECE8E">S</span><div class="codepuppy-ext-kit-body"><div class="codepuppy-ext-kit-ttl"><b>supabase</b></div><div class="codepuppy-ext-kit-desc">技能 · 技能 · 连接器 · 未开启</div></div><div class="codepuppy-ext-more"><button class="codepuppy-ext-add" aria-label="更多">…</button></div></div>
+        <div class="codepuppy-ext-kit"><span class="codepuppy-ext-kit-ic" style="background:#f97316">G</span><div class="codepuppy-ext-kit-body"><div class="codepuppy-ext-kit-ttl"><b>Git 版本管理</b></div><div class="codepuppy-ext-kit-desc" data-hub-state="pending">待生效 · 对话空闲后自动生效</div></div><button class="codepuppy-ext-add">立即生效</button></div>
+        <div class="codepuppy-ext-kit"><span class="codepuppy-ext-kit-ic" style="background:#0f766e">C7</span><div class="codepuppy-ext-kit-body"><div class="codepuppy-ext-kit-ttl"><b>context7</b></div><div class="codepuppy-ext-kit-desc">未开启</div></div><button class="codepuppy-ext-add">开启</button></div>
+        <div class="codepuppy-ext-kit"><span class="codepuppy-ext-kit-ic" style="background:#7c3aed">网</span><div class="codepuppy-ext-kit-body"><div class="codepuppy-ext-kit-ttl"><b>网页读取</b></div><div class="codepuppy-ext-kit-desc">抓取网页并转成 Markdown,供研究和检索。</div></div><button class="codepuppy-ext-add">审查更新</button></div>
+      </div>
+      <div class="codepuppy-ext-secrow"><span class="codepuppy-ext-overline">研发</span></div>
+      <div class="codepuppy-ext-grid">
+        <div class="codepuppy-ext-kit"><span class="codepuppy-ext-kit-ic" style="background:#0e7490">数</span><div class="codepuppy-ext-kit-body"><div class="codepuppy-ext-kit-ttl"><b>数据库(本机 SQLite)</b></div><div class="codepuppy-ext-kit-desc">让助手查询你电脑上的数据库。</div></div><button class="codepuppy-ext-add" data-variant="primary">添加</button></div>
+        <div class="codepuppy-ext-kit"><span class="codepuppy-ext-kit-ic" style="background:#dc2626">调</span><div class="codepuppy-ext-kit-body"><div class="codepuppy-ext-kit-ttl"><b>网页性能与调试</b></div><div class="codepuppy-ext-kit-desc">用 Chrome 开发者工具排查网页:性能追踪、控制台报错、网络请求。</div></div><button class="codepuppy-ext-add" data-variant="ghost">添加</button></div>
+      </div>
+    </div></div>
+  </div>
+  <p class="dz-cap">改前:github 一个包占两行;按钮有「开启」「立即生效」「审查更新」「添加」四种,「添加」还分实心和描边。</p>
+
+  <div class="dz-tag">改后</div>
+  <div class="a-ui dz-page" data-check="after-list">
+    <nav class="codepuppy-ext-tabs"><div class="codepuppy-ext-tabs-inner"><button class="codepuppy-ext-tab" data-active>连接器</button><button class="codepuppy-ext-tab">技能</button><button class="codepuppy-ext-tab">助手</button></div><button class="codepuppy-ext-close" aria-label="关闭"><svg class="codepuppy-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6l12 12M18 6L6 18"/></svg></button></nav>
+    <div class="codepuppy-ext-scroll"><div class="codepuppy-ext-center">
+      <header class="codepuppy-ext-pagehd">
+        <div class="codepuppy-ext-pagehd-t"><h1 class="codepuppy-ext-title">连接器</h1><p class="codepuppy-ext-sub">让助手使用外部工具和服务</p></div>
+        <div class="codepuppy-ext-search"><span class="codepuppy-ext-search-ic"><svg class="codepuppy-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg></span><input type="search" placeholder="搜索连接器" /></div>
+        <div class="codepuppy-ext-more"><button class="codepuppy-ext-add" data-variant="primary">添加 ▾</button></div>
+      </header>
+      <div class="codepuppy-ext-secrow"><span class="codepuppy-ext-overline">已安装</span></div>
+      <div class="codepuppy-ext-grid">
+        <div class="codepuppy-ext-kit"><span class="codepuppy-ext-kit-ic" style="background:#3ECE8E">S</span><div class="codepuppy-ext-kit-body"><div class="codepuppy-ext-kit-ttl"><b>Supabase</b><span class="codepuppy-ext-package-state" data-prerequisite="required-action">待登录</span></div><div class="codepuppy-ext-kit-desc">Manage and query databases</div></div><div class="codepuppy-ext-more"><button class="codepuppy-ext-add" aria-label="更多">…</button></div></div>
+        <div class="codepuppy-ext-kit"><span class="codepuppy-ext-kit-ic" style="background:#18181b">GH</span><div class="codepuppy-ext-kit-body"><div class="codepuppy-ext-kit-ttl"><b>GitHub</b></div><div class="codepuppy-ext-kit-desc">Official GitHub MCP server for repository management. Create issues, manage pull requests, review code.</div></div><div class="codepuppy-ext-more"><button class="codepuppy-ext-add" aria-label="更多">…</button></div></div>
+        <div class="codepuppy-ext-kit"><span class="codepuppy-ext-kit-ic" style="background:#f97316">G</span><div class="codepuppy-ext-kit-body"><div class="codepuppy-ext-kit-ttl"><b>Git 版本管理</b></div><div class="codepuppy-ext-kit-desc">查看仓库状态、改动和提交历史，也能暂存文件并创建提交。由官方 Git 参考实现提供。</div></div><div class="codepuppy-ext-more"><button class="codepuppy-ext-add" aria-label="更多">…</button></div></div>
+        <div class="codepuppy-ext-kit"><span class="codepuppy-ext-kit-ic" style="background:#0f766e">C7</span><div class="codepuppy-ext-kit-body"><div class="codepuppy-ext-kit-ttl"><b>context7</b></div><div class="codepuppy-ext-kit-desc">已关闭</div></div><div class="codepuppy-ext-more"><button class="codepuppy-ext-add" aria-label="更多">…</button></div></div>
+        <div class="codepuppy-ext-kit"><span class="codepuppy-ext-kit-ic" style="background:#7c3aed">网</span><div class="codepuppy-ext-kit-body"><div class="codepuppy-ext-kit-ttl"><b>网页读取</b></div><div class="codepuppy-ext-kit-desc">抓取网页并转成 Markdown,供研究和检索。</div></div><div class="codepuppy-ext-more"><button class="codepuppy-ext-add" aria-label="更多">…</button></div></div>
+        <div class="codepuppy-ext-kit"><span class="codepuppy-ext-kit-ic" style="background:#2563eb">X</span><div class="codepuppy-ext-kit-body"><div class="codepuppy-ext-kit-ttl"><b>Excel 表格读写</b></div><div class="codepuppy-ext-kit-desc" data-err>Code Puppy 自带的文档运行环境缺失或不完整，请重新安装 Code Puppy。</div></div><div class="codepuppy-ext-more"><button class="codepuppy-ext-add" aria-label="更多">…</button></div></div>
+      </div>
+      <div class="codepuppy-ext-secrow"><span class="codepuppy-ext-overline">研发</span></div>
+      <div class="codepuppy-ext-grid">
+        <div class="codepuppy-ext-kit"><span class="codepuppy-ext-kit-ic" style="background:#0e7490">数</span><div class="codepuppy-ext-kit-body"><div class="codepuppy-ext-kit-ttl"><b>数据库(本机 SQLite)</b></div><div class="codepuppy-ext-kit-desc">让助手查询你电脑上的数据库。</div></div><button class="codepuppy-ext-add" aria-label="添加">+</button></div>
+        <div class="codepuppy-ext-kit"><span class="codepuppy-ext-kit-ic" style="background:#dc2626">调</span><div class="codepuppy-ext-kit-body"><div class="codepuppy-ext-kit-ttl"><b>网页性能与调试</b></div><div class="codepuppy-ext-kit-desc">用 Chrome 开发者工具排查网页:性能追踪、控制台报错、网络请求。</div></div><button class="codepuppy-ext-add" aria-label="添加">+</button></div>
+      </div>
+    </div></div>
+  </div>
+  <p class="dz-cap">改后:一个包一行;动作只有「+」或「…」;要你处理时名称后一个词(待登录 / 待填令牌),关着的描述写「已关闭」,出错的描述换成一句红字原因。</p>
+</section>
+
+<!-- ═══ 2 菜单 ═══ -->
+<section class="dz-sec" id="menu">
+  <h2 class="dz-h2">2 · 「…」菜单:开关、管理、移除</h2>
+  <div class="dz-duo">
+    <div>
+      <div class="dz-tag">改前(今天)</div>
+      <div class="a-ui dz-page"><div class="codepuppy-ext-scroll dz-menu-room"><div class="codepuppy-ext-center">
+        <div class="codepuppy-ext-grid">
+          <div class="codepuppy-ext-kit"><span class="codepuppy-ext-kit-ic" style="background:#7c3aed">网</span><div class="codepuppy-ext-kit-body"><div class="codepuppy-ext-kit-ttl"><b>网页读取</b></div><div class="codepuppy-ext-kit-desc">抓取网页并转成 Markdown,供研究和检索。</div></div>
+            <div class="codepuppy-ext-more"><button class="codepuppy-ext-add" aria-label="更多" aria-expanded="true">…</button>
+              <div class="codepuppy-ext-menu" role="menu"><button class="codepuppy-ext-menu-item" role="menuitem">停用</button><button class="codepuppy-ext-menu-item" role="menuitem" data-variant="danger">移除</button><button class="codepuppy-ext-menu-item" role="menuitem">设置</button></div>
+            </div>
+          </div>
+        </div>
+      </div></div></div>
+      <p class="dz-cap">改前:关着的行另有一颗「开启」按钮;包的菜单只有「移除此扩展包」。</p>
+    </div>
+    <div>
+      <div class="dz-tag">改后</div>
+      <div class="a-ui dz-page" data-check="after-menu"><div class="codepuppy-ext-scroll dz-menu-room"><div class="codepuppy-ext-center">
+        <div class="codepuppy-ext-grid">
+          <div class="codepuppy-ext-kit"><span class="codepuppy-ext-kit-ic" style="background:#3ECE8E">S</span><div class="codepuppy-ext-kit-body"><div class="codepuppy-ext-kit-ttl"><b>Supabase</b></div><div class="codepuppy-ext-kit-desc">Manage and query databases</div></div>
+            <div class="codepuppy-ext-more"><button class="codepuppy-ext-add" aria-label="更多" aria-expanded="true">…</button>
+              <div class="codepuppy-ext-menu" role="menu"><label class="codepuppy-ext-menu-item" role="menuitemcheckbox" aria-checked="true" data-switch>开启<button class="codepuppy-ext-sw" data-on role="switch" aria-checked="true" aria-label="开启"></button></label><button class="codepuppy-ext-menu-item" role="menuitem">管理</button><button class="codepuppy-ext-menu-item" role="menuitem" data-variant="danger">移除</button></div>
+            </div>
+          </div>
+        </div>
+      </div></div></div>
+      <p class="dz-cap">改后:开关在第一行,正在回答时等这轮结束再生效;「移除」直接移除整个包。</p>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ 3 安装 ═══ -->
+<section class="dz-sec" id="install">
+  <h2 class="dz-h2">3 · 点「+」:装好并开启,需要时才弹小窗</h2>
+
+  <div class="dz-tag">改前(今天):点「添加」先弹确认框</div>
+  <div class="dz-duo">
+    <div>
+      <div class="dz-stage a-ui"><div class="a-dialog-panel" data-size="md">
+        <header class="a-dialog-header"><div class="a-dialog-title">安装「supabase」?</div><button class="a-dialog-close" aria-label="关闭">✕</button></header>
+        <div class="a-dialog-body">
+          <div class="codepuppy-ext-confirm">
+            <p class="codepuppy-ext-confirm-desc">Manage Supabase projects directly through ChatGPT. Execute SQL queries on PostgreSQL databases, design and modify table schemas, deploy serverless edge functions, and configure user authentication. Access real-time logs for debugging, create and apply database migrations, and manage development branches through natural language.</p>
+            <div class="codepuppy-ext-install-box">
+              <div class="codepuppy-ext-install-row"><span class="codepuppy-ext-install-nm">supabase</span><span class="codepuppy-ext-install-k">技能</span></div>
+              <div class="codepuppy-ext-install-row"><span class="codepuppy-ext-install-nm">supabase-postgres-best-practices</span><span class="codepuppy-ext-install-k">技能</span></div>
+              <div class="codepuppy-ext-install-row"><span class="codepuppy-ext-install-nm">supabase</span><span class="codepuppy-ext-install-k">连接器</span></div>
+            </div>
+            <div class="codepuppy-ext-authz">
+              <p class="codepuppy-ext-authz-intro">「supabase」中的 1 项扩展需要你允许以下操作：</p>
+              <div class="codepuppy-ext-authz-box">
+                <div class="codepuppy-ext-authz-item">supabase</div>
+                <div class="codepuppy-ext-authz-cap"><span class="codepuppy-ext-authz-ic" data-tier="mid"><span aria-hidden="true">?</span></span><span class="codepuppy-ext-authz-nm"><b>codepuppy.mcp-oauth.v1</b></span><span class="codepuppy-ext-authz-id">codepuppy.mcp-oauth.v1</span><span class="codepuppy-ext-authz-chip" data-kind="new">新增</span></div>
+                <div class="codepuppy-ext-authz-rest">其余 2 项的权限没有变化，无需再次确认。</div>
+              </div>
+              <p class="codepuppy-ext-confirm-note">确认后，你同意授予上面列出的全部权限。安装成功后，扩展才会获得这些权限。点取消不会安装，也不会授予权限。</p>
+            </div>
+            <p class="codepuppy-ext-confirm-note">未经审核,装好后默认关闭</p>
+          </div>
+        </div>
+        <footer class="a-dialog-footer"><button class="a-btn" data-variant="ghost" data-size="md">取消</button><button class="a-btn" data-variant="primary" data-size="md">确认安装</button></footer>
+      </div></div>
+      <p class="dz-cap">改前 · Supabase:长英文说明、三行组件、带内部编号的权限段、两段说明;装好后默认关闭。</p>
+    </div>
+    <div>
+      <div class="dz-stage a-ui"><div class="a-dialog-panel" data-size="md">
+        <header class="a-dialog-header"><div class="a-dialog-title">安装「github」?</div><button class="a-dialog-close" aria-label="关闭">✕</button></header>
+        <div class="a-dialog-body">
+          <div class="codepuppy-ext-confirm">
+            <p class="codepuppy-ext-confirm-desc">Official GitHub MCP server for repository management. Create issues, manage pull requests, review code, search repositories, and interact with GitHub's full API directly from Claude Code.</p>
+            <div class="codepuppy-ext-install-box"><div class="codepuppy-ext-install-row"><span class="codepuppy-ext-install-nm">github</span><span class="codepuppy-ext-install-k">连接器</span></div></div>
+            <div class="codepuppy-ext-confirm-keys">
+              <div class="codepuppy-ext-confirm-line">连接所需的密钥（全部必填）</div>
+              <label class="codepuppy-ext-key-field"><span class="codepuppy-ext-key-name">GITHUB_PERSONAL_ACCESS_TOKEN</span><input class="codepuppy-ext-key-input" type="password" placeholder="粘贴密钥…(必填)" /></label>
+              <p class="codepuppy-ext-key-hint" role="status">请填写全部密钥，再确认安装。</p>
+              <p class="codepuppy-ext-key-hint">密钥保存在本机的 Code Puppy 文件中，只有当前系统用户可读写（0600）。配置文件不保存密钥内容。</p>
+            </div>
+            <p class="codepuppy-ext-confirm-note">未经审核,装好后默认关闭</p>
+          </div>
+        </div>
+        <footer class="a-dialog-footer"><button class="a-btn" data-variant="ghost" data-size="md">取消</button><button class="a-btn" data-variant="primary" data-size="md" disabled>确认安装</button></footer>
+      </div></div>
+      <p class="dz-cap">改前 · GitHub:输入框只写变量名,不告诉你令牌是什么、去哪拿;同框的权限段与左侧相同,此处略。</p>
+    </div>
+  </div>
+
+  <div class="dz-tag">改后:点「+」= 装好并开启;不需要登录或令牌的,只出一条提示</div>
+  <div class="dz-stage a-ui" data-check="after-toast"><div class="a-toast" data-kind="success" role="status"><span class="a-toast-ico" aria-hidden="true"></span><div class="a-toast-body"><b>已添加「数据库(本机 SQLite)」</b></div><button class="a-toast-x" aria-label="关闭">×</button></div></div>
+  <p class="dz-cap">「+」随即变成「…」,右下角一条提示,4 秒后自己消失。</p>
+
+  <div class="dz-duo" style="margin-top:18px">
+    <div>
+      <div class="dz-stage a-ui" data-check="after-login"><div class="a-dialog-panel" data-size="sm">
+        <header class="a-dialog-header"><div class="a-dialog-title">登录 Supabase</div><button class="a-dialog-close" aria-label="关闭">✕</button></header>
+        <div class="a-dialog-body"><p class="a-dialog-description">登录后,助手就能使用 Supabase。</p></div>
+        <footer class="a-dialog-footer"><button class="a-btn" data-variant="primary" data-size="md">登录</button></footer>
+      </div></div>
+      <p class="dz-cap">要登录的:已经装好,弹一个小窗;点「登录」打开浏览器,关掉小窗就以后再登,列表显示「待登录」。</p>
+    </div>
+    <div>
+      <div class="dz-stage a-ui" data-check="after-token"><div class="a-dialog-panel" data-size="sm">
+        <header class="a-dialog-header"><div class="a-dialog-title">连接 GitHub</div><button class="a-dialog-close" aria-label="关闭">✕</button></header>
+        <div class="a-dialog-body">
+          <div class="codepuppy-ext-confirm-keys">
+            <label class="codepuppy-ext-key-field"><span class="codepuppy-ext-flabel">GitHub 访问令牌</span><input class="codepuppy-ext-input" type="password" placeholder="粘贴令牌" /></label>
+            <p class="codepuppy-ext-key-hint">助手用它访问你的 GitHub,只保存在这台电脑上。</p>
+          </div>
+        </div>
+        <footer class="a-dialog-footer"><button class="codepuppy-ext-link">去 GitHub 生成</button><button class="a-btn" data-variant="primary" data-size="md" disabled>保存</button></footer>
+      </div></div>
+      <p class="dz-cap">要令牌的:同样已装好;填好才能保存,「去 GitHub 生成」打开 GitHub 的令牌页,关掉小窗列表显示「待填令牌」。</p>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ 4 管理 ═══ -->
+<section class="dz-sec" id="manage">
+  <h2 class="dz-h2">4 · 管理页:权限、账户、关于</h2>
+  <p class="dz-sub">改前是现在的详情页,见活稿 <a href="../current/customization-center/design.html#detail"><code>#detail</code></a>(事实段、组件与来源段、已授权能力段等多段)。下面是改后。</p>
+  <div class="a-ui dz-page" data-check="after-manage">
+    <nav class="codepuppy-ext-tabs"><div class="codepuppy-ext-tabs-inner"><button class="codepuppy-ext-tab" data-active>连接器</button><button class="codepuppy-ext-tab">技能</button><button class="codepuppy-ext-tab">助手</button></div><button class="codepuppy-ext-close" aria-label="关闭"><svg class="codepuppy-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6l12 12M18 6L6 18"/></svg></button></nav>
+    <div class="codepuppy-ext-scroll"><div class="codepuppy-ext-center">
+      <div class="codepuppy-ext-detail">
+        <nav class="codepuppy-ext-crumbs"><button class="codepuppy-ext-crumb-link">‹ 连接器</button><span class="codepuppy-ext-crumb-sep">/</span><span class="codepuppy-ext-crumb-cur">Supabase</span></nav>
+        <div class="codepuppy-ext-dhead">
+          <span class="codepuppy-ext-dhead-ic" style="background:#3ECE8E">S</span>
+          <div class="codepuppy-ext-dhead-body"><div class="codepuppy-ext-dhead-t"><h2>Supabase</h2></div><p class="codepuppy-ext-dabout">Manage and query databases</p></div>
+          <div class="codepuppy-ext-dhead-act"><div class="codepuppy-ext-more"><button class="codepuppy-ext-add" data-size="lg" aria-label="更多">…</button></div></div>
+        </div>
+        <div>
+          <section class="codepuppy-settings-group"><h3>权限</h3>
+            <div class="codepuppy-settings-row"><div class="codepuppy-settings-row-copy"><strong>使用工具</strong><small>每次使用前问你</small></div><button class="codepuppy-ext-add">更改</button></div>
+          </section>
+          <section class="codepuppy-settings-group"><h3>账户</h3>
+            <div class="codepuppy-settings-row"><div class="codepuppy-settings-row-copy"><strong>Supabase 账户</strong><small>未登录</small></div><button class="codepuppy-ext-add" data-variant="primary">登录</button></div>
+          </section>
+          <section class="codepuppy-settings-group"><h3>关于</h3>
+            <div class="codepuppy-settings-row"><div class="codepuppy-settings-row-copy"><strong>包含</strong><small>2 个技能 · 1 个连接器</small></div></div>
+            <div class="codepuppy-settings-row"><div class="codepuppy-settings-row-copy"><strong>来源</strong><small>Codex 插件 · 本地文件夹</small></div></div>
+            <div class="codepuppy-settings-row"><div class="codepuppy-settings-row-copy"><strong>版本</strong><small>1.0.0</small></div><button class="codepuppy-ext-add">更新</button></div>
+          </section>
+        </div>
+      </div>
+    </div></div>
+  </div>
+  <p class="dz-cap">「更改」打开设置里现有的工具权限;登录后账户行写「已登录」、按钮换成「重新登录」;要令牌的这一行是「GitHub 访问令牌 · 已保存」+「更换」;「更新」只在有新版本时出现;头部「…」与列表里是同一个菜单。</p>
+</section>
+
+<!-- ═══ 5 搜索 ═══ -->
+<section class="dz-sec" id="search">
+  <h2 class="dz-h2">5 · 搜索:结果同样一行一个,外来的标出处</h2>
+  <p class="dz-sub">改前是页头同一个搜索框,只在本页已有条目里筛。下面是目标样子。</p>
+  <div class="a-ui dz-page" data-check="after-search">
+    <nav class="codepuppy-ext-tabs"><div class="codepuppy-ext-tabs-inner"><button class="codepuppy-ext-tab" data-active>连接器</button><button class="codepuppy-ext-tab">技能</button><button class="codepuppy-ext-tab">助手</button></div><button class="codepuppy-ext-close" aria-label="关闭"><svg class="codepuppy-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6l12 12M18 6L6 18"/></svg></button></nav>
+    <div class="codepuppy-ext-scroll"><div class="codepuppy-ext-center">
+      <header class="codepuppy-ext-pagehd">
+        <div class="codepuppy-ext-pagehd-t"><h1 class="codepuppy-ext-title">连接器</h1><p class="codepuppy-ext-sub">让助手使用外部工具和服务</p></div>
+        <div class="codepuppy-ext-search"><span class="codepuppy-ext-search-ic"><svg class="codepuppy-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg></span><input type="search" placeholder="搜索连接器" value="网页" /></div>
+        <div class="codepuppy-ext-more"><button class="codepuppy-ext-add" data-variant="primary">添加 ▾</button></div>
+      </header>
+      <div class="codepuppy-ext-secrow"><span class="codepuppy-ext-overline">搜索结果 · <b>3</b></span></div>
+      <div class="codepuppy-ext-grid">
+        <div class="codepuppy-ext-kit"><span class="codepuppy-ext-kit-ic" style="background:#7c3aed">网</span><div class="codepuppy-ext-kit-body"><div class="codepuppy-ext-kit-ttl"><b>网页读取</b></div><div class="codepuppy-ext-kit-desc">抓取网页并转成 Markdown,供研究和检索。</div></div><div class="codepuppy-ext-more"><button class="codepuppy-ext-add" aria-label="更多">…</button></div></div>
+        <div class="codepuppy-ext-kit"><span class="codepuppy-ext-kit-ic" style="background:#dc2626">调</span><div class="codepuppy-ext-kit-body"><div class="codepuppy-ext-kit-ttl"><b>网页性能与调试</b></div><div class="codepuppy-ext-kit-desc">用 Chrome 开发者工具排查网页:性能追踪、控制台报错、网络请求。</div></div><button class="codepuppy-ext-add" aria-label="添加">+</button></div>
+        <div class="codepuppy-ext-kit"><span class="codepuppy-ext-kit-ic" style="background:#16a34a">P</span><div class="codepuppy-ext-kit-body"><div class="codepuppy-ext-kit-ttl"><b>playwright</b><span class="codepuppy-ext-chip">来自 Claude 插件市场</span></div><div class="codepuppy-ext-kit-desc">Browser automation and end-to-end testing MCP server by Microsoft. Enables Claude to interact with web pages, take screenshots, fill forms.</div></div><button class="codepuppy-ext-add" aria-label="添加">+</button></div>
+      </div>
+    </div></div>
+  </div>
+  <p class="dz-cap">搜第三方插件市场已写进规格(对话里一句话安装、三家都支持),留到后续会话实现;这里只定它出现时的样子,同一个插件几家都有时只列一个。</p>
+</section>
+
+<!-- ═══ 文案 ═══ -->
+<section class="dz-sec" id="copy">
+  <h2 class="dz-h2">文案(请按这张表批措辞)</h2>
+  <table class="dz-table">
+    <tr><th>位置</th><th>改后文案</th><th>今天</th></tr>
+    <tr><td>行上动作</td><td>「+」(读屏:添加)/「…」(读屏:更多)</td><td>添加 / 开启 / 立即生效 / 审查更新 / …</td></tr>
+    <tr><td>要你处理</td><td>待登录 · 待填令牌</td><td>需要重新登录 + 去授权</td></tr>
+    <tr><td>关着</td><td>已关闭</td><td>未开启</td></tr>
+    <tr><td>「…」菜单</td><td>开启(开关)· 管理 · 移除</td><td>停用 / 开启 · 移除 · 设置;扩展包:移除此扩展包</td></tr>
+    <tr><td>正在回答时拨了开关</td><td>提示「这轮回答结束后生效」</td><td>待生效 · 对话空闲后自动生效 + 立即生效</td></tr>
+    <tr><td>装好</td><td>已添加「名称」</td><td>(先过确认框)</td></tr>
+    <tr><td>登录小窗</td><td>标题「登录 Supabase」· 正文「登录后,助手就能使用 Supabase。」· 按钮「登录」</td><td>权限段 + 授权并安装</td></tr>
+    <tr><td>令牌小窗</td><td>标题「连接 GitHub」· 字段「GitHub 访问令牌」· 占位「粘贴令牌」· 说明「助手用它访问你的 GitHub,只保存在这台电脑上。」· 链接「去 GitHub 生成」· 按钮「保存」</td><td>连接所需的密钥（全部必填）/ GITHUB_PERSONAL_ACCESS_TOKEN / 粘贴密钥…(必填)/ 0600 一句</td></tr>
+    <tr><td>管理页</td><td>权限:使用工具 · 每次使用前问你 ·「更改」;账户:Supabase 账户 · 未登录 ·「登录」(已登录 ·「重新登录」);关于:包含 / 来源 / 版本 ·「更新」</td><td>详情页多段</td></tr>
+    <tr><td>移除</td><td>已移除「名称」</td><td>扩展包已移除</td></tr>
+    <tr><td>搜索出处</td><td>来自 Claude 插件市场 / 来自 Codex 插件市场</td><td>(没有)</td></tr>
+  </table>
+</section>
+
+<!-- ═══ 去掉了什么 ═══ -->
+<section class="dz-sec" id="removed">
+  <h2 class="dz-h2">和今天比,去掉了什么</h2>
+  <table class="dz-table">
+    <tr><th>哪里</th><th>去掉的元素与文字</th></tr>
+    <tr><td>列表</td><td>行上的「开启」「立即生效」「审查更新」「去授权」按钮;「添加」的实心 / 描边两种;包的第二行(包里的连接器单独成行);「技能 · 技能 · 连接器 · 未开启」;「待生效 · 对话空闲后自动生效」;单个技能被拒移除时的「此技能属于扩展包「…」,需要随整个包一起移除。」与「移除整个扩展包」</td></tr>
+    <tr><td>安装</td><td>整个确认框:长说明、组件清单、权限段(内部编号、「?」图标、「新增」标签)、「其余 N 项的权限没有变化,无需再次确认。」、「确认后,你同意授予……」、「未经审核,装好后默认关闭」、「确认安装 / 授权并安装」、「取消」</td></tr>
+    <tr><td>令牌</td><td>变量名标题、「连接所需的密钥(全部必填)」、「请填写全部密钥,再确认安装。」、0600 那句</td></tr>
+    <tr><td>菜单</td><td>「停用」「设置」「移除此扩展包」三个词,换成开关、「管理」、「移除」</td></tr>
+    <tr><td>行为</td><td>装好默认关闭 → 默认开启;「立即生效」(打断正在进行的回答马上生效)→ 等这轮回答结束自动生效</td></tr>
+  </table>
+</section>
+
+</main>
+
+<script>
+document.getElementById("themeSeg").addEventListener("click", (e) => {
+  const b = e.target.closest("button[data-theme]")
+  if (!b) return
+  document.documentElement.setAttribute("data-color-scheme", b.dataset.theme)
+  for (const x of document.querySelectorAll("#themeSeg button")) x.toggleAttribute("data-on", x === b)
+})
+</script>
+</body>
+</html>

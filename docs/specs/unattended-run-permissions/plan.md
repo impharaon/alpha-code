@@ -235,3 +235,12 @@ R4 修正回执:
 - 最终构建:`cd packages/ui-mac && bun run build` exit 0,引擎 / ext / main / preload / renderer 产物已生成,未启动应用。最终重采与记录补齐后,ui-mac 两项登记命令复核 exit 0,33 pass / 0 fail;ext authority-registry 的 C9 为 5 pass / 0 fail。docs_index.py --check、416 个本轮变更文档相对链接与 git diff --check 通过。
 - 已核:Codex(GPT-6),r3 IMPLEMENT 组装自检通过。依据版本为接受的 `6b0c054e75` 与 `9dd7349975`;AC-01–08 的 C1–C9 及两单元组合证据均通过,已审行为和 owner 的消息/shell 边界不重开。下一步交编排器独立审查及发布边界,未推送 / 开 PR。遗留去向仅上述 C5 计数观察交原票编排器;前两单元已登记的文档/环境问题沿原去向,本轮不扩查。无新增设计疑虑或限制提案。
 - 本轮约 19 分钟(15:03–15:23 UTC),自身协调 4 个冲突文件与 6 个必要测试/样本/登记/文档文件;适配器真实重采 17 份产物另计。未安装依赖、未改冻结合同、未扩大到其它能力。
+
+
+## batch F r4 — 吸收批次 E 最终修复及装配验证(2026-11-15 UTC)
+
+- 依据:r4 IMPLEMENT 派发,从已接受的 `6e6c729830` 开始,03:25 UTC 计时。`git fetch origin` 后确认指定输入 `origin/batch/post-0-2-0-e` 为 `64a8355ee4`,合并提交 `7c8fcb5a3a`。仅 `engine-plugin-policy.engine.cases.ts` 与测试宿主 `codepuppy-engine.ts` 两处冲突:输入调整的是已由 #1713 明确删除的 managed deny-all / allowance,按原派发保留删除;其它 E 修复全部接入,没有恢复旧策略。
+- 读取 gate 的 test stage 后,按 `origin/alpha...HEAD` 的触及包串行执行整包测试,未运行 gate/bin/check。consumer 使用 check:vendor 和地板 15,ext 地板 100,ui-mac 地板 3000;其余触及包为 schema/core/plugin/util/codepuppy-sdk-v1,另执行 gate 的 app 测试脚本。首次整包结果与后续复核续记下方。
+- 三处装配修正:① `ext-project-adopt.test.ts` 的 #356 顺序锚同步 #1713 现有 rows 早退,不改顺序断言;② `permission-mount-ratchet.test.ts` 的生产扫描排除真实引擎宿主命名 `*.cases.*`,新增用真实 #1699 宿主源码生成的生产文件对照,证明生产同内容仍受扫描,先红提交 `ff5b92a2f4` 为 6 pass / 2 fail,修后 8 pass / 0 fail;③ ext `cloud-websearch-kill.test.ts` 的跨 Location 宿主补齐 #1699 所读 `agent.get` 的真实空权限返回形状,原断言不改,30 pass / 0 fail。前者单文件 9 pass / 0 fail。三处均为派发允许的组合破坏接缝,无生产行为或冻结合同变化。
+- 登记验证:94 个变更文件对应行逐条使用仓库 `bun-test-floor.sh` 的 CODEPUPPY_TEST_COUNT_FILE 测量路径,92 行通过;两行属已放行网络失败(net-failure-real-stack / schema codepuppy-net-failure),保留原期望值。唯一计数变化由计数器实测为审批扫描 7→8,按测量结果机械写回,没有手写计数或放宽地板。E 的 consumer contracts 行实测仍为 27。
+- 初次整包另外发现 core 15 条失败,逐文件在本树和只读基线 `alpha-code-probe-alpha-base` 单跑同红:tool-shell 56 pass / 11 skip / 3 fail、permission 114 pass / 8 fail、command-subagent 1 pass / 3 fail、compound-parity 576 pass / 1 fail。前 11 条要求 always 持久化,与已冻结会话内存授权相反;3 条要求子任务覆盖父模型,与 #1560 相反;最后 1 条为系统 /bin/bash 不支持样本语法。没有改未接管的上游测试或反改冻结生产语义,处置已向编排器提问,独立工作继续。

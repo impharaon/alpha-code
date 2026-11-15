@@ -14,6 +14,10 @@ import { assertEngineSandboxed, engineSandbox } from "../../test-component/engin
 import { codepuppyEngine, scriptedModel, type Running } from "../../test-component/codepuppy-engine"
 import { engineGlobalConfigDirectory } from "./engine-paths"
 import { writeMcpServerTruth } from "./mcp-server-truth-write"
+import { findRecordV2, upsertRecordV2 } from "./ext-receipt-v2"
+import { setInstallStateByKey } from "./ext-install-planner"
+import { createEngineFetch } from "../engine-adapter"
+import { createOpencodeClient } from "../engine-adapter/contract/v1"
 
 const sandbox = engineSandbox()
 const model = scriptedModel()
@@ -28,6 +32,49 @@ const listener = Bun.serve({
   },
 })
 const at = (route: string) => `http://127.0.0.1:${listener.port}/${route}/mcp`
+
+test("disabled local MCP survives startup and the installed-list enable path connects its stdio definition", async () => {
+  const name = "disabled-local-switch"
+  const root = path.join(sandbox.root, `${name}-state`, "codepuppy-state", "env", "dev")
+  fs.mkdirSync(root, { recursive: true })
+  expect(upsertRecordV2(root, {
+    id: "user:local-files", name: "local-files", kind: "mcp", environment: "dev", scope: { kind: "global" },
+    desiredState: "disabled", origin: "created", configKey: "mcp.local-files", installedAt: "2026-11-15T00:00:00.000Z",
+  }).ok).toBe(true)
+  const pidFile = path.join(root, "mcp-pids")
+  // 真实 stdio 样本来自 core 的 mcp-modern-stdio.ts;它记录启动 pid 并提供 echo 工具。
+  const host = codepuppyEngine({
+    sandbox, name, modelBaseURL: model.baseURL,
+    mcp: { "local-files": {
+      type: "local", command: [process.execPath, path.resolve(import.meta.dir, "../../../core/test/fixture/mcp-modern-stdio.ts")],
+      environment: { MCP_PID_FILE: pidFile }, enabled: false,
+    } },
+  })
+  const engine = await host.start()
+  engines.push(engine)
+  const origin = new URL(engine.url).origin
+  const client = createOpencodeClient({
+    baseUrl: origin, directory: host.slot.projectDirectory,
+    fetch: createEngineFetch({
+      isEngineOrigin: (value) => value === origin,
+      fetch: ((input, init) => engine.fetch(new Request(input, init))) as typeof fetch,
+    }),
+  })
+  expect((await client.mcp.status({}, { throwOnError: true })).data?.["local-files"]).toEqual({ status: "disabled" })
+  expect(fs.existsSync(pidFile)).toBe(false)
+  expect(await setInstallStateByKey({ type: "mcp", name: "local-files", scope: "global", state: "enabled" }, {
+    globalRoot: () => root, advisoryGate: () => ({ allowed: true }), resolveEntry: async () => null,
+  })).toEqual({ ok: true })
+  expect(findRecordV2(root, "mcp", "local-files")?.desiredState).toBe("enabled")
+  await client.mcp.connect({ name: "local-files" }, { throwOnError: true })
+  let status = (await client.mcp.status({}, { throwOnError: true })).data?.["local-files"]
+  for (let attempt = 0; status?.status === "pending" && attempt < 100; attempt++) {
+    await Bun.sleep(100)
+    status = (await client.mcp.status({}, { throwOnError: true })).data?.["local-files"]
+  }
+  expect(status).toEqual({ status: "connected" })
+  expect(fs.existsSync(pidFile)).toBe(true)
+}, 90_000)
 
 beforeAll(async () => {
   await assertEngineSandboxed(sandbox)

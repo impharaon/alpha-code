@@ -265,3 +265,21 @@ describe("codepuppy_hub_search / codepuppy_hub_status", () => {
       expect(contentOf(await t.execute({ query: "", catalogId: "mcp:github" } as never, ctx))).toBe("The Customization Center is not available in this engine host.")
   })
 })
+
+test("A3 tools search sources and install a main ID without permission transport, returning package metadata", async () => {
+  const context = contextWith(async () => { throw Error("installation must not use permission.assert transport") })
+  const calls: unknown[] = []
+  const result = { ok: true as const, packageId: "claude:playwright", displayName: "playwright", source: { kind: "marketplace" as const, ecosystem: "claude" as const, repository: "https://github.com/anthropics/claude-plugins-official", commit: "fixed", path: "external_plugins/playwright", entryName: "playwright" }, installed: [{ kind: "mcp" as const, hostName: "playwright", sourceName: "playwright" }], notRunning: [] }
+  const bridge = bridgeWith({ views: [view([row({ id: "claude:playwright", state: "available", installed: true, enabled: true })])] }).bridge
+  bridge.search = async (input) => { calls.push(input); return { ok: true, result: { searchId: "search_main", query: input.query, sources: [{ source: "catalog", status: "ok", matched: 0, skipped: 0 }], candidates: [{ id: "cand_main", source: "claude-marketplace", name: "playwright", displayName: "playwright", description: "browser", kind: "plugin", upstream: {} }] } } }
+  bridge.install = async (input) => { calls.push(input); return { ok: true, accepted: true } }
+  bridge.request = async (requestId) => ({ ok: true, record: { requestId, stage: "committed", packageId: result.packageId, outcome: result } })
+  const list = tools(bridge, context.context)
+  const searched = await list.codepuppy_hub_search!.execute({ query: "playwright" }, context.ctx)
+  expect(contentOf(searched)).toContain("cand_main")
+  const installed = await list.codepuppy_hub_install!.execute({ id: "cand_main" }, context.ctx)
+  expect(context.asserts).toEqual([])
+  expect(calls[1]).toMatchObject({ ref: { kind: "id", id: "cand_main" }, scope: "all-projects", sessionID: "ses_1", directory: "/work/a" })
+  expect(installed).toMatchObject({ metadata: { packageId: "claude:playwright", stage: "committed" } })
+  expect(contentOf(installed)).toContain("installed; available")
+})

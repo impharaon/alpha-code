@@ -181,3 +181,16 @@ test("#1646 AC2 reload-now forces a queued connector change and a failed generat
   expect([engine.reloads, refreshes]).toEqual([2, 2])
   expect(coordinator.pendingFor("/current")).toBeUndefined()
 })
+
+test("runtime package reapplication follows only a successful non-restart reload", async () => {
+  const applied: unknown[] = []
+  const coordinator = createReloadCoordinator({ log: () => {}, onChange: () => {}, applyPackageMcp: async items => { applied.push(items) } })
+  const items = [{ id: "package:supabase", scope: "global" as const }]
+  const { generation } = coordinator.request({ scope: "global", items, reason: "package state", force: true })
+  coordinator.receiveReport({ generation, scope: "global", outcome: "waiting", directories: ["/project"] })
+  expect(applied).toEqual([])
+  coordinator.receiveReport({ generation, scope: "global", outcome: "reloaded", directories: ["/project"] })
+  expect(applied).toEqual([items])
+  coordinator.receiveReport({ generation, scope: "global", outcome: "reloaded", directories: ["/project"] })
+  expect(applied).toHaveLength(1)
+})

@@ -79,7 +79,7 @@ import type { CatalogPackageViewV1 } from "../shared/catalog-package-view"
 import { isHubRequestId, parseReloadScope, type ReloadItem } from "./codepuppy-sidecar-messages"
 import { packageVersionFromRecordsV1 } from "./ext-package-lifecycle"
 import { tryAcquireBundleLock } from "./ext-bundle-lock"
-import { lookupForUninstall, migrateV1Ledger, parseUninstallLedgerKey, readLedgerV2, readPackageLedgerStateV1, removeRecordV2 } from "./ext-receipt-v2"
+import { lookupForUninstall, migrateV1Ledger, parseUninstallLedgerKey, readLedgerV2, readPackageLedgerStateV1, removeRecordV2, projectScopeIdentity } from "./ext-receipt-v2"
 import { commitTransactionLedger } from "./ext-package-ledger-commit"
 import { packagedSeedBrowseView, readPackagedSeed } from "./ext-seed"
 import { releaseCodePuppyConnectionBindingsV1 } from "./codepuppy-connection-store"
@@ -1096,13 +1096,14 @@ export function registerExtIpcHandlers(
     if (!removed.ok) getLogger().warn("Package departing content cleanup is pending")
     if (children.length) await removePackageMcpV1({ root: children[0]!, children: children.slice(1) }, codepuppyUserWorkspaceDir(), awaitServer).catch(() => undefined)
   }
+  // Runtime work is completed below, after the recovery mutex has released.
   const sourceInstaller = createSourceInstaller({
     globalRoot: codepuppyGlobalRoot, casBaseRoot: () => getCodePuppyEnvironment().casBaseRoot, environment: () => getCodePuppyEnvironment().environment, userDataPath, sources: pluginSources,
     advisoryGate: (input) => plannerDeps().advisoryGate(input), resolvePackage: (id, version) => plannerDeps().resolvePackage(id, version),
-    activateMcp: activatePackageMcp, reloadSkills: reloadPackageSkills, removeDeparting: removeDepartingPackageComponents,
+    activateMcp: async () => [], reloadSkills: () => {}, removeDeparting: removeDepartingPackageComponents,
     catalogInstall: (catalogId, request) => installCatalogFromSource(catalogId, request, {
-      planner: plannerDeps(), admission: packageAdmissionDeps, activateMcp: activatePackageMcp,
-      reloadSkills: reloadPackageSkills, removeDeparting: removeDepartingPackageComponents,
+      planner: plannerDeps(), admission: packageAdmissionDeps, activateMcp: async () => [],
+      reloadSkills: () => {}, removeDeparting: removeDepartingPackageComponents,
     }),
   })
   const resolvePackageDeclarationsV1 = createPackageDeclarationResolver({ root: codepuppyGlobalRoot, catalog: () => verifiedDeclarationCatalog })
@@ -1260,7 +1261,6 @@ export function registerExtIpcHandlers(
         const result = await setPackageStateV1(intent, plannerDeps())
         if (!result.ok) return result
         const packageId = (intent as { packageId: string }).packageId
-        await activatePackageMcp(packageId)
         const state = readPackageLedgerStateV1(codepuppyGlobalRoot(), { sideEffectFree: true })
         const graph = state.ok && state.packageGraphs.find((entry) => entry.packageId === packageId)
         return graph && [graph.root, ...graph.children].some((node) => node.kind !== "mcp") ? { ...result, ...reloads.request({ scope: "global", items: packageReloadItems(packageId), reason: `set package state ${packageId}`, force: true }) } : result
@@ -1269,7 +1269,6 @@ export function registerExtIpcHandlers(
         const result = await savePackageSecretsV1(intent, packageAdmissionDeps)
         if (!result.ok) return result
         const packageId = (intent as { packageId: string }).packageId
-        await activatePackageMcp(packageId)
         notifyHubViewChanged()
         return result
       },
@@ -1377,26 +1376,64 @@ export function registerExtIpcHandlers(
   ipcMain.handle(GATED_WRITE_CHANNELS.installCatalog, barrier(gatedWrite.installCatalog))
   ipcMain.handle(GATED_WRITE_CHANNELS.uninstallV2, barrier(gatedWrite.uninstallV2))
   ipcMain.handle(GATED_WRITE_CHANNELS.uninstallPackage, barrier(gatedWrite.uninstallPackage))
-  ipcMain.handle(GATED_WRITE_CHANNELS.installPackage, barrier(gatedWrite.installPackage))
   // A folder request keeps its captured candidate across retries. Only the picker/capture runs outside
   // the gate; the ordinary candidate install still passes through the same ledger barrier/write entry.
   const folderSelections = new Map<string, Promise<PreparePluginSourceResultV1>>()
   const installFromSource = async (request: InstallRequestV1) => {
     await ledgerReady
-    if (request?.source?.kind !== "folder") return gatedWrite.installFromSource(request)
-    if (!isHubRequestId(request.requestId) || !Object.keys(request.source).every(key => key === "kind"))
-      return { ok: false as const, code: "unknown-id" as const, detail: "Invalid folder request" }
-    const selection = folderSelections.get(request.requestId) ?? preparePluginSource({ kind: "folder" })
-    folderSelections.set(request.requestId, selection)
-    const result = await selection
-    if (!result.ok) return { ok: false as const, code: "source-unreachable" as const, detail: result.detail }
-    if (result.prepared.kind !== "package")
-      return { ok: false as const, code: "unknown-id" as const, detail: "Choose an individual plugin from this marketplace" }
-    return gatedWrite.installFromSource({ ...request, source: { kind: "candidate", candidateId: result.prepared.candidateId } })
+    if (request?.source?.kind === "folder") {
+      if (!isHubRequestId(request.requestId) || !Object.keys(request.source).every(key => key === "kind"))
+        return { ok: false as const, code: "unknown-id" as const, detail: "Invalid folder request" }
+      const selection = folderSelections.get(request.requestId) ?? preparePluginSource({ kind: "folder" })
+      folderSelections.set(request.requestId, selection)
+      const prepared = await selection
+      if (!prepared.ok) return { ok: false as const, code: "source-unreachable" as const, detail: prepared.detail }
+      if (prepared.prepared.kind !== "package")
+        return { ok: false as const, code: "unknown-id" as const, detail: "Choose an individual plugin from this marketplace" }
+      return installFromSource({ ...request, source: { kind: "candidate", candidateId: prepared.prepared.candidateId } })
+    }
+    const project = request?.effect?.kind === "project" ? projectScopeIdentity(request.effect.directory) : undefined
+    if (project && !project.ok) return { ok: false as const, code: "transaction-failed" as const, detail: project.reason }
+    if (request?.source?.kind === "candidate" || request?.source?.kind === "created") {
+      try {
+        const { convertCreatedPlugin } = await import("./created-plugin")
+        const converted = request.source.kind === "candidate" ? await pluginSources.convertCandidate(request.source.candidateId) : await convertCreatedPlugin(request.source.draft)
+        if (!converted.ok) return converted
+        await pluginSources.catalogComparisons(converted.package.name)
+      } catch {
+        return { ok: false as const, code: "source-unreachable" as const, detail: "Selected source could not be prepared" }
+      }
+    }
+    if (project?.ok && request.effect.kind === "project") {
+      const current = projectScopeIdentity(request.effect.directory)
+      if (!current.ok || current.scope.projectPathHash !== project.scope.projectPathHash)
+        return { ok: false as const, code: "transaction-failed" as const, detail: "Project identity changed during source capture" }
+    }
+    const result = await gatedWrite.installFromSource(request)
+    if (isInstallOutcomeV1(result) && result.ok) {
+      await activatePackageMcp(result.packageId)
+      const state = readPackageLedgerStateV1(codepuppyGlobalRoot(), { sideEffectFree: true })
+      const graph = state.ok && state.packageGraphs.find(graph => graph.packageId === result.packageId)
+      if (graph && [graph.root, ...graph.children].some(node => node.kind === "skill")) reloadPackageSkills(result.packageId)
+    }
+    return result
   }
   ipcMain.handle(GATED_WRITE_CHANNELS.installFromSource, (_event: IpcMainInvokeEvent, request: InstallRequestV1) => installFromSource(request))
-  ipcMain.handle(GATED_WRITE_CHANNELS.setPackageState, barrier(gatedWrite.setPackageState))
-  ipcMain.handle(GATED_WRITE_CHANNELS.savePackageSecrets, barrier(gatedWrite.savePackageSecrets))
+  ipcMain.handle(GATED_WRITE_CHANNELS.installPackage, async (_event: IpcMainInvokeEvent, packageId: unknown) => {
+    if (typeof packageId !== "string") return { ok: false, reason: "invalid package identity" }
+    const result = await installFromSource({ requestId: "hub_" + randomUUID(), source: { kind: "catalog", catalogId: packageId }, effect: { kind: "all-projects" }, via: "hub" })
+    return isInstallOutcomeV1(result) && !result.ok ? { ok: false, reason: result.detail } : result
+  })
+  ipcMain.handle(GATED_WRITE_CHANNELS.setPackageState, barrier(async (intent: unknown) => {
+    const result = await gatedWrite.setPackageState(intent)
+    if (result && typeof result === "object" && "ok" in result && result.ok) await activatePackageMcp((intent as { packageId: string }).packageId)
+    return result
+  }))
+  ipcMain.handle(GATED_WRITE_CHANNELS.savePackageSecrets, barrier(async (intent: unknown) => {
+    const result = await gatedWrite.savePackageSecrets(intent)
+    if (result && typeof result === "object" && "ok" in result && result.ok) await activatePackageMcp((intent as { packageId: string }).packageId)
+    return result
+  }))
   ipcMain.handle(GATED_WRITE_CHANNELS.rollback, barrier(gatedWrite.rollback))
   ipcMain.handle(GATED_WRITE_CHANNELS.setInstallState, barrier(gatedWrite.setInstallState))
   ipcMain.handle(GATED_WRITE_CHANNELS.projectResidualsClean, barrier(gatedWrite.projectResidualsClean))
@@ -1441,7 +1478,7 @@ export function registerExtIpcHandlers(
         : await pluginSources.resolveInstallSource(request.ref.id)
       if (!source) return { ok: false, code: "unknown-id", detail: "The ID was not issued by the application" }
       await ledgerReady
-      const result = await gatedWrite.installFromSource({ requestId: request.requestId, source, effect: request.scope === "all-projects" ? { kind: "all-projects" } : { kind: "project", directory: request.directory }, via: "chat" })
+      const result = await installFromSource({ requestId: request.requestId, source, effect: request.scope === "all-projects" ? { kind: "all-projects" } : { kind: "project", directory: request.directory }, via: "chat" })
       return isInstallOutcomeV1(result) ? result : { ok: false, code: "transaction-failed", detail: "Installation recovery is incomplete" }
     },
     reloads,

@@ -1,4 +1,4 @@
-import { createMemo, createResource, createSignal, For, Show, type JSX } from "solid-js"
+import { createEffect, createMemo, createResource, createSignal, For, Show, onCleanup, type JSX } from "solid-js"
 import type { CandidateV1, SourceSearchResultV1 } from "../../main/plugin-sources"
 import type { InstallOutcomeV1 } from "../../shared/plugin-install"
 import { t } from "../i18n"
@@ -12,7 +12,14 @@ export function PluginSourceResults(props: {
   /** The Hub renders its existing installed row/menu, without another management implementation. */
   installedMenu(packageId: string): JSX.Element
 }) {
-  const [result] = createResource(() => props.query, props.search)
+  const [query, setQuery] = createSignal(props.query)
+  createEffect(() => {
+    const next = props.query
+    if (next === query()) return
+    const timer = setTimeout(() => setQuery(next), 250)
+    onCleanup(() => clearTimeout(timer))
+  })
+  const [result] = createResource(query, props.search)
   const current = () => (!result.loading && !result.error && result()?.query === props.query ? result() : undefined)
   const candidates = createMemo(() => {
     const all = current()?.candidates ?? []
@@ -23,7 +30,7 @@ export function PluginSourceResults(props: {
   })
   return (
     <section data-source-results="" aria-live="polite">
-      <Show when={result.loading}>
+      <Show when={result.loading || query() !== props.query}>
         <p class="codepuppy-ext-dnote">{t("codepuppy.timeline.hub.searching", { name: props.query })}</p>
       </Show>
       <Show when={result.error}>

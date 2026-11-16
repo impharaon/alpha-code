@@ -138,6 +138,8 @@ test("BC1 late search replies cannot replace the current query or leave stale ro
     ),
   )
   setQuery("second")
+  // The stale-reply proof starts after the debounced second query is actually sent.
+  await new Promise(resolve => setTimeout(resolve, 260))
   const answer = structuredClone(recorded)
   answer.query = "second"
   answer.candidates[0]!.displayName = "current result"

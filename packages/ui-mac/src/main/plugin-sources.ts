@@ -8,6 +8,7 @@ import type { Capture, Json, MarketplaceEntry, Source, TreeNode, PluginPackage, 
 import type { PackageGraphAnnotationsV1 } from "../shared/plugin-install"
 import type { PackageAcceptedFactsV1 } from "./package-installability"
 import { SKILL_MD_PATH } from "../shared/host-extension-package-contract/decoder"
+import { PLUGIN_SOURCE_REQUEST_TIMEOUT_MS, PLUGIN_SOURCE_DEADLINE_MS } from "../shared/plugin-source-timing"
 
 export type PluginSourceIdV1 = "catalog" | "claude-marketplace" | "codex-marketplace" | "opencode-npm" | "mcp-registry"
 export type SourceStatusV1 =
@@ -54,7 +55,7 @@ type CatalogContents = Pick<PackageAcceptedFactsV1, "envelope"> & { components: 
 type CatalogComparison = { catalogId: string; packageId: string; version: string; runtimeIdentity: string }
 
 /** One instance per main-process run; only this owner mints candidate IDs and retains fetched bytes. */
-export function createPluginSources(deps: { catalog: () => Promise<readonly CandidateV1[]>; catalogPackage?: (id: string, version?: string) => Promise<CatalogContents | undefined>; installed?: () => readonly { packageId: string; name: string; enabled: boolean; runtimeIdentity?: string }[]; fetch?: (url: string) => Promise<Response> }) {
+export function createPluginSources(deps: { catalog: () => Promise<readonly CandidateV1[]>; catalogPackage?: (id: string, version?: string) => Promise<CatalogContents | undefined>; installed?: () => readonly { packageId: string; name: string; enabled: boolean; runtimeIdentity?: string }[]; fetch?: (url: string, init?: RequestInit) => Promise<Response> }) {
   const searches = new Map<string, readonly SourceStatusV1[]>()
   const candidates = new Map<string, SourceCandidate>()
   const captures = new Map<string, Promise<Capture>>()
@@ -65,15 +66,25 @@ export function createPluginSources(deps: { catalog: () => Promise<readonly Cand
   const indexes = new Map<string, Promise<ReturnType<typeof readMarketplace>>>()
   const registryQueries = new Map<string, Promise<ReturnType<typeof registryRecord>[]>>()
   const npmQueries = new Map<string, Promise<{ name: string; version: string; description: string }[]>>()
-  const get = async (url: string) => {
-    const response = await (deps.fetch ?? fetch)(url).catch(() => { throw new SourceError("network", "Source request failed") })
-    if (!response.ok) throw new SourceError("http", "Source returned HTTP " + response.status)
-    return new Uint8Array(await response.arrayBuffer().catch(() => { throw new SourceError("network", "Source download failed") }))
+  // Keep timeout provenance private; the source failure wire shape remains unchanged.
+  const timedOut = new WeakSet<SourceFailure>()
+  const get = async (url: string, signal?: AbortSignal) => {
+    if (signal?.aborted) throw new SourceError("network", "Source deadline exceeded")
+    const controller = new AbortController()
+    try {
+      return await sourceDeadline((async () => {
+        const response = await (deps.fetch ?? fetch)(url, { signal: signal ? AbortSignal.any([signal, controller.signal]) : controller.signal }).catch(() => { throw new SourceError("network", "Source request failed") })
+        if (!response.ok) throw new SourceError("http", "Source returned HTTP " + response.status)
+        return new Uint8Array(await response.arrayBuffer().catch(() => { throw new SourceError("network", "Source download failed") }))
+      })(), PLUGIN_SOURCE_REQUEST_TIMEOUT_MS)
+    } finally {
+      controller.abort()
+    }
   }
-  const loadIndex = (market: typeof MARKETPLACES[number]) => {
+  const loadIndex = (market: typeof MARKETPLACES[number], signal?: AbortSignal) => {
     const known = indexes.get(market.source)
     if (known) return known
-    const pending = get(market.repository.replace("https://github.com/", "https://raw.githubusercontent.com/") + "/main/" + market.manifest).then((bytes) => {
+    const pending = get(market.repository.replace("https://github.com/", "https://raw.githubusercontent.com/") + "/main/" + market.manifest, signal).then((bytes) => {
       try { return readMarketplace(bytes, market.ecosystem) } catch { throw new SourceError("format", "Marketplace is not readable") }
     }).catch((error: unknown) => { indexes.delete(market.source); throw error })
     indexes.set(market.source, pending)
@@ -93,7 +104,7 @@ export function createPluginSources(deps: { catalog: () => Promise<readonly Cand
     archives.set(key, pending)
     return pending
   }
-  const loadRegistry = (query: string) => {
+  const loadRegistry = (query: string, signal?: AbortSignal) => {
     const known = registryQueries.get(query)
     if (known) return known
     const pending = (async () => {
@@ -101,7 +112,7 @@ export function createPluginSources(deps: { catalog: () => Promise<readonly Cand
       const cursors = new Set<string>()
       let cursor = ""
       do {
-        const page = registryDocument(await get(MCP_REGISTRY + "?search=" + encodeURIComponent(query) + "&version=latest" + (cursor ? "&cursor=" + encodeURIComponent(cursor) : "")))
+        const page = registryDocument(await get(MCP_REGISTRY + "?search=" + encodeURIComponent(query) + "&version=latest" + (cursor ? "&cursor=" + encodeURIComponent(cursor) : ""), signal))
         if (!Array.isArray(page.servers)) throw new SourceError("format", "Registry search has no server records")
         records.push(...page.servers.map(registryRecord))
         const next = isRecord(page.metadata) ? page.metadata.nextCursor : undefined
@@ -115,14 +126,14 @@ export function createPluginSources(deps: { catalog: () => Promise<readonly Cand
     registryQueries.set(query, pending)
     return pending
   }
-  const loadNpm = (query: string) => {
+  const loadNpm = (query: string, signal?: AbortSignal) => {
     const known = npmQueries.get(query)
     if (known) return known
     const pending = (async () => {
       const records: { name: string; version: string; description: string }[] = []
       let offset = 0
       do {
-        const page = registryDocument(await get(NPM_REGISTRY + "/-/v1/search?text=" + encodeURIComponent(query + " keywords:opencode-plugin") + "&size=250&from=" + offset))
+        const page = registryDocument(await get(NPM_REGISTRY + "/-/v1/search?text=" + encodeURIComponent(query + " keywords:opencode-plugin") + "&size=250&from=" + offset, signal))
         if (!Array.isArray(page.objects) || typeof page.total !== "number" || !Number.isSafeInteger(page.total) || page.total < 0) throw new SourceError("format", "npm search is not readable")
         for (const item of page.objects) {
           const pkg = isRecord(item) && isRecord(item.package) ? item.package : undefined
@@ -192,7 +203,9 @@ export function createPluginSources(deps: { catalog: () => Promise<readonly Cand
       return { ok: true, capture: await pending }
     } catch (error) {
       captures.delete(candidateId)
-      return { ok: false, code: error instanceof SourceChanged ? "source-changed" : "source-unreachable", detail: error instanceof SourceChanged ? "Selected source changed; search again" : "Selected source could not be captured" }
+      const failure: SourceFailure = { ok: false, code: error instanceof SourceChanged ? "source-changed" : "source-unreachable", detail: error instanceof SourceChanged ? "Selected source changed; search again" : "Selected source could not be captured" }
+      if (error instanceof SourceDeadline) timedOut.add(failure)
+      return failure
     }
   }
   const convertCandidate = async (candidateId: string): Promise<ConvertedCandidate | SourceFailure> => {
@@ -317,18 +330,22 @@ export function createPluginSources(deps: { catalog: () => Promise<readonly Cand
       return treeCapture({ kind: "git", locator: canonical, repository: canonical, commit: archive.commit, pluginPath: path }, members)
     },
     async searchSources(query: string): Promise<SourceSearchResultV1> {
+      const expires = Date.now() + PLUGIN_SOURCE_DEADLINE_MS
+      const controllers = new Map(PLUGIN_SOURCE_ORDER.map(source => [source, new AbortController()]))
+      const withinSource = <T>(source: PluginSourceIdV1, work: Promise<T>) => sourceDeadline(work, Math.max(0, expires - Date.now())).catch(error => { controllers.get(source)!.abort(); throw error })
+      try {
       const [catalog, results, registry, npm] = await Promise.all([
-        Promise.allSettled([deps.catalog()]).then((results) => results[0]!),
-        Promise.allSettled(MARKETPLACES.map(loadIndex)),
-        Promise.allSettled([loadRegistry(query)]).then((results) => results[0]!),
-        Promise.allSettled([loadNpm(query)]).then((results) => results[0]!),
+        Promise.allSettled([withinSource("catalog", deps.catalog())]).then((results) => results[0]!),
+        Promise.allSettled(MARKETPLACES.map(market => withinSource(market.source, loadIndex(market, controllers.get(market.source)!.signal)))),
+        Promise.allSettled([withinSource("mcp-registry", loadRegistry(query, controllers.get("mcp-registry")!.signal))]).then((results) => results[0]!),
+        Promise.allSettled([withinSource("opencode-npm", loadNpm(query, controllers.get("opencode-npm")!.signal))]).then((results) => results[0]!),
       ])
       const local = catalog.status === "fulfilled" ? rank(catalog.value, query) : []
       catalogRows.clear()
       if (catalog.status === "fulfilled") for (const row of catalog.value) catalogRows.set(row.id, row)
       const source: SourceStatusV1 = catalog.status === "fulfilled"
         ? { source: "catalog", status: "ok", matched: local.length, skipped: 0 }
-        : { source: "catalog", status: "failed", reason: "format", detail: "Customization catalog is unavailable" }
+        : { source: "catalog", status: "failed", reason: catalog.reason instanceof SourceError ? catalog.reason.reason : "format", detail: "Customization catalog is unavailable" }
       const markets = MARKETPLACES.map((market, index): { status: SourceStatusV1; candidates: CandidateV1[] } => {
         const result = results[index]!
         if (result.status === "rejected") {
@@ -376,16 +393,32 @@ export function createPluginSources(deps: { catalog: () => Promise<readonly Cand
       const groups = [{ status: source, candidates: local }, ...markets, { status: registryStatus, candidates: found }, { status: npmStatus, candidates: rank(npmFound, query) }]
         .toSorted((left, right) => PLUGIN_SOURCE_ORDER.indexOf(left.status.source) - PLUGIN_SOURCE_ORDER.indexOf(right.status.source))
       const ordered = groups.flatMap((group) => group.candidates)
+      const sourceFailed = (source: PluginSourceIdV1) => {
+        const group = groups.find(group => group.status.source === source)!
+        group.status = { source, status: "failed", reason: "network", detail: "Source could not be read within its network budget" }
+      }
+      const convertedForSearch = async (candidate: CandidateV1) => {
+        if (groups.find(group => group.status.source === candidate.source)?.status.status === "failed") return
+        try {
+          const result = await withinSource(candidate.source, convertCandidate(candidate.id))
+          if (!result.ok && timedOut.has(result)) sourceFailed(candidate.source)
+          return result.ok ? result : undefined
+        } catch {
+          sourceFailed(candidate.source)
+        }
+      }
       const installed = deps.installed?.() ?? []
       for (const [index, candidate] of ordered.entries()) {
         if (candidate.source === "catalog") continue
         delete candidate.sameAs
         const higher = ordered.slice(0, index).filter((entry) => PLUGIN_SOURCE_ORDER.indexOf(entry.source) < PLUGIN_SOURCE_ORDER.indexOf(candidate.source) && entry.name.toLowerCase() === candidate.name.toLowerCase())
         if (!higher.length) continue
-        const converted = await convertCandidate(candidate.id)
-        if (!converted.ok || !converted.runtimeIdentity) continue
+        const converted = await convertedForSearch(candidate)
+        if (!converted?.runtimeIdentity) continue
         for (const entry of higher) {
-          const other = entry.source === "catalog" ? (await catalogComparisons(entry.name)).find((row) => row.catalogId === entry.id)?.runtimeIdentity : await convertCandidate(entry.id).then((value) => value.ok ? value.runtimeIdentity : undefined)
+          const other = entry.source === "catalog"
+            ? await withinSource("catalog", catalogComparisons(entry.name)).then(rows => rows.find(row => row.catalogId === entry.id)?.runtimeIdentity).catch(() => { sourceFailed("catalog"); return undefined })
+            : (await convertedForSearch(entry))?.runtimeIdentity
           if (other !== converted.runtimeIdentity) continue
           candidate.sameAs = entry.sameAs ?? entry.id
           break
@@ -395,13 +428,16 @@ export function createPluginSources(deps: { catalog: () => Promise<readonly Cand
         delete candidate.installed
         const direct = installed.find(item => item.packageId === candidate.id)
         const possible = installed.filter(item => item.runtimeIdentity && item.name.toLowerCase() === candidate.name.toLowerCase())
-        const converted = !direct && possible.length ? await convertCandidate(candidate.id) : undefined
+        const converted = !direct && possible.length ? await convertedForSearch(candidate) : undefined
         const match = direct ?? (converted?.ok ? possible.find(item => item.runtimeIdentity === converted.runtimeIdentity) : undefined)
         if (match) candidate.installed = { packageId: match.packageId, enabled: match.enabled }
       }
       const result = { searchId: "search_" + randomUUID(), query, sources: groups.map((group) => group.status), candidates: ordered }
       searches.set(result.searchId, result.sources.map((source) => ({ ...source })))
       return result
+      } finally {
+        for (const controller of controllers.values()) controller.abort()
+      }
     },
     captureCandidate,
     convertCandidate,
@@ -411,6 +447,15 @@ export function createPluginSources(deps: { catalog: () => Promise<readonly Cand
 
 class SourceError extends Error {
   constructor(readonly reason: "network" | "http" | "format", message: string) { super(message) }
+}
+class SourceDeadline extends SourceError {
+  constructor() { super("network", "Source deadline exceeded") }
+}
+function sourceDeadline<T>(work: Promise<T>, duration: number): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new SourceDeadline()), duration)
+    work.then(value => { clearTimeout(timer); resolve(value) }, error => { clearTimeout(timer); reject(error) })
+  })
 }
 class SourceChanged extends Error {}
 

@@ -375,3 +375,19 @@ test("BC4 canceled timeline login keeps the installed package and the same actio
  expect(calls).toBe(2)
  expect(document.querySelector('[role="dialog"]')).toBeNull()
 })
+
+test("R12 B2 settled installs with neither package nor live stage show their tool result and stop polling", async () => {
+  for (const removed of [false, true]) {
+    const h = harness(removed ? committed() : null, [])
+    const host = mount(row({ phase: "completed", packageId: removed ? pack().packageId : undefined, result: removed ? "Package was removed" : "not installed: source-unreachable" }))
+    await flush()
+    expect(host.textContent).toContain(removed ? "Package was removed" : "not installed: source-unreachable")
+    expect(host.textContent).not.toContain("正在安装")
+    expect(host.textContent).not.toContain("正在生效")
+    const reads = h.reads.length
+    await new Promise(resolve => setTimeout(resolve, 1100))
+    await flush()
+    expect(h.reads).toHaveLength(reads)
+    disposers.pop()!()
+  }
+})

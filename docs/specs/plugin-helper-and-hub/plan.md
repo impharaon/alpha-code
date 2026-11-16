@@ -822,3 +822,5 @@ A4 FIXED：同一运行身份且 effect 相等才返回 alreadyInstalled；effec
 A5 前提属实：仅 OpenCode 单数目录有 discovery。补充 pr-review-toolkit 的真实 commands/agents 与 manifest（来自原完整 codeload、pax comment 与原固定 b5b01ac4… 提交相符）；provenance 逐文件 digest 与 selection archive 同步，未手造格式、未执行 hook。Claude 原树及同字节 Codex 来源受控变体保留六 agent/一 command，既有 explanatory-output-style 保留 SessionStart hook；main nothing-runnable 具名原因且零账本写。两红例 exit 1（a5-red.log），原 converter 均漏项。
 
 A5 FIXED：三生态复用 Markdown agent/command 解析，Claude/Codex 的标准复数目录得以具名；hooks/hooks.json 的命令事件转换成 Hook entry，默认字段沿既有提供方合同（UserPromptSubmit 30 秒，其余列明事件 600 秒），此增量仍不执行 hooks。现有 install entry 将不支持的 entry 映成 kind-not-supported-yet，hooks-only/commands-only 均有原因且不写账本。生成 converter ESM 与 artifact 清单，未改发布 schema；四文件 converter/artifact/sources/install entry exit 0（98 pass/638 assertions，a5-related.log），ui-mac bun typecheck exit 0。真实夹具新增 1,300 余行均为固定上游字节，产品改动约 30 行；非扩大运行范围。
+
+B2 前提属实：!pack 无条件轮询、无包无阶段按 installing 展示。生产 DOM 红例覆盖失败后重启/已装后移除，结束工具结果须可见且轮询读数不再增长；exit 1（b2-red.log）。

@@ -946,3 +946,14 @@ C3 已完成的文字同步逐行核对：card 宿主 1→1，叙述保持实测
 own-assertion corrections 全表：`eb699846b0` 旧 primitive 的额外 saved:true；`25dc6cc380` 新本地查询例等待短于既有防抖；`5334d225ed` Figma config action 不调用 populate；`05ccc47509` connect 与工具库存异步。各自独立提交且保留审核要求的行为断言；官方 probe 的进程级隔离修复另在 `5b10e9a65c`，既有 HOME 排除断言未改。
 
 仍待真实应用验收：编排器收集 built application 的真实模型请求、真实服务授权及任务调用；本轮本机 transport/OAuth 替身不是线上账户证据。AC-16 Registry MCP 在项目 B 的真实调用仍为记录项，去向该验收。无新产品限制、无项目配置写入、无真实账户登录/外部写、无 gate/bin/check、无 push/PR/merge。
+
+
+r15 · host publication artifact 边界裁定（2026-11-17；本轮开始 16:22:07 UTC）：编排器说明 Alpha Web 当前未消费转换器，采纳「转换库仍在当前位置且唯一解析第三方格式，本增量不属于 host artifact」；跨仓发布转换器延到实际消费者接线时。此裁定替代 r14 C3 的跨仓重固定路线，不再要求发布或重签现有目录。没有把这项裁定归于 owner 原话；design §10 由编排器按其变更程序登记。
+
+r15 实施偏离：`generate-artifact.ts` 本身也是 artifact 成员，单删其表中三个文件仍会改变 generator 的 SHA，因此将原有 Bun build / TypeScript declaration / drift-check 逻辑原样搬到同目录 `generate-plugin-conversion.ts`，host generator 与 manifest 一并恢复 origin/alpha 精确字节；这是裁定所需同链文件，没有新转换实现、运行时分支、依赖或发布端变更。独立生成/核验命令分别为 `bun src/shared/host-extension-package-contract/generate-plugin-conversion.ts` / `--check`，原 host `generate-artifact.ts --check` 只负责其原有 14 个文件。源 `.ts` 与运行时 `.mjs`/声明 `.d.mts` 均保留，所有原 converter/source 测试保留。
+
+r15 红/绿：先提交 `3a0a181241`，两个行为红例为 host 清单排除转换器，以及独立 CLI 核验；原树 39 pass / 2 fail（artifact-red.log，exit 1）。改动后 host --check、standalone --check 均 exit 0；新增 drift 负控制在临时副本分别改坏 `.mjs` 和 `.d.mts`，两次都必须拒绝。`bun test --max-concurrency 2 src/shared/host-extension-package-contract/plugin-conversion.test.ts src/shared/host-extension-package-contract/host-extension-package-artifact.test.ts src/main/plugin-sources.test.ts` 80 pass / 0 fail（artifact-green.log）。`git diff --exit-code origin/alpha -- <host manifest> <host generator>` exit 0；consumer vendor/locks 未改。
+
+r15 打包加载核对：`src/main/index.ts:27` 静态引入 ext-ipc，后者消费 plugin-sources / install-from-source；三个运行时模块均以相对路径直接导入 `plugin-conversion.mjs`。`electron.vite.config.ts` 的 main Rollup index 入口为 `src/main/index.ts`，转换器随这条静态图编入 `out/main/index.js`（若 Rollup 形成共享 chunk，一同位于 out/main）；`package.json` 的 Electron main 就是 `./out/main/index.js`，`electron-builder.config.ts` 的 files 包含 `out/**/*`，随 app.asar 带入。没有 manifest 查找、artifact 文件集读取或需要复制的独立转换器 resource 路径。进一步将真实 `.mjs` 单独复制到只含脚本和库的临时目录，在 Node 下转换固定 Playwright 原始样本，产出 claude-code / 一个 MCP，exit 0（node-runtime.log）；该目录没有 host artifact 或 registry，证明 Node 库加载不依赖其成员身份。此证据是加载链/独立库运行，不冒充最终签名应用验收。
+
+r15 新授权诊断（按 codepuppy-check.sh [5/14] 对应子命令，仅追加并发 2）：`bun run --cwd packages/codepuppy-contracts-consumer check:vendor` exit 0；`bash scripts/bun-test-floor.sh 15 packages/codepuppy-contracts-consumer --max-concurrency 2` 65 pass / 0 fail、exit 0（consumer-step.log）；`bash scripts/bun-test-floor.sh 100 packages/ext --max-concurrency 2` 626 pass / 0 fail、exit 0（ext-step.log）。vendor 检查如实提示没有 staged upstream checkout，故本次仅锁↔vendor 字节及 producer aggregate 验证，不声称重新验证外仓 provenance；没有 vendor/pin 修改。ui-mac/ext `bun typecheck` 均 exit 0。未运行 ui-mac/app whole-package、bin/check 或 gate run。

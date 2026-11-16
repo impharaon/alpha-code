@@ -1032,3 +1032,37 @@ r17 冻结后收口（2026-11-16 18:38 UTC）：frozen-complete-pass.log 完整�
 指定收口命令：ui-mac `bun test --max-concurrency 2 src/main/gate-file-registry.test.ts` 23 pass / exit 0；ext `bun test --max-concurrency 2 src/policy/authority-registry.test.ts` 5 pass / exit 0；两包 `bun typecheck` 均 exit 0。contracts-consumer 按 codepuppy-check.sh 的该步骤执行 `bun run --cwd packages/codepuppy-contracts-consumer check:vendor` + `bash scripts/bun-test-floor.sh 15 packages/codepuppy-contracts-consumer`（同一并发 2 包装），均 exit 0，65 pass / 6 文件；119 行 host artifact 消费断言保留。check:vendor 只确认 lock↔vendored 字节与 source-pinned aggregate，明确自报 PROVENANCE NOT VERIFIED（未 staged 对应 producer checkout），本轮不冒称新完成 producer provenance 审计，去向正式 ship 核验；没有为此变更 vendor/lock 或访问外仓。日志均在 /tmp/helper-install-r17，命令与 frozen HEAD 可重放。
 
 最终依据 r17 brief / 1706604f5e 接收点 / distribution §1；已核 Codex（GPT-6），结论 DONE：C3 数字已自动写回并逐行审阅，0.2.1 候选目录与 seed 验签/双跑幂等，357 行最终逐行证据全绿，指定类型/登记/consumer 检查通过。实际本轮 15 文件 +230/-119（含生成快照与本文），约 60 分钟。已定勿重开：无聊天安装确认、MCP runtime/技能非 force reload、统一包身份与秘密/作用域契约不变。下一步仅编排器 review/ship/build/publish 和真实应用模型/授权任务验收；本轮不承担发布。遗留去向：前述两个无效 patch warning → intent item；producer provenance / built application 验收 → ship；其它无。没有 tag/build/package/sign/notarize/manifest/release/push/merge，没有 Core 源码或外仓改动，host artifact 仍逐字等于 origin/alpha。
+
+
+r18 · 首次整闸反馈（起点 70e28642c7 / 0.2.1，开始 2026-11-16 19:14 UTC）：完整日志按步骤/失败 markers 检索，硬红只有 G1 NUL、G2 docs、G3 三条 ui-mac 新红（matrix 同时是 gate-files 红）。[9–13] 无其它失败；[12] inventory matches snapshot，未越预算、未改库存快照。没有运行整闸。
+
+G1：assert-no-nul-bytes.py 已有 BINARY_SUFFIXES 格式登记（.tgz 原已登记，实际红为 .gz，包括 .tar.gz/.json.gz）；按脚本正文规定登记仓内真实存在的 gzip 格式，不改扫描面/默认拒绝/源码 NUL 判据，也不增加泛目录豁免、不编码篡改样本。原整闸 9291 hits / exit 1 是红证据；按原步骤 source docs-gates.sh; docs_gate_nul 后 exit 0，5613 个受检文件零 NUL（nul-step.log）。删回 .gz 登记即重新拒绝这些 gzip 实采字节。
+
+G3a 初步归因证据：package-effect 单跑通过；server.test.ts + package-effect.engine.test.ts 同进程混跑稳定复现 npx ENOENT（effect-after-server.log，33 pass/1 fail），失败在 engine-npm-cache.ts:19、进入引擎案例之前，不能归咎 C7 的 watcher/RPC 窗口。后续在同一 toolchain 链修复并复跑混排与整包，不收编 known-fails。
+
+#### PR notes · r18
+
+G4 模块脚本明文定义 exit 2 为“不拦 push”的告警；只在坏登记或抬 tree 却未跟随 file 行时 exit 1。此次未修改任何基线，日志只有前者；本次增量跨来源/统一入口/runtime 及管理接线造成的体积债照实留在编排器 PR notes，不借修 gate 重构或抬基线：
+
+```text
+⚠ 超基线:packages/ui-mac/src/main/ext-install-planner.ts 实测 3703 行 > 基线 3552(+151)
+⚠ 超基线:packages/ui-mac/src/main/ext-transaction.ts 实测 2827 行 > 基线 2825(+2)
+⚠ 超基线:packages/ui-mac/src/main 实测 67455 行 > 基线 65177(+2278)
+⚠ 超阈值:packages/ext/src/context-injection.ts 831 行 > 800
+⚠ 超阈值:packages/ui-mac/src/main/ext-config.ts 1551 行 > 800
+⚠ 超阈值:packages/ui-mac/src/main/ext-fs-installer.ts 983 行 > 800
+⚠ 超阈值:packages/ui-mac/src/main/ext-ipc.ts 1545 行 > 800
+⚠ 超阈值:packages/ui-mac/src/main/ext-receipt-v2.ts 1655 行 > 800
+⚠ 超阈值:packages/ui-mac/src/main/package-admission.ts 1762 行 > 800
+⚠ 超阈值:packages/ui-mac/src/preload/types.ts 1364 行 > 800
+⚠ 超阈值:packages/ui-mac/src/renderer/codepuppy-ui/session-timeline/cards/tool-card-model.ts 1828 行 > 800
+⚠ 超阈值:packages/ui-mac/src/renderer/codepuppy-ui/session-timeline/session-timeline-view.tsx 887 行 > 800
+⚠ 超阈值:packages/ui-mac/src/renderer/codepuppy-ui/session-timeline/timeline-model.ts 1556 行 > 800
+⚠ 超阈值:packages/ui-mac/src/renderer/extensions/extension-detail.tsx 1978 行 > 800
+⚠ 超阈值:packages/ui-mac/src/renderer/extensions/extension-hub.tsx 2702 行 > 800
+⚠ 超阈值:packages/ui-mac/src/renderer/extensions/use-extensions.ts 1248 行 > 800
+⚠ 超阈值:packages/ui-mac/src/renderer/i18n/en.ts 2336 行 > 800
+⚠ 超阈值:packages/ui-mac/src/renderer/i18n/zh.ts 2305 行 > 800
+```
+
+已记录但不修：unsigned dir 包签名问题按 r18 明确交包装 lane，非本增量修复范围。

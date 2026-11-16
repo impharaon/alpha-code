@@ -666,3 +666,14 @@ test("R14 B6 all previously allowed Git forges prepare a whole real MCP package 
   expect(cloned).toHaveLength(before)
  }finally{clone.mockRestore()}
 })
+
+test("R14 A7 main source entry reloads a real bundled agent without force", async () => {
+ catalogOverride=currentCatalog
+ try{
+  const before=toSidecar.filter(message=>message.type==="codepuppy.reload.request").length
+  expect(await handlers.get("ext-install-from-source")!({sender:{id:1}},{requestId:"r14_native_agent_reload",source:{kind:"catalog",catalogId:"agent:code-reviewer"},effect:{kind:"all-projects"},via:"chat"})).toMatchObject({ok:true,packageId:"agent:code-reviewer"})
+  const requests=toSidecar.filter(message=>message.type==="codepuppy.reload.request").slice(before)
+  expect(requests).toContainEqual(expect.objectContaining({scope:"global",items:expect.arrayContaining([expect.objectContaining({id:"agent:code-reviewer"})])}))
+  expect(requests.every(request=>!request.force)).toBe(true)
+ }finally{catalogOverride=undefined}
+})

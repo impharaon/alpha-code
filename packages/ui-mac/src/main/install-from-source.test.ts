@@ -476,3 +476,21 @@ test("R14 A6 an unpublishable substituted remote leaf leaves no committed packag
  expect(readPackageLedgerStateV1(h.root)).toMatchObject({ok:true,records:[],packageGraphs:[]})
  expect(readMcpLeafStrict("context7")).toMatchObject({ok:true,value:undefined})
 }))
+
+for(const kind of ["agent","command"] as const)test("R14 A7 catalog "+kind+" schedules a non-force content reload",()=>installerHarness(async h=>{
+ const {mixedBundleFixture}=await import("../../test-component/package-mixed-bundle.fixture")
+ const {installCatalogFromSource}=await import("./install-from-source")
+ const {resolveVerifiedPackageV1}=await import("./package-installability")
+ const {sha256Hex}=await import("./ext-manifest-v2")
+ const fixture=mixedBundleFixture()
+ const component=fixture.envelope.components.find(component=>component.profileId===kind)!
+ const envelope={...fixture.envelope,root:component.id,components:[{...component,required:true,dependencies:[]}],capabilities:component.capabilities}
+ const catalog={version:"r14",entries:[],packages:[envelope]}
+ const fetchBytes=async(ref:{sha256:string})=>{const bytes=fixture.payloadByDigest.get(ref.sha256)??fixture.assetByDigest.get(ref.sha256);if(!bytes)throw Error("fixture digest missing");return bytes}
+ const planner={globalRoot:()=>h.root,resolveEntry:async()=>null,advisoryGate:()=>({allowed:true}),resolvePackage:async(id:string,version:string)=>resolveVerifiedPackageV1(catalog,id,version)}
+ const admission={root:()=>h.root,userDataPath:h.temporary,casBaseRoot:()=>h.temporary,environment:()=>"dev" as const,loadVerifiedCatalog:async()=>({source:"remote" as const,catalog,snapshotDigest:sha256Hex(JSON.stringify(catalog))}),installability:{fetchPayload:fetchBytes},fetchAsset:fetchBytes}
+ const reloads:string[]=[]
+ const result=await installCatalogFromSource(envelope.prelude.packageId,{requestId:"r14_reload_"+kind,source:{kind:"catalog",catalogId:envelope.prelude.packageId},effect:{kind:"all-projects"},via:"chat"},{planner:planner as never,admission,activateMcp:async()=>[],reloadSkills:id=>{reloads.push(id)},removeDeparting:()=>{}})
+ expect(result).toMatchObject({ok:true})
+ expect(reloads).toEqual([envelope.prelude.packageId])
+}))

@@ -371,3 +371,49 @@ test("D3 a malformed draft does not write and project-only creation uses the sam
   expect(state.ok && state.packageGraphs[0]?.effect).toMatchObject({ kind: "project" })
   expect(readdirSync(project)).toEqual([])
 }))
+
+test("BC2a real local package captures install through the entry without replacing another local package", () => installerHarness(async h => {
+  const { mkdirSync, writeFileSync } = await import("node:fs")
+  const { dirname } = await import("node:path")
+  for (const [sample, name] of [["plugins/frontend-design", "frontend-design"], ["external_plugins/context7", "context7"]]) {
+    const original = await captureFixture(sample!)
+    const directory = join(h.temporary, name!)
+    for (const node of original.nodes) {
+      if (node.kind !== "file") continue
+      mkdirSync(dirname(join(directory, node.path)), { recursive: true })
+      writeFileSync(join(directory, node.path), await original.readFile(node.path))
+    }
+    const captured = await h.sources.captureFolder(directory)
+    const prepared = await h.sources.prepareCapture(captured)
+    expect(prepared.kind).toBe("package")
+    if (prepared.kind !== "package") throw Error("expected single package")
+    expect(JSON.stringify(prepared)).not.toContain(directory)
+    expect(await h.install(h.request(prepared.candidateId, "bc2_local_" + name))).toMatchObject({ ok: true, packageId: "local:" + name, source: { kind: "local-folder" } })
+    const file = original.nodes.find(node => node.kind === "file")!
+    expect(await captured.readFile(file.path)).toEqual(await original.readFile(file.path))
+  }
+  const state = readPackageLedgerStateV1(h.root)
+  expect(state.ok && state.packageGraphs.map(graph => graph.packageId).sort()).toEqual(["local:context7", "local:frontend-design"])
+  expect(state.ok && state.records.every(record => record.desiredState === "enabled")).toBe(true)
+}))
+
+test("BC2a pinned marketplace prepares opaque choices and only the selected real subtree installs", () => installerHarness(async h => {
+  const { fixtureCommit } = await import("../../test-fixtures/plugin-helper/fixture")
+  const captured = await h.sources.captureGit("https://github.com/anthropics/claude-plugins-official", "refs/heads/main")
+  expect(captured.source.commit).toBe(fixtureCommit)
+  const prepared = await h.sources.prepareCapture(captured)
+  expect(prepared.kind).toBe("marketplace")
+  if (prepared.kind !== "marketplace") throw Error("expected marketplace choices")
+  const selected = prepared.entries.find(entry => entry.displayName === "context7")!
+  expect(selected).toBeDefined()
+  expect(prepared.entries.some(entry => entry.displayName === "playwright")).toBe(true)
+  expect(readPackageLedgerStateV1(h.root)).toMatchObject({ ok: true, records: [] })
+  const converted = await h.sources.convertCandidate(selected.id)
+  expect(converted.ok && converted.capture.nodes.some(node => node.path.startsWith("external_plugins/"))).toBe(false)
+  expect(await h.install(h.request(selected.id, "bc2_selected_context7"))).toMatchObject({ ok: true, packageId: "claude:context7" })
+  const state = readPackageLedgerStateV1(h.root)
+  expect(state.ok && state.packageGraphs.map(graph => graph.packageId)).toEqual(["claude:context7"])
+  expect(state.ok && state.records.map(record => record.name)).toEqual(["context7"])
+  expect(h.activation).toEqual(["claude:context7"])
+  expect(h.reloads).toEqual([])
+}))

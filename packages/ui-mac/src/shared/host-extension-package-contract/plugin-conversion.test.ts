@@ -269,3 +269,22 @@ test("the published converter is self-contained ESM with the same conversion res
   const captured = await captureFixture("external_plugins/playwright")
   expect((await published.convertPluginTree(captured)).package).toEqual((await source.convertPluginTree(captured)).package)
 })
+
+test("A2 installed skill copy rewrites host names and structured MCP references while retaining other bytes", async () => {
+  const capture = await captureFixture("plugins/frontend-design")
+  const original = new TextDecoder().decode(await capture.readFile("skills/frontend-design/SKILL.md"))
+  // Controlled frontmatter additions to the actual skill, using the converter's existing fields.
+  const skill = original.replace("---\n", '---\nallowed-tools: ["mcp__playwright__browser_navigate", "Read"]\ndisallowed-tools: ["mcp__playwright__browser_close"]\ntools: ["mcp__playwright__browser_snapshot"]\ndependencies:\n  mcp: [playwright]\n')
+  const converted = await (await converter()).convertPluginTree(await captureFixture("plugins/frontend-design", { "skills/frontend-design/SKILL.md": skill }))
+  const entry = converted.package.entries.find((entry) => entry.kind === "skill")!
+  if (entry.kind !== "skill") throw Error("real skill is absent")
+  const result = (await converter()).renderInstalledSkill(entry, new TextEncoder().encode(skill), new Map([[entry.sourceName, "frontend-design-host"], ["playwright", "playwright-host"]]))
+  const text = new TextDecoder().decode(result)
+  expect(text).toContain("name: frontend-design-host")
+  expect(text).toContain("mcp__playwright-host__browser_navigate")
+  expect(text).toContain("mcp__playwright-host__browser_close")
+  expect(text).toContain("mcp__playwright-host__browser_snapshot")
+  expect(text).toContain("mcp: [playwright-host]")
+  expect(text.slice(text.indexOf("\n---", 4))).toBe(skill.slice(skill.indexOf("\n---", 4)))
+  expect(text).toContain('description:')
+})

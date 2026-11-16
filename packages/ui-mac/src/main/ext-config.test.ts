@@ -1014,11 +1014,12 @@ describe("#1381 远程 MCP 的记录住在真源:写、读前像、失败补偿�
     expect(fs.existsSync(path.join(codepuppyTmp, "codepuppy.jsonc"))).toBe(false)
   })
 
-  test("远程条目带真源不装的键(oauth / timeout / enabled)⇒ 拒,不静默丢;名字 cloud ⇒ 拒(平台云 MCP 的名字)", () => {
-    expect(persistMcp("srv", { ...REMOTE, oauth: false })).toEqual({ ok: false, reason: "remote MCP server carries key(s) the truth file does not hold: oauth" })
-    expect(persistMcp("srv", { ...REMOTE, timeout: 5000, enabled: true })).toEqual({ ok: false, reason: "remote MCP server carries key(s) the truth file does not hold: timeout, enabled" })
+  test("远程条目保留已批准的 oauth/timeout，拒 enabled 和平台云 MCP 名字", () => {
+    expect(persistMcp("srv", { ...REMOTE, oauth: false, timeout: 5000 })).toEqual({ ok: true })
+    expect(readMcpLeaf("srv")).toEqual({ ...REMOTE, oauth: false, timeout: 5000 })
+    expect(persistMcp("srv", { ...REMOTE, timeout: 5000, enabled: true })).toEqual({ ok: false, reason: "remote MCP server has unexpected key(s): enabled" })
     expect(persistMcp("codepuppy", REMOTE)).toEqual({ ok: false, reason: 'server name "codepuppy" is reserved by the platform cloud MCP' })
-    expect(fs.existsSync(mcpTruthFile())).toBe(false)
+    expect(mcpTruthNames()).toEqual(["srv"])
   })
 
   test("同名改成本地 ⇒ 真源记录让位、codepuppy.jsonc 得到本地叶(账本键 mcp.<name> 是同一个)", () => {

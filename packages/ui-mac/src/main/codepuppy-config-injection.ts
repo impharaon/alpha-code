@@ -35,6 +35,8 @@ import { codepuppyGlobalRoot, codepuppyJsoncPath } from "./engine-config-truth"
 import { injectDisabledOverrides } from "./ext-disabled-injection"
 import { injectMcpDefaultDeny } from "./mcp-default-deny"
 import { readMcpServerRecords } from "./mcp-server-records"
+import { remoteMcpLeaf } from "./mcp-server-truth"
+import { projectServerConfig } from "../../../ext/src/engine-transforms"
 import { materializeCloudMcpConfig } from "./cloud-sidecar-config"
 import type { ChannelName } from "./catalog-channels"
 import { CODEPUPPY_V2_CATALOG_READY_PROVIDER_ID } from "../shared/codepuppy-config"
@@ -626,7 +628,7 @@ export function injectCodePuppyConfig(
         ...config.mcp,
         servers: {
           ...config.mcp?.servers,
-          [server.name]: { type: "remote", url: server.url, ...(server.headers ? { headers: server.headers } : {}) },
+          [server.name]: projectServerConfig(remoteMcpLeaf(server)),
         },
       }
       injectedMcpNames.add(server.name)

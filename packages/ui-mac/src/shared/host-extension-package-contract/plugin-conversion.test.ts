@@ -320,3 +320,24 @@ test("R14 B6 a repository with one loose skill keeps the previously accepted chi
  const converted=await (await converter()).convertPluginTree(relocated)
  expect(converted.package.entries).toContainEqual(expect.objectContaining({kind:"skill",sourcePath:"frontend-design/SKILL.md",sourceName:"frontend-design"}))
 })
+
+
+test("standalone converter check detects drift in both committed runtime and declaration outputs", async () => {
+  const { mkdtemp, readFile, writeFile, rm } = await import("node:fs/promises")
+  const { tmpdir } = await import("node:os")
+  const child = Bun.spawnSync([process.execPath, join(import.meta.dir, "generate-plugin-conversion.ts"), "--check"], { cwd: import.meta.dir })
+  expect(child.exitCode, child.stdout.toString() + child.stderr.toString()).toBe(0)
+  const { checkPluginConversion } = await import("./generate-plugin-conversion")
+  const root = await mkdtemp(join(tmpdir(), "conversion-check-"))
+  try {
+    for (const file of ["plugin-conversion.mjs", "plugin-conversion.d.mts"])
+      await writeFile(join(root, file), await readFile(join(import.meta.dir, file)))
+    await checkPluginConversion(root)
+    for (const file of ["plugin-conversion.mjs", "plugin-conversion.d.mts"]) {
+      const original = await readFile(join(root, file))
+      await writeFile(join(root, file), Buffer.concat([original, Buffer.from("\n// controlled drift\n")]))
+      await expect(checkPluginConversion(root)).rejects.toThrow(file + " drifted")
+      await writeFile(join(root, file), original)
+    }
+  } finally { await rm(root, { recursive: true, force: true }) }
+})

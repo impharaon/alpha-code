@@ -884,3 +884,5 @@ B6 FIXED：非 github.com 地址走既有 validGitUrl/cloneSkillGitToTmp（原 a
 A6 CONTRARY EVIDENCE：给定 whole ${VAR} URL 在当前生产链已在写前拒绝，未改生产。真实 Context7 配置只替换 URL 为 ${WHOLE_URL} 并显式 oauth:false，新用例首跑即 exit 0（a6-red.log 名沿采集，实际 1 pass）；结果 transaction-failed、records/graphs 空、remote leaf 不存在。ext-package-tx-builders.ts:403–405 已有 validateServer(config)，ext-config.ts:299–305 通过 classifyBaseUrl:new URL 拒该地址；blame 分别 7b9a20cec8c/ad386420617，均早于审查范围。临时只撤去这道 builder 校验，原用例 exit 1 且出现 committed MCP record（a6-guard-mutation.log），finally 原字节恢复。因此不会为未复现的前提再叠 invalidMcpServerRecord 门或改变合法来源能力；保留反证回归，交编排器据此关闭/修正 finding。
 
 A7 前提属实：catalog helper 与主 entry 锁后回调均只看 skill。派生自既有 mixed-bundle 生产方语料的单 agent/单 command 两臂，以及真实随包 agent:code-reviewer 的完整 main IPC 一臂，安装成功后都无 reload；三例 exit 1（a7-red.log）。后者同时断言非 force，保留 MCP/cloud 即时路径。
+
+A7 FIXED：catalog helper 与 main 锁后生效均为非 MCP/非 cloud 内容请求原 non-force reload，故 agent/command 不再漏调度；MCP 仍 runtime add/connect。三个原红断言保留，install-from-source/ext-write-channels/package-command-engine-visibility 三文件 exit 0（a7-green.log，含真实命令可见与执行宿主），ui-mac typecheck exit 0（a7-types.log）；IPC 内部实跑 22，同步 pin。

@@ -552,6 +552,6 @@ export async function installCatalogFromSource(
   if (before) await deps.removeDeparting([before.root, ...before.children].filter((node) => !state.records.some((record) => record.kind === node.kind && record.name === node.name)))
   await deps.activateMcp(catalogId)
   const nodes = [graph.root, ...graph.children]
-  if (nodes.some((node) => node.kind === "skill")) deps.reloadSkills(catalogId)
+  if (nodes.some((node) => node.kind !== "mcp" && node.kind !== "cloud")) deps.reloadSkills(catalogId)
   return { ok: true, packageId: catalogId, displayName: graph.displayName ?? legacy?.entry.displayName ?? catalogId, source: { kind: "catalog" }, installed: nodes.flatMap((node) => node.kind === "skill" || node.kind === "mcp" ? [{ kind: node.kind, hostName: node.name, sourceName: node.name }] : []), notRunning: graph.notRunning ?? [] }
 }

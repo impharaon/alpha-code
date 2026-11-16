@@ -1098,7 +1098,7 @@ export function registerExtIpcHandlers(
   }
   ipcMain.handle(LOCAL_PACKAGE_READ_CHANNELS.preparePluginSource, (_event: IpcMainInvokeEvent, input: unknown) => preparePluginSource(input))
   const activatePackageMcp = (packageId: string) => applyPackageMcpV1(packageId, codepuppyUserWorkspaceDir(), { root: codepuppyGlobalRoot, awaitServer })
-  const reloadPackageSkills = (packageId: string) => reloads.request({ scope: "global", items: packageReloadItems(packageId), reason: `installed package skills ${packageId}` })
+  const reloadPackageSkills = (packageId: string) => reloads.request({ scope: "global", items: packageReloadItems(packageId), reason: `installed package content ${packageId}` })
   const removeDepartingPackageComponents = async (children: Array<{ kind: string; name: string }>) => {
     const removed = packageChildFileCleanup(children)
     if (!removed.ok) getLogger().warn("Package departing content cleanup is pending")
@@ -1422,7 +1422,7 @@ export function registerExtIpcHandlers(
       await activatePackageMcp(result.packageId)
       const state = readPackageLedgerStateV1(codepuppyGlobalRoot(), { sideEffectFree: true })
       const graph = state.ok && state.packageGraphs.find(graph => graph.packageId === result.packageId)
-      if (graph && [graph.root, ...graph.children].some(node => node.kind === "skill")) reloadPackageSkills(result.packageId)
+      if (graph && [graph.root, ...graph.children].some(node => node.kind !== "mcp" && node.kind !== "cloud")) reloadPackageSkills(result.packageId)
     }
     return result
   }

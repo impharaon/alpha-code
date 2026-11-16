@@ -1190,6 +1190,7 @@ test("review B7 one search finds own agents and local/created packages across ta
     expect(qa('[data-installed-package]')).toHaveLength(0)
     expect(document.body.textContent).not.toContain(zh["codepuppy.ext.sourceNoMatches"])
     search("no-local-result")
+    await Bun.sleep(300) // The production source query is debounced by 250 ms.
     await waitFor(() => expect(document.body.textContent).toContain(zh["codepuppy.ext.sourceNoMatches"]))
     expect(document.body.textContent).not.toContain("docs-writer")
     expect(calls.installPackage).toEqual([])

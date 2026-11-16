@@ -12,6 +12,84 @@ import { commitTransactionLedger } from "./ext-package-ledger-commit"
 import { readPackageLedgerStateV1, type UpsertInput } from "./ext-receipt-v2"
 import { runExtensionTransaction } from "./ext-transaction"
 import { persistMcp, readMcpLeafStrict } from "./ext-config"
+import { createPluginSources } from "./plugin-sources"
+import { fixtureFetch } from "../../test-fixtures/plugin-helper/source-fetch"
+import { makeRecoveryGate } from "./ext-recovery-gate"
+import { existsSync, readFileSync } from "node:fs"
+
+async function installerHarness(run: (h: Awaited<ReturnType<typeof sourceHarness>>) => Promise<void>) {
+  const temporary = mkdtempSync(join(tmpdir(), "helper-a2-entry-"))
+  const previous = process.env.CODEPUPPY_GLOBAL_DIR
+  process.env.CODEPUPPY_GLOBAL_DIR = join(temporary, "env", "dev")
+  try { await run(await sourceHarness(temporary)) } finally {
+    if (previous === undefined) delete process.env.CODEPUPPY_GLOBAL_DIR
+    else process.env.CODEPUPPY_GLOBAL_DIR = previous
+    rmSync(temporary, { recursive: true, force: true })
+  }
+}
+async function sourceHarness(temporary: string) {
+  const { createSourceInstaller } = await import("./install-from-source")
+  const sources = createPluginSources({ catalog: async () => [], fetch: fixtureFetch })
+  const root = join(temporary, "env", "dev")
+  const activation: string[] = []
+  const reloads: string[] = []
+  const install = createSourceInstaller({ sources, globalRoot: () => root, casBaseRoot: () => temporary, environment: () => "dev", userDataPath: temporary,
+    gate: makeRecoveryGate(() => ({})), advisoryGate: () => ({ allowed: true }), resolvePackage: async () => { throw Error("non-catalog must use graph declarations") },
+    catalogInstall: async () => ({ ok: false, code: "unknown-id", detail: "no catalog entries in this controlled search" }),
+    activateMcp: async (id) => { activation.push(id) }, reloadSkills: (id) => { reloads.push(id) }, removeDeparting: () => {},
+  })
+  const candidate = async (query: string, source = "claude-marketplace") => (await sources.searchSources(query)).candidates.find((row) => row.source === source)!.id
+  const request = (candidateId: string, requestId = "request_a2_01") => ({ requestId, source: { kind: "candidate" as const, candidateId }, effect: { kind: "all-projects" as const }, via: "chat" as const })
+  return { install, sources, root, temporary, activation, reloads, candidate, request }
+}
+
+test("A2 marketplace context7 commits one real enabled package and durable declarations", () => installerHarness(async (h) => {
+  const input = h.request(await h.candidate("context7"))
+  const outcome = await h.install(input)
+  expect(outcome).toMatchObject({ ok: true, packageId: "claude:context7", source: { kind: "marketplace", ecosystem: "claude" }, installed: [{ kind: "mcp", hostName: "context7", sourceName: "context7" }] })
+  const state = readPackageLedgerStateV1(h.root)
+  expect(state.ok && state.records.map((record) => record.desiredState)).toEqual(["enabled"])
+  expect(state.ok && state.packageGraphs[0]?.declarations?.[0]?.mcp).toMatchObject({ type: "remote", url: "https://mcp.context7.com/mcp?client=claude-code-plugin" })
+  expect(readMcpLeafStrict("context7")).toMatchObject({ ok: true, value: { url: "https://mcp.context7.com/mcp?client=claude-code-plugin" } })
+  expect(h.activation).toEqual(["claude:context7"])
+  expect(h.reloads).toEqual([])
+  expect(await h.install(input)).toEqual(outcome)
+  expect(await h.install(h.request(input.source.candidateId, "request_a2_02"))).toMatchObject({ ok: true, packageId: "claude:context7", alreadyInstalled: true })
+  const after = readPackageLedgerStateV1(h.root)
+  expect(after.ok && after.packageGraphs).toHaveLength(1)
+}))
+
+test("A2 host-name collision preserves existing content and rewrites only installed skill name", () => installerHarness(async (h) => {
+  const { mkdirSync, writeFileSync } = await import("node:fs")
+  mkdirSync(join(h.root, "skills", "frontend-design"), { recursive: true })
+  const original = join(h.root, "skills", "frontend-design", "SKILL.md")
+  writeFileSync(original, "user owned bytes")
+  const outcome = await h.install(h.request(await h.candidate("frontend-design")))
+  expect(outcome.ok).toBe(true)
+  if (!outcome.ok) throw Error(outcome.detail)
+  expect(outcome.installed[0]?.hostName).toMatch(/^frontend-design-[a-f0-9]{8}$/)
+  expect(readFileSync(original, "utf8")).toBe("user owned bytes")
+  expect(h.reloads).toEqual([outcome.packageId])
+  const { readCurrentGeneration } = await import("./ext-transaction")
+  // Read the real generation written by the existing builder, not a synthetic probe.
+  const current = readCurrentGeneration(h.root, "skill--" + outcome.installed[0]!.hostName)
+  expect(current).toBeTruthy()
+  expect(readFileSync(join(current!.dir, "SKILL.md"), "utf8")).toContain("name: " + outcome.installed[0]!.hostName)
+}))
+
+test("A2 zero runnable package maps diagnostics without writing ledger", () => installerHarness(async (h) => {
+  const id = await h.candidate("skills", "opencode-npm")
+  const outcome = await h.install(h.request(id))
+  expect(outcome).toMatchObject({ ok: false, code: "nothing-runnable", notRunning: [{ kind: "plugin", reason: "native-js-plugin" }] })
+  expect(existsSync(join(h.root, "installs.json"))).toBe(false)
+  expect(h.activation).toEqual([])
+}))
+
+test("A2 unknown candidate and conflicting request ID do not create a second package", () => installerHarness(async (h) => {
+  expect(await h.install(h.request("not-issued"))).toMatchObject({ ok: false, code: "unknown-id" })
+  expect(await h.install(h.request(await h.candidate("context7")))).toMatchObject({ ok: false, code: "unknown-id" })
+  expect(existsSync(join(h.root, "installs.json"))).toBe(false)
+}))
 
 test("A2 remote MCP leaf retains timeout and OAuth policy through main truth publication", async () => {
   const temporary = mkdtempSync(join(tmpdir(), "helper-a2-remote-truth-"))

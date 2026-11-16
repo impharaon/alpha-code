@@ -15,6 +15,7 @@ import { PROJECT_HIDDEN_DIR } from "../src/shared/project-hidden-dir"
 
 pinShippedPlatform()
 
+let pickedDirectory: string | undefined
 let catalogOverride: unknown
 
 type IpcHandler = (event: { sender: { id: number } }, ...args: unknown[]) => unknown
@@ -63,7 +64,7 @@ mock.module("electron", () => ({
   },
   dialog: {
     showMessageBox: async () => ({ response: 1, checkboxChecked: false }),
-    showOpenDialog: async () => ({ canceled: true, filePaths: [] }),
+    showOpenDialog: async () => ({ canceled: !pickedDirectory, filePaths: pickedDirectory ? [pickedDirectory] : [] }),
   },
   ipcMain: {
     handle: (channel: string, handler: IpcHandler) => handlers.set(channel, handler),
@@ -451,4 +452,58 @@ test("BC1 real formal GitHub identity wins for both chat and source plus without
   expect(state.packages.find(pack=>pack.packageId==="package:github")?.version).toBe("1.0.1")
   expect(state.packages.some(pack=>pack.source?.kind==="marketplace"&&pack.source.entryName==="github")).toBe(false)
  } finally {catalogOverride=undefined;fetchSpy.mockRestore()}
+})
+
+
+test("BC2a.2 main picker captures a whole package without exposing its path or writing before selection", async () => {
+ const {captureFixture}=await import("../test-fixtures/plugin-helper/fixture")
+ const {createHash}=await import("node:crypto")
+ const capture=await captureFixture("plugins/frontend-design")
+ const directory=join(root,"picked-frontend")
+ for(const node of capture.nodes)if(node.kind==="file"){
+  const path=join(directory,node.path);mkdirSync(join(path,".."),{recursive:true});await Bun.write(path,await capture.readFile(node.path))
+ }
+ const digest=()=>capture.nodes.filter(node=>node.kind==="file").map(node=>createHash("sha256").update(readFileSync(join(directory,node.path))).digest("hex"))
+ const before=digest()
+ const list=()=>handlers.get("ext-installed-packages")!({sender:{id:1}})
+ const old=await list()
+ const prepare=handlers.get("ext-prepare-plugin-source")
+ expect(prepare).toBeFunction()
+ pickedDirectory=directory
+ try {
+  const result=await prepare!({sender:{id:1}},{kind:"folder"}) as {ok:true;prepared:{kind:string;candidateId:string;displayName:string}}
+  expect(result).toMatchObject({ok:true,prepared:{kind:"package",displayName:"frontend-design"}})
+  expect(result.prepared.candidateId).toMatch(/^cand_/)
+  expect(JSON.stringify(result)).not.toContain(directory)
+  expect(JSON.stringify(result)).not.toContain("SKILL.md")
+  expect(await list()).toEqual(old)
+  const outcome=await handlers.get("ext-install-from-source")!({sender:{id:1}},{requestId:"bc2a_folder_entry",source:{kind:"folder"},effect:{kind:"all-projects"},via:"hub"})
+  expect(outcome).toMatchObject({ok:true,packageId:"local:frontend-design",source:{kind:"local-folder"}})
+  expect(digest()).toEqual(before)
+ } finally {pickedDirectory=undefined}
+ const after=await list()
+ expect(await prepare!({sender:{id:1}},{kind:"folder"})).toMatchObject({ok:false,canceled:true})
+ expect(await list()).toEqual(after)
+ expect(await prepare!({sender:{id:1}},{kind:"folder",path:directory})).toMatchObject({ok:false})
+})
+
+test("BC2a.2 Git market transport prepares real choices; only the selected entry reaches the installer",async()=>{
+ const {fixtureFetch}=await import("../test-fixtures/plugin-helper/source-fetch")
+ const fetchSpy=spyOn(globalThis,"fetch").mockImplementation(url=>fixtureFetch(String(url).replace("/tar.gz/HEAD","/tar.gz/refs/heads/main")))
+ try {
+  const list=()=>handlers.get("ext-installed-packages")!({sender:{id:1}})
+  const before=await list()
+  const prepared=await handlers.get("ext-prepare-plugin-source")!({sender:{id:1}},{kind:"git",url:"https://github.com/anthropics/claude-plugins-official"}) as {ok:true;prepared:{kind:string;entries:{id:string;displayName:string;source:string}[]}}
+  expect(prepared).toMatchObject({ok:true,prepared:{kind:"marketplace"}})
+  expect(prepared.prepared.entries.length).toBeGreaterThan(300)
+  const selected=prepared.prepared.entries.find(entry=>entry.displayName==="context7")!
+  expect(selected.source).toBe("claude-marketplace")
+  expect(await list()).toEqual(before)
+  const outcome=await handlers.get("ext-install-from-source")!({sender:{id:1}},{requestId:"bc2a_market_selected",source:{kind:"candidate",candidateId:selected.id},effect:{kind:"all-projects"},via:"hub"})
+  expect(outcome).toMatchObject({ok:true,packageId:"claude:context7"})
+  const after=await list() as {ok:true;packages:{packageId:string}[]}
+  const previous=before as typeof after
+  expect(after.packages.filter(pack=>pack.packageId!=="claude:context7")).toEqual(previous.packages.filter(pack=>pack.packageId!=="claude:context7"))
+  expect(after.packages.filter(pack=>pack.packageId==="claude:context7")).toHaveLength(1)
+ }finally{fetchSpy.mockRestore()}
 })

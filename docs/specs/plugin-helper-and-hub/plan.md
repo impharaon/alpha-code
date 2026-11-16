@@ -643,3 +643,8 @@ BC2a.1：`prepareCapture` 用既有候选表持有私有捕获 thunk，捕获／
 BC2a.1 验证：四文件 `bun test --max-concurrency 2 src/main/plugin-sources.test.ts src/main/install-from-source.test.ts src/shared/host-extension-package-contract/plugin-conversion.test.ts src/shared/host-extension-package-contract/host-extension-package-artifact.test.ts` exit 0（80 pass／0 fail／522 assertions；`bc2a-final.log`）。两先行红例保持原断言；新增移走原目录后仍能安装、逐文件读回实际源 bytes 不变的正向证据，捕获若改为安装时重新读取原路径便失败。两包 `bun typecheck` exit 0（`bc2a-ui-typecheck-final.log`、`bc2a-ext-typecheck.log`）；文档链接和 diff 检查 exit 0。生产约 100 行增删、2 文件，无生成产物／依赖变化。BC1→本笔约 35 分钟；已核 Codex（GPT-6）作者自查，未执行账户登录或外部写入。
 
 r8 下一步准确边界：BC2a.2 与 BC2b 尚未接 main 选择器／Git IPC、未撤旧 hub 逐技能／确认运输；BC3 非目录令牌保存、BC4 时间线账户动作、BC5 OpenCode 真实可检索正向样本／引擎／模型验收均未完成。构建应用真实账号与自然语言证据继续归编排器，H 四处基线红项不在此处理。工作树在本 main 能力边界提交后交回；不把本机或市场 UI、独立 MCP 授权后的真实使用、AC-06/07/14/15 报通过。OPTIONAL 无。
+
+
+r9 BC2a.2 红例先行：生产 `ext-install-catalog-result.cases.ts` 新增 main 目录选择、路径／字节不跨线、准备零写入、取消／伪造路径零提交，以及 Git 市场清单只装所选 context7。真实 frontend-design 与市场原字节沿既有 provenance；Git HEAD 在网络边界映射到同一固定提交 archive。`bun test --max-concurrency 2 --test-name-pattern BC2a.2 ./test-component/ext-install-catalog-result.cases.ts` exit 1（0 pass／2 fail，缺 `ext-prepare-plugin-source`，`bc2a2-red.log`）。
+
+r9 指定先跑 `bun test --max-concurrency 2 src/main/codepuppy-sidecar-wiring.test.ts` exit 1（5 pass／1 fail）：`codepuppy-sidecar-wiring.test.ts:131` 仍调用 A3 已移除的 `requests.record`，并断言旧 `confirming`；现行 `HubRequestStages` 为 submit/settleInstall/get 与 submitted。修正会改变阶段期望，本轮明确将行为断言交编排器裁定，原例保持；不为旧测试恢复已退役运输。其他 BC 工作独立继续。

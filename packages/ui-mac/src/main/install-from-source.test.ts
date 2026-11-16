@@ -16,6 +16,11 @@ import { createPluginSources } from "./plugin-sources"
 import { fixtureFetch } from "../../test-fixtures/plugin-helper/source-fetch"
 import { makeRecoveryGate } from "./ext-recovery-gate"
 import { existsSync, readFileSync } from "node:fs"
+import { parse } from "jsonc-parser"
+
+function persistedMcp(root: string, name: string) {
+  return (parse(readFileSync(join(root, "codepuppy.jsonc"), "utf8")) as { mcp?: Record<string, unknown> }).mcp?.[name]
+}
 
 async function installerHarness(run: (h: Awaited<ReturnType<typeof sourceHarness>>) => Promise<void>) {
   const temporary = mkdtempSync(join(tmpdir(), "helper-a2-entry-"))
@@ -72,14 +77,14 @@ test("E2 project-only MCP stays globally disabled through install and package-ro
   if (!identity.ok) throw new Error(identity.reason)
   const outcome = await h.install({ ...h.request(await h.candidate("context7")), effect: { kind: "project", directory: alias } })
   expect(outcome).toMatchObject({ ok: true, packageId: "claude:context7" })
-  expect(readMcpLeafStrict("context7")).toMatchObject({ ok: true, value: { enabled: false } })
+  expect(persistedMcp(h.root, "context7")).toMatchObject({ enabled: false })
   const state = readPackageLedgerStateV1(h.root)
   expect(state.ok && state.packageGraphs[0]?.effect).toEqual(identity.scope)
   expect(state.ok && state.records.every((record) => record.scope.kind === "global" && record.desiredState === "enabled")).toBe(true)
   const deps = { globalRoot: () => h.root, advisoryGate: () => ({ allowed: true as const }), resolvePackage: async () => { throw new Error("non-catalog package") } }
   for (const state of ["disabled", "enabled"] as const) {
     expect((await setPackageStateV1({ packageId: "claude:context7", state }, deps)).ok).toBe(true)
-    expect(readMcpLeafStrict("context7")).toMatchObject({ ok: true, value: { enabled: false } })
+    expect(persistedMcp(h.root, "context7")).toMatchObject({ enabled: false })
   }
   expect(JSON.parse(readFileSync(join(h.root, "skills-enabled.json"), "utf8"))).toEqual({
     v: 2, keys: [], scoped: [{ kind: "mcp", name: "context7", projectPath: realpathSync(project) }],
@@ -119,7 +124,7 @@ test("E2 startup reconcile cannot globally enable a project-only MCP", () => ins
   mkdirSync(project)
   expect((await h.install({ ...h.request(await h.candidate("context7")), effect: { kind: "project", directory: project } })).ok).toBe(true)
   expect(reconcileDesiredStateAtBoot(h.root, { userDataPath: h.temporary, channel: "stable" }).ok).toBe(true)
-  expect(readMcpLeafStrict("context7")).toMatchObject({ ok: true, value: { enabled: false } })
+  expect(persistedMcp(h.root, "context7")).toMatchObject({ enabled: false })
 }))
 
 test("A2 host-name collision preserves existing content and rewrites only installed skill name", () => installerHarness(async (h) => {

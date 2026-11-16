@@ -864,3 +864,5 @@ BLOCKED · 本 lane 新增行为断言前提错误，需编排器裁定：test-c
 r14 续修（2026-11-16 14:37:00 UTC 开始）：编排器 r14 决定 1 允许撤去本 lane 在 r13 添加的 canary saved:true 额外断言；决定 2 扩大 own-assertion correction ruling，仅针对 r12 起本 lane 自增且前提/字面量/调用形状错误的断言，仍不改 AC/审查所需证明或 r12 前断言。该项独立提交，非放宽产品授权读。
 
 own-assertion corrections：ext-install-catalog-result.cases.ts 原 :433 saved:true 假定旧 primitive 条目已具当前包声明；package-admission.ts:450–465/792–805 的现有读取需已验包 snapshot，该夹具无，r13 反证输出已记录。按 r14 明确裁定删除该额外断言，保留 canaryEntry.id、args/result/asks/wire/toSidecar 零泄漏和磁盘正命中原断言。另加 R14 B3 正向生产链：真实固定 Registry GitHub 定义经当前 source entry 安装，读取与 renderer 完全相等，专用存储保存后 saved:true，同双向消息无 token/路径/声明；不存在包仍拒绝。B3/C2 FIXED：ext-write-channels + sidecar-messages 两文件 exit 0（28 pass，内部实际 19；b3-c2-green.log），pin 同步 18→19，C2 磁盘正命中现已执行。没有旧记录迁移/兼容或新增 native 读权威。
+
+A1/B5 deadline ruling 红例：真实来源 context7 在 Codex index 悬置时，main 须先发 Claude 候选、30 秒内最终报告 Codex failed:network；生产 DOM 须在悬置未解时已有可安装行；main IPC 进度须只发给请求 sender 并携带关联 ID。三例 exit 1（deadline-red.log），现有全源 Promise.all/长预算/无进度运输分别被击中。搜索私有进度只复用 SourceSearchResultV1 快照，不更改候选或安装合同。

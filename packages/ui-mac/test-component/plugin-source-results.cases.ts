@@ -209,3 +209,17 @@ test("R12 B5 typing coalesces source queries without delaying the initial search
   expect(queries).toEqual(["initial","playwright"])
  }finally{jest.useRealTimers()}
 })
+
+test("R14 hub shows a responding real source while another source index is still hung", async () => {
+ let release!: (response:Response)=>void
+ const stalled=new Promise<Response>(resolve=>{release=resolve})
+ const sources=createPluginSources({catalog:async()=>[],fetch:url=>url.includes("raw.githubusercontent.com/openai")?stalled:fixtureFetch(url)})
+ try{
+  const node=mount({query:"context7",search:(query,progress)=>sources.searchSources(query,progress)})
+  await flush()
+  expect(node.textContent).toContain("context7")
+  expect(node.querySelector('[data-source-candidate]')).not.toBeNull()
+  expect(node.textContent).toContain("Claude 插件市场")
+  expect(node.textContent).toContain("正在查找")
+ }finally{release(await fixtureFetch("https://raw.githubusercontent.com/openai/plugins/main/.agents/plugins/marketplace.json"));await flush()}
+})

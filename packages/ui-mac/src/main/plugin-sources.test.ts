@@ -594,3 +594,31 @@ test("R12 A3 re-search discards the stale marketplace index and main archive aft
  expect(indexes).toBe(2)
  expect(archives).toBe(2)
 })
+
+test("R14 search publishes responsive sources before a hung index and finishes within thirty seconds", async () => {
+ const {jest}=await import("bun:test")
+ const {createPluginSources}=await sourcesModule()
+ const {fixtureFetch}=await import("../../test-fixtures/plugin-helper/source-fetch")
+ let release!: (response:Response)=>void
+ const stalled=new Promise<Response>(resolve=>{release=resolve})
+ const requested:Promise<Response>[]=[]
+ const sources=createPluginSources({catalog:async()=>[],fetch:(url)=>{
+  if(url.includes("raw.githubusercontent.com/openai"))return stalled
+  const response=fixtureFetch(url);requested.push(response);return response
+ }})
+ const progress:import("./plugin-sources").SourceSearchResultV1[]=[]
+ let answer:import("./plugin-sources").SourceSearchResultV1|undefined
+ jest.useFakeTimers()
+ const pending=sources.searchSources("context7",partial=>progress.push(structuredClone(partial))).then(value=>{answer=value})
+ try{
+  await Promise.all(requested)
+  for(let n=0;n<60;n++)await Promise.resolve()
+  expect(progress.some(result=>result.candidates.some(candidate=>candidate.name==="context7"))).toBe(true)
+  expect(answer).toBeUndefined()
+  jest.advanceTimersByTime(30_000)
+  for(let n=0;n<60;n++)await Promise.resolve()
+  expect(answer).toBeDefined()
+  expect(answer!.sources.find(source=>source.source==="codex-marketplace")).toMatchObject({status:"failed",reason:"network"})
+  expect(answer!.candidates.some(candidate=>candidate.name==="context7")).toBe(true)
+ }finally{release(await fixtureFetch("https://raw.githubusercontent.com/openai/plugins/main/.agents/plugins/marketplace.json"));await pending;jest.useRealTimers()}
+})

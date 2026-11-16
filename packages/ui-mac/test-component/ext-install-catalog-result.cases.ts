@@ -624,3 +624,15 @@ test("R14 B3 current Registry package account state crosses the real tool bridge
   expect(JSON.stringify(wire)).not.toContain("declarations")
  }finally{fetchSpy.mockRestore()}
 })
+
+test("R14 source progress is sent only to its correlated renderer request", async () => {
+ const {fixtureFetch}=await import("../test-fixtures/plugin-helper/source-fetch")
+ const fetchSpy=spyOn(globalThis,"fetch").mockImplementation(fixtureFetch)
+ try{
+  const progress:unknown[]=[]
+  const result=await handlers.get("ext-sources-search")!({sender:{id:1,send:(...args:unknown[])=>progress.push(args)}} as never,"context7","r14_search_progress")
+  expect(progress.length).toBeGreaterThan(0)
+  expect(progress.every(message=>Array.isArray(message)&&message[0]==="ext-sources-search-progress"&&message[1]==="r14_search_progress")).toBe(true)
+  expect((progress.at(-1) as unknown[])[2]).toEqual(result)
+ }finally{fetchSpy.mockRestore()}
+})

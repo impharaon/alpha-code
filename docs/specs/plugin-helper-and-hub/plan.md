@@ -920,3 +920,5 @@ B8 FIXED：source table 提供只读 displayNameForId（捕获包在既有转换
 - r14 B7 FIXED：统一搜索继续呈现按查询过滤的本地文件夹包、我的插件和用户助手，复用既有安装行/菜单；按 packageId 排除重复来源行，同名包不合并。红例 `review B7 one search finds own agents and local/created packages across tabs` 删除本地结果即 0/2 行；`bun test --max-concurrency 2 ./test-component/hub-three-pages.cases.ts` 36 pass、ui-mac typecheck exit 0。自身断言修正 `25dc6cc380`：新例的 120 ms 轮询短于既有 250 ms 防抖，保留无命中断言并等待实际查询。
 
 - r14 B9 FIXED：搜索来源按 `reason`、安装结果按 `code` 映射中英文文案，文件夹安装失败同样消费代码；时间线未安装成功使用「未能安装」，已安装但运行失败仍保留实际运行状态。修改的是审核明确替代的原始英文断言，红例命中三处来源/候选/卡片；四个 renderer 相关宿主与 ui-mac typecheck exit 0（`/tmp/helper-install-r14/b9-green.log`）。
+
+- r14 C4 FIXED：两个真实 Playwright 宿主从独有空 npm 缓存起步；每个公开包用空 npmrc、官方 registry、零重试、45 s 请求/120 s 进程界限预取，失败报告 `ENGINE_NPM_PREFETCH_FAILED`。预取实际 `@latest`（本轮 0.0.85）与 scope 用的 0.0.77，随后所有引擎子进程固定此缓存并 `offline=true`，运行中不再解析上游 dist-tag；真实样本 `npx @playwright/mcp@latest` 字节未改。空离线缓存对照 `c4-red.log` spawn_failed；修复后两个宿主及内层 2+5 真引擎用例通过，ui-mac typecheck exit 0；不依赖人工预热目录。

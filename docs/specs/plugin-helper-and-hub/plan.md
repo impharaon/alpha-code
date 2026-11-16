@@ -16,6 +16,7 @@ last_reviewed: 2026-11-16
 
 - 依据：[Issue #1724](https://github.com/impharaon/alpha-code/issues/1724)；[SPEC-plugin-helper-and-hub v3](https://github.com/impharaon/alpha-work/blob/8663fb2a982eaf7c626bfee3bcd8b20b870f2577/docs/specs/plugin-helper-and-hub/spec.md) AC-01；[DESIGN-plugin-helper-and-hub v4](https://github.com/impharaon/alpha-work/blob/850fd2a61f220596fb10922c8b2e477c7475fac4/docs/specs/plugin-helper-and-hub/design.md) §2、§4.1–4.4、§4.6–4.7、§5–6、§8 A、§10；转换类型与发现规则继承 [DESIGN-local-plugin-install §4.1/4.5](https://github.com/impharaon/alpha-work/blob/8663fb2a982eaf7c626bfee3bcd8b20b870f2577/docs/specs/local-plugin-install/design.md)。沿用两轮设计处置，只返回下述新实测及 H 接缝缺口。
 - 核对：b46a8702d4 · orchestrator/Claude Fable 5.2 · plan check passed for A1–A3（AC-01 chain has failing-capable proof per stage, files inside the allowed scope, no frozen decision restated, no restriction added）；A4 stays pending the H seam delta。r1 的 Phase: IMPLEMENT 本轮仅授权 A1；A2–A3 等 H 合入与分支刷新，A2 另等 runtime 设计修订提交。
+- r3 续派核对：编排器已将本分支重放到 H 已提交主进程头 `d1320c131e`，本车道现有提交为 `d406a13e44`、`7550abac5e`、`abb0287faf`、`8e40a921ec`；本轮授权 A2 先于 H 合入实施，设计 v4 @850fd2a。A3–A4、H 页面冻结；`plugin-conversion.*`、artifact 生成集和 `plugin-sources.ts` 归 `feat/helper-sources`，本轮只读。消费的 H 主进程接缝若变化由编排器回传 delta。
 - 代码基线：本车道 `265c42529e`，工作树 `alpha-code-feat-helper-install-slice-a`，派定分支 `feat/helper-install-slice-a`；Bun 1.4.4。H 只读基线为 `feat/hub-package-one-row@f4b5a10424`（含 `8a8e0f4d19`），另有 renderer 在途修改，观察于 2026-11-16；消费其[计划「片 1 · 桌面」](../local-plugin-install/plan.md)，不修改该工作树。
 - UI：[11-15 批准帧](../../design/2026-11-15-plugin-package-install-and-card/frame.html#install) @ `265c42529e` 的装后反馈及现有时间线卡片/动作组件；时间线事实、状态与动作按设计 §4.7。不另画稿，不制作登录/token 动作（切片 C）。
 - 预计规模：约 28–34 个生产/生成文件、16–22 个测试/夹具文件，约 2,000–2,800 行实质改动（不计真实样本及生成字节），实施与相关验证约 6–8 小时。明显超过 15 文件/800 行，按下述 A1–A4 的真实边界顺序提交，不省掉 AC 的任一环；每段结束核对规模/用时，超过估算两倍返回编排器。
@@ -131,6 +132,14 @@ PLAN 文档检查（2026-11-16）：`python3 scripts/check-doc-links.py docs/spe
 计划作者已核：Codex（GPT-6），核对上述冻结版本、A 的入口/构建器/图/消息/时间线调用链及 H 接缝快照；临时引擎前提成立，**H 来源呈现与包管理定位需接缝补充，尚不能交付 PLAN-READY**。遗留去向：两处接缝返回编排器/H；runtime 新证据返回设计 §10；真实模型/浏览器任务验收仍归编排器；OPTIONAL：无。
 
 ### 偏离记录
+
+2026-11-16 r3 · A2 在重放头 `8e40a921ec` 开始，先跑计划中的既有七文件回归：ui-mac `bun test --max-concurrency 2 src/main/ext-package-ledger-v3.test.ts src/main/package-builders-wiring.test.ts src/main/ext-set-state-tx.test.ts src/main/ext-package-ledger-uninstall.test.ts src/main/package-admission.test.ts src/main/package-admission.wiring.test.ts src/main/package-admission.parity.test.ts` exit 1（123 pass / 2 fail），日志 `/tmp/helper-install-plan-YCXgtv/a2-baseline.log`。两处报告均来自 H 已提交 `package-admission.test.ts:145` 的同一回归（直接执行和 wiring 宿主）：Supabase 安装返回成功，但主进程远程 MCP 真源没有 supabase；该例由 `089d0e1a7e` 引入，不是本轮新增失败，不称为 flaky，不修改 H 断言或发布权威。
+
+本轮新增计划内 `src/main/install-from-source.test.ts` 的接缝红例：使用原 pinned frontend-design 的真实文件，经 `promotePayloadToCas`、`buildSkillTxItems`、`runExtensionTransaction` 和 `commitTransactionLedger` 成功提交完整关闭态技能包，再调用设计指定的 H `setPackageStateV1` 自动开启。ui-mac `bun test --max-concurrency 2 src/main/install-from-source.test.ts` exit 1（0 pass / 1 fail，6 assertions），实际返回 `{ok:false, reason:"config tx has no edits"}`，事务提交及初始账本断言已通过，日志 `/tmp/helper-install-plan-YCXgtv/a2-root-state-red.log`。测试根遵循 `<base>/env/dev`，不读 owner 数据；树、generation 与探针均为实际生产路径，不手造第三方技能。
+
+`BLOCKED: H 包根状态接缝仍有主进程缺口 — ext-install-planner.ts:2904 对纯技能包的空 edits 无条件调用 prepareConfigTx，ext-config-tx.ts:60 因空 edits 拒绝，先于 :2906 的账本状态写入；remote truth 已发布、无 JSONC 编辑的包也经过同一分支 — 需 H 修复零配置编辑时的整包状态动作，并回传主进程 delta。` 最小修正保持同一包根/账本/配置权威，零配置编辑时仍执行现有整包状态更新，不另造 A2 自动开启路径或加用户操作。远程 publication 的已提交基线失败一并返回 H；不在本片改它。此阻塞直接影响 A2 的纯技能/碰撞与远程包自动开启证明，因此尚未写安装入口、叶子 builder、声明或激活生产代码；后续 A2 红例/真实引擎用例尚未执行，不能报 A2 完成。
+
+r3 回执：Codex（GPT-6）核对计划、重放版本与上述真实接缝红例；仅新增 A2 红例和更新本计划，未改来源车道、H 权威或 A3–A4。ui-mac `bun typecheck` exit 0；文档链接及 `git diff --check` exit 0。06:48:38 UTC 开始，约 10 分钟；遗留去向为编排器/H 修正主进程接缝后续派 A2，OPTIONAL 无。
 
 2026-11-16 r2 · 按本轮编排器裁定，仅纠正 a821d9386a 中两条目录红例：原“Playwright 目录缺席”不成立，原“GitHub 目录优先”缺少真实目录条目。目录缺席例改用现有固定样本 context7，保留来源顺序/状态、候选身份、固定提交、节点和真实 MCP 内容，并补原字节相等；目录优先例改用两处都有的 playwright。两例各自显式断言目录及 pinned 市场前提，未来目录变化会先令前提红；未过滤生产目录、未放宽结果。计划证明行、样本说明和真实请求路径同步：Playwright 经统一入口目录分支，市场→取源→转换→安装覆盖用 context7；未修改规格或产品行为。此笔为独立测试纠错提交，不含生产代码。设计版本收据更新为 v4 @850fd2a，A2–A4 本轮仍冻结。
 

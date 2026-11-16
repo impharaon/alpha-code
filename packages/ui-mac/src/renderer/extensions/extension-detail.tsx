@@ -30,6 +30,7 @@ import type { CurationStatus } from "../../shared/catalog-curation"
 import type { CatalogPackageViewV1 } from "../../shared/catalog-package-view"
 import { installedPackagePresentation, packageComponentPresentation, packagePresentation, packageRetainedReasonKey } from "./ext-package-presentation"
 import { packageListingListV1, packageListingTextV1 } from "../../shared/host-extension-package-contract/decoder"
+import { PackageAccountDialog } from "./package-account-dialog"
 import { extIpc } from "./ext-ipc"
 
 /** What the detail page shows: a legacy catalog entry, a host-projected package, an engine agent
@@ -65,7 +66,6 @@ export function InstalledPackageDetail(props: {
     return value?.ok ? value.items : []
   }
   const [account, setAccount] = createSignal<PackageAuthorizationItemV1 | null>(null)
-  const [values, setValues] = createSignal<Record<string, string>>({})
   const [busy, setBusy] = createSignal(false)
   const [error, setError] = createSignal("")
   const [editingPolicy, setEditingPolicy] = createSignal(false)
@@ -96,20 +96,16 @@ export function InstalledPackageDetail(props: {
   }
   const close = () => {
     setAccount(null)
-    setValues({})
   }
   const submit = async () => {
     const selected = account()
-    if (!selected || busy()) return
+    if (selected?.kind !== "mcp-oauth" || busy()) return
     setBusy(true)
     setError("")
     try {
-      const result =
-        selected.kind === "secret"
-          ? await props.ext.savePackageSecrets({ packageId: props.pack.packageId, secrets: values() })
-          : await props.ext.authenticateMcp(selected.serviceName)
+      const result = await props.ext.authenticateMcp(selected.serviceName)
       if (!result.ok) {
-        setError(extensionError(result.reason, selected.kind === "secret" ? "codepuppy.ext.packageCredentialSaveFailed" : "codepuppy.ext.mcpAuthFailed"))
+        setError(extensionError(result.reason, "codepuppy.ext.mcpAuthFailed"))
         return
       }
       close()
@@ -118,7 +114,7 @@ export function InstalledPackageDetail(props: {
       setBusy(false)
     }
   }
-  const github = () => props.pack.packageId === "package:github" || props.pack.packageId === "package:github-official"
+  const tokenAccount = () => { const entry = account(); return entry?.kind === "secret" ? entry : undefined }
   return (
     <div class="codepuppy-ext-detail" data-package-detail={props.pack.packageId}>
       <nav class="codepuppy-ext-crumbs">
@@ -190,7 +186,6 @@ export function InstalledPackageDetail(props: {
                     disabled={busy()}
                     onClick={() => {
                       setError("")
-                      setValues({})
                       setAccount(item)
                       if (item.kind === "mcp-oauth") void submit()
                     }}
@@ -264,55 +259,13 @@ export function InstalledPackageDetail(props: {
       <Show when={error() || props.error}>
         <p role="alert">{error() || props.error}</p>
       </Show>
-      <Dialog
-        open={!!account()}
-        onClose={close}
-        size="sm"
-        title={
-          account()?.kind === "secret"
-            ? t("codepuppy.ext.packageTokenTitle", { name: props.label })
-            : t("codepuppy.ext.packageLoginTitle", { name: props.label })
-        }
-        footer={
-          <Button variant="primary" loading={busy()} onClick={() => void submit()}>
-            {account()?.kind === "secret" ? t("codepuppy.ext.packageSaveToken") : t("codepuppy.ext.packageLogin")}
-          </Button>
-        }
-      >
-        <Show
-          when={account()?.kind === "secret"}
-          fallback={<p>{t("codepuppy.ext.packageLoginBrowser", { name: props.label })}</p>}
-        >
-          <p>{t("codepuppy.ext.packageTokenPurpose", { name: props.label })}</p>
-          <Show when={github()}>
-            <button
-              class="codepuppy-ext-link"
-              onClick={() => void window.api.openLink("https://github.com/settings/personal-access-tokens/new")}
-            >
-              {t("codepuppy.ext.packageGithubTokenLink")}
-            </button>
-          </Show>
-          <For each={items().filter((item) => item.kind === "secret" && item.serviceName === account()?.serviceName)}>
-            {(item) => (
-              <label class="codepuppy-ext-flabel">
-                {item.prerequisiteId === "mcp:github-official#GITHUB_PERSONAL_ACCESS_TOKEN" ? t("codepuppy.ext.officialGithubPat") : item.prerequisiteId === "mcp:dbhub-readonly#DSN" ? t("codepuppy.ext.officialSqliteDsn") : t("codepuppy.ext.packageToken", { name: props.label })}
-                <input
-                  class="codepuppy-ext-input"
-                  type="password"
-                  autocomplete="off"
-                  placeholder={t(item.prerequisiteId === "mcp:github-official#GITHUB_PERSONAL_ACCESS_TOKEN" ? "codepuppy.ext.officialGithubPat" : item.prerequisiteId === "mcp:dbhub-readonly#DSN" ? "codepuppy.ext.officialSqliteDsn" : "codepuppy.ext.packageTokenPlaceholder")}
-                  value={values()[item.prerequisiteId] ?? ""}
-                  onInput={(event) =>
-                    setValues((current) => ({ ...current, [item.prerequisiteId]: event.currentTarget.value }))
-                  }
-                />
-              </label>
-            )}
-          </For>
-        </Show>
-        <Show when={error()}>
-          <p role="alert">{error()}</p>
-        </Show>
+      <Show when={tokenAccount()}>
+        {item => <PackageAccountDialog packageId={props.pack.packageId} label={props.label} needId={item().prerequisiteId} save={props.ext.savePackageSecrets} onClose={close} onSaved={async () => { await refetch() }} />}
+      </Show>
+      <Dialog open={account()?.kind === "mcp-oauth"} onClose={close} size="sm" title={t("codepuppy.ext.packageLoginTitle", { name: props.label })}
+        footer={<Button variant="primary" loading={busy()} onClick={() => void submit()}>{t("codepuppy.ext.packageLogin")}</Button>}>
+        <p>{t("codepuppy.ext.packageLoginBrowser", { name: props.label })}</p>
+        <Show when={error()}><p role="alert">{error()}</p></Show>
       </Dialog>
     </div>
   )

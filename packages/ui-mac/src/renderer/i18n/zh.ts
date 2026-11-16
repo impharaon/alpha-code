@@ -18,6 +18,8 @@ export const dict = {
   "codepuppy.timeline.hub.failed": "未能启用：",
   "codepuppy.timeline.hub.login": "待登录 · 登录后，助手就能使用 {{name}}。",
   "codepuppy.timeline.hub.token": "待填令牌",
+  "codepuppy.timeline.hub.loginAction": "登录 {{name}}",
+  "codepuppy.timeline.hub.tokenAction": "连接 {{name}}",
   "codepuppy.timeline.hub.manage": "管理",
   "codepuppy.timeline.hub.disabled": "此包尚未开启",
   "codepuppy.timeline.hub.unverified": "尚未读到引擎可用状态",

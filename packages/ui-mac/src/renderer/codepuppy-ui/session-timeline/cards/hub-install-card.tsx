@@ -4,6 +4,7 @@ import type { InstalledPackageV1 } from "../../../../preload/types"
 import { t } from "../../../i18n"
 import { extIpc } from "../../../extensions/ext-ipc"
 import { openPackageManagement } from "../../../extensions/ext-hub-state"
+import { PackageAccountDialog } from "../../../extensions/package-account-dialog"
 import { installedPackagePresentation } from "../../../extensions/ext-package-presentation"
 import type { TimelineRow } from "../timeline-model"
 import { useTimelineIntents } from "./timeline-intents"
@@ -18,20 +19,29 @@ type Facts = {
   error?: string
 }
 
+type AccountItem = Extract<Facts["authorization"], { ok: true }>["items"][number]
+
 function safeText(text: string) {
   const result = redactText(text, 4000)
   return result.ok ? result.value : t("codepuppy.timeline.hub.hidden")
 }
 
-/** Read-only install receipt. Stage completion is separate from the engine's availability. */
+/** Main-backed install receipt with account actions bound to that same installed package. */
 export function HubInstallCard(props: { row: HubInstallRow }) {
   const intents = useTimelineIntents()
   const [facts, setFacts] = createSignal<Facts>({ record: null })
+  const [refreshFacts, setRefreshFacts] = createSignal<() => Promise<void>>(async () => {})
+  const [account, setAccount] = createSignal<{ packageId: string; label: string; needId: string } | null>(null)
+  const [authBusy, setAuthBusy] = createSignal(false)
+  const [authError, setAuthError] = createSignal("")
   createEffect(
     on(
       () => props.row.install,
       (call) => {
         setFacts({ record: null })
+        setAccount(null)
+        setAuthError("")
+        setRefreshFacts(() => async () => {})
         if (call.operation === "search" || (!call.requestId && !call.packageId)) return
         let alive = true
         let revision = 0
@@ -71,6 +81,7 @@ export function HubInstallCard(props: { row: HubInstallRow }) {
           )
             timer = setTimeout(() => void refresh(), 1000)
         }
+        setRefreshFacts(() => refresh)
         const off = extIpc.onHubViewChanged(() => void refresh())
         void refresh()
         onCleanup(() => {
@@ -89,7 +100,9 @@ export function HubInstallCard(props: { row: HubInstallRow }) {
     const name = safeText(pack?.displayName ?? current.record?.displayName ?? pack?.rootComponentName ?? call.name)
     const record = current.record
     const source = pack ? installedPackagePresentation(pack) : undefined
-    const base = { name, source, detail: undefined as string | undefined, manage: undefined as string | undefined }
+    const base = { name, source, detail: undefined as string | undefined, manage: undefined as string | undefined,
+      packageId: pack?.packageId, login: undefined as Extract<AccountItem, { kind: "mcp-oauth" }> | undefined,
+      token: undefined as Extract<AccountItem, { kind: "secret" }> | undefined }
     if (call.operation === "search")
       return { ...base, state: "search", title: t("codepuppy.timeline.hub.searching", { name }) }
     if (!call.requestId && !call.packageId)
@@ -123,11 +136,12 @@ export function HubInstallCard(props: { row: HubInstallRow }) {
       return {
         ...base,
         state: "login",
+        login,
         title: added,
         detail: t("codepuppy.timeline.hub.login", { name: safeText(login.serviceName) }),
       }
-    if (auth.some((item) => item.kind === "secret" && !item.saved))
-      return { ...base, state: "token", title: added, detail: t("codepuppy.timeline.hub.token") }
+    const token = auth.find(item => item.kind === "secret" && !item.saved)
+    if (token) return { ...base, state: "token", token, title: added, detail: t("codepuppy.timeline.hub.token") }
     const row = current.view?.rows.find((row) => row.id === pack?.packageId)
     if (pack?.desiredState === "enabled" && row?.state === "available")
       return {
@@ -151,6 +165,24 @@ export function HubInstallCard(props: { row: HubInstallRow }) {
       detail: safeText(current.error ?? row?.stateReason?.detail ?? t("codepuppy.timeline.hub.unverified")),
     }
   })
+  const login = async () => {
+    const item = presentation().login
+    const packageId = presentation().packageId
+    const authenticate = intents.authenticateMcp
+    if (!item || !packageId || !authenticate || authBusy()) return
+    setAuthBusy(true)
+    setAuthError("")
+    try {
+      const result = await authenticate(item.serviceName)
+      if (facts().pack?.packageId !== packageId) return
+      if (!result.ok) setAuthError(t("codepuppy.ext.mcpAuthFailed"))
+      await refreshFacts()()
+    } catch {
+      if (facts().pack?.packageId === packageId) setAuthError(t("codepuppy.ext.mcpAuthFailed"))
+    } finally {
+      setAuthBusy(false)
+    }
+  }
   return (
     <div class="a-tl-row" data-codepuppy-timeline-row="hubInstall">
       <div class="a-tc-safe" role="status" aria-live="polite" data-install-state={presentation().state}>
@@ -175,6 +207,18 @@ export function HubInstallCard(props: { row: HubInstallRow }) {
             </>
           )}
         </Show>
+        <Show when={presentation().login && intents.authenticateMcp}>
+          <div class="a-tc-actions"><button type="button" class="a-tc-open" data-package-login-action="" disabled={authBusy()} onClick={() => void login()}>
+            {t("codepuppy.timeline.hub.loginAction", { name: safeText(presentation().login!.serviceName) })}
+          </button></div>
+        </Show>
+        <Show when={presentation().token}>
+          {item => <div class="a-tc-actions"><button type="button" class="a-tc-open" data-package-token-action="" onClick={() => {
+            const packageId = presentation().packageId
+            if (packageId) setAccount({ packageId, label: safeText(item().serviceName), needId: item().prerequisiteId })
+          }}>{t("codepuppy.timeline.hub.tokenAction", { name: safeText(item().serviceName) })}</button></div>}
+        </Show>
+        <Show when={authError()}>{message => <span role="alert">{message()}</span>}</Show>
         <Show when={presentation().manage}>
           {(packageId) => (
             <div class="a-tc-actions">
@@ -185,6 +229,9 @@ export function HubInstallCard(props: { row: HubInstallRow }) {
           )}
         </Show>
       </div>
+      <Show when={account()}>
+        {selected => <PackageAccountDialog packageId={selected().packageId} label={selected().label} needId={selected().needId} save={intent => extIpc.savePackageSecrets(intent)} onClose={() => setAccount(null)} onSaved={() => refreshFacts()()} />}
+      </Show>
     </div>
   )
 }

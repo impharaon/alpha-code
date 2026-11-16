@@ -35,6 +35,7 @@ import type { ProviderAddressRejection } from "../../shared/codepuppy-model-type
 import type { SessionGrantRefusalCode, SessionGrantWire } from "../../shared/ext-session-grant-wire"
 import type { HubViewRow, ReloadItem, ReloadScope } from "../../main/codepuppy-sidecar-messages"
 import { connectOutcome, grantsToReassert, sessionGrantKeyOf } from "./ext-session-toggle"
+import { authenticatePackageMcp } from "./package-account-auth"
 import { extIpc } from "./ext-ipc"
 import { t } from "../i18n"
 import { approvalToolOf } from "../codepuppy-ui/session-timeline/cards/tool-card-model"
@@ -758,22 +759,9 @@ export function useExtensions(
    *  返回值只报**这次调用的真伪**,状态真相仍由随后的 `loadStatus()` 从引擎重读 ——
    *  「HTTP 调通了」不等于「授权成功了」,所以成功臂也要看回来的 status 是不是真的连上。 */
   async function authenticateMcp(name: string): Promise<ActionResult> {
-    const c = client
-    if (!c) return { ok: false, reason: "no server" }
-    try {
-      // SDK v2 默认 `throwOnError:false` —— 400/404 以 `{error}` 正常 resolve,不进 catch。
-      // 判据复用本文件既有的 `connectOutcome`(同一个问题在这里已经有一个答案)。
-      const r = await c.mcp.auth.authenticate({ name })
-      const ok = connectOutcome(r as { error?: unknown })
-      await loadStatus()
-      if (!ok) return { ok: false, reason: "auth-failed" }
-      // The adapter only reports disabled after OAuth completes successfully. A disabled
-      // connector can hold a ready account without exposing any callable tools.
-      return store.mcp[name]?.connected === true || r.data?.status === "disabled" ? { ok: true } : { ok: false, reason: "auth-failed" }
-    } catch {
-      await loadStatus()
-      return { ok: false, reason: "auth-failed" }
-    }
+    const result = await authenticatePackageMcp(client, name)
+    await loadStatus()
+    return result
   }
 
   // ── #408:session-grant(实验室扩展的会话级启用)────────────────────────────────────────────

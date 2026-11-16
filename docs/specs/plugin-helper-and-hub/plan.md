@@ -708,3 +708,12 @@ BC4 红例先行：时间线三个具名场景 exit 1（无登录／连接动作
 
 
 BC4 测试运输窄修正：新生产绑定例的 SDK mock 原把 mcp 错放进 `ensureDirSdkContext().client`，而生产 `session-timeline.tsx` 消费 `serverSDK().client`；故按钮已出现后、尚未到 adapter 即失败，观测引擎请求数组为空。按 standing API 调用形状修正规则单独将 mock 移至实际根 client，并将该例两微任务 flush 改为等到实际按钮挂载后断言（上限 1s，断言与一击授权行为不变）；不改变 SDK/生产签名、动作或成功条件。原红例仍能检测缺少动作／生产 intent 接线。
+
+
+BC4 收据：`PackageAccountDialog` 从 H 的实际密码窗提取，管理页与时间线共用 main 需求读取／同一个 savePackageSecrets 写方，按 packageId＋needId 绑定，仅显示同组件需求；字段无 required，部分值提交，关闭或身份变化清空输入，失败留窗且不泄漏。多需求字段采用 main 的实际 label 区分，不让不同凭据都只显示“令牌”。保留 H 的 GitHub/SQLite 帮助与既有 OAuth 小窗，不重做权限／管理页。必要私有动作文件 delta：新增 `package-account-auth.ts`，将现有 SDK authenticate＋status 回读收成一个被 useExtensions 和生产时间线两处实际消费的函数；不另开授权运输、listener 或 token store。
+
+时间线从 main 的真实待授权事实给出「登录 {服务名}」「连接 {服务名}」；登录一次即经当前目录的现有 SDK/adapter 调 system-browser，取消仍保留原图和动作；令牌打开上述共享窗，保存后重读原 packageId，不重装。现有 `openPackageManagement` 继续处理管理动作。生产绑定例确实挂载 `CodePuppySessionTimeline`，再经真实 SDK 与 adapter 的公开引擎 API 模拟，检查只有一次 openLink、一次 OAuth connect、全部请求保留 location[directory]；没有登录真实账号。
+
+追加先行红例 `r10-bc4-label-red.log`（多需求标签不可区分）与 `r10-bc4-identity-red.log`（切换目标包仍留旧密码）均 exit 1，再修组件；原有行为断言未放宽。共享生产文件本步仅 `extension-detail.tsx` 的密码窗提取／调用段，未改 D/E 范围展示；其余为计划中的 useExtensions／时间线／双语言和共享组件。新增 auth helper 名称是上表“必要的窄动作复用”的实际落点。
+
+最终 ui-mac：`bun test --timeout 60000 --max-concurrency 2 src/renderer/extensions/package-account-dialog.test.ts src/renderer/codepuppy-ui/session-timeline/hub-install-card.test.ts src/renderer/codepuppy-ui/session-timeline/session-timeline.test.ts src/renderer/codepuppy-ui/session-timeline/timeline-model.test.ts src/renderer/codepuppy-ui/session-timeline/cards/cards-contract.test.ts src/renderer/extensions/hub-three-pages.test.ts src/renderer/extensions/ext-ipc-chokepoint.test.ts src/renderer/extensions/use-extensions-ipc.test.ts src/renderer/extensions/hub-copy.test.ts src/engine-adapter/mcp-auth.test.ts src/main/package-mcp-oauth.wiring.test.ts src/main/package-mcp-oauth.engine.test.ts` exit 0，137 pass／0 fail／1356 assertions（`r10-bc4-related-final.log`）；内部宿主严格核共享窗 4、卡片 10、生产时间线 123、H 29 场景。首跑原 5 秒默认测试执行预算触发整个时间线子宿主超时，后续用上述 60 秒 CLI 执行预算完成（总 26.32 秒）；未改产品超时、成功阈值或测试内期限。cards import 棘轮保持，通过既有只读 IPC 返回类型推导 AccountItem，未引入权限判定面或放宽静态检查。ui-mac/ext 各 `bun typecheck` exit 0（`r10-bc4-{ui,ext}-types-final.log`）。文档链接与 diff 检查 exit 0；已核 Codex（GPT-6）作者自查，BC4 自动证据通过，真实 Supabase 登录及完整应用输入／模型任务仍交编排器。下一步 BC5，OPTIONAL 无。

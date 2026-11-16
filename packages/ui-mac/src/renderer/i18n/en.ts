@@ -18,6 +18,8 @@ export const dict = {
   "codepuppy.timeline.hub.failed": "Could not enable:",
   "codepuppy.timeline.hub.login": "Sign-in needed · After signing in, the assistant can use {{name}}.",
   "codepuppy.timeline.hub.token": "Token needed",
+  "codepuppy.timeline.hub.loginAction": "Sign in to {{name}}",
+  "codepuppy.timeline.hub.tokenAction": "Connect {{name}}",
   "codepuppy.timeline.hub.manage": "Manage",
   "codepuppy.timeline.hub.disabled": "This package is not enabled",
   "codepuppy.timeline.hub.unverified": "Engine availability has not been verified",

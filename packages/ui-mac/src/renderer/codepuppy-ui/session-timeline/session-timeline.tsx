@@ -15,6 +15,7 @@ import { useNavigate } from "@solidjs/router"
 import { createEffect, createMemo, createSignal, on, onCleanup, type Accessor } from "solid-js"
 import { hrefFor } from "../../../shared/route-manifest"
 import { t } from "../../i18n"
+import { authenticatePackageMcp } from "../../extensions/package-account-auth"
 import { setSettingsOpen } from "../settings-state"
 import { composerAgent, composerPerm, tierAgent } from "../composer-state"
 import { projectImageSends } from "../pending-image-sends"
@@ -186,6 +187,7 @@ export function CodePuppySessionTimeline(props: CodePuppySessionTimelineProps = 
     model: (providerID, modelID) => serverSync().data.provider.all.get(providerID)?.models?.[modelID]?.name ?? modelID,
   }
   const intents: TimelineIntents = {
+    authenticateMcp: name => authenticatePackageMcp(serverSDK().client, name),
     // 子任务卡「打开子会话」:route-manifest 构 href 失败即放弃(fail-closed,不裸拼路径)。
     openSession: (childSessionID) => {
       const identity = live.current()?.identity

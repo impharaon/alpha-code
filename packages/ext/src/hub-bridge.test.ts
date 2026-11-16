@@ -158,3 +158,37 @@ test("R13 B3 package account read crosses the bridge with a safe projection and 
   wire.deliver({ type: "codepuppy.package.authorization.reply", id: 2, result: { ok: true, packageId: "claude:github", items: [{ kind: "secret", componentId: "mcp", prerequisiteId: "TOKEN", serviceName: "github", label: "Token", saved: false, value: "rejected" }] } })
   expect(await bad).toMatchObject({ ok: false })
 })
+
+test("R14 chat search receives failed hung-source status within thirty seconds, before its bridge budget", async () => {
+ const {jest}=await import("bun:test")
+ const {createPluginSources}=await import("../../ui-mac/src/main/plugin-sources")
+ const {fixtureFetch}=await import("../../ui-mac/test-fixtures/plugin-helper/source-fetch")
+ const {buildSourcesSearchReply}=await import("../../ui-mac/src/main/codepuppy-sidecar-messages")
+ const {createHubTools}=await import("./hub-tools")
+ let release!: (response:Response)=>void
+ const stalled=new Promise<Response>(resolve=>{release=resolve})
+ const fetching:Promise<Response>[]=[]
+ const sources=createPluginSources({catalog:async()=>[],fetch:url=>{
+  if(url.includes("raw.githubusercontent.com/openai"))return stalled
+  const response=fixtureFetch(url);fetching.push(response);return response
+ }})
+ const wire=fakePort()
+ const bridge=createHubBridge(wire.port)
+ const tool=createHubTools(bridge,{location:{directory:"/work/a"}} as never).find(tool=>tool.name==="codepuppy_hub_search")!
+ jest.useFakeTimers()
+ let output:Awaited<ReturnType<typeof tool.execute>>|undefined
+ const pending=tool.execute({query:"context7"},{} as never).then(value=>{output=value})
+ const request=parseCodePuppySidecarInbound(wire.sent[0])!
+ if(request.type!=="codepuppy.sources.search.request")throw Error("wrong chat transport")
+ const responding=sources.searchSources(request.query).then(result=>wire.deliver(buildSourcesSearchReply(request.id,{result})))
+ try{
+  await Promise.all(fetching)
+  for(let n=0;n<60;n++)await Promise.resolve()
+  jest.advanceTimersByTime(30_000)
+  for(let n=0;n<80;n++)await Promise.resolve()
+  expect(output).toBeDefined()
+  const result=JSON.parse(output!.content)
+  expect(result.sources.find((source:{source:string})=>source.source==="codex-marketplace")).toMatchObject({status:"failed",reason:"network"})
+  expect(result.candidates.some((candidate:{name:string})=>candidate.name==="context7")).toBe(true)
+ }finally{release(await fixtureFetch("https://raw.githubusercontent.com/openai/plugins/main/.agents/plugins/marketplace.json"));await responding;await pending;jest.useRealTimers()}
+})

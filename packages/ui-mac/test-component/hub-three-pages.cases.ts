@@ -170,6 +170,7 @@ Object.defineProperty(window, "api", {
       },
       hubView: async () => ({ directory: "/", rows: hubRows, warnings: [] }),
       reloadRequest: async () => ({ ok: true as const, generation: 1 }),
+      onSourcesSearchProgress: () => () => {},
       onHubViewChanged: (listener: () => void) => { hubListeners.add(listener); return () => { hubListeners.delete(listener) } },
       builtinRead: async () => ({
         gov: structuredClone(DEFAULT_BUILTIN_POLICY),

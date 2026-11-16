@@ -413,7 +413,7 @@ test("真实 catalog MCP 写通道结果只公开状态且不回显提交的 sec
   // 子串匹配会在用例数增减时假绿。七条子用例:enabled / installedDisabled 两条返回分支,加 #702 的 detail 通道注册、package 预检接线、browse 数据源,
   // 加 `#1529` 的 I4(IPC 与 parentPort 同档)与 A3(main-owned submitted ⇒ committed),
   // 加 `#1531` 的项目作用域重载请求与 agent 安装金丝雀端到端(生产 ext codepuppy_hub_install × 真 main 分发)。
-  expect(output).toMatch(/\b19 pass\b/)
+  expect(output).toMatch(/\b20 pass\b/)
   expect(output).toMatch(/\b0 fail\b/)
 }, 120_000)
 

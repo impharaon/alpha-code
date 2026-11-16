@@ -622,3 +622,24 @@ test("R14 search publishes responsive sources before a hung index and finishes w
   expect(answer!.candidates.some(candidate=>candidate.name==="context7")).toBe(true)
  }finally{release(await fixtureFetch("https://raw.githubusercontent.com/openai/plugins/main/.agents/plugins/marketplace.json"));await pending;jest.useRealTimers()}
 })
+
+test("R14 selecting a candidate keeps the generous capture budget after the search phase", async () => {
+ const {jest}=await import("bun:test")
+ const {createPluginSources}=await sourcesModule()
+ const {fixtureFetch}=await import("../../test-fixtures/plugin-helper/source-fetch")
+ const archive="https://codeload.github.com/anthropics/claude-plugins-official/tar.gz/refs/heads/main"
+ let release!: (response:Response)=>void
+ const stalled=new Promise<Response>(resolve=>{release=resolve})
+ const sources=createPluginSources({catalog:async()=>[],fetch:url=>url===archive?stalled:fixtureFetch(url)})
+ const candidate=(await sources.searchSources("context7")).candidates.find(candidate=>candidate.source==="claude-marketplace")!
+ let captured:Awaited<ReturnType<typeof sources.captureCandidate>>|undefined
+ jest.useFakeTimers()
+ const pending=sources.captureCandidate(candidate.id).then(value=>{captured=value;return value})
+ try{
+  jest.advanceTimersByTime(60_000)
+  for(let n=0;n<20;n++)await Promise.resolve()
+  expect(captured).toBeUndefined()
+  release(await fixtureFetch(archive))
+  expect(await pending).toMatchObject({ok:true,capture:{source:{commit:fixtureCommit}}})
+ }finally{release(await fixtureFetch(archive));await pending;jest.useRealTimers()}
+})

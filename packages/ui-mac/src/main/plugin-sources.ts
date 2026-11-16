@@ -363,75 +363,20 @@ export function createPluginSources(deps: { catalog: () => Promise<readonly Cand
       const members = new Map([...archive.members].filter(([name]) => !path || name.startsWith(path + "/")).map(([name, member]) => [path ? name.slice(path.length + 1) : name, member]))
       return treeCapture({ kind: "git", locator: canonical, repository: canonical, commit: archive.commit, pluginPath: path }, members)
     },
-    async searchSources(query: string): Promise<SourceSearchResultV1> {
+    async searchSources(query: string, onProgress?: (result: SourceSearchResultV1) => void): Promise<SourceSearchResultV1> {
+      const searchId = "search_" + randomUUID()
       const expires = Date.now() + PLUGIN_SOURCE_DEADLINE_MS
       const controllers = new Map(PLUGIN_SOURCE_ORDER.map(source => [source, new AbortController()]))
       const withinSource = <T>(source: PluginSourceIdV1, work: Promise<T>) => sourceDeadline(work, Math.max(0, expires - Date.now())).catch(error => { controllers.get(source)!.abort(); throw error })
-      try {
-      const [catalog, results, registry, npm] = await Promise.all([
-        Promise.allSettled([withinSource("catalog", deps.catalog())]).then((results) => results[0]!),
-        Promise.allSettled(MARKETPLACES.map(market => withinSource(market.source, loadIndex(market, controllers.get(market.source)!.signal)))),
-        Promise.allSettled([withinSource("mcp-registry", loadRegistry(query, controllers.get("mcp-registry")!.signal))]).then((results) => results[0]!),
-        Promise.allSettled([withinSource("opencode-npm", loadNpm(query, controllers.get("opencode-npm")!.signal))]).then((results) => results[0]!),
-      ])
-      const local = catalog.status === "fulfilled" ? rank(catalog.value, query) : []
-      catalogRows.clear()
-      if (catalog.status === "fulfilled") for (const row of catalog.value) catalogRows.set(row.id, row)
-      const source: SourceStatusV1 = catalog.status === "fulfilled"
-        ? { source: "catalog", status: "ok", matched: local.length, skipped: 0 }
-        : { source: "catalog", status: "failed", reason: catalog.reason instanceof SourceError ? catalog.reason.reason : "format", detail: "Customization catalog is unavailable" }
-      const markets = MARKETPLACES.map((market, index): { status: SourceStatusV1; candidates: CandidateV1[] } => {
-        const result = results[index]!
-        if (result.status === "rejected") {
-          const failure = result.reason instanceof SourceError ? result.reason : new SourceError("network", "Marketplace is unavailable")
-          return { status: { source: market.source, status: "failed", reason: failure.reason, detail: failure.message }, candidates: [] }
-        }
-        const matches = result.value.entries.filter((entry) => relevance(entry.name, entry.name, entry.description, query) > 0)
-        const available = matches.flatMap((entry): CandidateV1[] => {
-          if (entry.source.kind === "unsupported" || (entry.source.kind === "git" && !githubRepository(entry.source.url))) return []
-          const identity = market.source + JSON.stringify(entry)
-          const known = candidates.get(identity)
-          if (known && known.kind !== "captured") return [known.candidate]
-          const repository = entry.source.kind === "git" ? githubRepository(entry.source.url)! : market.repository
-          const candidate: CandidateV1 = {
-            id: "cand_" + randomUUID(), source: market.source, name: entry.name, displayName: entry.name, description: entry.description, kind: "plugin",
-            upstream: { repository, ...(entry.source.kind === "path" ? { path: entry.source.path } : { ...(entry.source.path === undefined ? {} : { path: entry.source.path }), ...(entry.source.commit ? { commit: entry.source.commit } : {}) }) },
-          }
-          candidates.set(identity, { kind: "marketplace", entry, candidate, market })
-          return [candidate]
-        })
-        return { status: { source: market.source, status: "ok", matched: available.length, skipped: matches.length - available.length }, candidates: rank(available, query) }
-      })
-      const found = registry.status === "fulfilled" ? registry.value.map((record) => {
-        const identity = "mcp-registry:" + record.server.name + "@" + record.server.version
-        const known = candidates.get(identity)
-        if (known && known.kind !== "captured") return known.candidate
-        const candidate: CandidateV1 = { id: "cand_" + randomUUID(), source: "mcp-registry", name: record.server.name, displayName: typeof record.server.title === "string" ? record.server.title : record.server.name,
-          description: typeof record.server.description === "string" ? record.server.description : "", kind: "mcp", publisher: record.publisher,
-          upstream: { serverName: record.server.name, version: record.server.version } }
-        candidates.set(identity, { kind: "mcp-registry", candidate, serverName: record.server.name, version: record.server.version })
-        return candidate
-      }) : []
-      const failure = registry.status === "rejected" ? registry.reason instanceof SourceError ? registry.reason : new SourceError("network", "Registry is unavailable") : undefined
-      const registryStatus: SourceStatusV1 = failure ? { source: "mcp-registry", status: "failed", reason: failure.reason, detail: failure.message } : { source: "mcp-registry", status: "ok", matched: found.length, skipped: 0 }
-      const npmFound = npm.status === "fulfilled" ? npm.value.filter((pkg) => relevance(pkg.name, pkg.name, pkg.description, query) > 0).map((pkg) => {
-        const identity = "npm:" + pkg.name + "@" + pkg.version
-        const known = candidates.get(identity)
-        if (known && known.kind !== "captured") return known.candidate
-        const candidate: CandidateV1 = { id: "cand_" + randomUUID(), source: "opencode-npm", name: pkg.name, displayName: pkg.name, description: pkg.description, kind: "plugin", upstream: { npm: pkg.name, version: pkg.version } }
-        candidates.set(identity, { kind: "npm", candidate, name: pkg.name, version: pkg.version })
-        return candidate
-      }) : []
-      const npmFailure = npm.status === "rejected" ? npm.reason instanceof SourceError ? npm.reason : new SourceError("network", "npm is unavailable") : undefined
-      const npmStatus: SourceStatusV1 = npmFailure ? { source: "opencode-npm", status: "failed", reason: npmFailure.reason, detail: npmFailure.message } : { source: "opencode-npm", status: "ok", matched: npmFound.length, skipped: 0 }
-      const groups = [{ status: source, candidates: local }, ...markets, { status: registryStatus, candidates: found }, { status: npmStatus, candidates: rank(npmFound, query) }]
-        .toSorted((left, right) => PLUGIN_SOURCE_ORDER.indexOf(left.status.source) - PLUGIN_SOURCE_ORDER.indexOf(right.status.source))
-      const ordered = groups.flatMap((group) => group.candidates)
+      const groups: { status: SourceStatusV1; candidates: CandidateV1[] }[] = []
+      const orderedGroups = () => groups.toSorted((left, right) => PLUGIN_SOURCE_ORDER.indexOf(left.status.source) - PLUGIN_SOURCE_ORDER.indexOf(right.status.source))
+      const snapshot = (): SourceSearchResultV1 => ({ searchId, query, sources: orderedGroups().map(group => ({ ...group.status })), candidates: orderedGroups().flatMap(group => group.candidates.map(candidate => ({ ...candidate, upstream: { ...candidate.upstream } }))) })
       const sourceFailed = (source: PluginSourceIdV1, reason: "network" | "format" = "network") => {
         const group = groups.find(group => group.status.source === source)!
         group.status = { source, status: "failed", reason, detail: reason === "network" ? "Source could not be read within its network budget" : "Source exceeded its archive resource budget" }
       }
       const convertedForSearch = async (candidate: CandidateV1) => {
+        if (Date.now() >= expires) return
         if (groups.find(group => group.status.source === candidate.source)?.status.status === "failed") return
         try {
           const result = await withinSource(candidate.source, convertCandidate(candidate.id))
@@ -441,34 +386,114 @@ export function createPluginSources(deps: { catalog: () => Promise<readonly Cand
           sourceFailed(candidate.source)
         }
       }
-      const installed = deps.installed?.() ?? []
-      for (const [index, candidate] of ordered.entries()) {
-        if (candidate.source === "catalog") continue
-        delete candidate.sameAs
-        const higher = ordered.slice(0, index).filter((entry) => PLUGIN_SOURCE_ORDER.indexOf(entry.source) < PLUGIN_SOURCE_ORDER.indexOf(candidate.source) && entry.name.toLowerCase() === candidate.name.toLowerCase())
-        if (!higher.length) continue
-        const converted = await convertedForSearch(candidate)
-        if (!converted?.runtimeIdentity) continue
-        for (const entry of higher) {
-          const other = entry.source === "catalog"
-            ? await withinSource("catalog", catalogComparisons(entry.name)).then(rows => rows.find(row => row.catalogId === entry.id)?.runtimeIdentity).catch(() => { sourceFailed("catalog"); return undefined })
-            : (await convertedForSearch(entry))?.runtimeIdentity
-          if (other !== converted.runtimeIdentity) continue
-          candidate.sameAs = entry.sameAs ?? entry.id
-          break
+      const decorate = async () => {
+        const ordered = orderedGroups().flatMap(group => group.candidates)
+        const installed = deps.installed?.() ?? []
+        for (const [index, candidate] of ordered.entries()) {
+          if (candidate.source === "catalog") continue
+          const higher = ordered.slice(0, index).filter((entry) => PLUGIN_SOURCE_ORDER.indexOf(entry.source) < PLUGIN_SOURCE_ORDER.indexOf(candidate.source) && entry.name.toLowerCase() === candidate.name.toLowerCase())
+          if (!higher.length) continue
+          const converted = await convertedForSearch(candidate)
+          if (!converted?.runtimeIdentity) continue
+          for (const entry of higher) {
+            const other = entry.source === "catalog"
+              ? await withinSource("catalog", catalogComparisons(entry.name)).then(rows => rows.find(row => row.catalogId === entry.id)?.runtimeIdentity).catch(() => { sourceFailed("catalog"); return undefined })
+              : (await convertedForSearch(entry))?.runtimeIdentity
+            if (other !== converted.runtimeIdentity) continue
+            candidate.sameAs = entry.sameAs ?? entry.id
+            break
+          }
+        }
+        for (const candidate of ordered) {
+          const direct = installed.find(item => item.packageId === candidate.id)
+          const possible = installed.filter(item => item.runtimeIdentity && item.name.toLowerCase() === candidate.name.toLowerCase())
+          const converted = !direct && possible.length ? await convertedForSearch(candidate) : undefined
+          const match = direct ?? (converted?.ok ? possible.find(item => item.runtimeIdentity === converted.runtimeIdentity) : undefined)
+          if (match) candidate.installed = { packageId: match.packageId, enabled: match.enabled }
         }
       }
-      for (const candidate of ordered) {
-        delete candidate.installed
-        const direct = installed.find(item => item.packageId === candidate.id)
-        const possible = installed.filter(item => item.runtimeIdentity && item.name.toLowerCase() === candidate.name.toLowerCase())
-        const converted = !direct && possible.length ? await convertedForSearch(candidate) : undefined
-        const match = direct ?? (converted?.ok ? possible.find(item => item.runtimeIdentity === converted.runtimeIdentity) : undefined)
-        if (match) candidate.installed = { packageId: match.packageId, enabled: match.enabled }
+      const comparisons: Promise<void>[] = []
+      const publish = (group: { status: SourceStatusV1; candidates: CandidateV1[] }) => {
+        for (const candidate of group.candidates) { delete candidate.sameAs; delete candidate.installed }
+        groups.push(group)
+        onProgress?.(snapshot())
+        if (Date.now() < expires) comparisons.push(decorate().then(() => { onProgress?.(snapshot()) }))
       }
-      const result = { searchId: "search_" + randomUUID(), query, sources: groups.map((group) => group.status), candidates: ordered }
-      searches.set(result.searchId, result.sources.map((source) => ({ ...source })))
-      return result
+      try {
+        await Promise.all([
+          Promise.allSettled([withinSource("catalog", deps.catalog())]).then(results => {
+            const catalog = results[0]!
+            const local = catalog.status === "fulfilled" ? rank(catalog.value, query) : []
+            catalogRows.clear()
+            if (catalog.status === "fulfilled") for (const row of catalog.value) catalogRows.set(row.id, row)
+            const source: SourceStatusV1 = catalog.status === "fulfilled"
+              ? { source: "catalog", status: "ok", matched: local.length, skipped: 0 }
+              : { source: "catalog", status: "failed", reason: catalog.reason instanceof SourceError ? catalog.reason.reason : "format", detail: "Customization catalog is unavailable" }
+            publish({ status: source, candidates: local })
+          }),
+          ...MARKETPLACES.map(market => Promise.allSettled([withinSource(market.source, loadIndex(market, controllers.get(market.source)!.signal))]).then(results => {
+            const result = results[0]!
+            const group = (() : { status: SourceStatusV1; candidates: CandidateV1[] } => {
+              if (result.status === "rejected") {
+                const failure = result.reason instanceof SourceError ? result.reason : new SourceError("network", "Marketplace is unavailable")
+                return { status: { source: market.source, status: "failed", reason: failure.reason, detail: failure.message }, candidates: [] }
+              }
+              const matches = result.value.entries.filter((entry) => relevance(entry.name, entry.name, entry.description, query) > 0)
+              const available = matches.flatMap((entry): CandidateV1[] => {
+                if (entry.source.kind === "unsupported" || (entry.source.kind === "git" && !githubRepository(entry.source.url))) return []
+                const identity = market.source + JSON.stringify(entry)
+                const known = candidates.get(identity)
+                if (known && known.kind !== "captured") return [known.candidate]
+                const repository = entry.source.kind === "git" ? githubRepository(entry.source.url)! : market.repository
+                const candidate: CandidateV1 = {
+                  id: "cand_" + randomUUID(), source: market.source, name: entry.name, displayName: entry.name, description: entry.description, kind: "plugin",
+                  upstream: { repository, ...(entry.source.kind === "path" ? { path: entry.source.path } : { ...(entry.source.path === undefined ? {} : { path: entry.source.path }), ...(entry.source.commit ? { commit: entry.source.commit } : {}) }) },
+                }
+                candidates.set(identity, { kind: "marketplace", entry, candidate, market })
+                return [candidate]
+              })
+              return { status: { source: market.source, status: "ok", matched: available.length, skipped: matches.length - available.length }, candidates: rank(available, query) }
+
+            })()
+            publish(group)
+          })),
+          Promise.allSettled([withinSource("mcp-registry", loadRegistry(query, controllers.get("mcp-registry")!.signal))]).then(results => {
+            const registry = results[0]!
+            const found = registry.status === "fulfilled" ? registry.value.map((record) => {
+              const identity = "mcp-registry:" + record.server.name + "@" + record.server.version
+              const known = candidates.get(identity)
+              if (known && known.kind !== "captured") return known.candidate
+              const candidate: CandidateV1 = { id: "cand_" + randomUUID(), source: "mcp-registry", name: record.server.name, displayName: typeof record.server.title === "string" ? record.server.title : record.server.name,
+                description: typeof record.server.description === "string" ? record.server.description : "", kind: "mcp", publisher: record.publisher,
+                upstream: { serverName: record.server.name, version: record.server.version } }
+              candidates.set(identity, { kind: "mcp-registry", candidate, serverName: record.server.name, version: record.server.version })
+              return candidate
+            }) : []
+            const failure = registry.status === "rejected" ? registry.reason instanceof SourceError ? registry.reason : new SourceError("network", "Registry is unavailable") : undefined
+            const registryStatus: SourceStatusV1 = failure ? { source: "mcp-registry", status: "failed", reason: failure.reason, detail: failure.message } : { source: "mcp-registry", status: "ok", matched: found.length, skipped: 0 }
+            publish({ status: registryStatus, candidates: found })
+          }),
+          Promise.allSettled([withinSource("opencode-npm", loadNpm(query, controllers.get("opencode-npm")!.signal))]).then(results => {
+            const npm = results[0]!
+            const npmFound = npm.status === "fulfilled" ? npm.value.filter((pkg) => relevance(pkg.name, pkg.name, pkg.description, query) > 0).map((pkg) => {
+              const identity = "npm:" + pkg.name + "@" + pkg.version
+              const known = candidates.get(identity)
+              if (known && known.kind !== "captured") return known.candidate
+              const candidate: CandidateV1 = { id: "cand_" + randomUUID(), source: "opencode-npm", name: pkg.name, displayName: pkg.name, description: pkg.description, kind: "plugin", upstream: { npm: pkg.name, version: pkg.version } }
+              candidates.set(identity, { kind: "npm", candidate, name: pkg.name, version: pkg.version })
+              return candidate
+            }) : []
+            const npmFailure = npm.status === "rejected" ? npm.reason instanceof SourceError ? npm.reason : new SourceError("network", "npm is unavailable") : undefined
+            const npmStatus: SourceStatusV1 = npmFailure ? { source: "opencode-npm", status: "failed", reason: npmFailure.reason, detail: npmFailure.message } : { source: "opencode-npm", status: "ok", matched: npmFound.length, skipped: 0 }
+            publish({ status: npmStatus, candidates: rank(npmFound, query) })
+          }),
+        ])
+        await Promise.all(comparisons)
+        if (Date.now() < expires) await decorate()
+        const result = snapshot()
+        searches.set(searchId, result.sources.map(source => ({ ...source })))
+        onProgress?.(result)
+        return result
       } finally {
         for (const controller of controllers.values()) controller.abort()
       }

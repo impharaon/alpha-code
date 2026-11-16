@@ -1167,7 +1167,8 @@ export type ElectronAPI = {
     hubView: (directory?: string) => Promise<HubView>
     /** Main-owned installation progress; renderer cannot advance a stage. */
     hubRequest: (requestId: string) => Promise<HubRequestRecord | null>
-    sourcesSearch: (query: string) => Promise<SourceSearchResultV1>
+    sourcesSearch: (query: string, requestId?: string) => Promise<SourceSearchResultV1>
+    onSourcesSearchProgress: (callback: (requestId: string, result: SourceSearchResultV1) => void) => () => void
     preparePluginSource: (input: PreparePluginSourceInputV1) => Promise<PreparePluginSourceResultV1>
     installFromSource: (request: InstallRequestV1) => Promise<InstallOutcomeV1>
     /** REQ-234 `#1529`:「待重载」的原因变了(重载请求 / ext 报告 / 引擎连上或断开)—— 重读 `hubView`。返回退订函数。 */

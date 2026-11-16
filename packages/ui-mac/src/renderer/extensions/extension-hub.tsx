@@ -2457,7 +2457,11 @@ export function ExtensionHub(props: {
                   </Show>
                 </Show>
                 </>}>
-                  <PluginSourceResults query={query().trim()} search={value => extIpc.sourcesSearch(value)}
+                  <PluginSourceResults query={query().trim()} search={(value, progress) => {
+                    const requestId = crypto.randomUUID()
+                    const off = extIpc.onSourcesSearchProgress((id, result) => { if (id === requestId) progress?.(result) })
+                    return extIpc.sourcesSearch(value, requestId).finally(off)
+                  }}
                     install={installSourceChoice}
                     installedMenu={sourceInstalledMenu} />
                 </Show>

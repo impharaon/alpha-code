@@ -7,7 +7,7 @@ import { pluginSourceLabelKey } from "./ext-package-presentation"
 /** Search owns pending selection only; main owns order, identity, installation and status. */
 export function PluginSourceResults(props: {
   query: string
-  search(query: string): Promise<SourceSearchResultV1>
+  search(query: string, progress?: (result: SourceSearchResultV1) => void): Promise<SourceSearchResultV1>
   install(candidate: CandidateV1): Promise<InstallOutcomeV1>
   /** The Hub renders its existing installed row/menu, without another management implementation. */
   installedMenu(packageId: string): JSX.Element
@@ -19,8 +19,17 @@ export function PluginSourceResults(props: {
     const timer = setTimeout(() => setQuery(next), 250)
     onCleanup(() => clearTimeout(timer))
   })
-  const [result] = createResource(query, props.search)
-  const current = () => (!result.loading && !result.error && result()?.query === props.query ? result() : undefined)
+  const [progress, setProgress] = createSignal<SourceSearchResultV1>()
+  let revision = 0
+  onCleanup(() => { revision++ })
+  const [result] = createResource(query, async value => {
+    const current = ++revision
+    setProgress(undefined)
+    return props.search(value, partial => {
+      if (current === revision && partial.query === props.query) setProgress(partial)
+    })
+  })
+  const current = () => !result.error && result()?.query === props.query && !result.loading ? result() : progress()?.query === props.query ? progress() : undefined
   const candidates = createMemo(() => {
     const all = current()?.candidates ?? []
     return all.filter(
@@ -49,7 +58,7 @@ export function PluginSourceResults(props: {
             {t("codepuppy.ext.sourceSearchResults", { count: candidates().length })}
           </span>
         </div>
-        <Show when={!candidates().length && current()?.sources.every(source => source.status === "ok")}>
+        <Show when={!result.loading && !candidates().length && current()?.sources.every(source => source.status === "ok")}>
           <p class="codepuppy-ext-dnote">{t("codepuppy.ext.sourceNoMatches")}</p>
         </Show>
         <PluginSourceChoices candidates={candidates()} install={props.install} installedMenu={props.installedMenu} />

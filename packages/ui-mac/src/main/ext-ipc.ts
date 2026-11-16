@@ -1463,9 +1463,12 @@ export function registerExtIpcHandlers(
   ipcMain.handle(HUB_READ_CHANNELS.hubView, (_event: IpcMainInvokeEvent, directory?: unknown) =>
     hubView.view(typeof directory === "string" ? directory : undefined),
   )
-  ipcMain.handle(HUB_READ_CHANNELS.sourcesSearch, (_event: IpcMainInvokeEvent, query: unknown) => {
+  ipcMain.handle(HUB_READ_CHANNELS.sourcesSearch, (event: IpcMainInvokeEvent, query: unknown, requestId?: unknown) => {
     if (typeof query !== "string") throw Error("Invalid source query")
-    return pluginSources.searchSources(query)
+    return pluginSources.searchSources(query, typeof requestId === "string" ? result => {
+      try { if (!event.sender.isDestroyed?.()) event.sender.send("ext-sources-search-progress", requestId, result) }
+      catch { getLogger()?.warn("Source search progress target is unavailable") }
+    } : undefined)
   })
   ipcMain.handle(HUB_READ_CHANNELS.hubRequest, (_event: IpcMainInvokeEvent, requestId: unknown) => isHubRequestId(requestId) ? hubRequests.get(requestId) : null)
   const codepuppySidecarHost: CodePuppySidecarHost = createCodePuppySidecarHost({

@@ -4,11 +4,65 @@ import { captureFixture, digest, fixtureRoot } from "../../../test-fixtures/plug
 import provenance from "../../../test-fixtures/plugin-helper/provenance.json"
 import codex from "../../../test-fixtures/plugin-helper/codex/provenance.json"
 import registry from "../../../test-fixtures/plugin-helper/registry/provenance.json"
+import opencode from "../../../test-fixtures/plugin-helper/opencode/provenance.json"
 import type { Json, Source } from "./plugin-conversion"
 
 const converter = () => import("./plugin-conversion")
 const registryServer = async (file: string) => (await Bun.file(join(fixtureRoot, "registry", file)).json()).server as { [key: string]: Json }
 const registrySource: Source = { kind: "mcp-registry", locator: "https://registry.modelcontextprotocol.io", serverName: "io.github.github/github-mcp-server", version: "2.1.0" }
+
+test("OpenCode native modules remain visible with native-js-plugin while skills survive", async () => {
+  for (const tree of opencode.trees) for (const file of [...tree.files, { path: tree.archive.path, sha256: tree.archive.sha256 }])
+    expect(digest(await Bun.file(join(fixtureRoot, "opencode", tree.root, file.path)).bytes())).toBe(`sha256:${file.sha256}`)
+  const captured = await captureFixture("superpowers", {}, "opencode")
+  const converted = await (await converter()).convertPluginTree(captured)
+  expect(converted.package.provider).toBe("opencode")
+  expect(converted.package.entries).toContainEqual(expect.objectContaining({ kind: "skill", sourceName: "using-superpowers" }))
+  expect(converted.package.diagnostics).toContainEqual(expect.objectContaining({ code: "native-js-plugin", path: ".opencode/plugins/superpowers.js", sourceName: "superpowers" }))
+  expect(converted.package.tree).toEqual(captured.nodes)
+  expect((await (await import("./plugin-conversion.mjs")).convertPluginTree(captured)).package).toEqual(converted.package)
+})
+
+test("pinned OpenCode JSONC and skills use the shared package model", async () => {
+  const converted = await (await converter()).convertPluginTree(await captureFixture("onyxia", {}, "opencode"))
+  expect(converted.package.provider).toBe("opencode")
+  expect(converted.package.entries.filter((entry) => entry.kind === "skill")).toHaveLength(15)
+  expect(converted.package.entries.filter((entry) => entry.kind === "mcp")).toMatchObject([
+    { sourceName: "excalidraw", transport: "http", url: ["https://mcp.excalidraw.com/mcp"] },
+    { sourceName: "datagouv", transport: "http", url: ["https://mcp.data.gouv.fr/mcp"] },
+  ])
+  expect(converted.package.diagnostics).toEqual([])
+})
+
+test("OpenCode singular hidden skill paths and local MCP preserve credentials and original field pointers", async () => {
+  const original = await captureFixture("superpowers", {}, "opencode")
+  const skill = new TextDecoder().decode(await original.readFile("skills/using-superpowers/SKILL.md"))
+  // Relocate actual entry files; MCP fields remain the pinned OpenCode user's original configuration.
+  const config = await Bun.file(join(fixtureRoot, "opencode/local-config.jsonc")).text()
+  const capture = await captureFixture("superpowers", { "skills/using-superpowers/SKILL.md": null, ".opencode/skill/using-superpowers/SKILL.md": skill, ".opencode/opencode.jsonc": config }, "opencode")
+  const result = await (await converter()).convertPluginTree(capture)
+  expect(result.package.entries).toContainEqual(expect.objectContaining({ kind: "skill", directory: ".opencode/skill/using-superpowers" }))
+  expect(result.package.entries).toContainEqual(expect.objectContaining({ kind: "mcp", transport: "stdio", command: [["npx"], ["@playwright/mcp@latest"]], environment: {} }))
+  expect(result.package.secrets).toContainEqual(expect.objectContaining({ targets: [{ file: ".opencode/opencode.jsonc", pointer: "/mcp/zai-mcp-server/environment/Z_AI_API_KEY" }] }))
+  expect(result.privateCredentials.size).toBe(0)
+})
+
+test("OpenCode native module diagnostics deduplicate paths and never evaluate source bytes", async () => {
+  const { mkdtemp, access, rm } = await import("node:fs/promises")
+  const { tmpdir } = await import("node:os")
+  const root = await mkdtemp(join(tmpdir(), "helper-native-"))
+  try {
+    const original = await captureFixture("superpowers", {}, "opencode")
+    const js = new TextDecoder().decode(await original.readFile(".opencode/plugins/superpowers.js"))
+    const manifest = await Bun.file(join(fixtureRoot, "opencode/npm/package.json")).json()
+    const capture = await captureFixture("superpowers", { ".opencode/plugins/superpowers.js": `import { writeFileSync } from "node:fs"; writeFileSync(${JSON.stringify(join(root, "executed"))}, "executed");\n` + js,
+      "package.json": JSON.stringify({ ...manifest, name: "superpowers-package", main: "./.opencode/plugins/superpowers.js", exports: { ".": { import: "./.opencode/plugins/superpowers.js", default: "./.opencode/plugins/superpowers.js" } } }) }, "opencode")
+    const result = await (await converter()).convertPluginTree(capture)
+    expect(result.package.diagnostics.filter((diagnostic) => diagnostic.code === "native-js-plugin")).toMatchObject([{ path: ".opencode/plugins/superpowers.js", sourceName: "superpowers-package" }])
+    expect(await access(join(root, "executed")).then(() => true, () => false)).toBe(false)
+    expect(result.package.entries.some((entry) => entry.kind === "skill")).toBe(true)
+  } finally { await rm(root, { recursive: true, force: true }) }
+})
 
 test("registry GitHub without plugin manifest becomes one remote MCP with a Bearer secret need", async () => {
   for (const file of registry.files) expect(digest(await Bun.file(join(fixtureRoot, "registry", file.path)).bytes())).toBe(`sha256:${file.sha256}`)

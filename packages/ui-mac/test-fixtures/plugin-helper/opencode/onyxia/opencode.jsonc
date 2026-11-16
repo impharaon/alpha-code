@@ -1,0 +1,405 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  // =========================================================================
+  //  PROVIDER: self-hosted models exposed by the Onyxia platform.
+  //  The gateway is Open WebUI (https://llm.lab.sspcloud.fr): it exposes an
+  //  OpenAI-compatible layer on /v1 (distinct from the native /api API).
+  //
+  //  baseURL expected by OpenCode:  https://llm.lab.sspcloud.fr/v1
+  //    -> OpenCode calls {baseURL}/chat/completions = /v1/chat/completions
+  //    -> Fallback if /v1 is absent: https://llm.lab.sspcloud.fr/api  (see INSTALL.md)
+  //
+  //  The "models" KEYS below are confirmed (curl .../api/models):
+  //  gemma4-26b-moe, qwen3-8-27b, qwen3-6-35b-moe, qwen3-vl, qwen3-cursor,
+  //  qwen3-embedding-8b, qwen-36. The gateway does not publish
+  //  context/output limits; see the note in INSTALL.md if generation truncates.
+  //
+  //  THINKING MODE: the gateway serves qwen3-8-27b with thinking ON by
+  //  default (the response carries a "reasoning_content" field). We do not
+  //  rely on that default: "options.chat_template_kwargs.enable_thinking" is
+  //  pinned per model / per agent. Anything in a model's or an agent's
+  //  "options" is forwarded verbatim into the request body by the
+  //  @ai-sdk/openai-compatible provider (agent options win over model ones).
+  // =========================================================================
+  "provider": {
+    "onyxia": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "SSPCloud LLM (self-hosted)",
+      "options": {
+        "baseURL": "{env:OPENAI_BASE_URL}",
+        "apiKey": "{env:OPENAI_API_KEY}"
+      },
+      "models": {
+        "qwen3-8-27b": {
+          "name": "Qwen3 27B MoE — code & reasoning",
+          "tools": true,
+          "reasoning": true,
+          // Thinking OFF by default: the code-writing agents stay fast and
+          // spend their output budget on code, not on a reasoning trace.
+          // The `plan` agent re-enables it in its own "options" block.
+          "options": {
+            "chat_template_kwargs": {
+              "enable_thinking": false
+            }
+          },
+          "limit": {
+            "context": 131072,
+            "output": 32768
+          }
+        },
+        "gemma4-26b-moe": {
+          "name": "Gemma 4 26B MoE — fast / review",
+          "tools": true,
+          "limit": {
+            "context": 131072,
+            "output": 16384
+          }
+        },
+        "qwen3-vl": {
+          "name": "Qwen3 VL — vision (charts, diagrams, screenshots)",
+          "tools": true,
+          "limit": {
+            "context": 65536,
+            "output": 16384
+          }
+        }
+      }
+    }
+  },
+  // ---- Default model + small model (titles, summaries, compaction) ----
+  "model": "onyxia/qwen3-8-27b",
+  "small_model": "onyxia/gemma4-26b-moe",
+  // ---- Default agent at startup ----
+  "default_agent": "plan",
+  // =========================================================================
+  //  CONTEXT BUDGET — 131k window, data science tool output.
+  //  A single duckdb SUMMARIZE, a verbose pytest run or a kubectl logs easily
+  //  exceeds the defaults (2000 lines / 50 KB) and burns >10k tokens per call.
+  //  Truncated output is NOT lost: OpenCode writes the full text under
+  //  ~/.local/share/opencode/tool-output/ and gives the model the path.
+  //  CAVEAT: truncation keeps the HEAD, so prompts must bound output at the
+  //  source (`| tail -n 30`) — pytest puts its verdict at the END.
+  // =========================================================================
+  "tool_output": {
+    "max_lines": 200,
+    "max_bytes": 20000
+  },
+  "compaction": {
+    "auto": true,
+    // Off by default: without it, stale tool outputs are carried for the whole
+    // session. This is the single biggest context-rot win for DS work.
+    "prune": true,
+    // Keep the last 4 user turns verbatim (default 2).
+    "tail_turns": 4
+  },
+  "experimental": {
+    // The reviewer hard-denies anything off its allowlist; a denial should make
+    // the agent adapt, not end the turn.
+    "continue_loop_on_deny": true
+  },
+  // =========================================================================
+  //  PERMISSIONS — OpenCode is NOT sandboxed: every `bash` runs on the pod.
+  //  Common data science tooling is broadly allowed; anything destructive or
+  //  outbound (network, k8s mutations, rm) asks for confirmation.
+  //
+  //  ⚠ ORDER IS SEMANTIC. OpenCode evaluates the LAST matching rule
+  //  (`rules.findLast(...)`), so the layout must be:
+  //      1. the "*" catch-all FIRST,
+  //      2. then the broad allows,
+  //      3. then the narrow re-restrictions LAST.
+  //  Putting "*" at the end — as this file used to — makes every rule above it
+  //  dead and silently collapses the whole block into `"bash": "ask"`.
+  // =========================================================================
+  "permission": {
+    // NOTE: "edit" is deliberately NOT granted globally. A subagent inherits
+    // the permission set of the session that spawned it, merged AFTER its own
+    // rules — so a global `"edit": "allow"` silently overrides a subagent's
+    // `"edit": "deny"` and the read-only agents stop being read-only. Grant
+    // "edit" per agent instead (build / python-ds / r-ds / mlops below).
+    "webfetch": "ask",
+    // Delegation: allow the purpose-built subagents, refuse the generic
+    // "general" one — it has full write permission and no Onyxia context, so
+    // it is never the right delegate here.
+    "task": {
+      "*": "allow",
+      "general": "deny"
+    },
+    "bash": {
+      "*": "ask",
+      // ---- broad allows: routine, non-destructive DS tooling ----
+      "find *": "allow",
+      "grep *": "allow",
+      "head *": "allow",
+      "echo *": "allow",
+      "ls *": "allow",
+      "sort *": "allow",
+      "cat *": "allow",
+      "git *": "allow",
+      "uv *": "allow",
+      "pip *": "allow",
+      "pixi *": "allow",
+      "python *": "allow",
+      "python3 *": "allow",
+      "pytest*": "allow",
+      "ruff *": "allow",
+      "mypy *": "allow",
+      "Rscript *": "allow",
+      "R -e *": "allow",
+      "quarto *": "allow",
+      "make *": "allow",
+      "just *": "allow",
+      "mc *": "allow",
+      "aws s3*": "allow",
+      "mlflow *": "allow",
+      "duckdb *": "allow",
+      // Vault: read-only only; put/delete fall back to the "*" catch-all.
+      "vault kv get*": "allow",
+      "vault kv list*": "allow",
+      // Argo / kubectl: browsing is free; mutations are re-restricted below.
+      "argo list*": "allow",
+      "argo get*": "allow",
+      "argo logs*": "allow",
+      "argo watch*": "allow",
+      "kubectl get*": "allow",
+      "kubectl describe*": "allow",
+      "kubectl logs*": "allow",
+      "kubectl top*": "allow",
+      // ---- narrow re-restrictions: MUST stay after the allows ----
+      // Outbound or irreversible: leaving the pod, or destroying local state.
+      "git push*": "ask",
+      "git reset --hard*": "ask",
+      "git clean*": "ask",
+      // Submitting a workflow launches containers on the cluster.
+      "argo submit*": "ask",
+      "argo delete*": "ask",
+      "kubectl apply*": "ask",
+      "kubectl create*": "ask",
+      "kubectl delete*": "ask",
+      "docker *": "ask",
+      // S3 writes/deletes: `ls`/`cp` inward stay free via "aws s3*" above.
+      "aws s3 rm*": "ask",
+      "aws s3 sync*": "ask",
+      "mc rm*": "ask",
+      // Deletions always confirm (covers `rm -rf <glob>` too). Regenerate
+      // outputs via the pipeline rather than deleting data/artifacts.
+      "rm *": "ask",
+      "curl *": "ask",
+      "wget *": "ask"
+    },
+    "skill": {
+      "*": "allow"
+    }
+  },
+  // =========================================================================
+  //  AGENTS — 2 primary agents (Tab to switch) + 5 subagents, delegated
+  //  automatically based on their "description" or invoked via @name.
+  //  Each agent's system prompt lives in ./prompts/<agent>.md
+  //
+  //  `plan` is the only agent running in thinking mode (Qwen3): planning is
+  //  where an explicit reasoning trace pays off. `reviewer` stays on Gemma 4
+  //  on purpose — a second model gives a genuinely different point of view.
+  //
+  //  ⚠ "prompt" is inline prompt TEXT, not a path. A bare "./prompts/x.md" is
+  //  sent to the model verbatim as a 19-character system prompt. Use
+  //  {file:...}: it resolves relative to THIS file's directory (so the same
+  //  string works in the repo and in ~/.config/opencode) and OpenCode refuses
+  //  to start if the target is missing. Setting "prompt" also replaces
+  //  OpenCode's own built-in system prompt, which is why every agent starts
+  //  from ./prompts/shared/base.md.
+  //
+  //  ./prompts/shared/completion-contract.md goes ONLY to the agents that
+  //  change files. `reviewer` grades against that contract — it must not be
+  //  told when it may declare itself done.
+  //
+  //  python-ds / r-ds / mlops deliberately have NO tool restriction:
+  //  they must execute and verify code; the global bash allowlist above
+  //  (rm/curl/kubectl apply/docker/argo submit on "ask") keeps them in check.
+  // =========================================================================
+  "agent": {
+    "build": {
+      "mode": "primary",
+      "model": "onyxia/qwen3-8-27b",
+      "temperature": 0.2,
+      "prompt": "{file:./prompts/shared/base.md}\n\n{file:./prompts/build.md}\n\n{file:./prompts/shared/completion-contract.md}",
+      "permission": {
+        "edit": "allow"
+      }
+    },
+    "plan": {
+      "mode": "primary",
+      "model": "onyxia/qwen3-8-27b",
+      // Qwen3 thinking mode: near-greedy decoding sends the reasoning trace
+      // into repetition loops — use the sampling Qwen recommends for it.
+      "temperature": 0.6,
+      "top_p": 0.95,
+      "options": {
+        "chat_template_kwargs": {
+          "enable_thinking": true
+        }
+      },
+      "prompt": "{file:./prompts/shared/base.md}\n\n{file:./prompts/plan.md}",
+      "permission": {
+        // Read-only EXCEPT its own plan files: that is where the acceptance
+        // list and the evidence log live, and `build` reads them from there.
+        // Must be explicit — the global `"edit": "allow"` merges in and the
+        // last matching rule wins.
+        "edit": {
+          "*": "deny",
+          ".opencode/plans/*.md": "allow"
+        },
+        "bash": {
+          "*": "ask",
+          "git status": "allow",
+          "git log*": "allow",
+          "git diff*": "allow",
+          "ls *": "allow",
+          "aws s3 ls*": "allow",
+          "mc ls*": "allow",
+          "duckdb *": "allow"
+        }
+      }
+    },
+    "python-ds": {
+      "mode": "subagent",
+      "description": "Python data science / ML specialist on Onyxia (uv, ruff, polars, pandas, scikit-learn, pyarrow, s3fs). Use to write or refactor Python code for analysis, modelling, or pipelines.",
+      "model": "onyxia/qwen3-8-27b",
+      "temperature": 0.2,
+      "prompt": "{file:./prompts/shared/base.md}\n\n{file:./prompts/python-ds.md}\n\n{file:./prompts/shared/completion-contract.md}",
+      "permission": {
+        "edit": "allow"
+      }
+    },
+    "r-ds": {
+      "mode": "subagent",
+      "description": "R data science specialist (tidyverse, data.table, targets, renv, testthat, aws.s3, arrow). Use for any R code for analysis, modelling, or reproducible pipelines.",
+      "model": "onyxia/qwen3-8-27b",
+      "temperature": 0.2,
+      "prompt": "{file:./prompts/shared/base.md}\n\n{file:./prompts/r-ds.md}\n\n{file:./prompts/shared/completion-contract.md}",
+      "permission": {
+        "edit": "allow"
+      }
+    },
+    "mlops": {
+      "mode": "subagent",
+      "description": "Onyxia MLOps engineer: MLflow experiment tracking, parallel training via Argo Workflows (argo submit, CronWorkflow), GitOps deployment via ArgoCD, model packaging and productionization. Use to industrialize/deploy a model or schedule recurring jobs.",
+      "model": "onyxia/qwen3-8-27b",
+      "temperature": 0.2,
+      "prompt": "{file:./prompts/shared/base.md}\n\n{file:./prompts/mlops.md}\n\n{file:./prompts/shared/completion-contract.md}",
+      "permission": {
+        "edit": "allow"
+      }
+    },
+    "reviewer": {
+      "mode": "subagent",
+      "description": "Fresh-context grader AND code reviewer (read-only). Give it the path to an acceptance file (usually .opencode/plans/<slug>.md) plus `git diff --stat`: it re-runs every check itself and returns PASS/FAIL per acceptance item (blocking), followed by quality/reproducibility/security findings (advisory). Invoke at the END of any task that changed a file, before telling the user it is done. Never edits, never commits, never deploys.",
+      "model": "onyxia/gemma4-26b-moe",
+      // Grading should be reproducible, not creative.
+      "temperature": 0,
+      "steps": 40,
+      "prompt": "{file:./prompts/shared/base.md}\n\n{file:./prompts/reviewer.md}",
+      "permission": {
+        "edit": "deny",
+        "webfetch": "deny",
+        "websearch": "deny",
+        "task": "deny",
+        // Catch-all is "deny", not "ask": a subagent has no user to ask, so an
+        // "ask" here would stall. Same ordering rule as the global block —
+        // broad first, narrow last.
+        "bash": {
+          "*": "deny",
+          // -- inspect
+          "ls *": "allow",
+          "cat *": "allow",
+          "head *": "allow",
+          "tail *": "allow",
+          "wc *": "allow",
+          "grep *": "allow",
+          "rg *": "allow",
+          "find *": "allow",
+          "git status": "allow",
+          "git status*": "allow",
+          "git diff*": "allow",
+          "git log*": "allow",
+          "git show*": "allow",
+          // -- actually re-run the checks (this is the point of the agent)
+          "uv run *": "allow",
+          "uv sync*": "allow",
+          "uv tree*": "allow",
+          "python *": "allow",
+          "python3 *": "allow",
+          "pytest*": "allow",
+          "ruff *": "allow",
+          "mypy *": "allow",
+          "Rscript *": "allow",
+          "R -e *": "allow",
+          "quarto render*": "allow",
+          "quarto check*": "allow",
+          "duckdb *": "allow",
+          "mlflow *": "allow",
+          "aws s3 ls*": "allow",
+          "mc ls*": "allow",
+          "make *": "allow",
+          "just *": "allow",
+          // -- narrow denies AFTER the allows: nothing mutating, nothing
+          //    outbound, no dependency changes. `uv run *` still lets it
+          //    execute project code — irreducible, since re-running the tests
+          //    IS the job; this list blocks the categorically wrong actions
+          //    rather than pretending to sandbox.
+          "git commit*": "deny",
+          "git push*": "deny",
+          "git checkout*": "deny",
+          "git reset*": "deny",
+          "git clean*": "deny",
+          "rm *": "deny",
+          "mv *": "deny",
+          "aws s3 cp*": "deny",
+          "aws s3 rm*": "deny",
+          "aws s3 sync*": "deny",
+          "mc cp*": "deny",
+          "mc rm*": "deny",
+          "argo submit*": "deny",
+          "kubectl apply*": "deny",
+          "kubectl delete*": "deny",
+          "docker *": "deny",
+          "pip install*": "deny",
+          "uv add*": "deny"
+        }
+      }
+    },
+    "dataviz-vision": {
+      "mode": "subagent",
+      "description": "Visual analysis (vision model): reads screenshots, matplotlib/ggplot charts, architecture diagrams, or dashboards to interpret them or suggest improvements. Use whenever an image is provided.",
+      "model": "onyxia/qwen3-vl",
+      "temperature": 0.3,
+      "prompt": "{file:./prompts/dataviz-vision.md}",
+      "permission": {
+        "edit": "deny",
+        "bash": "deny",
+        "task": "deny",
+        "webfetch": "deny"
+      }
+    }
+  },
+  // =========================================================================
+  //  MCP (optional) — disabled by default.
+  //  Careful: a "local" MCP server executes a command on the pod;
+  //  a "remote" one sends context outside the platform.
+  //  Enable only knowingly (confidentiality of Insee data).
+  // =========================================================================
+  "mcp": {
+    "excalidraw": {
+      "type": "remote",
+      "url": "https://api.excalidraw.com/api/v1/mcp",
+      "enabled": false,
+      "headers": {
+        "Authorization": "Bearer {env:EXCALIDRAW_API_KEY}"
+      }
+    },
+    "datagouv": {
+      "type": "remote",
+      "url": "https://mcp.data.gouv.fr/mcp",
+      "enabled": false
+    }
+  },
+  "autoupdate": "notify"
+}

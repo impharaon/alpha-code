@@ -1,0 +1,242 @@
+{
+    "$schema": "https://opencode.ai/config.json",
+    "experimental": {
+        "mcp_timeout": 120000
+    },
+    "provider": {
+        "ollama": {
+            "models": {
+                "qwen3:8b": {
+                    "attachment": true,
+                    "reasoning": true,
+                    "temperature": true,
+                    "tool_call": true,
+                    "options": {
+                        "temperature": 0.2,
+                        "num_ctx": 40960
+                    },
+                    "limit": {
+                        "context": 40960,
+                        "output": 8192
+                    },
+                    "name": "qwen3:8b"
+                },
+                "qwen2.5-coder:14b": {
+                    "attachment": true,
+                    "reasoning": true,
+                    "temperature": true,
+                    "tool_call": true,
+                    "options": {
+                        "temperature": 0.2,
+                        "num_ctx": 8192
+                    },
+                    "limit": {
+                        "context": 8192,
+                        "output": 4096
+                    },
+                    "name": "qwen2.5-coder:14b"
+                },
+                "qwen3-coder": {
+                    "attachment": true,
+                    "reasoning": true,
+                    "temperature": true,
+                    "tool_call": true,
+                    "options": {
+                        "temperature": 0.2,
+                        "num_ctx": 81920
+                    },
+                    "limit": {
+                        "context": 81920,
+                        "output": 16384
+                    },
+                    "name": "qwen3-coder"
+                }
+            },
+            "name": "Ollama (local)",
+            "npm": "@ai-sdk/openai-compatible",
+            "options": {
+                "baseURL": "http://127.0.0.1:11434/v1"
+            }
+        },
+        "openrouter": {
+            "options": {
+                "apiKey": "{env:OPENROUTER_KEY}"
+            }
+        },
+        "openrouter-compatible": {
+            "name": "OpenRouter Compatible",
+            "npm": "@ai-sdk/openai-compatible",
+            "options": {
+                "baseURL": "https://openrouter.ai/api/v1",
+                "apiKey": "{env:OPENROUTER_KEY}"
+            },
+            "models": {
+                // the opencode built-in openrouter anthropic models doesn't have variant toggle (ctrl-t), making me unable to turn the thinking mode on, this is to fix them:
+                "anthropic/claude-haiku-4.5": {
+                    "id": "anthropic/claude-haiku-4.5",
+                    "name": "Claude Haiku 4.5 Thinking",
+                    "reasoning": true,
+                    "limit": {
+                        "context": 1000000,
+                        "output": 64000
+                    },
+                    "options": {
+                        "thinking": {
+                            "type": "enabled",
+                            "budgetTokens": 16000
+                        },
+                    },
+                    "cost": {
+                        "input": 1.0,
+                        "output": 5.0
+                    }
+                },
+                "anthropic/claude-sonnet-4.6": {
+                    "id": "anthropic/claude-sonnet-4.6",
+                    "name": "Claude Sonnet 4.6 Thinking",
+                    "reasoning": true,
+                    "limit": {
+                        "context": 1000000,
+                        "output": 128000
+                    },
+                    "options": {
+                        "thinking": {
+                            "type": "enabled",
+                            "budgetTokens": 16000
+                        },
+                    },
+                    "cost": {
+                        "input": 3.0,
+                        "output": 15.0
+                    }
+                },
+                "anthropic/claude-opus-4.6": {
+                    "id": "anthropic/claude-opus-4.6",
+                    "name": "Claude Opus 4.6 Thinking",
+                    "reasoning": true,
+                    "limit": {
+                        "context": 1000000,
+                        "output": 128000
+                    },
+                    "options": {
+                        "thinking": {
+                            "type": "enabled",
+                            "budgetTokens": 16000
+                        },
+                    },
+                    "cost": {
+                        "input": 5.0,
+                        "output": 25.0
+                    }
+                },
+            },
+        },
+        "deepseek": {
+            "options": {
+                "apiKey": "{env:DEEPSEEK_API_KEY}"
+            }
+        },
+        "zhipuai-coding-plan": {
+            "options": {
+                "apiKey": "{env:Z_AI_API_KEY}"
+            }
+        }
+    },
+    "model": "zhipuai-coding-plan/glm-5.1",
+    // "model": "deepseek/deepseek-reasoner",
+    // "model": "openrouter-compatible/anthropic/claude-sonnet-4.6",
+    "small_model": "zhipuai-coding-plan/glm-4.5-air",
+    "default_agent": "build",
+    "mcp": {
+        "zai-mcp-server": {
+            "type": "local",
+            "command": [
+                "npx",
+                "-y",
+                "@z_ai/mcp-server"
+            ],
+            "environment": {
+                "Z_AI_MODE": "ZHIPU",
+                "Z_AI_API_KEY": "{env:Z_AI_API_KEY}"
+            },
+            "enabled": false,
+        },
+        "web-search-prime": {
+            "type": "remote",
+            "url": "https://open.bigmodel.cn/api/mcp/web_search_prime/mcp",
+            "headers": {
+                "Authorization": "Bearer {env:Z_AI_API_KEY}"
+            },
+            "enabled": true,
+        },
+        "web-reader": {
+            "type": "remote",
+            "url": "https://open.bigmodel.cn/api/mcp/web_reader/mcp",
+            "headers": {
+                "Authorization": "Bearer {env:Z_AI_API_KEY}"
+            },
+            "enabled": true,
+        },
+        "zread": {
+            "type": "remote",
+            "url": "https://open.bigmodel.cn/api/mcp/zread/mcp",
+            "headers": {
+                "Authorization": "Bearer {env:Z_AI_API_KEY}"
+            },
+            "enabled": false,
+        },
+        "playwright": {
+            "type": "local",
+            "command": [
+                "npx",
+                "@playwright/mcp@latest"
+            ],
+            "enabled": false,
+        },
+        "context7": {
+            "type": "local",
+            "command": [
+                "npx",
+                "-y",
+                "@upstash/context7-mcp",
+                "--api-key",
+                "{env:CONTEXT7_API_KEY}"
+            ],
+            "enabled": true,
+        },
+        "chrome-devtools": {
+            "type": "local",
+            "command": [
+                "npx",
+                "-y",
+                "chrome-devtools-mcp@latest",
+                "--no-usage-statistics",
+                "--headless", "true"
+            ],
+            "enabled": false
+        },
+        "grep": {
+            "type": "remote",
+            "url": "https://mcp.grep.app",
+            "enabled": true,
+        }
+    },
+    "permission": {
+        "external_directory": {
+            "*": "ask",
+            "~/.config/opencode/skills/*": "allow",
+            "/tmp/*": "allow",
+        }
+    },
+    "formatter": {
+        "stylua": {
+            "command": ["stylua", "-", "$FILE"],
+            "extensions": [".lua"]
+        }
+    },
+    "plugin": [
+        "@franlol/opencode-md-table-formatter@0.0.3",
+        "opencode-pty@0.2.1",
+        "@mohak34/opencode-notifier@0.1.19"
+    ]
+}

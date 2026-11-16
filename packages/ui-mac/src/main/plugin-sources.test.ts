@@ -1,4 +1,8 @@
 import { expect, test } from "bun:test"
+import { mkdtemp, rm, cp, readFile, stat } from "node:fs/promises"
+import { tmpdir } from "node:os"
+import opencode from "../../test-fixtures/plugin-helper/opencode/provenance.json"
+import npm from "../../test-fixtures/plugin-helper/opencode/npm/provenance.json"
 import { gunzipSync, gzipSync } from "node:zlib"
 import { join } from "node:path"
 import catalog from "../renderer/extensions/codepuppy-catalog.json"
@@ -18,6 +22,14 @@ async function fixtureFetch(url: string | URL | Request): Promise<Response> {
   if (address === "https://codeload.github.com/openai/plugins/tar.gz/refs/heads/main") return new Response(await Bun.file(join(fixtureRoot, "codex/selection.tar.gz")).bytes())
   if (address.startsWith("https://registry.modelcontextprotocol.io/v0.1/servers?")) return new Response(await Bun.file(join(fixtureRoot, "registry", address.includes("search=io.github.github%2Fgithub-mcp-server") ? "github-registry-search.json" : "empty-search.json")).bytes())
   if (address === "https://registry.modelcontextprotocol.io/v0.1/servers/io.github.github%2Fgithub-mcp-server/versions/2.1.0") return new Response(await Bun.file(join(fixtureRoot, "registry/github-registry-version.json")).bytes())
+  if (address.startsWith("https://registry.npmjs.org/-/v1/search?")) {
+    const page = await Bun.file(join(fixtureRoot, "opencode/npm", address.includes("text=skills") ? "search.json" : "empty-search.json")).json()
+    // Scope the recorded index to these actual objects for skills; control other queries as no-match records.
+    return Response.json({ ...page, objects: address.includes("text=skills") ? page.objects : [], total: address.includes("text=skills") ? page.objects.length : 0 })
+  }
+  if (address === "https://registry.npmjs.org/opencode-skills-hub/0.0.5") return new Response(await Bun.file(join(fixtureRoot, "opencode/npm/metadata.json")).bytes())
+  if (address === npm.tarballUrl) return new Response(await Bun.file(join(fixtureRoot, "opencode/npm/package.tgz")).bytes())
+  for (const tree of opencode.trees) if (address === "https://codeload.github.com/" + tree.repository.slice("https://github.com/".length) + "/tar.gz/" + tree.commit) return new Response(await Bun.file(join(fixtureRoot, "opencode", tree.root, tree.archive.path)).bytes())
   throw new Error(`unexpected fixture URL: ${address}`)
 }
 
@@ -59,7 +71,7 @@ test("successful index and pinned archive bytes are reused within the applicatio
   const one = await sources.captureCandidate(id)
   const two = await sources.captureCandidate(id)
   expect(one.ok && two.ok && one.capture === two.capture).toBe(true)
-  expect(requests).toHaveLength(4)
+  expect(requests).toHaveLength(5)
   expect(requests.every((url) => !url.includes("api.github.com"))).toBe(true)
 })
 
@@ -71,7 +83,7 @@ test("failed sources are truthful and not cached as no results", async () => {
   expect(failed.candidates).toEqual([])
   const retried = await sources.searchSources("playwright")
   expect(retried.candidates).toHaveLength(1)
-  expect(calls).toBe(4)
+  expect(calls).toBe(5)
 })
 
 test("invalid index is a format failure and unknown candidate cannot start a download", async () => {
@@ -109,7 +121,7 @@ test("non-GitHub and command sources are counted but never minted as installable
 test("Codex local entry captures only its pinned subtree and rechecks marketplace membership", async () => {
   const sources = (await sourcesModule()).createPluginSources({ catalog: async () => [], fetch: fixtureFetch })
   const result = await sources.searchSources("figma")
-  expect(result.sources.map((source) => source.source)).toEqual(["catalog", "claude-marketplace", "codex-marketplace", "mcp-registry"])
+  expect(result.sources.map((source) => source.source)).toEqual(["catalog", "claude-marketplace", "codex-marketplace", "opencode-npm", "mcp-registry"])
   expect(result.sources[2]).toMatchObject({ status: "ok", matched: 1, skipped: 0 })
   const candidate = result.candidates.find((entry) => entry.source === "codex-marketplace")!
   expect(candidate).toMatchObject({ name: "figma", upstream: { repository: codex.repository, path: "plugins/figma" } })
@@ -200,4 +212,62 @@ test("registry version changes fail capture without replacing the selected ident
   const candidate = result.candidates.find((entry) => entry.source === "mcp-registry")!
   expect(await sources.captureCandidate(candidate.id)).toMatchObject({ ok: false, code: "source-changed" })
   expect(candidate.upstream.version).toBe("2.1.0")
+})
+
+test("native-only npm exposes no runnable entry for the nothing-runnable result", async () => {
+  const sources = (await sourcesModule()).createPluginSources({ catalog: async () => [], fetch: fixtureFetch })
+  const result = await sources.searchSources("skills")
+  expect(result.sources.map((source) => source.source)).toEqual(["catalog", "claude-marketplace", "codex-marketplace", "opencode-npm", "mcp-registry"])
+  const candidate = result.candidates.find((entry) => entry.upstream.npm === npm.name)!
+  expect(candidate).toMatchObject({ source: "opencode-npm", upstream: { npm: npm.name, version: npm.version } })
+  const captured = await sources.captureCandidate(candidate.id)
+  expect(captured.ok).toBe(true)
+  if (!captured.ok) throw new Error(captured.code)
+  const metadata = await Bun.file(join(fixtureRoot, "opencode/npm/metadata.json")).json()
+  expect(captured.capture.source).toMatchObject({ kind: "npm", ecosystem: "opencode", version: npm.version, integrity: metadata.dist.integrity })
+  const converted = await (await import("../shared/host-extension-package-contract/plugin-conversion.mjs")).convertPluginTree(captured.capture)
+  expect(converted.package.entries).toEqual([])
+  expect(converted.package.diagnostics.filter((diagnostic) => diagnostic.code === "native-js-plugin")).toMatchObject([{ path: "dist/index.js", sourceName: npm.name }])
+  expect(converted.package.version).toBe(npm.version)
+})
+
+test("folder and pinned Git captures preserve equal OpenCode entries and original bytes", async () => {
+  const root = await mkdtemp(join(tmpdir(), "helper-folder-"))
+  try {
+    const tree = opencode.trees.find((tree) => tree.root === "superpowers")!
+    for (const file of tree.files) await cp(join(fixtureRoot, "opencode/superpowers", file.path), join(root, file.path), { recursive: true }).catch(async () => {
+      const { mkdir } = await import("node:fs/promises")
+      await mkdir(join(root, file.path, ".."), { recursive: true })
+      await cp(join(fixtureRoot, "opencode/superpowers", file.path), join(root, file.path))
+    })
+    const before = await Promise.all(tree.files.map((file) => readFile(join(root, file.path))))
+    const sources = (await sourcesModule()).createPluginSources({ catalog: async () => [], fetch: fixtureFetch })
+    const folder = await sources.captureFolder(root)
+    const git = await sources.captureGit(tree.repository, tree.commit)
+    expect(git.source.commit).toBe(tree.commit)
+    const convert = (await import("../shared/host-extension-package-contract/plugin-conversion.mjs")).convertPluginTree
+    expect((await convert(folder)).package.entries).toEqual((await convert(git)).package.entries)
+    expect((await convert(folder)).package.diagnostics).toEqual((await convert(git)).package.diagnostics)
+    expect(folder.nodes.filter((node) => node.kind === "file")).toHaveLength(tree.files.length)
+    expect(await Promise.all(tree.files.map((file) => readFile(join(root, file.path))))).toEqual(before)
+    expect((await stat(root)).isDirectory()).toBe(true)
+  } finally { await rm(root, { recursive: true, force: true }) }
+})
+
+test("npm integrity mismatch is source-unreachable and failed queries retry", async () => {
+  let attempts = 0
+  const sources = (await sourcesModule()).createPluginSources({ catalog: async () => [], fetch: async (url) => {
+    if (url.includes("/-/v1/search?") && ++attempts === 1) return new Response("unavailable", { status: 503 })
+    if (url === npm.tarballUrl) {
+      const bytes = await Bun.file(join(fixtureRoot, "opencode/npm/package.tgz")).bytes()
+      bytes[100] = bytes[100]! ^ 1
+      return new Response(bytes)
+    }
+    return fixtureFetch(url)
+  } })
+  expect((await sources.searchSources("skills")).sources.find((source) => source.source === "opencode-npm")).toMatchObject({ status: "failed", reason: "http" })
+  const result = await sources.searchSources("skills")
+  const candidate = result.candidates.find((entry) => entry.upstream.npm === npm.name)!
+  expect(await sources.captureCandidate(candidate.id)).toMatchObject({ ok: false, code: "source-unreachable" })
+  expect(attempts).toBe(2)
 })

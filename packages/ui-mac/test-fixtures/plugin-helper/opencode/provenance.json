@@ -1,0 +1,148 @@
+{
+  "trees": [
+    {
+      "root": "superpowers",
+      "repository": "https://github.com/obra/superpowers",
+      "commit": "22f0b463e7a5e579904dd6211a520321035526f7",
+      "fetchedAt": "2026-11-16",
+      "originalArchiveSha256": "fbb262b662873eca70bfc4152c688852e97f93c811e9635d490453941fecad05",
+      "archive": {
+        "path": "selection.tar.gz",
+        "sha256": "3cf233b38160528292dbc0c12ced7c5be2a409e6b65ae1c5ca56eea1f96d8608",
+        "note": "Mechanical selection of real file bytes, ancestor directories and original modes; global pax commit retained."
+      },
+      "files": [
+        {
+          "path": ".opencode/plugins/superpowers.js",
+          "bytes": 19346,
+          "mode": 436,
+          "sha256": "e0a696ca06f0b05f9e76734ea302f0796fe747d6a79fe4910e34462822723043"
+        },
+        {
+          "path": "skills/using-superpowers/SKILL.md",
+          "bytes": 3192,
+          "mode": 436,
+          "sha256": "82c5c8866ad7f5dd4440ce66bd7806ba48a2f13771beae5cf112e53f08fe36ba"
+        }
+      ]
+    },
+    {
+      "root": "onyxia",
+      "repository": "https://github.com/InseeFrLab/opencode-onyxia",
+      "commit": "bb5996565f7198c22dfe16acc0adfde98877d3e6",
+      "fetchedAt": "2026-11-16",
+      "originalArchiveSha256": "417ee4da62b3e6d0c1bc62d5fffe97d303eba827557e506a48ea042601929142",
+      "archive": {
+        "path": "selection.tar.gz",
+        "sha256": "52a7fb268ed8e2f31b6f0f2dafe03fe27c49a6dd2b4479f429c7bf72d9e8a89c",
+        "note": "Mechanical selection of real file bytes, ancestor directories and original modes; global pax commit retained."
+      },
+      "files": [
+        {
+          "path": ".opencode/skills/argo-mlops/SKILL.md",
+          "bytes": 2765,
+          "mode": 436,
+          "sha256": "30ddc49bfbbf09d8547481c1d9fe77a0c1e9d217e9eba1b43eea3bb46b973b89"
+        },
+        {
+          "path": ".opencode/skills/data-validation/SKILL.md",
+          "bytes": 3684,
+          "mode": 436,
+          "sha256": "e07fcdbda15ec0b9389f0b492b2d6e4e601cf99cd005449ccbde429b6162c8f7"
+        },
+        {
+          "path": ".opencode/skills/eda-duckdb/SKILL.md",
+          "bytes": 4376,
+          "mode": 436,
+          "sha256": "1281ef9a49294b791685cec9ce0465549612cbe66df10c746cb124a4b03809cf"
+        },
+        {
+          "path": ".opencode/skills/geodata/SKILL.md",
+          "bytes": 4567,
+          "mode": 436,
+          "sha256": "eab40983ab0e861127443df4b78d172a154e061af2918498f4e27b6fa31f334d"
+        },
+        {
+          "path": ".opencode/skills/git-workflow-ds/SKILL.md",
+          "bytes": 3305,
+          "mode": 436,
+          "sha256": "f073bf5868ed91c183b78178f5b61082092e15e902373c7af97ec874e832ceff"
+        },
+        {
+          "path": ".opencode/skills/insee-public-data/SKILL.md",
+          "bytes": 7630,
+          "mode": 436,
+          "sha256": "fe71dcc2b56b9c6dacfc68414840b0864b931098a110fb494a30c35e54dc4320"
+        },
+        {
+          "path": ".opencode/skills/mlflow-tracking/SKILL.md",
+          "bytes": 2268,
+          "mode": 436,
+          "sha256": "b728a448fda294b03b434b37ccd8e8dd2325f554fde0b5682f5ba593b5958ef0"
+        },
+        {
+          "path": ".opencode/skills/onyxia-diagnostics/SKILL.md",
+          "bytes": 4794,
+          "mode": 436,
+          "sha256": "a0f02a4de564ddeaad1c092601ac4a5dafc1cd0802b7229fb6291a92a16a73b8"
+        },
+        {
+          "path": ".opencode/skills/onyxia-reproducibility/SKILL.md",
+          "bytes": 3014,
+          "mode": 436,
+          "sha256": "58dbb9b4b6bd7d77ad4112c0fb1728589fa65074b2990cad82cea13420d4fbf2"
+        },
+        {
+          "path": ".opencode/skills/onyxia-security-audit/SKILL.md",
+          "bytes": 5430,
+          "mode": 436,
+          "sha256": "8eef1a5dd3b0641075ea448c638f2449e293f2d77f8129dfb07f2e555b89aaaa"
+        },
+        {
+          "path": ".opencode/skills/onyxia-storage-s3/SKILL.md",
+          "bytes": 2902,
+          "mode": 436,
+          "sha256": "41fcf9338319e00faa713f7ac4b0d5d487426016d1ac2603e29c7edcdcf4646f"
+        },
+        {
+          "path": ".opencode/skills/python-datascience/SKILL.md",
+          "bytes": 2293,
+          "mode": 436,
+          "sha256": "11c52e34792cf2fcad273eea512e6df767e896744d1802afc2b2f6bf90542b10"
+        },
+        {
+          "path": ".opencode/skills/quarto-publication/SKILL.md",
+          "bytes": 2616,
+          "mode": 436,
+          "sha256": "6622e5ef54295acae19939228602bd03f8407b44afd501f8921da77d40cd1a61"
+        },
+        {
+          "path": ".opencode/skills/r-datascience/SKILL.md",
+          "bytes": 4032,
+          "mode": 436,
+          "sha256": "08649aad16c0fca915af53efb705b0733d66c666aabe67ce45a949dc596dd1a7"
+        },
+        {
+          "path": ".opencode/skills/vault-secrets-onyxia/SKILL.md",
+          "bytes": 3146,
+          "mode": 436,
+          "sha256": "e4a420d790bace6b00e52b3038230b31cda496d8af685844435571ebc996cc37"
+        },
+        {
+          "path": "opencode.jsonc",
+          "bytes": 16585,
+          "mode": 436,
+          "sha256": "bd2e8a4647da112e974c4f5f1f455e21533145486322ffc566d9f959fbd4bedd"
+        }
+      ]
+    }
+  ],
+  "localConfig": {
+    "repository": "https://github.com/archibate/dotfiles-opencode",
+    "commit": "46b6b23087de595d20df792bb4cbd769d3dfe20f",
+    "path": "opencode.jsonc",
+    "fetchedAt": "2026-11-16",
+    "bytes": 7770,
+    "sha256": "2f62016f64c584be0f9da823ff05c3598626ec02db6b3936cbb586f8755ed138"
+  }
+}

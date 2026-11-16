@@ -320,6 +320,8 @@ export const dict = {
   "codepuppy.builtin.save": "Save & apply",
   "codepuppy.builtin.cancel": "Cancel",
   "codepuppy.ext.factoryBuiltin": "Built in",
+  "codepuppy.ext.pluginHelperName": "Plugin helper",
+  "codepuppy.ext.pluginHelperDescription": "Find and install plugins and MCP",
   "codepuppy.ext.createViaChatBody": "In any conversation, say “Help me create a skill” or “Help me create an assistant.” The built-in skill-creator and agent-creator will ask about your needs and create it. It is available from the next message in the current conversation.",
   "codepuppy.ext.heroSub": "Choose extensions that help your assistant do more. These extensions have passed a security review; see their details for components and sources.",
   // ── #397 PR-B:四级货架与策展呈现(v6 已批稿词汇表;用户语言,零开发术语)──

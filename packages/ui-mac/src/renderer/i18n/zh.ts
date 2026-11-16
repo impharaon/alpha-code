@@ -310,6 +310,8 @@ export const dict = {
   "codepuppy.builtin.save": "保存并生效",
   "codepuppy.builtin.cancel": "取消",
   "codepuppy.ext.factoryBuiltin": "出厂内置",
+  "codepuppy.ext.pluginHelperName": "插件助手",
+  "codepuppy.ext.pluginHelperDescription": "查找并安装插件和 MCP",
   "codepuppy.ext.createViaChatBody": "在任意会话中说「帮我创建一个技能」或「帮我创建一个助手」。应用自带的 skill-creator 和 agent-creator 会询问你的需求并创建内容。完成后，当前会话的下一条消息就能使用。",
   "codepuppy.ext.heroSub": "选择适合你的扩展，让助手完成更多任务。这里的扩展已通过安全审核，详情中可查看组件和来源。",
   // ── #397 PR-B:四级货架与策展呈现(v6 已批稿词汇表;用户语言,零开发术语)──

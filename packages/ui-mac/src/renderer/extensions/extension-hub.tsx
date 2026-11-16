@@ -1543,9 +1543,9 @@ export function ExtensionHub(props: {
         </span>
         <div class="codepuppy-ext-kit-body">
           <div class="codepuppy-ext-kit-ttl">
-            <b title={cp.name}>{entry()?.displayName ?? cp.name}</b>
+            <b title={cp.name}>{entry()?.displayName ?? (cp.name === "plugin-helper" ? t("codepuppy.ext.pluginHelperName") : cp.name)}</b>
           </div>
-          <div class="codepuppy-ext-kit-desc">{entry() ? catalogDescription(entry()!) : t("codepuppy.ext.factoryBuiltin")}</div>
+          <div class="codepuppy-ext-kit-desc">{entry() ? catalogDescription(entry()!) : t(cp.name === "plugin-helper" ? "codepuppy.ext.pluginHelperDescription" : "codepuppy.ext.factoryBuiltin")}</div>
         </div>
         <Show when={entry()}>
           {(e) => <MoreMenu id={`factory:${cp.name}`} items={[{ key: "settings", label: t("codepuppy.ext.rowSetup"), onSelect: () => openEntryDetail(e()) }]} />}

@@ -265,6 +265,7 @@ export function hubToolActionOf(part: ToolPart): "search" | "install" | undefine
   if (snapshot?.identity.source !== "plugin" || snapshot.authority.kind !== "codepuppy-bundled") return
   if (snapshot.identity.name === "codepuppy_hub_search" && snapshot.readable === "codepuppy:hub_search") return "search"
   if (snapshot.identity.name === "codepuppy_hub_install" && snapshot.readable === "codepuppy:hub_install") return "install"
+  if (snapshot.identity.name === "codepuppy_hub_create" && snapshot.readable === "codepuppy:hub_create") return "install"
 }
 
 // ── #1576 来源三类 × 执行位置(只从持久化快照派生) ─────────────────────────

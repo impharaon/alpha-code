@@ -1318,23 +1318,34 @@ export function setDesiredStateV2(
   state: DesiredState,
   publishFinal?: SkillsFinalPublish,
 ): { ok: true; projectionLag?: string } | { ok: false; reason: string } {
+  return setDesiredStatesV2(root, [{ kind, name, state }], publishFinal)
+}
+
+/** One ledger write and one skill projection for an entire package state action. */
+export function setDesiredStatesV2(
+  root: string,
+  updates: Array<{ kind: InstallReceiptType; name: string; state: DesiredState }>,
+  publishFinal?: SkillsFinalPublish,
+): { ok: true; projectionLag?: string } | { ok: false; reason: string } {
   const { parsed, readError } = parseLedger(root)
   if (readError) return { ok: false, reason: `${readError} — refusing to write` }
-  const k = key(kind, name)
-  // r18:与 upsert/remove 同款损坏闸 —— 同 key 损坏所有权不明、unattributable 无从自证,
-  // desiredState 翻转同为写路径,一律拒(原文保全依旧带回,见下方重建)。
-  if (parsed.corruptRecords.corruptKeys.has(k))
-    return { ok: false, reason: `refusing to set desired state for ${k}: ledger holds a corrupt v2 record for this key (fail closed — inspect ${ledgerPath(root)})` }
-  if (parsed.corruptRecords.unattributable)
-    return { ok: false, reason: `refusing to set desired state for ${k}: ledger holds an unattributable corrupt v2 record (fail closed — inspect ${ledgerPath(root)})` }
-  const rec = parsed.records.find((r) => key(r.kind, r.name) === k)
-  if (!rec) return { ok: false, reason: `no v2 record for ${k} — fail closed (v1-only installs have no desired-state channel)` }
-  const next: InstallRecordV2 = { ...rec, desiredState: state, updatedAt: new Date().toISOString() }
-  // Bundle 只拥有**安装** claim,不拥有用户的启停 —— desiredState 翻转对 V3 段是纯透传。
+  const states = new Map(updates.map((update) => [key(update.kind, update.name), update.state]))
+  for (const k of states.keys()) {
+    if (parsed.corruptRecords.corruptKeys.has(k))
+      return { ok: false, reason: `refusing to set desired state for ${k}: ledger holds a corrupt v2 record for this key (fail closed — inspect ${ledgerPath(root)})` }
+    if (parsed.corruptRecords.unattributable)
+      return { ok: false, reason: `refusing to set desired state for ${k}: ledger holds an unattributable corrupt v2 record (fail closed — inspect ${ledgerPath(root)})` }
+    if (!parsed.records.some((record) => key(record.kind, record.name) === k))
+      return { ok: false, reason: `no v2 record for ${k} — fail closed (v1-only installs have no desired-state channel)` }
+  }
+  const updatedAt = new Date().toISOString()
   const written = writeLedgerFile(
     root,
     [...parsed.receipts, ...parsed.rawInvalidReceipts],
-    [...parsed.records.filter((r) => key(r.kind, r.name) !== k), next, ...parsed.rawCorruptRecords],
+    [...parsed.records.map((record) => {
+      const desiredState = states.get(key(record.kind, record.name))
+      return desiredState ? { ...record, desiredState, updatedAt } : record
+    }), ...parsed.rawCorruptRecords],
     { packageGraphs: parsed.packageGraphs, claims: parsed.claims },
     publishFinal,
   )

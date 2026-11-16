@@ -63,6 +63,9 @@ function makeHarness(admit: boolean) {
       return { ok: true as const, via: key }
     }
   const bodies: WriteChannelBodies = {
+    installPackage: body("installPackage"),
+    setPackageState: body("setPackageState"),
+    savePackageSecrets: body("savePackageSecrets"),
     installCatalog: body("installCatalog"),
     uninstallV2: body("uninstallV2"),
     // `#698`:整包卸载。**必须逐条列在下面三处枚举里** —— `WriteChannelBodies` 是编译期类型,
@@ -102,6 +105,9 @@ describe("GATED_WRITE_CHANNELS — 表完整性", () => {
   test("写表内容逐名钉死:preview / cancel / 列表三条纯读通道**不在**表内", () => {
     expect(Object.values(GATED_WRITE_CHANNELS)).toEqual([
       "ext-install-catalog",
+      "ext-install-package",
+      "ext-set-package-state",
+      "ext-save-package-secrets",
       "ext-uninstall-v2",
       "ext-uninstall-package",
       "ext-rollback",
@@ -155,7 +161,7 @@ describe("GATED_WRITE_CHANNELS — 表完整性", () => {
 })
 
 describe("逐通道:gate 先行、root 正确、拒绝短路、实参透传", () => {
-  test("放行:全部 13 通道 body 收到原实参,gate 收到该通道的解析 root", async () => {
+  test("放行:全部 16 通道 body 收到原实参,gate 收到该通道的解析 root", async () => {
     const h = makeHarness(true)
     const w = buildGatedWriteChannels(h)
     await w.installCatalog({ catalogId: "mcp:demo", scope: { scope: "project", projectDir: "/p" } })
@@ -171,6 +177,9 @@ describe("逐通道:gate 先行、root 正确、拒绝短路、实参透传", ()
     await w.importSkillFolder("/picked/dir", { scope: "project", projectDir: "/p" })
     await w.importSkillGit("https://x.git", undefined)
     await w.reloadRequest({ scope: "global", items: [], reason: "x" })
+    await w.installPackage("package:supabase")
+    await w.setPackageState({ packageId: "package:supabase", state: "disabled" })
+    await w.savePackageSecrets({ packageId: "package:github", secrets: {} })
     expect(h.bodyLog.map((b) => b.key)).toEqual([
       "installCatalog",
       "uninstallV2",
@@ -185,9 +194,13 @@ describe("逐通道:gate 先行、root 正确、拒绝短路、实参透传", ()
       "importSkillFolder",
       "importSkillGit",
       "reloadRequest",
+      "installPackage",
+      "setPackageState",
+      "savePackageSecrets",
     ])
     // root 断言:global 面 / intent 定根 / 项目面 / 导入 target 定根
-    expect(h.gateLog).toEqual([PROJECT, PROJECT, GLOBAL, GLOBAL, PROJECT, PROJECT, GLOBAL, GLOBAL, GLOBAL, GLOBAL, PROJECT, GLOBAL, GLOBAL])
+    expect(h.gateLog).toEqual([PROJECT, PROJECT, GLOBAL, GLOBAL, PROJECT, PROJECT, GLOBAL, GLOBAL, GLOBAL, GLOBAL, PROJECT, GLOBAL, GLOBAL, GLOBAL, GLOBAL, GLOBAL])
+    expect(h.bodyLog.slice(13).map((entry) => entry.args)).toEqual([["package:supabase"], [{ packageId: "package:supabase", state: "disabled" }], [{ packageId: "package:github", secrets: {} }]])
     // 实参透传抽查
     expect(h.bodyLog[7]?.args).toEqual(["m", { type: "local" }, ["K"]])
     expect(h.bodyLog[3]?.args).toEqual([{ type: "skill" }, "gen-000001-abcdef12"])
@@ -198,7 +211,7 @@ describe("逐通道:gate 先行、root 正确、拒绝短路、实参透传", ()
     expect(h.bodyLog[9]?.args).toEqual(["local-preview-1"])
   })
 
-  test("gate 拒绝:全部 13 通道 body 零调用,拒因原样返回", async () => {
+  test("gate 拒绝:全部 16 通道 body 零调用,拒因原样返回", async () => {
     const h = makeHarness(false)
     const w = buildGatedWriteChannels(h)
     const results = await Promise.all([
@@ -215,9 +228,12 @@ describe("逐通道:gate 先行、root 正确、拒绝短路、实参透传", ()
       w.importSkillFolder("/d", undefined),
       w.importSkillGit("u", undefined),
       w.reloadRequest({ scope: { directory: "/p" }, items: [], reason: "x" }),
+      w.installPackage("package:supabase"),
+      w.setPackageState({ packageId: "package:supabase", state: "disabled" }),
+      w.savePackageSecrets({ packageId: "package:github", secrets: {} }),
     ])
     expect(h.bodyLog).toEqual([])
-    expect(h.gateLog).toHaveLength(13)
+    expect(h.gateLog).toHaveLength(16)
     for (const r of results) expect(r).toEqual({ ok: false, reason: "gate refused" })
   })
 

@@ -654,6 +654,8 @@ async function authenticateMcp(context: TranslatorContext<"POST /mcp/:name/auth/
   for (;;) {
     if (outcome === "complete") await poll()
     const server = (await context.api.mcp.list(at(context))).data.find((item) => item.name === name)
+    if (outcome !== "complete" && server?.status.status === "disabled")
+      return context.reply({ status: "failed", error: outcome })
     if (outcome !== "complete" || server?.status.status !== "pending")
       return context.reply(server ? v1McpStatus(server.status) : { status: "failed", error: outcome })
   }

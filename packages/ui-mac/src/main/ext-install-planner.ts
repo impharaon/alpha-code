@@ -163,6 +163,7 @@ import {
   releaseStandaloneClaim,
   removeRecordV2,
   setDesiredStateV2,
+  setDesiredStatesV2,
   probeLedgerForWrite,
   readLedgerV2,
   readPackageLedgerStateV1,
@@ -2852,6 +2853,70 @@ export type SetStateIntent = UninstallIntent & {
   /** #397:curated 条目复审过期(排他截止)后的 enable 显式确认位(合同 §7.2:新启用需
    *  显式确认并展示过期事实)。renderer 在用户确认对话后重发意图携带 true。 */
   confirmExpiredReview?: boolean
+}
+
+/** Package identity is the only caller-controlled key; graph/root own the component set. */
+export async function setPackageStateV1(
+  input: unknown,
+  deps: Pick<PlannerDeps, "globalRoot" | "advisoryGate" | "resolvePackage">,
+): Promise<{ ok: true; warning?: string } | { ok: false; reason: string }> {
+  if (!isObj(input) || Object.keys(input).some((key) => key !== "packageId" && key !== "state") ||
+    typeof input.packageId !== "string" || (input.state !== "enabled" && input.state !== "disabled"))
+    return { ok: false, reason: "invalid package state action" }
+  const state = input.state
+  const root = deps.globalRoot()
+  const before = readPackageLedgerStateV1(root, { sideEffectFree: true })
+  if (!before.ok) return { ok: false, reason: "package installation state is unreadable" }
+  const graph = before.packageGraphs.find((entry) => entry.packageId === input.packageId)
+  if (!graph) return { ok: false, reason: "package is not installed" }
+  const rootRecord = before.records.find((record) => record.kind === graph.root.kind && record.name === graph.root.name)!
+  const verified = state === "enabled" && rootRecord.origin === "catalog"
+    ? await deps.resolvePackage(graph.packageId, rootRecord.version!) : undefined
+  const held = tryAcquireBundleLock(root, { txId: `package-state-${randomUUID()}` })
+  if (!held.ok) return held
+  try {
+    const current = readPackageLedgerStateV1(root, { sideEffectFree: true })
+    if (!current.ok) return { ok: false, reason: "package installation state is unreadable" }
+    if (current.packageGraphs.find((entry) => entry.packageId === graph.packageId)?.installedGraphDigest !== graph.installedGraphDigest)
+      return { ok: false, reason: "package changed while applying its state" }
+    const records = [graph.root, ...graph.children].map((node) => current.records.find((record) => record.kind === node.kind && record.name === node.name)!)
+    if (state === "enabled") for (const record of records) {
+      const advisory = deps.advisoryGate({ catalogId: record.id, name: record.name, payloadDigest: record.payloadDigest, provenance: record.origin === "catalog" ? "cache" : "bundled" })
+      if (!advisory.allowed) return { ok: false, reason: `advisory ${advisory.advisoryId}: ${advisory.reason}` }
+      if (record.origin === "catalog" && verified) {
+        const matched = verifyPackageCandidate(graph, verified, record)
+        if (!matched.ok) return matched
+      }
+    }
+    const target = path.join(root, "codepuppy.jsonc")
+    const text = fs.existsSync(target) ? fs.readFileSync(target, "utf8") : "{}"
+    const errors: ParseError[] = []
+    const config = parse(text, errors)
+    if (errors.length || !isObj(config)) return { ok: false, reason: "package config is not valid jsonc" }
+    const edits: ConfigEdit[] = []
+    const remoteNames = remoteMcpTruthNames()
+    for (const record of records) {
+      if (record.kind !== "mcp" && record.kind !== "agent" && record.kind !== "plugin") continue
+      const projection = computeEnableProjectionEdit(config, root, record, state, remoteNames)
+      if (!projection.ok) return projection
+      if (projection.edit) edits.push(projection.edit)
+    }
+    const prepared = prepareConfigTx(target, edits, text)
+    if (!prepared.ok) return prepared
+    const written = setDesiredStatesV2(root, records.map((record) => ({ kind: record.kind, name: record.name, state })))
+    if (!written.ok) return written
+    try {
+      if (edits.length) applyConfigImage(prepared.image)
+    } catch {
+      const restored = setDesiredStatesV2(root, records.map((record) => ({ kind: record.kind, name: record.name, state: record.desiredState })))
+      return { ok: false, reason: restored.ok ? "package config write failed; state unchanged" : `package config write failed; ${restored.reason}` }
+    }
+    return { ok: true, ...(written.projectionLag ? { warning: written.projectionLag } : {}) }
+  } catch {
+    return { ok: false, reason: "package config could not be read or applied" }
+  } finally {
+    held.lock.release()
+  }
 }
 
 /** 严格解码同卸载意图(key 面完全一致 + state 枚举);伪造 receipt/路径同样无通道。 */

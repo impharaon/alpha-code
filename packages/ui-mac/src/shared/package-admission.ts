@@ -5,6 +5,18 @@ import type {
   PackageSupportedComponentV1,
 } from "./host-extension-package-contract/decoder"
 
+/** Installed package account view: declarations and presence/status only, never secret references. */
+export type PackageAuthorizationItemV1 =
+  | { kind: "secret"; componentId: string; prerequisiteId: string; serviceName: string; label: string; saved: boolean }
+  | { kind: "mcp-oauth"; componentId: string; prerequisiteId: string; serviceName: string; label: string; authenticated: boolean; status: string }
+  | { kind: "connection"; componentId: string; prerequisiteId: string; serviceName: string; label: string; ready: boolean }
+
+export type PackageAuthorizationResultV1 =
+  | { ok: true; packageId: string; items: PackageAuthorizationItemV1[] }
+  | { ok: false; reason: string }
+
+export type PackageActionResultV1 = { ok: true; warning?: string; generation?: number } | { ok: false; reason: string }
+
 export type PackageAdmissionBindingV1 = {
   snapshotDigest: string
   envelopeDigest: string

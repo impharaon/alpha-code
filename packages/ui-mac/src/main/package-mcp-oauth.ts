@@ -15,6 +15,10 @@ import {
  * OpenCode 2", decision 3). There is no main-side attempt, listener or callback any more.
  */
 export type PackageMcpOauthEngineV1 = {
+  read(name: string): Promise<
+    | { ok: true; status: PackageMcpOauthEngineStatusV1 | "pending"; authenticated: boolean }
+    | { ok: false; reason: string }
+  >
   /**
    * `PUT /api/experimental/mcp/:server { config }`, then `GET /api/mcp` until this server is no
    * longer `pending`. Runtime state only, nothing durable (same meaning as v1's `POST /mcp`).
@@ -51,6 +55,21 @@ export function createPackageMcpOauthEngineV1(
   fetchImpl: typeof fetch = fetch,
 ): PackageMcpOauthEngineV1 {
   return {
+    read: async (name) => {
+      try {
+        const client = engineClient(await awaitServer(), fetchImpl)
+        const server = (await client.mcp.list()).data.find((entry) => entry.name === name)
+        if (!server) return { ok: false, reason: "engine lists no status for the service" }
+        const integration = server.integrationID ? (await client.integration.get({ integrationID: server.integrationID })).data : undefined
+        return {
+          ok: true,
+          status: server.status.status,
+          authenticated: integration?.connections.some((connection) => connection.type === "credential" && connection.method === "oauth" && !connection.status) ?? false,
+        }
+      } catch {
+        return { ok: false, reason: "connector account status is unavailable" }
+      }
+    },
     add: async (name, config) => {
       try {
         const client = engineClient(await awaitServer(), fetchImpl)

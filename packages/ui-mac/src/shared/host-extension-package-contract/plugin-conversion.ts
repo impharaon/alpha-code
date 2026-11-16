@@ -66,16 +66,15 @@ export class CaptureError extends Error {
 }
 
 export function readMarketplace(bytes: Uint8Array, ecosystem: "claude" | "codex"): { name: string; entries: MarketplaceEntry[]; diagnostics: Diagnostic[] } {
-  if (ecosystem !== "claude") throw new Error("marketplace provider is not implemented in slice A")
   const document: unknown = JSON.parse(decode(bytes))
   if (!object(document) || !Array.isArray(document.plugins)) throw new Error("invalid marketplace definition")
   const diagnostics: Diagnostic[] = []
   const entries = document.plugins.flatMap((entry, index): MarketplaceEntry[] => {
     if (!object(entry) || typeof entry.name !== "string" || !entry.name) {
-      diagnostics.push({ path: ".claude-plugin/marketplace.json", field: "plugins/" + index, code: "invalid-definition", message: "Marketplace entry has no name" })
+      diagnostics.push({ path: ecosystem === "codex" ? ".agents/plugins/marketplace.json" : ".claude-plugin/marketplace.json", field: "plugins/" + index, code: "invalid-definition", message: "Marketplace entry has no name" })
       return []
     }
-    return [{ name: entry.name, description: string(entry.description) ?? "", ...(typeof entry.category === "string" ? { category: entry.category } : {}), source: marketplaceSource(entry.source) }]
+    return [{ name: entry.name, description: string(entry.description) ?? "", ...(typeof entry.category === "string" ? { category: entry.category } : {}), source: marketplaceSource(ecosystem === "codex" && object(entry.source) && entry.source.source === "local" ? entry.source.path : entry.source) }]
   })
   return { name: string(document.name) ?? "", entries, diagnostics }
 }
@@ -106,8 +105,15 @@ export async function convertPluginTree(input: Capture): Promise<{ package: Plug
     documents.set(path, parsed)
     return parsed
   }
-  const manifestPath = ".claude-plugin/plugin.json"
+  const codex = input.source.ecosystem === "codex" || files.has(".codex-plugin/plugin.json") || (!files.has(".claude-plugin/plugin.json") && files.has("plugin.json"))
+  const manifestPath = codex ? files.has(".codex-plugin/plugin.json") ? ".codex-plugin/plugin.json" : "plugin.json" : ".claude-plugin/plugin.json"
   const manifest = files.has(manifestPath) ? json(manifestPath) : undefined
+  if (codex && files.has(".app.json")) {
+    const apps = json(".app.json")
+    if (object(apps?.apps)) for (const [name, app] of Object.entries(apps.apps)) {
+      if (object(app) && typeof app.id === "string") diagnostics.push({ path: ".app.json", field: "/apps/" + escapePointer(name), code: "unresolved-app-id", message: "An application identifier is not an MCP definition" })
+    }
+  }
   const entries: Entry[] = []
   const roots = ["skills", ...declaredPaths(manifest?.skills, manifestPath, "skills", diagnostics)]
   const skillFiles = [...files.keys()].filter((path) => path === "SKILL.md" || roots.some((root) => path.startsWith(root + "/") && path.endsWith("/SKILL.md")))
@@ -136,11 +142,12 @@ export async function convertPluginTree(input: Capture): Promise<{ package: Plug
     const definition = json(path)
     if (definition) addServers(path, definition, "")
   }
-  const winners = new Map(definitions.map((definition) => [definition.name, definition]))
+  const unique = [...new Map(definitions.map((definition) => [definition.path + "#" + definition.pointer, definition])).values()]
+  const winners = new Map(unique.map((definition) => [definition.name, definition]))
   const needs = new Map<string, SecretNeed>()
   const credentials = new Map<string, Uint8Array>()
   const changed = new Set<string>()
-  for (const definition of definitions) {
+  for (const definition of unique) {
     const winner = winners.get(definition.name)!
     const id = "mcp:" + winner.path + "#" + definition.name
     const text = (value: string, pointer: string, sensitive = false) => credentialText(value, {
@@ -158,7 +165,7 @@ export async function convertPluginTree(input: Capture): Promise<{ package: Plug
   })
   return {
     package: {
-      schema: "codepuppy.plugin-package.v1", provider: !manifest && files.has("SKILL.md") ? "skill" : "claude-code",
+      schema: "codepuppy.plugin-package.v1", provider: codex ? "codex" : !manifest && files.has("SKILL.md") ? "skill" : "claude-code",
       name: string(manifest?.name) ?? input.source.entryName ?? entries.find((entry) => entry.kind === "skill")?.sourceName ?? input.source.pluginPath?.split("/").at(-1) ?? "plugin",
       ...(typeof manifest?.version === "string" ? { version: manifest.version } : {}), ...(typeof manifest?.description === "string" ? { description: manifest.description } : {}),
       source: input.source, tree, treeDigest: sha256(new TextEncoder().encode(canonical(tree.toSorted((a, b) => a.path.localeCompare(b.path))))), entries, secrets: [...needs.values()], diagnostics,
@@ -209,18 +216,18 @@ function mcpEntry(definition: { name: string; path: string; pointer: string; val
   if (typeof value.url !== "string" || !value.url || (value.type !== undefined && value.type !== "http" && value.type !== "sse")) return
   if (value.headers !== undefined && !stringMap(value.headers)) return
   const headers = Object.fromEntries(Object.entries(stringMap(value.headers) ? value.headers : {}).map(([key, part]) => [key, text(part, definition.pointer + "/headers/" + escapePointer(key), /authorization|token|secret|api[_-]?key|cookie/i.test(key))]))
-  const oauth = value.oauth === false ? false : object(value.oauth) ? value.oauth : undefined
+  const oauth = object(value.oauth) ? value.oauth : undefined
   const login: LoginNeed = {
     id: "login_" + sha256(new TextEncoder().encode(id)).slice(7, 23), componentId: id, kind: "mcp-oauth", required: false, serviceId: definition.name, serverUrl: value.url,
-    ...(oauth ? { oauth: {
-      ...(typeof oauth.clientId === "string" ? { clientId: oauth.clientId } : {}),
-      ...(typeof oauth.clientSecret === "string" ? { clientSecret: text(oauth.clientSecret, definition.pointer + "/oauth/clientSecret", true) } : {}),
-      ...(Array.isArray(oauth.scopes) ? { scopes: strings(oauth.scopes) } : {}),
-      ...(typeof oauth.resource === "string" ? { resource: oauth.resource } : {}),
-      ...(typeof oauth.authorizationServerUrl === "string" ? { authorizationServerUrl: oauth.authorizationServerUrl } : {}),
+    ...(oauth || typeof value.oauth_resource === "string" ? { oauth: {
+      ...(typeof (oauth?.clientId ?? oauth?.client_id) === "string" ? { clientId: String(oauth?.clientId ?? oauth?.client_id) } : {}),
+      ...(typeof (oauth?.clientSecret ?? oauth?.client_secret) === "string" ? { clientSecret: text(String(oauth?.clientSecret ?? oauth?.client_secret), definition.pointer + (typeof oauth?.clientSecret === "string" ? "/oauth/clientSecret" : "/oauth/client_secret"), true) } : {}),
+      ...(Array.isArray(oauth?.scopes ?? value.scopes) ? { scopes: strings(oauth?.scopes ?? value.scopes) } : {}),
+      ...(typeof (oauth?.resource ?? value.oauth_resource) === "string" ? { resource: String(oauth?.resource ?? value.oauth_resource) } : {}),
+      ...(typeof oauth?.authorizationServerUrl === "string" ? { authorizationServerUrl: oauth.authorizationServerUrl } : {}),
     } } : {}),
   }
-  return { ...base, transport: value.type === "sse" ? "sse" : "http", url: bindings(value.url), headers, ...(oauth === false ? { oauth: false } : !Object.keys(headers).some((key) => /authorization|token|secret|api[_-]?key|cookie/i.test(key)) || oauth ? { oauth: login } : {}) }
+  return { ...base, transport: value.type === "sse" ? "sse" : "http", url: bindings(value.url), headers, ...(value.oauth === false ? { oauth: false } : !Object.keys(headers).some((key) => /authorization|token|secret|api[_-]?key|cookie/i.test(key)) || oauth ? { oauth: login } : {}) }
 }
 
 function credentialText(value: string, context: { componentId: string; file: string; pointer: string; sensitive: boolean; needs: Map<string, SecretNeed>; credentials: Map<string, Uint8Array>; replace(value: string): void }): Text {
@@ -255,7 +262,7 @@ function credentialText(value: string, context: { componentId: string; file: str
 
 function invocation(data: Record<string, unknown>): Invocation {
   return {
-    fork: data.context === "fork", userInvocable: data["user-invocable"] !== false, implicitInvocation: data["disable-model-invocation"] !== true,
+    fork: data.context === "fork", userInvocable: data["user-invocable"] !== false, implicitInvocation: data["disable-model-invocation"] !== true && data.allow_implicit_invocation !== false,
     allowedTools: toolRules(data["allowed-tools"]), deniedTools: toolRules(data["disallowed-tools"]),
     ...(data.tools === undefined ? {} : { availableTools: toolRules(data.tools) }),
     ...(typeof data.model === "string" ? { model: { alias: data.model } } : {}),

@@ -17,26 +17,31 @@ export type CandidateV1 = {
 }
 export type SourceSearchResultV1 = { searchId: string; query: string; sources: SourceStatusV1[]; candidates: CandidateV1[] }
 export const PLUGIN_SOURCE_ORDER: readonly PluginSourceIdV1[] = ["catalog", "claude-marketplace", "codex-marketplace", "opencode-npm", "mcp-registry"]
-const CLAUDE_REPOSITORY = "https://github.com/anthropics/claude-plugins-official"
-const CLAUDE_INDEX = "https://raw.githubusercontent.com/anthropics/claude-plugins-official/main/.claude-plugin/marketplace.json"
+const MARKETPLACES = [
+  { source: "claude-marketplace", ecosystem: "claude", repository: "https://github.com/anthropics/claude-plugins-official", manifest: ".claude-plugin/marketplace.json" },
+  { source: "codex-marketplace", ecosystem: "codex", repository: "https://github.com/openai/plugins", manifest: ".agents/plugins/marketplace.json" },
+] as const
 type Archive = { commit: string; members: Map<string, { node: TreeNode; bytes?: Uint8Array }> }
 
 /** One instance per main-process run; only this owner mints candidate IDs and retains fetched bytes. */
 export function createPluginSources(deps: { catalog: () => Promise<readonly CandidateV1[]>; fetch?: (url: string) => Promise<Response> }) {
-  const candidates = new Map<string, { entry: MarketplaceEntry; candidate: CandidateV1 }>()
+  const candidates = new Map<string, { entry: MarketplaceEntry; candidate: CandidateV1; market: typeof MARKETPLACES[number] }>()
   const captures = new Map<string, Promise<Capture>>()
   const archives = new Map<string, Promise<Archive>>()
-  let index: Promise<ReturnType<typeof readMarketplace>> | undefined
+  const indexes = new Map<string, Promise<ReturnType<typeof readMarketplace>>>()
   const get = async (url: string) => {
     const response = await (deps.fetch ?? fetch)(url).catch(() => { throw new SourceError("network", "Source request failed") })
     if (!response.ok) throw new SourceError("http", "Source returned HTTP " + response.status)
     return new Uint8Array(await response.arrayBuffer().catch(() => { throw new SourceError("network", "Source download failed") }))
   }
-  const loadIndex = () => {
-    index ??= get(CLAUDE_INDEX).then((bytes) => {
-      try { return readMarketplace(bytes, "claude") } catch { throw new SourceError("format", "Claude marketplace is not readable") }
-    }).catch((error: unknown) => { index = undefined; throw error })
-    return index
+  const loadIndex = (market: typeof MARKETPLACES[number]) => {
+    const known = indexes.get(market.source)
+    if (known) return known
+    const pending = get(market.repository.replace("https://github.com/", "https://raw.githubusercontent.com/") + "/main/" + market.manifest).then((bytes) => {
+      try { return readMarketplace(bytes, market.ecosystem) } catch { throw new SourceError("format", "Marketplace is not readable") }
+    }).catch((error: unknown) => { indexes.delete(market.source); throw error })
+    indexes.set(market.source, pending)
+    return pending
   }
   const loadArchive = (repository: string, revision: string) => {
     const key = repository + "@" + revision
@@ -50,33 +55,37 @@ export function createPluginSources(deps: { catalog: () => Promise<readonly Cand
   }
   return {
     async searchSources(query: string): Promise<SourceSearchResultV1> {
-      const [catalog, market] = await Promise.allSettled([deps.catalog(), loadIndex()])
+      const [catalog, results] = await Promise.all([
+        Promise.allSettled([deps.catalog()]).then((results) => results[0]!),
+        Promise.allSettled(MARKETPLACES.map(loadIndex)),
+      ])
       const local = catalog.status === "fulfilled" ? rank(catalog.value, query) : []
       const source: SourceStatusV1 = catalog.status === "fulfilled"
         ? { source: "catalog", status: "ok", matched: local.length, skipped: 0 }
         : { source: "catalog", status: "failed", reason: "format", detail: "Customization catalog is unavailable" }
-      if (market.status === "rejected") {
-        const failure = market.reason instanceof SourceError ? market.reason : new SourceError("network", "Claude marketplace is unavailable")
-        return { searchId: "search_" + randomUUID(), query, sources: [source, { source: "claude-marketplace", status: "failed", reason: failure.reason, detail: failure.message }], candidates: local }
-      }
-      const matches = market.value.entries.filter((entry) => relevance(entry.name, entry.name, entry.description, query) > 0)
-      const available = matches.flatMap((entry): CandidateV1[] => {
-        if (entry.source.kind === "unsupported" || (entry.source.kind === "git" && !githubRepository(entry.source.url))) return []
-        const identity = JSON.stringify(entry)
-        const known = candidates.get(identity)
-        if (known) return [known.candidate]
-        const repository = entry.source.kind === "git" ? githubRepository(entry.source.url)! : CLAUDE_REPOSITORY
-        const candidate: CandidateV1 = {
-          id: "cand_" + randomUUID(), source: "claude-marketplace", name: entry.name, displayName: entry.name, description: entry.description, kind: "plugin",
-          upstream: { repository, ...(entry.source.kind === "path" ? { path: entry.source.path } : { ...(entry.source.path === undefined ? {} : { path: entry.source.path }), ...(entry.source.commit ? { commit: entry.source.commit } : {}) }) },
+      const markets = MARKETPLACES.map((market, index): { status: SourceStatusV1; candidates: CandidateV1[] } => {
+        const result = results[index]!
+        if (result.status === "rejected") {
+          const failure = result.reason instanceof SourceError ? result.reason : new SourceError("network", "Marketplace is unavailable")
+          return { status: { source: market.source, status: "failed", reason: failure.reason, detail: failure.message }, candidates: [] }
         }
-        candidates.set(identity, { entry, candidate })
-        return [candidate]
+        const matches = result.value.entries.filter((entry) => relevance(entry.name, entry.name, entry.description, query) > 0)
+        const available = matches.flatMap((entry): CandidateV1[] => {
+          if (entry.source.kind === "unsupported" || (entry.source.kind === "git" && !githubRepository(entry.source.url))) return []
+          const identity = market.source + JSON.stringify(entry)
+          const known = candidates.get(identity)
+          if (known) return [known.candidate]
+          const repository = entry.source.kind === "git" ? githubRepository(entry.source.url)! : market.repository
+          const candidate: CandidateV1 = {
+            id: "cand_" + randomUUID(), source: market.source, name: entry.name, displayName: entry.name, description: entry.description, kind: "plugin",
+            upstream: { repository, ...(entry.source.kind === "path" ? { path: entry.source.path } : { ...(entry.source.path === undefined ? {} : { path: entry.source.path }), ...(entry.source.commit ? { commit: entry.source.commit } : {}) }) },
+          }
+          candidates.set(identity, { entry, candidate, market })
+          return [candidate]
+        })
+        return { status: { source: market.source, status: "ok", matched: available.length, skipped: matches.length - available.length }, candidates: rank(available, query) }
       })
-      return {
-        searchId: "search_" + randomUUID(), query, sources: [source, { source: "claude-marketplace", status: "ok", matched: available.length, skipped: matches.length - available.length }],
-        candidates: [...local, ...rank(available, query)],
-      }
+      return { searchId: "search_" + randomUUID(), query, sources: [source, ...markets.map((market) => market.status)], candidates: [...local, ...markets.flatMap((market) => market.candidates)] }
     },
     async captureCandidate(candidateId: string): Promise<{ ok: true; capture: Capture } | { ok: false; code: "unknown-id" | "source-unreachable" | "source-changed"; detail: string }> {
       const selected = [...candidates.values()].find((entry) => entry.candidate.id === candidateId)
@@ -86,13 +95,13 @@ export function createPluginSources(deps: { catalog: () => Promise<readonly Cand
         const pending = known ?? (async () => {
           const source = selected.entry.source
           if (source.kind === "unsupported") throw new SourceError("format", "Source cannot be captured")
-          const repository = source.kind === "path" ? CLAUDE_REPOSITORY : githubRepository(source.url)!
+          const repository = source.kind === "path" ? selected.market.repository : githubRepository(source.url)!
           const archive = await loadArchive(repository, source.kind === "path" ? "refs/heads/main" : source.commit ?? source.ref ?? "refs/heads/main")
           if (source.kind === "git" && source.commit && archive.commit !== source.commit) throw new SourceChanged()
           if (source.kind === "path") {
-            const manifest = archive.members.get(".claude-plugin/marketplace.json")?.bytes
+            const manifest = archive.members.get(selected.market.manifest)?.bytes
             if (!manifest) throw new SourceChanged()
-            const entry = readMarketplace(manifest, "claude").entries.find((entry) => entry.name === selected.entry.name)
+            const entry = readMarketplace(manifest, selected.market.ecosystem).entries.find((entry) => entry.name === selected.entry.name)
             if (JSON.stringify(entry) !== JSON.stringify(selected.entry)) throw new SourceChanged()
           }
           const path = source.kind === "path" ? source.path : source.path ?? ""
@@ -101,7 +110,7 @@ export function createPluginSources(deps: { catalog: () => Promise<readonly Cand
           if (!members.length) throw new SourceChanged()
           const relative = new Map(members.map(([name, member]) => [name.slice(prefix.length), member]))
           const capture: Capture = {
-            source: { kind: "marketplace", locator: repository, repository, commit: archive.commit, pluginPath: path, ecosystem: "claude", entryName: selected.entry.name },
+            source: { kind: "marketplace", locator: repository, repository, commit: archive.commit, pluginPath: path, ecosystem: selected.market.ecosystem, entryName: selected.entry.name },
             nodes: [...relative].map(([name, member]) => ({ ...member.node, path: name })),
             readFile: async (name) => {
               const visited = new Set<string>()

@@ -530,7 +530,7 @@ r4 本轮约 77 分钟（18:42:34→19:59 CST）；范围接缝→D3→D4→D5 �
 ## 切片 B/C · 其余入口与时间线授权
 
 - 依据：[Issue #1724](https://github.com/impharaon/alpha-code/issues/1724)；[SPEC-plugin-helper-and-hub v3 @8663fb2](https://github.com/impharaon/alpha-work/blob/8663fb2a982eaf7c626bfee3bcd8b20b870f2577/docs/specs/plugin-helper-and-hub/spec.md) AC-02、03、05、11、15 及 AC-06/07/14 的时间线部分；[DESIGN-plugin-helper-and-hub v5 @8bd3075](https://github.com/impharaon/alpha-work/blob/8bd3075040befdcfcb62e616b7004ec2edd0d744/docs/specs/plugin-helper-and-hub/design.md) §4.1–4.4、§4.6–4.9、§5、§8 B/C、§10。继承其冻结处置与上节 A、来源车道的已验实现，不重新设计转换、来源顺序、权限、账本或范围模型。
-- 核对：待编排器核对本节；首笔 IMPLEMENT 提交填续派 Phase 收据。本轮 PHASE: PLAN，只追加本节，不改代码／测试／其他计划节。
+- 核对：Phase: IMPLEMENT — 8c4bd680bc · orchestrator/Claude Fable 5.2 · plan check passed (AC-02/03/05/11/15 and the timeline parts of AC-06/07/14 each have failing-capable proof; the old skill-by-skill hub import path is retired in the same step that replaces it; overlap with the D/E lane is named; no restriction added). r8 授权 BC1→BC2a→BC2b→BC3→BC4→BC5；D/E 与 Core 仍冻结。
 - 基线：`feat/helper-install-slice-a@f876922949`；已接 H 最终头 `93c0a4765f` 与 D/E 的 E2，A 经编排器验收。文档影响为本节实施计划；实施时仅同步实际受影响的既有当前说明，不建立另一份规格或状态台账。
 - UI：[11-15 批准帧](../../design/2026-11-15-plugin-package-install-and-card/frame.html#search) `#search/#install/#manage` @265c42529e；逐项对照 spec「体验约定」的搜索、来源、动作及账户文案。沿用现有列表行、菜单、时间线动作、Dialog、密码输入与链接，不另画稿。关于单条选择、默认范围及安装动作的处置直接消费本轮 brief 与冻结设计。
 - 预计规模：约 20–26 个生产／运输文件（含退役旧调用）、14–20 个新增或直接相关测试文件，约 1,700–2,400 行实质新增／修改，另删除旧逐技能导入／确认运输的死实现；真实样本与生成字节另计，约 4–6 小时。超过一提交单元，按 BC1–BC5 的真实边界顺序实施，每步先提交可失败用例；每段核实际规模／用时，达到原估算两倍返回编排器，不静默扩张。
@@ -620,3 +620,8 @@ r4 本轮约 77 分钟（18:42:34→19:59 CST）；范围接缝→D3→D4→D5 �
 - 初次真 Playwright 场景 `install-from-source.engine.cases.ts:82` 报 spawn_failed（受控失败场景通过）。按 A 已有环境办法，先在临时 cache 执行实际 `npx @playwright/mcp@latest --version`（offline，exit 0，实际补齐可执行安装 0.0.85，`a-r7-playwright-command.log`），再只复核同一 engine 宿主：`npm_config_cache=/tmp/helper-install-plan-YCXgtv/npm-cache npm_config_offline=true bun test --max-concurrency 2 src/main/install-from-source.engine.test.ts` exit 0（宿主 1 pass，严格核内部 2 pass／0 fail；`a-r7-engine-cache-confirm.log`）。保留初红，不宣称冷缓存稳定；产品／测试文件均未改。
 
 上述基线变化已在开始本节规划前报告：未发现另需修改 A 冻结行为的证据；H 两处测试接线和既定语言扫描由其车道处置。BC 真账号／实时 Figma／正向 OpenCode 样本的证明按上表实施或验收取得，不把 PLAN 当作验收。已核：Codex（GPT-6），核 f876922949、H 接缝与设计 v5，本节待编排器检查。PLAN 09:44:36 UTC 开始，约 20 分钟；文档链接检查与 `git diff --check` 均 exit 0，仅本文件新增本节。OPTIONAL：无。
+
+
+2026-11-16 r8 · BC1 10:11:05 UTC 开始，基线 8c4bd680bc，H 的四处基线红例不在此修正。BC1 同调用链补 main `CandidateV1.installed` 的实际投影：当前来源函数从未填该字段，外部包在重新查询／重挂载后会误回“+”；复用账本／已解析声明的既有运行身份算法，不按显示名猜已装。此小段提前触及 `plugin-sources.ts` 及 `install-from-source.ts` 的身份 helper 调用，仍在本节已列文件内，D/E 重叠逐项报告；不改其 created/effect 分支。
+
+BC1 红例收据：`ext-write-channels.test.ts` 的只读搜索通道、`ext-install-catalog-result.cases.ts` 的 renderer→同源 ID→实际单入口／已装投影、`plugin-source-results.test.ts` 的生产 DOM 四场景、`hub-three-pages.cases.ts` 的同一搜索框／单入口各命令均 exit 1；日志 `bc1-{main,entry,dom,hub}-red.log`（同 A 临时日志目录）。分别缺 sourcesSearch、缺 main handler、缺生产组件、现有占位仍仅当前分类搜索；尚无生产改动。每条保留其失败断言，后续只替换明确编码旧占位／宿主计数的直接消费者。

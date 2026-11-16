@@ -1,4 +1,4 @@
-import { afterAll, expect, mock, test } from "bun:test"
+import { afterAll, expect, mock, spyOn, test } from "bun:test"
 import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
@@ -386,4 +386,26 @@ test("A3 canary stays in main secret files while the production tool/bridge/main
  walk(root)
  expect(hits.length).toBeGreaterThan(0)
  expect(hits.every(path=>/secret/i.test(path)),JSON.stringify(hits)).toBe(true)
+})
+
+
+test("BC1 renderer source query and sidecar share main IDs, and search selection uses the source entry", async () => {
+ const {fixtureFetch}=await import("../test-fixtures/plugin-helper/source-fetch")
+ const fetchSpy=spyOn(globalThis,"fetch").mockImplementation(fixtureFetch)
+ try {
+  const search=handlers.get("ext-sources-search")
+  expect(search).toBeFunction()
+  const before=await search!({sender:{id:1}},"context7") as import("../src/main/plugin-sources").SourceSearchResultV1
+  const candidate=before.candidates.find(candidate=>candidate.source==="claude-marketplace")!
+  expect(candidate).toBeDefined()
+  expect(candidate.installed).toBeUndefined()
+  const replies:unknown[]=[]
+  codepuppySidecar.receive({type:"codepuppy.sources.search.request",id:819,directory:root,query:"context7"}, reply=>replies.push(reply))
+  for(let n=0;n<200&&!replies.length;n++)await Bun.sleep(5)
+  expect(replies).toMatchObject([{type:"codepuppy.sources.search.reply",result:{candidates:[{id:candidate.id}]}}])
+  const installed=await handlers.get("ext-install-from-source")!({sender:{id:1}},{requestId:"bc1_search_install",source:{kind:"candidate",candidateId:candidate.id},effect:{kind:"all-projects"},via:"hub"}) as import("../src/shared/plugin-install").InstallOutcomeV1
+  expect(installed).toMatchObject({ok:true,packageId:"claude:context7"})
+  const after=await search!({sender:{id:1}},"context7") as typeof before
+  expect(after.candidates.find(item=>item.id===candidate.id)?.installed).toEqual({packageId:"claude:context7",enabled:true})
+ } finally {fetchSpy.mockRestore()}
 })

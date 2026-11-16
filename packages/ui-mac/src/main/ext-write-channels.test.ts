@@ -449,3 +449,9 @@ test("A2 source install channel gates, refuses and transports only the frozen re
   expect(await buildGatedWriteChannels(refused).installFromSource(request)).toEqual({ ok: false, reason: "gate refused" })
   expect(refused.bodyLog).toEqual([])
 })
+
+
+test("BC1 source search is a read-only channel separate from the single install writer", () => {
+  expect(HUB_READ_CHANNELS.sourcesSearch).toBe("ext-sources-search")
+  expect(Object.values(GATED_WRITE_CHANNELS)).not.toContain(HUB_READ_CHANNELS.sourcesSearch)
+})

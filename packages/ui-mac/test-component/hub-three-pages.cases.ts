@@ -1073,3 +1073,22 @@ test("D4 created source stays My plugin through its package row, management and 
   await waitFor(() => expect(q('[data-installed-package]')).toBeNull())
   expect(calls.uninstall).toEqual([])
 })
+
+test("BC1 the one Hub search input reaches sources and its plus reaches the single install entry",async()=>{
+ reset();mount()
+ const {createPluginSources}=await import("../src/main/plugin-sources")
+ const {fixtureFetch}=await import("../test-fixtures/plugin-helper/source-fetch")
+ const answer=await createPluginSources({catalog:async()=>[],fetch:fixtureFetch}).searchSources("context7")
+ const calls:unknown[]=[]
+ Object.assign(window.api.ext,{sourcesSearch:async(query:string)=>{calls.push(["search",query]);return answer},installFromSource:async(request:unknown)=>{calls.push(["install",request]);return {ok:true,packageId:"claude:context7",displayName:"context7",source:{kind:"marketplace",ecosystem:"claude",repository:"anthropics/claude-plugins-official",commit:"b5b01ac4",path:"external_plugins/context7",entryName:"context7"},installed:[],notRunning:[]}}})
+ const input=q<HTMLInputElement>('input[type="search"]')!
+ expect(input.placeholder).toBe("搜索插件、技能或 MCP")
+ input.value="context7";input.dispatchEvent(new Event("input",{bubbles:true}))
+ await waitFor(()=>expect(q("[data-source-candidate]" )).not.toBeNull())
+ expect(qa('input[type="search"]')).toHaveLength(1)
+ click(q("[data-source-candidate] button"))
+ await waitFor(()=>expect(calls.filter((call)=>Array.isArray(call)&&call[0]==="install")).toHaveLength(1))
+ expect(calls).toMatchObject([["search","context7"],["install",{source:{kind:"candidate",candidateId:answer.candidates[0]!.id},effect:{kind:"all-projects"},via:"hub"}]])
+ expect(q('[role="dialog"]')).toBeNull()
+ expect(qa('[data-group="installed"]')).toHaveLength(0)
+})

@@ -1,6 +1,6 @@
 ---
 name: customize-codepuppy
-description: Customize Code Puppy — find capabilities in the Customization Center, install through the single managed entry, check availability, create project skills/agents/commands/connectors, and explain project plugin trust. Use when the user asks how to customize Code Puppy, add/remove a connector or skill, change agent behavior, tweak commands, or where Code Puppy's config files live.
+description: Customize Code Puppy — find capabilities in the Customization Center, install through the single managed entry, check availability, create project skills/agents/commands, and explain project plugin trust. Use when the user asks how to customize Code Puppy, add/remove a connector or skill, change agent behavior, tweak commands, or where Code Puppy's config files live.
 license: MIT (Code Puppy original)
 ---
 
@@ -16,7 +16,7 @@ tools' conventions; Code Puppy does not read them).
 |---|---|---|
 | Global (all projects) | `$CODEPUPPY_GLOBAL_DIR/codepuppy.jsonc` | connectors (`mcp`), `plugin`, `agent`, `command`, `provider` overrides |
 | Global installs | `$CODEPUPPY_GLOBAL_DIR/{skills,agents,plugins}/` + ledger `$CODEPUPPY_GLOBAL_DIR/installs.json` | things the user installed/created/imported |
-| Per project | `<project>/.codepuppy/codepuppy.jsonc` | project-scoped connectors / agents / commands / skills path |
+| Per project | `<project>/.codepuppy/codepuppy.jsonc` | project agents / commands / skills path |
 | Per project content | `<project>/.codepuppy/skills/<name>/SKILL.md`, `<project>/.codepuppy/plugins/*.js` | project skills and plugins |
 
 Rule of thumb: `.codepuppy` only ever contains what the user chose to add. Factory content ships inside
@@ -32,6 +32,8 @@ the app and never appears in `.codepuppy`.
    the user's request to install authorizes installation and automatic enabling. Do not ask a route question
    or another installation confirmation. The default is all my projects. Use this same managed entry for
    existing plugins and connectors; do not write project config or project skill directories to install them.
+   If the user explicitly requests an MCP only in this project, pass `scope:"this-project"` to
+   `codepuppy_hub_install`; the same globally managed package records where it applies.
    Never ask for or accept keys in chat; never invent or guess keys for the user. Account setup belongs in
    the installed package's management page. Tokens never pass through tool arguments or results.
 3. **Check `codepuppy_hub_status` before use.** Pass the installed package's `id`.
@@ -44,11 +46,8 @@ the app and never appears in `.codepuppy`.
    Skills can remain pending while sessions are busy; report that state without promising a completion time.
 4. **Creating project-scoped extensions** — use the `codepuppy_register` tool only for project scope:
    - `type=agent|command` with the entry JSON (`{"description":"...","prompt":"..."}` / `{"template":"..."}`)
-   - `type=mcp` with the connector config — executable connectors additionally need the user's
-     per-project consent dialog before they load
    - `type=skill` (no entry) after writing `<project>/.codepuppy/skills/<name>/SKILL.md`
    Changes are validated, written atomically, and scheduled for reload after sessions become idle.
-   Executable connectors stay gated until the user trusts the project; do not promise immediate use.
 5. **Global installs** — use the Customization Center tools above. The desktop process supplies
    `CODEPUPPY_GLOBAL_DIR` as an absolute, canonical current-environment root; never synthesize, replace,
    or redirect it, and never fall back to the retired `$HOME/.alpha` root.

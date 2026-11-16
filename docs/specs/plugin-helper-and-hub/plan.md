@@ -859,3 +859,8 @@ BLOCKED · 本 lane 新增行为断言前提错误，需编排器裁定：test-c
 边界实报：含 canary 的 ext-write-channels 宿主仍 exit 1（52 pass/1 fail，b3-main-boundary.log），C2 原末尾磁盘正命中在额外断言之后，尚未完成本次绿证，不报 FIXED。B3 已实现、C1 的正反控制已恢复，整体步骤未验收。A1/B5 的 30 秒/逐源显示裁定、A6–A10、B4/B6–B12、C3–C9/OPTIONAL 与 recorded verify 本轮尚未开始；C3 唯一授权 assert-gate-files.sh --update 留到恢复其余项后的最终收口，当前未运行，旧 exact counts 尚未写回。无 gate/bin/check、无 push/PR/merge、无账号登录或外部写入。
 
 本边界独立 gate-file-registry exit 0（23 pass/176 assertions，registry-boundary.log），仅证明登记存在性，不冒充 C3 exact counts 通过；文档 7 链检查/diff check 均 exit 0。C1 结果表与状态控制已核 Codex（GPT-6）；因本 lane 额外 committed red 的前提问题按原规则返回 BLOCKED，所需输入是上述窄断言裁定，不需要放宽产品合同。全部前台进程已结束。
+
+
+r14 续修（2026-11-16 14:37:00 UTC 开始）：编排器 r14 决定 1 允许撤去本 lane 在 r13 添加的 canary saved:true 额外断言；决定 2 扩大 own-assertion correction ruling，仅针对 r12 起本 lane 自增且前提/字面量/调用形状错误的断言，仍不改 AC/审查所需证明或 r12 前断言。该项独立提交，非放宽产品授权读。
+
+own-assertion corrections：ext-install-catalog-result.cases.ts 原 :433 saved:true 假定旧 primitive 条目已具当前包声明；package-admission.ts:450–465/792–805 的现有读取需已验包 snapshot，该夹具无，r13 反证输出已记录。按 r14 明确裁定删除该额外断言，保留 canaryEntry.id、args/result/asks/wire/toSidecar 零泄漏和磁盘正命中原断言。另加 R14 B3 正向生产链：真实固定 Registry GitHub 定义经当前 source entry 安装，读取与 renderer 完全相等，专用存储保存后 saved:true，同双向消息无 token/路径/声明；不存在包仍拒绝。B3/C2 FIXED：ext-write-channels + sidecar-messages 两文件 exit 0（28 pass，内部实际 19；b3-c2-green.log），pin 同步 18→19，C2 磁盘正命中现已执行。没有旧记录迁移/兼容或新增 native 读权威。

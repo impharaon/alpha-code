@@ -430,7 +430,6 @@ test("A3 canary stays in main secret files while the production tool/bridge/main
  for(const surface of [args,result,asks,wire,toSidecar])expect(JSON.stringify(surface)).not.toContain(value)
  expect(wire.some(message=>(message as {type:string}).type==="codepuppy.hub.install.request")).toBe(true)
  expect(wire.some(message=>(message as {type:string}).type==="codepuppy.hub.request.reply")).toBe(true)
- expect(await bridge.packageAuthorization(canaryEntry.id)).toMatchObject({ok:true,packageId:canaryEntry.id,items:[{kind:"secret",saved:true}]})
  expect(await bridge.packageAuthorization("not-in-ledger")).toMatchObject({ok:false})
  const hits:string[]=[]
  const walk=(dir:string):void=>{for(const item of readdirSync(dir,{withFileTypes:true})){const path=join(dir,item.name);if(item.isDirectory())walk(path);else if(readFileSync(path).includes(value))hits.push(path)}}
@@ -591,5 +590,37 @@ test("BC3 production account save re-applies the same standalone MCP package and
   expect(toSidecar.filter(message=>message.type==="codepuppy.reload.request")).toHaveLength(reloads)
   expect(await read()).toMatchObject({ok:true,packageId:result.packageId,items:[{saved:true}]})
   expect(JSON.stringify(toSidecar)).not.toContain("bc3-production-invalid-token")
+ }finally{fetchSpy.mockRestore()}
+})
+
+
+test("R14 B3 current Registry package account state crosses the real tool bridge and matches renderer state", async () => {
+ const {fixtureFetch}=await import("../test-fixtures/plugin-helper/source-fetch")
+ const {createHubBridge}=await import("../../ext/src/hub-bridge")
+ const fetchSpy=spyOn(globalThis,"fetch").mockImplementation(fixtureFetch)
+ try {
+  const result=await handlers.get("ext-sources-search")!({sender:{id:1}},"io.github.github/github-mcp-server") as import("../src/main/plugin-sources").SourceSearchResultV1
+  const candidate=result.candidates.find(item=>item.source==="mcp-registry")!
+  expect(candidate).toBeDefined()
+  const installed=await handlers.get("ext-install-from-source")!({sender:{id:1}},{requestId:"r14_account_package",source:{kind:"candidate",candidateId:candidate.id},effect:{kind:"all-projects"},via:"hub"}) as import("../src/shared/plugin-install").InstallOutcomeV1
+  expect(installed.ok).toBe(true)
+  if(!installed.ok)throw Error(installed.code)
+  const wire:unknown[]=[]
+  const listeners:Array<(event:{data:unknown})=>void>=[]
+  const bridge=createHubBridge({postMessage:message=>{wire.push(message);codepuppySidecar.receive(message,reply=>{wire.push(reply);listeners.forEach(listener=>listener({data:reply}))})},on:(_event,listener)=>{listeners.push(listener)}},{log:()=>{}})
+  const read=()=>handlers.get("ext-package-authorization")!({sender:{id:1}},installed.packageId)
+  const before=await bridge.packageAuthorization(installed.packageId)
+  expect(before).toEqual(await read())
+  expect(before).toMatchObject({ok:true,packageId:installed.packageId,items:[{kind:"secret"}]})
+  if(!before.ok)throw Error("current package declarations unavailable")
+  const secret=before.items.find(item=>item.kind==="secret")!
+  const value="R14_DECLARED_PACKAGE_TOKEN_CANARY"
+  expect(await handlers.get("ext-save-package-secrets")!({sender:{id:1}},{packageId:installed.packageId,secrets:{[secret.prerequisiteId]:value}})).toMatchObject({ok:true})
+  expect(await bridge.packageAuthorization(installed.packageId)).toMatchObject({ok:true,items:[{kind:"secret",saved:true}]})
+  expect(await bridge.packageAuthorization(installed.packageId)).toEqual(await read())
+  expect(await bridge.packageAuthorization("not-in-ledger")).toMatchObject({ok:false})
+  expect(JSON.stringify(wire)).not.toContain(value)
+  expect(JSON.stringify(wire)).not.toContain("{file:")
+  expect(JSON.stringify(wire)).not.toContain("declarations")
  }finally{fetchSpy.mockRestore()}
 })

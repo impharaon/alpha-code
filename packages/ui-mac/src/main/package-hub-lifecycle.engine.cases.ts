@@ -10,6 +10,7 @@ import { canonicalArtifactJsonBytesV1, HOST_EXTENSION_PACKAGE_CORPUS } from "../
 import { engineSandbox, assertEngineSandboxed } from "../../test-component/engine-sandbox"
 import { hubPackageFixture } from "../../test-component/hub-package.fixture"
 import type { Running } from "../../test-component/codepuppy-engine"
+import type { ReloadRequestMessage, ReloadReportMessage } from "./codepuppy-sidecar-messages"
 import type { PackageAuthorizationResultV1 } from "../shared/package-admission"
 
 const sandbox = engineSandbox()
@@ -32,6 +33,9 @@ let host: Awaited<ReturnType<(typeof import("../../test-component/codepuppy-engi
 let main: ReturnType<(typeof import("./ext-ipc"))["registerExtIpcHandlers"]>
 let refreshFailure = ""
 let refreshes = 0
+let locationReloads = 0
+const reloadRequests: ReloadRequestMessage[] = []
+const reloadReports: ReloadReportMessage[] = []
 let toolCalls = 0
 let runtimeInitializes = 0
 let cloudEndpoint: ReturnType<typeof Bun.serve> | undefined
@@ -60,8 +64,11 @@ const mcpStatus = async (name: string) =>
   )?.status.status
 async function action(channel: string, ...args: unknown[]) {
   const before = refreshes
+  const requested = reloadRequests.length
   expect(await invoke(channel, ...args)).toMatchObject({ ok: true })
-  await until(() => refreshes > before || !!refreshFailure, channel)
+  if (channel === "ext-install-package" && args[0] === "package:supabase")
+    expect(reloadRequests.slice(requested)).toContainEqual(expect.objectContaining({ scope: "global", force: false }))
+  await until(() => refreshes > before || !!refreshFailure, `${channel}; requests=${JSON.stringify(reloadRequests.slice(requested))}; reports=${JSON.stringify(reloadReports)}; locationReloads=${locationReloads}`)
   if (refreshFailure) throw new Error(refreshFailure)
 }
 
@@ -153,8 +160,10 @@ beforeAll(async () => {
   processPort.parentPort = {
     on: (_event: string, listener: (event: { data: unknown }) => void) => listeners.add(listener),
     off: (_event: string, listener: (event: { data: unknown }) => void) => listeners.delete(listener),
-    postMessage: (message: Parameters<typeof main.codepuppySidecar.receive>[0]) =>
-      main?.codepuppySidecar.receive(message, () => {}),
+    postMessage: (message: Parameters<typeof main.codepuppySidecar.receive>[0]) => {
+      if (message.type === "codepuppy.reload.report") reloadReports.push(message)
+      main?.codepuppySidecar.receive(message, () => {})
+    },
   }
   const { codepuppyEngine, scriptedModel } = await import("../../test-component/codepuppy-engine")
   model = scriptedModel()
@@ -178,7 +187,10 @@ beforeAll(async () => {
   })
   const { injectCodePuppyConfig } = await import("./codepuppy-config-injection")
   const { publishInProcessEngine } = await import("./in-process-engine")
-  publishInProcessEngine((request) => running!.fetch(request))
+  publishInProcessEngine((request) => {
+    if (new URL(request.url).pathname === "/api/location/reload") locationReloads++
+    return running!.fetch(request)
+  })
   const { registerExtIpcHandlers } = await import("./ext-ipc")
   main = registerExtIpcHandlers(
     host.userData,
@@ -216,6 +228,7 @@ beforeAll(async () => {
     async () => undefined,
   )
   main.codepuppySidecar.attach((message) => {
+    if (message.type === "codepuppy.reload.request") reloadRequests.push(message)
     for (const listener of listeners) listener({ data: message })
   })
   await main.ledgerReady

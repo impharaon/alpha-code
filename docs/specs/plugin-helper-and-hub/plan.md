@@ -133,6 +133,10 @@ PLAN 文档检查（2026-11-16）：`python3 scripts/check-doc-links.py docs/spe
 
 ### 偏离记录
 
+2026-11-16 r4 · A2 新接缝红例 `install-from-source.test.ts`：`A2 remote MCP leaf retains timeout and OAuth policy through main truth publication`。从同一 pinned context7 转换结果取得真实 http URL，附加**本方规范化叶子合同**中的 `timeout: 7890` / `oauth: false`，调用现有 `persistMcp`，要求成功并经 `readMcpLeafStrict` 保持相同叶子；没有手造第三方输入格式。ui-mac `bun test --max-concurrency 2 --test-name-pattern 'A2 remote MCP leaf retains' src/main/install-from-source.test.ts` exit 1（0 pass / 1 fail，真实样本 transport 前提通过），日志 `/tmp/helper-install-plan-YCXgtv/a2-r4-remote-truth-red.log`。实回 `{ok:false, reason:"remote MCP server carries key(s) the truth file does not hold: timeout, oauth"}`。
+
+`SEAM-CHANGE-NEEDED: 远程 MCP 持久叶子合同 — 设计 v5 §4.1 的叶子含 timeout/oauth，§5 要求重建后来自同一持久配置；ext-config.ts:462 的 REMOTE_RECORD_LEAF_KEYS 及 mcp-server-truth.ts:36/55 仅接 url/headers，现有 package-admission.ts:553 的发布权威删掉 enabled 后仍调用 persistMcp，无法持久这两个已批准字段 — 请设计/真源拥有方回传在既有远程真源及读取/注入链中保留 timeout/oauth 的最小合同 delta，或指定不重复权威的已批准落点。` 不静默丢字段、不改冻结的真源 schema、不把包图授权声明另作运行配置真源；本轮在此停止后续入口/IPC/真实引擎实施。此例只针对真实可达的规范化叶子边界，不推翻原始 context7 无这些字段时的可安装性；A2 完整证明尚未完成。
+
 2026-11-16 r4 · 编排器重放到 H `5b46447823`，本车道头 `b45664681b`；原技能包红例未改。A2 八文件基线（r3 七文件加 `install-from-source.test.ts`，均 `--max-concurrency 2`）exit 0：126 pass / 0 fail，日志 `/tmp/helper-install-plan-YCXgtv/a2-r4-baseline.log`，H 零配置编辑与远程发布阻塞闭合。接收设计 v5 @8bd3075（本轮指定工作树）：按 §4.1 第 6 步消费结构化 diagnostics，零可运行结果带 notRunning，不改 converter 或 sources。H 已知双技能 generation 碰撞不在本片修复；若直接引擎断言受其阻断，独立返回该项依赖。
 
 r4 新红例：ui-mac `bun test --max-concurrency 2 src/main/install-from-source.test.ts` exit 1（1 pass / 2 fail，8 assertions），日志 `/tmp/helper-install-plan-YCXgtv/a2-r4-red.log`；原技能包激活例通过，新例分别因 MCP builder 尚不接受 leaf 输入、图 schema 尚无 source/notRunning/declarations 而失败。拟新增 `src/shared/plugin-install.ts` 作为 A2 图/构建器/入口共用的冻结 DTO 与严格校验落点，避免图纯数据模块反向依赖主进程声明读取器；这是同调用链必要落点，不更改合同。

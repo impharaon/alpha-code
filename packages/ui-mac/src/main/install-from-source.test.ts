@@ -11,6 +11,28 @@ import { diffPackageGraphsV1, planPackageClaimTransferV1 } from "./ext-package-l
 import { commitTransactionLedger } from "./ext-package-ledger-commit"
 import { readPackageLedgerStateV1, type UpsertInput } from "./ext-receipt-v2"
 import { runExtensionTransaction } from "./ext-transaction"
+import { persistMcp, readMcpLeafStrict } from "./ext-config"
+
+test("A2 remote MCP leaf retains timeout and OAuth policy through main truth publication", async () => {
+  const temporary = mkdtempSync(join(tmpdir(), "helper-a2-remote-truth-"))
+  const previousRoot = process.env.CODEPUPPY_GLOBAL_DIR
+  process.env.CODEPUPPY_GLOBAL_DIR = join(temporary, "env", "dev")
+  try {
+    const converted = await convertPluginTree(await captureFixture("external_plugins/context7"))
+    const entry = converted.package.entries.find((entry) => entry.kind === "mcp")!
+    expect(entry.kind === "mcp" && entry.transport).toBe("http")
+    if (entry.kind !== "mcp" || entry.transport === "stdio") throw new Error("recorded context7 must remain remote")
+    // The real URL plus our normalized leaf contract's explicit timeout/OAuth fields;
+    // this is not a fabricated third-party manifest or definition.
+    const leaf = { type: "remote", url: entry.url.join(""), timeout: 7890, oauth: false }
+    expect(persistMcp("context7", leaf)).toMatchObject({ ok: true })
+    expect(readMcpLeafStrict("context7")).toMatchObject({ ok: true, value: leaf })
+  } finally {
+    if (previousRoot === undefined) delete process.env.CODEPUPPY_GLOBAL_DIR
+    else process.env.CODEPUPPY_GLOBAL_DIR = previousRoot
+    rmSync(temporary, { recursive: true, force: true })
+  }
+})
 
 test("A2 MCP leaf builder preserves normalized fields and owns secret references", async () => {
   const { buildMcpTxItems } = await import("./ext-package-tx-builders")

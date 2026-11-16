@@ -5,8 +5,8 @@ import opencode from "../../test-fixtures/plugin-helper/opencode/provenance.json
 import npm from "../../test-fixtures/plugin-helper/opencode/npm/provenance.json"
 import formalCatalog from "../../test-fixtures/plugin-helper/catalog/catalog.json"
 import catalogProvenance from "../../test-fixtures/plugin-helper/catalog/provenance.json"
-import { createPublicKey, verify } from "node:crypto"
-import { evaluatePackageForHost, type PackageAcceptedFactsV1 } from "./package-installability"
+import { createHash, createPublicKey, verify } from "node:crypto"
+import { decodePackageEnvelopeHeaderV1, decodePackageProfilePayloadV1 } from "../shared/host-extension-package-contract/decoder"
 import { gunzipSync, gzipSync } from "node:zlib"
 import { join } from "node:path"
 import catalog from "../renderer/extensions/codepuppy-catalog.json"
@@ -20,13 +20,18 @@ const catalogCandidates = () => catalog.entries.map((entry) => ({ id: entry.id, 
 const formalCandidates = () => formalCatalog.packages.filter((entry) => ["package:github", "package:github-official"].includes(entry.prelude.packageId)).map((entry) => ({ id: entry.prelude.packageId, source: "catalog" as const, name: entry.presentation.displayName, displayName: entry.presentation.displayName, description: entry.presentation.description, kind: "plugin" as const, upstream: { version: entry.prelude.version } }))
 async function formalPackage(id: string) {
   const envelope = formalCatalog.packages.find((entry) => entry.prelude.packageId === id)!
-  let accepted: PackageAcceptedFactsV1 | undefined
-  await evaluatePackageForHost(envelope, { fetchPayload: async (ref) => {
+  const header = decodePackageEnvelopeHeaderV1(new TextEncoder().encode(JSON.stringify(envelope)))
+  if (!header.ok) throw new Error("Pinned formal envelope was not accepted")
+  const components = await Promise.all(header.components.filter((component) => component.status === "supported").map(async (item) => {
+    const ref = item.component.payloadRef
     const file = catalogProvenance.files.find((file) => file.url === ref.url)!
-    return Bun.file(join(fixtureRoot, "catalog", file.path)).bytes()
-  }, accepted: (facts) => { accepted = facts } })
-  if (!accepted) throw new Error("Pinned formal package was not accepted")
-  return accepted
+    const bytes = await Bun.file(join(fixtureRoot, "catalog", file.path)).bytes()
+    if (bytes.length !== ref.bytes || createHash("sha256").update(bytes).digest("hex") !== ref.sha256) throw new Error("Pinned payload integrity failed")
+    const decoded = decodePackageProfilePayloadV1(item.component.profileId, bytes, item.component.capabilities)
+    if (!decoded.ok) throw new Error("Pinned formal payload was not accepted")
+    return { payload: decoded.payload }
+  }))
+  return { envelope: header.envelope, components }
 }
 
 async function fixtureFetch(url: string | URL | Request): Promise<Response> {
@@ -376,4 +381,18 @@ test("runtime identity includes every MCP and skill while stdio package versions
   const skill = (await convertPluginTree(await captureFixture("plugins/frontend-design"))).package.entries[0]!
   expect(identity({ ...source, entries: [...source.entries, skill] })).not.toBe(identity(source))
   expect(identity({ ...source, entries: [] })).toBeUndefined()
+})
+
+test("a real npm tree keeps OpenCode discovery when presented as a local folder", async () => {
+  const sources = (await sourcesModule()).createPluginSources({ catalog: async () => [], fetch: fixtureFetch })
+  const result = await sources.searchSources("skills")
+  const candidate = result.candidates.find((entry) => entry.upstream.npm === npm.name)!
+  const captured = await sources.captureCandidate(candidate.id)
+  if (!captured.ok) throw new Error(captured.code)
+  const convert = (await import("../shared/host-extension-package-contract/plugin-conversion.mjs")).convertPluginTree
+  const original = await convert(captured.capture)
+  const folder = await convert({ ...captured.capture, source: { kind: "folder", locator: "recorded-npm-tree" } })
+  expect(folder.package.provider).toBe("opencode")
+  expect(folder.package.diagnostics).toEqual(original.package.diagnostics)
+  expect(folder.package.entries).toEqual(original.package.entries)
 })

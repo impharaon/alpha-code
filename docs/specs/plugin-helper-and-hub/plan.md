@@ -526,3 +526,97 @@ D5 相关回归 ui-mac `bun test --max-concurrency 2 src/main/created-plugin.eng
 D5 文档检查收据：`python3 scripts/check-doc-links.py docs/specs/plugin-helper-and-hub/plan.md docs/README.md` exit 0（424 条相对链接）；canonical `docs_index.py --check` exit 0。依 alpha profile 复用 canonical `check_docs_contract.py:check_repo`，只检查当前工作树（changed-since bda9ea62d7，不扫描其他仓）exit 1：72 errors / 217 warnings，日志 `/tmp/helper-de-r4-doc-contract.log`。错误为现有根 README 项目引用、旧断链/角色目录/额外 plan 文件，以及本计划原有跨仓裸 SPEC/DESIGN ID；新增 assets 未命中错误。`git show bda9ea62d7:docs/specs/plugin-helper-and-hub/plan.md` 已确认 :7/8 和旧链接文字存在，不为本片改其他节/全仓修文档；遗留交编排器的文档治理队列。生成索引已当前，不能把合同总体检查报绿。
 
 r4 本轮约 77 分钟（18:42:34→19:59 CST）；范围接缝→D3→D4→D5 依序提交。实际增加目录准入同链路与 A4 投影文件的原因已在各步逐项记录，无迁移、无新依赖、无项目写入、无 Core 改动。已核：Codex（GPT-6）自查，spec v3/design v5 与 r4 授权范围；本轮实现/交接 DONE，AC-04/08/09/16 完整真实应用验收仍交编排器，未报通过。并行共享生产文件汇总：plugin-sources.ts、install-from-source.ts、ext-ipc.ts、ext/hub-tools.ts、extension-hub.tsx（只 FactorySkillRow），另 i18n 和 A4 timeline-model.ts / cards/tool-card-model.ts；本轮未改 package-mcp-activation.ts、extension-detail.tsx、B/C 搜索/凭据/时间线动作。
+
+## 切片 B/C · 其余入口与时间线授权
+
+- 依据：[Issue #1724](https://github.com/impharaon/alpha-code/issues/1724)；[SPEC-plugin-helper-and-hub v3 @8663fb2](https://github.com/impharaon/alpha-work/blob/8663fb2a982eaf7c626bfee3bcd8b20b870f2577/docs/specs/plugin-helper-and-hub/spec.md) AC-02、03、05、11、15 及 AC-06/07/14 的时间线部分；[DESIGN-plugin-helper-and-hub v5 @8bd3075](https://github.com/impharaon/alpha-work/blob/8bd3075040befdcfcb62e616b7004ec2edd0d744/docs/specs/plugin-helper-and-hub/design.md) §4.1–4.4、§4.6–4.9、§5、§8 B/C、§10。继承其冻结处置与上节 A、来源车道的已验实现，不重新设计转换、来源顺序、权限、账本或范围模型。
+- 核对：待编排器核对本节；首笔 IMPLEMENT 提交填续派 Phase 收据。本轮 PHASE: PLAN，只追加本节，不改代码／测试／其他计划节。
+- 基线：`feat/helper-install-slice-a@f876922949`；已接 H 最终头 `93c0a4765f` 与 D/E 的 E2，A 经编排器验收。文档影响为本节实施计划；实施时仅同步实际受影响的既有当前说明，不建立另一份规格或状态台账。
+- UI：[11-15 批准帧](../../design/2026-11-15-plugin-package-install-and-card/frame.html#search) `#search/#install/#manage` @265c42529e；逐项对照 spec「体验约定」的搜索、来源、动作及账户文案。沿用现有列表行、菜单、时间线动作、Dialog、密码输入与链接，不另画稿。关于单条选择、默认范围及安装动作的处置直接消费本轮 brief 与冻结设计。
+- 预计规模：约 20–26 个生产／运输文件（含退役旧调用）、14–20 个新增或直接相关测试文件，约 1,700–2,400 行实质新增／修改，另删除旧逐技能导入／确认运输的死实现；真实样本与生成字节另计，约 4–6 小时。超过一提交单元，按 BC1–BC5 的真实边界顺序实施，每步先提交可失败用例；每段核实际规模／用时，达到原估算两倍返回编排器，不静默扩张。
+
+### 改动
+
+路径未标包名时相对 `packages/ui-mac/`。已有五源查询／捕获／转换与 A 的安装、运行生效保持唯一实现；不是重新开发来源层。BC 的新私有 helper 只承接可达入口，不改 §4 的冻结 DTO、消息联合、错误、宿主发布 schema 或权限 evaluator。
+
+| 段 | 文件／入口 | 改什么 |
+| --- | --- | --- |
+| BC1 · 搜索接线 | `src/main/ext-ipc.ts`、`ext-write-channels.ts`、`src/preload/index.ts`／`types.ts` | 注册设计 §4.8 的只读 `sourcesSearch` 到 A 的同一 `pluginSources.searchSources` 单例；搜索写入动作仅调用已有 gated `installFromSource`。读取不过写闸，安装保持账本屏障／恢复准入；未知或过期候选保留真实失败。 |
+| BC1 · 搜索显示 | `src/renderer/extensions/extension-hub.tsx`、`use-extensions.ts`；新增 `plugin-source-results.tsx`、`plugin-source-results.test.ts` | 同一个页头 query 请求真实五源结果，替换“只筛当前页目录”的搜索呈现；用 main 已排序结果与已证实的 sameAs 呈现行、逐源失败／查无结果及单条安装进度。响应落后于当前 query 时不盖掉新结果。新组件供搜索和市场清单共用现有行／动作，不造第二套包管理。 |
+| BC1 · 来源呈现 | `src/renderer/extensions/ext-package-presentation.ts`、`src/renderer/i18n/zh.ts`／`en.ts` | 既有来源显示投影供候选与已装包共同消费，`installedPackagePresentation(pack)` 接缝保持；不在列表再写一份来源标签表，不从名称／前缀推 provenance。已装候选从真实 packageId 进入 H 的同一菜单／管理。搜索占位和读屏按 spec 文案。 |
+| BC2 · 直接捕获及市场清单 | `src/main/plugin-sources.ts`、`install-from-source.ts`、`ext-ipc.ts`；`src/main/plugin-sources.test.ts`／`install-from-source.test.ts` | 把已有 `captureFolder`、`captureGit` 和 `readMarketplace` 接入 main 候选／捕获／转换缓存；直接 Git 地址在 main 捕获并铸私有 candidateId，安装仍使用冻结 candidate 分支，文件夹接冻结 folder 分支。市场只准备各条目的 ID 和安全展示事实，选择前零账本／运行入口；安装只取所选子来源。第三方文法仍只交 `plugin-conversion.mjs`。 |
+| BC2 · 文件夹／Git 页面入口 | `src/renderer/extensions/extension-hub.tsx`、`use-extensions.ts`；preload／主进程的既有导入接线；`src/renderer/extensions/plugin-source-results.tsx` | 复用现有添加菜单、main 目录选择器及 Git 地址输入；Git 地址指向官方市场仓库时列其条目，本机文件夹中的市场清单同样列出；取消仍在既有选择器外层零提交，选择器不跨事务锁。来源目录只留 main，捕获后进同一入口；市场目录的读前准备沿既有只读 intake/preview 边界，返回的是可选择条目而不是装前确认清单，安装 ID 仅由 main 持有的捕获产生。局部运输只返回 main 编号及安全显示事实，Capture、路径、字节和私有凭据都留 main；不向 CandidateV1.source 伪造第六个远端源，也不把本机清单假标为线上市场。 |
+| BC2 · 退役旧本机安装链 | `src/main/ext-ipc.ts`、`ext-write-channels.ts`、`src/preload/index.ts`／`types.ts`、`src/renderer/extensions/extension-hub.tsx`／`use-extensions.ts`；`src/main/local-package-preview.ts`、`local-package-install-port.ts`、`claude-plugin-intake.ts`、`claude-plugin-install.ts` 中仅旧入口拥有的运行实现 | 撤下 hub 的逐技能导入分支、`importClaudePluginConfirm` 通道、一次预览再确认安装的控制器及死调用；有活跃非 hub 消费者的纯类型／命名合同不搬动，公共 host schema 不变。原生文件按引用纳管／其他生态导入不在本片，不为它另保留一条 hub 安装旁路；若发现不能分离的同调用链依赖，具名返回，不能改 project-only 行为。 |
+| BC2 · 旧调用方证明 | `src/main/claude-plugin-intake.ipc.test.ts`、`claude-plugin-import-matrix.test.ts`、`ext-write-channels.test.ts`；`test-component/local-package-channel.cases.ts`、`local-package-renderer.cases.ts`、`claude-plugin-import-matrix.cases.ts` 及各自宿主 | 将明确钉旧确认／逐技能安装的用例改到 picker/Git→捕获→统一入口→一包图，保留目录边界、秘密、失败零部分写入、卸载／同名碰撞等行为对照。只删随已退役实现失去主体的专测，替代证据在同笔提交；有其他调用的 intake／installer 测试不借此删除。 |
+| BC3 · 装后账户真源 | `src/main/package-admission.ts`、`package-declarations.ts`、`ext-ipc.ts`；必要的 `ext-package-tx-builders.ts` 同调用链 | 已装目录和非目录的账户读取／保存均消费 `resolvePackageDeclarationsV1`。当前 ext-ipc 已有非目录只读投影，但 `savePackageSecretsV1` 仍止于 catalog facts；把装后动作接到同一读取接缝，不另存声明。非目录按存储的 MCP leaf／needId 调既有 builder、事务、包图更新和版本化 dedicated store；保持 H 已完成的包拥有权、旧密钥版本清理与并发前置核验。 |
+| BC3 · 运行收敛 | `src/main/ext-ipc.ts`、`package-mcp-activation.ts` | 凭据更新后复用 A 的运行 MCP apply／read-back，使原包立即按实态收敛；登录继续调用原引擎 OAuth integration/系统浏览器路径，不新建 main OAuth listener／token store，不切引擎代次。管理／关闭／移除保持 H 的同一 packageId 和资源拥有关系。 |
+| BC3 · 账户证明 | 新增 `src/main/plugin-package-accounts.test.ts`；已有 `package-admission.test.ts`、`package-admission.wiring.test.ts`、`package-secret-recovery-wiring.test.ts`、`package-builders-wiring.test.ts`／`package-mixed-bundle.wiring.test.ts`；`test-component/package-secret-recovery-wiring.cases.ts` | 真临时盘验证非目录读取、首次保存、部分需求保存、更换及失败不改旧有效状态；回读 actual encrypted/file-ref 版本及包图，秘密金丝雀扫描正反臂。若 builder 导出改变，直接 mock 消费者同笔同步且执行。 |
+| BC4 · 同一账户组件 | `src/renderer/extensions/extension-detail.tsx`；新增 `package-account-dialog.tsx` 与 `package-account-dialog.test.ts`／`test-component/package-account-dialog.cases.ts`；`use-extensions.ts` | 将 H 内联的装后密码 Dialog 提取为管理页与时间线共用组件，复用原输入／用途／链接／保存动作；不复制字段状态和凭据写方。登录直接复用已有 `authenticateMcp` 的当前目录 SDK→adapter→system-browser 路径；必要的窄动作复用从 use-extensions 移到这条同调用链，不再实例化一套 hub 数据层。 |
+| BC4 · 时间线动作 | `src/renderer/codepuppy-ui/session-timeline/cards/hub-install-card.tsx`、`cards/timeline-intents.ts`、`session-timeline.tsx`；`src/renderer/i18n/zh.ts`／`en.ts`；现有 `hub-install-card.test.ts`／`test-component/hub-install-card.cases.ts`、`session-timeline-test-runtime.tsx` | 把既有只读待登录／待填令牌状态接到一个有效动作：登录按钮直接发起系统浏览器，不先弹第二个登录确认；令牌按钮打开上述同包组件。绑定 packageId＋组件／需求 ID，由 main 重读声明；关闭／取消后包保留、可续做；成功后回读同包，不重装。metadata 淘汰恢复和 manage 仍用 A／H 接缝。生产 intents 接线也测试，不只测注入了假 handler 的卡片。 |
+| BC5 · 真实链与资料 | 新增 `src/main/plugin-entrypoints.engine.cases.ts`／`.test.ts`；扩展 `test-component/hub-three-pages.cases.ts`、`hub-install-card.cases.ts`；`test-fixtures/plugin-helper/` | 真实来源经聊天／搜索／folder/Git 到实际入口和引擎，覆盖独立 Registry、OpenCode、关闭／移除及 JS 零执行；复用隔离 engine harness，宿主严格计内部用例数。补真实查询／包树／版本原字节及 provenance，最终模型与真实账号验收交编排器，不把局部 DOM 或本机模型桩当作真实第三方授权成功。 |
+
+**已核接缝与并行文件**
+
+- A：`createPluginSources` 的五源结果、main ID 表、捕获／转换缓存、运行身份；`createSourceInstaller`、`InstallRequestV1`／`InstallOutcomeV1`；`package-mcp-activation.ts` 的 runtime apply/disconnect；只读 `hubRequest` 及推送。直接复用，缺少入口接线不解释成需要另一套安装器。
+- H：`installedPackages`／`packageAuthorization`／`savePackageSecrets`，`installedPackagePresentation(pack)`，`openPackageManagement(packageId)`；`InstalledPackageDetail` 中现有账户 Dialog、`useExtensions.authenticateMcp` 与 `savePackageSecrets`。H 最终基线已在本树，本片只做上表的提取／消费及非目录分支，不重做行、菜单、权限编辑器或账户存储。
+- D/E 预期重叠：`src/main/plugin-sources.ts`（D searchId/create 捕获记录）、`install-from-source.ts`（D created、E effect）、`ext-ipc.ts`（D/E 同一入口接线）、`package-mcp-activation.ts`（E Location 过滤）、`src/renderer/extensions/extension-hub.tsx`／`extension-detail.tsx`（E 范围显示）、本 `plan.md`。BC 的改动局限在上表区段，后续续派按编排器重放版本核 delta；不改 D 的助手／create 校验或 E 的范围成员判定。
+- `packages/ext/src/{hub-tools,hub-bridge,context-injection}.ts`、`plugin.ts`、`engine-transforms.ts` 当前无需 B/C 新消息或生产改动：现有 ID-only search/install 已能承载 Registry／其他五源；账户动作在 renderer 复用现有通道。D/E 拥有这些文件的 create／scope 变更；若实测发现本片必须改，先具名返回最小接缝，不顺手重写。`packages/core`、host 发布 schema、权限 evaluator、D/E 源文件职责均冻结。
+
+### 顺序
+
+1. **BC1 · 单搜索框到同一入口**：先提交只读 IPC／五源排序与折叠／来源失败／慢响应／“+”真入口的红例；接 main 单例、preload 与生产结果组件及既有菜单。真实 GitHub 正式目录和同能力外源点击两条路径，锁内仍只落目录身份／版本。此步不等文件夹或账户小窗，可与 D/E 分区并行。
+2. **BC2a · main 捕获到单条候选**：先加真实 marketplace 清单的两个可安装条目、固定 Git 树、main picker 的连通红例，再接 private 捕获登记及 folder/Git 的统一入口。清单打开／选中之前只读，点击一条只安装那条；列表准备和安装共用捕获缓存。单技能目录仍成为一包，不退回旧单技能写方。**BC2b · 同笔撤旧可达路径**：切换 hub 添加菜单、撤旧确认与逐技能通道，再跑旧路径的直接消费者替代证据；两步各为可审提交，最终不并存两条 hub 安装链。
+3. **BC3 · 装后账户到专用存储／现有引擎**：先以真实独立 GitHub Registry 定义提交非目录保存红例，再统一声明读取和 H 的保存函数；沿原事务更新包拥有的密钥版本，接 runtime apply。目录凭据更换／旧版本清理和失败／恢复用例保持，默认全局不触及 E 的范围解释。
+4. **BC4 · 时间线一个登录动作与同包令牌窗**：BC3 接缝到齐后，先加生产 DOM／adapter 的“一击系统浏览器”、取消重开、保存金丝雀、返回原包的红例，再提取 H 组件、接生产 timeline intents。提取与两个调用方同一提交，不临时留下两份实现。无安装确认、无聊天令牌字段。
+5. **BC5 · 各入口真实引擎闭环**：扩展受影响 engine／hub DOM 用例，再收齐 AC 证据；安装、开启、实际工具或技能调用、关闭撤入口、移除清专有内容分别看真实状态。最后只跑变更／直接相关测试和两包类型检查，编排器在构建应用收自然语言、真实 GitHub token／Supabase OAuth 与屏幕证据。未做真实账号操作的部分保持未验，不发出登录／写外部数据动作。
+
+### 风险
+
+- **旧入口不是整包管线**：`ext-ipc.ts:1519` 仍接旧 intake→预览确认；Git 仍调逐技能 importer。替换范围以上表可达链为界，不能在 UI 另加一个新入口后让旧的继续接用户安装，也不能顺带改原生项目文件纳管。marketplace 的路径解释只在已捕获树和共享 converter，renderer 不提供重放路径。
+- **H 账户能力目前只完整覆盖已验目录**：`package-admission.ts:502` 的非目录分支没有 catalog facts 就不能保存，而 `ext-ipc.ts:458` 已有非目录只读声明投影。BC3 统一在既有装后动作权威内补齐，不把只读“待令牌”误当已有可用保存能力；不为非目录另建密钥表或直接改运行 JSON。
+- **真实样本的正向前提**：现有 `opencode/npm/opencode-skills-hub@0.0.5` 是 JS-only，适合作零可运行反例，不能拿它证明技能／MCP 正向。BC5 使用 pinned `obra/superpowers` 技能和 `onyxia` MCP 树作已知语料，并在实施前取得实际可通过对话来源检索到、含技能或 MCP 的 OpenCode 包／定义与其同版本 Git/folder 树；实际前提先断言，不虚构 npm 收录。缺少真实正向样本时返回这一项证据缺口，不换成手写包。
+- **Figma／官方标签**：当前库已有 Codex Figma 和 Registry 1.0.3 的来源记录，它们不是实时可达或账号可用证明。准确的两句来自 [22ea013 原案例](https://github.com/impharaon/alpha-work/blob/22ea013/docs/specs/local-plugin-install/spec.md)：先「帮我安装figma 插件」，再「帮我安装 figma 官方mcp 服务」。查询记录与 publisher 的事实分别留档；不从旧聊天地址、插件名字或空 app ID 造“官方”。没有定义和来源失败的文字不能混同；不改 D 的助手行为来偷换模型验收。
+- **凭据／异步状态**：输入只进共用密码窗，提交后清空临时值；秘密值不进 part、预览、图、日志或配置明文。窗口关闭、授权取消、包同时删除／替换、旧 callback 晚到分别有对照；回读 main 声明／当前图防止改另一个包。OAuth 的 discovery、PKCE、回调与 token 仍由既有引擎 integration 处理，BC 不另加超时、等待、字段要求或连接器版本限制。
+- **并行及基线红项**：按下方 r7 收据处理 H 的夹具／宿主计数及已知语言扫描；本片不代修。实现阶段返回的同调用链修正必须列实际文件和理由；D/E 的新 commits 只核接缝 delta，不重新审设计。
+
+### 证明
+
+以下为 IMPLEMENT 的拟执行用例／Acceptance，PLAN 未把未实现的 B/C 行为报通过。每个对照先核真实前提，红例在实现前单独提交；仅将真实记录副本的缺席／故障明确标成控制臂，不造第三方格式。
+
+| AC／行为 | 命名证据 | 去掉什么会使它失败 |
+| --- | --- | --- |
+| AC-02 · 聊天与“+”目录身份 | `install-from-source.test.ts` 的 `BC catalog identity wins from chat and search selection`；`plugin-source-results` 生产 DOM 经真 main 的正式 GitHub/Supabase catalog fixture | 去掉提交前运行身份比较，外部候选会多一张图；去掉搜索“+”统一入口，目录 packageId／版本或仅一条事务／一行断言失败。与 `sameAs` 缺席的未折叠对照一起测，不能只测默认首行。 |
+| AC-02 · 来源优先级 | 继承并扩展 `plugin-sources.test.ts` 的 `recorded source misses preserve catalog Claude Codex OpenCode order`，以真实查询记录机械缺项的逐级对照；源失败单列 | 任一来源被跳过、用完成先后排序或失败假装查无，首个有效候选／逐源状态断言红。助手实际选源由后述模型证据核，不把数组排序冒充模型已正确选择。 |
+| AC-11 · 一个搜索框／不误并 | 新 `plugin-source-results.test.ts`／生产 DOM：`BC one query searches all sources, keeps distinct runtime identities and ignores late replies` | 只筛目录、仅按名字折叠、陈旧响应覆盖当前搜索，实际可见行数／来源／请求 query 失败；两个同名不同 URL/header/技能集合的记录保留两行。 |
+| AC-11 · 市场只安装选定项 | `plugin-sources.test.ts` + `test-component/local-package-renderer.cases.ts`：`BC marketplace selection commits only the chosen real plugin`；官方 raw 清单和本机同份清单两臂 | 从 pinned 市场选择一个真实插件后，枚举全部其他条目的图、账本组件和 engine inventory 都为空；去掉单条选择约束、退回批量 fan-out 或只改界面都会红。打开清单本身零写，取源／转换失败也不安装其他项。 |
+| AC-03 · 两次 Figma 查询 | 新真实查询记录与 `plugin-sources.test.ts`／来源转换：`BC Figma plugin and explicit official MCP retain verified target and source status`；编排器重放两句原请求 | 只搜目录、把 `.app.json` 当已核服务、忽略 registry publisher 或把网络失败当没有，会改变捕获记录、诊断和输出；取得定义的臂核 main 安装 packageId，实际未取得的臂核零安装。模型留工具 part/query/来源/短结果及项目快照，不抛路线或编造成功。 |
+| AC-05 · 独立官方 MCP | 新 `plugin-entrypoints.engine`：`BC registry-only GitHub definition becomes one package before authorization`；随后真实 GitHub 授权任务由编排器 | 输入仅现有 pinned `github-registry-version.json`，没有 plugin manifest；检查 source/publisher/version、单图 root MCP、一个管理项、真实需求；去掉 registry→入口映射，包不能落账。授权后读 inventory 并调用一个获授权的真实只读工具；关闭／移除后再次调用失败。项目原配置摘要前后相同。 |
+| AC-15 · 三入口同管理模型 | `plugin-entrypoints.engine`：`BC real OpenCode package installs from chat, folder and Git with usable entries`；同版本真实包／来源分别留 provenance | 每条路径核 source/version、同一 graph 模型、至少一个实际技能读取／MCP 工具调用；关闭后入口消失，移除后图、专有 generation／密钥／运行入口消失，项目配置 bytes 不变。退回只导入一个技能、目录路径依赖原件、未热接入或未清理都会红；共享资源按现有 claims 仍在，不用“全目录消失”误杀共享项。 |
+| AC-15 · JS 不执行且有原因 | 同一真实混合包的 native module 监视／管理页 + 现有 JS-only npm 反例：`BC native JS never loads while runnable entries remain usable` | 对真实模块路径的装载点设拦截哨兵；正臂只触发同一路径的装载请求，由拦截器返回安全空模块，不求值原字节，以证明监测能看见。安装／启用过程零装载，管理页显示结构化 native-js-plugin 原因。若加载它、静默漏诊断或把 JS-only 包记成已装都红；不执行不明第三方脚本来预取来源。 |
+| AC-06 · 一个登录动作 | `package-account-dialog`／`hub-install-card` 生产 DOM + 现有 `src/engine-adapter/mcp-auth.test.ts`、`package-mcp-oauth.engine.test.ts`：`BC timeline sign-in opens system browser once and returns to its package` | 点击一次即从生产 intents 到实际 adapter 的 openLink，URL 取引擎 attempt；不多弹确认、不走应用内网页。取消后同图仍在，可续登录；complete 后回读同名组件＋URL／packageId。去掉生产接线、另开第二确认或回错包都红。真实 Supabase 浏览器授权另由编排器留证。 |
+| AC-07 · 同包令牌保存／更换 | `plugin-package-accounts.test.ts`、`package-secret-recovery-wiring`、生产共用 Dialog：`BC timeline token save changes only its package-owned secret version` | 在 password 输入金丝雀，真保存／重读引用／版本目录正臂看见，聊天／tool part／预览／config 明文／日志／包图负臂零命中；更换清旧专有版本、失败保留旧有效版本。去掉包拥有权或把值经聊天／配置运输都会红；提交未知 needId／已移除包不改其他安装。 |
+| AC-14 · 同一安装身份 | `hub-three-pages` + 卡片重挂载／关闭小窗／旧回调：`BC timeline and management keep package identity through account actions` | timeline.metadata.packageId、H 管理目标、账户提交的 packageId／needId 和 main 图必须一致；安装调用计数仍为 1。以名称挑行、淘汰后丢身份、关窗重装、重复删除任一项均被对照抓住。 |
+
+**样本与实际验收安排**
+
+- 继承 `test-fixtures/plugin-helper/` 的 Claude b5b01ac4…、Codex d420d130…、正式签名 GitHub catalog／载荷、Registry GitHub 2.1.0／Figma 1.0.3、OpenCode superpowers/onyxia、JS-only npm 0.0.5 的原字节与各 `provenance.json`。正式 GitHub 同名另用途、Claude GitHub 同能力、Supabase（若采用）都先核完整 MCP/header／技能集合与目录身份／版本；不凭索引名字断言相同。
+- 实施时补同版本的正向 OpenCode 可检索记录／树及 Git 捕获（完整性前提先过）、Figma 两目标的实际五源查询记录、市场第二个真实可运行插件与必要实际 OAuth／MCP 交互记录。每个新原件留 URL／query、版本或提交、取得时间、bytes／digest；归档裁剪留原包摘要与成员清单，控制缺项／错误臂说明机械差异。不得把现有 Codex Figma 的**不完整裁剪树**当完整插件可运行证明。
+- 自动检查只能证明入口、存储、状态和可调用链。自然语言的择源／不抛路线，真实 GitHub 令牌后的任务、Supabase 系统浏览器登录、以及构建应用与批准帧的实际对照，由编排器在接到实现后收集；凭据值不进入证据报告。受账号／定义可达性影响的未验项逐 AC 返回，不以 mock 结果标 DONE。
+
+**相关命令（IMPLEMENT，包目录执行；并发 2）**
+
+- BC1／BC2，ui-mac：`bun test --max-concurrency 2 src/main/plugin-sources.test.ts src/main/install-from-source.test.ts src/main/ext-write-channels.test.ts src/renderer/extensions/plugin-source-results.test.ts src/renderer/extensions/ext-package-presentation.test.ts src/renderer/extensions/ext-ipc-chokepoint.test.ts src/renderer/extensions/use-extensions-ipc.test.ts src/renderer/extensions/hub-three-pages.test.ts src/renderer/extensions/local-package-renderer.test.ts src/main/claude-plugin-intake.ipc.test.ts src/main/claude-plugin-import-matrix.test.ts`。retire 的专测按实际主体更新；保留的 `claude-plugin-intake.test.ts`／`claude-plugin-install.test.ts`／`local-package-preview.test.ts`／`ext-uncurated-import.test.ts`／`ecosystem-import.test.ts` 只在相关调用变更时执行，明确列结果，不跑全仓。
+- BC3／BC4，ui-mac：`bun test --max-concurrency 2 src/main/plugin-package-accounts.test.ts src/main/package-admission.test.ts src/main/package-admission.wiring.test.ts src/main/package-secret-recovery-wiring.test.ts src/main/package-builders-wiring.test.ts src/main/package-mixed-bundle.wiring.test.ts src/main/package-mcp-oauth.wiring.test.ts src/main/package-mcp-oauth.engine.test.ts src/engine-adapter/mcp-auth.test.ts src/renderer/extensions/package-account-dialog.test.ts src/renderer/codepuppy-ui/session-timeline/hub-install-card.test.ts src/renderer/codepuppy-ui/session-timeline/session-timeline.test.ts src/renderer/codepuppy-ui/session-timeline/cards/cards-contract.test.ts src/renderer/extensions/hub-three-pages.test.ts`；preload／秘密／builder 直接 mock 或表枚举消费者按实际改导出追加。
+- BC5，ui-mac：`bun test --max-concurrency 2 src/main/plugin-entrypoints.engine.test.ts src/main/install-from-source.engine.test.ts src/main/ext-package-ledger-uninstall.test.ts src/main/ext-set-state-tx.test.ts`；真实 MCP 运行依赖先放临时缓存，使用 A 已记录的测试隔离环境，不改产品命令／超时。
+- 若 D/E 集成改到现有 ext 查询／安装导出，再在 ext 跑 `bun test --max-concurrency 2 src/hub-tools.test.ts src/hub-bridge.test.ts src/context-injection.test.ts src/plugin-host.test.ts`；本片不借此实现 create／scope。每个实际修改包各 `bun typecheck`，文档仍只 `python3 scripts/check-doc-links.py docs/specs/plugin-helper-and-hub/plan.md` 与 `git diff --check`；无 gate／bin/check。
+
+### 偏离记录
+
+2026-11-16 r7 PLAN · 编排器已接受 A，重放至 f876922949。本轮先按 A 已记录集合合并复跑 ui-mac 41 文件（全部 `--max-concurrency 2`）：735 pass／4 fail，exit 1（`/tmp/helper-install-plan-YCXgtv/a-r7-ui-base.log`）；ext 五文件 165 pass／1 fail，exit 1（`a-r7-ext-base.log`）；两包 `bun typecheck` 均 exit 0（`a-r7-{ui,ext}-typecheck.log`）。未改任何代码／测试或放宽检查。
+
+- 已知两红：`locale-regression.test.ts:162/189` 的 H OpenCode 来源名称扫描，沿 r7 裁定交 H，不调查／修复。
+- 新宿主计数红：`package-admission.wiring.test.ts:46` 仍要求 21，实际子进程 22 pass／0 fail。新增 H 凭据例未同步宿主计数；返回 H／编排器，不在 PLAN 改测试。
+- 新夹具接线红：`context-injection.test.ts:304` 仍预期从空 MCP editor 新增 cloud；H `plugin.ts:334` 的实际关闭修正只重臂 main 已注入的服务，而 `extWrites():248` 仍创建空 Map。命名原因后单例确认命令 `bun test --max-concurrency 2 --test-name-pattern '云 MCP 定义落在' src/context-injection.test.ts` exit 1（0 pass／1 fail；`a-r7-cloud-confirm.log`），返回 H 同步夹具，不称为 flaky，也不改关闭语义。
+- 初次真 Playwright 场景 `install-from-source.engine.cases.ts:82` 报 spawn_failed（受控失败场景通过）。按 A 已有环境办法，先在临时 cache 执行实际 `npx @playwright/mcp@latest --version`（offline，exit 0，实际补齐可执行安装 0.0.85，`a-r7-playwright-command.log`），再只复核同一 engine 宿主：`npm_config_cache=/tmp/helper-install-plan-YCXgtv/npm-cache npm_config_offline=true bun test --max-concurrency 2 src/main/install-from-source.engine.test.ts` exit 0（宿主 1 pass，严格核内部 2 pass／0 fail；`a-r7-engine-cache-confirm.log`）。保留初红，不宣称冷缓存稳定；产品／测试文件均未改。
+
+上述基线变化已在开始本节规划前报告：未发现另需修改 A 冻结行为的证据；H 两处测试接线和既定语言扫描由其车道处置。BC 真账号／实时 Figma／正向 OpenCode 样本的证明按上表实施或验收取得，不把 PLAN 当作验收。已核：Codex（GPT-6），核 f876922949、H 接缝与设计 v5，本节待编排器检查。PLAN 09:44:36 UTC 开始，约 20 分钟；文档链接检查与 `git diff --check` 均 exit 0，仅本文件新增本节。OPTIONAL：无。

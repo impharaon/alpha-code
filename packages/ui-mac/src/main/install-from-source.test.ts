@@ -112,6 +112,16 @@ test("E2 unresolved project identity cannot silently install for all projects", 
   expect(h.activation).toEqual([])
 }))
 
+test("E2 startup reconcile cannot globally enable a project-only MCP", () => installerHarness(async (h) => {
+  const { mkdirSync } = await import("node:fs")
+  const { reconcileDesiredStateAtBoot } = await import("./ext-install-planner")
+  const project = join(h.temporary, "project")
+  mkdirSync(project)
+  expect((await h.install({ ...h.request(await h.candidate("context7")), effect: { kind: "project", directory: project } })).ok).toBe(true)
+  expect(reconcileDesiredStateAtBoot(h.root, { userDataPath: h.temporary, channel: "stable" }).ok).toBe(true)
+  expect(readMcpLeafStrict("context7")).toMatchObject({ ok: true, value: { enabled: false } })
+}))
+
 test("A2 host-name collision preserves existing content and rewrites only installed skill name", () => installerHarness(async (h) => {
   const { mkdirSync, writeFileSync } = await import("node:fs")
   mkdirSync(join(h.root, "skills", "frontend-design"), { recursive: true })

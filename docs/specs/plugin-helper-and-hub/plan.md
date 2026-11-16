@@ -886,3 +886,5 @@ A6 CONTRARY EVIDENCE：给定 whole ${VAR} URL 在当前生产链已在写前拒
 A7 前提属实：catalog helper 与主 entry 锁后回调均只看 skill。派生自既有 mixed-bundle 生产方语料的单 agent/单 command 两臂，以及真实随包 agent:code-reviewer 的完整 main IPC 一臂，安装成功后都无 reload；三例 exit 1（a7-red.log）。后者同时断言非 force，保留 MCP/cloud 即时路径。
 
 A7 FIXED：catalog helper 与 main 锁后生效均为非 MCP/非 cloud 内容请求原 non-force reload，故 agent/command 不再漏调度；MCP 仍 runtime add/connect。三个原红断言保留，install-from-source/ext-write-channels/package-command-engine-visibility 三文件 exit 0（a7-green.log，含真实命令可见与执行宿主），ui-mac typecheck exit 0（a7-types.log）；IPC 内部实跑 22，同步 pin。
+
+A8 前提属实：任一 strict V3 失败使整段 disabled 注入跳过。两个真账本 red 从实际 applyPackageMutation 生成项目包，再分别加入不可归属坏 record／破坏 claims 不变量，已关远端和仅项目远端都被错留 enabled；exit 1（a8-red.log）。应保留 readLedgerV2 的可读记录；graph 不可用时复用 skills-enabled v2 正向成员投影的现有唯一读方，不另解账本或复制项目判定。

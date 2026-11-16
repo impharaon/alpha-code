@@ -63,7 +63,6 @@ describe("factorySkillSources", () => {
       "For `submitted; result pending` or `reload-pending`, check\n   `codepuppy_hub_status` instead of repeating the installation",
       "do not wait inside\n   the current reply for reload",
       "`codepuppy_register` tool only for project scope",
-      "Executable connectors stay gated until the user trusts the project",
       "(skills + agents + commands + connectors)",
       "Project `.codepuppy/plugins/*.js` files are loaded and executed with the same permissions as\n  the engine after the user trusts the project",
       "Trust is granted once for the whole project,\n  not per file or per execution",
@@ -81,7 +80,10 @@ describe("factorySkillSources", () => {
       /从目录装插件/,
       /(?:install|installing) (?:executable )?plugins from (?:the )?catalog/i,
       /For connectors\/skills\/agents\/plugins prefer/,
+      /type=mcp/,
+      /create project skills\/agents\/commands\/connectors/,
     ]) expect(text).not.toMatch(forbidden)
+    expect(text).toContain('scope:"this-project"')
   })
 
   test("#1513: shipped customization skill registers only customize-codepuppy", () => {

@@ -134,6 +134,8 @@ PLAN 文档检查（2026-11-16）：`python3 scripts/check-doc-links.py docs/spe
 
 ### 偏离记录
 
+A3 补齐直接消费者：`composer-tier-matrix.engine.cases.ts:431` 仍编码“普通身份询问后还必须出现安装确认”。先运行该场景 exit 1（0 pass／1 fail，实际第一普通审批出现，第二旧安装确认不再出现；`a-r6-a3-composer-old-red.log`）。此处按原计划明确替换旧确认流程为一次普通审批、协议 JSON 往返、无安装运输 metadata 及结束后零待批；调用参数 catalogId→id 为 r6 允许的 API 形状纠正，未改普通权限求值。相关矩阵宿主 `bun test --max-concurrency 2 src/main/composer-tier-matrix.engine.test.ts` exit 0（宿主 1 pass／0 fail，严格核内部 27 场景全部通过；`a-r6-a3-composer-final.log`）。
+
 r6 A3 完成：红例提交 `1c5a5de6f5`（main 消息／受理阶段）及 `a2b2436e36`（工具生产 bridge）先于生产改动；工具红命令 `bun test --max-concurrency 2 --test-name-pattern 'A3 tools search' src/hub-tools.test.ts` exit 1，旧实现只返回 hub 视图，未发来源消息（`a-r6-a3-tools-red.log`）。生产链现由 main 候选表解析 ID，sidecar 即时 ACK，经既有写闸安装，main 独占 submitted／committed／failed；只读 `hubRequest` 替代 renderer 写阶段。非目录图进入同一即时引擎核验视图，不从 committed 推断 available。普通工具审批保留在单一原面；移除 chat 的 permission.assert 运输、ask 钉子、asksForItself 特例和已死守望者。
 
 A3 最终命令（均 `--max-concurrency 2`）：上节 ui-mac 七文件集合加 `ext-package-ledger-v3.test.ts` exit 0（108 pass／0 fail／561 assertions，`a-r6-a3-ui-final.log`）；ext 的 bridge／tools／context 加 `policy/register-policy.test.ts`、`plugin-host.test.ts` exit 0（166 pass／0 fail／1016 assertions，`a-r6-a3-ext-final.log`）。两包 `bun typecheck` exit 0（`a-r6-a3-{ui,ext}-typecheck.log`）。真实 plugin host 证明全权 0 ask、询问档恰 1 普通 ask、自动化 0 ask 且 deny；生产 ext 工具→bridge→真 main→统一 catalog 入口的金丝雀用例证明秘密只留 main 专用文件，结果带 packageId，stage 不可由 renderer 写入。去掉来源消息、直装受理、metadata 身份或普通审批分流中的任一环，对应用例变红。

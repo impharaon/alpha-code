@@ -428,16 +428,17 @@ describe("ext 造出的每一种待批请求都能经引擎路由列出,且 JSON
     await store!.removeRecord({ level: "tool", canonical: "builtin::subagent" } as never)
   }, 60_000)
 
-  test("定制中心安装:调用前的身份询问与安装确认两条", async () => {
-    const owner = await turn(ASK, "codepuppy_hub_install", { catalogId: "mcp:github" })
+  test("定制中心安装:只有调用前的普通身份询问,无安装确认运输", async () => {
+    const owner = await turn(ASK, "codepuppy_hub_install", { id: "mcp:github" })
     const first = await listed(owner.id)
     expect(first.held.map((item) => item.action)).toEqual(["plugin::codepuppy_hub_install"])
     expect(first.route.status).toBe(200)
+    expect(undefinedPaths(first.held[0])).toEqual([])
+    expect(first.route.json.data).toEqual(first.held)
+    expect(JSON.stringify(first.held)).not.toContain("codepuppyHub")
     await send("POST", `/api/session/${owner.id}/permission/${String(first.held[0]!.id)}/reply`, { decision: "once" })
-    for (let i = 0; i < 200 && !((await probe().ctx.permission.list({ sessionID: owner.id })) as Array<{ action: string }>).some((item) => item.action === "codepuppy_hub_install"); i++)
-      await Bun.sleep(25)
-    await check(owner.id, "codepuppy_hub_install")
     await idle(owner.id)
+    expect(await probe().ctx.permission.list({ sessionID: owner.id })).toEqual([])
   }, 60_000)
 
   test("已知的坏:同一条路由上,metadata 里藏一层 undefined 的请求列不出来(判据看得见这一类)", async () => {

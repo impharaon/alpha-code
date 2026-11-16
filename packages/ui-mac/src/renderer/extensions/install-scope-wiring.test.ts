@@ -45,13 +45,19 @@ describe("REQ-136 wiring: only catalog MCP may submit Current project", () => {
     expect(mcpCalls).toHaveLength(1)
     expect(mcpCalls[0]).toContain("scope: target.target")
 
+    // Six legacy planner exits remain: addMcp above is scoped; the five below are literal-global.
+    // BC2b retired importSkillFolder. The next method after installCatalogIntent is now installPackage,
+    // whose ID-only bridge leaves package effect to main; it is not another installCatalog exit.
     const globalOnly = [
       ["installSkill", "installPlugin"],
       ["installPlugin", "installAgentEntry"],
       ["installAgentEntry", "installCatalogIntent"],
-      ["installCatalogIntent", "importSkillFolder"],
+      ["installCatalogIntent", "installPackage"],
       ["enableCloud", "updateEntry"],
     ] as const
+    const packageExit = functionSlice(source, "installPackage", "setPackageState")
+    expect(packageExit).toContain("extIpc.installPackage(packageId)")
+    expect(installCatalogCallArgs(packageExit)).toEqual([])
     for (const [name, nextName] of globalOnly) {
       const exit = installCatalogCallArgs(functionSlice(source, name, nextName))
       expect(exit).toHaveLength(1)

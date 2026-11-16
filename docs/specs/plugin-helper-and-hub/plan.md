@@ -290,3 +290,117 @@ S4 红例 0f97d78bd3：三文件 exit 1，55 pass / 5 fail / 390 assertions（4 
 2026-11-16 r3 / 来源车道完成 · 收到编排器对固定实样的裁定，仅把 plugin-conversion.test.ts:31 的 URL 字面量纠正为 opencode/onyxia/opencode.jsonc:392 的 https://api.excalidraw.com/api/v1/mcp（该样本固定于 bb5996565f7198c22dfe16acc0adfde98877d3e6，SHA-256 bd2e8a4647da112e974c4f5f1f455e21533145486322ffc566d9f959fbd4bedd）。其余断言、生产代码和样本字节不变。三文件命令 `bun test --max-concurrency 2 src/shared/host-extension-package-contract/plugin-conversion.test.ts src/shared/host-extension-package-contract/host-extension-package-artifact.test.ts src/main/plugin-sources.test.ts`（cwd ui-mac）exit 0：61 pass / 0 fail / 407 assertions；`bun src/shared/host-extension-package-contract/generate-artifact.ts --check` exit 0（17 files）；`bun typecheck` exit 0。文档链接与 diff 检查 exit 0。r2 唯一测试阻塞解除，S1–S4 的本 lane 查找/捕获/转换/比较工作完成；安装/UI/真实服务验收仍归 A2/A3/B/C。已核：Codex（GPT-6）作者自查；OPTIONAL：无。
 
 A2/A3 接线收据：主进程每次应用运行创建一份 `createPluginSources`；`catalog` 提供已验目录候选，`catalogPackage(id, version)` 提供既有已验事实的 envelope 与 components[].payload 内容投影。实例 `searchSources` 返回五源状态/候选；`captureCandidate`、`captureFolder`、`captureGit` 只读捕获；`convertCandidate` 返回缓存的 Capture、规范化包、replacements、privateCredentials 和 runtimeIdentity；`catalogComparisons(name)` 给出目录 catalogId/packageId/version/runtimeIdentity。独立导出 `pluginRuntimeIdentity` 供提交前比对复用。转换运行时统一导入 `plugin-conversion.mjs` 的 `readMarketplace`、`convertPluginTree`、`convertMcpServerDefinition`，类型由同目录 TS/声明文件提供；查询类型为 `PluginSourceIdV1`、`SourceStatusV1`、`CandidateV1`、`SourceSearchResultV1`。转换合同为 `Source`、`Capture`、`PluginPackage`、`Entry`、`Diagnostic`、`Text`、`SecretNeed`、`LoginNeed`；A2 仅从 Diagnostic 的 code/path/sourceName 生成 notRunning，不解析 message，零可运行时由 A2 返回 v5 的 nothing-runnable 结果。
+
+## 切片 D
+
+- 依据：[Issue #1724](https://github.com/impharaon/alpha-code/issues/1724)；[SPEC-plugin-helper-and-hub v3](https://github.com/impharaon/alpha-work/blob/8663fb2a982eaf7c626bfee3bcd8b20b870f2577/docs/specs/plugin-helper-and-hub/spec.md) AC-04、AC-08、AC-09、体验约定；[DESIGN-plugin-helper-and-hub v4](https://github.com/impharaon/alpha-work/blob/850fd2a61f220596fb10922c8b2e477c7475fac4/docs/specs/plugin-helper-and-hub/design.md) §4.4–4.6、§5、§8 D、§10。消费 §4.1 的唯一入口及 A1 转换产物，不重定合同、来源顺序或 owner 决定。
+- 核对：待编排器核对本节计划；当前 Phase: PLAN。首笔实施提交从续派的 `Phase:` 回执填入计划提交、核对人/模型及结论。
+- 基线：`8e40a921ec09cc95d8580142fd45af760d3599d1`，派定工作树/分支沿本次 brief；A1 已有 converter、真实语料和 `createPluginSources`，A2–A4 尚未接入。本次仅追加 D/E 两节，不修改 A 的记录、规格、冻结设计、规则或 H 页面。
+- 预计实施：约 9–12 个生产/资源文件、6–9 个测试/夹具文件，600–1,000 行实质改动（不计真实记录），3–5 小时；按下列提交单元推进，每个 AC 后核对用时和证据。等待合入不计作已实现。
+
+### 改动
+
+路径除 `packages/ext/` 外均相对 `packages/ui-mac/`；标为“新增”的文件在本基线不存在。共享文件等生产方合入后再改，消费其导出，不复制实现。
+
+| 文件 | 改什么 |
+| --- | --- |
+| `resources/factory-skills/plugin-helper/SKILL.md`（新增） | 编写可直接随包使用的完整技能：模型触发说明；PS 必要的一问；检索、语义匹配、已有包安装与无匹配制作；项目范围参数；登录/令牌动作及真实状态短报。工具名、参数与职责引用设计 §4.5/4.6，使用规格原句，不以占位正文交付。 |
+| `src/main/factory-skills.ts`、`factory-skills.test.ts` | 在既有 `FACTORY_SKILL_IDS` 与 `factorySkillSources` 登记 `plugin-helper`，验证 dev/packaged 路径与实际 reconcile 注入。出厂资源仍直达应用资源，不制造用户安装记录。 |
+| `src/main/created-plugin.ts`、`created-plugin.test.ts`（新增） | 将冻结 `CreatedPluginDraftV1` 的文件转为 converter 的真实 capture，并生成插件 manifest；只负责自制输入的组装/形状与 RelPath 校验，提供方语义仍交 A1 converter。不实现另一套技能安装器、事务或路径规则。 |
+| `src/main/plugin-sources.ts`、`plugin-sources.test.ts` | 在同一个 main 来源实例内留存实际 `searchId` 对应的来源状态，供制作分支读取；用来源拥有方的适用集合校验查询完成，不复制来源名单。A1 当前只有目录/Claude 返回值，且没有搜索记录查阅能力；D 补记录消费，不把这两个来源的成功当成全部适用来源成功。 |
+| `src/main/install-from-source.ts`、`install-from-source.test.ts` | 接入冻结 `source.kind: created`：先核 main 记录，再转换并走 A2 的宿主命名、去重、事务、图、自动开启及生效路径。`source.kind: created` / `origin: created` 的结果仍由入口生成；错误沿既有 `not-searched`、`invalid-draft` 等类别。 |
+| `packages/ext/src/hub-tools.ts`、`context-injection.ts` 及对应测试；`src/main/codepuppy-sidecar-messages.test.ts` | 在 A3 的同一 bridge、普通工具判定和阶段读取上登记 `codepuppy_hub_create`，复用其 created 消息合同、requestId 与结果 metadata；参数不加秘密、确认或路线字段。同步真实工具清单/上下文快照及直接 mock 消费者。 |
+| `src/renderer/extensions/extension-hub.tsx` 的 `FactorySkillRow` 回退、`src/renderer/i18n/zh.ts` / `en.ts`；`src/renderer/extensions/plugin-helper.test.ts` 与 `test-component/plugin-helper.cases.ts`（新增） | H 合入后仅接出厂技能键的名称/说明：「插件助手」「查找并安装插件和 MCP」。生产 DOM 验证「系统」行；自制包的行、菜单、来源和管理页消费 H/A4 已有接缝，不重写 H 页面。 |
+| `src/main/created-plugin.engine.test.ts` / `created-plugin.engine.cases.ts`（新增）、`test-fixtures/plugin-helper/` 的新增查询记录及 provenance | 真实入口→安装→技能载入/执行→整包移除；记录查询 URL/范围、时间、上游固定版本及每份原始字节 SHA-256。既有第三方语料引用 A1 `provenance.json`，不手写市场、manifest 或 MCP 的替身。自制草稿是本应用输入，不冒称第三方样本。 |
+
+### 顺序
+
+1. **D1 · 仅新增文件，可立即并行**：只写新的 `resources/factory-skills/plugin-helper/SKILL.md`。按 §4.5 的职责分工逐项写出实际操作：清楚目标直接查；歧义 PS 用「你要读取 PSD 文件，还是操作 Photoshop？」；先 search、后 install/create；无匹配用「在本次查询的来源中没有找到现成插件，正在为你制作一个自己的插件。」；只在用户明说时传项目范围；不提前建环境/写技能、不用 register 安装、不在聊天要令牌、不假报官方或已可用。本提交暂未接出厂注册，不据此声称 AC-09 完成；资源可达性普查待 D2 一起通过。
+2. **D2 · 含既有文件，可独立于 A2–A4/H 开始**：登记 factory IDs/资源路径，补真实资源的 reconcile 与零账本证据；运行 factory、打包资源可达性、非空壳检查。此步不修改 renderer、不改 A4 拥有的 `customize-codepuppy` 安装段。构建应用的行为验收仍等 D4/D5。
+3. **D3 · 等 A2、A3 合入，并在 B/C 的来源 delta 上集成**：接缝是 A2 `installFromSource`/converter/自动开启、A3 `CreatedPluginDraftV1`/bridge/阶段与普通权限路径、同一 main 来源实例。先落制作资格、坏草稿、真实整包安装的可失败用例，再补创建 capture、搜索记录与工具接线。未知 searchId、任何适用来源失败或未查询都须在写盘前返回 `not-searched`；不能仅用返回数组的 `every(ok)` 放行缺来源的 A1 结果。匹配与否仍由助手按目标判断，不能新增“候选数组必须为空”的限制。B/C 未合入时只做其已存在接缝的代码，不宣称完整无匹配链可用。
+4. **D4 · 等 H、A4 合入**：接缝是 H 的 `FactorySkillRow`/包行/整包状态与移除、A4 的 source 呈现及 `hubInstall` 对 create part 的投影。只补出厂文案回退及 D 的生产 DOM/自制来源集成例；复用已合入时间线订阅、按 packageId 管理和移除。若接缝缺失，按 A 节已有返回向编排器报告，不在 D 复制页面或卡片。
+5. **D5 · 等 D3/D4 及 B/C 的完整查询/独立 MCP 链**：跑创建引擎回归、受影响包 typecheck；向编排器交构建应用的四份验收脚本/所需证据：歧义 PS、已明确 PSD、清楚任务且全来源无匹配、已有匹配/来源失败对照。由编排器在实际模型会话收集顺序、提问数、真实任务与界面证据；使用出厂技能分别装插件和独立 MCP。未取得模型行为证据不能只凭技能正文报 AC-04/08/09 通过。
+
+### 风险
+
+- **来源完整性与语义判断不同**：工具校验实际查询记录，助手判断能力是否匹配。无匹配正例必须保留各适用来源真实联网记录；已有匹配、同名不同用途和失败记录分别对照，不用删除生产目录或伪造空市场得到正例。B/C 的来源增量是完整验收依赖，本车道不实施其查询器。
+- **提示词不能代替行为证据**：内容审读与出厂非空壳检查只能证明资源质量；PS 只问一次、先查后写、无第二次同意、优先现成包、真实任务使用必须从实际工具 part/会话与盘面证明。失败查询绝不触发制作原句；来源标签由 main 的事实给出。
+- **接缝与命名**：草稿中的路径/内容经生产转换与 A2 的宿主名称映射处理，保留重名对照；不再手写第三方解析。自制技能依赖包内资料能否运行沿既有 converter/物化能力，如实显示 `notRunning`，正例选本增量可运行的独立技能。零可运行内容、事务失败和阶段中止沿 A 的行为验证，无新增大小/次数/有效期限制。
+
+### 证明
+
+下列均为 **IMPLEMENT 拟执行**，PLAN 不把它们记为已运行。实际模型验收归编排器，保留请求、工具序列、来源原字节/摘要、产物、引擎结果与界面证据，不新增“检查文字是否包含某句”的文档测试。
+
+| AC | 测试/证据 | 缺少行为为什么会失败 |
+| --- | --- | --- |
+| AC-04 | 构建应用重放「帮我安装 ps 插件」→回答读取 PSD；对照直接说读取 PSD。核实际问题次数（1/0）、search 返回的所有适用来源、第一笔自制动作的先后顺序；匹配正例安装已有候选，无匹配正例按约定句制作；来源/包行不冒称官方 Photoshop。 | 反复提问、用含糊品牌直接制作、查找前建 Python 环境/写技能、遇到匹配仍制作都会在会话序列或盘面失败；明确 PSD 仍提问也失败。 |
+| AC-08 · 制作资格 | `created-plugin.test.ts` / `install-from-source.test.ts`：`complete successful search admits created draft`、`unknown failed or incomplete search has no writes`；完整状态由真实查询记录驱动，分别删去一项来源、换未知 ID、使用实际失败记录。助手的有匹配对照留在模型验收。 | 拿掉 main 的 searchId 校验会令失败/缺来源对照落账；只检查已有返回项全 ok 会错误放行不完整记录；把语义匹配强加成 candidates.length=0 又会错误拒绝有无关候选的任务。 |
+| AC-08 · 装好、使用、移除 | `created-plugin.engine.test.ts`：`created skill installs through the shared entry and runs`；真实临时盘上检查同一 packageId、真实 root/组件、enabled、技能目录被引擎发现并可通过技能工具读取/执行明确任务；H DOM/构建应用显示「我的插件」、一包一行、整包移除后入口与专有内容消失。安装前后项目文件树/原有文件 bytes 相同。 | 旁路安装、仅写散落 SKILL.md、未开启、仅返回成功文字、不能用于任务、来源读包前缀、移除留下组件或写项目文件都会使对应实际断言失败。 |
+| AC-08 · 无二次同意 | 同一无匹配任务的真实模型会话：约定句后直接 create/install；已匹配和任一来源失败两个对照均无自制动作；普通工具档位检查沿 A3 的相关用例。 | 新增“是否同意制作”或把普通工具审批误当安装确认，会改变会话/工具序列；失败源冒称无结果、先创建后补查会被对照抓住。 |
+| AC-09 | `factory-skills.test.ts`、资源 census/hygiene；新引擎从真实出厂目录发现 `plugin-helper` 并能读到完整技能；干净应用「系统」行显示精确名称/说明，用户账本没有 helper 包。再经助手分别安装真实插件与 C 的独立 MCP，H 各一包一行。 | 少资源、漏 registry、未进入显式技能注入或只有空壳分别被资源/引擎断言抓住；依赖另装 helper 包会在干净数据根失败；只测 registry 不能替代两类真实安装。 |
+
+**相关命令（IMPLEMENT）**：ui-mac 内运行 `bun test --max-concurrency 2 src/main/created-plugin.test.ts src/main/plugin-sources.test.ts src/main/install-from-source.test.ts src/main/codepuppy-sidecar-messages.test.ts`；`bun test --max-concurrency 2 src/main/factory-skills.test.ts src/main/codepuppy-skill-packaging-census.test.ts src/main/codepuppy-factory-skill-hygiene.test.ts src/main/created-plugin.engine.test.ts src/renderer/extensions/plugin-helper.test.ts`。ext 内运行 `bun test --max-concurrency 2 src/hub-tools.test.ts src/hub-bridge.test.ts src/context-injection.test.ts`；工具清单、自动化 deny/普通权限及 changed exports 的直接 mock 消费者按实际 delta 补跑。A4 的 `timeline-model.test.ts` / `hub-install-card.test.ts` 和 H 的 `hub-three-pages.test.ts` 只跑 create/source 直接相关文件。两包各 `bun typecheck`，不跑全 gate/bin/check。PLAN 只运行末尾两项文档检查。
+
+### 偏离记录
+
+暂无。输入缺口：2026-11-16 读取 Issue #1724 当前正文，其依据/交接仍是 design v3 @8663fb2，未含派发明确指定的 v4 @850fd2a；返回编排器同步正文。本节按派发冻结的 v4 写计划，不改 Issue、不据旧版本重开裁决。
+
+## 切片 E
+
+- 依据：[Issue #1724](https://github.com/impharaon/alpha-code/issues/1724)；[SPEC-plugin-helper-and-hub v3](https://github.com/impharaon/alpha-work/blob/8663fb2a982eaf7c626bfee3bcd8b20b870f2577/docs/specs/plugin-helper-and-hub/spec.md) AC-16、体验约定及已定的提案 A；[DESIGN-plugin-helper-and-hub v4](https://github.com/impharaon/alpha-work/blob/850fd2a61f220596fb10922c8b2e477c7475fac4/docs/specs/plugin-helper-and-hub/design.md) §4.4、§4.6、§5、§8 E、§10 R2-F2 与 v4 生效修订。只实现这些已冻结接缝，不增加范围选择步骤或重定默认。
+- 核对：待编排器核对本节计划；当前 Phase: PLAN。首笔实施提交从续派的 `Phase:` 回执填写。
+- 基线：同 D 的 `8e40a921ec`。已核现状：`ext-receipt-v2.ts:586–735` 是允许集唯一发布方；`packages/ext/src/gen-skill-paths.ts` 只读 v1 keys；main 的 `explicitSkillDirs` 直接复用它；`engine-explicit-config.ts:133` 以 100 ms 去抖刷新；`plugin.ts` 已有 post 段后的 agent/provider tail，可复用机制。上述是 E 的改动落点，不据此重审冻结方案。
+- UI：沿 A 节链接的批准帧 `#manage` 和现有 H 管理页，仅接「生效范围」及「我的所有项目」/「仅当前项目」展示；本片不新增范围编辑控件、安装前提问或 H 页面。
+- 预计实施：约 10–13 个生产文件、7–10 个测试文件，800–1,200 行实质改动，4–6 小时；每项隔离证明后核对时间/规模，明显翻倍则交回，不扩成配置/权限重构。
+
+### 改动
+
+路径约定同 D；与 D 共用文件时先完成 D 的提交再集成 E 的范围行为，不同时写同一文件。
+
+| 文件 | 改什么 |
+| --- | --- |
+| `packages/ext/src/package-scope.ts`、`package-scope.test.ts`（新增） | 实现设计已冻结的 `PackageAllowSetV2` 单一类型/解码与 `managedSkillAllowedHere` 正向成员判断；相同的项目匹配供 MCP 消费。仅依赖自身合同/路径基础库，可先开发；不另建配置文件、账本 decoder 或副本规则。 |
+| `src/main/ext-package-ledger-v3.ts`、`ext-package-ledger-v3.test.ts` | 在 A2 已扩展的图上加入 effect 的严格解码/摘要覆盖，消费既有 `projectScopeIdentity`；记录仍全局物理安装。 |
+| `src/main/ext-receipt-v2.ts`、`ext-receipt-v2.test.ts` | 沿同一允许集发布点由真实 records/包图生成 v2；测试 tuple 交集收窄、账本提交、完整发布和 `projectionLag`/启动重算。类型消费 ext 的同一合同；不另存范围真源、不兼容旧投影。 |
+| `packages/ext/src/gen-skill-paths.ts` / `.test.ts`、`src/main/codepuppy-config-injection.test.ts`、`engine-explicit-config.test.ts` | 技能注入读取 v2 的 keys 与 scoped(skill) 的并集，沿现有 live generation 和 main 调用链；更新明确编码旧版本的断言，保留未知版本/坏文件失败对照。实际 watcher 的输入和去抖机制复用，不为测试增加产品开关。 |
+| `packages/ext/src/plugin.ts`、`plugin-host.test.ts` | MCP transform 在配置 MCP 已存在后仅启用匹配 scoped 项；受管技能使用 postActivationTail 收口，`plugin.updated` 后重放；setup evaluate 使用同一个 `managedSkillAllowedHere`。识别受管目录后才套成员规则，出厂/原生/项目自带技能保持原判定。 |
+| `src/main/install-from-source.ts`、`ext-package-tx-builders.ts`、`ext-install-planner.ts` 及对应入口/builder/状态测试 | 将 A3 的 this-project 请求经 main 项目身份解析写图 effect；全局 MCP 物化与包根开启均保持项目项的持久停用，启用状态仍由包根/允许集表达。默认请求消费既有 all-projects，不写项目配置。 |
+| `src/main/package-mcp-activation.ts` / `.test.ts`、`hub-view.ts` / `.test.ts` | 在 A2 运行时接入的同一路径中按 effect 选择已加载 Location；关包、移除或收窄时撤掉不再匹配的运行时项，后加载 Location 读持久停用配置并由 ext 匹配。按当前目录实际工具/状态回读可用性。 |
+| `src/main/ext-ipc.ts`、`src/renderer/extensions/ext-ipc.ts`、`extension-detail.tsx`、`src/renderer/i18n/zh.ts` / `en.ts`，H 的 `test-component/hub-three-pages.cases.ts` | H 合入后通过既有 installedPackages 只读投影传图的 effect，管理页接范围字段与精确文案。复用 H 的包身份、权限/账户/关于及整包动作，不承接 H 的页面建设或新写 IPC。若 preload 类型是该视图导出的直接消费者，只做同笔机械类型同步。 |
+| `src/main/package-effect.engine.test.ts` / `package-effect.engine.cases.ts`（新增） | 复用 A2 真引擎宿主及真实安装产物，证明两个已加载 Location、后加载/重建、技能执行与真实 MCP 工具可见性；包含关包/改范围的旧显式配置窗口。每个用例核隔离数据根和项目快照。 |
+
+### 顺序
+
+1. **E1 · 仅新增文件，可立即并行**：新增 `packages/ext/src/package-scope.ts` 与单元测试，直接消费冻结形状。先钉住正向/反向成员、未知项目/坏允许集、同名不同项目、空但合法 v2、keys 成员与 scoped 成员对照；尤其是条目已离开 scoped 的合法文件。此时不改 main 发布方、现有 gen-skill-paths 或 plugin 接线，不能把纯函数通过当作 AC-16 验收。
+2. **E2 · 等 A2 合入**：接缝是扩展后的包图/摘要、`installFromSource`、MCP 叶子 builder 与包根状态。先补 effect/投影/全局 MCP 恒停用的红例，再接 v2 唯一写方及 gen-skill-paths 读方，同笔更新所有直接编码 v1 的相关断言。不迁移记录、不双读两版；沿原发布顺序实现并证明范围变更的 tuple 交集。A3 的 scope 运输可尚未调用，本步直接从真实入口测试驱动。
+3. **E3 · 等 A3、H 合入；运行时部分同时等 A2**：A3 接缝为 install/create 的 scope 与 Location.directory，H 接缝为同一 `setPackageStateV1`/卸载/自动生效动作。接 main 身份复核、ext MCP transform、技能尾巴/evaluate 与 A2 runtime 接入的 Location 过滤；跑真正插件宿主和跨 Location 引擎例。D 已实现 create 后补其 this-project 对照，不复制 D 的创建入口。尾巴、权限兜底只能共用 E1 判断；不改 Core/Server 或引擎代次。
+4. **E4 · 等 H、A4 合入**：接缝为 `InstalledPackageV1` 安全只读投影、H 同包管理页与 A4 真实可用状态。仅增加 effect 的展示与对应 DOM 证据；项目乙即使能管理同一全局包，也不能将仅甲的组件报告成可用工具。缺接缝只返回编排器，不在本片重做包行/管理页。
+5. **E5 · 等上述接入及 B/C 的真实来源样本**：完成 AC-16 的默认全局、显式项目、缺投影、合法收窄、去抖窗口和重建用例；跑直接相关回归/包 typecheck。向编排器交构建应用两项目普通请求、明确项目请求及管理页/真实任务证据脚本。不可用来源或未跑真实 MCP 的例子如实留未验收，不用 stub 代替通过。
+
+### 风险
+
+- **允许集暂态**：不能只按技能 key 求交集而忽略 kind/name/projectPath，全部项目→项目甲或项目甲→项目乙都须先撤后增。用现有 final-publish 注入点验证失败仍停在窄态、回报 projectionLag，再由生产启动对账恢复；不是新增恢复协议。
+- **已解析技能会回来**：配置插件持有旧技能路径，即使新允许集合法且没有该条目，也会在 watcher 刷新前重建。尾巴须在真实 post 段之后，未安置时的 evaluate 也必须拒绝不再是正向成员的受管技能。测全局 keys 移除和 scoped 移除两支，不能只测“scoped 存在但项目不同”。
+- **运行时与持久状态**：MCP 热接入不能无视 effect 给所有 Location add；H 再开启不能把项目 MCP 的全局 enabled 改成 true。用安装、关包/再开、移除和范围收窄的真实链校验，而不把 recordingMcp 记账服务当作真实隔离证据。
+- **窗口证据不能空跑**：引擎用例先证明旧配置确已解析该技能、技能曾可用，且新允许集已落而显式配置仍旧，再触发重建。以实际前提/屏障定位窗口，不靠 sleep 后猜时序；没命中旧配置窗口就失败，不跳过。scope 更新由真实包图 mutation/账本提交驱动，不为构造反例新增面向用户的 scope 编辑能力。
+
+### 证明
+
+所有实现用例拟执行，当前 PLAN 只做代码阅读。真实第三方输入复用 A1 `test-fixtures/plugin-helper/provenance.json` 固定的 Claude `b5b01ac4…`：`frontend-design` 技能、context7 插件、Playwright MCP；独立 MCP 的注册表原字节/版本/摘要消费 C 的真实语料。新格式只允许为本应用的 v2 合同/草稿构造状态，不手写第三方格式。各测试先断言样本的真实类型/无需凭据和不同运行身份，再断言范围结果，避免去重掉“另一包”而空跑隔离。
+
+| AC | 测试/证据 | 缺少行为为什么会失败 |
+| --- | --- | --- |
+| AC-16 · 默认所有项目 | `package-effect.engine.test.ts`：`default plugin and standalone MCP are usable in both projects`。干净数据根从甲普通请求分别安装 frontend-design 插件和 C 的真实独立 Playwright MCP；甲乙真实引擎都发现并可调用技能/浏览器工具，账本只有各自同一个 packageId。 | 默认错误写 project effect、仅向请求 Location 热接入或在乙复制安装，会分别使乙调用/工具清单、同一包计数失败。仅有 config 或 connected 状态不能通过。 |
+| AC-16 · 明确仅项目 | 同宿主从甲明确只在本项目装另一 context7 包，真实工具在甲可用、乙无可用入口；另一个隔离数据根以真实 frontend-design 验证项目技能在甲可读/使用、乙不在技能清单且实际 skill 请求不放行。检查项目身份 realpath 与无项目 Location 对照；重建/后加载乙结果相同。 | 把技能路径注入当最终隔离、只在 setup 早删、未知目录当全局、MCP 全局启用或 runtime add 不过滤，都会在乙实际清单/执行断言暴露；仅改 UI 标签无效。 |
+| AC-16 · 允许集发布/失败 | `ext-receipt-v2.test.ts`：`scope shrink publishes intersection before ledger`、`final publish failure remains narrower and reconciles`；用真实安装派生 v2，核全部→甲、甲→乙、关包、移除；读取缺失、未知版本/畸形文件对照。 | 只比较 keys、提前扩容或失败时解释成全局会留下可运行成员；记录/图/投影次序及 ext 读回断言失败。移除所有数据后仍保留旧成员也会失败。 |
+| AC-16 · 去抖窗口关包 | `package-effect.engine.test.ts`：`disabled managed skill stays absent with stale explicit config`；先真实安装并可用，再开生产 watcher，经 H 同一包根动作关闭，在允许集已更新而显式文件仍含旧 generation 的窗口触发生产配置技能重建。尾巴完成后清单不含该技能；尾巴未安置子场景实际 evaluate 不放行。keys/scoped 两类均覆盖。 | 撤掉尾巴或改成“只删除不匹配 scoped 条目”的旧规则，合法允许集不再含该条目时会把已解析技能加回；撤掉 evaluate 则尾巴未安置的真实执行对照失败。 |
+| AC-16 · 去抖窗口改范围 | 同文件 `scope change cannot revive a parsed skill in another project`：乙已解析全局技能，实际包图提交将 effect 收窄到甲，v2 仍合法；在乙显式配置未刷新时重建并尝试 skill。另测甲→乙，确认旧项目撤回且新项目可用；MCP 由同一范围提交触发既有 runtime 撤销路径。 | 没测曾经可用的乙、仅看磁盘、只删显式目录或只测坏 JSON 都会漏错；合法 scoped 已删除/换项目仍放行时，旧 Location 的真实清单/调用断言变红。 |
+| AC-16 · 管理与项目零写入 | H 生产 `hub-three-pages.test.ts` 从同一 packageId 打开管理页，显示精确范围；构建应用甲乙各执行真实调用，安装/关开/移除前后所有已有配置 bytes/digest 相等，空项目无新增配置/技能目录；数据根只见全局包。 | 展示安装落点而非 effect、误报乙可用、分成两包、向 `.codepuppy` / `.mcp.json` / 项目技能目录落文件会令 DOM、包身份或全树快照失败。 |
+
+**相关命令（IMPLEMENT）**：ext 内运行 `bun test --max-concurrency 2 src/package-scope.test.ts src/gen-skill-paths.test.ts src/engine-transforms.test.ts src/plugin-host.test.ts`。ui-mac 内运行 `bun test --max-concurrency 2 src/main/ext-package-ledger-v3.test.ts src/main/ext-receipt-v2.test.ts src/main/ext-set-state-tx.test.ts src/main/ext-package-ledger-uninstall.test.ts src/main/install-from-source.test.ts src/main/package-mcp-activation.test.ts src/main/package-effect.engine.test.ts src/main/hub-view.test.ts`；`bun test --max-concurrency 2 src/main/codepuppy-config-injection.test.ts src/main/engine-explicit-config.test.ts src/main/package-builders-wiring.test.ts src/renderer/extensions/hub-three-pages.test.ts`。改动 MCP builder 导出时补现有 mock 消费者 `package-mixed-bundle.wiring.test.ts` / `package-secret-recovery-wiring.test.ts`；直接类型/消息消费者按实际 delta 同步并跑对应测试。两包各 `bun typecheck`；这些命令限制并发 2，不另跑全仓套件/gate/bin/check。
+
+### 偏离记录
+
+暂无。E1 不接生产、不假报范围功能已交付；其余按上列合入接缝推进。已核：计划作者 Codex（GPT-6）核对 spec v3、design v4、A1 @8e40a921ec 与允许集/注入/插件尾巴/刷新调用链；本阶段尚无行为验收。遗留去向：Issue 正文版本同步→编排器；H/A/B/C 接缝合入与构建应用真实模型/任务验收→各片及编排器；OPTIONAL：无。
+
+本轮 D/E PLAN 开始于 2026-11-16 14:48:39 CST，约 13 分钟（预算 45 分钟）；只改本文件的这两节。`python3 scripts/check-doc-links.py docs/specs/plugin-helper-and-hub/plan.md` exit 0（2 条相对链接可达），`git diff --check` exit 0；原有计划 33,609 bytes 逐字节保持，提交前另核暂存范围。未执行仓库测试、typecheck、全 gate 或功能验收。

@@ -67,6 +67,7 @@ const MANAGED = [
 ] as const
 const saved: Record<string, string | undefined> = {}
 let userData = ""
+const discoveryPath = "/api/v1/models" // LM Studio discovery protocol, outside the Alpha route manifest.
 let localModels: ReturnType<typeof Bun.serve> | undefined
 
 beforeAll(async () => {
@@ -76,7 +77,7 @@ beforeAll(async () => {
     localModels = Bun.serve({
       hostname: "127.0.0.1",
       port: 1234, // Built-in LMStudioPlugin discovery origin; no owner service is required.
-      fetch: (request) => new URL(request.url).pathname === "/api/v1/models"
+      fetch: (request) => new URL(request.url).pathname === discoveryPath
         // Same discovery sample as core/test/plugin/provider-lmstudio.test.ts, first language model.
         ? Response.json({ models: [{
             type: "llm", key: "google/gemma-4-26b-a4b", display_name: "Gemma 4 26B A4B", architecture: "gemma4",

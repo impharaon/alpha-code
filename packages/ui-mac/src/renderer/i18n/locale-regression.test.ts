@@ -67,6 +67,8 @@ const EXTERNALIZED_SURFACES = [
 const localeDictionaries = { ar, br, bs, da, de, en, es, fr, ja, ko, no, pl, ru, uk, zh, zht }
 
 const visibleOpencodeAllowlist = {
+  // The external plugin ecosystem is a source identity, not this application's brand.
+  "codepuppy.ext.packageSourceOpenCode": "external-ecosystem",
   // `opencode` is the real installed CLI executable; renaming this instruction would break the command.
   "desktop.cli.installed.message": "cli-command",
   // This is the real upstream-compatible configuration path written by the shipped app.
@@ -177,12 +179,16 @@ describe("locale regression gate", () => {
     )
     const occurrences = (
       await Promise.all(
-        files.map(async (file) => ({
-          file,
-          tokens: Array.from((await Bun.file(join(renderer, file)).text()).matchAll(/OpenCode[A-Za-z]*(?:\.app)?/g)).map(
-            (match) => match[0],
-          ),
-        })),
+        files.map(async (file) => {
+          const dictionary = Object.entries(localeDictionaries).find(([locale]) => file === `i18n/${locale}.ts`)?.[1]
+          // Exempt only registered dictionary rows and their literal key references; scan all other text.
+          const source = Object.keys(visibleOpencodeAllowlist).reduce((text, key) => {
+            const value = dictionary && Object.entries(dictionary).find(([name]) => name === key)?.[1]
+            const row = value === undefined ? text : text.replace(`${JSON.stringify(key)}: ${JSON.stringify(value)}`, "")
+            return row.replaceAll(JSON.stringify(key), "")
+          }, await Bun.file(join(renderer, file)).text())
+          return { file, tokens: Array.from(source.matchAll(/OpenCode[A-Za-z]*(?:\.app)?/g)).map((match) => match[0]) }
+        }),
       )
     ).flatMap((item) => item.tokens.map((token) => ({ file: item.file, token })))
 

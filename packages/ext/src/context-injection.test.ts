@@ -61,6 +61,7 @@ import { assertWebSearchToolAllowed } from "./cloud-websearch-kill"
 import { namedDeny, type PolicyDenyReason } from "./policy/gate"
 import { ToolFailure } from "../../ai/src/schema/errors.ts"
 import { REBRAND_RULES } from "./prompt-rebrand"
+import { WITHHELD_CLOUD_MCP } from "../../ui-mac/src/main/cloud-web-search"
 import { applyPromptTakeover } from "./codepuppy-prompts"
 import { CODEPUPPY_AGENT_TEXT } from "../../ui-mac/src/main/codepuppy-agents"
 import { CODEPUPPY_BEHAVIOR_MD } from "../../ui-mac/src/main/codepuppy-behavior"
@@ -228,7 +229,7 @@ function unexplainedWrites(after: unknown): Leaf[] {
  * `/commands/<name>/{description,template}`(template = 用空参数执行该命令时发给会话的那段字)、`/mcp/<name>/…`。
  * 只收字符串,所以 `mode` 一类枚举不进判官。transform 回调由本函数用记账的编辑器驱动(宿主里的接线在 plugin-host.test.ts)。
  */
-async function extWrites(): Promise<Record<string, Record<string, Record<string, unknown>>>> {
+async function extWrites(initialMcp: Record<string, unknown> = {}): Promise<Record<string, Record<string, Record<string, unknown>>>> {
   const recorded = recordingContext(join(root, "project"))
   await CodePuppyExt.setup(recorded.context)
   const agents = new Map<string, Record<string, unknown>>()
@@ -244,7 +245,7 @@ async function extWrites(): Promise<Record<string, Record<string, Record<string,
     } as never)
   const definitions: Array<{ name: string; description?: string; execute: (input: unknown) => Promise<void> }> = []
   for (const transform of recorded.transforms.command ?? []) transform({ add: (definition: never) => void definitions.push(definition) } as never)
-  const servers = new Map<string, unknown>()
+  const servers = new Map<string, unknown>(Object.entries(initialMcp))
   for (const transform of recorded.transforms.mcp ?? [])
     transform({
       list: () => Array.from(servers),
@@ -300,9 +301,13 @@ describe("③a 配置域 transform 咽喉:ext 写进 agent / command / mcp 的�
     const token = join(root, "cloud-token")
     writeFileSync(token, "tok-cloud\n")
     republish({ killSwitch: true, cloudMcp: testCloudMcp("https://cloud.invalid/mcp", token) })
-    const after = await extWrites()
+    const after = await extWrites({ codepuppy: WITHHELD_CLOUD_MCP })
     expect(after.mcp.codepuppy).toEqual({ type: "remote", url: "https://cloud.invalid/mcp", headers: { Authorization: "Bearer tok-cloud" }, oauth: false })
     expect(unexplainedWrites(after)).toEqual([])
+    // Package off: main omits its effective server, so the kill-switch rearm must not resurrect it.
+    const off = await extWrites()
+    expect(off.mcp.codepuppy).toBeUndefined()
+    expect(unexplainedWrites(off)).toEqual([])
   })
   test("已知的坏 ①:绕过登记簿写一个 agent system —— 判官点名那一条", async () => {
     const after = await extWrites()

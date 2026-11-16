@@ -34,7 +34,8 @@ last_reviewed: 2026-11-15
 | `src/main/ext-transaction.ts`、`src/main/ext-transaction.test.ts` | r3 授权：事务内以条目序号区分 generation 的八位十六进制后缀；不改现有读者文法、探针、core 或已落记录。新用例验普通/进位边界的唯一代号及读回/卸载。 |
 | `src/main/engine-explicit-config.ts` / `.test.ts`、`src/main/codepuppy-config-injection.ts`、`src/main/{codepuppy-config-injection-engine,engine-plugin-policy.engine}.cases.ts` | r4 B1：由原账本读器按包 root 状态投影同图 disabled 组件；显式层撤下关闭包的 command/commands，启动注入不注册关闭云包的 MCP；只透传现有 root 到显式层写入/监听，不改存储内容、engine 或发布 schema。相关调用测试同步私有签名。 |
 | `src/main/official-connector-resources.ts`、`src/main/official-connectors.test.ts`、`test-component/official-connectors.cases.ts`、`src/main/ext-package-tx-builders-command.test.ts` | r4 A/B2–4：复用原官方投影 writer 发布提交后的新引用，按密文版本判 saved；具名验证成功清旧/失败保旧。command builder 旧 disabled 拒绝例随真实有效声明投影替换，保留内容等待同包 root 开启。 |
-| `../ext/src/plugin.ts`、`../ext/src/plugin-host.test.ts` | r4 B1 同链：既有 kill-switch rearm 仅重装 main 有效注入中存在的云 server；包 off 的缺席不会被重装。原身份测试补 main 真实 withheld 前像，既有断言不改。 |
+| `../ext/src/plugin.ts`、`../ext/src/plugin-host.test.ts`、`../ext/src/context-injection.test.ts` | r4 B1 同链：既有 kill-switch rearm 仅重装 main 有效注入中存在的云 server；包 off 的缺席不会被重装。原身份测试补 main 真实 withheld 前像，既有断言不改。 |
+| `../../scripts/gate-files.tsv`、`../../scripts/old-name-exceptions.tsv`、`src/renderer/i18n/locale-regression.test.ts`、`test-component/local-package-namespace.cases.ts` | r6 授权的登记同步：生命周期宿主及实际精确计数、真实样本外部锚点、外部生态来源名与既有安全 DTO 的 desiredState；不改变扫描正则/范围、地板或失败清单。 |
 | `src/main/ext-config.ts` | 同调用链补严格读取：沿既有 main-only remote MCP 真值读取器取得已装定义，供装后凭据编辑保留原文件引用；不另建配置或 secret 权威。 |
 | `src/main/ext-ipc.ts`、`src/main/ext-write-channels.ts` | 已安装投影带 root 状态、组成和安全授权视图；包状态/装后密钥写动作接现有写闸、恢复与重载通道。main 依据包身份重读图和已验声明，调用方不能指定 server URL、任意 config 或秘密文件。卸载仍走 `uninstallPackageV1`。 |
 | `src/preload/types.ts`、`src/preload/index.ts`、`src/renderer/extensions/ext-ipc.ts` | 串接包状态及装后授权动作，统一引用安全 DTO；只增加本片所需的桌面内部动作，不新增发布者合同。 |
@@ -199,3 +200,17 @@ r5 C7 ship 前置修正（2026-11-16）：续派在干净 origin/alpha 的诊断
 修正过程补证：首次仅在 C7 组前启动时，C7 子集已绿，但完整宿主仍 exit 1（23 pass / 1 fail）；原因是前面的 S6 引擎已经把无本地服务缓存进进程级 discovery。最终 fixture 提前到文件 beforeAll、所有引擎之前；未改缓存实现、前置等待或断言。
 
 最终宿主 `bun test --max-concurrency 2 src/main/codepuppy-config-injection-engine.test.ts` exit 0（1 宿主 pass，实际 24 子例 / 0 fail）；启动前 lsof 确认 1234/11434 均无监听。最终 setup 的已知坏变异只把反向臂 content 换回原注入内容、仍不传显式文件，同一 C7 命令 exit 1（3 pass / 1 fail，Expected true / Received false），已恢复。ui-mac `bun typecheck`、计划链接检查及 `git diff --check` exit 0。改动仅测试 setup 与本段证据，无 gate/bin/check 或产品变更。
+
+
+r6 ship 前置（2026-11-16，按 Claude Opus 5.5 对照干净 origin/alpha 的 class B 分类及续派授权）：B1 判断是测试缺 main 前像，产品条件正确。`codepuppy-config-injection.ts` 在 owning root off 时不注入云 server；`ext/plugin.ts` 只重装有效条目正是避免关后复活。context-injection 的测试输入改用既有 WITHHELD_CLOUD_MCP 常量，原注入断言保留，并在同例证明无 main 条目时 server 缺席。修前 `bun test --max-concurrency 2 src/context-injection.test.ts` exit 1（42 pass / 1 fail），修后 exit 0（43 pass）；未改产品。B2/B3 注册生命周期宿主，实测外层 1 / 子例 5；B4 wiring 子计数同步 22，补 17→22 来由；B5/B6/B7 登记精确值同步为 22/6/5。B8 外部 LM Studio 协议 stub 的 pathname 与局部常量比较，保留 Alpha route-authority 棘轮原规则。B9 真实 hub fixture 的 impharaon/alpha-web 按 external-anchor 精确登记 1 处，不改样本字节。B10 安全 DTO 键表增加 desiredState 并断言 disabled。locale 按唯一 allowlist 注册外部生态来源 key，source scan 仅扣除登记翻译行与其字面 key 引用，保留其它文本扫描；临时未登记品牌 JSON probe 仍使该用例 exit 1（0 pass / 1 fail），已清理。
+
+相关核对：ui-mac `bun test --max-concurrency 2 src/main/package-admission.wiring.test.ts src/main/gate-file-registry.test.ts src/shared/route-authority-ratchet.test.ts src/main/old-name-scan.test.ts src/main/local-package-channel.test.ts src/renderer/i18n/locale-regression.test.ts` exit 0（91 pass / 6 文件）；admission/presentation/mcp-auth/生命周期四文件组 exit 0（34 pass = 22+6+5+1）。ui-mac 与 ext `bun typecheck` 均 exit 0。
+
+仅按 r6 授权各执行一次相应包级/逐文件步骤，进程带 `GATE_ALLOW_FULL="gate diagnosis: steps skipped by short-circuit in PR 1725 gate"`，未调用整个 gate：
+
+- `bash scripts/bun-test-floor.sh 100 packages/ext` exit 0，585 pass / 0 fail（51 文件）。
+- `CODEPUPPY_KNOWN_FAILS_FILE=scripts/known-fails.tsv bash scripts/bun-test-floor.sh 3000 packages/ui-mac src` exit 1，6666 pass / 1 skip / 3 fail（525 文件）；仅分类报告的 M1–M3，未发现新分支失败，未改 known-fails。日志 `/tmp/hub-r6-ui-whole.log`。
+- `bash scripts/bun-test-app.sh` exit 0，整包 725 pass / 0 fail（105 文件），另 9 个补丁拥有测试文件 / 72 条逐一精确相符。
+- `bash scripts/assert-gate-files.sh` exit 0，352 个文件全部在位、通过且精确计数一致；新生命周期宿主 1、admission 22、presentation 6、mcp-auth 5。日志 `/tmp/hub-r6-gate-files.log`。同轮此步骤的 network-egress-proxy / net-failure-real-stack / schema codepuppy-net-failure 分别 23/5/20 pass，均 exit 0；这是后续逐文件实测，不冒充前述 ui-mac 整包 exit 0，也不重跑已授权一次的整包。
+
+M1–M3 本次整包的具名记录（去向：编排器的机器条件处置，本片不改 DNS 或共享主 checkout）：`其它失败形态各自可辨,且都不转发 > 登记了但解析不了(.invalid)⇒ 503 dial-failed ENOTFOUND:DNS 在代理进程里发生,失败也在这里可读`；`六个 webfetch 都经出网代理失败,并作为工具记录落库`；`持久化记录的 metadata.codepuppyNetFailure:policy / dns / tcp / tcp / tls-silent`。后两条父组为 `#1572 AC4 真栈:Electron 内嵌 node + 真出网代理 + 真 webfetch ⇒ 持久化的工具记录带层`。M4 本轮逐文件检查已绿。r6 偏离仅为授权的测试/登记同步与本段证据，无生产改动、依赖、接口、迁移或额外放宽；class B 全部闭合。已核 Codex / GPT-6。

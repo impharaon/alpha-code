@@ -210,6 +210,7 @@ test("只读列表通道:装成之后的 `origin` 来自 child record,不是从 
   expect(entry.version).toBe("1.0.0")
   expect(entry.rootComponentName).toBe("namespace-fixture")
   expect(entry.origin).toBe("catalog")
+  expect(entry.desiredState).toBe("disabled")
   expect(entry.components).toEqual([
     { componentId: "mcp:namespace-fixture", kind: "mcp", name: "namespace-fixture", required: true, desiredState: "disabled" },
   ])
@@ -224,6 +225,7 @@ test("只读列表通道:装成之后的 `origin` 来自 child record,不是从 
   expect(entry.displayName).toBeNull()
   expect(Object.keys(entry).sort()).toEqual([
     "components",
+    "desiredState",
     "displayName",
     "installedGraphDigest",
     "origin",

@@ -61,6 +61,7 @@ let mcpStates: Record<string, { status: string; error?: string }> = {}
 let authOutcome = "connected"
 let authPending: Promise<void> | undefined
 const hubListeners = new Set<() => void>()
+let secretFailure: string | undefined
 let stateFailure: string | undefined
 let leaveApplying = false
 let remoteCatalog: unknown = { source: "none" }
@@ -141,7 +142,7 @@ Object.defineProperty(window, "api", {
         if (!leaveApplying) for (const component of pack.components.filter((entry) => entry.kind === "mcp")) mcpStates[component.name] = { status: intent.state === "disabled" ? "disabled" : "connected" }
         return { ok: true }
       },
-      savePackageSecrets: async (intent: { packageId: string; secrets: Record<string, string> }) => { calls.packageSecrets.push(intent); packageAuthorizationItems = packageAuthorizationItems.map((item) => ({ ...item as object, saved: true })); return { ok: true } },
+      savePackageSecrets: async (intent: { packageId: string; secrets: Record<string, string> }) => { calls.packageSecrets.push(intent); if (secretFailure) return { ok: false, reason: secretFailure }; packageAuthorizationItems = packageAuthorizationItems.map((item) => ({ ...item as object, saved: true })); return { ok: true } },
       uninstallPackage: async (packageId: string) => { calls.packageRemove.push(packageId); installedPackages = installedPackages.filter((pack) => pack.packageId !== packageId); receipts = []; hubRows = []; mcpStates = {}; return { ok: true, packageId, removed: [], retained: [] } },
       advisoryActive: async () => ({ ids: [], fresh: true }),
       migrateScan: async () => ({ enabled: false, inventory: { skills: [], mcp: [], plugins: [] } }),
@@ -315,6 +316,7 @@ function mount(section: "connectors" | "skills" | "agents" = "connectors") {
   )
 }
 function reset() {
+  secretFailure = undefined
   for (const dispose of disposals.splice(0)) dispose()
   document.body.replaceChildren()
   receipts = []
@@ -961,4 +963,31 @@ test("package management navigation survives a closed hub and a later reopen", a
   await waitFor(() => expect(q('[data-package-detail]')?.getAttribute("data-package-detail")).toBe(entry.prelude.packageId))
   expect(calls.installPackage).toEqual([])
   expect(calls.packageState).toEqual([])
+})
+
+
+test("official credential dialogs reuse DSN and PAT help and report credential save failures", async () => {
+  for (const [name, variable, help] of [["dbhub-readonly", "DSN", "codepuppy.ext.officialSqliteDsn"], ["github-official", "GITHUB_PERSONAL_ACCESS_TOKEN", "codepuppy.ext.officialGithubPat"]] as const) {
+    reset()
+    const entry = bundledCatalog.packages.find((entry) => entry.prelude.packageId === `package:${name}`)!
+    // Actual bundled catalog entry; only the renderer IPC read model is constructed here.
+    installedPackages = [{ packageId: entry.prelude.packageId, installedGraphDigest: "sha256:" + "a".repeat(64), displayName: entry.presentation.displayName, rootComponentName: name, version: entry.prelude.version, origin: "catalog", desiredState: "enabled", components: entry.components.map((component) => ({ componentId: component.id, kind: "mcp", name, required: component.required, desiredState: "enabled" })) }]
+    receipts = [receipt(entry.root, name, "mcp")]
+    packageAuthorizationItems = [{ kind: "secret", componentId: entry.root, prerequisiteId: `${entry.root}#${variable}`, serviceName: name, label: variable, saved: false }]
+    secretFailure = "package credentials could not be saved"
+    mount()
+    await managePackage(entry.prelude.packageId)
+    click(q('[data-package-secret]'))
+    await waitFor(() => expect(q('input[type="password"]')).toBeInstanceOf(HTMLInputElement))
+    expect(q('[role="dialog"]')?.textContent).toContain(zh[help])
+    const input = q<HTMLInputElement>('input[type="password"]')!
+    expect(input.placeholder).toBe(zh[help])
+    expect(input.required).toBe(false)
+    input.value = "invalid-local-credential-r4"
+    input.dispatchEvent(new Event("input", { bubbles: true }))
+    click(q('[role="dialog"] .a-dialog-footer button'))
+    await waitFor(() => expect(q('[role="dialog"] [role="alert"]')?.textContent).toBe("凭据未能保存，请检查填写内容后重试。"))
+    expect(q('[role="dialog"]')?.textContent).not.toContain(zh["codepuppy.ext.mcpAuthFailed"])
+    expect(installedPackages[0]?.packageId).toBe(entry.prelude.packageId)
+  }
 })

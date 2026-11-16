@@ -336,6 +336,46 @@ test("real admission commits remote truth plus encrypted resource; failed replac
   expect(readFileSync(truth, "utf8")).not.toContain(old)
 })
 
+test("desktop official package without an encrypted token stays pending after runtime restoration", async () => {
+  const { installDesktopPackageV1, readPackageAuthorizationV1, savePackageSecretsV1 } = await import("../src/main/package-admission")
+  const { resolveVerifiedPackageV1 } = await import("../src/main/package-installability")
+  const f = await fixture()
+  const catalog = { version: "r4-official", entries: [], packages: [f.envelope] }
+  let version = 0
+  const deps = {
+    loadVerifiedCatalog: async () => ({ source: "remote" as const, catalog, snapshotDigest: "7".repeat(64) }),
+    root: () => root, globalRoot: () => root, userDataPath: join(home, "userData"), casBaseRoot: () => join(home, "state"), environment: () => "dev" as const,
+    installability: { fetchPayload: async () => f.bytes }, advisoryGate: () => ({ allowed: true as const }),
+    resolvePackage: async (id: string, version: string) => ({ ...resolveVerifiedPackageV1(catalog, id, version), channel: "cache" as const }),
+    secretVersionId: () => `v-desktop-r4-${version++}`,
+  }
+  expect(await installDesktopPackageV1("package:github-official", deps)).toMatchObject({ ok: true })
+  clearOfficialConnectorRuntime()
+  restoreCommittedOfficialConnectors()
+  expect(await readPackageAuthorizationV1("package:github-official", deps)).toMatchObject({ ok: true, items: [{ kind: "secret", saved: false }] })
+  expect(await savePackageSecretsV1({ packageId: "package:github-official", secrets: { "mcp:github-official#GITHUB_PERSONAL_ACCESS_TOKEN": pat } }, deps)).toMatchObject({ ok: true })
+  expect(await readPackageAuthorizationV1("package:github-official", deps)).toMatchObject({ ok: true, items: [{ kind: "secret", saved: true }] })
+})
+
+test("desktop official install and credential replacement do not publish a reserved remote name", async () => {
+  const { installDesktopPackageV1, savePackageSecretsV1 } = await import("../src/main/package-admission")
+  const { resolveVerifiedPackageV1 } = await import("../src/main/package-installability")
+  const f = await fixture()
+  const catalog = { version: "r4-official", entries: [], packages: [f.envelope] }
+  const deps = {
+    loadVerifiedCatalog: async () => ({ source: "remote" as const, catalog, snapshotDigest: "7".repeat(64) }),
+    root: () => root, globalRoot: () => root, userDataPath: join(home, "userData"), casBaseRoot: () => join(home, "state"), environment: () => "dev" as const,
+    installability: { fetchPayload: async () => f.bytes }, advisoryGate: () => ({ allowed: true as const }),
+    resolvePackage: async (id: string, version: string) => ({ ...resolveVerifiedPackageV1(catalog, id, version), channel: "cache" as const }),
+  }
+  const installed = await installDesktopPackageV1("package:github-official", deps)
+  expect(installed).toMatchObject({ ok: true })
+  expect("warning" in installed ? installed.warning : undefined).toBeUndefined()
+  const saved = await savePackageSecretsV1({ packageId: "package:github-official", secrets: { "mcp:github-official#GITHUB_PERSONAL_ACCESS_TOKEN": pat } }, deps)
+  expect(saved).toMatchObject({ ok: true })
+  expect("warning" in saved ? saved.warning : undefined).toBeUndefined()
+})
+
 test("prepared journal crash recovery removes only uncommitted official versions", async () => {
   prepareOfficialConnector(root, "github-official", "v-crash", pat)
   await expect(

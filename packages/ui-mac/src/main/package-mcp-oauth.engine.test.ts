@@ -3,7 +3,7 @@
 import { expect, test } from "bun:test"
 import { join } from "node:path"
 
-test("就绪探针走 2.x 路由:登录前 needs_auth、登录后同名同 URL connected、换名 needs_auth、引擎拒绝 ⇒ ok:false、v1 路由拿不到状态(package-mcp-oauth.engine.cases.ts,3 条)", () => {
+test("就绪探针走 2.x 路由及关闭态登录:登录前 needs_auth、登录后同名同 URL connected、换名 needs_auth、引擎拒绝 ⇒ ok:false、v1 路由拿不到状态(package-mcp-oauth.engine.cases.ts,4 条)", () => {
   const result = Bun.spawnSync({
     cmd: [process.execPath, "test", "--timeout", "90000", join(import.meta.dir, "package-mcp-oauth.engine.cases.ts")],
     cwd: join(import.meta.dir, "../.."),
@@ -12,5 +12,5 @@ test("就绪探针走 2.x 路由:登录前 needs_auth、登录后同名同 URL c
   const output = `${result.stdout.toString()}${result.stderr.toString()}`
   if (result.exitCode !== 0) throw new Error(output)
   expect(output.match(/(\d+) fail\b/)?.[1], output).toBe("0")
-  expect(output.match(/(\d+) pass\b/)?.[1], output).toBe("3")
+  expect(output.match(/(\d+) pass\b/)?.[1], output).toBe("4")
 }, 300_000)

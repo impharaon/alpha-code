@@ -35,9 +35,11 @@ import {
   type PackageProfilePayloadV1,
 } from "../shared/host-extension-package-contract/decoder"
 import {
+  PACKAGE_SECRET_PREREQUISITE_PROFILE_V1,
   packageSecretReferenceV1,
   type PackageSecretPrerequisiteProfileV1,
 } from "../shared/package-secret-prerequisite"
+import { validMcpConfigLeaf, type McpConfigLeafV1 } from "../shared/plugin-install"
 
 /** 受限 prepared resource 的计划面(#705 定形状;#712 落 journal)。
  *
@@ -146,16 +148,27 @@ export type AgentTxBuildInputV1 = CommonInput & { asset?: Buffer; agentEntry?: R
 export type CommandTxBuildInputV1 = CommonInput & { commandEntry?: Record<string, unknown> }
 export type McpTxBuildInputV1 = CommonInput & {
   userDataPath: string
-  payload: PackageProfilePayloadV1
-  prerequisite: PackageSecretPrerequisiteProfileV1
   /** 用户本次提交的密钥明文(只在 populate 闭包内用,不进描述符、不进 receipt)。 */
   secretValues: Record<string, string>
   /** 版本号发生器(注入以便测试固定;生产 = newMcpSecretVersionId)。 */
   newSecretVersionId: () => string
-}
+} & (
+  | { payload: PackageProfilePayloadV1; prerequisite: PackageSecretPrerequisiteProfileV1 }
+  | { leaf: McpConfigLeafV1; secretNeeds: { needId: string }[] }
+)
 
 /** 计划无法构造(缺资产/缺解析结果)时的统一理由 —— 与 #705 之前 planItems 为空的落点逐字相同。 */
 const NO_PLAN = "package profile could not produce a transaction plan"
+
+function replaceLeafSecretReferences(leaf: McpConfigLeafV1, refs: Record<string, string>): McpConfigLeafV1 {
+  const replace = (value: unknown): unknown => {
+    if (typeof value === "string") return value.replace(/\{secret:([^}]+)\}/g, (match, id: string) => refs[id] ?? match)
+    if (Array.isArray(value)) return value.map(replace)
+    if (value && typeof value === "object") return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, replace(item)]))
+    return value
+  }
+  return replace(leaf) as McpConfigLeafV1
+}
 
 /**
  * skill:单 generation item —— **整份文件清单**写进 staging,probe 验 `SKILL.md` frontmatter 与 key 一致。
@@ -335,28 +348,35 @@ export function buildCloudTxItems(input: CommonInput): PackageTxBuildResultV1 {
 /** mcp:单 config item + 版本化密钥 prepared resource;live 叶未在册即拒(不认领、不覆盖)。 */
 export function buildMcpTxItems(input: McpTxBuildInputV1): PackageTxBuildResultV1 {
   const receipt = input.receipt
-  const official = "officialRecipe" in input.payload.behavior && input.payload.behavior.officialRecipe
+  if ("leaf" in input && !validMcpConfigLeaf(input.leaf)) return { ok: false, reason: "invalid MCP configuration leaf" }
+  const prerequisite: PackageSecretPrerequisiteProfileV1 = "prerequisite" in input ? input.prerequisite : {
+    profile: PACKAGE_SECRET_PREREQUISITE_PROFILE_V1,
+    componentId: receipt.id,
+    server: input.name,
+    items: input.secretNeeds.map((need) => ({ prerequisiteId: need.needId, componentId: receipt.id, label: need.needId, required: true, target: input.leaf.type === "local" ? { kind: "mcp-environment", variable: need.needId } : { kind: "mcp-remote-headers", variable: need.needId, headers: Object.keys(input.leaf.headers ?? {}).filter((key) => input.leaf.type === "remote" && input.leaf.headers?.[key]?.includes(`{secret:${need.needId}}`)) } })),
+  }
+  const official = "payload" in input && "officialRecipe" in input.payload.behavior && input.payload.behavior.officialRecipe
   if (official && !isOfficialConnector(input.name)) return { ok: false, reason: "invalid official connector identity" }
-  const secretVersion = input.prerequisite.items.length ? input.newSecretVersionId() : undefined
-  const submitted = input.prerequisite.items.filter((item) => typeof input.secretValues[item.prerequisiteId] === "string" && input.secretValues[item.prerequisiteId]!.length > 0)
+  const secretVersion = prerequisite.items.length ? input.newSecretVersionId() : undefined
+  const submitted = prerequisite.items.filter((item) => typeof input.secretValues[item.prerequisiteId] === "string" && input.secretValues[item.prerequisiteId]!.length > 0)
   const existing = readMcpLeafStrict(input.name)
   if (!existing.ok) return { ok: false, reason: existing.reason }
   const officialConfig = official && isOfficialConnector(input.name)
     ? officialConnectorConfig(input.root, input.name, secretVersion!) : undefined
   const refs = Object.fromEntries(
-    input.prerequisite.items.map((item) => [
+    prerequisite.items.map((item) => [
       item.target.variable,
       officialConfig ? `{file:${officialConfig.file}}` : (() => {
         const retained = input.secretValues[item.prerequisiteId] === undefined && collectMcpFileRefPaths(existing.value).find((file) => {
-          const reference = packageSecretReferenceV1(input.prerequisite, item.prerequisiteId, basename(dirname(file)))
+          const reference = packageSecretReferenceV1(prerequisite, item.prerequisiteId, basename(dirname(file)))
           return reference && mcpSecretVersionedRef(input.userDataPath, reference.server, reference.version, reference.variable) === `{file:${file}}`
         })
-        return retained ? `{file:${retained}}` : mcpSecretVersionedRef(input.userDataPath, input.prerequisite.server, secretVersion!, item.target.variable)
+        return retained ? `{file:${retained}}` : mcpSecretVersionedRef(input.userDataPath, prerequisite.server, secretVersion!, item.target.variable)
       })(),
     ]),
   )
   const config = officialConfig?.config ?? (
-    input.payload.schema === "codepuppy.host-extension-package.payload.mcp-local.v1"
+    "leaf" in input ? replaceLeafSecretReferences(input.leaf, refs) : input.payload.schema === "codepuppy.host-extension-package.payload.mcp-local.v1"
       ? {
           type: "local",
           command: input.payload.behavior.command,
@@ -369,7 +389,7 @@ export function buildMcpTxItems(input: McpTxBuildInputV1): PackageTxBuildResultV
             headers: Object.fromEntries(
               Object.entries(input.payload.behavior.headersTemplate).map(([header, template]) => [
                 header,
-                input.prerequisite.items.reduce(
+                prerequisite.items.reduce(
                   (value, item) => value.replaceAll(`{${item.target.variable}}`, refs[item.target.variable]!),
                   template,
                 ),
@@ -409,19 +429,19 @@ export function buildMcpTxItems(input: McpTxBuildInputV1): PackageTxBuildResultV
         descriptor: {
           kind: "mcp-secret-version",
           store: official ? "official-connectors" : "codepuppy-mcp-secrets",
-          server: input.prerequisite.server,
+          server: prerequisite.server,
           version: secretVersion,
         },
         files: secretFiles,
         populate: () => {
           if (official && isOfficialConnector(input.name)) {
-            prepareOfficialConnector(input.root, input.name, secretVersion, input.secretValues[input.prerequisite.items[0]!.prerequisiteId]!)
+            prepareOfficialConnector(input.root, input.name, secretVersion, input.secretValues[prerequisite.items[0]!.prerequisiteId]!)
             return
           }
-          const claimed = claimMcpSecretVersionDir(input.userDataPath, input.prerequisite.server, secretVersion)
+          const claimed = claimMcpSecretVersionDir(input.userDataPath, prerequisite.server, secretVersion)
           if (!claimed.ok) throw new Error(claimed.reason)
           for (const item of submitted) {
-            const reference = packageSecretReferenceV1(input.prerequisite, item.prerequisiteId, secretVersion)
+            const reference = packageSecretReferenceV1(prerequisite, item.prerequisiteId, secretVersion)
             if (!reference) throw new Error(`invalid secret reference for ${item.prerequisiteId}`)
             const written = writeMcpSecretVersioned(
               input.userDataPath,

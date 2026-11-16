@@ -16,7 +16,6 @@ import { tmpdir } from "node:os"
 import { dirname, join, resolve } from "node:path"
 import { Database } from "bun:sqlite"
 import { engineSandbox, assertEngineSandboxed, engineSlot } from "./engine-sandbox"
-const sandbox = engineSandbox()
 import { createRequire } from "node:module"
 
 // `#1662`(OpenCode 2):v1 引擎 packages/opencode 随换代删除。「引擎真的那份 {file:} 实现」换成 2.x 的
@@ -949,6 +948,16 @@ test("package-owned encrypted token replacement retires the old version and a fa
 
 
 test("review official recipe installs, changes token and toggles through runtime add without engine reload", async () => {
+  // Existing recipe cases deliberately exercise the real OS HOME boundary. Keep the engine's
+  // process-global HOME/XDG setup in its own child, so those older controls retain their premise.
+  if (process.env.CODEPUPPY_OFFICIAL_RUNTIME_CHILD !== "1") {
+    const result = Bun.spawnSync({ cmd: [process.execPath, "test", "--max-concurrency", "2", "--test-name-pattern", "review official recipe", import.meta.path], cwd: resolve(import.meta.dir, ".."), env: { ...process.env, CODEPUPPY_OFFICIAL_RUNTIME_CHILD: "1" } })
+    const output = result.stdout.toString() + result.stderr.toString()
+    if (result.exitCode !== 0) throw Error(output)
+    expect(output.match(/(\d+) pass\b/)?.[1], output).toBe("1")
+    return
+  }
+  const sandbox = engineSandbox()
   await assertEngineSandboxed(sandbox)
   const { buildEngineServerOptions } = await import("../src/main/engine-server-options")
   const { engineClient } = await import("../src/main/engine-client")

@@ -55,6 +55,7 @@ let receipts: Receipt[] = []
 let inventoryRows: unknown[] = []
 let hubRows: unknown[] = []
 let installedPackages: InstalledPackageV1[] = []
+let packageAuthorizationItems: unknown[] = []
 let factorySkillIds: string[] = []
 let remoteCatalog: unknown = { source: "none" }
 const calls = {
@@ -64,6 +65,7 @@ const calls = {
   setInstallState: [] as Array<Record<string, unknown>>,
   uninstall: [] as Array<Record<string, unknown>>,
   builtinApply: [] as unknown[],
+  installPackage: [] as string[],
 }
 
 const emptyStream = { [Symbol.asyncIterator]: async function* () {} }
@@ -115,6 +117,8 @@ Object.defineProperty(window, "api", {
       onSessionGrantsEnded: () => () => {},
       inventoryView: async () => ({ catalogVersion: null, catalogChannel: null, rows: inventoryRows, warnings: [] }),
       installedPackages: async () => ({ ok: true as const, packages: installedPackages }),
+      packageAuthorization: async (packageId: string) => ({ ok: true, packageId, items: packageAuthorizationItems }),
+      installPackage: async (id: string) => { calls.installPackage.push(id); return { ok: true } },
       advisoryActive: async () => ({ ids: [], fresh: true }),
       migrateScan: async () => ({ enabled: false, inventory: { skills: [], mcp: [], plugins: [] } }),
       remoteCatalog: async () => remoteCatalog,
@@ -173,6 +177,87 @@ async function waitFor(assertion: () => void) {
   }
   throw failure
 }
+
+test("catalog package owns one installed row across pages with its switch in the menu", async () => {
+  reset()
+  const { hubPackageFixture } = await import("./hub-package.fixture")
+  const sample = hubPackageFixture()
+  installedPackages = sample.packages.map((entry) => ({
+    packageId: entry.prelude.packageId,
+    installedGraphDigest: "sha256:" + "a".repeat(64),
+    displayName: entry.presentation.displayName,
+    rootComponentName: entry.root.split(":")[1]!,
+    version: entry.prelude.version,
+    origin: "catalog",
+    desiredState: "enabled",
+    components: entry.components.map((component) => ({
+      componentId: component.id, kind: component.profileId === "mcp-remote" ? "mcp" : component.profileId,
+      name: component.id.split(":")[1]!, required: component.required, desiredState: "enabled" as const,
+    })),
+  }))
+  receipts = installedPackages.flatMap((pack) => pack.components.map((component) => receipt(component.componentId, component.name, component.kind)))
+  // A separate project-independent skill is a control: package filtering must not swallow it.
+  receipts.push(receipt("skill:safe-refactor", "safe-refactor", "skill"))
+  mount("skills")
+  await waitFor(() => expect(q('[data-installed-package="package:supabase"]')).toBeInstanceOf(HTMLElement))
+  expect(q('[data-installed-row="skill:supabase"]')).toBeNull()
+  expect(q('[data-installed-row="skill:supabase-postgres-best-practices"]')).toBeNull()
+  expect(q('[data-installed-row="skill:safe-refactor"]')).toBeInstanceOf(HTMLElement)
+  const row = q('[data-installed-package="package:supabase"]')!
+  expect(qa("button", row).map((button) => button.textContent?.trim())).toEqual(["…"])
+  click(q("[data-more]", row))
+  await waitFor(() => expect(q('[role="switch"]')).toBeInstanceOf(HTMLElement))
+  expect(document.body.textContent).toContain("管理")
+  expect(document.body.textContent).toContain("移除")
+})
+
+test("package plus installs directly before separate credentials without an installation wall", async () => {
+  reset()
+  calls.installPackage.length = 0
+  const { hubPackageFixture } = await import("./hub-package.fixture")
+  const sample = hubPackageFixture()
+  const view = await evaluatePackageForHost(sample.packages[0], { fetchPayload: sample.fetchBytes })
+  remoteCatalog = { source: "remote", catalog: { version: "hub-real", entries: bundledCatalog.entries, packages: [view] } }
+  mount()
+  await waitFor(() => expect(q('[data-package-card="package:github"]')).toBeInstanceOf(HTMLElement))
+  const card = q('[data-package-card="package:github"]')!
+  expect(q("button", card)?.textContent?.trim()).toBe("+")
+  click(q("button", card))
+  await waitFor(() => expect(calls.installPackage).toEqual(["package:github"]))
+  expect(document.body.textContent).not.toContain("确认安装")
+  expect(document.body.textContent).not.toContain("未经审核,装好后默认关闭")
+  expect(document.body.textContent).not.toContain("codepuppy.secret-prerequisite.v1")
+})
+
+test("installed package management keeps token entry available after closing its window", async () => {
+  reset()
+  const { hubPackageFixture } = await import("./hub-package.fixture")
+  const entry = hubPackageFixture().packages[0]!
+  installedPackages = [{
+    packageId: entry.prelude.packageId, installedGraphDigest: "sha256:" + "b".repeat(64),
+    displayName: entry.presentation.displayName, rootComponentName: "github", version: entry.prelude.version,
+    origin: "catalog", desiredState: "disabled",
+    components: [{ componentId: entry.root, kind: "mcp", name: "github", required: true, desiredState: "disabled" }],
+  }]
+  packageAuthorizationItems = [{ kind: "secret", componentId: entry.root, prerequisiteId: `${entry.root}#GITHUB_PERSONAL_ACCESS_TOKEN`, serviceName: "github", label: "GITHUB_PERSONAL_ACCESS_TOKEN", saved: false }]
+  receipts = [receipt(entry.root, "github", "mcp")]
+  mount()
+  await waitFor(() => expect(q('[data-installed-package="package:github"]')).toBeInstanceOf(HTMLElement))
+  click(q('[data-installed-package="package:github"] [data-more]'))
+  await waitFor(() => expect(q('[data-menu-item="manage"]')).toBeInstanceOf(HTMLElement))
+  click(q('[data-menu-item="manage"]'))
+  await waitFor(() => expect(q(".codepuppy-ext-detail")?.textContent).toContain("账户"))
+  expect(q(".codepuppy-ext-detail")?.textContent).toContain("权限")
+  expect(q(".codepuppy-ext-detail")?.textContent).toContain("关于")
+  const openToken = () => click(q(".codepuppy-ext-detail [data-package-secret]"))
+  openToken()
+  await waitFor(() => expect(q('input[type="password"]')).toBeInstanceOf(HTMLInputElement))
+  expect(q('[role="dialog"]')?.textContent).not.toContain("GITHUB_PERSONAL_ACCESS_TOKEN")
+  click(q('[role="dialog"] .a-dialog-close'))
+  await waitFor(() => expect(q('input[type="password"]')).toBeNull())
+  openToken()
+  await waitFor(() => expect(q('input[type="password"]')).toBeInstanceOf(HTMLInputElement))
+})
 const q = <T extends Element = HTMLElement>(selector: string, root: ParentNode = document) => root.querySelector<T>(selector)
 const qa = (selector: string, root: ParentNode = document) => Array.from(root.querySelectorAll<HTMLElement>(selector))
 function click(element: Element | null) {

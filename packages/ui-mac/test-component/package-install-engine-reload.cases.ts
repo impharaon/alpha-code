@@ -39,6 +39,7 @@ import { join } from "node:path"
 import bundledCatalog from "../src/renderer/extensions/codepuppy-catalog.json"
 import { LEAF_MCP_ID, MIXED_BUNDLE_PACKAGE_ID, mixedBundleFixture } from "./package-mixed-bundle.fixture"
 import { pinShippedPlatform } from "./pin-shipped-platform"
+import { hubPackageFixture } from "./hub-package.fixture"
 
 // 本文件要验的是**发布平台上**的安装行为,而它会走到生产平台闸
 // (套件/条目 `compatibility.platforms` = darwin/win32,ADR-026):linux runner 上套件安装被
@@ -175,6 +176,7 @@ const testBundle = (id: string, name: string, member: string) => ({
 })
 
 const fixture = mixedBundleFixture()
+const hubSample = hubPackageFixture()
 const catalogEntries = [
   ...(bundledCatalog as unknown as { entries: unknown[] }).entries,
   testBundle(BUNDLE_OK, BUNDLE_OK_NAME, "mcp:markitdown"),
@@ -183,12 +185,18 @@ const catalogEntries = [
 const catalogDocument = {
   version: "2026-08-03",
   entries: catalogEntries,
-  packages: [fixture.envelope],
+  packages: [fixture.envelope, ...hubSample.packages],
 }
 
 // URL → 字节。payload 由信封的 `payloadRef` 给出;资产由 payload 自己给出 —— agent 是
 // `behavior.asset`、skill 是 `behavior.files`、command 是 `behavior.template`,都要**逐条**登记进这张表。
 const bytesByUrl = new Map<string, Uint8Array>()
+for (const component of hubSample.packages.flatMap((entry) => entry.components)) {
+  const bytes = await hubSample.fetchBytes(component.payloadRef)
+  bytesByUrl.set(component.payloadRef.url, bytes)
+  for (const ref of JSON.parse(new TextDecoder().decode(bytes)).behavior.files ?? [])
+    bytesByUrl.set(ref.url, await hubSample.fetchBytes(ref))
+}
 for (const component of fixture.envelope.components) {
   const payload = fixture.payloadByDigest.get(component.payloadRef.sha256)
   if (!payload) throw new Error(`fixture: payload bytes missing for ${component.id}`)
@@ -644,6 +652,7 @@ const pdfRow = () => q('[data-installed-row="mcp:codepuppy-pdf"]')!
 // Same staged attachment metadata as attachment-reader-hooks.test.ts / attachment-cards.cases.ts.
 const meta = { v: 1 as const, name: "a.pdf", mime: "application/pdf", size: 2048, path: "attachments/00000000-0000-4000-8000-000000000000/a.pdf", reader: "pdf" as const }
 
+
 test("#1646 AC1 disable PDF waits for idle, then the fresh runtime blocks reading and the attachment shows why", async () => {
   for (const request of reloadRequests) codepuppySidecar.receive({ type: "codepuppy.reload.report", generation: request.generation, scope: "global", outcome: "reloaded", directories: [] }, () => {})
   expect(restoreMcpLeaf("codepuppy-pdf", { type: "local", command: codepuppyOfficeInstallCommand("pdf"), enabled: true }).ok).toBe(true)
@@ -813,4 +822,23 @@ test("#1652 audit: a refused ledger write sends no permission rejection", async 
     expect(permissionReplies).toEqual([])
     expect(permissions[projectA]).toHaveLength(1)
   } finally { refuseState = false; permissions = {} }
+})
+
+test("busy package switch forces the existing scheduler without a second reload action", async () => {
+  const installed = await call("ext-install-package", "package:supabase")
+  expect(installed).toMatchObject({ ok: true })
+  const before = connectorRefreshes
+  busy = true
+  scheduler.register(join(tmp, "project"), {})
+  codepuppySidecar.attach((request) => scheduler.request(request))
+  for (const state of ["disabled", "enabled"] as const) {
+    expect(await call("ext-set-package-state", { packageId: "package:supabase", state })).toMatchObject({ ok: true })
+    await scheduler.settled()
+    await waitFor(() => expect(connectorRefreshes).toBe(before + (state === "disabled" ? 1 : 2)))
+    expect(busy).toBe(true)
+    const ledger = readPackageLedgerStateV1(globalRoot)
+    expect(ledger.ok).toBe(true)
+    if (ledger.ok)
+      expect(ledger.records.filter((record) => ["supabase", "supabase-postgres-best-practices"].includes(record.name)).map((record) => record.desiredState)).toEqual([state, state, state])
+  }
 })

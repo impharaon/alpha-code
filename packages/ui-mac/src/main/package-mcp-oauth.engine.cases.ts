@@ -20,6 +20,8 @@ const sandbox = engineSandbox()
 const PASSWORD = "cp-l5-mcp-oauth"
 const SERVICE = "oauth-remote"
 const OTHER_NAME = "oauth-remote-renamed"
+const DISABLED_SERVICE = "package-off-oauth"
+let disabledMcpRequests = 0
 
 // ── 替身:OAuth 授权服务器 + 要求 Bearer 的远端 MCP(同一个回环源)────────────────────────────────────────────────
 const challenges = new Map<string, string>()
@@ -69,6 +71,7 @@ const fake = Bun.serve({
       return Response.json({ access_token: token, token_type: "Bearer", expires_in: 3600 })
     }
     if (path === "/mcp") {
+      if (url.searchParams.has("disabled")) disabledMcpRequests++
       const authorization = request.headers.get("authorization") ?? ""
       if (!authorization.startsWith("Bearer ") || !tokens.has(authorization.slice("Bearer ".length)))
         return Response.json(
@@ -110,7 +113,7 @@ beforeAll(async () => {
       engineVersion: "test",
       databasePath: slot.databasePath,
       configDirectory: slot.configDirectory,
-      config: { content: "{}" },
+      config: { content: JSON.stringify({ mcp: { servers: { [DISABLED_SERVICE]: { type: "remote", url: `${MCP_URL}?disabled`, disabled: true } } } }) },
       models: { fetch: false },
       filewatcher: false,
       platform: process.platform,
@@ -150,6 +153,16 @@ async function signInThroughEngine(name: string) {
 }
 
 describe("admission 的 MCP OAuth 就绪探针(OpenCode 2)", () => {
+  test("disabled package OAuth stores a credential without starting MCP", async () => {
+    const probe = createPackageMcpOauthEngineV1(async () => ({ url: engineUrl, username: "opencode", password: PASSWORD }))
+    expect(await probe.read(DISABLED_SERVICE)).toMatchObject({ ok: true, status: "disabled", authenticated: false })
+    expect(disabledMcpRequests).toBe(0)
+    expect(await signInThroughEngine(DISABLED_SERVICE)).toBe("complete")
+    expect(await probe.read(DISABLED_SERVICE)).toMatchObject({ ok: true, status: "disabled", authenticated: true })
+    expect(disabledMcpRequests).toBe(0)
+    expect(await probe.add(DISABLED_SERVICE, { type: "remote", url: `${MCP_URL}?disabled` })).toEqual({ ok: true, status: "connected" })
+    expect(disabledMcpRequests).toBeGreaterThan(0)
+  }, 60_000)
   test("同名同 URL 只有在引擎自己的登录之后才 connected;同一个 URL 换个名字 ⇒ needs_auth", async () => {
     const probe = createPackageMcpOauthEngineV1(async () => ({ url: engineUrl, username: "opencode", password: PASSWORD }))
     expect(await probe.add(SERVICE, { type: "remote", url: MCP_URL })).toEqual({ ok: true, status: "needs_auth" })

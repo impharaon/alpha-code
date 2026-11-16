@@ -49,6 +49,7 @@ const until = (done: () => boolean) =>
     for (let waited = 0; waited < 2000 && !done(); waited += 20) yield* Effect.sleep("20 millis")
   })
 
+
 it.live("main 的重载请求 ⇒ 等全部会话空闲 ⇒ 恰好一次 location/reload ⇒ 报 reloaded;Location 关掉之后不再算它", () =>
   Effect.gen(function* () {
     // 监听在 setup 之前就在了(模块求值时挂上)
@@ -80,5 +81,19 @@ it.live("main 的重载请求 ⇒ 等全部会话空闲 ⇒ 恰好一次 locatio
     yield* settled()
     expect(engine.reloads).toBe(1)
     expect(reports().at(-1)).toEqual({ type: "codepuppy.reload.report", generation: 8, scope: { directory }, outcome: "reloaded", directories: [] })
+  }),
+)
+
+it.live("package state request with force reloads while an answer is still running", () =>
+  Effect.gen(function* () {
+    engine.busy = true
+    const before = engine.reloads
+    const directory = (yield* Location.Service).directory
+    yield* activate(CodePuppyExt)
+    deliver(buildReloadRequest({ generation: 19, scope: "global", items: [{ id: "package:supabase", scope: "global" }], reason: "package switch", force: true }))
+    yield* settled()
+    expect(engine.busy).toBe(true)
+    expect(engine.reloads).toBe(before + 1)
+    expect(reports().at(-1)).toEqual({ type: "codepuppy.reload.report", generation: 19, scope: "global", outcome: "reloaded", directories: [directory] })
   }),
 )

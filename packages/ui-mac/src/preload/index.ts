@@ -1,4 +1,3 @@
-import type { SourceSearchResultV1 } from "../main/plugin-sources"
 import { contextBridge, ipcRenderer } from "electron"
 import {
   type AuthErrorCode,
@@ -291,7 +290,7 @@ const api: ElectronAPI = {
     hubRequest: (requestId) => ipcRenderer.invoke("ext-hub-request", requestId),
     sourcesSearch: (query, requestId) => ipcRenderer.invoke("ext-sources-search", query, requestId),
     onSourcesSearchProgress: (cb) => {
-      const handler = (_event: Electron.IpcRendererEvent, requestId: string, result: SourceSearchResultV1) => cb(requestId, result)
+      const handler = (_event: Electron.IpcRendererEvent, requestId: string, result: Parameters<typeof cb>[1]) => cb(requestId, result)
       ipcRenderer.on("ext-sources-search-progress", handler)
       return () => ipcRenderer.removeListener("ext-sources-search-progress", handler)
     },

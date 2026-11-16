@@ -357,3 +357,21 @@ test("BC4 timeline token input cancels and reopens empty, saves only to the same
  host.querySelector<HTMLButtonElement>('.a-tc-open')!.click()
  expect(takePackageManagementTarget()).toBe(pack().packageId)
 })
+
+test("BC4 canceled timeline login keeps the installed package and the same action available for retry",async()=>{
+ const h=harness(committed())
+ h.change({authorization:[{kind:"mcp-oauth",componentId:"mcp",prerequisiteId:"oauth",serviceName:"Docs",label:"Docs",authenticated:false,status:"needs_auth"}]})
+ let calls=0
+ const host=mount(row(),{authenticateMcp:async()=>{calls++;return {ok:false,reason:"auth-failed"}}})
+ await flush()
+ const button=()=>host.querySelector<HTMLButtonElement>('[data-package-login-action]')!
+ button().click();await flush()
+ expect(calls).toBe(1)
+ expect(host.textContent).toContain("待登录")
+ expect(host.querySelector('[role="alert"]')?.textContent).toContain("授权没有完成")
+ expect(h.packages).toHaveLength(1)
+ expect(button().disabled).toBe(false)
+ button().click();await flush()
+ expect(calls).toBe(2)
+ expect(document.querySelector('[role="dialog"]')).toBeNull()
+})

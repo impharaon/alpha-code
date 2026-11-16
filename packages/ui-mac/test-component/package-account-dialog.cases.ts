@@ -36,6 +36,7 @@ test("BC4 shared password dialog re-reads package needs, keeps fields optional, 
  expect(h.reads).toEqual(["main-package"])
  const inputs=Array.from(document.querySelectorAll<HTMLInputElement>('input[type="password"]'))
  expect(inputs).toHaveLength(2)
+ expect(inputs.map(input=>input.closest("label")?.textContent?.trim())).toEqual(["FIRST","SECOND"])
  for(const input of inputs){expect(input.required).toBe(false);expect(input.autocomplete).toBe("off")}
  const canary="BC4_DIALOG_PRIVATE_CANARY_398d"
  inputs[0]!.value=canary;inputs[0]!.dispatchEvent(new Event("input",{bubbles:true}))

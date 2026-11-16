@@ -455,3 +455,14 @@ test("R12 A4 identical package bytes update the same identity when the requested
  expect(await h.install({...h.request(id,"r12_effect_b_again"),effect:{kind:"project",directory:b}})).toMatchObject({ok:true,alreadyInstalled:true,packageId:"claude:frontend-design"})
  expect(readdirSync(a)).toEqual([]);expect(readdirSync(b)).toEqual([])
 }))
+
+test("R12 A5 unsupported real command agent and hook entries explain nothing-runnable without ledger writes", () => installerHarness(async h => {
+  for (const [name, kinds] of [["explanatory-output-style", ["hook"]], ["pr-review-toolkit", ["command", "agent", "agent", "agent", "agent", "agent", "agent"]]] as const) {
+    const result = await h.install(h.request(await h.candidate(name), "r12_unsupported_" + name))
+    expect(result).toMatchObject({ ok: false, code: "nothing-runnable" })
+    if (result.ok || result.code !== "nothing-runnable") throw Error("expected unsupported components")
+    expect(result.notRunning.map(entry => entry.kind).sort()).toEqual([...kinds].sort())
+    expect(result.notRunning.every(entry => entry.reason === "kind-not-supported-yet" && !!entry.sourceName)).toBe(true)
+  }
+  expect(readPackageLedgerStateV1(h.root)).toMatchObject({ ok: true, records: [], packageGraphs: [] })
+}))

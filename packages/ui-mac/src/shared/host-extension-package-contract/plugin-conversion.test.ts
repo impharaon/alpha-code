@@ -288,3 +288,18 @@ test("A2 installed skill copy rewrites host names and structured MCP references 
   expect(text.slice(text.indexOf("\n---", 4))).toBe(skill.slice(skill.indexOf("\n---", 4)))
   expect(text).toContain('description:')
 })
+
+test("R12 A5 real Claude command agent and hook components survive discovery without execution", async () => {
+  const review = await captureFixture("plugins/pr-review-toolkit")
+  const hooks = await captureFixture("plugins/explanatory-output-style")
+  for (const ecosystem of ["claude", "codex"] as const) {
+    const capture = { ...review, source: { ...review.source, ecosystem } }
+    const converted = await (await converter()).convertPluginTree(capture)
+    expect(converted.package.entries.filter(entry => entry.kind === "agent")).toHaveLength(6)
+    expect(converted.package.entries).toContainEqual(expect.objectContaining({ kind: "command", sourcePath: "commands/review-pr.md", sourceName: "review-pr" }))
+    expect((await (await import("./plugin-conversion.mjs")).convertPluginTree(capture)).package).toEqual(converted.package)
+  }
+  const converted = await (await converter()).convertPluginTree(hooks)
+  expect(converted.package.entries).toMatchObject([{ kind: "hook", sourcePath: "hooks/hooks.json", sourceName: "SessionStart", hook: { event: "SessionStart", command: ["bash \"", { binding: "pluginRoot" }, "/hooks-handlers/session-start.sh\""], scope: { kind: "package" } } }])
+  expect(converted.package.diagnostics).toEqual([])
+})

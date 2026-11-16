@@ -3,7 +3,7 @@
   "commit": "b5b01ac4f889fec0c4c6bb89f27ca7c8574473f6",
   "archive": {
     "path": "claude-selection.tar.gz",
-    "sha256": "310e8de1f76795758f924d8458c0c3f870d53be3afe0ca4e5721a4b0c843ca32",
+    "sha256": "8efc6f76a3b4e306b441392e45caf63f9ee4dfc86ee478db02f5fc9c63a0ea07",
     "note": "Repacked subset of real codeload members; original member paths, bytes, modes and global pax comment retained. Not the original full archive."
   },
   "files": [
@@ -114,6 +114,66 @@
       "bytes": 9390,
       "mode": 436,
       "sha256": "d91970639e9f5c37682ac7ab60094d35f1c7c1f38d731bd56396563aee10c1d3"
+    },
+    {
+      "path": "plugins/pr-review-toolkit/.claude-plugin/plugin.json",
+      "bytes": 288,
+      "mode": 436,
+      "sha256": "59239b506df0a629cb3cbe42e5617c37599dc07a0a14dcf54f895885e010b51f"
+    },
+    {
+      "path": "plugins/pr-review-toolkit/LICENSE",
+      "bytes": 11358,
+      "mode": 436,
+      "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+    },
+    {
+      "path": "plugins/pr-review-toolkit/README.md",
+      "bytes": 7528,
+      "mode": 436,
+      "sha256": "364cb1d46aa64a01016e4ef5f41dfea5bd5e3cf530459409a376feba93dd2b49"
+    },
+    {
+      "path": "plugins/pr-review-toolkit/agents/code-reviewer.md",
+      "bytes": 3635,
+      "mode": 436,
+      "sha256": "019395c3ce457460115cc703e2f4a86fed4bbe560dc58355051c4d877155d366"
+    },
+    {
+      "path": "plugins/pr-review-toolkit/agents/code-simplifier.md",
+      "bytes": 5292,
+      "mode": 436,
+      "sha256": "976ddb22b84bc5a714216531a75db5e73169554add6b953442beeedb49b56891"
+    },
+    {
+      "path": "plugins/pr-review-toolkit/agents/comment-analyzer.md",
+      "bytes": 4925,
+      "mode": 436,
+      "sha256": "4a9c1f2eb8234a4b9231983e75739663d512e1aed242388964a165a719b84698"
+    },
+    {
+      "path": "plugins/pr-review-toolkit/agents/pr-test-analyzer.md",
+      "bytes": 4560,
+      "mode": 436,
+      "sha256": "fcb1cde9ba7b21694b508766a8d6a79bc91bed9982f828f816210059934f46b4"
+    },
+    {
+      "path": "plugins/pr-review-toolkit/agents/silent-failure-hunter.md",
+      "bytes": 7807,
+      "mode": 436,
+      "sha256": "fa9b0daec5a267e7e66435cc48b3328301fc9f70c3af259fe248881327a1babc"
+    },
+    {
+      "path": "plugins/pr-review-toolkit/agents/type-design-analyzer.md",
+      "bytes": 4999,
+      "mode": 436,
+      "sha256": "c1cf67843d3c4fd27ddf6b24aa92521414b16c01610e7f7e87212c7b8681198d"
+    },
+    {
+      "path": "plugins/pr-review-toolkit/commands/review-pr.md",
+      "bytes": 4997,
+      "mode": 436,
+      "sha256": "5e70c17293a044e1bf9d092c80b5da8b4fd5802ebb07dc53993dec4ba7ce2fc4"
     }
   ]
 }

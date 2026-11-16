@@ -730,3 +730,8 @@ BC5 宿主接线修正（独立测试提交）：首红的 main 重载请求和 
 
 
 BC5 固定样本字面期望更正（单独提交，standing ruling）：`plugin-entrypoints.engine.cases.ts:188/241` 原把 Git 树不存在的构建入口期待为 plugin／包名；真实 `repository.tar.gz`（provenance 所记 gitHead）里的 package.json 声明 main `dist/index.js`，树没有此文件。按 design v5 §4.1 对 missing-entry 的既定映射，图项实际是 definition／index.js／missing-entry。只改这一字面三元组，仍断言同版本、缺失入口真实原因与 JS 零加载，npm/folder 的 native-js-plugin 三元组不变。`r10-bc5-engine-watching.log` 2 pass／3 fail，其中首红为此字面，其余均残留图级联，不作为行为变化或独立缺陷。
+
+
+BC5 原生入口监测的测试接线修正：单独 Registry 例停在 pending 且传输收到 0 请求；先尝试全局 fetch 与既有 engine fetch 注入口两种控制都保持 pending，不能将其归因于 fetch 捕获。实际记录的 onLoad 路径显示，新监测器 `/dist/index.js` 还拦了引擎已锁定依赖 `eventsource@3.0.7`／`eventsource-parser@3.1.1`，错误地拿它们与包入口摘要比较（`r10-bc5-registry-monitor.log`）。仅在回调内按摘要返回 undefined 仍 pending；将 Bun filter 本身限定到隔离 sandbox 的输入／托管目录后，依赖不再过这条钩子，Registry 单例 exit 0（`r10-bc5-registry-monitor-filter.log`，1 pass／23 assertions）。实际包入口仍被无操作替换，正控制 1、各安装过程 0；没有加载第三方 JS、修改生产行为、去掉或放宽断言。
+
+新 cases 为封闭协议运输，直接把现有 ServerOptions.fetch 注入口传给原 `startEngine`（使用 `codepuppyEngine` 的原注入配置／ext／数据库／probe），而非给生产添加选项或更改引擎。必要测试启动代码仅留在此新文件，不改共享 harness 或 Core。失败诊断只记 URI 路径／认证布尔值和公开库存，不记令牌值。此提交只修正测试宿主形状，额外实际技能调用与专有令牌文件清理断言下一笔追加。

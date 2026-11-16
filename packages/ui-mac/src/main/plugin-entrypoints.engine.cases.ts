@@ -29,7 +29,9 @@ let host: ReturnType<(typeof import("../../test-component/codepuppy-engine"))["c
 let main: ReturnType<(typeof import("./ext-ipc"))["registerExtIpcHandlers"]>
 let echo: ReturnType<(typeof import("../../../core/test/fixture/mcp-echo"))["echoMcpHandler"]>
 let nativeLoads = 0
+const monitoredPaths: string[] = []
 let toolCalls = 0
+const transport: unknown[] = []
 let stopWatching: (() => void) | undefined
 const projectFiles = { "opencode.json": "{\"mcp\":{}}\n", "AGENTS.md": "BC5 project byte sentinel\n" }
 const invoke = async <T>(channel: string, ...args: unknown[]) => {
@@ -44,7 +46,7 @@ async function until(check: () => Promise<boolean>, label: string) {
   }
 }
 const send = (method: string, route: string, body?: unknown) => running!.send(method, route, body)
-const skills = async () => (await send("GET", "/api/skill")).json.data as Array<{ name: string; content: string }>
+const skills = async () => (await send("GET", "/api/skill")).json.data as Array<{ id: string; name: string; content: string }>
 async function ledger() {
   const { readPackageLedgerStateV1 } = await import("./ext-receipt-v2")
   const state = readPackageLedgerStateV1(root)
@@ -102,9 +104,12 @@ beforeAll(async () => {
     const url = new URL(request.url)
     if (url.hostname === "127.0.0.1" || url.hostname === "localhost") return nativeFetch(request)
     if (url.hostname === "api.githubcopilot.com") {
+      transport.push({ method: request.method, authorized: request.headers.get("authorization") === `Bearer ${TOKEN}` })
       if (request.headers.get("authorization") !== `Bearer ${TOKEN}`) return new Response(null, { status: 401, headers: { "www-authenticate": "Bearer" } })
       if (request.method === "POST" && (await request.clone().json() as { method?: string }).method === "tools/call") toolCalls++
-      return echo.fetch(request)
+      const response = await echo.fetch(request)
+      transport.push({ status: response.status })
+      return response
     }
     if (url.hostname === "mcp.figma.com") return new Response(null, { status: 401, headers: { "www-authenticate": "Bearer" } })
     return entrypointsFetch(request.url)
@@ -145,12 +150,34 @@ beforeAll(async () => {
   const { watchExplicitSources } = await import("./engine-explicit-config")
   const injection = injectCodePuppyConfig(host.userData, join(sandbox.root, "plugin-entrypoints-ext"), "stable", codepuppyBootstrap().paths.userConfig ?? null)
   stopWatching = watchExplicitSources({ ...injection.explicit!, skills: explicitSkillDirs, log: line => logs.push(line) })
-  running = await host.start()
+  // Pass the existing embedder transport explicitly; Effect's default fetch may predate
+  // this suite's override. The config, ext, database and probe still come from the real harness.
+  const { startEngine } = await import("../../engine/engine-embed")
+  const { buildEngineServerOptions } = await import("./engine-server-options")
+  const { withEngineAuthorization, engineAuthorization } = await import("./engine-authorization")
+  const { engineProjectTrust } = await import("./engine-project-trust")
+  const engine = await startEngine({ ...buildEngineServerOptions({ hostname: "127.0.0.1", port: 0, password: "cp-plugin-entrypoints", engineVersion: "test", databasePath: host.slot.databasePath, configDirectory: host.slot.configDirectory, config: { content: JSON.stringify(host.content), file: injection.config.file }, models: { fetch: false }, filewatcher: true, platform: process.platform }), fetch: globalThis.fetch }, { projectTrust: engineProjectTrust })
+  const dispatch = withEngineAuthorization(engine.dispatch, "cp-plugin-entrypoints")
+  running = {
+    url: engine.url, authorization: engineAuthorization("cp-plugin-entrypoints"), fetch: dispatch, close: engine.close,
+    send: async (method, route, body) => {
+      const response = await dispatch(new Request("http://codepuppy-sidecar.invalid" + route, { method, headers: { "x-opencode-directory": encodeURIComponent(host.projectDirectory), "content-type": "application/json" }, ...(body === undefined ? {} : { body: JSON.stringify(body) }) }))
+      const raw = await response.text()
+      return { status: response.status, json: raw ? JSON.parse(raw) : undefined }
+    },
+  }
+  await until(async () => {
+    const plugins = (await send("GET", "/api/plugin")).json.data as Array<{ id: string; state: { status: string } }>
+    return ["codepuppy.ext", "codepuppy.test.engine-probe"].every(id => plugins.some(plugin => plugin.id === id && plugin.state.status === "active"))
+  }, "desktop ext readiness")
   // Intercept every matching import before any module code can execute. The positive control
   // proves this monitor sees the actual pinned native entry, then installs must yield zero hits.
-  Bun.plugin({ name: "bc5-native-entry-monitor", setup(builder) { builder.onLoad({ filter: /\/dist\/index\.js$/ }, async args => {
-    nativeLoads++
+  const nativeEntryFilter = new RegExp("^" + sandbox.root.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "/.*dist/index\\.js$")
+  Bun.plugin({ name: "bc5-native-entry-monitor", setup(builder) { builder.onLoad({ filter: nativeEntryFilter }, async args => {
+    monitoredPaths.push(args.path)
+    // Both input and managed package paths stay inside the sandbox; engine dependencies do not.
     expect(createHash("sha256").update(await Bun.file(args.path).bytes()).digest("hex")).toBe(nativeEntryDigest)
+    nativeLoads++
     return { contents: "export default {}", loader: "js" }
   }) } })
   const candidate = (await main.pluginSources.searchSources(provenance.opencode.name)).candidates.find(candidate => candidate.source === "opencode-npm")!
@@ -254,7 +281,11 @@ test("BC5 standalone official Registry GitHub uses main-owned credentials, runti
   expect(await invoke("ext-save-package-secrets", { packageId, secrets: { [account.items[0]!.prerequisiteId]: TOKEN } })).toMatchObject({ ok: true })
   const { probe } = await import("../../test-component/codepuppy-engine")
   const tools = async () => (await probe().ctx.tool.list()).filter((tool: { options?: { namespace?: string } }) => tool.options?.namespace === "github-mcp-server")
-  await until(async () => (await tools()).length === 1, "Registry GitHub protocol fixture tool")
+  try {
+    await until(async () => (await tools()).length === 1, "Registry GitHub protocol fixture tool")
+  } catch (error) {
+    throw Error(String(error) + JSON.stringify({ nativeLoads, monitoredPaths, transport, mcp: (await send("GET", "/api/mcp")).json.data, tools: (await probe().ctx.tool.list()).map((tool: { name: string; options: unknown }) => ({ name: tool.name, options: tool.options })) }))
+  }
   const session = await send("POST", "/api/session", { agent: "build", permissions: [{ action: "*", resource: "*", effect: "allow" }] })
   expect(session.status).toBe(200)
   const called = await (await tools())[0]!.execute({}, { ...ctx(), sessionID: session.json.data.id })

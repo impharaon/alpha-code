@@ -161,13 +161,34 @@ export async function convertPluginTree(input: Capture): Promise<{ package: Plug
       modules.set(path, string(manifest?.name) ?? path.split("/").at(-1)!.replace(/\.[^.]+$/, ""))
     }
     for (const [path, sourceName] of modules) diagnostics.push({ code: "native-js-plugin", path, sourceName, message: "Code Puppy does not run third-party native plugin code" })
-    for (const [path, bytes] of files) {
-      const match = path.match(/^(?:\.opencode\/)?(agent|command)\/(.+)\.md$/)
-      if (!match) continue
-      const instruction = decode(bytes)
-      const parsed = ConfigMarkdown.parseOption(instruction)
-      if (!parsed) { diagnostics.push({ path, code: "invalid-definition", message: "Markdown definition is invalid" }); continue }
-      entries.push({ kind: match[1] === "agent" ? "agent" : "command", id: match[1] + ":" + path, sourcePath: path, sourceName: match[2]!, instruction: bindings(instruction), invocation: invocation(parsed.data) })
+  }
+  for (const [path, bytes] of files) {
+    const match = path.match(opencode ? /^(?:\.opencode\/)?(agent|command)\/(.+)\.md$/ : /^(agents|commands)\/(.+)\.md$/)
+    if (!match) continue
+    const instruction = decode(bytes)
+    const parsed = ConfigMarkdown.parseOption(instruction)
+    if (!parsed) { diagnostics.push({ path, code: "invalid-definition", message: "Markdown definition is invalid" }); continue }
+    const kind = match[1]!.startsWith("agent") ? "agent" : "command"
+    entries.push({ kind, id: kind + ":" + path, sourcePath: path, sourceName: match[2]!, instruction: bindings(instruction), invocation: invocation(parsed.data) })
+  }
+  if (!opencode && files.has("hooks/hooks.json")) {
+    const path = "hooks/hooks.json"
+    const document = json(path)
+    const events: HookEvent[] = ["SessionStart", "UserPromptSubmit", "UserPromptExpansion", "PreToolUse", "PostToolUse", "PostToolUseFailure", "Stop", "StopFailure", "PermissionRequest"]
+    if (object(document?.hooks)) for (const [name, groups] of Object.entries(document.hooks)) {
+      const event = events.find(event => event === name)
+      if (!event || !Array.isArray(groups)) { diagnostics.push({ path, sourceName: name, code: "invalid-definition", message: "Hook event definition is invalid" }); continue }
+      for (const [groupIndex, group] of groups.entries()) {
+        if (!object(group) || !Array.isArray(group.hooks)) { diagnostics.push({ path, sourceName: name, code: "invalid-definition", message: "Hook group is invalid" }); continue }
+        for (const [index, hook] of group.hooks.entries()) {
+          if (!object(hook) || hook.type !== "command" || typeof hook.command !== "string") { diagnostics.push({ path, sourceName: name, code: "invalid-definition", message: "Hook command is unsupported" }); continue }
+          entries.push({ kind: "hook", id: "hook:" + path + "#" + event + "/" + groupIndex + "/" + index, sourcePath: path, sourceName: event, hook: {
+            event, ...(typeof group.matcher === "string" ? { matcher: group.matcher } : {}), ...(typeof hook.if === "string" ? { if: hook.if } : {}),
+            command: bindings(hook.command), timeoutSeconds: typeof hook.timeout === "number" ? hook.timeout : event === "UserPromptSubmit" ? 30 : 600,
+            async: hook.async === true, asyncRewake: hook.asyncRewake === true, onFailure: hook.onFailure === "block" ? "block" : "continue", order: index, scope: { kind: "package" },
+          } })
+        }
+      }
     }
   }
   const unique = [...new Map(definitions.map((definition) => [definition.path + "#" + definition.pointer, definition])).values()]

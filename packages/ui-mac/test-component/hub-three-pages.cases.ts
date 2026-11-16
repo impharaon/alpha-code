@@ -1164,3 +1164,34 @@ test("R14 B12 a non-search catalog plus installs directly without the unreviewed
  })
  expect(calls.installCatalog).toEqual([])
 })
+
+
+test("review B7 one search finds own agents and local/created packages across tabs", async () => {
+  reset()
+  await realInstalledPackage(0)
+  const original = installedPackages[0]!
+  installedPackages = [
+    { ...original, packageId: "local:github", origin: "imported", source: { kind: "local-folder" } },
+    { ...original, packageId: "mine:github", origin: "created", source: { kind: "created" } },
+  ]
+  const previous = window.api.ext.sourcesSearch
+  Object.assign(window.api.ext, { sourcesSearch: async (query: string) => ({ searchId: "local-search", query, sources: [], candidates: [] }) })
+  try {
+    mount("skills")
+    const input = q<HTMLInputElement>('input[type="search"]')!
+    const search = (query: string) => { input.value = query; input.dispatchEvent(new Event("input", { bubbles: true })) }
+    search("GitHub")
+    await waitFor(() => expect(qa('[data-installed-package]')).toHaveLength(2))
+    expect(q('[data-installed-package="local:github"]')?.textContent).toContain("本地文件夹")
+    expect(q('[data-installed-package="mine:github"]')?.textContent).toContain("我的插件")
+    expect(document.body.textContent).not.toContain(zh["codepuppy.ext.sourceNoMatches"])
+    search("docs-writer")
+    await waitFor(() => expect(document.body.textContent).toContain("docs-writer"))
+    expect(qa('[data-installed-package]')).toHaveLength(0)
+    expect(document.body.textContent).not.toContain(zh["codepuppy.ext.sourceNoMatches"])
+    search("no-local-result")
+    await waitFor(() => expect(document.body.textContent).toContain(zh["codepuppy.ext.sourceNoMatches"]))
+    expect(document.body.textContent).not.toContain("docs-writer")
+    expect(calls.installPackage).toEqual([])
+  } finally { Object.assign(window.api.ext, { sourcesSearch: previous }) }
+})

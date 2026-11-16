@@ -507,3 +507,11 @@ test("BC2a.2 Git market transport prepares real choices; only the selected entry
   expect(after.packages.filter(pack=>pack.packageId==="claude:context7")).toHaveLength(1)
  }finally{fetchSpy.mockRestore()}
 })
+
+
+test("BC2b old Hub skill import and plugin confirmation transports are retired",()=>{
+ for(const channel of ["ext-import-skill-folder","ext-import-skill-git","ext-import-claude-plugin-preview","ext-import-claude-plugin-cancel","ext-import-claude-plugin-confirm"])
+  expect(handlers.has(channel),channel).toBe(false)
+ expect(handlers.has("ext-import-agent-confirm")).toBe(true)
+ expect(handlers.has("ext-install-from-source")).toBe(true)
+})

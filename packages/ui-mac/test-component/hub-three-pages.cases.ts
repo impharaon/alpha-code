@@ -1092,3 +1092,49 @@ test("BC1 the one Hub search input reaches sources and its plus reaches the sing
  expect(q('[role="dialog"]')).toBeNull()
  expect(qa('[data-group="installed"]')).toHaveLength(0)
 })
+
+
+test("BC2b folder menu installs the main-minted whole package without an install confirmation",async()=>{
+ reset();mount("skills")
+ const {createPluginSources}=await import("../src/main/plugin-sources")
+ const {captureFixture}=await import("../test-fixtures/plugin-helper/fixture")
+ const sources=createPluginSources({catalog:async()=>[]})
+ const prepared=await sources.prepareCapture(await captureFixture("plugins/frontend-design"))
+ expect(prepared.kind).toBe("package")
+ const wire:unknown[]=[]
+ const previous={preparePluginSource:window.api.ext.preparePluginSource,installFromSource:window.api.ext.installFromSource}
+ Object.assign(window.api.ext,{preparePluginSource:async(input:unknown)=>{wire.push(input);return {ok:true,prepared}},installFromSource:async(input:unknown)=>{wire.push(input);return {ok:true,packageId:"local:frontend-design",displayName:"frontend-design",source:{kind:"local-folder"},installed:[],notRunning:[]}}})
+ try{
+  await openMenu(q("[data-more='add']"));click(q("[data-menu-item='folder']"))
+  await waitFor(()=>expect(wire).toHaveLength(2))
+  expect(wire).toMatchObject([{kind:"folder"},{source:{kind:"candidate",candidateId:prepared.kind==="package"?prepared.candidateId:""},effect:{kind:"all-projects"},via:"hub"}])
+  expect(q('[role="dialog"]')).toBeNull()
+  expect(q('[data-local-package-preview]')).toBeNull()
+  expect(calls.importSkillFolder).toBe(0)
+ }finally{Object.assign(window.api.ext,previous)}
+})
+
+test("BC2b Git market shows real per-entry source rows and installs only the clicked main ID",async()=>{
+ reset();mount()
+ const {createPluginSources}=await import("../src/main/plugin-sources")
+ const {fixtureFetch}=await import("../test-fixtures/plugin-helper/source-fetch")
+ const sources=createPluginSources({catalog:async()=>[],fetch:fixtureFetch})
+ const prepared=await sources.prepareCapture(await sources.captureGit("https://github.com/anthropics/claude-plugins-official","refs/heads/main"))
+ if(prepared.kind!=="marketplace")throw Error("real fixture is not a marketplace")
+ const selected=prepared.entries.find(entry=>entry.displayName==="context7")!
+ const wire:unknown[]=[]
+ const previous={preparePluginSource:window.api.ext.preparePluginSource,installFromSource:window.api.ext.installFromSource}
+ Object.assign(window.api.ext,{preparePluginSource:async(input:unknown)=>{wire.push(input);return {ok:true,prepared}},installFromSource:async(input:unknown)=>{wire.push(input);return {ok:true,packageId:"claude:context7",displayName:"context7",source:{kind:"marketplace",ecosystem:"claude"},installed:[],notRunning:[]}}})
+ try{
+  await openMenu(q("[data-more='add']"));click(q("[data-menu-item='git']"))
+  const input=q<HTMLInputElement>('[role="dialog"] input')!;input.value="https://github.com/anthropics/claude-plugins-official";input.dispatchEvent(new Event("input",{bubbles:true}))
+  click(qa('[role="dialog"] .a-dialog-footer button')[1]!)
+  await waitFor(()=>expect(qa("[data-source-candidate]")).toHaveLength(prepared.entries.length))
+  expect(wire).toEqual([{kind:"git",url:input.value}])
+  expect(qa('[role="dialog"] button').some(button=>button.textContent?.includes("全部安装"))).toBe(false)
+  expect(q(`[data-source-candidate="${selected.id}"]`)?.textContent).toContain("Claude 插件市场")
+  click(q(`[data-source-candidate="${selected.id}"] button`))
+  await waitFor(()=>expect(wire).toHaveLength(2))
+  expect(wire[1]).toMatchObject({source:{kind:"candidate",candidateId:selected.id},effect:{kind:"all-projects"},via:"hub"})
+ }finally{Object.assign(window.api.ext,previous)}
+})

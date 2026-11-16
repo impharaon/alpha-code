@@ -653,3 +653,6 @@ r9 指定先跑 `bun test --max-concurrency 2 src/main/codepuppy-sidecar-wiring.
 BC2a.2 实施收据：main 新增私有只读取源准备通道 `preparePluginSource`（folder/Git），目录选择和捕获都在恢复 mutex 外；返回既有 prepared 的编号与安全展示事实，取消零写盘，拒收 renderer 路径。Git 通过已有 codeload 固定实际提交，支持仓库根与 GitHub tree 地址，不运行 clone/hook/script。冻结 folder 安装请求在 main 选择并捕获后映射到同一 candidate 写闸；同 requestId 复用捕获，写入／结果幂等仍由既有 installer 持有。市场通过只读准备清单逐条选择；直接 folder 请求若取得市场而非单包，不安装市场本身。
 
 `bun test --max-concurrency 2 src/main/ext-write-channels.test.ts src/main/plugin-sources.test.ts src/main/install-from-source.test.ts` exit 0（57 pass／0 fail，326 assertions；`bc2a2-main.log`，生产 IPC 子进程严格 13 场景）；ui-mac/ext 各 `bun typecheck` exit 0（`bc2a2-ui-typecheck.log`、`bc2a2-ext-typecheck.log`）。共享生产文件 `ext-ipc.ts` 的取源/入口外层与 `plugin-sources.ts` 的私有准备类型；另为既列 preload/注册表。生产约 60 行增删、6 文件，无冻结 DTO 改动。本笔未切换 hub 菜单，用户可达链在 BC2b 同笔撤旧收口；本片整体及 AC-15 仍未标完成。已核 Codex（GPT-6）作者自查；下一步 BC2b，OPTIONAL 无。
+
+
+BC2b 红例先行：生产 IPC 明确断言旧 folder/Git/Claude preview/cancel/confirm 五条运输不再注册、普通 agent confirm 仍在；真实 Hub DOM 以固定 frontend-design／317 项官方市场 prepared 投影证明文件夹直接安装整包无确认、Git 列表选择前零安装且仅所点 ID 出站。`bun test --max-concurrency 2 --test-name-pattern BC2b ./test-component/ext-install-catalog-result.cases.ts ./test-component/hub-three-pages.cases.ts` exit 1（0 pass／3 fail，`bc2b-red.log`）；旧菜单仍调用旧通道，清单未出现。

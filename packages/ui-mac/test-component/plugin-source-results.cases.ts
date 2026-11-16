@@ -93,7 +93,8 @@ test("BC1 main order, distinct same-name identities and real sources survive ren
   node.querySelectorAll<HTMLButtonElement>("button")[1]!.click()
   await flush()
   expect(requests).toEqual([recorded.candidates[1]!.id])
-  expect(node.textContent).toContain("main candidate expired")
+  expect(node.textContent).toContain("该条目已不可用，请重新搜索。")
+  expect(node.textContent).not.toContain("main candidate expired")
   expect(node.querySelectorAll('[role="dialog"]')).toHaveLength(0)
 })
 
@@ -163,7 +164,8 @@ test("BC1 per-source failure stays visible alongside good results and is never r
   const node = mount({ search: async () => answer })
   await flush()
   expect(node.textContent).toContain("Claude 插件市场")
-  expect(node.textContent).toContain("source connection failed")
+  expect(node.textContent).toContain("网络连接失败，请重试。")
+  expect(node.textContent).not.toContain("source connection failed")
   expect(node.querySelectorAll("[data-source-candidate]")).toHaveLength(recorded.candidates.length)
 })
 
@@ -173,7 +175,8 @@ test("BC1 an empty failed source does not claim a completed no-match search", as
   answer.sources[1] = { source: "claude-marketplace", status: "failed", reason: "http", detail: "HTTP 503" }
   const failed = mount({ search: async () => answer })
   await flush()
-  expect(failed.textContent).toContain("HTTP 503")
+  expect(failed.textContent).toContain("来源服务暂时不可用，请重试。")
+  expect(failed.textContent).not.toContain("HTTP 503")
   expect(failed.textContent).not.toContain("本次查询没有匹配条目")
   const empty = mount({ search: async () => ({ ...answer, sources: answer.sources.map(source => ({ source: source.source, status: "ok", matched: 0, skipped: 0 })) }) })
   await flush()

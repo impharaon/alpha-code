@@ -242,7 +242,10 @@ test("A4 failed main outcome is shown without manage or install confirmation", a
   })
   const host = mount(row())
   await flush()
-  expect(host.textContent).toContain("Main candidate no longer exists")
+  expect(host.textContent).toContain("未能安装")
+  expect(host.textContent).toContain("该条目已不可用，请重新搜索。")
+  expect(host.textContent).not.toContain("Main candidate no longer exists")
+  expect(host.textContent).not.toContain("未能启用")
   expect(host.querySelector("button")).toBeNull()
 })
 

@@ -1,5 +1,5 @@
 // `#840`:`buildCommandTxItems` 的构造期判据 —— 单 config item 的形状、fresh 闸(未登记 live 叶
-// 不认领不覆盖)、R4-1(disabled receipt 具名拒绝)、以及 departing 分支的 keyPath 同源。
+// 不认领不覆盖)、disabled package content 保存、以及 departing 分支的 keyPath 同源。
 //
 // 行为半场(装上之后引擎真的读到、卸载之后引擎真的读不到)不在本文件:
 // 它在 `package-command-engine-visibility.test.ts`(真引擎 `GET /command`)。
@@ -73,13 +73,12 @@ describe("buildCommandTxItems (#840)", () => {
     expect(built).toMatchObject({ ok: false, reason: expect.stringContaining("could not produce a transaction plan") })
   })
 
-  test("R4-1:disabled receipt ⇒ 具名拒绝(command 无启停面,不装假态)", () => {
+  test("disabled package command stores content for the root-owned effective projection", () => {
     const built = buildCommandTxItems(input({ receipt: receipt({ desiredState: "disabled" }) }))
-    expect(built.ok).toBe(false)
-    if (!built.ok) {
-      expect(built.reason).toContain("no enable/disable surface")
-      expect(built.reason).toContain("R4-1")
-    }
+    expect(built.ok).toBe(true)
+    if (!built.ok) return
+    expect(built.build.receipt.desiredState).toBe("disabled")
+    expect(built.build.items[0]?.config?.edits[0]?.keyPath).toEqual(["command", "probe"])
   })
 
   test("fresh 闸:未登记的 live command 叶不认领不覆盖(治理路 builtin 覆盖叶是真实保护对象)", () => {

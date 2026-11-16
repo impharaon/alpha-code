@@ -909,3 +909,38 @@ test("real IPC previews/cancels without secrets, installs both recipes, stops be
     globalThis.fetch = original
   }
 }, 30_000)
+
+test("package-owned encrypted token replacement retires the old version and a failed ledger commit preserves the current value", async () => {
+  const { installDesktopPackageV1, savePackageSecretsV1, readPackageAuthorizationV1 } = await import("../src/main/package-admission")
+  const { resolveVerifiedPackageV1 } = await import("../src/main/package-installability")
+  const { readPackageLedgerStateV1 } = await import("../src/main/ext-receipt-v2")
+  const f = await fixture()
+  const catalog = { version: "official-real", entries: [{}], packages: [f.envelope] }
+  let version = 0
+  const deps = {
+    root: () => root, globalRoot: () => root, userDataPath: join(home, "userData"), casBaseRoot: () => join(home, "state"), environment: () => "dev" as const,
+    loadVerifiedCatalog: async () => ({ source: "remote" as const, catalog, snapshotDigest: "d".repeat(64) }),
+    installability: { fetchPayload: async () => f.bytes }, advisoryGate: () => ({ allowed: true as const }),
+    resolvePackage: async (id: string, version: string) => ({ ...resolveVerifiedPackageV1(catalog, id, version), channel: "cache" as const }),
+    secretVersionId: () => `v-owned-${version++}`,
+  }
+  expect(await installDesktopPackageV1("package:github-official", deps)).toMatchObject({ ok: true })
+  const before = readPackageLedgerStateV1(root)
+  const intent = (value: string) => ({ packageId: "package:github-official", secrets: { "mcp:github-official#GITHUB_PERSONAL_ACCESS_TOKEN": value } })
+  expect(await savePackageSecretsV1(intent(pat), deps)).toEqual({ ok: true })
+  expect(existsSync(join(officialConnectorPaths(root, "github-official", "v-owned-1").secret, "secret.enc"))).toBe(true)
+  expect(await savePackageSecretsV1(intent(pat + "NEXT"), deps)).toEqual({ ok: true })
+  expect(existsSync(officialConnectorPaths(root, "github-official", "v-owned-1").secret)).toBe(false)
+  expect(existsSync(join(officialConnectorPaths(root, "github-official", "v-owned-2").secret, "secret.enc"))).toBe(true)
+  expect(await savePackageSecretsV1(intent(pat + "FAILED"), { ...deps, transaction: (root, plan, hooks) => runExtensionTransaction(root, plan, { ...hooks, commitReceipt: () => { throw new Error("injected credential ledger failure") } }) })).toMatchObject({ ok: false })
+  expect(readFileSync(officialConnectorConfig(root, "github-official", "v-owned-2").file, "utf8")).toBe(pat + "NEXT")
+  expect(existsSync(join(officialConnectorPaths(root, "github-official", "v-owned-2").secret, "secret.enc"))).toBe(true)
+  const after = readPackageLedgerStateV1(root)
+  expect(after.ok && after.packageGraphs).toEqual(before.ok && before.packageGraphs)
+  expect(after.ok && after.claims).toEqual(before.ok && before.claims)
+  // A malformed user-edited runtime reference is pending, rather than an exception from the path authority.
+  const { removeMcpServerRecord } = await import("../src/main/mcp-server-lifecycle")
+  expect(removeMcpServerRecord("github-official").ok).toBe(true)
+  writeFileSync(join(root, "codepuppy.jsonc"), JSON.stringify({ mcp: { "github-official": { type: "remote", url: "https://api.githubcopilot.com/mcp/", headers: { Authorization: `Bearer {file:${join(home, "invalid version", "GITHUB_PERSONAL_ACCESS_TOKEN")}}` } } } }))
+  expect(await readPackageAuthorizationV1("package:github-official", deps)).toMatchObject({ ok: true, items: [{ kind: "secret", saved: false }] })
+})

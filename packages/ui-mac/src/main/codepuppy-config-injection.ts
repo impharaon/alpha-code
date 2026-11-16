@@ -45,7 +45,7 @@ import { USER_DATA_LAYOUT } from "./user-data-layout"
 import { factorySkillPaths } from "../../../ext/src/factory-paths"
 import { publishProviderAllowList } from "../../../ext/src/provider-allow"
 import { skillGenerationLiveDirs } from "../../../ext/src/gen-skill-paths"
-import { explicitConfigPath, writeExplicitConfig, type ExplicitLayer } from "./engine-explicit-config"
+import { disabledPackageComponents, explicitConfigPath, writeExplicitConfig, type ExplicitLayer } from "./engine-explicit-config"
 import { applyPromptTakeover } from "../../../ext/src/codepuppy-prompts"
 
 // Inject alpha-code's customizations into opencode via OPENCODE_CONFIG_CONTENT. This env var is
@@ -248,7 +248,8 @@ export function injectCodePuppyConfig(
     // 三分支**同一组输入**(kill-switch ⇒ 中和条目 `enabled:false`;代付 ⇒ 真定义 `enabled:true`;
     // 其余 ⇒ 无凭证 `enabled:false`)。identity 的云腿在场性读它,不另算一遍(`#1414` S4)。
     const mcpUrl = cloudMcp?.definition.url
-    const cloudMcpEnabled = Boolean(mcpUrl) && !killSwitch && platformPays
+    const cloudPackageEnabled = !disabledPackageComponents(codepuppyGlobalRoot()).some((component) => component.kind === "cloud")
+    const cloudMcpEnabled = cloudPackageEnabled && Boolean(mcpUrl) && !killSwitch && platformPays
     // 只记录本轮函数自己新放进 mcp 的名字;继承来的 OPENCODE_CONFIG_CONTENT 不是治理授权。
     const injectedMcpNames = new Set<string>()
 
@@ -546,7 +547,7 @@ export function injectCodePuppyConfig(
     //      `#1106` 的 doomed-connect 判据(镜像引擎 mcp-auth.json)随之就地退役:引擎不再持有
     //      云凭证,「boot 连接注定失败」的判据现在就是 platformPays 自己 —— 缺凭证 ⇒
     //      `enabled:false` ⇒ `MCP.create` 直接 DISABLED_RESULT,boot 零等待,形态不变。
-    if (cloudMcp && mcpUrl) {
+    if (cloudMcp && mcpUrl && cloudPackageEnabled) {
       // #223 R4→R5 fail-closed:kill-switch 下 `cloud_web_search` 的**最终**闸住在 @codepuppy/ext
       // 的 tool.execute.before 钩子里(远端 MCP 无 per-tool 注册期过滤,permission deny 可被后置
       // allow 顶掉)。R3 用「extPluginPath 路径是否存在」判 ext 在不在场 —— R4 证明那不成立:
@@ -660,7 +661,7 @@ export function injectCodePuppyConfig(
     const modelsFile = models ? materializeGovernedModelsBase(userDataPath, models) : undefined
     // 显式槽:用户的 codepuppy.jsonc(有的话)+ 上面那一层,合成一份写进 Code Puppy 自己的 userData(engine-explicit-config.ts)。
     const explicitFile = explicitConfigPath(userDataPath)
-    const written = writeExplicitConfig(explicitFile, file, layer)
+    const written = writeExplicitConfig(explicitFile, file, layer, codepuppyGlobalRoot())
     if (written.userError) console.warn(`[alpha-code#1667] ${file} is not valid (${written.userError}); the engine sees only Code Puppy's explicit layer`)
     return {
       ok: true,

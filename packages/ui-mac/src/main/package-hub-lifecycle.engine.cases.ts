@@ -191,20 +191,22 @@ beforeAll(async () => {
       },
       refresh: async () => {
         try {
-        await running?.close()
-        const injection = injectCodePuppyConfig(
-          host.userData,
-          join(sandbox.root, "hub-lifecycle-ext"),
-          "stable",
-          codepuppyBootstrap().paths.userConfig ?? null,
-        )
-        const next = JSON.parse(injection.config.content) as typeof host.content
-        next.providers.codepuppy!.models = host.content.providers.codepuppy!.models
-        next.plugins = [...next.plugins, ...host.content.plugins.filter((entry) => entry.endsWith("-probe"))]
-        Object.assign(host.content, next)
-        running = await host.start()
-        refreshes++
-        return true
+          await running?.close()
+          const injection = injectCodePuppyConfig(
+            host.userData,
+            join(sandbox.root, "hub-lifecycle-ext"),
+            "stable",
+            codepuppyBootstrap().paths.userConfig ?? null,
+          )
+          const next = JSON.parse(injection.config.content) as typeof host.content
+          next.providers.codepuppy!.models = host.content.providers.codepuppy!.models
+          next.plugins = [...next.plugins, ...host.content.plugins.filter((entry) => entry.endsWith("-probe"))]
+          // A sidecar refresh replaces its launch config; absent keys must not survive the old fork.
+          for (const key of Object.keys(host.content)) Reflect.deleteProperty(host.content, key)
+          Object.assign(host.content, next)
+          running = await host.start()
+          refreshes++
+          return true
         } catch (error) {
           refreshFailure = error instanceof Error ? error.message : String(error)
           throw error

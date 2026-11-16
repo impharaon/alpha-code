@@ -23,7 +23,7 @@ last_reviewed: 2026-11-15
 
 ### 改动
 
-下表路径均相对 `packages/ui-mac/`；同一行列出的文件各自只承担所述接线。宿主发布 schema、Protocol/HttpApi、引擎执行器、权限 evaluator、账本和专用 secret store 权威及 alpha-web 目录数据均冻结，不引入依赖。包开关调用现有 force 路径，包含忙时；仅在同调用链需要时改 `packages/ext/` 调度调用点及相关测试，不新增调度机制、轮询框架、确认或等待。
+下表路径均相对 `packages/ui-mac/`；同一行列出的文件各自只承担所述接线。宿主发布 schema、Protocol/HttpApi、引擎执行器、权限 evaluator、账本和专用 secret store 权威及 alpha-web 目录数据均冻结，不引入依赖。包开关调用现有 force 路径，包含忙时；仅在同调用链需要时改 `packages/ext/` 调度/云 MCP 重装调用点及相关测试，不新增调度机制、轮询框架、确认或等待。
 
 | 文件 | 改什么 |
 | --- | --- |
@@ -32,6 +32,9 @@ last_reviewed: 2026-11-15
 | `src/main/package-mcp-oauth.ts` | 将安装期主动 add/probe 与显式登录动作分开；就绪从真实引擎状态/集成连接读回。关闭包的定义经同名 disabled 配置投影，不走当前 active `experimental.mcp.add`。不自建 OAuth attempt、callback 或 token store。 |
 | `src/main/ext-install-planner.ts`、`src/main/ext-receipt-v2.ts`、`src/main/ext-package-tx-builders.ts` | 包状态操作从既有 graph/root 找全组件，复用锁、配置写入、账本写器与技能允许集发布；自动开启与菜单开关均由 root 意图派生组件投影，避免 renderer 逐项循环开关。尚缺 token 的连接器不阻断内容提交；凭据写入沿版本化 prepared resource，改 token 不改变包的启停状态。 |
 | `src/main/ext-transaction.ts`、`src/main/ext-transaction.test.ts` | r3 授权：事务内以条目序号区分 generation 的八位十六进制后缀；不改现有读者文法、探针、core 或已落记录。新用例验普通/进位边界的唯一代号及读回/卸载。 |
+| `src/main/engine-explicit-config.ts` / `.test.ts`、`src/main/codepuppy-config-injection.ts`、`src/main/{codepuppy-config-injection-engine,engine-plugin-policy.engine}.cases.ts` | r4 B1：由原账本读器按包 root 状态投影同图 disabled 组件；显式层撤下关闭包的 command/commands，启动注入不注册关闭云包的 MCP；只透传现有 root 到显式层写入/监听，不改存储内容、engine 或发布 schema。相关调用测试同步私有签名。 |
+| `src/main/official-connector-resources.ts`、`src/main/official-connectors.test.ts`、`test-component/official-connectors.cases.ts`、`src/main/ext-package-tx-builders-command.test.ts` | r4 A/B2–4：复用原官方投影 writer 发布提交后的新引用，按密文版本判 saved；具名验证成功清旧/失败保旧。command builder 旧 disabled 拒绝例随真实有效声明投影替换，保留内容等待同包 root 开启。 |
+| `../ext/src/plugin.ts`、`../ext/src/plugin-host.test.ts` | r4 B1 同链：既有 kill-switch rearm 仅重装 main 有效注入中存在的云 server；包 off 的缺席不会被重装。原身份测试补 main 真实 withheld 前像，既有断言不改。 |
 | `src/main/ext-config.ts` | 同调用链补严格读取：沿既有 main-only remote MCP 真值读取器取得已装定义，供装后凭据编辑保留原文件引用；不另建配置或 secret 权威。 |
 | `src/main/ext-ipc.ts`、`src/main/ext-write-channels.ts` | 已安装投影带 root 状态、组成和安全授权视图；包状态/装后密钥写动作接现有写闸、恢复与重载通道。main 依据包身份重读图和已验声明，调用方不能指定 server URL、任意 config 或秘密文件。卸载仍走 `uninstallPackageV1`。 |
 | `src/preload/types.ts`、`src/preload/index.ts`、`src/renderer/extensions/ext-ipc.ts` | 串接包状态及装后授权动作，统一引用安全 DTO；只增加本片所需的桌面内部动作，不新增发布者合同。 |
@@ -177,3 +180,15 @@ r4 仅记录的遗留（续派明确排除）：`package-admission.ts` — busy 
 r4 B1 补红：`bun test --max-concurrency 2 ./src/main/package-hub-lifecycle.engine.cases.ts -t 'cloud-only package switch|package command switch'` exit 1（0 pass / 2 fail）：真实云 MCP 关闭后仍 connected；真实 mixed-bundle 的 command 在直装内容落关闭阶段被旧 R4-1 拒绝。夹具复用 HOST_EXTENSION_PACKAGE_CORPUS 的 cloud-v1 原字节、producer-derived mixedBundleFixture 与 core SDK echo handler；云 fixture 的 server 名用启动文档已支持的 hub-cloud，避开既有 codepuppy_echo 工具名碰撞，不改协议或引擎。新增两条 inventory 正反对照要求开→关→开的真实工具/command 清单；原三条生命周期行为断言保持。
 
 B1 同链补充：`packages/ext/src/plugin.ts:333` 的既有 kill-switch rearm 也会从 bootstrap 重装云 MCP。把新生命周期夹具的既有 killSwitch 输入置 true（行为断言不改），具名 cloud switch 再次 exit 1，off 后仍 connected；修复需让该调用点消费 main 有效注入中 server 是否存在，不复制账本判断、不改 bootstrap schema。此 ext 同调用链由 r4 B1“真实 off”覆盖。
+
+
+r4 B1 实施：在既有 engine-explicit-config 读取已验包图和 root 状态，一处派生 disabled 组件；云注入与 command 有效声明共同消费。command 内容保留、合成文件撤下，开启恢复；云 off 时无注入、on 时继续原 billing/kill-switch 条件，ext 只消费 main 有效条目的在场性而不重算账本。未新增 scheduler/轮询/flag、确认或等待，core 与 ext-config 未改。旧 command builder “disabled 即拒绝”断言正是本次取代的行为，改为验证内容保存；原 standalone 无启停面拒绝不动。表外文件均为上述有效声明调用点/同链测试，加入本表；原 22 个生产文件增加 engine-explicit-config、codepuppy-config-injection、official-connector-resources、ext/plugin 四个，共 26（r4 续派新增范围；另有复用 bad-port 的 2 个生产文件，相对 origin/alpha 共 28）。
+
+- B1 正反对照：`bun test --max-concurrency 2 ./src/main/package-hub-lifecycle.engine.cases.ts -t 'cloud-only package switch|package command switch'` exit 0，2 pass / 13 断言，含 kill-switch rearm；关闭后实际云 server/工具消失、command 声明消失，重开恢复。新增夹具发现原 refresh 的 Object.assign 会保留本次缺席的启动键，已改成与 sidecar 一样替换整份 content；只修夹具前像，所有既有/新生命周期行为断言不改。
+- B1 相关：explicit/builder/admission/parity/wiring 五文件组 exit 0，44 pass；注入/header/websearch/throat/derivation/bad-port/recovery/state/write-channel 九文件组 exit 0，117 pass。ext 云/host/reload 四文件组最初 82 pass / 1 fail，是身份测试缺 main withheld 前像；仅补该真实前像后 plugin-host exit 0，41 pass，原断言不改，ext `bun typecheck` exit 0。
+- A 官方资源补证：`bun test --max-concurrency 2 ./test-component/official-connectors.cases.ts -t 'desktop official|real admission commits|package-owned encrypted'` exit 0，4 pass / 36 断言；实际加密版本连续更换后旧目录不存在，注入 ledger commit 失败后旧 runtime 值/密文仍可用、graph/claims 相同。官方宿主计数随实际测试定义增为 13，未绕过已有 TMPDIR 失败。
+- 新证实的既有失败：`src/main/codepuppy-config-injection-engine.cases.ts:240` — C7 反向臂去掉 provider.use 后没有出现额外 provider（Expected true / Received false）。相关宿主 exit 1，23 pass / 1 fail；临时恢复本次改动的 injection/explicit/ext plugin 为 HEAD 基线再执行同一 24 例，仍 exit 1，23 pass / 1 fail，同一 :240（日志 `/tmp/hub-r4-injection-baseline.log`），随后已恢复本次改动。不修 provider/模型数据或该断言；去向：编排器安排既有 C7 证据缺口。其余真实引擎宿主（生命周期、插件 policy、command visibility）在该组均通过。
+- B7 删除 project 分支的临时反向检验 exit 1（同名行数 0，期望 1），已恢复；B8 删除 guard 的反向检验亦红，故两个补证都能检出行为缺失。
+
+
+r4 收口（Codex / GPT-6）：`bun test --max-concurrency 2 src/main/package-hub-lifecycle.engine.test.ts src/main/package-mcp-oauth.engine.test.ts src/renderer/extensions/hub-three-pages.test.ts src/renderer/extensions/ext-package-detail-wiring.test.ts` exit 0，4 宿主 / 0 fail，实际 5/4/26/15 子例。AC-10 五态单行/直装/无永久 allow、AC-12 全技能/连接器/云/command 启停及更换密钥后整包移除、AC-13 真实 busy force 中断、AC-14 同包管理/真实来源、AC-06/07 hub 的登录/token 分开与取消/继续均有具名证据；真实服务凭据验收仍由编排器后收。ui-mac 和 ext `bun typecheck` 均 exit 0；文档链接检查 4 条与 diff check exit 0。当前约 50 分钟，未达原 40 分钟的两倍；B1–B8 处置及新增范围已记录。没有 core、ext-config 新编辑、公开 schema/Protocol、权限 evaluator、迁移、发布或 gate/bin/check。已知两条独立失败保留原断言，交回其既有责任链，不影响本轮 AC 证据。

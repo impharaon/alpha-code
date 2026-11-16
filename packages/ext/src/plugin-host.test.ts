@@ -321,7 +321,7 @@ it.live("权威 · 云工具准入:治理云 server 上的 web search 只按本 
     // `#1698`:web search 的判决只有 kill-switch 一个信号(「只有本地信号」的漂移态不再存在);治理 / 冒名的区分体现在拒绝理由上 ——
     // 治理云工具只拿 kill-switch 那一句,冒名的拿到点名「按名字认出的工具」的第三方那一句。
     env({}, { killSwitch: true, cloudMcp: testCloudMcp("https://cloud.example/mcp", token, "cloud") })
-    const mcp = recordingMcp({ cloud_attacker: { type: "remote", url: "https://evil.example/mcp" } })
+    const mcp = recordingMcp({ cloud: { type: "remote", url: "http://127.0.0.1:1/withheld", disabled: true }, cloud_attacker: { type: "remote", url: "https://evil.example/mcp" } })
     yield* registered("cloud_web_search", "cloud_attacker_web_search")
     yield* activate(CodePuppyExt, { mcp })
     const governed = yield* before("cloud_web_search")

@@ -254,21 +254,13 @@ export function buildAgentTxItems(input: AgentTxBuildInputV1): PackageTxBuildRes
  * (未登记 live 叶不认领不覆盖 —— 治理路写的 builtin 覆盖叶 `command.init/review` 是
  * 该闸的真实保护对象)。
  *
- * **R4-1(owner 2026-08-05)**:command 没有禁用面(引擎叶无 disable 键、
- * `setInstallStateByKey` 拒绝翻转)。`desiredState === "disabled"` 的 receipt(唯一可达
- * 来源 = codepuppy-connection 前置不可用时 admission 的全组件压制)在这里**具名拒绝** ——
- * 装成 disabled 是永远无法启用的死态,且叶一旦落盘命令就活着,账本却说关。整包因此
- * fail-closed,而不是装出半真半假。
+ * Disabled package commands keep their stored content. The main-owned explicit layer withdraws
+ * their effective declarations from the engine until the owning package root is enabled.
  */
 export function buildCommandTxItems(input: CommandTxBuildInputV1): PackageTxBuildResultV1 {
   const commandEntry = input.commandEntry
   if (!commandEntry) return { ok: false, reason: NO_PLAN }
   const receipt = input.receipt
-  if (receipt.desiredState === "disabled")
-    return {
-      ok: false,
-      reason: `command "${input.name}" has no enable/disable surface — a package whose connection prerequisite is unavailable cannot install its command children; the whole package fails closed (R4-1)`,
-    }
   receipt.configKey = `command.${input.name}`
   const items: TxPlanItem[] = [
     {

@@ -109,7 +109,7 @@ describe("运行中:输入一变就重写显式文件", () => {
     const file = path.join(root, "..", `${path.basename(root)}-engine`, "codepuppy-explicit.json")
     dirs.push(path.dirname(file))
     fs.writeFileSync(userConfig, `{ "commands": { "one": { "template": "1" } } }`)
-    writeExplicitConfig(file, userConfig, LAYER)
+    writeExplicitConfig(file, userConfig, LAYER, root)
     const read = () => JSON.parse(fs.readFileSync(file, "utf8")) as { commands?: Record<string, unknown> }
     expect(Object.keys(read().commands!).sort()).toEqual(["init", "one", "review"])
     const logs: string[] = []
@@ -136,7 +136,7 @@ describe("运行中:输入一变就重写显式文件", () => {
     const file = path.join(root, "..", `${path.basename(root)}-engine`, "codepuppy-explicit.json")
     dirs.push(path.dirname(file))
     let skills = ["/gen/one"]
-    writeExplicitConfig(file, undefined, { ...LAYER, skills })
+    writeExplicitConfig(file, undefined, { ...LAYER, skills }, root)
     const read = () => (JSON.parse(fs.readFileSync(file, "utf8")) as { skills: string[] }).skills
     const stop = watchExplicitSources({ file, root, layer: LAYER, skills: () => skills, log: () => {} })
     await settle()

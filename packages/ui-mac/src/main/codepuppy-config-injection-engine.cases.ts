@@ -428,7 +428,7 @@ describe("编排器裁决 2026-11-12:项目导入的技能经显式文件那一�
   test("反向臂(今天的代码):显式文件的 skills 里没有那一条 ⇒ 项目 A 已导入的技能不可用", async () => {
     const injection = injectCodePuppyConfig(userData, undefined, "stable", codepuppyBootstrap().paths.userConfig ?? null)
     const explicit = injection.explicit!
-    writeExplicitConfig(injection.config.file!, explicit.userConfig, { ...explicit.layer, skills: explicit.layer.skills.filter((entry) => entry !== "./.codepuppy/skills") })
+    writeExplicitConfig(injection.config.file!, explicit.userConfig, { ...explicit.layer, skills: explicit.layer.skills.filter((entry) => entry !== "./.codepuppy/skills") }, explicit.root)
     expect(fs.readFileSync(injection.config.file!, "utf8")).not.toContain(".codepuppy/skills")
     const projectA = path.join(sandbox.root, "projects", "project-skills-today")
     fs.mkdirSync(projectA, { recursive: true })

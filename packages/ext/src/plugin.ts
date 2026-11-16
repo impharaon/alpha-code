@@ -330,7 +330,9 @@ export const CodePuppyExt: Plugin.Plugin = {
       await context.mcp.transform((editor) => {
         // #223 R5 / M3:云 MCP 的完整定义只由 ext 在这里装 —— 本句能执行 = 本 Location 的 ext 已装上、上面的执行闸已注册。
         try {
-          const installed = installCloudMcp(editor, bootstrap)
+          // Main omits the effective server when its owning package is off. Rearm only an injected entry.
+          const installed = bootstrap.cloudMcp && editor.get(bootstrap.cloudMcp.name)
+            ? installCloudMcp(editor, bootstrap) : undefined
           if (installed) log(`[@codepuppy/ext] cloud MCP server "${installed}" installed — the web search sovereignty gate is registered in this Location`)
         } catch (cause) {
           error(`[@codepuppy/ext] cloud MCP install failed: ${describe(cause)}`)

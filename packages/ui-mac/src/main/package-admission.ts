@@ -473,9 +473,14 @@ export async function readPackageAuthorizationV1(packageId: unknown, deps: Packa
       const files = collectMcpFileRefPaths(leaf.value)
       for (const item of component.prerequisite.items) items.push({
         kind: "secret", componentId: item.componentId, prerequisiteId: item.prerequisiteId, serviceName: name, label: item.label,
-        saved: files.some((file) => isOfficialConnector(name)
-          ? existsSync(join(officialConnectorPaths(deps.root(), name, basename(dirname(file))).secret, "secret.enc"))
-          : basename(file) === item.target.variable && existsSync(file)),
+        saved: files.some((file) => {
+          if (!isOfficialConnector(name)) return basename(file) === item.target.variable && existsSync(file)
+          try {
+            return existsSync(join(officialConnectorPaths(deps.root(), name, basename(dirname(file))).secret, "secret.enc"))
+          } catch {
+            return false
+          }
+        }),
       })
     }
     for (const item of component.oauth.items) {

@@ -1066,3 +1066,5 @@ G4 模块脚本明文定义 exit 2 为“不拦 push”的告警；只在坏登�
 ```
 
 已记录但不修：unsigned dir 包签名问题按 r18 明确交包装 lane，非本增量修复范围。
+
+r18 S1/S2 红证据：新增真实 Chrome 布局例载入已批准 #search 帧及其正式 CSS，用 ui-mac 默认 1280×800 和当前生产占位字测量 canvas 字体宽度/实际 input 可用宽度；原样只得 116px、需 146.4873px，明确失败。源结果 DOM 新例实际读第三方 icon，原字符 p 且无背景，而现有 fallback 为 P/类型底色。search-ui-red.log 外层 0 pass / 2 fail；两例分别移除宽度修复/现有 fallback 接入即红，不新增资产或画视觉稿。先提交这两条回归及内层精确 10 条 pin，再改生产。frame 文件不编辑，真实来源结果仍由生产组件与 pinned 样本驱动。

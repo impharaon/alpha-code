@@ -239,3 +239,13 @@ test("R14 B12 a real third-party plus has no unreviewed default-off message or i
  expect(document.querySelector('[role="dialog"]')).toBeNull()
  expect(node.textContent).toContain("installed package menu")
 })
+
+test("third-party entries without artwork use the customization center's visible fallback", async () => {
+  const node = mount()
+  await flush()
+  const candidate = recorded.candidates.find(row => row.source === "claude-marketplace")!
+  const icon = node.querySelector<HTMLElement>(`[data-source-candidate="${candidate.id}"] .codepuppy-ext-kit-ic`)!
+  expect(icon).toBeInstanceOf(HTMLElement)
+  expect(icon.textContent).toBe("P")
+  expect(icon.style.background).not.toBe("")
+})

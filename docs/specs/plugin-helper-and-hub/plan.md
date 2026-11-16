@@ -320,7 +320,7 @@ A2/A3 接线收据：主进程每次应用运行创建一份 `createPluginSource
 ## 切片 D
 
 - 依据：[Issue #1724](https://github.com/impharaon/alpha-code/issues/1724)；[SPEC-plugin-helper-and-hub v3](https://github.com/impharaon/alpha-work/blob/8663fb2a982eaf7c626bfee3bcd8b20b870f2577/docs/specs/plugin-helper-and-hub/spec.md) AC-04、AC-08、AC-09、体验约定；[DESIGN-plugin-helper-and-hub v4](https://github.com/impharaon/alpha-work/blob/850fd2a61f220596fb10922c8b2e477c7475fac4/docs/specs/plugin-helper-and-hub/design.md) §4.4–4.6、§5、§8 D、§10。消费 §4.1 的唯一入口及 A1 转换产物，不重定合同、来源顺序或 owner 决定。
-- 核对：Phase: IMPLEMENT — e2b26e5ecd · orchestrator/Claude Fable 5.2 · plan check passed (AC-04/08/09/16 each have failing-capable proof including the debounce-window isolation case; steps that wait name their seam; no restriction added). r1 仅授权 D1、D2、E1，其他步骤继续等待具名接缝。
+- 核对：Phase: IMPLEMENT — e2b26e5ecd · orchestrator/Claude Fable 5.2 · plan check passed (AC-04/08/09/16 each have failing-capable proof including the debounce-window isolation case; steps that wait name their seam; no restriction added). r1 仅授权 D1、D2、E1，其他步骤继续等待具名接缝。 r3 已接收完整 A1–A4、H 与来源车道（基线 f876922949），授权 E3→D3→D4→D5；D5 真实模型验收交编排器。
 - 基线：`8e40a921ec09cc95d8580142fd45af760d3599d1`，派定工作树/分支沿本次 brief；A1 已有 converter、真实语料和 `createPluginSources`，A2–A4 尚未接入。本次仅追加 D/E 两节，不修改 A 的记录、规格、冻结设计、规则或 H 页面。
 - 预计实施：约 9–12 个生产/资源文件、6–9 个测试/夹具文件，600–1,000 行实质改动（不计真实记录），3–5 小时；按下列提交单元推进，每个 AC 后核对用时和证据。等待合入不计作已实现。
 
@@ -376,7 +376,7 @@ A2/A3 接线收据：主进程每次应用运行创建一份 `createPluginSource
 ## 切片 E
 
 - 依据：[Issue #1724](https://github.com/impharaon/alpha-code/issues/1724)；[SPEC-plugin-helper-and-hub v3](https://github.com/impharaon/alpha-work/blob/8663fb2a982eaf7c626bfee3bcd8b20b870f2577/docs/specs/plugin-helper-and-hub/spec.md) AC-16、体验约定及已定的提案 A；[DESIGN-plugin-helper-and-hub v5](https://github.com/impharaon/alpha-work/blob/8bd3075/docs/specs/plugin-helper-and-hub/design.md) §4.4、§4.6、§5、§8 E、§10 R2-F2 与生效修订。r2 已核 §4.4 相对原计划不变，§5 的作用域/断开路径由后续 E3 消费；不增加范围选择步骤或重定默认。
-- 核对：Phase: IMPLEMENT — e2b26e5ecd · orchestrator/Claude Fable 5.2 · plan check passed (AC-04/08/09/16 each have failing-capable proof including the debounce-window isolation case; steps that wait name their seam; no restriction added). r1 仅授权 D1、D2、E1，其他步骤继续等待具名接缝。 r2 续派仅授权 E2；重栈基线 1a218e8a2e，消费 design v5 @8bd3075（§4.4 不变、§5 的 Location/断开说明已核），E3 与 D3–D5 继续冻结。
+- 核对：Phase: IMPLEMENT — e2b26e5ecd · orchestrator/Claude Fable 5.2 · plan check passed (AC-04/08/09/16 each have failing-capable proof including the debounce-window isolation case; steps that wait name their seam; no restriction added). r1 仅授权 D1、D2、E1，其他步骤继续等待具名接缝。 r2 续派仅授权 E2；重栈基线 1a218e8a2e，消费 design v5 @8bd3075（§4.4 不变、§5 的 Location/断开说明已核），E3 与 D3–D5 继续冻结。 r3 基线 f876922949 已接收 A3/A4 与 H 最终接缝，现授权 E3，合并原 E4 的范围展示与 E5 的自动化隔离证明；不新增范围编辑控件。
 - 基线：同 D 的 `8e40a921ec`。已核现状：`ext-receipt-v2.ts:586–735` 是允许集唯一发布方；`packages/ext/src/gen-skill-paths.ts` 只读 v1 keys；main 的 `explicitSkillDirs` 直接复用它；`engine-explicit-config.ts:133` 以 100 ms 去抖刷新；`plugin.ts` 已有 post 段后的 agent/provider tail，可复用机制。上述是 E 的改动落点，不据此重审冻结方案。
 - UI：沿 A 节链接的批准帧 `#manage` 和现有 H 管理页，仅接「生效范围」及「我的所有项目」/「仅当前项目」展示；本片不新增范围编辑控件、安装前提问或 H 页面。
 - 预计实施：约 10–13 个生产文件、7–10 个测试文件，800–1,200 行实质改动，4–6 小时；每项隔离证明后核对时间/规模，明显翻倍则交回，不扩成配置/权限重构。
@@ -459,3 +459,5 @@ Hub 重叠生产文件仅 ext-install-planner.ts 的 computeEnableProjectionEdit
 本轮已核：Codex（GPT-6），D1/D2/E1 的范围、真实出厂资源发现及纯函数证据通过；spec v3/design v4 与已定裁决不变。AC-04/08/09/16 均尚未满足。遗留去向：Issue 版本引用已按续派回执同步；H/A/B/C 接缝合入与构建应用真实模型/任务验收→各片及编排器。除上列 tsgo 参数适配及 census 机械同步外无偏离；OPTIONAL：无。
 
 本轮 D/E PLAN 开始于 2026-11-16 14:48:39 CST，约 13 分钟（预算 45 分钟）；只改本文件的这两节。`python3 scripts/check-doc-links.py docs/specs/plugin-helper-and-hub/plan.md` exit 0（2 条相对链接可达），`git diff --check` exit 0；原有计划 33,609 bytes 逐字节保持，提交前另核暂存范围。未执行仓库测试、typecheck、全 gate 或功能验收。
+
+2026-11-16 r3 / E3 红例 · 17:44:53 CST 开始。重栈后先复跑 E2：ui-mac 170 pass / 762 assertions、另组 166 pass / 1838 assertions，ext 40 pass / 107 assertions；技能翻代引擎 2 pass / 44 assertions 与 composer 1 pass / 2 assertions，两包 `GOMAXPROCS=2 bun typecheck` 均 exit 0。不存在 `package-mcp-activation.test.ts` 的旧命令过滤项未计作已运行，此轮补真实测试文件。新增宿主的正向技能撤销与 MCP Location 成员两例 exit 1（2 fail / 4 assertions，`/tmp/helper-de-r3-scope-red.log`）；真实路径身份复核例 exit 1（1 fail / 1 assertion，`/tmp/helper-de-r3-runtime-red.log`）。技能用 pinned frontend-design 原文件并经生产 ConfigSkillPlugin 解析；已确认初始技能可用后才测撤销，不用正文断言。

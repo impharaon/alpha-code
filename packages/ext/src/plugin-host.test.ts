@@ -47,6 +47,7 @@ import * as Media from "../../ai/src/media.ts"
 import { toLLMMessages } from "../../core/src/session/runner/to-llm-message.ts"
 import { Config } from "../../core/src/config.ts"
 import { ConfigNormalize } from "../../core/src/config/normalize.ts"
+import { ConfigSkillPlugin } from "../../core/src/config/plugin/skill.ts"
 import { ConfigAgentPlugin } from "../../core/src/config/plugin/agent.ts"
 import { PluginPromise } from "../../core/src/plugin/promise.ts"
 import { Document as ConfigDocument, Info as ConfigInfo } from "../../schema/src/config.ts"
@@ -1253,5 +1254,54 @@ it.live("权威 · 网页抓取失败的原因(#1702):Unable to fetch 的失败�
     expect(reason.message).toBe("Request timed out")
     expect(reason.metadata?.codepuppyNetFailure).toEqual({ layer: "timeout", code: "timeout" })
     expect((yield* after(new ToolFailure({ message: `Unable to fetch ${url}` }))).error.message).toBe(`Unable to fetch ${url}`)
+  }),
+)
+
+
+it.live("scope · parsed managed skills use positive membership before and after the post tail", () =>
+  Effect.gen(function* () {
+    env({})
+    const root = join(scratch, "codepuppy-state", "env", "dev")
+    const directory = realpathSync((yield* Location.Service).directory)
+    const generation = join(root, "ext-store", "skill--frontend-design", "generations", "gen-000001-abcdef")
+    mkdirSync(generation, { recursive: true })
+    // Real pinned Claude skill; provenance and digest are in ui-mac/test-fixtures/plugin-helper/provenance.json.
+    writeFileSync(join(generation, "SKILL.md"), readFileSync(join(import.meta.dir, "../../ui-mac/test-fixtures/plugin-helper/plugins/frontend-design/skills/frontend-design/SKILL.md")))
+    const allow = (scoped: { kind: string; name: string; projectPath: string }[]) =>
+      writeFileSync(join(root, "skills-enabled.json"), JSON.stringify({ v: 2, keys: [], scoped }))
+    allow([{ kind: "skill", name: "frontend-design", projectPath: directory }])
+    const ext = yield* activateExtUntilFinished
+    const plugins = yield* Plugins.Service
+    yield* ConfigSkillPlugin.Plugin.effect(yield* PluginHost.make(plugins, ConfigSkillPlugin.Plugin.id)).pipe(
+      Effect.provide(Config.testLayer([configDocument({ skills: [generation] })])),
+    )
+    const skills = yield* Skill.Service
+    const hooks = yield* PluginHooks.Service
+    const evaluation = { sessionID: ids.sessionID, action: "skill", resources: ["gen-000001-abcdef"], effect: "allow" as const }
+    expect((yield* skills.list()).some((skill) => skill.name === "frontend-design")).toBe(true)
+    expect((yield* hooks.trigger("permission", "evaluate", evaluation)).effect).toBe("allow")
+    // A valid projection with the old entry removed must revoke, even while the config plugin retains its parsed skill.
+    allow([])
+    expect((yield* hooks.trigger("permission", "evaluate", evaluation)).effect).toBe("deny")
+    yield* ext.finish(skills.list().pipe(Effect.map((items) => !items.some((skill) => skill.name === "frontend-design"))))
+    yield* skills.reload()
+    expect((yield* skills.list()).some((skill) => skill.name === "frontend-design")).toBe(false)
+  }),
+)
+
+it.live("scope · MCP transforms enable only matching project members", () =>
+  Effect.gen(function* () {
+    env({})
+    const root = join(scratch, "codepuppy-state", "env", "dev")
+    const directory = realpathSync((yield* Location.Service).directory)
+    const projection = join(root, "skills-enabled.json")
+    writeFileSync(projection, JSON.stringify({ v: 2, keys: [], scoped: [{ kind: "mcp", name: "managed", projectPath: directory }] }))
+    const mcp = recordingMcp({ managed: { type: "remote", url: "https://example.test/mcp", enabled: false }, unrelated: { type: "remote", url: "https://example.test/other", enabled: true } })
+    yield* activate(CodePuppyExt, { mcp })
+    expect(mcp.servers.get("managed")).toMatchObject({ enabled: true })
+    writeFileSync(projection, JSON.stringify({ v: 2, keys: [], scoped: [{ kind: "mcp", name: "managed", projectPath: join(directory, "other") }] }))
+    mcp.rerun()
+    expect(mcp.servers.get("managed")).toMatchObject({ enabled: false })
+    expect(mcp.servers.get("unrelated")).toMatchObject({ enabled: true })
   }),
 )

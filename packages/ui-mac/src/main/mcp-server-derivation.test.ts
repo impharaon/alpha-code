@@ -8,7 +8,7 @@
 // `packages/opencode/src/index.ts debug config`。本文件其余各条判 main 侧:真源位置、注入面、放行集合。期望值手写字面量。
 
 import { codepuppyBootstrap } from "@opencode/util/codepuppy-bootstrap"
-import { afterAll, beforeAll, beforeEach, describe, expect, test } from "bun:test"
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test"
 import * as fs from "node:fs"
 import * as os from "node:os"
 import * as path from "node:path"
@@ -88,6 +88,8 @@ afterAll(() => {
   }
   fs.rmSync(root, { recursive: true, force: true })
 })
+
+afterEach(() => unpublishTestBootstrap())
 
 beforeEach(() => {
   setConfiguredEgressDestinations([])

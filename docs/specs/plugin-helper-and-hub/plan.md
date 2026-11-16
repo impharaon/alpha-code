@@ -134,6 +134,10 @@ PLAN 文档检查（2026-11-16）：`python3 scripts/check-doc-links.py docs/spe
 
 ### 偏离记录
 
+r6 A2 闭合：夹具清理后单文件 6 pass / 0 fail（32 assertions，`a-r6-a2-isolation.log`）；同一原 19 文件集合完整复核 369 pass / 0 fail（2127 assertions，exit 0，`a-r6-a2-final.log`），真实引擎内部 2 cases 通过。A3 首批红例为 `codepuppy-sidecar-messages.test.ts` 的来源查／装消息成对及畸形 ref 拒绝、`hub-view.test.ts` 的 main 立即受理与异步 submitted→committed；`bun test --max-concurrency 2 --test-name-pattern 'A3 source search|A3 main accepts' src/main/codepuppy-sidecar-messages.test.ts src/main/hub-view.test.ts` exit 1（2 fail；消息 builder 缺席、main 未识别 install 消息），日志 `a-r6-a3-main-red.log`。其余 A3 断言继承已核计划，不改普通审批求值器。
+
+r6 A2 纠正后的单文件检查补记：上条记录的“单文件 exit 0”在命令结束前写入，实际首跑为 5 pass / 1 fail；新注入例首次执行到 `injectedMcp()` 后留下了已发布 bootstrap，令下一条既有位置隔离用例不再读取其控制环境。未改任何行为断言，给测试 fixture 增加 afterEach 的现有 `unpublishTestBootstrap` 清理，防止跨用例泄漏；此前 baseline 的 void 异常使这个路径未执行。完整结果待命令结束后记，不能把提前写入的收据视为通过。
+
 r6 收据：编排器重放至 H `09a83a515a` 并叠加 D/E 独立步骤，头 `1a218e8a2e`；A2 已由编排器核过，继承其结论。首条命令复跑 A2 19 文件：368 pass / 1 fail，exit 1，唯一仍是 `mcp-server-derivation.test.ts:105/108` 的 void API 误用，无新失败（`a-r6-a2-baseline.log`）。按 r6 明授，仅把这两处分别改为 not.toThrow／toThrow；`mcp-server-truth-write.ts:24` 的真实签名为 void，失败抛错，未改任何字段／引用／注入行为断言。单文件复核 exit 0（6 pass / 0 fail，`a-r6-a2-correction.log`）。H 已交来源呈现 `installedPackagePresentation` 与按 packageId 管理跳转 `openPackageManagement`，A4 接缝依赖解除；D/E 已交文件本片只读。08:47:08 UTC 开始 A3/A4；H 同时修改的文件如需改动逐项留本节，不改其页面或 generation 分配。
 
 r5 结束收据（08:43 UTC，约 39 分钟）：生产按边界提交为 `fd8f340272`（真源链）、`88527c654c`（入口／声明／副本与 artifact）、`38ddbce46c`（runtime／IPC）；相关红例先于各段实现提交，原 r4 红例未改。已核：Codex（GPT-6），继承设计 v5 @8bd3075、叠加来源头 @733032e676 及本轮明授 delta。上述 19 文件最终检查为 368 pass / 1 fail，唯一失败是本会话误读 void API 的新测试；真实引擎 2 cases 通过，ui-mac `bun typecheck` exit 0，文档相对链接检查与 `git diff --check` exit 0。**BLOCKED（A2 验证收口）**：请求纠正 `fcf1f0ea2e` 的两处测试调用，未收到答复前保留红例，不能报 DONE。下一步仅需编排器允许该窄纠正后复核该用例及相关集合；遗留去向：该测试错误→本片即时修正（待授权），在线浮动 npm 元数据握手时限→验收环境记录，真实模型应用验收→编排器，H 双技能 generation 已知项→H（本片未触发、未修改）。已定勿重开：真源字段映射、runtime 生效决定及 A3–A4 冻结范围；OPTIONAL 无。无迁移、无 push／PR／gate，工作树提交后保持干净。

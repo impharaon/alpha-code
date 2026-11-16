@@ -64,6 +64,27 @@ test("A2 marketplace context7 commits one real enabled package and durable decla
   expect(after.ok && after.packageGraphs).toHaveLength(1)
 }))
 
+test("E3 main rechecks project identity after source capture before committing", () => installerHarness(async (h) => {
+  const { mkdirSync, symlinkSync, unlinkSync } = await import("node:fs")
+  const first = join(h.temporary, "first")
+  const second = join(h.temporary, "second")
+  const alias = join(h.temporary, "alias")
+  mkdirSync(first)
+  mkdirSync(second)
+  symlinkSync(first, alias)
+  const candidate = await h.candidate("frontend-design")
+  const convert = h.sources.convertCandidate
+  h.sources.convertCandidate = async (id) => {
+    const result = await convert(id)
+    unlinkSync(alias)
+    symlinkSync(second, alias)
+    return result
+  }
+  expect(await h.install({ ...h.request(candidate), effect: { kind: "project", directory: alias } })).toMatchObject({ ok: false })
+  const state = readPackageLedgerStateV1(h.root)
+  expect(state.ok && state.packageGraphs).toEqual([])
+}))
+
 test("E2 project-only MCP stays globally disabled through install and package-root toggles", () => installerHarness(async (h) => {
   const { mkdirSync, realpathSync, readdirSync, symlinkSync, writeFileSync } = await import("node:fs")
   const { projectScopeIdentity } = await import("./ext-receipt-v2")
@@ -91,6 +112,17 @@ test("E2 project-only MCP stays globally disabled through install and package-ro
   })
   expect(readdirSync(project)).toEqual(["existing.json"])
   expect(readFileSync(join(project, "existing.json"), "utf8")).toBe("project bytes\n")
+}))
+
+test("E3 remote definition publication retains the project-only disabled projection", () => installerHarness(async (h) => {
+  const { mkdirSync } = await import("node:fs")
+  const project = join(h.temporary, "remote-project")
+  mkdirSync(project)
+  expect(await h.install({ ...h.request(await h.candidate("context7")), effect: { kind: "project", directory: project } })).toMatchObject({ ok: true })
+  const leaf = readMcpLeafStrict("context7")
+  if (!leaf.ok || !leaf.value) throw Error("installed definition missing")
+  expect(persistMcp("context7", leaf.value)).toMatchObject({ ok: true })
+  expect(persistedMcp(h.root, "context7")).toEqual({ enabled: false })
 }))
 
 test("E2 project-only skill is stored globally and projected only as scoped", () => installerHarness(async (h) => {

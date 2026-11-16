@@ -119,3 +119,19 @@ describe("#397 session-grant 强制(注入面)", () => {
     expect(config.agents!.la).toEqual({ disabled: true })
   })
 })
+
+test("project-effect MCP remains disabled in the global injected config even when its package is enabled", async () => {
+  const { applyPackageMutation } = await import("./ext-receipt-v2")
+  const { bundleOwner, computeInstalledGraphDigest } = await import("./ext-package-ledger-v3")
+  const node = { kind: "mcp" as const, name: "scoped", componentId: "mcp:scoped", required: true, manifestDigest: "sha256:" + "a".repeat(64) }
+  const graph = { packageId: "local:scoped", envelopeDigest: node.manifestDigest, root: node, children: [], effect: { kind: "project" as const, projectPath: root, projectPathHash: "a".repeat(64) } }
+  expect(applyPackageMutation(root, {
+    operation: "install", transactionId: "scope-injection", graphBeforeDigest: null,
+    graphAfter: { ...graph, installedGraphDigest: computeInstalledGraphDigest(graph) },
+    childRecordMutations: [{ op: "upsert", input: { id: node.componentId, kind: node.kind, name: node.name, environment: "prod", scope: { kind: "global" }, desiredState: "enabled", origin: "catalog", installedAt: "2026-11-16T00:00:00.000Z", manifestDigest: node.manifestDigest } }],
+    claimMutations: [{ op: "acquire", kind: node.kind, name: node.name, owner: bundleOwner(graph.packageId, node.manifestDigest) }],
+  }).ok).toBe(true)
+  const config = { mcp: { servers: { scoped: { type: "remote", url: "https://example.test/mcp", disabled: false } } } }
+  injectDisabledOverrides(config, { userDataPath: root, channel: "stable" })
+  expect(config.mcp.servers.scoped.disabled).toBe(true)
+})

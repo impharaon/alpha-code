@@ -1014,3 +1014,22 @@ test("official credential dialogs reuse DSN and PAT help and report credential s
     expect(installedPackages[0]?.packageId).toBe(entry.prelude.packageId)
   }
 })
+
+test.each([undefined, { kind: "project" as const, projectPath: "/project/alpha", projectPathHash: "a".repeat(64) }])("installed package management displays its effective scope: %j", async (effect) => {
+  reset()
+  installedPackages = [{
+    packageId: "mine:scope-display", installedGraphDigest: "sha256:" + "b".repeat(64),
+    displayName: "Scope display", rootComponentName: "scope-display", version: "1.0.0",
+    origin: "created", desiredState: "enabled", source: { kind: "created" },
+    ...(effect ? { effect } : {}),
+    components: [{ componentId: "user:scope-display", kind: "skill", name: "scope-display", required: true, desiredState: "enabled" }],
+  }]
+  receipts = [receipt("user:scope-display", "scope-display", "skill")]
+  mount()
+  await waitFor(() => expect(q('[data-installed-package="mine:scope-display"]')).toBeInstanceOf(HTMLElement))
+  click(q('[data-installed-package="mine:scope-display"] [data-more]'))
+  await waitFor(() => expect(q('[data-menu-item="manage"]')).toBeInstanceOf(HTMLElement))
+  click(q('[data-menu-item="manage"]'))
+  await waitFor(() => expect(q(".codepuppy-ext-detail")?.textContent).toContain("生效范围"))
+  expect(q(".codepuppy-ext-detail")?.textContent).toContain(effect ? "仅当前项目" : "我的所有项目")
+})

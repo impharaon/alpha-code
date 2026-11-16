@@ -49,6 +49,39 @@ function desktopDeps() {
   }
 }
 
+test("project-only catalog admission commits effect with the graph and keeps persistent MCP disabled", async () => {
+  const { installDesktopPackageV1 } = await import("./package-admission")
+  const { projectScopeIdentity } = await import("./ext-receipt-v2")
+  const { parse } = await import("jsonc-parser")
+  const deps = desktopDeps()
+  const project = join(tmp, "scope-project")
+  mkdirSync(project)
+  const identity = projectScopeIdentity(project)
+  if (!identity.ok) throw Error(identity.reason)
+  expect(await installDesktopPackageV1("package:supabase", { ...deps, effect: identity.scope })).toMatchObject({ ok: true })
+  const state = readPackageLedgerStateV1(root)
+  expect(state.ok && state.packageGraphs[0]?.effect).toEqual(identity.scope)
+  expect(state.ok && state.records.every((record) => record.scope.kind === "global" && record.desiredState === "enabled")).toBe(true)
+  expect(parse(readFileSync(join(root, "codepuppy.jsonc"), "utf8")).mcp.supabase.enabled).toBe(false)
+  expect(JSON.parse(readFileSync(skillsEnabledPath(root), "utf8")).scoped).toContainEqual({ kind: "mcp", name: "supabase", projectPath: identity.scope.projectPath })
+  expect(readdirSync(project)).toEqual([])
+})
+
+test("project-only catalog token updates preserve effect and the disabled global MCP projection", async () => {
+  const { installDesktopPackageV1, savePackageSecretsV1 } = await import("./package-admission")
+  const { projectScopeIdentity } = await import("./ext-receipt-v2")
+  const { parse } = await import("jsonc-parser")
+  const deps = desktopDeps()
+  const identity = projectScopeIdentity(tmp)
+  if (!identity.ok) throw Error(identity.reason)
+  expect(await installDesktopPackageV1("package:github", { ...deps, effect: identity.scope })).toMatchObject({ ok: true })
+  const before = readPackageLedgerStateV1(root)
+  expect(await savePackageSecretsV1({ packageId: "package:github", secrets: { "mcp:github#GITHUB_PERSONAL_ACCESS_TOKEN": "scope-test-token" } }, deps)).toMatchObject({ ok: true })
+  expect(parse(readFileSync(join(root, "codepuppy.jsonc"), "utf8")).mcp.github.enabled).toBe(false)
+  const after = readPackageLedgerStateV1(root)
+  expect(after.ok && after.packageGraphs).toEqual(before.ok && before.packageGraphs)
+})
+
 test("desktop plus commits content before automatic package enable without login or token", async () => {
   const { installDesktopPackageV1 } = await import("./package-admission")
   const deps = desktopDeps()

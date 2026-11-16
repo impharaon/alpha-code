@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { decodePackageAllowSet, managedSkillAllowedHere, scopedPackageAllowedHere } from "./package-scope"
+import { decodePackageAllowSet, managedSkillAllowedHere, managedSkillIdentity, scopedPackageAllowedHere } from "./package-scope"
 import type { PackageAllowSetV2 } from "./package-scope"
 
 // Synthetic states of our own frozen v2 projection, not third-party format fixtures.
@@ -129,4 +129,11 @@ describe("scopedPackageAllowedHere", () => {
     expect(scopedPackageAllowedHere("mcp", "context7", decoded, alpha)).toBe(true)
     expect(JSON.stringify(input)).toBe(before)
   })
+})
+
+
+test("managed skill identity uses the store path boundary, independent of the engine-generated skill ID", () => {
+  expect(managedSkillIdentity("/state/ext-store/skill--frontend-design/generations/gen-000001-abcdef/SKILL.md", "/state")).toEqual({ key: "skill--frontend-design", name: "frontend-design" })
+  for (const path of ["/state/factory-skills/plugin-helper/SKILL.md", "/project/.codepuppy/skills/native/SKILL.md", "/other/ext-store/skill--frontend-design/generations/gen-000001-abcdef/SKILL.md", "/state/ext-store-backup/skill--frontend-design/generations/gen-000001-abcdef/SKILL.md"])
+    expect(managedSkillIdentity(path, "/state")).toBeUndefined()
 })

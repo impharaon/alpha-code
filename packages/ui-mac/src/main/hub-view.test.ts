@@ -417,6 +417,19 @@ describe("hub-view 三档状态(§2.5)", () => {
     expect(row(after.rows, "package:kit")).toMatchObject({ scope: "global", installed: true, state: "available" })
     // 定制中心那一侧读的是同一档(I4)
     expect(row((await w.service.viewForAgent({ directory: w.projectDir })).rows, "package:kit").state).toBe("available")
+    const { projectScopeIdentity } = await import("./ext-receipt-v2")
+    const identity = projectScopeIdentity(w.globalRoot)
+    if (!identity.ok) throw Error(identity.reason)
+    const previous = { ...graph, installedGraphDigest: computeInstalledGraphDigest(graph) }
+    const scoped = { ...graph, effect: identity.scope }
+    expect(applyPackageMutation(w.globalRoot, {
+      transactionId: "tx-kit-scope", operation: "update", graphBeforeDigest: previous.installedGraphDigest,
+      graphAfter: { ...scoped, installedGraphDigest: computeInstalledGraphDigest(scoped) },
+      childRecordMutations: [], claimMutations: [],
+    }).ok).toBe(true)
+    const outside = await w.service.view(w.projectDir)
+    expect(row(outside.rows, "package:kit").state).toBe("installed")
+    expect(row(outside.rows, "skill:kit-skill").state).toBe("installed")
   })
 
   test("引擎读不出 ⇒ 不标可用(核不了 = 待重载 + 原因),停用条目照旧只看账本", async () => {

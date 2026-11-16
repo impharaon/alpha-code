@@ -4,6 +4,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 
 // DBHub 来自 src/renderer/extensions/testvectors/d5-old-catalog.json(2026-08-31.2 的真实历史目录样本)。
+import catalogProvenance from "../test-fixtures/plugin-helper/catalog/provenance.json"
 import currentCatalog from "../src/renderer/extensions/codepuppy-catalog.json"
 import bundledCatalog from "../src/renderer/extensions/testvectors/d5-old-catalog.json"
 // `#777`:本文件跑的是生产 `ext-install-catalog` 全链,里面有 ADR-026 的平台闸
@@ -13,6 +14,8 @@ import { pinShippedPlatform } from "./pin-shipped-platform"
 import { PROJECT_HIDDEN_DIR } from "../src/shared/project-hidden-dir"
 
 pinShippedPlatform()
+
+let catalogOverride: unknown
 
 type IpcHandler = (event: { sender: { id: number } }, ...args: unknown[]) => unknown
 
@@ -103,7 +106,11 @@ mock.module("../src/main/remote-catalog", () => ({
   },
   refreshRemoteCatalog: async () => ({
     source: "remote",
-    catalog: { version: bundledCatalog.version, entries: [entry, disabledEntry, agentEntry, projectEntry, canaryEntry, chatEntry] },
+    ...(catalogOverride ? { snapshotDigest: catalogProvenance.files.find(file => file.path === "catalog.json")!.sha256, packageViews: await Promise.all((catalogOverride as { packages: unknown[] }).packages.map(async envelope => {
+      const { evaluatePackageForHost } = await import("../src/main/package-installability")
+      return evaluatePackageForHost(envelope)
+    })) } : {}),
+    catalog: catalogOverride ?? { version: bundledCatalog.version, entries: [entry, disabledEntry, agentEntry, projectEntry, canaryEntry, chatEntry] },
     version: bundledCatalog.version,
     fetchedAt: "2026-07-30T00:00:00.000Z",
     via: "channel-dev",
@@ -408,4 +415,40 @@ test("BC1 renderer source query and sidecar share main IDs, and search selection
   const after=await search!({sender:{id:1}},"context7") as typeof before
   expect(after.candidates.find(item=>item.id===candidate.id)?.installed).toEqual({packageId:"claude:context7",enabled:true})
  } finally {fetchSpy.mockRestore()}
+})
+
+
+test("BC1 real formal GitHub identity wins for both chat and source plus without a second external package",async()=>{
+ const formal=await Bun.file(join(import.meta.dir,"../test-fixtures/plugin-helper/catalog/catalog.json")).json()
+ const provenance=await Bun.file(join(import.meta.dir,"../test-fixtures/plugin-helper/catalog/provenance.json")).json() as {files:{url:string;path:string}[]}
+ const {fixtureFetch}=await import("../test-fixtures/plugin-helper/source-fetch")
+ const {createPublicKey,verify}=await import("node:crypto")
+ const bytes=await Bun.file(join(import.meta.dir,"../test-fixtures/plugin-helper/catalog/catalog.json")).bytes()
+ const signature=Buffer.from((await Bun.file(join(import.meta.dir,"../test-fixtures/plugin-helper/catalog/catalog.json.sig")).text()).trim(),"base64")
+ expect(verify(null,bytes,createPublicKey({key:Buffer.from("MCowBQYDK2VwAyEAqBBmG0mbZ3tZF7Vt8VEWhgm1RQdF2boFU5uUTSmsgHI=","base64"),format:"der",type:"spki"}),signature)).toBe(true)
+ const fetchSpy=spyOn(globalThis,"fetch").mockImplementation(async(url)=>{
+  const file=provenance.files.find(file=>file.url===String(url))
+  return file ? new Response(await Bun.file(join(import.meta.dir,"../test-fixtures/plugin-helper/catalog",file.path)).bytes()) : fixtureFetch(url)
+ })
+ catalogOverride=formal
+ try {
+  const search=handlers.get("ext-sources-search")!
+  const found=await search({sender:{id:1}},"github") as import("../src/main/plugin-sources").SourceSearchResultV1
+  const candidate=found.candidates.find(candidate=>candidate.source==="claude-marketplace"&&candidate.name==="github")!
+  expect(candidate.sameAs).toBe("package:github")
+  const replies:unknown[]=[]
+  codepuppySidecar.receive({type:"codepuppy.hub.install.request",id:820,requestId:"bc1_catalog_chat",directory:root,sessionID:"bc1_session",agent:"build",ref:{kind:"id",id:candidate.id},scope:"all-projects"},reply=>replies.push(reply))
+  expect(replies).toMatchObject([{accepted:true}])
+  let record:import("../src/main/codepuppy-sidecar-messages").HubRequestRecord|null=null
+  for(let n=0;n<400;n++){record=await handlers.get("ext-hub-request")!({sender:{id:1}},"bc1_catalog_chat") as typeof record;if(record?.stage!=="submitted")break;await Bun.sleep(5)}
+  expect(record?.outcome).toMatchObject({ok:true,packageId:"package:github",resolvedToCatalog:"package:github"})
+  const selected=await handlers.get("ext-install-from-source")!({sender:{id:1}},{requestId:"bc1_catalog_plus",source:{kind:"candidate",candidateId:candidate.id},effect:{kind:"all-projects"},via:"hub"})
+  expect(selected).toMatchObject({ok:true,packageId:"package:github",resolvedToCatalog:"package:github"})
+  const state=await handlers.get("ext-installed-packages")!({sender:{id:1}}) as import("../src/preload/types").InstalledPackagesResultV1
+  expect(state.ok).toBe(true)
+  if(!state.ok)throw Error(state.reason)
+  expect(state.packages.filter(pack=>pack.packageId==="package:github")).toHaveLength(1)
+  expect(state.packages.find(pack=>pack.packageId==="package:github")?.version).toBe("1.0.1")
+  expect(state.packages.some(pack=>pack.source?.kind==="marketplace"&&pack.source.entryName==="github")).toBe(false)
+ } finally {catalogOverride=undefined;fetchSpy.mockRestore()}
 })

@@ -625,3 +625,5 @@ r4 本轮约 77 分钟（18:42:34→19:59 CST）；范围接缝→D3→D4→D5 �
 2026-11-16 r8 · BC1 10:11:05 UTC 开始，基线 8c4bd680bc，H 的四处基线红例不在此修正。BC1 同调用链补 main `CandidateV1.installed` 的实际投影：当前来源函数从未填该字段，外部包在重新查询／重挂载后会误回“+”；复用账本／已解析声明的既有运行身份算法，不按显示名猜已装。此小段提前触及 `plugin-sources.ts` 及 `install-from-source.ts` 的身份 helper 调用，仍在本节已列文件内，D/E 重叠逐项报告；不改其 created/effect 分支。
 
 BC1 红例收据：`ext-write-channels.test.ts` 的只读搜索通道、`ext-install-catalog-result.cases.ts` 的 renderer→同源 ID→实际单入口／已装投影、`plugin-source-results.test.ts` 的生产 DOM 四场景、`hub-three-pages.cases.ts` 的同一搜索框／单入口各命令均 exit 1；日志 `bc1-{main,entry,dom,hub}-red.log`（同 A 临时日志目录）。分别缺 sourcesSearch、缺 main handler、缺生产组件、现有占位仍仅当前分类搜索；尚无生产改动。每条保留其失败断言，后续只替换明确编码旧占位／宿主计数的直接消费者。
+
+BC1 补充红例：空候选且某源失败时，不得同时声称查无匹配；IPC 拒绝也要留在行内错误。`plugin-source-results.test.ts` exit 1（内部 4 pass／2 fail，`bc1-empty-error-red.log`），分别实际显示了矛盾的 no-match 提示、resource 错误抛出。生产改动仍未提交，新增这两例后再修；四个先行行为断言未改。正式签名 GitHub 连通证据补入真 main 宿主，边界 mock 使用实际 packageViews 求值与 provenance 的 snapshot digest，不改签名输入或安装行为；固定 1.0.1 的聊天／“+”两支实际均落同一目录包，无外源第二图。

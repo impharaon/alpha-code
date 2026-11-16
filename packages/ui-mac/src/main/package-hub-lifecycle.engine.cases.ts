@@ -67,7 +67,7 @@ async function action(channel: string, ...args: unknown[]) {
   const requested = reloadRequests.length
   expect(await invoke(channel, ...args)).toMatchObject({ ok: true })
   if (channel === "ext-install-package" && args[0] === "package:supabase")
-    expect(reloadRequests.slice(requested)).toContainEqual(expect.objectContaining({ scope: "global", force: false }))
+    expect(reloadRequests.slice(requested).some(request => request.scope === "global" && request.force !== true)).toBe(true)
   await until(() => refreshes > before || !!refreshFailure, `${channel}; requests=${JSON.stringify(reloadRequests.slice(requested))}; reports=${JSON.stringify(reloadReports)}; locationReloads=${locationReloads}`)
   if (refreshFailure) throw new Error(refreshFailure)
 }

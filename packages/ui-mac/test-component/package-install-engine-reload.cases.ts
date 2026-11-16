@@ -1,27 +1,11 @@
-// REQ-128 Phase 4 `#810` —— **签名 package / 套件安装路径收口 + 引擎重扫**的闸。
-//
-// 缺陷:三个 Hub 安装入口(`runPackageAction` / `installBundle` / `confirmPackageAuthz`)全部
-// 直连 `extIpc.installCatalog`,**一个都不调 `refreshEngine()`**;而组件的注入面只在引擎实例
-// 构造时装载 ⇒ placebo 安装:账本翻了、盘上有了、界面说「已安装」,用户下一条消息里什么都没有。
-//
-// ⚠️ 本文件的判据形状是被 R1 审计 F13 钉死的:**必须驱动三个生产 Hub 动作本身**。
-// 只测一个新 helper 的话,一个「新写了收口方法、而 Hub 仍旧直连 `extIpc`」的实现
-// **生产行为一点没变而测试全绿**(假闸形态⑧:没测生产接线)。所以这里:
-//   · 三个动作全部经**真实 DOM 点击**触发(卡片按钮 / 确认屏按钮),不直接调函数;
-//   · `useExtensions` 的收口方法上挂一个**真包装**(真函数值先存 const 再 `mock.module`),
-//     任何一个入口改回直连 `extIpc`,它就不在计数里 ⇒ 红;
-//   · 另加一条**出站计数相等**:到达 IPC 的 `installCatalog` 次数必须等于经过收口方法的次数,
-//     于是「既走收口方法、又另外直连一次」也红。
-//
-// REQ-234 `#1529` 起「引擎有没有被叫去重扫」的判据换了位置:重扫的执行者是 ext 调度器(等会话空闲),
-// main 安装体提交成功后经 parentPort 发 `codepuppy.reload.request`。本文件像 server.ts 在 sidecar ready 时那样
-// 接上发送口(`codepuppySidecar.attach`),**数到的那一条就是判据**;renderer 自己一次 dispose 都不许做。
-//
-// 被替身的只有进程边界:
-//   · 引擎 HTTP 客户端(`@opencode-ai/sdk/v2/client`)—— 没有对端;它的 dispose spy 用来证明 renderer **不再** dispose。
-//   · `globalThis.fetch` —— 签名 package 的 payload/资产取用。admission 自己那条取用/复验
-//     仍是生产实现(不传 `deps.fetchAsset`)。
-// main 侧其余一律真实现:真 `registerExtIpcHandlers`、真 admission、真事务、真 legacy planner。
+// Hub DOM → real useExtensions.installPackage → one main install entry.
+// Both package and legacy-bundle plus actions are immediate; the renderer does not confirm or dispose.
+// Main applies MCP components at runtime and schedules only skill-bearing content for Location reload.
+// Exact data-layer/IPC ID counts catch bypasses and duplicate writes. The existing scheduler,
+// pending-state, connector permission and attachment checks below keep their original behavior.
+// Only process/HTTP boundaries are substituted; admission, ledger, transactions and planners are real.
+// Real MCP availability/read-back is additionally guarded by package-hub-lifecycle.engine.test.ts
+// and install-from-source.engine.test.ts; this host exercises actual renderer actions.
 //
 // ⚠️ 本仓踩过的三条本机纪律,本文件逐条遵守:
 //   · `mock.module` 会**就地改写**已捕获的模块命名空间对象 ⇒ 函数值必须先存进独立 const;
@@ -53,6 +37,7 @@ pinShippedPlatform()
 let disposeCalls = 0
 let connectorRefreshes = 0
 let liveMcpCalls = 0
+let locationReloads = 0
 // `#1662`(#1667):启动投影是 OpenCode 2 形状 —— 停用的 MCP 在 `mcp.servers.<名字>` 写整条中和条目(`disabled: true`),不是 v1 的 `mcp.<名字>.enabled: false`。
 let startup: { mcp?: { servers?: Record<string, { disabled?: boolean }> } } | undefined
 const services = () => startup ? { "codepuppy-pdf": { status: startup.mcp?.servers?.["codepuppy-pdf"]?.disabled === true ? "disabled" : "connected" } } : {}
@@ -288,11 +273,12 @@ Bun.plugin({
 // ── ⑤ 收口方法的真包装 = F13 的判据 ─────────────────────────────────────────────────────
 //
 // **这不是替身**:`useExtensions` 的真函数值先存进独立 const,包装只在调用前后记一笔。
-// 一个「新写了 helper 而 Hub 仍旧直连 `extIpc`」的实现,在这里的计数是 0 ⇒ 红。
+// Hub 绕过数据层或重复出站时，desktopCalls 与 desktopIpcCalls 的精确对照变红。
 type CentralCall = { catalogId: string; attemptId: string | undefined; authorized: boolean }
 const centralCalls: CentralCall[] = []
 const desktopCalls: string[] = []
 const desktopIpcCalls: string[] = []
+const desktopResults = new Map<string, unknown>()
 const realUseExtensionsModule = await import("../src/renderer/extensions/use-extensions")
 const realUseExtensions = realUseExtensionsModule.useExtensions
 let hubApi: ReturnType<typeof realUseExtensions>
@@ -384,7 +370,12 @@ const extBridge: Record<string, unknown> = {
   packageInstalled: (catalogId: unknown) => call("ext-package-installed", catalogId),
   installedPackages: () => call("ext-installed-packages"),
   uninstallPackage: (packageId: string) => call("ext-uninstall-package", packageId),
-  installPackage: (packageId: string) => { desktopIpcCalls.push(packageId); return call("ext-install-package", packageId) },
+  installPackage: async (packageId: string) => {
+    desktopIpcCalls.push(packageId)
+    const result = await call("ext-install-package", packageId)
+    desktopResults.set(packageId, result)
+    return result
+  },
   setPackageState: (intent: unknown) => call("ext-set-package-state", intent),
   packageAuthorization: (packageId: string) => call("ext-package-authorization", packageId),
   savePackageSecrets: (intent: unknown) => call("ext-save-package-secrets", intent),
@@ -480,15 +471,6 @@ const toasts = (): string[] => qa(".a-toast").map((node) => node.textContent ?? 
 const clearToasts = (): void => qa(".a-toast").forEach((node) => node.remove())
 
 /** 当前打开的对话框里那颗「确认安装」主按钮(package 授权屏与套件确认框共用同一句文案)。 */
-function confirmInstallButton(): HTMLElement | undefined {
-  return qa("[role='dialog'] button").find((node) => (node.textContent ?? "").trim() === zh["codepuppy.ext.confirmInstall"])
-}
-
-/** 能力授权框(第二阶段)的主按钮。文案与上面那颗**不同**,不能共用一个查找。 */
-function authzConfirmButton(): HTMLElement | undefined {
-  return qa("[role='dialog'] button").find((node) => (node.textContent ?? "").trim() === zh["codepuppy.ext.authz.confirmInstall"])
-}
-
 /** 条目卡:卡上没有 id 属性,按 `<b title={e.name}>` 定位(name 是 catalog 身份的一半)。 */
 function entryCard(name: string): HTMLElement {
   const label = qa(".codepuppy-ext-card b").find((node) => node.getAttribute("title") === name)
@@ -503,31 +485,24 @@ function ledgerPackageIds(): string[] {
   return state.ok ? state.packageGraphs.map((graph) => graph.packageId).sort() : ["<unreadable>"]
 }
 
-/**
- * 走生产路径装一条套件:套件页 → 卡片「添加」→ 确认框「确认安装」→ **能力授权框「授权并安装」**。
- *
- * 第二步不是多余的:legacy planner 对套件成员的 capability 一律要求显式确认
- *(`silent inheritance refused`),所以套件的**首驱恒落 authorize 臂**,真正落盘的是重驱那一趟。
- * 于是一条套件 = 两次经过收口方法,而只有后一次会重扫 —— 这正是「authorize 不是安装」的行为半场。
- */
+/** Direct Hub plus: one main-owned install, no confirmation or renderer authorization. */
 async function installBundleThroughUi(name: string): Promise<void> {
-  // package 授权屏与套件确认框共用同一个 Dialog 宿主,且前者优先渲染 —— 它没关干净时,
-  // 下面点到的会是**另一条路径**的按钮。这条前置断言把那种串味变成一句明白话。
-  expect(q("[data-package-authorization]"), "a package authorization dialog is still open").toBeNull()
-  setHubSection("connectors") // `#1594`:套件是连接器页的一组
+  expect(q("[data-package-authorization]")).toBeNull()
+  setHubSection("connectors")
   await waitFor(() => expect(entryCard(name)).toBeInstanceOf(HTMLElement))
   click(entryCard(name).querySelector(".codepuppy-ext-add"))
-  await waitFor(() => expect(confirmInstallButton()).toBeInstanceOf(HTMLElement))
-  click(confirmInstallButton())
-  await waitFor(() => expect(authzConfirmButton()).toBeInstanceOf(HTMLElement))
-  click(authzConfirmButton())
+  const catalogId = name === BUNDLE_OK_NAME ? BUNDLE_OK : BUNDLE_PENDING
+  await waitFor(() => expect(desktopResults.get(catalogId)).toMatchObject({ ok: true }))
+  const state = readPackageLedgerStateV1(globalRoot)
+  expect(state.ok && state.packageGraphs.some(graph => graph.packageId === catalogId)).toBe(true)
+  expect(q("[role='dialog']")).toBeNull()
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════════════
 // 判据
 // ═══════════════════════════════════════════════════════════════════════════════════════
 
-test("① 卡片直接保存包并自动开启,经数据层一次出站并请求一次重载", async () => {
+test("① MCP 包直接保存并自动开启,经数据层一次出站且不请求重载", async () => {
   setHubSection("connectors")
   await waitFor(() => expect(q(`[data-package-card="package:github"]`)).toBeInstanceOf(HTMLElement))
   const reloadsBefore = reloadRequests.length
@@ -536,11 +511,11 @@ test("① 卡片直接保存包并自动开启,经数据层一次出站并请求
   expect(q("[data-package-authorization]")).toBeNull()
   expect(desktopCalls).toEqual(["package:github"])
   expect(desktopIpcCalls).toEqual(desktopCalls)
-  expect(reloadRequests.slice(reloadsBefore)).toEqual([expect.objectContaining({ type: "codepuppy.reload.request", scope: "global" })])
+  expect(reloadRequests.slice(reloadsBefore)).toEqual([])
   expect(disposeCalls).toBe(0)
 })
 
-test("② 同包管理页单独保存密钥,不重装且请求重载", async () => {
+test("② MCP 包管理页保存密钥,不重装且不请求重载", async () => {
   await waitFor(() => expect(q(`[data-installed-package="package:github"] [data-more]`)).toBeInstanceOf(HTMLElement))
   click(q(`[data-installed-package="package:github"] [data-more]`))
   click(q('[data-menu-item="manage"]'))
@@ -554,25 +529,22 @@ test("② 同包管理页单独保存密钥,不重装且请求重载", async () 
   click(q('[role="dialog"] .a-dialog-footer button'))
   await waitFor(() => expect(q('input[type="password"]')).toBeNull())
   expect(desktopCalls).toEqual(["package:github"])
-  expect(reloadRequests.slice(reloadsBefore)).toEqual([expect.objectContaining({ type: "codepuppy.reload.request", scope: "global" })])
+  expect(reloadRequests.slice(reloadsBefore)).toEqual([])
   expect(disposeCalls).toBe(0)
   click(q('.codepuppy-ext-crumb-link'))
 })
 
-test("③ 入口三 `installBundle`:套件装完同样经收口方法 + 引擎重扫一次", async () => {
+test("③ MCP 套件与包共用单一安装收口,一次出站且不重载", async () => {
   const reloadsBefore = reloadRequests.length
   const centralBefore = centralCalls.length
   clearToasts()
   await installBundleThroughUi(BUNDLE_OK_NAME)
 
   await waitFor(() => expect(toasts().join("\n")).toContain(zh["codepuppy.ext.added"]))
-  // 首驱(authorize)+ 重驱(落盘)各一次,两次都经过同一个收口方法。
-  expect(centralCalls.slice(centralBefore)).toEqual([
-    { catalogId: BUNDLE_OK, attemptId: undefined, authorized: false },
-    { catalogId: BUNDLE_OK, attemptId: undefined, authorized: true },
-  ])
-  // **只有落盘那一次**请求重扫:authorize 臂上盘面还没动,重扫它就是谎报。
-  expect(reloadRequests.slice(reloadsBefore)).toEqual([expect.objectContaining({ type: "codepuppy.reload.request", scope: "global" })])
+  expect(centralCalls.slice(centralBefore)).toEqual([])
+  expect(desktopCalls.at(-1)).toBe(BUNDLE_OK)
+  expect(desktopIpcCalls).toEqual(desktopCalls)
+  expect(reloadRequests.slice(reloadsBefore)).toEqual([])
   expect(disposeCalls).toBe(0)
   expect(toasts().join("\n")).not.toContain(zh["codepuppy.ext.addedPendingReload"])
 })
@@ -581,7 +553,12 @@ test("④ `#1529` AC3:ext 报告重载失败 ⇒ 已安装列表如实「待重�
   const reloadsBefore = reloadRequests.length
   clearToasts()
   await installBundleThroughUi(BUNDLE_PENDING_NAME)
+  expect(reloadRequests.length).toBe(reloadsBefore)
+  // A skill-bearing package retains its non-force reload and truthful failure surface.
+  click(q('[data-package-card="package:supabase"] .codepuppy-ext-add'))
+  await waitFor(() => expect(ledgerPackageIds()).toContain("package:supabase"))
   await waitFor(() => expect(reloadRequests.length).toBe(reloadsBefore + 1))
+  expect(reloadRequests.at(-1)).not.toHaveProperty("force", true)
   // 引擎(ext 调度器)对**所有在途**的重载报失败 —— 它们都覆盖当前目录。
   for (const request of reloadRequests)
     codepuppySidecar.receive(
@@ -591,7 +568,7 @@ test("④ `#1529` AC3:ext 报告重载失败 ⇒ 已安装列表如实「待重�
   // `#1594`:已装行分在三页各自的「已安装」组(技能、命令进技能页,助手进助手页,其余进连接器页)。
   // 夹具自检:列表上真的有没核验通过的已装行(引擎替身答不出技能 / agent / 命令清单),否则下面那几条恒成立。
   setHubSection("connectors")
-  await waitFor(() => expect(q("[data-installed-package]")?.textContent).toContain("未能启用"))
+  await waitFor(() => expect(q('[data-installed-package="package:supabase"]')?.textContent).toContain("未能启用"))
   let pendingRows = 0
   let failedPackages = 0
   for (const page of ["connectors", "skills", "agents"] as const) {
@@ -615,16 +592,10 @@ test("④ `#1529` AC3:ext 报告重载失败 ⇒ 已安装列表如实「待重�
 })
 
 test("⑤ 出站计数相等:到达 IPC 的每一次安装都经过了收口方法", async () => {
-  // 三个入口共六次出站(package 首驱 + 确认屏,两条套件各首驱 + 重驱)。任何一次直连 `extIpc` 都会让
-  // 右边多出来一次而左边不动 —— 「既走收口方法又另外直连一次」的实现在这里红。
-  expect(ipcInstallIntents.length).toBe(centralCalls.length)
-  expect(centralCalls.map((entry) => entry.catalogId)).toEqual([
-    BUNDLE_OK,
-    BUNDLE_OK,
-    BUNDLE_PENDING,
-    BUNDLE_PENDING,
-  ])
-  expect(ipcInstallIntents.map((intent) => intent.catalogId)).toEqual(centralCalls.map((entry) => entry.catalogId))
+  expect(centralCalls).toEqual([])
+  expect(ipcInstallIntents).toEqual([])
+  expect(desktopCalls).toEqual(["package:github", BUNDLE_OK, BUNDLE_PENDING, "package:supabase"])
+  expect(desktopIpcCalls).toEqual(desktopCalls)
   // 夹具自检:被装的那个 package 里真的有一个 MCP 组件(套件成员之外还有 fs 类组件),
   // 也就是说「装完要重扫」这件事对本夹具是真需求,不是摆设。
   expect(fixture.envelope.components.map((component) => component.id)).toContain(LEAF_MCP_ID)
@@ -641,7 +612,7 @@ const scheduler = createReloadScheduler({
   engine: () => async (request: Request) => {
     const url = new URL(request.url)
     if (request.method === "GET" && url.pathname === "/api/session/active") return Response.json({ data: busy ? { ses_1: { type: "running" } } : {} })
-    if (request.method === "POST" && url.pathname === "/api/location/reload") return new Response(null, { status: 204 })
+    if (request.method === "POST" && url.pathname === "/api/location/reload") { locationReloads++; return new Response(null, { status: 204 }) }
     return new Response("not found", { status: 404 })
   },
   log: () => {}, error: () => {},
@@ -830,13 +801,15 @@ test("busy package switch forces the existing scheduler without a second reload 
   const installed = await call("ext-install-package", "package:supabase")
   expect(installed).toMatchObject({ ok: true })
   const before = connectorRefreshes
+  const reloadsBefore = locationReloads
   busy = true
   scheduler.register(join(tmp, "project"), {})
   codepuppySidecar.attach((request) => scheduler.request(request))
   for (const state of ["disabled", "enabled"] as const) {
     expect(await call("ext-set-package-state", { packageId: "package:supabase", state })).toMatchObject({ ok: true })
     await scheduler.settled()
-    await waitFor(() => expect(connectorRefreshes).toBe(before + (state === "disabled" ? 1 : 2)))
+    await waitFor(() => expect(locationReloads).toBe(reloadsBefore + (state === "disabled" ? 1 : 2)))
+    expect(connectorRefreshes).toBe(before)
     expect(busy).toBe(true)
     const ledger = readPackageLedgerStateV1(globalRoot)
     expect(ledger.ok).toBe(true)

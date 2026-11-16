@@ -1014,3 +1014,7 @@ r17 · 完整登记检查与候选冻结（开始 2026-11-16 17:38 UTC，接收 
 | `packages/ext/src/plugin-host.test.ts` | 41 → 44 |
 
 下降项 local-package-channel 的 2→1 对照 77adad13f0（BC2b）：旧逐技能导入 transport 案例随旧链退役，现存宿主仍执行 5 条命名空间/已装来源投影断言；不是把失败/skip 写低。其余增长均对应此增量/D/E lane 已接收的新案例，未删除行为以配数。候选刷新/0.2.1 冻结在修绿并成功写回后才开始。
+
+r17 批修 disposition：第 199 行保持安全测试逐字不改，preload/index.ts 的 sourcesSearchProgress handler 从 Parameters<typeof cb>[1] 取既有 ElectronAPI 形状，不再 type-import main。第 151 行只替换已移除的确认动作为单次目录 ID 出站，仍断目录 picker 零次；补现有 cloud.accountStatus 只读接口的 network 错误替身，云恢复中/ready 与授权失败不谎报的既有断言均保留。第 157 行数据层/IPC 精确 ID 双计数改观察同一 installPackage（旧 installCatalogIntent 必须零调用）；MCP-only 装/存令牌零 reload，套件一次出站无确认，真实 Supabase skill+MCP 样本保持非 force reload、失败报告后的对应包行必须「未能启用」，普通单项 PDF/自定义连接器的调度与待批取消断言未改。busy 包切换只把 full refresh 计数换成实际 Location reload，并继续验每个 ledger 状态、busy 与零 renderer dispose。
+
+自加断言修正说明：本轮临时加入“整包名等于 leaf record.name”的断言是假前提（install-from-source.ts 的 catalog result 以 graph.packageId 返回，叶子名各自保留）；改核 packageGraphs 中的 catalogId，bundle-diagnostic.log 先证实 main 已 ok:true。新 reload 反控制最初选了带 agent/command 的 mixed sample，触发其应有的 startup refresh，改用已存在的真实 Supabase skill+MCP sample 隔离非 force Location 路径；最终失败行 selector 明确指向 Supabase 而非列表第一条 GitHub。以上均为本轮自加/改接的观察前提，不删 AC 或旧有效断言，不修生产来迎合夹具。batch-hosts-final.log 三文件 10 pass / 0 fail、内层重载 15 pass，ui-mac typecheck exit 0；曾有一次包目录/相对路径不符的编辑未生效，已用绝对路径纠正，无该次文件改动。

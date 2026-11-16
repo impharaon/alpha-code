@@ -137,6 +137,7 @@ Object.defineProperty(window, "api", {
     },
     updater: { check: async () => {} },
     auth: { start: async () => {} },
+    cloud: { accountStatus: async () => ({ error: "network" }) },
     ext: {
       listInstalls: async () => ({ global: [], project: [] }),
       sessionGrants: async () => ({ grants: [] }),
@@ -148,6 +149,11 @@ Object.defineProperty(window, "api", {
       migrateScan: async () => ({ enabled: false, inventory: { skills: [], mcp: [], plugins: [] } }),
       remoteCatalog: async () => ({ ok: false as const, reason: "not used by this case file" }),
       checkRuntime: async () => ({ ok: true as const }),
+      installPackage: async (catalogId: string) => {
+        installCatalogCalls.push({ catalogId })
+        engineStatus = { ...engineStatus, filesystem: { status: "connected" } }
+        return { ok: true as const, packageId: catalogId }
+      },
       installCatalog: async (intent: unknown) => {
         installCatalogCalls.push(intent)
         engineStatus = { ...engineStatus, filesystem: { status: "connected" } }
@@ -369,7 +375,7 @@ test("云连接器卡在 needs_auth 时说「需要重新登录」并给出同�
   expect(authorizeButtons().length).toBe(0)
 })
 
-test("带 {workspace} 的 Hub MCP 安装不打开目录选择器,只发送全局 catalog intent", async () => {
+test("带 {workspace} 的 Hub MCP 安装不打开目录选择器或确认框,只交出目录 ID", async () => {
   reset()
   engineStatus = {}
   mount()
@@ -383,16 +389,11 @@ test("带 {workspace} 的 Hub MCP 安装不打开目录选择器,只发送全局
   })
   filesystemCard!.querySelector<HTMLButtonElement>(".codepuppy-ext-add")!.click()
 
-  let confirm: HTMLButtonElement | null = null
-  await waitFor(() => {
-    confirm = document.querySelector<HTMLButtonElement>("[role='dialog'] .a-dialog-footer .a-btn:last-child")
-    expect(confirm).toBeInstanceOf(HTMLButtonElement)
-  })
-  confirm!.click()
+  expect(document.querySelector("[role='dialog']")).toBeNull()
 
   await waitFor(() => expect(installCatalogCalls).toHaveLength(1))
   expect(directoryPickerCalls).toBe(0)
-  expect(installCatalogCalls[0]).toEqual({ catalogId: "mcp:filesystem", scope: { scope: "global" } })
+  expect(installCatalogCalls[0]).toEqual({ catalogId: "mcp:filesystem" })
 })
 
 // ── `#624`:平台凭证恢复中,云能力 fail-close ────────────────────────────────────────────────

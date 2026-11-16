@@ -192,3 +192,10 @@ r4 B1 实施：在既有 engine-explicit-config 读取已验包图和 root 状�
 
 
 r4 收口（Codex / GPT-6）：`bun test --max-concurrency 2 src/main/package-hub-lifecycle.engine.test.ts src/main/package-mcp-oauth.engine.test.ts src/renderer/extensions/hub-three-pages.test.ts src/renderer/extensions/ext-package-detail-wiring.test.ts` exit 0，4 宿主 / 0 fail，实际 5/4/26/15 子例。AC-10 五态单行/直装/无永久 allow、AC-12 全技能/连接器/云/command 启停及更换密钥后整包移除、AC-13 真实 busy force 中断、AC-14 同包管理/真实来源、AC-06/07 hub 的登录/token 分开与取消/继续均有具名证据；真实服务凭据验收仍由编排器后收。ui-mac 和 ext `bun typecheck` 均 exit 0；文档链接检查 4 条与 diff check exit 0。当前约 50 分钟，未达原 40 分钟的两倍；B1–B8 处置及新增范围已记录。没有 core、ext-config 新编辑、公开 schema/Protocol、权限 evaluator、迁移、发布或 gate/bin/check。已知两条独立失败保留原断言，交回其既有责任链，不影响本轮 AC 证据。
+
+
+r5 C7 ship 前置修正（2026-11-16）：续派在干净 origin/alpha 的诊断确认 models.file 限定 ModelsDev 只读 Code Puppy 投影，旧反向臂的外部 provider 只可能来自机器上正在运行的 LM Studio/Ollama；这是测试前提缺失，非产品缺陷。仅在 codepuppy-config-injection-engine.cases.ts 提供 C7 使用的既有 LM Studio 发现样本（来自 core/test/plugin/provider-lmstudio.test.ts 首个 language-model 输入），文件 beforeAll 在任何引擎启动前提供 127.0.0.1:1234，文件 afterAll 在引擎关闭后只关闭自有 server；EADDRINUSE 时仍执行原真实发现/断言，消费已有服务。正向臂与原断言逐字不改，产品/core/投影 provider/model 数据不改。修前 `bun test --max-concurrency 2 ./src/main/codepuppy-config-injection-engine.cases.ts -t C7` exit 1（3 pass / 1 fail）；修后同命令 exit 0（4 pass），已有兼容监听服务的独立对照亦 exit 0（4 pass）。临时让反向臂保留 injection.config.content 的 provider.use（仍不传显式文件） 后同命令 exit 1（3 pass / 1 fail，外部 provider 仍不可见），已恢复变异。原 official-connectors TMPDIR/HOME 观察按 r5 收据消解：direct cases 的 Bun process-start HOME 造成假红，应运行既有宿主；宿主已由编排器确认绿，本轮不改该链。
+
+修正过程补证：首次仅在 C7 组前启动时，C7 子集已绿，但完整宿主仍 exit 1（23 pass / 1 fail）；原因是前面的 S6 引擎已经把无本地服务缓存进进程级 discovery。最终 fixture 提前到文件 beforeAll、所有引擎之前；未改缓存实现、前置等待或断言。
+
+最终宿主 `bun test --max-concurrency 2 src/main/codepuppy-config-injection-engine.test.ts` exit 0（1 宿主 pass，实际 24 子例 / 0 fail）；启动前 lsof 确认 1234/11434 均无监听。最终 setup 的已知坏变异只把反向臂 content 换回原注入内容、仍不传显式文件，同一 C7 命令 exit 1（3 pass / 1 fail，Expected true / Received false），已恢复。ui-mac `bun typecheck`、计划链接检查及 `git diff --check` exit 0。改动仅测试 setup 与本段证据，无 gate/bin/check 或产品变更。

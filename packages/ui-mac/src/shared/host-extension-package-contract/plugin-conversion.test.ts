@@ -28,7 +28,7 @@ test("pinned OpenCode JSONC and skills use the shared package model", async () =
   expect(converted.package.provider).toBe("opencode")
   expect(converted.package.entries.filter((entry) => entry.kind === "skill")).toHaveLength(15)
   expect(converted.package.entries.filter((entry) => entry.kind === "mcp")).toMatchObject([
-    { sourceName: "excalidraw", transport: "http", url: ["https://mcp.excalidraw.com/mcp"] },
+    { sourceName: "excalidraw", transport: "http", url: ["https://api.excalidraw.com/api/v1/mcp"] },
     { sourceName: "datagouv", transport: "http", url: ["https://mcp.data.gouv.fr/mcp"] },
   ])
   expect(converted.package.diagnostics).toEqual([])

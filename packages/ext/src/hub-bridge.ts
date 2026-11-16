@@ -1,3 +1,4 @@
+import type { SourceSearchResultV1 } from "../../ui-mac/src/main/plugin-sources"
 // hub-bridge — REQ-234 `#1531`(基线 docs/design/2026-10-14-req234-hub-agent-install-baseline.md §2.2 / §2.6)。
 //
 // ext 这一侧的 parentPort 请求簿记:agent 的三个定制中心工具经它向 main 问「这个目录的三档视图」与「某次安装请求走到哪一步」,
@@ -14,6 +15,11 @@
 import { createUnattendedState } from "./policy/unattended"
 import {
   buildUnattendedAck,
+  buildSourcesSearchRequest,
+  buildHubInstallRequest,
+  parseSourcesSearchReply,
+  parseHubInstallReply,
+  type HubInstallRequest,
   parseUnattendedLive,
   buildHubRequestQuery,
   buildHubViewRequest,
@@ -41,6 +47,8 @@ export type HubBridge = {
   readonly unattended: ReturnType<typeof createUnattendedState>
   readonly available: boolean
   view(input: { directory: string; sessionID?: string; agent?: string; query?: string }): Promise<{ ok: true; view: HubView } | BridgeFailure>
+  search(input: { directory: string; query: string }): Promise<{ ok: true; result: SourceSearchResultV1 } | BridgeFailure>
+  install(input: Omit<HubInstallRequest, "type" | "id">): Promise<{ ok: true; accepted: true } | BridgeFailure>
   request(requestId: string): Promise<{ ok: true; record: HubRequestRecord | null } | BridgeFailure>
   report(input: { generation: number; scope: ReloadScope; outcome: ReloadOutcome; directories: string[]; error?: string }): void
   /** main → ext 的重载请求交给谁。只能挂一个(调度器);挂上之前到达的请求按序缓存,挂上时补交。 */
@@ -130,6 +138,8 @@ export function createHubBridge(
             : { ok: false as const, reason: "error" as const, detail: "the app could not compute the view" }
         },
       ),
+    search: (input) => ask((id) => buildSourcesSearchRequest({ id, ...input }), (message) => { const reply = parseSourcesSearchReply(message); if (!reply) return; return "result" in reply ? { ok: true as const, result: reply.result } : { ok: false as const, reason: "error" as const, detail: reply.error } }),
+    install: (input) => ask((id) => buildHubInstallRequest({ id, ...input }), (message) => { const reply = parseHubInstallReply(message); if (!reply) return; return "accepted" in reply ? { ok: true as const, accepted: true as const } : { ok: false as const, reason: "error" as const, detail: reply.error } }),
     request: (requestId) =>
       ask(
         (id) => buildHubRequestQuery(id, requestId),

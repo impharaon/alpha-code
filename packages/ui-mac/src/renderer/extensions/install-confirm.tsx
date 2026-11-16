@@ -1,9 +1,6 @@
 // install-confirm — 定制中心的**安装确认框**与 `#348` capability 授权两阶段控制器。
 //
-// REQ-234 `#1531`(基线 §2.3):从 extension-hub.tsx 原样抽出,定制中心与 agent 安装守望者(codepuppy-ui/hub-install-watcher.tsx)
-// 共用**同一份** —— agent 请求的安装弹的就是定制中心自己的这个框(同一个条目说明、同一个作用域选择、同一个遮罩密钥输入、
-// 同一个授权第二阶段),不是另画一个。两个宿主各建一份控制器实例,区别只在「确认之后装的那一下」(deps.install):
-// 定制中心装完自己呈现结果;守望者装的时候带上 hubRequestId,让 main 记下这一次请求的结局。
+// Shared Customization Center confirmation controller; chat installation is main-owned.
 //
 // 状态机(设计稿 D1 + Codex 裁决 D2):
 //   idle → confirming-install(确认框)→ driving(confirmBusy)→ authorizing(authz 非空)

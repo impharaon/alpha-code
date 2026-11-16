@@ -4,6 +4,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 
 // DBHub 来自 src/renderer/extensions/testvectors/d5-old-catalog.json(2026-08-31.2 的真实历史目录样本)。
+import currentCatalog from "../src/renderer/extensions/codepuppy-catalog.json"
 import bundledCatalog from "../src/renderer/extensions/testvectors/d5-old-catalog.json"
 // `#777`:本文件跑的是生产 `ext-install-catalog` 全链,里面有 ADR-026 的平台闸
 // (`platforms: ["darwin","win32"]`)。在 ubuntu runner 上不声明这一条,两条用例量到的是
@@ -18,6 +19,7 @@ type IpcHandler = (event: { sender: { id: number } }, ...args: unknown[]) => unk
 const handlers = new Map<string, IpcHandler>()
 const root = mkdtempSync(join(tmpdir(), "ext-install-result-"))
 const canary = "REQ128_IPC_CANARY_02c9f86a"
+const chatEntry = currentCatalog.entries.find((entry) => entry.id === "mcp:playwright")!
 // 两条条目覆盖 `ext-ipc.ts` 的**两条**返回分支。R2 审计实测:只测 source="codepuppy" 那条
 // 是不够的 —— shipped catalog 的 8 条 MCP 全是 official/community,`source:"codepuppy"` 一条都没有,
 // 所以每一次真实首装走的都是 installedDisabled 那条提前返回。往那条分支塞明文,
@@ -31,12 +33,12 @@ const disabledEntry = structuredClone(bundledCatalog.entries.find((item) => item
 disabledEntry.id = "mcp:dbhub-default-off"
 disabledEntry.name = "dbhub-default-off"
 
-// REQ-234 `#1529`:agent 请求的那一次安装(带 hubRequestId),走默认关那条真实分支。
+// Main-owned request stage uses the real catalog install branch.
 const agentEntry = structuredClone(bundledCatalog.entries.find((item) => item.id === "mcp:dbhub")!)
 agentEntry.id = "mcp:dbhub-agent"
 agentEntry.name = "dbhub-agent"
 
-// REQ-234 `#1531`:项目作用域安装(只重载该项目目录)与 agent 经确认框的金丝雀端到端,各一条目。
+// 项目作用域重载与 agent 直装的金丝雀端到端,各一条目。
 const projectEntry = structuredClone(bundledCatalog.entries.find((item) => item.id === "mcp:dbhub")!)
 projectEntry.id = "mcp:dbhub-project"
 projectEntry.name = "dbhub-project"
@@ -101,7 +103,7 @@ mock.module("../src/main/remote-catalog", () => ({
   },
   refreshRemoteCatalog: async () => ({
     source: "remote",
-    catalog: { version: bundledCatalog.version, entries: [entry, disabledEntry, agentEntry, projectEntry, canaryEntry] },
+    catalog: { version: bundledCatalog.version, entries: [entry, disabledEntry, agentEntry, projectEntry, canaryEntry, chatEntry] },
     version: bundledCatalog.version,
     fetchedAt: "2026-07-30T00:00:00.000Z",
     via: "channel-dev",
@@ -312,38 +314,20 @@ test("#1529 I4:同一目录,定制中心(IPC)与 agent(parentPort)读到逐行�
   expect(JSON.stringify(fromHub)).not.toContain(canary)
 })
 
-test("#1529 I9:确认框记的阶段 + 带 hubRequestId 的安装 ⇒ main 记 committed(带作用域),ext 查得到", async () => {
-  const stage = handlers.get("ext-hub-request-stage")!
-  const install = handlers.get("ext-install-catalog")!
-  const requestId = "req_agent_0001"
-  expect(await stage({ sender: { id: 1 } }, { requestId, stage: "confirming", catalogId: agentEntry.id })).toEqual({ ok: true })
-  expect(await stage({ sender: { id: 1 } }, { requestId, stage: "submitted" })).toEqual({ ok: true })
-  const intent = { catalogId: agentEntry.id, scope: { scope: "global" }, hubRequestId: requestId }
-  const first = (await install({ sender: { id: 1 } }, intent)) as {
-    stage?: string
-    authorization: Array<{ key: string; requested: unknown; requiresConfirmation: boolean }>
-  }
-  // 授权暂停不是落定
-  expect(first.stage).toBe("authorize")
-  const query = (id: number) => {
-    const replies: Array<Record<string, unknown>> = []
-    codepuppySidecar.receive({ type: "codepuppy.hub.request.request", id, requestId }, (m) => void replies.push(m as Record<string, unknown>))
-    return replies[0]
-  }
-  expect(query(51)).toEqual({ type: "codepuppy.hub.request.reply", id: 51, record: { requestId, catalogId: agentEntry.id, stage: "submitted" } })
-  const confirmed = Object.fromEntries(
-    first.authorization.filter((d) => d.requiresConfirmation).map((d) => [d.key, d.requested]),
-  )
-  const result = (await install({ sender: { id: 1 } }, { ...intent, authorization: { confirmed } })) as { ok?: boolean }
-  expect(result.ok, JSON.stringify(result)).toBe(true)
-  expect(query(52)).toEqual({
-    type: "codepuppy.hub.request.reply",
-    id: 52,
-    record: { requestId, catalogId: agentEntry.id, stage: "committed", scope: "global" },
-  })
-  // 之后到达的 reject 回执(期限到 / 用户点了取消)记不成「用户拒绝」
-  expect((await stage({ sender: { id: 1 } }, { requestId, stage: "declined" })) as { ok: boolean }).toMatchObject({ ok: false })
-  expect(query(53)).toMatchObject({ record: { stage: "committed" } })
+test("A3 sidecar installs a main-known catalog ID and renderer can only read its progress", async () => {
+ const requestId="req_agent_0001"
+ const replies: unknown[]=[]
+ expect(handlers.has("ext-hub-request-stage")).toBe(false)
+ const stage=handlers.get("ext-hub-request")!
+ codepuppySidecar.receive({type:"codepuppy.hub.install.request",id:50,requestId,directory:join(root,"workspace"),sessionID:"ses_stage",agent:"build",ref:{kind:"id",id:chatEntry.id},scope:"all-projects"},message=>{replies.push(message)})
+ expect(replies).toEqual([{type:"codepuppy.hub.install.reply",id:50,accepted:true}])
+ for(let attempt=0;attempt<100;attempt++) {
+  const record=await stage({sender:{id:1}},requestId) as {stage:string}
+  if(record.stage!=="submitted")break
+  await Bun.sleep(10)
+ }
+ expect(await stage({sender:{id:1}},requestId)).toMatchObject({stage:"committed",packageId:chatEntry.id,outcome:{ok:true}})
+ expect(await stage({sender:{id:1}},{requestId,stage:"failed"})).toBeNull()
 })
 
 // ── REQ-234 `#1531` ─────────────────────────────────────────────────────────────────────────
@@ -374,64 +358,32 @@ test("#1531:项目作用域安装 ⇒ 发往 ext 的是 { scope:{ directory }, i
 })
 
 // 基线 §2.4 的金丝雀端到端(I2):agent 的 codepuppy_hub_install(**生产** ext 工具)经 parentPort 形状的消息接到**真** main 分发;
-// 确认框那一环由守望者的出站动作代演(记 confirming / submitted → 带 hubRequestId 与金丝雀密钥两段式安装 → 回 once)。
+// main 受理请求并通过统一入口提交;工具不通过审批运输安装参数。
 // 金丝雀值在工具参数、工具输出与 metadata、审批请求载荷、parentPort 双向全部消息、发往 ext 的重载请求里 **零命中**;
 // 对照组:同一个值在 main 落盘的密钥文件里**必须命中**(证明这把 grep 看得见它)。
-test("#1531 金丝雀:agent 安装的密钥只落在 main 的密钥文件里,工具 / 审批 / parentPort 一个字节都没有", async () => {
-  const { createHubBridge } = await import("../../ext/src/hub-bridge")
-  const { createHubTools } = await import("../../ext/src/hub-tools")
-  const stage = handlers.get("ext-hub-request-stage")!
-  const value = "REQ234_AGENT_CANARY_7b31e0d4"
-  const wire: unknown[] = []
-  const listeners: Array<(event: { data: unknown }) => void> = []
-  const bridge = createHubBridge(
-    {
-      postMessage: (message) => {
-        wire.push(message)
-        codepuppySidecar.receive(message, (reply) => {
-          wire.push(reply)
-          for (const listener of listeners) listener({ data: reply })
-        })
-      },
-      on: (_event, listener) => void listeners.push(listener),
-    },
-    { log: () => {} },
-  )
-  const asks: unknown[] = []
-  // `#1665`(OpenCode 2,接口 I10):确认请求经插件 Context 的 `permission.assert` 运输,目录取本 Location(2.x 的工具上下文没有 directory)。
-  const context = {
-    location: { directory: join(root, "workspace") },
-    permission: {
-      // 守望者:先记阶段再出站,框里填的密钥只进 install 意图的 grants。
-      assert: async (input: { metadata: { codepuppyHub: { catalogId: string; requestId: string } } }) => {
-        asks.push(input)
-        const { catalogId, requestId } = input.metadata.codepuppyHub
-        expect(await stage({ sender: { id: 1 } }, { requestId, stage: "confirming", catalogId })).toEqual({ ok: true })
-        expect(await stage({ sender: { id: 1 } }, { requestId, stage: "submitted" })).toEqual({ ok: true })
-        const result = await installTwice({ catalogId, scope: { scope: "global" }, grants: { secrets: { DSN: value } }, hubRequestId: requestId })
-        expect(result.ok, JSON.stringify(result)).toBe(true)
-      },
-    },
-  }
-  const ctx = { sessionID: "ses_canary", messageID: "msg_canary", agent: "build", id: "call_canary", signal: new AbortController().signal, progress: async () => {} }
-  const args = { catalogId: canaryEntry.id }
-  const install = createHubTools(bridge, context as never).find((tool) => tool.name === "codepuppy_hub_install")!
-  const result = (await install.execute(args, ctx as never)) as { content: string; metadata: unknown }
-  expect(asks.length).toBe(1)
-  expect(result.content.split("\n")[0]).toBe("installed; available")
-  for (const surface of [args, result, asks, wire, toSidecar]) expect(JSON.stringify(surface)).not.toContain(value)
-  expect(wire.some((m) => (m as { type?: string }).type === "codepuppy.hub.request.reply")).toBe(true)
-
-  // 对照组:main 落盘的密钥文件里看得见它
-  const hits: string[] = []
-  const walk = (dir: string): void => {
-    for (const e of readdirSync(dir, { withFileTypes: true })) {
-      const abs = join(dir, e.name)
-      if (e.isDirectory()) walk(abs)
-      else if (readFileSync(abs).includes(value)) hits.push(abs)
-    }
-  }
-  walk(root)
-  expect(hits.length).toBeGreaterThan(0)
-  expect(hits.every((path) => /secret/i.test(path)), JSON.stringify(hits)).toBe(true)
+test("A3 canary stays in main secret files while the production tool/bridge/main chain installs without approval transport", async () => {
+ const {createHubBridge}=await import("../../ext/src/hub-bridge")
+ const {createHubTools}=await import("../../ext/src/hub-tools")
+ const value="REQ234_AGENT_CANARY_7b31e0d4"
+ // Account setup uses the existing main-owned secret writer; no secret enters the chat tool.
+ expect((await installTwice({catalogId:canaryEntry.id,scope:{scope:"global"},grants:{secrets:{DSN:value}}})).ok).toBe(true)
+ const wire:unknown[]=[]
+ const listeners:Array<(event:{data:unknown})=>void>=[]
+ const bridge=createHubBridge({postMessage:message=>{wire.push(message);codepuppySidecar.receive(message,reply=>{wire.push(reply);for(const listener of listeners)listener({data:reply})})},on:(_event,listener)=>{listeners.push(listener)}},{log:()=>{}})
+ const asks:unknown[]=[]
+ const context={location:{directory:join(root,"workspace")},permission:{assert:async(input:unknown)=>{asks.push(input);throw Error("chat must not assert")}}}
+ const ctx={sessionID:"ses_canary",messageID:"msg_canary",agent:"build",id:"call_canary",signal:new AbortController().signal,progress:async()=>{}}
+ const args={id:chatEntry.id}
+ const install=createHubTools(bridge,context as never).find(tool=>tool.name==="codepuppy_hub_install")!
+ const result=await install.execute(args,ctx as never)
+ expect(asks).toEqual([])
+ expect(result).toMatchObject({metadata:{packageId:chatEntry.id,stage:"committed"}})
+ for(const surface of [args,result,asks,wire,toSidecar])expect(JSON.stringify(surface)).not.toContain(value)
+ expect(wire.some(message=>(message as {type:string}).type==="codepuppy.hub.install.request")).toBe(true)
+ expect(wire.some(message=>(message as {type:string}).type==="codepuppy.hub.request.reply")).toBe(true)
+ const hits:string[]=[]
+ const walk=(dir:string):void=>{for(const item of readdirSync(dir,{withFileTypes:true})){const path=join(dir,item.name);if(item.isDirectory())walk(path);else if(readFileSync(path).includes(value))hits.push(path)}}
+ walk(root)
+ expect(hits.length).toBeGreaterThan(0)
+ expect(hits.every(path=>/secret/i.test(path)),JSON.stringify(hits)).toBe(true)
 })

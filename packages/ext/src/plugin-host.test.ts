@@ -29,13 +29,14 @@ import { SessionMessage } from "../../schema/src/session-message.ts"
 import type { Plugin } from "@opencode/plugin"
 import CodePuppyExt, { PROCESS_STATE_KEY } from "./plugin"
 import { codePuppyWebSearchFailureOf } from "./exa-websearch"
-import { buildHubRequestReply, buildHubViewReply } from "../../ui-mac/src/main/codepuppy-sidecar-messages"
+import { buildHubInstallReply, buildHubRequestReply, buildHubViewReply } from "../../ui-mac/src/main/codepuppy-sidecar-messages"
 import { activate, it, recordingMcp } from "./plugin-host.harness"
 import { testEffect } from "../../core/test/lib/effect.ts"
 import { makePluginTestLayer } from "../../core/test/plugin/fixture.ts"
 import { CODEPUPPY_EXPLORE_PROMPT } from "./codepuppy-prompts"
 import { TOOL_TEXT, explainAttachmentBlock, explainVisionBlock } from "./context-injection"
 import { STAGED_ATTACHMENT_PART_NAME, stagedAttachmentPart } from "./staged-attachment-part"
+import { canonicalToolIdentity } from "../../schema/src/tool-identity"
 import { policyWorkspace } from "./policy/index"
 import { createToolPolicyStore, defaultPolicyBaseDir } from "./policy/resolver"
 import { Message } from "../../ai/src/schema/messages.ts"
@@ -525,7 +526,9 @@ const hubHost = (options: { manifest: boolean }) =>
       postMessage: (message: { type: string; id: number; directory?: string }) =>
         queueMicrotask(() => {
           const reply =
-            message.type === "codepuppy.hub.view.request"
+            message.type === "codepuppy.hub.install.request"
+              ? buildHubInstallReply(message.id, { accepted: true })
+              : message.type === "codepuppy.hub.view.request"
               ? buildHubViewReply(message.id, { view: { directory: message.directory ?? "", rows: [row as never], warnings: [] } })
               : message.type === "codepuppy.hub.request.request"
                 ? buildHubRequestReply(message.id, { record: null })
@@ -553,8 +556,8 @@ const hubHost = (options: { manifest: boolean }) =>
       id: "test.injected-tier-agents",
       async setup(context) {
         await context.agent.transform((editor) => {
-          for (const id of ["codepuppy-ask", "codepuppy-automation-standard"])
-            editor.update(id as never, (item) => void item.permissions.push({ action: "tool-policy-default", resource: "*", effect: "ask" } as never))
+          for (const [id, effect] of [["build", "allow"], ["codepuppy-ask", "ask"], ["codepuppy-automation-standard", "ask"]] as const)
+            editor.update(id as never, (item) => void item.permissions.push({ action: "*", resource: "*", effect: "allow" } as never, { action: "tool-policy-default", resource: "*", effect } as never))
         })
       },
     })
@@ -576,7 +579,7 @@ const hubInstall = (agent: string, answer: "once" | "always" = "once") =>
         sessionID: session.id,
         agent: agent as never,
         messageID: SessionMessage.ID.make("msg_hub_install"),
-        call: { type: "tool-call", id: "call_hub_install", name: "codepuppy_hub_install", input: { catalogId: "mcp:github" } },
+        call: { type: "tool-call", id: "call_hub_install", name: "codepuppy_hub_install", input: { id: "mcp:github" } },
       })
       .pipe(Effect.exit, Effect.forkChild)
     const asks: Array<{ action: string; metadata: Record<string, unknown> }> = []
@@ -593,48 +596,33 @@ const hubInstall = (agent: string, answer: "once" | "always" = "once") =>
     return { asks, exit: yield* Fiber.join(call) }
   })
 
-itWithPermission.live("权威 · 定制中心安装(I10):codepuppy_hub_install 的权限评估恒 ask,自动化 agent 恒 deny,压过先注册的 allow;反向臂:不装 ext ⇒ allow 留着", () =>
-  Effect.gen(function* () {
-    env({})
-    yield* hubHost({ manifest: true })
-    const hooks = yield* PluginHooks.Service
-    const evaluation = (agent: string) => ({ sessionID: ids.sessionID, agent: agent as never, action: "codepuppy_hub_install", resources: ["mcp:github"], effect: "allow" as const })
-    expect((yield* hooks.trigger("permission", "evaluate", evaluation("build"))).effect).toBe("allow")
-    yield* activate(CodePuppyExt)
-    expect((yield* hooks.trigger("permission", "evaluate", evaluation("build"))).effect).toBe("ask")
-    expect((yield* hooks.trigger("permission", "evaluate", evaluation("codepuppy-automation-standard"))).effect).toBe("deny")
-    // 别的动作不碰
-    const other = yield* hooks.trigger("permission", "evaluate", { ...evaluation("build"), action: "read" })
-    expect(other.effect).toBe("allow")
-
-    // 一次安装,用户只看到一次审批,就是带安装详情的那一个(0.1.26 同样只问一次):全权档(build)与逐次询问档(codepuppy-ask)都是
-    const hubAsk = (asks: Array<{ action: string; metadata: Record<string, unknown> }>) =>
-      asks.map((ask) => ({ action: ask.action, catalogId: (ask.metadata.codepuppyHub as { catalogId?: string } | undefined)?.catalogId }))
-    for (const agent of ["build", "codepuppy-ask"]) {
-      const { asks, exit } = yield* hubInstall(agent)
-      expect([agent, hubAsk(asks)]).toEqual([agent, [{ action: "codepuppy_hub_install", catalogId: "mcp:github" }]])
-      expect(Exit.isSuccess(exit)).toBe(true)
-    }
-    // 永不记住:回「始终允许」之后,下一次安装照样问
-    expect((yield* hubInstall("codepuppy-ask", "always")).asks).toHaveLength(1)
-    expect(hubAsk((yield* hubInstall("codepuppy-ask")).asks)).toEqual([{ action: "codepuppy_hub_install", catalogId: "mcp:github" }])
-    // 自动化 agent:零审批,具名拒绝
-    const automation = yield* hubInstall("codepuppy-automation-standard")
-    expect(automation.asks).toEqual([])
-    expect(Exit.isFailure(automation.exit)).toBe(true)
-    expect(JSON.stringify(automation.exit)).toContain("Permission denied: codepuppy_hub_install")
-  }),
-)
-
-itWithPermission.live("定制中心安装:没经随包清单核验的同名工具(开发构建 / 冒名)照常在调用时先问一次,不享受「只问安装那一次」", () =>
-  Effect.gen(function* () {
-    env({})
-    yield* hubHost({ manifest: false })
-    yield* activate(CodePuppyExt)
-    const { asks } = yield* hubInstall("codepuppy-ask")
-    expect(asks.map((ask) => ask.action)).toEqual(["plugin::codepuppy_hub_install", "codepuppy_hub_install"])
-  }),
-)
+itWithPermission.live("A3 install uses ordinary allow/ask policy and automation is denied before any ask", () => Effect.gen(function* () {
+ env({})
+ yield* hubHost({manifest:true})
+ const hooks=yield* PluginHooks.Service
+ const evaluation={sessionID:ids.sessionID,agent:"build" as never,action:"codepuppy_hub_install",resources:["mcp:github"],effect:"allow" as const}
+ yield* activate(CodePuppyExt)
+ const allowed=yield* hubInstall("build")
+ expect(allowed.asks).toEqual([])
+ expect(Exit.isSuccess(allowed.exit)).toBe(true)
+ expect((yield* hooks.trigger("permission","evaluate",{...evaluation,action:"read"})).effect).toBe("allow")
+ const asked=yield* hubInstall("codepuppy-ask")
+ expect(asked.asks.map(ask=>ask.action)).toEqual([canonicalToolIdentity({source:"plugin",origin:join(import.meta.dir,"policy","index.ts"),name:"codepuppy_hub_install"})])
+ expect(asked.asks.every(ask=>ask.metadata.codepuppyHub===undefined)).toBe(true)
+ expect(Exit.isSuccess(asked.exit)).toBe(true)
+ const automation=yield* hubInstall("codepuppy-automation-standard")
+ expect(automation.asks).toEqual([])
+ expect(Exit.isFailure(automation.exit)).toBe(true)
+ expect(JSON.stringify(automation.exit)).toContain("Permission denied: codepuppy_hub_install")
+}))
+itWithPermission.live("A3 a same-named unverified tool uses the same ordinary ask surface",()=>Effect.gen(function*(){
+ env({})
+ yield* hubHost({manifest:false})
+ yield* activate(CodePuppyExt)
+ const {asks}=yield* hubInstall("codepuppy-ask")
+ expect(asks.map(ask=>ask.action)).toEqual(["plugin::codepuppy_hub_install"])
+ expect(asks.every(ask=>ask.metadata.codepuppyHub===undefined)).toBe(true)
+}))
 
 /** 装一次 ext,收下这期间 ext 打进 console.log 的行(ext 的日志就是 console.log,plugin.ts 的 `log`)。 */
 const activationLog = (bootstrap: Omit<TestBootstrapInput, "globalRoot">) =>

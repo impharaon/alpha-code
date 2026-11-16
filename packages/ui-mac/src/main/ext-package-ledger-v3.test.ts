@@ -514,6 +514,6 @@ describe("REQ-128 #784 — 包显示名:可选、只管显示、不承载任何�
     // 前提自检:走查真的看到了文件 —— 空树会让「无违规」变成假绿。
     expect(hits.length).toBeGreaterThan(0)
     // Ledger owns type/decoding/digest; IPC and install outcome only project the display field.
-    expect(hits.sort()).toEqual(["ext-ipc.ts", "ext-package-ledger-v3.ts", "install-from-source.ts"])
+    expect(hits.sort()).toEqual(["ext-ipc.ts", "ext-package-ledger-v3.ts", "hub-view.ts", "install-from-source.ts"])
   })
 })

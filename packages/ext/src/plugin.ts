@@ -34,7 +34,7 @@ import {
   type McpOwnership,
 } from "./cloud-websearch-kill"
 import { createHubBridge, processParentPort, type HubBridge } from "./hub-bridge"
-import { createHubTools, hubInstallEvaluate } from "./hub-tools"
+import { createHubTools } from "./hub-tools"
 import { createReloadScheduler, type ReloadScheduler } from "./reload-scheduler"
 import { createCodePuppyTools } from "./codepuppy-tools"
 import { agentSampling, applyAgents, applyProjectMcp, commandDefinitions, removeAgents } from "./engine-transforms"
@@ -401,8 +401,6 @@ export const CodePuppyExt: Plugin.Plugin = {
         for (const id of factoryDeniedSkills()) editor.remove(id)
       })
       await context.permission.hook("evaluate", (event) => {
-        // I10:定制中心安装恒弹框(自动化 agent 恒拒)。注册在 registerPolicy 之后 ⇒ 按注册顺序它说了算。
-        hubInstallEvaluate(event)
         if (event.action === "skill" && event.resources.some((id) => factoryDeniedSkills().includes(id)))
           event.effect = "deny"
       })

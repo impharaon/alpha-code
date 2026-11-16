@@ -525,7 +525,7 @@ render(() => {
     const surfaceComponents = createMemo<AppSurfaces>(() => ({
       permission: (props) => (
         <CodePuppyBoundary name="PermissionWatcher">
-          <PermissionWatcher {...props} server={sidebarServer} />
+          <PermissionWatcher {...props} />
         </CodePuppyBoundary>
       ),
       [productionRoutes.home.surface]: productionRoutes.home.mount(codepuppyProjects, projectsServerKey),

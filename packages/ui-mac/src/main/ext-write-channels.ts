@@ -55,12 +55,12 @@ export const GATED_WRITE_CHANNELS = {
 /**
  * REQ-234 `#1529`:定制中心状态面的两条**表外**通道,与写表**必须互斥**(`ext-write-channels.test.ts` 断言)。
  *   · `hubView`         —— 纯读:main 对 (id, scope, directory) 即时算出的「已安装 / 待重载 / 可用」(hub-view.ts)。
- *   · `hubRequestStage` —— 只记 main **内存**里的安装请求阶段(I9),一个字节都不落盘、不碰账本。
- * 不进写表的理由与 `LOCAL_PACKAGE_READ_CHANNELS` 一致:账本待恢复时用户照样要看得到状态、确认框照样要能记阶段。
+ *   · `hubRequest` —— 只读 main 内存里的安装进度,renderer 没有写阶段通道。
+ * 不进写表的理由与 `LOCAL_PACKAGE_READ_CHANNELS` 一致:账本待恢复时用户照样要看得到状态和 main 已受理请求的进度。
  */
 export const HUB_READ_CHANNELS = {
   hubView: "ext-hub-view",
-  hubRequestStage: "ext-hub-request-stage",
+  hubRequest: "ext-hub-request",
 } as const
 
 /**

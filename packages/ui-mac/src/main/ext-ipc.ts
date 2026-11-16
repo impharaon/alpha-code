@@ -95,7 +95,7 @@ import { createPluginSources } from "./plugin-sources"
 import { createSourceInstaller } from "./install-from-source"
 import { createPackageDeclarationResolver } from "./package-declarations"
 import { applyPackageMcpV1, removePackageMcpV1 } from "./package-mcp-activation"
-import type { InstallRequestV1, InstallOutcomeV1 } from "../shared/plugin-install"
+import { isInstallOutcomeV1, type InstallRequestV1, type InstallOutcomeV1 } from "../shared/plugin-install"
 import type { PackageAcceptedFactsV1 } from "./package-installability"
 import { evaluatePackageForHost, validateCatalogPackageShape } from "./package-installability"
 import { capabilitiesForCatalogEntry } from "../shared/ext-capability-authorization"
@@ -143,20 +143,17 @@ export function registerExtIpcHandlers(
   // ── REQ-234 `#1529`:重载的**请求方与记录方**(执行者是 ext 调度器,C3)。任何会改变「待重载」原因的事件
   // ⇒ 通知 renderer 重读视图(index.ts 把它接到 `ext-hub-view-changed`)。
   const hubViewChangedListeners = new Set<() => void>()
+  const notifyHubViewChanged = () => {
+    for (const listener of hubViewChangedListeners) {
+      try { listener() } catch (error) { getLogger()?.warn(`ext-hub-view-changed listener failed: ${error instanceof Error ? error.message : String(error)}`) }
+    }
+  }
   const reloads = createReloadCoordinator({
     restartConnectors: () => officialRuntime?.refresh() ?? Promise.resolve(false),
     log: (line) => getLogger()?.log(line),
-    onChange: () => {
-      for (const listener of hubViewChangedListeners) {
-        try {
-          listener()
-        } catch (error) {
-          getLogger()?.warn(`ext-hub-view-changed listener failed: ${error instanceof Error ? error.message : String(error)}`)
-        }
-      }
-    },
+    onChange: notifyHubViewChanged,
   })
-  const hubRequests = createHubRequestStages({ log: (line) => getLogger()?.warn(line) })
+  const hubRequests = createHubRequestStages({ log: (line) => getLogger()?.warn(line), onChange: notifyHubViewChanged })
   /** 安装体提交成功之后:请 ext 重载,不再 dispose(基线 §2.6)。cloud 只动账本、没有重载环节。
    *  作用域:项目 MCP = 该项目目录;其余(含 package / seed / bundle)= global。 */
   const requestReloadAfterInstall = (intent: unknown, result: { kind: string; name: string }) => {
@@ -1504,28 +1501,7 @@ export function registerExtIpcHandlers(
       await ledgerReady // #309:账本写方等 recovery+迁移收敛
       return fn(...a)
     }
-  // REQ-234 `#1529`(I9 的 main 半边):agent 请求的安装带 `hubRequestId`(确认框守望者转交)。它只用于记阶段,
-  // 在这里剥掉再进表通道 —— 下游意图解码器照旧拒任何未知键。提交成功 ⇒ committed(带作用域);授权暂停不是落定;
-  // 其它失败 ⇒ failed。
-  ipcMain.handle(
-    GATED_WRITE_CHANNELS.installCatalog,
-    barrier(async (raw: unknown) => {
-      if (!raw || typeof raw !== "object" || !("hubRequestId" in raw)) return gatedWrite.installCatalog(raw)
-      const { hubRequestId, ...intent } = raw as Record<string, unknown>
-      if (!isHubRequestId(hubRequestId)) return { ok: false, reason: "intent.hubRequestId: malformed" }
-      const result = (await gatedWrite.installCatalog(intent)) as { ok?: unknown; stage?: unknown; reason?: unknown }
-      if (result?.ok === true) {
-        const decoded = decodeCatalogInstallIntent(intent)
-        hubRequests.settleInstall(hubRequestId, {
-          ok: true,
-          catalogId: typeof intent.catalogId === "string" ? intent.catalogId : String(intent.assetId ?? ""),
-          scope: decoded.ok && decoded.intent.scope.scope === "project" ? "project" : "global",
-        })
-      } else if (result?.stage !== "authorize")
-        hubRequests.settleInstall(hubRequestId, { ok: false, reason: typeof result?.reason === "string" ? result.reason : "install failed" })
-      return result
-    }),
-  )
+  ipcMain.handle(GATED_WRITE_CHANNELS.installCatalog, barrier(gatedWrite.installCatalog))
   ipcMain.handle(GATED_WRITE_CHANNELS.uninstallV2, barrier(gatedWrite.uninstallV2))
   ipcMain.handle(GATED_WRITE_CHANNELS.uninstallPackage, barrier(gatedWrite.uninstallPackage))
   ipcMain.handle(GATED_WRITE_CHANNELS.installPackage, barrier(gatedWrite.installPackage))
@@ -1620,10 +1596,19 @@ export function registerExtIpcHandlers(
   ipcMain.handle(HUB_READ_CHANNELS.hubView, (_event: IpcMainInvokeEvent, directory?: unknown) =>
     hubView.view(typeof directory === "string" ? directory : undefined),
   )
-  ipcMain.handle(HUB_READ_CHANNELS.hubRequestStage, (_event: IpcMainInvokeEvent, input: unknown) => hubRequests.record(input))
+  ipcMain.handle(HUB_READ_CHANNELS.hubRequest, (_event: IpcMainInvokeEvent, requestId: unknown) => isHubRequestId(requestId) ? hubRequests.get(requestId) : null)
   const codepuppySidecarHost: CodePuppySidecarHost = createCodePuppySidecarHost({
     view: hubView,
     requests: hubRequests,
+    searchSources: (query) => pluginSources.searchSources(query),
+    install: async (request) => {
+      if (request.ref.kind !== "id") return { ok: false, code: "unknown-id", detail: "This request does not identify an installable candidate" }
+      const source = await pluginSources.resolveInstallSource(request.ref.id)
+      if (!source) return { ok: false, code: "unknown-id", detail: "The ID was not issued by the application" }
+      await ledgerReady
+      const result = await gatedWrite.installFromSource({ requestId: request.requestId, source, effect: request.scope === "all-projects" ? { kind: "all-projects" } : { kind: "project", directory: request.directory }, via: "chat" })
+      return isInstallOutcomeV1(result) ? result : { ok: false, code: "transaction-failed", detail: "Installation recovery is incomplete" }
+    },
     reloads,
     log: (line) => getLogger()?.warn(line),
   })

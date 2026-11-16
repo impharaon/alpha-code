@@ -92,3 +92,14 @@ export function diagnosticNotRunning(
     reason: diagnostic.code,
   }))
 }
+
+/** Wire projection of main's result; rejects invented fields and never transports private credentials. */
+export function isInstallOutcomeV1(input: unknown): input is InstallOutcomeV1 {
+  if (!record(input) || typeof input.ok !== "boolean") return false
+  if (!input.ok) {
+    if (!exact(input, ["ok", "code", "detail", "notRunning"]) || typeof input.detail !== "string") return false
+    if (input.code === "nothing-runnable") return Array.isArray(input.notRunning) && validPackageGraphAnnotations({ notRunning: input.notRunning })
+    return input.notRunning === undefined && ["unknown-id", "source-unreachable", "source-changed", "invalid-draft", "not-searched", "transaction-failed"].includes(String(input.code))
+  }
+  return exact(input, ["ok", "packageId", "displayName", "source", "installed", "notRunning", "alreadyInstalled", "resolvedToCatalog"]) && nonempty(input.packageId) && typeof input.displayName === "string" && validSource(input.source) && Array.isArray(input.notRunning) && validPackageGraphAnnotations({ notRunning: input.notRunning }) && Array.isArray(input.installed) && input.installed.every((item: unknown) => exact(item, ["kind", "hostName", "sourceName"]) && (item.kind === "skill" || item.kind === "mcp") && nonempty(item.hostName) && typeof item.sourceName === "string") && (input.alreadyInstalled === undefined || input.alreadyInstalled === true) && (input.resolvedToCatalog === undefined || typeof input.resolvedToCatalog === "string")
+}

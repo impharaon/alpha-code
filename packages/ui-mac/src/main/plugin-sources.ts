@@ -233,6 +233,10 @@ export function createPluginSources(deps: { catalog: () => Promise<readonly Cand
     return comparisons.filter((row): row is CatalogComparison => row !== undefined)
   }
   return {
+    async resolveInstallSource(id: string): Promise<{ kind: "catalog"; catalogId: string } | { kind: "candidate"; candidateId: string } | undefined> {
+      if ([...candidates.values()].some((entry) => entry.candidate.id === id)) return { kind: "candidate", candidateId: id }
+      if (catalogRows.has(id) || (await deps.catalog()).some((row) => row.id === id)) return { kind: "catalog", catalogId: id }
+    },
     async captureFolder(directory: string): Promise<Capture> {
       const members: Archive["members"] = new Map()
       const visit = async (relative: string): Promise<void> => {

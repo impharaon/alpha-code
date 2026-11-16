@@ -163,12 +163,12 @@ describe("codepuppy-sidecar-messages — ext 侧 build/parse(#1531)", () => {
 
   test("main 建的两种应答逐字过 ext 的解析(含 error 臂与 record:null)", () => {
     for (const reply of [buildHubViewReply(1, { view }), buildHubViewReply(2, { error: "boom" })]) expect(parseHubViewReply(reply)).toEqual(reply)
-    const record = { requestId: "req_abcdefgh", catalogId: "mcp:x", stage: "committed" as const, scope: "project" as const }
+    const record = { requestId: "req_abcdefgh", packageId: "claude:x", stage: "committed" as const }
     for (const reply of [
       buildHubRequestReply(3, { record }),
       buildHubRequestReply(4, { record: null }),
       buildHubRequestReply(5, { error: "boom" }),
-      buildHubRequestReply(6, { record: { requestId: "req_abcdefgh", catalogId: "mcp:x", stage: "failed", reason: "no" } }),
+      buildHubRequestReply(6, { record: { requestId: "req_abcdefgh", stage: "failed", outcome: { ok: false, code: "unknown-id", detail: "no" } } }),
     ])
       expect(parseHubRequestReply(reply)).toEqual(reply)
   })

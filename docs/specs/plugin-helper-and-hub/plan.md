@@ -134,6 +134,14 @@ PLAN 文档检查（2026-11-16）：`python3 scripts/check-doc-links.py docs/spe
 
 ### 偏离记录
 
+r6 A3 完成：红例提交 `1c5a5de6f5`（main 消息／受理阶段）及 `a2b2436e36`（工具生产 bridge）先于生产改动；工具红命令 `bun test --max-concurrency 2 --test-name-pattern 'A3 tools search' src/hub-tools.test.ts` exit 1，旧实现只返回 hub 视图，未发来源消息（`a-r6-a3-tools-red.log`）。生产链现由 main 候选表解析 ID，sidecar 即时 ACK，经既有写闸安装，main 独占 submitted／committed／failed；只读 `hubRequest` 替代 renderer 写阶段。非目录图进入同一即时引擎核验视图，不从 committed 推断 available。普通工具审批保留在单一原面；移除 chat 的 permission.assert 运输、ask 钉子、asksForItself 特例和已死守望者。
+
+A3 最终命令（均 `--max-concurrency 2`）：上节 ui-mac 七文件集合加 `ext-package-ledger-v3.test.ts` exit 0（108 pass／0 fail／561 assertions，`a-r6-a3-ui-final.log`）；ext 的 bridge／tools／context 加 `policy/register-policy.test.ts`、`plugin-host.test.ts` exit 0（166 pass／0 fail／1016 assertions，`a-r6-a3-ext-final.log`）。两包 `bun typecheck` exit 0（`a-r6-a3-{ui,ext}-typecheck.log`）。真实 plugin host 证明全权 0 ask、询问档恰 1 普通 ask、自动化 0 ask 且 deny；生产 ext 工具→bridge→真 main→统一 catalog 入口的金丝雀用例证明秘密只留 main 专用文件，结果带 packageId，stage 不可由 renderer 写入。去掉来源消息、直装受理、metadata 身份或普通审批分流中的任一环，对应用例变红。
+
+A3 文件偏离均为同调用链：`src/shared/plugin-install.ts` 增加冻结 outcome 的 wire 校验；`plugin-sources.ts` 增加仅查 main 已铸 ID 的解析接缝；`renderer/index.tsx` 删除退役 watcher 的死 prop；`test-component/ext-install-catalog-result.cases.ts` 改测同一真 main 安装直达链；context inventory 快照机械同步；ledger display-only 消费白名单加入 hub-view 的纯展示读取。退役 watcher 的三生产文件及专用旧确认测试整体删除，原单一审批面／pin／秘密行为分别在普通审批、宿主及 main 连通证据保留；不删其他审批能力。A3 共 32 个代码／测试文件，约 +808／−1953（主要减少旧确认运输及专测），无新增依赖；生产的 H 共享文件仅 `ext-ipc.ts`（main sidecar 接线／通知），`use-extensions.ts`／`install-confirm.tsx` 仅移死参数／注释，不改 H 页面。H 本轮列出的并行修复文件未编辑。
+
+A3 的 `scope` 按冻结消息原样运输；当前 A2 入口尚未持久解释 this-project，E2／E3 尚未到齐，此依赖已返回编排器，不能将项目范围能力记为本片已验。AC-01 默认 all-projects 的真实入口和运行证据不依赖该项。A4 现在消费 H 已交的两个原名接缝，不实现其页面或 E 的范围逻辑。
+
 r6 A2 闭合：夹具清理后单文件 6 pass / 0 fail（32 assertions，`a-r6-a2-isolation.log`）；同一原 19 文件集合完整复核 369 pass / 0 fail（2127 assertions，exit 0，`a-r6-a2-final.log`），真实引擎内部 2 cases 通过。A3 首批红例为 `codepuppy-sidecar-messages.test.ts` 的来源查／装消息成对及畸形 ref 拒绝、`hub-view.test.ts` 的 main 立即受理与异步 submitted→committed；`bun test --max-concurrency 2 --test-name-pattern 'A3 source search|A3 main accepts' src/main/codepuppy-sidecar-messages.test.ts src/main/hub-view.test.ts` exit 1（2 fail；消息 builder 缺席、main 未识别 install 消息），日志 `a-r6-a3-main-red.log`。其余 A3 断言继承已核计划，不改普通审批求值器。
 
 r6 A2 纠正后的单文件检查补记：上条记录的“单文件 exit 0”在命令结束前写入，实际首跑为 5 pass / 1 fail；新注入例首次执行到 `injectedMcp()` 后留下了已发布 bootstrap，令下一条既有位置隔离用例不再读取其控制环境。未改任何行为断言，给测试 fixture 增加 afterEach 的现有 `unpublishTestBootstrap` 清理，防止跨用例泄漏；此前 baseline 的 void 异常使这个路径未执行。完整结果待命令结束后记，不能把提前写入的收据视为通过。

@@ -35,7 +35,8 @@ import { classifyPermissionRequest, RISK_METADATA_KEY } from "./risk"
 import { TOOL_POLICY_RPC_DEFINITION, toolPolicyHandlers } from "./rpc"
 import type { ToolDisplaySnapshotV1 } from "../../../schema/src/tool-identity"
 import { isCodePuppyPolicyRequest } from "../../../schema/src/codepuppy-tool-policy"
-import { HUB_INSTALL_ACTION } from "../hub-tools"
+
+import { denyHubInstallForAutomation, HUB_INSTALL_ACTION } from "../hub-tools"
 
 export interface PolicyRegistration {
   /** Last statement of the extension's `setup`: registers the parts that must see every earlier registration. */
@@ -55,18 +56,7 @@ export function policyWorkspace(location: Plugin.Context["location"]): string {
   return String(location.project.id) === "global" ? location.directory : String(location.project.id)
 }
 
-/**
- * I10: the extension's own, manifest-verified Customization Center install asks the user through its own
- * `codepuppy_hub_install` assert (hub-tools.ts), carrying the install details. The evaluate hook below decides that assert
- * on this tool's identity axis (`gateWithoutToolCall`: deny by name, or ask with Code Puppy's envelope) and hub-tools.ts
- * pins it to ask — never remembered, denied to automation agents. Asking at the call as well would ask twice, the first
- * time without the install details. Its call is still decided first (`decide`: a disabled tool is refused) and pinned;
- * before the one ask it only reads the catalog view from the app. A tool of that name with any other identity is asked
- * at the call like every tool.
- */
-function asksForItself(facts: ToolFacts) {
-  return facts.technicalId === HUB_INSTALL_ACTION && facts.identity.source === "plugin" && facts.authority.kind === "codepuppy-bundled"
-}
+
 
 export async function registerPolicy(context: Plugin.Context, unattended: UnattendedState): Promise<PolicyRegistration> {
   const env = process.env
@@ -156,6 +146,7 @@ export async function registerPolicy(context: Plugin.Context, unattended: Unatte
 
   // Head of the execute.before chain: a denied call reaches no other hook and no side effect.
   await context.tool.hook("execute.before", async (event) => {
+    if (event.tool === HUB_INSTALL_ACTION) denyHubInstallForAutomation(event.agent)
     await decide(deps, event)
   })
 
@@ -228,7 +219,7 @@ export async function registerPolicy(context: Plugin.Context, unattended: Unatte
           // rules before the identity-axis ask is evaluated, so a document-axis ask holds for it too.
           await catalog.refresh()
           const decision = await decide(deps, event)
-          if (!asksForItself(decision.facts)) await confirm(deps, decision, event)
+          await confirm(deps, decision, event)
           displays.set(event.id, displaySnapshot(decision.facts))
           pin(event)
           if (event.tool === CODE_MODE_TOOL && await profile(event.sessionID, event.agent) !== undefined) codeModeDenials.set(event.id, undefined)

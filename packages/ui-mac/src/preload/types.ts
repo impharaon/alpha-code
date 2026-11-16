@@ -584,7 +584,7 @@ export type {
 // REQ-103(#195):governance 只读视图形状(真源 main/ext-inventory.ts;shared/ext-ownership +
 // ext-states 的五维/三态纯值)。
 import type { ExtInventory } from "../main/ext-inventory"
-import type { HubRequestStage, HubView, ReloadItem } from "../main/codepuppy-sidecar-messages"
+import type { HubRequestRecord, HubView, ReloadItem } from "../main/codepuppy-sidecar-messages"
 export type { InventoryRow, ExtInventory } from "../main/ext-inventory"
 
 // REQ-128 Phase 3(`#780`/`#782`/`#784`):本地 Claude 插件包导入的 wire 形状。
@@ -1007,9 +1007,6 @@ export type ElectronAPI = {
             }
             /** REQ-128 package admission attempt identity; package intents require it. */
             attemptId?: string
-            /** REQ-234 `#1529`:agent 经确认框发起的这一次安装的请求号。main 在进表通道前剥掉它,只用于记
-             *  committed / failed 阶段(I9);缺席 = 定制中心自己的安装。 */
-            hubRequestId?: string
             /** package 重驱还必须原样带回四组 digest binding；legacy 仍只交 confirmed。 */
             authorization?: AuthorizationConfirmationWire | PackageAdmissionAuthorizationV1
           }
@@ -1245,13 +1242,8 @@ export type ElectronAPI = {
     /** REQ-234 `#1529`:「已安装 / 待重载 / 可用」—— main 对 (id, scope, directory) 即时算出的唯一权威,
      *  agent 工具读的是同一份。directory 缺省 = 引擎初始工作区。纯读。 */
     hubView: (directory?: string) => Promise<HubView>
-    /** REQ-234 `#1529`:确认框守望者记 agent 安装请求的阶段(只记 main 内存;committed 只由安装体写)。 */
-    hubRequestStage: (input: {
-      requestId: string
-      stage: Exclude<HubRequestStage, "committed">
-      catalogId?: string
-      reason?: string
-    }) => Promise<{ ok: true } | { ok: false; reason: string }>
+    /** Main-owned installation progress; renderer cannot advance a stage. */
+    hubRequest: (requestId: string) => Promise<HubRequestRecord | null>
     /** REQ-234 `#1529`:「待重载」的原因变了(重载请求 / ext 报告 / 引擎连上或断开)—— 重读 `hubView`。返回退订函数。 */
     onHubViewChanged: (cb: () => void) => () => void
   }

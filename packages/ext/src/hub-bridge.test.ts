@@ -107,3 +107,21 @@ describe("hub-bridge", () => {
     })
   })
 })
+
+test("A3 bridge pairs source search and direct install replies; malformed candidates never reach tools", async () => {
+  const { buildSourcesSearchReply, buildHubInstallReply } = await import("../../ui-mac/src/main/codepuppy-sidecar-messages")
+  const wire = fakePort()
+  const bridge = createHubBridge(wire.port, { log: () => {} })
+  const search = bridge.search({ directory: "/work/a", query: "playwright" })
+  expect(parseCodePuppySidecarInbound(wire.sent[0])).toMatchObject({ type: "codepuppy.sources.search.request", query: "playwright" })
+  const result = { searchId: "search_main", query: "playwright", sources: [{ source: "catalog" as const, status: "ok" as const, matched: 0, skipped: 0 }], candidates: [] }
+  wire.deliver(buildSourcesSearchReply(1, { result }))
+  expect(await search).toEqual({ ok: true, result })
+  const install = bridge.install({ requestId: "request_a3", directory: "/work/a", sessionID: "ses_1", agent: "build", ref: { kind: "id", id: "cand_main" }, scope: "all-projects" })
+  expect(parseCodePuppySidecarInbound(wire.sent[1])).toMatchObject({ type: "codepuppy.hub.install.request", ref: { kind: "id", id: "cand_main" } })
+  wire.deliver(buildHubInstallReply(2, { accepted: true }))
+  expect(await install).toEqual({ ok: true, accepted: true })
+  const bad = bridge.search({ directory: "/work/a", query: "browser" })
+  wire.deliver(buildSourcesSearchReply(3, { result: { ...result, candidates: [{ id: "cand_bad", source: "claude-marketplace", name: "bad", displayName: "bad", description: "bad", kind: "plugin", upstream: { token: "must-not-cross" } } as never] } }))
+  expect(await bad).toMatchObject({ ok: false, reason: "error" })
+})

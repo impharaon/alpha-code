@@ -73,10 +73,9 @@ export function HubInstallCard(props: { row: HubInstallRow }) {
           )
           if (!alive || current !== revision) return
           setFacts(next)
-          const row = next.view?.rows.find((row) => row.id === next.pack?.packageId)
           // Runtime MCP changes can complete without a Location reload report. Keep reading while pending.
           if (
-            (next.record?.stage === "submitted" || !next.pack || row?.state === "reload-pending" || next.error) &&
+            (next.record?.stage === "submitted" || call.phase === "running") &&
             next.record?.stage !== "failed"
           )
             timer = setTimeout(() => void refresh(), 1000)
@@ -114,13 +113,14 @@ export function HubInstallCard(props: { row: HubInstallRow }) {
         title: t("codepuppy.timeline.hub.failed"),
         detail: record.outcome && !record.outcome.ok ? safeText(record.outcome.detail) : call.result,
       }
-    if (record?.stage === "submitted" || (!pack && !record?.packageId && !call.packageId))
+    if (record?.stage === "submitted" || (!pack && call.phase === "running"))
       return {
         ...base,
         state: "installing",
         title: t("codepuppy.timeline.hub.installing", { name }),
         detail: current.error,
       }
+    if (!pack) return { ...base, state: "result", title: call.result ?? t("codepuppy.timeline.hub.unverified") }
     const added = t("codepuppy.timeline.hub.added", { name })
     if (source?.notRunning.length)
       return {

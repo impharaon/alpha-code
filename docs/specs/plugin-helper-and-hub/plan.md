@@ -824,3 +824,19 @@ A5 前提属实：仅 OpenCode 单数目录有 discovery。补充 pr-review-tool
 A5 FIXED：三生态复用 Markdown agent/command 解析，Claude/Codex 的标准复数目录得以具名；hooks/hooks.json 的命令事件转换成 Hook entry，默认字段沿既有提供方合同（UserPromptSubmit 30 秒，其余列明事件 600 秒），此增量仍不执行 hooks。现有 install entry 将不支持的 entry 映成 kind-not-supported-yet，hooks-only/commands-only 均有原因且不写账本。生成 converter ESM 与 artifact 清单，未改发布 schema；四文件 converter/artifact/sources/install entry exit 0（98 pass/638 assertions，a5-related.log），ui-mac bun typecheck exit 0。真实夹具新增 1,300 余行均为固定上游字节，产品改动约 30 行；非扩大运行范围。
 
 B2 前提属实：!pack 无条件轮询、无包无阶段按 installing 展示。生产 DOM 红例覆盖失败后重启/已装后移除，结束工具结果须可见且轮询读数不再增长；exit 1（b2-red.log）。
+
+B2 FIXED：轮询仅在 submitted 或工具仍 running 时继续，failed 阶段不轮询；已结束且包不存在时只显示工具结果，不再伪装正在安装/生效。正常 pending 仍由原 running 轮询与主视图通知更新。原 DOM 红例未改，卡片/timeline model/registry 三文件 exit 0（97 pass/474 assertions，b2-green.log），卡片内部实跑 11，host pin 与 TSV 说明同步。
+
+B3 SEAM-CHANGE-NEEDED（设计 §4.6 冻结侧车读合同）：已核 ext/hub-bridge.ts:47–56 仅 view/search/install/request，无包授权读；ui-mac/codepuppy-sidecar-messages.ts:32–50 的 authorization 仅 none/secret:<变量>/platform-login，HubRequestRecord:70–75 也无授权事实。main 的实际 saved/authenticated/status 由 package-admission.ts:468–483 计算，经 ext-ipc.ts:350–353 的 renderer-only ext-package-authorization 返回。现有 ext 终读无法区分令牌未存、登录未就绪与普通 MCP 启动失败，不能猜测这些状态或解析引擎错误词冒充专用存储事实。最小请求：在 §4.6 允许只读侧车 packageAuthorization(packageId)，复用现有 PackageAuthorizationResultV1 安全投影及 readPackageAuthorizationV1（无凭据值），build/parse 成对；无新写面/确认/权限。该接缝未获冻结合同 delta 前在 B3 边界收口，未新增运输或改合同。
+
+本次 r12 边界：B1、A1/B5、A2、A3、A4、A5、B2 已修；B3 等只读接缝；B4、B6、A6–A10、B7–B12 尚未开始，不冒充反证或已处置。后续仍按原顺序，B12 的生产 DOM 与两项 recorded verify 均未完成。
+
+r12 遗留（记录去向，无本轮旁修）：
+- A recorded：plugin-sources.ts 的 archive/capture bytes 保留整个应用运行期 — 依裁定仅记录，去向编排器。
+- A recorded：applyPackageMcp 使用 workspace 而非请求 Location — 依裁定仅记录，去向编排器。
+- A recorded：runtime {file:} 未 trim 与引擎处理不同 — 依裁定仅记录，去向编排器。
+- A recorded verify：official connector 取消 connectorChange restart 后须补真实引擎验证 — 尚未执行，随 B3 后续步骤继续，不先恢复 restart。
+- B recorded：Registry GitHub 无 get-token 链接，现有 SecretNeed 无 URL — 依裁定仅记录，去向编排器。
+- B recorded verify：folderSelections 入口是否不可达，核 public folder 合同与实际调用再删 — 尚未执行，随后续继续。
+- B recorded：automation deny 的普通 Error 无 unattended-denial metadata — 依裁定仅记录，去向编排器。
+- B recorded：pending 卡片每秒 hubView 重算 — B2 已将轮询约束到 submitted/running；无额外重构。

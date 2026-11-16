@@ -1,5 +1,7 @@
 import { expect, test } from "bun:test"
-import { join } from "node:path"
+import { realpathSync } from "node:fs"
+import { tmpdir } from "node:os"
+import { join, relative, sep } from "node:path"
 import { captureFixture, digest, fixtureRoot } from "../../../test-fixtures/plugin-helper/fixture"
 import provenance from "../../../test-fixtures/plugin-helper/provenance.json"
 import codex from "../../../test-fixtures/plugin-helper/codex/provenance.json"
@@ -11,6 +13,20 @@ import type { Json, Source } from "./plugin-conversion"
 const converter = () => import("./plugin-conversion")
 const registryServer = async (file: string) => (await Bun.file(join(fixtureRoot, "registry", file)).json()).server as { [key: string]: Json }
 const registrySource: Source = { kind: "mcp-registry", locator: "https://registry.modelcontextprotocol.io", serverName: "io.github.github/github-mcp-server", version: "2.1.0" }
+
+test("real third-party sample trees are archive-only and unpacked into temporary storage", async () => {
+  const storedRoot = join(import.meta.dir, "../../../test-fixtures/plugin-helper")
+  expect(fixtureRoot).not.toBe(storedRoot)
+  expect(relative(realpathSync(tmpdir()), realpathSync(fixtureRoot)).split(sep)[0]).not.toBe("..")
+  for (const tree of [
+    { root: "", files: provenance.files, archive: provenance.archive },
+    { root: "codex", files: codex.files, archive: codex.archive },
+    ...opencode.trees.map(tree => ({ ...tree, root: join("opencode", tree.root) })),
+  ]) {
+    expect(digest(await Bun.file(join(storedRoot, tree.root, tree.archive.path)).bytes())).toBe(`sha256:${tree.archive.sha256}`)
+    for (const file of tree.files) expect(await Bun.file(join(storedRoot, tree.root, file.path)).exists()).toBe(false)
+  }
+})
 
 test("OpenCode native modules remain visible with native-js-plugin while skills survive", async () => {
   for (const tree of opencode.trees) for (const file of [...tree.files, { path: tree.archive.path, sha256: tree.archive.sha256 }])

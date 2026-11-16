@@ -115,14 +115,14 @@ mock.module("@opencode-ai/app", () => ({
   useServerSDK: () => () => ({
     scope: "sidecar",
     ensureDirSdkContext: () => ({
-      client: {
-      mcp: {
-        auth: { authenticate: (args: { name: string }) => bindingAccountClient!.mcp.auth.authenticate(args) },
-        status: () => bindingAccountClient!.mcp.status(),
-      }, file: { list: async () => ({ data: [] }) } },
+      client: { file: { list: async () => ({ data: [] }) } },
       event: { on: () => () => {} },
     }),
     client: {
+      mcp: {
+        auth: { authenticate: (args: { name: string }) => bindingAccountClient!.mcp.auth.authenticate(args) },
+        status: () => bindingAccountClient!.mcp.status(),
+      },
       // #652:续钮与 composer 共用同一条发送入口 = v1 session.promptAsync。
       session: {
         promptAsync: (args: unknown) => {
@@ -4911,7 +4911,7 @@ test("BC4 production timeline intent reaches the existing SDK OAuth adapter and 
  const host=document.createElement("div");document.body.append(host)
  disposers.push(solidWeb.render(()=>binding.CodePuppySessionTimeline(),host))
  try{
-  await flush()
+  for(const end=Date.now()+1000;!host.querySelector('[data-package-login-action]');await new Promise(resolve=>setTimeout(resolve,10)))if(Date.now()>end)break
   const button=host.querySelector<HTMLButtonElement>('[data-package-login-action]')
   expect(button?.textContent).toBe("登录 docs")
   button!.click()

@@ -705,3 +705,6 @@ r10 决定 2：按本轮裁定直接替换 `codepuppy-sidecar-wiring.test.ts` �
 
 
 BC4 红例先行：时间线三个具名场景 exit 1（无登录／连接动作，`r10-bc4-card-red.log`）；生产 `CodePuppySessionTimeline`→当前 SDK→既有 OAuth adapter→system-browser 的接线例 exit 1（按钮缺席，`r10-bc4-binding-red.log`），测试端点只模拟本仓引擎 API，不登录真实服务。独立共享密码组件三例宿主 exit 1（组件尚不存在，`r10-bc4-dialog-red.log`）；断言同包重读需求、部分提交、无 required、失效需求零写、失败不泄漏。旧 A4「没有时间线动作」断言随明确替换行为同步，原状态／金丝雀／manage 断言保持；生产 adapter 的目录参数形状已用实际 SDK 探测为 `location[directory]` 后写入断言，未手造第三方格式。
+
+
+BC4 测试运输窄修正：新生产绑定例的 SDK mock 原把 mcp 错放进 `ensureDirSdkContext().client`，而生产 `session-timeline.tsx` 消费 `serverSDK().client`；故按钮已出现后、尚未到 adapter 即失败，观测引擎请求数组为空。按 standing API 调用形状修正规则单独将 mock 移至实际根 client，并将该例两微任务 flush 改为等到实际按钮挂载后断言（上限 1s，断言与一击授权行为不变）；不改变 SDK/生产签名、动作或成功条件。原红例仍能检测缺少动作／生产 intent 接线。

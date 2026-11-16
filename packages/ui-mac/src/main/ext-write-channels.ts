@@ -75,6 +75,7 @@ export const HUB_READ_CHANNELS = {
  * 这个问题**可被一条断言回答**。两表互斥由 `ext-write-channels.test.ts` 钉死。
  */
 export const LOCAL_PACKAGE_READ_CHANNELS = {
+  preparePluginSource: "ext-prepare-plugin-source",
   /** 按 previewId 取回已签发预览的安全投影(无绝对路径、无字节)。 */
   importClaudePluginPreview: "ext-import-claude-plugin-preview",
   /** 显式取消:释放 main 侧留存的字节。**必须不过 gate** —— 账本待恢复时也得放得掉。 */

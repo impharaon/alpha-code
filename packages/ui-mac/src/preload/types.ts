@@ -1,4 +1,4 @@
-import type { SourceSearchResultV1 } from "../main/plugin-sources"
+import type { SourceSearchResultV1, PreparePluginSourceInputV1, PreparePluginSourceResultV1 } from "../main/plugin-sources"
 import type { InstallRequestV1, InstallOutcomeV1 } from "../shared/plugin-install"
 import type { DesktopMenuAction } from "@opencode-ai/app/desktop-menu"
 import type { WslServersPlatform } from "@opencode-ai/app/wsl/types"
@@ -1249,6 +1249,7 @@ export type ElectronAPI = {
     /** Main-owned installation progress; renderer cannot advance a stage. */
     hubRequest: (requestId: string) => Promise<HubRequestRecord | null>
     sourcesSearch: (query: string) => Promise<SourceSearchResultV1>
+    preparePluginSource: (input: PreparePluginSourceInputV1) => Promise<PreparePluginSourceResultV1>
     installFromSource: (request: InstallRequestV1) => Promise<InstallOutcomeV1>
     /** REQ-234 `#1529`:「待重载」的原因变了(重载请求 / ext 报告 / 引擎连上或断开)—— 重读 `hubView`。返回退订函数。 */
     onHubViewChanged: (cb: () => void) => () => void

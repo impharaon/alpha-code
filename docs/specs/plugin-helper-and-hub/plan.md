@@ -648,3 +648,8 @@ r8 下一步准确边界：BC2a.2 与 BC2b 尚未接 main 选择器／Git IPC、
 r9 BC2a.2 红例先行：生产 `ext-install-catalog-result.cases.ts` 新增 main 目录选择、路径／字节不跨线、准备零写入、取消／伪造路径零提交，以及 Git 市场清单只装所选 context7。真实 frontend-design 与市场原字节沿既有 provenance；Git HEAD 在网络边界映射到同一固定提交 archive。`bun test --max-concurrency 2 --test-name-pattern BC2a.2 ./test-component/ext-install-catalog-result.cases.ts` exit 1（0 pass／2 fail，缺 `ext-prepare-plugin-source`，`bc2a2-red.log`）。
 
 r9 指定先跑 `bun test --max-concurrency 2 src/main/codepuppy-sidecar-wiring.test.ts` exit 1（5 pass／1 fail）：`codepuppy-sidecar-wiring.test.ts:131` 仍调用 A3 已移除的 `requests.record`，并断言旧 `confirming`；现行 `HubRequestStages` 为 submit/settleInstall/get 与 submitted。修正会改变阶段期望，本轮明确将行为断言交编排器裁定，原例保持；不为旧测试恢复已退役运输。其他 BC 工作独立继续。
+
+
+BC2a.2 实施收据：main 新增私有只读取源准备通道 `preparePluginSource`（folder/Git），目录选择和捕获都在恢复 mutex 外；返回既有 prepared 的编号与安全展示事实，取消零写盘，拒收 renderer 路径。Git 通过已有 codeload 固定实际提交，支持仓库根与 GitHub tree 地址，不运行 clone/hook/script。冻结 folder 安装请求在 main 选择并捕获后映射到同一 candidate 写闸；同 requestId 复用捕获，写入／结果幂等仍由既有 installer 持有。市场通过只读准备清单逐条选择；直接 folder 请求若取得市场而非单包，不安装市场本身。
+
+`bun test --max-concurrency 2 src/main/ext-write-channels.test.ts src/main/plugin-sources.test.ts src/main/install-from-source.test.ts` exit 0（57 pass／0 fail，326 assertions；`bc2a2-main.log`，生产 IPC 子进程严格 13 场景）；ui-mac/ext 各 `bun typecheck` exit 0（`bc2a2-ui-typecheck.log`、`bc2a2-ext-typecheck.log`）。共享生产文件 `ext-ipc.ts` 的取源/入口外层与 `plugin-sources.ts` 的私有准备类型；另为既列 preload/注册表。生产约 60 行增删、6 文件，无冻结 DTO 改动。本笔未切换 hub 菜单，用户可达链在 BC2b 同笔撤旧收口；本片整体及 AC-15 仍未标完成。已核 Codex（GPT-6）作者自查；下一步 BC2b，OPTIONAL 无。

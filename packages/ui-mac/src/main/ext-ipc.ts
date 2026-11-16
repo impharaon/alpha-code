@@ -91,7 +91,7 @@ import { getLogger } from "./logging"
 import { resolveVerifiedPackageV1, runCatalogInstallWithPackagePreflight } from "./package-installability"
 import { readPackageAuthorizationV1, savePackageSecretsV1, type PackageAdmissionDeps, createPackageAdmissionCoordinator } from "./package-admission"
 import { createPackageMcpOauthEngineV1 } from "./package-mcp-oauth"
-import { createPluginSources, installedPackageIdentity } from "./plugin-sources"
+import { createPluginSources, installedPackageIdentity, type PreparePluginSourceResultV1 } from "./plugin-sources"
 import { createSourceInstaller, installCatalogFromSource } from "./install-from-source"
 import { createPackageDeclarationResolver } from "./package-declarations"
 import { applyPackageMcpV1, removePackageMcpV1 } from "./package-mcp-activation"
@@ -523,7 +523,7 @@ export function registerExtIpcHandlers(
     if (process.env.CODEPUPPY_OPEN_DIR) return { ok: true, srcDir: process.env.CODEPUPPY_OPEN_DIR } // headless/测试短路(main 控制的 env)
     const result = await dialog.showOpenDialog({
       properties: ["openDirectory"],
-      title: "选择要导入的技能文件夹",
+      title: "选择要添加的插件文件夹",
       defaultPath: ensureUserWorkspaceDir() ?? undefined,
     })
     if (result.canceled || result.filePaths.length === 0) return { ok: false, canceled: true, reason: "已取消" }
@@ -1182,6 +1182,35 @@ export function registerExtIpcHandlers(
       return accepted
     },
   })
+  // Preparation never holds the recovery mutex, writes package state or exposes the picked path.
+  const preparePluginSource = async (input: unknown): Promise<PreparePluginSourceResultV1> => {
+    if (!input || typeof input !== "object" || Array.isArray(input))
+      return { ok: false, detail: "Invalid source selection" }
+    const raw = input as Record<string, unknown>
+    if (raw.kind === "folder" && Object.keys(raw).every(key => key === "kind")) {
+      const picked = await pickImportSkillDir()
+      if (!picked.ok) return { ok: false, canceled: true, detail: picked.reason }
+      try {
+        return { ok: true, prepared: await pluginSources.prepareCapture(await pluginSources.captureFolder(picked.srcDir)) }
+      } catch {
+        return { ok: false, detail: "The selected folder could not be read as a plugin package" }
+      }
+    }
+    if (raw.kind !== "git" || typeof raw.url !== "string" || !Object.keys(raw).every(key => key === "kind" || key === "url"))
+      return { ok: false, detail: "Invalid source selection" }
+    try {
+      const url = new URL(raw.url)
+      const parts = url.pathname.replace(/\/$/, "").split("/").filter(Boolean)
+      if (url.protocol !== "https:" || url.hostname !== "github.com" || url.username || url.password || url.search || url.hash || parts.length < 2 || (parts.length > 2 && (parts[2] !== "tree" || !parts[3])))
+        return { ok: false, detail: "This address is not a supported Git repository" }
+      const repository = "https://github.com/" + parts.slice(0, 2).join("/").replace(/\.git$/, "")
+      const capture = await pluginSources.captureGit(repository, parts[3] ?? "HEAD", parts.slice(4).join("/"))
+      return { ok: true, prepared: await pluginSources.prepareCapture(capture) }
+    } catch {
+      return { ok: false, detail: "The Git source could not be read as a plugin package or marketplace" }
+    }
+  }
+  ipcMain.handle(LOCAL_PACKAGE_READ_CHANNELS.preparePluginSource, (_event: IpcMainInvokeEvent, input: unknown) => preparePluginSource(input))
   const activatePackageMcp = (packageId: string) => applyPackageMcpV1(packageId, codepuppyUserWorkspaceDir(), { root: codepuppyGlobalRoot, awaitServer })
   const reloadPackageSkills = (packageId: string) => reloads.request({ scope: "global", items: packageReloadItems(packageId), reason: `installed package skills ${packageId}` })
   const removeDepartingPackageComponents = async (children: Array<{ kind: string; name: string }>) => {
@@ -1497,7 +1526,23 @@ export function registerExtIpcHandlers(
   ipcMain.handle(GATED_WRITE_CHANNELS.uninstallV2, barrier(gatedWrite.uninstallV2))
   ipcMain.handle(GATED_WRITE_CHANNELS.uninstallPackage, barrier(gatedWrite.uninstallPackage))
   ipcMain.handle(GATED_WRITE_CHANNELS.installPackage, barrier(gatedWrite.installPackage))
-  ipcMain.handle(GATED_WRITE_CHANNELS.installFromSource, barrier(gatedWrite.installFromSource))
+  // A folder request keeps its captured candidate across retries. Only the picker/capture runs outside
+  // the gate; the ordinary candidate install still passes through the same ledger barrier/write entry.
+  const folderSelections = new Map<string, Promise<PreparePluginSourceResultV1>>()
+  const installFromSource = async (request: InstallRequestV1) => {
+    await ledgerReady
+    if (request?.source?.kind !== "folder") return gatedWrite.installFromSource(request)
+    if (typeof request.requestId !== "string" || !Object.keys(request.source).every(key => key === "kind"))
+      return { ok: false as const, code: "unknown-id" as const, detail: "Invalid folder request" }
+    const selection = folderSelections.get(request.requestId) ?? preparePluginSource({ kind: "folder" })
+    folderSelections.set(request.requestId, selection)
+    const result = await selection
+    if (!result.ok) return { ok: false as const, code: "source-unreachable" as const, detail: result.detail }
+    if (result.prepared.kind !== "package")
+      return { ok: false as const, code: "unknown-id" as const, detail: "Choose an individual plugin from this marketplace" }
+    return gatedWrite.installFromSource({ ...request, source: { kind: "candidate", candidateId: result.prepared.candidateId } })
+  }
+  ipcMain.handle(GATED_WRITE_CHANNELS.installFromSource, (_event: IpcMainInvokeEvent, request: InstallRequestV1) => installFromSource(request))
   ipcMain.handle(GATED_WRITE_CHANNELS.setPackageState, barrier(gatedWrite.setPackageState))
   ipcMain.handle(GATED_WRITE_CHANNELS.savePackageSecrets, barrier(gatedWrite.savePackageSecrets))
   ipcMain.handle(GATED_WRITE_CHANNELS.rollback, barrier(gatedWrite.rollback))
@@ -1629,5 +1674,5 @@ export function registerExtIpcHandlers(
   // #390:同时交出恢复-gate 包装的 global 技能安装器,供 ecosystem gate 走事务安装(不绕恢复准入)。
   // REQ-234 `#1529`:codepuppySidecar 交给 composition root —— spawnLocalServer 在 `child.on("message")` 旁挂它的 receive,
   // ready 时 attach;onViewChanged 接 `ext-hub-view-changed` 推送。
-  return { ledgerReady, ecosystemGlobalSkillInstaller, codepuppySidecar, pluginSources, installFromSource: gatedWrite.installFromSource, resolvePackageDeclarationsV1 }
+  return { ledgerReady, ecosystemGlobalSkillInstaller, codepuppySidecar, pluginSources, installFromSource, resolvePackageDeclarationsV1 }
 }

@@ -44,6 +44,10 @@ export type PreparedPluginSourceV1 =
   | { kind: "package"; candidateId: string; displayName: string }
   | { kind: "marketplace"; entries: { id: string; displayName: string; description: string; source: "local-folder" | "claude-marketplace" | "codex-marketplace" }[] }
 
+/** Private picker/Git preparation transport; the frozen candidate and install DTOs stay unchanged. */
+export type PreparePluginSourceInputV1 = { kind: "folder" } | { kind: "git"; url: string }
+export type PreparePluginSourceResultV1 = { ok: true; prepared: PreparedPluginSourceV1 } | { ok: false; detail: string; canceled?: true }
+
 type SourceFailure = { ok: false; code: "unknown-id" | "source-unreachable" | "source-changed"; detail: string }
 type ConvertedCandidate = Awaited<ReturnType<typeof convertPluginTree>> & { ok: true; capture: Capture; runtimeIdentity: string | undefined; publisher?: CandidateV1["publisher"] }
 type CatalogContents = Pick<PackageAcceptedFactsV1, "envelope"> & { components: readonly Pick<PackageAcceptedFactsV1["components"][number], "payload">[] }

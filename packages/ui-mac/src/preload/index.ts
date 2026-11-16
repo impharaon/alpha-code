@@ -294,6 +294,7 @@ const api: ElectronAPI = {
     hubView: (directory) => ipcRenderer.invoke("ext-hub-view", directory),
     hubRequest: (requestId) => ipcRenderer.invoke("ext-hub-request", requestId),
     sourcesSearch: (query) => ipcRenderer.invoke("ext-sources-search", query),
+    preparePluginSource: (input) => ipcRenderer.invoke("ext-prepare-plugin-source", input),
     installFromSource: (request) => ipcRenderer.invoke("ext-install-from-source", request),
     onHubViewChanged: (cb) => {
       const handler = () => cb()

@@ -133,3 +133,6 @@ r2 步骤 4 · **PARTIAL / 技能运行身份范围阻塞**（2026-11-16）：�
 - 步骤 3 已提交 `714aaabd53`；原三条 DOM 新回归、busy-force 和 bad-port 断言保持，唯一已提交断言修正仍只有 r2 裁定的 OAuth。其他新增额外文件/校准原因均已列表和上文。真实 Supabase 登录/GitHub token 由编排器后收，自动证据不冒充真实服务验收。没有推送、PR、merge、gate 或 bin/check。
 
 收口检查（r2，2026-11-16）：ui-mac `bun typecheck` exit 0；文档链接检查 exit 0（4 条）；`git diff --check` exit 0。r2 实际约 1 小时 40 分钟，生产累计 19 文件，未超原规模/工时。步骤 3 已完成；步骤 4 除上述双技能运行身份及其全部技能启停/移除库存对照外已留运行证据，本片整体仍为 PARTIAL。
+
+
+r3（2026-11-16）：编排器裁定 generation 身份冲突由本片的事务分配修复，core 保持冻结；沿现有八位十六进制后缀文法，在同事务以条目序号区分 generation 名称，无记录迁移。读取链只校验文法/指针/完整代号，未发现依赖共享后缀的 reader。新增真盘分配与全技能库存回归，既有 `real Supabase package exposes both enabled generation skills` 保持逐字不变。补红：ui-mac `bun test --max-concurrency 2 src/main/ext-transaction.test.ts -t 'skill generation names are distinct'` exit 1，0 pass / 2 fail（普通后缀及 ffffffff 边界均只有一个唯一代号）；`bun test --max-concurrency 2 ./src/main/package-hub-lifecycle.engine.cases.ts -t 'all package skills leave'` exit 1，0 pass / 1 fail（实际技能缺 supabase-postgres-best-practices）。继承原宿主亦 exit 1，原缺项重现。新用例复用真实包字节与既有事务内部夹具，先提交红证据再改分配；本轮仍按 `--max-concurrency 2` 运行相关检查。

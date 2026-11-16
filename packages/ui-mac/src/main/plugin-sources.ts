@@ -1,8 +1,9 @@
 import { createHash, randomUUID } from "node:crypto"
-import { posix } from "node:path"
+import { posix, join } from "node:path"
+import { readdir, lstat, readFile, readlink } from "node:fs/promises"
 import { gunzipSync } from "node:zlib"
 import { readMarketplace } from "../shared/host-extension-package-contract/plugin-conversion.mjs"
-import type { Capture, Json, MarketplaceEntry, TreeNode } from "../shared/host-extension-package-contract/plugin-conversion"
+import type { Capture, Json, MarketplaceEntry, Source, TreeNode } from "../shared/host-extension-package-contract/plugin-conversion"
 
 export type PluginSourceIdV1 = "catalog" | "claude-marketplace" | "codex-marketplace" | "opencode-npm" | "mcp-registry"
 export type SourceStatusV1 =
@@ -22,10 +23,12 @@ const MARKETPLACES = [
   { source: "codex-marketplace", ecosystem: "codex", repository: "https://github.com/openai/plugins", manifest: ".agents/plugins/marketplace.json" },
 ] as const
 const MCP_REGISTRY = "https://registry.modelcontextprotocol.io/v0.1/servers"
-type Archive = { commit: string; members: Map<string, { node: TreeNode; bytes?: Uint8Array }> }
+const NPM_REGISTRY = "https://registry.npmjs.org"
+type Archive = { commit?: string; members: Map<string, { node: TreeNode; bytes?: Uint8Array }> }
 type SourceCandidate = { candidate: CandidateV1 } & (
   | { kind: "marketplace"; entry: MarketplaceEntry; market: typeof MARKETPLACES[number] }
   | { kind: "mcp-registry"; serverName: string; version: string }
+  | { kind: "npm"; name: string; version: string }
 )
 
 /** One instance per main-process run; only this owner mints candidate IDs and retains fetched bytes. */
@@ -35,6 +38,7 @@ export function createPluginSources(deps: { catalog: () => Promise<readonly Cand
   const archives = new Map<string, Promise<Archive>>()
   const indexes = new Map<string, Promise<ReturnType<typeof readMarketplace>>>()
   const registryQueries = new Map<string, Promise<ReturnType<typeof registryRecord>[]>>()
+  const npmQueries = new Map<string, Promise<{ name: string; version: string; description: string }[]>>()
   const get = async (url: string) => {
     const response = await (deps.fetch ?? fetch)(url).catch(() => { throw new SourceError("network", "Source request failed") })
     if (!response.ok) throw new SourceError("http", "Source returned HTTP " + response.status)
@@ -54,7 +58,11 @@ export function createPluginSources(deps: { catalog: () => Promise<readonly Cand
     const known = archives.get(key)
     if (known) return known
     const pending = get("https://codeload.github.com/" + repository.slice("https://github.com/".length) + "/tar.gz/" + revision.split("/").map(encodeURIComponent).join("/"))
-      .then((bytes) => readCodeload(bytes))
+      .then((bytes) => {
+        const archive = readArchive(bytes)
+        if (!/^[a-f0-9]{40}$/.test(archive.commit ?? "")) throw new Error("Codeload has no fixed commit")
+        return archive
+      })
       .catch((error: unknown) => { archives.delete(key); throw error })
     archives.set(key, pending)
     return pending
@@ -81,12 +89,61 @@ export function createPluginSources(deps: { catalog: () => Promise<readonly Cand
     registryQueries.set(query, pending)
     return pending
   }
+  const loadNpm = (query: string) => {
+    const known = npmQueries.get(query)
+    if (known) return known
+    const pending = (async () => {
+      const records: { name: string; version: string; description: string }[] = []
+      let offset = 0
+      do {
+        const page = registryDocument(await get(NPM_REGISTRY + "/-/v1/search?text=" + encodeURIComponent(query + " keywords:opencode-plugin") + "&size=250&from=" + offset))
+        if (!Array.isArray(page.objects) || typeof page.total !== "number" || !Number.isSafeInteger(page.total) || page.total < 0) throw new SourceError("format", "npm search is not readable")
+        for (const item of page.objects) {
+          const pkg = isRecord(item) && isRecord(item.package) ? item.package : undefined
+          if (!pkg || typeof pkg.name !== "string" || typeof pkg.version !== "string") throw new SourceError("format", "npm package identity is invalid")
+          records.push({ name: pkg.name, version: pkg.version, description: typeof pkg.description === "string" ? pkg.description : "" })
+        }
+        offset += page.objects.length
+        if (offset >= page.total) break
+        if (!page.objects.length) throw new SourceError("format", "npm search pagination is incomplete")
+      } while (true)
+      return [...new Map(records.map((record) => [record.name + "@" + record.version, record])).values()]
+    })().catch((error: unknown) => { npmQueries.delete(query); throw error })
+    npmQueries.set(query, pending)
+    return pending
+  }
   return {
+    async captureFolder(directory: string): Promise<Capture> {
+      const members: Archive["members"] = new Map()
+      const visit = async (relative: string): Promise<void> => {
+        for (const name of (await readdir(join(directory, relative))).sort()) {
+          const path = relative ? relative + "/" + name : name
+          const stat = await lstat(join(directory, path))
+          if (stat.isSymbolicLink()) { members.set(path, { node: { kind: "symlink", path, target: await readlink(join(directory, path)) } }); continue }
+          if (stat.isDirectory()) { members.set(path, { node: { kind: "directory", path, mode: stat.mode & 0o7777 } }); await visit(path); continue }
+          if (!stat.isFile()) continue
+          const bytes = new Uint8Array(await readFile(join(directory, path)))
+          members.set(path, { node: { kind: "file", path, mode: stat.mode & 0o7777, bytes: bytes.length, digest: ("sha256:" + createHash("sha256").update(bytes).digest("hex")) as `sha256:${string}` }, bytes })
+        }
+      }
+      await visit("")
+      return treeCapture({ kind: "folder", locator: directory }, members)
+    },
+    async captureGit(repository: string, revision: string, path = ""): Promise<Capture> {
+      const canonical = githubRepository(repository)
+      if (!canonical) throw new SourceError("format", "Git source is not a supported repository")
+      if (path && !relativePath(path)) throw new SourceError("format", "Git source path is invalid")
+      const archive = await loadArchive(canonical, revision)
+      if (/^[a-f0-9]{40}$/.test(revision) && archive.commit !== revision) throw new SourceChanged()
+      const members = new Map([...archive.members].filter(([name]) => !path || name.startsWith(path + "/")).map(([name, member]) => [path ? name.slice(path.length + 1) : name, member]))
+      return treeCapture({ kind: "git", locator: canonical, repository: canonical, commit: archive.commit, pluginPath: path }, members)
+    },
     async searchSources(query: string): Promise<SourceSearchResultV1> {
-      const [catalog, results, registry] = await Promise.all([
+      const [catalog, results, registry, npm] = await Promise.all([
         Promise.allSettled([deps.catalog()]).then((results) => results[0]!),
         Promise.allSettled(MARKETPLACES.map(loadIndex)),
         Promise.allSettled([loadRegistry(query)]).then((results) => results[0]!),
+        Promise.allSettled([loadNpm(query)]).then((results) => results[0]!),
       ])
       const local = catalog.status === "fulfilled" ? rank(catalog.value, query) : []
       const source: SourceStatusV1 = catalog.status === "fulfilled"
@@ -126,7 +183,17 @@ export function createPluginSources(deps: { catalog: () => Promise<readonly Cand
       }) : []
       const failure = registry.status === "rejected" ? registry.reason instanceof SourceError ? registry.reason : new SourceError("network", "Registry is unavailable") : undefined
       const registryStatus: SourceStatusV1 = failure ? { source: "mcp-registry", status: "failed", reason: failure.reason, detail: failure.message } : { source: "mcp-registry", status: "ok", matched: found.length, skipped: 0 }
-      const groups = [{ status: source, candidates: local }, ...markets, { status: registryStatus, candidates: found }]
+      const npmFound = npm.status === "fulfilled" ? npm.value.filter((pkg) => relevance(pkg.name, pkg.name, pkg.description, query) > 0).map((pkg) => {
+        const identity = "npm:" + pkg.name + "@" + pkg.version
+        const known = candidates.get(identity)
+        if (known) return known.candidate
+        const candidate: CandidateV1 = { id: "cand_" + randomUUID(), source: "opencode-npm", name: pkg.name, displayName: pkg.name, description: pkg.description, kind: "plugin", upstream: { npm: pkg.name, version: pkg.version } }
+        candidates.set(identity, { kind: "npm", candidate, name: pkg.name, version: pkg.version })
+        return candidate
+      }) : []
+      const npmFailure = npm.status === "rejected" ? npm.reason instanceof SourceError ? npm.reason : new SourceError("network", "npm is unavailable") : undefined
+      const npmStatus: SourceStatusV1 = npmFailure ? { source: "opencode-npm", status: "failed", reason: npmFailure.reason, detail: npmFailure.message } : { source: "opencode-npm", status: "ok", matched: npmFound.length, skipped: 0 }
+      const groups = [{ status: source, candidates: local }, ...markets, { status: registryStatus, candidates: found }, { status: npmStatus, candidates: rank(npmFound, query) }]
         .toSorted((left, right) => PLUGIN_SOURCE_ORDER.indexOf(left.status.source) - PLUGIN_SOURCE_ORDER.indexOf(right.status.source))
       return { searchId: "search_" + randomUUID(), query, sources: groups.map((group) => group.status), candidates: groups.flatMap((group) => group.candidates) }
     },
@@ -136,6 +203,17 @@ export function createPluginSources(deps: { catalog: () => Promise<readonly Cand
       try {
         const known = captures.get(candidateId)
         const pending = known ?? (async () => {
+          if (selected.kind === "npm") {
+            const metadata = registryDocument(await get(NPM_REGISTRY + "/" + encodeURIComponent(selected.name) + "/" + encodeURIComponent(selected.version)))
+            if (metadata.name !== selected.name || metadata.version !== selected.version) throw new SourceChanged()
+            if (!isRecord(metadata.dist) || typeof metadata.dist.tarball !== "string" || typeof metadata.dist.integrity !== "string") throw new SourceError("format", "npm distribution metadata is missing")
+            const bytes = await get(metadata.dist.tarball)
+            const integrity = metadata.dist.integrity.split(/\s+/).find((value) => /^(sha512|sha384|sha256|sha1)-/.test(value))
+            if (!integrity) throw new SourceError("format", "npm integrity is not readable")
+            const separator = integrity.indexOf("-")
+            if (createHash(integrity.slice(0, separator)).update(bytes).digest("base64") !== integrity.slice(separator + 1)) throw new SourceError("format", "npm integrity does not match")
+            return treeCapture({ kind: "npm", locator: selected.name, ecosystem: "opencode", entryName: selected.name, version: selected.version, integrity: metadata.dist.integrity }, readArchive(bytes).members)
+          }
           if (selected.kind === "mcp-registry") {
             const locator = MCP_REGISTRY + "/" + encodeURIComponent(selected.serverName) + "/versions/" + encodeURIComponent(selected.version)
             const record = registryRecord(registryDocument(await get(locator)))
@@ -164,22 +242,7 @@ export function createPluginSources(deps: { catalog: () => Promise<readonly Cand
           const members = [...archive.members].filter(([name]) => name.startsWith(prefix) && name !== path)
           if (!members.length) throw new SourceChanged()
           const relative = new Map(members.map(([name, member]) => [name.slice(prefix.length), member]))
-          const capture: Capture = {
-            source: { kind: "marketplace", locator: repository, repository, commit: archive.commit, pluginPath: path, ecosystem: selected.market.ecosystem, entryName: selected.entry.name },
-            nodes: [...relative].map(([name, member]) => ({ ...member.node, path: name })),
-            readFile: async (name) => {
-              const visited = new Set<string>()
-              const read = (name: string): Uint8Array => {
-                if (visited.has(name)) throw new Error("Captured link cycle")
-                visited.add(name)
-                const member = relative.get(name)
-                if (member?.bytes) return member.bytes
-                if (member?.node.kind === "symlink") return read(posix.normalize(posix.join(posix.dirname(name), member.node.target)))
-                throw new Error("Captured file is missing")
-              }
-              return read(name)
-            },
-          }
+          const capture = treeCapture({ kind: "marketplace", locator: repository, repository, commit: archive.commit, pluginPath: path, ecosystem: selected.market.ecosystem, entryName: selected.entry.name }, relative)
           selected.candidate.upstream.commit = archive.commit
           return capture
         })()
@@ -197,6 +260,21 @@ class SourceError extends Error {
   constructor(readonly reason: "network" | "http" | "format", message: string) { super(message) }
 }
 class SourceChanged extends Error {}
+
+function treeCapture(source: Source, members: Archive["members"]): Capture {
+  return { source, nodes: [...members].map(([path, member]) => ({ ...member.node, path })), readFile: async (path) => {
+    const visited = new Set<string>()
+    const read = (name: string): Uint8Array => {
+      if (visited.has(name)) throw new Error("Captured link cycle")
+      visited.add(name)
+      const member = members.get(name)
+      if (member?.bytes) return member.bytes
+      if (member?.node.kind === "symlink") return read(posix.normalize(posix.join(posix.dirname(name), member.node.target)))
+      throw new Error("Captured file is missing")
+    }
+    return read(path)
+  } }
+}
 
 function registryDocument(bytes: Uint8Array): Record<string, Json> {
   try {
@@ -240,7 +318,7 @@ function githubRepository(value: string): string | undefined {
 }
 
 /** GitHub codeload's ustar/PAX container, parsed without materializing any path or executing source content. */
-function readCodeload(compressed: Uint8Array): Archive {
+function readArchive(compressed: Uint8Array): Archive {
   const bytes = gunzipSync(compressed)
   const members: Archive["members"] = new Map()
   let global: Record<string, string> = {}
@@ -281,8 +359,7 @@ function readCodeload(compressed: Uint8Array): Archive {
     if (type !== "0" && type !== "") throw new Error("Unsupported tar member")
     members.set(name, { node: { kind: "file", path: name, mode, bytes: data.length, digest: ("sha256:" + createHash("sha256").update(data).digest("hex")) as `sha256:${string}` }, bytes: data })
   }
-  if (!/^[a-f0-9]{40}$/.test(global.comment ?? "")) throw new Error("Codeload has no fixed commit")
-  return { commit: global.comment!, members }
+  return { commit: global.comment, members }
 }
 function text(bytes: Uint8Array): string { return new TextDecoder("utf-8", { fatal: true }).decode(bytes).split("\0", 1)[0]! }
 function octal(bytes: Uint8Array): number {

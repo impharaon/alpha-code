@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto"
+import { parse, type ParseError } from "jsonc-parser/lib/esm/main.js"
 import { ConfigMarkdown } from "@opencode/core/config/markdown"
 
 export type Sha256 = `sha256:${string}`
@@ -49,7 +50,7 @@ export type Entry = EntryBase & (
   | { kind: "mcp"; transport: "http" | "sse"; url: Text; headers: Record<string, Text>; timeoutMs?: number; oauth?: false | LoginNeed }
   | { kind: "hook"; hook: Hook }
 )
-export type Diagnostic = { path: RelPath; field?: string; code: "invalid-definition" | "missing-entry" | "unresolved-app-id"; message: string }
+export type Diagnostic = { path: RelPath; field?: string; code: "invalid-definition" | "missing-entry" | "unresolved-app-id" | "native-js-plugin"; sourceName?: string; message: string }
 export type PluginPackage = {
   schema: "codepuppy.plugin-package.v1"; provider: Provider; name: string; version?: string; description?: string
   source: Source; tree: TreeNode[]; treeDigest: Sha256; entries: Entry[]; secrets: SecretNeed[]; diagnostics: Diagnostic[]
@@ -100,13 +101,14 @@ export async function convertPluginTree(input: Capture): Promise<{ package: Plug
     if (known) return known
     const bytes = files.get(path)
     if (!bytes) { diagnostics.push({ path, code: "missing-entry", message: "Declared file is missing" }); return }
-    const parsed = parseJson(bytes)
+    const parsed = parseJson(bytes, path.endsWith(".jsonc"))
     if (!object(parsed)) { diagnostics.push({ path, code: "invalid-definition", message: "Definition is not a JSON object" }); return }
     documents.set(path, parsed)
     return parsed
   }
-  const codex = input.source.ecosystem === "codex" || files.has(".codex-plugin/plugin.json") || (!files.has(".claude-plugin/plugin.json") && files.has("plugin.json"))
-  const manifestPath = codex ? files.has(".codex-plugin/plugin.json") ? ".codex-plugin/plugin.json" : "plugin.json" : ".claude-plugin/plugin.json"
+  const opencode = input.source.ecosystem === "opencode" || (input.source.ecosystem === undefined && [...files.keys()].some((path) => /^(?:\.opencode\/|opencode\.jsonc?$)/.test(path)))
+  const codex = !opencode && (input.source.ecosystem === "codex" || files.has(".codex-plugin/plugin.json") || (!files.has(".claude-plugin/plugin.json") && files.has("plugin.json")))
+  const manifestPath = opencode ? "package.json" : codex ? files.has(".codex-plugin/plugin.json") ? ".codex-plugin/plugin.json" : "plugin.json" : ".claude-plugin/plugin.json"
   const manifest = files.has(manifestPath) ? json(manifestPath) : undefined
   if (codex && files.has(".app.json")) {
     const apps = json(".app.json")
@@ -115,7 +117,7 @@ export async function convertPluginTree(input: Capture): Promise<{ package: Plug
     }
   }
   const entries: Entry[] = []
-  const roots = ["skills", ...declaredPaths(manifest?.skills, manifestPath, "skills", diagnostics)]
+  const roots = opencode ? ["skills", "skill", ".opencode/skills", ".opencode/skill"] : ["skills", ...declaredPaths(manifest?.skills, manifestPath, "skills", diagnostics)]
   const skillFiles = [...files.keys()].filter((path) => path === "SKILL.md" || roots.some((root) => path.startsWith(root + "/") && path.endsWith("/SKILL.md")))
   for (const path of skillFiles) {
     const instruction = decode(files.get(path)!)
@@ -142,6 +144,32 @@ export async function convertPluginTree(input: Capture): Promise<{ package: Plug
     const definition = json(path)
     if (definition) addServers(path, definition, "")
   }
+  if (opencode) {
+    for (const path of ["opencode.json", "opencode.jsonc", ".opencode/opencode.json", ".opencode/opencode.jsonc"]) {
+      if (!files.has(path)) continue
+      const config = json(path)
+      if (object(config?.mcp)) for (const [name, value] of Object.entries(config.mcp)) definitions.push({ name, path, pointer: "/mcp/" + escapePointer(name), value })
+    }
+    const modules = new Map([...files.keys()].filter((path) => /^(?:\.opencode\/)?plugins?\/.+\.(?:js|mjs|cjs|ts)$/.test(path)).map((path) => [path, path.split("/").at(-1)!.replace(/\.[^.]+$/, "")]))
+    const exports = object(manifest?.exports) ? manifest.exports["."] : undefined
+    const declared = [manifest?.main, ...(object(exports) ? [exports.import, exports.default] : [exports])]
+    for (const entry of declared) {
+      if (typeof entry !== "string") continue
+      const path = entry.replace(/^\.\//, "")
+      if (!validPath(path)) { diagnostics.push({ path: "package.json", code: "invalid-definition", message: "Native module entry is not a relative tree path" }); continue }
+      if (!files.has(path)) { diagnostics.push({ path, code: "missing-entry", message: "Native module entry is missing" }); continue }
+      modules.set(path, string(manifest?.name) ?? path.split("/").at(-1)!.replace(/\.[^.]+$/, ""))
+    }
+    for (const [path, sourceName] of modules) diagnostics.push({ code: "native-js-plugin", path, sourceName, message: "Code Puppy does not run third-party native plugin code" })
+    for (const [path, bytes] of files) {
+      const match = path.match(/^(?:\.opencode\/)?(agent|command)\/(.+)\.md$/)
+      if (!match) continue
+      const instruction = decode(bytes)
+      const parsed = ConfigMarkdown.parseOption(instruction)
+      if (!parsed) { diagnostics.push({ path, code: "invalid-definition", message: "Markdown definition is invalid" }); continue }
+      entries.push({ kind: match[1] === "agent" ? "agent" : "command", id: match[1] + ":" + path, sourcePath: path, sourceName: match[2]!, instruction: bindings(instruction), invocation: invocation(parsed.data) })
+    }
+  }
   const unique = [...new Map(definitions.map((definition) => [definition.path + "#" + definition.pointer, definition])).values()]
   const winners = new Map(unique.map((definition) => [definition.name, definition]))
   const needs = new Map<string, SecretNeed>()
@@ -165,9 +193,9 @@ export async function convertPluginTree(input: Capture): Promise<{ package: Plug
   })
   return {
     package: {
-      schema: "codepuppy.plugin-package.v1", provider: codex ? "codex" : !manifest && files.has("SKILL.md") ? "skill" : "claude-code",
+      schema: "codepuppy.plugin-package.v1", provider: opencode ? "opencode" : codex ? "codex" : !manifest && files.has("SKILL.md") ? "skill" : "claude-code",
       name: string(manifest?.name) ?? input.source.entryName ?? entries.find((entry) => entry.kind === "skill")?.sourceName ?? input.source.pluginPath?.split("/").at(-1) ?? "plugin",
-      ...(typeof manifest?.version === "string" ? { version: manifest.version } : {}), ...(typeof manifest?.description === "string" ? { description: manifest.description } : {}),
+      ...(typeof (manifest?.version ?? input.source.version) === "string" ? { version: String(manifest?.version ?? input.source.version) } : {}), ...(typeof manifest?.description === "string" ? { description: manifest.description } : {}),
       source: input.source, tree, treeDigest: sha256(new TextEncoder().encode(canonical(tree.toSorted((a, b) => a.path.localeCompare(b.path))))), entries, secrets: [...needs.values()], diagnostics,
     },
     replacements, privateCredentials: credentials,
@@ -263,21 +291,23 @@ function mcpEntry(definition: { name: string; path: string; pointer: string; val
   const value = definition.value
   if (!object(value)) return
   const base = { kind: "mcp" as const, id, sourcePath: definition.path, sourceName: definition.name, ...(typeof value.timeout === "number" && value.timeout > 0 ? { timeoutMs: value.timeout } : {}) }
-  if (typeof value.command === "string" && value.command && (value.type === undefined || value.type === "stdio")) {
+  if ((value.type === "local" && Array.isArray(value.command)) || (typeof value.command === "string" && value.command && (value.type === undefined || value.type === "stdio"))) {
+    if (Array.isArray(value.command) && (!value.command.length || !value.command.every((arg) => typeof arg === "string"))) return
     if (value.args !== undefined && (!Array.isArray(value.args) || !value.args.every((arg) => typeof arg === "string"))) return
-    if (value.env !== undefined && !stringMap(value.env)) return
+    const environment = value.type === "local" ? value.environment : value.env
+    if (environment !== undefined && !stringMap(environment)) return
     if (value.cwd !== undefined && typeof value.cwd !== "string") return
-    const command = [value.command, ...strings(value.args)]
-    const commandIndex = ["npx", "uvx"].includes(value.command) ? command.findIndex((arg, index) => index > 0 && !arg.startsWith("-")) : -1
+    const command = Array.isArray(value.command) ? strings(value.command) : [String(value.command), ...strings(value.args)]
+    const commandIndex = ["npx", "uvx"].includes(command[0]!) ? command.findIndex((arg, index) => index > 0 && !arg.startsWith("-")) : -1
     const token = command[commandIndex]
     return {
       ...base, transport: "stdio", command: command.map((part) => bindings(part)),
-      environment: Object.fromEntries(Object.entries(stringMap(value.env) ? value.env : {}).map(([key, part]) => [key, text(part, definition.pointer + "/env/" + escapePointer(key), /token|secret|password|api[_-]?key/i.test(key))])),
+      environment: Object.fromEntries(Object.entries(stringMap(environment) ? environment : {}).map(([key, part]) => [key, text(part, definition.pointer + (value.type === "local" ? "/environment/" : "/env/") + escapePointer(key), /token|secret|password|api[_-]?key/i.test(key))])),
       ...(typeof value.cwd === "string" ? { cwd: bindings(value.cwd) } : {}),
       ...(token && !/@\d/.test(token) ? { floatingVersion: { commandIndex, token } } : {}),
     }
   }
-  if (typeof value.url !== "string" || !value.url || (value.type !== undefined && value.type !== "http" && value.type !== "sse")) return
+  if (typeof value.url !== "string" || !value.url || (value.type !== undefined && value.type !== "http" && value.type !== "sse" && value.type !== "remote")) return
   if (value.headers !== undefined && !stringMap(value.headers)) return
   const headers = Object.fromEntries(Object.entries(stringMap(value.headers) ? value.headers : {}).map(([key, part]) => [key, text(part, definition.pointer + "/headers/" + escapePointer(key), /authorization|token|secret|api[_-]?key|cookie/i.test(key))]))
   const oauth = object(value.oauth) ? value.oauth : undefined
@@ -286,7 +316,7 @@ function mcpEntry(definition: { name: string; path: string; pointer: string; val
     ...(oauth || typeof value.oauth_resource === "string" ? { oauth: {
       ...(typeof (oauth?.clientId ?? oauth?.client_id) === "string" ? { clientId: String(oauth?.clientId ?? oauth?.client_id) } : {}),
       ...(typeof (oauth?.clientSecret ?? oauth?.client_secret) === "string" ? { clientSecret: text(String(oauth?.clientSecret ?? oauth?.client_secret), definition.pointer + (typeof oauth?.clientSecret === "string" ? "/oauth/clientSecret" : "/oauth/client_secret"), true) } : {}),
-      ...(Array.isArray(oauth?.scopes ?? value.scopes) ? { scopes: strings(oauth?.scopes ?? value.scopes) } : {}),
+      ...(typeof oauth?.scope === "string" || Array.isArray(oauth?.scopes ?? value.scopes) ? { scopes: strings(oauth?.scope ?? oauth?.scopes ?? value.scopes) } : {}),
       ...(typeof (oauth?.resource ?? value.oauth_resource) === "string" ? { resource: String(oauth?.resource ?? value.oauth_resource) } : {}),
       ...(typeof oauth?.authorizationServerUrl === "string" ? { authorizationServerUrl: oauth.authorizationServerUrl } : {}),
     } } : {}),
@@ -313,8 +343,8 @@ function credentialText(value: string, context: CredentialContext): Text {
   const need = (label: string, literal?: string) => credentialNeed(label, context, literal)
   const pieces: Text[number][] = []
   let offset = 0
-  for (const match of value.matchAll(/\$\{([A-Za-z_][\w]*)(?::-[^}]*)?\}|\$([A-Za-z_][\w]*)|\{([A-Za-z_][\w]*)\}|<([A-Za-z_][\w]*)>/g)) {
-    const label = match[1] ?? match[2] ?? match[3] ?? match[4]!
+  for (const match of value.matchAll(/\$\{([A-Za-z_][\w]*)(?::-[^}]*)?\}|\$([A-Za-z_][\w]*)|\{([A-Za-z_][\w]*)\}|<([A-Za-z_][\w]*)>|\{env:([A-Za-z_][\w]*)\}/g)) {
+    const label = match[1] ?? match[2] ?? match[3] ?? match[4] ?? match[5]!
     if (bindingName(label) || ["PATH", "HOME", "USER", "TMPDIR"].includes(label)) continue
     if (match.index > offset) pieces.push(...bindings(value.slice(offset, match.index)))
     pieces.push({ secret: need(label) })
@@ -367,7 +397,14 @@ function object(value: unknown): value is Record<string, unknown> { return typeo
 function string(value: unknown): string | undefined { return typeof value === "string" ? value : undefined }
 function stringMap(value: unknown): value is Record<string, string> { return object(value) && Object.values(value).every((part) => typeof part === "string") }
 function decode(bytes: Uint8Array): string { return new TextDecoder("utf-8", { fatal: true }).decode(bytes).replace(/^\uFEFF/, "") }
-function parseJson(bytes: Uint8Array): unknown { try { return JSON.parse(decode(bytes)) } catch { return undefined } }
+function parseJson(bytes: Uint8Array, jsonc = false): unknown {
+  try {
+    if (!jsonc) return JSON.parse(decode(bytes))
+    const errors: ParseError[] = []
+    const value: unknown = parse(decode(bytes), errors, { allowTrailingComma: true })
+    return errors.length ? undefined : value
+  } catch { return undefined }
+}
 function jsonRecord(value: Record<string, unknown>): Record<string, Json> { return JSON.parse(JSON.stringify(value)) as Record<string, Json> }
 function sha256(bytes: Uint8Array): Sha256 { return ("sha256:" + createHash("sha256").update(bytes).digest("hex")) as Sha256 }
 function canonical(value: unknown): string { return JSON.stringify(value, (_key, item: unknown) => object(item) ? Object.fromEntries(Object.keys(item).sort().map((key) => [key, item[key]])) : item) }

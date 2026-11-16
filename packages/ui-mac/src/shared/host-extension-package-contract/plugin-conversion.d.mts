@@ -145,7 +145,8 @@ export type Entry = EntryBase & ({
 export type Diagnostic = {
     path: RelPath;
     field?: string;
-    code: "invalid-definition" | "missing-entry" | "unresolved-app-id";
+    code: "invalid-definition" | "missing-entry" | "unresolved-app-id" | "native-js-plugin";
+    sourceName?: string;
     message: string;
 };
 export type PluginPackage = {

@@ -505,7 +505,7 @@ describe("package installability production wiring", () => {
     expect(detail.components).toHaveLength(envelope.components.length)
   })
 
-  test("the real bundled Catalog ships exactly one package instance, and it passes the production shape gate", () => {
+  test("the real bundled Catalog pins every package identity and passes the production shape gate", () => {
     // ac#1132:快照 2026-08-25.2 起,内置 catalog 第一次携带真实 package。此前这条闸的陈述是
     // 「真 catalog 无 package;上面的构造件只是可达性外骨骼」—— 前提翻转,改的是前提陈述而非
     // 放宽断言:现在断**真实随包字节**过生产形状闸并精确点名身份集合。快照重生成若产出形状
@@ -518,7 +518,9 @@ describe("package installability production wiring", () => {
       "package:cloud-image@1.0.0",
       "package:codepuppy-first@1.0.1",
       "package:dbhub-readonly@1.0.0",
+      "package:github@1.0.1",
       "package:github-official@1.0.0",
+      "package:supabase@1.0.0",
     ])
     expect((bundledCatalog as { entries: unknown[] }).entries.length).toBeGreaterThan(0)
   })

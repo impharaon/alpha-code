@@ -1,0 +1,347 @@
+// Real desktop main IPC, ext scheduler and engine in an isolated HOME/XDG/database.
+// Package bytes: hub-package.fixture (unmodified alpha-web 0bb739ce). MCP transport:
+// core/test/fixture/mcp-echo.ts, not a claimed GitHub/Supabase service acceptance.
+import { afterAll, beforeAll, expect, mock, test } from "bun:test"
+import { readFileSync } from "node:fs"
+import { join } from "node:path"
+import { engineSandbox, assertEngineSandboxed } from "../../test-component/engine-sandbox"
+import { hubPackageFixture } from "../../test-component/hub-package.fixture"
+import type { Running } from "../../test-component/codepuppy-engine"
+import type { PackageAuthorizationResultV1 } from "../shared/package-admission"
+
+const sandbox = engineSandbox()
+const sample = hubPackageFixture()
+const nativeFetch = globalThis.fetch
+const previousCwd = process.cwd()
+const TOKEN = "invalid-local-fixture-token-r2"
+const NEXT_TOKEN = "invalid-local-fixture-token-r2-replacement"
+const handlers = new Map<string, (event: unknown, ...args: unknown[]) => unknown>()
+const listeners = new Set<(event: { data: unknown }) => void>()
+const consoleLines: unknown[] = []
+const consoleOriginal = { log: console.log, warn: console.warn, error: console.error }
+for (const method of ["log", "warn", "error"] as const)
+  console[method] = (...args: unknown[]) => {
+    consoleLines.push(args)
+  }
+let running: Running | undefined
+let model: Awaited<ReturnType<(typeof import("../../test-component/codepuppy-engine"))["scriptedModel"]>>
+let host: Awaited<ReturnType<(typeof import("../../test-component/codepuppy-engine"))["codepuppyEngine"]>>
+let main: ReturnType<(typeof import("./ext-ipc"))["registerExtIpcHandlers"]>
+let refreshes = 0
+let toolCalls = 0
+let runtimeInitializes = 0
+let root = ""
+let initialPolicy = ""
+let echo: ReturnType<(typeof import("../../../core/test/fixture/mcp-echo"))["echoMcpHandler"]>
+const invoke = async (channel: string, ...args: unknown[]) => {
+  const handler = handlers.get(channel)
+  if (!handler) throw new Error(`missing desktop IPC ${channel}`)
+  return handler({ sender: { id: 1, on() {}, once() {} } }, ...args)
+}
+async function until(check: () => Promise<boolean> | boolean, label: string) {
+  for (const deadline = Date.now() + 15_000; ; await Bun.sleep(25)) {
+    try {
+      if (await check()) return
+    } catch {
+      /* A connector refresh replaces the engine. */
+    }
+    if (Date.now() >= deadline) throw new Error(`did not settle: ${label}`)
+  }
+}
+const send = (method: string, route: string, body?: unknown) => running!.send(method, route, body)
+const mcpStatus = async (name: string) =>
+  ((await send("GET", "/api/mcp")).json.data as Array<{ name: string; status: { status: string } }>).find(
+    (entry) => entry.name === name,
+  )?.status.status
+async function action(channel: string, ...args: unknown[]) {
+  const before = refreshes
+  expect(await invoke(channel, ...args)).toMatchObject({ ok: true })
+  await until(() => refreshes > before, channel)
+}
+
+beforeAll(async () => {
+  await assertEngineSandboxed(sandbox)
+  await sample.verify()
+  const { echoMcpHandler } = await import("../../../core/test/fixture/mcp-echo")
+  echo = echoMcpHandler()
+  const bytes = new Map<string, Uint8Array>()
+  const urls: string[] = []
+  for (const component of sample.packages.flatMap((entry) => entry.components)) {
+    const payload = await sample.fetchBytes(component.payloadRef)
+    bytes.set(component.payloadRef.url, payload)
+    const decoded = JSON.parse(new TextDecoder().decode(payload)) as {
+      behavior: { url?: string; files?: Array<{ url: string; bytes: number; sha256: string }> }
+    }
+    if (decoded.behavior.url) urls.push(decoded.behavior.url)
+    for (const ref of decoded.behavior.files ?? []) bytes.set(ref.url, await sample.fetchBytes(ref))
+  }
+  globalThis.fetch = (async (input, init) => {
+    const request = new Request(input, init)
+    const payload = bytes.get(request.url)
+    if (payload) return new Response(payload)
+    if (urls.some((url) => new URL(url).origin === new URL(request.url).origin)) {
+      if (!request.url.includes("githubcopilot"))
+        return new Response(null, { status: 401, headers: { "www-authenticate": "Bearer" } })
+      if (![TOKEN, NEXT_TOKEN].some((value) => request.headers.get("authorization") === `Bearer ${value}`))
+        return new Response(null, { status: 401, headers: { "www-authenticate": "Bearer" } })
+      if (request.method === "POST") {
+        const body = (await request.clone().json()) as { method?: string }
+        if (body.method === "initialize") runtimeInitializes++
+        if (body.method === "tools/call") toolCalls++
+      }
+      return echo.fetch(request)
+    }
+    const url = new URL(request.url)
+    if (url.hostname === "127.0.0.1" || url.hostname === "localhost") return nativeFetch(request)
+    throw new Error(`unrecorded outbound request to ${url.origin}`)
+  }) as typeof fetch
+  mock.module("electron", () => ({
+    ipcMain: {
+      handle: (channel: string, handler: (event: unknown, ...args: unknown[]) => unknown) =>
+        handlers.set(channel, handler),
+    },
+    BrowserWindow: class {
+      static fromWebContents() {
+        return undefined
+      }
+    },
+    dialog: {
+      showMessageBox: async () => ({ response: 1 }),
+      showOpenDialog: async () => ({ canceled: true, filePaths: [] }),
+    },
+  }))
+  mock.module("./logging", () => ({ getLogger: () => ({ log() {}, warn() {}, error() {} }) }))
+  mock.module("./ipc", () => ({
+    pickedFiles: {
+      read: async () => {
+        throw new Error("file picker is outside this runtime proof")
+      },
+    },
+  }))
+  const advisory = await import("./ext-advisory-gate")
+  mock.module("./ext-advisory-gate", () => ({ ...advisory, makeAdvisoryGate: () => () => ({ allowed: true }) }))
+  const remote = await import("./remote-catalog")
+  const evaluate = remote.evaluateRemoteCatalogPackages
+  mock.module("./remote-catalog", () => ({
+    ...remote,
+    readCachedCatalog: () => null,
+    refreshRemoteCatalog: async () =>
+      evaluate({
+        source: "remote",
+        catalog: sample.catalog,
+        version: "hub-real",
+        fetchedAt: "2026-11-16T00:00:00.000Z",
+        via: "channel-dev",
+        channel: "dev",
+        snapshotDigest: "a".repeat(64),
+      }),
+  }))
+  const processPort = process as unknown as { parentPort: unknown }
+  processPort.parentPort = {
+    on: (_event: string, listener: (event: { data: unknown }) => void) => listeners.add(listener),
+    off: (_event: string, listener: (event: { data: unknown }) => void) => listeners.delete(listener),
+    postMessage: (message: Parameters<typeof main.codepuppySidecar.receive>[0]) =>
+      main?.codepuppySidecar.receive(message, () => {}),
+  }
+  const { codepuppyEngine, scriptedModel } = await import("../../test-component/codepuppy-engine")
+  model = scriptedModel()
+  host = codepuppyEngine({ sandbox, name: "hub-lifecycle", modelBaseURL: model.baseURL })
+  process.chdir(host.projectDirectory)
+  const { codepuppyBootstrap } = await import("@opencode/util/codepuppy-bootstrap")
+  root = codepuppyBootstrap().paths.globalRoot
+  const { initCodePuppyEnvironment, environmentFromMutableRoot } = await import("./codepuppy-environment")
+  delete process.env.CODEPUPPY_GLOBAL_DIR
+  initCodePuppyEnvironment({
+    isPackaged: false,
+    channel: "dev",
+    appDataDir: sandbox.root,
+    baseRoot: environmentFromMutableRoot(root)!.casBaseRoot,
+    homeDir: sandbox.home,
+  })
+  const { injectCodePuppyConfig } = await import("./codepuppy-config-injection")
+  const { publishInProcessEngine } = await import("./in-process-engine")
+  publishInProcessEngine((request) => running!.fetch(request))
+  const { registerExtIpcHandlers } = await import("./ext-ipc")
+  main = registerExtIpcHandlers(
+    host.userData,
+    "dev",
+    async () => ({ url: running!.url, username: "opencode", password: "cp-hub-lifecycle" }),
+    sandbox.home,
+    {
+      stop: async () => {
+        await running?.close()
+      },
+      refresh: async () => {
+        await running?.close()
+        const injection = injectCodePuppyConfig(
+          host.userData,
+          join(sandbox.root, "hub-lifecycle-ext"),
+          "stable",
+          codepuppyBootstrap().paths.userConfig ?? null,
+        )
+        const next = JSON.parse(injection.config.content) as typeof host.content
+        next.providers.codepuppy!.models = host.content.providers.codepuppy!.models
+        next.plugins = [...next.plugins, ...host.content.plugins.filter((entry) => entry.endsWith("-probe"))]
+        Object.assign(host.content, next)
+        running = await host.start()
+        refreshes++
+        return true
+      },
+    },
+    async () => undefined,
+  )
+  main.codepuppySidecar.attach((message) => {
+    for (const listener of listeners) listener({ data: message })
+  })
+  await main.ledgerReady
+  running = await host.start()
+  const { policyStore } = await import("../../test-component/codepuppy-engine")
+  initialPolicy = JSON.stringify((await (await policyStore()).snapshot()).user)
+}, 60_000)
+
+afterAll(async () => {
+  await running?.close()
+  model?.stop()
+  await echo?.close()
+  globalThis.fetch = nativeFetch
+  process.chdir(previousCwd)
+  Object.assign(console, consoleOriginal)
+})
+
+async function askedTurn() {
+  const created = await send("POST", "/api/session", {
+    location: { directory: host.projectDirectory },
+    agent: "codepuppy-ask",
+    model: { id: "m", providerID: "codepuppy" },
+  })
+  expect(created.status).toBe(200)
+  const sessionID = created.json.data.id as string
+  expect(
+    (
+      await send("POST", `/api/session/${sessionID}/prompt`, {
+        text: `CP-CALL ${JSON.stringify({ name: "execute", args: { code: "return await tools.github.echo({})" } })}`,
+      })
+    ).status,
+  ).toBe(200)
+  let requestID = ""
+  await until(async () => {
+    const pending = (await send("GET", `/api/session/${sessionID}/permission`)).json?.data as Array<{
+      id: string
+      action: string
+    }>
+    requestID = pending?.[0]?.id ?? ""
+    if (requestID) expect(pending[0]!.action).toBe("mcp:github:echo")
+    return !!requestID
+  }, "real Session tool approval")
+  return { sessionID, requestID }
+}
+
+test("real Supabase package exposes both enabled generation skills", async () => {
+  await action("ext-install-package", "package:supabase")
+  await until(
+    async () =>
+      (await send("GET", "/api/plugin")).json.data.some(
+        (plugin: { id: string; state: { status: string } }) =>
+          plugin.id === "opencode.config.skill" && plugin.state.status === "active",
+      ),
+    "skill configuration readiness",
+  )
+  const { readPackageLedgerStateV1 } = await import("./ext-receipt-v2")
+  const installed = readPackageLedgerStateV1(root)
+  expect(
+    installed.ok &&
+      installed.records
+        .filter((record) => record.kind === "skill")
+        .map((record) => ({ name: record.name, state: record.desiredState }))
+        .sort((a, b) => a.name.localeCompare(b.name)),
+  ).toEqual([
+    { name: "supabase", state: "enabled" },
+    { name: "supabase-postgres-best-practices", state: "enabled" },
+  ])
+  const skills = (await send("GET", "/api/skill")).json.data as Array<{ id: string; name: string; content: string }>
+  expect(
+    skills
+      .filter((skill) => ["supabase", "supabase-postgres-best-practices"].includes(skill.name))
+      .map((skill) => skill.name)
+      .sort(),
+  ).toEqual(["supabase", "supabase-postgres-best-practices"])
+})
+
+test("real desktop package lifecycle asks twice, applies a busy switch, and removes runtime entries", async () => {
+  const { readPackageLedgerStateV1 } = await import("./ext-receipt-v2")
+  const { policyStore, probe } = await import("../../test-component/codepuppy-engine")
+  const githubTools = async () =>
+    (await probe().ctx.tool.list()).filter(
+      (tool: { options?: { namespace?: string } }) => tool.options?.namespace === "github",
+    )
+  const policyBefore = initialPolicy
+  const ledgerBefore = readPackageLedgerStateV1(root)
+  if (!ledgerBefore.ok || !ledgerBefore.packageGraphs.some((graph) => graph.packageId === "package:supabase"))
+    await action("ext-install-package", "package:supabase")
+  const skills = (await send("GET", "/api/skill")).json.data as Array<{ name: string; content: string }>
+  expect(skills.find((skill) => skill.name === "supabase")!.content.length).toBeGreaterThan(20)
+  expect(await mcpStatus("supabase")).not.toBe("connected")
+  await action("ext-install-package", "package:github")
+  const authorization = (await invoke("ext-package-authorization", "package:github")) as PackageAuthorizationResultV1
+  expect(authorization).toMatchObject({ ok: true, items: [{ kind: "secret", saved: false }] })
+  if (!authorization.ok) throw new Error("package authorization is unavailable")
+  const prerequisiteId = authorization.items[0]!.prerequisiteId
+  await action("ext-save-package-secrets", { packageId: "package:github", secrets: { [prerequisiteId]: TOKEN } })
+  await until(async () => (await mcpStatus("github")) === "connected", "GitHub fixture connection")
+  expect(runtimeInitializes).toBeGreaterThan(0)
+  await until(async () => (await githubTools()).length === 1, "connected tool registry")
+  expect(await githubTools()).toHaveLength(1)
+  for (const count of [1, 2]) {
+    const { sessionID, requestID } = await askedTurn()
+    expect(toolCalls).toBe(count - 1)
+    expect(
+      (await send("POST", `/api/session/${sessionID}/permission/${requestID}/reply`, { decision: "once" })).status,
+    ).toBe(204)
+    expect((await send("POST", `/api/experimental/session/${sessionID}/wait`)).status).toBe(204)
+    expect(toolCalls).toBe(count)
+  }
+  expect(JSON.stringify((await (await policyStore()).snapshot()).user)).toBe(policyBefore)
+  await action("ext-set-package-state", { packageId: "package:github", state: "disabled" })
+  expect(await mcpStatus("github")).toBe("disabled")
+  expect(await githubTools()).toEqual([])
+  const disabledInitializes = runtimeInitializes
+  await action("ext-save-package-secrets", { packageId: "package:github", secrets: { [prerequisiteId]: NEXT_TOKEN } })
+  expect(await mcpStatus("github")).toBe("disabled")
+  expect(await githubTools()).toEqual([])
+  expect(runtimeInitializes).toBe(disabledInitializes)
+  await action("ext-set-package-state", { packageId: "package:github", state: "enabled" })
+  await until(async () => (await mcpStatus("github")) === "connected", "reenabled connector")
+  const held = await askedTurn()
+  expect((await send("GET", "/api/session/active")).json.data[held.sessionID]).toBeDefined()
+  await action("ext-set-package-state", { packageId: "package:github", state: "disabled" })
+  expect((await send("GET", `/api/session/${held.sessionID}/permission`)).json.data).toEqual([])
+  expect((await send("GET", "/api/session/active")).json.data[held.sessionID]).toBeUndefined()
+  expect(toolCalls).toBe(2)
+  expect(await githubTools()).toEqual([])
+  const messages = (await send("GET", `/api/session/${held.sessionID}/message`)).json.data as Array<{
+    type: string
+    error?: { type: string }
+    time?: { completed?: number }
+  }>
+  expect(messages.find((message) => message.type === "assistant")?.time?.completed).toBeNumber()
+  await action("ext-set-package-state", { packageId: "package:github", state: "enabled" })
+  await until(async () => (await mcpStatus("github")) === "connected", "final connector reenable")
+  const refreshBeforeRemove = refreshes
+  expect(await invoke("ext-uninstall-package", "package:github")).toMatchObject({ ok: true })
+  expect(
+    await invoke("ext-reload-request", { scope: "global", items: [], reason: "uninstalled package package:github" }),
+  ).toMatchObject({ ok: true })
+  await until(async () => !(await mcpStatus("github")), "removed runtime connector")
+  expect(await githubTools()).toEqual([])
+  const ledger = readPackageLedgerStateV1(root)
+  expect(ledger.ok && ledger.packageGraphs.some((graph) => graph.packageId === "package:github")).toBe(false)
+  expect(ledger.ok && ledger.packageGraphs.some((graph) => graph.packageId === "package:supabase")).toBe(true)
+  expect(
+    ledger.ok &&
+      ledger.records.filter((record) => record.kind === "skill").every((record) => record.desiredState === "enabled"),
+  ).toBe(true)
+  expect(readFileSync(join(root, "codepuppy.jsonc"), "utf8").includes(TOKEN)).toBe(false)
+  expect(JSON.stringify(await invoke("ext-installed-packages")).includes(TOKEN)).toBe(false)
+  expect(JSON.stringify(consoleLines).includes(TOKEN)).toBe(false)
+  expect(refreshes).toBeGreaterThanOrEqual(refreshBeforeRemove)
+}, 180_000)

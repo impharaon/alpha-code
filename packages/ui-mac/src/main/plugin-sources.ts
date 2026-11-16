@@ -231,6 +231,12 @@ export function createPluginSources(deps: { catalog: () => Promise<readonly Cand
       return { ok: true, capture: await pending }
     } catch (error) {
       captures.delete(candidateId)
+      if (error instanceof SourceChanged && selected.kind === "marketplace") {
+        indexes.delete(selected.market.source)
+        archives.delete(selected.market.repository + "@refs/heads/main")
+        const source = selected.entry.source
+        if (source.kind === "git") archives.delete(githubRepository(source.url)! + "@" + (source.commit ?? source.ref ?? "refs/heads/main"))
+      }
       const failure: SourceFailure = { ok: false, code: error instanceof SourceChanged ? "source-changed" : "source-unreachable", detail: error instanceof SourceChanged ? "Selected source changed; search again" : "Selected source could not be captured" }
       if (error instanceof SourceDeadline || error instanceof SourceSizeLimit) boundedFailures.set(failure, error instanceof SourceDeadline ? "network" : "format")
       return failure

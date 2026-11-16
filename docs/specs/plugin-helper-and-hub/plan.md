@@ -812,3 +812,5 @@ A2 预算取下载 128MiB、解压 512MiB：对审查记录的最大 25.8MB 压�
 A2 FIXED：get 同时核 content-length 与真实流式计数，128MiB 以上立即取消 body；没有完整缓冲后再检查。gzip 走异步 gunzip，maxOutputLength=512MiB，原生 ERR_BUFFER_TOO_LARGE 转为该源 failed:format；私有失败 provenance 改用 WeakMap 保留 network/format，不改公开错误字段。原三条红例未改，a2-green-first.log 3 pass/10 assertions；四文件 plugin-sources/plugin-conversion/host-extension-package-artifact/install-from-source 94 pass/599 assertions，exit 0（a2-related.log）。两包 bun typecheck exit 0（a2-{ui,ext}-types.log）。没有新增产品限制、确认或依赖；未执行下载内容。
 
 A3 前提属实：SourceChanged 只删 capture，不删 marketplace index 或 main archive。真实 manifest 的 description 作一次显式 stale 变体、实际 tar 保持 pinned 原字节，重搜应拿到更新后的真实 index 并重取 archive；`bun test --max-concurrency 2 --test-name-pattern '^R12 A3' src/main/plugin-sources.test.ts` exit 1（1 fail；a3-red.log），旧缓存第二次仍报 source-changed。红例断言原输入格式不改。
+
+A3 FIXED：SourceChanged 同时淘汰该市场 index、市场 refs/heads/main archive；外部 Git 源还淘汰本次实际 revision 的错误 archive。第二次 search 读取当前 index，再次捕获核同一已验提交，不需要重启。完整 plugin-sources.test.ts exit 0（34 pass，a3-green.log），原重试红例不改断言；未给缓存新增 TTL/容量或改 source-changed 错误合同。

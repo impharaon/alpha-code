@@ -876,3 +876,7 @@ B4 前提属实：实际 runtime-loaded customize-codepuppy 的 description 与�
 B4 FIXED：实际出厂 SKILL.md description 不再声称创建项目连接器，第 4 项删 type=mcp/额外连接器等待指引，第 2 项明确 hub_install scope:this-project，项目位置表不再教项目连接器配置。工件实读保留 agent/command/skill 原用途及既有插件信任边界；没有封禁旧通用 register 工具或增授权面。factory-skills/packaging-census 两文件 exit 0（b4-green.log），原 #1532 新反控制未改。
 
 B6 前提属实：prepare 的 hostname===github.com 排除了既有 validGitUrl 的另四个 forge。额外核同链 cloneSkillGitToTmp：它还要求根/唯一子目录有 SKILL.md，不能直接承接整包 MCP；其旧唯一子目录技能能力须保留在共享 converter 发现方，不能通过复制识别规则修补。三条 red（四主机复用真实固定 Playwright 树、实际 Hub Git 错误呈现、真实技能字节的旧单子目录变体）exit 1（b6-red.log）。clone 边界只模拟 git 的进程 I/O；不声称所换主机上的镜像实际存在，不进行外部写入。
+
+B6 FIXED：非 github.com 地址走既有 validGitUrl/cloneSkillGitToTmp（原 allowlist/subdomain/redirect/进程参数策略原样），捕获整个临时仓库后 prepareCapture，finally 清理；GitHub codeload 现有入口保持。clone 不再技能专用定位；原唯一子目录技能布局由同一共享 converter 增补发现（仅无 manifest 的单 loose SKILL），没有第二份格式判断。该必要同链文件 ext-fs-installer 与 converter/artifact 已列；无额外参数/选项/依赖。真实固定 Playwright 的四 forge 路由、清理与转换后 MCP 安装均绿；非法 localhost 未进 clone。Hub Git/文件夹失败按操作类型取 i18n，不外发 main detail。
+
+六文件 ext-write-channels/ext-import-validate/ext-uncurated-import/hub-three-pages/converter/artifact exit 0（104 pass，b6-final.log），ui-mac typecheck exit 0（b6-ui-types.log）。内部 IPC 21、Hub 34 的两个输出 pin 均按执行值同步；前两次仅漏改第二条机械 count pin 的失败已核，不改任何行为断言。三个原红例断言保留。共享文件 ext-ipc 仅 prepare 分支、extension-hub 仅 prepare 错误、locale 新两键、converter 唯一发现方；未改 Hub 管理页、scope 或 Core。

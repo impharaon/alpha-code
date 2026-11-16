@@ -32,8 +32,8 @@ import { makeUncuratedInstallBodies } from "./ext-uncurated-bodies"
 import { applyMcpWritePolicy, officeRuntimeReadiness } from "./ext-mcp-policy"
 import { probeProjectMcpActivation } from "./ext-mcp-activation"
 import { codepuppyUserWorkspaceDir, ensureUserWorkspaceDir } from "./codepuppy-user-workspace"
-import { agentInstallPresent, collectBuiltinAgentPayload, collectVendoredPluginPayload, stageVendoredPluginVersioned, installBuiltinSkill, installRemoteSkill, readBuiltinSkill, removeFsInstall, removeFsInstallFilesOnly, resourcesRoot } from "./ext-fs-installer"
-import { parseAgentImport } from "./ext-import-validate"
+import { cloneSkillGitToTmp, agentInstallPresent, collectBuiltinAgentPayload, collectVendoredPluginPayload, stageVendoredPluginVersioned, installBuiltinSkill, installRemoteSkill, readBuiltinSkill, removeFsInstall, removeFsInstallFilesOnly, resourcesRoot } from "./ext-fs-installer"
+import { validGitUrl, parseAgentImport } from "./ext-import-validate"
 import { cleanProjectCatalogResiduals, detectProjectCatalogResiduals } from "./ext-project-residuals"
 import { listRetainedJournals, retireTransactionJournal, type JournalRootRef } from "./ext-journal-retire"
 import { collectSkillPayloadFromDir } from "./ext-skill-generations"
@@ -1078,6 +1078,14 @@ export function registerExtIpcHandlers(
       return { ok: false, detail: "Invalid source selection" }
     try {
       const url = new URL(raw.url)
+      if (url.hostname !== "github.com") {
+        if (!validGitUrl(raw.url)) return { ok: false, detail: "This address is not a supported Git repository" }
+        const cloned = await cloneSkillGitToTmp(raw.url)
+        if (!cloned.ok) return { ok: false, detail: "The Git source could not be read as a plugin package or marketplace" }
+        try {
+          return { ok: true, prepared: await pluginSources.prepareCapture(await pluginSources.captureFolder(cloned.srcDir)) }
+        } finally { cloned.cleanup() }
+      }
       const parts = url.pathname.replace(/\/$/, "").split("/").filter(Boolean)
       if (url.protocol !== "https:" || url.hostname !== "github.com" || url.username || url.password || url.search || url.hash || parts.length < 2 || (parts.length > 2 && (parts[2] !== "tree" || !parts[3])))
         return { ok: false, detail: "This address is not a supported Git repository" }

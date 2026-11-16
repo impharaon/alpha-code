@@ -4,6 +4,8 @@ export const dict = {
   "codepuppy.ext.packageEffectProject": "This project only",
   "codepuppy.ext.sourceMarketplaceTitle": "Marketplace plugins",
   "codepuppy.ext.sourceSearchPlaceholder": "Search plugins, skills or MCP",
+  "codepuppy.ext.sourceGitFailed": "Could not read the Git plugin source. Check the address and try again.",
+  "codepuppy.ext.sourceFolderFailed": "Could not read the selected plugin folder. Try again.",
   "codepuppy.ext.sourceInstallFailed": "Installation failed. Try again.",
   "codepuppy.ext.sourceSearchFailed": "Could not search sources. Try again.",
   "codepuppy.ext.sourceSearchResults": "Search results · {{count}}",

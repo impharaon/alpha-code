@@ -4,6 +4,8 @@ export const dict = {
   "codepuppy.ext.packageEffectProject": "仅当前项目",
   "codepuppy.ext.sourceMarketplaceTitle": "市场插件",
   "codepuppy.ext.sourceSearchPlaceholder": "搜索插件、技能或 MCP",
+  "codepuppy.ext.sourceGitFailed": "未能读取 Git 插件来源，请检查地址后重试。",
+  "codepuppy.ext.sourceFolderFailed": "未能读取所选插件文件夹，请重试。",
   "codepuppy.ext.sourceInstallFailed": "未能安装，请重试。",
   "codepuppy.ext.sourceSearchFailed": "未能查询来源，请重试。",
   "codepuppy.ext.sourceSearchResults": "搜索结果 · {{count}}",

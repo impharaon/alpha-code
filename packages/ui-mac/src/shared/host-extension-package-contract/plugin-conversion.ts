@@ -118,7 +118,8 @@ export async function convertPluginTree(input: Capture): Promise<{ package: Plug
   }
   const entries: Entry[] = []
   const roots = opencode ? ["skills", "skill", ".opencode/skills", ".opencode/skill"] : ["skills", ...declaredPaths(manifest?.skills, manifestPath, "skills", diagnostics)]
-  const skillFiles = [...files.keys()].filter((path) => path === "SKILL.md" || roots.some((root) => path.startsWith(root + "/") && path.endsWith("/SKILL.md")))
+  const loose = !manifest && !opencode ? [...files.keys()].filter(path => /^[^/]+\/SKILL\.md$/.test(path)) : []
+  const skillFiles = [...files.keys()].filter((path) => path === "SKILL.md" || (loose.length === 1 && path === loose[0]) || roots.some((root) => path.startsWith(root + "/") && path.endsWith("/SKILL.md")))
   for (const path of skillFiles) {
     const instruction = decode(files.get(path)!)
     const parsed = ConfigMarkdown.parseOption(instruction)

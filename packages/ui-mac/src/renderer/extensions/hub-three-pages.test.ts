@@ -14,7 +14,7 @@ test("定制中心三页结构:页签、页头、列表行、「添加 ▾」、
   const output = `${result.stdout.toString()}${result.stderr.toString()}`
   if (result.exitCode !== 0) throw new Error(output)
   // 条数是先单跑 cases 文件确认 pass 数之后才写上来的:AC1–AC7 各一条(7);审计 r1 补「全部更新只管本页」与「菜单不重复开启」两条(9);`#1691` 补「查看」定位的两条(AC-01/02)。
-  expect(output).toContain(" 33 pass")
+  expect(output).toContain(" 34 pass")
   expect(output).toContain(" 0 fail")
-  expect(output).toMatch(/Ran 33 tests across 1 file/)
+  expect(output).toMatch(/Ran 34 tests across 1 file/)
 })

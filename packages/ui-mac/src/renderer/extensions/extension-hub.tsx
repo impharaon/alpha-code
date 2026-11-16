@@ -509,7 +509,7 @@ export function ExtensionHub(props: {
     try {
       const result = await extIpc.preparePluginSource(input)
       if (!result.ok) {
-        if (!result.canceled) setImportErr(result.detail)
+        if (!result.canceled) setImportErr(t(input.kind === "git" ? "codepuppy.ext.sourceGitFailed" : "codepuppy.ext.sourceFolderFailed"))
         return
       }
       if (result.prepared.kind === "marketplace") {

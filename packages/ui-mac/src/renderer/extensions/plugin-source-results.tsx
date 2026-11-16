@@ -2,7 +2,7 @@ import { createEffect, createMemo, createResource, createSignal, For, Show, onCl
 import type { CandidateV1, SourceSearchResultV1 } from "../../main/plugin-sources"
 import type { InstallOutcomeV1 } from "../../shared/plugin-install"
 import { t } from "../i18n"
-import { pluginSourceLabelKey } from "./ext-package-presentation"
+import { pluginSourceLabelKey, pluginInstallFailureKey, pluginSourceFailureKey } from "./ext-package-presentation"
 
 /** Search owns pending selection only; main owns order, identity, installation and status. */
 export function PluginSourceResults(props: {
@@ -50,7 +50,7 @@ export function PluginSourceResults(props: {
       <For each={current()?.sources.filter((source) => source.status === "failed")}>
         {(source) => (
           <p class="codepuppy-ext-import-err">
-            {t(pluginSourceLabelKey(source.source))}：{source.status === "failed" ? source.detail : ""}
+            {t(pluginSourceLabelKey(source.source))}：{source.status === "failed" ? t(pluginSourceFailureKey(source.reason)) : ""}
           </p>
         )}
       </For>
@@ -86,7 +86,7 @@ export function PluginSourceChoices<C extends Pick<CandidateV1, "id" | "displayN
     try {
       const outcome = await props.install(candidate)
       if (!outcome.ok) {
-        setErrors((errors) => ({ ...errors, [candidate.id]: outcome.detail }))
+        setErrors((errors) => ({ ...errors, [candidate.id]: t(pluginInstallFailureKey(outcome.code)) }))
         return
       }
       setInstalled((current) => ({ ...current, [candidate.id]: outcome.packageId }))

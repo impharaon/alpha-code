@@ -74,7 +74,7 @@ import { curatedOf, curationMapOf, curationOf, isArchived, isSessionGrant, split
 import { findSessionGrant, sessionGrantKeyOf, sessionRefusalRoute, sessionToggleView } from "./ext-session-toggle"
 import { curationActivationFacts, type Curation, type CurationStatus } from "../../shared/catalog-curation"
 import type { CatalogPackageViewV1 } from "../../shared/catalog-package-view"
-import { installedPackagePresentation, packageRetainedReasonKey } from "./ext-package-presentation"
+import { pluginInstallFailureKey, installedPackagePresentation, packageRetainedReasonKey } from "./ext-package-presentation"
 import { packageListingTextV1 } from "../../shared/host-extension-package-contract/decoder"
 import { extIpc } from "./ext-ipc"
 import { PROJECT_HIDDEN_DIR } from "../../shared/project-hidden-dir"
@@ -519,7 +519,7 @@ export function ExtensionHub(props: {
       }
       const installed = await installSourceChoice({ id: result.prepared.candidateId })
       if (!installed.ok) {
-        setImportErr(installed.detail)
+        setImportErr(t(pluginInstallFailureKey(installed.code)))
         return
       }
       setImportDialog(null)

@@ -5,7 +5,7 @@ import { t } from "../../../i18n"
 import { extIpc } from "../../../extensions/ext-ipc"
 import { openPackageManagement } from "../../../extensions/ext-hub-state"
 import { PackageAccountDialog } from "../../../extensions/package-account-dialog"
-import { installedPackagePresentation } from "../../../extensions/ext-package-presentation"
+import { installedPackagePresentation, pluginInstallFailureKey } from "../../../extensions/ext-package-presentation"
 import type { TimelineRow } from "../timeline-model"
 import { useTimelineIntents } from "./timeline-intents"
 import { redactText } from "./tool-redactor"
@@ -110,8 +110,8 @@ export function HubInstallCard(props: { row: HubInstallRow }) {
       return {
         ...base,
         state: "failed",
-        title: t("codepuppy.timeline.hub.failed"),
-        detail: record.outcome && !record.outcome.ok ? safeText(record.outcome.detail) : call.result,
+        title: t("codepuppy.timeline.hub.installFailed"),
+        detail: record.outcome && !record.outcome.ok ? t(pluginInstallFailureKey(record.outcome.code)) : call.result,
       }
     if (record?.stage === "submitted" || (!pack && call.phase === "running"))
       return {

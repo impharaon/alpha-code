@@ -144,3 +144,21 @@ export function packagePresentation(view: CatalogPackageViewV1) {
     prerequisiteKey: PREREQUISITE_KEYS[view.prerequisites.status],
   }
 }
+
+
+/** User-facing copy uses stable codes; main detail remains diagnostic text. */
+export function pluginInstallFailureKey(code: Extract<import("../../shared/plugin-install").InstallOutcomeV1, { ok: false }>["code"]) {
+  return ({
+    "unknown-id": "codepuppy.ext.sourceUnknownId",
+    "source-unreachable": "codepuppy.ext.sourceUnreachable",
+    "source-changed": "codepuppy.ext.sourceChanged",
+    "nothing-runnable": "codepuppy.ext.sourceNothingRunnable",
+    "invalid-draft": "codepuppy.ext.sourceInvalidDraft",
+    "not-searched": "codepuppy.ext.sourceNotSearched",
+    "transaction-failed": "codepuppy.ext.sourceInstallFailed",
+  } as const)[code]
+}
+
+export function pluginSourceFailureKey(reason: Extract<import("../../main/plugin-sources").SourceStatusV1, { status: "failed" }>["reason"]) {
+  return ({ network: "codepuppy.ext.sourceNetworkFailed", http: "codepuppy.ext.sourceHttpFailed", format: "codepuppy.ext.sourceFormatFailed" } as const)[reason]
+}

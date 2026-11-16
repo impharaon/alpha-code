@@ -134,6 +134,8 @@ PLAN 文档检查（2026-11-16）：`python3 scripts/check-doc-links.py docs/spe
 
 ### 偏离记录
 
+r6 A4 红例先行：`timeline-model.test.ts` 新例验证可信随包工具的查／装投影、requestId/packageId 重挂载和同名第三方拒绝；`bun test --max-concurrency 2 --test-name-pattern 'A4' src/renderer/codepuppy-ui/session-timeline/timeline-model.test.ts` exit 1（1 pass／1 fail，缺 hubInstall 投影，`a-r6-a4-model-red.log`）。新增生产卡片 DOM 六场景与严格计数宿主；宿主命令 exit 1（卡片模块缺席，`a-r6-a4-dom-red.log`）。六场景分别移除阶段重读、即时引擎可用性、持久 metadata 身份、来源／管理接缝、真实失败或账户需求中的任一行为即转红；不靠模型文本声称成功。卡片只显示账户状态，登录／令牌动作仍留 C。身份资格复用 `cards/tool-card-model.ts` 的完整快照校验及随包 authority/readable，不从别名或路径前缀猜；该文件为原 timeline 同调用链必要落点，相关专用卡／来源测试补跑。
+
 A3 补齐直接消费者：`composer-tier-matrix.engine.cases.ts:431` 仍编码“普通身份询问后还必须出现安装确认”。先运行该场景 exit 1（0 pass／1 fail，实际第一普通审批出现，第二旧安装确认不再出现；`a-r6-a3-composer-old-red.log`）。此处按原计划明确替换旧确认流程为一次普通审批、协议 JSON 往返、无安装运输 metadata 及结束后零待批；调用参数 catalogId→id 为 r6 允许的 API 形状纠正，未改普通权限求值。相关矩阵宿主 `bun test --max-concurrency 2 src/main/composer-tier-matrix.engine.test.ts` exit 0（宿主 1 pass／0 fail，严格核内部 27 场景全部通过；`a-r6-a3-composer-final.log`）。
 
 r6 A3 完成：红例提交 `1c5a5de6f5`（main 消息／受理阶段）及 `a2b2436e36`（工具生产 bridge）先于生产改动；工具红命令 `bun test --max-concurrency 2 --test-name-pattern 'A3 tools search' src/hub-tools.test.ts` exit 1，旧实现只返回 hub 视图，未发来源消息（`a-r6-a3-tools-red.log`）。生产链现由 main 候选表解析 ID，sidecar 即时 ACK，经既有写闸安装，main 独占 submitted／committed／failed；只读 `hubRequest` 替代 renderer 写阶段。非目录图进入同一即时引擎核验视图，不从 committed 推断 available。普通工具审批保留在单一原面；移除 chat 的 permission.assert 运输、ask 钉子、asksForItself 特例和已死守望者。

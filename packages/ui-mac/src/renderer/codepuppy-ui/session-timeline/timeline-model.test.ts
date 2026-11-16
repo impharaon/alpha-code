@@ -1718,3 +1718,37 @@ describe("#1553 附件卡读取结果:只按会话里的真实读取调用与逐
     expect(unread.kind === "user" && unread.rev !== user.rev).toBe(true)
   })
 })
+
+
+describe("A4 trusted hub parts become main-backed timeline cards", () => {
+  const display = (name: string) => ({
+    identity: { source: "plugin", origin: "@codepuppy/ext", name: `codepuppy_hub_${name}` },
+    technicalId: `alias_${name}`,
+    authority: { kind: "codepuppy-bundled", bindingId: "verified-bundle", evidenceDigest: "verified-digest" },
+    readable: `codepuppy:hub_${name}`,
+  }) as ToolPart["display"]
+  const turn = (part: ToolPart) => project([userMsg("u", 1), assistantMsg("a", "u")], { a: [part] })
+
+  test("A4 running search and install carry progress identity; completed part retains packageId for remount", () => {
+    const search = toolPart("search", "a", "unrelated-alias", { display: display("search"), state: { status: "running", input: { query: "playwright" }, time: { start: 1 } } as ToolPart["state"] })
+    const card = turn(search).find(row => row.kind === "hubInstall")
+    expect(card?.kind).toBe("hubInstall")
+    if (card?.kind !== "hubInstall") throw Error("no hub card")
+    expect(card.install).toMatchObject({ operation: "search", name: "playwright", phase: "running" })
+    const install = toolPart("install", "a", "unrelated-alias", { display: display("install"), state: { status: "completed", input: { id: "candidate-main-id" }, output: "submitted; result pending", title: "install", time: { start: 1, end: 2 }, metadata: { requestId: "request_install", packageId: "package-main-id" } } })
+    const result = turn(install).find(row => row.kind === "hubInstall")
+    expect(result?.kind).toBe("hubInstall")
+    if (result?.kind !== "hubInstall") throw Error("no hub card")
+    expect(result.install).toMatchObject({ operation: "install", requestId: "request_install", packageId: "package-main-id", result: "submitted; result pending" })
+    const again = reuseTimelineRows(turn(install), turn(install))
+    expect(again.find(row => row.kind === "hubInstall")?.key).toBe(result.key)
+  })
+
+  test("A4 same-name third-party, missing/invalid proof and wrong tool identity never read install metadata", () => {
+    const trusted = display("install")!
+    for (const proof of [undefined, { ...trusted, authority: { kind: "not-asserted" } }, { ...trusted, authority: { kind: "codepuppy-bundled" } }, { ...trusted, identity: { source: "mcp", origin: "codepuppy", name: "codepuppy_hub_install" } }, { ...trusted, readable: "codepuppy:echo" }, { ...trusted, identity: { ...trusted.identity, name: "other" } }]) {
+      const part = toolPart("forged", "a", "codepuppy_hub_install", { display: proof as ToolPart["display"], state: { status: "completed", input: { id: "secret-input" }, output: "secret-output", title: "x", time: { start: 1, end: 2 }, metadata: { requestId: "forged_request", packageId: "forged-package" } } })
+      expect(turn(part).some(row => row.kind === "hubInstall")).toBe(false)
+    }
+  })
+})

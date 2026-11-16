@@ -43,7 +43,7 @@ type IndexedSourceCandidate = { candidate: CandidateV1 } & (
   | { kind: "mcp-registry"; serverName: string; version: string }
   | { kind: "npm"; name: string; version: string }
 )
-type SourceCandidate = IndexedSourceCandidate | { kind: "captured"; candidate: { id: string }; capture(): Promise<Capture> }
+type SourceCandidate = IndexedSourceCandidate | { kind: "captured"; candidate: { id: string; displayName?: string }; capture(): Promise<Capture> }
 export type PreparedPluginSourceV1 =
   | { kind: "package"; candidateId: string; displayName: string }
   | { kind: "marketplace"; entries: { id: string; displayName: string; description: string; source: "local-folder" | "claude-marketplace" | "codex-marketplace" }[] }
@@ -253,6 +253,7 @@ export function createPluginSources(deps: { catalog: () => Promise<readonly Cand
         ? { ...convertMcpServerDefinition(JSON.parse(new TextDecoder().decode(await captured.capture.readFile("server.json"))), captured.capture.source), replacements: new Map<string, Uint8Array>() }
         : await convertPluginTree(captured.capture)
       const selected = [...candidates.values()].find((entry) => entry.candidate.id === candidateId)
+      if (selected?.kind === "captured") selected.candidate.displayName = converted.package.name
       const publisher = selected && selected.kind !== "captured" ? selected.candidate.publisher : undefined
       return { ok: true, capture: captured.capture, ...converted, runtimeIdentity: pluginRuntimeIdentity(converted.package), ...(publisher ? { publisher } : {}) }
     })().catch((): SourceFailure => ({ ok: false, code: "source-unreachable", detail: "Selected source could not be converted" }))
@@ -307,6 +308,7 @@ export function createPluginSources(deps: { catalog: () => Promise<readonly Cand
   }
   return {
     searchedSources(searchId: string) { return searches.get(searchId) },
+    displayNameForId(id: string) { return [...candidates.values()].find(entry => entry.candidate.id === id)?.candidate.displayName ?? catalogRows.get(id)?.displayName },
     async prepareCapture(capture: Capture): Promise<PreparedPluginSourceV1> {
       const issue = (getCapture: () => Promise<Capture>) => {
         const id = "cand_" + randomUUID()

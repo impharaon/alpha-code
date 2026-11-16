@@ -91,7 +91,7 @@ let detach: (reason: string) => void
 
 beforeAll(async () => {
   await assertEngineSandboxed(sandbox)
-  mainHost = createCodePuppySidecarHost({ packageAuthorization: async () => ({ ok: false, reason: "not installed" }),
+  mainHost = createCodePuppySidecarHost({ installName: () => undefined, packageAuthorization: async () => ({ ok: false, reason: "not installed" }),
     view: {
       view: async () => ({ directory, rows: [], warnings: [] }),
       viewForAgent: async () => ({ directory, rows: [], warnings: [] }),

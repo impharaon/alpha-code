@@ -1486,6 +1486,9 @@ export function registerExtIpcHandlers(
   const codepuppySidecarHost: CodePuppySidecarHost = createCodePuppySidecarHost({
     view: hubView,
     requests: hubRequests,
+    installName: ref => ref.kind === "created" ? ref.draft.name : pluginSources.displayNameForId(ref.id)
+      ?? bundledCatalogJson.entries.find(entry => entry.id === ref.id)?.displayName
+      ?? bundledCatalogJson.packages.find(entry => entry.prelude.packageId === ref.id)?.presentation.displayName,
     packageAuthorization: async (packageId) => {
       await ledgerReady
       const state = readPackageLedgerStateV1(codepuppyGlobalRoot(), { sideEffectFree: true })

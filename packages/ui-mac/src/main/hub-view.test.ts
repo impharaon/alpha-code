@@ -551,7 +551,7 @@ describe("I6:main 侧 alpha.* 分发只做只读查询与重载记录", () => {
     const w = world("host")
     const logs: string[] = []
     const stages = createHubRequestStages({ log: () => {} })
-    const host = createCodePuppySidecarHost({ packageAuthorization: async () => ({ ok: false, reason: "not installed" }), view: w.service, requests: stages, searchSources: async () => ({ searchId: "search", query: "", sources: [], candidates: [] }), install: async () => ({ ok: false, code: "unknown-id", detail: "unknown" }), reloads: w.coordinator, log: (line) => logs.push(line) })
+    const host = createCodePuppySidecarHost({ installName: () => undefined, packageAuthorization: async () => ({ ok: false, reason: "not installed" }), view: w.service, requests: stages, searchSources: async () => ({ searchId: "search", query: "", sources: [], candidates: [] }), install: async () => ({ ok: false, code: "unknown-id", detail: "unknown" }), reloads: w.coordinator, log: (line) => logs.push(line) })
     const posted: CodePuppySidecarOutbound[] = []
     const post = (m: CodePuppySidecarOutbound) => void posted.push(m)
 
@@ -584,7 +584,7 @@ describe("I6:main 侧 alpha.* 分发只做只读查询与重载记录", () => {
     const w = world("host-dead")
     const logs: string[] = []
     const stages = createHubRequestStages({ log: () => {} })
-    const host = createCodePuppySidecarHost({ packageAuthorization: async () => ({ ok: false, reason: "not installed" }), view: w.service, requests: stages, searchSources: async () => ({ searchId: "search", query: "", sources: [], candidates: [] }), install: async () => ({ ok: false, code: "unknown-id", detail: "unknown" }), reloads: w.coordinator, log: (line) => logs.push(line) })
+    const host = createCodePuppySidecarHost({ installName: () => undefined, packageAuthorization: async () => ({ ok: false, reason: "not installed" }), view: w.service, requests: stages, searchSources: async () => ({ searchId: "search", query: "", sources: [], candidates: [] }), install: async () => ({ ok: false, code: "unknown-id", detail: "unknown" }), reloads: w.coordinator, log: (line) => logs.push(line) })
     expect(() =>
       host.receive({ type: "codepuppy.hub.request.request", id: 1, requestId: "req_abcdef12" }, () => {
         throw new Error("Cannot post to a dead process")
@@ -602,7 +602,7 @@ test("A3 main accepts before a slow install finishes and owns the submitted/comm
   let finish!: (outcome: import("../shared/plugin-install").InstallOutcomeV1) => void
   const pending = new Promise<import("../shared/plugin-install").InstallOutcomeV1>((resolve) => { finish = resolve })
   const inputs: unknown[] = []
-  const host = createCodePuppySidecarHost({ packageAuthorization: async () => ({ ok: false, reason: "not installed" }), view: w.service, requests, reloads: w.coordinator, log: () => {}, searchSources: async () => ({ searchId: "search_main", query: "playwright", sources: [], candidates: [] }), install: async (input) => { inputs.push(input); return pending } })
+  const host = createCodePuppySidecarHost({ installName: () => undefined, packageAuthorization: async () => ({ ok: false, reason: "not installed" }), view: w.service, requests, reloads: w.coordinator, log: () => {}, searchSources: async () => ({ searchId: "search_main", query: "playwright", sources: [], candidates: [] }), install: async (input) => { inputs.push(input); return pending } })
   const posted: unknown[] = []
   expect(host.receive({ type: "codepuppy.hub.install.request", id: 1, requestId: "request_a3", directory: w.projectDir, sessionID: "ses_1", agent: "build", ref: { kind: "id", id: "cand_main_issued" }, scope: "all-projects" }, (message) => { posted.push(message) })).toBe(true)
   expect(posted).toEqual([{ type: "codepuppy.hub.install.reply", id: 1, accepted: true }])

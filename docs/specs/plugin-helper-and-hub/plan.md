@@ -914,3 +914,5 @@ B12 VERIFY→REPRODUCED：生产 Hub 非搜索 mcp:fetch 添加实际打开旧�
 B12 FIXED：MCP/bundle 的新增目录添加（含详情安装按钮）调用既有 ext.installPackage 适配到统一入口，不再触发旧安装确认，故 + 上不会显示默认关闭文案。没有删除仍供既有更新/审批流程使用的 locale 权威，也没有把它们放宽；真实已装状态仍由原读方呈现。目录/第三方两个 DOM 断言保留，四文件 Hub/source-results/use-extensions/chokepoint exit 0（23 pass，b12-green.log，内部 35/9），ui-mac typecheck exit 0（b12-types.log），pins 已同步。共享 extension-hub 仅添加调用适配，未另建管理或账户页。
 
 B8 前提属实：host.submit 只记 submitted，不含 main 已知名称。真实目录/Claude 候选两臂在 runtime 暂停期间读阶段，期望主表 displayName（并确认它不是 id），均 exit 1（b8-red.log）。不让 renderer 从输入猜名字，沿冻结 HubRequestRecord.displayName 现有字段补值。
+
+B8 FIXED：source table 提供只读 displayNameForId（捕获包在既有转换时记其真实名），host 从 main 表/随包目录取名或自制草稿名，在 submit 即写现有 displayName 字段，失败终态也保留目标名。无新侧车字段或 renderer 猜测。两条原 red 保留，sources/hub-view/sidecar-wiring/ext-write-channels 四文件 exit 0（b8-green.log），ui-mac typecheck exit 0（b8-types.log）；IPC 内部实跑 26，pin 同步，现有 fake host 补必需 name 读方（含 unattended fixture）。

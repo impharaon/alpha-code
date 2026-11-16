@@ -459,7 +459,7 @@ export function createHubViewService(deps: HubViewDeps): HubViewService {
 
 const MAX_REQUESTS = 256
 export type HubRequestStages = {
-  submit(requestId: string, identity: string): "created" | "existing" | "conflict"
+  submit(requestId: string, identity: string, displayName?: string): "created" | "existing" | "conflict"
   settleInstall(requestId: string, outcome: InstallOutcomeV1): void
   get(requestId: string): HubRequestRecord | null
 }
@@ -467,10 +467,10 @@ export function createHubRequestStages(deps: { log: (line: string) => void; onCh
   const records = new Map<string, HubRequestRecord>()
   const identities = new Map<string, string>()
   return {
-    submit(requestId, identity) {
+    submit(requestId, identity, displayName) {
       if (!isHubRequestId(requestId)) return "conflict"
       if (records.has(requestId)) return identities.get(requestId) === identity ? "existing" : "conflict"
-      records.set(requestId, { requestId, stage: "submitted" })
+      records.set(requestId, { requestId, stage: "submitted", ...(displayName ? { displayName } : {}) })
       identities.set(requestId, identity)
       while (records.size > MAX_REQUESTS) { const oldest = records.keys().next().value!; records.delete(oldest); identities.delete(oldest) }
       deps.onChange?.()
@@ -479,7 +479,7 @@ export function createHubRequestStages(deps: { log: (line: string) => void; onCh
     settleInstall(requestId, outcome) {
       const known = records.get(requestId)
       if (!known || known.stage !== "submitted") return
-      records.set(requestId, { requestId, stage: outcome.ok ? "committed" : "failed", outcome, ...(outcome.ok ? { packageId: outcome.packageId, displayName: outcome.displayName } : {}) })
+      records.set(requestId, { requestId, stage: outcome.ok ? "committed" : "failed", ...(known.displayName ? { displayName: known.displayName } : {}), outcome, ...(outcome.ok ? { packageId: outcome.packageId, displayName: outcome.displayName } : {}) })
       deps.onChange?.()
     },
     get(requestId) { const record = records.get(requestId); return record ? structuredClone(record) : null },
@@ -501,6 +501,7 @@ export type CodePuppySidecarHost = {
 export function createCodePuppySidecarHost(deps: {
   view: HubViewService
   requests: HubRequestStages
+  installName(ref: HubInstallRequest["ref"]): string | undefined
   packageAuthorization(packageId: string): Promise<PackageAuthorizationResultV1>
   searchSources(query: string): Promise<SourceSearchResultV1>
   install(request: HubInstallRequest): Promise<InstallOutcomeV1>
@@ -532,7 +533,7 @@ export function createCodePuppySidecarHost(deps: {
       }
       if (inbound.type === "codepuppy.hub.install.request") {
         const { id, ...identity } = inbound
-        const admitted = deps.requests.submit(inbound.requestId, JSON.stringify(identity))
+        const admitted = deps.requests.submit(inbound.requestId, JSON.stringify(identity), deps.installName(inbound.ref))
         if (admitted === "conflict") { reply(post, buildHubInstallReply(inbound.id, { error: "invalid" })); return true }
         reply(post, buildHubInstallReply(inbound.id, { accepted: true }))
         if (admitted === "created") deps.install(inbound).then((outcome) => deps.requests.settleInstall(inbound.requestId, outcome), () => deps.requests.settleInstall(inbound.requestId, { ok: false, code: "transaction-failed", detail: "Installation could not finish" }))

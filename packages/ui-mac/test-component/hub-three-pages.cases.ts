@@ -1152,3 +1152,15 @@ test("R14 B6 Git import failure uses localised copy rather than main detail", as
   expect(document.body.textContent).not.toContain("RAW_MAIN_GIT_FAILURE")
  }finally{Object.assign(window.api.ext,{preparePluginSource:previous})}
 })
+
+test("R14 B12 a non-search catalog plus installs directly without the unreviewed default-off wall", async () => {
+ reset();mount("connectors")
+ await waitFor(()=>expect(q('[data-entry="mcp:fetch"] button')).toBeInstanceOf(HTMLButtonElement))
+ click(q('[data-entry="mcp:fetch"] button'))
+ await waitFor(()=>{
+  expect(document.body.textContent).not.toContain("未经审核,装好后默认关闭")
+  expect(q('[role="dialog"]')).toBeNull()
+  expect(calls.installPackage).toEqual(["mcp:fetch"])
+ })
+ expect(calls.installCatalog).toEqual([])
+})

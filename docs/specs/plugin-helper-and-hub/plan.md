@@ -908,3 +908,5 @@ C6 新核数据补充：npm empty-search.json 的真实记录是 286,376B，高�
 B10/B11 前提属实：errored hub_search 仍生成 searching 行；空查询的真实固定市场有超过 25 个 Claude 候选，工具无裁剪原样 JSON 输出。两个命名 red 分别 exit 1（b10-red.log、b11-red.log）。B11 仅模型输出取各源前 25 个，完整 main 结果与 matched/skipped/失败状态保留，Hub 仍全部可见/可安装；不是包/用户数量限额。
 
 B10/B11 FIXED：error search 回到普通工具的真实错误呈现，不再保留搜索卡；模型候选每源前 25 个，保留原 main 结果和各源完整状态/计数及 searchId，Hub 不裁剪。25 是模型列表预算，具体目标样本通常只命中少量，宽泛/空查询的完整目录仍能在 Hub 或按目标查询获得；无插件内容/安装数量限制、无新参数。timeline-model 74 pass exit 0（b10-green.log），ext tools/bridge/plugin-host/authority-registry 81 pass exit 0（b11-green.log），两包 typecheck exit 0。两个原 red 均未改。
+
+B12 VERIFY→REPRODUCED：生产 Hub 非搜索 mcp:fetch 添加实际打开旧确认框并显示「未经审核,装好后默认关闭」（b12-catalog-red.log exit 1）；第三方真实 Claude 候选的 + 单独宿主首跑 exit 0（b12-third-party-first.log）。初次把两个 DOM cases 混在一个子进程引起 delegated-event 宿主冲突，已按各自既有独立 host 单跑确认，不改断言。修正只把 MCP/bundle 的新增安装调用接到既有 ext.installPackage→统一 main entry，借此退役 + 的旧确认调用；既有更新/权限流程不动，不删除仍供它们使用的 locale/authority。

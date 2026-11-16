@@ -223,3 +223,16 @@ test("R14 hub shows a responding real source while another source index is still
   expect(node.textContent).toContain("正在查找")
  }finally{release(await fixtureFetch("https://raw.githubusercontent.com/openai/plugins/main/.agents/plugins/marketplace.json"));await flush()}
 })
+
+test("R14 B12 a real third-party plus has no unreviewed default-off message or installation confirmation", async () => {
+ const candidate=recorded.candidates.find(candidate=>candidate.source==="claude-marketplace")!
+ const calls:string[]=[]
+ const node=mount({install:async selected=>{calls.push(selected.id);return {ok:true,packageId:"claude:"+selected.name,displayName:selected.displayName,source:{kind:"marketplace",ecosystem:"claude",repository:selected.upstream.repository!,commit:selected.upstream.commit!,path:selected.upstream.path!,entryName:selected.name},installed:[],notRunning:[]}},installedMenu:()=>"installed package menu"})
+ await flush()
+ node.querySelector<HTMLButtonElement>(`[data-source-candidate="${candidate.id}"] button`)!.click()
+ await flush()
+ expect(calls).toEqual([candidate.id])
+ expect(document.body.textContent).not.toContain("未经审核,装好后默认关闭")
+ expect(document.querySelector('[role="dialog"]')).toBeNull()
+ expect(node.textContent).toContain("installed package menu")
+})

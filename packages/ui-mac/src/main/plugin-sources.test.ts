@@ -574,3 +574,23 @@ test("R12 A2 async gunzip receives a large real-plugin ceiling and propagates na
   expect(result.candidates.some(candidate=>candidate.id===entry.id)).toBe(true)
  }finally{unzip.mockRestore()}
 })
+
+test("R12 A3 re-search discards the stale marketplace index and main archive after source-changed",async()=>{
+ const {fixtureFetch}=await import("../../test-fixtures/plugin-helper/source-fetch")
+ const {createPluginSources}=await sourcesModule()
+ let indexes=0,archives=0
+ const sources=createPluginSources({catalog:async()=>[],fetch:async url=>{
+  if(url==="https://raw.githubusercontent.com/anthropics/claude-plugins-official/main/.claude-plugin/marketplace.json"){
+   indexes++
+   if(indexes===1){const index=await (await fixtureFetch(url)).json();const entry=index.plugins.find((entry:{name:string})=>entry.name==="playwright");entry.description+=" controlled stale index";return Response.json(index)}
+  }
+  if(url==="https://codeload.github.com/anthropics/claude-plugins-official/tar.gz/refs/heads/main")archives++
+  return fixtureFetch(url)
+ }})
+ const first=(await sources.searchSources("playwright")).candidates.find(candidate=>candidate.source==="claude-marketplace")!
+ expect(await sources.captureCandidate(first.id)).toMatchObject({ok:false,code:"source-changed"})
+ const next=(await sources.searchSources("playwright")).candidates.find(candidate=>candidate.source==="claude-marketplace")!
+ expect(await sources.captureCandidate(next.id)).toMatchObject({ok:true})
+ expect(indexes).toBe(2)
+ expect(archives).toBe(2)
+})

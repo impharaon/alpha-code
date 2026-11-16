@@ -86,8 +86,16 @@ export default {id:"test.package-effect",setup:async(ctx)=>{
   for (const directory of [slot.projectDirectory, other]) await until(() => client.plugin.list({ location: { directory } }), (result) => ["codepuppy.ext", "opencode.config.policy", "test.package-effect"].every((id) => result.data.some((plugin) => plugin.id === id && plugin.state.status === "active")))
   const rpc = async (method: string, directory = slot.projectDirectory, input?: unknown) => (await client.rpc.call({ rpcID: "package-effect", method, input, location: { directory } })).output
   let refreshes = 0
-  const stop = watchExplicitSources({ file, userConfig: user, root, layer, skills: () => { refreshes++; return skillGenerationLiveDirs(root) }, log: (line) => { throw Error(line) } })
-  return { root, other, slot, planner, installed, rpc, session, file, snapshots, sources, install, awaitServer, client, refreshes: () => refreshes, close: async () => { stop(); await engine.close(); process.chdir(previous) } }
+  const watch = () => watchExplicitSources({ file, userConfig: user, root, layer, skills: () => { refreshes++; return skillGenerationLiveDirs(root) }, log: (line) => { throw Error(line) } })
+  let stop = watch()
+  const pauseWatcher = () => stop()
+  const resumeWatcher = () => {
+    stop = watch()
+    // The stopped watcher deliberately missed the package change. A real input event after
+    // resuming makes it reread that state, without editing any project file or package state.
+    writeFileSync(user, readFileSync(user))
+  }
+  return { root, other, slot, planner, installed, rpc, session, file, snapshots, sources, install, awaitServer, client, pauseWatcher, resumeWatcher, refreshes: () => refreshes, close: async () => { stop(); await engine.close(); process.chdir(previous) } }
 }
 
 for (const initial of ["global", "project"] as const) test(`disabled managed skill stays absent with stale explicit config (${initial})`, async () => {
@@ -97,6 +105,7 @@ for (const initial of ["global", "project"] as const) test(`disabled managed ski
     const skill = skills.find((skill) => skill.name === "frontend-design")
     expect((await h.rpc("use", undefined, { sessionID: h.session.id, id: skill.id })).content).toContain("Frontend Design")
     expect((await h.rpc("skills", h.other)).some((skill) => skill.name === "frontend-design")).toBe(initial === "global")
+    h.pauseWatcher()
     const refreshes = h.refreshes()
     const stale = readFileSync(h.file, "utf8")
     expect(await setPackageStateV1({ packageId: h.installed.packageId, state: "disabled" }, h.planner)).toMatchObject({ ok: true })
@@ -104,10 +113,12 @@ for (const initial of ["global", "project"] as const) test(`disabled managed ski
     expect(JSON.parse(readFileSync(join(h.root, "skills-enabled.json"), "utf8"))).toEqual({ v: 2, keys: [], scoped: [] })
     expect(readFileSync(h.file, "utf8")).toBe(stale)
     expect((await h.rpc("rebuild")).some((skill) => skill.name === "frontend-design")).toBe(false)
-    // Fail if this did not hit the actual production 100 ms config-refresh window.
+    // Watcher is paused: prove tail/evaluate exclusion with the stale explicit paths,
+    // even when RPCs exceed the production debounce.
     expect(readFileSync(h.file, "utf8")).toBe(stale)
     expect(await h.rpc("use", undefined, { sessionID: h.session.id, id: skill.id })).toEqual({ denied: true })
     expect(h.refreshes()).toBe(refreshes)
+    h.resumeWatcher()
     await until(async () => h.refreshes(), (count) => count > refreshes)
     expect([snapshot(h.slot.projectDirectory), snapshot(h.other)]).toEqual(h.snapshots)
   } finally { await h.close() }
@@ -124,6 +135,7 @@ test("scope change cannot revive a parsed skill in another project", async () =>
     if (!identity.ok) throw Error(identity.reason)
     const graph = { ...before, effect: identity.scope }
     graph.installedGraphDigest = computeInstalledGraphDigest(graph)
+    h.pauseWatcher()
     const refreshes = h.refreshes()
     const stale = readFileSync(h.file, "utf8")
     expect(applyPackageMutation(h.root, { operation: "update", transactionId: "scope-change", graphBeforeDigest: before.installedGraphDigest, graphAfter: graph, claimMutations: [], childRecordMutations: [] })).toMatchObject({ ok: true })
@@ -133,6 +145,7 @@ test("scope change cannot revive a parsed skill in another project", async () =>
     expect(readFileSync(h.file, "utf8")).toBe(stale)
     expect((await h.rpc("rebuild")).some((skill) => skill.name === "frontend-design")).toBe(true)
     expect(h.refreshes()).toBe(refreshes)
+    h.resumeWatcher()
     await until(async () => h.refreshes(), (count) => count > refreshes)
   } finally { await h.close() }
 }, 90000)

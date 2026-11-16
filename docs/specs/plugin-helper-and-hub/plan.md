@@ -922,3 +922,5 @@ B8 FIXED：source table 提供只读 displayNameForId（捕获包在既有转换
 - r14 B9 FIXED：搜索来源按 `reason`、安装结果按 `code` 映射中英文文案，文件夹安装失败同样消费代码；时间线未安装成功使用「未能安装」，已安装但运行失败仍保留实际运行状态。修改的是审核明确替代的原始英文断言，红例命中三处来源/候选/卡片；四个 renderer 相关宿主与 ui-mac typecheck exit 0（`/tmp/helper-install-r14/b9-green.log`）。
 
 - r14 C4 FIXED：两个真实 Playwright 宿主从独有空 npm 缓存起步；每个公开包用空 npmrc、官方 registry、零重试、45 s 请求/120 s 进程界限预取，失败报告 `ENGINE_NPM_PREFETCH_FAILED`。预取实际 `@latest`（本轮 0.0.85）与 scope 用的 0.0.77，随后所有引擎子进程固定此缓存并 `offline=true`，运行中不再解析上游 dist-tag；真实样本 `npx @playwright/mcp@latest` 字节未改。空离线缓存对照 `c4-red.log` spawn_failed；修复后两个宿主及内层 2+5 真引擎用例通过，ui-mac typecheck exit 0；不依赖人工预热目录。
+
+- r14 C5 FIXED：真实 Codex Figma（先 MCP config、后一个 skill generation）在技能写出后注入 populate 失败，零 records/graph、零激活；成功臂全部组件共用一个非空 transaction.id。新增真实 Context7 与用户已有远程 MCP 同名例确实变红：`listConfiguredMcpServerNamesStrict` 漏读独立真源，沿既有严格读端补入名称后新包自动避让且用户叶原值不变。相关 `install-from-source/ext-config/mcp-server-derivation` 133 pass、typecheck exit 0。自身断言修正 `5334d225ed`：config action 不调用 populate，失败点改到实际的唯一 generation；仍在 MCP 已 staging 后，保留所有回滚与身份断言。

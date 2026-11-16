@@ -40,6 +40,7 @@ import { assertProjectCodePuppyRootIdentity } from "./codepuppy-workdir"
 import { writeFileAtomicSync } from "./ext-atomic-fs"
 import { classifyBaseUrl } from "./network-egress-derived"
 import { CLOUD_MCP_SERVER_NAME } from "./cloud-web-search"
+import { readMcpServerTruthFromEnvironment } from "./mcp-server-records"
 import { findMcpServerRecord, removeMcpServerRecord, upsertMcpServerRecord } from "./mcp-server-lifecycle"
 import { invalidMcpServerRecord, remoteMcpLeaf, type McpServerRecord } from "./mcp-server-truth"
 
@@ -1299,6 +1300,9 @@ function legalPluginEntry(x: unknown): boolean {
  *  吊销别家在用凭证。任一源不可读/解析失败 = 集合不可信(strict 调用方必须失败)。 */
 export function listConfiguredMcpServerNamesStrict(): { ok: true; names: string[] } | { ok: false; reason: string } {
   const names = new Set<string>()
+  const remote = readMcpServerTruthFromEnvironment(() => {})
+  if (!remote.ok && !("unresolved" in remote)) return { ok: false, reason: remote.reason }
+  if (remote.ok) for (const server of remote.servers) names.add(server.name)
   const isRec = (v: unknown): v is Record<string, unknown> => !!v && typeof v === "object" && !Array.isArray(v)
   for (const file of [mcpPluginTargetPath(), ...legacyConfigPaths(mcpPluginTargetPath())]) {
     try {

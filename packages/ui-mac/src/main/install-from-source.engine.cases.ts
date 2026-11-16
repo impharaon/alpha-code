@@ -1,3 +1,4 @@
+import { ClientApi } from "../../../protocol/src/client"
 import { test, expect } from 'bun:test'
 import { mkdirSync, writeFileSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
@@ -7,6 +8,7 @@ import { engineClient } from "./engine-client"
 import { publishTestBootstrap } from "../../test-component/codepuppy-bootstrap-fixture"
 import { publishInProcessEngine } from "./in-process-engine"
 const repo = join(import.meta.dir, "../../../..")
+const reloadEndpoint = ClientApi.groups["server.location"].endpoints["location.reload"]
 const sandbox = engineSandbox()
 import { createSourceInstaller } from "./install-from-source"
 import { createPluginSources } from "./plugin-sources"
@@ -49,7 +51,7 @@ export default { id:'test.slice-a-observer', setup:async(ctx)=>{
  const previous=process.cwd(); process.chdir(slot.projectDirectory)
  const {startEngine}=await import("../../engine/engine-embed")
  let reloads=0
- const start=()=>startEngine(buildEngineServerOptions({hostname:'127.0.0.1',port:0,password:'slice-a-probe',engineVersion:'test',databasePath:slot.databasePath,configDirectory:slot.configDirectory,config:{file:join(globalRoot,'codepuppy.jsonc'),content:JSON.stringify({plugins:[ext,observer]})},models:{fetch:false},filewatcher:false,platform:process.platform}),{projectTrust:()=>true,onDispatch:(dispatch)=>publishInProcessEngine(async(request)=>{if(new URL(request.url).pathname==='/api/location/reload') reloads++;return dispatch(request)})})
+ const start=()=>startEngine(buildEngineServerOptions({hostname:'127.0.0.1',port:0,password:'slice-a-probe',engineVersion:'test',databasePath:slot.databasePath,configDirectory:slot.configDirectory,config:{file:join(globalRoot,'codepuppy.jsonc'),content:JSON.stringify({plugins:[ext,observer]})},models:{fetch:false},filewatcher:false,platform:process.platform}),{projectTrust:()=>true,onDispatch:(dispatch)=>publishInProcessEngine(async(request)=>{if(request.method===reloadEndpoint.method && new URL(request.url).pathname===reloadEndpoint.path) reloads++;return dispatch(request)})})
  let engine=await start()
  try {
  let client=engineClient({url:engine.url,username:'opencode',password:'slice-a-probe'})

@@ -1,3 +1,4 @@
+import { ClientApi } from "../../../protocol/src/client"
 // Real desktop main IPC, ext scheduler and engine in an isolated HOME/XDG/database.
 // Package bytes: hub-package.fixture (unmodified alpha-web 0bb739ce). MCP transport:
 // core/test/fixture/mcp-echo.ts, not a claimed GitHub/Supabase service acceptance.
@@ -13,6 +14,7 @@ import type { Running } from "../../test-component/codepuppy-engine"
 import type { ReloadRequestMessage, ReloadReportMessage } from "./codepuppy-sidecar-messages"
 import type { PackageAuthorizationResultV1 } from "../shared/package-admission"
 
+const reloadEndpoint = ClientApi.groups["server.location"].endpoints["location.reload"]
 const sandbox = engineSandbox()
 const sample = hubPackageFixture()
 const nativeFetch = globalThis.fetch
@@ -196,7 +198,7 @@ beforeAll(async () => {
   const { injectCodePuppyConfig } = await import("./codepuppy-config-injection")
   const { publishInProcessEngine } = await import("./in-process-engine")
   publishInProcessEngine((request) => {
-    if (new URL(request.url).pathname === "/api/location/reload") locationReloads++
+    if (request.method === reloadEndpoint.method && new URL(request.url).pathname === reloadEndpoint.path) locationReloads++
     return running!.fetch(request)
   })
   const { registerExtIpcHandlers } = await import("./ext-ipc")

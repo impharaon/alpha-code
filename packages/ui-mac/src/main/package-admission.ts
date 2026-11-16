@@ -1,16 +1,16 @@
 import { isOfficialConnector } from "./official-connector-recipes"
 import { collectOldOfficialConnectorVersions, releaseOfficialConnectorResources, restoreCommittedOfficialConnectors } from "./official-connector-resources"
 import { createHash } from "node:crypto"
-import { isAbsolute, basename } from "node:path"
+import { isAbsolute, basename, dirname } from "node:path"
 import { existsSync } from "node:fs"
 import type { AppEnvironment } from "./codepuppy-environment"
-import { collectMcpFileRefPaths, newMcpSecretVersionId } from "./codepuppy-mcp-secrets"
+import { collectMcpFileRefPaths, mcpSecretVersionedRef, newMcpSecretVersionId } from "./codepuppy-mcp-secrets"
 import { agentMdToEntry } from "./agent-md-entry"
 import { evaluateBundleAuthorization, evaluateCapabilityDiff, isSafeCapability, type CapabilityDiff } from "./ext-capability-grants"
 import { recoveryReceiptInputs } from "./ext-agent-install"
 import { nextDesiredState } from "./ext-install-policy"
 import { promotePayloadToCas, setPackageStateV1, type PlannerDeps } from "./ext-install-planner"
-import { persistMcp, readMcpLeafStrict } from "./ext-config"
+import { persistMcp, readMcpLeafStrict, withConfigWriteLock } from "./ext-config"
 import { canonicalJson, sha256Hex } from "./ext-manifest-v2"
 import { buildAgentTxItems, buildCloudTxItems, buildCommandTxItems, buildDepartingChildConfigItemsV1, buildMcpTxItems, buildSkillTxItems } from "./ext-package-tx-builders"
 import { computeGrantDigest, readPackageLedgerStateV1, type UpsertInput } from "./ext-receipt-v2"
@@ -504,9 +504,17 @@ export async function savePackageSecretsV1(input: unknown, deps: PackageAdmissio
   const declared = resolved.facts.components.flatMap((component) => component.prerequisite.items.map((item) => item.prerequisiteId))
   if (Object.keys(secrets).some((key) => !declared.includes(key))) return { ok: false, reason: "undeclared package credential" }
   const builds: PackageTxBuildV1[] = []
+  const superseded: TxPreparedResourceV1[] = []
   for (const component of resolved.facts.components) {
     if (!component.prerequisite.items.some((item) => secrets[item.prerequisiteId] !== undefined)) continue
     const record = resolved.records.find((entry) => entry.id === component.component.id)!
+    const leaf = readMcpLeafStrict(record.name)
+    if (!leaf.ok) return { ok: false, reason: "package credential configuration could not be read" }
+    for (const file of collectMcpFileRefPaths(leaf.value)) {
+      const version = basename(dirname(file))
+      if (isOfficialConnector(record.name) || mcpSecretVersionedRef(deps.userDataPath, record.name, version, basename(file)) === `{file:${file}}`)
+        superseded.push({ kind: "mcp-secret-version", store: isOfficialConnector(record.name) ? "official-connectors" : "codepuppy-mcp-secrets", server: record.name, version })
+    }
     const built = buildMcpTxItems({
       root: deps.root(), key: packageChildTxKeyV1("mcp", record.name), name: record.name,
       capabilities: packageAuthorizationCapabilitiesV1(component.component), manifestDigest: record.manifestDigest!, receipt: { ...record },
@@ -519,7 +527,9 @@ export async function savePackageSecretsV1(input: unknown, deps: PackageAdmissio
   if (!builds.length) return { ok: true }
   const resources = builds.flatMap((build) => build.prepared ? [build.prepared] : [])
   const result = await (deps.transaction ?? runExtensionTransaction)(deps.root(), {
-    items: builds.flatMap((build) => build.items),
+    items: builds.flatMap((build) => build.items).map((item, index) => index === 0 ? { ...item, packageMutation: {
+      operation: "update", graphBeforeDigest: resolved.graph.installedGraphDigest, graphAfter: resolved.graph, claimMutations: [], childRemovals: [],
+    } satisfies PackageMutationEnvelopeV1 } : item),
     prepared: resources.map((resource) => resource.descriptor),
     authorization: { confirmed: Object.fromEntries(builds.flatMap((build) => build.items.map((item) => [item.key, item.capabilities ?? []]))), decidedAt: (deps.now?.() ?? new Date()).toISOString() },
   }, {
@@ -545,7 +555,18 @@ export async function savePackageSecretsV1(input: unknown, deps: PackageAdmissio
   })
   if (!result.ok) return { ok: false, reason: "package credentials could not be saved" }
   const published = publishPackageMcp(builds)
-  return { ok: true, ...(!published.ok ? { warning: published.reason } : {}) }
+  const warnings = published.ok ? [] : [published.reason]
+  if (published.ok) try {
+    const cleaned = withConfigWriteLock(() => {
+      if (resources.some((resource) => resource.descriptor.store === "official-connectors")) restoreCommittedOfficialConnectors()
+      releaseOfficialConnectorResources(deps.userDataPath, superseded)
+      return { ok: true as const }
+    })
+    if (!cleaned.ok) warnings.push("package superseded credential cleanup failed")
+  } catch {
+    warnings.push("package superseded credential cleanup failed")
+  }
+  return { ok: true, ...(warnings.length ? { warning: warnings.join("; ") } : {}) }
 }
 
 // The transaction owns content/config. After commit the existing main-only MCP writer publishes

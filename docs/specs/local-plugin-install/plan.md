@@ -159,3 +159,6 @@ r3 收口（Codex / GPT-6，约 40 分钟，生产累计 22 文件，仍在 20�
 
 
 r4 A 补红（2026-11-16）：ui-mac `bun test --max-concurrency 2 src/main/package-admission.test.ts -t 'package credential replacement preserves'` exit 1，0 pass / 1 fail；仅经原包保存/更换令牌，claims 多出 standalone:mcp:github。新例同时要求 graph/claims 不变、成功后旧版本删除、exact replay 字节不变、落账失败旧值仍可用；继承 r3 全生命周期失败断言不改。r4 明确授权在现有单一账本写入及事务/恢复链表达同图凭据更新，未新增记录族或迁移。
+
+
+r4 A 实施：同图的 MCP 凭据 update 由原 applyPackageMutation 按 child transaction identity 判新写/重放，保留原 graph/claims；savePackageSecretsV1 携既有 package mutation 进入原 journal/commit/recovery，不新增 writer/记录族。成功发布后沿原资源清理权威删除旧版本；失败不清理。`bun test --max-concurrency 2 src/main/package-admission.test.ts src/main/ext-package-ledger-v3.test.ts src/main/ext-package-ledger-commit.test.ts src/main/ext-receipt-v2.test.ts src/main/package-secret-recovery-wiring.test.ts` exit 0（实际四文件 112 pass）；`bun test --max-concurrency 2 src/main/package-admission.test.ts src/main/package-hub-lifecycle.engine.test.ts` exit 0（23 pass，生命周期实际三例全绿）；`bun typecheck` exit 0。继承 r3 生命周期失败断言未改。A 的原接缝阻塞解除，官方连接器发布/保存态审查项另续。

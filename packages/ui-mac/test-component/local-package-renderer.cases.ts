@@ -245,6 +245,8 @@ const extBridge: Record<string, unknown> = {
   importClaudePluginCancel: (previewId: unknown) => call(PRELOAD_CHANNELS.importClaudePluginCancel, previewId),
   importClaudePluginConfirm: (previewId: unknown) => call(PRELOAD_CHANNELS.importClaudePluginConfirm, previewId),
   installedPackages: () => call(PRELOAD_CHANNELS.installedPackages),
+  setPackageState: (intent: unknown) => call("ext-set-package-state", intent),
+  packageAuthorization: (packageId: string) => call("ext-package-authorization", packageId),
   listInstalls: (projectDir?: unknown) => call("ext-list-installs", projectDir),
   inventoryView: (projectDir?: unknown) => call("ext-inventory-view", projectDir),
   setInstallState: (intent: unknown) => call(GATED_WRITE_CHANNELS.setInstallState, intent),
@@ -421,7 +423,7 @@ function click(element: Element | null | undefined): void {
 const q = <T extends Element = HTMLElement>(selector: string): T | null => document.querySelector<T>(selector)
 const qa = (selector: string): HTMLElement[] => Array.from(document.querySelectorAll<HTMLElement>(selector))
 const toasts = (): string[] => qa(".a-toast").map((node) => node.textContent ?? "")
-const clearToasts = (): void => qa(".a-toast").forEach((node) => node.remove())
+const clearToasts = (): void => qa(".a-toast-x").forEach((node) => node.click())
 const previewDialog = () => q("[data-local-package-preview]")
 const packCard = (packageId: string) => q(`[data-installed-package="${packageId}"]`)
 
@@ -667,20 +669,15 @@ describe("REQ-128 Phase 3 第 1→9 跳(生产 renderer × 生产 main,端到端
     expect(card.querySelector('[data-package-label="local:tide"]')?.textContent).toBe("tide")
     expect(card.textContent).not.toContain("tide-folder-name")
     expect(card.querySelector('[data-package-label="local:tide"]')?.textContent).not.toBe("postmarket-review")
-    expect(card.textContent).toContain(zh["codepuppy.ext.packageAllOffRow"].replace("{{count}}", "2"))
+    expect(card.textContent).toContain(zh["codepuppy.ext.packageOff"])
     // 来源只从 child record 的 origin 读,留作行的属性;`#1594` AC3:来源与版本不在列表行上。
     expect(card.getAttribute("data-package-origin")).toBe("imported-claude")
     expect(card.textContent).not.toContain("v0.1.0")
-    // 包内技能各是技能页「已安装」组里的一行:「未开启」+「开启」(`#1594` AC7)。
+    // 包图归属先加载:技能页也是一行包,不再展开组件卡。
     setHubSection("skills")
-    await waitFor(() =>
-      expect(qa('[data-enable-row^="skill:p"]').map((n) => n.getAttribute("data-enable-row")).sort()).toEqual([
-        "skill:postmarket-review",
-        "skill:premarket-briefing",
-      ]),
-    )
+    await waitFor(() => expect(packCard("local:tide")).toBeInstanceOf(HTMLElement))
     for (const name of ["postmarket-review", "premarket-briefing"])
-      expect(q(`[data-installed-row="skill:${name}"] .codepuppy-ext-kit-desc`)?.textContent).toBe(zh["codepuppy.ext.notOn"])
+      expect(q(`[data-installed-row="skill:${name}"]`)).toBeNull()
 
     // G20 前半:confirm 成功 ⇒ 引擎被要求重扫(`#1529`:一条发往 ext 调度器的重载请求;renderer 自己不 dispose)。
     expect(reloadRequests.filter((m) => m.type === "codepuppy.reload.request").length).toBeGreaterThan(0)
@@ -689,60 +686,36 @@ describe("REQ-128 Phase 3 第 1→9 跳(生产 renderer × 生产 main,端到端
     expect(toasts().join("\n")).toContain(zh["codepuppy.ext.localPackageInstalled"].replace("{{count}}", "2"))
   })
 
-  test("第 9 跳:显示未启用 → 用户点「开启」→ **引擎允许集里当场出现它** → 引擎重载", async () => {
+  test("第 9 跳:整包开关启用全部技能,生产注入允许集与包状态一致", async () => {
     reloadRequests.length = 0
     expect(await engineInjectedSkillPaths()).toEqual([])
-    click(q('[data-enable-row="skill:premarket-briefing"]'))
-
-    // 「下一条消息里技能真可用」在无头进程里可判的最强形式:**跑生产引擎的 config hook**,
-    // 看它到底往 `cfg.skills.paths` 里注入了什么。这条链包含允许集版本闸、SAFE_KEY、
-    // live generation 指针与目录存在性 —— 全部真跑,不是「我读了那个文件」。
-    await waitFor(async () => expect(injectedSkillNames(await engineInjectedSkillPaths())).toEqual(["premarket-briefing"]))
+    click(packCard("local:tide")!.querySelector('[data-more]'))
+    await waitFor(() => expect(q('[role="switch"]')).toBeInstanceOf(HTMLElement))
+    click(q('[role="switch"]'))
+    await waitFor(async () => expect(injectedSkillNames(await engineInjectedSkillPaths())).toEqual(["postmarket-review", "premarket-briefing"]))
     const injected = await engineInjectedSkillPaths()
-    // 注入的是**这个技能的 live generation 目录**,不是随便一个存在的路径。
-    expect(injected).toHaveLength(1)
-    expect(injected[0]).toContain(join(globalRoot, "ext-store", "skill--premarket-briefing", "generations"))
-    expect(existsSync(injected[0]!)).toBe(true)
-    // 另一个仍然是关的 —— 界面**没有**「贴心地」替用户多打开一个。
-    expect(injectedSkillNames(injected)).not.toContain("postmarket-review")
-    expect(engineAllowSet()).toEqual(["skill--premarket-briefing"])
-    // 拨开关同时请引擎重载(`use-extensions.setInstallState` → `ext-reload-request`)。
+    expect(injected).toHaveLength(2)
+    for (const directory of injected) expect(existsSync(directory)).toBe(true)
+    expect(engineAllowSet()).toEqual(["skill--postmarket-review", "skill--premarket-briefing"])
     await waitFor(() => expect(reloadRequests.filter((m) => m.type === "codepuppy.reload.request").length).toBeGreaterThan(0))
-
-    // 这一行的「开启」随之消失;包那一行不再说「都未开启」。
-    await waitFor(() => expect(q('[data-enable-row="skill:premarket-briefing"]')).toBeNull())
-    expect(q('[data-enable-row="skill:postmarket-review"]')).toBeInstanceOf(HTMLElement)
     await gotoInstalled()
-    await waitFor(() =>
-      expect(packCard("local:tide")!.textContent).not.toContain(zh["codepuppy.ext.packageAllOffRow"].replace("{{count}}", "2")),
-    )
+    await waitFor(() => expect(packCard("local:tide")!.textContent).not.toContain(zh["codepuppy.ext.packageOff"]))
   })
 
-  test("第 8 跳:包内单个技能点「移除」⇒ **明确拒绝 + 指向整包移除**,实物一个字节不动", async () => {
-    clearToasts()
+  test("第 8 跳:包内组件不再单独占行,包管理保留同一安装身份且不改实物", async () => {
     const beforeSkills = ledgerSkillNames()
     const beforeInjected = await engineInjectedSkillPaths()
     setHubSection("skills")
-    await waitFor(() => expect(q('[data-installed-row="skill:premarket-briefing"]')).toBeInstanceOf(HTMLElement))
-    const row = q('[data-installed-row="skill:premarket-briefing"]')
-    // `#1594`:移除在行上的「…」里。
-    await chooseFromMenu(row, "remove")
-
-    await waitFor(() => expect(q('[data-row-refusal="skill:premarket-briefing"]')).toBeInstanceOf(HTMLElement))
-    const refusal = q('[data-row-refusal="skill:premarket-briefing"]')!
-    // 包在界面上的名字 = **插件作者声明的名字**(`#784`)。写死这个值是刻意的:
-    // 从 projection 里现算一个期望值,等于让错误实现自己给自己打分。
-    expect(refusal.textContent).toContain(zh["codepuppy.ext.componentOwnedByPackage"].replace("{{pack}}", "tide"))
-    // 「怎么办」必须给得出来:点下去落到连接器页的那个扩展包上。
-    expect(refusal.querySelector("[data-goto-package]")?.getAttribute("data-goto-package")).toBe("local:tide")
-    click(refusal.querySelector("[data-goto-package]"))
     await waitFor(() => expect(packCard("local:tide")).toBeInstanceOf(HTMLElement))
-    // **不是假成功**:没有任何一条 toast 说「已移除」。
-    expect(toasts().join("\n")).not.toContain(zh["codepuppy.ext.removed"])
-    // 实物没动。
+    expect(q('[data-installed-row="skill:premarket-briefing"]')).toBeNull()
+    await chooseFromMenu(packCard("local:tide"), "manage")
+    await waitFor(() => expect(q('[data-package-detail="local:tide"]')).toBeInstanceOf(HTMLElement))
+    await waitFor(() => expect(q('[data-package-detail]')?.textContent).toContain("账户"))
     expect(ledgerSkillNames()).toEqual(beforeSkills)
     expect(await engineInjectedSkillPaths()).toEqual(beforeInjected)
     expect(ledgerPackageIds()).toEqual(["local:tide"])
+    click(q('.codepuppy-ext-crumb-link'))
+    await gotoInstalled()
   })
 
   test("移除失败**必须显示失败** —— `ok` 之外任何东西不许读成「已移除」", async () => {
@@ -757,7 +730,7 @@ describe("REQ-128 Phase 3 第 1→9 跳(生产 renderer × 生产 main,端到端
     // 包**仍然留在列表里**,错误就在卡上。
     expect(packCard("local:tide")).toBeInstanceOf(HTMLElement)
     expect(q('[data-package-error="local:tide"]')!.textContent).toContain(zh["codepuppy.ext.error.removePackage"])
-    expect(toasts().join("\n")).not.toContain(zh["codepuppy.ext.packageRemoved"])
+    expect(toasts().join("\n")).not.toContain("已移除『tide』")
     expect(ledgerPackageIds()).toEqual(["local:tide"])
     expect(ledgerSkillNames()).toEqual(["postmarket-review", "premarket-briefing"])
   })
@@ -765,7 +738,7 @@ describe("REQ-128 Phase 3 第 1→9 跳(生产 renderer × 生产 main,端到端
   test("第 7 跳(+ G20 后半):整包移除 ⇒ 卡消失、账本清零、**引擎允许集清空**、引擎重载", async () => {
     clearToasts()
     reloadRequests.length = 0
-    expect(injectedSkillNames(await engineInjectedSkillPaths())).toEqual(["premarket-briefing"])
+    expect(injectedSkillNames(await engineInjectedSkillPaths())).toEqual(["postmarket-review", "premarket-briefing"])
     await removePackage("local:tide")
 
     await waitFor(() => expect(packCard("local:tide")).toBeNull())
@@ -775,7 +748,7 @@ describe("REQ-128 Phase 3 第 1→9 跳(生产 renderer × 生产 main,端到端
     // 于是技能一直能用到下次重启。这就是 G20 钉的那条接线。
     expect(await engineInjectedSkillPaths()).toEqual([])
     expect(reloadRequests.filter((m) => m.type === "codepuppy.reload.request").length).toBeGreaterThan(0)
-    expect(toasts().join("\n")).toContain(zh["codepuppy.ext.packageRemoved"])
+    expect(toasts().join("\n")).toContain("已移除『tide』")
   })
 
   test("重载请求这次没被受理 ⇒ 如实说「待重载」,不谎报已生效", async () => {
@@ -875,7 +848,6 @@ describe("REQ-128 Phase 3 第 1→9 跳(生产 renderer × 生产 main,端到端
       writeFileSync(ledgerFile, "{ this is not json", "utf8")
       // 走用户真走得到的路径:离开连接器页再回来 ⇒ 重读一次。
       await leaveInstalled()
-      await waitFor(() => expect(q("[data-installed-package]")).toBeNull())
       setHubSection("connectors")
       await waitFor(() => expect(q("[data-packages-unreadable]")).toBeInstanceOf(HTMLElement))
 

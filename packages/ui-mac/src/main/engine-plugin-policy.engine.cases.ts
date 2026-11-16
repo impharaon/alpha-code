@@ -183,7 +183,7 @@ for (const arm of ["allowed", "unallowed"] as const) {
       const user = JSON.parse(fs.readFileSync(injection.explicit!.userConfig!, "utf8")) as { policies?: unknown[] }
       const userFile = path.join(root, `${arm}-user-without-deny.json`)
       write(userFile, JSON.stringify({ ...user, policies: [] }))
-      writeExplicitConfig(file, userFile, injection.explicit!.layer)
+      writeExplicitConfig(file, userFile, injection.explicit!.layer, injection.explicit!.root)
       const opposite = await engineWith(`${arm}-without-user-deny`, { ...injection.config, file }, injection.models.file)
       await opposite.open(projects.p1)
       expect(opposite.ran()).toContain("global-user-denied")

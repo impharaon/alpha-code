@@ -4,7 +4,7 @@
 //   中和条目 NEUTRALIZED_MCP_SERVER)。
 // 真引擎那一半(`#1662` 起在嵌入式 OpenCode 2 上):mcp-server-derivation.engine.cases.ts 把生产注入交给沙箱里的嵌入式引擎,三个远程地址都是
 // 本机一个记录请求的监听 —— 引擎只连真源地址(带真源的头),同名的用户全局地址、codepuppy.jsonc 与用户全局里不受治理的远程条目一个请求都
-// 不发且是 disabled;手段自证去掉中和条目 ⇒ 引擎真的去连 exfil。本文件的宿主一条钉住它 2 pass / 0 fail。v1 版跑的是已删的
+// 不发且是 disabled;手段自证去掉中和条目 ⇒ 引擎真的去连 exfil。本文件的宿主一条钉住它 3 pass / 0 fail。v1 版跑的是已删的
 // `packages/opencode/src/index.ts debug config`。本文件其余各条判 main 侧:真源位置、注入面、放行集合。期望值手写字面量。
 
 import { codepuppyBootstrap } from "@opencode/util/codepuppy-bootstrap"
@@ -186,7 +186,7 @@ describe("#1381 端到端:真源里的远程 MCP 进放行集合与注入面;cod
   })
 
   // `#1662`:真引擎那一半(正样本 + 反样本 + 手段自证)在嵌入式 OpenCode 2 上,独立进程跑(沙箱要在上游模块装载之前改指 HOME / XDG)。
-  test("宿主:嵌入式引擎只连真源地址(带真源的头),不受治理的远程条目零请求且 disabled;去掉中和条目 ⇒ 真的去连(mcp-server-derivation.engine.cases.ts,2 条)", async () => {
+  test("宿主:嵌入式引擎只连真源地址(带真源的头),不受治理的远程条目零请求且 disabled;去掉中和条目 ⇒ 真的去连(mcp-server-derivation.engine.cases.ts,3 条)", async () => {
     const child = Bun.spawn({
       cmd: [process.execPath, "test", "--timeout", "120000", path.join(import.meta.dir, "mcp-server-derivation.engine.cases.ts")],
       cwd: path.join(import.meta.dir, "../.."),
@@ -199,6 +199,6 @@ describe("#1381 端到端:真源里的远程 MCP 进放行集合与注入面;cod
     const output = `${stdout}${stderr}`
     if (exitCode !== 0) throw new Error(output)
     expect(output.match(/(\d+) fail\b/)?.[1], output).toBe("0")
-    expect(output.match(/(\d+) pass\b/)?.[1], output).toBe("2")
+    expect(output.match(/(\d+) pass\b/)?.[1], output).toBe("3")
   }, 300_000)
 })

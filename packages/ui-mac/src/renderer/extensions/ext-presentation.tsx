@@ -112,7 +112,7 @@ export const LockIc = () => (
   </svg>
 )
 
-export type MoreMenuItem = { key: string; label: string; onSelect: () => void; disabled?: boolean; danger?: boolean }
+export type MoreMenuItem = { key: string; label: string; onSelect: () => void; disabled?: boolean; danger?: boolean; checked?: boolean }
 
 // 同一时刻只开一个菜单:点开另一个「…」时上一个自动收起。
 const [openMenu, setOpenMenu] = createSignal<object | null>(null)
@@ -129,7 +129,14 @@ createRoot(() =>
  * `#1594`(批准稿 `#hub-add` / `#hub-skills`):定制中心行上的「…」与页头的「添加 ▾」—— 一颗按钮,
  * 点开一列动作。点菜单外任意处收起。按钮与菜单项都拦住冒泡:行本身点下去是进详情页,不能顺带触发。
  */
-export function MoreMenu(p: { id: string; items: MoreMenuItem[]; trigger?: string; primary?: boolean; disabled?: boolean }) {
+export function MoreMenu(p: {
+  id: string
+  items: MoreMenuItem[]
+  label?: string
+  trigger?: string
+  primary?: boolean
+  disabled?: boolean
+}) {
   const self = {}
   const open = () => openMenu() === self
   const setOpen = (value: boolean) => setOpenMenu(value ? self : null)
@@ -144,7 +151,7 @@ export function MoreMenu(p: { id: string; items: MoreMenuItem[]; trigger?: strin
         data-more={p.id}
         aria-haspopup="menu"
         aria-expanded={open()}
-        aria-label={p.trigger ? undefined : t("codepuppy.ext.more")}
+        aria-label={p.label ?? (p.trigger ? undefined : t("codepuppy.ext.more"))}
         title={p.trigger ? undefined : t("codepuppy.ext.more")}
         disabled={p.disabled}
         onClick={(ev) => {
@@ -158,20 +165,49 @@ export function MoreMenu(p: { id: string; items: MoreMenuItem[]; trigger?: strin
         <div class="codepuppy-ext-menu" role="menu" data-menu={p.id}>
           <For each={p.items}>
             {(item) => (
-              <button
-                class="codepuppy-ext-menu-item"
-                role="menuitem"
-                data-menu-item={item.key}
-                data-variant={item.danger ? "danger" : undefined}
-                disabled={item.disabled}
-                onClick={(ev) => {
-                  ev.stopPropagation()
-                  setOpen(false)
-                  item.onSelect()
-                }}
+              <Show
+                when={item.checked !== undefined}
+                fallback={
+                  <button
+                    class="codepuppy-ext-menu-item"
+                    role="menuitem"
+                    data-menu-item={item.key}
+                    data-variant={item.danger ? "danger" : undefined}
+                    disabled={item.disabled}
+                    onClick={(ev) => {
+                      ev.stopPropagation()
+                      setOpen(false)
+                      item.onSelect()
+                    }}
+                  >
+                    {item.label}
+                  </button>
+                }
               >
-                {item.label}
-              </button>
+                <label
+                  class="codepuppy-ext-menu-item"
+                  role="menuitemcheckbox"
+                  aria-checked={item.checked}
+                  data-menu-item={item.key}
+                  data-switch=""
+                  onClick={(event) => event.stopPropagation()}
+                >
+                  {item.label}
+                  <button
+                    class="codepuppy-ext-sw"
+                    role="switch"
+                    aria-label={item.label}
+                    aria-checked={item.checked}
+                    data-on={item.checked ? "" : undefined}
+                    disabled={item.disabled}
+                    onClick={(event) => {
+                      event.stopPropagation()
+                      setOpen(false)
+                      item.onSelect()
+                    }}
+                  />
+                </label>
+              </Show>
             )}
           </For>
         </div>

@@ -68,7 +68,7 @@ import {
   type PackageArtifactInstallersV1,
   type PackageArtifactRemovalV1,
 } from "./ext-package-uninstall"
-import { decodeCatalogInstallIntent, decodeSetStateIntent, decodeUninstallIntent, installCatalog, installUncuratedAgentImport, installUncuratedSkillImport, listGenerationsByKey, removeInstallGrants, resolveCatalogInstallWriteRoot, rollbackGenerationByKey, setInstallStateByKey, uninstallByKey, type PlannerDeps } from "./ext-install-planner"
+import { decodeCatalogInstallIntent, decodeSetStateIntent, decodeUninstallIntent, installCatalog, installUncuratedAgentImport, installUncuratedSkillImport, listGenerationsByKey, removeInstallGrants, resolveCatalogInstallWriteRoot, rollbackGenerationByKey, setInstallStateByKey, setPackageStateV1, uninstallByKey, type PlannerDeps } from "./ext-install-planner"
 import { fetchCurationBlob } from "./curation-blobs"
 import { makeRecoveryGate, runVerifiedMutation } from "./ext-recovery-gate"
 // #408:session-grant 会话级启用(main 内存登记 + 栅栏;生命周期接线在 index.ts)。
@@ -89,7 +89,7 @@ import { releaseCodePuppyConnectionBindingsV1 } from "./codepuppy-connection-sto
 import { listTransactionJournals, recoverExtensionTransactions, recoverExtensionTransactionsInHeldLock, recoveryClean, type RecoverOptions } from "./ext-transaction"
 import { getLogger } from "./logging"
 import { resolveVerifiedPackageV1, runCatalogInstallWithPackagePreflight } from "./package-installability"
-import { createPackageAdmissionCoordinator } from "./package-admission"
+import { installDesktopPackageV1, readPackageAuthorizationV1, savePackageSecretsV1, type PackageAdmissionDeps, createPackageAdmissionCoordinator } from "./package-admission"
 import { createPackageMcpOauthEngineV1 } from "./package-mcp-oauth"
 import { PROJECT_HIDDEN_DIR } from "../shared/project-hidden-dir"
 
@@ -390,6 +390,7 @@ export function registerExtIpcHandlers(
       ok: true as const,
       packages: state.packageGraphs.map((graph) => ({
         packageId: graph.packageId,
+        desiredState: recordOf(graph.root.kind, graph.root.name)?.desiredState ?? null,
         installedGraphDigest: graph.installedGraphDigest,
         // `#784`(owner 裁决):插件作者自己声明的显示名。存量图没有这个字段 ⇒ `null`,
         // 由呈现层回退到 root 组件名。**这一栏只管显示**,任何判定都不许读它。
@@ -415,7 +416,7 @@ export function registerExtIpcHandlers(
     (channel, handler) => ipcMain.handle(channel, handler),
     () => refreshRemoteCatalog(userDataPath, registryChannel),
   )
-  const admitPackage = createPackageAdmissionCoordinator({
+  const packageAdmissionDeps: PackageAdmissionDeps = {
     loadVerifiedCatalog: async () => {
       const loaded = await refreshRemoteCatalog(userDataPath, registryChannel)
       return loaded.source === "none"
@@ -438,6 +439,16 @@ export function registerExtIpcHandlers(
     // `#703`:required MCP OAuth 的就绪判据问引擎(authenticated typed route)。接缝缺席时
     // admission 对声明了 mcp-oauth 的包 fail-closed,所以这里必须真接,不是可选优化。
     mcpOauthEngine: createPackageMcpOauthEngineV1(awaitServer),
+  }
+  const admitPackage = createPackageAdmissionCoordinator(packageAdmissionDeps)
+  const packageReloadItems = (packageId: string) => {
+    const state = readPackageLedgerStateV1(codepuppyGlobalRoot(), { sideEffectFree: true })
+    const graph = state.ok ? state.packageGraphs.find((entry) => entry.packageId === packageId) : undefined
+    return [packageId, ...(graph ? [graph.root, ...graph.children].map((node) => node.componentId) : [])].map((id) => ({ id, scope: "global" as const }))
+  }
+  ipcMain.handle("ext-package-authorization", async (_event: IpcMainInvokeEvent, packageId: unknown) => {
+    await ledgerReady
+    return readPackageAuthorizationV1(packageId, packageAdmissionDeps)
   })
   // REQ-128 `#698`:某个 package 在本机装没装(**只读**,不进写通道注册表)。详情页据此决定
   // 要不要显示「移除此扩展包」。只回安全投影:componentId / kind / name / required 与图摘要 ——
@@ -1274,6 +1285,25 @@ export function registerExtIpcHandlers(
       projectDir: (projectDir: unknown) => resolveProjectEntry(projectDir),
     },
     bodies: {
+      installPackage: async (packageId) => {
+        const planner = plannerDeps()
+        const result = await installDesktopPackageV1(packageId, { ...packageAdmissionDeps, advisoryGate: planner.advisoryGate, resolvePackage: planner.resolvePackage })
+        if (!result.ok) return { ok: false, reason: result.reason }
+        const requested = reloads.request({ scope: "global", items: packageReloadItems(packageId as string), reason: `installed package ${packageId}`, connectorChange: true })
+        return { ok: true, ...requested, ...(result.warning ? { warning: result.warning } : {}) }
+      },
+      setPackageState: async (intent) => {
+        const result = await setPackageStateV1(intent, plannerDeps())
+        if (!result.ok) return result
+        const packageId = (intent as { packageId: string }).packageId
+        return { ...result, ...reloads.request({ scope: "global", items: packageReloadItems(packageId), reason: `set package state ${packageId}`, force: true, connectorChange: true }) }
+      },
+      savePackageSecrets: async (intent) => {
+        const result = await savePackageSecretsV1(intent, packageAdmissionDeps)
+        if (!result.ok) return result
+        const packageId = (intent as { packageId: string }).packageId
+        return { ...result, ...reloads.request({ scope: "global", items: packageReloadItems(packageId), reason: `saved package credentials ${packageId}`, connectorChange: true }) }
+      },
       installCatalog: async (intent) => {
         const official = !!intent && typeof intent === "object" && "catalogId" in intent &&
           (intent.catalogId === "package:github-official" || intent.catalogId === "package:dbhub-readonly") && "authorization" in intent
@@ -1414,6 +1444,9 @@ export function registerExtIpcHandlers(
   )
   ipcMain.handle(GATED_WRITE_CHANNELS.uninstallV2, barrier(gatedWrite.uninstallV2))
   ipcMain.handle(GATED_WRITE_CHANNELS.uninstallPackage, barrier(gatedWrite.uninstallPackage))
+  ipcMain.handle(GATED_WRITE_CHANNELS.installPackage, barrier(gatedWrite.installPackage))
+  ipcMain.handle(GATED_WRITE_CHANNELS.setPackageState, barrier(gatedWrite.setPackageState))
+  ipcMain.handle(GATED_WRITE_CHANNELS.savePackageSecrets, barrier(gatedWrite.savePackageSecrets))
   ipcMain.handle(GATED_WRITE_CHANNELS.rollback, barrier(gatedWrite.rollback))
   ipcMain.handle(GATED_WRITE_CHANNELS.setInstallState, barrier(gatedWrite.setInstallState))
   ipcMain.handle(GATED_WRITE_CHANNELS.projectResidualsClean, barrier(gatedWrite.projectResidualsClean))

@@ -8,7 +8,7 @@ import { createEngineFetch } from "./index"
 const ENGINE = "http://127.0.0.1:47007"
 const RECONNECT_MS = 1_200
 
-function engine(terminal: "complete" | "failed") {
+function engine(terminal: "complete" | "failed" | "expired", disabled = false) {
   let statusPolls = 0
   let mcpReads = 0
   let completedAt: number | undefined
@@ -29,8 +29,8 @@ function engine(terminal: "complete" | "failed") {
       mcpReads++
       // failed:第一次读到时这台仍在 pending(还在按旧凭证重连),之后才落到 needs_auth —— 适配器若在失败后也等它离开 pending,
       // 就会多读几次、回 needs_auth;不等则只读这一次、原样回 pending。
-      const status =
-        terminal === "failed"
+      const status = disabled ? { status: "disabled" } :
+        terminal !== "complete"
           ? mcpReads === 1
             ? { status: "pending" }
             : { status: "needs_auth", error: "Authorization required" }
@@ -57,6 +57,11 @@ afterEach(() => {
 })
 
 describe("#1668 H1 MCP OAuth 完成后等 MCP 离开 pending", () => {
+  test.each(["complete", "failed", "expired"] as const)("disabled OAuth %s distinguishes authorization from runtime activation", async (terminal) => {
+    const fake = engine(terminal, true)
+    const response = await fake.engineFetch(`${ENGINE}/mcp/docs/auth/authenticate`, { method: "POST" })
+    expect(await response.json()).toMatchObject({ status: terminal === "complete" ? "disabled" : "failed" })
+  }, 10_000)
   test(
     "complete ⇒ 回 connected;紧接着的 /mcp 也是 connected(定制中心判成功)",
     async () => {

@@ -75,6 +75,22 @@ function hooksFor(files: Record<string, string>, extra: Partial<TxHooks> = {}): 
 
 const healthyProbe: HealthProbe = () => ({ healthy: true })
 
+test.each(["tx-skills-12345678", "tx-skills-ffffffff"])("skill generation names are distinct within %s and remain readable", async (txId) => {
+  const keys = ["skill--supabase", "skill--supabase-postgres-best-practices"]
+  const result = await runExtensionTransaction(root, { ...planFor(keys, V1), txId }, hooksFor(V1))
+  expect(result.ok).toBe(true)
+  if (!result.ok) throw new Error(result.reason)
+  const generations = keys.map((key) => readCurrentGeneration(root, key)!.genId)
+  expect(new Set(generations).size).toBe(2)
+  for (const key of keys) {
+    expect(readCurrentGeneration(root, key)!.genId).toMatch(/^gen-000001-[a-f0-9]{8}$/)
+    expect(listGenerations(root, key)).toHaveLength(1)
+    expect(versionOf(root, key)).toBe("v1")
+    expect((await uninstallExtension(root, key, { log: noop })).ok).toBe(true)
+    expect(readCurrentGeneration(root, key)).toBeNull()
+  }
+})
+
 async function installOk(keys: string[], files: Record<string, string>, extra: Partial<TxHooks> = {}) {
   const result = await runExtensionTransaction(root, planFor(keys, files), hooksFor(files, extra))
   if (!result.ok) throw new Error(`install failed: ${result.reason}`)

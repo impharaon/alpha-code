@@ -533,6 +533,11 @@ export function readMcpLeafStrict(
 ): { ok: true; value: Record<string, unknown> | undefined } | { ok: false; reason: string } {
   if (!isExtensionName(name)) return { ok: false, reason: "invalid server name" }
   const target = targetPath ?? mcpPluginTargetPath()
+  if (target === mcpPluginTargetPath()) {
+    const truth = findMcpServerRecord(name, () => {})
+    if (!truth.ok) return truth
+    if (truth.record) return { ok: true, value: remoteLeafFromRecord(truth.record) }
+  }
   try {
     if (!fs.existsSync(target)) return { ok: true, value: undefined }
     // review #379 Major:jsonc-parser 容错解析不抛错(损坏文本静默给部分对象)—— 必须收集

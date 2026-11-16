@@ -25,6 +25,9 @@ export type RootResolution = { ok: true; root: string } | { ok: false; reason: s
 
 export const GATED_WRITE_CHANNELS = {
   installCatalog: "ext-install-catalog",
+  installPackage: "ext-install-package",
+  setPackageState: "ext-set-package-state",
+  savePackageSecrets: "ext-save-package-secrets",
   uninstallV2: "ext-uninstall-v2",
   /** `#698`:整包卸载。与 `uninstallV2` 分开是因为**意图形状不同** —— 这里传的是 packageId,
    *  而 main 要删什么完全由它自己的账本图算出;把它塞进 key-based 卸载会让 renderer 的一次
@@ -94,6 +97,9 @@ export type WriteChannelRoots = {
 }
 
 export type WriteChannelBodies = {
+  installPackage: (packageId: unknown) => Promise<unknown>
+  setPackageState: (intent: unknown) => Promise<unknown>
+  savePackageSecrets: (intent: unknown) => Promise<unknown>
   installCatalog: (intent: unknown) => Promise<unknown>
   uninstallV2: (intent: unknown) => Promise<unknown>
   uninstallPackage: (packageId: unknown) => Promise<unknown>
@@ -119,6 +125,9 @@ export type GatedWriteHandlers = {
 export function buildGatedWriteChannels(deps: { gate: RecoveryGate; roots: WriteChannelRoots; bodies: WriteChannelBodies }): GatedWriteHandlers {
   const { gate, roots, bodies } = deps
   return {
+    installPackage: gatedWriteHandler(gate, roots.global, bodies.installPackage),
+    setPackageState: gatedWriteHandler(gate, roots.global, bodies.setPackageState),
+    savePackageSecrets: gatedWriteHandler(gate, roots.global, bodies.savePackageSecrets),
     // REQ-136 C1:project recovery is itself a mutation, so verified-MCP admission must finish
     // before the gate may replay D. The body re-resolves facts for the actual transaction.
     installCatalog: async (intent) => {

@@ -18,6 +18,7 @@
 import * as fs from "node:fs"
 import * as path from "node:path"
 import { parse as parseJsonc, type ParseError } from "jsonc-parser"
+import { readPackageLedgerStateV1 } from "./ext-receipt-v2"
 import { USER_DATA_LAYOUT } from "./user-data-layout"
 
 export const EXPLICIT_CONFIG_FILE = "codepuppy-explicit.json"
@@ -76,8 +77,9 @@ function readUser(userConfig: string | undefined): string | undefined {
 }
 
 /** 启动时:合成并原子写出显式文件。返回用户文件的解析问题(有的话)。 */
-export function writeExplicitConfig(file: string, userConfig: string | undefined, layer: ExplicitLayer): { userError?: string } {
+export function writeExplicitConfig(file: string, userConfig: string | undefined, layer: ExplicitLayer, root: string): { userError?: string } {
   const { document, userError } = composeExplicitDocument(readUser(userConfig), layer)
+  withdrawDisabledPackageCommands(document, root)
   writeAtomic(file, `${JSON.stringify(document, null, 2)}\n`)
   return userError ? { userError } : {}
 }
@@ -115,6 +117,7 @@ export function watchExplicitSources(input: {
       return
     }
     if (userError && text !== undefined) return
+    withdrawDisabledPackageCommands(document, input.root)
     const next = `${JSON.stringify(document, null, 2)}\n`
     lastUser = text
     if (next === lastWritten) return
@@ -138,5 +141,23 @@ export function watchExplicitSources(input: {
   return () => {
     clearTimeout(timer)
     watcher?.close()
+  }
+}
+
+/** Package state is owned by the ledger root; runtime projections consume the same graph membership. */
+export function disabledPackageComponents(root: string) {
+  const state = readPackageLedgerStateV1(root, { sideEffectFree: true })
+  if (!state.ok) {
+    console.warn("package runtime projection could not read the installation ledger")
+    return []
+  }
+  return state.packageGraphs.flatMap((graph) => state.records.find((record) => record.kind === graph.root.kind && record.name === graph.root.name)?.desiredState === "disabled" ? [graph.root, ...graph.children] : [])
+}
+
+function withdrawDisabledPackageCommands(document: Record<string, unknown>, root: string) {
+  const names = new Set(disabledPackageComponents(root).filter((component) => component.kind === "command").map((component) => component.name))
+  for (const key of ["command", "commands"]) {
+    const entries = document[key]
+    if (isRecord(entries)) document[key] = Object.fromEntries(Object.entries(entries).filter(([name]) => !names.has(name)))
   }
 }

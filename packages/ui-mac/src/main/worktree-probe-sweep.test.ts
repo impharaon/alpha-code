@@ -47,7 +47,7 @@
 // 而没有任何东西变红(泄漏本身是不可见的 —— 下一个人只会看见 `git worktree list` 越来越长)。
 // 它因此登记在 scripts/gate-files.tsv 里,拿精确条数。
 
-import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs"
+import { existsSync, mkdirSync, readdirSync, readFileSync, unlinkSync, writeFileSync } from "node:fs"
 import { mkdtempSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join, resolve } from "node:path"
@@ -152,6 +152,13 @@ function initFixture(opts: {
   git(repo, ["add", "-A"], home)
   git(repo, ["commit", "-q", "-m", "fixture"], home)
   git(repo, ["config", "--local", "core.hooksPath", opts.hooksPath], home)
+  // 复现 Bun 1.4.4 的包内布局:根 .bin 不提供 tsgo;沿用本夹具已有的可控 typecheck 边界。
+  mkdirSync(join(repo, "packages/ui-mac/node_modules/.bin"), { recursive: true })
+  writeFileSync(
+    join(repo, "packages/ui-mac/node_modules/.bin/tsgo"),
+    '#!/usr/bin/env bash\nprintf "%s\\n" "$PWD" >> "$0.calls"\nexec bun run typecheck\n',
+    { mode: 0o755 },
+  )
   return { root, home, repo }
 }
 
@@ -546,6 +553,12 @@ describe("可达性判别依据(#941):半通不通降级,恒 'network' 硬红", 
     // 序列取自真实复现:第 3 发 curl 抖掉,旧实现在这里打出
     // 「明明可达,判别依据却说 'network' —— 一律算网络 = 这道门永不失守」并 exit 1。
     const r = run(fx.repo, ["bash", "scripts/assert-worktree-bootstrap.sh"], fx.home, flakyEnv(fx, "http://registry.flap-941a.invalid", "ok ok fail", "ok"))
+    expect(readFileSync(join(fx.repo, "packages/ui-mac/node_modules/.bin/tsgo.calls"), "utf8")).toContain("-neg/packages/ui-mac")
+    unlinkSync(join(fx.repo, "packages/ui-mac/node_modules/.bin/tsgo"))
+    const missing = run(fx.repo, ["bash", "scripts/assert-worktree-bootstrap.sh"], fx.home)
+    expect(missing.code).toBe(2)
+    expect(missing.out).toContain("未验证")
+    expect(missing.out).not.toContain("[1/6]")
     expect(r.code).toBe(2)
     expect(r.out).toContain("本次测量作废")
     expect(r.err).not.toContain("能力判据失守")

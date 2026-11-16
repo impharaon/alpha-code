@@ -321,7 +321,7 @@ export function restoreCommittedOfficialConnectors() {
   return [...runs.values()]
 }
 
-function projectOfficialConnector(name: OfficialConnectorName, config: Record<string, unknown>) {
+export function projectOfficialConnector(name: OfficialConnectorName, config: Record<string, unknown>) {
   const written = withConfigWriteLock(() => {
     const target = mcpPluginTargetPath()
     const before = readFileSync(target, "utf8")

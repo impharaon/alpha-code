@@ -67,10 +67,12 @@
 #          输出里**有「未验证」**、且**没有**那句「新建 worktree 自己就能跑出可信 typecheck」。
 #          嵌套跑靠 CODEPUPPY_WT_PROBE_NESTED=1 断掉递归(只关掉 (c) 自己,不关任何真判据)。
 #
-# 一条载重的实现事实:`.worktrees/` 就在主 checkout **内部**,而 `bun run` 找可执行文件是
-# 逐级往上走父目录的 `node_modules/.bin` —— 所以未 bootstrap 的 worktree 仍能跑起 `tsgo`
-# (借的是**共享主 checkout** 那一份),报出来的才是 TS2307 而不是 `command not found`。
-# [1/6] 的指纹依赖这一点;真变成 `command not found` 时它会因「零条 TS2307」而红,不会假绿。
+# 一条载重的实现事实:[1/6] 显式调用跑本脚本的已安装树(其次主 checkout)里的 `tsgo`,
+# cwd 仍是未 bootstrap 的探针包,模块解析仍由探针自己的依赖状态决定。不能靠 `bun run`
+# 向上找父目录的 .bin:隔离安装可能只在 ui-mac 包内提供 tsgo,不在根 .bin 提供它。
+# 两棵已安装树都找不到 checker ⇒ 本次未验证(exit 2);[2/6] 仍用探针自己的 typecheck。
+# 反向纳入真实测试源码(ui-mac 的正式配置排除了测试),沿用包配置的显式 types,
+# 避免自动借用主 checkout 的 bun ambient types,以保留 bun:test 的模块解析指纹。
 #
 # 用法:bash scripts/assert-worktree-bootstrap.sh
 set -uo pipefail
@@ -102,6 +104,19 @@ SELF_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 BOOTSTRAP="$SELF_ROOT/scripts/worktree-bootstrap.sh"
 SELF="$SELF_ROOT/scripts/assert-worktree-bootstrap.sh"
 [ -f "$BOOTSTRAP" ] || { echo "✗ 找不到 $BOOTSTRAP" >&2; exit 1; }
+
+NEG_TSGO=""
+for root in "$SELF_ROOT" "$MAIN"; do
+  for checker in "$root/packages/ui-mac/node_modules/.bin/tsgo" "$root/node_modules/.bin/tsgo"; do
+    [ -x "$checker" ] || continue
+    NEG_TSGO="$checker"
+    break 2
+  done
+done
+if [ -z "$NEG_TSGO" ]; then
+  echo "    ⚠️  未验证:当前树与主 checkout 都找不到已安装的 tsgo —— 反向模块解析探针无从运行"
+  exit 2
+fi
 
 # 探针树一律从 HEAD 建:判的是**当前这棵树上的**脚本与配置,不是某个远端 ref 的历史版本。
 BASE_SHA="$(git rev-parse HEAD 2>/dev/null)" || { echo "✗ 读不到 HEAD" >&2; exit 1; }
@@ -367,7 +382,8 @@ if ! git -C "$MAIN" worktree add --detach -q "$MAIN/.worktrees/$NEG" "$BASE_SHA"
   echo "    ✗ 建不出反向探针 worktree —— **本次测量作废**,不要把它读成绿" >&2
   exit 1
 fi
-neg_out="$(typecheck_in "$NEG")"; neg_rc=$?
+printf '%s\n' '{"extends":"./tsconfig.json","files":["src/main/worktree-probe-sweep.test.ts"],"include":[],"exclude":[]}' > "$MAIN/.worktrees/$NEG/packages/ui-mac/tsconfig.probe.json"
+neg_out="$(cd "$MAIN/.worktrees/$NEG/packages/ui-mac" && "$NEG_TSGO" -p tsconfig.probe.json 2>&1)"; neg_rc=$?
 neg_missing="$(missing_module_lines "$neg_out")"
 if [ "$neg_rc" -eq 0 ]; then
   red "未 bootstrap 的 worktree 竟然 typecheck 通过(rc=0)—— 这台机器哪里都能解析,[2/6] 于是空对空;本判据不成立"

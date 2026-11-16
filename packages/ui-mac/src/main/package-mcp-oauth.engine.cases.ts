@@ -9,6 +9,8 @@
 // (进程 cwd)也切到沙箱里的空项目目录,绝不碰 owner 的数据目录、浏览器或钥匙串。围栏不在这里测(设计 §10 R-2 已在生产围栏下实测)。
 import { afterAll, beforeAll, describe, expect, test } from "bun:test"
 import { createHash, randomBytes } from "node:crypto"
+import { mkdirSync, writeFileSync } from "node:fs"
+import { join } from "node:path"
 import { assertEngineSandboxed, engineSandbox, engineSlot } from "../../test-component/engine-sandbox"
 import { engineAuthorization } from "./engine-authorization"
 import { buildEngineServerOptions } from "./engine-server-options"
@@ -20,6 +22,8 @@ const sandbox = engineSandbox()
 const PASSWORD = "cp-l5-mcp-oauth"
 const SERVICE = "oauth-remote"
 const OTHER_NAME = "oauth-remote-renamed"
+const DISABLED_SERVICE = "package-off-oauth"
+const disabledRuntime = { initialize: 0, calls: 0, discovery: 0 }
 
 // ── 替身:OAuth 授权服务器 + 要求 Bearer 的远端 MCP(同一个回环源)────────────────────────────────────────────────
 const challenges = new Map<string, string>()
@@ -70,20 +74,28 @@ const fake = Bun.serve({
     }
     if (path === "/mcp") {
       const authorization = request.headers.get("authorization") ?? ""
-      if (!authorization.startsWith("Bearer ") || !tokens.has(authorization.slice("Bearer ".length)))
+      if (!authorization.startsWith("Bearer ") || !tokens.has(authorization.slice("Bearer ".length))) {
+        if (url.searchParams.has("disabled")) disabledRuntime.discovery++
         return Response.json(
           { error: "unauthorized" },
           { status: 401, headers: { "www-authenticate": `Bearer resource_metadata="${origin}/.well-known/oauth-protected-resource/mcp"` } },
         )
+      }
       if (request.method !== "POST") return new Response(null, { status: 405 })
       const message = (await request.json()) as { id?: unknown; method?: string; params?: { protocolVersion?: string } }
       if (message.id === undefined) return new Response(null, { status: 202 })
       const reply = (result: unknown) => Response.json({ jsonrpc: "2.0", id: message.id, result }, { headers: { "mcp-session-id": "cp-l5-session" } })
-      if (message.method === "initialize")
+      if (message.method === "initialize") {
+        if (url.searchParams.has("disabled")) disabledRuntime.initialize++
         return reply({ protocolVersion: message.params?.protocolVersion ?? "2025-06-18", capabilities: { tools: {} }, serverInfo: { name: "cp-l5-mcp", version: "1.0.0" } })
+      }
       if (message.method === "tools/list")
         return reply({ tools: [{ name: "cp_l5_ping", description: "ping", inputSchema: { type: "object", properties: {} } }] })
       if (message.method === "ping") return reply({})
+      if (message.method === "tools/call") {
+        if (url.searchParams.has("disabled")) disabledRuntime.calls++
+        return reply({ content: [{ type: "text", text: "pong" }] })
+      }
       return Response.json({ jsonrpc: "2.0", id: message.id, error: { code: -32601, message: `method not found: ${message.method}` } })
     }
     return new Response("not found", { status: 404 })
@@ -100,6 +112,24 @@ beforeAll(async () => {
   await assertEngineSandboxed(sandbox)
   const { startEngine } = await import("../../engine/engine-embed")
   const slot = engineSlot(sandbox, "mcp-oauth")
+  // Location-scoped observation only: read the real MCP inventory and execute the positive control.
+  const observer = join(sandbox.root, "oauth-observer")
+  mkdirSync(observer)
+  writeFileSync(join(observer, "server.js"), `
+import { Schema } from ${JSON.stringify(import.meta.resolve("effect"))}
+export default { id: "test.oauth-observer", setup: async (ctx) => {
+  await ctx.rpc.register({ id: "oauth-observer", methods: {
+    tools: { input: Schema.Undefined, output: Schema.Unknown },
+    call: { input: Schema.String, output: Schema.Unknown },
+  }, events: {} }, {
+    tools: async () => (await ctx.tool.list()).filter((tool) => tool.name === "cp_l5_ping").map((tool) => ({ name: tool.name })),
+    call: async (sessionID) => {
+      const tool = (await ctx.tool.list()).find((tool) => tool.name === "cp_l5_ping")
+      return tool.execute({}, { sessionID, agent: "build", messageID: "msg_oauth_control", id: "call_oauth_control", signal: new AbortController().signal, progress: async () => {} })
+    },
+  })
+} }
+`)
   // 生产接缝不带 location(与 v1 的 `POST /mcp` 同义)⇒ 引擎用进程 cwd 当默认 Location;切到沙箱里的空项目目录。
   process.chdir(slot.projectDirectory)
   const engine = await startEngine(
@@ -110,7 +140,7 @@ beforeAll(async () => {
       engineVersion: "test",
       databasePath: slot.databasePath,
       configDirectory: slot.configDirectory,
-      config: { content: "{}" },
+      config: { content: JSON.stringify({ plugins: [observer], mcp: { servers: { [DISABLED_SERVICE]: { type: "remote", url: `${MCP_URL}?disabled`, disabled: true } } } }) },
       models: { fetch: false },
       filewatcher: false,
       platform: process.platform,
@@ -120,6 +150,11 @@ beforeAll(async () => {
   engines.push(engine)
   engineUrl = engine.url
   client = engineClient({ url: engine.url, username: "opencode", password: PASSWORD })
+  for (const deadline = Date.now() + 10_000; ; await Bun.sleep(25)) {
+    const plugins = (await client.plugin.list()).data
+    if (["opencode.config.mcp", "test.oauth-observer"].every((id) => plugins.some((plugin) => plugin.id === id && plugin.state.status === "active"))) break
+    if (Date.now() >= deadline) throw new Error("MCP config and observation plugins did not become active")
+  }
 })
 
 afterAll(async () => {
@@ -150,6 +185,31 @@ async function signInThroughEngine(name: string) {
 }
 
 describe("admission 的 MCP OAuth 就绪探针(OpenCode 2)", () => {
+  test("disabled package OAuth stores a credential without starting MCP", async () => {
+    const probe = createPackageMcpOauthEngineV1(async () => ({ url: engineUrl, username: "opencode", password: PASSWORD }))
+    expect(await probe.read(DISABLED_SERVICE)).toMatchObject({ ok: true, status: "disabled", authenticated: false })
+    expect(disabledRuntime).toEqual({ initialize: 0, calls: 0, discovery: 0 })
+    expect((await client.rpc.call({ rpcID: "oauth-observer", method: "tools" })).output).toEqual([])
+    expect(await signInThroughEngine(DISABLED_SERVICE)).toBe("complete")
+    expect(await probe.read(DISABLED_SERVICE)).toMatchObject({ ok: true, status: "disabled", authenticated: true })
+    const server = (await client.mcp.list()).data.find((entry) => entry.name === DISABLED_SERVICE)!
+    expect((await client.integration.get({ integrationID: server.integrationID! })).data.connections).toContainEqual(expect.objectContaining({ type: "credential", method: "oauth" }))
+    expect((await client.rpc.call({ rpcID: "oauth-observer", method: "tools" })).output).toEqual([])
+    expect(disabledRuntime.initialize).toBe(0)
+    expect(disabledRuntime.calls).toBe(0)
+    expect(disabledRuntime.discovery).toBeGreaterThan(0)
+    expect(await probe.add(DISABLED_SERVICE, { type: "remote", url: `${MCP_URL}?disabled` })).toEqual({ ok: true, status: "connected" })
+    expect(disabledRuntime.initialize).toBeGreaterThan(0)
+    for (const deadline = Date.now() + 5000; ; await Bun.sleep(25)) {
+      const inventory = (await client.rpc.call({ rpcID: "oauth-observer", method: "tools" })).output
+      if (Array.isArray(inventory) && inventory.length) break
+      if (Date.now() >= deadline) throw new Error("enabled MCP tool did not enter the tool inventory")
+    }
+    expect((await client.rpc.call({ rpcID: "oauth-observer", method: "tools" })).output).toEqual([{ name: "cp_l5_ping" }])
+    const session = await client.session.create({ permissions: [{ action: "*", resource: "*", effect: "allow" }] })
+    expect((await client.rpc.call({ rpcID: "oauth-observer", method: "call", input: session.id })).output).toMatchObject({ content: [{ type: "text", text: "pong" }] })
+    expect(disabledRuntime.calls).toBe(1)
+  }, 60_000)
   test("同名同 URL 只有在引擎自己的登录之后才 connected;同一个 URL 换个名字 ⇒ needs_auth", async () => {
     const probe = createPackageMcpOauthEngineV1(async () => ({ url: engineUrl, username: "opencode", password: PASSWORD }))
     expect(await probe.add(SERVICE, { type: "remote", url: MCP_URL })).toEqual({ ok: true, status: "needs_auth" })

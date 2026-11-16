@@ -16,6 +16,7 @@ import { transformAsync } from "@babel/core"
 import presetTypescript from "@babel/preset-typescript"
 import { GlobalRegistrator } from "@happy-dom/global-registrator"
 import presetSolid from "babel-preset-solid"
+import { hrefFor } from "../src/shared/route-manifest"
 import bundledCatalog from "../src/renderer/extensions/codepuppy-catalog.json"
 import { DEFAULT_BUILTIN_POLICY } from "../src/main/codepuppy-builtin-policy"
 import { evaluatePackageForHost, packageActionForReason } from "../src/main/package-installability"
@@ -50,12 +51,23 @@ Bun.plugin({
 })
 
 // ── 边界替身(用例可驱动)───────────────────────────────────────────────────────────────────
-type Receipt = { id: string; name: string; type: string; scope: "global"; installedAt: string; origin: string; version?: string }
+type Receipt = { id: string; name: string; type: string; scope: "global" | "project"; installedAt: string; origin: string; version?: string }
 let receipts: Receipt[] = []
+let projectReceipts: Receipt[] = []
+let pathname = "/"
+let removalPending: Promise<void> | undefined
 let inventoryRows: unknown[] = []
 let hubRows: unknown[] = []
 let installedPackages: InstalledPackageV1[] = []
+let packageAuthorizationItems: unknown[] = []
 let factorySkillIds: string[] = []
+let mcpStates: Record<string, { status: string; error?: string }> = {}
+let authOutcome = "connected"
+let authPending: Promise<void> | undefined
+const hubListeners = new Set<() => void>()
+let secretFailure: string | undefined
+let stateFailure: string | undefined
+let leaveApplying = false
 let remoteCatalog: unknown = { source: "none" }
 const calls = {
   importSkillFolder: 0,
@@ -64,16 +76,22 @@ const calls = {
   setInstallState: [] as Array<Record<string, unknown>>,
   uninstall: [] as Array<Record<string, unknown>>,
   builtinApply: [] as unknown[],
+  installPackage: [] as string[],
+  packageState: [] as Array<{ packageId: string; state: string }>,
+  packageSecrets: [] as Array<{ packageId: string; secrets: Record<string, string> }>,
+  packageRemove: [] as string[],
+  auth: [] as string[],
+  links: [] as string[],
 }
 
 const emptyStream = { [Symbol.asyncIterator]: async function* () {} }
 const fakeClient = {
   mcp: {
-    status: async () => ({ data: {}, error: undefined }),
+    status: async () => ({ data: mcpStates, error: undefined }),
     connect: async () => ({ data: {}, error: undefined }),
     disconnect: async () => ({ data: {}, error: undefined }),
     add: async () => ({ data: {}, error: undefined }),
-    auth: { authenticate: async () => ({ data: { status: "connected" }, error: undefined }) },
+    auth: { authenticate: async ({ name }: { name: string }) => { calls.auth.push(name); await authPending; if (authOutcome === "disabled") packageAuthorizationItems = packageAuthorizationItems.map((item) => ({ ...item as object, authenticated: true })); return { data: { status: authOutcome }, error: undefined } } },
   },
   app: {
     agents: async () => ({
@@ -96,7 +114,7 @@ mock.module("../src/renderer/auth-recovery", () => ({
     return () => {}
   },
 }))
-mock.module("@solidjs/router", () => ({ useLocation: () => ({ pathname: "/" }) }))
+mock.module("@solidjs/router", () => ({ useLocation: () => ({ get pathname() { return pathname } }) }))
 mock.module("../src/renderer/codepuppy-ui/Banner", () => ({ Banner: () => null }))
 
 Object.defineProperty(window, "api", {
@@ -106,15 +124,30 @@ Object.defineProperty(window, "api", {
       calls.filePicker.push(options)
       return null
     },
+    openLink: async (url: string) => { calls.links.push(url) },
     updater: { check: async () => {} },
     auth: { start: async () => {}, setMode: async () => {} },
     ext: {
-      listInstalls: async () => ({ global: receipts, project: [], warnings: [] }),
+      listInstalls: async () => ({ global: receipts, project: projectReceipts, warnings: [] }),
       sessionGrants: async () => ({ grants: [] }),
       factorySkillIds: async () => factorySkillIds,
       onSessionGrantsEnded: () => () => {},
       inventoryView: async () => ({ catalogVersion: null, catalogChannel: null, rows: inventoryRows, warnings: [] }),
       installedPackages: async () => ({ ok: true as const, packages: installedPackages }),
+      packageAuthorization: async (packageId: string) => ({ ok: true, packageId, items: packageAuthorizationItems }),
+      installPackage: async (id: string) => { calls.installPackage.push(id); return { ok: true } },
+      setPackageState: async (intent: { packageId: string; state: "enabled" | "disabled" }) => {
+        calls.packageState.push(intent)
+        if (stateFailure) return { ok: false, reason: stateFailure }
+        installedPackages = installedPackages.map((pack) => pack.packageId === intent.packageId ? { ...pack, desiredState: intent.state, components: pack.components.map((component) => ({ ...component, desiredState: intent.state })) } : pack)
+        const pack = installedPackages.find((entry) => entry.packageId === intent.packageId)!
+        hubRows = pack.components.map((component) => hubRow(component.componentId, component.name, component.kind, leaveApplying ? "reload-pending" : intent.state === "disabled" ? "installed" : "available", leaveApplying ? "reload-waiting" : undefined))
+        hubRows.push(hubRow(pack.packageId, pack.rootComponentName, "package", leaveApplying ? "reload-pending" : intent.state === "disabled" ? "installed" : "available", leaveApplying ? "reload-waiting" : undefined))
+        if (!leaveApplying) for (const component of pack.components.filter((entry) => entry.kind === "mcp")) mcpStates[component.name] = { status: intent.state === "disabled" ? "disabled" : "connected" }
+        return { ok: true }
+      },
+      savePackageSecrets: async (intent: { packageId: string; secrets: Record<string, string> }) => { calls.packageSecrets.push(intent); if (secretFailure) return { ok: false, reason: secretFailure }; packageAuthorizationItems = packageAuthorizationItems.map((item) => ({ ...item as object, saved: true })); return { ok: true } },
+      uninstallPackage: async (packageId: string) => { calls.packageRemove.push(packageId); await removalPending; installedPackages = installedPackages.filter((pack) => pack.packageId !== packageId); receipts = []; hubRows = []; mcpStates = {}; return { ok: true, packageId, removed: [], retained: [] } },
       advisoryActive: async () => ({ ids: [], fresh: true }),
       migrateScan: async () => ({ enabled: false, inventory: { skills: [], mcp: [], plugins: [] } }),
       remoteCatalog: async () => remoteCatalog,
@@ -137,7 +170,7 @@ Object.defineProperty(window, "api", {
       },
       hubView: async () => ({ directory: "/", rows: hubRows, warnings: [] }),
       reloadRequest: async () => ({ ok: true as const, generation: 1 }),
-      onHubViewChanged: () => () => {},
+      onHubViewChanged: (listener: () => void) => { hubListeners.add(listener); return () => { hubListeners.delete(listener) } },
       builtinRead: async () => ({
         gov: structuredClone(DEFAULT_BUILTIN_POLICY),
         protection: { hard: [], codepuppyInjected: [], confirm: [] },
@@ -156,7 +189,7 @@ const { createComponent } = solid
 const { render } = solidWeb
 // 必须**动态** import:静态 import 会在 registrator 之前牵出 solid-js。
 const { ExtensionHub } = await import("../src/renderer/extensions/extension-hub")
-const { openExtHubAt, setExtHubOpen, setHubSection, takeHubLocateTarget } = await import("../src/renderer/extensions/ext-hub-state")
+const { openExtHubAt, openPackageManagement, extHubOpen, setExtHubOpen, setHubSection, takeHubLocateTarget } = await import("../src/renderer/extensions/ext-hub-state")
 
 const disposals: Array<() => void> = []
 const flush = () => new Promise((resolve) => setTimeout(resolve, 0))
@@ -173,6 +206,90 @@ async function waitFor(assertion: () => void) {
   }
   throw failure
 }
+
+test("catalog package owns one installed row across pages with its switch in the menu", async () => {
+  reset()
+  const { hubPackageFixture } = await import("./hub-package.fixture")
+  const sample = hubPackageFixture()
+  installedPackages = sample.packages.map((entry) => ({
+    packageId: entry.prelude.packageId,
+    installedGraphDigest: "sha256:" + "a".repeat(64),
+    displayName: entry.presentation.displayName,
+    rootComponentName: entry.root.split(":")[1]!,
+    version: entry.prelude.version,
+    origin: "catalog",
+    desiredState: "enabled",
+    components: entry.components.map((component) => ({
+      componentId: component.id, kind: component.profileId === "mcp-remote" ? "mcp" : component.profileId,
+      name: component.id.split(":")[1]!, required: component.required, desiredState: "enabled" as const,
+    })),
+  }))
+  receipts = installedPackages.flatMap((pack) => pack.components.map((component) => receipt(component.componentId, component.name, component.kind)))
+  pathname = hrefFor.directory("/tmp/hub-project-control")
+  projectReceipts = [{ ...receipt("skill:supabase", "supabase", "skill"), scope: "project" }]
+  // A separate project-independent skill is a control: package filtering must not swallow it.
+  receipts.push(receipt("skill:safe-refactor", "safe-refactor", "skill"))
+  mount("skills")
+  await waitFor(() => expect(q('[data-installed-package="package:supabase"]')).toBeInstanceOf(HTMLElement))
+  expect(qa('[data-installed-row="skill:supabase"]')).toHaveLength(1)
+  expect(q('[data-installed-row="skill:supabase-postgres-best-practices"]')).toBeNull()
+  expect(q('[data-installed-row="skill:safe-refactor"]')).toBeInstanceOf(HTMLElement)
+  expect(q('[data-group="project"] [data-installed-row="skill:supabase"]')?.textContent).toContain("supabase")
+  const row = q('[data-installed-package="package:supabase"]')!
+  expect(qa("button", row).map((button) => button.textContent?.trim())).toEqual(["…"])
+  click(q("[data-more]", row))
+  await waitFor(() => expect(q('[role="switch"]')).toBeInstanceOf(HTMLElement))
+  expect(document.body.textContent).toContain("管理")
+  expect(document.body.textContent).toContain("移除")
+})
+
+test("package plus installs directly before separate credentials without an installation wall", async () => {
+  reset()
+  calls.installPackage.length = 0
+  const { hubPackageFixture } = await import("./hub-package.fixture")
+  const sample = hubPackageFixture()
+  const view = await evaluatePackageForHost(sample.packages[0], { fetchPayload: sample.fetchBytes })
+  remoteCatalog = { source: "remote", catalog: { version: "hub-real", entries: bundledCatalog.entries, packages: [view] } }
+  mount()
+  await waitFor(() => expect(q('[data-package-card="package:github"]')).toBeInstanceOf(HTMLElement))
+  const card = q('[data-package-card="package:github"]')!
+  expect(q("button", card)?.textContent?.trim()).toBe("+")
+  click(q("button", card))
+  await waitFor(() => expect(calls.installPackage).toEqual(["package:github"]))
+  expect(document.body.textContent).not.toContain("确认安装")
+  expect(document.body.textContent).not.toContain("未经审核,装好后默认关闭")
+  expect(document.body.textContent).not.toContain("codepuppy.secret-prerequisite.v1")
+})
+
+test("installed package management keeps token entry available after closing its window", async () => {
+  reset()
+  const { hubPackageFixture } = await import("./hub-package.fixture")
+  const entry = hubPackageFixture().packages[0]!
+  installedPackages = [{
+    packageId: entry.prelude.packageId, installedGraphDigest: "sha256:" + "b".repeat(64),
+    displayName: entry.presentation.displayName, rootComponentName: "github", version: entry.prelude.version,
+    origin: "catalog", desiredState: "disabled",
+    components: [{ componentId: entry.root, kind: "mcp", name: "github", required: true, desiredState: "disabled" }],
+  }]
+  packageAuthorizationItems = [{ kind: "secret", componentId: entry.root, prerequisiteId: `${entry.root}#GITHUB_PERSONAL_ACCESS_TOKEN`, serviceName: "github", label: "GITHUB_PERSONAL_ACCESS_TOKEN", saved: false }]
+  receipts = [receipt(entry.root, "github", "mcp")]
+  mount()
+  await waitFor(() => expect(q('[data-installed-package="package:github"]')).toBeInstanceOf(HTMLElement))
+  click(q('[data-installed-package="package:github"] [data-more]'))
+  await waitFor(() => expect(q('[data-menu-item="manage"]')).toBeInstanceOf(HTMLElement))
+  click(q('[data-menu-item="manage"]'))
+  await waitFor(() => expect(q(".codepuppy-ext-detail")?.textContent).toContain("账户"))
+  expect(q(".codepuppy-ext-detail")?.textContent).toContain("权限")
+  expect(q(".codepuppy-ext-detail")?.textContent).toContain("关于")
+  const openToken = () => click(q(".codepuppy-ext-detail [data-package-secret]"))
+  openToken()
+  await waitFor(() => expect(q('input[type="password"]')).toBeInstanceOf(HTMLInputElement))
+  expect(q('[role="dialog"]')?.textContent).not.toContain("GITHUB_PERSONAL_ACCESS_TOKEN")
+  click(q('[role="dialog"] .a-dialog-close'))
+  await waitFor(() => expect(q('input[type="password"]')).toBeNull())
+  openToken()
+  await waitFor(() => expect(q('input[type="password"]')).toBeInstanceOf(HTMLInputElement))
+})
 const q = <T extends Element = HTMLElement>(selector: string, root: ParentNode = document) => root.querySelector<T>(selector)
 const qa = (selector: string, root: ParentNode = document) => Array.from(root.querySelectorAll<HTMLElement>(selector))
 function click(element: Element | null) {
@@ -206,6 +323,10 @@ function mount(section: "connectors" | "skills" | "agents" = "connectors") {
   )
 }
 function reset() {
+  secretFailure = undefined
+  projectReceipts = []
+  pathname = "/"
+  removalPending = undefined
   for (const dispose of disposals.splice(0)) dispose()
   document.body.replaceChildren()
   receipts = []
@@ -213,8 +334,14 @@ function reset() {
   hubRows = []
   installedPackages = []
   factorySkillIds = []
+  packageAuthorizationItems = []
+  mcpStates = {}
+  authOutcome = "connected"
+  authPending = undefined
+  stateFailure = undefined
+  leaveApplying = false
   calls.importSkillFolder = 0
-  for (const list of [calls.filePicker, calls.installCatalog, calls.setInstallState, calls.uninstall, calls.builtinApply]) list.length = 0
+  for (const list of [calls.filePicker, calls.installCatalog, calls.setInstallState, calls.uninstall, calls.builtinApply, calls.installPackage, calls.packageState, calls.packageSecrets, calls.packageRemove, calls.auth, calls.links]) list.length = 0
 }
 afterAll(async () => {
   reset()
@@ -411,7 +538,7 @@ test("AC5 每页顶部「已安装」一组,已装行的「…」含停用 / 移
   expect(q("[data-group='installed'] [data-own-agent='docs-writer']")).toBeInstanceOf(HTMLElement)
 })
 
-test("AC6 需要令牌的扩展包:行上写缺什么(「需要 GitHub 令牌」),动作是「设置」并走原来那个填写窗口;不再出现「需要先处理」「处理前置条件」", async () => {
+test("AC6 需要令牌的扩展包仍可直接添加,安装与令牌填写分开", async () => {
   reset()
   const sample = (bundledCatalog as { packages: Array<{ prelude: { packageId: string; version: string }; presentation: { displayName: string; description: string } }> }).packages.find(
     (pack) => pack.prelude.packageId === "package:github-official",
@@ -434,14 +561,14 @@ test("AC6 需要令牌的扩展包:行上写缺什么(「需要 GitHub 令牌」
   mount("connectors")
   await waitFor(() => expect(q("[data-package-card='package:github-official']")).toBeInstanceOf(HTMLElement))
   const row = q("[data-package-card='package:github-official']")!
-  expect(q("[data-package-need]", row)?.textContent).toBe(zh["codepuppy.ext.needGithubToken"])
-  expect(qa("button", row).map((button) => button.textContent?.trim())).toEqual([zh["codepuppy.ext.rowSetup"]])
+  expect(q(".codepuppy-ext-kit-desc", row)?.textContent).toBe(sample.presentation.description)
+  expect(qa("button", row).map((button) => button.textContent?.trim())).toEqual(["+"])
   expect(row.textContent).not.toContain("GITHUB_PERSONAL_ACCESS_TOKEN")
   expect(document.body.textContent).not.toContain("需要先处理")
   expect(document.body.textContent).not.toContain("处理前置条件")
   // 「设置」= 原来的「处理前置条件」那一趟:同一条安装意图出站(随后由 main 的 authorize 臂打开填令牌的确认屏)。
   click(q("button", row))
-  await waitFor(() => expect(calls.installCatalog).toEqual([expect.objectContaining({ catalogId: "package:github-official" })]))
+  await waitFor(() => expect(calls.installPackage).toEqual(["package:github-official"]))
 })
 
 test("AC7 未完成审核的扩展装上默认关闭:行上「未开启」+「开启」;待生效的行「待生效 · …」+「立即生效」", async () => {
@@ -535,8 +662,8 @@ test("#1658 AC1 installed cloud package and component use catalog names and clou
     installedPackages[0].displayName = displayName
     mount()
     await waitFor(() => expect(q("[data-installed-package] b")?.textContent).toBe("云端图片生成"))
-    expect(q("[data-installed-row='cloud:image'] b")?.textContent).toBe("云端图片生成")
-    expect(q("[data-installed-package] .codepuppy-ext-kit-desc")?.textContent).toContain("云能力")
+    expect(q("[data-installed-row='cloud:image']")).toBeNull()
+    expect(q("[data-installed-package] .codepuppy-ext-type-pill")?.textContent).toBe("云能力")
     expect(q("[data-installed-package]")?.textContent).not.toContain("技能")
   }
 })
@@ -544,11 +671,10 @@ test("#1658 AC1 installed cloud package and component use catalog names and clou
 test("#1658 AC2 installed cloud catalog card says installed and cannot add again; missing receipt remains addable", async () => {
   for (const installed of [true, false]) {
     await installedCloud()
-    if (!installed) receipts = []
+    if (!installed) { receipts = []; installedPackages = [] }
     mount()
-    await waitFor(() => expect(q("[data-package-card] button")?.textContent).toBe(installed ? "已安装" : "添加"))
-    expect(q<HTMLButtonElement>("[data-package-card] button")?.disabled).toBe(installed)
-    if (installed) click(q("[data-package-card] button"))
+    await waitFor(() => expect(q(installed ? "[data-installed-package] [data-more]" : "[data-package-card] button")?.textContent).toBe(installed ? "…" : "+"))
+    if (installed) expect(q("[data-package-card]")).toBeNull()
     expect(calls.installCatalog).toEqual([])
   }
 })
@@ -562,8 +688,8 @@ test("#1658 AC3 cloud verification identifies connection, tools or policy; raw d
     await installedCloud()
     hubRows = [{ ...hubRow("cloud:image", "image", "cloud", "installed"), stateReason: { code, detail } }]
     mount()
-    await waitFor(() => expect(q("[data-installed-row='cloud:image'] .codepuppy-ext-kit-desc")?.textContent).toBe(`已安装 · ${text}`))
-    const row = q("[data-installed-row='cloud:image']")!
+    await waitFor(() => expect(q("[data-installed-package='package:cloud-image'] .codepuppy-ext-kit-desc")?.textContent).toBe(`已安装 · ${text}`))
+    const row = q("[data-installed-package='package:cloud-image']")!
     const details = q<HTMLDetailsElement>("details", row)!
     expect(details.open).toBe(false)
     expect(details.textContent).toContain(detail)
@@ -618,4 +744,273 @@ test("#1691 AC-02 查看指向的连接器已不在:页面照常打开、不报�
   expect(qa("[role='alert']").map((node) => node.textContent)).toEqual([])
   setExtHubOpen(false)
   expect(takeHubLocateTarget("mcp:uninstalled-one"), "a stale target does not survive closing the hub").toBe(false)
+})
+
+async function realInstalledPackage(index: number, state: "enabled" | "disabled" = "enabled") {
+  const { hubPackageFixture } = await import("./hub-package.fixture")
+  const sample = hubPackageFixture()
+  const entry = sample.packages[index]!
+  const view = await evaluatePackageForHost(entry, { fetchPayload: sample.fetchBytes })
+  remoteCatalog = { source: "remote", catalog: { version: "hub-real", entries: bundledCatalog.entries, packages: [view] } }
+  installedPackages = [{ packageId: entry.prelude.packageId, installedGraphDigest: "sha256:" + "c".repeat(64), displayName: entry.presentation.displayName, rootComponentName: entry.root.split(":")[1]!, version: entry.prelude.version, origin: "catalog", desiredState: state, components: entry.components.map((component) => ({ componentId: component.id, kind: component.profileId === "mcp-remote" ? "mcp" : component.profileId, name: component.id.split(":")[1]!, required: component.required, desiredState: state })) }]
+  receipts = installedPackages[0]!.components.map((component) => receipt(component.componentId, component.name, component.kind))
+  return entry
+}
+async function managePackage(packageId: string) {
+  await waitFor(() => expect(q(`[data-installed-package="${packageId}"]`)).toBeInstanceOf(HTMLElement))
+  click(q(`[data-installed-package="${packageId}"] [data-more]`))
+  await waitFor(() => expect(q('[data-menu-item="manage"]')).toBeInstanceOf(HTMLElement))
+  click(q('[data-menu-item="manage"]'))
+  await waitFor(() => expect(q('[data-package-detail]')?.textContent).toContain(zh["codepuppy.ext.packageAccounts"]))
+}
+
+test("package idle switch converges from applying to off on the existing event and can turn on again", async () => {
+  reset()
+  const entry = await realInstalledPackage(0)
+  packageAuthorizationItems = [{ kind: "secret", componentId: entry.root, prerequisiteId: `${entry.root}#GITHUB_PERSONAL_ACCESS_TOKEN`, serviceName: "github", label: "GITHUB_PERSONAL_ACCESS_TOKEN", saved: false }]
+  mcpStates.github = { status: "connected" }
+  mount()
+  await waitFor(() => expect(q('[data-installed-package]')?.textContent).toContain("待填令牌"))
+  leaveApplying = true
+  click(q('[data-installed-package] [data-more]'))
+  click(q('[role="switch"]'))
+  await waitFor(() => expect(q('[data-installed-package]')?.textContent).toContain("正在生效"))
+  expect(calls.packageState).toEqual([{ packageId: entry.prelude.packageId, state: "disabled" }])
+  expect(document.body.textContent).not.toContain("这轮回答结束后生效")
+  expect(q('[data-hub-reload-now]')).toBeNull()
+  mcpStates.github = { status: "disabled" }
+  hubRows = [hubRow(entry.root, "github", "mcp", "installed")]
+  for (const listener of hubListeners) listener()
+  await waitFor(() => expect(q('[data-installed-package]')?.textContent).toContain("已关闭"))
+  leaveApplying = false
+  click(q('[data-installed-package] [data-more]'))
+  click(q('[role="switch"]'))
+  await waitFor(() => expect(calls.packageState).toHaveLength(2))
+  await waitFor(() => expect(q('[data-installed-package]')?.textContent).toContain("待填令牌"))
+  expect(q('[data-installed-row="mcp:github"]')).toBeNull()
+})
+
+test("package switch reflects failed and completed main results without a second apply action", async () => {
+  reset()
+  await realInstalledPackage(0, "disabled")
+  stateFailure = "fixture: package write failed"
+  mount()
+  await waitFor(() => expect(q('[data-installed-package]')?.textContent).toContain("已关闭"))
+  click(q('[data-installed-package] [data-more]'))
+  click(q('[role="switch"]'))
+  await waitFor(() => expect(q('[data-package-error]')).toBeInstanceOf(HTMLElement))
+  click(q('[data-installed-package] [data-more]'))
+  expect(q('[role="switch"]')?.getAttribute("aria-checked")).toBe("false")
+  stateFailure = undefined
+  click(q('[role="switch"]'))
+  await waitFor(() => expect(installedPackages[0]?.desiredState).toBe("enabled"))
+  await waitFor(() => expect(q('[data-installed-package]')?.textContent).not.toContain("正在生效"))
+  expect(q('[data-hub-reload-now]')).toBeNull()
+  expect(document.body.textContent).not.toContain("这轮回答结束后生效")
+})
+
+test("package token dialog explains purpose and real retrieval, clears cancelled input and saves to its package only", async () => {
+  reset()
+  const entry = await realInstalledPackage(0, "disabled")
+  const prerequisiteId = `${entry.root}#GITHUB_PERSONAL_ACCESS_TOKEN`
+  packageAuthorizationItems = [{ kind: "secret", componentId: entry.root, prerequisiteId, serviceName: "github", label: "GITHUB_PERSONAL_ACCESS_TOKEN", saved: false }]
+  mount()
+  await managePackage(entry.prelude.packageId)
+  expect(q('[data-package-detail]')?.textContent).toContain("定制中心")
+  expect(q('[data-package-detail]')?.textContent).toContain(entry.prelude.version)
+  click(q('[data-package-secret]'))
+  await waitFor(() => expect(q('input[type="password"]')).toBeInstanceOf(HTMLInputElement))
+  expect(q('[role="dialog"]')?.textContent).toContain("连接 github")
+  expect(q('input[type="password"]')?.getAttribute("placeholder")).toBe("粘贴令牌")
+  expect(q('[role="dialog"]')?.textContent).toContain("助手用它访问你的 github，保存在这台电脑的专用密钥存储中。")
+  expect(q('[role="dialog"]')?.textContent).toContain("专用密钥存储")
+  click(q('[role="dialog"] .codepuppy-ext-link'))
+  expect(calls.links).toEqual(["https://github.com/settings/personal-access-tokens/new"])
+  const input = q<HTMLInputElement>('input[type="password"]')!
+  input.value = "invalid-hub-token-canary-r2"
+  input.dispatchEvent(new Event("input", { bubbles: true }))
+  click(q('[role="dialog"] .a-dialog-close'))
+  expect(calls.packageSecrets).toEqual([])
+  click(q('[data-package-secret]'))
+  await waitFor(() => expect(q<HTMLInputElement>('input[type="password"]')?.value).toBe(""))
+  const fresh = q<HTMLInputElement>('input[type="password"]')!
+  fresh.value = "invalid-hub-token-canary-r2"
+  fresh.dispatchEvent(new Event("input", { bubbles: true }))
+  click(q('[role="dialog"] .a-dialog-footer button'))
+  await waitFor(() => expect(calls.packageSecrets).toEqual([{ packageId: entry.prelude.packageId, secrets: { [prerequisiteId]: "invalid-hub-token-canary-r2" } }]))
+  await waitFor(() => expect(q('input[type="password"]')).toBeNull())
+  expect(document.body.textContent).not.toContain("invalid-hub-token-canary-r2")
+  expect(document.body.textContent).not.toContain("GITHUB_PERSONAL_ACCESS_TOKEN")
+  expect(installedPackages[0]?.desiredState).toBe("disabled")
+  expect(calls.installPackage).toEqual([])
+})
+
+test("package login cancellation and failure keep the same installed package; disabled login can complete", async () => {
+  reset()
+  const entry = await realInstalledPackage(1, "disabled")
+  packageAuthorizationItems = [{ kind: "mcp-oauth", componentId: "mcp:supabase", prerequisiteId: "mcp:supabase#oauth", serviceName: "supabase", label: "Supabase", authenticated: false, status: "disabled" }]
+  mcpStates.supabase = { status: "disabled" }
+  authOutcome = "failed"
+  mount()
+  await managePackage(entry.prelude.packageId)
+  let finishAuth: () => void = () => {}
+  authPending = new Promise<void>((resolve) => { finishAuth = resolve })
+  click(q('[data-package-login]'))
+  await waitFor(() => expect(calls.auth).toEqual(["supabase"]))
+  expect(q('[role="dialog"]')?.textContent).toContain("登录后，助手就能使用")
+  expect(q('input[type="password"]')).toBeNull()
+  click(q('[role="dialog"] .a-dialog-close'))
+  finishAuth()
+  authPending = undefined
+  await flush()
+  expect(installedPackages[0]?.packageId).toBe(entry.prelude.packageId)
+  click(q('[data-package-login]'))
+  await waitFor(() => expect(q('[role="dialog"] [role="alert"]')).toBeInstanceOf(HTMLElement))
+  click(q('[role="dialog"] .a-dialog-close'))
+  authOutcome = "disabled"
+  click(q('[data-package-login]'))
+  await waitFor(() => expect(q('[role="dialog"]')).toBeNull())
+  await waitFor(() => expect(q('[data-package-detail]')?.textContent).toContain("已登录"))
+  expect(q('[data-package-login]')?.textContent).toBe("重新登录")
+  expect(calls.auth).toEqual(["supabase", "supabase", "supabase"])
+  expect(calls.installPackage).toEqual([])
+  expect(installedPackages[0]?.desiredState).toBe("disabled")
+})
+
+test("package management uses the existing permission editor and removes once without component remnants", async () => {
+  reset()
+  const entry = await realInstalledPackage(1)
+  mount()
+  await managePackage(entry.prelude.packageId)
+  expect(q('[data-package-detail]')?.textContent).toContain("2 个技能 · 1 个连接器")
+  const permissionButton = qa('.codepuppy-settings-group button').find((button) => button.textContent === "更改")!
+  click(permissionButton)
+  expect(q('[data-tools-live]')).toBeInstanceOf(HTMLElement)
+  expect(q('[data-tools-state="no-project"]')).toBeInstanceOf(HTMLElement)
+  click(q('[data-package-detail] [data-more]'))
+  const remove = q('[data-menu-item="remove-package"]')!
+  let finishRemoval: () => void = () => {}
+  removalPending = new Promise<void>((resolve) => { finishRemoval = resolve })
+  click(remove)
+  await waitFor(() => expect(calls.packageRemove).toHaveLength(1))
+  // A second activation admitted while the first IPC is unresolved must hit the action guard.
+  // Use a live menu node; remove disabled only to model an already-admitted activation.
+  click(q('[data-package-detail] [data-more]'))
+  const again = q<HTMLButtonElement>('[data-menu-item="remove-package"]')!
+  expect(again.isConnected).toBe(true)
+  expect(again.disabled).toBe(true)
+  again.disabled = false
+  click(again)
+  await flush()
+  expect(calls.packageRemove).toHaveLength(1)
+  finishRemoval()
+  await waitFor(() => expect(calls.packageRemove).toEqual([entry.prelude.packageId]))
+  await waitFor(() => expect(q('[data-installed-package]')).toBeNull())
+  expect(q('[data-installed-row="mcp:supabase"]')).toBeNull()
+  expect(q('[data-installed-row="skill:supabase"]')).toBeNull()
+  expect(document.body.textContent).not.toContain(entry.prelude.packageId)
+})
+
+test("graph marketplace source and notRunning facts reach the installed row and the same management page", async () => {
+  // Renderer boundary variants of the real GitHub package; source shape is DESIGN v5 §4.4,
+  // repository and abbreviated pinned commit come from its captured E-02 sample.
+  for (const ecosystem of ["claude", "codex"] as const) {
+    reset()
+    const entry = await realInstalledPackage(0)
+    Object.assign(installedPackages[0]!, {
+      origin: "imported-claude",
+      source: { kind: "marketplace", ecosystem, repository: "anthropics/claude-plugins-official", commit: "b5b01ac4", path: "external_plugins/github", entryName: "github" },
+      notRunning: [{ kind: "plugin", sourceName: "native-addon", reason: "native-js-plugin" }],
+    })
+    mount()
+    const source = ecosystem === "claude" ? "Claude 插件市场" : "Codex 插件市场"
+    await waitFor(() => expect(q('[data-installed-package]')?.textContent).toContain(source))
+    expect(q('[data-installed-package]')?.textContent).toContain("未能启用：")
+    expect(q('[data-installed-package]')?.textContent).toContain("Code Puppy 不在引擎里运行第三方插件代码")
+    await managePackage(entry.prelude.packageId)
+    expect(q('[data-package-detail]')?.textContent).toContain(source)
+    expect(q('[data-package-detail]')?.textContent).not.toContain("本地文件夹")
+    expect(q('[data-package-detail]')?.textContent).toContain("anthropics/claude-plugins-official")
+    expect(q('[data-package-detail]')?.textContent).toContain("b5b01ac4")
+    expect(q('[data-package-detail]')?.textContent).toContain("native-addon")
+    expect(q('[data-package-detail]')?.textContent).toContain("未能启用：Code Puppy 不在引擎里运行第三方插件代码")
+    expect(q('[data-package-detail]')?.textContent).not.toContain("native-js-plugin")
+  }
+})
+
+test("openPackageManagement opens the requested installed identity from another tab without installing", async () => {
+  reset()
+  await realInstalledPackage(0)
+  const github = installedPackages[0]!
+  await realInstalledPackage(1)
+  const supabase = installedPackages[0]!
+  installedPackages = [github, supabase]
+  receipts = installedPackages.flatMap((pack) => pack.components.map((component) => receipt(component.componentId, component.name, component.kind)))
+  mount("skills")
+  await waitFor(() => expect(q('[data-installed-package="package:supabase"]')).toBeInstanceOf(HTMLElement))
+  expect(typeof openPackageManagement).toBe("function")
+  openPackageManagement(github.packageId)
+  await waitFor(() => expect(q('[data-package-detail]')?.getAttribute("data-package-detail")).toBe(github.packageId))
+  expect(extHubOpen()).toBe(true)
+  expect(q('[data-tab="connectors"]')?.hasAttribute("data-active")).toBe(true)
+  expect(q('[data-package-detail="package:supabase"]')).toBeNull()
+  openPackageManagement(supabase.packageId)
+  await waitFor(() => expect(q('[data-package-detail]')?.getAttribute("data-package-detail")).toBe(supabase.packageId))
+  expect(q('[data-package-detail]')?.textContent).toContain("2 个技能 · 1 个连接器")
+  expect(calls.installPackage).toEqual([])
+  expect(calls.packageState).toEqual([])
+  openPackageManagement("package:removed")
+  await waitFor(() => expect(q('[data-package-detail]')).toBeNull())
+})
+
+test("package management navigation survives a closed hub and a later reopen", async () => {
+  reset()
+  const entry = await realInstalledPackage(1)
+  setExtHubOpen(false)
+  const root = document.createElement("div")
+  root.id = "root"
+  root.className = "a-ui"
+  document.body.append(root)
+  disposals.push(render(() => createComponent(ExtensionHub, {
+    server: () => ({ baseUrl: "http://127.0.0.1:65535" }) as never,
+    open: extHubOpen,
+    onClose: () => setExtHubOpen(false),
+  }), root))
+  expect(q('[data-package-detail]')).toBeNull()
+  openPackageManagement(entry.prelude.packageId)
+  await waitFor(() => expect(q('[data-package-detail]')?.getAttribute("data-package-detail")).toBe(entry.prelude.packageId))
+  click(q('.codepuppy-ext-close'))
+  await waitFor(() => expect(extHubOpen()).toBe(false))
+  expect(q('[data-package-detail]')).toBeNull()
+  openPackageManagement(entry.prelude.packageId)
+  await waitFor(() => expect(q('[data-package-detail]')?.getAttribute("data-package-detail")).toBe(entry.prelude.packageId))
+  expect(calls.installPackage).toEqual([])
+  expect(calls.packageState).toEqual([])
+})
+
+
+test("official credential dialogs reuse DSN and PAT help and report credential save failures", async () => {
+  for (const [name, variable, help] of [["dbhub-readonly", "DSN", "codepuppy.ext.officialSqliteDsn"], ["github-official", "GITHUB_PERSONAL_ACCESS_TOKEN", "codepuppy.ext.officialGithubPat"]] as const) {
+    reset()
+    const entry = bundledCatalog.packages.find((entry) => entry.prelude.packageId === `package:${name}`)!
+    // Actual bundled catalog entry; only the renderer IPC read model is constructed here.
+    installedPackages = [{ packageId: entry.prelude.packageId, installedGraphDigest: "sha256:" + "a".repeat(64), displayName: entry.presentation.displayName, rootComponentName: name, version: entry.prelude.version, origin: "catalog", desiredState: "enabled", components: entry.components.map((component) => ({ componentId: component.id, kind: "mcp", name, required: component.required, desiredState: "enabled" })) }]
+    receipts = [receipt(entry.root, name, "mcp")]
+    packageAuthorizationItems = [{ kind: "secret", componentId: entry.root, prerequisiteId: `${entry.root}#${variable}`, serviceName: name, label: variable, saved: false }]
+    secretFailure = "package credentials could not be saved"
+    mount()
+    await managePackage(entry.prelude.packageId)
+    click(q('[data-package-secret]'))
+    await waitFor(() => expect(q('input[type="password"]')).toBeInstanceOf(HTMLInputElement))
+    expect(q('[role="dialog"]')?.textContent).toContain(zh[help])
+    const input = q<HTMLInputElement>('input[type="password"]')!
+    expect(input.placeholder).toBe(zh[help])
+    expect(input.required).toBe(false)
+    input.value = "invalid-local-credential-r4"
+    input.dispatchEvent(new Event("input", { bubbles: true }))
+    click(q('[role="dialog"] .a-dialog-footer button'))
+    await waitFor(() => expect(q('[role="dialog"] [role="alert"]')?.textContent).toBe("凭据未能保存，请检查填写内容后重试。"))
+    expect(q('[role="dialog"]')?.textContent).not.toContain(zh["codepuppy.ext.mcpAuthFailed"])
+    expect(installedPackages[0]?.packageId).toBe(entry.prelude.packageId)
+  }
 })

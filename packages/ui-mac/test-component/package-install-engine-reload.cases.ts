@@ -39,6 +39,7 @@ import { join } from "node:path"
 import bundledCatalog from "../src/renderer/extensions/codepuppy-catalog.json"
 import { LEAF_MCP_ID, MIXED_BUNDLE_PACKAGE_ID, mixedBundleFixture } from "./package-mixed-bundle.fixture"
 import { pinShippedPlatform } from "./pin-shipped-platform"
+import { hubPackageFixture } from "./hub-package.fixture"
 
 // 本文件要验的是**发布平台上**的安装行为,而它会走到生产平台闸
 // (套件/条目 `compatibility.platforms` = darwin/win32,ADR-026):linux runner 上套件安装被
@@ -175,6 +176,7 @@ const testBundle = (id: string, name: string, member: string) => ({
 })
 
 const fixture = mixedBundleFixture()
+const hubSample = hubPackageFixture()
 const catalogEntries = [
   ...(bundledCatalog as unknown as { entries: unknown[] }).entries,
   testBundle(BUNDLE_OK, BUNDLE_OK_NAME, "mcp:markitdown"),
@@ -183,12 +185,18 @@ const catalogEntries = [
 const catalogDocument = {
   version: "2026-08-03",
   entries: catalogEntries,
-  packages: [fixture.envelope],
+  packages: [fixture.envelope, ...hubSample.packages],
 }
 
 // URL → 字节。payload 由信封的 `payloadRef` 给出;资产由 payload 自己给出 —— agent 是
 // `behavior.asset`、skill 是 `behavior.files`、command 是 `behavior.template`,都要**逐条**登记进这张表。
 const bytesByUrl = new Map<string, Uint8Array>()
+for (const component of hubSample.packages.flatMap((entry) => entry.components)) {
+  const bytes = await hubSample.fetchBytes(component.payloadRef)
+  bytesByUrl.set(component.payloadRef.url, bytes)
+  for (const ref of JSON.parse(new TextDecoder().decode(bytes)).behavior.files ?? [])
+    bytesByUrl.set(ref.url, await hubSample.fetchBytes(ref))
+}
 for (const component of fixture.envelope.components) {
   const payload = fixture.payloadByDigest.get(component.payloadRef.sha256)
   if (!payload) throw new Error(`fixture: payload bytes missing for ${component.id}`)
@@ -283,6 +291,8 @@ Bun.plugin({
 // 一个「新写了 helper 而 Hub 仍旧直连 `extIpc`」的实现,在这里的计数是 0 ⇒ 红。
 type CentralCall = { catalogId: string; attemptId: string | undefined; authorized: boolean }
 const centralCalls: CentralCall[] = []
+const desktopCalls: string[] = []
+const desktopIpcCalls: string[] = []
 const realUseExtensionsModule = await import("../src/renderer/extensions/use-extensions")
 const realUseExtensions = realUseExtensionsModule.useExtensions
 let hubApi: ReturnType<typeof realUseExtensions>
@@ -297,6 +307,7 @@ mock.module("../src/renderer/extensions/use-extensions", () => ({
       throw new Error("useExtensions() has no installCatalogIntent — the #810 chokepoint is missing")
     return {
       ...api,
+      installPackage: (packageId: string) => { desktopCalls.push(packageId); return api.installPackage(packageId) },
       installCatalogIntent: (intent: Parameters<typeof realInstallCatalogIntent>[0]) => {
         centralCalls.push({
           catalogId: intent.catalogId,
@@ -372,6 +383,11 @@ const extBridge: Record<string, unknown> = {
   packageDetail: (catalogId: unknown) => call("ext-package-detail", catalogId),
   packageInstalled: (catalogId: unknown) => call("ext-package-installed", catalogId),
   installedPackages: () => call("ext-installed-packages"),
+  uninstallPackage: (packageId: string) => call("ext-uninstall-package", packageId),
+  installPackage: (packageId: string) => { desktopIpcCalls.push(packageId); return call("ext-install-package", packageId) },
+  setPackageState: (intent: unknown) => call("ext-set-package-state", intent),
+  packageAuthorization: (packageId: string) => call("ext-package-authorization", packageId),
+  savePackageSecrets: (intent: unknown) => call("ext-save-package-secrets", intent),
   setInstallState: async (intent: unknown) => {
     if (refuseState) return { ok: false, reason: "fixture write failure" }
     const result = await call("ext-set-install-state", intent)
@@ -511,48 +527,36 @@ async function installBundleThroughUi(name: string): Promise<void> {
 // 判据
 // ═══════════════════════════════════════════════════════════════════════════════════════
 
-test("① 入口一 `runPackageAction`:卡片「安装」经收口方法出站,而 authorize 臂**不**重扫", async () => {
-  setHubSection("connectors") // `#1594`:扩展包是连接器页的一组
-  await waitFor(() => expect(q(`[data-package-card="${MIXED_BUNDLE_PACKAGE_ID}"]`)).toBeInstanceOf(HTMLElement))
+test("① 卡片直接保存包并自动开启,经数据层一次出站并请求一次重载", async () => {
+  setHubSection("connectors")
+  await waitFor(() => expect(q(`[data-package-card="package:github"]`)).toBeInstanceOf(HTMLElement))
   const reloadsBefore = reloadRequests.length
-  click(q(`[data-package-card="${MIXED_BUNDLE_PACKAGE_ID}"] .codepuppy-ext-add`))
-  // 首驱恒落 authorize 臂 ⇒ 授权屏出现。
-  await waitFor(() => expect(q("[data-package-authorization]")).toBeInstanceOf(HTMLElement))
-
-  expect(centralCalls).toEqual([{ catalogId: MIXED_BUNDLE_PACKAGE_ID, attemptId: expect.any(String), authorized: false }])
-  // 盘上还什么都没发生 ⇒ 一次重扫请求都不许有。谎报「已生效」与不重扫是同一个缺陷的两面。
-  expect(reloadRequests.length).toBe(reloadsBefore)
+  click(q(`[data-package-card="package:github"] .codepuppy-ext-add`))
+  await waitFor(() => expect(ledgerPackageIds()).toContain("package:github"))
+  expect(q("[data-package-authorization]")).toBeNull()
+  expect(desktopCalls).toEqual(["package:github"])
+  expect(desktopIpcCalls).toEqual(desktopCalls)
+  expect(reloadRequests.slice(reloadsBefore)).toEqual([expect.objectContaining({ type: "codepuppy.reload.request", scope: "global" })])
   expect(disposeCalls).toBe(0)
 })
 
-test("② 入口二 `confirmPackageAuthz`:确认屏落盘 ⇒ 同一个收口方法 + 引擎当场重扫一次", async () => {
-  const input = q<HTMLInputElement>("[data-package-authorization] .codepuppy-ext-key-input")
-  expect(input, "package authorization screen has no required-secret field").toBeInstanceOf(HTMLInputElement)
-  // 夹具的 MCP 叶带一个必填密钥 ⇒ 确认按钮在填完之前是禁用的。这条只为让下面的点击走
-  // **用户真实做得到**的那条路;密钥面本身的判据在 `ext-package-detail-wiring` 里,不在这里重述。
-  expect((q("[data-package-authorization] .codepuppy-ext-key-name")?.textContent ?? "").length).toBeGreaterThan(0)
-  input!.value = "req810-secret"
-  input!.dispatchEvent(new Event("input", { bubbles: true }))
-
+test("② 同包管理页单独保存密钥,不重装且请求重载", async () => {
+  await waitFor(() => expect(q(`[data-installed-package="package:github"] [data-more]`)).toBeInstanceOf(HTMLElement))
+  click(q(`[data-installed-package="package:github"] [data-more]`))
+  click(q('[data-menu-item="manage"]'))
+  await waitFor(() => expect(q('[data-package-secret]')).toBeInstanceOf(HTMLElement))
+  click(q('[data-package-secret]'))
+  await waitFor(() => expect(q('input[type="password"]')).toBeInstanceOf(HTMLInputElement))
+  const input = q<HTMLInputElement>('input[type="password"]')!
+  input.value = "req810-secret"
+  input.dispatchEvent(new Event("input", { bubbles: true }))
   const reloadsBefore = reloadRequests.length
-  clearToasts()
-  await waitFor(() => expect(confirmInstallButton()?.hasAttribute("disabled")).toBe(false))
-  click(confirmInstallButton())
-
-  // 真落盘:账本里出现这个包(不是「我调过 install」这种内部事实)。
-  await waitFor(() => expect(ledgerPackageIds()).toContain(MIXED_BUNDLE_PACKAGE_ID))
-  expect(centralCalls.at(-1)).toEqual({
-    catalogId: MIXED_BUNDLE_PACKAGE_ID,
-    attemptId: expect.any(String),
-    authorized: true,
-  })
-  // 首驱与确认屏是**同一次 attempt**:确认屏若自己另铸一个 id,admission 会当场拒。
-  expect(centralCalls.at(-1)!.attemptId).toBe(centralCalls[0]!.attemptId)
-  // 落盘 ⇒ main 恰好请求一次重扫(global,交给 ext 调度器);renderer 自己不 dispose。
+  click(q('[role="dialog"] .a-dialog-footer button'))
+  await waitFor(() => expect(q('input[type="password"]')).toBeNull())
+  expect(desktopCalls).toEqual(["package:github"])
   expect(reloadRequests.slice(reloadsBefore)).toEqual([expect.objectContaining({ type: "codepuppy.reload.request", scope: "global" })])
   expect(disposeCalls).toBe(0)
-  // 请求已受理 ⇒ 不许出现「要重启」。
-  expect(toasts().join("\n")).not.toContain(zh["codepuppy.ext.addedPendingReload"])
+  click(q('.codepuppy-ext-crumb-link'))
 })
 
 test("③ 入口三 `installBundle`:套件装完同样经收口方法 + 引擎重扫一次", async () => {
@@ -586,9 +590,10 @@ test("④ `#1529` AC3:ext 报告重载失败 ⇒ 已安装列表如实「待重�
     )
   // `#1594`:已装行分在三页各自的「已安装」组(技能、命令进技能页,助手进助手页,其余进连接器页)。
   // 夹具自检:列表上真的有没核验通过的已装行(引擎替身答不出技能 / agent / 命令清单),否则下面那几条恒成立。
-  setHubSection("skills")
-  await waitFor(() => expect(qa("[data-hub-state='reload-pending']").length).toBeGreaterThan(0))
+  setHubSection("connectors")
+  await waitFor(() => expect(q("[data-installed-package]")?.textContent).toContain("未能启用"))
   let pendingRows = 0
+  let failedPackages = 0
   for (const page of ["connectors", "skills", "agents"] as const) {
     setHubSection(page)
     await flush()
@@ -602,18 +607,18 @@ test("④ `#1529` AC3:ext 报告重载失败 ⇒ 已安装列表如实「待重�
     for (const node of qa("[data-hub-state='reload-pending']")) expect(node.textContent ?? "").not.toContain(zh["codepuppy.ext.hubStateAvailable"])
     expect(qa("[data-hub-reload-now]").length).toBe(qa("[data-hub-state='reload-pending']").length)
     pendingRows += qa("[data-hub-state='reload-pending']").length
+    failedPackages += qa("[data-installed-package]").filter((row) => row.textContent?.includes("未能启用")).length
+    expect(qa("[data-installed-package] [data-hub-reload-now]")).toEqual([])
   }
-  expect(pendingRows).toBeGreaterThan(0)
+  expect(pendingRows + failedPackages).toBeGreaterThan(0)
   expect(disposeCalls).toBe(0)
 })
 
-test("⑤ 出站计数相等:到达 IPC 的每一次安装都经过了收口方法", () => {
+test("⑤ 出站计数相等:到达 IPC 的每一次安装都经过了收口方法", async () => {
   // 三个入口共六次出站(package 首驱 + 确认屏,两条套件各首驱 + 重驱)。任何一次直连 `extIpc` 都会让
   // 右边多出来一次而左边不动 —— 「既走收口方法又另外直连一次」的实现在这里红。
   expect(ipcInstallIntents.length).toBe(centralCalls.length)
   expect(centralCalls.map((entry) => entry.catalogId)).toEqual([
-    MIXED_BUNDLE_PACKAGE_ID,
-    MIXED_BUNDLE_PACKAGE_ID,
     BUNDLE_OK,
     BUNDLE_OK,
     BUNDLE_PENDING,
@@ -623,6 +628,8 @@ test("⑤ 出站计数相等:到达 IPC 的每一次安装都经过了收口方�
   // 夹具自检:被装的那个 package 里真的有一个 MCP 组件(套件成员之外还有 fs 类组件),
   // 也就是说「装完要重扫」这件事对本夹具是真需求,不是摆设。
   expect(fixture.envelope.components.map((component) => component.id)).toContain(LEAF_MCP_ID)
+  expect((await hubApi.uninstallPackage("package:github")).ok).toBe(true)
+  await flush()
 })
 
 // #1646 uses the same real Hub → IPC → ledger. Only process launch is substituted;
@@ -644,8 +651,12 @@ const pdfRow = () => q('[data-installed-row="mcp:codepuppy-pdf"]')!
 // Same staged attachment metadata as attachment-reader-hooks.test.ts / attachment-cards.cases.ts.
 const meta = { v: 1 as const, name: "a.pdf", mime: "application/pdf", size: 2048, path: "attachments/00000000-0000-4000-8000-000000000000/a.pdf", reader: "pdf" as const }
 
+
 test("#1646 AC1 disable PDF waits for idle, then the fresh runtime blocks reading and the attachment shows why", async () => {
   for (const request of reloadRequests) codepuppySidecar.receive({ type: "codepuppy.reload.report", generation: request.generation, scope: "global", outcome: "reloaded", directories: [] }, () => {})
+  await flush()
+  connectorRefreshes = 0
+  liveMcpCalls = 0
   expect(restoreMcpLeaf("codepuppy-pdf", { type: "local", command: codepuppyOfficeInstallCommand("pdf"), enabled: true }).ok).toBe(true)
   expect(upsertRecordV2(globalRoot, {
     id: "mcp:codepuppy-pdf", name: "codepuppy-pdf", kind: "mcp", origin: "catalog", environment: "dev",
@@ -813,4 +824,32 @@ test("#1652 audit: a refused ledger write sends no permission rejection", async 
     expect(permissionReplies).toEqual([])
     expect(permissions[projectA]).toHaveLength(1)
   } finally { refuseState = false; permissions = {} }
+})
+
+test("busy package switch forces the existing scheduler without a second reload action", async () => {
+  const installed = await call("ext-install-package", "package:supabase")
+  expect(installed).toMatchObject({ ok: true })
+  const before = connectorRefreshes
+  busy = true
+  scheduler.register(join(tmp, "project"), {})
+  codepuppySidecar.attach((request) => scheduler.request(request))
+  for (const state of ["disabled", "enabled"] as const) {
+    expect(await call("ext-set-package-state", { packageId: "package:supabase", state })).toMatchObject({ ok: true })
+    await scheduler.settled()
+    await waitFor(() => expect(connectorRefreshes).toBe(before + (state === "disabled" ? 1 : 2)))
+    expect(busy).toBe(true)
+    const ledger = readPackageLedgerStateV1(globalRoot)
+    expect(ledger.ok).toBe(true)
+    if (ledger.ok)
+      expect(ledger.records.filter((record) => ["supabase", "supabase-postgres-best-practices"].includes(record.name)).map((record) => record.desiredState)).toEqual([state, state, state])
+  }
+})
+
+ test("package reload requests address graph component identities", async () => {
+  const requests: Array<{ items?: Array<{ id: string }> }> = []
+  const detach = codepuppySidecar.attach((message) => { requests.push(message as { items?: Array<{ id: string }> }) })
+  try {
+    expect(await call("ext-install-package", "package:supabase")).toMatchObject({ ok: true })
+    expect(requests.at(-1)?.items?.map((item) => item.id)).toEqual(expect.arrayContaining(["package:supabase", "skill:supabase", "mcp:supabase", "skill:supabase-postgres-best-practices"]))
+  } finally { detach() }
 })

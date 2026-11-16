@@ -28,6 +28,10 @@ import type { AttachmentReader, AttachmentStageResult } from "../shared/attachme
 import type {
   PackageAdmissionAuthorizationV1,
   PackageAdmissionPreviewV1,
+  PackageAuthorizationResultV1,
+  PackageActionResultV1,
+  PackageSourceV1,
+  PackageNotRunningV1,
 } from "../shared/package-admission"
 // Deep links reach the renderer already decoded by the route manifest — the wire carries the
 // delivery, never a URL, so no second codec can exist on the renderer side.
@@ -623,6 +627,7 @@ export type InstalledPackageComponentV1 = {
 }
 export type InstalledPackageV1 = {
   packageId: string
+  desiredState: "enabled" | "disabled" | null
   installedGraphDigest: string
   /** `#784`:插件作者在 `.claude-plugin/plugin.json` 里自己声明的名字。
    *  `null` = 这张图是加这个字段之前落的(存量)⇒ 呈现层回退到 `rootComponentName`。
@@ -632,9 +637,12 @@ export type InstalledPackageV1 = {
   /** 回退名。它**是**包里某个技能的名字,不是包名 —— 只在 `displayName` 缺席时才用。 */
   rootComponentName: string
   version: string | null
-  /** 来源一律从 child record 的 `origin` 读,**绝不从 packageId 前缀读**(基线 §8 纪律 2,`#737`)。
-   *  `imported-claude` = 用户从本地文件夹导入的;`catalog` = 已验签目录来的。 */
+  /** Fallback provenance when the graph has no source; never derive it from packageId.
+   *  source, when present, owns the displayed source label (DESIGN v5 §4.4). */
   origin: string | null
+  /** Safe graph presentation fields supplied by the source installation lane. */
+  source?: PackageSourceV1
+  notRunning?: PackageNotRunningV1[]
   components: InstalledPackageComponentV1[]
 }
 export type InstalledPackagesResultV1 =
@@ -926,6 +934,10 @@ export type ElectronAPI = {
      *  分支,只有远程 catalog 进得去)。
      *  **「读不出」与「没装」是两件事**,合并成一句「暂无扩展包」会让用户以为东西丢了。 */
     installedPackages: () => Promise<InstalledPackagesResultV1>
+    installPackage: (packageId: string) => Promise<PackageActionResultV1>
+    setPackageState: (intent: { packageId: string; state: "enabled" | "disabled" }) => Promise<PackageActionResultV1>
+    packageAuthorization: (packageId: string) => Promise<PackageAuthorizationResultV1>
+    savePackageSecrets: (intent: { packageId: string; secrets: Record<string, string> }) => Promise<PackageActionResultV1>
     /** REQ-032:远程 catalog(main 拉取+ed25519 验签+ETag 缓存;source 指示回退层级,renderer 内置兜底)。
      *  REQ-098 #302:通道 = main 冻结环境快照(renderer 无输入权);via = 传输面,channel = 内容通道
      *  (结构化,勿解析 via)。 */

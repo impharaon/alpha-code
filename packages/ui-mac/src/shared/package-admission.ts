@@ -1,9 +1,52 @@
 import type { CapabilityDiffWire } from "./ext-capability-authorization"
+
 import type {
   CodePuppyPackageEnvelopeV1,
   PackageComponentSkipReasonV1,
   PackageSupportedComponentV1,
 } from "./host-extension-package-contract/decoder"
+
+/** Graph display data from DESIGN-plugin-helper-and-hub v5 §4.4; supplied by main. */
+export type PackageSourceV1 =
+  | { kind: "catalog" }
+  | {
+      kind: "marketplace"
+      ecosystem: "claude" | "codex"
+      repository: string
+      commit: string
+      path: string
+      entryName: string
+    }
+  | {
+      kind: "mcp-registry"
+      serverName: string
+      version: string
+      publisher: { kind: "github"; account: string } | { kind: "domain"; domain: string }
+    }
+  | { kind: "npm"; ecosystem: "opencode"; name: string; version: string; integrity: string }
+  | { kind: "created" }
+  | { kind: "local-folder" }
+
+export type NotRunningReasonV1 =
+  | "kind-not-supported-yet"
+  | "needs-plugin-files"
+  | "unresolved-app-id"
+  | "native-js-plugin"
+  | "invalid-definition"
+  | "missing-entry"
+export type PackageNotRunningV1 = { kind: string; sourceName: string; reason: NotRunningReasonV1 }
+
+/** Installed package account view: declarations and presence/status only, never secret references. */
+export type PackageAuthorizationItemV1 =
+  | { kind: "secret"; componentId: string; prerequisiteId: string; serviceName: string; label: string; saved: boolean }
+  | { kind: "mcp-oauth"; componentId: string; prerequisiteId: string; serviceName: string; label: string; authenticated: boolean; status: string }
+  | { kind: "connection"; componentId: string; prerequisiteId: string; serviceName: string; label: string; ready: boolean }
+
+export type PackageAuthorizationResultV1 =
+  | { ok: true; packageId: string; items: PackageAuthorizationItemV1[] }
+  | { ok: false; reason: string }
+
+export type PackageActionResultV1 = { ok: true; warning?: string; generation?: number } | { ok: false; reason: string }
 
 export type PackageAdmissionBindingV1 = {
   snapshotDigest: string

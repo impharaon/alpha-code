@@ -15,6 +15,9 @@ import {
 import { createPackageAdmissionCoordinator } from "./package-admission"
 import { canonicalJson, sha256Hex } from "./ext-manifest-v2"
 import { runExtensionTransaction } from "./ext-transaction"
+import { hubPackageFixture } from "../../test-component/hub-package.fixture"
+import { readPackageLedgerStateV1, skillsEnabledPath } from "./ext-receipt-v2"
+import { resolveVerifiedPackageV1 } from "./package-installability"
 
 const artifact = resolve(
   import.meta.dir,
@@ -26,6 +29,167 @@ let tmp = ""
 let root = ""
 let userData = ""
 const previousRoot = process.env.CODEPUPPY_GLOBAL_DIR
+
+function desktopDeps() {
+  root = join(tmp, "codepuppy-state", "env", "dev")
+  mkdirSync(root, { recursive: true })
+  process.env.CODEPUPPY_GLOBAL_DIR = root
+  const sample = hubPackageFixture()
+  return {
+    loadVerifiedCatalog: async () => ({ source: "remote" as const, catalog: sample.catalog, snapshotDigest }),
+    root: () => root,
+    globalRoot: () => root,
+    userDataPath: userData,
+    casBaseRoot: () => userData,
+    environment: () => "dev" as const,
+    installability: { fetchPayload: sample.fetchBytes },
+    fetchAsset: sample.fetchBytes,
+    advisoryGate: () => ({ allowed: true as const }),
+    resolvePackage: async (id: string, version: string) => ({ ...resolveVerifiedPackageV1(sample.catalog, id, version), channel: "cache" as const }),
+  }
+}
+
+test("desktop plus commits content before automatic package enable without login or token", async () => {
+  const { installDesktopPackageV1 } = await import("./package-admission")
+  const deps = desktopDeps()
+  await hubPackageFixture().verify()
+  const commits: string[][] = []
+  const result = await installDesktopPackageV1("package:supabase", {
+    ...deps,
+    transaction: async (...args: Parameters<typeof runExtensionTransaction>) => {
+      const result = await runExtensionTransaction(...args)
+      const state = readPackageLedgerStateV1(root)
+      expect(state.ok).toBe(true)
+      if (state.ok) commits.push(state.records.map((record) => record.desiredState))
+      return result
+    },
+    mcpOauthEngine: { add: async () => { throw new Error("content installation must not probe OAuth") } },
+  })
+  expect(result.ok).toBe(true)
+  expect(commits).toEqual([["disabled", "disabled", "disabled"]])
+  const state = readPackageLedgerStateV1(root)
+  expect(state.ok).toBe(true)
+  if (!state.ok) return
+  expect(state.records).toHaveLength(3)
+  expect(state.records.map((record) => record.desiredState)).toEqual(["enabled", "enabled", "enabled"])
+  expect(await Bun.file(skillsEnabledPath(root)).text()).toContain("supabase")
+})
+
+test("installed GitHub package saves and changes its token while off and on without reinstalling", async () => {
+  const { installDesktopPackageV1, readPackageAuthorizationV1, savePackageSecretsV1 } = await import("./package-admission")
+  const { setPackageStateV1 } = await import("./ext-install-planner")
+  const deps = desktopDeps()
+  expect((await installDesktopPackageV1("package:github", deps)).ok).toBe(true)
+  const before = readPackageLedgerStateV1(root)
+  expect(before.ok).toBe(true)
+  const pending = await readPackageAuthorizationV1("package:github", deps)
+  expect(pending.ok).toBe(true)
+  if (!pending.ok) return
+  expect(pending.items).toMatchObject([{ kind: "secret", saved: false }])
+  const id = pending.items[0]!.prerequisiteId
+  for (const desiredState of ["disabled", "enabled"] as const) {
+    expect((await setPackageStateV1({ packageId: "package:github", state: desiredState }, deps)).ok).toBe(true)
+    const value = `invalid-hub-token-${desiredState}`
+    expect((await savePackageSecretsV1({ packageId: "package:github", secrets: { [id]: value } }, deps)).ok).toBe(true)
+    const current = readPackageLedgerStateV1(root)
+    expect(current.ok).toBe(true)
+    if (!current.ok || !before.ok) return
+    expect(current.packageGraphs).toEqual(before.packageGraphs)
+    expect(current.records[0]!.desiredState).toBe(desiredState)
+    const view = await readPackageAuthorizationV1("package:github", deps)
+    expect(view).toMatchObject({ ok: true, items: [{ kind: "secret", saved: true }] })
+    expect(JSON.stringify(view)).not.toContain(value)
+    expect(await Bun.file(join(root, "codepuppy.jsonc")).text()).not.toContain(value)
+    const versions = join(userData, "codepuppy-mcp-secrets", "github")
+    expect(readdirSync(versions).some((version) => readFileSync(join(versions, version, "GITHUB_PERSONAL_ACCESS_TOKEN"), "utf8") === value)).toBe(true)
+  }
+  const previous = await Bun.file(join(root, "codepuppy.jsonc")).text()
+  const collision = readdirSync(join(userData, "codepuppy-mcp-secrets", "github"))[0]!
+  expect((await savePackageSecretsV1({ packageId: "package:github", secrets: { [id]: "invalid-hub-token-failed-write" } }, { ...deps, secretVersionId: () => collision })).ok).toBe(false)
+  expect(await Bun.file(join(root, "codepuppy.jsonc")).text()).toBe(previous)
+})
+
+test("one package switch projects every skill and connector from the package graph", async () => {
+  const { installDesktopPackageV1 } = await import("./package-admission")
+  const { setPackageStateV1 } = await import("./ext-install-planner")
+  const deps = desktopDeps()
+  expect((await installDesktopPackageV1("package:supabase", deps)).ok).toBe(true)
+  for (const desiredState of ["disabled", "enabled"] as const) {
+    expect((await setPackageStateV1({ packageId: "package:supabase", state: desiredState }, deps)).ok).toBe(true)
+    const ledger = readPackageLedgerStateV1(root)
+    expect(ledger.ok).toBe(true)
+    if (!ledger.ok) return
+    expect(ledger.records.map((record) => record.desiredState)).toEqual([desiredState, desiredState, desiredState])
+    const allowed = await Bun.file(skillsEnabledPath(root)).json()
+    expect(allowed.keys).toHaveLength(desiredState === "enabled" ? 2 : 0)
+  }
+  const config = join(root, "codepuppy.jsonc")
+  rmSync(config)
+  mkdirSync(config)
+  expect((await setPackageStateV1({ packageId: "package:supabase", state: "disabled" }, deps)).ok).toBe(false)
+  const ledger = readPackageLedgerStateV1(root)
+  if (ledger.ok) expect(ledger.records.map((record) => record.desiredState)).toEqual(["enabled", "enabled", "enabled"])
+})
+
+test("package credential replacement preserves graph and claims, retires old versions, and keeps the old value on failed commit", async () => {
+  const { installDesktopPackageV1, savePackageSecretsV1 } = await import("./package-admission")
+  const { readMcpLeafStrict } = await import("./ext-config")
+  const { collectMcpFileRefPaths } = await import("./codepuppy-mcp-secrets")
+  const { commitTransactionLedger } = await import("./ext-package-ledger-commit")
+  const deps = desktopDeps()
+  expect((await installDesktopPackageV1("package:github", deps)).ok).toBe(true)
+  const before = readPackageLedgerStateV1(root)
+  if (!before.ok) throw new Error(before.reason)
+  const id = "mcp:github#GITHUB_PERSONAL_ACCESS_TOKEN"
+  const liveFile = () => { const leaf = readMcpLeafStrict("github"); if (!leaf.ok) throw new Error(leaf.reason); return collectMcpFileRefPaths(leaf.value)[0]! }
+  expect((await savePackageSecretsV1({ packageId: "package:github", secrets: { [id]: "invalid-first-token-r4" } }, deps)).ok).toBe(true)
+  const first = liveFile()
+  expect(readFileSync(first, "utf8")).toBe("invalid-first-token-r4")
+  let committed: Parameters<typeof commitTransactionLedger>[1] = []
+  expect((await savePackageSecretsV1({ packageId: "package:github", secrets: { [id]: "invalid-second-token-r4" } }, {
+    ...deps,
+    transaction: (target, plan, hooks) => runExtensionTransaction(target, plan, { ...hooks, commitReceipt: (records) => { committed = records; return hooks.commitReceipt?.(records) } }),
+  })).ok).toBe(true)
+  const current = readPackageLedgerStateV1(root)
+  expect(current.ok && current.packageGraphs).toEqual(before.packageGraphs)
+  expect(current.ok && current.claims).toEqual(before.claims)
+  expect(existsSync(first)).toBe(false)
+  const second = liveFile()
+  expect(readFileSync(second, "utf8")).toBe("invalid-second-token-r4")
+  const durable = readFileSync(join(root, "installs.json"), "utf8")
+  commitTransactionLedger(root, committed)
+  expect(readFileSync(join(root, "installs.json"), "utf8")).toBe(durable)
+  expect((await savePackageSecretsV1({ packageId: "package:github", secrets: { [id]: "invalid-refused-token-r4" } }, {
+    ...deps,
+    transaction: (target, plan, hooks) => runExtensionTransaction(target, plan, { ...hooks, commitReceipt: () => { throw new Error("injected ledger write failure") } }),
+  })).ok).toBe(false)
+  expect(liveFile()).toBe(second)
+  expect(readFileSync(second, "utf8")).toBe("invalid-second-token-r4")
+  expect(readFileSync(join(root, "installs.json"), "utf8")).toBe(durable)
+})
+
+test("package activation and switch work when main-owned remote definitions require no JSONC edits", async () => {
+  const { readMcpServerRecords } = await import("./mcp-server-records")
+  const { initCodePuppyEnvironment, __resetCodePuppyEnvironmentForTests } = await import("./codepuppy-environment")
+  const { installDesktopPackageV1 } = await import("./package-admission")
+  const { setPackageStateV1 } = await import("./ext-install-planner")
+  const deps = desktopDeps()
+  delete process.env.CODEPUPPY_GLOBAL_DIR
+  initCodePuppyEnvironment({ isPackaged: false, channel: "dev", appDataDir: tmp, baseRoot: join(tmp, "codepuppy-state"), homeDir: join(tmp, "home") })
+  try {
+    expect((await installDesktopPackageV1("package:supabase", deps)).ok).toBe(true)
+    expect(readMcpServerRecords(() => {}).map((record) => record.name)).toContain("supabase")
+    const installed = readPackageLedgerStateV1(root)
+    expect(installed.ok && installed.records.map((record) => record.desiredState)).toEqual(["enabled", "enabled", "enabled"])
+    const config = readFileSync(join(root, "codepuppy.jsonc"), "utf8")
+    for (const state of ["disabled", "enabled"] as const) {
+      expect(await setPackageStateV1({ packageId: "package:supabase", state }, deps)).toMatchObject({ ok: true })
+      const ledger = readPackageLedgerStateV1(root)
+      expect(ledger.ok && ledger.records.map((record) => record.desiredState)).toEqual([state, state, state])
+      expect(readFileSync(join(root, "codepuppy.jsonc"), "utf8")).toBe(config)
+    }
+  } finally { __resetCodePuppyEnvironmentForTests() }
+})
 
 beforeEach(() => {
   tmp = mkdtempSync(join(tmpdir(), "package-admission-"))

@@ -45,7 +45,7 @@ describe("injectDisabledOverrides（主权注入）", () => {
     expect(config.agents!.a).toEqual({ disabled: true })
   })
 
-  test("已有同名条目 → MCP 整条换成中和条目(2.x 按名字整条替换,不存在「只盖一个字段」);agent 保留其余字段只加 disabled", () => {
+  test("已有治理定义 → MCP 保留 stdio 定义并禁用,开启时仍可连接;agent 保留其余字段只加 disabled", () => {
     record({ name: "m", kind: "mcp", configKey: "mcp.m", desiredState: "disabled" })
     record({ name: "a", kind: "agent", configKey: "agent.a", desiredState: "disabled" })
     const config = {
@@ -53,7 +53,7 @@ describe("injectDisabledOverrides（主权注入）", () => {
       agents: { a: { description: "kept" } } as Record<string, unknown>,
     }
     injectDisabledOverrides(config, { userDataPath: root, channel: "stable" })
-    expect(config.mcp.servers.m).toEqual({ ...NEUTRALIZED_MCP_SERVER })
+    expect(config.mcp.servers.m).toEqual({ type: "local", command: ["x"], disabled: true })
     expect(config.agents.a).toEqual({ description: "kept", disabled: true })
   })
 

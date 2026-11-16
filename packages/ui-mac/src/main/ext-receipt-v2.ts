@@ -1318,23 +1318,34 @@ export function setDesiredStateV2(
   state: DesiredState,
   publishFinal?: SkillsFinalPublish,
 ): { ok: true; projectionLag?: string } | { ok: false; reason: string } {
+  return setDesiredStatesV2(root, [{ kind, name, state }], publishFinal)
+}
+
+/** One ledger write and one skill projection for an entire package state action. */
+export function setDesiredStatesV2(
+  root: string,
+  updates: Array<{ kind: InstallReceiptType; name: string; state: DesiredState }>,
+  publishFinal?: SkillsFinalPublish,
+): { ok: true; projectionLag?: string } | { ok: false; reason: string } {
   const { parsed, readError } = parseLedger(root)
   if (readError) return { ok: false, reason: `${readError} — refusing to write` }
-  const k = key(kind, name)
-  // r18:与 upsert/remove 同款损坏闸 —— 同 key 损坏所有权不明、unattributable 无从自证,
-  // desiredState 翻转同为写路径,一律拒(原文保全依旧带回,见下方重建)。
-  if (parsed.corruptRecords.corruptKeys.has(k))
-    return { ok: false, reason: `refusing to set desired state for ${k}: ledger holds a corrupt v2 record for this key (fail closed — inspect ${ledgerPath(root)})` }
-  if (parsed.corruptRecords.unattributable)
-    return { ok: false, reason: `refusing to set desired state for ${k}: ledger holds an unattributable corrupt v2 record (fail closed — inspect ${ledgerPath(root)})` }
-  const rec = parsed.records.find((r) => key(r.kind, r.name) === k)
-  if (!rec) return { ok: false, reason: `no v2 record for ${k} — fail closed (v1-only installs have no desired-state channel)` }
-  const next: InstallRecordV2 = { ...rec, desiredState: state, updatedAt: new Date().toISOString() }
-  // Bundle 只拥有**安装** claim,不拥有用户的启停 —— desiredState 翻转对 V3 段是纯透传。
+  const states = new Map(updates.map((update) => [key(update.kind, update.name), update.state]))
+  for (const k of states.keys()) {
+    if (parsed.corruptRecords.corruptKeys.has(k))
+      return { ok: false, reason: `refusing to set desired state for ${k}: ledger holds a corrupt v2 record for this key (fail closed — inspect ${ledgerPath(root)})` }
+    if (parsed.corruptRecords.unattributable)
+      return { ok: false, reason: `refusing to set desired state for ${k}: ledger holds an unattributable corrupt v2 record (fail closed — inspect ${ledgerPath(root)})` }
+    if (!parsed.records.some((record) => key(record.kind, record.name) === k))
+      return { ok: false, reason: `no v2 record for ${k} — fail closed (v1-only installs have no desired-state channel)` }
+  }
+  const updatedAt = new Date().toISOString()
   const written = writeLedgerFile(
     root,
     [...parsed.receipts, ...parsed.rawInvalidReceipts],
-    [...parsed.records.filter((r) => key(r.kind, r.name) !== k), next, ...parsed.rawCorruptRecords],
+    [...parsed.records.map((record) => {
+      const desiredState = states.get(key(record.kind, record.name))
+      return desiredState ? { ...record, desiredState, updatedAt } : record
+    }), ...parsed.rawCorruptRecords],
     { packageGraphs: parsed.packageGraphs, claims: parsed.claims },
     publishFinal,
   )
@@ -1524,9 +1535,20 @@ export function applyPackageMutation(root: string, mutation: PackageLedgerMutati
       ok: false,
       reason: `refusing package mutation: ledger graph digest ${beforeDigest ?? "<absent>"} does not match the expected before-image ${mutation.graphBeforeDigest ?? "<absent>"}`,
     }
-  // exact replay:图已经是目标态 ⇒ 这次提交此前已 durable,原样返回(绝不重放 claim mutation)。
-  if (existingGraph && mutation.graphAfter && existingGraph.installedGraphDigest === mutation.graphAfter.installedGraphDigest)
-    return { ok: true, replayed: true, warnings }
+  // Credential updates keep the content graph and its claims. Their child transaction identities,
+  // rather than the unchanged graph digest, distinguish a fresh write from recovery replay.
+  const sameGraph = existingGraph && mutation.graphAfter && existingGraph.installedGraphDigest === mutation.graphAfter.installedGraphDigest
+  const credentials = sameGraph && mutation.operation === "update" && mutation.claimMutations.length === 0 && mutation.childRecordMutations.length > 0 &&
+      mutation.childRecordMutations.every((child) => child.op === "upsert" && child.input.kind === "mcp" &&
+        [existingGraph.root, ...existingGraph.children].some((node) => node.kind === child.input.kind && node.name === child.input.name && node.manifestDigest === child.input.manifestDigest))
+  if (sameGraph) {
+    if (!credentials) return { ok: true, replayed: true, warnings }
+    const verdicts = mutation.childRecordMutations.flatMap((child) => child.op === "upsert"
+      ? [replayVerdict(parsed.records.find((record) => record.kind === child.input.kind && record.name === child.input.name) ?? null, child.input)] : [])
+    const conflict = verdicts.find((verdict) => verdict.kind === "conflict")
+    if (conflict?.kind === "conflict") return { ok: false, reason: conflict.reason }
+    if (verdicts.every((verdict) => verdict.kind === "replay")) return { ok: true, replayed: true, warnings }
+  }
 
   // REQ-128 `#698`:作用域闸 —— 这次 mutation 只准动**自己的 owner、自己图里的 child、离场的 child**。
   // 判据与理由都在 `validatePackageMutationScopeV1`(三个洞各自为什么账本自身查不出来,见那里)。
@@ -1578,7 +1600,7 @@ export function applyPackageMutation(root: string, mutation: PackageLedgerMutati
   // 同名 child,并不能证明那条存量原本属于这个包;「不猜」正是 legacy 保护存在的理由。
   // 仍然活着的 record 才收编:同一次 mutation 里被 remove 掉的 key 不该凭空长出一条 claim。
   let claims: PackageClaimV1[] = [...parsed.claims]
-  for (const k of preexistingUnclaimed) {
+  for (const k of credentials ? [] : preexistingUnclaimed) {
     const rec = recordsByKey.get(k)
     if (rec && !findClaim(claims, rec.kind, rec.name)) claims = withOwner(claims, rec.kind, rec.name, LEGACY_PROTECTED_OWNER)
   }
@@ -1591,7 +1613,7 @@ export function applyPackageMutation(root: string, mutation: PackageLedgerMutati
   // 同一份 mutation 会撞上既有的 dangling-claim 闸并整次拒写:claim 必须由 release **显式**清空,
   // 「owner set 空才删」因此成为写盘前的判据,而不是一句纪律。
 
-  const nextGraphs = mutation.graphAfter
+  const nextGraphs = credentials ? parsed.packageGraphs : mutation.graphAfter
     ? [...parsed.packageGraphs.filter((g) => g.packageId !== mutation.graphAfter!.packageId), mutation.graphAfter]
     : parsed.packageGraphs.filter((g) => g.installedGraphDigest !== mutation.graphBeforeDigest)
 

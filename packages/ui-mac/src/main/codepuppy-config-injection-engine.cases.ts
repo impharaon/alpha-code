@@ -67,14 +67,35 @@ const MANAGED = [
 ] as const
 const saved: Record<string, string | undefined> = {}
 let userData = ""
+const discoveryPath = "/api/v1/models" // LM Studio discovery protocol, outside the Alpha route manifest.
+let localModels: ReturnType<typeof Bun.serve> | undefined
 
 beforeAll(async () => {
   await assertEngineSandboxed(sandbox)
+  // Discovery is process-cached: provide the source before even the earlier S6 engines start.
+  try {
+    localModels = Bun.serve({
+      hostname: "127.0.0.1",
+      port: 1234, // Built-in LMStudioPlugin discovery origin; no owner service is required.
+      fetch: (request) => new URL(request.url).pathname === discoveryPath
+        // Same discovery sample as core/test/plugin/provider-lmstudio.test.ts, first language model.
+        ? Response.json({ models: [{
+            type: "llm", key: "google/gemma-4-26b-a4b", display_name: "Gemma 4 26B A4B", architecture: "gemma4",
+            loaded_instances: [{ config: { context_length: 32_768 } }, { config: { context_length: 16_384 } }],
+            max_context_length: 262_144, capabilities: { vision: true, trained_for_tool_use: true },
+          }] })
+        : new Response(null, { status: 404 }),
+    })
+  } catch (error) {
+    // A real local model service can supply the same outside-provider premise. Assertions still run.
+    if (!(error instanceof Error) || !("code" in error) || error.code !== "EADDRINUSE") throw error
+  }
 })
 
 afterAll(async () => {
   unpublishTestBootstrap()
   for (const engine of engines.reverse()) await engine.close().catch(() => undefined)
+  localModels?.stop(true)
   for (const k of MANAGED) {
     if (saved[k] === undefined) delete process.env[k]
     else process.env[k] = saved[k]
@@ -428,7 +449,7 @@ describe("编排器裁决 2026-11-12:项目导入的技能经显式文件那一�
   test("反向臂(今天的代码):显式文件的 skills 里没有那一条 ⇒ 项目 A 已导入的技能不可用", async () => {
     const injection = injectCodePuppyConfig(userData, undefined, "stable", codepuppyBootstrap().paths.userConfig ?? null)
     const explicit = injection.explicit!
-    writeExplicitConfig(injection.config.file!, explicit.userConfig, { ...explicit.layer, skills: explicit.layer.skills.filter((entry) => entry !== "./.codepuppy/skills") })
+    writeExplicitConfig(injection.config.file!, explicit.userConfig, { ...explicit.layer, skills: explicit.layer.skills.filter((entry) => entry !== "./.codepuppy/skills") }, explicit.root)
     expect(fs.readFileSync(injection.config.file!, "utf8")).not.toContain(".codepuppy/skills")
     const projectA = path.join(sandbox.root, "projects", "project-skills-today")
     fs.mkdirSync(projectA, { recursive: true })

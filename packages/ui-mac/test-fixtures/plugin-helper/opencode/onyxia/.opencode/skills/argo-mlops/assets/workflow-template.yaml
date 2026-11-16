@@ -1,0 +1,69 @@
+# Starter Argo Workflow — parameterized training job on Onyxia (SSP Cloud).
+#
+# Adapt the <placeholders>, then submit with:
+#   argo submit workflow-template.yaml --watch
+# or, without the argo CLI:
+#   kubectl create -f workflow-template.yaml      # create, NOT apply (generateName)
+#
+# Prerequisites:
+# - a Docker image containing your code + dependencies, built from an Insee
+#   base image (e.g. inseefrlab/python-datascience) and published by CI;
+# - a K8s Secret holding the S3/MLflow credentials (never plain-text in YAML).
+apiVersion: argoproj.io/v1alpha1
+kind: Workflow
+metadata:
+  generateName: training-          # Argo appends a random suffix per run
+spec:
+  entrypoint: main
+  arguments:
+    parameters:
+      # Global parameters, overridable at submission time:
+      #   argo submit workflow-template.yaml -p experiment=my-experiment
+      - name: experiment
+        value: "my-project"
+      - name: data_path
+        value: "s3://<bucket>/data/train.parquet"
+      - name: output_path
+        value: "s3://<bucket>/models/"
+
+  templates:
+    - name: main
+      steps:
+        - - name: train
+            template: train
+
+    - name: train
+      container:
+        image: inseefrlab/<project-image>:main   # your image: code + pinned deps
+        command: ["python", "train.py"]
+        args:
+          - "--experiment"
+          - "{{workflow.parameters.experiment}}"
+          - "--data"
+          - "{{workflow.parameters.data_path}}"
+          - "--output"
+          - "/tmp/model"                          # collected as an artifact below
+        env:
+          # Auto-generated URL of the MLflow catalog service (= $MLFLOW_TRACKING_URI)
+          - name: MLFLOW_TRACKING_URI
+            value: "https://user-<namespace>-<id>.user.lab.sspcloud.fr"
+          - name: MLFLOW_S3_ENDPOINT_URL
+            value: "https://minio.lab.sspcloud.fr"
+          # S3/MinIO credentials from a K8s Secret — never plain-text YAML
+          - name: AWS_ACCESS_KEY_ID
+            valueFrom:
+              secretKeyRef: { name: s3-creds, key: accessKey }
+          - name: AWS_SECRET_ACCESS_KEY
+            valueFrom:
+              secretKeyRef: { name: s3-creds, key: secretKey }
+      outputs:
+        artifacts:
+          # Copy of the trained model pushed to S3 (MinIO) at the end of the step
+          - name: model
+            path: /tmp/model
+            s3:
+              endpoint: minio.lab.sspcloud.fr
+              bucket: <bucket>
+              key: "models/{{workflow.name}}/model.tgz"
+              accessKeySecret: { name: s3-creds, key: accessKey }
+              secretKeySecret: { name: s3-creds, key: secretKey }

@@ -1,0 +1,100 @@
+---
+title: "Parameterized report"
+author: "Firstname Lastname"
+format:
+  html:
+    toc: true
+    # Publication default: code hidden. To show code, set `echo: true` (below)
+    # and optionally add `code-fold: true` here.
+execute:
+  echo: false            # code hidden by default — override per cell with #| echo: true
+  warning: false
+  freeze: auto           # cache: re-run a chunk only when its code changes
+jupyter: python3
+params:
+  year: 2024
+  dept: "31"
+  data_uri: ""           # s3://<bucket>/... — set at render time (see below)
+---
+
+<!--
+Starter parameterized report (Python engine).
+
+Render (ALWAYS inside the project env so Quarto uses .venv, not /opt/python):
+  uv run quarto render report-template.qmd
+  uv run quarto render report-template.qmd -P year:2025 -P dept:11 \
+      -P data_uri:s3://<bucket>/data/2025/dept=11/*.parquet
+
+The `_environment` file (QUARTO_PYTHON=.venv/bin/python) is a safety net for a
+bare `quarto render`, but Quarto only reads it inside a project (a `_quarto.yml`
+at the root) — so prefer `uv run` anyway. Data is STREAMED from S3 (skill
+onyxia-storage-s3), never read from a hard-coded local path, and every figure
+below is COMPUTED from that data — never transcribed or hard-coded.
+-->
+
+```{python}
+#| tags: [parameters]
+# Default values — overridden by -P at render time
+year = 2024
+dept = "31"
+data_uri = ""
+```
+
+## Context
+
+This report covers department `{python} dept` for year `{python} year`.
+
+```{python}
+#| label: load-data
+import os
+import polars as pl
+
+# ---- Stream data from S3 first (Onyxia rule, skill onyxia-storage-s3) --------
+# Read lazily / in memory from S3; only `aws s3 cp` to local disk if a tool
+# truly needs a file. Endpoint from the injected AWS_S3_ENDPOINT — never
+# hard-code credentials.
+if data_uri:
+    storage_options = {"aws_endpoint": f"https://{os.environ['AWS_S3_ENDPOINT']}"}
+    df = pl.read_parquet(data_uri, storage_options=storage_options)
+    # Large data → scan lazily and let predicate/column pushdown trim it:
+    #   df = (pl.scan_parquet(data_uri, storage_options=storage_options)
+    #           .filter(pl.col("dept") == dept)
+    #           .collect())
+else:
+    # Placeholder so the *template* renders out of the box. DELETE this branch
+    # and pass -P data_uri:s3://... for a real report.
+    # NEVER hard-code result figures here — they must come from the data.
+    df = pl.DataFrame({"category": ["A", "B", "C"], "value": [12, 7, 21]})
+
+n_rows = df.height
+total = df["value"].sum()
+```
+
+Loaded **`{python} n_rows`** rows; total value **`{python} f"{total:,}"`**.
+
+## Key figure
+
+```{python}
+#| label: fig-values
+#| fig-cap: "Value by category (computed from the data)"
+import matplotlib.pyplot as plt
+
+# Draw in the cell and let Quarto capture it via plt.show().
+# Do NOT use IPython.display.Image and do NOT savefig + ![](path.png) here.
+fig, ax = plt.subplots()
+ax.bar(df["category"], df["value"])
+ax.set_xlabel("Category")
+ax.set_ylabel("Value")
+plt.show()
+```
+
+## Summary table
+
+```{python}
+#| label: tbl-summary
+#| tbl-cap: "Summary by category"
+from IPython.display import Markdown
+
+# .to_markdown() needs `tabulate` (in the project's `doc` dependency group).
+Markdown(df.to_pandas().to_markdown(index=False))
+```

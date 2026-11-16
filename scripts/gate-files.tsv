@@ -468,4 +468,5 @@
 1	packages/ui-mac	src/main/unattended-run.engine.test.ts	-	#1699 无人值守运行的真实入口宿主:独立 bun test 子进程跑 unattended-run.engine.cases.ts;本轮直接实跑 16 pass / 0 fail、101 断言。生产调度/手动运行/一句话解析、握手与退出名单、即时工具裁决、Code Mode 终态原因、MCP 补充信息取消;消息插话退出而 shell 命令不接管。宿主自身精确条数=1,子进程用例不在整包计数里,删宿主会丢失这组证据。
 1	packages/ui-mac	src/main/plugin-entrypoints.engine.test.ts	-	#1724 BC5:独立宿主钉住 5 pass/0 fail，真实 main/ext/engine 覆盖 OpenCode 聊天/文件夹/Git 生命周期、独立 Registry GitHub 凭据与工具、两次 Figma 目标；固定公开样本与原生 JS 安全拦截。删除宿主会丢失全部 cases。实跑宿主 1 条。
 1	packages/ui-mac	src/renderer/extensions/package-account-dialog.test.ts	-	#1724 BC4:独立宿主钉住 4 pass/0 fail，真实共用账户窗的同包声明/部分提交、失效需求、失败保留与身份切换清空。删除宿主会丢失全部 cases。实跑宿主 1 条。
-1	packages/ui-mac	src/renderer/extensions/plugin-source-results.test.ts	-	#1724 BC1:独立宿主钉住 7 pass/0 fail，真实来源结果的统一查询/来源状态、身份不误并、过期响应、逐条安装与错误。删除宿主会丢失全部 cases。实跑宿主 1 条。
+1	packages/ui-mac	src/renderer/extensions/plugin-source-results.test.ts	-	#1724 BC1:独立宿主钉住 10 pass/0 fail，真实来源结果的统一查询/来源状态、身份不误并、过期响应、逐条安装与错误。删除宿主会丢失全部 cases。实跑宿主 1 条。
+1	packages/ui-mac	src/renderer/extensions/plugin-search-layout.browser.test.ts	-	#1724 S1：真实 Chrome 在批准 #search 帧/生产 CSS/默认1280×800下，实际测量现行占位文字与输入框可用宽度；恢复180px即红，缺CSS同样红。精确实测1条。

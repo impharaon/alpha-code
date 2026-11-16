@@ -9,8 +9,8 @@
   },
   "archive": {
     "path": "selection.tar.gz",
-    "sha256": "a0d0560fd2b5823fa41c0c732861aa2498f281bf4e86c690d5fdf6f0b0ac68e4",
-    "note": "Selected original members and modes, retaining global pax commit. This subset is not a complete Figma plugin; one actual skill is retained. GitHub MCP containing literal credentials is excluded."
+    "sha256": "6fd594668b54411f2c5ecd96dffad8180fa6c67328290c291cda69d970180c7c",
+    "note": "Selected original members and modes, retaining global pax commit. This subset is not a complete Figma plugin; one actual skill is retained. GitHub MCP containing literal credentials is excluded. Relative-link references/assets completed mechanically from the same pinned tree; existing file bytes unchanged."
   },
   "files": [
     {
@@ -66,6 +66,23 @@
       "bytes": 570,
       "mode": 436,
       "sha256": "bbf8ab405f1163ff1d94333011a30e2abe5be80d484418cd0b77181584fc24e7"
+    },
+    {
+      "path": "plugins/figma/skills/figma-code-connect/references/advanced-patterns.md",
+      "bytes": 10069,
+      "mode": 436,
+      "sha256": "ac2cb232aca4e43b75169f47f5550d6e7e48a8df0eb55aa1adbfb1a2ab0aa1b4"
+    },
+    {
+      "path": "plugins/figma/skills/figma-code-connect/references/api.md",
+      "bytes": 23396,
+      "mode": 436,
+      "sha256": "40c1dcae2db387fb93ffbf4eba8ae81362e204bdfa5be7018f743b8ac24d4252"
     }
-  ]
+  ],
+  "completionCapture": {
+    "url": "https://codeload.github.com/openai/plugins/tar.gz/d420d13051bffe4543ed39e30fa46b87148e47dd",
+    "sha256": "266a67df9a75cae0f58613ac2b47635b1d6779362804b0ba26e2c8674a249ca2",
+    "note": "New codeload container digest recorded separately; pinned commit pax and every retained original file digest verified."
+  }
 }

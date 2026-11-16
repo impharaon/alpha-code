@@ -1,0 +1,20 @@
+# Starter Quarto project config (website) for Onyxia.
+# Adapt the title/pages, then: quarto render  (or quarto preview)
+project:
+  type: website          # or: book, default
+  output-dir: _site      # rendered site goes here — do not commit it to Git
+
+website:
+  title: "My project"
+  navbar:
+    left: [index.qmd, analysis.qmd]
+
+format:
+  html:
+    toc: true
+    code-fold: true
+
+execute:
+  echo: true
+  warning: false
+  freeze: auto           # freeze results of unmodified chunks (reproducible, faster)

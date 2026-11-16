@@ -184,3 +184,26 @@ test("BC1 an IPC rejection stays an inline failure and never renders an old resu
   expect(failed.textContent).toContain("未能查询来源")
   expect(failed.querySelectorAll("[data-source-candidate]")).toHaveLength(0)
 })
+
+
+test("R12 B5 typing coalesces source queries without delaying the initial search",async()=>{
+ const {jest}=await import("bun:test")
+ const queries:string[]=[]
+ const [query,setQuery]=solid.createSignal("initial")
+ jest.useFakeTimers()
+ try{
+  const node=document.createElement("div")
+  document.body.append(node)
+  disposers.push(web.render(()=>solid.createComponent(PluginSourceResults,{get query(){return query()},search:async value=>{queries.push(value);return {...structuredClone(recorded),query:value}},install:async()=>({ok:false,code:"unknown-id",detail:"fixture"}),installedMenu:()=>undefined}),node))
+  await Promise.resolve()
+  expect(queries).toEqual(["initial"])
+  setQuery("pl")
+  jest.advanceTimersByTime(249)
+  await Promise.resolve()
+  expect(queries).toEqual(["initial"])
+  setQuery("playwright")
+  jest.advanceTimersByTime(250)
+  await Promise.resolve()
+  expect(queries).toEqual(["initial","playwright"])
+ }finally{jest.useRealTimers()}
+})

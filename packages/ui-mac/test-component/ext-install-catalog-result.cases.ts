@@ -134,8 +134,9 @@ const applyRuntime = activationModule.applyPackageMcpV1
 const removeRuntime = activationModule.removePackageMcpV1
 const packageAppliesAt = activationModule.packageAppliesAt
 const credentialActivations: string[] = []
+let heldRuntime: { entered(): void; release: Promise<void> } | undefined
 mock.module("../src/main/package-mcp-activation", () => ({
-  applyPackageMcpV1: (...args: Parameters<typeof applyRuntime>) => { credentialActivations.push(args[0]); return applyRuntime(...args) },
+  applyPackageMcpV1: async (...args: Parameters<typeof applyRuntime>) => { credentialActivations.push(args[0]); if(heldRuntime){heldRuntime.entered();await heldRuntime.release} return applyRuntime(...args) },
   removePackageMcpV1: removeRuntime,
   packageAppliesAt,
 }))
@@ -151,7 +152,7 @@ initCodePuppyEnvironment({
   baseRoot: join(root, "codepuppy-state"),
   homeDir: join(root, "home"),
 })
-const { codepuppySidecar } = registerExtIpcHandlers(
+const { codepuppySidecar, pluginSources } = registerExtIpcHandlers(
   join(root, "user-data"),
   "dev",
   async () => ({
@@ -169,6 +170,34 @@ codepuppySidecar.attach((message) => void toSidecar.push(message as Record<strin
 afterAll(() => {
   rmSync(root, { recursive: true, force: true })
 })
+
+// Actual IPC/recovery gate; only the external capture or engine boundary is held.
+for (const boundary of ["capture", "runtime"] as const) test("R12 A1 " + boundary + " cannot hold the global write mutex",async()=>{
+ const {fixtureFetch}=await import("../test-fixtures/plugin-helper/source-fetch")
+ const fetchSpy=spyOn(globalThis,"fetch").mockImplementation(fixtureFetch)
+ const entered=Promise.withResolvers<void>()
+ const release=Promise.withResolvers<void>()
+ const candidate=(await pluginSources.searchSources("playwright")).candidates.find(candidate=>candidate.source==="claude-marketplace")!
+ const original=pluginSources.convertCandidate
+ const conversion=boundary==="capture"?spyOn(pluginSources,"convertCandidate").mockImplementation(async id=>{entered.resolve();await release.promise;return original(id)}):undefined
+ if(boundary==="runtime")heldRuntime={entered:()=>entered.resolve(),release:release.promise}
+ const installing=handlers.get("ext-install-from-source")!({sender:{id:1}},{requestId:"r12_lock_"+boundary,source:{kind:"candidate",candidateId:candidate.id},effect:{kind:"all-projects"},via:"hub"})
+ let reload:Promise<unknown>|undefined
+ try{
+  await entered.promise
+  reload=Promise.resolve(handlers.get("ext-reload-request")!({sender:{id:1}},{scope:"global",items:[],reason:"r12 write availability"}))
+  const available=await Promise.race([reload.then(()=>true),Bun.sleep(1000).then(()=>false)])
+  expect(available).toBe(true)
+ }finally{
+  release.resolve()
+  conversion?.mockRestore()
+  const outcome=await installing as {ok:boolean;packageId?:string}
+  heldRuntime=undefined
+  await reload
+  if(outcome.packageId)await handlers.get("ext-uninstall-package")!({sender:{id:1}},outcome.packageId)
+  fetchSpy.mockRestore()
+ }
+},10000)
 
 test("真实 ext-install-catalog 返回值只含公开状态且不回显 canary", async () => {
   const install = handlers.get("ext-install-catalog")

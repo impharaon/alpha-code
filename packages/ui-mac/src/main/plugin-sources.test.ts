@@ -461,3 +461,74 @@ test("BC5 real Figma plugin and official-MCP query records keep their distinct t
  expect(definition.package.entries).toMatchObject([{kind:"mcp",transport:"http",url:["https://mcp.figma.com/mcp"]}])
  expect(definition.package.source).toMatchObject({serverName:"com.figma.mcp/mcp",version:"1.0.3"})
 })
+
+
+test("R12 A1 B5 a stalled fetch aborts only its source and leaves catalog and other sources available", async () => {
+ const {jest}=await import("bun:test")
+ const {createPluginSources}=await sourcesModule()
+ const {fixtureFetch}=await import("../../test-fixtures/plugin-helper/source-fetch")
+ let release!: (response:Response)=>void
+ let signal:AbortSignal|undefined
+ const completed:Promise<Response>[]=[]
+ const stalled=new Promise<Response>(resolve=>{release=resolve})
+ const sources=createPluginSources({catalog:async()=>[],fetch:(url,init?:RequestInit)=>{
+  if(url.includes("raw.githubusercontent.com/openai")){signal=init?.signal??undefined;return stalled}
+  const request=fixtureFetch(url);completed.push(request);return request
+ }})
+ jest.useFakeTimers()
+ let result:Awaited<ReturnType<typeof sources.searchSources>>|undefined
+ const pending=sources.searchSources("__no_entry__").then(value=>{result=value;return value})
+ try {
+  await Promise.all(completed)
+  for(let i=0;i<20;i++)await Promise.resolve()
+  jest.advanceTimersByTime(600_001)
+  for(let i=0;i<40;i++)await Promise.resolve()
+  expect(result).toBeDefined()
+  expect(signal?.aborted).toBe(true)
+  expect(result!.sources.find(source=>source.source==="codex-marketplace")).toMatchObject({status:"failed",reason:"network"})
+  expect(result!.sources.filter(source=>source.source!=="codex-marketplace").every(source=>source.status==="ok")).toBe(true)
+ }finally{release(await fixtureFetch("https://raw.githubusercontent.com/openai/plugins/main/.agents/plugins/marketplace.json"));await pending;jest.useRealTimers()}
+})
+
+test("R12 B5 a whole source deadline also bounds a hung catalog callback", async()=>{
+ const {jest}=await import("bun:test")
+ const {createPluginSources}=await sourcesModule()
+ const {fixtureFetch}=await import("../../test-fixtures/plugin-helper/source-fetch")
+ let release!: (value:[])=>void
+ const completed:Promise<Response>[]=[]
+ const sources=createPluginSources({catalog:()=>new Promise(resolve=>{release=resolve}),fetch:url=>{const request=fixtureFetch(url);completed.push(request);return request}})
+ jest.useFakeTimers()
+ let result:Awaited<ReturnType<typeof sources.searchSources>>|undefined
+ const pending=sources.searchSources("__no_entry__").then(value=>{result=value;return value})
+ try{
+  await Promise.all(completed)
+  for(let i=0;i<20;i++)await Promise.resolve()
+  jest.advanceTimersByTime(900_001)
+  for(let i=0;i<40;i++)await Promise.resolve()
+  expect(result?.sources.find(source=>source.source==="catalog")).toMatchObject({status:"failed",reason:"network"})
+  expect(result!.sources.filter(source=>source.source!=="catalog").every(source=>source.status==="ok")).toBe(true)
+ }finally{release([]);await pending;jest.useRealTimers()}
+})
+
+test("R12 B5 archive comparison timeout reports that source failed without hiding the catalog candidate", async()=>{
+ const {jest}=await import("bun:test")
+ const {createPluginSources}=await sourcesModule()
+ const {fixtureFetch}=await import("../../test-fixtures/plugin-helper/source-fetch")
+ const entry=catalog.entries.find(entry=>entry.id==="mcp:playwright")!
+ let release!: (value:Response)=>void
+ let entered!:()=>void
+ const capturing=new Promise<void>(resolve=>{entered=resolve})
+ const stalled=new Promise<Response>(resolve=>{release=resolve})
+ const archive="https://codeload.github.com/anthropics/claude-plugins-official/tar.gz/refs/heads/main"
+ const sources=createPluginSources({catalog:async()=>[{id:entry.id,source:"catalog",name:entry.name,displayName:entry.displayName,description:entry.description,kind:"mcp",upstream:{version:entry.version}}],fetch:url=>{if(url===archive){entered();return stalled}return fixtureFetch(url)}})
+ jest.useFakeTimers()
+ let result:Awaited<ReturnType<typeof sources.searchSources>>|undefined
+ const pending=sources.searchSources("playwright").then(value=>{result=value;return value})
+ try{
+  await capturing
+  jest.advanceTimersByTime(600_001)
+  for(let i=0;i<50;i++)await Promise.resolve()
+  expect(result?.sources.find(source=>source.source==="claude-marketplace")).toMatchObject({status:"failed",reason:"network"})
+  expect(result!.candidates.some(candidate=>candidate.id===entry.id)).toBe(true)
+ }finally{release(await fixtureFetch(archive));await pending;jest.useRealTimers()}
+})

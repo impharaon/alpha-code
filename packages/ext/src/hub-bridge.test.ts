@@ -125,3 +125,24 @@ test("A3 bridge pairs source search and direct install replies; malformed candid
   wire.deliver(buildSourcesSearchReply(3, { result: { ...result, candidates: [{ id: "cand_bad", source: "claude-marketplace", name: "bad", displayName: "bad", description: "bad", kind: "plugin", upstream: { token: "must-not-cross" } } as never] } }))
   expect(await bad).toMatchObject({ ok: false, reason: "error" })
 })
+
+
+test("R12 B5 source search has its own reply budget while ordinary reads keep 20 seconds",async()=>{
+ const {jest}=await import("bun:test")
+ const {buildSourcesSearchReply}=await import("../../ui-mac/src/main/codepuppy-sidecar-messages")
+ const wire=fakePort()
+ const bridge=createHubBridge(wire.port)
+ jest.useFakeTimers()
+ let readDone=false,searchDone=false
+ const read=bridge.view({directory:"/work/a"}).then(result=>{readDone=true;return result})
+ const search=bridge.search({directory:"/work/a",query:"playwright"}).then(result=>{searchDone=true;return result})
+ try{
+  jest.advanceTimersByTime(20_001)
+  await Promise.resolve()
+  expect(readDone).toBe(true)
+  expect(searchDone).toBe(false)
+  wire.deliver(buildSourcesSearchReply(2,{result:{searchId:"search_real",query:"playwright",sources:[],candidates:[]}}))
+  expect(await search).toMatchObject({ok:true,result:{query:"playwright"}})
+  expect(await read).toMatchObject({ok:false,reason:"timeout"})
+ }finally{jest.useRealTimers()}
+})

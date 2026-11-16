@@ -7,6 +7,8 @@ import { pluginSourceLabelKey } from "./ext-package-presentation"
 /** Search owns pending selection only; main owns order, identity, installation and status. */
 export function PluginSourceResults(props: {
   query: string
+  localPackageIds?: string[]
+  localMatchCount?: number
   search(query: string, progress?: (result: SourceSearchResultV1) => void): Promise<SourceSearchResultV1>
   install(candidate: CandidateV1): Promise<InstallOutcomeV1>
   /** The Hub renders its existing installed row/menu, without another management implementation. */
@@ -32,7 +34,7 @@ export function PluginSourceResults(props: {
   const current = () => !result.error && result()?.query === props.query && !result.loading ? result() : progress()?.query === props.query ? progress() : undefined
   const candidates = createMemo(() => {
     const all = current()?.candidates ?? []
-    return all.filter(
+    return all.filter(candidate => !candidate.installed || !props.localPackageIds?.includes(candidate.installed.packageId)).filter(
       (candidate) =>
         !candidate.sameAs || !all.some((other) => other.id === candidate.sameAs && other.id !== candidate.id),
     )
@@ -55,10 +57,10 @@ export function PluginSourceResults(props: {
       <Show when={current()}>
         <div class="codepuppy-ext-secrow">
           <span class="codepuppy-ext-overline">
-            {t("codepuppy.ext.sourceSearchResults", { count: candidates().length })}
+            {t("codepuppy.ext.sourceSearchResults", { count: candidates().length + (props.localMatchCount ?? 0) })}
           </span>
         </div>
-        <Show when={!result.loading && !candidates().length && current()?.sources.every(source => source.status === "ok")}>
+        <Show when={!result.loading && !candidates().length && !props.localMatchCount && current()?.sources.every(source => source.status === "ok")}>
           <p class="codepuppy-ext-dnote">{t("codepuppy.ext.sourceNoMatches")}</p>
         </Show>
         <PluginSourceChoices candidates={candidates()} install={props.install} installedMenu={props.installedMenu} />

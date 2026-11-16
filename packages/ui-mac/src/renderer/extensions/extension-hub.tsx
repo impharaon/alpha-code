@@ -1530,6 +1530,13 @@ export function ExtensionHub(props: {
       .filter((pack) => (section() === "connectors" || pack.components.some((component) => pageOfType(component.kind as InstallReceiptType) === section())) && (!q || packLabel(pack).toLowerCase().includes(q)))
       .sort((a, b) => (a.packageId === top ? -1 : b.packageId === top ? 1 : packLabel(a) < packLabel(b) ? -1 : 1))
   })
+  const localSearchPackages = createMemo(() => {
+    const state = installedPackages()
+    return state?.ok ? state.packages.filter(pack =>
+      (pack.source?.kind === "local-folder" || pack.source?.kind === "created") &&
+      matchesAgent({ name: packLabel(pack), description: pack.components.map(component => component.name).join(" ") }),
+    ) : []
+  })
   const packageMenu = (pack: InstalledPackageV1): MoreMenuItem[] => [
     {
       key: "package-state",
@@ -2472,7 +2479,15 @@ export function ExtensionHub(props: {
                   </Show>
                 </Show>
                 </>}>
-                  <PluginSourceResults query={query().trim()} search={(value, progress) => {
+                  <Show when={localSearchPackages().length || ownAgentsUnreceipted().length}>
+                    <div class="codepuppy-ext-grid" data-local-search-results="">
+                      <For each={localSearchPackages()}>{pack => <InstalledPackageRow pack={pack} />}</For>
+                      <For each={ownAgentsUnreceipted()}>{agent => <AgentRow a={agent} />}</For>
+                    </div>
+                  </Show>
+                  <PluginSourceResults query={query().trim()}
+                    localPackageIds={localSearchPackages().map(pack => pack.packageId)}
+                    localMatchCount={localSearchPackages().length + ownAgentsUnreceipted().length} search={(value, progress) => {
                     const requestId = crypto.randomUUID()
                     const off = extIpc.onSourcesSearchProgress((id, result) => { if (id === requestId) progress?.(result) })
                     return extIpc.sourcesSearch(value, requestId).finally(off)

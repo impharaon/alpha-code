@@ -668,3 +668,6 @@ BC2b 收据：添加菜单现通过 main picker/Git 准备整包；单包无需�
 
 
 BC3 红例先行：`plugin-package-accounts.test.ts` 复用 provenance 中 GitHub 2.1.0 与 agentfetch 1.0.1 独立 Registry 定义；后者真实 environmentVariables 有 JINA_API_KEY、FIRECRAWL_API_KEY、REDIS_URL 三个绑定，转换后的三需求不缩减。查询边界只把已录 search envelope 的 server 换成该真实 version 记录。`bun test --max-concurrency 2 src/main/plugin-package-accounts.test.ts` exit 1（0 pass／3 fail，`bc3-accounts-red.log`）：非目录账户读取为空／保存被拒。断言覆盖专用存储金丝雀正反臂、同包图/claims、旧版本清理、失败保留旧值、未声明需求零改写、部分更新保留其他需求。
+
+
+BC3 补证与窄修正：生产账户保存→同包 runtime apply 红例 `bc3-runtime-red.log` exit 1（应用调用为空；主进程仍只请求 reload）已先提交。补充范围保持例时误把 `readMcpLeafStrict` 的返回形状当作 JSONC 禁用投影；`ext-config.ts:529–532` 优先返回 `remoteMcpLeaf(record)`，该定义没有 enabled，第一条前置断言即红、尚未执行保存（`bc3-projection-red.log`）。依 r6/r9 关于 API 返回形状误用的 standing ruling，单独修正该例的两个读取表达式，改读实际 JSONC；行为期望仍为保存凭据保留已存在的全局禁用投影与同包身份，不改变期望、scope 或正式契约。

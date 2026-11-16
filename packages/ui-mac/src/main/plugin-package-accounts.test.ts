@@ -1,4 +1,5 @@
 import { expect, test } from "bun:test"
+import { parse } from "jsonc-parser"
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
@@ -127,10 +128,10 @@ test("BC3 a real multi-secret MCP accepts partial account updates and preserves 
 
 test("BC3 saving credentials preserves a package's existing project-only global disable projection", () => withPackage(false, async h => {
   expect(h.graph.effect?.kind).toBe("project")
-  expect(readMcpLeafStrict(h.declaration.hostName)).toMatchObject({ok:true,value:{enabled:false}})
+  expect(parse(readFileSync(join(h.root(), "codepuppy.jsonc"), "utf8")).mcp[h.declaration.hostName]).toMatchObject({enabled:false})
   const id=h.declaration.secretNeeds[0]!.needId
   expect(await savePackageSecretsV1({packageId:h.packageId,secrets:{[id]:"bc3-project-invalid-token"}},h.deps)).toEqual({ok:true})
-  expect(readMcpLeafStrict(h.declaration.hostName)).toMatchObject({ok:true,value:{enabled:false}})
+  expect(parse(readFileSync(join(h.root(), "codepuppy.jsonc"), "utf8")).mcp[h.declaration.hostName]).toMatchObject({enabled:false})
   const state=readPackageLedgerStateV1(h.root())
   expect(state.ok&&state.packageGraphs).toEqual(h.before.packageGraphs)
   expect(readdirSync(join(h.directory,"project"))).toEqual([])

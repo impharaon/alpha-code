@@ -1,0 +1,30 @@
+{
+  "version": "2026-11-15.1",
+  "fetchedAt": "2026-11-16",
+  "files": [
+    {
+      "path": "catalog.json",
+      "url": "https://codepuppy.cn/catalog/v1/releases/2026-11-15.1/catalog.json",
+      "bytes": 90305,
+      "sha256": "abc42734f02cfe666dc0c12cd3884b5598b3f20fdc334020c15cee90c7a63db3"
+    },
+    {
+      "path": "catalog.json.sig",
+      "url": "https://codepuppy.cn/catalog/v1/releases/2026-11-15.1/catalog.json.sig",
+      "bytes": 88,
+      "sha256": "ea6b9f0a72fe05ab72f33da3945955d4395701b6fcff85d05c1a5282ce2f8991"
+    },
+    {
+      "path": "package-github.json",
+      "url": "https://codepuppy.cn/catalog/assets/mcp.github/1.0.1/codepuppy-package/d242835ad2e7177222eeb403e543556b2c449d11da5ab1dcb6295769c2685d80.json",
+      "bytes": 326,
+      "sha256": "d242835ad2e7177222eeb403e543556b2c449d11da5ab1dcb6295769c2685d80"
+    },
+    {
+      "path": "package-github-official.json",
+      "url": "https://codepuppy.cn/catalog/assets/mcp.github-official/1.0.0/codepuppy-package/0a91f683ab6ccafba2b9480a14c5557b5990937c176a27203f434d02a0883222.json",
+      "bytes": 433,
+      "sha256": "0a91f683ab6ccafba2b9480a14c5557b5990937c176a27203f434d02a0883222"
+    }
+  ]
+}

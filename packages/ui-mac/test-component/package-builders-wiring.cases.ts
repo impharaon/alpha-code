@@ -15,6 +15,7 @@ import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync } from "node
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { afterAll, expect, mock, test } from "bun:test"
+import bundledCatalog from "../src/renderer/extensions/codepuppy-catalog.json"
 import type { PackageAdmissionPreviewV1 } from "../src/shared/package-admission"
 
 type IpcHandler = (event: { sender: { id: number } }, ...args: unknown[]) => unknown
@@ -204,7 +205,7 @@ mock.module("../src/main/remote-catalog", () => ({
   },
   refreshRemoteCatalog: async () => ({
     source: "remote",
-    catalog: { version: "2026-07-31", entries: [{}], packages: [agentEnvelope, mcpEnvelope] },
+    catalog: { version: "2026-07-31", entries: [bundledCatalog.entries.find((entry) => entry.id === "mcp:playwright")!], packages: [agentEnvelope, mcpEnvelope] },
     version: "2026-07-31",
     fetchedAt: "2026-07-31T00:00:00.000Z",
     via: "channel-dev",
@@ -365,4 +366,16 @@ test("reinstalling an already-registered MCP package keeps the ledger exemption 
   const config = readFileSync(join(root, "codepuppy.jsonc"), "utf8")
   expect(config).toContain(`{file:${rotatedSecretFile}}`)
   expect(config).not.toContain(secretCanaryReinstall)
+})
+
+test("A2 real source-install IPC routes catalog Playwright and a signed package through the single entry", async () => {
+  const handler = handlers.get("ext-install-from-source")
+  expect(handler).toBeDefined()
+  const playwright = await handler!({ sender: { id: 1 } }, { requestId: "catalog_playwright_a2", source: { kind: "catalog", catalogId: "mcp:playwright" }, effect: { kind: "all-projects" }, via: "hub" })
+  expect(playwright).toMatchObject({ ok: true, packageId: "mcp:playwright", source: { kind: "catalog" }, installed: [{ kind: "mcp", hostName: "playwright" }] })
+  expect(findRecordV2(getCodePuppyEnvironment().mutableRoot, "mcp", "playwright")?.desiredState).toBe("enabled")
+  expect(readMcpLeafStrict("playwright")).toMatchObject({ ok: true, value: { command: ["npx", "-y", "@playwright/mcp@0.0.77"] } })
+  const before = builderCalls.agent
+  expect(await handler!({ sender: { id: 1 } }, { requestId: "catalog_package_a2", source: { kind: "catalog", catalogId: "package:wired-agent" }, effect: { kind: "all-projects" }, via: "chat" })).toMatchObject({ ok: true, packageId: "package:wired-agent" })
+  expect(builderCalls.agent).toBe(before + 1)
 })

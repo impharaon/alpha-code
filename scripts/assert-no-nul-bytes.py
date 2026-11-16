@@ -63,7 +63,7 @@ BINARY_SUFFIXES = frozenset(
         ".png", ".jpg", ".ico", ".icns",  # 位图与图标
         ".woff2", ".ttf",                 # 字体
         ".mp3", ".aac", ".mp4",           # 音视频
-        ".zip", ".tgz",                   # 归档
+        ".zip", ".tgz", ".gz",            # 归档及真实 gzip 采样(含 .tar.gz/.json.gz)
     }
 )
 

@@ -9,7 +9,6 @@
 //
 // 注:ext-import-skill-folder 的目录选择对话框在 gate 之外(ext-ipc 的 IPC 回调先弹窗拿
 // srcDir,再调本表的 gated 持久化阶段)—— mutex 决不能横跨用户交互。
-import type { InstallTarget } from "../preload/types"
 import { gatedWriteHandler, type GateRefusal, type RecoveryGate } from "./ext-recovery-gate"
 import {
   decodeJournalListIntent,
@@ -26,6 +25,7 @@ export type RootResolution = { ok: true; root: string } | { ok: false; reason: s
 export const GATED_WRITE_CHANNELS = {
   installCatalog: "ext-install-catalog",
   installPackage: "ext-install-package",
+  installFromSource: "ext-install-from-source",
   setPackageState: "ext-set-package-state",
   savePackageSecrets: "ext-save-package-secrets",
   uninstallV2: "ext-uninstall-v2",
@@ -39,13 +39,6 @@ export const GATED_WRITE_CHANNELS = {
   removeMcpLegacy: "ext-remove-mcp",
   persistMcp: "ext-persist-mcp",
   importAgentConfirm: "ext-import-agent-confirm",
-  /** REQ-128 Phase 3 `#782`:本地 Claude 插件包的**确认**。两段式里**只有它**会写盘,
-   *  所以两段式里**只有它**在这张表里 —— preview / cancel / 列表三条纯读通道在下面的
-   *  `LOCAL_PACKAGE_READ_CHANNELS`,与本表**必须互斥**(`ext-write-channels.test.ts` 断言)。
-   *  入参只有 previewId:写入内容取自 main 侧留存的 preview 产物,renderer 全程给不出。 */
-  importClaudePluginConfirm: "ext-import-claude-plugin-confirm",
-  importSkillFolder: "ext-import-skill-folder",
-  importSkillGit: "ext-import-skill-git",
   /** REQ-234 `#1529`:请 ext 调度器重载(global 或某项目目录;等会话空闲,`force` = 用户「现在重载」)。
    *  它不写账本与 config,但它改变引擎正在用什么 —— 与安装体同一道恢复准入(半恢复的根上不该重载)。 */
   reloadRequest: "ext-reload-request",
@@ -54,29 +47,18 @@ export const GATED_WRITE_CHANNELS = {
 /**
  * REQ-234 `#1529`:定制中心状态面的两条**表外**通道,与写表**必须互斥**(`ext-write-channels.test.ts` 断言)。
  *   · `hubView`         —— 纯读:main 对 (id, scope, directory) 即时算出的「已安装 / 待重载 / 可用」(hub-view.ts)。
- *   · `hubRequestStage` —— 只记 main **内存**里的安装请求阶段(I9),一个字节都不落盘、不碰账本。
- * 不进写表的理由与 `LOCAL_PACKAGE_READ_CHANNELS` 一致:账本待恢复时用户照样要看得到状态、确认框照样要能记阶段。
+ *   · `hubRequest` —— 只读 main 内存里的安装进度,renderer 没有写阶段通道。
+ * 不进写表的理由与 `LOCAL_PACKAGE_READ_CHANNELS` 一致:账本待恢复时用户照样要看得到状态和 main 已受理请求的进度。
  */
 export const HUB_READ_CHANNELS = {
   hubView: "ext-hub-view",
-  hubRequestStage: "ext-hub-request-stage",
+  hubRequest: "ext-hub-request",
+  sourcesSearch: "ext-sources-search",
 } as const
 
-/**
- * REQ-128 Phase 3 `#782`:本地插件包两段式里的**纯读**通道。
- *
- * 它们**不进** `GATED_WRITE_CHANNELS`,理由与 `ext-import-agent-preview` 不在表里逐字一致:
- * 它们不写 `installs.json`、不写事务拥有的 config/store,一个字节都不落盘。把纯读通道塞进写表
- * 不是「更安全」,是让恢复 gate 在读面上生效 —— 账本待恢复时用户连「这个包能不能装」都看不到。
- *
- * 立成具名表(而不是散在 `ext-ipc` 里的字面量)的唯一目的:让「preview 有没有被人挪进写表」
- * 这个问题**可被一条断言回答**。两表互斥由 `ext-write-channels.test.ts` 钉死。
- */
+/** Main-owned source preparation and installed package reads never enter the write mutex. */
 export const LOCAL_PACKAGE_READ_CHANNELS = {
-  /** 按 previewId 取回已签发预览的安全投影(无绝对路径、无字节)。 */
-  importClaudePluginPreview: "ext-import-claude-plugin-preview",
-  /** 显式取消:释放 main 侧留存的字节。**必须不过 gate** —— 账本待恢复时也得放得掉。 */
-  importClaudePluginCancel: "ext-import-claude-plugin-cancel",
+  preparePluginSource: "ext-prepare-plugin-source",
   /** 列出本机已装的 V3 包图(安全投影)。 */
   listInstalledPackages: "ext-installed-packages",
 } as const
@@ -90,14 +72,13 @@ export type WriteChannelRoots = {
   uninstallIntent: (intent: unknown) => RootResolution
   /** 严格 set-state 意图解码定根。 */
   setStateIntent: (intent: unknown) => RootResolution
-  /** 导入目标(InstallTarget)定根:缺省/global → 全局;project → identity fail-closed。 */
-  importTarget: (target: InstallTarget | undefined) => RootResolution
   /** 项目目录定根(residuals clean)。 */
   projectDir: (projectDir: unknown) => RootResolution
 }
 
 export type WriteChannelBodies = {
   installPackage: (packageId: unknown) => Promise<unknown>
+  installFromSource: (request: unknown) => Promise<unknown>
   setPackageState: (intent: unknown) => Promise<unknown>
   savePackageSecrets: (intent: unknown) => Promise<unknown>
   installCatalog: (intent: unknown) => Promise<unknown>
@@ -109,11 +90,6 @@ export type WriteChannelBodies = {
   removeMcpLegacy: (name: unknown) => Promise<unknown>
   persistMcp: (name: unknown, server: unknown, secretVars?: unknown) => Promise<unknown>
   importAgentConfirm: (previewId: unknown) => Promise<unknown>
-  /** `#782`:**只收 previewId**。多一个入参就是多一条 renderer 可控的写入内容通道。 */
-  importClaudePluginConfirm: (previewId: unknown) => Promise<unknown>
-  /** 持久化阶段(srcDir 已由 main 弹窗取得)。 */
-  importSkillFolder: (srcDir: string, target?: InstallTarget) => Promise<unknown>
-  importSkillGit: (url: unknown, target?: InstallTarget) => Promise<unknown>
   /** `{ scope, items, reason, force? }`;定根:global → 全局根,{ directory } → 该项目根(fail-closed)。 */
   reloadRequest: (input: unknown) => Promise<unknown>
 }
@@ -126,6 +102,7 @@ export function buildGatedWriteChannels(deps: { gate: RecoveryGate; roots: Write
   const { gate, roots, bodies } = deps
   return {
     installPackage: gatedWriteHandler(gate, roots.global, bodies.installPackage),
+    installFromSource: gatedWriteHandler(gate, roots.global, bodies.installFromSource),
     setPackageState: gatedWriteHandler(gate, roots.global, bodies.setPackageState),
     savePackageSecrets: gatedWriteHandler(gate, roots.global, bodies.savePackageSecrets),
     // REQ-136 C1:project recovery is itself a mutation, so verified-MCP admission must finish
@@ -144,10 +121,6 @@ export function buildGatedWriteChannels(deps: { gate: RecoveryGate; roots: Write
     removeMcpLegacy: gatedWriteHandler(gate, roots.global, bodies.removeMcpLegacy),
     persistMcp: gatedWriteHandler(gate, roots.global, bodies.persistMcp),
     importAgentConfirm: gatedWriteHandler(gate, roots.global, bodies.importAgentConfirm),
-    // 本地包恒全局面(project scope 显式不支持,ADR-030);定根与 catalog 安装同一个。
-    importClaudePluginConfirm: gatedWriteHandler(gate, roots.global, bodies.importClaudePluginConfirm),
-    importSkillFolder: gatedWriteHandler(gate, (_srcDir: string, target?: InstallTarget) => roots.importTarget(target), bodies.importSkillFolder),
-    importSkillGit: gatedWriteHandler(gate, (_url: unknown, target?: InstallTarget) => roots.importTarget(target), bodies.importSkillGit),
     reloadRequest: gatedWriteHandler(
       gate,
       (input: unknown): RootResolution => {

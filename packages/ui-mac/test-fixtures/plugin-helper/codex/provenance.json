@@ -1,0 +1,88 @@
+{
+  "repository": "https://github.com/openai/plugins",
+  "commit": "d420d13051bffe4543ed39e30fa46b87148e47dd",
+  "fetchedAt": "2026-11-16",
+  "originalArchive": {
+    "url": "https://codeload.github.com/openai/plugins/tar.gz/d420d13051bffe4543ed39e30fa46b87148e47dd",
+    "bytes": 25797809,
+    "sha256": "7eafbb993eb7baafb213b88d85213efacaaea192279e48068410f72d4a8ffa36"
+  },
+  "archive": {
+    "path": "selection.tar.gz",
+    "sha256": "6fd594668b54411f2c5ecd96dffad8180fa6c67328290c291cda69d970180c7c",
+    "note": "Selected original members and modes, retaining global pax commit. This subset is not a complete Figma plugin; one actual skill is retained. GitHub MCP containing literal credentials is excluded. Relative-link references/assets completed mechanically from the same pinned tree; existing file bytes unchanged."
+  },
+  "files": [
+    {
+      "path": ".agents/plugins/marketplace.json",
+      "bytes": 18951,
+      "mode": 436,
+      "sha256": "62ed7a1c906a7e486a84ee3f2f7eba048d075e360e355072e1b0823a128f432e"
+    },
+    {
+      "path": "plugins/figma/.app.json",
+      "bytes": 98,
+      "mode": 436,
+      "sha256": "f5c3537639811b981ac8e9880d4eb0a3d4c7ccc3eb757d2d06c4f42c57dbd6d2"
+    },
+    {
+      "path": "plugins/figma/.codex-plugin/plugin.json",
+      "bytes": 1677,
+      "mode": 436,
+      "sha256": "4a94826aedb047fed25d2a7b16a07aaf5bc4fb1238d47e51d71985fa3336010d"
+    },
+    {
+      "path": "plugins/figma/.mcp.json",
+      "bytes": 163,
+      "mode": 436,
+      "sha256": "5ad3583f97d28e3dd065c38e024cef9eaf78f2b191930ead29021666ccc14466"
+    },
+    {
+      "path": "plugins/figma/skills/figma-code-connect/SKILL.md",
+      "bytes": 26669,
+      "mode": 436,
+      "sha256": "87af3996edb167d6aa3c044cb1bbb6a0d8e2d631c731bb896b1e1e8669640415"
+    },
+    {
+      "path": "plugins/github/.app.json",
+      "bytes": 229,
+      "mode": 436,
+      "sha256": "5a803d452119abe6c5ccec088370ada20dc80b3812ab7402218c47ee6596a7d4"
+    },
+    {
+      "path": "plugins/github/.codex-plugin/plugin.json",
+      "bytes": 1741,
+      "mode": 436,
+      "sha256": "f4cc2f85283f50bc1afdb47f13fbd2f3b6724200ee222ba952a54772c88e1cf3"
+    },
+    {
+      "path": "plugins/gmail/.codex-plugin/plugin.json",
+      "bytes": 1351,
+      "mode": 436,
+      "sha256": "ca945ecc4e8d6c3e0da890ce4172b1d69427e4df1a399f365b772f4fbe01c9f7"
+    },
+    {
+      "path": "plugins/gmail/.mcp.json",
+      "bytes": 570,
+      "mode": 436,
+      "sha256": "bbf8ab405f1163ff1d94333011a30e2abe5be80d484418cd0b77181584fc24e7"
+    },
+    {
+      "path": "plugins/figma/skills/figma-code-connect/references/advanced-patterns.md",
+      "bytes": 10069,
+      "mode": 436,
+      "sha256": "ac2cb232aca4e43b75169f47f5550d6e7e48a8df0eb55aa1adbfb1a2ab0aa1b4"
+    },
+    {
+      "path": "plugins/figma/skills/figma-code-connect/references/api.md",
+      "bytes": 23396,
+      "mode": 436,
+      "sha256": "40c1dcae2db387fb93ffbf4eba8ae81362e204bdfa5be7018f743b8ac24d4252"
+    }
+  ],
+  "completionCapture": {
+    "url": "https://codeload.github.com/openai/plugins/tar.gz/d420d13051bffe4543ed39e30fa46b87148e47dd",
+    "sha256": "266a67df9a75cae0f58613ac2b47635b1d6779362804b0ba26e2c8674a249ca2",
+    "note": "New codeload container digest recorded separately; pinned commit pax and every retained original file digest verified."
+  }
+}

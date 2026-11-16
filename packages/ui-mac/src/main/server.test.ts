@@ -93,6 +93,7 @@ const keylessWebSearchFlags = [
   "OPENCODE_EXPERIMENTAL_PARALLEL",
 ] as const
 const managedEnv = [
+  "PATH", // preferAppEnv applies the cached shell PATH; restore it before the next test file.
   "SHELL",
   "CODEPUPPY_GLOBAL_DIR",
   "CODEPUPPY_CLOUD_MCP_URL",
@@ -115,7 +116,8 @@ beforeEach(() => {
   userDataPath = mkdtempSync(join(tmpdir(), "server-scratch-cwd-"))
   for (const key of managedEnv) {
     savedEnv[key] = process.env[key]
-    delete process.env[key]
+    // Keep the real toolchain available during this case; cached fork input may replace it.
+    if (key !== "PATH") delete process.env[key]
   }
   process.env.SHELL = "nu"
   process.env.CODEPUPPY_SECRETS_DISABLE = "1"

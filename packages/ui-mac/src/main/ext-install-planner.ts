@@ -148,6 +148,7 @@ import {
   computeManifestDigest,
   decodeManifestV2,
   sha256Hex,
+  canonicalJson,
   MANIFEST_SCHEMA_VERSION,
   type ExtensionManifestV2,
   type ManifestCapability,
@@ -176,7 +177,11 @@ import {
   type UpsertInput,
 } from "./ext-receipt-v2"
 import type { PackageEnvelopeIdentityV1 } from "./package-installability"
-import { parseOwnerToken } from "./ext-package-ledger-v3"
+import { computeInstalledGraphDigest, parseOwnerToken, type PackageGraphNodeV1, type PackageGraphV1, type PackageMutationEnvelopeV1 } from "./ext-package-ledger-v3"
+import { commitTransactionLedger } from "./ext-package-ledger-commit"
+import { diffPackageGraphsV1, planPackageClaimTransferV1, planPackageChildConflictsV1, planPackageChildRemovalsV1 } from "./ext-package-lifecycle"
+import { buildDepartingChildConfigItemsV1 } from "./ext-package-tx-builders"
+import type { PackageEffectV1 } from "../shared/plugin-install"
 import {
   commitInputFromRecord,
   hasSkillGeneration,
@@ -444,6 +449,53 @@ export function synthesizeManifest(verified: VerifiedCatalogEntry): unknown {
         }
       : {}),
   }
+}
+
+// Native catalog entries and signed envelopes both enter the same package ledger transaction.
+function nativeCatalogDigest(entries: readonly VerifiedCatalogEntry[]): string {
+  return "sha256:" + sha256Hex(canonicalJson([...new Map(entries.map((item) => [item.entry.id, item.entry])).values()].sort((a, b) => a.id.localeCompare(b.id))))
+}
+
+function nativeCatalogPackageMutation(
+  root: string,
+  verified: VerifiedCatalogEntry,
+  entries: readonly VerifiedCatalogEntry[],
+  nodes: PackageGraphNodeV1[],
+  effect: PackageEffectV1 | undefined,
+): { ok: true; mutation: PackageMutationEnvelopeV1 } | { ok: false; reason: string } {
+  const graph: PackageGraphV1 = {
+    packageId: verified.entry.id, displayName: verified.entry.displayName,
+    envelopeDigest: nativeCatalogDigest(entries), installedGraphDigest: "",
+    root: { ...nodes[0]!, required: true }, children: nodes.slice(1), source: { kind: "catalog" },
+    ...(effect ? { effect } : {}),
+  }
+  graph.installedGraphDigest = computeInstalledGraphDigest(graph)
+  const current = readPackageLedgerStateV1(root, { sideEffectFree: true })
+  if (!current.ok) return current
+  const before = current.packageGraphs.find((item) => item.packageId === graph.packageId)
+  const diff = diffPackageGraphsV1(before ?? null, graph, { before: before ? current.records.find((record) => record.kind === before.root.kind && record.name === before.root.name)?.version ?? null : null, after: verified.entry.version ?? verified.catalogVersion })
+  if (!diff.ok) return diff
+  if (planPackageChildConflictsV1({ graphs: current.packageGraphs, candidate: graph }).length)
+    return { ok: false, reason: "catalog package conflicts with installed content" }
+  const departing = diff.diff.changes.filter((item) => item.change === "removed").map((item) => ({ kind: item.kind, name: item.name }))
+  const removals = diff.diff.ownerBefore ? planPackageChildRemovalsV1({ departing, ownerBefore: diff.diff.ownerBefore, claims: current.claims, recordKeys: current.recordKeys }).filter((item) => item.decision === "delete").map((item) => ({ kind: item.kind, name: item.name })) : []
+  return { ok: true, mutation: {
+    operation: before ? "update" : "install", graphBeforeDigest: before?.installedGraphDigest ?? null,
+    graphAfter: graph, claimMutations: planPackageClaimTransferV1(diff.diff), childRemovals: removals,
+  } }
+}
+
+async function verifyNativeCatalogPackage(graph: PackageGraphV1, resolveEntry: PlannerDeps["resolveEntry"]): Promise<boolean> {
+  const entries = await Promise.all([...new Set([graph.packageId, ...[graph.root, ...graph.children].map((node) => node.componentId)])].map((id) => resolveEntry(id)))
+  if (entries.some((entry) => entry === null)) return false
+  const verified = entries.filter((entry): entry is VerifiedCatalogEntry => entry !== null)
+  if (nativeCatalogDigest(verified) !== graph.envelopeDigest) return false
+  return [graph.root, ...graph.children].every((node) => {
+    const entry = verified.find((item) => item.entry.id === node.componentId)
+    // The complete native entry (including asset hashes/config) is bound above. Transport ownership
+    // in ManifestV2 can differ between bundled and cached catalogs; record/node digests are checked by the ledger.
+    return !!entry && entry.entry.name === node.name && entry.entry.type === node.kind
+  })
 }
 
 // ── grants → MCP config 派生(main 重建安装事实;renderer 只供用户输入)────────────────────────
@@ -992,6 +1044,7 @@ async function installBundleAtomic(
   verified: VerifiedCatalogEntry,
   intent: CatalogInstallIntent,
   deps: PlannerDeps,
+  admission?: { effect?: PackageEffectV1 },
 ): Promise<CatalogInstallOutcome> {
   if (intent.scope.scope !== "global")
     return { ok: false, reason: "bundle install is global-scoped only (project bundles rejected — single-root atomicity)" }
@@ -1084,6 +1137,14 @@ async function installBundleAtomic(
   if (planItems.length === 0)
     return { ok: true, kind: "bundle", name: verified.entry.name, manifestDigest: computeManifestDigest(bundleDecoded.manifest), installed: [], skipped }
 
+  const admitted = admission ? nativeCatalogPackageMutation(deps.globalRoot(), verified, [verified, ...[...resolved.values()].filter((entry) => installedIds.includes(entry.entry.id))], planItems.map((item) => { const receipt = item.receipt as UpsertInput; return { componentId: receipt.id, kind: receipt.kind, name: receipt.name, required: !items.find((entry) => entry.catalogEntryId === receipt.id)?.optional, manifestDigest: item.manifestDigest! } }), admission.effect) : undefined
+  if (admitted && !admitted.ok) return admitted
+  if (admitted?.ok) {
+    planItems[0] = { ...planItems[0]!, packageMutation: admitted.mutation }
+    for (const item of planItems) if (admission?.effect && item.config) for (const edit of item.config.edits)
+      if (edit.keyPath[0] === "mcp" && isObj(edit.value)) edit.value = { ...edit.value, enabled: false }
+    planItems.push(...buildDepartingChildConfigItemsV1({ root: deps.globalRoot(), children: admitted.mutation.childRemovals }))
+  }
   const plan: TxPlan = {
     items: planItems,
     // #348:bundle 一次展示、一次授权、一次 commit —— 确认重驱带回的整集决定进引擎 plan。
@@ -1130,6 +1191,7 @@ async function installBundleAtomic(
     // 账本写失败即事务失败(#336):bundle 全部 receipt 一次批量落盘,不留半套。从 rec.receipt 模板
     // 重建(与恢复前滚同源,#312)。
     commitReceipt: (recs: TxCommitRecord[]) => {
+      if (admitted?.ok) return commitTransactionLedger(deps.globalRoot(), recs)
       const written = upsertRecordsV2(deps.globalRoot(), recs.map((rec) => commitInputFromRecord(rec)))
       if (!written.ok) throw new Error(`bundle receipt commit failed: ${written.reason}`)
       // #336:账本 durable 但 skills 派生允许集发布失败 —— 不 throw(会误触发引擎回滚与已
@@ -1165,11 +1227,11 @@ async function installBundleAtomic(
  * catalog 安装唯一入口:意图严格解码 → 已验 catalog 解析 → ManifestV2 合成 + 写盘前严格校验
  * → main 重建安装事实执行 → InstallRecordV2 落账。
  */
-export async function installCatalog(rawIntent: unknown, deps: PlannerDeps): Promise<CatalogInstallOutcome> {
+export async function installCatalog(rawIntent: unknown, deps: PlannerDeps, admission?: { effect?: PackageEffectV1 }): Promise<CatalogInstallOutcome> {
   const decodedIntent = decodeCatalogInstallIntent(rawIntent)
   if (!decodedIntent.ok) return decodedIntent
   if ("source" in decodedIntent.intent) return installSeedAsset(decodedIntent.intent, deps)
-  const intent = decodedIntent.intent
+  const intent = admission ? { ...decodedIntent.intent, scope: { scope: "global" as const } } : decodedIntent.intent
 
   const verified = await deps.resolveEntry(intent.catalogId)
   if (!verified) return { ok: false, reason: `entry not in verified catalog: ${intent.catalogId}` }
@@ -1188,7 +1250,7 @@ export async function installCatalog(rawIntent: unknown, deps: PlannerDeps): Pro
   if (isCurationArchived(decodeEntryCurationLoud(entry)))
     return { ok: false, reason: `entry ${entry.id}: upstream is archived per curation review — new installs are refused (existing installs unaffected)` }
 
-  if (entry.type === "bundle") return installBundleAtomic(verified, intent, deps)
+  if (entry.type === "bundle") return installBundleAtomic(verified, intent, deps, admission)
 
   // ADR-040(`#825` 第 2/3/4 条):catalog 的 plugin 条目 —— npm 钉版、vendored 载荷、以及它们的
   // 更新链(原子置换)—— 一律**具名拒绝**,而且拒在这里:资产下载、CAS 提升、事务开启、账本探测
@@ -1396,16 +1458,20 @@ export async function installCatalog(rawIntent: unknown, deps: PlannerDeps): Pro
       configKey: `mcp.${entry.name}`,
       installedAt: mcpNow,
     }
+    const admitted = admission ? nativeCatalogPackageMutation(mcpRoot, verified, [verified], [{ componentId: entry.id, kind: "mcp", name: entry.name, required: true, manifestDigest }], admission.effect) : undefined
+    if (admitted && !admitted.ok) return admitted
     const plan: TxPlan = {
       items: [
         {
           key: `mcp--${entry.name}`,
+          ...(admitted?.ok ? { packageMutation: admitted.mutation } : {}),
           action: "config",
-          config: { target: mcpConfigTarget, edits: [{ keyPath: ["mcp", entry.name], value: mcpReceipt.desiredState === "disabled" ? { ...durable, enabled: false } : durable }] },
+          config: { target: mcpConfigTarget, edits: [{ keyPath: ["mcp", entry.name], value: admission?.effect || mcpReceipt.desiredState === "disabled" ? { ...durable, enabled: false } : durable }] },
           manifestDigest,
           capabilities: manifest.capabilities,
           receipt: mcpReceipt,
         },
+        ...(admitted?.ok ? buildDepartingChildConfigItemsV1({ root: mcpRoot, children: admitted.mutation.childRemovals }) : []),
       ],
       ...(intent.authorization ? { authorization: stampAuthorization(intent.authorization, () => deps.now?.() ?? new Date().toISOString())! } : {}),
     }
@@ -1448,6 +1514,7 @@ export async function installCatalog(rawIntent: unknown, deps: PlannerDeps): Pro
           const identity = projectMcpWriteIdentityGate(mcpRoot, mcpConfigTarget)
           if (!identity.ok) throw new Error(identity.reason)
         }
+        if (admitted?.ok) return commitTransactionLedger(mcpRoot, records)
         const written = upsertRecordsV2(mcpRoot, recoveryReceiptInputs(records))
         if (!written.ok) throw new Error(`mcp receipt commit failed: ${written.reason}`)
       },
@@ -1593,7 +1660,10 @@ export async function installCatalog(rawIntent: unknown, deps: PlannerDeps): Pro
       rollback("no installable content")
       return { ok: false, reason: "该内容尚未随此版本打包(entry declares no installable asset)" }
     }
+    const admitted = admission ? nativeCatalogPackageMutation(scope.root(deps), verified, [verified], [{ componentId: entry.id, kind: "skill", name: entry.name, required: true, manifestDigest }], admission.effect) : undefined
+    if (admitted && !admitted.ok) return admitted
     const gen = await installSkillGeneration(scope.root(deps), {
+      ...(admitted?.ok ? { packageMutation: admitted.mutation } : {}),
       name: entry.name,
       id: entry.id,
       environment: deps.environment(),
@@ -1696,7 +1766,10 @@ export async function installCatalog(rawIntent: unknown, deps: PlannerDeps): Pro
     }
     const agentRoot = scope.root(deps)
     const agentConfigTarget = path.join(agentRoot, "codepuppy.jsonc")
+    const admitted = admission ? nativeCatalogPackageMutation(scope.root(deps), verified, [verified], [{ componentId: entry.id, kind: "agent", name: entry.name, required: true, manifestDigest }], admission.effect) : undefined
+    if (admitted && !admitted.ok) return admitted
     const agentGen = await installAgentFromCas(agentRoot, {
+      ...(admitted?.ok ? { packageMutation: admitted.mutation } : {}),
       name: entry.name,
       id: entry.id,
       environment: deps.environment(),
@@ -1762,15 +1835,19 @@ export async function installCatalog(rawIntent: unknown, deps: PlannerDeps): Pro
       origin: "catalog",
       installedAt: cloudNow,
     }
+    const admitted = admission ? nativeCatalogPackageMutation(cloudRoot, verified, [verified], [{ componentId: entry.id, kind: "cloud", name: entry.name, required: true, manifestDigest }], admission.effect) : undefined
+    if (admitted && !admitted.ok) return admitted
     const plan: TxPlan = {
       items: [
         {
           key: `cloud--${entry.name}`,
+          ...(admitted?.ok ? { packageMutation: admitted.mutation } : {}),
           action: "receipt",
           manifestDigest,
           capabilities: manifest.capabilities,
           receipt: cloudReceipt,
         },
+        ...(admitted?.ok ? buildDepartingChildConfigItemsV1({ root: cloudRoot, children: admitted.mutation.childRemovals }) : []),
       ],
       ...(intent.authorization ? { authorization: stampAuthorization(intent.authorization, () => deps.now?.() ?? new Date().toISOString())! } : {}),
     }
@@ -1786,6 +1863,7 @@ export async function installCatalog(rawIntent: unknown, deps: PlannerDeps): Pro
         return cloudDesiredStateGate(cloudRoot, entry.name, cloudSessionGrantForced ? cloudPlanObserved : plannedState)
       },
       commitReceipt: (records: TxCommitRecord[]) => {
+        if (admitted?.ok) return commitTransactionLedger(cloudRoot, records)
         const written = upsertRecordsV2(cloudRoot, recoveryReceiptInputs(records))
         if (!written.ok) throw new Error(`cloud receipt commit failed: ${written.reason}`)
       },
@@ -2858,7 +2936,7 @@ export type SetStateIntent = UninstallIntent & {
 /** Package identity is the only caller-controlled key; graph/root own the component set. */
 export async function setPackageStateV1(
   input: unknown,
-  deps: Pick<PlannerDeps, "globalRoot" | "advisoryGate" | "resolvePackage">,
+  deps: Pick<PlannerDeps, "globalRoot" | "advisoryGate" | "resolvePackage"> & Partial<Pick<PlannerDeps, "resolveEntry">>,
 ): Promise<{ ok: true; warning?: string } | { ok: false; reason: string }> {
   if (!isObj(input) || Object.keys(input).some((key) => key !== "packageId" && key !== "state") ||
     typeof input.packageId !== "string" || (input.state !== "enabled" && input.state !== "disabled"))
@@ -2870,7 +2948,9 @@ export async function setPackageStateV1(
   const graph = before.packageGraphs.find((entry) => entry.packageId === input.packageId)
   if (!graph) return { ok: false, reason: "package is not installed" }
   const rootRecord = before.records.find((record) => record.kind === graph.root.kind && record.name === graph.root.name)!
-  const verified = state === "enabled" && rootRecord.origin === "catalog"
+  const native = state === "enabled" && rootRecord.origin === "catalog" && graph.source?.kind === "catalog" && deps.resolveEntry
+    ? await verifyNativeCatalogPackage(graph, deps.resolveEntry) : false
+  const verified = state === "enabled" && rootRecord.origin === "catalog" && !native
     ? await deps.resolvePackage(graph.packageId, rootRecord.version!) : undefined
   const held = tryAcquireBundleLock(root, { txId: `package-state-${randomUUID()}` })
   if (!held.ok) return held
@@ -3353,7 +3433,11 @@ function computeEnableProjectionEdit(
   /** `#1381`:真源里的远程 MCP 名字 —— 它们在 codepuppy.jsonc 里没有叶,启停不投影 config(见函数体)。 */
   remoteMcpNames: ReadonlySet<string>,
 ): { ok: true; edit?: ConfigEdit } | { ok: false; reason: string } {
-  const disable = state === "disabled"
+  const packages = record.kind === "mcp" ? readPackageLedgerStateV1(root, { sideEffectFree: true }) : undefined
+  if (packages && !packages.ok) return { ok: false, reason: packages.reason }
+  // Package intent stays enabled; only a matching Location may enable a project MCP at runtime.
+  const projectOnly = packages?.ok && packages.packageGraphs.some((graph) => graph.effect && [graph.root, ...graph.children].some((node) => node.kind === "mcp" && node.name === record.name))
+  const disable = state === "disabled" || projectOnly
   if (record.kind === "plugin") {
     const ck = record.configKey ?? ""
     const isPath = ck.startsWith("plugin-path:")
@@ -3407,9 +3491,11 @@ function computeEnableProjectionEdit(
   const leaf = isObj(map) ? map[record.name] : undefined
   if (!isObj(leaf)) {
     // `#1381`:远程 MCP 的记录住在真源(mcp-servers/<env>.json),codepuppy.jsonc 里没有它的叶 —— 启停只翻账本,生效面是 sidecar 注入
-    // (disable:injectDisabledOverrides 压 enabled:false;enable:注入面从真源发出完整条目)。两个方向都没有 config edit。
+    // (disable:injectDisabledOverrides 压 enabled:false;enable:注入面从真源发出完整条目)。项目包另留 enabled:false 覆盖,
+    // 定义仍只在远程真源;匹配项目的 Location 才能开启。
     // 真源坏了 / 位置未知 ⇒ 名单读成空 ⇒ enable 照旧按「缺生效面」拒(fail closed),disable 照旧只翻账本。
-    if (record.kind === "mcp" && remoteMcpNames.has(record.name)) return { ok: true }
+    if (record.kind === "mcp" && remoteMcpNames.has(record.name))
+      return projectOnly ? { ok: true, edit: { keyPath: ["mcp", record.name], value: { enabled: false } } } : { ok: true }
     return disable ? { ok: true } : { ok: false, reason: `${record.kind} ${record.name}: config entry missing — cannot enable (reinstall to repair)` }
   }
   if (disable) {

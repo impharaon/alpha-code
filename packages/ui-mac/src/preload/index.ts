@@ -245,9 +245,6 @@ const api: ElectronAPI = {
     // REQ-128 Phase 3:本地 Claude 插件包。通道名与 main 的 `LOCAL_PACKAGE_READ_CHANNELS` /
     // `GATED_WRITE_CHANNELS` 逐字一致(preview / cancel / 列表纯读,只有 confirm 过写闸);
     // 三条读通道**必须**在这里暴露,否则第 3/6 跳在 renderer 结构上到不了。
-    importClaudePluginPreview: (previewId) => ipcRenderer.invoke("ext-import-claude-plugin-preview", previewId),
-    importClaudePluginCancel: (previewId) => ipcRenderer.invoke("ext-import-claude-plugin-cancel", previewId),
-    importClaudePluginConfirm: (previewId) => ipcRenderer.invoke("ext-import-claude-plugin-confirm", previewId),
     installedPackages: () => ipcRenderer.invoke("ext-installed-packages"),
     installPackage: (packageId) => ipcRenderer.invoke("ext-install-package", packageId),
     setPackageState: (intent) => ipcRenderer.invoke("ext-set-package-state", intent),
@@ -259,8 +256,6 @@ const api: ElectronAPI = {
     browseSeed: () => ipcRenderer.invoke("ext-seed-browse"),
     installCatalog: (intent) => ipcRenderer.invoke("ext-install-catalog", intent),
     readBuiltinSkill: (builtinAssetKey) => ipcRenderer.invoke("ext-read-builtin-skill", builtinAssetKey),
-    importSkillFolder: (target) => ipcRenderer.invoke("ext-import-skill-folder", target),
-    importSkillGit: (url, target) => ipcRenderer.invoke("ext-import-skill-git", url, target),
     listInstalls: (projectDir) => ipcRenderer.invoke("ext-list-installs", projectDir),
     uninstallV2: (intent) => ipcRenderer.invoke("ext-uninstall-v2", intent),
     uninstallPackage: (packageId) => ipcRenderer.invoke("ext-uninstall-package", packageId),
@@ -292,7 +287,15 @@ const api: ElectronAPI = {
     // REQ-234 `#1529`:重载请求(写表通道)+ 三档状态视图 / 安装请求阶段(表外两条)+ 视图变更推送。
     reloadRequest: (input) => ipcRenderer.invoke("ext-reload-request", input),
     hubView: (directory) => ipcRenderer.invoke("ext-hub-view", directory),
-    hubRequestStage: (input) => ipcRenderer.invoke("ext-hub-request-stage", input),
+    hubRequest: (requestId) => ipcRenderer.invoke("ext-hub-request", requestId),
+    sourcesSearch: (query, requestId) => ipcRenderer.invoke("ext-sources-search", query, requestId),
+    onSourcesSearchProgress: (cb) => {
+      const handler = (_event: Electron.IpcRendererEvent, requestId: string, result: Parameters<typeof cb>[1]) => cb(requestId, result)
+      ipcRenderer.on("ext-sources-search-progress", handler)
+      return () => ipcRenderer.removeListener("ext-sources-search-progress", handler)
+    },
+    preparePluginSource: (input) => ipcRenderer.invoke("ext-prepare-plugin-source", input),
+    installFromSource: (request) => ipcRenderer.invoke("ext-install-from-source", request),
     onHubViewChanged: (cb) => {
       const handler = () => cb()
       ipcRenderer.on("ext-hub-view-changed", handler)

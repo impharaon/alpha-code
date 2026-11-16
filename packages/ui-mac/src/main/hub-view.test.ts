@@ -417,6 +417,19 @@ describe("hub-view 三档状态(§2.5)", () => {
     expect(row(after.rows, "package:kit")).toMatchObject({ scope: "global", installed: true, state: "available" })
     // 定制中心那一侧读的是同一档(I4)
     expect(row((await w.service.viewForAgent({ directory: w.projectDir })).rows, "package:kit").state).toBe("available")
+    const { projectScopeIdentity } = await import("./ext-receipt-v2")
+    const identity = projectScopeIdentity(w.globalRoot)
+    if (!identity.ok) throw Error(identity.reason)
+    const previous = { ...graph, installedGraphDigest: computeInstalledGraphDigest(graph) }
+    const scoped = { ...graph, effect: identity.scope }
+    expect(applyPackageMutation(w.globalRoot, {
+      transactionId: "tx-kit-scope", operation: "update", graphBeforeDigest: previous.installedGraphDigest,
+      graphAfter: { ...scoped, installedGraphDigest: computeInstalledGraphDigest(scoped) },
+      childRecordMutations: [], claimMutations: [],
+    }).ok).toBe(true)
+    const outside = await w.service.view(w.projectDir)
+    expect(row(outside.rows, "package:kit").state).toBe("installed")
+    expect(row(outside.rows, "skill:kit-skill").state).toBe("installed")
   })
 
   test("引擎读不出 ⇒ 不标可用(核不了 = 待重载 + 原因),停用条目照旧只看账本", async () => {
@@ -499,49 +512,38 @@ describe("I4:定制中心与 agent 读同一档,会话只进 agentNote", () => {
   })
 })
 
-describe("I9 main 半边:安装请求的阶段只前进、committed 只由安装体写", () => {
-  const ID = "req_abcdef12"
-  test("confirming → submitted → committed(带作用域);之后的 declined / failed 一律被拒", () => {
-    const stages = createHubRequestStages({ log: () => {} })
-    expect(stages.record({ requestId: ID, stage: "confirming", catalogId: "skill:writer" })).toEqual({ ok: true })
-    expect(stages.record({ requestId: ID, stage: "submitted" })).toEqual({ ok: true })
-    // 300 s 期限到了、引擎广播 reject 回执:不得被记成「用户拒绝」
-    expect(stages.record({ requestId: ID, stage: "declined" }).ok).toBe(false)
-    expect(stages.get(ID)).toEqual({ requestId: ID, catalogId: "skill:writer", stage: "submitted" })
-    stages.settleInstall(ID, { ok: true, catalogId: "skill:writer", scope: "global" })
-    expect(stages.get(ID)).toEqual({ requestId: ID, catalogId: "skill:writer", stage: "committed", scope: "global" })
-    expect(stages.record({ requestId: ID, stage: "declined" }).ok).toBe(false)
-    expect(stages.record({ requestId: ID, stage: "failed", reason: "late" }).ok).toBe(false)
-    stages.settleInstall(ID, { ok: false, reason: "late failure" })
-    expect(stages.get(ID)?.stage).toBe("committed")
-  })
-
-  test("renderer 写不了 committed;没有 confirming 就没有记录;catalogId 不可中途换", () => {
-    const stages = createHubRequestStages({ log: () => {} })
-    expect(stages.record({ requestId: ID, stage: "committed", catalogId: "skill:writer" }).ok).toBe(false)
-    expect(stages.record({ requestId: ID, stage: "submitted", catalogId: "skill:writer" }).ok).toBe(false)
-    expect(stages.get(ID)).toBeNull()
-    stages.settleInstall(ID, { ok: true, catalogId: "skill:writer", scope: "global" })
-    expect(stages.get(ID)).toBeNull()
-    expect(stages.record({ requestId: ID, stage: "confirming", catalogId: "skill:writer" }).ok).toBe(true)
-    expect(stages.record({ requestId: ID, stage: "submitted" }).ok).toBe(true)
-    // 已确认、已提交 —— renderer 照样写不了 committed(只有亲眼看到提交成功的安装体能写)
-    expect(stages.record({ requestId: ID, stage: "committed", catalogId: "skill:writer" }).ok).toBe(false)
-    expect(stages.get(ID)?.stage).toBe("submitted")
-    expect(stages.record({ requestId: ID, stage: "failed", catalogId: "mcp:files" }).ok).toBe(false)
-    expect(stages.record({ requestId: "bad id", stage: "confirming", catalogId: "x" }).ok).toBe(false)
-  })
-
-  test("用户取消:confirming → declined;安装失败:submitted → failed(带原因)", () => {
-    const stages = createHubRequestStages({ log: () => {} })
-    stages.record({ requestId: ID, stage: "confirming", catalogId: "skill:writer" })
-    expect(stages.record({ requestId: ID, stage: "declined" })).toEqual({ ok: true })
-    const other = "req_zyxwvu98"
-    stages.record({ requestId: other, stage: "confirming", catalogId: "mcp:files" })
-    stages.record({ requestId: other, stage: "submitted" })
-    stages.settleInstall(other, { ok: false, reason: "missing DSN" })
-    expect(stages.get(other)).toEqual({ requestId: other, catalogId: "mcp:files", stage: "failed", reason: "missing DSN" })
-  })
+describe("A3 main alone owns install stages", () => {
+ const ID="req_abcdef12"
+ test("submitted settles once; late errors cannot replace the result",()=>{
+  const stages=createHubRequestStages({log:()=>{}})
+  expect(stages.submit(ID,"candidate-1")).toBe("created")
+  expect(stages.submit(ID,"candidate-1")).toBe("existing")
+  expect(stages.submit(ID,"candidate-2")).toBe("conflict")
+  expect(stages.get(ID)).toEqual({requestId:ID,stage:"submitted"})
+  const outcome={ok:true as const,packageId:"claude:writer",displayName:"writer",source:{kind:"catalog" as const},installed:[],notRunning:[]}
+  stages.settleInstall(ID,outcome)
+  expect(stages.get(ID)).toEqual({requestId:ID,stage:"committed",packageId:outcome.packageId,displayName:"writer",outcome})
+  stages.settleInstall(ID,{ok:false,code:"transaction-failed",detail:"late"})
+  expect(stages.get(ID)?.stage).toBe("committed")
+ })
+ test("unadmitted records cannot settle; returned data cannot mutate main",()=>{
+  const stages=createHubRequestStages({log:()=>{}})
+  const outcome={ok:false as const,code:"source-changed" as const,detail:"search again"}
+  stages.settleInstall(ID,outcome)
+  expect(stages.get(ID)).toBeNull()
+  expect(stages.submit("bad id","x")).toBe("conflict")
+  stages.submit(ID,"x");stages.settleInstall(ID,outcome)
+  const record=stages.get(ID)!
+  record.stage="committed"
+  expect(stages.get(ID)).toEqual({requestId:ID,stage:"failed",outcome})
+  expect("record" in stages).toBe(false)
+ })
+ test("existing 256-record capacity evicts only memory, never repeats installation",()=>{
+  const stages=createHubRequestStages({log:()=>{}})
+  for(let index=0;index<257;index++) stages.submit("request_"+index,"source_"+index)
+  expect(stages.get("request_0")).toBeNull()
+  expect(stages.get("request_256")).toMatchObject({stage:"submitted"})
+ })
 })
 
 describe("I6:main 侧 alpha.* 分发只做只读查询与重载记录", () => {
@@ -549,7 +551,7 @@ describe("I6:main 侧 alpha.* 分发只做只读查询与重载记录", () => {
     const w = world("host")
     const logs: string[] = []
     const stages = createHubRequestStages({ log: () => {} })
-    const host = createCodePuppySidecarHost({ view: w.service, requests: stages, reloads: w.coordinator, log: (line) => logs.push(line) })
+    const host = createCodePuppySidecarHost({ installName: () => undefined, packageAuthorization: async () => ({ ok: false, reason: "not installed" }), view: w.service, requests: stages, searchSources: async () => ({ searchId: "search", query: "", sources: [], candidates: [] }), install: async () => ({ ok: false, code: "unknown-id", detail: "unknown" }), reloads: w.coordinator, log: (line) => logs.push(line) })
     const posted: CodePuppySidecarOutbound[] = []
     const post = (m: CodePuppySidecarOutbound) => void posted.push(m)
 
@@ -582,7 +584,7 @@ describe("I6:main 侧 alpha.* 分发只做只读查询与重载记录", () => {
     const w = world("host-dead")
     const logs: string[] = []
     const stages = createHubRequestStages({ log: () => {} })
-    const host = createCodePuppySidecarHost({ view: w.service, requests: stages, reloads: w.coordinator, log: (line) => logs.push(line) })
+    const host = createCodePuppySidecarHost({ installName: () => undefined, packageAuthorization: async () => ({ ok: false, reason: "not installed" }), view: w.service, requests: stages, searchSources: async () => ({ searchId: "search", query: "", sources: [], candidates: [] }), install: async () => ({ ok: false, code: "unknown-id", detail: "unknown" }), reloads: w.coordinator, log: (line) => logs.push(line) })
     expect(() =>
       host.receive({ type: "codepuppy.hub.request.request", id: 1, requestId: "req_abcdef12" }, () => {
         throw new Error("Cannot post to a dead process")
@@ -590,4 +592,25 @@ describe("I6:main 侧 alpha.* 分发只做只读查询与重载记录", () => {
     ).not.toThrow()
     expect(logs.some((l) => l.includes("could not be delivered"))).toBe(true)
   })
+})
+
+test("A3 main accepts before a slow install finishes and owns the submitted/committed result", async () => {
+  const { createHubRequestStages, createCodePuppySidecarHost } = await import("./hub-view")
+  const w = world("source-install-acceptance")
+  const changes: string[] = []
+  const requests = createHubRequestStages({ log: () => {}, onChange: () => { changes.push("changed") } })
+  let finish!: (outcome: import("../shared/plugin-install").InstallOutcomeV1) => void
+  const pending = new Promise<import("../shared/plugin-install").InstallOutcomeV1>((resolve) => { finish = resolve })
+  const inputs: unknown[] = []
+  const host = createCodePuppySidecarHost({ installName: () => undefined, packageAuthorization: async () => ({ ok: false, reason: "not installed" }), view: w.service, requests, reloads: w.coordinator, log: () => {}, searchSources: async () => ({ searchId: "search_main", query: "playwright", sources: [], candidates: [] }), install: async (input) => { inputs.push(input); return pending } })
+  const posted: unknown[] = []
+  expect(host.receive({ type: "codepuppy.hub.install.request", id: 1, requestId: "request_a3", directory: w.projectDir, sessionID: "ses_1", agent: "build", ref: { kind: "id", id: "cand_main_issued" }, scope: "all-projects" }, (message) => { posted.push(message) })).toBe(true)
+  expect(posted).toEqual([{ type: "codepuppy.hub.install.reply", id: 1, accepted: true }])
+  expect(requests.get("request_a3")).toMatchObject({ stage: "submitted" })
+  expect(inputs).toHaveLength(1)
+  expect(changes).toHaveLength(1)
+  finish({ ok: true, packageId: "claude:playwright", displayName: "playwright", source: { kind: "marketplace", ecosystem: "claude", repository: "https://github.com/anthropics/claude-plugins-official", commit: "fixed", path: "external_plugins/playwright", entryName: "playwright" }, installed: [{ kind: "mcp", sourceName: "playwright", hostName: "playwright" }], notRunning: [] })
+  await Bun.sleep(0)
+  expect(requests.get("request_a3")).toMatchObject({ stage: "committed", packageId: "claude:playwright", outcome: { ok: true } })
+  expect(changes).toHaveLength(2)
 })

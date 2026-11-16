@@ -1675,6 +1675,38 @@
           "file": "packages/ext/src/hub-tools.test.ts",
           "name": "规则被绕过(assert 直接放行)⇒ 查不到记录 ⇒ not installed: no confirmation box ran;assert 入参逐字段是冻结的形状"
         }
+      ],
+      "retired": {
+        "quote": "owner 2026-11-16: 「我觉得挺好的，本 session 我希望采纳，纳入本seesion 处理的核心目标」(adopting the audit; orchestrator r12 / review B1). Approved SPEC-plugin-helper-and-hub v3: 「点击「+」或明确说安装就是安装动作」 / 「不再加一次安装确认」。",
+        "date": "2026-11-16",
+        "by": "Codex (GPT-6), under orchestrator Claude Fable 5.2"
+      }
+    },
+    {
+      "id": "chat-install-main-owned",
+      "decision": "Chat installation denies automation agents, uses ordinary permission tiers, and accepts only IDs owned by main; an explicit install request needs no second install confirmation.",
+      "adr": [
+        "ADR-048"
+      ],
+      "lane": "#1724 SPEC-plugin-helper-and-hub v3 / design v5",
+      "takeovers": [],
+      "mechanism": {
+        "file": "packages/ext/src/hub-tools.ts",
+        "ladder": "L0: denyHubInstallForAutomation before bridge writes; ordinary tier judgment in packages/ext/src/policy/index.ts; ID validation at main install entry"
+      },
+      "tests": [
+        {
+          "file": "packages/ext/src/plugin-host.test.ts",
+          "name": "A3 install uses ordinary allow/ask policy and automation is denied before any ask"
+        },
+        {
+          "file": "packages/ext/src/hub-tools.test.ts",
+          "name": "A3 failed transactions return main's code; automation is still denied"
+        },
+        {
+          "file": "packages/ui-mac/src/main/install-from-source.test.ts",
+          "name": "A2 unknown candidate and conflicting request ID do not create a second package"
+        }
       ]
     },
     {
@@ -1909,6 +1941,26 @@
           "name": "项目信任组件:不完整下次再查"
         }
       ]
+    },
+    {
+      "id": "package-disable-pending-mcp-requests",
+      "decision": "Disabling a managed package revokes pending requests whose validated MCP identity belongs to that package. The existing reject API releases that session; this path cannot grant permission or create a second approval surface (#1724; AC-05/AC-15, preserving the merged hub lifecycle behaviour).",
+      "lane": "#1724 r16",
+      "mechanism": {
+        "file": "packages/ui-mac/src/main/package-mcp-activation.ts",
+        "ladder": "L0: existing engine permission reply, literal reject only; replaces the cancellation side effect of the old Location/engine refresh without changing the permission evaluator."
+      },
+      "tests": [
+        {
+          "file": "packages/ui-mac/src/main/package-hub-lifecycle.engine.test.ts",
+          "name": "desktop package lifecycle uses main IPC, the real ext scheduler and sandbox engine"
+        },
+        {
+          "file": "packages/ui-mac/src/renderer/codepuppy-ui/permission-mount-ratchet.test.ts",
+          "name": "package MCP disable has a literal reject-only main reply entry"
+        }
+      ],
+      "note": "Orchestrator r16 requires the original busy-disable assertions to remain; the real lifecycle case fails with the revoke call removed. This preserves the existing explicit package-off authority, with no new grant or owner decision."
     }
   ]
 }

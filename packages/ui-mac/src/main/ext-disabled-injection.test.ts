@@ -119,3 +119,39 @@ describe("#397 session-grant 强制(注入面)", () => {
     expect(config.agents!.la).toEqual({ disabled: true })
   })
 })
+
+test("project-effect MCP remains disabled in the global injected config even when its package is enabled", async () => {
+  const { applyPackageMutation } = await import("./ext-receipt-v2")
+  const { bundleOwner, computeInstalledGraphDigest } = await import("./ext-package-ledger-v3")
+  const node = { kind: "mcp" as const, name: "scoped", componentId: "mcp:scoped", required: true, manifestDigest: "sha256:" + "a".repeat(64) }
+  const graph = { packageId: "local:scoped", envelopeDigest: node.manifestDigest, root: node, children: [], effect: { kind: "project" as const, projectPath: root, projectPathHash: "a".repeat(64) } }
+  expect(applyPackageMutation(root, {
+    operation: "install", transactionId: "scope-injection", graphBeforeDigest: null,
+    graphAfter: { ...graph, installedGraphDigest: computeInstalledGraphDigest(graph) },
+    childRecordMutations: [{ op: "upsert", input: { id: node.componentId, kind: node.kind, name: node.name, environment: "prod", scope: { kind: "global" }, desiredState: "enabled", origin: "catalog", installedAt: "2026-11-16T00:00:00.000Z", manifestDigest: node.manifestDigest } }],
+    claimMutations: [{ op: "acquire", kind: node.kind, name: node.name, owner: bundleOwner(graph.packageId, node.manifestDigest) }],
+  }).ok).toBe(true)
+  const config = { mcp: { servers: { scoped: { type: "remote", url: "https://example.test/mcp", disabled: false } } } }
+  injectDisabledOverrides(config, { userDataPath: root, channel: "stable" })
+  expect(config.mcp.servers.scoped.disabled).toBe(true)
+})
+
+test.each(["unattributable-record","broken-claims"])("R14 A8 disabled and project MCP stay disabled with %s", async defect => {
+ const {applyPackageMutation,readPackageLedgerStateV1}=await import("./ext-receipt-v2")
+ const {bundleOwner,computeInstalledGraphDigest}=await import("./ext-package-ledger-v3")
+ record({name:"disabled-remote",kind:"mcp",configKey:"mcp.disabled-remote",desiredState:"disabled"})
+ const node={kind:"mcp" as const,name:"scoped-remote",componentId:"mcp:scoped-remote",required:true,manifestDigest:"sha256:"+"a".repeat(64)}
+ const graph={packageId:"local:scoped-remote",envelopeDigest:node.manifestDigest,root:node,children:[],effect:{kind:"project" as const,projectPath:root,projectPathHash:"a".repeat(64)}}
+ expect(applyPackageMutation(root,{operation:"install",transactionId:"r14-scope",graphBeforeDigest:null,graphAfter:{...graph,installedGraphDigest:computeInstalledGraphDigest(graph)},childRecordMutations:[{op:"upsert",input:{id:node.componentId,kind:"mcp",name:node.name,environment:"prod",scope:{kind:"global"},desiredState:"enabled",origin:"catalog",installedAt:"2026-11-16T00:00:00.000Z",manifestDigest:node.manifestDigest}}],claimMutations:[{op:"acquire",kind:"mcp",name:node.name,owner:bundleOwner(graph.packageId,node.manifestDigest)}]})).toMatchObject({ok:true})
+ const file=path.join(root,"installs.json")
+ const document=JSON.parse(fs.readFileSync(file,"utf8"))
+ if(defect==="broken-claims")document.claims=[]
+ if(defect==="unattributable-record")document.records.push(null)
+ const text=JSON.stringify(document);fs.writeFileSync(file,text)
+ expect(readPackageLedgerStateV1(root,{sideEffectFree:true}).ok).toBe(false)
+ const config={mcp:{servers:{"disabled-remote":{type:"remote",url:"https://example.test/disabled",disabled:false},"scoped-remote":{type:"remote",url:"https://example.test/scoped",disabled:false}}}}
+ injectDisabledOverrides(config,{userDataPath:root,channel:"stable"})
+ expect(config.mcp.servers["disabled-remote"].disabled).toBe(true)
+ expect(config.mcp.servers["scoped-remote"].disabled).toBe(true)
+ expect(fs.readFileSync(file,"utf8")).toBe(text)
+})

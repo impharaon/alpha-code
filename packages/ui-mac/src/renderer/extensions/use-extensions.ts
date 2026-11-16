@@ -24,7 +24,6 @@ import type {
   InstallReceipt,
   InstallTarget,
   InstalledPackagesResultV1,
-  LocalPackagePreviewV1,
   ProjectMcpState,
   SetStateRefusalCodeWire,
   UninstallKeyIntent,
@@ -36,6 +35,7 @@ import type { ProviderAddressRejection } from "../../shared/codepuppy-model-type
 import type { SessionGrantRefusalCode, SessionGrantWire } from "../../shared/ext-session-grant-wire"
 import type { HubViewRow, ReloadItem, ReloadScope } from "../../main/codepuppy-sidecar-messages"
 import { connectOutcome, grantsToReassert, sessionGrantKeyOf } from "./ext-session-toggle"
+import { authenticatePackageMcp } from "./package-account-auth"
 import { extIpc } from "./ext-ipc"
 import { t } from "../i18n"
 import { approvalToolOf } from "../codepuppy-ui/session-timeline/cards/tool-card-model"
@@ -116,15 +116,6 @@ export type ActionResult =
 type ExtApi = ElectronAPI["ext"]
 type Awaited1<T> = T extends Promise<infer U> ? U : never
 
-/** main 的「这是一个 Claude 插件目录」判别臂(`ok:false` + `route`)。 */
-export type LocalPluginRoute = Extract<Awaited1<ReturnType<ExtApi["importSkillFolder"]>>, { route: "local-claude-plugin" }>
-export type LocalPluginPreviewFetch = Awaited1<ReturnType<ExtApi["importClaudePluginPreview"]>>
-export type LocalPluginCancelResult = Awaited1<ReturnType<ExtApi["importClaudePluginCancel"]>>
-/** confirm 的成功臂再挂一条 `reason: "reload-pending"` —— 账本已 durable 但引擎这次没重载成功。
- *  **不许**把它读成「已生效」:那正是 `use-extensions.ts` 里那条生产注释说的 placebo 安装。 */
-export type LocalPluginConfirmResult =
-  | (Extract<Awaited1<ReturnType<ExtApi["importClaudePluginConfirm"]>>, { ok: true }> & { reason?: "reload-pending" })
-  | Extract<Awaited1<ReturnType<ExtApi["importClaudePluginConfirm"]>>, { ok: false }>
 export type LocalPackageUninstallResult =
   | (Extract<Awaited1<ReturnType<ExtApi["uninstallPackage"]>>, { ok: true }> & { reloadPending?: true })
   | Extract<Awaited1<ReturnType<ExtApi["uninstallPackage"]>>, { ok: false }>
@@ -143,16 +134,6 @@ export type CatalogInstallIntentV1 = Omit<
 export type CatalogInstallResult =
   | (Extract<InstallCatalogWireResult, { ok: true }> & { reloadPending?: true })
   | Extract<InstallCatalogWireResult, { ok: false }>
-
-/** `route === "local-claude-plugin"` 的类型守卫。**判据是 main 给的 `route` 字段** ——
- *  renderer 一个字都不看目录形态(`#255` 之后它连路径都拿不到)。 */
-export function isLocalPluginRoute(
-  result: LocalPluginRoute | (ActionResult & { name?: string; canceled?: boolean }),
-): result is LocalPluginRoute {
-  return !result.ok && (result as { route?: unknown }).route === "local-claude-plugin"
-}
-
-export type { LocalPackagePreviewV1 }
 
 export const DEFAULT_CATALOG_INSTALL_SCOPE = "global" as const
 export type CatalogInstallScopeChoice = "global" | "project"
@@ -353,8 +334,6 @@ export interface ExtensionsApi {
     authorization?: AuthorizationConfirmationWire,
     scope?: CatalogInstallScopeChoice,
     selectedProjectDir?: string,
-    /** REQ-234 `#1531`:agent 经确认框发起的这一次安装的请求号(main 只用它记阶段);缺席 = 定制中心自己的安装。 */
-    hubRequestId?: string,
   ): Promise<ActionResult>
   /** REQ-033:catalog 外任意 MCP(local command / remote url + env/密钥);白名单校验在 main 不放宽。 */
   addCustomMcp(
@@ -398,7 +377,7 @@ export interface ExtensionsApi {
    *  条目呈现为「出厂内置」而非可安装(S18 X1)。创建类操作已技能化,不再有表单写入方法。 */
   factorySkills(): string[]
   /** Install a catalog skill entry by writing its SKILL.md. */
-  installSkill(entry: CatalogEntry, authorization?: AuthorizationConfirmationWire, hubRequestId?: string): Promise<ActionResult>
+  installSkill(entry: CatalogEntry, authorization?: AuthorizationConfirmationWire): Promise<ActionResult>
   /** REQ-234 `#1529`:「现在重载(会打断正在输出的回答)」—— 唯一的强制入口。缺省 = 全部;给目录 = 只重载那个项目。
    *  只是请 ext 调度器跳过「等空闲」,结果看 `store.hubRows`。返回 false = 请求本身没被受理。 */
   refreshEngine(directory?: string): Promise<boolean>
@@ -407,7 +386,7 @@ export interface ExtensionsApi {
   /** REQ-018 T7:刷新引擎已知的 agents(内置 + 自建)供 Agent tab 呈现。 */
   reloadAgents(): Promise<void>
   /** Append a plugin to config `plugins` (opencode auto-installs on next launch; needs restart). */
-  installPlugin(entry: CatalogEntry, authorization?: AuthorizationConfirmationWire, hubRequestId?: string): Promise<ActionResult>
+  installPlugin(entry: CatalogEntry, authorization?: AuthorizationConfirmationWire): Promise<ActionResult>
   /**
    * REQ-019 T5:按 catalog 当前钉版更新已装条目。skill = 覆盖重装(同名 dest,receipt 版本翻新);
    * plugin = 卸旧配置项再写新钉版(persistPlugin 只会追加,直接重装会留旧版残留)。
@@ -415,22 +394,9 @@ export interface ExtensionsApi {
    * (密钥可重填),见 extension-hub.runUpdate。
    */
   updateEntry(entry: CatalogEntry, authorization?: AuthorizationConfirmationWire): Promise<ActionResult>
-  /** REQ-019 T6 / REQ-098 #255:导入本地技能文件夹(main 自弹选择器,renderer 不传 srcDir)。
-   *  REQ-128 Phase 3 `#784`:选中的若是 Claude 插件目录,main 回 `route: "local-claude-plugin"`
-   *  —— **本方法原样透传那条臂,不折叠**。折叠掉它 = 用户看到一句「导入失败」而真因是
-   *  「这是一个插件目录,请看预览」;分流判据在 main,renderer 只读 `route`。 */
-  importSkillFolder(): Promise<LocalPluginRoute | (ActionResult & { name?: string; canceled?: boolean })>
-  /** `#784` 第 3 跳:按 previewId 取回已签发预览的安全投影(纯读;无路径、无字节)。 */
-  localPluginPreview(previewId: string): Promise<LocalPluginPreviewFetch>
-  /** `#784`:取消预览 ⇒ main 侧留存字节立即释放(G19)。
-   *  **安装已经在跑时它会如实拒绝** —— 调用方必须把那条拒绝呈现成「取消不了」,
-   *  绝不许读成「已取消」(那会让用户以为东西没装进去)。 */
-  localPluginCancel(previewId: string): Promise<LocalPluginCancelResult>
-  /** `#784` 第 4/9 跳:确认安装。**只送 previewId**;成功后刷新账本并请 ext 调度器重载,
-   *  请求没被受理则如实回 `reload-pending`(G20)。 */
-  localPluginConfirm(previewId: string): Promise<LocalPluginConfirmResult>
   /** `#784` 第 6 跳:本机已装扩展包的只读清单(「读不出」与「没装」不折叠)。 */
   listInstalledPackages(): Promise<InstalledPackagesResultV1>
+  installFromSource: ExtApi["installFromSource"]
   installPackage: ExtApi["installPackage"]
   setPackageState: ExtApi["setPackageState"]
   savePackageSecrets: ExtApi["savePackageSecrets"]
@@ -439,11 +405,8 @@ export interface ExtensionsApi {
    *  今天详情页的 `removePackage` 只 `refetchInstalled()` 不 refresh ⇒ 移除之后技能仍然
    *  能用到下次重启,那正是本方法要消灭的缺陷。 */
   uninstallPackage(packageId: string): Promise<LocalPackageUninstallResult>
-  /** REQ-019 T6:导入 Git 仓库技能(https-only 浅克隆临时目录 → 同校验)。 */
-  importSkillGit(url: string): Promise<ActionResult & { name?: string }>
-  /** REQ-019 T6:npm 插件导入 = 复用 persistPlugin 通道(主进程包名白名单)。 */
   /** REQ-023:安装 catalog 官方 agent(vendored md 资产 → writeAgent 同管线)。 */
-  installAgentEntry(entry: CatalogEntry, authorization?: AuthorizationConfirmationWire, hubRequestId?: string): Promise<ActionResult>
+  installAgentEntry(entry: CatalogEntry, authorization?: AuthorizationConfirmationWire): Promise<ActionResult>
   /**
    * REQ-128 Phase 4 `#810`:**签名 package 与套件安装的唯一出站点**。
    *
@@ -459,7 +422,7 @@ export interface ExtensionsApi {
   installCatalogIntent(intent: CatalogInstallIntentV1): Promise<CatalogInstallResult>
   /** REQ-020 T4:启用云 pipeline = receipts-only(进本机可用列表;不落文件、不写引擎 config)。
    *  停用走 uninstall(cloud receipt → 去账)。 */
-  enableCloud(entry: CatalogEntry, authorization?: AuthorizationConfirmationWire, hubRequestId?: string): Promise<ActionResult>
+  enableCloud(entry: CatalogEntry, authorization?: AuthorizationConfirmationWire): Promise<ActionResult>
 }
 
 // MCP status is a discriminated union (connected/disabled/failed/needs_auth/…). We don't hard-code
@@ -697,7 +660,6 @@ export function useExtensions(
     authorization?: AuthorizationConfirmationWire,
     scope: CatalogInstallScopeChoice = DEFAULT_CATALOG_INSTALL_SCOPE,
     selectedProjectDir?: string,
-    hubRequestId?: string,
   ): Promise<ActionResult> {
     const c = client
     if (!c) return { ok: false, reason: "no server" }
@@ -720,7 +682,7 @@ export function useExtensions(
       scope: target.target,
       ...(Object.keys(grants).length ? { grants } : {}),
       ...(authorization ? { authorization } : {}),
-      ...(hubRequestId ? { hubRequestId } : {}),
+
     })
     if (!r.ok) return r
     if (r.kind !== "mcp") {
@@ -797,22 +759,9 @@ export function useExtensions(
    *  返回值只报**这次调用的真伪**,状态真相仍由随后的 `loadStatus()` 从引擎重读 ——
    *  「HTTP 调通了」不等于「授权成功了」,所以成功臂也要看回来的 status 是不是真的连上。 */
   async function authenticateMcp(name: string): Promise<ActionResult> {
-    const c = client
-    if (!c) return { ok: false, reason: "no server" }
-    try {
-      // SDK v2 默认 `throwOnError:false` —— 400/404 以 `{error}` 正常 resolve,不进 catch。
-      // 判据复用本文件既有的 `connectOutcome`(同一个问题在这里已经有一个答案)。
-      const r = await c.mcp.auth.authenticate({ name })
-      const ok = connectOutcome(r as { error?: unknown })
-      await loadStatus()
-      if (!ok) return { ok: false, reason: "auth-failed" }
-      // The adapter only reports disabled after OAuth completes successfully. A disabled
-      // connector can hold a ready account without exposing any callable tools.
-      return store.mcp[name]?.connected === true || r.data?.status === "disabled" ? { ok: true } : { ok: false, reason: "auth-failed" }
-    } catch {
-      await loadStatus()
-      return { ok: false, reason: "auth-failed" }
-    }
+    const result = await authenticatePackageMcp(client, name)
+    await loadStatus()
+    return result
   }
 
   // ── #408:session-grant(实验室扩展的会话级启用)────────────────────────────────────────────
@@ -1138,7 +1087,7 @@ export function useExtensions(
     .then((ids) => setFactoryIds(Array.isArray(ids) ? ids : []))
     .catch(() => {})
 
-  async function installSkill(entry: CatalogEntry, authorization?: AuthorizationConfirmationWire, hubRequestId?: string): Promise<ActionResult> {
+  async function installSkill(entry: CatalogEntry, authorization?: AuthorizationConfirmationWire): Promise<ActionResult> {
     const spec = entry.installSpec
     if (spec?.kind !== "skill") return { ok: false, reason: "not a skill entry" }
     // REQ-100 #313(补 #310):单装与 bundle 同入口 —— main-owned installCatalog。renderer 仍只传
@@ -1151,7 +1100,7 @@ export function useExtensions(
       catalogId: entry.id,
       scope: { scope: "global" },
       ...(authorization ? { authorization } : {}),
-      ...(hubRequestId ? { hubRequestId } : {}),
+
     })
     if (!r.ok) return r
     // REQ-234 `#1529`:重载已由 main 安装体请求(等会话空闲);能不能用看该行的三档状态。
@@ -1159,13 +1108,13 @@ export function useExtensions(
     return r
   }
 
-  async function installPlugin(entry: CatalogEntry, authorization?: AuthorizationConfirmationWire, hubRequestId?: string): Promise<ActionResult> {
+  async function installPlugin(entry: CatalogEntry, authorization?: AuthorizationConfirmationWire): Promise<ActionResult> {
     const spec = entry.installSpec
     if (!spec || spec.kind !== "plugin") return { ok: false, reason: "not a plugin entry" }
     // REQ-099 #305:catalog 插件切 installCatalog(vendored/npm 分支由 planner 从已验签条目裁决)。
     // dispose 触发实例重建 → 引擎立刻装载(vendored=本地即读;npm=后台下载);失败不降级为错误,
     // config 已落盘、下次重建自然装载。
-    const r = await extIpc.installCatalog({ catalogId: entry.id, scope: { scope: "global" }, ...(authorization ? { authorization } : {}), ...(hubRequestId ? { hubRequestId } : {}) })
+    const r = await extIpc.installCatalog({ catalogId: entry.id, scope: { scope: "global" }, ...(authorization ? { authorization } : {}) })
     // REQ-234 `#1529`:重载已由 main 安装体请求。
     if (r.ok) await Promise.all([loadInstalls(), loadHubView()])
     return r
@@ -1173,10 +1122,10 @@ export function useExtensions(
 
   /** 安装 catalog 官方 agent(REQ-099 #305:切 installCatalog —— remote/builtin 分支与「内容未打包」
    *  诚实失败均由 planner 从已验签条目裁决;写盘/桥/账本走 writeAgent 同管线)。 */
-  async function installAgentEntry(entry: CatalogEntry, authorization?: AuthorizationConfirmationWire, hubRequestId?: string): Promise<ActionResult> {
+  async function installAgentEntry(entry: CatalogEntry, authorization?: AuthorizationConfirmationWire): Promise<ActionResult> {
     const spec = entry.installSpec
     if (!spec || spec.kind !== "agent") return { ok: false, reason: "not an agent entry" }
-    const r = await extIpc.installCatalog({ catalogId: entry.id, scope: { scope: "global" }, ...(authorization ? { authorization } : {}), ...(hubRequestId ? { hubRequestId } : {}) })
+    const r = await extIpc.installCatalog({ catalogId: entry.id, scope: { scope: "global" }, ...(authorization ? { authorization } : {}) })
     if (!r.ok) return r
     // REQ-234 `#1529`:重载已由 main 安装体请求;agent 列表在重载后由 hub-view-changed 推送刷新。
     await Promise.all([loadInstalls(), loadHubView()])
@@ -1203,55 +1152,14 @@ export function useExtensions(
     return r
   }
 
-  // REQ-019 T6:导入。成功后刷新账本 + dispose 重载(与 createSkill 同节奏);失败原因原样上抛,
-  // 由 hub 行内呈现(B11)。ADR-040(`#825`):npm 插件导入通道随「扩展安装不得写引擎 plugin[]」退场。
-  async function importSkillFolder(): Promise<LocalPluginRoute | (ActionResult & { name?: string; canceled?: boolean })> {
-    // REQ-098 #255:main 自弹目录选择器,renderer 不再传 srcDir。
-    const r = await extIpc.importSkillFolder()
-    // `#784`:插件目录判别臂**原样上抛**。这里一旦把它折进 `{ok:false, reason}`,
-    // 预览屏就永远打不开 —— 第 1→3 跳会断在这一行,而 typecheck 不会红(reason 都是 string)。
-    if (!r.ok && "route" in r && r.route === "local-claude-plugin") return r
-    if (!r.ok) return r
-    await loadInstalls()
-    // #336 r1:warning/projectionLag 端到端透传(此前重建 {ok,name} 把降级信号吞掉)。
-    const carry = { ...(r.warning ? { warning: r.warning } : {}), ...(r.projectionLag ? { projectionLag: r.projectionLag } : {}) }
-    const requested = await requestReload("global", `imported skill ${r.name}`)
-    void loadHubView()
-    if (!requested) return { ok: true, name: r.name, reason: "reload-pending", ...carry }
-    return { ok: true, name: r.name, ...carry }
-  }
-  // ── REQ-128 Phase 3 `#784`:本地 Claude 插件包的第 3 / 4 / 6 / 7 / 9 跳 ─────────────────────
-  //
-  // 五个方法全部落在这一层(而不是 hub 里逐处调 `extIpc`),理由只有一条:
-  // **重载请求必须只在这里接一次**。逐调用点接一行的形态在本仓已栽三次
-  // (`#765` 的 warning 呈现是同一个故事)—— 枚举对新调用点默认放行,而「默认放行」在这里
-  // 的具体后果是 placebo 安装:账本翻了、盘上有了,引擎实例没重扫,用户下一条消息里什么都没有。
-
-  async function localPluginPreview(previewId: string): Promise<LocalPluginPreviewFetch> {
-    return extIpc.importClaudePluginPreview(previewId)
-  }
-
-  async function localPluginCancel(previewId: string): Promise<LocalPluginCancelResult> {
-    // 取消**不**触发 refresh:什么都没写过,没有可生效的东西。
-    // main 侧安装在跑时会回 `ok:false + install-in-flight`,这里原样上抛 —— 调用方必须
-    // 把它呈现成「取消不了」。界面说了什么,就必须是实际发生的什么。
-    return extIpc.importClaudePluginCancel(previewId)
-  }
-
-  async function localPluginConfirm(previewId: string): Promise<LocalPluginConfirmResult> {
-    const r = await extIpc.importClaudePluginConfirm(previewId)
-    if (!r.ok) return r
-    await loadInstalls()
-    // G20:装完必须让引擎重扫 —— 本地包是 fs 类的 N 倍。REQ-234 `#1529`:请 ext 调度器重载(等会话空闲);
-    // 请求没被受理 ⇒ **如实**回 reload-pending,不谎报「下一条消息里就能用」。
-    const requested = await requestReload("global", `installed local package ${previewId}`)
-    void loadHubView()
-    if (!requested) return { ...r, reason: "reload-pending" }
-    return r
-  }
-
   async function listInstalledPackages(): Promise<InstalledPackagesResultV1> {
     return extIpc.installedPackages()
+  }
+
+  async function installFromSource(request: Parameters<ExtApi["installFromSource"]>[0]) {
+    const result = await extIpc.installFromSource(request)
+    if (result.ok) await Promise.all([loadInstalls(), loadHubView(), loadStatus(), loadAgents()])
+    return result
   }
 
   async function installPackage(packageId: string) {
@@ -1284,21 +1192,11 @@ export function useExtensions(
     return r
   }
 
-  async function importSkillGit(url: string): Promise<ActionResult & { name?: string }> {
-    const r = await extIpc.importSkillGit(url)
-    if (!r.ok) return r
-    await loadInstalls()
-    const carry = { ...(r.warning ? { warning: r.warning } : {}), ...(r.projectionLag ? { projectionLag: r.projectionLag } : {}) }
-    const requested = await requestReload("global", `imported skill ${r.name}`)
-    void loadHubView()
-    if (!requested) return { ok: true, name: r.name, reason: "reload-pending", ...carry }
-    return { ok: true, name: r.name, ...carry }
-  }
   /** REQ-020 T4 / REQ-099 #305:云 pipeline「启用」= receipts-only,切 installCatalog(planner cloud
    *  分支同语义:不触达引擎/文件系统,只落账)。 */
-  async function enableCloud(entry: CatalogEntry, authorization?: AuthorizationConfirmationWire, hubRequestId?: string): Promise<ActionResult> {
+  async function enableCloud(entry: CatalogEntry, authorization?: AuthorizationConfirmationWire): Promise<ActionResult> {
     if (entry.type !== "cloud") return { ok: false, reason: "not a cloud entry" }
-    const r = await extIpc.installCatalog({ catalogId: entry.id, scope: { scope: "global" }, ...(authorization ? { authorization } : {}), ...(hubRequestId ? { hubRequestId } : {}) })
+    const r = await extIpc.installCatalog({ catalogId: entry.id, scope: { scope: "global" }, ...(authorization ? { authorization } : {}) })
     if (!r.ok) return r // #348:不折叠 —— stage/authorization 原样透传(cloud 未来入事务时自然接上)
     await Promise.all([loadInstalls(), loadHubView()])
     return { ok: true }
@@ -1337,16 +1235,12 @@ export function useExtensions(
     reloadAgents: loadAgents,
     installPlugin,
     updateEntry,
-    importSkillFolder,
-    localPluginPreview,
-    localPluginCancel,
-    localPluginConfirm,
     listInstalledPackages,
+    installFromSource,
     installPackage,
     setPackageState,
     savePackageSecrets,
     uninstallPackage,
-    importSkillGit,
     installAgentEntry,
     installCatalogIntent,
     enableCloud,

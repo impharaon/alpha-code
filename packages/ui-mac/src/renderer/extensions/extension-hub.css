@@ -1713,7 +1713,7 @@ body[data-codepuppy-sidebar="open"] .codepuppy-ext-page {
 .codepuppy-ext-pagehd .codepuppy-ext-search {
   margin: 0;
   height: 34px;
-  width: 180px;
+  width: 240px;
   flex: none;
 }
 .codepuppy-ext-pagehd .codepuppy-ext-more > .codepuppy-ext-add {

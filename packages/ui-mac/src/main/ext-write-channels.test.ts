@@ -53,7 +53,6 @@ function makeHarness(admit: boolean) {
     uninstallIntent: (intent) =>
       intent === "bad" ? { ok: false, reason: "bad uninstall intent" } : { ok: true, root: intent === "proj" ? PROJECT : GLOBAL },
     setStateIntent: (intent) => (intent === "proj" ? { ok: true, root: PROJECT } : { ok: true, root: GLOBAL }),
-    importTarget: (target) => (target?.scope === "project" ? { ok: true, root: PROJECT } : { ok: true, root: GLOBAL }),
     projectDir: () => ({ ok: true, root: PROJECT }),
   }
   const body =
@@ -64,6 +63,7 @@ function makeHarness(admit: boolean) {
     }
   const bodies: WriteChannelBodies = {
     installPackage: body("installPackage"),
+    installFromSource: body("installFromSource"),
     setPackageState: body("setPackageState"),
     savePackageSecrets: body("savePackageSecrets"),
     installCatalog: body("installCatalog"),
@@ -79,9 +79,6 @@ function makeHarness(admit: boolean) {
     persistMcp: body("persistMcp"),
     importAgentConfirm: body("importAgentConfirm"),
     // `#782`:同上 —— 漏掉这一行时 body 是 undefined,而「键集一一对应」仍然全绿。
-    importClaudePluginConfirm: body("importClaudePluginConfirm"),
-    importSkillFolder: body("importSkillFolder"),
-    importSkillGit: body("importSkillGit"),
     // `#1529`:同上 —— 显式列出,漏掉时 body 是 undefined 而「键集一一对应」仍绿。
     reloadRequest: body("reloadRequest"),
   }
@@ -106,6 +103,7 @@ describe("GATED_WRITE_CHANNELS — 表完整性", () => {
     expect(Object.values(GATED_WRITE_CHANNELS)).toEqual([
       "ext-install-catalog",
       "ext-install-package",
+      "ext-install-from-source",
       "ext-set-package-state",
       "ext-save-package-secrets",
       "ext-uninstall-v2",
@@ -116,26 +114,19 @@ describe("GATED_WRITE_CHANNELS — 表完整性", () => {
       "ext-remove-mcp",
       "ext-persist-mcp",
       "ext-import-agent-confirm",
-      "ext-import-claude-plugin-confirm",
-      "ext-import-skill-folder",
-      "ext-import-skill-git",
       "ext-reload-request",
     ])
-    // 两段式的既有先例:agent 的 preview 不在表内、confirm 在表内。本地插件包逐字同款。
+    // Ordinary agent confirmation keeps its existing write surface.
     const write = new Set<string>(Object.values(GATED_WRITE_CHANNELS))
     expect(write.has("ext-import-agent-preview")).toBe(false)
     expect(write.has("ext-import-agent-confirm")).toBe(true)
-    expect(write.has("ext-import-claude-plugin-confirm")).toBe(true)
     // ↓ 这三条是本条用例存在的理由:把 preview 挪进写表,这里立刻红。
-    expect(write.has("ext-import-claude-plugin-preview")).toBe(false)
-    expect(write.has("ext-import-claude-plugin-cancel")).toBe(false)
     expect(write.has("ext-installed-packages")).toBe(false)
   })
 
   test("纯读通道表:内容逐名钉死,且与写表**互斥**", () => {
     expect(Object.values(LOCAL_PACKAGE_READ_CHANNELS)).toEqual([
-      "ext-import-claude-plugin-preview",
-      "ext-import-claude-plugin-cancel",
+      "ext-prepare-plugin-source",
       "ext-installed-packages",
     ])
     const write = new Set<string>(Object.values(GATED_WRITE_CHANNELS))
@@ -149,7 +140,7 @@ describe("GATED_WRITE_CHANNELS — 表完整性", () => {
   // `#1529`:三档状态的读面与「记阶段」面是表外通道 —— 账本待恢复时状态照样要看得到、确认框照样要能记阶段。
   // 把它们挪进写表(或反过来把重载请求挪出写表),这条立刻红。
   test("定制中心状态面两条表外通道:内容逐名钉死,与写表、纯读表都**互斥**", () => {
-    expect(Object.values(HUB_READ_CHANNELS)).toEqual(["ext-hub-view", "ext-hub-request-stage"])
+    expect(Object.values(HUB_READ_CHANNELS)).toEqual(["ext-hub-view", "ext-hub-request", "ext-sources-search"])
     const write = new Set<string>(Object.values(GATED_WRITE_CHANNELS))
     const localRead = new Set<string>(Object.values(LOCAL_PACKAGE_READ_CHANNELS))
     for (const name of Object.values(HUB_READ_CHANNELS)) {
@@ -161,7 +152,7 @@ describe("GATED_WRITE_CHANNELS — 表完整性", () => {
 })
 
 describe("逐通道:gate 先行、root 正确、拒绝短路、实参透传", () => {
-  test("放行:全部 16 通道 body 收到原实参,gate 收到该通道的解析 root", async () => {
+  test("放行:全部 13 通道 body 收到原实参,gate 收到该通道的解析 root", async () => {
     const h = makeHarness(true)
     const w = buildGatedWriteChannels(h)
     await w.installCatalog({ catalogId: "mcp:demo", scope: { scope: "project", projectDir: "/p" } })
@@ -173,9 +164,6 @@ describe("逐通道:gate 先行、root 正确、拒绝短路、实参透传", ()
     await w.removeMcpLegacy("live-mcp")
     await w.persistMcp("m", { type: "local" }, ["K"])
     await w.importAgentConfirm("preview-1")
-    await w.importClaudePluginConfirm("local-preview-1")
-    await w.importSkillFolder("/picked/dir", { scope: "project", projectDir: "/p" })
-    await w.importSkillGit("https://x.git", undefined)
     await w.reloadRequest({ scope: "global", items: [], reason: "x" })
     await w.installPackage("package:supabase")
     await w.setPackageState({ packageId: "package:supabase", state: "disabled" })
@@ -190,28 +178,22 @@ describe("逐通道:gate 先行、root 正确、拒绝短路、实参透传", ()
       "removeMcpLegacy",
       "persistMcp",
       "importAgentConfirm",
-      "importClaudePluginConfirm",
-      "importSkillFolder",
-      "importSkillGit",
       "reloadRequest",
       "installPackage",
       "setPackageState",
       "savePackageSecrets",
     ])
     // root 断言:global 面 / intent 定根 / 项目面 / 导入 target 定根
-    expect(h.gateLog).toEqual([PROJECT, PROJECT, GLOBAL, GLOBAL, PROJECT, PROJECT, GLOBAL, GLOBAL, GLOBAL, GLOBAL, PROJECT, GLOBAL, GLOBAL, GLOBAL, GLOBAL, GLOBAL])
-    expect(h.bodyLog.slice(13).map((entry) => entry.args)).toEqual([["package:supabase"], [{ packageId: "package:supabase", state: "disabled" }], [{ packageId: "package:github", secrets: {} }]])
+    expect(h.gateLog).toEqual([PROJECT, PROJECT, GLOBAL, GLOBAL, PROJECT, PROJECT, GLOBAL, GLOBAL, GLOBAL, GLOBAL, GLOBAL, GLOBAL, GLOBAL])
+    expect(h.bodyLog.slice(10).map((entry) => entry.args)).toEqual([["package:supabase"], [{ packageId: "package:supabase", state: "disabled" }], [{ packageId: "package:github", secrets: {} }]])
     // 实参透传抽查
     expect(h.bodyLog[7]?.args).toEqual(["m", { type: "local" }, ["K"]])
     expect(h.bodyLog[3]?.args).toEqual([{ type: "skill" }, "gen-000001-abcdef12"])
-    expect(h.bodyLog[10]?.args).toEqual(["/picked/dir", { scope: "project", projectDir: "/p" }])
     expect(h.bodyLog[2]?.args).toEqual(["package:kit"])
-    // `#782`:confirm **只**拿到 previewId 一个实参。表构造器若把 event / target / srcDir
-    // 之类的东西一起透进 body,这条立刻红 —— 那正是「renderer 给得出写入内容」的第一步。
-    expect(h.bodyLog[9]?.args).toEqual(["local-preview-1"])
+
   })
 
-  test("gate 拒绝:全部 16 通道 body 零调用,拒因原样返回", async () => {
+  test("gate 拒绝:全部 13 通道 body 零调用,拒因原样返回", async () => {
     const h = makeHarness(false)
     const w = buildGatedWriteChannels(h)
     const results = await Promise.all([
@@ -224,16 +206,13 @@ describe("逐通道:gate 先行、root 正确、拒绝短路、实参透传", ()
       w.removeMcpLegacy("m"),
       w.persistMcp("m", {}, undefined),
       w.importAgentConfirm("id"),
-      w.importClaudePluginConfirm("id"),
-      w.importSkillFolder("/d", undefined),
-      w.importSkillGit("u", undefined),
       w.reloadRequest({ scope: { directory: "/p" }, items: [], reason: "x" }),
       w.installPackage("package:supabase"),
       w.setPackageState({ packageId: "package:supabase", state: "disabled" }),
       w.savePackageSecrets({ packageId: "package:github", secrets: {} }),
     ])
     expect(h.bodyLog).toEqual([])
-    expect(h.gateLog).toHaveLength(16)
+    expect(h.gateLog).toHaveLength(13)
     for (const r of results) expect(r).toEqual({ ok: false, reason: "gate refused" })
   })
 
@@ -421,6 +400,8 @@ test("真实 catalog MCP 写通道结果只公开状态且不回显提交的 sec
     cmd: [
       process.execPath,
       "test",
+      "--max-concurrency",
+      "2",
       path.resolve(import.meta.dir, "../../test-component/ext-install-catalog-result.cases.ts"),
     ],
     cwd: path.resolve(import.meta.dir, "../.."),
@@ -429,9 +410,26 @@ test("真实 catalog MCP 写通道结果只公开状态且不回显提交的 sec
   const output = `${result.stdout.toString()}${result.stderr.toString()}`
   if (result.exitCode !== 0) throw new Error(output)
   // 用词边界而非 toContain:`"11 pass"` 含 `"1 pass"`、`"10 fail"` 含 `"0 fail"`,
-  // 子串匹配会在用例数增减时假绿。七条子用例:enabled / installedDisabled 两条返回分支,加 #702 的 detail 通道注册、package 预检接线、browse 数据源,
-  // 加 `#1529` 的 I4(IPC 与 parentPort 同档)与 I9(hubRequestId ⇒ committed),
-  // 加 `#1531` 的项目作用域重载请求与 agent 安装金丝雀端到端(生产 ext codepuppy_hub_install × 真 main 分发)。
-  expect(output).toMatch(/\b9 pass\b/)
+  // 子串匹配会在用例数增减时假绿。实际子用例覆盖目录/包读取、唯一安装入口、
+  // main-owned 阶段、聊天 canary、授权只读、whole capture 和 renderer 边界；没有聊天确认阶段。
+  expect(output).toMatch(/\b26 pass\b/)
   expect(output).toMatch(/\b0 fail\b/)
 }, 120_000)
+
+// The source entry uses the same recovery gate and global root as catalog/package writes.
+test("A2 source install channel gates, refuses and transports only the frozen request", async () => {
+  const request = { requestId: "request_a2", source: { kind: "candidate", candidateId: "cand_1" }, via: "chat", effect: { kind: "all-projects" } }
+  const allowed = makeHarness(true)
+  await buildGatedWriteChannels(allowed).installFromSource(request)
+  expect(allowed.gateLog).toEqual([GLOBAL])
+  expect(allowed.bodyLog).toEqual([{ key: "installFromSource", args: [request] }])
+  const refused = makeHarness(false)
+  expect(await buildGatedWriteChannels(refused).installFromSource(request)).toEqual({ ok: false, reason: "gate refused" })
+  expect(refused.bodyLog).toEqual([])
+})
+
+
+test("BC1 source search is a read-only channel separate from the single install writer", () => {
+  expect(HUB_READ_CHANNELS.sourcesSearch).toBe("ext-sources-search")
+  expect(Object.values(GATED_WRITE_CHANNELS)).not.toContain(HUB_READ_CHANNELS.sourcesSearch)
+})

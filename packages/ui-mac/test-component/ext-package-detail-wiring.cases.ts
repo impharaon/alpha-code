@@ -21,6 +21,8 @@ import type {
 import { evaluatePackageForHost, runCatalogInstallWithPackagePreflight, resolveVerifiedPackageV1 } from "../src/main/package-installability"
 import { createPackageAdmissionCoordinator, installDesktopPackageV1, savePackageSecretsV1, readPackageAuthorizationV1 } from "../src/main/package-admission"
 import { setPackageStateV1 } from "../src/main/ext-install-planner"
+import { createPluginSources, type SourceSearchResultV1 } from "../src/main/plugin-sources"
+import { fixtureFetch } from "../test-fixtures/plugin-helper/source-fetch"
 import { writeCapabilityGrantSync } from "../src/main/ext-capability-grants"
 import { readPackageGraphs, readPackageLedgerStateV1 } from "../src/main/ext-receipt-v2"
 import { uninstallPackageV1 } from "../src/main/ext-package-uninstall"
@@ -418,6 +420,18 @@ async function mountHarness(options?: {
     refresh,
   )
 
+  const searchResults: SourceSearchResultV1[] = []
+  const sourceProgress = new Set<(id: string, result: SourceSearchResultV1) => void>()
+  const sources = createPluginSources({
+    catalog: async () => {
+      const result = await refresh()
+      return result.source === "none" ? [] : (result.packageViews ?? [])
+        .filter(view => view.verdict === "compatible")
+        .map(view => ({ id: view.catalogId, source: "catalog" as const, name: view.presentation.displayName, displayName: view.presentation.displayName, description: view.presentation.description, kind: "plugin" as const, upstream: { version: view.presentation.version } }))
+    },
+    fetch: fixtureFetch,
+  })
+
   injectInstallWarning = options?.injectInstallWarning ?? null
   injectUninstallWarning = options?.injectUninstallWarning ?? null
   const browseResults: unknown[] = []
@@ -440,6 +454,17 @@ async function mountHarness(options?: {
         start: async () => {},
       },
       ext: {
+        sourcesSearch: async (query: string, requestId: string) => {
+          const result = await sources.searchSources(query, partial => {
+            for (const listener of sourceProgress) listener(requestId, partial)
+          })
+          searchResults.push(result)
+          return result
+        },
+        onSourcesSearchProgress: (listener: (id: string, result: SourceSearchResultV1) => void) => {
+          sourceProgress.add(listener)
+          return () => sourceProgress.delete(listener)
+        },
         remoteCatalog: async () => {
           const result = await handlers.get("ext-remote-catalog")!(undefined)
           browseResults.push(result)
@@ -621,6 +646,7 @@ async function mountHarness(options?: {
   })
   return {
     browseResults,
+    searchResults,
     detailResults,
     installIntents,
     installResults,
@@ -999,7 +1025,7 @@ describe("package detail production renderer path", () => {
 
     const search = document.querySelector<HTMLInputElement>(".codepuppy-ext-search input")
     expect(search).toBeInstanceOf(HTMLInputElement)
-    search!.value = "renderer-update"
+    search!.value = "Renderer Update Package"
     search!.dispatchEvent(new Event("input", { bubbles: true }))
     await waitFor(() =>
       expect(
@@ -1008,14 +1034,16 @@ describe("package detail production renderer path", () => {
         ),
       ).toEqual([]),
     )
+    await waitFor(() => expect(harness.searchResults.at(-1)).toMatchObject({ query: "Renderer Update Package", candidates: [] }))
+    expect(harness.searchResults.at(-1)!.sources).toHaveLength(5)
+    expect(document.querySelector('[data-source-candidate="package:renderer-update"]')).toBeNull()
     expect(document.querySelector("[data-package-detail='package:renderer-update']")).toBeNull()
-    search!.value = "renderer-ready"
+    search!.value = "Generic Remote MCP"
     search!.dispatchEvent(new Event("input", { bubbles: true }))
-    await waitFor(() =>
-      expect(
-        Array.from(document.querySelectorAll("[data-package-card]"), (card) => card.getAttribute("data-package-card")),
-      ).toEqual(["package:renderer-ready"]),
-    )
+    // Existing unified-search debounce is 250ms; observe its actual source rows.
+    await sleep(300)
+    await waitFor(() => expect(Array.from(document.querySelectorAll("[data-source-candidate]"), row => row.getAttribute("data-source-candidate")))
+      .toEqual(["package:renderer-ready", "package:renderer-prerequisite"]))
     search!.value = ""
     search!.dispatchEvent(new Event("input", { bubbles: true }))
     await waitFor(expectInstallablePackageCards)
@@ -1244,6 +1272,11 @@ describe("package detail production renderer path", () => {
     await installDirect(harness, "package:renderer-prerequisite")
     await openManagement("package:renderer-prerequisite")
     await openToken()
+    const input = document.querySelector<HTMLInputElement>('input[type="password"]')!
+    expect(input.value).toBe("")
+    expect(input.required).toBe(false)
+    expect(input.placeholder).toBe(zh["codepuppy.ext.packageTokenPlaceholder"])
+    expect(document.querySelector<HTMLButtonElement>('[role="dialog"] .a-dialog-footer button')?.disabled).toBe(false)
     fillManagementToken(secretCanary)
     click(document.querySelector('[role="dialog"] .a-dialog-close'))
     await waitFor(() => expect(document.querySelector('input[type="password"]')).toBeNull())
@@ -1357,28 +1390,16 @@ describe("package detail production renderer path", () => {
     expect(harness.installIntents).toEqual([])
   })
 
-  test("legacy MCP keeps optional-key copy and allows confirmation with an empty value", async () => {
-    await mountHarness()
+  test("legacy MCP plus submits immediately without confirmation or required credentials", async () => {
+    const harness = await mountHarness()
     setHubSection("connectors")
-    await waitFor(() =>
-      expect(document.querySelector(".codepuppy-ext-card b[title='git']")).toBeInstanceOf(
-        HTMLElement,
-      ),
-    )
+    await waitFor(() => expect(document.querySelector(".codepuppy-ext-card b[title='git']")).toBeInstanceOf(HTMLElement))
     const card = document.querySelector(".codepuppy-ext-card b[title='git']")!.closest(".codepuppy-ext-card")!
     click(card.querySelector(".codepuppy-ext-add"))
-    const keys = document.querySelector<HTMLElement>(".codepuppy-ext-confirm-keys")
-    expect(keys).toBeInstanceOf(HTMLElement)
-    const dialog = keys!.closest<HTMLElement>("[role='dialog']")
-    expect(dialog).toBeInstanceOf(HTMLElement)
-    expect(dialog!.querySelector("[data-package-authorization]")).toBeNull()
-    expect(zh["codepuppy.ext.confirmEnv"]).toBe("连接所需的密钥（可稍后填写）")
-    expect(zh["codepuppy.ext.keyPlaceholder"]).toBe("粘贴密钥…(可留空)")
-    expect(keys!.querySelector(".codepuppy-ext-confirm-line")?.textContent).toBe(zh["codepuppy.ext.confirmEnv"])
-    const input = keys!.querySelector<HTMLInputElement>(".codepuppy-ext-key-input")
-    expect(input).toBeInstanceOf(HTMLInputElement)
-    expect(input!.placeholder).toBe(zh["codepuppy.ext.keyPlaceholder"])
-    expect(input!.value).toBe("")
-    expect(dialog!.querySelector<HTMLButtonElement>(".a-dialog-footer .a-btn:last-child")?.disabled).toBe(false)
+    await waitFor(() => expect(harness.installIntents).toEqual([{ catalogId: "mcp:git" }]))
+    expect(document.querySelector('[role="dialog"]')).toBeNull()
+    expect(document.querySelector(".codepuppy-ext-confirm-keys")).toBeNull()
+    expect(document.querySelector('[data-package-authorization]')).toBeNull()
+    expect(JSON.stringify(harness.installIntents)).not.toContain("secrets")
   })
 })

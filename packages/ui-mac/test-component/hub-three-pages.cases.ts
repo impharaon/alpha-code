@@ -164,12 +164,13 @@ Object.defineProperty(window, "api", {
         calls.uninstall.push(intent)
         return { ok: true as const }
       },
-      importSkillFolder: async () => {
+      preparePluginSource: async () => {
         calls.importSkillFolder++
-        return { ok: false as const, canceled: true, reason: "canceled" }
+        return { ok: false as const, canceled: true, detail: "canceled" }
       },
       hubView: async () => ({ directory: "/", rows: hubRows, warnings: [] }),
       reloadRequest: async () => ({ ok: true as const, generation: 1 }),
+      onSourcesSearchProgress: () => () => {},
       onHubViewChanged: (listener: () => void) => { hubListeners.add(listener); return () => { hubListeners.delete(listener) } },
       builtinRead: async () => ({
         gov: structuredClone(DEFAULT_BUILTIN_POLICY),
@@ -418,7 +419,7 @@ test("AC2 每页只有标题、一行副标题、搜索框和「添加 ▾」;�
     click(q(`[data-tab="${key}"]`))
     await waitFor(() => expect(q(".codepuppy-ext-pagehd .codepuppy-ext-sub")?.textContent).toBe(zh[sub]))
     const head = q(".codepuppy-ext-pagehd")!
-    expect(q<HTMLInputElement>("input[type='search']", head)?.placeholder).toBe(zh[placeholder])
+    expect(q<HTMLInputElement>("input[type='search']", head)?.placeholder).toBe(zh["codepuppy.ext.sourceSearchPlaceholder"])
     expect(q("[data-more='add']", head)?.textContent).toBe(`${zh["codepuppy.ext.add"]} ▾`)
     // 页上不再有筛选条、说明框;技能页「推荐 / 系统」两个分段都看一遍。
     for (const segment of key === "connectors" ? [null] : ["recommended", "system"]) {
@@ -1013,4 +1014,185 @@ test("official credential dialogs reuse DSN and PAT help and report credential s
     expect(q('[role="dialog"]')?.textContent).not.toContain(zh["codepuppy.ext.mcpAuthFailed"])
     expect(installedPackages[0]?.packageId).toBe(entry.prelude.packageId)
   }
+})
+
+test.each([undefined, { kind: "project" as const, projectPath: "/project/alpha", projectPathHash: "a".repeat(64) }])("installed package management displays its effective scope: %j", async (effect) => {
+  reset()
+  installedPackages = [{
+    packageId: "mine:scope-display", installedGraphDigest: "sha256:" + "b".repeat(64),
+    displayName: "Scope display", rootComponentName: "scope-display", version: "1.0.0",
+    origin: "created", desiredState: "enabled", source: { kind: "created" },
+    ...(effect ? { effect } : {}),
+    components: [{ componentId: "user:scope-display", kind: "skill", name: "scope-display", required: true, desiredState: "enabled" }],
+  }]
+  receipts = [receipt("user:scope-display", "scope-display", "skill")]
+  mount()
+  await waitFor(() => expect(q('[data-installed-package="mine:scope-display"]')).toBeInstanceOf(HTMLElement))
+  click(q('[data-installed-package="mine:scope-display"] [data-more]'))
+  await waitFor(() => expect(q('[data-menu-item="manage"]')).toBeInstanceOf(HTMLElement))
+  click(q('[data-menu-item="manage"]'))
+  await waitFor(() => expect(q(".codepuppy-ext-detail")?.textContent).toContain("生效范围"))
+  expect(q(".codepuppy-ext-detail")?.textContent).toContain(effect ? "仅当前项目" : "我的所有项目")
+})
+
+test("D4 factory plugin helper has its shipped name and purpose without an install or switch", async () => {
+  reset()
+  factorySkillIds = ["plugin-helper"]
+  mount("skills")
+  click(q('[data-segment="system"]'))
+  await waitFor(() => expect(q('[data-factory-skill="plugin-helper"]')).toBeInstanceOf(HTMLElement))
+  const row = q('[data-factory-skill="plugin-helper"]')!
+  expect(q("b", row)?.textContent).toBe("插件助手")
+  expect(q(".codepuppy-ext-kit-desc", row)?.textContent).toBe("查找并安装插件和 MCP")
+  expect(q("[data-more], button, input", row)).toBeNull()
+  expect(q('[data-installed-package]')).toBeNull()
+  expect(calls.installCatalog).toEqual([])
+  expect(calls.installPackage).toEqual([])
+  expect(calls.packageState).toEqual([])
+})
+
+test("D4 created source stays My plugin through its package row, management and whole removal", async () => {
+  reset()
+  // This is our renderer read model; source, rather than an ID prefix or name, owns provenance.
+  const packageId = "package:photoshop-report"
+  installedPackages = [{
+    packageId, installedGraphDigest: "sha256:" + "c".repeat(64),
+    displayName: "PSD report", rootComponentName: "photoshop-report", version: "1.0.0",
+    origin: "created", desiredState: "enabled", source: { kind: "created" },
+    components: [{ componentId: "user:photoshop-report", kind: "skill", name: "photoshop-report", required: true, desiredState: "enabled" }],
+  }]
+  receipts = [receipt("user:photoshop-report", "photoshop-report", "skill")]
+  mount()
+  await waitFor(() => expect(q('[data-installed-package]')?.textContent).toContain("我的插件"))
+  expect(q('[data-installed-package]')?.textContent).not.toContain("官方")
+  await managePackage(packageId)
+  expect(q('[data-package-detail]')?.textContent).toContain("我的插件")
+  expect(q('[data-package-detail]')?.textContent).not.toContain("官方")
+  click(q('[data-package-detail] [data-more]'))
+  click(q('[data-menu-item="remove-package"]'))
+  await waitFor(() => expect(calls.packageRemove).toEqual([packageId]))
+  await waitFor(() => expect(q('[data-installed-package]')).toBeNull())
+  expect(calls.uninstall).toEqual([])
+})
+
+test("BC1 the one Hub search input reaches sources and its plus reaches the single install entry",async()=>{
+ reset();mount()
+ const {createPluginSources}=await import("../src/main/plugin-sources")
+ const {fixtureFetch}=await import("../test-fixtures/plugin-helper/source-fetch")
+ const answer=await createPluginSources({catalog:async()=>[],fetch:fixtureFetch}).searchSources("context7")
+ const calls:unknown[]=[]
+ Object.assign(window.api.ext,{sourcesSearch:async(query:string)=>{calls.push(["search",query]);return answer},installFromSource:async(request:unknown)=>{calls.push(["install",request]);return {ok:true,packageId:"claude:context7",displayName:"context7",source:{kind:"marketplace",ecosystem:"claude",repository:"anthropics/claude-plugins-official",commit:"b5b01ac4",path:"external_plugins/context7",entryName:"context7"},installed:[],notRunning:[]}}})
+ const input=q<HTMLInputElement>('input[type="search"]')!
+ expect(input.placeholder).toBe("搜索插件、技能或 MCP")
+ input.value="context7";input.dispatchEvent(new Event("input",{bubbles:true}))
+ await waitFor(()=>expect(q("[data-source-candidate]" )).not.toBeNull())
+ expect(qa('input[type="search"]')).toHaveLength(1)
+ click(q("[data-source-candidate] button"))
+ await waitFor(()=>expect(calls.filter((call)=>Array.isArray(call)&&call[0]==="install")).toHaveLength(1))
+ expect(calls).toMatchObject([["search","context7"],["install",{source:{kind:"candidate",candidateId:answer.candidates[0]!.id},effect:{kind:"all-projects"},via:"hub"}]])
+ expect(q('[role="dialog"]')).toBeNull()
+ expect(qa('[data-group="installed"]')).toHaveLength(0)
+})
+
+
+test("BC2b folder menu installs the main-minted whole package without an install confirmation",async()=>{
+ reset();mount("skills")
+ const {createPluginSources}=await import("../src/main/plugin-sources")
+ const {captureFixture}=await import("../test-fixtures/plugin-helper/fixture")
+ const sources=createPluginSources({catalog:async()=>[]})
+ const prepared=await sources.prepareCapture(await captureFixture("plugins/frontend-design"))
+ expect(prepared.kind).toBe("package")
+ const wire:unknown[]=[]
+ const previous={preparePluginSource:window.api.ext.preparePluginSource,installFromSource:window.api.ext.installFromSource}
+ Object.assign(window.api.ext,{preparePluginSource:async(input:unknown)=>{wire.push(input);return {ok:true,prepared}},installFromSource:async(input:unknown)=>{wire.push(input);return {ok:true,packageId:"local:frontend-design",displayName:"frontend-design",source:{kind:"local-folder"},installed:[],notRunning:[]}}})
+ try{
+  await openMenu(q("[data-more='add']"));click(q("[data-menu-item='folder']"))
+  await waitFor(()=>expect(wire).toHaveLength(2))
+  expect(wire).toMatchObject([{kind:"folder"},{source:{kind:"candidate",candidateId:prepared.kind==="package"?prepared.candidateId:""},effect:{kind:"all-projects"},via:"hub"}])
+  expect(q('[role="dialog"]')).toBeNull()
+  expect(q('[data-local-package-preview]')).toBeNull()
+  expect(calls.importSkillFolder).toBe(0)
+ }finally{Object.assign(window.api.ext,previous)}
+})
+
+test("BC2b Git market shows real per-entry source rows and installs only the clicked main ID",async()=>{
+ reset();mount()
+ const {createPluginSources}=await import("../src/main/plugin-sources")
+ const {fixtureFetch}=await import("../test-fixtures/plugin-helper/source-fetch")
+ const sources=createPluginSources({catalog:async()=>[],fetch:fixtureFetch})
+ const prepared=await sources.prepareCapture(await sources.captureGit("https://github.com/anthropics/claude-plugins-official","refs/heads/main"))
+ if(prepared.kind!=="marketplace")throw Error("real fixture is not a marketplace")
+ const selected=prepared.entries.find(entry=>entry.displayName==="context7")!
+ const wire:unknown[]=[]
+ const previous={preparePluginSource:window.api.ext.preparePluginSource,installFromSource:window.api.ext.installFromSource}
+ Object.assign(window.api.ext,{preparePluginSource:async(input:unknown)=>{wire.push(input);return {ok:true,prepared}},installFromSource:async(input:unknown)=>{wire.push(input);return {ok:true,packageId:"claude:context7",displayName:"context7",source:{kind:"marketplace",ecosystem:"claude"},installed:[],notRunning:[]}}})
+ try{
+  await openMenu(q("[data-more='add']"));click(q("[data-menu-item='git']"))
+  const input=q<HTMLInputElement>('[role="dialog"] input')!;input.value="https://github.com/anthropics/claude-plugins-official";input.dispatchEvent(new Event("input",{bubbles:true}))
+  click(qa('[role="dialog"] .a-dialog-footer button')[1]!)
+  await waitFor(()=>expect(qa("[data-source-candidate]")).toHaveLength(prepared.entries.length))
+  expect(wire).toEqual([{kind:"git",url:input.value}])
+  expect(qa('[role="dialog"] button').some(button=>button.textContent?.includes("全部安装"))).toBe(false)
+  expect(q(`[data-source-candidate="${selected.id}"]`)?.textContent).toContain("Claude 插件市场")
+  click(q(`[data-source-candidate="${selected.id}"] button`))
+  await waitFor(()=>expect(wire).toHaveLength(2))
+  expect(wire[1]).toMatchObject({source:{kind:"candidate",candidateId:selected.id},effect:{kind:"all-projects"},via:"hub"})
+ }finally{Object.assign(window.api.ext,previous)}
+})
+
+test("R14 B6 Git import failure uses localised copy rather than main detail", async () => {
+ reset();mount()
+ const previous=window.api.ext.preparePluginSource
+ Object.assign(window.api.ext,{preparePluginSource:async()=>({ok:false,detail:"RAW_MAIN_GIT_FAILURE"})})
+ try{
+  await openMenu(q("[data-more='add']"));click(q("[data-menu-item='git']"))
+  const input=q<HTMLInputElement>('[role="dialog"] input')!;input.value="https://gitlab.com/anthropics/claude-plugins-official";input.dispatchEvent(new Event("input",{bubbles:true}))
+  click(qa('[role="dialog"] .a-dialog-footer button')[1]!)
+  await waitFor(()=>expect(document.body.textContent).toContain("未能读取 Git 插件来源"))
+  expect(document.body.textContent).not.toContain("RAW_MAIN_GIT_FAILURE")
+ }finally{Object.assign(window.api.ext,{preparePluginSource:previous})}
+})
+
+test("R14 B12 a non-search catalog plus installs directly without the unreviewed default-off wall", async () => {
+ reset();mount("connectors")
+ await waitFor(()=>expect(q('[data-entry="mcp:fetch"] button')).toBeInstanceOf(HTMLButtonElement))
+ click(q('[data-entry="mcp:fetch"] button'))
+ await waitFor(()=>{
+  expect(document.body.textContent).not.toContain("未经审核,装好后默认关闭")
+  expect(q('[role="dialog"]')).toBeNull()
+  expect(calls.installPackage).toEqual(["mcp:fetch"])
+ })
+ expect(calls.installCatalog).toEqual([])
+})
+
+
+test("review B7 one search finds own agents and local/created packages across tabs", async () => {
+  reset()
+  await realInstalledPackage(0)
+  const original = installedPackages[0]!
+  installedPackages = [
+    { ...original, packageId: "local:github", origin: "imported", source: { kind: "local-folder" } },
+    { ...original, packageId: "mine:github", origin: "created", source: { kind: "created" } },
+  ]
+  const previous = window.api.ext.sourcesSearch
+  Object.assign(window.api.ext, { sourcesSearch: async (query: string) => ({ searchId: "local-search", query, sources: [], candidates: [] }) })
+  try {
+    mount("skills")
+    const input = q<HTMLInputElement>('input[type="search"]')!
+    const search = (query: string) => { input.value = query; input.dispatchEvent(new Event("input", { bubbles: true })) }
+    search("GitHub")
+    await waitFor(() => expect(qa('[data-installed-package]')).toHaveLength(2))
+    expect(q('[data-installed-package="local:github"]')?.textContent).toContain("本地文件夹")
+    expect(q('[data-installed-package="mine:github"]')?.textContent).toContain("我的插件")
+    expect(document.body.textContent).not.toContain(zh["codepuppy.ext.sourceNoMatches"])
+    search("docs-writer")
+    await waitFor(() => expect(document.body.textContent).toContain("docs-writer"))
+    expect(qa('[data-installed-package]')).toHaveLength(0)
+    expect(document.body.textContent).not.toContain(zh["codepuppy.ext.sourceNoMatches"])
+    search("no-local-result")
+    await Bun.sleep(300) // The production source query is debounced by 250 ms.
+    await waitFor(() => expect(document.body.textContent).toContain(zh["codepuppy.ext.sourceNoMatches"]))
+    expect(document.body.textContent).not.toContain("docs-writer")
+    expect(calls.installPackage).toEqual([])
+  } finally { Object.assign(window.api.ext, { sourcesSearch: previous }) }
 })

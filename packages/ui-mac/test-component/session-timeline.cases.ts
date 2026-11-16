@@ -109,6 +109,7 @@ const bindingData: {
 const bindingSyncCalls: unknown[][] = []
 let bindingSyncImpl: () => Promise<void> = () => Promise.resolve()
 
+let bindingAccountClient: ReturnType<typeof import("../src/engine-adapter/contract/v1").createOpencodeClient> | undefined
 mock.module("@opencode-ai/app", () => ({
   useLayout: () => ({ tabs: () => ({ all: () => [], active: () => undefined }) }),
   useServerSDK: () => () => ({
@@ -118,6 +119,10 @@ mock.module("@opencode-ai/app", () => ({
       event: { on: () => () => {} },
     }),
     client: {
+      mcp: {
+        auth: { authenticate: (args: { name: string }) => bindingAccountClient!.mcp.auth.authenticate(args) },
+        status: () => bindingAccountClient!.mcp.status(),
+      },
       // #652:续钮与 composer 共用同一条发送入口 = v1 session.promptAsync。
       session: {
         promptAsync: (args: unknown) => {
@@ -4873,3 +4878,48 @@ describe("#1649 对话小字", () => {
     })
   }
 })
+
+
+test("BC4 production timeline intent reaches the existing SDK OAuth adapter and opens the system browser with one click",async()=>{
+ const {createEngineFetch}=await import("../src/engine-adapter/index")
+ const {createOpencodeClient}=await import("../src/engine-adapter/contract/v1")
+ const opened:string[]=[]
+ const requests:Request[]=[]
+ let authenticated=false
+ const engine="http://127.0.0.1:47007"
+ const fetch=createEngineFetch({isEngineOrigin:origin=>origin===engine,fetch:async(input,init)=>{
+  const request=new Request(input,init);requests.push(request)
+  const path=new URL(request.url).pathname
+  if(path==="/api/integration")return Response.json({data:[{id:"mcp_docs",name:"docs",metadata:{source:"mcp"}}]})
+  if(path==="/api/integration/mcp_docs")return Response.json({data:{methods:[{type:"oauth",id:"oauth"}]}})
+  if(path==="/api/integration/mcp_docs/connect/oauth")return Response.json({data:{attemptID:"attempt",url:"https://auth.example/authorize",mode:"auto",paste:true}})
+  if(path==="/api/integration/mcp_docs/connect/oauth/attempt"){authenticated=true;return Response.json({data:{status:"complete"}})}
+  if(path==="/api/mcp")return Response.json({data:[{name:"docs",status:{status:authenticated?"connected":"needs_auth"}}]})
+  return new Response("Unexpected engine route",{status:500})
+ }})
+ bindingAccountClient=createOpencodeClient({baseUrl:engine,directory:"/tmp/workspace",fetch})
+ const previous=window.api
+ const pack={packageId:"bc4-main-package",displayName:"Docs",rootComponentName:"docs",version:"recorded",origin:"local-import",source:{kind:"local-folder"},desiredState:"enabled",installedGraphDigest:"digest",components:[]}
+ Object.assign(window,{api:{...previous,openLink:(url:string)=>{opened.push(url)},ext:{hubRequest:async()=>null,installedPackages:async()=>({ok:true,packages:[pack]}),hubView:async()=>({directory:"/tmp/workspace",rows:[],warnings:[]}),packageAuthorization:async()=>({ok:true,packageId:pack.packageId,items:[{kind:"mcp-oauth",componentId:"mcp_docs",prerequisiteId:"oauth",serviceName:"docs",label:"Docs",authenticated,status:authenticated?"connected":"needs_auth"}]}),onHubViewChanged:()=>()=>{}}}})
+ bindingData.message[BINDING_SESSION_ID]=[
+  {id:"bc4_u",sessionID:BINDING_SESSION_ID,role:"user",time:{created:1},agent:"build",model:{providerID:"test",modelID:"test"}},
+  {id:"bc4_a",sessionID:BINDING_SESSION_ID,role:"assistant",parentID:"bc4_u",time:{created:2,completed:3},agent:"build",providerID:"test",modelID:"test",mode:"build",path:{cwd:"/tmp/workspace",root:"/tmp/workspace"},cost:0,tokens:{input:0,output:0,reasoning:0,cache:{read:0,write:0}}},
+ ]
+ bindingData.part.bc4_u=[{id:"bc4_text",sessionID:BINDING_SESSION_ID,messageID:"bc4_u",type:"text",text:"install Docs"}]
+ bindingData.part.bc4_a=[{id:"bc4_tool",sessionID:BINDING_SESSION_ID,messageID:"bc4_a",type:"tool",callID:"bc4_call",tool:"alias_install",display:{identity:{source:"plugin",origin:"@codepuppy/ext",name:"codepuppy_hub_install"},technicalId:"alias_install",authority:{kind:"codepuppy-bundled",bindingId:"verified-bundle",evidenceDigest:"verified-digest"},readable:"codepuppy:hub_install"},state:{status:"completed",input:{id:"main-candidate"},output:"installed",title:"Docs",time:{start:2,end:3},metadata:{packageId:pack.packageId}}}]
+ delete bindingData.session_status[BINDING_SESSION_ID]
+ const host=document.createElement("div");document.body.append(host)
+ disposers.push(solidWeb.render(()=>binding.CodePuppySessionTimeline(),host))
+ try{
+  for(const end=Date.now()+1000;!host.querySelector('[data-package-login-action]');await new Promise(resolve=>setTimeout(resolve,10)))if(Date.now()>end)break
+  const button=host.querySelector<HTMLButtonElement>('[data-package-login-action]')
+  expect(button?.textContent).toBe("登录 docs")
+  button!.click()
+  for(const end=Date.now()+5000;!authenticated;await new Promise(resolve=>setTimeout(resolve,20)))if(Date.now()>end)throw Error("OAuth intent did not reach engine")
+  await new Promise(resolve=>setTimeout(resolve,650))
+  expect(opened).toEqual(["https://auth.example/authorize"])
+  expect(document.querySelector('[role="dialog"]')).toBeNull()
+  expect(requests.filter(request=>new URL(request.url).pathname==="/api/integration/mcp_docs/connect/oauth")).toHaveLength(1)
+  expect(requests.every(request=>new URL(request.url).searchParams.get("location[directory]")==="/tmp/workspace")).toBe(true)
+ }finally{Object.assign(window,{api:previous});bindingAccountClient=undefined}
+},15000)

@@ -163,12 +163,12 @@ describe("codepuppy-sidecar-messages — ext 侧 build/parse(#1531)", () => {
 
   test("main 建的两种应答逐字过 ext 的解析(含 error 臂与 record:null)", () => {
     for (const reply of [buildHubViewReply(1, { view }), buildHubViewReply(2, { error: "boom" })]) expect(parseHubViewReply(reply)).toEqual(reply)
-    const record = { requestId: "req_abcdefgh", catalogId: "mcp:x", stage: "committed" as const, scope: "project" as const }
+    const record = { requestId: "req_abcdefgh", packageId: "claude:x", stage: "committed" as const }
     for (const reply of [
       buildHubRequestReply(3, { record }),
       buildHubRequestReply(4, { record: null }),
       buildHubRequestReply(5, { error: "boom" }),
-      buildHubRequestReply(6, { record: { requestId: "req_abcdefgh", catalogId: "mcp:x", stage: "failed", reason: "no" } }),
+      buildHubRequestReply(6, { record: { requestId: "req_abcdefgh", stage: "failed", outcome: { ok: false, code: "unknown-id", detail: "no" } } }),
     ])
       expect(parseHubRequestReply(reply)).toEqual(reply)
   })
@@ -203,4 +203,38 @@ describe("codepuppy-sidecar-messages — ext 侧 build/parse(#1531)", () => {
     for (const priceNote of [null, 1, {}, []])
       expect(parseHubViewReply({ type: "codepuppy.hub.view.reply", id: 1, view: { ...view, rows: [{ ...view.rows[0], priceNote }] } })).toBeUndefined()
   })
+})
+
+test("A3 source search and install messages round-trip only opaque IDs and reject caller-supplied locations of content", async () => {
+  const contract = await import("./codepuppy-sidecar-messages")
+  const search = contract.buildSourcesSearchRequest({ id: 7, directory: "/work/a", query: "playwright" })
+  expect(contract.parseCodePuppySidecarInbound(search)).toEqual(search)
+  const install = contract.buildHubInstallRequest({ id: 8, requestId: "request_a3", directory: "/work/a", sessionID: "ses_1", agent: "build", ref: { kind: "id", id: "cand_main_issued" }, scope: "all-projects" })
+  expect(contract.parseCodePuppySidecarInbound(install)).toEqual(install)
+  expect(contract.parseCodePuppySidecarInbound({ ...install, ref: { kind: "id", id: "cand_main_issued", url: "https://not-an-issued-definition.example/plugin" } })).toBeUndefined()
+  expect(contract.parseCodePuppySidecarInbound({ ...install, scope: "choose-route" })).toBeUndefined()
+  expect(contract.parseHubInstallReply(contract.buildHubInstallReply(8, { accepted: true }))).toEqual({ type: "codepuppy.hub.install.reply", id: 8, accepted: true })
+})
+
+test("D3 created refs round-trip without a draft content cap, and malformed file shapes are discarded", () => {
+  const message = {
+    type: "codepuppy.hub.install.request", id: 31, requestId: "request_created_transport",
+    directory: "/project", sessionID: "ses_created", agent: "build", scope: "this-project",
+    ref: { kind: "created", draft: { searchId: "search_owned", name: "own-report", description: "Own report", files: [{ path: "skills/report/SKILL.md", text: "x".repeat(131072) }] } },
+  }
+  expect(parseCodePuppySidecarInbound(message)).toEqual(message)
+  expect(parseCodePuppySidecarInbound({ ...message, ref: { ...message.ref, draft: { ...message.ref.draft, files: [{ path: "skills/report/SKILL.md", text: false }] } } })).toBeUndefined()
+})
+
+test("R13 B3 package authorization messages reject malformed inputs and credential-bearing projections", async () => {
+  const messages = await import("./codepuppy-sidecar-messages")
+  const request = messages.buildPackageAuthorizationQuery(1, "claude:github")
+  expect(messages.parseCodePuppySidecarInbound(request)).toEqual(request)
+  for (const bad of [{ ...request, packageId: "" }, { ...request, packageId: {} }, { ...request, secret: "rejected" }])
+    expect(messages.parseCodePuppySidecarInbound(bad)).toBeUndefined()
+  const item = { kind: "mcp-oauth" as const, componentId: "mcp", prerequisiteId: "oauth", serviceName: "Docs", label: "Docs", authenticated: false, status: "needs_auth" }
+  const reply = messages.buildPackageAuthorizationReply(1, { ok: true, packageId: "claude:github", items: [item] })
+  expect(messages.parsePackageAuthorizationReply(reply)).toEqual(reply)
+  for (const bad of [{ ...reply, result: { ok: true, packageId: "claude:github", items: [{ ...item, path: "/private" }] } }, { ...reply, result: { ok: true, packageId: "claude:github", items: [{ ...item, authenticated: "false" }] } }])
+    expect(messages.parsePackageAuthorizationReply(bad)).toBeUndefined()
 })

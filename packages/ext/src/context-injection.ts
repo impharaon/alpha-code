@@ -324,30 +324,31 @@ export const TOOL_TEXT = {
     description: "Health-check tool: returns 'pong' plus the session directory. Proof that the Code Puppy extension is loaded.",
     args: { note: "Optional note echoed back with the pong" },
   },
-  // REQ-234 `#1531`:定制中心三工具(hub-tools.ts)。措辞按「主要通路」,不宣称确认框是唯一安装通路(基线 §4 冻结面)。
   codepuppy_hub_search: {
     readable: "codepuppy:hub_search",
-    description:
-      "Search the Code Puppy Customization Center (skills, agents, commands, connectors, cloud capabilities) as seen from this workspace: " +
-      "what exists, whether it is installed and enabled, its state (not-installed / installed / reload-pending / available) and what authorization it needs. " +
-      "Cloud capabilities include priceNote when the catalog provides pricing information; otherwise the output ends with an explicit missing-price notice. " +
-      "Use it before telling the user a capability is missing. An empty query lists everything.",
-    args: { query: "Keywords or purpose matched against id, name and description; empty string lists all entries" },
+    description: "Find installable capabilities in the Customization Center, Claude and Codex plugin marketplaces, OpenCode npm and the official MCP Registry. Returns each source's actual status and main-issued candidate IDs. Search before installing; distinguish failed sources from no matches.",
+    args: { query: "Capability name or purpose to find" },
   },
   codepuppy_hub_install: {
     readable: "codepuppy:hub_install",
-    description:
-      "Ask the user to install a Customization Center entry (id from codepuppy_hub_search). The app shows its own confirmation box; the user approves there and types any required key there. " +
-      "Never ask for, accept or invent keys or tokens in chat. Returns at once with the outcome; nothing installed takes effect inside the current reply — " +
-      "once codepuppy_hub_status shows available, it can be used from the next message. If the result is pending, check codepuppy_hub_status instead of installing again.",
-    args: { catalogId: "Entry id exactly as returned by codepuppy_hub_search, e.g. mcp:github" },
+    description: "Install an ID returned by codepuppy_hub_search. Saying install authorizes installation: the app installs and turns it on without an installation confirmation. Default: all my projects. Never request tokens in chat or write project configuration. The result reports main's state; pending does not mean the install was cancelled.",
+    args: { id: "Exact catalog or main-issued candidate ID", scope: "all-projects by default; this-project only when explicitly requested" },
+  },
+  codepuppy_hub_create: {
+    readable: "codepuppy:hub_create",
+    description: "Create and install the user's own plugin after a successful query of every applicable source found no matching existing content. Reuse the returned searchId. Explain with the agreed sentence and proceed without another consent question. Main validates the draft and installs the whole package in the Customization Center as My plugin.",
+    args: {
+      searchId: "ID of the completed successful source query",
+      name: "Name of the user's own plugin",
+      description: "The clear task this plugin serves",
+      files: "Plugin-relative UTF-8 text files, including skills/<name>/SKILL.md and their resources",
+      scope: "all-projects by default; this-project only when explicitly requested",
+    },
   },
   codepuppy_hub_status: {
     readable: "codepuppy:hub_status",
-    description:
-      "Check one Customization Center entry in this workspace: installed or not, enabled, its state (installed / reload-pending / available) " +
-      "and, when it is not available yet, why (sessions still busy, last reload failed, not loaded in this directory).",
-    args: { catalogId: "Entry id exactly as returned by codepuppy_hub_search, e.g. mcp:github" },
+    description: "Read the installed package or catalog entry's actual state in this directory. Available is based on engine verification.",
+    args: { id: "Package ID or catalog ID" },
   },
 } as const
 

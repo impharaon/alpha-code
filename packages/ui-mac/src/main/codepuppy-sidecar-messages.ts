@@ -1,23 +1,9 @@
-// REQ-234 `#1529`(基线 docs/design/2026-10-14-req234-hub-agent-install-baseline.md §2.2 / §2.5 / §2.6)——
-// main ⇄ sidecar(parentPort)上 `codepuppy.*` 这一族窄消息的**唯一合同**,两侧共用。
-//
-// 形制与 workspace-write-probe.ts 相同:一份文件、build/parse 成对、parse 一律 fail-closed(形状不对 ⇒ undefined,
-// 由收方丢弃并记一行,不带着半条消息去做事)。本族**穷举**(I6):
-//
-//   ext → main   codepuppy.hub.view.request     { id, directory, sessionID?, agent?, query? }  只读:按目录算视图
-//   ext → main   codepuppy.hub.request.request  { id, requestId }                              只读:某次安装请求的阶段
-//   ext → main   codepuppy.reload.report        { generation, scope, outcome, directories, error? }  记录
-//   ext → main   codepuppy.unattended.ack       { seq, nonce }                                  名单已装上
-//   main → ext   codepuppy.unattended.live      { seq, nonce, sessions }                        完整名单
-//   main → ext   codepuppy.reload.request       { generation, scope, items, reason, force? }   ext 调度器入队
-//   main → ext   codepuppy.hub.view.reply / codepuppy.hub.request.reply                              对 id 的应答
-//
-// 未知 type 两侧都忽略;sidecar.ts 的 parseCommand 对这些 type 返回 undefined,两边不改对方的分支。
-// 安全边界(S12):sidecar 里任何 JS 都能发 ext → main 的三种;main 对它们只做**只读查询与重载请求**,
-// 没有任何一条能安装、启用或写盘。
-//
-// 本文件被 packages/ext 经相对路径 import(与 codepuppy-identity 同一先例),所以**不得**依赖 electron / node:fs。
-// C1 合并后冻结:消息族与载荷、状态词、agentNote、requestId 形状与阶段词(基线 §4 末段)。
+import type { PackageAuthorizationResultV1 } from "../shared/package-admission"
+import { isInstallOutcomeV1, type InstallOutcomeV1, type CreatedPluginDraftV1 } from "../shared/plugin-install"
+import type { SourceSearchResultV1, CandidateV1, SourceStatusV1 } from "./plugin-sources"
+
+// Main ↔ sidecar contract: source lookup, ID-only installation, main-owned progress and reload messages.
+// Shared by ext and ui-mac; no filesystem or Electron dependencies. Build/parse pairs reject malformed payloads.
 
 // ── 状态词(§2.5)────────────────────────────────────────────────────────────────────────────
 
@@ -32,7 +18,15 @@ export type HubStateWord = (typeof HUB_STATE_WORDS)[number]
  *   not-loaded     没有在途重载,但本目录的即时核验没过
  *   cloud-connection / cloud-tools / cloud-policy 云核验未通过的具体步骤,不改变安装状态词
  */
-export const HUB_REASON_CODES = ["disabled", "reload-waiting", "reload-failed", "not-loaded", "cloud-connection", "cloud-tools", "cloud-policy"] as const
+export const HUB_REASON_CODES = [
+  "disabled",
+  "reload-waiting",
+  "reload-failed",
+  "not-loaded",
+  "cloud-connection",
+  "cloud-tools",
+  "cloud-policy",
+] as const
 export type HubReasonCode = (typeof HUB_REASON_CODES)[number]
 export type HubStateReason = { code: HubReasonCode; detail?: string }
 
@@ -65,10 +59,10 @@ export const AGENT_NOTE_UNVERIFIED = "本会话权限未核验"
 
 // ── 安装请求的阶段(§2.3,I9)──────────────────────────────────────────────────────────────────
 
-export const HUB_REQUEST_STAGES = ["confirming", "submitted", "committed", "failed", "declined"] as const
+export const HUB_REQUEST_STAGES = ["submitted", "committed", "failed"] as const
 export type HubRequestStage = (typeof HUB_REQUEST_STAGES)[number]
 
-/** requestId 由 ext 生成(随机),随审批请求的 metadata 走;形状冻结。 */
+/** The tool mints this request ID; main alone advances its installation record. */
 const REQUEST_ID = /^[A-Za-z0-9_-]{8,64}$/
 export function isHubRequestId(value: unknown): value is string {
   return typeof value === "string" && REQUEST_ID.test(value)
@@ -76,12 +70,10 @@ export function isHubRequestId(value: unknown): value is string {
 
 export type HubRequestRecord = {
   requestId: string
-  catalogId: string
   stage: HubRequestStage
-  /** committed 时由 main 安装体写入:落在哪个作用域。 */
-  scope?: "global" | "project"
-  /** failed 的原因。 */
-  reason?: string
+  displayName?: string
+  packageId?: string
+  outcome?: InstallOutcomeV1
 }
 
 // ── 重载(§2.6)────────────────────────────────────────────────────────────────────────────────
@@ -127,8 +119,48 @@ export type HubRequestReplyMessage =
   | { type: "codepuppy.hub.request.reply"; id: number; record: HubRequestRecord | null }
   | { type: "codepuppy.hub.request.reply"; id: number; error: string }
 
-export type CodePuppySidecarInbound = HubViewRequestMessage | HubRequestQueryMessage | ReloadReportMessage | UnattendedAck
-export type CodePuppySidecarOutbound = ReloadRequestMessage | HubViewReplyMessage | HubRequestReplyMessage | UnattendedLive
+export type SourcesSearchRequest = {
+  type: "codepuppy.sources.search.request"
+  id: number
+  directory: string
+  query: string
+}
+export type HubInstallRequest = {
+  type: "codepuppy.hub.install.request"
+  id: number
+  requestId: string
+  directory: string
+  sessionID: string
+  agent: string
+  ref: { kind: "id"; id: string } | { kind: "created"; draft: CreatedPluginDraftV1 }
+  scope: "all-projects" | "this-project"
+}
+export type SourcesSearchReply =
+  | { type: "codepuppy.sources.search.reply"; id: number; result: SourceSearchResultV1 }
+  | { type: "codepuppy.sources.search.reply"; id: number; error: string }
+export type HubInstallReply =
+  | { type: "codepuppy.hub.install.reply"; id: number; accepted: true }
+  | { type: "codepuppy.hub.install.reply"; id: number; error: "invalid" | "unavailable" }
+
+export type PackageAuthorizationQuery = { type: "codepuppy.package.authorization.request"; id: number; packageId: string }
+export type PackageAuthorizationReply = { type: "codepuppy.package.authorization.reply"; id: number; result: PackageAuthorizationResultV1 }
+
+export type CodePuppySidecarInbound =
+  | HubViewRequestMessage
+  | PackageAuthorizationQuery
+  | HubRequestQueryMessage
+  | ReloadReportMessage
+  | UnattendedAck
+  | SourcesSearchRequest
+  | HubInstallRequest
+export type CodePuppySidecarOutbound =
+  | ReloadRequestMessage
+  | PackageAuthorizationReply
+  | HubViewReplyMessage
+  | HubRequestReplyMessage
+  | UnattendedLive
+  | SourcesSearchReply
+  | HubInstallReply
 
 const MAX_TEXT = 4_096
 
@@ -169,6 +201,76 @@ function parseReloadItems(value: unknown): ReloadItem[] | undefined {
 /** main 侧:ext → main 的封闭消息族。别的一律 undefined(含 main → ext 的方向)。 */
 export function parseCodePuppySidecarInbound(value: unknown): CodePuppySidecarInbound | undefined {
   if (!isRecord(value)) return
+  if (value.type === "codepuppy.package.authorization.request")
+    return isId(value.id) && isText(value.packageId) && Object.keys(value).every(key => ["type", "id", "packageId"].includes(key))
+      ? buildPackageAuthorizationQuery(value.id, value.packageId) : undefined
+  if (value.type === "codepuppy.sources.search.request")
+    return isId(value.id) && typeof value.directory === "string" && typeof value.query === "string"
+      ? buildSourcesSearchRequest({ id: value.id, directory: value.directory, query: value.query })
+      : undefined
+  if (value.type === "codepuppy.hub.install.request") {
+    if (
+      !isId(value.id) ||
+      !isHubRequestId(value.requestId) ||
+      !isText(value.directory) ||
+      !isText(value.sessionID) ||
+      !isText(value.agent) ||
+      (value.scope !== "all-projects" && value.scope !== "this-project") ||
+      !isRecord(value.ref)
+    )
+      return
+    const ref = value.ref
+    if (
+      ref.kind === "id" &&
+      Object.keys(ref).every((key) => key === "kind" || key === "id") &&
+      typeof ref.id === "string" &&
+      ref.id
+    )
+      return buildHubInstallRequest({
+        id: value.id,
+        requestId: value.requestId,
+        directory: value.directory,
+        sessionID: value.sessionID,
+        agent: value.agent,
+        ref: { kind: "id", id: ref.id },
+        scope: value.scope,
+      })
+    if (
+      ref.kind === "created" &&
+      Object.keys(ref).every((key) => key === "kind" || key === "draft") &&
+      isRecord(ref.draft) &&
+      typeof ref.draft.searchId === "string" &&
+      typeof ref.draft.name === "string" &&
+      typeof ref.draft.description === "string" &&
+      Array.isArray(ref.draft.files) &&
+      ref.draft.files.every(
+        (file: unknown) =>
+          isRecord(file) &&
+          typeof file.path === "string" &&
+          typeof file.text === "string" &&
+          Object.keys(file).every((key) => key === "path" || key === "text"),
+      )
+    )
+      return buildHubInstallRequest({
+        id: value.id,
+        requestId: value.requestId,
+        directory: value.directory,
+        sessionID: value.sessionID,
+        agent: value.agent,
+        ref: {
+          kind: "created",
+          draft: {
+            searchId: ref.draft.searchId,
+            name: ref.draft.name,
+            description: ref.draft.description,
+            files: ref.draft.files as CreatedPluginDraftV1["files"],
+          },
+        },
+        scope: value.scope,
+      })
+    return
+  }
+
   if (value.type === "codepuppy.unattended.ack") return parseUnattendedAck(value)
   if (value.type === "codepuppy.hub.view.request") {
     if (!isId(value.id) || !isText(value.directory)) return
@@ -298,7 +400,12 @@ export function buildReloadReport(input: {
 
 function parseStateReason(value: unknown): HubStateReason | undefined | null {
   if (value === undefined) return undefined
-  if (!isRecord(value) || typeof value.code !== "string" || !(HUB_REASON_CODES as readonly string[]).includes(value.code)) return null
+  if (
+    !isRecord(value) ||
+    typeof value.code !== "string" ||
+    !(HUB_REASON_CODES as readonly string[]).includes(value.code)
+  )
+    return null
   if (value.detail !== undefined && typeof value.detail !== "string") return null
   return { code: value.code as HubReasonCode, ...(typeof value.detail === "string" ? { detail: value.detail } : {}) }
 }
@@ -336,7 +443,13 @@ export function parseHubViewReply(value: unknown): HubViewReplyMessage | undefin
   if (!isRecord(value) || value.type !== "codepuppy.hub.view.reply" || !isId(value.id)) return
   if (typeof value.error === "string") return { type: "codepuppy.hub.view.reply", id: value.id, error: value.error }
   const view = value.view
-  if (!isRecord(view) || typeof view.directory !== "string" || !Array.isArray(view.rows) || !Array.isArray(view.warnings)) return
+  if (
+    !isRecord(view) ||
+    typeof view.directory !== "string" ||
+    !Array.isArray(view.rows) ||
+    !Array.isArray(view.warnings)
+  )
+    return
   if (!view.warnings.every((warning) => typeof warning === "string")) return
   const rows = view.rows.map(parseHubViewRow)
   if (rows.some((row) => row === undefined)) return
@@ -353,23 +466,20 @@ export function parseHubRequestReply(value: unknown): HubRequestReplyMessage | u
   if (typeof value.error === "string") return { type: "codepuppy.hub.request.reply", id: value.id, error: value.error }
   if (value.record === null) return { type: "codepuppy.hub.request.reply", id: value.id, record: null }
   const record = value.record
-  if (!isRecord(record) || !isHubRequestId(record.requestId) || !isText(record.catalogId, 256)) return
-  if (typeof record.stage !== "string" || !(HUB_REQUEST_STAGES as readonly string[]).includes(record.stage)) return
-  if (record.scope !== undefined && record.scope !== "global" && record.scope !== "project") return
-  if (record.reason !== undefined && typeof record.reason !== "string") return
-  return {
-    type: "codepuppy.hub.request.reply",
-    id: value.id,
-    record: {
-      requestId: record.requestId,
-      catalogId: record.catalogId,
-      stage: record.stage as HubRequestStage,
-      ...(record.scope ? { scope: record.scope } : {}),
-      ...(typeof record.reason === "string" ? { reason: record.reason } : {}),
-    },
-  }
+  if (
+    !isRecord(record) ||
+    !isHubRequestId(record.requestId) ||
+    typeof record.stage !== "string" ||
+    !(HUB_REQUEST_STAGES as readonly string[]).includes(record.stage)
+  )
+    return
+  if (Object.keys(record).some((key) => !["requestId", "stage", "displayName", "packageId", "outcome"].includes(key)))
+    return
+  if (record.displayName !== undefined && typeof record.displayName !== "string") return
+  if (record.packageId !== undefined && typeof record.packageId !== "string") return
+  if (record.outcome !== undefined && !isInstallOutcomeV1(record.outcome)) return
+  return { type: "codepuppy.hub.request.reply", id: value.id, record: record as HubRequestRecord }
 }
-
 
 /** #1699:完整名单只从 main 推给 ext,回程只承认这一版的随机回执。 */
 export type UnattendedLive = {
@@ -413,4 +523,154 @@ export function buildUnattendedAck(seq: number, nonce: string): UnattendedAck {
 export function parseUnattendedAck(value: unknown): UnattendedAck | undefined {
   if (!isRecord(value) || value.type !== "codepuppy.unattended.ack" || !isId(value.seq) || !isText(value.nonce)) return
   return buildUnattendedAck(value.seq, value.nonce)
+}
+
+export function buildSourcesSearchRequest(input: Omit<SourcesSearchRequest, "type">): SourcesSearchRequest {
+  return { type: "codepuppy.sources.search.request", ...input }
+}
+export function buildHubInstallRequest(input: Omit<HubInstallRequest, "type">): HubInstallRequest {
+  return { type: "codepuppy.hub.install.request", ...input }
+}
+export function buildSourcesSearchReply(
+  id: number,
+  result: { result: SourceSearchResultV1 } | { error: string },
+): SourcesSearchReply {
+  return { type: "codepuppy.sources.search.reply", id, ...result }
+}
+export function buildHubInstallReply(
+  id: number,
+  result: { accepted: true } | { error: "invalid" | "unavailable" },
+): HubInstallReply {
+  return { type: "codepuppy.hub.install.reply", id, ...result }
+}
+export function parseHubInstallReply(input: unknown): HubInstallReply | undefined {
+  if (!isRecord(input) || input.type !== "codepuppy.hub.install.reply" || !isId(input.id)) return
+  if (input.accepted === true && input.error === undefined) return buildHubInstallReply(input.id, { accepted: true })
+  if (input.error === "invalid" || input.error === "unavailable")
+    return buildHubInstallReply(input.id, { error: input.error })
+}
+export function parseSourcesSearchReply(input: unknown): SourcesSearchReply | undefined {
+  if (!isRecord(input) || input.type !== "codepuppy.sources.search.reply" || !isId(input.id)) return
+  if (typeof input.error === "string") return buildSourcesSearchReply(input.id, { error: input.error })
+  const result = input.result
+  const source = (value: unknown) =>
+    ["catalog", "claude-marketplace", "codex-marketplace", "opencode-npm", "mcp-registry"].includes(String(value))
+  if (
+    !isRecord(result) ||
+    typeof result.searchId !== "string" ||
+    typeof result.query !== "string" ||
+    !Array.isArray(result.sources) ||
+    !Array.isArray(result.candidates)
+  )
+    return
+  const keys = (input: Record<string, unknown>, allowed: string[]) =>
+    Object.keys(input).every((key) => allowed.includes(key))
+  if (!keys(result, ["searchId", "query", "sources", "candidates"])) return
+  if (
+    !result.sources.every(
+      (item: unknown) =>
+        isRecord(item) &&
+        source(item.source) &&
+        (item.status === "ok"
+          ? keys(item, ["source", "status", "matched", "skipped"]) &&
+            Number.isSafeInteger(item.matched) &&
+            Number(item.matched) >= 0 &&
+            Number.isSafeInteger(item.skipped) &&
+            Number(item.skipped) >= 0
+          : item.status === "failed" &&
+            keys(item, ["source", "status", "reason", "detail"]) &&
+            ["network", "http", "format"].includes(String(item.reason)) &&
+            typeof item.detail === "string"),
+    )
+  )
+    return
+  if (
+    !result.candidates.every((item: unknown) => {
+      if (
+        !isRecord(item) ||
+        typeof item.id !== "string" ||
+        !source(item.source) ||
+        typeof item.name !== "string" ||
+        typeof item.displayName !== "string" ||
+        typeof item.description !== "string" ||
+        (item.kind !== "plugin" && item.kind !== "mcp") ||
+        !isRecord(item.upstream) ||
+        !keys(item, [
+          "id",
+          "source",
+          "name",
+          "displayName",
+          "description",
+          "kind",
+          "sameAs",
+          "installed",
+          "publisher",
+          "upstream",
+        ])
+      )
+        return false
+      if (item.sameAs !== undefined && typeof item.sameAs !== "string") return false
+      if (
+        item.installed !== undefined &&
+        (!isRecord(item.installed) ||
+          !keys(item.installed, ["packageId", "enabled"]) ||
+          typeof item.installed.packageId !== "string" ||
+          typeof item.installed.enabled !== "boolean")
+      )
+        return false
+      if (
+        item.publisher !== undefined &&
+        (!isRecord(item.publisher) ||
+          !(item.publisher.kind === "github"
+            ? keys(item.publisher, ["kind", "account"]) && typeof item.publisher.account === "string"
+            : item.publisher.kind === "domain" &&
+              keys(item.publisher, ["kind", "domain"]) &&
+              typeof item.publisher.domain === "string"))
+      )
+        return false
+      return (
+        keys(item.upstream, ["repository", "commit", "path", "serverName", "version", "npm"]) &&
+        Object.values(item.upstream).every((value) => typeof value === "string")
+      )
+    })
+  )
+    return
+  return buildSourcesSearchReply(input.id, {
+    result: {
+      searchId: result.searchId,
+      query: result.query,
+      sources: result.sources as SourceStatusV1[],
+      candidates: result.candidates as CandidateV1[],
+    },
+  })
+}
+
+export function buildPackageAuthorizationQuery(id: number, packageId: string): PackageAuthorizationQuery {
+  return { type: "codepuppy.package.authorization.request", id, packageId }
+}
+
+export function buildPackageAuthorizationReply(id: number, result: PackageAuthorizationResultV1): PackageAuthorizationReply {
+  return { type: "codepuppy.package.authorization.reply", id, result: result.ok ? {
+    ok: true, packageId: result.packageId, items: result.items.map(item => ({
+      kind: item.kind, componentId: item.componentId, prerequisiteId: item.prerequisiteId, serviceName: item.serviceName, label: item.label,
+      ...(item.kind === "secret" ? { saved: item.saved } : item.kind === "mcp-oauth" ? { authenticated: item.authenticated, status: item.status } : { ready: item.ready }),
+    })) as Extract<PackageAuthorizationResultV1, { ok: true }>["items"],
+  } : { ok: false, reason: result.reason } }
+}
+
+export function parsePackageAuthorizationReply(value: unknown): PackageAuthorizationReply | undefined {
+  if (!isRecord(value) || value.type !== "codepuppy.package.authorization.reply" || !isId(value.id) || Object.keys(value).some(key => !["type", "id", "result"].includes(key))) return
+  const result = value.result
+  if (!isRecord(result)) return
+  if (result.ok === false && typeof result.reason === "string" && Object.keys(result).every(key => ["ok", "reason"].includes(key)))
+    return buildPackageAuthorizationReply(value.id, { ok: false, reason: result.reason })
+  if (result.ok !== true || !isText(result.packageId) || !Array.isArray(result.items) || Object.keys(result).some(key => !["ok", "packageId", "items"].includes(key))) return
+  for (const item of result.items) {
+    if (!isRecord(item) || !["componentId", "prerequisiteId", "serviceName", "label"].every(key => typeof item[key] === "string")) return
+    const fields = item.kind === "secret" && typeof item.saved === "boolean" ? ["saved"]
+      : item.kind === "mcp-oauth" && typeof item.authenticated === "boolean" && typeof item.status === "string" ? ["authenticated", "status"]
+      : item.kind === "connection" && typeof item.ready === "boolean" ? ["ready"] : undefined
+    if (!fields || Object.keys(item).some(key => !["kind", "componentId", "prerequisiteId", "serviceName", "label", ...fields].includes(key))) return
+  }
+  return buildPackageAuthorizationReply(value.id, result as Extract<PackageAuthorizationResultV1, { ok: true }>)
 }

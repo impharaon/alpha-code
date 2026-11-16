@@ -1,6 +1,6 @@
 ---
 name: customize-codepuppy
-description: Customize Code Puppy — find capabilities in the Customization Center, request installation with the user's confirmation, check availability, create project skills/agents/commands/connectors, and explain project plugin trust. Use when the user asks how to customize Code Puppy, add/remove a connector or skill, change agent behavior, tweak commands, or where Code Puppy's config files live.
+description: Customize Code Puppy — find capabilities in the Customization Center, install through the single managed entry, check availability, create project skills/agents/commands, and explain project plugin trust. Use when the user asks how to customize Code Puppy, add/remove a connector or skill, change agent behavior, tweak commands, or where Code Puppy's config files live.
 license: MIT (Code Puppy original)
 ---
 
@@ -16,7 +16,7 @@ tools' conventions; Code Puppy does not read them).
 |---|---|---|
 | Global (all projects) | `$CODEPUPPY_GLOBAL_DIR/codepuppy.jsonc` | connectors (`mcp`), `plugin`, `agent`, `command`, `provider` overrides |
 | Global installs | `$CODEPUPPY_GLOBAL_DIR/{skills,agents,plugins}/` + ledger `$CODEPUPPY_GLOBAL_DIR/installs.json` | things the user installed/created/imported |
-| Per project | `<project>/.codepuppy/codepuppy.jsonc` | project-scoped connectors / agents / commands / skills path |
+| Per project | `<project>/.codepuppy/codepuppy.jsonc` | project agents / commands / skills path |
 | Per project content | `<project>/.codepuppy/skills/<name>/SKILL.md`, `<project>/.codepuppy/plugins/*.js` | project skills and plugins |
 
 Rule of thumb: `.codepuppy` only ever contains what the user chose to add. Factory content ships inside
@@ -24,25 +24,30 @@ the app and never appears in `.codepuppy`.
 
 ## How to make changes
 
-1. **Missing a capability? Search first with `codepuppy_hub_search`.** The Customization Center (定制中心)
-   offers skills, agents, commands, connectors (MCP), bundles, and cloud capabilities. Read its
-   installed/enabled state, required authorization, and any price explanation before proposing an install.
-2. **Explain what to install and why, then call `codepuppy_hub_install`.** Ask the user to approve in the
-   app's confirmation box (软件弹出的确认框). If a key is needed, the user enters it in that box.
-   Never ask for or accept keys in chat; never invent or guess keys for the user.
-   This is the primary managed installation path; do not edit global config to install capabilities.
-3. **Check `codepuppy_hub_status` before use.** For `submitted; result pending` or `reload-pending`, check
-   `codepuppy_hub_status` instead of repeating the installation. Tools return immediately; do not wait inside
-   the current reply for reload. Report installed, reload-pending, and available as distinct states.
-   Tell the user: 显示可用以后,下一条消息就能用;不用重启。
-   Only promise use from the next message after the state is `available`.
+1. **Missing a capability? Search first with `codepuppy_hub_search`.** Pass `{query: "<goal>"}`.
+   The Customization Center (定制中心) offers skills, agents, commands, connectors (MCP), bundles, and cloud capabilities.
+   Search continues through plugin marketplaces and the official MCP source. Prefer a matching catalog entry,
+   then the higher-priority real candidate. A failed source is not evidence that no matching plugin exists.
+2. **Explain what to install and why, then call `codepuppy_hub_install`.** Pass only the returned `id`;
+   the user's request to install authorizes installation and automatic enabling. Do not ask a route question
+   or another installation confirmation. The default is all my projects. Use this same managed entry for
+   existing plugins and connectors; do not write project config or project skill directories to install them.
+   If the user explicitly requests an MCP only in this project, pass `scope:"this-project"` to
+   `codepuppy_hub_install`; the same globally managed package records where it applies.
+   Never ask for or accept keys in chat; never invent or guess keys for the user. Account setup belongs in
+   the installed package's management page. Tokens never pass through tool arguments or results.
+3. **Check `codepuppy_hub_status` before use.** Pass the installed package's `id`.
+   For `submitted; result pending` or `reload-pending`, check
+   `codepuppy_hub_status` instead of repeating the installation. For a loading-pending result, read the
+   actual reason; do not wait inside
+   the current reply for reload. Report installed, applying, available, login/token needed and partial
+   failure as distinct states, including the actual source and reason.
+   Once the MCP tools are available, use them in this conversation without re-entering the project or restarting.
+   Skills can remain pending while sessions are busy; report that state without promising a completion time.
 4. **Creating project-scoped extensions** — use the `codepuppy_register` tool only for project scope:
    - `type=agent|command` with the entry JSON (`{"description":"...","prompt":"..."}` / `{"template":"..."}`)
-   - `type=mcp` with the connector config — executable connectors additionally need the user's
-     per-project consent dialog before they load
    - `type=skill` (no entry) after writing `<project>/.codepuppy/skills/<name>/SKILL.md`
    Changes are validated, written atomically, and scheduled for reload after sessions become idle.
-   Executable connectors stay gated until the user trusts the project; do not promise immediate use.
 5. **Global installs** — use the Customization Center tools above. The desktop process supplies
    `CODEPUPPY_GLOBAL_DIR` as an absolute, canonical current-environment root; never synthesize, replace,
    or redirect it, and never fall back to the retired `$HOME/.alpha` root.
@@ -51,13 +56,10 @@ the app and never appears in `.codepuppy`.
 
 ## Connectors (MCP) and bundles
 
-- **Primary path = Extension Hub (定制中心)**: browse the curated catalog, one-click install with
-  dependency preflight (`uv` / `node` checked before install), API keys collected as masked input
-  and stored as `{file:}` references — **never write a connector API key in plaintext into
-  `codepuppy.jsonc` yourself**; if a connector needs a key, send the user to the Hub install flow.
-- **Project-scoped secondary path** = `codepuppy_register type=mcp` (config goes to
-  `<project>/.codepuppy/codepuppy.jsonc`): executable connectors only load after the user grants the
-  per-project trust dialog — expect that, don't call it a failure.
+- **Managed installation = `codepuppy_hub_search` → `codepuppy_hub_install`**: the same entry installs catalog
+  and marketplace content, enables it, and keeps one package in the Customization Center. Inspect actual
+  availability before using its tools. Login and masked token entry use the installed package's existing
+  management page; **never write a connector API key in plaintext into `codepuppy.jsonc` yourself**.
 - **Runtime note**: catalog connectors run via `uvx`/`npx` pinned versions; first launch downloads
   from PyPI/npm and can be slow or blocked on restricted networks. A just-installed connector may
   show "connecting" for a while — that is honest state, not an error.
@@ -65,7 +67,7 @@ the app and never appears in `.codepuppy`.
   (skills + agents + commands + connectors), each with its own receipt and uninstall. A bundle is not an engine
   plugin (插件 = JS module with hooks; it cannot contain skills/agents).
 - The Hub's install ledger (receipts) is what makes 「已安装」 accurate — installs done by editing
-  config by hand won't show there; prefer the Hub or `codepuppy_register` so state stays visible.
+  config by hand won't show there; install existing content through the Hub tools so state stays visible.
 
 ## Governing built-ins
 

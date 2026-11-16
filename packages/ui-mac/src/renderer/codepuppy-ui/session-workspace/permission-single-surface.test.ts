@@ -457,45 +457,19 @@ describe("审批单一呈现面:watcher × 生产 dock 同场运行时闸门", (
   })
 })
 
-// REQ-234 `#1531`:审批面的第二个消费者 —— metadata.codepuppyHub 的请求(agent 的 codepuppy_hub_install)由 HubInstallWatcher 接手,
-// 弹定制中心自己的安装确认框;通用五栏 Dialog **不**呈现它(同一个请求不弹两个框)。本场景里 main 记不上阶段
-// (hubRequestStage 答 ok:false)⇒ 守望者 fail-closed:不弹任何框,经**同一个** surface client 回 reject;dock 仍只有既定提示增量、
-// 零审批写流量。正向流程(弹框 / 确认 / 失败 / 取消的阶段与回复顺序)在 codepuppy-ui/hub-install-watcher.test.ts。
-describe("审批单一呈现面:agent 的定制中心安装请求(#1531)", () => {
-  test("codepuppyHub 请求:通用五栏框不出现;记不上阶段 ⇒ 不弹框、经 surface client 回 reject;dock 零写流量", async () => {
+// Legacy metadata has no rendering authority; ordinary asks retain the one surface.
+describe("ordinary approvals without chat-install transport", () => {
+  test("a tool ask has one dialog and no install-stage write", async () => {
     const stageCalls: unknown[] = []
     const api = (window as unknown as { api: Record<string, unknown> }).api
-    api.ext = new Proxy(
-      {},
-      {
-        get: (_target, name: string) => {
-          if (name === "hubRequestStage")
-            return (input: unknown) => (stageCalls.push(input), Promise.resolve({ ok: false, reason: "not recorded" }))
-          if (name.startsWith("on")) return () => () => {}
-          return () => neverSettle()
-        },
-      },
-    )
+    api.ext = new Proxy({}, { get: (_target, name: string) => name.startsWith("on") ? () => () => {} : (input: unknown) => { stageCalls.push(input); return neverSettle() } })
     mountHarness()
-    await flush()
-    await flush()
-    const dockHost = document.body.querySelector("[data-harness-dock]")!
-    const hubRequest: PermissionV2Request = {
-      ...request,
-      id: "per_single_surface_hub",
-      action: "codepuppy_hub_install",
-      resources: ["mcp:github"],
-      save: [],
-      metadata: { codepuppyHub: { catalogId: "mcp:github", requestId: "req_singlesurface01" } },
-    } as PermissionV2Request
-    runtime.injectPermissionAsked(hubRequest)
-    await flush()
-    await flush()
-    expect(stageCalls).toEqual([{ requestId: "req_singlesurface01", stage: "confirming", catalogId: "mcp:github" }])
-    expect(document.querySelectorAll("[data-permission-fact]")).toHaveLength(0)
-    expect(document.querySelectorAll("[role='dialog']")).toHaveLength(0)
-    expect(runtime.surfaceReplyCalls.map((call) => [call.requestID, call.command.decision])).toEqual([[hubRequest.id, "reject"]])
-    expect(dockHost.querySelector('[data-codepuppy-composer="session"]')!.hasAttribute("data-approval")).toBeTrue()
+    await flush(); await flush()
+    runtime.injectPermissionAsked({ ...request, id: "per_ordinary_install", action: "codepuppy_hub_install", resources: ["mcp:github"], metadata: { codepuppyHub: { catalogId: "mcp:github", requestId: "req_singlesurface01" } } } as PermissionV2Request)
+    await flush(); await flush()
+    expect(stageCalls).toEqual([])
+    expect(document.querySelectorAll("[role='dialog']")).toHaveLength(1)
+    expect(runtime.surfaceReplyCalls).toHaveLength(0)
     expect([...dockPermissionTraffic()].every((path) => SANCTIONED_DOCK_TRAFFIC.has(path))).toBe(true)
   })
 })

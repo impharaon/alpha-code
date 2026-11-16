@@ -8,6 +8,7 @@
 
 import { readdirSync, readFileSync, statSync } from "node:fs"
 import { join } from "node:path"
+import { decodePackageAllowSet } from "./package-scope"
 
 const GEN_NAME = /^gen-\d{6,}-[a-f0-9]{6,}$/
 const SAFE_KEY = /^skill--[a-zA-Z0-9][a-zA-Z0-9._-]{0,120}$/
@@ -42,21 +43,21 @@ function liveGenerationDir(codepuppyRoot: string, key: string): string | null {
  *  排序:收窄先行;boot reconcile 自愈 backfill),hook 只读该文件。
  *  缺失/不可解析/形状异常 = 无从确证任何 skill 为 enabled → 全部不注入(fail closed):孤儿
  *  generation、损坏账本、升级空窗一律走安全侧;条目须匹配受管 key 形状(SAFE_KEY)。 */
-function enabledSkillKeys(codepuppyRoot: string): Set<string> | null {
+export function readPackageAllowSet(codepuppyRoot: string) {
   let parsed: unknown
   try {
     parsed = JSON.parse(readFileSync(join(codepuppyRoot, "skills-enabled.json"), "utf8"))
   } catch {
-    return null // 缺失/不可解析 → fail closed
+    return undefined
   }
-  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return null
-  const o = parsed as { v?: unknown; keys?: unknown }
-  if (o.v !== 1 || !Array.isArray(o.keys)) return null // 未知版本/形状 → fail closed
-  const out = new Set<string>()
-  for (const k of o.keys) {
-    if (typeof k === "string" && SAFE_KEY.test(k)) out.add(k)
-  }
-  return out
+  return decodePackageAllowSet(parsed)
+}
+
+function enabledSkillKeys(codepuppyRoot: string): Set<string> | null {
+  const allowSet = readPackageAllowSet(codepuppyRoot)
+  if (!allowSet) return null
+  // Directory injection is shared; Location filtering belongs to the post-activation tail/evaluate consumers.
+  return new Set([...allowSet.keys, ...allowSet.scoped.filter((entry) => entry.kind === "skill").map((entry) => `skill--${entry.name}`)].filter((key) => SAFE_KEY.test(key)))
 }
 
 /** 枚举 `<codepuppyRoot>/ext-store/skill--*` 的 live generation 目录(升序,稳定;#395 过账本 enabled 门)。 */

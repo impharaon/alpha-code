@@ -353,7 +353,7 @@ function givenEnabledGeneration() {
   const dir = path.join(codepuppyRoot, "ext-store", "skill--throat", "generations", generation)
   fs.mkdirSync(dir, { recursive: true })
   fs.writeFileSync(path.join(codepuppyRoot, "ext-store", "skill--throat", "current.json"), JSON.stringify({ generation }))
-  fs.writeFileSync(path.join(codepuppyRoot, "skills-enabled.json"), JSON.stringify({ v: 1, keys: ["skill--throat"] }))
+  fs.writeFileSync(path.join(codepuppyRoot, "skills-enabled.json"), JSON.stringify({ v: 2, keys: ["skill--throat"], scoped: [] }))
   return dir
 }
 

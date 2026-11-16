@@ -63,6 +63,8 @@ export interface TimelineEditUserMessageIntent {
 }
 
 export interface TimelineIntents {
+  /** Package OAuth reuses the current directory SDK; no credential enters the tool or chat. */
+  authenticateMcp?: (name: string) => Promise<{ ok: true } | { ok: false; reason: string }>
   focusArtifact?: (intent: TimelineFocusArtifactIntent) => void
   openSession?: (sessionID: string) => void
   openFile?: (intent: TimelineOpenFileIntent) => void

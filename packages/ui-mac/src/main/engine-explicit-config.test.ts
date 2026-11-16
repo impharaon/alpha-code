@@ -146,7 +146,7 @@ describe("运行中:输入一变就重写显式文件", () => {
       expect(await waitFor(() => read()[0] === "/gen/two")).toBe(true)
 
       skills = ["/gen/two", "/gen/new-key"]
-      atomic(path.join(root, "skills-enabled.json"), JSON.stringify({ v: 1, keys: ["skill--a", "skill--b"] }))
+      atomic(path.join(root, "skills-enabled.json"), JSON.stringify({ v: 2, keys: ["skill--a", "skill--b"], scoped: [] }))
       expect(await waitFor(() => read().includes("/gen/new-key"))).toBe(true)
 
       skills = ["/gen/should-not-appear"]

@@ -1,3 +1,6 @@
+import type { PackageAuthorizationResultV1 } from "../shared/package-admission"
+import type { InstallOutcomeV1 } from "../shared/plugin-install"
+import type { SourceSearchResultV1 } from "./plugin-sources"
 import { unattendedRuns } from "./codepuppy-unattended"
 // REQ-234 `#1529`(基线 §2.2 / §2.5,不变量 I4)—— 「已安装 / 待重载 / 可用」的**唯一权威**。
 //
@@ -34,18 +37,23 @@ import type { EngineConnection } from "./engine-authorization"
 import type { CatalogEntry } from "../renderer/extensions/catalog-types"
 import { installableCatalogEntries, installableCatalogPackages } from "../renderer/extensions/catalog-installable-view"
 import type { CatalogPackageViewV1 } from "../shared/catalog-package-view"
-import { readPackageGraphs } from "./ext-receipt-v2"
+import { readPackageLedgerStateV1 } from "./ext-receipt-v2"
+import { packageAppliesAt } from "./package-mcp-activation"
+import { LEGACY_PROTECTED_OWNER, standaloneOwner, type PackageGraphV1 } from "./ext-package-ledger-v3"
 import {
+  buildPackageAuthorizationReply,
   AGENT_NOTE_DENIED,
   AGENT_NOTE_UNVERIFIED,
   buildHubRequestReply,
+  buildSourcesSearchReply,
+  buildHubInstallReply,
+  type HubInstallRequest,
   buildHubViewReply,
   isCodePuppySidecarMessage,
   isHubRequestId,
   parseCodePuppySidecarInbound,
   type CodePuppySidecarOutbound,
   type HubRequestRecord,
-  type HubRequestStage,
   type HubStateReason,
   type HubView,
   type HubViewRow,
@@ -173,29 +181,26 @@ export function skillActionFor(name: string, agentRules: readonly Rule[], sessio
   return rule?.effect ?? "ask"
 }
 
-function packageRowsFor(views: CatalogPackageViewV1[], rows: HubViewRow[], globalRoot: string, warnings: string[]): HubViewRow[] {
-  if (views.length === 0) return []
-  const graphsRead = readPackageGraphs(globalRoot)
-  if (!graphsRead.ok) warnings.push(`package ledger unreadable: ${graphsRead.reason}`)
-  const graphs = graphsRead.ok ? graphsRead.packageGraphs : []
-  return views.map((view): HubViewRow => {
-    const ids = view.prerequisites.items.map((item) => item.prerequisiteId)
-    const base = {
-      id: view.catalogId,
-      name: view.catalogId,
-      kind: "package",
-      displayName: view.presentation.displayName,
-      description: view.presentation.description,
-      authorization: ids.length > 0 ? `secret:${[...ids].sort().join(",")}` : "none",
-      ...(view.cloud ? { priceNote: priceNoteFor(view) } : {}),
-    }
-    const graph = graphs.find((item) => item.packageId === view.catalogId)
+function packageRowsFor(views: CatalogPackageViewV1[], rows: HubViewRow[], graphs: PackageGraphV1[], directory: string): HubViewRow[] {
+  const definitions = views.map((view) => ({
+    id: view.catalogId, name: view.catalogId, kind: "package", displayName: view.presentation.displayName, description: view.presentation.description,
+    authorization: view.prerequisites.items.length ? "secret:" + view.prerequisites.items.map((item) => item.prerequisiteId).sort().join(",") : "none",
+    ...(view.cloud ? { priceNote: priceNoteFor(view) } : {}),
+  }))
+  for (const graph of graphs.filter((graph) => !views.some((view) => view.catalogId === graph.packageId))) definitions.push({
+    id: graph.packageId, name: graph.packageId, kind: "package", displayName: graph.displayName ?? graph.root.name, description: "",
+    authorization: graph.declarations?.some((entry) => entry.secretNeeds.length) ? "secret:" + graph.declarations.flatMap((entry) => entry.secretNeeds.map((need) => need.needId)).join(",") : "none",
+  })
+  return definitions.map((base): HubViewRow => {
+    const graph = graphs.find((item) => item.packageId === base.id)
     if (!graph) return { ...base, scope: null, installed: false, enabled: false, state: "not-installed" }
     const components = [graph.root, ...graph.children].map((node) => ({
       node,
       row: rows.find((row) => row.scope === "global" && row.kind === node.kind && row.name === node.name),
     }))
     const enabled = components.every((component) => component.row?.enabled === true)
+    if (!packageAppliesAt(graph, directory))
+      return { ...base, scope: "global", installed: true, enabled, state: "installed", stateReason: { code: "not-loaded", detail: "This package applies to another project" } }
     const blocking = components.find((component) => component.row?.state !== "available")
     if (!blocking) return { ...base, scope: "global", installed: true, enabled, state: "available" }
     const label = `${blocking.node.kind} ${blocking.node.name}`
@@ -354,6 +359,9 @@ export function createHubViewService(deps: HubViewDeps): HubViewService {
     const entries = catalog?.entries ?? []
     const byId = new Map(entries.map((entry) => [entry.id, entry] as const))
     const installable = new Set(installableCatalogEntries(entries, deps.advisoryBlocked()).map((entry) => entry.id))
+    const state = readPackageLedgerStateV1(deps.globalRoot(), { sideEffectFree: true })
+    if (!state.ok) warnings.push(`package ledger unreadable: ${state.reason}`)
+    const graphs = state.ok ? state.packageGraphs : []
     const reads = engineReads(directory)
     const pending = deps.pendingFor(directory)
 
@@ -381,6 +389,10 @@ export function createHubViewService(deps: HubViewDeps): HubViewService {
             return { ...base, installed: true, enabled: row.activation !== "disabled", state: "reload-pending", stateReason: connectorPending }
           if (row.activation === "disabled")
             return { ...base, installed: true, enabled: false, state: "installed", stateReason: { code: "disabled" } }
+          const owners = graphs.filter((graph) => [graph.root, ...graph.children].some((node) => node.kind === row.kind && node.name === row.name))
+          const independent = state.ok && state.claims.some((claim) => claim.kind === row.kind && claim.name === row.name && claim.owners.some((owner) => owner === LEGACY_PROTECTED_OWNER || owner === standaloneOwner(row.kind, row.name)))
+          if (!independent && owners.length && owners.every((graph) => !packageAppliesAt(graph, directory)))
+            return { ...base, installed: true, enabled: true, state: "installed", stateReason: { code: "not-loaded", detail: "This package applies to another project" } }
           const verdict = await verify(row, directory, project, reads)
           if (verdict.ok) return { ...base, installed: true, enabled: true, state: "available" }
           // 云条目没有重载环节(基线 §2.5 云行):最高 installed,原因说清缺的是连接还是工具。重载修不好的(要授权 / 没有
@@ -397,8 +409,8 @@ export function createHubViewService(deps: HubViewDeps): HubViewService {
     const packageRows = packageRowsFor(
       installableCatalogPackages(catalog?.packages ?? [], entries, deps.advisoryBlocked()),
       rows,
-      deps.globalRoot(),
-      warnings,
+      graphs,
+      directory,
     )
     return { view: { directory, rows: [...rows, ...packageRows], warnings }, reads }
   }
@@ -442,86 +454,42 @@ export function createHubViewService(deps: HubViewDeps): HubViewService {
 
 // ── 安装请求的阶段簿记(§2.3,I9 的 main 半边)───────────────────────────────────────────────────
 //
-// requestId 由 ext 生成、随审批请求的 metadata 走;renderer 守望者**先**经 IPC `ext-hub-request-stage` 记阶段**再**回复
-// 审批;`committed` 只由 main 安装体在提交成功后写(带 (id, scope)),renderer 写不了。阶段只前进不后退:
-//   (无) → confirming → submitted → committed | failed
-//               └──────→ declined | failed
-// 终态(committed / failed / declined)之后的任何记录一律拒 —— 于是 submitted / committed 之后那条 300 s 期限的
-// reject 回执**不可能**被记成「用户拒绝」。只存 main 内存(sidecar 一代之内有效;main 重启即失 ⇒ 查不到 = 无法判断)。
+// Main admits submitted records, completes them from the install entry, and publishes read-only changes.
+// Sidecar shutdown or a tool abort does not cancel an admitted installation.
 
-const STAGE_FROM: Record<HubRequestStage, readonly (HubRequestStage | "none")[]> = {
-  confirming: ["none"],
-  submitted: ["confirming"],
-  declined: ["confirming"],
-  failed: ["confirming", "submitted"],
-  committed: ["confirming", "submitted"],
-}
-const RENDERER_STAGES: ReadonlySet<string> = new Set<HubRequestStage>(["confirming", "submitted", "declined", "failed"])
 const MAX_REQUESTS = 256
-
 export type HubRequestStages = {
-  /** renderer 守望者记阶段(committed 不在其列)。 */
-  record(input: unknown): { ok: true } | { ok: false; reason: string }
-  /** main 安装体:带 hubRequestId 的一次安装落定(授权暂停不算落定,不在此调用)。 */
-  settleInstall(requestId: string, outcome: { ok: true; catalogId: string; scope: "global" | "project" } | { ok: false; reason: string }): void
+  submit(requestId: string, identity: string, displayName?: string): "created" | "existing" | "conflict"
+  settleInstall(requestId: string, outcome: InstallOutcomeV1): void
   get(requestId: string): HubRequestRecord | null
 }
-
-export function createHubRequestStages(deps: { log: (line: string) => void }): HubRequestStages {
+export function createHubRequestStages(deps: { log: (line: string) => void; onChange?: () => void }): HubRequestStages {
   const records = new Map<string, HubRequestRecord>()
-  const advance = (requestId: string, next: HubRequestRecord): { ok: true } | { ok: false; reason: string } => {
-    const current = records.get(requestId)
-    if (!STAGE_FROM[next.stage].includes(current?.stage ?? "none"))
-      return { ok: false, reason: `hub request ${requestId}: ${current?.stage ?? "no record"} → ${next.stage} refused` }
-    if (current && current.catalogId !== next.catalogId)
-      return { ok: false, reason: `hub request ${requestId}: catalog id changed` }
-    records.delete(requestId)
-    records.set(requestId, next)
-    while (records.size > MAX_REQUESTS) records.delete(records.keys().next().value!)
-    return { ok: true }
-  }
+  const identities = new Map<string, string>()
   return {
-    record(input) {
-      if (!isRecord(input)) return { ok: false, reason: "stage record: must be an object" }
-      const { requestId, stage, catalogId, reason } = input
-      if (!isHubRequestId(requestId)) return { ok: false, reason: "stage record: requestId malformed" }
-      if (typeof stage !== "string" || !RENDERER_STAGES.has(stage)) return { ok: false, reason: "stage record: stage not recordable here" }
-      const known = records.get(requestId)
-      const id = stage === "confirming" ? catalogId : (catalogId ?? known?.catalogId)
-      if (typeof id !== "string" || id.length === 0 || id.length > 200) return { ok: false, reason: "stage record: catalogId required" }
-      if (reason !== undefined && (typeof reason !== "string" || reason.length > 1_000))
-        return { ok: false, reason: "stage record: reason malformed" }
-      const result = advance(requestId, {
-        requestId,
-        catalogId: id,
-        stage: stage as HubRequestStage,
-        ...(stage === "failed" && typeof reason === "string" && reason ? { reason } : {}),
-      })
-      if (!result.ok) deps.log(result.reason)
-      return result
+    submit(requestId, identity, displayName) {
+      if (!isHubRequestId(requestId)) return "conflict"
+      if (records.has(requestId)) return identities.get(requestId) === identity ? "existing" : "conflict"
+      records.set(requestId, { requestId, stage: "submitted", ...(displayName ? { displayName } : {}) })
+      identities.set(requestId, identity)
+      while (records.size > MAX_REQUESTS) { const oldest = records.keys().next().value!; records.delete(oldest); identities.delete(oldest) }
+      deps.onChange?.()
+      return "created"
     },
     settleInstall(requestId, outcome) {
       const known = records.get(requestId)
-      if (!known) {
-        deps.log(`hub request ${requestId}: install settled without a recorded confirmation — not recorded`)
-        return
-      }
-      const result = outcome.ok
-        ? advance(requestId, { requestId, catalogId: outcome.catalogId, stage: "committed", scope: outcome.scope })
-        : advance(requestId, { requestId, catalogId: known.catalogId, stage: "failed", reason: outcome.reason.slice(0, 1_000) })
-      if (!result.ok) deps.log(result.reason)
+      if (!known || known.stage !== "submitted") return
+      records.set(requestId, { requestId, stage: outcome.ok ? "committed" : "failed", ...(known.displayName ? { displayName: known.displayName } : {}), outcome, ...(outcome.ok ? { packageId: outcome.packageId, displayName: outcome.displayName } : {}) })
+      deps.onChange?.()
     },
-    get(requestId) {
-      const record = records.get(requestId)
-      return record ? { ...record } : null
-    },
+    get(requestId) { const record = records.get(requestId); return record ? structuredClone(record) : null },
   }
 }
 
 // ── parentPort 上 `codepuppy.*` 的 main 侧分发(I6)──────────────────────────────────────────────────
 //
-// server.ts 在 `child.on("message")` 旁挂这一个入口(与 writeProbes.receive 并列)。只做三件事:只读视图、只读阶段、
-// 记录重载报告。是本族但形状不对 ⇒ 丢弃 + 记一行;不是本族 ⇒ 返回 false,原样交还给别的接收者。
+// server.ts 在 `child.on("message")` 旁挂这一个入口(与 writeProbes.receive 并列):来源查询、受理安装、
+// 只读视图/阶段及重载报告。是本族但形状不对 ⇒ 丢弃 + 记一行;不是本族 ⇒ 返回 false,交还给别的接收者。
 // 回复发不出去(sidecar 已退出)⇒ 记一行,不抛:ext 侧的请求簿记会按超时 / 子进程退出答「无法判断」。
 
 export type CodePuppySidecarHost = {
@@ -533,6 +501,10 @@ export type CodePuppySidecarHost = {
 export function createCodePuppySidecarHost(deps: {
   view: HubViewService
   requests: HubRequestStages
+  installName(ref: HubInstallRequest["ref"]): string | undefined
+  packageAuthorization(packageId: string): Promise<PackageAuthorizationResultV1>
+  searchSources(query: string): Promise<SourceSearchResultV1>
+  install(request: HubInstallRequest): Promise<InstallOutcomeV1>
   reloads: ReloadCoordinator
   log: (line: string) => void
 }): CodePuppySidecarHost {
@@ -549,6 +521,22 @@ export function createCodePuppySidecarHost(deps: {
       const inbound = parseCodePuppySidecarInbound(message)
       if (!inbound) {
         deps.log(`alpha sidecar: dropped malformed or unknown message type=${String((message as { type: unknown }).type).slice(0, 80)}`)
+        return true
+      }
+      if (inbound.type === "codepuppy.package.authorization.request") {
+        deps.packageAuthorization(inbound.packageId).then(result => reply(post, buildPackageAuthorizationReply(inbound.id, result)), () => reply(post, buildPackageAuthorizationReply(inbound.id, { ok: false, reason: "Package authorization is unavailable" })))
+        return true
+      }
+      if (inbound.type === "codepuppy.sources.search.request") {
+        deps.searchSources(inbound.query).then((result) => reply(post, buildSourcesSearchReply(inbound.id, { result })), () => reply(post, buildSourcesSearchReply(inbound.id, { error: "unavailable" })))
+        return true
+      }
+      if (inbound.type === "codepuppy.hub.install.request") {
+        const { id, ...identity } = inbound
+        const admitted = deps.requests.submit(inbound.requestId, JSON.stringify(identity), deps.installName(inbound.ref))
+        if (admitted === "conflict") { reply(post, buildHubInstallReply(inbound.id, { error: "invalid" })); return true }
+        reply(post, buildHubInstallReply(inbound.id, { accepted: true }))
+        if (admitted === "created") deps.install(inbound).then((outcome) => deps.requests.settleInstall(inbound.requestId, outcome), () => deps.requests.settleInstall(inbound.requestId, { ok: false, code: "transaction-failed", detail: "Installation could not finish" }))
         return true
       }
       if (inbound.type === "codepuppy.hub.view.request") {

@@ -621,8 +621,8 @@ export function collectImportSkillPayload(
   return { ok: true, name: fm.name, files }
 }
 
-/** #390:git 技能仓浅克隆到临时目录并定位 SKILL.md 源目录(网络/SSRF 隔离与 importSkillGit 同源)。
- *  返回本地源目录 + 清理句柄,供 planner 走 CAS 事务导入;调用方 finally 必须 cleanup()。 */
+/** Shallow-clone the whole repository under the existing forge/redirect policy.
+ *  The shared converter discovers its components; callers must cleanup() after capturing the bytes. */
 export async function cloneSkillGitToTmp(
   url: string,
 ): Promise<{ ok: true; srcDir: string; cleanup: () => void } | { ok: false; reason: string }> {
@@ -652,20 +652,7 @@ export async function cloneSkillGitToTmp(
         (err, _stdout, stderr) => (err ? reject(new Error(oneLine(String(stderr || err.message)).slice(0, 200))) : resolve()),
       )
     })
-    let src = tmp
-    if (!fs.existsSync(path.join(src, "SKILL.md"))) {
-      const dirs = fs
-        .readdirSync(tmp, { withFileTypes: true })
-        .filter((e) => e.isDirectory() && e.name !== ".git")
-        .map((e) => e.name)
-      const candidate = dirs.length === 1 ? path.join(tmp, dirs[0]) : null
-      if (!candidate || !fs.existsSync(path.join(candidate, "SKILL.md"))) {
-        cleanup()
-        return { ok: false, reason: "仓库内未找到 SKILL.md(根目录或唯一子目录)" }
-      }
-      src = candidate
-    }
-    return { ok: true, srcDir: src, cleanup }
+    return { ok: true, srcDir: tmp, cleanup }
   } catch (error) {
     cleanup()
     return { ok: false, reason: error instanceof Error ? error.message : "克隆失败" }

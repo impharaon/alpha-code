@@ -1,3 +1,5 @@
+import type { PackageEffectV1 } from "../shared/plugin-install"
+import { createPackageDeclarationResolver } from "./package-declarations"
 import { isOfficialConnector } from "./official-connector-recipes"
 import { collectOldOfficialConnectorVersions, officialConnectorPaths, projectOfficialConnector, releaseOfficialConnectorResources, restoreCommittedOfficialConnectors } from "./official-connector-resources"
 import { createHash } from "node:crypto"
@@ -10,7 +12,7 @@ import { evaluateBundleAuthorization, evaluateCapabilityDiff, isSafeCapability, 
 import { recoveryReceiptInputs } from "./ext-agent-install"
 import { nextDesiredState } from "./ext-install-policy"
 import { promotePayloadToCas, setPackageStateV1, type PlannerDeps } from "./ext-install-planner"
-import { persistMcp, readMcpLeafStrict, withConfigWriteLock } from "./ext-config"
+import { persistMcp, readMcpLeafStrict, releasePreparedMcpSecretVersion, withConfigWriteLock } from "./ext-config"
 import { canonicalJson, sha256Hex } from "./ext-manifest-v2"
 import { buildAgentTxItems, buildCloudTxItems, buildCommandTxItems, buildDepartingChildConfigItemsV1, buildMcpTxItems, buildSkillTxItems } from "./ext-package-tx-builders"
 import { computeGrantDigest, readPackageLedgerStateV1, type UpsertInput } from "./ext-receipt-v2"
@@ -420,13 +422,13 @@ export function createPackageAdmissionCoordinator(deps: PackageAdmissionDeps) {
 /** Desktop '+' commits content first. Runtime activation and account authorization are separate. */
 export async function installDesktopPackageV1(
   catalogId: unknown,
-  deps: PackageAdmissionDeps & Pick<PlannerDeps, "advisoryGate" | "resolvePackage">,
+  deps: PackageAdmissionDeps & Pick<PlannerDeps, "advisoryGate" | "resolvePackage"> & { effect?: PackageEffectV1 },
 ): Promise<PackageAdmissionOutcome> {
   if (typeof catalogId !== "string") return { ok: false, reason: "invalid package identity" }
   const resolved = await resolvePreparedPackage(catalogId, deps)
   if (!resolved.ok) return resolved
   const prepared = resolved.prepared
-  const lifecycle = resolvePackageLifecyclePlan(deps.root(), prepared)
+  const lifecycle = resolvePackageLifecyclePlan(deps.root(), prepared, deps.effect)
   if (!lifecycle.ok) return lifecycle
   if (lifecycle.plan.conflicts.length) return { ok: false, reason: conflictReason(lifecycle.plan.conflicts) }
   const connection = resolveConnectionBinding(prepared, deps, false)
@@ -452,19 +454,34 @@ async function resolveInstalledPackage(packageId: unknown, deps: PackageAdmissio
   const graph = state.packageGraphs.find((entry) => entry.packageId === packageId)
   if (!graph) return { ok: false as const, reason: "package is not installed" }
   const record = state.records.find((entry) => entry.kind === graph.root.kind && entry.name === graph.root.name)!
-  if (record.origin !== "catalog") return { ok: true as const, facts: undefined, graph, records: state.records }
-  const resolved = await resolveAcceptedPackage(packageId, deps, record.version)
+  const loaded = record.origin === "catalog" ? await deps.loadVerifiedCatalog() : undefined
+  const declaration = createPackageDeclarationResolver({ root: deps.root, catalog: () => loaded && loaded.source !== "none" ? loaded.catalog : undefined })(packageId)
+  if (!declaration.ok) return { ok: false as const, reason: declaration.reason }
+  if (declaration.origin === "installed") return { ok: true as const, facts: undefined, declarations: declaration.declarations, graph, records: state.records }
+  const resolved = await resolveAcceptedPackage(packageId, { ...deps, loadVerifiedCatalog: async () => loaded! }, record.version)
   if (!resolved.ok) return resolved
   if (`sha256:${sha256Hex(canonicalJson(resolved.facts.envelope))}` !== graph.envelopeDigest)
     return { ok: false as const, reason: "installed package does not match its signed declaration" }
-  return { ok: true as const, facts: resolved.facts, graph, records: state.records }
+  return { ok: true as const, facts: resolved.facts, declarations: [], graph, records: state.records }
 }
 
 export async function readPackageAuthorizationV1(packageId: unknown, deps: PackageAdmissionDeps): Promise<PackageAuthorizationResultV1> {
   const resolved = await resolveInstalledPackage(packageId, deps)
   if (!resolved.ok) return { ok: false, reason: resolved.reason }
-  if (!resolved.facts) return { ok: true, packageId: resolved.graph.packageId, items: [] }
   const items: PackageAuthorizationItemV1[] = []
+  if (!resolved.facts) {
+    for (const entry of resolved.declarations) {
+      const leaf = entry.kind === "mcp" ? readMcpLeafStrict(entry.hostName) : undefined
+      if (leaf && !leaf.ok) return { ok: false, reason: "package connector configuration is unreadable" }
+      const files = leaf?.ok ? collectMcpFileRefPaths(leaf.value) : []
+      for (const need of entry.secretNeeds) items.push({ kind: "secret", componentId: entry.componentId, prerequisiteId: need.needId, serviceName: entry.hostName, label: need.label, saved: files.some(file => basename(file) === need.needId && existsSync(file)) })
+      if (entry.login) {
+        const current = await deps.mcpOauthEngine?.read?.(entry.hostName)
+        items.push({ kind: "mcp-oauth", componentId: entry.componentId, prerequisiteId: entry.componentId + "#oauth", serviceName: entry.hostName, label: entry.sourceName, authenticated: current?.ok === true && current.authenticated, status: current?.ok ? current.status : "unavailable" })
+      }
+    }
+    return { ok: true, packageId: resolved.graph.packageId, items }
+  }
   for (const component of resolved.facts.components) {
     const name = component.component.id.slice(component.component.id.indexOf(":") + 1)
     if (component.prerequisite.items.length) {
@@ -507,14 +524,24 @@ export async function savePackageSecretsV1(input: unknown, deps: PackageAdmissio
   if (!secrets || Object.values(secrets).some((value) => !value.length)) return { ok: false, reason: "invalid package credentials" }
   const resolved = await resolveInstalledPackage(raw.packageId, deps)
   if (!resolved.ok) return { ok: false, reason: resolved.reason }
-  if (!resolved.facts) return { ok: false, reason: "package declares no connector credentials" }
-  const declared = resolved.facts.components.flatMap((component) => component.prerequisite.items.map((item) => item.prerequisiteId))
+  const components = resolved.facts
+    ? resolved.facts.components.map(component => ({
+        componentId: component.component.id,
+        needs: component.prerequisite.items.map(item => item.prerequisiteId),
+        definition: { payload: component.payload, prerequisite: component.prerequisite, capabilities: packageAuthorizationCapabilitiesV1(component.component) },
+      }))
+    : resolved.declarations.flatMap(entry => entry.kind === "mcp" && entry.mcp ? [{
+        componentId: entry.componentId, needs: entry.secretNeeds.map(need => need.needId),
+        definition: { leaf: entry.mcp, secretNeeds: entry.secretNeeds, capabilities: [] },
+      }] : [])
+  const declared = components.flatMap(component => component.needs)
   if (Object.keys(secrets).some((key) => !declared.includes(key))) return { ok: false, reason: "undeclared package credential" }
   const builds: PackageTxBuildV1[] = []
   const superseded: TxPreparedResourceV1[] = []
-  for (const component of resolved.facts.components) {
-    if (!component.prerequisite.items.some((item) => secrets[item.prerequisiteId] !== undefined)) continue
-    const record = resolved.records.find((entry) => entry.id === component.component.id)!
+  for (const component of components) {
+    if (!component.needs.some(id => secrets[id] !== undefined)) continue
+    const record = resolved.records.find(entry => entry.id === component.componentId)
+    if (!record) return { ok: false, reason: "package credential component is not installed" }
     const leaf = readMcpLeafStrict(record.name)
     if (!leaf.ok) return { ok: false, reason: "package credential configuration could not be read" }
     for (const file of collectMcpFileRefPaths(leaf.value)) {
@@ -523,12 +550,19 @@ export async function savePackageSecretsV1(input: unknown, deps: PackageAdmissio
         superseded.push({ kind: "mcp-secret-version", store: isOfficialConnector(record.name) ? "official-connectors" : "codepuppy-mcp-secrets", server: record.name, version })
     }
     const built = buildMcpTxItems({
+      effect: resolved.graph.effect,
       root: deps.root(), key: packageChildTxKeyV1("mcp", record.name), name: record.name,
-      capabilities: packageAuthorizationCapabilitiesV1(component.component), manifestDigest: record.manifestDigest!, receipt: { ...record },
-      userDataPath: deps.userDataPath, payload: component.payload, prerequisite: component.prerequisite,
+      ...component.definition, manifestDigest: record.manifestDigest!, receipt: { ...record },
+      userDataPath: deps.userDataPath,
       secretValues: secrets, newSecretVersionId: deps.secretVersionId ?? newMcpSecretVersionId,
     })
     if (!built.ok) return { ok: false, reason: "package credential configuration could not be prepared" }
+    // Saving an account does not turn on a disabled global projection (including a project-only
+    // package). Its logical desiredState remains owned by the existing package state action.
+    if (resolved.graph.effect) {
+      const edit = built.build.items[0]!.config!.edits[0]!
+      edit.value = { ...(edit.value as Record<string, unknown>), enabled: false }
+    }
     builds.push(built.build)
   }
   if (!builds.length) return { ok: true }
@@ -568,7 +602,16 @@ export async function savePackageSecretsV1(input: unknown, deps: PackageAdmissio
       projectOfficialConnector(build.receipt.name, build.items[0]!.config!.edits[0]!.value as Record<string, unknown>)
     if (resources.some((resource) => resource.descriptor.store === "official-connectors")) restoreCommittedOfficialConnectors()
     const cleaned = withConfigWriteLock(() => {
-      releaseOfficialConnectorResources(deps.userDataPath, superseded)
+      for (const resource of superseded) {
+        if (resource.store === "official-connectors") {
+          releaseOfficialConnectorResources(deps.userDataPath, [resource])
+          continue
+        }
+        // A partial submission intentionally keeps other variables' old versions live. The
+        // existing reference-aware release owner retains those without treating it as a failure.
+        const released = releasePreparedMcpSecretVersion(deps.userDataPath, resource.server, resource.version)
+        if (!released.ok) throw new Error(released.reason)
+      }
       return { ok: true as const }
     })
     if (!cleaned.ok) warnings.push("package superseded credential cleanup failed")
@@ -1153,6 +1196,7 @@ async function executePreparedPackage(
         case "mcp":
           return buildMcpTxItems({
             ...common,
+            effect: lifecycle.graph.effect,
             userDataPath: deps.userDataPath,
             payload: component.accepted.payload,
             prerequisite: component.accepted.prerequisite,
@@ -1332,9 +1376,10 @@ type PackageLifecyclePlanV1 = {
 function resolvePackageLifecyclePlan(
   root: string,
   prepared: PreparedPackage,
+  effect?: PackageEffectV1,
 ): { ok: true; plan: PackageLifecyclePlanV1 } | { ok: false; reason: string } {
   const rootManifestDigest = `sha256:${prepared.root.itemDigest}`
-  const graph = packageGraphOf(prepared, rootManifestDigest)
+  const graph = packageGraphOf(prepared, rootManifestDigest, effect)
   const state = readPackageLedgerStateV1(root)
   if (!state.ok) return { ok: false, reason: state.reason }
   const before = state.packageGraphs.find((candidate) => candidate.packageId === graph.packageId) ?? null
@@ -1429,9 +1474,10 @@ const conflictReason = (conflicts: PackageChildConflictV1[]): string =>
  * 把一个排版约定升级成承重不变量。这个 componentId 直接进 owner token 的派生链,认错了 =
  * claim 归属认错人。
  */
-function packageGraphOf(prepared: PreparedPackage, rootManifestDigest: string): PackageGraphV1 {
+function packageGraphOf(prepared: PreparedPackage, rootManifestDigest: string, effect?: PackageEffectV1): PackageGraphV1 {
   const withoutDigest = {
     packageId: prepared.facts.envelope.prelude.packageId,
+    ...(effect ? { effect } : {}),
     ...(prepared.root.kind === "cloud" ? { displayName: prepared.facts.envelope.presentation.displayName } : {}),
     envelopeDigest: `sha256:${prepared.binding.envelopeDigest}`,
     root: { ...graphNodeOf(prepared.root), required: true, manifestDigest: rootManifestDigest },

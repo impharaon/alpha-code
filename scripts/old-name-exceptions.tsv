@@ -1150,3 +1150,9 @@ scripts/worktree-link-deps.sh	@alpha-code	1	external-anchor	GitHub 仓库名 alp
 packages/ui-mac/src/engine-adapter/fixtures/events.json	/Users/tide/app/wt/alpha-code-integ-post-0-2-0-f/packages/cli	21	external-anchor	#1697 放回单元 3:真引擎采样的 CLI 工作目录,词元含仓库名;保留实际事件原文,不是产品旧品牌。处数由 old-name-scan.ts 的 hitTokens 逐行计算。
 packages/ui-mac/src/engine-adapter/fixtures/approval-actions.json	alpha-code	1	external-anchor	#1697 放回 r4:采样出处中的真实仓库名,不是产品旧品牌。
 packages/ui-mac/test-component/hub-package.fixture.json	impharaon/alpha-web	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含由仓库名派生的 producer 夹具来源),保留真实样本外部锚点
+packages/ui-mac/test-fixtures/plugin-helper/catalog-scope/provenance.json	https://github.com/impharaon/alpha-code	1	external-anchor	真实目录来源的 GitHub 仓库地址；用于定位 pinned commit 与摘要，不是产品名称
+packages/ui-mac/test-fixtures/plugin-helper/catalog/catalog.json	alpha-code alpha-catalog.json	1	historical	正式目录 2026-11-15.1 的原始说明；provenance 钉住整文件摘要，历史样本不改写
+packages/ui-mac/test-fixtures/plugin-helper/catalog/catalog.json	alpha-web	1	historical	正式目录原样保存的 REQ-105/REQ-135 历史来源说明；整文件摘要受 provenance 验证
+packages/ui-mac/test-fixtures/plugin-helper/catalog/catalog.json	alpha-work alpha-code :Alpha	3	historical	正式目录三个办公连接器的 REQ-133 历史来源说明；保留原始样本及其已记录摘要
+packages/ui-mac/test-fixtures/plugin-helper/catalog/catalog.json	alpha-work alpha-code :Alpha alpha-web Alpha alpha-code@e77cb02f3	1	historical	正式目录办公连接器的历史 intake 与字节来源记录；保留原始样本及其已记录摘要
+packages/ui-mac/test-fixtures/plugin-helper/catalog/catalog.json	alpha-web alpha-work	1	historical	正式目录套件的 REQ-105/REQ-135 历史来源说明；保留原始样本及其已记录摘要

@@ -19,6 +19,7 @@
 // `codepuppy-installs.writeLedger` 的全部生产调用)。
 
 import { isExtensionName } from "../shared/extension-name"
+import { validPackageGraphAnnotations, type PackageGraphAnnotationsV1 } from "../shared/plugin-install"
 import { canonicalJson, sha256Hex } from "./ext-manifest-v2"
 import type { InstallReceiptType } from "../preload/types"
 import type { UpsertInput } from "./ext-receipt-v2"
@@ -68,7 +69,7 @@ export type PackageGraphNodeV1 = {
  *  payloadSha256,这边是 componentId/kind/name/required/manifestDigest),连字面格式都不同
  *  (那边裸 hex,这边带 `sha256:` 前缀)。**两者恒不相等,也不该相等。**
  *  可执行判据:`test-component/package-admission.wiring.cases.ts` 在同一次真实安装里同时取两个值。 */
-export type PackageGraphV1 = {
+export type PackageGraphV1 = PackageGraphAnnotationsV1 & {
   packageId: string
   /**
    * **这个字段名不再字面成立,而这是一个裁决,不是遗漏**(REQ-128 Phase 3 基线 §9 D3)。
@@ -234,7 +235,16 @@ export function parseOwnerToken(token: unknown): OwnerToken | null {
 const isObj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === "object" && !Array.isArray(v)
 
 const GRAPH_NODE_KEYS = new Set(["componentId", "kind", "name", "required", "manifestDigest"])
-const GRAPH_KEYS = new Set(["packageId", "envelopeDigest", "displayName", "installedGraphDigest", "root", "children"])
+const GRAPH_KEYS = new Set(["packageId", "envelopeDigest", "displayName", "installedGraphDigest", "root", "children", "source", "effect", "notRunning", "declarations"])
+
+function graphAnnotations(graph: PackageGraphAnnotationsV1): PackageGraphAnnotationsV1 {
+  return {
+    ...(graph.source === undefined ? {} : { source: graph.source }),
+    ...(graph.effect === undefined ? {} : { effect: graph.effect }),
+    ...(graph.notRunning === undefined ? {} : { notRunning: graph.notRunning }),
+    ...(graph.declarations === undefined ? {} : { declarations: graph.declarations }),
+  }
+}
 const CLAIM_KEYS = new Set(["kind", "name", "owners"])
 
 export type Decoded<T> = { ok: true; value: T } | { ok: false; errors: string[] }
@@ -284,6 +294,7 @@ export function computeInstalledGraphDigest(graph: Omit<PackageGraphV1, "install
       packageId: graph.packageId,
       envelopeDigest: graph.envelopeDigest,
       ...(graph.displayName === undefined ? {} : { displayName: graph.displayName }),
+      ...graphAnnotations(graph),
       root: graph.root,
       children: [...graph.children].sort((a, b) => (a.componentId < b.componentId ? -1 : a.componentId > b.componentId ? 1 : 0)),
     }),
@@ -293,6 +304,7 @@ export function computeInstalledGraphDigest(graph: Omit<PackageGraphV1, "install
 export function decodePackageGraphV1(input: unknown): Decoded<PackageGraphV1> {
   const errors: string[] = []
   if (!isObj(input)) return { ok: false, errors: ["packageGraph: must be an object"] }
+  if (!validPackageGraphAnnotations(input)) errors.push("packageGraph: invalid source, scope, notRunning or sanitized declarations")
   for (const k of Object.keys(input)) if (!GRAPH_KEYS.has(k)) errors.push(`packageGraph: unknown key "${k}" — refused (strict schema)`)
   const packageId = input.packageId
   const envelopeDigest = input.envelopeDigest
@@ -336,9 +348,15 @@ export function decodePackageGraphV1(input: unknown): Decoded<PackageGraphV1> {
     // 会被篡改闸判成「被改过」而拒载。这条在本票开发中真实发生过一次(测试当场变红)——
     // 它正是「前提为假的闸门比没有闸门更贵」的最小实例:拒的不是坏输入,是我们自己刚写的配置。
     ...(displayName === undefined ? {} : { displayName: displayName as string }),
+    ...graphAnnotations(input as PackageGraphAnnotationsV1),
     installedGraphDigest: installedGraphDigest as string,
     root,
     children,
+  }
+  if (value.declarations) {
+    const declarations = value.declarations
+    if (new Set(declarations.map((entry) => entry.componentId)).size !== declarations.length || declarations.some((entry) => ![root, ...children].some((node) => node.componentId === entry.componentId && node.kind === entry.kind && node.name === entry.hostName)))
+      return { ok: false, errors: ["packageGraph: declaration does not identify a unique installed component"] }
   }
   // 篡改闸:任何节点被改过 → 重算 digest 不符 → 拒。
   const recomputed = computeInstalledGraphDigest(value)

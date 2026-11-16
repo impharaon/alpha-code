@@ -67,6 +67,7 @@ export function createReloadCoordinator(deps: {
   /** 任何会改变「待重载」原因的事件之后调用(hub-view 据此推 `ext-hub-view-changed`)。 */
   onChange: () => void
   restartConnectors?: () => Promise<boolean>
+  applyPackageMcp?: (items: readonly ReloadItem[]) => Promise<void>
   now?: () => number
 }): ReloadCoordinator {
   const now = deps.now ?? Date.now
@@ -160,6 +161,7 @@ export function createReloadCoordinator(deps: {
           ` after ${record.reportedAt - record.requestedAt}ms`,
       )
       if (report.outcome === "reloaded") {
+        void deps.applyPackageMcp?.(record.items).catch(() => deps.log("reload: package connectors could not be reapplied"))
         for (const other of [...inFlight.values()])
           if (other.generation <= record.generation && coversScope(record.scope, other.scope)) inFlight.delete(other.generation)
       }

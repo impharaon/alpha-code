@@ -1,0 +1,119 @@
+{
+  "id": "mcp:playwright",
+  "type": "mcp",
+  "name": "playwright",
+  "displayName": "浏览器操作（Playwright）",
+  "description": "让助手打开网页、点击、填写表单、截图和运行页面脚本，也能读取需要 JavaScript 加载的网页。由 Microsoft 提供。使用前请在本机安装 Google Chrome 和 Node.js 18 或以上版本。",
+  "source": "official",
+  "category": "dev",
+  "license": "Apache-2.0",
+  "redistributable": true,
+  "version": "1.0.0",
+  "installSpec": {
+    "kind": "mcp",
+    "mcpType": "local",
+    "command": [
+      "npx",
+      "-y",
+      "@playwright/mcp@0.0.77"
+    ],
+    "requiredEnvVars": [],
+    "runtimeDep": [
+      "node"
+    ]
+  },
+  "tools": [
+    {
+      "name": "browser_navigate",
+      "description": "打开指定网页"
+    },
+    {
+      "name": "browser_click",
+      "description": "点击网页中的按钮或其它元素"
+    },
+    {
+      "name": "browser_type",
+      "description": "输入文字或填写网页表单"
+    },
+    {
+      "name": "browser_snapshot",
+      "description": "读取页面的文字和控件信息，帮助助手理解网页"
+    },
+    {
+      "name": "browser_take_screenshot",
+      "description": "截取网页画面"
+    },
+    {
+      "name": "browser_evaluate",
+      "description": "在网页中运行 JavaScript 代码"
+    }
+  ],
+  "curation": {
+    "schema": "codepuppy.catalog.curation.v1",
+    "tier": "precache",
+    "activationPolicy": "default-disabled",
+    "deliveryMode": "installable",
+    "review": {
+      "reviewedAt": "2026-07-18T00:00:00Z",
+      "reviewedBy": "jinjunnn",
+      "upstreamStatus": "active",
+      "supportTier": "community",
+      "reviewBefore": "2027-01-18T00:00:00Z"
+    },
+    "applicability": {
+      "frameworks": [
+        "*"
+      ]
+    },
+    "summaries": {
+      "capabilities": [
+        "net:http"
+      ],
+      "networkDomains": [
+        "block.github.io",
+        "code.visualstudio.com",
+        "cursor.com",
+        "docs.cline.bot",
+        "docs.factory.ai",
+        "docs.github.com",
+        "docs.qodo.ai",
+        "docs.warp.dev",
+        "docs.windsurf.com",
+        "example.com",
+        "files.lmstudio.ai",
+        "github.com",
+        "img.shields.io",
+        "insiders.vscode.dev",
+        "junie.jetbrains.com",
+        "kiro.dev",
+        "lmstudio.ai",
+        "modelcontextprotocol.io",
+        "opencode.ai",
+        "playwright.dev",
+        "www.apache.org"
+      ],
+      "requiredSecrets": [],
+      "runtimeDependencies": [
+        "node"
+      ],
+      "download": {
+        "bytes": null,
+        "basis": "unknown"
+      }
+    },
+    "refs": {
+      "sbom": {
+        "sha256": "c7bdeb162de72c19f00be720d2363be86d2580ddde0595a87eb0a5f1c98eb93a",
+        "bytes": 258,
+        "url": "https://codepuppy.cn/catalog/assets/mcp.playwright/1.0.0/codepuppy-curation/sbom/c7bdeb162de72c19f00be720d2363be86d2580ddde0595a87eb0a5f1c98eb93a.cdx.json",
+        "format": "cyclonedx-1.6+json"
+      },
+      "intakeProvenance": {
+        "sha256": "1155d5771637aee4871e42facc70f04f831d1617f4c4cf420fbef835756ae70b",
+        "bytes": 614,
+        "url": "https://codepuppy.cn/catalog/assets/mcp.playwright/1.0.0/codepuppy-curation/intake-provenance/1155d5771637aee4871e42facc70f04f831d1617f4c4cf420fbef835756ae70b.json",
+        "format": "codepuppy.intake-provenance.v1+json"
+      }
+    }
+  }
+}

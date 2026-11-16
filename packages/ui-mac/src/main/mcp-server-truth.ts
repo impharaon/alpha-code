@@ -28,16 +28,13 @@
 
 import { resolve } from "node:path"
 import { isExtensionName } from "../shared/extension-name"
+import { validMcpConfigLeaf, type McpConfigLeafV1 } from "../shared/plugin-install"
 import type { AppEnvironment } from "./codepuppy-environment"
 
 export const MCP_SERVERS_DIRNAME = "mcp-servers"
 export const MCP_SERVER_TRUTH_VERSION = 1
 
-export type McpServerRecord = {
-  name: string
-  url: string
-  headers?: Record<string, string>
-}
+export type McpServerRecord = Omit<Extract<McpConfigLeafV1, { type: "remote" }>, "type"> & { name: string }
 
 /** `<casBaseRoot>/mcp-servers/<env>.json` —— 与 `env/`、`cas/`、`custom-providers/` 同级(见文件头)。 */
 export function mcpServerTruthPath(casBaseRoot: string, environment: AppEnvironment): string {
@@ -52,7 +49,7 @@ export type McpServerTruthReadDeps = {
 
 export type McpServerTruthRead = { ok: true; absent: boolean; servers: McpServerRecord[] } | { ok: false; reason: string }
 
-const RECORD_KEYS: readonly string[] = ["name", "url", "headers"]
+const RECORD_KEYS: readonly string[] = ["name", "url", "headers", "timeout", "oauth"]
 const TOP_KEYS: readonly string[] = ["v", "servers"]
 
 function isRecord(v: unknown): v is Record<string, unknown> {
@@ -87,6 +84,9 @@ export function invalidMcpServerRecord(entry: unknown, label: string): string | 
     if (!isRecord(entry.headers)) return `${label}.headers is not an object`
     for (const [k, v] of Object.entries(entry.headers)) if (typeof v !== "string") return `${label}.headers[${JSON.stringify(k)}] is not a string`
   }
+  const { name, ...definition } = entry
+  if (!validMcpConfigLeaf({ type: "remote", ...definition })) return `${label} is not a remote MCP leaf`
+  if (isRecord(entry.oauth) && entry.oauth.clientSecret !== undefined && (typeof entry.oauth.clientSecret !== "string" || !/^\{file:[^}]+\}$/.test(entry.oauth.clientSecret))) return `${label}.oauth.clientSecret must reference the dedicated secret store`
   return undefined
 }
 
@@ -106,7 +106,7 @@ export function invalidMcpServerList(entries: unknown, label = "servers"): strin
 
 /** 固定键序 + headers 拷贝:读回的对象不带文件里的键序,写端用同一个函数得到确定的字节。没有 headers 就没有这个键。 */
 export function canonicalMcpServerRecord(r: McpServerRecord): McpServerRecord {
-  return { name: r.name, url: r.url, ...(r.headers ? { headers: { ...r.headers } } : {}) }
+  return { name: r.name, url: r.url, ...(r.headers ? { headers: { ...r.headers } } : {}), ...(r.timeout === undefined ? {} : { timeout: r.timeout }), ...(r.oauth === undefined ? {} : { oauth: r.oauth === false ? false : { ...r.oauth } }) }
 }
 
 /** 严格读(见文件头)。缺失 ⇒ ok + absent + 空清单;其余任何不对 ⇒ ok:false + 一行日志。 */
@@ -137,4 +137,10 @@ export function readMcpServerTruth(path: string, deps: McpServerTruthReadDeps): 
   const bad = invalidMcpServerList(parsed.servers)
   if (bad) return reject(bad)
   return { ok: true, absent: false, servers: (parsed.servers as McpServerRecord[]).map(canonicalMcpServerRecord) }
+}
+
+/** One projection for strict reads and engine injection; preserves the frozen v1 remote mapping. */
+export function remoteMcpLeaf(record: McpServerRecord): Extract<McpConfigLeafV1, { type: "remote" }> {
+  const { name, ...definition } = canonicalMcpServerRecord(record)
+  return { type: "remote", ...definition }
 }

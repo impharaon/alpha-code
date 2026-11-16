@@ -128,12 +128,17 @@ test("真 host + 真协调器:阶段查询经子进程往返;退出 ⇒ pendingF
   const child = new RecordingChild()
   const reloads = createReloadCoordinator({ log: () => {}, onChange: () => {} })
   const requests = createHubRequestStages({ log: () => {} })
-  expect(requests.record({ requestId: "req_abcdef12", stage: "confirming", catalogId: "mcp:github" })).toEqual({ ok: true })
-  const host = createCodePuppySidecarHost({
+  const logs: string[] = []
+  const canary = "SIDE_CAR_REJECTED_SECRET_CANARY_a23f"
+  let finish!: (outcome: import("../shared/plugin-install").InstallOutcomeV1) => void
+  const installing = new Promise<import("../shared/plugin-install").InstallOutcomeV1>(resolve => { finish = resolve })
+  const host = createCodePuppySidecarHost({ installName: () => undefined, packageAuthorization: async () => ({ ok: false, reason: "not installed" }),
     view: { view: async () => ({ directory: "/w", rows: [], warnings: [] }), viewForAgent: async () => ({ directory: "/w", rows: [], warnings: [] }) },
     requests,
+    searchSources: async () => ({ searchId: "search_unused", query: "", sources: [], candidates: [] }),
+    install: () => installing,
     reloads,
-    log: () => {},
+    log: line => logs.push(line),
   })
   reloads.request({ scope: "global", items: [], reason: "installed skill writer" })
   creditDanglingSweepForSpawn()
@@ -148,12 +153,25 @@ test("真 host + 真协调器:阶段查询经子进程往返;退出 ⇒ pendingF
   await result.health.wait
   // ready 时在途的那一代被重发给子进程
   expect(child.wire.at(-1)).toMatchObject({ type: "codepuppy.reload.request", generation: 1, scope: "global" })
+  child.emit("message", { type: "codepuppy.hub.install.request", id: 4, requestId: "req_abcdef12", directory: "/w", sessionID: "ses_wiring", agent: "build", ref: { kind: "id", id: "mcp:github" }, scope: "all-projects" })
+  expect(child.wire.at(-1)).toEqual({ type: "codepuppy.hub.install.reply", id: 4, accepted: true })
   child.emit("message", { type: "codepuppy.hub.request.request", id: 5, requestId: "req_abcdef12" })
-  expect(child.wire.at(-1)).toEqual({
-    type: "codepuppy.hub.request.reply",
-    id: 5,
-    record: { requestId: "req_abcdef12", catalogId: "mcp:github", stage: "confirming" },
-  })
+  expect(child.wire.at(-1)).toEqual({ type: "codepuppy.hub.request.reply", id: 5, record: { requestId: "req_abcdef12", stage: "submitted" } })
+  const sent = child.wire.length
+  // Removed renderer stage writes and malformed reads cannot advance or forge main's stage.
+  child.emit("message", { type: "codepuppy.hub.request.stage", id: 6, requestId: "req_abcdef12", stage: "confirming", secret: canary })
+  child.emit("message", { type: "codepuppy.hub.request.request", id: 7, requestId: { requestId: "req_abcdef12", stage: "failed" } })
+  expect(child.wire).toHaveLength(sent)
+  expect(requests.get("req_abcdef12")).toEqual({ requestId: "req_abcdef12", stage: "submitted" })
+  expect(logs.filter(line => line.includes("dropped malformed"))).toHaveLength(2)
+  const outcome = { ok: true as const, packageId: "mcp:github", displayName: "GitHub", source: { kind: "catalog" as const }, installed: [{ kind: "mcp" as const, hostName: "github", sourceName: "github" }], notRunning: [] }
+  finish(outcome)
+  await Bun.sleep(0)
+  child.emit("message", { type: "codepuppy.hub.request.request", id: 8, requestId: "req_abcdef12" })
+  expect(child.wire.at(-1)).toEqual({ type: "codepuppy.hub.request.reply", id: 8, record: { requestId: "req_abcdef12", stage: "committed", outcome, packageId: "mcp:github", displayName: "GitHub" } })
+  expect(JSON.stringify(child.wire)).not.toContain("confirming")
+  expect(JSON.stringify(child.wire)).not.toContain(canary)
+  expect(logs.join("\n")).not.toContain(canary)
   expect(reloads.pendingFor("/w")).toEqual({ code: "reload-waiting", detail: "queued" })
   await result.listener.stop()
   expect(reloads.pendingFor("/w")).toEqual({ code: "reload-waiting", detail: "sidecar exited with code 0" })

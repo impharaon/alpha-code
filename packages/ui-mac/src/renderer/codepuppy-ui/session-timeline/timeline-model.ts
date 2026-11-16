@@ -28,7 +28,8 @@ import { egressPolicyDenialOf } from "../../../shared/egress-denial"
 import { isNetFailureLayer, type NetFailureLayer } from "@opencode/schema/codepuppy-net-failure"
 import { isCloudFacadeToolPart } from "../cloud-facade-identity"
 import type { CodePuppySessionIdentity } from "../session-workspace/session-workspace-core"
-import { toolCardDispatchOf, toolTitleKeyOf } from "./cards/tool-card-model"
+import { hubToolActionOf, toolCardDispatchOf, toolTitleKeyOf } from "./cards/tool-card-model"
+import { redactText } from "./cards/tool-redactor"
 import { attachmentRev, timelineAttachmentsOf, type TimelineAttachment, type TimelineAttachmentContext } from "./timeline-attachments"
 
 export type { TimelineAttachment, TimelineAttachmentRead } from "./timeline-attachments"
@@ -178,6 +179,34 @@ export type TimelineProcessStep =
   | { kind: "tool"; key: string; parts: ToolPart[] }
   | { kind: "say"; key: string; part: TextPart }
 
+export type TimelineHubInstall = {
+  partID: string
+  operation: "search" | "install"
+  name: string
+  phase: "running" | "completed" | "error"
+  requestId?: string
+  packageId?: string
+  result?: string
+}
+
+function hubInstallOf(part: ToolPart): TimelineHubInstall | undefined {
+  const operation = hubToolActionOf(part)
+  if (!operation || (operation === "search" && (part.state.status === "completed" || part.state.status === "error"))) return
+  const input = part.state.input
+  const name = input && typeof input === "object" ? operation === "search" ? input.query : input.id ?? input.name : undefined
+  const clean = typeof name === "string" ? redactText(name, 400) : undefined
+  const metadata = "metadata" in part.state ? part.state.metadata : undefined
+  const raw = part.state.status === "completed" ? part.state.output : part.state.status === "error" ? part.state.error : undefined
+  const result = typeof raw === "string" ? redactText(raw, 4000) : undefined
+  return {
+    partID: part.id, operation, name: clean?.ok ? clean.value : "",
+    phase: part.state.status === "completed" ? "completed" : part.state.status === "error" ? "error" : "running",
+    ...(typeof metadata?.requestId === "string" ? { requestId: metadata.requestId } : {}),
+    ...(typeof metadata?.packageId === "string" ? { packageId: metadata.packageId } : {}),
+    ...(result?.ok ? { result: result.value } : {}),
+  }
+}
+
 export type TimelineRow =
   | { kind: "turn"; key: string; rev: string; userMessageID: string; createdAt: number }
   | {
@@ -226,6 +255,7 @@ export type TimelineRow =
   | { kind: "artifacts"; key: string; rev: string; partID: string; links: TimelineArtifactLink[] }
   /** REQ-236 `#1552`:第一方云端生图派发 → 生图卡(挂在回答之后,同回合取代同一任务的产物链接行)。 */
   | { kind: "cloudImage"; key: string; rev: string; image: TimelineCloudImage }
+  | { kind: "hubInstall"; key: string; rev: string; install: TimelineHubInstall }
   | {
       kind: "turnError"
       key: string
@@ -1238,6 +1268,8 @@ export function projectTimelineRows(input: TimelineProjectionInput): TimelineRow
     // REQ-236 `#1552`:本回合生图卡跟住的任务 —— 它们的产物链接行由卡片取代(图已经在卡里)。
     const imageRuns = new Set<string>()
     const pushToolTrailing = (part: ToolPart) => {
+      const install = hubInstallOf(part)
+      if (install) trailing.push({ kind: "hubInstall", key: `hubInstall:${part.id}`, rev: JSON.stringify(install), install })
       const image = cloudImageOf(part)
       if (image) {
         const call = image.call

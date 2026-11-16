@@ -31,7 +31,7 @@ import {
 } from "./codepuppy-mcp-secrets"
 import type { TxPreparedResourceV1 } from "./ext-transaction"
 import { codepuppyGlobalRoot } from "./codepuppy-installs"
-import { findRecordV2 } from "./ext-receipt-v2"
+import { findRecordV2, readPackageLedgerStateV1 } from "./ext-receipt-v2"
 import { codepuppyJsoncPath, classifyProviderKey, PROVIDER_KEYCHAIN_MARKER, type ProviderKeyKind } from "./engine-config-truth"
 import { sealEnginePluginAdditions } from "./engine-plugin-seal"
 import { commandHeadBase } from "./platform"
@@ -40,8 +40,9 @@ import { assertProjectCodePuppyRootIdentity } from "./codepuppy-workdir"
 import { writeFileAtomicSync } from "./ext-atomic-fs"
 import { classifyBaseUrl } from "./network-egress-derived"
 import { CLOUD_MCP_SERVER_NAME } from "./cloud-web-search"
+import { readMcpServerTruthFromEnvironment } from "./mcp-server-records"
 import { findMcpServerRecord, removeMcpServerRecord, upsertMcpServerRecord } from "./mcp-server-lifecycle"
-import type { McpServerRecord } from "./mcp-server-truth"
+import { invalidMcpServerRecord, remoteMcpLeaf, type McpServerRecord } from "./mcp-server-truth"
 
 /** `code` 只在地址被拒时在场(`#1381`:与自定义节点同一套类别,renderer 据此用用户的语言说原因)。 */
 export type ConfigResult = { ok: true } | { ok: false; reason: string; code?: ProviderAddressRejection }
@@ -458,19 +459,11 @@ export function writeConfigTextAtomic(target: string, before: string, result: st
   }
 }
 
-/** `#1381`:远程 MCP 真源只装 url / headers(启停归账本,由 sidecar 注入压;其余键没有生产路径会送来)。多出来的键**拒**,不静默丢。 */
-const REMOTE_RECORD_LEAF_KEYS = new Set(["type", "url", "headers"])
-
 function remoteRecordFromLeaf(name: string, leaf: Record<string, unknown>): { ok: true; record: McpServerRecord } | { ok: false; reason: string } {
-  const extra = Object.keys(leaf).filter((k) => !REMOTE_RECORD_LEAF_KEYS.has(k))
-  if (extra.length) return { ok: false, reason: `remote MCP server carries key(s) the truth file does not hold: ${extra.join(", ")}` }
-  const headers = leaf.headers
-  const isRec = (v: unknown): v is Record<string, string> => !!v && typeof v === "object" && !Array.isArray(v)
-  return { ok: true, record: { name, url: leaf.url as string, ...(isRec(headers) ? { headers: { ...headers } } : {}) } }
-}
-
-function remoteLeafFromRecord(record: McpServerRecord): Record<string, unknown> {
-  return { type: "remote", url: record.url, ...(record.headers ? { headers: { ...record.headers } } : {}) }
+  const { type, ...definition } = leaf
+  const record = { name, ...definition }
+  const bad = invalidMcpServerRecord(record, "remote MCP server")
+  return bad ? { ok: false, reason: bad } : { ok: true, record: record as McpServerRecord }
 }
 
 /** Persist an MCP server: local ⇒ `mcp[<name>]` in the codepuppy-owned engine config file (durable); remote ⇒ the main-only truth file. */
@@ -489,7 +482,21 @@ export function persistMcp(name: string, server: Record<string, unknown>, meta?:
     if (name === CLOUD_MCP_SERVER_NAME) return { ok: false, reason: `server name "${CLOUD_MCP_SERVER_NAME}" is reserved by the platform cloud MCP` }
     const record = remoteRecordFromLeaf(name, server)
     if (!record.ok) return record
-    const cleared = withConfigWriteLock(() => removeMcpLeafCopiesUnlocked(name))
+    const cleared = withConfigWriteLock(() => {
+      const state = readPackageLedgerStateV1(codepuppyGlobalRoot(), { sideEffectFree: true })
+      if (!state.ok) return state
+      const projectOnly = state.packageGraphs.some((graph) => graph.effect && [graph.root, ...graph.children].some((node) => node.kind === "mcp" && node.name === name))
+      if (!projectOnly) return removeMcpLeafCopiesUnlocked(name)
+      // Replace the primary copy atomically with the scope override; never publish an enabled gap.
+      const target = mcpPluginTargetPath()
+      const kept = writeKeyUnlocked(target, ["mcp", name], { enabled: false })
+      if (!kept.ok) return kept
+      for (const legacy of legacyConfigPaths(target)) {
+        const removed = removeMcpLeafFromExistingFile(legacy, name)
+        if (!removed.ok) return removed
+      }
+      return { ok: true as const }
+    })
     if (!cleared.ok) return cleared
     return upsertMcpServerRecord(record.record)
   }
@@ -512,7 +519,7 @@ export function persistMcp(name: string, server: Record<string, unknown>, meta?:
 export function readMcpLeaf(name: string): Record<string, unknown> | undefined {
   if (!isExtensionName(name)) return undefined
   const truth = findMcpServerRecord(name, () => {})
-  if (truth.ok && truth.record) return remoteLeafFromRecord(truth.record)
+  if (truth.ok && truth.record) return remoteMcpLeaf(truth.record)
   try {
     const target = mcpPluginTargetPath()
     if (!fs.existsSync(target)) return undefined
@@ -536,7 +543,7 @@ export function readMcpLeafStrict(
   if (target === mcpPluginTargetPath()) {
     const truth = findMcpServerRecord(name, () => {})
     if (!truth.ok) return truth
-    if (truth.record) return { ok: true, value: remoteLeafFromRecord(truth.record) }
+    if (truth.record) return { ok: true, value: remoteMcpLeaf(truth.record) }
   }
   try {
     if (!fs.existsSync(target)) return { ok: true, value: undefined }
@@ -1293,6 +1300,9 @@ function legalPluginEntry(x: unknown): boolean {
  *  吊销别家在用凭证。任一源不可读/解析失败 = 集合不可信(strict 调用方必须失败)。 */
 export function listConfiguredMcpServerNamesStrict(): { ok: true; names: string[] } | { ok: false; reason: string } {
   const names = new Set<string>()
+  const remote = readMcpServerTruthFromEnvironment(() => {})
+  if (!remote.ok && !("unresolved" in remote)) return { ok: false, reason: remote.reason }
+  if (remote.ok) for (const server of remote.servers) names.add(server.name)
   const isRec = (v: unknown): v is Record<string, unknown> => !!v && typeof v === "object" && !Array.isArray(v)
   for (const file of [mcpPluginTargetPath(), ...legacyConfigPaths(mcpPluginTargetPath())]) {
     try {

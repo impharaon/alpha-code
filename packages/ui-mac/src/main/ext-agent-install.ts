@@ -1,3 +1,6 @@
+import type { PackageMutationEnvelopeV1 } from "./ext-package-ledger-v3"
+import { commitTransactionLedger } from "./ext-package-ledger-commit"
+import { buildDepartingChildConfigItemsV1 } from "./ext-package-tx-builders"
 // ext-agent-install — REQ-102 #358:把 agent seed 安装路由进事务引擎(file + config 双 item 单事务)。
 //
 // 背景:agent 的物理形态 = `<root>/agents/<name>.md`(内容真源)+ codepuppy.jsonc `agent.<name>` 条目
@@ -125,6 +128,7 @@ export function recoveryReceiptInputs(records: TxCommitRecord[]): UpsertInput[] 
 }
 
 export type AgentSeedInstall = {
+  packageMutation?: PackageMutationEnvelopeV1
   name: string
   /** catalog entry id(agent:<name>)。 */
   id: string
@@ -221,6 +225,7 @@ export async function installAgentFromCas(root: string, spec: AgentSeedInstall):
     items: [
       {
         key: agentInstallKey(spec.name),
+        ...(spec.packageMutation ? { packageMutation: spec.packageMutation } : {}),
         action: "file",
         // requireAbsent(#359 r3 同款):fresh-only 语义钉进引擎锁内断言 —— 锁外门与锁内捕获
         // 之间被旁路建文件时,拒绝而不是带前像覆盖认领。
@@ -240,6 +245,7 @@ export async function installAgentFromCas(root: string, spec: AgentSeedInstall):
           edits: [{ keyPath: ["agent", spec.name], value: receiptTemplate.desiredState === "disabled" ? { ...parsed.entry, disable: true } : parsed.entry }],
         },
       },
+      ...(spec.packageMutation ? buildDepartingChildConfigItemsV1({ root, children: spec.packageMutation.childRemovals }) : []),
     ],
     ...(spec.authorization ? { authorization: spec.authorization } : {}),
   }
@@ -251,6 +257,7 @@ export async function installAgentFromCas(root: string, spec: AgentSeedInstall):
     // 账本是事务提交证据(#336/#354):只有主 item 带 receipt,config 副 item 不落账(与
     // recovery 前滚同一过滤,recoveryReceiptInputs)。
     commitReceipt: (records: TxCommitRecord[]) => {
+      if (spec.packageMutation) return commitTransactionLedger(root, records)
       const written = upsertRecordsV2(root, recoveryReceiptInputs(records))
       if (!written.ok) throw new Error(`receipt commit failed for agent ${spec.name}: ${written.reason}`)
     },

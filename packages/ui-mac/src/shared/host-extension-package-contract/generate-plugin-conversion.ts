@@ -1,0 +1,59 @@
+#!/usr/bin/env bun
+
+import { readFile, writeFile } from "node:fs/promises"
+import { dirname, resolve } from "node:path"
+import { fileURLToPath } from "node:url"
+import ts from "typescript"
+
+// This Bun CLI is also typechecked with Electron's DOM libraries. Keep its build API local:
+// importing Bun's ambient types changes fetch/stream types throughout the desktop program.
+declare const Bun: {
+  build(options: { entrypoints: string[]; target: "node"; format: "esm"; minify: boolean }): Promise<{
+    success: boolean
+    logs: { message: string }[]
+    outputs: Blob[]
+  }>
+}
+
+const root = dirname(fileURLToPath(import.meta.url))
+const textEncoder = new TextEncoder()
+
+/** Desktop runtime outputs are checked independently of the published host contract. */
+export async function checkPluginConversion(outputRoot = root): Promise<void> {
+  for (const [path, bytes] of await conversionArtifactBytes()) {
+    if (!Buffer.from(await readFile(resolve(outputRoot, path))).equals(bytes))
+      throw new Error(path + " drifted; run generate-plugin-conversion.ts")
+  }
+}
+
+async function conversionArtifactBytes(): Promise<Map<string, Uint8Array>> {
+  const built = await Bun.build({
+    entrypoints: [resolve(root, "plugin-conversion.ts")],
+    target: "node",
+    format: "esm",
+    minify: true,
+  })
+  if (!built.success) throw new Error("Could not bundle plugin-conversion: " + built.logs.map((log) => log.message).join("; "))
+  const declaration = ts.transpileDeclaration(await readFile(resolve(root, "plugin-conversion.ts"), "utf8"), {
+    fileName: "plugin-conversion.ts",
+    compilerOptions: { target: ts.ScriptTarget.ESNext, module: ts.ModuleKind.ESNext },
+  })
+  if (declaration.diagnostics?.length) throw new Error("Could not emit plugin-conversion declarations")
+  return new Map([
+    ["plugin-conversion.mjs", new Uint8Array(await built.outputs[0]!.arrayBuffer())],
+    ["plugin-conversion.d.mts", textEncoder.encode(declaration.outputText)],
+  ])
+}
+
+
+if (resolve(process.argv[1] ?? "") === fileURLToPath(import.meta.url)) {
+  const unknown = process.argv.slice(2).filter(arg => arg !== "--check")
+  if (unknown.length) throw new Error(`unknown arguments: ${unknown.join(" ")}`)
+  if (process.argv.includes("--check")) {
+    await checkPluginConversion()
+    console.log("checked plugin-conversion.mjs and plugin-conversion.d.mts")
+  } else {
+    for (const [path, bytes] of await conversionArtifactBytes()) await writeFile(resolve(root, path), bytes)
+    console.log("generated plugin-conversion.mjs and plugin-conversion.d.mts")
+  }
+}

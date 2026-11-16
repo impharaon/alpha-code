@@ -1,0 +1,37 @@
+{
+  "fetchedAt": "2026-11-16",
+  "searchUrl": "https://registry.npmjs.org/-/v1/search?text=skills%20keywords:opencode-plugin&size=15",
+  "name": "opencode-skills-hub",
+  "version": "0.0.5",
+  "metadataUrl": "https://registry.npmjs.org/opencode-skills-hub/0.0.5",
+  "tarballUrl": "https://registry.npmjs.org/opencode-skills-hub/-/opencode-skills-hub-0.0.5.tgz",
+  "files": [
+    {
+      "path": "search.json",
+      "bytes": 17004,
+      "sha256": "c1a13ee113d9d35c1e02404efeb5af0de7666d2e04788a10bd2f8be447fa212f"
+    },
+    {
+      "path": "metadata.json",
+      "bytes": 2143,
+      "sha256": "60edbb9ba64b9104acf36acc7f023f9225b5d3a97047d4ed7eaace7bbac38464"
+    },
+    {
+      "path": "package.tgz",
+      "bytes": 496109,
+      "sha256": "200328d2a4066a8cfe5ae7307fc09faa5973d3405f4e755248d6967ecde9fdaf"
+    },
+    {
+      "path": "empty-search.json",
+      "bytes": 286376,
+      "sha256": "fbd519be991d97b6fe375d3924f47bfae87d08231a868306d024dcf635c2bffd",
+      "url": "https://registry.npmjs.org/-/v1/search?text=%22codepuppy-no-such-server-1724%22"
+    },
+    {
+      "path": "package.json",
+      "bytes": 853,
+      "sha256": "7c2db21acbd6f003ddfb77263d207fc44476443e74c3d8cfed35236be3d6cf0c",
+      "source": "package/package.json in the integrity-verified package.tgz"
+    }
+  ]
+}

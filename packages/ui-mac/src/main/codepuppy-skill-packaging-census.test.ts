@@ -115,6 +115,7 @@ describe("#1250 随包技能资产的可达性普查", () => {
       "factory-skills/customize-codepuppy → factory",
       "factory-skills/integrate-project → factory",
       "factory-skills/office-docs → factory",
+      "factory-skills/plugin-helper → factory",
       "skills/codepuppy-upstream-sync → catalog(skill:codepuppy-upstream-sync)",
       "skills/safe-refactor → catalog(skill:safe-refactor)",
       // 签名 catalog 2026-10-15.1 含 skill:skill-creator;安装后出厂路径让位,见 factory-skills.ts reconcile「current environment skills holds installed/user content」分支。

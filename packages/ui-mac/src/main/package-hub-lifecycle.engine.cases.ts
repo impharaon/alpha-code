@@ -1,3 +1,4 @@
+import { ClientApi } from "../../../protocol/src/client"
 // Real desktop main IPC, ext scheduler and engine in an isolated HOME/XDG/database.
 // Package bytes: hub-package.fixture (unmodified alpha-web 0bb739ce). MCP transport:
 // core/test/fixture/mcp-echo.ts, not a claimed GitHub/Supabase service acceptance.
@@ -10,8 +11,10 @@ import { canonicalArtifactJsonBytesV1, HOST_EXTENSION_PACKAGE_CORPUS } from "../
 import { engineSandbox, assertEngineSandboxed } from "../../test-component/engine-sandbox"
 import { hubPackageFixture } from "../../test-component/hub-package.fixture"
 import type { Running } from "../../test-component/codepuppy-engine"
+import type { ReloadRequestMessage, ReloadReportMessage } from "./codepuppy-sidecar-messages"
 import type { PackageAuthorizationResultV1 } from "../shared/package-admission"
 
+const reloadEndpoint = ClientApi.groups["server.location"].endpoints["location.reload"]
 const sandbox = engineSandbox()
 const sample = hubPackageFixture()
 const nativeFetch = globalThis.fetch
@@ -26,12 +29,16 @@ for (const method of ["log", "warn", "error"] as const)
   console[method] = (...args: unknown[]) => {
     consoleLines.push(args)
   }
+let stopWatching: (() => void) | undefined
 let running: Running | undefined
 let model: Awaited<ReturnType<(typeof import("../../test-component/codepuppy-engine"))["scriptedModel"]>>
 let host: Awaited<ReturnType<(typeof import("../../test-component/codepuppy-engine"))["codepuppyEngine"]>>
 let main: ReturnType<(typeof import("./ext-ipc"))["registerExtIpcHandlers"]>
 let refreshFailure = ""
 let refreshes = 0
+let locationReloads = 0
+const reloadRequests: ReloadRequestMessage[] = []
+const reloadReports: ReloadReportMessage[] = []
 let toolCalls = 0
 let runtimeInitializes = 0
 let cloudEndpoint: ReturnType<typeof Bun.serve> | undefined
@@ -60,8 +67,18 @@ const mcpStatus = async (name: string) =>
   )?.status.status
 async function action(channel: string, ...args: unknown[]) {
   const before = refreshes
+  const requested = reloadRequests.length
   expect(await invoke(channel, ...args)).toMatchObject({ ok: true })
-  await until(() => refreshes > before || !!refreshFailure, channel)
+  if (channel === "ext-install-package" && args[0] === "package:supabase")
+    expect(reloadRequests.slice(requested).some(request => request.scope === "global" && request.force !== true)).toBe(true)
+  const pending = reloadRequests.slice(requested)
+  if (pending.length)
+    await until(() => pending.every(request => reloadReports.some(report => report.generation === request.generation && report.outcome === "reloaded")), channel)
+  if (pending.length) await until(async () => {
+    const plugins = (await send("GET", "/api/plugin")).json.data as Array<{ id: string; state: { status: string } }>
+    return ["codepuppy.ext", "codepuppy.test.engine-probe"].every(id => plugins.some(plugin => plugin.id === id && plugin.state.status === "active"))
+  }, "reloaded plugins ready")
+  if (!pending.length) expect(refreshes).toBe(before)
   if (refreshFailure) throw new Error(refreshFailure)
 }
 
@@ -153,15 +170,17 @@ beforeAll(async () => {
   processPort.parentPort = {
     on: (_event: string, listener: (event: { data: unknown }) => void) => listeners.add(listener),
     off: (_event: string, listener: (event: { data: unknown }) => void) => listeners.delete(listener),
-    postMessage: (message: Parameters<typeof main.codepuppySidecar.receive>[0]) =>
-      main?.codepuppySidecar.receive(message, () => {}),
+    postMessage: (message: Parameters<typeof main.codepuppySidecar.receive>[0]) => {
+      if (message.type === "codepuppy.reload.report") reloadReports.push(message)
+      main?.codepuppySidecar.receive(message, () => {})
+    },
   }
   const { codepuppyEngine, scriptedModel } = await import("../../test-component/codepuppy-engine")
   model = scriptedModel()
   cloudEndpoint = Bun.serve({ hostname: "127.0.0.1", port: 0, fetch: (request) => echo.fetch(request) })
   const { testCloudMcp } = await import("../../test-component/codepuppy-bootstrap-fixture")
   const { secretFilePath } = await import("./codepuppy-secret-files")
-  host = codepuppyEngine({ sandbox, name: "hub-lifecycle", modelBaseURL: model.baseURL, killSwitch: true,
+  host = codepuppyEngine({ sandbox, name: "hub-lifecycle", modelBaseURL: model.baseURL, killSwitch: true, filewatcher: true,
     cloudMcp: testCloudMcp(`http://127.0.0.1:${cloudEndpoint.port}/mcp`, secretFilePath(join(sandbox.root, "hub-lifecycle-userdata"), "CODEPUPPY_MCP_TOKEN"), "hub-cloud"),
   })
   process.chdir(host.projectDirectory)
@@ -178,7 +197,10 @@ beforeAll(async () => {
   })
   const { injectCodePuppyConfig } = await import("./codepuppy-config-injection")
   const { publishInProcessEngine } = await import("./in-process-engine")
-  publishInProcessEngine((request) => running!.fetch(request))
+  publishInProcessEngine((request) => {
+    if (request.method === reloadEndpoint.method && new URL(request.url).pathname === reloadEndpoint.path) locationReloads++
+    return running!.fetch(request)
+  })
   const { registerExtIpcHandlers } = await import("./ext-ipc")
   main = registerExtIpcHandlers(
     host.userData,
@@ -216,15 +238,23 @@ beforeAll(async () => {
     async () => undefined,
   )
   main.codepuppySidecar.attach((message) => {
+    if (message.type === "codepuppy.reload.request") reloadRequests.push(message)
     for (const listener of listeners) listener({ data: message })
   })
   await main.ledgerReady
+  // sidecar.ts starts this watcher before the engine. The old connector refresh happened
+  // to re-inject paths; runtime MCP activation must exercise the real in-process path too.
+  const { explicitSkillDirs } = await import("./codepuppy-config-injection")
+  const { watchExplicitSources } = await import("./engine-explicit-config")
+  if (!host.injection.explicit) throw Error("missing explicit config inputs")
+  stopWatching = watchExplicitSources({ ...host.injection.explicit, skills: explicitSkillDirs, log: line => consoleLines.push(line) })
   running = await host.start()
   const { policyStore } = await import("../../test-component/codepuppy-engine")
   initialPolicy = JSON.stringify((await (await policyStore()).snapshot()).user)
 }, 60_000)
 
 afterAll(async () => {
+  stopWatching?.()
   await running?.close()
   model?.stop()
   await echo?.close()
@@ -263,6 +293,8 @@ async function askedTurn() {
 }
 
 test("real Supabase package exposes both enabled generation skills", async () => {
+  const beforeReloads = locationReloads
+  const beforeRefreshes = refreshes
   await action("ext-install-package", "package:supabase")
   await until(
     async () =>
@@ -272,6 +304,12 @@ test("real Supabase package exposes both enabled generation skills", async () =>
       ),
     "skill configuration readiness",
   )
+  await until(async () => {
+    const names = (await send("GET", "/api/skill")).json.data.map((skill: { name: string }) => skill.name)
+    return ["supabase", "supabase-postgres-best-practices"].every(name => names.includes(name))
+  }, "installed Supabase skill read-back")
+  expect(locationReloads).toBeGreaterThan(beforeReloads)
+  expect(refreshes).toBe(beforeRefreshes)
   const { readPackageLedgerStateV1 } = await import("./ext-receipt-v2")
   const installed = readPackageLedgerStateV1(root)
   expect(
@@ -312,9 +350,11 @@ test("real desktop package lifecycle asks twice, applies a busy switch, and remo
   expect(authorization).toMatchObject({ ok: true, items: [{ kind: "secret", saved: false }] })
   if (!authorization.ok) throw new Error("package authorization is unavailable")
   const prerequisiteId = authorization.items[0]!.prerequisiteId
+  const beforeTokenReloads = locationReloads
   await action("ext-save-package-secrets", { packageId: "package:github", secrets: { [prerequisiteId]: TOKEN } })
   await until(async () => (await mcpStatus("github")) === "connected", "GitHub fixture connection")
   expect(runtimeInitializes).toBeGreaterThan(0)
+  expect(locationReloads).toBe(beforeTokenReloads)
   await until(async () => (await githubTools()).length === 1, "connected tool registry")
   expect(await githubTools()).toHaveLength(1)
   for (const count of [1, 2]) {
@@ -329,20 +369,28 @@ test("real desktop package lifecycle asks twice, applies a busy switch, and remo
   expect(JSON.stringify((await (await policyStore()).snapshot()).user)).toBe(policyBefore)
   await action("ext-set-package-state", { packageId: "package:github", state: "disabled" })
   expect(await mcpStatus("github")).toBe("disabled")
+  await until(async () => (await githubTools()).length === 0, "disabled GitHub tool inventory")
   expect(await githubTools()).toEqual([])
   const disabledInitializes = runtimeInitializes
+  const beforeDisabledTokenReloads = locationReloads
   await action("ext-save-package-secrets", { packageId: "package:github", secrets: { [prerequisiteId]: NEXT_TOKEN } })
   expect(await mcpStatus("github")).toBe("disabled")
+  await until(async () => (await githubTools()).length === 0, "disabled GitHub tool inventory")
   expect(await githubTools()).toEqual([])
   expect(runtimeInitializes).toBe(disabledInitializes)
+  expect(locationReloads).toBe(beforeDisabledTokenReloads)
   await action("ext-set-package-state", { packageId: "package:github", state: "enabled" })
   await until(async () => (await mcpStatus("github")) === "connected", "reenabled connector")
   const held = await askedTurn()
   expect((await send("GET", "/api/session/active")).json.data[held.sessionID]).toBeDefined()
+  const beforeHotDisableReloads = locationReloads
   await action("ext-set-package-state", { packageId: "package:github", state: "disabled" })
+  await until(async () => (await send("GET", `/api/session/${held.sessionID}/permission`)).json.data.length === 0 && !(await send("GET", "/api/session/active")).json.data[held.sessionID], "disabled connector releases its pending round")
+  expect(locationReloads).toBe(beforeHotDisableReloads)
   expect((await send("GET", `/api/session/${held.sessionID}/permission`)).json.data).toEqual([])
   expect((await send("GET", "/api/session/active")).json.data[held.sessionID]).toBeUndefined()
   expect(toolCalls).toBe(2)
+  await until(async () => (await githubTools()).length === 0, "disabled GitHub tool inventory")
   expect(await githubTools()).toEqual([])
   const messages = (await send("GET", `/api/session/${held.sessionID}/message`)).json.data as Array<{
     type: string
@@ -358,6 +406,7 @@ test("real desktop package lifecycle asks twice, applies a busy switch, and remo
     await invoke("ext-reload-request", { scope: "global", items: [], reason: "uninstalled package package:github" }),
   ).toMatchObject({ ok: true })
   await until(async () => !(await mcpStatus("github")), "removed runtime connector")
+  await until(async () => (await githubTools()).length === 0, "disabled GitHub tool inventory")
   expect(await githubTools()).toEqual([])
   const ledger = readPackageLedgerStateV1(root)
   expect(ledger.ok && ledger.packageGraphs.some((graph) => graph.packageId === "package:github")).toBe(false)
@@ -385,6 +434,7 @@ test("all package skills leave and return to the callable inventory and disappea
   await action("ext-set-package-state", { packageId: "package:supabase", state: "disabled" })
   await until(async () => (await packageSkills()).length === 0, "all package skills disabled")
   expect(await packageSkills()).toEqual([])
+  await until(async () => await mcpStatus("supabase") === "disabled", "disabled Supabase MCP read-back")
   expect(await mcpStatus("supabase")).toBe("disabled")
   await action("ext-set-package-state", { packageId: "package:supabase", state: "enabled" })
   await until(async () => (await packageSkills()).length === names.length, "all package skills reenabled")
@@ -410,6 +460,7 @@ test("cloud-only package switch withdraws and restores real engine tools", async
   await until(async () => (await tools()).length > 0, "cloud tool inventory")
   expect((await tools()).length).toBeGreaterThan(0)
   await action("ext-set-package-state", { packageId: "package:cloud-v1", state: "disabled" })
+  await until(async () => !(await mcpStatus("hub-cloud")) && (await tools()).length === 0, "disabled cloud runtime read-back")
   expect(await mcpStatus("hub-cloud")).toBeUndefined()
   expect(await tools()).toEqual([])
   await action("ext-set-package-state", { packageId: "package:cloud-v1", state: "enabled" })
@@ -426,5 +477,6 @@ test("package command switch withdraws and restores the real engine declaration"
   await action("ext-set-package-state", { packageId: "package:generic-bundle", state: "disabled" })
   expect(await commands()).not.toContain("generic-bundle-command")
   await action("ext-set-package-state", { packageId: "package:generic-bundle", state: "enabled" })
+  await until(async () => (await commands()).includes("generic-bundle-command"), "re-enabled package command read-back")
   expect(await commands()).toContain("generic-bundle-command")
 })

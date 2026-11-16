@@ -258,6 +258,16 @@ function displaySnapshotOf(part: { display?: unknown }): DisplaySnapshot | undef
   }
 }
 
+/** Hub progress is owned by the verified bundled plugin, never a same-name third-party tool.
+ * The persisted manifest readable ID binds this rule without a machine-specific plugin path. */
+export function hubToolActionOf(part: ToolPart): "search" | "install" | undefined {
+  const snapshot = displaySnapshotOf(part)
+  if (snapshot?.identity.source !== "plugin" || snapshot.authority.kind !== "codepuppy-bundled") return
+  if (snapshot.identity.name === "codepuppy_hub_search" && snapshot.readable === "codepuppy:hub_search") return "search"
+  if (snapshot.identity.name === "codepuppy_hub_install" && snapshot.readable === "codepuppy:hub_install") return "install"
+  if (snapshot.identity.name === "codepuppy_hub_create" && snapshot.readable === "codepuppy:hub_create") return "install"
+}
+
 // ── #1576 来源三类 × 执行位置(只从持久化快照派生) ─────────────────────────
 /** 用户层来源三类:内置(builtin / host / 当次持久化 authority = codepuppy-bundled)、云(codepuppy-cloud)、其余一律第三方(含无快照)。 */
 export type ToolProvenanceSource = "builtin" | "codepuppy-cloud" | "third-party"

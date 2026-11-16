@@ -1761,6 +1761,13 @@ describe("A4 trusted hub parts become main-backed timeline cards", () => {
     expect(again.find(row => row.kind === "hubInstall")?.key).toBe(result.key)
   })
 
+  test("R14 B10 an errored search keeps its actual tool error instead of a searching card", () => {
+    const search = toolPart("aborted-search", "a", "unrelated-alias", { display: display("search"), state: { status: "error", input: { query: "playwright" }, error: "Search aborted", time: { start: 1, end: 2 } } })
+    const rows = turn(search)
+    expect(rows.some(row => row.kind === "hubInstall")).toBe(false)
+    expect(JSON.stringify(rows)).toContain("Search aborted")
+  })
+
   test("A4 same-name third-party, missing/invalid proof and wrong tool identity never read install metadata", () => {
     const trusted = display("install")!
     for (const proof of [undefined, { ...trusted, authority: { kind: "not-asserted" } }, { ...trusted, authority: { kind: "codepuppy-bundled" } }, { ...trusted, identity: { source: "mcp", origin: "codepuppy", name: "codepuppy_hub_install" } }, { ...trusted, readable: "codepuppy:echo" }, { ...trusted, identity: { ...trusted.identity, name: "other" } }]) {

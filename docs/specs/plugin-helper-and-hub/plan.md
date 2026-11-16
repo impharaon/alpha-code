@@ -904,3 +904,5 @@ C6/C8/C9 FIXED（仅证据，无产品分支改动）：C6 在既有 converter p
 逐项负控制：只给 npm metadata 加一个换行→digest 例 exit 1（c6-digest-negative.log）；临时在卡片 login 中插入真实 extIpc.installFromSource 调用→零写调用断言 exit 1（c8-install-negative.log）；临时把 search 完整性门挪到 CAS 提升之后→全树快照在新增 CAS 节点处 exit 1、旧两路径断言仍过（c9-cas-negative.log）。全部 finally 原字节恢复。四文件 install-from-source/converter/artifact/hub-install-card exit 0（c6-c8-c9-green.log）；不把本来绿色的实现报作新产品修复。
 
 C6 新核数据补充：npm empty-search.json 的真实记录是 286,376B，高于 r13 brief「最大 pinned index 不足 200KB」的前提；它被 fixtureFetch 变成无匹配受控页时响应较小。上段列举的四份索引尺寸仍正确，固定原样本最大现应按 286,376B（约 280KiB）报告，30 秒查询预算仍留充分余量。仅事实更正，未改期限裁定或编排器设计。
+
+B10/B11 前提属实：errored hub_search 仍生成 searching 行；空查询的真实固定市场有超过 25 个 Claude 候选，工具无裁剪原样 JSON 输出。两个命名 red 分别 exit 1（b10-red.log、b11-red.log）。B11 仅模型输出取各源前 25 个，完整 main 结果与 matched/skipped/失败状态保留，Hub 仍全部可见/可安装；不是包/用户数量限额。

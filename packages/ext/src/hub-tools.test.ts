@@ -313,3 +313,20 @@ test("R13 C1 status price notes are verbatim and main warnings stay private", as
     expect(output).toContain("this list may be incomplete")
   }
 })
+
+test("R14 B11 chat search bounds each source while retaining full main results and status counts", async () => {
+ const {createPluginSources}=await import("../../ui-mac/src/main/plugin-sources")
+ const {fixtureFetch}=await import("../../ui-mac/test-fixtures/plugin-helper/source-fetch")
+ const answer=await createPluginSources({catalog:async()=>[],fetch:fixtureFetch}).searchSources("")
+ expect(answer.candidates.filter(candidate=>candidate.source==="claude-marketplace").length).toBeGreaterThan(25)
+ const h=bridgeWith({views:[view([])]})
+ h.bridge.search=async()=>({ok:true,result:answer})
+ const context=contextWith(async()=>{})
+ const output=await tools(h.bridge,context.context).codepuppy_hub_search!.execute({query:""},context.ctx)
+ const shown=JSON.parse(contentOf(output)) as typeof answer
+ expect(shown.sources).toEqual(answer.sources)
+ for(const status of answer.sources)
+  expect(shown.candidates.filter(candidate=>candidate.source===status.source)).toEqual(answer.candidates.filter(candidate=>candidate.source===status.source).slice(0,25))
+ expect(answer.candidates.filter(candidate=>candidate.source==="claude-marketplace").length).toBeGreaterThan(25)
+ expect(output.metadata).toEqual({searchId:answer.searchId})
+})

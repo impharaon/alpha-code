@@ -2,6 +2,7 @@ import { createEffect, createMemo, createResource, createSignal, For, Show, onCl
 import type { CandidateV1, SourceSearchResultV1 } from "../../main/plugin-sources"
 import type { InstallOutcomeV1 } from "../../shared/plugin-install"
 import { t } from "../i18n"
+import { iconForRow, PackageLogo } from "./ext-presentation"
 import { pluginSourceLabelKey, pluginInstallFailureKey, pluginSourceFailureKey } from "./ext-package-presentation"
 
 /** Search owns pending selection only; main owns order, identity, installation and status. */
@@ -107,7 +108,7 @@ export function PluginSourceChoices<C extends Pick<CandidateV1, "id" | "displayN
                     when={packageId()}
                     fallback={
                       <div class="codepuppy-ext-kit">
-                        <span class="codepuppy-ext-kit-ic">{candidate.displayName.slice(0, 1)}</span>
+                        <span class="codepuppy-ext-kit-ic" style={{ background: iconForRow(undefined, "plugin", candidate.displayName).color }}><PackageLogo listing={undefined} fallback={candidate.displayName} /></span>
                         <div class="codepuppy-ext-kit-body">
                           <div class="codepuppy-ext-kit-ttl">
                             <b>{candidate.displayName}</b>

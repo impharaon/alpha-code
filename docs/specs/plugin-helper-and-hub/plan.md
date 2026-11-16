@@ -168,7 +168,7 @@ r2 验证：ui-mac `bun test --max-concurrency 2 src/shared/host-extension-packa
 ## 来源扩展（B/C 的转换与查询层）
 
 - 依据：[Issue #1724](https://github.com/impharaon/alpha-code/issues/1724)；[SPEC-plugin-helper-and-hub v3](https://github.com/impharaon/alpha-work/blob/8663fb2a982eaf7c626bfee3bcd8b20b870f2577/docs/specs/plugin-helper-and-hub/spec.md) AC-02、AC-05、AC-15 的查找、取源和转换部分；[DESIGN-plugin-helper-and-hub v4](https://github.com/impharaon/alpha-work/blob/850fd2a61f220596fb10922c8b2e477c7475fac4/docs/specs/plugin-helper-and-hub/design.md) §4.2、§4.3、§4.9，及 §4.1/§4.8 的来源、身份比较部分，按 §8 B/C 分工；继承 [DESIGN-local-plugin-install §4.1/4.2/4.5](https://github.com/impharaon/alpha-work/blob/8663fb2a982eaf7c626bfee3bcd8b20b870f2577/docs/specs/local-plugin-install/design.md) 的转换类型、捕获及秘密处理规则。§10 处置与 owner 两项决定不重开。
-- 核对：待编排器核对本节；首笔实施提交从续派 brief 的 `Phase:` 行填入计划提交、核对者/模型和结论，不以本次作者自查代替。
+- 核对：Phase: IMPLEMENT — b4c822f9f5 · orchestrator/Claude Fable 5.2 · plan check passed for S1, S3 and S4 (per-source ok/failed, identity after conversion, real pinned samples, failing-capable proofs; no restriction added); S2's native-module record waits for the design amendment。本轮仅授权按 S1→S3 实施；S2、S4 仍冻结，设计原生模块表示另待回传。
 - 代码基线：`8e40a921ec09cc95d8580142fd45af760d3599d1`，派定工作树 `alpha-code-feat-helper-sources`、分支 `feat/helper-sources`，Bun 1.4.4。沿用上节 A1 的 converter/artifact、main 候选表与只读 capture；开工不依赖 A2，安装集成等待 A2。
 - 文档影响：实施计划；本阶段只追加本节，保留上节历史证据，不改变 frontmatter、索引、规格、设计或其他 lane 文件。安装入口、builders、账本、IPC/preload/ext、renderer/i18n、UI 与真实服务调用均由其他 lane 承担。本机目录捕获沿 `Source.kind: folder`，不向固定的远端搜索来源枚举加第六项。
 - 预计规模：6 个生产/生成文件（下表），3 个测试文件，约 20–30 个真实夹具/来源记录文件；约 1,200–1,800 行实质改动，不计上游原字节与生成产物，实施及相关验证约 4–6 小时。拆成 S1–S4 顺序提交；每段核对规模/用时，达到估算两倍即返回。PLAN 从 2026-11-16 06:48:37 UTC 开始，预算 40 分钟。
@@ -245,3 +245,5 @@ r2 验证：ui-mac `bun test --max-concurrency 2 src/shared/host-extension-packa
 2026-11-16 · 本次只写计划，生产与夹具文件均未改。AC-15 的原生 JS 记录因规范化表示缺口返回设计；其他来源的步骤与证明保留，未自定新合同。Issue 当前正文「依据/交接」仍钉 design v3 @8663fb2；本派发和代码上节收据钉 v4 @850fd2a，且 v4 §10 明确其余来源章节不变；引用差异返回编排器更新有效正文，本 lane 不改 Issue、不读取评论另择版本。安装、UI 与真实服务验收仍归其他车道。OPTIONAL：无。
 
 PLAN 检查（2026-11-16）：`python3 scripts/check-doc-links.py docs/specs/plugin-helper-and-hub/plan.md` exit 0（2 条相对链接）；`git diff --check` exit 0。额外用 `check-docs-contract` 的只读 `check_repo`、Alpha 真实 profile 与 `changed_since=HEAD` 检查本工作树，exit 1：72 errors / 217 warnings（索引 1、README Project 链接 1、旧链接 28、旧目录 35、既有规格额外文件 4、跨仓规格/设计 ID 3）。原计划是工作文件未改的前缀，frontmatter 相同，3 个跨仓 ID 在 HEAD 已有；不修改范围外文档或撤掉引用。明细在上述临时目录 `docs-contract.json`，遗留去向为编排器/文档治理，非本片新增阻塞。原生 JS 合同缺口单独返回，其他检查不得被报告成全部通过。未跑生产测试、typecheck 或全门。本阶段约 18 分钟，仅新增本节 81 行；已核为计划作者 Codex（GPT-6）自查，不代替编排器核对。
+
+2026-11-16 r1 / S1 红例 · 按续派填入核对回执，仅实施 S1→S3；新增 Codex 真实选择夹具（固定提交、9 个原文件及裁剪归档摘要）。三文件相关测试命令 exit 1，29 pass / 9 fail / 245 assertions，日志 `/tmp/helper-sources-s1-red.log`：7 个新增 Codex 行为失败，另 2 个既有请求计数已按新增 Codex 查询更新、实现尚未发请求；未改生产代码。

@@ -2,8 +2,55 @@ import { expect, test } from "bun:test"
 import { join } from "node:path"
 import { captureFixture, digest, fixtureRoot } from "../../../test-fixtures/plugin-helper/fixture"
 import provenance from "../../../test-fixtures/plugin-helper/provenance.json"
+import codex from "../../../test-fixtures/plugin-helper/codex/provenance.json"
 
 const converter = () => import("./plugin-conversion")
+
+test("pinned Codex marketplace preserves real local sources and provenance", async () => {
+  for (const file of [...codex.files, { path: codex.archive.path, sha256: codex.archive.sha256 }])
+    expect(digest(await Bun.file(join(fixtureRoot, "codex", file.path)).bytes())).toBe(`sha256:${file.sha256}`)
+  const read = (await converter()).readMarketplace(await Bun.file(join(fixtureRoot, "codex/.agents/plugins/marketplace.json")).bytes(), "codex")
+  expect(read.entries).toHaveLength(65)
+  expect(read.entries.find((entry) => entry.name === "figma")).toMatchObject({ source: { kind: "path", path: "plugins/figma" }, category: "Creativity" })
+  expect(read.diagnostics).toEqual([])
+})
+
+test("pinned Codex Figma keeps skill MCP and provider metadata", async () => {
+  const captured = await captureFixture("plugins/figma", {}, "codex")
+  const converted = await (await converter()).convertPluginTree(captured)
+  expect(converted.package).toMatchObject({ provider: "codex", name: "figma", version: "2.0.20", source: { ecosystem: "codex", commit: codex.commit } })
+  expect(converted.package.entries).toContainEqual(expect.objectContaining({ kind: "skill", sourceName: "figma-code-connect", sourcePath: "skills/figma-code-connect/SKILL.md" }))
+  expect(converted.package.entries).toContainEqual(expect.objectContaining({ kind: "mcp", sourceName: "figma", transport: "http", url: ["https://mcp.figma.com/mcp"] }))
+  expect(converted.package.diagnostics).toContainEqual(expect.objectContaining({ path: ".app.json", code: "unresolved-app-id" }))
+  const published = await import("./plugin-conversion.mjs")
+  expect((await published.convertPluginTree(captured)).package).toEqual(converted.package)
+})
+
+test("Codex root manifest and invocation controls reuse the same conversion", async () => {
+  const original = await captureFixture("plugins/figma", {}, "codex")
+  const manifest = new TextDecoder().decode(await original.readFile(".codex-plugin/plugin.json"))
+  const skill = new TextDecoder().decode(await original.readFile("skills/figma-code-connect/SKILL.md"))
+  // Relocate the real manifest and add the documented Codex invocation field to real frontmatter.
+  const root = await captureFixture("plugins/figma", { ".codex-plugin/plugin.json": null, "plugin.json": manifest, "skills/figma-code-connect/SKILL.md": skill.replace("---\n", "---\nallow_implicit_invocation: false\n") }, "codex")
+  const converted = await (await converter()).convertPluginTree(root)
+  expect(converted.package).toMatchObject({ provider: "codex", name: "figma", version: "2.0.20" })
+  expect(converted.package.entries.find((entry) => entry.kind === "skill")).toMatchObject({ invocation: { implicitInvocation: false } })
+})
+
+test("real app identifiers stay unresolved without inventing MCP", async () => {
+  const converted = await (await converter()).convertPluginTree(await captureFixture("plugins/github", {}, "codex"))
+  expect(converted.package.provider).toBe("codex")
+  expect(converted.package.entries).toEqual([])
+  expect(converted.package.diagnostics).toContainEqual(expect.objectContaining({ path: ".app.json", code: "unresolved-app-id" }))
+  expect(converted.package.diagnostics).toContainEqual(expect.objectContaining({ path: ".mcp.json", code: "missing-entry" }))
+})
+
+test("real Codex Gmail OAuth snake-case fields and scopes remain typed and redacted", async () => {
+  const converted = await (await converter()).convertPluginTree(await captureFixture("plugins/gmail", {}, "codex"))
+  expect(converted.package.entries).toMatchObject([{ kind: "mcp", oauth: { oauth: { clientId: "<GMAIL_PUBLIC_CLIENT_ID>", clientSecret: [{ secret: expect.any(String) }], scopes: expect.arrayContaining(["https://mail.google.com/"]) } } }])
+  expect(converted.package.secrets).toContainEqual(expect.objectContaining({ targets: [{ file: ".mcp.json", pointer: "/mcpServers/gmail/oauth/client_secret" }] }))
+  expect(converted.replacements.get(".mcp.json")).toBeDefined()
+})
 
 test("recorded upstream bytes and reduced codeload archive match their provenance", async () => {
   for (const file of [...provenance.files, { path: provenance.archive.path, sha256: provenance.archive.sha256 }])

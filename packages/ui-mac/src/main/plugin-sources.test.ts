@@ -2,6 +2,7 @@ import { expect, test } from "bun:test"
 import { gunzipSync, gzipSync } from "node:zlib"
 import { join } from "node:path"
 import catalog from "../renderer/extensions/codepuppy-catalog.json"
+import codex from "../../test-fixtures/plugin-helper/codex/provenance.json"
 import { fixtureCommit, fixtureRoot } from "../../test-fixtures/plugin-helper/fixture"
 
 const sourcesModule = () => import("./plugin-sources")
@@ -13,6 +14,8 @@ async function fixtureFetch(url: string | URL | Request): Promise<Response> {
   const address = String(url)
   if (address === "https://raw.githubusercontent.com/anthropics/claude-plugins-official/main/.claude-plugin/marketplace.json") return new Response(await marketplace())
   if (address === "https://codeload.github.com/anthropics/claude-plugins-official/tar.gz/refs/heads/main") return new Response(await archive())
+  if (address === "https://raw.githubusercontent.com/openai/plugins/main/.agents/plugins/marketplace.json") return new Response(await Bun.file(join(fixtureRoot, "codex/.agents/plugins/marketplace.json")).bytes())
+  if (address === "https://codeload.github.com/openai/plugins/tar.gz/refs/heads/main") return new Response(await Bun.file(join(fixtureRoot, "codex/selection.tar.gz")).bytes())
   throw new Error(`unexpected fixture URL: ${address}`)
 }
 
@@ -21,7 +24,7 @@ test("catalog miss continues to the pinned Claude context7 entry", async () => {
   expect(JSON.parse(await marketplace()).plugins.some((entry: { name: string }) => entry.name === "context7")).toBe(true)
   const sources = (await sourcesModule()).createPluginSources({ catalog: async () => catalogCandidates(), fetch: fixtureFetch })
   const result = await sources.searchSources("context7")
-  expect(result.sources).toMatchObject([{ source: "catalog", status: "ok", matched: 0 }, { source: "claude-marketplace", status: "ok", matched: 1 }])
+  expect(result.sources.slice(0, 2)).toMatchObject([{ source: "catalog", status: "ok", matched: 0 }, { source: "claude-marketplace", status: "ok", matched: 1 }])
   expect(result.candidates).toMatchObject([{ source: "claude-marketplace", name: "context7", upstream: { repository: "https://github.com/anthropics/claude-plugins-official", path: "external_plugins/context7" } }])
   expect(result.candidates[0]!.id).toMatch(/^cand_/)
   expect(result.searchId).not.toBe("")
@@ -54,7 +57,7 @@ test("successful index and pinned archive bytes are reused within the applicatio
   const one = await sources.captureCandidate(id)
   const two = await sources.captureCandidate(id)
   expect(one.ok && two.ok && one.capture === two.capture).toBe(true)
-  expect(requests).toHaveLength(2)
+  expect(requests).toHaveLength(3)
   expect(requests.every((url) => !url.includes("api.github.com"))).toBe(true)
 })
 
@@ -62,11 +65,11 @@ test("failed sources are truthful and not cached as no results", async () => {
   let calls = 0
   const sources = (await sourcesModule()).createPluginSources({ catalog: async () => [], fetch: async (url) => ++calls === 1 ? new Response("unavailable", { status: 503 }) : fixtureFetch(url) })
   const failed = await sources.searchSources("playwright")
-  expect(failed.sources).toMatchObject([{ status: "ok" }, { source: "claude-marketplace", status: "failed", reason: "http" }])
+  expect(failed.sources.slice(0, 2)).toMatchObject([{ status: "ok" }, { source: "claude-marketplace", status: "failed", reason: "http" }])
   expect(failed.candidates).toEqual([])
   const retried = await sources.searchSources("playwright")
   expect(retried.candidates).toHaveLength(1)
-  expect(calls).toBe(2)
+  expect(calls).toBe(3)
 })
 
 test("invalid index is a format failure and unknown candidate cannot start a download", async () => {
@@ -74,7 +77,7 @@ test("invalid index is a format failure and unknown candidate cannot start a dow
   const sources = (await sourcesModule()).createPluginSources({ catalog: async () => [], fetch: async () => { requests++; return new Response("{not-json") } })
   expect(await sources.captureCandidate("cand_invented")).toMatchObject({ ok: false, code: "unknown-id" })
   expect(requests).toBe(0)
-  expect((await sources.searchSources("playwright")).sources).toMatchObject([{ status: "ok" }, { status: "failed", reason: "format" }])
+  expect((await sources.searchSources("playwright")).sources.slice(0, 2)).toMatchObject([{ status: "ok" }, { status: "failed", reason: "format" }])
 })
 
 test("selected entry changed between index and codeload is source-changed", async () => {
@@ -99,4 +102,42 @@ test("non-GitHub and command sources are counted but never minted as installable
   const result = await sources.searchSources("xcode")
   expect(result.candidates.some((candidate) => candidate.name === "xcode")).toBe(false)
   expect(result.sources.find((source) => source.source === "claude-marketplace")).toMatchObject({ status: "ok", skipped: 1 })
+})
+
+test("Codex local entry captures only its pinned subtree and rechecks marketplace membership", async () => {
+  const sources = (await sourcesModule()).createPluginSources({ catalog: async () => [], fetch: fixtureFetch })
+  const result = await sources.searchSources("figma")
+  expect(result.sources.map((source) => source.source)).toEqual(["catalog", "claude-marketplace", "codex-marketplace"])
+  expect(result.sources[2]).toMatchObject({ status: "ok", matched: 1, skipped: 0 })
+  const candidate = result.candidates.find((entry) => entry.source === "codex-marketplace")!
+  expect(candidate).toMatchObject({ name: "figma", upstream: { repository: codex.repository, path: "plugins/figma" } })
+  const captured = await sources.captureCandidate(candidate.id)
+  expect(captured.ok).toBe(true)
+  if (!captured.ok) throw new Error(captured.code)
+  expect(captured.capture.source).toMatchObject({ ecosystem: "codex", commit: codex.commit, pluginPath: "plugins/figma" })
+  expect(captured.capture.nodes.every((node) => !node.path.startsWith("plugins/"))).toBe(true)
+  expect(await captured.capture.readFile(".mcp.json")).toEqual(await Bun.file(join(fixtureRoot, "codex/plugins/figma/.mcp.json")).bytes())
+  expect(await sources.captureCandidate(candidate.id)).toEqual(captured)
+  // Only change the selected path in a recorded real index; the archive retains its original entry.
+  const index = JSON.parse(await Bun.file(join(fixtureRoot, "codex/.agents/plugins/marketplace.json")).text())
+  index.plugins.find((entry: { name: string }) => entry.name === "figma").source.path = "./plugins/github"
+  const changed = (await sourcesModule()).createPluginSources({ catalog: async () => [], fetch: async (url) => url.includes("openai/plugins/main/") ? Response.json(index) : fixtureFetch(url) })
+  const found = (await changed.searchSources("figma")).candidates.find((entry) => entry.source === "codex-marketplace")!
+  expect(await changed.captureCandidate(found.id)).toMatchObject({ ok: false, code: "source-changed" })
+})
+
+test("Codex failures retry per source while successful Claude results survive", async () => {
+  let attempts = 0
+  const sources = (await sourcesModule()).createPluginSources({ catalog: async () => [], fetch: async (url) => {
+    if (!url.includes("openai/plugins/main/")) return fixtureFetch(url)
+    attempts++
+    return attempts === 1 ? new Response("unavailable", { status: 503 }) : fixtureFetch(url)
+  } })
+  const failed = await sources.searchSources("figma")
+  expect(failed.sources[2]).toMatchObject({ source: "codex-marketplace", status: "failed", reason: "http" })
+  expect(failed.candidates.some((entry) => entry.source === "claude-marketplace")).toBe(true)
+  const retried = await sources.searchSources("figma")
+  expect(retried.sources[2]).toMatchObject({ status: "ok", matched: 1 })
+  await sources.searchSources("figma")
+  expect(attempts).toBe(2)
 })

@@ -151,6 +151,7 @@ test("project MCP activates only in matching Locations and scope narrowing revok
     await until(() => h.rpc("tools", h.other), items => items.includes("browser_close"))
     expect(await h.install({ requestId: "r12_effect_narrow", source: { kind: "candidate", candidateId: candidate.id }, effect: { kind: "project", directory: h.slot.projectDirectory }, via: "chat" })).toMatchObject({ ok: true, packageId: "claude:playwright" })
     await until(() => h.rpc("tools", h.other), items => !items.includes("browser_close"))
+    await until(() => h.rpc("tools"), items => items.includes("browser_close"))
     expect((await h.rpc("close", undefined, h.session.id)).content.some((part) => part.type === "text" && part.text.length > 0)).toBe(true)
     const projection = readFileSync(join(h.root, "skills-enabled.json"), "utf8")
     writeFileSync(join(h.root, "skills-enabled.json"), JSON.stringify({ v: 2, keys: [], scoped: [] }))

@@ -816,3 +816,5 @@ A3 前提属实：SourceChanged 只删 capture，不删 marketplace index 或 ma
 A3 FIXED：SourceChanged 同时淘汰该市场 index、市场 refs/heads/main archive；外部 Git 源还淘汰本次实际 revision 的错误 archive。第二次 search 读取当前 index，再次捕获核同一已验提交，不需要重启。完整 plugin-sources.test.ts exit 0（34 pass，a3-green.log），原重试红例不改断言；未给缓存新增 TTL/容量或改 source-changed 错误合同。
 
 A4 前提属实：重复运行身份分支在比较 effect 前就返回 alreadyInstalled。同一技能包 project A→all→project B 的红例 exit 1（a4-red.log）；真实 MCP 同一包从 A 扩至 all，B 已加载 Location 在 15 秒后仍无 browser_close，exit 1（a4-engine-red.log）。两例均保持包身份单一、物理全局与项目文件零改动，未改变已有 scope 断言。
+
+A4 FIXED：同一运行身份且 effect 相等才返回 alreadyInstalled；effect 不同复用原包 id 走更新，沿用既有全局物理安装、项目逻辑 effect、声明与运行时接入。unit 相关集 exit 0（a4-unit-green.log）；真实 package-effect/plugin-entrypoints 两宿主 exit 0（内部 5/5，a4-engine-green.log），两 Location 扩至全局/缩回项目均实测工具库存。连续更新后旧 close 调用仍保持，在调用前显式等 A 的工具库存恢复，以覆盖真实配置去抖窗口而非把瞬时断连当稳定态；首轮该窗口日志保留于初次输出。未改行为断言。ui-mac bun typecheck exit 0（a4-ui-types.log）。

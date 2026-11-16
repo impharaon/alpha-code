@@ -107,7 +107,7 @@ export function createSourceInstaller(deps: Dependencies) {
       const slug = converted.package.name.toLowerCase().replace(/[^a-z0-9._-]/g, "-").replace(/^[^a-z0-9]+/, "").slice(0, 119) || "plugin"
       const namespace = source.kind === "created" ? "mine" : source.kind === "marketplace" ? source.ecosystem : source.kind === "npm" ? "opencode" : source.kind === "mcp-registry" ? "mcpreg" : "local"
       const proposed = namespace + ":" + slug
-      const sameSource = before.packageGraphs.find(
+      const fromSource = before.packageGraphs.find(
         (graph) => graph.source && sourceIdentity(graph.source) === sourceIdentity(source) && ((source.kind !== "created" && source.kind !== "local-folder") || graph.packageId === proposed),
       )
       const duplicate =
@@ -116,9 +116,11 @@ export function createSourceInstaller(deps: Dependencies) {
           (graph) =>
             graph.declarations &&
             installedPackageIdentity(graph).runtimeIdentity === identity &&
-            (graph.packageId !== sameSource?.packageId || graph.envelopeDigest === converted.package.treeDigest),
+            (graph.packageId !== fromSource?.packageId || graph.envelopeDigest === converted.package.treeDigest),
         )
-      if (duplicate) return outcomeOf(duplicate, true)
+      if (duplicate && canonicalJson(duplicate.effect ?? null) === canonicalJson(project?.ok ? project.scope : null))
+        return outcomeOf(duplicate, true)
+      const sameSource = duplicate || fromSource
       const packageId =
         sameSource?.packageId ??
         (before.packageGraphs.some((graph) => graph.packageId === proposed)

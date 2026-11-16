@@ -735,3 +735,23 @@ BC5 固定样本字面期望更正（单独提交，standing ruling）：`plugin
 BC5 原生入口监测的测试接线修正：单独 Registry 例停在 pending 且传输收到 0 请求；先尝试全局 fetch 与既有 engine fetch 注入口两种控制都保持 pending，不能将其归因于 fetch 捕获。实际记录的 onLoad 路径显示，新监测器 `/dist/index.js` 还拦了引擎已锁定依赖 `eventsource@3.0.7`／`eventsource-parser@3.1.1`，错误地拿它们与包入口摘要比较（`r10-bc5-registry-monitor.log`）。仅在回调内按摘要返回 undefined 仍 pending；将 Bun filter 本身限定到隔离 sandbox 的输入／托管目录后，依赖不再过这条钩子，Registry 单例 exit 0（`r10-bc5-registry-monitor-filter.log`，1 pass／23 assertions）。实际包入口仍被无操作替换，正控制 1、各安装过程 0；没有加载第三方 JS、修改生产行为、去掉或放宽断言。
 
 新 cases 为封闭协议运输，直接把现有 ServerOptions.fetch 注入口传给原 `startEngine`（使用 `codepuppyEngine` 的原注入配置／ext／数据库／probe），而非给生产添加选项或更改引擎。必要测试启动代码仅留在此新文件，不改共享 harness 或 Core。失败诊断只记 URI 路径／认证布尔值和公开库存，不记令牌值。此提交只修正测试宿主形状，额外实际技能调用与专有令牌文件清理断言下一笔追加。
+
+
+BC5 当前收据／未闭环（r10）：补了实际技能工具调用及正负凭据证据，不只读列表：真 session 的 `skill` 工具返回固定样本正文；Registry 令牌正臂在专用目录恰有 1 文件，图／消息／日志／config 负臂零命中，移除后该文件消失。新增库存判断同时要求 ext、config.skill、probe 都 active，避免把重载期间暂时的空表当作“关闭生效”；场景入口也先核已载入的桌面 Location。这是加强原有关闭／移除语义，没有改产品等待、状态或阈值。
+
+此强化暴露 **AC-15 尚未通过**：`bun test --max-concurrency 2 --test-name-pattern '^BC5 chat installs' ./src/main/plugin-entrypoints.engine.cases.ts` exit 1（`r10-bc5-off-state.log`）。主进程关闭返回 ok；15 秒后 37 张账本记录全为 disabled，`skills-enabled.json` 为 `{v:2,keys:[],scoped:[]}`；合成显式文件仍有 38 条 skills（37 受管目录＋项目路径），完整已载入引擎仍有 37 技能。失败点 `plugin-entrypoints.engine.cases.ts` 的 `OpenCode skills off`。前面的短暂空表与较弱谓词曾得到绿，**这些日志不再作为 AC-15 关闭／完整生命周期通过证据**；`r10-bc5-engine-full.log`／`r10-bc5-engine-settled.log` 已留实际整组失败，不用隔离或重启绕过去。
+
+当前定位到“账本／v2 允许集已收窄，显式配置未撤路径”的既有接缝；`codepuppy-config-injection.ts:112` 的 explicitSkillDirs、`engine-explicit-config.ts:101` 的 watchExplicitSources 和生产 `sidecar.ts:154` 为同一投影链。尚未鉴别为生产监听还是新宿主运输差异，不把它宣称为已证实的 Core／H 缺陷；本轮没有旁路其单一算法、写第二份配置或修改 H 状态／D/E／Core。下一步准确范围是核这条显式配置更新接缝，让上述原红例在 loaded 状态撤完技能，再完成三入口 off/on/remove 五例宿主；BC5 在此可恢复红例边界交回，BC4 完成，不报 BC5 完成。
+
+已完成的独立证据：
+
+- `bun test --max-concurrency 2 --test-name-pattern '^BC5 standalone official|^BC5 Figma plugin' ./src/main/plugin-entrypoints.engine.cases.ts` exit 0，2 pass／40 assertions（`r10-bc5-independent-final.log`）。GitHub 是独立 Registry 公共定义、单图、同包专用令牌、真引擎发现／调用 echo 协议工具、关闭／移除有效；只模拟 MCP 运输，未使用真实账号。Figma 插件聊天查询与明确官方 MCP 的搜索查询进入各自 main 安装，source／commit／publisher／version／URL 均来自已捕获定义，官方 MCP 保留待登录，不报已授权。两例项目字节均不变。
+- `bun test --max-concurrency 2 src/shared/host-extension-package-contract/plugin-conversion.test.ts src/shared/host-extension-package-contract/host-extension-package-artifact.test.ts src/main/plugin-sources.test.ts` exit 0，64 pass／434 assertions（`r10-bc5-sources-final.log`）。去掉 npm/OpenCode 发现／Git 取源、换 Figma 查询目标或丢官方 URL／发布者都会红；原字节逐一验摘要。
+- `npm_config_cache=/tmp/helper-install-plan-YCXgtv/npm-cache npm_config_offline=true bun test --max-concurrency 2 src/main/plugin-entrypoints.engine.test.ts src/main/install-from-source.engine.test.ts src/main/ext-package-ledger-uninstall.test.ts src/main/ext-set-state-tx.test.ts` exit 1，65 pass／1 fail（`r10-bc5-related-final.log`）；唯一红宿主为上述 BC5，内部首红技能关闭，其余残留图级联不计独立缺陷。A2 完整宿主（严格内部两例）、账本卸载与状态事务仍绿，决定 1 没有回退。
+- ui-mac／ext 各 `bun typecheck` exit 0（`r10-final-{ui,ext}-types.log`）；BC4 的 137 pass 与 sidecar 6 pass 收据如上。文档链接与 diff 检查在最终提交前执行。
+
+规模／偏离：r10 到 12:39 UTC 约 76 分钟，生产为 BC4 的 9 文件约 245 行增删；BC5 零生产改动、新 engine 宿主／cases、sources 两例与 35 份原响应（共约 3.2 MB，摘要／压缩另记）。私有 auth helper、测试宿主初始化、固定 Git missing-entry 字面与 JS 监测钩子形状修正均已逐笔留档，没有放宽行为断言。H/D/E 共享生产文件本轮只触及 `extension-detail.tsx` 的密码窗提取／调用段，另共同计划文件；未动 plugin-sources.ts／install-from-source.ts／ext-ipc.ts／package-mcp-activation.ts／extension-hub.tsx 的并行段。
+
+已核：Codex（GPT-6）作者自查，PARTIAL。依据仍为 spec v3／design v5 和 r8/r10 授权；已定勿重开不变。遗留去向：BC5 技能显式配置生效差异→编排器接回／下一轮；H 现有生命周期宿主 refreshes 超时→H／编排器（上述单次对照，不修）；构建应用的两句 Figma 自然语言、真实 GitHub 授权只读任务、Supabase 系统浏览器登录与时间线屏幕证据→编排器实际验收。未做真实账号登录、外部写入、gate/bin/check、push/PR/merge；OPTIONAL 无。
+
+最终文档验证：`python3 scripts/check-doc-links.py docs/specs/plugin-helper-and-hub/plan.md` exit 0（3 个相对链接）；`git diff --check` exit 0。本轮所有前台命令已结束；以保留可复现红例的提交交回，不把 BC5 宿主报绿。

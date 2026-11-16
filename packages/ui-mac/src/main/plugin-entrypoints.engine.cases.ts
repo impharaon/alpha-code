@@ -1,6 +1,6 @@
 // Real main/sidecar/ext/engine; pinned third-party bytes are only parsed, never executed.
 // GitHub's authenticated transport uses the repository's echo MCP fixture, not a real account.
-import { afterAll, beforeAll, expect, mock, test } from "bun:test"
+import { afterAll, beforeAll, beforeEach, expect, mock, test } from "bun:test"
 import { createHash } from "node:crypto"
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs"
 import { dirname, join } from "node:path"
@@ -46,6 +46,11 @@ async function until(check: () => Promise<boolean>, label: string) {
   }
 }
 const send = (method: string, route: string, body?: unknown) => running!.send(method, route, body)
+const loaded = async () => {
+  const plugins = (await send("GET", "/api/plugin")).json.data as Array<{ id: string; state: { status: string } }>
+  return ["codepuppy.ext", "opencode.config.skill", "codepuppy.test.engine-probe"].every(id => plugins.some(plugin => plugin.id === id && plugin.state.status === "active"))
+}
+const ready = () => until(loaded, "loaded desktop Location")
 const skills = async () => (await send("GET", "/api/skill")).json.data as Array<{ id: string; name: string; content: string }>
 async function ledger() {
   const { readPackageLedgerStateV1 } = await import("./ext-receipt-v2")
@@ -166,10 +171,7 @@ beforeAll(async () => {
       return { status: response.status, json: raw ? JSON.parse(raw) : undefined }
     },
   }
-  await until(async () => {
-    const plugins = (await send("GET", "/api/plugin")).json.data as Array<{ id: string; state: { status: string } }>
-    return ["codepuppy.ext", "codepuppy.test.engine-probe"].every(id => plugins.some(plugin => plugin.id === id && plugin.state.status === "active"))
-  }, "desktop ext readiness")
+  await ready()
   // Intercept every matching import before any module code can execute. The positive control
   // proves this monitor sees the actual pinned native entry, then installs must yield zero hits.
   const nativeEntryFilter = new RegExp("^" + sandbox.root.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "/.*dist/index\\.js$")
@@ -197,6 +199,7 @@ beforeAll(async () => {
 }, 60_000)
 
 let nativeEntryDigest = ""
+beforeEach(ready)
 afterAll(async () => {
   stopWatching?.()
   await running?.close()
@@ -217,24 +220,39 @@ async function verifyOpenCodeLifecycle(packageId: string, unsupported: { kind: s
   expect(names.length).toBeGreaterThan(30)
   const inventory = async () => (await skills()).filter(skill => names.includes(skill.name))
   try {
-    await until(async () => (await inventory()).length === names.length, "all installed OpenCode skills available")
+    await until(async () => await loaded() && (await inventory()).length === names.length, "all installed OpenCode skills available")
   } catch (error) {
     throw Error(String(error) + JSON.stringify({ expected: names, actual: (await skills()).map(skill => skill.name), reloads: wire.filter(message => (message as { type?: string }).type?.includes("reload")), plugin: (await send("GET", "/api/plugin")).json.data }))
   }
   expect((await inventory()).map(skill => skill.name).sort()).toEqual(names)
   expect((await inventory()).every(skill => skill.content.length > 20)).toBe(true)
+  const { probe } = await import("../../test-component/codepuppy-engine")
+  const session = await send("POST", "/api/session", { agent: "build", permissions: [{ action: "*", resource: "*", effect: "allow" }] })
+  expect(session.status).toBe(200)
+  const selected = (await inventory())[0]!
+  const skillContext = { ...ctx(), sessionID: session.json.data.id }
+  const skillTool = () => probe().ctx.tool.list().then((tools: Array<{ name: string; execute: (input: unknown, context: unknown) => Promise<{ content: string; output: { name: string } }> }>) => tools.find(tool => tool.name === "skill")!)
+  const instruction = await (await skillTool()).execute({ id: selected.id }, skillContext)
+  expect(instruction.output.name).toBe(selected.name)
+  expect(instruction.content).toContain(selected.content.trim())
   expect(state.records.every(record => record.desiredState === "enabled")).toBe(true)
   expect(nativeLoads).toBe(0)
   const exclusivePaths = state.records.flatMap(record => record.files ?? [])
   expect(exclusivePaths.length).toBeGreaterThan(0)
   expect(await invoke("ext-set-package-state", { packageId, state: "disabled" })).toMatchObject({ ok: true })
-  await until(async () => (await inventory()).length === 0, "OpenCode skills off")
+  try {
+    await until(async () => await loaded() && (await inventory()).length === 0, "OpenCode skills off")
+  } catch (error) {
+    throw Error(String(error) + JSON.stringify({ root, records: (await ledger()).records.map(record => ({ name: record.name, desiredState: record.desiredState })), allow: JSON.parse(readFileSync(join(root, "skills-enabled.json"), "utf8")), explicitSkills: JSON.parse(readFileSync(host.injection.config.file!, "utf8")).skills, actual: (await inventory()).map(skill => skill.name) }))
+  }
   expect(await inventory()).toEqual([])
+  await expect((await skillTool()).execute({ id: selected.id }, skillContext)).rejects.toThrow()
   expect(await invoke("ext-set-package-state", { packageId, state: "enabled" })).toMatchObject({ ok: true })
-  await until(async () => (await inventory()).length === names.length, "OpenCode skills back on")
+  await until(async () => await loaded() && (await inventory()).length === names.length, "OpenCode skills back on")
   expect(await invoke("ext-uninstall-package", packageId)).toMatchObject({ ok: true })
   expect(await invoke("ext-reload-request", { scope: "global", items: [], reason: "BC5 package removed" })).toMatchObject({ ok: true })
-  await until(async () => (await inventory()).length === 0, "OpenCode skills removed")
+  await until(async () => await loaded() && (await inventory()).length === 0, "OpenCode skills removed")
+  expect(await inventory()).toEqual([])
   expect((await ledger()).packageGraphs).toEqual([])
   expect((await ledger()).records).toEqual([])
   for (const path of exclusivePaths) expect(existsSync(path)).toBe(false)
@@ -279,6 +297,18 @@ test("BC5 standalone official Registry GitHub uses main-owned credentials, runti
   if (!account.ok) throw Error(account.reason)
   expect(account.items).toMatchObject([{ kind: "secret", saved: false }])
   expect(await invoke("ext-save-package-secrets", { packageId, secrets: { [account.items[0]!.prerequisiteId]: TOKEN } })).toMatchObject({ ok: true })
+  const { USER_DATA_LAYOUT } = await import("./user-data-layout")
+  const secretRoot = join(host.userData, USER_DATA_LAYOUT.mcpSecrets)
+  const tokenFiles: string[] = []
+  const scan = (directory: string): void => {
+    for (const entry of readdirSync(directory, { withFileTypes: true })) {
+      const file = join(directory, entry.name)
+      if (entry.isDirectory()) scan(file)
+      if (entry.isFile() && readFileSync(file).includes(TOKEN)) tokenFiles.push(file)
+    }
+  }
+  scan(secretRoot)
+  expect(tokenFiles.length).toBe(1)
   const { probe } = await import("../../test-component/codepuppy-engine")
   const tools = async () => (await probe().ctx.tool.list()).filter((tool: { options?: { namespace?: string } }) => tool.options?.namespace === "github-mcp-server")
   try {
@@ -295,6 +325,7 @@ test("BC5 standalone official Registry GitHub uses main-owned credentials, runti
   await until(async () => (await tools()).length === 0, "Registry tool off")
   expect(await invoke("ext-uninstall-package", packageId)).toMatchObject({ ok: true })
   expect(await tools()).toEqual([])
+  for (const file of tokenFiles) expect(existsSync(file)).toBe(false)
   expect((await ledger()).packageGraphs).toEqual([])
   for (const surface of [wire, logs, await invoke("ext-installed-packages"), await ledger(), readFileSync(join(root, "codepuppy.jsonc"), "utf8")]) expect(JSON.stringify(surface)).not.toContain(TOKEN)
   unchangedProject()

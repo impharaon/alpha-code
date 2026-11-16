@@ -788,3 +788,7 @@ AC-15 在组装树已关闭，无新增产品修补：保留的 `BC5 chat instal
 本轮新提交只作 assembly 元数据收口：scripts/gate-files.tsv、退役源码锚记录、Hub count pin 与本计划；其余修改均在原 replay 提交中解决，D/E 共享文件已逐行列上表，未改 Core。已核 Codex（GPT-6）作者自查，组装相关自动证据 DONE；依据仍 spec v3/design v5、r11 裁定，已定勿重开不变。遗留去向仅上述真实应用验收→编排器；OPTIONAL 无。文档链接／diff／独立 registry 的最终收据在提交前核验。
 
 最终收口检查：独立 `bun test --max-concurrency 2 src/main/gate-file-registry.test.ts` exit 0（23 pass/176 assertions；registry-final.log）；`python3 scripts/check-doc-links.py docs/specs/plugin-helper-and-hub/plan.md` exit 0（7 个相对链接），`git diff --check` exit 0；AC-15 cases 与原 979fe21266 的文件 diff 为零，临时 mutation 无残留。`1ac2e61d8b` 是 HEAD 祖先，28 笔 replay 完整保留；另以一个 chore(assembly) 提交收口。所有前台命令完成，无 gate/bin/check/push/PR/merge 或真实账号动作。
+
+r12 代码审查处置（2026-11-16 13:27:38 UTC 开始）：独立一轮，Claude Opus 5.5 只读审查 `origin/alpha@23546fd5b1...6377955826`；part A/B 均 FIX-THEN-MERGE，编排器采纳 A1–A10/B1–B12，原报告为 session-f35ed133 的 r2-findings-A.md、r2-findings-B.md。按 r12 顺序逐项核前提、红例先行，修正仍消费 spec v3/design v5，不重审既定决定；part C 待下一续派，不计本轮已收。
+
+B1 前提属实：原 hub-install-ask 的三条 proof 名与 hubInstallEvaluate 均已退役，登记未同步。先行原有行为闸 `cd packages/ext && bun test --max-concurrency 2 src/policy/authority-registry.test.ts` exit 1（4 pass/1 fail，三条 test not found，`/tmp/helper-install-r12/b1-red.log`）；现有已提交闸就是本项红例，不另造只测文案的测试。已读 ADR-048 决定 3/4，随后按其 retired.quote/date/by 形状保留旧条目，并登记仍在役的 automation deny/ordinary tier/main ID 权威与现有真实正反例。

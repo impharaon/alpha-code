@@ -1,3 +1,4 @@
+import { convertCreatedPlugin } from "./created-plugin"
 import { posix } from "node:path"
 import { renderInstalledSkill } from "../shared/host-extension-package-contract/plugin-conversion.mjs"
 import type { Capture, Entry, Text } from "../shared/host-extension-package-contract/plugin-conversion"
@@ -41,14 +42,14 @@ import { runCatalogInstallWithPackagePreflight } from "./package-installability"
 import { capabilitiesForCatalogEntry } from "../shared/ext-capability-authorization"
 import { FACTORY_SKILL_IDS } from "./factory-skills"
 import { releaseOfficialConnectorResources } from "./official-connector-resources"
-import { packageDeclarationRuntimeIdentity, type createPluginSources } from "./plugin-sources"
+import { allPluginSourcesSucceeded, packageDeclarationRuntimeIdentity, type createPluginSources } from "./plugin-sources"
 
 type Dependencies = Pick<
   PlannerDeps,
   "globalRoot" | "casBaseRoot" | "environment" | "advisoryGate" | "resolvePackage"
 > & {
   userDataPath: string
-  sources: Pick<ReturnType<typeof createPluginSources>, "convertCandidate" | "catalogComparisons">
+  sources: Pick<ReturnType<typeof createPluginSources>, "convertCandidate" | "catalogComparisons" | "searchedSources">
   catalogInstall(catalogId: string, request: InstallRequestV1): Promise<InstallOutcomeV1>
   activateMcp(packageId: string): Promise<unknown>
   reloadSkills(packageId: string): void
@@ -78,9 +79,13 @@ export function createSourceInstaller(deps: Dependencies) {
       }
       const catalogRequest = project?.ok ? { ...request, effect: { kind: "project" as const, directory: project.scope.projectPath } } : request
       if (request.source.kind === "catalog") return deps.catalogInstall(request.source.catalogId, catalogRequest)
-      if (request.source.kind !== "candidate")
+      if (request.source.kind !== "candidate" && request.source.kind !== "created")
         return { ok: false, code: "unknown-id", detail: "Source is not an issued candidate" }
-      const converted = await deps.sources.convertCandidate(request.source.candidateId)
+      if (request.source.kind === "created" && !allPluginSourcesSucceeded(deps.sources.searchedSources(request.source.draft.searchId)))
+        return { ok: false, code: "not-searched", detail: "Every applicable source must have a successful recorded query" }
+      const converted = request.source.kind === "created"
+        ? await convertCreatedPlugin(request.source.draft)
+        : await deps.sources.convertCandidate(request.source.candidateId)
       if (!converted.ok) return converted
       if (!projectMatches())
         return { ok: false, code: "transaction-failed", detail: "Project identity changed during source capture" }
@@ -98,9 +103,12 @@ export function createSourceInstaller(deps: Dependencies) {
         const outcome = await deps.catalogInstall(catalog, catalogRequest)
         return outcome.ok ? { ...outcome, resolvedToCatalog: catalog } : outcome
       }
-      const source = sourceOf(captured.capture, converted.publisher)
+      const source = sourceOf(captured.capture, "publisher" in converted ? converted.publisher : undefined)
+      const slug = converted.package.name.toLowerCase().replace(/[^a-z0-9._-]/g, "-").replace(/^[^a-z0-9]+/, "").slice(0, 119) || "plugin"
+      const namespace = source.kind === "created" ? "mine" : source.kind === "marketplace" ? source.ecosystem : source.kind === "npm" ? "opencode" : source.kind === "mcp-registry" ? "mcpreg" : "local"
+      const proposed = namespace + ":" + slug
       const sameSource = before.packageGraphs.find(
-        (graph) => graph.source && sourceIdentity(graph.source) === sourceIdentity(source),
+        (graph) => graph.source && sourceIdentity(graph.source) === sourceIdentity(source) && (source.kind !== "created" || graph.packageId === proposed),
       )
       const duplicate =
         identity &&
@@ -120,21 +128,6 @@ export function createSourceInstaller(deps: Dependencies) {
             (graph.packageId !== sameSource?.packageId || graph.envelopeDigest === converted.package.treeDigest),
         )
       if (duplicate) return outcomeOf(duplicate, true)
-      const slug =
-        converted.package.name
-          .toLowerCase()
-          .replace(/[^a-z0-9._-]/g, "-")
-          .replace(/^[^a-z0-9]+/, "")
-          .slice(0, 119) || "plugin"
-      const namespace =
-        source.kind === "marketplace"
-          ? source.ecosystem
-          : source.kind === "npm"
-            ? "opencode"
-            : source.kind === "mcp-registry"
-              ? "mcpreg"
-              : "local"
-      const proposed = namespace + ":" + slug
       const packageId =
         sameSource?.packageId ??
         (before.packageGraphs.some((graph) => graph.packageId === proposed)
@@ -205,7 +198,7 @@ export function createSourceInstaller(deps: Dependencies) {
           name: item.hostName,
           scope: { kind: "global" },
           environment: deps.environment(),
-          origin: "imported-claude",
+          origin: source.kind === "created" ? "created" : "imported-claude",
           desiredState: "disabled",
           version,
           installedAt: new Date().toISOString(),
@@ -461,6 +454,7 @@ function renderText(text: Text): string {
 }
 function sourceOf(capture: Capture, publisher?: import("./plugin-sources").CandidateV1["publisher"]): PackageSourceV1 {
   const source = capture.source
+  if (source.kind === "created") return { kind: "created" }
   if (source.kind === "mcp-registry")
     return { kind: "mcp-registry", serverName: source.serverName!, version: source.version!, publisher: publisher! }
   if (source.kind === "npm")

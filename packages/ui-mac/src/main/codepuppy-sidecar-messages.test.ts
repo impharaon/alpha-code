@@ -215,3 +215,13 @@ test("A3 source search and install messages round-trip only opaque IDs and rejec
   expect(contract.parseCodePuppySidecarInbound({ ...install, scope: "choose-route" })).toBeUndefined()
   expect(contract.parseHubInstallReply(contract.buildHubInstallReply(8, { accepted: true }))).toEqual({ type: "codepuppy.hub.install.reply", id: 8, accepted: true })
 })
+
+test("D3 created refs round-trip without a draft content cap, and malformed file shapes are discarded", () => {
+  const message = {
+    type: "codepuppy.hub.install.request", id: 31, requestId: "request_created_transport",
+    directory: "/project", sessionID: "ses_created", agent: "build", scope: "this-project",
+    ref: { kind: "created", draft: { searchId: "search_owned", name: "own-report", description: "Own report", files: [{ path: "skills/report/SKILL.md", text: "x".repeat(131072) }] } },
+  }
+  expect(parseCodePuppySidecarInbound(message)).toEqual(message)
+  expect(parseCodePuppySidecarInbound({ ...message, ref: { ...message.ref, draft: { ...message.ref.draft, files: [{ path: "skills/report/SKILL.md", text: false }] } } })).toBeUndefined()
+})

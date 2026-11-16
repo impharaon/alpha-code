@@ -21,6 +21,11 @@ export type CandidateV1 = {
 }
 export type SourceSearchResultV1 = { searchId: string; query: string; sources: SourceStatusV1[]; candidates: CandidateV1[] }
 export const PLUGIN_SOURCE_ORDER: readonly PluginSourceIdV1[] = ["catalog", "claude-marketplace", "codex-marketplace", "opencode-npm", "mcp-registry"]
+export function allPluginSourcesSucceeded(sources: readonly SourceStatusV1[] | undefined): boolean {
+  return !!sources && sources.every((source) => source.status === "ok") &&
+    PLUGIN_SOURCE_ORDER.every((required) => sources.some((source) => source.source === required))
+}
+
 const MARKETPLACES = [
   { source: "claude-marketplace", ecosystem: "claude", repository: "https://github.com/anthropics/claude-plugins-official", manifest: ".claude-plugin/marketplace.json" },
   { source: "codex-marketplace", ecosystem: "codex", repository: "https://github.com/openai/plugins", manifest: ".agents/plugins/marketplace.json" },
@@ -40,6 +45,7 @@ type CatalogComparison = { catalogId: string; packageId: string; version: string
 
 /** One instance per main-process run; only this owner mints candidate IDs and retains fetched bytes. */
 export function createPluginSources(deps: { catalog: () => Promise<readonly CandidateV1[]>; catalogPackage?: (id: string, version?: string) => Promise<CatalogContents | undefined>; fetch?: (url: string) => Promise<Response> }) {
+  const searches = new Map<string, readonly SourceStatusV1[]>()
   const candidates = new Map<string, SourceCandidate>()
   const captures = new Map<string, Promise<Capture>>()
   const conversions = new Map<string, Promise<ConvertedCandidate | SourceFailure>>()
@@ -233,6 +239,7 @@ export function createPluginSources(deps: { catalog: () => Promise<readonly Cand
     return comparisons.filter((row): row is CatalogComparison => row !== undefined)
   }
   return {
+    searchedSources(searchId: string) { return searches.get(searchId) },
     async resolveInstallSource(id: string): Promise<{ kind: "catalog"; catalogId: string } | { kind: "candidate"; candidateId: string } | undefined> {
       if ([...candidates.values()].some((entry) => entry.candidate.id === id)) return { kind: "candidate", candidateId: id }
       if (catalogRows.has(id) || (await deps.catalog()).some((row) => row.id === id)) return { kind: "catalog", catalogId: id }
@@ -336,7 +343,9 @@ export function createPluginSources(deps: { catalog: () => Promise<readonly Cand
           break
         }
       }
-      return { searchId: "search_" + randomUUID(), query, sources: groups.map((group) => group.status), candidates: ordered }
+      const result = { searchId: "search_" + randomUUID(), query, sources: groups.map((group) => group.status), candidates: ordered }
+      searches.set(result.searchId, result.sources.map((source) => ({ ...source })))
+      return result
     },
     captureCandidate,
     convertCandidate,

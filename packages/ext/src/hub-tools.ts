@@ -1,14 +1,17 @@
+import type { CreatedPluginDraftV1 } from "../../ui-mac/src/shared/plugin-install"
 import { randomUUID } from "node:crypto"
 import type { Plugin } from "@opencode/plugin"
 import type { Info as ToolInfo, ToolContext } from "@opencode/plugin/promise/tool"
 import { AUTOMATION_PROFILES } from "../../schema/src/codepuppy-unattended"
-import type { HubRequestRecord, HubView, HubViewRow } from "../../ui-mac/src/main/codepuppy-sidecar-messages"
+import type { HubInstallRequest, HubRequestRecord, HubView, HubViewRow } from "../../ui-mac/src/main/codepuppy-sidecar-messages"
 import { TOOL_TEXT } from "./context-injection"
 import type { BridgeFailure, HubBridge } from "./hub-bridge"
 
 export const HUB_INSTALL_ACTION = "codepuppy_hub_install"
-export function denyHubInstallForAutomation(agent: string) {
-  if (Object.hasOwn(AUTOMATION_PROFILES, agent)) throw Error("Permission denied: " + HUB_INSTALL_ACTION)
+export const HUB_CREATE_ACTION = "codepuppy_hub_create"
+export function denyHubMutationForAutomation(agent: string, action: string) {
+  if (action !== HUB_INSTALL_ACTION && action !== HUB_CREATE_ACTION) return
+  if (Object.hasOwn(AUTOMATION_PROFILES, agent)) throw Error("Permission denied: " + action)
 }
 export const HUB_INSTALL_OUTCOME = {
   available: "installed; available",
@@ -29,6 +32,75 @@ const idInput = (description: string) => ({
 export function createHubTools(bridge: HubBridge, context: HubToolContext): ToolInfo[] {
   const directory = context.location.directory
   const viewOf = (ctx: ToolContext) => bridge.view({ directory, sessionID: ctx.sessionID, agent: ctx.agent })
+  const submit = async (ref: HubInstallRequest["ref"], scope: HubInstallRequest["scope"], ctx: ToolContext, action: string) => {
+    denyHubMutationForAutomation(ctx.agent, action)
+    if (!bridge.available) return result(HUB_UNAVAILABLE, { ok: false })
+    const requestId = randomUUID().replaceAll("-", "")
+    const metadata = { requestId, stage: "submitted" }
+    await ctx.progress({ metadata })
+    const accepted = await bridge.install({
+      requestId,
+      directory,
+      sessionID: ctx.sessionID,
+      agent: ctx.agent,
+      ref,
+      scope,
+    })
+    if (!accepted.ok)
+      return result(
+        accepted.reason === "timeout" ? HUB_INSTALL_OUTCOME.submitted : "not installed: " + accepted.detail,
+        metadata,
+      )
+    while (!ctx.signal.aborted) {
+      const answer = await bridge.request(requestId)
+      if (!answer.ok || !answer.record) return result(HUB_INSTALL_OUTCOME.submitted, metadata)
+      const record = answer.record
+      if (record.stage === "submitted") {
+        await new Promise<void>((resolve) => {
+          const timer = setTimeout(done, 100)
+          function done() {
+            clearTimeout(timer)
+            ctx.signal.removeEventListener("abort", done)
+            resolve()
+          }
+          ctx.signal.addEventListener("abort", done, { once: true })
+        })
+        continue
+      }
+      const outcome = record.outcome
+      const identity = {
+        ...metadata,
+        stage: record.stage,
+        ...(record.packageId ? { packageId: record.packageId } : {}),
+      }
+      if (!outcome) return result(HUB_INSTALL_OUTCOME.submitted, identity)
+      if (!outcome.ok) return result("not installed: " + outcome.code, identity)
+      const after = await viewOf(ctx)
+      const rows = after.ok
+        ? after.view.rows.filter(
+            (row) =>
+              row.id === outcome.packageId ||
+              outcome.installed.some((entry) => row.name === entry.hostName && row.kind === entry.kind),
+          )
+        : []
+      const state = outcome.alreadyInstalled
+        ? "already installed"
+        : outcome.notRunning.length
+          ? "installed; partly running: " +
+            outcome.notRunning.map((item) => item.sourceName + ": " + item.reason).join(", ")
+          : rows.length && rows.every((row) => row.state === "available")
+            ? HUB_INSTALL_OUTCOME.available
+            : "installed; loading pending: " +
+              (rows.find((row) => row.state !== "available")?.stateReason?.detail ??
+                "engine state is not available")
+      return result(state, identity)
+    }
+    return result(HUB_INSTALL_OUTCOME.submitted, metadata)
+  }
+  const scopeInput = {
+    type: "string", description: TOOL_TEXT.codepuppy_hub_install.args.scope,
+    enum: ["all-projects", "this-project"],
+  }
   return [
     {
       name: "codepuppy_hub_search",
@@ -54,78 +126,33 @@ export function createHubTools(bridge: HubBridge, context: HubToolContext): Tool
         ...idInput(TOOL_TEXT.codepuppy_hub_install.args.id),
         properties: {
           id: { type: "string", description: TOOL_TEXT.codepuppy_hub_install.args.id },
-          scope: {
-            type: "string",
-            description: TOOL_TEXT.codepuppy_hub_install.args.scope,
-            enum: ["all-projects", "this-project"],
-          },
+          scope: scopeInput,
         },
       },
       options: { codemode: false },
       async execute(input: { id: string; scope?: "all-projects" | "this-project" }, ctx) {
-        denyHubInstallForAutomation(ctx.agent)
-        if (!bridge.available) return result(HUB_UNAVAILABLE, { ok: false })
-        const requestId = randomUUID().replaceAll("-", "")
-        const metadata = { requestId, stage: "submitted" }
-        await ctx.progress({ metadata })
-        const accepted = await bridge.install({
-          requestId,
-          directory,
-          sessionID: ctx.sessionID,
-          agent: ctx.agent,
-          ref: { kind: "id", id: input.id },
-          scope: input.scope ?? "all-projects",
-        })
-        if (!accepted.ok)
-          return result(
-            accepted.reason === "timeout" ? HUB_INSTALL_OUTCOME.submitted : "not installed: " + accepted.detail,
-            metadata,
-          )
-        while (!ctx.signal.aborted) {
-          const answer = await bridge.request(requestId)
-          if (!answer.ok || !answer.record) return result(HUB_INSTALL_OUTCOME.submitted, metadata)
-          const record = answer.record
-          if (record.stage === "submitted") {
-            await new Promise<void>((resolve) => {
-              const timer = setTimeout(done, 100)
-              function done() {
-                clearTimeout(timer)
-                ctx.signal.removeEventListener("abort", done)
-                resolve()
-              }
-              ctx.signal.addEventListener("abort", done, { once: true })
-            })
-            continue
-          }
-          const outcome = record.outcome
-          const identity = {
-            ...metadata,
-            stage: record.stage,
-            ...(record.packageId ? { packageId: record.packageId } : {}),
-          }
-          if (!outcome) return result(HUB_INSTALL_OUTCOME.submitted, identity)
-          if (!outcome.ok) return result("not installed: " + outcome.code, identity)
-          const after = await viewOf(ctx)
-          const rows = after.ok
-            ? after.view.rows.filter(
-                (row) =>
-                  row.id === outcome.packageId ||
-                  outcome.installed.some((entry) => row.name === entry.hostName && row.kind === entry.kind),
-              )
-            : []
-          const state = outcome.alreadyInstalled
-            ? "already installed"
-            : outcome.notRunning.length
-              ? "installed; partly running: " +
-                outcome.notRunning.map((item) => item.sourceName + ": " + item.reason).join(", ")
-              : rows.length && rows.every((row) => row.state === "available")
-                ? HUB_INSTALL_OUTCOME.available
-                : "installed; loading pending: " +
-                  (rows.find((row) => row.state !== "available")?.stateReason?.detail ??
-                    "engine state is not available")
-          return result(state, identity)
-        }
-        return result(HUB_INSTALL_OUTCOME.submitted, metadata)
+        return submit({ kind: "id", id: input.id }, input.scope ?? "all-projects", ctx, HUB_INSTALL_ACTION)
+      },
+    },
+    {
+      name: HUB_CREATE_ACTION,
+      description: TOOL_TEXT.codepuppy_hub_create.description,
+      input: {
+        type: "object", additionalProperties: false,
+        properties: {
+          searchId: { type: "string", description: TOOL_TEXT.codepuppy_hub_create.args.searchId },
+          name: { type: "string", description: TOOL_TEXT.codepuppy_hub_create.args.name },
+          description: { type: "string", description: TOOL_TEXT.codepuppy_hub_create.args.description },
+          files: { type: "array", description: TOOL_TEXT.codepuppy_hub_create.args.files, items: {
+            type: "object", properties: { path: { type: "string" }, text: { type: "string" } }, required: ["path", "text"], additionalProperties: false,
+          } },
+          scope: scopeInput,
+        },
+        required: ["searchId", "name", "description", "files"],
+      },
+      options: { codemode: false },
+      async execute(input: CreatedPluginDraftV1 & { scope?: HubInstallRequest["scope"] }, ctx) {
+        return submit({ kind: "created", draft: { searchId: input.searchId, name: input.name, description: input.description, files: input.files } }, input.scope ?? "all-projects", ctx, HUB_CREATE_ACTION)
       },
     },
     {

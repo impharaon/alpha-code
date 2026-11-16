@@ -1586,8 +1586,9 @@ export function registerExtIpcHandlers(
     requests: hubRequests,
     searchSources: (query) => pluginSources.searchSources(query),
     install: async (request) => {
-      if (request.ref.kind !== "id") return { ok: false, code: "unknown-id", detail: "This request does not identify an installable candidate" }
-      const source = await pluginSources.resolveInstallSource(request.ref.id)
+      const source = request.ref.kind === "created"
+        ? { kind: "created" as const, draft: request.ref.draft }
+        : await pluginSources.resolveInstallSource(request.ref.id)
       if (!source) return { ok: false, code: "unknown-id", detail: "The ID was not issued by the application" }
       await ledgerReady
       const result = await gatedWrite.installFromSource({ requestId: request.requestId, source, effect: request.scope === "all-projects" ? { kind: "all-projects" } : { kind: "project", directory: request.directory }, via: "chat" })

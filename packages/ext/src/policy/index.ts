@@ -36,7 +36,7 @@ import { TOOL_POLICY_RPC_DEFINITION, toolPolicyHandlers } from "./rpc"
 import type { ToolDisplaySnapshotV1 } from "../../../schema/src/tool-identity"
 import { isCodePuppyPolicyRequest } from "../../../schema/src/codepuppy-tool-policy"
 
-import { denyHubInstallForAutomation, HUB_INSTALL_ACTION } from "../hub-tools"
+import { denyHubMutationForAutomation } from "../hub-tools"
 
 export interface PolicyRegistration {
   /** Last statement of the extension's `setup`: registers the parts that must see every earlier registration. */
@@ -146,7 +146,7 @@ export async function registerPolicy(context: Plugin.Context, unattended: Unatte
 
   // Head of the execute.before chain: a denied call reaches no other hook and no side effect.
   await context.tool.hook("execute.before", async (event) => {
-    if (event.tool === HUB_INSTALL_ACTION) denyHubInstallForAutomation(event.agent)
+    denyHubMutationForAutomation(event.agent, event.tool)
     await decide(deps, event)
   })
 

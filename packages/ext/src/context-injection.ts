@@ -334,6 +334,17 @@ export const TOOL_TEXT = {
     description: "Install an ID returned by codepuppy_hub_search. Saying install authorizes installation: the app installs and turns it on without an installation confirmation. Default: all my projects. Never request tokens in chat or write project configuration. The result reports main's state; pending does not mean the install was cancelled.",
     args: { id: "Exact catalog or main-issued candidate ID", scope: "all-projects by default; this-project only when explicitly requested" },
   },
+  codepuppy_hub_create: {
+    readable: "codepuppy:hub_create",
+    description: "Create and install the user's own plugin after a successful query of every applicable source found no matching existing content. Reuse the returned searchId. Explain with the agreed sentence and proceed without another consent question. Main validates the draft and installs the whole package in the Customization Center as My plugin.",
+    args: {
+      searchId: "ID of the completed successful source query",
+      name: "Name of the user's own plugin",
+      description: "The clear task this plugin serves",
+      files: "Plugin-relative UTF-8 text files, including skills/<name>/SKILL.md and their resources",
+      scope: "all-projects by default; this-project only when explicitly requested",
+    },
+  },
   codepuppy_hub_status: {
     readable: "codepuppy:hub_status",
     description: "Read the installed package or catalog entry's actual state in this directory. Available is based on engine verification.",

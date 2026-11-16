@@ -403,6 +403,10 @@ A2/A3 接线收据：主进程每次应用运行创建一份 `createPluginSource
 
 ### 偏离记录
 
-暂无。E1 不接生产、不假报范围功能已交付；其余按上列合入接缝推进。已核：计划作者 Codex（GPT-6）核对 spec v3、design v4、A1 @8e40a921ec 与允许集/注入/插件尾巴/刷新调用链；本阶段尚无行为验收。遗留去向：Issue 正文版本同步→编排器；H/A/B/C 接缝合入与构建应用真实模型/任务验收→各片及编排器；OPTIONAL：无。
+2026-11-16 r1 · E1：仅新增 `packages/ext/src/package-scope.ts` / `.test.ts`，实现 v2 结构解码、正向技能成员判断及技能/MCP 共用的项目精确匹配；未接 main、gen-skill-paths、plugin 或 renderer。测试状态是本应用自己的冻结投影，不冒充第三方语料。ext `bun test --max-concurrency 2 src/package-scope.test.ts` exit 0（27 pass、0 fail、86 assertions），`GOMAXPROCS=2 bun typecheck` exit 0。首跑有一项测试框架超时：Bun 将 test.each 的裸 undefined 行解释为 done 回调；行包装为对象后保留所有断言并通过，未修改生产判定迎合测试。
+
+可失败实证：将两份新文件复制到 `/tmp/helper-scope-mutant-5xb0enp5/`，只在临时副本将正向成员改回“排除不匹配 scoped 项”的错误规则，同一测试命令 exit 1（21 pass、6 fail）；合法空投影中的移除、keys 撤回及无关条目对照均失败。日志 `result.log` SHA-256 `15321927f65fa48a8e6fb525f5f2bb15900beeb95e1b97e4b54b738ac118137e`。工作树生产文件未为此改动。真实 watcher 去抖窗口、尾巴/evaluate 及双 Location 隔离仍待 E2/E3/E5，纯函数通过不等于 AC-16 验收。
+
+本轮已核：Codex（GPT-6），D1/D2/E1 的范围、真实出厂资源发现及纯函数证据通过；spec v3/design v4 与已定裁决不变。AC-04/08/09/16 均尚未满足。遗留去向：Issue 版本引用已按续派回执同步；H/A/B/C 接缝合入与构建应用真实模型/任务验收→各片及编排器。除上列 tsgo 参数适配及 census 机械同步外无偏离；OPTIONAL：无。
 
 本轮 D/E PLAN 开始于 2026-11-16 14:48:39 CST，约 13 分钟（预算 45 分钟）；只改本文件的这两节。`python3 scripts/check-doc-links.py docs/specs/plugin-helper-and-hub/plan.md` exit 0（2 条相对链接可达），`git diff --check` exit 0；原有计划 33,609 bytes 逐字节保持，提交前另核暂存范围。未执行仓库测试、typecheck、全 gate 或功能验收。

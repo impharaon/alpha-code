@@ -100,6 +100,7 @@ for (const initial of ["global", "project"] as const) test(`disabled managed ski
     const refreshes = h.refreshes()
     const stale = readFileSync(h.file, "utf8")
     expect(await setPackageStateV1({ packageId: h.installed.packageId, state: "disabled" }, h.planner)).toMatchObject({ ok: true })
+    await Bun.sleep(150) // Model an RPC round trip slower than the 100 ms watcher debounce.
     expect(JSON.parse(readFileSync(join(h.root, "skills-enabled.json"), "utf8"))).toEqual({ v: 2, keys: [], scoped: [] })
     expect(readFileSync(h.file, "utf8")).toBe(stale)
     expect((await h.rpc("rebuild")).some((skill) => skill.name === "frontend-design")).toBe(false)
@@ -126,6 +127,7 @@ test("scope change cannot revive a parsed skill in another project", async () =>
     const refreshes = h.refreshes()
     const stale = readFileSync(h.file, "utf8")
     expect(applyPackageMutation(h.root, { operation: "update", transactionId: "scope-change", graphBeforeDigest: before.installedGraphDigest, graphAfter: graph, claimMutations: [], childRecordMutations: [] })).toMatchObject({ ok: true })
+    await Bun.sleep(150) // The stale-config control must survive a slow RPC window.
     expect(readFileSync(h.file, "utf8")).toBe(stale)
     expect((await h.rpc("rebuild", h.other)).some((skill) => skill.name === "frontend-design")).toBe(false)
     expect(readFileSync(h.file, "utf8")).toBe(stale)

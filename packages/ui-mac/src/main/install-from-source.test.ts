@@ -1,5 +1,5 @@
 import { sha256Hex } from "./ext-manifest-v2"
-import { expect, test } from "bun:test"
+import { expect, spyOn, test } from "bun:test"
 import { mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
@@ -497,4 +497,62 @@ for(const kind of ["agent","command"] as const)test("R14 A7 catalog "+kind+" sch
  const result=await installCatalogFromSource(envelope.prelude.packageId,{requestId:"r14_reload_"+kind,source:{kind:"catalog",catalogId:envelope.prelude.packageId},effect:{kind:"all-projects"},via:"chat"},{planner:planner as never,admission,activateMcp:async()=>[],reloadSkills:id=>{reloads.push(id)},removeDeparting:()=>{}})
  expect(result).toMatchObject({ok:true})
  expect(reloads).toEqual([envelope.prelude.packageId])
+}))
+
+
+test("review C5 one real multi-component transaction rolls back a mid-populate failure and commits one identity", () => installerHarness(async h => {
+  const id = await h.candidate("figma", "codex-marketplace")
+  const converted = await h.sources.convertCandidate(id)
+  if (!converted.ok) throw Error(converted.detail)
+  expect(converted.package.entries.some(entry => entry.kind === "skill")).toBe(true)
+  expect(converted.package.entries.some(entry => entry.kind === "mcp")).toBe(true)
+  const transactions = await import("./ext-transaction")
+  const real = transactions.runExtensionTransaction
+  let populated = 0
+  const probe = spyOn(transactions, "runExtensionTransaction").mockImplementation((root, request, hooks) => real(root, request, {
+    ...hooks,
+    populate: async (item, directory) => {
+      await hooks.populate(item, directory)
+      if (++populated === 2) throw Error("controlled second-component populate failure")
+    },
+  }))
+  try {
+    expect(await h.install(h.request(id, "c5_failed"))).toMatchObject({ ok: false, code: "transaction-failed" })
+    expect(populated).toBe(2)
+    expect(probe).toHaveBeenCalledTimes(1)
+    const failed = readPackageLedgerStateV1(h.root)
+    expect(failed.ok && failed.records).toEqual([])
+    expect(failed.ok && failed.packageGraphs).toEqual([])
+    expect(h.activation).toEqual([])
+  } finally { probe.mockRestore() }
+  const result = await h.install(h.request(id, "c5_success"))
+  expect(result.ok).toBe(true)
+  const state = readPackageLedgerStateV1(h.root)
+  if (!state.ok || !result.ok) throw Error("real multi-component package not committed")
+  expect(state.packageGraphs).toHaveLength(1)
+  expect(state.records).toHaveLength(result.installed.length)
+  expect(state.records.length).toBeGreaterThan(1)
+  expect(new Set(state.records.map(record => record.transaction?.id)).size).toBe(1)
+  expect(state.records[0]!.transaction?.id).toBeTruthy()
+  expect(state.records.map(record => record.kind).sort()).toEqual(["mcp", "skill"])
+}))
+
+test("review C5 an existing user MCP keeps its name and bytes when a real same-name plugin installs", () => installerHarness(async h => {
+  const id = await h.candidate("context7")
+  const converted = await h.sources.convertCandidate(id)
+  if (!converted.ok) throw Error(converted.detail)
+  const entry = converted.package.entries.find(entry => entry.kind === "mcp")!
+  if (entry.kind !== "mcp" || entry.transport === "stdio") throw Error("pinned context7 must remain a remote MCP")
+  const user = { type: "remote", url: entry.url.join(""), oauth: false }
+  expect(persistMcp("context7", user)).toMatchObject({ ok: true })
+  const before = readMcpLeafStrict("context7")
+  const result = await h.install(h.request(id, "c5_collision"))
+  if (!result.ok) throw Error(result.detail)
+  expect(result.installed).toHaveLength(1)
+  expect(result.installed[0]!.hostName).toMatch(/^context7-[a-f0-9]{8}$/)
+  expect(readMcpLeafStrict("context7")).toEqual(before)
+  expect(readMcpLeafStrict(result.installed[0]!.hostName)).toMatchObject({ ok: true })
+  const state = readPackageLedgerStateV1(h.root)
+  expect(state.ok && state.records.map(record => record.name)).toEqual([result.installed[0]!.hostName])
+  expect(state.ok && state.packageGraphs[0]!.root.name).toBe(result.installed[0]!.hostName)
 }))

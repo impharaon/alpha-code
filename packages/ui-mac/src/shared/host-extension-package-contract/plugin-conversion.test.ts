@@ -52,6 +52,11 @@ test("real Codex Gmail OAuth snake-case fields and scopes remain typed and redac
   expect(converted.replacements.get(".mcp.json")).toBeDefined()
 })
 
+test("real Codex Figma OAuth resource survives for the installer's applicability report", async () => {
+  const converted = await (await converter()).convertPluginTree(await captureFixture("plugins/figma", {}, "codex"))
+  expect(converted.package.entries.find((entry) => entry.kind === "mcp")).toMatchObject({ oauth: { oauth: { resource: "https://mcp.figma.com/mcp" } } })
+})
+
 test("recorded upstream bytes and reduced codeload archive match their provenance", async () => {
   for (const file of [...provenance.files, { path: provenance.archive.path, sha256: provenance.archive.sha256 }])
     expect(digest(new Uint8Array(await Bun.file(join(fixtureRoot, file.path)).arrayBuffer()))).toBe(`sha256:${file.sha256}`)

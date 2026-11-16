@@ -1164,15 +1164,30 @@ export function ExtensionHub(props: {
     const diffs = await onAdd(e)
     if (diffs) setAuthz({ entry: e, mode: "install", host: "standalone", diffs })
   }
-  // 「添加」三档分流(2026-07-04 拍板,Q1/Q2):
-  //   skill  → 直装(零配置零密钥,免确认框);
-  //   plugin → 详情页先行(风险最高:运行于引擎进程 + npm 下载),页内安装再过风险确认框;
-  //   mcp / bundle → 确认框(密钥采集 / 组合清单)。
+  const addManagedEntry = async (entry: CatalogEntry) => {
+    if (busy() === entry.id) return
+    setBusy(entry.id)
+    setErrFor(entry.id, null)
+    setStageFor(entry.id, "installing")
+    try {
+      const result = await ext.installPackage(entry.id)
+      if (!result.ok) { setErrFor(entry.id, extensionError(result.reason, "codepuppy.ext.error.installPackage")); return }
+      await refetchPackages()
+      flash(t("codepuppy.ext.packageAddedName", { name: entry.displayName }), "success")
+    } catch {
+      setErrFor(entry.id, t("codepuppy.ext.error.installUnknown"))
+    } finally {
+      setBusy(null)
+      setStageFor(entry.id, null)
+    }
+  }
+  // New connector/bundle installs use the same managed entry as source search.
   const stageInstall = (e: CatalogEntry) => {
     if (retiredCommunityOfficeFor({ id: e.id, name: e.name })) {
       setErrFor(e.id, t("codepuppy.ext.retiredCommunityNoInstallHint"))
       return
     }
+    if (e.type === "mcp" || e.type === "bundle") return void addManagedEntry(e)
     if (e.type === "skill") return void addDirect(e)
     // plugin(引擎进程内运行)/ agent(带权限档)/ cloud(数据出境,上行明细在详情页)=
     // 详情页先行档:先看清楚再启用。
@@ -1186,8 +1201,8 @@ export function ExtensionHub(props: {
       setErrFor(e.id, t("codepuppy.ext.retiredCommunityNoInstallHint"))
       return
     }
-    // 用户已在详情页看过内容/权限:skill/agent 直装;cloud 直启用(上行明细刚看过);
-    // plugin 仍过风险确认框;MCP/套件过确认框。
+    // Existing executable-plugin policy remains here; connector/bundle content is managed by main.
+    if (e.type === "mcp" || e.type === "bundle") return void addManagedEntry(e)
     if (e.type === "skill" || e.type === "agent" || e.type === "cloud") return void addDirect(e)
     openInstallConfirmation(e)
   }

@@ -933,3 +933,16 @@ B8 FIXED：source table 提供只读 displayNameForId（捕获包在既有转换
 
 - r14 A recorded verify 已核：真实已固定 GitHub 官方 envelope/payload（先验 SHA）+ AES-GCM OS 边界 + 真引擎/本机 echo transport，安装后待令牌、保存后工具可调用、更换令牌产生携新凭据的建连、关闭库存清空、重开恢复；同一 observer setup、0 Location reload。没有真实 PAT/远端写入，不声称 GitHub 线上验收。`official-connectors.test.ts` 内层 14 pass、typecheck exit 0。新引擎用例放独立子进程，避免 HOME/XDG 沙箱改变既有 OS HOME 排除控制的前提，原断言未改。自身断言修正 `05ccc47509`：新用例初版在 connect 后同步断库存；异步投影需读回轮询，保留全部凭据/启停/工具/零重载断言。
 - r14 收口相关集：main 47 文件 928 pass / 0 fail，renderer 14 文件 202 pass / 0 fail，ext 8 文件 197 pass / 0 fail；ext typecheck 与 authority-registry exit 0。真实 Playwright 宿主已自备缓存，收口命令没有使用手工缓存路径。下面单次条数脚本另记，不把相关集冒充 full gate。
+
+
+r14 最终边界 / C3 PARTIAL（2026-11-17 北京时间）：按授权仅一次执行 `bash scripts/assert-gate-files.sh --update`，通过继承 bash 函数给其 bun test 子调用附 `--max-concurrency 2`（脚本及测试逻辑未改）。第 1/2 行 27/11 pass；第 3 行 `packages/codepuppy-contracts-consumer/src/extension-package-artifact.test.ts` 6 pass / 1 fail，exit 1。失败断言 :119：vendored host manifest 文件 SHA `ef5eda81b5d3d5cf1f4089381cf9a64923d25c6bd35103411d9552ca7176c0ae`，live `695d69af7d047b2f0f4561237a815a0f74423ba1fbc32c9dd3f567b6d1116c5a`。具名原因是跨仓 producer pin 仍基于旧 host（vendor 与 origin/alpha 对应字节一致），不是 npm/机器问题；本 lane 的 converter/artifact 修改需要发布端重固定。脚本 all-or-nothing，**没有任何条数前→后写回**，不伪报 C3 已绿；唯一调用已使用，未再跑。
+
+SEAM-CHANGE-NEEDED：alpha-web extension producer 的 host-contract pin / re-publication — 本仓 consumer 测试 :119 及 `alpha-web-extension-package.lock.json` 固定 alpha-web a7f79c667c71b03a4ae54350dd061a116a2c4080；不得手改 vendor/manifest/SHA 冒充该真实提交的产物 — 编排器安排发布端以新 host 工件重固定后按既有机制 re-vendor，并追加一次计数脚本授权。alpha-web、公共 pin 与发布动作不在本 lane 授权中。未弱化消费者断言，未写另一个计数脚本绕过一次调用边界。
+
+C3 已完成的文字同步逐行核对：card 宿主 1→1，叙述保持实测内层 11；permission-mount 8→8，移除旧 HubInstallWatcher 存在保证，改为聊天无确认挂载；permission-single-surface 5→5，改为普通唯一审批、零安装阶段写；local-package-channel 登记仍 2→2（待脚本量改），文字修正为现存 local namespace 单宿主及原 preview/confirm 替代证据；official-connectors 宿主 1→1，内层 10→14 的文字改为实际 14、补无重启 runtime 证据。其余 C3 点名的 11 个 exact count 行均待成功脚本写回，未凭声明数/聚合数猜改数字。
+
+本轮处置总表：A1/B5 以短 search/长 capture 分阶段修复；A2–A5、B1/B2 维持 r12 通过证据；A6 现有 validator 反证（含去守卫红控制），A7–A10、B3/B4/B6–B12、C1/C2/C4–C9 均已具名修复/补证；C3 与跨仓 pin 留给编排器 fix now。recorded-only 条目按前列逐项保留，两个 verify 已执行（官方 runtime 通过；folder 合同入口仍可调用，未删）。AC-11 本地市场臂已补。已核 Codex（GPT-6）；审查范围及 Claude Opus 5.5 A/B/C 审计来源沿 r12 记录，无重开设计。
+
+own-assertion corrections 全表：`eb699846b0` 旧 primitive 的额外 saved:true；`25dc6cc380` 新本地查询例等待短于既有防抖；`5334d225ed` Figma config action 不调用 populate；`05ccc47509` connect 与工具库存异步。各自独立提交且保留审核要求的行为断言；官方 probe 的进程级隔离修复另在 `5b10e9a65c`，既有 HOME 排除断言未改。
+
+仍待真实应用验收：编排器收集 built application 的真实模型请求、真实服务授权及任务调用；本轮本机 transport/OAuth 替身不是线上账户证据。AC-16 Registry MCP 在项目 B 的真实调用仍为记录项，去向该验收。无新产品限制、无项目配置写入、无真实账户登录/外部写、无 gate/bin/check、无 push/PR/merge。

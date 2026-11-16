@@ -293,11 +293,6 @@ export const KEPT_SOURCE_TEXT_READS: Record<string, SourceTextEntry> = {
     evidence: "#985",
     lines: 6,
   },
-  "packages/ui-mac/test-component/local-package-renderer.cases.ts": {
-    why: "主语是 preload 暴露的通道名与 main 侧常量**逐字一致**(写错一个字母 = 功能死掉且什么都不红)。跨进程的字符串相等只能对文本断言,没有更细的粒度。",
-    evidence: "#791",
-    lines: 1,
-  },
   "packages/ui-mac/src/main/naming-migration-wiring.test.ts": {
     why: "主语是 index.ts 里升级迁移两段的**调用顺序**:A 段在 requestSingleInstanceLock 之后、preferAppEnv 之前,会话库一步在 preferAppEnv 之后、首个 yield* 之前,完成标记之前不出现 initEndpoints / getStore / safeStorage;失败分支只许 dialog.showErrorBox + app.exit(1)。index.ts 结构上进不了 bun,用 TypeScript AST 按源码位置判先后 —— 迁移本身的行为由 naming-migration 的行为测试真跑。守不住:把调用包进恒假条件、或把返回值丢掉,位置不变,断言照绿。",
     evidence: "#1569",

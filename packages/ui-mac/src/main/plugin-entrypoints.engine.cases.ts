@@ -116,6 +116,7 @@ beforeAll(async () => {
       transport.push({ status: response.status })
       return response
     }
+    // Controlled 401 transport stand-in; this does not verify live Figma reachability or OAuth.
     if (url.hostname === "mcp.figma.com") return new Response(null, { status: 401, headers: { "www-authenticate": "Bearer" } })
     return entrypointsFetch(request.url)
   }) as typeof fetch
@@ -192,7 +193,12 @@ beforeAll(async () => {
     writeFileSync(file, await capture.capture.readFile(node.path))
   }
   nativeEntryDigest = createHash("sha256").update(readFileSync(join(directory, "dist/index.js"))).digest("hex")
-  await import(join(directory, "dist/index.js"))
+  const control = join(sandbox.root, "native-positive-control", "dist/index.js")
+  mkdirSync(dirname(control), { recursive: true })
+  writeFileSync(control, readFileSync(join(directory, "dist/index.js")))
+  // A distinct module path keeps Bun's import cache from suppressing a later accidental
+  // load of the actual folder entry; the onLoad monitor replaces bytes before execution.
+  await import(control)
   expect(nativeLoads).toBe(1)
   nativeLoads = 0
   selectedDirectory = directory

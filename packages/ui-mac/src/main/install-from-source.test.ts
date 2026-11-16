@@ -559,3 +559,32 @@ test("review C5 an existing user MCP keeps its name and bytes when a real same-n
   expect(state.ok && state.records.map(record => record.name)).toEqual([result.installed[0]!.hostName])
   expect(state.ok && state.packageGraphs[0]!.root.name).toBe(result.installed[0]!.hostName)
 }))
+
+
+test("review AC11 local marketplace folder installs only the selected real plugin", () => installerHarness(async h => {
+  const { mkdirSync } = await import("node:fs")
+  const provenance = await Bun.file(join(import.meta.dir, "../../test-fixtures/plugin-helper/provenance.json")).json()
+  const directory = join(h.temporary, "local-marketplace")
+  for (const file of provenance.files as { path: string }[]) {
+    const target = join(directory, file.path)
+    mkdirSync(join(target, ".."), { recursive: true })
+    await Bun.write(target, Bun.file(join(import.meta.dir, "../../test-fixtures/plugin-helper", file.path)))
+  }
+  const prepared = await h.sources.prepareCapture(await h.sources.captureFolder(directory))
+  if (prepared.kind !== "marketplace") throw Error("pinned local marketplace not recognized")
+  expect(prepared.entries.length).toBeGreaterThan(300)
+  const selected = prepared.entries.find(entry => entry.displayName === "context7")!
+  expect(selected).toBeDefined()
+  const before = readPackageLedgerStateV1(h.root)
+  expect(before.ok && before.records).toEqual([])
+  const result = await h.install(h.request(selected.id, "c11_folder_selected"))
+  if (!result.ok) throw Error(result.detail)
+  const state = readPackageLedgerStateV1(h.root)
+  if (!state.ok) throw Error(state.reason)
+  expect(state.packageGraphs.map(graph => graph.packageId)).toEqual([result.packageId])
+  expect(state.records.map(record => record.name)).toEqual(["context7"])
+  expect(result.source).toEqual({ kind: "local-folder" })
+  expect(h.activation).toEqual([result.packageId])
+  expect(h.reloads).toEqual([])
+  expect(state.records.some(record => ["github", "playwright", "frontend-design"].includes(record.name))).toBe(false)
+}))

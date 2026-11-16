@@ -410,9 +410,8 @@ test("真实 catalog MCP 写通道结果只公开状态且不回显提交的 sec
   const output = `${result.stdout.toString()}${result.stderr.toString()}`
   if (result.exitCode !== 0) throw new Error(output)
   // 用词边界而非 toContain:`"11 pass"` 含 `"1 pass"`、`"10 fail"` 含 `"0 fail"`,
-  // 子串匹配会在用例数增减时假绿。七条子用例:enabled / installedDisabled 两条返回分支,加 #702 的 detail 通道注册、package 预检接线、browse 数据源,
-  // 加 `#1529` 的 I4(IPC 与 parentPort 同档)与 A3(main-owned submitted ⇒ committed),
-  // 加 `#1531` 的项目作用域重载请求与 agent 安装金丝雀端到端(生产 ext codepuppy_hub_install × 真 main 分发)。
+  // 子串匹配会在用例数增减时假绿。实际子用例覆盖目录/包读取、唯一安装入口、
+  // main-owned 阶段、聊天 canary、授权只读、whole capture 和 renderer 边界；没有聊天确认阶段。
   expect(output).toMatch(/\b26 pass\b/)
   expect(output).toMatch(/\b0 fail\b/)
 }, 120_000)

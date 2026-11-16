@@ -16,27 +16,31 @@ async function fixtureFetch(url: string | URL | Request): Promise<Response> {
   throw new Error(`unexpected fixture URL: ${address}`)
 }
 
-test("catalog miss continues to the pinned Claude playwright entry", async () => {
-  expect(catalog.entries.some((entry) => /playwright/i.test(`${entry.name} ${entry.displayName}`))).toBe(false)
+test("catalog miss continues to the pinned Claude context7 entry", async () => {
+  expect(catalog.entries.some((entry) => /context7/i.test(`${entry.name} ${entry.displayName} ${entry.description}`))).toBe(false)
+  expect(JSON.parse(await marketplace()).plugins.some((entry: { name: string }) => entry.name === "context7")).toBe(true)
   const sources = (await sourcesModule()).createPluginSources({ catalog: async () => catalogCandidates(), fetch: fixtureFetch })
-  const result = await sources.searchSources("playwright")
+  const result = await sources.searchSources("context7")
   expect(result.sources).toMatchObject([{ source: "catalog", status: "ok", matched: 0 }, { source: "claude-marketplace", status: "ok", matched: 1 }])
-  expect(result.candidates).toMatchObject([{ source: "claude-marketplace", name: "playwright", upstream: { repository: "https://github.com/anthropics/claude-plugins-official", path: "external_plugins/playwright" } }])
+  expect(result.candidates).toMatchObject([{ source: "claude-marketplace", name: "context7", upstream: { repository: "https://github.com/anthropics/claude-plugins-official", path: "external_plugins/context7" } }])
   expect(result.candidates[0]!.id).toMatch(/^cand_/)
   expect(result.searchId).not.toBe("")
   const captured = await sources.captureCandidate(result.candidates[0]!.id)
   expect(captured.ok).toBe(true)
   if (!captured.ok) throw new Error(captured.code)
   expect(captured.capture.source.commit).toBe(fixtureCommit)
-  expect(captured.capture.nodes.map((node) => node.path).filter(Boolean).sort()).toEqual([".claude-plugin", ".claude-plugin/plugin.json", ".mcp.json"])
-  expect(JSON.parse(new TextDecoder().decode(await captured.capture.readFile(".mcp.json")))).toEqual({ playwright: { command: "npx", args: ["@playwright/mcp@latest"] } })
+  expect(captured.capture.nodes.map((node) => node.path).filter(Boolean).sort()).toEqual([".claude-plugin", ".claude-plugin/plugin.json", ".mcp.json", "README.md"])
+  expect(JSON.parse(new TextDecoder().decode(await captured.capture.readFile(".mcp.json")))).toEqual({ mcpServers: { context7: { type: "http", url: "https://mcp.context7.com/mcp?client=claude-code-plugin" } } })
+  expect(await captured.capture.readFile(".mcp.json")).toEqual(new Uint8Array(await Bun.file(join(fixtureRoot, "external_plugins/context7/.mcp.json")).arrayBuffer()))
 })
 
 test("catalog candidates precede marketplace candidates; names alone do not claim sameAs", async () => {
+  expect(catalog.entries.find((entry) => entry.name === "playwright")).toMatchObject({ id: "mcp:playwright", type: "mcp" })
+  expect(JSON.parse(await marketplace()).plugins.some((entry: { name: string }) => entry.name === "playwright")).toBe(true)
   const sources = (await sourcesModule()).createPluginSources({ catalog: async () => catalogCandidates(), fetch: fixtureFetch })
-  const result = await sources.searchSources("github")
-  expect(result.candidates[0]!.source).toBe("catalog")
-  expect(result.candidates.some((candidate) => candidate.source === "claude-marketplace")).toBe(true)
+  const result = await sources.searchSources("playwright")
+  expect(result.candidates[0]).toMatchObject({ id: "mcp:playwright", source: "catalog", name: "playwright" })
+  expect(result.candidates.some((candidate) => candidate.source === "claude-marketplace" && candidate.name === "playwright")).toBe(true)
   expect(result.candidates.filter((candidate) => candidate.source === "claude-marketplace").every((candidate) => candidate.sameAs === undefined)).toBe(true)
 })
 

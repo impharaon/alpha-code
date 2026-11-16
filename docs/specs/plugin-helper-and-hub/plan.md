@@ -14,7 +14,7 @@ last_reviewed: 2026-11-16
 
 ## 切片 A
 
-- 依据：[Issue #1724](https://github.com/impharaon/alpha-code/issues/1724)；[SPEC-plugin-helper-and-hub v3](https://github.com/impharaon/alpha-work/blob/8663fb2a982eaf7c626bfee3bcd8b20b870f2577/docs/specs/plugin-helper-and-hub/spec.md) AC-01；[DESIGN-plugin-helper-and-hub v3](https://github.com/impharaon/alpha-work/blob/8663fb2a982eaf7c626bfee3bcd8b20b870f2577/docs/specs/plugin-helper-and-hub/design.md) §2、§4.1–4.4、§4.6–4.7、§5–6、§8 A、§10；转换类型与发现规则继承 [DESIGN-local-plugin-install §4.1/4.5](https://github.com/impharaon/alpha-work/blob/8663fb2a982eaf7c626bfee3bcd8b20b870f2577/docs/specs/local-plugin-install/design.md)。沿用两轮设计处置，只返回下述新实测及 H 接缝缺口。
+- 依据：[Issue #1724](https://github.com/impharaon/alpha-code/issues/1724)；[SPEC-plugin-helper-and-hub v3](https://github.com/impharaon/alpha-work/blob/8663fb2a982eaf7c626bfee3bcd8b20b870f2577/docs/specs/plugin-helper-and-hub/spec.md) AC-01；[DESIGN-plugin-helper-and-hub v4](https://github.com/impharaon/alpha-work/blob/850fd2a61f220596fb10922c8b2e477c7475fac4/docs/specs/plugin-helper-and-hub/design.md) §2、§4.1–4.4、§4.6–4.7、§5–6、§8 A、§10；转换类型与发现规则继承 [DESIGN-local-plugin-install §4.1/4.5](https://github.com/impharaon/alpha-work/blob/8663fb2a982eaf7c626bfee3bcd8b20b870f2577/docs/specs/local-plugin-install/design.md)。沿用两轮设计处置，只返回下述新实测及 H 接缝缺口。
 - 核对：b46a8702d4 · orchestrator/Claude Fable 5.2 · plan check passed for A1–A3（AC-01 chain has failing-capable proof per stage, files inside the allowed scope, no frozen decision restated, no restriction added）；A4 stays pending the H seam delta。r1 的 Phase: IMPLEMENT 本轮仅授权 A1；A2–A3 等 H 合入与分支刷新，A2 另等 runtime 设计修订提交。
 - 代码基线：本车道 `265c42529e`，工作树 `alpha-code-feat-helper-install-slice-a`，派定分支 `feat/helper-install-slice-a`；Bun 1.4.4。H 只读基线为 `feat/hub-package-one-row@f4b5a10424`（含 `8a8e0f4d19`），另有 renderer 在途修改，观察于 2026-11-16；消费其[计划「片 1 · 桌面」](../local-plugin-install/plan.md)，不修改该工作树。
 - UI：[11-15 批准帧](../../design/2026-11-15-plugin-package-install-and-card/frame.html#install) @ `265c42529e` 的装后反馈及现有时间线卡片/动作组件；时间线事实、状态与动作按设计 §4.7。不另画稿，不制作登录/token 动作（切片 C）。
@@ -59,7 +59,7 @@ last_reviewed: 2026-11-16
 
 ### 顺序
 
-1. **A1 · 真实来源到规范化包**：先将 pinned 样本及新入口的可失败用例提交，再实现 converter/artifact 与来源模块，跑 converter、artifact、sources 三组相关测试。目录无 playwright 的实际数据与真实市场命中作为同一检索用例，不能只测数组排序。
+1. **A1 · 真实来源到规范化包**：先将 pinned 样本及新入口的可失败用例提交，再实现 converter/artifact 与来源模块，跑 converter、artifact、sources 三组相关测试。以真实目录未收录的 context7 证明继续搜索与固定提交取源；以目录和市场均收录的 playwright 证明目录优先。两例各自断言真实前提，不能只测数组排序。
 2. **A2 · 规范化包到持久安装及运行 MCP**：先加入口/事务/命名/图/热接入的红例，后完成入口、叶子 builder、声明持久化、自动开启和 runtime add。目录与候选都走真实入口；在现有锁与写闸内完成提交前身份比对，不另建事务或账本。跑本段新例和已有 builder、图、admission、状态/卸载回归。以真实引擎用例落实下述限时探测，再证明重建后仍读同一持久配置。
 3. **A3 · 对话真正能发起安装**：先加 bridge/main/tool 的连通用例，再接新消息、只读阶段与普通档位路径，同笔退役确认运输及其死调用。查找来源失败、未知候选、桥超时、失败事务、重复 requestId 都有行为断言；已有确认场景替换为直装及普通审批对照，其他审批不变。跑消息、bridge、hub-tools、policy、hub-view 与所有改导出的直接调用方测试。
 4. **A4 · 时间线与 H 统一结果**：取得上表 H 接缝 delta 后，落卡片投影/订阅、管理动作、来源文案、customize-codepuppy 安装段及生产 DOM 证据；不带入搜索框、市场列表或账户动作。跑 timeline-model、卡片 DOM、H 既有一行包集成及普通审批单一面回归。最后仅跑实际修改包的 `bun typecheck` 和文档检查；编排器随后收集构建应用中的真实自然语言与浏览器任务证据。
@@ -67,7 +67,7 @@ last_reviewed: 2026-11-16
 ### 风险
 
 - **H 尚在实施**：上述观察是 `f4b5a10424` 加在途 renderer 的事实，不冒充已冻结的合入 API。来源呈现与管理定位缺口先返回 H；收到 delta 才补 A4 的具体调用，不修改 H 页面对冲依赖。
-- **runtime 路径的设计回写**：本次真实探测成立，按派发要求计划 MCP 使用既有 add/connect；设计 §4.1 第 8 步、§5 重载时机及 §10 留档须由编排器/设计方依据本证据作相应修订并在 IMPLEMENT 续派钉版本。此处不改批准设计，也不把技能和登录/令牌路径的未测行为推成成立。
+- **runtime 路径的依据**：r2 已收到设计 v4 @850fd2a；仅消费 §4.1 第 8 步、§5「生效方式」、§10 修订行的变更及直接后果，其余冻结处置不重开。A2 按该版本实施，A1 不改运行时路径；技能和登录/令牌的未测行为不因此视为已验证。
 - **热接入与持久状态一致**：安装事务/自动开启先完成，运行配置按已提交的同一叶子派生，普通工具权限仍按原权威。对每个已加载 Location 应用并回读；以后加载的 Location 从持久配置得到它。任何启动/连接失败保留已装包，卡片按实态显示，不把 committed 当 available。相关引擎例还要覆盖中途出现工具的 policy inventory 与重建后相同配置。
 - **第三方字节**：固定 pax 提交、在归档内复核市场条目和选定子目录，语义统一交 converter；畸形 JSON/tar、越界路径、链接、缺入口或绑定包内文件都用设计已有类别处理。安装阶段不执行仓库脚本；秘密原件不入 CAS、图或日志；零可运行组件时零持久写入。
 - **相关检查影响面**：artifact 文件清单、消息/写通道枚举、旧确认运输调用方、工具集合与 timeline row 穷举都会受影响，按实际变更同步相关断言；不放宽检查。若出现新增侧车闭包写盘点，仅机械同步既有写点登记，不扩大可写根；除此之外的范围扩张返回编排器。
@@ -78,15 +78,16 @@ AC-01 拆为下列同一条端到端路径的断言，不增 AC。表中仓库�
 
 | AC | 测试/证据 | 缺少行为为什么会失败 |
 | --- | --- | --- |
-| AC-01 · 目录没有也继续找真实插件 | `plugin-sources.test.ts`：`catalog miss continues to the pinned Claude playwright entry`；`plugin-conversion.test.ts`：`real bare-map playwright becomes one stdio MCP`。用真实目录读取确认未收录，再处理 pinned 市场与归档。 | 只查目录、伪造候选或不支持裸 map 时，找不到 main 候选/真实 command；来源失败对照必须报告 failed，不能变成“查无结果”。 |
-| AC-01 · 单一入口、装好自动开启 | `install-from-source.test.ts`：`chat candidate and hub catalog reach the same install entry`、`playwright commits one graph and enables its root`；实际 builder/事务/CAS/账本/配置接线用例。 | 绕入口、逐组件漏账、MCP-only root 不是真组件、未自动开启，都会使真实盘面/图/root 状态断言失败；异常事务对照须无半包。 |
+| AC-01 · 目录没有也继续找真实插件 | `plugin-sources.test.ts`：`catalog miss continues to the pinned Claude context7 entry`；`plugin-conversion.test.ts`：`real bare-map playwright becomes one stdio MCP`。context7 例先断言真实目录未收录、固定市场已收录，再核候选来源/ID、pax 提交、全部节点与真实 wrapped MCP 字节；Playwright 裸 map 转换证据保留。 | 只查目录、伪造候选或不支持裸 map 时，找不到 main 候选/真实 command；来源失败对照必须报告 failed，不能变成“查无结果”。 |
+| AC-01 · 真实 Playwright 目录优先 | `plugin-sources.test.ts`：`catalog candidates precede marketplace candidates; names alone do not claim sameAs`。先断言真实目录含 `mcp:playwright`、固定市场含 playwright；再核目录候选排在市场候选之前，同名不产生 `sameAs`。 | 目录删项会使前提断言红；倒转来源顺序或只凭同名标为同一项会使结果断言红，不再把缺席的 GitHub 当目录优先证据。 |
+| AC-01 · 单一入口、装好自动开启 | `install-from-source.test.ts`：`chat candidate and hub catalog reach the same install entry`、`catalog playwright and marketplace context7 each commit one enabled package`；Playwright 走统一入口的目录分支，context7 走市场取源→转换→同一入口；实际 builder/事务/CAS/账本/配置接线用例。 | 绕入口、逐组件漏账、MCP-only root 不是真组件、未自动开启，都会使真实盘面/图/root 状态断言失败；异常事务对照须无半包。 |
 | AC-01 · 来源身份和内容不乱 | 同文件 `same runtime identity returns the installed package`、`host-name collision preserves the user's existing MCP and rewrites the installed skill name`；`ext-package-ledger-v3.test.ts` 严格解码/摘要覆盖 source/notRunning/declarations。 | 再装第二份会多图/组件；宿主名碰撞会覆盖旧配置或使真实 skill probe 拒绝；字段缺失、篡改或秘密值混入公开图会被相应断言抓住。 |
 | AC-01 · 不强迫确认或等待重进 | `hub-tools.test.ts`、`hub-bridge.test.ts`、main host 集成：`install is accepted before slow fetch finishes and settles without permission transport`；普通档位/自动化 deny 对照；卡片 DOM 的无安装确认断言。 | 保留 assert 运输会发审批 metadata/等守望者；等完整安装才答 bridge 会过早超时；拿掉普通档位或自动化 deny 则对照失败。工具中止/桥断连不得取消 main 已受理的安装。 |
 | AC-01 · 工具实际可见、可调用 | `install-from-source.engine.test.ts` 宿主 → `install-from-source.engine.cases.ts`：真实 ext 激活、已有会话和另一已加载 Location，安装后工具清单含 `playwright_browser_navigate`，同会话调用真实 `browser_close`；移除 runtime add 的对照为缺工具。再重建证明持久配置一致。 | 单落盘/单开启/单报 connected 不足以满足工具清单和执行断言；整 Location reload 会改变 observer setup 或取消受控审批；只给默认目录 add 会漏第二个 Location。 |
-| AC-01 · 一包一行且来源准确 | 卡片 DOM + H `hub-three-pages` 生产组件：图的同一 packageId 只有一行，source 显示「Claude 插件市场」，结果管理动作到该 packageId。`hub-view.test.ts` 核验非目录 MCP。 | 源标签仍读 origin 会出现“本机导入”；组件未收敛会多行；错包/只开 hub 的动作不能命中管理页；非目录必须有目录 entry 才可用的旧逻辑会让结果一直未载入。此项等 H 接缝修复后才能执行。 |
+| AC-01 · 一包一行且来源准确 | 卡片 DOM + H `hub-three-pages` 生产组件：图的同一 packageId 只有一行，Playwright 目录包显示「定制中心」，context7 市场包显示「Claude 插件市场」，结果管理动作到该 packageId。`hub-view.test.ts` 核验非目录 MCP。 | 源标签仍读 origin 会出现“本机导入”；组件未收敛会多行；错包/只开 hub 的动作不能命中管理页；非目录必须有目录 entry 才可用的旧逻辑会让结果一直未载入。此项等 H 接缝修复后才能执行。 |
 | AC-01 · 卡片状态诚实且可恢复 | `timeline-model.test.ts` + `hub-install-card` DOM：submitted、committed/pending、available、failed、notRunning；推送重读；阶段被淘汰后 metadata.packageId 恢复。 | 以模型文本或 committed 报成功，会在引擎仍 pending 的对照中错误显示已可用；只靠阶段簿则重挂载/淘汰后结果丢失。 |
 | AC-01 · 没改项目、没换项目 | 真实入口临时项目的文件树及所有原有文件 bytes/digest 前后相等，空项目无新增 `.codepuppy`/`.mcp.json`/技能目录；已有 sessionID 和 Location setup 不变。 | 落项目配置/技能目录、要求重新进入或强制重建 Location 会改变快照或会话/observer 证据。 |
-| AC-01 · 构建应用中的完整请求 | 编排器：目录实际无 playwright 的隔离应用，新对话说「帮我安装 playwright」，留检索/安装工具 part、真实浏览器任务调用及定制中心同包来源截图；前后项目快照。 | 模型没有走查找/安装工具、抛路线、假报安装、工具未进入真实任务或包行不出现，都不能通过。临时引擎探测不能代替这一验收。 |
+| AC-01 · 构建应用中的完整请求 | 编排器：真实目录已收录 playwright，新对话说「帮我安装 playwright」经同一入口目录分支安装，留检索/安装工具 part、真实浏览器任务调用及定制中心同包来源截图；另以真实未收录的 context7 留市场→取源→转换→安装链证据及来源截图。两支均核前后项目快照；不再假定 Playwright 在当前目录缺席。 | 模型没有走查找/安装工具、抛路线、假报安装、工具未进入真实任务或包行不出现，都不能通过。临时引擎探测不能代替这一验收。 |
 
 **相关命令（IMPLEMENT，全部从包目录执行测试）**：
 
@@ -98,7 +99,7 @@ AC-01 拆为下列同一条端到端路径的断言，不增 AC。表中仓库�
 
 **真实样本与摘要**
 
-来源为 [anthropics/claude-plugins-official @ b5b01ac4f889fec0c4c6bb89f27ca7c8574473f6](https://github.com/anthropics/claude-plugins-official/tree/b5b01ac4f889fec0c4c6bb89f27ca7c8574473f6)。2026-11-16 只读取得 raw 市场清单与 codeload `refs/heads/main`，tar pax `comment` 固定到该提交，归档内清单与 raw 清单摘要相同；317 个条目，playwright 的 source 是 `./external_plugins/playwright`。实施夹具从该 pinned 归档截取原字节，源/摘要元数据跟夹具同放，不复制 8 MB 全库进测试。
+来源为 [anthropics/claude-plugins-official @ b5b01ac4f889fec0c4c6bb89f27ca7c8574473f6](https://github.com/anthropics/claude-plugins-official/tree/b5b01ac4f889fec0c4c6bb89f27ca7c8574473f6)。2026-11-16 只读取得 raw 市场清单与 codeload `refs/heads/main`，tar pax `comment` 固定到该提交，归档内清单与 raw 清单摘要相同；317 个条目，playwright 的 source 是 `./external_plugins/playwright`，context7 的 source 是 `./external_plugins/context7`。r2 核对实际内置目录：已有 `mcp:playwright`、没有 context7；因此真实 Playwright 请求按 BR-02 装目录项，市场回退链改由已在本夹具中的 context7 证明，不需要新增或改造第三方样本。实施夹具从该 pinned 归档截取原字节，源/摘要元数据跟夹具同放，不复制 8 MB 全库进测试。
 
 | 样本（相对上游根） | bytes | SHA-256 |
 | --- | --- | --- |
@@ -106,6 +107,8 @@ AC-01 拆为下列同一条端到端路径的断言，不增 AC。表中仓库�
 | `.claude-plugin/marketplace.json` | 191,699 | `414a31a148c83b7293c17b464b518425455e9c43413c24f77d9f262354dcb693` |
 | `external_plugins/playwright/.claude-plugin/plugin.json` | 295 | `f2d7c0f611b93287ebb07454255d0cccf3a343d7095b7f8f763ff21d1995c096` |
 | `external_plugins/playwright/.mcp.json` | 87 | `b6fd7e9ccee1682af353854195516826da6970026b68c86ad800ff4d931d3250` |
+| `external_plugins/context7/.claude-plugin/plugin.json` | 427 | `9c61f72909301338f08025cafa67a7055e55572ba1bb76ba68f74d4d21c9c682` |
+| `external_plugins/context7/.mcp.json` | 142 | `e5dfed1749b361fbb2d0ad64a3792a28622e788c3c058fa0f0c923991f941c17` |
 | `plugins/frontend-design/.claude-plugin/plugin.json` | 202 | `d45be5b9f5e729dd8dd545d97b46800f50c2791cb053c480495d1195ce2052be` |
 | `plugins/frontend-design/skills/frontend-design/SKILL.md` | 9,390 | `d91970639e9f5c37682ac7ab60094d35f1c7c1f38d731bd56396563aee10c1d3` |
 | `plugins/explanatory-output-style/.claude-plugin/plugin.json` | 290 | `8e195dd839cb704af2ec926bbd822996398ea4cf310be1363d7ab791ba2242ae` |
@@ -121,13 +124,17 @@ AC-01 拆为下列同一条端到端路径的断言，不增 AC。表中仓库�
 - 观察：同一 Location 的 observer setup 始终为 1；原有会话所在工具清单从 0 变为 25 个真实 playwright 工具，含 `playwright_browser_navigate`、`playwright_browser_close`，仍是原有 MCP namespace/codemode。原 sessionID 调用 `browser_close` 成功，返回 `No open tabs. Navigate to a URL to create one.`；disconnect 后工具清单回空，Location reload 计数为 0。拿掉 runtime add 会令新增工具断言失败，拿掉 disconnect 则清空断言失败。
 - 首次探测的工具清单也成功，但工具执行因 macOS 临时根过长触发 Playwright socket 路径错误。最终只将探测环境 `PWTEST_SOCKETS_DIR` 指向上述短临时目录，真实插件命令不变；不把这个本机探测设置加成产品配置。
 - 结论范围：**既有 runtime MCP add/connect 路径足以让已有会话所在 Location 的工具表更新并实际调用，无需整 Location 重载**。本次未执行模型请求、浏览器导航、安装事务、忙时审批、第二个 Location 或 H 页面；不得将它们记作已验收。按派发约定该工具清单证据足以决定 A 的 MCP 计划路径，其余由 A2 引擎回归和编排器真实应用验收覆盖。
-- 交回设计方：以上新证据对应设计 G-20/§10 留档，申请按派发已指定分支修订受影响小节；不重开其余两轮处置。
+- 设计收据：以上新证据对应 G-20/§10 留档，已由设计 v4 @850fd2a 采纳；r2 收到修订提交，留本段为原实测证据，不重开其余两轮处置。
 
 PLAN 文档检查（2026-11-16）：`python3 scripts/check-doc-links.py docs/specs/plugin-helper-and-hub/plan.md` exit 0，2 条相对链接可达；`git diff --check` exit 0；提交前另查暂存差异。工作树只有本文件新增；未跑仓库测试或全 gate。开始于 05:55:58 UTC，本阶段约 18 分钟（派发预计 45 分钟），限时探测未超过 30 分钟。
 
 计划作者已核：Codex（GPT-6），核对上述冻结版本、A 的入口/构建器/图/消息/时间线调用链及 H 接缝快照；临时引擎前提成立，**H 来源呈现与包管理定位需接缝补充，尚不能交付 PLAN-READY**。遗留去向：两处接缝返回编排器/H；runtime 新证据返回设计 §10；真实模型/浏览器任务验收仍归编排器；OPTIONAL：无。
 
 ### 偏离记录
+
+2026-11-16 r2 · 按本轮编排器裁定，仅纠正 a821d9386a 中两条目录红例：原“Playwright 目录缺席”不成立，原“GitHub 目录优先”缺少真实目录条目。目录缺席例改用现有固定样本 context7，保留来源顺序/状态、候选身份、固定提交、节点和真实 MCP 内容，并补原字节相等；目录优先例改用两处都有的 playwright。两例各自显式断言目录及 pinned 市场前提，未来目录变化会先令前提红；未过滤生产目录、未放宽结果。计划证明行、样本说明和真实请求路径同步：Playwright 经统一入口目录分支，市场→取源→转换→安装覆盖用 context7；未修改规格或产品行为。此笔为独立测试纠错提交，不含生产代码。设计版本收据更新为 v4 @850fd2a，A2–A4 本轮仍冻结。
+
+r2 验证：ui-mac `bun test --max-concurrency 2 src/shared/host-extension-package-contract/plugin-conversion.test.ts src/shared/host-extension-package-contract/host-extension-package-artifact.test.ts src/main/plugin-sources.test.ts` exit 0（31 pass / 0 fail / 230 assertions）；`bun typecheck` exit 0。文档链接检查及 `git diff --check` exit 0。r1 的 A1 红例阻塞解除；本轮 A1 完成，完整 AC-01 的入口/运行/页面验收仍归后续 A2–A4 与编排器。开始于 06:39:42 UTC，约 5 分钟。已核：Codex（GPT-6）；遗留去向：H 接缝/合入与 A2 启动→编排器，OPTIONAL 无。
 
 2026-11-16 r1 · A1 可恢复实现：新增纯 converter 与自包含 ESM/声明，artifact 生成/校验纳入这份产物；新增只读来源查询、候选及 codeload capture。未接安装/IPC/页面，也未进入 A2–A4。三文件 A1 命令（同上）exit 1：29 pass / 2 fail；日志 `/tmp/helper-install-plan-YCXgtv/a1-first-green.log`。converter 12 条及既有 artifact 11 条均通过；来源 8 条中 6 条通过，两个目录夹具前提错误，见下段。生成器使用局部 Bun build 类型声明，避免引入 Bun ambient 类型污染 Electron fetch/stream；修正后 ui-mac `bun typecheck` exit 0，artifact 单文件复核 exit 0（11 pass / 0 fail）。相应日志为 `/tmp/helper-install-plan-YCXgtv/a1-typecheck-final.log`、`a1-artifact-final.log`。
 

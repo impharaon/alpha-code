@@ -62,3 +62,19 @@ test("BC4 account save failure stays in the shared dialog and never displays the
  expect(document.querySelector('[role="alert"]')?.textContent).toBe("凭据未能保存，请检查填写内容后重试。")
  expect(document.body.innerHTML).not.toContain(input.value)
 })
+
+test("BC4 changing the package target clears the previous input before a different package can save",async()=>{
+ const [packageId,setPackageId]=solid.createSignal("first-package")
+ const writes:unknown[]=[]
+ Object.assign(window,{api:{ext:{packageAuthorization:async(id:string)=>({ok:true,packageId:id,items:[field("FIRST")]})}}})
+ const host=document.createElement("div");document.body.append(host)
+ disposers.push(web.render(()=>solid.createComponent(PackageAccountDialog,{get packageId(){return packageId()},label:"Docs",needId:"FIRST",save:async(input:unknown)=>{writes.push(input);return {ok:true}},onClose:()=>{},onSaved:()=>{}}),host))
+ await flush()
+ const fieldBefore=document.querySelector<HTMLInputElement>('input[type="password"]')!
+ fieldBefore.value="BC4_FIRST_PACKAGE_PRIVATE_TOKEN";fieldBefore.dispatchEvent(new Event("input",{bubbles:true}))
+ setPackageId("second-package");await flush()
+ expect(document.querySelector<HTMLInputElement>('input[type="password"]')!.value).toBe("")
+ document.querySelector<HTMLButtonElement>('.a-dialog-footer button')!.click();await flush()
+ expect(writes).toEqual([{packageId:"second-package",secrets:{}}])
+ expect(JSON.stringify(writes)).not.toContain("BC4_FIRST_PACKAGE_PRIVATE_TOKEN")
+})

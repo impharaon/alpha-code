@@ -12,6 +12,44 @@ import { commitTransactionLedger } from "./ext-package-ledger-commit"
 import { readPackageLedgerStateV1, type UpsertInput } from "./ext-receipt-v2"
 import { runExtensionTransaction } from "./ext-transaction"
 
+test("A2 MCP leaf builder preserves normalized fields and owns secret references", async () => {
+  const { buildMcpTxItems } = await import("./ext-package-tx-builders")
+  const temporary = mkdtempSync(join(tmpdir(), "helper-a2-leaf-"))
+  const root = join(temporary, "env", "dev")
+  const previousRoot = process.env.CODEPUPPY_GLOBAL_DIR
+  process.env.CODEPUPPY_GLOBAL_DIR = root
+  try {
+    // Our normalized boundary, derived from the recorded real GitHub definition.
+    const capture = await captureFixture("external_plugins/github")
+    const converted = await convertPluginTree(capture)
+    const need = converted.package.secrets[0]!
+    const receipt: UpsertInput = { id: "user:github", kind: "mcp", name: "github", environment: "dev", scope: { kind: "global" }, origin: "imported-claude", desiredState: "disabled", installedAt: "2026-11-16T07:24:11Z" }
+    const built = buildMcpTxItems({ root, key: "mcp--github", name: "github", capabilities: [], manifestDigest: converted.package.treeDigest, receipt, userDataPath: temporary, newSecretVersionId: () => "a2-test-version", leaf: { type: "remote", url: "https://api.githubcopilot.com/mcp/", headers: { Authorization: `Bearer {secret:${need.id}}` }, timeout: 7890, oauth: false }, secretNeeds: [{ needId: need.id }], secretValues: { [need.id]: "fixture-not-a-real-token" } })
+    expect(built.ok).toBe(true)
+    if (!built.ok) throw new Error(built.reason)
+    expect(built.build.items[0]?.config?.edits[0]?.value).toMatchObject({ type: "remote", timeout: 7890, oauth: false, enabled: false })
+    expect(JSON.stringify(built.build.items)).not.toContain("fixture-not-a-real-token")
+    expect(built.build.prepared?.descriptor).toMatchObject({ kind: "mcp-secret-version", server: "github", version: "a2-test-version" })
+    expect(String((built.build.items[0]?.config?.edits[0]?.value as { headers: { Authorization: string } }).headers.Authorization)).toContain("{file:")
+  } finally {
+    if (previousRoot === undefined) delete process.env.CODEPUPPY_GLOBAL_DIR
+    else process.env.CODEPUPPY_GLOBAL_DIR = previousRoot
+    rmSync(temporary, { recursive: true, force: true })
+  }
+})
+
+test("A2 graph metadata is strict, digest-bound and rejects plaintext credential declarations", async () => {
+  const { decodePackageGraphV1 } = await import("./ext-package-ledger-v3")
+  const capture = await captureFixture("external_plugins/context7")
+  const converted = await convertPluginTree(capture)
+  const base = { packageId: "claude:context7", envelopeDigest: converted.package.treeDigest, root: { componentId: "user:context7", kind: "mcp" as const, name: "context7", required: true, manifestDigest: converted.package.treeDigest }, children: [], source: { kind: "marketplace", ecosystem: "claude", repository: capture.source.repository!, commit: capture.source.commit!, path: capture.source.pluginPath!, entryName: "context7" }, notRunning: [{ kind: "plugin", sourceName: "example.js", reason: "native-js-plugin" }], declarations: [{ componentId: "user:context7", kind: "mcp", hostName: "context7", sourceName: "context7", mcp: { type: "remote", url: "https://mcp.context7.com/mcp?client=claude-code-plugin" }, secretNeeds: [] }] }
+  const graph = { ...base, installedGraphDigest: computeInstalledGraphDigest(base) }
+  expect(decodePackageGraphV1(graph)).toMatchObject({ ok: true, value: { source: base.source, notRunning: base.notRunning, declarations: base.declarations } })
+  expect(decodePackageGraphV1({ ...graph, source: { ...base.source, commit: "different" } }).ok).toBe(false)
+  const bad = { ...base, declarations: [{ ...base.declarations[0]!, mcp: { ...base.declarations[0]!.mcp, headers: { Authorization: "Bearer fixture-not-a-real-token" } } }] }
+  expect(decodePackageGraphV1({ ...bad, installedGraphDigest: computeInstalledGraphDigest(bad) }).ok).toBe(false)
+})
+
 test("A2 automatic enable uses H's package-root action for a real skill-only package without config edits", async () => {
   const temporary = mkdtempSync(join(tmpdir(), "helper-a2-state-"))
   const root = join(temporary, "env", "dev")

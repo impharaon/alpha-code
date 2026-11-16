@@ -133,6 +133,10 @@ PLAN 文档检查（2026-11-16）：`python3 scripts/check-doc-links.py docs/spe
 
 ### 偏离记录
 
+2026-11-16 r4 · 编排器重放到 H `5b46447823`，本车道头 `b45664681b`；原技能包红例未改。A2 八文件基线（r3 七文件加 `install-from-source.test.ts`，均 `--max-concurrency 2`）exit 0：126 pass / 0 fail，日志 `/tmp/helper-install-plan-YCXgtv/a2-r4-baseline.log`，H 零配置编辑与远程发布阻塞闭合。接收设计 v5 @8bd3075（本轮指定工作树）：按 §4.1 第 6 步消费结构化 diagnostics，零可运行结果带 notRunning，不改 converter 或 sources。H 已知双技能 generation 碰撞不在本片修复；若直接引擎断言受其阻断，独立返回该项依赖。
+
+r4 新红例：ui-mac `bun test --max-concurrency 2 src/main/install-from-source.test.ts` exit 1（1 pass / 2 fail，8 assertions），日志 `/tmp/helper-install-plan-YCXgtv/a2-r4-red.log`；原技能包激活例通过，新例分别因 MCP builder 尚不接受 leaf 输入、图 schema 尚无 source/notRunning/declarations 而失败。拟新增 `src/shared/plugin-install.ts` 作为 A2 图/构建器/入口共用的冻结 DTO 与严格校验落点，避免图纯数据模块反向依赖主进程声明读取器；这是同调用链必要落点，不更改合同。
+
 2026-11-16 r3 · A2 在重放头 `8e40a921ec` 开始，先跑计划中的既有七文件回归：ui-mac `bun test --max-concurrency 2 src/main/ext-package-ledger-v3.test.ts src/main/package-builders-wiring.test.ts src/main/ext-set-state-tx.test.ts src/main/ext-package-ledger-uninstall.test.ts src/main/package-admission.test.ts src/main/package-admission.wiring.test.ts src/main/package-admission.parity.test.ts` exit 1（123 pass / 2 fail），日志 `/tmp/helper-install-plan-YCXgtv/a2-baseline.log`。两处报告均来自 H 已提交 `package-admission.test.ts:145` 的同一回归（直接执行和 wiring 宿主）：Supabase 安装返回成功，但主进程远程 MCP 真源没有 supabase；该例由 `089d0e1a7e` 引入，不是本轮新增失败，不称为 flaky，不修改 H 断言或发布权威。
 
 本轮新增计划内 `src/main/install-from-source.test.ts` 的接缝红例：使用原 pinned frontend-design 的真实文件，经 `promotePayloadToCas`、`buildSkillTxItems`、`runExtensionTransaction` 和 `commitTransactionLedger` 成功提交完整关闭态技能包，再调用设计指定的 H `setPackageStateV1` 自动开启。ui-mac `bun test --max-concurrency 2 src/main/install-from-source.test.ts` exit 1（0 pass / 1 fail，6 assertions），实际返回 `{ok:false, reason:"config tx has no edits"}`，事务提交及初始账本断言已通过，日志 `/tmp/helper-install-plan-YCXgtv/a2-root-state-red.log`。测试根遵循 `<base>/env/dev`，不读 owner 数据；树、generation 与探针均为实际生产路径，不手造第三方技能。

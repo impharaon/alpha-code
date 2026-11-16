@@ -1729,6 +1729,23 @@ describe("A4 trusted hub parts become main-backed timeline cards", () => {
   }) as ToolPart["display"]
   const turn = (part: ToolPart) => project([userMsg("u", 1), assistantMsg("a", "u")], { a: [part] })
 
+  test("D4 trusted create uses the same install card and persisted main identity without draft bytes", () => {
+    const part = toolPart("create", "a", "unrelated-alias", {
+      display: display("create"),
+      state: { status: "completed", input: { searchId: "searched", name: "my-report", description: "My report", files: [{ path: "skills/report/SKILL.md", text: "private-draft-body" }] }, output: "Created and installed", title: "create", time: { start: 1, end: 2 }, metadata: { requestId: "request_create", packageId: "mine:my-report" } },
+    })
+    const row = turn(part).find(row => row.kind === "hubInstall")
+    expect(row?.kind).toBe("hubInstall")
+    if (row?.kind !== "hubInstall") throw Error("no create card")
+    expect(row.install).toMatchObject({ operation: "install", name: "my-report", requestId: "request_create", packageId: "mine:my-report", phase: "completed" })
+    expect(JSON.stringify(row)).not.toContain("private-draft-body")
+    expect(reuseTimelineRows(turn(part), turn(part)).find(row => row.kind === "hubInstall")?.key).toBe(row.key)
+    const trusted = display("create")!
+    for (const proof of [undefined, { ...trusted, authority: { kind: "not-asserted" } }, { ...trusted, readable: "codepuppy:hub_install" }, { ...trusted, identity: { ...trusted.identity, source: "mcp" } }]) {
+      expect(turn({ ...part, display: proof as ToolPart["display"] }).some(row => row.kind === "hubInstall")).toBe(false)
+    }
+  })
+
   test("A4 running search and install carry progress identity; completed part retains packageId for remount", () => {
     const search = toolPart("search", "a", "unrelated-alias", { display: display("search"), state: { status: "running", input: { query: "playwright" }, time: { start: 1 } } as ToolPart["state"] })
     const card = turn(search).find(row => row.kind === "hubInstall")

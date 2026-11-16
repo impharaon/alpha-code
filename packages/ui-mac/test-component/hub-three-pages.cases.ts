@@ -1033,3 +1033,43 @@ test.each([undefined, { kind: "project" as const, projectPath: "/project/alpha",
   await waitFor(() => expect(q(".codepuppy-ext-detail")?.textContent).toContain("生效范围"))
   expect(q(".codepuppy-ext-detail")?.textContent).toContain(effect ? "仅当前项目" : "我的所有项目")
 })
+
+test("D4 factory plugin helper has its shipped name and purpose without an install or switch", async () => {
+  reset()
+  factorySkillIds = ["plugin-helper"]
+  mount("skills")
+  click(q('[data-segment="system"]'))
+  await waitFor(() => expect(q('[data-factory-skill="plugin-helper"]')).toBeInstanceOf(HTMLElement))
+  const row = q('[data-factory-skill="plugin-helper"]')!
+  expect(q("b", row)?.textContent).toBe("插件助手")
+  expect(q(".codepuppy-ext-kit-desc", row)?.textContent).toBe("查找并安装插件和 MCP")
+  expect(q("[data-more], button, input", row)).toBeNull()
+  expect(q('[data-installed-package]')).toBeNull()
+  expect(calls.installCatalog).toEqual([])
+  expect(calls.installPackage).toEqual([])
+  expect(calls.packageState).toEqual([])
+})
+
+test("D4 created source stays My plugin through its package row, management and whole removal", async () => {
+  reset()
+  // This is our renderer read model; source, rather than an ID prefix or name, owns provenance.
+  const packageId = "package:photoshop-report"
+  installedPackages = [{
+    packageId, installedGraphDigest: "sha256:" + "c".repeat(64),
+    displayName: "PSD report", rootComponentName: "photoshop-report", version: "1.0.0",
+    origin: "created", desiredState: "enabled", source: { kind: "created" },
+    components: [{ componentId: "user:photoshop-report", kind: "skill", name: "photoshop-report", required: true, desiredState: "enabled" }],
+  }]
+  receipts = [receipt("user:photoshop-report", "photoshop-report", "skill")]
+  mount()
+  await waitFor(() => expect(q('[data-installed-package]')?.textContent).toContain("我的插件"))
+  expect(q('[data-installed-package]')?.textContent).not.toContain("官方")
+  await managePackage(packageId)
+  expect(q('[data-package-detail]')?.textContent).toContain("我的插件")
+  expect(q('[data-package-detail]')?.textContent).not.toContain("官方")
+  click(q('[data-package-detail] [data-more]'))
+  click(q('[data-menu-item="remove-package"]'))
+  await waitFor(() => expect(calls.packageRemove).toEqual([packageId]))
+  await waitFor(() => expect(q('[data-installed-package]')).toBeNull())
+  expect(calls.uninstall).toEqual([])
+})

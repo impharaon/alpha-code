@@ -165,3 +165,10 @@ r4 A 实施：同图的 MCP 凭据 update 由原 applyPackageMutation 按 child 
 
 
 r4 B2/B3/B4 补红：`bun test --max-concurrency 2 ./test-component/official-connectors.cases.ts -t 'desktop official'` exit 1（0 pass / 2 fail）：missing-token 重启恢复后 saved 误为 true，official 安装带 reserved-name 发布警告。`bun test --max-concurrency 2 ./test-component/hub-three-pages.cases.ts -t 'official credential dialogs'` exit 1（0 pass / 1 fail）：真实随包 DBHub 条目的 DSN 说明缺失；同例要求 PAT 说明及凭据保存失败文案。测试复用既有官方 recipe 加密边界及真实 bundled catalog，不放宽原生命周期断言。
+
+
+r4 审查处置（Claude Opus 5.5，只读 range `origin/alpha...5b46447823`，round 1/1，FIX-THEN-MERGE；本片只闭合已接受 finding）：B2 以官方引用版本的 `connector-secrets/<ver>/secret.enc` 判 saved，空 runtime 不再冒充凭据；B3 复用官方 DSN/PAT 两段说明与 placeholder，保存失败用凭据文案；B4 通用 publish 跳过 official，沿原 projectOfficialConnector 在 commit 后发布新引用再恢复/清旧版本（仅导出原函数，不添第二 writer；也修复 A 的官方更换版本同链引用）。新具名 official 三例 exit 0（3 pass），Hub 实际 26 例 exit 0。B5 删除两条 ledger “always” 无效断言及虚假测试名承诺，永久允许证明继续由真实生命周期 policy store 前后相同承担。B6 恢复详情页会装/不会装、必需/可选、逐字 skip reason 及两条 #765 flush 后 exactly-one toast。B7 真实 directory 路由下加入同名 project skill，断言 project 分组内仍有行。B8 保留 IPC 未完成时，用当前仍连接 DOM 的第二次已接纳 activation 验 guard，不再点击 detached 节点。临时摘除 packBusy guard 后具名 case exit 1（移除调用 2 次），恢复生产代码；Hub/detail 两个隔离宿主组 exit 0（2 pass，实际 26/15 子例），`bun typecheck` exit 0。新回归断言未改。
+
+相关官方全文件检查暴露未改边界：`test-component/official-connectors.cases.ts:586` — 将 TMPDIR 设为 HOME 后 officialRuntimeRoot 未抛 needs-reentry，独立具名确认仍 exit 1（0 pass / 1 fail）；该运行目录实现本轮仅导出另一函数、此边界未改，不作为凭据修复通过证据。去向：编排器安排既有 runtime-root 环境边界问题；不扩修。
+
+r4 仅记录的遗留（续派明确排除）：`package-admission.ts` — busy 时直装未 force，交 helper 片 runtime MCP add；`readPackageAuthorizationV1` — MCP 状态刷新逐包重取远程 catalog，交 intent；`resolveInstalledPackage` — 授权读取依赖已装版本仍在当前 catalog，交 intent；`ext-config.ts:536` — remote truth 损坏也会阻断 local MCP 严格读，交 intent。以上均无代码改动。

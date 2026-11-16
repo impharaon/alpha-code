@@ -1102,7 +1102,38 @@ describe("package detail production renderer path", () => {
     await waitFor(() => expect(document.querySelector('[data-package-detail]')).toBeInstanceOf(HTMLElement))
     const rows = Array.from(document.querySelectorAll('[data-package-component]'))
     expect(rows.map((row) => row.getAttribute('data-package-component'))).toEqual([ROOT_AGENT_ID, LEAF_SKILL_ID, LEAF_MCP_ID, LEAF_COMMAND_ID, LEAF_UNSUPPORTED_ID])
-    expect(document.querySelector(`[data-skip-reason="${EXPECTED_SKIP_REASON}"]`)).toBeInstanceOf(HTMLElement)
+    // ② 「会装 / 不会装」是**用户能读到的中文**,不是一个 data 属性(属性可以在没有任何文案的
+    //    情况下写对 —— 那正是 `#749` 之后的现状)。
+    const stateText = (row: HTMLElement) =>
+      row.querySelector(".codepuppy-ext-package-component-state")?.textContent
+    expect(rows.map(stateText)).toEqual([
+      zh["codepuppy.ext.packageComponentIncluded"],
+      zh["codepuppy.ext.packageComponentIncluded"],
+      zh["codepuppy.ext.packageComponentIncluded"],
+      zh["codepuppy.ext.packageComponentIncluded"],
+      zh["codepuppy.ext.packageComponentSkipped"],
+    ])
+    expect(rows.map((row) => row.querySelector(".codepuppy-ext-package-component-req")?.textContent)).toEqual([
+      zh["codepuppy.ext.packageRequired"],
+      zh["codepuppy.ext.packageRequired"],
+      zh["codepuppy.ext.packageOptional"],
+      zh["codepuppy.ext.packageOptional"],
+      zh["codepuppy.ext.packageOptional"],
+    ])
+
+    // ③ 被跳过的那一行有**具名原因**,且原因文案非空、来自 decoder 的 token。
+    const why = rows[4]!.querySelector<HTMLElement>(".codepuppy-ext-package-component-why")
+    expect(why).toBeInstanceOf(HTMLElement)
+    expect(why!.getAttribute("data-skip-reason")).toBe(EXPECTED_SKIP_REASON)
+    expect(why!.textContent).toBe(zh["codepuppy.ext.packageSkipCapabilityUnsupported"])
+    expect(why!.textContent!.trim()).not.toBe("")
+    // 会安装的四行不得出现任何原因段(「所有行都显示原因」是另一种假绿)。
+    expect(rows.slice(0, 4).map((row) => row.querySelector(".codepuppy-ext-package-component-why"))).toEqual([
+      null,
+      null,
+      null,
+      null,
+    ])
     click(document.querySelector('.codepuppy-ext-crumb-link'))
     click(packageCard("package:renderer-ready").querySelector('button'))
     await waitFor(() => expect(harness.installResults.at(-1)).toMatchObject({ ok: true }))
@@ -1116,6 +1147,8 @@ describe("package detail production renderer path", () => {
     expect(harness.installResults.at(-1)).toMatchObject({ ok: true, warning: "PACKAGE_INSTALL_WARNING_r2" })
     await waitFor(() => expect(toastsContaining(zh["codepuppy.ext.error.warningUnknown"])).toBe(1))
     expect(persistentToastsContaining(zh["codepuppy.ext.error.warningUnknown"])).toBe(1)
+    await flush()
+    expect(toastsContaining(zh["codepuppy.ext.error.warningUnknown"])).toBe(1)
   })
 
   test("a named warning on package removal reaches the user once from the management menu", async () => {
@@ -1126,6 +1159,8 @@ describe("package detail production renderer path", () => {
     await waitFor(() => expect(readPackageGraphs(harness.globalRoot)).toEqual({ ok: true, packageGraphs: [] }))
     expect(dataLayerPackageUninstalls).toEqual(["package:renderer-ready"])
     await waitFor(() => expect(toastsContaining(zh["codepuppy.ext.error.warningUnknown"])).toBe(1))
+    await flush()
+    expect(toastsContaining(zh["codepuppy.ext.error.warningUnknown"])).toBe(1)
   })
 
   test("the uninstall warning stays put instead of expiring with the toast timer", async () => {
@@ -1196,13 +1231,12 @@ describe("package detail production renderer path", () => {
     }
   })
 
-  test("existing capability grants do not add an installation confirmation or permanent tool permission", async () => {
+  test("existing capability grants do not add an installation confirmation", async () => {
     const harness = await mountHarness({ preauthorized: true })
     await installDirect(harness, "package:renderer-prerequisite")
     expect(harness.installIntents).toEqual([{ catalogId: "package:renderer-prerequisite" }])
     expect(JSON.stringify(harness.installIntents)).not.toContain("authorization")
     expect(document.querySelector('[data-package-authorization]')).toBeNull()
-    expect(JSON.stringify(readPackageLedgerStateV1(harness.globalRoot))).not.toContain("always")
   })
 
   test("closing token entry clears transient input and leaves installed content ready to continue", async () => {

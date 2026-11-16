@@ -109,7 +109,7 @@ export function InstalledPackageDetail(props: {
           ? await props.ext.savePackageSecrets({ packageId: props.pack.packageId, secrets: values() })
           : await props.ext.authenticateMcp(selected.serviceName)
       if (!result.ok) {
-        setError(extensionError(result.reason, "codepuppy.ext.mcpAuthFailed"))
+        setError(extensionError(result.reason, selected.kind === "secret" ? "codepuppy.ext.packageCredentialSaveFailed" : "codepuppy.ext.mcpAuthFailed"))
         return
       }
       close()
@@ -289,12 +289,12 @@ export function InstalledPackageDetail(props: {
           <For each={items().filter((item) => item.kind === "secret" && item.serviceName === account()?.serviceName)}>
             {(item) => (
               <label class="codepuppy-ext-flabel">
-                {t("codepuppy.ext.packageToken", { name: props.label })}
+                {item.prerequisiteId === "mcp:github-official#GITHUB_PERSONAL_ACCESS_TOKEN" ? t("codepuppy.ext.officialGithubPat") : item.prerequisiteId === "mcp:dbhub-readonly#DSN" ? t("codepuppy.ext.officialSqliteDsn") : t("codepuppy.ext.packageToken", { name: props.label })}
                 <input
                   class="codepuppy-ext-input"
                   type="password"
                   autocomplete="off"
-                  placeholder={t("codepuppy.ext.packageTokenPlaceholder")}
+                  placeholder={t(item.prerequisiteId === "mcp:github-official#GITHUB_PERSONAL_ACCESS_TOKEN" ? "codepuppy.ext.officialGithubPat" : item.prerequisiteId === "mcp:dbhub-readonly#DSN" ? "codepuppy.ext.officialSqliteDsn" : "codepuppy.ext.packageTokenPlaceholder")}
                   value={values()[item.prerequisiteId] ?? ""}
                   onInput={(event) =>
                     setValues((current) => ({ ...current, [item.prerequisiteId]: event.currentTarget.value }))

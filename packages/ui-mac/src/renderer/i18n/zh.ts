@@ -599,6 +599,7 @@ export const dict = {
   "codepuppy.ext.mcpNeedsAuth": "需要重新登录",
   "codepuppy.ext.mcpAuthorize": "去授权",
   "codepuppy.ext.mcpAuthorizing": "等待浏览器授权…",
+  "codepuppy.ext.packageCredentialSaveFailed": "凭据未能保存，请检查填写内容后重试。",
   "codepuppy.ext.mcpAuthFailed": "授权没有完成,请再试一次",
   "codepuppy.ext.mcpAuthDone": "已重新登录",
   "codepuppy.ext.cloudToolDispatch": "将任务发送到云端处理",

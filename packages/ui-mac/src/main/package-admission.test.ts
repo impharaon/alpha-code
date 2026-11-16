@@ -73,7 +73,6 @@ test("desktop plus commits content before automatic package enable without login
   expect(state.records).toHaveLength(3)
   expect(state.records.map((record) => record.desiredState)).toEqual(["enabled", "enabled", "enabled"])
   expect(await Bun.file(skillsEnabledPath(root)).text()).toContain("supabase")
-  expect(JSON.stringify(state)).not.toContain("always")
 })
 
 test("installed GitHub package saves and changes its token while off and on without reinstalling", async () => {

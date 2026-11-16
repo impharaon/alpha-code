@@ -16,6 +16,7 @@ import { transformAsync } from "@babel/core"
 import presetTypescript from "@babel/preset-typescript"
 import { GlobalRegistrator } from "@happy-dom/global-registrator"
 import presetSolid from "babel-preset-solid"
+import { hrefFor } from "../src/shared/route-manifest"
 import bundledCatalog from "../src/renderer/extensions/codepuppy-catalog.json"
 import { DEFAULT_BUILTIN_POLICY } from "../src/main/codepuppy-builtin-policy"
 import { evaluatePackageForHost, packageActionForReason } from "../src/main/package-installability"
@@ -50,8 +51,11 @@ Bun.plugin({
 })
 
 // ── 边界替身(用例可驱动)───────────────────────────────────────────────────────────────────
-type Receipt = { id: string; name: string; type: string; scope: "global"; installedAt: string; origin: string; version?: string }
+type Receipt = { id: string; name: string; type: string; scope: "global" | "project"; installedAt: string; origin: string; version?: string }
 let receipts: Receipt[] = []
+let projectReceipts: Receipt[] = []
+let pathname = "/"
+let removalPending: Promise<void> | undefined
 let inventoryRows: unknown[] = []
 let hubRows: unknown[] = []
 let installedPackages: InstalledPackageV1[] = []
@@ -110,7 +114,7 @@ mock.module("../src/renderer/auth-recovery", () => ({
     return () => {}
   },
 }))
-mock.module("@solidjs/router", () => ({ useLocation: () => ({ pathname: "/" }) }))
+mock.module("@solidjs/router", () => ({ useLocation: () => ({ get pathname() { return pathname } }) }))
 mock.module("../src/renderer/codepuppy-ui/Banner", () => ({ Banner: () => null }))
 
 Object.defineProperty(window, "api", {
@@ -124,7 +128,7 @@ Object.defineProperty(window, "api", {
     updater: { check: async () => {} },
     auth: { start: async () => {}, setMode: async () => {} },
     ext: {
-      listInstalls: async () => ({ global: receipts, project: [], warnings: [] }),
+      listInstalls: async () => ({ global: receipts, project: projectReceipts, warnings: [] }),
       sessionGrants: async () => ({ grants: [] }),
       factorySkillIds: async () => factorySkillIds,
       onSessionGrantsEnded: () => () => {},
@@ -143,7 +147,7 @@ Object.defineProperty(window, "api", {
         return { ok: true }
       },
       savePackageSecrets: async (intent: { packageId: string; secrets: Record<string, string> }) => { calls.packageSecrets.push(intent); if (secretFailure) return { ok: false, reason: secretFailure }; packageAuthorizationItems = packageAuthorizationItems.map((item) => ({ ...item as object, saved: true })); return { ok: true } },
-      uninstallPackage: async (packageId: string) => { calls.packageRemove.push(packageId); installedPackages = installedPackages.filter((pack) => pack.packageId !== packageId); receipts = []; hubRows = []; mcpStates = {}; return { ok: true, packageId, removed: [], retained: [] } },
+      uninstallPackage: async (packageId: string) => { calls.packageRemove.push(packageId); await removalPending; installedPackages = installedPackages.filter((pack) => pack.packageId !== packageId); receipts = []; hubRows = []; mcpStates = {}; return { ok: true, packageId, removed: [], retained: [] } },
       advisoryActive: async () => ({ ids: [], fresh: true }),
       migrateScan: async () => ({ enabled: false, inventory: { skills: [], mcp: [], plugins: [] } }),
       remoteCatalog: async () => remoteCatalog,
@@ -221,13 +225,16 @@ test("catalog package owns one installed row across pages with its switch in the
     })),
   }))
   receipts = installedPackages.flatMap((pack) => pack.components.map((component) => receipt(component.componentId, component.name, component.kind)))
+  pathname = hrefFor.directory("/tmp/hub-project-control")
+  projectReceipts = [{ ...receipt("skill:supabase", "supabase", "skill"), scope: "project" }]
   // A separate project-independent skill is a control: package filtering must not swallow it.
   receipts.push(receipt("skill:safe-refactor", "safe-refactor", "skill"))
   mount("skills")
   await waitFor(() => expect(q('[data-installed-package="package:supabase"]')).toBeInstanceOf(HTMLElement))
-  expect(q('[data-installed-row="skill:supabase"]')).toBeNull()
+  expect(qa('[data-installed-row="skill:supabase"]')).toHaveLength(1)
   expect(q('[data-installed-row="skill:supabase-postgres-best-practices"]')).toBeNull()
   expect(q('[data-installed-row="skill:safe-refactor"]')).toBeInstanceOf(HTMLElement)
+  expect(q('[data-group="project"] [data-installed-row="skill:supabase"]')?.textContent).toContain("supabase")
   const row = q('[data-installed-package="package:supabase"]')!
   expect(qa("button", row).map((button) => button.textContent?.trim())).toEqual(["…"])
   click(q("[data-more]", row))
@@ -317,6 +324,9 @@ function mount(section: "connectors" | "skills" | "agents" = "connectors") {
 }
 function reset() {
   secretFailure = undefined
+  projectReceipts = []
+  pathname = "/"
+  removalPending = undefined
   for (const dispose of disposals.splice(0)) dispose()
   document.body.replaceChildren()
   receipts = []
@@ -879,8 +889,21 @@ test("package management uses the existing permission editor and removes once wi
   expect(q('[data-tools-state="no-project"]')).toBeInstanceOf(HTMLElement)
   click(q('[data-package-detail] [data-more]'))
   const remove = q('[data-menu-item="remove-package"]')!
+  let finishRemoval: () => void = () => {}
+  removalPending = new Promise<void>((resolve) => { finishRemoval = resolve })
   click(remove)
-  click(remove)
+  await waitFor(() => expect(calls.packageRemove).toHaveLength(1))
+  // A second activation admitted while the first IPC is unresolved must hit the action guard.
+  // Use a live menu node; remove disabled only to model an already-admitted activation.
+  click(q('[data-package-detail] [data-more]'))
+  const again = q<HTMLButtonElement>('[data-menu-item="remove-package"]')!
+  expect(again.isConnected).toBe(true)
+  expect(again.disabled).toBe(true)
+  again.disabled = false
+  click(again)
+  await flush()
+  expect(calls.packageRemove).toHaveLength(1)
+  finishRemoval()
   await waitFor(() => expect(calls.packageRemove).toEqual([entry.prelude.packageId]))
   await waitFor(() => expect(q('[data-installed-package]')).toBeNull())
   expect(q('[data-installed-row="mcp:supabase"]')).toBeNull()

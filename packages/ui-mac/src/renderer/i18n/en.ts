@@ -609,6 +609,7 @@ export const dict = {
   "codepuppy.ext.mcpNeedsAuth": "Sign-in required",
   "codepuppy.ext.mcpAuthorize": "Authorize",
   "codepuppy.ext.mcpAuthorizing": "Waiting for browser authorization…",
+  "codepuppy.ext.packageCredentialSaveFailed": "Credentials could not be saved. Check the value and try again.",
   "codepuppy.ext.mcpAuthFailed": "Authorization did not complete — please try again",
   "codepuppy.ext.mcpAuthDone": "Signed in again",
   "codepuppy.ext.cloudToolDispatch": "Send tasks to the cloud for processing",

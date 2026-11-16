@@ -1,7 +1,7 @@
 import { isOfficialConnector } from "./official-connector-recipes"
-import { collectOldOfficialConnectorVersions, releaseOfficialConnectorResources, restoreCommittedOfficialConnectors } from "./official-connector-resources"
+import { collectOldOfficialConnectorVersions, officialConnectorPaths, projectOfficialConnector, releaseOfficialConnectorResources, restoreCommittedOfficialConnectors } from "./official-connector-resources"
 import { createHash } from "node:crypto"
-import { isAbsolute, basename, dirname } from "node:path"
+import { isAbsolute, basename, dirname, join } from "node:path"
 import { existsSync } from "node:fs"
 import type { AppEnvironment } from "./codepuppy-environment"
 import { collectMcpFileRefPaths, mcpSecretVersionedRef, newMcpSecretVersionId } from "./codepuppy-mcp-secrets"
@@ -473,7 +473,9 @@ export async function readPackageAuthorizationV1(packageId: unknown, deps: Packa
       const files = collectMcpFileRefPaths(leaf.value)
       for (const item of component.prerequisite.items) items.push({
         kind: "secret", componentId: item.componentId, prerequisiteId: item.prerequisiteId, serviceName: name, label: item.label,
-        saved: files.some((file) => (isOfficialConnector(name) || basename(file) === item.target.variable) && existsSync(file)),
+        saved: files.some((file) => isOfficialConnector(name)
+          ? existsSync(join(officialConnectorPaths(deps.root(), name, basename(dirname(file))).secret, "secret.enc"))
+          : basename(file) === item.target.variable && existsSync(file)),
       })
     }
     for (const item of component.oauth.items) {
@@ -557,8 +559,10 @@ export async function savePackageSecretsV1(input: unknown, deps: PackageAdmissio
   const published = publishPackageMcp(builds)
   const warnings = published.ok ? [] : [published.reason]
   if (published.ok) try {
+    for (const build of builds) if (isOfficialConnector(build.receipt.name))
+      projectOfficialConnector(build.receipt.name, build.items[0]!.config!.edits[0]!.value as Record<string, unknown>)
+    if (resources.some((resource) => resource.descriptor.store === "official-connectors")) restoreCommittedOfficialConnectors()
     const cleaned = withConfigWriteLock(() => {
-      if (resources.some((resource) => resource.descriptor.store === "official-connectors")) restoreCommittedOfficialConnectors()
       releaseOfficialConnectorResources(deps.userDataPath, superseded)
       return { ok: true as const }
     })
@@ -573,6 +577,7 @@ export async function savePackageSecretsV1(input: unknown, deps: PackageAdmissio
 // remote definitions to its truth file; neither the renderer nor the engine owns this write.
 function publishPackageMcp(builds: PackageTxBuildV1[]): PackageActionResultV1 {
   for (const build of builds) {
+    if (isOfficialConnector(build.receipt.name)) continue
     const config = build.items[0]!.config!.edits[0]!.value as Record<string, unknown>
     if (config.type !== "remote") continue
     const definition = { ...config }
@@ -1240,6 +1245,8 @@ async function executePreparedPackage(
   if (result.ok) for (const resource of preparedResources) {
     if (resource.descriptor.store !== "official-connectors" || !isOfficialConnector(resource.descriptor.server)) continue
     try {
+      const build = builds.find((entry) => entry.build.receipt.name === resource.descriptor.server)!.build
+      projectOfficialConnector(resource.descriptor.server, build.items[0]!.config!.edits[0]!.value as Record<string, unknown>)
       restoreCommittedOfficialConnectors()
       collectOldOfficialConnectorVersions(root, resource.descriptor.server, resource.descriptor.version)
     } catch {

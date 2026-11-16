@@ -13,7 +13,7 @@
 // SDK v2 生成类型与 server 实际接受/返回形状的已知偏斜(directory/scope/roots 扩展参数、data
 // 数组元素形状、event 信封)。上游 codegen 修齐后应成批删除,不新增其它用途的 as any。
 import { createStore } from "solid-js/store"
-import { createEffect, createSignal, onCleanup, untrack, type Accessor } from "solid-js"
+import { createEffect, createMemo, createSignal, on, onCleanup, untrack, type Accessor } from "solid-js"
 // CLIENT subpath only — the v2 barrel pulls Node-only deps that break the renderer (see ADR-008).
 import { createOpencodeClient } from "../../engine-adapter/contract/v1"
 import type { ServerInfo } from "../sidebar/use-projects"
@@ -431,6 +431,9 @@ export interface ExtensionsApi {
   localPluginConfirm(previewId: string): Promise<LocalPluginConfirmResult>
   /** `#784` 第 6 跳:本机已装扩展包的只读清单(「读不出」与「没装」不折叠)。 */
   listInstalledPackages(): Promise<InstalledPackagesResultV1>
+  installPackage: ExtApi["installPackage"]
+  setPackageState: ExtApi["setPackageState"]
+  savePackageSecrets: ExtApi["savePackageSecrets"]
   /** `#784` 第 7/9 跳:整包移除。**唯一**一条整包卸载通道 —— 详情页与 Hub 的包卡都走它,
    *  于是「卸完要让引擎当场重载」只需要在这一个地方成立(G20)。
    *  今天详情页的 `removePackage` 只 `refetchInstalled()` 不 refresh ⇒ 移除之后技能仍然
@@ -803,12 +806,9 @@ export function useExtensions(
       const ok = connectOutcome(r as { error?: unknown })
       await loadStatus()
       if (!ok) return { ok: false, reason: "auth-failed" }
-      // 授权调用成功 ≠ 这个 server 现在能用。**判据是正向的 `connected === true`,不是
-      // 「不再 needs_auth」** —— 端点 200 时 body 合法地可以是 `{status:"failed"}`
-      //(`MCP.Status` 是五臂联合),此时「不再 needs_auth」成立而 MCP 仍然不可用,
-      // 界面会宣布「已重新登录」。审计 M1:按缺席取反去判成功,等于把 failed /
-      // needs_client_registration / 读不出**全部**读成成功。
-      return store.mcp[name]?.connected === true ? { ok: true } : { ok: false, reason: "auth-failed" }
+      // The adapter only reports disabled after OAuth completes successfully. A disabled
+      // connector can hold a ready account without exposing any callable tools.
+      return store.mcp[name]?.connected === true || r.data?.status === "disabled" ? { ok: true } : { ok: false, reason: "auth-failed" }
     } catch {
       await loadStatus()
       return { ok: false, reason: "auth-failed" }
@@ -1127,6 +1127,9 @@ export function useExtensions(
       void loadInstalls()
     }),
   )
+  // Package results settle through the existing view event. Preserve standalone connector scheduling.
+  const packageRuntime = createMemo(() => JSON.stringify(store.hubRows.filter((row) => row.kind === "package").map((row) => [row.id, row.state, row.stateReason])))
+  createEffect(on(packageRuntime, () => { if (activated) { void loadStatus(); void loadAgents() } }, { defer: true }))
 
   // REQ-036:出厂技能名单(一次取回缓存;失败诚实为空 = 不显「出厂内置」徽标,条目退回可安装态)。
   const [factoryIds, setFactoryIds] = createSignal<string[]>([])
@@ -1251,6 +1254,24 @@ export function useExtensions(
     return extIpc.installedPackages()
   }
 
+  async function installPackage(packageId: string) {
+    const result = await extIpc.installPackage(packageId)
+    if (result.ok) await Promise.all([loadInstalls(), loadHubView(), loadStatus(), loadAgents()])
+    return result
+  }
+
+  async function setPackageState(intent: Parameters<ExtApi["setPackageState"]>[0]) {
+    const result = await extIpc.setPackageState(intent)
+    if (result.ok) await Promise.all([loadInstalls(), loadHubView(), loadStatus(), loadAgents()])
+    return result
+  }
+
+  async function savePackageSecrets(intent: Parameters<ExtApi["savePackageSecrets"]>[0]) {
+    const result = await extIpc.savePackageSecrets(intent)
+    if (result.ok) await Promise.all([loadInstalls(), loadHubView(), loadStatus()])
+    return result
+  }
+
   async function uninstallPackage(packageId: string): Promise<LocalPackageUninstallResult> {
     const r = await extIpc.uninstallPackage(packageId)
     if (!r.ok) return r
@@ -1321,6 +1342,9 @@ export function useExtensions(
     localPluginCancel,
     localPluginConfirm,
     listInstalledPackages,
+    installPackage,
+    setPackageState,
+    savePackageSecrets,
     uninstallPackage,
     importSkillGit,
     installAgentEntry,

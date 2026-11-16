@@ -8,7 +8,12 @@
 import { createMemo, createResource, createSignal, For, Show, type Accessor, type JSX } from "solid-js"
 import { t } from "../i18n"
 import type { CatalogEntry, CloudPipelineSpec, InstalledState, McpInstallSpec, PluginInstallSpec, SkillInstallSpec } from "./catalog-types"
-import type { InstallReceipt, ExtInventory } from "../../preload/types"
+import type { InstallReceipt, ExtInventory, InstalledPackageV1 } from "../../preload/types"
+import type { PackageAuthorizationItemV1 } from "../../shared/package-admission"
+import { Dialog } from "../codepuppy-ui/Dialog"
+import { Button } from "../codepuppy-ui/Button"
+import { CodePuppySettingsTools } from "../codepuppy-ui/settings-tools"
+import "../codepuppy-ui/settings.css"
 import { hubRowFor, hubStateView, type ExtensionsApi, type HubAgent } from "./use-extensions"
 import { CloudDispatchBox } from "./cloud-dispatch-box"
 import { CloudFormBox } from "./cloud-form-box"
@@ -38,6 +43,264 @@ export type DetailTarget =
     }
   | { kind: "agent"; agent: HubAgent }
   | { kind: "cloud-connector" }
+
+/** The installed graph owns this page, including after an account dialog is closed. */
+export function InstalledPackageDetail(props: {
+  pack: InstalledPackageV1
+  label: string
+  view?: CatalogPackageViewV1
+  ext: ExtensionsApi
+  directory?: string
+  menu: JSX.Element
+  error?: string
+  onBack: () => void
+}) {
+  const [authorization, { refetch }] = createResource(
+    () => `${props.pack.packageId}:${JSON.stringify(props.ext.store.mcp)}`,
+    () => extIpc.packageAuthorization(props.pack.packageId),
+  )
+  const items = () => {
+    const value = authorization()
+    return value?.ok ? value.items : []
+  }
+  const [account, setAccount] = createSignal<PackageAuthorizationItemV1 | null>(null)
+  const [values, setValues] = createSignal<Record<string, string>>({})
+  const [busy, setBusy] = createSignal(false)
+  const [error, setError] = createSignal("")
+  const [editingPolicy, setEditingPolicy] = createSignal(false)
+  const [policy] = createResource(
+    () => props.directory,
+    (directory) => window.api.toolPolicy.inventory({ directory }),
+  )
+  const policyText = () => {
+    const result = policy()
+    if (!result?.ok) return t("codepuppy.ext.packagePolicyUnavailable")
+    const states = result.inventory.services
+      .filter((service) =>
+        props.pack.components.some(
+          (component) => component.kind === service.source && component.name === service.origin,
+        ),
+      )
+      .flatMap((service) => service.tools.map((tool) => tool.effective.state))
+    if (!states.length) return t("codepuppy.ext.packagePolicyUnavailable")
+    return [...new Set(states)]
+      .map((state) =>
+        state === "ask"
+          ? t("codepuppy.ext.packageAskEachTime")
+          : state === "enabled"
+            ? t("codepuppy.settings.toolsStateEnabled")
+            : t("codepuppy.settings.toolsStateDisabled"),
+      )
+      .join(" · ")
+  }
+  const close = () => {
+    setAccount(null)
+    setValues({})
+  }
+  const submit = async () => {
+    const selected = account()
+    if (!selected || busy()) return
+    setBusy(true)
+    setError("")
+    try {
+      const result =
+        selected.kind === "secret"
+          ? await props.ext.savePackageSecrets({ packageId: props.pack.packageId, secrets: values() })
+          : await props.ext.authenticateMcp(selected.serviceName)
+      if (!result.ok) {
+        setError(extensionError(result.reason, "codepuppy.ext.mcpAuthFailed"))
+        return
+      }
+      close()
+      await refetch()
+    } finally {
+      setBusy(false)
+    }
+  }
+  const github = () => props.pack.packageId === "package:github" || props.pack.packageId === "package:github-official"
+  return (
+    <div class="codepuppy-ext-detail" data-package-detail={props.pack.packageId}>
+      <nav class="codepuppy-ext-crumbs">
+        <button class="codepuppy-ext-crumb-link" onClick={props.onBack}>
+          <Svg d="M14 6l-6 6 6 6" />
+          {t("codepuppy.ext.back")}
+        </button>
+        <span>{props.label}</span>
+      </nav>
+      <header class="codepuppy-ext-dhead">
+        <span
+          class="codepuppy-ext-dhead-ic"
+          style={{ background: packageListingTextV1(props.view?.listing, "brandColor") ?? "var(--a-accent-solid)" }}
+        >
+          <PackageLogo listing={props.view?.listing} fallback={props.label} />
+        </span>
+        <div class="codepuppy-ext-dhead-body">
+          <div class="codepuppy-ext-dhead-t">
+            <h2>{props.label}</h2>
+          </div>
+          <p class="codepuppy-ext-dabout">{props.view?.presentation.description}</p>
+        </div>
+        <div class="codepuppy-ext-dhead-act">{props.menu}</div>
+      </header>
+      <section class="codepuppy-settings-group">
+        <h3>{t("codepuppy.ext.packagePermissions")}</h3>
+        <div class="codepuppy-settings-row">
+          <div class="codepuppy-settings-row-copy">
+            <strong>{t("codepuppy.ext.packageUseTools")}</strong>
+            <small>{policyText()}</small>
+          </div>
+          <button class="codepuppy-ext-add" onClick={() => setEditingPolicy(!editingPolicy())}>
+            {t("codepuppy.ext.packageChange")}
+          </button>
+        </div>
+        <Show when={editingPolicy()}>
+          <CodePuppySettingsTools open active directory={props.directory} api={window.api.toolPolicy} />
+        </Show>
+      </section>
+      <Show when={!authorization.loading}>
+        <section class="codepuppy-settings-group">
+          <h3>{t("codepuppy.ext.packageAccounts")}</h3>
+          <For each={items()}>
+            {(item) => (
+              <div class="codepuppy-settings-row">
+                <div class="codepuppy-settings-row-copy">
+                  <strong>
+                    {t(item.kind === "secret" ? "codepuppy.ext.packageToken" : "codepuppy.ext.packageAccount", {
+                      name: props.label,
+                    })}
+                  </strong>
+                  <small>
+                    {item.kind === "secret"
+                      ? t(item.saved ? "codepuppy.ext.packageTokenSaved" : "codepuppy.ext.packagePendingToken")
+                      : item.kind === "mcp-oauth"
+                        ? t(
+                            item.authenticated
+                              ? "codepuppy.ext.packageAccountReady"
+                              : "codepuppy.ext.packagePendingLogin",
+                          )
+                        : t(item.ready ? "codepuppy.ext.packageAccountReady" : "codepuppy.ext.packagePendingLogin")}
+                  </small>
+                </div>
+                <Show when={item.kind !== "connection"}>
+                  <button
+                    class="codepuppy-ext-add"
+                    data-package-secret={item.kind === "secret" ? "" : undefined}
+                    data-package-login={item.kind === "mcp-oauth" ? "" : undefined}
+                    disabled={busy()}
+                    onClick={() => {
+                      setError("")
+                      setValues({})
+                      setAccount(item)
+                      if (item.kind === "mcp-oauth") void submit()
+                    }}
+                  >
+                    {item.kind === "secret"
+                      ? t(item.saved ? "codepuppy.ext.packageChangeToken" : "codepuppy.ext.packageFillToken")
+                      : t(
+                          item.kind === "mcp-oauth" && item.authenticated
+                            ? "codepuppy.ext.packageRelogin"
+                            : "codepuppy.ext.packageLogin",
+                        )}
+                  </button>
+                </Show>
+              </div>
+            )}
+          </For>
+          <Show when={authorization() && !authorization()!.ok}>
+            <p role="alert">{t("codepuppy.ext.packageAccountUnavailable")}</p>
+          </Show>
+        </section>
+      </Show>
+      <section class="codepuppy-settings-group">
+        <h3>{t("codepuppy.ext.packageAbout")}</h3>
+        <div class="codepuppy-settings-row">
+          <div class="codepuppy-settings-row-copy">
+            <strong>{t("codepuppy.ext.packageIncludes")}</strong>
+            <small>
+              {[...new Set(props.pack.components.map((component) => component.kind))]
+                .map((kind) =>
+                  t("codepuppy.ext.packageComponentCount", {
+                    count: props.pack.components.filter((component) => component.kind === kind).length,
+                    kind: typeLabel(kind as InstallReceipt["type"]),
+                  }),
+                )
+                .join(" · ")}
+            </small>
+          </div>
+        </div>
+        <div class="codepuppy-settings-row">
+          <div class="codepuppy-settings-row-copy">
+            <strong>{t("codepuppy.ext.packageSource")}</strong>
+            <small>
+              {t(
+                props.pack.origin === "catalog" ? "codepuppy.ext.packageSourceHub" : "codepuppy.ext.packageSourceLocal",
+              )}
+            </small>
+          </div>
+        </div>
+        <div class="codepuppy-settings-row">
+          <div class="codepuppy-settings-row-copy">
+            <strong>{t("codepuppy.ext.detailVersion")}</strong>
+            <small>{props.pack.version}</small>
+          </div>
+        </div>
+      </section>
+      <Show when={error() || props.error}>
+        <p role="alert">{error() || props.error}</p>
+      </Show>
+      <Dialog
+        open={!!account()}
+        onClose={close}
+        size="sm"
+        title={
+          account()?.kind === "secret"
+            ? t("codepuppy.ext.packageTokenTitle", { name: props.label })
+            : t("codepuppy.ext.packageLoginTitle", { name: props.label })
+        }
+        footer={
+          <Button variant="primary" loading={busy()} onClick={() => void submit()}>
+            {account()?.kind === "secret" ? t("codepuppy.ext.packageSaveToken") : t("codepuppy.ext.packageLogin")}
+          </Button>
+        }
+      >
+        <Show
+          when={account()?.kind === "secret"}
+          fallback={<p>{t("codepuppy.ext.packageLoginBrowser", { name: props.label })}</p>}
+        >
+          <p>{t("codepuppy.ext.packageTokenPurpose", { name: props.label })}</p>
+          <Show when={github()}>
+            <button
+              class="codepuppy-ext-link"
+              onClick={() => void window.api.openLink("https://github.com/settings/personal-access-tokens/new")}
+            >
+              {t("codepuppy.ext.packageGithubTokenLink")}
+            </button>
+          </Show>
+          <For each={items().filter((item) => item.kind === "secret" && item.serviceName === account()?.serviceName)}>
+            {(item) => (
+              <label class="codepuppy-ext-flabel">
+                {t("codepuppy.ext.packageToken", { name: props.label })}
+                <input
+                  class="codepuppy-ext-input"
+                  type="password"
+                  autocomplete="off"
+                  placeholder={t("codepuppy.ext.packageTokenPlaceholder")}
+                  value={values()[item.prerequisiteId] ?? ""}
+                  onInput={(event) =>
+                    setValues((current) => ({ ...current, [item.prerequisiteId]: event.currentTarget.value }))
+                  }
+                />
+              </label>
+            )}
+          </For>
+        </Show>
+        <Show when={error()}>
+          <p role="alert">{error()}</p>
+        </Show>
+      </Dialog>
+    </div>
+  )
+}
 
 // mcp.cloud 的 4 个工具(B 侧 MCP facade;alpha-platform docs/contracts/cloud-jobs-v1.md)。
 // 引擎无 tools 查询路由 → 与 MCP 条目一样用精选元数据展示(REQ-019 T3 同约束)。

@@ -2901,12 +2901,12 @@ export async function setPackageStateV1(
       if (!projection.ok) return projection
       if (projection.edit) edits.push(projection.edit)
     }
-    const prepared = prepareConfigTx(target, edits, text)
-    if (!prepared.ok) return prepared
+    const prepared = edits.length ? prepareConfigTx(target, edits, text) : undefined
+    if (prepared && !prepared.ok) return prepared
     const written = setDesiredStatesV2(root, records.map((record) => ({ kind: record.kind, name: record.name, state })))
     if (!written.ok) return written
     try {
-      if (edits.length) applyConfigImage(prepared.image)
+      if (prepared?.ok) applyConfigImage(prepared.image)
     } catch {
       const restored = setDesiredStatesV2(root, records.map((record) => ({ kind: record.kind, name: record.name, state: record.desiredState })))
       return { ok: false, reason: restored.ok ? "package config write failed; state unchanged" : `package config write failed; ${restored.reason}` }

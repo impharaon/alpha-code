@@ -18,8 +18,9 @@ import type {
   CodePuppyPackageEnvelopeV1,
   PackageProfilePayloadV1,
 } from "../src/shared/host-extension-package-contract/decoder"
-import { evaluatePackageForHost, runCatalogInstallWithPackagePreflight } from "../src/main/package-installability"
-import { createPackageAdmissionCoordinator } from "../src/main/package-admission"
+import { evaluatePackageForHost, runCatalogInstallWithPackagePreflight, resolveVerifiedPackageV1 } from "../src/main/package-installability"
+import { createPackageAdmissionCoordinator, installDesktopPackageV1, savePackageSecretsV1, readPackageAuthorizationV1 } from "../src/main/package-admission"
+import { setPackageStateV1 } from "../src/main/ext-install-planner"
 import { writeCapabilityGrantSync } from "../src/main/ext-capability-grants"
 import { readPackageGraphs, readPackageLedgerStateV1 } from "../src/main/ext-receipt-v2"
 import { uninstallPackageV1 } from "../src/main/ext-package-uninstall"
@@ -44,6 +45,11 @@ import {
   mixedBundleFixture,
   ROOT_AGENT_ID,
 } from "./package-mixed-bundle.fixture"
+
+const consoleOutput: unknown[] = []
+const originalConsole = { log: console.log, warn: console.warn, error: console.error }
+for (const method of ["log", "warn", "error"] as const) console[method] = (...args: unknown[]) => { consoleOutput.push(args) }
+afterAll(() => Object.assign(console, originalConsole))
 
 GlobalRegistrator.register()
 const solid = await import("solid-js/dist/solid.js")
@@ -90,7 +96,10 @@ const extensions = {
   refresh: async () => {},
   refreshEngine: async () => true,
   requestEngineReload: async () => true,
-  listInstalledPackages: async () => ({ ok: true as const, packages: [] }),
+  listInstalledPackages: async () => extIpcRef!.installedPackages(),
+  installPackage: async (packageId: string) => extIpcRef!.installPackage(packageId),
+  setPackageState: async (intent: { packageId: string; state: "enabled" | "disabled" }) => extIpcRef!.setPackageState(intent),
+  savePackageSecrets: async (intent: { packageId: string; secrets: Record<string, string> }) => extIpcRef!.savePackageSecrets(intent),
   uninstallPackage: async (packageId: string) => {
     dataLayerPackageUninstalls.push(packageId)
     // **照生产那条链走**:`use-extensions.uninstallPackage` 调的是 `extIpc`(`#765` 的呈现咽喉),
@@ -107,12 +116,7 @@ const extensions = {
     extIpcRef!.installCatalog({ ...intent, scope: { scope: "global" } }),
 }
 /** `extIpc` 会牵出 `Toast` → solid,只能在 registrator 之后动态 import;上面的替身按调用时求值。 */
-let extIpcRef:
-  | {
-      uninstallPackage: (packageId: string) => Promise<never>
-      installCatalog: (intent: unknown) => Promise<never>
-    }
-  | undefined
+let extIpcRef: typeof import("../src/renderer/extensions/ext-ipc").extIpc | undefined
 
 const realUseExtensionsModule = await import("../src/renderer/extensions/use-extensions")
 mock.module("../src/renderer/extensions/use-extensions", () => ({
@@ -369,9 +373,10 @@ async function mountHarness(options?: {
   /** REQ-235:追加一个 root 档案为 cloud@1 的签名包(其余夹具与断言不变)。 */
   withCloud?: boolean
 }) {
+  dataLayerPackageUninstalls.length = 0
   const fixture = await packageFixture({ withCloud: options?.withCloud })
   const tmp = mkdtempSync(join(tmpdir(), "package-renderer-wiring-"))
-  const globalRoot = join(tmp, "root")
+  const globalRoot = join(tmp, "codepuppy-state", "env", "dev")
   const userData = join(tmp, "user-data")
   mkdirSync(globalRoot, { recursive: true })
   const previousRoot = process.env.CODEPUPPY_GLOBAL_DIR
@@ -384,7 +389,7 @@ async function mountHarness(options?: {
       txId: "preauthorized",
       grantedAt: "2026-07-31T00:00:00.000Z",
     })
-  const admitPackage = createPackageAdmissionCoordinator({
+  const admissionDeps = {
     loadVerifiedCatalog: async () => ({
       source: "remote",
       catalog: fixture.raw.source === "none" ? {} : fixture.raw.catalog,
@@ -399,7 +404,10 @@ async function mountHarness(options?: {
     fetchAsset: fixture.fetchAsset,
     secretVersionId: () => "v-0badcafe",
     now: () => new Date("2026-07-31T12:00:00.000Z"),
-  })
+    advisoryGate: () => ({ allowed: true as const }),
+    resolvePackage: async (id: string, version: string) => ({ ...resolveVerifiedPackageV1(fixture.raw.source === "none" ? {} : fixture.raw.catalog, id, version), channel: "cache" as const }),
+  }
+  const admitPackage = createPackageAdmissionCoordinator(admissionDeps)
   const handlers = new Map<string, Handler>()
   const refresh = () =>
     evaluateRemoteCatalogPackages(fixture.raw, {
@@ -441,6 +449,28 @@ async function mountHarness(options?: {
           const result = await handlers.get(PACKAGE_DETAIL_IPC_CHANNEL)!(undefined, catalogId)
           detailResults.push(result)
           return result
+        },
+        installedPackages: async () => {
+          const state = readPackageLedgerStateV1(globalRoot)
+          if (!state.ok) return { ok: false, reason: state.reason }
+          return { ok: true, packages: state.packageGraphs.map((graph) => {
+            const nodes = [graph.root, ...graph.children]
+            const record = (kind: string, name: string) => state.records.find((entry) => entry.kind === kind && entry.name === name)!
+            return { packageId: graph.packageId, installedGraphDigest: graph.installedGraphDigest, displayName: graph.displayName ?? null, rootComponentName: graph.root.name, origin: record(graph.root.kind, graph.root.name).origin, version: record(graph.root.kind, graph.root.name).version ?? null, desiredState: record(graph.root.kind, graph.root.name).desiredState, components: nodes.map((node) => ({ componentId: node.componentId, kind: node.kind, name: node.name, required: node.required, desiredState: record(node.kind, node.name).desiredState })) }
+          }) }
+        },
+        packageAuthorization: (packageId: string) => readPackageAuthorizationV1(packageId, admissionDeps),
+        savePackageSecrets: (intent: unknown) => savePackageSecretsV1(intent, admissionDeps),
+        setPackageState: (intent: unknown) => setPackageStateV1(intent, { ...admissionDeps, globalRoot: admissionDeps.root }),
+        installPackage: async (packageId: string) => {
+          installIntents.push({ catalogId: packageId })
+          if (rejectPreview) { rejectPreview = false; throw new Error("package renderer transport failed") }
+          if (failPreview) { failPreview = false; const result = { ok: false, reason: "package renderer install unavailable" }; installResults.push(result); return result }
+          const result = await installDesktopPackageV1(packageId, admissionDeps)
+          const withWarning = injectInstallWarning && result.ok ? { ...result, warning: injectInstallWarning } : result
+          installResults.push(withWarning)
+          if (result.ok) fixture.complete(packageId)
+          return withWarning
         },
         installCatalog: async (intent: unknown) => {
           installIntents.push(intent)
@@ -861,6 +891,30 @@ afterEach(() => {
 })
 afterAll(() => GlobalRegistrator.unregister())
 
+async function installDirect(harness: Awaited<ReturnType<typeof mountHarness>>, id = "package:renderer-ready") {
+  click(packageCard(id).querySelector("button"))
+  await waitFor(() => expect(harness.installResults.at(-1)).toMatchObject({ ok: true }))
+  await waitFor(() => expect(document.querySelector(`[data-installed-package="${id}"]`)).toBeInstanceOf(HTMLElement))
+}
+async function openManagement(id: string) {
+  click(document.querySelector(`[data-installed-package="${id}"] [data-more]`))
+  click(document.querySelector('[data-menu-item="manage"]'))
+  await waitFor(() => expect(document.querySelector('[data-package-detail]')?.textContent).toContain("账户"))
+}
+async function removeManaged() {
+  click(document.querySelector('[data-package-detail] [data-more]'))
+  click(document.querySelector('[data-menu-item="remove-package"]'))
+}
+async function openToken() {
+  click(document.querySelector('[data-package-secret]'))
+  await waitFor(() => expect(document.querySelector('input[type="password"]')).toBeInstanceOf(HTMLInputElement))
+}
+function fillManagementToken(value: string) {
+  filledSecretInput = document.querySelector<HTMLInputElement>('input[type="password"]')!
+  filledSecretInput.value = value
+  filledSecretInput.dispatchEvent(new Event("input", { bubbles: true }))
+}
+
 describe("package detail production renderer path", () => {
   test("registered catalog read handlers feed the real card and detail with safe-view values only", async () => {
     const harness = await mountHarness()
@@ -883,13 +937,13 @@ describe("package detail production renderer path", () => {
         catalogId: "package:renderer-ready",
         verdict: "compatible",
         prerequisite: "ready",
-        action: zh["codepuppy.ext.add"],
+        action: "+",
       },
       {
         catalogId: "package:renderer-prerequisite",
         verdict: "compatible",
         prerequisite: "required-action",
-        action: zh["codepuppy.ext.rowSetup"],
+        action: "+",
       },
       {
         catalogId: "package:renderer-update",
@@ -913,7 +967,7 @@ describe("package detail production renderer path", () => {
         catalogId: MIXED_BUNDLE_PACKAGE_ID,
         verdict: "compatible",
         prerequisite: "required-action",
-        action: zh["codepuppy.ext.rowSetup"],
+        action: "+",
       },
     ]) {
       const view = browse.catalog.packages.find((view) => view.catalogId === expected.catalogId)
@@ -938,11 +992,7 @@ describe("package detail production renderer path", () => {
       expect(card.querySelector("[data-verdict], .codepuppy-ext-package-state, .codepuppy-ext-chip, .codepuppy-ext-meta")).toBeNull()
       // `#1594` AC6:前置条件未就绪 ⇒ 描述换成缺什么(逐项取 main 安全视图的 label),动作是「设置」;
       // 「需要先处理」「处理前置条件」不再出现在行上。
-      if (expected.prerequisite === "required-action")
-        expect(card.querySelector("[data-package-need]")?.textContent).toBe(
-          view!.prerequisites.items.map((item) => zh["codepuppy.ext.needItem"].replace("{{item}}", item.label)).join(" · "),
-        )
-      else expect(card.querySelector("[data-package-need]")).toBeNull()
+      expect(card.querySelector(".codepuppy-ext-kit-desc")?.textContent).toBe(view!.presentation.description)
       expect(card.textContent).not.toContain("需要先处理")
       expect(card.textContent).not.toContain("处理前置条件")
     }
@@ -1046,447 +1096,160 @@ describe("package detail production renderer path", () => {
    * 这条用例走的是生产 ExtensionHub → ExtensionDetail → 授权确认屏,断言的是**用户看得到的
    * 那句话**:不会安装的组件出现在详情页与确认屏,并带着同一个具名原因。
    */
-  test("the detail page and the confirm screen both list every component and name why one is skipped", async () => {
+  test("detail lists every component and skipped reason while plus no longer opens an installation wall", async () => {
     const harness = await mountHarness()
     click(packageCard(MIXED_BUNDLE_PACKAGE_ID))
-    await waitFor(() =>
-      expect(document.querySelector(`[data-package-detail='${MIXED_BUNDLE_PACKAGE_ID}']`)).toBeInstanceOf(HTMLElement),
-    )
-    const detail = document.querySelector<HTMLElement>(`[data-package-detail='${MIXED_BUNDLE_PACKAGE_ID}']`)!
-
-    // ① 逐组件一行,root 与四个 leaf 全在,顺序即签名顺序。
-    const rows = Array.from(detail.querySelectorAll<HTMLElement>("[data-package-component]"))
-    expect(rows.map((row) => row.getAttribute("data-package-component"))).toEqual([
-      ROOT_AGENT_ID,
-      LEAF_SKILL_ID,
-      LEAF_MCP_ID,
-      LEAF_COMMAND_ID,
-      LEAF_UNSUPPORTED_ID,
-    ])
-    expect(rows.map((row) => row.getAttribute("data-included"))).toEqual([
-      "true",
-      "true",
-      "true",
-      "true",
-      "false",
-    ])
-
-    // ② 「会装 / 不会装」是**用户能读到的中文**,不是一个 data 属性(属性可以在没有任何文案的
-    //    情况下写对 —— 那正是 `#749` 之后的现状)。
-    const stateText = (row: HTMLElement) =>
-      row.querySelector(".codepuppy-ext-package-component-state")?.textContent
-    expect(rows.map(stateText)).toEqual([
-      zh["codepuppy.ext.packageComponentIncluded"],
-      zh["codepuppy.ext.packageComponentIncluded"],
-      zh["codepuppy.ext.packageComponentIncluded"],
-      zh["codepuppy.ext.packageComponentIncluded"],
-      zh["codepuppy.ext.packageComponentSkipped"],
-    ])
-    expect(rows.map((row) => row.querySelector(".codepuppy-ext-package-component-req")?.textContent)).toEqual([
-      zh["codepuppy.ext.packageRequired"],
-      zh["codepuppy.ext.packageRequired"],
-      zh["codepuppy.ext.packageOptional"],
-      zh["codepuppy.ext.packageOptional"],
-      zh["codepuppy.ext.packageOptional"],
-    ])
-
-    // ③ 被跳过的那一行有**具名原因**,且原因文案非空、来自 decoder 的 token。
-    const why = rows[4]!.querySelector<HTMLElement>(".codepuppy-ext-package-component-why")
-    expect(why).toBeInstanceOf(HTMLElement)
-    expect(why!.getAttribute("data-skip-reason")).toBe(EXPECTED_SKIP_REASON)
-    expect(why!.textContent).toBe(zh["codepuppy.ext.packageSkipCapabilityUnsupported"])
-    expect(why!.textContent!.trim()).not.toBe("")
-    // 会安装的四行不得出现任何原因段(「所有行都显示原因」是另一种假绿)。
-    expect(rows.slice(0, 4).map((row) => row.querySelector(".codepuppy-ext-package-component-why"))).toEqual([
-      null,
-      null,
-      null,
-      null,
-    ])
-
-    // ④ 授权确认屏是第二个 preview 面:会装的四条 + 不会装的一条(带同一句原因)。
-    click(detail.querySelector(".codepuppy-ext-dsub button"))
-    await waitForPackageAuthorization(MIXED_BUNDLE_PACKAGE_ID)
-    const dialog = packageAuthorizationDialog()
-    const included = Array.from(dialog.querySelectorAll<HTMLElement>("[data-plan-component][data-included='true']"))
-    expect(included.map((row) => row.getAttribute("data-plan-component"))).toEqual([
-      ROOT_AGENT_ID,
-      LEAF_COMMAND_ID,
-      LEAF_MCP_ID,
-      LEAF_SKILL_ID,
-    ])
-    const skippedRows = Array.from(dialog.querySelectorAll<HTMLElement>("[data-plan-component][data-included='false']"))
-    expect(skippedRows.map((row) => row.getAttribute("data-plan-component"))).toEqual([LEAF_UNSUPPORTED_ID])
-    expect(skippedRows[0]!.getAttribute("data-skip-reason")).toBe(EXPECTED_SKIP_REASON)
-    expect(skippedRows[0]!.querySelector(".codepuppy-ext-install-k")?.textContent).toBe(
-      zh["codepuppy.ext.packageSkipCapabilityUnsupported"],
-    )
-    // 详情页与确认屏对同一个组件给出的是**同一句话**。
-    expect(skippedRows[0]!.querySelector(".codepuppy-ext-install-k")?.textContent).toBe(why!.textContent)
-
-    cancelPackageAuthorization()
-    expect(JSON.stringify(harness.installResults)).not.toContain(secretCanary)
-  })
-
-  /**
-   * `#698` 的**用户可达路径闭合**。`#706` 之后,属于 Bundle 的单个部件被单独移除会被响亮拒绝
-   * (「它还属于这个包」)—— 而在这颗按钮之前,那句拒绝指向的地方并不存在:用户装完一个扩展包
-   * 就再也删不掉它。这条从「装上」一路走到「移除」,每一跳都是生产件:真 ExtensionHub 卡片 →
-   * 真 ExtensionDetail → 真 admission → 真事务 → 真 V3 账本 → 真 `uninstallPackageV1`。
-   */
-  /**
-   * `#698` R3 Major:后端诚实到 IPC 边界还不够 —— 用户得**真的看见**。
-   *
-   * 这条走真实 ExtensionHub + 真实 ToastViewport:admission 的成功响应带一条具名 warning
-   * (update 后「离场组件已停用、但残留文件没删掉」正是这条),断言它出现在用户能读到的 DOM 里。
-   * 把 hub 里那行呈现删掉,本条立刻变红 —— 这就是它与「hub 调过 flash」之类内部断言的区别。
-   */
-  test("a named warning on a successful install reaches the user surface, not just the IPC boundary", async () => {
-    const canary = "R3_NAMED_WARNING_ba17c2"
-    const harness = await mountHarness({ injectInstallWarning: canary })
-    click(packageCard(MIXED_BUNDLE_PACKAGE_ID))
-    await waitFor(() =>
-      expect(document.querySelector(`[data-package-detail='${MIXED_BUNDLE_PACKAGE_ID}']`)).toBeInstanceOf(HTMLElement),
-    )
-    const detail = document.querySelector<HTMLElement>(`[data-package-detail='${MIXED_BUNDLE_PACKAGE_ID}']`)!
-    click(detail.querySelector(".codepuppy-ext-dsub button"))
-    await waitForPackageAuthorization(MIXED_BUNDLE_PACKAGE_ID)
-    fillPackageSecret(secretCanary)
-    confirmPackageAuthorization()
-    await waitFor(() => expect(harness.installResults.at(-1)).toMatchObject({ ok: true, warning: canary }))
-
-    // 用户面显示可理解的提示；上方仍断言 IPC 原始 warning 未改。
-    await waitFor(() => expect(toastsContaining(zh["codepuppy.ext.error.warningUnknown"])).toBe(1))
-    // `#765`:**恰好一条**。呈现搬进 IPC 包装层之后,调用点再自己 flash 一次就会出现两条
-    // 一模一样的提示 —— 那是本次重构最容易留下的尾巴,所以这里判等而不是判「有」。
-    await flush()
-    expect(toastsContaining(zh["codepuppy.ext.error.warningUnknown"]), "the same warning was presented more than once").toBe(1)
-  })
-
-  /**
-   * `#765`:同一条保证,换一条**没有任何呈现代码**的路径。
-   *
-   * 整包卸载走 extension-detail 的 `removePackage` → `uninstallPackage` IPC。生产代码在这条路径上
-   * 一行 warning 呈现都没有(`#698` 当时写的那行已经删掉)。它仍然到得了 `.a-toast`,只可能是
-   * 因为咽喉在 IPC 包装层做了事 —— 这正是「新调用点默认被覆盖」的可执行证据,而不是一句声明。
-   */
-  test("a named warning on package uninstall reaches the user surface with no presentation code on that path", async () => {
-    const canary = "CHOKEPOINT_UNINSTALL_WARNING_7f31ac"
-    const harness = await mountHarness({ injectUninstallWarning: canary })
-    click(packageCard(MIXED_BUNDLE_PACKAGE_ID))
-    await waitFor(() =>
-      expect(document.querySelector(`[data-package-detail='${MIXED_BUNDLE_PACKAGE_ID}']`)).toBeInstanceOf(HTMLElement),
-    )
-    const detail = () => document.querySelector<HTMLElement>(`[data-package-detail='${MIXED_BUNDLE_PACKAGE_ID}']`)!
-    click(detail().querySelector(".codepuppy-ext-dsub button"))
-    await waitForPackageAuthorization(MIXED_BUNDLE_PACKAGE_ID)
-    fillPackageSecret(secretCanary)
-    confirmPackageAuthorization()
+    await waitFor(() => expect(document.querySelector('[data-package-detail]')).toBeInstanceOf(HTMLElement))
+    const rows = Array.from(document.querySelectorAll('[data-package-component]'))
+    expect(rows.map((row) => row.getAttribute('data-package-component'))).toEqual([ROOT_AGENT_ID, LEAF_SKILL_ID, LEAF_MCP_ID, LEAF_COMMAND_ID, LEAF_UNSUPPORTED_ID])
+    expect(document.querySelector(`[data-skip-reason="${EXPECTED_SKIP_REASON}"]`)).toBeInstanceOf(HTMLElement)
+    click(document.querySelector('.codepuppy-ext-crumb-link'))
+    click(packageCard("package:renderer-ready").querySelector('button'))
     await waitFor(() => expect(harness.installResults.at(-1)).toMatchObject({ ok: true }))
-    await waitFor(() =>
-      expect(detail().querySelector(`[data-package-uninstall='${MIXED_BUNDLE_PACKAGE_ID}']`)).toBeInstanceOf(HTMLElement),
-    )
-    // 装的时候没有注入 warning —— 卸载前的 toast 里不该已经有这条 canary(否则下面判的是别人)。
-    expect(toastsContaining(zh["codepuppy.ext.error.warningUnknown"])).toBe(0)
-
-    click(detail().querySelector(`[data-package-uninstall='${MIXED_BUNDLE_PACKAGE_ID}']`))
-    await waitFor(() => expect(readPackageGraphs(harness.globalRoot)).toEqual({ ok: true, packageGraphs: [] }))
-    await waitFor(() => expect(toastsContaining(zh["codepuppy.ext.error.warningUnknown"])).toBe(1))
-    await flush()
-    expect(toastsContaining(zh["codepuppy.ext.error.warningUnknown"]), "the same warning was presented more than once").toBe(1)
+    expect(document.querySelector('[data-package-authorization]')).toBeNull()
+    expect(document.body.textContent).not.toContain(zh["codepuppy.ext.confirmInstall"])
   })
 
-  /**
-   * `#771`:同一条 warning,判的是**它待多久**。
-   *
-   * `#765` 之前这条 warning 落在 `extension-detail` 的 `packageError` 槽里,一直显示到用户处理;
-   * 搬进 IPC 包装层之后变成默认 toast —— 4 秒自动消失。对「连接绑定没释放干净 / 残留没清掉」
-   * 这种东西,一条 4 秒的提示和丢掉的差别只是运气。重构不该顺带降低可见性。
-   *
-   * 判据分两半,各自抓不同的东西 —— 两条**都实跑过对应的变异**,不是看着像:
-   *   ① `data-persistent`(快、精确):抓「这条 warning 被当成短命的推出去了」。
-   *      变异 = 去掉 ext-ipc.ts 的 `duration: 0` ⇒ ① 当场红(它排在前面,② 到不了)。
-   *   ② 真的等过一闪而过的那个窗口(慢、行为):抓 ① **失效**的那种改动 —— `data-persistent`
-   *      与「装没装拆除定时器」在 Toast.tsx 里脱钩。变异 = 保留 persistent 字段但无条件
-   *      `setTimeout` ⇒ ① 照绿、② 红。所以 ② 不是 ① 的复读,是 ① 作为代理的守卫。
-   *      同时推一条**普通** toast 作正对照:它必须消失 —— 没有这条对照,「常驻 toast 还在」
-   *      在一个定时器根本不跑的环境里也会绿。
-   */
+  test("a named warning on direct package install reaches the user surface", async () => {
+    const harness = await mountHarness({ injectInstallWarning: "PACKAGE_INSTALL_WARNING_r2" })
+    await installDirect(harness)
+    expect(harness.installResults.at(-1)).toMatchObject({ ok: true, warning: "PACKAGE_INSTALL_WARNING_r2" })
+    await waitFor(() => expect(toastsContaining(zh["codepuppy.ext.error.warningUnknown"])).toBe(1))
+    expect(persistentToastsContaining(zh["codepuppy.ext.error.warningUnknown"])).toBe(1)
+  })
+
+  test("a named warning on package removal reaches the user once from the management menu", async () => {
+    const harness = await mountHarness({ injectUninstallWarning: "PACKAGE_REMOVE_WARNING_r2" })
+    await installDirect(harness)
+    await openManagement("package:renderer-ready")
+    await removeManaged()
+    await waitFor(() => expect(readPackageGraphs(harness.globalRoot)).toEqual({ ok: true, packageGraphs: [] }))
+    expect(dataLayerPackageUninstalls).toEqual(["package:renderer-ready"])
+    await waitFor(() => expect(toastsContaining(zh["codepuppy.ext.error.warningUnknown"])).toBe(1))
+  })
+
   test("the uninstall warning stays put instead of expiring with the toast timer", async () => {
-    const canary = "PERSISTENT_UNINSTALL_WARNING_2c8b4e"
-    const harness = await mountHarness({ injectUninstallWarning: canary })
-    click(packageCard(MIXED_BUNDLE_PACKAGE_ID))
-    await waitFor(() =>
-      expect(document.querySelector(`[data-package-detail='${MIXED_BUNDLE_PACKAGE_ID}']`)).toBeInstanceOf(HTMLElement),
-    )
-    const detail = () => document.querySelector<HTMLElement>(`[data-package-detail='${MIXED_BUNDLE_PACKAGE_ID}']`)!
-    click(detail().querySelector(".codepuppy-ext-dsub button"))
-    await waitForPackageAuthorization(MIXED_BUNDLE_PACKAGE_ID)
-    fillPackageSecret(secretCanary)
-    confirmPackageAuthorization()
-    await waitFor(() => expect(harness.installResults.at(-1)).toMatchObject({ ok: true }))
-    await waitFor(() =>
-      expect(detail().querySelector(`[data-package-uninstall='${MIXED_BUNDLE_PACKAGE_ID}']`)).toBeInstanceOf(HTMLElement),
-    )
-
-    click(detail().querySelector(`[data-package-uninstall='${MIXED_BUNDLE_PACKAGE_ID}']`))
+    const harness = await mountHarness({ injectUninstallWarning: "PERSISTENT_UNINSTALL_WARNING_2c8b4e" })
+    await installDirect(harness)
+    await openManagement("package:renderer-ready")
+    await removeManaged()
     await waitFor(() => expect(readPackageGraphs(harness.globalRoot)).toEqual({ ok: true, packageGraphs: [] }))
-    await waitFor(() => expect(toastsContaining(zh["codepuppy.ext.error.warningUnknown"])).toBe(1))
-
-    // ① 呈现出来的那条**就是**常驻的那条(不是「视口里另外还有一条常驻的」)。
-    expect(
-      persistentToastsContaining(zh["codepuppy.ext.error.warningUnknown"]),
-      "the uninstall warning was pushed as a self-expiring toast",
-    ).toBe(1)
-
-    // ② 正对照 + 真实等待:普通 toast 走了,warning 还在。
+    await waitFor(() => expect(persistentToastsContaining(zh["codepuppy.ext.error.warningUnknown"])).toBe(1))
     const control = "TRANSIENT_CONTROL_TOAST_9d10f7"
     pushToast({ kind: "info", title: control })
     expect(toastsContaining(control)).toBe(1)
     expect(persistentToastsContaining(control)).toBe(0)
-
     await sleep(4600)
     await flush()
-    expect(
-      toastsContaining(control),
-      "the transient control toast never expired — timers are not running, so the assertion below would be vacuous",
-    ).toBe(0)
-    expect(
-      toastsContaining(zh["codepuppy.ext.error.warningUnknown"]),
-      "the uninstall warning expired with the toast timer — `#771` regressed",
-    ).toBe(1)
+    expect(toastsContaining(control)).toBe(0)
+    expect(toastsContaining(zh["codepuppy.ext.error.warningUnknown"])).toBe(1)
   }, 20000)
 
-  test("installing a Bundle reveals the remove-package action, and pressing it removes it through production main", async () => {
+  test("direct install exposes one package row and its menu removes the installed graph once", async () => {
     const harness = await mountHarness()
-    click(packageCard(MIXED_BUNDLE_PACKAGE_ID))
-    await waitFor(() =>
-      expect(document.querySelector(`[data-package-detail='${MIXED_BUNDLE_PACKAGE_ID}']`)).toBeInstanceOf(HTMLElement),
-    )
-    const detail = () => document.querySelector<HTMLElement>(`[data-package-detail='${MIXED_BUNDLE_PACKAGE_ID}']`)!
-    // 装之前:没有「移除此扩展包」这颗按钮(它不是常显的)。
-    expect(detail().querySelector(`[data-package-uninstall='${MIXED_BUNDLE_PACKAGE_ID}']`)).toBeNull()
-
-    click(detail().querySelector(".codepuppy-ext-dsub button"))
-    await waitForPackageAuthorization(MIXED_BUNDLE_PACKAGE_ID)
-    fillPackageSecret(secretCanary)
-    confirmPackageAuthorization()
-    await waitFor(() => expect(harness.installResults.at(-1)).toMatchObject({ ok: true }))
-    // 账本里真的有这张图 —— 按钮出现的依据是 main 的账本,不是 renderer 记得自己点过安装。
-    await waitFor(() =>
-      expect(readPackageLedgerStateV1(harness.globalRoot)).toMatchObject({ ok: true, packageGraphs: [{ packageId: MIXED_BUNDLE_PACKAGE_ID }] }),
-    )
-
-    // 留在同一张详情页上:装完之后按钮必须**当场**出现,不需要退出再进来。
-    await waitFor(() =>
-      expect(detail().querySelector(`[data-package-uninstall='${MIXED_BUNDLE_PACKAGE_ID}']`)).toBeInstanceOf(HTMLElement),
-    )
-    const remove = detail().querySelector<HTMLElement>(`[data-package-uninstall='${MIXED_BUNDLE_PACKAGE_ID}']`)!
-    expect(remove.textContent?.trim()).toBe(zh["codepuppy.ext.packageActionUninstall"])
-
-    const uninstallsBefore = dataLayerPackageUninstalls.length
-    click(remove)
-    // 移除之后:图没了(main 说的),按钮跟着消失(renderer 重新问了 main,而不是自己乐观翻转)。
-    await waitFor(() => expect(readPackageGraphs(harness.globalRoot)).toEqual({ ok: true, packageGraphs: [] }))
-    await waitFor(() =>
-      expect(detail().querySelector(`[data-package-uninstall='${MIXED_BUNDLE_PACKAGE_ID}']`)).toBeNull(),
-    )
-    // 没有任何 child 被保留(这个包没和别人共享),所以不显示保留清单。
-    expect(detail().querySelector(".codepuppy-ext-package-retained")).toBeNull()
-
-    // `#784` G20:这一次移除**经过了数据层**,而不是从详情页直连 IPC。
-    // 这条断言是必须的,因为上面每一条都能在「直连 IPC」的实现下照样绿 ——
-    // 包确实被删了,只是引擎从此不再被要求重扫,技能一直能用到下次重启。
-    expect(dataLayerPackageUninstalls.slice(uninstallsBefore)).toEqual([MIXED_BUNDLE_PACKAGE_ID])
+    await installDirect(harness)
+    expect(readPackageLedgerStateV1(harness.globalRoot)).toMatchObject({ ok: true, packageGraphs: [{ packageId: "package:renderer-ready" }] })
+    expect(document.querySelectorAll('[data-installed-package="package:renderer-ready"]')).toHaveLength(1)
+    expect(document.querySelector('[data-package-card="package:renderer-ready"]')).toBeNull()
+    await openManagement("package:renderer-ready")
+    await removeManaged()
+    await waitFor(() => expect(document.querySelector('[data-installed-package="package:renderer-ready"]')).toBeNull())
+    expect(dataLayerPackageUninstalls).toEqual(["package:renderer-ready"])
   })
 
-  test("detail install button drives preview and confirmation through real package admission, then adopts the new view", async () => {
+  test("detail plus commits once without preview authorization and returns the same package management page", async () => {
     const harness = await mountHarness()
     click(packageCard("package:renderer-ready"))
-    await waitFor(() =>
-      expect(document.querySelector("[data-package-detail='package:renderer-ready']")).toBeInstanceOf(HTMLElement),
-    )
-    const detail = document.querySelector<HTMLElement>("[data-package-detail='package:renderer-ready']")!
-    expect(detail.querySelector(".codepuppy-ext-dhead-meta span")?.textContent).toContain("1.0.0")
-
-    click(detail.querySelector(".codepuppy-ext-dsub button"))
-    await waitForPackageAuthorization("package:renderer-ready")
-    expect(packageAuthorizationDialog().querySelector(".codepuppy-ext-install-nm")?.textContent).toBe("generic-remote")
-    expect(packageAuthorizationDialog().querySelector(".codepuppy-ext-install-k")?.textContent).toBeTruthy()
-    expectDialogContract(packageAuthorizationDialog(), { capabilities: [] })
-    confirmPackageAuthorization()
-
-    await waitFor(() => expect(harness.installResults).toHaveLength(2))
-    expect(harness.installResults.at(-1)).toMatchObject({ ok: true })
-    await waitFor(() =>
-      expect(detail.querySelector(".codepuppy-ext-dhead-meta span")?.textContent).toContain("1.0.0-installed"),
-    )
-    expect(harness.installIntents).toHaveLength(2)
-    const first = harness.installIntents[0] as Record<string, unknown>
-    const second = harness.installIntents[1] as Record<string, unknown>
-    expect(Object.keys(first).sort()).toEqual(["attemptId", "catalogId", "scope"])
-    expect(first).not.toHaveProperty("grants")
-    expect(first).not.toHaveProperty("authorization")
-    expect(second.attemptId).toBe(first.attemptId)
-    expect(Object.keys(second).sort()).toEqual(["attemptId", "authorization", "catalogId", "scope"])
-    expect(JSON.stringify(harness.installResults)).not.toContain(secretCanary)
+    await waitFor(() => expect(document.querySelector('[data-package-detail] .codepuppy-ext-dsub button')).toBeInstanceOf(HTMLElement))
+    click(document.querySelector('[data-package-detail] .codepuppy-ext-dsub button'))
+    await waitFor(() => expect(harness.installResults.at(-1)).toMatchObject({ ok: true }))
+    await waitFor(() => expect(document.querySelector('[data-package-detail="package:renderer-ready"]')?.textContent).toContain("账户"))
+    expect(harness.installIntents).toEqual([{ catalogId: "package:renderer-ready" }])
+    expect(document.querySelector('[data-package-authorization]')).toBeNull()
+    const state = readPackageLedgerStateV1(harness.globalRoot)
+    expect(state.ok && state.records.every((record) => record.desiredState === "enabled")).toBe(true)
   })
 
-  test("card resolve-prerequisite button collects prerequisiteId secret, writes it 0600, and refreshes the card", async () => {
-    const consoleCapture = captureConsole()
-    try {
+  test("installed secret entry writes the declared prerequisite to dedicated storage while off and on", async () => {
+    for (const state of ["disabled", "enabled"] as const) {
       const harness = await mountHarness()
-      const card = packageCard("package:renderer-prerequisite")
-      expect(card.getAttribute("data-prerequisite")).toBe("required-action")
-      // `#1594` AC6:行上的「设置」打开的就是原来那个填写前置项的确认屏。
-      expect(card.querySelector("button")?.textContent?.trim()).toBe(zh["codepuppy.ext.rowSetup"])
-      click(card.querySelector("button"))
-      await waitForPackageAuthorization("package:renderer-prerequisite")
-      expectDialogContract(packageAuthorizationDialog(), {
-        capabilities: ["codepuppy.secret-prerequisite.v1"],
-        prerequisite: "A_KEY",
-      })
-      const submittedSecret = ` ${secretCanary} `
-      fillPackageSecret(submittedSecret)
-      expectNoCanaryAnywhere(secretCanary, consoleCapture.output)
-      confirmPackageAuthorization()
-
-      await waitFor(() => expect(harness.installResults.at(-1)).toMatchObject({ ok: true }))
-      const secretFile = join(harness.userData, "codepuppy-mcp-secrets", "generic-remote", "v-0badcafe", "A_KEY")
-      expect(readFileSync(secretFile, "utf8")).toBe(submittedSecret)
-      expect(statSync(secretFile).mode & 0o777).toBe(0o600)
-      expect(readdirSync(join(harness.userData, "codepuppy-mcp-secrets", "generic-remote"))).toEqual(["v-0badcafe"])
+      await installDirect(harness, "package:renderer-prerequisite")
+      await extensions.setPackageState({ packageId: "package:renderer-prerequisite", state })
+      await openManagement("package:renderer-prerequisite")
+      await openToken()
+      fillManagementToken(secretCanary)
+      expectNoCanaryAnywhere(secretCanary, consoleOutput)
+      click(document.querySelector('[role="dialog"] .a-dialog-footer button'))
+      await waitFor(() => expect(document.querySelector('input[type="password"]')).toBeNull())
+      const versions = join(harness.userData, "codepuppy-mcp-secrets", "generic-remote")
+      const version = readdirSync(versions)[0]!
+      const file = join(versions, version, "A_KEY")
+      expect(readFileSync(file, "utf8")).toBe(secretCanary)
+      expect(statSync(file).mode & 0o777).toBe(0o600)
       expect(readFileSync(join(harness.globalRoot, "codepuppy.jsonc"), "utf8")).not.toContain(secretCanary)
-      expect(JSON.stringify(harness.installResults)).not.toContain(secretCanary)
-      expectNoCanaryAnywhere(secretCanary, consoleCapture.output)
-      await waitFor(() =>
-        expect((harness.detailResults.at(-1) as CatalogPackageViewV1).prerequisites.status).toBe("ready"),
-      )
-      await waitFor(() =>
-        expect({
-          prerequisite: packageCard("package:renderer-prerequisite").getAttribute("data-prerequisite"),
-          need: packageCard("package:renderer-prerequisite").querySelector("[data-package-need]"),
-          action: packageCard("package:renderer-prerequisite").querySelector("button")?.textContent?.trim(),
-        }).toEqual({ prerequisite: "ready", need: null, action: zh["codepuppy.ext.add"] }),
-      )
-
-      const first = harness.installIntents[0] as Record<string, unknown>
-      const second = harness.installIntents[1] as {
-        attemptId: unknown
-        grants: { secrets: Record<string, string> }
-        authorization: { confirmed: Record<string, string[]> }
-      }
-      expect(Object.keys(first).sort()).toEqual(["attemptId", "catalogId", "scope"])
-      expect(first).not.toHaveProperty("grants")
-      expect(second.attemptId).toBe(first.attemptId)
-      expect(Object.keys(second.grants.secrets)).toEqual(["mcp:generic-remote#A_KEY"])
-      expect(second.grants.secrets["mcp:generic-remote#A_KEY"]).toBe(submittedSecret)
-      expect(Object.keys(second.authorization.confirmed)).toEqual(["mcp--generic-remote"])
-    } finally {
-      consoleCapture.restore()
+      expectNoCanaryAnywhere(secretCanary, consoleOutput)
+      const ledger = readPackageLedgerStateV1(harness.globalRoot)
+      expect(ledger.ok && ledger.records[0]?.desiredState).toBe(state)
+      expect(harness.installIntents).toHaveLength(1)
+      for (const dispose of disposals.splice(0)) dispose()
+      document.body.replaceChildren()
     }
   })
 
-  test("preauthorized capability still submits every preview diff key", async () => {
+  test("existing capability grants do not add an installation confirmation or permanent tool permission", async () => {
     const harness = await mountHarness({ preauthorized: true })
-    click(packageCard("package:renderer-prerequisite").querySelector("button"))
-    await waitFor(() => expect(harness.installResults).toHaveLength(1))
-    expect(harness.installResults[0]).toMatchObject({
-      ok: false,
-      stage: "authorize",
-      authorization: [{ key: "mcp--generic-remote", requiresConfirmation: false }],
-    })
-    fillPackageSecret(secretCanary)
-    confirmPackageAuthorization()
-    await waitFor(() => expect(harness.installResults.at(-1)).toMatchObject({ ok: true }))
-    const submitted = harness.installIntents[1] as {
-      authorization: { confirmed: Record<string, string[]> }
-    }
-    expect(submitted.authorization.confirmed).toEqual({
-      "mcp--generic-remote": ["codepuppy.secret-prerequisite.v1"],
-    })
+    await installDirect(harness, "package:renderer-prerequisite")
+    expect(harness.installIntents).toEqual([{ catalogId: "package:renderer-prerequisite" }])
+    expect(JSON.stringify(harness.installIntents)).not.toContain("authorization")
+    expect(document.querySelector('[data-package-authorization]')).toBeNull()
+    expect(JSON.stringify(readPackageLedgerStateV1(harness.globalRoot))).not.toContain("always")
   })
 
-  test("cancel clears transient secrets and retry issues a different attemptId without writing", async () => {
+  test("closing token entry clears transient input and leaves installed content ready to continue", async () => {
     const harness = await mountHarness()
-    click(packageCard("package:renderer-prerequisite").querySelector("button"))
-    await waitForPackageAuthorization("package:renderer-prerequisite")
-    fillPackageSecret(secretCanary)
-    cancelPackageAuthorization()
-    await waitFor(() => expect(document.querySelector("[data-package-authorization]")).toBeNull())
-    expect(existsSync(join(harness.userData, "codepuppy-mcp-secrets"))).toBe(false)
-    expect(existsSync(join(harness.globalRoot, "codepuppy.jsonc"))).toBe(false)
-    expect(document.body.textContent).not.toContain(secretCanary)
-
-    click(packageCard("package:renderer-prerequisite").querySelector("button"))
-    await waitForPackageAuthorization("package:renderer-prerequisite")
-    expect(harness.installIntents).toHaveLength(2)
-    expect((harness.installIntents[1] as { attemptId: string }).attemptId).not.toBe(
-      (harness.installIntents[0] as { attemptId: string }).attemptId,
-    )
-    expect(packageAuthorizationDialog().querySelector<HTMLInputElement>(".codepuppy-ext-key-input")?.value).toBe("")
-    cancelPackageAuthorization()
+    await installDirect(harness, "package:renderer-prerequisite")
+    await openManagement("package:renderer-prerequisite")
+    await openToken()
+    fillManagementToken(secretCanary)
+    click(document.querySelector('[role="dialog"] .a-dialog-close'))
+    await waitFor(() => expect(document.querySelector('input[type="password"]')).toBeNull())
+    expect(readPackageLedgerStateV1(harness.globalRoot)).toMatchObject({ ok: true, packageGraphs: [{ packageId: "package:renderer-prerequisite" }] })
+    expect(existsSync(join(harness.userData, "codepuppy-mcp-secrets", "generic-remote"))).toBe(false)
+    await openToken()
+    expect(document.querySelector<HTMLInputElement>('input[type="password"]')?.value).toBe("")
+    expectNoCanaryAnywhere(secretCanary, consoleOutput)
+    expect(harness.installIntents).toHaveLength(1)
   })
 
-  test("consumed failed attempt shows inline error and successful retry uses a new attemptId", async () => {
-    const harness = await mountHarness({ failConfirmationOnce: true })
-    const card = packageCard("package:renderer-prerequisite")
-    click(card.querySelector("button"))
-    await waitForPackageAuthorization("package:renderer-prerequisite")
-    fillPackageSecret(secretCanary)
-    confirmPackageAuthorization()
-    await waitFor(() => expect(harness.installResults).toHaveLength(2))
-    expect(harness.installResults.at(-1)).toMatchObject({
-      ok: false,
-      reason: expect.stringContaining("confirmed capability set"),
-    })
-    await waitFor(() =>
-      expect(
-        document.querySelector("[data-package-card='package:renderer-prerequisite'] [role='alert']")
-          ?.textContent,
-      ).toContain(zh["codepuppy.ext.error.confirmPackage"]),
-    )
-    expect(existsSync(join(harness.userData, "codepuppy-mcp-secrets"))).toBe(false)
-    const failedAttempt = (harness.installIntents[0] as { attemptId: string }).attemptId
-
-    await waitFor(() =>
-      expect(
-        packageCard("package:renderer-prerequisite").querySelector<HTMLButtonElement>("button")
-          ?.disabled,
-      ).toBe(false),
-    )
-    click(packageCard("package:renderer-prerequisite").querySelector("button"))
-    await waitForPackageAuthorization("package:renderer-prerequisite")
-    expect(harness.installIntents).toHaveLength(3)
-    const retryAttempt = (harness.installIntents[2] as { attemptId: string }).attemptId
-    expect(retryAttempt).not.toBe(failedAttempt)
-    fillPackageSecret(secretCanary)
-    confirmPackageAuthorization()
-    await waitFor(() => expect(harness.installResults.at(-1)).toMatchObject({ ok: true }))
-    expect((harness.installIntents[3] as { attemptId: string }).attemptId).toBe(retryAttempt)
-    expect(packageCard("package:renderer-prerequisite").querySelector("[role='alert']")).toBeNull()
+  test("failed credential write leaves installed package and saved token unchanged without reinstalling", async () => {
+    const harness = await mountHarness()
+    await installDirect(harness, "package:renderer-prerequisite")
+    await openManagement("package:renderer-prerequisite")
+    await openToken()
+    fillManagementToken(secretCanary)
+    click(document.querySelector('[role="dialog"] .a-dialog-footer button'))
+    await waitFor(() => expect(document.querySelector('input[type="password"]')).toBeNull())
+    await openToken()
+    fillManagementToken("invalid-replacement-canary-r2")
+    click(document.querySelector('[role="dialog"] .a-dialog-footer button'))
+    await waitFor(() => expect(document.querySelector('[role="dialog"] [role="alert"]')).toBeInstanceOf(HTMLElement))
+    expect(readFileSync(join(harness.userData, "codepuppy-mcp-secrets", "generic-remote", "v-0badcafe", "A_KEY"), "utf8")).toBe(secretCanary)
+    expect(document.body.textContent).not.toContain("invalid-replacement-canary-r2")
+    expect(harness.installIntents).toHaveLength(1)
   })
 
-  test("preview throw and failure render inline on detail and card without an unhandled rejection", async () => {
-    const harness = await mountHarness({ failPreviewOnce: true, rejectPreviewOnce: true })
-    click(packageCard("package:renderer-ready"))
-    await waitFor(() =>
-      expect(document.querySelector("[data-package-detail='package:renderer-ready']")).toBeInstanceOf(HTMLElement),
-    )
-    click(document.querySelector("[data-package-detail] .codepuppy-ext-dsub button"))
-    await waitFor(() =>
-      expect(document.querySelector("[data-package-detail] [role='alert']")?.textContent).toContain(zh["codepuppy.ext.error.installUnknown"]),
-    )
-    expect(document.querySelector("[data-package-authorization]")).toBeNull()
-    click(document.querySelector(".codepuppy-ext-crumb-link"))
-    await waitFor(() => expect(document.querySelector("[data-package-detail]")).toBeNull())
-    click(packageCard("package:renderer-prerequisite").querySelector("button"))
-    await waitFor(() =>
-      expect(packageCard("package:renderer-prerequisite").querySelector("[role='alert']")?.textContent)
-        .toContain(zh["codepuppy.ext.error.installPackage"]),
-    )
-    expect(document.querySelector("[data-package-authorization]")).toBeNull()
-    expect(harness.installIntents).toHaveLength(2)
+  test("direct install transport and declared failure render inline, leave no content and permit retry", async () => {
+    for (const options of [{ rejectPreviewOnce: true }, { failPreviewOnce: true }]) {
+      const harness = await mountHarness(options)
+      click(packageCard("package:renderer-ready").querySelector('button'))
+      await waitFor(() => expect(packageCard("package:renderer-ready").querySelector('[role="alert"]')).toBeInstanceOf(HTMLElement))
+      expect(readPackageGraphs(harness.globalRoot)).toEqual({ ok: true, packageGraphs: [] })
+      expect(document.querySelector('[data-package-authorization]')).toBeNull()
+      await installDirect(harness)
+      expect(harness.installIntents).toHaveLength(2)
+      for (const dispose of disposals.splice(0)) dispose()
+      document.body.replaceChildren()
+    }
   })
 
   test("unavailable packages have no recommendation, category, search or detail entry and trigger no install/update IPC", async () => {

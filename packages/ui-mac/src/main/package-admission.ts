@@ -452,6 +452,7 @@ async function resolveInstalledPackage(packageId: unknown, deps: PackageAdmissio
   const graph = state.packageGraphs.find((entry) => entry.packageId === packageId)
   if (!graph) return { ok: false as const, reason: "package is not installed" }
   const record = state.records.find((entry) => entry.kind === graph.root.kind && entry.name === graph.root.name)!
+  if (record.origin !== "catalog") return { ok: true as const, facts: undefined, graph, records: state.records }
   const resolved = await resolveAcceptedPackage(packageId, deps, record.version)
   if (!resolved.ok) return resolved
   if (`sha256:${sha256Hex(canonicalJson(resolved.facts.envelope))}` !== graph.envelopeDigest)
@@ -462,6 +463,7 @@ async function resolveInstalledPackage(packageId: unknown, deps: PackageAdmissio
 export async function readPackageAuthorizationV1(packageId: unknown, deps: PackageAdmissionDeps): Promise<PackageAuthorizationResultV1> {
   const resolved = await resolveInstalledPackage(packageId, deps)
   if (!resolved.ok) return { ok: false, reason: resolved.reason }
+  if (!resolved.facts) return { ok: true, packageId: resolved.graph.packageId, items: [] }
   const items: PackageAuthorizationItemV1[] = []
   for (const component of resolved.facts.components) {
     const name = component.component.id.slice(component.component.id.indexOf(":") + 1)
@@ -498,6 +500,7 @@ export async function savePackageSecretsV1(input: unknown, deps: PackageAdmissio
   if (!secrets || Object.values(secrets).some((value) => !value.length)) return { ok: false, reason: "invalid package credentials" }
   const resolved = await resolveInstalledPackage(raw.packageId, deps)
   if (!resolved.ok) return { ok: false, reason: resolved.reason }
+  if (!resolved.facts) return { ok: false, reason: "package declares no connector credentials" }
   const declared = resolved.facts.components.flatMap((component) => component.prerequisite.items.map((item) => item.prerequisiteId))
   if (Object.keys(secrets).some((key) => !declared.includes(key))) return { ok: false, reason: "undeclared package credential" }
   const builds: PackageTxBuildV1[] = []
@@ -551,7 +554,9 @@ function publishPackageMcp(builds: PackageTxBuildV1[]): PackageActionResultV1 {
   for (const build of builds) {
     const config = build.items[0]!.config!.edits[0]!.value as Record<string, unknown>
     if (config.type !== "remote") continue
-    const written = persistMcp(build.receipt.name, config)
+    const definition = { ...config }
+    delete definition.enabled
+    const written = persistMcp(build.receipt.name, definition)
     if (!written.ok) return { ok: false, reason: "package connector configuration could not be applied" }
   }
   return { ok: true }

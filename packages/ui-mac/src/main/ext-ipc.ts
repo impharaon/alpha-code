@@ -441,6 +441,11 @@ export function registerExtIpcHandlers(
     mcpOauthEngine: createPackageMcpOauthEngineV1(awaitServer),
   }
   const admitPackage = createPackageAdmissionCoordinator(packageAdmissionDeps)
+  const packageReloadItems = (packageId: string) => {
+    const state = readPackageLedgerStateV1(codepuppyGlobalRoot(), { sideEffectFree: true })
+    const graph = state.ok ? state.packageGraphs.find((entry) => entry.packageId === packageId) : undefined
+    return [packageId, ...(graph ? [graph.root, ...graph.children].map((node) => node.componentId) : [])].map((id) => ({ id, scope: "global" as const }))
+  }
   ipcMain.handle("ext-package-authorization", async (_event: IpcMainInvokeEvent, packageId: unknown) => {
     await ledgerReady
     return readPackageAuthorizationV1(packageId, packageAdmissionDeps)
@@ -1284,20 +1289,20 @@ export function registerExtIpcHandlers(
         const planner = plannerDeps()
         const result = await installDesktopPackageV1(packageId, { ...packageAdmissionDeps, advisoryGate: planner.advisoryGate, resolvePackage: planner.resolvePackage })
         if (!result.ok) return { ok: false, reason: result.reason }
-        const requested = reloads.request({ scope: "global", items: [{ id: packageId as string, scope: "global" }], reason: `installed package ${packageId}`, connectorChange: true })
+        const requested = reloads.request({ scope: "global", items: packageReloadItems(packageId as string), reason: `installed package ${packageId}`, connectorChange: true })
         return { ok: true, ...requested, ...(result.warning ? { warning: result.warning } : {}) }
       },
       setPackageState: async (intent) => {
         const result = await setPackageStateV1(intent, plannerDeps())
         if (!result.ok) return result
         const packageId = (intent as { packageId: string }).packageId
-        return { ...result, ...reloads.request({ scope: "global", items: [{ id: packageId, scope: "global" }], reason: `set package state ${packageId}`, force: true, connectorChange: true }) }
+        return { ...result, ...reloads.request({ scope: "global", items: packageReloadItems(packageId), reason: `set package state ${packageId}`, force: true, connectorChange: true }) }
       },
       savePackageSecrets: async (intent) => {
         const result = await savePackageSecretsV1(intent, packageAdmissionDeps)
         if (!result.ok) return result
         const packageId = (intent as { packageId: string }).packageId
-        return { ...result, ...reloads.request({ scope: "global", items: [{ id: packageId, scope: "global" }], reason: `saved package credentials ${packageId}`, connectorChange: true }) }
+        return { ...result, ...reloads.request({ scope: "global", items: packageReloadItems(packageId), reason: `saved package credentials ${packageId}`, connectorChange: true }) }
       },
       installCatalog: async (intent) => {
         const official = !!intent && typeof intent === "object" && "catalogId" in intent &&

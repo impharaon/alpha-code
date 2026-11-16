@@ -62,11 +62,11 @@ const MCP_ADDRESS_REJECTION_KEY = {
 } as const satisfies Record<ProviderAddressRejection, string>
 import type { AuthorizationConfirmationWire, CapabilityDiffWire } from "../../shared/ext-capability-authorization"
 import type { Catalog, CatalogEntry, InstalledState } from "./catalog-types"
-import type { AuthState, InstallReceipt, InstallReceiptType, ProvenanceRequest } from "../../preload/types"
+import type { AuthState, InstallReceipt, InstallReceiptType, ProvenanceRequest, InstalledPackageV1 } from "../../preload/types"
 import { hubSection, installedRowKey, setHubSection, takeHubLocateTarget, type HubSection } from "./ext-hub-state"
 import { extensionError, catalogDescription, iconFor, iconForRow, MoreMenu, PackageLogo, typeLabel, Svg, SearchIc, type MoreMenuItem } from "./ext-presentation"
 import { inventoryInstallRow, healthPresentation } from "./ext-inventory-present"
-import { ExtensionDetail, type DetailTarget } from "./extension-detail"
+import { ExtensionDetail, InstalledPackageDetail, type DetailTarget } from "./extension-detail"
 import { isCodePuppyOfficeCatalogId, officeAdvisoryFor, retiredCommunityOfficeFor } from "../../shared/office-advisories"
 // #397 PR-B:四级货架与策展呈现(纯派生层;解码真源 = shared/catalog-curation,fail-closed)。
 import { curatedOf, curationMapOf, curationOf, isArchived, isSessionGrant, splitBrowse } from "./ext-curation-view"
@@ -141,22 +141,6 @@ function versionLess(a: string, b: string): boolean {
   return false
 }
 
-// `#1594` AC6:需要令牌或本机文件的扩展包,行上直接写缺什么。官方两条按前置项的 id 说人话
-// (id 由 `shared/package-secret-prerequisite.ts` 以「组件 id#变量名」生成,安装确认框按同一 id 给填写说明);
-// 其余前置项的 label 就是确认框里那一格的名字,照它说。
-const PREREQUISITE_NEED_KEYS: Record<string, string> = {
-  "mcp:github-official#GITHUB_PERSONAL_ACCESS_TOKEN": "codepuppy.ext.needGithubToken",
-  "mcp:dbhub-readonly#DSN": "codepuppy.ext.needDatabaseFile",
-}
-function prerequisiteNeedText(view: CatalogPackageViewV1): string {
-  return view.prerequisites.items
-    .map((item) => {
-      const key = PREREQUISITE_NEED_KEYS[item.prerequisiteId]
-      return key ? t(key as never) : t("codepuppy.ext.needItem", { item: item.label })
-    })
-    .join(" · ")
-}
-
 export function ExtensionHub(props: {
   server: Accessor<ServerInfo | undefined>
   open: Accessor<boolean>
@@ -199,10 +183,9 @@ export function ExtensionHub(props: {
   // key 里带账本指纹:装完/卸完 receipts 变了就自动重取。启停**不**改指纹(desiredState 不在
   // 指纹里),所以 `runStateToggle` 末尾显式 `refetchPackages()` —— 少这一行的后果是开关拨完
   // 包卡上的「未启用」不消失,用户以为没生效又去拨一次。
-  // key 里也带 tab:进连接器页(已装扩展包在它的「已安装」组,`#1594`)就重读一次。这不只是省一次 IPC ——
-  // 账本在别处坏掉时,「回到这一页会重新读」是用户唯一能自己走到「读不出」那条如实呈现上的路。
+  // Re-entering any page re-reads the graph, so an unreadable ledger is shown truthfully.
   const [installedPackages, { refetch: refetchPackages }] = createResource(
-    () => (props.open() && section() === "connectors" ? `${receiptFingerprint(ext.store.receipts)}` : null),
+    () => (props.open() ? `${section()}:${receiptFingerprint(ext.store.receipts)}:${ext.store.hubRows.map((row) => `${row.id}:${row.state}:${row.stateReason?.code}`).join("|")}` : null),
     () => ext.listInstalledPackages(),
   )
   /** 存量图缺少显示名时,先取同 id 的目录名称,再回退到根组件名。 */
@@ -427,6 +410,8 @@ export function ExtensionHub(props: {
     })
   // REQ-019 T2:详情页目标(catalog 条目或引擎 agent)。非空 = 当前 tab 内下钻显示详情页。
   const [detail, setDetail] = createSignal<DetailTarget | null>(null)
+  const [managedPackageId, setManagedPackageId] = createSignal<string | null>(null)
+  const managedPackage = () => { const state = installedPackages(); return state?.ok ? state.packages.find((pack) => pack.packageId === managedPackageId()) : undefined }
   // 安装确认框 + #348 capability 授权两阶段状态机 —— REQ-234 `#1531` 起住在 install-confirm.tsx,与 agent 安装守望者共用
   // 同一份(这里是定制中心那一个实例)。Skill 在这里直装(Q1),plugin 只从详情页进确认框(Q2)。
   // 解构只为让本文件的既有调用点一字不动(这些名字从前就是本组件的局部 signal)。
@@ -454,7 +439,7 @@ export function ExtensionHub(props: {
       return latest ?? pending.view
     },
   })
-  const { confirming, openInstallConfirmation, authz, setAuthz, confirmBusy, authzBusy, cancelAuthz, confirmAuthz, openPackage, closePackageAuthz } = confirm
+  const { confirming, openInstallConfirmation, authz, setAuthz, confirmBusy, authzBusy, cancelAuthz, confirmAuthz, closePackageAuthz } = confirm
   // REQ-036:创建表单已移除(创建走技能:skill-creator/agent-creator 出厂注入),原表单 state 随之下线。
   // T3:存量迁移候选(旧 XDG 根里、名字匹配 catalog 的 alpha 安装物)。仅当主进程门控开启
   // (CODEPUPPY_MIGRATE_ENABLE=1,A6 真机验证后)且有候选时显示迁移条。
@@ -609,9 +594,10 @@ export function ExtensionHub(props: {
       // 那和一个缺陷没有区别。**落在区块级结果上**,因为包卡马上就要消失了。
       const retained = r.retained.map((entry) => ({ kind: entry.kind, name: entry.name, reasonCode: entry.reasonCode }))
       setPackRemoval(retained.length > 0 ? { packageId, label, retained } : null)
+      setManagedPackageId(null)
       await refetchPackages()
       flash(
-        r.reloadPending ? t("codepuppy.ext.packageRemovedPendingReload") : t("codepuppy.ext.packageRemoved"),
+        r.reloadPending ? t("codepuppy.ext.packageRemovedPendingReload") : t("codepuppy.ext.packageRemovedName", { name: label }),
         r.reloadPending ? "info" : "success",
       )
     } finally {
@@ -648,6 +634,7 @@ export function ExtensionHub(props: {
   // `#1594`:搜索是本页的(占位写「搜索连接器 / 技能 / 助手」),换页就清空,分段回到「推荐」。
   const gotoSection = (key: HubSection) => {
     setDetail(null)
+    setManagedPackageId(null)
     setQuery("")
     setSegment("recommended")
     setHubSection(key)
@@ -669,28 +656,14 @@ export function ExtensionHub(props: {
         return latest ?? view
       }
       if (view.action.kind !== "install" && view.action.kind !== "resolve-prerequisite") return view
-      // package 首驱只带全新的 attempt identity；密钥与 authorization 必须等 preview 后再提交。
-      // `#810`:经**数据层**出站(`ext.installCatalogIntent`),不直连 `extIpc` —— 引擎重扫接在那一层。
-      const result = await ext.installCatalogIntent({
-        catalogId: view.catalogId,
-        attemptId: `renderer-${globalThis.crypto.randomUUID()}`,
-      })
-      if (
-        !result.ok &&
-        "stage" in result &&
-        result.stage === "authorize" &&
-        "packageAuthorization" in result &&
-        result.packageAuthorization
-      ) {
-        const preview = result.packageAuthorization
-        return await new Promise<CatalogPackageViewV1>((finish) => openPackage({ view, preview, finish }))
-      }
+      const result = await ext.installPackage(view.catalogId)
       if (!result.ok) setErrFor(view.catalogId, extensionError(result.reason, "codepuppy.ext.error.installPackage"))
-      // `#810`:引擎重扫失败 ⇒ 如实说「要重载」。今天 admission 的首驱恒走 authorize 臂,
-      // 所以这条臂到不了;留着是因为它一旦到得了,缺这一行用户读到的就是一句谎话。
-      if (result.ok && result.reloadPending) flash(t("codepuppy.ext.addedPendingReload"))
-      const latest =
-        !result.ok && "package" in result ? result.package : await extIpc.packageDetail(view.catalogId)
+      if (result.ok) {
+        await refetchPackages()
+        if (detail()?.kind === "package") { setDetail(null); setManagedPackageId(view.catalogId) }
+        flash(t("codepuppy.ext.packageAddedName", { name: view.presentation.displayName }), "success")
+      }
+      const latest = await extIpc.packageDetail(view.catalogId)
       if (latest) rememberPackageView(latest)
       return latest ?? view
     } catch (error) {
@@ -712,6 +685,7 @@ export function ExtensionHub(props: {
     if (!props.open()) {
       closePackageAuthz()
       setDetail(null)
+      setManagedPackageId(null)
       setQuery("")
     } else {
       // REQ-032:进 hub 时刷新远端 catalog(main 侧 ETag 304 零成本;失败回退缓存/内置,B20 永不空白)
@@ -804,6 +778,8 @@ export function ExtensionHub(props: {
     // #348(review Major 1):授权框在场(独立宿主)或驱动/重驱进行中,hub 层绝不消费 Esc ——
     // 否则外层先关掉整个 hub,Dialog 的 dismissible=false 拦不住,IPC 会在隐藏状态下提交。
     if (confirming() || authz() || confirmBusy() || authzBusy()) return
+    if (document.querySelector("[role=dialog]")) return
+    if (managedPackageId()) { setManagedPackageId(null); return }
     if (detail()) {
       setDetail(null)
       return
@@ -883,9 +859,10 @@ export function ExtensionHub(props: {
   }
   const connectorGroups = createMemo(() => groupByCategory([...browsable("mcp"), ...browsable("plugin")]))
   const skillGroups = createMemo(() => groupByCategory(browsable("skill")))
-  const browsablePackages = createMemo(() => installablePackages().filter((view) => !view.cloud && matchesPackage(view)))
+  const packageIsInstalled = (view: CatalogPackageViewV1) => { const state = installedPackages(); return (state?.ok && state.packages.some((pack) => pack.packageId === view.catalogId)) || ext.isInstalled(view) }
+  const browsablePackages = createMemo(() => installablePackages().filter((view) => !view.cloud && !packageIsInstalled(view) && matchesPackage(view)))
   const browsableCloud = createMemo(() => browsable("cloud"))
-  const browsableCloudPackages = createMemo(() => cloudPackages().filter(matchesPackage))
+  const browsableCloudPackages = createMemo(() => cloudPackages().filter((view) => !packageIsInstalled(view) && matchesPackage(view)))
 
   // 已安装 = 全类型统一视图(REQ-018 T6):receipts(skill/agent/plugin/mcp)⨝ SDK 的 MCP 实时
   // 状态(connected/error)。live-but-unrecorded 的 MCP(手动加/迁移前)也并入,合成最小 receipt
@@ -951,6 +928,7 @@ export function ExtensionHub(props: {
     const rows = installedAll().filter(
       (row) =>
         pageOfType(row.type) === page &&
+        (row.receipt.scope === "project" || !packageOwnerOf().has(`${row.type}:${row.name}`)) &&
         (!q || `${row.displayName} ${row.name} ${row.entry?.description ?? ""}`.toLowerCase().includes(q)),
     )
     return {
@@ -1470,8 +1448,7 @@ export function ExtensionHub(props: {
     </div>
   )
 
-  // 签名扩展包的一行。`#1594` AC6:需要令牌或本机文件时,描述换成缺什么(「需要 GitHub 令牌」),动作是「设置」,
-  // 点下去走既有的 runPackageAction —— 打开的就是原来那个填令牌 / 填数据库位置的确认屏。
+  // The package content is installed directly; account actions stay on its management page.
   const PackageRow = (cp: { view: CatalogPackageViewV1; dim?: boolean }) => {
     const view = () => currentPackageView(cp.view)
     const installed = () => ext.isInstalled(view())
@@ -1494,10 +1471,10 @@ export function ExtensionHub(props: {
         </span>
         <div class="codepuppy-ext-kit-body">
           <div class="codepuppy-ext-kit-ttl">
-            <b title={view().catalogId}>{view().presentation.displayName}</b>
+            <b>{view().presentation.displayName}</b>
           </div>
           <div class="codepuppy-ext-kit-desc" data-package-need={needsSetup() ? "" : undefined}>
-            {needsSetup() ? prerequisiteNeedText(view()) : view().presentation.description}
+            {view().presentation.description}
           </div>
           <Show when={cardErr()[view().catalogId]}>
             <p class="codepuppy-ext-card-err" role="alert">{cardErr()[view().catalogId]}</p>
@@ -1505,6 +1482,7 @@ export function ExtensionHub(props: {
         </div>
         <button
           class="codepuppy-ext-add"
+          aria-label={t("codepuppy.ext.packageInstallName", { name: view().presentation.displayName })}
           data-variant={needsSetup() ? "ghost" : "primary"}
           disabled={installed() || !view().action.enabled || busy() === view().catalogId}
           onClick={(event) => {
@@ -1512,7 +1490,7 @@ export function ExtensionHub(props: {
             void runPackageAction(view())
           }}
         >
-          {installed() ? t("codepuppy.ext.installed") : needsSetup() ? t("codepuppy.ext.rowSetup") : t("codepuppy.ext.add")}
+          +
         </button>
       </div>
     )
@@ -1583,9 +1561,7 @@ export function ExtensionHub(props: {
 
   // ── REQ-128 Phase 3 `#784`:已装扩展包 ─────────────────────────────────────────────────────
   //
-  // `#1594`:每个包是连接器页「已安装」组里的一行,「…」里是「移除此扩展包」(整包移除的入口,本地导入的包
-  // 没有目录详情页可去,这里是唯一的移除入口)。包内技能各自是技能页「已安装」组里的一行,开关走既有的
-  // `runStateToggle` —— 与平铺行同一条通道、同一个账本、同一次重载请求。
+  // The graph owns each installed row and all component state actions.
   const orderedPackages = createMemo(() => {
     const s = installedPackages()
     if (!s || !s.ok) return []
@@ -1593,50 +1569,177 @@ export function ExtensionHub(props: {
     const top = highlightPackage()
     // 刚装完的排最前(裁决 B 之下,不这么做用户按完确认「什么都看不到」)。
     return s.packages
-      .filter((pack) => !q || packLabel(pack).toLowerCase().includes(q))
+      .filter((pack) => (section() === "connectors" || pack.components.some((component) => pageOfType(component.kind as InstallReceiptType) === section())) && (!q || packLabel(pack).toLowerCase().includes(q)))
       .sort((a, b) => (a.packageId === top ? -1 : b.packageId === top ? 1 : packLabel(a) < packLabel(b) ? -1 : 1))
   })
-  const InstalledPackageRow = (cp: { pack: ReturnType<typeof orderedPackages>[number] }) => {
-    const pack = cp.pack
-    const enabledCount = () => pack.components.filter((c) => c.desiredState === "enabled").length
-    const ic = iconForRow(undefined, "bundle", packLabel(pack))
+  const packageMenu = (pack: InstalledPackageV1): MoreMenuItem[] => [
+    {
+      key: "package-state",
+      label: t("codepuppy.ext.turnOn"),
+      checked: pack.desiredState === "enabled",
+      disabled: packBusy() === pack.packageId,
+      onSelect: () => void runPackageToggle(pack),
+    },
+    {
+      key: "manage",
+      label: t("codepuppy.ext.packageManage"),
+      onSelect: () => {
+        setDetail(null)
+        setManagedPackageId(pack.packageId)
+      },
+    },
+    {
+      key: "remove-package",
+      label: t("codepuppy.ext.remove"),
+      danger: true,
+      disabled: packBusy() === pack.packageId,
+      onSelect: () => void runRemovePackage(pack.packageId),
+    },
+  ]
+  const runPackageToggle = async (pack: InstalledPackageV1) => {
+    if (packBusy() === pack.packageId) return
+    setPackBusy(pack.packageId)
+    setPackErr((current) => ({ ...current, [pack.packageId]: "" }))
+    try {
+      const result = await ext.setPackageState({
+        packageId: pack.packageId,
+        state: pack.desiredState === "enabled" ? "disabled" : "enabled",
+      })
+      if (!result.ok)
+        setPackErr((current) => ({
+          ...current,
+          [pack.packageId]: extensionError(result.reason, "codepuppy.ext.error.installPackage"),
+        }))
+      await refetchPackages()
+    } finally {
+      setPackBusy(null)
+    }
+  }
+  const InstalledPackageRow = (cp: { pack: InstalledPackageV1 }) => {
+    const pack = () => cp.pack
+    const view = () => catalog().packages?.find((entry) => entry.catalogId === pack().packageId)
+    const [authorization] = createResource(
+      () => `${pack().packageId}:${JSON.stringify(ext.store.mcp)}`,
+      () => extIpc.packageAuthorization(pack().packageId),
+    )
+    const rootHub = () =>
+      hubStateView(
+        hubRowFor(
+          ext.store.hubRows,
+          pack().components.find((component) => component.name === pack().rootComponentName)?.componentId ?? "",
+          "global",
+        ),
+      )
+    const description = () => {
+      const current = status()
+      if (current?.kind === "off" || current?.kind === "error") return current.text
+      const state = rootHub()
+      if (pack().components.some((component) => component.kind === "cloud") && state && state.state !== "available")
+        return state.reasonKey ? `${t(state.textKey)} · ${t(state.reasonKey)}` : t(state.textKey)
+      return (
+        view()?.presentation.description ??
+        pack()
+          .components.map((component) => typeLabel(component.kind as InstallReceipt["type"]))
+          .join(" · ")
+      )
+    }
+    const status = () => {
+      if (packBusy() === pack().packageId) return { kind: "progress" as const, text: t("codepuppy.ext.packageApplying") }
+      const failedReload = ext.store.hubRows.find(
+        (row) =>
+          row.scope === "global" &&
+          pack().components.some((component) => component.componentId === row.id) &&
+          row.stateReason?.code === "reload-failed",
+      )
+      if (failedReload)
+        return {
+          kind: "error" as const,
+          text: t("codepuppy.ext.packageEnableFailed", {
+            reason: failedReload.stateReason?.detail ?? t("codepuppy.ext.hubReasonFailed"),
+          }),
+        }
+      if (
+        ext.store.hubRows.some(
+          (row) =>
+            row.scope === "global" &&
+            pack().components.some((component) => component.componentId === row.id) &&
+            row.state === "reload-pending",
+        )
+      )
+        return { kind: "progress" as const, text: t("codepuppy.ext.packageApplying") }
+      if (pack().desiredState === "disabled") return { kind: "off" as const, text: t("codepuppy.ext.packageOff") }
+      const auth = authorization()
+      if (auth?.ok && auth.items.some((item) => item.kind === "secret" && !item.saved))
+        return { kind: "prerequisite" as const, text: t("codepuppy.ext.packagePendingToken") }
+      if (auth?.ok && auth.items.some((item) => item.kind === "mcp-oauth" && !item.authenticated))
+        return { kind: "prerequisite" as const, text: t("codepuppy.ext.packagePendingLogin") }
+      const live = pack().components.flatMap((component) =>
+        component.kind === "mcp" && ext.store.mcp[component.name] ? [ext.store.mcp[component.name]!] : [],
+      )
+      const failed = live.find((item) => item.error && !item.needsAuth)
+      if (failed)
+        return { kind: "error" as const, text: t("codepuppy.ext.packageEnableFailed", { reason: failed.error! }) }
+      if (live.some((item) => item.needsAuth))
+        return { kind: "prerequisite" as const, text: t("codepuppy.ext.packagePendingLogin") }
+      if (live.some((item) => item.pending))
+        return { kind: "progress" as const, text: t("codepuppy.ext.packageApplying") }
+      return undefined
+    }
+    const ic = () => iconForRow(undefined, "bundle", packLabel(pack()))
     return (
-      // 来源**只从 child record 的 `origin` 读**(基线 §8 纪律 2),行上不显示,留作身份属性。
-      <div class="codepuppy-ext-kit" data-installed-package={pack.packageId} data-package-origin={pack.origin ?? ""}>
-        <span class="codepuppy-ext-kit-ic" style={{ background: ic.color }}>
-          {ic.glyph}
+      <div
+        class="codepuppy-ext-kit"
+        data-installed-package={pack().packageId}
+        data-package-origin={pack().origin ?? ""}
+        data-clickable=""
+        onClick={() => setManagedPackageId(pack().packageId)}
+      >
+        <span
+          class="codepuppy-ext-kit-ic"
+          style={{ background: packageListingTextV1(view()?.listing, "brandColor") ?? ic().color }}
+        >
+          <Show when={view()} fallback={ic().glyph}>
+            {(entry) => <PackageLogo listing={entry().listing} fallback={packLabel(pack())} />}
+          </Show>
         </span>
         <div class="codepuppy-ext-kit-body">
           <div class="codepuppy-ext-kit-ttl">
-            <b data-package-label={pack.packageId}>{packLabel(pack)}</b>
+            <b data-package-label={pack().packageId}>{packLabel(pack())}</b>
+            <Show when={view()?.cloud}>
+              <span class="codepuppy-ext-type-pill">{typeLabel("cloud")}</span>
+            </Show>
+            <Show when={status()?.kind === "prerequisite" || status()?.kind === "progress"}>
+              <span
+                class="codepuppy-ext-package-state"
+                data-prerequisite={status()?.kind === "prerequisite" ? "required-action" : undefined}
+              >
+                {status()?.text}
+              </span>
+            </Show>
           </div>
-          {/* 裁决 B 的必然连带:装完默认全关 ⇒ 不说下一步,用户按完确认拿不到任何东西。有任意一个开了就换成计数。 */}
-          <div class="codepuppy-ext-kit-desc">
-            {pack.components.some((component) => component.kind !== "skill")
-              ? `${pack.components.map((component) => typeLabel(component.kind as InstallReceipt["type"])).join(" · ")} · ${enabledCount() === 0 ? t("codepuppy.ext.notOn") : t("codepuppy.ext.packageSomeEnabled", { count: String(enabledCount()) })}`
-              : enabledCount() === 0
-              ? t("codepuppy.ext.packageAllOffRow", { count: String(pack.components.length) })
-              : `${t("codepuppy.ext.packageSkillCount", { count: String(pack.components.length) })} · ${t("codepuppy.ext.packageSomeEnabled", { count: String(enabledCount()) })}`}
+          <div class="codepuppy-ext-kit-desc" data-err={status()?.kind === "error" ? "" : undefined}>
+            {description()}
           </div>
-          <Show when={packErr()[pack.packageId]}>
+          <Show when={rootHub()?.detail}>
+            {(detail) => (
+              <details onClick={(event) => event.stopPropagation()}>
+                <summary>{t("codepuppy.settings.toolsDevDetails")}</summary>
+                {detail()}
+              </details>
+            )}
+          </Show>
+          <Show when={packErr()[pack().packageId]}>
             {(error) => (
-              <p class="codepuppy-ext-card-err" data-package-error={pack.packageId} role="alert">
+              <p class="codepuppy-ext-card-err" data-package-error={pack().packageId} role="alert">
                 {error()}
               </p>
             )}
           </Show>
         </div>
         <MoreMenu
-          id={`package:${pack.packageId}`}
-          items={[
-            {
-              key: "remove-package",
-              label: packBusy() === pack.packageId ? t("codepuppy.ext.packageRemoving") : t("codepuppy.ext.packageActionUninstall"),
-              danger: true,
-              disabled: packBusy() === pack.packageId,
-              onSelect: () => void runRemovePackage(pack.packageId),
-            },
-          ]}
+          id={`package:${pack().packageId}`}
+          label={t("codepuppy.ext.packageManageName", { name: packLabel(pack()) })}
+          items={packageMenu(pack())}
         />
       </div>
     )
@@ -2172,10 +2275,10 @@ export function ExtensionHub(props: {
               </Show>
 
               <Show
-                when={!detail()}
+                when={!detail() && !managedPackageId()}
                 fallback={
-                  <ExtensionDetail
-                    target={detail()!}
+                  <Show when={managedPackage()} fallback={<Show when={detail()}>{(target) => <ExtensionDetail
+                    target={target()}
                     ext={ext}
                     catalogVersion={catalog().version}
                     byId={byId}
@@ -2199,7 +2302,9 @@ export function ExtensionHub(props: {
                     sessionAvailable={() => !!sessionDirectory()}
                     sessionBusyFor={(id) => sessionBusy() === id}
                     onSessionToggle={runSessionToggle}
-                  />
+                  />}</Show>}>
+                    {(pack) => <InstalledPackageDetail pack={pack()} label={packLabel(pack())} view={catalog().packages?.find((view) => view.catalogId === pack().packageId)} ext={ext} directory={projectDir()} menu={<MoreMenu id={`manage:${pack().packageId}`} label={t("codepuppy.ext.packageManageName", { name: packLabel(pack()) })} items={packageMenu(pack())} />} error={packErr()[pack().packageId]} onBack={() => setManagedPackageId(null)} />}
+                  </Show>
                 }
               >
                 {/* 页头(批准稿 `#hub-connectors`):标题 + 一行副标题 + 本页搜索 +「添加 ▾」。 */}
@@ -2321,7 +2426,7 @@ export function ExtensionHub(props: {
                   <InstalledHead />
                   <Skeleton />
                   <Show
-                    when={installedPage().global.length > 0}
+                    when={installedPage().global.length > 0 || orderedPackages().length > 0}
                     fallback={
                       <Show when={ext.store.ready && !searching()}>
                         <p class="codepuppy-ext-man-empty">
@@ -2331,6 +2436,7 @@ export function ExtensionHub(props: {
                     }
                   >
                     <div class="codepuppy-ext-grid" data-group="installed">
+                      <For each={orderedPackages()}>{(pack) => <InstalledPackageRow pack={pack} />}</For>
                       <For each={installedPage().global}>{(row) => <InstalledRow row={row} />}</For>
                     </div>
                   </Show>
@@ -2345,7 +2451,7 @@ export function ExtensionHub(props: {
                         </>
                       )}
                     </For>
-                    <NoMatches when={skillGroups().length === 0 && installedPage().global.length === 0} />
+                    <NoMatches when={skillGroups().length === 0 && installedPage().global.length === 0 && orderedPackages().length === 0} />
                   </Show>
                   {/* 「系统」= 应用自带的技能与内置命令(原「已安装 → 应用自带的功能」);隐藏 / 停用 / 自定义收进「…」。 */}
                   <Show when={segment() === "system"}>
@@ -2369,7 +2475,7 @@ export function ExtensionHub(props: {
                   <InstalledHead />
                   <Skeleton />
                   <Show
-                    when={installedPage().global.length > 0 || ownAgentsUnreceipted().length > 0}
+                    when={installedPage().global.length > 0 || ownAgentsUnreceipted().length > 0 || orderedPackages().length > 0}
                     fallback={
                       <Show when={ext.store.ready && !searching()}>
                         <p class="codepuppy-ext-man-empty">
@@ -2379,6 +2485,7 @@ export function ExtensionHub(props: {
                     }
                   >
                     <div class="codepuppy-ext-grid" data-group="installed">
+                      <For each={orderedPackages()}>{(pack) => <InstalledPackageRow pack={pack} />}</For>
                       <For each={installedPage().global}>{(row) => <InstalledRow row={row} />}</For>
                       <For each={ownAgentsUnreceipted()}>{(a) => <AgentRow a={a} />}</For>
                     </div>

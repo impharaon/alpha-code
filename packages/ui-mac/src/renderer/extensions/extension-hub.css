@@ -1830,3 +1830,7 @@ body[data-codepuppy-sidebar="open"] .codepuppy-ext-page {
 .codepuppy-ext-grid + .codepuppy-gov {
   margin-top: 12px;
 }
+
+/* Approved 11-15 frame: compose the existing switch and detail header. */
+.codepuppy-ext-menu-item[data-switch] { display: flex; align-items: center; justify-content: space-between; gap: var(--a-space-3); }
+.codepuppy-ext-dhead .codepuppy-ext-dhead-body { flex: 1; }

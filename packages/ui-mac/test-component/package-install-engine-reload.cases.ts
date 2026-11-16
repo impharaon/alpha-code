@@ -383,6 +383,7 @@ const extBridge: Record<string, unknown> = {
   packageDetail: (catalogId: unknown) => call("ext-package-detail", catalogId),
   packageInstalled: (catalogId: unknown) => call("ext-package-installed", catalogId),
   installedPackages: () => call("ext-installed-packages"),
+  uninstallPackage: (packageId: string) => call("ext-uninstall-package", packageId),
   installPackage: (packageId: string) => { desktopIpcCalls.push(packageId); return call("ext-install-package", packageId) },
   setPackageState: (intent: unknown) => call("ext-set-package-state", intent),
   packageAuthorization: (packageId: string) => call("ext-package-authorization", packageId),
@@ -613,7 +614,7 @@ test("④ `#1529` AC3:ext 报告重载失败 ⇒ 已安装列表如实「待重�
   expect(disposeCalls).toBe(0)
 })
 
-test("⑤ 出站计数相等:到达 IPC 的每一次安装都经过了收口方法", () => {
+test("⑤ 出站计数相等:到达 IPC 的每一次安装都经过了收口方法", async () => {
   // 三个入口共六次出站(package 首驱 + 确认屏,两条套件各首驱 + 重驱)。任何一次直连 `extIpc` 都会让
   // 右边多出来一次而左边不动 —— 「既走收口方法又另外直连一次」的实现在这里红。
   expect(ipcInstallIntents.length).toBe(centralCalls.length)
@@ -627,6 +628,8 @@ test("⑤ 出站计数相等:到达 IPC 的每一次安装都经过了收口方�
   // 夹具自检:被装的那个 package 里真的有一个 MCP 组件(套件成员之外还有 fs 类组件),
   // 也就是说「装完要重扫」这件事对本夹具是真需求,不是摆设。
   expect(fixture.envelope.components.map((component) => component.id)).toContain(LEAF_MCP_ID)
+  expect((await hubApi.uninstallPackage("package:github")).ok).toBe(true)
+  await flush()
 })
 
 // #1646 uses the same real Hub → IPC → ledger. Only process launch is substituted;

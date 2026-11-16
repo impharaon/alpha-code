@@ -695,3 +695,28 @@ for(const source of ["created","project"] as const)test("R14 A9 renderer cannot 
   expect(readdirSync(project)).toEqual([])
  }finally{fetchSpy.mockRestore()}
 })
+
+for(const kind of ["catalog","candidate"] as const)test("R14 B8 submitted "+kind+" stage has its main-owned display name before runtime settles",async()=>{
+ const {fixtureFetch}=await import("../test-fixtures/plugin-helper/source-fetch")
+ const fetchSpy=spyOn(globalThis,"fetch").mockImplementation(fixtureFetch)
+ const candidate=(await pluginSources.searchSources("context7")).candidates.find(candidate=>candidate.source==="claude-marketplace")!
+ const id=kind==="catalog"?chatEntry.id:candidate.id
+ const name=kind==="catalog"?chatEntry.displayName:candidate.displayName
+ expect(name).not.toBe(id)
+ const entered=Promise.withResolvers<void>(),release=Promise.withResolvers<void>()
+ const requestId="r14_named_"+kind
+ heldRuntime={entered:()=>entered.resolve(),release:release.promise}
+ try{
+  codepuppySidecar.receive({type:"codepuppy.hub.install.request",id:901,requestId,directory:join(root,"workspace"),sessionID:"ses_name",agent:"build",ref:{kind:"id",id},scope:"all-projects"},()=>{})
+  await entered.promise
+  expect(handlers.get("ext-hub-request")!({sender:{id:1}},requestId)).toMatchObject({stage:"submitted",displayName:name})
+ }finally{
+  release.resolve();heldRuntime=undefined
+  for(let n=0;n<100;n++){
+   const record=handlers.get("ext-hub-request")!({sender:{id:1}},requestId) as {stage:string}
+   if(record.stage!=="submitted")break
+   await Bun.sleep(10)
+  }
+  fetchSpy.mockRestore()
+ }
+})

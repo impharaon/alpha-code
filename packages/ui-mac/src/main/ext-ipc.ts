@@ -1426,7 +1426,11 @@ export function registerExtIpcHandlers(
     }
     return result
   }
-  ipcMain.handle(GATED_WRITE_CHANNELS.installFromSource, (_event: IpcMainInvokeEvent, request: InstallRequestV1) => installFromSource(request))
+  ipcMain.handle(GATED_WRITE_CHANNELS.installFromSource, (_event: IpcMainInvokeEvent, request: InstallRequestV1) => {
+    if (request?.source?.kind === "created" || request?.effect?.kind !== "all-projects")
+      return { ok: false, code: "unknown-id", detail: "This renderer entry installs existing packages for all projects" }
+    return installFromSource({ ...request, via: "hub" })
+  })
   ipcMain.handle(GATED_WRITE_CHANNELS.installPackage, async (_event: IpcMainInvokeEvent, packageId: unknown) => {
     if (typeof packageId !== "string") return { ok: false, reason: "invalid package identity" }
     const result = await installFromSource({ requestId: "hub_" + randomUUID(), source: { kind: "catalog", catalogId: packageId }, effect: { kind: "all-projects" }, via: "hub" })

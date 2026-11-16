@@ -892,3 +892,5 @@ A8 前提属实：任一 strict V3 失败使整段 disabled 注入跳过。两�
 A8 FIXED：disabled 循环恢复只读 readLedgerV2 的已解记录；strict graph 不可用时项目 MCP 集合回退到既有 readPackageAllowSet 的 v2 scoped 投影，正常图仍读 strict state。账本与项目投影单一写/读权威未改、无原始 JSON 二次 decoder，注入不改损坏文件。两个原 red 保留，disabled-injection/config-injection/boot-safety 三文件 exit 0（a8-green.log），ui-mac typecheck exit 0（a8-types.log）。
 
 A9 前提属实：renderer source 写口可递交 created 与 project effect；两条完整 main IPC red 使用全源已查询记录、真实技能字节的自制草稿与真实目录项，旧 handler 都接受，exit 1（a9-red.log）。拒绝范围只落 renderer handler，sidecar/common entry 保留制作/项目 scope；无用户能力收窄。
+
+A9 FIXED：renderer handler 在任何准备/写入前拒 created 或非 all-projects，via 由主进程写为 hub；共同 installFromSource 与 sidecar 不改，制作和逻辑项目 scope 仍走聊天。原两 red 保留，ext-write-channels/sidecar-wiring/install-from-source 三文件 exit 0（a9-green.log），ui-mac typecheck exit 0（a9-types.log）；IPC 实跑 24，pin 同步。

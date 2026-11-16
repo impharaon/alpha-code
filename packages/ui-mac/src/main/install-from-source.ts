@@ -108,7 +108,7 @@ export function createSourceInstaller(deps: Dependencies) {
       const namespace = source.kind === "created" ? "mine" : source.kind === "marketplace" ? source.ecosystem : source.kind === "npm" ? "opencode" : source.kind === "mcp-registry" ? "mcpreg" : "local"
       const proposed = namespace + ":" + slug
       const sameSource = before.packageGraphs.find(
-        (graph) => graph.source && sourceIdentity(graph.source) === sourceIdentity(source) && (source.kind !== "created" || graph.packageId === proposed),
+        (graph) => graph.source && sourceIdentity(graph.source) === sourceIdentity(source) && ((source.kind !== "created" && source.kind !== "local-folder") || graph.packageId === proposed),
       )
       const duplicate =
         identity &&
@@ -189,7 +189,7 @@ export function createSourceInstaller(deps: Dependencies) {
           name: item.hostName,
           scope: { kind: "global" },
           environment: deps.environment(),
-          origin: source.kind === "created" ? "created" : "imported-claude",
+          origin: source.kind === "created" ? "created" : converted.package.provider === "claude-code" ? "imported-claude" : "imported",
           desiredState: "disabled",
           version,
           installedAt: new Date().toISOString(),
@@ -446,6 +446,7 @@ function renderText(text: Text): string {
 function sourceOf(capture: Capture, publisher?: import("./plugin-sources").CandidateV1["publisher"]): PackageSourceV1 {
   const source = capture.source
   if (source.kind === "created") return { kind: "created" }
+  if (source.kind === "folder" || source.kind === "git") return { kind: "local-folder" }
   if (source.kind === "mcp-registry")
     return { kind: "mcp-registry", serverName: source.serverName!, version: source.version!, publisher: publisher! }
   if (source.kind === "npm")
@@ -465,6 +466,7 @@ function sourceOf(capture: Capture, publisher?: import("./plugin-sources").Candi
     entryName: source.entryName ?? source.pluginPath?.split("/").at(-1) ?? "plugin",
   }
 }
+
 function sourceIdentity(source: PackageSourceV1): string {
   return canonicalJson(
     source.kind === "marketplace"

@@ -34,11 +34,16 @@ const MARKETPLACES = [
 const MCP_REGISTRY = "https://registry.modelcontextprotocol.io/v0.1/servers"
 const NPM_REGISTRY = "https://registry.npmjs.org"
 type Archive = { commit?: string; members: Map<string, { node: TreeNode; bytes?: Uint8Array }> }
-type SourceCandidate = { candidate: CandidateV1 } & (
+type IndexedSourceCandidate = { candidate: CandidateV1 } & (
   | { kind: "marketplace"; entry: MarketplaceEntry; market: typeof MARKETPLACES[number] }
   | { kind: "mcp-registry"; serverName: string; version: string }
   | { kind: "npm"; name: string; version: string }
 )
+type SourceCandidate = IndexedSourceCandidate | { kind: "captured"; candidate: { id: string }; capture(): Promise<Capture> }
+export type PreparedPluginSourceV1 =
+  | { kind: "package"; candidateId: string; displayName: string }
+  | { kind: "marketplace"; entries: { id: string; displayName: string; description: string; source: "local-folder" | "claude-marketplace" | "codex-marketplace" }[] }
+
 type SourceFailure = { ok: false; code: "unknown-id" | "source-unreachable" | "source-changed"; detail: string }
 type ConvertedCandidate = Awaited<ReturnType<typeof convertPluginTree>> & { ok: true; capture: Capture; runtimeIdentity: string | undefined; publisher?: CandidateV1["publisher"] }
 type CatalogContents = Pick<PackageAcceptedFactsV1, "envelope"> & { components: readonly Pick<PackageAcceptedFactsV1["components"][number], "payload">[] }
@@ -135,6 +140,7 @@ export function createPluginSources(deps: { catalog: () => Promise<readonly Cand
     try {
       const known = captures.get(candidateId)
       const pending = known ?? (async () => {
+        if (selected.kind === "captured") return selected.capture()
         if (selected.kind === "npm") {
           const metadata = registryDocument(await get(NPM_REGISTRY + "/" + encodeURIComponent(selected.name) + "/" + encodeURIComponent(selected.version)))
           if (metadata.name !== selected.name || metadata.version !== selected.version) throw new SourceChanged()
@@ -194,7 +200,8 @@ export function createPluginSources(deps: { catalog: () => Promise<readonly Cand
       const converted = captured.capture.source.kind === "mcp-registry"
         ? { ...convertMcpServerDefinition(JSON.parse(new TextDecoder().decode(await captured.capture.readFile("server.json"))), captured.capture.source), replacements: new Map<string, Uint8Array>() }
         : await convertPluginTree(captured.capture)
-      const publisher = [...candidates.values()].find((entry) => entry.candidate.id === candidateId)?.candidate.publisher
+      const selected = [...candidates.values()].find((entry) => entry.candidate.id === candidateId)
+      const publisher = selected && selected.kind !== "captured" ? selected.candidate.publisher : undefined
       return { ok: true, capture: captured.capture, ...converted, runtimeIdentity: pluginRuntimeIdentity(converted.package), ...(publisher ? { publisher } : {}) }
     })().catch((): SourceFailure => ({ ok: false, code: "source-unreachable", detail: "Selected source could not be converted" }))
     conversions.set(candidateId, pending)
@@ -241,6 +248,41 @@ export function createPluginSources(deps: { catalog: () => Promise<readonly Cand
   }
   return {
     searchedSources(searchId: string) { return searches.get(searchId) },
+    async prepareCapture(capture: Capture): Promise<PreparedPluginSourceV1> {
+      const issue = (getCapture: () => Promise<Capture>) => {
+        const id = "cand_" + randomUUID()
+        candidates.set("captured:" + id, { kind: "captured", candidate: { id }, capture: getCapture })
+        return id
+      }
+      const manifest = [".claude-plugin/marketplace.json", ".agents/plugins/marketplace.json"].find(path => capture.nodes.some(node => node.kind === "file" && node.path === path))
+      if (manifest) {
+        const ecosystem = manifest.startsWith(".agents/") ? "codex" : "claude"
+        const marketplace = readMarketplace(await capture.readFile(manifest), ecosystem)
+        return { kind: "marketplace", entries: marketplace.entries.flatMap(entry => {
+          if (entry.source.kind === "unsupported") return []
+          const source = entry.source
+          const prefix = source.kind === "path" ? source.path.replace(/\/$/, "") : source.path ?? ""
+          const provenance: Source = capture.source.kind === "folder"
+            ? { ...capture.source, ecosystem, entryName: entry.name }
+            : { kind: "marketplace", locator: source.kind === "git" ? source.url : capture.source.locator, repository: source.kind === "git" ? source.url : capture.source.repository, commit: source.kind === "git" ? source.commit : capture.source.commit, pluginPath: prefix, ecosystem, entryName: entry.name }
+          const id = issue(async () => {
+            if (source.kind === "git") {
+              const captured = await this.captureGit(source.url, source.commit ?? source.ref ?? "refs/heads/main", source.path)
+              return { ...captured, source: { ...captured.source, kind: "marketplace", ecosystem, entryName: entry.name } }
+            }
+            const base = prefix && prefix !== "." ? prefix + "/" : ""
+            const nodes = capture.nodes.filter(node => node.path.startsWith(base) && node.path !== prefix).map(node => ({ ...node, path: node.path.slice(base.length) }))
+            if (!nodes.length) throw Error("Selected marketplace subtree is missing")
+            return { source: provenance, nodes, readFile: path => capture.readFile(base + path) }
+          })
+          return [{ id, displayName: entry.name, description: entry.description, source: capture.source.kind === "folder" ? "local-folder" as const : ecosystem === "claude" ? "claude-marketplace" as const : "codex-marketplace" as const }]
+        }) }
+      }
+      const candidateId = issue(async () => capture)
+      const converted = await convertCandidate(candidateId)
+      if (!converted.ok) throw Error(converted.detail)
+      return { kind: "package", candidateId, displayName: converted.package.name }
+    },
     async resolveInstallSource(id: string): Promise<{ kind: "catalog"; catalogId: string } | { kind: "candidate"; candidateId: string } | undefined> {
       if ([...candidates.values()].some((entry) => entry.candidate.id === id)) return { kind: "candidate", candidateId: id }
       if (catalogRows.has(id) || (await deps.catalog()).some((row) => row.id === id)) return { kind: "catalog", catalogId: id }
@@ -294,7 +336,7 @@ export function createPluginSources(deps: { catalog: () => Promise<readonly Cand
           if (entry.source.kind === "unsupported" || (entry.source.kind === "git" && !githubRepository(entry.source.url))) return []
           const identity = market.source + JSON.stringify(entry)
           const known = candidates.get(identity)
-          if (known) return [known.candidate]
+          if (known && known.kind !== "captured") return [known.candidate]
           const repository = entry.source.kind === "git" ? githubRepository(entry.source.url)! : market.repository
           const candidate: CandidateV1 = {
             id: "cand_" + randomUUID(), source: market.source, name: entry.name, displayName: entry.name, description: entry.description, kind: "plugin",
@@ -308,7 +350,7 @@ export function createPluginSources(deps: { catalog: () => Promise<readonly Cand
       const found = registry.status === "fulfilled" ? registry.value.map((record) => {
         const identity = "mcp-registry:" + record.server.name + "@" + record.server.version
         const known = candidates.get(identity)
-        if (known) return known.candidate
+        if (known && known.kind !== "captured") return known.candidate
         const candidate: CandidateV1 = { id: "cand_" + randomUUID(), source: "mcp-registry", name: record.server.name, displayName: typeof record.server.title === "string" ? record.server.title : record.server.name,
           description: typeof record.server.description === "string" ? record.server.description : "", kind: "mcp", publisher: record.publisher,
           upstream: { serverName: record.server.name, version: record.server.version } }
@@ -320,7 +362,7 @@ export function createPluginSources(deps: { catalog: () => Promise<readonly Cand
       const npmFound = npm.status === "fulfilled" ? npm.value.filter((pkg) => relevance(pkg.name, pkg.name, pkg.description, query) > 0).map((pkg) => {
         const identity = "npm:" + pkg.name + "@" + pkg.version
         const known = candidates.get(identity)
-        if (known) return known.candidate
+        if (known && known.kind !== "captured") return known.candidate
         const candidate: CandidateV1 = { id: "cand_" + randomUUID(), source: "opencode-npm", name: pkg.name, displayName: pkg.name, description: pkg.description, kind: "plugin", upstream: { npm: pkg.name, version: pkg.version } }
         candidates.set(identity, { kind: "npm", candidate, name: pkg.name, version: pkg.version })
         return candidate

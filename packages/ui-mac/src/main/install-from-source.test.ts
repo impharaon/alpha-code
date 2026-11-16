@@ -513,12 +513,15 @@ test("review C5 one real multi-component transaction rolls back a mid-populate f
     ...hooks,
     populate: async (item, directory) => {
       await hooks.populate(item, directory)
-      if (++populated === 2) throw Error("controlled second-component populate failure")
+      // The real Figma MCP is a config action staged before this skill generation.
+      populated++
+      throw Error("controlled skill populate failure after MCP staging")
     },
   }))
   try {
     expect(await h.install(h.request(id, "c5_failed"))).toMatchObject({ ok: false, code: "transaction-failed" })
-    expect(populated).toBe(2)
+    expect(populated).toBe(1)
+    expect(probe.mock.calls[0]![1].items.map(item => item.action)).toEqual(["config", undefined])
     expect(probe).toHaveBeenCalledTimes(1)
     const failed = readPackageLedgerStateV1(h.root)
     expect(failed.ok && failed.records).toEqual([])

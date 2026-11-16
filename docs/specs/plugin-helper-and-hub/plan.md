@@ -164,3 +164,84 @@ r2 验证：ui-mac `bun test --max-concurrency 2 src/shared/host-extension-packa
 2026-11-16 r1 · A1 首笔实施提交填入续派核对回执；真实夹具扩为同一 pinned 库的 context7（wrapped MCP）与 github（凭据占位）实样，18 个原始文件逐一记录摘要，另存保留真实成员/全局 pax 的裁剪 tar。ui-mac `bun test --max-concurrency 2 src/shared/host-extension-package-contract/plugin-conversion.test.ts src/shared/host-extension-package-contract/host-extension-package-artifact.test.ts src/main/plugin-sources.test.ts` exit 1：12 pass / 19 fail；首报把 19 项都归因于入口缺失不准确，复核为 18 项入口缺失，另 1 项已是下述目录夹具断言有误，既有 artifact 及真实夹具摘要检查通过。日志 `/tmp/helper-install-plan-YCXgtv/a1-red.log`。尚无生产变更，后续实现不改这批断言。
 
 2026-11-16 · PLAN 新证据：按派发的限时分支实测成功，MCP 生效计划采用现有 runtime add/connect，代替该组件的非 force Location 重载；技能路径沿冻结设计。设计由其拥有方回写，本阶段只记录证据。H 的来源展示及管理定位缺口只读返回，不越界改页；其余无偏离。
+
+## 来源扩展（B/C 的转换与查询层）
+
+- 依据：[Issue #1724](https://github.com/impharaon/alpha-code/issues/1724)；[SPEC-plugin-helper-and-hub v3](https://github.com/impharaon/alpha-work/blob/8663fb2a982eaf7c626bfee3bcd8b20b870f2577/docs/specs/plugin-helper-and-hub/spec.md) AC-02、AC-05、AC-15 的查找、取源和转换部分；[DESIGN-plugin-helper-and-hub v4](https://github.com/impharaon/alpha-work/blob/850fd2a61f220596fb10922c8b2e477c7475fac4/docs/specs/plugin-helper-and-hub/design.md) §4.2、§4.3、§4.9，及 §4.1/§4.8 的来源、身份比较部分，按 §8 B/C 分工；继承 [DESIGN-local-plugin-install §4.1/4.2/4.5](https://github.com/impharaon/alpha-work/blob/8663fb2a982eaf7c626bfee3bcd8b20b870f2577/docs/specs/local-plugin-install/design.md) 的转换类型、捕获及秘密处理规则。§10 处置与 owner 两项决定不重开。
+- 核对：待编排器核对本节；首笔实施提交从续派 brief 的 `Phase:` 行填入计划提交、核对者/模型和结论，不以本次作者自查代替。
+- 代码基线：`8e40a921ec09cc95d8580142fd45af760d3599d1`，派定工作树 `alpha-code-feat-helper-sources`、分支 `feat/helper-sources`，Bun 1.4.4。沿用上节 A1 的 converter/artifact、main 候选表与只读 capture；开工不依赖 A2，安装集成等待 A2。
+- 文档影响：实施计划；本阶段只追加本节，保留上节历史证据，不改变 frontmatter、索引、规格、设计或其他 lane 文件。安装入口、builders、账本、IPC/preload/ext、renderer/i18n、UI 与真实服务调用均由其他 lane 承担。本机目录捕获沿 `Source.kind: folder`，不向固定的远端搜索来源枚举加第六项。
+- 预计规模：6 个生产/生成文件（下表），3 个测试文件，约 20–30 个真实夹具/来源记录文件；约 1,200–1,800 行实质改动，不计上游原字节与生成产物，实施及相关验证约 4–6 小时。拆成 S1–S4 顺序提交；每段核对规模/用时，达到估算两倍即返回。PLAN 从 2026-11-16 06:48:37 UTC 开始，预算 40 分钟。
+
+**需设计方补齐的接缝（仅影响 AC-15 的原生模块记录）**：`SEAM-CHANGE-NEEDED: PluginPackage 的原生 JS 表示 — v4 §4.3:210 保持其余类型不变，继承的 Entry/Diagnostic（当前 plugin-conversion.ts:44–55）既无原生模块分支，也无 native-js-plugin 诊断；§4.9:413 却要求转换库发现并记录它 — 请明确机器可读的规范化通道，携带模块的 sourcePath/sourceName 与 native-js-plugin 原因，并同步 A2 消费点。` 不能用 diagnostic.message 文案充当协议、把 JS 伪装成其他 entry，或让安装层再解析 package.json/目录。待设计回传前，S2 的技能/MCP 捕获与转换可单独核对，原生模块表示及其 A2 交接不宣称 Ready；本节不自行添加字段或更改冻结类型。
+
+### 改动
+
+路径相对 `packages/ui-mac/`。下表只列本车道可改文件；新私有函数放在既有所有者文件内，不另建提供方框架或安装器。
+
+| 文件 | 改什么 |
+| --- | --- |
+| `src/shared/host-extension-package-contract/plugin-conversion.ts` | 补齐 Codex 市场及插件发现、OpenCode 文件树发现、`convertMcpServerDefinition`；沿现有 `Capture`、`PluginPackage`、`Text`、凭据/替换字节与摘要权威。Codex `.app.json` 保留具名诊断；OpenCode JSON/JSONC MCP 使用同一标准化结果。原生模块通道只在上述接缝冻结后实施。 |
+| `src/shared/host-extension-package-contract/plugin-conversion.mjs`、`plugin-conversion.d.mts`、`host-extension-package-artifact.v1.json` | 每段经现有生成器同步 ESM、声明和摘要，不手改产物，不改发布信封/profile，不重钉其他仓消费者。 |
+| `src/shared/host-extension-package-contract/generate-artifact.ts` | 仅在新增的真实解析依赖须纳入既有生成摘要文件集时机械同步；JSONC 复用仓内已有 `jsonc-parser`，无新依赖。converter 运行闭包保持自包含，不带 Electron、网络或 Core 服务。无需变更文件集时不改此文件。 |
+| `src/main/plugin-sources.ts` | 在现有唯一 `PLUGIN_SOURCE_ORDER`、main 候选表及捕获缓存上补 Codex/npm/Registry 查询与取源、本机目录捕获；GitHub 复用 codeload，npm 校验真实 tarball integrity 并处理其实际归档根，不把 npm 当成必须有 pax 提交的 codeload。用转换后的定义产出同名比较数据并共享缓存；供 A2 提交前再比较，不在此安装。市场语义只调 `readMarketplace`。 |
+| `src/shared/host-extension-package-contract/plugin-conversion.test.ts` | 实际 provider 树→规范化包、秘密替换与摘要、坏定义局部诊断、Registry 映射及 source/ESM 等价；原生模块的可判失败断言等待接缝回传。 |
+| `src/main/plugin-sources.test.ts` | 五源查询/排序/逐源状态、失败重查、固定版本捕获、本机目录与 Git/npm 相同内容转换、同名身份对照、缓存及前置比较数据。既有仅枚举两源/请求计数的断言按五源真实请求同步，保留 A1 的真实目录前提与 Claude 捕获内容断言。 |
+| `src/shared/host-extension-package-contract/host-extension-package-artifact.test.ts` | 对照生成器及真实转换结果核验发布文件/声明/摘要；保留现有拒绝漂移与不引入运行依赖的检查。 |
+| `test-fixtures/plugin-helper/` | 按下述 pinned 原字节增加 Codex、npm、OpenCode、Registry、正式目录样本；来源记录含 URL、提交/版本、取得时间、长度/摘要，npm 另记 integrity。裁剪归档只机械保留真实成员与必要原始头，另记原包和裁剪包摘要；完整 npm tarball 校验用原包。受控缺项、损坏或入口搬移对照记录与原件的差异，不手写第三方格式。 |
+
+### 顺序
+
+1. **S1 · Codex 市场与包**：先加入 pinned 清单、Figma 技能/MCP 与 `.app.json` 真实语料及可失败用例，再补 `readMarketplace(..., "codex")` 和 Codex 插件树转换；随后在来源模块复用 codeload 捕获、重读清单及子目录核验。覆盖 `.codex-plugin/plugin.json`，根 manifest 对照从实样机械搬移并注明差异。保留 Claude 用例；此时未实现的来源仍不可假报已查。重生 artifact 后跑本节三文件相关测试。
+2. **S2 · OpenCode/npm 与本机目录**：加入真实 npm 搜索/定版 metadata/完整 tarball、OpenCode 配置及技能树，先补查询、integrity、目录捕获和配置转换用例，再落查询与只读捕获。相同内容分别以 folder/Git/npm 的 `Capture` 进入同一转换入口；真实 JSONC 的注释/尾逗号不另写解析器。包名、版本、integrity/提交进入已有 source 元数据。技能/MCP、命令/助手的发现按冻结章节实施；JS 只读字节、不 import、求值或安装依赖。原生模块的具名记录及 JS-only 包结果等待接缝冻结，不以丢弃文件取得通过。
+3. **S3 · 官方 MCP Registry**：加入 GitHub 固定版本定义和真实 namespace/meta、npm/pypi/oci 定义样本；补查询与版本详情请求、publisher 推导、remote 优先/stdio 回退、模板和秘密占位用例，再实现 `convertMcpServerDefinition` 与来源捕获。定义不要求插件 manifest，输出仍为同一 `PluginPackage`；首次查询结果与定版详情的名字/版本须相符。失败按既有类别返回，不补造地址或把其他来源包装成官方。
+4. **S4 · 五源合并与 A2 数据交接**：补齐五源并行查询、来源顺序/逐源失败、同名实际取源转换、身份相同/不同和搜索→捕获缓存复用的整条只读链。目录比较数据从现有已验目录/载荷取得，携带原 catalogId/packageId/version；不从候选名猜身份，不复制 payload decoder。同一份转换结果与已取字节交给 A2，A2 仍拥有提交前比较及目录重定向、安装/自动开启。核对所有 `plugin-sources`/converter 导出的直接测试调用者，跑相关三文件测试、生成器 `--check` 与 ui-mac `bun typecheck`；最后跑文档链接检查及 `git diff --check`。不跑全套/gate/bin/check，不接 UI/IPC。
+
+每段对应同一组命令（cwd `packages/ui-mac`）：`bun test --max-concurrency 2 src/shared/host-extension-package-contract/plugin-conversion.test.ts src/shared/host-extension-package-contract/host-extension-package-artifact.test.ts src/main/plugin-sources.test.ts`；生成用 `bun src/shared/host-extension-package-contract/generate-artifact.ts`，检查加 `--check`。这些是**实施时拟执行**的检查，PLAN 未运行生产测试或 typecheck。
+
+### 风险
+
+- **规范化合同缺口**：见上方 `SEAM-CHANGE-NEEDED`。不能由本 lane 悄加 schema、让 A2 从字符串猜原因，或另建 OpenCode reader；设计回传后更新本节核对/偏离并增加具名回归。
+- **实际样本与目录前提**：内置目录的 legacy `entries[]` 没有 GitHub，不代表正式目录 `packages[]` 没有。AC-02 使用下表正式签名目录及匹配载荷；`github-official` 的额外 header 集合作为不合并对照，不能只凭名字/URL 合并。目录缺席按规格允许在真实记录副本中删去该条并记录差异，生产目录不被过滤。
+- **源缓存及分页**：远端分页索引需按实际响应继续取得本次查询匹配，不能人为截断候选；npm 搜索缓存按查询隔离，不能将一个关键词的响应当作整个索引。逐源网络/HTTP/格式失败不缓存为成功或空集；捕获失败不污染已固定版本缓存。并行查询的完成先后不决定候选顺序。
+- **不同归档形状与本机树**：codeload 的 pax 提交和 npm `package/` 根/integrity 各自核验；只捕获、不执行。目录路径/链接/重复成员/摘要失配沿既有 Capture 规则，原文件字节及 mode 不因扫描改变。本机选择器和市场页面仍由 B 的安装/UI lane 接线，本 lane 不增用户输入条件。
+- **秘密与部分有效定义**：复用已有 secret/replacements/digest 通道；OpenCode 环境/headers 与 Codex OAuth 字段从真实样本映射，公开包不含凭据原值。坏定义只诊断对应项，不让一个坏 MCP 丢掉其他合法技能。Registry 返回不能表达的定义仍按冻结诊断处理，不假造可运行 entry。
+- **边界与证明强度**：同名合并及提供给 A2 的比较数据在此验证；真实聊天/「+」安装只装目录版本、事务去重、工具调用、管理页、开关/移除及项目字节不变仍需 A2/B/C 的集成验收，不能由 source 的内存结果代签。
+
+### 证明
+
+| AC | 测试/证据（拟新增名称） | 缺少行为为什么会失败 |
+| --- | --- | --- |
+| AC-02 · 真实目录优先与完整顺序 | `plugin-sources.test.ts`：`signed GitHub package and external definition supply the catalog identity and version`、`recorded source misses preserve catalog Claude Codex OpenCode order`。先验证正式目录中 `package:github@1.0.1` 及载荷摘要，再从真实记录副本逐次移除较高来源的匹配项，核候选身份/来源/顺序与每源 matched 状态。 | 目录样本缺项/变版首先使前提红；只查前两源、异步完成顺序排序或未保留目录版本使结果红。本 lane 不把此例冒称已从聊天/「+」安装。 |
+| AC-02 · 身份来自取源与转换 | 同文件：`equal converted GitHub definitions fold to catalog while readonly headers stay distinct`、`same name with changed runtime definition remains separate`、`search comparison and later capture reuse pinned bytes`。比较真实 Claude GitHub 与正式目录普通 GitHub，并以 GitHub 官方配方额外 header 集合作对照；再从实样改变 URL/技能集合做具名对照。 | 用名称或索引直接写 `sameAs`、漏 header/技能集合、未取源转换或安装前重新下载漂移字节，都使身份/请求次数/摘要断言红。对比失败保持不折叠，不伪造相同身份。 |
+| AC-02 · 每源无结果与失败有别 | 同文件：`every queried source distinguishes zero matches from network http and format failure`、`failed source retries without discarding successful siblings`。五源分别以真实空查询记录、损坏记录或传输失败对照，保留其余来源结果；覆盖 npm/Registry 实际分页与不同查询的缓存。 | 某源没查却报 ok、失败伪装 matched 0、缓存失败或一源失败吞掉其他结果会红；未知候选仍不能发起任意下载。 |
+| AC-02 · Codex 规范化与固定来源 | `plugin-conversion.test.ts`：`pinned Codex Figma keeps skill MCP and provider metadata`、`real app identifiers stay unresolved without inventing MCP`；`plugin-sources.test.ts`：`Codex local entry captures only its pinned subtree and rechecks marketplace membership`。 | 缺 Codex parser/provider、漏技能/MCP、把 app id 当 URL、取错子目录或漏清单变化核验，都会使内容/诊断/commit 断言红；既有 Claude 等价用例保留。 |
+| AC-05 · 独立官方定义可转换 | `plugin-sources.test.ts`：`GitHub registry candidate has namespace publisher and exact version detail`；`plugin-conversion.test.ts`：`registry GitHub without plugin manifest becomes one remote MCP with a Bearer secret need`、`registry remote preference and real npm pypi oci fallbacks preserve commands`。核固定版本详情与查询中 server 内容相同，检查 SecretNeed 的目标、模板及公开字节不含原值。 | 要求 plugin manifest、丢版本/publisher、从聊天地址产官方身份、秘密被写成普通 header 或命令映射不对会红；无可表达定义的对照须空 entries 加具名诊断。真实授权/调用与生命周期归 C/A2。 |
+| AC-15 · OpenCode 技能/MCP同一转换 | `plugin-conversion.test.ts`：`pinned OpenCode JSONC and skills use the shared package model`；`plugin-sources.test.ts`：`folder and pinned Git captures preserve equal OpenCode entries and original bytes`、`npm version and integrity bind the captured package`。实样机械搬移覆盖 `skill`/`skills` 及 `.opencode/` 入口，记明变体；完整 npm tarball 单字节损坏对照须拒绝。 | 只支持 Claude、只支持 JSON、目录壳另产形状、遗漏源版本/摘要或不验 integrity 会红。测试逐文件比较扫描前后字节，并检查捕获/转换没有安装盘面副作用；不把它替代后续安装后的项目字节证明。 |
+| AC-15 · JS 记录但不执行 | 接缝回传后新增 `OpenCode native modules remain visible with native-js-plugin while skills survive`、`native-only npm exposes no runnable entry`。真实 superpowers 模块和 npm 入口只读捕获；从实样派生带可观察写文件标记的执行对照，转换/捕获后该标记不存在，同时检查具名记录仍在。 | 单断言“不执行”不能防静默丢掉 JS；必须同时具名记录、保留技能与无执行副作用，撤掉任一行为均红。当前无冻结表示，尚不能确定该断言的字段读取位置；返回设计，不以弱断言顶替。 |
+| 三项 AC · 发布产物一致 | 既有 `the published converter is self-contained ESM with the same conversion result` 扩到本节实样，并核 Registry 新导出；artifact 测试及生成器 `--check`。 | 只更新 TS、漏新导出/声明/摘要或运行产物仍用旧 parser，会与真实转换结果或发布文件摘要不一致而红。 |
+
+**PLAN 已取得的真实语料**
+
+2026-11-16 只读 GET，原件暂存于本机临时目录 `helper-sources-plan-su2r1brs`（系统临时根下）；PLAN 不向仓库加入夹具。实施时从固定提交/版本取原字节，逐文件记录来源及摘要。下表 archive 的版本由真实 tar 全局 pax `comment` 读得，npm 原包由 metadata 的 sha512 integrity 复核；不是运行/安装证据。
+
+| 来源/样本 | 固定版本及已核事实 | SHA-256 |
+| --- | --- | --- |
+| [Codex 清单](https://raw.githubusercontent.com/openai/plugins/d420d13051bffe4543ed39e30fa46b87148e47dd/.agents/plugins/marketplace.json) | `openai/plugins@d420d13051bffe4543ed39e30fa46b87148e47dd`；18,951 B，raw 与同次 codeload 内原件相同 | `62ed7a1c906a7e486a84ee3f2f7eba048d075e360e355072e1b0823a128f432e` |
+| Codex codeload 原包 | 同上；25,797,809 B；Figma 有实际 skills 与 `.mcp.json`，GitHub 有 `.app.json` | `7eafbb993eb7baafb213b88d85213efacaaea192279e48068410f72d4a8ffa36` |
+| Codex Figma `.codex-plugin/plugin.json` / `.mcp.json` | 同上；1,677 B / 163 B；Figma 插件版本 `2.0.20` | `4a94826aedb047fed25d2a7b16a07aaf5bc4fb1238d47e51d71985fa3336010d` / `5ad3583f97d28e3dd065c38e024cef9eaf78f2b191930ead29021666ccc14466` |
+| [npm 查询记录](https://registry.npmjs.org/-/v1/search?text=skills%20keywords:opencode-plugin&size=15) | 本次查询范围 `skills keywords:opencode-plugin`、size=15；17,004 B；仅作真实记录范围，不把 15 当产品限制 | `c1a13ee113d9d35c1e02404efeb5af0de7666d2e04788a10bd2f8be447fa212f` |
+| [npm 定版 metadata](https://registry.npmjs.org/opencode-skills-hub/0.0.5) / tarball | `opencode-skills-hub@0.0.5`；2,143 B / 496,109 B；原包 sha512 integrity 一致；真实入口 `dist/index.js`，只有原生模块、无 SKILL.md | `60edbb9ba64b9104acf36acc7f023f9225b5d3a97047d4ed7eaace7bbac38464` / `200328d2a4066a8cfe5ae7307fc09faa5973d3405f4e755248d6967ecde9fdaf` |
+| [OpenCode 源仓](https://github.com/InseeFrLab/opencode-onyxia/tree/bb5996565f7198c22dfe16acc0adfde98877d3e6) codeload / `opencode.jsonc` | `bb5996565f7198c22dfe16acc0adfde98877d3e6`；69,736 B / 16,585 B；归档有 15 个真实 SKILL.md 与 MCP 配置 | `417ee4da62b3e6d0c1bc62d5fffe97d303eba827557e506a48ea042601929142` / `bd2e8a4647da112e974c4f5f1f455e21533145486322ffc566d9f959fbd4bedd` |
+| [superpowers 源仓](https://github.com/obra/superpowers/tree/22f0b463e7a5e579904dd6211a520321035526f7) codeload | `22f0b463e7a5e579904dd6211a520321035526f7`；542,813 B；含 `skills/using-superpowers/SKILL.md` 和 `.opencode/plugins/superpowers.js` | `fbb262b662873eca70bfc4152c688852e97f93c811e9635d490453941fecad05` |
+| [GitHub Registry 定版详情](https://registry.modelcontextprotocol.io/v0.1/servers/io.github.github%2Fgithub-mcp-server/versions/2.1.0) | `io.github.github/github-mcp-server@2.1.0`；1,505 B；与同次 latest 查询中的 server 相同，含 remote 与 OCI 定义，无插件清单 | `042afbd02aab3c0906d22d2d0b6861e47453bb5c6a390bc9bb60fd08d6bbf599` |
+| [Registry npm 实样](https://registry.modelcontextprotocol.io/v0.1/servers/io.github.microsoft%2Fplaywright-mcp/versions/0.0.85) | `io.github.microsoft/playwright-mcp@0.0.85`；630 B | `f25dcc6e540608783c4fab55e22bae71feaac720ca677d2c7ac2ce8f40ab00c6` |
+| [Registry pypi 实样](https://registry.modelcontextprotocol.io/v0.1/servers/io.github.bch1212%2Fagentfetch/versions/1.0.1) | `io.github.bch1212/agentfetch@1.0.1`；1,058 B；来自本次 `search=fetch&version=latest&limit=100` 返回的真实 pypi 定义 | `4685d3aa065ed3921e898e88c2d63a760241169b29165b11e4a054d69efe5654` |
+| [正式目录](https://codepuppy.cn/catalog/v1/releases/2026-11-15.1/catalog.json) | `2026-11-15.1`；90,305 B；与 stable 指针 sha256/bytes 一致；指针和目录签名以仓内内置 Ed25519 公钥验证均 true | `abc42734f02cfe666dc0c12cd3884b5598b3f20fdc334020c15cee90c7a63db3` |
+| 正式 `package:github@1.0.1` / `package:github-official@1.0.0` 的 MCP 载荷 | 326 B / 433 B，均与目录 payloadRef 摘要一致；同 URL，header 名集合分别为 `Authorization` / `Authorization,X-MCP-Readonly,X-MCP-Toolsets`，用作相同/不同身份对照 | `d242835ad2e7177222eeb403e543556b2c449d11da5ab1dcb6295769c2685d80` / `0a91f683ab6ccafba2b9480a14c5557b5990937c176a27203f434d02a0883222` |
+
+### 偏离记录
+
+2026-11-16 · 本次只写计划，生产与夹具文件均未改。AC-15 的原生 JS 记录因规范化表示缺口返回设计；其他来源的步骤与证明保留，未自定新合同。Issue 当前正文「依据/交接」仍钉 design v3 @8663fb2；本派发和代码上节收据钉 v4 @850fd2a，且 v4 §10 明确其余来源章节不变；引用差异返回编排器更新有效正文，本 lane 不改 Issue、不读取评论另择版本。安装、UI 与真实服务验收仍归其他车道。OPTIONAL：无。
+
+PLAN 检查（2026-11-16）：`python3 scripts/check-doc-links.py docs/specs/plugin-helper-and-hub/plan.md` exit 0（2 条相对链接）；`git diff --check` exit 0。额外用 `check-docs-contract` 的只读 `check_repo`、Alpha 真实 profile 与 `changed_since=HEAD` 检查本工作树，exit 1：72 errors / 217 warnings（索引 1、README Project 链接 1、旧链接 28、旧目录 35、既有规格额外文件 4、跨仓规格/设计 ID 3）。原计划是工作文件未改的前缀，frontmatter 相同，3 个跨仓 ID 在 HEAD 已有；不修改范围外文档或撤掉引用。明细在上述临时目录 `docs-contract.json`，遗留去向为编排器/文档治理，非本片新增阻塞。原生 JS 合同缺口单独返回，其他检查不得被报告成全部通过。未跑生产测试、typecheck 或全门。本阶段约 18 分钟，仅新增本节 81 行；已核为计划作者 Codex（GPT-6）自查，不代替编排器核对。

@@ -1,0 +1,130 @@
+import { test, expect } from 'bun:test'
+import { mkdirSync, writeFileSync, readFileSync } from 'node:fs'
+import { join } from 'node:path'
+import { engineSandbox, assertEngineSandboxed, engineSlot } from "../../test-component/engine-sandbox"
+import { buildEngineServerOptions } from "./engine-server-options"
+import { engineClient } from "./engine-client"
+import { publishTestBootstrap } from "../../test-component/codepuppy-bootstrap-fixture"
+import { publishInProcessEngine } from "./in-process-engine"
+const repo = join(import.meta.dir, "../../../..")
+const sandbox = engineSandbox()
+import { createSourceInstaller } from "./install-from-source"
+import { createPluginSources } from "./plugin-sources"
+import { fixtureFetch } from "../../test-fixtures/plugin-helper/source-fetch"
+import { makeRecoveryGate } from "./ext-recovery-gate"
+import { applyPackageMcpV1, removePackageMcpV1 } from "./package-mcp-activation"
+import { readPackageLedgerStateV1 } from "./ext-receipt-v2"
+import { readMcpLeafStrict } from "./ext-config"
+import { setPackageStateV1 } from "./ext-install-planner"
+import { mkdtempSync, rmSync } from "node:fs"
+
+
+test('A2 real package installation updates two loaded Locations without reload, persists after rebuild, and disconnects', async () => {
+ await assertEngineSandboxed(sandbox)
+ const slot = engineSlot(sandbox, 'slice-a-runtime')
+ const sockets = mkdtempSync("/tmp/a2-pw-")
+ process.env.PWTEST_SOCKETS_DIR = sockets
+ const globalRoot = join(sandbox.root, 'state', 'env', 'dev')
+ mkdirSync(globalRoot, {recursive:true})
+ process.env.CODEPUPPY_GLOBAL_DIR = globalRoot
+ const other = join(sandbox.root, 'other-loaded-project')
+ mkdirSync(other)
+ publishTestBootstrap({ globalRoot })
+ const effect = Bun.resolveSync('effect', join(repo, 'packages/ui-mac'))
+ const ext = join(sandbox.root, 'ext')
+ const observer = join(sandbox.root, 'observer')
+ mkdirSync(ext); mkdirSync(observer)
+ writeFileSync(join(ext, 'server.js'), `export {default} from ${JSON.stringify(join(repo,'packages/ext/src/plugin.ts'))}`)
+ writeFileSync(join(observer, 'server.js'), `
+import {Schema} from ${JSON.stringify(effect)}
+let setups=0
+export default { id:'test.slice-a-observer', setup:async(ctx)=>{
+ const setup=++setups
+ await ctx.rpc.register({id:'slice-a-observer',methods:{tools:{input:Schema.Undefined,output:Schema.Unknown},call:{input:Schema.String,output:Schema.Unknown}},events:{}},{
+ tools:async()=>({setup,tools:(await ctx.tool.list()).filter(t=>t.name.startsWith('browser_')).map(t=>({name:t.name,id:t.id,options:t.options}))}),
+ call:async(sessionID)=>{const tool=(await ctx.tool.list()).find(t=>t.name==='browser_close');if(!tool)throw Error('browser_close absent');return tool.execute({}, {sessionID, agent:'build', messageID:'msg_slice_a_probe',id:'call_slice_a_probe',signal:new AbortController().signal,progress:async()=>{}})}
+ })
+} }
+`)
+ const previous=process.cwd(); process.chdir(slot.projectDirectory)
+ const {startEngine}=await import("../../engine/engine-embed")
+ let reloads=0
+ const start=()=>startEngine(buildEngineServerOptions({hostname:'127.0.0.1',port:0,password:'slice-a-probe',engineVersion:'test',databasePath:slot.databasePath,configDirectory:slot.configDirectory,config:{file:join(globalRoot,'codepuppy.jsonc'),content:JSON.stringify({plugins:[ext,observer]})},models:{fetch:false},filewatcher:false,platform:process.platform}),{projectTrust:()=>true,onDispatch:(dispatch)=>publishInProcessEngine(async(request)=>{if(new URL(request.url).pathname==='/api/location/reload') reloads++;return dispatch(request)})})
+ let engine=await start()
+ try {
+ let client=engineClient({url:engine.url,username:'opencode',password:'slice-a-probe'})
+ for(const end=Date.now()+15000;;await Bun.sleep(50)){
+ const plugins=(await client.plugin.list()).data
+ if(['codepuppy.ext','opencode.config.mcp','test.slice-a-observer','opencode.config.policy'].every(id=>plugins.some(p=>p.id===id&&p.state.status==='active')))break
+ if(Date.now()>end)throw Error('plugins not active: '+JSON.stringify(plugins.map(p=>({id:p.id,state:p.state}))))
+ }
+ const session=await client.session.create({permissions:[{action:'*',resource:'*',effect:'allow'}]})
+ await client.session.create({location:{directory:other}})
+ for(const end=Date.now()+15000;;await Bun.sleep(50)){
+ const plugins=(await client.plugin.list({location:{directory:other}})).data
+ if(plugins.some(p=>p.id==='test.slice-a-observer'&&p.state.status==='active'))break
+ if(Date.now()>end)throw Error('second Location observer not active')
+ }
+ const beforeOther=(await client.rpc.call({rpcID:'slice-a-observer',method:'tools',location:{directory:other}})).output
+ expect(beforeOther.tools).toHaveLength(0)
+ const before=(await client.rpc.call({rpcID:'slice-a-observer',method:'tools'})).output
+
+ expect(before.tools).toHaveLength(0)
+ const sources=createPluginSources({catalog:async()=>[],fetch:fixtureFetch})
+ const rootDeps={globalRoot:()=>globalRoot,advisoryGate:()=>({allowed:true as const}),resolvePackage:async()=>{throw Error('noncatalog')}}
+ const deps={...rootDeps,casBaseRoot:()=>join(sandbox.root,'state'),environment:()=>"dev" as const,userDataPath:sandbox.root,sources,gate:makeRecoveryGate(()=>({})),catalogInstall:async()=>{throw Error('controlled catalog is empty')},activateMcp:(id:string)=>applyPackageMcpV1(id,slot.projectDirectory,{root:()=>globalRoot,awaitServer:async()=>({url:engine.url,username:'opencode',password:'slice-a-probe'})}),reloadSkills:()=>{throw Error('MCP-only install must not reload')},removeDeparting:()=>{}}
+ const install=createSourceInstaller(deps)
+ const candidate=(await sources.searchSources('playwright')).candidates.find(row=>row.source==='claude-marketplace')!
+ expect(await install({requestId:'engine_install_a2',source:{kind:'candidate',candidateId:candidate.id},effect:{kind:'all-projects'},via:'chat'})).toMatchObject({ok:true,packageId:'claude:playwright'})
+ for(const end=Date.now()+60000;;await Bun.sleep(100)){
+ const state=(await client.mcp.list()).data.find(s=>s.name==='playwright')
+ if(state?.status.status==='connected')break
+ if(state&&state.status.status!=='pending')throw Error(JSON.stringify(state))
+ if(Date.now()>end)throw Error('MCP connect timed out')
+ }
+ let after
+ for(const end=Date.now()+10000;;await Bun.sleep(100)){
+ after=(await client.rpc.call({rpcID:'slice-a-observer',method:'tools'})).output
+ if(after.tools.some(t=>t.name==='browser_navigate'))break
+ if(Date.now()>end)throw Error('browser_navigate absent')
+ }
+ expect(after.setup).toBe(before.setup)
+ expect(after.tools.some(t=>t.name==='browser_close')).toBe(true)
+ const otherTools=()=>client.rpc.call({rpcID:'slice-a-observer',method:'tools',location:{directory:other}}).then(result=>result.output)
+ for(const end=Date.now()+15000;!(await otherTools()).tools.some(t=>t.name==='browser_navigate');await Bun.sleep(50))if(Date.now()>end)throw Error('second Location has no browser tool')
+ expect((await otherTools()).setup).toBe(beforeOther.setup)
+ const result=(await client.rpc.call({rpcID:'slice-a-observer',method:'call',input:session.id})).output
+
+ expect(result.content.some(part=>part.type==='text'&&part.text.length>0)).toBe(true)
+ expect(reloads).toBe(0)
+ const durable=readMcpLeafStrict('playwright')
+ expect(durable).toMatchObject({ok:true,value:{command:['npx','@playwright/mcp@latest']}})
+ await engine.close()
+ engine=await start()
+ client=engineClient({url:engine.url,username:'opencode',password:'slice-a-probe'})
+ for(const end=Date.now()+15000;;await Bun.sleep(50)){
+ const plugins=(await client.plugin.list()).data
+ if(plugins.some(p=>p.id==='test.slice-a-observer'&&p.state.status==='active'))break
+ if(Date.now()>end)throw Error('rebuild not active')
+ }
+ for(const end=Date.now()+60000;;await Bun.sleep(50)){
+ if((await client.rpc.call({rpcID:'slice-a-observer',method:'tools'})).output.tools.some(t=>t.name==='browser_close'))break
+ if(Date.now()>end)throw Error('persistent definition did not load after rebuild')
+ }
+ expect(readMcpLeafStrict('playwright')).toEqual(durable)
+ expect(await setPackageStateV1({packageId:'claude:playwright',state:'disabled'},rootDeps)).toMatchObject({ok:true})
+ await deps.activateMcp('claude:playwright')
+ for(const end=Date.now()+10000;;await Bun.sleep(100)){
+ const stopped=(await client.rpc.call({rpcID:'slice-a-observer',method:'tools'})).output
+ if(stopped.tools.length===0)break
+ if(Date.now()>end)throw Error('disconnect did not remove tools')
+ }
+ const state=readPackageLedgerStateV1(globalRoot)
+ if(!state.ok)throw Error('ledger unreadable')
+ await removePackageMcpV1(state.packageGraphs[0]!,slot.projectDirectory,async()=>({url:engine.url,username:'opencode',password:'slice-a-probe'}))
+ expect((await client.mcp.list()).data.some(server=>server.name==='playwright')).toBe(false)
+ const failure=await applyPackageMcpV1('claude:playwright',slot.projectDirectory,{root:()=>globalRoot,awaitServer:async()=>{throw Error('test engine unavailable')}})
+ expect(failure).toMatchObject([{name:'playwright',status:'unavailable'}])
+ expect(readPackageLedgerStateV1(globalRoot)).toMatchObject({ok:true,packageGraphs:[{packageId:'claude:playwright'}]})
+ }finally{await engine.close();process.chdir(previous);rmSync(sockets,{recursive:true,force:true})}
+},180000)

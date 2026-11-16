@@ -30,6 +30,7 @@ let main: ReturnType<(typeof import("./ext-ipc"))["registerExtIpcHandlers"]>
 let echo: ReturnType<(typeof import("../../../core/test/fixture/mcp-echo"))["echoMcpHandler"]>
 let nativeLoads = 0
 let toolCalls = 0
+let stopWatching: (() => void) | undefined
 const projectFiles = { "opencode.json": "{\"mcp\":{}}\n", "AGENTS.md": "BC5 project byte sentinel\n" }
 const invoke = async <T>(channel: string, ...args: unknown[]) => {
   const handler = handlers.get(channel)
@@ -127,7 +128,7 @@ beforeAll(async () => {
   }
   const { codepuppyEngine, scriptedModel } = await import("../../test-component/codepuppy-engine")
   model = scriptedModel()
-  host = codepuppyEngine({ sandbox, name: "plugin-entrypoints", modelBaseURL: model.baseURL, projectFiles })
+  host = codepuppyEngine({ sandbox, name: "plugin-entrypoints", modelBaseURL: model.baseURL, projectFiles, filewatcher: true })
   process.chdir(host.projectDirectory)
   const { codepuppyBootstrap } = await import("@opencode/util/codepuppy-bootstrap")
   root = codepuppyBootstrap().paths.globalRoot
@@ -140,6 +141,10 @@ beforeAll(async () => {
   main = registerExtIpcHandlers(host.userData, "dev", async () => ({ url: running!.url, username: "opencode", password: "cp-plugin-entrypoints" }), sandbox.home, undefined, async () => undefined)
   main.codepuppySidecar.attach(message => { wire.push(message); for (const listener of listeners) listener({ data: message }) })
   await main.ledgerReady
+  const { injectCodePuppyConfig, explicitSkillDirs } = await import("./codepuppy-config-injection")
+  const { watchExplicitSources } = await import("./engine-explicit-config")
+  const injection = injectCodePuppyConfig(host.userData, join(sandbox.root, "plugin-entrypoints-ext"), "stable", codepuppyBootstrap().paths.userConfig ?? null)
+  stopWatching = watchExplicitSources({ ...injection.explicit!, skills: explicitSkillDirs, log: line => logs.push(line) })
   running = await host.start()
   // Intercept every matching import before any module code can execute. The positive control
   // proves this monitor sees the actual pinned native entry, then installs must yield zero hits.
@@ -148,10 +153,25 @@ beforeAll(async () => {
     expect(createHash("sha256").update(await Bun.file(args.path).bytes()).digest("hex")).toBe(nativeEntryDigest)
     return { contents: "export default {}", loader: "js" }
   }) } })
+  const candidate = (await main.pluginSources.searchSources(provenance.opencode.name)).candidates.find(candidate => candidate.source === "opencode-npm")!
+  const capture = await main.pluginSources.captureCandidate(candidate.id)
+  if (!capture.ok) throw Error(capture.detail)
+  const directory = join(sandbox.root, "real-npm-folder")
+  for (const node of capture.capture.nodes.filter(node => node.kind === "file")) {
+    const file = join(directory, node.path)
+    mkdirSync(dirname(file), { recursive: true })
+    writeFileSync(file, await capture.capture.readFile(node.path))
+  }
+  nativeEntryDigest = createHash("sha256").update(readFileSync(join(directory, "dist/index.js"))).digest("hex")
+  await import(join(directory, "dist/index.js"))
+  expect(nativeLoads).toBe(1)
+  nativeLoads = 0
+  selectedDirectory = directory
 }, 60_000)
 
 let nativeEntryDigest = ""
 afterAll(async () => {
+  stopWatching?.()
   await running?.close()
   model?.stop()
   await echo?.close()
@@ -172,7 +192,7 @@ async function verifyOpenCodeLifecycle(packageId: string, nativeReason: "native-
   try {
     await until(async () => (await inventory()).length === names.length, "all installed OpenCode skills available")
   } catch (error) {
-    throw Error(String(error) + JSON.stringify({ expected: names, actual: (await skills()).map(skill => skill.name), logs, listeners: listeners.size, reloads: wire.filter(message => (message as { type?: string }).type?.includes("reload")), plugin: (await send("GET", "/api/plugin")).json.data }))
+    throw Error(String(error) + JSON.stringify({ expected: names, actual: (await skills()).map(skill => skill.name), reloads: wire.filter(message => (message as { type?: string }).type?.includes("reload")), plugin: (await send("GET", "/api/plugin")).json.data }))
   }
   expect((await inventory()).map(skill => skill.name).sort()).toEqual(names)
   expect((await inventory()).every(skill => skill.content.length > 20)).toBe(true)
@@ -198,19 +218,6 @@ async function verifyOpenCodeLifecycle(packageId: string, nativeReason: "native-
 test("BC5 chat installs pinned OpenCode skills, native JS is not loaded, off/on/remove reaches the engine", async () => {
   const found = await chatSearch(provenance.opencode.name)
   const candidate = found.candidates.find(candidate => candidate.source === "opencode-npm")!
-  const capture = await main.pluginSources.captureCandidate(candidate.id)
-  if (!capture.ok) throw Error(capture.detail)
-  const directory = join(sandbox.root, "real-npm-folder")
-  for (const node of capture.capture.nodes.filter(node => node.kind === "file")) {
-    const file = join(directory, node.path)
-    mkdirSync(dirname(file), { recursive: true })
-    writeFileSync(file, await capture.capture.readFile(node.path))
-  }
-  nativeEntryDigest = createHash("sha256").update(readFileSync(join(directory, "dist/index.js"))).digest("hex")
-  await import(join(directory, "dist/index.js"))
-  expect(nativeLoads).toBe(1)
-  nativeLoads = 0
-  selectedDirectory = directory
   const packageId = await chatInstall(candidate.id)
   expect((await ledger()).packageGraphs[0]!.source).toMatchObject({ kind: "npm", ecosystem: "opencode", name: provenance.opencode.name, version: "3.0.6" })
   await verifyOpenCodeLifecycle(packageId, "native-js-plugin")

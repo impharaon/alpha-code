@@ -3,7 +3,7 @@
 // 幂等、绝不动用户内容、同名遮蔽不注入(防引擎双源)、REQ-059 逃生门不拆不改、
 // legacy `~/.opencode/skill/` 直链清理。
 import { afterEach, beforeEach, describe, expect, test } from "bun:test"
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, readlinkSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, readlinkSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { Effect } from "effect"
@@ -233,6 +233,40 @@ async function engineSkills(directories: string[]) {
     }
   return skills
 }
+
+describe("#1724 plugin helper factory resources", () => {
+  test.each(["dev", "packaged"] as const)("#1724 real %s resources reach engine discovery without ledger writes", async (layout) => {
+    expect(FACTORY_SKILL_IDS).toContain("plugin-helper")
+    const dev = factorySkillSources({ packaged: false, resourcesPath: "/ignored", moduleDir: import.meta.dir })
+    if (layout === "packaged") {
+      const { getConfig } = await import("../../electron-builder.config")
+      const resources = getConfig("prod").extraResources
+      if (!Array.isArray(resources)) throw new Error("packaged resources are missing")
+      const factory = resources.find((entry) => typeof entry !== "string" && entry.from === "resources/factory-skills/")
+      if (!factory || typeof factory === "string" || !factory.from || !factory.to) throw new Error("factory resource copy is missing")
+      // The production entry copies the entire directory; a filter would need its own staging proof.
+      expect(factory.filter).toBeUndefined()
+      cpSync(join(import.meta.dir, "../..", factory.from), join(res, factory.to), { recursive: true })
+    }
+    const registered = layout === "packaged" ? sources : dev
+    expect(registered["plugin-helper"]).toBe(join(layout === "packaged" ? res : join(import.meta.dir, "../../resources"), "factory-skills/plugin-helper"))
+    const source = readFileSync(join(dev["plugin-helper"]!, "SKILL.md"), "utf8")
+    expect(readFileSync(join(registered["plugin-helper"]!, "SKILL.md"), "utf8")).toBe(source)
+    const result = reconcileFactorySkills(registered, roots)
+    expect(result.active).toContain("plugin-helper")
+    expect(result.paths).toContain(registered["plugin-helper"]!)
+    expect((await engineSkills(result.paths)).find((entry) => entry.name === "plugin-helper")?.content).toBe(ConfigMarkdown.parse(source).content)
+    expect(existsSync(roots.codepuppyRoot)).toBe(false)
+
+    // This is our own empty ledger, not a third-party format fixture.
+    mkdirSync(roots.codepuppyRoot)
+    const ledger = JSON.stringify({ v: 3, receipts: [], records: [], packageGraphs: [], claims: [] }) + "\n"
+    writeFileSync(join(roots.codepuppyRoot, "installs.json"), ledger)
+    expect(reconcileFactorySkills(registered, roots).active).toContain("plugin-helper")
+    expect(readFileSync(join(roots.codepuppyRoot, "installs.json"), "utf8")).toBe(ledger)
+    expect(readdirSync(roots.codepuppyRoot)).toEqual(["installs.json"])
+  })
+})
 
 // These assertions guard shipped model instructions, not model behavior (AC3 is a separate live eval).
 describe("REQ-233 cloud skill instructions", () => {

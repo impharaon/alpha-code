@@ -52,6 +52,7 @@ export const FACTORY_SKILL_IDS = [
   "codepuppy-workspace",
   "cloud-capabilities",
   "office-docs",
+  "plugin-helper",
 ] as const
 
 export function factorySkillsEnabled(): boolean {
@@ -78,6 +79,7 @@ export function factorySkillSources(input: {
     "cloud-capabilities": join(root, "factory-skills", "cloud-capabilities"),
     // REQ-080:办公文档引导(连接器选型 + xlsx 惯例自写重表达 + PDF 缺口 pypdf/reportlab 补位)
     "office-docs": join(root, "factory-skills", "office-docs"),
+    "plugin-helper": join(root, "factory-skills", "plugin-helper"),
   }
 }
 

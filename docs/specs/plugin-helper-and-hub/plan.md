@@ -343,6 +343,8 @@ A2/A3 接线收据：主进程每次应用运行创建一份 `createPluginSource
 
 ### 偏离记录
 
+2026-11-16 r1 · D2：登记 factory ID/资源路径；新增 dev、packaged 两例，使用本仓真实技能原字节和引擎 SkillScan/SkillFile 发现链，packaged 例按生产 electron-builder `extraResources` 的 from/to 复制整目录，核对零新建全局根及已有空账本字节/文件集不变。未运行整包构建/签名或模型任务。新例注册前 exit 1（2 fail，均缺 plugin-helper），注册后 ui-mac 三组 factory/census/hygiene 命令 exit 0（63 pass、289 assertions）；`naming-migration-wiring.test.ts` exit 0（9 pass、74 assertions）；`brand-guard.test.ts` exit 0（25 pass、89 assertions），均 `--max-concurrency 2`。机械同步 census 的新出厂项枚举，未改打包配置或其他资源。`bun typecheck --max-concurrency 2` 被 tsgo 拒绝（TS5072，exit 2），改用 `GOMAXPROCS=2 bun typecheck` exit 0；这是工具参数适配，不改变产品或冻结合同。其余无偏离，AC-04/08/09 尚未验收。
+
 2026-11-16 r1 · D1：新增完整 `plugin-helper/SKILL.md`；尚未登记出厂路径，资源可达性待 D2。首笔实施提交按续派 Phase 行填入 D/E 核对回执；未改其余接缝。ui-mac `bun test --max-concurrency 2 src/main/codepuppy-factory-skill-hygiene.test.ts` exit 0（24 pass、0 fail、68 assertions）；文档链接与 `git diff --check` exit 0。实际资源审读覆盖本节 D1 的工具/文案与边界，未用正文字符串断言代替模型验收。原输入缺口已由编排器同步 Issue 的 design v4 引用（本轮回执），不再待办。无计划偏离。
 
 ## 切片 E

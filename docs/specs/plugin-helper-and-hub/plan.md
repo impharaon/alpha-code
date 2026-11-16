@@ -840,3 +840,7 @@ r12 遗留（记录去向，无本轮旁修）：
 - B recorded verify：folderSelections 入口是否不可达，核 public folder 合同与实际调用再删 — 尚未执行，随后续继续。
 - B recorded：automation deny 的普通 Error 无 unattended-denial metadata — 依裁定仅记录，去向编排器。
 - B recorded：pending 卡片每秒 hubView 重算 — B2 已将轮询约束到 submitted/running；无额外重构。
+
+r12 本边界最终检查（日志 /tmp/helper-install-r12）：复跑上列 r11 两 lane 的明确相关命令并集，main 46 文件 exit 0（905 pass/5948 assertions，main-related-partial.log），renderer 14 文件 exit 0（201 pass/1772 assertions，renderer-related-partial.log），ext 8 文件 exit 0（182 pass/1138 assertions，ext-related-partial.log）。其中真实引擎使用已准备的临时 offline npm cache；不是未准备缓存的联网替身，未用 PATH wrapper。A5 converter/artifact/sources/install entry 四文件另已 exit 0（98 pass）。两包 bun typecheck exit 0（{ui,ext}-types-partial.log）。独立 authority-registry 5 pass exit 0、gate-file-registry 23 pass exit 0（authority-partial-final.log、registry-partial-final.log）；计数 pins 为实际子例 18/7/11，登记无增漏。所有测试命令均 --max-concurrency 2，无 gate/bin/check。文档链接 7 个均存在、git diff --check exit 0。
+
+已核 Codex（GPT-6）作者自查；本轮约 52 分钟，完成八项（A1/A2/A3/A4/A5、B1/B2/B5），在冻结 B3 读接缝处返回，其他事项没有改变断言或擅自提前修复。每项红命令 exit 1 与 green 结果见本节，红例仍保留；记录项目均标去向。真实构建应用/真实账号验收仍交编排器，未执行登录或外部写入；没有 push/PR/merge。OPTIONAL 无。

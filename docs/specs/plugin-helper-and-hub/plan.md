@@ -844,3 +844,10 @@ r12 遗留（记录去向，无本轮旁修）：
 r12 本边界最终检查（日志 /tmp/helper-install-r12）：复跑上列 r11 两 lane 的明确相关命令并集，main 46 文件 exit 0（905 pass/5948 assertions，main-related-partial.log），renderer 14 文件 exit 0（201 pass/1772 assertions，renderer-related-partial.log），ext 8 文件 exit 0（182 pass/1138 assertions，ext-related-partial.log）。其中真实引擎使用已准备的临时 offline npm cache；不是未准备缓存的联网替身，未用 PATH wrapper。A5 converter/artifact/sources/install entry 四文件另已 exit 0（98 pass）。两包 bun typecheck exit 0（{ui,ext}-types-partial.log）。独立 authority-registry 5 pass exit 0、gate-file-registry 23 pass exit 0（authority-partial-final.log、registry-partial-final.log）；计数 pins 为实际子例 18/7/11，登记无增漏。所有测试命令均 --max-concurrency 2，无 gate/bin/check。文档链接 7 个均存在、git diff --check exit 0。
 
 已核 Codex（GPT-6）作者自查；本轮约 52 分钟，完成八项（A1/A2/A3/A4/A5、B1/B2/B5），在冻结 B3 读接缝处返回，其他事项没有改变断言或擅自提前修复。每项红命令 exit 1 与 green 结果见本节，红例仍保留；记录项目均标去向。真实构建应用/真实账号验收仍交编排器，未执行登录或外部写入；没有 push/PR/merge。OPTIONAL 无。
+
+
+r13 审查续修（2026-11-16 14:22:29 UTC 开始）：已完整读取 part C，范围仍为 origin/alpha@23546fd5b1...6377955826，Claude Opus 5.5 一轮只读；编排器采纳全部 C1–C9 及 cheap OPTIONAL evidence fixes。r12 已修八项不重审，仅按本轮搜索期限裁定修正 A1/B5。
+
+偏离记录·编排器批准接缝 delta（r13 决定 1）：§4.6 侧车新增一个只读 packageAuthorization(packageId)，main 仅接受账本存在的包，复用 renderer 所用 PackageAuthorizationResultV1 安全投影；只含状态/身份/标签，不含值、路径或 raw declaration，build/parse 成对并拒绝坏输入。设计 §4.6/§10 由编排器按变更程序落档，本 lane 不改设计。
+
+B3/C1 红例：恢复 committed+pending/not-loaded/空视图、partly-running、already-installed、login/token、saved-token 的模型结果表；恢复 status 的三种 cloud reason、priceNote 原样与 warning 隐藏。B3 补桥往返/坏投影拒绝、生产 main 对已存在/不存在包授权读。C2 同笔将 canary 聊天请求改为已持有该密钥的 canaryEntry.id，原 args/result/asks/wire/toSidecar 零命中与秘密文件正命中断言不减。ext 两文件 exit 1（b3-c1-red.log）、main message/生产 canary 过滤例 exit 1（b3-main-red.log）；前者因缺 login/token 与新桥方法，后者因缺合同构造器/读口。原仍有效 C1 控制在现实现已绿，恢复后能守住删除分支的回归。

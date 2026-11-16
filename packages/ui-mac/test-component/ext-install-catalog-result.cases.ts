@@ -422,14 +422,16 @@ test("A3 canary stays in main secret files while the production tool/bridge/main
  const asks:unknown[]=[]
  const context={location:{directory:join(root,"workspace")},permission:{assert:async(input:unknown)=>{asks.push(input);throw Error("chat must not assert")}}}
  const ctx={sessionID:"ses_canary",messageID:"msg_canary",agent:"build",id:"call_canary",signal:new AbortController().signal,progress:async()=>{}}
- const args={id:chatEntry.id}
+ const args={id:canaryEntry.id}
  const install=createHubTools(bridge,context as never).find(tool=>tool.name==="codepuppy_hub_install")!
  const result=await install.execute(args,ctx as never)
  expect(asks).toEqual([])
- expect(result).toMatchObject({metadata:{packageId:chatEntry.id,stage:"committed"}})
+ expect(result).toMatchObject({metadata:{packageId:canaryEntry.id,stage:"committed"}})
  for(const surface of [args,result,asks,wire,toSidecar])expect(JSON.stringify(surface)).not.toContain(value)
  expect(wire.some(message=>(message as {type:string}).type==="codepuppy.hub.install.request")).toBe(true)
  expect(wire.some(message=>(message as {type:string}).type==="codepuppy.hub.request.reply")).toBe(true)
+ expect(await bridge.packageAuthorization(canaryEntry.id)).toMatchObject({ok:true,packageId:canaryEntry.id,items:[{kind:"secret",saved:true}]})
+ expect(await bridge.packageAuthorization("not-in-ledger")).toMatchObject({ok:false})
  const hits:string[]=[]
  const walk=(dir:string):void=>{for(const item of readdirSync(dir,{withFileTypes:true})){const path=join(dir,item.name);if(item.isDirectory())walk(path);else if(readFileSync(path).includes(value))hits.push(path)}}
  walk(root)

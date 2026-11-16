@@ -265,3 +265,50 @@ test("D3 automation cannot send a create request", async () => {
   await expect(tool!.execute({ searchId: "search_main", name: "n", description: "d", files: [] }, { ...(context.ctx as object), agent: "codepuppy-automation-standard" } as never)).rejects.toThrow("Permission denied: codepuppy_hub_create")
   expect(writes).toBe(0)
 })
+
+const settledOutcome = () => ({ ok: true as const, packageId: "claude:playwright", displayName: "Playwright", source: { kind: "catalog" as const }, installed: [{ kind: "mcp" as const, hostName: "playwright", sourceName: "playwright" }], notRunning: [] })
+const oauthPending = { kind: "mcp-oauth" as const, componentId: "mcp", prerequisiteId: "login", serviceName: "Docs", label: "Docs", authenticated: false, status: "needs_auth" }
+const tokenPending = { kind: "secret" as const, componentId: "mcp", prerequisiteId: "token", serviceName: "GitHub", label: "Token", saved: false }
+test.each([
+  { name: "pending", rows: [row({ id: "claude:playwright", state: "reload-pending", stateReason: { code: "reload-waiting", detail: "session busy" } })], expected: "installed; loading pending: session busy" },
+  { name: "not loaded", rows: [row({ id: "claude:playwright", state: "installed", stateReason: { code: "not-loaded", detail: "spawn_failed" } })], expected: "installed; loading pending: spawn_failed" },
+  { name: "empty view", rows: [], expected: "installed; loading pending: engine state is not available" },
+  { name: "partial", rows: [], notRunning: [{ kind: "hook" as const, sourceName: "SessionStart", reason: "kind-not-supported-yet" as const }], expected: "installed; partly running: SessionStart: kind-not-supported-yet" },
+  { name: "duplicate", rows: [], alreadyInstalled: true, expected: "already installed" },
+  { name: "login", rows: [], items: [oauthPending], expected: "installed; needs login: Docs" },
+  { name: "token", rows: [], items: [tokenPending], expected: "installed; needs token: GitHub" },
+  { name: "saved token is not pending", rows: [row({ id: "claude:playwright", state: "available" })], items: [{ ...tokenPending, saved: true }], expected: "installed; available" },
+])("R13 B3 C1 model outcome: $name", async c => {
+  const outcome = { ...settledOutcome(), ...(c.notRunning ? { notRunning: c.notRunning } : {}), ...(c.alreadyInstalled ? { alreadyInstalled: true } : {}) }
+  const h = bridgeWith({ views: [view(c.rows)], record: { requestId: "r13_outcome", stage: "committed", packageId: outcome.packageId, outcome } })
+  const reads: string[] = []
+  Object.assign(h.bridge, { packageAuthorization: async (packageId: string) => { reads.push(packageId); return { ok: true, packageId, items: c.items ?? [] } } })
+  const context = contextWith(async () => {})
+  const output = await tools(h.bridge, context.context).codepuppy_hub_install!.execute({ id: "cand_main" }, context.ctx)
+  expect(contentOf(output)).toBe(c.expected)
+  if (c.items) expect(reads).toEqual([outcome.packageId])
+})
+
+test.each([
+  ["cloud-connection", "cloud MCP needs_auth", "cloud connection"],
+  ["cloud-tools", "dispatch missing", "cloud tool list"],
+  ["cloud-policy", "dispatch is ask by tool policy", "cloud tool policy"],
+] as const)("R13 C1 status retains %s stage and detail", async (code, detail, stage) => {
+  const context = contextWith(async () => {})
+  const bridge = bridgeWith({ views: [view([row({ stateReason: { code, detail } })])] }).bridge
+  const output = await tools(bridge, context.context).codepuppy_hub_status!.execute({ id: "mcp:github" }, context.ctx)
+  expect(JSON.parse(contentOf(output)).reason).toBe(stage + ": " + detail)
+})
+
+test("R13 C1 status price notes are verbatim and main warnings stay private", async () => {
+  const context = contextWith(async () => {})
+  for (const priceNote of [undefined, "预留 US$1.00,按实际用量结算;失败时已产生的费用仍会结算"]) {
+    const bridge = bridgeWith({ views: [{ ...view([row({ kind: "cloud", ...(priceNote ? { priceNote } : {}) })]), warnings: ["PRIVATE_PATH_LEDGER_WARNING"] }] }).bridge
+    const output = contentOf(await tools(bridge, context.context).codepuppy_hub_status!.execute({ id: "mcp:github" }, context.ctx))
+    const parsed = JSON.parse(output.split("\n")[0]!)
+    expect(parsed.priceNote).toBe(priceNote)
+    expect(output.includes("本目录尚未提供价格说明;费用以服务端为准")).toBe(!priceNote)
+    expect(output).not.toContain("PRIVATE_PATH_LEDGER_WARNING")
+    expect(output).toContain("this list may be incomplete")
+  }
+})

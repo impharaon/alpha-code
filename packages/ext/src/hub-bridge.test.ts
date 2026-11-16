@@ -146,3 +146,15 @@ test("R12 B5 source search has its own reply budget while ordinary reads keep 20
   expect(await read).toMatchObject({ok:false,reason:"timeout"})
  }finally{jest.useRealTimers()}
 })
+
+test("R13 B3 package account read crosses the bridge with a safe projection and rejects malformed replies", async () => {
+  const wire = fakePort()
+  const bridge = createHubBridge(wire.port, { log: () => {} })
+  const pending = bridge.packageAuthorization("claude:github")
+  expect(parseCodePuppySidecarInbound(wire.sent[0])).toEqual({ type: "codepuppy.package.authorization.request", id: 1, packageId: "claude:github" })
+  wire.deliver({ type: "codepuppy.package.authorization.reply", id: 1, result: { ok: true, packageId: "claude:github", items: [{ kind: "secret", componentId: "mcp", prerequisiteId: "TOKEN", serviceName: "github", label: "Token", saved: false }] } })
+  expect(await pending).toMatchObject({ ok: true, items: [{ saved: false }] })
+  const bad = bridge.packageAuthorization("claude:github")
+  wire.deliver({ type: "codepuppy.package.authorization.reply", id: 2, result: { ok: true, packageId: "claude:github", items: [{ kind: "secret", componentId: "mcp", prerequisiteId: "TOKEN", serviceName: "github", label: "Token", saved: false, value: "rejected" }] } })
+  expect(await bad).toMatchObject({ ok: false })
+})

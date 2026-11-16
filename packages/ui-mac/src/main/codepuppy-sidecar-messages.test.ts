@@ -225,3 +225,16 @@ test("D3 created refs round-trip without a draft content cap, and malformed file
   expect(parseCodePuppySidecarInbound(message)).toEqual(message)
   expect(parseCodePuppySidecarInbound({ ...message, ref: { ...message.ref, draft: { ...message.ref.draft, files: [{ path: "skills/report/SKILL.md", text: false }] } } })).toBeUndefined()
 })
+
+test("R13 B3 package authorization messages reject malformed inputs and credential-bearing projections", async () => {
+  const messages = await import("./codepuppy-sidecar-messages")
+  const request = messages.buildPackageAuthorizationQuery(1, "claude:github")
+  expect(messages.parseCodePuppySidecarInbound(request)).toEqual(request)
+  for (const bad of [{ ...request, packageId: "" }, { ...request, packageId: {} }, { ...request, secret: "rejected" }])
+    expect(messages.parseCodePuppySidecarInbound(bad)).toBeUndefined()
+  const item = { kind: "mcp-oauth" as const, componentId: "mcp", prerequisiteId: "oauth", serviceName: "Docs", label: "Docs", authenticated: false, status: "needs_auth" }
+  const reply = messages.buildPackageAuthorizationReply(1, { ok: true, packageId: "claude:github", items: [item] })
+  expect(messages.parsePackageAuthorizationReply(reply)).toEqual(reply)
+  for (const bad of [{ ...reply, result: { ok: true, packageId: "claude:github", items: [{ ...item, path: "/private" }] } }, { ...reply, result: { ok: true, packageId: "claude:github", items: [{ ...item, authenticated: "false" }] } }])
+    expect(messages.parsePackageAuthorizationReply(bad)).toBeUndefined()
+})

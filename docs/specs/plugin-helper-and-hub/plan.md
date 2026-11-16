@@ -656,3 +656,12 @@ BC2a.2 实施收据：main 新增私有只读取源准备通道 `preparePluginSo
 
 
 BC2b 红例先行：生产 IPC 明确断言旧 folder/Git/Claude preview/cancel/confirm 五条运输不再注册、普通 agent confirm 仍在；真实 Hub DOM 以固定 frontend-design／317 项官方市场 prepared 投影证明文件夹直接安装整包无确认、Git 列表选择前零安装且仅所点 ID 出站。`bun test --max-concurrency 2 --test-name-pattern BC2b ./test-component/ext-install-catalog-result.cases.ts ./test-component/hub-three-pages.cases.ts` exit 1（0 pass／3 fail，`bc2b-red.log`）；旧菜单仍调用旧通道，清单未出现。
+
+
+BC2b 收据：添加菜单现通过 main picker/Git 准备整包；单包无需确认直接到统一入口，市场显示逐条来源与「+」，只提交所选 main ID。`PluginSourceChoices` 从已有搜索行提取供两处实际复用，已装结果复用 H 原行／菜单。Hub、useExtensions、preload、main 写表同时撤下旧 skill folder/Git 与 Claude preview/cancel/confirm 五条运输。`ecosystem-import` 的项目／原生来源链与 ext-fs-installer 原语不变；`claude-plugin-intake` 的纯类型／命名及真实语料检查保留，不重写公共命名合同。
+
+清理范围补记：删除只属于旧两段式入口的 `local-package-preview.ts`、`local-package-install-port.ts`、`claude-plugin-install.ts` 及其专测；删除旧 `claude-plugin-intake.ipc` 与 `local-package-renderer` 两对宿主／cases、旧 local-package-channel 的 preview/confirm 子宿主与 cases。它们钉的逐技能／预览确认／默认关闭链已被替换；替代生产 IPC 15 场景、Hub DOM 29 场景与 A2 整包事务／碰撞／失败／私密文件用例在同树执行，公开 namespace 子宿主仍保留。除计划所列文件外，仅旧 installer/preview 的 `.test.ts` 专测随主体删除，原因同上。实际约 26 文件、约 100 行新增／4,500 行退役，符合计划的旧实现删除项；不是扩大新功能。
+
+执行中撤旧的块边界曾误删相邻普通 reload 注册；提交新增红例 `BC2b ordinary reload transport stays active`（`bc2b-reload-red.log`，exit 1）后恢复，生产注册集合对照最终仅减少上述五条；普通 agent confirmation 与 reload 均保留。`bun test --max-concurrency 2 src/main/ext-write-channels.test.ts src/main/plugin-sources.test.ts src/main/install-from-source.test.ts src/main/claude-plugin-import-matrix.test.ts src/renderer/extensions/plugin-source-results.test.ts src/renderer/extensions/hub-three-pages.test.ts src/renderer/extensions/use-extensions-ipc.test.ts src/renderer/extensions/ext-ipc-chokepoint.test.ts src/renderer/extensions/ext-package-presentation.test.ts src/renderer/extensions/hub-copy.test.ts` exit 0（91 pass／0 fail，1353 assertions，`bc2b-related-final.log`）。ui-mac/ext `bun typecheck` 各 exit 0（`bc2b-*-types-final.log`）；未跑 gate/bin/check。
+
+另一次具名相关集含保留的 `local-package-channel.test.ts` 时，namespace 子例 `test-component/local-package-namespace.cases.ts:225` 仅因 Object.keys 钉值缺少 H 已有 desiredState 而红（内部 4 pass／1 fail；`bc2b-related-first.log`）；该测试字段与生产投影在此步前已如此，`git show 70a5af8951:packages/ui-mac/src/main/ext-ipc.ts` 的原投影已有 desiredState。本轮不修改 H 行为期望，去向编排器／H。连同前述 sidecar confirming 红项，两条原例均保留，不宣称相关全集全绿。共享本步文件为 `ext-ipc.ts`（撤旧接线）、`extension-hub.tsx`（菜单／清单段）、本计划；未改 D/E 的分支、effect 或 Locations 过滤。已核 Codex（GPT-6）作者自查，BC2b 自动证据通过；BC3–BC5 与实际应用／真实账户验收尚待，OPTIONAL 无。

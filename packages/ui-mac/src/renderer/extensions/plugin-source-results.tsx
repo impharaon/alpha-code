@@ -13,9 +13,6 @@ export function PluginSourceResults(props: {
   installedMenu(packageId: string): JSX.Element
 }) {
   const [result] = createResource(() => props.query, props.search)
-  const [busy, setBusy] = createSignal<string[]>([])
-  const [errors, setErrors] = createSignal<Record<string, string>>({})
-  const [installed, setInstalled] = createSignal<Record<string, string>>({})
   const current = () => (!result.loading && !result.error && result()?.query === props.query ? result() : undefined)
   const candidates = createMemo(() => {
     const all = current()?.candidates ?? []
@@ -24,23 +21,6 @@ export function PluginSourceResults(props: {
         !candidate.sameAs || !all.some((other) => other.id === candidate.sameAs && other.id !== candidate.id),
     )
   })
-  const install = async (candidate: CandidateV1) => {
-    if (busy().includes(candidate.id)) return
-    setBusy((list) => [...list, candidate.id])
-    setErrors((errors) => ({ ...errors, [candidate.id]: "" }))
-    try {
-      const outcome = await props.install(candidate)
-      if (!outcome.ok) {
-        setErrors((errors) => ({ ...errors, [candidate.id]: outcome.detail }))
-        return
-      }
-      setInstalled((current) => ({ ...current, [candidate.id]: outcome.packageId }))
-    } catch {
-      setErrors((errors) => ({ ...errors, [candidate.id]: t("codepuppy.ext.sourceInstallFailed") }))
-    } finally {
-      setBusy((list) => list.filter((id) => id !== candidate.id))
-    }
-  }
   return (
     <section data-source-results="" aria-live="polite">
       <Show when={result.loading}>
@@ -65,8 +45,42 @@ export function PluginSourceResults(props: {
         <Show when={!candidates().length && current()?.sources.every(source => source.status === "ok")}>
           <p class="codepuppy-ext-dnote">{t("codepuppy.ext.sourceNoMatches")}</p>
         </Show>
+        <PluginSourceChoices candidates={candidates()} install={props.install} installedMenu={props.installedMenu} />
+      </Show>
+    </section>
+  )
+}
+
+
+/** The same item row/action serves source queries and a captured marketplace's individual choices. */
+export function PluginSourceChoices<C extends Pick<CandidateV1, "id" | "displayName" | "description" | "installed"> & { source: CandidateV1["source"] | "local-folder" }>(props: {
+  candidates: C[]
+  install(candidate: C): Promise<InstallOutcomeV1>
+  installedMenu(packageId: string): JSX.Element
+}) {
+  const [busy, setBusy] = createSignal<string[]>([])
+  const [errors, setErrors] = createSignal<Record<string, string>>({})
+  const [installed, setInstalled] = createSignal<Record<string, string>>({})
+  const install = async (candidate: C) => {
+    if (busy().includes(candidate.id)) return
+    setBusy((list) => [...list, candidate.id])
+    setErrors((errors) => ({ ...errors, [candidate.id]: "" }))
+    try {
+      const outcome = await props.install(candidate)
+      if (!outcome.ok) {
+        setErrors((errors) => ({ ...errors, [candidate.id]: outcome.detail }))
+        return
+      }
+      setInstalled((current) => ({ ...current, [candidate.id]: outcome.packageId }))
+    } catch {
+      setErrors((errors) => ({ ...errors, [candidate.id]: t("codepuppy.ext.sourceInstallFailed") }))
+    } finally {
+      setBusy((list) => list.filter((id) => id !== candidate.id))
+    }
+  }
+  return (
         <div class="codepuppy-ext-grid">
-          <For each={candidates()}>
+          <For each={props.candidates}>
             {(candidate) => {
               const packageId = () => candidate.installed?.packageId ?? installed()[candidate.id]
               return (
@@ -107,7 +121,5 @@ export function PluginSourceResults(props: {
             }}
           </For>
         </div>
-      </Show>
-    </section>
   )
 }

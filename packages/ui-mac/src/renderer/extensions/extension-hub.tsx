@@ -25,7 +25,8 @@ import { parseRoute } from "../../shared/route-manifest"
 import { initialDesiredState } from "../../shared/ext-install-policy"
 import { projectLabel } from "../sidebar/route"
 import { subscribeAuthState } from "../auth-recovery"
-import { PluginSourceResults } from "./plugin-source-results"
+import { PluginSourceResults, PluginSourceChoices } from "./plugin-source-results"
+import type { PreparedPluginSourceV1, PreparePluginSourceInputV1 } from "../../main/plugin-sources"
 import { BuiltinControlsPanel } from "./builtin-controls-panel"
 import { catalog, catalogSource, entryVersion, refreshCatalog } from "./catalog-source"
 import { installableCatalogEntries, installableCatalogPackages } from "./catalog-installable-view"
@@ -43,11 +44,9 @@ import {
   hubStateView,
   useExtensions,
   isAuthzRequired,
-  isLocalPluginRoute,
   type ActionResult,
   type CatalogInstallScopeChoice,
   type HubAgent,
-  type LocalPackagePreviewV1,
 } from "./use-extensions"
 import { ExtStandaloneAuthzDialog } from "./ext-authz"
 import { createInstallConfirm, InstallConfirmBody, InstallConfirmFooter } from "./install-confirm"
@@ -476,18 +475,8 @@ export function ExtensionHub(props: {
   const [importInput, setImportInput] = createSignal("")
   const [importBusy, setImportBusy] = createSignal(false)
   const [importErr, setImportErr] = createSignal("")
-  // REQ-128 Phase 3 `#784`:本地 Claude 插件包的预览屏状态。
-  // `previewId` **可能缺席** —— 一个都装不上 / 超预算 / 已装过时 main 不签发预览:
-  // 那种终态仍然要给用户一屏说明,只是没有可确认的东西(确认键保留但禁用,原因写在键面上)。
-  const [localPlugin, setLocalPlugin] = createSignal<{
-    previewId?: string
-    headline: string
-    preview: LocalPackagePreviewV1
-    reasonCode?: string
-  } | null>(null)
-  const [localPluginBusy, setLocalPluginBusy] = createSignal(false)
-  const [localPluginErr, setLocalPluginErr] = createSignal("")
-  /** 刚装完的包 —— 已安装页把它排在最前并挂引导条(裁决 B 之下不引导 = 用户以为没装上)。 */
+  const [marketplace, setMarketplace] = createSignal<Extract<PreparedPluginSourceV1, { kind: "marketplace" }> | null>(null)
+  /** Keep the newly added package visible in the existing installed group. */
   const [highlightPackage, setHighlightPackage] = createSignal<string | null>(null)
   const [packBusy, setPackBusy] = createSignal<string | null>(null)
   const [packErr, setPackErr] = createSignal<Record<string, string>>({})
@@ -505,86 +494,50 @@ export function ExtensionHub(props: {
    *  这条必须留在行上,不能只发一条 toast:用户要的是「那我该怎么办」,而答案是「移除整个包」。 */
   const [rowRefusal, setRowRefusal] = createSignal<Record<string, string>>({})
 
-  const runImportFolder = async () => {
+  const installSourceChoice = async (candidate: { id: string; source?: string }) => {
+    const result = await ext.installFromSource({ requestId: "hub_" + crypto.randomUUID(), source: candidate.source === "catalog" ? { kind: "catalog", catalogId: candidate.id } : { kind: "candidate", candidateId: candidate.id }, effect: { kind: "all-projects" }, via: "hub" })
+    if (result.ok) {
+      setHighlightPackage(result.packageId)
+      await refetchPackages()
+    }
+    return result
+  }
+  const runPrepareSource = async (input: PreparePluginSourceInputV1) => {
+    if (importBusy()) return
     setImportErr("")
     setImportBusy(true)
     try {
-      // REQ-098 #255:main 自弹目录选择器并直接以用户实选目录为来源;renderer 不再传 srcDir。
-      const r = await ext.importSkillFolder()
-      // REQ-128 Phase 3 `#784` 第 1 跳:**按 main 给的 `route` 分流**。
-      // renderer 不判目录形态(它连路径都没有),也不新增第六张卡 —— 同一张「文件夹」卡,
-      // 按下去之后由 main 决定这是一个技能目录还是一个插件目录。
-      if (isLocalPluginRoute(r)) {
-        setLocalPlugin({
-          previewId: r.previewId,
-          headline: r.reason,
-          preview: r.localPluginPreview,
-          reasonCode: r.reasonCode,
-        })
+      const result = await extIpc.preparePluginSource(input)
+      if (!result.ok) {
+        if (!result.canceled) setImportErr(result.detail)
         return
       }
-      // ↓ 非插件目录:**逐字不变**的既有行为(成功 toast / 失败行内红字)。
-      // #336 r1:projectionLag = 本次未注入(重启自愈)—— 不得宣称「当场生效」。
-      if (r.ok) flash(t(r.projectionLag ? "codepuppy.ext.importedPendingRestart" : "codepuppy.ext.imported", { name: r.name ?? "" }), "success")
-      else if (!r.canceled) setImportErr(extensionError(r.reason, "codepuppy.ext.error.importFolder"))
+      if (result.prepared.kind === "marketplace") {
+        setImportDialog(null)
+        setMarketplace(result.prepared)
+        return
+      }
+      const installed = await installSourceChoice({ id: result.prepared.candidateId })
+      if (!installed.ok) {
+        setImportErr(installed.detail)
+        return
+      }
+      setImportDialog(null)
+      flash(t("codepuppy.ext.packageAddedName", { name: installed.displayName }), "success")
+    } catch {
+      setImportErr(t("codepuppy.ext.sourceInstallFailed"))
     } finally {
       setImportBusy(false)
     }
   }
-  // ── `#784` 第 3/4 跳:本地插件包预览屏 ────────────────────────────────────────────────────
-  //
-  // 关掉预览屏 = **取消**,而取消必须真的把 main 侧留存的字节放掉(G19)。
-  //
-  // ⚠️ 这里有一条本 portfolio 栽过的形态:**中止不了却报「已取消」**。
-  // main 在安装已经开跑时会如实拒绝(`install-in-flight`),那批字节仍然算在计量里。
-  // 所以拒绝**不能**被读成成功:界面留在原地、把拒绝写在屏内,而不是先关掉弹窗再飞一条
-  // toast —— 弹窗一关,用户读到的第一件事就是「它取消了」。
-  const closeLocalPlugin = async (): Promise<void> => {
-    const current = localPlugin()
-    if (!current?.previewId) {
-      setLocalPlugin(null)
-      setLocalPluginErr("")
-      return
-    }
-    const released = await ext.localPluginCancel(current.previewId)
-    if (!released.ok) {
-      setLocalPluginErr(released.reasonCode === "install-in-flight" ? t("codepuppy.ext.error.cancelBusy") : extensionError(released.reason, "codepuppy.ext.error.cancelUnknown", released.reasonCode))
-      return
-    }
-    setLocalPlugin(null)
-    setLocalPluginErr("")
+  const sourceInstalledMenu = (packageId: string) => {
+    const state = installedPackages()
+    const pack = state?.ok ? state.packages.find(pack => pack.packageId === packageId) : undefined
+    if (pack) return <InstalledPackageRow pack={pack} />
+    const row = installedAll().find(row => row.receipt.scope === "global" && row.receipt.id === packageId)
+    return row ? <InstalledRow row={row} /> : <p class="codepuppy-ext-dnote">{t("codepuppy.ext.sourceInstallReadPending")}</p>
   }
-  const runConfirmLocalPlugin = async (): Promise<void> => {
-    const current = localPlugin()
-    if (!current?.previewId || localPluginBusy()) return
-    setLocalPluginBusy(true)
-    setLocalPluginErr("")
-    try {
-      const r = await ext.localPluginConfirm(current.previewId)
-      if (!r.ok) {
-        // 「预览过期」「安装中途失败」对用户是同一件事:**一个都没装,盘上没有半成品**。
-        // 措辞里不许出现「已装了 N 个」这种中间态。
-        setLocalPluginErr(extensionError(r.reason, "codepuppy.ext.error.localInstall", r.code))
-        return
-      }
-      setLocalPlugin(null)
-      // 裁决 B:装完默认全关。不跳页的结果是用户按完确认**什么都看不到**,然后判定功能坏了。
-      // 所以确认成功后直接落在连接器页(已装扩展包在它的「已安装」组,`#1594`),新包排最前并写明下一步。
-      // **先切页再重取** —— 包清单的 resource key 里带着 tab,切页本身就是那次重取的触发器。
-      setDetail(null)
-      setHubSection("connectors")
-      setHighlightPackage(r.packageId)
-      await refetchPackages()
-      flash(
-        r.reason === "reload-pending"
-          ? t("codepuppy.ext.localPackageInstalledPendingReload", { count: String(r.installed.length) })
-          : t("codepuppy.ext.localPackageInstalled", { count: String(r.installed.length) }),
-        r.reason === "reload-pending" ? "info" : "success",
-      )
-    } finally {
-      setLocalPluginBusy(false)
-    }
-  }
+  const runImportFolder = () => runPrepareSource({ kind: "folder" })
   // ── `#784` 第 7 跳:整包移除 ─────────────────────────────────────────────────────────────
   const runRemovePackage = async (packageId: string): Promise<void> => {
     if (packBusy() === packageId) return
@@ -616,29 +569,7 @@ export function ExtensionHub(props: {
       setPackBusy(null)
     }
   }
-  const runImportDialog = async () => {
-    const kind = importDialog()
-    const value = importInput().trim()
-    if (!kind || !value) return
-    setImportBusy(true)
-    setImportErr("")
-    try {
-      const r = await ext.importSkillGit(value)
-      if (r.ok) {
-        // #336 r1:projectionLag = 本次未注入(重启自愈)—— 不得宣称「当场生效」。
-        flash(
-          t(r.projectionLag ? "codepuppy.ext.importedPendingRestart" : "codepuppy.ext.imported", { name: (r as { name?: string }).name ?? "" }),
-          "success",
-        )
-        setImportDialog(null)
-        setImportInput("")
-      } else {
-        setImportErr(extensionError(r.reason, "codepuppy.ext.error.importGit"))
-      }
-    } finally {
-      setImportBusy(false)
-    }
-  }
+  const runImportDialog = () => runPrepareSource({ kind: "git", url: importInput().trim() })
 
   // 技能 / 助手页的「推荐 / 系统」分段(批准稿 `#hub-skills`)。
   const [segment, setSegment] = createSignal<"recommended" | "system">("recommended")
@@ -2527,18 +2458,8 @@ export function ExtensionHub(props: {
                 </Show>
                 </>}>
                   <PluginSourceResults query={query().trim()} search={value => extIpc.sourcesSearch(value)}
-                    install={async candidate => {
-                      const result = await ext.installFromSource({ requestId: "hub_" + crypto.randomUUID(), source: candidate.source === "catalog" ? { kind: "catalog", catalogId: candidate.id } : { kind: "candidate", candidateId: candidate.id }, effect: { kind: "all-projects" }, via: "hub" })
-                      if (result.ok) await refetchPackages()
-                      return result
-                    }}
-                    installedMenu={packageId => {
-                      const state = installedPackages()
-                      const pack = state?.ok ? state.packages.find(pack => pack.packageId === packageId) : undefined
-                      if (pack) return <InstalledPackageRow pack={pack} />
-                      const row = installedAll().find(row => row.receipt.scope === "global" && row.receipt.id === packageId)
-                      return row ? <InstalledRow row={row} /> : <p class="codepuppy-ext-dnote">{t("codepuppy.ext.sourceInstallReadPending")}</p>
-                    }} />
+                    install={installSourceChoice}
+                    installedMenu={sourceInstalledMenu} />
                 </Show>
               </Show>
             </div>
@@ -2625,11 +2546,11 @@ export function ExtensionHub(props: {
         >
           <div class="codepuppy-ext-confirm">
             <p class="codepuppy-ext-confirm-desc">
-              {t("codepuppy.ext.importGitHint", { dir: PROJECT_HIDDEN_DIR })}
+              {t("codepuppy.ext.importGitHint")}
             </p>
             <input
               class="codepuppy-ext-input codepuppy-mono"
-              placeholder="https://github.com/user/skill-repo"
+              placeholder="https://github.com/owner/plugin-repository"
               value={importInput()}
               onInput={(ev) => setImportInput(ev.currentTarget.value)}
               onKeyDown={(ev) => {
@@ -2691,182 +2612,8 @@ export function ExtensionHub(props: {
           </div>
         </Dialog>
 
-        {/* ░░ REQ-128 Phase 3 `#784` 第 3 跳:本地插件包预览屏 ░░
-            骨架继承上面那个 agent 两段式预览(取消 / 确认两键,确认之前一个字节都不写盘),
-            尺寸放大到 lg —— 单插件技能数实测最多 13 个,弹窗装得下。
-            内容分三段:会安装 / 不会安装(逐条原因)/ 这一版不安装的内容类型。
-            **每一条「不装」都带具名原因,没有「其他」这一档** —— 原因文案全部由 main 的
-            `reasonCode → 人话` 表给出,renderer 一个字都不自己编,也不把多条折叠成「跳过 N 项」。 */}
-        <Dialog
-          open={!!localPlugin()}
-          onClose={() => void closeLocalPlugin()}
-          besideSidebar
-          size="lg"
-          title={t("codepuppy.ext.localPackageTitle")}
-          dismissible={!localPluginBusy()}
-          restoreFocus={() => hubCloseButton}
-          footer={
-            <>
-              {/* 安装在跑的时候「取消」**照样可点** —— 用户必须有一条出路,而 main 会如实告诉他
-                  这次中止不了。把按钮禁掉等于把那条真话藏起来,用户只会以为界面卡死了。 */}
-              <Button variant="ghost" onClick={() => void closeLocalPlugin()}>
-                {t("codepuppy.ext.cancel")}
-              </Button>
-              {/* 一个都装不上时**保留确认键但禁用**,并把原因写在键面上 —— 这一屏和能装的那一屏
-                  是同一屏,不换成一个「知道了」把它伪装成提示框。 */}
-              <Button
-                variant="primary"
-                disabled={localPluginBusy() || !localPlugin()?.previewId}
-                onClick={() => void runConfirmLocalPlugin()}
-              >
-                {localPluginBusy()
-                  ? t("codepuppy.ext.importing")
-                  : localPlugin()?.previewId
-                    ? t("codepuppy.ext.localPackageConfirm", { count: String(localPlugin()?.preview.installableCount ?? 0) })
-                    : t("codepuppy.ext.localPackageNothingToInstall")}
-              </Button>
-            </>
-          }
-        >
-          <Show when={localPlugin()}>
-            {(pv) => (
-              <div class="codepuppy-ext-confirm" data-local-package-preview={pv().preview.packageId ?? ""}>
-                <p class="codepuppy-ext-confirm-desc">
-                  <b>{pv().preview.name}</b> ·{" "}
-                  {pv().preview.version ? `v${pv().preview.version}` : t("codepuppy.ext.packageNoVersion")} ·{" "}
-                  {t("codepuppy.ext.localPackageFound", { count: String(pv().preview.limits.skillCandidates) })}
-                </p>
-                {/* 这句话不是免责声明,是这个功能的实际保证水平。任何把它改写成
-                    「已检查 / 已验证 / 安全」的措辞都是错的(基线 §8 纪律 3)。 */}
-                <p class="codepuppy-ext-verify-note" data-unreviewed="" role="note">
-                  {t("codepuppy.ext.localPackageUnreviewed")}
-                </p>
-                {/* `#784` R2:名字显示不了(超长 / 带特殊字符)⇒ 在**按确认之前**说清它会怎么显示。
-                    它**不影响能不能装** —— 显示名是可选的、只管显示的;之前它能让整个事务在
-                    落账那一刻回滚,那是「预览说能装、点了确认却失败」。 */}
-                <Show when={pv().preview.displayNameNotice}>
-                  {(notice) => (
-                    <p class="codepuppy-ext-verify-note" data-display-name-notice="" role="note">
-                      {notice()}
-                    </p>
-                  )}
-                </Show>
-                {/* K19:重复导入必须在**按确认之前**说清。说得晚就从提示变成了失败。 */}
-                <Show when={pv().preview.duplicateImportNotice}>
-                  {(notice) => (
-                    <p class="codepuppy-ext-verify-note" data-duplicate-import="" role="alert">
-                      {notice()}
-                    </p>
-                  )}
-                </Show>
-                {/* 一个都装不上 / 结构不认识 / 超出单次导入上限 —— 三种终态共用这一条,
-                    文字全部来自 main 的具名判定,不在这里重新措辞。 */}
-                <Show when={pv().preview.disposition === "blocked" || !pv().previewId}>
-                  <p class="codepuppy-ext-import-err" data-local-package-blocked={pv().preview.blockedReasonCode ?? pv().reasonCode ?? ""} role="alert">
-                    {extensionError(pv().headline, "codepuppy.ext.error.localInstall", pv().reasonCode ?? pv().preview.blockedReasonCode ?? undefined)}
-                  </p>
-                </Show>
-
-                <Show when={pv().preview.components.some((c) => c.disposition === "install")}>
-                  <SecRow
-                    label={t("codepuppy.ext.localPackageWillInstall")}
-                    count={pv().preview.components.filter((c) => c.disposition === "install").length}
-                  />
-                  <div class="codepuppy-ext-manage">
-                    <For each={pv().preview.components.filter((c) => c.disposition === "install")}>
-                      {(component) => (
-                        <div class="codepuppy-ext-man" data-preview-component={component.dir} data-disposition="install">
-                          <div class="codepuppy-ext-man-body">
-                            <div class="codepuppy-ext-man-nm">
-                              <b>{component.name}</b>
-                              <span class="codepuppy-ext-type-pill">{typeLabel("skill")}</span>
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                    </For>
-                  </div>
-                </Show>
-
-                <Show when={pv().preview.components.some((c) => c.disposition === "skip")}>
-                  <SecRow
-                    label={t("codepuppy.ext.localPackageWontInstall")}
-                    count={pv().preview.components.filter((c) => c.disposition === "skip").length}
-                  />
-                  <div class="codepuppy-ext-manage">
-                    <For each={pv().preview.components.filter((c) => c.disposition === "skip")}>
-                      {(component) => (
-                        <div class="codepuppy-ext-man" data-preview-component={component.dir} data-disposition="skip" data-dim="">
-                          <div class="codepuppy-ext-man-body">
-                            <div class="codepuppy-ext-man-nm">
-                              <b>{component.name}</b>
-                              <For each={component.reasonCodes}>
-                                {(code) => (
-                                  <span class="codepuppy-ext-type-pill" data-off="" data-skip-reason={code}>
-                                    {code}
-                                  </span>
-                                )}
-                              </For>
-                            </div>
-                            {/* 逐条人话,与 reasonCodes 同序同长(main 给的,不折叠、不改写)。 */}
-                            <For each={component.reasons}>
-                              {(reason) => <div class="codepuppy-ext-man-st">{reason}</div>}
-                            </For>
-                          </div>
-                        </div>
-                      )}
-                    </For>
-                  </div>
-                </Show>
-
-                <Show when={pv().preview.unsupportedLayouts.length > 0}>
-                  <SecRow label={t("codepuppy.ext.localPackageUnsupportedLayout")} count={pv().preview.unsupportedLayouts.length} />
-                  <div class="codepuppy-ext-manage">
-                    <For each={pv().preview.unsupportedLayouts}>
-                      {(issue) => (
-                        <div class="codepuppy-ext-man" data-unsupported-layout={issue.code} data-dim="">
-                          <div class="codepuppy-ext-man-body">
-                            <div class="codepuppy-ext-man-nm">
-                              <b>{issue.at || pv().preview.name}</b>
-                            </div>
-                            <div class="codepuppy-ext-man-st">{issue.detail}</div>
-                          </div>
-                        </div>
-                      )}
-                    </For>
-                  </div>
-                </Show>
-
-                <Show when={pv().preview.unsupportedComponentTypes.length > 0}>
-                  <SecRow
-                    label={t("codepuppy.ext.localPackageUnsupportedTypes")}
-                    count={pv().preview.unsupportedComponentTypes.length}
-                  />
-                  <div class="codepuppy-ext-manage">
-                    <For each={pv().preview.unsupportedComponentTypes}>
-                      {(item) => (
-                        <div class="codepuppy-ext-man" data-unsupported-type={item.type} data-dim="">
-                          <div class="codepuppy-ext-man-body">
-                            <div class="codepuppy-ext-man-nm">
-                              <b>{item.at}</b>
-                            </div>
-                            <div class="codepuppy-ext-man-st">{item.detail}</div>
-                          </div>
-                        </div>
-                      )}
-                    </For>
-                  </div>
-                </Show>
-
-                <Show when={localPluginErr()}>
-                  <p class="codepuppy-ext-import-err" data-local-package-error="" role="alert">
-                    {localPluginErr()}
-                  </p>
-                </Show>
-                <p class="codepuppy-ext-key-hint">{t("codepuppy.ext.localPackageCancelNote")}</p>
-              </div>
-            )}
-          </Show>
+        <Dialog open={!!marketplace()} onClose={() => setMarketplace(null)} besideSidebar size="lg" title={t("codepuppy.ext.sourceMarketplaceTitle")} restoreFocus={() => hubCloseButton}>
+          <PluginSourceChoices candidates={marketplace()?.entries ?? []} install={installSourceChoice} installedMenu={sourceInstalledMenu} />
         </Dialog>
 
         {/* REQ-033:agent 导入映射预览(显式逐字段;不支持项 loud,确认才写入) */}

@@ -24,7 +24,6 @@ import type {
   InstallReceipt,
   InstallTarget,
   InstalledPackagesResultV1,
-  LocalPackagePreviewV1,
   ProjectMcpState,
   SetStateRefusalCodeWire,
   UninstallKeyIntent,
@@ -116,15 +115,6 @@ export type ActionResult =
 type ExtApi = ElectronAPI["ext"]
 type Awaited1<T> = T extends Promise<infer U> ? U : never
 
-/** main 的「这是一个 Claude 插件目录」判别臂(`ok:false` + `route`)。 */
-export type LocalPluginRoute = Extract<Awaited1<ReturnType<ExtApi["importSkillFolder"]>>, { route: "local-claude-plugin" }>
-export type LocalPluginPreviewFetch = Awaited1<ReturnType<ExtApi["importClaudePluginPreview"]>>
-export type LocalPluginCancelResult = Awaited1<ReturnType<ExtApi["importClaudePluginCancel"]>>
-/** confirm 的成功臂再挂一条 `reason: "reload-pending"` —— 账本已 durable 但引擎这次没重载成功。
- *  **不许**把它读成「已生效」:那正是 `use-extensions.ts` 里那条生产注释说的 placebo 安装。 */
-export type LocalPluginConfirmResult =
-  | (Extract<Awaited1<ReturnType<ExtApi["importClaudePluginConfirm"]>>, { ok: true }> & { reason?: "reload-pending" })
-  | Extract<Awaited1<ReturnType<ExtApi["importClaudePluginConfirm"]>>, { ok: false }>
 export type LocalPackageUninstallResult =
   | (Extract<Awaited1<ReturnType<ExtApi["uninstallPackage"]>>, { ok: true }> & { reloadPending?: true })
   | Extract<Awaited1<ReturnType<ExtApi["uninstallPackage"]>>, { ok: false }>
@@ -143,16 +133,6 @@ export type CatalogInstallIntentV1 = Omit<
 export type CatalogInstallResult =
   | (Extract<InstallCatalogWireResult, { ok: true }> & { reloadPending?: true })
   | Extract<InstallCatalogWireResult, { ok: false }>
-
-/** `route === "local-claude-plugin"` 的类型守卫。**判据是 main 给的 `route` 字段** ——
- *  renderer 一个字都不看目录形态(`#255` 之后它连路径都拿不到)。 */
-export function isLocalPluginRoute(
-  result: LocalPluginRoute | (ActionResult & { name?: string; canceled?: boolean }),
-): result is LocalPluginRoute {
-  return !result.ok && (result as { route?: unknown }).route === "local-claude-plugin"
-}
-
-export type { LocalPackagePreviewV1 }
 
 export const DEFAULT_CATALOG_INSTALL_SCOPE = "global" as const
 export type CatalogInstallScopeChoice = "global" | "project"
@@ -413,20 +393,6 @@ export interface ExtensionsApi {
    * (密钥可重填),见 extension-hub.runUpdate。
    */
   updateEntry(entry: CatalogEntry, authorization?: AuthorizationConfirmationWire): Promise<ActionResult>
-  /** REQ-019 T6 / REQ-098 #255:导入本地技能文件夹(main 自弹选择器,renderer 不传 srcDir)。
-   *  REQ-128 Phase 3 `#784`:选中的若是 Claude 插件目录,main 回 `route: "local-claude-plugin"`
-   *  —— **本方法原样透传那条臂,不折叠**。折叠掉它 = 用户看到一句「导入失败」而真因是
-   *  「这是一个插件目录,请看预览」;分流判据在 main,renderer 只读 `route`。 */
-  importSkillFolder(): Promise<LocalPluginRoute | (ActionResult & { name?: string; canceled?: boolean })>
-  /** `#784` 第 3 跳:按 previewId 取回已签发预览的安全投影(纯读;无路径、无字节)。 */
-  localPluginPreview(previewId: string): Promise<LocalPluginPreviewFetch>
-  /** `#784`:取消预览 ⇒ main 侧留存字节立即释放(G19)。
-   *  **安装已经在跑时它会如实拒绝** —— 调用方必须把那条拒绝呈现成「取消不了」,
-   *  绝不许读成「已取消」(那会让用户以为东西没装进去)。 */
-  localPluginCancel(previewId: string): Promise<LocalPluginCancelResult>
-  /** `#784` 第 4/9 跳:确认安装。**只送 previewId**;成功后刷新账本并请 ext 调度器重载,
-   *  请求没被受理则如实回 `reload-pending`(G20)。 */
-  localPluginConfirm(previewId: string): Promise<LocalPluginConfirmResult>
   /** `#784` 第 6 跳:本机已装扩展包的只读清单(「读不出」与「没装」不折叠)。 */
   listInstalledPackages(): Promise<InstalledPackagesResultV1>
   installFromSource: ExtApi["installFromSource"]
@@ -438,9 +404,6 @@ export interface ExtensionsApi {
    *  今天详情页的 `removePackage` 只 `refetchInstalled()` 不 refresh ⇒ 移除之后技能仍然
    *  能用到下次重启,那正是本方法要消灭的缺陷。 */
   uninstallPackage(packageId: string): Promise<LocalPackageUninstallResult>
-  /** REQ-019 T6:导入 Git 仓库技能(https-only 浅克隆临时目录 → 同校验)。 */
-  importSkillGit(url: string): Promise<ActionResult & { name?: string }>
-  /** REQ-019 T6:npm 插件导入 = 复用 persistPlugin 通道(主进程包名白名单)。 */
   /** REQ-023:安装 catalog 官方 agent(vendored md 资产 → writeAgent 同管线)。 */
   installAgentEntry(entry: CatalogEntry, authorization?: AuthorizationConfirmationWire): Promise<ActionResult>
   /**
@@ -1201,53 +1164,6 @@ export function useExtensions(
     return r
   }
 
-  // REQ-019 T6:导入。成功后刷新账本 + dispose 重载(与 createSkill 同节奏);失败原因原样上抛,
-  // 由 hub 行内呈现(B11)。ADR-040(`#825`):npm 插件导入通道随「扩展安装不得写引擎 plugin[]」退场。
-  async function importSkillFolder(): Promise<LocalPluginRoute | (ActionResult & { name?: string; canceled?: boolean })> {
-    // REQ-098 #255:main 自弹目录选择器,renderer 不再传 srcDir。
-    const r = await extIpc.importSkillFolder()
-    // `#784`:插件目录判别臂**原样上抛**。这里一旦把它折进 `{ok:false, reason}`,
-    // 预览屏就永远打不开 —— 第 1→3 跳会断在这一行,而 typecheck 不会红(reason 都是 string)。
-    if (!r.ok && "route" in r && r.route === "local-claude-plugin") return r
-    if (!r.ok) return r
-    await loadInstalls()
-    // #336 r1:warning/projectionLag 端到端透传(此前重建 {ok,name} 把降级信号吞掉)。
-    const carry = { ...(r.warning ? { warning: r.warning } : {}), ...(r.projectionLag ? { projectionLag: r.projectionLag } : {}) }
-    const requested = await requestReload("global", `imported skill ${r.name}`)
-    void loadHubView()
-    if (!requested) return { ok: true, name: r.name, reason: "reload-pending", ...carry }
-    return { ok: true, name: r.name, ...carry }
-  }
-  // ── REQ-128 Phase 3 `#784`:本地 Claude 插件包的第 3 / 4 / 6 / 7 / 9 跳 ─────────────────────
-  //
-  // 五个方法全部落在这一层(而不是 hub 里逐处调 `extIpc`),理由只有一条:
-  // **重载请求必须只在这里接一次**。逐调用点接一行的形态在本仓已栽三次
-  // (`#765` 的 warning 呈现是同一个故事)—— 枚举对新调用点默认放行,而「默认放行」在这里
-  // 的具体后果是 placebo 安装:账本翻了、盘上有了,引擎实例没重扫,用户下一条消息里什么都没有。
-
-  async function localPluginPreview(previewId: string): Promise<LocalPluginPreviewFetch> {
-    return extIpc.importClaudePluginPreview(previewId)
-  }
-
-  async function localPluginCancel(previewId: string): Promise<LocalPluginCancelResult> {
-    // 取消**不**触发 refresh:什么都没写过,没有可生效的东西。
-    // main 侧安装在跑时会回 `ok:false + install-in-flight`,这里原样上抛 —— 调用方必须
-    // 把它呈现成「取消不了」。界面说了什么,就必须是实际发生的什么。
-    return extIpc.importClaudePluginCancel(previewId)
-  }
-
-  async function localPluginConfirm(previewId: string): Promise<LocalPluginConfirmResult> {
-    const r = await extIpc.importClaudePluginConfirm(previewId)
-    if (!r.ok) return r
-    await loadInstalls()
-    // G20:装完必须让引擎重扫 —— 本地包是 fs 类的 N 倍。REQ-234 `#1529`:请 ext 调度器重载(等会话空闲);
-    // 请求没被受理 ⇒ **如实**回 reload-pending,不谎报「下一条消息里就能用」。
-    const requested = await requestReload("global", `installed local package ${previewId}`)
-    void loadHubView()
-    if (!requested) return { ...r, reason: "reload-pending" }
-    return r
-  }
-
   async function listInstalledPackages(): Promise<InstalledPackagesResultV1> {
     return extIpc.installedPackages()
   }
@@ -1288,16 +1204,6 @@ export function useExtensions(
     return r
   }
 
-  async function importSkillGit(url: string): Promise<ActionResult & { name?: string }> {
-    const r = await extIpc.importSkillGit(url)
-    if (!r.ok) return r
-    await loadInstalls()
-    const carry = { ...(r.warning ? { warning: r.warning } : {}), ...(r.projectionLag ? { projectionLag: r.projectionLag } : {}) }
-    const requested = await requestReload("global", `imported skill ${r.name}`)
-    void loadHubView()
-    if (!requested) return { ok: true, name: r.name, reason: "reload-pending", ...carry }
-    return { ok: true, name: r.name, ...carry }
-  }
   /** REQ-020 T4 / REQ-099 #305:云 pipeline「启用」= receipts-only,切 installCatalog(planner cloud
    *  分支同语义:不触达引擎/文件系统,只落账)。 */
   async function enableCloud(entry: CatalogEntry, authorization?: AuthorizationConfirmationWire): Promise<ActionResult> {
@@ -1341,17 +1247,12 @@ export function useExtensions(
     reloadAgents: loadAgents,
     installPlugin,
     updateEntry,
-    importSkillFolder,
-    localPluginPreview,
-    localPluginCancel,
-    localPluginConfirm,
     listInstalledPackages,
     installFromSource,
     installPackage,
     setPackageState,
     savePackageSecrets,
     uninstallPackage,
-    importSkillGit,
     installAgentEntry,
     installCatalogIntent,
     enableCloud,

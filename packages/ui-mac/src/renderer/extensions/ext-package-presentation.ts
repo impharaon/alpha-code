@@ -19,9 +19,10 @@ const NOT_RUNNING_KEYS = {
   "missing-entry": "codepuppy.ext.packageNotRunningMissing",
 } as const satisfies Record<NotRunningReasonV1, string>
 
-export function pluginSourceLabelKey(source: PluginSourceIdV1) {
+export function pluginSourceLabelKey(source: PluginSourceIdV1 | "local-folder") {
   return ({
     catalog: "codepuppy.ext.packageSourceHub",
+    "local-folder": "codepuppy.ext.packageSourceLocal",
     "claude-marketplace": "codepuppy.ext.packageSourceClaude",
     "codex-marketplace": "codepuppy.ext.packageSourceCodex",
     "opencode-npm": "codepuppy.ext.packageSourceOpenCode",

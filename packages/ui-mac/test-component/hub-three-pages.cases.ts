@@ -164,9 +164,9 @@ Object.defineProperty(window, "api", {
         calls.uninstall.push(intent)
         return { ok: true as const }
       },
-      importSkillFolder: async () => {
+      preparePluginSource: async () => {
         calls.importSkillFolder++
-        return { ok: false as const, canceled: true, reason: "canceled" }
+        return { ok: false as const, canceled: true, detail: "canceled" }
       },
       hubView: async () => ({ directory: "/", rows: hubRows, warnings: [] }),
       reloadRequest: async () => ({ ok: true as const, generation: 1 }),

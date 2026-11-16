@@ -195,4 +195,9 @@ export declare function convertPluginTree(input: Capture): Promise<{
     replacements: ReadonlyMap<RelPath, Uint8Array>;
     privateCredentials: ReadonlyMap<string, Uint8Array>;
 }>;
+/** A registry definition has no plugin tree or executable installation step. */
+export declare function convertMcpServerDefinition(server: Json, source: Source): {
+    package: PluginPackage;
+    privateCredentials: ReadonlyMap<string, Uint8Array>;
+};
 export {};

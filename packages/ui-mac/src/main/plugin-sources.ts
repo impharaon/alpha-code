@@ -2,7 +2,7 @@ import { createHash, randomUUID } from "node:crypto"
 import { posix } from "node:path"
 import { gunzipSync } from "node:zlib"
 import { readMarketplace } from "../shared/host-extension-package-contract/plugin-conversion.mjs"
-import type { Capture, MarketplaceEntry, TreeNode } from "../shared/host-extension-package-contract/plugin-conversion"
+import type { Capture, Json, MarketplaceEntry, TreeNode } from "../shared/host-extension-package-contract/plugin-conversion"
 
 export type PluginSourceIdV1 = "catalog" | "claude-marketplace" | "codex-marketplace" | "opencode-npm" | "mcp-registry"
 export type SourceStatusV1 =
@@ -21,14 +21,20 @@ const MARKETPLACES = [
   { source: "claude-marketplace", ecosystem: "claude", repository: "https://github.com/anthropics/claude-plugins-official", manifest: ".claude-plugin/marketplace.json" },
   { source: "codex-marketplace", ecosystem: "codex", repository: "https://github.com/openai/plugins", manifest: ".agents/plugins/marketplace.json" },
 ] as const
+const MCP_REGISTRY = "https://registry.modelcontextprotocol.io/v0.1/servers"
 type Archive = { commit: string; members: Map<string, { node: TreeNode; bytes?: Uint8Array }> }
+type SourceCandidate = { candidate: CandidateV1 } & (
+  | { kind: "marketplace"; entry: MarketplaceEntry; market: typeof MARKETPLACES[number] }
+  | { kind: "mcp-registry"; serverName: string; version: string }
+)
 
 /** One instance per main-process run; only this owner mints candidate IDs and retains fetched bytes. */
 export function createPluginSources(deps: { catalog: () => Promise<readonly CandidateV1[]>; fetch?: (url: string) => Promise<Response> }) {
-  const candidates = new Map<string, { entry: MarketplaceEntry; candidate: CandidateV1; market: typeof MARKETPLACES[number] }>()
+  const candidates = new Map<string, SourceCandidate>()
   const captures = new Map<string, Promise<Capture>>()
   const archives = new Map<string, Promise<Archive>>()
   const indexes = new Map<string, Promise<ReturnType<typeof readMarketplace>>>()
+  const registryQueries = new Map<string, Promise<ReturnType<typeof registryRecord>[]>>()
   const get = async (url: string) => {
     const response = await (deps.fetch ?? fetch)(url).catch(() => { throw new SourceError("network", "Source request failed") })
     if (!response.ok) throw new SourceError("http", "Source returned HTTP " + response.status)
@@ -53,11 +59,34 @@ export function createPluginSources(deps: { catalog: () => Promise<readonly Cand
     archives.set(key, pending)
     return pending
   }
+  const loadRegistry = (query: string) => {
+    const known = registryQueries.get(query)
+    if (known) return known
+    const pending = (async () => {
+      const records: ReturnType<typeof registryRecord>[] = []
+      const cursors = new Set<string>()
+      let cursor = ""
+      do {
+        const page = registryDocument(await get(MCP_REGISTRY + "?search=" + encodeURIComponent(query) + "&version=latest" + (cursor ? "&cursor=" + encodeURIComponent(cursor) : "")))
+        if (!Array.isArray(page.servers)) throw new SourceError("format", "Registry search has no server records")
+        records.push(...page.servers.map(registryRecord))
+        const next = isRecord(page.metadata) ? page.metadata.nextCursor : undefined
+        if (next !== undefined && typeof next !== "string") throw new SourceError("format", "Registry cursor is invalid")
+        cursor = typeof next === "string" ? next : ""
+        if (cursor && cursors.has(cursor)) throw new SourceError("format", "Registry cursor repeats")
+        if (cursor) cursors.add(cursor)
+      } while (cursor)
+      return [...new Map(records.map((record) => [record.server.name + "@" + record.server.version, record])).values()]
+    })().catch((error: unknown) => { registryQueries.delete(query); throw error })
+    registryQueries.set(query, pending)
+    return pending
+  }
   return {
     async searchSources(query: string): Promise<SourceSearchResultV1> {
-      const [catalog, results] = await Promise.all([
+      const [catalog, results, registry] = await Promise.all([
         Promise.allSettled([deps.catalog()]).then((results) => results[0]!),
         Promise.allSettled(MARKETPLACES.map(loadIndex)),
+        Promise.allSettled([loadRegistry(query)]).then((results) => results[0]!),
       ])
       const local = catalog.status === "fulfilled" ? rank(catalog.value, query) : []
       const source: SourceStatusV1 = catalog.status === "fulfilled"
@@ -80,12 +109,26 @@ export function createPluginSources(deps: { catalog: () => Promise<readonly Cand
             id: "cand_" + randomUUID(), source: market.source, name: entry.name, displayName: entry.name, description: entry.description, kind: "plugin",
             upstream: { repository, ...(entry.source.kind === "path" ? { path: entry.source.path } : { ...(entry.source.path === undefined ? {} : { path: entry.source.path }), ...(entry.source.commit ? { commit: entry.source.commit } : {}) }) },
           }
-          candidates.set(identity, { entry, candidate, market })
+          candidates.set(identity, { kind: "marketplace", entry, candidate, market })
           return [candidate]
         })
         return { status: { source: market.source, status: "ok", matched: available.length, skipped: matches.length - available.length }, candidates: rank(available, query) }
       })
-      return { searchId: "search_" + randomUUID(), query, sources: [source, ...markets.map((market) => market.status)], candidates: [...local, ...markets.flatMap((market) => market.candidates)] }
+      const found = registry.status === "fulfilled" ? registry.value.map((record) => {
+        const identity = "mcp-registry:" + record.server.name + "@" + record.server.version
+        const known = candidates.get(identity)
+        if (known) return known.candidate
+        const candidate: CandidateV1 = { id: "cand_" + randomUUID(), source: "mcp-registry", name: record.server.name, displayName: typeof record.server.title === "string" ? record.server.title : record.server.name,
+          description: typeof record.server.description === "string" ? record.server.description : "", kind: "mcp", publisher: record.publisher,
+          upstream: { serverName: record.server.name, version: record.server.version } }
+        candidates.set(identity, { kind: "mcp-registry", candidate, serverName: record.server.name, version: record.server.version })
+        return candidate
+      }) : []
+      const failure = registry.status === "rejected" ? registry.reason instanceof SourceError ? registry.reason : new SourceError("network", "Registry is unavailable") : undefined
+      const registryStatus: SourceStatusV1 = failure ? { source: "mcp-registry", status: "failed", reason: failure.reason, detail: failure.message } : { source: "mcp-registry", status: "ok", matched: found.length, skipped: 0 }
+      const groups = [{ status: source, candidates: local }, ...markets, { status: registryStatus, candidates: found }]
+        .toSorted((left, right) => PLUGIN_SOURCE_ORDER.indexOf(left.status.source) - PLUGIN_SOURCE_ORDER.indexOf(right.status.source))
+      return { searchId: "search_" + randomUUID(), query, sources: groups.map((group) => group.status), candidates: groups.flatMap((group) => group.candidates) }
     },
     async captureCandidate(candidateId: string): Promise<{ ok: true; capture: Capture } | { ok: false; code: "unknown-id" | "source-unreachable" | "source-changed"; detail: string }> {
       const selected = [...candidates.values()].find((entry) => entry.candidate.id === candidateId)
@@ -93,6 +136,18 @@ export function createPluginSources(deps: { catalog: () => Promise<readonly Cand
       try {
         const known = captures.get(candidateId)
         const pending = known ?? (async () => {
+          if (selected.kind === "mcp-registry") {
+            const locator = MCP_REGISTRY + "/" + encodeURIComponent(selected.serverName) + "/versions/" + encodeURIComponent(selected.version)
+            const record = registryRecord(registryDocument(await get(locator)))
+            if (record.server.name !== selected.serverName || record.server.version !== selected.version) throw new SourceChanged()
+            const bytes = new TextEncoder().encode(JSON.stringify(record.server))
+            const capture: Capture = {
+              source: { kind: "mcp-registry", locator, serverName: selected.serverName, version: selected.version },
+              nodes: [{ kind: "file", path: "server.json", mode: 0o644, bytes: bytes.length, digest: ("sha256:" + createHash("sha256").update(bytes).digest("hex")) as `sha256:${string}` }],
+              readFile: async (path) => { if (path !== "server.json") throw new Error("Captured file is missing"); return bytes },
+            }
+            return capture
+          }
           const source = selected.entry.source
           if (source.kind === "unsupported") throw new SourceError("format", "Source cannot be captured")
           const repository = source.kind === "path" ? selected.market.repository : githubRepository(source.url)!
@@ -142,6 +197,29 @@ class SourceError extends Error {
   constructor(readonly reason: "network" | "http" | "format", message: string) { super(message) }
 }
 class SourceChanged extends Error {}
+
+function registryDocument(bytes: Uint8Array): Record<string, Json> {
+  try {
+    const value: Json = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes))
+    if (isRecord(value)) return value
+  } catch { /* Source status carries a safe format error, never response content. */ }
+  throw new SourceError("format", "Registry response is not readable")
+}
+
+function registryRecord(value: Json): { server: Record<string, Json> & { name: string; version: string }; publisher: NonNullable<CandidateV1["publisher"]> } {
+  if (!isRecord(value) || !isRecord(value.server) || typeof value.server.name !== "string" || typeof value.server.version !== "string" || !value.server.version) throw new SourceError("format", "Registry server identity is invalid")
+  const server = { ...value.server, name: value.server.name, version: value.server.version }
+  const namespace = server.name.split("/")
+  if (namespace.length !== 2 || !namespace[1]) throw new SourceError("format", "Registry namespace is invalid")
+  if (!isRecord(value._meta) || !isRecord(value._meta["io.modelcontextprotocol.registry/official"])) throw new SourceError("format", "Registry publication metadata is missing")
+  const github = namespace[0]!.match(/^io\.github\.([A-Za-z0-9][A-Za-z0-9-]*)$/)
+  const publisher: CandidateV1["publisher"] = github ? { kind: "github", account: github[1]! }
+    : /^(?:[a-z][a-z0-9-]*\.)+[a-z][a-z0-9-]*$/.test(namespace[0]!) ? { kind: "domain", domain: namespace[0]!.split(".").reverse().join(".").replace(/^mcp\./, "") } : undefined
+  if (!publisher) throw new SourceError("format", "Registry namespace is invalid")
+  return { server, publisher }
+}
+
+function isRecord(value: Json | undefined): value is { [key: string]: Json } { return value !== null && typeof value === "object" && !Array.isArray(value) }
 
 function rank(candidates: readonly CandidateV1[], query: string): CandidateV1[] {
   return candidates.filter((entry) => relevance(entry.name, entry.displayName, entry.description, query) > 0)

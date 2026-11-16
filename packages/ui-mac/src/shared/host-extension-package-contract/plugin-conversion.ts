@@ -174,6 +174,70 @@ export async function convertPluginTree(input: Capture): Promise<{ package: Plug
   }
 }
 
+/** A registry definition has no plugin tree or executable installation step. */
+export function convertMcpServerDefinition(server: Json, source: Source): { package: PluginPackage; privateCredentials: ReadonlyMap<string, Uint8Array> } {
+  const name = (object(server) ? string(server.name) : undefined) ?? source.serverName ?? "mcp"
+  const sourceName = name.split("/").at(-1)!
+  const id = "mcp:server.json#" + sourceName
+  const needs = new Map<string, SecretNeed>()
+  const credentials = new Map<string, Uint8Array>()
+  const entries: Entry[] = []
+  const diagnostics: Diagnostic[] = []
+  const fieldText = (field: Record<string, unknown>, pointer: string, label: string): Text => {
+    const context: CredentialContext = { componentId: id, file: "server.json", pointer, sensitive: field.isSecret === true, needs, credentials, replace: () => {} }
+    const value = field.value ?? field.default
+    if (typeof value !== "string") return [{ secret: credentialNeed(label, context) }]
+    if (!object(field.variables)) return credentialText(value, context)
+    const parts: Text[number][] = []
+    let offset = 0
+    for (const match of value.matchAll(/\{([^{}]+)\}/g)) {
+      if (match.index > offset) parts.push(...bindings(value.slice(offset, match.index)))
+      const variable = field.variables[match[1]!]
+      const fallback = object(variable) ? string(variable.value ?? variable.default) : undefined
+      parts.push(...(fallback !== undefined ? credentialText(fallback, { ...context, sensitive: object(variable) && variable.isSecret === true }) : [{ secret: credentialNeed(match[1]!, context) }]))
+      offset = match.index + match[0].length
+    }
+    if (!offset) return credentialText(value, context)
+    if (offset < value.length) parts.push(...bindings(value.slice(offset)))
+    return parts
+  }
+  if (object(server)) {
+    for (const [index, remote] of (Array.isArray(server.remotes) ? server.remotes : []).entries()) {
+      if (!object(remote) || (remote.type !== "streamable-http" && remote.type !== "sse") || typeof remote.url !== "string" || /\{[^}]+\}/.test(remote.url)) continue
+      if (!URL.canParse(remote.url) || !["http:", "https:"].includes(new URL(remote.url).protocol)) continue
+      if (remote.headers !== undefined && (!Array.isArray(remote.headers) || remote.headers.some((header) => !object(header) || typeof header.name !== "string"))) continue
+      const headers = Object.fromEntries((Array.isArray(remote.headers) ? remote.headers as Record<string, Json>[] : []).map((header, headerIndex) => {
+        const value = fieldText(header, "/remotes/" + index + "/headers/" + headerIndex + "/value", String(header.name))
+        return [header.name, header.isSecret === true && String(header.name).toLowerCase() === "authorization" && header.value === undefined ? ["Bearer ", ...value] : value]
+      }))
+      entries.push({ kind: "mcp", id, sourcePath: "server.json", sourceName, transport: remote.type === "sse" ? "sse" : "http", url: [remote.url], headers,
+        ...(!Object.keys(headers).some((key) => /authorization|token|secret|api[_-]?key|cookie/i.test(key)) && needs.size === 0 ? { oauth: mcpLogin(id, sourceName, remote.url) } : {}) })
+      break
+    }
+    if (!entries.length) for (const [index, pkg] of (Array.isArray(server.packages) ? server.packages : []).entries()) {
+      if (!object(pkg) || !["npm", "pypi", "oci"].includes(String(pkg.registryType)) || typeof pkg.identifier !== "string" || !pkg.identifier) continue
+      if (!object(pkg.transport) || pkg.transport.type !== "stdio") continue
+      if (pkg.registryType !== "oci" && typeof pkg.version !== "string") continue
+      if (pkg.runtimeArguments !== undefined && (!Array.isArray(pkg.runtimeArguments) || pkg.runtimeArguments.some((arg) => !object(arg)))) continue
+      if (pkg.environmentVariables !== undefined && (!Array.isArray(pkg.environmentVariables) || pkg.environmentVariables.some((env) => !object(env) || typeof env.name !== "string"))) continue
+      const args = (Array.isArray(pkg.runtimeArguments) ? pkg.runtimeArguments as Record<string, Json>[] : []).flatMap((arg, argIndex): Text[] => [
+        ...(arg.type === "named" && typeof arg.name === "string" ? [[arg.name]] : []),
+        ...(arg.value !== undefined || object(arg.variables) ? [fieldText(arg, "/packages/" + index + "/runtimeArguments/" + argIndex + "/value", string(arg.name) ?? "argument")] : []),
+      ])
+      const command: Text[] = pkg.registryType === "oci" ? [["docker"], ["run"], ["-i"], ["--rm"], ...args, [pkg.identifier]]
+        : pkg.registryType === "npm" ? [["npx"], ["-y"], ...args, [pkg.identifier + "@" + pkg.version]] : [["uvx"], ...args, [pkg.identifier + "==" + pkg.version]]
+      const environment = Object.fromEntries((Array.isArray(pkg.environmentVariables) ? pkg.environmentVariables as Record<string, Json>[] : []).map((env, envIndex) => [env.name, fieldText(env, "/packages/" + index + "/environmentVariables/" + envIndex + "/value", String(env.name))]))
+      entries.push({ kind: "mcp", id, sourcePath: "server.json", sourceName, transport: "stdio", command, environment })
+      break
+    }
+  }
+  if (!entries.length) diagnostics.push({ path: "server.json", code: "invalid-definition", message: "Registry definition has no expressible MCP connection" })
+  return { package: { schema: "codepuppy.plugin-package.v1", provider: "mcp-registry", name: sourceName,
+    ...(object(server) && typeof server.version === "string" ? { version: server.version } : {}),
+    ...(object(server) && typeof server.description === "string" ? { description: server.description } : {}),
+    source, tree: [], treeDigest: sha256(new TextEncoder().encode(canonical([]))), entries, secrets: [...needs.values()], diagnostics }, privateCredentials: credentials }
+}
+
 function marketplaceSource(value: unknown): MarketplaceEntry["source"] {
   if (typeof value === "string") {
     const path = value.replace(/^\.\//, "").replace(/\/$/, "")
@@ -218,7 +282,7 @@ function mcpEntry(definition: { name: string; path: string; pointer: string; val
   const headers = Object.fromEntries(Object.entries(stringMap(value.headers) ? value.headers : {}).map(([key, part]) => [key, text(part, definition.pointer + "/headers/" + escapePointer(key), /authorization|token|secret|api[_-]?key|cookie/i.test(key))]))
   const oauth = object(value.oauth) ? value.oauth : undefined
   const login: LoginNeed = {
-    id: "login_" + sha256(new TextEncoder().encode(id)).slice(7, 23), componentId: id, kind: "mcp-oauth", required: false, serviceId: definition.name, serverUrl: value.url,
+    ...mcpLogin(id, definition.name, value.url),
     ...(oauth || typeof value.oauth_resource === "string" ? { oauth: {
       ...(typeof (oauth?.clientId ?? oauth?.client_id) === "string" ? { clientId: String(oauth?.clientId ?? oauth?.client_id) } : {}),
       ...(typeof (oauth?.clientSecret ?? oauth?.client_secret) === "string" ? { clientSecret: text(String(oauth?.clientSecret ?? oauth?.client_secret), definition.pointer + (typeof oauth?.clientSecret === "string" ? "/oauth/clientSecret" : "/oauth/client_secret"), true) } : {}),
@@ -230,15 +294,23 @@ function mcpEntry(definition: { name: string; path: string; pointer: string; val
   return { ...base, transport: value.type === "sse" ? "sse" : "http", url: bindings(value.url), headers, ...(value.oauth === false ? { oauth: false } : !Object.keys(headers).some((key) => /authorization|token|secret|api[_-]?key|cookie/i.test(key)) || oauth ? { oauth: login } : {}) }
 }
 
-function credentialText(value: string, context: { componentId: string; file: string; pointer: string; sensitive: boolean; needs: Map<string, SecretNeed>; credentials: Map<string, Uint8Array>; replace(value: string): void }): Text {
-  const need = (label: string, literal?: string) => {
-    const id = "need_" + sha256(new TextEncoder().encode(context.componentId + "\0" + label)).slice(7, 23)
-    const existing = context.needs.get(id) ?? { id, componentId: context.componentId, label, targets: [] }
-    if (!existing.targets.some((target) => target.file === context.file && target.pointer === context.pointer)) existing.targets.push({ file: context.file, pointer: context.pointer })
-    context.needs.set(id, existing)
-    if (literal !== undefined) context.credentials.set(id, new TextEncoder().encode(literal))
-    return id
-  }
+function mcpLogin(componentId: string, serviceId: string, serverUrl: string): LoginNeed {
+  return { id: "login_" + sha256(new TextEncoder().encode(componentId)).slice(7, 23), componentId, kind: "mcp-oauth", required: false, serviceId, serverUrl }
+}
+
+type CredentialContext = { componentId: string; file: string; pointer: string; sensitive: boolean; needs: Map<string, SecretNeed>; credentials: Map<string, Uint8Array>; replace(value: string): void }
+
+function credentialNeed(label: string, context: CredentialContext, literal?: string): string {
+  const id = "need_" + sha256(new TextEncoder().encode(context.componentId + "\0" + label)).slice(7, 23)
+  const existing = context.needs.get(id) ?? { id, componentId: context.componentId, label, targets: [] }
+  if (!existing.targets.some((target) => target.file === context.file && target.pointer === context.pointer)) existing.targets.push({ file: context.file, pointer: context.pointer })
+  context.needs.set(id, existing)
+  if (literal !== undefined) context.credentials.set(id, new TextEncoder().encode(literal))
+  return id
+}
+
+function credentialText(value: string, context: CredentialContext): Text {
+  const need = (label: string, literal?: string) => credentialNeed(label, context, literal)
   const pieces: Text[number][] = []
   let offset = 0
   for (const match of value.matchAll(/\$\{([A-Za-z_][\w]*)(?::-[^}]*)?\}|\$([A-Za-z_][\w]*)|\{([A-Za-z_][\w]*)\}|<([A-Za-z_][\w]*)>/g)) {

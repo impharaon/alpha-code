@@ -5,6 +5,7 @@ import { gunzipSync } from "node:zlib"
 import { readMarketplace, convertPluginTree, convertMcpServerDefinition } from "../shared/host-extension-package-contract/plugin-conversion.mjs"
 import type { Capture, Json, MarketplaceEntry, Source, TreeNode, PluginPackage, Text } from "../shared/host-extension-package-contract/plugin-conversion"
 
+import type { PackageGraphAnnotationsV1 } from "../shared/plugin-install"
 import type { PackageAcceptedFactsV1 } from "./package-installability"
 import { SKILL_MD_PATH } from "../shared/host-extension-package-contract/decoder"
 
@@ -44,7 +45,7 @@ type CatalogContents = Pick<PackageAcceptedFactsV1, "envelope"> & { components: 
 type CatalogComparison = { catalogId: string; packageId: string; version: string; runtimeIdentity: string }
 
 /** One instance per main-process run; only this owner mints candidate IDs and retains fetched bytes. */
-export function createPluginSources(deps: { catalog: () => Promise<readonly CandidateV1[]>; catalogPackage?: (id: string, version?: string) => Promise<CatalogContents | undefined>; fetch?: (url: string) => Promise<Response> }) {
+export function createPluginSources(deps: { catalog: () => Promise<readonly CandidateV1[]>; catalogPackage?: (id: string, version?: string) => Promise<CatalogContents | undefined>; installed?: () => readonly { packageId: string; name: string; enabled: boolean; runtimeIdentity?: string }[]; fetch?: (url: string) => Promise<Response> }) {
   const searches = new Map<string, readonly SourceStatusV1[]>()
   const candidates = new Map<string, SourceCandidate>()
   const captures = new Map<string, Promise<Capture>>()
@@ -329,6 +330,7 @@ export function createPluginSources(deps: { catalog: () => Promise<readonly Cand
       const groups = [{ status: source, candidates: local }, ...markets, { status: registryStatus, candidates: found }, { status: npmStatus, candidates: rank(npmFound, query) }]
         .toSorted((left, right) => PLUGIN_SOURCE_ORDER.indexOf(left.status.source) - PLUGIN_SOURCE_ORDER.indexOf(right.status.source))
       const ordered = groups.flatMap((group) => group.candidates)
+      const installed = deps.installed?.() ?? []
       for (const [index, candidate] of ordered.entries()) {
         if (candidate.source === "catalog") continue
         delete candidate.sameAs
@@ -342,6 +344,14 @@ export function createPluginSources(deps: { catalog: () => Promise<readonly Cand
           candidate.sameAs = entry.sameAs ?? entry.id
           break
         }
+      }
+      for (const candidate of ordered) {
+        delete candidate.installed
+        const direct = installed.find(item => item.packageId === candidate.id)
+        const possible = installed.filter(item => item.runtimeIdentity && item.name.toLowerCase() === candidate.name.toLowerCase())
+        const converted = !direct && possible.length ? await convertCandidate(candidate.id) : undefined
+        const match = direct ?? (converted?.ok ? possible.find(item => item.runtimeIdentity === converted.runtimeIdentity) : undefined)
+        if (match) candidate.installed = { packageId: match.packageId, enabled: match.enabled }
       }
       const result = { searchId: "search_" + randomUUID(), query, sources: groups.map((group) => group.status), candidates: ordered }
       searches.set(result.searchId, result.sources.map((source) => ({ ...source })))
@@ -366,6 +376,15 @@ export function pluginRuntimeIdentity(pkg: PluginPackage): string | undefined {
     const endpoint = entry.transport === "stdio" ? stdioIdentity(entry.command) : literal(entry.url)
     return endpoint ? [entry.transport, endpoint, entry.transport === "stdio" ? [] : Object.keys(entry.headers)] : undefined
   }), pkg.entries.filter((entry) => entry.kind === "skill").map((entry) => entry.sourceName))
+}
+
+/** Shared installed identity projection for deduplication and read-only search presentation. */
+export function installedPackageIdentity(graph: PackageGraphAnnotationsV1 & { root: { name: string } }) {
+  const name = graph.source?.kind === "marketplace" ? graph.source.entryName
+    : graph.source?.kind === "npm" ? graph.source.name
+    : graph.source?.kind === "mcp-registry" ? graph.source.serverName.split("/").at(-1)!
+    : graph.root.name
+  return { name, runtimeIdentity: graph.declarations ? packageDeclarationRuntimeIdentity(name, graph.declarations) : undefined }
 }
 
 /** Installed sanitized declarations use the same identity implementation as captured definitions. */

@@ -429,6 +429,7 @@ export interface ExtensionsApi {
   localPluginConfirm(previewId: string): Promise<LocalPluginConfirmResult>
   /** `#784` 第 6 跳:本机已装扩展包的只读清单(「读不出」与「没装」不折叠)。 */
   listInstalledPackages(): Promise<InstalledPackagesResultV1>
+  installFromSource: ExtApi["installFromSource"]
   installPackage: ExtApi["installPackage"]
   setPackageState: ExtApi["setPackageState"]
   savePackageSecrets: ExtApi["savePackageSecrets"]
@@ -1251,6 +1252,12 @@ export function useExtensions(
     return extIpc.installedPackages()
   }
 
+  async function installFromSource(request: Parameters<ExtApi["installFromSource"]>[0]) {
+    const result = await extIpc.installFromSource(request)
+    if (result.ok) await Promise.all([loadInstalls(), loadHubView(), loadStatus(), loadAgents()])
+    return result
+  }
+
   async function installPackage(packageId: string) {
     const result = await extIpc.installPackage(packageId)
     if (result.ok) await Promise.all([loadInstalls(), loadHubView(), loadStatus(), loadAgents()])
@@ -1339,6 +1346,7 @@ export function useExtensions(
     localPluginCancel,
     localPluginConfirm,
     listInstalledPackages,
+    installFromSource,
     installPackage,
     setPackageState,
     savePackageSecrets,

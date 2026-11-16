@@ -42,7 +42,7 @@ import { runCatalogInstallWithPackagePreflight } from "./package-installability"
 import { capabilitiesForCatalogEntry } from "../shared/ext-capability-authorization"
 import { FACTORY_SKILL_IDS } from "./factory-skills"
 import { releaseOfficialConnectorResources } from "./official-connector-resources"
-import { allPluginSourcesSucceeded, packageDeclarationRuntimeIdentity, type createPluginSources } from "./plugin-sources"
+import { allPluginSourcesSucceeded, installedPackageIdentity, packageDeclarationRuntimeIdentity, type createPluginSources } from "./plugin-sources"
 
 type Dependencies = Pick<
   PlannerDeps,
@@ -115,16 +115,7 @@ export function createSourceInstaller(deps: Dependencies) {
         before.packageGraphs.find(
           (graph) =>
             graph.declarations &&
-            packageDeclarationRuntimeIdentity(
-              graph.source?.kind === "marketplace"
-                ? graph.source.entryName
-                : graph.source?.kind === "npm"
-                  ? graph.source.name
-                  : graph.source?.kind === "mcp-registry"
-                    ? graph.source.serverName.split("/").at(-1)!
-                    : graph.root.name,
-              graph.declarations,
-            ) === identity &&
+            installedPackageIdentity(graph).runtimeIdentity === identity &&
             (graph.packageId !== sameSource?.packageId || graph.envelopeDigest === converted.package.treeDigest),
         )
       if (duplicate) return outcomeOf(duplicate, true)

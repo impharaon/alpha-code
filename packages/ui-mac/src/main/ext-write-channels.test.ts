@@ -151,7 +151,7 @@ describe("GATED_WRITE_CHANNELS — 表完整性", () => {
   // `#1529`:三档状态的读面与「记阶段」面是表外通道 —— 账本待恢复时状态照样要看得到、确认框照样要能记阶段。
   // 把它们挪进写表(或反过来把重载请求挪出写表),这条立刻红。
   test("定制中心状态面两条表外通道:内容逐名钉死,与写表、纯读表都**互斥**", () => {
-    expect(Object.values(HUB_READ_CHANNELS)).toEqual(["ext-hub-view", "ext-hub-request"])
+    expect(Object.values(HUB_READ_CHANNELS)).toEqual(["ext-hub-view", "ext-hub-request", "ext-sources-search"])
     const write = new Set<string>(Object.values(GATED_WRITE_CHANNELS))
     const localRead = new Set<string>(Object.values(LOCAL_PACKAGE_READ_CHANNELS))
     for (const name of Object.values(HUB_READ_CHANNELS)) {
@@ -434,7 +434,7 @@ test("真实 catalog MCP 写通道结果只公开状态且不回显提交的 sec
   // 子串匹配会在用例数增减时假绿。七条子用例:enabled / installedDisabled 两条返回分支,加 #702 的 detail 通道注册、package 预检接线、browse 数据源,
   // 加 `#1529` 的 I4(IPC 与 parentPort 同档)与 A3(main-owned submitted ⇒ committed),
   // 加 `#1531` 的项目作用域重载请求与 agent 安装金丝雀端到端(生产 ext codepuppy_hub_install × 真 main 分发)。
-  expect(output).toMatch(/\b9 pass\b/)
+  expect(output).toMatch(/\b11 pass\b/)
   expect(output).toMatch(/\b0 fail\b/)
 }, 120_000)
 

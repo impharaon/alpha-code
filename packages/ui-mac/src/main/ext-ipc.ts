@@ -91,7 +91,7 @@ import { getLogger } from "./logging"
 import { resolveVerifiedPackageV1, runCatalogInstallWithPackagePreflight } from "./package-installability"
 import { readPackageAuthorizationV1, savePackageSecretsV1, type PackageAdmissionDeps, createPackageAdmissionCoordinator } from "./package-admission"
 import { createPackageMcpOauthEngineV1 } from "./package-mcp-oauth"
-import { createPluginSources } from "./plugin-sources"
+import { createPluginSources, installedPackageIdentity } from "./plugin-sources"
 import { createSourceInstaller, installCatalogFromSource } from "./install-from-source"
 import { createPackageDeclarationResolver } from "./package-declarations"
 import { applyPackageMcpV1, removePackageMcpV1 } from "./package-mcp-activation"
@@ -1158,6 +1158,14 @@ export function registerExtIpcHandlers(
     }
   }
   const pluginSources = createPluginSources({
+    installed: () => {
+      const state = readPackageLedgerStateV1(codepuppyGlobalRoot(), { sideEffectFree: true })
+      if (!state.ok) return []
+      return [
+        ...state.packageGraphs.map(graph => ({ packageId: graph.packageId, ...installedPackageIdentity(graph), enabled: state.records.find(record => record.kind === graph.root.kind && record.name === graph.root.name)?.desiredState === "enabled" })),
+        ...state.records.map(record => ({ packageId: record.id, name: record.name, enabled: record.desiredState === "enabled" })),
+      ]
+    },
     catalog: async () => {
       const catalog = await resolveEffectiveCatalog()
       return [...catalog.entries.map((entry) => ({ id: entry.id, source: "catalog" as const, name: entry.name, displayName: entry.displayName, description: entry.description, kind: entry.type === "mcp" ? "mcp" as const : "plugin" as const, upstream: { version: entry.version } })), ...(catalog.packages ?? []).map((entry) => ({ id: entry.catalogId, source: "catalog" as const, name: entry.presentation.displayName, displayName: entry.presentation.displayName, description: entry.presentation.description, kind: "plugin" as const, upstream: { version: entry.presentation.version } }))]
@@ -1580,6 +1588,10 @@ export function registerExtIpcHandlers(
   ipcMain.handle(HUB_READ_CHANNELS.hubView, (_event: IpcMainInvokeEvent, directory?: unknown) =>
     hubView.view(typeof directory === "string" ? directory : undefined),
   )
+  ipcMain.handle(HUB_READ_CHANNELS.sourcesSearch, (_event: IpcMainInvokeEvent, query: unknown) => {
+    if (typeof query !== "string") throw Error("Invalid source query")
+    return pluginSources.searchSources(query)
+  })
   ipcMain.handle(HUB_READ_CHANNELS.hubRequest, (_event: IpcMainInvokeEvent, requestId: unknown) => isHubRequestId(requestId) ? hubRequests.get(requestId) : null)
   const codepuppySidecarHost: CodePuppySidecarHost = createCodePuppySidecarHost({
     view: hubView,

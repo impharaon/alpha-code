@@ -418,7 +418,7 @@ test("AC2 每页只有标题、一行副标题、搜索框和「添加 ▾」;�
     click(q(`[data-tab="${key}"]`))
     await waitFor(() => expect(q(".codepuppy-ext-pagehd .codepuppy-ext-sub")?.textContent).toBe(zh[sub]))
     const head = q(".codepuppy-ext-pagehd")!
-    expect(q<HTMLInputElement>("input[type='search']", head)?.placeholder).toBe(zh[placeholder])
+    expect(q<HTMLInputElement>("input[type='search']", head)?.placeholder).toBe(zh["codepuppy.ext.sourceSearchPlaceholder"])
     expect(q("[data-more='add']", head)?.textContent).toBe(`${zh["codepuppy.ext.add"]} ▾`)
     // 页上不再有筛选条、说明框;技能页「推荐 / 系统」两个分段都看一遍。
     for (const segment of key === "connectors" ? [null] : ["recommended", "system"]) {

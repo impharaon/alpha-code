@@ -25,6 +25,7 @@ import { parseRoute } from "../../shared/route-manifest"
 import { initialDesiredState } from "../../shared/ext-install-policy"
 import { projectLabel } from "../sidebar/route"
 import { subscribeAuthState } from "../auth-recovery"
+import { PluginSourceResults } from "./plugin-source-results"
 import { BuiltinControlsPanel } from "./builtin-controls-panel"
 import { catalog, catalogSource, entryVersion, refreshCatalog } from "./catalog-source"
 import { installableCatalogEntries, installableCatalogPackages } from "./catalog-installable-view"
@@ -2333,7 +2334,7 @@ export function ExtensionHub(props: {
                     </span>
                     <input
                       type="search"
-                      placeholder={t(currentTab().searchKey as never)}
+                      placeholder={t("codepuppy.ext.sourceSearchPlaceholder")}
                       value={query()}
                       onInput={(ev) => setQuery(ev.currentTarget.value)}
                     />
@@ -2351,6 +2352,7 @@ export function ExtensionHub(props: {
                   <p class="codepuppy-ext-dnote">{t("codepuppy.ext.importing")}</p>
                 </Show>
 
+                <Show when={searching()} fallback={<>
                 {/* ░░ 连接器 ░░ */}
                 <Show when={section() === "connectors"}>
                   {/* T3:存量迁移条(仅门控开启且检测到旧安装时;不碰用户自建内容) */}
@@ -2522,6 +2524,21 @@ export function ExtensionHub(props: {
                       flash={flash}
                     />
                   </Show>
+                </Show>
+                </>}>
+                  <PluginSourceResults query={query().trim()} search={value => extIpc.sourcesSearch(value)}
+                    install={async candidate => {
+                      const result = await ext.installFromSource({ requestId: "hub_" + crypto.randomUUID(), source: candidate.source === "catalog" ? { kind: "catalog", catalogId: candidate.id } : { kind: "candidate", candidateId: candidate.id }, effect: { kind: "all-projects" }, via: "hub" })
+                      if (result.ok) await refetchPackages()
+                      return result
+                    }}
+                    installedMenu={packageId => {
+                      const state = installedPackages()
+                      const pack = state?.ok ? state.packages.find(pack => pack.packageId === packageId) : undefined
+                      if (pack) return <InstalledPackageRow pack={pack} />
+                      const row = installedAll().find(row => row.receipt.scope === "global" && row.receipt.id === packageId)
+                      return row ? <InstalledRow row={row} /> : <p class="codepuppy-ext-dnote">{t("codepuppy.ext.sourceInstallReadPending")}</p>
+                    }} />
                 </Show>
               </Show>
             </div>

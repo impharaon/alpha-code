@@ -1,3 +1,4 @@
+import type { PluginSourceIdV1 } from "../../main/plugin-sources"
 import type {
   CatalogPackageActionKindV1,
   CatalogPackageComponentV1,
@@ -18,23 +19,24 @@ const NOT_RUNNING_KEYS = {
   "missing-entry": "codepuppy.ext.packageNotRunningMissing",
 } as const satisfies Record<NotRunningReasonV1, string>
 
+export function pluginSourceLabelKey(source: PluginSourceIdV1) {
+  return ({
+    catalog: "codepuppy.ext.packageSourceHub",
+    "claude-marketplace": "codepuppy.ext.packageSourceClaude",
+    "codex-marketplace": "codepuppy.ext.packageSourceCodex",
+    "opencode-npm": "codepuppy.ext.packageSourceOpenCode",
+    "mcp-registry": "codepuppy.ext.packageSourceOfficialMcp",
+  } as const)[source]
+}
+
 /** Display-only graph projection; package names and prefixes never establish provenance. */
 export function installedPackagePresentation(pack: Pick<InstalledPackageV1, "source" | "origin" | "notRunning">) {
   const source = pack.source
-  const sourceKey =
-    source?.kind === "marketplace"
-      ? source.ecosystem === "claude"
-        ? "codepuppy.ext.packageSourceClaude"
-        : "codepuppy.ext.packageSourceCodex"
-      : source?.kind === "npm"
-        ? "codepuppy.ext.packageSourceOpenCode"
-        : source?.kind === "mcp-registry"
-          ? "codepuppy.ext.packageSourceOfficialMcp"
-          : source?.kind === "created"
-            ? "codepuppy.ext.packageSourceMine"
-            : source?.kind === "catalog" || (!source && pack.origin === "catalog")
-              ? "codepuppy.ext.packageSourceHub"
-              : "codepuppy.ext.packageSourceLocal"
+  const sourceKey = source?.kind === "created" ? "codepuppy.ext.packageSourceMine"
+    : !source ? pack.origin === "catalog" ? pluginSourceLabelKey("catalog") : "codepuppy.ext.packageSourceLocal"
+    : source.kind === "local-folder" ? "codepuppy.ext.packageSourceLocal"
+    : pluginSourceLabelKey(source.kind === "marketplace" ? source.ecosystem === "claude" ? "claude-marketplace" : "codex-marketplace" : source.kind === "npm" ? "opencode-npm" : source.kind)
+
   return {
     sourceKey,
     sourceDetail:

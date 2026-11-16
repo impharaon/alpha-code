@@ -293,6 +293,8 @@ const api: ElectronAPI = {
     reloadRequest: (input) => ipcRenderer.invoke("ext-reload-request", input),
     hubView: (directory) => ipcRenderer.invoke("ext-hub-view", directory),
     hubRequest: (requestId) => ipcRenderer.invoke("ext-hub-request", requestId),
+    sourcesSearch: (query) => ipcRenderer.invoke("ext-sources-search", query),
+    installFromSource: (request) => ipcRenderer.invoke("ext-install-from-source", request),
     onHubViewChanged: (cb) => {
       const handler = () => cb()
       ipcRenderer.on("ext-hub-view-changed", handler)

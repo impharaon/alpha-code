@@ -61,6 +61,7 @@ export const GATED_WRITE_CHANNELS = {
 export const HUB_READ_CHANNELS = {
   hubView: "ext-hub-view",
   hubRequest: "ext-hub-request",
+  sourcesSearch: "ext-sources-search",
 } as const
 
 /**

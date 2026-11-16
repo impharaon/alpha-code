@@ -1,3 +1,4 @@
+import type { PackageAuthorizationResultV1 } from "../shared/package-admission"
 import { isInstallOutcomeV1, type InstallOutcomeV1, type CreatedPluginDraftV1 } from "../shared/plugin-install"
 import type { SourceSearchResultV1, CandidateV1, SourceStatusV1 } from "./plugin-sources"
 
@@ -141,8 +142,12 @@ export type HubInstallReply =
   | { type: "codepuppy.hub.install.reply"; id: number; accepted: true }
   | { type: "codepuppy.hub.install.reply"; id: number; error: "invalid" | "unavailable" }
 
+export type PackageAuthorizationQuery = { type: "codepuppy.package.authorization.request"; id: number; packageId: string }
+export type PackageAuthorizationReply = { type: "codepuppy.package.authorization.reply"; id: number; result: PackageAuthorizationResultV1 }
+
 export type CodePuppySidecarInbound =
   | HubViewRequestMessage
+  | PackageAuthorizationQuery
   | HubRequestQueryMessage
   | ReloadReportMessage
   | UnattendedAck
@@ -150,6 +155,7 @@ export type CodePuppySidecarInbound =
   | HubInstallRequest
 export type CodePuppySidecarOutbound =
   | ReloadRequestMessage
+  | PackageAuthorizationReply
   | HubViewReplyMessage
   | HubRequestReplyMessage
   | UnattendedLive
@@ -195,6 +201,9 @@ function parseReloadItems(value: unknown): ReloadItem[] | undefined {
 /** main 侧:ext → main 的封闭消息族。别的一律 undefined(含 main → ext 的方向)。 */
 export function parseCodePuppySidecarInbound(value: unknown): CodePuppySidecarInbound | undefined {
   if (!isRecord(value)) return
+  if (value.type === "codepuppy.package.authorization.request")
+    return isId(value.id) && isText(value.packageId) && Object.keys(value).every(key => ["type", "id", "packageId"].includes(key))
+      ? buildPackageAuthorizationQuery(value.id, value.packageId) : undefined
   if (value.type === "codepuppy.sources.search.request")
     return isId(value.id) && typeof value.directory === "string" && typeof value.query === "string"
       ? buildSourcesSearchRequest({ id: value.id, directory: value.directory, query: value.query })
@@ -634,4 +643,34 @@ export function parseSourcesSearchReply(input: unknown): SourcesSearchReply | un
       candidates: result.candidates as CandidateV1[],
     },
   })
+}
+
+export function buildPackageAuthorizationQuery(id: number, packageId: string): PackageAuthorizationQuery {
+  return { type: "codepuppy.package.authorization.request", id, packageId }
+}
+
+export function buildPackageAuthorizationReply(id: number, result: PackageAuthorizationResultV1): PackageAuthorizationReply {
+  return { type: "codepuppy.package.authorization.reply", id, result: result.ok ? {
+    ok: true, packageId: result.packageId, items: result.items.map(item => ({
+      kind: item.kind, componentId: item.componentId, prerequisiteId: item.prerequisiteId, serviceName: item.serviceName, label: item.label,
+      ...(item.kind === "secret" ? { saved: item.saved } : item.kind === "mcp-oauth" ? { authenticated: item.authenticated, status: item.status } : { ready: item.ready }),
+    })) as Extract<PackageAuthorizationResultV1, { ok: true }>["items"],
+  } : { ok: false, reason: result.reason } }
+}
+
+export function parsePackageAuthorizationReply(value: unknown): PackageAuthorizationReply | undefined {
+  if (!isRecord(value) || value.type !== "codepuppy.package.authorization.reply" || !isId(value.id) || Object.keys(value).some(key => !["type", "id", "result"].includes(key))) return
+  const result = value.result
+  if (!isRecord(result)) return
+  if (result.ok === false && typeof result.reason === "string" && Object.keys(result).every(key => ["ok", "reason"].includes(key)))
+    return buildPackageAuthorizationReply(value.id, { ok: false, reason: result.reason })
+  if (result.ok !== true || !isText(result.packageId) || !Array.isArray(result.items) || Object.keys(result).some(key => !["ok", "packageId", "items"].includes(key))) return
+  for (const item of result.items) {
+    if (!isRecord(item) || !["componentId", "prerequisiteId", "serviceName", "label"].every(key => typeof item[key] === "string")) return
+    const fields = item.kind === "secret" && typeof item.saved === "boolean" ? ["saved"]
+      : item.kind === "mcp-oauth" && typeof item.authenticated === "boolean" && typeof item.status === "string" ? ["authenticated", "status"]
+      : item.kind === "connection" && typeof item.ready === "boolean" ? ["ready"] : undefined
+    if (!fields || Object.keys(item).some(key => !["kind", "componentId", "prerequisiteId", "serviceName", "label", ...fields].includes(key))) return
+  }
+  return buildPackageAuthorizationReply(value.id, result as Extract<PackageAuthorizationResultV1, { ok: true }>)
 }

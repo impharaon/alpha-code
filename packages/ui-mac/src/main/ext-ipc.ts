@@ -1471,6 +1471,12 @@ export function registerExtIpcHandlers(
   const codepuppySidecarHost: CodePuppySidecarHost = createCodePuppySidecarHost({
     view: hubView,
     requests: hubRequests,
+    packageAuthorization: async (packageId) => {
+      await ledgerReady
+      const state = readPackageLedgerStateV1(codepuppyGlobalRoot(), { sideEffectFree: true })
+      if (!state.ok || !state.packageGraphs.some(graph => graph.packageId === packageId)) return { ok: false, reason: "Unknown installed package" }
+      return readPackageAuthorizationV1(packageId, packageAdmissionDeps)
+    },
     searchSources: (query) => pluginSources.searchSources(query),
     install: async (request) => {
       const source = request.ref.kind === "created"

@@ -21,6 +21,7 @@ function bridgeWith(script: { views: HubView[]; record?: HubRequestRecord | null
   const calls = { view: [] as unknown[], request: [] as string[] }
   const bridge: HubBridge = {
     available: true,
+    packageAuthorization: async (packageId) => ({ ok: true, packageId, items: [] }),
     unattended: createUnattendedState(),
     search: async () => ({ ok: true, result: { searchId: "search_main", query: "", sources: [], candidates: [] } }),
     install: async () => ({ ok: true, accepted: true }),

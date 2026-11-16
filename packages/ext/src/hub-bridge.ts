@@ -1,3 +1,4 @@
+import type { PackageAuthorizationResultV1 } from "../../ui-mac/src/shared/package-admission"
 import type { SourceSearchResultV1 } from "../../ui-mac/src/main/plugin-sources"
 import { PLUGIN_SOURCE_SEARCH_REPLY_TIMEOUT_MS } from "../../ui-mac/src/shared/plugin-source-timing"
 // hub-bridge — REQ-234 `#1531`(基线 docs/design/2026-10-14-req234-hub-agent-install-baseline.md §2.2 / §2.6)。
@@ -15,6 +16,8 @@ import { PLUGIN_SOURCE_SEARCH_REPLY_TIMEOUT_MS } from "../../ui-mac/src/shared/p
 
 import { createUnattendedState } from "./policy/unattended"
 import {
+  buildPackageAuthorizationQuery,
+  parsePackageAuthorizationReply,
   buildUnattendedAck,
   buildSourcesSearchRequest,
   buildHubInstallRequest,
@@ -51,6 +54,7 @@ export type HubBridge = {
   search(input: { directory: string; query: string }): Promise<{ ok: true; result: SourceSearchResultV1 } | BridgeFailure>
   install(input: Omit<HubInstallRequest, "type" | "id">): Promise<{ ok: true; accepted: true } | BridgeFailure>
   request(requestId: string): Promise<{ ok: true; record: HubRequestRecord | null } | BridgeFailure>
+  packageAuthorization(packageId: string): Promise<PackageAuthorizationResultV1 | BridgeFailure>
   report(input: { generation: number; scope: ReloadScope; outcome: ReloadOutcome; directories: string[]; error?: string }): void
   /** main → ext 的重载请求交给谁。只能挂一个(调度器);挂上之前到达的请求按序缓存,挂上时补交。 */
   onReloadRequest(handler: (message: ReloadRequestMessage) => void): void
@@ -152,6 +156,7 @@ export function createHubBridge(
             : { ok: false as const, reason: "error" as const, detail: "the app could not read the request" }
         },
       ),
+    packageAuthorization: (packageId) => ask((id) => buildPackageAuthorizationQuery(id, packageId), (message) => parsePackageAuthorizationReply(message)?.result),
     report(input) {
       if (!port) return
       try {

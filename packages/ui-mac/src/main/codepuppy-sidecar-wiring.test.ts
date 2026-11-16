@@ -132,7 +132,7 @@ test("真 host + 真协调器:阶段查询经子进程往返;退出 ⇒ pendingF
   const canary = "SIDE_CAR_REJECTED_SECRET_CANARY_a23f"
   let finish!: (outcome: import("../shared/plugin-install").InstallOutcomeV1) => void
   const installing = new Promise<import("../shared/plugin-install").InstallOutcomeV1>(resolve => { finish = resolve })
-  const host = createCodePuppySidecarHost({
+  const host = createCodePuppySidecarHost({ packageAuthorization: async () => ({ ok: false, reason: "not installed" }),
     view: { view: async () => ({ directory: "/w", rows: [], warnings: [] }), viewForAgent: async () => ({ directory: "/w", rows: [], warnings: [] }) },
     requests,
     searchSources: async () => ({ searchId: "search_unused", query: "", sources: [], candidates: [] }),

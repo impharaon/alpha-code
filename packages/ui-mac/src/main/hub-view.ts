@@ -1,3 +1,4 @@
+import type { PackageAuthorizationResultV1 } from "../shared/package-admission"
 import type { InstallOutcomeV1 } from "../shared/plugin-install"
 import type { SourceSearchResultV1 } from "./plugin-sources"
 import { unattendedRuns } from "./codepuppy-unattended"
@@ -40,6 +41,7 @@ import { readPackageLedgerStateV1 } from "./ext-receipt-v2"
 import { packageAppliesAt } from "./package-mcp-activation"
 import { LEGACY_PROTECTED_OWNER, standaloneOwner, type PackageGraphV1 } from "./ext-package-ledger-v3"
 import {
+  buildPackageAuthorizationReply,
   AGENT_NOTE_DENIED,
   AGENT_NOTE_UNVERIFIED,
   buildHubRequestReply,
@@ -499,6 +501,7 @@ export type CodePuppySidecarHost = {
 export function createCodePuppySidecarHost(deps: {
   view: HubViewService
   requests: HubRequestStages
+  packageAuthorization(packageId: string): Promise<PackageAuthorizationResultV1>
   searchSources(query: string): Promise<SourceSearchResultV1>
   install(request: HubInstallRequest): Promise<InstallOutcomeV1>
   reloads: ReloadCoordinator
@@ -517,6 +520,10 @@ export function createCodePuppySidecarHost(deps: {
       const inbound = parseCodePuppySidecarInbound(message)
       if (!inbound) {
         deps.log(`alpha sidecar: dropped malformed or unknown message type=${String((message as { type: unknown }).type).slice(0, 80)}`)
+        return true
+      }
+      if (inbound.type === "codepuppy.package.authorization.request") {
+        deps.packageAuthorization(inbound.packageId).then(result => reply(post, buildPackageAuthorizationReply(inbound.id, result)), () => reply(post, buildPackageAuthorizationReply(inbound.id, { ok: false, reason: "Package authorization is unavailable" })))
         return true
       }
       if (inbound.type === "codepuppy.sources.search.request") {

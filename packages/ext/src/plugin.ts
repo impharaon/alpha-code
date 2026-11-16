@@ -40,6 +40,9 @@ import { createCodePuppyTools } from "./codepuppy-tools"
 import { agentSampling, applyAgents, applyProjectMcp, commandDefinitions, removeAgents } from "./engine-transforms"
 import { postActivationTail } from "./post-activation-tail"
 import type { AgentEditor } from "@opencode/plugin/promise/agent"
+import type { SkillEditor } from "@opencode/plugin/promise/skill"
+import { readPackageAllowSet } from "./gen-skill-paths"
+import { managedSkillAllowedHere, managedSkillIdentity, scopedPackageAllowedHere } from "./package-scope"
 import { modelFacts } from "./model-facts"
 import { createCloudVisionHooks } from "./cloud-vision-hooks"
 import { createAttachmentReaderHooks } from "./attachment-reader-hooks"
@@ -135,6 +138,10 @@ export const CodePuppyExt: Plugin.Plugin = {
         return identity.status === "project" ? identity : null
       }
       const project = projectRootFor(directory)
+      const skillAllowed = (skill: { path: string }) => {
+        const managed = managedSkillIdentity(skill.path, bootstrap.paths.globalRoot)
+        return !managed || managedSkillAllowedHere(managed, readPackageAllowSet(bootstrap.paths.globalRoot), projectRootFor(directory)?.directory)
+      }
 
       // #223 R7:MCP 治理归属是**本 Location** 的状态 —— 由本 Location 的 mcp.transform 写、显式传给本 Location 的执行钩子;
       // 模块侧不留可变状态(I2 的进程级对象里只有桥与调度器)。没算出来 = 没有治理 server = 豁免不给(fail-closed)。
@@ -340,6 +347,13 @@ export const CodePuppyExt: Plugin.Plugin = {
         let merged = true
         try {
           applyProjectMcp(editor, extConfig().mcp, error)
+          const allowSet = readPackageAllowSet(bootstrap.paths.globalRoot)
+          for (const entry of allowSet?.scoped ?? []) {
+            if (entry.kind !== "mcp") continue
+            editor.update(entry.name, (config) => {
+              config.disabled = !scopedPackageAllowedHere("mcp", entry.name, allowSet, projectRootFor(directory)?.directory)
+            })
+          }
         } catch (cause) {
           merged = false
           error(`[@codepuppy/ext] project MCP merge failed: ${describe(cause)}`)
@@ -400,9 +414,13 @@ export const CodePuppyExt: Plugin.Plugin = {
       await context.skill.transform((editor) => {
         for (const id of factoryDeniedSkills()) editor.remove(id)
       })
-      await context.permission.hook("evaluate", (event) => {
+      await context.permission.hook("evaluate", async (event) => {
         if (event.action === "skill" && event.resources.some((id) => factoryDeniedSkills().includes(id)))
           event.effect = "deny"
+        if (event.action === "skill") {
+          const skills = (await context.skill.list()).data
+          if (skills.some((skill) => event.resources.includes(skill.id) && !skillAllowed(skill))) event.effect = "deny"
+        }
       })
 
       // ── 会话事件(P12):状态变了 ⇒ 调度器重判 ───────────────────────────────────────────────
@@ -456,6 +474,17 @@ export const CodePuppyExt: Plugin.Plugin = {
         signal: providerTail.signal,
       })
       void agentTail.settle().catch((cause) => error(`[@codepuppy/ext] disabled project agents not removed: ${describe(cause)}`))
+      const skillTail = postActivationTail<SkillEditor>({
+        transform: (callback) => context.skill.transform(callback),
+        apply: (editor) => {
+          for (const skill of editor.list()) if (!skillAllowed(skill)) editor.remove(skill.id)
+        },
+        activePlugins,
+        log,
+        unplaced: "managed skills remain subject to the permission membership check",
+        signal: providerTail.signal,
+      })
+      void skillTail.settle().catch((cause) => error(`[@codepuppy/ext] package skill scope tail not placed: ${describe(cause)}`))
       const tail = providerAllowTail({
         transform: (callback) => context.provider.transform(callback),
         activePlugins,
@@ -465,7 +494,7 @@ export const CodePuppyExt: Plugin.Plugin = {
       })
       void tail.settle().catch((cause) => error(`[@codepuppy/ext] provider allow list not placed: ${describe(cause)}`))
       void (async () => {
-        for await (const _ of context.event.subscribe({ types: ["plugin.updated"], signal: providerTail.signal })) await Promise.all([tail.place(), agentTail.place()])
+        for await (const _ of context.event.subscribe({ types: ["plugin.updated"], signal: providerTail.signal })) await Promise.all([tail.place(), agentTail.place(), skillTail.place()])
       })().catch((cause) => {
         if (!providerTail.signal.aborted) error(`[@codepuppy/ext] plugin event subscription ended: ${describe(cause)}`)
       })

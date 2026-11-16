@@ -67,11 +67,18 @@ export function createSourceInstaller(deps: Dependencies) {
       const project = request.effect?.kind === "project" ? projectScopeIdentity(request.effect.directory) : undefined
       if (project && !project.ok)
         return { ok: false, code: "transaction-failed", detail: project.reason }
+      const projectMatches = () => {
+        if (!project?.ok || request.effect?.kind !== "project") return true
+        const current = projectScopeIdentity(request.effect.directory)
+        return current.ok && current.scope.projectPathHash === project.scope.projectPathHash
+      }
       if (request.source.kind === "catalog") return deps.catalogInstall(request.source.catalogId, request)
       if (request.source.kind !== "candidate")
         return { ok: false, code: "unknown-id", detail: "Source is not an issued candidate" }
       const converted = await deps.sources.convertCandidate(request.source.candidateId)
       if (!converted.ok) return converted
+      if (!projectMatches())
+        return { ok: false, code: "transaction-failed", detail: "Project identity changed during source capture" }
       const captured = { capture: converted.capture }
       const before = readPackageLedgerStateV1(deps.globalRoot(), { sideEffectFree: true })
       if (!before.ok)
@@ -373,6 +380,7 @@ export function createSourceInstaller(deps: Dependencies) {
           },
           probe: builds[0]!.probe,
           precondition: () => {
+            if (!projectMatches()) return { ok: false, reason: "Project identity changed during installation" }
             const current = readPackageLedgerStateV1(deps.globalRoot(), { sideEffectFree: true })
             if (!current.ok || canonicalJson(current.packageGraphs) !== canonicalJson(before.packageGraphs))
               return { ok: false, reason: "Package installation state changed" }

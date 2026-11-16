@@ -1,3 +1,5 @@
+import { isAbsolute, join, relative, sep } from "node:path"
+
 export type PackageAllowSetV2 = {
   v: 2
   keys: string[]
@@ -33,6 +35,12 @@ export function managedSkillAllowedHere(
 ): boolean {
   if (!allowSet) return false
   return allowSet.keys.includes(skill.key) || scopedPackageAllowedHere("skill", skill.name, allowSet, projectRoot)
+}
+
+export function managedSkillIdentity(path: string, globalRoot: string) {
+  const parts = relative(join(globalRoot, "ext-store"), path).split(sep)
+  if (isAbsolute(parts[0]!) || !/^skill--[a-zA-Z0-9][a-zA-Z0-9._-]*$/.test(parts[0]!) || parts[1] !== "generations" || parts.length < 4) return
+  return { key: parts[0]!, name: parts[0]!.slice("skill--".length) }
 }
 
 function object(input: unknown): input is Record<string, unknown> {

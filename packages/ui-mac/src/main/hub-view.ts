@@ -36,7 +36,9 @@ import type { EngineConnection } from "./engine-authorization"
 import type { CatalogEntry } from "../renderer/extensions/catalog-types"
 import { installableCatalogEntries, installableCatalogPackages } from "../renderer/extensions/catalog-installable-view"
 import type { CatalogPackageViewV1 } from "../shared/catalog-package-view"
-import { readPackageGraphs } from "./ext-receipt-v2"
+import { readPackageLedgerStateV1 } from "./ext-receipt-v2"
+import { packageAppliesAt } from "./package-mcp-activation"
+import { LEGACY_PROTECTED_OWNER, standaloneOwner, type PackageGraphV1 } from "./ext-package-ledger-v3"
 import {
   AGENT_NOTE_DENIED,
   AGENT_NOTE_UNVERIFIED,
@@ -177,10 +179,7 @@ export function skillActionFor(name: string, agentRules: readonly Rule[], sessio
   return rule?.effect ?? "ask"
 }
 
-function packageRowsFor(views: CatalogPackageViewV1[], rows: HubViewRow[], globalRoot: string, warnings: string[]): HubViewRow[] {
-  const graphsRead = readPackageGraphs(globalRoot)
-  if (!graphsRead.ok) warnings.push(`package ledger unreadable: ${graphsRead.reason}`)
-  const graphs = graphsRead.ok ? graphsRead.packageGraphs : []
+function packageRowsFor(views: CatalogPackageViewV1[], rows: HubViewRow[], graphs: PackageGraphV1[], directory: string): HubViewRow[] {
   const definitions = views.map((view) => ({
     id: view.catalogId, name: view.catalogId, kind: "package", displayName: view.presentation.displayName, description: view.presentation.description,
     authorization: view.prerequisites.items.length ? "secret:" + view.prerequisites.items.map((item) => item.prerequisiteId).sort().join(",") : "none",
@@ -198,6 +197,8 @@ function packageRowsFor(views: CatalogPackageViewV1[], rows: HubViewRow[], globa
       row: rows.find((row) => row.scope === "global" && row.kind === node.kind && row.name === node.name),
     }))
     const enabled = components.every((component) => component.row?.enabled === true)
+    if (!packageAppliesAt(graph, directory))
+      return { ...base, scope: "global", installed: true, enabled, state: "installed", stateReason: { code: "not-loaded", detail: "This package applies to another project" } }
     const blocking = components.find((component) => component.row?.state !== "available")
     if (!blocking) return { ...base, scope: "global", installed: true, enabled, state: "available" }
     const label = `${blocking.node.kind} ${blocking.node.name}`
@@ -356,6 +357,9 @@ export function createHubViewService(deps: HubViewDeps): HubViewService {
     const entries = catalog?.entries ?? []
     const byId = new Map(entries.map((entry) => [entry.id, entry] as const))
     const installable = new Set(installableCatalogEntries(entries, deps.advisoryBlocked()).map((entry) => entry.id))
+    const state = readPackageLedgerStateV1(deps.globalRoot(), { sideEffectFree: true })
+    if (!state.ok) warnings.push(`package ledger unreadable: ${state.reason}`)
+    const graphs = state.ok ? state.packageGraphs : []
     const reads = engineReads(directory)
     const pending = deps.pendingFor(directory)
 
@@ -383,6 +387,10 @@ export function createHubViewService(deps: HubViewDeps): HubViewService {
             return { ...base, installed: true, enabled: row.activation !== "disabled", state: "reload-pending", stateReason: connectorPending }
           if (row.activation === "disabled")
             return { ...base, installed: true, enabled: false, state: "installed", stateReason: { code: "disabled" } }
+          const owners = graphs.filter((graph) => [graph.root, ...graph.children].some((node) => node.kind === row.kind && node.name === row.name))
+          const independent = state.ok && state.claims.some((claim) => claim.kind === row.kind && claim.name === row.name && claim.owners.some((owner) => owner === LEGACY_PROTECTED_OWNER || owner === standaloneOwner(row.kind, row.name)))
+          if (!independent && owners.length && owners.every((graph) => !packageAppliesAt(graph, directory)))
+            return { ...base, installed: true, enabled: true, state: "installed", stateReason: { code: "not-loaded", detail: "This package applies to another project" } }
           const verdict = await verify(row, directory, project, reads)
           if (verdict.ok) return { ...base, installed: true, enabled: true, state: "available" }
           // 云条目没有重载环节(基线 §2.5 云行):最高 installed,原因说清缺的是连接还是工具。重载修不好的(要授权 / 没有
@@ -399,8 +407,8 @@ export function createHubViewService(deps: HubViewDeps): HubViewService {
     const packageRows = packageRowsFor(
       installableCatalogPackages(catalog?.packages ?? [], entries, deps.advisoryBlocked()),
       rows,
-      deps.globalRoot(),
-      warnings,
+      graphs,
+      directory,
     )
     return { view: { directory, rows: [...rows, ...packageRows], warnings }, reads }
   }

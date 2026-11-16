@@ -1,9 +1,12 @@
 import { readFileSync } from "node:fs"
+import { readPackageAllowSet } from "../../../ext/src/gen-skill-paths"
+import { scopedPackageAllowedHere } from "../../../ext/src/package-scope"
+import { projectDirectoryIdentity } from "../../../ext/src/project-config"
 import { projectServerConfig } from "../../../ext/src/engine-transforms"
 import type { EngineConnection } from "./engine-authorization"
 import { engineClient } from "./engine-client"
 import { readMcpLeafStrict } from "./ext-config"
-import { readPackageLedgerStateV1 } from "./ext-receipt-v2"
+import { projectScopeIdentity, readPackageLedgerStateV1 } from "./ext-receipt-v2"
 import type { PackageGraphV1 } from "./ext-package-ledger-v3"
 
 export type PackageMcpActivationV1 = { directory: string; name: string; status: string; detail?: string }
@@ -32,18 +35,24 @@ export async function applyPackageMcpV1(
     return (
       await Promise.all(
         directories
-          .filter((target) => packageAppliesAt(graph, target))
           .map(async (target) => {
             const location = { directory: target }
             return Promise.all(
               names.map(async (name): Promise<PackageMcpActivationV1> => {
                 try {
-                  if (!enabled) {
+                  const project = graph?.effect ? projectDirectoryIdentity(target) : undefined
+                  const activeHere = enabled && packageAppliesAt(graph, target) && (
+                    !graph?.effect || scopedPackageAllowedHere(
+                      "mcp", name, readPackageAllowSet(deps.root()),
+                      project?.status === "project" ? project.directory : undefined,
+                    )
+                  )
+                  if (!activeHere) {
                     const servers = (await client.mcp.list({ location })).data
                     if (servers.some((server) => server.name === name))
                       await client.experimental.mcp.disconnect({ server: name, location })
                   }
-                  if (enabled) {
+                  if (activeHere) {
                     const leaf = readMcpLeafStrict(name)
                     if (!leaf.ok || !leaf.value)
                       return {
@@ -60,7 +69,8 @@ export async function applyPackageMcpV1(
                         status: "failed",
                         detail: "Installed connector definition is invalid",
                       }
-                    await client.experimental.mcp.add({ server: name, config, location })
+                    await client.experimental.mcp.add({ server: name, config: { ...config, disabled: false }, location })
+                    await client.experimental.mcp.connect({ server: name, location })
                   }
                   const server = (await client.mcp.list({ location })).data.find((server) => server.name === name)
                   return {
@@ -105,7 +115,7 @@ export async function removePackageMcpV1(
   const client = engineClient(await awaitServer())
   for (const target of [
     ...new Set([directory, ...(await client.debug.location.list()).map((location) => location.directory)]),
-  ].filter((target) => packageAppliesAt(graph, target))) {
+  ]) {
     const location = { directory: target }
     const servers = (await client.mcp.list({ location })).data
     for (const node of [graph.root, ...graph.children].filter(
@@ -116,7 +126,11 @@ export async function removePackageMcpV1(
 }
 
 export function packageAppliesAt(graph: Pick<PackageGraphV1, "effect"> | undefined, directory: string): boolean {
-  return graph?.effect === undefined || graph.effect.projectPath === directory
+  if (!graph?.effect) return true
+  const project = projectDirectoryIdentity(directory)
+  if (project.status !== "project") return false
+  const identity = projectScopeIdentity(project.directory)
+  return identity.ok && identity.scope.projectPath === graph.effect.projectPath && identity.scope.projectPathHash === graph.effect.projectPathHash
 }
 
 function resolveFileReferences(value: Record<string, unknown>): Record<string, unknown> {

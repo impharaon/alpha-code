@@ -216,6 +216,12 @@ export function InstalledPackageDetail(props: {
         <h3>{t("codepuppy.ext.packageAbout")}</h3>
         <div class="codepuppy-settings-row">
           <div class="codepuppy-settings-row-copy">
+            <strong>{t("codepuppy.ext.packageEffect")}</strong>
+            <small>{t(props.pack.effect ? "codepuppy.ext.packageEffectProject" : "codepuppy.ext.packageEffectAll")}</small>
+          </div>
+        </div>
+        <div class="codepuppy-settings-row">
+          <div class="codepuppy-settings-row-copy">
             <strong>{t("codepuppy.ext.packageIncludes")}</strong>
             <small>
               {[...new Set(props.pack.components.map((component) => component.kind))]

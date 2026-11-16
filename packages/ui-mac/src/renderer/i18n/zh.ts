@@ -1,4 +1,7 @@
 export const dict = {
+  "codepuppy.ext.packageEffect": "生效范围",
+  "codepuppy.ext.packageEffectAll": "我的所有项目",
+  "codepuppy.ext.packageEffectProject": "仅当前项目",
   "codepuppy.timeline.hub.searching": "正在查找 {{name}}",
   "codepuppy.timeline.hub.installing": "正在安装 {{name}}",
   "codepuppy.timeline.hub.added": "已添加『{{name}}』",

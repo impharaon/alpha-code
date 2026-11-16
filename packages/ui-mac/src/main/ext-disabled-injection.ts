@@ -12,7 +12,7 @@
 
 import { codepuppyGlobalRoot } from "./codepuppy-installs"
 import { readSessionGrantIdsSync, type SessionGrantOracle } from "./ext-curation-policy"
-import { readLedgerV2 } from "./ext-receipt-v2"
+import { readPackageLedgerStateV1 } from "./ext-receipt-v2"
 import type { ChannelName } from "./catalog-channels"
 import { NEUTRALIZED_MCP_SERVER, readCodePuppyMcpServers } from "./mcp-default-deny"
 import { tryCodePuppyBootstrap } from "@opencode/util/codepuppy-bootstrap"
@@ -27,7 +27,10 @@ export function injectDisabledOverrides(
   },
 ): void {
   try {
-    const { records } = readLedgerV2(codepuppyGlobalRoot())
+    const state = readPackageLedgerStateV1(codepuppyGlobalRoot(), { sideEffectFree: true })
+    if (!state.ok) throw Error(state.reason)
+    const records = state.records
+    const projectMcp = new Set(state.packageGraphs.filter((graph) => graph.effect).flatMap((graph) => [graph.root, ...graph.children].filter((node) => node.kind === "mcp").map((node) => node.name)))
     // r1-4:oracle 不可判定 ≠ 空集 —— 注入面尽力强制随包可识别子集并 loud;fail-closed 权威
     // 在 boot reconcile(不可判定 + 存在已启用 catalog 记录 = enforcementGap 阻断 sidecar,
     // 本函数在被阻断时根本不会执行到)。
@@ -50,7 +53,7 @@ export function injectDisabledOverrides(
     for (const r of records) {
       if (r.scope.kind !== "global") continue
       const sessionGrantForced = r.desiredState !== "disabled" && sessionGrantIds.has(r.id)
-      if (r.desiredState !== "disabled" && !sessionGrantForced) continue
+      if (r.desiredState !== "disabled" && !sessionGrantForced && !(r.kind === "mcp" && projectMcp.has(r.name))) continue
       if (sessionGrantForced)
         console.error(
           `[req104-397] ${r.kind} "${r.name}" is session-grant per curation but the ledger says enabled — forcing disabled in injection (persistent enable is illegal; per-session activation = #408)`,

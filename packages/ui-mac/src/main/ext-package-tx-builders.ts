@@ -1,3 +1,4 @@
+import type { PackageEffectV1 } from "../shared/plugin-install"
 import { isOfficialConnector } from "./official-connector-recipes"
 import { officialConnectorConfig, prepareOfficialConnector } from "./official-connector-resources"
 // ext-package-tx-builders — REQ-128 #705:把「一个已接受的 package 组件 → 一次事务里的那几条 item」
@@ -147,6 +148,7 @@ export type AgentTxBuildInputV1 = CommonInput & { asset?: Buffer; agentEntry?: R
  *  `{template, description?, agent?, model?, subtask?}`。本层不解释其内容,只落 config。 */
 export type CommandTxBuildInputV1 = CommonInput & { commandEntry?: Record<string, unknown> }
 export type McpTxBuildInputV1 = CommonInput & {
+  effect?: PackageEffectV1
   userDataPath: string
   /** 用户本次提交的密钥明文(只在 populate 闭包内用,不进描述符、不进 receipt)。 */
   secretValues: Record<string, string>
@@ -411,7 +413,7 @@ export function buildMcpTxItems(input: McpTxBuildInputV1): PackageTxBuildResultV
         edits: [
           {
             keyPath: ["mcp", input.name],
-            value: receipt.desiredState === "disabled" ? { ...config, enabled: false } : config,
+            value: input.effect || receipt.desiredState === "disabled" ? { ...config, enabled: false } : config,
           },
         ],
       },

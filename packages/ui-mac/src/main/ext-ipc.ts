@@ -82,7 +82,7 @@ import type { CatalogPackageViewV1 } from "../shared/catalog-package-view"
 import { isHubRequestId, parseReloadScope, type ReloadItem } from "./codepuppy-sidecar-messages"
 import { packageVersionFromRecordsV1 } from "./ext-package-lifecycle"
 import { tryAcquireBundleLock } from "./ext-bundle-lock"
-import { lookupForUninstall, migrateV1Ledger, parseUninstallLedgerKey, readLedgerV2, readPackageLedgerStateV1, removeRecordV2 } from "./ext-receipt-v2"
+import { lookupForUninstall, migrateV1Ledger, parseUninstallLedgerKey, projectScopeIdentity, readLedgerV2, readPackageLedgerStateV1, removeRecordV2 } from "./ext-receipt-v2"
 import { commitTransactionLedger } from "./ext-package-ledger-commit"
 import { packagedSeedBrowseView, readPackagedSeed } from "./ext-seed"
 import { releaseCodePuppyConnectionBindingsV1 } from "./codepuppy-connection-store"
@@ -405,6 +405,7 @@ export function registerExtIpcHandlers(
         version: packageVersionFromRecordsV1(graph, state.records),
         origin: recordOf(graph.root.kind, graph.root.name)?.origin ?? null,
         ...(graph.source ? { source: graph.source } : {}),
+        ...(graph.effect ? { effect: graph.effect } : {}),
         ...(graph.notRunning ? { notRunning: graph.notRunning } : {}),
         components: [graph.root, ...graph.children].map((node) => ({
           componentId: node.componentId,
@@ -1189,10 +1190,12 @@ export function registerExtIpcHandlers(
       const planner = plannerDeps()
       const legacy = await planner.resolveEntry(catalogId)
       const packaged = !legacy
+      const effect = request.effect.kind === "project" ? projectScopeIdentity(request.effect.directory) : undefined
+      if (effect && !effect.ok) return { ok: false, code: "transaction-failed", detail: effect.reason }
       const result = await runCatalogInstallWithPackagePreflight({ catalogId, scope: { scope: "global" }, ...(packaged ? { attemptId: request.requestId } : { authorization: { confirmed: legacy ? { [`${legacy.entry.type}--${legacy.entry.name}`]: capabilitiesForCatalogEntry(legacy.entry) } : {} } }) }, {
         loadVerifiedCatalog: packageAdmissionDeps.loadVerifiedCatalog,
         installLegacy: (intent) => installCatalog(intent, planner),
-        installPackage: () => installDesktopPackageV1(catalogId, { ...packageAdmissionDeps, advisoryGate: planner.advisoryGate, resolvePackage: planner.resolvePackage }),
+        installPackage: () => installDesktopPackageV1(catalogId, { ...packageAdmissionDeps, advisoryGate: planner.advisoryGate, resolvePackage: planner.resolvePackage, ...(effect?.ok ? { effect: effect.scope } : {}) }),
       })
       if (!result.ok) return { ok: false, code: "transaction-failed", detail: "Catalog entry could not be installed" }
       const state = readPackageLedgerStateV1(codepuppyGlobalRoot(), { sideEffectFree: true })

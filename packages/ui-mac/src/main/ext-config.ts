@@ -31,7 +31,7 @@ import {
 } from "./codepuppy-mcp-secrets"
 import type { TxPreparedResourceV1 } from "./ext-transaction"
 import { codepuppyGlobalRoot } from "./codepuppy-installs"
-import { findRecordV2 } from "./ext-receipt-v2"
+import { findRecordV2, readPackageLedgerStateV1 } from "./ext-receipt-v2"
 import { codepuppyJsoncPath, classifyProviderKey, PROVIDER_KEYCHAIN_MARKER, type ProviderKeyKind } from "./engine-config-truth"
 import { sealEnginePluginAdditions } from "./engine-plugin-seal"
 import { commandHeadBase } from "./platform"
@@ -481,7 +481,21 @@ export function persistMcp(name: string, server: Record<string, unknown>, meta?:
     if (name === CLOUD_MCP_SERVER_NAME) return { ok: false, reason: `server name "${CLOUD_MCP_SERVER_NAME}" is reserved by the platform cloud MCP` }
     const record = remoteRecordFromLeaf(name, server)
     if (!record.ok) return record
-    const cleared = withConfigWriteLock(() => removeMcpLeafCopiesUnlocked(name))
+    const cleared = withConfigWriteLock(() => {
+      const state = readPackageLedgerStateV1(codepuppyGlobalRoot(), { sideEffectFree: true })
+      if (!state.ok) return state
+      const projectOnly = state.packageGraphs.some((graph) => graph.effect && [graph.root, ...graph.children].some((node) => node.kind === "mcp" && node.name === name))
+      if (!projectOnly) return removeMcpLeafCopiesUnlocked(name)
+      // Replace the primary copy atomically with the scope override; never publish an enabled gap.
+      const target = mcpPluginTargetPath()
+      const kept = writeKeyUnlocked(target, ["mcp", name], { enabled: false })
+      if (!kept.ok) return kept
+      for (const legacy of legacyConfigPaths(target)) {
+        const removed = removeMcpLeafFromExistingFile(legacy, name)
+        if (!removed.ok) return removed
+      }
+      return { ok: true as const }
+    })
     if (!cleared.ok) return cleared
     return upsertMcpServerRecord(record.record)
   }

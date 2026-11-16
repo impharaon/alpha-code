@@ -22,6 +22,7 @@ export type { SessionGrantsEndedEventWire } from "../shared/ext-session-grant-wi
 import type { ArtifactDescriptor } from "../shared/cloud-artifact-descriptor"
 import type { NetFailureLayer } from "@opencode/schema/codepuppy-net-failure"
 import type { ToolPolicyApi } from "../shared/tool-policy-wire"
+import type { PackageEffectV1 } from "../shared/plugin-install"
 import type { CatalogPackageViewV1 } from "../shared/catalog-package-view"
 import type { OfficeRuntimeReadiness } from "../shared/office-advisories"
 import type { AttachmentReader, AttachmentStageResult } from "../shared/attachment-path"
@@ -642,6 +643,7 @@ export type InstalledPackageV1 = {
   origin: string | null
   /** Safe graph presentation fields supplied by the source installation lane. */
   source?: PackageSourceV1
+  effect?: PackageEffectV1
   notRunning?: PackageNotRunningV1[]
   components: InstalledPackageComponentV1[]
 }

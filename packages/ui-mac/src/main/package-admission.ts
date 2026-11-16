@@ -1,3 +1,4 @@
+import type { PackageEffectV1 } from "../shared/plugin-install"
 import { isOfficialConnector } from "./official-connector-recipes"
 import { collectOldOfficialConnectorVersions, officialConnectorPaths, projectOfficialConnector, releaseOfficialConnectorResources, restoreCommittedOfficialConnectors } from "./official-connector-resources"
 import { createHash } from "node:crypto"
@@ -420,13 +421,13 @@ export function createPackageAdmissionCoordinator(deps: PackageAdmissionDeps) {
 /** Desktop '+' commits content first. Runtime activation and account authorization are separate. */
 export async function installDesktopPackageV1(
   catalogId: unknown,
-  deps: PackageAdmissionDeps & Pick<PlannerDeps, "advisoryGate" | "resolvePackage">,
+  deps: PackageAdmissionDeps & Pick<PlannerDeps, "advisoryGate" | "resolvePackage"> & { effect?: PackageEffectV1 },
 ): Promise<PackageAdmissionOutcome> {
   if (typeof catalogId !== "string") return { ok: false, reason: "invalid package identity" }
   const resolved = await resolvePreparedPackage(catalogId, deps)
   if (!resolved.ok) return resolved
   const prepared = resolved.prepared
-  const lifecycle = resolvePackageLifecyclePlan(deps.root(), prepared)
+  const lifecycle = resolvePackageLifecyclePlan(deps.root(), prepared, deps.effect)
   if (!lifecycle.ok) return lifecycle
   if (lifecycle.plan.conflicts.length) return { ok: false, reason: conflictReason(lifecycle.plan.conflicts) }
   const connection = resolveConnectionBinding(prepared, deps, false)
@@ -523,6 +524,7 @@ export async function savePackageSecretsV1(input: unknown, deps: PackageAdmissio
         superseded.push({ kind: "mcp-secret-version", store: isOfficialConnector(record.name) ? "official-connectors" : "codepuppy-mcp-secrets", server: record.name, version })
     }
     const built = buildMcpTxItems({
+      effect: resolved.graph.effect,
       root: deps.root(), key: packageChildTxKeyV1("mcp", record.name), name: record.name,
       capabilities: packageAuthorizationCapabilitiesV1(component.component), manifestDigest: record.manifestDigest!, receipt: { ...record },
       userDataPath: deps.userDataPath, payload: component.payload, prerequisite: component.prerequisite,
@@ -1153,6 +1155,7 @@ async function executePreparedPackage(
         case "mcp":
           return buildMcpTxItems({
             ...common,
+            effect: lifecycle.graph.effect,
             userDataPath: deps.userDataPath,
             payload: component.accepted.payload,
             prerequisite: component.accepted.prerequisite,
@@ -1332,9 +1335,10 @@ type PackageLifecyclePlanV1 = {
 function resolvePackageLifecyclePlan(
   root: string,
   prepared: PreparedPackage,
+  effect?: PackageEffectV1,
 ): { ok: true; plan: PackageLifecyclePlanV1 } | { ok: false; reason: string } {
   const rootManifestDigest = `sha256:${prepared.root.itemDigest}`
-  const graph = packageGraphOf(prepared, rootManifestDigest)
+  const graph = packageGraphOf(prepared, rootManifestDigest, effect)
   const state = readPackageLedgerStateV1(root)
   if (!state.ok) return { ok: false, reason: state.reason }
   const before = state.packageGraphs.find((candidate) => candidate.packageId === graph.packageId) ?? null
@@ -1429,9 +1433,10 @@ const conflictReason = (conflicts: PackageChildConflictV1[]): string =>
  * 把一个排版约定升级成承重不变量。这个 componentId 直接进 owner token 的派生链,认错了 =
  * claim 归属认错人。
  */
-function packageGraphOf(prepared: PreparedPackage, rootManifestDigest: string): PackageGraphV1 {
+function packageGraphOf(prepared: PreparedPackage, rootManifestDigest: string, effect?: PackageEffectV1): PackageGraphV1 {
   const withoutDigest = {
     packageId: prepared.facts.envelope.prelude.packageId,
+    ...(effect ? { effect } : {}),
     ...(prepared.root.kind === "cloud" ? { displayName: prepared.facts.envelope.presentation.displayName } : {}),
     envelopeDigest: `sha256:${prepared.binding.envelopeDigest}`,
     root: { ...graphNodeOf(prepared.root), required: true, manifestDigest: rootManifestDigest },

@@ -466,3 +466,13 @@ test("R12 A5 unsupported real command agent and hook entries explain nothing-run
   }
   expect(readPackageLedgerStateV1(h.root)).toMatchObject({ ok: true, records: [], packageGraphs: [] })
 }))
+
+test("R14 A6 an unpublishable substituted remote leaf leaves no committed package", () => installerHarness(async h => {
+ const capture=await captureFixture("external_plugins/context7")
+ const definition=JSON.parse(new TextDecoder().decode(await capture.readFile(".mcp.json")))
+ const prepared=await h.sources.prepareCapture(await captureFixture("external_plugins/context7",{".mcp.json":JSON.stringify({...definition,mcpServers:{...definition.mcpServers,context7:{...definition.mcpServers.context7,url:"${WHOLE_URL}",oauth:false}}})}))
+ if(prepared.kind!=="package")throw Error("expected a real package variant")
+ expect(await h.install(h.request(prepared.candidateId,"r14_remote_publish"))).toMatchObject({ok:false,code:"transaction-failed"})
+ expect(readPackageLedgerStateV1(h.root)).toMatchObject({ok:true,records:[],packageGraphs:[]})
+ expect(readMcpLeafStrict("context7")).toMatchObject({ok:true,value:undefined})
+}))

@@ -7,7 +7,7 @@
 //  · REQ-100 事务接缝(begin/commit/rollback)与孤儿密钥回收。
 // 依赖注入假 installer(仓规:零 mock.module);账本走真盘临时目录。
 
-import { afterEach, beforeEach, describe, expect, test } from "bun:test"
+import { afterEach, beforeEach, describe, expect, spyOn, test } from "bun:test"
 import * as crypto from "node:crypto"
 import * as fs from "node:fs"
 import * as os from "node:os"
@@ -3067,4 +3067,46 @@ describe("REQ-105 #319:Excel 包版本 + 执行物 digest 落盘并可在重启�
     expect(record?.payloadDigest).toBeUndefined()
     expect(ledgerOnDisk().receipts.find((r) => r.name === "markitdown")?.payloadDigest).toBeUndefined()
   })
+})
+
+
+test("helper catalog admission commits the project effect and components together in the global ledger", async () => {
+  const { readPackageLedgerStateV1 } = await import("./ext-receipt-v2")
+  const { setPackageStateV1 } = await import("./ext-install-planner")
+  const entry = await Bun.file(path.join(import.meta.dir, "../../test-fixtures/plugin-helper/catalog-scope/playwright.json")).json() as CatalogEntry
+  const provenance = await Bun.file(path.join(import.meta.dir, "../../test-fixtures/plugin-helper/catalog-scope/provenance.json")).json()
+  expect(crypto.createHash("sha256").update(Buffer.from(await Bun.file(path.join(import.meta.dir, "../../test-fixtures/plugin-helper/catalog-scope/playwright.json")).arrayBuffer())).digest("hex")).toBe(provenance.capture.sha256)
+  const h = makeDeps({ entries: [entry] })
+  const project = makeProject("catalog-scope-a")
+  const identity = projectScopeIdentity(project)
+  if (!identity.ok) throw Error(identity.reason)
+  const manifest = decodeManifestV2(synthesizeManifest((await h.deps.resolveEntry(entry.id))!))
+  if (!manifest.ok) throw Error(manifest.errors.join("; "))
+  const writes: unknown[] = []
+  const rename = fs.renameSync
+  const observation = spyOn(fs, "renameSync").mockImplementation((from, to) => {
+    rename(from, to)
+    if (String(to) === path.join(globalRoot, "installs.json")) writes.push(JSON.parse(fs.readFileSync(String(to), "utf8")))
+  })
+  try {
+    expect(await installCatalog({ catalogId: entry.id, scope: { scope: "global" }, authorization: { confirmed: { [`mcp--${entry.name}`]: manifest.manifest.capabilities } } }, h.deps, { effect: identity.scope })).toMatchObject({ ok: true })
+    expect(writes.length).toBeGreaterThan(0)
+    for (const write of writes) expect(write).toMatchObject({ packageGraphs: [{ packageId: entry.id, effect: identity.scope }], records: [{ name: entry.name, scope: { kind: "global" } }] })
+    const state = readPackageLedgerStateV1(globalRoot)
+    expect(state.ok && state.packageGraphs[0]?.effect).toEqual(identity.scope)
+    expect(await setPackageStateV1({ packageId: entry.id, state: "enabled" }, h.deps)).toMatchObject({ ok: true })
+    expect(JSON.parse(fs.readFileSync(path.join(globalRoot, "codepuppy.jsonc"), "utf8")).mcp.playwright.enabled).toBe(false)
+    expect(fs.readdirSync(project)).toEqual([])
+  } finally { observation.mockRestore() }
+})
+
+test("helper catalog skill admission uses a graph while direct callers keep their existing receipt path", async () => {
+  const { readPackageLedgerStateV1 } = await import("./ext-receipt-v2")
+  const h = makeDeps()
+  const manifest = decodeManifestV2(synthesizeManifest((await h.deps.resolveEntry(skillBuiltinEntry.id))!))
+  if (!manifest.ok) throw Error(manifest.errors.join("; "))
+  const intent = { catalogId: skillBuiltinEntry.id, scope: { scope: "global" }, authorization: { confirmed: { [`skill--${skillBuiltinEntry.name}`]: manifest.manifest.capabilities } } }
+  expect(await installCatalog(intent, h.deps, {})).toMatchObject({ ok: true })
+  const state = readPackageLedgerStateV1(globalRoot)
+  expect(state.ok && state.packageGraphs.map((graph) => ({ packageId: graph.packageId, effect: graph.effect }))).toEqual([{ packageId: skillBuiltinEntry.id, effect: undefined }])
 })

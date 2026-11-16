@@ -3,7 +3,7 @@
 // scope identity fail-closed(项目移动 / 符号链接 / Unicode 路径 / 损坏 record,AC#4)、显式迁移。
 // 全部真盘临时目录;纯模块直测,零 mock.module(仓规)。
 
-import { afterEach, beforeEach, describe, expect, test } from "bun:test"
+import { afterEach, beforeEach, describe, expect, spyOn, test } from "bun:test"
 import * as fs from "node:fs"
 import * as os from "node:os"
 import * as path from "node:path"
@@ -12,6 +12,7 @@ import type { InstallReceipt } from "../preload/types"
 import { sha256Hex } from "./ext-manifest-v2"
 import {
   computeGrantDigest,
+  applyPackageMutation,
   decodeRecordV2,
   findRecordV2,
   lookupForUninstall,
@@ -24,6 +25,9 @@ import {
   readPackageLedgerStateV1,
   removeRecordV2,
   setDesiredStateV2,
+  setDesiredStatesV2,
+  reconcileSkillsDerivation,
+  skillsEnabledPath,
   toV1Receipt,
   upsertRecordV2,
   upsertRecordsV2,
@@ -32,6 +36,7 @@ import {
   type InstallRecordV2,
   type UpsertInput,
 } from "./ext-receipt-v2"
+import { bundleOwner, computeInstalledGraphDigest, type PackageGraphV1 } from "./ext-package-ledger-v3"
 
 let root: string
 beforeEach(() => {
@@ -789,6 +794,123 @@ describe("#336 skills projection final-publish lag — 判别式如实上报", (
 })
 
 // ── `#773`:V3 只读路径的一致失败(读不出来 ≠ 空)────────────────────────────────────────────
+describe("E2 package allow-set v2", () => {
+  // These are our own ledger/graph inputs, not fabricated provider definitions.
+  const scopeFor = (name: string) => {
+    const directory = path.join(root, name)
+    fs.mkdirSync(directory, { recursive: true })
+    const result = projectScopeIdentity(directory)
+    if (!result.ok) throw new Error(result.reason)
+    return result.scope
+  }
+  const entries = (effect: NonNullable<PackageGraphV1["effect"]>) => [
+    { kind: "mcp", name: "scope-mcp", projectPath: effect.projectPath },
+    { kind: "skill", name: "scope-skill", projectPath: effect.projectPath },
+  ]
+  const seed = (effect?: PackageGraphV1["effect"]) => {
+    const inputs = [
+      upsertInput({ id: "skill:scope-skill", name: "scope-skill", kind: "skill", configKey: undefined }),
+      upsertInput({ id: "mcp:scope-mcp", name: "scope-mcp", kind: "mcp", configKey: "mcp.scope-mcp" }),
+    ]
+    const nodes = inputs.map((input) => ({ componentId: input.id, kind: input.kind, name: input.name, required: true, manifestDigest: DIGEST_A }))
+    const graph: PackageGraphV1 = {
+      packageId: "local:scope-test", envelopeDigest: DIGEST_A, installedGraphDigest: "", root: nodes[0]!, children: nodes.slice(1),
+      ...(effect ? { effect } : {}),
+    }
+    graph.installedGraphDigest = computeInstalledGraphDigest(graph)
+    expect(applyPackageMutation(root, {
+      operation: "install", transactionId: "e2-seed", graphBeforeDigest: null, graphAfter: graph,
+      claimMutations: nodes.map((node) => ({ op: "acquire", kind: node.kind, name: node.name, owner: bundleOwner(graph.packageId, graph.root.manifestDigest) })),
+      childRecordMutations: inputs.map((input) => ({ op: "upsert", input })),
+    }).ok).toBe(true)
+    return graph
+  }
+  const change = (before: PackageGraphV1, effect: NonNullable<PackageGraphV1["effect"]>) => {
+    const graph = { ...before, effect }
+    graph.installedGraphDigest = computeInstalledGraphDigest(graph)
+    return applyPackageMutation(root, {
+      operation: "update", transactionId: "e2-change", graphBeforeDigest: before.installedGraphDigest,
+      graphAfter: graph, claimMutations: [], childRecordMutations: [],
+    })
+  }
+  const projection = () => JSON.parse(fs.readFileSync(skillsEnabledPath(root), "utf8"))
+
+  test("E2 projects enabled package components by effect while records stay global", () => {
+    const effect = scopeFor("alpha")
+    seed(effect)
+    expect(projection()).toEqual({ v: 2, keys: [], scoped: entries(effect) })
+    expect(readLedgerV2(root).records.every((record) => record.scope.kind === "global")).toBe(true)
+    expect(setDesiredStatesV2(root, ["scope-skill", "scope-mcp"].map((name) => ({ kind: name === "scope-skill" ? "skill" : "mcp", name, state: "disabled" }))).ok).toBe(true)
+    expect(projection()).toEqual({ v: 2, keys: [], scoped: [] })
+  })
+
+  test.each(["all-to-project", "project-to-project"] as const)("E2 scope shrink publishes tuple intersection before ledger: %s", (mode) => {
+    const before = seed(mode === "project-to-project" ? scopeFor("alpha") : undefined)
+    const effect = scopeFor("beta")
+    expect(upsertRecordV2(root, upsertInput({ id: "skill:keep", name: "keep", kind: "skill", configKey: undefined })).ok).toBe(true)
+    const writes: { file: string; data: unknown }[] = []
+    const rename = fs.renameSync
+    // Observe the real atomic renames; the existing final-publish seam cannot observe pre-ledger writes.
+    const probe = spyOn(fs, "renameSync").mockImplementation((from, to) => {
+      if (String(to) === skillsEnabledPath(root) || String(to) === ledgerFile())
+        writes.push({ file: path.basename(String(to)), data: JSON.parse(fs.readFileSync(from, "utf8")) })
+      rename(from, to)
+    })
+    try { expect(change(before, effect).ok).toBe(true) } finally { probe.mockRestore() }
+    expect(writes.map((write) => write.file)).toEqual(["skills-enabled.json", "installs.json", "skills-enabled.json"])
+    expect(writes[0]?.data).toEqual({ v: 2, keys: ["skill--keep"], scoped: [] })
+    expect(writes[1]?.data).toMatchObject({ packageGraphs: [{ effect }] })
+    expect(writes[2]?.data).toEqual({ v: 2, keys: ["skill--keep"], scoped: entries(effect) })
+  })
+
+  test("E2 ledger write failure leaves scope already narrowed and the old ledger unchanged", () => {
+    const before = seed()
+    const ledger = fs.readFileSync(ledgerFile(), "utf8")
+    const rename = fs.renameSync
+    const probe = spyOn(fs, "renameSync").mockImplementation((from, to) => {
+      if (String(to) === ledgerFile()) throw new Error("injected ledger rename failure")
+      rename(from, to)
+    })
+    try { expect(change(before, scopeFor("alpha")).ok).toBe(false) } finally { probe.mockRestore() }
+    expect(fs.readFileSync(ledgerFile(), "utf8")).toBe(ledger)
+    expect(projection()).toEqual({ v: 2, keys: [], scoped: [] })
+  })
+
+  test("E2 final publish failure reports projection lag and startup reconcile completes the scoped set", () => {
+    const before = seed()
+    const effect = scopeFor("alpha")
+    const rename = fs.renameSync
+    let publishes = 0
+    const probe = spyOn(fs, "renameSync").mockImplementation((from, to) => {
+      if (String(to) === skillsEnabledPath(root) && ++publishes === 2) throw new Error("injected final publish failure")
+      rename(from, to)
+    })
+    try {
+      const result = change(before, effect)
+      expect(result.ok).toBe(true)
+      expect(result.ok && result.warnings.join(" ")).toContain("final publish failed")
+    } finally { probe.mockRestore() }
+    expect(projection()).toEqual({ v: 2, keys: [], scoped: [] })
+    const state = readPackageLedgerStateV1(root)
+    expect(state.ok && state.packageGraphs[0]?.effect).toEqual(effect)
+    expect(reconcileSkillsDerivation(root).ok).toBe(true)
+    expect(projection()).toEqual({ v: 2, keys: [], scoped: entries(effect) })
+  })
+
+  test("E2 an unrecognized projection is emptied before the next ledger write", () => {
+    const before = seed()
+    fs.writeFileSync(skillsEnabledPath(root), JSON.stringify({ v: 1, keys: ["skill--scope-skill", "skill--ghost"] }))
+    const rename = fs.renameSync
+    const snapshots: unknown[] = []
+    const probe = spyOn(fs, "renameSync").mockImplementation((from, to) => {
+      if (String(to) === ledgerFile()) snapshots.push(projection())
+      rename(from, to)
+    })
+    try { expect(change(before, scopeFor("alpha")).ok).toBe(true) } finally { probe.mockRestore() }
+    expect(snapshots).toEqual([{ v: 2, keys: [], scoped: [] }])
+  })
+})
+
 //
 // 修复前:`readPackageGraphs` / `packageClaimOwners` 各自 `parseLedger(...).parsed.X`,而
 // `parseLedger` 对读失败返回的是 `empty` 常量 —— 于是它们对同一本坏账本返回 `[]`,与

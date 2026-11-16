@@ -59,6 +59,59 @@ test("A2 marketplace context7 commits one real enabled package and durable decla
   expect(after.ok && after.packageGraphs).toHaveLength(1)
 }))
 
+test("E2 project-only MCP stays globally disabled through install and package-root toggles", () => installerHarness(async (h) => {
+  const { mkdirSync, realpathSync, readdirSync, symlinkSync, writeFileSync } = await import("node:fs")
+  const { projectScopeIdentity } = await import("./ext-receipt-v2")
+  const project = join(h.temporary, "project")
+  mkdirSync(project)
+  writeFileSync(join(project, "existing.json"), "project bytes\n")
+  const alias = join(h.temporary, "project-alias")
+  symlinkSync(project, alias)
+  const identity = projectScopeIdentity(alias)
+  expect(identity.ok).toBe(true)
+  if (!identity.ok) throw new Error(identity.reason)
+  const outcome = await h.install({ ...h.request(await h.candidate("context7")), effect: { kind: "project", directory: alias } })
+  expect(outcome).toMatchObject({ ok: true, packageId: "claude:context7" })
+  expect(readMcpLeafStrict("context7")).toMatchObject({ ok: true, value: { enabled: false } })
+  const state = readPackageLedgerStateV1(h.root)
+  expect(state.ok && state.packageGraphs[0]?.effect).toEqual(identity.scope)
+  expect(state.ok && state.records.every((record) => record.scope.kind === "global" && record.desiredState === "enabled")).toBe(true)
+  const deps = { globalRoot: () => h.root, advisoryGate: () => ({ allowed: true as const }), resolvePackage: async () => { throw new Error("non-catalog package") } }
+  for (const state of ["disabled", "enabled"] as const) {
+    expect((await setPackageStateV1({ packageId: "claude:context7", state }, deps)).ok).toBe(true)
+    expect(readMcpLeafStrict("context7")).toMatchObject({ ok: true, value: { enabled: false } })
+  }
+  expect(JSON.parse(readFileSync(join(h.root, "skills-enabled.json"), "utf8"))).toEqual({
+    v: 2, keys: [], scoped: [{ kind: "mcp", name: "context7", projectPath: realpathSync(project) }],
+  })
+  expect(readdirSync(project)).toEqual(["existing.json"])
+  expect(readFileSync(join(project, "existing.json"), "utf8")).toBe("project bytes\n")
+}))
+
+test("E2 project-only skill is stored globally and projected only as scoped", () => installerHarness(async (h) => {
+  const { mkdirSync } = await import("node:fs")
+  const { projectScopeIdentity } = await import("./ext-receipt-v2")
+  const project = join(h.temporary, "project")
+  mkdirSync(project)
+  const identity = projectScopeIdentity(project)
+  if (!identity.ok) throw new Error(identity.reason)
+  const outcome = await h.install({ ...h.request(await h.candidate("frontend-design")), effect: { kind: "project", directory: project } })
+  expect(outcome.ok).toBe(true)
+  const state = readPackageLedgerStateV1(h.root)
+  expect(state.ok && state.packageGraphs[0]?.effect).toEqual(identity.scope)
+  expect(JSON.parse(readFileSync(join(h.root, "skills-enabled.json"), "utf8"))).toEqual({
+    v: 2, keys: [], scoped: [{ kind: "skill", name: "frontend-design", projectPath: identity.scope.projectPath }],
+  })
+  expect(existsSync(join(project, ".codepuppy"))).toBe(false)
+}))
+
+test("E2 unresolved project identity cannot silently install for all projects", () => installerHarness(async (h) => {
+  const outcome = await h.install({ ...h.request(await h.candidate("context7")), effect: { kind: "project", directory: join(h.temporary, "absent") } })
+  expect(outcome.ok).toBe(false)
+  expect(existsSync(join(h.root, "installs.json"))).toBe(false)
+  expect(h.activation).toEqual([])
+}))
+
 test("A2 host-name collision preserves existing content and rewrites only installed skill name", () => installerHarness(async (h) => {
   const { mkdirSync, writeFileSync } = await import("node:fs")
   mkdirSync(join(h.root, "skills", "frontend-design"), { recursive: true })

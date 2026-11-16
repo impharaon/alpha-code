@@ -134,6 +134,18 @@ describe("REQ-128 #706 — owner token 解析", () => {
 })
 
 describe("REQ-128 #706 — 严格解码", () => {
+  test("E2 project effect round-trips, is digest-bound and rejects malformed fields", () => {
+    const effect = { kind: "project" as const, projectPath: "/projects/alpha", projectPathHash: sha256Hex("/projects/alpha") }
+    const scoped = graph({ effect })
+    expect(decodePackageGraphV1(scoped)).toEqual({ ok: true, value: scoped })
+    expect(decodePackageGraphV1({ ...scoped, effect: { ...effect, projectPath: "/projects/beta" } }).ok).toBe(false)
+    for (const bad of [null, { kind: "project" }, { ...effect, projectPath: 1 }, { ...effect, projectPathHash: "" }, { ...effect, unknown: true }]) {
+      const malformed = { ...scoped, effect: bad }
+      expect(decodePackageGraphV1({ ...malformed, installedGraphDigest: computeInstalledGraphDigest(malformed as never) }).ok).toBe(false)
+    }
+    expect(decodePackageGraphV1(graph()).ok).toBe(true)
+  })
+
   test("graph 往返 + installedGraphDigest 篡改响亮失败", () => {
     const g = graph()
     expect(decodePackageGraphV1(g)).toEqual({ ok: true, value: g })

@@ -38,6 +38,25 @@ function makeGeneration(name: string, genId: string) {
 beforeEach(() => allowed.clear())
 
 describe("skillGenerationLiveDirs", () => {
+  test("E2 reads v2 keys plus scoped skills without injecting scoped MCPs", () => {
+    const global = makeGeneration("global", "gen-000001-111111")
+    const scoped = makeGeneration("scoped", "gen-000001-222222")
+    makeGeneration("mcp-only", "gen-000001-333333")
+    writeFileSync(join(root, "skills-enabled.json"), JSON.stringify({
+      v: 2, keys: ["skill--global"], scoped: [
+        { kind: "skill", name: "scoped", projectPath: "/projects/alpha" },
+        { kind: "mcp", name: "mcp-only", projectPath: "/projects/alpha" },
+      ],
+    }))
+    expect(skillGenerationLiveDirs(root)).toEqual([global, scoped].sort())
+  })
+
+  test("E2 does not dual-read a v1 projection", () => {
+    makeGeneration("old", "gen-000001-111111")
+    writeFileSync(join(root, "skills-enabled.json"), JSON.stringify({ v: 1, keys: ["skill--old"] }))
+    expect(skillGenerationLiveDirs(root)).toEqual([])
+  })
+
   test("解析 current.json → live generation 目录(升序)", () => {
     const a = makeGeneration("alpha", "gen-000001-aabbcc")
     const b = makeGeneration("beta", "gen-000002-ddeeff")

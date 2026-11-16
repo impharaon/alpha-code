@@ -64,6 +64,7 @@ function makeHarness(admit: boolean) {
     }
   const bodies: WriteChannelBodies = {
     installPackage: body("installPackage"),
+    installFromSource: body("installFromSource"),
     setPackageState: body("setPackageState"),
     savePackageSecrets: body("savePackageSecrets"),
     installCatalog: body("installCatalog"),
@@ -106,6 +107,7 @@ describe("GATED_WRITE_CHANNELS — 表完整性", () => {
     expect(Object.values(GATED_WRITE_CHANNELS)).toEqual([
       "ext-install-catalog",
       "ext-install-package",
+      "ext-install-from-source",
       "ext-set-package-state",
       "ext-save-package-secrets",
       "ext-uninstall-v2",
@@ -435,3 +437,15 @@ test("真实 catalog MCP 写通道结果只公开状态且不回显提交的 sec
   expect(output).toMatch(/\b9 pass\b/)
   expect(output).toMatch(/\b0 fail\b/)
 }, 120_000)
+
+// The source entry uses the same recovery gate and global root as catalog/package writes.
+test("A2 source install channel gates, refuses and transports only the frozen request", async () => {
+  const request = { requestId: "request_a2", source: { kind: "candidate", candidateId: "cand_1" }, via: "chat", effect: { kind: "all-projects" } }
+  const allowed = makeHarness(true)
+  await buildGatedWriteChannels(allowed).installFromSource(request)
+  expect(allowed.gateLog).toEqual([GLOBAL])
+  expect(allowed.bodyLog).toEqual([{ key: "installFromSource", args: [request] }])
+  const refused = makeHarness(false)
+  expect(await buildGatedWriteChannels(refused).installFromSource(request)).toEqual({ ok: false, reason: "gate refused" })
+  expect(refused.bodyLog).toEqual([])
+})

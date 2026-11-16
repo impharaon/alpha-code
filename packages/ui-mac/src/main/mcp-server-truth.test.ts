@@ -276,6 +276,7 @@ describe("写模块与 main 侧读改写模块不在 sidecar 的 import 闭包�
     expect(rel(relativeImportClosure(join(repoRoot, "packages/ui-mac/src/main/mcp-server-truth.ts")))).toEqual([
       "packages/ui-mac/src/main/mcp-server-truth.ts",
       "packages/ui-mac/src/shared/extension-name.ts",
+      "packages/ui-mac/src/shared/plugin-install.ts",
     ])
     const records = rel(relativeImportClosure(join(repoRoot, "packages/ui-mac/src/main/mcp-server-records.ts")))
     expect(records).toContain("packages/ui-mac/src/main/mcp-server-truth.ts")

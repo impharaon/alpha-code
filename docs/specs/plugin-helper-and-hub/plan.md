@@ -489,3 +489,5 @@ E3 收据补充：最终 `bun test --max-concurrency 2 src/main/install-from-sou
 2026-11-16 r4 / D3 红例 · 目录接缝已关闭，开始 D3。新增 `created-plugin.test.ts`（本应用自制输入，不伪装第三方样本）；实际入口的成功制作、未知/缺失/失败来源记录无写入、坏草稿及 project-only 制作三例：`bun test --max-concurrency 2 --test-name-pattern '^D3' src/main/install-from-source.test.ts` exit 1（3 fail / 5 assertions，`/tmp/helper-de-r4-create-red.log`）。来源记录读取/完整性一例 exit 1（`/tmp/helper-de-r4-search-record-red.log`）；新 create 工具的冻结 payload、无自问同意、自动化先拒及真权限宿主共三例 exit 1（`/tmp/helper-de-r4-create-tools-red.log`）。成功查询取既有真实 pinned frontend-design 查询响应，保留无关候选，不能用“候选必须为空”替代语义判断。
 
 D3 红例设置校正：`plugin-sources.test.ts:403` 新例缺少 createPluginSources 绑定，原红例在 lookup 前是 ReferenceError；补同模块已有导出的 import，不改任何完成性/失败性断言，单独提交。实际入口三条已提交红例不受此设置错误影响。
+
+D3 真权限例的宿主前提校正：`plugin-host.test.ts:1313` 未装 main 注入的 tier-carrier agents，就调用 codepuppy-ask；该 fixture 的实际注入在同文件 hubHost（约 :555–565）。补用既有 hubHost(manifest:false) 构造真实应用前提，不改 allow=0 ask、ask=1 普通审批、automation=0 ask 且 deny 的任何断言；修正后该例通过。不是在 ext 中另写一套档位规则。

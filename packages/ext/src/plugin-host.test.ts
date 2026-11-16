@@ -1309,6 +1309,7 @@ it.live("scope · MCP transforms enable only matching project members", () =>
 
 itWithPermission.live("D3 create uses the ordinary permission tier; automation is denied before any ask", () => Effect.gen(function* () {
   env({})
+  yield* hubHost({ manifest: false })
   yield* activate(CodePuppyExt)
   const input = { searchId: "search_owned", name: "own-report", description: "Own report", files: [] }
   const allow = yield* hubInstall("build", "once", "codepuppy_hub_create", input)

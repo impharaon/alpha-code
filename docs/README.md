@@ -395,6 +395,7 @@ status.
 | `SPEC-large-project-directories` | [specs/large-project-directories/spec.md](specs/large-project-directories/spec.md) | 打开巨大目录不会启动无界扫描，保留历史条款、有效裁决和交付证据边界。 | draft |
 | `SPEC-local-cloud-task-routing` | [specs/local-cloud-task-routing/spec.md](specs/local-cloud-task-routing/spec.md) | 助手根据任务选择本机或云端处理，保留历史条款、有效裁决和交付证据边界。 | approved |
 | `SPEC-local-memory` | [specs/local-memory/spec.md](specs/local-memory/spec.md) | 本机记忆可查看、修改、删除并按项目用于对话，保留历史条款、有效裁决和交付证据边界。 | approved |
+| `PLAN-local-plugin-install` | [specs/local-plugin-install/plan.md](specs/local-plugin-install/plan.md) | 片 1 桌面部分：目录包合并展示、整包启停、安装授权说明及装后凭据操作的改动顺序和行为证据 | active |
 | `SPEC-office-content-preview` | [specs/office-content-preview/spec.md](specs/office-content-preview/spec.md) | Office 文件内容可在应用内安全查看，保留历史条款、有效裁决和交付证据边界。 | approved |
 | `SPEC-office-layout-preview` | [specs/office-layout-preview/spec.md](specs/office-layout-preview/spec.md) | Office 文件在隔离预览里显示真实版式，按历史条文与实际证明登记范围。 | approved |
 | `SPEC-opencode-generation-switch` | [specs/opencode-generation-switch/spec.md](specs/opencode-generation-switch/spec.md) | 升级引擎后保留当前桌面体验与整体撤回能力，保留历史条款、有效裁决和交付证据边界。 | approved |
@@ -404,6 +405,7 @@ status.
 | `SPEC-permission-risk-classification` | [specs/permission-risk-classification/spec.md](specs/permission-risk-classification/spec.md) | 高风险动作在执行前先完成分类，保留历史条款、有效裁决和交付证据边界。 | approved |
 | `PLAN-permission-risk-display` | [specs/permission-risk-display/plan.md](specs/permission-risk-display/plan.md) | #1314 的实施计划:风险标签组件进组件库,批准面板与能力授权框共用;只做呈现,分类器不动 | active |
 | `SPEC-permission-risk-display` | [specs/permission-risk-display/spec.md](specs/permission-risk-display/spec.md) | 用户在授权时能看出动作的风险档位，保留历史条款、有效裁决和交付证据边界。 | approved |
+| `PLAN-plugin-helper-and-hub` | [specs/plugin-helper-and-hub/plan.md](specs/plugin-helper-and-hub/plan.md) | 切片 A 的 Claude 来源、统一安装入口、对话安装与时间线证据，以及对切片 H 的接缝依赖 | active |
 | `PLAN-project-agent-fields` | [specs/project-agent-fields/plan.md](specs/project-agent-fields/plan.md) | alpha-code#1700 一段 —— 项目助手的 disable、temperature、top_p、steps(maxSteps)、hidden、color、variant 在 OpenCode 2 上生效,用不上的字段记一行日志,写坏的条目整条不装(tools 已由 | active |
 | `SPEC-project-agent-fields` | [specs/project-agent-fields/spec.md](specs/project-agent-fields/spec.md) | 项目文档里给 agent 写的 disable、tools、temperature 等字段在新引擎上重新生效,用不上的字段有记录可查 | approved |
 | `PLAN-project-consent-store` | [specs/project-consent-store/plan.md](specs/project-consent-store/plan.md) | #1709 一段:项目扩展的信任只认用户在确认框里的决定,记录存在 Code Puppy 自己的状态目录,项目目录里的任何文件都不再算数 | active |

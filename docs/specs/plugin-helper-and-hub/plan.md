@@ -507,3 +507,22 @@ create 工具与 install 共用同一 bridge、阶段轮询、结果与 requestI
 计划偏离：原定新增 plugin-helper.test.ts / plugin-helper.cases.ts 改为复用现有 hub-three-pages 真生产 DOM 宿主，避免重复环境；另补 A4 同链路 timeline-model.ts / cards/tool-card-model.ts 及其直接测试。宿主旧 pin 26 已落后 E3 新增的 2 项，本步再添 2 项，实跑 30 项后同步到 30，未删行为断言。wrapper 子进程补 --max-concurrency 2。共享文件：extension-hub.tsx 的 FactorySkillRow、中英 i18n、A4 timeline-model.ts / cards/tool-card-model.ts 与测试；不改现有卡片 UI。
 
 ui-mac `bun test --max-concurrency 2 src/renderer/extensions/hub-three-pages.test.ts src/renderer/codepuppy-ui/session-timeline/timeline-model.test.ts src/renderer/codepuppy-ui/session-timeline/cards/tool-card-model.test.ts src/renderer/codepuppy-ui/session-timeline/hub-install-card.test.ts` exit 0（132 pass / 565 assertions；H 子进程 30 项、既有卡片子进程 7 项，`/tmp/helper-de-r4-d4-related.log`）。`GOMAXPROCS=2 bun typecheck` exit 0（`/tmp/helper-de-r4-d4-ui-type.log`）。D5 继续交验，不以 DOM 代替真实模型提问/语义行为。
+
+2026-11-16 r4 / D5 交付 · 四份构建应用真实模型重放脚本作为本计划的 `assets/` 文本附件（不是已执行证据，也不另建验收状态台账）：
+
+- [歧义 PS](assets/acceptance-ps-ambiguous.txt)：唯一能力问题、按回答联网查询、查询完成前零自建、真实来源与无第二次同意。
+- [明确 PSD](assets/acceptance-psd-explicit.txt)：真实 PSD 样本/摘要与独立读取结果，零重复澄清及实际读取对照。真实 PSD 样本由编排器从实际样本库选择并固定来源，不编造文件格式或把自动重放夹具当联网证据。
+- [全来源无匹配后制作](assets/acceptance-create-own-plugin.txt)：本应用自有 harvest-net-v1 任务、真实完整查询、语义无匹配、约定原句、创建/自动开启/实际任务、我的插件、跨项目同包及整包移除。若实有匹配或来源失败，明确该分支未覆盖，不删候选来强造无匹配。
+- [已有匹配、来源失败、双项目范围](assets/acceptance-existing-and-source-failure.txt)：真实现成插件/独立 MCP 优先、隔离进程真实网络失败的禁止自制对照，默认全项目及显式项目范围的目录/外部来源臂；甲乙工具名单/调用与原始配置字节对照。精确去抖窗口继续引用已验真实引擎和 exclusion 变异，不加产品范围编辑控件。
+
+四份已读回全文并检查具体 prompt、事件顺序、可失败判据与交回证据；未做仅断言文案/标题数量的伪测试，未启动收费模型/真实应用会话。B/C 集成后的真实模型/真实联网结果由编排器按这些文件收集。故 D3–D5 自动化实现及交接完成，AC-04/08/09/16 均未报已验收。
+
+D5 相关回归 ui-mac `bun test --max-concurrency 2 src/main/created-plugin.engine.test.ts src/main/package-effect.engine.test.ts src/main/factory-skills.test.ts src/main/codepuppy-skill-packaging-census.test.ts` exit 0（41 pass / 220 assertions，`/tmp/helper-de-r4-d5-engines-factory.log`）：创建引擎子例 1 项、范围引擎子例 5 项，含目录 Playwright arm，资源实际可达/零账本证据仍通过。类型检查复用 D3 ext 与 D4 ui-mac 的最终 exit 0，本步只增加脚本/记录，无重复全套。没有 gate/bin/check。
+
+文档偏离：新脚本归本计划可选 assets，避免在 verification 目录制造尚未执行的“证据”；`docs/README.md` 由 canonical docs_index.py 机械同步两条缺失的本功能/H 计划索引，不手改块或清理其他文档。第一次尝试不存在的 ~/.local/bin/docs_index.py exit 2；沿 check-docs-contract 的真实 symlink 找到 skill 脚本后执行，未安装或变更工具。
+
+额外相关检查 ui-mac `bun test --max-concurrency 2 src/renderer/i18n/locale-regression.test.ts` exit 1（8 pass / 2 fail / 35 assertions，`/tmp/helper-de-r4-d4-i18n.log`）。遗留去向：该测试 :162/189 的旧品牌白名单未消费真实 OpenCode 市场来源，命中 packageSourceOpenCode（en/zh）及 ext-package-presentation(.test).ts；`git show 27a5997580:<file>` 已确认在本轮之前存在，D4 只增加 Plugin helper/MCP 文案，不改白名单；交来源车道/编排器同步规则判据，不在本片修。其余遗留沿 D3 收据：context-injection.test.ts:304 待 H 已完成修复重栈，sidecar-wiring.test.ts:131 交 A3。OPTIONAL：无。
+
+D5 文档检查收据：`python3 scripts/check-doc-links.py docs/specs/plugin-helper-and-hub/plan.md docs/README.md` exit 0（424 条相对链接）；canonical `docs_index.py --check` exit 0。依 alpha profile 复用 canonical `check_docs_contract.py:check_repo`，只检查当前工作树（changed-since bda9ea62d7，不扫描其他仓）exit 1：72 errors / 217 warnings，日志 `/tmp/helper-de-r4-doc-contract.log`。错误为现有根 README 项目引用、旧断链/角色目录/额外 plan 文件，以及本计划原有跨仓裸 SPEC/DESIGN ID；新增 assets 未命中错误。`git show bda9ea62d7:docs/specs/plugin-helper-and-hub/plan.md` 已确认 :7/8 和旧链接文字存在，不为本片改其他节/全仓修文档；遗留交编排器的文档治理队列。生成索引已当前，不能把合同总体检查报绿。
+
+r4 本轮约 77 分钟（18:42:34→19:59 CST）；范围接缝→D3→D4→D5 依序提交。实际增加目录准入同链路与 A4 投影文件的原因已在各步逐项记录，无迁移、无新依赖、无项目写入、无 Core 改动。已核：Codex（GPT-6）自查，spec v3/design v5 与 r4 授权范围；本轮实现/交接 DONE，AC-04/08/09/16 完整真实应用验收仍交编排器，未报通过。并行共享生产文件汇总：plugin-sources.ts、install-from-source.ts、ext-ipc.ts、ext/hub-tools.ts、extension-hub.tsx（只 FactorySkillRow），另 i18n 和 A4 timeline-model.ts / cards/tool-card-model.ts；本轮未改 package-mcp-activation.ts、extension-detail.tsx、B/C 搜索/凭据/时间线动作。

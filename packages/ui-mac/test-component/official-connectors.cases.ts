@@ -15,6 +15,8 @@ import {
 import { tmpdir } from "node:os"
 import { dirname, join, resolve } from "node:path"
 import { Database } from "bun:sqlite"
+import { engineSandbox, assertEngineSandboxed, engineSlot } from "./engine-sandbox"
+const sandbox = engineSandbox()
 import { createRequire } from "node:module"
 
 // `#1662`(OpenCode 2):v1 引擎 packages/opencode 随换代删除。「引擎真的那份 {file:} 实现」换成 2.x 的
@@ -944,3 +946,90 @@ test("package-owned encrypted token replacement retires the old version and a fa
   writeFileSync(join(root, "codepuppy.jsonc"), JSON.stringify({ mcp: { "github-official": { type: "remote", url: "https://api.githubcopilot.com/mcp/", headers: { Authorization: `Bearer {file:${join(home, "invalid version", "GITHUB_PERSONAL_ACCESS_TOKEN")}}` } } } }))
   expect(await readPackageAuthorizationV1("package:github-official", deps)).toMatchObject({ ok: true, items: [{ kind: "secret", saved: false }] })
 })
+
+
+test("review official recipe installs, changes token and toggles through runtime add without engine reload", async () => {
+  await assertEngineSandboxed(sandbox)
+  const { buildEngineServerOptions } = await import("../src/main/engine-server-options")
+  const { engineClient } = await import("../src/main/engine-client")
+  const { startEngine } = await import("../engine/engine-embed")
+  const { echoMcpHandler } = await import("../../core/test/fixture/mcp-echo")
+  const { installDesktopPackageV1, savePackageSecretsV1 } = await import("../src/main/package-admission")
+  const { resolveVerifiedPackageV1 } = await import("../src/main/package-installability")
+  const { setPackageStateV1 } = await import("../src/main/ext-install-planner")
+  const { applyPackageMcpV1 } = await import("../src/main/package-mcp-activation")
+  const shipped = await Bun.file(join(import.meta.dir, "../src/renderer/extensions/codepuppy-catalog.json")).json()
+  const envelope = shipped.packages.find((entry: CodePuppyPackageEnvelopeV1) => entry.prelude.packageId === "package:github-official")!
+  // Unmodified pinned public payload, not a made-up third-party definition or a live PAT call.
+  const bytes = await Bun.file(join(import.meta.dir, "../test-fixtures/plugin-helper/catalog/package-github-official.json")).bytes()
+  expect(createHash("sha256").update(bytes).digest("hex")).toBe(envelope.components[0].payloadRef.sha256)
+  const catalog = { version: "official-runtime-proof", entries: [], packages: [envelope] }
+  const deps = {
+    loadVerifiedCatalog: async () => ({ source: "remote" as const, catalog, snapshotDigest: "7".repeat(64) }),
+    root: () => root, globalRoot: () => root, userDataPath: join(home, "userData"), casBaseRoot: () => join(home, "state"), environment: () => "dev" as const,
+    installability: { fetchPayload: async () => bytes }, advisoryGate: () => ({ allowed: true as const }),
+    resolvePackage: async (id: string, version: string) => ({ ...resolveVerifiedPackageV1(catalog, id, version), channel: "cache" as const }),
+  }
+  const slot = engineSlot(sandbox, "official-runtime")
+  const observer = join(iso, "observer")
+  mkdirSync(observer)
+  writeFileSync(join(observer, "server.js"), `
+import {Schema} from ${JSON.stringify(import.meta.resolve("effect"))}
+let setups=0
+export default {id:"test.official-runtime",setup:async(ctx)=>{
+ const setup=++setups
+ await ctx.rpc.register({id:"official-runtime",methods:{tools:{input:Schema.Undefined,output:Schema.Unknown},call:{input:Schema.String,output:Schema.Unknown}},events:{}},{
+ tools:async()=>({setup,names:(await ctx.tool.list()).filter(t=>t.options?.namespace==="github-official").map(t=>t.name)}),
+ call:async(sessionID)=>(await ctx.tool.list()).find(t=>t.options?.namespace==="github-official").execute({message:"runtime official proof"},{sessionID,agent:"build",messageID:"msg_official",id:"call_official",signal:new AbortController().signal,progress:async()=>{}})
+ })
+}}`)
+  const echo = echoMcpHandler()
+  const originalFetch = globalThis.fetch
+  let expected = pat
+  let authenticated = 0
+  globalThis.fetch = (async (input, init) => {
+    const request = new Request(input, init)
+    if (new URL(request.url).hostname !== "api.githubcopilot.com") return originalFetch(input, init)
+    if (request.headers.get("authorization") !== `Bearer ${expected}`) return new Response(null, { status: 401 })
+    authenticated++
+    return echo.fetch(request)
+  }) as typeof fetch
+  const previous = process.cwd()
+  process.chdir(slot.projectDirectory)
+  let reloads = 0
+  const engine = await startEngine(buildEngineServerOptions({ hostname: "127.0.0.1", port: 0, password: "official-runtime-proof", engineVersion: "test", databasePath: slot.databasePath, configDirectory: slot.configDirectory, config: { content: JSON.stringify({ plugins: [observer] }) }, models: { fetch: false }, filewatcher: false, platform: process.platform }), { projectTrust: () => true, onDispatch: dispatch => async request => { if (new URL(request.url).pathname.endsWith("/location/reload")) reloads++; return dispatch(request) } })
+  try {
+    const connection = { url: engine.url, username: "opencode", password: "official-runtime-proof" }
+    const client = engineClient(connection)
+    const session = await client.session.create({ permissions: [{ action: "*", resource: "*", effect: "allow" }] })
+    for (const end = Date.now() + 10000; ; await Bun.sleep(20)) {
+      if ((await client.plugin.list()).data.some(plugin => plugin.id === "test.official-runtime" && plugin.state.status === "active")) break
+      if (Date.now() > end) throw Error("official runtime observer not active")
+    }
+    const tools = async () => (await client.rpc.call({ rpcID: "official-runtime", method: "tools" })).output as { setup: number; names: string[] }
+    const before = await tools()
+    expect(before.names).toEqual([])
+    expect(await installDesktopPackageV1("package:github-official", deps)).toMatchObject({ ok: true })
+    const apply = () => applyPackageMcpV1("package:github-official", slot.projectDirectory, { root: () => root, awaitServer: async () => connection })
+    await apply()
+    expect((await tools()).names).toEqual([])
+    const save = (value: string) => savePackageSecretsV1({ packageId: "package:github-official", secrets: { "mcp:github-official#GITHUB_PERSONAL_ACCESS_TOKEN": value } }, deps)
+    expect(await save(pat)).toMatchObject({ ok: true })
+    await apply()
+    expect((await tools()).names.length).toBeGreaterThan(0)
+    expect((await client.rpc.call({ rpcID: "official-runtime", method: "call", input: session.id })).output.isError).not.toBe(true)
+    expected = pat + "REPLACEMENT"
+    const priorRequests = authenticated
+    expect(await save(expected)).toMatchObject({ ok: true })
+    await apply()
+    expect(authenticated).toBeGreaterThan(priorRequests)
+    expect((await tools()).names.length).toBeGreaterThan(0)
+    for (const state of ["disabled", "enabled"] as const) {
+      expect(await setPackageStateV1({ packageId: "package:github-official", state }, deps)).toMatchObject({ ok: true })
+      await apply()
+      expect((await tools()).names.length > 0).toBe(state === "enabled")
+    }
+    expect((await tools()).setup).toBe(before.setup)
+    expect(reloads).toBe(0)
+  } finally { await engine.close(); process.chdir(previous); globalThis.fetch = originalFetch; await echo.close() }
+}, 60000)

@@ -134,6 +134,8 @@ PLAN 文档检查（2026-11-16）：`python3 scripts/check-doc-links.py docs/spe
 
 ### 偏离记录
 
+r6 收据：编排器重放至 H `09a83a515a` 并叠加 D/E 独立步骤，头 `1a218e8a2e`；A2 已由编排器核过，继承其结论。首条命令复跑 A2 19 文件：368 pass / 1 fail，exit 1，唯一仍是 `mcp-server-derivation.test.ts:105/108` 的 void API 误用，无新失败（`a-r6-a2-baseline.log`）。按 r6 明授，仅把这两处分别改为 not.toThrow／toThrow；`mcp-server-truth-write.ts:24` 的真实签名为 void，失败抛错，未改任何字段／引用／注入行为断言。单文件复核 exit 0（6 pass / 0 fail，`a-r6-a2-correction.log`）。H 已交来源呈现 `installedPackagePresentation` 与按 packageId 管理跳转 `openPackageManagement`，A4 接缝依赖解除；D/E 已交文件本片只读。08:47:08 UTC 开始 A3/A4；H 同时修改的文件如需改动逐项留本节，不改其页面或 generation 分配。
+
 r5 结束收据（08:43 UTC，约 39 分钟）：生产按边界提交为 `fd8f340272`（真源链）、`88527c654c`（入口／声明／副本与 artifact）、`38ddbce46c`（runtime／IPC）；相关红例先于各段实现提交，原 r4 红例未改。已核：Codex（GPT-6），继承设计 v5 @8bd3075、叠加来源头 @733032e676 及本轮明授 delta。上述 19 文件最终检查为 368 pass / 1 fail，唯一失败是本会话误读 void API 的新测试；真实引擎 2 cases 通过，ui-mac `bun typecheck` exit 0，文档相对链接检查与 `git diff --check` exit 0。**BLOCKED（A2 验证收口）**：请求纠正 `fcf1f0ea2e` 的两处测试调用，未收到答复前保留红例，不能报 DONE。下一步仅需编排器允许该窄纠正后复核该用例及相关集合；遗留去向：该测试错误→本片即时修正（待授权），在线浮动 npm 元数据握手时限→验收环境记录，真实模型应用验收→编排器，H 双技能 generation 已知项→H（本片未触发、未修改）。已定勿重开：真源字段映射、runtime 生效决定及 A3–A4 冻结范围；OPTIONAL 无。无迁移、无 push／PR／gate，工作树提交后保持干净。
 
 2026-11-16 r5 · A2.1 已按明授 delta 扩展 `mcp-server-truth.ts` 的严格字段、确定性写出和唯一 `remoteMcpLeaf` 投影；`ext-config.ts` 的持久化／读回消费同一判据，`codepuppy-config-injection.ts` 原来只复制 URL/headers，现经同一投影及现有 `projectServerConfig` 将 timeout/OAuth 交引擎，转换权威不复制。OAuth clientSecret 拒明文，只接专用存储引用；仍拒 enabled 与未批准字段。旧 `ext-config.test.ts` 中明确编码“拒 timeout/oauth”的用例按本轮裁定改为保留并读回，enabled／平台保留名拒绝对照保留；`mcp-server-truth.test.ts` 的导入闭包清单只追加无 I/O 的共享校验文件，写模块仍被排除。原 `bac7678005` 红例未改并已转绿。

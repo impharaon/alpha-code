@@ -102,10 +102,10 @@ type McpMap = Record<string, Record<string, unknown>>
 test("A2 remote truth preserves timeout and OAuth policy in the actual engine injection", () => {
   const secret = path.join(root, "dedicated-secret-reference")
   const record = { ...MY_MCP, timeout: 7890, oauth: { clientId: "public-client-id", clientSecret: `{file:${secret}}`, scope: "read", redirectUri: "https://client.example.com/callback" } }
-  expect(writeMcpServerTruth(truthPath, [record], fs).ok).toBe(true)
+  expect(() => writeMcpServerTruth(truthPath, [record], fs)).not.toThrow()
   expect(readMcpServerRecords(() => {})).toEqual([record])
   expect(injectedMcp().mcp[record.name]).toMatchObject({ timeout: { startup: 7890, catalog: 7890, execution: 7890 }, oauth: { client_id: "public-client-id", client_secret: `{file:${secret}}`, scope: "read", redirect_uri: "https://client.example.com/callback" } })
-  expect(writeMcpServerTruth(truthPath, [{ ...record, oauth: { clientSecret: "test-only-plaintext" } }], fs).ok).toBe(false)
+  expect(() => writeMcpServerTruth(truthPath, [{ ...record, oauth: { clientSecret: "test-only-plaintext" } }], fs)).toThrow()
 })
 
 /** 生产注入面(sidecar 里 injectCodePuppyConfig 跑的那一份),只取它交给引擎的内联文档里的 `mcp.servers`(2.x 形状)。 */

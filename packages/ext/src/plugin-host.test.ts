@@ -568,7 +568,7 @@ const hubHost = (options: { manifest: boolean }) =>
  * 一次 `codepuppy_hub_install` 调用里用户看到的审批:每出现一条待批请求就记下并按 `answer` 回复,直到调用结束。
  * 引擎的 prompt 流程先于工具调用触发 session.hook.prompt(策略的目录尾规则在这里登记)。
  */
-const hubInstall = (agent: string, answer: "once" | "always" = "once") =>
+const hubInstall = (agent: string, answer: "once" | "always" = "once", action = "codepuppy_hub_install", input: Record<string, unknown> = { id: "mcp:github" }) =>
   Effect.gen(function* () {
     const directory = realpathSync((yield* Location.Service).directory)
     const session = yield* (yield* Sessions.Service).create({ location: { directory }, title: `hub install ${agent}` })
@@ -580,7 +580,7 @@ const hubInstall = (agent: string, answer: "once" | "always" = "once") =>
         sessionID: session.id,
         agent: agent as never,
         messageID: SessionMessage.ID.make("msg_hub_install"),
-        call: { type: "tool-call", id: "call_hub_install", name: "codepuppy_hub_install", input: { id: "mcp:github" } },
+        call: { type: "tool-call", id: "call_hub_install", name: action, input },
       })
       .pipe(Effect.exit, Effect.forkChild)
     const asks: Array<{ action: string; metadata: Record<string, unknown> }> = []
@@ -1305,3 +1305,21 @@ it.live("scope · MCP transforms enable only matching project members", () =>
     expect(mcp.servers.get("unrelated")).toMatchObject({ disabled: false })
   }),
 )
+
+
+itWithPermission.live("D3 create uses the ordinary permission tier; automation is denied before any ask", () => Effect.gen(function* () {
+  env({})
+  yield* activate(CodePuppyExt)
+  const input = { searchId: "search_owned", name: "own-report", description: "Own report", files: [] }
+  const allow = yield* hubInstall("build", "once", "codepuppy_hub_create", input)
+  expect(allow.asks).toEqual([])
+  expect(Exit.isSuccess(allow.exit)).toBe(true)
+  const ask = yield* hubInstall("codepuppy-ask", "once", "codepuppy_hub_create", input)
+  expect(ask.asks).toHaveLength(1)
+  expect(ask.asks[0]!.metadata.codepuppyHub).toBeUndefined()
+  expect(Exit.isSuccess(ask.exit)).toBe(true)
+  const automation = yield* hubInstall("codepuppy-automation-standard", "once", "codepuppy_hub_create", input)
+  expect(automation.asks).toEqual([])
+  expect(Exit.isFailure(automation.exit)).toBe(true)
+  expect(JSON.stringify(automation.exit)).toContain("Permission denied: codepuppy_hub_create")
+}))

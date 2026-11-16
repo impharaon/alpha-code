@@ -327,3 +327,47 @@ test("A2 same pinned source with changed real bytes updates its package instead 
   expect(readMcpLeafStrict("context7")).toMatchObject({ ok: true, value: { url: "https://mcp.context7.com/mcp?client=updated-definition" } })
   expect(after.ok && after.records.map((record) => record.desiredState)).toEqual(["enabled"])
 }))
+
+function ownDraft(searchId: string, name = "own-report") {
+  return { searchId, name, description: "My report format", files: [{ path: "skills/report/SKILL.md", text: "---\nname: report\ndescription: My report format\n---\nApply my report format.\n" }] }
+}
+
+test("D3 completed real source search admits an own package despite unrelated candidates", () => installerHarness(async (h) => {
+  const search = await h.sources.searchSources("frontend-design")
+  expect(search.sources.every((source) => source.status === "ok")).toBe(true)
+  expect(search.candidates.length).toBeGreaterThan(0)
+  const result = await h.install({ ...h.request("unused"), source: { kind: "created", draft: ownDraft(search.searchId) } })
+  expect(result).toMatchObject({ ok: true, packageId: "mine:own-report", source: { kind: "created" } })
+  const state = readPackageLedgerStateV1(h.root)
+  expect(state.ok && state.records.every((record) => record.origin === "created" && record.desiredState === "enabled")).toBe(true)
+  expect(state.ok && state.packageGraphs).toHaveLength(1)
+  expect(h.reloads).toEqual(["mine:own-report"])
+  const second = await h.install({ ...h.request("unused", "create_second"), source: { kind: "created", draft: ownDraft(search.searchId, "another-report") } })
+  expect(second).toMatchObject({ ok: true, packageId: "mine:another-report" })
+  const after = readPackageLedgerStateV1(h.root)
+  expect(after.ok && after.packageGraphs).toHaveLength(2)
+}))
+
+test("D3 unknown, incomplete and failed search records deny creation without ledger or generation writes", () => installerHarness(async (h) => {
+  const search = await h.sources.searchSources("frontend-design")
+  for (const [requestId, searchId] of [["create_unknown", "unknown"], ["create_missing", search.searchId], ["create_failed", search.searchId]]) {
+    if (requestId === "create_missing") h.sources.searchedSources = () => search.sources.slice(1)
+    if (requestId === "create_failed") h.sources.searchedSources = () => search.sources.map((source, index) => index ? source : { source: source.source, status: "failed", reason: "network", detail: "recorded source failure" })
+    expect(await h.install({ ...h.request("unused", requestId), source: { kind: "created", draft: ownDraft(searchId) } })).toMatchObject({ ok: false, code: "not-searched" })
+    expect(existsSync(join(h.root, "installs.json"))).toBe(false)
+    expect(existsSync(join(h.root, "ext-store"))).toBe(false)
+  }
+}))
+
+test("D3 a malformed draft does not write and project-only creation uses the same scope path", () => installerHarness(async (h) => {
+  const { mkdirSync, readdirSync } = await import("node:fs")
+  const search = await h.sources.searchSources("frontend-design")
+  expect(await h.install({ ...h.request("unused", "create_bad"), source: { kind: "created", draft: { ...ownDraft(search.searchId), files: [{ path: "../escape", text: "x" }] } } })).toMatchObject({ ok: false, code: "invalid-draft" })
+  expect(existsSync(join(h.root, "installs.json"))).toBe(false)
+  const project = join(h.temporary, "created-project")
+  mkdirSync(project)
+  expect(await h.install({ ...h.request("unused", "create_scoped"), source: { kind: "created", draft: ownDraft(search.searchId) }, effect: { kind: "project", directory: project } })).toMatchObject({ ok: true, source: { kind: "created" } })
+  const state = readPackageLedgerStateV1(h.root)
+  expect(state.ok && state.packageGraphs[0]?.effect).toMatchObject({ kind: "project" })
+  expect(readdirSync(project)).toEqual([])
+}))

@@ -396,3 +396,22 @@ test("a real npm tree keeps OpenCode discovery when presented as a local folder"
   expect(folder.package.diagnostics).toEqual(original.package.diagnostics)
   expect(folder.package.entries).toEqual(original.package.entries)
 })
+
+test("D3 creation eligibility requires a recorded success for every source, not just every returned row", async () => {
+  const { allPluginSourcesSucceeded, PLUGIN_SOURCE_ORDER } = await import("./plugin-sources")
+  const { fixtureFetch } = await import("../../test-fixtures/plugin-helper/source-fetch")
+  const sources = createPluginSources({ catalog: async () => [], fetch: fixtureFetch })
+  expect(sources.searchedSources("unknown")).toBeUndefined()
+  const result = await sources.searchSources("frontend-design")
+  const recorded = sources.searchedSources(result.searchId)!
+  expect(allPluginSourcesSucceeded(recorded)).toBe(true)
+  for (const source of PLUGIN_SOURCE_ORDER) expect(allPluginSourcesSucceeded(recorded.filter((item) => item.source !== source))).toBe(false)
+  expect(allPluginSourcesSucceeded([])).toBe(false)
+  expect(allPluginSourcesSucceeded(undefined)).toBe(false)
+  result.sources.splice(0)
+  expect(allPluginSourcesSucceeded(sources.searchedSources(result.searchId))).toBe(true)
+  const failed = createPluginSources({ catalog: async () => [], fetch: (url) => url.startsWith("https://registry.modelcontextprotocol.io/") ? Promise.reject(Error("controlled network failure")) : fixtureFetch(url) })
+  const failure = await failed.searchSources("frontend-design")
+  expect(failure.sources.find((item) => item.source === "mcp-registry")).toMatchObject({ status: "failed", reason: "network" })
+  expect(allPluginSourcesSucceeded(failed.searchedSources(failure.searchId))).toBe(false)
+})

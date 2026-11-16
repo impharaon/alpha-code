@@ -70,6 +70,7 @@ const view = (rows: HubViewRow[]): HubView => ({ directory: "/work/a", rows, war
 test("A3 tool contract is IDs only with source search, no secrets or routes", () => {
   const list = createHubTools(bridgeWith({ views: [view([])] }).bridge, contextWith(async () => {}).context)
   expect(list.map((tool) => tool.name).sort()).toEqual([
+    "codepuppy_hub_create",
     "codepuppy_hub_install",
     "codepuppy_hub_search",
     "codepuppy_hub_status",
@@ -79,6 +80,7 @@ test("A3 tool contract is IDs only with source search, no secrets or routes", ()
     Object.keys((list.find((tool) => tool.name === name)!.input as { properties: object }).properties)
   expect(fields("codepuppy_hub_search")).toEqual(["query"])
   expect(fields("codepuppy_hub_install")).toEqual(["id", "scope"])
+  expect(fields("codepuppy_hub_create")).toEqual(["searchId", "name", "description", "files", "scope"])
   expect(fields("codepuppy_hub_status")).toEqual(["id"])
   for (const tool of list)
     for (const key of fields(tool.name)) expect(key).not.toMatch(/secret|token|password|url|path|route|grant/i)
@@ -233,4 +235,33 @@ test("A3 tools search sources and install a main ID without permission transport
   })
   expect(installed).toMatchObject({ metadata: { packageId: "claude:playwright", stage: "committed" } })
   expect(contentOf(installed)).toContain("installed; available")
+})
+
+
+test("D3 create relays the frozen draft and scope through the install bridge without asking for consent", async () => {
+  const outcome = { ok: true as const, packageId: "mine:notes", displayName: "notes", source: { kind: "created" as const }, installed: [], notRunning: [] }
+  const h = bridgeWith({ views: [view([row({ id: outcome.packageId, name: "notes", installed: true, enabled: true, state: "available" })])], record: { requestId: "request_main", stage: "committed", packageId: outcome.packageId, outcome } })
+  const calls: unknown[] = []
+  h.bridge.install = async (input) => { calls.push(input); return { ok: true, accepted: true } }
+  const context = contextWith(async () => { throw Error("create must use ordinary policy, not an installation-consent transport") })
+  const input = { searchId: "search_main", name: "notes", description: "My notes", files: [{ path: "skills/notes/SKILL.md", text: "own instructions" }], scope: "this-project" as const }
+  const tool = tools(h.bridge, context.context).codepuppy_hub_create
+  expect(tool).toBeDefined()
+  const output = await tool!.execute(input, context.ctx)
+  expect(calls).toHaveLength(1)
+  expect(calls[0]).toMatchObject({ directory: "/work/a", scope: "this-project", ref: { kind: "created", draft: { searchId: input.searchId, name: input.name, description: input.description, files: input.files } } })
+  expect(context.asserts).toEqual([])
+  expect(contentOf(output)).toBe("installed; available")
+  expect(output.metadata).toMatchObject({ packageId: outcome.packageId, stage: "committed" })
+})
+
+test("D3 automation cannot send a create request", async () => {
+  const h = bridgeWith({ views: [view([])] })
+  let writes = 0
+  h.bridge.install = async () => { writes++; return { ok: true, accepted: true } }
+  const context = contextWith(async () => {})
+  const tool = tools(h.bridge, context.context).codepuppy_hub_create
+  expect(tool).toBeDefined()
+  await expect(tool!.execute({ searchId: "search_main", name: "n", description: "d", files: [] }, { ...(context.ctx as object), agent: "codepuppy-automation-standard" } as never)).rejects.toThrow("Permission denied: codepuppy_hub_create")
+  expect(writes).toBe(0)
 })

@@ -702,3 +702,6 @@ r10 决定 1 核验（2026-11-16，起始 11:23:40 UTC，约 8 分钟）：按 b
 
 
 r10 决定 2：按本轮裁定直接替换 `codepuppy-sidecar-wiring.test.ts` 中旧 renderer-recorded confirming 断言，生产行为不改。真 host 经真子进程分发受理 install 后，读取 submitted；只有 main 安装回调完成后读到 committed。旧 stage 写消息与畸形只读消息均拒绝，不改变 main 记录、不发伪回复；子进程 ready/attach、reload 排队与退出断开原断言保留，出站及日志金丝雀扫描零泄漏、无 confirming。`bun test --max-concurrency 2 src/main/codepuppy-sidecar-wiring.test.ts` exit 0，6 pass／0 fail／62 assertions（`r10-sidecar.log`）。原红已在 r9 指定命令留档，本笔属明确编码被替换行为的旧断言同步。已核 Codex（GPT-6），通过；普通审批面未改，下一步 BC4。
+
+
+BC4 红例先行：时间线三个具名场景 exit 1（无登录／连接动作，`r10-bc4-card-red.log`）；生产 `CodePuppySessionTimeline`→当前 SDK→既有 OAuth adapter→system-browser 的接线例 exit 1（按钮缺席，`r10-bc4-binding-red.log`），测试端点只模拟本仓引擎 API，不登录真实服务。独立共享密码组件三例宿主 exit 1（组件尚不存在，`r10-bc4-dialog-red.log`）；断言同包重读需求、部分提交、无 required、失效需求零写、失败不泄漏。旧 A4「没有时间线动作」断言随明确替换行为同步，原状态／金丝雀／manage 断言保持；生产 adapter 的目录参数形状已用实际 SDK 探测为 `location[directory]` 后写入断言，未手造第三方格式。

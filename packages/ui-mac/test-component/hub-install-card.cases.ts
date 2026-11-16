@@ -145,14 +145,14 @@ function harness(initial: HubRequestRecord | null, packages = [pack()]) {
     },
   }
 }
-function mount(value: Row) {
+function mount(value: Row, intents: Record<string, unknown> = {}) {
   const host = document.createElement("div")
   document.body.append(host)
   disposers.push(
     web.render(
       () =>
         solid.createComponent(TimelineIntentsContext.Provider, {
-          value: { cloudDirectory: "/requesting-directory" },
+          value: { cloudDirectory: "/requesting-directory", ...intents },
           get children() {
             return solid.createComponent(HubInstallCard, { row: value })
           },
@@ -254,7 +254,7 @@ test("A4 missing both identities only shows tool result; running search reports 
   expect(h.reads).toHaveLength(0)
 })
 
-test("A4 existing account truth supplies login/token states, with no timeline account actions", async () => {
+test("BC4 existing account truth supplies login/token states and a token action", async () => {
   const h = harness(committed())
   h.change({
     authorization: [
@@ -289,7 +289,7 @@ test("A4 existing account truth supplies login/token states, with no timeline ac
   await flush()
   expect(host.textContent).toContain("待填令牌")
   expect(host.querySelector("input")).toBeNull()
-  expect(host.querySelector("button")).toBeNull()
+  expect(host.querySelector("[data-package-token-action]")?.textContent).toBe("连接 Docs")
 })
 
 test("A4 pending engine state is reread without a Location reload notification", async () => {
@@ -301,4 +301,59 @@ test("A4 pending engine state is reread without a Location reload notification",
   await new Promise((resolve) => setTimeout(resolve, 1100))
   await flush()
   expect(host.textContent).toContain("context7 已可用")
+})
+
+
+test("BC4 timeline login invokes the current directory auth intent once without another confirmation",async()=>{
+ const h=harness(committed())
+ const account={kind:"mcp-oauth" as const,componentId:"mcp",prerequisiteId:"oauth",serviceName:"Docs",label:"Docs",authenticated:false,status:"needs_auth"}
+ h.change({authorization:[account]})
+ const calls:string[]=[]
+ let finish!:()=>void
+ const pending=new Promise<void>(resolve=>{finish=resolve})
+ const host=mount(row(),{authenticateMcp:async(name:string)=>{calls.push(name);await pending;h.change({state:"available",authorization:[{...account,authenticated:true,status:"connected"}]});return {ok:true}}})
+ await flush()
+ const button=host.querySelector<HTMLButtonElement>('[data-package-login-action]')
+ expect(button?.textContent).toBe("登录 Docs")
+ button!.click();button!.click()
+ await flush()
+ expect(calls).toEqual(["Docs"])
+ expect(document.querySelector('[role="dialog"]')).toBeNull()
+ finish();await flush()
+ expect(host.textContent).toContain("context7 已可用")
+ expect(h.packages).toHaveLength(1)
+})
+
+test("BC4 timeline token input cancels and reopens empty, saves only to the same package channel, and keeps management identity",async()=>{
+ const h=harness(committed())
+ const account={kind:"secret" as const,componentId:"mcp",prerequisiteId:"TOKEN",serviceName:"Docs",label:"Token",saved:false}
+ h.change({authorization:[account]})
+ const saves:unknown[]=[]
+ const canary="BC4_TIMELINE_PASSWORD_CANARY_1949"
+ Object.assign(window.api.ext,{savePackageSecrets:async(input:unknown)=>{saves.push(input);h.change({state:"available",authorization:[{...account,saved:true}]});return {ok:true}}})
+ const host=mount(row())
+ await flush()
+ const open=()=>host.querySelector<HTMLButtonElement>('[data-package-token-action]')!.click()
+ open();await flush()
+ const field=document.querySelector<HTMLInputElement>('[role="dialog"] input[type="password"]')!
+ expect(field).not.toBeNull();expect(field.required).toBe(false);expect(field.autocomplete).toBe("off")
+ field.value=canary;field.dispatchEvent(new Event("input",{bubbles:true}))
+ expect(document.body.innerHTML).not.toContain(canary)
+ document.querySelector<HTMLButtonElement>('[role="dialog"] .a-dialog-close')?.click()
+ document.dispatchEvent(new KeyboardEvent("keydown",{key:"Escape",bubbles:true}))
+ await flush()
+ expect(document.querySelector('[role="dialog"]')).toBeNull();expect(saves).toEqual([])
+ expect(host.textContent).toContain("待填令牌");expect(h.packages).toHaveLength(1)
+ open();await flush()
+ const reopened=document.querySelector<HTMLInputElement>('[role="dialog"] input[type="password"]')!
+ expect(reopened.value).toBe("")
+ reopened.value=canary;reopened.dispatchEvent(new Event("input",{bubbles:true}))
+ document.querySelector<HTMLButtonElement>('[role="dialog"] .a-dialog-footer button')!.click();await flush()
+ expect(saves).toEqual([{packageId:pack().packageId,secrets:{TOKEN:canary}}])
+ expect(document.querySelector('[role="dialog"]')).toBeNull()
+ expect(host.textContent).toContain("context7 已可用")
+ expect(JSON.stringify(h.reads)).not.toContain(canary)
+ expect(document.body.innerHTML).not.toContain(canary)
+ host.querySelector<HTMLButtonElement>('.a-tc-open')!.click()
+ expect(takePackageManagementTarget()).toBe(pack().packageId)
 })

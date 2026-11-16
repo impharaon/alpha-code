@@ -161,7 +161,7 @@ beforeAll(async () => {
   cloudEndpoint = Bun.serve({ hostname: "127.0.0.1", port: 0, fetch: (request) => echo.fetch(request) })
   const { testCloudMcp } = await import("../../test-component/codepuppy-bootstrap-fixture")
   const { secretFilePath } = await import("./codepuppy-secret-files")
-  host = codepuppyEngine({ sandbox, name: "hub-lifecycle", modelBaseURL: model.baseURL,
+  host = codepuppyEngine({ sandbox, name: "hub-lifecycle", modelBaseURL: model.baseURL, killSwitch: true,
     cloudMcp: testCloudMcp(`http://127.0.0.1:${cloudEndpoint.port}/mcp`, secretFilePath(join(sandbox.root, "hub-lifecycle-userdata"), "CODEPUPPY_MCP_TOKEN"), "hub-cloud"),
   })
   process.chdir(host.projectDirectory)

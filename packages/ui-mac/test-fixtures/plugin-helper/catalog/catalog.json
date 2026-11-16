@@ -1,0 +1,2176 @@
+{
+  "version": "2026-11-15.1",
+  "_note": "alpha-code 扩展目录 —— 远程分发真源(REQ-032:codepuppy.cn/catalog/v1,ed25519 签名,ETag 缓存;A 侧回退链 远端→缓存→内置)。schema 同 A 侧 alpha-catalog.json + 条目级 version + remoteAsset(下载清单,sha256 钉死)。编辑本文件后跑 scripts/build-catalog.mjs 再 git commit + deploy。",
+  "_disclaimers": [
+    "标 _verify 的条目:包名/协议/可用性需落地前手工核实,不得当作已确认事实。",
+    "redistributable=false 的条目不得把其文件内置进 app,只能运行时远程拉或引导用户自装。",
+    "Anthropic document-skills(docx/xlsx/pptx/pdf)源码可见但禁止再分发,故本目录不收。",
+    "MCP command/version 全部钉精确版本(A2/T1.5):npx `@pkg@x.y.z` / uvx `pkg@x.y.z`,消除每启动在线解析风暴。钉的值 = 更新当日各包 latest,行为与不钉一致、仅冻结确定性。升级 = 手动 bump(见 npm/pypi)。存量用户配置的一键钉版本迁移(T1.5 第二半)仍待做。",
+    "内置 skill 资产(builtinAssetKey → resources/skills/):codepuppy-upstream-sync / safe-refactor(MIT,自写)+ skill-creator(Apache-2.0,Anthropic 官方,S12 T7 已打包,见 NOTICE)。mcp-builder / canvas-design / brand-guidelines 及空壳 bundle:design 已撤(REQ-044:资产从未打包 → 安装恒失败;S21 真机实锤)——资产就绪后经远程 catalog(REQ-032)上架,零发版,不再内置无资产条目。",
+    "tools[]/hooks[] 是精选元数据(详情页展示用),非全集;引擎无 tools 查询路由,实时探测为 flag 内 V2(REQ-019 T8)。标 _verify 条目的 tools[] 同属待核实。",
+    "agent 类条目 = vendored md 资产(resources/agents/),安装经 writeAgent 同管线(桥+账本);legacy catalog 的 plugin entry type 只保留为货架词汇,ADR-040 后当前目录不再发布会写入引擎 plugin[] 的条目。",
+    "REQ-105/REQ-135(2026-08-18,alpha-web#21/#155):Word/PPT 社区连接器因上游归档从 stable catalog 下架;社区 Excel 连接器也按 owner lock 从推荐面退役。处置 = 条目移除而非 tombstone/legacy 卡;Hub Excel 仅 mcp:codepuppy-excel。退役 id、bundle 引用与包名回流由 tests/catalog-guard.test.mjs 拦截。"
+  ],
+  "entries": [
+    {
+      "id": "mcp:markitdown",
+      "type": "mcp",
+      "name": "markitdown",
+      "displayName": "文档读取（markitdown）",
+      "description": "让助手读取 PDF、Word、PowerPoint、Excel、图片或网页内容。由 Microsoft 提供，会将内容转成便于助手读取的 Markdown 文本。",
+      "source": "official",
+      "category": "office",
+      "license": "MIT",
+      "redistributable": true,
+      "version": "1.0.1",
+      "installSpec": {
+        "kind": "mcp",
+        "mcpType": "local",
+        "command": [
+          "uvx",
+          "markitdown-mcp@0.0.1a7"
+        ],
+        "requiredEnvVars": [],
+        "runtimeDep": [
+          "uv"
+        ]
+      },
+      "tools": [
+        {
+          "name": "convert_to_markdown",
+          "description": "读取文件或网址中的内容，并转成 Markdown 文本；支持 PDF、Word、PowerPoint、Excel、图片和 HTML。"
+        }
+      ]
+    },
+    {
+      "id": "mcp:codepuppy-word",
+      "type": "mcp",
+      "name": "codepuppy-word",
+      "displayName": "Word 文档读写",
+      "description": "读取 .docx 的正文和结构，也能新建或改写文档。由 Code Puppy 提供，在本机运行，无需安装 Microsoft Office。只能读写你已授权的项目目录；请提供完整文件路径。",
+      "source": "codepuppy",
+      "category": "office",
+      "license": "MIT",
+      "redistributable": true,
+      "version": "1.0.0",
+      "installSpec": {
+        "kind": "mcp",
+        "mcpType": "local",
+        "command": [
+          "uv",
+          "run",
+          "--no-project",
+          "--with",
+          "python-docx==1.2.0",
+          "{codepuppyResources}/office-mcp/server.py",
+          "word",
+          "{workspace}"
+        ],
+        "requiredEnvVars": [],
+        "runtimeDep": [
+          "uv"
+        ],
+        "_note": "{codepuppyResources} 只由桌面端 main 替换为随包资源根,{workspace} 替换为当前项目目录(即本连接器的可访问白名单);renderer 与 catalog 都选不了别的资源根。"
+      },
+      "tools": [
+        {
+          "name": "read_docx",
+          "description": "读取 Word 文档（.docx）的正文和结构"
+        },
+        {
+          "name": "write_docx",
+          "description": "新建或改写 Word 文档（.docx）"
+        }
+      ],
+      "_provenance": "REQ-133(2026-08-17,alpha-work#64;已批基线 alpha-code#1005 docs/design/req-133-office-four-format-hub.md):Alpha 出品四格式办公连接器之一,文件级薄包装。命令数组逐字取自该基线;唯一 transport 是进程 stdin/stdout 上的 JSON-RPC,CLI 只接受 <format> <absolute-workspace>。依赖钉版升级 = 重新 intake + 同步改 A 侧 office-advisories 与本仓 tests/catalog-guard.test.mjs。与 2026-03-03 归档的社区 Word 连接器无关(其 id 与包名仍在禁列)。",
+      "curation": {
+        "schema": "codepuppy.catalog.curation.v1",
+        "tier": "connector",
+        "activationPolicy": "default-disabled",
+        "deliveryMode": "installable",
+        "review": {
+          "reviewedAt": "2026-08-17T00:00:00Z",
+          "reviewedBy": "jinjunnn",
+          "upstreamStatus": "active",
+          "supportTier": "full",
+          "reviewBefore": "2027-02-17T00:00:00Z"
+        },
+        "applicability": {
+          "frameworks": [
+            "*"
+          ]
+        },
+        "summaries": {
+          "capabilities": [
+            "fs:read"
+          ],
+          "networkDomains": [],
+          "requiredSecrets": [],
+          "runtimeDependencies": [],
+          "download": {
+            "bytes": null,
+            "basis": "unknown"
+          }
+        },
+        "refs": {
+          "sbom": {
+            "sha256": "ccf3205975b050a411bfb138b6b522c09996fed01019804cf1664ff3ecb60d6d",
+            "bytes": 266,
+            "url": "https://codepuppy.cn/catalog/assets/mcp.codepuppy-word/1.0.0/codepuppy-curation/sbom/ccf3205975b050a411bfb138b6b522c09996fed01019804cf1664ff3ecb60d6d.cdx.json",
+            "format": "cyclonedx-1.6+json"
+          },
+          "intakeProvenance": {
+            "sha256": "ecdff35459390ff545649f09f2f167818e0d4a3a9241327ea69d53dc85470679",
+            "bytes": 496,
+            "url": "https://codepuppy.cn/catalog/assets/mcp.codepuppy-word/1.0.0/codepuppy-curation/intake-provenance/ecdff35459390ff545649f09f2f167818e0d4a3a9241327ea69d53dc85470679.json",
+            "format": "codepuppy.intake-provenance.v1+json"
+          }
+        }
+      }
+    },
+    {
+      "id": "mcp:codepuppy-excel",
+      "type": "mcp",
+      "name": "codepuppy-excel",
+      "displayName": "Excel 表格读写",
+      "description": "读取 .xlsx 工作表，写入单元格或新建工作簿。由 Code Puppy 提供，在本机运行，无需安装 Microsoft Office。只能读写你已授权的项目目录；请提供完整文件路径。定制中心的本地 Excel 连接器使用此项。",
+      "source": "codepuppy",
+      "category": "office",
+      "license": "MIT",
+      "redistributable": true,
+      "version": "1.0.0",
+      "artifactDigest": "sha256:f8dc3f1ade116ab3a9739b47a625d30d586403b7478950b03f2a122c0338f680",
+      "installSpec": {
+        "kind": "mcp",
+        "mcpType": "local",
+        "command": [
+          "uv",
+          "run",
+          "--no-project",
+          "--with",
+          "openpyxl==3.1.5",
+          "{codepuppyResources}/office-mcp/server.py",
+          "excel",
+          "{workspace}"
+        ],
+        "requiredEnvVars": [],
+        "runtimeDep": [
+          "uv"
+        ],
+        "_note": "{codepuppyResources} 只由桌面端 main 替换为随包资源根,{workspace} 替换为当前项目目录(即本连接器的可访问白名单);renderer 与 catalog 都选不了别的资源根。"
+      },
+      "tools": [
+        {
+          "name": "read_xlsx",
+          "description": "读取 Excel 工作表（.xlsx）中的数据"
+        },
+        {
+          "name": "write_xlsx",
+          "description": "写入或新建 Excel 工作簿（.xlsx）"
+        }
+      ],
+      "_provenance": "REQ-133(2026-08-17,alpha-work#64;已批基线 alpha-code#1005 docs/design/req-133-office-four-format-hub.md):Alpha 出品四格式办公连接器之一,文件级薄包装。命令数组逐字取自该基线;唯一 transport 是进程 stdin/stdout 上的 JSON-RPC,CLI 只接受 <format> <absolute-workspace>。依赖钉版升级 = 重新 intake + 同步改 A 侧 office-advisories 与本仓 tests/catalog-guard.test.mjs。REQ-135(2026-08-18,alpha-work#65;alpha-web#155):Hub Excel owner lock 仅保留本 Alpha 条目;社区实现从推荐面退役,不改标、不保留 legacy 卡。REQ-105(2026-08-25,alpha-work#7 AC2;alpha-web#164):artifactDigest = 本条目执行物(A 侧随包 office-mcp/server.py)的内容地址,与 A 侧 receipt 同域同算法 —— alpha-code packages/ui-mac/src/main/ext-mcp-policy.ts bundledOfficeServerDigest,即 aggregateFilesDigest 域:对 path+NUL字节+file-sha256 的行排序 join(LF) 再 sha256,带 sha256: 前缀;path 恒为 office-mcp/server.py,file-sha256 = 本仓 intake record(catalog-src/intake/records/mcp.codepuppy-excel/<version>/intake.json,source alpha-code@e77cb02f3)files[server.py].sha256。server.py 换字节 = 重新 intake,并同步改本字段与 tests/catalog-guard.test.mjs 的独立锚点,缺一即测试红。",
+      "curation": {
+        "schema": "codepuppy.catalog.curation.v1",
+        "tier": "connector",
+        "activationPolicy": "default-disabled",
+        "deliveryMode": "installable",
+        "review": {
+          "reviewedAt": "2026-08-17T00:00:00Z",
+          "reviewedBy": "jinjunnn",
+          "upstreamStatus": "active",
+          "supportTier": "full",
+          "reviewBefore": "2027-02-17T00:00:00Z"
+        },
+        "applicability": {
+          "frameworks": [
+            "*"
+          ]
+        },
+        "summaries": {
+          "capabilities": [
+            "fs:read"
+          ],
+          "networkDomains": [],
+          "requiredSecrets": [],
+          "runtimeDependencies": [],
+          "download": {
+            "bytes": null,
+            "basis": "unknown"
+          }
+        },
+        "refs": {
+          "sbom": {
+            "sha256": "451af989243c05da5d4501c95a1e6da25cd554d8406101da04d319258fd78745",
+            "bytes": 268,
+            "url": "https://codepuppy.cn/catalog/assets/mcp.codepuppy-excel/1.0.0/codepuppy-curation/sbom/451af989243c05da5d4501c95a1e6da25cd554d8406101da04d319258fd78745.cdx.json",
+            "format": "cyclonedx-1.6+json"
+          },
+          "intakeProvenance": {
+            "sha256": "90008fd6478fd234741de1745f676d099b0c6a630d2ef54818486d86cf30bced",
+            "bytes": 497,
+            "url": "https://codepuppy.cn/catalog/assets/mcp.codepuppy-excel/1.0.0/codepuppy-curation/intake-provenance/90008fd6478fd234741de1745f676d099b0c6a630d2ef54818486d86cf30bced.json",
+            "format": "codepuppy.intake-provenance.v1+json"
+          }
+        }
+      }
+    },
+    {
+      "id": "mcp:codepuppy-powerpoint",
+      "type": "mcp",
+      "name": "codepuppy-powerpoint",
+      "displayName": "PowerPoint 幻灯片读写",
+      "description": "读取 .pptx 的幻灯片文字和结构，也能新建或改写演示文稿。由 Code Puppy 提供，在本机运行，无需安装 Microsoft Office。只能读写你已授权的项目目录；请提供完整文件路径。",
+      "source": "codepuppy",
+      "category": "office",
+      "license": "MIT",
+      "redistributable": true,
+      "version": "1.0.0",
+      "installSpec": {
+        "kind": "mcp",
+        "mcpType": "local",
+        "command": [
+          "uv",
+          "run",
+          "--no-project",
+          "--with",
+          "python-pptx==1.0.2",
+          "{codepuppyResources}/office-mcp/server.py",
+          "powerpoint",
+          "{workspace}"
+        ],
+        "requiredEnvVars": [],
+        "runtimeDep": [
+          "uv"
+        ],
+        "_note": "{codepuppyResources} 只由桌面端 main 替换为随包资源根,{workspace} 替换为当前项目目录(即本连接器的可访问白名单);renderer 与 catalog 都选不了别的资源根。"
+      },
+      "tools": [
+        {
+          "name": "read_pptx",
+          "description": "读取 PowerPoint（.pptx）的幻灯片文字和结构"
+        },
+        {
+          "name": "write_pptx",
+          "description": "新建或改写 PowerPoint 演示文稿（.pptx）"
+        }
+      ],
+      "_provenance": "REQ-133(2026-08-17,alpha-work#64;已批基线 alpha-code#1005 docs/design/req-133-office-four-format-hub.md):Alpha 出品四格式办公连接器之一,文件级薄包装。命令数组逐字取自该基线;唯一 transport 是进程 stdin/stdout 上的 JSON-RPC,CLI 只接受 <format> <absolute-workspace>。依赖钉版升级 = 重新 intake + 同步改 A 侧 office-advisories 与本仓 tests/catalog-guard.test.mjs。与 2026-03-03 归档的社区 PowerPoint 连接器无关(其 id 与包名仍在禁列)。",
+      "curation": {
+        "schema": "codepuppy.catalog.curation.v1",
+        "tier": "connector",
+        "activationPolicy": "default-disabled",
+        "deliveryMode": "installable",
+        "review": {
+          "reviewedAt": "2026-08-17T00:00:00Z",
+          "reviewedBy": "jinjunnn",
+          "upstreamStatus": "active",
+          "supportTier": "full",
+          "reviewBefore": "2027-02-17T00:00:00Z"
+        },
+        "applicability": {
+          "frameworks": [
+            "*"
+          ]
+        },
+        "summaries": {
+          "capabilities": [
+            "fs:read"
+          ],
+          "networkDomains": [],
+          "requiredSecrets": [],
+          "runtimeDependencies": [],
+          "download": {
+            "bytes": null,
+            "basis": "unknown"
+          }
+        },
+        "refs": {
+          "sbom": {
+            "sha256": "afdd0c24689136aefce910500f2d2dd67b31ff4cc92725bf108b567cbbdb22ed",
+            "bytes": 278,
+            "url": "https://codepuppy.cn/catalog/assets/mcp.codepuppy-powerpoint/1.0.0/codepuppy-curation/sbom/afdd0c24689136aefce910500f2d2dd67b31ff4cc92725bf108b567cbbdb22ed.cdx.json",
+            "format": "cyclonedx-1.6+json"
+          },
+          "intakeProvenance": {
+            "sha256": "3c6ea1fd6aab30809ac6933b154235938d14b44a3cfe94e2aac282cc651733fc",
+            "bytes": 502,
+            "url": "https://codepuppy.cn/catalog/assets/mcp.codepuppy-powerpoint/1.0.0/codepuppy-curation/intake-provenance/3c6ea1fd6aab30809ac6933b154235938d14b44a3cfe94e2aac282cc651733fc.json",
+            "format": "codepuppy.intake-provenance.v1+json"
+          }
+        }
+      }
+    },
+    {
+      "id": "mcp:codepuppy-pdf",
+      "type": "mcp",
+      "name": "codepuppy-pdf",
+      "displayName": "PDF 文本读写",
+      "description": "提取 PDF 文字，创建文字型 PDF，替换正文或追加文字页。由 Code Puppy 提供，在本机运行；只能读写已授权的项目目录，请提供完整文件路径。不支持版式设计、保持印刷效果的编辑、Office 格式转换、数字签名或任意修改 PDF 对象。",
+      "source": "codepuppy",
+      "category": "office",
+      "license": "MIT",
+      "redistributable": true,
+      "version": "1.0.0",
+      "installSpec": {
+        "kind": "mcp",
+        "mcpType": "local",
+        "command": [
+          "uv",
+          "run",
+          "--no-project",
+          "--with",
+          "pypdf==6.16.1",
+          "--with",
+          "reportlab==5.0.0",
+          "{codepuppyResources}/office-mcp/server.py",
+          "pdf",
+          "{workspace}"
+        ],
+        "requiredEnvVars": [],
+        "runtimeDep": [
+          "uv"
+        ],
+        "_note": "{codepuppyResources} 只由桌面端 main 替换为随包资源根,{workspace} 替换为当前项目目录(即本连接器的可访问白名单);renderer 与 catalog 都选不了别的资源根。"
+      },
+      "tools": [
+        {
+          "name": "read_pdf",
+          "description": "提取 PDF 中的文字"
+        },
+        {
+          "name": "write_pdf",
+          "description": "新建文字型 PDF、替换正文或追加文字页"
+        }
+      ],
+      "_provenance": "REQ-133(2026-08-17,alpha-work#64;已批基线 alpha-code#1005 docs/design/req-133-office-four-format-hub.md):Alpha 出品四格式办公连接器之一,文件级薄包装。命令数组逐字取自该基线;唯一 transport 是进程 stdin/stdout 上的 JSON-RPC,CLI 只接受 <format> <absolute-workspace>。依赖钉版升级 = 重新 intake + 同步改 A 侧 office-advisories 与本仓 tests/catalog-guard.test.mjs。写入面的边界(仅文本型文档)是已批基线的安全不变量,不得在文案或工具面外扩。",
+      "curation": {
+        "schema": "codepuppy.catalog.curation.v1",
+        "tier": "connector",
+        "activationPolicy": "default-disabled",
+        "deliveryMode": "installable",
+        "review": {
+          "reviewedAt": "2026-08-17T00:00:00Z",
+          "reviewedBy": "jinjunnn",
+          "upstreamStatus": "active",
+          "supportTier": "full",
+          "reviewBefore": "2027-02-17T00:00:00Z"
+        },
+        "applicability": {
+          "frameworks": [
+            "*"
+          ]
+        },
+        "summaries": {
+          "capabilities": [
+            "fs:read"
+          ],
+          "networkDomains": [],
+          "requiredSecrets": [],
+          "runtimeDependencies": [],
+          "download": {
+            "bytes": null,
+            "basis": "unknown"
+          }
+        },
+        "refs": {
+          "sbom": {
+            "sha256": "798223e8854951333d8f3749431a4f6b4ba24bff7a700989a45bb18c76a623b2",
+            "bytes": 264,
+            "url": "https://codepuppy.cn/catalog/assets/mcp.codepuppy-pdf/1.0.0/codepuppy-curation/sbom/798223e8854951333d8f3749431a4f6b4ba24bff7a700989a45bb18c76a623b2.cdx.json",
+            "format": "cyclonedx-1.6+json"
+          },
+          "intakeProvenance": {
+            "sha256": "c152f2920b0c2154370b7a454cb208c079e76c6ef3529d30fab7454b0f011d31",
+            "bytes": 495,
+            "url": "https://codepuppy.cn/catalog/assets/mcp.codepuppy-pdf/1.0.0/codepuppy-curation/intake-provenance/c152f2920b0c2154370b7a454cb208c079e76c6ef3529d30fab7454b0f011d31.json",
+            "format": "codepuppy.intake-provenance.v1+json"
+          }
+        }
+      }
+    },
+    {
+      "id": "mcp:filesystem",
+      "type": "mcp",
+      "name": "filesystem",
+      "displayName": "本地文件读写",
+      "description": "让助手读取和修改允许访问的本地文件夹中的文件。由 modelcontextprotocol 提供的官方参考实现。",
+      "source": "official",
+      "category": "dev",
+      "license": "MIT",
+      "redistributable": true,
+      "version": "1.0.0",
+      "installSpec": {
+        "kind": "mcp",
+        "mcpType": "local",
+        "command": [
+          "npx",
+          "-y",
+          "@modelcontextprotocol/server-filesystem@2026.1.14",
+          "{workspace}"
+        ],
+        "requiredEnvVars": [],
+        "runtimeDep": [
+          "node"
+        ],
+        "_note": "{workspace} 安装时替换为当前项目目录;该路径即此 MCP 的可访问白名单。"
+      },
+      "tools": [
+        {
+          "name": "read_text_file",
+          "description": "读取允许访问的文件夹中的文件"
+        },
+        {
+          "name": "write_file",
+          "description": "写入文件，或覆盖现有内容"
+        },
+        {
+          "name": "edit_file",
+          "description": "按指定改动编辑文件"
+        },
+        {
+          "name": "list_directory",
+          "description": "查看文件夹中的内容"
+        },
+        {
+          "name": "search_files",
+          "description": "按名称查找文件，包括子文件夹"
+        }
+      ],
+      "curation": {
+        "schema": "codepuppy.catalog.curation.v1",
+        "tier": "precache",
+        "activationPolicy": "default-disabled",
+        "deliveryMode": "installable",
+        "review": {
+          "reviewedAt": "2026-07-18T00:00:00Z",
+          "reviewedBy": "jinjunnn",
+          "upstreamStatus": "active",
+          "supportTier": "community",
+          "reviewBefore": "2027-01-18T00:00:00Z"
+        },
+        "applicability": {
+          "frameworks": [
+            "*"
+          ]
+        },
+        "summaries": {
+          "capabilities": [
+            "fs:read",
+            "fs:write"
+          ],
+          "networkDomains": [
+            "anthropic.com",
+            "code.visualstudio.com",
+            "github.com",
+            "img.shields.io",
+            "insiders.vscode.dev",
+            "modelcontextprotocol.io"
+          ],
+          "requiredSecrets": [],
+          "runtimeDependencies": [
+            "node"
+          ],
+          "download": {
+            "bytes": null,
+            "basis": "unknown"
+          }
+        },
+        "refs": {
+          "sbom": {
+            "sha256": "440af2f3847a719355731bcb94269baf9511242e711eb1f6288502e4036621ae",
+            "bytes": 258,
+            "url": "https://codepuppy.cn/catalog/assets/mcp.filesystem/1.0.0/codepuppy-curation/sbom/440af2f3847a719355731bcb94269baf9511242e711eb1f6288502e4036621ae.cdx.json",
+            "format": "cyclonedx-1.6+json"
+          },
+          "intakeProvenance": {
+            "sha256": "4426b32695d613007ff53bf34de22bba8d7bfb6bf8774d30a6d4909444a4f072",
+            "bytes": 518,
+            "url": "https://codepuppy.cn/catalog/assets/mcp.filesystem/1.0.0/codepuppy-curation/intake-provenance/4426b32695d613007ff53bf34de22bba8d7bfb6bf8774d30a6d4909444a4f072.json",
+            "format": "codepuppy.intake-provenance.v1+json"
+          }
+        }
+      }
+    },
+    {
+      "id": "mcp:fetch",
+      "type": "mcp",
+      "name": "fetch",
+      "displayName": "网页读取（fetch）",
+      "description": "提供网页地址，让助手读取网页并转成 Markdown 文本，用于检索和研究。由官方参考实现提供。",
+      "source": "official",
+      "category": "research",
+      "license": "MIT",
+      "redistributable": true,
+      "version": "1.0.1",
+      "installSpec": {
+        "kind": "mcp",
+        "mcpType": "local",
+        "command": [
+          "uvx",
+          "--with=mcp==1.29.0",
+          "mcp-server-fetch@2026.6.4"
+        ],
+        "requiredEnvVars": [],
+        "runtimeDep": [
+          "uv"
+        ]
+      },
+      "tools": [
+        {
+          "name": "fetch",
+          "description": "读取网页并转成 Markdown 文本，较长内容可以分段继续读取"
+        }
+      ]
+    },
+    {
+      "id": "mcp:playwright",
+      "type": "mcp",
+      "name": "playwright",
+      "displayName": "浏览器操作（Playwright）",
+      "description": "让助手打开网页、点击、填写表单、截图和运行页面脚本，也能读取需要 JavaScript 加载的网页。由 Microsoft 提供。使用前请在本机安装 Google Chrome 和 Node.js 18 或以上版本。",
+      "source": "official",
+      "category": "dev",
+      "license": "Apache-2.0",
+      "redistributable": true,
+      "version": "1.0.0",
+      "installSpec": {
+        "kind": "mcp",
+        "mcpType": "local",
+        "command": [
+          "npx",
+          "-y",
+          "@playwright/mcp@0.0.77"
+        ],
+        "requiredEnvVars": [],
+        "runtimeDep": [
+          "node"
+        ]
+      },
+      "tools": [
+        {
+          "name": "browser_navigate",
+          "description": "打开指定网页"
+        },
+        {
+          "name": "browser_click",
+          "description": "点击网页中的按钮或其它元素"
+        },
+        {
+          "name": "browser_type",
+          "description": "输入文字或填写网页表单"
+        },
+        {
+          "name": "browser_snapshot",
+          "description": "读取页面的文字和控件信息，帮助助手理解网页"
+        },
+        {
+          "name": "browser_take_screenshot",
+          "description": "截取网页画面"
+        },
+        {
+          "name": "browser_evaluate",
+          "description": "在网页中运行 JavaScript 代码"
+        }
+      ],
+      "curation": {
+        "schema": "codepuppy.catalog.curation.v1",
+        "tier": "precache",
+        "activationPolicy": "default-disabled",
+        "deliveryMode": "installable",
+        "review": {
+          "reviewedAt": "2026-07-18T00:00:00Z",
+          "reviewedBy": "jinjunnn",
+          "upstreamStatus": "active",
+          "supportTier": "community",
+          "reviewBefore": "2027-01-18T00:00:00Z"
+        },
+        "applicability": {
+          "frameworks": [
+            "*"
+          ]
+        },
+        "summaries": {
+          "capabilities": [
+            "net:http"
+          ],
+          "networkDomains": [
+            "block.github.io",
+            "code.visualstudio.com",
+            "cursor.com",
+            "docs.cline.bot",
+            "docs.factory.ai",
+            "docs.github.com",
+            "docs.qodo.ai",
+            "docs.warp.dev",
+            "docs.windsurf.com",
+            "example.com",
+            "files.lmstudio.ai",
+            "github.com",
+            "img.shields.io",
+            "insiders.vscode.dev",
+            "junie.jetbrains.com",
+            "kiro.dev",
+            "lmstudio.ai",
+            "modelcontextprotocol.io",
+            "opencode.ai",
+            "playwright.dev",
+            "www.apache.org"
+          ],
+          "requiredSecrets": [],
+          "runtimeDependencies": [
+            "node"
+          ],
+          "download": {
+            "bytes": null,
+            "basis": "unknown"
+          }
+        },
+        "refs": {
+          "sbom": {
+            "sha256": "c7bdeb162de72c19f00be720d2363be86d2580ddde0595a87eb0a5f1c98eb93a",
+            "bytes": 258,
+            "url": "https://codepuppy.cn/catalog/assets/mcp.playwright/1.0.0/codepuppy-curation/sbom/c7bdeb162de72c19f00be720d2363be86d2580ddde0595a87eb0a5f1c98eb93a.cdx.json",
+            "format": "cyclonedx-1.6+json"
+          },
+          "intakeProvenance": {
+            "sha256": "1155d5771637aee4871e42facc70f04f831d1617f4c4cf420fbef835756ae70b",
+            "bytes": 614,
+            "url": "https://codepuppy.cn/catalog/assets/mcp.playwright/1.0.0/codepuppy-curation/intake-provenance/1155d5771637aee4871e42facc70f04f831d1617f4c4cf420fbef835756ae70b.json",
+            "format": "codepuppy.intake-provenance.v1+json"
+          }
+        }
+      }
+    },
+    {
+      "id": "mcp:git",
+      "type": "mcp",
+      "name": "git",
+      "displayName": "Git 版本管理",
+      "description": "查看仓库状态、改动和提交历史，也能暂存文件并创建提交。由官方 Git 参考实现提供。",
+      "source": "official",
+      "category": "dev",
+      "license": "MIT",
+      "redistributable": true,
+      "version": "1.0.1",
+      "installSpec": {
+        "kind": "mcp",
+        "mcpType": "local",
+        "command": [
+          "uvx",
+          "mcp-server-git@2026.10.10",
+          "--repository",
+          "{workspace}"
+        ],
+        "requiredEnvVars": [],
+        "runtimeDep": [
+          "uv",
+          "git"
+        ]
+      },
+      "tools": [
+        {
+          "name": "git_status",
+          "description": "查看仓库当前状态"
+        },
+        {
+          "name": "git_diff",
+          "description": "查看文件改动"
+        },
+        {
+          "name": "git_log",
+          "description": "查看提交历史"
+        },
+        {
+          "name": "git_add",
+          "description": "将文件加入下一次提交"
+        },
+        {
+          "name": "git_commit",
+          "description": "创建 Git 提交"
+        }
+      ]
+    },
+    {
+      "id": "mcp:chrome-devtools",
+      "type": "mcp",
+      "name": "chrome-devtools",
+      "displayName": "网页排查（Chrome DevTools）",
+      "description": "帮助排查网页加载慢、报错和网络请求问题，还能截图和运行调试脚本。由 Google 提供。请先在本机安装 Chrome；Node.js 需使用 20.19+、22.12+ 或 23+ 版本。",
+      "source": "official",
+      "category": "dev",
+      "license": "Apache-2.0",
+      "redistributable": true,
+      "version": "1.0.0",
+      "installSpec": {
+        "kind": "mcp",
+        "mcpType": "local",
+        "command": [
+          "npx",
+          "-y",
+          "chrome-devtools-mcp@1.6.0"
+        ],
+        "requiredEnvVars": [],
+        "runtimeDep": [
+          "node"
+        ]
+      },
+      "tools": [
+        {
+          "name": "performance_start_trace",
+          "description": "记录网页运行情况，帮助找出加载慢的原因"
+        },
+        {
+          "name": "navigate_page",
+          "description": "打开指定网页"
+        },
+        {
+          "name": "list_console_messages",
+          "description": "查看浏览器控制台中的错误信息"
+        },
+        {
+          "name": "list_network_requests",
+          "description": "查看网页发出的网络请求"
+        },
+        {
+          "name": "take_screenshot",
+          "description": "截取网页画面"
+        },
+        {
+          "name": "evaluate_script",
+          "description": "在网页中运行调试脚本"
+        }
+      ],
+      "curation": {
+        "schema": "codepuppy.catalog.curation.v1",
+        "tier": "labs",
+        "activationPolicy": "session-grant",
+        "deliveryMode": "installable",
+        "review": {
+          "reviewedAt": "2026-07-18T00:00:00Z",
+          "reviewedBy": "jinjunnn",
+          "upstreamStatus": "active",
+          "supportTier": "community",
+          "reviewBefore": "2027-01-18T00:00:00Z"
+        },
+        "applicability": {
+          "frameworks": [
+            "*"
+          ]
+        },
+        "summaries": {
+          "capabilities": [
+            "env:read",
+            "fs:read",
+            "fs:write",
+            "net:http",
+            "proc:spawn"
+          ],
+          "networkDomains": [
+            "127.0.0.1",
+            "ajv.js.org",
+            "ampcode.com",
+            "antigravity.google",
+            "chromeuxreport.googleapis.com",
+            "chromiumdash.appspot.com",
+            "cloud.google.com",
+            "code.claude.com",
+            "code.visualstudio.com",
+            "commandcode.ai",
+            "core-js.io",
+            "creativecommons.org",
+            "csp-evaluator.withgoogle.com",
+            "cursor.com",
+            "daringfireball.net",
+            "developer.chrome.com",
+            "developers.chrome.com",
+            "developers.openai.com",
+            "docs.cline.bot",
+            "docs.factory.ai",
+            "docs.katalon.com",
+            "docs.qoder.com",
+            "docs.warp.dev",
+            "docs.windsurf.com",
+            "docs.x.ai",
+            "example.com",
+            "facebook.github.io",
+            "ffmpeg.org",
+            "geminicli.com",
+            "github.com",
+            "img.shields.io",
+            "insiders.vscode.dev",
+            "lodash.com",
+            "mathiasbynens.be",
+            "modelcontextprotocol.io",
+            "mozilla.org",
+            "mths.be",
+            "nodejs.org",
+            "npmjs.org",
+            "opencode.ai",
+            "openjsf.org",
+            "play.googleapis.com",
+            "policies.google.com",
+            "registry.npmjs.org",
+            "sindresorhus.com",
+            "source.chromium.org",
+            "underscorejs.org",
+            "urlpattern.spec.whatwg.org",
+            "vs-open.link",
+            "vscode.dev",
+            "web.dev",
+            "www.apache.org",
+            "www.chromium.org",
+            "www.deque.com",
+            "www.ffmpeg.org",
+            "www.google.com",
+            "www.npmjs.com",
+            "www.typescriptlang.org",
+            "yargs.js.org",
+            "zod.dev"
+          ],
+          "requiredSecrets": [],
+          "runtimeDependencies": [
+            "node"
+          ],
+          "download": {
+            "bytes": null,
+            "basis": "unknown"
+          }
+        },
+        "refs": {
+          "sbom": {
+            "sha256": "97bde39092f92142ebbf69bebabf8c2dec86084dc0c479c5f9bbec71c45f4ddc",
+            "bytes": 268,
+            "url": "https://codepuppy.cn/catalog/assets/mcp.chrome-devtools/1.0.0/codepuppy-curation/sbom/97bde39092f92142ebbf69bebabf8c2dec86084dc0c479c5f9bbec71c45f4ddc.cdx.json",
+            "format": "cyclonedx-1.6+json"
+          },
+          "intakeProvenance": {
+            "sha256": "2ab4d2880eb9aa85666ec95e267b540130eb1bddcdf550555e1942078be924f1",
+            "bytes": 623,
+            "url": "https://codepuppy.cn/catalog/assets/mcp.chrome-devtools/1.0.0/codepuppy-curation/intake-provenance/2ab4d2880eb9aa85666ec95e267b540130eb1bddcdf550555e1942078be924f1.json",
+            "format": "codepuppy.intake-provenance.v1+json"
+          }
+        }
+      }
+    },
+    {
+      "id": "skill:skill-creator",
+      "type": "skill",
+      "name": "skill-creator",
+      "displayName": "技能创建助手",
+      "description": "帮助你创建、改进和测试技能（SKILL.md）。来自 Anthropic 的 example-skills。",
+      "source": "official",
+      "category": "dev",
+      "license": "Apache-2.0",
+      "redistributable": true,
+      "version": "1.0.0",
+      "installSpec": {
+        "kind": "skill",
+        "source": "builtin",
+        "builtinAssetKey": "skills/skill-creator",
+        "targetDir": "codepuppy-skills"
+      }
+    },
+    {
+      "id": "skill:codepuppy-upstream-sync",
+      "type": "skill",
+      "name": "codepuppy-upstream-sync",
+      "displayName": "同步上游更新并检查兼容性",
+      "description": "将 opencode 的更新合入你的 Code Puppy 分支，并按 ADR-015 检查原有助手指令和设置是否仍与新版本兼容。",
+      "source": "codepuppy",
+      "category": "dev",
+      "license": "MIT",
+      "redistributable": true,
+      "version": "1.0.0",
+      "installSpec": {
+        "kind": "skill",
+        "source": "builtin",
+        "builtinAssetKey": "skills/codepuppy-upstream-sync",
+        "targetDir": "global"
+      }
+    },
+    {
+      "id": "skill:safe-refactor",
+      "type": "skill",
+      "name": "safe-refactor",
+      "displayName": "保持功能不变的代码整理",
+      "description": "在保持现有功能表现不变的前提下整理代码。先记录并检查现有行为，再分小步修改，每一步都能撤回，并持续检查结果。",
+      "source": "codepuppy",
+      "category": "dev",
+      "license": "MIT",
+      "redistributable": true,
+      "version": "1.0.0",
+      "installSpec": {
+        "kind": "skill",
+        "source": "builtin",
+        "builtinAssetKey": "skills/safe-refactor",
+        "targetDir": "global"
+      }
+    },
+    {
+      "id": "skill:mcp-builder",
+      "type": "skill",
+      "name": "mcp-builder",
+      "displayName": "MCP 服务开发指南",
+      "description": "指导你编写 MCP 服务，让助手连接工具和外部服务。来自 Anthropic 的 example-skills。",
+      "source": "official",
+      "category": "dev",
+      "license": "Apache-2.0",
+      "redistributable": true,
+      "version": "1.0.1",
+      "installSpec": {
+        "kind": "skill",
+        "source": "remote"
+      },
+      "_provenance": "REQ-045 补货:再分发自 anthropics/skills@9d2f1ae(Apache-2.0,LICENSE.txt+NOTICE.md 随资产,仅依赖钉版由 Code Puppy 维护,见 NOTICE.md);S22 关闭内置通道后经远程资产管线上架。",
+      "remoteAsset": {
+        "version": "1.0.1",
+        "files": [
+          {
+            "path": "LICENSE.txt",
+            "sha256": "bc6b3af2f331cbc7fb0da1344efb2cbe5877a31498b4d70dbc7000f3405a1362",
+            "bytes": 11345,
+            "url": "https://codepuppy.cn/catalog/assets/skill.mcp-builder/1.0.1/LICENSE.txt"
+          },
+          {
+            "path": "NOTICE.md",
+            "sha256": "f9b432e6330f7353c9afec28884f70a17d295e0ab62decdf9ea4010b437e4804",
+            "bytes": 505,
+            "url": "https://codepuppy.cn/catalog/assets/skill.mcp-builder/1.0.1/NOTICE.md"
+          },
+          {
+            "path": "SKILL.md",
+            "sha256": "0f4592dcb53cf2b5d6b7febee6b4152018b565551a1c29e3c612f57b218ab295",
+            "bytes": 9092,
+            "url": "https://codepuppy.cn/catalog/assets/skill.mcp-builder/1.0.1/SKILL.md"
+          },
+          {
+            "path": "reference/evaluation.md",
+            "sha256": "8c99479f8a2d22a636c38e274537aac3610879e26f34e0709825077c4576f427",
+            "bytes": 21663,
+            "url": "https://codepuppy.cn/catalog/assets/skill.mcp-builder/1.0.1/reference/evaluation.md"
+          },
+          {
+            "path": "reference/mcp_best_practices.md",
+            "sha256": "80fb4369a349447cf18ecdd7494fe7938b6065377e9f08c077cec411093a3007",
+            "bytes": 7330,
+            "url": "https://codepuppy.cn/catalog/assets/skill.mcp-builder/1.0.1/reference/mcp_best_practices.md"
+          },
+          {
+            "path": "reference/node_mcp_server.md",
+            "sha256": "c3ba35a4f599dd53be9c6555ae72c19a7bf412cd5426576c2c08d42755482c66",
+            "bytes": 28550,
+            "url": "https://codepuppy.cn/catalog/assets/skill.mcp-builder/1.0.1/reference/node_mcp_server.md"
+          },
+          {
+            "path": "reference/python_mcp_server.md",
+            "sha256": "2da52f77e675191014ca2e146a4b95aa04d0ca7dd7e2b100322df15ade685e80",
+            "bytes": 25099,
+            "url": "https://codepuppy.cn/catalog/assets/skill.mcp-builder/1.0.1/reference/python_mcp_server.md"
+          },
+          {
+            "path": "scripts/connections.py",
+            "sha256": "9403668a2041568772082a8b334122c1f88daf0541fb393af4522d0094a47a6e",
+            "bytes": 4875,
+            "url": "https://codepuppy.cn/catalog/assets/skill.mcp-builder/1.0.1/scripts/connections.py"
+          },
+          {
+            "path": "scripts/evaluation.py",
+            "sha256": "49ed1d17cdce5da101b210197740713f49b935c29d4f339542a14b132658e6f7",
+            "bytes": 12579,
+            "url": "https://codepuppy.cn/catalog/assets/skill.mcp-builder/1.0.1/scripts/evaluation.py"
+          },
+          {
+            "path": "scripts/example_evaluation.xml",
+            "sha256": "9272b348ddcc4b06ba562367ccd0770e018158c0068ac5116d5e34aaeff8777a",
+            "bytes": 1194,
+            "url": "https://codepuppy.cn/catalog/assets/skill.mcp-builder/1.0.1/scripts/example_evaluation.xml"
+          },
+          {
+            "path": "scripts/requirements.txt",
+            "sha256": "4ce08a3337ca8c6c165781f472d6836419d1e50a73592a4015474e74f6667217",
+            "bytes": 30,
+            "url": "https://codepuppy.cn/catalog/assets/skill.mcp-builder/1.0.1/scripts/requirements.txt"
+          }
+        ]
+      }
+    },
+    {
+      "id": "skill:canvas-design",
+      "type": "skill",
+      "name": "canvas-design",
+      "displayName": "视觉作品与海报设计",
+      "description": "帮助设计并生成 PNG 或 PDF 视觉作品。来自 Anthropic 的 example-skills，安装时需下载约 5.4 MB 的 OFL 授权字体。",
+      "source": "official",
+      "category": "design",
+      "license": "Apache-2.0",
+      "redistributable": true,
+      "version": "1.0.0",
+      "installSpec": {
+        "kind": "skill",
+        "source": "remote"
+      },
+      "_provenance": "REQ-045 补货:再分发自 anthropics/skills@9d2f1ae(Apache-2.0;canvas-fonts/ 字体为 SIL OFL 1.1,许可文本随资产);S22 关闭内置通道后经远程资产管线上架。",
+      "remoteAsset": {
+        "version": "1.0.0",
+        "files": [
+          {
+            "path": "LICENSE.txt",
+            "sha256": "bc6b3af2f331cbc7fb0da1344efb2cbe5877a31498b4d70dbc7000f3405a1362",
+            "bytes": 11345,
+            "url": "https://codepuppy.cn/catalog/assets/skill.canvas-design/1.0.0/LICENSE.txt"
+          },
+          {
+            "path": "NOTICE.md",
+            "sha256": "450908a9b26b499a22d976cc4937fbc82427e9d57d4e18f06b8e36f4167e3511",
+            "bytes": 570,
+            "url": "https://codepuppy.cn/catalog/assets/skill.canvas-design/1.0.0/NOTICE.md"
+          },
+          {
+            "path": "SKILL.md",
+            "sha256": "a1f288079624402f30682753c1d43920b6664785698d21d3e7aa197450a6448b",
+            "bytes": 11939,
+            "url": "https://codepuppy.cn/catalog/assets/skill.canvas-design/1.0.0/SKILL.md"
+          },
+          {
+            "path": "canvas-fonts/ArsenalSC-OFL.txt",
+            "sha256": "8ddd61b18ba2c0d0dbe4a691cf5f1a0673f473d02fa0546e67ee88c006aeff6e",
+            "bytes": 4373,
+            "url": "https://codepuppy.cn/catalog/assets/skill.canvas-design/1.0.0/canvas-fonts/ArsenalSC-OFL.txt"
+          },
+          {
+            "path": "canvas-fonts/ArsenalSC-Regular.ttf",
+            "sha256": "65e6f89df58f68fd905b3add34a79dd6106aa3b3044df0dad9676fff53d504b9",
+            "bytes": 165848,
+            "url": "https://codepuppy.cn/catalog/assets/skill.canvas-design/1.0.0/canvas-fonts/ArsenalSC-Regular.ttf"
+          },
+          {
+            "path": "canvas-fonts/BigShoulders-Bold.ttf",
+            "sha256": "b43bcd198b9fdf717dd42aa61a34dba32e01aceaeae659d689afd0ca52c37ea2",
+            "bytes": 94528,
+            "url": "https://codepuppy.cn/catalog/assets/skill.canvas-design/1.0.0/canvas-fonts/BigShoulders-Bold.ttf"
+          },
+          {
+            "path": "canvas-fonts/BigShoulders-OFL.txt",
+            "sha256": "fbc746aabf0eb1847dfd92e2efc4596d79fa897d60b8e64062a22f585508fb3f",
+            "bytes": 4397,
+            "url": "https://codepuppy.cn/catalog/assets/skill.canvas-design/1.0.0/canvas-fonts/BigShoulders-OFL.txt"
+          },
+          {
+            "path": "canvas-fonts/BigShoulders-Regular.ttf",
+            "sha256": "18a879fc71978a4447150705caf880a9da3860083c259fd29e6dc03057b6842a",
+            "bytes": 94396,
+            "url": "https://codepuppy.cn/catalog/assets/skill.canvas-design/1.0.0/canvas-fonts/BigShoulders-Regular.ttf"
+          },
+          {
+            "path": "canvas-fonts/Boldonse-OFL.txt",
+            "sha256": "45cc82ab4032273c0924025ffcf8f0665a68e1a5955e3f7247e5daf1deeb1326",
+            "bytes": 4390,
+            "url": "https://codepuppy.cn/catalog/assets/skill.canvas-design/1.0.0/canvas-fonts/Boldonse-OFL.txt"
+          },
+          {
+            "path": "canvas-fonts/Boldonse-Regular.ttf",
+            "sha256": "cc2e540604565c0f90a7d8d46194a2f42fc9c45512cd2e39bf03b50eb68c35a4",
+            "bytes": 77168,
+            "url": "https://codepuppy.cn/catalog/assets/skill.canvas-design/1.0.0/canvas-fonts/Boldonse-Regular.ttf"
+          },
+          {
+            "path": "canvas-fonts/BricolageGrotesque-Bold.ttf",
+            "sha256": "a737b146fe0d77ffe8a86e3cd16700dd431d3b1e420d4fd80e142cd68a1cb50d",
+            "bytes": 90952,
+            "url": "https://codepuppy.cn/catalog/assets/skill.canvas-design/1.0.0/canvas-fonts/BricolageGrotesque-Bold.ttf"
+          },
+          {
+            "path": "canvas-fonts/BricolageGrotesque-OFL.txt",
+            "sha256": "0e4f4eb8534bc66a76aca13dd19c1f9731b2008866b29ccff182b764649df9b4",
+            "bytes": 4403,
+            "url": "https://codepuppy.cn/catalog/assets/skill.canvas-design/1.0.0/canvas-fonts/BricolageGrotesque-OFL.txt"
+          },
+          {
+            "path": "canvas-fonts/BricolageGrotesque-Regular.ttf",
+            "sha256": "972a6d098c9867ae131d0ea99e221e63976b11a19d4b931c2c7ace525674e4f6",
+            "bytes": 90920,
+            "url": "https://codepuppy.cn/catalog/assets/skill.canvas-design/1.0.0/canvas-fonts/BricolageGrotesque-Regular.ttf"
+          },
+          {
+            "path": "canvas-fonts/CrimsonPro-Bold.ttf",
+            "sha256": "48f191e38355c8db100eb3ce157c20f9302a3b9a37b44a660f77ecfce3986609",
+            "bytes": 107352,
+            "url": "https://codepuppy.cn/catalog/assets/skill.canvas-design/1.0.0/canvas-fonts/CrimsonPro-Bold.ttf"
+          },
+          {
+            "path": "canvas-fonts/CrimsonPro-Italic.ttf",
+            "sha256": "52318db3526b644e6efa60be0b3ca5a50e40fbe8bd026c261e0aa206f0772267",
+            "bytes": 108828,
+            "url": "https://codepuppy.cn/catalog/assets/skill.canvas-design/1.0.0/canvas-fonts/CrimsonPro-Italic.ttf"
+          },
+          {
+            "path": "canvas-fonts/CrimsonPro-OFL.txt",
+            "sha256": "35680d14547b6748b6f362a052a46d22764ce5eccf96e18b74f567bb2ee58114",
+            "bytes": 4394,
+            "url": "https://codepuppy.cn/catalog/assets/skill.canvas-design/1.0.0/canvas-fonts/CrimsonPro-OFL.txt"
+          },
+          {
+            "path": "canvas-fonts/CrimsonPro-Regular.ttf",
+            "sha256": "48fad08cb1917a7b2f2c6fe5135d6c07743a6663cf7631ec4481108aaf081422",
+            "bytes": 106696,
+            "url": "https://codepuppy.cn/catalog/assets/skill.canvas-design/1.0.0/canvas-fonts/CrimsonPro-Regular.ttf"
+          },
+          {
+            "path": "canvas-fonts/DMMono-OFL.txt",
+            "sha256": "bfe7842fcb88323e2981e24710c25202677385a8c75fb6a87217b275a0247ae3",
+            "bytes": 4392,
+            "url": "https://codepuppy.cn/catalog/assets/skill.canvas-design/1.0.0/canvas-fonts/DMMono-OFL.txt"
+          },
+          {
+            "path": "canvas-fonts/DMMono-Regular.ttf",
+            "sha256": "f98ada968dc3b6b2c08d3f5caaf266977df0bfe0929372b93df5a06cf2ace450",
+            "bytes": 48852,
+            "url": "https://codepuppy.cn/catalog/assets/skill.canvas-design/1.0.0/canvas-fonts/DMMono-Regular.ttf"
+          },
+          {
+            "path": "canvas-fonts/EricaOne-OFL.txt",
+            "sha256": "e0de629968b52255548d5fafcf30b24ff9edae0eda362380755a75816404d0fa",
+            "bytes": 4410,
+            "url": "https://codepuppy.cn/catalog/assets/skill.canvas-design/1.0.0/canvas-fonts/EricaOne-OFL.txt"
+          },
+          {
+            "path": "canvas-fonts/EricaOne-Regular.ttf",
+            "sha256": "db1d89e80e33a8a01beaaac7a85df582857d24a43f1e181461aa7ff5d701476a",
+            "bytes": 24872,
+            "url": "https://codepuppy.cn/catalog/assets/skill.canvas-design/1.0.0/canvas-fonts/EricaOne-Regular.ttf"
+          },
+          {
+            "path": "canvas-fonts/GeistMono-Bold.ttf",
+            "sha256": "75c0828d5c1ee44b9ef9f4df577bf41595ec362e2ea3f1e558590c9e92c7949d",
+            "bytes": 78304,
+            "url": "https://codepuppy.cn/catalog/assets/skill.canvas-design/1.0.0/canvas-fonts/GeistMono-Bold.ttf"
+          },
+          {
+            "path": "canvas-fonts/GeistMono-OFL.txt",
+            "sha256": "6a873c900f584109b13ae0aaf81d6e3cf0a68751a216b03f7b6c68d547057bb4",
+            "bytes": 4388,
+            "url": "https://codepuppy.cn/catalog/assets/skill.canvas-design/1.0.0/canvas-fonts/GeistMono-OFL.txt"
+          },
+          {
+            "path": "canvas-fonts/GeistMono-Regular.ttf",
+            "sha256": "a55c1b51cda4afeab9e471e7947b85a20f7c8831d7e6b1470c1b7fbdc0f0f15e",
+            "bytes": 78232,
+            "url": "https://codepuppy.cn/catalog/assets/skill.canvas-design/1.0.0/canvas-fonts/GeistMono-Regular.ttf"
+          },
+          {
+            "path": "canvas-fonts/Gloock-OFL.txt",
+            "sha256": "c0a3f3125ac491ef3d1f09f401be4834c646562f647e44f2bcbc49f0466c656d",
+            "bytes": 4381,
+            "url": "https://codepuppy.cn/catalog/assets/skill.canvas-design/1.0.0/canvas-fonts/Gloock-OFL.txt"
+          },
+          {
+            "path": "canvas-fonts/Gloock-Regular.ttf",
+            "sha256": "e86b4ce66dbd3f1f83eee8db99ec96e0da1128c3f53df0e9b3b7472025dfe960",
+            "bytes": 95156,
+            "url": "https://codepuppy.cn/catalog/assets/skill.canvas-design/1.0.0/canvas-fonts/Gloock-Regular.ttf"
+          },
+          {
+            "path": "canvas-fonts/IBMPlexMono-Bold.ttf",
+            "sha256": "dbd2a2fb024579438d6400a84e57579bfd2dbe67c306c8fd9fde92a61e4f2eea",
+            "bytes": 136008,
+            "url": "https://codepuppy.cn/catalog/assets/skill.canvas-design/1.0.0/canvas-fonts/IBMPlexMono-Bold.ttf"
+          },
+          {
+            "path": "canvas-fonts/IBMPlexMono-OFL.txt",
+            "sha256": "5294ce778857e1eb02e830b6ab06435537d38f43055327e73d03a2d4d57d5123",
+            "bytes": 4363,
+            "url": "https://codepuppy.cn/catalog/assets/skill.canvas-design/1.0.0/canvas-fonts/IBMPlexMono-OFL.txt"
+          },
+          {
+            "path": "canvas-fonts/IBMPlexMono-Regular.ttf",
+            "sha256": "ab08018ccd276b79fb2c636bb95b9c543598f9d50505fe92506fcb4dae7810cd",
+            "bytes": 133796,
+            "url": "https://codepuppy.cn/catalog/assets/skill.canvas-design/1.0.0/canvas-fonts/IBMPlexMono-Regular.ttf"
+          },
+          {
+            "path": "canvas-fonts/IBMPlexSerif-Bold.ttf",
+            "sha256": "b8d294e9b5c5a0940f167c3ced0f7ef2e3f57082ca3ff096ef30e86e26c1c159",
+            "bytes": 161000,
+            "url": "https://codepuppy.cn/catalog/assets/skill.canvas-design/1.0.0/canvas-fonts/IBMPlexSerif-Bold.ttf"
+          },
+          {
+            "path": "canvas-fonts/IBMPlexSerif-BoldItalic.ttf",
+            "sha256": "da64b75f4284f53e7b5c71fa190a35b8bf3494fe19f1804c81c3a53340bca570",
+            "bytes": 169840,
+            "url": "https://codepuppy.cn/catalog/assets/skill.canvas-design/1.0.0/canvas-fonts/IBMPlexSerif-BoldItalic.ttf"
+          },
+          {
+            "path": "canvas-fonts/IBMPlexSerif-Italic.ttf",
+            "sha256": "b11f1048745e715a55c9d837b3f10226ca3d78867b7db7251ddad8f98dcf0f38",
+            "bytes": 170004,
+            "url": "https://codepuppy.cn/catalog/assets/skill.canvas-design/1.0.0/canvas-fonts/IBMPlexSerif-Italic.ttf"
+          },
+          {
+            "path": "canvas-fonts/IBMPlexSerif-Regular.ttf",
+            "sha256": "77cd233a2af8dc6b1022faea3bb3b01f3c75af68bcf530cb6aeb15982ff3dbb7",
+            "bytes": 160380,
+            "url": "https://codepuppy.cn/catalog/assets/skill.canvas-design/1.0.0/canvas-fonts/IBMPlexSerif-Regular.ttf"
+          },
+          {
+            "path": "canvas-fonts/InstrumentSans-Bold.ttf",
+            "sha256": "444f85bf1c4b0e1ce1ca624f6be54bcd832207714ccaf4ea99ee531341683bdf",
+            "bytes": 68084,
+            "url": "https://codepuppy.cn/catalog/assets/skill.canvas-design/1.0.0/canvas-fonts/InstrumentSans-Bold.ttf"
+          },
+          {
+            "path": "canvas-fonts/InstrumentSans-BoldItalic.ttf",
+            "sha256": "3762f6cef95d6039489ad5ba5787d4c30f17a1ad01e9ac3c816ed69692722a68",
+            "bytes": 70004,
+            "url": "https://codepuppy.cn/catalog/assets/skill.canvas-design/1.0.0/canvas-fonts/InstrumentSans-BoldItalic.ttf"
+          },
+          {
+            "path": "canvas-fonts/InstrumentSans-Italic.ttf",
+            "sha256": "78e85858e371b2cb4e18f617c10f0f937c0e12a0887ffee98555b24ed305b3a7",
+            "bytes": 69900,
+            "url": "https://codepuppy.cn/catalog/assets/skill.canvas-design/1.0.0/canvas-fonts/InstrumentSans-Italic.ttf"
+          },
+          {
+            "path": "canvas-fonts/InstrumentSans-OFL.txt",
+            "sha256": "bf4dc6d13a8cccd4807133c77a1ee9619a16b92cb23322258725ab6731c2f6e5",
+            "bytes": 4403,
+            "url": "https://codepuppy.cn/catalog/assets/skill.canvas-design/1.0.0/canvas-fonts/InstrumentSans-OFL.txt"
+          },
+          {
+            "path": "canvas-fonts/InstrumentSans-Regular.ttf",
+            "sha256": "a22cb26e48fd79bcb01bf2fc92d36785474dce36d9c544ab0a8868c2657c4a87",
+            "bytes": 68028,
+            "url": "https://codepuppy.cn/catalog/assets/skill.canvas-design/1.0.0/canvas-fonts/InstrumentSans-Regular.ttf"
+          },
+          {
+            "path": "canvas-fonts/InstrumentSerif-Italic.ttf",
+            "sha256": "9c86e4d5a47b50224a2463a9eca8535835257c8e85c470c2c6b454b1af6f046e",
+            "bytes": 70868,
+            "url": "https://codepuppy.cn/catalog/assets/skill.canvas-design/1.0.0/canvas-fonts/InstrumentSerif-Italic.ttf"
+          },
+          {
+            "path": "canvas-fonts/InstrumentSerif-Regular.ttf",
+            "sha256": "56ac3be03ac3ba283196b3e77850ab2ffcf56cfb6fd3212c5620109a972f8c99",
+            "bytes": 69312,
+            "url": "https://codepuppy.cn/catalog/assets/skill.canvas-design/1.0.0/canvas-fonts/InstrumentSerif-Regular.ttf"
+          },
+          {
+            "path": "canvas-fonts/Italiana-OFL.txt",
+            "sha256": "8373b11312ace78c4cec2e8f9f6aa9f2330601107dac7bcf899c6f2dbd40c5a5",
+            "bytes": 4394,
+            "url": "https://codepuppy.cn/catalog/assets/skill.canvas-design/1.0.0/canvas-fonts/Italiana-OFL.txt"
+          },
+          {
+            "path": "canvas-fonts/Italiana-Regular.ttf",
+            "sha256": "15c4dd6ab8cf4a29ba8826f65edcbe2f6c266c557d34d081f25072dfd5605fd2",
+            "bytes": 27184,
+            "url": "https://codepuppy.cn/catalog/assets/skill.canvas-design/1.0.0/canvas-fonts/Italiana-Regular.ttf"
+          },
+          {
+            "path": "canvas-fonts/JetBrainsMono-Bold.ttf",
+            "sha256": "a2349098b9e45419e7bf0e2958d6c4937a049dded37387b08be725be4c7615f3",
+            "bytes": 114828,
+            "url": "https://codepuppy.cn/catalog/assets/skill.canvas-design/1.0.0/canvas-fonts/JetBrainsMono-Bold.ttf"
+          },
+          {
+            "path": "canvas-fonts/JetBrainsMono-OFL.txt",
+            "sha256": "a76abf002c49097d146e86740a3105a5d00450b1592e820a1109a8c5680cd697",
+            "bytes": 4399,
+            "url": "https://codepuppy.cn/catalog/assets/skill.canvas-design/1.0.0/canvas-fonts/JetBrainsMono-OFL.txt"
+          },
+          {
+            "path": "canvas-fonts/JetBrainsMono-Regular.ttf",
+            "sha256": "b6b1ff4ddefe36d7f2a6174e1d001cab374e594519ee9049af028d577b64c5f5",
+            "bytes": 114904,
+            "url": "https://codepuppy.cn/catalog/assets/skill.canvas-design/1.0.0/canvas-fonts/JetBrainsMono-Regular.ttf"
+          },
+          {
+            "path": "canvas-fonts/Jura-Light.ttf",
+            "sha256": "c891a381df056b2c4dfe85841e911bf45da0890fa21a7b2692cbe5ea1f505e1e",
+            "bytes": 154308,
+            "url": "https://codepuppy.cn/catalog/assets/skill.canvas-design/1.0.0/canvas-fonts/Jura-Light.ttf"
+          },
+          {
+            "path": "canvas-fonts/Jura-Medium.ttf",
+            "sha256": "c72965cb732a92872643819fd1734128238583cc36b116313859137a51d3368a",
+            "bytes": 154488,
+            "url": "https://codepuppy.cn/catalog/assets/skill.canvas-design/1.0.0/canvas-fonts/Jura-Medium.ttf"
+          },
+          {
+            "path": "canvas-fonts/Jura-OFL.txt",
+            "sha256": "eaf9bdb675f6d87e5feb88199ab3ea581d3bd2082f426e384fa9c394576d7260",
+            "bytes": 4380,
+            "url": "https://codepuppy.cn/catalog/assets/skill.canvas-design/1.0.0/canvas-fonts/Jura-OFL.txt"
+          },
+          {
+            "path": "canvas-fonts/LibreBaskerville-OFL.txt",
+            "sha256": "55959eef5b0c3b2e3c1c7631b8ff0f9447d75de20f29cfa7db5bcfb026763343",
+            "bytes": 4449,
+            "url": "https://codepuppy.cn/catalog/assets/skill.canvas-design/1.0.0/canvas-fonts/LibreBaskerville-OFL.txt"
+          },
+          {
+            "path": "canvas-fonts/LibreBaskerville-Regular.ttf",
+            "sha256": "2101302538d9e88adb679031c04623e4578b5745e89566284fd2c508d79acae0",
+            "bytes": 147584,
+            "url": "https://codepuppy.cn/catalog/assets/skill.canvas-design/1.0.0/canvas-fonts/LibreBaskerville-Regular.ttf"
+          },
+          {
+            "path": "canvas-fonts/Lora-Bold.ttf",
+            "sha256": "7d74015e950c2fb66519c7295b8155621d22200ae2ca2a4c6b43ce3c490cac87",
+            "bytes": 133828,
+            "url": "https://codepuppy.cn/catalog/assets/skill.canvas-design/1.0.0/canvas-fonts/Lora-Bold.ttf"
+          },
+          {
+            "path": "canvas-fonts/Lora-BoldItalic.ttf",
+            "sha256": "152f87e71f5ddb60d5c57ecd9132807c947e65c42977193c9164e7c5a6690081",
+            "bytes": 140332,
+            "url": "https://codepuppy.cn/catalog/assets/skill.canvas-design/1.0.0/canvas-fonts/Lora-BoldItalic.ttf"
+          },
+          {
+            "path": "canvas-fonts/Lora-Italic.ttf",
+            "sha256": "be627e595184e8afe521f08da0607eee613f1997d423bc8dadc5798995581377",
+            "bytes": 139328,
+            "url": "https://codepuppy.cn/catalog/assets/skill.canvas-design/1.0.0/canvas-fonts/Lora-Italic.ttf"
+          },
+          {
+            "path": "canvas-fonts/Lora-OFL.txt",
+            "sha256": "62e37a82d3f1ef2a70712885fa8b3144b65fd144d8e748d6196b690a354d792c",
+            "bytes": 4423,
+            "url": "https://codepuppy.cn/catalog/assets/skill.canvas-design/1.0.0/canvas-fonts/Lora-OFL.txt"
+          },
+          {
+            "path": "canvas-fonts/Lora-Regular.ttf",
+            "sha256": "7ed00e7c9cdf16ab7e2fd2361fe45d4f0b61263cd60aae398b27b7ee08108827",
+            "bytes": 133888,
+            "url": "https://codepuppy.cn/catalog/assets/skill.canvas-design/1.0.0/canvas-fonts/Lora-Regular.ttf"
+          },
+          {
+            "path": "canvas-fonts/NationalPark-Bold.ttf",
+            "sha256": "69ac4c301c4a7233c6e602d12a92c54d7967b575f4449951c45ce773f7acff53",
+            "bytes": 79208,
+            "url": "https://codepuppy.cn/catalog/assets/skill.canvas-design/1.0.0/canvas-fonts/NationalPark-Bold.ttf"
+          },
+          {
+            "path": "canvas-fonts/NationalPark-OFL.txt",
+            "sha256": "81c6c71d83b5b45d7344f96df12bb4a2477a5b092a9144757ee1d0f50f855175",
+            "bytes": 4399,
+            "url": "https://codepuppy.cn/catalog/assets/skill.canvas-design/1.0.0/canvas-fonts/NationalPark-OFL.txt"
+          },
+          {
+            "path": "canvas-fonts/NationalPark-Regular.ttf",
+            "sha256": "a477338b7e18308d476650dfe31235ef86a883572665e56ffb5fb80f82009b58",
+            "bytes": 76424,
+            "url": "https://codepuppy.cn/catalog/assets/skill.canvas-design/1.0.0/canvas-fonts/NationalPark-Regular.ttf"
+          },
+          {
+            "path": "canvas-fonts/NothingYouCouldDo-OFL.txt",
+            "sha256": "7c2a6970584ddad04919816163746f83b378078015899b18468b40f05e9ce128",
+            "bytes": 4363,
+            "url": "https://codepuppy.cn/catalog/assets/skill.canvas-design/1.0.0/canvas-fonts/NothingYouCouldDo-OFL.txt"
+          },
+          {
+            "path": "canvas-fonts/NothingYouCouldDo-Regular.ttf",
+            "sha256": "d866f985896d3280f4fce72db7e17302c24a0c1fdb0699b6b5ed3af14f944d57",
+            "bytes": 32020,
+            "url": "https://codepuppy.cn/catalog/assets/skill.canvas-design/1.0.0/canvas-fonts/NothingYouCouldDo-Regular.ttf"
+          },
+          {
+            "path": "canvas-fonts/Outfit-Bold.ttf",
+            "sha256": "6654b93d21301ec61887d3cedd6c11d9df1b1dfb63f9cf45ac7995f6e2235ab1",
+            "bytes": 55392,
+            "url": "https://codepuppy.cn/catalog/assets/skill.canvas-design/1.0.0/canvas-fonts/Outfit-Bold.ttf"
+          },
+          {
+            "path": "canvas-fonts/Outfit-OFL.txt",
+            "sha256": "1945b62cd76da9a3051a1660dde72afaa64ffc2666d30e7a78356d651653ba2f",
+            "bytes": 4389,
+            "url": "https://codepuppy.cn/catalog/assets/skill.canvas-design/1.0.0/canvas-fonts/Outfit-OFL.txt"
+          },
+          {
+            "path": "canvas-fonts/Outfit-Regular.ttf",
+            "sha256": "f24945365147c9e783e91d8649959b59be6b00c9ee4ecd2f6b33afbb2dd871fe",
+            "bytes": 54912,
+            "url": "https://codepuppy.cn/catalog/assets/skill.canvas-design/1.0.0/canvas-fonts/Outfit-Regular.ttf"
+          },
+          {
+            "path": "canvas-fonts/PixelifySans-Medium.ttf",
+            "sha256": "38397504f71c122b03d234ea6f55118e3d5bdbddffd82bedddbd7755d3b3be82",
+            "bytes": 51072,
+            "url": "https://codepuppy.cn/catalog/assets/skill.canvas-design/1.0.0/canvas-fonts/PixelifySans-Medium.ttf"
+          },
+          {
+            "path": "canvas-fonts/PixelifySans-OFL.txt",
+            "sha256": "7f54d1d9f1ae1ba9f2722f978145f90324fea34ca3c2304b3a29cfa96ac6037e",
+            "bytes": 4395,
+            "url": "https://codepuppy.cn/catalog/assets/skill.canvas-design/1.0.0/canvas-fonts/PixelifySans-OFL.txt"
+          },
+          {
+            "path": "canvas-fonts/PoiretOne-OFL.txt",
+            "sha256": "2eaf541f7eb8b512e4c757a5212060abf5b6edfef230e9d7640bf736b315c33a",
+            "bytes": 4366,
+            "url": "https://codepuppy.cn/catalog/assets/skill.canvas-design/1.0.0/canvas-fonts/PoiretOne-OFL.txt"
+          },
+          {
+            "path": "canvas-fonts/PoiretOne-Regular.ttf",
+            "sha256": "9cf265b139648b36b6c0afdfeb0bf27f7e66db9a16094bc40f644d8da05bc318",
+            "bytes": 45244,
+            "url": "https://codepuppy.cn/catalog/assets/skill.canvas-design/1.0.0/canvas-fonts/PoiretOne-Regular.ttf"
+          },
+          {
+            "path": "canvas-fonts/RedHatMono-Bold.ttf",
+            "sha256": "7ef48353f4be5ddb90f000f6fad48f2b62b3e8c27d9818d8d45ff46c201065e0",
+            "bytes": 34420,
+            "url": "https://codepuppy.cn/catalog/assets/skill.canvas-design/1.0.0/canvas-fonts/RedHatMono-Bold.ttf"
+          },
+          {
+            "path": "canvas-fonts/RedHatMono-OFL.txt",
+            "sha256": "435fbfb7e66988b2a06686a4cb966faec733f35d8fe100a1601573c27f3e0bb8",
+            "bytes": 4394,
+            "url": "https://codepuppy.cn/catalog/assets/skill.canvas-design/1.0.0/canvas-fonts/RedHatMono-OFL.txt"
+          },
+          {
+            "path": "canvas-fonts/RedHatMono-Regular.ttf",
+            "sha256": "452fe826871b37539f5212b20c87cf30f82f58dd2741f1c96edd1dcbdc0db6b4",
+            "bytes": 34488,
+            "url": "https://codepuppy.cn/catalog/assets/skill.canvas-design/1.0.0/canvas-fonts/RedHatMono-Regular.ttf"
+          },
+          {
+            "path": "canvas-fonts/Silkscreen-OFL.txt",
+            "sha256": "6b849745119bbe85ec01fd080c9cd50234da9f52ac6e48b55d1a424a0c4d7ca9",
+            "bytes": 4394,
+            "url": "https://codepuppy.cn/catalog/assets/skill.canvas-design/1.0.0/canvas-fonts/Silkscreen-OFL.txt"
+          },
+          {
+            "path": "canvas-fonts/Silkscreen-Regular.ttf",
+            "sha256": "49567408600809e25147e9225ac4f37f410e2df45a750696c45027531fb65f1b",
+            "bytes": 31960,
+            "url": "https://codepuppy.cn/catalog/assets/skill.canvas-design/1.0.0/canvas-fonts/Silkscreen-Regular.ttf"
+          },
+          {
+            "path": "canvas-fonts/SmoochSans-Medium.ttf",
+            "sha256": "dd76e6e77cce82f827a8654cd906e9ce58f3aaf78adda63c4a7f655b8ecb41f0",
+            "bytes": 59704,
+            "url": "https://codepuppy.cn/catalog/assets/skill.canvas-design/1.0.0/canvas-fonts/SmoochSans-Medium.ttf"
+          },
+          {
+            "path": "canvas-fonts/SmoochSans-OFL.txt",
+            "sha256": "74c9c4eb88e891483e1b7bc54780b452cbf4f4df66d4e71881d7569aa2130749",
+            "bytes": 4396,
+            "url": "https://codepuppy.cn/catalog/assets/skill.canvas-design/1.0.0/canvas-fonts/SmoochSans-OFL.txt"
+          },
+          {
+            "path": "canvas-fonts/Tektur-Medium.ttf",
+            "sha256": "52bbe8c9b057b3d2da4eeace31a524b1ea26a1375ae34319cf6900ccc57a4c82",
+            "bytes": 76248,
+            "url": "https://codepuppy.cn/catalog/assets/skill.canvas-design/1.0.0/canvas-fonts/Tektur-Medium.ttf"
+          },
+          {
+            "path": "canvas-fonts/Tektur-OFL.txt",
+            "sha256": "3f1466cb5438f31782eeb6e895f3a655bc4d090e24263e331f555357d1cb734e",
+            "bytes": 4385,
+            "url": "https://codepuppy.cn/catalog/assets/skill.canvas-design/1.0.0/canvas-fonts/Tektur-OFL.txt"
+          },
+          {
+            "path": "canvas-fonts/Tektur-Regular.ttf",
+            "sha256": "162e1b36c4718c5b051b36c971ad7e50d341944f35618f480422ebbe72988f98",
+            "bytes": 75604,
+            "url": "https://codepuppy.cn/catalog/assets/skill.canvas-design/1.0.0/canvas-fonts/Tektur-Regular.ttf"
+          },
+          {
+            "path": "canvas-fonts/WorkSans-Bold.ttf",
+            "sha256": "240d125fc9f8561363dc1ea3f513501253bd70942f41468f48f0b0cafb0c82e2",
+            "bytes": 191304,
+            "url": "https://codepuppy.cn/catalog/assets/skill.canvas-design/1.0.0/canvas-fonts/WorkSans-Bold.ttf"
+          },
+          {
+            "path": "canvas-fonts/WorkSans-BoldItalic.ttf",
+            "sha256": "a5b2cad813df0aaa7d16621f2e93b5117c25e9bc788bc9a3ad218e9d6348ce34",
+            "bytes": 175772,
+            "url": "https://codepuppy.cn/catalog/assets/skill.canvas-design/1.0.0/canvas-fonts/WorkSans-BoldItalic.ttf"
+          },
+          {
+            "path": "canvas-fonts/WorkSans-Italic.ttf",
+            "sha256": "6b7f7002e0b0c8b261fe878658ef5551e3e59d9f6b609b04efb90dde1e2c1ada",
+            "bytes": 174280,
+            "url": "https://codepuppy.cn/catalog/assets/skill.canvas-design/1.0.0/canvas-fonts/WorkSans-Italic.ttf"
+          },
+          {
+            "path": "canvas-fonts/WorkSans-OFL.txt",
+            "sha256": "ace8c22a3326318b54e67c3691857929634205533f454a70ef5a3473ddb2e2ba",
+            "bytes": 4397,
+            "url": "https://codepuppy.cn/catalog/assets/skill.canvas-design/1.0.0/canvas-fonts/WorkSans-OFL.txt"
+          },
+          {
+            "path": "canvas-fonts/WorkSans-Regular.ttf",
+            "sha256": "e67985a843df0d3cdee51a3d0f329eb1774a344ad9ff0c9ab923751f1577e2a4",
+            "bytes": 188916,
+            "url": "https://codepuppy.cn/catalog/assets/skill.canvas-design/1.0.0/canvas-fonts/WorkSans-Regular.ttf"
+          },
+          {
+            "path": "canvas-fonts/YoungSerif-OFL.txt",
+            "sha256": "cdcb8039606b40a027a6d24586ec62d5fe29c701343d82a048c829cb28a3dd28",
+            "bytes": 4398,
+            "url": "https://codepuppy.cn/catalog/assets/skill.canvas-design/1.0.0/canvas-fonts/YoungSerif-OFL.txt"
+          },
+          {
+            "path": "canvas-fonts/YoungSerif-Regular.ttf",
+            "sha256": "f8dc08f77abad753a00670af70756a8ace938e5c3f0b770f4f4c2071c4bd8fc6",
+            "bytes": 105136,
+            "url": "https://codepuppy.cn/catalog/assets/skill.canvas-design/1.0.0/canvas-fonts/YoungSerif-Regular.ttf"
+          }
+        ]
+      },
+      "curation": {
+        "schema": "codepuppy.catalog.curation.v1",
+        "tier": "precache",
+        "activationPolicy": "default-disabled",
+        "deliveryMode": "installable",
+        "review": {
+          "reviewedAt": "2026-07-18T00:00:00Z",
+          "reviewedBy": "jinjunnn",
+          "upstreamStatus": "active",
+          "supportTier": "community",
+          "reviewBefore": "2027-01-18T00:00:00Z"
+        },
+        "applicability": {
+          "frameworks": [
+            "*"
+          ]
+        },
+        "summaries": {
+          "capabilities": [],
+          "networkDomains": [
+            "github.com",
+            "openfontlicense.org",
+            "www.apache.org",
+            "www.github.com"
+          ],
+          "requiredSecrets": [],
+          "runtimeDependencies": [],
+          "download": {
+            "bytes": 5554573,
+            "basis": "catalog-assets"
+          }
+        },
+        "refs": {
+          "sbom": {
+            "sha256": "2e6200c3962f6bfc0f426ef83c16bfad4d3ef9c01c69aae63d37d0bfd7609edd",
+            "bytes": 268,
+            "url": "https://codepuppy.cn/catalog/assets/skill.canvas-design/1.0.0/codepuppy-curation/sbom/2e6200c3962f6bfc0f426ef83c16bfad4d3ef9c01c69aae63d37d0bfd7609edd.cdx.json",
+            "format": "cyclonedx-1.6+json"
+          },
+          "intakeProvenance": {
+            "sha256": "e73021f7927a8675abf2acde72f1b83f2f33b010e0cbb39e27cb50aa8f9599ce",
+            "bytes": 4535,
+            "url": "https://codepuppy.cn/catalog/assets/skill.canvas-design/1.0.0/codepuppy-curation/intake-provenance/e73021f7927a8675abf2acde72f1b83f2f33b010e0cbb39e27cb50aa8f9599ce.json",
+            "format": "codepuppy.intake-provenance.v1+json"
+          }
+        }
+      }
+    },
+    {
+      "id": "skill:brand-guidelines",
+      "type": "skill",
+      "name": "brand-guidelines",
+      "displayName": "应用品牌色彩与字体",
+      "description": "将品牌规定的颜色和字体应用到作品中。来自 Anthropic 的 example-skills。",
+      "source": "official",
+      "category": "design",
+      "license": "Apache-2.0",
+      "redistributable": true,
+      "version": "1.0.0",
+      "installSpec": {
+        "kind": "skill",
+        "source": "remote"
+      },
+      "_provenance": "REQ-045 补货:再分发自 anthropics/skills@9d2f1ae(Apache-2.0,LICENSE.txt+NOTICE.md 随资产,内容与上游逐字节一致);S22 关闭内置通道后经远程资产管线上架。",
+      "remoteAsset": {
+        "version": "1.0.0",
+        "files": [
+          {
+            "path": "LICENSE.txt",
+            "sha256": "bc6b3af2f331cbc7fb0da1344efb2cbe5877a31498b4d70dbc7000f3405a1362",
+            "bytes": 11345,
+            "url": "https://codepuppy.cn/catalog/assets/skill.brand-guidelines/1.0.0/LICENSE.txt"
+          },
+          {
+            "path": "NOTICE.md",
+            "sha256": "4616b6c35782eabaf142f3df5457ae74496713c2758bf51661e94244c1684280",
+            "bytes": 407,
+            "url": "https://codepuppy.cn/catalog/assets/skill.brand-guidelines/1.0.0/NOTICE.md"
+          },
+          {
+            "path": "SKILL.md",
+            "sha256": "1120b3769e2985cefb3d25be981b1f914abeba57ae079b83c20c666c164fa9fe",
+            "bytes": 2235,
+            "url": "https://codepuppy.cn/catalog/assets/skill.brand-guidelines/1.0.0/SKILL.md"
+          }
+        ]
+      },
+      "curation": {
+        "schema": "codepuppy.catalog.curation.v1",
+        "tier": "precache",
+        "activationPolicy": "default-disabled",
+        "deliveryMode": "installable",
+        "review": {
+          "reviewedAt": "2026-07-18T00:00:00Z",
+          "reviewedBy": "jinjunnn",
+          "upstreamStatus": "active",
+          "supportTier": "community",
+          "reviewBefore": "2027-01-18T00:00:00Z"
+        },
+        "applicability": {
+          "frameworks": [
+            "*"
+          ]
+        },
+        "summaries": {
+          "capabilities": [],
+          "networkDomains": [
+            "www.apache.org"
+          ],
+          "requiredSecrets": [],
+          "runtimeDependencies": [],
+          "download": {
+            "bytes": 13987,
+            "basis": "catalog-assets"
+          }
+        },
+        "refs": {
+          "sbom": {
+            "sha256": "2375a7875da7ddfd36fb24d6ee6ac82ea646429c4d929603caac455b2a5850b4",
+            "bytes": 274,
+            "url": "https://codepuppy.cn/catalog/assets/skill.brand-guidelines/1.0.0/codepuppy-curation/sbom/2375a7875da7ddfd36fb24d6ee6ac82ea646429c4d929603caac455b2a5850b4.cdx.json",
+            "format": "cyclonedx-1.6+json"
+          },
+          "intakeProvenance": {
+            "sha256": "be59f10b05d1f697669aef415d79457716eef7497a7f27842329999afcb95e4f",
+            "bytes": 625,
+            "url": "https://codepuppy.cn/catalog/assets/skill.brand-guidelines/1.0.0/codepuppy-curation/intake-provenance/be59f10b05d1f697669aef415d79457716eef7497a7f27842329999afcb95e4f.json",
+            "format": "codepuppy.intake-provenance.v1+json"
+          }
+        }
+      }
+    },
+    {
+      "id": "agent:bug-triage",
+      "type": "agent",
+      "name": "bug-triage",
+      "displayName": "问题排查助手（只读）",
+      "description": "根据报错或现象查找可能的问题位置，给出复现步骤、有代码依据的原因分析和修复建议。由 Code Puppy 开发。不能编辑文件；每次运行 bash 命令前都需要你确认。",
+      "source": "codepuppy",
+      "category": "dev",
+      "license": "MIT",
+      "redistributable": true,
+      "version": "1.0.0",
+      "installSpec": {
+        "kind": "agent",
+        "source": "remote"
+      },
+      "_provenance": "S27 上架(2026-07-06):首条远程 agent 条目(REQ-046 通道首用);资产 = 单顶层 bug-triage.md(装约定:单文件/.md/256KB 帽)。",
+      "remoteAsset": {
+        "version": "1.0.0",
+        "files": [
+          {
+            "path": "bug-triage.md",
+            "sha256": "645c1a629e10d739881e7301549963a430e5f8ca3d730dc0ebecffe7cabc0542",
+            "bytes": 1084,
+            "url": "https://codepuppy.cn/catalog/assets/agent.bug-triage/1.0.0/bug-triage.md"
+          }
+        ]
+      }
+    },
+    {
+      "id": "agent:code-reviewer",
+      "type": "agent",
+      "name": "code-reviewer",
+      "displayName": "代码审查助手（只读）",
+      "description": "审查代码改动或指定文件，列出问题和修复建议。不能编辑文件；每次运行 bash 命令前都需要你确认。",
+      "source": "codepuppy",
+      "category": "dev",
+      "license": "MIT",
+      "redistributable": true,
+      "version": "1.0.0",
+      "installSpec": {
+        "kind": "agent",
+        "source": "builtin",
+        "builtinAssetKey": "agents/code-reviewer.md"
+      }
+    },
+    {
+      "id": "bundle:office",
+      "type": "bundle",
+      "name": "office-suite",
+      "displayName": "办公套件",
+      "description": "组合安装 markitdown 文档读取、本地文件读写和 Code Puppy Excel 表格读写。创建 docx 或 pptx 时，应用自带的 office-docs 技能会指导使用本地脚本，无需另装连接器。",
+      "source": "codepuppy",
+      "category": "office",
+      "license": "mixed",
+      "redistributable": true,
+      "version": "1.3.0",
+      "bundleItems": [
+        {
+          "catalogEntryId": "mcp:markitdown",
+          "optional": false,
+          "installOrder": 1
+        },
+        {
+          "catalogEntryId": "mcp:filesystem",
+          "optional": false,
+          "installOrder": 2
+        },
+        {
+          "catalogEntryId": "mcp:codepuppy-excel",
+          "optional": false,
+          "installOrder": 3
+        }
+      ],
+      "_provenance": "REQ-105(2026-07-13,alpha-web#21):Word/PPT 写作连接器上游 2026-03-03 归档 → 移出本套件与 stable catalog。REQ-135(2026-08-18,alpha-work#65;alpha-web#155):社区 Excel 从推荐面退役,套件表格成员改为 mcp:codepuppy-excel;成员真变 → 1.2.0 → 1.3.0。"
+    },
+    {
+      "id": "bundle:research",
+      "type": "bundle",
+      "name": "research-suite",
+      "displayName": "研究套件",
+      "description": "组合使用多来源检索、网页读取和本地资料读写，帮助深入研究问题。",
+      "source": "codepuppy",
+      "category": "research",
+      "license": "MIT",
+      "redistributable": true,
+      "version": "1.0.0",
+      "bundleItems": [
+        {
+          "catalogEntryId": "mcp:fetch",
+          "optional": false,
+          "installOrder": 1
+        },
+        {
+          "catalogEntryId": "mcp:filesystem",
+          "optional": false,
+          "installOrder": 2
+        }
+      ]
+    },
+    {
+      "id": "bundle:dev",
+      "type": "bundle",
+      "name": "dev-suite",
+      "displayName": "开发套件",
+      "description": "组合安装 Git 工具和 MCP 服务、技能开发指南。",
+      "source": "codepuppy",
+      "category": "dev",
+      "license": "mixed",
+      "redistributable": true,
+      "version": "1.1.0",
+      "bundleItems": [
+        {
+          "catalogEntryId": "mcp:git",
+          "optional": false,
+          "installOrder": 1
+        },
+        {
+          "catalogEntryId": "skill:mcp-builder",
+          "optional": true,
+          "installOrder": 3
+        },
+        {
+          "catalogEntryId": "skill:skill-creator",
+          "optional": true,
+          "installOrder": 4
+        }
+      ]
+    },
+    {
+      "id": "bundle:design",
+      "type": "bundle",
+      "name": "design-suite",
+      "displayName": "设计套件",
+      "description": "组合安装视觉设计和品牌应用技能。内容通过网络下载，使用 Apache-2.0 许可证。",
+      "source": "codepuppy",
+      "category": "design",
+      "license": "Apache-2.0",
+      "redistributable": true,
+      "version": "1.0.0",
+      "bundleItems": [
+        {
+          "catalogEntryId": "skill:canvas-design",
+          "optional": false,
+          "installOrder": 1
+        },
+        {
+          "catalogEntryId": "skill:brand-guidelines",
+          "optional": false,
+          "installOrder": 2
+        }
+      ],
+      "_provenance": "REQ-045:S22 撤空壳后随成员补货回归(验收④,成员齐才复活)。"
+    },
+    {
+      "id": "cloud:code-review",
+      "type": "cloud",
+      "name": "cloud-code-review",
+      "displayName": "云端代码审查",
+      "description": "将 Git 代码改动交给云端检查正确性、安全、性能和风格；必要时会联网查证依赖库行为和已知漏洞（CVE）。只发送代码改动，不上传整个仓库。",
+      "source": "codepuppy",
+      "category": "cloud",
+      "version": "1.0.1",
+      "installSpec": {
+        "kind": "cloud",
+        "pipelineKind": "code-review",
+        "inputContract": [
+          {
+            "field": "input.diff",
+            "description": "需要审查的 Git 代码改动文本；云端最多处理前 12,000 个字符。",
+            "required": true
+          }
+        ],
+        "budgetDefaults": {
+          "max_iter": 25,
+          "max_tokens": 300000,
+          "max_wall_clock_sec": 600
+        },
+        "budgetLimits": {
+          "max_iter": 50,
+          "max_tokens": 500000,
+          "max_wall_clock_sec": 1800
+        },
+        "tier": "云端运行,无沙箱",
+        "upstreamData": [
+          "要审查的代码改动(git diff 文本,最多 256 KB;超出 1.2 万字的部分云端不会读)",
+          "云端会生成改动目的摘要和审查结论，并保存在任务结果中。",
+          "任务设置"
+        ]
+      }
+    },
+    {
+      "id": "cloud:research",
+      "type": "cloud",
+      "name": "cloud-research",
+      "displayName": "云端深度调研",
+      "description": "提供调研问题，云端会分解问题、联网检索，并整理带来源的回答。",
+      "source": "codepuppy",
+      "category": "cloud",
+      "version": "1.0.1",
+      "installSpec": {
+        "kind": "cloud",
+        "pipelineKind": "research",
+        "inputContract": [
+          {
+            "field": "input.question",
+            "description": "你想调研的问题",
+            "required": true
+          }
+        ],
+        "budgetDefaults": {
+          "max_iter": 25,
+          "max_tokens": 300000,
+          "max_wall_clock_sec": 600
+        },
+        "budgetLimits": {
+          "max_iter": 50,
+          "max_tokens": 500000,
+          "max_wall_clock_sec": 1800
+        },
+        "tier": "云端运行,无沙箱",
+        "upstreamData": [
+          "发送你填写的调研问题（input.question）。",
+          "任务设置"
+        ]
+      }
+    },
+    {
+      "id": "cloud:docs",
+      "type": "cloud",
+      "name": "cloud-docs",
+      "displayName": "云端开发文档生成",
+      "description": "提供代码片段，让云端先拟大纲，再生成 README、API 说明等文档。",
+      "source": "codepuppy",
+      "category": "cloud",
+      "version": "1.0.1",
+      "installSpec": {
+        "kind": "cloud",
+        "pipelineKind": "docs",
+        "inputContract": [
+          {
+            "field": "input.code",
+            "description": "提供代码片段，不要上传整个仓库；云端最多处理前 12,000 个字符。",
+            "required": true
+          },
+          {
+            "field": "input.type",
+            "description": "要生成的文档类型，如 readme 或 api；未指定时使用 readme。"
+          }
+        ],
+        "budgetDefaults": {
+          "max_iter": 25,
+          "max_tokens": 300000,
+          "max_wall_clock_sec": 600
+        },
+        "budgetLimits": {
+          "max_iter": 50,
+          "max_tokens": 500000,
+          "max_wall_clock_sec": 1800
+        },
+        "tier": "云端运行,无沙箱",
+        "upstreamData": [
+          "发送代码片段（input.code），云端最多处理前 12,000 个字符。",
+          "任务设置"
+        ]
+      }
+    },
+    {
+      "id": "skill:conventional-commits",
+      "type": "skill",
+      "name": "conventional-commits",
+      "displayName": "Git 提交说明助手",
+      "description": "按 Conventional Commits 格式编写提交说明，包括 type(scope): subject，以及说明不兼容改动的脚注。由 Code Puppy 开发。",
+      "source": "codepuppy",
+      "category": "dev",
+      "license": "MIT",
+      "redistributable": true,
+      "version": "1.0.0",
+      "installSpec": {
+        "kind": "skill",
+        "source": "remote"
+      },
+      "remoteAsset": {
+        "version": "1.0.0",
+        "files": [
+          {
+            "path": "SKILL.md",
+            "sha256": "0bce63105eeac8c23c22c1272df6c684fa64166516bc54ab607af9036dcc5dbf",
+            "bytes": 1353,
+            "url": "https://codepuppy.cn/catalog/assets/skill.conventional-commits/1.0.0/SKILL.md"
+          }
+        ]
+      }
+    }
+  ],
+  "packages": [
+    {
+      "schema": "codepuppy.host-extension-package.v1",
+      "prelude": {
+        "packageId": "package:cloud-image",
+        "version": "1.0.0"
+      },
+      "presentation": {
+        "description": "描述画面内容与风格，云端生成可下载的 PNG 图片。",
+        "displayName": "云端图片生成"
+      },
+      "root": "cloud:image",
+      "components": [
+        {
+          "id": "cloud:image",
+          "required": true,
+          "dependencies": [],
+          "profileId": "cloud",
+          "profileVersion": 1,
+          "capabilities": [],
+          "payloadRef": {
+            "sha256": "66b13419d0459a8186c88508913deea78ddacd66dc9d871839139349c63671b4",
+            "bytes": 699,
+            "mediaType": "application/vnd.codepuppy.host-extension-package.cloud.v1+json",
+            "url": "https://codepuppy.cn/catalog/assets/cloud.image/1.0.0/codepuppy-package/66b13419d0459a8186c88508913deea78ddacd66dc9d871839139349c63671b4.json"
+          }
+        }
+      ],
+      "capabilities": []
+    },
+    {
+      "schema": "codepuppy.host-extension-package.v1",
+      "prelude": {
+        "packageId": "package:codepuppy-first",
+        "version": "1.0.1"
+      },
+      "presentation": {
+        "description": "A single first-party skill that checks a Code Puppy extension package finished installing and reports what landed on disk. Local state only: no network, no credentials, no writes.",
+        "displayName": "Code Puppy install check"
+      },
+      "root": "skill:codepuppy-first",
+      "components": [
+        {
+          "id": "skill:codepuppy-first",
+          "required": true,
+          "dependencies": [],
+          "profileId": "skill",
+          "profileVersion": 1,
+          "capabilities": [],
+          "payloadRef": {
+            "sha256": "52f5e619f2e707da97efaad61e8bb56957c938ca2ef3c16dd11c9c10ba411496",
+            "bytes": 640,
+            "mediaType": "application/vnd.codepuppy.host-extension-package.skill.v1+json",
+            "url": "https://codepuppy.cn/catalog/assets/skill.codepuppy-first/1.0.1/codepuppy-package/52f5e619f2e707da97efaad61e8bb56957c938ca2ef3c16dd11c9c10ba411496.json"
+          }
+        }
+      ],
+      "capabilities": []
+    },
+    {
+      "schema": "codepuppy.host-extension-package.v1",
+      "prelude": {
+        "packageId": "package:dbhub-readonly",
+        "version": "1.0.0"
+      },
+      "presentation": {
+        "description": "让助手查询你电脑上的数据库，只支持本机 SQLite 数据库文件，只读，不会修改数据。安装前请准备已有的数据库文件，并安装 Node.js 22.5 或更高版本；在安装窗口填写以 sqlite:// 开头的文件地址。目前仅 macOS 可安装。",
+        "displayName": "数据库（本机 SQLite，只读）"
+      },
+      "root": "mcp:dbhub-readonly",
+      "components": [
+        {
+          "id": "mcp:dbhub-readonly",
+          "required": true,
+          "dependencies": [],
+          "profileId": "mcp-local",
+          "profileVersion": 1,
+          "capabilities": [
+            "codepuppy.official-connectors.v1",
+            "codepuppy.secret-prerequisite.v1"
+          ],
+          "payloadRef": {
+            "sha256": "10ad6f34ca4d8d9684134847dac47ebb9bba8f9e52cf415a8fd5382e699fd32d",
+            "bytes": 317,
+            "mediaType": "application/vnd.codepuppy.host-extension-package.mcp-local.v1+json",
+            "url": "https://codepuppy.cn/catalog/assets/mcp.dbhub-readonly/1.0.0/codepuppy-package/10ad6f34ca4d8d9684134847dac47ebb9bba8f9e52cf415a8fd5382e699fd32d.json"
+          }
+        }
+      ],
+      "capabilities": [
+        "codepuppy.official-connectors.v1",
+        "codepuppy.secret-prerequisite.v1"
+      ]
+    },
+    {
+      "schema": "codepuppy.host-extension-package.v1",
+      "prelude": {
+        "packageId": "package:github",
+        "version": "1.0.1"
+      },
+      "presentation": {
+        "description": "Official GitHub MCP server for repository management. Create issues, manage pull requests, review code, search repositories, and interact with GitHub's full API directly from Claude Code.",
+        "displayName": "github"
+      },
+      "root": "mcp:github",
+      "components": [
+        {
+          "id": "mcp:github",
+          "required": true,
+          "dependencies": [],
+          "profileId": "mcp-remote",
+          "profileVersion": 1,
+          "capabilities": [
+            "codepuppy.secret-prerequisite.v1"
+          ],
+          "payloadRef": {
+            "sha256": "d242835ad2e7177222eeb403e543556b2c449d11da5ab1dcb6295769c2685d80",
+            "bytes": 326,
+            "mediaType": "application/vnd.codepuppy.host-extension-package.mcp-remote.v1+json",
+            "url": "https://codepuppy.cn/catalog/assets/mcp.github/1.0.1/codepuppy-package/d242835ad2e7177222eeb403e543556b2c449d11da5ab1dcb6295769c2685d80.json"
+          }
+        }
+      ],
+      "capabilities": [
+        "codepuppy.secret-prerequisite.v1"
+      ]
+    },
+    {
+      "schema": "codepuppy.host-extension-package.v1",
+      "prelude": {
+        "packageId": "package:github-official",
+        "version": "1.0.0"
+      },
+      "presentation": {
+        "description": "让助手查找 GitHub 仓库、阅读代码和查看提交记录，只读访问。需要你自己的 GitHub 令牌，建议只读的 fine-grained 令牌；请在安装窗口填写。目前仅 macOS 可安装。",
+        "displayName": "GitHub（官方）"
+      },
+      "root": "mcp:github-official",
+      "components": [
+        {
+          "id": "mcp:github-official",
+          "required": true,
+          "dependencies": [],
+          "profileId": "mcp-remote",
+          "profileVersion": 1,
+          "capabilities": [
+            "codepuppy.official-connectors.v1",
+            "codepuppy.secret-prerequisite.v1"
+          ],
+          "payloadRef": {
+            "sha256": "0a91f683ab6ccafba2b9480a14c5557b5990937c176a27203f434d02a0883222",
+            "bytes": 433,
+            "mediaType": "application/vnd.codepuppy.host-extension-package.mcp-remote.v1+json",
+            "url": "https://codepuppy.cn/catalog/assets/mcp.github-official/1.0.0/codepuppy-package/0a91f683ab6ccafba2b9480a14c5557b5990937c176a27203f434d02a0883222.json"
+          }
+        }
+      ],
+      "capabilities": [
+        "codepuppy.official-connectors.v1",
+        "codepuppy.secret-prerequisite.v1"
+      ]
+    },
+    {
+      "schema": "codepuppy.host-extension-package.v1",
+      "prelude": {
+        "packageId": "package:supabase",
+        "version": "1.0.0"
+      },
+      "presentation": {
+        "description": "Manage Supabase projects directly through ChatGPT. Execute SQL queries on PostgreSQL databases, design and modify table schemas, deploy serverless edge functions, and configure user authentication. Access real-time logs for debugging, create and apply database migrations, and manage development branches through natural language.",
+        "displayName": "supabase"
+      },
+      "root": "skill:supabase",
+      "components": [
+        {
+          "id": "skill:supabase",
+          "required": true,
+          "dependencies": [
+            "skill:supabase-postgres-best-practices",
+            "mcp:supabase"
+          ],
+          "profileId": "skill",
+          "profileVersion": 1,
+          "capabilities": [],
+          "payloadRef": {
+            "sha256": "cf97b1f02a9f2d1e8dd53c29ceb95b94327fc5494fd73558da2c000fa2798d67",
+            "bytes": 1427,
+            "mediaType": "application/vnd.codepuppy.host-extension-package.skill.v1+json",
+            "url": "https://codepuppy.cn/catalog/assets/skill.supabase/1.0.0/codepuppy-package/cf97b1f02a9f2d1e8dd53c29ceb95b94327fc5494fd73558da2c000fa2798d67.json"
+          }
+        },
+        {
+          "id": "skill:supabase-postgres-best-practices",
+          "required": false,
+          "dependencies": [],
+          "profileId": "skill",
+          "profileVersion": 1,
+          "capabilities": [],
+          "payloadRef": {
+            "sha256": "b13872682d7f04580a46d54794beadabd1e7c07dc9f325786e8fcc5ecd6eb3ac",
+            "bytes": 11501,
+            "mediaType": "application/vnd.codepuppy.host-extension-package.skill.v1+json",
+            "url": "https://codepuppy.cn/catalog/assets/skill.supabase-postgres-best-practices/1.0.0/codepuppy-package/b13872682d7f04580a46d54794beadabd1e7c07dc9f325786e8fcc5ecd6eb3ac.json"
+          }
+        },
+        {
+          "id": "mcp:supabase",
+          "required": false,
+          "dependencies": [],
+          "profileId": "mcp-remote",
+          "profileVersion": 1,
+          "capabilities": [
+            "codepuppy.mcp-oauth.v1"
+          ],
+          "payloadRef": {
+            "sha256": "df61469ce2a27179cd4b30206d86bd5bbc72812853b03704a6a212c240cd7355",
+            "bytes": 333,
+            "mediaType": "application/vnd.codepuppy.host-extension-package.mcp-remote.v1+json",
+            "url": "https://codepuppy.cn/catalog/assets/mcp.supabase/1.0.0/codepuppy-package/df61469ce2a27179cd4b30206d86bd5bbc72812853b03704a6a212c240cd7355.json"
+          }
+        }
+      ],
+      "capabilities": [
+        "codepuppy.mcp-oauth.v1"
+      ]
+    }
+  ]
+}

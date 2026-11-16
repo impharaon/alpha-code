@@ -1,0 +1,13 @@
+{
+  "behavior": {
+    "auth": "none",
+    "headersTemplate": {
+      "Authorization": "Bearer {GITHUB_PERSONAL_ACCESS_TOKEN}"
+    },
+    "requiredSecrets": [
+      "GITHUB_PERSONAL_ACCESS_TOKEN"
+    ],
+    "url": "https://api.githubcopilot.com/mcp/"
+  },
+  "schema": "codepuppy.host-extension-package.payload.mcp-remote.v1"
+}

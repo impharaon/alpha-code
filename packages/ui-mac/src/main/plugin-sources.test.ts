@@ -3,6 +3,10 @@ import { mkdtemp, rm, cp, readFile, stat } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import opencode from "../../test-fixtures/plugin-helper/opencode/provenance.json"
 import npm from "../../test-fixtures/plugin-helper/opencode/npm/provenance.json"
+import formalCatalog from "../../test-fixtures/plugin-helper/catalog/catalog.json"
+import catalogProvenance from "../../test-fixtures/plugin-helper/catalog/provenance.json"
+import { createPublicKey, verify } from "node:crypto"
+import { evaluatePackageForHost, type PackageAcceptedFactsV1 } from "./package-installability"
 import { gunzipSync, gzipSync } from "node:zlib"
 import { join } from "node:path"
 import catalog from "../renderer/extensions/codepuppy-catalog.json"
@@ -13,6 +17,17 @@ const sourcesModule = () => import("./plugin-sources")
 const marketplace = () => Bun.file(join(fixtureRoot, ".claude-plugin/marketplace.json")).text()
 const archive = () => Bun.file(join(fixtureRoot, "claude-selection.tar.gz")).arrayBuffer()
 const catalogCandidates = () => catalog.entries.map((entry) => ({ id: entry.id, source: "catalog" as const, name: entry.name, displayName: entry.displayName, description: entry.description, kind: "plugin" as const, upstream: {} }))
+const formalCandidates = () => formalCatalog.packages.filter((entry) => ["package:github", "package:github-official"].includes(entry.prelude.packageId)).map((entry) => ({ id: entry.prelude.packageId, source: "catalog" as const, name: entry.presentation.displayName, displayName: entry.presentation.displayName, description: entry.presentation.description, kind: "plugin" as const, upstream: { version: entry.prelude.version } }))
+async function formalPackage(id: string) {
+  const envelope = formalCatalog.packages.find((entry) => entry.prelude.packageId === id)!
+  let accepted: PackageAcceptedFactsV1 | undefined
+  await evaluatePackageForHost(envelope, { fetchPayload: async (ref) => {
+    const file = catalogProvenance.files.find((file) => file.url === ref.url)!
+    return Bun.file(join(fixtureRoot, "catalog", file.path)).bytes()
+  }, accepted: (facts) => { accepted = facts } })
+  if (!accepted) throw new Error("Pinned formal package was not accepted")
+  return accepted
+}
 
 async function fixtureFetch(url: string | URL | Request): Promise<Response> {
   const address = String(url)
@@ -270,4 +285,95 @@ test("npm integrity mismatch is source-unreachable and failed queries retry", as
   const candidate = result.candidates.find((entry) => entry.upstream.npm === npm.name)!
   expect(await sources.captureCandidate(candidate.id)).toMatchObject({ ok: false, code: "source-unreachable" })
   expect(attempts).toBe(2)
+})
+
+test("signed GitHub package and external definition supply the catalog identity and version", async () => {
+  const bytes = await Bun.file(join(fixtureRoot, "catalog/catalog.json")).bytes()
+  const signature = Buffer.from((await Bun.file(join(fixtureRoot, "catalog/catalog.json.sig")).text()).trim(), "base64")
+  const key = createPublicKey({ key: Buffer.from("MCowBQYDK2VwAyEAqBBmG0mbZ3tZF7Vt8VEWhgm1RQdF2boFU5uUTSmsgHI=", "base64"), format: "der", type: "spki" })
+  expect(verify(null, bytes, key, signature)).toBe(true)
+  expect(formalCandidates().find((entry) => entry.id === "package:github")).toMatchObject({ name: "github", upstream: { version: "1.0.1" } })
+  const sources = (await sourcesModule()).createPluginSources({ catalog: async () => formalCandidates(), catalogPackage: formalPackage, fetch: fixtureFetch })
+  const result = await sources.searchSources("github")
+  const candidate = result.candidates.find((entry) => entry.source === "claude-marketplace")!
+  expect(candidate.sameAs).toBe("package:github")
+  const converted = await sources.convertCandidate(candidate.id)
+  expect(converted.ok).toBe(true)
+  if (!converted.ok) throw new Error(converted.code)
+  const comparison = (await sources.catalogComparisons("github")).find((row) => row.catalogId === "package:github")!
+  expect(comparison).toMatchObject({ packageId: "package:github", version: "1.0.1", runtimeIdentity: converted.runtimeIdentity })
+})
+
+test("equal converted GitHub definitions fold to catalog while readonly headers stay distinct", async () => {
+  // Same-name controlled view of the two real catalog definitions isolates their header-set difference.
+  const rows = formalCandidates().map((row) => ({ ...row, name: "github" }))
+  const sources = (await sourcesModule()).createPluginSources({ catalog: async () => rows, catalogPackage: formalPackage, fetch: fixtureFetch })
+  const result = await sources.searchSources("github")
+  expect(result.candidates.filter((entry) => entry.source === "catalog")).toHaveLength(2)
+  const comparisons = await sources.catalogComparisons("github")
+  expect(comparisons).toHaveLength(2)
+  expect(comparisons[0]!.runtimeIdentity).not.toBe(comparisons[1]!.runtimeIdentity)
+  expect(result.candidates.find((entry) => entry.source === "claude-marketplace")?.sameAs).toBe("package:github")
+})
+
+test("same name with changed runtime definition remains separate", async () => {
+  const sources = (await sourcesModule()).createPluginSources({ catalog: async () => formalCandidates(), catalogPackage: formalPackage, fetch: async (url) => {
+    if (!url.includes("codeload.github.com/anthropics")) return fixtureFetch(url)
+    // Change only the real GitHub URL inside the recorded archive, rebuilding the same real tar members.
+    const { captureFixture } = await import("../../test-fixtures/plugin-helper/fixture")
+    const source = await captureFixture("external_plugins/github")
+    const text = new TextDecoder().decode(await source.readFile(".mcp.json"))
+    const bytes = new Uint8Array(gunzipSync(await archive()))
+    const original = new TextEncoder().encode(text)
+    const replacement = new TextEncoder().encode(text.replace("api.githubcopilot.com", "api.otherprovider.com"))
+    expect(replacement.length).toBe(original.length)
+    const offset = Buffer.from(bytes).indexOf(original)
+    expect(offset).toBeGreaterThan(0)
+    bytes.set(replacement, offset)
+    return new Response(gzipSync(bytes))
+  } })
+  const result = await sources.searchSources("github")
+  expect(result.candidates.find((entry) => entry.source === "claude-marketplace")?.sameAs).toBeUndefined()
+})
+
+test("search comparison and later capture reuse pinned bytes and normalized definitions", async () => {
+  const requests: string[] = []
+  const sources = (await sourcesModule()).createPluginSources({ catalog: async () => formalCandidates(), catalogPackage: formalPackage, fetch: async (url) => { requests.push(url); return fixtureFetch(url) } })
+  const first = await sources.searchSources("github")
+  const candidate = first.candidates.find((entry) => entry.source === "claude-marketplace")!
+  const one = await sources.convertCandidate(candidate.id)
+  const two = await sources.convertCandidate(candidate.id)
+  expect(one.ok && two.ok && one.package === two.package).toBe(true)
+  expect(requests.filter((url) => url.includes("codeload.github.com/anthropics"))).toHaveLength(1)
+  expect((await sources.searchSources("github")).candidates.find((entry) => entry.id === candidate.id)?.sameAs).toBe("package:github")
+})
+
+test("recorded source misses preserve catalog Claude Codex OpenCode order", async () => {
+  const claude = JSON.parse(await marketplace())
+  const codexIndex = await Bun.file(join(fixtureRoot, "codex/.agents/plugins/marketplace.json")).json()
+  const npmPage = await Bun.file(join(fixtureRoot, "opencode/npm/search.json")).json()
+  for (const level of [0, 1, 2, 3]) {
+    const sources = (await sourcesModule()).createPluginSources({ catalog: async () => level === 0 ? formalCandidates() : [], fetch: async (url) => {
+      if (url.includes("raw.githubusercontent.com/anthropics")) return Response.json({ ...claude, plugins: level <= 1 ? claude.plugins : [] })
+      if (url.includes("raw.githubusercontent.com/openai")) return Response.json({ ...codexIndex, plugins: level <= 2 ? codexIndex.plugins : [] })
+      if (url.includes("/-/v1/search?")) return Response.json({ ...npmPage, total: npmPage.objects.length })
+      return fixtureFetch(url)
+    } })
+    const result = await sources.searchSources("")
+    expect(result.sources.map((source) => source.source)).toEqual(["catalog", "claude-marketplace", "codex-marketplace", "opencode-npm", "mcp-registry"])
+    expect(result.candidates[0]!.source).toBe(["catalog", "claude-marketplace", "codex-marketplace", "opencode-npm"][level]!)
+    expect(result.sources.every((source) => source.status === "ok")).toBe(true)
+  }
+})
+
+test("runtime identity includes every MCP and skill while stdio package versions are ignored", async () => {
+  const { captureFixture } = await import("../../test-fixtures/plugin-helper/fixture")
+  const { convertPluginTree } = await import("../shared/host-extension-package-contract/plugin-conversion.mjs")
+  const source = (await convertPluginTree(await captureFixture("external_plugins/playwright"))).package
+  const identity = (await sourcesModule()).pluginRuntimeIdentity
+  const mcp = source.entries.find((entry) => entry.kind === "mcp" && entry.transport === "stdio")!
+  expect(identity({ ...source, name: source.name.toUpperCase(), entries: [{ ...mcp, kind: "mcp", transport: "stdio", command: [["npx"], ["-y"], ["@playwright/mcp@0.0.85"]], environment: {} }] })).toBe(identity(source))
+  const skill = (await convertPluginTree(await captureFixture("plugins/frontend-design"))).package.entries[0]!
+  expect(identity({ ...source, entries: [...source.entries, skill] })).not.toBe(identity(source))
+  expect(identity({ ...source, entries: [] })).toBeUndefined()
 })

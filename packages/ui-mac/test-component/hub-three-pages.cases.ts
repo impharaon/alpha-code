@@ -1139,3 +1139,16 @@ test("BC2b Git market shows real per-entry source rows and installs only the cli
   expect(wire[1]).toMatchObject({source:{kind:"candidate",candidateId:selected.id},effect:{kind:"all-projects"},via:"hub"})
  }finally{Object.assign(window.api.ext,previous)}
 })
+
+test("R14 B6 Git import failure uses localised copy rather than main detail", async () => {
+ reset();mount()
+ const previous=window.api.ext.preparePluginSource
+ Object.assign(window.api.ext,{preparePluginSource:async()=>({ok:false,detail:"RAW_MAIN_GIT_FAILURE"})})
+ try{
+  await openMenu(q("[data-more='add']"));click(q("[data-menu-item='git']"))
+  const input=q<HTMLInputElement>('[role="dialog"] input')!;input.value="https://gitlab.com/anthropics/claude-plugins-official";input.dispatchEvent(new Event("input",{bubbles:true}))
+  click(qa('[role="dialog"] .a-dialog-footer button')[1]!)
+  await waitFor(()=>expect(document.body.textContent).toContain("未能读取 Git 插件来源"))
+  expect(document.body.textContent).not.toContain("RAW_MAIN_GIT_FAILURE")
+ }finally{Object.assign(window.api.ext,{preparePluginSource:previous})}
+})

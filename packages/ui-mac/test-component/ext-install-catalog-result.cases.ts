@@ -636,3 +636,33 @@ test("R14 source progress is sent only to its correlated renderer request", asyn
   expect((progress.at(-1) as unknown[])[2]).toEqual(result)
  }finally{fetchSpy.mockRestore()}
 })
+
+test("R14 B6 all previously allowed Git forges prepare a whole real MCP package and clean their clone", async () => {
+ const processModule=await import("node:child_process")
+ const {captureFixture}=await import("../test-fixtures/plugin-helper/fixture")
+ const {existsSync,writeFileSync}=await import("node:fs")
+ const capture=await captureFixture("external_plugins/playwright")
+ const files=await Promise.all(capture.nodes.filter(node=>node.kind==="file").map(async node=>({path:node.path,bytes:await capture.readFile(node.path)})))
+ const cloned:string[]=[],directories:string[]=[]
+ // Routing variants use real pinned plugin bytes, not claims that these forge mirrors exist.
+ const clone=spyOn(processModule,"execFile").mockImplementation((command,args,options,callback)=>{
+  if(command!=="git"||!Array.isArray(args)||typeof callback!=="function")throw Error("unexpected clone boundary")
+  cloned.push(String(args.at(-2)));const target=String(args.at(-1));directories.push(target)
+  for(const file of files){const dest=join(target,file.path);mkdirSync(join(dest,".."),{recursive:true});writeFileSync(dest,file.bytes)}
+  callback(null,"","");return {} as never
+ })
+ try{
+  let selected=""
+  for(const host of ["gitlab.com","bitbucket.org","codeberg.org","git.sr.ht"]){
+   const result=await handlers.get("ext-prepare-plugin-source")!({sender:{id:1}},{kind:"git",url:`https://${host}/anthropics/claude-plugins-official`}) as import("../src/main/plugin-sources").PreparePluginSourceResultV1
+   expect(result).toMatchObject({ok:true,prepared:{kind:"package",displayName:"playwright"}})
+   if(result.ok&&result.prepared.kind==="package")selected=result.prepared.candidateId
+  }
+  expect(cloned).toHaveLength(4)
+  expect(directories.every(directory=>!existsSync(directory))).toBe(true)
+  expect(await handlers.get("ext-install-from-source")!({sender:{id:1}},{requestId:"r14_forge_package",source:{kind:"candidate",candidateId:selected},effect:{kind:"all-projects"},via:"hub"})).toMatchObject({ok:true,installed:[{kind:"mcp",sourceName:"playwright"}]})
+  const before=cloned.length
+  expect(await handlers.get("ext-prepare-plugin-source")!({sender:{id:1}},{kind:"git",url:"https://localhost/private"})).toMatchObject({ok:false})
+  expect(cloned).toHaveLength(before)
+ }finally{clone.mockRestore()}
+})

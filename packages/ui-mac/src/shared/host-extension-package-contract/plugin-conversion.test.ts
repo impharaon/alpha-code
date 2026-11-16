@@ -303,3 +303,11 @@ test("R12 A5 real Claude command agent and hook components survive discovery wit
   expect(converted.package.entries).toMatchObject([{ kind: "hook", sourcePath: "hooks/hooks.json", sourceName: "SessionStart", hook: { event: "SessionStart", command: ["bash \"", { binding: "pluginRoot" }, "/hooks-handlers/session-start.sh\""], scope: { kind: "package" } } }])
   expect(converted.package.diagnostics).toEqual([])
 })
+
+test("R14 B6 a repository with one loose skill keeps the previously accepted child layout", async () => {
+ const captured=await captureFixture("plugins/frontend-design")
+ const skill=new TextDecoder().decode(await captured.readFile("skills/frontend-design/SKILL.md"))
+ const relocated=await captureFixture("plugins/frontend-design",{".claude-plugin/plugin.json":null,"skills/frontend-design/SKILL.md":null,"frontend-design/SKILL.md":skill})
+ const converted=await (await converter()).convertPluginTree(relocated)
+ expect(converted.package.entries).toContainEqual(expect.objectContaining({kind:"skill",sourcePath:"frontend-design/SKILL.md",sourceName:"frontend-design"}))
+})

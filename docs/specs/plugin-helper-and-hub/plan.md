@@ -874,3 +874,5 @@ A1/B5 deadline ruling FIXED：search 每源 30,000ms（包括比较），chat br
 B4 前提属实：实际 runtime-loaded customize-codepuppy 的 description 与第 4 项仍教 type=mcp 注册及项目连接器。先将既有 runtime 指令守卫中被本 AC 替换的旧等待句去掉，加入 MCP 注册反控制和 this-project 托管路由正控制；命名 #1532 AC5 两例 exit 1（b4-red.log）。这是运行时技能内容回归，另对实际 SKILL.md 工件逐段检查，不拿普通 docs 的标题/措辞计数作产品证明。
 
 B4 FIXED：实际出厂 SKILL.md description 不再声称创建项目连接器，第 4 项删 type=mcp/额外连接器等待指引，第 2 项明确 hub_install scope:this-project，项目位置表不再教项目连接器配置。工件实读保留 agent/command/skill 原用途及既有插件信任边界；没有封禁旧通用 register 工具或增授权面。factory-skills/packaging-census 两文件 exit 0（b4-green.log），原 #1532 新反控制未改。
+
+B6 前提属实：prepare 的 hostname===github.com 排除了既有 validGitUrl 的另四个 forge。额外核同链 cloneSkillGitToTmp：它还要求根/唯一子目录有 SKILL.md，不能直接承接整包 MCP；其旧唯一子目录技能能力须保留在共享 converter 发现方，不能通过复制识别规则修补。三条 red（四主机复用真实固定 Playwright 树、实际 Hub Git 错误呈现、真实技能字节的旧单子目录变体）exit 1（b6-red.log）。clone 边界只模拟 git 的进程 I/O；不声称所换主机上的镜像实际存在，不进行外部写入。

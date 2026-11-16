@@ -191,3 +191,39 @@ test("A2 automatic enable uses H's package-root action for a real skill-only pac
     rmSync(temporary, { recursive: true, force: true })
   }
 })
+
+for (const sample of [
+  { query: "figma", source: "codex-marketplace", name: "figma", expected: { kind: "marketplace", ecosystem: "codex" } },
+  { query: "io.github.github/github-mcp-server", source: "mcp-registry", name: "io.github.github/github-mcp-server", expected: { kind: "mcp-registry", serverName: "io.github.github/github-mcp-server", version: "2.1.0" } },
+]) test("A2 shared entry installs pinned " + sample.source + " definitions and retains diagnostics", () => installerHarness(async (h) => {
+  const row = (await h.sources.searchSources(sample.query)).candidates.find((row) => row.source === sample.source && row.name === sample.name)
+  expect(row).toBeDefined()
+  const outcome = await h.install(h.request(row!.id))
+  expect(outcome).toMatchObject({ ok: true, source: sample.expected })
+  if (!outcome.ok) throw Error(outcome.detail)
+  const state = readPackageLedgerStateV1(h.root)
+  expect(state.ok && state.records.every((record) => record.desiredState === "enabled")).toBe(true)
+  expect(state.ok && state.packageGraphs[0]?.source).toMatchObject(sample.expected)
+  if (sample.source === "codex-marketplace") expect(outcome.notRunning).toContainEqual(expect.objectContaining({ kind: "app", reason: "unresolved-app-id" }))
+  const { createPackageDeclarationResolver } = await import("./package-declarations")
+  expect(await createPackageDeclarationResolver({ root: () => h.root, catalog: async () => { throw Error("non-catalog must not load catalog") } })(outcome.packageId)).toMatchObject({ ok: true, origin: "installed", declarations: state.ok && state.packageGraphs[0]?.declarations })
+}))
+
+test("A2 same pinned source with changed real bytes updates its package instead of duplicating", () => installerHarness(async (h) => {
+  const id = await h.candidate("context7")
+  const first = await h.install(h.request(id))
+  expect(first).toMatchObject({ ok: true, packageId: "claude:context7" })
+  const before = readPackageLedgerStateV1(h.root)
+  const captured = await captureFixture("external_plugins/context7")
+  const original = new TextDecoder().decode(await captured.readFile(".mcp.json"))
+  const updatedCapture = await captureFixture("external_plugins/context7", { ".mcp.json": original.replace("client=claude-code-plugin", "client=updated-definition") })
+  const updated = await convertPluginTree(updatedCapture)
+  const { pluginRuntimeIdentity } = await import("./plugin-sources")
+  h.sources.convertCandidate = async () => ({ ok: true, ...updated, capture: updatedCapture, runtimeIdentity: pluginRuntimeIdentity(updated.package) })
+  expect(await h.install(h.request(id, "request_update_02"))).toMatchObject({ ok: true, packageId: "claude:context7" })
+  const after = readPackageLedgerStateV1(h.root)
+  expect(after.ok && after.packageGraphs).toHaveLength(1)
+  expect(after.ok && before.ok && after.packageGraphs[0]!.installedGraphDigest).not.toBe(before.ok && before.packageGraphs[0]!.installedGraphDigest)
+  expect(readMcpLeafStrict("context7")).toMatchObject({ ok: true, value: { url: "https://mcp.context7.com/mcp?client=updated-definition" } })
+  expect(after.ok && after.records.map((record) => record.desiredState)).toEqual(["enabled"])
+}))

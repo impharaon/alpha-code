@@ -77,3 +77,18 @@ function record(value: unknown): value is Record<string, unknown> { return value
 function exact(value: unknown, keys: string[]): value is Record<string, unknown> { return record(value) && Object.keys(value).every((key) => keys.includes(key)) }
 function nonempty(value: unknown): value is string { return typeof value === "string" && value.length > 0 }
 function stringMap(value: unknown): value is Record<string, string> { return record(value) && Object.values(value).every((item) => typeof item === "string") }
+
+export function diagnosticNotRunning(
+  diagnostics: readonly import("./host-extension-package-contract/plugin-conversion").Diagnostic[],
+): PackageNotRunningV1[] {
+  return diagnostics.map((diagnostic) => ({
+    kind:
+      diagnostic.code === "native-js-plugin"
+        ? "plugin"
+        : diagnostic.code === "unresolved-app-id"
+          ? "app"
+          : "definition",
+    sourceName: diagnostic.sourceName ?? diagnostic.path.split("/").at(-1) ?? diagnostic.path,
+    reason: diagnostic.code,
+  }))
+}

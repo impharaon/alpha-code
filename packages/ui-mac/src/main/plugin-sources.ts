@@ -34,7 +34,7 @@ type SourceCandidate = { candidate: CandidateV1 } & (
   | { kind: "npm"; name: string; version: string }
 )
 type SourceFailure = { ok: false; code: "unknown-id" | "source-unreachable" | "source-changed"; detail: string }
-type ConvertedCandidate = Awaited<ReturnType<typeof convertPluginTree>> & { ok: true; capture: Capture; runtimeIdentity: string | undefined }
+type ConvertedCandidate = Awaited<ReturnType<typeof convertPluginTree>> & { ok: true; capture: Capture; runtimeIdentity: string | undefined; publisher?: CandidateV1["publisher"] }
 type CatalogContents = Pick<PackageAcceptedFactsV1, "envelope"> & { components: readonly Pick<PackageAcceptedFactsV1["components"][number], "payload">[] }
 type CatalogComparison = { catalogId: string; packageId: string; version: string; runtimeIdentity: string }
 
@@ -187,7 +187,8 @@ export function createPluginSources(deps: { catalog: () => Promise<readonly Cand
       const converted = captured.capture.source.kind === "mcp-registry"
         ? { ...convertMcpServerDefinition(JSON.parse(new TextDecoder().decode(await captured.capture.readFile("server.json"))), captured.capture.source), replacements: new Map<string, Uint8Array>() }
         : await convertPluginTree(captured.capture)
-      return { ok: true, capture: captured.capture, ...converted, runtimeIdentity: pluginRuntimeIdentity(converted.package) }
+      const publisher = [...candidates.values()].find((entry) => entry.candidate.id === candidateId)?.candidate.publisher
+      return { ok: true, capture: captured.capture, ...converted, runtimeIdentity: pluginRuntimeIdentity(converted.package), ...(publisher ? { publisher } : {}) }
     })().catch((): SourceFailure => ({ ok: false, code: "source-unreachable", detail: "Selected source could not be converted" }))
     conversions.set(candidateId, pending)
     const result = await pending
@@ -352,6 +353,15 @@ export function pluginRuntimeIdentity(pkg: PluginPackage): string | undefined {
     const endpoint = entry.transport === "stdio" ? stdioIdentity(entry.command) : literal(entry.url)
     return endpoint ? [entry.transport, endpoint, entry.transport === "stdio" ? [] : Object.keys(entry.headers)] : undefined
   }), pkg.entries.filter((entry) => entry.kind === "skill").map((entry) => entry.sourceName))
+}
+
+/** Installed sanitized declarations use the same identity implementation as captured definitions. */
+export function packageDeclarationRuntimeIdentity(name: string, declarations: readonly import("../shared/plugin-install").PackageDeclarationV1[]): string | undefined {
+  return identity(name, declarations.flatMap((entry): McpIdentity[] => {
+    if (!entry.mcp) return []
+    const endpoint = entry.mcp.type === "local" ? stdioIdentity(entry.mcp.command.map((token) => [token])) : entry.mcp.url
+    return endpoint ? [[entry.mcp.type === "local" ? "stdio" : "http", endpoint, entry.mcp.type === "remote" ? Object.keys(entry.mcp.headers ?? {}) : []]] : []
+  }), declarations.filter((entry) => entry.kind === "skill").map((entry) => entry.sourceName))
 }
 
 function identity(name: string, mcps: (McpIdentity | undefined)[], skills: string[]): string | undefined {

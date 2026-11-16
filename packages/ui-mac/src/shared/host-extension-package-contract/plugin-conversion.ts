@@ -414,3 +414,31 @@ function replacePointer(root: Record<string, unknown>, pointer: string, replacem
   const target = keys.slice(0, -1).reduce<unknown>((node, key) => object(node) ? node[key] : undefined, root)
   if (object(target)) target[keys.at(-1)!] = replacement
 }
+
+/** Materialize only the installed copy; discovery and frontmatter field meanings remain converter-owned. */
+export function renderInstalledSkill(entry: Extract<Entry, { kind: "skill" }>, bytes: Uint8Array, hosts: ReadonlyMap<string, string>): Uint8Array {
+  const text = decode(bytes)
+  const hostName = hosts.get(entry.id) ?? hosts.get(entry.sourceName) ?? entry.sourceName
+  const rendered = text.replace(/^(---\r?\n)([\s\S]*?)(\r?\n---)/, (_match, start: string, frontmatter: string, end: string) => {
+    const named = /^name:/.test(frontmatter) || /\nname:/.test(frontmatter)
+      ? frontmatter.replace(/^name:[^\r\n]*$/m, "name: " + hostName)
+      : "name: " + hostName + "\n" + frontmatter
+    const rules = [["allowed-tools", entry.invocation.allowedTools], ["disallowed-tools", entry.invocation.deniedTools], ["tools", entry.invocation.availableTools ?? []]] as const
+    const withRules = rules.reduce((value, [field, rules]) => {
+      const rewritten = rules.map((rule) => {
+        const tool = [...hosts].reduce((tool, [source, host]) => tool.startsWith("mcp__" + source + "__") ? "mcp__" + host + "__" + tool.slice(("mcp__" + source + "__").length) : tool, rule.tool)
+        return tool + (rule.pattern === undefined ? "" : "(" + rule.pattern + ")")
+      })
+      if (rules.every((rule, index) => rule.tool + (rule.pattern === undefined ? "" : "(" + rule.pattern + ")") === rewritten[index])) return value
+      return value.replace(new RegExp("^" + field + ":[^\\r\\n]*(?:\\r?\\n[ \\t]+[^\\r\\n]*)*", "m"), field + ": " + JSON.stringify(rewritten))
+    }, named)
+    const dependencies = withRules.replace(/^dependencies:[^\r\n]*(?:\r?\n[ \t]+[^\r\n]*)*/m, (block) => block.replace(/\bmcp:[^\r\n]*(?:\r?\n[ \t]+-[^\r\n]*)*/, (mcp) => entry.mcpDependencies.reduce((value, source) => {
+      const host = hosts.get(source)
+      if (!host || host === source) return value
+      const escaped = source.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+      return value.replace(new RegExp("(?<=[\\s\\[,'\"])" + escaped + "(?=[\\s\\],'\"]|$)", "g"), host)
+    }, mcp)))
+    return start + dependencies + end
+  })
+  return new TextEncoder().encode(rendered)
+}

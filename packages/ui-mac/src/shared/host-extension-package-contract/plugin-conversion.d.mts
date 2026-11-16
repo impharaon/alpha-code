@@ -201,4 +201,8 @@ export declare function convertMcpServerDefinition(server: Json, source: Source)
     package: PluginPackage;
     privateCredentials: ReadonlyMap<string, Uint8Array>;
 };
+/** Materialize only the installed copy; discovery and frontmatter field meanings remain converter-owned. */
+export declare function renderInstalledSkill(entry: Extract<Entry, {
+    kind: "skill";
+}>, bytes: Uint8Array, hosts: ReadonlyMap<string, string>): Uint8Array;
 export {};

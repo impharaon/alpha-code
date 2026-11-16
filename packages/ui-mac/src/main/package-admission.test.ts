@@ -132,6 +132,43 @@ test("one package switch projects every skill and connector from the package gra
   if (ledger.ok) expect(ledger.records.map((record) => record.desiredState)).toEqual(["enabled", "enabled", "enabled"])
 })
 
+test("package credential replacement preserves graph and claims, retires old versions, and keeps the old value on failed commit", async () => {
+  const { installDesktopPackageV1, savePackageSecretsV1 } = await import("./package-admission")
+  const { readMcpLeafStrict } = await import("./ext-config")
+  const { collectMcpFileRefPaths } = await import("./codepuppy-mcp-secrets")
+  const { commitTransactionLedger } = await import("./ext-package-ledger-commit")
+  const deps = desktopDeps()
+  expect((await installDesktopPackageV1("package:github", deps)).ok).toBe(true)
+  const before = readPackageLedgerStateV1(root)
+  if (!before.ok) throw new Error(before.reason)
+  const id = "mcp:github#GITHUB_PERSONAL_ACCESS_TOKEN"
+  const liveFile = () => { const leaf = readMcpLeafStrict("github"); if (!leaf.ok) throw new Error(leaf.reason); return collectMcpFileRefPaths(leaf.value)[0]! }
+  expect((await savePackageSecretsV1({ packageId: "package:github", secrets: { [id]: "invalid-first-token-r4" } }, deps)).ok).toBe(true)
+  const first = liveFile()
+  expect(readFileSync(first, "utf8")).toBe("invalid-first-token-r4")
+  let committed: Parameters<typeof commitTransactionLedger>[1] = []
+  expect((await savePackageSecretsV1({ packageId: "package:github", secrets: { [id]: "invalid-second-token-r4" } }, {
+    ...deps,
+    transaction: (target, plan, hooks) => runExtensionTransaction(target, plan, { ...hooks, commitReceipt: (records) => { committed = records; return hooks.commitReceipt?.(records) } }),
+  })).ok).toBe(true)
+  const current = readPackageLedgerStateV1(root)
+  expect(current.ok && current.packageGraphs).toEqual(before.packageGraphs)
+  expect(current.ok && current.claims).toEqual(before.claims)
+  expect(existsSync(first)).toBe(false)
+  const second = liveFile()
+  expect(readFileSync(second, "utf8")).toBe("invalid-second-token-r4")
+  const durable = readFileSync(join(root, "installs.json"), "utf8")
+  commitTransactionLedger(root, committed)
+  expect(readFileSync(join(root, "installs.json"), "utf8")).toBe(durable)
+  expect((await savePackageSecretsV1({ packageId: "package:github", secrets: { [id]: "invalid-refused-token-r4" } }, {
+    ...deps,
+    transaction: (target, plan, hooks) => runExtensionTransaction(target, plan, { ...hooks, commitReceipt: () => { throw new Error("injected ledger write failure") } }),
+  })).ok).toBe(false)
+  expect(liveFile()).toBe(second)
+  expect(readFileSync(second, "utf8")).toBe("invalid-second-token-r4")
+  expect(readFileSync(join(root, "installs.json"), "utf8")).toBe(durable)
+})
+
 test("package activation and switch work when main-owned remote definitions require no JSONC edits", async () => {
   const { readMcpServerRecords } = await import("./mcp-server-records")
   const { initCodePuppyEnvironment, __resetCodePuppyEnvironmentForTests } = await import("./codepuppy-environment")

@@ -65,6 +65,7 @@ export function createPluginSources(deps: { catalog: () => Promise<readonly Cand
   const conversions = new Map<string, Promise<ConvertedCandidate | SourceFailure>>()
   const catalogRows = new Map<string, CandidateV1>()
   const catalogIdentities = new Map<string, Promise<CatalogComparison | undefined>>()
+  const catalogComparisonRequests = new Map<string, Promise<CatalogComparison[]>>()
   const archives = new Map<string, Promise<Archive>>()
   const indexes = new Map<string, Promise<ReturnType<typeof readMarketplace>>>()
   const registryQueries = new Map<string, Promise<ReturnType<typeof registryRecord>[]>>()
@@ -260,42 +261,49 @@ export function createPluginSources(deps: { catalog: () => Promise<readonly Cand
     if (!result.ok) conversions.delete(candidateId)
     return result
   }
-  const catalogComparisons = async (name: string): Promise<CatalogComparison[]> => {
-    const rows = [...catalogRows.values()].filter((row) => row.name.toLowerCase() === name.toLowerCase())
-    const comparisons = await Promise.all(rows.map(async (row) => {
-      const key = row.id + "@" + row.upstream.version
-      const known = row.upstream.version ? catalogIdentities.get(key) : undefined
-      if (known) return known
-      const pending = (async () => {
-        const facts = await deps.catalogPackage?.(row.id, row.upstream.version)
-        if (!facts || (row.upstream.version && facts.envelope.prelude.version !== row.upstream.version)) return
-        const mcps: (McpIdentity | undefined)[] = []
-        const skills: string[] = []
-        for (const component of facts.components) {
-          const payload = component.payload
-          if (payload.schema === "codepuppy.host-extension-package.payload.mcp-remote.v1") mcps.push(["http", payload.behavior.url, Object.keys(payload.behavior.headersTemplate)])
-          if (payload.schema === "codepuppy.host-extension-package.payload.mcp-local.v1") {
-            const command = stdioIdentity(payload.behavior.command.map((token) => [token]))
-            mcps.push(command ? ["stdio", command, []] : undefined)
+  const catalogComparisons = (name: string, requestId?: string): Promise<CatalogComparison[]> => {
+    const requestKey = requestId ? JSON.stringify([requestId, name.toLowerCase()]) : undefined
+    const known = requestKey ? catalogComparisonRequests.get(requestKey) : undefined
+    if (known) return known
+    const pending = (async () => {
+      const rows = (await deps.catalog()).filter((row) => row.name.toLowerCase() === name.toLowerCase())
+      const comparisons = await Promise.all(rows.map(async (row) => {
+        const key = row.id + "@" + row.upstream.version
+        const known = row.upstream.version ? catalogIdentities.get(key) : undefined
+        if (known) return known
+        const pending = (async () => {
+          const facts = await deps.catalogPackage?.(row.id, row.upstream.version)
+          if (!facts || (row.upstream.version && facts.envelope.prelude.version !== row.upstream.version)) return
+          const mcps: (McpIdentity | undefined)[] = []
+          const skills: string[] = []
+          for (const component of facts.components) {
+            const payload = component.payload
+            if (payload.schema === "codepuppy.host-extension-package.payload.mcp-remote.v1") mcps.push(["http", payload.behavior.url, Object.keys(payload.behavior.headersTemplate)])
+            if (payload.schema === "codepuppy.host-extension-package.payload.mcp-local.v1") {
+              const command = stdioIdentity(payload.behavior.command.map((token) => [token]))
+              mcps.push(command ? ["stdio", command, []] : undefined)
+            }
+            if (payload.schema !== "codepuppy.host-extension-package.payload.skill.v1") continue
+            const file = payload.behavior.files.find((file) => file.path === SKILL_MD_PATH)
+            if (!file) throw new SourceError("format", "Catalog skill entry is missing")
+            const bytes = await get(file.url)
+            const digest = createHash("sha256").update(bytes).digest("hex")
+            if (digest !== file.sha256 || bytes.length !== file.bytes) throw new SourceError("format", "Catalog skill integrity does not match")
+            const converted = await convertPluginTree({ source: { kind: "listing", locator: file.url }, nodes: [{ kind: "file", path: SKILL_MD_PATH, mode: 0o644, bytes: bytes.length, digest: `sha256:${digest}` }], readFile: async () => bytes })
+            const skill = converted.package.entries.find((entry) => entry.kind === "skill")
+            if (!skill) throw new SourceError("format", "Catalog skill definition is invalid")
+            skills.push(skill.sourceName)
           }
-          if (payload.schema !== "codepuppy.host-extension-package.payload.skill.v1") continue
-          const file = payload.behavior.files.find((file) => file.path === SKILL_MD_PATH)
-          if (!file) throw new SourceError("format", "Catalog skill entry is missing")
-          const bytes = await get(file.url)
-          const digest = createHash("sha256").update(bytes).digest("hex")
-          if (digest !== file.sha256 || bytes.length !== file.bytes) throw new SourceError("format", "Catalog skill integrity does not match")
-          const converted = await convertPluginTree({ source: { kind: "listing", locator: file.url }, nodes: [{ kind: "file", path: SKILL_MD_PATH, mode: 0o644, bytes: bytes.length, digest: `sha256:${digest}` }], readFile: async () => bytes })
-          const skill = converted.package.entries.find((entry) => entry.kind === "skill")
-          if (!skill) throw new SourceError("format", "Catalog skill definition is invalid")
-          skills.push(skill.sourceName)
-        }
-        const runtimeIdentity = identity(row.name, mcps, skills)
-        return runtimeIdentity ? { catalogId: row.id, packageId: facts.envelope.prelude.packageId, version: facts.envelope.prelude.version, runtimeIdentity } : undefined
-      })().catch(() => { catalogIdentities.delete(key); return undefined })
-      if (row.upstream.version) catalogIdentities.set(key, pending)
-      return pending
-    }))
-    return comparisons.filter((row): row is CatalogComparison => row !== undefined)
+          const runtimeIdentity = identity(row.name, mcps, skills)
+          return runtimeIdentity ? { catalogId: row.id, packageId: facts.envelope.prelude.packageId, version: facts.envelope.prelude.version, runtimeIdentity } : undefined
+        })().catch(() => { catalogIdentities.delete(key); return undefined })
+        if (row.upstream.version) catalogIdentities.set(key, pending)
+        return pending
+      }))
+      return comparisons.filter((row): row is CatalogComparison => row !== undefined)
+    })().catch(error => { if (requestKey) catalogComparisonRequests.delete(requestKey); throw error })
+    if (requestKey) catalogComparisonRequests.set(requestKey, pending)
+    return pending
   }
   return {
     searchedSources(searchId: string) { return searches.get(searchId) },
@@ -397,7 +405,7 @@ export function createPluginSources(deps: { catalog: () => Promise<readonly Cand
           if (!converted?.runtimeIdentity) continue
           for (const entry of higher) {
             const other = entry.source === "catalog"
-              ? await withinSource("catalog", catalogComparisons(entry.name)).then(rows => rows.find(row => row.catalogId === entry.id)?.runtimeIdentity).catch(() => { sourceFailed("catalog"); return undefined })
+              ? await withinSource("catalog", catalogComparisons(entry.name, searchId)).then(rows => rows.find(row => row.catalogId === entry.id)?.runtimeIdentity).catch(() => { sourceFailed("catalog"); return undefined })
               : (await convertedForSearch(entry))?.runtimeIdentity
             if (other !== converted.runtimeIdentity) continue
             candidate.sameAs = entry.sameAs ?? entry.id

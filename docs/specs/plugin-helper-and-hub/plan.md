@@ -896,3 +896,5 @@ A9 前提属实：renderer source 写口可递交 created 与 project effect；�
 A9 FIXED：renderer handler 在任何准备/写入前拒 created 或非 all-projects，via 由主进程写为 hub；共同 installFromSource 与 sidecar 不改，制作和逻辑项目 scope 仍走聊天。原两 red 保留，ext-write-channels/sidecar-wiring/install-from-source 三文件 exit 0（a9-green.log），ui-mac typecheck exit 0（a9-types.log）；IPC 实跑 24，pin 同步。
 
 A10 前提属实：catalogComparisons 只消费上次 search 的 catalogRows；没有 search 或上次目录失败就返回空。三 red 覆盖两种前提及请求级准备缓存（同请求锁内复用、下一请求必须重新读目录），exit 1（a10-red.log）。直接改成每次调用都联网会回退 A1；本步以既有 requestId 为私有比较缓存键，查询使用 searchId，准备时读 deps.catalog 当前事实，提交复用同一准备 Promise。不是产品选项，不改冻结 DTO/安装入参。
+
+A10 FIXED：catalogComparisons 从 deps.catalog 当前已验目录取得表，不再依赖 catalogRows；查询与安装分别用既有 searchId/requestId 固定本次比较准备 Promise。main 锁外预热与 entry 锁内比较传同一 requestId，因此仍无目录联网进入写锁，下一请求重新取目录。catalogPackage 身份仍复用既有 id@version 校验，不复制身份算法。三条原 red 未改，sources/install-from-source/ext-write-channels 三文件 exit 0（a10-green.log），ui-mac typecheck exit 0（a10-types.log）；额外同链修改 install-from-source/ext-ipc 仅传入已存在请求身份，不改公开 DTO 或 scope。

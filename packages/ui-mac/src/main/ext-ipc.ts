@@ -1407,7 +1407,7 @@ export function registerExtIpcHandlers(
         const { convertCreatedPlugin } = await import("./created-plugin")
         const converted = request.source.kind === "candidate" ? await pluginSources.convertCandidate(request.source.candidateId) : await convertCreatedPlugin(request.source.draft)
         if (!converted.ok) return converted
-        await pluginSources.catalogComparisons(converted.package.name)
+        await pluginSources.catalogComparisons(converted.package.name, request.requestId)
       } catch {
         return { ok: false as const, code: "source-unreachable" as const, detail: "Selected source could not be prepared" }
       }

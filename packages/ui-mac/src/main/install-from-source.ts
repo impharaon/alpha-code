@@ -95,7 +95,7 @@ export function createSourceInstaller(deps: Dependencies) {
         return { ok: false, code: "transaction-failed", detail: "Package installation state is unreadable" }
       const identity = converted.runtimeIdentity
       const catalog = identity
-        ? (await deps.sources.catalogComparisons(converted.package.name)).find(
+        ? (await deps.sources.catalogComparisons(converted.package.name, request.requestId)).find(
             (row) => row.runtimeIdentity === identity,
           )?.catalogId
         : undefined

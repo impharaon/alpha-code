@@ -814,3 +814,5 @@ A2 FIXED：get 同时核 content-length 与真实流式计数，128MiB 以上立
 A3 前提属实：SourceChanged 只删 capture，不删 marketplace index 或 main archive。真实 manifest 的 description 作一次显式 stale 变体、实际 tar 保持 pinned 原字节，重搜应拿到更新后的真实 index 并重取 archive；`bun test --max-concurrency 2 --test-name-pattern '^R12 A3' src/main/plugin-sources.test.ts` exit 1（1 fail；a3-red.log），旧缓存第二次仍报 source-changed。红例断言原输入格式不改。
 
 A3 FIXED：SourceChanged 同时淘汰该市场 index、市场 refs/heads/main archive；外部 Git 源还淘汰本次实际 revision 的错误 archive。第二次 search 读取当前 index，再次捕获核同一已验提交，不需要重启。完整 plugin-sources.test.ts exit 0（34 pass，a3-green.log），原重试红例不改断言；未给缓存新增 TTL/容量或改 source-changed 错误合同。
+
+A4 前提属实：重复运行身份分支在比较 effect 前就返回 alreadyInstalled。同一技能包 project A→all→project B 的红例 exit 1（a4-red.log）；真实 MCP 同一包从 A 扩至 all，B 已加载 Location 在 15 秒后仍无 browser_close，exit 1（a4-engine-red.log）。两例均保持包身份单一、物理全局与项目文件零改动，未改变已有 scope 断言。

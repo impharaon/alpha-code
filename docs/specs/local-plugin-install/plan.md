@@ -140,3 +140,6 @@ r3（2026-11-16）：编排器裁定 generation 身份冲突由本片的事务�
 
 
 r3 generation 修复：分配调用点已有 item index，以它对 tx 后缀作无符号加法；同一数组各 slot 的后缀唯一，含 ffffffff 进位，既有读者文法不变。ui-mac `bun test --max-concurrency 2 src/main/ext-transaction.test.ts src/main/ext-skill-generations.test.ts src/main/ext-receipt-v2.test.ts src/main/ext-package-ledger-uninstall.test.ts` exit 0，193 pass；真实引擎前两个既有用例均绿，双技能缺项已消除。新增全库存用例已走完双技能 off/on/移除，但最后发现更换 GitHub 凭据后的旧记录：`savePackageSecretsV1` 调 `commitTransactionLedger` 的 standalone 分支，`ext-receipt-v2.ts:1013` 会新增 standalone owner；包移除遂保留该 record。现有 package mutation 对相同 graph digest 在 `ext-receipt-v2.ts:1539` 直接 replay，不能拿不变图冒充一次凭据更新。该失败断言保留，不改写冻结账本权威；先完成独立呈现接缝，再交回明确的“包内凭据更新保留原 claim”写入接缝缺口。
+
+
+r3 呈现接缝补红：ui-mac `bun test --max-concurrency 2 ./test-component/hub-three-pages.cases.ts -t 'graph marketplace source|openPackageManagement opens'` exit 1，0 pass / 2 fail；真实 Solid DOM 缺 Claude 来源标签，`openPackageManagement` 尚未导出。夹具复用真实 GitHub/Supabase 安全视图，在 main→renderer 边界按 DESIGN v5 §4.4 加受控 source/notRunning 字段变体（不是第三方 manifest）；仓库与短提交取设计 E-02 的捕获记录。具名用例同时要求 row/manage 显示原因、同一 packageId 的管理页与现有菜单路径一致，不触发安装/启停；旧回归断言不改。

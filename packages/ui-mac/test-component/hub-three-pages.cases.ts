@@ -184,7 +184,7 @@ const { createComponent } = solid
 const { render } = solidWeb
 // 必须**动态** import:静态 import 会在 registrator 之前牵出 solid-js。
 const { ExtensionHub } = await import("../src/renderer/extensions/extension-hub")
-const { openExtHubAt, setExtHubOpen, setHubSection, takeHubLocateTarget } = await import("../src/renderer/extensions/ext-hub-state")
+const { openExtHubAt, openPackageManagement, extHubOpen, setExtHubOpen, setHubSection, takeHubLocateTarget } = await import("../src/renderer/extensions/ext-hub-state")
 
 const disposals: Array<() => void> = []
 const flush = () => new Promise((resolve) => setTimeout(resolve, 0))
@@ -884,4 +884,56 @@ test("package management uses the existing permission editor and removes once wi
   expect(q('[data-installed-row="mcp:supabase"]')).toBeNull()
   expect(q('[data-installed-row="skill:supabase"]')).toBeNull()
   expect(document.body.textContent).not.toContain(entry.prelude.packageId)
+})
+
+test("graph marketplace source and notRunning facts reach the installed row and the same management page", async () => {
+  // Renderer boundary variants of the real GitHub package; source shape is DESIGN v5 §4.4,
+  // repository and abbreviated pinned commit come from its captured E-02 sample.
+  for (const ecosystem of ["claude", "codex"] as const) {
+    reset()
+    const entry = await realInstalledPackage(0)
+    Object.assign(installedPackages[0]!, {
+      origin: "imported-claude",
+      source: { kind: "marketplace", ecosystem, repository: "anthropics/claude-plugins-official", commit: "b5b01ac4", path: "external_plugins/github", entryName: "github" },
+      notRunning: [{ kind: "plugin", sourceName: "native-addon", reason: "native-js-plugin" }],
+    })
+    mount()
+    const source = ecosystem === "claude" ? "Claude 插件市场" : "Codex 插件市场"
+    await waitFor(() => expect(q('[data-installed-package]')?.textContent).toContain(source))
+    expect(q('[data-installed-package]')?.textContent).toContain("未能启用：")
+    expect(q('[data-installed-package]')?.textContent).toContain("Code Puppy 不在引擎里运行第三方插件代码")
+    await managePackage(entry.prelude.packageId)
+    expect(q('[data-package-detail]')?.textContent).toContain(source)
+    expect(q('[data-package-detail]')?.textContent).not.toContain("本地文件夹")
+    expect(q('[data-package-detail]')?.textContent).toContain("anthropics/claude-plugins-official")
+    expect(q('[data-package-detail]')?.textContent).toContain("b5b01ac4")
+    expect(q('[data-package-detail]')?.textContent).toContain("native-addon")
+    expect(q('[data-package-detail]')?.textContent).toContain("未能启用：Code Puppy 不在引擎里运行第三方插件代码")
+    expect(q('[data-package-detail]')?.textContent).not.toContain("native-js-plugin")
+  }
+})
+
+test("openPackageManagement opens the requested installed identity from another tab without installing", async () => {
+  reset()
+  await realInstalledPackage(0)
+  const github = installedPackages[0]!
+  await realInstalledPackage(1)
+  const supabase = installedPackages[0]!
+  installedPackages = [github, supabase]
+  receipts = installedPackages.flatMap((pack) => pack.components.map((component) => receipt(component.componentId, component.name, component.kind)))
+  mount("skills")
+  await waitFor(() => expect(q('[data-installed-package="package:supabase"]')).toBeInstanceOf(HTMLElement))
+  expect(typeof openPackageManagement).toBe("function")
+  openPackageManagement(github.packageId)
+  await waitFor(() => expect(q('[data-package-detail]')?.getAttribute("data-package-detail")).toBe(github.packageId))
+  expect(extHubOpen()).toBe(true)
+  expect(q('[data-tab="connectors"]')?.hasAttribute("data-active")).toBe(true)
+  expect(q('[data-package-detail="package:supabase"]')).toBeNull()
+  openPackageManagement(supabase.packageId)
+  await waitFor(() => expect(q('[data-package-detail]')?.getAttribute("data-package-detail")).toBe(supabase.packageId))
+  expect(q('[data-package-detail]')?.textContent).toContain("2 个技能 · 1 个连接器")
+  expect(calls.installPackage).toEqual([])
+  expect(calls.packageState).toEqual([])
+  openPackageManagement("package:removed")
+  await waitFor(() => expect(q('[data-package-detail]')).toBeNull())
 })

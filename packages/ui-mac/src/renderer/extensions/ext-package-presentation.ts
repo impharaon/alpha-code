@@ -6,6 +6,51 @@ import type {
   CatalogPackageViewV1,
 } from "../../shared/catalog-package-view"
 import type { PackageComponentSkipReasonV1 } from "../../shared/host-extension-package-contract/decoder"
+import type { InstalledPackageV1 } from "../../preload/types"
+import type { NotRunningReasonV1 } from "../../shared/package-admission"
+
+const NOT_RUNNING_KEYS = {
+  "kind-not-supported-yet": "codepuppy.ext.packageNotRunningKind",
+  "needs-plugin-files": "codepuppy.ext.packageNotRunningFiles",
+  "unresolved-app-id": "codepuppy.ext.packageNotRunningApp",
+  "native-js-plugin": "codepuppy.ext.packageNotRunningNative",
+  "invalid-definition": "codepuppy.ext.packageNotRunningDefinition",
+  "missing-entry": "codepuppy.ext.packageNotRunningMissing",
+} as const satisfies Record<NotRunningReasonV1, string>
+
+/** Display-only graph projection; package names and prefixes never establish provenance. */
+export function installedPackagePresentation(pack: Pick<InstalledPackageV1, "source" | "origin" | "notRunning">) {
+  const source = pack.source
+  const sourceKey =
+    source?.kind === "marketplace"
+      ? source.ecosystem === "claude"
+        ? "codepuppy.ext.packageSourceClaude"
+        : "codepuppy.ext.packageSourceCodex"
+      : source?.kind === "npm"
+        ? "codepuppy.ext.packageSourceOpenCode"
+        : source?.kind === "mcp-registry"
+          ? "codepuppy.ext.packageSourceOfficialMcp"
+          : source?.kind === "created"
+            ? "codepuppy.ext.packageSourceMine"
+            : source?.kind === "catalog" || (!source && pack.origin === "catalog")
+              ? "codepuppy.ext.packageSourceHub"
+              : "codepuppy.ext.packageSourceLocal"
+  return {
+    sourceKey,
+    sourceDetail:
+      source?.kind === "marketplace"
+        ? `${source.repository} · ${source.commit} · ${source.path}`
+        : source?.kind === "npm"
+          ? `${source.name} · ${source.version}`
+          : source?.kind === "mcp-registry"
+            ? `${source.serverName} · ${source.version}`
+            : undefined,
+    notRunning: (pack.notRunning ?? []).map((item) => ({
+      sourceName: item.sourceName,
+      reasonKey: NOT_RUNNING_KEYS[item.reason],
+    })),
+  } as const
+}
 
 const VERDICT_KEYS = {
   compatible: "codepuppy.ext.packageVerdictCompatible",

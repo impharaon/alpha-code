@@ -63,7 +63,7 @@ const MCP_ADDRESS_REJECTION_KEY = {
 import type { AuthorizationConfirmationWire, CapabilityDiffWire } from "../../shared/ext-capability-authorization"
 import type { Catalog, CatalogEntry, InstalledState } from "./catalog-types"
 import type { AuthState, InstallReceipt, InstallReceiptType, ProvenanceRequest, InstalledPackageV1 } from "../../preload/types"
-import { hubSection, installedRowKey, setHubSection, takeHubLocateTarget, type HubSection } from "./ext-hub-state"
+import { hubSection, installedRowKey, setHubSection, takeHubLocateTarget, takePackageManagementTarget, type HubSection } from "./ext-hub-state"
 import { extensionError, catalogDescription, iconFor, iconForRow, MoreMenu, PackageLogo, typeLabel, Svg, SearchIc, type MoreMenuItem } from "./ext-presentation"
 import { inventoryInstallRow, healthPresentation } from "./ext-inventory-present"
 import { ExtensionDetail, InstalledPackageDetail, type DetailTarget } from "./extension-detail"
@@ -74,7 +74,7 @@ import { curatedOf, curationMapOf, curationOf, isArchived, isSessionGrant, split
 import { findSessionGrant, sessionGrantKeyOf, sessionRefusalRoute, sessionToggleView } from "./ext-session-toggle"
 import { curationActivationFacts, type Curation, type CurationStatus } from "../../shared/catalog-curation"
 import type { CatalogPackageViewV1 } from "../../shared/catalog-package-view"
-import { packageRetainedReasonKey } from "./ext-package-presentation"
+import { installedPackagePresentation, packageRetainedReasonKey } from "./ext-package-presentation"
 import { packageListingTextV1 } from "../../shared/host-extension-package-contract/decoder"
 import { extIpc } from "./ext-ipc"
 import { PROJECT_HIDDEN_DIR } from "../../shared/project-hidden-dir"
@@ -412,6 +412,17 @@ export function ExtensionHub(props: {
   const [detail, setDetail] = createSignal<DetailTarget | null>(null)
   const [managedPackageId, setManagedPackageId] = createSignal<string | null>(null)
   const managedPackage = () => { const state = installedPackages(); return state?.ok ? state.packages.find((pack) => pack.packageId === managedPackageId()) : undefined }
+  createEffect(() => {
+    if (!props.open()) return
+    const target = takePackageManagementTarget()
+    if (!target) return
+    setDetail(null)
+    setManagedPackageId(target)
+  })
+  createEffect(() => {
+    const state = installedPackages()
+    if (managedPackageId() && !installedPackages.loading && state?.ok && !managedPackage()) setManagedPackageId(null)
+  })
   // 安装确认框 + #348 capability 授权两阶段状态机 —— REQ-234 `#1531` 起住在 install-confirm.tsx,与 agent 安装守望者共用
   // 同一份(这里是定制中心那一个实例)。Skill 在这里直装(Q1),plugin 只从详情页进确认框(Q2)。
   // 解构只为让本文件的既有调用点一字不动(这些名字从前就是本组件的局部 signal)。
@@ -1617,6 +1628,7 @@ export function ExtensionHub(props: {
   }
   const InstalledPackageRow = (cp: { pack: InstalledPackageV1 }) => {
     const pack = () => cp.pack
+    const presentation = () => installedPackagePresentation(pack())
     const view = () => catalog().packages?.find((entry) => entry.catalogId === pack().packageId)
     const [authorization] = createResource(
       () => `${pack().packageId}:${JSON.stringify(ext.store.mcp)}`,
@@ -1720,6 +1732,8 @@ export function ExtensionHub(props: {
           <div class="codepuppy-ext-kit-desc" data-err={status()?.kind === "error" ? "" : undefined}>
             {description()}
           </div>
+          <Show when={pack().source}><small>{t(presentation().sourceKey)}</small></Show>
+          <For each={presentation().notRunning}>{(item) => <p class="codepuppy-ext-card-err">{item.sourceName} · {t("codepuppy.ext.packageEnableFailed", { reason: t(item.reasonKey) })}</p>}</For>
           <Show when={rootHub()?.detail}>
             {(detail) => (
               <details onClick={(event) => event.stopPropagation()}>

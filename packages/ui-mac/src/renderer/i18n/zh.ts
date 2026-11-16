@@ -1,4 +1,15 @@
 export const dict = {
+  "codepuppy.ext.packageSourceClaude": "Claude 插件市场",
+  "codepuppy.ext.packageSourceCodex": "Codex 插件市场",
+  "codepuppy.ext.packageSourceOpenCode": "OpenCode 插件市场",
+  "codepuppy.ext.packageSourceOfficialMcp": "官方 MCP",
+  "codepuppy.ext.packageSourceMine": "我的插件",
+  "codepuppy.ext.packageNotRunningKind": "Code Puppy 暂未接通此类内容",
+  "codepuppy.ext.packageNotRunningFiles": "此项需要包内文件，当前尚未接通",
+  "codepuppy.ext.packageNotRunningApp": "应用编号未能解析为可连接的服务",
+  "codepuppy.ext.packageNotRunningNative": "Code Puppy 不在引擎里运行第三方插件代码",
+  "codepuppy.ext.packageNotRunningDefinition": "来源提供的定义无效",
+  "codepuppy.ext.packageNotRunningMissing": "来源声明的内容不存在",
   "codepuppy.ext.packageAccount": "{{name}} 账户",
   "codepuppy.ext.packageComponentCount": "{{count}} 个{{kind}}",
 

@@ -1,9 +1,40 @@
 import type { CapabilityDiffWire } from "./ext-capability-authorization"
+
 import type {
   CodePuppyPackageEnvelopeV1,
   PackageComponentSkipReasonV1,
   PackageSupportedComponentV1,
 } from "./host-extension-package-contract/decoder"
+
+/** Graph display data from DESIGN-plugin-helper-and-hub v5 §4.4; supplied by main. */
+export type PackageSourceV1 =
+  | { kind: "catalog" }
+  | {
+      kind: "marketplace"
+      ecosystem: "claude" | "codex"
+      repository: string
+      commit: string
+      path: string
+      entryName: string
+    }
+  | {
+      kind: "mcp-registry"
+      serverName: string
+      version: string
+      publisher: { kind: "github"; account: string } | { kind: "domain"; domain: string }
+    }
+  | { kind: "npm"; ecosystem: "opencode"; name: string; version: string; integrity: string }
+  | { kind: "created" }
+  | { kind: "local-folder" }
+
+export type NotRunningReasonV1 =
+  | "kind-not-supported-yet"
+  | "needs-plugin-files"
+  | "unresolved-app-id"
+  | "native-js-plugin"
+  | "invalid-definition"
+  | "missing-entry"
+export type PackageNotRunningV1 = { kind: string; sourceName: string; reason: NotRunningReasonV1 }
 
 /** Installed package account view: declarations and presence/status only, never secret references. */
 export type PackageAuthorizationItemV1 =

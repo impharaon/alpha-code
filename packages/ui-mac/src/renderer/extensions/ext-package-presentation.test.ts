@@ -12,10 +12,46 @@ import { PACKAGE_COMPONENT_SKIP_REASONS_V1 } from "../../shared/host-extension-p
 import { dict as en } from "../i18n/en"
 import { dict as zh } from "../i18n/zh"
 import {
+  installedPackagePresentation,
   packageComponentPresentation,
   packagePresentation,
   packageSkipReasonKey,
 } from "./ext-package-presentation"
+import type { PackageSourceV1, NotRunningReasonV1 } from "../../shared/package-admission"
+
+test("installed graph source owns labels over origin and preserves the no-source fallback", () => {
+  // Owned display DTO variants from DESIGN v5 §4.4, not publisher manifests or source verification.
+  const sources: Array<[PackageSourceV1, string]> = [
+    [{ kind: "catalog" }, "codepuppy.ext.packageSourceHub"],
+    [{ kind: "marketplace", ecosystem: "claude", repository: "anthropics/claude-plugins-official", commit: "b5b01ac4", path: "external_plugins/github", entryName: "github" }, "codepuppy.ext.packageSourceClaude"],
+    [{ kind: "marketplace", ecosystem: "codex", repository: "openai/plugins", commit: "d420d130", path: ".agents/plugins", entryName: "github" }, "codepuppy.ext.packageSourceCodex"],
+    [{ kind: "npm", ecosystem: "opencode", name: "opencode-skills-hub", version: "0.0.5", integrity: "opaque-main-verified-integrity" }, "codepuppy.ext.packageSourceOpenCode"],
+    [{ kind: "mcp-registry", serverName: "GitHub", version: "1.0.0", publisher: { kind: "github", account: "github" } }, "codepuppy.ext.packageSourceOfficialMcp"],
+    [{ kind: "created" }, "codepuppy.ext.packageSourceMine"],
+    [{ kind: "local-folder" }, "codepuppy.ext.packageSourceLocal"],
+  ]
+  for (const [source, key] of sources) {
+    expect(installedPackagePresentation({ source, origin: "imported-claude" }).sourceKey).toBe(key)
+    expect(installedPackagePresentation({ source, origin: "catalog" }).sourceKey).toBe(key)
+    expect(zh[key as keyof typeof zh]).toBeString()
+    expect(en[key as keyof typeof en]).toBeString()
+  }
+  expect(installedPackagePresentation({ origin: "catalog" }).sourceKey).toBe("codepuppy.ext.packageSourceHub")
+  expect(installedPackagePresentation({ origin: "imported-claude" }).sourceKey).toBe("codepuppy.ext.packageSourceLocal")
+  expect(installedPackagePresentation({ origin: "catalog" }).notRunning).toEqual([])
+})
+
+test("each graph notRunning reason has human display data without interpreting its kind or source name", () => {
+  const reasons: NotRunningReasonV1[] = ["kind-not-supported-yet", "needs-plugin-files", "unresolved-app-id", "native-js-plugin", "invalid-definition", "missing-entry"]
+  const result = installedPackagePresentation({ origin: "catalog", notRunning: reasons.map((reason) => ({ kind: "plugin", sourceName: "source entry", reason })) })
+  expect(result.notRunning).toHaveLength(reasons.length)
+  for (const item of result.notRunning) {
+    expect(item.sourceName).toBe("source entry")
+    expect(zh[item.reasonKey]).toBeString()
+    expect(en[item.reasonKey]).toBeString()
+    expect(reasons).not.toContain(zh[item.reasonKey] as NotRunningReasonV1)
+  }
+})
 
 const blockedReasons = [
   "package-invalid",

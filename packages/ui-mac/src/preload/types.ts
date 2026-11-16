@@ -30,6 +30,8 @@ import type {
   PackageAdmissionPreviewV1,
   PackageAuthorizationResultV1,
   PackageActionResultV1,
+  PackageSourceV1,
+  PackageNotRunningV1,
 } from "../shared/package-admission"
 // Deep links reach the renderer already decoded by the route manifest — the wire carries the
 // delivery, never a URL, so no second codec can exist on the renderer side.
@@ -635,9 +637,12 @@ export type InstalledPackageV1 = {
   /** 回退名。它**是**包里某个技能的名字,不是包名 —— 只在 `displayName` 缺席时才用。 */
   rootComponentName: string
   version: string | null
-  /** 来源一律从 child record 的 `origin` 读,**绝不从 packageId 前缀读**(基线 §8 纪律 2,`#737`)。
-   *  `imported-claude` = 用户从本地文件夹导入的;`catalog` = 已验签目录来的。 */
+  /** Fallback provenance when the graph has no source; never derive it from packageId.
+   *  source, when present, owns the displayed source label (DESIGN v5 §4.4). */
   origin: string | null
+  /** Safe graph presentation fields supplied by the source installation lane. */
+  source?: PackageSourceV1
+  notRunning?: PackageNotRunningV1[]
   components: InstalledPackageComponentV1[]
 }
 export type InstalledPackagesResultV1 =

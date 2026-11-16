@@ -28,7 +28,7 @@ import { CAPABILITY_LABEL_KEYS, SHELF_CHIP_KEYS, curatedOf, foldDomains, isArchi
 import type { SessionToggleView } from "./ext-session-toggle"
 import type { CurationStatus } from "../../shared/catalog-curation"
 import type { CatalogPackageViewV1 } from "../../shared/catalog-package-view"
-import { packageComponentPresentation, packagePresentation, packageRetainedReasonKey } from "./ext-package-presentation"
+import { installedPackagePresentation, packageComponentPresentation, packagePresentation, packageRetainedReasonKey } from "./ext-package-presentation"
 import { packageListingListV1, packageListingTextV1 } from "../../shared/host-extension-package-contract/decoder"
 import { extIpc } from "./ext-ipc"
 
@@ -55,6 +55,7 @@ export function InstalledPackageDetail(props: {
   error?: string
   onBack: () => void
 }) {
+  const presentation = () => installedPackagePresentation(props.pack)
   const [authorization, { refetch }] = createResource(
     () => `${props.pack.packageId}:${JSON.stringify(props.ext.store.mcp)}`,
     () => extIpc.packageAuthorization(props.pack.packageId),
@@ -231,11 +232,8 @@ export function InstalledPackageDetail(props: {
         <div class="codepuppy-settings-row">
           <div class="codepuppy-settings-row-copy">
             <strong>{t("codepuppy.ext.packageSource")}</strong>
-            <small>
-              {t(
-                props.pack.origin === "catalog" ? "codepuppy.ext.packageSourceHub" : "codepuppy.ext.packageSourceLocal",
-              )}
-            </small>
+            <small>{t(presentation().sourceKey)}</small>
+            <Show when={presentation().sourceDetail}>{(detail) => <small>{detail()}</small>}</Show>
           </div>
         </div>
         <div class="codepuppy-settings-row">
@@ -244,6 +242,18 @@ export function InstalledPackageDetail(props: {
             <small>{props.pack.version}</small>
           </div>
         </div>
+        <For each={presentation().notRunning}>
+          {(item) => (
+            <div class="codepuppy-settings-row">
+              <div class="codepuppy-settings-row-copy">
+                <strong>{item.sourceName}</strong>
+                <small class="codepuppy-ext-card-err">
+                  {t("codepuppy.ext.packageEnableFailed", { reason: t(item.reasonKey) })}
+                </small>
+              </div>
+            </div>
+          )}
+        </For>
       </section>
       <Show when={error() || props.error}>
         <p role="alert">{error() || props.error}</p>

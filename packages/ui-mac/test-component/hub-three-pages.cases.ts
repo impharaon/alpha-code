@@ -937,3 +937,28 @@ test("openPackageManagement opens the requested installed identity from another 
   openPackageManagement("package:removed")
   await waitFor(() => expect(q('[data-package-detail]')).toBeNull())
 })
+
+test("package management navigation survives a closed hub and a later reopen", async () => {
+  reset()
+  const entry = await realInstalledPackage(1)
+  setExtHubOpen(false)
+  const root = document.createElement("div")
+  root.id = "root"
+  root.className = "a-ui"
+  document.body.append(root)
+  disposals.push(render(() => createComponent(ExtensionHub, {
+    server: () => ({ baseUrl: "http://127.0.0.1:65535" }) as never,
+    open: extHubOpen,
+    onClose: () => setExtHubOpen(false),
+  }), root))
+  expect(q('[data-package-detail]')).toBeNull()
+  openPackageManagement(entry.prelude.packageId)
+  await waitFor(() => expect(q('[data-package-detail]')?.getAttribute("data-package-detail")).toBe(entry.prelude.packageId))
+  click(q('.codepuppy-ext-close'))
+  await waitFor(() => expect(extHubOpen()).toBe(false))
+  expect(q('[data-package-detail]')).toBeNull()
+  openPackageManagement(entry.prelude.packageId)
+  await waitFor(() => expect(q('[data-package-detail]')?.getAttribute("data-package-detail")).toBe(entry.prelude.packageId))
+  expect(calls.installPackage).toEqual([])
+  expect(calls.packageState).toEqual([])
+})

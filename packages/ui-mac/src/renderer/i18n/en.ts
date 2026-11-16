@@ -1,4 +1,15 @@
 export const dict = {
+  "codepuppy.ext.packageSourceClaude": "Claude plugin marketplace",
+  "codepuppy.ext.packageSourceCodex": "Codex plugin marketplace",
+  "codepuppy.ext.packageSourceOpenCode": "OpenCode plugin marketplace",
+  "codepuppy.ext.packageSourceOfficialMcp": "Official MCP",
+  "codepuppy.ext.packageSourceMine": "My plugin",
+  "codepuppy.ext.packageNotRunningKind": "Code Puppy does not run this kind of content yet",
+  "codepuppy.ext.packageNotRunningFiles": "This item needs package files that are not connected yet",
+  "codepuppy.ext.packageNotRunningApp": "The app ID could not be resolved to a connectable service",
+  "codepuppy.ext.packageNotRunningNative": "Code Puppy does not run third-party plugin code in the engine",
+  "codepuppy.ext.packageNotRunningDefinition": "The source provided an invalid definition",
+  "codepuppy.ext.packageNotRunningMissing": "The content declared by the source is missing",
   "codepuppy.ext.packageAccount": "{{name}} account",
   "codepuppy.ext.packageComponentCount": "{{count}} {{kind}}",
 

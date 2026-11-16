@@ -1,0 +1,46 @@
+{
+  "files": [
+    {
+      "path": "github-registry-search.json",
+      "url": "https://registry.modelcontextprotocol.io/v0.1/servers?search=io.github.github%2Fgithub-mcp-server&version=latest",
+      "fetchedAt": "2026-11-16",
+      "bytes": 1542,
+      "sha256": "e8d5eb67a140ab9a9dfae0366d1ad30c2ee0a006831bb15cefb2af660cd50703"
+    },
+    {
+      "path": "github-registry-version.json",
+      "url": "https://registry.modelcontextprotocol.io/v0.1/servers/io.github.github%2Fgithub-mcp-server/versions/2.1.0",
+      "fetchedAt": "2026-11-16",
+      "bytes": 1505,
+      "sha256": "042afbd02aab3c0906d22d2d0b6861e47453bb5c6a390bc9bb60fd08d6bbf599"
+    },
+    {
+      "path": "playwright-registry-version.json",
+      "url": "https://registry.modelcontextprotocol.io/v0.1/servers/io.github.microsoft%2Fplaywright-mcp/versions/0.0.85",
+      "fetchedAt": "2026-11-16",
+      "bytes": 630,
+      "sha256": "f25dcc6e540608783c4fab55e22bae71feaac720ca677d2c7ac2ce8f40ab00c6"
+    },
+    {
+      "path": "pypi-registry-version.json",
+      "url": "https://registry.modelcontextprotocol.io/v0.1/servers/io.github.bch1212%2Fagentfetch/versions/1.0.1",
+      "fetchedAt": "2026-11-16",
+      "bytes": 1058,
+      "sha256": "4685d3aa065ed3921e898e88c2d63a760241169b29165b11e4a054d69efe5654"
+    },
+    {
+      "path": "figma-registry-version.json",
+      "url": "https://registry.modelcontextprotocol.io/v0.1/servers/com.figma.mcp%2Fmcp/versions/1.0.3",
+      "fetchedAt": "2026-11-16",
+      "bytes": 651,
+      "sha256": "31de18ab27ae3746f2da6401b00532b3b3dff58e277b411c9bcc23de92c2b720"
+    },
+    {
+      "path": "empty-search.json",
+      "url": "https://registry.modelcontextprotocol.io/v0.1/servers?search=codepuppy-no-such-server-1724&version=latest",
+      "fetchedAt": "2026-11-16",
+      "bytes": 38,
+      "sha256": "bd77acb780201187e66256677f13e4145d6839a056c477181355b19589b40f23"
+    }
+  ]
+}

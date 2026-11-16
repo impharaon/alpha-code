@@ -249,3 +249,5 @@ PLAN 检查（2026-11-16）：`python3 scripts/check-doc-links.py docs/specs/plu
 2026-11-16 r1 / S1 红例 · 按续派填入核对回执，仅实施 S1→S3；新增 Codex 真实选择夹具（固定提交、9 个原文件及裁剪归档摘要）。三文件相关测试命令 exit 1，29 pass / 9 fail / 245 assertions，日志 `/tmp/helper-sources-s1-red.log`：7 个新增 Codex 行为失败，另 2 个既有请求计数已按新增 Codex 查询更新、实现尚未发请求；未改生产代码。
 
 2026-11-16 r1 / S1 完成 · 实现 Codex local 清单、固定 codeload 子树、逐源失败重查、manifest/技能/MCP 与 app-id 诊断；同一声明文件去重避免凭据重复解析。Figma 实样的 oauth_resource 增加独立红例（0d10a838fa；17 pass / 1 fail，日志 `/tmp/helper-sources-s1-resource-red.log`）后保留为 LoginNeed 元数据，安装层仍按冻结规则报告 applicability。最终三文件测试 exit 0：39 pass / 0 fail / 271 assertions；artifact --check exit 0（17 files）；ui-mac `bun typecheck` exit 0。Bun 1.4.4 的 `bun run --max-concurrency 2 typecheck` 报 Script not found 2，实际使用标准包命令，测试始终 --max-concurrency 2。生产仅 converter/main sources 与生成 ESM/摘要；S2、S4 未实施。本轮开始 07:08:55 UTC，S1 约 8 分钟。
+
+2026-11-16 r1 / S3 红例 · 新增 Registry 原始查询/定版响应（GitHub、Figma、Playwright/npm、agentfetch/pypi、真实空查询），逐文件记录 URL、版本、长度和摘要；分页/坏命名空间等对照由真实响应作具名受控变体。三文件测试 exit 1，新增 Registry 导出、取源和查询未实现；结果见 `/tmp/helper-sources-s3-red.log`。安装和 S2/S4 仍冻结。

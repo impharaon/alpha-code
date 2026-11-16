@@ -3,8 +3,62 @@ import { join } from "node:path"
 import { captureFixture, digest, fixtureRoot } from "../../../test-fixtures/plugin-helper/fixture"
 import provenance from "../../../test-fixtures/plugin-helper/provenance.json"
 import codex from "../../../test-fixtures/plugin-helper/codex/provenance.json"
+import registry from "../../../test-fixtures/plugin-helper/registry/provenance.json"
+import type { Json, Source } from "./plugin-conversion"
 
 const converter = () => import("./plugin-conversion")
+const registryServer = async (file: string) => (await Bun.file(join(fixtureRoot, "registry", file)).json()).server as { [key: string]: Json }
+const registrySource: Source = { kind: "mcp-registry", locator: "https://registry.modelcontextprotocol.io", serverName: "io.github.github/github-mcp-server", version: "2.1.0" }
+
+test("registry GitHub without plugin manifest becomes one remote MCP with a Bearer secret need", async () => {
+  for (const file of registry.files) expect(digest(await Bun.file(join(fixtureRoot, "registry", file.path)).bytes())).toBe(`sha256:${file.sha256}`)
+  const server = await registryServer("github-registry-version.json")
+  const converted = (await converter()).convertMcpServerDefinition(server, registrySource)
+  expect(converted.package).toMatchObject({ provider: "mcp-registry", version: "2.1.0", source: registrySource, diagnostics: [] })
+  expect(converted.package.entries).toMatchObject([{ kind: "mcp", transport: "http", url: ["https://api.githubcopilot.com/mcp/"], headers: { Authorization: ["Bearer ", { secret: expect.any(String) }] } }])
+  expect(converted.package.secrets).toHaveLength(1)
+  expect(converted.package.secrets[0]!.targets).toEqual([{ file: "server.json", pointer: "/remotes/0/headers/0/value" }])
+  expect(converted.privateCredentials.size).toBe(0)
+  expect((await import("./plugin-conversion.mjs")).convertMcpServerDefinition(server, registrySource)).toEqual(converted)
+})
+
+test("registry remote preference and real npm pypi oci fallbacks preserve commands", async () => {
+  const convert = (await converter()).convertMcpServerDefinition
+  const npm = convert(await registryServer("playwright-registry-version.json"), registrySource)
+  expect(npm.package.entries).toMatchObject([{ transport: "stdio", command: [["npx"], ["-y"], ["@playwright/mcp@0.0.85"]] }])
+  const pypi = convert(await registryServer("pypi-registry-version.json"), registrySource)
+  expect(pypi.package.entries).toMatchObject([{ transport: "stdio", command: [["uvx"], ["agentfetch-mcp==1.0.1"]], environment: { JINA_API_KEY: [{ secret: expect.any(String) }], FIRECRAWL_API_KEY: [{ secret: expect.any(String) }], REDIS_URL: [{ secret: expect.any(String) }] } }])
+  // Remove only remotes from the real GitHub server; its original OCI/runtime arguments are retained.
+  const github = await registryServer("github-registry-version.json")
+  const oci = convert({ ...github, remotes: [] }, registrySource)
+  expect(oci.package.entries).toMatchObject([{ transport: "stdio", command: [["docker"], ["run"], ["-i"], ["--rm"], ["-p"], ["127.0.0.1:8085:8085"], ["-e"], ["GITHUB_OAUTH_CALLBACK_PORT=8085"], ["-e"], ["GITHUB_PERSONAL_ACCESS_TOKEN=", { secret: expect.any(String) }], ["ghcr.io/github/github-mcp-server:2.1.0"]] }])
+  expect(oci.package.secrets).toHaveLength(1)
+})
+
+test("registry header templates defaults and literal credentials keep public output safe", async () => {
+  const server = await registryServer("github-registry-version.json")
+  // Controlled variants of the real header: templated, literal, then a non-secret default.
+  const remote = (server.remotes as { [key: string]: Json }[])[0]!
+  const header = (remote.headers as { [key: string]: Json }[])[0]!
+  const templated = (await converter()).convertMcpServerDefinition({ ...server, remotes: [{ ...remote, headers: [{ ...header, value: "Token {token}" }] }] }, registrySource)
+  expect(templated.package.entries).toMatchObject([{ headers: { Authorization: ["Token ", { secret: expect.any(String) }] } }])
+  const literal = (await converter()).convertMcpServerDefinition({ ...server, remotes: [{ ...remote, headers: [{ ...header, value: "Bearer test-credential-1724" }] }] }, registrySource)
+  expect(JSON.stringify(literal.package)).not.toContain("test-credential-1724")
+  expect(new TextDecoder().decode([...literal.privateCredentials.values()][0])).toBe("test-credential-1724")
+  const ordinary = (await converter()).convertMcpServerDefinition({ ...server, remotes: [{ ...remote, headers: [{ ...header, name: "Accept", isSecret: false, value: "application/json" }] }] }, registrySource)
+  expect(ordinary.package.entries).toMatchObject([{ headers: { Accept: ["application/json"] }, oauth: { kind: "mcp-oauth" } }])
+  expect(ordinary.package.secrets).toEqual([])
+})
+
+test("registry unsupported or malformed definitions diagnose instead of inventing endpoints", async () => {
+  const convert = (await converter()).convertMcpServerDefinition
+  const github = await registryServer("github-registry-version.json")
+  for (const server of [null, [], { ...github, remotes: [], packages: [] }, { ...github, remotes: [{ type: "streamable-http", url: "https://{region}/mcp" }], packages: [] }]) {
+    const result = convert(server, registrySource)
+    expect(result.package.entries).toEqual([])
+    expect(result.package.diagnostics).toContainEqual(expect.objectContaining({ code: "invalid-definition" }))
+  }
+})
 
 test("pinned Codex marketplace preserves real local sources and provenance", async () => {
   for (const file of [...codex.files, { path: codex.archive.path, sha256: codex.archive.sha256 }])

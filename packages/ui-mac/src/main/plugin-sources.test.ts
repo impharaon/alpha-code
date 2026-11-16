@@ -16,6 +16,8 @@ async function fixtureFetch(url: string | URL | Request): Promise<Response> {
   if (address === "https://codeload.github.com/anthropics/claude-plugins-official/tar.gz/refs/heads/main") return new Response(await archive())
   if (address === "https://raw.githubusercontent.com/openai/plugins/main/.agents/plugins/marketplace.json") return new Response(await Bun.file(join(fixtureRoot, "codex/.agents/plugins/marketplace.json")).bytes())
   if (address === "https://codeload.github.com/openai/plugins/tar.gz/refs/heads/main") return new Response(await Bun.file(join(fixtureRoot, "codex/selection.tar.gz")).bytes())
+  if (address.startsWith("https://registry.modelcontextprotocol.io/v0.1/servers?")) return new Response(await Bun.file(join(fixtureRoot, "registry", address.includes("search=io.github.github%2Fgithub-mcp-server") ? "github-registry-search.json" : "empty-search.json")).bytes())
+  if (address === "https://registry.modelcontextprotocol.io/v0.1/servers/io.github.github%2Fgithub-mcp-server/versions/2.1.0") return new Response(await Bun.file(join(fixtureRoot, "registry/github-registry-version.json")).bytes())
   throw new Error(`unexpected fixture URL: ${address}`)
 }
 
@@ -57,7 +59,7 @@ test("successful index and pinned archive bytes are reused within the applicatio
   const one = await sources.captureCandidate(id)
   const two = await sources.captureCandidate(id)
   expect(one.ok && two.ok && one.capture === two.capture).toBe(true)
-  expect(requests).toHaveLength(3)
+  expect(requests).toHaveLength(4)
   expect(requests.every((url) => !url.includes("api.github.com"))).toBe(true)
 })
 
@@ -69,7 +71,7 @@ test("failed sources are truthful and not cached as no results", async () => {
   expect(failed.candidates).toEqual([])
   const retried = await sources.searchSources("playwright")
   expect(retried.candidates).toHaveLength(1)
-  expect(calls).toBe(3)
+  expect(calls).toBe(4)
 })
 
 test("invalid index is a format failure and unknown candidate cannot start a download", async () => {
@@ -107,7 +109,7 @@ test("non-GitHub and command sources are counted but never minted as installable
 test("Codex local entry captures only its pinned subtree and rechecks marketplace membership", async () => {
   const sources = (await sourcesModule()).createPluginSources({ catalog: async () => [], fetch: fixtureFetch })
   const result = await sources.searchSources("figma")
-  expect(result.sources.map((source) => source.source)).toEqual(["catalog", "claude-marketplace", "codex-marketplace"])
+  expect(result.sources.map((source) => source.source)).toEqual(["catalog", "claude-marketplace", "codex-marketplace", "mcp-registry"])
   expect(result.sources[2]).toMatchObject({ status: "ok", matched: 1, skipped: 0 })
   const candidate = result.candidates.find((entry) => entry.source === "codex-marketplace")!
   expect(candidate).toMatchObject({ name: "figma", upstream: { repository: codex.repository, path: "plugins/figma" } })
@@ -140,4 +142,62 @@ test("Codex failures retry per source while successful Claude results survive", 
   expect(retried.sources[2]).toMatchObject({ status: "ok", matched: 1 })
   await sources.searchSources("figma")
   expect(attempts).toBe(2)
+})
+
+test("GitHub registry candidate has namespace publisher and exact version detail", async () => {
+  const requests: string[] = []
+  const sources = (await sourcesModule()).createPluginSources({ catalog: async () => [], fetch: async (url) => { requests.push(url); return fixtureFetch(url) } })
+  const result = await sources.searchSources("io.github.github/github-mcp-server")
+  expect(result.sources.at(-1)).toMatchObject({ source: "mcp-registry", status: "ok", matched: 1 })
+  const candidate = result.candidates.find((entry) => entry.source === "mcp-registry")!
+  expect(candidate).toMatchObject({ kind: "mcp", publisher: { kind: "github", account: "github" }, upstream: { serverName: "io.github.github/github-mcp-server", version: "2.1.0" } })
+  const captured = await sources.captureCandidate(candidate.id)
+  expect(captured.ok).toBe(true)
+  if (!captured.ok) throw new Error(captured.code)
+  expect(captured.capture.source).toMatchObject({ kind: "mcp-registry", serverName: candidate.upstream.serverName, version: "2.1.0" })
+  expect(JSON.parse(new TextDecoder().decode(await captured.capture.readFile("server.json")))).toEqual((await Bun.file(join(fixtureRoot, "registry/github-registry-version.json")).json()).server)
+  await sources.searchSources("io.github.github/github-mcp-server")
+  expect(await sources.captureCandidate(candidate.id)).toEqual(captured)
+  expect(requests.filter((url) => url.includes("registry.modelcontextprotocol.io"))).toHaveLength(2)
+})
+
+test("registry zero matches and transport http format failures stay distinct and retry", async () => {
+  for (const reason of ["network", "http", "format"] as const) {
+    let attempts = 0
+    const sources = (await sourcesModule()).createPluginSources({ catalog: async () => [], fetch: async (url) => {
+      if (!url.includes("registry.modelcontextprotocol.io")) return fixtureFetch(url)
+      if (++attempts > 1) return fixtureFetch(url)
+      if (reason === "network") throw new Error("transport failed")
+      return reason === "http" ? new Response("unavailable", { status: 503 }) : new Response("{malformed")
+    } })
+    expect((await sources.searchSources("playwright")).sources.at(-1)).toMatchObject({ source: "mcp-registry", status: "failed", reason })
+    expect((await sources.searchSources("playwright")).sources.at(-1)).toEqual({ source: "mcp-registry", status: "ok", matched: 0, skipped: 0 })
+    expect(attempts).toBe(2)
+  }
+})
+
+test("registry pagination preserves real records and malformed namespaces cannot claim a publisher", async () => {
+  const page = await Bun.file(join(fixtureRoot, "registry/github-registry-search.json")).json()
+  const figma = await Bun.file(join(fixtureRoot, "registry/figma-registry-version.json")).json()
+  const sources = (await sourcesModule()).createPluginSources({ catalog: async () => [], fetch: async (url) => {
+    if (!url.includes("registry.modelcontextprotocol.io")) return fixtureFetch(url)
+    // Page a recorded result into two responses; only container metadata and record selection change.
+    return url.includes("cursor=") ? Response.json({ ...page, servers: [figma] }) : Response.json({ ...page, metadata: { ...page.metadata, nextCursor: "recorded-page-2" } })
+  } })
+  const result = await sources.searchSources("mcp")
+  expect(result.sources.at(-1)).toMatchObject({ status: "ok", matched: 2 })
+  expect(result.candidates.find((entry) => entry.upstream.serverName === "com.figma.mcp/mcp")).toMatchObject({ publisher: { kind: "domain", domain: "figma.com" } })
+  const broken = (await sourcesModule()).createPluginSources({ catalog: async () => [], fetch: async (url) => url.includes("registry.modelcontextprotocol.io") ? Response.json({ ...page, servers: [{ ...page.servers[0], server: { ...page.servers[0].server, name: "github" } }] }) : fixtureFetch(url) })
+  const invalid = await broken.searchSources("github")
+  expect(invalid.sources.at(-1)).toMatchObject({ status: "failed", reason: "format" })
+  expect(invalid.candidates.some((entry) => entry.source === "mcp-registry")).toBe(false)
+})
+
+test("registry version changes fail capture without replacing the selected identity", async () => {
+  const detail = await Bun.file(join(fixtureRoot, "registry/github-registry-version.json")).json()
+  const sources = (await sourcesModule()).createPluginSources({ catalog: async () => [], fetch: async (url) => url.includes("/versions/") ? Response.json({ ...detail, server: { ...detail.server, version: "changed" } }) : fixtureFetch(url) })
+  const result = await sources.searchSources("io.github.github/github-mcp-server")
+  const candidate = result.candidates.find((entry) => entry.source === "mcp-registry")!
+  expect(await sources.captureCandidate(candidate.id)).toMatchObject({ ok: false, code: "source-changed" })
+  expect(candidate.upstream.version).toBe("2.1.0")
 })

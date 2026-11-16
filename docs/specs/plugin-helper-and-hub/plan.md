@@ -685,3 +685,17 @@ r9 BC3 实施／未决收据：账户读取与保存现共同消费已有 `creat
 - **未决，不报引擎全绿**：原 A2 `install-from-source.engine.test.ts` 首次当前树 exit 1，内部一场景通过，一场景在 `install-from-source.engine.cases.ts:82` 的 Playwright MCP 进程启动处 `spawn_failed`（`bc3-engine.log`）。只将本轮四份生产／机械同步改动保存为临时 patch 并 scoped restore，对照 HEAD 的同一宿主 exit 0、严格内部 2 场景通过（`bc3-engine-base.log`）；随后恢复 patch，显式离线缓存 `npx @playwright/mcp@latest --version` exit 0（0.0.85），当前树同宿主仍 exit 1、同一启动处失败（`bc3-engine-warm.log`）。未隔离因果，不宣称是环境／flaky，也未修改 Core、真实样本命令、超时或断言；这项当前树与基线差异交编排器处理，BC3 的真实引擎复核保持未完。
 
 r9 在本可恢复边界交回：BC2a.2／BC2b 完成；BC3 账户主链与生产 IPC／存储证明已提交，以上 A2 真引擎差异未决；BC4 同包令牌组件／时间线一个登录动作、BC5 Figma 实查记录／OpenCode 可检索正向样本／完整引擎与模型验收均未开始。不要把 AC-03/05/06/07/14/15 报完整通过。最先指定的 A3 旧 confirming 断言与新发现 H namespace 字段钉值均待编排器裁定／H，同既有 21→22 钉值不在此修复。已核 Codex（GPT-6），作者自查结论为 PARTIAL；依据版本仍为本节 spec v3／design v5 和 r8/r9 授权，已定勿重开不变；OPTIONAL 无。未执行真实账号登录、外部写入、gate/bin/check、push/PR/merge；所有前台命令已结束。
+
+
+r10 决定 1 核验（2026-11-16，起始 11:23:40 UTC，约 8 分钟）：按 brief 先对三个生产提交做单一失败场景对照。仅临时物化三提交所改生产文件在各节点的字节，每次执行后 finally 恢复原始字节；分支／index 不移动。命令均在 ui-mac：`npm_config_cache=/tmp/helper-install-plan-YCXgtv/npm-cache npm_config_offline=true bun test --max-concurrency 2 --test-name-pattern '^A2 real package installation updates two loaded Locations' ./src/main/install-from-source.engine.cases.ts`。
+
+| 生产节点 | 单场景结果 | 日志（`/tmp/helper-install-plan-YCXgtv/`） |
+| --- | --- | --- |
+| `0404f0add5` 当前 | exit 0，1 pass，14 assertions | `r10-bisect-0404f0add5.log` |
+| `389de63aca` | exit 0，1 pass，14 assertions | `r10-bisect-389de63aca.log` |
+| `70a5af8951` | exit 0，1 pass，14 assertions | `r10-bisect-70a5af8951.log` |
+| `ed19756043` 本轮生产改动前 | exit 0，1 pass，14 assertions | `r10-bisect-ed19756043.log` |
+
+因四节点均通过，未发现可二分到三提交某一改动的失败。继续只改变离线缓存做因果对照，临时 npx 包装器只把 stderr 分流到临时文件、保持原命令/参数/stdin/stdout 和退出码：当前树空缓存 exit 1（`r10-empty-cache.log`），两个 npx 子进程实报 `ENOTCACHED`，缺 `https://registry.npmjs.org/@playwright%2fmcp` 的缓存响应；同一空缓存下 `ed19756043` 也 exit 1、同一 spawn_failed 点（`r10-empty-base-ed19756043.log`）。当前树换回已准备缓存 exit 0（`r10-prepared-cache.log`）；只复制既有 `_cacache`、不复制 `_npx` 的冷解包缓存亦 exit 0（`r10-unpacked-cold-cache.log`）。运行条件是 offline 模式的缓存必须有 npm 解析元数据及相应包内容；可用临时缓存执行真实 `npx @playwright/mcp@latest --version` 准备，不能用“空 offline cache”当产品回归证据。没有改真实样本命令/版本、timeout、Core 或任何生产投影。
+
+最终当前树完整宿主 `npm_config_cache=/tmp/helper-install-plan-YCXgtv/npm-cache npm_config_offline=true bun test --max-concurrency 2 src/main/install-from-source.engine.test.ts` exit 0，宿主 1 pass，严格内部 2 场景（`r10-engine-current-final.log`），最终已移除 PATH/stderr 包装器；证明两已载入 Locations、工具回读/调用、重建与断开原断言仍通过。带诊断包装器的完整宿主也 exit 0（`r10-engine-current-full.log`）。已证明同一失败类型不依赖本轮提交、由空离线缓存独立触发；r9 原始 stderr 未留存，不能声称其两次历史失败一定为 ENOTCACHED。继承这项历史归因限制，不宣称冷网络验收已完成。决定 1 的当前树引擎核验关闭，BC3 不再因该项悬置；后续 BC4/BC5 仍按原计划推进。已核 Codex（GPT-6），作者核验；剩余真实应用／账号验收归编排器，OPTIONAL 无。

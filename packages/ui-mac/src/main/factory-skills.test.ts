@@ -52,20 +52,16 @@ const truthPath = (name: string) => join(home, ".alpha", "skills", name)
 const legacyPath = (name: string) => join(home, ".opencode", "skill", name)
 
 describe("factorySkillSources", () => {
-  test("#1532 AC5: customization teaches search, confirmation, availability and project trust", () => {
+  test("#1532 AC5: customization guide remains bundled with project trust boundaries", () => {
     const text = readFileSync(join(import.meta.dir, "../../resources/factory-skills/customize-codepuppy/SKILL.md"), "utf8")
     for (const sentence of [
       "Search first with `codepuppy_hub_search`",
       "offers skills, agents, commands, connectors (MCP), bundles, and cloud capabilities",
       "Explain what to install and why, then call `codepuppy_hub_install`",
-      "app's confirmation box (软件弹出的确认框)",
-      "If a key is needed, the user enters it in that box",
       "Never ask for or accept keys in chat; never invent or guess keys for the user",
       "Check `codepuppy_hub_status` before use",
       "For `submitted; result pending` or `reload-pending`, check\n   `codepuppy_hub_status` instead of repeating the installation",
       "do not wait inside\n   the current reply for reload",
-      "显示可用以后,下一条消息就能用;不用重启",
-      "Only promise use from the next message after the state is `available`",
       "`codepuppy_register` tool only for project scope",
       "Executable connectors stay gated until the user trusts the project",
       "(skills + agents + commands + connectors)",

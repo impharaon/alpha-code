@@ -103,6 +103,8 @@ AC-01 拆为下列同一条端到端路径的断言，不增 AC。表中仓库�
 
 来源为 [anthropics/claude-plugins-official @ b5b01ac4f889fec0c4c6bb89f27ca7c8574473f6](https://github.com/anthropics/claude-plugins-official/tree/b5b01ac4f889fec0c4c6bb89f27ca7c8574473f6)。2026-11-16 只读取得 raw 市场清单与 codeload `refs/heads/main`，tar pax `comment` 固定到该提交，归档内清单与 raw 清单摘要相同；317 个条目，playwright 的 source 是 `./external_plugins/playwright`，context7 的 source 是 `./external_plugins/context7`。r2 核对实际内置目录：已有 `mcp:playwright`、没有 context7；因此真实 Playwright 请求按 BR-02 装目录项，市场回退链改由已在本夹具中的 context7 证明，不需要新增或改造第三方样本。实施夹具从该 pinned 归档截取原字节，源/摘要元数据跟夹具同放，不复制 8 MB 全库进测试。
 
+自 r19 起，下表只列固定归档内的上游成员身份，不表示本仓有散装副本。所有测试读取方（含 ext）须从 `test-fixtures/plugin-helper/fixture.ts` 的临时 `fixtureRoot` 或 `captureFixture` 取得真实字节；不能把这些成员路径直接拼到仓内目录。
+
 | 样本（相对上游根） | bytes | SHA-256 |
 | --- | --- | --- |
 | 本次 codeload gzip | 8,404,791 | `20eee39640588b8987519372c29607f36468e903fe0efee5b69cc29761074df6` |
@@ -1105,3 +1107,10 @@ r19 两包各目录 bun typecheck 均 exit 0（ui-types.log/ext-types.log）。�
 r19 最终复验：机械登记同步后的组件/账户/registry/旧名七文件再次合跑 **55 pass / 0 fail、exit 0**（component-readers-final.log）；真实引擎四宿主 4 pass / exit 0，三个主样本读取方 101 pass / exit 0，精确转换器行 31 与 registry 行 23 均 exit 0。最终 committed 树按 codepuppy-check.sh 原 `source scripts/docs-gates.sh; docs_gate_links` 再跑 **exit 0，426 相对链接 / 5 个本仓 Markdown**（docs-links-final.log）。独立逐项检查四个归档的 SHA、82 个成员的 bytes/SHA/mode 与原 provenance 全一致，散装成员均不存在，fixture 目录无 loose .md；归档/provenance 相对 445b37c1d4 的 diff 为空，原有摘要断言实际读临时解包后的真实字节，docs gate 两个脚本无变动。本文链接检查和 git diff --check 均 exit 0。
 
 已核 Codex（GPT-6），对照 r19 裁定及 445b37c1d4 接收点，结论 DONE（G2）：选用方案 2，r18 的新增豁免请求不再需要；样本自己的坏链原字节保留在既有归档中，本仓文档规则完整保留。实际约 10 分钟、88 文件；主要为 82 份已保存在固定归档的重复成员移除，代码只涉及测试加载器/新存储回归/单一本地市场测试读路径，另两份脚本登记作必要机械同步。遗留去向：组合 profile 旧 checkout 路径与跨仓 ref→编排器环境配置，非本轮修改；其它无。候选版本与生产代码、host artifact、依赖均未变；未跑整闸或整包测试、未执行发布操作。
+
+
+r20 · ext 遗漏读取方与独立步骤诊断（接收 cb63f9e2f7，开始 2026-11-16 20:31:31 UTC）：gate-helper-2.log 的唯一红与源码一致，plugin-host.test.ts:1269 仍从 import.meta.dir 拼已移除的 frontend-design/SKILL.md。先单跑原题名，0 pass / 1 fail（43 filtered）、exit 1，明确 ENOENT（ext-reader-red.log）；只新增共用测试 fixtureRoot 导入并改读根，与已有跨包 bootstrap fixture 的测试导入方式相同，无生产依赖变化。原 case 的全部正向成员、撤销前后权限及 post tail 断言不变；完整 plugin-host.test.ts 修后 **44 pass / 0 fail、exit 0**（ext-reader-fixed.log），登记 44 不变。
+
+r20 残留引用检查：从 r19 的删除 diff 取得全部 82 路径，展开完整仓内路径/fixture-root 相对路径/归档相对成员路径及父目录，共 515 个 literal 模式，rg 同时搜索 packages/ext、packages/ui-mac、scripts，另加根 docs（排除秘密配置与依赖目录）。结果 571 行/153 文件，进一步区分 generic opencode.jsonc 等格式名后为 250 行；并补搜 plugin-helper/fixtureRoot 211 行。日志和模式清单在 /tmp/helper-install-r20/*reference-audit*.txt。唯一失效磁盘读取是上述 ext case，已修。其它命中分别为：临时 fixtureRoot/captureFixture 的有效读取；三份 provenance 中必须保留的真实归档成员名；来源/转换器与 safe projection 中的外部格式或包身份；独立 claude-plugin-corpus.json/census 的有效成员；冻结设计/历史收据中的上游或通用配置路径，均不把它们误改成机器路径。scripts 的登记指向仍存在的 catalog、factory skill 与测试文件，无新失效项。计划的当前样本表增加“归档成员身份，读取须走临时加载器”的说明，摘要表不改。修复清单只有 plugin-host.test.ts 的读取根，以及本计划的样本路径口径；无其它失效引用。
+
+r20 验证冻结规则：本修复提交就是以下各独立步骤的验证对象；测试期间不再编辑工作树，每条开始/结束记录同一 HEAD，实际 exit/count 与同 SHA 收据写入 /tmp/helper-install-r20/results.tsv 并在本轮返回提供，不为填写事后收据再造一个未验证提交。按 codepuppy-check.sh 原调用分别执行：六包 typecheck（consumer/ext/ui-mac/plugin/core/schema）；consumer check:vendor；bun-test-floor.sh 15 consumer、100 ext、带原 known-fails 的 3000 ui-mac src；bun-test-app.sh；完整非 update 的 assert-gate-files.sh；原 docs_gate_nul 与 docs_gate_links。仅对 bun test 注入 --max-concurrency 2，与其它 lane 的并发约束相同。每个步骤独立收集结果，任一步失败不会跳过后面的包，不执行 gate run/bin/check 或第 9 步的 worktree 创建。未改变测试数量，不应运行 --update；如诊断揭示新事实则依现有规则修复并重新冻结实际最终提交。

@@ -2,6 +2,7 @@
 // 经上游真的钩子链 / 工具注册表 / transform 服务判结果。「权威保持」类用例都带反向臂:同一个输入在**不装 ext** 的宿主里
 // 走上游默认,结论必须相反 —— 去掉我们的钩子 ⇒ 这条用例红。
 import { publishTestBootstrap, testCloudMcp, unpublishTestBootstrap, type TestBootstrapInput } from "../../ui-mac/test-component/codepuppy-bootstrap-fixture"
+import { fixtureRoot } from "../../ui-mac/test-fixtures/plugin-helper/fixture"
 import { afterEach, beforeAll, expect } from "bun:test"
 import { createHash } from "node:crypto"
 import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs"
@@ -1266,7 +1267,7 @@ it.live("scope · parsed managed skills use positive membership before and after
     const generation = join(root, "ext-store", "skill--frontend-design", "generations", "gen-000001-abcdef")
     mkdirSync(generation, { recursive: true })
     // Real pinned Claude skill; provenance and digest are in ui-mac/test-fixtures/plugin-helper/provenance.json.
-    writeFileSync(join(generation, "SKILL.md"), readFileSync(join(import.meta.dir, "../../ui-mac/test-fixtures/plugin-helper/plugins/frontend-design/skills/frontend-design/SKILL.md")))
+    writeFileSync(join(generation, "SKILL.md"), readFileSync(join(fixtureRoot, "plugins/frontend-design/skills/frontend-design/SKILL.md")))
     const allow = (scoped: { kind: string; name: string; projectPath: string }[]) =>
       writeFileSync(join(root, "skills-enabled.json"), JSON.stringify({ v: 2, keys: [], scoped }))
     allow([{ kind: "skill", name: "frontend-design", projectPath: directory }])

@@ -894,3 +894,5 @@ A8 FIXED：disabled 循环恢复只读 readLedgerV2 的已解记录；strict gra
 A9 前提属实：renderer source 写口可递交 created 与 project effect；两条完整 main IPC red 使用全源已查询记录、真实技能字节的自制草稿与真实目录项，旧 handler 都接受，exit 1（a9-red.log）。拒绝范围只落 renderer handler，sidecar/common entry 保留制作/项目 scope；无用户能力收窄。
 
 A9 FIXED：renderer handler 在任何准备/写入前拒 created 或非 all-projects，via 由主进程写为 hub；共同 installFromSource 与 sidecar 不改，制作和逻辑项目 scope 仍走聊天。原两 red 保留，ext-write-channels/sidecar-wiring/install-from-source 三文件 exit 0（a9-green.log），ui-mac typecheck exit 0（a9-types.log）；IPC 实跑 24，pin 同步。
+
+A10 前提属实：catalogComparisons 只消费上次 search 的 catalogRows；没有 search 或上次目录失败就返回空。三 red 覆盖两种前提及请求级准备缓存（同请求锁内复用、下一请求必须重新读目录），exit 1（a10-red.log）。直接改成每次调用都联网会回退 A1；本步以既有 requestId 为私有比较缓存键，查询使用 searchId，准备时读 deps.catalog 当前事实，提交复用同一准备 Promise。不是产品选项，不改冻结 DTO/安装入参。

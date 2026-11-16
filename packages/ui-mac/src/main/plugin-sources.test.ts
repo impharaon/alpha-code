@@ -643,3 +643,23 @@ test("R14 selecting a candidate keeps the generous capture budget after the sear
   expect(await pending).toMatchObject({ok:true,capture:{source:{commit:fixtureCommit}}})
  }finally{release(await fixtureFetch(archive));await pending;jest.useRealTimers()}
 })
+
+for(const premise of ["without-search","after-failed-search"] as const)test("R14 A10 catalog identity lookup works "+premise,async()=>{
+ let available=premise==="without-search"
+ const sources=(await sourcesModule()).createPluginSources({catalog:async()=>{if(!available)throw Error("controlled catalog outage");return formalCandidates()},catalogPackage:formalPackage,fetch:fixtureFetch})
+ if(!available){expect((await sources.searchSources("no-such-name")).sources.find(source=>source.source==="catalog")).toMatchObject({status:"failed"});available=true}
+ expect(await sources.catalogComparisons("github")).toContainEqual(expect.objectContaining({catalogId:"package:github",version:"1.0.1",runtimeIdentity:expect.any(String)}))
+})
+
+test("R14 A10 install preparation reuses one catalog lookup inside its request while a new request reads current facts",async()=>{
+ let reads=0
+ let rows=formalCandidates()
+ const sources=(await sourcesModule()).createPluginSources({catalog:async()=>{reads++;return rows},catalogPackage:formalPackage,fetch:fixtureFetch})
+ const prepared=await sources.catalogComparisons("github","r14_install_one")
+ expect(prepared).toHaveLength(1)
+ rows=[]
+ expect(await sources.catalogComparisons("github","r14_install_one")).toEqual(prepared)
+ expect(reads).toBe(1)
+ expect(await sources.catalogComparisons("github","r14_install_two")).toEqual([])
+ expect(reads).toBe(2)
+})

@@ -1941,6 +1941,26 @@
           "name": "项目信任组件:不完整下次再查"
         }
       ]
+    },
+    {
+      "id": "package-disable-pending-mcp-requests",
+      "decision": "Disabling a managed package revokes pending requests whose validated MCP identity belongs to that package. The existing reject API releases that session; this path cannot grant permission or create a second approval surface (#1724; AC-05/AC-15, preserving the merged hub lifecycle behaviour).",
+      "lane": "#1724 r16",
+      "mechanism": {
+        "file": "packages/ui-mac/src/main/package-mcp-activation.ts",
+        "ladder": "L0: existing engine permission reply, literal reject only; replaces the cancellation side effect of the old Location/engine refresh without changing the permission evaluator."
+      },
+      "tests": [
+        {
+          "file": "packages/ui-mac/src/main/package-hub-lifecycle.engine.test.ts",
+          "name": "desktop package lifecycle uses main IPC, the real ext scheduler and sandbox engine"
+        },
+        {
+          "file": "packages/ui-mac/src/renderer/codepuppy-ui/permission-mount-ratchet.test.ts",
+          "name": "package MCP disable has a literal reject-only main reply entry"
+        }
+      ],
+      "note": "Orchestrator r16 requires the original busy-disable assertions to remain; the real lifecycle case fails with the revoke call removed. This preserves the existing explicit package-off authority, with no new grant or owner decision."
     }
   ]
 }

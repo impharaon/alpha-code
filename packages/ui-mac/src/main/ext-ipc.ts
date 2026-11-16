@@ -146,6 +146,14 @@ export function registerExtIpcHandlers(
   }
   const reloads = createReloadCoordinator({
     restartConnectors: () => officialRuntime?.refresh() ?? Promise.resolve(false),
+    applyPackageMcp: async (items) => {
+      const state = readPackageLedgerStateV1(codepuppyGlobalRoot(), { sideEffectFree: true })
+      if (!state.ok) return
+      await Promise.all(state.packageGraphs.filter(graph => {
+        const nodes = [graph.root, ...graph.children]
+        return nodes.some(node => node.kind === "mcp") && (!items.length || items.some(item => item.id === graph.packageId || nodes.some(node => node.componentId === item.id)))
+      }).map(graph => applyPackageMcpV1(graph.packageId, codepuppyUserWorkspaceDir(), { root: codepuppyGlobalRoot, awaitServer })))
+    },
     log: (line) => getLogger()?.log(line),
     onChange: notifyHubViewChanged,
   })
@@ -346,6 +354,11 @@ export function registerExtIpcHandlers(
     const state = readPackageLedgerStateV1(codepuppyGlobalRoot(), { sideEffectFree: true })
     const graph = state.ok ? state.packageGraphs.find((entry) => entry.packageId === packageId) : undefined
     return [packageId, ...(graph ? [graph.root, ...graph.children].map((node) => node.componentId) : [])].map((id) => ({ id, scope: "global" as const }))
+  }
+  const packageNeedsStartupRefresh = (packageId: string) => {
+    const state = readPackageLedgerStateV1(codepuppyGlobalRoot(), { sideEffectFree: true })
+    const graph = state.ok && state.packageGraphs.find(entry => entry.packageId === packageId)
+    return !!graph && [graph.root, ...graph.children].some(node => node.kind === "cloud" || node.kind === "agent" || node.kind === "command")
   }
   ipcMain.handle("ext-package-authorization", async (_event: IpcMainInvokeEvent, packageId: unknown) => {
     await ledgerReady
@@ -1098,7 +1111,7 @@ export function registerExtIpcHandlers(
   }
   ipcMain.handle(LOCAL_PACKAGE_READ_CHANNELS.preparePluginSource, (_event: IpcMainInvokeEvent, input: unknown) => preparePluginSource(input))
   const activatePackageMcp = (packageId: string) => applyPackageMcpV1(packageId, codepuppyUserWorkspaceDir(), { root: codepuppyGlobalRoot, awaitServer })
-  const reloadPackageSkills = (packageId: string) => reloads.request({ scope: "global", items: packageReloadItems(packageId), reason: `installed package content ${packageId}` })
+  const reloadPackageSkills = (packageId: string) => reloads.request({ scope: "global", items: packageReloadItems(packageId), reason: `installed package content ${packageId}`, connectorChange: packageNeedsStartupRefresh(packageId) })
   const removeDepartingPackageComponents = async (children: Array<{ kind: string; name: string }>) => {
     const removed = packageChildFileCleanup(children)
     if (!removed.ok) getLogger().warn("Package departing content cleanup is pending")
@@ -1271,7 +1284,7 @@ export function registerExtIpcHandlers(
         const packageId = (intent as { packageId: string }).packageId
         const state = readPackageLedgerStateV1(codepuppyGlobalRoot(), { sideEffectFree: true })
         const graph = state.ok && state.packageGraphs.find((entry) => entry.packageId === packageId)
-        return graph && [graph.root, ...graph.children].some((node) => node.kind !== "mcp") ? { ...result, ...reloads.request({ scope: "global", items: packageReloadItems(packageId), reason: `set package state ${packageId}`, force: true }) } : result
+        return graph && [graph.root, ...graph.children].some((node) => node.kind !== "mcp") ? { ...result, ...reloads.request({ scope: "global", items: packageReloadItems(packageId), reason: `set package state ${packageId}`, force: true, connectorChange: packageNeedsStartupRefresh(packageId) }) } : result
       },
       savePackageSecrets: async (intent) => {
         const result = await savePackageSecretsV1(intent, packageAdmissionDeps)
@@ -1422,7 +1435,7 @@ export function registerExtIpcHandlers(
       await activatePackageMcp(result.packageId)
       const state = readPackageLedgerStateV1(codepuppyGlobalRoot(), { sideEffectFree: true })
       const graph = state.ok && state.packageGraphs.find(graph => graph.packageId === result.packageId)
-      if (graph && [graph.root, ...graph.children].some(node => node.kind !== "mcp" && node.kind !== "cloud")) reloadPackageSkills(result.packageId)
+      if (graph && [graph.root, ...graph.children].some(node => node.kind !== "mcp")) reloadPackageSkills(result.packageId)
     }
     return result
   }

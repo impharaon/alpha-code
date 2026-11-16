@@ -291,6 +291,8 @@ async function askedTurn() {
 }
 
 test("real Supabase package exposes both enabled generation skills", async () => {
+  const beforeReloads = locationReloads
+  const beforeRefreshes = refreshes
   await action("ext-install-package", "package:supabase")
   await until(
     async () =>
@@ -304,6 +306,8 @@ test("real Supabase package exposes both enabled generation skills", async () =>
     const names = (await send("GET", "/api/skill")).json.data.map((skill: { name: string }) => skill.name)
     return ["supabase", "supabase-postgres-best-practices"].every(name => names.includes(name))
   }, "installed Supabase skill read-back")
+  expect(locationReloads).toBeGreaterThan(beforeReloads)
+  expect(refreshes).toBe(beforeRefreshes)
   const { readPackageLedgerStateV1 } = await import("./ext-receipt-v2")
   const installed = readPackageLedgerStateV1(root)
   expect(
@@ -344,9 +348,11 @@ test("real desktop package lifecycle asks twice, applies a busy switch, and remo
   expect(authorization).toMatchObject({ ok: true, items: [{ kind: "secret", saved: false }] })
   if (!authorization.ok) throw new Error("package authorization is unavailable")
   const prerequisiteId = authorization.items[0]!.prerequisiteId
+  const beforeTokenReloads = locationReloads
   await action("ext-save-package-secrets", { packageId: "package:github", secrets: { [prerequisiteId]: TOKEN } })
   await until(async () => (await mcpStatus("github")) === "connected", "GitHub fixture connection")
   expect(runtimeInitializes).toBeGreaterThan(0)
+  expect(locationReloads).toBe(beforeTokenReloads)
   await until(async () => (await githubTools()).length === 1, "connected tool registry")
   expect(await githubTools()).toHaveLength(1)
   for (const count of [1, 2]) {
@@ -364,16 +370,21 @@ test("real desktop package lifecycle asks twice, applies a busy switch, and remo
   await until(async () => (await githubTools()).length === 0, "disabled GitHub tool inventory")
   expect(await githubTools()).toEqual([])
   const disabledInitializes = runtimeInitializes
+  const beforeDisabledTokenReloads = locationReloads
   await action("ext-save-package-secrets", { packageId: "package:github", secrets: { [prerequisiteId]: NEXT_TOKEN } })
   expect(await mcpStatus("github")).toBe("disabled")
   await until(async () => (await githubTools()).length === 0, "disabled GitHub tool inventory")
   expect(await githubTools()).toEqual([])
   expect(runtimeInitializes).toBe(disabledInitializes)
+  expect(locationReloads).toBe(beforeDisabledTokenReloads)
   await action("ext-set-package-state", { packageId: "package:github", state: "enabled" })
   await until(async () => (await mcpStatus("github")) === "connected", "reenabled connector")
   const held = await askedTurn()
   expect((await send("GET", "/api/session/active")).json.data[held.sessionID]).toBeDefined()
+  const beforeHotDisableReloads = locationReloads
   await action("ext-set-package-state", { packageId: "package:github", state: "disabled" })
+  await until(async () => (await send("GET", `/api/session/${held.sessionID}/permission`)).json.data.length === 0 && !(await send("GET", "/api/session/active")).json.data[held.sessionID], "disabled connector releases its pending round")
+  expect(locationReloads).toBe(beforeHotDisableReloads)
   expect((await send("GET", `/api/session/${held.sessionID}/permission`)).json.data).toEqual([])
   expect((await send("GET", "/api/session/active")).json.data[held.sessionID]).toBeUndefined()
   expect(toolCalls).toBe(2)
@@ -447,6 +458,7 @@ test("cloud-only package switch withdraws and restores real engine tools", async
   await until(async () => (await tools()).length > 0, "cloud tool inventory")
   expect((await tools()).length).toBeGreaterThan(0)
   await action("ext-set-package-state", { packageId: "package:cloud-v1", state: "disabled" })
+  await until(async () => !(await mcpStatus("hub-cloud")) && (await tools()).length === 0, "disabled cloud runtime read-back")
   expect(await mcpStatus("hub-cloud")).toBeUndefined()
   expect(await tools()).toEqual([])
   await action("ext-set-package-state", { packageId: "package:cloud-v1", state: "enabled" })

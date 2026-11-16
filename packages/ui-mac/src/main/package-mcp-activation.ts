@@ -1,3 +1,5 @@
+import { Schema } from "effect"
+import { ToolIdentity } from "@opencode/schema/tool-identity"
 import { readFileSync } from "node:fs"
 import { readPackageAllowSet } from "../../../ext/src/gen-skill-paths"
 import { scopedPackageAllowedHere } from "../../../ext/src/package-scope"
@@ -48,9 +50,24 @@ export async function applyPackageMcpV1(
                     )
                   )
                   if (!activeHere) {
+                    const pending = (await client.permission.request.list({ location })).data
+                    const replied = new Set<string>()
+                    for (const request of pending) {
+                      const identity = request.metadata?.identity
+                      if (!Schema.is(ToolIdentity)(identity) || identity.source !== "mcp" || identity.origin !== name || replied.has(request.sessionID)) continue
+                      await client.permission.reply({ sessionID: request.sessionID, requestID: request.id, decision: "reject" })
+                      replied.add(request.sessionID)
+                    }
                     const servers = (await client.mcp.list({ location })).data
                     if (servers.some((server) => server.name === name))
                       await client.experimental.mcp.disconnect({ server: name, location })
+                    else if (!enabled && packageAppliesAt(graph, target)) {
+                      // A skill/config reload can remove a runtime-only server. Keep its disabled
+                      // definition visible without resolving or opening any credential file.
+                      const leaf = readMcpLeafStrict(name)
+                      const config = leaf.ok && leaf.value ? projectServerConfig(leaf.value) : undefined
+                      if (config) await client.experimental.mcp.add({ server: name, config: { ...config, disabled: true }, location })
+                    }
                   }
                   if (activeHere) {
                     const leaf = readMcpLeafStrict(name)

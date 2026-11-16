@@ -147,8 +147,8 @@ describe("审批决定提交入口:单一引用面白名单棘轮(#619 R3 Blocke
       .replace(/["'`]\]/g, "")
 
   const rejectOnly = (source: string) => {
-    const calls = [...source.matchAll(/permission\.reply\(([^]*?)\},/g)]
-    return calls.length > 0 && calls.every((call) => /\breply:["']reject["'](?:,|$)/.test(call[1]!))
+    const calls = [...source.matchAll(/permission\.reply\(([^]*?)\}(?:,|\))/g)]
+    return calls.length > 0 && calls.every((call) => /\b(?:reply|decision):["']reject["'](?:,|$)/.test(call[1]!))
       && calls.length === (source.match(/permission\.reply/g) ?? []).length
   }
 
@@ -233,7 +233,9 @@ describe("审批决定提交入口:单一引用面白名单棘轮(#619 R3 Blocke
   const SANCTIONED_ENTRY_HOLDERS = [
     // #1652 AC2 explicitly requires connector disable to reject its pending approvals via the existing API.
     // This entry only sends reject; the real Hub test checks the exact reply and connector identity.
-    { file: "packages/ui-mac/src/renderer/extensions/use-extensions.ts", token: "permission.reply" },
+    { file: "packages/ui-mac/src/renderer/extensions/use-extensions.ts", token: "permission.reply", rejectOnly: true },
+    // #1724: same explicit disable authority for package-root actions; no grant is permitted.
+    { file: "packages/ui-mac/src/main/package-mcp-activation.ts", token: "permission.reply", rejectOnly: true },
     { file: "packages/codepuppy-app/src/context/permission-surface.tsx", token: "permission.reply" },
     { file: "packages/codepuppy-app/src/context/permission-v1-adapter.ts", token: "permission.reply" },
     { file: "packages/codepuppy-app/src/context/permission.tsx", token: "permission.reply" },
@@ -244,7 +246,7 @@ describe("审批决定提交入口:单一引用面白名单棘轮(#619 R3 Blocke
 
   const sanctionedEntry = (file: string, token: string, source: string) =>
     SANCTIONED_ENTRY_HOLDERS.some((holder) => holder.file === file && holder.token === token
-      && (file !== "packages/ui-mac/src/renderer/extensions/use-extensions.ts" || rejectOnly(source)))
+      && (!("rejectOnly" in holder) || rejectOnly(source)))
 
   test("permission 决定提交入口(reply/respond,含方括号等义形态)只出现在白名单接线点", () => {
     const offenders: Array<{ file: string; token: string }> = []

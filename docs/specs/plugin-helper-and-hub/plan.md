@@ -808,3 +808,5 @@ A1/B5 FIXED：main 单例在恢复写锁前预热同一候选转换及目录身�
 A2 前提属实：readArchive 直接 gunzipSync，get 无字节上界。三条真实市场/tar 受控变体红例：声明超大 content-length、未声明而流式附加 gzip 允许的零填充、原生异步 gunzip 的 maxOutputLength/overflow 传播；压缩/清单前缀仍来自固定样本，原生边界测试只将测试里的 zlib 上界调低以避免分配 512MiB。`bun test --timeout 60000 --max-concurrency 2 --test-name-pattern '^R12 A2' src/main/plugin-sources.test.ts` exit 1（3 fail，a2-red.log），旧实现把超大捕获仍报 source ok、未调用异步 gunzip。
 
 A2 预算取下载 128MiB、解压 512MiB：对审查记录的最大 25.8MB 压缩库分别约 5 倍和 20 倍（解压还留更多余量），对已捕获 npm 正向样本 0.3MB 更高三个数量级；普通技能/MCP 包、已核市场均远低于它们。不限制候选/技能/包数，不删任何可安装类型；命中只令该来源 failed:format，其他结果保留，异步解压不阻塞主进程事件循环。
+
+A2 FIXED：get 同时核 content-length 与真实流式计数，128MiB 以上立即取消 body；没有完整缓冲后再检查。gzip 走异步 gunzip，maxOutputLength=512MiB，原生 ERR_BUFFER_TOO_LARGE 转为该源 failed:format；私有失败 provenance 改用 WeakMap 保留 network/format，不改公开错误字段。原三条红例未改，a2-green-first.log 3 pass/10 assertions；四文件 plugin-sources/plugin-conversion/host-extension-package-artifact/install-from-source 94 pass/599 assertions，exit 0（a2-related.log）。两包 bun typecheck exit 0（a2-{ui,ext}-types.log）。没有新增产品限制、确认或依赖；未执行下载内容。

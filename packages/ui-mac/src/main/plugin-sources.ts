@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from "node:crypto"
 import { posix, join } from "node:path"
 import { readdir, lstat, readFile, readlink } from "node:fs/promises"
-import { gunzipSync } from "node:zlib"
+import { gunzip } from "node:zlib"
 import { readMarketplace, convertPluginTree, convertMcpServerDefinition } from "../shared/host-extension-package-contract/plugin-conversion.mjs"
 import type { Capture, Json, MarketplaceEntry, Source, TreeNode, PluginPackage, Text } from "../shared/host-extension-package-contract/plugin-conversion"
 
@@ -34,6 +34,9 @@ const MARKETPLACES = [
 ] as const
 const MCP_REGISTRY = "https://registry.modelcontextprotocol.io/v0.1/servers"
 const NPM_REGISTRY = "https://registry.npmjs.org"
+// Largest recorded marketplace download is 25.8MB; leave ample room for real bundles.
+const SOURCE_DOWNLOAD_MAX_BYTES = 128 * 1024 * 1024
+const SOURCE_UNPACK_MAX_BYTES = 512 * 1024 * 1024
 type Archive = { commit?: string; members: Map<string, { node: TreeNode; bytes?: Uint8Array }> }
 type IndexedSourceCandidate = { candidate: CandidateV1 } & (
   | { kind: "marketplace"; entry: MarketplaceEntry; market: typeof MARKETPLACES[number] }
@@ -66,8 +69,8 @@ export function createPluginSources(deps: { catalog: () => Promise<readonly Cand
   const indexes = new Map<string, Promise<ReturnType<typeof readMarketplace>>>()
   const registryQueries = new Map<string, Promise<ReturnType<typeof registryRecord>[]>>()
   const npmQueries = new Map<string, Promise<{ name: string; version: string; description: string }[]>>()
-  // Keep timeout provenance private; the source failure wire shape remains unchanged.
-  const timedOut = new WeakSet<SourceFailure>()
+  // Keep deadline/resource failure provenance private; the source failure wire shape remains unchanged.
+  const boundedFailures = new WeakMap<SourceFailure, "network" | "format">()
   const get = async (url: string, signal?: AbortSignal) => {
     if (signal?.aborted) throw new SourceError("network", "Source deadline exceeded")
     const controller = new AbortController()
@@ -75,7 +78,32 @@ export function createPluginSources(deps: { catalog: () => Promise<readonly Cand
       return await sourceDeadline((async () => {
         const response = await (deps.fetch ?? fetch)(url, { signal: signal ? AbortSignal.any([signal, controller.signal]) : controller.signal }).catch(() => { throw new SourceError("network", "Source request failed") })
         if (!response.ok) throw new SourceError("http", "Source returned HTTP " + response.status)
-        return new Uint8Array(await response.arrayBuffer().catch(() => { throw new SourceError("network", "Source download failed") }))
+        if (Number(response.headers.get("content-length")) > SOURCE_DOWNLOAD_MAX_BYTES) {
+          void response.body?.cancel().catch(() => undefined)
+          throw new SourceSizeLimit()
+        }
+        if (!response.body) return new Uint8Array()
+        const reader = response.body.getReader()
+        const chunks: Uint8Array[] = []
+        let length = 0
+        try {
+          for (;;) {
+            const chunk = await reader.read()
+            if (chunk.done) break
+            length += chunk.value.byteLength
+            if (length > SOURCE_DOWNLOAD_MAX_BYTES) throw new SourceSizeLimit()
+            chunks.push(chunk.value)
+          }
+        } catch (error) {
+          void reader.cancel().catch(() => undefined)
+          throw error instanceof SourceSizeLimit ? error : new SourceError("network", "Source download failed")
+        } finally {
+          reader.releaseLock()
+        }
+        const bytes = new Uint8Array(length)
+        let offset = 0
+        for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.byteLength }
+        return bytes
       })(), PLUGIN_SOURCE_REQUEST_TIMEOUT_MS)
     } finally {
       controller.abort()
@@ -95,8 +123,8 @@ export function createPluginSources(deps: { catalog: () => Promise<readonly Cand
     const known = archives.get(key)
     if (known) return known
     const pending = get("https://codeload.github.com/" + repository.slice("https://github.com/".length) + "/tar.gz/" + revision.split("/").map(encodeURIComponent).join("/"))
-      .then((bytes) => {
-        const archive = readArchive(bytes)
+      .then(async (bytes) => {
+        const archive = await readArchive(bytes)
         if (!/^[a-f0-9]{40}$/.test(archive.commit ?? "")) throw new Error("Codeload has no fixed commit")
         return archive
       })
@@ -165,7 +193,7 @@ export function createPluginSources(deps: { catalog: () => Promise<readonly Cand
           if (!integrity) throw new SourceError("format", "npm integrity is not readable")
           const separator = integrity.indexOf("-")
           if (createHash(integrity.slice(0, separator)).update(bytes).digest("base64") !== integrity.slice(separator + 1)) throw new SourceError("format", "npm integrity does not match")
-          return treeCapture({ kind: "npm", locator: selected.name, ecosystem: "opencode", entryName: selected.name, version: selected.version, integrity: metadata.dist.integrity }, readArchive(bytes).members)
+          return treeCapture({ kind: "npm", locator: selected.name, ecosystem: "opencode", entryName: selected.name, version: selected.version, integrity: metadata.dist.integrity }, (await readArchive(bytes)).members)
         }
         if (selected.kind === "mcp-registry") {
           const locator = MCP_REGISTRY + "/" + encodeURIComponent(selected.serverName) + "/versions/" + encodeURIComponent(selected.version)
@@ -204,7 +232,7 @@ export function createPluginSources(deps: { catalog: () => Promise<readonly Cand
     } catch (error) {
       captures.delete(candidateId)
       const failure: SourceFailure = { ok: false, code: error instanceof SourceChanged ? "source-changed" : "source-unreachable", detail: error instanceof SourceChanged ? "Selected source changed; search again" : "Selected source could not be captured" }
-      if (error instanceof SourceDeadline) timedOut.add(failure)
+      if (error instanceof SourceDeadline || error instanceof SourceSizeLimit) boundedFailures.set(failure, error instanceof SourceDeadline ? "network" : "format")
       return failure
     }
   }
@@ -393,15 +421,15 @@ export function createPluginSources(deps: { catalog: () => Promise<readonly Cand
       const groups = [{ status: source, candidates: local }, ...markets, { status: registryStatus, candidates: found }, { status: npmStatus, candidates: rank(npmFound, query) }]
         .toSorted((left, right) => PLUGIN_SOURCE_ORDER.indexOf(left.status.source) - PLUGIN_SOURCE_ORDER.indexOf(right.status.source))
       const ordered = groups.flatMap((group) => group.candidates)
-      const sourceFailed = (source: PluginSourceIdV1) => {
+      const sourceFailed = (source: PluginSourceIdV1, reason: "network" | "format" = "network") => {
         const group = groups.find(group => group.status.source === source)!
-        group.status = { source, status: "failed", reason: "network", detail: "Source could not be read within its network budget" }
+        group.status = { source, status: "failed", reason, detail: reason === "network" ? "Source could not be read within its network budget" : "Source exceeded its archive resource budget" }
       }
       const convertedForSearch = async (candidate: CandidateV1) => {
         if (groups.find(group => group.status.source === candidate.source)?.status.status === "failed") return
         try {
           const result = await withinSource(candidate.source, convertCandidate(candidate.id))
-          if (!result.ok && timedOut.has(result)) sourceFailed(candidate.source)
+          if (!result.ok && boundedFailures.has(result)) sourceFailed(candidate.source, boundedFailures.get(result)!)
           return result.ok ? result : undefined
         } catch {
           sourceFailed(candidate.source)
@@ -450,6 +478,9 @@ class SourceError extends Error {
 }
 class SourceDeadline extends SourceError {
   constructor() { super("network", "Source deadline exceeded") }
+}
+class SourceSizeLimit extends SourceError {
+  constructor() { super("format", "Source exceeded its archive resource budget") }
 }
 function sourceDeadline<T>(work: Promise<T>, duration: number): Promise<T> {
   return new Promise((resolve, reject) => {
@@ -560,8 +591,13 @@ function githubRepository(value: string): string | undefined {
 }
 
 /** GitHub codeload's ustar/PAX container, parsed without materializing any path or executing source content. */
-function readArchive(compressed: Uint8Array): Archive {
-  const bytes = gunzipSync(compressed)
+async function readArchive(compressed: Uint8Array): Promise<Archive> {
+  const bytes = await new Promise<Uint8Array>((resolve, reject) => {
+    gunzip(compressed, { maxOutputLength: SOURCE_UNPACK_MAX_BYTES }, (error, output) => {
+      if (error) return reject((error as NodeJS.ErrnoException).code === "ERR_BUFFER_TOO_LARGE" ? new SourceSizeLimit() : error)
+      resolve(output)
+    })
+  })
   const members: Archive["members"] = new Map()
   let global: Record<string, string> = {}
   let extended: Record<string, string> = {}

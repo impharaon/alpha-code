@@ -204,3 +204,14 @@ describe("codepuppy-sidecar-messages — ext 侧 build/parse(#1531)", () => {
       expect(parseHubViewReply({ type: "codepuppy.hub.view.reply", id: 1, view: { ...view, rows: [{ ...view.rows[0], priceNote }] } })).toBeUndefined()
   })
 })
+
+test("A3 source search and install messages round-trip only opaque IDs and reject caller-supplied locations of content", async () => {
+  const contract = await import("./codepuppy-sidecar-messages")
+  const search = contract.buildSourcesSearchRequest({ id: 7, directory: "/work/a", query: "playwright" })
+  expect(contract.parseCodePuppySidecarInbound(search)).toEqual(search)
+  const install = contract.buildHubInstallRequest({ id: 8, requestId: "request_a3", directory: "/work/a", sessionID: "ses_1", agent: "build", ref: { kind: "id", id: "cand_main_issued" }, scope: "all-projects" })
+  expect(contract.parseCodePuppySidecarInbound(install)).toEqual(install)
+  expect(contract.parseCodePuppySidecarInbound({ ...install, ref: { kind: "id", id: "cand_main_issued", url: "https://not-an-issued-definition.example/plugin" } })).toBeUndefined()
+  expect(contract.parseCodePuppySidecarInbound({ ...install, scope: "choose-route" })).toBeUndefined()
+  expect(contract.parseHubInstallReply(contract.buildHubInstallReply(8, { accepted: true }))).toEqual({ type: "codepuppy.hub.install.reply", id: 8, accepted: true })
+})

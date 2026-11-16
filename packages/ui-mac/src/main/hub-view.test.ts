@@ -591,3 +591,24 @@ describe("I6:main 侧 alpha.* 分发只做只读查询与重载记录", () => {
     expect(logs.some((l) => l.includes("could not be delivered"))).toBe(true)
   })
 })
+
+test("A3 main accepts before a slow install finishes and owns the submitted/committed result", async () => {
+  const { createHubRequestStages, createCodePuppySidecarHost } = await import("./hub-view")
+  const w = world("source-install-acceptance")
+  const changes: string[] = []
+  const requests = createHubRequestStages({ log: () => {}, onChange: () => { changes.push("changed") } })
+  let finish!: (outcome: import("../shared/plugin-install").InstallOutcomeV1) => void
+  const pending = new Promise<import("../shared/plugin-install").InstallOutcomeV1>((resolve) => { finish = resolve })
+  const inputs: unknown[] = []
+  const host = createCodePuppySidecarHost({ view: w.service, requests, reloads: w.coordinator, log: () => {}, searchSources: async () => ({ searchId: "search_main", query: "playwright", sources: [], candidates: [] }), install: async (input) => { inputs.push(input); return pending } })
+  const posted: unknown[] = []
+  expect(host.receive({ type: "codepuppy.hub.install.request", id: 1, requestId: "request_a3", directory: w.projectDir, sessionID: "ses_1", agent: "build", ref: { kind: "id", id: "cand_main_issued" }, scope: "all-projects" }, (message) => { posted.push(message) })).toBe(true)
+  expect(posted).toEqual([{ type: "codepuppy.hub.install.reply", id: 1, accepted: true }])
+  expect(requests.get("request_a3")).toMatchObject({ stage: "submitted" })
+  expect(inputs).toHaveLength(1)
+  expect(changes).toHaveLength(1)
+  finish({ ok: true, packageId: "claude:playwright", displayName: "playwright", source: { kind: "marketplace", ecosystem: "claude", repository: "https://github.com/anthropics/claude-plugins-official", commit: "fixed", path: "external_plugins/playwright", entryName: "playwright" }, installed: [{ kind: "mcp", sourceName: "playwright", hostName: "playwright" }], notRunning: [] })
+  await Bun.sleep(0)
+  expect(requests.get("request_a3")).toMatchObject({ stage: "committed", packageId: "claude:playwright", outcome: { ok: true } })
+  expect(changes).toHaveLength(2)
+})

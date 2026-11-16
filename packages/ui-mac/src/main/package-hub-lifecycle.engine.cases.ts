@@ -27,6 +27,7 @@ for (const method of ["log", "warn", "error"] as const)
   console[method] = (...args: unknown[]) => {
     consoleLines.push(args)
   }
+let stopWatching: (() => void) | undefined
 let running: Running | undefined
 let model: Awaited<ReturnType<(typeof import("../../test-component/codepuppy-engine"))["scriptedModel"]>>
 let host: Awaited<ReturnType<(typeof import("../../test-component/codepuppy-engine"))["codepuppyEngine"]>>
@@ -68,7 +69,14 @@ async function action(channel: string, ...args: unknown[]) {
   expect(await invoke(channel, ...args)).toMatchObject({ ok: true })
   if (channel === "ext-install-package" && args[0] === "package:supabase")
     expect(reloadRequests.slice(requested).some(request => request.scope === "global" && request.force !== true)).toBe(true)
-  await until(() => refreshes > before || !!refreshFailure, `${channel}; requests=${JSON.stringify(reloadRequests.slice(requested))}; reports=${JSON.stringify(reloadReports)}; locationReloads=${locationReloads}`)
+  const pending = reloadRequests.slice(requested)
+  if (pending.length)
+    await until(() => pending.every(request => reloadReports.some(report => report.generation === request.generation && report.outcome === "reloaded")), channel)
+  if (pending.length) await until(async () => {
+    const plugins = (await send("GET", "/api/plugin")).json.data as Array<{ id: string; state: { status: string } }>
+    return ["codepuppy.ext", "codepuppy.test.engine-probe"].every(id => plugins.some(plugin => plugin.id === id && plugin.state.status === "active"))
+  }, "reloaded plugins ready")
+  if (!pending.length) expect(refreshes).toBe(before)
   if (refreshFailure) throw new Error(refreshFailure)
 }
 
@@ -170,7 +178,7 @@ beforeAll(async () => {
   cloudEndpoint = Bun.serve({ hostname: "127.0.0.1", port: 0, fetch: (request) => echo.fetch(request) })
   const { testCloudMcp } = await import("../../test-component/codepuppy-bootstrap-fixture")
   const { secretFilePath } = await import("./codepuppy-secret-files")
-  host = codepuppyEngine({ sandbox, name: "hub-lifecycle", modelBaseURL: model.baseURL, killSwitch: true,
+  host = codepuppyEngine({ sandbox, name: "hub-lifecycle", modelBaseURL: model.baseURL, killSwitch: true, filewatcher: true,
     cloudMcp: testCloudMcp(`http://127.0.0.1:${cloudEndpoint.port}/mcp`, secretFilePath(join(sandbox.root, "hub-lifecycle-userdata"), "CODEPUPPY_MCP_TOKEN"), "hub-cloud"),
   })
   process.chdir(host.projectDirectory)
@@ -232,12 +240,19 @@ beforeAll(async () => {
     for (const listener of listeners) listener({ data: message })
   })
   await main.ledgerReady
+  // sidecar.ts starts this watcher before the engine. The old connector refresh happened
+  // to re-inject paths; runtime MCP activation must exercise the real in-process path too.
+  const { explicitSkillDirs } = await import("./codepuppy-config-injection")
+  const { watchExplicitSources } = await import("./engine-explicit-config")
+  if (!host.injection.explicit) throw Error("missing explicit config inputs")
+  stopWatching = watchExplicitSources({ ...host.injection.explicit, skills: explicitSkillDirs, log: line => consoleLines.push(line) })
   running = await host.start()
   const { policyStore } = await import("../../test-component/codepuppy-engine")
   initialPolicy = JSON.stringify((await (await policyStore()).snapshot()).user)
 }, 60_000)
 
 afterAll(async () => {
+  stopWatching?.()
   await running?.close()
   model?.stop()
   await echo?.close()
@@ -285,6 +300,10 @@ test("real Supabase package exposes both enabled generation skills", async () =>
       ),
     "skill configuration readiness",
   )
+  await until(async () => {
+    const names = (await send("GET", "/api/skill")).json.data.map((skill: { name: string }) => skill.name)
+    return ["supabase", "supabase-postgres-best-practices"].every(name => names.includes(name))
+  }, "installed Supabase skill read-back")
   const { readPackageLedgerStateV1 } = await import("./ext-receipt-v2")
   const installed = readPackageLedgerStateV1(root)
   expect(
@@ -342,10 +361,12 @@ test("real desktop package lifecycle asks twice, applies a busy switch, and remo
   expect(JSON.stringify((await (await policyStore()).snapshot()).user)).toBe(policyBefore)
   await action("ext-set-package-state", { packageId: "package:github", state: "disabled" })
   expect(await mcpStatus("github")).toBe("disabled")
+  await until(async () => (await githubTools()).length === 0, "disabled GitHub tool inventory")
   expect(await githubTools()).toEqual([])
   const disabledInitializes = runtimeInitializes
   await action("ext-save-package-secrets", { packageId: "package:github", secrets: { [prerequisiteId]: NEXT_TOKEN } })
   expect(await mcpStatus("github")).toBe("disabled")
+  await until(async () => (await githubTools()).length === 0, "disabled GitHub tool inventory")
   expect(await githubTools()).toEqual([])
   expect(runtimeInitializes).toBe(disabledInitializes)
   await action("ext-set-package-state", { packageId: "package:github", state: "enabled" })
@@ -356,6 +377,7 @@ test("real desktop package lifecycle asks twice, applies a busy switch, and remo
   expect((await send("GET", `/api/session/${held.sessionID}/permission`)).json.data).toEqual([])
   expect((await send("GET", "/api/session/active")).json.data[held.sessionID]).toBeUndefined()
   expect(toolCalls).toBe(2)
+  await until(async () => (await githubTools()).length === 0, "disabled GitHub tool inventory")
   expect(await githubTools()).toEqual([])
   const messages = (await send("GET", `/api/session/${held.sessionID}/message`)).json.data as Array<{
     type: string
@@ -371,6 +393,7 @@ test("real desktop package lifecycle asks twice, applies a busy switch, and remo
     await invoke("ext-reload-request", { scope: "global", items: [], reason: "uninstalled package package:github" }),
   ).toMatchObject({ ok: true })
   await until(async () => !(await mcpStatus("github")), "removed runtime connector")
+  await until(async () => (await githubTools()).length === 0, "disabled GitHub tool inventory")
   expect(await githubTools()).toEqual([])
   const ledger = readPackageLedgerStateV1(root)
   expect(ledger.ok && ledger.packageGraphs.some((graph) => graph.packageId === "package:github")).toBe(false)
@@ -398,6 +421,7 @@ test("all package skills leave and return to the callable inventory and disappea
   await action("ext-set-package-state", { packageId: "package:supabase", state: "disabled" })
   await until(async () => (await packageSkills()).length === 0, "all package skills disabled")
   expect(await packageSkills()).toEqual([])
+  await until(async () => await mcpStatus("supabase") === "disabled", "disabled Supabase MCP read-back")
   expect(await mcpStatus("supabase")).toBe("disabled")
   await action("ext-set-package-state", { packageId: "package:supabase", state: "enabled" })
   await until(async () => (await packageSkills()).length === names.length, "all package skills reenabled")
@@ -439,5 +463,6 @@ test("package command switch withdraws and restores the real engine declaration"
   await action("ext-set-package-state", { packageId: "package:generic-bundle", state: "disabled" })
   expect(await commands()).not.toContain("generic-bundle-command")
   await action("ext-set-package-state", { packageId: "package:generic-bundle", state: "enabled" })
+  await until(async () => (await commands()).includes("generic-bundle-command"), "re-enabled package command read-back")
   expect(await commands()).toContain("generic-bundle-command")
 })

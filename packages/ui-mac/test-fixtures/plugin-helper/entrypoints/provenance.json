@@ -1,0 +1,327 @@
+{
+  "fetchedAt": "2026-11-16T12:03:09.685683+00:00",
+  "opencode": {
+    "name": "@unfrgivn/opencode-config",
+    "version": "3.0.6",
+    "commit": "6970d6f3f957358bfb1fc36a260fb7b2e4cb5a78",
+    "repository": "https://github.com/unfrgivn/opencode-config",
+    "integrity": "sha512-G1cuu8Slp2Me4KttWMSSSXJnt6tYMw95es3LiXz+WN42xdorDYPCgS1WbkZcgYE469cCWM3/ZQ8bnDpy+JoXCQ=="
+  },
+  "files": [
+    {
+      "url": "https://registry.npmjs.org/%40unfrgivn%2Fopencode-config/3.0.6",
+      "path": "npm-metadata.json",
+      "status": 200,
+      "bytes": 3112,
+      "sha256": "3143437ad03d4d47f981157843236c1fb7c511cc5d77f4e99d6a3214d96d3e1b"
+    },
+    {
+      "url": "https://registry.npmjs.org/@unfrgivn/opencode-config/-/opencode-config-3.0.6.tgz",
+      "path": "npm-package.tgz",
+      "status": 200,
+      "bytes": 307285,
+      "sha256": "2ea46359046667c9048affc7e0a4eeae069d960ed8373d488b6713ac714c8e07"
+    },
+    {
+      "url": "https://registry.npmjs.org/-/v1/search?text=%40unfrgivn%2Fopencode-config%20keywords%3Aopencode-plugin&size=250&from=0",
+      "path": "npm-search.json",
+      "status": 200,
+      "bytes": 281821,
+      "sha256": "52c8967d4f0e231d0e4f3577cc7e48f46792bd9ac695aa3646c40288f8e22c78"
+    },
+    {
+      "url": "https://codeload.github.com/unfrgivn/opencode-config/tar.gz/6970d6f3f957358bfb1fc36a260fb7b2e4cb5a78",
+      "path": "repository.tar.gz",
+      "status": 200,
+      "bytes": 454145,
+      "sha256": "b3c6aa460fa5a3a0f637c97030df3207ce4e2ee9b6a9f79bb03bf03acbbfcc7f"
+    },
+    {
+      "url": "https://registry.modelcontextprotocol.io/v0.1/servers?search=figma&version=latest",
+      "path": "figma-registry-search.json",
+      "status": 200,
+      "bytes": 25482,
+      "sha256": "ccd7eb6f27ed177d4d92a845c2da4aaf81f158bdc2e4e88c41cb383a3e980173"
+    },
+    {
+      "url": "https://registry.modelcontextprotocol.io/v0.1/servers?search=com.figma.mcp%2Fmcp&version=latest",
+      "path": "figma-official-search.json",
+      "status": 200,
+      "bytes": 688,
+      "sha256": "6de2c3ea5f9d9af63beab10c49a7e28d72a84ac030182a33f2d5bee2c6746318"
+    },
+    {
+      "url": "https://registry.modelcontextprotocol.io/v0.1/servers/com.figma.mcp%2Fmcp/versions/1.0.3",
+      "path": "figma-official-version.json",
+      "status": 200,
+      "bytes": 651,
+      "sha256": "31de18ab27ae3746f2da6401b00532b3b3dff58e277b411c9bcc23de92c2b720"
+    },
+    {
+      "url": "https://codeload.github.com/figma/mcp-server-guide/tar.gz/f2789420e7e8b4e2465dfeb1e12e1fc6a31397e5",
+      "path": "figma-plugin.tar.gz",
+      "status": 200,
+      "bytes": 980355,
+      "sha256": "c6442bd69cc9cd719f2fd6e31d7ecba42a75876ef3e661b9d647bf00b53f3fe5"
+    },
+    {
+      "url": "https://registry.modelcontextprotocol.io/v0.1/servers?search=figma&version=latest&cursor=io.github.workingmodel%2Ffigma-vector-mcp%3A0.3.3",
+      "path": "figma-registry-search-1.json",
+      "status": 200,
+      "bytes": 1950,
+      "sha256": "b3e8085c5d03f3dd2d2c0e77527d89d216f287a83043bebf51014d1ea7159bed"
+    },
+    {
+      "url": "https://registry.npmjs.org/-/v1/search?text=figma%20keywords%3Aopencode-plugin&size=250&from=0",
+      "path": "figma-npm-0.json.gz",
+      "status": 200,
+      "bytes": 281945,
+      "sha256": "4aa9737cdf60bd0f6b76f92f26509c6881fac335d37937abae6ab29115444d9f",
+      "encoding": "gzip",
+      "compressedSha256": "0261ac08b580574de4b663dc52d7885b0f21352bd189eee37b50eacbca432e62"
+    },
+    {
+      "url": "https://registry.npmjs.org/-/v1/search?text=figma%20keywords%3Aopencode-plugin&size=250&from=250",
+      "path": "figma-npm-250.json.gz",
+      "status": 200,
+      "bytes": 274405,
+      "sha256": "5de568159d51b1c4eee393093df44216ad4a72bac86e9229a8a9fa1443c98b11",
+      "encoding": "gzip",
+      "compressedSha256": "87139c4abb2a15e029eaef3bfba8efdb9b4d36ba337089b8a157c33799fc3bb9"
+    },
+    {
+      "url": "https://registry.npmjs.org/-/v1/search?text=figma%20keywords%3Aopencode-plugin&size=250&from=500",
+      "path": "figma-npm-500.json.gz",
+      "status": 200,
+      "bytes": 268101,
+      "sha256": "595bfb11ec749347351633ecc965e65613cfd4f92a7172da1e072ad3bae2a0f9",
+      "encoding": "gzip",
+      "compressedSha256": "b274c2c312538a300dba5443a28e91370457421bd26c942f126c3d803e60033f"
+    },
+    {
+      "url": "https://registry.npmjs.org/-/v1/search?text=figma%20keywords%3Aopencode-plugin&size=250&from=750",
+      "path": "figma-npm-750.json.gz",
+      "status": 200,
+      "bytes": 265986,
+      "sha256": "db16559059a5dce21b776a8ece70d349de388d5faf3cffacb7738659edfd56b3",
+      "encoding": "gzip",
+      "compressedSha256": "a7b171fbc36894bc3d3afbf31e4627828eaac86d60d9e8131da14bac1d61f7b8"
+    },
+    {
+      "url": "https://registry.npmjs.org/-/v1/search?text=figma%20keywords%3Aopencode-plugin&size=250&from=1000",
+      "path": "figma-npm-1000.json.gz",
+      "status": 200,
+      "bytes": 263765,
+      "sha256": "051396503e7e883b17e316e3c83fc54b7cb0ac209279fdc23656e18cd7b3921b",
+      "encoding": "gzip",
+      "compressedSha256": "d1c597334c02f1cd3c7e85d79dafd0768b596cac6ad706954d58ee2274335bdb"
+    },
+    {
+      "url": "https://registry.npmjs.org/-/v1/search?text=figma%20keywords%3Aopencode-plugin&size=250&from=1250",
+      "path": "figma-npm-1250.json.gz",
+      "status": 200,
+      "bytes": 259875,
+      "sha256": "277f1bcc995a956b023874f0a1c839ce72ee4963ffae52d47d867645f98d250e",
+      "encoding": "gzip",
+      "compressedSha256": "ce803929249c12f12680a7daaee605231e295b5d826a2b256f1fd19e14891ae9"
+    },
+    {
+      "url": "https://registry.npmjs.org/-/v1/search?text=figma%20keywords%3Aopencode-plugin&size=250&from=1500",
+      "path": "figma-npm-1500.json.gz",
+      "status": 200,
+      "bytes": 257991,
+      "sha256": "e4971dd5ce98dba3aad00a9257ec713321306249d3c05463a2bbf41ee79b9dfc",
+      "encoding": "gzip",
+      "compressedSha256": "4131c6f55f43171fa207e2c73b84e1673d96d43520a85b1c8eab16ca33d25ce2"
+    },
+    {
+      "url": "https://registry.npmjs.org/-/v1/search?text=figma%20keywords%3Aopencode-plugin&size=250&from=1750",
+      "path": "figma-npm-1750.json.gz",
+      "status": 200,
+      "bytes": 258359,
+      "sha256": "ab229d9d46f187c7f4fc1d30170748ace70f7a241a764d81934fb8da5f06a544",
+      "encoding": "gzip",
+      "compressedSha256": "90234d561bb8e56408009dbc02738869c78dfc63a9335775d271b4bcb01d8b97"
+    },
+    {
+      "url": "https://registry.npmjs.org/-/v1/search?text=figma%20keywords%3Aopencode-plugin&size=250&from=2000",
+      "path": "figma-npm-2000.json.gz",
+      "status": 200,
+      "bytes": 252304,
+      "sha256": "3d549b0adb0d87aa43905254380499aea4b705a1d65fd2f97a47c44d7eea6579",
+      "encoding": "gzip",
+      "compressedSha256": "0584eef86b8826696d2866c047ec387f8f81bb63ce3562a951a13a7288ba336b"
+    },
+    {
+      "url": "https://registry.npmjs.org/-/v1/search?text=figma%20keywords%3Aopencode-plugin&size=250&from=2250",
+      "path": "figma-npm-2250.json.gz",
+      "status": 200,
+      "bytes": 249560,
+      "sha256": "a0d6a7a09a7f43e9eb912dbbde5957b2152ddb0f931d8bf9cb8172b3970440e5",
+      "encoding": "gzip",
+      "compressedSha256": "74d68bf917be0203ab9c816a6826350a0004e8421132bc06b79d770c38d55e45"
+    },
+    {
+      "url": "https://registry.npmjs.org/-/v1/search?text=figma%20keywords%3Aopencode-plugin&size=250&from=2500",
+      "path": "figma-npm-2500.json.gz",
+      "status": 200,
+      "bytes": 246612,
+      "sha256": "c774bd5c5322b3140cb12eb09c457241086ee860a32b12a5a924ad331f9e42d3",
+      "encoding": "gzip",
+      "compressedSha256": "075eb0109b335634495d75797ec4a87dcc36106ccd91b44d2c31446c5023a261"
+    },
+    {
+      "url": "https://registry.npmjs.org/-/v1/search?text=figma%20keywords%3Aopencode-plugin&size=250&from=2750",
+      "path": "figma-npm-2750.json.gz",
+      "status": 200,
+      "bytes": 243799,
+      "sha256": "ca508880dc56c02fafbf048f6e6fb6f634fe872dd0cbf9491110031061a190b5",
+      "encoding": "gzip",
+      "compressedSha256": "2bc5fd85ac2f335d0edb63dd446ebe302736791f5fa4cc4b84d1e09ae593ae4e"
+    },
+    {
+      "url": "https://registry.npmjs.org/-/v1/search?text=figma%20keywords%3Aopencode-plugin&size=250&from=3000",
+      "path": "figma-npm-3000.json.gz",
+      "status": 200,
+      "bytes": 227019,
+      "sha256": "133bb6eaf7e1c0cbe8632935f7670cde29c2aa71e111de8d279eabf395855f94",
+      "encoding": "gzip",
+      "compressedSha256": "4a6fac204953af2f4d064c7e200ce24e35aaa29c8eed2145236ea6139c872675"
+    },
+    {
+      "url": "https://registry.npmjs.org/-/v1/search?text=com.figma.mcp%2Fmcp%20keywords%3Aopencode-plugin&size=250&from=0",
+      "path": "figma-official-npm-0.json.gz",
+      "status": 200,
+      "bytes": 278398,
+      "sha256": "68bccef7eba3705d4ba1004a4d13bc936409b213535e13afdc209c33a7cef11c",
+      "encoding": "gzip",
+      "compressedSha256": "dc833aa3626b499821ed70f3da5f9509e80c28fc88496d6a147e7c8ec409cb24"
+    },
+    {
+      "url": "https://registry.npmjs.org/-/v1/search?text=com.figma.mcp%2Fmcp%20keywords%3Aopencode-plugin&size=250&from=250",
+      "path": "figma-official-npm-250.json.gz",
+      "status": 200,
+      "bytes": 276494,
+      "sha256": "4bbad74c6e6619cfbccf7f84621914b9fe7283b851a2ee45f0a706d2abe6de76",
+      "encoding": "gzip",
+      "compressedSha256": "a48dd779976169c8c274ae2f5a5c667c7cdb830fc662e626d432841da53ac7fc"
+    },
+    {
+      "url": "https://registry.npmjs.org/-/v1/search?text=com.figma.mcp%2Fmcp%20keywords%3Aopencode-plugin&size=250&from=500",
+      "path": "figma-official-npm-500.json.gz",
+      "status": 200,
+      "bytes": 272612,
+      "sha256": "3f04edca7d95878eaac7f51df9e2485aeb9dfa1c18e282b8852c696ab522cad6",
+      "encoding": "gzip",
+      "compressedSha256": "677d31578f9be3f1c0379253af547c5a9448ebb3fe23aa663e0507b22df87a1a"
+    },
+    {
+      "url": "https://registry.npmjs.org/-/v1/search?text=com.figma.mcp%2Fmcp%20keywords%3Aopencode-plugin&size=250&from=750",
+      "path": "figma-official-npm-750.json.gz",
+      "status": 200,
+      "bytes": 264529,
+      "sha256": "924cd1bc8cd7d0ad8751c268ad4a7b81dff472ada95ca989d86e5793feedf239",
+      "encoding": "gzip",
+      "compressedSha256": "2263d5d5956c6ab31479db7d6e276aed4ae343943207a67a18635b36804644a0"
+    },
+    {
+      "url": "https://registry.npmjs.org/-/v1/search?text=com.figma.mcp%2Fmcp%20keywords%3Aopencode-plugin&size=250&from=1000",
+      "path": "figma-official-npm-1000.json.gz",
+      "status": 200,
+      "bytes": 261478,
+      "sha256": "b8e5620649c71c964c8300a43dd2d42ad22d663b15dd073bbb2968676fc754b9",
+      "encoding": "gzip",
+      "compressedSha256": "d8f3c1521bcd5986120e6267bae2b7f60a22c72a6b9e5a39c8e1a88391e48edb"
+    },
+    {
+      "url": "https://registry.npmjs.org/-/v1/search?text=com.figma.mcp%2Fmcp%20keywords%3Aopencode-plugin&size=250&from=1250",
+      "path": "figma-official-npm-1250.json.gz",
+      "status": 200,
+      "bytes": 260682,
+      "sha256": "353f148740c9fba74378af91761429c9c3d5f2bf558feae5e7e2def75788ca95",
+      "encoding": "gzip",
+      "compressedSha256": "4604b5935ec6b3d7d359b655efed1e2034d2ca2c3d49083d2e3d67bf94aaf238"
+    },
+    {
+      "url": "https://registry.npmjs.org/-/v1/search?text=com.figma.mcp%2Fmcp%20keywords%3Aopencode-plugin&size=250&from=1500",
+      "path": "figma-official-npm-1500.json.gz",
+      "status": 200,
+      "bytes": 257356,
+      "sha256": "6edb19cf640e70c5b5bb051ca12b412f4986375b84a1c01ea80b1498cd8b5e09",
+      "encoding": "gzip",
+      "compressedSha256": "a90c37c7fb0a2dc86b4d7374df503a29e473d2acee6c3574b5feaf81c846b37c"
+    },
+    {
+      "url": "https://registry.npmjs.org/-/v1/search?text=com.figma.mcp%2Fmcp%20keywords%3Aopencode-plugin&size=250&from=1750",
+      "path": "figma-official-npm-1750.json.gz",
+      "status": 200,
+      "bytes": 257779,
+      "sha256": "cf3a6261f8c410695c775b440089ea73339743743d68389a0f46c1059bf5ba02",
+      "encoding": "gzip",
+      "compressedSha256": "c8a14dd0578fe2d47a10523f57e7fd2a2ec30a4973bd84d8166d7cf930a3febd"
+    },
+    {
+      "url": "https://registry.npmjs.org/-/v1/search?text=com.figma.mcp%2Fmcp%20keywords%3Aopencode-plugin&size=250&from=2000",
+      "path": "figma-official-npm-2000.json.gz",
+      "status": 200,
+      "bytes": 253712,
+      "sha256": "c68b5ae64f97c3a2d3da21a6c844b6d575ed7cbfe8e072c5859250e260bd965b",
+      "encoding": "gzip",
+      "compressedSha256": "f5171981794f3761c97411622ab846ce9c59549bbab1e761aa929bc679b85385"
+    },
+    {
+      "url": "https://registry.npmjs.org/-/v1/search?text=com.figma.mcp%2Fmcp%20keywords%3Aopencode-plugin&size=250&from=2250",
+      "path": "figma-official-npm-2250.json.gz",
+      "status": 200,
+      "bytes": 249411,
+      "sha256": "f56593124964551012f38ff3ae94354b06b4cd4e6f4f1f0569ecbe6efd09d207",
+      "encoding": "gzip",
+      "compressedSha256": "4b8db2151a2fb3640922e3060c7226b350ef94702b3d8f70e43eb1a990a15722"
+    },
+    {
+      "url": "https://registry.npmjs.org/-/v1/search?text=com.figma.mcp%2Fmcp%20keywords%3Aopencode-plugin&size=250&from=2500",
+      "path": "figma-official-npm-2500.json.gz",
+      "status": 200,
+      "bytes": 247171,
+      "sha256": "782a1dd12ba006b7024f5f7f252a070e44d769397f3d50ae4147458981e73366",
+      "encoding": "gzip",
+      "compressedSha256": "f77ea73aec898b71c624039957b6c8cc3e342d3d0d5f2de0534f6a54dc168e56"
+    },
+    {
+      "url": "https://registry.npmjs.org/-/v1/search?text=com.figma.mcp%2Fmcp%20keywords%3Aopencode-plugin&size=250&from=2750",
+      "path": "figma-official-npm-2750.json.gz",
+      "status": 200,
+      "bytes": 243785,
+      "sha256": "6c844b502fca529dfe096c2d150a933a71686496a6dd31626fcdbd1f62c5f824",
+      "encoding": "gzip",
+      "compressedSha256": "97e726477f5b60a9e1fecdeff8afef8cd710b101f13ca516810835a7b0091033"
+    },
+    {
+      "url": "https://registry.npmjs.org/-/v1/search?text=com.figma.mcp%2Fmcp%20keywords%3Aopencode-plugin&size=250&from=3000",
+      "path": "figma-official-npm-3000.json.gz",
+      "status": 200,
+      "bytes": 226384,
+      "sha256": "77ed54c80a642908fadbe6d9e9f9351b469103442895dfeb340f2b4c29eae562",
+      "encoding": "gzip",
+      "compressedSha256": "5ecafb8ef72d3def39ce29e437ee1a35f008f60fcd35e4a7e8ea76c7fd85dc7b"
+    }
+  ],
+  "notes": [
+    "Raw public HTTP bytes; no package scripts, dependencies or third-party native JS executed.",
+    "npm-search.json is the original first page. Tests mechanically select the named real object and set total to that controlled membership, like the existing source-fetch fixture; this is not a complete live npm-search snapshot.",
+    "Figma registry query bodies are unmodified current responses. No claim about provider login or authorized tasks.",
+    "Figma npm and Registry pages are complete recorded pagination; .json.gz only compresses the original response bytes. Claude/Codex market indexes reuse the existing pinned snapshots."
+  ],
+  "figma": {
+    "pluginRepository": "https://github.com/figma/mcp-server-guide",
+    "pluginCommit": "f2789420e7e8b4e2465dfeb1e12e1fc6a31397e5",
+    "requests": [
+      "帮我安装figma 插件",
+      "帮我安装 figma 官方mcp 服务"
+    ],
+    "queries": [
+      "figma",
+      "com.figma.mcp/mcp"
+    ]
+  }
+}

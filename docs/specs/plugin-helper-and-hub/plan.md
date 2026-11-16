@@ -792,3 +792,5 @@ AC-15 在组装树已关闭，无新增产品修补：保留的 `BC5 chat instal
 r12 代码审查处置（2026-11-16 13:27:38 UTC 开始）：独立一轮，Claude Opus 5.5 只读审查 `origin/alpha@23546fd5b1...6377955826`；part A/B 均 FIX-THEN-MERGE，编排器采纳 A1–A10/B1–B12，原报告为 session-f35ed133 的 r2-findings-A.md、r2-findings-B.md。按 r12 顺序逐项核前提、红例先行，修正仍消费 spec v3/design v5，不重审既定决定；part C 待下一续派，不计本轮已收。
 
 B1 前提属实：原 hub-install-ask 的三条 proof 名与 hubInstallEvaluate 均已退役，登记未同步。先行原有行为闸 `cd packages/ext && bun test --max-concurrency 2 src/policy/authority-registry.test.ts` exit 1（4 pass/1 fail，三条 test not found，`/tmp/helper-install-r12/b1-red.log`）；现有已提交闸就是本项红例，不另造只测文案的测试。已读 ADR-048 决定 3/4，随后按其 retired.quote/date/by 形状保留旧条目，并登记仍在役的 automation deny/ordinary tier/main ID 权威与现有真实正反例。
+
+B1 FIXED：旧条目保留并按 ADR-048 写 retired.quote/date/by（原话、2026-11-16、Codex/GPT-6 与编排器）；新增 chat-install-main-owned 在役条目指向现有 ordinary allow/ask、automation deny、main 未发行 ID 无写入的真实测试。`cd packages/ext && bun test --max-concurrency 2 src/policy/authority-registry.test.ts src/hub-tools.test.ts src/plugin-host.test.ts` exit 0（58 pass/269 assertions，`b1-green.log`）；原红闸未改。登记没有将安装交回上游默认，也没有恢复确认面。

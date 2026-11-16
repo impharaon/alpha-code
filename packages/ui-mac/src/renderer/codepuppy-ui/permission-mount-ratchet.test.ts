@@ -161,6 +161,15 @@ describe("审批决定提交入口:单一引用面白名单棘轮(#619 R3 Blocke
     }
   })
 
+  test("package MCP disable has a literal reject-only main reply entry", () => {
+    const file = "packages/ui-mac/src/main/package-mcp-activation.ts"
+    const source = normalize(readFileSync(resolve(root, file), "utf8"))
+    expect(sanctionedEntry(file, "permission.reply", source)).toBe(true)
+    for (const decision of ["once", "always", "choice"]) {
+      expect(sanctionedEntry(file, "permission.reply", source.replace('decision:"reject"', `decision:"${decision}"`))).toBe(false)
+    }
+  })
+
   const DECISION_ENTRY_TOKENS = ["permission.reply", "permission.respond"] as const
 
   /** 白名单 = 今天真实存在的引用面,一文件一 token,精确到形态。

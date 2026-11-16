@@ -1,11 +1,26 @@
 import { createHash } from "node:crypto"
+import { cpSync, mkdirSync, mkdtempSync, rmSync } from "node:fs"
+import { tmpdir } from "node:os"
 import { join } from "node:path"
 import type { Capture, TreeNode } from "../../src/shared/host-extension-package-contract/plugin-conversion"
 import provenance from "./provenance.json"
 import codex from "./codex/provenance.json"
 import opencode from "./opencode/provenance.json"
 
-export const fixtureRoot = import.meta.dir
+// Keep foreign Markdown only in pinned archives; all consumers read the same temporary tree.
+export const fixtureRoot = mkdtempSync(join(tmpdir(), "plugin-helper-samples-"))
+process.once("exit", () => rmSync(fixtureRoot, { recursive: true, force: true }))
+cpSync(import.meta.dir, fixtureRoot, { recursive: true })
+for (const tree of [
+  { root: "", archive: provenance.archive },
+  { root: "codex", archive: codex.archive },
+  ...opencode.trees.map(tree => ({ root: join("opencode", tree.root), archive: tree.archive })),
+]) {
+  const target = join(fixtureRoot, tree.root)
+  mkdirSync(target, { recursive: true })
+  const extracted = Bun.spawnSync(["tar", "-xzf", join(import.meta.dir, tree.root, tree.archive.path), "-C", target, "--strip-components=1"])
+  if (extracted.exitCode !== 0) throw new Error(`Cannot unpack pinned fixture ${tree.root}: ${extracted.stderr.toString()}`)
+}
 export const fixtureCommit = provenance.commit
 export const digest = (bytes: Uint8Array) => `sha256:${createHash("sha256").update(bytes).digest("hex")}` as const
 

@@ -3,7 +3,7 @@ import { expect, spyOn, test } from "bun:test"
 import { mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { captureFixture } from "../../test-fixtures/plugin-helper/fixture"
+import { captureFixture, fixtureRoot } from "../../test-fixtures/plugin-helper/fixture"
 import { convertPluginTree } from "../shared/host-extension-package-contract/plugin-conversion.mjs"
 import { buildSkillTxItems } from "./ext-package-tx-builders"
 import { promotePayloadToCas, setPackageStateV1 } from "./ext-install-planner"
@@ -568,7 +568,7 @@ test("review AC11 local marketplace folder installs only the selected real plugi
   for (const file of provenance.files as { path: string }[]) {
     const target = join(directory, file.path)
     mkdirSync(join(target, ".."), { recursive: true })
-    await Bun.write(target, Bun.file(join(import.meta.dir, "../../test-fixtures/plugin-helper", file.path)))
+    await Bun.write(target, Bun.file(join(fixtureRoot, file.path)))
   }
   const prepared = await h.sources.prepareCapture(await h.sources.captureFolder(directory))
   if (prepared.kind !== "marketplace") throw Error("pinned local marketplace not recognized")

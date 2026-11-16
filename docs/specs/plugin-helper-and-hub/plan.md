@@ -948,7 +948,7 @@ own-assertion corrections 全表：`eb699846b0` 旧 primitive 的额外 saved:tr
 仍待真实应用验收：编排器收集 built application 的真实模型请求、真实服务授权及任务调用；本轮本机 transport/OAuth 替身不是线上账户证据。AC-16 Registry MCP 在项目 B 的真实调用仍为记录项，去向该验收。无新产品限制、无项目配置写入、无真实账户登录/外部写、无 gate/bin/check、无 push/PR/merge。
 
 
-r15 · host publication artifact 边界裁定（2026-11-17；本轮开始 16:22:07 UTC）：编排器说明 Alpha Web 当前未消费转换器，采纳「转换库仍在当前位置且唯一解析第三方格式，本增量不属于 host artifact」；跨仓发布转换器延到实际消费者接线时。此裁定替代 r14 C3 的跨仓重固定路线，不再要求发布或重签现有目录。没有把这项裁定归于 owner 原话；design §10 由编排器按其变更程序登记。
+r15 · host publication artifact 边界裁定（2026-11-17 北京时间；本轮开始 2026-11-16 16:22:07 UTC）：编排器说明 Alpha Web 当前未消费转换器，采纳「转换库仍在当前位置且唯一解析第三方格式，本增量不属于 host artifact」；跨仓发布转换器延到实际消费者接线时。此裁定替代 r14 C3 的跨仓重固定路线，不再要求发布或重签现有目录。没有把这项裁定归于 owner 原话；design §10 由编排器按其变更程序登记。
 
 r15 实施偏离：`generate-artifact.ts` 本身也是 artifact 成员，单删其表中三个文件仍会改变 generator 的 SHA，因此将原有 Bun build / TypeScript declaration / drift-check 逻辑原样搬到同目录 `generate-plugin-conversion.ts`，host generator 与 manifest 一并恢复 origin/alpha 精确字节；这是裁定所需同链文件，没有新转换实现、运行时分支、依赖或发布端变更。独立生成/核验命令分别为 `bun src/shared/host-extension-package-contract/generate-plugin-conversion.ts` / `--check`，原 host `generate-artifact.ts --check` 只负责其原有 14 个文件。源 `.ts` 与运行时 `.mjs`/声明 `.d.mts` 均保留，所有原 converter/source 测试保留。
 
@@ -957,3 +957,12 @@ r15 红/绿：先提交 `3a0a181241`，两个行为红例为 host 清单排除�
 r15 打包加载核对：`src/main/index.ts:27` 静态引入 ext-ipc，后者消费 plugin-sources / install-from-source；三个运行时模块均以相对路径直接导入 `plugin-conversion.mjs`。`electron.vite.config.ts` 的 main Rollup index 入口为 `src/main/index.ts`，转换器随这条静态图编入 `out/main/index.js`（若 Rollup 形成共享 chunk，一同位于 out/main）；`package.json` 的 Electron main 就是 `./out/main/index.js`，`electron-builder.config.ts` 的 files 包含 `out/**/*`，随 app.asar 带入。没有 manifest 查找、artifact 文件集读取或需要复制的独立转换器 resource 路径。进一步将真实 `.mjs` 单独复制到只含脚本和库的临时目录，在 Node 下转换固定 Playwright 原始样本，产出 claude-code / 一个 MCP，exit 0（node-runtime.log）；该目录没有 host artifact 或 registry，证明 Node 库加载不依赖其成员身份。此证据是加载链/独立库运行，不冒充最终签名应用验收。
 
 r15 新授权诊断（按 codepuppy-check.sh [5/14] 对应子命令，仅追加并发 2）：`bun run --cwd packages/codepuppy-contracts-consumer check:vendor` exit 0；`bash scripts/bun-test-floor.sh 15 packages/codepuppy-contracts-consumer --max-concurrency 2` 65 pass / 0 fail、exit 0（consumer-step.log）；`bash scripts/bun-test-floor.sh 100 packages/ext --max-concurrency 2` 626 pass / 0 fail、exit 0（ext-step.log）。vendor 检查如实提示没有 staged upstream checkout，故本次仅锁↔vendor 字节及 producer aggregate 验证，不声称重新验证外仓 provenance；没有 vendor/pin 修改。ui-mac/ext `bun typecheck` 均 exit 0。未运行 ui-mac/app whole-package、bin/check 或 gate run。
+
+
+r15 C3 PARTIAL · 唯一授权计数调用的实报：`bash scripts/assert-gate-files.sh --update`（给 bun test 子调用追加并发 2）已实际执行一次，第 3 行 consumer artifact 比对已通过，不再有 host pin 漂移；第 41/357 行 `packages/ui-mac/src/main/package-hub-lifecycle.engine.test.ts` exit 1，内层 0 pass / 5 fail（gate-files-update.log）。首个具名失败是 cases.ts:64 的 action 固定等待 `refreshes > before`，:266 安装 Supabase 后超时 `did not settle: ext-install-package`；随后技能读取缺项并有其它 refresh/库存超时。未据此声称生产正确，也不把问题称为 flaky。
+
+依 Handling problems §2 与 delivery-ship §3 只做一次具名基线对照：临时恢复 e9d2b0725a 的 host generator/manifest，执行 `bun test --max-concurrency 2 --test-name-pattern 'real Supabase package exposes' ./src/main/package-hub-lifecycle.engine.cases.ts`，同一 cases.ts:64/:266 失败（0 pass / 1 fail / 4 filtered，exit 1，hub-lifecycle-base-control.log），finally 恢复 r15 文件；因此该失败在本轮 artifact 拆分前已经存在。原宿主及所有行为断言均未改，未展开根因扫描；遗留去向：编排器 fix now，裁定这条 H 生命周期宿主与当前 reload/runtime 生效链的修复，再授权一次计数脚本。没有重跑计数脚本，没有用另一份脚本或手改数字绕过 all-or-nothing。
+
+逐行 count diff：**无 before→after 行**；脚本因失败未写回任何行，`git diff --exit-code -- scripts/gate-files.tsv` exit 0。C3 所需自动条数写回仍未完成，不能宣称 DONE。此前 40 行的执行结果和第 41 行失败完整保存在 gate-files-update.log；不把部分测量当全登记簿通过。
+
+r15 已核收口：`generate-plugin-conversion.ts` 默认生成及 `--check` 均 exit 0，未改变既有 `.mjs` / `.d.mts` 字节；host `generate-artifact.ts --check` exit 0（14 文件）；与 origin/alpha 的 host generator/manifest diff 为空，vendor/lock diff 为空。三文件 converter/source 80 pass；contracts-consumer 65 pass、ext whole-package 626 pass；ui-mac/ext typecheck 均 exit 0；gate-file-registry 23 pass、exit 0。已核 Codex（GPT-6），依据 r15 编排器裁定；下一步仅上述生命周期宿主处置及 C3 计数收口，真实应用验收仍归编排器。本轮无 own-assertion correction、无外仓改动/发布、无 ui-mac/app whole-package、无 gate run/bin/check、无 push/PR/merge。

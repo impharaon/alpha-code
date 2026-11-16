@@ -906,3 +906,5 @@ C6/C8/C9 FIXED（仅证据，无产品分支改动）：C6 在既有 converter p
 C6 新核数据补充：npm empty-search.json 的真实记录是 286,376B，高于 r13 brief「最大 pinned index 不足 200KB」的前提；它被 fixtureFetch 变成无匹配受控页时响应较小。上段列举的四份索引尺寸仍正确，固定原样本最大现应按 286,376B（约 280KiB）报告，30 秒查询预算仍留充分余量。仅事实更正，未改期限裁定或编排器设计。
 
 B10/B11 前提属实：errored hub_search 仍生成 searching 行；空查询的真实固定市场有超过 25 个 Claude 候选，工具无裁剪原样 JSON 输出。两个命名 red 分别 exit 1（b10-red.log、b11-red.log）。B11 仅模型输出取各源前 25 个，完整 main 结果与 matched/skipped/失败状态保留，Hub 仍全部可见/可安装；不是包/用户数量限额。
+
+B10/B11 FIXED：error search 回到普通工具的真实错误呈现，不再保留搜索卡；模型候选每源前 25 个，保留原 main 结果和各源完整状态/计数及 searchId，Hub 不裁剪。25 是模型列表预算，具体目标样本通常只命中少量，宽泛/空查询的完整目录仍能在 Hub 或按目标查询获得；无插件内容/安装数量限制、无新参数。timeline-model 74 pass exit 0（b10-green.log），ext tools/bridge/plugin-host/authority-registry 81 pass exit 0（b11-green.log），两包 typecheck exit 0。两个原 red 均未改。

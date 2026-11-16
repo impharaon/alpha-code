@@ -21,6 +21,8 @@ export const HUB_INSTALL_OUTCOME = {
 export const HUB_PRICE_NOTE_MISSING = "本目录尚未提供价格说明;费用以服务端为准"
 export const HUB_UNAVAILABLE = "The Customization Center is not available in this engine host."
 
+const HUB_SEARCH_CANDIDATES_PER_SOURCE = 25
+
 type HubToolContext = Pick<Plugin.Context, "location">
 const idInput = (description: string) => ({
   type: "object",
@@ -122,7 +124,13 @@ export function createHubTools(bridge: HubBridge, context: HubToolContext): Tool
         if (!bridge.available) return result(HUB_UNAVAILABLE, { ok: false })
         const answer = await bridge.search({ directory, query: input.query })
         if (!answer.ok) return result(unreachable(answer), { ok: false })
-        return result(JSON.stringify(answer.result), { searchId: answer.result.searchId })
+        const counts = new Map<string, number>()
+        const candidates = answer.result.candidates.filter(candidate => {
+          const count = counts.get(candidate.source) ?? 0
+          counts.set(candidate.source, count + 1)
+          return count < HUB_SEARCH_CANDIDATES_PER_SOURCE
+        })
+        return result(JSON.stringify({ ...answer.result, candidates }), { searchId: answer.result.searchId })
       },
     },
     {

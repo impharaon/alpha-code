@@ -191,7 +191,7 @@ export type TimelineHubInstall = {
 
 function hubInstallOf(part: ToolPart): TimelineHubInstall | undefined {
   const operation = hubToolActionOf(part)
-  if (!operation || (operation === "search" && part.state.status === "completed")) return
+  if (!operation || (operation === "search" && (part.state.status === "completed" || part.state.status === "error"))) return
   const input = part.state.input
   const name = input && typeof input === "object" ? operation === "search" ? input.query : input.id ?? input.name : undefined
   const clean = typeof name === "string" ? redactText(name, 400) : undefined

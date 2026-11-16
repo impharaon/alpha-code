@@ -106,7 +106,7 @@ export async function convertPluginTree(input: Capture): Promise<{ package: Plug
     documents.set(path, parsed)
     return parsed
   }
-  const opencode = input.source.ecosystem === "opencode" || (input.source.ecosystem === undefined && [...files.keys()].some((path) => /^(?:\.opencode\/|opencode\.jsonc?$)/.test(path)))
+  const opencode = input.source.ecosystem === "opencode" || (input.source.ecosystem === undefined && ([...files.keys()].some((path) => /^(?:\.opencode\/|opencode\.jsonc?$)/.test(path)) || (files.has("package.json") && !files.has(".claude-plugin/plugin.json") && !files.has(".codex-plugin/plugin.json") && !files.has("plugin.json"))))
   const codex = !opencode && (input.source.ecosystem === "codex" || files.has(".codex-plugin/plugin.json") || (!files.has(".claude-plugin/plugin.json") && files.has("plugin.json")))
   const manifestPath = opencode ? "package.json" : codex ? files.has(".codex-plugin/plugin.json") ? ".codex-plugin/plugin.json" : "plugin.json" : ".claude-plugin/plugin.json"
   const manifest = files.has(manifestPath) ? json(manifestPath) : undefined

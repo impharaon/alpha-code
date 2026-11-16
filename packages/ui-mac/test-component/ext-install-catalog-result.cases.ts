@@ -128,6 +128,18 @@ mock.module("../src/main/ext-mcp-activation", () => ({
   probeProjectMcpActivation: async () => "unverifiable" as const,
 }))
 
+// Keep the real runtime activation implementation; record the package identity at its main seam.
+const activationModule = await import("../src/main/package-mcp-activation")
+const applyRuntime = activationModule.applyPackageMcpV1
+const removeRuntime = activationModule.removePackageMcpV1
+const packageAppliesAt = activationModule.packageAppliesAt
+const credentialActivations: string[] = []
+mock.module("../src/main/package-mcp-activation", () => ({
+  applyPackageMcpV1: (...args: Parameters<typeof applyRuntime>) => { credentialActivations.push(args[0]); return applyRuntime(...args) },
+  removePackageMcpV1: removeRuntime,
+  packageAppliesAt,
+}))
+
 const { initCodePuppyEnvironment } = await import("../src/main/codepuppy-environment")
 const { registerExtIpcHandlers } = await import("../src/main/ext-ipc")
 
@@ -522,4 +534,31 @@ test("BC2b ordinary reload transport stays active after old import transports re
  const result=await reload!({sender:{id:1}},{scope:"global",items:[],reason:"normal reload after local import retirement"})
  expect(result).toMatchObject({ok:true})
  expect((result as {generation:number}).generation).toBeGreaterThan(0)
+})
+
+
+test("BC3 production account save re-applies the same standalone MCP package and reads its saved state without a Location reload",async()=>{
+ const {fixtureFetch}=await import("../test-fixtures/plugin-helper/source-fetch")
+ const fetchSpy=spyOn(globalThis,"fetch").mockImplementation(fixtureFetch)
+ try{
+  const found=await handlers.get("ext-sources-search")!({sender:{id:1}},"io.github.github/github-mcp-server") as import("../src/main/plugin-sources").SourceSearchResultV1
+  const candidate=found.candidates.find(candidate=>candidate.source==="mcp-registry")!
+  expect(candidate).toBeDefined()
+  const result=await handlers.get("ext-install-from-source")!({sender:{id:1}},{requestId:"bc3_registry_account_install",source:{kind:"candidate",candidateId:candidate.id},effect:{kind:"all-projects"},via:"hub"}) as import("../src/shared/plugin-install").InstallOutcomeV1
+  expect(result.ok,JSON.stringify(result)).toBe(true)
+  if(!result.ok)throw Error(result.detail)
+  const read=()=>handlers.get("ext-package-authorization")!({sender:{id:1}},result.packageId) as Promise<import("../src/shared/package-admission").PackageAuthorizationResultV1>
+  const pending=await read()
+  expect(pending).toMatchObject({ok:true,items:[{kind:"secret",saved:false}]})
+  if(!pending.ok)throw Error(pending.reason)
+  const item=pending.items.find(item=>item.kind==="secret")!
+  const before=credentialActivations.length
+  const reloads=toSidecar.filter(message=>message.type==="codepuppy.reload.request").length
+  const saved=await handlers.get("ext-save-package-secrets")!({sender:{id:1}},{packageId:result.packageId,secrets:{[item.prerequisiteId]:"bc3-production-invalid-token"}})
+  expect(saved).toMatchObject({ok:true})
+  expect(credentialActivations.slice(before)).toEqual([result.packageId])
+  expect(toSidecar.filter(message=>message.type==="codepuppy.reload.request")).toHaveLength(reloads)
+  expect(await read()).toMatchObject({ok:true,packageId:result.packageId,items:[{saved:true}]})
+  expect(JSON.stringify(toSidecar)).not.toContain("bc3-production-invalid-token")
+ }finally{fetchSpy.mockRestore()}
 })

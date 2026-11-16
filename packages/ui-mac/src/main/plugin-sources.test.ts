@@ -532,3 +532,45 @@ test("R12 B5 archive comparison timeout reports that source failed without hidin
   expect(result!.candidates.some(candidate=>candidate.id===entry.id)).toBe(true)
  }finally{release(await fixtureFetch(archive));await pending;jest.useRealTimers()}
 })
+
+// These controlled transport/resource variants keep the recorded marketplace and tar bytes.
+for(const declared of [true,false]) test("R12 A2 "+(declared?"declared":"streamed")+" oversized archive fails only its source before buffering it whole",async()=>{
+ const {createPluginSources}=await sourcesModule()
+ const {fixtureFetch}=await import("../../test-fixtures/plugin-helper/source-fetch")
+ const archive="https://codeload.github.com/anthropics/claude-plugins-official/tar.gz/refs/heads/main"
+ const prefix=new Uint8Array(await (await fixtureFetch(archive)).arrayBuffer())
+ const entry=catalog.entries.find(entry=>entry.id==="mcp:playwright")!
+ let canceled=false,parts=0
+ const padding=new Uint8Array(1024*1024)
+ const sources=createPluginSources({catalog:async()=>[{id:entry.id,source:"catalog",name:entry.name,displayName:entry.displayName,description:entry.description,kind:"mcp",upstream:{version:entry.version}}],fetch:url=>url===archive?Promise.resolve(new Response(new ReadableStream<Uint8Array>({
+  pull(controller){parts++;if(parts===1){controller.enqueue(prefix);return}if(!declared&&parts<=130){controller.enqueue(padding);return}controller.close()},
+  cancel(){canceled=true},
+ }),{headers:declared?{"content-length":String(128*1024*1024+1)}:{}})):fixtureFetch(url)})
+ const result=await sources.searchSources("playwright")
+ expect(result.sources.find(source=>source.source==="claude-marketplace")).toMatchObject({status:"failed",reason:"format"})
+ expect(canceled).toBe(true)
+ expect(result.candidates.some(candidate=>candidate.id===entry.id)).toBe(true)
+ if(declared)expect(parts).toBeLessThan(3)
+})
+
+test("R12 A2 async gunzip receives a large real-plugin ceiling and propagates native overflow as a source failure",async()=>{
+ const {spyOn}=await import("bun:test")
+ const zlib=await import("node:zlib")
+ const original=zlib.gunzip
+ const bounds:number[]=[]
+ const unzip=spyOn(zlib,"gunzip").mockImplementation((bytes,options,callback)=>{
+  bounds.push(options.maxOutputLength)
+  // Lower only the native test boundary; gzip/tar/marketplace bytes remain the pinned sample.
+  return original(bytes,{...options,maxOutputLength:16*1024},callback)
+ })
+ try{
+  const {createPluginSources}=await sourcesModule()
+  const {fixtureFetch}=await import("../../test-fixtures/plugin-helper/source-fetch")
+  const entry=catalog.entries.find(entry=>entry.id==="mcp:playwright")!
+  const sources=createPluginSources({catalog:async()=>[{id:entry.id,source:"catalog",name:entry.name,displayName:entry.displayName,description:entry.description,kind:"mcp",upstream:{version:entry.version}}],fetch:fixtureFetch})
+  const result=await sources.searchSources("playwright")
+  expect(bounds).toEqual([512*1024*1024])
+  expect(result.sources.find(source=>source.source==="claude-marketplace")).toMatchObject({status:"failed",reason:"format"})
+  expect(result.candidates.some(candidate=>candidate.id===entry.id)).toBe(true)
+ }finally{unzip.mockRestore()}
+})

@@ -1007,6 +1007,12 @@ export default {id:"test.official-runtime",setup:async(ctx)=>{
       if (Date.now() > end) throw Error("official runtime observer not active")
     }
     const tools = async () => (await client.rpc.call({ rpcID: "official-runtime", method: "tools" })).output as { setup: number; names: string[] }
+    const waitForTools = async (present: boolean) => {
+      for (const end = Date.now() + 10000; ; await Bun.sleep(25)) {
+        if (((await tools()).names.length > 0) === present) return
+        if (Date.now() > end) throw Error("Official tool inventory did not settle: " + JSON.stringify((await client.mcp.list()).data.map(server => ({ name: server.name, status: server.status.status }))))
+      }
+    }
     const before = await tools()
     expect(before.names).toEqual([])
     expect(await installDesktopPackageV1("package:github-official", deps)).toMatchObject({ ok: true })
@@ -1016,6 +1022,7 @@ export default {id:"test.official-runtime",setup:async(ctx)=>{
     const save = (value: string) => savePackageSecretsV1({ packageId: "package:github-official", secrets: { "mcp:github-official#GITHUB_PERSONAL_ACCESS_TOKEN": value } }, deps)
     expect(await save(pat)).toMatchObject({ ok: true })
     await apply()
+    await waitForTools(true)
     expect((await tools()).names.length).toBeGreaterThan(0)
     expect((await client.rpc.call({ rpcID: "official-runtime", method: "call", input: session.id })).output.isError).not.toBe(true)
     expected = pat + "REPLACEMENT"
@@ -1023,10 +1030,12 @@ export default {id:"test.official-runtime",setup:async(ctx)=>{
     expect(await save(expected)).toMatchObject({ ok: true })
     await apply()
     expect(authenticated).toBeGreaterThan(priorRequests)
+    await waitForTools(true)
     expect((await tools()).names.length).toBeGreaterThan(0)
     for (const state of ["disabled", "enabled"] as const) {
       expect(await setPackageStateV1({ packageId: "package:github-official", state }, deps)).toMatchObject({ ok: true })
       await apply()
+      await waitForTools(state === "enabled")
       expect((await tools()).names.length > 0).toBe(state === "enabled")
     }
     expect((await tools()).setup).toBe(before.setup)

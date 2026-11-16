@@ -294,7 +294,7 @@ A2/A3 接线收据：主进程每次应用运行创建一份 `createPluginSource
 ## 切片 D
 
 - 依据：[Issue #1724](https://github.com/impharaon/alpha-code/issues/1724)；[SPEC-plugin-helper-and-hub v3](https://github.com/impharaon/alpha-work/blob/8663fb2a982eaf7c626bfee3bcd8b20b870f2577/docs/specs/plugin-helper-and-hub/spec.md) AC-04、AC-08、AC-09、体验约定；[DESIGN-plugin-helper-and-hub v4](https://github.com/impharaon/alpha-work/blob/850fd2a61f220596fb10922c8b2e477c7475fac4/docs/specs/plugin-helper-and-hub/design.md) §4.4–4.6、§5、§8 D、§10。消费 §4.1 的唯一入口及 A1 转换产物，不重定合同、来源顺序或 owner 决定。
-- 核对：待编排器核对本节计划；当前 Phase: PLAN。首笔实施提交从续派的 `Phase:` 回执填入计划提交、核对人/模型及结论。
+- 核对：Phase: IMPLEMENT — e2b26e5ecd · orchestrator/Claude Fable 5.2 · plan check passed (AC-04/08/09/16 each have failing-capable proof including the debounce-window isolation case; steps that wait name their seam; no restriction added). r1 仅授权 D1、D2、E1，其他步骤继续等待具名接缝。
 - 基线：`8e40a921ec09cc95d8580142fd45af760d3599d1`，派定工作树/分支沿本次 brief；A1 已有 converter、真实语料和 `createPluginSources`，A2–A4 尚未接入。本次仅追加 D/E 两节，不修改 A 的记录、规格、冻结设计、规则或 H 页面。
 - 预计实施：约 9–12 个生产/资源文件、6–9 个测试/夹具文件，600–1,000 行实质改动（不计真实记录），3–5 小时；按下列提交单元推进，每个 AC 后核对用时和证据。等待合入不计作已实现。
 
@@ -343,12 +343,12 @@ A2/A3 接线收据：主进程每次应用运行创建一份 `createPluginSource
 
 ### 偏离记录
 
-暂无。输入缺口：2026-11-16 读取 Issue #1724 当前正文，其依据/交接仍是 design v3 @8663fb2，未含派发明确指定的 v4 @850fd2a；返回编排器同步正文。本节按派发冻结的 v4 写计划，不改 Issue、不据旧版本重开裁决。
+2026-11-16 r1 · D1：新增完整 `plugin-helper/SKILL.md`；尚未登记出厂路径，资源可达性待 D2。首笔实施提交按续派 Phase 行填入 D/E 核对回执；未改其余接缝。ui-mac `bun test --max-concurrency 2 src/main/codepuppy-factory-skill-hygiene.test.ts` exit 0（24 pass、0 fail、68 assertions）；文档链接与 `git diff --check` exit 0。实际资源审读覆盖本节 D1 的工具/文案与边界，未用正文字符串断言代替模型验收。原输入缺口已由编排器同步 Issue 的 design v4 引用（本轮回执），不再待办。无计划偏离。
 
 ## 切片 E
 
 - 依据：[Issue #1724](https://github.com/impharaon/alpha-code/issues/1724)；[SPEC-plugin-helper-and-hub v3](https://github.com/impharaon/alpha-work/blob/8663fb2a982eaf7c626bfee3bcd8b20b870f2577/docs/specs/plugin-helper-and-hub/spec.md) AC-16、体验约定及已定的提案 A；[DESIGN-plugin-helper-and-hub v4](https://github.com/impharaon/alpha-work/blob/850fd2a61f220596fb10922c8b2e477c7475fac4/docs/specs/plugin-helper-and-hub/design.md) §4.4、§4.6、§5、§8 E、§10 R2-F2 与 v4 生效修订。只实现这些已冻结接缝，不增加范围选择步骤或重定默认。
-- 核对：待编排器核对本节计划；当前 Phase: PLAN。首笔实施提交从续派的 `Phase:` 回执填写。
+- 核对：Phase: IMPLEMENT — e2b26e5ecd · orchestrator/Claude Fable 5.2 · plan check passed (AC-04/08/09/16 each have failing-capable proof including the debounce-window isolation case; steps that wait name their seam; no restriction added). r1 仅授权 D1、D2、E1，其他步骤继续等待具名接缝。
 - 基线：同 D 的 `8e40a921ec`。已核现状：`ext-receipt-v2.ts:586–735` 是允许集唯一发布方；`packages/ext/src/gen-skill-paths.ts` 只读 v1 keys；main 的 `explicitSkillDirs` 直接复用它；`engine-explicit-config.ts:133` 以 100 ms 去抖刷新；`plugin.ts` 已有 post 段后的 agent/provider tail，可复用机制。上述是 E 的改动落点，不据此重审冻结方案。
 - UI：沿 A 节链接的批准帧 `#manage` 和现有 H 管理页，仅接「生效范围」及「我的所有项目」/「仅当前项目」展示；本片不新增范围编辑控件、安装前提问或 H 页面。
 - 预计实施：约 10–13 个生产文件、7–10 个测试文件，800–1,200 行实质改动，4–6 小时；每项隔离证明后核对时间/规模，明显翻倍则交回，不扩成配置/权限重构。

@@ -890,3 +890,5 @@ A7 FIXED：catalog helper 与 main 锁后生效均为非 MCP/非 cloud 内容请
 A8 前提属实：任一 strict V3 失败使整段 disabled 注入跳过。两个真账本 red 从实际 applyPackageMutation 生成项目包，再分别加入不可归属坏 record／破坏 claims 不变量，已关远端和仅项目远端都被错留 enabled；exit 1（a8-red.log）。应保留 readLedgerV2 的可读记录；graph 不可用时复用 skills-enabled v2 正向成员投影的现有唯一读方，不另解账本或复制项目判定。
 
 A8 FIXED：disabled 循环恢复只读 readLedgerV2 的已解记录；strict graph 不可用时项目 MCP 集合回退到既有 readPackageAllowSet 的 v2 scoped 投影，正常图仍读 strict state。账本与项目投影单一写/读权威未改、无原始 JSON 二次 decoder，注入不改损坏文件。两个原 red 保留，disabled-injection/config-injection/boot-safety 三文件 exit 0（a8-green.log），ui-mac typecheck exit 0（a8-types.log）。
+
+A9 前提属实：renderer source 写口可递交 created 与 project effect；两条完整 main IPC red 使用全源已查询记录、真实技能字节的自制草稿与真实目录项，旧 handler 都接受，exit 1（a9-red.log）。拒绝范围只落 renderer handler，sidecar/common entry 保留制作/项目 scope；无用户能力收窄。

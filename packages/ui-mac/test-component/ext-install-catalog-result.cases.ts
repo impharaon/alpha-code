@@ -677,3 +677,21 @@ test("R14 A7 main source entry reloads a real bundled agent without force", asyn
   expect(requests.every(request=>!request.force)).toBe(true)
  }finally{catalogOverride=undefined}
 })
+
+for(const source of ["created","project"] as const)test("R14 A9 renderer cannot submit "+source+" writes", async () => {
+ const {fixtureFetch}=await import("../test-fixtures/plugin-helper/source-fetch")
+ const {captureFixture}=await import("../test-fixtures/plugin-helper/fixture")
+ const fetchSpy=spyOn(globalThis,"fetch").mockImplementation(fixtureFetch)
+ try{
+  const search=await pluginSources.searchSources("r14-own-review")
+  expect(search.sources.every(source=>source.status==="ok")).toBe(true)
+  const capture=await captureFixture("plugins/frontend-design")
+  const skill=new TextDecoder().decode(await capture.readFile("skills/frontend-design/SKILL.md")).replaceAll("frontend-design","r14-own-review")
+  const project=join(root,"r14-renderer-project");mkdirSync(project,{recursive:true})
+  const request={requestId:"r14_renderer_"+source,via:"hub",effect:source==="project"?{kind:"project",directory:project}:{kind:"all-projects"},source:source==="created"?{kind:"created",draft:{searchId:search.searchId,name:"r14-own-review",description:"Review notes",files:[{path:"skills/r14-own-review/SKILL.md",text:skill}]}}:{kind:"catalog",catalogId:chatEntry.id}}
+  const before=await handlers.get("ext-installed-packages")!({sender:{id:1}})
+  expect(await handlers.get("ext-install-from-source")!({sender:{id:1}},request)).toMatchObject({ok:false,code:"unknown-id"})
+  expect(await handlers.get("ext-installed-packages")!({sender:{id:1}})).toEqual(before)
+  expect(readdirSync(project)).toEqual([])
+ }finally{fetchSpy.mockRestore()}
+})

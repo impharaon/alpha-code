@@ -350,20 +350,6 @@ export function registerExtIpcHandlers(
   ipcMain.handle("ext-package-authorization", async (_event: IpcMainInvokeEvent, packageId: unknown) => {
     await ledgerReady
     if (typeof packageId !== "string") return { ok: false, reason: "invalid package identity" }
-    const declarations = await resolvePackageDeclarationsV1(packageId)
-    if (declarations.ok && declarations.origin === "installed") {
-      const items: import("../shared/package-admission").PackageAuthorizationItemV1[] = []
-      for (const entry of declarations.declarations) {
-        const leaf = entry.kind === "mcp" ? readMcpLeafStrict(entry.hostName) : undefined
-        const files = leaf?.ok ? collectMcpFileRefPaths(leaf.value) : []
-        for (const need of entry.secretNeeds) items.push({ kind: "secret", componentId: entry.componentId, prerequisiteId: need.needId, serviceName: entry.hostName, label: need.label, saved: files.some((file) => path.basename(file) === need.needId && fs.existsSync(file)) })
-        if (entry.login) {
-          const current = await packageAdmissionDeps.mcpOauthEngine?.read?.(entry.hostName)
-          items.push({ kind: "mcp-oauth", componentId: entry.componentId, prerequisiteId: entry.componentId + "#oauth", serviceName: entry.hostName, label: entry.sourceName, authenticated: current?.ok === true && current.authenticated, status: current?.ok ? current.status : "unavailable" })
-        }
-      }
-      return { ok: true, packageId, items }
-    }
     return readPackageAuthorizationV1(packageId, packageAdmissionDeps)
   })
   // REQ-128 `#698`:某个 package 在本机装没装(**只读**,不进写通道注册表)。详情页据此决定
@@ -1283,7 +1269,9 @@ export function registerExtIpcHandlers(
         const result = await savePackageSecretsV1(intent, packageAdmissionDeps)
         if (!result.ok) return result
         const packageId = (intent as { packageId: string }).packageId
-        return { ...result, ...reloads.request({ scope: "global", items: packageReloadItems(packageId), reason: `saved package credentials ${packageId}`, connectorChange: true }) }
+        await activatePackageMcp(packageId)
+        notifyHubViewChanged()
+        return result
       },
       installCatalog: async (intent) => {
         const official = !!intent && typeof intent === "object" && "catalogId" in intent &&

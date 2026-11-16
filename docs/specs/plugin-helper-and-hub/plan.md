@@ -671,3 +671,17 @@ BC3 红例先行：`plugin-package-accounts.test.ts` 复用 provenance 中 GitHu
 
 
 BC3 补证与窄修正：生产账户保存→同包 runtime apply 红例 `bc3-runtime-red.log` exit 1（应用调用为空；主进程仍只请求 reload）已先提交。补充范围保持例时误把 `readMcpLeafStrict` 的返回形状当作 JSONC 禁用投影；`ext-config.ts:529–532` 优先返回 `remoteMcpLeaf(record)`，该定义没有 enabled，第一条前置断言即红、尚未执行保存（`bc3-projection-red.log`）。依 r6/r9 关于 API 返回形状误用的 standing ruling，单独修正该例的两个读取表达式，改读实际 JSONC；行为期望仍为保存凭据保留已存在的全局禁用投影与同包身份，不改变期望、scope 或正式契约。
+
+
+r9 BC3 实施／未决收据：账户读取与保存现共同消费已有 `createPackageDeclarationResolver` 的安装身份／声明；非目录以已存 MCP leaf/needId 调原 builder、版本化专用存储与包拥有的单次账本事务。读取非目录不取目录事实；目录沿原验签事实与摘要复核，装后更换不重装、不改 graph/claims。部分更新用现有 `releasePreparedMcpSecretVersion` 保留仍引用的旧版本，完整替换清理旧版本，失败回滚仍用 H 原事务。main 保存成功后调用原 `applyPackageMcpV1` 并通知真实视图，不再请求 Location reload。
+
+必要同调用链文件 delta：`ext-config.ts` 的远端 `persistMcp` 发布原会清掉 project-only 的全局 disabled 覆盖，修正读取表达式后的红例已到达保存后断言（`bc3-projection-corrected-red.log`，exit 1，保存后覆盖缺席）。凭据事务按现存 graph.effect 保留 disabled；既有配置写方只留下 graph.effect 要求的 `{enabled:false}` 覆盖，远端定义仍只在 main truth。普通全局包保持 H 无 JSONC 状态编辑的行为；没有改 effect 的决定、v2 allow-set、Location 过滤或 `packages/ext/src/package-scope.ts`。这是 BC3 必需的发布链修复，新增约 13 行，不另设配置写方、选项或 schema。共享文件新增 `package-admission.ts`（账户／已装声明段）与 `ext-config.ts`（远端发布段），请编排器在 D/E/H restack 对照。
+
+验证（包目录 ui-mac，均 `--max-concurrency 2`）：
+
+- `bun test --max-concurrency 2 src/main/plugin-package-accounts.test.ts src/main/package-admission.test.ts src/main/package-secret-recovery-wiring.test.ts src/main/package-builders-wiring.test.ts src/main/package-mixed-bundle.wiring.test.ts src/main/ext-write-channels.test.ts src/main/install-from-source.test.ts` exit 0：62 pass／0 fail／452 assertions（`bc3-related-final.log`）；生产 IPC 子宿主严格 16 场景，包括保存→runtime apply 同 packageId、回读 saved 与零 reload；四个账户例包含私密文件正向金丝雀／配置与账本负向扫描、部分保存、旧版本、更换失败、既有范围投影与项目目录零文件。
+- 因 `persistMcp` 行为变化，运行其直接消费者：`bun test --max-concurrency 2 src/main/ext-config.test.ts src/main/ext-config-tx.test.ts src/main/mcp-server-truth.test.ts src/main/mcp-server-derivation.test.ts src/main/ext-seed-install.test.ts src/main/engine-plugin-seal.test.ts src/main/ext-project-residuals.test.ts src/main/ext-install-planner.test.ts src/main/codepuppy-environment.test.ts src/main/ext-security-boundaries.test.ts` exit 0：403 pass／0 fail／3273 assertions（`bc3-config-consumers.log`）。public exports、签名与冻结 DTO 均无变化。
+- ui-mac/ext 各 `bun typecheck` exit 0（`bc3-ui-types-final.log`、`bc3-ext-types-final.log`）。具名 `package-admission.wiring.test.ts` 已跑，仍因编排器已接管的 21→22 宿主计数失败，内部 22 pass／0 fail（`bc3-related-with-pin.log`）；未更改该钉值。
+- **未决，不报引擎全绿**：原 A2 `install-from-source.engine.test.ts` 首次当前树 exit 1，内部一场景通过，一场景在 `install-from-source.engine.cases.ts:82` 的 Playwright MCP 进程启动处 `spawn_failed`（`bc3-engine.log`）。只将本轮四份生产／机械同步改动保存为临时 patch 并 scoped restore，对照 HEAD 的同一宿主 exit 0、严格内部 2 场景通过（`bc3-engine-base.log`）；随后恢复 patch，显式离线缓存 `npx @playwright/mcp@latest --version` exit 0（0.0.85），当前树同宿主仍 exit 1、同一启动处失败（`bc3-engine-warm.log`）。未隔离因果，不宣称是环境／flaky，也未修改 Core、真实样本命令、超时或断言；这项当前树与基线差异交编排器处理，BC3 的真实引擎复核保持未完。
+
+r9 在本可恢复边界交回：BC2a.2／BC2b 完成；BC3 账户主链与生产 IPC／存储证明已提交，以上 A2 真引擎差异未决；BC4 同包令牌组件／时间线一个登录动作、BC5 Figma 实查记录／OpenCode 可检索正向样本／完整引擎与模型验收均未开始。不要把 AC-03/05/06/07/14/15 报完整通过。最先指定的 A3 旧 confirming 断言与新发现 H namespace 字段钉值均待编排器裁定／H，同既有 21→22 钉值不在此修复。已核 Codex（GPT-6），作者自查结论为 PARTIAL；依据版本仍为本节 spec v3／design v5 和 r8/r9 授权，已定勿重开不变；OPTIONAL 无。未执行真实账号登录、外部写入、gate/bin/check、push/PR/merge；所有前台命令已结束。

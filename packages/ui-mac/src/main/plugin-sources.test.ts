@@ -398,7 +398,7 @@ test("a real npm tree keeps OpenCode discovery when presented as a local folder"
 })
 
 test("D3 creation eligibility requires a recorded success for every source, not just every returned row", async () => {
-  const { allPluginSourcesSucceeded, PLUGIN_SOURCE_ORDER } = await import("./plugin-sources")
+  const { allPluginSourcesSucceeded, PLUGIN_SOURCE_ORDER, createPluginSources } = await import("./plugin-sources")
   const { fixtureFetch } = await import("../../test-fixtures/plugin-helper/source-fetch")
   const sources = createPluginSources({ catalog: async () => [], fetch: fixtureFetch })
   expect(sources.searchedSources("unknown")).toBeUndefined()

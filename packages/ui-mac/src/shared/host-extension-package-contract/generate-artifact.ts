@@ -4,7 +4,18 @@ import { createHash } from "node:crypto"
 import { mkdir, readFile, writeFile } from "node:fs/promises"
 import { dirname, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
+import ts from "typescript"
 import { PROFILE_REGISTRY_V1, type PackageProfileIdV1 } from "./registry"
+
+// This Bun CLI is also typechecked with Electron's DOM libraries. Keep its build API local:
+// importing Bun's ambient types changes fetch/stream types throughout the desktop program.
+declare const Bun: {
+  build(options: { entrypoints: string[]; target: "node"; format: "esm"; minify: boolean }): Promise<{
+    success: boolean
+    logs: { message: string }[]
+    outputs: Blob[]
+  }>
+}
 
 export const HOST_EXTENSION_PACKAGE_ARTIFACT_PATH =
   "packages/ui-mac/src/shared/host-extension-package-contract"
@@ -25,6 +36,9 @@ export const HOST_EXTENSION_PACKAGE_ARTIFACT_FILES = [
   "profiles/skill.v1.schema.json",
   "registry.ts",
   "synthetic-decoder.ts",
+  "plugin-conversion.ts",
+  "plugin-conversion.mjs",
+  "plugin-conversion.d.mts",
   HOST_EXTENSION_PACKAGE_CORPUS,
 ] as const
 
@@ -424,6 +438,10 @@ export async function buildHostExtensionPackageArtifactManifest(
 }
 
 export async function checkHostExtensionPackageArtifact(artifactRoot = root): Promise<void> {
+  for (const [path, bytes] of await conversionArtifactBytes()) {
+    if (!bytesEqual(await readFile(resolve(artifactRoot, path)), bytes))
+      throw new Error(path + " drifted; run generate-artifact.ts")
+  }
   const corpus = await readFile(resolve(artifactRoot, HOST_EXTENSION_PACKAGE_CORPUS))
   if (!bytesEqual(corpus, decoderCorpusBytesV1()))
     throw new Error(`${HOST_EXTENSION_PACKAGE_CORPUS} drifted; run generate-artifact.ts`)
@@ -436,12 +454,33 @@ export async function checkHostExtensionPackageArtifact(artifactRoot = root): Pr
 }
 
 async function writeHostExtensionPackageArtifact(artifactRoot = root): Promise<void> {
+  for (const [path, bytes] of await conversionArtifactBytes())
+    await writeFile(resolve(artifactRoot, path), bytes)
   await mkdir(resolve(artifactRoot, dirname(HOST_EXTENSION_PACKAGE_CORPUS)), { recursive: true })
   await writeFile(resolve(artifactRoot, HOST_EXTENSION_PACKAGE_CORPUS), decoderCorpusBytesV1())
   await writeFile(
     resolve(artifactRoot, HOST_EXTENSION_PACKAGE_ARTIFACT_MANIFEST),
     canonicalArtifactJsonBytesV1(await buildHostExtensionPackageArtifactManifest(artifactRoot)),
   )
+}
+
+async function conversionArtifactBytes(): Promise<Map<string, Uint8Array>> {
+  const built = await Bun.build({
+    entrypoints: [resolve(root, "plugin-conversion.ts")],
+    target: "node",
+    format: "esm",
+    minify: true,
+  })
+  if (!built.success) throw new Error("Could not bundle plugin-conversion: " + built.logs.map((log) => log.message).join("; "))
+  const declaration = ts.transpileDeclaration(await readFile(resolve(root, "plugin-conversion.ts"), "utf8"), {
+    fileName: "plugin-conversion.ts",
+    compilerOptions: { target: ts.ScriptTarget.ESNext, module: ts.ModuleKind.ESNext },
+  })
+  if (declaration.diagnostics?.length) throw new Error("Could not emit plugin-conversion declarations")
+  return new Map([
+    ["plugin-conversion.mjs", new Uint8Array(await built.outputs[0]!.arrayBuffer())],
+    ["plugin-conversion.d.mts", textEncoder.encode(declaration.outputText)],
+  ])
 }
 
 function single(

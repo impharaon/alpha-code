@@ -129,6 +129,10 @@ PLAN 文档检查（2026-11-16）：`python3 scripts/check-doc-links.py docs/spe
 
 ### 偏离记录
 
-2026-11-16 r1 · A1 首笔实施提交填入续派核对回执；真实夹具扩为同一 pinned 库的 context7（wrapped MCP）与 github（凭据占位）实样，18 个原始文件逐一记录摘要，另存保留真实成员/全局 pax 的裁剪 tar。ui-mac `bun test --max-concurrency 2 src/shared/host-extension-package-contract/plugin-conversion.test.ts src/shared/host-extension-package-contract/host-extension-package-artifact.test.ts src/main/plugin-sources.test.ts` exit 1：12 pass / 19 fail；19 条具名新例因尚无 converter/sources 入口而红，既有 artifact 及真实夹具摘要检查通过。日志 `/tmp/helper-install-plan-YCXgtv/a1-red.log`。尚无生产变更，后续实现不改这批断言。
+2026-11-16 r1 · A1 可恢复实现：新增纯 converter 与自包含 ESM/声明，artifact 生成/校验纳入这份产物；新增只读来源查询、候选及 codeload capture。未接安装/IPC/页面，也未进入 A2–A4。三文件 A1 命令（同上）exit 1：29 pass / 2 fail；日志 `/tmp/helper-install-plan-YCXgtv/a1-first-green.log`。converter 12 条及既有 artifact 11 条均通过；来源 8 条中 6 条通过，两个目录夹具前提错误，见下段。生成器使用局部 Bun build 类型声明，避免引入 Bun ambient 类型污染 Electron fetch/stream；修正后 ui-mac `bun typecheck` exit 0，artifact 单文件复核 exit 0（11 pass / 0 fail）。相应日志为 `/tmp/helper-install-plan-YCXgtv/a1-typecheck-final.log`、`a1-artifact-final.log`。
+
+`BLOCKED: A1 已提交测试的目录夹具前提错误 — plugin-sources.test.ts:20 断言内置目录不含 playwright，实际 codepuppy-catalog.json 有 id=mcp:playwright；:38 以 GitHub 查询要求首项来自目录，但该真实内置 entries 没有 GitHub 条目 — 需编排器纠正两条测试输入/断言后续跑。` 原始红例 a821d9386a 中第一项已经因该错误失败；实现没有修改已提交断言，也没有过滤生产目录来满足测试。规格允许从真实记录副本控制未收录情形，可用这种明确标注的目录变体证明继续搜索，并用真实含 GitHub 的签名目录样本证明优先级；本轮不自行改红例，不将 A1 或 AC-01 报完成。生产新增文件尚未接入产品安装链，先提交保存。H 与 runtime 设计后续依赖继续按续派回执处理，OPTIONAL 无。
+
+2026-11-16 r1 · A1 首笔实施提交填入续派核对回执；真实夹具扩为同一 pinned 库的 context7（wrapped MCP）与 github（凭据占位）实样，18 个原始文件逐一记录摘要，另存保留真实成员/全局 pax 的裁剪 tar。ui-mac `bun test --max-concurrency 2 src/shared/host-extension-package-contract/plugin-conversion.test.ts src/shared/host-extension-package-contract/host-extension-package-artifact.test.ts src/main/plugin-sources.test.ts` exit 1：12 pass / 19 fail；首报把 19 项都归因于入口缺失不准确，复核为 18 项入口缺失，另 1 项已是下述目录夹具断言有误，既有 artifact 及真实夹具摘要检查通过。日志 `/tmp/helper-install-plan-YCXgtv/a1-red.log`。尚无生产变更，后续实现不改这批断言。
 
 2026-11-16 · PLAN 新证据：按派发的限时分支实测成功，MCP 生效计划采用现有 runtime add/connect，代替该组件的非 force Location 重载；技能路径沿冻结设计。设计由其拥有方回写，本阶段只记录证据。H 的来源展示及管理定位缺口只读返回，不越界改页；其余无偏离。

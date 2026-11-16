@@ -15,7 +15,7 @@ last_reviewed: 2026-11-16
 ## 切片 A
 
 - 依据：[Issue #1724](https://github.com/impharaon/alpha-code/issues/1724)；[SPEC-plugin-helper-and-hub v3](https://github.com/impharaon/alpha-work/blob/8663fb2a982eaf7c626bfee3bcd8b20b870f2577/docs/specs/plugin-helper-and-hub/spec.md) AC-01；[DESIGN-plugin-helper-and-hub v3](https://github.com/impharaon/alpha-work/blob/8663fb2a982eaf7c626bfee3bcd8b20b870f2577/docs/specs/plugin-helper-and-hub/design.md) §2、§4.1–4.4、§4.6–4.7、§5–6、§8 A、§10；转换类型与发现规则继承 [DESIGN-local-plugin-install §4.1/4.5](https://github.com/impharaon/alpha-work/blob/8663fb2a982eaf7c626bfee3bcd8b20b870f2577/docs/specs/local-plugin-install/design.md)。沿用两轮设计处置，只返回下述新实测及 H 接缝缺口。
-- 核对：待编排器核对本计划提交；实施首笔提交按续派 `Phase:` 回执填写，不以作者自核代替。
+- 核对：b46a8702d4 · orchestrator/Claude Fable 5.2 · plan check passed for A1–A3（AC-01 chain has failing-capable proof per stage, files inside the allowed scope, no frozen decision restated, no restriction added）；A4 stays pending the H seam delta。r1 的 Phase: IMPLEMENT 本轮仅授权 A1；A2–A3 等 H 合入与分支刷新，A2 另等 runtime 设计修订提交。
 - 代码基线：本车道 `265c42529e`，工作树 `alpha-code-feat-helper-install-slice-a`，派定分支 `feat/helper-install-slice-a`；Bun 1.4.4。H 只读基线为 `feat/hub-package-one-row@f4b5a10424`（含 `8a8e0f4d19`），另有 renderer 在途修改，观察于 2026-11-16；消费其[计划「片 1 · 桌面」](../local-plugin-install/plan.md)，不修改该工作树。
 - UI：[11-15 批准帧](../../design/2026-11-15-plugin-package-install-and-card/frame.html#install) @ `265c42529e` 的装后反馈及现有时间线卡片/动作组件；时间线事实、状态与动作按设计 §4.7。不另画稿，不制作登录/token 动作（切片 C）。
 - 预计规模：约 28–34 个生产/生成文件、16–22 个测试/夹具文件，约 2,000–2,800 行实质改动（不计真实样本及生成字节），实施与相关验证约 6–8 小时。明显超过 15 文件/800 行，按下述 A1–A4 的真实边界顺序提交，不省掉 AC 的任一环；每段结束核对规模/用时，超过估算两倍返回编排器。
@@ -128,5 +128,7 @@ PLAN 文档检查（2026-11-16）：`python3 scripts/check-doc-links.py docs/spe
 计划作者已核：Codex（GPT-6），核对上述冻结版本、A 的入口/构建器/图/消息/时间线调用链及 H 接缝快照；临时引擎前提成立，**H 来源呈现与包管理定位需接缝补充，尚不能交付 PLAN-READY**。遗留去向：两处接缝返回编排器/H；runtime 新证据返回设计 §10；真实模型/浏览器任务验收仍归编排器；OPTIONAL：无。
 
 ### 偏离记录
+
+2026-11-16 r1 · A1 首笔实施提交填入续派核对回执；真实夹具扩为同一 pinned 库的 context7（wrapped MCP）与 github（凭据占位）实样，18 个原始文件逐一记录摘要，另存保留真实成员/全局 pax 的裁剪 tar。ui-mac `bun test --max-concurrency 2 src/shared/host-extension-package-contract/plugin-conversion.test.ts src/shared/host-extension-package-contract/host-extension-package-artifact.test.ts src/main/plugin-sources.test.ts` exit 1：12 pass / 19 fail；19 条具名新例因尚无 converter/sources 入口而红，既有 artifact 及真实夹具摘要检查通过。日志 `/tmp/helper-install-plan-YCXgtv/a1-red.log`。尚无生产变更，后续实现不改这批断言。
 
 2026-11-16 · PLAN 新证据：按派发的限时分支实测成功，MCP 生效计划采用现有 runtime add/connect，代替该组件的非 force Location 重载；技能路径沿冻结设计。设计由其拥有方回写，本阶段只记录证据。H 的来源展示及管理定位缺口只读返回，不越界改页；其余无偏离。

@@ -1,0 +1,119 @@
+{
+  "repository": "https://github.com/anthropics/claude-plugins-official",
+  "commit": "b5b01ac4f889fec0c4c6bb89f27ca7c8574473f6",
+  "archive": {
+    "path": "claude-selection.tar.gz",
+    "sha256": "310e8de1f76795758f924d8458c0c3f870d53be3afe0ca4e5721a4b0c843ca32",
+    "note": "Repacked subset of real codeload members; original member paths, bytes, modes and global pax comment retained. Not the original full archive."
+  },
+  "files": [
+    {
+      "path": ".claude-plugin/marketplace.json",
+      "bytes": 191699,
+      "mode": 436,
+      "sha256": "414a31a148c83b7293c17b464b518425455e9c43413c24f77d9f262354dcb693"
+    },
+    {
+      "path": "external_plugins/context7/.claude-plugin/plugin.json",
+      "bytes": 427,
+      "mode": 436,
+      "sha256": "9c61f72909301338f08025cafa67a7055e55572ba1bb76ba68f74d4d21c9c682"
+    },
+    {
+      "path": "external_plugins/context7/.mcp.json",
+      "bytes": 142,
+      "mode": 436,
+      "sha256": "e5dfed1749b361fbb2d0ad64a3792a28622e788c3c058fa0f0c923991f941c17"
+    },
+    {
+      "path": "external_plugins/context7/README.md",
+      "bytes": 1865,
+      "mode": 436,
+      "sha256": "93efb82e48fc436a803b8a61111915dfab83f705868d985de35cb309d4dcdab7"
+    },
+    {
+      "path": "external_plugins/github/.claude-plugin/plugin.json",
+      "bytes": 271,
+      "mode": 436,
+      "sha256": "86a6c2ffb21e8b1e1a74db18c26bdf7fbb46079a0b6a42e72d741b3cbba979c9"
+    },
+    {
+      "path": "external_plugins/github/.mcp.json",
+      "bytes": 178,
+      "mode": 436,
+      "sha256": "b536ea03380d2f2f93f31c87a158e21e74cce5f664d20f7bdb81c6710418e06d"
+    },
+    {
+      "path": "external_plugins/playwright/.claude-plugin/plugin.json",
+      "bytes": 295,
+      "mode": 436,
+      "sha256": "f2d7c0f611b93287ebb07454255d0cccf3a343d7095b7f8f763ff21d1995c096"
+    },
+    {
+      "path": "external_plugins/playwright/.mcp.json",
+      "bytes": 87,
+      "mode": 436,
+      "sha256": "b6fd7e9ccee1682af353854195516826da6970026b68c86ad800ff4d931d3250"
+    },
+    {
+      "path": "plugins/explanatory-output-style/.claude-plugin/plugin.json",
+      "bytes": 290,
+      "mode": 436,
+      "sha256": "8e195dd839cb704af2ec926bbd822996398ea4cf310be1363d7ab791ba2242ae"
+    },
+    {
+      "path": "plugins/explanatory-output-style/LICENSE",
+      "bytes": 11358,
+      "mode": 436,
+      "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+    },
+    {
+      "path": "plugins/explanatory-output-style/README.md",
+      "bytes": 2470,
+      "mode": 436,
+      "sha256": "543754079554d2c58b72322edebcf09775a5fe74eafe1f5102c496388ab4aa82"
+    },
+    {
+      "path": "plugins/explanatory-output-style/hooks-handlers/session-start.sh",
+      "bytes": 1468,
+      "mode": 509,
+      "sha256": "58efe97b7f5ccd384e0ee12a2f3dd2e75a38df35841a1b27ea6d9eb833c28912"
+    },
+    {
+      "path": "plugins/explanatory-output-style/hooks/hooks.json",
+      "bytes": 323,
+      "mode": 436,
+      "sha256": "f941cedcbac07688675fb8d0fad741e9ba13900d73416409861001efe3fedba9"
+    },
+    {
+      "path": "plugins/frontend-design/.claude-plugin/plugin.json",
+      "bytes": 202,
+      "mode": 436,
+      "sha256": "d45be5b9f5e729dd8dd545d97b46800f50c2791cb053c480495d1195ce2052be"
+    },
+    {
+      "path": "plugins/frontend-design/LICENSE",
+      "bytes": 11358,
+      "mode": 436,
+      "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+    },
+    {
+      "path": "plugins/frontend-design/README.md",
+      "bytes": 977,
+      "mode": 436,
+      "sha256": "5351137ecb2c5adfcdbadcdbbeda1eab16409bae98eb53f62f945514552d6706"
+    },
+    {
+      "path": "plugins/frontend-design/skills/frontend-design/LICENSE.txt",
+      "bytes": 10174,
+      "mode": 436,
+      "sha256": "0d542e0c8804e39aa7f37eb00da5a762149dc682d7829451287e11b938e94594"
+    },
+    {
+      "path": "plugins/frontend-design/skills/frontend-design/SKILL.md",
+      "bytes": 9390,
+      "mode": 436,
+      "sha256": "d91970639e9f5c37682ac7ab60094d35f1c7c1f38d731bd56396563aee10c1d3"
+    }
+  ]
+}

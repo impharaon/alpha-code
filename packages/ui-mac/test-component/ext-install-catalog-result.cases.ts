@@ -515,3 +515,11 @@ test("BC2b old Hub skill import and plugin confirmation transports are retired",
  expect(handlers.has("ext-import-agent-confirm")).toBe(true)
  expect(handlers.has("ext-install-from-source")).toBe(true)
 })
+
+test("BC2b ordinary reload transport stays active after old import transports retire",async()=>{
+ const reload=handlers.get("ext-reload-request")
+ expect(reload).toBeFunction()
+ const result=await reload!({sender:{id:1}},{scope:"global",items:[],reason:"normal reload after local import retirement"})
+ expect(result).toMatchObject({ok:true})
+ expect((result as {generation:number}).generation).toBeGreaterThan(0)
+})

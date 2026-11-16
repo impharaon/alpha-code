@@ -78,7 +78,10 @@ test("A2 host-name collision preserves existing content and rewrites only instal
 }))
 
 test("A2 zero runnable package maps diagnostics without writing ledger", () => installerHarness(async (h) => {
-  const id = await h.candidate("skills", "opencode-npm")
+  // npm/provenance.json:4 pins this package; the recorded search contains other packages too.
+  const selected = (await h.sources.searchSources("skills")).candidates.find((row) => row.source === "opencode-npm" && row.name === "opencode-skills-hub")
+  expect(selected).toBeDefined()
+  const id = selected!.id
   const outcome = await h.install(h.request(id))
   expect(outcome).toMatchObject({ ok: false, code: "nothing-runnable", notRunning: [{ kind: "plugin", reason: "native-js-plugin" }] })
   expect(existsSync(join(h.root, "installs.json"))).toBe(false)

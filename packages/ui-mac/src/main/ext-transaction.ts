@@ -596,7 +596,7 @@ export function listGenerationsStrict(root: string, key: string): Array<{ genId:
     .map((genId) => ({ genId, dir: path.join(generations, genId), current: genId === current }))
 }
 
-function nextGenId(root: string, key: string, txId: string): string {
+function nextGenId(root: string, key: string, txId: string, slot: number): string {
   const { generations } = extensionStorePaths(root, key)
   let max = 0
   try {
@@ -607,7 +607,9 @@ function nextGenId(root: string, key: string, txId: string): string {
   } catch {
     /* dir 未建 = 0 */
   }
-  const suffix = txId.slice(-8)
+  // Different items must have different directory names: the skill loader uses the basename as its ID.
+  // Array slots are unique; unsigned addition preserves the existing eight-hex grammar, including wraparound.
+  const suffix = ((Number.parseInt(txId.slice(-8), 16) + slot) >>> 0).toString(16).padStart(8, "0")
   return `gen-${String(max + 1).padStart(6, "0")}-${suffix}`
 }
 
@@ -1182,7 +1184,7 @@ export async function runExtensionTransaction(root: string, plan: TxPlan, hooks:
       key: item.key,
       action: actionOf(item),
       // generation 才建代号;config/receipt 用占位(不建目录、不翻指针)。
-      genId: actionOf(item) === "generation" ? nextGenId(root, item.key, txId) : "gen-000000-000000",
+      genId: actionOf(item) === "generation" ? nextGenId(root, item.key, txId, index) : "gen-000000-000000",
       files: item.files ?? [],
       ...(actionOf(item) === "config" && configImages.has(item.key)
         ? {

@@ -31,6 +31,7 @@ last_reviewed: 2026-11-15
 | `src/main/package-installability.ts`、`src/main/package-admission.ts` | 「+」沿既有 binding/写闸校验直接提交内容，不再以安装确认或登录/token 就绪作保存前提；内容提交后自动开启包。缺凭据或真实载入失败按组件读回状态，不连带关闭/删减其余功能；安装阶段不执行包脚本或主动 OAuth probe。装后密钥修改复用 admission/builders/事务资源，保持包图与开关，未改字段保留，不让 renderer 提交配置或文件位置；不新增永久工具 allow。 |
 | `src/main/package-mcp-oauth.ts` | 将安装期主动 add/probe 与显式登录动作分开；就绪从真实引擎状态/集成连接读回。关闭包的定义经同名 disabled 配置投影，不走当前 active `experimental.mcp.add`。不自建 OAuth attempt、callback 或 token store。 |
 | `src/main/ext-install-planner.ts`、`src/main/ext-receipt-v2.ts`、`src/main/ext-package-tx-builders.ts` | 包状态操作从既有 graph/root 找全组件，复用锁、配置写入、账本写器与技能允许集发布；自动开启与菜单开关均由 root 意图派生组件投影，避免 renderer 逐项循环开关。尚缺 token 的连接器不阻断内容提交；凭据写入沿版本化 prepared resource，改 token 不改变包的启停状态。 |
+| `src/main/ext-transaction.ts`、`src/main/ext-transaction.test.ts` | r3 授权：事务内以条目序号区分 generation 的八位十六进制后缀；不改现有读者文法、探针、core 或已落记录。新用例验普通/进位边界的唯一代号及读回/卸载。 |
 | `src/main/ext-config.ts` | 同调用链补严格读取：沿既有 main-only remote MCP 真值读取器取得已装定义，供装后凭据编辑保留原文件引用；不另建配置或 secret 权威。 |
 | `src/main/ext-ipc.ts`、`src/main/ext-write-channels.ts` | 已安装投影带 root 状态、组成和安全授权视图；包状态/装后密钥写动作接现有写闸、恢复与重载通道。main 依据包身份重读图和已验声明，调用方不能指定 server URL、任意 config 或秘密文件。卸载仍走 `uninstallPackageV1`。 |
 | `src/preload/types.ts`、`src/preload/index.ts`、`src/renderer/extensions/ext-ipc.ts` | 串接包状态及装后授权动作，统一引用安全 DTO；只增加本片所需的桌面内部动作，不新增发布者合同。 |
@@ -136,3 +137,6 @@ r2 步骤 4 · **PARTIAL / 技能运行身份范围阻塞**（2026-11-16）：�
 
 
 r3（2026-11-16）：编排器裁定 generation 身份冲突由本片的事务分配修复，core 保持冻结；沿现有八位十六进制后缀文法，在同事务以条目序号区分 generation 名称，无记录迁移。读取链只校验文法/指针/完整代号，未发现依赖共享后缀的 reader。新增真盘分配与全技能库存回归，既有 `real Supabase package exposes both enabled generation skills` 保持逐字不变。补红：ui-mac `bun test --max-concurrency 2 src/main/ext-transaction.test.ts -t 'skill generation names are distinct'` exit 1，0 pass / 2 fail（普通后缀及 ffffffff 边界均只有一个唯一代号）；`bun test --max-concurrency 2 ./src/main/package-hub-lifecycle.engine.cases.ts -t 'all package skills leave'` exit 1，0 pass / 1 fail（实际技能缺 supabase-postgres-best-practices）。继承原宿主亦 exit 1，原缺项重现。新用例复用真实包字节与既有事务内部夹具，先提交红证据再改分配；本轮仍按 `--max-concurrency 2` 运行相关检查。
+
+
+r3 generation 修复：分配调用点已有 item index，以它对 tx 后缀作无符号加法；同一数组各 slot 的后缀唯一，含 ffffffff 进位，既有读者文法不变。ui-mac `bun test --max-concurrency 2 src/main/ext-transaction.test.ts src/main/ext-skill-generations.test.ts src/main/ext-receipt-v2.test.ts src/main/ext-package-ledger-uninstall.test.ts` exit 0，193 pass；真实引擎前两个既有用例均绿，双技能缺项已消除。新增全库存用例已走完双技能 off/on/移除，但最后发现更换 GitHub 凭据后的旧记录：`savePackageSecretsV1` 调 `commitTransactionLedger` 的 standalone 分支，`ext-receipt-v2.ts:1013` 会新增 standalone owner；包移除遂保留该 record。现有 package mutation 对相同 graph digest 在 `ext-receipt-v2.ts:1539` 直接 replay，不能拿不变图冒充一次凭据更新。该失败断言保留，不改写冻结账本权威；先完成独立呈现接缝，再交回明确的“包内凭据更新保留原 claim”写入接缝缺口。

@@ -26,6 +26,7 @@ export type RootResolution = { ok: true; root: string } | { ok: false; reason: s
 export const GATED_WRITE_CHANNELS = {
   installCatalog: "ext-install-catalog",
   installPackage: "ext-install-package",
+  installFromSource: "ext-install-from-source",
   setPackageState: "ext-set-package-state",
   savePackageSecrets: "ext-save-package-secrets",
   uninstallV2: "ext-uninstall-v2",
@@ -98,6 +99,7 @@ export type WriteChannelRoots = {
 
 export type WriteChannelBodies = {
   installPackage: (packageId: unknown) => Promise<unknown>
+  installFromSource: (request: unknown) => Promise<unknown>
   setPackageState: (intent: unknown) => Promise<unknown>
   savePackageSecrets: (intent: unknown) => Promise<unknown>
   installCatalog: (intent: unknown) => Promise<unknown>
@@ -126,6 +128,7 @@ export function buildGatedWriteChannels(deps: { gate: RecoveryGate; roots: Write
   const { gate, roots, bodies } = deps
   return {
     installPackage: gatedWriteHandler(gate, roots.global, bodies.installPackage),
+    installFromSource: gatedWriteHandler(gate, roots.global, bodies.installFromSource),
     setPackageState: gatedWriteHandler(gate, roots.global, bodies.setPackageState),
     savePackageSecrets: gatedWriteHandler(gate, roots.global, bodies.savePackageSecrets),
     // REQ-136 C1:project recovery is itself a mutation, so verified-MCP admission must finish

@@ -128,3 +128,37 @@ export default { id:'test.slice-a-observer', setup:async(ctx)=>{
  expect(readPackageLedgerStateV1(globalRoot)).toMatchObject({ok:true,packageGraphs:[{packageId:'claude:playwright'}]})
  }finally{await engine.close();process.chdir(previous);rmSync(sockets,{recursive:true,force:true})}
 },180000)
+
+// A controlled command-path change to the real pinned Playwright definition exercises engine failure.
+test('A2 real engine startup failure keeps the enabled package and exposes failed status', async () => {
+ const {captureFixture}=await import('../../test-fixtures/plugin-helper/fixture')
+ const {convertPluginTree}=await import('../shared/host-extension-package-contract/plugin-conversion.mjs')
+ const slot=engineSlot(sandbox,'a2-failed-startup')
+ const root=join(sandbox.root,'failed-state','env','dev')
+ mkdirSync(root,{recursive:true})
+ process.env.CODEPUPPY_GLOBAL_DIR=root
+ publishTestBootstrap({globalRoot:root})
+ const previous=process.cwd()
+ process.chdir(slot.projectDirectory)
+ const {startEngine}=await import('../../engine/engine-embed')
+ const engine=await startEngine(buildEngineServerOptions({hostname:'127.0.0.1',port:0,password:'a2-failure',engineVersion:'test',databasePath:slot.databasePath,configDirectory:slot.configDirectory,config:{content:'{}'},models:{fetch:false},filewatcher:false,platform:process.platform}),{projectTrust:()=>true})
+ try {
+ const original=await captureFixture('external_plugins/playwright')
+ const definition=JSON.parse(new TextDecoder().decode(await original.readFile('.mcp.json')))
+ const capture=await captureFixture('external_plugins/playwright',{'.mcp.json':JSON.stringify({...definition,playwright:{...definition.playwright,command:'node',args:[join(sandbox.root,'missing-a2-cli.js')]}})})
+ const converted=await convertPluginTree(capture)
+ const {pluginRuntimeIdentity}=await import('./plugin-sources')
+ const connect=async()=>({url:engine.url,username:'opencode',password:'a2-failure'})
+ const installer=createSourceInstaller({globalRoot:()=>root,casBaseRoot:()=>join(sandbox.root,'failed-state'),environment:()=> 'dev',userDataPath:sandbox.root,advisoryGate:()=>({allowed:true}),resolvePackage:async()=>{throw Error('not catalog')},sources:{convertCandidate:async()=>({ok:true,...converted,capture,runtimeIdentity:pluginRuntimeIdentity(converted.package)}),catalogComparisons:async()=>[]},catalogInstall:async()=>{throw Error('not catalog')},activateMcp:(id)=>applyPackageMcpV1(id,slot.projectDirectory,{root:()=>root,awaitServer:connect}),reloadSkills:()=>{throw Error('not skill')},removeDeparting:()=>{}})
+ expect(await installer({requestId:'failed_start_a2',source:{kind:'candidate',candidateId:'cand_controlled_failure'},effect:{kind:'all-projects'},via:'chat'})).toMatchObject({ok:true,packageId:'claude:playwright'})
+ const client=engineClient(await connect())
+ let observed
+ for(const end=Date.now()+15000;;await Bun.sleep(50)) {
+ observed=(await client.mcp.list()).data.find(server=>server.name==='playwright')
+ if(observed&&observed.status.status!=='pending')break
+ if(Date.now()>end)throw Error('failed MCP did not settle')
+ }
+ expect(observed?.status.status).toBe('failed')
+ expect(readPackageLedgerStateV1(root)).toMatchObject({ok:true,packageGraphs:[{packageId:'claude:playwright'}],records:[{kind:'mcp',name:'playwright',desiredState:'enabled'}]})
+ } finally {await engine.close();process.chdir(previous)}
+},30000)

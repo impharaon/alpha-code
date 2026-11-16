@@ -25,7 +25,7 @@ import type { InstalledPackagesResultV1, InstallTarget, ProjectMcpState } from "
 import type { EngineConnection } from "./engine-authorization"
 import { isExtensionName } from "../shared/extension-name"
 import { codepuppyGlobalRoot, findReceipt, listInstalls } from "./codepuppy-installs"
-import { claimMcpSecretVersionDir, mcpSecretVersionedRef, removeMcpSecretVersionDir, removeMcpServerSecrets, removeMcpServerSecretsStrict, writeMcpSecretVersioned } from "./codepuppy-mcp-secrets"
+import { claimMcpSecretVersionDir, collectMcpFileRefPaths, mcpSecretVersionedRef, removeMcpSecretVersionDir, removeMcpServerSecrets, removeMcpServerSecretsStrict, writeMcpSecretVersioned } from "./codepuppy-mcp-secrets"
 import { isMigrationEnabled, removeLegacy, scanLegacy, verifyLegacyProvenance, type ProvenanceRequest } from "./codepuppy-migrate"
 import { assertProjectMcpTransactionRootIdentity, assertProjectRecoveryJournalAlgebra, collectLegacyMcpRefPathsStrict, configHealth, findPluginBaseConflictStrict, gcMcpSecretsAgainstConfig, listConfiguredMcpServerNamesStrict, mcpConfigTruthPath, readLegacyPluginArrayStrict, readMcpLeafStrict, readPluginArrayStrict, removeCommandEntry, removeMcp, removeMcpConfigInLock, removePlugin, removePluginPath, removeProjectMcpConfigInLock, withConfigWriteLock } from "./ext-config"
 import { makeUncuratedInstallBodies } from "./ext-uncurated-bodies"
@@ -91,6 +91,14 @@ import { getLogger } from "./logging"
 import { resolveVerifiedPackageV1, runCatalogInstallWithPackagePreflight } from "./package-installability"
 import { installDesktopPackageV1, readPackageAuthorizationV1, savePackageSecretsV1, type PackageAdmissionDeps, createPackageAdmissionCoordinator } from "./package-admission"
 import { createPackageMcpOauthEngineV1 } from "./package-mcp-oauth"
+import { createPluginSources } from "./plugin-sources"
+import { createSourceInstaller } from "./install-from-source"
+import { createPackageDeclarationResolver } from "./package-declarations"
+import { applyPackageMcpV1, removePackageMcpV1 } from "./package-mcp-activation"
+import type { InstallRequestV1, InstallOutcomeV1 } from "../shared/plugin-install"
+import type { PackageAcceptedFactsV1 } from "./package-installability"
+import { evaluatePackageForHost, validateCatalogPackageShape } from "./package-installability"
+import { capabilitiesForCatalogEntry } from "../shared/ext-capability-authorization"
 import { PROJECT_HIDDEN_DIR } from "../shared/project-hidden-dir"
 
 // REQ-076 T2(阻断②):原实现硬编码 `which` + `:` 拼接的 unix PATH,Windows 上恒报「未安装」
@@ -399,6 +407,8 @@ export function registerExtIpcHandlers(
         rootComponentName: graph.root.name,
         version: packageVersionFromRecordsV1(graph, state.records),
         origin: recordOf(graph.root.kind, graph.root.name)?.origin ?? null,
+        ...(graph.source ? { source: graph.source } : {}),
+        ...(graph.notRunning ? { notRunning: graph.notRunning } : {}),
         components: [graph.root, ...graph.children].map((node) => ({
           componentId: node.componentId,
           kind: node.kind as string,
@@ -416,9 +426,11 @@ export function registerExtIpcHandlers(
     (channel, handler) => ipcMain.handle(channel, handler),
     () => refreshRemoteCatalog(userDataPath, registryChannel),
   )
+  let verifiedDeclarationCatalog: unknown
   const packageAdmissionDeps: PackageAdmissionDeps = {
     loadVerifiedCatalog: async () => {
       const loaded = await refreshRemoteCatalog(userDataPath, registryChannel)
+      verifiedDeclarationCatalog = loaded.source === "none" ? undefined : loaded.catalog
       return loaded.source === "none"
         ? { source: "none", error: loaded.error }
         : {
@@ -448,6 +460,21 @@ export function registerExtIpcHandlers(
   }
   ipcMain.handle("ext-package-authorization", async (_event: IpcMainInvokeEvent, packageId: unknown) => {
     await ledgerReady
+    if (typeof packageId !== "string") return { ok: false, reason: "invalid package identity" }
+    const declarations = await resolvePackageDeclarationsV1(packageId)
+    if (declarations.ok && declarations.origin === "installed") {
+      const items: import("../shared/package-admission").PackageAuthorizationItemV1[] = []
+      for (const entry of declarations.declarations) {
+        const leaf = entry.kind === "mcp" ? readMcpLeafStrict(entry.hostName) : undefined
+        const files = leaf?.ok ? collectMcpFileRefPaths(leaf.value) : []
+        for (const need of entry.secretNeeds) items.push({ kind: "secret", componentId: entry.componentId, prerequisiteId: need.needId, serviceName: entry.hostName, label: need.label, saved: files.some((file) => path.basename(file) === need.needId && fs.existsSync(file)) })
+        if (entry.login) {
+          const current = await packageAdmissionDeps.mcpOauthEngine?.read?.(entry.hostName)
+          items.push({ kind: "mcp-oauth", componentId: entry.componentId, prerequisiteId: entry.componentId + "#oauth", serviceName: entry.hostName, label: entry.sourceName, authenticated: current?.ok === true && current.authenticated, status: current?.ok ? current.status : "unavailable" })
+        }
+      }
+      return { ok: true, packageId, items }
+    }
     return readPackageAuthorizationV1(packageId, packageAdmissionDeps)
   })
   // REQ-128 `#698`:某个 package 在本机装没装(**只读**,不进写通道注册表)。详情页据此决定
@@ -1133,6 +1160,57 @@ export function registerExtIpcHandlers(
       },
     }
   }
+  const pluginSources = createPluginSources({
+    catalog: async () => {
+      const catalog = await resolveEffectiveCatalog()
+      return [...catalog.entries.map((entry) => ({ id: entry.id, source: "catalog" as const, name: entry.name, displayName: entry.displayName, description: entry.description, kind: entry.type === "mcp" ? "mcp" as const : "plugin" as const, upstream: { version: entry.version } })), ...(catalog.packages ?? []).map((entry) => ({ id: entry.catalogId, source: "catalog" as const, name: entry.presentation.displayName, displayName: entry.presentation.displayName, description: entry.presentation.description, kind: "plugin" as const, upstream: { version: entry.presentation.version } }))]
+    },
+    catalogPackage: async (id, version) => {
+      const loaded = await packageAdmissionDeps.loadVerifiedCatalog()
+      if (loaded.source === "none") return
+      const decoded = validateCatalogPackageShape(loaded.catalog)
+      if (!decoded.ok) return
+      const selected = decoded.packages.find((item) => item.prelude.packageId === id && (version === undefined || item.prelude.version === version))
+      if (!selected) return
+      let accepted: PackageAcceptedFactsV1 | undefined
+      await evaluatePackageForHost(selected.envelope, { ...packageAdmissionDeps.installability, accepted: (facts) => { accepted = facts } })
+      return accepted
+    },
+  })
+  const activatePackageMcp = (packageId: string) => applyPackageMcpV1(packageId, codepuppyUserWorkspaceDir(), { root: codepuppyGlobalRoot, awaitServer })
+  const reloadPackageSkills = (packageId: string) => reloads.request({ scope: "global", items: packageReloadItems(packageId), reason: `installed package skills ${packageId}` })
+  const sourceInstaller = createSourceInstaller({
+    globalRoot: codepuppyGlobalRoot, casBaseRoot: () => getCodePuppyEnvironment().casBaseRoot, environment: () => getCodePuppyEnvironment().environment, userDataPath, sources: pluginSources,
+    advisoryGate: (input) => plannerDeps().advisoryGate(input), resolvePackage: (id, version) => plannerDeps().resolvePackage(id, version),
+    activateMcp: activatePackageMcp, reloadSkills: reloadPackageSkills, removeDeparting: async (children) => {
+      const removed = packageChildFileCleanup(children)
+      if (!removed.ok) getLogger().warn("Package departing content cleanup is pending")
+      if (children.length) await removePackageMcpV1({ root: children[0]!, children: children.slice(1) }, codepuppyUserWorkspaceDir(), awaitServer).catch(() => undefined)
+    },
+    catalogInstall: async (catalogId, request): Promise<InstallOutcomeV1> => {
+      const catalog = await resolveEffectiveCatalog()
+      const planner = plannerDeps()
+      const legacy = await planner.resolveEntry(catalogId)
+      const packaged = !legacy
+      const result = await runCatalogInstallWithPackagePreflight({ catalogId, scope: { scope: "global" }, ...(packaged ? { attemptId: request.requestId } : { authorization: { confirmed: legacy ? { [`${legacy.entry.type}--${legacy.entry.name}`]: capabilitiesForCatalogEntry(legacy.entry) } : {} } }) }, {
+        loadVerifiedCatalog: packageAdmissionDeps.loadVerifiedCatalog,
+        installLegacy: (intent) => installCatalog(intent, planner),
+        installPackage: () => installDesktopPackageV1(catalogId, { ...packageAdmissionDeps, advisoryGate: planner.advisoryGate, resolvePackage: planner.resolvePackage }),
+      })
+      if (!result.ok) return { ok: false, code: "transaction-failed", detail: "Catalog entry could not be installed" }
+      const state = readPackageLedgerStateV1(codepuppyGlobalRoot(), { sideEffectFree: true })
+      if (!state.ok) return { ok: false, code: "transaction-failed", detail: "Installed catalog entry could not be read" }
+      const graph = state.packageGraphs.find((graph) => graph.packageId === catalogId)
+      const nodes = graph ? [graph.root, ...graph.children] : state.records.filter((record) => record.id === catalogId)
+      const installed = nodes.flatMap((node) => node.kind === "skill" || node.kind === "mcp" ? [{ kind: node.kind, hostName: node.name, sourceName: node.name }] : [])
+      if (!graph) for (const node of nodes) await setInstallStateByKey({ type: node.kind, name: node.name, scope: "global", state: "enabled" }, planner)
+      await activatePackageMcp(catalogId)
+      if (nodes.some((node) => node.kind === "skill")) reloadPackageSkills(catalogId)
+      return { ok: true, packageId: catalogId, displayName: graph?.displayName ?? catalog.entries.find((entry) => entry.id === catalogId)?.displayName ?? catalogId, source: { kind: "catalog" }, installed, notRunning: graph?.notRunning ?? [] }
+    },
+  })
+  const resolvePackageDeclarationsV1 = createPackageDeclarationResolver({ root: codepuppyGlobalRoot, catalog: () => verifiedDeclarationCatalog })
+
   // #347 root 解析:global 写方恒全局根;uninstall/set-state 由严格 intent 解码定根(project
   // identity fail-closed,与 planner 同口径);解析失败原样返回、零副作用、不进 gate。
   const globalWriteRoot = (..._args: unknown[]) => ({ ok: true as const, root: codepuppyGlobalRoot() })
@@ -1285,18 +1363,20 @@ export function registerExtIpcHandlers(
       projectDir: (projectDir: unknown) => resolveProjectEntry(projectDir),
     },
     bodies: {
+      installFromSource: (request) => sourceInstaller(request as InstallRequestV1),
       installPackage: async (packageId) => {
-        const planner = plannerDeps()
-        const result = await installDesktopPackageV1(packageId, { ...packageAdmissionDeps, advisoryGate: planner.advisoryGate, resolvePackage: planner.resolvePackage })
-        if (!result.ok) return { ok: false, reason: result.reason }
-        const requested = reloads.request({ scope: "global", items: packageReloadItems(packageId as string), reason: `installed package ${packageId}`, connectorChange: true })
-        return { ok: true, ...requested, ...(result.warning ? { warning: result.warning } : {}) }
+        if (typeof packageId !== "string") return { ok: false, reason: "invalid package identity" }
+        const result = await sourceInstaller({ requestId: "hub_" + randomUUID(), source: { kind: "catalog", catalogId: packageId }, effect: { kind: "all-projects" }, via: "hub" })
+        return result.ok ? result : { ok: false, reason: result.detail }
       },
       setPackageState: async (intent) => {
         const result = await setPackageStateV1(intent, plannerDeps())
         if (!result.ok) return result
         const packageId = (intent as { packageId: string }).packageId
-        return { ...result, ...reloads.request({ scope: "global", items: packageReloadItems(packageId), reason: `set package state ${packageId}`, force: true, connectorChange: true }) }
+        await activatePackageMcp(packageId)
+        const state = readPackageLedgerStateV1(codepuppyGlobalRoot(), { sideEffectFree: true })
+        const graph = state.ok && state.packageGraphs.find((entry) => entry.packageId === packageId)
+        return graph && [graph.root, ...graph.children].some((node) => node.kind !== "mcp") ? { ...result, ...reloads.request({ scope: "global", items: packageReloadItems(packageId), reason: `set package state ${packageId}`, force: true }) } : result
       },
       savePackageSecrets: async (intent) => {
         const result = await savePackageSecretsV1(intent, packageAdmissionDeps)
@@ -1349,7 +1429,11 @@ export function registerExtIpcHandlers(
         if (official && !officialRuntime) return { ok: false, reason: "official connector runtime unavailable" }
         if (official) await officialRuntime!.stop()
         try {
-          return await uninstallPackageV1(packageId, { globalRoot: codepuppyGlobalRoot, installers: packageArtifactInstallers() })
+          const state = readPackageLedgerStateV1(codepuppyGlobalRoot(), { sideEffectFree: true })
+          const graph = state.ok && state.packageGraphs.find((entry) => entry.packageId === packageId)
+          const result = await uninstallPackageV1(packageId, { globalRoot: codepuppyGlobalRoot, installers: packageArtifactInstallers() })
+          if (result.ok && graph) await removePackageMcpV1(graph, codepuppyUserWorkspaceDir(), awaitServer).catch(() => undefined)
+          return result
         } finally {
           if (official && !(await officialRuntime!.refresh()))
             return { ok: false, reason: "official-connector-needs-reentry: runtime refresh failed" }
@@ -1445,6 +1529,7 @@ export function registerExtIpcHandlers(
   ipcMain.handle(GATED_WRITE_CHANNELS.uninstallV2, barrier(gatedWrite.uninstallV2))
   ipcMain.handle(GATED_WRITE_CHANNELS.uninstallPackage, barrier(gatedWrite.uninstallPackage))
   ipcMain.handle(GATED_WRITE_CHANNELS.installPackage, barrier(gatedWrite.installPackage))
+  ipcMain.handle(GATED_WRITE_CHANNELS.installFromSource, barrier(gatedWrite.installFromSource))
   ipcMain.handle(GATED_WRITE_CHANNELS.setPackageState, barrier(gatedWrite.setPackageState))
   ipcMain.handle(GATED_WRITE_CHANNELS.savePackageSecrets, barrier(gatedWrite.savePackageSecrets))
   ipcMain.handle(GATED_WRITE_CHANNELS.rollback, barrier(gatedWrite.rollback))
@@ -1562,5 +1647,5 @@ export function registerExtIpcHandlers(
   // #390:同时交出恢复-gate 包装的 global 技能安装器,供 ecosystem gate 走事务安装(不绕恢复准入)。
   // REQ-234 `#1529`:codepuppySidecar 交给 composition root —— spawnLocalServer 在 `child.on("message")` 旁挂它的 receive,
   // ready 时 attach;onViewChanged 接 `ext-hub-view-changed` 推送。
-  return { ledgerReady, ecosystemGlobalSkillInstaller, codepuppySidecar }
+  return { ledgerReady, ecosystemGlobalSkillInstaller, codepuppySidecar, pluginSources, installFromSource: gatedWrite.installFromSource, resolvePackageDeclarationsV1 }
 }

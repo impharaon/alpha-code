@@ -8,6 +8,7 @@
 
 import { readdirSync, readFileSync, statSync } from "node:fs"
 import { join } from "node:path"
+import { decodePackageAllowSet } from "./package-scope"
 
 const GEN_NAME = /^gen-\d{6,}-[a-f0-9]{6,}$/
 const SAFE_KEY = /^skill--[a-zA-Z0-9][a-zA-Z0-9._-]{0,120}$/
@@ -49,14 +50,10 @@ function enabledSkillKeys(codepuppyRoot: string): Set<string> | null {
   } catch {
     return null // 缺失/不可解析 → fail closed
   }
-  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return null
-  const o = parsed as { v?: unknown; keys?: unknown }
-  if (o.v !== 1 || !Array.isArray(o.keys)) return null // 未知版本/形状 → fail closed
-  const out = new Set<string>()
-  for (const k of o.keys) {
-    if (typeof k === "string" && SAFE_KEY.test(k)) out.add(k)
-  }
-  return out
+  const allowSet = decodePackageAllowSet(parsed)
+  if (!allowSet) return null
+  // Directory injection is shared; Location filtering belongs to the post-activation tail/evaluate consumers.
+  return new Set([...allowSet.keys, ...allowSet.scoped.filter((entry) => entry.kind === "skill").map((entry) => `skill--${entry.name}`)].filter((key) => SAFE_KEY.test(key)))
 }
 
 /** 枚举 `<codepuppyRoot>/ext-store/skill--*` 的 live generation 目录(升序,稳定;#395 过账本 enabled 门)。 */

@@ -844,6 +844,13 @@ describe("E2 package allow-set v2", () => {
     expect(projection()).toEqual({ v: 2, keys: [], scoped: [] })
   })
 
+  test("E2 a standalone owner retains its all-projects skill membership", () => {
+    expect(upsertRecordV2(root, upsertInput({ id: "skill:scope-skill", name: "scope-skill", kind: "skill", configKey: undefined })).ok).toBe(true)
+    const effect = scopeFor("alpha")
+    seed(effect)
+    expect(projection()).toEqual({ v: 2, keys: ["skill--scope-skill"], scoped: entries(effect) })
+  })
+
   test.each(["all-to-project", "project-to-project"] as const)("E2 scope shrink publishes tuple intersection before ledger: %s", (mode) => {
     const before = seed(mode === "project-to-project" ? scopeFor("alpha") : undefined)
     const effect = scopeFor("beta")

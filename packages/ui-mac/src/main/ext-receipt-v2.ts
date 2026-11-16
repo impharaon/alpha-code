@@ -22,6 +22,7 @@
 
 import * as fs from "node:fs"
 import * as path from "node:path"
+import { decodePackageAllowSet, type PackageAllowSetV2 } from "../../../ext/src/package-scope"
 import type { InstallReceipt, InstallReceiptOrigin, InstallReceiptType } from "../preload/types"
 import { isExtensionName } from "../shared/extension-name"
 import type { AppEnvironment } from "./codepuppy-environment"
@@ -32,6 +33,7 @@ import {
   LEGACY_PROTECTED_OWNER,
   PACKAGE_LEDGER_ENVELOPE_VERSION,
   bundleOwner,
+  parseOwnerToken,
   computeInstalledGraphDigest,
   decodePackageClaimV1,
   decodePackageGraphV1,
@@ -591,15 +593,29 @@ export function skillsEnabledPath(root: string): string {
   return path.join(root, SKILLS_ENABLED_FILE)
 }
 
-/** 从 raw records(含损坏保全条目)派生 enabled skill 允许集 —— **真 decoder** 判定:
- *  损坏/畸形记录解码失败自然排除,与主进程一切读侧同强度(未知键/digest/id 前缀等不变量全覆盖)。 */
-function enabledSkillKeysFromRecords(records: readonly unknown[]): string[] {
+/** Records, package effects and claims are the authority; this is the sole v2 projection producer. */
+function enabledPackageAllowSet(records: readonly unknown[], graphs: readonly PackageGraphV1[], claims: readonly PackageClaimV1[]): PackageAllowSetV2 {
+  const valid = records.flatMap((record) => {
+    const decoded = decodeRecordV2(record)
+    return decoded.ok ? [decoded.record] : []
+  })
   const keys = new Set<string>()
-  for (const r of records) {
-    const d = decodeRecordV2(r)
-    if (d.ok && d.record.kind === "skill" && d.record.desiredState === "enabled") keys.add(`skill--${d.record.name}`)
+  const scoped = new Map<string, PackageAllowSetV2["scoped"][number]>()
+  for (const record of valid) {
+    if (record.desiredState !== "enabled" || (record.kind !== "skill" && record.kind !== "mcp")) continue
+    const owners = graphs.filter((graph) => [graph.root, ...graph.children].some((node) => node.kind === record.kind && node.name === record.name))
+    const independent = owners.length === 0 || findClaim(claims, record.kind, record.name)?.owners.some((owner) => {
+      const parsed = parseOwnerToken(owner)
+      return parsed?.kind === "standalone" || parsed?.kind === "legacy-protected"
+    })
+    if (record.kind === "skill" && (independent || owners.some((graph) => graph.effect === undefined))) keys.add(`skill--${record.name}`)
+    for (const graph of owners) {
+      if (!graph.effect) continue
+      const entry = { kind: record.kind, name: record.name, projectPath: graph.effect.projectPath }
+      scoped.set(canonicalJson(entry), entry)
+    }
   }
-  return [...keys].sort()
+  return { v: 2, keys: [...keys].sort(), scoped: [...scoped].sort(([left], [right]) => left < right ? -1 : left > right ? 1 : 0).map(([, entry]) => entry) }
 }
 
 function isAbsenceCode(e: unknown): boolean {
@@ -607,7 +623,7 @@ function isAbsenceCode(e: unknown): boolean {
   return code === "ENOENT" || code === "ENOTDIR"
 }
 
-function readDerivationKeys(file: string): string[] | "absent" | "unknown" {
+function readDerivation(file: string): PackageAllowSetV2 | "absent" | "unknown" {
   let text: string
   try {
     text = fs.readFileSync(file, "utf8")
@@ -615,15 +631,13 @@ function readDerivationKeys(file: string): string[] | "absent" | "unknown" {
     return isAbsenceCode(e) ? "absent" : "unknown"
   }
   try {
-    const parsed = JSON.parse(text) as { v?: unknown; keys?: unknown } | null
-    if (!parsed || typeof parsed !== "object" || parsed.v !== 1 || !Array.isArray(parsed.keys)) return "unknown"
-    return parsed.keys.filter((k): k is string => typeof k === "string")
+    return decodePackageAllowSet(JSON.parse(text)) ?? "unknown"
   } catch {
     return "unknown"
   }
 }
 
-const derivationTextOf = (keys: readonly string[]): string => JSON.stringify({ v: 1, keys }, null, 2) + "\n"
+const derivationTextOf = (allowSet: PackageAllowSetV2): string => JSON.stringify(allowSet, null, 2) + "\n"
 
 export type SkillsDerivationOutcome =
   | { ok: true }
@@ -654,8 +668,7 @@ export function reconcileSkillsDerivation(root: string): SkillsDerivationOutcome
   try {
     // Codex r12 B3:只喂**干净 records**(parsed.records 已排除损坏/重复 key);rawCorruptRecords 含能
     // 解码的重复条目,若重新解码会把已 fail-closed 的 skill 重新放进允许集 —— 绝不喂。
-    const keys = enabledSkillKeysFromRecords(parsed.records)
-    writeFileAtomicSync(file, derivationTextOf(keys))
+    writeFileAtomicSync(file, derivationTextOf(enabledPackageAllowSet(parsed.records, parsed.packageGraphs, parsed.claims)))
     return { ok: true }
   } catch (error) {
     // 写失败 = 旧派生原样保留,可能列出已在账本禁用的 skill(过度授权)→ fail-closed。
@@ -693,21 +706,17 @@ function writeLedgerFile(
     fs.mkdirSync(root, { recursive: true })
     const file = ledgerPath(root)
     const derivationFile = skillsEnabledPath(root)
-    const nextKeys = enabledSkillKeysFromRecords(records)
-    const cur = readDerivationKeys(derivationFile)
-    // 收窄先行:算出「账本写之前必须落盘的更严格允许集」。
-    //   · unknown(派生损坏)→ 空集(无从算交集,最严格 fail-closed)。
-    //   · array 且有键将被移除 → current ∩ next(只留仍授权的,移除立即生效)。
-    //   · absent / array 无移除 → 无需 pre-write。
-    let preKeys: string[] | null = null
-    if (cur === "unknown") preKeys = []
-    else if (Array.isArray(cur)) {
-      const intersection = cur.filter((k) => nextKeys.includes(k))
-      if (intersection.length !== cur.length) preKeys = intersection
+    const next = enabledPackageAllowSet(records, v3.packageGraphs, v3.claims)
+    const cur = readDerivation(derivationFile)
+    // Scope is part of each member's identity: all→project and alpha→beta both revoke before adding.
+    const intersection: PackageAllowSetV2 | undefined = cur === "absent" ? undefined : cur === "unknown" ? { v: 2, keys: [], scoped: [] } : {
+      v: 2,
+      keys: cur.keys.filter((key) => next.keys.includes(key)),
+      scoped: cur.scoped.filter((entry) => next.scoped.some((item) => item.kind === entry.kind && item.name === entry.name && item.projectPath === entry.projectPath)),
     }
-    if (preKeys !== null) {
+    if (intersection && canonicalJson(intersection) !== canonicalJson(cur)) {
       try {
-        writeFileAtomicSync(derivationFile, derivationTextOf(preKeys))
+        writeFileAtomicSync(derivationFile, derivationTextOf(intersection))
       } catch (error) {
         // 账本尚未写 → 回到起点(旧账本 + 旧派生一致),安全 fail-closed,用户/调用方可重试。
         return { ok: false, reason: `refusing ledger write: could not shrink skills allow-list first (a stale entry may still enable a disabled skill): ${error instanceof Error ? error.message : String(error)}` }
@@ -722,10 +731,10 @@ function writeLedgerFile(
       : { v: 2, receipts, records }
     writeFileAtomicSync(file, JSON.stringify(payload, null, 2) + "\n") // 账本 durable
     // 完整 next 发布(新增在账本之后):absent 首建、pre 后补新增、纯扩容都需要;已相等则跳过。
-    const alreadyFinal = preKeys === null && Array.isArray(cur) && cur.length === nextKeys.length && cur.every((k) => nextKeys.includes(k))
+    const alreadyFinal = cur !== "absent" && cur !== "unknown" && canonicalJson(cur) === canonicalJson(next)
     if (!alreadyFinal) {
       try {
-        publishFinal(derivationFile, derivationTextOf(nextKeys))
+        publishFinal(derivationFile, derivationTextOf(next))
       } catch (error) {
         // 派生停在更严格态(空集 / 交集 / 旧集去掉移除项)= skill 少注入 = 安全侧;账本已 durable,
         // 下次 boot reconcile 按账本重算补齐。不让整体失败(账本才是真源)—— #336:但**如实上报**:
@@ -1625,6 +1634,7 @@ export function applyPackageMutation(root: string, mutation: PackageLedgerMutati
   ]
   const written = writeLedgerFile(root, nextReceipts, nextRecords, { packageGraphs: nextGraphs, claims })
   if (!written.ok) return written
+  if (written.projectionLag) warnings.push(written.projectionLag)
   return { ok: true, replayed: false, warnings }
 }
 

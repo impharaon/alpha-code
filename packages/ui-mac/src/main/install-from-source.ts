@@ -33,7 +33,7 @@ import {
   buildSkillTxItems,
   type PackageTxBuildV1,
 } from "./ext-package-tx-builders"
-import { readPackageLedgerStateV1, type UpsertInput } from "./ext-receipt-v2"
+import { projectScopeIdentity, readPackageLedgerStateV1, type UpsertInput } from "./ext-receipt-v2"
 import { runExtensionTransaction } from "./ext-transaction"
 import { FACTORY_SKILL_IDS } from "./factory-skills"
 import { releaseOfficialConnectorResources } from "./official-connector-resources"
@@ -64,6 +64,9 @@ export function createSourceInstaller(deps: Dependencies) {
         ? known.result
         : { ok: false, code: "unknown-id", detail: "Installation request ID belongs to a different request" }
     const pending = (async (): Promise<InstallOutcomeV1> => {
+      const project = request.effect?.kind === "project" ? projectScopeIdentity(request.effect.directory) : undefined
+      if (project && !project.ok)
+        return { ok: false, code: "transaction-failed", detail: project.reason }
       if (request.source.kind === "catalog") return deps.catalogInstall(request.source.catalogId, request)
       if (request.source.kind !== "candidate")
         return { ok: false, code: "unknown-id", detail: "Source is not an issued candidate" }
@@ -322,6 +325,7 @@ export function createSourceInstaller(deps: Dependencies) {
         root: nodes[0]!,
         children: nodes.slice(1),
         source,
+        ...(project?.ok ? { effect: project.scope } : {}),
         notRunning,
         declarations,
       }

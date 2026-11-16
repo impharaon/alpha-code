@@ -803,12 +803,12 @@ test("`#817` signed package children flip on through the production ext-set-inst
   // 安装后 skill / agent / mcp 三类可启停 child 均 disabled(catalog 首装缺省)—— #817 报的现场。
   expect(cfg().agent["generic-bundle-agent"].disable).toBe(true)
   expect(cfg().mcp["generic-bundle-remote"].enabled).toBe(false)
-  expect(allow()).toEqual({ v: 1, keys: [] })
+  expect(allow()).toEqual({ v: 2, keys: [], scoped: [] })
 
   // skill:拨开 → 引擎允许集当场出现它。
   const skillOn = (await setState({ sender: { id: 1 } }, { type: "skill", name: "generic-bundle-skill", scope: "global", state: "enabled" })) as { ok: boolean; reason?: string }
   expect(skillOn.ok, skillOn.reason).toBe(true)
-  expect(allow()).toEqual({ v: 1, keys: ["skill--generic-bundle-skill"] })
+  expect(allow()).toEqual({ v: 2, keys: ["skill--generic-bundle-skill"], scoped: [] })
 
   // agent:拨开 → disable 投影解除。
   const agentOn = (await setState({ sender: { id: 1 } }, { type: "agent", name: "generic-bundle-agent", scope: "global", state: "enabled" })) as { ok: boolean; reason?: string }

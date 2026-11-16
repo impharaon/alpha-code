@@ -3353,7 +3353,11 @@ function computeEnableProjectionEdit(
   /** `#1381`:真源里的远程 MCP 名字 —— 它们在 codepuppy.jsonc 里没有叶,启停不投影 config(见函数体)。 */
   remoteMcpNames: ReadonlySet<string>,
 ): { ok: true; edit?: ConfigEdit } | { ok: false; reason: string } {
-  const disable = state === "disabled"
+  const packages = record.kind === "mcp" ? readPackageLedgerStateV1(root, { sideEffectFree: true }) : undefined
+  if (packages && !packages.ok) return { ok: false, reason: packages.reason }
+  // Package intent stays enabled; only a matching Location may enable a project MCP at runtime.
+  const projectOnly = packages?.ok && packages.packageGraphs.some((graph) => graph.effect && [graph.root, ...graph.children].some((node) => node.kind === "mcp" && node.name === record.name))
+  const disable = state === "disabled" || projectOnly
   if (record.kind === "plugin") {
     const ck = record.configKey ?? ""
     const isPath = ck.startsWith("plugin-path:")
@@ -3407,9 +3411,11 @@ function computeEnableProjectionEdit(
   const leaf = isObj(map) ? map[record.name] : undefined
   if (!isObj(leaf)) {
     // `#1381`:远程 MCP 的记录住在真源(mcp-servers/<env>.json),codepuppy.jsonc 里没有它的叶 —— 启停只翻账本,生效面是 sidecar 注入
-    // (disable:injectDisabledOverrides 压 enabled:false;enable:注入面从真源发出完整条目)。两个方向都没有 config edit。
+    // (disable:injectDisabledOverrides 压 enabled:false;enable:注入面从真源发出完整条目)。项目包另留 enabled:false 覆盖,
+    // 定义仍只在远程真源;匹配项目的 Location 才能开启。
     // 真源坏了 / 位置未知 ⇒ 名单读成空 ⇒ enable 照旧按「缺生效面」拒(fail closed),disable 照旧只翻账本。
-    if (record.kind === "mcp" && remoteMcpNames.has(record.name)) return { ok: true }
+    if (record.kind === "mcp" && remoteMcpNames.has(record.name))
+      return projectOnly ? { ok: true, edit: { keyPath: ["mcp", record.name], value: { enabled: false } } } : { ok: true }
     return disable ? { ok: true } : { ok: false, reason: `${record.kind} ${record.name}: config entry missing — cannot enable (reinstall to repair)` }
   }
   if (disable) {

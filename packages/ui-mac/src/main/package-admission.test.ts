@@ -132,6 +132,29 @@ test("one package switch projects every skill and connector from the package gra
   if (ledger.ok) expect(ledger.records.map((record) => record.desiredState)).toEqual(["enabled", "enabled", "enabled"])
 })
 
+test("package activation and switch work when main-owned remote definitions require no JSONC edits", async () => {
+  const { readMcpServerRecords } = await import("./mcp-server-records")
+  const { initCodePuppyEnvironment, __resetCodePuppyEnvironmentForTests } = await import("./codepuppy-environment")
+  const { installDesktopPackageV1 } = await import("./package-admission")
+  const { setPackageStateV1 } = await import("./ext-install-planner")
+  const deps = desktopDeps()
+  delete process.env.CODEPUPPY_GLOBAL_DIR
+  initCodePuppyEnvironment({ isPackaged: false, channel: "dev", appDataDir: tmp, baseRoot: join(tmp, "codepuppy-state"), homeDir: join(tmp, "home") })
+  try {
+    expect((await installDesktopPackageV1("package:supabase", deps)).ok).toBe(true)
+    expect(readMcpServerRecords(() => {}).map((record) => record.name)).toContain("supabase")
+    const installed = readPackageLedgerStateV1(root)
+    expect(installed.ok && installed.records.map((record) => record.desiredState)).toEqual(["enabled", "enabled", "enabled"])
+    const config = readFileSync(join(root, "codepuppy.jsonc"), "utf8")
+    for (const state of ["disabled", "enabled"] as const) {
+      expect(await setPackageStateV1({ packageId: "package:supabase", state }, deps)).toMatchObject({ ok: true })
+      const ledger = readPackageLedgerStateV1(root)
+      expect(ledger.ok && ledger.records.map((record) => record.desiredState)).toEqual([state, state, state])
+      expect(readFileSync(join(root, "codepuppy.jsonc"), "utf8")).toBe(config)
+    }
+  } finally { __resetCodePuppyEnvironmentForTests() }
+})
+
 beforeEach(() => {
   tmp = mkdtempSync(join(tmpdir(), "package-admission-"))
   root = join(tmp, "root")

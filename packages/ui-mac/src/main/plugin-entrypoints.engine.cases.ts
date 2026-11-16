@@ -180,12 +180,12 @@ afterAll(async () => {
   Object.assign(console, consoleOriginal)
 })
 
-async function verifyOpenCodeLifecycle(packageId: string, nativeReason: "native-js-plugin" | "missing-entry") {
+async function verifyOpenCodeLifecycle(packageId: string, unsupported: { kind: string; sourceName: string; reason: string }) {
   const state = await ledger()
   expect(state.packageGraphs).toHaveLength(1)
   const graph = state.packageGraphs[0]!
   expect(graph.packageId).toBe(packageId)
-  expect(graph.notRunning).toContainEqual({ kind: "plugin", sourceName: provenance.opencode.name, reason: nativeReason })
+  expect(graph.notRunning).toContainEqual(unsupported)
   const names = state.records.filter(record => record.kind === "skill").map(record => record.name).sort()
   expect(names.length).toBeGreaterThan(30)
   const inventory = async () => (await skills()).filter(skill => names.includes(skill.name))
@@ -220,7 +220,7 @@ test("BC5 chat installs pinned OpenCode skills, native JS is not loaded, off/on/
   const candidate = found.candidates.find(candidate => candidate.source === "opencode-npm")!
   const packageId = await chatInstall(candidate.id)
   expect((await ledger()).packageGraphs[0]!.source).toMatchObject({ kind: "npm", ecosystem: "opencode", name: provenance.opencode.name, version: "3.0.6" })
-  await verifyOpenCodeLifecycle(packageId, "native-js-plugin")
+  await verifyOpenCodeLifecycle(packageId, { kind: "plugin", sourceName: provenance.opencode.name, reason: "native-js-plugin" })
 }, 90_000)
 
 test("BC5 the main folder picker installs the same real OpenCode package as one managed graph", async () => {
@@ -229,7 +229,7 @@ test("BC5 the main folder picker installs the same real OpenCode package as one 
   if (!prepared.ok || prepared.prepared.kind !== "package") throw Error(JSON.stringify(prepared))
   const packageId = await sourceInstall(prepared.prepared.candidateId)
   expect((await ledger()).packageGraphs[0]!.source).toEqual({ kind: "local-folder" })
-  await verifyOpenCodeLifecycle(packageId, "native-js-plugin")
+  await verifyOpenCodeLifecycle(packageId, { kind: "plugin", sourceName: provenance.opencode.name, reason: "native-js-plugin" })
 }, 90_000)
 
 test("BC5 the Git address pins the same OpenCode version and installs whole-package skills", async () => {
@@ -238,7 +238,7 @@ test("BC5 the Git address pins the same OpenCode version and installs whole-pack
   const converted = await main.pluginSources.convertCandidate(prepared.prepared.candidateId)
   expect(converted.ok && converted.package.version).toBe("3.0.6")
   expect(converted.ok && converted.capture.source.commit).toBe(provenance.opencode.commit)
-  await verifyOpenCodeLifecycle(await sourceInstall(prepared.prepared.candidateId), "missing-entry")
+  await verifyOpenCodeLifecycle(await sourceInstall(prepared.prepared.candidateId), { kind: "definition", sourceName: "index.js", reason: "missing-entry" })
 }, 90_000)
 
 test("BC5 standalone official Registry GitHub uses main-owned credentials, runtime tools, off and removal", async () => {

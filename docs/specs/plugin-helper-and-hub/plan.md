@@ -727,3 +727,6 @@ BC5 先行资料与用例：新增 `test-fixtures/plugin-helper/entrypoints/`，
 BC5 宿主接线修正（独立测试提交）：首红的 main 重载请求和 ext 的 reloaded 回报均正常，库存仍只有内置技能；新宿主漏了生产 `sidecar.ts:154` 的 `watchExplicitSources`，且 `codepuppyEngine` 默认 filewatcher=false（引擎不重读显式文件）。仅在新 cases 的启动中接同一个生产监听／`explicitSkillDirs` 算法并使用生产启用的文件监听，不手工拼技能目录、不加重启、不改变任何库存／关闭／移除断言。正向原生 JS 监测与真实 npm 树准备移到 beforeAll，单独筛 folder/Git 例也能独立运行。`bun test --max-concurrency 2 --test-name-pattern '^BC5 chat installs' ./src/main/plugin-entrypoints.engine.cases.ts` exit 0，1 pass／61 assertions（`r10-bc5-chat-watching.log`）；没有修改生产。
 
 遗留去向：`package-hub-lifecycle.engine.cases.ts:266` — 用现有 H 宿主作一次对照时 action 在等待 refreshes 增量处超时，日志 `r10-bc5-harness-control.log`（同名筛选 0 pass／1 fail）；该宿主既有刷新计数前提由 H／编排器处置，本轮不调查或修改，未把它当作通过证据。
+
+
+BC5 固定样本字面期望更正（单独提交，standing ruling）：`plugin-entrypoints.engine.cases.ts:188/241` 原把 Git 树不存在的构建入口期待为 plugin／包名；真实 `repository.tar.gz`（provenance 所记 gitHead）里的 package.json 声明 main `dist/index.js`，树没有此文件。按 design v5 §4.1 对 missing-entry 的既定映射，图项实际是 definition／index.js／missing-entry。只改这一字面三元组，仍断言同版本、缺失入口真实原因与 JS 零加载，npm/folder 的 native-js-plugin 三元组不变。`r10-bc5-engine-watching.log` 2 pass／3 fail，其中首红为此字面，其余均残留图级联，不作为行为变化或独立缺陷。

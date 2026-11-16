@@ -3,7 +3,10 @@
 // core/test/fixture/mcp-echo.ts, not a claimed GitHub/Supabase service acceptance.
 import { afterAll, beforeAll, expect, mock, test } from "bun:test"
 import { readFileSync } from "node:fs"
-import { join } from "node:path"
+import { join, resolve } from "node:path"
+import { mixedBundleFixture } from "../../test-component/package-mixed-bundle.fixture"
+import type { CodePuppyPackageEnvelopeV1 } from "../shared/host-extension-package-contract/decoder"
+import { canonicalArtifactJsonBytesV1, HOST_EXTENSION_PACKAGE_CORPUS } from "../shared/host-extension-package-contract/generate-artifact"
 import { engineSandbox, assertEngineSandboxed } from "../../test-component/engine-sandbox"
 import { hubPackageFixture } from "../../test-component/hub-package.fixture"
 import type { Running } from "../../test-component/codepuppy-engine"
@@ -27,9 +30,11 @@ let running: Running | undefined
 let model: Awaited<ReturnType<(typeof import("../../test-component/codepuppy-engine"))["scriptedModel"]>>
 let host: Awaited<ReturnType<(typeof import("../../test-component/codepuppy-engine"))["codepuppyEngine"]>>
 let main: ReturnType<(typeof import("./ext-ipc"))["registerExtIpcHandlers"]>
+let refreshFailure = ""
 let refreshes = 0
 let toolCalls = 0
 let runtimeInitializes = 0
+let cloudEndpoint: ReturnType<typeof Bun.serve> | undefined
 let root = ""
 let initialPolicy = ""
 let echo: ReturnType<(typeof import("../../../core/test/fixture/mcp-echo"))["echoMcpHandler"]>
@@ -56,7 +61,8 @@ const mcpStatus = async (name: string) =>
 async function action(channel: string, ...args: unknown[]) {
   const before = refreshes
   expect(await invoke(channel, ...args)).toMatchObject({ ok: true })
-  await until(() => refreshes > before, channel)
+  await until(() => refreshes > before || !!refreshFailure, channel)
+  if (refreshFailure) throw new Error(refreshFailure)
 }
 
 beforeAll(async () => {
@@ -64,16 +70,23 @@ beforeAll(async () => {
   await sample.verify()
   const { echoMcpHandler } = await import("../../../core/test/fixture/mcp-echo")
   echo = echoMcpHandler()
+  // Existing host decoder corpus + producer-derived mixed bundle (with real markdown assets).
+  const corpus = await Bun.file(resolve(import.meta.dir, "../shared/host-extension-package-contract", HOST_EXTENSION_PACKAGE_CORPUS)).json() as { cases: Array<{ name: string; envelope: CodePuppyPackageEnvelopeV1; components: Array<{ payload: unknown }> }> }
+  const cloud = corpus.cases.find((entry) => entry.name === "cloud-v1")!
+  const bundle = mixedBundleFixture()
+  const payloads = new Map([...bundle.payloadByDigest, [cloud.envelope.components[0]!.payloadRef.sha256, canonicalArtifactJsonBytesV1(cloud.components[0]!.payload)] as const])
+  sample.packages.push(cloud.envelope, bundle.envelope)
   const bytes = new Map<string, Uint8Array>()
   const urls: string[] = []
   for (const component of sample.packages.flatMap((entry) => entry.components)) {
-    const payload = await sample.fetchBytes(component.payloadRef)
+    const payload = payloads.get(component.payloadRef.sha256) ?? await sample.fetchBytes(component.payloadRef)
     bytes.set(component.payloadRef.url, payload)
     const decoded = JSON.parse(new TextDecoder().decode(payload)) as {
-      behavior: { url?: string; files?: Array<{ url: string; bytes: number; sha256: string }> }
+      behavior: { url?: string; asset?: { url: string; bytes: number; sha256: string }; template?: { url: string; bytes: number; sha256: string }; files?: Array<{ url: string; bytes: number; sha256: string }> }
     }
     if (decoded.behavior.url) urls.push(decoded.behavior.url)
-    for (const ref of decoded.behavior.files ?? []) bytes.set(ref.url, await sample.fetchBytes(ref))
+    for (const ref of [decoded.behavior.asset, decoded.behavior.template, ...decoded.behavior.files ?? []])
+      if (ref) bytes.set(ref.url, bundle.assetByDigest.get(ref.sha256) ?? await sample.fetchBytes(ref))
   }
   globalThis.fetch = (async (input, init) => {
     const request = new Request(input, init)
@@ -145,7 +158,12 @@ beforeAll(async () => {
   }
   const { codepuppyEngine, scriptedModel } = await import("../../test-component/codepuppy-engine")
   model = scriptedModel()
-  host = codepuppyEngine({ sandbox, name: "hub-lifecycle", modelBaseURL: model.baseURL })
+  cloudEndpoint = Bun.serve({ hostname: "127.0.0.1", port: 0, fetch: (request) => echo.fetch(request) })
+  const { testCloudMcp } = await import("../../test-component/codepuppy-bootstrap-fixture")
+  const { secretFilePath } = await import("./codepuppy-secret-files")
+  host = codepuppyEngine({ sandbox, name: "hub-lifecycle", modelBaseURL: model.baseURL,
+    cloudMcp: testCloudMcp(`http://127.0.0.1:${cloudEndpoint.port}/mcp`, secretFilePath(join(sandbox.root, "hub-lifecycle-userdata"), "CODEPUPPY_MCP_TOKEN"), "hub-cloud"),
+  })
   process.chdir(host.projectDirectory)
   const { codepuppyBootstrap } = await import("@opencode/util/codepuppy-bootstrap")
   root = codepuppyBootstrap().paths.globalRoot
@@ -172,6 +190,7 @@ beforeAll(async () => {
         await running?.close()
       },
       refresh: async () => {
+        try {
         await running?.close()
         const injection = injectCodePuppyConfig(
           host.userData,
@@ -186,6 +205,10 @@ beforeAll(async () => {
         running = await host.start()
         refreshes++
         return true
+        } catch (error) {
+          refreshFailure = error instanceof Error ? error.message : String(error)
+          throw error
+        }
       },
     },
     async () => undefined,
@@ -203,6 +226,7 @@ afterAll(async () => {
   await running?.close()
   model?.stop()
   await echo?.close()
+  cloudEndpoint?.stop(true)
   globalThis.fetch = nativeFetch
   process.chdir(previousCwd)
   Object.assign(console, consoleOriginal)
@@ -372,3 +396,33 @@ test("all package skills leave and return to the callable inventory and disappea
   expect(after.ok && after.packageGraphs).toEqual([])
   expect(after.ok && after.records).toEqual([])
 }, 60_000)
+
+
+test("cloud-only package switch withdraws and restores real engine tools", async () => {
+  const { syncSecretFiles } = await import("./codepuppy-secret-files")
+  const { probe } = await import("../../test-component/codepuppy-engine")
+  syncSecretFiles(host.userData, { CODEPUPPY_MCP_TOKEN: "invalid-local-cloud-r4", CODEPUPPY_API_KEY: "invalid-local-model-r4" })
+  const tools = async () => (await probe().ctx.tool.list()).filter((tool: { options?: { namespace?: string } }) => tool.options?.namespace === "hub-cloud")
+  await action("ext-install-package", "package:cloud-v1")
+  await until(async () => await mcpStatus("hub-cloud") === "connected", "enabled cloud package connected")
+  await until(async () => (await tools()).length > 0, "cloud tool inventory")
+  expect((await tools()).length).toBeGreaterThan(0)
+  await action("ext-set-package-state", { packageId: "package:cloud-v1", state: "disabled" })
+  expect(await mcpStatus("hub-cloud")).toBeUndefined()
+  expect(await tools()).toEqual([])
+  await action("ext-set-package-state", { packageId: "package:cloud-v1", state: "enabled" })
+  await until(async () => await mcpStatus("hub-cloud") === "connected", "cloud package re-enabled")
+  await until(async () => (await tools()).length > 0, "cloud tool inventory")
+  expect((await tools()).length).toBeGreaterThan(0)
+})
+
+test("package command switch withdraws and restores the real engine declaration", async () => {
+  const commands = async () => (await send("GET", "/api/command")).json.data.map((command: { name?: string; id: string }) => command.name ?? command.id) as string[]
+  await action("ext-install-package", "package:generic-bundle")
+  await until(async () => (await commands()).includes("generic-bundle-command"), "enabled package command")
+  expect(await commands()).toContain("generic-bundle-command")
+  await action("ext-set-package-state", { packageId: "package:generic-bundle", state: "disabled" })
+  expect(await commands()).not.toContain("generic-bundle-command")
+  await action("ext-set-package-state", { packageId: "package:generic-bundle", state: "enabled" })
+  expect(await commands()).toContain("generic-bundle-command")
+})

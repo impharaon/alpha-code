@@ -172,3 +172,6 @@ r4 审查处置（Claude Opus 5.5，只读 range `origin/alpha...5b46447823`，r
 相关官方全文件检查暴露未改边界：`test-component/official-connectors.cases.ts:586` — 将 TMPDIR 设为 HOME 后 officialRuntimeRoot 未抛 needs-reentry，独立具名确认仍 exit 1（0 pass / 1 fail）；该运行目录实现本轮仅导出另一函数、此边界未改，不作为凭据修复通过证据。去向：编排器安排既有 runtime-root 环境边界问题；不扩修。
 
 r4 仅记录的遗留（续派明确排除）：`package-admission.ts` — busy 时直装未 force，交 helper 片 runtime MCP add；`readPackageAuthorizationV1` — MCP 状态刷新逐包重取远程 catalog，交 intent；`resolveInstalledPackage` — 授权读取依赖已装版本仍在当前 catalog，交 intent；`ext-config.ts:536` — remote truth 损坏也会阻断 local MCP 严格读，交 intent。以上均无代码改动。
+
+
+r4 B1 补红：`bun test --max-concurrency 2 ./src/main/package-hub-lifecycle.engine.cases.ts -t 'cloud-only package switch|package command switch'` exit 1（0 pass / 2 fail）：真实云 MCP 关闭后仍 connected；真实 mixed-bundle 的 command 在直装内容落关闭阶段被旧 R4-1 拒绝。夹具复用 HOST_EXTENSION_PACKAGE_CORPUS 的 cloud-v1 原字节、producer-derived mixedBundleFixture 与 core SDK echo handler；云 fixture 的 server 名用启动文档已支持的 hub-cloud，避开既有 codepuppy_echo 工具名碰撞，不改协议或引擎。新增两条 inventory 正反对照要求开→关→开的真实工具/command 清单；原三条生命周期行为断言保持。

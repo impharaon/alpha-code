@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test"
-import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync } from "node:fs"
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 import { fixtureFetch } from "../../test-fixtures/plugin-helper/source-fetch"
@@ -14,17 +14,17 @@ import { runExtensionTransaction } from "./ext-transaction"
 // Real, pinned Registry definitions and their provenance are shared with the source/converter cases.
 // The multi-secret query uses the recorded search envelope with its one server replaced by the real
 // recorded agentfetch version; no third-party definition is synthesized.
-async function withPackage(multiple: boolean, run: (h: Awaited<ReturnType<typeof installPackage>>) => Promise<void>) {
+async function withPackage(multiple: boolean, run: (h: Awaited<ReturnType<typeof installPackage>>) => Promise<void>, projectOnly = false) {
   const directory = mkdtempSync(join(tmpdir(), "plugin-accounts-"))
   const previous = process.env.CODEPUPPY_GLOBAL_DIR
   process.env.CODEPUPPY_GLOBAL_DIR = join(directory, "env", "dev")
-  try { await run(await installPackage(directory, multiple)) } finally {
+  try { await run(await installPackage(directory, multiple, projectOnly)) } finally {
     if (previous === undefined) delete process.env.CODEPUPPY_GLOBAL_DIR
     else process.env.CODEPUPPY_GLOBAL_DIR = previous
     rmSync(directory, { recursive: true, force: true })
   }
 }
-async function installPackage(directory: string, multiple: boolean) {
+async function installPackage(directory: string, multiple: boolean, projectOnly: boolean) {
   const fixture = join(import.meta.dir, "../../test-fixtures/plugin-helper/registry")
   const record = await Bun.file(join(fixture, multiple ? "pypi-registry-version.json" : "github-registry-version.json")).json()
   const source = record.server.name as string
@@ -45,7 +45,9 @@ async function installPackage(directory: string, multiple: boolean) {
   const install = createSourceInstaller({ ...deps, sources, catalogInstall: async () => ({ ok: false, code: "unknown-id", detail: "no catalog" }), activateMcp: async () => {}, reloadSkills: () => {}, removeDeparting: () => {} })
   const candidate = (await sources.searchSources(source)).candidates.find(item => item.source === "mcp-registry")!
   expect(candidate).toBeDefined()
-  const installed = await install({ requestId: "account_install_01", source: { kind: "candidate", candidateId: candidate.id }, effect: { kind: "all-projects" }, via: "chat" })
+  const project = join(directory, "project")
+  if (projectOnly) mkdirSync(project)
+  const installed = await install({ requestId: "account_install_01", source: { kind: "candidate", candidateId: candidate.id }, effect: projectOnly ? { kind: "project", directory: project } : { kind: "all-projects" }, via: "chat" })
   expect(installed.ok, JSON.stringify(installed)).toBe(true)
   if (!installed.ok) throw Error(installed.detail)
   const before = readPackageLedgerStateV1(root())
@@ -121,3 +123,15 @@ test("BC3 a real multi-secret MCP accepts partial account updates and preserves 
   expect(existsSync(dirname(retained))).toBe(false)
   expect(readFileSync(secondFile, "utf8")).toBe("bc3-second-invalid-key")
 }))
+
+
+test("BC3 saving credentials preserves a package's existing project-only global disable projection", () => withPackage(false, async h => {
+  expect(h.graph.effect?.kind).toBe("project")
+  expect(readMcpLeafStrict(h.declaration.hostName)).toMatchObject({ok:true,value:{enabled:false}})
+  const id=h.declaration.secretNeeds[0]!.needId
+  expect(await savePackageSecretsV1({packageId:h.packageId,secrets:{[id]:"bc3-project-invalid-token"}},h.deps)).toEqual({ok:true})
+  expect(readMcpLeafStrict(h.declaration.hostName)).toMatchObject({ok:true,value:{enabled:false}})
+  const state=readPackageLedgerStateV1(h.root())
+  expect(state.ok&&state.packageGraphs).toEqual(h.before.packageGraphs)
+  expect(readdirSync(join(h.directory,"project"))).toEqual([])
+}, true))

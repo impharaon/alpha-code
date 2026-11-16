@@ -6,10 +6,14 @@ import { publishTestBootstrap } from "../../test-component/codepuppy-bootstrap-f
 import { fixtureFetch } from "../../test-fixtures/plugin-helper/source-fetch"
 import { skillGenerationLiveDirs } from "../../../ext/src/gen-skill-paths"
 import { createPluginSources } from "./plugin-sources"
-import { createSourceInstaller } from "./install-from-source"
+import { createSourceInstaller, installCatalogFromSource } from "./install-from-source"
 import { buildEngineServerOptions } from "./engine-server-options"
 import { engineClient } from "./engine-client"
 import { makeRecoveryGate } from "./ext-recovery-gate"
+import { applyMcpWritePolicy } from "./ext-mcp-policy"
+import { collectLegacyMcpRefPathsStrict, gcMcpSecretsAgainstConfig, mcpConfigTruthPath, readMcpLeafStrict } from "./ext-config"
+import type { PlannerDeps } from "./ext-install-planner"
+import type { CatalogEntry } from "../renderer/extensions/catalog-types"
 import { setPackageStateV1 } from "./ext-install-planner"
 import { applyPackageMutation, projectScopeIdentity, readPackageLedgerStateV1 } from "./ext-receipt-v2"
 import { computeInstalledGraphDigest } from "./ext-package-ledger-v3"
@@ -187,5 +191,59 @@ test("project MCP activates only in matching Locations and scope narrowing revok
     expect((await h.client.mcp.list()).data.some((server) => server.name === "playwright")).toBe(false)
     expect((await h.client.mcp.list({ location: { directory: h.other } })).data.some((server) => server.name === "playwright")).toBe(false)
     expect([snapshot(h.slot.projectDirectory), snapshot(h.other)]).toEqual(h.snapshots)
+  } finally { await h.close(); (await import("node:fs")).rmSync(sockets, { recursive: true, force: true }); delete process.env.PWTEST_SOCKETS_DIR }
+}, 180000)
+
+
+test("catalog item is usable only in project A and leaves both projects' config bytes unchanged", async () => {
+  const h = await harness("scope-native-catalog", false)
+  const sockets = (await import("node:fs")).mkdtempSync("/tmp/catalog-pw-")
+  process.env.PWTEST_SOCKETS_DIR = sockets
+  const unexpected = (): never => { throw Error("unexpected adapter: the real pinned catalog fixture needs neither credentials nor non-MCP installers") }
+  const entry = await Bun.file(join(import.meta.dir, "../../test-fixtures/plugin-helper/catalog-scope/playwright.json")).json() as CatalogEntry
+  const native: PlannerDeps = {
+    ...h.planner, platform: () => process.platform, environment: () => "dev", casBaseRoot: () => join(h.root, "cas"),
+    resolveEntry: async (id) => id === entry.id ? { entry, channel: "bundled", catalogVersion: entry.version! } : null,
+    resolvePackage: unexpected,
+    installers: {
+      applyMcpWritePolicy, readMcpLeafStrict, mcpConfigTruthPath,
+      gcMcpSecrets: (name) => gcMcpSecretsAgainstConfig(h.root, name), legacyMcpRefPaths: collectLegacyMcpRefPathsStrict,
+      mcpSecretRefFor: unexpected, claimMcpSecretVersionDir: unexpected, writeMcpSecretVersioned: unexpected, removeMcpSecretVersionDir: unexpected,
+      removeMcpConfigInLock: unexpected, removeProjectMcpConfigInLock: unexpected, removeMcpSecretsStrict: unexpected,
+      releaseCodePuppyConnectionBindings: unexpected, findPluginBaseConflictStrict: unexpected, readPluginArrayStrict: unexpected, readLegacyPluginArrayStrict: unexpected,
+      removePlugin: unexpected, collectVendoredPluginPayload: unexpected, removePluginPath: unexpected,
+      installBuiltinSkill: unexpected, collectBuiltinSkillPayload: unexpected, collectBuiltinAgentPayload: unexpected,
+      installRemoteSkill: unexpected, removeFsInstall: unexpected, agentPresent: unexpected, downloadRemoteAsset: unexpected,
+    },
+  }
+  const apply = (packageId: string) => applyPackageMcpV1(packageId, h.slot.projectDirectory, { root: () => h.root, awaitServer: h.awaitServer })
+  const install = createSourceInstaller({
+    ...native, userDataPath: h.root, sources: h.sources, gate: makeRecoveryGate(() => ({})), activateMcp: apply, reloadSkills: unexpected, removeDeparting: unexpected,
+    catalogInstall: (id, request) => installCatalogFromSource(id, request, {
+      planner: native, admission: { root: () => h.root, userDataPath: h.root, casBaseRoot: native.casBaseRoot, environment: native.environment, loadVerifiedCatalog: unexpected },
+      activateMcp: apply, reloadSkills: unexpected, removeDeparting: unexpected,
+    }),
+  })
+  try {
+    for (const directory of [h.slot.projectDirectory, h.other]) {
+      mkdirSync(join(directory, ".codepuppy"))
+      writeFileSync(join(directory, ".codepuppy", "codepuppy.jsonc"), "// existing project config\n" + JSON.stringify({ mcp: {} }, null, 2) + "\n")
+    }
+    const before = [snapshot(h.slot.projectDirectory), snapshot(h.other)]
+    expect(await install({ requestId: "native_catalog_scope", source: { kind: "catalog", catalogId: entry.id }, effect: { kind: "project", directory: h.slot.projectDirectory }, via: "chat" })).toMatchObject({ ok: true, packageId: entry.id, source: { kind: "catalog" } })
+    await until(() => h.rpc("tools"), (items) => items.includes("browser_close"))
+    expect(await h.rpc("tools", h.other)).not.toContain("browser_close")
+    expect((await h.rpc("close", undefined, h.session.id)).content.some((part) => part.type === "text" && part.text.length > 0)).toBe(true)
+    const state = readPackageLedgerStateV1(h.root)
+    expect(state.ok && state.packageGraphs.find((graph) => graph.packageId === entry.id)?.effect).toMatchObject({ kind: "project", projectPath: h.slot.projectDirectory })
+    expect(state.ok && state.records.find((record) => record.id === entry.id)).toMatchObject({ scope: { kind: "global" }, desiredState: "enabled" })
+    expect(await setPackageStateV1({ packageId: entry.id, state: "disabled" }, native)).toMatchObject({ ok: true })
+    await apply(entry.id)
+    await until(() => h.rpc("tools"), (items) => !items.includes("browser_close"))
+    expect(await setPackageStateV1({ packageId: entry.id, state: "enabled" }, native)).toMatchObject({ ok: true })
+    await apply(entry.id)
+    await until(() => h.rpc("tools"), (items) => items.includes("browser_close"))
+    expect(await h.rpc("tools", h.other)).not.toContain("browser_close")
+    expect([snapshot(h.slot.projectDirectory), snapshot(h.other)]).toEqual(before)
   } finally { await h.close(); (await import("node:fs")).rmSync(sockets, { recursive: true, force: true }); delete process.env.PWTEST_SOCKETS_DIR }
 }, 180000)

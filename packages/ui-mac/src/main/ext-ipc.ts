@@ -82,23 +82,22 @@ import type { CatalogPackageViewV1 } from "../shared/catalog-package-view"
 import { isHubRequestId, parseReloadScope, type ReloadItem } from "./codepuppy-sidecar-messages"
 import { packageVersionFromRecordsV1 } from "./ext-package-lifecycle"
 import { tryAcquireBundleLock } from "./ext-bundle-lock"
-import { lookupForUninstall, migrateV1Ledger, parseUninstallLedgerKey, projectScopeIdentity, readLedgerV2, readPackageLedgerStateV1, removeRecordV2 } from "./ext-receipt-v2"
+import { lookupForUninstall, migrateV1Ledger, parseUninstallLedgerKey, readLedgerV2, readPackageLedgerStateV1, removeRecordV2 } from "./ext-receipt-v2"
 import { commitTransactionLedger } from "./ext-package-ledger-commit"
 import { packagedSeedBrowseView, readPackagedSeed } from "./ext-seed"
 import { releaseCodePuppyConnectionBindingsV1 } from "./codepuppy-connection-store"
 import { listTransactionJournals, recoverExtensionTransactions, recoverExtensionTransactionsInHeldLock, recoveryClean, type RecoverOptions } from "./ext-transaction"
 import { getLogger } from "./logging"
 import { resolveVerifiedPackageV1, runCatalogInstallWithPackagePreflight } from "./package-installability"
-import { installDesktopPackageV1, readPackageAuthorizationV1, savePackageSecretsV1, type PackageAdmissionDeps, createPackageAdmissionCoordinator } from "./package-admission"
+import { readPackageAuthorizationV1, savePackageSecretsV1, type PackageAdmissionDeps, createPackageAdmissionCoordinator } from "./package-admission"
 import { createPackageMcpOauthEngineV1 } from "./package-mcp-oauth"
 import { createPluginSources } from "./plugin-sources"
-import { createSourceInstaller } from "./install-from-source"
+import { createSourceInstaller, installCatalogFromSource } from "./install-from-source"
 import { createPackageDeclarationResolver } from "./package-declarations"
 import { applyPackageMcpV1, removePackageMcpV1 } from "./package-mcp-activation"
-import { isInstallOutcomeV1, type InstallRequestV1, type InstallOutcomeV1 } from "../shared/plugin-install"
+import { isInstallOutcomeV1, type InstallRequestV1 } from "../shared/plugin-install"
 import type { PackageAcceptedFactsV1 } from "./package-installability"
 import { evaluatePackageForHost, validateCatalogPackageShape } from "./package-installability"
-import { capabilitiesForCatalogEntry } from "../shared/ext-capability-authorization"
 import { PROJECT_HIDDEN_DIR } from "../shared/project-hidden-dir"
 
 // REQ-076 T2(阻断②):原实现硬编码 `which` + `:` 拼接的 unix PATH,Windows 上恒报「未安装」
@@ -1177,37 +1176,19 @@ export function registerExtIpcHandlers(
   })
   const activatePackageMcp = (packageId: string) => applyPackageMcpV1(packageId, codepuppyUserWorkspaceDir(), { root: codepuppyGlobalRoot, awaitServer })
   const reloadPackageSkills = (packageId: string) => reloads.request({ scope: "global", items: packageReloadItems(packageId), reason: `installed package skills ${packageId}` })
+  const removeDepartingPackageComponents = async (children: Array<{ kind: string; name: string }>) => {
+    const removed = packageChildFileCleanup(children)
+    if (!removed.ok) getLogger().warn("Package departing content cleanup is pending")
+    if (children.length) await removePackageMcpV1({ root: children[0]!, children: children.slice(1) }, codepuppyUserWorkspaceDir(), awaitServer).catch(() => undefined)
+  }
   const sourceInstaller = createSourceInstaller({
     globalRoot: codepuppyGlobalRoot, casBaseRoot: () => getCodePuppyEnvironment().casBaseRoot, environment: () => getCodePuppyEnvironment().environment, userDataPath, sources: pluginSources,
     advisoryGate: (input) => plannerDeps().advisoryGate(input), resolvePackage: (id, version) => plannerDeps().resolvePackage(id, version),
-    activateMcp: activatePackageMcp, reloadSkills: reloadPackageSkills, removeDeparting: async (children) => {
-      const removed = packageChildFileCleanup(children)
-      if (!removed.ok) getLogger().warn("Package departing content cleanup is pending")
-      if (children.length) await removePackageMcpV1({ root: children[0]!, children: children.slice(1) }, codepuppyUserWorkspaceDir(), awaitServer).catch(() => undefined)
-    },
-    catalogInstall: async (catalogId, request): Promise<InstallOutcomeV1> => {
-      const catalog = await resolveEffectiveCatalog()
-      const planner = plannerDeps()
-      const legacy = await planner.resolveEntry(catalogId)
-      const packaged = !legacy
-      const effect = request.effect.kind === "project" ? projectScopeIdentity(request.effect.directory) : undefined
-      if (effect && !effect.ok) return { ok: false, code: "transaction-failed", detail: effect.reason }
-      const result = await runCatalogInstallWithPackagePreflight({ catalogId, scope: { scope: "global" }, ...(packaged ? { attemptId: request.requestId } : { authorization: { confirmed: legacy ? { [`${legacy.entry.type}--${legacy.entry.name}`]: capabilitiesForCatalogEntry(legacy.entry) } : {} } }) }, {
-        loadVerifiedCatalog: packageAdmissionDeps.loadVerifiedCatalog,
-        installLegacy: (intent) => installCatalog(intent, planner),
-        installPackage: () => installDesktopPackageV1(catalogId, { ...packageAdmissionDeps, advisoryGate: planner.advisoryGate, resolvePackage: planner.resolvePackage, ...(effect?.ok ? { effect: effect.scope } : {}) }),
-      })
-      if (!result.ok) return { ok: false, code: "transaction-failed", detail: "Catalog entry could not be installed" }
-      const state = readPackageLedgerStateV1(codepuppyGlobalRoot(), { sideEffectFree: true })
-      if (!state.ok) return { ok: false, code: "transaction-failed", detail: "Installed catalog entry could not be read" }
-      const graph = state.packageGraphs.find((graph) => graph.packageId === catalogId)
-      const nodes = graph ? [graph.root, ...graph.children] : state.records.filter((record) => record.id === catalogId)
-      const installed = nodes.flatMap((node) => node.kind === "skill" || node.kind === "mcp" ? [{ kind: node.kind, hostName: node.name, sourceName: node.name }] : [])
-      if (!graph) for (const node of nodes) await setInstallStateByKey({ type: node.kind, name: node.name, scope: "global", state: "enabled" }, planner)
-      await activatePackageMcp(catalogId)
-      if (nodes.some((node) => node.kind === "skill")) reloadPackageSkills(catalogId)
-      return { ok: true, packageId: catalogId, displayName: graph?.displayName ?? catalog.entries.find((entry) => entry.id === catalogId)?.displayName ?? catalogId, source: { kind: "catalog" }, installed, notRunning: graph?.notRunning ?? [] }
-    },
+    activateMcp: activatePackageMcp, reloadSkills: reloadPackageSkills, removeDeparting: removeDepartingPackageComponents,
+    catalogInstall: (catalogId, request) => installCatalogFromSource(catalogId, request, {
+      planner: plannerDeps(), admission: packageAdmissionDeps, activateMcp: activatePackageMcp,
+      reloadSkills: reloadPackageSkills, removeDeparting: removeDepartingPackageComponents,
+    }),
   })
   const resolvePackageDeclarationsV1 = createPackageDeclarationResolver({ root: codepuppyGlobalRoot, catalog: () => verifiedDeclarationCatalog })
 

@@ -1,3 +1,6 @@
+import type { PackageMutationEnvelopeV1 } from "./ext-package-ledger-v3"
+import { commitTransactionLedger } from "./ext-package-ledger-commit"
+import { buildDepartingChildConfigItemsV1 } from "./ext-package-tx-builders"
 // ext-skill-generations — REQ-100 #310:把 skill 生产安装/更新路由进不可变 generation。
 //
 // 现状问题(审计 6/6 AC FAIL):1246 行事务引擎 runExtensionTransaction 生产零调用;planner 走
@@ -191,6 +194,7 @@ export function collectSkillPayloadFromDir(
 
 /** 从载荷派生 TxFileSpec[](引擎 verify 会精确匹配 staging 与此:缺一/多一/哈希不符均拒)。 */
 export type SkillGenerationInstall = {
+  packageMutation?: PackageMutationEnvelopeV1
   name: string
   /** catalog entry id 或 user:<name>。 */
   id: string
@@ -284,11 +288,13 @@ export async function installSkillGeneration(root: string, spec: SkillGeneration
     items: [
       {
         key,
+        ...(spec.packageMutation ? { packageMutation: spec.packageMutation } : {}),
         files: txFiles,
         receipt: receiptTemplate,
         capabilities: spec.capabilities,
         ...(spec.manifestDigest ? { manifestDigest: spec.manifestDigest } : {}),
       },
+      ...(spec.packageMutation ? buildDepartingChildConfigItemsV1({ root, children: spec.packageMutation.childRemovals }) : []),
     ],
     ...(spec.authorization ? { authorization: spec.authorization } : {}),
   }
@@ -306,6 +312,7 @@ export async function installSkillGeneration(root: string, spec: SkillGeneration
     // 账本是事务的提交证据:写失败必须抛错,引擎据此 rollback+quarantine(#336)。批量单写(#311),
     // 从 rec.receipt 模板重建(与恢复前滚同源,#312):补 files(generationDir)+ committed 事务标记。
     commitReceipt: (records: TxCommitRecord[]) => {
+      if (spec.packageMutation) return commitTransactionLedger(root, records)
       const written = upsertRecordsV2(root, records.map((rec) => commitInputFromRecord(rec)))
       if (!written.ok) throw new Error(`receipt commit failed for skill ${spec.name}: ${written.reason}`)
       // #336:账本 durable 但派生允许集发布失败 —— 不 throw(会误触发引擎回滚与已 durable

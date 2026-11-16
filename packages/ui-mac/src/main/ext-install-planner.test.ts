@@ -3110,3 +3110,44 @@ test("helper catalog skill admission uses a graph while direct callers keep thei
   const state = readPackageLedgerStateV1(globalRoot)
   expect(state.ok && state.packageGraphs.map((graph) => ({ packageId: graph.packageId, effect: graph.effect }))).toEqual([{ packageId: skillBuiltinEntry.id, effect: undefined }])
 })
+
+// Application-owned catalog states; the external executable input is pinned separately in the engine case.
+test.each([agentBuiltinEntry, cloudEntry, { ...bundleEntry, bundleItems: [{ catalogEntryId: skillBuiltinEntry.id, optional: false, installOrder: 1 }, { catalogEntryId: mcpProjectEntry.id, optional: false, installOrder: 2 }] }])("helper catalog %s carries the graph through its existing transaction", async (entry) => {
+  const { readPackageLedgerStateV1 } = await import("./ext-receipt-v2")
+  const { setPackageStateV1 } = await import("./ext-install-planner")
+  const h = makeDeps({ entries: [...ALL_ENTRIES.filter((item) => item.id !== entry.id), entry, agentBuiltinEntry] })
+  const project = makeProject("graph-carrier")
+  const identity = projectScopeIdentity(project)
+  if (!identity.ok) throw Error(identity.reason)
+  const selected = entry.type === "bundle" ? await Promise.all(entry.bundleItems!.map((item) => h.deps.resolveEntry(item.catalogEntryId))) : [await h.deps.resolveEntry(entry.id)]
+  const confirmed = Object.fromEntries(selected.map((item) => {
+    if (!item) throw Error("missing own catalog fixture")
+    const manifest = decodeManifestV2(synthesizeManifest(item))
+    if (!manifest.ok) throw Error(manifest.errors.join("; "))
+    return [`${item.entry.type}--${item.entry.name}`, manifest.manifest.capabilities]
+  }))
+  expect(await installCatalog({ catalogId: entry.id, scope: { scope: "project", projectDir: project }, authorization: { confirmed } }, h.deps, { effect: identity.scope })).toMatchObject({ ok: true })
+  const state = readPackageLedgerStateV1(globalRoot)
+  expect(state.ok && state.packageGraphs[0]).toMatchObject({ packageId: entry.id, effect: identity.scope })
+  expect(state.ok && state.records.every((record) => record.scope.kind === "global")).toBe(true)
+  if (state.ok) for (const record of state.records.filter((record) => record.kind === "mcp"))
+    expect(JSON.parse(fs.readFileSync(path.join(globalRoot, "codepuppy.jsonc"), "utf8")).mcp[record.name].enabled).toBe(false)
+  expect(await setPackageStateV1({ packageId: entry.id, state: "enabled" }, h.deps)).toMatchObject({ ok: true })
+  expect(fs.readdirSync(project)).toEqual([])
+})
+
+test("native catalog enable checks the bound entry contents and accepts the same entry from the bundled transport", async () => {
+  const { setPackageStateV1 } = await import("./ext-install-planner")
+  const entry = await Bun.file(path.join(import.meta.dir, "../../test-fixtures/plugin-helper/catalog-scope/playwright.json")).json() as CatalogEntry
+  const h = makeDeps({ entries: [entry] })
+  const verified = (await h.deps.resolveEntry(entry.id))!
+  const manifest = decodeManifestV2(synthesizeManifest(verified))
+  if (!manifest.ok) throw Error(manifest.errors.join("; "))
+  expect(await installCatalog({ catalogId: entry.id, scope: { scope: "global" }, authorization: { confirmed: { [`mcp--${entry.name}`]: manifest.manifest.capabilities } } }, h.deps, {})).toMatchObject({ ok: true })
+  h.deps.resolveEntry = async (id) => id === entry.id ? { ...verified, channel: "bundled" } : null
+  expect(await setPackageStateV1({ packageId: entry.id, state: "enabled" }, h.deps)).toMatchObject({ ok: true })
+  expect(await setPackageStateV1({ packageId: entry.id, state: "disabled" }, h.deps)).toMatchObject({ ok: true })
+  const changed = { ...entry, description: entry.description + " changed" }
+  h.deps.resolveEntry = async (id) => id === entry.id ? { ...verified, entry: changed } : null
+  expect(await setPackageStateV1({ packageId: entry.id, state: "enabled" }, h.deps)).toMatchObject({ ok: false })
+})

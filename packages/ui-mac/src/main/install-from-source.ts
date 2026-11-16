@@ -13,6 +13,7 @@ import { isHubRequestId } from "./codepuppy-sidecar-messages"
 import { newMcpSecretVersionId } from "./codepuppy-mcp-secrets"
 import { listConfiguredMcpServerNamesStrict, persistMcp } from "./ext-config"
 import {
+  installCatalog,
   promotePayloadToCas,
   setPackageStateV1,
   uncuratedSkillFreshGate,
@@ -35,6 +36,9 @@ import {
 } from "./ext-package-tx-builders"
 import { projectScopeIdentity, readPackageLedgerStateV1, type UpsertInput } from "./ext-receipt-v2"
 import { runExtensionTransaction } from "./ext-transaction"
+import { installDesktopPackageV1, type PackageAdmissionDeps } from "./package-admission"
+import { runCatalogInstallWithPackagePreflight } from "./package-installability"
+import { capabilitiesForCatalogEntry } from "../shared/ext-capability-authorization"
 import { FACTORY_SKILL_IDS } from "./factory-skills"
 import { releaseOfficialConnectorResources } from "./official-connector-resources"
 import { packageDeclarationRuntimeIdentity, type createPluginSources } from "./plugin-sources"
@@ -72,7 +76,8 @@ export function createSourceInstaller(deps: Dependencies) {
         const current = projectScopeIdentity(request.effect.directory)
         return current.ok && current.scope.projectPathHash === project.scope.projectPathHash
       }
-      if (request.source.kind === "catalog") return deps.catalogInstall(request.source.catalogId, request)
+      const catalogRequest = project?.ok ? { ...request, effect: { kind: "project" as const, directory: project.scope.projectPath } } : request
+      if (request.source.kind === "catalog") return deps.catalogInstall(request.source.catalogId, catalogRequest)
       if (request.source.kind !== "candidate")
         return { ok: false, code: "unknown-id", detail: "Source is not an issued candidate" }
       const converted = await deps.sources.convertCandidate(request.source.candidateId)
@@ -90,7 +95,7 @@ export function createSourceInstaller(deps: Dependencies) {
           )?.catalogId
         : undefined
       if (catalog) {
-        const outcome = await deps.catalogInstall(catalog, request)
+        const outcome = await deps.catalogInstall(catalog, catalogRequest)
         return outcome.ok ? { ...outcome, resolvedToCatalog: catalog } : outcome
       }
       const source = sourceOf(captured.capture, converted.publisher)
@@ -524,4 +529,40 @@ function needsPluginFiles(entry: Extract<Entry, { kind: "mcp" | "skill" }>, path
         }),
     )
   )
+}
+
+
+/** The entry's catalog arm: global storage and one graph admission, including native catalog items. */
+export async function installCatalogFromSource(
+  catalogId: string,
+  request: InstallRequestV1,
+  deps: { planner: PlannerDeps; admission: PackageAdmissionDeps } & Pick<Dependencies, "activateMcp" | "reloadSkills" | "removeDeparting">,
+): Promise<InstallOutcomeV1> {
+  const planner = deps.planner
+  const legacy = await planner.resolveEntry(catalogId)
+  const previous = readPackageLedgerStateV1(planner.globalRoot(), { sideEffectFree: true })
+  if (!previous.ok) return { ok: false, code: "transaction-failed", detail: "Package installation state is unreadable" }
+  const before = previous.packageGraphs.find((graph) => graph.packageId === catalogId)
+  const entries = legacy?.entry.type === "bundle"
+    ? await Promise.all((legacy.entry.bundleItems ?? []).map((item) => planner.resolveEntry(item.catalogEntryId)))
+    : [legacy]
+  const confirmed = Object.fromEntries(entries.flatMap((item) => item ? [[`${item.entry.type}--${item.entry.name}`, capabilitiesForCatalogEntry(item.entry)]] : []))
+  const effect = request.effect.kind === "project" ? projectScopeIdentity(request.effect.directory) : undefined
+  if (effect && !effect.ok) return { ok: false, code: "transaction-failed", detail: effect.reason }
+  const result = await runCatalogInstallWithPackagePreflight({ catalogId, scope: { scope: "global" }, ...(!legacy ? { attemptId: request.requestId } : { authorization: { confirmed } }) }, {
+    loadVerifiedCatalog: deps.admission.loadVerifiedCatalog,
+    installLegacy: (intent) => installCatalog(intent, planner, { ...(effect?.ok ? { effect: effect.scope } : {}) }),
+    installPackage: () => installDesktopPackageV1(catalogId, { ...deps.admission, advisoryGate: planner.advisoryGate, resolvePackage: planner.resolvePackage, ...(effect?.ok ? { effect: effect.scope } : {}) }),
+  })
+  if (!result.ok) return { ok: false, code: "transaction-failed", detail: "Catalog entry could not be installed" }
+  const state = readPackageLedgerStateV1(planner.globalRoot(), { sideEffectFree: true })
+  if (!state.ok) return { ok: false, code: "transaction-failed", detail: "Installed catalog entry could not be read" }
+  const graph = state.packageGraphs.find((graph) => graph.packageId === catalogId)
+  if (!graph) return { ok: false, code: "nothing-runnable", detail: "No catalog content could be installed", notRunning: [] }
+  if (legacy) await setPackageStateV1({ packageId: catalogId, state: "enabled" }, planner)
+  if (before) await deps.removeDeparting([before.root, ...before.children].filter((node) => !state.records.some((record) => record.kind === node.kind && record.name === node.name)))
+  await deps.activateMcp(catalogId)
+  const nodes = [graph.root, ...graph.children]
+  if (nodes.some((node) => node.kind === "skill")) deps.reloadSkills(catalogId)
+  return { ok: true, packageId: catalogId, displayName: graph.displayName ?? legacy?.entry.displayName ?? catalogId, source: { kind: "catalog" }, installed: nodes.flatMap((node) => node.kind === "skill" || node.kind === "mcp" ? [{ kind: node.kind, hostName: node.name, sourceName: node.name }] : []), notRunning: graph.notRunning ?? [] }
 }

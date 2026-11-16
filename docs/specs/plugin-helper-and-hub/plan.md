@@ -987,3 +987,30 @@ r16 计数脚本第 3 次（gate-files-update-3.log）在第 127/357 行退出 1
 本轮授权最多三次，已全部用完，未运行第 4 次脚本，也未手改数字或另写更新器绕过 all-or-nothing。故 C3 **仍未完成**：三轮均 exit 1，一条计数也未写回；`git diff 05592e59d0 -- scripts/gate-files.tsv` 为空，没有可声称的 before→after 行。已测得但尚未写回的差额（不是完整登记簿结论）：gen-skill-paths 11→13、plugin-conversion 27→30、package-admission 22→24、ext-write-channels 13→15、ext-receipt-v2 59→66、permission-mount-ratchet 8→9。route-authority 仍为 43，第二次的 42 是失败数而非新计数，不登记。余下第 128–357 项本轮没有执行证据；去向编排器 fix now：在接收此轮 host 修复后另授权计数脚本，成功后逐行审阅实际 diff 并同步保证说明。不得将本段部分测量当作全闸通过。
 
 r16 最终收口（2026-11-16 17:35 UTC，约 56 分钟，11 文件 +217/-40，含本文与必要登记）：`bun test --max-concurrency 2 src/main/old-name-scan.test.ts src/main/gate-file-registry.test.ts` 33 pass / 0 fail、exit 0；ext `bun test --max-concurrency 2 src/policy/authority-registry.test.ts` 5 pass、exit 0；两包 `bun typecheck` 均 exit 0（registries-final.log / authority-final.log / ui-types-close.log / ext-types-close.log）。Protocol 接法修正后的 route ratchet + A2 + lifecycle 三文件 45 pass / 0 fail、exit 0（route-observation.log），其中 lifecycle 内层 5 pass。文档链接 7 个、diff --check 均 exit 0；host artifact 仍与 origin/alpha 完全相同，主 checkout 无改动。脚本三次均通过导出 bash bun 包装仅追加 `--max-concurrency 2`，未改其代码或计数算法。第 127 项已单独修绿，未据此声称剩余 230 项或 C3 已绿。已核 Codex（GPT-6）；own-assertion corrections 仅本轮前述 `0e86467c4c`。没有 gate run/bin/check、push/PR/merge、Core/外仓改动、真实账户或外部写。真实应用验收仍归编排器；本轮返回 PARTIAL，仅计数脚本全程通过与自动写回/最终 diff 审阅留待另一次授权。
+
+
+r17 · 完整登记检查与候选冻结（开始 2026-11-16 17:38 UTC，接收 1706604f5e）：读过 assert-gate-files.sh 全文，普通检查模式会逐行继续，--update 才 fail-fast；因此先原样执行普通模式，bash 导出 bun 包装只追加 --max-concurrency 2。complete-pass.log / pass-table.tsv 为完整一轮证据，357/357 行均实际执行且获得外层退出码/条数，无 incomplete：339 行计数一致通过，15 行只有 count pin 漂移，3 行测试本身 exit 1；总命令 exit 1。没有平台不适用行或机器状态失败。未先修途中红项、未用前轮局部结果拼装全表。
+
+失败分类与批处理红证据：第 151 行 mcp-needs-auth-wiring（旧确认屏断言，另有同宿主缺 cloud.accountStatus 夹具接线）；第 157 行 package-install-engine-reload（MCP-only 仍期待 full refresh、套件仍走确认/authorize 两趟，前例失败未退出详情页引发后续 DOM 连锁；busy 包技能切换的 refresh 计数也需观测实际 Location reload）。两者为本增量已批准替换的行为/旧夹具；必须保留认证失败/恢复中门控、安全出站与其它未替代的生命周期断言。第 199 行 ext-security-boundaries 是有效边界守卫：preload 直接 type-import main/plugin-sources 超出原导入集合；生产改为从既有 ElectronAPI 回调类型派生，测试不改、不扩白名单。三个现存红例的完整输出 failure-151/157/199.log；此提交先固化未修红证据。机器状态类=0，不把缺夹具接口称为机器问题。
+
+仅计数类（将由 --update 自动写回，以下不是手改登记）：
+
+| 登记文件 | before → 实测 |
+| --- | --- |
+| `packages/ext/src/gen-skill-paths.test.ts` | 11 → 13 |
+| `packages/ui-mac/src/shared/host-extension-package-contract/plugin-conversion.test.ts` | 27 → 30 |
+| `packages/ui-mac/src/main/package-admission.test.ts` | 22 → 24 |
+| `packages/ui-mac/src/main/ext-write-channels.test.ts` | 13 → 15 |
+| `packages/ui-mac/src/main/ext-receipt-v2.test.ts` | 59 → 66 |
+| `packages/ui-mac/src/renderer/codepuppy-ui/permission-mount-ratchet.test.ts` | 8 → 9 |
+| `packages/ui-mac/src/main/hub-view.test.ts` | 18 → 19 |
+| `packages/ui-mac/src/main/ext-package-ledger-v3.test.ts` | 30 → 31 |
+| `packages/ui-mac/src/main/local-package-channel.test.ts` | 2 → 1 |
+| `packages/ui-mac/src/main/codepuppy-factory-skill-hygiene.test.ts` | 23 → 24 |
+| `packages/ui-mac/src/main/codepuppy-skill-packaging-census.test.ts` | 13 → 14 |
+| `packages/ui-mac/src/main/factory-skills.test.ts` | 23 → 25 |
+| `packages/ui-mac/src/main/mcp-server-derivation.test.ts` | 5 → 6 |
+| `packages/ext/src/hub-tools.test.ts` | 18 → 22 |
+| `packages/ext/src/plugin-host.test.ts` | 41 → 44 |
+
+下降项 local-package-channel 的 2→1 对照 77adad13f0（BC2b）：旧逐技能导入 transport 案例随旧链退役，现存宿主仍执行 5 条命名空间/已装来源投影断言；不是把失败/skip 写低。其余增长均对应此增量/D/E lane 已接收的新案例，未删除行为以配数。候选刷新/0.2.1 冻结在修绿并成功写回后才开始。

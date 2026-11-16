@@ -5,6 +5,7 @@ import provenance from "../../../test-fixtures/plugin-helper/provenance.json"
 import codex from "../../../test-fixtures/plugin-helper/codex/provenance.json"
 import registry from "../../../test-fixtures/plugin-helper/registry/provenance.json"
 import opencode from "../../../test-fixtures/plugin-helper/opencode/provenance.json"
+import npmProvenance from "../../../test-fixtures/plugin-helper/opencode/npm/provenance.json"
 import type { Json, Source } from "./plugin-conversion"
 
 const converter = () => import("./plugin-conversion")
@@ -14,6 +15,14 @@ const registrySource: Source = { kind: "mcp-registry", locator: "https://registr
 test("OpenCode native modules remain visible with native-js-plugin while skills survive", async () => {
   for (const tree of opencode.trees) for (const file of [...tree.files, { path: tree.archive.path, sha256: tree.archive.sha256 }])
     expect(digest(await Bun.file(join(fixtureRoot, "opencode", tree.root, file.path)).bytes())).toBe(`sha256:${file.sha256}`)
+  for (const file of npmProvenance.files) {
+    const bytes = await Bun.file(join(fixtureRoot, "opencode/npm", file.path)).bytes()
+    expect(bytes.byteLength).toBe(file.bytes)
+    expect(digest(bytes)).toBe(`sha256:${file.sha256}`)
+  }
+  const local = await Bun.file(join(fixtureRoot, "opencode/local-config.jsonc")).bytes()
+  expect(local.byteLength).toBe(opencode.localConfig.bytes)
+  expect(digest(local)).toBe(`sha256:${opencode.localConfig.sha256}`)
   const captured = await captureFixture("superpowers", {}, "opencode")
   const converted = await (await converter()).convertPluginTree(captured)
   expect(converted.package.provider).toBe("opencode")

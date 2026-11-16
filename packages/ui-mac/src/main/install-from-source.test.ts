@@ -1,3 +1,4 @@
+import { sha256Hex } from "./ext-manifest-v2"
 import { expect, test } from "bun:test"
 import { mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
@@ -15,7 +16,7 @@ import { persistMcp, readMcpLeafStrict } from "./ext-config"
 import { createPluginSources } from "./plugin-sources"
 import { fixtureFetch } from "../../test-fixtures/plugin-helper/source-fetch"
 import { makeRecoveryGate } from "./ext-recovery-gate"
-import { existsSync, readFileSync } from "node:fs"
+import { existsSync, readFileSync, readdirSync } from "node:fs"
 import { parse } from "jsonc-parser"
 
 function persistedMcp(root: string, name: string) {
@@ -349,6 +350,8 @@ test("D3 completed real source search admits an own package despite unrelated ca
 }))
 
 test("D3 unknown, incomplete and failed search records deny creation without ledger or generation writes", () => installerHarness(async (h) => {
+  const snapshot = (directory: string): unknown => readdirSync(directory, { withFileTypes: true }).sort((a,b) => a.name.localeCompare(b.name)).map(entry => entry.isDirectory() ? [entry.name, snapshot(join(directory, entry.name))] : [entry.name, sha256Hex(readFileSync(join(directory, entry.name)))])
+  const before = snapshot(h.temporary)
   const search = await h.sources.searchSources("frontend-design")
   for (const [requestId, searchId] of [["create_unknown", "unknown"], ["create_missing", search.searchId], ["create_failed", search.searchId]]) {
     if (requestId === "create_missing") h.sources.searchedSources = () => search.sources.slice(1)
@@ -356,6 +359,7 @@ test("D3 unknown, incomplete and failed search records deny creation without led
     expect(await h.install({ ...h.request("unused", requestId), source: { kind: "created", draft: ownDraft(searchId) } })).toMatchObject({ ok: false, code: "not-searched" })
     expect(existsSync(join(h.root, "installs.json"))).toBe(false)
     expect(existsSync(join(h.root, "ext-store"))).toBe(false)
+    expect(snapshot(h.temporary)).toEqual(before)
   }
 }))
 

@@ -82,9 +82,12 @@ function harness(initial: HubRequestRecord | null, packages = [pack()]) {
   let authorization: PackageAuthorizationItemV1[] = []
   const listeners = new Set<() => void>()
   const reads: unknown[] = []
+  const installs: unknown[] = []
   Object.assign(window, {
     api: {
       ext: {
+        installFromSource: async (...args: unknown[]) => { installs.push(["source", ...args]); return { ok: false, code: "unknown-id", detail: "unexpected install" } },
+        installCatalog: async (...args: unknown[]) => { installs.push(["catalog", ...args]); return { ok: false, reason: "unexpected install" } },
         hubRequest: async (id: string) => {
           reads.push(["request", id])
           return record
@@ -126,6 +129,7 @@ function harness(initial: HubRequestRecord | null, packages = [pack()]) {
   })
   return {
     reads,
+    installs,
     listeners,
     packages,
     change(
@@ -321,7 +325,7 @@ test("BC4 timeline login invokes the current directory auth intent once without 
  expect(document.querySelector('[role="dialog"]')).toBeNull()
  finish();await flush()
  expect(host.textContent).toContain("context7 已可用")
- expect(h.packages).toHaveLength(1)
+ expect(h.installs).toEqual([])
 })
 
 test("BC4 timeline token input cancels and reopens empty, saves only to the same package channel, and keeps management identity",async()=>{
@@ -343,7 +347,7 @@ test("BC4 timeline token input cancels and reopens empty, saves only to the same
  document.dispatchEvent(new KeyboardEvent("keydown",{key:"Escape",bubbles:true}))
  await flush()
  expect(document.querySelector('[role="dialog"]')).toBeNull();expect(saves).toEqual([])
- expect(host.textContent).toContain("待填令牌");expect(h.packages).toHaveLength(1)
+ expect(host.textContent).toContain("待填令牌");expect(h.installs).toEqual([])
  open();await flush()
  const reopened=document.querySelector<HTMLInputElement>('[role="dialog"] input[type="password"]')!
  expect(reopened.value).toBe("")
@@ -369,7 +373,7 @@ test("BC4 canceled timeline login keeps the installed package and the same actio
  expect(calls).toBe(1)
  expect(host.textContent).toContain("待登录")
  expect(host.querySelector('[role="alert"]')?.textContent).toContain("授权没有完成")
- expect(h.packages).toHaveLength(1)
+ expect(h.installs).toEqual([])
  expect(button().disabled).toBe(false)
  button().click();await flush()
  expect(calls).toBe(2)

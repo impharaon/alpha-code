@@ -898,3 +898,9 @@ A9 FIXED：renderer handler 在任何准备/写入前拒 created 或非 all-proj
 A10 前提属实：catalogComparisons 只消费上次 search 的 catalogRows；没有 search 或上次目录失败就返回空。三 red 覆盖两种前提及请求级准备缓存（同请求锁内复用、下一请求必须重新读目录），exit 1（a10-red.log）。直接改成每次调用都联网会回退 A1；本步以既有 requestId 为私有比较缓存键，查询使用 searchId，准备时读 deps.catalog 当前事实，提交复用同一准备 Promise。不是产品选项，不改冻结 DTO/安装入参。
 
 A10 FIXED：catalogComparisons 从 deps.catalog 当前已验目录取得表，不再依赖 catalogRows；查询与安装分别用既有 searchId/requestId 固定本次比较准备 Promise。main 锁外预热与 entry 锁内比较传同一 requestId，因此仍无目录联网进入写锁，下一请求重新取目录。catalogPackage 身份仍复用既有 id@version 校验，不复制身份算法。三条原 red 未改，sources/install-from-source/ext-write-channels 三文件 exit 0（a10-green.log），ui-mac typecheck exit 0（a10-types.log）；额外同链修改 install-from-source/ext-ipc 仅传入已存在请求身份，不改公开 DTO 或 scope。
+
+C6/C8/C9 FIXED（仅证据，无产品分支改动）：C6 在既有 converter provenance loop 校验 npm 五文件与 local-config.jsonc 的 bytes/sha256；根 provenance 补 fetchedAt=2026-11-16（原完整 codeload 本机创建日期同日，未虚构精确时分）。C8 卡片 harness 的 installFromSource/installCatalog 实际边界记录调用，登录/令牌后由零 calls 替换自持数组长度控制；包身份断言仍在。C9 不完整搜索的原拒绝用例增加整个 h.temporary 的递归路径/内容 digest 前后快照，旧 ledger/ext-store 断言保留，覆盖 CAS 及其他持久位置。
+
+逐项负控制：只给 npm metadata 加一个换行→digest 例 exit 1（c6-digest-negative.log）；临时在卡片 login 中插入真实 extIpc.installFromSource 调用→零写调用断言 exit 1（c8-install-negative.log）；临时把 search 完整性门挪到 CAS 提升之后→全树快照在新增 CAS 节点处 exit 1、旧两路径断言仍过（c9-cas-negative.log）。全部 finally 原字节恢复。四文件 install-from-source/converter/artifact/hub-install-card exit 0（c6-c8-c9-green.log）；不把本来绿色的实现报作新产品修复。
+
+C6 新核数据补充：npm empty-search.json 的真实记录是 286,376B，高于 r13 brief「最大 pinned index 不足 200KB」的前提；它被 fixtureFetch 变成无匹配受控页时响应较小。上段列举的四份索引尺寸仍正确，固定原样本最大现应按 286,376B（约 280KiB）报告，30 秒查询预算仍留充分余量。仅事实更正，未改期限裁定或编排器设计。

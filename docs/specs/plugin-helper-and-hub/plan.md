@@ -1286,4 +1286,5 @@ Q3/Q4 的代码事实：启动注入把账本停用的 MCP/助手写进引擎**�
 - 2026-11-18 · 渲染进程：`use-extensions.ts` 的 `directories` 参数（经 `extension-hub.tsx` 的同名 prop 来自 `renderer/index.tsx`）只服务已退役的拒审批循环，现已无用；`index.tsx` 不在派发允许的渲染进程范围内，所以三处都留着，记为观察 · `725e970026`。
 - 2026-11-18 · 证明 6 对照：这个 wiring 宿主装不了 `package:cloud-image`（目录返回「Catalog entry could not be installed」），改用生产账本写入方 `applyPackageMutation` 记下同一张包图，再经真实 IPC 拨开关 · `725e970026`。
 - 2026-11-18 · 测试宿主条数（按实测写回）：`package-install-engine-reload` 内层 15 → 12（#1646 AC1/AC2 与 #1652 共 8 条编码旧行为，换成 4 条新用例）；`official-connectors` 15 → 18；`permission-mount-ratchet` 9 → 8；`plugin-host` 46 → 51；`ext-receipt-v2` 66 → 69；新宿主 `managed-mcp-toggle.engine` 内层 6 · 本提交。
+- 2026-11-18 · Codex R1（GPT-6，只读，HEAD `bb6d409595`，FIX-THEN-MERGE，两项均采纳，按红例先行窄修，不进 R2）：① 拒审批失败（用户先答了那张审批，引擎返回已答）会让外层 catch 跳过断开 —— 红例 `805ff76893`（真引擎、远程记录、用户先答后 main 的拒绝返回 4xx，连接器停在 connected），修复 `ac25ba7933`（列出与回复都尽力而为，断开照常）。② 证明缺口「开启已发布、窗口里建了 Location、配置写失败回滚 → 该 Location 为关」经生产 IPC：加在 `package-hub-lifecycle.engine.cases.ts`（真 `registerExtIpcHandlers` + 真引擎）；进程内引擎无法在 main 的同步写窗口里建 Location，窗口残留由窗口自己的同一组生产账本写造出；把 IPC 的收敛改成只在成功时请求即失败（已实测）· 本提交。
 

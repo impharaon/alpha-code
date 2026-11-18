@@ -48,7 +48,7 @@ const idInput = (description: string) => ({
   additionalProperties: false,
 })
 
-export function createHubTools(bridge: HubBridge, context: HubToolContext, askInstall: (callID: string) => Promise<void>): ToolInfo[] {
+export function createHubTools(bridge: HubBridge, context: HubToolContext, askInstall: (call: { sessionID: string; messageID: string; id: string }) => Promise<void>): ToolInfo[] {
   const directory = context.location.directory
   const viewOf = (ctx: ToolContext) => bridge.view({ directory, sessionID: ctx.sessionID, agent: ctx.agent })
   const submit = async (ref: HubInstallRequest["ref"], scope: HubInstallRequest["scope"], ctx: ToolContext, action: string) => {
@@ -59,7 +59,7 @@ export function createHubTools(bridge: HubBridge, context: HubToolContext, askIn
     const named = subject ? { install: subject } : {}
     // 进度更新原样成为工具状态的 metadata(core session/runner/publish-llm-event.ts progress),所以是扁平的键,时间线直接读。
     await ctx.progress({ ...named, stage: "awaiting-approval" })
-    await askInstall(ctx.id)
+    await askInstall({ sessionID: ctx.sessionID, messageID: ctx.messageID, id: ctx.id })
     const requestId = randomUUID().replaceAll("-", "")
     const metadata = { ...named, requestId, stage: "submitted" }
     await ctx.progress(metadata)

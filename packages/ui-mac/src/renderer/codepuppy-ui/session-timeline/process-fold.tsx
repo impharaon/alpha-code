@@ -268,26 +268,15 @@ export function ProcessRow(props: { row: Extract<TimelineRow, { kind: "process" 
   const summary = createMemo(() => processSummaryOf(props.row.steps))
   const parts = createMemo(() => {
     const value = summary()
-    const segments: { text: string; tone?: "warn" | "num" }[] = value.actions.map((action) => ({
-      text: t("codepuppy.timeline.processAction", {
-        verb: action.titleKey ? t(action.titleKey as I18nKey) : action.name,
-        count: action.count,
-      }),
-    }))
-    if (segments.length === 0 && value.reasoningCount > 0 && value.failed === 0) {
-      segments.push({
-        text:
-          value.reasoningMs !== undefined
-            ? t("codepuppy.timeline.stepReasoning", { seconds: Math.max(0, Math.round(value.reasoningMs / 1000)) })
-            : t("codepuppy.timeline.reasoning"),
-      })
-    }
+    // 收起行 = 「思考与操作 · N 步 · 不顺 · 整轮用时」(#session 稿 `.proc`);动作清单在展开后的步骤里。
+    const segments: { text: string; tone?: "warn" | "num" }[] = []
+    // 回答已开始、过程里还一步都没有(纯文字回答):收起行写「正在生成」,不写空洞的标题。
+    const bare = value.toolCount === 0 && value.reasoningCount === 0 && value.failed === 0
+    segments.push({ text: bare && props.row.active ? t("codepuppy.timeline.turnRunning") : t("codepuppy.timeline.process") })
+    if (value.toolCount > 0) segments.push({ text: t("codepuppy.timeline.processSteps", { count: value.toolCount }) })
     // 「不顺」只在有失败步骤且回合本身成功时出现;回合失败时错误卡已在外面,不重复。
     if (value.failed > 0 && !props.row.turnFailed)
       segments.push({ text: t("codepuppy.timeline.processFailed", { count: value.failed }), tone: "warn" })
-    // 回答已开始、过程里还一步都没有(纯文字回答):收起行写「正在生成」,不写空洞的「工作过程」。
-    if (segments.length === 0)
-      segments.push({ text: props.row.active ? t("codepuppy.timeline.turnRunning") : t("codepuppy.timeline.process") })
     if (props.row.durationMs !== undefined)
       segments.push({ text: formatProcessDuration(props.row.durationMs), tone: "num" })
     return segments

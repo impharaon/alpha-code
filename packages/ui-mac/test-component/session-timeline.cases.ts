@@ -3551,7 +3551,10 @@ describe("#1474 进行中的工作过程:实时标题 / 最近两步 / 已等 / 
     const sum = processOf(host)!.querySelector(".a-tl-pf-sum")!
     expect(sum.getAttribute("aria-expanded")).toBe("false")
     expect(sum.querySelector("[data-codepuppy-process-title]")).toBeNull()
-    expect([...sum.querySelectorAll("[data-codepuppy-process-segment]")].map((el) => el.textContent)[0]).toBe("搜索 2 次")
+    expect([...sum.querySelectorAll("[data-codepuppy-process-segment]")].map((el) => el.textContent).slice(0, 2)).toEqual([
+      "思考与操作",
+      "2 步",
+    ])
     expect(sum.querySelector("[data-codepuppy-process-segment='elapsed']")!.textContent).toMatch(/^1:0[5-9]$/)
     expect(sum.querySelector(".a-tl-pf-pulse")).not.toBeNull()
     expect(host.querySelector("[data-codepuppy-timeline-row='markdown']")!.textContent).toContain("字段表")
@@ -3791,7 +3794,7 @@ describe("#1473 工作过程折叠(design ⑧ #process-fold)", () => {
     return host
   }
 
-  test("回答之前恰好一行工作过程:摘要 = 动作计数 · 琥珀色的不顺 · 整轮用时;回答完整在外面", async () => {
+  test("回答之前恰好一行工作过程:摘要 = 思考与操作 · 步数 · 琥珀色的不顺 · 整轮用时;回答完整在外面", async () => {
     const host = await mountResearch()
     const kinds = [...host.querySelectorAll("[data-codepuppy-timeline-row]")].map((el) =>
       el.getAttribute("data-codepuppy-timeline-row"),
@@ -3801,10 +3804,10 @@ describe("#1473 工作过程折叠(design ⑧ #process-fold)", () => {
     const summary = host.querySelector<HTMLButtonElement>(".a-tl-pf-sum")!
     expect(summary.getAttribute("aria-expanded")).toBe("false")
     const segments = [...summary.querySelectorAll("[data-codepuppy-process-segment]")].map((el) => el.textContent)
-    expect(segments).toEqual(["搜索 16 次", "2 步没成功", "3 分 27 秒"])
+    expect(segments).toEqual(["思考与操作", "18 步", "2 步没成功", "3 分 27 秒"])
     expect(summary.querySelector(".a-tl-pf-warn")!.textContent).toBe("2 步没成功")
-    // 思考次数不进摘要;收起时一个步骤、一张卡、一个来源徽标都不在 DOM 里。
-    expect(summary.textContent).not.toContain("思考")
+    // 思考的段数 / 秒数不进摘要(标题「思考与操作」是固定文字);收起时一个步骤、一张卡、一个来源徽标都不在 DOM 里。
+    expect(summary.textContent).not.toMatch(/思考 \d/)
     expect(host.querySelector("[data-codepuppy-process-step]")).toBeNull()
     expect(host.querySelector("[data-codepuppy-tool-card]")).toBeNull()
     expect(host.querySelector("[data-codepuppy-source-badge]")).toBeNull()

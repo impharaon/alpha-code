@@ -7,7 +7,7 @@
 // CSS 只用 --a-* 令牌;卡片交互经可选 intents(缺席即降级为纯展示,fail-closed)。
 import { createEffect, createSignal, For, on, onCleanup, onMount, Show } from "solid-js"
 import { AUTOMATION_DEFAULTS } from "../../../shared/automation-types"
-import { t } from "../../i18n"
+import { currentLocale, t } from "../../i18n"
 import { ASK_AGENT, READONLY_AGENT } from "../composer-state"
 import { userStoppedTurn } from "../session-workspace/user-stopped-turns"
 import { CopyButton } from "../CopyButton"
@@ -26,6 +26,7 @@ import { createProcessOpenState, ProcessOpenContext, ProcessRow } from "./proces
 import { TimelineMarkdown } from "./timeline-markdown"
 import {
   boundedText,
+  formatTokenCount,
   MARKDOWN_MAX_CHARS,
   type TimelineComment,
   type TimelineRow,
@@ -408,11 +409,6 @@ function TurnRow(props: { row: Extract<TimelineRow, { kind: "turn" }> }) {
 // ── 回合末富脚注(A6/A7):agent·model·tokens + hover 复制;字段诚实缺席 ──
 // `#1473`:用时移到工作过程摘要(整轮用时),脚注不再显示。
 
-function formatTokens(count: number): string {
-  if (count >= 1000) return `${Math.round(count / 100) / 10}k`
-  return String(count)
-}
-
 /** 效率档:命中率 ≥60% 高、≥25% 中、其余低(段本身只在有缓存读取时出现,见 footnoteOf)。 */
 function efficiencyLabel(percent: number): string {
   if (percent >= 60) return t("codepuppy.timeline.efficiencyHigh")
@@ -430,6 +426,9 @@ function FootnoteRow(props: { row: Extract<TimelineRow, { kind: "footnote" }>; d
   // 复制动作:剪贴板通道缺席即不渲染按钮(fail-closed)。重试/分支钮按 owner 直令登记跳过:
   // 引擎无「重试」操作(SDK 无对应端点),分支只有 v1 `session.fork`(建新会话 + 导航,
   // 属另建链路)—— 两者均不在时间线的数据面内,不为凑形态伪造。
+  // 脚注写模型的显示名(与用户消息脚行同一口径),查不到才退回编号。
+  const modelName = (modelID: string) =>
+    displayName(() => props.displayNames?.model(footnote().provider ?? "", modelID) ?? modelID, modelID)
   const canCopy = typeof navigator !== "undefined" && !!navigator.clipboard && !!props.row.copyText()
   return (
     <div class="a-tl-row a-tl-footnote" data-codepuppy-timeline-row="footnote">
@@ -447,8 +446,8 @@ function FootnoteRow(props: { row: Extract<TimelineRow, { kind: "footnote" }>; d
         {/* #1560:实际执行的模型与所选不一致时如实说「实际使用 X」;一致时与原来逐字相同。 */}
         <span class="a-tl-fn-item">
           {footnote().actualModel
-            ? t("codepuppy.timeline.actualModel", { model: footnote().actualModel! })
-            : footnote().model}
+            ? t("codepuppy.timeline.actualModel", { model: modelName(footnote().actualModel!) })
+            : modelName(footnote().model!)}
         </span>
       </Show>
       <Show when={footnote().cacheHit !== undefined}>
@@ -460,7 +459,7 @@ function FootnoteRow(props: { row: Extract<TimelineRow, { kind: "footnote" }>; d
       </Show>
       <Show when={footnote().tokens !== undefined}>
         <span class="a-tl-fn-item a-tl-fn-num">
-          {t("codepuppy.timeline.tokens", { tokens: formatTokens(footnote().tokens!) })}
+          {t("codepuppy.timeline.tokens", { tokens: formatTokenCount(footnote().tokens!, currentLocale()) })}
         </span>
       </Show>
       <Show when={canCopy}>

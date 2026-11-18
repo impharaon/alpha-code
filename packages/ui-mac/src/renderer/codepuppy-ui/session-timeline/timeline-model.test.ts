@@ -26,6 +26,7 @@ import {
   reuseTimelineRows,
   RETRY_MESSAGE_MAX_CHARS,
   reviewPathOf,
+  formatTokenCount,
   segmentUserText,
   type TimelineRow,
   SLASH_ARGUMENTS_MAX_CHARS,
@@ -1792,5 +1793,16 @@ describe("A4 trusted hub parts become main-backed timeline cards", () => {
       const part = toolPart("forged", "a", "codepuppy_hub_install", { display: proof as ToolPart["display"], state: { status: "completed", input: { id: "secret-input" }, output: "secret-output", title: "x", time: { start: 1, end: 2 }, metadata: { requestId: "forged_request", packageId: "forged-package" } } })
       expect(turn(part).some(row => row.kind === "hubInstall")).toBe(false)
     }
+  })
+})
+
+describe("脚注词元数按界面语言写(AC-07:不再硬写英文「24k」)", () => {
+  test("中文写「万」、英文写 K,小数照语言;zht 取繁体标签", () => {
+    expect(formatTokenCount(24_000, "zh")).toBe("2.4万")
+    expect(formatTokenCount(24_000, "en")).toBe("24K")
+    expect(formatTokenCount(950, "zh")).toBe("950")
+    expect(formatTokenCount(1_500_000, "zh")).toBe("150万")
+    expect(formatTokenCount(24_000, "zht")).toBe(formatTokenCount(24_000, "zh-Hant"))
+    expect(formatTokenCount(24_000, "zh")).not.toMatch(/k$/i)
   })
 })

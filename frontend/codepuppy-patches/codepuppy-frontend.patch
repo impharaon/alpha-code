@@ -2699,22 +2699,23 @@ index 8f91b46af..dcb1525da 100644
 +  "session.draft.missing.action": "Back to home",
  }
 diff --git a/packages/app/src/i18n/en.ts b/packages/app/src/i18n/en.ts
-index 62d4dc1ae..95bb31db8 100644
+index 62d4dc1ae..3f484fb84 100644
 --- a/packages/app/src/i18n/en.ts
 +++ b/packages/app/src/i18n/en.ts
-@@ -670,8 +670,9 @@ export const dict = {
+@@ -670,9 +670,9 @@ export const dict = {
    "session.tab.context": "Context",
    "session.tab.unknown": "Unknown Session",
    "session.panel.reviewAndFiles": "Review and files",
 -  "session.error.notFound": "This session cannot be found",
 -  "session.error.notFound.description": "This tab points to a session that no longer exists on this server.",
+-  "session.error.notFound.closeTab": "Close Tab",
 +  "session.error.notFound": "This conversation can't be found",
 +  "session.error.notFound.description": "It may have been deleted.",
-+  "session.error.notFound.newChat": "Back to a new conversation",
-   "session.error.notFound.closeTab": "Close Tab",
++  "session.error.notFound.closeTab": "Back to a new conversation",
    "session.error.serverConnection": "Can't connect to this server",
    "session.review.filesChanged": "Files Changed {{count}}",
-@@ -736,6 +737,13 @@ export const dict = {
+   "session.review.change.one": "Change",
+@@ -736,6 +736,13 @@ export const dict = {
    "session.new.git.none": "No Git",
    "session.new.lastModified": "Last modified",
  
@@ -3406,22 +3407,23 @@ index 06fda4ce7..2692d9fd8 100644
 +  "session.draft.missing.action": "Back to home",
  }
 diff --git a/packages/app/src/i18n/zh.ts b/packages/app/src/i18n/zh.ts
-index b0ba04534..dca7e60db 100644
+index b0ba04534..b1ef1d5aa 100644
 --- a/packages/app/src/i18n/zh.ts
 +++ b/packages/app/src/i18n/zh.ts
-@@ -745,8 +745,9 @@ export const dict = {
+@@ -745,9 +745,9 @@ export const dict = {
    "session.tab.context": "上下文",
    "session.tab.unknown": "未知会话",
    "session.panel.reviewAndFiles": "审查和文件",
 -  "session.error.notFound": "找不到此会话",
 -  "session.error.notFound.description": "此标签页指向的会话已不存在于此服务器上。",
+-  "session.error.notFound.closeTab": "关闭标签页",
 +  "session.error.notFound": "找不到这段对话",
 +  "session.error.notFound.description": "它可能已经被删除。",
-+  "session.error.notFound.newChat": "回到新对话",
-   "session.error.notFound.closeTab": "关闭标签页",
++  "session.error.notFound.closeTab": "回到新对话",
    "session.error.serverConnection": "无法连接到此服务器",
    "session.review.filesChanged": "{{count}} 个文件已更改",
-@@ -800,6 +801,11 @@ export const dict = {
+   "session.review.change.one": "更改",
+@@ -800,6 +800,11 @@ export const dict = {
    "session.new.workspace.existing": "工作区…",
    "session.new.git.none": "无 Git",
    "session.new.lastModified": "最后修改",
@@ -3434,22 +3436,23 @@ index b0ba04534..dca7e60db 100644
    "session.header.searchFiles": "搜索文件",
    "session.header.openIn": "打开方式",
 diff --git a/packages/app/src/i18n/zht.ts b/packages/app/src/i18n/zht.ts
-index 6cc3d5552..3f740e97a 100644
+index 6cc3d5552..08f631348 100644
 --- a/packages/app/src/i18n/zht.ts
 +++ b/packages/app/src/i18n/zht.ts
-@@ -740,8 +740,9 @@ export const dict = {
+@@ -740,9 +740,9 @@ export const dict = {
    "session.tab.context": "上下文",
    "session.tab.unknown": "未知的工作階段",
    "session.panel.reviewAndFiles": "檢閱與檔案",
 -  "session.error.notFound": "找不到此工作階段",
 -  "session.error.notFound.description": "此分頁指向的工作階段已不存在於此伺服器。",
+-  "session.error.notFound.closeTab": "關閉分頁",
 +  "session.error.notFound": "找不到這段對話",
 +  "session.error.notFound.description": "它可能已經被刪除。",
-+  "session.error.notFound.newChat": "回到新對話",
-   "session.error.notFound.closeTab": "關閉分頁",
++  "session.error.notFound.closeTab": "回到新對話",
    "session.error.serverConnection": "無法連線至此伺服器",
    "session.review.filesChanged": "{{count}} 個檔案變更",
-@@ -1220,4 +1221,9 @@ export const dict = {
+   "session.review.change.one": "變更",
+@@ -1220,4 +1220,9 @@ export const dict = {
    "error.childStore.persistedProjectIconCreateFailed": "建立持續性專案圖示失敗",
    "error.childStore.storeCreateFailed": "建立儲存區失敗",
    "terminal.connectionLost.abnormalClose": "WebSocket 異常關閉：{{code}}",
@@ -4143,7 +4146,7 @@ index 000000000..571e61b6c
 +  )
 +}
 diff --git a/packages/app/src/pages/session.tsx b/packages/app/src/pages/session.tsx
-index 2e647e0f4..5b38eee33 100644
+index 2e647e0f4..bf121fb16 100644
 --- a/packages/app/src/pages/session.tsx
 +++ b/packages/app/src/pages/session.tsx
 @@ -16,6 +16,7 @@ import {
@@ -4197,7 +4200,7 @@ index 2e647e0f4..5b38eee33 100644
        </SessionRouteErrorBoundary>
      </TargetServerScopedProviders>
    )
-@@ -204,46 +205,26 @@ function SessionErrorFallback(props: { error: unknown; sessionID?: string; serve
+@@ -204,46 +205,27 @@ function SessionErrorFallback(props: { error: unknown; sessionID?: string; serve
    const language = useLanguage()
    const server = useServer()
    const tabs = useTabs()
@@ -4243,7 +4246,8 @@ index 2e647e0f4..5b38eee33 100644
 +      <SessionNotFound
 +        title={language.t("session.error.notFound")}
 +        description={language.t("session.error.notFound.description")}
-+        action={language.t("session.error.notFound.newChat")}
++        // 键沿用上游的 closeTab(新增键会破坏各语种键对齐判据);中 / 英 / 繁值已改成「回到新对话」。
++        action={language.t("session.error.notFound.closeTab")}
 +        onAction={backToNewChat}
 +      />
      )
@@ -4256,7 +4260,7 @@ index 2e647e0f4..5b38eee33 100644
    const params = useParams<{ serverKey: string; id: string }>()
    const tabs = useTabs()
    const sync = useServerSync()
-@@ -272,7 +253,7 @@ function ResolvedTargetSessionRoute() {
+@@ -272,7 +254,7 @@ function ResolvedTargetSessionRoute() {
      <Show when={directory()}>
        <SDKProvider directory={targetDirectory}>
          <DirectoryDataProvider directory={targetDirectory} server={serverKey}>
@@ -4265,7 +4269,7 @@ index 2e647e0f4..5b38eee33 100644
          </DirectoryDataProvider>
        </SDKProvider>
      </Show>
-@@ -282,12 +263,18 @@ function ResolvedTargetSessionRoute() {
+@@ -282,12 +264,18 @@ function ResolvedTargetSessionRoute() {
  // Owns the workspace-identity remount. Must not include the session ID in the
  // key: SessionPage handles session changes reactively, and remounting here
  // destroys workspace-scoped state (terminal PTYs, file/prompt providers).
@@ -4286,7 +4290,7 @@ index 2e647e0f4..5b38eee33 100644
      </Show>
    )
  }
-@@ -314,7 +301,7 @@ function MarkSessionNotificationsViewed(props: { sessionID?: () => string | unde
+@@ -314,7 +302,7 @@ function MarkSessionNotificationsViewed(props: { sessionID?: () => string | unde
    return null
  }
  

@@ -230,7 +230,7 @@ export function HubInstallCard(props: { row: HubInstallRow }) {
         </Show>
       </div>
       <Show when={account()}>
-        {selected => <PackageAccountDialog packageId={selected().packageId} label={selected().label} needId={selected().needId} save={intent => extIpc.savePackageSecrets(intent)} onClose={() => setAccount(null)} onSaved={() => refreshFacts()()} />}
+        {selected => <PackageAccountDialog packageId={selected().packageId} source={facts().pack?.source} label={selected().label} needId={selected().needId} save={intent => extIpc.savePackageSecrets(intent)} onClose={() => setAccount(null)} onSaved={() => refreshFacts()()} />}
       </Show>
     </div>
   )

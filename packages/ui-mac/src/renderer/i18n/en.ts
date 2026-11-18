@@ -1594,7 +1594,7 @@ export const dict = {
   "codepuppy.session.artifactsRunsLabel": "Past cloud runs in this project",
   "codepuppy.session.artifactsNewRun": "A new cloud run's results have arrived locally.",
   "codepuppy.session.artifactsNewRunView": "View",
-  "codepuppy.session.filesFilter": "Filter files…",
+  "codepuppy.session.filesFilter": "Filter files",
   "codepuppy.session.filesOpened": "Open",
   "codepuppy.session.filesWorkspace": "Workspace",
   "codepuppy.session.filesLoading": "Loading…",

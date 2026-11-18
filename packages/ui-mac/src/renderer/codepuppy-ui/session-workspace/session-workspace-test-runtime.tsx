@@ -8,6 +8,7 @@ import { SessionQuestionCard } from "./session-question-card"
 import { sameSessionIdentity, type CodePuppySessionLiveSnapshot } from "./session-workspace-core"
 import {
   SessionWorkspaceShell,
+  WorkspaceRightPanel,
   type CodePuppySessionLiveContext,
   type SessionRailPanelRenderers,
 } from "./session-workspace-shell"
@@ -103,6 +104,24 @@ export function SessionQuestionHarness() {
       identity={() => initial.identity}
       accepts={() => true}
       client={() => undefined}
+    />
+  )
+}
+
+/**
+ * 首页右栏(`WorkspaceRightPanel`):四个页面的渲染器都给齐 —— 只有「文件」「终端」两页能出现,
+ * 是右栏自己的页集合在限定,不是靠没给渲染器。
+ */
+export function WorkspaceRightPanelHarness() {
+  return (
+    <WorkspaceRightPanel
+      live={liveContext()}
+      panels={{
+        review: () => <div data-harness-panel="review" />,
+        files: () => <div data-harness-panel="files" />,
+        artifacts: () => <div data-harness-panel="artifacts" />,
+      }}
+      terminalChannel={() => terminalChannel}
     />
   )
 }

@@ -1568,7 +1568,7 @@ export const dict = {
   "codepuppy.session.artifactsRunsLabel": "这个项目的历次云任务",
   "codepuppy.session.artifactsNewRun": "有一次新的云任务结果已回到本地。",
   "codepuppy.session.artifactsNewRunView": "查看",
-  "codepuppy.session.filesFilter": "过滤文件…",
+  "codepuppy.session.filesFilter": "筛选文件",
   "codepuppy.session.filesOpened": "已打开",
   "codepuppy.session.filesWorkspace": "工作区",
   "codepuppy.session.filesLoading": "加载中…",

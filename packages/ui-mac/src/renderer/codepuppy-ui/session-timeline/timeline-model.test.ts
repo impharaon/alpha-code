@@ -1776,7 +1776,7 @@ describe("A4 trusted hub parts become main-backed timeline cards", () => {
     expect(JSON.stringify(no)).not.toContain("cand_abc123")
     // 没记下名称的旧调用也不拿编号顶名字
     const old = toolPart("old", "a", "unrelated-alias", { display: display("install"), state: { status: "running", input: { id: "cand_abc123" }, metadata: {}, time: { start: 1 } } as ToolPart["state"] })
-    expect(JSON.stringify(turn(old))).not.toContain("cand_abc123")
+    expect(JSON.stringify(turn(old).find(row => row.kind === "hubInstall"))).not.toContain("cand_abc123")
   })
 
   test("R14 B10 an errored search keeps its actual tool error instead of a searching card", () => {

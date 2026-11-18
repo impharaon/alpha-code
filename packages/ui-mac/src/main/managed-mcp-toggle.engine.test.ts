@@ -10,6 +10,6 @@ test("managed MCP toggles converge per connector on the real engine with product
   })
   const output = `${result.stdout.toString()}${result.stderr.toString()}`
   if (result.exitCode !== 0) throw new Error(output)
-  expect(output.match(/(\d+) pass\b/)?.[1], output).toBe("6")
+  expect(output.match(/(\d+) pass\b/)?.[1], output).toBe("7")
   expect(output.match(/(\d+) fail\b/)?.[1], output).toBe("0")
 }, 480_000)

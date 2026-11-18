@@ -260,3 +260,53 @@ test("proof 5 (engine): with an unreadable allow-set a new Location starts every
   const later = await m.until(() => m.status(m.otherProject), (s) => s.late !== undefined && s.probe !== undefined && s.late !== "pending" && s.probe !== "pending")
   expect(later).toMatchObject({ late: "disabled", probe: "disabled" })
 }, 90_000)
+
+// Codex R1 #1(I-11):用户先答了那张审批,main 的拒绝随即落到引擎「已答」路径而失败 —— 收敛不能因此停下,断开照常。
+// 远程记录没有 codepuppy.jsonc 叶子,没有配置刷新兜底:漏了这次断开就是「持久为关、连接仍开」。
+test("R1 #1: an approval the user answered first does not stop the disconnect of a remote connector", async () => {
+  const m = await machine("answered-first", { remote: { "remote-echo": "enabled" } })
+  expect((await m.until(() => m.status(), (s) => s["remote-echo"] === "connected"))["remote-echo"]).toBe("connected")
+  const send = m.at(m.project)
+  const session = await m.sessionIn(m.project, "codepuppy-ask")
+  await send("POST", `/api/session/${session.id}/prompt`, { text: `CP-CALL ${JSON.stringify({ name: "execute", args: { code: 'return await tools["remote-echo"].echo({})' } })}` })
+  let pending: Array<{ id: string; action: string }> = []
+  for (const end = Date.now() + 8000; !pending.length && Date.now() < end; await Bun.sleep(25))
+    pending = ((await send("GET", `/api/session/${session.id}/permission`)).json?.data ?? []) as typeof pending
+  expect(pending.map((request) => request.action)).toEqual(["mcp:remote-echo:echo"])
+  // A real TCP hop in front of the engine: right before main's reject arrives, the user answers the same request.
+  let answeredFirst = 0
+  let rejectStatus = 0
+  // fetch has already decoded the body; pass it on without the engine's encoding headers.
+  const relay = async (response: Response) => {
+    const headers = new Headers(response.headers)
+    headers.delete("content-encoding")
+    headers.delete("content-length")
+    return new Response(await response.arrayBuffer(), { status: response.status, headers })
+  }
+  const proxy = Bun.serve({
+    hostname: "127.0.0.1",
+    port: 0,
+    fetch: async (request) => {
+      const url = new URL(request.url)
+      const target = new URL(url.pathname + url.search, m.connection.url)
+      const body = request.method === "GET" || request.method === "HEAD" ? undefined : await request.arrayBuffer()
+      if (request.method === "POST" && /\/permission\/[^/]+\/reply$/.test(url.pathname)) {
+        answeredFirst++
+        await fetch(new Request(target, { method: "POST", headers: request.headers, body: JSON.stringify({ decision: "once" }) }))
+        const response = await fetch(new Request(target, { method: "POST", headers: request.headers, body }))
+        rejectStatus = response.status
+        return relay(response)
+      }
+      return relay(await fetch(new Request(target, { method: request.method, headers: request.headers, body })))
+    },
+  })
+  try {
+    expect(await m.write("remote-echo", "disabled")).toMatchObject({ ok: true })
+    await m.convergence({ ...m.connection, url: `http://127.0.0.1:${proxy.port}` })(["remote-echo"])
+    expect(answeredFirst).toBe(1)
+    expect(rejectStatus).toBeGreaterThanOrEqual(400)
+    expect((await m.status())["remote-echo"]).toBe("disabled")
+  } finally {
+    proxy.stop(true)
+  }
+}, 90_000)

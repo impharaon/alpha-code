@@ -3,16 +3,17 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>桌面端界面优化 · 新视觉方向样张 · 评审稿 第二轮 2026-11-18</title>
-<!-- 正式代码样式:令牌与基础、组件库(按钮 / 输入框 / 悬停提示)、输入框弹层原语(.a-pop / .a-ic)。frame.css 只放令牌提案与画框版式。 -->
+<title>桌面端界面优化 · 新视觉方向 · 定稿 2026-11-18</title>
 <link rel="stylesheet" href="../../../packages/ui-mac/src/renderer/codepuppy-ui/base.css" />
 <link rel="stylesheet" href="../../../packages/ui-mac/src/renderer/codepuppy-ui/button.css" />
 <link rel="stylesheet" href="../../../packages/ui-mac/src/renderer/codepuppy-ui/input.css" />
 <link rel="stylesheet" href="../../../packages/ui-mac/src/renderer/codepuppy-ui/tooltip.css" />
+<link rel="stylesheet" href="../../../packages/ui-mac/src/renderer/codepuppy-ui/dialog.css" />
+<link rel="stylesheet" href="../../../packages/ui-mac/src/renderer/codepuppy-ui/risk-tag.css" />
+<link rel="stylesheet" href="../../../packages/ui-mac/src/renderer/codepuppy-ui/key-value-list.css" />
 <link rel="stylesheet" href="../../../packages/ui-mac/src/renderer/codepuppy-ui/home.css" />
 <link rel="stylesheet" href="frame.css" />
 <script>
-  // ?size=1280 → 整页画框按 1280×800 排(检查窄窗);组件画框尺寸不变。
   document.addEventListener("DOMContentLoaded", () => {
     const small = new URLSearchParams(location.search).get("size") === "1280"
     document.body.classList.toggle("is-1280", small)
@@ -22,618 +23,283 @@
 </head>
 <body>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
-  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
-  <symbol id="i-pen" viewBox="0 0 24 24"><path d="M12 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-6"/><path d="M18.4 3.6a2 2 0 0 1 2.9 2.9L12.5 15.3 9 16l.7-3.5Z"/></symbol>
-  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.2-4.2"/></symbol>
-  <symbol id="i-grid" viewBox="0 0 24 24"><rect x="4" y="4" width="6.5" height="6.5" rx="1.5"/><rect x="13.5" y="4" width="6.5" height="6.5" rx="1.5"/><rect x="4" y="13.5" width="6.5" height="6.5" rx="1.5"/><path d="M16.75 13.5v6.5M13.5 16.75H20"/></symbol>
-  <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></symbol>
-  <symbol id="i-panel-l" viewBox="0 0 24 24"><rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><path d="M9.5 4.5v15"/></symbol>
-  <symbol id="i-panel-r" viewBox="0 0 24 24"><rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><path d="M14.5 4.5v15"/></symbol>
-  <symbol id="i-left" viewBox="0 0 24 24"><path d="m14.5 18-6-6 6-6"/></symbol>
-  <symbol id="i-right" viewBox="0 0 24 24"><path d="m9.5 18 6-6-6-6"/></symbol>
-  <symbol id="i-down" viewBox="0 0 24 24"><path d="m6 9.5 6 6 6-6"/></symbol>
-  <symbol id="i-folder" viewBox="0 0 24 24"><path d="M3.5 7.5a2 2 0 0 1 2-2h3.8l2 2h7.2a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2Z"/></symbol>
-  <symbol id="i-folder-open" viewBox="0 0 24 24"><path d="M3.5 17V7.5a2 2 0 0 1 2-2h3.8l2 2h6.2a2 2 0 0 1 2 2V11"/><path d="M3.5 17l2.3-5.2a1.5 1.5 0 0 1 1.4-.8h13a1 1 0 0 1 .9 1.4L19 17.6a1.5 1.5 0 0 1-1.4.9H5a1.5 1.5 0 0 1-1.5-1.5Z"/></symbol>
-  <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3.5 18.5 6v5.5c0 4.2-2.7 7.3-6.5 8.9-3.8-1.6-6.5-4.7-6.5-8.9V6Z"/></symbol>
-  <symbol id="i-zap" viewBox="0 0 24 24"><path d="M13 3 5 13.5h6.5L10.5 21 19 10.5h-6.5Z"/></symbol>
-  <symbol id="i-up" viewBox="0 0 24 24"><path d="M12 19V6M6.5 11.5 12 6l5.5 5.5"/></symbol>
-  <symbol id="i-clip" viewBox="0 0 24 24"><path d="m20 11.5-8 8a5 5 0 0 1-7-7l8.5-8.5a3.3 3.3 0 0 1 4.7 4.7L9.7 17.2a1.7 1.7 0 0 1-2.4-2.4l7.5-7.5"/></symbol>
-  <symbol id="i-plan" viewBox="0 0 24 24"><path d="M10.5 6.5H20M10.5 12H20M10.5 17.5H20"/><path d="m4 6.5 1.4 1.4L8 5.3M4 12l1.4 1.4L8 10.8M4 17.5l1.4 1.4L8 16.3"/></symbol>
-  <symbol id="i-at" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.6"/><path d="M15.6 8.5v4.8a2.6 2.6 0 0 0 5.2 0V12a8.8 8.8 0 1 0-3.5 7"/></symbol>
-  <symbol id="i-file" viewBox="0 0 24 24"><path d="M14 3.5H7a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8.5Z"/><path d="M14 3.5v5h5"/></symbol>
-  <symbol id="i-file-text" viewBox="0 0 24 24"><path d="M14 3.5H7a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8.5Z"/><path d="M14 3.5v5h5M8.5 13h7M8.5 16.5h4.5"/></symbol>
-  <symbol id="i-file-search" viewBox="0 0 24 24"><path d="M14 3.5H7a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8.5Z"/><path d="M14 3.5v5h5"/><circle cx="11.5" cy="14" r="2.5"/><path d="m13.4 15.9 1.8 1.8"/></symbol>
-  <symbol id="i-plug" viewBox="0 0 24 24"><path d="M9 3.5V8M15 3.5V8M6.5 8h11v3.5a5.5 5.5 0 0 1-11 0ZM12 17v3.5"/></symbol>
-  <symbol id="i-more" viewBox="0 0 24 24"><circle cx="6" cy="12" r="1.3" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.3" fill="currentColor" stroke="none"/><circle cx="18" cy="12" r="1.3" fill="currentColor" stroke="none"/></symbol>
-  <symbol id="i-reset" viewBox="0 0 24 24"><path d="M4.5 12a7.5 7.5 0 1 0 2.2-5.3L4.5 9"/><path d="M4.5 4.5V9H9"/></symbol>
-  <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7.5"/></symbol>
-  <symbol id="i-globe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c2.4 2.4 3.5 5.3 3.5 8.5s-1.1 6.1-3.5 8.5c-2.4-2.4-3.5-5.3-3.5-8.5s1.1-6.1 3.5-8.5Z"/></symbol>
-  <symbol id="i-branch" viewBox="0 0 24 24"><circle cx="7" cy="6" r="2.2"/><circle cx="7" cy="18" r="2.2"/><circle cx="17" cy="8" r="2.2"/><path d="M7 8.2v7.6M17 10.2c0 3.6-3.5 4.4-8.3 5.6"/></symbol>
-  <symbol id="i-db" viewBox="0 0 24 24"><ellipse cx="12" cy="6" rx="7" ry="2.6"/><path d="M5 6v12c0 1.4 3.1 2.6 7 2.6s7-1.2 7-2.6V6M5 12c0 1.4 3.1 2.6 7 2.6s7-1.2 7-2.6"/></symbol>
-  <symbol id="i-table" viewBox="0 0 24 24"><rect x="3.5" y="4.5" width="17" height="15" rx="2"/><path d="M3.5 9.5h17M3.5 14.5h17M9.5 4.5v15"/></symbol>
-  <symbol id="i-slides" viewBox="0 0 24 24"><path d="M3.5 4.5h17"/><rect x="5" y="4.5" width="14" height="10.5" rx="1"/><path d="M12 15v4.5M8.5 19.5h7"/></symbol>
-  <symbol id="i-window" viewBox="0 0 24 24"><rect x="3.5" y="4.5" width="17" height="15" rx="2"/><path d="M3.5 9h17"/><path d="M6.5 6.8h.01M9 6.8h.01"/></symbol>
-  <symbol id="i-bug" viewBox="0 0 24 24"><rect x="7.5" y="7.5" width="9" height="12.5" rx="4.5"/><path d="M12 7.5V5M9.5 5.5 8 4M14.5 5.5 16 4M7.5 12.5H4M20 12.5h-3.5M7.5 16.5l-3 1.5M16.5 16.5l3 1.5"/></symbol>
-  <symbol id="i-term" viewBox="0 0 24 24"><path d="m5.5 8 4 4-4 4M12 16.5h6.5"/></symbol>
-  <symbol id="i-box" viewBox="0 0 24 24"><path d="M20 8 12 3.8 4 8v8l8 4.2 8-4.2Z"/><path d="M4 8l8 4.2L20 8M12 12.2v8"/></symbol>
-  <symbol id="i-review" viewBox="0 0 24 24"><circle cx="6.5" cy="17.5" r="2.2"/><circle cx="17.5" cy="6.5" r="2.2"/><path d="M6.5 15.3V9.5a3 3 0 0 1 3-3h4"/><path d="m11.5 4.5 2 2-2 2"/><path d="M17.5 8.7v5.8a3 3 0 0 1-3 3h-4"/><path d="m12.5 19.5-2-2 2-2"/></symbol>
-  <symbol id="i-loader" viewBox="0 0 24 24"><path d="M12 3.5a8.5 8.5 0 1 1-8.5 8.5"/></symbol>
-  <symbol id="i-cloud" viewBox="0 0 24 24"><path d="M7 18.5a4.5 4.5 0 0 1-.6-9A6 6 0 0 1 18 9.6a4.5 4.5 0 0 1-.5 8.9Z"/></symbol>
-  <symbol id="i-pkg" viewBox="0 0 24 24"><path d="M4.5 7.5 12 3.5l7.5 4v9L12 20.5l-7.5-4Z"/><path d="M8.3 5.5 15.7 9.6V13"/></symbol>
+<symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+<symbol id="i-pen" viewBox="0 0 24 24"><path d="M12 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-6"/><path d="M18.4 3.6a2 2 0 0 1 2.9 2.9L12.5 15.3 9 16l.7-3.5Z"/></symbol>
+<symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.2-4.2"/></symbol>
+<symbol id="i-grid" viewBox="0 0 24 24"><rect x="4" y="4" width="6.5" height="6.5" rx="1.5"/><rect x="13.5" y="4" width="6.5" height="6.5" rx="1.5"/><rect x="4" y="13.5" width="6.5" height="6.5" rx="1.5"/><path d="M16.75 13.5v6.5M13.5 16.75H20"/></symbol>
+<symbol id="i-cal" viewBox="0 0 24 24"><rect x="4" y="5.5" width="16" height="14.5" rx="2.5"/><path d="M4 10h16M8.5 3.5v4M15.5 3.5v4"/><path d="m9.5 14.5 1.8 1.8 3.4-3.4"/></symbol>
+<symbol id="i-panel-l" viewBox="0 0 24 24"><rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><path d="M9.5 4.5v15"/></symbol>
+<symbol id="i-panel-r" viewBox="0 0 24 24"><rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><path d="M14.5 4.5v15"/></symbol>
+<symbol id="i-left" viewBox="0 0 24 24"><path d="m14.5 18-6-6 6-6"/></symbol>
+<symbol id="i-right" viewBox="0 0 24 24"><path d="m9.5 18 6-6-6-6"/></symbol>
+<symbol id="i-down" viewBox="0 0 24 24"><path d="m6 9.5 6 6 6-6"/></symbol>
+<symbol id="i-folder" viewBox="0 0 24 24"><path d="M3.5 7.5a2 2 0 0 1 2-2h3.8l2 2h7.2a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2Z"/></symbol>
+<symbol id="i-folder-open" viewBox="0 0 24 24"><path d="M3.5 17V7.5a2 2 0 0 1 2-2h3.8l2 2h6.2a2 2 0 0 1 2 2V11"/><path d="M3.5 17l2.3-5.2a1.5 1.5 0 0 1 1.4-.8h13a1 1 0 0 1 .9 1.4L19 17.6a1.5 1.5 0 0 1-1.4.9H5a1.5 1.5 0 0 1-1.5-1.5Z"/></symbol>
+<symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3.5 18.5 6v5.5c0 4.2-2.7 7.3-6.5 8.9-3.8-1.6-6.5-4.7-6.5-8.9V6Z"/></symbol>
+<symbol id="i-zap" viewBox="0 0 24 24"><path d="M13 3 5 13.5h6.5L10.5 21 19 10.5h-6.5Z"/></symbol>
+<symbol id="i-up" viewBox="0 0 24 24"><path d="M12 19V6M6.5 11.5 12 6l5.5 5.5"/></symbol>
+<symbol id="i-clip" viewBox="0 0 24 24"><path d="m20 11.5-8 8a5 5 0 0 1-7-7l8.5-8.5a3.3 3.3 0 0 1 4.7 4.7L9.7 17.2a1.7 1.7 0 0 1-2.4-2.4l7.5-7.5"/></symbol>
+<symbol id="i-plan" viewBox="0 0 24 24"><path d="M10.5 6.5H20M10.5 12H20M10.5 17.5H20"/><path d="m4 6.5 1.4 1.4L8 5.3M4 12l1.4 1.4L8 10.8M4 17.5l1.4 1.4L8 16.3"/></symbol>
+<symbol id="i-at" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.6"/><path d="M15.6 8.5v4.8a2.6 2.6 0 0 0 5.2 0V12a8.8 8.8 0 1 0-3.5 7"/></symbol>
+<symbol id="i-file" viewBox="0 0 24 24"><path d="M14 3.5H7a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8.5Z"/><path d="M14 3.5v5h5"/></symbol>
+<symbol id="i-file-text" viewBox="0 0 24 24"><path d="M14 3.5H7a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8.5Z"/><path d="M14 3.5v5h5M8.5 13h7M8.5 16.5h4.5"/></symbol>
+<symbol id="i-file-search" viewBox="0 0 24 24"><path d="M14 3.5H7a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8.5Z"/><path d="M14 3.5v5h5"/><circle cx="11.5" cy="14" r="2.5"/><path d="m13.4 15.9 1.8 1.8"/></symbol>
+<symbol id="i-plug" viewBox="0 0 24 24"><path d="M9 3.5V8M15 3.5V8M6.5 8h11v3.5a5.5 5.5 0 0 1-11 0ZM12 17v3.5"/></symbol>
+<symbol id="i-more" viewBox="0 0 24 24"><circle cx="6" cy="12" r="1.3" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.3" fill="currentColor" stroke="none"/><circle cx="18" cy="12" r="1.3" fill="currentColor" stroke="none"/></symbol>
+<symbol id="i-reset" viewBox="0 0 24 24"><path d="M4.5 12a7.5 7.5 0 1 0 2.2-5.3L4.5 9"/><path d="M4.5 4.5V9H9"/></symbol>
+<symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7.5"/></symbol>
+<symbol id="i-globe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c2.4 2.4 3.5 5.3 3.5 8.5s-1.1 6.1-3.5 8.5c-2.4-2.4-3.5-5.3-3.5-8.5s1.1-6.1 3.5-8.5Z"/></symbol>
+<symbol id="i-branch" viewBox="0 0 24 24"><circle cx="7" cy="6" r="2.2"/><circle cx="7" cy="18" r="2.2"/><circle cx="17" cy="8" r="2.2"/><path d="M7 8.2v7.6M17 10.2c0 3.6-3.5 4.4-8.3 5.6"/></symbol>
+<symbol id="i-db" viewBox="0 0 24 24"><ellipse cx="12" cy="6" rx="7" ry="2.6"/><path d="M5 6v12c0 1.4 3.1 2.6 7 2.6s7-1.2 7-2.6V6M5 12c0 1.4 3.1 2.6 7 2.6s7-1.2 7-2.6"/></symbol>
+<symbol id="i-table" viewBox="0 0 24 24"><rect x="3.5" y="4.5" width="17" height="15" rx="2"/><path d="M3.5 9.5h17M3.5 14.5h17M9.5 4.5v15"/></symbol>
+<symbol id="i-slides" viewBox="0 0 24 24"><path d="M3.5 4.5h17"/><rect x="5" y="4.5" width="14" height="10.5" rx="1"/><path d="M12 15v4.5M8.5 19.5h7"/></symbol>
+<symbol id="i-window" viewBox="0 0 24 24"><rect x="3.5" y="4.5" width="17" height="15" rx="2"/><path d="M3.5 9h17"/><path d="M6.5 6.8h.01M9 6.8h.01"/></symbol>
+<symbol id="i-bug" viewBox="0 0 24 24"><rect x="7.5" y="7.5" width="9" height="12.5" rx="4.5"/><path d="M12 7.5V5M9.5 5.5 8 4M14.5 5.5 16 4M7.5 12.5H4M20 12.5h-3.5M7.5 16.5l-3 1.5M16.5 16.5l3 1.5"/></symbol>
+<symbol id="i-term" viewBox="0 0 24 24"><path d="m5.5 8 4 4-4 4M12 16.5h6.5"/></symbol>
+<symbol id="i-box" viewBox="0 0 24 24"><path d="M20 8 12 3.8 4 8v8l8 4.2 8-4.2Z"/><path d="M4 8l8 4.2L20 8M12 12.2v8"/></symbol>
+<symbol id="i-review" viewBox="0 0 24 24"><circle cx="6.5" cy="17.5" r="2.2"/><circle cx="17.5" cy="6.5" r="2.2"/><path d="M6.5 15.3V9.5a3 3 0 0 1 3-3h4"/><path d="m11.5 4.5 2 2-2 2"/><path d="M17.5 8.7v5.8a3 3 0 0 1-3 3h-4"/><path d="m12.5 19.5-2-2 2-2"/></symbol>
+<symbol id="i-loader" viewBox="0 0 24 24"><path d="M12 3.5a8.5 8.5 0 1 1-8.5 8.5"/></symbol>
+<symbol id="i-pkg" viewBox="0 0 24 24"><path d="M4.5 7.5 12 3.5l7.5 4v9L12 20.5l-7.5-4Z"/><path d="M8.3 5.5 15.7 9.6V13"/></symbol>
+<symbol id="i-gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 3.5v2.2M12 18.3v2.2M20.5 12h-2.2M5.7 12H3.5M18 6l-1.6 1.6M7.6 16.4 6 18M18 18l-1.6-1.6M7.6 7.6 6 6"/></symbol>
+<symbol id="i-contrast" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 3.5v17a8.5 8.5 0 0 0 0-17Z" fill="currentColor" stroke="none"/></symbol>
+<symbol id="i-help" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M9.6 9.4a2.5 2.5 0 0 1 4.8.9c0 1.7-2.4 2.2-2.4 3.7"/><path d="M12 17h.01"/></symbol>
+<symbol id="i-update" viewBox="0 0 24 24"><path d="M19.5 12a7.5 7.5 0 1 1-2.2-5.3L19.5 9"/><path d="M19.5 4.5V9H15"/></symbol>
+<symbol id="i-bulb" viewBox="0 0 24 24"><path d="M9 17.5h6M10 20.5h4"/><path d="M12 3.5a5.5 5.5 0 0 0-3.3 9.9c.6.5 1 1.2 1.1 2.1h4.4c.1-.9.5-1.6 1.1-2.1A5.5 5.5 0 0 0 12 3.5Z"/></symbol>
+<symbol id="i-edit" viewBox="0 0 24 24"><path d="M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16Z"/><path d="m13.5 6.5 4 4"/></symbol>
+<symbol id="i-x" viewBox="0 0 24 24"><path d="M6.5 6.5l11 11M17.5 6.5l-11 11"/></symbol>
+<symbol id="i-msg" viewBox="0 0 24 24"><path d="M5 18.5V7a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H8Z"/></symbol>
+<symbol id="i-msg-off" viewBox="0 0 24 24"><path d="M5 18.5V7a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H8Z" stroke-dasharray="2.2 2.2"/></symbol>
+<symbol id="i-ban" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="m6 6 12 12"/></symbol>
+<symbol id="i-eye" viewBox="0 0 24 24"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z"/><circle cx="12" cy="12" r="2.8"/></symbol>
+<symbol id="p-deepseek" viewBox="0 0 40 40" fill="currentColor">
+<path d="M35.6638 9.91965C35.3251 9.75432 35.1785 10.0703 34.9811 10.2316C34.9131 10.2836 34.8558 10.3516 34.7985 10.413C34.3025 10.9423 33.7238 11.289 32.9678 11.2476C31.8625 11.1863 30.9186 11.533 30.0839 12.3783C29.9066 11.3356 29.3173 10.7143 28.4213 10.3143C27.9519 10.1063 27.4773 9.89965 27.148 9.44766C26.9186 9.12633 26.856 8.76767 26.7413 8.41568C26.668 8.20235 26.5946 7.98502 26.3506 7.94902C26.084 7.90769 25.98 8.13035 25.876 8.31702C25.4587 9.07967 25.2973 9.91965 25.3133 10.7703C25.3493 12.6849 26.1573 14.2102 27.764 15.2942C27.9466 15.4182 27.9933 15.5435 27.9359 15.7249C27.8266 16.0982 27.696 16.4609 27.5813 16.8355C27.508 17.0742 27.3986 17.1248 27.1426 17.0222C26.2777 16.6504 25.4919 16.1164 24.828 15.4489C23.6854 14.3449 22.6534 13.1263 21.3654 12.1716C21.067 11.9511 20.7606 11.7416 20.4468 11.5436C19.1335 10.2676 20.6201 9.21967 20.9641 9.09567C21.3241 8.965 21.0881 8.51968 19.9254 8.52501C18.7628 8.53035 17.6988 8.91834 16.3428 9.43699C16.1413 9.51421 15.934 9.57529 15.7229 9.61966C14.4557 9.38091 13.1598 9.33506 11.8789 9.48366C9.36565 9.76365 7.35902 10.953 5.88305 12.9809C4.10975 15.4182 3.69243 18.1888 4.20308 21.0768C4.74041 24.122 6.29504 26.6433 8.683 28.6139C11.1603 30.6579 14.0122 31.6592 17.2668 31.4672C19.2428 31.3539 21.4441 31.0886 23.9254 28.9873C24.552 29.2993 25.208 29.4233 26.2986 29.5166C27.1386 29.5953 27.9466 29.4766 28.5719 29.3459C29.5519 29.1379 29.4839 28.23 29.1306 28.0646C26.2573 26.726 26.888 27.2713 26.3133 26.83C27.7746 25.102 29.9746 23.3074 30.8359 17.4928C30.9026 17.0302 30.8452 16.7395 30.8359 16.3662C30.8306 16.1395 30.8826 16.0502 31.1426 16.0249C31.8639 15.95 32.5637 15.7349 33.2025 15.3915C35.0638 14.3742 35.8158 12.7049 35.9931 10.7023C36.0198 10.3956 35.9878 10.081 35.6638 9.91965ZM19.4414 27.9433C16.6562 25.754 15.3055 25.0327 14.7482 25.0634C14.2256 25.0954 14.3202 25.6913 14.4349 26.0807C14.5549 26.4647 14.7109 26.7286 14.9295 27.066C15.0815 27.2886 15.1855 27.6206 14.7789 27.87C13.8816 28.4246 12.3229 27.6833 12.2496 27.6473C10.435 26.578 8.91632 25.1673 7.84834 23.2381C6.81637 21.3808 6.21638 19.3888 6.11771 17.2622C6.09105 16.7475 6.24171 16.5662 6.7537 16.4729C7.42583 16.3442 8.11451 16.3267 8.79233 16.4209C11.6349 16.8368 14.0536 18.1075 16.0828 20.1194C17.2402 21.2661 18.1161 22.6354 19.0188 23.974C19.9788 25.3953 21.0108 26.75 22.3254 27.8593C22.7894 28.2486 23.1587 28.5446 23.5134 28.7619C22.4441 28.8819 20.6601 28.9086 19.4414 27.9433ZM20.7748 19.3568C20.7745 19.2906 20.7904 19.2253 20.8211 19.1666C20.8517 19.1078 20.8962 19.0575 20.9507 19.0198C21.0052 18.9821 21.068 18.9583 21.1337 18.9503C21.1995 18.9424 21.2662 18.9505 21.3281 18.9741C21.407 19.0024 21.475 19.0546 21.5228 19.1235C21.5706 19.1923 21.5958 19.2743 21.5947 19.3581C21.5949 19.4123 21.5843 19.4659 21.5636 19.5159C21.5428 19.5659 21.5123 19.6113 21.4738 19.6494C21.4354 19.6875 21.3897 19.7176 21.3395 19.7378C21.2893 19.7581 21.2356 19.7682 21.1814 19.7675C21.1277 19.7676 21.0745 19.7571 21.0248 19.7365C20.9752 19.7158 20.9302 19.6855 20.8925 19.6473C20.8548 19.609 20.825 19.5636 20.805 19.5138C20.785 19.4639 20.7739 19.4105 20.7748 19.3568ZM24.9213 21.4848C24.6547 21.5928 24.3893 21.6861 24.1347 21.6981C23.7516 21.7114 23.3756 21.5918 23.0707 21.3594C22.7054 21.0528 22.4441 20.8821 22.3347 20.3488C22.297 20.0881 22.3042 19.823 22.3561 19.5648C22.4494 19.1288 22.3454 18.8488 22.0374 18.5955C21.7881 18.3875 21.4694 18.3302 21.1201 18.3302C21.0005 18.3232 20.8843 18.2875 20.7814 18.2262C20.6348 18.1542 20.5148 17.9728 20.6294 17.7488C20.6668 17.6768 20.8428 17.5008 20.8854 17.4688C21.3601 17.1995 21.9081 17.2875 22.4134 17.4902C22.8827 17.6822 23.2374 18.0342 23.748 18.5328C24.2694 19.1341 24.364 19.3008 24.6613 19.7515C24.896 20.1048 25.1093 20.4674 25.2547 20.8821C25.344 21.1421 25.2293 21.3541 24.9213 21.4848Z"/>
+</symbol>
+<symbol id="p-zhipu" viewBox="0 0 40 40" fill="currentColor">
+<path d="M20.1312 7.50002L17.4088 11.1913H5.81625L8.5375 7.50002H20.1325H20.1312ZM34.0675 28.81L31.3475 32.5H19.795L22.5125 28.81H34.0675ZM35 7.50002L16.58 32.5H5L23.42 7.50002H35Z"/>
+</symbol>
+<symbol id="p-kimi" viewBox="0 0 40 40" fill="currentColor">
+<path d="M5.85893 26.3499L18.1801 29.6463C18.1635 30.5223 18.1894 31.3987 18.2576 32.2722L25.9507 34.3298C23.669 35.2716 21.1952 35.6547 18.7355 35.4471L18.503 35.4265L18.4462 35.4213L18.3377 35.4097L18.2163 35.3968C18.1486 35.3886 18.081 35.38 18.0135 35.3709L17.8753 35.3528L17.7332 35.3322C17.5951 35.3121 17.4573 35.2901 17.3198 35.2663L17.2656 35.256L17.1687 35.2392L17.0305 35.2133L16.9401 35.194L16.82 35.1694L16.7231 35.1488L16.6004 35.1229L16.4751 35.0932L16.3537 35.0648L16.2659 35.0428L16.1522 35.0144L16.0359 34.9834L15.9132 34.9511L15.8073 34.9214L15.6665 34.8827L15.5864 34.8568L15.4779 34.8245L15.3578 34.7884L15.2222 34.7445L15.1473 34.7199L15.0439 34.6863L14.9277 34.6463L14.8424 34.6153C14.8235 34.6089 14.8045 34.6025 14.7856 34.5959L14.6978 34.5636L14.5673 34.5158L14.4937 34.4874L14.3904 34.4487L14.278 34.4035L14.1643 34.3583L14.0623 34.3169L13.9396 34.2653L13.8582 34.2291L13.7768 34.1942C13.7591 34.1865 13.7415 34.1788 13.7239 34.171L13.6386 34.1322L13.5056 34.0715L13.4384 34.0405L13.3144 33.9811L13.2343 33.9423L13.1258 33.8907L13.0147 33.8338L12.8946 33.7731L12.8274 33.7383L12.6944 33.6672L12.6208 33.6285L12.5459 33.5871C12.526 33.576 12.5062 33.5648 12.4864 33.5536L12.365 33.4851L12.2875 33.4412L12.2217 33.4024L12.1287 33.3495L12.0227 33.2849L11.9026 33.2126L11.8354 33.1712L11.7269 33.1028L11.6482 33.0524L11.5461 32.9878L11.4557 32.9271L11.3872 32.8819C11.3639 32.8665 11.3407 32.851 11.3175 32.8354L11.2607 32.7966L11.2038 32.7579C11.1866 32.7459 11.1693 32.7338 11.1522 32.7217L11.0785 32.6701L10.9804 32.6003L10.8912 32.5357L10.7957 32.466L10.7233 32.4117L10.6252 32.3381L10.527 32.2619L10.4159 32.1753L10.3578 32.1301L10.2751 32.063L10.1795 31.9855L10.0646 31.8912L10.0052 31.8408L9.94575 31.7904C9.92717 31.7746 9.90866 31.7586 9.8902 31.7426L9.83208 31.691L9.75329 31.6225L9.66287 31.5424L9.57504 31.4649L9.49496 31.39L9.40841 31.3099L9.33996 31.2453L9.22629 31.1368C9.18345 31.0953 9.14082 31.0535 9.09842 31.0116L9.06096 30.9754L9.008 30.9211L8.91887 30.8307L8.85429 30.7648L8.78971 30.6964C8.71592 30.6207 8.64357 30.5436 8.57271 30.4652L8.46938 30.3515L8.38929 30.2611L8.29758 30.1578L8.24333 30.0945L8.17488 30.0144L8.09996 29.9266L8.04054 29.8542C8.02888 29.8401 8.01725 29.8258 8.00567 29.8116L7.94754 29.7406L7.86229 29.6346L7.80934 29.5675L7.74475 29.4848L7.71892 29.4525C6.97985 28.4945 6.3556 27.4532 5.85893 26.3499ZM4.54143 18.8661L19.2057 22.7888C18.9602 23.6439 18.758 24.5109 18.5999 25.3864L32.5718 29.1244C31.8777 30.0748 31.0782 30.9436 30.1887 31.7142L5.34872 25.0673L5.32805 25.0079L5.28284 24.8736C5.26087 24.8078 5.23934 24.742 5.21826 24.676L5.20922 24.6462C5.1098 24.3302 5.02063 24.011 4.94184 23.6891L4.90309 23.5264L4.87984 23.423L4.85272 23.2978L4.82947 23.1931L4.80622 23.0769L4.78426 22.9684L4.76101 22.847C4.72743 22.6648 4.69643 22.4814 4.6693 22.2967L4.64735 22.1443L4.63314 22.0371L4.61635 21.9053C4.6077 21.8361 4.59952 21.7668 4.5918 21.6974L4.58535 21.6367C4.48884 20.7162 4.47414 19.7891 4.54143 18.8661ZM6.59905 12.214L22.0318 16.3421C21.5565 17.1236 21.1212 17.9322 20.7273 18.764L35.3166 22.6674C35.1332 23.7266 34.8413 24.7496 34.4538 25.7222L19.5351 21.731L4.66026 17.7526L4.67964 17.6235L4.68997 17.5602L4.70289 17.4736L4.72226 17.3613L4.74551 17.2347C4.7791 17.0435 4.81785 16.8536 4.85918 16.6638L4.89534 16.5036L4.92118 16.3938L4.95218 16.2685C4.98059 16.1523 5.0103 16.036 5.04259 15.9224L5.07876 15.7906L5.10847 15.6834L5.14722 15.5542L5.17951 15.4483L5.21826 15.3243L5.25184 15.2184L5.29189 15.0957C5.62637 14.0924 6.06355 13.1262 6.59646 12.2127L6.59905 12.214ZM12.3366 6.53068L26.913 10.4289C26.1438 11.1271 25.4158 11.8693 24.7327 12.6519L34.8374 15.3553C35.1823 16.4558 35.4083 17.608 35.5 18.7976L7.22034 11.2336L7.27846 11.1497L7.31334 11.098L7.365 11.027L7.42442 10.943L7.49546 10.8448L7.56521 10.7518L7.64788 10.6407L7.71246 10.5568L7.78609 10.4625L7.85713 10.3721L7.93463 10.2765L8.00567 10.1874L8.08963 10.0879L8.15938 10.0027L8.24463 9.90321L8.31308 9.82571L8.40608 9.71979L8.47454 9.64229L8.56108 9.54671L8.63083 9.47179L8.72512 9.37104L8.80004 9.29354L8.88142 9.207L9.09842 8.98742L9.22758 8.86084L9.30379 8.7885L9.40196 8.69679C10.2922 7.86254 11.2771 7.13554 12.3366 6.53068ZM20.022 4.50018H20.1473L20.2532 4.50147L20.3423 4.50277L20.4121 4.50535L20.4999 4.50793L20.5593 4.50922L20.6575 4.5131L20.7182 4.51568L20.7957 4.51956L20.8655 4.52214L20.9778 4.5286L21.1135 4.53764L21.2995 4.55185L21.4131 4.56089L21.47 4.56606L21.5694 4.57639L21.6753 4.58672L21.736 4.59318L21.8678 4.60868L21.9324 4.61643L22.0719 4.63452L22.1765 4.64743L22.2308 4.65518L22.3147 4.6681L22.5821 4.70943L22.6725 4.72493L22.7565 4.73914L22.9373 4.77272L23.0561 4.79597L23.1982 4.82439L23.2576 4.83731L23.3545 4.85797L23.4075 4.87089L23.4875 4.88768L23.5418 4.9006L23.6257 4.91997L23.689 4.93547L23.7807 4.95743L23.9047 4.98843L24.0494 5.02718L24.1954 5.06593L24.3413 5.10726L24.4059 5.12664L24.4963 5.15247L24.5971 5.18347L24.6914 5.21318L24.756 5.23385L24.8205 5.25451L24.9187 5.28681L25.0466 5.32943L25.1783 5.37593L25.2403 5.39789L25.323 5.4276L25.4431 5.47151L25.5852 5.52447L25.735 5.5826L25.8642 5.63426L25.9249 5.6601L26.0024 5.6911L26.0554 5.71435L26.1367 5.74793L26.1884 5.77118L26.262 5.80347L26.4041 5.86547L26.5333 5.92489L26.6289 5.97009L26.7257 6.01659L26.8032 6.05276L26.9221 6.11218L27.0396 6.1703L27.1714 6.23747L27.2398 6.27364L27.3031 6.30722L27.3625 6.33822L27.44 6.38084L27.493 6.40926L27.5602 6.44672L27.6738 6.5113L27.8107 6.5888L27.9231 6.65468L27.9967 6.69859L28.0652 6.73993L28.1892 6.81613L28.3029 6.88718L28.4294 6.96726L28.4759 6.99826L28.5586 7.05122L28.6671 7.12355L28.7188 7.15842L28.7989 7.21267L28.8789 7.26822L28.9086 7.29017C28.9784 7.33797 29.0481 7.38705 29.1166 7.43742L29.2238 7.51492L29.3078 7.57692L29.3801 7.63246L29.4912 7.71642L29.5971 7.79909L29.6488 7.83784L29.7134 7.8908L29.8244 7.97992L29.9265 8.06388L30.0363 8.15559C30.9559 8.93059 31.7839 9.81279 32.5021 10.779L13.8285 5.7841L13.9086 5.74922L13.9925 5.71305L14.0971 5.66914L14.2082 5.62393C14.3542 5.5658 14.5014 5.50768 14.6487 5.45472L14.7727 5.40951L14.8928 5.36689L15.0013 5.32814L15.1253 5.2881C15.2377 5.24935 15.3526 5.21318 15.4663 5.17831L15.5839 5.14343L15.6949 5.11114L15.8267 5.07239L15.9365 5.04268L16.0656 5.0091L16.1767 4.9781L16.293 4.94839L16.4105 4.91997L16.5332 4.89156L16.6495 4.86572L16.7761 4.8386L16.8936 4.81276L17.0163 4.78951L17.1351 4.76627L17.2643 4.74302L17.3818 4.72235L17.5084 4.70039L17.6273 4.68231L17.7526 4.66293L17.8714 4.64614L18.0031 4.62935L18.1207 4.61385L18.2563 4.59835L18.3726 4.58543L18.5082 4.57252C18.6283 4.5596 18.7484 4.54927 18.8698 4.54152L19.0068 4.53118L19.123 4.52472L19.2651 4.51697L19.3852 4.51181L19.5144 4.50664L19.6397 4.50406L19.7675 4.50147L20.022 4.49889V4.50018Z"/>
+</symbol>
 </svg>
-
-<header class="dz-bar">
-  <b>桌面端界面优化 · 新视觉方向样张</b>
-  <nav>
-    <a href="#home">首页</a><a href="#home-right-panel">首页右栏</a><a href="#home-empty">无项目</a><a href="#home-dark">首页深色</a>
-    <a href="#hub-connectors">定制中心</a><a href="#hub-row-menu">行菜单</a>
-    <a href="#picker">模型与推理强度</a><a href="#plus-menu">「+」菜单</a>
-    <a href="#right-panel">右栏</a><a href="#right-panel-empty">右栏空状态</a>
-    <a href="#tokens">令牌提案</a><a href="#components">组件对照</a><a href="#relation">与上一稿的关系</a>
-  </nav>
-  <span class="dz-grow"></span>
-  <span class="dz-seg"><a href="?size=1440" data-size="1440">1440×900</a><a href="?size=1280" data-size="1280">1280×800</a></span>
-</header>
-
+<header class="dz-bar"><b>桌面端界面优化 · 定稿</b><nav><a href="#home">新对话首页</a><a href="#home-right-panel">首页 · 右栏打开</a><a href="#home-empty">无项目</a><a href="#home-dark">首页 · 深色</a><a href="#account-menu">账户菜单</a><a href="#search">搜索对话</a><a href="#session">会话页</a><a href="#session-dark">会话页 · 深色</a><a href="#session-popovers">会话页 · 向上展开的弹层</a><a href="#install-card">助手安装的批准卡</a><a href="#right-panel">会话页右栏</a><a href="#right-panel-empty">右栏四页的空状态</a><a href="#not-found">找不到对话</a><a href="#picker">模型与推理强度合并选择</a><a href="#plus-menu">「+」菜单</a><a href="#hub-custom-service">接入其它服务</a><a href="#hub-connectors">定制中心 · 连接器</a><a href="#hub-row-menu">已安装行的「…」菜单</a><a href="#hub-skills">定制中心 · 技能</a><a href="#hub-manage">定制中心 · 管理页</a><a href="#automation">自动化</a><a href="#settings">设置</a><a href="#onboarding">首次引导</a><a href="#audit-r1">审计核对</a><a href="#tokens">令牌终表</a><a href="#components">组件对照</a><a href="#relation">与上一稿的关系</a></nav><span class="dz-grow"></span><span class="dz-seg"><a href="?size=1440" data-size="1440">1440×900</a><a href="?size=1280" data-size="1280">1280×800</a></span></header>
 <main class="dz-wrap">
 <section class="dz-intro">
-  <h1>新视觉方向：灰色外框包住一块圆角白色工作面</h1>
-  <p>第二轮评审稿（owner 2026-11-18 U-02/U-03/U-04 修订）。顶栏与最左窄轨是同一支浅灰，侧栏、主区、右栏装在一块圆角白色工作面里；窄轨和工作面之间不画线，靠灰白两色与工作面的轻投影分开，工作面里的分栏线几乎看不见。整页画框 1440×900，可切到 1280×800。浅色为主；深色只给首页一张。</p>
-  <p>选了「一整块工作面」而不是「三块相邻圆角面板」：owner 说「左中右应该是一个完整的 box」；三块面板会多出两道灰缝，侧栏与主区像两个窗口，和「一个完整的」相反。现状问题见 <a href="audit.md">audit.md</a>;本轮改了什么见 <a href="#relation">与上一稿的关系</a>。</p>
+  <h1>新视觉方向：灰色外框包住一块圆角纯白工作面</h1>
+  <p>owner 2026-11-18 批准方向（U-05「可以，按这个方向做」；侧栏「保持纯白」）。本稿是第三轮，也是实现前最后一稿：独立设计审计 R1 的 24 项与 5 条观察全部落实(逐项见 <a href="#audit-r1">审计核对</a>)，并按同一方向补齐会话、搜索、自动化、设置、账户菜单、定制中心技能页与管理页、接入其它服务、找不到对话、首次引导。行为、步骤与限制都不变。</p>
+  <p><b>本目录已冻结</b>:以后的修改在 <code>docs/design/current/</code> 各页活稿里进行(见 <a href="#relation">与上一稿的关系</a> 末尾的落点表)。整页画框 1440×900，可切到 1280×800。现状问题见 <a href="audit.md">audit.md</a>。</p>
 </section>
-
-<section class="dz-sec">
-  <h2 class="dz-h2">样张一 · 新对话首页 <code>#home</code></h2>
-  <p class="dz-sub">外框：顶栏（红绿灯、左栏开关、前进后退、页面名「新对话」、右上角右栏开关）与窄轨（新对话、搜索、定制中心、自动化，账户在底部）同一支灰。工作面：侧栏（品牌、项目与最近对话）和主区在同一块圆角白里。主区标题「我们要处理什么？」；输入框底行「+」、运行权限、模型与推理强度合并按钮、发送；项目 / 文件 / 插件在贴着输入框的托盘里。</p>
-  <div class="dz-stage">
-  <div class="fr a-ui" id="home">
+<section class="dz-sec"><h2 class="dz-h2">新对话首页 <code>#home</code></h2><p class="dz-sub">外框（顶栏 + 窄轨）同一支灰；侧栏、主区装在一块圆角纯白工作面里。标题「我们要处理什么？」500 字重、视觉居中；输入框底行「+」、运行权限、模型与推理强度合并按钮、发送；项目 / 文件 / 插件在托盘里。</p>
+  <div class="dz-stage"><div class="fr a-ui" id="home">
     <div class="tb">
-      <div class="tb-left">
-        <span class="tl"><i></i><i></i><i></i></span>
-        <button class="tb-btn" aria-label="隐藏侧边栏"><svg class="a-ic"><use href="#i-panel-l"/></svg></button>
-        <button class="tb-btn" aria-label="后退"><svg class="a-ic"><use href="#i-left"/></svg></button>
-        <button class="tb-btn is-dim" aria-label="前进"><svg class="a-ic"><use href="#i-right"/></svg></button>
-      </div>
-      <div class="tb-title">新对话</div>
-      <div class="tb-right"><button class="tb-btn" aria-label="显示右栏"><svg class="a-ic"><use href="#i-panel-r"/></svg></button></div>
+      <div class="tb-left"><span class="tl"><i></i><i></i><i></i></span><button class="tb-btn" aria-label="隐藏侧边栏"><svg class="a-ic"><use href="#i-panel-l"/></svg></button><button class="tb-btn" aria-label="后退"><svg class="a-ic"><use href="#i-left"/></svg></button><button class="tb-btn is-dim" aria-label="前进"><svg class="a-ic"><use href="#i-right"/></svg></button></div>
+      <div class="tb-title">新对话</div><div class="tb-right"><button class="tb-btn" aria-label="显示右栏"><svg class="a-ic"><use href="#i-panel-r"/></svg></button></div>
     </div>
-    <nav class="rail">
-      <button class="rail-btn is-on" aria-label="新对话"><svg class="a-ic ic-18"><use href="#i-pen"/></svg></button>
-      <button class="rail-btn" aria-label="搜索对话 ⌘K"><svg class="a-ic ic-18"><use href="#i-search"/></svg></button>
-      <button class="rail-btn" aria-label="定制中心"><svg class="a-ic ic-18"><use href="#i-grid"/></svg></button>
-      <button class="rail-btn" aria-label="自动化"><svg class="a-ic ic-18"><use href="#i-clock"/></svg></button>
-      <span class="rail-grow"></span>
-      <button class="rail-avatar" aria-label="账户">A</button>
-    </nav>
-    <div class="box">
-      <aside class="side">
+    <nav class="rail"><button class="rail-btn" aria-label="新对话"><svg class="a-ic ic-18"><use href="#i-pen"/></svg></button><button class="rail-btn" aria-label="搜索对话 ⌘K"><svg class="a-ic ic-18"><use href="#i-search"/></svg></button><button class="rail-btn" aria-label="定制中心"><svg class="a-ic ic-18"><use href="#i-grid"/></svg></button><button class="rail-btn" aria-label="自动化"><svg class="a-ic ic-18"><use href="#i-cal"/></svg></button><span class="rail-grow"></span><button class="rail-avatar" aria-label="账户">A</button></nav>
+    <div class="box"><aside class="side">
         <div class="side-brand"><img src="../../../packages/ui-mac/src/renderer/brand/brand-mark.png" alt="" /><b>Code Puppy</b></div>
         <div class="side-sec">项目<span class="acts"><button class="tb-btn" aria-label="筛选项目和对话"><svg class="a-ic ic-14"><use href="#i-search"/></svg></button><button class="tb-btn" aria-label="打开项目"><svg class="a-ic ic-14"><use href="#i-plus"/></svg></button></span></div>
-        <div class="side-list">
-        <div class="row is-hover"><svg class="a-ic"><use href="#i-folder-open"/></svg><span class="grow">orbit-web</span><span class="hov"><button class="tb-btn" aria-label="更多"><svg class="a-ic ic-14"><use href="#i-more"/></svg></button><button class="tb-btn" aria-label="在此项目新对话"><svg class="a-ic ic-14"><use href="#i-pen"/></svg></button></span></div>
-        <div class="row conv"><span class="grow">修复登录页在窄屏下的错位</span></div>
-        <div class="row conv"><span class="grow">把定价表改成从配置读取</span><span class="dot" title="有新进展"></span></div>
-        <div class="row conv"><span class="grow">梳理项目目录结构并写进 README</span></div>
-        <div class="row conv"><span class="grow">给结算接口补上重试与超时</span></div>
-        <div class="row more">显示更多</div>
-        <div class="row"><svg class="a-ic"><use href="#i-folder"/></svg><span class="grow">pricing-api</span></div>
-        <div class="row"><svg class="a-ic"><use href="#i-folder"/></svg><span class="grow">design-notes</span></div>
-        <div class="row"><svg class="a-ic"><use href="#i-folder"/></svg><span class="grow">weekly-report</span></div>
-        </div>
-      </aside>
-      <div class="main">
-        <div class="hero">
-          <h1>我们要处理什么？</h1>
-          <div class="compose-wrap">
-            <div class="comp">
-            <div class="comp-input">问点什么，输入 / 调命令，@ 引用上下文…</div>
-            <div class="comp-row">
-              <button class="cbtn icon" aria-label="添加附件、计划模式或助手"><svg class="a-ic"><use href="#i-plus"/></svg></button>
-              <button class="cbtn perm"><svg class="a-ic ic-14"><use href="#i-shield"/></svg>全部批准<svg class="a-ic chev"><use href="#i-down"/></svg></button>
-              <span class="grow"></span>
-              <button class="cbtn"><span class="brand-tile">D</span>DeepSeek V4 Pro<span class="lvl">高</span><svg class="a-ic chev"><use href="#i-down"/></svg></button>
-              <button class="send" aria-label="发送"><svg class="a-ic"><use href="#i-up"/></svg></button>
-            </div>
-            </div>
-          <div class="tray">
-            <button class="cbtn"><svg class="a-ic"><use href="#i-folder"/></svg>orbit-web<svg class="a-ic chev"><use href="#i-down"/></svg></button>
-            <button class="cbtn"><svg class="a-ic"><use href="#i-file"/></svg>文件</button>
-            <button class="cbtn"><svg class="a-ic"><use href="#i-plug"/></svg>插件</button>
-          </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-  </div>
-  <p class="dz-cap">悬停态示意：侧栏「orbit-web」一行悬停时出现「更多」「在此项目新对话」。侧栏没有「搜索」一行：搜索在窄轨第二个图标（⌘K）；项目筛选收进「项目」标题右侧放大镜。</p>
-</section>
-
-<section class="dz-sec">
-  <h2 class="dz-h2">首页 · 右栏打开 <code>#home-right-panel</code></h2>
-  <p class="dz-sub">owner 定：首页顶栏也有右栏开关；首页右栏只有当前项目的「文件」「终端」两页，「审查」「产物」进入对话后才出现。右栏与主区在同一块工作面里，中间一条几乎看不见的分栏线。</p>
-  <div class="dz-stage">
-  <div class="fr a-ui" id="home-right-panel">
+        <div class="side-list"><div class="row is-hover"><svg class="a-ic"><use href="#i-folder-open"/></svg><span class="grow">orbit-web</span><span class="hov"><button class="tb-btn" aria-label="更多"><svg class="a-ic ic-14"><use href="#i-more"/></svg></button><button class="tb-btn" aria-label="在此项目新对话"><svg class="a-ic ic-14"><use href="#i-pen"/></svg></button></span></div><div class="row conv"><span class="grow">修复登录页在窄屏下的错位</span></div><div class="row conv"><span class="grow">把定价表改成从配置读取</span><span class="slot"><span class="dot" title="有新进展"></span></span></div><div class="row conv"><span class="grow">梳理项目目录结构并写进 README</span></div><div class="row conv"><span class="grow">给结算接口补上重试与超时</span></div><div class="row more">显示更多</div><div class="row"><svg class="a-ic"><use href="#i-folder"/></svg><span class="grow">pricing-api</span></div><div class="row"><svg class="a-ic"><use href="#i-folder"/></svg><span class="grow">design-notes</span></div><div class="row"><svg class="a-ic"><use href="#i-folder"/></svg><span class="grow">weekly-report</span></div></div>
+      </aside><div class="main"><div class="hero"><h1>我们要处理什么？</h1><div class="compose-wrap"><div class="comp"><div class="comp-input">问点什么，输入 / 调命令，@ 引用上下文…</div><div class="comp-row"><button class="cbtn icon" aria-label="添加附件、计划模式或助手"><svg class="a-ic"><use href="#i-plus"/></svg></button><button class="cbtn perm"><svg class="a-ic ic-14"><use href="#i-shield"/></svg>全部批准<svg class="a-ic ic-12 chev"><use href="#i-down"/></svg></button><span class="grow"></span><button class="cbtn"><span class="brand-tile"><svg class="prov"><use href="#p-deepseek"/></svg></span>DeepSeek V4 Pro<span class="lvl">高</span><svg class="a-ic ic-12 chev"><use href="#i-down"/></svg></button><button class="send" aria-label="发送"><svg class="a-ic"><use href="#i-up"/></svg></button></div></div><div class="tray"><button class="cbtn"><svg class="a-ic ic-14"><use href="#i-folder"/></svg>orbit-web<svg class="a-ic ic-12 chev"><use href="#i-down"/></svg></button><button class="cbtn"><svg class="a-ic ic-14"><use href="#i-file"/></svg>文件</button><button class="cbtn"><svg class="a-ic ic-14"><use href="#i-plug"/></svg>插件</button></div></div></div></div></div>
+  </div></div><p class="dz-cap">悬停态示意：「orbit-web」一行悬停时出现「更多」「在此项目新对话」，两颗按钮与「项目」标题右侧按钮同一竖轴。</p></section><section class="dz-sec"><h2 class="dz-h2">首页 · 右栏打开 <code>#home-right-panel</code></h2><p class="dz-sub">首页右栏只有当前项目的「文件」「终端」；「审查」「产物」进入对话后才出现（owner U-02）。</p>
+  <div class="dz-stage"><div class="fr a-ui" id="home-right-panel">
     <div class="tb">
-      <div class="tb-left">
-        <span class="tl"><i></i><i></i><i></i></span>
-        <button class="tb-btn" aria-label="隐藏侧边栏"><svg class="a-ic"><use href="#i-panel-l"/></svg></button>
-        <button class="tb-btn" aria-label="后退"><svg class="a-ic"><use href="#i-left"/></svg></button>
-        <button class="tb-btn is-dim" aria-label="前进"><svg class="a-ic"><use href="#i-right"/></svg></button>
-      </div>
-      <div class="tb-title">新对话</div>
-      <div class="tb-right"><button class="tb-btn is-on" aria-label="收起右栏" aria-pressed="true"><svg class="a-ic"><use href="#i-panel-r"/></svg></button></div>
+      <div class="tb-left"><span class="tl"><i></i><i></i><i></i></span><button class="tb-btn" aria-label="隐藏侧边栏"><svg class="a-ic"><use href="#i-panel-l"/></svg></button><button class="tb-btn" aria-label="后退"><svg class="a-ic"><use href="#i-left"/></svg></button><button class="tb-btn is-dim" aria-label="前进"><svg class="a-ic"><use href="#i-right"/></svg></button></div>
+      <div class="tb-title">新对话</div><div class="tb-right"><button class="tb-btn is-on" aria-label="收起右栏" aria-pressed="true"><svg class="a-ic"><use href="#i-panel-r"/></svg></button></div>
     </div>
-    <nav class="rail">
-      <button class="rail-btn is-on" aria-label="新对话"><svg class="a-ic ic-18"><use href="#i-pen"/></svg></button>
-      <button class="rail-btn" aria-label="搜索对话 ⌘K"><svg class="a-ic ic-18"><use href="#i-search"/></svg></button>
-      <button class="rail-btn" aria-label="定制中心"><svg class="a-ic ic-18"><use href="#i-grid"/></svg></button>
-      <button class="rail-btn" aria-label="自动化"><svg class="a-ic ic-18"><use href="#i-clock"/></svg></button>
-      <span class="rail-grow"></span>
-      <button class="rail-avatar" aria-label="账户">A</button>
-    </nav>
-    <div class="box">
-      <aside class="side">
+    <nav class="rail"><button class="rail-btn" aria-label="新对话"><svg class="a-ic ic-18"><use href="#i-pen"/></svg></button><button class="rail-btn" aria-label="搜索对话 ⌘K"><svg class="a-ic ic-18"><use href="#i-search"/></svg></button><button class="rail-btn" aria-label="定制中心"><svg class="a-ic ic-18"><use href="#i-grid"/></svg></button><button class="rail-btn" aria-label="自动化"><svg class="a-ic ic-18"><use href="#i-cal"/></svg></button><span class="rail-grow"></span><button class="rail-avatar" aria-label="账户">A</button></nav>
+    <div class="box"><aside class="side">
         <div class="side-brand"><img src="../../../packages/ui-mac/src/renderer/brand/brand-mark.png" alt="" /><b>Code Puppy</b></div>
         <div class="side-sec">项目<span class="acts"><button class="tb-btn" aria-label="筛选项目和对话"><svg class="a-ic ic-14"><use href="#i-search"/></svg></button><button class="tb-btn" aria-label="打开项目"><svg class="a-ic ic-14"><use href="#i-plus"/></svg></button></span></div>
-        <div class="side-list">
-        <div class="row"><svg class="a-ic"><use href="#i-folder-open"/></svg><span class="grow">orbit-web</span></div>
-        <div class="row conv"><span class="grow">修复登录页在窄屏下的错位</span></div>
-        <div class="row conv"><span class="grow">把定价表改成从配置读取</span><span class="dot" title="有新进展"></span></div>
-        <div class="row conv"><span class="grow">梳理项目目录结构并写进 README</span></div>
-        <div class="row conv"><span class="grow">给结算接口补上重试与超时</span></div>
-        <div class="row more">显示更多</div>
-        <div class="row"><svg class="a-ic"><use href="#i-folder"/></svg><span class="grow">pricing-api</span></div>
-        <div class="row"><svg class="a-ic"><use href="#i-folder"/></svg><span class="grow">design-notes</span></div>
-        <div class="row"><svg class="a-ic"><use href="#i-folder"/></svg><span class="grow">weekly-report</span></div>
-        </div>
-      </aside>
-      <div class="main">
-        <div class="hero">
-          <h1>我们要处理什么？</h1>
-          <div class="compose-wrap">
-            <div class="comp">
-            <div class="comp-input">问点什么，输入 / 调命令，@ 引用上下文…</div>
-            <div class="comp-row">
-              <button class="cbtn icon" aria-label="添加附件、计划模式或助手"><svg class="a-ic"><use href="#i-plus"/></svg></button>
-              <button class="cbtn perm"><svg class="a-ic ic-14"><use href="#i-shield"/></svg>全部批准<svg class="a-ic chev"><use href="#i-down"/></svg></button>
-              <span class="grow"></span>
-              <button class="cbtn"><span class="brand-tile">D</span>DeepSeek V4 Pro<span class="lvl">高</span><svg class="a-ic chev"><use href="#i-down"/></svg></button>
-              <button class="send" aria-label="发送"><svg class="a-ic"><use href="#i-up"/></svg></button>
-            </div>
-            </div>
-          <div class="tray">
-            <button class="cbtn"><svg class="a-ic"><use href="#i-folder"/></svg>orbit-web<svg class="a-ic chev"><use href="#i-down"/></svg></button>
-            <button class="cbtn"><svg class="a-ic"><use href="#i-file"/></svg>文件</button>
-            <button class="cbtn"><svg class="a-ic"><use href="#i-plug"/></svg>插件</button>
-          </div>
-          </div>
-        </div>
-      </div>
-      <aside class="rp">
-        <div class="rp-tabs"><span class="tab is-on">文件</span><span class="tab">终端</span></div>
-        <div class="rp-filter"><label class="a-field"><svg class="a-ic"><use href="#i-search"/></svg><input placeholder="筛选文件" /></label></div>
-        <div class="tree">
-          <div class="trow"><svg class="a-ic chev"><use href="#i-down"/></svg><svg class="a-ic"><use href="#i-folder-open"/></svg>src</div>
-          <div class="trow l2"><svg class="a-ic chev"><use href="#i-right"/></svg><svg class="a-ic"><use href="#i-folder"/></svg>components</div>
-          <div class="trow l2 is-hover"><svg class="a-ic chev"><use href="#i-right"/></svg><svg class="a-ic"><use href="#i-folder"/></svg>pages</div>
-          <div class="trow l2"><svg class="a-ic chev"><use href="#i-right"/></svg><svg class="a-ic"><use href="#i-folder"/></svg>styles</div>
-          <div class="trow l2"><span class="sp"></span><svg class="a-ic"><use href="#i-file"/></svg>main.tsx</div>
-          <div class="trow"><svg class="a-ic chev"><use href="#i-right"/></svg><svg class="a-ic"><use href="#i-folder"/></svg>public</div>
-          <div class="trow"><span class="sp"></span><svg class="a-ic"><use href="#i-file"/></svg>.gitignore</div>
-          <div class="trow"><span class="sp"></span><svg class="a-ic"><use href="#i-file"/></svg>index.html</div>
-          <div class="trow"><span class="sp"></span><svg class="a-ic"><use href="#i-file"/></svg>package.json</div>
-          <div class="trow"><span class="sp"></span><svg class="a-ic"><use href="#i-file-text"/></svg>README.md</div>
-          <div class="trow"><span class="sp"></span><svg class="a-ic"><use href="#i-file"/></svg>tsconfig.json</div>
-          <div class="trow"><span class="sp"></span><svg class="a-ic"><use href="#i-file"/></svg>vite.config.ts</div>
-        </div>
-      </aside>
-    </div>
-  </div>
-  </div>
-</section>
-
-<section class="dz-sec">
-  <h2 class="dz-h2">无项目时 <code>#home-empty</code>（也即 <code>#sidebar-empty</code>）</h2>
-  <p class="dz-sub">空状态贴着「项目」标题左对齐：一句说明、行样式的「打开项目…」、底部一句默认工作区。托盘里的项目显示为默认工作区「Code Puppy」。窄轨「搜索」悬停提示「搜索对话 ⌘K」（组件库 Tooltip，右侧出现）。</p>
-  <span id="sidebar-empty"></span>
-  <div class="dz-stage">
-  <div class="fr a-ui" id="home-empty">
+        <div class="side-list"><div class="row"><svg class="a-ic"><use href="#i-folder-open"/></svg><span class="grow">orbit-web</span></div><div class="row conv"><span class="grow">修复登录页在窄屏下的错位</span></div><div class="row conv"><span class="grow">把定价表改成从配置读取</span><span class="slot"><span class="dot" title="有新进展"></span></span></div><div class="row conv"><span class="grow">梳理项目目录结构并写进 README</span></div><div class="row conv"><span class="grow">给结算接口补上重试与超时</span></div><div class="row more">显示更多</div><div class="row"><svg class="a-ic"><use href="#i-folder"/></svg><span class="grow">pricing-api</span></div><div class="row"><svg class="a-ic"><use href="#i-folder"/></svg><span class="grow">design-notes</span></div><div class="row"><svg class="a-ic"><use href="#i-folder"/></svg><span class="grow">weekly-report</span></div></div>
+      </aside><div class="main"><div class="hero"><h1>我们要处理什么？</h1><div class="compose-wrap"><div class="comp"><div class="comp-input">问点什么，输入 / 调命令，@ 引用上下文…</div><div class="comp-row"><button class="cbtn icon" aria-label="添加附件、计划模式或助手"><svg class="a-ic"><use href="#i-plus"/></svg></button><button class="cbtn perm"><svg class="a-ic ic-14"><use href="#i-shield"/></svg>全部批准<svg class="a-ic ic-12 chev"><use href="#i-down"/></svg></button><span class="grow"></span><button class="cbtn"><span class="brand-tile"><svg class="prov"><use href="#p-deepseek"/></svg></span>DeepSeek V4 Pro<span class="lvl">高</span><svg class="a-ic ic-12 chev"><use href="#i-down"/></svg></button><button class="send" aria-label="发送"><svg class="a-ic"><use href="#i-up"/></svg></button></div></div><div class="tray"><button class="cbtn"><svg class="a-ic ic-14"><use href="#i-folder"/></svg>orbit-web<svg class="a-ic ic-12 chev"><use href="#i-down"/></svg></button><button class="cbtn"><svg class="a-ic ic-14"><use href="#i-file"/></svg>文件</button><button class="cbtn"><svg class="a-ic ic-14"><use href="#i-plug"/></svg>插件</button></div></div></div></div><aside class="rp"><div class="rp-tabs"><span class="tab is-on">文件</span><span class="tab">终端</span></div>
+      <div class="rp-filter"><label class="a-field"><svg class="a-ic ic-14"><use href="#i-search"/></svg><span class="ph">筛选文件</span></label></div><div class="tree"><div class="trow "><svg class="a-ic ic-12 chev"><use href="#i-down"/></svg><svg class="a-ic ic-14"><use href="#i-folder-open"/></svg>src</div><div class="trow l2"><svg class="a-ic ic-12 chev"><use href="#i-right"/></svg><svg class="a-ic ic-14"><use href="#i-folder"/></svg>components</div><div class="trow l2 is-hover"><svg class="a-ic ic-12 chev"><use href="#i-right"/></svg><svg class="a-ic ic-14"><use href="#i-folder"/></svg>pages</div><div class="trow l2"><svg class="a-ic ic-12 chev"><use href="#i-right"/></svg><svg class="a-ic ic-14"><use href="#i-folder"/></svg>styles</div><div class="trow l2"><span class=sp></span><svg class="a-ic ic-14"><use href="#i-file"/></svg>main.tsx</div><div class="trow "><svg class="a-ic ic-12 chev"><use href="#i-right"/></svg><svg class="a-ic ic-14"><use href="#i-folder"/></svg>public</div><div class="trow "><span class=sp></span><svg class="a-ic ic-14"><use href="#i-file"/></svg>.gitignore</div><div class="trow "><span class=sp></span><svg class="a-ic ic-14"><use href="#i-file"/></svg>index.html</div><div class="trow "><span class=sp></span><svg class="a-ic ic-14"><use href="#i-file"/></svg>package.json</div><div class="trow "><span class=sp></span><svg class="a-ic ic-14"><use href="#i-file-text"/></svg>README.md</div><div class="trow "><span class=sp></span><svg class="a-ic ic-14"><use href="#i-file"/></svg>tsconfig.json</div><div class="trow "><span class=sp></span><svg class="a-ic ic-14"><use href="#i-file"/></svg>vite.config.ts</div></div></aside></div>
+  </div></div></section><section class="dz-sec"><h2 class="dz-h2">无项目（也即 #sidebar-empty） <code>#home-empty</code></h2><p class="dz-sub">空状态与右栏空状态同一套：20px 图标、标题、说明，不装方块；「打开项目…」用侧栏行样式；底部一句默认工作区。</p>
+  <div class="dz-stage"><div class="fr a-ui" id="home-empty">
     <div class="tb">
-      <div class="tb-left">
-        <span class="tl"><i></i><i></i><i></i></span>
-        <button class="tb-btn" aria-label="隐藏侧边栏"><svg class="a-ic"><use href="#i-panel-l"/></svg></button>
-        <button class="tb-btn is-dim" aria-label="后退"><svg class="a-ic"><use href="#i-left"/></svg></button>
-        <button class="tb-btn is-dim" aria-label="前进"><svg class="a-ic"><use href="#i-right"/></svg></button>
-      </div>
-      <div class="tb-title">新对话</div>
-      <div class="tb-right"><button class="tb-btn" aria-label="显示右栏"><svg class="a-ic"><use href="#i-panel-r"/></svg></button></div>
+      <div class="tb-left"><span class="tl"><i></i><i></i><i></i></span><button class="tb-btn" aria-label="隐藏侧边栏"><svg class="a-ic"><use href="#i-panel-l"/></svg></button><button class="tb-btn is-dim" aria-label="后退"><svg class="a-ic"><use href="#i-left"/></svg></button><button class="tb-btn is-dim" aria-label="前进"><svg class="a-ic"><use href="#i-right"/></svg></button></div>
+      <div class="tb-title">新对话</div><div class="tb-right"><button class="tb-btn" aria-label="显示右栏"><svg class="a-ic"><use href="#i-panel-r"/></svg></button></div>
     </div>
-    <nav class="rail">
-      <button class="rail-btn is-on" aria-label="新对话"><svg class="a-ic ic-18"><use href="#i-pen"/></svg></button>
-      <button class="rail-btn" aria-label="搜索对话 ⌘K"><svg class="a-ic ic-18"><use href="#i-search"/></svg></button>
-      <button class="rail-btn" aria-label="定制中心"><svg class="a-ic ic-18"><use href="#i-grid"/></svg></button>
-      <button class="rail-btn" aria-label="自动化"><svg class="a-ic ic-18"><use href="#i-clock"/></svg></button>
-      <span class="rail-grow"></span>
-      <button class="rail-avatar" aria-label="账户">A</button>
-    </nav>
-    <div class="box">
-      <aside class="side">
+    <nav class="rail"><button class="rail-btn" aria-label="新对话"><svg class="a-ic ic-18"><use href="#i-pen"/></svg></button><button class="rail-btn" aria-label="搜索对话 ⌘K"><svg class="a-ic ic-18"><use href="#i-search"/></svg></button><button class="rail-btn" aria-label="定制中心"><svg class="a-ic ic-18"><use href="#i-grid"/></svg></button><button class="rail-btn" aria-label="自动化"><svg class="a-ic ic-18"><use href="#i-cal"/></svg></button><span class="rail-grow"></span><button class="rail-avatar" aria-label="账户">A</button></nav>
+    <div class="box"><aside class="side">
         <div class="side-brand"><img src="../../../packages/ui-mac/src/renderer/brand/brand-mark.png" alt="" /><b>Code Puppy</b></div>
         <div class="side-sec">项目<span class="acts"><button class="tb-btn" aria-label="打开项目"><svg class="a-ic ic-14"><use href="#i-plus"/></svg></button></span></div>
-        <div class="side-empty">
-          <div class="ico"><svg class="a-ic"><use href="#i-folder"/></svg></div>
+        <div class="side-empty"><svg class="a-ic ic-20"><use href="#i-folder"/></svg>
           <h4>还没有项目</h4>
           <p>打开电脑上的一个文件夹，助手就能在里面读写文件、运行命令；它的对话也会列在这里。</p>
           <button class="row"><svg class="a-ic"><use href="#i-plus"/></svg><span class="grow">打开项目…</span></button>
-          <div class="note">不开项目也能直接开始：对话和生成的文件放在默认工作区「Code Puppy」。</div>
+          <div class="note">不开项目也能直接开始。对话和生成的文件会放在默认工作区「Code Puppy」。</div>
         </div>
-      </aside>
-      <div class="main">
-        <div class="hero">
-          <h1>我们要处理什么？</h1>
-          <div class="compose-wrap">
-            <div class="comp">
-            <div class="comp-input">问点什么，输入 / 调命令，@ 引用上下文…</div>
-            <div class="comp-row">
-              <button class="cbtn icon" aria-label="添加附件、计划模式或助手"><svg class="a-ic"><use href="#i-plus"/></svg></button>
-              <button class="cbtn perm"><svg class="a-ic ic-14"><use href="#i-shield"/></svg>全部批准<svg class="a-ic chev"><use href="#i-down"/></svg></button>
-              <span class="grow"></span>
-              <button class="cbtn"><span class="brand-tile">D</span>DeepSeek V4 Pro<span class="lvl">高</span><svg class="a-ic chev"><use href="#i-down"/></svg></button>
-              <button class="send" aria-label="发送"><svg class="a-ic"><use href="#i-up"/></svg></button>
-            </div>
-            </div>
-          <div class="tray">
-            <button class="cbtn"><svg class="a-ic"><use href="#i-folder"/></svg>Code Puppy<span class="tag">默认工作区</span><svg class="a-ic chev"><use href="#i-down"/></svg></button>
-            <button class="cbtn"><svg class="a-ic"><use href="#i-file"/></svg>文件</button>
-            <button class="cbtn"><svg class="a-ic"><use href="#i-plug"/></svg>插件</button>
-          </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-  </div>
-</section>
-
-<section class="dz-sec">
-  <h2 class="dz-h2">首页 · 深色 <code>#home-dark</code></h2>
-  <p class="dz-sub">深色外框最暗（#0e0e10），工作面亮一档（#161618），托盘与弹层再亮一档；同样不画竖线。输入框里已有文字，发送键亮起。</p>
-  <div class="dz-stage">
-  <div class="fr a-ui is-dark" id="home-dark">
+      </aside><div class="main"><div class="hero"><h1>我们要处理什么？</h1><div class="compose-wrap"><div class="comp"><div class="comp-input">问点什么，输入 / 调命令，@ 引用上下文…</div><div class="comp-row"><button class="cbtn icon" aria-label="添加附件、计划模式或助手"><svg class="a-ic"><use href="#i-plus"/></svg></button><button class="cbtn perm"><svg class="a-ic ic-14"><use href="#i-shield"/></svg>全部批准<svg class="a-ic ic-12 chev"><use href="#i-down"/></svg></button><span class="grow"></span><button class="cbtn"><span class="brand-tile"><svg class="prov"><use href="#p-deepseek"/></svg></span>DeepSeek V4 Pro<span class="lvl">高</span><svg class="a-ic ic-12 chev"><use href="#i-down"/></svg></button><button class="send" aria-label="发送"><svg class="a-ic"><use href="#i-up"/></svg></button></div></div><div class="tray"><button class="cbtn"><svg class="a-ic ic-14"><use href="#i-folder"/></svg>Code Puppy<span class="tag">默认工作区</span><svg class="a-ic ic-12 chev"><use href="#i-down"/></svg></button><button class="cbtn"><svg class="a-ic ic-14"><use href="#i-file"/></svg>文件</button><button class="cbtn"><svg class="a-ic ic-14"><use href="#i-plug"/></svg>插件</button></div></div></div></div></div>
+  </div></div></section><section class="dz-sec"><h2 class="dz-h2">首页 · 深色 <code>#home-dark</code></h2><p class="dz-sub">深色外框最暗、工作面亮一档、输入框再亮一档，托盘比输入框低一档；工作面上沿一道极淡的高光。</p>
+  <div class="dz-stage"><div class="fr a-ui is-dark" id="home-dark">
     <div class="tb">
-      <div class="tb-left">
-        <span class="tl"><i></i><i></i><i></i></span>
-        <button class="tb-btn" aria-label="隐藏侧边栏"><svg class="a-ic"><use href="#i-panel-l"/></svg></button>
-        <button class="tb-btn" aria-label="后退"><svg class="a-ic"><use href="#i-left"/></svg></button>
-        <button class="tb-btn is-dim" aria-label="前进"><svg class="a-ic"><use href="#i-right"/></svg></button>
-      </div>
-      <div class="tb-title">新对话</div>
-      <div class="tb-right"><button class="tb-btn" aria-label="显示右栏"><svg class="a-ic"><use href="#i-panel-r"/></svg></button></div>
+      <div class="tb-left"><span class="tl"><i></i><i></i><i></i></span><button class="tb-btn" aria-label="隐藏侧边栏"><svg class="a-ic"><use href="#i-panel-l"/></svg></button><button class="tb-btn" aria-label="后退"><svg class="a-ic"><use href="#i-left"/></svg></button><button class="tb-btn is-dim" aria-label="前进"><svg class="a-ic"><use href="#i-right"/></svg></button></div>
+      <div class="tb-title">新对话</div><div class="tb-right"><button class="tb-btn" aria-label="显示右栏"><svg class="a-ic"><use href="#i-panel-r"/></svg></button></div>
     </div>
-    <nav class="rail">
-      <button class="rail-btn is-on" aria-label="新对话"><svg class="a-ic ic-18"><use href="#i-pen"/></svg></button>
-      <button class="rail-btn" aria-label="搜索对话 ⌘K"><svg class="a-ic ic-18"><use href="#i-search"/></svg></button>
-      <button class="rail-btn" aria-label="定制中心"><svg class="a-ic ic-18"><use href="#i-grid"/></svg></button>
-      <button class="rail-btn" aria-label="自动化"><svg class="a-ic ic-18"><use href="#i-clock"/></svg></button>
-      <span class="rail-grow"></span>
-      <button class="rail-avatar" aria-label="账户">A</button>
-    </nav>
-    <div class="box">
-      <aside class="side">
+    <nav class="rail"><button class="rail-btn" aria-label="新对话"><svg class="a-ic ic-18"><use href="#i-pen"/></svg></button><button class="rail-btn" aria-label="搜索对话 ⌘K"><svg class="a-ic ic-18"><use href="#i-search"/></svg></button><button class="rail-btn" aria-label="定制中心"><svg class="a-ic ic-18"><use href="#i-grid"/></svg></button><button class="rail-btn" aria-label="自动化"><svg class="a-ic ic-18"><use href="#i-cal"/></svg></button><span class="rail-grow"></span><button class="rail-avatar" aria-label="账户">A</button></nav>
+    <div class="box"><aside class="side">
         <div class="side-brand"><img src="../../../packages/ui-mac/src/renderer/brand/brand-mark.png" alt="" /><b>Code Puppy</b></div>
         <div class="side-sec">项目<span class="acts"><button class="tb-btn" aria-label="筛选项目和对话"><svg class="a-ic ic-14"><use href="#i-search"/></svg></button><button class="tb-btn" aria-label="打开项目"><svg class="a-ic ic-14"><use href="#i-plus"/></svg></button></span></div>
-        <div class="side-list">
-        <div class="row"><svg class="a-ic"><use href="#i-folder-open"/></svg><span class="grow">orbit-web</span></div>
-        <div class="row conv"><span class="grow">修复登录页在窄屏下的错位</span></div>
-        <div class="row conv"><span class="grow">把定价表改成从配置读取</span><span class="dot" title="有新进展"></span></div>
-        <div class="row conv"><span class="grow">梳理项目目录结构并写进 README</span></div>
-        <div class="row conv"><span class="grow">给结算接口补上重试与超时</span></div>
-        <div class="row more">显示更多</div>
-        <div class="row"><svg class="a-ic"><use href="#i-folder"/></svg><span class="grow">pricing-api</span></div>
-        <div class="row"><svg class="a-ic"><use href="#i-folder"/></svg><span class="grow">design-notes</span></div>
-        <div class="row"><svg class="a-ic"><use href="#i-folder"/></svg><span class="grow">weekly-report</span></div>
-        </div>
-      </aside>
-      <div class="main">
-        <div class="hero">
-          <h1>我们要处理什么？</h1>
-          <div class="compose-wrap">
-            <div class="comp">
-            <div class="comp-input has-text">把登录页的表单改成移动端优先，窄屏下按钮别再溢出</div>
-            <div class="comp-row">
-              <button class="cbtn icon" aria-label="添加附件、计划模式或助手"><svg class="a-ic"><use href="#i-plus"/></svg></button>
-              <button class="cbtn perm"><svg class="a-ic ic-14"><use href="#i-shield"/></svg>全部批准<svg class="a-ic chev"><use href="#i-down"/></svg></button>
-              <span class="grow"></span>
-              <button class="cbtn"><span class="brand-tile">D</span>DeepSeek V4 Pro<span class="lvl">高</span><svg class="a-ic chev"><use href="#i-down"/></svg></button>
-              <button class="send is-ready" aria-label="发送"><svg class="a-ic"><use href="#i-up"/></svg></button>
-            </div>
-            </div>
-          <div class="tray">
-            <button class="cbtn"><svg class="a-ic"><use href="#i-folder"/></svg>orbit-web<svg class="a-ic chev"><use href="#i-down"/></svg></button>
-            <button class="cbtn"><svg class="a-ic"><use href="#i-file"/></svg>文件</button>
-            <button class="cbtn"><svg class="a-ic"><use href="#i-plug"/></svg>插件</button>
-          </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-  </div>
-</section>
-
-<section class="dz-sec">
-  <h2 class="dz-h2">样张二 · 定制中心（顶级页面） <code>#hub-connectors</code></h2>
-  <p class="dz-sub">定制中心和首页、自动化同级：替换工作面里的主区，顶栏写「定制中心」，不留会话路径与右栏页签；这一页没有右栏，所以顶栏右端不放右栏开关。一个搜索框；分组标题带折叠箭头；两列无边框的行，未安装「+」、已安装「…」，状态是名称后的小字。</p>
-  <div class="dz-stage">
-  <div class="fr a-ui" id="hub-connectors">
+        <div class="side-list"><div class="row"><svg class="a-ic"><use href="#i-folder-open"/></svg><span class="grow">orbit-web</span></div><div class="row conv"><span class="grow">修复登录页在窄屏下的错位</span></div><div class="row conv"><span class="grow">把定价表改成从配置读取</span><span class="slot"><span class="dot" title="有新进展"></span></span></div><div class="row conv"><span class="grow">梳理项目目录结构并写进 README</span></div><div class="row conv"><span class="grow">给结算接口补上重试与超时</span></div><div class="row more">显示更多</div><div class="row"><svg class="a-ic"><use href="#i-folder"/></svg><span class="grow">pricing-api</span></div><div class="row"><svg class="a-ic"><use href="#i-folder"/></svg><span class="grow">design-notes</span></div><div class="row"><svg class="a-ic"><use href="#i-folder"/></svg><span class="grow">weekly-report</span></div></div>
+      </aside><div class="main"><div class="hero"><h1>我们要处理什么？</h1><div class="compose-wrap"><div class="comp"><div class="comp-input has-text">把登录页的表单改成移动端优先，窄屏下按钮别再溢出</div><div class="comp-row"><button class="cbtn icon" aria-label="添加附件、计划模式或助手"><svg class="a-ic"><use href="#i-plus"/></svg></button><button class="cbtn perm"><svg class="a-ic ic-14"><use href="#i-shield"/></svg>全部批准<svg class="a-ic ic-12 chev"><use href="#i-down"/></svg></button><span class="grow"></span><button class="cbtn"><span class="brand-tile"><svg class="prov"><use href="#p-deepseek"/></svg></span>DeepSeek V4 Pro<span class="lvl">高</span><svg class="a-ic ic-12 chev"><use href="#i-down"/></svg></button><button class="send is-ready" aria-label="发送"><svg class="a-ic"><use href="#i-up"/></svg></button></div></div><div class="tray"><button class="cbtn"><svg class="a-ic ic-14"><use href="#i-folder"/></svg>orbit-web<svg class="a-ic ic-12 chev"><use href="#i-down"/></svg></button><button class="cbtn"><svg class="a-ic ic-14"><use href="#i-file"/></svg>文件</button><button class="cbtn"><svg class="a-ic ic-14"><use href="#i-plug"/></svg>插件</button></div></div></div></div></div>
+  </div></div></section><section class="dz-sec"><h2 class="dz-h2">账户菜单 <code>#account-menu</code></h2><p class="dz-sub">从窄轨头像向右上展开，不再压到主区之外；全部用线性图标；「登录」不带符号。已登录时这里换成现有的余额卡（组件库卡片 + 名称 — 值列表），本稿不重画。</p>
+  <div class="dz-stage"><div class="fr a-ui" id="account-menu">
     <div class="tb">
-      <div class="tb-left">
-        <span class="tl"><i></i><i></i><i></i></span>
-        <button class="tb-btn" aria-label="隐藏侧边栏"><svg class="a-ic"><use href="#i-panel-l"/></svg></button>
-        <button class="tb-btn" aria-label="后退"><svg class="a-ic"><use href="#i-left"/></svg></button>
-        <button class="tb-btn is-dim" aria-label="前进"><svg class="a-ic"><use href="#i-right"/></svg></button>
-      </div>
-      <div class="tb-title">定制中心</div>
-      
+      <div class="tb-left"><span class="tl"><i></i><i></i><i></i></span><button class="tb-btn" aria-label="隐藏侧边栏"><svg class="a-ic"><use href="#i-panel-l"/></svg></button><button class="tb-btn" aria-label="后退"><svg class="a-ic"><use href="#i-left"/></svg></button><button class="tb-btn is-dim" aria-label="前进"><svg class="a-ic"><use href="#i-right"/></svg></button></div>
+      <div class="tb-title">新对话</div><div class="tb-right"><button class="tb-btn" aria-label="显示右栏"><svg class="a-ic"><use href="#i-panel-r"/></svg></button></div>
     </div>
-    <nav class="rail">
-      <button class="rail-btn" aria-label="新对话"><svg class="a-ic ic-18"><use href="#i-pen"/></svg></button>
-      <button class="rail-btn" aria-label="搜索对话 ⌘K"><svg class="a-ic ic-18"><use href="#i-search"/></svg></button>
-      <button class="rail-btn is-on" aria-label="定制中心"><svg class="a-ic ic-18"><use href="#i-grid"/></svg></button>
-      <button class="rail-btn" aria-label="自动化"><svg class="a-ic ic-18"><use href="#i-clock"/></svg></button>
-      <span class="rail-grow"></span>
-      <button class="rail-avatar" aria-label="账户">A</button>
-    </nav>
-    <div class="box">
-      <aside class="side">
+    <nav class="rail"><button class="rail-btn" aria-label="新对话"><svg class="a-ic ic-18"><use href="#i-pen"/></svg></button><button class="rail-btn" aria-label="搜索对话 ⌘K"><svg class="a-ic ic-18"><use href="#i-search"/></svg></button><button class="rail-btn" aria-label="定制中心"><svg class="a-ic ic-18"><use href="#i-grid"/></svg></button><button class="rail-btn" aria-label="自动化"><svg class="a-ic ic-18"><use href="#i-cal"/></svg></button><span class="rail-grow"></span><button class="rail-avatar is-open" aria-label="账户">A</button></nav>
+    <div class="box"><aside class="side">
         <div class="side-brand"><img src="../../../packages/ui-mac/src/renderer/brand/brand-mark.png" alt="" /><b>Code Puppy</b></div>
         <div class="side-sec">项目<span class="acts"><button class="tb-btn" aria-label="筛选项目和对话"><svg class="a-ic ic-14"><use href="#i-search"/></svg></button><button class="tb-btn" aria-label="打开项目"><svg class="a-ic ic-14"><use href="#i-plus"/></svg></button></span></div>
-        <div class="side-list">
-        <div class="row"><svg class="a-ic"><use href="#i-folder-open"/></svg><span class="grow">orbit-web</span></div>
-        <div class="row conv"><span class="grow">修复登录页在窄屏下的错位</span></div>
-        <div class="row conv"><span class="grow">把定价表改成从配置读取</span><span class="dot" title="有新进展"></span></div>
-        <div class="row conv"><span class="grow">梳理项目目录结构并写进 README</span></div>
-        <div class="row more">显示更多</div>
-        <div class="row"><svg class="a-ic"><use href="#i-folder"/></svg><span class="grow">pricing-api</span></div>
-        <div class="row"><svg class="a-ic"><use href="#i-folder"/></svg><span class="grow">design-notes</span></div>
-        </div>
-      </aside>
-      <div class="main">
-        <div class="page"><div class="page-in">
-          <div class="hub-bar">
-            <div class="tabs"><span class="tab is-on">连接器</span><span class="tab">技能</span><span class="tab">助手</span></div>
-            <label class="a-field"><svg class="a-ic"><use href="#i-search"/></svg><input placeholder="搜索插件、技能或 MCP" /></label>
-            <button class="a-btn" data-variant="secondary">添加<svg class="a-ic ic-12"><use href="#i-down"/></svg></button>
-          </div>
-          <p class="hub-desc">让助手使用外部工具和服务。</p>
-          <div class="grp-h"><svg class="a-ic chev"><use href="#i-down"/></svg>已安装<span class="n">6</span></div>
-          <div class="grid2">
-            <div class="item"><span class="mono"><svg class="a-ic"><use href="#i-folder"/></svg></span><div class="txt"><div class="nm"><span>本地文件读写</span></div><div class="ds">读取和修改你允许访问的文件夹</div></div><button class="iact" aria-label="管理 本地文件读写"><svg class="a-ic"><use href="#i-more"/></svg></button></div>
-            <div class="item"><span class="mono">G</span><div class="txt"><div class="nm"><span>GitHub（官方）</span><span class="st warn"><i></i>待填令牌</span></div><div class="ds">查找仓库、阅读代码、查看提交记录</div></div><button class="iact" aria-label="管理 GitHub（官方）"><svg class="a-ic"><use href="#i-more"/></svg></button></div>
-            <div class="item is-hover"><span class="mono">S</span><div class="txt"><div class="nm"><span>Supabase</span><span class="st warn"><i></i>待登录</span></div><div class="ds">管理 Supabase 项目、数据表和函数</div></div><button class="iact is-hover" aria-label="管理 Supabase"><svg class="a-ic"><use href="#i-more"/></svg></button></div>
-            <div class="item"><span class="mono"><svg class="a-ic"><use href="#i-window"/></svg></span><div class="txt"><div class="nm"><span>浏览器操作（Playwright）</span><span class="st"><svg class="a-ic spin"><use href="#i-loader"/></svg>正在生效</span></div><div class="ds">打开网页、点击、填写表单、截图</div></div><button class="iact" aria-label="管理 浏览器操作（Playwright）"><svg class="a-ic"><use href="#i-more"/></svg></button></div>
-            <div class="item"><span class="mono"><svg class="a-ic"><use href="#i-file-search"/></svg></span><div class="txt"><div class="nm"><span>文档读取（markitdown）</span><span class="st"><i></i>已关闭</span></div><div class="ds">读取 PDF、Word、PowerPoint、Excel</div></div><button class="iact" aria-label="管理 文档读取（markitdown）"><svg class="a-ic"><use href="#i-more"/></svg></button></div>
-            <div class="item"><span class="mono">N</span><div class="txt"><div class="nm"><span>opencode-notify</span><span class="st err"><i></i>未能启用</span></div><div class="ds err">包里的原生 JS 插件不会运行</div></div><button class="iact" aria-label="管理 opencode-notify"><svg class="a-ic"><use href="#i-more"/></svg></button></div>
-          </div>
-          <div class="grp-h"><svg class="a-ic chev"><use href="#i-down"/></svg>研发<span class="n">4</span></div>
-          <div class="grid2">
-            <div class="item"><span class="mono"><svg class="a-ic"><use href="#i-bug"/></svg></span><div class="txt"><div class="nm"><span>网页排查（Chrome DevTools）</span></div><div class="ds">排查网页加载慢、报错和网络请求</div></div><button class="iact" aria-label="安装 网页排查（Chrome DevTools）"><svg class="a-ic"><use href="#i-plus"/></svg></button></div>
-            <div class="item"><span class="mono"><svg class="a-ic"><use href="#i-branch"/></svg></span><div class="txt"><div class="nm"><span>Git 版本管理</span></div><div class="ds">查看仓库状态、改动和提交历史</div></div><button class="iact" aria-label="安装 Git 版本管理"><svg class="a-ic"><use href="#i-plus"/></svg></button></div>
-            <div class="item"><span class="mono"><svg class="a-ic"><use href="#i-db"/></svg></span><div class="txt"><div class="nm"><span>数据库（本机 SQLite，只读）</span></div><div class="ds">查询你电脑上的 SQLite 数据库</div></div><button class="iact" aria-label="安装 数据库（本机 SQLite，只读）"><svg class="a-ic"><use href="#i-plus"/></svg></button></div>
-            <div class="item"><span class="mono"><svg class="a-ic"><use href="#i-pkg"/></svg></span><div class="txt"><div class="nm"><span>Code Puppy 安装自检</span></div><div class="ds">检查插件、技能与连接器是否装好</div></div><button class="iact" aria-label="安装 Code Puppy 安装自检"><svg class="a-ic"><use href="#i-plus"/></svg></button></div>
-          </div>
-          <div class="grp-h"><svg class="a-ic chev"><use href="#i-down"/></svg>办公文档<span class="n">4</span></div>
-          <div class="grid2">
-            <div class="item"><span class="mono"><svg class="a-ic"><use href="#i-file-text"/></svg></span><div class="txt"><div class="nm"><span>Word 文档读写</span></div><div class="ds">读取 .docx 的正文和结构，也能新建或改写</div></div><button class="iact" aria-label="安装 Word 文档读写"><svg class="a-ic"><use href="#i-plus"/></svg></button></div>
-            <div class="item"><span class="mono"><svg class="a-ic"><use href="#i-table"/></svg></span><div class="txt"><div class="nm"><span>Excel 表格读写</span></div><div class="ds">读取 .xlsx，写入单元格或新建工作簿</div></div><button class="iact" aria-label="安装 Excel 表格读写"><svg class="a-ic"><use href="#i-plus"/></svg></button></div>
-            <div class="item"><span class="mono"><svg class="a-ic"><use href="#i-slides"/></svg></span><div class="txt"><div class="nm"><span>PowerPoint 幻灯片读写</span></div><div class="ds">读取 .pptx 的文字和结构，也能新建</div></div><button class="iact" aria-label="安装 PowerPoint 幻灯片读写"><svg class="a-ic"><use href="#i-plus"/></svg></button></div>
-            <div class="item"><span class="mono"><svg class="a-ic"><use href="#i-file"/></svg></span><div class="txt"><div class="nm"><span>PDF 文本读写</span></div><div class="ds">提取 PDF 文字，创建文字型 PDF</div></div><button class="iact" aria-label="安装 PDF 文本读写"><svg class="a-ic"><use href="#i-plus"/></svg></button></div>
-          </div>
-          <div class="grp-h is-closed"><svg class="a-ic chev"><use href="#i-right"/></svg>Code Puppy 云<span class="n">5</span><span class="aside">登录 Code Puppy 账户后可用<a href="#hub-connectors">登录</a></span></div>
-          <div class="grp-h is-closed"><svg class="a-ic chev"><use href="#i-right"/></svg>研究<span class="n">3</span></div>
-        </div></div>
-      </div>
+        <div class="side-list"><div class="row"><svg class="a-ic"><use href="#i-folder-open"/></svg><span class="grow">orbit-web</span></div><div class="row conv"><span class="grow">修复登录页在窄屏下的错位</span></div><div class="row conv"><span class="grow">把定价表改成从配置读取</span><span class="slot"><span class="dot" title="有新进展"></span></span></div><div class="row conv"><span class="grow">梳理项目目录结构并写进 README</span></div><div class="row conv"><span class="grow">给结算接口补上重试与超时</span></div><div class="row more">显示更多</div><div class="row"><svg class="a-ic"><use href="#i-folder"/></svg><span class="grow">pricing-api</span></div><div class="row"><svg class="a-ic"><use href="#i-folder"/></svg><span class="grow">design-notes</span></div><div class="row"><svg class="a-ic"><use href="#i-folder"/></svg><span class="grow">weekly-report</span></div></div>
+      </aside><div class="main"><div class="hero"><h1>我们要处理什么？</h1><div class="compose-wrap"><div class="comp"><div class="comp-input">问点什么，输入 / 调命令，@ 引用上下文…</div><div class="comp-row"><button class="cbtn icon" aria-label="添加附件、计划模式或助手"><svg class="a-ic"><use href="#i-plus"/></svg></button><button class="cbtn perm"><svg class="a-ic ic-14"><use href="#i-shield"/></svg>全部批准<svg class="a-ic ic-12 chev"><use href="#i-down"/></svg></button><span class="grow"></span><button class="cbtn"><span class="brand-tile"><svg class="prov"><use href="#p-deepseek"/></svg></span>DeepSeek V4 Pro<span class="lvl">高</span><svg class="a-ic ic-12 chev"><use href="#i-down"/></svg></button><button class="send" aria-label="发送"><svg class="a-ic"><use href="#i-up"/></svg></button></div></div><div class="tray"><button class="cbtn"><svg class="a-ic ic-14"><use href="#i-folder"/></svg>orbit-web<svg class="a-ic ic-12 chev"><use href="#i-down"/></svg></button><button class="cbtn"><svg class="a-ic ic-14"><use href="#i-file"/></svg>文件</button><button class="cbtn"><svg class="a-ic ic-14"><use href="#i-plug"/></svg>插件</button></div></div></div></div></div><div class="acct" role="menu">
+      <div class="acct-who"><span class="rail-avatar">A</span><div><b>未登录</b><small>登录后解锁云端能力</small></div></div>
+      <button class="a-btn" data-variant="primary">登录</button>
+      <div class="a-pop-sep"></div>
+      <button class="a-pop-item"><svg class="a-ic"><use href="#i-gear"/></svg><span class="k">设置</span></button>
+      <div class="a-pop-item"><svg class="a-ic"><use href="#i-contrast"/></svg><span class="k">外观</span><span class="seg"><span>浅色</span><span>深色</span><span class="on">系统</span></span></div>
+      <button class="a-pop-item"><svg class="a-ic"><use href="#i-help"/></svg><span class="k">帮助与反馈</span></button>
+      <button class="a-pop-item"><svg class="a-ic"><use href="#i-update"/></svg><span class="k">检查更新</span></button>
+      <div class="a-pop-sep"></div>
+      <div class="acct-ver">版本 0.2.2<span>开发版</span></div>
     </div>
-  </div>
-  </div>
-  <p class="dz-cap">「Code Puppy 云」「研究」两组示意收起态；云组未登录时整组一句「登录 Code Puppy 账户后可用 · 登录」，组内「+」置灰。</p>
-</section>
-
-<!-- ═════════════ 行菜单 ═════════════ -->
-<section class="dz-sec">
-  <h2 class="dz-h2">已安装行的「…」菜单 <code>#hub-row-menu</code></h2>
-  <p class="dz-sub">沿用现行菜单项与顺序：需要登录或令牌时第一项是对应动作（「登录 Supabase」/「连接 GitHub」）；然后「开启」开关、「管理」；「移除」单独一段放最后。菜单是正式弹层 .a-pop，向下展开，右缘对齐「…」。</p>
-  <div class="dz-stage">
-  <div class="fr fr-comp a-ui" id="hub-row-menu" style="width:640px;height:330px;padding:24px 28px">
-    <div class="item" style="margin:0"><span class="mono">S</span><div class="txt"><div class="nm"><span>Supabase</span><span class="st warn"><i></i>待登录</span></div><div class="ds">管理 Supabase 项目、数据表和函数</div></div>
-      <div style="position:relative"><button class="iact is-open" aria-label="管理 Supabase"><svg class="a-ic"><use href="#i-more"/></svg></button>
-        <div class="a-pop" style="top:calc(100% + 6px);right:0;width:220px">
-          <button class="a-pop-item is-focus"><svg class="a-ic"><use href="#i-globe"/></svg><span class="k">登录 Supabase</span></button>
-          <div class="a-pop-sep"></div>
-          <button class="a-pop-item"><span class="k">开启</span><span class="sw on" role="switch" aria-checked="true"></span></button>
-          <button class="a-pop-item"><span class="k">管理</span></button>
-          <div class="a-pop-sep"></div>
-          <button class="a-pop-item danger"><span class="k">移除</span></button>
-        </div>
-      </div>
-    </div>
-  </div>
-  <div class="fr fr-comp a-ui" style="width:640px;height:330px;padding:24px 28px">
-    <div class="item" style="margin:0"><span class="mono"><svg class="a-ic"><use href="#i-file-search"/></svg></span><div class="txt"><div class="nm"><span>文档读取（markitdown）</span><span class="st"><i></i>已关闭</span></div><div class="ds">读取 PDF、Word、PowerPoint、Excel</div></div>
-      <div style="position:relative"><button class="iact is-open" aria-label="管理 文档读取（markitdown）"><svg class="a-ic"><use href="#i-more"/></svg></button>
-        <div class="a-pop" style="top:calc(100% + 6px);right:0;width:220px">
-          <button class="a-pop-item"><span class="k">开启</span><span class="sw" role="switch" aria-checked="false"></span></button>
-          <button class="a-pop-item"><span class="k">管理</span></button>
-          <div class="a-pop-sep"></div>
-          <button class="a-pop-item danger"><span class="k">移除</span></button>
-        </div>
-      </div>
-    </div>
-  </div>
-  </div>
-  <p class="dz-cap">左：待登录（第一项是登录动作）。右：已关闭（开关为关）。安装、开关、移除的行为与文字按已批准的插件助手规格，本稿只改样子。</p>
-</section>
-
-<!-- ═════════════ 模型 + 推理强度 ═════════════ -->
-<section class="dz-sec">
-  <h2 class="dz-h2">模型与推理强度合并选择 <code>#picker</code></h2>
-  <p class="dz-sub">输入框里只剩一个按钮「DeepSeek V4 Pro 高」。点开是一张小卡：上方档位名与图标，右上「重置」回到默认档；档位名下面是模型名，点它切到模型列表；下方是分档滑条，档位取当前模型在目录里的档位（这里是 低 / 中 / 高 / 最高）。模型没有档位时，滑条位置换成一句说明。</p>
-  <div class="dz-stage">
-  <div class="fr fr-comp a-ui" id="picker" style="width:420px;height:400px;padding:28px 24px">
-    <div class="comp-row" style="padding:0;justify-content:flex-end"><div style="position:relative">
-      <button class="cbtn is-open"><span class="brand-tile">D</span>DeepSeek V4 Pro<span class="lvl">高</span><svg class="a-ic chev"><use href="#i-down"/></svg></button>
-      <div class="a-pop pk" style="top:calc(100% + 6px);right:0">
-        <div class="pk-head"><svg class="a-ic"><use href="#i-zap"/></svg><span class="lv">高</span><span class="grow"></span><button class="pk-reset"><svg class="a-ic ic-12"><use href="#i-reset"/></svg>重置</button></div>
-        <button class="pk-model is-hover"><span class="brand-tile">D</span>DeepSeek V4 Pro<svg class="a-ic chev"><use href="#i-right"/></svg></button>
-        <div class="slider" role="slider" aria-label="推理强度" aria-valuetext="高">
-          <span class="track"></span><span class="fill" style="width:66.67%"></span>
-          <span class="stop past" style="left:0"></span><span class="stop past" style="left:33.33%"></span><span class="stop" style="left:100%"></span>
-          <span class="knob" style="left:66.67%"></span>
-        </div>
-        <div class="slider-lbl"><span style="left:0">低</span><span style="left:33.33%">中</span><span class="on" style="left:66.67%">高</span><span style="left:100%">最高</span></div>
-        <div class="pk-note">档位越高想得越久，也更费额度。</div>
-      </div>
-    </div></div>
-  </div>
-  <div class="fr fr-comp a-ui" style="width:420px;height:400px;padding:28px 24px">
-    <div class="comp-row" style="padding:0;justify-content:flex-end"><div style="position:relative">
-      <button class="cbtn is-open"><span class="brand-tile">D</span>DeepSeek V4 Pro<span class="lvl">高</span><svg class="a-ic chev"><use href="#i-down"/></svg></button>
-      <div class="a-pop pk pk-list" style="top:calc(100% + 6px);right:0">
-        <button class="pk-back"><svg class="a-ic ic-14"><use href="#i-left"/></svg>选择模型</button>
-        <label class="a-field pk-search" data-size="sm"><svg class="a-ic ic-14"><use href="#i-search"/></svg><input placeholder="搜索模型或服务" /></label>
-        <div class="grp">国内直连 · 自带 Key</div>
-        <button class="a-pop-item"><span class="brand-tile">D</span><span class="nm">DeepSeek V4 Pro<small>4 档推理</small></span><svg class="a-ic chk"><use href="#i-check"/></svg></button>
-        <button class="a-pop-item"><span class="brand-tile">D</span><span class="nm">DeepSeek V4 Flash<small>无推理档位</small></span></button>
-        <button class="a-pop-item"><span class="brand-tile">Z</span><span class="nm">GLM-5.2<small>2 档推理</small></span><span class="act">填 Key 后可用</span></button>
-        <button class="a-pop-item"><span class="brand-tile">K</span><span class="nm">Kimi K3<small>无推理档位</small></span><span class="act">填 Key 后可用</span></button>
-      </div>
-    </div></div>
-  </div>
-  <div class="fr fr-comp a-ui" style="width:420px;height:400px;padding:28px 24px">
-    <div class="comp-row" style="padding:0;justify-content:flex-end"><div style="position:relative">
-      <button class="cbtn is-open"><span class="brand-tile">D</span>DeepSeek V4 Flash<svg class="a-ic chev"><use href="#i-down"/></svg></button>
-      <div class="a-pop pk" style="top:calc(100% + 6px);right:0">
-        <div class="pk-head"><svg class="a-ic"><use href="#i-zap"/></svg><span class="lv">默认</span><span class="grow"></span></div>
-        <button class="pk-model"><span class="brand-tile">D</span>DeepSeek V4 Flash<svg class="a-ic chev"><use href="#i-right"/></svg></button>
-        <div class="pk-note" style="border-top:0;padding-top:0;margin-top:14px">这个模型没有推理档位。换用带档位的模型即可调档。</div>
-      </div>
-    </div></div>
-  </div>
-  </div>
-  <p class="dz-cap">左：默认状态（按钮按下、卡片向下展开）。中：点模型名后同一张卡换成模型列表，左上「选择模型」返回档位。右：模型没有档位。档位文字直接取目录（DeepSeek V4 Pro = 低 / 中 / 高 / 最高），按钮上没选过档位时只显示模型名。</p>
-</section>
-
-<!-- ═════════════ 「+」菜单 ═════════════ -->
-<section class="dz-sec">
-  <h2 class="dz-h2">「+」菜单 <code>#plus-menu</code></h2>
-  <p class="dz-sub">首页输入框在屏幕中部，菜单向下展开；会话页输入框贴底，同一菜单向上展开（owner 已接受）。菜单只留添加附件、计划模式与助手（@general / @explore / @docs）；「文件」「插件」只在输入框下的托盘（owner U-02）。单色线性图标，键盘焦点是中性灰底，去掉底部按键提示行。</p>
-  <div class="dz-stage">
-  <div class="fr fr-comp a-ui" id="plus-menu" style="width:760px;height:500px;padding:36px 40px">
-    <div class="compose-wrap" style="width:680px">
-      <div class="comp">
-        <div class="comp-input">问点什么，输入 / 调命令，@ 引用上下文…</div>
-        <div class="comp-row">
-          <div style="position:relative">
-            <button class="cbtn icon is-open" aria-label="添加附件、计划模式或助手" aria-expanded="true"><svg class="a-ic"><use href="#i-plus"/></svg></button>
-            <div class="a-pop pop-down" style="width:340px;top:calc(100% + 8px);left:-2px">
-              <button class="a-pop-item is-focus"><svg class="a-ic"><use href="#i-clip"/></svg><span class="k">添加附件</span><span class="d">图片或 PDF</span></button>
-              <button class="a-pop-item"><svg class="a-ic"><use href="#i-plan"/></svg><span class="k">计划模式</span><span class="d">先出方案再动手</span></button>
-              <div class="a-pop-sep"></div>
-              <div class="a-pop-label">助手</div>
-              <button class="a-pop-item"><svg class="a-ic"><use href="#i-at"/></svg><span class="k mono-at">general</span><span class="d">通用子任务：调研与多步骤执行</span></button>
-              <button class="a-pop-item"><svg class="a-ic"><use href="#i-at"/></svg><span class="k mono-at">explore</span><span class="d">快速探索代码库、找文件</span></button>
-              <button class="a-pop-item"><svg class="a-ic"><use href="#i-at"/></svg><span class="k mono-at">docs</span><span class="d">写文档：报告、规范、设计说明</span></button>
-              </div>
-          </div>
-          <button class="cbtn perm"><svg class="a-ic ic-14"><use href="#i-shield"/></svg>全部批准<svg class="a-ic chev"><use href="#i-down"/></svg></button>
-          <span class="grow"></span>
-          <button class="cbtn"><span class="brand-tile">D</span>DeepSeek V4 Pro<span class="lvl">高</span><svg class="a-ic chev"><use href="#i-down"/></svg></button>
-          <button class="send" aria-label="发送"><svg class="a-ic"><use href="#i-up"/></svg></button>
-        </div>
-      </div>
-      <div class="tray">
-        <button class="cbtn"><svg class="a-ic"><use href="#i-folder"/></svg>orbit-web<svg class="a-ic chev"><use href="#i-down"/></svg></button>
-        <button class="cbtn"><svg class="a-ic"><use href="#i-file"/></svg>文件</button>
-        <button class="cbtn"><svg class="a-ic"><use href="#i-plug"/></svg>插件</button>
-      </div>
-    </div>
-  </div>
-  </div>
-  <p class="dz-cap">菜单盖住托盘（托盘在菜单下层）。</p>
-</section>
-
-
-<section class="dz-sec">
-  <h2 class="dz-h2">会话页右栏 <code>#right-panel</code></h2>
-  <p class="dz-sub">右栏是工作面里的第三栏，与主区同底，分栏线几乎看不见；页签是文字加中性下划线。右栏开关固定在顶栏右上角（打开时呈按下态），去掉了右栏自带的「›」与顶栏上重复的终端按钮。会话页输入框贴底，「+」菜单与合并选择卡在这里向上展开（首页向下）。</p>
-  <div class="dz-stage">
-  <div class="fr a-ui" id="right-panel">
+  </div></div></section><section class="dz-sec"><h2 class="dz-h2">搜索对话 <code>#search</code></h2><p class="dz-sub">窄轨「搜索」或 ⌘K 打开。轻弹层，不模糊整屏；只有输入框一层焦点，没有内框；按标题搜，行尾写项目名。</p>
+  <div class="dz-stage"><div class="fr a-ui" id="search">
     <div class="tb">
-      <div class="tb-left">
-        <span class="tl"><i></i><i></i><i></i></span>
-        <button class="tb-btn" aria-label="隐藏侧边栏"><svg class="a-ic"><use href="#i-panel-l"/></svg></button>
-        <button class="tb-btn" aria-label="后退"><svg class="a-ic"><use href="#i-left"/></svg></button>
-        <button class="tb-btn is-dim" aria-label="前进"><svg class="a-ic"><use href="#i-right"/></svg></button>
-      </div>
-      <div class="tb-title"><span class="crumb">orbit-web</span><span class="crumb-sep">/</span>修复登录页在窄屏下的错位</div>
-      <div class="tb-right"><button class="tb-btn is-on" aria-label="收起右栏" aria-pressed="true"><svg class="a-ic"><use href="#i-panel-r"/></svg></button></div>
+      <div class="tb-left"><span class="tl"><i></i><i></i><i></i></span><button class="tb-btn" aria-label="隐藏侧边栏"><svg class="a-ic"><use href="#i-panel-l"/></svg></button><button class="tb-btn" aria-label="后退"><svg class="a-ic"><use href="#i-left"/></svg></button><button class="tb-btn is-dim" aria-label="前进"><svg class="a-ic"><use href="#i-right"/></svg></button></div>
+      <div class="tb-title">新对话</div><div class="tb-right"><button class="tb-btn" aria-label="显示右栏"><svg class="a-ic"><use href="#i-panel-r"/></svg></button></div>
     </div>
-    <nav class="rail">
-      <button class="rail-btn" aria-label="新对话"><svg class="a-ic ic-18"><use href="#i-pen"/></svg></button>
-      <button class="rail-btn" aria-label="搜索对话 ⌘K"><svg class="a-ic ic-18"><use href="#i-search"/></svg></button>
-      <button class="rail-btn" aria-label="定制中心"><svg class="a-ic ic-18"><use href="#i-grid"/></svg></button>
-      <button class="rail-btn" aria-label="自动化"><svg class="a-ic ic-18"><use href="#i-clock"/></svg></button>
-      <span class="rail-grow"></span>
-      <button class="rail-avatar" aria-label="账户">A</button>
-    </nav>
-    <div class="box">
-      <aside class="side">
+    <nav class="rail"><button class="rail-btn" aria-label="新对话"><svg class="a-ic ic-18"><use href="#i-pen"/></svg></button><button class="rail-btn is-on" aria-label="搜索对话 ⌘K"><svg class="a-ic ic-18"><use href="#i-search"/></svg></button><button class="rail-btn" aria-label="定制中心"><svg class="a-ic ic-18"><use href="#i-grid"/></svg></button><button class="rail-btn" aria-label="自动化"><svg class="a-ic ic-18"><use href="#i-cal"/></svg></button><span class="rail-grow"></span><button class="rail-avatar" aria-label="账户">A</button></nav>
+    <div class="box"><aside class="side">
         <div class="side-brand"><img src="../../../packages/ui-mac/src/renderer/brand/brand-mark.png" alt="" /><b>Code Puppy</b></div>
         <div class="side-sec">项目<span class="acts"><button class="tb-btn" aria-label="筛选项目和对话"><svg class="a-ic ic-14"><use href="#i-search"/></svg></button><button class="tb-btn" aria-label="打开项目"><svg class="a-ic ic-14"><use href="#i-plus"/></svg></button></span></div>
-        <div class="side-list">
-        <div class="row"><svg class="a-ic"><use href="#i-folder-open"/></svg><span class="grow">orbit-web</span></div>
-        <div class="row conv is-on"><span class="grow">修复登录页在窄屏下的错位</span></div>
-        <div class="row conv"><span class="grow">把定价表改成从配置读取</span><span class="dot" title="有新进展"></span></div>
-        <div class="row conv"><span class="grow">梳理项目目录结构并写进 README</span></div>
-        <div class="row conv"><span class="grow">给结算接口补上重试与超时</span></div>
-        <div class="row more">显示更多</div>
-        <div class="row"><svg class="a-ic"><use href="#i-folder"/></svg><span class="grow">pricing-api</span></div>
-        <div class="row"><svg class="a-ic"><use href="#i-folder"/></svg><span class="grow">design-notes</span></div>
-        </div>
-      </aside>
-      <div class="main">
-        <div class="thread">
-          <div class="thread-in">
-            <div class="msg-user">登录页在 375 宽的手机上，「登录」按钮会溢出卡片，帮我修一下，别影响桌面端。</div>
-            <div class="proc"><svg class="a-ic"><use href="#i-right"/></svg>读了 4 个文件 · 改了 3 个文件 · 运行 2 条命令 · 1 分 12 秒</div>
-            <div class="ans">
-              <p>问题出在表单容器写死了 <code>width: 420px</code>，窄屏下按钮跟着撑出卡片。我做了三处改动：</p>
-              <p>1. 表单改为 <code>width: min(420px, 100%)</code>，卡片内边距在 480px 以下收到 16px；<br />2. 按钮行改成可换行，小屏下「登录」占满一行；<br />3. README 补了一句移动端的检查方法。</p>
-              <p>本地在 375 / 768 / 1280 三个宽度下截图核对过，桌面端外观没有变化。</p>
-            </div>
-            <div class="meta">DeepSeek V4 Pro · 高</div>
-          </div>
-          <div class="dock">
-            <div class="comp">
-              <div class="comp-input">继续说点什么…</div>
-              <div class="comp-row">
-              <button class="cbtn icon" aria-label="添加附件、计划模式或助手"><svg class="a-ic"><use href="#i-plus"/></svg></button>
-              <button class="cbtn perm"><svg class="a-ic ic-14"><use href="#i-shield"/></svg>全部批准<svg class="a-ic chev"><use href="#i-down"/></svg></button>
-              <span class="grow"></span>
-              <button class="cbtn"><span class="brand-tile">D</span>DeepSeek V4 Pro<span class="lvl">高</span><svg class="a-ic chev"><use href="#i-down"/></svg></button>
-              <button class="send" aria-label="发送"><svg class="a-ic"><use href="#i-up"/></svg></button>
-            </div>
-            </div>
-            <div class="dock-note">内容由 AI 生成，仅供参考</div>
-          </div>
-        </div>
+        <div class="side-list"><div class="row"><svg class="a-ic"><use href="#i-folder-open"/></svg><span class="grow">orbit-web</span></div><div class="row conv"><span class="grow">修复登录页在窄屏下的错位</span></div><div class="row conv"><span class="grow">把定价表改成从配置读取</span><span class="slot"><span class="dot" title="有新进展"></span></span></div><div class="row conv"><span class="grow">梳理项目目录结构并写进 README</span></div><div class="row conv"><span class="grow">给结算接口补上重试与超时</span></div><div class="row more">显示更多</div><div class="row"><svg class="a-ic"><use href="#i-folder"/></svg><span class="grow">pricing-api</span></div><div class="row"><svg class="a-ic"><use href="#i-folder"/></svg><span class="grow">design-notes</span></div><div class="row"><svg class="a-ic"><use href="#i-folder"/></svg><span class="grow">weekly-report</span></div></div>
+      </aside><div class="main"><div class="hero"><h1>我们要处理什么？</h1><div class="compose-wrap"><div class="comp"><div class="comp-input">问点什么，输入 / 调命令，@ 引用上下文…</div><div class="comp-row"><button class="cbtn icon" aria-label="添加附件、计划模式或助手"><svg class="a-ic"><use href="#i-plus"/></svg></button><button class="cbtn perm"><svg class="a-ic ic-14"><use href="#i-shield"/></svg>全部批准<svg class="a-ic ic-12 chev"><use href="#i-down"/></svg></button><span class="grow"></span><button class="cbtn"><span class="brand-tile"><svg class="prov"><use href="#p-deepseek"/></svg></span>DeepSeek V4 Pro<span class="lvl">高</span><svg class="a-ic ic-12 chev"><use href="#i-down"/></svg></button><button class="send" aria-label="发送"><svg class="a-ic"><use href="#i-up"/></svg></button></div></div><div class="tray"><button class="cbtn"><svg class="a-ic ic-14"><use href="#i-folder"/></svg>orbit-web<svg class="a-ic ic-12 chev"><use href="#i-down"/></svg></button><button class="cbtn"><svg class="a-ic ic-14"><use href="#i-file"/></svg>文件</button><button class="cbtn"><svg class="a-ic ic-14"><use href="#i-plug"/></svg>插件</button></div></div></div></div></div><div class="veil"></div><div class="srch" role="dialog" aria-label="搜索对话">
+      <div class="srch-in"><svg class="a-ic"><use href="#i-search"/></svg><span class="q">定价</span><span class="caret"></span><span class="kbd">esc 关闭</span></div>
+      <div class="srch-list"><div class="grp">对话</div>
+        <div class="srch-row is-focus"><svg class="a-ic ic-14"><use href="#i-msg"/></svg><span class="t">把<mark>定价</mark>表改成从配置读取</span><span class="p">orbit-web</span></div>
+        <div class="srch-row"><svg class="a-ic ic-14"><use href="#i-msg"/></svg><span class="t"><mark>定价</mark>页的价格说明改成中文</span><span class="p">pricing-api</span></div>
+        <div class="srch-row"><svg class="a-ic ic-14"><use href="#i-msg"/></svg><span class="t">核对<mark>定价</mark>接口返回的字段</span><span class="p">pricing-api</span></div>
       </div>
-      <aside class="rp">
+      <div class="srch-foot"><span>↑↓ 选择</span><span>↵ 打开</span><span>按标题搜索</span></div>
+    </div>
+  </div></div></section><section class="dz-sec"><h2 class="dz-h2">会话页 <code>#session</code></h2><p class="dz-sub">完整一页对话：上一轮助手发起的安装被拒绝（「已拒绝，未安装『名称』」）；这一轮的思考与操作步骤展开，最后一步等你允许；批准面板停在输入框上方，「期限」写成人话「今天 18:30 前」，按钮都在右边。输入框下仍有托盘（项目固定、文件、插件），「内容由 AI 生成」在托盘下面。</p>
+  <div class="dz-stage"><div class="fr a-ui" id="session">
+    <div class="tb">
+      <div class="tb-left"><span class="tl"><i></i><i></i><i></i></span><button class="tb-btn" aria-label="隐藏侧边栏"><svg class="a-ic"><use href="#i-panel-l"/></svg></button><button class="tb-btn" aria-label="后退"><svg class="a-ic"><use href="#i-left"/></svg></button><button class="tb-btn is-dim" aria-label="前进"><svg class="a-ic"><use href="#i-right"/></svg></button></div>
+      <div class="tb-title"><span class="crumb">orbit-web</span><span class="crumb-sep">/</span>把定价表改成从配置读取</div><div class="tb-right"><button class="tb-btn" aria-label="显示右栏"><svg class="a-ic"><use href="#i-panel-r"/></svg></button></div>
+    </div>
+    <nav class="rail"><button class="rail-btn" aria-label="新对话"><svg class="a-ic ic-18"><use href="#i-pen"/></svg></button><button class="rail-btn" aria-label="搜索对话 ⌘K"><svg class="a-ic ic-18"><use href="#i-search"/></svg></button><button class="rail-btn" aria-label="定制中心"><svg class="a-ic ic-18"><use href="#i-grid"/></svg></button><button class="rail-btn" aria-label="自动化"><svg class="a-ic ic-18"><use href="#i-cal"/></svg></button><span class="rail-grow"></span><button class="rail-avatar" aria-label="账户">A</button></nav>
+    <div class="box"><aside class="side">
+        <div class="side-brand"><img src="../../../packages/ui-mac/src/renderer/brand/brand-mark.png" alt="" /><b>Code Puppy</b></div>
+        <div class="side-sec">项目<span class="acts"><button class="tb-btn" aria-label="筛选项目和对话"><svg class="a-ic ic-14"><use href="#i-search"/></svg></button><button class="tb-btn" aria-label="打开项目"><svg class="a-ic ic-14"><use href="#i-plus"/></svg></button></span></div>
+        <div class="side-list"><div class="row"><svg class="a-ic"><use href="#i-folder-open"/></svg><span class="grow">orbit-web</span></div><div class="row conv"><span class="grow">修复登录页在窄屏下的错位</span></div><div class="row conv is-on"><span class="grow">把定价表改成从配置读取</span></div><div class="row conv"><span class="grow">梳理项目目录结构并写进 README</span></div><div class="row conv"><span class="grow">给结算接口补上重试与超时</span></div><div class="row more">显示更多</div><div class="row"><svg class="a-ic"><use href="#i-folder"/></svg><span class="grow">pricing-api</span></div><div class="row"><svg class="a-ic"><use href="#i-folder"/></svg><span class="grow">design-notes</span></div><div class="row"><svg class="a-ic"><use href="#i-folder"/></svg><span class="grow">weekly-report</span></div></div>
+      </aside><div class="main"><div class="thread">
+      <div class="thread-in" style="display:flex;flex-direction:column;justify-content:flex-end;overflow:hidden">
+        <div class="turn"><div class="msg-user">帮我装一个能读 Figma 设计稿的插件。</div><div style="margin-top:14px"><div class="hcard"><span class="mono"><svg class="a-ic ic-18"><use href="#i-ban"/></svg></span><div class="txt"><div class="nm">已拒绝，未安装『Figma 读取』</div><div class="ds">来源：Claude 插件市场</div></div></div></div></div>
+        <div class="turn"><div class="msg-user">那先把定价表改成从配置读取，价格别再写死在组件里。</div><div class="proc"><svg class="a-ic ic-12"><use href="#i-down"/></svg>思考与操作 · 6 步 · 48 秒</div>
+      <div class="steps">
+        <div class="step"><svg class="a-ic ic-14"><use href="#i-bulb"/></svg><b>思考 3 秒</b><span class="tgt">先找出价格写死在哪些组件里，再把它们收进一份配置</span></div>
+        <div class="step"><svg class="a-ic ic-14"><use href="#i-search"/></svg><b>搜索</b><span class="tgt mono-t">price</span><span class="r">4 处</span></div>
+        <div class="step"><svg class="a-ic ic-14"><use href="#i-file"/></svg><b>读取</b><span class="tgt">src/pages/Pricing.tsx</span></div>
+        <div class="step"><svg class="a-ic ic-14"><use href="#i-edit"/></svg><b>新建</b><span class="tgt">src/config/pricing.ts</span><span class="r"><span class="add">+24</span></span></div>
+        <div class="step"><svg class="a-ic ic-14"><use href="#i-edit"/></svg><b>修改</b><span class="tgt">src/pages/Pricing.tsx</span><span class="r"><span class="add">+6</span> <span class="del">−31</span></span></div>
+        <div class="step"><svg class="a-ic ic-14"><use href="#i-term"/></svg><b>运行</b><span class="tgt mono-t">bun test pricing</span><span class="r ok">通过</span></div>
+        <div class="step"><svg class="a-ic ic-14"><use href="#i-term"/></svg><b>运行</b><span class="tgt mono-t">bun run build &amp;&amp; bun run preview</span><span class="r"><svg class="a-ic ic-12 spin"><use href="#i-loader"/></svg> 等你允许</span></div>
+      </div></div>
+      </div>
+      <div class="dock"><div class="apv">
+      <div class="apv-h"><svg class="a-ic"><use href="#i-shield"/></svg><b>允许这次操作吗？</b><span class="a-risk-tag" data-level="medium">中风险</span></div>
+      <div class="apv-act">运行命令</div>
+      <div class="apv-cmd">bun run build &amp;&amp; bun run preview</div>
+      <dl class="a-kv"><div class="a-kv-row"><dt class="a-kv-k">适用范围</dt><dd class="a-kv-v">本次会话</dd></div><div class="a-kv-row"><dt class="a-kv-k">期限</dt><dd class="a-kv-v">今天 18:30 前</dd></div></dl>
+      <div class="apv-note">「始终允许」会为当前项目创建永久授权，不会自动过期。</div>
+      <div class="apv-foot"><button class="a-btn" data-variant="danger">拒绝</button><button class="a-btn" data-variant="secondary">始终允许</button><button class="a-btn" data-variant="primary">允许一次</button></div>
+    </div><div class="compose-wrap"><div class="comp"><div class="comp-input">继续说点什么…</div><div class="comp-row"><button class="cbtn icon" aria-label="添加附件、计划模式或助手"><svg class="a-ic"><use href="#i-plus"/></svg></button><button class="cbtn perm"><svg class="a-ic ic-14"><use href="#i-shield"/></svg>全部批准<svg class="a-ic ic-12 chev"><use href="#i-down"/></svg></button><span class="grow"></span><button class="cbtn"><span class="brand-tile"><svg class="prov"><use href="#p-deepseek"/></svg></span>DeepSeek V4 Pro<span class="lvl">高</span><svg class="a-ic ic-12 chev"><use href="#i-down"/></svg></button><button class="send is-stop" aria-label="停止"><svg class="a-ic ic-12" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2.5" fill="currentColor" stroke="none"/></svg></button></div></div><div class="tray"><button class="cbtn static"><svg class="a-ic ic-14"><use href="#i-folder"/></svg>orbit-web</button><button class="cbtn"><svg class="a-ic ic-14"><use href="#i-file"/></svg>文件</button><button class="cbtn"><svg class="a-ic ic-14"><use href="#i-plug"/></svg>插件</button></div></div><div class="dock-note">内容由 AI 生成，仅供参考</div></div>
+    </div></div></div>
+  </div></div><p class="dz-cap">回答进行中发送键变成停止键（现有行为）。工具图标统一单色；工具类型色仍留在代码令牌里，只是时间线不再用。</p></section><section class="dz-sec"><h2 class="dz-h2">会话页 · 深色 <code>#session-dark</code></h2><p class="dz-sub">同上，深色。</p>
+  <div class="dz-stage"><div class="fr a-ui is-dark" id="session-dark">
+    <div class="tb">
+      <div class="tb-left"><span class="tl"><i></i><i></i><i></i></span><button class="tb-btn" aria-label="隐藏侧边栏"><svg class="a-ic"><use href="#i-panel-l"/></svg></button><button class="tb-btn" aria-label="后退"><svg class="a-ic"><use href="#i-left"/></svg></button><button class="tb-btn is-dim" aria-label="前进"><svg class="a-ic"><use href="#i-right"/></svg></button></div>
+      <div class="tb-title"><span class="crumb">orbit-web</span><span class="crumb-sep">/</span>把定价表改成从配置读取</div><div class="tb-right"><button class="tb-btn" aria-label="显示右栏"><svg class="a-ic"><use href="#i-panel-r"/></svg></button></div>
+    </div>
+    <nav class="rail"><button class="rail-btn" aria-label="新对话"><svg class="a-ic ic-18"><use href="#i-pen"/></svg></button><button class="rail-btn" aria-label="搜索对话 ⌘K"><svg class="a-ic ic-18"><use href="#i-search"/></svg></button><button class="rail-btn" aria-label="定制中心"><svg class="a-ic ic-18"><use href="#i-grid"/></svg></button><button class="rail-btn" aria-label="自动化"><svg class="a-ic ic-18"><use href="#i-cal"/></svg></button><span class="rail-grow"></span><button class="rail-avatar" aria-label="账户">A</button></nav>
+    <div class="box"><aside class="side">
+        <div class="side-brand"><img src="../../../packages/ui-mac/src/renderer/brand/brand-mark.png" alt="" /><b>Code Puppy</b></div>
+        <div class="side-sec">项目<span class="acts"><button class="tb-btn" aria-label="筛选项目和对话"><svg class="a-ic ic-14"><use href="#i-search"/></svg></button><button class="tb-btn" aria-label="打开项目"><svg class="a-ic ic-14"><use href="#i-plus"/></svg></button></span></div>
+        <div class="side-list"><div class="row"><svg class="a-ic"><use href="#i-folder-open"/></svg><span class="grow">orbit-web</span></div><div class="row conv"><span class="grow">修复登录页在窄屏下的错位</span></div><div class="row conv is-on"><span class="grow">把定价表改成从配置读取</span></div><div class="row conv"><span class="grow">梳理项目目录结构并写进 README</span></div><div class="row conv"><span class="grow">给结算接口补上重试与超时</span></div><div class="row more">显示更多</div><div class="row"><svg class="a-ic"><use href="#i-folder"/></svg><span class="grow">pricing-api</span></div><div class="row"><svg class="a-ic"><use href="#i-folder"/></svg><span class="grow">design-notes</span></div><div class="row"><svg class="a-ic"><use href="#i-folder"/></svg><span class="grow">weekly-report</span></div></div>
+      </aside><div class="main"><div class="thread">
+      <div class="thread-in" style="display:flex;flex-direction:column;justify-content:flex-end;overflow:hidden">
+        <div class="turn"><div class="msg-user">帮我装一个能读 Figma 设计稿的插件。</div><div style="margin-top:14px"><div class="hcard"><span class="mono"><svg class="a-ic ic-18"><use href="#i-ban"/></svg></span><div class="txt"><div class="nm">已拒绝，未安装『Figma 读取』</div><div class="ds">来源：Claude 插件市场</div></div></div></div></div>
+        <div class="turn"><div class="msg-user">那先把定价表改成从配置读取，价格别再写死在组件里。</div><div class="proc"><svg class="a-ic ic-12"><use href="#i-down"/></svg>思考与操作 · 6 步 · 48 秒</div>
+      <div class="steps">
+        <div class="step"><svg class="a-ic ic-14"><use href="#i-bulb"/></svg><b>思考 3 秒</b><span class="tgt">先找出价格写死在哪些组件里，再把它们收进一份配置</span></div>
+        <div class="step"><svg class="a-ic ic-14"><use href="#i-search"/></svg><b>搜索</b><span class="tgt mono-t">price</span><span class="r">4 处</span></div>
+        <div class="step"><svg class="a-ic ic-14"><use href="#i-file"/></svg><b>读取</b><span class="tgt">src/pages/Pricing.tsx</span></div>
+        <div class="step"><svg class="a-ic ic-14"><use href="#i-edit"/></svg><b>新建</b><span class="tgt">src/config/pricing.ts</span><span class="r"><span class="add">+24</span></span></div>
+        <div class="step"><svg class="a-ic ic-14"><use href="#i-edit"/></svg><b>修改</b><span class="tgt">src/pages/Pricing.tsx</span><span class="r"><span class="add">+6</span> <span class="del">−31</span></span></div>
+        <div class="step"><svg class="a-ic ic-14"><use href="#i-term"/></svg><b>运行</b><span class="tgt mono-t">bun test pricing</span><span class="r ok">通过</span></div>
+        <div class="step"><svg class="a-ic ic-14"><use href="#i-term"/></svg><b>运行</b><span class="tgt mono-t">bun run build &amp;&amp; bun run preview</span><span class="r"><svg class="a-ic ic-12 spin"><use href="#i-loader"/></svg> 等你允许</span></div>
+      </div></div>
+      </div>
+      <div class="dock"><div class="apv">
+      <div class="apv-h"><svg class="a-ic"><use href="#i-shield"/></svg><b>允许这次操作吗？</b><span class="a-risk-tag" data-level="medium">中风险</span></div>
+      <div class="apv-act">运行命令</div>
+      <div class="apv-cmd">bun run build &amp;&amp; bun run preview</div>
+      <dl class="a-kv"><div class="a-kv-row"><dt class="a-kv-k">适用范围</dt><dd class="a-kv-v">本次会话</dd></div><div class="a-kv-row"><dt class="a-kv-k">期限</dt><dd class="a-kv-v">今天 18:30 前</dd></div></dl>
+      <div class="apv-note">「始终允许」会为当前项目创建永久授权，不会自动过期。</div>
+      <div class="apv-foot"><button class="a-btn" data-variant="danger">拒绝</button><button class="a-btn" data-variant="secondary">始终允许</button><button class="a-btn" data-variant="primary">允许一次</button></div>
+    </div><div class="compose-wrap"><div class="comp"><div class="comp-input">继续说点什么…</div><div class="comp-row"><button class="cbtn icon" aria-label="添加附件、计划模式或助手"><svg class="a-ic"><use href="#i-plus"/></svg></button><button class="cbtn perm"><svg class="a-ic ic-14"><use href="#i-shield"/></svg>全部批准<svg class="a-ic ic-12 chev"><use href="#i-down"/></svg></button><span class="grow"></span><button class="cbtn"><span class="brand-tile"><svg class="prov"><use href="#p-deepseek"/></svg></span>DeepSeek V4 Pro<span class="lvl">高</span><svg class="a-ic ic-12 chev"><use href="#i-down"/></svg></button><button class="send is-stop" aria-label="停止"><svg class="a-ic ic-12" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2.5" fill="currentColor" stroke="none"/></svg></button></div></div><div class="tray"><button class="cbtn static"><svg class="a-ic ic-14"><use href="#i-folder"/></svg>orbit-web</button><button class="cbtn"><svg class="a-ic ic-14"><use href="#i-file"/></svg>文件</button><button class="cbtn"><svg class="a-ic ic-14"><use href="#i-plug"/></svg>插件</button></div></div><div class="dock-note">内容由 AI 生成，仅供参考</div></div>
+    </div></div></div>
+  </div></div></section><section class="dz-sec"><h2 class="dz-h2">会话页 · 向上展开的弹层 <code>#session-popovers</code></h2><p class="dz-sub">会话页输入框贴底，「+」菜单与合并选择卡向上展开，下缘离输入框上沿 6px;「+」菜单左缘对齐「+」按钮，选择卡右缘对齐发送键。</p><div class="dz-stage" id="session-popovers">
+    <div class="fr fr-comp a-ui " id="session-plus-up" style="width:760px;height:560px;padding:0"><div class="ans" style="padding:28px 40px 0"><p>改好了：价格都收进 <code>src/config/pricing.ts</code>，页面只从这里读；测试通过，桌面端与窄屏截图都核对过。</p></div><div style="position:absolute;left:40px;right:40px;bottom:16px"><div class="compose-wrap"><div class="comp"><div class="comp-input">继续说点什么…</div><div class="comp-row"><button class="cbtn icon is-open" aria-label="添加附件、计划模式或助手" aria-expanded="true"><svg class="a-ic"><use href="#i-plus"/></svg></button><button class="cbtn perm"><svg class="a-ic ic-14"><use href="#i-shield"/></svg>全部批准<svg class="a-ic ic-12 chev"><use href="#i-down"/></svg></button><span class="grow"></span><button class="cbtn"><span class="brand-tile"><svg class="prov"><use href="#p-deepseek"/></svg></span>DeepSeek V4 Pro<span class="lvl">高</span><svg class="a-ic ic-12 chev"><use href="#i-down"/></svg></button><button class="send" aria-label="发送"><svg class="a-ic"><use href="#i-up"/></svg></button></div><div class="a-pop cols up at-plus" style="width:340px"><button class="a-pop-item is-focus"><svg class="a-ic"><use href="#i-clip"/></svg><span class="k">添加附件</span><span class="d">图片或 PDF</span></button>
+<button class="a-pop-item"><svg class="a-ic"><use href="#i-plan"/></svg><span class="k">计划模式</span><span class="d">先出方案再动手</span></button>
+<div class="a-pop-sep"></div><div class="a-pop-label">助手</div>
+<button class="a-pop-item"><svg class="a-ic"><use href="#i-at"/></svg><span class="k">general</span><span class="d">通用子任务：调研与多步骤执行</span></button>
+<button class="a-pop-item"><svg class="a-ic"><use href="#i-at"/></svg><span class="k">explore</span><span class="d">快速探索代码库、找文件</span></button>
+<button class="a-pop-item"><svg class="a-ic"><use href="#i-at"/></svg><span class="k">docs</span><span class="d">写文档：报告、规范、设计说明</span></button></div></div><div class="tray"><button class="cbtn static"><svg class="a-ic ic-14"><use href="#i-folder"/></svg>orbit-web</button><button class="cbtn"><svg class="a-ic ic-14"><use href="#i-file"/></svg>文件</button><button class="cbtn"><svg class="a-ic ic-14"><use href="#i-plug"/></svg>插件</button></div></div><div class="dock-note">内容由 AI 生成，仅供参考</div></div></div>
+    <div class="fr fr-comp a-ui " id="session-picker-up" style="width:760px;height:560px;padding:0"><div class="ans" style="padding:28px 40px 0"><p>改好了：价格都收进 <code>src/config/pricing.ts</code>，页面只从这里读；测试通过，桌面端与窄屏截图都核对过。</p></div><div style="position:absolute;left:40px;right:40px;bottom:16px"><div class="compose-wrap"><div class="comp"><div class="comp-input">继续说点什么…</div><div class="comp-row"><button class="cbtn icon" aria-label="添加附件、计划模式或助手"><svg class="a-ic"><use href="#i-plus"/></svg></button><button class="cbtn perm"><svg class="a-ic ic-14"><use href="#i-shield"/></svg>全部批准<svg class="a-ic ic-12 chev"><use href="#i-down"/></svg></button><span class="grow"></span><button class="cbtn is-open"><span class="brand-tile"><svg class="prov"><use href="#p-deepseek"/></svg></span>DeepSeek V4 Pro<span class="lvl">高</span><svg class="a-ic ic-12 chev"><use href="#i-down"/></svg></button><button class="send" aria-label="发送"><svg class="a-ic"><use href="#i-up"/></svg></button></div><div class="a-pop pk up at-send">
+      <div class="pk-head"><svg class="a-ic"><use href="#i-zap"/></svg><span class="lv">高</span><span class="grow"></span><button class="pk-reset"><svg class="a-ic ic-12"><use href="#i-reset"/></svg>重置</button></div>
+      <button class="pk-model"><span class="brand-tile"><svg class="prov"><use href="#p-deepseek"/></svg></span>DeepSeek V4 Pro<svg class="a-ic ic-12"><use href="#i-right"/></svg></button>
+      <div class="slider" role="slider" aria-label="推理强度" aria-valuetext="高"><span class="track"></span><span class="fill" style="width:66.67%"></span><span class="stop past" style="left:0.00%"></span><span class="stop past" style="left:33.33%"></span><span class="stop" style="left:100.00%"></span><span class="knob" style="left:66.67%"></span></div><div class="slider-lbl"><span style="left:0.00%">低</span><span style="left:33.33%">中</span><span class="on" style="left:66.67%">高</span><span style="left:100.00%">最高</span></div>
+      <div class="pk-note">档位越高想得越久，也更费额度。</div>
+    </div></div><div class="tray"><button class="cbtn static"><svg class="a-ic ic-14"><use href="#i-folder"/></svg>orbit-web</button><button class="cbtn"><svg class="a-ic ic-14"><use href="#i-file"/></svg>文件</button><button class="cbtn"><svg class="a-ic ic-14"><use href="#i-plug"/></svg>插件</button></div></div><div class="dock-note">内容由 AI 生成，仅供参考</div></div></div>
+  </div><p class="dz-cap">左 #session-plus-up，右 #session-picker-up。</p></section><section class="dz-sec"><h2 class="dz-h2">助手安装的批准卡 <code>#install-card</code></h2><p class="dz-sub">左：等待允许；右：已拒绝，这一轮到此结束。助手在对话里要安装时：时间线写「等待你允许安装『名称』」，同时出现一张普通批准面板，只写名称与真实来源，只能允许一次；拒绝后时间线写「已拒绝，未安装『名称』」，这一轮结束。定制中心「+」不出现这张卡（规格 v5 BR-10）。</p><div class="dz-stage" id="install-card"><div class="fr fr-comp a-ui " style="width:680px;height:420px;padding:0"><div style="padding:24px 32px"><div class="msg-user">帮我装一个能管理 Supabase 的插件。</div>
+      <div style="margin-top:14px"><div class="hcard"><span class="mono">S</span><div class="txt"><div class="nm">等待你允许安装『Supabase』</div><div class="ds">来源：Claude 插件市场</div></div></div></div>
+      <div style="margin-top:18px"><div class="apv">
+      <div class="apv-h"><svg class="a-ic"><use href="#i-shield"/></svg><b>允许这次操作吗？</b></div>
+      <div class="apv-act">安装插件</div>
+      <dl class="a-kv"><div class="a-kv-row"><dt class="a-kv-k">名称</dt><dd class="a-kv-v">Supabase</dd></div><div class="a-kv-row"><dt class="a-kv-k">来源</dt><dd class="a-kv-v">Claude 插件市场</dd></div></dl>
+      <div class="apv-foot"><button class="a-btn" data-variant="danger">拒绝</button><button class="a-btn" data-variant="primary">允许一次</button></div>
+    </div></div></div></div><div class="fr fr-comp a-ui " style="width:680px;height:420px;padding:0"><div style="padding:24px 32px"><div class="msg-user">帮我装一个能读 Figma 设计稿的插件。</div><div style="margin-top:14px"><div class="hcard"><span class="mono"><svg class="a-ic ic-18"><use href="#i-ban"/></svg></span><div class="txt"><div class="nm">已拒绝，未安装『Figma 读取』</div><div class="ds">来源：Claude 插件市场</div></div></div></div></div></div></div></section><section class="dz-sec"><h2 class="dz-h2">会话页右栏 <code>#right-panel</code></h2><p class="dz-sub">右栏是工作面里的第三栏，分栏线几乎看不见；页签文字加中性下划线；右栏开关在顶栏右上角（按下态）。差异视图右缘淡出，提示可横向滚动。</p>
+  <div class="dz-stage"><div class="fr a-ui" id="right-panel">
+    <div class="tb">
+      <div class="tb-left"><span class="tl"><i></i><i></i><i></i></span><button class="tb-btn" aria-label="隐藏侧边栏"><svg class="a-ic"><use href="#i-panel-l"/></svg></button><button class="tb-btn" aria-label="后退"><svg class="a-ic"><use href="#i-left"/></svg></button><button class="tb-btn is-dim" aria-label="前进"><svg class="a-ic"><use href="#i-right"/></svg></button></div>
+      <div class="tb-title"><span class="crumb">orbit-web</span><span class="crumb-sep">/</span>修复登录页在窄屏下的错位</div><div class="tb-right"><button class="tb-btn is-on" aria-label="收起右栏" aria-pressed="true"><svg class="a-ic"><use href="#i-panel-r"/></svg></button></div>
+    </div>
+    <nav class="rail"><button class="rail-btn" aria-label="新对话"><svg class="a-ic ic-18"><use href="#i-pen"/></svg></button><button class="rail-btn" aria-label="搜索对话 ⌘K"><svg class="a-ic ic-18"><use href="#i-search"/></svg></button><button class="rail-btn" aria-label="定制中心"><svg class="a-ic ic-18"><use href="#i-grid"/></svg></button><button class="rail-btn" aria-label="自动化"><svg class="a-ic ic-18"><use href="#i-cal"/></svg></button><span class="rail-grow"></span><button class="rail-avatar" aria-label="账户">A</button></nav>
+    <div class="box"><aside class="side">
+        <div class="side-brand"><img src="../../../packages/ui-mac/src/renderer/brand/brand-mark.png" alt="" /><b>Code Puppy</b></div>
+        <div class="side-sec">项目<span class="acts"><button class="tb-btn" aria-label="筛选项目和对话"><svg class="a-ic ic-14"><use href="#i-search"/></svg></button><button class="tb-btn" aria-label="打开项目"><svg class="a-ic ic-14"><use href="#i-plus"/></svg></button></span></div>
+        <div class="side-list"><div class="row"><svg class="a-ic"><use href="#i-folder-open"/></svg><span class="grow">orbit-web</span></div><div class="row conv is-on"><span class="grow">修复登录页在窄屏下的错位</span></div><div class="row conv"><span class="grow">把定价表改成从配置读取</span><span class="slot"><span class="dot" title="有新进展"></span></span></div><div class="row conv"><span class="grow">梳理项目目录结构并写进 README</span></div><div class="row conv"><span class="grow">给结算接口补上重试与超时</span></div><div class="row more">显示更多</div><div class="row"><svg class="a-ic"><use href="#i-folder"/></svg><span class="grow">pricing-api</span></div><div class="row"><svg class="a-ic"><use href="#i-folder"/></svg><span class="grow">design-notes</span></div></div>
+      </aside><div class="main"><div class="thread">
+      <div class="thread-in">
+        <div class="msg-user">登录页在 375 宽的手机上，「登录」按钮会溢出卡片。帮我修一下，别影响桌面端。</div>
+        <div class="proc"><svg class="a-ic ic-12"><use href="#i-right"/></svg>读了 4 个文件 · 改了 3 个文件 · 运行 2 条命令 · 1 分 12 秒</div>
+        <div class="ans">
+          <p>问题出在表单容器写死了 <code>width: 420px</code>，窄屏下按钮跟着撑出卡片。我改了三处：</p>
+          <p>1. 表单改为 <code>width: min(420px, 100%)</code>，卡片内边距在 480px 以下收到 16px；<br />2. 按钮行可以换行，小屏下「登录」占满一行；<br />3. README 补了一句移动端的检查方法。</p>
+          <p>本地在 375、768、1280 三个宽度下截图核对过，桌面端外观没有变化。</p>
+        </div>
+        <div class="meta">DeepSeek V4 Pro · 高</div>
+      </div>
+      <div class="dock"><div class="compose-wrap"><div class="comp"><div class="comp-input">继续说点什么…</div><div class="comp-row"><button class="cbtn icon" aria-label="添加附件、计划模式或助手"><svg class="a-ic"><use href="#i-plus"/></svg></button><button class="cbtn perm"><svg class="a-ic ic-14"><use href="#i-shield"/></svg>全部批准<svg class="a-ic ic-12 chev"><use href="#i-down"/></svg></button><span class="grow"></span><button class="cbtn"><span class="brand-tile"><svg class="prov"><use href="#p-deepseek"/></svg></span>DeepSeek V4 Pro<span class="lvl">高</span><svg class="a-ic ic-12 chev"><use href="#i-down"/></svg></button><button class="send" aria-label="发送"><svg class="a-ic"><use href="#i-up"/></svg></button></div></div><div class="tray"><button class="cbtn static"><svg class="a-ic ic-14"><use href="#i-folder"/></svg>orbit-web</button><button class="cbtn"><svg class="a-ic ic-14"><use href="#i-file"/></svg>文件</button><button class="cbtn"><svg class="a-ic ic-14"><use href="#i-plug"/></svg>插件</button></div></div><div class="dock-note">内容由 AI 生成，仅供参考</div></div>
+    </div></div><aside class="rp">
         <div class="rp-tabs"><span class="tab is-on">审查<span class="n">3</span></span><span class="tab">文件</span><span class="tab">终端</span><span class="tab">产物</span></div>
         <div class="rp-tool"><span class="t">本回合变更</span><span class="s">3 个文件</span><span class="add">+42</span><span class="del">−11</span><span class="grow"></span><span class="seg"><span class="on">统一</span><span>拆分</span></span></div>
         <div class="rp-body">
-          <div class="file"><svg class="a-ic"><use href="#i-down"/></svg><span class="p"><em>src/pages/</em>Login.tsx</span><span class="add">+18</span><span class="del">−6</span></div>
+          <div class="file"><svg class="a-ic ic-12"><use href="#i-down"/></svg><span class="p"><em>src/pages/</em>Login.tsx</span><span class="add">+18</span><span class="del">−6</span></div>
           <div class="diff">
             <div class="hunk"><b></b>@@ 32,9 @@ export function LoginForm()</div>
             <div class="ctx"><b>32</b>  return (</div>
@@ -646,136 +312,340 @@
             <div class="ctx"><b>37</b>        &lt;Button type="submit"&gt;登录&lt;/Button&gt;</div>
             <div class="ctx"><b>38</b>      &lt;/div&gt;</div>
           </div>
-          <div class="file"><svg class="a-ic"><use href="#i-right"/></svg><span class="p"><em>src/styles/</em>login.css</span><span class="add">+21</span><span class="del">−4</span></div>
-          <div class="file"><svg class="a-ic"><use href="#i-right"/></svg><span class="p">README.md</span><span class="add">+3</span><span class="del">−1</span></div>
+          <div class="file"><svg class="a-ic ic-12"><use href="#i-right"/></svg><span class="p"><em>src/styles/</em>login.css</span><span class="add">+21</span><span class="del">−4</span></div>
+          <div class="file"><svg class="a-ic ic-12"><use href="#i-right"/></svg><span class="p">README.md</span><span class="add">+3</span><span class="del">−1</span></div>
         </div>
-      </aside>
+      </aside></div>
+  </div></div></section><section class="dz-sec"><h2 class="dz-h2">右栏四页的空状态 <code>#right-panel-empty</code></h2><p class="dz-sub">图标顶端统一钉在面板 30% 处，多出的说明或按钮往下长，四页标题同一高度。</p><div class="dz-stage" id="right-panel-empty">
+    <div class="fr fr-comp a-ui " style="width:340px;height:440px;padding:0"><aside class="rp" style="width:100%;height:100%;border-left:0"><div class="rp-tabs"><span class="tab is-on">审查</span><span class="tab">文件</span><span class="tab">终端</span><span class="tab">产物</span></div><div class="rp-empty"><svg class="a-ic ic-20"><use href="#i-review"/></svg><h4>这个项目还没有版本管理</h4><p>把项目放进版本管理后，这里会显示每一轮对话产生的改动。</p></div></aside></div>
+    <div class="fr fr-comp a-ui " style="width:340px;height:440px;padding:0"><aside class="rp" style="width:100%;height:100%;border-left:0"><div class="rp-tabs"><span class="tab">审查</span><span class="tab is-on">文件</span><span class="tab">终端</span><span class="tab">产物</span></div><div class="rp-filter"><label class="a-field"><svg class="a-ic ic-14"><use href="#i-search"/></svg><span class="ph">筛选文件</span></label></div><div class="rp-empty"><svg class="a-ic ic-20"><use href="#i-folder"/></svg><h4>工作区还没有文件</h4><p>文件创建后会实时出现在这里。</p></div></aside></div>
+    <div class="fr fr-comp a-ui " style="width:340px;height:440px;padding:0"><aside class="rp" style="width:100%;height:100%;border-left:0"><div class="rp-tabs"><span class="tab">审查</span><span class="tab">文件</span><span class="tab is-on">终端</span><span class="tab">产物</span></div><div class="rp-empty"><svg class="a-ic ic-20"><use href="#i-term"/></svg><h4>还没有终端</h4><p>新建一个，或在输入框里让助手替你跑命令。</p><button class="a-btn" data-variant="secondary" data-size="sm"><svg class="a-ic ic-12"><use href="#i-plus"/></svg>新建终端</button></div></aside></div>
+    <div class="fr fr-comp a-ui " style="width:340px;height:440px;padding:0"><aside class="rp" style="width:100%;height:100%;border-left:0"><div class="rp-tabs"><span class="tab">审查</span><span class="tab">文件</span><span class="tab">终端</span><span class="tab is-on">产物</span></div><div class="rp-seg"><span class="seg"><span class="on">本次对话</span><span>项目全部</span></span></div><div class="rp-empty"><svg class="a-ic ic-20"><use href="#i-box"/></svg><h4>还没有产物</h4><p>助手生成的文档会出现在这里。</p></div></aside></div>
+  </div></section><section class="dz-sec"><h2 class="dz-h2">找不到对话 <code>#not-found</code></h2><p class="dz-sub">取代上游的「找不到此会话 / Local Server / 关闭标签页」：一句话 + 「回到新对话」。</p>
+  <div class="dz-stage"><div class="fr a-ui" id="not-found">
+    <div class="tb">
+      <div class="tb-left"><span class="tl"><i></i><i></i><i></i></span><button class="tb-btn" aria-label="隐藏侧边栏"><svg class="a-ic"><use href="#i-panel-l"/></svg></button><button class="tb-btn" aria-label="后退"><svg class="a-ic"><use href="#i-left"/></svg></button><button class="tb-btn is-dim" aria-label="前进"><svg class="a-ic"><use href="#i-right"/></svg></button></div>
+      <div class="tb-title">找不到对话</div><div class="tb-right"><button class="tb-btn" aria-label="显示右栏"><svg class="a-ic"><use href="#i-panel-r"/></svg></button></div>
     </div>
-  </div>
-  </div>
+    <nav class="rail"><button class="rail-btn" aria-label="新对话"><svg class="a-ic ic-18"><use href="#i-pen"/></svg></button><button class="rail-btn" aria-label="搜索对话 ⌘K"><svg class="a-ic ic-18"><use href="#i-search"/></svg></button><button class="rail-btn" aria-label="定制中心"><svg class="a-ic ic-18"><use href="#i-grid"/></svg></button><button class="rail-btn" aria-label="自动化"><svg class="a-ic ic-18"><use href="#i-cal"/></svg></button><span class="rail-grow"></span><button class="rail-avatar" aria-label="账户">A</button></nav>
+    <div class="box"><aside class="side">
+        <div class="side-brand"><img src="../../../packages/ui-mac/src/renderer/brand/brand-mark.png" alt="" /><b>Code Puppy</b></div>
+        <div class="side-sec">项目<span class="acts"><button class="tb-btn" aria-label="筛选项目和对话"><svg class="a-ic ic-14"><use href="#i-search"/></svg></button><button class="tb-btn" aria-label="打开项目"><svg class="a-ic ic-14"><use href="#i-plus"/></svg></button></span></div>
+        <div class="side-list"><div class="row"><svg class="a-ic"><use href="#i-folder-open"/></svg><span class="grow">orbit-web</span></div><div class="row conv"><span class="grow">修复登录页在窄屏下的错位</span></div><div class="row conv"><span class="grow">把定价表改成从配置读取</span><span class="slot"><span class="dot" title="有新进展"></span></span></div><div class="row conv"><span class="grow">梳理项目目录结构并写进 README</span></div><div class="row conv"><span class="grow">给结算接口补上重试与超时</span></div><div class="row more">显示更多</div><div class="row"><svg class="a-ic"><use href="#i-folder"/></svg><span class="grow">pricing-api</span></div><div class="row"><svg class="a-ic"><use href="#i-folder"/></svg><span class="grow">design-notes</span></div></div>
+      </aside><div class="main"><div class="gone"><svg class="a-ic ic-20"><use href="#i-msg"/></svg><h4>找不到这段对话</h4><p>它可能已经被删除。</p><button class="a-btn" data-variant="secondary">回到新对话</button></div></div></div>
+  </div></div></section><section class="dz-sec"><h2 class="dz-h2">模型与推理强度合并选择 <code>#picker</code></h2><p class="dz-sub">卡片从托盘下沿 +6px 向下展开，右缘对齐发送键；滑条把手是白色小圆，无黑圈；已过档位用次级灰。点模型名换成模型列表；模型没有档位时只写一句说明。</p><div class="dz-stage" id="picker">
+    <div class="fr fr-comp a-ui " style="width:760px;height:520px;padding:0"><div style="padding:28px 40px"><div class="compose-wrap"><div class="comp"><div class="comp-input">问点什么，输入 / 调命令，@ 引用上下文…</div><div class="comp-row"><button class="cbtn icon" aria-label="添加附件、计划模式或助手"><svg class="a-ic"><use href="#i-plus"/></svg></button><button class="cbtn perm"><svg class="a-ic ic-14"><use href="#i-shield"/></svg>全部批准<svg class="a-ic ic-12 chev"><use href="#i-down"/></svg></button><span class="grow"></span><button class="cbtn is-open"><span class="brand-tile"><svg class="prov"><use href="#p-deepseek"/></svg></span>DeepSeek V4 Pro<span class="lvl">高</span><svg class="a-ic ic-12 chev"><use href="#i-down"/></svg></button><button class="send" aria-label="发送"><svg class="a-ic"><use href="#i-up"/></svg></button></div></div><div class="tray"><button class="cbtn"><svg class="a-ic ic-14"><use href="#i-folder"/></svg>orbit-web<svg class="a-ic ic-12 chev"><use href="#i-down"/></svg></button><button class="cbtn"><svg class="a-ic ic-14"><use href="#i-file"/></svg>文件</button><button class="cbtn"><svg class="a-ic ic-14"><use href="#i-plug"/></svg>插件</button></div><div class="a-pop pk down at-send">
+      <div class="pk-head"><svg class="a-ic"><use href="#i-zap"/></svg><span class="lv">高</span><span class="grow"></span><button class="pk-reset"><svg class="a-ic ic-12"><use href="#i-reset"/></svg>重置</button></div>
+      <button class="pk-model"><span class="brand-tile"><svg class="prov"><use href="#p-deepseek"/></svg></span>DeepSeek V4 Pro<svg class="a-ic ic-12"><use href="#i-right"/></svg></button>
+      <div class="slider" role="slider" aria-label="推理强度" aria-valuetext="高"><span class="track"></span><span class="fill" style="width:66.67%"></span><span class="stop past" style="left:0.00%"></span><span class="stop past" style="left:33.33%"></span><span class="stop" style="left:100.00%"></span><span class="knob" style="left:66.67%"></span></div><div class="slider-lbl"><span style="left:0.00%">低</span><span style="left:33.33%">中</span><span class="on" style="left:66.67%">高</span><span style="left:100.00%">最高</span></div>
+      <div class="pk-note">档位越高想得越久，也更费额度。</div>
+    </div></div></div></div>
+    <div class="fr fr-comp a-ui " style="width:760px;height:520px;padding:0"><div style="padding:28px 40px"><div class="compose-wrap"><div class="comp"><div class="comp-input">问点什么，输入 / 调命令，@ 引用上下文…</div><div class="comp-row"><button class="cbtn icon" aria-label="添加附件、计划模式或助手"><svg class="a-ic"><use href="#i-plus"/></svg></button><button class="cbtn perm"><svg class="a-ic ic-14"><use href="#i-shield"/></svg>全部批准<svg class="a-ic ic-12 chev"><use href="#i-down"/></svg></button><span class="grow"></span><button class="cbtn is-open"><span class="brand-tile"><svg class="prov"><use href="#p-deepseek"/></svg></span>DeepSeek V4 Pro<span class="lvl">高</span><svg class="a-ic ic-12 chev"><use href="#i-down"/></svg></button><button class="send" aria-label="发送"><svg class="a-ic"><use href="#i-up"/></svg></button></div></div><div class="tray"><button class="cbtn"><svg class="a-ic ic-14"><use href="#i-folder"/></svg>orbit-web<svg class="a-ic ic-12 chev"><use href="#i-down"/></svg></button><button class="cbtn"><svg class="a-ic ic-14"><use href="#i-file"/></svg>文件</button><button class="cbtn"><svg class="a-ic ic-14"><use href="#i-plug"/></svg>插件</button></div><div class="a-pop pk pk-list down at-send">
+      <button class="pk-back"><svg class="a-ic ic-14"><use href="#i-left"/></svg>选择模型</button>
+      <label class="a-field pk-search" data-size="sm"><svg class="a-ic ic-14"><use href="#i-search"/></svg><span class="ph">搜索模型或服务</span></label>
+      <div class="grp">国内直连 · 自带密钥</div>
+      <button class="a-pop-item"><span class="brand-tile"><svg class="prov"><use href="#p-deepseek"/></svg></span><span class="nm">DeepSeek V4 Pro<small>4 档推理</small></span><svg class="a-ic chk"><use href="#i-check"/></svg></button>
+      <button class="a-pop-item"><span class="brand-tile"><svg class="prov"><use href="#p-deepseek"/></svg></span><span class="nm">DeepSeek V4 Flash<small>无推理档位</small></span></button>
+      <button class="a-pop-item"><span class="brand-tile"><svg class="prov"><use href="#p-zhipu"/></svg></span><span class="nm">GLM-5.2<small>2 档推理</small></span><span class="act">填写 API 密钥后可用</span></button>
+      <button class="a-pop-item"><span class="brand-tile"><svg class="prov"><use href="#p-kimi"/></svg></span><span class="nm">Kimi K3<small>无推理档位</small></span><span class="act">填写 API 密钥后可用</span></button>
+    </div></div></div></div>
+    <div class="fr fr-comp a-ui " style="width:760px;height:520px;padding:0"><div style="padding:28px 40px"><div class="compose-wrap"><div class="comp"><div class="comp-input">问点什么，输入 / 调命令，@ 引用上下文…</div><div class="comp-row"><button class="cbtn icon" aria-label="添加附件、计划模式或助手"><svg class="a-ic"><use href="#i-plus"/></svg></button><button class="cbtn perm"><svg class="a-ic ic-14"><use href="#i-shield"/></svg>全部批准<svg class="a-ic ic-12 chev"><use href="#i-down"/></svg></button><span class="grow"></span><button class="cbtn is-open"><span class="brand-tile"><svg class="prov"><use href="#p-deepseek"/></svg></span>DeepSeek V4 Flash<svg class="a-ic ic-12 chev"><use href="#i-down"/></svg></button><button class="send" aria-label="发送"><svg class="a-ic"><use href="#i-up"/></svg></button></div></div><div class="tray"><button class="cbtn"><svg class="a-ic ic-14"><use href="#i-folder"/></svg>orbit-web<svg class="a-ic ic-12 chev"><use href="#i-down"/></svg></button><button class="cbtn"><svg class="a-ic ic-14"><use href="#i-file"/></svg>文件</button><button class="cbtn"><svg class="a-ic ic-14"><use href="#i-plug"/></svg>插件</button></div><div class="a-pop pk down at-send">
+      <div class="pk-head"><svg class="a-ic"><use href="#i-zap"/></svg><span class="lv">默认</span><span class="grow"></span></div>
+      <button class="pk-model"><span class="brand-tile"><svg class="prov"><use href="#p-deepseek"/></svg></span>DeepSeek V4 Flash<svg class="a-ic ic-12"><use href="#i-right"/></svg></button>
+      <div class="pk-note" style="border-top:0;padding-top:0;margin-top:12px">这个模型没有推理档位。换用带档位的模型即可调档。</div>
+    </div></div></div></div>
+  </div><p class="dz-cap">左：档位；中：模型列表（现有品牌图标，单色）；右：无档位。</p></section><section class="dz-sec"><h2 class="dz-h2">「+」菜单（首页向下） <code>#plus-menu</code></h2><p class="dz-sub">只留添加附件、计划模式与助手；「文件」「插件」只在托盘（owner U-02）。左缘对齐「+」按钮，说明列左对齐。</p><div class="dz-stage"><div class="fr fr-comp a-ui " id="plus-menu" style="width:760px;height:420px;padding:0"><div style="padding:36px 40px"><div class="compose-wrap"><div class="comp"><div class="comp-input">问点什么，输入 / 调命令，@ 引用上下文…</div><div class="comp-row"><button class="cbtn icon is-open" aria-label="添加附件、计划模式或助手" aria-expanded="true"><svg class="a-ic"><use href="#i-plus"/></svg></button><button class="cbtn perm"><svg class="a-ic ic-14"><use href="#i-shield"/></svg>全部批准<svg class="a-ic ic-12 chev"><use href="#i-down"/></svg></button><span class="grow"></span><button class="cbtn"><span class="brand-tile"><svg class="prov"><use href="#p-deepseek"/></svg></span>DeepSeek V4 Pro<span class="lvl">高</span><svg class="a-ic ic-12 chev"><use href="#i-down"/></svg></button><button class="send" aria-label="发送"><svg class="a-ic"><use href="#i-up"/></svg></button></div></div><div class="tray"><button class="cbtn"><svg class="a-ic ic-14"><use href="#i-folder"/></svg>orbit-web<svg class="a-ic ic-12 chev"><use href="#i-down"/></svg></button><button class="cbtn"><svg class="a-ic ic-14"><use href="#i-file"/></svg>文件</button><button class="cbtn"><svg class="a-ic ic-14"><use href="#i-plug"/></svg>插件</button></div><div class="a-pop cols down at-plus" style="width:340px"><button class="a-pop-item is-focus"><svg class="a-ic"><use href="#i-clip"/></svg><span class="k">添加附件</span><span class="d">图片或 PDF</span></button>
+<button class="a-pop-item"><svg class="a-ic"><use href="#i-plan"/></svg><span class="k">计划模式</span><span class="d">先出方案再动手</span></button>
+<div class="a-pop-sep"></div><div class="a-pop-label">助手</div>
+<button class="a-pop-item"><svg class="a-ic"><use href="#i-at"/></svg><span class="k">general</span><span class="d">通用子任务：调研与多步骤执行</span></button>
+<button class="a-pop-item"><svg class="a-ic"><use href="#i-at"/></svg><span class="k">explore</span><span class="d">快速探索代码库、找文件</span></button>
+<button class="a-pop-item"><svg class="a-ic"><use href="#i-at"/></svg><span class="k">docs</span><span class="d">写文档：报告、规范、设计说明</span></button></div></div></div></div></div></section><section class="dz-sec"><h2 class="dz-h2">接入其它服务（对话框） <code>#hub-custom-service</code></h2><p class="dz-sub">从模型选择器「添加供应商 / 接入其它服务」打开。表单改在组件库对话框里填，不再塞进弹层；字段改成中文说法（服务地址、模型名）；按钮都在右边。</p>
+  <div class="dz-stage"><div class="fr a-ui" id="hub-custom-service">
+    <div class="tb">
+      <div class="tb-left"><span class="tl"><i></i><i></i><i></i></span><button class="tb-btn" aria-label="隐藏侧边栏"><svg class="a-ic"><use href="#i-panel-l"/></svg></button><button class="tb-btn" aria-label="后退"><svg class="a-ic"><use href="#i-left"/></svg></button><button class="tb-btn is-dim" aria-label="前进"><svg class="a-ic"><use href="#i-right"/></svg></button></div>
+      <div class="tb-title">新对话</div><div class="tb-right"><button class="tb-btn" aria-label="显示右栏"><svg class="a-ic"><use href="#i-panel-r"/></svg></button></div>
+    </div>
+    <nav class="rail"><button class="rail-btn" aria-label="新对话"><svg class="a-ic ic-18"><use href="#i-pen"/></svg></button><button class="rail-btn" aria-label="搜索对话 ⌘K"><svg class="a-ic ic-18"><use href="#i-search"/></svg></button><button class="rail-btn" aria-label="定制中心"><svg class="a-ic ic-18"><use href="#i-grid"/></svg></button><button class="rail-btn" aria-label="自动化"><svg class="a-ic ic-18"><use href="#i-cal"/></svg></button><span class="rail-grow"></span><button class="rail-avatar" aria-label="账户">A</button></nav>
+    <div class="box"><aside class="side">
+        <div class="side-brand"><img src="../../../packages/ui-mac/src/renderer/brand/brand-mark.png" alt="" /><b>Code Puppy</b></div>
+        <div class="side-sec">项目<span class="acts"><button class="tb-btn" aria-label="筛选项目和对话"><svg class="a-ic ic-14"><use href="#i-search"/></svg></button><button class="tb-btn" aria-label="打开项目"><svg class="a-ic ic-14"><use href="#i-plus"/></svg></button></span></div>
+        <div class="side-list"><div class="row"><svg class="a-ic"><use href="#i-folder-open"/></svg><span class="grow">orbit-web</span></div><div class="row conv"><span class="grow">修复登录页在窄屏下的错位</span></div><div class="row conv"><span class="grow">把定价表改成从配置读取</span><span class="slot"><span class="dot" title="有新进展"></span></span></div><div class="row conv"><span class="grow">梳理项目目录结构并写进 README</span></div><div class="row conv"><span class="grow">给结算接口补上重试与超时</span></div><div class="row more">显示更多</div><div class="row"><svg class="a-ic"><use href="#i-folder"/></svg><span class="grow">pricing-api</span></div><div class="row"><svg class="a-ic"><use href="#i-folder"/></svg><span class="grow">design-notes</span></div><div class="row"><svg class="a-ic"><use href="#i-folder"/></svg><span class="grow">weekly-report</span></div></div>
+      </aside><div class="main"><div class="hero"><h1>我们要处理什么？</h1><div class="compose-wrap"><div class="comp"><div class="comp-input">问点什么，输入 / 调命令，@ 引用上下文…</div><div class="comp-row"><button class="cbtn icon" aria-label="添加附件、计划模式或助手"><svg class="a-ic"><use href="#i-plus"/></svg></button><button class="cbtn perm"><svg class="a-ic ic-14"><use href="#i-shield"/></svg>全部批准<svg class="a-ic ic-12 chev"><use href="#i-down"/></svg></button><span class="grow"></span><button class="cbtn"><span class="brand-tile"><svg class="prov"><use href="#p-deepseek"/></svg></span>DeepSeek V4 Pro<span class="lvl">高</span><svg class="a-ic ic-12 chev"><use href="#i-down"/></svg></button><button class="send" aria-label="发送"><svg class="a-ic"><use href="#i-up"/></svg></button></div></div><div class="tray"><button class="cbtn"><svg class="a-ic ic-14"><use href="#i-folder"/></svg>orbit-web<svg class="a-ic ic-12 chev"><use href="#i-down"/></svg></button><button class="cbtn"><svg class="a-ic ic-14"><use href="#i-file"/></svg>文件</button><button class="cbtn"><svg class="a-ic ic-14"><use href="#i-plug"/></svg>插件</button></div></div></div></div></div><div class="a-dialog-root"><div class="a-dialog-backdrop"></div>
+      <div class="a-dialog-panel" style="width:480px" role="dialog" aria-label="接入其它服务">
+        <div class="a-dialog-header"><div class="a-dialog-title">接入其它服务</div><button class="a-dialog-close tb-btn" aria-label="关闭"><svg class="a-ic"><use href="#i-x"/></svg></button></div>
+        <div class="a-dialog-body">
+          <div class="fld"><label>服务名称</label><span class="a-field"><span class="ph">例如 DeepSeek</span></span></div>
+          <div class="fld"><label>兼容方式</label><span class="seg"><span class="on">OpenAI 兼容</span><span>Anthropic 兼容</span></span></div>
+          <div class="fld"><label>服务地址</label><span class="a-field"><span class="ph">https://api.example.com/v1</span></span><div class="help">填服务商提供的接口地址；本机地址（localhost、127.0.0.1）不支持。</div></div>
+          <div class="fld"><label>API 密钥<span class="aside">显示</span></label><span class="a-field"><span class="ph" style="color:var(--a-text);letter-spacing:2px">••••••••••••••••</span></span><div class="help">保存在这台电脑的专用密钥存储中。</div></div>
+          <div class="fld" style="margin-bottom:0"><label>模型名</label><span class="a-field"><span class="chip">deepseek-chat<svg class="a-ic ic-12"><use href="#i-x"/></svg></span><span class="ph">回车添加，例如 deepseek-reasoner</span></span></div>
+        </div>
+        <div class="a-dialog-footer"><button class="a-btn" data-variant="ghost">测试连接</button><span class="grow"></span><button class="a-btn" data-variant="secondary">取消</button><button class="a-btn" data-variant="primary">保存并启用</button></div>
+      </div></div>
+  </div></div></section><section class="dz-sec"><h2 class="dz-h2">定制中心 · 连接器（顶级页面） <code>#hub-connectors</code></h2><p class="dz-sub">共用页头：页签 + 搜索 + 「添加 ▾」。分组小标题与侧栏「项目」同一种安静样式；两列间距 48px;「+」「…」平时是三级灰。「未能启用」只有圆点和这四个字是红的。</p>
+  <div class="dz-stage"><div class="fr a-ui" id="hub-connectors">
+    <div class="tb">
+      <div class="tb-left"><span class="tl"><i></i><i></i><i></i></span><button class="tb-btn" aria-label="隐藏侧边栏"><svg class="a-ic"><use href="#i-panel-l"/></svg></button><button class="tb-btn" aria-label="后退"><svg class="a-ic"><use href="#i-left"/></svg></button><button class="tb-btn is-dim" aria-label="前进"><svg class="a-ic"><use href="#i-right"/></svg></button></div>
+      <div class="tb-title">定制中心</div>
+    </div>
+    <nav class="rail"><button class="rail-btn" aria-label="新对话"><svg class="a-ic ic-18"><use href="#i-pen"/></svg></button><button class="rail-btn" aria-label="搜索对话 ⌘K"><svg class="a-ic ic-18"><use href="#i-search"/></svg></button><button class="rail-btn is-on" aria-label="定制中心"><svg class="a-ic ic-18"><use href="#i-grid"/></svg></button><button class="rail-btn" aria-label="自动化"><svg class="a-ic ic-18"><use href="#i-cal"/></svg></button><span class="rail-grow"></span><button class="rail-avatar" aria-label="账户">A</button></nav>
+    <div class="box"><aside class="side">
+        <div class="side-brand"><img src="../../../packages/ui-mac/src/renderer/brand/brand-mark.png" alt="" /><b>Code Puppy</b></div>
+        <div class="side-sec">项目<span class="acts"><button class="tb-btn" aria-label="筛选项目和对话"><svg class="a-ic ic-14"><use href="#i-search"/></svg></button><button class="tb-btn" aria-label="打开项目"><svg class="a-ic ic-14"><use href="#i-plus"/></svg></button></span></div>
+        <div class="side-list"><div class="row"><svg class="a-ic"><use href="#i-folder-open"/></svg><span class="grow">orbit-web</span></div><div class="row conv"><span class="grow">修复登录页在窄屏下的错位</span></div><div class="row conv"><span class="grow">把定价表改成从配置读取</span><span class="slot"><span class="dot" title="有新进展"></span></span></div><div class="row conv"><span class="grow">梳理项目目录结构并写进 README</span></div><div class="row more">显示更多</div><div class="row"><svg class="a-ic"><use href="#i-folder"/></svg><span class="grow">pricing-api</span></div><div class="row"><svg class="a-ic"><use href="#i-folder"/></svg><span class="grow">design-notes</span></div></div>
+      </aside><div class="main"><div class="page"><div class="page-in">
+      <div class="phd"><div class="tabs"><span class="tab is-on">连接器</span><span class="tab">技能</span><span class="tab">助手</span></div><label class="a-field"><svg class="a-ic ic-14"><use href="#i-search"/></svg><span class="ph">搜索插件、技能或 MCP</span></label><button class="a-btn" data-variant="secondary">添加<svg class="a-ic ic-12"><use href="#i-down"/></svg></button></div>
+      <p class="ph-desc">让助手使用外部工具和服务。</p>
+      <div class="grp-h first"><svg class="a-ic ic-12"><use href="#i-down"/></svg>已安装<span class="n">6</span></div>
+      <div class="grid2">
+        <div class="item"><span class="mono"><svg class="a-ic ic-18"><use href="#i-folder"/></svg></span><div class="txt"><div class="nm"><span>本地文件读写</span></div><div class="ds">读取和修改你允许访问的文件夹</div></div><button class="iact" aria-label="管理 本地文件读写"><svg class="a-ic"><use href="#i-more"/></svg></button></div>
+        <div class="item"><span class="mono">G</span><div class="txt"><div class="nm"><span>GitHub（官方）</span><span class="st warn"><i></i>待填令牌</span></div><div class="ds">查找仓库、阅读代码、查看提交记录</div></div><button class="iact" aria-label="管理 GitHub（官方）"><svg class="a-ic"><use href="#i-more"/></svg></button></div>
+        <div class="item is-hover"><span class="mono">S</span><div class="txt"><div class="nm"><span>Supabase</span><span class="st warn"><i></i>待登录</span></div><div class="ds">管理 Supabase 项目、数据表和函数</div></div><button class="iact is-hover" aria-label="管理 Supabase"><svg class="a-ic"><use href="#i-more"/></svg></button></div>
+        <div class="item"><span class="mono"><svg class="a-ic ic-18"><use href="#i-window"/></svg></span><div class="txt"><div class="nm"><span>浏览器操作（Playwright）</span><span class="st"><svg class="a-ic ic-12 spin"><use href="#i-loader"/></svg>正在生效</span></div><div class="ds">打开网页、点击、填写表单、截图</div></div><button class="iact" aria-label="管理 浏览器操作（Playwright）"><svg class="a-ic"><use href="#i-more"/></svg></button></div>
+        <div class="item"><span class="mono"><svg class="a-ic ic-18"><use href="#i-file-search"/></svg></span><div class="txt"><div class="nm"><span>文档读取（markitdown）</span><span class="st"><i></i>已关闭</span></div><div class="ds">读取 PDF、Word、PowerPoint、Excel</div></div><button class="iact" aria-label="管理 文档读取（markitdown）"><svg class="a-ic"><use href="#i-more"/></svg></button></div>
+        <div class="item"><span class="mono">N</span><div class="txt"><div class="nm"><span>opencode-notify</span><span class="st err"><i></i>未能启用</span></div><div class="ds reason">包里的原生 JS 插件不会运行</div></div><button class="iact" aria-label="管理 opencode-notify"><svg class="a-ic"><use href="#i-more"/></svg></button></div>
+      </div>
+      <div class="grp-h"><svg class="a-ic ic-12"><use href="#i-down"/></svg>研发<span class="n">4</span></div>
+      <div class="grid2">
+        <div class="item"><span class="mono"><svg class="a-ic ic-18"><use href="#i-bug"/></svg></span><div class="txt"><div class="nm"><span>网页排查（Chrome DevTools）</span></div><div class="ds">排查网页加载慢、报错和网络请求</div></div><button class="iact" aria-label="安装 网页排查（Chrome DevTools）"><svg class="a-ic"><use href="#i-plus"/></svg></button></div>
+        <div class="item"><span class="mono"><svg class="a-ic ic-18"><use href="#i-branch"/></svg></span><div class="txt"><div class="nm"><span>Git 版本管理</span></div><div class="ds">查看仓库状态、改动和提交历史</div></div><button class="iact" aria-label="安装 Git 版本管理"><svg class="a-ic"><use href="#i-plus"/></svg></button></div>
+        <div class="item"><span class="mono"><svg class="a-ic ic-18"><use href="#i-db"/></svg></span><div class="txt"><div class="nm"><span>数据库（本机 SQLite，只读）</span></div><div class="ds">查询你电脑上的 SQLite 数据库</div></div><button class="iact" aria-label="安装 数据库（本机 SQLite，只读）"><svg class="a-ic"><use href="#i-plus"/></svg></button></div>
+        <div class="item"><span class="mono"><svg class="a-ic ic-18"><use href="#i-pkg"/></svg></span><div class="txt"><div class="nm"><span>Code Puppy 安装自检</span></div><div class="ds">检查插件、技能与连接器是否装好</div></div><button class="iact" aria-label="安装 Code Puppy 安装自检"><svg class="a-ic"><use href="#i-plus"/></svg></button></div>
+      </div>
+      <div class="grp-h"><svg class="a-ic ic-12"><use href="#i-down"/></svg>办公文档<span class="n">4</span></div>
+      <div class="grid2">
+        <div class="item"><span class="mono"><svg class="a-ic ic-18"><use href="#i-file-text"/></svg></span><div class="txt"><div class="nm"><span>Word 文档读写</span></div><div class="ds">读取 .docx 的正文和结构，也能新建或改写</div></div><button class="iact" aria-label="安装 Word 文档读写"><svg class="a-ic"><use href="#i-plus"/></svg></button></div>
+        <div class="item"><span class="mono"><svg class="a-ic ic-18"><use href="#i-table"/></svg></span><div class="txt"><div class="nm"><span>Excel 表格读写</span></div><div class="ds">读取 .xlsx，写入单元格或新建工作簿</div></div><button class="iact" aria-label="安装 Excel 表格读写"><svg class="a-ic"><use href="#i-plus"/></svg></button></div>
+        <div class="item"><span class="mono"><svg class="a-ic ic-18"><use href="#i-slides"/></svg></span><div class="txt"><div class="nm"><span>PowerPoint 幻灯片读写</span></div><div class="ds">读取 .pptx 的文字和结构，也能新建</div></div><button class="iact" aria-label="安装 PowerPoint 幻灯片读写"><svg class="a-ic"><use href="#i-plus"/></svg></button></div>
+        <div class="item"><span class="mono"><svg class="a-ic ic-18"><use href="#i-file"/></svg></span><div class="txt"><div class="nm"><span>PDF 文本读写</span></div><div class="ds">提取 PDF 文字，创建文字型 PDF</div></div><button class="iact" aria-label="安装 PDF 文本读写"><svg class="a-ic"><use href="#i-plus"/></svg></button></div>
+      </div>
+      <div class="grp-h is-closed"><svg class="a-ic ic-12"><use href="#i-right"/></svg>Code Puppy 云<span class="n">5</span><span class="aside">需要 Code Puppy 账户<a href="#hub-connectors">登录</a></span></div>
+      <div class="grp-h is-closed"><svg class="a-ic ic-12"><use href="#i-right"/></svg>研究<span class="n">3</span></div>
+    </div></div></div></div>
+  </div></div><p class="dz-cap">云组未登录时一句「需要 Code Puppy 账户 · 登录」。</p></section><section class="dz-sec"><h2 class="dz-h2">已安装行的「…」菜单 <code>#hub-row-menu</code></h2><p class="dz-sub">纯文字菜单，所有项同一条左缘。待登录时第一项是「登录 Supabase」。</p><div class="dz-stage" id="hub-row-menu"><div class="fr fr-comp a-ui " style="width:640px;height:320px;padding:24px 28px"><div class="item" style="margin:0"><span class="mono">S</span><div class="txt"><div class="nm"><span>Supabase</span><span class="st warn"><i></i>待登录</span></div><div class="ds">管理 Supabase 项目、数据表和函数</div></div>
+      <div style="position:relative"><button class="iact is-open" aria-label="管理 Supabase"><svg class="a-ic"><use href="#i-more"/></svg></button>
+        <div class="a-pop" style="top:calc(100% + 6px);right:0;width:200px">
+          <button class="a-pop-item is-focus"><span class="k">登录 Supabase</span></button><div class="a-pop-sep"></div>
+          <button class="a-pop-item"><span class="k">开启</span><span class="sw on" role="switch" aria-checked="true"></span></button>
+          <button class="a-pop-item"><span class="k">管理</span></button><div class="a-pop-sep"></div>
+          <button class="a-pop-item danger"><span class="k">移除</span></button>
+        </div></div></div></div><div class="fr fr-comp a-ui " style="width:640px;height:320px;padding:24px 28px"><div class="item" style="margin:0"><span class="mono"><svg class="a-ic ic-18"><use href="#i-file-search"/></svg></span><div class="txt"><div class="nm"><span>文档读取（markitdown）</span><span class="st"><i></i>已关闭</span></div><div class="ds">读取 PDF、Word、PowerPoint、Excel</div></div>
+      <div style="position:relative"><button class="iact is-open" aria-label="管理 文档读取（markitdown）"><svg class="a-ic"><use href="#i-more"/></svg></button>
+        <div class="a-pop" style="top:calc(100% + 6px);right:0;width:200px">
+          <button class="a-pop-item"><span class="k">开启</span><span class="sw" role="switch" aria-checked="false"></span></button>
+          <button class="a-pop-item"><span class="k">管理</span></button><div class="a-pop-sep"></div>
+          <button class="a-pop-item danger"><span class="k">移除</span></button>
+        </div></div></div></div></div></section><section class="dz-sec"><h2 class="dz-h2">定制中心 · 技能 <code>#hub-skills</code></h2><p class="dz-sub">同一页头与行样式；已安装下面是现有的「推荐 / 系统」分段。</p>
+  <div class="dz-stage"><div class="fr a-ui" id="hub-skills">
+    <div class="tb">
+      <div class="tb-left"><span class="tl"><i></i><i></i><i></i></span><button class="tb-btn" aria-label="隐藏侧边栏"><svg class="a-ic"><use href="#i-panel-l"/></svg></button><button class="tb-btn" aria-label="后退"><svg class="a-ic"><use href="#i-left"/></svg></button><button class="tb-btn is-dim" aria-label="前进"><svg class="a-ic"><use href="#i-right"/></svg></button></div>
+      <div class="tb-title">定制中心</div>
+    </div>
+    <nav class="rail"><button class="rail-btn" aria-label="新对话"><svg class="a-ic ic-18"><use href="#i-pen"/></svg></button><button class="rail-btn" aria-label="搜索对话 ⌘K"><svg class="a-ic ic-18"><use href="#i-search"/></svg></button><button class="rail-btn is-on" aria-label="定制中心"><svg class="a-ic ic-18"><use href="#i-grid"/></svg></button><button class="rail-btn" aria-label="自动化"><svg class="a-ic ic-18"><use href="#i-cal"/></svg></button><span class="rail-grow"></span><button class="rail-avatar" aria-label="账户">A</button></nav>
+    <div class="box"><aside class="side">
+        <div class="side-brand"><img src="../../../packages/ui-mac/src/renderer/brand/brand-mark.png" alt="" /><b>Code Puppy</b></div>
+        <div class="side-sec">项目<span class="acts"><button class="tb-btn" aria-label="筛选项目和对话"><svg class="a-ic ic-14"><use href="#i-search"/></svg></button><button class="tb-btn" aria-label="打开项目"><svg class="a-ic ic-14"><use href="#i-plus"/></svg></button></span></div>
+        <div class="side-list"><div class="row"><svg class="a-ic"><use href="#i-folder-open"/></svg><span class="grow">orbit-web</span></div><div class="row conv"><span class="grow">修复登录页在窄屏下的错位</span></div><div class="row conv"><span class="grow">把定价表改成从配置读取</span><span class="slot"><span class="dot" title="有新进展"></span></span></div><div class="row conv"><span class="grow">梳理项目目录结构并写进 README</span></div><div class="row more">显示更多</div><div class="row"><svg class="a-ic"><use href="#i-folder"/></svg><span class="grow">pricing-api</span></div><div class="row"><svg class="a-ic"><use href="#i-folder"/></svg><span class="grow">design-notes</span></div></div>
+      </aside><div class="main"><div class="page"><div class="page-in">
+      <div class="phd"><div class="tabs"><span class="tab">连接器</span><span class="tab is-on">技能</span><span class="tab">助手</span></div><label class="a-field"><svg class="a-ic ic-14"><use href="#i-search"/></svg><span class="ph">搜索插件、技能或 MCP</span></label><button class="a-btn" data-variant="secondary">添加<svg class="a-ic ic-12"><use href="#i-down"/></svg></button></div>
+      <p class="ph-desc">可重复使用的任务流程。</p>
+      <div class="grp-h first"><svg class="a-ic ic-12"><use href="#i-down"/></svg>已安装<span class="n">2</span></div>
+      <div class="grid2">
+        <div class="item"><span class="mono"><svg class="a-ic ic-18"><use href="#i-plug"/></svg></span><div class="txt"><div class="nm"><span>插件助手</span><span class="st">随应用提供</span></div><div class="ds">查找并安装插件和 MCP</div></div><button class="iact" aria-label="管理 插件助手"><svg class="a-ic"><use href="#i-more"/></svg></button></div>
+        <div class="item"><span class="mono"><svg class="a-ic ic-18"><use href="#i-branch"/></svg></span><div class="txt"><div class="nm"><span>Git 提交说明助手</span></div><div class="ds">按约定格式编写提交说明</div></div><button class="iact" aria-label="管理 Git 提交说明助手"><svg class="a-ic"><use href="#i-more"/></svg></button></div>
+      </div>
+      <div style="margin-top:28px"><span class="seg"><span class="on">推荐</span><span>系统</span></span></div>
+      <div class="grp-h" style="margin-top:18px"><svg class="a-ic ic-12"><use href="#i-down"/></svg>研发<span class="n">4</span></div>
+      <div class="grid2">
+        <div class="item"><span class="mono">技</span><div class="txt"><div class="nm"><span>技能创建助手</span></div><div class="ds">帮你创建、改进和测试技能</div></div><button class="iact" aria-label="安装 技能创建助手"><svg class="a-ic"><use href="#i-plus"/></svg></button></div>
+        <div class="item"><span class="mono">同</span><div class="txt"><div class="nm"><span>同步上游更新并检查兼容性</span></div><div class="ds">把上游更新合入你的分支，并检查兼容性</div></div><button class="iact" aria-label="安装 同步上游更新并检查兼容性"><svg class="a-ic"><use href="#i-plus"/></svg></button></div>
+        <div class="item"><span class="mono">整</span><div class="txt"><div class="nm"><span>保持功能不变的代码整理</span></div><div class="ds">在现有表现不变的前提下整理代码</div></div><button class="iact" aria-label="安装 保持功能不变的代码整理"><svg class="a-ic"><use href="#i-plus"/></svg></button></div>
+        <div class="item"><span class="mono">M</span><div class="txt"><div class="nm"><span>MCP 服务开发指南</span></div><div class="ds">指导你编写 MCP 服务，让助手连接外部工具</div></div><button class="iact" aria-label="安装 MCP 服务开发指南"><svg class="a-ic"><use href="#i-plus"/></svg></button></div>
+      </div>
+      <div class="grp-h"><svg class="a-ic ic-12"><use href="#i-down"/></svg>设计<span class="n">2</span></div>
+      <div class="grid2">
+        <div class="item"><span class="mono">视</span><div class="txt"><div class="nm"><span>视觉作品与海报设计</span></div><div class="ds">帮你设计并生成 PNG 或 PDF 视觉作品</div></div><button class="iact" aria-label="安装 视觉作品与海报设计"><svg class="a-ic"><use href="#i-plus"/></svg></button></div>
+        <div class="item"><span class="mono">品</span><div class="txt"><div class="nm"><span>应用品牌色彩与字体</span></div><div class="ds">把品牌规定的颜色和字体用到作品里</div></div><button class="iact" aria-label="安装 应用品牌色彩与字体"><svg class="a-ic"><use href="#i-plus"/></svg></button></div>
+      </div>
+    </div></div></div></div>
+  </div></div></section><section class="dz-sec"><h2 class="dz-h2">定制中心 · 管理页 <code>#hub-manage</code></h2><p class="dz-sub">规格 v5 的三组：账户、权限、关于。行用名称 — 值排法，发丝线分隔；登录、更改各一个按钮；固定版本（选填）在关于里。</p>
+  <div class="dz-stage"><div class="fr a-ui" id="hub-manage">
+    <div class="tb">
+      <div class="tb-left"><span class="tl"><i></i><i></i><i></i></span><button class="tb-btn" aria-label="隐藏侧边栏"><svg class="a-ic"><use href="#i-panel-l"/></svg></button><button class="tb-btn" aria-label="后退"><svg class="a-ic"><use href="#i-left"/></svg></button><button class="tb-btn is-dim" aria-label="前进"><svg class="a-ic"><use href="#i-right"/></svg></button></div>
+      <div class="tb-title">定制中心</div>
+    </div>
+    <nav class="rail"><button class="rail-btn" aria-label="新对话"><svg class="a-ic ic-18"><use href="#i-pen"/></svg></button><button class="rail-btn" aria-label="搜索对话 ⌘K"><svg class="a-ic ic-18"><use href="#i-search"/></svg></button><button class="rail-btn is-on" aria-label="定制中心"><svg class="a-ic ic-18"><use href="#i-grid"/></svg></button><button class="rail-btn" aria-label="自动化"><svg class="a-ic ic-18"><use href="#i-cal"/></svg></button><span class="rail-grow"></span><button class="rail-avatar" aria-label="账户">A</button></nav>
+    <div class="box"><aside class="side">
+        <div class="side-brand"><img src="../../../packages/ui-mac/src/renderer/brand/brand-mark.png" alt="" /><b>Code Puppy</b></div>
+        <div class="side-sec">项目<span class="acts"><button class="tb-btn" aria-label="筛选项目和对话"><svg class="a-ic ic-14"><use href="#i-search"/></svg></button><button class="tb-btn" aria-label="打开项目"><svg class="a-ic ic-14"><use href="#i-plus"/></svg></button></span></div>
+        <div class="side-list"><div class="row"><svg class="a-ic"><use href="#i-folder-open"/></svg><span class="grow">orbit-web</span></div><div class="row conv"><span class="grow">修复登录页在窄屏下的错位</span></div><div class="row conv"><span class="grow">把定价表改成从配置读取</span><span class="slot"><span class="dot" title="有新进展"></span></span></div><div class="row conv"><span class="grow">梳理项目目录结构并写进 README</span></div><div class="row more">显示更多</div><div class="row"><svg class="a-ic"><use href="#i-folder"/></svg><span class="grow">pricing-api</span></div><div class="row"><svg class="a-ic"><use href="#i-folder"/></svg><span class="grow">design-notes</span></div></div>
+      </aside><div class="main"><div class="page"><div class="page-in">
+      <div class="phd"><div class="tabs"><span class="tab is-on">连接器</span><span class="tab">技能</span><span class="tab">助手</span></div><label class="a-field"><svg class="a-ic ic-14"><use href="#i-search"/></svg><span class="ph">搜索插件、技能或 MCP</span></label><button class="a-btn" data-variant="secondary">添加<svg class="a-ic ic-12"><use href="#i-down"/></svg></button></div>
+      <div class="back"><svg class="a-ic ic-14"><use href="#i-left"/></svg>连接器</div>
+      <div class="mhead"><span class="mono">S</span><div><h2>Supabase</h2><div class="sub">管理 Supabase 项目、数据表和函数</div></div><span class="grow"></span><span class="st warn"><i></i>待登录</span><button class="iact" aria-label="管理 Supabase"><svg class="a-ic"><use href="#i-more"/></svg></button></div>
+      <div class="kv-sec"><h3>账户</h3>
+        <div class="kv-row"><span class="k">Supabase 账户</span><span class="v">待登录<small>登录后，助手就能使用 Supabase。</small></span><span class="act"><button class="a-btn" data-variant="secondary" data-size="sm">登录</button></span></div>
+      </div>
+      <div class="kv-sec"><h3>权限</h3>
+        <div class="kv-row"><span class="k">使用工具</span><span class="v">12 个工具<small>每次使用前问你</small></span><span class="act"><button class="a-btn" data-variant="ghost" data-size="sm">更改</button></span></div>
+      </div>
+      <div class="kv-sec"><h3>关于</h3>
+        <div class="kv-row"><span class="k">包含</span><span class="v">1 个连接器</span></div>
+        <div class="kv-row"><span class="k">来源</span><span class="v">Claude 插件市场</span></div>
+        <div class="kv-row"><span class="k">版本</span><span class="v">1.4.0</span></div>
+        <div class="kv-row"><span class="k">生效范围</span><span class="v">我的所有项目</span></div>
+        <div class="kv-row"><span class="k">固定版本（选填）</span><span class="v"><small style="margin-top:0">这个连接器每次启动都会获取当时的最新版本。</small></span><span class="act"><label class="a-field"><span class="ph">例如 1.4.0</span></label></span></div>
+      </div>
+    </div></div></div></div>
+  </div></div></section><section class="dz-sec"><h2 class="dz-h2">自动化 <code>#automation</code></h2><p class="dz-sub">与定制中心同一页头。两项开关并到一行说明里；输入框与「创建」同高；每个任务一行：周期、项目、权限，右侧下次与上次结果、开关、更多。</p>
+  <div class="dz-stage"><div class="fr a-ui" id="automation">
+    <div class="tb">
+      <div class="tb-left"><span class="tl"><i></i><i></i><i></i></span><button class="tb-btn" aria-label="隐藏侧边栏"><svg class="a-ic"><use href="#i-panel-l"/></svg></button><button class="tb-btn" aria-label="后退"><svg class="a-ic"><use href="#i-left"/></svg></button><button class="tb-btn is-dim" aria-label="前进"><svg class="a-ic"><use href="#i-right"/></svg></button></div>
+      <div class="tb-title">自动化</div>
+    </div>
+    <nav class="rail"><button class="rail-btn" aria-label="新对话"><svg class="a-ic ic-18"><use href="#i-pen"/></svg></button><button class="rail-btn" aria-label="搜索对话 ⌘K"><svg class="a-ic ic-18"><use href="#i-search"/></svg></button><button class="rail-btn" aria-label="定制中心"><svg class="a-ic ic-18"><use href="#i-grid"/></svg></button><button class="rail-btn is-on" aria-label="自动化"><svg class="a-ic ic-18"><use href="#i-cal"/></svg></button><span class="rail-grow"></span><button class="rail-avatar" aria-label="账户">A</button></nav>
+    <div class="box"><aside class="side">
+        <div class="side-brand"><img src="../../../packages/ui-mac/src/renderer/brand/brand-mark.png" alt="" /><b>Code Puppy</b></div>
+        <div class="side-sec">项目<span class="acts"><button class="tb-btn" aria-label="筛选项目和对话"><svg class="a-ic ic-14"><use href="#i-search"/></svg></button><button class="tb-btn" aria-label="打开项目"><svg class="a-ic ic-14"><use href="#i-plus"/></svg></button></span></div>
+        <div class="side-list"><div class="row"><svg class="a-ic"><use href="#i-folder-open"/></svg><span class="grow">orbit-web</span></div><div class="row conv"><span class="grow">修复登录页在窄屏下的错位</span></div><div class="row conv"><span class="grow">把定价表改成从配置读取</span><span class="slot"><span class="dot" title="有新进展"></span></span></div><div class="row conv"><span class="grow">梳理项目目录结构并写进 README</span></div><div class="row more">显示更多</div><div class="row"><svg class="a-ic"><use href="#i-folder"/></svg><span class="grow">pricing-api</span></div><div class="row"><svg class="a-ic"><use href="#i-folder"/></svg><span class="grow">design-notes</span></div></div>
+      </aside><div class="main"><div class="page"><div class="page-in">
+      <div class="phd"><div class="tabs"><span class="tab is-on">全部任务</span></div></div>
+      <div class="auto-opts"><span>应用关着时，本机任务不运行。</span><span class="grow"></span><label><span class="sw" role="switch" aria-checked="false"></span>登录时启动 Code Puppy</label><label><span class="sw" role="switch" aria-checked="false"></span>全部暂停</label></div>
+      <div class="auto-new"><label class="a-field"><span class="ph">一句话描述：每天早上 9 点，检查本项目未处理的 TODO 并生成清单</span></label><button class="a-btn" data-variant="primary">创建</button></div>
+      <div class="chips"><button class="a-btn" data-variant="ghost" data-size="sm">每日总结模板</button></div>
+      <div class="grp-h">任务<span class="n">3</span></div>
+      <div class="auto-row"><span class="mono"><svg class="a-ic ic-18"><use href="#i-cal"/></svg></span><div class="txt"><div class="nm">检查未处理的 TODO</div><div class="ds">每天 09:00 · orbit-web · 只读</div></div><div class="when">下次 明天 09:00<small>上次成功 · 今天 09:00</small></div><span class="sw lg on" role="switch" aria-checked="true"></span><button class="iact" aria-label="更多"><svg class="a-ic"><use href="#i-more"/></svg></button></div>
+      <div class="auto-row"><span class="mono"><svg class="a-ic ic-18"><use href="#i-cal"/></svg></span><div class="txt"><div class="nm">汇总上周提交写成周报</div><div class="ds">每周一 10:00 · weekly-report · 可改文件</div></div><div class="when">下次 周一 10:00<small>上次失败 · 11 月 11 日</small></div><span class="sw lg on" role="switch" aria-checked="true"></span><button class="iact" aria-label="更多"><svg class="a-ic"><use href="#i-more"/></svg></button></div>
+      <div class="auto-row off"><span class="mono"><svg class="a-ic ic-18"><use href="#i-cal"/></svg></span><div class="txt"><div class="nm">清理过期的预览分支</div><div class="ds">每月 1 日 03:00 · orbit-web · 可改文件</div></div><div class="when">已停用<small>尚未运行</small></div><span class="sw lg" role="switch" aria-checked="false"></span><button class="iact" aria-label="更多"><svg class="a-ic"><use href="#i-more"/></svg></button></div>
+    </div></div></div></div>
+  </div></div><p class="dz-cap">窄轨「自动化」改用日历图标，不再像历史记录。</p></section><section class="dz-sec"><h2 class="dz-h2">设置 <code>#settings</code></h2><p class="dz-sub">设置也是顶级页面，与定制中心同一页头（页签 + 右侧「保存更改」）；分组用发丝线分隔，不再一组一个灰头方框；「Agent」改称「助手」。</p>
+  <div class="dz-stage"><div class="fr a-ui" id="settings">
+    <div class="tb">
+      <div class="tb-left"><span class="tl"><i></i><i></i><i></i></span><button class="tb-btn" aria-label="隐藏侧边栏"><svg class="a-ic"><use href="#i-panel-l"/></svg></button><button class="tb-btn" aria-label="后退"><svg class="a-ic"><use href="#i-left"/></svg></button><button class="tb-btn is-dim" aria-label="前进"><svg class="a-ic"><use href="#i-right"/></svg></button></div>
+      <div class="tb-title">设置</div>
+    </div>
+    <nav class="rail"><button class="rail-btn" aria-label="新对话"><svg class="a-ic ic-18"><use href="#i-pen"/></svg></button><button class="rail-btn" aria-label="搜索对话 ⌘K"><svg class="a-ic ic-18"><use href="#i-search"/></svg></button><button class="rail-btn" aria-label="定制中心"><svg class="a-ic ic-18"><use href="#i-grid"/></svg></button><button class="rail-btn" aria-label="自动化"><svg class="a-ic ic-18"><use href="#i-cal"/></svg></button><span class="rail-grow"></span><button class="rail-avatar" aria-label="账户">A</button></nav>
+    <div class="box"><aside class="side">
+        <div class="side-brand"><img src="../../../packages/ui-mac/src/renderer/brand/brand-mark.png" alt="" /><b>Code Puppy</b></div>
+        <div class="side-sec">项目<span class="acts"><button class="tb-btn" aria-label="筛选项目和对话"><svg class="a-ic ic-14"><use href="#i-search"/></svg></button><button class="tb-btn" aria-label="打开项目"><svg class="a-ic ic-14"><use href="#i-plus"/></svg></button></span></div>
+        <div class="side-list"><div class="row"><svg class="a-ic"><use href="#i-folder-open"/></svg><span class="grow">orbit-web</span></div><div class="row conv"><span class="grow">修复登录页在窄屏下的错位</span></div><div class="row conv"><span class="grow">把定价表改成从配置读取</span><span class="slot"><span class="dot" title="有新进展"></span></span></div><div class="row conv"><span class="grow">梳理项目目录结构并写进 README</span></div><div class="row more">显示更多</div><div class="row"><svg class="a-ic"><use href="#i-folder"/></svg><span class="grow">pricing-api</span></div><div class="row"><svg class="a-ic"><use href="#i-folder"/></svg><span class="grow">design-notes</span></div></div>
+      </aside><div class="main"><div class="page"><div class="page-in">
+      <div class="phd"><div class="tabs"><span class="tab is-on">通用</span><span class="tab">快捷键</span><span class="tab">扩展存储</span><span class="tab">工具</span></div><button class="a-btn" data-variant="primary" disabled>保存更改</button></div>
+      <p class="ph-desc">调整 Code Puppy 在这台电脑上的行为。</p>
+      <div class="kv-sec"><h3>行为</h3><div class="set-row"><div class="t"><b>显示版本说明</b><small>更新后显示本版本的重要变化。</small></div><span class="sw lg on" role="switch" aria-checked="true"></span></div><div class="set-row"><div class="t"><b>显示自定义助手</b><small>在可选助手列表里显示你自己添加的助手。</small></div><span class="sw lg on" role="switch" aria-checked="true"></span></div></div>
+      <div class="kv-sec"><h3>界面</h3><div class="set-row"><div class="t"><b>字号</b><small>界面基础字号，允许 8–72。</small></div><label class="a-field"><span class="ph" style="color:var(--a-text)">14</span></label></div></div>
+      <div class="kv-sec"><h3>通知与权限</h3><div class="set-row"><div class="t"><b>自动批准权限</b><small>关闭（默认）时，每个审批请求都由你亲自决定。开启后，命中自动接受规则的请求会直接放行，不再弹出审批。</small></div><span class="sw lg" role="switch" aria-checked="false"></span></div><div class="set-row"><div class="t"><b>助手完成通知</b></div><span class="sw lg on" role="switch" aria-checked="true"></span></div><div class="set-row"><div class="t"><b>权限请求通知</b></div><span class="sw lg on" role="switch" aria-checked="true"></span></div><div class="set-row"><div class="t"><b>错误通知</b></div><span class="sw lg" role="switch" aria-checked="false"></span></div></div>
+    </div></div></div></div>
+  </div></div></section><section class="dz-sec"><h2 class="dz-h2">首次引导 <code>#onboarding</code></h2><p class="dz-sub">卡片用小狗图标；三步是发丝线分隔的行，当前步是深色圆点；「跳过，使用自己的 API 密钥」。</p>
+  <div class="dz-stage"><div class="fr a-ui" id="onboarding">
+    <div class="tb">
+      <div class="tb-left"><span class="tl"><i></i><i></i><i></i></span><button class="tb-btn" aria-label="隐藏侧边栏"><svg class="a-ic"><use href="#i-panel-l"/></svg></button><button class="tb-btn is-dim" aria-label="后退"><svg class="a-ic"><use href="#i-left"/></svg></button><button class="tb-btn is-dim" aria-label="前进"><svg class="a-ic"><use href="#i-right"/></svg></button></div>
+      <div class="tb-title">新对话</div><div class="tb-right"><button class="tb-btn" aria-label="显示右栏"><svg class="a-ic"><use href="#i-panel-r"/></svg></button></div>
+    </div>
+    <nav class="rail"><button class="rail-btn" aria-label="新对话"><svg class="a-ic ic-18"><use href="#i-pen"/></svg></button><button class="rail-btn" aria-label="搜索对话 ⌘K"><svg class="a-ic ic-18"><use href="#i-search"/></svg></button><button class="rail-btn" aria-label="定制中心"><svg class="a-ic ic-18"><use href="#i-grid"/></svg></button><button class="rail-btn" aria-label="自动化"><svg class="a-ic ic-18"><use href="#i-cal"/></svg></button><span class="rail-grow"></span><button class="rail-avatar" aria-label="账户">A</button></nav>
+    <div class="box"><aside class="side">
+        <div class="side-brand"><img src="../../../packages/ui-mac/src/renderer/brand/brand-mark.png" alt="" /><b>Code Puppy</b></div>
+        <div class="side-sec">项目<span class="acts"><button class="tb-btn" aria-label="打开项目"><svg class="a-ic ic-14"><use href="#i-plus"/></svg></button></span></div>
+        <div class="side-empty"><svg class="a-ic ic-20"><use href="#i-folder"/></svg>
+          <h4>还没有项目</h4>
+          <p>打开电脑上的一个文件夹，助手就能在里面读写文件、运行命令；它的对话也会列在这里。</p>
+          <button class="row"><svg class="a-ic"><use href="#i-plus"/></svg><span class="grow">打开项目…</span></button>
+          <div class="note">不开项目也能直接开始。对话和生成的文件会放在默认工作区「Code Puppy」。</div>
+        </div>
+      </aside><div class="main"><div class="hero"><h1>我们要处理什么？</h1><div class="compose-wrap"><div class="comp"><div class="comp-input">问点什么，输入 / 调命令，@ 引用上下文…</div><div class="comp-row"><button class="cbtn icon" aria-label="添加附件、计划模式或助手"><svg class="a-ic"><use href="#i-plus"/></svg></button><button class="cbtn perm"><svg class="a-ic ic-14"><use href="#i-shield"/></svg>全部批准<svg class="a-ic ic-12 chev"><use href="#i-down"/></svg></button><span class="grow"></span><button class="cbtn"><span class="brand-tile"><svg class="prov"><use href="#p-deepseek"/></svg></span>DeepSeek V4 Pro<span class="lvl">高</span><svg class="a-ic ic-12 chev"><use href="#i-down"/></svg></button><button class="send" aria-label="发送"><svg class="a-ic"><use href="#i-up"/></svg></button></div></div><div class="tray"><button class="cbtn"><svg class="a-ic ic-14"><use href="#i-folder"/></svg>Code Puppy<span class="tag">默认工作区</span><svg class="a-ic ic-12 chev"><use href="#i-down"/></svg></button><button class="cbtn"><svg class="a-ic ic-14"><use href="#i-file"/></svg>文件</button><button class="cbtn"><svg class="a-ic ic-14"><use href="#i-plug"/></svg>插件</button></div></div></div></div></div><div class="veil dim"></div><div class="ob" role="dialog" aria-label="欢迎来到 Code Puppy">
+      <img src="../../../packages/ui-mac/src/renderer/brand/brand-mark.png" alt="" />
+      <h3>欢迎来到 Code Puppy</h3><p>三步开始你的第一个项目</p>
+      <div class="ob-steps">
+        <div class="ob-step on"><i>1</i>登录账号<span class="r">进行中</span></div>
+        <div class="ob-step"><i>2</i>选择模型</div>
+        <div class="ob-step"><i>3</i>打开第一个项目</div>
+      </div>
+      <button class="a-btn" data-variant="primary" data-size="lg">登录</button>
+      <span class="skip">跳过，使用自己的 API 密钥</span>
+    </div>
+  </div></div></section>
+
+<section class="dz-sec dz-doc" id="audit-r1">
+  <h2 class="dz-h2">设计审计 R1 逐项核对</h2>
+  <p class="dz-sub">审计稿：独立非作者审计（Claude Opus 5.5，只读），24 项必须 / 建议改 + 5 条观察，编排者全部采纳。状态都按本稿渲染核对过（截图见 screenshots/）。</p>
+  <table class="dz-table"><tr><th>#</th><th>问题</th><th>状态</th><th>怎么改的</th></tr><tr><td>1</td><td>会话页缺托盘</td><td>已改</td><td>#session、#right-panel、#session-popovers 输入框下都有托盘：项目（会话里固定，不带箭头）、文件、插件；「内容由 AI 生成」移到托盘下</td></tr><tr><td>2</td><td>首页标题过重、视觉偏左</td><td>已改</td><td>500 字重、字距 0;padding-left 0.5em 补全角「？」右侧空白</td></tr><tr><td>3</td><td>弹层与输入框边缘相撞</td><td>已改</td><td>一条规则：向下从托盘下沿 +6px，向上下缘 = 输入框上沿 −6px;「+」菜单左缘 = 「+」按钮左缘，选择卡右缘 = 发送键右缘（#picker、#plus-menu、#session-popovers）</td></tr><tr><td>4</td><td>右栏空状态高度跳动</td><td>已改</td><td>top 30%、不再位移；图标顶端钉住，多出的行向下长；四页标题同一高度（#right-panel-empty）</td></tr><tr><td>5</td><td>行菜单只有一项带图标</td><td>已改</td><td>#hub-row-menu 改成纯文字</td></tr><tr><td>6</td><td>窄轨头像用了强调色</td><td>已改</td><td>浅色 #e4e4e7 底 + 次级字；深色 #28282c 底 + #a1a1aa</td></tr><tr><td>7</td><td>冷暖灰混用</td><td>已改</td><td>改成 zinc 中性灰：muted #ececee、inset #e4e4e7、border #e4e4e7、border-strong #d4d4d8、border-faint #f0f0f2;三级字改 #63636b，落在 #e4e4e7 上 4.69:1</td></tr><tr><td>8</td><td>图标线宽随尺寸变化、字母图标过重、模型按钮换掉了品牌图标</td><td>已改</td><td>按尺寸给线宽（18→1.6、16→1.8、14→2.05、12→2.4、20→1.44，渲染约 1.2px）；17→18px、11→12px;字母 13px/500 次级色；模型按钮恢复现有品牌图标（DeepSeek、智谱、Kimi），单色放在 --a-monogram-bg 上</td></tr><tr><td>9</td><td>首页位置偏上</td><td>已改</td><td>主区高度 ×0.31，标题 + 输入框组中心约在工作面 45%</td></tr><tr><td>10</td><td>左上角与右侧按钮不对齐</td><td>已改</td><td>(a)红绿灯左内边距 18px，首颗圆心 x=24 与窄轨图标同轴；(b)窄轨首颗圆心 y=70 = 品牌行；(c)品牌图标 20px、左 14px、间距 6px，图标圆心落在文件夹列 x=72，字起点 x=88;(d)标题行与悬停行按钮 22px、右内边距 16px，未读点放进同一 22px 格，圆心 x=269</td></tr><tr><td>11</td><td>中文排版：孤字、断词、全角括号多出半格</td><td>已改</td><td>气泡、回答、空状态说明用 text-wrap: pretty;改写默认工作区那句不再断「文件」；名称用 text-spacing-trim 去掉末尾「)」的半格（渲染核对见自查）</td></tr><tr><td>12</td><td>定制中心分组标题层级</td><td>已改</td><td>上间距 32px、高 28px、500 字重、次级色，数量三级色，与侧栏「项目」同一种安静样式</td></tr><tr><td>13</td><td>悬停与选中分不清、选中加粗导致跳动</td><td>已改</td><td>选中用 --a-overlay-active（8% / 深色 9%），不加粗，文字主色</td></tr><tr><td>14</td><td>顶栏标题起点无对齐</td><td>已改</td><td>x = 窄轨 + 侧栏 + 16px = 312;所有面板头 16px 内边距</td></tr><tr><td>15</td><td>托盘首个图标偏移</td><td>已改</td><td>托盘左右各缩 10px、左内边距 0:首个图标左缘 = 占位字，圆心 = 「+」按钮圆心</td></tr><tr><td>16</td><td>会话列宽两套公式</td><td>已改</td><td>正文与输入框同一公式 min(680px, 100% − 64px)</td></tr><tr><td>17</td><td>两列太挤、「+/…」连成竖线</td><td>已改</td><td>列间距 48px;「+/…」平时三级色、悬停次级色</td></tr><tr><td>18</td><td>「未能启用」整行发红</td><td>已改</td><td>说明改次级色，只有红点与「未能启用」是红的</td></tr><tr><td>19</td><td>圆角不同心</td><td>已改</td><td>弹层项与托盘按钮用 --a-radius-sm(6px);工作面圆角 = 窗口圆角 − 8px（画框按 16px 模拟，实现按目标 macOS 实测）</td></tr><tr><td>20</td><td>深色托盘与输入框缝消失</td><td>已改</td><td>深色 --a-bg-subtle #131315（比输入框低一档）</td></tr><tr><td>21</td><td>空状态三套样式</td><td>已改</td><td>侧栏空状态去掉方块，20px 三级色图标，说明三级色，与右栏空状态一致</td></tr><tr><td>22</td><td>滑条把手像单选钮、黑色最重</td><td>已改</td><td>14px 白色把手，无黑圈，0.5px 描边 + 现有小投影；已过档位与填充用次级灰</td></tr><tr><td>23</td><td>「+」菜单说明列参差</td><td>已改</td><td>名称列固定 72px，说明列左对齐</td></tr><tr><td>24</td><td>画框违背自己的规则</td><td>已改</td><td>10px→--a-text-2xs、5px→--a-radius-xs、17/11px 图标→18/12、等宽字号改令牌、#fff→--a-text-on-accent;悬停提示的说明删去（不画就不写）；#picker 默认态模型行不再是悬停态</td></tr><tr><td>观察 1</td><td>深色工作面边缘</td><td>已改</td><td>工作面加 --a-edge-light（深色 = 上沿 6% 白高光）</td></tr><tr><td>观察 2</td><td>差异行硬切</td><td>已改</td><td>差异视图右缘 28px 淡出</td></tr><tr><td>观察 3</td><td>云组「登录」说了两次</td><td>已改</td><td>改成「需要 Code Puppy 账户 · 登录」</td></tr><tr><td>观察 4</td><td>自动化用时钟像历史</td><td>已改</td><td>改用日历图标</td></tr><tr><td>观察 5</td><td>缺 #picker 第 2、3 屏与会话向上弹层截图</td><td>已改</td><td>#picker 整组截图；新增 #session-popovers</td></tr><tr><td>全局</td><td>中文全角标点</td><td>已改</td><td>帧内文字统一全角；脚本检查帧内文字节点，剩余 0 处</td></tr><tr><td>全局</td><td>不出现英文原词</td><td>已改</td><td>allow/ask/deny → 「每次使用前问你」；tokens、Local Server 不再出现；KEY → 「API 密钥」；助手说明全中文；「Agent」→「助手」</td></tr><tr><td>全局</td><td>默认工作区一个名字</td><td>已改</td><td>统一「Code Puppy」+「默认工作区」标签（托盘、侧栏说明）</td></tr><tr><td>全局</td><td>深色层次</td><td>已改</td><td>外框 #0e0e10 < 托盘 #131315 < 工作面 #161618 < 输入框 #1c1c1f < 弹层 #1f1f22</td></tr></table>
 </section>
 
-<!-- ═════════════ 右栏空状态 ═════════════ -->
-<section class="dz-sec">
-  <h2 class="dz-h2">右栏四页的空状态 <code>#right-panel-empty</code></h2>
-  <p class="dz-sub">四页统一：图标不再装进灰方块，同一高度、同一字号；只有终端有一个动作（新建终端）。文字取现行文案（标点改全角）。</p>
-  <div class="dz-stage" id="right-panel-empty">
-    <div class="fr fr-comp a-ui" style="width:340px;height:440px"><aside class="rp" style="width:100%;height:100%;border-left:0">
-      <div class="rp-tabs"><span class="tab is-on">审查</span><span class="tab">文件</span><span class="tab">终端</span><span class="tab">产物</span></div>
-      <div class="rp-empty"><svg class="a-ic"><use href="#i-review"/></svg><h4>这个项目还没有版本管理</h4><p>把项目放进版本管理后，这里会显示每一轮对话产生的改动。</p></div>
-    </aside></div>
-    <div class="fr fr-comp a-ui" style="width:340px;height:440px"><aside class="rp" style="width:100%;height:100%;border-left:0">
-      <div class="rp-tabs"><span class="tab">审查</span><span class="tab is-on">文件</span><span class="tab">终端</span><span class="tab">产物</span></div>
-      <div class="rp-filter"><label class="a-field"><svg class="a-ic"><use href="#i-search"/></svg><input placeholder="筛选文件" /></label></div>
-      <div class="rp-empty"><svg class="a-ic"><use href="#i-folder"/></svg><h4>工作区还没有文件</h4><p>文件创建后会实时出现在这里。</p></div>
-    </aside></div>
-    <div class="fr fr-comp a-ui" style="width:340px;height:440px"><aside class="rp" style="width:100%;height:100%;border-left:0">
-      <div class="rp-tabs"><span class="tab">审查</span><span class="tab">文件</span><span class="tab is-on">终端</span><span class="tab">产物</span></div>
-      <div class="rp-empty"><svg class="a-ic"><use href="#i-term"/></svg><h4>还没有终端</h4><p>新建一个，或在输入框里让助手替你跑命令。</p><button class="a-btn" data-variant="secondary" data-size="sm"><svg class="a-ic ic-12"><use href="#i-plus"/></svg>新建终端</button></div>
-    </aside></div>
-    <div class="fr fr-comp a-ui" style="width:340px;height:440px"><aside class="rp" style="width:100%;height:100%;border-left:0">
-      <div class="rp-tabs"><span class="tab">审查</span><span class="tab">文件</span><span class="tab">终端</span><span class="tab is-on">产物</span></div>
-      <div class="rp-seg"><span class="seg"><span class="on">本次对话</span><span>项目全部</span></span></div>
-      <div class="rp-empty"><svg class="a-ic"><use href="#i-box"/></svg><h4>还没有产物</h4><p>助手生成的文档会出现在这里。</p></div>
-    </aside></div>
-  </div>
-  <p class="dz-cap">终端页的沙箱说明（「沙箱已开启 —— 终端里你自己的配置可能有一部分不生效」）保留在终端脚条与悬停层，空状态不再重复；文件与产物页顶部各有一行控件，空状态相应上移，与其他两页的视觉中心对齐。</p>
-</section>
-
-
-<!-- ═════════════ 令牌提案 ═════════════ -->
 <section class="dz-sec dz-doc" id="tokens">
-  <h2 class="dz-h2">令牌提案</h2>
-  <p class="dz-sub">只动中性色、分隔线、选中态和几个布局尺寸。强调色（#4f46e5 / 深色 #818cf8）、发送键、三档运行权限色、用户气泡蓝、语义色、字号阶、间距阶、圆角阶都不变。对比度按 WCAG 计算，次级说明文字在外框灰与工作面上都 ≥4.5:1（浅色最差 5.09:1 落在外框灰，深色最差 4.68:1 落在 --a-bg-inset）。</p>
-  <table class="dz-table">
-    <tr><th>令牌</th><th>浅色 现 → 提案</th><th>深色 现 → 提案</th><th>取代 / 用途</th></tr>
-    <tr><td><code>--a-bg-chrome</code>（新）</td><td>— → <span class="dz-sw" style="background:#f0f0f2"></span>#f0f0f2</td><td>— → <span class="dz-sw" style="background:#0e0e10"></span>#0e0e10</td><td>外框：顶栏与窄轨同一支（owner U-03）；取代现在顶栏的白与侧栏的 <code>--a-bg-subtle</code></td></tr>
-    <tr><td><code>--a-bg-canvas</code></td><td>#ffffff 不变</td><td>#0a0b0d → <span class="dz-sw" style="background:#161618"></span>#161618</td><td>工作面（侧栏、主区、右栏同一块）</td></tr>
-    <tr><td><code>--a-bg-subtle</code></td><td>#f6f7f9 → <span class="dz-sw" style="background:#f7f7f8"></span>#f7f7f8</td><td>#0e0f11 → <span class="dz-sw" style="background:#1b1b1e"></span>#1b1b1e</td><td>不再做侧栏底；只用于工作面上的托盘、筛选框</td></tr>
-    <tr><td><code>--a-surface</code> / <code>--a-surface-raised</code></td><td>不变</td><td>#121316 / #17181b → #1c1c1f / #1f1f22</td><td>深色弹层与输入框比工作面亮</td></tr>
-    <tr><td><code>--a-bg-muted</code> / <code>--a-bg-inset</code></td><td>不变</td><td>#16171a / #1e2024 → #222225 / #28282c</td><td>深色悬停、滑条轨道</td></tr>
-    <tr><td><code>--a-border</code></td><td>不变</td><td>#232428 → #2a2a2e</td><td>控件描边（输入框、按钮）</td></tr>
-    <tr><td><code>--a-text-tertiary</code></td><td>不变</td><td>#86878f → #909199</td><td>深色次级说明</td></tr>
-    <tr><td><code>--a-hairline</code>（新）</td><td>— → <span class="dz-sw" style="background:#ededf0"></span>#ededf0</td><td>— → <span class="dz-sw" style="background:#232327"></span>#232327</td><td>横向分隔线：页签行、分组、改动文件行、托盘与弹层描边；取代分隔用途的 <code>--a-border-faint</code> / <code>--a-border</code></td></tr>
-    <tr><td><code>--a-divider</code>（新）</td><td>— → rgba(15,17,21,.05)（落在白上 ≈#f3f3f4）</td><td>— → rgba(255,255,255,.05)</td><td>工作面里的竖向分栏线（侧栏 | 主区 | 右栏），几乎看不见（owner U-04）；窄轨与工作面之间不画线</td></tr>
-    <tr><td><code>--a-overlay-selected</code></td><td>= --a-accent-subtle（淡紫）→ rgba(15,17,21,.06)</td><td>淡紫 → rgba(255,255,255,.07)</td><td>选中行、按下的顶栏按钮改中性灰；窄轨当前入口用一小块工作面白</td></tr>
-    <tr><td><code>--a-monogram-bg</code>（新）</td><td>— → <span class="dz-sw" style="background:#efeff1"></span>#efeff1</td><td>— → #26262a</td><td>列表与模型图标底；取代按类别着色的字母方块与项目随机色头像</td></tr>
-    <tr><td><code>--a-rail-w</code> / <code>--a-topbar-h</code> / <code>--a-frame-gap</code>（新）</td><td>48px / 44px / 8px</td><td>同</td><td>窄轨宽、常驻顶栏高、工作面与窗口右下边缘的间距</td></tr>
-    <tr><td><code>--codepuppy-sidebar-w</code></td><td>256px → 248px</td><td>同</td><td>工作面里的侧栏宽</td></tr>
-    <tr><td>工作面外形</td><td colspan="2">圆角用现有 <code>--a-radius-lg</code>(11px)，投影用现有 <code>--a-shadow-xs</code>，不加描边</td><td>灰白两色 + 轻投影就是边界</td></tr>
-    <tr><td>停用</td><td colspan="2"><code>--a-glow-accent</code>、<code>--a-grain</code> 在首页停用；<code>.a-home-ghost</code> 水印删除</td><td>首页不再有发光、噪点与「CODE PUPPY」水印</td></tr>
-    <tr><td>沿用</td><td colspan="2">首页标题用现有 <code>--a-text-3xl</code>(30px，原 <code>--a-text-2xl</code> 23px);分组小标题不再大写加字距（<code>.a-pop-label</code> 取消 uppercase）</td><td>中文界面不用英文小型大写样式</td></tr>
-  </table>
-  <p class="dz-sub">相对上一稿（<code>bd35b6cd10</code>）:<code>--a-bg-rail</code> 改名并扩为 <code>--a-bg-chrome</code>（顶栏也用它）；新增 <code>--a-divider</code>、<code>--a-frame-gap</code>;<code>--a-hairline</code> 浅色 #e8e8eb → #ededf0、深色 #26262a → #232327;深色 <code>--a-bg-subtle</code> #111113 → #1b1b1e（不再是侧栏底）。</p>
+  <h2 class="dz-h2">令牌终表</h2>
+  <p class="dz-sub">实现时改 <code>packages/ui-mac/src/renderer/codepuppy-ui/tokens.css</code>（浅色块、深色块、系统深色兜底块三处都要写）。对比度由 <code>contrast-ratchet.test.ts</code> 判；下表的对比度是设计时按 WCAG 算的。</p>
+  <table class="dz-table"><tr><th>令牌</th><th>浅色 现 → 定</th><th>深色 现 → 定</th><th>用途</th></tr><tr><td><code>--a-bg-chrome（新）</code></td><td>#f0f0f2</td><td>#0e0e10</td><td>外框：顶栏与窄轨</td></tr><tr><td><code>--a-bg-canvas</code></td><td>#ffffff 不变</td><td>#0a0b0d → #161618</td><td>工作面（侧栏纯白，owner U-05）</td></tr><tr><td><code>--a-bg-subtle</code></td><td>#f6f7f9 → #f7f7f8</td><td>#0e0f11 → #131315</td><td>托盘、筛选框</td></tr><tr><td><code>--a-bg-muted</code></td><td>#eceef1 → #ececee</td><td>#16171a → #222225</td><td>悬停、分段控件底</td></tr><tr><td><code>--a-bg-inset</code></td><td>#e3e6ea → #e4e4e7</td><td>#1e2024 → #28282c</td><td>滑条轨道、开关关、空闲发送键、头像底</td></tr><tr><td><code>--a-surface / --a-surface-raised</code></td><td>不变</td><td>#121316 / #17181b → #1c1c1f / #1f1f22</td><td>输入框 / 弹层与对话框</td></tr><tr><td><code>--a-border-faint</code></td><td>#eef0f3 → #f0f0f2</td><td>#1b1c20 → #1d1d20</td><td>—</td></tr><tr><td><code>--a-border</code></td><td>#e4e6ea → #e4e4e7</td><td>#232428 → #2a2a2e</td><td>控件描边</td></tr><tr><td><code>--a-border-strong</code></td><td>#ced2d9 → #d4d4d8</td><td>#34363c → #3f3f46</td><td>强调描边、滑条档位点</td></tr><tr><td><code>--a-text-tertiary</code></td><td>#64656d → #63636b</td><td>#86878f → #909199</td><td>三级字；浅色最差 4.69:1(#e4e4e7)，深色最差 4.68:1(--a-bg-inset)</td></tr><tr><td><code>--a-text-disabled</code></td><td>#b3b6bd → #a1a1aa</td><td>#4f5158 → #52525b</td><td>停用</td></tr><tr><td><code>--a-hairline（新）</code></td><td>#ededf0</td><td>#232327</td><td>横向分隔线</td></tr><tr><td><code>--a-divider（新）</code></td><td>rgba(15,17,21,.05)</td><td>rgba(255,255,255,.05)</td><td>工作面里的竖向分栏线</td></tr><tr><td><code>--a-overlay-selected</code></td><td>淡紫 → rgba(15,17,21,.06)</td><td>淡紫 → rgba(255,255,255,.07)</td><td>按下态背景；选中行用现有 --a-overlay-active(8% / 9%)</td></tr><tr><td><code>--a-monogram-bg（新）</code></td><td>#efeff1</td><td>#26262a</td><td>列表与品牌图标底</td></tr><tr><td><code>--a-rail-w / --a-topbar-h / --a-frame-gap（新）</code></td><td>48px / 44px / 8px</td><td>同</td><td>窄轨宽、顶栏高、工作面到窗口右下边缘</td></tr><tr><td><code>--codepuppy-sidebar-w</code></td><td>256px → 248px</td><td>同</td><td>侧栏宽</td></tr><tr><td><code>工作面圆角</code></td><td>窗口圆角 − 8px</td><td>同</td><td>画框按窗口 16px 模拟 → 8px;投影 --a-shadow-xs + --a-edge-light</td></tr><tr><td><code>停用</code></td><td>--a-glow-accent、--a-grain、首页水印</td><td>同</td><td>—</td></tr><tr><td><code>不变</code></td><td>强调色、发送键、三档权限色、用户气泡、语义色、字号阶、间距阶、圆角阶</td><td>同</td><td>—</td></tr></table>
 </section>
 
-<!-- ═════════════ 组件对照 ═════════════ -->
 <section class="dz-sec dz-doc" id="components">
   <h2 class="dz-h2">元素 → 组件对照</h2>
-  <p class="dz-sub">「组件库」= <code>docs/design/system/components.md</code> 已登记的原语；「既有页面组件」= 代码里已有、未入库的页面级组件，本稿只改样子或位置；「新」= 现在没有，注明理由。</p>
+  <p class="dz-sub">「组件库」= <code>docs/design/system/components.md</code> 已登记的原语；「既有页面组件」= 代码里已有、未入库的页面级组件，本稿只改样子或位置；「新」= 现在没有，已登记到组件库的「Pending」表。</p>
   <table class="dz-table">
     <tr><th>元素</th><th>用的组件</th><th>类别</th><th>说明</th></tr>
-    <tr><td>外框（顶栏 + 窄轨同色）</td><td>新：窗口外框</td><td>新</td><td>owner U-03:顶栏与左侧同一种灰、内容在里面带圆角；现在没有这一层</td></tr>
-    <tr><td>工作面（侧栏 / 主区 / 右栏同一块圆角白）</td><td>新：工作面容器</td><td>新</td><td>owner U-03「左中右一个完整的 box」；只是容器，不含交互</td></tr>
-    <tr><td>窄轨图标按钮、账户头像</td><td>新：窄轨（Rail）；按钮形状沿用 <code>.codepuppy-topbar-btn</code></td><td>新</td><td>owner I-02;提示用组件库 Tooltip</td></tr>
-    <tr><td>窄轨悬停提示「搜索对话 ⌘K」</td><td>Tooltip(<code>.a-tip</code>)</td><td>组件库</td><td>右侧出现</td></tr>
-    <tr><td>顶栏左簇（红绿灯、左栏开关、前进后退）</td><td>侧栏工具条 <code>.codepuppy-topbar</code> + <code>.codepuppy-topbar-btn</code></td><td>既有页面组件</td><td>改到外框顶栏，任何页面同一位置</td></tr>
-    <tr><td>顶栏页面名 / 项目与对话路径、右栏开关</td><td>会话顶栏 <code>WorkspaceTopbar</code>(<code>.a-swk-topbar</code>)</td><td>既有页面组件</td><td>移进外框顶栏；首页也显示右栏开关（owner U-02）；定制中心没有右栏，不显示</td></tr>
-    <tr><td>侧栏品牌行</td><td><code>.codepuppy-sidebar-brand</code> + <code>brand-mark.png</code></td><td>既有页面组件</td><td>字标「Code Puppy」（owner U-02 定）</td></tr>
-    <tr><td>项目行、对话行、显示更多</td><td><code>.codepuppy-project-row</code> / <code>.codepuppy-session</code></td><td>既有页面组件</td><td>单色文件夹图标；选中中性灰；去掉连接竖线</td></tr>
-    <tr><td>「项目」标题与筛选、打开项目</td><td><code>.codepuppy-sidebar-section</code> + <code>.codepuppy-project-action</code></td><td>既有页面组件</td><td>常驻搜索框 <code>.codepuppy-sidebar-search</code> 收进放大镜</td></tr>
-    <tr><td>侧栏无项目空状态</td><td><code>.codepuppy-sidebar-empty-projects</code></td><td>既有页面组件</td><td>改版式与文字；「打开项目」用侧栏行样式</td></tr>
-    <tr><td>首页标题</td><td><code>.a-home-greet</code></td><td>既有页面组件</td><td>文字与字号</td></tr>
-    <tr><td>输入框外壳、底行按钮</td><td><code>codepuppy-composer</code>(<code>.a-comp</code>、<code>.a-chip</code>、<code>.a-comp-send</code>)</td><td>既有页面组件</td><td>按钮去底色，悬停才出底</td></tr>
-    <tr><td>运行权限按钮</td><td><code>PermChip</code>(<code>.a-chip-perm</code>)</td><td>既有页面组件</td><td>三档一色不变</td></tr>
-    <tr><td>模型 + 推理强度合并按钮、模型列表</td><td>模型按钮 <code>.a-pop-wrap[data-kind=model]</code>、<code>codepuppy-composer-model</code> + Input</td><td>既有页面组件 / 组件库</td><td>吸收独立的推理强度按钮（I-04）</td></tr>
-    <tr><td>分档滑条</td><td>新：滑条</td><td>新</td><td>owner 点名（I-04），代码里没有；只用 --a-* 令牌</td></tr>
-    <tr><td>托盘（项目 / 文件 / 插件）</td><td>工作区胶囊 <code>workspace-chip</code> + 新：托盘容器</td><td>胶囊既有 / 托盘新</td><td>I-06;「文件」「插件」只在这里（owner U-02），从「+」菜单移出</td></tr>
-    <tr><td>「+」菜单（添加附件、计划模式、助手）</td><td>装配弹层 <code>composer-autocomplete</code>(<code>.a-pop</code> 系列)</td><td>既有页面组件</td><td>首页向下、会话页向上；去淡紫焦点与按键提示行</td></tr>
-    <tr><td>首页右栏（文件 / 终端）</td><td>右栏 <code>.a-swk-rail-tab</code> + 文件面 <code>session-rail/files</code> + 终端面 <code>session-rail/terminal</code></td><td>既有页面组件</td><td>owner U-02:首页右栏只放项目范围的文件、终端；复用会话右栏的两页</td></tr>
-    <tr><td>文件树行</td><td>文件面 <code>files-view</code> 的行</td><td>既有页面组件</td><td>改配色与间距</td></tr>
-    <tr><td>定制中心页签、搜索框、「添加 ▾」</td><td><code>.codepuppy-ext-tab</code>、Input、Button secondary</td><td>既有页面组件 / 组件库</td><td>「添加 ▾」由实心强调色改中性描边</td></tr>
-    <tr><td>分组标题、列表行、「+」/「…」、状态小字</td><td><code>EntryRow</code> / <code>PackageRow</code> / <code>InstalledRow</code> / <code>MoreMenu</code></td><td>既有页面组件</td><td>去外框、两列、中性图标；行为按规格 v5</td></tr>
-    <tr><td>「…」菜单与「开启」开关</td><td><code>MoreMenu</code>(<code>.a-pop</code>)+ 设置页开关形状</td><td>既有页面组件</td><td>项与顺序不变</td></tr>
-    <tr><td>会话右栏页签、审查工具行、改动与差异</td><td><code>.a-swk-rail-tab</code>、<code>review-panel-view</code></td><td>既有页面组件</td><td>文字页签；去「›」收起钮</td></tr>
-    <tr><td>右栏空状态</td><td>四页现行空状态</td><td>既有页面组件</td><td>统一版式；「新建终端」用 Button secondary sm</td></tr>
-    <tr><td>用户消息、回答、过程摘要</td><td>时间线 <code>session-timeline</code></td><td>既有页面组件</td><td>本稿不改，只作背景</td></tr>
+    <tr><td>外框（顶栏 + 窄轨同色）</td><td>外框 Chrome</td><td>新</td><td>owner U-03</td></tr>
+    <tr><td>工作面（侧栏 / 主区 / 右栏同一块圆角纯白）</td><td>工作面 Working surface</td><td>新</td><td>owner U-03 / U-05;只是容器</td></tr>
+    <tr><td>窄轨图标按钮、账户头像</td><td>窄轨 Rail(按钮形状沿用 <code>.codepuppy-topbar-btn</code>)</td><td>新</td><td>owner I-02;提示用 Tooltip</td></tr>
+    <tr><td>顶栏左簇、页面名 / 对话路径、右栏开关</td><td><code>.codepuppy-topbar</code>、<code>WorkspaceTopbar</code></td><td>既有页面组件</td><td>移进外框顶栏；首页也有右栏开关，定制中心、自动化、设置没有右栏，不显示</td></tr>
+    <tr><td>侧栏品牌、项目、对话、空状态</td><td><code>codepuppy-sidebar.tsx</code> 各行</td><td>既有页面组件</td><td>纯白；选中 8% 灰、不加粗</td></tr>
+    <tr><td>账户菜单</td><td>账户弹层(<code>account-popover.css</code>)+ 弹层项 <code>.a-pop-item</code> + Button primary</td><td>既有页面组件 / 组件库</td><td>改位置与图标；已登录的余额卡沿用组件库 Card + KeyValueList</td></tr>
+    <tr><td>输入框、运行权限、发送 / 停止</td><td><code>codepuppy-composer</code>、<code>PermChip</code></td><td>既有页面组件</td><td>—</td></tr>
+    <tr><td>模型按钮的品牌图标</td><td><code>BrandIcon</code> / <code>ProviderIcon</code></td><td>既有页面组件</td><td>单色，放在 --a-monogram-bg 上</td></tr>
+    <tr><td>合并选择卡、模型列表</td><td>弹层 <code>.a-pop</code>、<code>codepuppy-composer-model</code>、Input</td><td>既有页面组件 / 组件库</td><td>—</td></tr>
+    <tr><td>分档滑条</td><td>滑条 Slider</td><td>新</td><td>owner I-04</td></tr>
+    <tr><td>托盘（项目 / 文件 / 插件）</td><td>托盘 Tray + 工作区胶囊 <code>workspace-chip</code></td><td>新 / 既有</td><td>owner I-06、U-02;会话里项目固定</td></tr>
+    <tr><td>「+」菜单</td><td>装配弹层 <code>composer-autocomplete</code></td><td>既有页面组件</td><td>只留添加附件、计划模式、助手</td></tr>
+    <tr><td>工作过程步骤、思考行</td><td>时间线过程折叠 <code>#process-fold</code></td><td>既有页面组件</td><td>单色图标</td></tr>
+    <tr><td>批准面板（运行命令 / 安装插件）</td><td><code>PermissionDialog</code> + RiskTag + KeyValueList + Button</td><td>既有页面组件 / 组件库</td><td>期限写人话；按钮靠右；安装只有「允许一次」</td></tr>
+    <tr><td>安装卡（等待你允许 / 已拒绝）</td><td><code>hub-install-card.tsx</code></td><td>既有页面组件</td><td>文字取现有 <code>codepuppy.timeline.hub.*</code></td></tr>
+    <tr><td>右栏页签、审查、文件树、终端、产物、空状态</td><td><code>session-rail/*</code>、<code>.a-swk-rail-tab</code></td><td>既有页面组件</td><td>首页右栏复用文件、终端两页</td></tr>
+    <tr><td>搜索对话弹层</td><td><code>codepuppy-session-search.tsx</code></td><td>既有页面组件</td><td>由模态改轻弹层，单层焦点</td></tr>
+    <tr><td>顶级页面页头（定制中心 / 设置 / 自动化）</td><td>定制中心页签 <code>.codepuppy-ext-tab</code> 的排法推广</td><td>既有页面组件</td><td>一套页头三处用</td></tr>
+    <tr><td>定制中心行、「…」菜单、管理页</td><td><code>EntryRow</code> / <code>PackageRow</code> / <code>InstalledRow</code> / <code>MoreMenu</code> / <code>extension-detail.tsx</code></td><td>既有页面组件</td><td>行为按规格 v5</td></tr>
+    <tr><td>设置行、开关、数字框</td><td><code>settings.tsx</code>(开关 <code>.codepuppy-settings-switch</code>)+ Input</td><td>既有页面组件 / 组件库</td><td>分组改发丝线</td></tr>
+    <tr><td>自动化行、开关、创建</td><td><code>automation-panel.tsx</code> + Button + Input</td><td>既有页面组件 / 组件库</td><td>原生复选框换成设置页开关</td></tr>
+    <tr><td>接入其它服务</td><td>组件库 Dialog + Input + Button;表单字段来自 <code>model-picker-add.tsx</code></td><td>组件库 / 既有页面组件</td><td>由弹层改对话框</td></tr>
+    <tr><td>找不到对话</td><td>Code Puppy 恢复页 <code>surface-boundary</code> 一类 + Button</td><td>既有页面组件</td><td>取代上游错误页文字</td></tr>
+    <tr><td>首次引导卡</td><td><code>CodePuppyOnboarding.tsx</code> + Button</td><td>既有页面组件</td><td>小狗图标</td></tr>
   </table>
 </section>
 
-<!-- ═════════════ 与上一稿的关系 ═════════════ -->
 <section class="dz-sec dz-doc" id="relation">
   <h2 class="dz-h2">与上一稿的关系</h2>
-  <h3>本轮修订（相对第一稿 <code>bd35b6cd10</code>）</h3>
+  <h3>本轮(第三轮，相对 <code>eaecae8b2a</code>)</h3>
   <ul>
-    <li><b>外框与工作面（owner U-03）：</b>顶栏改为与窄轨同一支灰（<code>--a-bg-chrome</code>），五张整页帧都是「灰色外框 + 一块圆角白色工作面」；页面名、对话路径、右栏开关从主区顶栏移到外框顶栏。选「一整块工作面」而不是三块相邻面板，理由见页首。</li>
-    <li><b>竖线（owner U-04）：</b>窄轨与侧栏之间、侧栏另一侧原来各有一条 1px 线（#e8e8eb），这两条都删了。窄轨与工作面靠灰白两色和工作面的轻投影分开；工作面里的分栏线改用 <code>--a-divider</code>（5% 黑，落在白上约 #f3f3f4）。横向分隔线一并调浅（#ededf0）；工作面本身不加描边；空状态图标框去掉描边改用外框灰底。</li>
-    <li><b>「+」菜单（owner U-02）：</b>只留添加附件、计划模式、助手；「文件」「插件」只在输入框下的托盘。</li>
-    <li><b>首页右栏（owner U-02）：</b>首页顶栏加右栏开关；新增帧 <code>#home-right-panel</code>，右栏只有「文件」「终端」。</li>
-    <li><b>字标「Code Puppy」</b>:owner U-02 确认，保持。</li>
-    <li><b>弹层方向</b>:首页向下、会话页向上，owner 已接受，写进帧说明。</li>
-    <li><b>没变</b>:<code>#hub-row-menu</code>、<code>#picker</code>、<code>#right-panel-empty</code> 三个组件帧只跟着令牌变浅，结构未动；audit.md 不变。</li>
+    <li><b>审计 R1</b>:24 项 + 5 条观察全部落实，见上表；最显眼的是 zinc 中性灰、图标线宽按尺寸、首页标题与位置、弹层统一锚点、右栏空状态同高、头像不再用强调色、模型按钮恢复品牌图标、会话页补托盘。</li>
+    <li><b>补齐界面</b>:#session / #session-dark / #session-popovers / #install-card / #search / #automation / #settings / #account-menu / #hub-skills / #hub-manage / #hub-custom-service / #not-found / #onboarding。</li>
+    <li><b>全局文字</b>:帧内中文统一全角标点；不出现英文原词；默认工作区一个名字；深色五层明度。</li>
+    <li><b>侧栏纯白</b>:owner U-05「保持纯白」，保留。</li>
   </ul>
-  <h3>继承</h3>
+  <h3>继承（三轮不变）</h3>
   <ul>
-    <li>品牌：Code Puppy 名称与小狗图标；强调色靛蓝、发送键颜色、三档运行权限「一档一色」、用户气泡蓝，均沿用 owner 既有决定。</li>
-    <li>行为与文字：定制中心按已批准的插件助手规格 v5（一行一个包；「+」直接安装；「…」里开关 / 管理 / 移除；待登录 / 待填令牌 / 已关闭 / 正在生效 / 未能启用：原因）；运行权限菜单三档与说明；右栏四页的内容与现行文案；对话搜索（⌘K）。</li>
-    <li>组件：按钮、输入框、悬停提示、弹层 <code>.a-pop</code> 直接引用正式代码样式；字号阶、间距阶、圆角阶不变。</li>
+    <li>品牌名称与小狗图标；强调色靛蓝、发送键、三档运行权限「一档一色」、用户气泡蓝。</li>
+    <li>所有行为与文字规则：定制中心按规格 v5;助手安装前确认一次（BR-10）；运行权限三档；右栏四页内容；对话搜索按标题。</li>
+    <li>组件库按钮、输入框、悬停提示、对话框、风险标签、名称 — 值列表直接引用正式代码样式。</li>
   </ul>
-  <h3>相对现行界面的改动与理由</h3>
+  <h3>owner 已定</h3>
   <ul>
-    <li><b>版面：</b>灰色外框（顶栏 + 48px 窄轨）包住圆角白色工作面（I-01/I-02/U-03）；侧栏「搜索」一行去掉（I-03），搜索在窄轨与 ⌘K。</li>
-    <li><b>顶栏常驻（I-09）：</b>首页、会话、定制中心同一条顶栏；左上角左栏开关与前进后退位置不变；右栏开关在右上角（首页、会话页）。</li>
-    <li><b>用色（I-01）：</b>外框灰、工作面白、托盘浅灰三层；选中、悬停一律中性灰；强调色只留给主要动作、焦点环、未读点和「全部批准」。</li>
-    <li><b>首页（I-07）：</b>去水印、发光、噪点和「新对话 — 项目名」，标题「我们要处理什么？」30px。</li>
-    <li><b>输入框（I-04/05/06）：</b>模型与推理强度合并为一个按钮和一张卡；「+」菜单首页向下、单色图标；项目 / 文件 / 插件进托盘。</li>
-    <li><b>无项目（I-08）</b>、<b>右栏（I-10）</b>、<b>定制中心（I-11/12）</b>:同第一稿，套进新外框。</li>
+    <li>U-02:「文件」「插件」只在托盘；首页右栏只有文件、终端；字标「Code Puppy」。U-03 / U-04:灰色外框 + 圆角工作面、竖线几乎看不见。U-05:批准方向，侧栏纯白。会话页弹层向上、首页向下。</li>
   </ul>
-  <h3>本稿不画</h3>
-  <ul>
-    <li>技能、助手两页签，自动化、设置页（套同一外框与行样式）；侧栏收起后的工作面（只剩主区与右栏，外框不变）；时间线卡片。这些问题列在 audit.md，获批后逐页出增量。</li>
-  </ul>
+  <h3>落点（活稿）</h3>
+  <table class="dz-table">
+    <tr><th>活稿</th><th>并入的帧</th></tr>
+    <tr><td><code>current/shell-sidebar/</code></td><td>#home、#home-right-panel、#home-empty、#home-dark、#account-menu</td></tr>
+    <tr><td><code>current/composer/</code></td><td>#picker、#plus-menu</td></tr>
+    <tr><td><code>current/model-picker/</code></td><td>#picker（引用 composer 帧）、#hub-custom-service</td></tr>
+    <tr><td><code>current/assemble-popup/</code></td><td>#plus-menu（引用 composer 帧）</td></tr>
+    <tr><td><code>current/session-workspace/</code></td><td>#session、#session-dark、#session-popovers、#right-panel、#right-panel-empty、#not-found</td></tr>
+    <tr><td><code>current/conversation-timeline/</code></td><td>#install-card、#session（引用）</td></tr>
+    <tr><td><code>current/customization-center/</code></td><td>#hub-connectors、#hub-row-menu、#hub-skills、#hub-manage</td></tr>
+    <tr><td><code>current/settings/</code></td><td>#settings</td></tr>
+    <tr><td><code>current/automations/</code>（新）</td><td>#automation</td></tr>
+    <tr><td><code>current/session-search/</code>（新）</td><td>#search</td></tr>
+    <tr><td><code>current/onboarding/</code>（新）</td><td>#onboarding</td></tr>
+  </table>
+  <p class="dz-sub">共享样式在 <code>docs/design/system/direction.css</code>（本目录 frame.css 冻结时的副本，以后在那里改）。新组件（外框、工作面、窄轨、滑条、托盘）登记在 <code>system/components.md</code> 的 Pending 表。</p>
 </section>
+
 </main>
 </body>
 </html>

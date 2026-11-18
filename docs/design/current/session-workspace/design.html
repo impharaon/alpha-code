@@ -28,6 +28,45 @@
 </div>
 
 <div class="wrap">
+
+  <!-- ========== 2026-11-18 新视觉方向(owner U-05 批准;增量稿 2026-11-18-ui-refresh/ 已冻结) ========== -->
+  <section class="sec ux2-sec" id="direction-2026-11">
+    <div class="sec-head">
+      <div class="sec-kicker">2026-11-18 · 新视觉方向 · owner 批准（U-05「可以，按这个方向做」）</div>
+      <h2>新视觉方向：灰色外框 + 圆角纯白工作面</h2>
+      <p class="lede">本节各帧取代本页旧稿的版式与配色；行为与文字规则照旧，帧内另写的除外。增量稿（已冻结，含设计审计 R1 逐项核对与令牌终表）：<a href="../../2026-11-18-ui-refresh/frame.html">2026-11-18-ui-refresh/frame.html</a>。共享样式 <a href="../../system/direction.css">system/direction.css</a>。本页下方旧稿保留作历史对照，与本节冲突时以本节为准。</p>
+    </div>
+  <div class="ux2-anchor" id="session">
+    <h3>会话页 <code>#session</code></h3>
+    <p>完整一页对话：上一轮助手发起的安装被拒绝（「已拒绝，未安装『名称』」）；这一轮的思考与操作步骤展开，最后一步等你允许；批准面板停在输入框上方，「期限」写成人话「今天 18:30 前」，按钮都在右边。输入框下仍有托盘（项目固定、文件、插件），「内容由 AI 生成」在托盘下面。 回答进行中发送键变成停止键（现有行为）。工具图标统一单色；工具类型色仍留在代码令牌里，只是时间线不再用。</p>
+    <div class="ux2-scroll"><iframe class="ux2-if" src="frames/session.html" style="height:940px" title="会话页" loading="lazy"></iframe></div>
+  </div>
+  <div class="ux2-anchor" id="session-dark">
+    <h3>会话页 · 深色 <code>#session-dark</code></h3>
+    <p>同上，深色。</p>
+    <div class="ux2-scroll"><iframe class="ux2-if" src="frames/session-dark.html" style="height:940px" title="会话页 · 深色" loading="lazy"></iframe></div>
+  </div>
+  <div class="ux2-anchor" id="session-popovers">
+    <h3>会话页 · 向上展开的弹层 <code>#session-popovers</code></h3>
+    <p>会话页输入框贴底，「+」菜单与合并选择卡向上展开，下缘离输入框上沿 6px;「+」菜单左缘对齐「+」按钮，选择卡右缘对齐发送键。 左 #session-plus-up，右 #session-picker-up。</p>
+    <div class="ux2-scroll"><iframe class="ux2-if" src="frames/session-popovers.html" style="height:600px" title="会话页 · 向上展开的弹层" loading="lazy"></iframe></div>
+  </div>
+  <div class="ux2-anchor" id="right-panel">
+    <h3>会话页右栏 <code>#right-panel</code></h3>
+    <p>右栏是工作面里的第三栏，分栏线几乎看不见；页签文字加中性下划线；右栏开关在顶栏右上角（按下态）。差异视图右缘淡出，提示可横向滚动。</p>
+    <div class="ux2-scroll"><iframe class="ux2-if" src="frames/right-panel.html" style="height:940px" title="会话页右栏" loading="lazy"></iframe></div>
+  </div>
+  <div class="ux2-anchor" id="right-panel-empty">
+    <h3>右栏四页的空状态 <code>#right-panel-empty</code></h3>
+    <p>图标顶端统一钉在面板 30% 处，多出的说明或按钮往下长，四页标题同一高度。</p>
+    <div class="ux2-scroll"><iframe class="ux2-if" src="frames/right-panel-empty.html" style="height:480px" title="右栏四页的空状态" loading="lazy"></iframe></div>
+  </div>
+  <div class="ux2-anchor" id="not-found">
+    <h3>找不到对话 <code>#not-found</code></h3>
+    <p>取代上游的「找不到此会话 / Local Server / 关闭标签页」：一句话 + 「回到新对话」。</p>
+    <div class="ux2-scroll"><iframe class="ux2-if" src="frames/not-found.html" style="height:940px" title="找不到对话" loading="lazy"></iframe></div>
+  </div>
+  </section>
   <div class="sec-kicker">产品设计门 · 会话工作区(整页)</div>
   <h2 class="t">一页装下会话的全部:左栏 · 单一顶栏 · 时间线 · 输入框 · 右栏四面板</h2>
   <p class="lede">会话工作区是产品的主战场。本稿给出它的整页终态:整页由 alpha 自有组件渲染、全量 <span class="mono">--a-*</span> 令牌,不再依附任何上游布局。五大块 —— 左侧栏、归并后的单一顶栏、时间线、底部输入框、右侧四面板边栏 —— 全部元素级呈现;右栏四面板(审查 / 文件 / 终端 / 产物)逐个出完整帧。</p>

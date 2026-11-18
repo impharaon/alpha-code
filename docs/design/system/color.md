@@ -113,3 +113,10 @@ own colors. All pairs are judged by `contrast-ratchet.test.ts`.
 - Selection = `--a-overlay-selected`; hover = `--a-overlay-hover` — not a solid fill.
 - Filled emphasis = `--a-accent-solid` + `--a-text-on-accent`.
 - Focus = `--a-ring-focus` (`3px` `--a-accent-ring`), always visible.
+
+## Pending — 2026-11-18 新视觉方向(已批准,未落地)
+
+owner 2026-11-18 U-05 批准。令牌终表(浅色 / 深色的现值与定值、对比度)在冻结的增量稿
+[`2026-11-18-ui-refresh/frame.html#tokens`](../2026-11-18-ui-refresh/frame.html#tokens);要点:新增 `--a-bg-chrome`(外框)、
+`--a-hairline`(横向分隔)、`--a-divider`(工作面内竖向分栏)、`--a-monogram-bg`,冷灰换成 zinc 中性灰,
+选中改中性灰(不再用淡紫)。实现改 `tokens.css` 并过 `contrast-ratchet.test.ts` 后,把本节并进上面各表。

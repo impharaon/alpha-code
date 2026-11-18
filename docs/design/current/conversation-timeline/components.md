@@ -66,6 +66,7 @@ review_after: 2027-01-16
 | 用户消息脚注写权限档(第一方模式 → 档名与色点;自建助手原名) | `#user-meta` | [`2026-10-30-req236-ux-core-pages/`](../../2026-10-30-req236-ux-core-pages/frame.html) | 2026-10-31 | ac#1588 | 2026-10-31 | `session-timeline/session-timeline-view.tsx`(`FIRST_PARTY_MODES`、`.a-tl-user-mode`)· `session-timeline.css` | 已落地(差异见 `design.html#core-pages-diff`) |
 | 自己发出新消息后回到最新 | `#send-follow` | [`2026-10-30-req236-ux-core-pages/`](../../2026-10-30-req236-ux-core-pages/frame.html) | 2026-10-31 | ac#1588 | 2026-10-31 | `session-timeline/session-timeline-view.tsx`(`lastUserKeyOf` 与其后的跟随效果) | 已落地 |
 | 工具批准面板的风险档位标签(低 / 中 / 高 / 极高 / 风险未知;极高且外发时一句原因;共享组件「风险标签」,能力授权框的「高风险」也用它) | `#permission-risk` | [`2026-11-13-permission-risk-display/`](../../2026-11-13-permission-risk-display/frame.html) · 组件 [`2026-11-13-1314-risk-tag/`](../../2026-11-13-1314-risk-tag/frame.html) | 2026-11-13 | ac#1314 | — | `codepuppy-ui/RiskTag.tsx` + `risk-tag.css`(共享组件)· `codepuppy-ui/permission-risk.ts`(`metadata.codepuppyRisk` → 五档;缺失 / 兜底 = 风险未知)· `codepuppy-ui/PermissionDialog.tsx`(`PermissionPanel` 标题行与 `description`)· 能力授权框 `extensions/ext-authz.tsx`(`CapRow` / `ExtGrantedCapRow`);证据 `risk-tag.browser.test.ts`(与已批 `frame.html` 逐项相等) | 已实现,待合并 |
+| 助手安装的批准卡与安装卡(等待你允许 / 已拒绝) | `#install-card`(活稿 `#direction-2026-11` 节) | [`2026-11-18-ui-refresh/`](../../2026-11-18-ui-refresh/frame.html) | 2026-11-18 | —(待开票) | — | `session-timeline/cards/hub-install-card.tsx` · `codepuppy-ui/PermissionDialog.tsx` | 设计定稿 |
 
 ## 本次登记时发现的两处不一致
 

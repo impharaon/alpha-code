@@ -12,6 +12,7 @@ import {
   sameSessionIdentity,
   type CodePuppySessionLiveSnapshot,
 } from "../../session-workspace/session-workspace-core"
+import { setRightPanelOpen } from "../../session-workspace/right-panel-state"
 import {
   SessionWorkspaceShell,
   type CodePuppySessionLiveContext,
@@ -173,6 +174,7 @@ export function createArtifactsShellHarness(options?: { parentOf?: SessionParent
     accepts: (candidate) => sameSessionIdentity(candidate, current()?.identity),
   }
   let railApi: SessionRailApi | undefined
+  setRightPanelOpen(true) // 右栏生产默认收起;这批用例验的是展开后的面板
   const Shell = () => (
     <SessionWorkspaceShell
       live={live}

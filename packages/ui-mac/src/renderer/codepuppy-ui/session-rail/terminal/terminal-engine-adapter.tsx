@@ -6,8 +6,23 @@
 // 数据通道)。本文件只做粘合,不重实现引擎:铸 channel(I8 三元身份盖章,纯投影在
 // terminal-engine-adapter-core)+ 引擎输出组件(持久化回写、连接后 trim、连接失败一次性
 // clone 恢复 —— 语义对齐上游 terminal-panel 的既有粘合)。
-import { Terminal, useTerminal, type LocalPTY, type TerminalColors } from "@opencode-ai/app/surface/terminal"
-import { createEffect, createMemo, createSignal, onCleanup, Show, type Accessor, type Component } from "solid-js"
+import {
+  Terminal,
+  useTerminal,
+  WorkspaceTerminalProvider,
+  type LocalPTY,
+  type TerminalColors,
+} from "@opencode-ai/app/surface/terminal"
+import {
+  createEffect,
+  createMemo,
+  createSignal,
+  onCleanup,
+  Show,
+  type Accessor,
+  type Component,
+  type ParentProps,
+} from "solid-js"
 import { t } from "../../../i18n"
 import type { CodePuppySessionLiveSnapshot } from "../../session-workspace/session-workspace-core"
 import {
@@ -165,4 +180,12 @@ export function useCodePuppyTerminalEngineChannel(
       },
     }),
   )
+}
+
+/**
+ * 首页右栏没有会话叶包着 —— 这里按项目目录补上同一对 provider(目录 SDK + workspace 级 PTY 状态)。
+ * 终端页签是 workspace 级的,首页开的终端就是该项目会话里同一批终端。
+ */
+export function WorkspaceTerminalScope(props: ParentProps<{ directory: string }>) {
+  return <WorkspaceTerminalProvider directory={props.directory}>{props.children}</WorkspaceTerminalProvider>
 }

@@ -369,7 +369,7 @@ describe("REQ-159 #1322 sandbox disclosure on the terminal face (AC1)", () => {
     expect(item!.getAttribute("tabindex")).toBe("0")
   })
 
-  test("sandbox on: the empty state carries the one-line notice below the body and above the create button", async () => {
+  test("sandbox on: the empty state does not repeat the sandbox sentence (it lives in the foot and its hover card only)", async () => {
     runtime.setTerminalSandbox(true)
     runtime.setTerminalInstances([])
     runtime.setTerminalActiveID(undefined)
@@ -377,15 +377,12 @@ describe("REQ-159 #1322 sandbox disclosure on the terminal face (AC1)", () => {
     await flush()
 
     const empty = host.querySelector<HTMLElement>("[data-codepuppy-terminal-empty]")!
-    const notice = empty.querySelector<HTMLElement>("[data-codepuppy-terminal-empty-sandbox]")
-    expect(notice).not.toBeNull()
-    expect(notice!.textContent).toContain("沙箱已开启 —— 终端里你自己的配置可能有一部分不生效。")
-    const children = [...empty.children]
-    const body = children.findIndex((el) => el.tagName === "P" && !el.hasAttribute("data-codepuppy-terminal-empty-sandbox"))
-    const line = children.findIndex((el) => el.hasAttribute("data-codepuppy-terminal-empty-sandbox"))
-    const button = children.findIndex((el) => el.hasAttribute("data-codepuppy-terminal-new"))
-    expect(line).toBeGreaterThan(body)
-    expect(button).toBeGreaterThan(line)
+    expect(empty.querySelector("[data-codepuppy-terminal-empty-sandbox]")).toBeNull()
+    expect(empty.textContent).not.toContain("沙箱")
+    // 空态只有:图标、标题、说明、一个新建按钮(冻结稿 #right-panel-empty)。
+    expect([...empty.children].map((el) => el.tagName)).toEqual(["SPAN", "B", "P", "BUTTON"])
+    expect(empty.querySelector("button")!.hasAttribute("data-codepuppy-terminal-new")).toBe(true)
+    // 沙箱告知仍在:有实例时脚条那一项由上面的用例守。
   })
 
   test("reverse arm: sandbox off — and the prop absent (today's mount) — renders neither hook; the item follows the signal live", async () => {

@@ -308,51 +308,6 @@
   font-size: var(--a-text-sm);
 }
 
-.a-rart-empty {
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  padding: 30px;
-  text-align: center;
-}
-
-.a-rart-empty-ic {
-  display: grid;
-  place-items: center;
-  width: 40px;
-  height: 40px;
-  border-radius: var(--a-radius-lg);
-  background: var(--a-bg-muted);
-  color: var(--a-text-tertiary);
-}
-
-.a-rart-empty-ic svg {
-  width: 19px;
-  height: 19px;
-  fill: none;
-  stroke: currentColor;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  stroke-width: 1.8;
-}
-
-.a-rart-empty b {
-  color: var(--a-text);
-  font-size: var(--a-text-sm);
-  font-weight: var(--a-weight-medium);
-}
-
-.a-rart-empty p {
-  max-width: 30ch;
-  margin: 0;
-  color: var(--a-text-tertiary);
-  font-size: var(--a-text-xs);
-  line-height: var(--a-leading-snug);
-}
-
 /* ── REQ-236 issue 1552 结果优先 + 本次对话 / 项目全部(批准稿 2026-10-30-req236-results-rail)── */
 
 .a-rart-scope {
@@ -360,7 +315,7 @@
   flex: none;
   align-items: center;
   gap: 8px;
-  padding: 11px 12px 0;
+  padding: 10px 12px 0;
 }
 
 .a-rart-scope + .a-rart-runbar {
@@ -371,24 +326,25 @@
   display: flex;
   flex: 1;
   padding: 2px;
-  border-radius: var(--a-radius-md);
+  gap: 2px;
+  border-radius: var(--a-radius-sm);
   background: var(--a-bg-muted);
 }
 
 .a-rart-seg button {
   flex: 1;
-  height: 26px;
+  height: 24px;
   border: 0;
-  border-radius: var(--a-radius-sm);
+  border-radius: var(--a-radius-xs);
   background: none;
   color: var(--a-text-secondary);
   font-size: var(--a-text-xs);
-  font-weight: var(--a-weight-medium);
+  font-weight: var(--a-weight-normal);
 }
 
 .a-rart-seg button[aria-selected="true"] {
   background: var(--a-surface);
-  box-shadow: var(--a-edge-light);
+  box-shadow: var(--a-shadow-xs);
   color: var(--a-text);
 }
 

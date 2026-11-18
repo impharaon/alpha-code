@@ -3,10 +3,12 @@ import { createSignal } from "solid-js"
 import { render } from "solid-js/web"
 import type { CodePuppyTerminalEngineChannel } from "../session-rail/terminal/terminal-rail-core"
 import type { TimelineTurnWait } from "../session-timeline/timeline-model"
+import { setRightPanelOpen } from "./right-panel-state"
 import { SessionQuestionCard } from "./session-question-card"
 import { sameSessionIdentity, type CodePuppySessionLiveSnapshot } from "./session-workspace-core"
 import {
   SessionWorkspaceShell,
+  WorkspaceRightPanel,
   type CodePuppySessionLiveContext,
   type SessionRailPanelRenderers,
 } from "./session-workspace-shell"
@@ -106,6 +108,24 @@ export function SessionQuestionHarness() {
   )
 }
 
+/**
+ * 首页右栏(`WorkspaceRightPanel`):四个页面的渲染器都给齐 —— 只有「文件」「终端」两页能出现,
+ * 是右栏自己的页集合在限定,不是靠没给渲染器。
+ */
+export function WorkspaceRightPanelHarness() {
+  return (
+    <WorkspaceRightPanel
+      live={liveContext()}
+      panels={{
+        review: () => <div data-harness-panel="review" />,
+        files: () => <div data-harness-panel="files" />,
+        artifacts: () => <div data-harness-panel="artifacts" />,
+      }}
+      terminalChannel={() => terminalChannel}
+    />
+  )
+}
+
 /** Mid-state harness: only the given lanes have landed — the rest must fail closed. */
 export function SessionWorkspacePartialHarness(props: { panels: SessionRailPanelRenderers }) {
   return <SessionWorkspaceShell live={liveContext()} panels={props.panels} />
@@ -132,6 +152,8 @@ export function setSessionWorkspaceTurnWait(next: TimelineTurnWait | undefined) 
 }
 
 export function resetSessionWorkspaceSnapshot() {
+  // 右栏默认收起(生产默认);这批用例的前提是「右栏已展开」,个别用例自己验收起/展开。
+  setRightPanelOpen(true)
   setSnapshot(initial)
   setTurnWait(undefined)
   setReviewCount(undefined)

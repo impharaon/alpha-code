@@ -60,7 +60,7 @@ function FileGlyph() {
 function ChevronGlyph(props: { class?: string }) {
   return (
     <svg class={props.class} viewBox="0 0 24 24" aria-hidden="true">
-      <path d="M9 6l6 6-6 6" />
+      <path d="m9.5 18 6-6-6-6" />
     </svg>
   )
 }
@@ -178,7 +178,7 @@ function ReviewFileCard(props: {
           onClick={props.onToggle}
           ref={(el) => props.registerHeader?.(el)}
         >
-          <FileGlyph />
+          <ChevronGlyph class="a-rvw-chev" />
           <span class="a-rvw-fn">
             <Show when={props.change.dir}>
               <span class="a-rvw-dir">{props.change.dir}</span>
@@ -187,7 +187,6 @@ function ReviewFileCard(props: {
           </span>
           <span class={`a-rvw-kind a-rvw-kind--${props.change.kind}`}>{t(kindKey())}</span>
           <StatPair additions={props.change.additions} deletions={props.change.deletions} />
-          <ChevronGlyph class="a-rvw-chev" />
         </button>
         {/* REQ-108 一跳可达的第二跳:改动看 diff(本卡),整份文件去查看器。删除的文件没有整份可看。 */}
         <Show when={props.onOpenFile && props.change.kind !== "deleted"}>
@@ -345,10 +344,12 @@ function ReviewEmpty(props: { kind: "no-vcs" | "clean" }) {
           }
         >
           <svg viewBox="0 0 24 24">
-            <circle cx="6" cy="6" r="2.4" />
-            <circle cx="6" cy="18" r="2.4" />
-            <circle cx="18" cy="9" r="2.4" />
-            <path d="M6 8.4v7.2M18 11.4a6 6 0 0 1-6 6H8.4" />
+            <circle cx="6.5" cy="17.5" r="2.2" />
+            <circle cx="17.5" cy="6.5" r="2.2" />
+            <path d="M6.5 15.3V9.5a3 3 0 0 1 3-3h4" />
+            <path d="m11.5 4.5 2 2-2 2" />
+            <path d="M17.5 8.7v5.8a3 3 0 0 1-3 3h-4" />
+            <path d="m12.5 19.5-2-2 2-2" />
           </svg>
         </Show>
       </span>
@@ -441,6 +442,7 @@ export function SessionRailReviewPanelView(props: ReviewPanelViewProps) {
       <Show when={props.phase === "changes"}>
         <div class="a-rvw-sum">
           <span class="a-rvw-sum-title">{t("codepuppy.review.title")}</span>
+          <span class="a-rvw-sum-count">{t("codepuppy.review.fileCount", { count: props.changes.length })}</span>
           <StatPair additions={totals().additions} deletions={totals().deletions} />
           <span class="a-rvw-grow" aria-hidden="true" />
           <div class="a-rvw-seg" role="group" aria-label={t("codepuppy.review.viewMode")}>
@@ -462,8 +464,13 @@ export function SessionRailReviewPanelView(props: ReviewPanelViewProps) {
               {t("codepuppy.review.viewSplit")}
             </button>
           </div>
-          <button type="button" class="a-rvw-expand" onClick={toggleAll}>
-            {allOpen() ? t("codepuppy.review.collapseAll") : t("codepuppy.review.expandAll")}
+          <button
+            type="button"
+            class="a-rvw-expand"
+            title={allOpen() ? t("codepuppy.review.collapseAll") : t("codepuppy.review.expandAll")}
+            onClick={toggleAll}
+          >
+            <span class="a-rvw-expand-tx">{allOpen() ? t("codepuppy.review.collapseAll") : t("codepuppy.review.expandAll")}</span>
             <UnfoldGlyph class="a-rvw-expand-ic" />
           </button>
         </div>

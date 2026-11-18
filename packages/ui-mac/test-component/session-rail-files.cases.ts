@@ -350,12 +350,13 @@ describe("REQ-125 C3 files panel real Solid mount", () => {
         .classList.contains("a-swk-rail-panel--hidden"),
     ).toBe(true)
 
-    host.querySelector<HTMLButtonElement>(".a-swk-rail-close")!.click()
+    // Close via the rail toggle (the rail itself carries no close button: one toggle, top right).
+    const topbarButtons = host.querySelectorAll<HTMLButtonElement>(".a-swk-panel-button")
+    topbarButtons[1]!.click()
     await flush()
     expect(host.querySelector("[data-codepuppy-session-rail-host]")).toBeNull()
 
-    // Reopen via the topbar rail toggle: visited panels were reset, review (last panel) is active.
-    const topbarButtons = host.querySelectorAll<HTMLButtonElement>(".a-swk-panel-button")
+    // Reopen via the same toggle: visited panels were reset, review (last panel) is active.
     topbarButtons[1]!.click()
     await flush()
     expect(host.querySelector("[data-codepuppy-session-rail-panel='review']")).not.toBeNull()

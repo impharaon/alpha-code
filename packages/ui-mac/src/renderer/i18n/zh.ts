@@ -1576,7 +1576,7 @@ export const dict = {
   "codepuppy.session.artifactsRunsLabel": "这个项目的历次云任务",
   "codepuppy.session.artifactsNewRun": "有一次新的云任务结果已回到本地。",
   "codepuppy.session.artifactsNewRunView": "查看",
-  "codepuppy.session.filesFilter": "过滤文件…",
+  "codepuppy.session.filesFilter": "筛选文件",
   "codepuppy.session.filesOpened": "已打开",
   "codepuppy.session.filesWorkspace": "工作区",
   "codepuppy.session.filesLoading": "加载中…",
@@ -1895,7 +1895,6 @@ export const dict = {
   // Code Puppy 应用自身(模型目录、登录、检查更新)的联网**不在**其内;判据在 src/main/network-egress-disclosure.test.ts。
   "codepuppy.terminal.sandboxHoverBody":
     "终端只能写入当前项目和 Code Puppy 自己的目录。你的 shell 配置里凡是要往主目录写缓存的步骤(例如补全缓存)会被拦下,而且不会报错 —— 表现通常是补全变慢或不灵。不写文件的设置(别名、提示符、PATH)照常生效。联网也一样:助手和终端只能经 Code Puppy 的出网闸门访问已登记的地址,其它地址会被拒绝并留下记录;Code Puppy 应用自身的联网(模型目录、登录、检查更新)不在这道沙箱之内,照常直连。",
-  "codepuppy.terminal.sandboxEmpty": "沙箱已开启 —— 终端里你自己的配置可能有一部分不生效。",
   "codepuppy.workspace.readonly": "只读",
   "codepuppy.workspace.readonlyTitle": "这个项目现在写不进去",
   "codepuppy.workspace.readonlyBody":
@@ -1946,6 +1945,7 @@ export const dict = {
   "codepuppy.review.kindAdded": "新增",
   "codepuppy.review.kindModified": "修改",
   "codepuppy.review.kindDeleted": "删除",
+  "codepuppy.review.fileCount": "{{count}} 个文件",
   "codepuppy.review.fileStat": "{{additions}} 处新增、{{deletions}} 处删除",
   "codepuppy.review.hunkLabel": "改动块",
   "codepuppy.review.hunkPrev": "上一处改动块",

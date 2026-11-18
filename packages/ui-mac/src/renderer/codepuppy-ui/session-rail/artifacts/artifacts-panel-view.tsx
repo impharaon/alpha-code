@@ -534,8 +534,8 @@ export function SessionRailArtifactsView(props: ArtifactsPanelViewProps) {
         <div class="a-rart-empty" data-artifacts-empty>
           <span class="a-rart-empty-ic" aria-hidden="true">
             <svg viewBox="0 0 24 24">
-              <path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z" />
-              <path d="M14 3v6h6" />
+              <path d="M20 8 12 3.8 4 8v8l8 4.2 8-4.2Z" />
+              <path d="M4 8l8 4.2L20 8M12 12.2v8" />
             </svg>
           </span>
           <b>{t("codepuppy.session.artifactsEmptyTitle")}</b>
@@ -549,8 +549,8 @@ export function SessionRailArtifactsView(props: ArtifactsPanelViewProps) {
         <div class="a-rart-empty" data-artifacts-empty-run>
           <span class="a-rart-empty-ic" aria-hidden="true">
             <svg viewBox="0 0 24 24">
-              <path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z" />
-              <path d="M14 3v6h6" />
+              <path d="M20 8 12 3.8 4 8v8l8 4.2 8-4.2Z" />
+              <path d="M4 8l8 4.2L20 8M12 12.2v8" />
             </svg>
           </span>
           <b>{t("codepuppy.session.artifactsRunEmptyTitle")}</b>
@@ -569,8 +569,8 @@ export function SessionRailArtifactsView(props: ArtifactsPanelViewProps) {
         <div class="a-rart-empty" data-artifacts-empty-scope>
           <span class="a-rart-empty-ic" aria-hidden="true">
             <svg viewBox="0 0 24 24">
-              <path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z" />
-              <path d="M14 3v6h6" />
+              <path d="M20 8 12 3.8 4 8v8l8 4.2 8-4.2Z" />
+              <path d="M4 8l8 4.2L20 8M12 12.2v8" />
             </svg>
           </span>
           <b>{t("codepuppy.session.artifactsScopeEmptyTitle")}</b>

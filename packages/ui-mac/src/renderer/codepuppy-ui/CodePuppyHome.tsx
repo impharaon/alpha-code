@@ -10,6 +10,7 @@ import { useNavigate } from "@solidjs/router"
 import { type CodePuppyProjectsApi } from "../sidebar/use-projects"
 import { hrefFor } from "../../shared/route-manifest"
 import { CodePuppyComposer } from "./codepuppy-composer"
+import { HomeRightPanel } from "./home-right-panel"
 import { noteHomeComposerUnmountDraft } from "./home-draft-discard-notice"
 import { launchDraftPending } from "./launch-draft-handoff"
 import { createDefaultWorkspaceDir } from "./default-workspace"
@@ -174,6 +175,8 @@ export function CodePuppyHome(props: {
           />
         </div>
       </div>
+      {/* BR-05:首页右栏 —— 当前项目(未选 = 默认工作区)的文件与终端;开合读全应用唯一的 right-panel-state。 */}
+      <HomeRightPanel directory={activeWs} serverKey={props.serverKey} />
     </div>
   )
 }

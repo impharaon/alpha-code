@@ -1602,7 +1602,7 @@ export const dict = {
   "codepuppy.session.artifactsRunsLabel": "Past cloud runs in this project",
   "codepuppy.session.artifactsNewRun": "A new cloud run's results have arrived locally.",
   "codepuppy.session.artifactsNewRunView": "View",
-  "codepuppy.session.filesFilter": "Filter files…",
+  "codepuppy.session.filesFilter": "Filter files",
   "codepuppy.session.filesOpened": "Open",
   "codepuppy.session.filesWorkspace": "Workspace",
   "codepuppy.session.filesLoading": "Loading…",
@@ -1921,7 +1921,6 @@ export const dict = {
   // update checks) is NOT covered. Guarded by src/main/network-egress-disclosure.test.ts.
   "codepuppy.terminal.sandboxHoverBody":
     "The terminal can only write inside the current project and Code Puppy's own folders. Steps in your shell config that write caches to your home folder (completion caches, for example) are blocked silently — completion may feel slow or stop working. Settings that don't write files (aliases, prompt, PATH) work as usual. Network access works the same way: the assistant and the terminal can only reach registered addresses through Code Puppy's egress gate; anything else is refused and logged. Code Puppy's own traffic (model catalog, sign-in, update checks) is outside this sandbox and connects as before.",
-  "codepuppy.terminal.sandboxEmpty": "Sandbox is on — some of your own shell config may not apply in here.",
   "codepuppy.workspace.readonly": "Read-only",
   "codepuppy.workspace.readonlyTitle": "This project can't be written to right now",
   "codepuppy.workspace.readonlyBody":
@@ -1975,6 +1974,7 @@ export const dict = {
   "codepuppy.review.kindAdded": "Added",
   "codepuppy.review.kindModified": "Modified",
   "codepuppy.review.kindDeleted": "Deleted",
+  "codepuppy.review.fileCount": "{{count}} files",
   "codepuppy.review.fileStat": "{{additions}} additions, {{deletions}} deletions",
   "codepuppy.review.hunkLabel": "Change block",
   "codepuppy.review.hunkPrev": "Previous change block",

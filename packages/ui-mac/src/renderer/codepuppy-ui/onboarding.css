@@ -1,32 +1,26 @@
-/* CodePuppyOnboarding — first-run welcome card (mockup shell.html §E). Centered over the content area
- * (above CodePuppyHome, respecting the sidebar) so first-run focuses on the 3-step start. Tokens only. */
+/* CodePuppyOnboarding — 首次引导卡(新外壳稿 #onboarding)。整窗一层暗幕,卡片居中在窄轨右侧的整个区域
+ * (侧栏开着也一样),小狗图标、发丝线分隔的三步、当前步是深色圆点。只用 --a-* 令牌。 */
 @import "./tokens.css";
 @import "./base.css";
 
 .a-ob {
   position: fixed;
-  top: var(--a-home-top, 40px);
-  left: 0;
-  right: 0;
-  bottom: 0;
+  inset: 0;
   z-index: 50;
-  background: var(--a-bg-canvas);
+  background: var(--a-scrim);
   display: grid;
   place-items: center;
-  padding: 24px;
+  padding: 24px 24px 24px calc(var(--a-rail-w) + 24px);
   overflow: auto;
-}
-body[data-codepuppy-sidebar="open"] .a-ob {
-  left: var(--codepuppy-surface-left);
 }
 
 .a-ob-card {
-  width: min(560px, 100%);
+  width: min(440px, 100%);
   background: var(--a-surface-raised);
-  border: 1px solid var(--a-border-faint);
+  border: 1px solid var(--a-hairline);
   border-radius: var(--a-radius-2xl);
-  box-shadow: var(--a-shadow-lg), var(--a-edge-light);
-  padding: 40px 40px 34px;
+  box-shadow: var(--a-shadow-overlay);
+  padding: 32px 32px 24px;
   text-align: center;
   animation: a-rise 0.5s var(--a-ease-out) both;
 }
@@ -38,106 +32,89 @@ body[data-codepuppy-sidebar="open"] .a-ob {
 }
 
 .a-ob-mark {
-  width: 56px;
-  height: 56px;
-  border-radius: 16px;
-  background: var(--a-accent-solid);
-  color: #fff;
-  display: grid;
-  place-items: center;
-  font-weight: 800;
-  font-size: 28px;
-  margin: 0 auto;
-  box-shadow: var(--a-shadow-md);
+  display: block;
+  width: 52px;
+  height: 52px;
+  margin: 0 auto 16px;
+  border-radius: 13px;
 }
 .a-ob-title {
-  font-size: var(--a-text-2xl);
-  font-weight: var(--a-weight-bold);
-  margin-top: 18px;
+  margin: 0;
+  font-size: var(--a-text-xl);
+  font-weight: var(--a-weight-semibold);
+  letter-spacing: var(--a-tracking-tight);
 }
 .a-ob-sub {
-  color: var(--a-text-secondary);
-  margin: 6px 0 0;
-  font-size: var(--a-text-md);
+  margin: 6px 0 22px;
+  color: var(--a-text-tertiary);
+  font-size: var(--a-text-sm);
 }
 
 .a-ob-steps {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  max-width: 340px;
-  margin: 22px auto 24px;
   text-align: left;
+  border-top: 1px solid var(--a-hairline);
 }
 .a-ob-step {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 12px 14px;
-  border: 1px solid var(--a-border);
-  border-radius: var(--a-radius-lg);
-  font-size: var(--a-text-sm);
-  color: var(--a-text);
+  height: 48px;
+  border-bottom: 1px solid var(--a-hairline);
+  font-size: var(--a-text-base);
+  color: var(--a-text-secondary);
 }
 .a-ob-step.now {
-  border-color: var(--a-accent);
-  background: var(--a-accent-subtle);
+  color: var(--a-text);
+  font-weight: var(--a-weight-medium);
 }
 .a-ob-n {
-  width: 24px;
-  height: 24px;
+  width: 22px;
+  height: 22px;
   border-radius: 50%;
   display: grid;
   place-items: center;
-  font-size: 11px;
-  font-weight: 700;
+  font-size: var(--a-text-xs);
+  font-weight: var(--a-weight-semibold);
   flex: none;
   background: var(--a-bg-muted);
-  color: var(--a-text-secondary);
-}
-.a-ob-step.done .a-ob-n {
-  background: var(--a-success);
-  color: #fff;
+  color: var(--a-text-tertiary);
 }
 .a-ob-step.now .a-ob-n {
-  background: var(--a-accent);
-  color: #fff;
+  background: var(--a-text);
+  color: var(--a-bg-canvas);
 }
 .a-ob-n .a-ic {
-  width: 13px;
-  height: 13px;
+  width: 12px;
+  height: 12px;
+  stroke-width: 2.4;
 }
 .a-ob-status {
   margin-left: auto;
   font-size: var(--a-text-xs);
+  font-weight: var(--a-weight-normal);
   color: var(--a-text-tertiary);
-}
-.a-ob-status.accent {
-  color: var(--a-accent);
 }
 
-.a-ob-btn {
-  height: 38px;
-  padding: 0 20px;
-  border: 0;
-  border-radius: var(--a-radius-md);
-  background: var(--a-accent-solid);
-  color: #fff;
-  font-size: var(--a-text-sm);
-  font-weight: var(--a-weight-medium);
-  cursor: pointer;
-  box-shadow: var(--a-shadow-xs);
-  transition: background var(--a-dur-fast) var(--a-ease-out);
-}
-.a-ob-btn:hover {
-  background: var(--a-accent-solid-hover);
+.a-ob-card .a-btn {
+  margin-top: 22px;
 }
 .a-ob-skip {
-  margin-top: 12px;
+  display: block;
+  margin: 12px auto 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
   font-size: var(--a-text-sm);
-  color: var(--a-text-tertiary);
+  color: var(--a-text-secondary);
   cursor: pointer;
 }
 .a-ob-skip:hover {
-  color: var(--a-text-secondary);
+  color: var(--a-text);
+}
+.a-ob-skip:focus-visible {
+  outline: none;
+  box-shadow: var(--a-ring-focus);
 }

@@ -638,15 +638,15 @@ describe("#1593 通用", () => {
   test("AC6 说明文字按批准稿对照表:不写「权威值」,通知开关不再共用一句说明", () => {
     expect(zh["codepuppy.settings.loading"]).toBe("正在读取设置…")
     expect(zh["codepuppy.settings.authorityStillActive"]).toBe("仍使用上次保存的设置")
-    expect(zh["codepuppy.settings.invalidStoredDetail"]).toBe("已显示默认设置,保存后替换")
-    expect(zh["codepuppy.settings.errorRead"]).toBe("读取失败,请重试")
+    expect(zh["codepuppy.settings.invalidStoredDetail"]).toBe("已显示默认设置，保存后替换")
+    expect(zh["codepuppy.settings.errorRead"]).toBe("读取失败，请重试")
     expect(zh["codepuppy.settings.storageSafeCounts"]).toBe("只显示数量")
     expect(zh["codepuppy.settings.storageFailClosed"]).toBe("未清理")
     expect(zh["codepuppy.settings.storageWorkerFailed"]).toBe("检查未完成")
-    expect(zh["codepuppy.settings.toolsReasonInvalid"]).toBe("来源无法确认,已停用")
+    expect(zh["codepuppy.settings.toolsReasonInvalid"]).toBe("来源无法确认，已停用")
     expect(zh["codepuppy.settings.toolsInherit"]).toBe("跟随上级")
-    expect(zh["codepuppy.settings.toolsNoBinding"]).toBe("服务设置无法确认,暂不能启用")
-    expect(zh["codepuppy.settings.toolsInvalidCount"]).toBe("{{count}} 项来源无法确认,已停用")
+    expect(zh["codepuppy.settings.toolsNoBinding"]).toBe("服务设置无法确认，暂不能启用")
+    expect(zh["codepuppy.settings.toolsInvalidCount"]).toBe("{{count}} 项来源无法确认，已停用")
     for (const key of Object.keys(zh).filter((k) => k.startsWith("codepuppy.settings.")) as Array<keyof typeof zh>) {
       expect(zh[key], key).not.toContain("权威")
     }

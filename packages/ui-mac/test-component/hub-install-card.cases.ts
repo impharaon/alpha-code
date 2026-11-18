@@ -413,3 +413,35 @@ test("I-10 an install awaiting approval and a declined install name the package,
   for (const host of [waiting, declined]) expect(host.textContent).not.toContain("candidate-main-id")
   expect(h.reads).toHaveLength(0)
 })
+
+test("安装卡 #install-card:等待允许与已拒绝都写名称与真实来源;已拒绝换禁止图标,没有按钮", async () => {
+  const h = harness(null)
+  const waiting = mount(
+    row({ requestId: undefined, name: "Supabase", approval: "waiting", source: "claude-marketplace" }),
+  )
+  await flush()
+  expect(waiting.textContent).toContain("等待你允许安装『Supabase』")
+  expect(waiting.textContent).toContain("来源：Claude 插件市场")
+  expect(waiting.querySelector(".a-tl-hcard-mark")?.textContent).toBe("S")
+  expect(waiting.querySelector("[data-install-state]")?.getAttribute("data-install-state")).toBe("awaiting")
+  expect(waiting.querySelector("button")).toBeNull()
+
+  const declined = mount(
+    row({ requestId: undefined, name: "Figma 读取", approval: "declined", phase: "error", source: "claude-marketplace" }),
+  )
+  await flush()
+  expect(declined.textContent).toContain("已拒绝，未安装『Figma 读取』")
+  expect(declined.textContent).toContain("来源：Claude 插件市场")
+  expect(declined.querySelector(".a-tl-hcard-mark svg")).not.toBeNull()
+  expect(declined.querySelector("button")).toBeNull()
+  expect(h.reads).toHaveLength(0)
+})
+
+test("安装卡:来源是不认识的值时不写来源行(不把原值露给用户)", async () => {
+  harness(null)
+  const host = mount(row({ requestId: undefined, name: "Supabase", approval: "waiting", source: "constructor" }))
+  await flush()
+  expect(host.textContent).toContain("等待你允许安装『Supabase』")
+  expect(host.textContent).not.toContain("来源")
+  expect(host.textContent).not.toContain("constructor")
+})

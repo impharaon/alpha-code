@@ -13,6 +13,7 @@
 //   · 回合级错误(非中断)→ turnError 行;session_status=retry → 工作过程实时标题写重试(`#1474`,不再另挂重试行);
 //   · 未知 part 类型 fail-closed:不渲染、不猜测(subtask 同上游 v1/v2 一致不渲染);
 //   · I7 有界:boundedText 把超大文本截断后才交给渲染管线(sanitizer/Shiki 不吃整串)。
+import { intlLocaleTag } from "../../i18n/intl-tag"
 import type {
   AssistantMessage,
   FilePart,
@@ -189,6 +190,8 @@ export type TimelineHubInstall = {
   result?: string
   /** BR-10:这次安装正等用户在审批卡上允许,或已被拒绝(没有安装)。 */
   approval?: "waiting" | "declined"
+  /** 执行闸记在调用上的真实来源(`metadata.install.source`,卡上只经来源词表翻成人话;不认识的值卡上不写)。 */
+  source?: string
 }
 
 /** 引擎对用户拒绝的工具调用写下的固定原因(packages/core/src/session/runner/step.ts 的 declines)。 */
@@ -203,6 +206,7 @@ function hubInstallOf(part: ToolPart): TimelineHubInstall | undefined {
   const recorded = metadata?.install && typeof metadata.install === "object" ? (metadata.install as { name?: unknown }).name : undefined
   const name = operation === "search" ? input?.query : typeof recorded === "string" ? recorded : input?.name
   const clean = typeof name === "string" ? redactText(name, 400) : undefined
+  const recordedSource = metadata?.install && typeof metadata.install === "object" ? (metadata.install as { source?: unknown }).source : undefined
   const awaiting = metadata?.stage === "awaiting-approval" && typeof metadata.requestId !== "string" && typeof recorded === "string"
   const approval = !awaiting ? undefined
     : part.state.status === "error" ? part.state.error === ENGINE_DECLINED_TOOL_CALL ? "declined" as const : undefined
@@ -217,6 +221,7 @@ function hubInstallOf(part: ToolPart): TimelineHubInstall | undefined {
     ...(typeof metadata?.packageId === "string" ? { packageId: metadata.packageId } : {}),
     ...(result?.ok ? { result: result.value } : {}),
     ...(approval ? { approval } : {}),
+    ...(typeof recordedSource === "string" ? { source: recordedSource } : {}),
   }
 }
 
@@ -474,8 +479,6 @@ function renderableToolPart(part: ToolPart) {
 export const PROCESS_GROUP_MAX = 24
 /** 一步(或合并组的最长一步)超过这个时长才在行尾写出用时(design §2)。 */
 export const PROCESS_STEP_DURATION_MIN_MS = 10_000
-/** 摘要里最多列几类动作(按次数排)。 */
-export const PROCESS_SUMMARY_ACTIONS_MAX = 3
 
 /**
  * 工具步骤的合并键。「同类」= identity 分派出的 kind(#934:别名不参与),「同来源」=
@@ -579,62 +582,34 @@ export function buildProcessSteps(items: readonly ProcessItem[]): TimelineProces
   return steps
 }
 
-/** 摘要里的一类动作:动词(i18n key)或被动净化的名称 + 成功次数。 */
-export interface ProcessSummaryAction {
-  key: string
-  titleKey?: string
-  name: string
-  count: number
-}
-
 export interface ProcessSummary {
-  /** 成功的动作,按次数排,最多 PROCESS_SUMMARY_ACTIONS_MAX 类;思考不进。 */
-  actions: ProcessSummaryAction[]
+  /** 工具调用总步数(成功、失败、仍在跑的都算;思考不计)—— 收起行写「思考与操作 · N 步」。 */
+  toolCount: number
   /** 失败的工具调用次数(含审批超时)。 */
   failed: number
-  /** 思考合计时长(只在没有任何动作时作为摘要)。 */
-  reasoningMs?: number
+  /** 思考段数(只用来区分「纯文字回答」与「有过程」)。 */
   reasoningCount: number
 }
 
 export function processSummaryOf(steps: readonly TimelineProcessStep[]): ProcessSummary {
-  const actions = new Map<string, ProcessSummaryAction & { order: number }>()
+  let toolCount = 0
   let failed = 0
-  let reasoningMs: number | undefined
   let reasoningCount = 0
   for (const step of steps) {
     if (step.kind === "reasoning") {
       reasoningCount += step.parts.length
-      const ms = reasoningStepDurationMs(step.parts)
-      if (ms !== undefined) reasoningMs = (reasoningMs ?? 0) + ms
       continue
     }
     if (step.kind !== "tool") continue
-    for (const part of step.parts) {
-      if (part.state.status === "error") {
-        failed += 1
-        continue
-      }
-      if (part.state.status !== "completed") continue
-      const dispatch = toolCardDispatchOf(part)
-      const key = toolStepMergeKeyOf(part)
-      const existing = actions.get(key)
-      if (existing) existing.count += 1
-      else
-        actions.set(key, {
-          key,
-          titleKey: dispatch.metadataOnly ? undefined : toolTitleKeyOf(dispatch),
-          name: dispatch.name,
-          count: 1,
-          order: actions.size,
-        })
-    }
+    toolCount += step.parts.length
+    failed += step.parts.filter((part) => part.state.status === "error").length
   }
-  const ranked = [...actions.values()]
-    .sort((a, b) => b.count - a.count || a.order - b.order)
-    .slice(0, PROCESS_SUMMARY_ACTIONS_MAX)
-    .map(({ order: _order, ...action }) => action)
-  return { actions: ranked, failed, reasoningMs, reasoningCount }
+  return { toolCount, failed, reasoningCount }
+}
+
+/** 脚注里的词元数:按界面语言取紧凑写法(中文「2.4万」、英文「24K」),不再硬写英文「24k」。 */
+export function formatTokenCount(count: number, locale: string): string {
+  return new Intl.NumberFormat(intlLocaleTag(locale), { notation: "compact", maximumFractionDigits: 1 }).format(count)
 }
 
 /** 整轮用时:用户消息创建 → 最后一条助手消息完成。最后一条未完成 / 数值异常 → 缺席。 */

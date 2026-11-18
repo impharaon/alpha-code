@@ -497,7 +497,8 @@ describe("REQ-126 CODE-D 新对话页工作区选择器", () => {
     await flush()
     await flush()
 
-    expect(chipButton(host).textContent).toContain("Alpha")
+    // 默认工作区在界面上一个名字「Code Puppy」(不是目录末段)
+    expect(chipButton(host).textContent).toContain("Code Puppy")
     expect(chipButton(host).textContent).not.toContain("alpha-code")
     expect(host.querySelector("h1")?.textContent).not.toContain("Alpha")
     // 默认对话目录未注册为项目 ⇒ 它作为常驻首项出现在列表里,选中态在它身上。
@@ -994,7 +995,8 @@ describe("REQ-126 CODE-D 首页:chip 抽取行为保持 + 默认落 ~/Alpha", ()
     await flush()
 
     // ADR-025 2026-07-28 改判:有项目的既有用户也一样,未显式选 ⇒ ~/Alpha。
-    expect(chipButton(host).textContent).toContain("Alpha")
+    // 默认工作区在界面上一个名字「Code Puppy」(不是目录末段)
+    expect(chipButton(host).textContent).toContain("Code Puppy")
     expect(chipButton(host).textContent).not.toContain("alpha-code")
 
     type(textarea(host)!, "开工")

@@ -394,33 +394,11 @@ export function CodePuppySettings(props: {
         tabIndex={-1}
         data-codepuppy-settings
       >
+        {/* 页头与定制中心 / 自动化同一套(#settings `.phd`):页签 + 右侧「保存更改」,底部发丝线;页名在顶栏,这里的 h1 只给读屏。 */}
         <header class="codepuppy-settings-head">
-          <button
-            ref={(element) => (closeButton = element)}
-            type="button"
-            class="codepuppy-settings-back"
-            aria-label={t("codepuppy.settings.back")}
-            onClick={close}
-          >
-            <svg aria-hidden="true" viewBox="0 0 24 24">
-              <path d="m15 18-6-6 6-6" />
-            </svg>
-          </button>
-          <div>
-            <h1 id="codepuppy-settings-title">{t("codepuppy.settings.title")}</h1>
-            <Show when={saveError()}>
-              <p>{t("codepuppy.settings.authorityStillActive")}</p>
-            </Show>
-          </div>
-          <Show when={dirty()}>
-            <span class="codepuppy-settings-unsaved">
-              <i aria-hidden="true" />
-              {t("codepuppy.settings.unsaved")}
-            </span>
-          </Show>
-        </header>
-
-        <div class="codepuppy-settings-layout">
+          <h1 id="codepuppy-settings-title" class="codepuppy-settings-sr">
+            {t("codepuppy.settings.title")}
+          </h1>
           <nav class="codepuppy-settings-nav" aria-label={t("codepuppy.settings.categories")}>
             <For
               each={[
@@ -442,7 +420,40 @@ export function CodePuppySettings(props: {
               )}
             </For>
           </nav>
+          <Show when={saveError()}>
+            <p class="codepuppy-settings-sr">{t("codepuppy.settings.authorityStillActive")}</p>
+          </Show>
+          <Show when={dirty()}>
+            <span class="codepuppy-settings-unsaved">
+              <i aria-hidden="true" />
+              {t("codepuppy.settings.unsaved")}
+            </span>
+          </Show>
+          <Show when={(section() === "general" || section() === "shortcuts") && draft()}>
+            <Button
+              variant="primary"
+              loading={saving()}
+              disabled={!dirty() || !readyToEdit()}
+              data-settings-save
+              onClick={save}
+            >
+              {saveError() ? t("codepuppy.settings.retrySave") : t("codepuppy.settings.save")}
+            </Button>
+          </Show>
+          <button
+            ref={(element) => (closeButton = element)}
+            type="button"
+            class="codepuppy-settings-back"
+            aria-label={t("codepuppy.settings.back")}
+            onClick={close}
+          >
+            <svg aria-hidden="true" viewBox="0 0 24 24">
+              <path d="M6 6l12 12M18 6L6 18" />
+            </svg>
+          </button>
+        </header>
 
+        <div class="codepuppy-settings-layout">
           <main class="codepuppy-settings-main">
             <Show when={loadState() === "loading"}>
               <div class="codepuppy-settings-loading" role="status">
@@ -488,15 +499,6 @@ export function CodePuppySettings(props: {
                       <h2>{t("codepuppy.settings.general")}</h2>
                       <p>{t("codepuppy.settings.generalDetail")}</p>
                     </div>
-                    <Button
-                      variant="primary"
-                      loading={saving()}
-                      disabled={!dirty() || !readyToEdit()}
-                      data-settings-save
-                      onClick={save}
-                    >
-                      {saveError() ? t("codepuppy.settings.retrySave") : t("codepuppy.settings.save")}
-                    </Button>
                   </div>
 
                   <section class="codepuppy-settings-group" aria-labelledby="settings-behavior-title">
@@ -592,15 +594,6 @@ export function CodePuppySettings(props: {
                       <h2>{t("codepuppy.settings.shortcuts")}</h2>
                       <p>{t("codepuppy.settings.shortcutsDetail")}</p>
                     </div>
-                    <Button
-                      variant="primary"
-                      loading={saving()}
-                      disabled={!dirty() || !readyToEdit()}
-                      data-settings-save
-                      onClick={save}
-                    >
-                      {saveError() ? t("codepuppy.settings.retrySave") : t("codepuppy.settings.save")}
-                    </Button>
                   </div>
                   <section class="codepuppy-settings-group" aria-label={t("codepuppy.settings.shortcutList")}>
                     <For each={SHORTCUTS}>

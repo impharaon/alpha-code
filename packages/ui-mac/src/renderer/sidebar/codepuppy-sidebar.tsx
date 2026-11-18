@@ -9,7 +9,7 @@ import { createEffect, createMemo, createRoot, createSignal, For, onCleanup, Sho
 import { Portal } from "solid-js/web"
 import { useLocation, useNavigate, type NavigateOptions } from "@solidjs/router"
 import { ServerConnection, useCommand, useServer, useTabs } from "../codepuppy-ui/providers"
-import { createDefaultWorkspaceDir } from "../codepuppy-ui/default-workspace"
+import { createDefaultWorkspaceDir, workspaceDisplayName } from "../codepuppy-ui/default-workspace"
 import { beginLaunchDraftHandoff, endLaunchDraftHandoff } from "../codepuppy-ui/launch-draft-handoff"
 import { useTheme } from "@opencode-ai/ui/theme/context"
 import { t } from "../i18n"
@@ -58,7 +58,7 @@ import { unresolvedProblems } from "../codepuppy-ui/problems"
 // opencode folds standalone (non-git) directories into a single sentinel "global" project whose
 // worktree is "/" and whose name is empty — give it a readable label instead of a blank row.
 function projectDisplayName(project: CodePuppyProject): string {
-  if (project.name) return project.name
+  if (project.name) return workspaceDisplayName(project.worktree, project.name)
   if (project.worktree === "/") return t("codepuppy.sidebar.globalProject")
   return project.worktree
 }

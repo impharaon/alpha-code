@@ -1,5 +1,5 @@
-// CodePuppyOnboarding — first-run welcome (mockup shell.html §E · 首次运行): an α mark, a 3-step progress
-// (登录账号 → 选择模型 → 打开第一个项目) and a 继续 / 跳过-BYOK CTA, so new users no longer land on a
+// CodePuppyOnboarding — first-run welcome (新外壳稿 #onboarding): the puppy mark, a 3-step progress
+// (登录账号 → 选择模型 → 打开第一个项目) and a 继续 / 跳过 CTA, so new users no longer land on a
 // bare empty state. Shown until dismissed (a localStorage flag); the steps reflect REAL auth state
 // (logged-in flips step 1 to done). Mounted as a route-agnostic AppInterface child like CodePuppyHome.
 
@@ -8,6 +8,8 @@ import { Portal } from "solid-js/web"
 import type { AuthState } from "../../preload/types"
 import { t } from "../i18n"
 import { subscribeAuthState } from "../auth-recovery"
+import brandMark from "../brand/brand-mark.png"
+import { Button } from "./Button"
 import "./onboarding.css"
 
 const DONE_KEY = "codepuppy.onboarding.done"
@@ -40,14 +42,14 @@ export function CodePuppyOnboarding() {
       <Portal>
         <div class="a-ui a-ob" data-codepuppy-onboarding>
           <div class="a-ob-card">
-            <div class="a-ob-mark">α</div>
+            <img class="a-ob-mark" src={brandMark} alt="" />
             <h3 class="a-ob-title">{t("codepuppy.onboarding.title")}</h3>
             <p class="a-ob-sub">{t("codepuppy.onboarding.subtitle")}</p>
             <div class="a-ob-steps">
               <div class="a-ob-step" classList={{ done: loggedIn(), now: !loggedIn() }}>
                 <span class="a-ob-n">
                   <Show when={loggedIn()} fallback={<>1</>}>
-                    <svg class="a-ic a-ic-sm" viewBox="0 0 24 24" style={{ stroke: "#fff" }}>
+                    <svg class="a-ic a-ic-sm" viewBox="0 0 24 24">
                       <path d="M20 6L9 17l-5-5" />
                     </svg>
                   </Show>
@@ -67,8 +69,12 @@ export function CodePuppyOnboarding() {
                 {t("codepuppy.onboarding.openFirstProject")}
               </div>
             </div>
-            <button class="a-ob-btn" onClick={primary}>{loggedIn() ? t("codepuppy.onboarding.continue") : t("codepuppy.onboarding.login")}</button>
-            <div class="a-ob-skip" onClick={finish}>{t("codepuppy.onboarding.skipByok")}</div>
+            <Button variant="primary" size="lg" block onClick={primary}>
+              {loggedIn() ? t("codepuppy.onboarding.continue") : t("codepuppy.onboarding.login")}
+            </Button>
+            <button type="button" class="a-ob-skip" onClick={finish}>
+              {t("codepuppy.onboarding.skipByok")}
+            </button>
           </div>
         </div>
       </Portal>

@@ -185,6 +185,11 @@ export function t(key: keyof Dictionary, params?: Record<string, string | number
   return translate(key, params) ?? key
 }
 
+/** 当前界面语言(按语言格式化数字、日期时用)。 */
+export function currentLocale(): Locale {
+  return state.locale
+}
+
 export function setLocale(locale: Locale) {
   state.locale = locale
   setDictionary(build(locale))

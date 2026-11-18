@@ -40,9 +40,10 @@
   display: flex;
   flex-direction: column;
   gap: 16px;
-  max-width: 820px;
+  /* 与输入框 / 批准面板同一条宽度公式(新外壳稿 #session 审计 #16)。 */
+  max-width: min(680px, calc(100% - 64px));
   margin: 0 auto;
-  padding: 24px 26px 40px;
+  padding: 28px 0 40px;
 }
 
 .a-tl-row {
@@ -360,9 +361,9 @@
    气泡内的子代理提及(唯一的「链接」形态)与截断提示改用与这层底配对过的色,
    对比度判据在 contrast-ratchet.test.ts。 */
 .a-tl-bubble {
-  padding: 10px 14px;
+  padding: 9px 14px;
   border: 1px solid transparent;
-  border-radius: var(--a-radius-lg);
+  border-radius: var(--a-radius-xl);
   background: var(--a-user-bubble);
   color: var(--a-user-bubble-text);
   font-size: var(--a-text-md);
@@ -746,7 +747,7 @@ button.a-tl-cmd-chip:focus-visible {
   width: 100%;
   max-width: 760px;
   font-size: var(--a-text-md);
-  line-height: var(--a-leading-normal);
+  line-height: 1.7;
 }
 
 /* 引擎(sanitize+Shiki 管线)保留内部结构与令牌;外框只约束宽度与断行。 */
@@ -754,6 +755,25 @@ button.a-tl-cmd-chip:focus-visible {
   min-width: 0;
   max-width: 100%;
   overflow-wrap: break-word;
+}
+
+/* 回答排版(#session `.ans`):行高 1.7、段间 10px、段落「pretty」换行(中文标点不再挤成孤字行)、行内代码用等宽小字 + 浅灰底。
+   选择器比上游 markdown.css 多一层 .a-tl-ai,不动上游样式。 */
+.a-tl-ai .a-tl-md-engine {
+  font-size: var(--a-text-md);
+  line-height: 1.7;
+}
+
+.a-tl-ai .a-tl-md-engine p {
+  margin-bottom: 10px;
+  text-wrap: pretty;
+}
+
+.a-tl-ai .a-tl-md-engine :not(pre) > code {
+  padding: 1px 5px;
+  border-radius: var(--a-radius-xs);
+  background: var(--a-bg-muted);
+  font-size: var(--a-text-sm);
 }
 
 /* Major-1:离屏 Markdown 行的引擎占位(行高由 min-height 保留的实测值撑起)。 */
@@ -809,7 +829,7 @@ button.a-tl-cmd-chip:focus-visible {
   border: 0;
   border-radius: var(--a-radius-md);
   background: transparent;
-  color: var(--a-text-secondary);
+  color: var(--a-text-tertiary);
   font: inherit;
   font-size: var(--a-text-sm);
   text-align: left;
@@ -833,7 +853,7 @@ button.a-tl-cmd-chip:focus-visible {
   height: 12px;
   fill: none;
   stroke: var(--a-text-tertiary);
-  stroke-width: 2.2;
+  stroke-width: 2.4;
   stroke-linecap: round;
   stroke-linejoin: round;
   transition: transform var(--a-dur) var(--a-ease-out);
@@ -863,8 +883,8 @@ button.a-tl-cmd-chip:focus-visible {
   display: flex;
   flex-direction: column;
   margin: 2px 0 2px 5px;
-  padding-left: 13px;
-  border-left: 1.5px solid var(--a-border);
+  padding-left: 14px;
+  border-left: 1px solid var(--a-hairline);
 }
 
 .a-tl-pf-item,
@@ -903,7 +923,7 @@ button.a-tl-cmd-chip:focus-visible {
   height: 14px;
   fill: none;
   stroke: currentColor;
-  stroke-width: 1.9;
+  stroke-width: 2.05;
   stroke-linecap: round;
   stroke-linejoin: round;
 }

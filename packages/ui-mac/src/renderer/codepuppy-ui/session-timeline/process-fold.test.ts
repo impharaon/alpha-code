@@ -133,12 +133,10 @@ describe("#1473 真实 18 步研究回合(生产装配)", () => {
     expect(fetches.kind === "tool" && fetches.parts.map((part) => part.tool)).toEqual(["webfetch", "webfetch"])
   })
 
-  test("摘要:搜索 16 次(思考不计)· 2 步没成功 · 整轮用时 3 分 27 秒", () => {
+  test("摘要:18 步(搜索 16 + 打开网页 2,思考不计)· 2 步没成功 · 整轮用时 3 分 27 秒", () => {
     const process = processRows(rows)[0]!
     const summary = processSummaryOf(process.steps)
-    expect(summary.actions).toEqual([
-      expect.objectContaining({ titleKey: "codepuppy.timeline.cloud.webSearch", count: 16 }),
-    ])
+    expect(summary.toolCount).toBe(18)
     expect(summary.failed).toBe(2)
     expect(summary.reasoningCount).toBe(6)
     expect(process.turnFailed).toBe(false)
@@ -296,7 +294,7 @@ describe("#1473 哪段文字是回答", () => {
 })
 
 describe("#1473 摘要", () => {
-  test("动作计数最多三类,按次数排;失败不计入动作,另计", () => {
+  test("步数 = 全部工具调用(含失败那一次);失败另计", () => {
     const steps = buildProcessSteps([
       { type: "tool", part: tool("a1", "read") },
       { type: "say", part: text("s", "x") },
@@ -309,15 +307,12 @@ describe("#1473 摘要", () => {
       { type: "tool", part: tool("f1", "webfetch", { state: failedState }) },
     ])
     const summary = processSummaryOf(steps)
-    expect(summary.actions.map((action) => [action.titleKey, action.count])).toEqual([
-      ["codepuppy.timeline.step.bash", 3],
-      ["codepuppy.timeline.tool.grep", 2],
-      ["codepuppy.timeline.tool.read", 1],
-    ])
+    // 步数 = 全部工具调用(含失败那一次),不按动作类别折算。
+    expect(summary.toolCount).toBe(8)
     expect(summary.failed).toBe(1)
   })
 
-  test("metadata-only 工具在摘要里只有名称(无动词),不读输入", () => {
+  test("metadata-only 工具照样计入步数,摘要不读它的输入", () => {
     const steps = buildProcessSteps([
       {
         type: "tool",
@@ -333,7 +328,7 @@ describe("#1473 摘要", () => {
         }),
       },
     ])
-    expect(processSummaryOf(steps).actions).toEqual([{ key: expect.any(String), name: "search", count: 1 }])
+    expect(processSummaryOf(steps).toolCount).toBe(1)
   })
 
   test("回合仍在跑:不出用时;最后一条助手未完成:不出用时", () => {

@@ -187,7 +187,7 @@ describe("#1314 风险标签 · 真浏览器", () => {
     // 极高风险 + 外发:说明句在正文最上面。
     expect(await page.locator(".a-permission-panel-description").innerText()).toBe("可能把密钥或私人数据发到外部")
     // 读屏:对话框的可读名称 = 标题 + 档位(Playwright 按浏览器的可访问性计算)。
-    expect(await page.getByRole("dialog", { name: "允许这次操作吗? 极高风险" }).count()).toBe(1)
+    expect(await page.getByRole("dialog", { name: "允许这次操作吗？ 极高风险" }).count()).toBe(1)
     await page.screenshot({ path: resolve(evidence, "approval-440-long-scrolled.png") })
     await page.close()
   }, 120_000)

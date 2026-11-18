@@ -100,20 +100,19 @@ describe("Alpha Settings ownership ratchets", () => {
     expect(harness).not.toMatch(/digest|finishedAt|warning detail|\/Users\/|\bMB\b/)
   })
 
-  test("#1550 AC2 the back button sits below the macOS window-button strip", async () => {
-    // 设置页 `position: fixed; inset: 0` 铺满整窗,红绿灯(windows.ts trafficLightPosition y:16)画在它上面。
-    // 改前头部 `padding: 10px 22px` ⇒ 返回键(44px 高,纵向居中)落在 y≈12…56,与灯重叠、点不到。
-    // 让位常量与首页 / 定制中心 / 自动化 / 引导页是同一个 `var(--a-home-top, 40px)`,不另起一个数。
+  test("#1550 AC2 / 新外壳:设置页铺在常驻顶栏与窄轨之外,返回键不会落在 macOS 红绿灯下", async () => {
+    // 原先设置页 `position: fixed; inset: 0` 铺满整窗,靠头部顶部留白让开红绿灯(#1550)。
+    // 新外壳里红绿灯在常驻顶栏上,设置页是顶栏 / 窄轨右下方的工作面页面:顶边 = 顶栏高,左边 = 窄轨宽,
+    // 不再盖住窗口按钮带 —— 让位由令牌 `--a-topbar-h` / `--a-rail-w` 承担(值在 tokens.css),不是碰巧写的数。
     const css = (await Bun.file(join(root, "src/renderer/codepuppy-ui/settings.css")).text()).replace(/\/\*[\s\S]*?\*\//g, "")
-    const head = css.match(/\.codepuppy-settings-head \{([^}]*)\}/)?.[1] ?? ""
-    expect(head).toMatch(/padding: var\(--a-home-top, 40px\) 22px 10px;/)
-    expect(head).toContain("-webkit-app-region: drag;")
     const page = css.match(/\.codepuppy-settings-page \{([^}]*)\}/)?.[1] ?? ""
-    expect(page).toContain("inset: 0;")
-    const home = await Bun.file(join(root, "src/renderer/codepuppy-ui/home.css")).text()
-    expect(home).toContain("top: var(--a-home-top, 40px);")
+    expect(page).toContain("top: var(--a-topbar-h);")
+    expect(page).toContain("left: var(--a-rail-w);")
+    expect(page).not.toContain("inset: 0;")
+    const tokens = await Bun.file(join(root, "src/renderer/codepuppy-ui/tokens.css")).text()
+    expect(tokens).toMatch(/--a-topbar-h:\s*44px;/)
     const windows = await Bun.file(join(root, "src/main/windows.ts")).text()
-    // 灯的下沿 = y16 + 12px 直径 = 28 < 40:常量真的让开了灯,而不是碰巧写了个数。
+    // 灯的下沿 = y16 + 12px 直径 = 28,在顶栏高 44 之内:页面顶边在灯之下。
     expect(windows).toContain("trafficLightPosition: { x: 18, y: 16 }")
     const source = await settingsSurface.text()
     expect(source.indexOf('class="codepuppy-settings-head"')).toBeLessThan(source.indexOf('class="codepuppy-settings-back"'))

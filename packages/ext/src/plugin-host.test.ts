@@ -532,7 +532,7 @@ const hubHost = (options: { manifest: boolean }) =>
           if (message.type === "codepuppy.hub.install.request") installs.push(message)
           const reply =
             message.type === "codepuppy.sources.search.request"
-              ? buildSourcesSearchReply(message.id, { result: { searchId: "search_github", query: message.query ?? "", sources: [{ source: "catalog", status: "ok", matched: 1, skipped: 0 }], candidates: [candidate] } })
+              ? buildSourcesSearchReply(message.id, { result: { searchId: "search_github", query: message.query ?? "", sources: [{ source: "catalog", status: "ok", matched: 1, skipped: 0 }], candidates: [candidate, { id: "cand_ctx7", source: "claude-marketplace", name: "context7", displayName: "Context7", description: "docs", kind: "plugin", upstream: {} }] } })
               : message.type === "codepuppy.hub.install.request"
               ? buildHubInstallReply(message.id, { accepted: true })
               : message.type === "codepuppy.hub.view.request"
@@ -665,6 +665,67 @@ itWithPermission.live("I-10 an assistant install asks once in every interactive 
   // 别的工具照常判定:同一引擎里普通读取照旧放行
   const hooks = yield* PluginHooks.Service
   expect((yield* hooks.trigger("permission", "evaluate", { sessionID: ids.sessionID, agent: "build" as never, action: "read", resources: ["a.txt"], effect: "allow" as const })).effect).toBe("allow")
+}))
+
+// Codex R1 Major(I-10):两个会话在同一 Location 里同时安装,模型供应商给了同一个调用编号(引擎原样沿用)。每次安装的审批
+// 只属于它自己那一次调用(会话 + 消息 + 调用编号);一个会话的允许绝不能放行另一个会话的安装。
+// 闸的准备在 execute.before 里、询问在工具体内;两次调用各停在自己「等待审批」那次进度上(闸已为两者都准备好),确定交错:
+// A 准备、B 准备、A 问、B 问 —— 即审查复现的顺序。
+itWithPermission.live("I-10 concurrent installs in two sessions with the same call ID each ask for and submit only their own package", () => Effect.gen(function* () {
+  env({})
+  const { installs } = yield* hubHost({ manifest: true })
+  yield* activate(CodePuppyExt)
+  const hold = () => {
+    let reached = () => {}
+    let release = () => {}
+    const atGate = new Promise<void>((resolve) => (reached = resolve))
+    const released = new Promise<void>((resolve) => (release = resolve))
+    return { reached: () => reached(), release: () => release(), atGate, released }
+  }
+  expect((yield* hubInstall("build", "once", "codepuppy_hub_search", { query: "docs" })).asks).toEqual([])
+  const directory = realpathSync((yield* Location.Service).directory)
+  const sessions = yield* Sessions.Service
+  const a = yield* sessions.create({ location: { directory }, title: "install A" })
+  const b = yield* sessions.create({ location: { directory }, title: "install B" })
+  const hooks = yield* PluginHooks.Service
+  for (const session of [a, b]) yield* hooks.trigger("session", "prompt", { sessionID: session.id, messageID: "msg_prompt", prompt: { text: "装" }, delivery: "queue" } as never)
+  const permission = yield* Permission.Service
+  const snapshot = yield* (yield* Tool.Service).snapshot()
+  const run = (session: { id: Session.ID }, id: string, latch: ReturnType<typeof hold>) =>
+    snapshot.execute({
+      sessionID: session.id, agent: "build" as never, messageID: SessionMessage.ID.make("msg_same"),
+      call: { type: "tool-call", id: "call_shared", name: "codepuppy_hub_install", input: { id } },
+      progress: (update: Record<string, unknown>) => update.stage === "awaiting-approval" ? Effect.promise(async () => { latch.reached(); await latch.released }) : Effect.void,
+    } as never).pipe(Effect.exit, Effect.forkChild)
+  const answerNext = (call: { pollUnsafe(): unknown }) => Effect.gen(function* () {
+    for (let waited = 0; waited < 4000 && !call.pollUnsafe(); waited += 20) {
+      const pending = [...(yield* permission.forSession(a.id)), ...(yield* permission.forSession(b.id))]
+      if (pending.length) {
+        const request = pending[0]!
+        yield* permission.reply({ requestID: request.id, reply: "once" })
+        return { sessionID: request.sessionID, install: (request.metadata?.policy as { install?: unknown } | undefined)?.install }
+      }
+      yield* Effect.sleep("20 millis")
+    }
+    return undefined
+  })
+  const latchA = hold()
+  const latchB = hold()
+  const callA = yield* run(a, "mcp:github", latchA)
+  yield* Effect.promise(() => latchA.atGate)
+  const callB = yield* run(b, "cand_ctx7", latchB)
+  yield* Effect.promise(() => latchB.atGate)
+  latchA.release()
+  const firstAsk = yield* answerNext(callA)
+  yield* Fiber.join(callA)
+  latchB.release()
+  const secondAsk = yield* answerNext(callB)
+  yield* Fiber.join(callB)
+  expect([firstAsk, secondAsk]).toEqual([
+    { sessionID: a.id, install: { name: "GitHub", source: "catalog" } },
+    { sessionID: b.id, install: { name: "Context7", source: "claude-marketplace" } },
+  ])
+  expect(installs.map((message) => [(message as { sessionID: string }).sessionID, (message as { ref: { id: string } }).ref.id])).toEqual([[a.id, "mcp:github"], [b.id, "cand_ctx7"]])
 }))
 
 itWithPermission.live("I-10 a tool the user enabled in Settings does not skip the install card", () => Effect.gen(function* () {

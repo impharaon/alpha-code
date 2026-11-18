@@ -274,7 +274,7 @@ function Page(): JSX.Element {
         <SessionNotFound
           title={t("session.error.notFound" as never)}
           description={t("session.error.notFound.description" as never)}
-          action={t("session.error.notFound.newChat" as never)}
+          action={t("session.error.notFound.closeTab" as never)}
           onAction={() => {}}
         />
       </Chrome>

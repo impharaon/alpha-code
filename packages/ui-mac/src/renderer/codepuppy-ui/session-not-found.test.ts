@@ -62,7 +62,7 @@ function mount(onAction: () => void) {
           // 与 SessionErrorFallback 同一组键:这里取生产词典,词典里的词一变,这条就跟着看。
           title: runtime.t("session.error.notFound" as never),
           description: runtime.t("session.error.notFound.description" as never),
-          action: runtime.t("session.error.notFound.newChat" as never),
+          action: runtime.t("session.error.notFound.closeTab" as never),
           onAction,
         }),
       host,

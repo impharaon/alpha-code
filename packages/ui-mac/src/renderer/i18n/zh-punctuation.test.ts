@@ -58,7 +58,7 @@ describe("已整理的面:中文旁没有半角标点", () => {
 
   test("找不到对话的几句(应用词典)也是全角", () => {
     const notFound = Object.entries(appZh).filter(([key]) => key.startsWith("session.error.notFound"))
-    expect(notFound.length).toBeGreaterThanOrEqual(4)
+    expect(notFound.length).toBeGreaterThanOrEqual(3)
     expect(scan(Object.fromEntries(notFound) as Record<string, string>)).toEqual([])
   })
 })
@@ -72,7 +72,7 @@ describe("已整理的面:没有原词", () => {
   })
 
   test("找不到对话不写服务器名、对话编号与「标签页」", () => {
-    const text = ["session.error.notFound", "session.error.notFound.description", "session.error.notFound.newChat"]
+    const text = ["session.error.notFound", "session.error.notFound.description", "session.error.notFound.closeTab"]
       .map((key) => (appZh as Record<string, string>)[key])
       .join("")
     expect(text).toBe("找不到这段对话它可能已经被删除。回到新对话")

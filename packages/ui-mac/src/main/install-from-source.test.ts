@@ -200,7 +200,7 @@ test("I-15 a finished install releases the fetched source bytes, success or fail
   expect(await h.install(h.request(id, "request_a2_02"))).toMatchObject({ ok: true, packageId: "claude:context7", alreadyInstalled: true })
   expect(archives()).toBe(2)
   const npm = (await h.sources.searchSources("skills")).candidates.find((row) => row.source === "opencode-npm" && row.name === "opencode-skills-hub")!.id
-  const tarballs = () => h.fetched.filter((url) => url.includes("/-/")).length
+  const tarballs = () => h.fetched.filter((url) => url.endsWith(".tgz")).length
   expect(await h.install(h.request(npm, "request_a2_03"))).toMatchObject({ ok: false, code: "nothing-runnable" })
   expect(tarballs()).toBe(1)
   expect(await h.install(h.request(npm, "request_a2_04"))).toMatchObject({ ok: false, code: "nothing-runnable" })

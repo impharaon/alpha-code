@@ -155,6 +155,10 @@ MCP 重装是产品流(确认框重装),允许覆盖(引擎前像可复原)而�
   自持 disabled 态 → **天然免疫「删/坏账本复活」**(账本不是运行时唯一权威,config 是)。
 - **skill 例外**:skill 不预加载,投影 = 引擎侧 config-hook 注入门(`skillGenerationLiveDirs`,
   只注入 **main 派生允许集** `skills-enabled.json` 里的 key;缺失/损坏/形状异常一律不注入 fail closed)。
+- **受管全局 MCP(I-11,`alpha-code#1724`;DESIGN-plugin-helper-and-hub v9 §4.4)**:同一份允许集(v3)带每条 global MCP
+  记录的开启状态 `mcp: {name, enabled}[]`。引擎里开不开只由 ext 的 `mcp.transform` 按它在每次 Location 构建与 MCP 重算时
+  收口(读不到即停用一切非云、非项目 MCP);运行时只经 main 的 `convergeManagedMcp`(按名串行)。codepuppy.jsonc 的
+  `enabled:false` 照写,只为与账本一致,不再是生效面。
 - **cloud 例外**:无本地运行面 + UI 无启停开关,一律 enabled(直装与 bundle 子项一致)。
 - **启停通道**(`ext-set-install-state`,#347-gated):锁内 record 重读 + advisory(R14)+ **持久化
   config 投影普通原子写 + 账本翻转**(非事务)。**两方向都账本先写**(Codex r4):账本是 durable
@@ -174,7 +178,8 @@ MCP 重装是产品流(确认框重装),允许覆盖(引擎前像可复原)而�
   `entries[]`**;全匹配 = 诚实 uncurated,落既有保守启用面(不发明 package curation)。
   **disable 方向不咨询 catalog**(两路皆然)。
 - **skill 严格门(Codex r5 定稿)**:ext 无法 import 主进程 decoder,逐字段镜像有永久漂移风险 ——
-  改为 **main 用真 `decodeRecordV2` 派生 enabled 允许集写独立文件 `<root>/skills-enabled.json`**,
+  改为 **main 用真 `decodeRecordV2` 派生 enabled 允许集写独立文件 `<root>/skills-enabled.json`**(v3:技能 `keys`、
+  仅当前项目 `scoped`、受管全局 MCP `mcp`;解码只认 v3),
   hook 只读该文件(缺失/损坏/未知版本 = fail closed 不注入)。派生与账本**锁步**
   (`writeLedgerFile` 方向排序:有 key 被收走/现状不可信 → 派生先写,中途崩溃只会技能变暗;
   纯扩容 → 账本先写,派生失败回退删除,删不掉陈旧允许集才报错);boot reconcile 按账本重算自愈
@@ -192,8 +197,9 @@ MCP 重装是产品流(确认框重装),允许覆盖(引擎前像可复原)而�
   plugins}/*.{ts,js}` 自动发现 / `OPENCODE_CONFIG_CONTENT` / 项目 / managed / MDM / active-org)。**逐源探测
   = 重实现引擎整个 config 解析器,是发散的无底洞**(r7→r11 每轮暴露新源:TOML、逐目录交错序、gray-matter
   YAML、JSONC、npm 身份归一……)。改为**让 alpha 权威**:
-    · **mcp/agent**:`injectDisabledOverrides`(`ext-disabled-injection.ts`)把每个 **global disabled** 记录的
-      `mcp[name].enabled=false` / `agent[name].disable=true` 注入 **`OPENCODE_CONFIG_CONTENT`** —— 它在引擎
+    · **agent**(I-11 起 mcp 只剩会话级授权的强制停用;账本停用的 mcp 改由允许集 v3 经 ext 收口,见上):
+      `injectDisabledOverrides`(`ext-disabled-injection.ts`)把每个 **global disabled** agent 记录的
+      `agent[name].disable=true` 注入 **`OPENCODE_CONFIG_CONTENT`** —— 它在引擎
       加载序 **step 6**(所有 in-scope 源之后:XDG/~/.opencode/agent-md·plugin-script 自动发现/项目)。
       `mergeDeep` later-wins 使 alpha 的禁用**压过一切 in-scope 源**,disabled 扩展**永不被引擎加载,无需
       探测**。引擎 schema 显式允许 lone `{enabled:false}` mcp 叶(`core/v1/config/config.ts:114` 的 Union)

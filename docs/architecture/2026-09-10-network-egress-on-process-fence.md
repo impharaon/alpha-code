@@ -406,7 +406,7 @@ host 过**静态表同一个** `isEgressHostShape`(同一个函数,不是抄一�
    记录搬进同一状态根下的兄弟真源 `<appData>/codepuppy-state/mcp-servers/<env>.json`(`mcp-server-truth.ts`,只有 main 写),
    `deriveMcpEgressDestinations` 经**同一个**准入函数 `classifyBaseUrl` 派生,`server.ts` 把它与 provider 那一半并成一次登记
    (日志 `network egress: N configured destination(s) …`,出处标签 `mcp:<name>`);sidecar 侧 `codepuppy-config-injection.ts` 从真源注入
-   完整条目(`enabled:true`,账本 disabled 由后续 `injectDisabledOverrides` 压回),`mcp-default-deny.ts` 把 codepuppy.jsonc 里不在真源的
+   完整条目(`enabled:true`;开不开由允许集 v3 经 ext 的 `mcp.transform` 决定,I-11 起内联层不再写账本停用),`mcp-default-deny.ts` 把 codepuppy.jsonc 里不在真源的
    `type:"remote"` 条目压成 `enabled:false`(引擎原生仍合并 `OPENCODE_CONFIG`,不压它就会去连 —— 只是被这里 403)。本地 MCP 不动。
    判据在 `mcp-server-derivation.test.ts`(端到端,含真引擎 `debug config`)。
 4. ~~**被拒时界面上的归因**~~ —— **已闭合(`#1382`,2026-09-21)**。代理的 403 正文

@@ -174,7 +174,6 @@ export function CodePuppySessionSearch(props: {
       onClose={() => setOpen(false)}
       title={t("codepuppy.search.title")}
       closeLabel={t("codepuppy.common.close")}
-      besideSidebar
     >
       <div class="a-search" data-codepuppy-session-search>
         <Input

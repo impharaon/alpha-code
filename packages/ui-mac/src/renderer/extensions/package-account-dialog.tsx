@@ -52,7 +52,7 @@ export function PackageAccountDialog(props: {
   return (
     <Dialog open onClose={close} size="sm" title={t("codepuppy.ext.packageTokenTitle", { name: props.label })}
       footer={<Button variant="primary" loading={busy()} onClick={() => void submit()}>{t("codepuppy.ext.packageSaveToken")}</Button>}>
-      <p>{t("codepuppy.ext.packageTokenPurpose", { name: props.label })}</p>
+      <p>{t(props.needId === "mcp:dbhub-readonly#DSN" ? "codepuppy.ext.packageSqlitePurpose" : "codepuppy.ext.packageTokenPurpose", { name: props.label })}</p>
       <Show when={props.packageId === "package:github" || props.packageId === "package:github-official"}>
         <button class="codepuppy-ext-link" onClick={() => void window.api.openLink("https://github.com/settings/personal-access-tokens/new")}>{t("codepuppy.ext.packageGithubTokenLink")}</button>
       </Show>

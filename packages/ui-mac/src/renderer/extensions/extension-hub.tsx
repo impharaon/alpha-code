@@ -1627,8 +1627,9 @@ export function ExtensionHub(props: {
       // `#1724`:开启时缺令牌 / 缺登录的连接器在引擎里本来就连不上,hub-view 会一直给 reload-pending ——
       // 缺的前置项必须先说,不然行永远停在「正在生效」。
       const auth = pack().desiredState === "enabled" ? authorization() : undefined
-      if (auth?.ok && auth.items.some((item) => item.kind === "secret" && !item.saved))
-        return { kind: "prerequisite" as const, text: t("codepuppy.ext.packagePendingToken") }
+      const missingSecret = auth?.ok ? auth.items.find((item) => item.kind === "secret" && !item.saved) : undefined
+      if (missingSecret)
+        return { kind: "prerequisite" as const, text: t(missingSecret.prerequisiteId === "mcp:dbhub-readonly#DSN" ? "codepuppy.ext.packagePendingSqliteAddress" : "codepuppy.ext.packagePendingToken") }
       if (auth?.ok && auth.items.some((item) => item.kind === "mcp-oauth" && !item.authenticated))
         return { kind: "prerequisite" as const, text: t("codepuppy.ext.packagePendingLogin") }
       if (

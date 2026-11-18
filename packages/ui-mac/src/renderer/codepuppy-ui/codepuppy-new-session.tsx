@@ -18,7 +18,7 @@ import { type CodePuppyProjectsApi } from "../sidebar/use-projects"
 import { CodePuppyComposer } from "./codepuppy-composer"
 import { createDefaultWorkspaceDir } from "./default-workspace"
 import { newSessionDraftStash } from "./new-session-draft-stash"
-import { CodePuppyWorkspaceChip, visibleWorkspaces, workspaceLabel } from "./workspace-chip"
+import { CodePuppyWorkspaceChip, visibleWorkspaces } from "./workspace-chip"
 import { useWorkspaceWritable } from "./workspace-writable"
 import { Banner } from "./Banner"
 import { ConfigBrokenBanner } from "./config-broken-banner"
@@ -66,10 +66,9 @@ export function CodePuppyNewSession(props: {
   const projects = createMemo(() => visibleWorkspaces(store.projects))
   const directory = createMemo(() => tabs.draft(props.draftId).directory)
   // 未显式选择时落默认对话目录 `~/Alpha`(ADR-025 §3,owner 2026-07-28 改判)。这里是**呈现**
-  // 口径:chip 与标题都按它显示;draft 真正带哪个目录由建 draft 的入口决定(CODE-C)。
+  // 口径:chip 按它显示;draft 真正带哪个目录由建 draft 的入口决定(CODE-C)。
   const defaultWs = createDefaultWorkspaceDir()
   const activeWs = createMemo(() => directory() || defaultWs())
-  const wsLabel = createMemo(() => (activeWs() ? workspaceLabel(projects(), activeWs()) : ""))
   // REQ-159 `#1322`:chip 选目录 / 侧栏 draft 目标解析都落在 draft 的 directory 上 —— 这里就是新对话页的咽喉。
   const wsReadonly = useWorkspaceWritable(activeWs)
   const [wsOpen, setWsOpen] = createSignal(false)
@@ -107,10 +106,6 @@ export function CodePuppyNewSession(props: {
   return (
     <div class="a-ui a-home a-home--page" data-codepuppy-new-session>
       <div class="a-home-stage">
-        <div class="a-home-ghost" aria-hidden="true">
-          {t("codepuppy.brand.wordmark")}
-        </div>
-
         <div class="a-home-center">
           <Show when={store.error}>
             <Banner
@@ -121,9 +116,7 @@ export function CodePuppyNewSession(props: {
             />
           </Show>
           <ConfigBrokenBanner />
-          <h1 class="a-home-greet">
-            {t("codepuppy.newSession.title")}<span class="a-home-greet-dim">{wsLabel() ? ` — ${wsLabel()}` : ""}</span>
-          </h1>
+          <h1 class="a-home-greet">{t("codepuppy.newSession.heading")}</h1>
 
           {/* THE shared composer(与首页/会话页同一组件,REQ-055);draft 提交 = 创建会话后
               经 seam promoteDraft 晋升(tab 交换、持久草稿清理、导航均由 upstream wrapper 承担)。 */}

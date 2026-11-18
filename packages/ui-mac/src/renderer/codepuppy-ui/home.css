@@ -15,7 +15,7 @@
   overflow: hidden;
 }
 body[data-codepuppy-sidebar="open"] .a-home {
-  left: var(--codepuppy-sidebar-w, 260px);
+  left: var(--codepuppy-surface-left);
 }
 
 /* REQ-085/ADR-027: routed surface mode —— 正式叶页面在 upstream Layout 内成流布局,
@@ -31,24 +31,6 @@ body[data-codepuppy-sidebar="open"] .a-home--page {
   left: 0;
 }
 
-/* Atmosphere: ≤4% accent glow + faint grain behind content (frontend-design pass). */
-.a-home::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: var(--a-glow-accent);
-  pointer-events: none;
-  z-index: 0;
-}
-.a-home::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background-image: var(--a-grain);
-  background-size: 140px 140px;
-  pointer-events: none;
-  z-index: 0;
-}
 .a-home-scroll {
   position: relative;
   z-index: 1;
@@ -252,49 +234,39 @@ body[data-codepuppy-sidebar="open"] .a-home--page {
    CodePuppyHome v2 — greeting + shared composer + workspace + recents (mockup §01).
    Supersedes the project-card layout above (those classes are now unused).
    ============================================================================ */
+/* Hero (BR-03, frame #home): the heading + composer + tray group sits with the heading's top at 36%
+ * of the window height (frame audit #9 — the group's centre lands near 45% of the working surface).
+ * No watermark, no glow, no grain: the working surface is plain white. */
 .a-home-stage {
   position: relative;
   z-index: 1;
   height: 100%;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
-  padding: 40px 24px;
+  box-sizing: border-box;
+  padding: calc(36vh - var(--a-topbar-h)) var(--a-space-10) 0;
   overflow: auto;
-}
-.a-home-ghost {
-  position: absolute;
-  top: 30%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  font-size: 88px;
-  font-weight: var(--a-weight-bold);
-  letter-spacing: -0.03em;
-  color: var(--a-text);
-  opacity: 0.035;
-  user-select: none;
-  white-space: nowrap;
-  pointer-events: none;
 }
 .a-home-center {
   position: relative;
   z-index: 1;
-  width: min(640px, 100%);
+  width: min(680px, 100%);
   display: flex;
   flex-direction: column;
 }
-.a-home-greet {
-  font-size: var(--a-text-2xl);
-  font-weight: var(--a-weight-semibold);
-  letter-spacing: var(--a-tracking-tight);
+/* 500 weight, no tracking (audit #2); the left padding balances the full-width "？" so the visible
+ * text, not the box, is centred. */
+.a-home .a-home-greet {
+  margin: 0 0 calc(var(--a-space-6) + var(--a-space-1)) !important;
+  padding-left: 0.5em;
+  font-size: var(--a-text-3xl);
+  font-weight: var(--a-weight-medium);
+  letter-spacing: 0;
+  line-height: var(--a-leading-tight);
+  color: var(--a-text);
   text-align: center;
-  /* More breathing room between the greeting and the composer (was 22px — read as cramped).
-   * !important because a non-obvious upstream/reset rule was zeroing it (measured 0px live). */
-  margin-bottom: var(--a-space-10) !important;
   animation: a-rise 0.55s var(--a-ease-out) both;
-}
-.a-home-greet-dim {
-  color: var(--a-text-tertiary);
 }
 
 /* composer 本体样式已收敛至 codepuppy-composer.css(REQ-055:单一组件单一 CSS)。

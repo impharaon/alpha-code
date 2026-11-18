@@ -470,7 +470,8 @@ describe("REQ-126 CODE-D 新对话页工作区选择器", () => {
     expect(updateDraftCalls).toEqual([{ draftID: "draft-1", patch: { directory: "/ws/b" } }])
     expect(draft().directory).toBe("/ws/b")
     expect(chipButton(host).textContent).toContain("beta")
-    expect(host.querySelector("h1")?.textContent).toContain("beta")
+    // BR-03:标题不再带项目名,工作区只在 chip 里显示。
+    expect(host.querySelector("h1")?.textContent).not.toContain("beta")
   })
 
   test("「打开项目…」选到的新目录同样即时生效(未注册项目走路径末段标签)", async () => {
@@ -497,7 +498,7 @@ describe("REQ-126 CODE-D 新对话页工作区选择器", () => {
 
     expect(chipButton(host).textContent).toContain("Alpha")
     expect(chipButton(host).textContent).not.toContain("alpha-code")
-    expect(host.querySelector("h1")?.textContent).toContain("Alpha")
+    expect(host.querySelector("h1")?.textContent).not.toContain("Alpha")
     // 默认对话目录未注册为项目 ⇒ 它作为常驻首项出现在列表里,选中态在它身上。
     chipButton(host).click()
     await flush()
@@ -634,11 +635,11 @@ describe("#1590 新对话页:配置失效提示、标题与准备中占位", () 
     }
   })
 
-  test("AC2:标题为「新对话 — <工作区名>」", async () => {
+  test("AC2(BR-03):标题为「我们要处理什么？」,不带「新对话 — 项目名」", async () => {
     const host = mount(() => createComponent(DraftLeaf, { projects: projectsApi([project("alpha-code", "/ws/a")]) }))
     await flush()
 
-    expect(host.querySelector("h1")?.textContent).toBe("新对话 — alpha-code")
+    expect(host.querySelector("h1")?.textContent).toBe("我们要处理什么？")
   })
 
   test("AC3:新对话目录未就绪 ⇒ 中性占位「正在准备新对话…」,不渲染警告条", async () => {

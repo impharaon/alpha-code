@@ -235,7 +235,7 @@ test("R14 B12 a real third-party plus has no unreviewed default-off message or i
  node.querySelector<HTMLButtonElement>(`[data-source-candidate="${candidate.id}"] button`)!.click()
  await flush()
  expect(calls).toEqual([candidate.id])
- expect(document.body.textContent).not.toContain("未经审核,装好后默认关闭")
+ expect(document.body.textContent).not.toContain("未经审核，装好后默认关闭")
  expect(document.querySelector('[role="dialog"]')).toBeNull()
  expect(node.textContent).toContain("installed package menu")
 })

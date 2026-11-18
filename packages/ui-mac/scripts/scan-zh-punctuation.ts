@@ -71,8 +71,14 @@ export function toFullWidth(value: string): string {
   return out
 }
 
+/** 逐字规定的文案,扫描与 --fix 都跳过(按键点名)。 */
+export const VERBATIM_KEYS: ReadonlySet<string> = new Set([
+  "codepuppy.session.aiDisclaimer", // 「内容由AI生成,仅供参考」是规定的逐字文案(合规),半角标点与无空格都不许改
+])
+
 export function scan(dict: Record<string, string>, prefixes: readonly string[] = []) {
   return Object.entries(dict)
+    .filter(([key]) => !VERBATIM_KEYS.has(key))
     .filter(([key]) => prefixes.length === 0 || prefixes.some((prefix) => key.startsWith(prefix)))
     .flatMap(([key, value]) => {
       const hits = halfWidthHits(value)

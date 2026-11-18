@@ -21,7 +21,7 @@ const REQUIRED: Record<Locale, string[]> = {
   zh: [
     "助手和终端只能经 Code Puppy 的出网闸门访问已登记的地址",
     "其它地址会被拒绝并留下记录",
-    "Code Puppy 应用自身的联网(模型目录、登录、检查更新)不在这道沙箱之内",
+    "Code Puppy 应用自身的联网（模型目录、登录、检查更新）不在这道沙箱之内",
   ],
   en: [
     "the assistant and the terminal can only reach registered addresses through Code Puppy's egress gate",
@@ -33,9 +33,9 @@ const REQUIRED: Record<Locale, string[]> = {
 
 /** 过度声明的形状:「全部 / 所有 … 出网 / 联网 / 网络 … 都被 / 受 …」及其英文。命中即红,不论别的句子在不在。 */
 const OVERCLAIM: Record<Locale, RegExp> = {
-  zh: /(全部|所有|一切)[^。;]{0,12}(出网|联网|网络)[^。;]{0,6}(都|均|全)?(被|受|经)/,
+  zh: /(全部|所有|一切)[^。;；]{0,12}(出网|联网|网络)[^。;；]{0,6}(都|均|全)?(被|受|经)/,
   en: /\ball\b[^.;]{0,20}\b(outbound|network|internet)\b[^.;]{0,20}\b(is|are)\b[^.;]{0,12}\b(restricted|blocked|limited|gated|covered)/i,
-  doc: /(全部|所有|一切)[^。;]{0,12}(出网|联网|网络)[^。;]{0,6}(都|均|全)?(被|受|经)/,
+  doc: /(全部|所有|一切)[^。;；]{0,12}(出网|联网|网络)[^。;；]{0,6}(都|均|全)?(被|受|经)/,
 }
 
 export function judgeEgressCoverageDisclosure(text: string, locale: Locale): { ok: boolean; detail: string } {
@@ -91,7 +91,7 @@ describe("REQ-137 #1337 AC5 覆盖面如实声明", () => {
   })
 
   test("反向 ②:只删掉「应用自身不在其内」那一句(其余照旧)⇒ 红并点名缺的是哪一句", () => {
-    const zhBad = zh["codepuppy.terminal.sandboxHoverBody"].replace(";Code Puppy 应用自身的联网(模型目录、登录、检查更新)不在这道沙箱之内,照常直连", "")
+    const zhBad = zh["codepuppy.terminal.sandboxHoverBody"].replace("；Code Puppy 应用自身的联网（模型目录、登录、检查更新）不在这道沙箱之内，照常直连", "")
     const enBad = en["codepuppy.terminal.sandboxHoverBody"].replace(" Code Puppy's own traffic (model catalog, sign-in, update checks) is outside this sandbox and connects as before.", "")
     expect(zhBad).not.toBe(zh["codepuppy.terminal.sandboxHoverBody"])
     expect(enBad).not.toBe(en["codepuppy.terminal.sandboxHoverBody"])

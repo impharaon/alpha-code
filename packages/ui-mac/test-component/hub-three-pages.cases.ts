@@ -260,7 +260,7 @@ test("package plus installs directly before separate credentials without an inst
   click(q("button", card))
   await waitFor(() => expect(calls.installPackage).toEqual(["package:github"]))
   expect(document.body.textContent).not.toContain("确认安装")
-  expect(document.body.textContent).not.toContain("未经审核,装好后默认关闭")
+  expect(document.body.textContent).not.toContain("未经审核，装好后默认关闭")
   expect(document.body.textContent).not.toContain("codepuppy.secret-prerequisite.v1")
 })
 
@@ -1216,7 +1216,7 @@ test("R14 B12 a non-search catalog plus installs directly without the unreviewed
  await waitFor(()=>expect(q('[data-entry="mcp:fetch"] button')).toBeInstanceOf(HTMLButtonElement))
  click(q('[data-entry="mcp:fetch"] button'))
  await waitFor(()=>{
-  expect(document.body.textContent).not.toContain("未经审核,装好后默认关闭")
+  expect(document.body.textContent).not.toContain("未经审核，装好后默认关闭")
   expect(q('[role="dialog"]')).toBeNull()
   expect(calls.installPackage).toEqual(["mcp:fetch"])
  })

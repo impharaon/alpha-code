@@ -8,7 +8,7 @@ describe("REQ-232 AC5 failure copy and frozen frame paths", () => {
     setLocale("zh")
     expect(failureCopy("account_allowance_exhausted")?.action).toBe("overflow")
     expect(failureCopy("account_wallet_insufficient")?.action).toBe("recharge")
-    expect(failureCopy("account_suspended")).toEqual({ text: "账户已被停用,请联系我们。", action: null })
+    expect(failureCopy("account_suspended")).toEqual({ text: "账户已被停用，请联系我们。", action: null })
     expect(failureCopy("not-authenticated")?.action).toBe("login")
     expect(failureCopy("unauthorized")?.action).toBe("login")
     expect(failureCopy("provider_failed")).toBeNull()

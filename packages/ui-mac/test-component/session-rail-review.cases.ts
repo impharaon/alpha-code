@@ -278,7 +278,7 @@ describe("REQ-125 C2 review panel real Solid mount", () => {
     await flush()
 
     const placeholder = host.querySelector("[data-review-oversized]")!
-    expect(placeholder.textContent).toContain("变更过大,已折叠")
+    expect(placeholder.textContent).toContain("变更过大，已折叠")
     expect(placeholder.querySelector(".a-rvw-stat-add")!.textContent).toBe("+9000")
     expect(placeholder.querySelector(".a-rvw-stat-del")!.textContent).toBe("−4000")
     expect(host.querySelectorAll(".a-rvw-dl")).toHaveLength(0)

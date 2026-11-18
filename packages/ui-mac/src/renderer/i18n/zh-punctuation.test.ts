@@ -6,7 +6,7 @@
 import { describe, expect, test } from "bun:test"
 import { dict as zh } from "./zh"
 import { dict as appZh } from "../../../../codepuppy-app/src/i18n/zh"
-import { halfWidthHits, scan, toFullWidth } from "../../../scripts/scan-zh-punctuation"
+import { halfWidthHits, scan, toFullWidth, VERBATIM_KEYS } from "../../../scripts/scan-zh-punctuation"
 
 /** 已整理的面(键前缀)。新面整理完就把前缀加进来,别的面还没整理,不在这里。 */
 const TIDIED_PREFIXES = [
@@ -77,5 +77,15 @@ describe("已整理的面:没有原词", () => {
       .join("")
     expect(text).toBe("找不到这段对话它可能已经被删除。回到新对话")
     expect(text).not.toMatch(/Local Server|ses_|标签页|服务器/)
+  })
+})
+
+describe("逐字规定的文案", () => {
+  test("aiDisclaimer 按键排除:原文保持半角,扫描不报,且确实在词典里(排除不是空转)", () => {
+    const text = (zh as Record<string, string>)["codepuppy.session.aiDisclaimer"]
+    expect(text).toBe("内容由AI生成,仅供参考")
+    expect(halfWidthHits(text!).length).toBeGreaterThan(0)
+    expect(VERBATIM_KEYS.has("codepuppy.session.aiDisclaimer")).toBe(true)
+    expect(scan(zh as Record<string, string>).some((hit) => hit.key === "codepuppy.session.aiDisclaimer")).toBe(false)
   })
 })

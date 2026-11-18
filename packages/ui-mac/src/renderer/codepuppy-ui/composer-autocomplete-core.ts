@@ -109,13 +109,13 @@ export function sourceTag(origin: CommandOrigin, name: string, factorySkills: Re
 /** 出厂件/引擎内置命令的中文简介 —— 仅展示层映射(SKILL.md 英文 description 面向模型匹配保留);
  *  外来第三方如实原文、不机译(拍板③)。 */
 export const SLASH_DESC_ZH: Record<string, string> = {
-  init: "初始化项目说明(生成 AGENTS.md 引导)",
-  review: "审查代码改动(未提交 / 分支 / PR)",
-  agents: "打开 Agent 管理(消息内用 @ 指派)",
+  init: "初始化项目说明（生成 AGENTS.md 引导）",
+  review: "审查代码改动（未提交 / 分支 / PR）",
+  agents: "打开 Agent 管理（消息内用 @ 指派）",
   "skill-creator": "创建自定义技能",
   "agent-creator": "创建自定义 Agent",
-  "customize-codepuppy": "配置与定制 Code Puppy(连接器 / 技能 / 治理)",
-  "integrate-project": "导入外部生态内容(.claude / .agents)",
+  "customize-codepuppy": "配置与定制 Code Puppy（连接器 / 技能 / 治理）",
+  "integrate-project": "导入外部生态内容（.claude / .agents）",
   "codepuppy-workspace": "总结与记忆写入默认工作区「Code Puppy」（Journal / Memory）",
 }
 
@@ -139,7 +139,7 @@ export function rankSlashMatch(item: { trigger: string; description?: string; ti
 
 /** 引擎内置子 agent 的中文一句话简介(拍板⑦:保留但降噪;外来/自装如实原文)。 */
 export const SUBAGENT_DESC_ZH: Record<string, string> = {
-  general: "通用子任务:调研与多步骤执行",
+  general: "通用子任务：调研与多步骤执行",
   explore: "快速探索代码库、按模式找文件",
 }
 
@@ -178,12 +178,12 @@ export function buildAssembleRows(input: {
   const hit = (...texts: Array<string | undefined>) => !q || texts.some((t) => (t ?? "").toLowerCase().includes(q))
   const add: AssembleRow[] = []
   const attach: AssembleRow = { kind: "action", id: "attach", label: "添加附件", desc: "选择图片 / PDF 作为附件", kbd: "↵" }
-  const term: AssembleRow = { kind: "action", id: "terminal", label: "打开终端", desc: "打开终端面板(输出不会自动进入上下文)" }
+  const term: AssembleRow = { kind: "action", id: "terminal", label: "打开终端", desc: "打开终端面板（输出不会自动进入上下文）" }
   const plan: AssembleRow = {
     kind: "action",
     id: "plan",
     label: input.planOn ? "关闭计划模式" : "计划模式",
-    desc: input.planOn ? "回到默认(build)" : "先出方案再动手(plan 档)",
+    desc: input.planOn ? "回到默认（build）" : "先出方案再动手（plan 档）",
     disabled: input.agentLocked ? "当前权限档固定使用它自己的 agent" : undefined,
   }
   const actionRows = input.terminal && input.scope === "at" ? [attach, term, plan] : [attach, plan]

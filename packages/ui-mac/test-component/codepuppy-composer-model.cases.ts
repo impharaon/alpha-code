@@ -1375,7 +1375,7 @@ describe("ModelPickPop production component", () => {
     })
     expect(mounted.host.textContent).not.toContain(zh["codepuppy.model.serverUnreachable"])
 
-    // ① 续期因网络错误失败:横幅与平台行都换成「连不上服务器,正在自动重试」,行仍不可点。
+    // ① 续期因网络错误失败:横幅与平台行都换成「连不上服务器，正在自动重试」,行仍不可点。
     authNow = { ...authNow, refreshUnreachable: true }
     authListener?.(authNow)
     await waitFor(() => {
@@ -4116,7 +4116,7 @@ describe("#679 生产 picker 呈现平台双倍数 / 不可用两态", () => {
     mounted.dispose()
   })
 
-  // `#1556` AC9:「已下载」与「已应用」不同 ⇒ 弹层底部一行「模型清单已更新,将在引擎下次启动后生效」;相同 ⇒ 不出现。
+  // `#1556` AC9:「已下载」与「已应用」不同 ⇒ 弹层底部一行「模型清单已更新，将在引擎下次启动后生效」;相同 ⇒ 不出现。
   // 批准稿:frame.html#versions「新清单已下载,待生效」(中性色、无按钮)。两份目录任一份不同都算。
   test("`#1556` AC9:已下载 ≠ 已应用 ⇒ 底部一行待生效说明;相同 ⇒ 整块不出现", async () => {
     const footer = () => document.body.querySelector<HTMLElement>(".a-mpp-foot")

@@ -607,7 +607,7 @@ describe("#1595 AC4 发送框、结果、生效状态与云端错误的文字按
       "codepuppy.ext.hubReasonFailed": "上次未能生效",
       "codepuppy.ext.hubReloadNow": "立即生效",
       "codepuppy.ext.hubReloadNowHint": "会打断正在输出的回答",
-      "codepuppy.ext.hubReloadNowRefused": "未能生效,请重启应用",
+      "codepuppy.ext.hubReloadNowRefused": "未能生效，请重启应用",
       "codepuppy.cloud.runSaved": "结果已存到本机",
       "codepuppy.ext.cloudConnRecovering": "正在恢复登录",
       "codepuppy.ext.cloudConnectorTitle": "云连接器",
@@ -619,8 +619,8 @@ describe("#1595 AC4 发送框、结果、生效状态与云端错误的文字按
       "codepuppy.ext.cloudDiffLastCommit": "最近一次提交",
       "codepuppy.ext.cloudDone": "已完成",
       "codepuppy.ext.cloudSaved": "已保存",
-      "codepuppy.ext.cloudErrConsentDeclined": "未同意上传,未发送",
-      "codepuppy.ext.cloudErrNetwork": "暂时连不上云端服务,稍后重试",
+      "codepuppy.ext.cloudErrConsentDeclined": "未同意上传，未发送",
+      "codepuppy.ext.cloudErrNetwork": "暂时连不上云端服务，稍后重试",
     }
     for (const [key, value] of Object.entries(expected)) expect(zh[key as keyof typeof zh], key).toBe(value)
     for (const key of ["codepuppy.cloud.runSaved", "codepuppy.ext.cloudSub", "codepuppy.ext.cloudInputHint"] as const) {

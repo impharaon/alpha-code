@@ -217,7 +217,7 @@ describe("slashSection / sourceTag — 类型分节 × 归属四档(拍板①②
 describe("displayDescription — 中文映射只覆盖出厂/内置,外来如实原文(拍板③)", () => {
   test("#1513: customize-codepuppy has the bundled description and matches slash search", () => {
     const item = entry("customize-codepuppy", "skill")
-    expect(displayDescription(item)).toBe("配置与定制 Code Puppy(连接器 / 技能 / 治理)")
+    expect(displayDescription(item)).toBe("配置与定制 Code Puppy（连接器 / 技能 / 治理）")
     expect(buildSlashList([item], "customize-code").flat.map((e) => e.trigger)).toEqual(["customize-codepuppy"])
   })
   test("映射命中 → 中文;未命中 → 原描述;都没有 → title 兜底", () => {

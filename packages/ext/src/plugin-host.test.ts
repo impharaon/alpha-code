@@ -583,26 +583,28 @@ const hubInstall = (agent: string, answer: "once" | "always" | "reject" = "once"
     yield* (yield* PluginHooks.Service).trigger("session", "prompt", { sessionID: session.id, messageID: "msg_prompt", prompt: { text: "装 github" }, delivery: "queue" } as never)
     const permission = yield* Permission.Service
     const snapshot = yield* (yield* Tool.Service).snapshot()
+    const progress: Record<string, unknown>[] = []
     const call = yield* snapshot
       .execute({
         sessionID: session.id,
         agent: agent as never,
         messageID: SessionMessage.ID.make("msg_hub_install"),
         call: { type: "tool-call", id: `call_hub_install_${++hubCalls}`, name: action, input },
-      })
+        progress: (update: Record<string, unknown>) => Effect.sync(() => void progress.push(update)),
+      } as never)
       .pipe(Effect.exit, Effect.forkChild)
-    const asks: Array<{ action: string; metadata: Record<string, unknown>; resources: readonly string[]; save: readonly string[] | undefined }> = []
+    const asks: Array<{ action: string; metadata: Record<string, unknown>; resources: readonly string[]; save: readonly string[] | undefined; progress: Record<string, unknown> | undefined }> = []
     const seen = new Set<string>()
     for (let waited = 0; waited < 5000 && !call.pollUnsafe(); waited += 20) {
       for (const request of yield* permission.forSession(session.id)) {
         if (seen.has(request.id)) continue
         seen.add(request.id)
-        asks.push({ action: request.action, metadata: (request.metadata ?? {}) as Record<string, unknown>, resources: request.resources, save: request.save })
+        asks.push({ action: request.action, metadata: (request.metadata ?? {}) as Record<string, unknown>, resources: request.resources, save: request.save, progress: progress.at(-1) })
         yield* permission.reply({ requestID: request.id, reply: answer })
       }
       yield* Effect.sleep("20 millis")
     }
-    return { asks, exit: yield* Fiber.join(call), sessionID: session.id }
+    return { asks, exit: yield* Fiber.join(call), sessionID: session.id, progress }
   })
 
 /** BR-10 的审批卡事实:身份轴、这一次调用、什么都不存,卡上只写名称与真实来源。 */
@@ -625,6 +627,10 @@ itWithPermission.live("I-10 an assistant install asks once in every interactive 
   // 「全部批准」:先出卡;拒绝 ⇒ 这次请求到不了 main 的安装入口
   const declined = yield* hubInstall("build", "reject")
   expect(declined.asks.map(askFacts)).toEqual([installAsk({ name: "GitHub", source: "catalog" })])
+  // 等审批时本次调用已记下(扁平,引擎原样存成工具状态 metadata):Code Puppy 的来源快照、要装的名称与来源、等待阶段;
+  // 引擎在拒绝时把最后一次记下的进度并入失败状态(core session/runner/publish-llm-event.ts failureSnapshot),卡片据此写「已拒绝，未安装」。
+  expect(declined.asks[0]!.progress).toMatchObject({ install: { name: "GitHub", source: "catalog" }, stage: "awaiting-approval", codepuppyDisplay: { technicalId: "codepuppy_hub_install" } })
+  expect(declined.progress.at(-1)).toMatchObject({ install: { name: "GitHub", source: "catalog" }, stage: "awaiting-approval" })
   expect(declined.asks[0]!.resources).toEqual([expect.stringMatching(/^call:call_hub_install_\d+$/)])
   expect(Exit.isFailure(declined.exit)).toBe(true)
   expect(installs).toEqual([])

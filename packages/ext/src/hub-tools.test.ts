@@ -70,7 +70,7 @@ const contentOf = (r: unknown) => (r as { content: string }).content
 const view = (rows: HubViewRow[]): HubView => ({ directory: "/work/a", rows, warnings: [] })
 
 test("A3 tool contract is IDs only with source search, no secrets or routes", () => {
-  const list = createHubTools(bridgeWith({ views: [view([])] }).bridge, contextWith(async () => {}).context)
+  const list = createHubTools(bridgeWith({ views: [view([])] }).bridge, contextWith(async () => {}).context, async () => {})
   expect(list.map((tool) => tool.name).sort()).toEqual([
     "codepuppy_hub_create",
     "codepuppy_hub_install",
@@ -271,7 +271,7 @@ test("I-10 the install records the package name before its one approval ask; a d
   const list = tools(h.bridge, context.context, async (callID) => { events.push(["ask", callID]); throw declined })
   await expect(list.codepuppy_hub_install!.execute({ id: "cand_ctx7" }, ctx)).rejects.toBe(declined)
   expect(events).toEqual([
-    ["progress", { metadata: { install: { name: "Context7", source: "claude-marketplace" }, stage: "awaiting-approval" } }],
+    ["progress", { install: { name: "Context7", source: "claude-marketplace" }, stage: "awaiting-approval" }],
     ["ask", "call_ctx7"],
   ])
   expect(installs).toEqual([])
@@ -286,7 +286,7 @@ test("I-10 the install records the package name before its one approval ask; a d
   // 自制插件:名称就是草稿名,来源「我的插件」
   events.length = 0
   await tools(h.bridge, context.context, async () => { throw declined }).codepuppy_hub_create!.execute({ searchId: "search_main", name: "own-report", description: "Own report", files: [] }, ctx).catch(() => undefined)
-  expect(events[0]).toEqual(["progress", { metadata: { install: { name: "own-report", source: "created" }, stage: "awaiting-approval" } }])
+  expect(events[0]).toEqual(["progress", { install: { name: "own-report", source: "created" }, stage: "awaiting-approval" }])
 })
 
 test("D3 automation cannot send a create request", async () => {

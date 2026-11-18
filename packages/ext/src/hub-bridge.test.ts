@@ -200,7 +200,7 @@ test("R14 chat search receives failed hung-source status within thirty seconds, 
  }})
  const wire=fakePort()
  const bridge=createHubBridge(wire.port)
- const tool=createHubTools(bridge,{location:{directory:"/work/a"}} as never).find(tool=>tool.name==="codepuppy_hub_search")!
+ const tool=createHubTools(bridge,{location:{directory:"/work/a"}} as never,async()=>{}).find(tool=>tool.name==="codepuppy_hub_search")!
  jest.useFakeTimers()
  let output:Awaited<ReturnType<typeof tool.execute>>|undefined
  const pending=tool.execute({query:"context7"},{} as never).then(value=>{output=value})

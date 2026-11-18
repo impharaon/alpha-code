@@ -1,51 +1,64 @@
 @import "./base.css";
 
 .codepuppy-settings-page {
+  /* 新外壳:设置是顶级页面 —— 顶栏与窄轨常驻在外,页面铺在它们右 / 下的工作面里;侧栏开着时让出侧栏。 */
   position: fixed;
-  inset: 0;
+  top: var(--a-topbar-h);
+  left: var(--a-rail-w);
+  right: var(--a-frame-gap);
+  bottom: var(--a-frame-gap);
   z-index: var(--a-z-overlay);
   display: flex;
   min-width: 0;
   min-height: 0;
   flex-direction: column;
+  overflow: hidden;
+  border-radius: var(--a-radius-md);
   background: var(--a-bg-canvas);
+  box-shadow: var(--a-shadow-xs), var(--a-edge-light);
   color: var(--a-text);
 }
 
+body[data-codepuppy-sidebar="open"] .codepuppy-settings-page {
+  left: calc(var(--a-rail-w) + var(--codepuppy-sidebar-w, 248px));
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+}
+
+/* 页头(#settings `.phd`):页签 + 右侧保存,底部发丝线;与定制中心 / 自动化同一套。 */
 .codepuppy-settings-head {
   display: flex;
-  min-height: 68px;
+  width: min(880px, calc(100% - 80px));
   align-items: center;
   gap: var(--a-space-3);
-  /* #1550:设置页铺满整窗,macOS 红绿灯(windows.ts trafficLightPosition y:14)画在它上面,
-     此前把返回键压在灯下点不到。顶部留出与首页/定制中心/自动化同一个窗口按钮带
-     (`--a-home-top`,同一个回落值),这一条本身仍是拖拽区。 */
-  padding: var(--a-home-top, 40px) 22px 10px;
-  border-bottom: 1px solid var(--a-border-faint);
-  background: var(--a-bg-canvas);
-  -webkit-app-region: drag;
+  margin: 18px auto 0;
+  border-bottom: 1px solid var(--a-hairline);
 }
 
-.codepuppy-settings-head > * {
-  -webkit-app-region: no-drag;
+.codepuppy-settings-head > .a-btn {
+  margin-bottom: 5px;
 }
 
-.codepuppy-settings-head h1 {
-  font-size: var(--a-text-xl);
-}
-
-.codepuppy-settings-head p {
-  margin: 3px 0 0;
-  color: var(--a-text-tertiary);
-  font-size: var(--a-text-xs);
+/* 读屏用的标题与提示:页名在顶栏,页内不再画大标题。 */
+.codepuppy-settings-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 .codepuppy-settings-back {
   display: inline-grid;
-  width: 44px;
-  height: 44px;
+  width: 28px;
+  height: 28px;
   flex: none;
   place-items: center;
+  margin: 0 calc(-1 * var(--a-space-1)) 5px 0;
   border: 0;
   border-radius: var(--a-radius-md);
   background: transparent;
@@ -54,13 +67,13 @@
 }
 
 .codepuppy-settings-back:hover {
-  background: var(--a-bg-muted);
+  background: var(--a-overlay-hover);
   color: var(--a-text);
 }
 
 .codepuppy-settings-back svg {
-  width: 20px;
-  height: 20px;
+  width: 16px;
+  height: 16px;
   fill: none;
   stroke: currentcolor;
   stroke-width: 1.8;
@@ -71,81 +84,84 @@
 .codepuppy-settings-unsaved {
   display: inline-flex;
   align-items: center;
-  gap: 7px;
-  margin-left: auto;
-  padding: 5px 9px;
-  border: 1px solid color-mix(in srgb, var(--a-warning) 28%, transparent);
-  border-radius: var(--a-radius-full);
-  background: var(--a-warning-subtle);
-  color: var(--a-warning);
+  gap: 6px;
+  margin: 0 0 5px;
+  color: var(--a-text-tertiary);
   font-size: var(--a-text-xs);
-  font-weight: var(--a-weight-medium);
 }
 
 .codepuppy-settings-unsaved i,
 .codepuppy-settings-storage-status i {
-  width: 7px;
-  height: 7px;
+  width: 6px;
+  height: 6px;
   flex: none;
   border-radius: var(--a-radius-full);
   background: currentcolor;
 }
 
 .codepuppy-settings-layout {
-  display: grid;
+  display: flex;
   min-height: 0;
   flex: 1;
-  grid-template-columns: 220px minmax(0, 1fr);
+  flex-direction: column;
 }
 
+/* 页签:文字 + 当前页中性下划线(与 .codepuppy-ext-tab 同一排法) */
 .codepuppy-settings-nav {
   display: flex;
   min-width: 0;
-  flex-direction: column;
-  gap: 3px;
-  padding: var(--a-space-4) var(--a-space-3);
-  border-right: 1px solid var(--a-border-faint);
-  background: var(--a-bg-subtle);
+  flex: 1;
+  gap: 22px;
 }
 
 .codepuppy-settings-nav button {
-  min-height: 44px;
-  padding: 0 var(--a-space-3);
+  position: relative;
+  height: 40px;
+  padding: 0;
   border: 0;
-  border-radius: var(--a-radius-md);
   background: transparent;
   color: var(--a-text-secondary);
   font: inherit;
-  font-size: var(--a-text-sm);
-  text-align: left;
+  font-size: var(--a-text-md);
+  white-space: nowrap;
   cursor: pointer;
 }
 
 .codepuppy-settings-nav button:hover {
-  background: var(--a-overlay-hover);
   color: var(--a-text);
 }
 
 .codepuppy-settings-nav button[aria-current="page"] {
-  background: var(--a-bg-muted);
   color: var(--a-text);
-  font-weight: var(--a-weight-semibold);
+  font-weight: var(--a-weight-medium);
+}
+
+.codepuppy-settings-nav button[aria-current="page"]::after {
+  position: absolute;
+  right: 0;
+  bottom: -1px;
+  left: 0;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--a-text);
+  content: "";
 }
 
 .codepuppy-settings-main {
   min-width: 0;
+  flex: 1;
   overflow: auto;
-  padding: var(--a-space-8) clamp(24px, 5vw, 64px) var(--a-space-16);
+  padding: 0 0 var(--a-space-16);
 }
 
 .codepuppy-settings-main > * {
-  width: min(760px, 100%);
+  width: min(880px, calc(100% - 80px));
   margin-inline: auto;
 }
 
 .codepuppy-settings-main > .a-banner,
 .codepuppy-settings-main > div:has(> .a-banner) {
-  margin-bottom: var(--a-space-4);
+  margin-top: var(--a-space-4);
 }
 
 .codepuppy-settings-loading {
@@ -154,55 +170,52 @@
   text-align: center;
 }
 
+/* 页签下的一句说明(#settings `.ph-desc`);小节标题已是页签,h1/h2 只留给读屏。 */
 .codepuppy-settings-section-head {
-  display: flex;
-  min-height: 42px;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--a-space-6);
-  margin-bottom: var(--a-space-6);
+  margin: 14px auto 4px;
 }
 
 .codepuppy-settings-section-head h2 {
-  font-size: var(--a-text-xl);
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
 }
 
 .codepuppy-settings-section-head p {
-  margin: 6px 0 0;
+  margin: 0;
   color: var(--a-text-tertiary);
   font-size: var(--a-text-sm);
 }
 
+/* 分组:发丝线分隔的行,不再一组一个灰头方框(#settings `.kv-sec`)。
+   定制中心「管理」页的名称—值行共用这几个类,所以两页是同一套节奏。 */
 .codepuppy-settings-group {
-  overflow: hidden;
-  margin-bottom: var(--a-space-6);
-  border: 1px solid var(--a-border-faint);
-  border-radius: var(--a-radius-lg);
-  background: var(--a-surface);
-  box-shadow: var(--a-shadow-xs);
+  margin-top: 26px;
 }
 
 .codepuppy-settings-group > h3 {
-  padding: 11px var(--a-space-4) 9px;
-  border-bottom: 1px solid var(--a-border-faint);
-  background: var(--a-bg-subtle);
+  margin: 0 0 4px;
   color: var(--a-text-secondary);
   font-size: var(--a-text-xs);
-  letter-spacing: var(--a-tracking-wide);
-  text-transform: uppercase;
+  font-weight: var(--a-weight-medium);
 }
 
 .codepuppy-settings-row {
   display: flex;
-  min-height: 58px;
+  min-height: 56px;
   align-items: center;
-  gap: var(--a-space-4);
+  gap: 24px;
   justify-content: space-between;
-  padding: 11px var(--a-space-4);
+  padding: 10px 0;
+  border-bottom: 1px solid var(--a-hairline);
 }
 
-.codepuppy-settings-row + .codepuppy-settings-row {
-  border-top: 1px solid var(--a-border-faint);
+.codepuppy-settings-row:last-child {
+  border-bottom: 0;
 }
 
 .codepuppy-settings-row-copy {
@@ -210,18 +223,20 @@
   min-width: 0;
   flex: 1;
   flex-direction: column;
-  gap: 3px;
+  gap: 2px;
 }
 
 .codepuppy-settings-row-copy strong {
   color: var(--a-text);
-  font-size: var(--a-text-sm);
+  font-size: var(--a-text-base);
   font-weight: var(--a-weight-medium);
 }
 
 .codepuppy-settings-row-copy small {
   color: var(--a-text-tertiary);
-  font-size: var(--a-text-xs);
+  font-size: var(--a-text-sm);
+  line-height: var(--a-leading-normal);
+  text-wrap: pretty;
 }
 
 .codepuppy-settings-row-copy code {
@@ -229,15 +244,15 @@
 }
 
 .codepuppy-settings-switch {
-  width: 38px;
-  height: 22px;
+  width: 34px;
+  height: 20px;
   flex: none;
   appearance: none;
-  border: 1px solid var(--a-border-strong);
+  border: 0;
   border-radius: var(--a-radius-full);
   background: var(--a-bg-inset);
   cursor: pointer;
-  transition: background var(--a-dur-fast) var(--a-ease-out), border-color var(--a-dur-fast) var(--a-ease-out);
+  transition: background var(--a-dur-fast) var(--a-ease-out);
 }
 
 .codepuppy-settings-switch::before {
@@ -246,19 +261,19 @@
   height: 16px;
   margin: 2px;
   border-radius: var(--a-radius-full);
-  background: var(--a-surface-raised);
-  box-shadow: var(--a-shadow-sm);
+  background: var(--a-surface);
+  box-shadow: var(--a-shadow-xs);
   content: "";
   transition: transform var(--a-dur-fast) var(--a-ease-out);
 }
 
 .codepuppy-settings-switch:checked {
-  border-color: var(--a-accent-solid);
   background: var(--a-accent-solid);
 }
 
 .codepuppy-settings-switch:checked::before {
-  transform: translateX(16px);
+  background: var(--a-text-on-accent);
+  transform: translateX(14px);
 }
 
 .codepuppy-settings-switch:disabled {
@@ -268,8 +283,8 @@
 
 .codepuppy-settings-number,
 .codepuppy-settings-shortcut {
-  height: 34px;
-  border: 1px solid var(--a-border);
+  height: 30px;
+  border: 1px solid var(--a-hairline);
   border-radius: var(--a-radius-md);
   background: var(--a-bg-subtle);
   color: var(--a-text);
@@ -278,7 +293,7 @@
 }
 
 .codepuppy-settings-number {
-  width: 88px;
+  width: 96px;
   padding: 0 10px;
 }
 
@@ -318,9 +333,13 @@
   cursor: default;
 }
 
+/* 扩展存储是一块自成一体的检查面板,保留卡片外框(分组的发丝线样式只管通用 / 快捷键里的行)。 */
 .codepuppy-settings-storage {
   overflow: visible;
   padding-bottom: 0;
+  border: 1px solid var(--a-hairline);
+  border-radius: var(--a-radius-lg);
+  background: var(--a-surface);
 }
 
 .codepuppy-settings-storage-title {
@@ -329,7 +348,7 @@
   justify-content: space-between;
   gap: var(--a-space-4);
   padding: 13px var(--a-space-4);
-  border-bottom: 1px solid var(--a-border-faint);
+  border-bottom: 1px solid var(--a-hairline);
 }
 
 .codepuppy-settings-storage-title > span:first-child {

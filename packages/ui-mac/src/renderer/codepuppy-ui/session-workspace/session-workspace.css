@@ -840,3 +840,45 @@
 .a-swk-readonly-restart:hover {
   background: var(--a-bg-muted);
 }
+
+/* 找不到对话(新外壳稿 #not-found):图标 + 一句话 + 一个出口,钉在主区 30% 处;
+   结构在 packages/codepuppy-app/src/pages/session-not-found.tsx(只给数据钩子,版式在这里)。 */
+[data-codepuppy-session-not-found] {
+  position: relative;
+}
+
+[data-codepuppy-session-not-found] [data-slot="not-found-body"] {
+  position: absolute;
+  top: 30%;
+  right: 0;
+  left: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0 var(--a-space-6);
+  text-align: center;
+}
+
+[data-codepuppy-session-not-found] [data-slot="not-found-icon"] {
+  width: 20px;
+  height: 20px;
+  margin-bottom: 14px;
+  fill: none;
+  stroke: var(--a-text-tertiary);
+  stroke-width: 1.44;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+[data-codepuppy-session-not-found] h4 {
+  margin: 0 0 6px;
+  color: var(--a-text);
+  font-size: var(--a-text-lg);
+  font-weight: var(--a-weight-semibold);
+}
+
+[data-codepuppy-session-not-found] p {
+  margin: 0 0 18px;
+  color: var(--a-text-tertiary);
+  font-size: var(--a-text-sm);
+}

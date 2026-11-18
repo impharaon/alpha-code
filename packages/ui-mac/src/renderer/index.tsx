@@ -470,7 +470,7 @@ render(() => {
       const list: ServerConnection.Any[] = []
       if (data) {
         list.push({
-          displayName: "Local Server",
+          displayName: t("desktop.server.local"),
           type: "sidecar",
           variant: "base",
           // I8:renderer 只拿到引擎源地址;`Authorization` 由 main 对引擎源补上,这里不带口令。

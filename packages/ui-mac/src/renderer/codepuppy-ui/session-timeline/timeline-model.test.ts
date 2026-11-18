@@ -1761,6 +1761,24 @@ describe("A4 trusted hub parts become main-backed timeline cards", () => {
     expect(again.find(row => row.kind === "hubInstall")?.key).toBe(result.key)
   })
 
+  // I-10 / 编排器裁决:等待审批与被拒绝的安装都写明要装的名称(本次调用记下的 install),绝不拿候选编号当名字。
+  test("I-10 an install awaiting approval names the package and never the candidate id; a declined one is marked declined", () => {
+    const metadata = { install: { name: "GitHub", source: "catalog" }, stage: "awaiting-approval" }
+    const waiting = toolPart("wait", "a", "unrelated-alias", { display: display("install"), state: { status: "running", input: { id: "cand_abc123" }, metadata, time: { start: 1 } } as ToolPart["state"] })
+    const row = turn(waiting).find(row => row.kind === "hubInstall")
+    if (row?.kind !== "hubInstall") throw Error("no hub card")
+    expect(row.install).toMatchObject({ operation: "install", name: "GitHub", phase: "running", approval: "waiting" })
+    expect(JSON.stringify(row)).not.toContain("cand_abc123")
+    const declined = toolPart("declined", "a", "unrelated-alias", { display: display("install"), state: { status: "error", input: { id: "cand_abc123" }, error: "The user declined this tool call", metadata, time: { start: 1, end: 2 } } })
+    const no = turn(declined).find(row => row.kind === "hubInstall")
+    if (no?.kind !== "hubInstall") throw Error("no hub card")
+    expect(no.install).toMatchObject({ name: "GitHub", phase: "error", approval: "declined" })
+    expect(JSON.stringify(no)).not.toContain("cand_abc123")
+    // 没记下名称的旧调用也不拿编号顶名字
+    const old = toolPart("old", "a", "unrelated-alias", { display: display("install"), state: { status: "running", input: { id: "cand_abc123" }, metadata: {}, time: { start: 1 } } as ToolPart["state"] })
+    expect(JSON.stringify(turn(old))).not.toContain("cand_abc123")
+  })
+
   test("R14 B10 an errored search keeps its actual tool error instead of a searching card", () => {
     const search = toolPart("aborted-search", "a", "unrelated-alias", { display: display("search"), state: { status: "error", input: { query: "playwright" }, error: "Search aborted", time: { start: 1, end: 2 } } })
     const rows = turn(search)

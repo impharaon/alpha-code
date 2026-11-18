@@ -16,6 +16,6 @@ test("A4 production install card: main progress, engine truth, remount, provenan
   const output = `${result.stdout.toString()}${result.stderr.toString()}`
   if (result.exitCode !== 0) throw Error(output)
   expect(output.match(/(\d+) fail\b/)?.[1]).toBe("0")
-  expect(output.match(/(\d+) pass\b/)?.[1]).toBe("11")
+  expect(output.match(/(\d+) pass\b/)?.[1]).toBe("12")
   expect(output.match(/Ran \d+ tests? across (\d+) files?/)?.[1]).toBe("1")
 }, 60_000)

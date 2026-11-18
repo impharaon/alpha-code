@@ -64,8 +64,8 @@ function contextWith(assert: (input: unknown) => Promise<void>) {
   return { context, ctx, asserts }
 }
 
-const tools = (bridge: HubBridge, context: Parameters<typeof createHubTools>[1]) =>
-  Object.fromEntries(createHubTools(bridge, context).map((tool) => [tool.name, tool]))
+const tools = (bridge: HubBridge, context: Parameters<typeof createHubTools>[1], askInstall: (callID: string) => Promise<void> = async () => {}) =>
+  Object.fromEntries((createHubTools as (...args: unknown[]) => ReturnType<typeof createHubTools>)(bridge, context, askInstall).map((tool) => [tool.name, tool]))
 const contentOf = (r: unknown) => (r as { content: string }).content
 const view = (rows: HubViewRow[]): HubView => ({ directory: "/work/a", rows, warnings: [] })
 
@@ -255,6 +255,38 @@ test("D3 create relays the frozen draft and scope through the install bridge wit
   expect(context.asserts).toEqual([])
   expect(contentOf(output)).toBe("installed; available")
   expect(output.metadata).toMatchObject({ packageId: outcome.packageId, stage: "committed" })
+})
+
+// I-10 / 编排器裁决(2026-11-18):安装先把要装的名称与来源写进本次调用(时间线卡在等待审批与拒绝之后都读它),再经执行闸问一次;
+// 拒绝照引擎合同原样抛出(不在工具里改成结果),什么也不交给 main。名称先于询问写入 ⇒ 去掉这一步,等待卡与拒绝卡就只剩编号。
+test("I-10 the install records the package name before its one approval ask; a declined ask propagates and nothing reaches main", async () => {
+  const h = bridgeWith({ views: [view([])] })
+  const installs: unknown[] = []
+  h.bridge.install = async (input) => { installs.push(input); return { ok: true, accepted: true } }
+  h.bridge.installSubject = (id) => (id === "cand_ctx7" ? { name: "Context7", source: "claude-marketplace" } : undefined)
+  const context = contextWith(async () => {})
+  const events: unknown[] = []
+  const ctx = { ...(context.ctx as object), id: "call_ctx7", progress: async (update: unknown) => void events.push(["progress", update]) } as never
+  const declined = Object.assign(Error("The user declined this tool call"), { _tag: "Permission.DeclinedError" })
+  const list = tools(h.bridge, context.context, async (callID) => { events.push(["ask", callID]); throw declined })
+  await expect(list.codepuppy_hub_install!.execute({ id: "cand_ctx7" }, ctx)).rejects.toBe(declined)
+  expect(events).toEqual([
+    ["progress", { metadata: { install: { name: "Context7", source: "claude-marketplace" }, stage: "awaiting-approval" } }],
+    ["ask", "call_ctx7"],
+  ])
+  expect(installs).toEqual([])
+  expect(context.asserts).toEqual([])
+  // 允许:照常交给 main,名称留在之后的阶段元数据里
+  events.length = 0
+  const allowed = tools(h.bridge, context.context, async (callID) => void events.push(["ask", callID]))
+  const output = await allowed.codepuppy_hub_install!.execute({ id: "cand_ctx7" }, ctx)
+  expect(events[1]).toEqual(["ask", "call_ctx7"])
+  expect(installs).toHaveLength(1)
+  expect(output.metadata).toMatchObject({ install: { name: "Context7", source: "claude-marketplace" } })
+  // 自制插件:名称就是草稿名,来源「我的插件」
+  events.length = 0
+  await tools(h.bridge, context.context, async () => { throw declined }).codepuppy_hub_create!.execute({ searchId: "search_main", name: "own-report", description: "Own report", files: [] }, ctx).catch(() => undefined)
+  expect(events[0]).toEqual(["progress", { metadata: { install: { name: "own-report", source: "created" }, stage: "awaiting-approval" } }])
 })
 
 test("D3 automation cannot send a create request", async () => {

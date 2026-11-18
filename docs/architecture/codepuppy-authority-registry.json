@@ -203,7 +203,7 @@
         },
         {
           "file": "packages/ui-mac/src/main/composer-tier-matrix.engine.test.ts",
-          "name": "三档 × R1–R12、三条委派入口与审批请求的整条路径(composer-tier-matrix.engine.cases.ts,27 条)"
+          "name": "三档 × R1–R12、三条委派入口与审批请求的整条路径与助手发起的安装(composer-tier-matrix.engine.cases.ts,29 条)"
         }
       ],
       "note": "An answer to the pending request itself is not held here: any plugin Context (including the extension's, which the project-plugin fan-out passes through) can call permission.reply on Code Puppy's request and the call runs (measured 2026-11-09); closing it belongs to the fan-out (L3), reported to the coordinator."
@@ -357,7 +357,7 @@
       "tests": [
         {
           "file": "packages/ui-mac/src/main/composer-tier-matrix.engine.test.ts",
-          "name": "三档 × R1–R12、三条委派入口与审批请求的整条路径(composer-tier-matrix.engine.cases.ts,27 条)"
+          "name": "三档 × R1–R12、三条委派入口与审批请求的整条路径与助手发起的安装(composer-tier-matrix.engine.cases.ts,29 条)"
         }
       ],
       "note": "R7 (egress fence and kill switch) is not a rule-layer cell. R9 (cloud tools) passes the same execution gate as R10 / R11 and differs only in identity derivation (codepuppy-cloud authority minted from the verified definition), judged by packages/ext/src/policy/register-policy.test.ts and plugin-host.test.ts; a governed remote MCP in the engine sandbox would need the ARM / DEF and cloud credential setup."
@@ -1684,20 +1684,24 @@
     },
     {
       "id": "chat-install-main-owned",
-      "decision": "Chat installation denies automation agents, uses ordinary permission tiers, and accepts only IDs owned by main; an explicit install request needs no second install confirmation.",
+      "decision": "Chat installation denies automation agents, accepts only IDs owned by main, and asks once on the ordinary approval card in every interactive tier, Approve all included (SPEC-plugin-helper-and-hub v4 BR-10, owner U-20 「就是全部批准下，也需要安装确认吧。」): the card names the package and its real source, allow covers that one call only (nothing saved), a decline submits nothing; the prepared ask is bound to its own session, message and call.",
       "adr": [
         "ADR-048"
       ],
-      "lane": "#1724 SPEC-plugin-helper-and-hub v3 / design v5",
+      "lane": "#1724 SPEC-plugin-helper-and-hub v4 / design v7 §4.6",
       "takeovers": [],
       "mechanism": {
         "file": "packages/ext/src/hub-tools.ts",
-        "ladder": "L0: denyHubInstallForAutomation before bridge writes; ordinary tier judgment in packages/ext/src/policy/index.ts; ID validation at main install entry"
+        "ladder": "L0: denyHubMutationForAutomation before bridge writes; the execution gate prepares the install ask keyed by session + message + call (packages/ext/src/policy/index.ts installAsks/askInstall, envelope from gate.ts confirm with askedBy install), hub-tools records the name and source on the call and then asks; the ext evaluate hook keeps it an ask in every tier; ID validation at main install entry"
       },
       "tests": [
         {
           "file": "packages/ext/src/plugin-host.test.ts",
-          "name": "A3 install uses ordinary allow/ask policy and automation is denied before any ask"
+          "name": "I-10 an assistant install asks once in every interactive tier, allow covers that install only, deny installs nothing"
+        },
+        {
+          "file": "packages/ext/src/plugin-host.test.ts",
+          "name": "I-10 concurrent installs in two sessions with the same call ID each ask for and submit only their own package"
         },
         {
           "file": "packages/ext/src/hub-tools.test.ts",

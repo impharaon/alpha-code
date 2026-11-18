@@ -73,7 +73,9 @@ async function chatTools() {
     },
     on: (_event, listener) => { replies.add(listener) },
   }, { log: () => {} })
-  return createHubTools(bridge, { location: { directory: host.projectDirectory } } as never)
+  // I-10:生产里 askInstall 由执行闸给(plugin.ts 的 policy.askInstall),这里只走取源/安装入口链,审批视为已允许;
+  // 审批本身由 packages/ext/src/plugin-host.test.ts 的 I-10 用例判。
+  return createHubTools(bridge, { location: { directory: host.projectDirectory } } as never, async () => {})
 }
 async function chatSearch(query: string) {
   const tool = (await chatTools()).find(tool => tool.name === "codepuppy_hub_search")!

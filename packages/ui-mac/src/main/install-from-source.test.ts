@@ -35,7 +35,8 @@ async function installerHarness(run: (h: Awaited<ReturnType<typeof sourceHarness
 }
 async function sourceHarness(temporary: string) {
   const { createSourceInstaller } = await import("./install-from-source")
-  const sources = createPluginSources({ catalog: async () => [], fetch: fixtureFetch })
+  const fetched: string[] = []
+  const sources = createPluginSources({ catalog: async () => [], fetch: (url) => { fetched.push(String(url)); return fixtureFetch(url) } })
   const root = join(temporary, "env", "dev")
   const activation: string[] = []
   const reloads: string[] = []
@@ -46,7 +47,7 @@ async function sourceHarness(temporary: string) {
   })
   const candidate = async (query: string, source = "claude-marketplace") => (await sources.searchSources(query)).candidates.find((row) => row.source === source)!.id
   const request = (candidateId: string, requestId = "request_a2_01") => ({ requestId, source: { kind: "candidate" as const, candidateId }, effect: { kind: "all-projects" as const }, via: "chat" as const })
-  return { install, sources, root, temporary, activation, reloads, candidate, request }
+  return { install, sources, root, temporary, activation, reloads, candidate, request, fetched }
 }
 
 test("A2 marketplace context7 commits one real enabled package and durable declarations", () => installerHarness(async (h) => {
@@ -187,6 +188,23 @@ test("A2 zero runnable package maps diagnostics without writing ledger", () => i
   expect(outcome).toMatchObject({ ok: false, code: "nothing-runnable", notRunning: [{ kind: "plugin", reason: "native-js-plugin" }] })
   expect(existsSync(join(h.root, "installs.json"))).toBe(false)
   expect(h.activation).toEqual([])
+}))
+
+// I-15(alpha-code#1726 审查):取得的来源字节不陪应用跑到退出 —— 一次安装结束(成功或失败)就放掉;
+// 同一候选再装时重新取源。去掉释放 ⇒ 第二次安装命中旧缓存、下载计数不涨,当场红。
+test("I-15 a finished install releases the fetched source bytes, success or failure; installing the same candidate again fetches again", () => installerHarness(async (h) => {
+  const archives = () => h.fetched.filter((url) => url.startsWith("https://codeload.github.com/")).length
+  const id = await h.candidate("context7")
+  expect(await h.install(h.request(id))).toMatchObject({ ok: true, packageId: "claude:context7" })
+  expect(archives()).toBe(1)
+  expect(await h.install(h.request(id, "request_a2_02"))).toMatchObject({ ok: true, packageId: "claude:context7", alreadyInstalled: true })
+  expect(archives()).toBe(2)
+  const npm = (await h.sources.searchSources("skills")).candidates.find((row) => row.source === "opencode-npm" && row.name === "opencode-skills-hub")!.id
+  const tarballs = () => h.fetched.filter((url) => url.includes("/-/")).length
+  expect(await h.install(h.request(npm, "request_a2_03"))).toMatchObject({ ok: false, code: "nothing-runnable" })
+  expect(tarballs()).toBe(1)
+  expect(await h.install(h.request(npm, "request_a2_04"))).toMatchObject({ ok: false, code: "nothing-runnable" })
+  expect(tarballs()).toBe(2)
 }))
 
 test("A2 unknown candidate and conflicting request ID do not create a second package", () => installerHarness(async (h) => {

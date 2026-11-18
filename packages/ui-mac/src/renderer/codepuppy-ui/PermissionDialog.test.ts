@@ -14,7 +14,7 @@ import { pathToFileURL } from "node:url"
 import { build } from "vite"
 import type { createComponent } from "solid-js"
 import type { render } from "solid-js/web"
-import type { createPermissionDecisionCommand, PermissionDialog } from "./PermissionDialog"
+import type { createPermissionDecisionCommand, expiryLabel, PermissionDialog } from "./PermissionDialog"
 import type { PermissionWatcher } from "./permission-watcher"
 import { dict as en } from "../i18n/en"
 import { dict as zh } from "../i18n/zh"
@@ -25,6 +25,7 @@ type TestRuntime = {
   createComponent: typeof createComponent
   render: typeof render
   createPermissionDecisionCommand: typeof createPermissionDecisionCommand
+  expiryLabel: typeof expiryLabel
   PermissionDialog: typeof PermissionDialog
   PermissionWatcher: typeof PermissionWatcher
   resetAuthRecoveryForTests: () => void
@@ -194,7 +195,13 @@ describe("Alpha Permission real Solid render", () => {
     expect(document.querySelector('[data-permission-fact="resources"]')?.textContent).toContain("pwd")
     expect(document.querySelector('[data-permission-fact="resources"]')?.textContent).toContain("src/**")
     expect(document.querySelector('[data-permission-fact="scope"]')?.textContent).toBe("适用范围本次会话")
-    expect(document.querySelector('[data-permission-fact="expiry"]')?.textContent).toContain("2030-01-01 00:00:00 UTC")
+    // 期限写人话(本地时区),不露 ISO / UTC;夹具的 2030-01-01 00:00 UTC 在本机时区下换算成年月日时分。
+    const due = new Date(1_893_456_000_000)
+    const clock = `${String(due.getHours()).padStart(2, "0")}:${String(due.getMinutes()).padStart(2, "0")}`
+    expect(document.querySelector('[data-permission-fact="expiry"]')?.textContent).toBe(
+      `期限${due.getFullYear()} 年 ${due.getMonth() + 1} 月 ${due.getDate()} 日 ${clock} 前`,
+    )
+    expect(document.querySelector('[data-permission-fact="expiry"]')?.textContent).not.toMatch(/UTC|T\d\d:/)
     expect(document.querySelector("[role='dialog']")?.textContent).not.toContain("待契约")
     expect(document.querySelector(".a-permission-grant-note")?.textContent).toContain(zh["codepuppy.permission.alwaysNote"])
   })
@@ -1265,5 +1272,29 @@ describe("#1314 批准面板的风险标签", () => {
       .map((id) => document.getElementById(id)!.textContent)
       .join(" ")
     expect(name).toBe("允许这次操作吗? 高风险")
+  })
+})
+
+describe("批准卡期限写成人话(AC-07)", () => {
+  // 本地时区构造,不依赖机器时区:「今天 / 明天 / 日期」按本地日历日分。
+  const now = new Date(2026, 10, 18, 9, 5).getTime()
+  const at = (y: number, mo: number, d: number, h: number, mi: number) => new Date(y, mo - 1, d, h, mi).getTime()
+
+  test("同一天 → 今天 HH:mm 前;次日 → 明天;同年更晚 → 月日;跨年 → 带年", () => {
+    expect(runtime.expiryLabel(at(2026, 11, 18, 18, 30), now)).toBe("今天 18:30 前")
+    expect(runtime.expiryLabel(at(2026, 11, 18, 0, 0), now)).toBe("今天 00:00 前")
+    expect(runtime.expiryLabel(at(2026, 11, 19, 7, 8), now)).toBe("明天 07:08 前")
+    expect(runtime.expiryLabel(at(2026, 11, 24, 18, 30), now)).toBe("11 月 24 日 18:30 前")
+    expect(runtime.expiryLabel(at(2027, 1, 5, 9, 0), now)).toBe("2027 年 1 月 5 日 09:00 前")
+  })
+
+  test("不过期仍写「不过期」;不可解析的数值原样不崩", () => {
+    expect(runtime.expiryLabel(null, now)).toBe("不过期")
+    expect(runtime.expiryLabel(Number.NaN, now)).toBe("NaN")
+  })
+
+  test("期限的任何输出都不含 ISO 时间戳或 UTC", () => {
+    for (const value of [at(2026, 11, 18, 18, 30), at(2026, 12, 1, 8, 0), at(2028, 2, 29, 23, 59)])
+      expect(runtime.expiryLabel(value, now)).not.toMatch(/UTC|\d{4}-\d{2}-\d{2}|T\d\d:/)
   })
 })

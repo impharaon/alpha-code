@@ -16,19 +16,17 @@
 
 .a-permission-verb {
   margin: 0;
-  color: var(--a-text);
+  color: var(--a-text-secondary);
   font-size: var(--a-text-sm);
-  font-weight: var(--a-weight-semibold);
 }
 
 .a-permission-tool {
   display: grid;
   gap: 1px;
-  padding: 10px 14px;
+  padding: 8px 10px;
   overflow-wrap: anywhere;
-  border: 1px solid var(--a-border-faint);
-  border-radius: var(--a-radius-lg);
-  background: var(--a-surface);
+  border-radius: var(--a-radius-sm);
+  background: var(--a-bg-subtle);
 }
 
 .a-permission-tool b {
@@ -41,62 +39,41 @@
   font-size: var(--a-text-2xs);
 }
 
+/* 适用范围 / 期限:名称 — 值行(组件库 KeyValueList 同款 .a-kv-*),不再一格一个方框。 */
 .a-permission-facts {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--a-space-3);
-  margin: var(--a-space-4) 0 0;
+  min-width: 0;
+  margin: var(--a-space-2) 0 0;
 }
 
 .a-permission-fact {
-  min-width: 0;
-  padding: var(--a-space-3);
-  border: 1px solid var(--a-border-faint);
-  border-radius: var(--a-radius-lg);
-  background: var(--a-bg-subtle);
+  align-items: baseline;
 }
 
-.a-permission-fact dt {
-  margin-bottom: var(--a-space-2);
-  color: var(--a-text-tertiary);
-  font-size: var(--a-text-xs);
-  font-weight: var(--a-weight-semibold);
-  letter-spacing: var(--a-tracking-wide);
-  text-transform: uppercase;
-}
-
-.a-permission-fact dd {
-  min-width: 0;
-  margin: 0;
-  overflow-wrap: anywhere;
-  color: var(--a-text);
-  font-size: var(--a-text-sm);
-  font-weight: var(--a-weight-semibold);
-}
-
-.a-permission-fact small {
+.a-permission-fact dd small {
   display: block;
   margin-top: var(--a-space-1);
   overflow-wrap: anywhere;
   color: var(--a-text-tertiary);
   font-size: var(--a-text-xs);
+  font-weight: var(--a-weight-normal);
 }
 
 .a-permission-resources {
   display: flex;
-  flex-wrap: wrap;
-  gap: var(--a-space-2);
+  flex-direction: column;
+  gap: var(--a-space-1);
 }
 
+/* 命令 / 资源:一块安静的等宽底,长内容照常换行(批准时不能把内容藏进省略号)。 */
 .a-permission-resources code {
   max-width: 100%;
-  padding: 3px 7px;
+  padding: 8px 10px;
   overflow-wrap: anywhere;
-  border: 1px solid var(--a-border);
-  border-radius: var(--a-radius-md);
-  background: var(--a-bg-inset);
+  border-radius: var(--a-radius-sm);
+  background: var(--a-bg-subtle);
   color: var(--a-text);
-  font-size: var(--a-text-xs);
+  font-family: var(--a-font-mono);
+  font-size: var(--a-text-sm);
 }
 
 /* REQ-236:「记住」框与卡内提示行(批准稿 2026-10-30-req236-permission-cards,行样式同能力授权框)。 */
@@ -187,7 +164,6 @@
 .a-permission-grant-note {
   color: var(--a-text-tertiary);
   font-size: var(--a-text-xs);
-  text-align: right;
 }
 
 .a-permission-actions {
@@ -196,10 +172,6 @@
   justify-content: flex-end;
   gap: var(--a-space-2);
   width: 100%;
-}
-
-.a-permission-actions [data-permission-decision="reject"] {
-  margin-right: auto;
 }
 
 @media (max-width: 560px) {
@@ -216,17 +188,15 @@
     text-align: left;
   }
 
-  .a-permission-actions .a-btn,
-  .a-permission-actions [data-permission-decision="reject"] {
+  .a-permission-actions .a-btn {
     width: 100%;
     min-height: 44px;
-    margin-right: 0;
   }
 }
 
 /* ── 工具批准面板(#1478):非模态、全应用唯一、关不掉 ──────────────────────
    没有遮罩、不冻结页面;窗口底部居中,有会话输入框时由 JS 锚到它正上方(写 left/width/bottom)。
-   视觉沿用提问卡一族:细边框、11px 圆角、轻阴影、琥珀色「等你处理」图标。 */
+   视觉沿用提问卡一族:细边框、大圆角、轻阴影、盾形图标(新外壳稿 #session)。 */
 .a-permission-panel-root {
   position: fixed;
   z-index: var(--a-z-overlay);
@@ -241,9 +211,9 @@
   display: flex;
   flex-direction: column;
   max-height: min(560px, calc(100vh - var(--a-permission-panel-bottom, 16px) - 16px));
-  border: 1px solid var(--a-border-faint);
-  border-radius: var(--a-radius-lg);
-  background: var(--a-surface-raised);
+  border: 1px solid var(--a-border);
+  border-radius: var(--a-radius-xl);
+  background: var(--a-surface);
   box-shadow: var(--a-shadow-md);
   color: var(--a-text);
   pointer-events: auto;
@@ -258,24 +228,28 @@
   display: flex;
   align-items: center;
   gap: var(--a-space-2);
-  padding: 12px 14px 0;
+  padding: 14px 16px 0;
 }
 
 .a-permission-panel-icon {
   display: inline-flex;
   flex: none;
-  color: var(--a-warning);
+  color: var(--a-text-secondary);
+}
+
+.a-permission-panel-icon .a-ic {
+  stroke-width: 1.8;
 }
 
 .a-permission-panel-title {
-  font-size: var(--a-text-sm);
+  font-size: var(--a-text-base);
   font-weight: var(--a-weight-semibold);
 }
 
 .a-permission-panel-body {
   min-height: 0;
   overflow-y: auto;
-  padding: var(--a-space-2) 14px 0;
+  padding: var(--a-space-2) 16px 0;
 }
 
 .a-permission-panel-description {
@@ -283,10 +257,6 @@
   font-size: var(--a-text-sm);
 }
 
-.a-permission-panel-body .a-permission-facts {
-  margin-top: var(--a-space-3);
-}
-
 .a-permission-panel-footer {
-  padding: var(--a-space-3) 14px 12px;
+  padding: var(--a-space-3) 16px 12px;
 }

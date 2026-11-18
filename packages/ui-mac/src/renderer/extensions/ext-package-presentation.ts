@@ -30,6 +30,16 @@ export function pluginSourceLabelKey(source: PluginSourceIdV1 | "local-folder") 
   } as const)[source]
 }
 
+/**
+ * 助手发起安装时执行闸记下的来源(`metadata.install.source` / `policy.install.source`)→ 来源名文案键。
+ * wire 上的值不认识(含原型链上的键、本地文件夹)⇒ undefined,卡上不写来源。
+ */
+export function installSourceLabelKey(source: unknown) {
+  if (source === "created") return "codepuppy.ext.packageSourceMine" as const
+  const known = typeof source === "string" && source !== "local-folder" ? pluginSourceLabelKey(source as PluginSourceIdV1) : undefined
+  return typeof known === "string" ? known : undefined
+}
+
 /** Display-only graph projection; package names and prefixes never establish provenance. */
 export function installedPackagePresentation(pack: Pick<InstalledPackageV1, "source" | "origin" | "notRunning">) {
   const source = pack.source

@@ -189,6 +189,8 @@ export type TimelineHubInstall = {
   result?: string
   /** BR-10:这次安装正等用户在审批卡上允许,或已被拒绝(没有安装)。 */
   approval?: "waiting" | "declined"
+  /** 执行闸记在调用上的真实来源(`metadata.install.source`,卡上只经来源词表翻成人话;不认识的值卡上不写)。 */
+  source?: string
 }
 
 /** 引擎对用户拒绝的工具调用写下的固定原因(packages/core/src/session/runner/step.ts 的 declines)。 */
@@ -203,6 +205,7 @@ function hubInstallOf(part: ToolPart): TimelineHubInstall | undefined {
   const recorded = metadata?.install && typeof metadata.install === "object" ? (metadata.install as { name?: unknown }).name : undefined
   const name = operation === "search" ? input?.query : typeof recorded === "string" ? recorded : input?.name
   const clean = typeof name === "string" ? redactText(name, 400) : undefined
+  const recordedSource = metadata?.install && typeof metadata.install === "object" ? (metadata.install as { source?: unknown }).source : undefined
   const awaiting = metadata?.stage === "awaiting-approval" && typeof metadata.requestId !== "string" && typeof recorded === "string"
   const approval = !awaiting ? undefined
     : part.state.status === "error" ? part.state.error === ENGINE_DECLINED_TOOL_CALL ? "declined" as const : undefined
@@ -217,6 +220,7 @@ function hubInstallOf(part: ToolPart): TimelineHubInstall | undefined {
     ...(typeof metadata?.packageId === "string" ? { packageId: metadata.packageId } : {}),
     ...(result?.ok ? { result: result.value } : {}),
     ...(approval ? { approval } : {}),
+    ...(typeof recordedSource === "string" ? { source: recordedSource } : {}),
   }
 }
 

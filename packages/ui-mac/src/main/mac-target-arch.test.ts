@@ -494,3 +494,30 @@ describe("#1669 checkPackagedEngineAssets(afterPack 的核对)", () => {
     await expect(afterPack({ ...context(packed.appOutDir), electronPlatformName: "win32" })).resolves.toBeUndefined()
   })
 })
+
+// I-14:没有签名材料时打出的本机包,electron-builder 不签(identity null 是「跳过签名」,不是 ad-hoc);而 fuses 改写了
+// Electron 可执行文件,原签名随之失效,macOS 启动即杀。所以本机包的 ad-hoc 签名由 fuses 翻转之后紧接着补
+// (@electron/fuses 的 resetAdHocDarwinSignature:`codesign --sign - --force --deep`,不查钥匙串身份);有签名材料的
+// 正式包配置逐字不变。去掉这一项 ⇒ 未签名一臂红;把它也加到正式包 ⇒ 签名一臂红。真打包启动的证据见交付记录。
+describe("I-14 本机包的本机签名", () => {
+  const configOf = (sign: string | undefined) => {
+    const env: Record<string, string | undefined> = { ...process.env, [TARGET_ARCH_ENV]: "arm64", GITHUB_ACTIONS: "false" }
+    delete env.CODEPUPPY_SIGN
+    delete env.CODEPUPPY_SIGN_IDENTITY
+    if (sign) env.CODEPUPPY_SIGN = sign
+    const script = `Object.defineProperty(process, "platform", { value: "darwin" }); const c = (await import(${JSON.stringify(path.join(packageDir, "electron-builder.config.ts"))})).default; console.log(JSON.stringify({ identity: c.mac.identity === null ? "skip" : c.mac.identity ?? "auto", fuses: c.electronFuses }))`
+    const result = spawnSync(process.execPath, ["-e", script], { cwd: packageDir, env: env as Record<string, string>, encoding: "utf8", timeout: 30_000 })
+    expect(result.status, result.stderr).toBe(0)
+    return JSON.parse(result.stdout.trim().split("\n").at(-1)!) as { identity: string; fuses: Record<string, boolean> }
+  }
+  const releaseFuses = { runAsNode: false, enableNodeOptionsEnvironmentVariable: false, enableNodeCliInspectArguments: false, enableEmbeddedAsarIntegrityValidation: true, onlyLoadAppFromAsar: true, enableCookieEncryption: true }
+
+  test("没有签名材料:不按钥匙串找身份,fuses 翻转后补 ad-hoc 签名;正式签名包的 fuse 配置与身份来源不变", () => {
+    const local = configOf(undefined)
+    expect(local.identity).toBe("skip")
+    expect(local.fuses).toEqual({ ...releaseFuses, resetAdHocDarwinSignature: true })
+    const release = configOf("1")
+    expect(release.identity).toBe("auto")
+    expect(release.fuses).toEqual(releaseFuses)
+  })
+})

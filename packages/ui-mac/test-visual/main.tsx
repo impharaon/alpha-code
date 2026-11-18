@@ -17,6 +17,7 @@ import { PermissionDialog } from "../src/renderer/codepuppy-ui/PermissionDialog"
 import { ExtStandaloneAuthzDialog } from "../src/renderer/extensions/ext-authz"
 import { classifyPermissionRequest } from "../../ext/src/policy/risk"
 import { CodePuppyComposerRuntime } from "../src/renderer/codepuppy-ui/codepuppy-composer"
+import { CodePuppyWorkspaceChip } from "../src/renderer/codepuppy-ui/workspace-chip"
 import { pushToast, ToastViewport } from "../src/renderer/codepuppy-ui/Toast"
 import type { ModelContract } from "../src/renderer/codepuppy-ui/model-contract"
 // 与生产 index.tsx 同口径:home.css(.a-pop / .a-ic / .a-chip 通用原语)与 composer-reskin 全局在场。
@@ -37,7 +38,8 @@ if (params.get("theme") === "dark") document.documentElement.dataset.colorScheme
 // 进不了浏览器 bundle;bun 测试用的是 test-component/effective-catalog.fixture.ts(走生产投影),这里只为画面照抄字段。
 const catalog = {
   defaultModel: catalogJson.defaultModel,
-  defaultPlatformModel: catalogJson.defaultPlatformModel,
+  // 输入框场景默认选 DeepSeek V4 Pro(带「低/中/高/最高」档位,推理强度弹层才有内容)。
+  defaultPlatformModel: scene.startsWith("composer-") ? "deepseek-v4-pro" : catalogJson.defaultPlatformModel,
   platformProvider: catalogJson.platformProvider,
   platformModels: producer.value.data.map((row) => ({
     id: row.id,
@@ -111,12 +113,39 @@ const modelContract: ModelContract = {
   current: async () => ({ providerID: catalog.platformProvider.id, id: catalog.platformModels[0]!.id }),
   switch: async () => {},
 }
+// 界面优化 BR-04 的输入框场景(composer-home / composer-session)用到的项目:托盘里的项目名与项目选择弹层。
+const composerProjects = ["orbit-web", "pricing-api", "design-notes"].map((name) => ({ worktree: `/Users/me/${name}`, name, color: "" }))
 const projects = {
-  store: { projects: [], ready: true, error: false },
+  store: { projects: composerProjects, ready: true, error: false },
   reload: async () => {},
   createSession: async () => undefined,
   startChat: async () => undefined,
-  sdk: () => undefined,
+  // 输入框场景:「+」菜单的助手一节与托盘「文件」的变更文件来自引擎,这里给一小组固定数据。
+  sdk: () =>
+    scene.startsWith("composer-")
+      ? ({
+          v2: {
+            agent: {
+              list: async () => ({
+                data: {
+                  data: [
+                    { id: "general", description: "General-purpose agent", mode: "subagent" },
+                    { id: "explore", description: "Fast agent for exploring codebases", mode: "subagent" },
+                    { id: "docs", description: "写文档：报告、规范、设计说明", mode: "subagent" },
+                  ],
+                },
+              }),
+            },
+          },
+          command: { list: async () => ({ data: [] }) },
+          find: { files: async () => ({ data: ["src/config/pricing.ts"] }) },
+          vcs: {
+            status: async () => ({
+              data: [{ file: "/Users/me/orbit-web/src/pages/Pricing.tsx" }, { file: "/Users/me/orbit-web/src/config/pricing.ts" }],
+            }),
+          },
+        } as never)
+      : undefined,
   renameSession: async () => false,
   shareSession: async () => undefined,
   deleteSession: async () => false,
@@ -334,7 +363,61 @@ function Authz(): JSX.Element {
   )
 }
 
-render(() => (scene === "authz" ? <Authz /> : <Workspace />), document.getElementById("root")!)
+// 界面优化 BR-04:输入框 + 托盘 + 各弹层,首页(朝下)与对话页(朝上)两种挂法。
+function ComposerScene(): JSX.Element {
+  const home = scene === "composer-home"
+  const [wsOpen, setWsOpen] = createSignal(false)
+  const [ws, setWs] = createSignal("/Users/me/orbit-web")
+  const [sessionID] = createSignal("ses_1")
+  const composer = (
+    <CodePuppyComposerRuntime
+      mode={home ? "home" : "session"}
+      projects={projects as never}
+      directory={ws}
+      sessionID={home ? undefined : sessionID}
+      command={command as never}
+      modelContract={modelContract}
+      workspaceChip={
+        home ? (
+          <CodePuppyWorkspaceChip
+            projects={composerProjects as never}
+            defaultWorkspace={undefined}
+            value={ws()}
+            open={wsOpen()}
+            onOpenChange={setWsOpen}
+            onSelect={setWs}
+          />
+        ) : undefined
+      }
+    />
+  )
+  return home ? (
+    <div class="a-ui a-home a-home--page" style={{ height: "100vh" }}>
+      <div class="a-home-stage" style={{ "align-items": "flex-start", "padding-top": "30vh" }}>
+        <div class="a-home-center">
+          <h1 class="a-home-greet">我们要处理什么？</h1>
+          {composer}
+        </div>
+      </div>
+    </div>
+  ) : (
+    <div class="vh-shell" data-scene={scene} style={{ "justify-content": "flex-end" }}>
+      <div class="a-swk-composer-dock">
+        <div class="a-swk-composer-host">
+          <div class="a-swk-dock">
+            {composer}
+            <p class="a-swk-ai-disclaimer">{"内容由AI生成,仅供参考"}</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+render(
+  () => (scene === "authz" ? <Authz /> : scene.startsWith("composer-") ? <ComposerScene /> : <Workspace />),
+  document.getElementById("root")!,
+)
 if (scene === "toast-tooltip") {
   pushToast({ kind: "success", title: "已切换到 deepseek-flash", detail: "下一条消息生效", duration: 600_000 })
   pushToast({ kind: "error", title: "发送失败", detail: "网络断开,内容还在输入框里" })

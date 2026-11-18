@@ -1624,6 +1624,13 @@ export function ExtensionHub(props: {
             reason: failedReload.stateReason?.detail ?? t("codepuppy.ext.hubReasonFailed"),
           }),
         }
+      // `#1724`:开启时缺令牌 / 缺登录的连接器在引擎里本来就连不上,hub-view 会一直给 reload-pending ——
+      // 缺的前置项必须先说,不然行永远停在「正在生效」。
+      const auth = pack().desiredState === "enabled" ? authorization() : undefined
+      if (auth?.ok && auth.items.some((item) => item.kind === "secret" && !item.saved))
+        return { kind: "prerequisite" as const, text: t("codepuppy.ext.packagePendingToken") }
+      if (auth?.ok && auth.items.some((item) => item.kind === "mcp-oauth" && !item.authenticated))
+        return { kind: "prerequisite" as const, text: t("codepuppy.ext.packagePendingLogin") }
       if (
         ext.store.hubRows.some(
           (row) =>
@@ -1634,11 +1641,6 @@ export function ExtensionHub(props: {
       )
         return { kind: "progress" as const, text: t("codepuppy.ext.packageApplying") }
       if (pack().desiredState === "disabled") return { kind: "off" as const, text: t("codepuppy.ext.packageOff") }
-      const auth = authorization()
-      if (auth?.ok && auth.items.some((item) => item.kind === "secret" && !item.saved))
-        return { kind: "prerequisite" as const, text: t("codepuppy.ext.packagePendingToken") }
-      if (auth?.ok && auth.items.some((item) => item.kind === "mcp-oauth" && !item.authenticated))
-        return { kind: "prerequisite" as const, text: t("codepuppy.ext.packagePendingLogin") }
       const live = pack().components.flatMap((component) =>
         component.kind === "mcp" && ext.store.mcp[component.name] ? [ext.store.mcp[component.name]!] : [],
       )

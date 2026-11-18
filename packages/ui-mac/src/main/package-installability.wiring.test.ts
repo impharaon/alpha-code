@@ -168,9 +168,9 @@ describe("package installability production wiring", () => {
       },
     )
 
-    // 2(refresh 评两个 package)+ 2(browse 再 refresh)+ 2(detail 再 refresh)+ 1(preflight 只评命中的那个)
-    // = 7。四条入口若有任何一条改调独立副本,副本不会 push 进 calls,这里就短。
-    expect(calls).toEqual(Array(7).fill("evaluatePackageForHost"))
+    // 2(refresh 评两个 package)+ 2(browse 再 refresh)+ 0(detail 读 browse 载入的那一份,I-15)+ 1(preflight 只评命中的那个)
+    // = 5。四条入口若有任何一条改调独立副本,副本不会 push 进 calls,这里就短(detail 的视图正是 browse 用同一评估器算出的)。
+    expect(calls).toEqual(Array(5).fill("evaluatePackageForHost"))
     expect(preflight).toMatchObject({
       ok: false,
       package: {

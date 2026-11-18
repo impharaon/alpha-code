@@ -27,7 +27,7 @@
   animation: a-ext-in var(--a-dur-base) var(--a-ease-out);
 }
 body[data-codepuppy-sidebar="open"] .codepuppy-ext-page {
-  left: var(--codepuppy-sidebar-w, 260px);
+  left: var(--codepuppy-surface-left);
 }
 @keyframes a-ext-in {
   from {

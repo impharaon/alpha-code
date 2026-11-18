@@ -1,73 +1,18 @@
-/* Account footer entry + upward popover (single bottom entry). Uses the codepuppy-ui --a-* tokens
- * (globally defined by codepuppy-ui/tokens.css, loaded via home/dialog/ext-hub css). Follows light/dark. */
-
-.codepuppy-sidebar-footer {
-  position: relative;
-}
-
-/* the single footer entry */
-.codepuppy-sidebar-account {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  width: 100%;
-  height: 52px;
-  padding: 0 10px;
-  border: none;
-  background: transparent;
-  border-radius: var(--a-radius-lg, 11px);
-  cursor: pointer;
-  color: var(--a-text);
-  text-align: left;
-  -webkit-app-region: no-drag;
-}
-.codepuppy-sidebar-account:hover {
-  background: var(--a-bg-muted);
-}
-.codepuppy-sidebar-account-id {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-}
-.codepuppy-sidebar-account-name {
-  font-size: 13px;
-  font-weight: 600;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.codepuppy-sidebar-account-sub {
-  font-size: 11px;
-  color: var(--a-text-tertiary);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.codepuppy-acct-chev {
-  width: 12px;
-  height: 12px;
-  flex: 0 0 auto;
-  color: var(--a-text-tertiary);
-}
+/* Account entry = the rail's avatar (shell-chrome.tsx); its popover opens up and to the right of it
+ * (frame #account-menu). Uses the codepuppy-ui --a-* tokens. Follows light/dark. */
 
 .codepuppy-acct-av {
   flex: 0 0 auto;
-  width: 30px;
-  height: 30px;
-  border-radius: 50%;
-  background: var(--a-accent-solid);
-  color: var(--a-text-on-accent);
+  width: 32px;
+  height: 32px;
+  border-radius: var(--a-radius-full);
+  background: var(--a-bg-inset);
+  color: var(--a-text-secondary);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-weight: 700;
-  font-size: 13px;
-}
-.codepuppy-acct-av.guest,
-.codepuppy-acct-av[data-guest] {
-  background: var(--a-bg-inset);
-  color: var(--a-text-tertiary);
+  font-weight: var(--a-weight-semibold);
+  font-size: var(--a-text-xs);
 }
 
 /* popover */
@@ -77,20 +22,20 @@
   z-index: 48;
 }
 .codepuppy-acct-pop {
-  /* fixed (not absolute) so it escapes the sidebar's overflow:hidden and can be wider than 256px */
   position: fixed;
-  left: 10px;
-  width: 312px;
-  bottom: 62px;
+  left: calc(var(--a-rail-w) + 4px);
+  bottom: calc(var(--a-frame-gap) + 2px);
+  width: 280px;
+  box-sizing: border-box;
   z-index: 50;
-  max-height: min(580px, calc(100vh - 120px));
+  max-height: min(580px, calc(100vh - var(--a-topbar-h) - var(--a-frame-gap)));
   overflow-y: auto;
-  background: var(--a-surface-raised, var(--a-surface));
-  border: 1px solid var(--a-border);
-  border-radius: var(--a-radius-xl, 14px);
-  box-shadow: var(--a-shadow-overlay);
-  padding-bottom: 6px;
-  animation: codepuppy-acct-in 160ms var(--a-ease-out, cubic-bezier(0.22, 1, 0.36, 1));
+  padding: 6px;
+  background: var(--a-surface-raised);
+  border: 1px solid var(--a-hairline);
+  border-radius: var(--a-radius-lg);
+  box-shadow: var(--a-shadow-md);
+  animation: codepuppy-acct-in 160ms var(--a-ease-out);
 }
 @keyframes codepuppy-acct-in {
   from {
@@ -103,18 +48,18 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 14px;
+  padding: 8px 10px 10px;
 }
 .codepuppy-acct-id {
   flex: 1;
   min-width: 0;
 }
 .codepuppy-acct-name {
-  font-weight: 600;
-  font-size: 13.5px;
+  font-weight: var(--a-weight-semibold);
+  font-size: var(--a-text-base);
 }
 .codepuppy-acct-email {
-  font-size: 11.5px;
+  font-size: var(--a-text-xs);
   color: var(--a-text-tertiary);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -138,13 +83,13 @@
 /* #1686:余额卡本体是组件库的 .a-card + .a-kv(codepuppy-ui/card.css、key-value-list.css);
    组件不带外边距,弹层的左右 14、下 12 放在这一层,卡片位置与改前相同。 */
 .codepuppy-acct-card-slot {
-  margin: 0 14px 12px;
+  margin: 0 4px 8px;
 }
 
 .codepuppy-acct-cta {
   display: flex;
   gap: 8px;
-  margin: 0 14px 10px;
+  margin: 0 4px 6px;
 }
 .codepuppy-acct-btn {
   flex: 1;
@@ -179,17 +124,17 @@
   align-items: center;
   justify-content: center;
   gap: 8px;
-  margin: 14px;
-  width: calc(100% - 28px); /* full width (it's a <button>, which otherwise shrinks to content) */
+  margin: 0 4px 6px;
+  width: calc(100% - 8px); /* full width (it's a <button>, which otherwise shrinks to content) */
   box-sizing: border-box;
-  height: 42px;
+  height: 34px;
   border-radius: var(--a-radius-md);
   border: none;
   background: var(--a-accent-solid);
   color: var(--a-text-on-accent);
   font: inherit;
-  font-size: 13.5px;
-  font-weight: 600;
+  font-size: var(--a-text-base);
+  font-weight: var(--a-weight-medium);
   cursor: pointer;
 }
 .codepuppy-acct-login:hover {
@@ -198,7 +143,7 @@
 
 .codepuppy-acct-sep {
   height: 1px;
-  background: var(--a-border-faint);
+  background: var(--a-hairline);
   margin: 6px 0;
 }
 
@@ -207,11 +152,11 @@
 .codepuppy-acct-version {
   display: block;
   width: 100%;
-  padding: 6px 16px 2px;
+  padding: 8px 0 4px;
   border: none;
   background: transparent;
   font: inherit;
-  font-size: 11px;
+  font-size: var(--a-text-xs);
   color: var(--a-text-tertiary);
   text-align: center;
   cursor: pointer;
@@ -235,9 +180,9 @@
 .codepuppy-acct-item {
   display: flex;
   align-items: center;
-  gap: 12px;
-  width: calc(100% - 12px);
-  margin: 0 6px;
+  gap: 10px;
+  width: 100%;
+  margin: 0;
   height: 34px;
   padding: 0 10px;
   border: none;
@@ -257,13 +202,22 @@
 .codepuppy-acct-cta + .codepuppy-acct-item,
 .codepuppy-acct-login + .codepuppy-acct-item {
   margin-top: 6px;
-  border-top: 1px solid var(--a-border-faint);
-  border-radius: 0;
+  position: relative;
+}
+.codepuppy-acct-cta + .codepuppy-acct-item::before,
+.codepuppy-acct-login + .codepuppy-acct-item::before {
+  content: "";
+  position: absolute;
+  top: -4px;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: var(--a-hairline);
 }
 .codepuppy-acct-ic {
-  width: 18px;
-  text-align: center;
-  color: var(--a-text-tertiary);
+  width: 16px;
+  height: 16px;
+  color: var(--a-text-secondary);
   flex: 0 0 auto;
 }
 .codepuppy-acct-spacer {

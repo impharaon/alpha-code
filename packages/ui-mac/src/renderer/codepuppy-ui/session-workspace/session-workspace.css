@@ -42,30 +42,15 @@
   app-region: no-drag;
 }
 
-.a-swk-project-pill {
-  display: inline-flex;
+/* Breadcrumb "project / title" (frame #session). Renders into the window chrome's top-bar slot
+ * (sidebar/shell-chrome.tsx) — type scale and weight come from there — or into .a-swk-topbar when the
+ * workspace is mounted without the chrome. */
+.a-swk-topbar-content {
+  display: flex;
   align-items: center;
-  gap: 7px;
+  flex: 1;
   min-width: 0;
-  height: 28px;
-  padding: 0 8px;
-  border-radius: var(--a-radius-md);
-  color: var(--a-text-tertiary);
-  font-size: var(--a-text-sm);
-  font-weight: var(--a-weight-medium);
-}
-
-.a-swk-project-avatar {
-  display: grid;
-  place-items: center;
-  flex: none;
-  width: 17px;
-  height: 17px;
-  border-radius: 5px;
-  background: var(--a-accent-solid);
-  color: var(--a-text-on-accent);
-  font-size: 9px;
-  font-weight: var(--a-weight-bold);
+  gap: 0;
 }
 
 .a-swk-project-label,
@@ -76,23 +61,23 @@
 
 .a-swk-project-label {
   max-width: 180px;
+  color: var(--a-text-tertiary);
+  font-size: var(--a-text-base);
+  font-weight: var(--a-weight-normal);
 }
 
 .a-swk-separator {
   flex: none;
+  margin: 0 6px;
   color: var(--a-text-disabled);
-  font-size: var(--a-text-sm);
+  font-size: var(--a-text-base);
 }
 
 .a-swk-session-title {
-  height: 28px;
-  max-width: min(42vw, 420px);
-  padding: 3px 9px 0;
-  border-radius: var(--a-radius-md);
+  min-width: 0;
   color: var(--a-text);
-  font-size: var(--a-text-md);
-  font-weight: var(--a-weight-semibold);
-  letter-spacing: var(--a-tracking-tight);
+  font-size: var(--a-text-base);
+  font-weight: var(--a-weight-medium);
 }
 
 .a-swk-status {
@@ -537,8 +522,9 @@
   max-width: calc(100% - 480px);
   min-height: 0;
   overflow: hidden;
-  border-left: 1px solid var(--a-border-faint);
-  background: var(--a-bg-subtle);
+  /* Part of the working surface: white, split from the conversation by --a-divider only (BR-01). */
+  border-left: 1px solid var(--a-divider);
+  background: var(--a-bg-canvas);
 }
 
 /* Left-edge resize hot zone: 6px, accent hairline on hover/drag/focus (approved form). */

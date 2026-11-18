@@ -12,6 +12,25 @@
 <body>
 <div class="wrap">
 
+  <!-- ========== 2026-11-18 新视觉方向(owner U-05 批准;增量稿 2026-11-18-ui-refresh/ 已冻结) ========== -->
+  <section class="sec ux2-sec" id="direction-2026-11">
+    <div class="sec-head">
+      <div class="sec-kicker">2026-11-18 · 新视觉方向 · owner 批准（U-05「可以，按这个方向做」）</div>
+      <h2>新视觉方向：灰色外框 + 圆角纯白工作面</h2>
+      <p class="lede">本节各帧取代本页旧稿的版式与配色；行为与文字规则照旧，帧内另写的除外。增量稿（已冻结，含设计审计 R1 逐项核对与令牌终表）：<a href="../../2026-11-18-ui-refresh/frame.html">2026-11-18-ui-refresh/frame.html</a>。共享样式 <a href="../../system/direction.css">system/direction.css</a>。本页下方旧稿保留作历史对照，与本节冲突时以本节为准。</p>
+    </div>
+  <div class="ux2-anchor" id="hub-custom-service">
+    <h3>接入其它服务（对话框） <code>#hub-custom-service</code></h3>
+    <p>从模型选择器「添加供应商 / 接入其它服务」打开。表单改在组件库对话框里填，不再塞进弹层；字段改成中文说法（服务地址、模型名）；按钮都在右边。</p>
+    <div class="ux2-scroll"><iframe class="ux2-if" src="frames/hub-custom-service.html" style="height:940px" title="接入其它服务（对话框）" loading="lazy"></iframe></div>
+  </div>
+  <div class="ux2-anchor" id="picker">
+    <h3>模型与推理强度合并选择 <code>#picker</code></h3>
+    <p>卡片从托盘下沿 +6px 向下展开，右缘对齐发送键；滑条把手是白色小圆，无黑圈；已过档位用次级灰。点模型名换成模型列表；模型没有档位时只写一句说明。 左：档位；中：模型列表（现有品牌图标，单色）；右：无档位。(帧在 <code>current/composer/</code>)</p>
+    <div class="ux2-scroll"><iframe class="ux2-if" src="../composer/frames/picker.html" style="height:1104px" title="模型与推理强度合并选择" loading="lazy"></iframe></div>
+  </div>
+  </section>
+
 <header class="doc">
   <p class="eyebrow">alpha-code · 交互重设计 · 2026-06-27</p>
   <h1 class="doc">模型选择器<br><em>登录态感知</em> 的重构</h1>

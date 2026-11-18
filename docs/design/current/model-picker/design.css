@@ -255,3 +255,12 @@ h2.sec .n{font-family:var(--a-font-mono); font-size:13px; color:var(--a-accent);
 .note{margin-top:22px; padding:16px 18px; border-left:3px solid var(--a-accent); background:var(--a-accent-subtle); border-radius:0 var(--a-radius-md) var(--a-radius-md) 0; font-size:13px; color:var(--a-text); line-height:1.55}
 .note b{color:var(--a-accent)}
 footer.doc{margin-top:80px; padding-top:28px; border-top:1px solid var(--a-border-faint); font-size:12px; color:var(--a-text-tertiary); font-family:var(--a-font-mono)}
+
+/* ── 2026-11-18 新视觉方向(owner U-05 批准)的子帧:样式来自 ../../system/direction.css,与本页旧稿样式不同,所以装在子帧里 ── */
+.ux2-sec{margin-top:24px}
+.ux2-anchor{scroll-margin-top:72px;margin:28px 0 0}
+.ux2-anchor h3{margin:0 0 4px;font-size:16px}
+.ux2-anchor h3 code{font-size:12px;opacity:.6;font-weight:400}
+.ux2-anchor p{margin:0 0 10px;max-width:110ch;font-size:13px;line-height:1.6;opacity:.8}
+.ux2-scroll{overflow-x:auto;border-radius:12px}
+.ux2-if{display:block;width:1600px;border:0;background:transparent}

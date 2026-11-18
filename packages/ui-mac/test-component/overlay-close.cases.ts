@@ -226,9 +226,10 @@ function query<T extends Element>(selector: string): T {
 
 function navItem(label: string): HTMLElement {
   for (const el of document.querySelectorAll<HTMLElement>(".codepuppy-sidebar-nav .codepuppy-sidebar-nav-item")) {
-    if ((el.textContent ?? "").includes(label)) return el
+    // 窄轨按钮只有图标,名字在 aria-label 上。
+    if ((el.getAttribute("aria-label") ?? el.textContent ?? "").includes(label)) return el
   }
-  throw new Error(`侧栏 nav 项未找到:${label}`)
+  throw new Error(`窄轨 nav 项未找到:${label}`)
 }
 
 function click(el: Element) {
@@ -378,7 +379,7 @@ describe("I-11 BR-07:sidecar 换代引起的整页重载后仍在原处", () => 
   })
 })
 
-// `#1687`:未恢复问题入口挂在**生产**侧栏里(同一真实组合体)—— footer 里账户按钮正上方;
+// `#1687`:未恢复问题入口挂在**生产**侧栏里(同一真实组合体)—— 侧栏 footer 里;
 // 侧栏收起时「显示侧边栏」按钮带小点与数量。入口自身的行为判据在
 // src/renderer/codepuppy-ui/problems-entry.test.ts;这里只钉生产挂载位置与收起态的小点。
 describe("#1687 未恢复问题入口在真实侧栏里", () => {
@@ -399,13 +400,15 @@ describe("#1687 未恢复问题入口在真实侧栏里", () => {
     await flush()
   }
 
-  test("入口在 footer 里、紧挨账户按钮之上;恢复后消失", async () => {
+  test("入口在侧栏 footer 里(账户已移到窄轨);恢复后消失", async () => {
     await mount(CURRENT_HREF)
     expect(document.querySelector(".codepuppy-problems-entry")).toBeNull()
     await foldOneProblem()
     const entry = query<HTMLButtonElement>(".codepuppy-sidebar-footer > .codepuppy-problems-entry")
     expect(entry.textContent).toContain(zh["codepuppy.problems.entry"].replace("{{count}}", "1"))
-    expect(entry.nextElementSibling?.classList.contains("codepuppy-sidebar-account")).toBe(true)
+    // 账户头像在窄轨上,不在侧栏 footer 里。
+    expect(document.querySelector(".codepuppy-sidebar-footer .codepuppy-sidebar-account")).toBeNull()
+    expect(document.querySelector(".codepuppy-rail .codepuppy-sidebar-account")).not.toBeNull()
     toastApi.resolveProblem(KEY)
     await flush()
     expect(document.querySelector(".codepuppy-problems-entry")).toBeNull()

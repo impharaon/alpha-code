@@ -25,7 +25,7 @@
   animation: a-ext-in var(--a-dur-base) var(--a-ease-out);
 }
 body[data-codepuppy-sidebar="open"] .codepuppy-auto-page {
-  left: var(--codepuppy-sidebar-w, 260px);
+  left: var(--codepuppy-surface-left);
 }
 
 .codepuppy-auto-head {

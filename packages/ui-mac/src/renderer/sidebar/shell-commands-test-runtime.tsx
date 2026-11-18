@@ -32,6 +32,8 @@ import { hrefFor } from "../../shared/route-manifest"
 import type { SettingsSurfaceApi } from "../codepuppy-ui/settings-authority-client"
 
 export { render }
+// 右栏开合信号(全应用唯一一份):顶栏右侧开关读写它;用例经运行时拿同一个模块实例。
+export { rightPanelOpen, setRightPanelOpen } from "../codepuppy-ui/session-workspace/right-panel-state"
 export { PermChip }
 
 export const FIXTURE_DIRECTORY = "/repos/alpha-code"

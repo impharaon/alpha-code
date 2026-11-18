@@ -194,11 +194,11 @@ describe("REQ-125 session workspace real Solid mount", () => {
     expect(status()!.getAttribute("role")).toBe("status")
   })
 
-  test("project avatar shows the project initial, and no legacy α glyph when the project name is missing", async () => {
+  test("breadcrumb shows the project name, and no legacy α glyph when the project name is missing", async () => {
     const host = mount()
     await flush()
-    const avatar = () => host.querySelector<HTMLElement>(".a-swk-project-avatar")!
-    expect(avatar().textContent).toBe("W")
+    const project = () => host.querySelector<HTMLElement>(".a-swk-project-label")!
+    expect(project().textContent).toMatch(/^workspace/i)
 
     runtime.setSessionWorkspaceSnapshot({
       identity: { serverKey: "sidecar", directory: "/tmp/workspace", sessionID: "ses_idle" },
@@ -207,7 +207,6 @@ describe("REQ-125 session workspace real Solid mount", () => {
       activity: "idle",
     })
     await flush()
-    expect(avatar().textContent).toBe("")
     expect(host.querySelector("[data-codepuppy-session-workspace-topbar]")!.textContent).not.toContain("α")
   })
 

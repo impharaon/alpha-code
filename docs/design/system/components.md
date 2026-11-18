@@ -40,6 +40,11 @@ implementation lands, move the row into the table above and add its gallery swat
 
 | Component | Design | Role | Variants · states |
 | --- | --- | --- | --- |
+| **外框 Chrome** | [`2026-11-18-ui-refresh/frame.html#home`](../2026-11-18-ui-refresh/frame.html#home) · 活稿 `current/shell-sidebar/design.html#direction-2026-11` | 窗口外框:常驻顶栏 + 左侧窄轨,同一支 `--a-bg-chrome`;装着工作面 | 浅 / 深;顶栏左簇(红绿灯、左栏开关、前进后退)固定;标题起点 = 窄轨 + 侧栏 + 16px;右栏开关只在有右栏的页 |
+| **工作面 Working surface** | 同上 | 侧栏 / 主区 / 右栏同一块圆角纯白容器;只做容器 | 圆角 = 窗口圆角 − `--a-frame-gap`(8px);投影 `--a-shadow-xs` + `--a-edge-light`;不描边;内部竖向分栏线 `--a-divider` |
+| **窄轨 Rail** | 同上 | 全局入口:新对话、搜索对话(⌘K)、定制中心、自动化;账户头像在底 | 48px;按钮 34px;当前 = 一小块工作面白 + `--a-shadow-xs`;悬停 `--a-overlay-hover`;头像 `--a-bg-inset` 底、次级字 |
+| **分档滑条 Slider** | [`2026-11-18-ui-refresh/frame.html#picker`](../2026-11-18-ui-refresh/frame.html#picker) | 模型与推理强度合并卡里的推理档位 | 档位数取模型目录;14px 白把手(0.5px 描边 + `--a-shadow-sm`);已过档位与填充 `--a-text-secondary`;档位名居中在点下;有「重置」 |
+| **托盘 Tray** | [`2026-11-18-ui-refresh/frame.html#home`](../2026-11-18-ui-refresh/frame.html#home) · `#session` | 贴着输入框下沿:项目 / 文件 / 插件 | 首页项目可切换(带箭头);会话里项目固定;左右各缩 10px,首个图标对齐「+」;`--a-bg-subtle` 底、`--a-hairline` 描边、按钮圆角 `--a-radius-sm` |
 
 ## Composition surfaces (page-level, not primitives)
 

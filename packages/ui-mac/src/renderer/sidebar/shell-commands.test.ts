@@ -203,10 +203,10 @@ describe("新对话页右上角「终端 / 审查」:连按钮一起退休", () 
     await mountShell(() => runtime.CodePuppyShell())
 
     expect(leftToolbar()).not.toBeNull()
-    expect(leftToolbar()!.querySelectorAll("button")).toHaveLength(3) // 折叠 + 后退 + 前进
+    expect(leftToolbar()!.querySelectorAll("button")).toHaveLength(4) // 折叠 + 后退 + 前进 + 右栏开关
     expect(document.querySelector(".codepuppy-topbar-right")).toBeNull()
     // 按可观察语义再查一次:整篇 DOM 里不该再有终端/审查这对浮动开关。
-    expect(document.querySelectorAll(".codepuppy-topbar-btn")).toHaveLength(3)
+    expect(document.querySelectorAll(".codepuppy-topbar-btn")).toHaveLength(4)
   })
 
   test("换到首页也不会冒出来(以前它由 `inWorkspace()` 控制,首页藏、新对话页可见且无效)", async () => {
@@ -217,7 +217,83 @@ describe("新对话页右上角「终端 / 审查」:连按钮一起退休", () 
     expect(runtime.routerPath()).toBe(homeHref())
     expect(leftToolbar()).not.toBeNull()
     expect(document.querySelector(".codepuppy-topbar-right")).toBeNull()
-    expect(document.querySelectorAll(".codepuppy-topbar-btn")).toHaveLength(3)
+    expect(document.querySelectorAll(".codepuppy-topbar-btn")).toHaveLength(4)
+  })
+})
+
+describe("窗口外框(BR-01 / BR-02):窄轨与常驻顶栏", () => {
+  const railLabels = () =>
+    Array.from(document.querySelectorAll<HTMLButtonElement>(".codepuppy-rail > button")).map((b) => b.getAttribute("aria-label"))
+  const topbarTitle = () => document.querySelector(".codepuppy-topbar-page")?.textContent
+  const rightToggle = () => document.querySelector("[data-codepuppy-topbar-action='right-panel']")
+
+  test("窄轨放新对话、搜索、定制中心、自动化与账户;侧栏里没有单独的「搜索」行", async () => {
+    await mountShell(() => runtime.CodePuppyShell())
+    expect(railLabels()).toEqual(["新对话", "搜索对话", "定制中心", "自动化", "账户"])
+    // 前提自检:侧栏确实渲染了(否则下面的 null 断言是空绿)。
+    expect(document.querySelector(".codepuppy-sidebar")).not.toBeNull()
+    expect(document.querySelector(".codepuppy-sidebar [data-codepuppy-sidebar-nav]")).toBeNull()
+    expect(document.querySelector(".codepuppy-sidebar .codepuppy-sidebar-nav-item")).toBeNull()
+  })
+
+  test("顶栏随页面换标题:新对话 → 设置(整页)→ 回到新对话;整页上没有右栏,开关收起", async () => {
+    runtime.setHasProjects(false)
+    await mountShell(() => runtime.CodePuppyShell())
+    expect(topbarTitle()).toBe("新对话")
+    expect(rightToggle()).not.toBeNull()
+
+    await openAccountMenu()
+    settingsItem()!.click()
+    await settle()
+    expect(topbarTitle()).toBe("设置")
+    expect(rightToggle()).toBeNull()
+    // 设置是整页:左侧栏与窄轨仍在旁边,不被它盖住。
+    expect(document.querySelector(".codepuppy-sidebar")).not.toBeNull()
+    expect(document.querySelector(".codepuppy-rail")).not.toBeNull()
+
+    // 点窄轨「新对话」离开设置页,标题与右栏开关回来。
+    document.querySelector<HTMLButtonElement>("[data-codepuppy-sidebar-nav='new-chat']")!.click()
+    await settle()
+    expect(settingsSurface()).toBeNull()
+    expect(topbarTitle()).toBe("新对话")
+    expect(rightToggle()).not.toBeNull()
+  })
+
+  test("窄轨开定制中心 / 自动化:顶栏标题是页名,再点同一颗收起", async () => {
+    await mountShell(() => runtime.CodePuppyShell())
+    const rail = (action: string) => document.querySelector<HTMLButtonElement>(`[data-codepuppy-sidebar-nav='${action}']`)!
+    rail("hub").click()
+    await settle()
+    expect(topbarTitle()).toBe("定制中心")
+    expect(rail("hub").getAttribute("aria-pressed")).toBe("true")
+    rail("automation").click()
+    await settle()
+    expect(topbarTitle()).toBe("自动化")
+    expect(rail("hub").getAttribute("aria-pressed")).toBe("false")
+    rail("automation").click()
+    await settle()
+    expect(topbarTitle()).toBe("新对话")
+  })
+
+  test("顶栏右侧开关读写全应用唯一的右栏信号;左侧开关折叠侧栏", async () => {
+    const state = runtime
+    state.setRightPanelOpen(false)
+    await mountShell(() => runtime.CodePuppyShell())
+    expect(rightToggle()!.getAttribute("aria-pressed")).toBe("false")
+    ;(rightToggle() as HTMLButtonElement).click()
+    await settle()
+    expect(state.rightPanelOpen()).toBe(true)
+    expect(rightToggle()!.getAttribute("aria-pressed")).toBe("true")
+    ;(rightToggle() as HTMLButtonElement).click()
+    await settle()
+    expect(state.rightPanelOpen()).toBe(false)
+
+    document.querySelector<HTMLButtonElement>("[data-codepuppy-topbar-action='sidebar']")!.click()
+    await settle()
+    expect(document.querySelector(".codepuppy-sidebar")).toBeNull()
+    document.querySelector<HTMLButtonElement>("[data-codepuppy-topbar-action='sidebar']")!.click()
+    await settle()
+    expect(document.querySelector(".codepuppy-sidebar")).not.toBeNull()
   })
 })
 

@@ -17,7 +17,7 @@
   overflow: auto;
 }
 body[data-codepuppy-sidebar="open"] .a-ob {
-  left: var(--codepuppy-sidebar-w, 260px);
+  left: var(--codepuppy-surface-left);
 }
 
 .a-ob-card {

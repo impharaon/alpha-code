@@ -22,15 +22,6 @@ import { t } from "../i18n"
 import { markStartupTimeline } from "../startup-timeline"
 import "./home.css"
 
-function greeting(): string {
-  const h = new Date().getHours()
-  if (h < 5) return t("codepuppy.home.greetingLate")
-  if (h < 11) return t("codepuppy.home.greetingMorning")
-  if (h < 13) return t("codepuppy.home.greetingNoon")
-  if (h < 18) return t("codepuppy.home.greetingAfternoon")
-  return t("codepuppy.home.greetingEvening")
-}
-
 // 首页未发送的草稿跨重挂保持身份,成功发送后才开始下一份。
 let homeDraftSequence = 0
 
@@ -115,10 +106,6 @@ export function CodePuppyHome(props: {
   return (
     <div class="a-ui a-home a-home--page" data-codepuppy-home>
       <div class="a-home-stage">
-        <div class="a-home-ghost" aria-hidden="true">
-          {t("codepuppy.brand.wordmark")}
-        </div>
-
         <div class="a-home-center">
           <Show when={store.error}>
             <Banner
@@ -129,9 +116,7 @@ export function CodePuppyHome(props: {
             />
           </Show>
           <ConfigBrokenBanner />
-          <h1 class="a-home-greet">
-            {greeting()},<span class="a-home-greet-dim"> {t("codepuppy.home.prompt")}</span>
-          </h1>
+          <h1 class="a-home-greet">{t("codepuppy.newSession.heading")}</h1>
 
           {/* ── THE shared composer(与会话页同一组件,REQ-055)──────────────
               #1056:冷启动那一拍例外 —— 侧栏的启动效应必然把路由换到 `/new-session`

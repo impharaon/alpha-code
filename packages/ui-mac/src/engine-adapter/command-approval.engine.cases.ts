@@ -83,7 +83,7 @@ test.each([
     args: { command: "echo approval-card" },
     action: "shell",
     verb: "运行命令",
-    remembered: "将记住:以 echo 开头的命令",
+    remembered: "将记住：以 echo 开头的命令",
     resource: "echo approval-card",
   },
   {
@@ -91,7 +91,7 @@ test.each([
     args: { patchText: "*** Begin Patch\n*** Add File: patch-card.txt\n+hello\n*** End Patch" },
     action: "edit",
     verb: "改文件",
-    remembered: "将记住:本会话内的所有文件修改",
+    remembered: "将记住：本会话内的所有文件修改",
     resource: "patch-card.txt",
   },
 ])("$tool:真实审批的列表与事件一致,卡片显示专用标题与可记住的范围", async (scenario) => {

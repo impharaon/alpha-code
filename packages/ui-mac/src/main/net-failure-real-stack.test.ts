@@ -298,7 +298,7 @@ describeDarwin("`#1572` AC4 真栈:Electron 内嵌 node + 真出网代理 + 真 
     expect(body).toMatchObject({ type: "error", netLayer: "timeout", host: TARGETS.timeout })
     if (body.type !== "error" || !body.netLayer) throw new Error("missing layered tool card")
     setLocale("zh")
-    expect(netFailureCopy(body.netLayer, body.host)).toBe(`等待 ${TARGETS.timeout} 超时,稍后重试`)
+    expect(netFailureCopy(body.netLayer, body.host)).toBe(`等待 ${TARGETS.timeout} 超时，稍后重试`)
   })
 
   test("AC6:落库的层只有层名与错误码,URL 查询里的令牌不进 codepuppyNetFailure", () => {

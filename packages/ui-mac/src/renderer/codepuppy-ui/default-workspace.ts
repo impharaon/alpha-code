@@ -32,9 +32,9 @@ export function isDefaultWorkspaceDir(dir: string | undefined): boolean {
 }
 
 /**
- * 默认工作区在界面上**只有一个名字**:产品名「Code Puppy」(目录本身叫 code-puppy,那是磁盘上的事)。
+ * 默认工作区在界面上**只有一个名字**:产品名「Code Puppy」(磁盘上的目录名是另一回事)。
  * 输入框下的项目胶囊、菜单、侧栏项目行、对话路径、定制中心的项目范围都读这里,不再各写各的
- * (审计 H3:胶囊写 code-puppy、菜单写「Code Puppy 默认工作区」)。不是默认目录 ⇒ 原样返回 `fallback`。
+ * (审计 H3:胶囊写目录名、菜单写「Code Puppy 默认工作区」)。不是默认目录 ⇒ 原样返回 `fallback`。
  */
 export function workspaceDisplayName(dir: string | undefined, fallback: string): string {
   return isDefaultWorkspaceDir(dir) ? t("codepuppy.brand.short") : fallback

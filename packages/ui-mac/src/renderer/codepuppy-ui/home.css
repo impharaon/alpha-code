@@ -77,6 +77,7 @@ body[data-codepuppy-sidebar="open"] .a-home--page {
   .a-home-section,
   .a-home-empty,
   .a-home-greet,
+  .a-home .a-home-greet,
   [data-codepuppy-home] .a-comp { animation: none; }
 }
 

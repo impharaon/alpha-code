@@ -158,9 +158,15 @@ describe("REQ-125 C7:ComposerTakeover 删除后零引用(棘轮)", () => {
     for (const file of fs.readdirSync(dir).filter((name) => /\.(ts|tsx)$/.test(name) && !/\.test\./.test(name))) {
       const src = read(path.join(dir, file))
       for (const token of ["<Portal", "querySelector", "MutationObserver", "data-component="]) {
-        expect({ file, token, hit: src.includes(token) }).toEqual({ file, token, hit: false })
+        // 新外壳:会话页的面包屑经一个 Portal 进壳的常驻顶栏(壳自己的宿主节点),这是 shell 文件里**唯一**
+        // 允许的 Portal —— 它不碰输入框,也不收养上游 DOM;下面单独钉死它只有一处、且只装顶栏内容。
+        const allowed = file === "session-workspace-shell.tsx" && token === "<Portal"
+        expect({ file, token, hit: allowed ? false : src.includes(token) }).toEqual({ file, token, hit: false })
       }
     }
+    const shellSrc = read(path.join(dir, "session-workspace-shell.tsx"))
+    expect(shellSrc.match(/<Portal\b/g)?.length).toBe(1)
+    expect(shellSrc).toMatch(/<Portal mount=\{host\(\)\}>\s*<div class="a-swk-topbar-content" data-codepuppy-session-workspace-topbar>/)
     const workspace = read(path.join(dir, "codepuppy-session-workspace.tsx"))
     expect(workspace).toMatch(/<SessionComposerDock\b[\s\S]*?live=\{live\}[\s\S]*?projects=\{props\.projects\}/)
     const dock = read(path.join(dir, "session-composer-dock.tsx"))

@@ -49,7 +49,7 @@ export function SubPageHarness(props: { onClosed: () => void; closeOnCustomDone?
             <AddProvider
               catalog={null}
               onClose={() => setSub(false)}
-              // 生产接线(codepuppy-composer-model.tsx):对话框关掉后发起它的弹层随之关闭。
+              // 生产接线(输入框的模型选择器):对话框关掉后发起它的弹层随之关闭。
               onCustomClosed={props.closeOnCustomDone ? () => (setOpen(false), props.onClosed()) : undefined}
             />
           </Show>

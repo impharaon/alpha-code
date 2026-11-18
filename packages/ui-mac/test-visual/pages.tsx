@@ -103,7 +103,7 @@ Object.defineProperty(window, "api", {
     loginItem: async () => ({ openAtLogin: false }),
     pauseAll: async () => ({ ok: true }),
   },
-  workspaceDefaultDir: async () => "/Users/me/code-puppy",
+  workspaceDefaultDir: async () => "/Users/me/default-ws",
   },
 })
 

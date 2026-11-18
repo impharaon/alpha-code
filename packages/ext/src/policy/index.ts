@@ -46,8 +46,12 @@ export interface PolicyRegistration {
    * card names it while the approval waits and after a decline). Resolves when allowed; a decline is rethrown as the
    * engine raised it. A call the gate did not prepare is refused (fail-closed).
    */
-  readonly askInstall: (callID: string) => Promise<void>
+  readonly askInstall: (call: InstallCall) => Promise<void>
 }
+
+/** One tool call: provider call IDs repeat across sessions and messages, so all three identify it. */
+export type InstallCall = { readonly sessionID: string; readonly messageID: string; readonly id: string }
+const installCallKey = (call: InstallCall) => JSON.stringify([call.sessionID, call.messageID, call.id])
 
 /** MCP argv placeholder replaced with the Location directory at spawn time (#1011, REQ-134). */
 export const WORKSPACE_PLACEHOLDER = "{workspace}"
@@ -79,7 +83,8 @@ export async function registerPolicy(context: Plugin.Context, unattended: Unatte
   let early: ReadonlySet<string> | undefined
   const mcp = new Map<string, McpEntry & Record<string, unknown>>()
   const displays = new Map<string, ToolDisplaySnapshotV1>()
-  // BR-10: install calls the gate prepared — deferred to the tool's own ask, or already asked here (same-named unverified tool).
+  // BR-10: install calls the gate prepared (keyed by session + message + call) — deferred to the tool's own ask, or already
+  // asked here (same-named unverified tool).
   const installAsks = new Map<string, { decision: GateDecision; call: GateCall; install: { subject?: HubInstallSubject } } | "asked">()
   const codeModeDenials = new Map<string, UnattendedDenial | undefined>()
   const profile = (sessionID: string, agent?: string) => unattended.unattendedProfile(sessionID, agent, async () => (await context.session.get({ sessionID })).agent ?? "")
@@ -217,10 +222,11 @@ export async function registerPolicy(context: Plugin.Context, unattended: Unatte
   }) as never)
 
   return {
-    askInstall: async (callID) => {
-      const prepared = installAsks.get(callID)
+    askInstall: async (call) => {
+      const key = installCallKey(call)
+      const prepared = installAsks.get(key)
       if (!prepared) throw Error("not installed: this install has no prepared approval")
-      installAsks.delete(callID)
+      installAsks.delete(key)
       if (prepared !== "asked") await confirm(deps, prepared.decision, prepared.call, prepared.install)
     },
     seal: async () => {
@@ -240,15 +246,15 @@ export async function registerPolicy(context: Plugin.Context, unattended: Unatte
           const facts = decision.facts
           const install = facts.identity.source === "plugin" ? hubInstallAsk(event, facts.authority.kind === "codepuppy-bundled", installSubject) : undefined
           // BR-10: the verified install tool asks from its own call (`askInstall`), once it has recorded what it installs.
-          if (install?.subject) installAsks.set(event.id, { decision, call: { tool: event.tool, sessionID: event.sessionID, agent: event.agent, messageID: event.messageID, id: event.id, input: event.input }, install })
+          if (install?.subject) installAsks.set(installCallKey(event), { decision, call: { tool: event.tool, sessionID: event.sessionID, agent: event.agent, messageID: event.messageID, id: event.id, input: event.input }, install })
           else await confirm(deps, decision, event, install)
-          if (install && !install.subject) installAsks.set(event.id, "asked")
+          if (install && !install.subject) installAsks.set(installCallKey(event), "asked")
           displays.set(event.id, displaySnapshot(decision.facts))
           pin(event)
           if (event.tool === CODE_MODE_TOOL && await profile(event.sessionID, event.agent) !== undefined) codeModeDenials.set(event.id, undefined)
         } catch (error) {
           displays.delete(event.id)
-          installAsks.delete(event.id)
+          installAsks.delete(installCallKey(event))
           throw error
         }
       })
@@ -265,7 +271,7 @@ export async function registerPolicy(context: Plugin.Context, unattended: Unatte
         attachDirectoryDisplay(event as never)
         attachTerminal(event as never, displays.get(event.id))
         displays.delete(event.id)
-        installAsks.delete(event.id)
+        installAsks.delete(installCallKey(event))
       })
 
       await catalog.refresh()

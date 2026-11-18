@@ -64,7 +64,7 @@ function contextWith(assert: (input: unknown) => Promise<void>) {
   return { context, ctx, asserts }
 }
 
-const tools = (bridge: HubBridge, context: Parameters<typeof createHubTools>[1], askInstall: (callID: string) => Promise<void> = async () => {}) =>
+const tools = (bridge: HubBridge, context: Parameters<typeof createHubTools>[1], askInstall: Parameters<typeof createHubTools>[2] = async () => {}) =>
   Object.fromEntries((createHubTools as (...args: unknown[]) => ReturnType<typeof createHubTools>)(bridge, context, askInstall).map((tool) => [tool.name, tool]))
 const contentOf = (r: unknown) => (r as { content: string }).content
 const view = (rows: HubViewRow[]): HubView => ({ directory: "/work/a", rows, warnings: [] })
@@ -268,7 +268,7 @@ test("I-10 the install records the package name before its one approval ask; a d
   const events: unknown[] = []
   const ctx = { ...(context.ctx as object), id: "call_ctx7", progress: async (update: unknown) => void events.push(["progress", update]) } as never
   const declined = Object.assign(Error("The user declined this tool call"), { _tag: "Permission.DeclinedError" })
-  const list = tools(h.bridge, context.context, async (callID) => { events.push(["ask", callID]); throw declined })
+  const list = tools(h.bridge, context.context, async (call) => { events.push(["ask", call.id]); throw declined })
   await expect(list.codepuppy_hub_install!.execute({ id: "cand_ctx7" }, ctx)).rejects.toBe(declined)
   expect(events).toEqual([
     ["progress", { install: { name: "Context7", source: "claude-marketplace" }, stage: "awaiting-approval" }],
@@ -278,7 +278,7 @@ test("I-10 the install records the package name before its one approval ask; a d
   expect(context.asserts).toEqual([])
   // 允许:照常交给 main,名称留在之后的阶段元数据里
   events.length = 0
-  const allowed = tools(h.bridge, context.context, async (callID) => void events.push(["ask", callID]))
+  const allowed = tools(h.bridge, context.context, async (call) => void events.push(["ask", call.id]))
   const output = await allowed.codepuppy_hub_install!.execute({ id: "cand_ctx7" }, ctx)
   expect(events[1]).toEqual(["ask", "call_ctx7"])
   expect(installs).toHaveLength(1)

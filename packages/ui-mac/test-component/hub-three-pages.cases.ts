@@ -830,6 +830,19 @@ test("catalog connector row with a start failure shows the localized short reaso
   expect(q("[data-installed-row='mcp:markitdown'] .codepuppy-ext-kit-desc")?.getAttribute("title")).toContain("exited with code 3")
 })
 
+// `#1724`(体验约定不露内部原因码;BR-04):重载失败时 main 给的是内部英文原因(如 `official-connector-needs-reentry…`),
+// 包行只说本地化的短原因,原文进开发者详情。
+test("package whose last reload failed shows a localized short reason and keeps main's raw reason in developer details", async () => {
+  reset()
+  const entry = await realInstalledPackage(0)
+  packageAuthorizationItems = [{ kind: "secret", componentId: entry.root, prerequisiteId: `${entry.root}#GITHUB_PERSONAL_ACCESS_TOKEN`, serviceName: "github", label: "GITHUB_PERSONAL_ACCESS_TOKEN", saved: true }]
+  const raw = "official-connector-needs-reentry: runtime refresh failed"
+  hubRows = [{ ...hubRow(entry.root, "github", "mcp", "reload-pending"), stateReason: { code: "reload-failed", detail: raw } }]
+  mount()
+  await waitFor(() => expect(q('[data-installed-package] .codepuppy-ext-kit-desc[data-err]')?.textContent).toBe("未能启用：上次未能生效"))
+  expect(q('[data-installed-package] details')?.textContent).toContain(raw)
+})
+
 test("package switch reflects failed and completed main results without a second apply action", async () => {
   reset()
   await realInstalledPackage(0, "disabled")

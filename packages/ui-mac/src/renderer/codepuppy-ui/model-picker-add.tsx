@@ -17,7 +17,7 @@
 // reaches providers.add and the truth file; catalog key entry unchanged). Keep this file free of the
 // canonical picker's module name: the REQ-090 takeover ratchet scans renderer sources for it as text.
 
-import { createMemo, createSignal, For, onMount, Show } from "solid-js"
+import { createEffect, createMemo, createSignal, For, onCleanup, onMount, Show } from "solid-js"
 import type { CodePuppyModelCatalog, ByokProvider, ProviderAddressRejection, ProviderKeyStatus, ProviderResult } from "../../shared/codepuppy-model-types"
 import { t } from "../i18n"
 import { BrandIcon } from "./brand-icon"
@@ -25,6 +25,7 @@ import { Dialog } from "./Dialog"
 import { Button } from "./Button"
 import { Input } from "./Input"
 import "./model-picker-custom-service.css"
+import { setCustomServiceOpen } from "./custom-service-state"
 
 /** main 拒绝地址时带的类别 → 用户语言的原因(与出网围栏同一个判据函数给出的类别,`#1392`)。无类别 ⇒ undefined,用原文。 */
 const ADDRESS_REJECTION_KEY: Record<ProviderAddressRejection, Parameters<typeof t>[0]> = {
@@ -53,6 +54,8 @@ function slug(s: string): string {
 export function AddProvider(props: {
   catalog: CodePuppyModelCatalog | null
   onClose: () => void
+  /** 「接入其它服务」对话框关掉(取消 / 保存)之后:发起它的弹层随之关闭。 */
+  onCustomClosed?: () => void
   onSaved?: () => void
   /** When set, open straight into this provider's config form (e.g. clicking a 需 Key BYOK row). */
   initialId?: string
@@ -81,6 +84,8 @@ export function AddProvider(props: {
   const isCustom = () => sel() === "custom"
   // 「接入其它服务」是对话框(冻结稿 `#hub-custom-service`);只有目录内供应商的填 Key 表单留在选择器里。
   const inForm = () => sel() !== null && sel() !== "custom"
+  createEffect(() => setCustomServiceOpen(isCustom()))
+  onCleanup(() => setCustomServiceOpen(false))
   // Key state for the provider currently open in the form (preset only; a fresh custom has none yet).
   const currentStatus = createMemo(() => {
     const s = sel()
@@ -124,6 +129,7 @@ export function AddProvider(props: {
   function closeCustom() {
     setSel(null)
     setError("")
+    props.onCustomClosed?.()
   }
   function back() {
     if (inForm()) {
@@ -193,6 +199,7 @@ export function AddProvider(props: {
     setSaving(false)
     if (r.ok) {
       props.onSaved?.()
+      if (isCustom()) props.onCustomClosed?.()
       props.onClose()
     } else setError(addressRejectionText(r) ?? r.reason)
   }

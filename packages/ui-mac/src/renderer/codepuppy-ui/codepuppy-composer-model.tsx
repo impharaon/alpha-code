@@ -714,6 +714,7 @@ export function ModelPickPop(props: {
             queueMicrotask(() => addRow?.isConnected && !addRow.disabled && addRow.focus())
           }}
           onSaved={retryAll}
+          onCustomClosed={props.onPicked}
         />
       </Show>
       {/* 弹层底部状态槽(批准稿 §二 B:与「已下载、待生效」同槽,一行一件事)。 */}

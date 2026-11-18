@@ -394,14 +394,15 @@ describe("I-17 / AC-06:顶级页面的定制中心", () => {
     setInstallStateCalls.length = 0
   })
 
-  test("定制中心盖住会话视图:页内只有页面名顶栏「定制中心」,从任意会话打开、关掉后回到原会话", async () => {
+  test("定制中心是顶级页面:用壳的页面容器 .codepuppy-page,页内没有会话顶栏;从任意会话打开、关掉后回到原会话", async () => {
     const history = await mount(CURRENT_HREF)
     await open(OVERLAYS[0])
     expect(overlayPresent(OVERLAYS[0]), "前提不成立:定制中心没打开").toBe(true)
-    const top = query<HTMLElement>(`${OVERLAYS[0].host} [data-top-level-page="hub"]`)
-    expect(top.textContent).toBe(zh["codepuppy.ext.hub"])
-    // 顶栏上没有会话面包屑与右栏页签。
-    expect(document.querySelector(`${OVERLAYS[0].page} [data-codepuppy-session-workspace-topbar], ${OVERLAYS[0].page} .a-swk-topbar`)).toBeNull()
+    const page = query<HTMLElement>(`${OVERLAYS[0].host} ${OVERLAYS[0].page}`)
+    expect(page.classList.contains("codepuppy-page")).toBe(true)
+    expect(page.dataset.topLevelPage).toBe("hub")
+    // 页内没有会话面包屑与右栏页签。
+    expect(page.querySelector("[data-codepuppy-session-workspace-topbar], .a-swk-topbar")).toBeNull()
     // 再点一次定制中心入口 = 关闭,回到打开前的会话,路由没动。
     await open(OVERLAYS[0])
     expect(overlayPresent(OVERLAYS[0])).toBe(false)

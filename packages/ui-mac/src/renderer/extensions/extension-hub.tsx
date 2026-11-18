@@ -65,7 +65,7 @@ import type { Catalog, CatalogEntry, InstalledState } from "./catalog-types"
 import type { AuthState, InstallReceipt, InstallReceiptType, ProvenanceRequest, InstalledPackageV1 } from "../../preload/types"
 import { hubSection, installedRowKey, setHubSection, takeHubLocateTarget, takePackageManagementTarget, type HubSection } from "./ext-hub-state"
 import { parseFailureCode } from "@opencode/schema/codepuppy-net-failure"
-import { extensionError, mcpFailureReason, catalogDescription, iconFor, iconForRow, MoreMenu, PackageLogo, typeLabel, Svg, HubIc, RowStatus, type MoreMenuItem } from "./ext-presentation"
+import { extensionError, mcpFailureReason, catalogDescription, iconFor, iconForRow, MoreMenu, PackageLogo, typeLabel, Svg, HubIc, KitIc, lineIconFor, RowStatus, type MoreMenuItem } from "./ext-presentation"
 import { inventoryInstallRow, healthPresentation } from "./ext-inventory-present"
 import { ExtensionDetail, InstalledPackageDetail, type DetailTarget } from "./extension-detail"
 import { isCodePuppyOfficeCatalogId, officeAdvisoryFor, retiredCommunityOfficeFor } from "../../shared/office-advisories"
@@ -1366,7 +1366,7 @@ export function ExtensionHub(props: {
         data-dim={cp.dim ? "" : undefined}
         onClick={() => openEntryDetail(e)}
       >
-        <span class="codepuppy-ext-kit-ic">{ic.glyph}</span>
+        <span class="codepuppy-ext-kit-ic"><KitIc id={e.id} glyph={ic.glyph} /></span>
         <div class="codepuppy-ext-kit-body">
           <div class="codepuppy-ext-kit-ttl">
             <b title={e.name}>{e.displayName}</b>
@@ -1433,7 +1433,9 @@ export function ExtensionHub(props: {
       >
         {/* `#1287`:发布者签名的 logo;缺就是首字母(底色一律是中性的 --a-monogram-bg,冻结稿 `#hub-connectors`)。 */}
         <span class="codepuppy-ext-kit-ic">
-          <PackageLogo listing={view().listing} fallback={view().presentation.displayName} />
+          <Show when={lineIconFor(view().catalogId)} fallback={<PackageLogo listing={view().listing} fallback={view().presentation.displayName} />}>
+            {(name) => <HubIc name={name()} size={18} />}
+          </Show>
         </span>
         <div class="codepuppy-ext-kit-body">
           <div class="codepuppy-ext-kit-ttl">
@@ -1491,7 +1493,7 @@ export function ExtensionHub(props: {
         data-factory-skill={cp.name}
         onClick={() => entry() && openEntryDetail(entry()!)}
       >
-        <span class="codepuppy-ext-kit-ic">{ic.glyph}</span>
+        <span class="codepuppy-ext-kit-ic"><KitIc id={cp.name === "plugin-helper" ? cp.name : entry()?.id} glyph={ic.glyph} /></span>
         <div class="codepuppy-ext-kit-body">
           <div class="codepuppy-ext-kit-ttl">
             <b title={cp.name}>{entry()?.displayName ?? (cp.name === "plugin-helper" ? t("codepuppy.ext.pluginHelperName") : cp.name)}</b>
@@ -1715,8 +1717,12 @@ export function ExtensionHub(props: {
         onClick={() => setManagedPackageId(pack().packageId)}
       >
         <span class="codepuppy-ext-kit-ic">
-          <Show when={view()} fallback={ic().glyph}>
-            {(entry) => <PackageLogo listing={entry().listing} fallback={packLabel(pack())} />}
+          <Show when={lineIconFor(pack().packageId)} fallback={
+            <Show when={view()} fallback={ic().glyph}>
+              {(entry) => <PackageLogo listing={entry().listing} fallback={packLabel(pack())} />}
+            </Show>
+          }>
+            {(name) => <HubIc name={name()} size={18} />}
           </Show>
         </span>
         <div class="codepuppy-ext-kit-body">
@@ -1945,7 +1951,7 @@ export function ExtensionHub(props: {
         data-clickable={clickable() ? "" : undefined}
         onClick={() => clickable() && openRow()}
       >
-        <span class="codepuppy-ext-kit-ic">{ic.glyph}</span>
+        <span class="codepuppy-ext-kit-ic"><KitIc id={row.receipt.id} glyph={ic.glyph} /></span>
         <div class="codepuppy-ext-kit-body">
           <div class="codepuppy-ext-kit-ttl">
             <b title={row.name}>{row.displayName}</b>
@@ -2260,12 +2266,8 @@ export function ExtensionHub(props: {
   return (
     <Show when={props.open()}>
       <Portal mount={host}>
-        <div class="a-ui codepuppy-ext-page" role="region" aria-label={t("codepuppy.ext.hub")} tabindex="-1" ref={(element) => (hubAnchor = element)}>
-          {/* 顶级页面的顶栏(冻结稿 `#hub-connectors` 的 `.tb-title`):盖住下面会话的面包屑与右栏页签,只写页面名。 */}
-          <div class="codepuppy-ext-topbar" data-top-level-page="hub">
-            <span class="codepuppy-ext-topbar-title">{t("codepuppy.ext.hub")}</span>
-          </div>
-
+        {/* 顶级页面容器:`.codepuppy-page`(壳,sidebar.css)定位在常驻顶栏之下;顶栏上的「定制中心」由壳在 `extHubOpen()` 时写。 */}
+        <div class="a-ui codepuppy-page codepuppy-ext-page" role="region" aria-label={t("codepuppy.ext.hub")} data-top-level-page="hub" tabindex="-1" ref={(element) => (hubAnchor = element)}>
           <div class="codepuppy-ext-scroll">
             <div class="codepuppy-ext-center">
               {/* 共用页头(冻结稿 `.phd`):页签 + 本页搜索 +「添加 ▾」,列表页与管理页同一条。 */}

@@ -127,7 +127,105 @@ const HUB_IC = {
     </>
   ),
   loader: () => <path d="M12 3.5a8.5 8.5 0 1 1-8.5 8.5" />,
+  // 以下是冻结稿 `#hub-connectors` / `#hub-skills` 里行图标用的线条图标(原样取自 frame.html 的 symbol)。
+  folder: () => <path d="M3.5 7.5a2 2 0 0 1 2-2h3.8l2 2h7.2a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2Z" />,
+  window: () => (
+    <>
+      <rect x="3.5" y="4.5" width="17" height="15" rx="2" />
+      <path d="M3.5 9h17" />
+      <path d="M6.5 6.8h.01M9 6.8h.01" />
+    </>
+  ),
+  "file-search": () => (
+    <>
+      <path d="M14 3.5H7a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8.5Z" />
+      <path d="M14 3.5v5h5" />
+      <circle cx="11.5" cy="14" r="2.5" />
+      <path d="m13.4 15.9 1.8 1.8" />
+    </>
+  ),
+  bug: () => (
+    <>
+      <rect x="7.5" y="7.5" width="9" height="12.5" rx="4.5" />
+      <path d="M12 7.5V5M9.5 5.5 8 4M14.5 5.5 16 4M7.5 12.5H4M20 12.5h-3.5M7.5 16.5l-3 1.5M16.5 16.5l3 1.5" />
+    </>
+  ),
+  branch: () => (
+    <>
+      <circle cx="7" cy="6" r="2.2" />
+      <circle cx="7" cy="18" r="2.2" />
+      <circle cx="17" cy="8" r="2.2" />
+      <path d="M7 8.2v7.6M17 10.2c0 3.6-3.5 4.4-8.3 5.6" />
+    </>
+  ),
+  db: () => (
+    <>
+      <ellipse cx="12" cy="6" rx="7" ry="2.6" />
+      <path d="M5 6v12c0 1.4 3.1 2.6 7 2.6s7-1.2 7-2.6V6M5 12c0 1.4 3.1 2.6 7 2.6s7-1.2 7-2.6" />
+    </>
+  ),
+  pkg: () => (
+    <>
+      <path d="M4.5 7.5 12 3.5l7.5 4v9L12 20.5l-7.5-4Z" />
+      <path d="M8.3 5.5 15.7 9.6V13" />
+    </>
+  ),
+  "file-text": () => (
+    <>
+      <path d="M14 3.5H7a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8.5Z" />
+      <path d="M14 3.5v5h5M8.5 13h7M8.5 16.5h4.5" />
+    </>
+  ),
+  table: () => (
+    <>
+      <rect x="3.5" y="4.5" width="17" height="15" rx="2" />
+      <path d="M3.5 9.5h17M3.5 14.5h17M9.5 4.5v15" />
+    </>
+  ),
+  slides: () => (
+    <>
+      <path d="M3.5 4.5h17" />
+      <rect x="5" y="4.5" width="14" height="10.5" rx="1" />
+      <path d="M12 15v4.5M8.5 19.5h7" />
+    </>
+  ),
+  file: () => (
+    <>
+      <path d="M14 3.5H7a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8.5Z" />
+      <path d="M14 3.5v5h5" />
+    </>
+  ),
+  plug: () => <path d="M9 3.5V8M15 3.5V8M6.5 8h11v3.5a5.5 5.5 0 0 1-11 0ZM12 17v3.5" />,
 }
+
+/** 冻结稿里画了线条图标的行(键 = 目录 id / 扩展包 id / 出厂技能名);没画的行用单字图标。 */
+const LINE_ICON_OF: Record<string, keyof typeof HUB_IC> = {
+  "mcp:filesystem": "folder",
+  "mcp:playwright": "window",
+  "mcp:markitdown": "file-search",
+  "mcp:chrome-devtools": "bug",
+  "mcp:git": "branch",
+  "mcp:dbhub-readonly": "db",
+  "package:dbhub-readonly": "db",
+  "skill:codepuppy-first": "pkg",
+  "package:codepuppy-first": "pkg",
+  "mcp:codepuppy-word": "file-text",
+  "mcp:codepuppy-excel": "table",
+  "mcp:codepuppy-powerpoint": "slides",
+  "mcp:codepuppy-pdf": "file",
+  "skill:conventional-commits": "branch",
+  "plugin-helper": "plug",
+  "skill:plugin-helper": "plug",
+}
+export function lineIconFor(id: string | undefined): keyof typeof HUB_IC | undefined {
+  return id ? LINE_ICON_OF[id] : undefined
+}
+/** 行图标的内容:有稿里的线条图标就画 18px 线条,否则是单字。 */
+export const KitIc = (p: { id?: string; glyph: string }) => (
+  <Show when={lineIconFor(p.id)} fallback={p.glyph}>
+    {(name) => <HubIc name={name()} size={18} />}
+  </Show>
+)
 export const HubIc = (p: { name: keyof typeof HUB_IC; size?: 12 | 14 | 18 }) => (
   <svg class={`a-ic${p.size ? ` ic-${p.size}` : ""}`} viewBox="0 0 24 24" aria-hidden="true">
     {HUB_IC[p.name]()}

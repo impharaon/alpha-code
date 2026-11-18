@@ -12,14 +12,19 @@
   pointer-events: none; /* empty host never intercepts; the page below re-enables it */
 }
 
-/* 顶级页面(冻结稿 `#hub-connectors`):替换会话视图,从窗口最上沿起盖住右侧整块 —— 会话的顶栏(面包屑、右栏页签)
- * 被它盖住,顶栏上只有页面名。侧栏收起时左缘退到窗口边,标题起点保持不变(同 sidebar.css 的会话顶栏)。 */
-.codepuppy-ext-page {
+/* 顶级页面(冻结稿 `#hub-connectors`):替换会话视图;容器类 `.codepuppy-page`(壳,sidebar.css)负责定位,
+ * 下面的 :where 只是壳合入之前的兜底(零优先级,`.codepuppy-page` 一律压过它)。 */
+:where(.codepuppy-ext-page) {
   position: fixed;
-  top: 0;
+  top: var(--a-topbar-h);
   left: 0;
   right: 0;
   bottom: 0;
+}
+body[data-codepuppy-sidebar="open"] :where(.codepuppy-ext-page) {
+  left: var(--codepuppy-sidebar-w, 248px);
+}
+.codepuppy-ext-page {
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -29,33 +34,11 @@
   outline: none;
   animation: a-ext-in var(--a-dur-base) var(--a-ease-out);
 }
-body[data-codepuppy-sidebar="open"] .codepuppy-ext-page {
-  left: var(--codepuppy-sidebar-w, 248px);
-}
 @keyframes a-ext-in {
   from {
     opacity: 0;
     transform: translateY(6px);
   }
-}
-.codepuppy-ext-topbar {
-  flex: none;
-  display: flex;
-  align-items: center;
-  height: var(--a-topbar-h);
-  padding: 0 16px;
-  background: var(--a-bg-canvas);
-  -webkit-app-region: drag;
-  app-region: drag;
-}
-body[data-codepuppy-sidebar="collapsed"] .codepuppy-ext-topbar {
-  padding-left: calc(var(--codepuppy-sidebar-w, 248px) + 16px);
-}
-.codepuppy-ext-topbar-title {
-  font-size: var(--a-text-base);
-  font-weight: var(--a-weight-medium);
-  color: var(--a-text);
-  white-space: nowrap;
 }
 
 /* shared inline-icon sizing (paths carry stroke=currentColor) */

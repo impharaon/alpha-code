@@ -247,6 +247,28 @@ describe("composer accessibility behavior", () => {
     expect(pop.style.bottom).toBe(`${window.innerHeight - 300 + 8}px`)
   })
 
+  test("「接入其它服务」对话框开着时发起它的弹层收起,对话框关掉后弹层随之关闭", async () => {
+    let closed = 0
+    mount(() => runtime.SubPageHarness({ onClosed: () => closed++, closeOnCustomDone: true }))
+    await flush()
+    await flush()
+    const pop = document.querySelector<HTMLElement>(".a-pop-fixed")!
+    expect(pop.style.visibility).toBe("")
+    document.querySelector<HTMLButtonElement>("[data-codepuppy-custom-endpoint-entry]")!.click()
+    await flush()
+    expect(document.querySelector("[role='dialog']")).not.toBeNull()
+    expect(pop.style.visibility).toBe("hidden")
+    // 点对话框里的内容不会把弹层(及它里面的对话框)当成外部点击关掉。
+    document.querySelector<HTMLButtonElement>(".a-csd-seg button")!.click()
+    await flush()
+    expect(document.querySelector("[role='dialog']")).not.toBeNull()
+    keydown(document.querySelector("[role='dialog'] input")!, "Escape")
+    await flush()
+    expect(document.querySelector("[role='dialog']")).toBeNull()
+    expect(document.querySelector(".a-pop-fixed")).toBeNull()
+    expect(closed).toBe(1)
+  })
+
   test("#1476 sub-page Escape goes back one level before closing the menu", async () => {
     let closed = 0
     mount(() => runtime.SubPageHarness({ onClosed: () => closed++ }))

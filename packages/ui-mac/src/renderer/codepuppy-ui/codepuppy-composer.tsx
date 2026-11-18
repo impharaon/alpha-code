@@ -95,6 +95,7 @@ import {
   type EngineModelRef,
 } from "./model-default-core"
 import { ModelPickPop } from "./codepuppy-composer-model"
+import { customServiceOpen } from "./custom-service-state"
 import { abortUserTurn } from "./session-workspace/user-stopped-turns"
 import { identityKey } from "./session-workspace/session-workspace-core"
 import { createModelContract, type ModelContract } from "./model-contract"
@@ -220,6 +221,8 @@ export function ChipPopover(props: {
       position: "fixed",
       bottom: `${Math.round(window.innerHeight - r.top + 8)}px`,
       "z-index": "var(--a-z-dropdown)",
+      // 「接入其它服务」对话框开着时弹层先收起(只是看不见,对话框关掉后弹层随之关闭)。
+      visibility: customServiceOpen() ? "hidden" : undefined,
       "min-width": `${minW}px`,
       "max-width": `${Math.round(vw - 16)}px`,
     }

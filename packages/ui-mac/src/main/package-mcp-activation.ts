@@ -112,13 +112,15 @@ async function applyAt(
       await client.experimental.mcp.add({ server: name, config: { ...config, ...startup, disabled: false }, location })
       await client.experimental.mcp.connect({ server: name, location })
     } else {
-      const pending = (await client.permission.request.list({ location })).data
+      // Rejecting this connector's own pending approvals is best effort: one the user answered meanwhile is already
+      // gone and the engine refuses the reply. That must never stop the disconnect below (Codex R1 #1).
+      const pending = await client.permission.request.list({ location }).then((response) => response.data, () => [])
       const replied = new Set<string>()
       for (const request of pending) {
         const identity = request.metadata?.identity
         if (!Schema.is(ToolIdentity)(identity) || identity.source !== "mcp" || identity.origin !== name || replied.has(request.sessionID)) continue
-        await client.permission.reply({ sessionID: request.sessionID, requestID: request.id, decision: "reject" })
-        replied.add(request.sessionID)
+        const rejected = await client.permission.reply({ sessionID: request.sessionID, requestID: request.id, decision: "reject" }).then(() => true, () => false)
+        if (rejected) replied.add(request.sessionID)
       }
       if (listed) await client.experimental.mcp.disconnect({ server: name, location })
       else if (record.desiredState === "disabled" && packageAppliesAt(graph, target)) {

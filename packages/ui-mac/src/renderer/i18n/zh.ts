@@ -1192,6 +1192,7 @@ export const dict = {
   "codepuppy.permission.delegationNote": "子任务里不再逐项询问",
   "codepuppy.permission.saveFailed": "没能保存,这次未放行",
   "codepuppy.permission.verbTool": "使用工具",
+  "codepuppy.permission.verbInstall": "安装",
   "codepuppy.permission.verbBash": "运行命令",
   "codepuppy.permission.verbEdit": "改文件",
   "codepuppy.permission.verbExternalDirectory": "访问项目以外的文件夹",

@@ -30,7 +30,7 @@ import { SessionMessage } from "../../schema/src/session-message.ts"
 import type { Plugin } from "@opencode/plugin"
 import CodePuppyExt, { PROCESS_STATE_KEY } from "./plugin"
 import { codePuppyWebSearchFailureOf } from "./exa-websearch"
-import { buildHubInstallReply, buildHubRequestReply, buildHubViewReply } from "../../ui-mac/src/main/codepuppy-sidecar-messages"
+import { buildHubInstallReply, buildHubRequestReply, buildHubViewReply, buildSourcesSearchReply } from "../../ui-mac/src/main/codepuppy-sidecar-messages"
 import { activate, it, recordingMcp } from "./plugin-host.harness"
 import { testEffect } from "../../core/test/lib/effect.ts"
 import { makePluginTestLayer } from "../../core/test/plugin/fixture.ts"
@@ -513,22 +513,27 @@ it.live("P6 / S5:平台凭据头只对平台节点、每次现读;别的节点�
 )
 
 /**
- * 定制中心安装的宿主:main 由一个假 parentPort 扮演(目录里有 mcp:github;请求记录查不到 —— 结局不归这里判),ext 的进程级对象
- * 在本用例里按这个 port 重建、用完复原;`manifest` 时像打包版一样经启动文档的 `paths.extBundledManifest` 核验 ext 自己的安装工具;
- * main 注入的两个 Code Puppy agent 带上决定本用例的那条规则(codepuppy-config-injection.ts 的「tool-policy-default」ask)。
- * 之后再装 ext。
+ * 定制中心安装的宿主:main 由一个假 parentPort 扮演(目录里有 mcp:github,搜索答出这一条;请求记录查不到 —— 结局不归这里判;
+ * 收到的安装请求记进返回的 `installs`),ext 的进程级对象在本用例里按这个 port 重建、用完复原;`manifest` 时像打包版一样经启动
+ * 文档的 `paths.extBundledManifest` 核验 ext 自己的安装与制作工具;main 注入的两个 Code Puppy agent 带上决定本用例的那条规则
+ * (codepuppy-config-injection.ts 的「tool-policy-default」ask)。之后再装 ext。
  */
 const hubHost = (options: { manifest: boolean }) =>
   Effect.gen(function* () {
     const holder = globalThis as Record<symbol, unknown>
     const savedState = holder[PROCESS_STATE_KEY]
     const listeners: Array<(event: { data: unknown }) => void> = []
+    const installs: unknown[] = []
     const row = { id: "mcp:github", scope: null, name: "github", kind: "mcp", displayName: "GitHub", description: "repos", installed: false, enabled: false, state: "not-installed", authorization: "none" }
+    const candidate = { id: "mcp:github", source: "catalog", name: "github", displayName: "GitHub", description: "repos", kind: "mcp", upstream: {} } as const
     const port = {
-      postMessage: (message: { type: string; id: number; directory?: string }) =>
+      postMessage: (message: { type: string; id: number; directory?: string; query?: string }) =>
         queueMicrotask(() => {
+          if (message.type === "codepuppy.hub.install.request") installs.push(message)
           const reply =
-            message.type === "codepuppy.hub.install.request"
+            message.type === "codepuppy.sources.search.request"
+              ? buildSourcesSearchReply(message.id, { result: { searchId: "search_github", query: message.query ?? "", sources: [{ source: "catalog", status: "ok", matched: 1, skipped: 0 }], candidates: [candidate] } })
+              : message.type === "codepuppy.hub.install.request"
               ? buildHubInstallReply(message.id, { accepted: true })
               : message.type === "codepuppy.hub.view.request"
               ? buildHubViewReply(message.id, { view: { directory: message.directory ?? "", rows: [row as never], warnings: [] } })
@@ -551,7 +556,7 @@ const hubHost = (options: { manifest: boolean }) =>
       // 打包版里 ext 构建写的清单:被装载模块的 sha256 + 自有工具名(源码里这个模块就是 policy/index.ts,它用自己的 URL 核验)
       const manifest = join(scratch, `bundled-tools-${Math.random().toString(36).slice(2)}.json`)
       const moduleSha256 = createHash("sha256").update(readFileSync(join(import.meta.dir, "policy", "index.ts"))).digest("hex")
-      writeFileSync(manifest, JSON.stringify({ moduleSha256, tools: ["codepuppy_hub_install"], readable: { codepuppy_hub_install: "codepuppy:hub_install" } }))
+      writeFileSync(manifest, JSON.stringify({ moduleSha256, tools: ["codepuppy_hub_install", "codepuppy_hub_create"], readable: { codepuppy_hub_install: "codepuppy:hub_install", codepuppy_hub_create: "codepuppy:hub_create" } }))
       publishTestBootstrap({ globalRoot: join(scratch, "codepuppy-state", "env", "dev"), extPlugin: scratch, extBundledManifest: manifest })
     }
     yield* activate({
@@ -563,16 +568,18 @@ const hubHost = (options: { manifest: boolean }) =>
         })
       },
     })
+    return { installs }
   })
 
 /**
  * 一次 `codepuppy_hub_install` 调用里用户看到的审批:每出现一条待批请求就记下并按 `answer` 回复,直到调用结束。
  * 引擎的 prompt 流程先于工具调用触发 session.hook.prompt(策略的目录尾规则在这里登记)。
  */
-const hubInstall = (agent: string, answer: "once" | "always" = "once", action = "codepuppy_hub_install", input: Record<string, unknown> = { id: "mcp:github" }) =>
+let hubCalls = 0
+const hubInstall = (agent: string, answer: "once" | "always" | "reject" = "once", action = "codepuppy_hub_install", input: Record<string, unknown> = { id: "mcp:github" }, sessionID?: Session.ID) =>
   Effect.gen(function* () {
     const directory = realpathSync((yield* Location.Service).directory)
-    const session = yield* (yield* Sessions.Service).create({ location: { directory }, title: `hub install ${agent}` })
+    const session = sessionID ? { id: sessionID } : yield* (yield* Sessions.Service).create({ location: { directory }, title: `hub install ${agent}` })
     yield* (yield* PluginHooks.Service).trigger("session", "prompt", { sessionID: session.id, messageID: "msg_prompt", prompt: { text: "装 github" }, delivery: "queue" } as never)
     const permission = yield* Permission.Service
     const snapshot = yield* (yield* Tool.Service).snapshot()
@@ -581,41 +588,96 @@ const hubInstall = (agent: string, answer: "once" | "always" = "once", action = 
         sessionID: session.id,
         agent: agent as never,
         messageID: SessionMessage.ID.make("msg_hub_install"),
-        call: { type: "tool-call", id: "call_hub_install", name: action, input },
+        call: { type: "tool-call", id: `call_hub_install_${++hubCalls}`, name: action, input },
       })
       .pipe(Effect.exit, Effect.forkChild)
-    const asks: Array<{ action: string; metadata: Record<string, unknown> }> = []
+    const asks: Array<{ action: string; metadata: Record<string, unknown>; resources: readonly string[]; save: readonly string[] | undefined }> = []
     const seen = new Set<string>()
     for (let waited = 0; waited < 5000 && !call.pollUnsafe(); waited += 20) {
       for (const request of yield* permission.forSession(session.id)) {
         if (seen.has(request.id)) continue
         seen.add(request.id)
-        asks.push({ action: request.action, metadata: (request.metadata ?? {}) as Record<string, unknown> })
+        asks.push({ action: request.action, metadata: (request.metadata ?? {}) as Record<string, unknown>, resources: request.resources, save: request.save })
         yield* permission.reply({ requestID: request.id, reply: answer })
       }
       yield* Effect.sleep("20 millis")
     }
-    return { asks, exit: yield* Fiber.join(call) }
+    return { asks, exit: yield* Fiber.join(call), sessionID: session.id }
   })
 
-itWithPermission.live("A3 install uses ordinary allow/ask policy and automation is denied before any ask", () => Effect.gen(function* () {
- env({})
- yield* hubHost({manifest:true})
- const hooks=yield* PluginHooks.Service
- const evaluation={sessionID:ids.sessionID,agent:"build" as never,action:"codepuppy_hub_install",resources:["mcp:github"],effect:"allow" as const}
- yield* activate(CodePuppyExt)
- const allowed=yield* hubInstall("build")
- expect(allowed.asks).toEqual([])
- expect(Exit.isSuccess(allowed.exit)).toBe(true)
- expect((yield* hooks.trigger("permission","evaluate",{...evaluation,action:"read"})).effect).toBe("allow")
- const asked=yield* hubInstall("codepuppy-ask")
- expect(asked.asks.map(ask=>ask.action)).toEqual([canonicalToolIdentity({source:"plugin",origin:join(import.meta.dir,"policy","index.ts"),name:"codepuppy_hub_install"})])
- expect(asked.asks.every(ask=>ask.metadata.codepuppyHub===undefined)).toBe(true)
- expect(Exit.isSuccess(asked.exit)).toBe(true)
- const automation=yield* hubInstall("codepuppy-automation-standard")
- expect(automation.asks).toEqual([])
- expect(Exit.isFailure(automation.exit)).toBe(true)
- expect(JSON.stringify(automation.exit)).toContain("Permission denied: codepuppy_hub_install")
+/** BR-10 的审批卡事实:身份轴、这一次调用、什么都不存,卡上只写名称与真实来源。 */
+const installAsk = (subject: Record<string, unknown>) => ({
+  action: canonicalToolIdentity({ source: "plugin", origin: join(import.meta.dir, "policy", "index.ts"), name: "codepuppy_hub_install" }),
+  save: [],
+  policy: expect.objectContaining({ askedBy: "install", install: subject }),
+})
+const askFacts = (ask: { action: string; save: readonly string[] | undefined; resources: readonly string[]; metadata: Record<string, unknown> }) => ({ action: ask.action, save: ask.save, policy: ask.metadata.policy })
+
+itWithPermission.live("I-10 an assistant install asks once in every interactive tier, allow covers that install only, deny installs nothing", () => Effect.gen(function* () {
+  env({})
+  const { installs } = yield* hubHost({ manifest: true })
+  yield* activate(CodePuppyExt)
+  // 模型只装搜索给出的编号:先经引擎执行一次搜索(全部批准档,搜索照档位普通判定 —— 不问)
+  const searched = yield* hubInstall("build", "once", "codepuppy_hub_search", { query: "github" })
+  expect(searched.asks).toEqual([])
+  expect(Exit.isSuccess(searched.exit)).toBe(true)
+
+  // 「全部批准」:先出卡;拒绝 ⇒ 这次请求到不了 main 的安装入口
+  const declined = yield* hubInstall("build", "reject")
+  expect(declined.asks.map(askFacts)).toEqual([installAsk({ name: "GitHub", source: "catalog" })])
+  expect(declined.asks[0]!.resources).toEqual([expect.stringMatching(/^call:call_hub_install_\d+$/)])
+  expect(Exit.isFailure(declined.exit)).toBe(true)
+  expect(installs).toEqual([])
+
+  // 「请求审批」:同一张卡;即便回复「始终允许」,同一会话里下一次安装照样出卡(只放行那一次,不留任何放行)
+  const first = yield* hubInstall("codepuppy-ask", "always")
+  expect(first.asks.map(askFacts)).toEqual([installAsk({ name: "GitHub", source: "catalog" })])
+  expect(Exit.isSuccess(first.exit)).toBe(true)
+  expect(installs).toHaveLength(1)
+  const again = yield* hubInstall("codepuppy-ask", "once", "codepuppy_hub_install", { id: "mcp:github" }, first.sessionID)
+  expect(again.asks.map(askFacts)).toEqual([installAsk({ name: "GitHub", source: "catalog" })])
+  expect(installs).toHaveLength(2)
+
+  // 「全部批准」允许 ⇒ 照常提交给 main
+  const allowed = yield* hubInstall("build", "once")
+  expect(allowed.asks.map(askFacts)).toEqual([installAsk({ name: "GitHub", source: "catalog" })])
+  expect(Exit.isSuccess(allowed.exit)).toBe(true)
+  expect(installs).toHaveLength(3)
+
+  // 自动化(无人在场)agent:照现有规则直接停下并写明原因,不出卡、不提交
+  const automation = yield* hubInstall("codepuppy-automation-standard")
+  expect(automation.asks).toEqual([])
+  expect(Exit.isFailure(automation.exit)).toBe(true)
+  expect(JSON.stringify(automation.exit)).toContain("Permission denied: codepuppy_hub_install")
+
+  // 本进程从没由搜索答过的编号:卡上无从写名 ⇒ 不出卡、不提交,请模型先搜索
+  const unknown = yield* hubInstall("build", "once", "codepuppy_hub_install", { id: "cand_never_searched" })
+  expect(unknown.asks).toEqual([])
+  expect(Exit.isFailure(unknown.exit)).toBe(true)
+  expect(JSON.stringify(unknown.exit)).toContain("codepuppy_hub_search")
+  expect(installs).toHaveLength(3)
+  // 别的工具照常判定:同一引擎里普通读取照旧放行
+  const hooks = yield* PluginHooks.Service
+  expect((yield* hooks.trigger("permission", "evaluate", { sessionID: ids.sessionID, agent: "build" as never, action: "read", resources: ["a.txt"], effect: "allow" as const })).effect).toBe("allow")
+}))
+
+itWithPermission.live("I-10 a tool the user enabled in Settings does not skip the install card", () => Effect.gen(function* () {
+  env({})
+  const { installs } = yield* hubHost({ manifest: true })
+  const location = yield* Location.Service
+  // 设置里把整类插件工具设为「启用」(此前的允许):别的插件工具因此不问,安装照样出卡
+  const store = createToolPolicyStore({
+    baseDir: defaultPolicyBaseDir(join(process.env.XDG_DATA_HOME!, "opencode")),
+    account: () => "anonymous",
+    workspace: () => policyWorkspace(location as never),
+  })
+  yield* Effect.promise(() => store.setRecord({ selector: { level: "class", class: "plugin" }, state: "enabled" } as never))
+  yield* activate(CodePuppyExt)
+  const searched = yield* hubInstall("codepuppy-ask", "once", "codepuppy_hub_search", { query: "github" })
+  expect(searched.asks).toEqual([])
+  const asked = yield* hubInstall("codepuppy-ask", "reject")
+  expect(asked.asks.map(askFacts)).toEqual([installAsk({ name: "GitHub", source: "catalog" })])
+  expect(installs).toEqual([])
 }))
 itWithPermission.live("A3 a same-named unverified tool uses the same ordinary ask surface",()=>Effect.gen(function*(){
  env({})
@@ -1308,18 +1370,23 @@ it.live("scope · MCP transforms enable only matching project members", () =>
 )
 
 
-itWithPermission.live("D3 create uses the ordinary permission tier; automation is denied before any ask", () => Effect.gen(function* () {
+itWithPermission.live("D3/I-10 installing the user's own plugin asks once in every tier with its name and source; automation is denied before any ask", () => Effect.gen(function* () {
   env({})
-  yield* hubHost({ manifest: false })
+  const { installs } = yield* hubHost({ manifest: true })
   yield* activate(CodePuppyExt)
   const input = { searchId: "search_owned", name: "own-report", description: "Own report", files: [] }
+  const card = { action: canonicalToolIdentity({ source: "plugin", origin: join(import.meta.dir, "policy", "index.ts"), name: "codepuppy_hub_create" }), save: [], policy: expect.objectContaining({ askedBy: "install", install: { name: "own-report", source: "created" } }) }
+  const declined = yield* hubInstall("build", "reject", "codepuppy_hub_create", input)
+  expect(declined.asks.map(askFacts)).toEqual([card])
+  expect(installs).toEqual([])
   const allow = yield* hubInstall("build", "once", "codepuppy_hub_create", input)
-  expect(allow.asks).toEqual([])
+  expect(allow.asks.map(askFacts)).toEqual([card])
   expect(Exit.isSuccess(allow.exit)).toBe(true)
   const ask = yield* hubInstall("codepuppy-ask", "once", "codepuppy_hub_create", input)
-  expect(ask.asks).toHaveLength(1)
+  expect(ask.asks.map(askFacts)).toEqual([card])
   expect(ask.asks[0]!.metadata.codepuppyHub).toBeUndefined()
   expect(Exit.isSuccess(ask.exit)).toBe(true)
+  expect(installs).toHaveLength(2)
   const automation = yield* hubInstall("codepuppy-automation-standard", "once", "codepuppy_hub_create", input)
   expect(automation.asks).toEqual([])
   expect(Exit.isFailure(automation.exit)).toBe(true)

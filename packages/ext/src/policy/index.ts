@@ -19,7 +19,7 @@ import path from "node:path"
 import type { Plugin } from "@opencode/plugin"
 import { createCatalog } from "./catalog"
 import { attachDirectoryDisplay, attachUnattendedDenial, attachNetFailure, attachTerminal, displaySnapshot, wrapForDisplay } from "./display"
-import { confirm, decide, effectiveFor, gateWithoutToolCall, holdAsk, holdUnattendedDeny, pin, type GateDeps } from "./gate"
+import { confirm, decide, effectiveFor, gateWithoutToolCall, holdAsk, holdUnattendedDeny, isInstallAsk, pin, type GateDeps } from "./gate"
 import {
   codeModeFacts,
   CODE_MODE_TOOL,
@@ -35,8 +35,8 @@ import { classifyPermissionRequest, RISK_METADATA_KEY } from "./risk"
 import { TOOL_POLICY_RPC_DEFINITION, toolPolicyHandlers } from "./rpc"
 import type { ToolDisplaySnapshotV1 } from "../../../schema/src/tool-identity"
 import { isCodePuppyPolicyRequest } from "../../../schema/src/codepuppy-tool-policy"
-
-import { denyHubMutationForAutomation } from "../hub-tools"
+import type { HubBridge } from "../hub-bridge"
+import { denyHubMutationForAutomation, hubInstallAsk } from "../hub-tools"
 
 export interface PolicyRegistration {
   /** Last statement of the extension's `setup`: registers the parts that must see every earlier registration. */
@@ -58,7 +58,7 @@ export function policyWorkspace(location: Plugin.Context["location"]): string {
 
 
 
-export async function registerPolicy(context: Plugin.Context, unattended: UnattendedState): Promise<PolicyRegistration> {
+export async function registerPolicy(context: Plugin.Context, unattended: UnattendedState, installSubject: HubBridge["installSubject"]): Promise<PolicyRegistration> {
   const env = process.env
   // `#1698`:随包清单与 Office 清单的路径、云 MCP 定义、账户分区来自 sidecar 发布的启动文档(冻结,一代不变)
   const bootstrap = codepuppyBootstrap()
@@ -178,7 +178,11 @@ export async function registerPolicy(context: Plugin.Context, unattended: Unatte
       }
       return holdUnattendedDeny(event, selected, event.action, (denial) => denied(event.source?.type === "tool" ? event.source.id : undefined, denial))
     }
-    if (isCodePuppyPolicyRequest(event.metadata)) return holdAsk(event)
+    if (isCodePuppyPolicyRequest(event.metadata)) {
+      // BR-10: an assistant-initiated install asks in every tier — no allow rule, saved approval or tier skips it.
+      if (isInstallAsk(event.metadata) && event.effect !== "deny") event.effect = "ask"
+      return holdAsk(event)
+    }
     // A tool's permission action asserted without a tool call (a subtask command, review R1 #2) is decided like the
     // tool's call; a tool call's own assert already passed confirm() in execute.before.
     if (event.source === undefined) {
@@ -219,7 +223,9 @@ export async function registerPolicy(context: Plugin.Context, unattended: Unatte
           // rules before the identity-axis ask is evaluated, so a document-axis ask holds for it too.
           await catalog.refresh()
           const decision = await decide(deps, event)
-          await confirm(deps, decision, event)
+          const facts = decision.facts
+          const install = facts.identity.source === "plugin" ? hubInstallAsk(event, facts.authority.kind === "codepuppy-bundled", installSubject) : undefined
+          await confirm(deps, decision, event, install)
           displays.set(event.id, displaySnapshot(decision.facts))
           pin(event)
           if (event.tool === CODE_MODE_TOOL && await profile(event.sessionID, event.agent) !== undefined) codeModeDenials.set(event.id, undefined)

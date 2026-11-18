@@ -25,6 +25,7 @@ function bridgeWith(script: { views: HubView[]; record?: HubRequestRecord | null
     unattended: createUnattendedState(),
     search: async () => ({ ok: true, result: { searchId: "search_main", query: "", sources: [], candidates: [] } }),
     install: async () => ({ ok: true, accepted: true }),
+    installSubject: () => undefined,
     view: async (input) => {
       calls.view.push(input)
       const next = script.views.length > 1 ? script.views.shift()! : script.views[0]!

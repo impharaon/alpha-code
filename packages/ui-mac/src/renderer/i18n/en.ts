@@ -1215,6 +1215,7 @@ export const dict = {
   "codepuppy.permission.delegationNote": "Subtasks won't ask again step by step",
   "codepuppy.permission.saveFailed": "Couldn't save, so this wasn't allowed",
   "codepuppy.permission.verbTool": "Use a tool",
+  "codepuppy.permission.verbInstall": "Install",
   "codepuppy.permission.verbBash": "Run a command",
   "codepuppy.permission.verbEdit": "Edit files",
   "codepuppy.permission.verbExternalDirectory": "Access folders outside the project",

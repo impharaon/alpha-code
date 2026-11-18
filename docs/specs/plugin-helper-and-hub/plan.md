@@ -1118,7 +1118,7 @@ r20 验证冻结规则：本修复提交就是以下各独立步骤的验证对�
 ## I-11 开关只影响该连接器（含：安装/开关后被弹出定制中心）
 
 - 依据：spec v4（alpha-work `d2345bb`）BR-07、AC-12、AC-13（待决 1 已定「立即生效」，design v7 §1）；design v7 §4.1 第 8 步、§5「生效方式」、§10「修订 v3→v4」行；意图 I-11（U-20 授权处理，来源 `packages/ext/src/reload-scheduler.ts:9`）；本派发的编排器裁决（包开关中 MCP 组件走现有运行时 add/connect/disconnect，技能保持现有重载，持久配置是后加载 Location 的真源）与 2026-11-18 补充（0.2.1 打包实测：安装/开关后整页重载、被弹回新对话页）；alpha-code#1724。
-- 核对：PLAN 阶段返回 `BLOCKED: false premise`（见「前提核实」Q3/Q4 与「需要裁决的设计缺口」），待编排器裁决后补本行。
+- 核对：PLAN `4509b8f262` 返回 `BLOCKED: false premise`；编排器裁决（2026-11-18）：本片 = 方案 C（BR-07 缺陷修复：sidecar 换代引起的整页重载后用户仍在定制中心）；方案 A 待 design §4.4/§5 修订，本片不实施；并行车道（`fix/hub-status-removal-firstrun`）在整包移除含远端连接器时也会触发 `connectorChange` 换代，本片修复须对该路径同样成立。
 
 ### 前提核实（真实引擎，临时目录，2026-11-18）
 
@@ -1137,6 +1137,7 @@ Q3/Q4 的代码事实：启动注入把账本停用的 MCP/助手写进引擎**�
 ### 被弹出定制中心的原因
 
 1. **已证实：引擎换代 → 整页重载。** 链条：`connectorChange` 重载请求——`ext-ipc.ts:1114`（装后技能重载，包含 cloud/agent/command 组件时）、`:1201`（官方/第一方连接器开关）、`:1287`（包开关，含非 MCP 组件且含 cloud/agent/command 时，另带 `force`）、`:1361`（旧式连接器安装，恒为真）；以及 `installCatalog`/`uninstallPackage` 对 `package:github-official`、`package:dbhub-readonly` 直接 stop/refresh（`ext-ipc.ts:1295-1350`）→ `reload-coordinator.ts:131-150` 在 ext 报 reloaded 后调 `restartConnectors` → `ui-mac/src/main/index.ts:1040` `requestSidecarRespawn("connector-change")` → `index.ts:1630-1637` `mainWindow.webContents.reload()`。渲染进程的路由在内存里、定制中心开关（`renderer/extensions/ext-hub-state.ts`，刻意不持久）随重载归零，于是落到首页/新对话。打包实测日志：`/tmp/alpha-1118/verify021/run1/.../logs/20261118T023838/main.log` 10:45:02.345「installed package content package:cloud-image」→ 10:45:02.400「respawning sidecar { reason: 'connector-change' }」→ 10:45:08.217「sidecar respawned + renderer reloaded」。换代还会结束所有会话里正在进行的回答，比 Location 重载更重。
+   重载后被弹回新对话的直接机制（本片已证实并修复）：渲染进程用 `MemoryRouter`，重载后从「/」起步；定制中心开关是不持久的模块信号；侧栏的启动落地 `startDraft("launch")`（`renderer/sidebar/codepuppy-sidebar.tsx`）在项目列表就绪后开新 draft，并先 `closeAllOverlays()`。
 2. **尚未证实：不换代时也被关掉。** 10:53 关掉 `mcp:markitdown`（旧式单连接器，不在官方/第一方名单）时 main.log 没有 respawn 或 renderer reload；`setInstallStateBody` 对它不发重载，渲染进程只做 disconnect（`renderer/extensions/use-extensions.ts:738-753`）。窗口最后停在新对话页（`evidence/25-markitdown-off.png`）。已核实的关闭机制：侧栏对**任何**路由变化（pathname+search，含程序化导航与新对话 draft 切换）关闭全部覆盖层（`renderer/sidebar/codepuppy-sidebar.tsx:601-603`）。哪个引擎事件让定制中心背后的路由变了，留给第 1 步红例确定，不在此猜。
 
 ### 需要裁决的设计缺口
@@ -1151,7 +1152,23 @@ Q3/Q4 的代码事实：启动注入把账本停用的 MCP/助手写进引擎**�
 
 无论 A/B，含 cloud 组件的包仍需换代（云 MCP 定义在每代冻结的启动文档里，#1698），那一小类需要 C 式「重载后回到原处」或另行裁决。
 
-### 改动（按建议方案 A 的暂定清单，裁决后定稿）
+### 本片（方案 C）
+
+| 文件 | 改什么 |
+| --- | --- |
+| `packages/ui-mac/src/renderer/reload-place-store.ts`（新） | 本窗口 sessionStorage 里的位置：路由、定制中心开着时的页签；只在当前页面确由重载而来（`PerformanceNavigationTiming.type === "reload"`，`webContents.reload()` 即此）时才读出，新窗口与冷启动照旧 |
+| `packages/ui-mac/src/renderer/reload-place.ts`（新） | `restoredHistory()` / `RestoredMemoryRouter`：重载后 MemoryRouter 从存下的路由起步（裸「/」仍交给启动落地） |
+| `packages/ui-mac/src/renderer/extensions/ext-hub-state.ts` | 开关与页签随改随记，模块装载时按重载前恢复 |
+| `packages/ui-mac/src/renderer/sidebar/codepuppy-sidebar.tsx` | 路由 effect 记下路由；重载后跳过启动落地（不再开新 draft、不再关覆盖层） |
+| `packages/ui-mac/src/renderer/index.tsx`、`surface-remount-test-runtime.tsx`、`surface-remount.test.ts` | 根路由改用 `RestoredMemoryRouter`；复刻与 #565 形状锚点按其注释同步 |
+
+与触发原因无关（只看「这一页是重载来的」），所以并行车道的整包移除换代、以及其它换代重载（登录身份、服务商变化、崩溃自愈）同样停在原处。管理页（`extension-hub.tsx` 内的局部信号）不在本片恢复：该文件属并行车道的改动集。
+
+| 行为 | 测试/证据 | 缺少行为为什么会失败 |
+| --- | --- | --- |
+| BR-07 换代重载后仍在定制中心 | `test-component/overlay-close.cases.ts`「I-11 BR-07」（真实侧栏 + 真实 ExtensionHub + 真 @solidjs/router）：定制中心开着、在技能页时重载 → 仍开着、仍在技能页、路由不变、启动落地不关它；关着时重载 → 路由不变；非重载的新窗口即使存储里留着位置也照旧冷启动。宿主 `src/renderer/sidebar/overlay-close.test.ts` 下界 21 | 去掉重载后跳过启动落地 ⇒ 第一条红（实测）；不记/不恢复开关 ⇒ 第一条红；不判导航类型 ⇒ 第三条红 |
+
+### 改动（方案 A，暂缓：待 design §4.4/§5 修订，本片不实施）
 
 | 文件 | 改什么 |
 | --- | --- |
@@ -1188,4 +1205,5 @@ Q3/Q4 的代码事实：启动注入把账本停用的 MCP/助手写进引擎**�
 
 ### 偏离记录
 
-暂无
+- 2026-11-18 · 本片改为方案 C（编排器裁决）；方案 A 的改动、顺序与证明各行保留为待修订后的计划，不在本片实施 · `4dda3ef97f`。
+- 2026-11-18 · 红例模拟重载最初只保留 sessionStorage；测试进程里它跨用例留存，改为按真实信号（导航类型 reload）模拟并加「新窗口不恢复」对照（本车道自加用例的设置更正）· `5cb3ad8d6a`。

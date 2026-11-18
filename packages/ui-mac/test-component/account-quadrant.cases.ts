@@ -97,7 +97,6 @@ const zeroUsage = { todayTokens: 0, weekTokens: 0, tasksThisMonth: 0 }
 type Expected = {
   chip: string
   chipPro: boolean
-  footerSub: string
   rows: Record<string, string> // 行标签 → 期望值(取 .a-kv-v 的可见文本;alpha-code#1686 起弹层用组件库名称 — 值列表)
   ctas: string[]
 }
@@ -109,7 +108,6 @@ const CASES: Array<{ name: string; summary: AccountSummary | { error: string }; 
     expected: {
       chip: "PRO 月卡",
       chipPro: true,
-      footerSub: "PRO 月卡",
       rows: {
         会员订阅: "Pro 月卡",
         可用余额: "¥998.65",
@@ -125,7 +123,6 @@ const CASES: Array<{ name: string; summary: AccountSummary | { error: string }; 
     expected: {
       chip: "PRO 月卡",
       chipPro: true,
-      footerSub: "PRO 月卡",
       rows: {
         会员订阅: "Pro 月卡",
         可用余额: "¥0.00",
@@ -141,7 +138,6 @@ const CASES: Array<{ name: string; summary: AccountSummary | { error: string }; 
     expected: {
       chip: "按量付费",
       chipPro: false,
-      footerSub: "按量付费",
       rows: {
         会员订阅: "未订阅",
         可用余额: "¥998.65",
@@ -157,7 +153,6 @@ const CASES: Array<{ name: string; summary: AccountSummary | { error: string }; 
     expected: {
       chip: "免费版",
       chipPro: false,
-      footerSub: "免费版",
       rows: {
         会员订阅: "未订阅",
         可用余额: "¥0.00",
@@ -174,7 +169,6 @@ const CASES: Array<{ name: string; summary: AccountSummary | { error: string }; 
     expected: {
       chip: "免费版",
       chipPro: false,
-      footerSub: "免费版",
       rows: {
         会员订阅: "—",
         可用余额: "—",
@@ -306,7 +300,6 @@ for (const { name, summary, expected } of CASES) {
     await mount()
     const trigger = document.querySelector(".codepuppy-sidebar-account")
     expect(trigger).not.toBeNull()
-    expect(document.querySelector(".codepuppy-sidebar-account-sub")?.textContent?.trim()).toBe(expected.footerSub)
     click(trigger!)
     await flush()
     const pop = document.querySelector(".codepuppy-acct-pop")

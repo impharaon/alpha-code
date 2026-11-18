@@ -1,7 +1,9 @@
 import { createEffect, createSignal, For, onCleanup, onMount, Show, type Accessor, type JSX } from "solid-js"
+import { Portal } from "solid-js/web"
 import { CodePuppyBoundary } from "../codepuppy-boundary"
 import { t } from "../../i18n"
 import { rovingKey, rovingTabIndex } from "../roving-focus"
+import { topbarTitleHost } from "../shell-chrome-state"
 import { acceptedEngineChannel, type CodePuppyTerminalEngineChannel } from "../session-rail/terminal/terminal-rail-core"
 import { TerminalRailPanel } from "../session-rail/terminal/terminal-rail-panel"
 import { terminalRailAnyRunning } from "../session-rail/terminal/terminal-rail-state"
@@ -213,16 +215,12 @@ function WorkspaceTopbar(props: {
     return { kind: "running", label: t("codepuppy.session.statusRunning") }
   }
   const railOpen = () => props.panel() !== undefined
-  return (
-    <header class="a-swk-topbar" data-codepuppy-session-workspace-topbar>
-      <span class="a-swk-project-pill">
-        <span class="a-swk-project-avatar" aria-hidden="true">
-          {snapshot()?.project.slice(0, 1).toUpperCase()}
-        </span>
-        <span class="a-swk-project-label">{snapshot()?.project || t("codepuppy.session.session")}</span>
-      </span>
+  // The breadcrumb and status pills (frame #session: "project / title").
+  const crumb = () => (
+    <>
+      <span class="a-swk-project-label">{snapshot()?.project || t("codepuppy.session.session")}</span>
       <span class="a-swk-separator" aria-hidden="true">
-        ›
+        /
       </span>
       <span class="a-swk-session-title">{snapshot()?.title || t("codepuppy.session.session")}</span>
       <Show when={status()}>
@@ -243,37 +241,58 @@ function WorkspaceTopbar(props: {
         )}
       </Show>
       <WorkspaceReadonlyPill readonly={() => props.workspaceReadonly?.() === true} relaunch={props.relaunch} />
-      <span class="a-swk-grow" aria-hidden="true" />
-      <button
-        type="button"
-        class="a-swk-panel-button"
-        classList={{ "a-swk-panel-button--active": props.panel() === "terminal" }}
-        aria-label={t("codepuppy.session.terminal")}
-        aria-pressed={props.panel() === "terminal"}
-        aria-controls="codepuppy-session-rail-host"
-        disabled={!props.terminalAvailable}
-        onClick={props.toggleTerminal}
-      >
-        <svg viewBox="0 0 24 24" aria-hidden="true">
-          <path d="M4 17l6-6-6-6M12 19h8" />
-        </svg>
-      </button>
-      <span class="a-swk-control-separator" aria-hidden="true" />
-      <button
-        type="button"
-        class="a-swk-panel-button"
-        classList={{ "a-swk-panel-button--active": railOpen() }}
-        aria-label={railOpen() ? t("codepuppy.session.closeRail") : t("codepuppy.session.openRail")}
-        aria-expanded={railOpen()}
-        aria-controls="codepuppy-session-rail-host"
-        onClick={props.toggleRail}
-      >
-        <svg viewBox="0 0 24 24" aria-hidden="true">
-          <rect x="3" y="4" width="18" height="16" rx="2" />
-          <path d="M15 4v16" />
-        </svg>
-      </button>
-    </header>
+    </>
+  )
+  // With the window chrome mounted (production) the breadcrumb renders into its top-bar slot and the
+  // right-panel toggle is the chrome's (right-panel-state.ts). Without it (component
+  // harnesses) the workspace carries its own top bar, toggles included.
+  return (
+    <Show
+      when={topbarTitleHost()}
+      fallback={
+        <header class="a-swk-topbar" data-codepuppy-session-workspace-topbar>
+          {crumb()}
+          <span class="a-swk-grow" aria-hidden="true" />
+          <button
+            type="button"
+            class="a-swk-panel-button"
+            classList={{ "a-swk-panel-button--active": props.panel() === "terminal" }}
+            aria-label={t("codepuppy.session.terminal")}
+            aria-pressed={props.panel() === "terminal"}
+            aria-controls="codepuppy-session-rail-host"
+            disabled={!props.terminalAvailable}
+            onClick={props.toggleTerminal}
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M4 17l6-6-6-6M12 19h8" />
+            </svg>
+          </button>
+          <span class="a-swk-control-separator" aria-hidden="true" />
+          <button
+            type="button"
+            class="a-swk-panel-button"
+            classList={{ "a-swk-panel-button--active": railOpen() }}
+            aria-label={railOpen() ? t("codepuppy.session.closeRail") : t("codepuppy.session.openRail")}
+            aria-expanded={railOpen()}
+            aria-controls="codepuppy-session-rail-host"
+            onClick={props.toggleRail}
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <rect x="3" y="4" width="18" height="16" rx="2" />
+              <path d="M15 4v16" />
+            </svg>
+          </button>
+        </header>
+      }
+    >
+      {(host) => (
+        <Portal mount={host()}>
+          <div class="a-swk-topbar-content" data-codepuppy-session-workspace-topbar>
+            {crumb()}
+          </div>
+        </Portal>
+      )}
+    </Show>
   )
 }
 

@@ -39,20 +39,63 @@ body[data-codepuppy-sidebar] #opencode-titlebar-right [aria-controls="review-pan
   display: none !important;
 }
 
-/* opencode's titlebar header is painted bg-v2-background-bg-deep (#ededec) — a flat gray strip that
- * reads as a jarring bar above the white conversation canvas (#13). Blend it into the canvas so the
- * top is seamless (the alpha sidebar owns the left; this header floats only over content on the
- * right). Scoped to `header` so the shared deep-bg shell div is untouched. Cosmetic coupling:
- * re-point the class fragment on an upstream rename. */
+/* ── The window frame (BR-01) ─────────────────────────────────────────────────────────────
+ * The window is the chrome gray (--a-bg-chrome): the top bar and the narrow rail paint nothing of
+ * their own. Everything else — sidebar, main area, right panel — sits on ONE rounded white working
+ * surface, inset by the top bar (top), the rail (left) and --a-frame-gap (right, bottom). The surface
+ * is the upstream shell's <main>; the sidebar is fixed on top of its left edge. Cosmetic coupling:
+ * re-point the class fragments on an upstream rename.
+ *
+ * Window radius on this macOS is 16 (tokens.css --a-window-radius), so the surface radius is 8.
+ * Full-page overlays (Customization Center, automation, settings) use --codepuppy-surface-left etc.
+ * below to fill the same surface. */
+:root {
+  --codepuppy-surface-left: var(--a-rail-w);
+}
+body[data-codepuppy-sidebar="open"] {
+  --codepuppy-surface-left: calc(var(--a-rail-w) + var(--codepuppy-sidebar-w));
+}
+
+/* The upstream titlebar strip is replaced by our own top bar (shell-chrome.tsx). */
 body[data-codepuppy-sidebar] header[class*="bg-v2-background-bg-deep"] {
-  background: var(--a-bg-canvas) !important;
+  display: none !important;
 }
-/* …and the deep shell background itself (#ededec) — it shows as a gray band between the white header
- * and the white conversation content (#22). Whiten the whole content shell so the canvas is seamless
- * white (alpha design). Scoped to the flex-1 shell so only the main content area is repainted. */
 body[data-codepuppy-sidebar] .relative.bg-v2-background-bg-deep.flex-1 {
-  background: var(--a-bg-canvas) !important;
+  background: var(--a-bg-chrome) !important;
+  box-sizing: border-box;
+  padding: var(--a-topbar-h) var(--a-frame-gap) var(--a-frame-gap) var(--a-rail-w) !important;
 }
+body[data-codepuppy-sidebar] .relative.bg-v2-background-bg-deep.flex-1 > main {
+  background: var(--a-bg-canvas);
+  border-radius: var(--a-surface-radius);
+  box-shadow: var(--a-shadow-xs), var(--a-edge-light);
+  overflow: hidden;
+}
+/* The sidebar is part of the surface: the content starts after it. */
+body[data-codepuppy-sidebar="open"] .relative.bg-v2-background-bg-deep.flex-1 > main {
+  padding-left: var(--codepuppy-sidebar-w);
+}
+
+/* Top-level page container (Customization Center, automation, settings): a full page fills the working
+ * surface to the right of the sidebar, below the persistent top bar, which carries the page title
+ * (shell-chrome.tsx). Give a page root the class `codepuppy-page` (or keep its own page class listed
+ * here); it needs no top bar of its own. */
+html body[data-codepuppy-sidebar] .codepuppy-page,
+html body[data-codepuppy-sidebar] .codepuppy-ext-page,
+html body[data-codepuppy-sidebar] .codepuppy-auto-page,
+html body[data-codepuppy-sidebar] .codepuppy-settings-page {
+  position: fixed;
+  inset: var(--a-topbar-h) var(--a-frame-gap) var(--a-frame-gap) var(--codepuppy-surface-left);
+  border-radius: var(--a-surface-radius);
+  box-shadow: var(--a-shadow-xs), var(--a-edge-light);
+}
+html body[data-codepuppy-sidebar="open"] .codepuppy-page,
+html body[data-codepuppy-sidebar="open"] .codepuppy-ext-page,
+html body[data-codepuppy-sidebar="open"] .codepuppy-auto-page,
+html body[data-codepuppy-sidebar="open"] .codepuppy-settings-page {
+  border-radius: 0 var(--a-surface-radius) var(--a-surface-radius) 0;
+}
+
 
 /* Hide opencode's floating bottom-right "?" help button (dev-channel, components/help-button.tsx).
    Code Puppy's account menu owns the Help & Feedback entry. */
@@ -71,12 +114,6 @@ body[data-codepuppy-sidebar]
     [data-slot="tabs-trigger-wrapper"][data-value="changes"]
   ) {
   display: none !important;
-}
-
-/* Shift the whole V2 shell (titlebar + main) right so it clears our fixed sidebar. */
-body[data-codepuppy-sidebar="open"] .relative.bg-v2-background-bg-deep.flex-1 {
-  padding-left: var(--codepuppy-sidebar-w) !important;
-  transition: padding-left 180ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 /* The V2 home repeats the project list in a 280px left column — redundant now that the sidebar
@@ -121,73 +158,79 @@ svg[viewBox="0 0 720.002 129.001"] {
   pointer-events: none;
 }
 
-/* ── the sidebar ─────────────────────────────────────────────────────────────────────── */
+/* ── the sidebar (left column of the working surface) ──────────────────────────────────── */
 
 .codepuppy-sidebar {
   position: fixed;
-  inset: 0 auto 0 0;
+  top: var(--a-topbar-h);
+  bottom: var(--a-frame-gap);
+  left: var(--a-rail-w);
   width: var(--codepuppy-sidebar-w);
   z-index: 40;
   display: flex;
   flex-direction: column;
   box-sizing: border-box;
-  background: var(--a-bg-subtle);
-  border-right: 1px solid var(--a-border);
+  padding-top: 6px;
+  background: var(--a-bg-canvas);
+  /* Vertical split inside the surface: nearly invisible (--a-divider), never a hard line (BR-01). */
+  border-right: 1px solid var(--a-divider);
+  border-radius: var(--a-surface-radius) 0 0 var(--a-surface-radius);
   color: var(--a-text);
-  font-size: 13px;
+  font-size: var(--a-text-base);
   user-select: none;
   overflow: hidden;
-}
-
-/* Empty spacer so the macOS traffic lights have room over the sidebar. NOT a drag region: a
- * drag region here (a separate element from the toolbar) overlaps the toolbar buttons and the
- * OS lets it "show through" their no-drag, swallowing clicks. Window dragging is provided by the
- * toolbar's own data-tauri-drag-region gaps + opencode's titlebar. */
-.codepuppy-sidebar-titlebar {
-  height: 38px;
-  flex: 0 0 auto;
-  -webkit-app-region: no-drag;
 }
 
 .codepuppy-sidebar-brand {
   flex: 0 0 auto;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  padding: 2px 10px 10px 12px;
+  height: 40px;
+  padding: 0 8px;
+  margin-bottom: var(--a-space-1);
 }
 
 .codepuppy-sidebar-brand-mark {
   display: inline-flex;
   align-items: center;
-  gap: 7px;
+  gap: 6px;
   min-width: 0;
-  padding: 3px 6px;
-  margin-left: -6px;
-  border-radius: 7px;
+  height: 32px;
+  padding: 0 6px;
+  border-radius: var(--a-radius-md);
 }
 .codepuppy-sidebar-brand-mark:hover {
   background: var(--a-overlay-hover);
 }
 
 .codepuppy-sidebar-mark {
-  width: 16px;
+  width: 20px;
   height: 20px;
   flex: 0 0 auto;
+  border-radius: 5px;
+  display: block;
+}
+
+/* On dark the brand tile gets a hairline ring so its edge reads against the surface (frame #home-dark). */
+:root[data-color-scheme="dark"] .codepuppy-sidebar-mark {
+  box-shadow: 0 0 0 1px var(--a-hairline);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-color-scheme="light"]):not([data-color-scheme="dark"]) .codepuppy-sidebar-mark {
+    box-shadow: 0 0 0 1px var(--a-hairline);
+  }
 }
 
 .codepuppy-sidebar-wordmark {
-  font-weight: 680;
-  font-size: 12.5px;
-  letter-spacing: 0.085em;
+  font-size: var(--a-text-md);
+  font-weight: var(--a-weight-semibold);
+  letter-spacing: var(--a-tracking-tight);
   color: var(--a-text);
   white-space: nowrap;
 }
 
 .codepuppy-sidebar-brand-mark,
 .codepuppy-sidebar-icon-btn,
-.codepuppy-sidebar-nav-item,
 .codepuppy-project-add,
 .codepuppy-sidebar-open-project,
 .codepuppy-sidebar-reveal {
@@ -199,55 +242,38 @@ svg[viewBox="0 0 720.002 129.001"] {
   cursor: pointer;
 }
 
+/* The two 22px buttons on the right of the section title share one vertical axis with the hover
+   buttons of project rows and the "…" slot of conversation rows (frame audit #10d: 16px from the edge). */
 .codepuppy-sidebar-icon-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 26px;
-  height: 26px;
-  border-radius: 7px;
-  color: var(--a-text-secondary);
+  width: 22px;
+  height: 22px;
+  border-radius: var(--a-radius-sm);
+  color: var(--a-text-tertiary);
 }
-.codepuppy-sidebar-icon-btn:hover {
+.codepuppy-sidebar-icon-btn:hover,
+.codepuppy-sidebar-icon-btn[data-on] {
   background: var(--a-overlay-hover);
   color: var(--a-text);
-}
-
-.codepuppy-sidebar-nav {
-  flex: 0 0 auto;
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-  padding: 0 8px;
-}
-
-.codepuppy-sidebar-nav-item {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  width: 100%;
-  padding: 7px 9px;
-  border-radius: 8px;
-  text-align: left;
-  color: var(--a-text);
-}
-.codepuppy-sidebar-nav-item:hover {
-  background: var(--a-overlay-hover);
-}
-.codepuppy-sidebar-nav-icon {
-  width: 16px;
-  height: 16px;
-  flex: 0 0 auto;
-  color: var(--a-text-secondary);
 }
 
 .codepuppy-sidebar-section {
   flex: 0 0 auto;
-  padding: 16px 14px 6px;
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.04em;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 30px;
+  padding: 0 16px;
+  margin-top: var(--a-space-1);
+  font-size: var(--a-text-xs);
+  font-weight: var(--a-weight-medium);
   color: var(--a-text-tertiary);
+}
+.codepuppy-sidebar-acts {
+  display: flex;
+  gap: 2px;
 }
 
 .codepuppy-sidebar-scroll {
@@ -263,8 +289,10 @@ svg[viewBox="0 0 720.002 129.001"] {
   display: flex;
   flex-direction: column;
   gap: 1px;
-  padding: 6px 8px 10px;
-  border-top: 1px solid var(--a-border-faint);
+  padding: 6px 8px 8px;
+}
+.codepuppy-sidebar-footer:empty {
+  display: none;
 }
 
 /* [ac#1207] 更新状态条(footer,账户按钮上方)。状态语义在 updater-state-surface.ts。 */
@@ -318,42 +346,26 @@ svg[viewBox="0 0 720.002 129.001"] {
 
 /* ── projects + sessions ─────────────────────────────────────────────────────────────── */
 
+/* One row grammar for projects and conversations: 30px, 8px radius, hover = --a-overlay-hover,
+   selected = --a-overlay-active with NO weight change (frame audit #13). */
 .codepuppy-project-row {
   position: relative;
   display: flex;
   align-items: center;
-  gap: 7px;
-  padding: 6px 8px;
-  border-radius: 8px;
+  gap: 8px;
+  height: 30px;
+  padding: 0 8px;
+  border-radius: var(--a-radius-md);
   cursor: pointer;
 }
-.codepuppy-project-row:hover {
+.codepuppy-project-row:hover,
+.codepuppy-project-row[data-menu] {
   background: var(--a-overlay-hover);
 }
-.codepuppy-project-row[data-active] {
-  background: var(--a-overlay-hover);
-}
-/* Active project = bold name (no heavy gray slab — just a faint overlay + emphasis), shell.html §A. */
-.codepuppy-project-row[data-active] .codepuppy-project-name {
-  font-weight: var(--a-weight-semibold);
-}
 
-.codepuppy-project-chevron {
-  width: 13px;
-  height: 13px;
+.codepuppy-project-icon {
   flex: 0 0 auto;
-  color: var(--a-text-tertiary);
-  transition: transform 120ms ease;
-}
-.codepuppy-project-chevron[data-collapsed] {
-  transform: rotate(-90deg);
-}
-
-.codepuppy-project-avatar {
-  width: 18px;
-  height: 18px;
-  flex: 0 0 auto;
-  font-size: 10px;
+  color: var(--a-text-secondary);
 }
 
 .codepuppy-project-name {
@@ -365,26 +377,27 @@ svg[viewBox="0 0 720.002 129.001"] {
   color: var(--a-text);
 }
 
-/* The per-project hover actions (⋯ more, + new chat). Hidden until the row is hovered (or, for
-   the ⋯ trigger, while its menu is open), so the row stays clean at rest. */
+/* The per-project hover actions (⋯ more, new chat): 22px slots, hidden until the row is hovered (or,
+   for the ⋯ trigger, while its menu is open), so the row stays clean at rest. */
 .codepuppy-project-action {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 20px;
-  height: 20px;
-  border-radius: 6px;
+  width: 22px;
+  height: 22px;
+  border-radius: var(--a-radius-sm);
   flex: 0 0 auto;
-  color: var(--a-text-secondary);
+  color: var(--a-text-tertiary);
   opacity: 0;
 }
-.codepuppy-project-action :where(svg) {
-  width: 14px;
-  height: 14px;
-}
 .codepuppy-project-row:hover .codepuppy-project-action,
-.codepuppy-project-row[data-menu] .codepuppy-project-action {
+.codepuppy-project-row[data-menu] .codepuppy-project-action,
+.codepuppy-project-action:focus-visible {
   opacity: 1;
+}
+/* The row's flex gap is 8; the two hover buttons sit 2px apart (frame .hov). */
+.codepuppy-project-action + .codepuppy-project-action {
+  margin-left: -6px;
 }
 .codepuppy-project-action:hover {
   background: var(--a-overlay-active);
@@ -465,73 +478,76 @@ svg[viewBox="0 0 720.002 129.001"] {
 .codepuppy-project-sessions {
   display: flex;
   flex-direction: column;
-  margin: 1px 0 4px;
-  padding-left: 14px;
 }
 
-.codepuppy-session {
-  display: block;
-  padding: 5px 8px 5px 14px;
-  margin-left: 5px;
-  /* Thin connector line (design uses --a-border-faint — the prior --a-border read too heavy). */
-  border-left: 1px solid var(--a-border-faint);
-  border-radius: 0 7px 7px 0;
-  color: var(--a-text-secondary);
-  text-decoration: none;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.codepuppy-session:hover {
-  background: var(--a-overlay-hover);
-  color: var(--a-text);
-}
-/* Selected session = indigo-subtle pill + ~2.5px left accent bar + accent text (shell.html §A).
- * The accent bar = the connector border turned accent (1px) + a 1.5px inset shadow, so it reads as
- * a single 2.5px bar WITHOUT shifting the row (no layout jump vs the 1px connector). */
-.codepuppy-session[data-active] {
-  background: var(--a-overlay-selected);
-  color: var(--a-accent);
-  font-weight: var(--a-weight-medium);
-  border-left-color: var(--a-accent);
-  box-shadow: inset 1.5px 0 0 var(--a-accent);
-}
-
-/* Per-session row: the link + a hover-revealed "⋯" actions button (rename/share/delete). */
+/* Conversation row: the whole row carries hover/selected; the title is indented to sit under the
+   project name (no connector line — the frame draws none). The right 22px slot holds the unread dot
+   or, on hover, the "…" button. */
 .codepuppy-session-row {
   display: flex;
   align-items: center;
   position: relative;
+  height: 30px;
+  padding: 0 8px 0 32px;
+  border-radius: var(--a-radius-md);
+  color: var(--a-text-secondary);
 }
-/* Unread dot: an agent produced new activity while this session was in the background. Sits in the
-   left gutter (absolute, so it never shifts the title) and clears the moment the session is opened. */
-.codepuppy-session-unread {
-  position: absolute;
-  left: 1px;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--a-accent);
-  box-shadow: 0 0 0 2px var(--a-bg-subtle);
-  pointer-events: none;
-  z-index: 1;
+.codepuppy-session-row:hover,
+.codepuppy-session-row:focus-within {
+  background: var(--a-overlay-hover);
+  color: var(--a-text);
 }
-.codepuppy-session-row > .codepuppy-session {
+.codepuppy-session-row[data-active] {
+  background: var(--a-overlay-active);
+  color: var(--a-text);
+}
+.codepuppy-session {
   flex: 1;
   min-width: 0;
+  display: block;
+  color: inherit;
+  text-decoration: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  line-height: 30px;
 }
-.codepuppy-session-menu-btn {
+.codepuppy-session:focus-visible {
+  outline: none;
+  box-shadow: var(--a-ring-focus);
+  border-radius: var(--a-radius-sm);
+}
+
+.codepuppy-session-slot {
+  position: relative;
   flex: 0 0 auto;
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
   width: 22px;
   height: 22px;
-  margin-right: 4px;
+}
+/* Unread dot: an agent produced new activity while this session was in the background. It clears
+   the moment the session is opened; on hover the same slot shows the "…" button instead. */
+.codepuppy-session-unread {
+  width: 6px;
+  height: 6px;
+  border-radius: var(--a-radius-full);
+  background: var(--a-accent);
+  pointer-events: none;
+}
+.codepuppy-session-row:hover .codepuppy-session-unread,
+.codepuppy-session-row:focus-within .codepuppy-session-unread {
+  visibility: hidden;
+}
+.codepuppy-session-menu-btn {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   border: none;
-  border-radius: 6px;
+  border-radius: var(--a-radius-sm);
   background: transparent;
   color: var(--a-text-tertiary);
   cursor: pointer;
@@ -542,7 +558,8 @@ svg[viewBox="0 0 720.002 129.001"] {
     color var(--a-dur-fast) var(--a-ease-out);
 }
 .codepuppy-session-row:hover .codepuppy-session-menu-btn,
-.codepuppy-session-row[data-active] .codepuppy-session-menu-btn {
+.codepuppy-session-row:focus-within .codepuppy-session-menu-btn,
+.codepuppy-session-menu-btn[aria-expanded="true"] {
   opacity: 1;
 }
 .codepuppy-session-menu-btn:hover {
@@ -552,27 +569,27 @@ svg[viewBox="0 0 720.002 129.001"] {
 .codepuppy-session-rename {
   flex: 1;
   min-width: 0;
-  margin-left: 5px;
+  margin-left: -4px;
   padding: 4px 8px;
   border: 1px solid var(--a-accent);
-  border-radius: 6px;
+  border-radius: var(--a-radius-sm);
   background: var(--a-surface);
   color: var(--a-text);
   font: inherit;
-  font-size: 12.5px;
+  font-size: var(--a-text-sm);
   outline: none;
   box-shadow: var(--a-ring-focus);
 }
 
-/* Sidebar-native search box (filters projects/sessions in place). */
+/* Sidebar-native filter (opens from the section's search icon; filters projects/sessions in place). */
 .codepuppy-sidebar-search {
   display: flex;
   align-items: center;
   gap: 7px;
-  margin: 0 10px 8px;
+  margin: 0 8px 6px;
   height: 30px;
   padding: 0 9px;
-  background: var(--a-surface);
+  background: var(--a-bg-subtle);
   border: 1px solid var(--a-border);
   border-radius: var(--a-radius-md);
 }
@@ -584,10 +601,6 @@ svg[viewBox="0 0 720.002 129.001"] {
   flex: 0 0 auto;
   color: var(--a-text-tertiary);
 }
-.codepuppy-sidebar-search-icon svg {
-  width: 14px;
-  height: 14px;
-}
 .codepuppy-sidebar-search-input {
   flex: 1;
   min-width: 0;
@@ -595,7 +608,7 @@ svg[viewBox="0 0 720.002 129.001"] {
   background: transparent;
   color: var(--a-text);
   font: inherit;
-  font-size: 12.5px;
+  font-size: var(--a-text-sm);
   outline: none;
 }
 .codepuppy-sidebar-search-input::placeholder {
@@ -609,7 +622,7 @@ svg[viewBox="0 0 720.002 129.001"] {
   width: 18px;
   height: 18px;
   border: none;
-  border-radius: 5px;
+  border-radius: var(--a-radius-xs);
   background: transparent;
   color: var(--a-text-tertiary);
   cursor: pointer;
@@ -622,62 +635,155 @@ svg[viewBox="0 0 720.002 129.001"] {
 }
 
 .codepuppy-sidebar-empty {
-  padding: 6px 10px 6px 19px;
+  padding: 6px 8px 6px 32px;
   color: var(--a-text-tertiary);
-  font-size: 12px;
+  font-size: var(--a-text-sm);
 }
-.codepuppy-sidebar-empty-projects {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 18px 14px;
-  text-align: center;
+/* No projects (frame #home-empty): same grammar as the right panel's empty state — a 20px icon, a
+   title, one explanation, an "Open project…" row and a closing note about the default workspace. */
+.codepuppy-sidebar-empty.codepuppy-sidebar-empty-projects {
+  display: block;
+  padding: 14px 8px 0;
+  text-align: left;
 }
-.codepuppy-sidebar-open-project {
-  align-self: center;
-  padding: 6px 12px;
-  border-radius: 8px;
-  background: var(--a-bg-muted);
+.codepuppy-sidebar-empty-icon {
+  display: block;
+  margin-bottom: 10px;
+  color: var(--a-text-tertiary);
+}
+.codepuppy-sidebar-empty-projects h4 {
+  margin: 0 0 4px;
+  font-size: var(--a-text-base);
+  font-weight: var(--a-weight-semibold);
+  line-height: var(--a-leading-normal);
   color: var(--a-text);
 }
+.codepuppy-sidebar-empty-projects p {
+  margin: 0 0 12px;
+  font-size: var(--a-text-sm);
+  line-height: var(--a-leading-normal);
+  color: var(--a-text-tertiary);
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+}
+.codepuppy-sidebar-open-project {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 30px;
+  margin: 0 -8px;
+  width: calc(100% + 16px);
+  padding: 0 8px;
+  border-radius: var(--a-radius-md);
+  color: var(--a-text);
+  white-space: nowrap;
+}
 .codepuppy-sidebar-open-project:hover {
-  background: var(--a-bg-inset);
+  background: var(--a-overlay-hover);
+}
+.codepuppy-sidebar-open-project > svg {
+  flex: none;
+  color: var(--a-text-secondary);
+}
+.codepuppy-sidebar-empty-note {
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--a-hairline);
+  font-size: var(--a-text-xs);
+  line-height: var(--a-leading-normal);
+  color: var(--a-text-tertiary);
+  word-break: keep-all;
+  overflow-wrap: anywhere;
 }
 
-/* ── top-left toolbar (lives in the native titlebar strip, always visible) ───────────── */
+/* ── top bar (persistent on every page, BR-01) ─────────────────────────────────────────── */
 
+/* The top bar paints nothing: the window's chrome gray shows through. It is the window drag region;
+ * every interactive child is carved out as no-drag (same pattern as the session topbar, #574).
+ * Left cluster: macOS traffic lights (windows.ts trafficLightPosition {x:18,y:16}, 52px wide) then
+ * sidebar toggle, back, forward. Title: starts where the working surface's main column starts + 16px
+ * (frame audit #14); with the sidebar collapsed it starts after the left cluster. */
 .codepuppy-topbar {
   position: fixed;
-  /* vertically centre the icons on the native macOS traffic lights (trafficLightPosition
-   * {x:12,y:14} in windows.ts → lights centre ≈ y20; 24px buttons → top 8). */
-  top: 8px;
-  /* RIGHT-aligned to the sidebar's right edge (not left, not centred) per request. */
-  left: auto;
-  right: calc(100vw - var(--codepuppy-sidebar-w) + 10px);
+  top: 0;
+  left: 0;
+  right: 0;
+  height: var(--a-topbar-h);
   z-index: 42;
   display: flex;
   align-items: center;
-  gap: 1px;
+  box-sizing: border-box;
+  -webkit-app-region: drag;
+  app-region: drag;
+  --codepuppy-title-left: 192px;
 }
-/* The whole toolbar (container + buttons + svgs) must be no-drag, so NO drag region sits under
- * the buttons. We do NOT make the container a drag region: a no-drag <button> inside a fixed
- * drag container does not carve out reliably in this Electron build, so the OS would steal the
- * click. With everything no-drag (and the sidebar strip no-drag), there is simply nothing to
- * intercept the click. !important beats the prefixed/unprefixed aliasing. */
-.codepuppy-topbar,
-.codepuppy-topbar * {
-  -webkit-app-region: no-drag !important;
-  app-region: no-drag !important;
+body[data-codepuppy-sidebar="open"] .codepuppy-topbar {
+  --codepuppy-title-left: calc(var(--codepuppy-surface-left) + 16px);
+}
+.codepuppy-topbar :is(button, a, input, [role="button"]) {
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
+}
+.codepuppy-topbar-left {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding-left: 88px; /* 18 (lights x) + 52 (three lights) + 18 */
+}
+.codepuppy-topbar-title {
+  position: absolute;
+  left: var(--codepuppy-title-left);
+  right: 120px;
+  top: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  font-size: var(--a-text-base);
+  font-weight: var(--a-weight-medium);
+  color: var(--a-text);
+  white-space: nowrap;
+  overflow: hidden;
+  pointer-events: none;
+}
+.codepuppy-topbar-title :is(button, a, input, [role="button"], [tabindex]) {
+  pointer-events: auto;
+}
+.codepuppy-topbar-page {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.codepuppy-topbar-session {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  flex: 1;
+}
+.codepuppy-topbar-session:empty {
+  display: none;
+}
+/* A full page is open over the workspace: its own breadcrumb steps aside. */
+.codepuppy-topbar[data-overlay] .codepuppy-topbar-session {
+  display: none;
+}
+.codepuppy-topbar-trail {
+  position: absolute;
+  right: calc(var(--a-frame-gap) + 2px);
+  top: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  gap: 2px;
 }
 .codepuppy-topbar-btn {
-  -webkit-app-region: no-drag;
+  position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   width: 28px;
-  height: 26px;
+  height: 28px;
   border: 0;
-  border-radius: 7px;
+  border-radius: var(--a-radius-md);
   background: transparent;
   color: var(--a-text-secondary);
   cursor: pointer;
@@ -686,27 +792,95 @@ svg[viewBox="0 0 720.002 129.001"] {
   background: var(--a-overlay-hover);
   color: var(--a-text);
 }
-.codepuppy-topbar-btn :where(svg) {
-  width: 16px;
-  height: 16px;
+.codepuppy-topbar-btn[data-on] {
+  background: var(--a-overlay-active);
+  color: var(--a-text);
 }
-.codepuppy-topbar-divider {
-  width: 1px;
-  height: 16px;
-  margin: 0 4px;
-  background: var(--a-border);
+.codepuppy-topbar-btn:focus-visible {
+  outline: none;
+  box-shadow: var(--a-ring-focus);
 }
 
-/* REQ-126 AC7(#658):`.codepuppy-topbar-right`(浮动的终端 + 审查开关)整块已删。#574 曾用
- * `body:has([data-codepuppy-session-workspace])` 把它在会话页藏起来 —— 但那只是**遮**:命令
- * `terminal.toggle` / `review.toggle` 随上游 session 叶退役后全应用无人注册,而 `inWorkspace()`
- * 在**新对话页**同样为真,那一页的这对按钮既可见又无效。控件本身退休,遮它的规则一并作废。
- *
- * #574 单一顶栏的另一半仍然有效:侧栏折叠时,工作区顶栏成为窗口最上沿,左侧让位 macOS 红绿灯(trafficLightPosition
- *    x:12,windows.ts)与本文件的浮动工具簇(其右缘 = sidebar 宽 − 10px)。内容起点对齐
- *    侧栏展开态(sidebar 宽 + 顶栏自身 14px 左 padding),折叠/展开切换不跳字。 */
-body[data-codepuppy-sidebar="collapsed"] .a-swk-topbar {
-  padding-left: calc(var(--codepuppy-sidebar-w) + 14px);
+/* ── narrow rail (BR-02): new chat, search, Customization Center, automation … account ───── */
+
+.codepuppy-rail {
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: var(--a-rail-w);
+  z-index: 41;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  box-sizing: border-box;
+  /* first button centre = y 70, level with the sidebar's brand row (frame audit #10b) */
+  padding: calc(var(--a-topbar-h) + 9px) 0 calc(var(--a-frame-gap) + 4px);
+  gap: 4px;
+}
+.codepuppy-rail-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border: 0;
+  border-radius: var(--a-radius-md);
+  background: transparent;
+  color: var(--a-text-secondary);
+  cursor: pointer;
+  -webkit-app-region: no-drag;
+}
+.codepuppy-rail-btn:hover {
+  background: var(--a-overlay-hover);
+  color: var(--a-text);
+}
+.codepuppy-rail-btn[data-on] {
+  background: var(--a-bg-canvas);
+  color: var(--a-text);
+  box-shadow: var(--a-shadow-xs);
+}
+.codepuppy-rail-btn:focus-visible,
+.codepuppy-rail-avatar:focus-visible {
+  outline: none;
+  box-shadow: var(--a-ring-focus);
+}
+.codepuppy-rail-badge {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  margin: 0;
+  min-width: 14px;
+  padding: 0 4px;
+  font-size: var(--a-text-2xs);
+  line-height: 14px;
+  text-align: center;
+  background: var(--a-error);
+  color: var(--a-text-on-accent);
+}
+.codepuppy-rail-grow {
+  flex: 1;
+}
+/* Neutral avatar (not the accent color — frame audit #6). */
+.codepuppy-rail-avatar {
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: var(--a-radius-full);
+  background: var(--a-bg-inset);
+  color: var(--a-text-secondary);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font: inherit;
+  font-size: var(--a-text-xs);
+  font-weight: var(--a-weight-semibold);
+  cursor: pointer;
+  -webkit-app-region: no-drag;
+}
+.codepuppy-rail-avatar[data-open] {
+  box-shadow: 0 0 0 2px var(--a-bg-chrome), 0 0 0 3.5px var(--a-border-strong);
 }
 
 /* ── `#1687` 未恢复问题入口(设计稿 shell-sidebar `#problems`,由 frames/error-lifetime.css 原样并入;只用 --a-*) ── */
@@ -719,7 +893,7 @@ body[data-codepuppy-sidebar="collapsed"] .a-swk-topbar {
 .codepuppy-problems-chev{flex:none;width:12px;height:12px;color:var(--a-text-tertiary)}
 @keyframes codepuppy-problems-fade{from{opacity:0}}
 /* ② 向上弹层:与账户弹层(.codepuppy-acct-pop)同一外观与宽度 */
-.codepuppy-problems-pop{position:fixed;left:10px;width:312px;z-index:50;max-height:min(420px,calc(100% - 140px));overflow-y:auto;background:var(--a-surface-raised);border:1px solid var(--a-border);border-radius:var(--a-radius-xl);box-shadow:var(--a-shadow-overlay);padding:0 0 var(--a-space-1)}
+.codepuppy-problems-pop{position:fixed;left:calc(var(--a-rail-w) + 10px);width:312px;z-index:50;max-height:min(420px,calc(100% - 140px));overflow-y:auto;background:var(--a-surface-raised);border:1px solid var(--a-border);border-radius:var(--a-radius-xl);box-shadow:var(--a-shadow-overlay);padding:0 0 var(--a-space-1)}
 .codepuppy-problems-head{display:flex;align-items:baseline;gap:var(--a-space-2);padding:12px 14px 8px}
 .codepuppy-problems-head b{font-size:13.5px;font-weight:var(--a-weight-semibold)}
 .codepuppy-problems-head small{font-size:var(--a-text-xs);color:var(--a-text-tertiary)}
@@ -733,5 +907,5 @@ body[data-codepuppy-sidebar="collapsed"] .a-swk-topbar {
 .codepuppy-problems-act:focus-visible{outline:none;box-shadow:var(--a-ring-focus)}
 /* ③ 侧栏收起时:「显示侧边栏」按钮右上角一个小点(同会话行未读点的写法) */
 .codepuppy-topbar-btn[data-problems]{position:relative}
-.codepuppy-topbar-btn[data-problems]::after{content:"";position:absolute;top:4px;right:5px;width:6px;height:6px;border-radius:var(--a-radius-full);background:var(--a-warning);box-shadow:0 0 0 2px var(--a-bg-canvas)}
+.codepuppy-topbar-btn[data-problems]::after{content:"";position:absolute;top:4px;right:5px;width:6px;height:6px;border-radius:var(--a-radius-full);background:var(--a-warning);box-shadow:0 0 0 2px var(--a-bg-chrome)}
 @media (prefers-reduced-motion: reduce){.codepuppy-problems-entry{animation:none}}

@@ -101,7 +101,7 @@ describe("Alpha Settings ownership ratchets", () => {
   })
 
   test("#1550 AC2 the back button sits below the macOS window-button strip", async () => {
-    // 设置页 `position: fixed; inset: 0` 铺满整窗,红绿灯(windows.ts trafficLightPosition y:14)画在它上面。
+    // 设置页 `position: fixed; inset: 0` 铺满整窗,红绿灯(windows.ts trafficLightPosition y:16)画在它上面。
     // 改前头部 `padding: 10px 22px` ⇒ 返回键(44px 高,纵向居中)落在 y≈12…56,与灯重叠、点不到。
     // 让位常量与首页 / 定制中心 / 自动化 / 引导页是同一个 `var(--a-home-top, 40px)`,不另起一个数。
     const css = (await Bun.file(join(root, "src/renderer/codepuppy-ui/settings.css")).text()).replace(/\/\*[\s\S]*?\*\//g, "")
@@ -113,8 +113,8 @@ describe("Alpha Settings ownership ratchets", () => {
     const home = await Bun.file(join(root, "src/renderer/codepuppy-ui/home.css")).text()
     expect(home).toContain("top: var(--a-home-top, 40px);")
     const windows = await Bun.file(join(root, "src/main/windows.ts")).text()
-    // 灯的下沿 = y14 + 12px 直径 = 26 < 40:常量真的让开了灯,而不是碰巧写了个数。
-    expect(windows).toContain("trafficLightPosition: { x: 12, y: 14 }")
+    // 灯的下沿 = y16 + 12px 直径 = 28 < 40:常量真的让开了灯,而不是碰巧写了个数。
+    expect(windows).toContain("trafficLightPosition: { x: 18, y: 16 }")
     const source = await settingsSurface.text()
     expect(source.indexOf('class="codepuppy-settings-head"')).toBeLessThan(source.indexOf('class="codepuppy-settings-back"'))
   })

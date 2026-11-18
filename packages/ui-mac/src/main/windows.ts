@@ -189,7 +189,7 @@ export function createMainWindow() {
     ...(process.platform === "darwin"
       ? {
           titleBarStyle: "hidden" as const,
-          trafficLightPosition: { x: 12, y: 14 },
+          trafficLightPosition: { x: 18, y: 16 },
         }
       : {}),
     ...(process.platform === "win32"

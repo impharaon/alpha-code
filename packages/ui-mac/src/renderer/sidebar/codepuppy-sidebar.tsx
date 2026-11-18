@@ -11,14 +11,14 @@ import { useLocation, useNavigate, type NavigateOptions } from "@solidjs/router"
 import { ServerConnection, useCommand, useServer, useTabs } from "../codepuppy-ui/providers"
 import { createDefaultWorkspaceDir } from "../codepuppy-ui/default-workspace"
 import { beginLaunchDraftHandoff, endLaunchDraftHandoff } from "../codepuppy-ui/launch-draft-handoff"
-import { ProjectAvatar, type ProjectAvatarVariant } from "@opencode-ai/ui/v2/project-avatar-v2"
-import { Icon } from "@opencode-ai/ui/v2/icon"
 import { useTheme } from "@opencode-ai/ui/theme/context"
 import { t } from "../i18n"
 import { pushToast } from "../codepuppy-ui/Toast"
 import { sessionDisplayTitle } from "../codepuppy-ui/session-title"
 import { SHELL_KEYBINDS } from "./shell-keybinds"
-import { Mark } from "../logo-codepuppy"
+import brandMark from "../brand/brand-mark.png"
+import { ShellIcon } from "../codepuppy-ui/shell-icons"
+import { ShellRail, ShellTopbar } from "./shell-chrome"
 import { CODEPUPPY_PATHS } from "../../shared/codepuppy-config"
 import { buildMarker, formatBuildIdentity, type BuildIdentity } from "../../shared/build-identity"
 import { useCodePuppyEndpoints } from "../use-codepuppy-endpoints"
@@ -45,49 +45,15 @@ import { updaterSurfaceFor } from "./updater-state-surface"
 import type { UpdaterState } from "@opencode-ai/app/updater"
 import { projectSidebarGroups } from "./project-display"
 import type { AuthState, AccountSummary } from "../../preload/types"
-import { setExtHubOpen, toggleExtHub } from "../extensions/ext-hub-state"
+import { extHubOpen, setExtHubOpen, toggleExtHub } from "../extensions/ext-hub-state"
 import { rememberRoute, restoredRoute } from "../reload-place-store"
-import { setAutomationOpen, toggleAutomation } from "../automations/automation-state"
-import { setSettingsOpen } from "../codepuppy-ui/settings-state"
+import { automationOpen, setAutomationOpen, toggleAutomation } from "../automations/automation-state"
+import { setSettingsOpen, settingsOpen } from "../codepuppy-ui/settings-state"
 import { dismissMenu, dismissMenuOnEscape, focusFirstMenuItem } from "./menu-a11y"
 import { ProblemsEntry } from "./problems-entry"
 import { Card } from "../codepuppy-ui/Card"
 import { KeyValueList } from "../codepuppy-ui/KeyValueList"
 import { unresolvedProblems } from "../codepuppy-ui/problems"
-
-// Replicate opencode's getProjectAvatarVariant (context/layout.tsx) for projects that already
-// have a server-assigned color; otherwise pick a stable variant from the worktree so the
-// avatars are colourful and consistent across launches (opencode assigns randomly + persists;
-// we never render beside its avatars, so a deterministic fallback is fine).
-const FALLBACK_VARIANTS: ProjectAvatarVariant[] = ["orange", "yellow", "cyan", "green", "red", "pink", "blue", "purple"]
-
-function variantForColor(color: string): ProjectAvatarVariant {
-  switch (color) {
-    case "orange":
-      return "orange"
-    case "pink":
-      return "pink"
-    case "cyan":
-      return "cyan"
-    case "purple":
-      return "purple"
-    case "mint":
-      return "cyan"
-    case "lime":
-      return "green"
-    default:
-      return "gray"
-  }
-}
-function hashVariant(worktree: string): ProjectAvatarVariant {
-  let h = 0
-  for (let i = 0; i < worktree.length; i++) h = (Math.imul(h, 31) + worktree.charCodeAt(i)) >>> 0
-  return FALLBACK_VARIANTS[h % FALLBACK_VARIANTS.length]
-}
-
-function projectVariant(project: CodePuppyProject): ProjectAvatarVariant {
-  return project.color ? variantForColor(project.color) : hashVariant(project.worktree)
-}
 
 // opencode folds standalone (non-git) directories into a single sentinel "global" project whose
 // worktree is "/" and whose name is empty — give it a readable label instead of a blank row.
@@ -143,6 +109,9 @@ const EMBEDDED_SIDECAR_KEY = ServerConnection.key({ type: "sidecar", variant: "b
 function closeAllOverlays(): void {
   setExtHubOpen(false)
   setAutomationOpen(false)
+  // Settings is a top-level page too (BR-01): the sidebar and rail stay reachable beside it, so any
+  // navigation leaves it.
+  setSettingsOpen(false)
 }
 
 /** 等一个响应式条件成真(一次性 effect,不轮询、不猜时长),返回 `[promise, cancel]`。
@@ -229,6 +198,31 @@ export function CodePuppySidebar(props: {
     closeAllOverlays()
     if (typeof to === "number") routerNavigate(to)
     else routerNavigate(to, options)
+  }
+
+  // Top-level pages (Customization Center, automation, settings) replace the working surface's content
+  // and share the persistent top bar. Settings wins when several are open (it is opened last).
+  const pageOpen = () => settingsOpen() || automationOpen() || extHubOpen()
+  const pageTitle = (): string | undefined => {
+    if (settingsOpen()) return t("codepuppy.sidebar.settings")
+    if (automationOpen()) return t("codepuppy.sidebar.automation")
+    if (extHubOpen()) return t("codepuppy.sidebar.plugins")
+    // A session names itself: the workspace renders its breadcrumb into the top bar.
+    return parseRoute(location.pathname).kind === "session" ? undefined : t("codepuppy.newSession.title")
+  }
+  const openPage = (page: "hub" | "automation") => {
+    setSettingsOpen(false)
+    if (page === "hub") {
+      setAutomationOpen(false)
+      toggleExtHub()
+    } else {
+      setExtHubOpen(false)
+      toggleAutomation()
+    }
+  }
+  const openSettings = () => {
+    closeAllOverlays()
+    setSettingsOpen(true)
   }
 
   // Platform auth state, pushed from main (codepuppy-auth.ts). The footer button reflects it: signed
@@ -445,13 +439,13 @@ export function CodePuppySidebar(props: {
           // `TargetSessionSettingsCommand` 里注册,于是同一个菜单项在会话页能开、首页/新对话页
           // 静默 no-op(上游 `run()` 对未注册 id 直接返回)。alpha 早就自己拥有设置面,直接开它:
           // 与路由无关,也不再经过一个可能没人接的命令总线。
-          setSettingsOpen(true)
+          openSettings()
         }}
       >
-        <span class="codepuppy-acct-ic">⚙</span>{t("codepuppy.sidebar.settings")}
+        <ShellIcon name="gear" class="codepuppy-acct-ic" />{t("codepuppy.sidebar.settings")}
       </button>
       <div class="codepuppy-acct-item codepuppy-acct-appearance">
-        <span class="codepuppy-acct-ic">◐</span>{t("codepuppy.sidebar.appearance")}
+        <ShellIcon name="contrast" class="codepuppy-acct-ic" />{t("codepuppy.sidebar.appearance")}
         <span class="codepuppy-acct-spacer" />
         <span class="codepuppy-acct-seg">
           <For each={SCHEMES}>
@@ -471,7 +465,7 @@ export function CodePuppySidebar(props: {
           window.api.openLink("https://codepuppy.cn/feedback")
         }}
       >
-        <span class="codepuppy-acct-ic">?</span>{t("codepuppy.sidebar.helpFeedback")}
+        <ShellIcon name="help" class="codepuppy-acct-ic" />{t("codepuppy.sidebar.helpFeedback")}
       </button>
       <button
         type="button"
@@ -485,7 +479,7 @@ export function CodePuppySidebar(props: {
           void window.api.updater.check()
         }}
       >
-        <span class="codepuppy-acct-ic">↑</span>{t("codepuppy.sidebar.checkUpdates")}
+        <ShellIcon name="update" class="codepuppy-acct-ic" />{t("codepuppy.sidebar.checkUpdates")}
       </button>
     </>
   )
@@ -509,6 +503,12 @@ export function CodePuppySidebar(props: {
   // Sidebar-native search: filters the project/session list in place (distinct from the "搜索"
   // nav item, which opens opencode's global command palette).
   const [searchQuery, setSearchQuery] = createSignal("")
+  // The filter box (former always-visible search row) opens from the section's search icon.
+  const [filterOpen, setFilterOpen] = createSignal(false)
+  const toggleFilter = (next = !filterOpen()) => {
+    setFilterOpen(next)
+    if (!next) setSearchQuery("")
+  }
   const openSessionMenu = (e: MouseEvent, session: { id: string; directory: string; title: string }) => {
     e.preventDefault()
     e.stopPropagation()
@@ -928,7 +928,7 @@ export function CodePuppySidebar(props: {
   // `shared/desktop-menu-policy.ts` 显式退休;左上角那对按钮直连 `navigate(±1)`,始终有效。
   // 其余**退休**的菜单项同理,都从那份发布面直接删掉。
   command.register("codepuppy.shell", () => [
-    { id: "settings.open", title: t("codepuppy.sidebar.settings"), keybind: SHELL_KEYBINDS["settings.open"], hidden: true, onSelect: () => setSettingsOpen(true) },
+    { id: "settings.open", title: t("codepuppy.sidebar.settings"), keybind: SHELL_KEYBINDS["settings.open"], hidden: true, onSelect: () => openSettings() },
     { id: "session.new", title: t("codepuppy.sidebar.newChat"), keybind: SHELL_KEYBINDS["session.new"], hidden: true, onSelect: () => newChat() },
     { id: "project.open", title: t("codepuppy.sidebar.openProject"), keybind: SHELL_KEYBINDS["project.open"], hidden: true, onSelect: () => void openProject() },
     { id: "sidebar.toggle", title: t("codepuppy.sidebar.hide"), keybind: SHELL_KEYBINDS["sidebar.toggle"], hidden: true, onSelect: () => toggleSidebar() },
@@ -1088,67 +1088,160 @@ export function CodePuppySidebar(props: {
         )}
       </Show>
 
-      {/* Always-visible top-left toolbar: collapse toggle + back/forward. The whole toolbar is
-          no-drag (sidebar.css) and sits over a no-drag area, so the OS never steals its clicks. */}
-      <div class="codepuppy-topbar">
-        <button
-          type="button"
-          class="codepuppy-topbar-btn"
-          data-problems={collapsedProblems() ? "" : undefined}
-          title={sidebarToggleLabel()}
-          aria-label={sidebarToggleLabel()}
-          onClick={() => toggleSidebar()}
+      {/* The persistent window chrome (BR-01/BR-02): top bar + narrow rail, always mounted, same gray.
+          The account popover is a child of the rail so it opens from the avatar (frame #account-menu). */}
+      <ShellTopbar
+        sidebarLabel={sidebarToggleLabel()}
+        problemsDot={collapsedProblems() > 0}
+        onToggleSidebar={() => toggleSidebar()}
+        onBack={() => navigate(-1)}
+        onForward={() => navigate(1)}
+        pageTitle={pageTitle()}
+        overlayOpen={pageOpen()}
+      />
+      <ShellRail
+        onNewChat={() => newChat()}
+        onSearch={() => command.show()}
+        onHub={() => openPage("hub")}
+        onAutomation={() => openPage("automation")}
+        hubActive={extHubOpen()}
+        automationActive={automationOpen()}
+        automationBadge={automationFailedCount()}
+        accountInitial={acctInitial()}
+        signedIn={authState().status === "logged-in"}
+        accountOpen={menuOpen()}
+        onAccount={() => setMenuOpen((o) => !o)}
+      >
+    <Show when={menuOpen()}>
+      <div class="codepuppy-acct-backdrop" onClick={() => setMenuOpen(false)} />
+      <div class="codepuppy-acct-pop" role="menu">
+        <Show
+          when={authState().status === "logged-in"}
+          fallback={
+            <>
+              <div class="codepuppy-acct-head">
+                <span class="codepuppy-acct-av guest">{acctInitial()}</span>
+                <div class="codepuppy-acct-id">
+                  <div class="codepuppy-acct-name">{t("codepuppy.sidebar.signedOut")}</div>
+                  <div class="codepuppy-acct-email">{t("codepuppy.sidebar.loginCloud")}</div>
+                </div>
+              </div>
+              <button
+                class="codepuppy-acct-login"
+                onClick={() => {
+                  setMenuOpen(false)
+                  void window.api.auth.start()
+                }}
+              >
+                {t("codepuppy.auth.signIn")}
+              </button>
+              <MenuCommon />
+            </>
+          }
         >
-          <Icon name="sidebar-right" />
-        </button>
-        <span class="codepuppy-topbar-divider" aria-hidden="true" />
-        <button
-          type="button"
-          class="codepuppy-topbar-btn"
-          title={t("codepuppy.sidebar.back")}
-          aria-label={t("codepuppy.sidebar.back")}
-          onClick={() => navigate(-1)}
-        >
-          <svg viewBox="0 0 16 16" fill="none" aria-hidden="true">
-            <path
-              d="M10 3.5 5.5 8l4.5 4.5"
-              stroke="currentColor"
-              stroke-width="1.5"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            />
-          </svg>
-        </button>
-        <button
-          type="button"
-          class="codepuppy-topbar-btn"
-          title={t("codepuppy.sidebar.forward")}
-          aria-label={t("codepuppy.sidebar.forward")}
-          onClick={() => navigate(1)}
-        >
-          <svg viewBox="0 0 16 16" fill="none" aria-hidden="true">
-            <path
-              d="M6 3.5 10.5 8 6 12.5"
-              stroke="currentColor"
-              stroke-width="1.5"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            />
-          </svg>
-        </button>
+          <div class="codepuppy-acct-head">
+            <span class="codepuppy-acct-av">{acctInitial()}</span>
+            <div class="codepuppy-acct-id">
+              <div class="codepuppy-acct-name">{t("codepuppy.sidebar.yourAccount")}</div>
+              <div class="codepuppy-acct-email">{accountLabel()}</div>
+            </div>
+            <span class="codepuppy-acct-plan" data-pro={acctIsPro() ? "" : undefined}>
+              {acctTierLabel()}
+            </span>
+          </div>
+          <div class="codepuppy-acct-card-slot">
+            {/* #1686:余额卡改用组件库「卡片 + 名称 — 值列表」;弹层外边距在 slot 上(组件不带外边距)。
+                B11:读取失败时订阅行不装「未订阅」(状态未知),与其余行一致显示 pending/错误占位。
+                REQ-146(#1194):window5h/window7d 只有订阅计划才有;未订阅时这两行显示 summary.usage 的真实用量,
+                标签随之换成「今日/7 日用量」。已订阅仍显示订阅额度窗口。 */}
+            <Card>
+              <KeyValueList
+                rows={[
+                  summary() || summaryState() !== "error"
+                    ? { label: t("codepuppy.sidebar.subscription"), value: activePlan()?.name ?? (isPro() ? plan() : t("codepuppy.sidebar.notSubscribed")) }
+                    : { label: t("codepuppy.sidebar.subscription"), state: pendingState() },
+                  summary()
+                    ? { label: t("codepuppy.sidebar.balance"), value: fmtYuan(summary()!.balanceFen) }
+                    : { label: t("codepuppy.sidebar.balance"), state: pendingState() },
+                  {
+                    label: activePlan() ? t("codepuppy.sidebar.fiveHour") : t("codepuppy.sidebar.todayUsage"),
+                    ...(!summary()
+                      ? { state: pendingState() }
+                      : {
+                          value: activePlan()
+                            ? `${activePlan()!.window5h.usedCredits.toLocaleString()} / ${activePlan()!.window5h.limitCredits.toLocaleString()}`
+                            : fmtTokens(summary()!.usage.todayTokens),
+                        }),
+                  },
+                  {
+                    label: activePlan() ? t("codepuppy.sidebar.sevenDay") : t("codepuppy.sidebar.weekUsage"),
+                    ...(!summary()
+                      ? { state: pendingState() }
+                      : {
+                          value: activePlan()
+                            ? `${activePlan()!.window7d.usedCredits.toLocaleString()} / ${activePlan()!.window7d.limitCredits.toLocaleString()}`
+                            : fmtTokens(summary()!.usage.weekTokens),
+                        }),
+                  },
+                  summary() && summary()!.usageSeries.length > 0
+                    ? { label: t("codepuppy.sidebar.fourteenDay"), value: <Sparkline data={summary()!.usageSeries.map((p) => p.tokens)} /> }
+                    : summary()
+                      ? { label: t("codepuppy.sidebar.fourteenDay"), value: t("codepuppy.sidebar.noData"), state: "unavailable" as const }
+                      : { label: t("codepuppy.sidebar.fourteenDay"), state: pendingState() },
+                ]}
+              />
+            </Card>
+          </div>
+          <div class="codepuppy-acct-cta">
+            <Show when={!acctIsPro()}>
+              <button class="codepuppy-acct-btn primary" onClick={() => window.api.openLink(subscribeUrl())}>
+                {t("codepuppy.sidebar.upgrade")}
+              </button>
+            </Show>
+            <button class="codepuppy-acct-btn" onClick={() => window.api.openLink(rechargeUrl())}>
+              {t("codepuppy.sidebar.recharge")}
+            </button>
+            <Show when={acctIsPro()}>
+              <button class="codepuppy-acct-btn" onClick={() => window.api.openLink(subscribeUrl())}>
+                {t("codepuppy.sidebar.manageSubscription")}
+              </button>
+            </Show>
+          </div>
+          <MenuCommon />
+          <div class="codepuppy-acct-sep" />
+          <button
+            class="codepuppy-acct-item codepuppy-acct-danger"
+            onClick={() => {
+              setMenuOpen(false)
+              void window.api.auth.logout()
+            }}
+          >
+            <ShellIcon name="logout" class="codepuppy-acct-ic" />{t("codepuppy.sidebar.signOut")}
+          </button>
+        </Show>
+        <Show when={appVersion()}>
+          <button type="button" class="codepuppy-acct-version" onClick={() => void copyBuildIdentity()}>
+            <Show
+              when={!versionCopied()}
+              fallback={t("codepuppy.common.copied")}
+            >
+              {t("codepuppy.sidebar.version")} {appVersion()}
+              <Show when={buildIdentity() && buildMarker(buildIdentity()!)}>
+                {(marker) => (
+                  <span class="codepuppy-acct-version-tag" data-marker={marker()}>
+                    {t(marker() === "dev" ? "codepuppy.sidebar.buildMarker.dev" : "codepuppy.sidebar.buildMarker.local")}
+                  </span>
+                )}
+              </Show>
+            </Show>
+          </button>
+        </Show>
       </div>
-
-      {/* REQ-126 AC7(#658):右上角浮动的「终端 / 审查」两个按钮已退休。它们发的
-          `terminal.toggle` / `review.toggle` 只在上游 session 叶注册,而那片叶已被 alpha 会话
-          工作区顶替 → 命令无人接、点了静默无事。会话页 CSS 曾把这一对藏起来
-          (`body:has([data-codepuppy-session-workspace])`),但 `inWorkspace()` 在**新对话页**也为真,
-          于是新对话页上它们既可见又无效 —— 而那一页根本没有终端/审查能力。会话页要用的同类开关
-          在工作区自己的 46px 顶栏上(session-workspace-shell.tsx),那两个是活的,不受影响。 */}
+    </Show>
+      </ShellRail>
 
       <Show when={!sidebarCollapsed()}>
         <aside class="codepuppy-sidebar" aria-label={t("codepuppy.sidebar.projects")}>
-          <div class="codepuppy-sidebar-titlebar" />
-
           <header class="codepuppy-sidebar-brand">
             <button
               type="button"
@@ -1156,71 +1249,53 @@ export function CodePuppySidebar(props: {
               title={t("codepuppy.sidebar.home")}
               onClick={() => navigate(homeHref())}
             >
-              <Mark class="codepuppy-sidebar-mark" />
+              <img class="codepuppy-sidebar-mark" src={brandMark} alt="" />
               <span class="codepuppy-sidebar-wordmark">{t("codepuppy.brand.wordmark")}</span>
             </button>
           </header>
 
-          <nav class="codepuppy-sidebar-nav">
-            <button
-              type="button"
-              class="codepuppy-sidebar-nav-item"
-              data-codepuppy-sidebar-nav="new-chat"
-              onClick={() => newChat()}
-            >
-              <Icon name="plus" class="codepuppy-sidebar-nav-icon" />
-              <span>{t("codepuppy.sidebar.newChat")}</span>
-            </button>
-            <button
-              type="button"
-              class="codepuppy-sidebar-nav-item"
-              data-codepuppy-sidebar-nav="search"
-              onClick={() => command.show()}
-            >
-              <Icon name="magnifying-glass" class="codepuppy-sidebar-nav-icon" />
-              <span>{t("codepuppy.sidebar.search")}</span>
-            </button>
-            <button
-              type="button"
-              class="codepuppy-sidebar-nav-item"
-              onClick={() => {
-                setAutomationOpen(false) // 全页面板互斥
-                toggleExtHub()
-              }}
-            >
-              <Icon name="grid-plus" class="codepuppy-sidebar-nav-icon" />
-              <span>{t("codepuppy.sidebar.plugins")}</span>
-            </button>
-            {/* 自动化(REQ-021 A1.1):复活孤儿 key;badge = 上次运行失败/超时的任务数 */}
-            <button
-              type="button"
-              class="codepuppy-sidebar-nav-item"
-              onClick={() => {
-                setExtHubOpen(false)
-                toggleAutomation()
-              }}
-            >
-              <svg class="codepuppy-sidebar-nav-icon" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-                <circle cx="8" cy="8" r="6.2" stroke="currentColor" />
-                <path d="M8 4.8V8l2.4 1.6" stroke="currentColor" stroke-linecap="square" />
-              </svg>
-              <span>{t("codepuppy.sidebar.automation")}</span>
-              <Show when={automationFailedCount() > 0}>
-                <span class="codepuppy-auto-badge">{automationFailedCount()}</span>
+          <div class="codepuppy-sidebar-section">
+            <span>{t("codepuppy.sidebar.projects")}</span>
+            <span class="codepuppy-sidebar-acts">
+              <Show when={visibleProjects().length > 0}>
+                <button
+                  type="button"
+                  class="codepuppy-sidebar-icon-btn"
+                  data-on={filterOpen() ? "" : undefined}
+                  title={t("codepuppy.sidebar.filterProjects")}
+                  aria-label={t("codepuppy.sidebar.filterProjects")}
+                  aria-pressed={filterOpen()}
+                  onClick={() => toggleFilter()}
+                >
+                  <ShellIcon name="search" size={14} />
+                </button>
               </Show>
-            </button>
-            {/* REQ-126 AC3(#654):产物工作台的侧栏入口已下线 —— 产物只经会话右栏 artifacts 面板到达。 */}
-          </nav>
+              <button
+                type="button"
+                class="codepuppy-sidebar-icon-btn"
+                title={t("codepuppy.sidebar.openProject")}
+                aria-label={t("codepuppy.sidebar.openProject")}
+                onClick={() => void openProject()}
+              >
+                <ShellIcon name="plus" size={14} />
+              </button>
+            </span>
+          </div>
 
-          <Show when={visibleProjects().length > 0}>
+          {/* The in-place filter (the former always-visible search box) opens from the section's search icon. */}
+          <Show when={visibleProjects().length > 0 && (filterOpen() || searchQuery() !== "")}>
             <div class="codepuppy-sidebar-search">
-              <Icon name="magnifying-glass" class="codepuppy-sidebar-search-icon" />
+              <ShellIcon name="search" size={14} class="codepuppy-sidebar-search-icon" />
               <input
+                ref={(el) => queueMicrotask(() => el.focus())}
                 class="codepuppy-sidebar-search-input"
                 type="text"
                 placeholder={t("codepuppy.sidebar.searchProjects")}
                 value={searchQuery()}
                 onInput={(e) => setSearchQuery(e.currentTarget.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Escape") toggleFilter(false)
+                }}
               />
               <Show when={searchQuery() !== ""}>
                 <button
@@ -1235,8 +1310,6 @@ export function CodePuppySidebar(props: {
             </div>
           </Show>
 
-          <div class="codepuppy-sidebar-section">{t("codepuppy.sidebar.projects")}</div>
-
           <div class="codepuppy-sidebar-scroll">
             <For each={searchedProjects()}>
               {(project) => {
@@ -1250,16 +1323,7 @@ export function CodePuppySidebar(props: {
                       data-menu={menuOpen() ? "" : undefined}
                       onClick={() => toggleProjectExpanded(project.worktree)}
                     >
-                      <Icon
-                        name="chevron-down"
-                        class="codepuppy-project-chevron"
-                        data-collapsed={expanded() ? undefined : ""}
-                      />
-                      <ProjectAvatar
-                        class="codepuppy-project-avatar"
-                        variant={projectVariant(project)}
-                        fallback={projectDisplayName(project)}
-                      />
+                      <ShellIcon name={expanded() ? "folder-open" : "folder"} class="codepuppy-project-icon" />
                       <span class="codepuppy-project-name" title={project.worktree}>
                         {projectDisplayName(project)}
                       </span>
@@ -1272,19 +1336,19 @@ export function CodePuppySidebar(props: {
                         aria-expanded={menuOpen()}
                         onClick={(e) => openProjectMenu(e, project.worktree)}
                       >
-                        <Icon name="outline-dots" />
+                        <ShellIcon name="more" size={14} />
                       </button>
                       <button
                         type="button"
                         class="codepuppy-project-action codepuppy-project-add"
-                        title={t("codepuppy.sidebar.newChat")}
+                        title={t("codepuppy.sidebar.newChatInProject")}
                         aria-label={t("codepuppy.sidebar.newChat")}
                         onClick={(e) => {
                           e.stopPropagation()
                           void startChat(project.worktree)
                         }}
                       >
-                        <Icon name="plus" />
+                        <ShellIcon name="pen" size={14} />
                       </button>
                     </div>
 
@@ -1304,11 +1368,6 @@ export function CodePuppySidebar(props: {
                               data-active={route().sessionId === session.id ? "" : undefined}
                             >
                               <Show
-                                when={isSessionUnread(session.id, session.updated) && route().sessionId !== session.id}
-                              >
-                                <span class="codepuppy-session-unread" aria-hidden="true" />
-                              </Show>
-                              <Show
                                 when={editingSession() === session.id}
                                 fallback={
                                   <>
@@ -1320,26 +1379,26 @@ export function CodePuppySidebar(props: {
                                     >
                                       <span class="codepuppy-session-title">{sessionDisplayTitle(session.title)}</span>
                                     </a>
-                                    <button
-                                      type="button"
-                                      class="codepuppy-session-menu-btn"
-                                      aria-label={t("codepuppy.sidebar.sessionActions")}
-                                      aria-haspopup="menu"
-                                      aria-expanded={sessionMenu()?.id === session.id}
-                                      onClick={(e) => openSessionMenu(e, session)}
-                                    >
-                                      <svg
-                                        viewBox="0 0 16 16"
-                                        width="14"
-                                        height="14"
-                                        fill="currentColor"
-                                        aria-hidden="true"
+                                    <span class="codepuppy-session-slot">
+                                      <Show
+                                        when={
+                                          isSessionUnread(session.id, session.updated) &&
+                                          route().sessionId !== session.id
+                                        }
                                       >
-                                        <circle cx="3.4" cy="8" r="1.2" />
-                                        <circle cx="8" cy="8" r="1.2" />
-                                        <circle cx="12.6" cy="8" r="1.2" />
-                                      </svg>
-                                    </button>
+                                        <span class="codepuppy-session-unread" aria-hidden="true" />
+                                      </Show>
+                                      <button
+                                        type="button"
+                                        class="codepuppy-session-menu-btn"
+                                        aria-label={t("codepuppy.sidebar.sessionActions")}
+                                        aria-haspopup="menu"
+                                        aria-expanded={sessionMenu()?.id === session.id}
+                                        onClick={(e) => openSessionMenu(e, session)}
+                                      >
+                                        <ShellIcon name="more" size={14} />
+                                      </button>
+                                    </span>
                                   </>
                                 }
                               >
@@ -1385,15 +1444,19 @@ export function CodePuppySidebar(props: {
             </Show>
             <Show when={store.ready && !store.error && visibleProjects().length === 0 && archivedCount() === 0}>
               <div class="codepuppy-sidebar-empty codepuppy-sidebar-empty-projects">
-                <p>{t("codepuppy.sidebar.noProjects")}</p>
+                <ShellIcon name="folder" size={20} class="codepuppy-sidebar-empty-icon" />
+                <h4>{t("codepuppy.sidebar.emptyTitle")}</h4>
+                <p>{t("codepuppy.sidebar.emptyBody")}</p>
                 <button
                   type="button"
                   class="codepuppy-sidebar-open-project"
                   data-codepuppy-sidebar-open-project
                   onClick={() => void openProject()}
                 >
-                  {t("codepuppy.sidebar.openProject")}
+                  <ShellIcon name="plus" />
+                  {t("codepuppy.sidebar.openProjectRow")}
                 </button>
+                <div class="codepuppy-sidebar-empty-note">{t("codepuppy.sidebar.emptyNote")}</div>
               </div>
             </Show>
             {/* B11: project.list failure previously left the sidebar silently blank (store.error was
@@ -1417,11 +1480,10 @@ export function CodePuppySidebar(props: {
             </Show>
           </div>
 
-          {/* Footer = ONE account entry → upward popover. Settings / appearance / help / update /
-              membership / sign-in/out all live in this single popover (user request). */}
+          {/* Footer: the update note and the unresolved-problems entry. The account lives on the rail. */}
           <footer class="codepuppy-sidebar-footer" data-menu-open={menuOpen() ? "" : undefined}>
             {/* [ac#1207] REQ-147 更新条:呈现完全由 updater-state-surface.ts 的映射驱动。
-                挂在 footer(账户按钮上方)而不是浮层里 —— AC2 要求「已就绪,重启安装」在
+                挂在 footer 而不是浮层里 —— AC2 要求「已就绪,重启安装」在
                 重启后不依赖任何菜单/对话框恰好开着就能看见。 */}
             <Show when={updaterSurface()} keyed>
               {(surface) => (
@@ -1453,161 +1515,8 @@ export function CodePuppySidebar(props: {
                 </div>
               )}
             </Show>
-            <Show when={menuOpen()}>
-              <div class="codepuppy-acct-backdrop" onClick={() => setMenuOpen(false)} />
-              <div class="codepuppy-acct-pop" role="menu">
-                <Show
-                  when={authState().status === "logged-in"}
-                  fallback={
-                    <>
-                      <div class="codepuppy-acct-head">
-                        <span class="codepuppy-acct-av guest">?</span>
-                        <div class="codepuppy-acct-id">
-                          <div class="codepuppy-acct-name">{t("codepuppy.sidebar.signedOut")}</div>
-                          <div class="codepuppy-acct-email">{t("codepuppy.sidebar.loginCloud")}</div>
-                        </div>
-                      </div>
-                      <button
-                        class="codepuppy-acct-login"
-                        onClick={() => {
-                          setMenuOpen(false)
-                          void window.api.auth.start()
-                        }}
-                      >
-                        ⊕ {t("codepuppy.auth.signIn")}
-                      </button>
-                      <MenuCommon />
-                    </>
-                  }
-                >
-                  <div class="codepuppy-acct-head">
-                    <span class="codepuppy-acct-av">{acctInitial()}</span>
-                    <div class="codepuppy-acct-id">
-                      <div class="codepuppy-acct-name">{t("codepuppy.sidebar.yourAccount")}</div>
-                      <div class="codepuppy-acct-email">{accountLabel()}</div>
-                    </div>
-                    <span class="codepuppy-acct-plan" data-pro={acctIsPro() ? "" : undefined}>
-                      {acctTierLabel()}
-                    </span>
-                  </div>
-                  <div class="codepuppy-acct-card-slot">
-                    {/* #1686:余额卡改用组件库「卡片 + 名称 — 值列表」;弹层外边距在 slot 上(组件不带外边距)。
-                        B11:读取失败时订阅行不装「未订阅」(状态未知),与其余行一致显示 pending/错误占位。
-                        REQ-146(#1194):window5h/window7d 只有订阅计划才有;未订阅时这两行显示 summary.usage 的真实用量,
-                        标签随之换成「今日/7 日用量」。已订阅仍显示订阅额度窗口。 */}
-                    <Card>
-                      <KeyValueList
-                        rows={[
-                          summary() || summaryState() !== "error"
-                            ? { label: t("codepuppy.sidebar.subscription"), value: activePlan()?.name ?? (isPro() ? plan() : t("codepuppy.sidebar.notSubscribed")) }
-                            : { label: t("codepuppy.sidebar.subscription"), state: pendingState() },
-                          summary()
-                            ? { label: t("codepuppy.sidebar.balance"), value: fmtYuan(summary()!.balanceFen) }
-                            : { label: t("codepuppy.sidebar.balance"), state: pendingState() },
-                          {
-                            label: activePlan() ? t("codepuppy.sidebar.fiveHour") : t("codepuppy.sidebar.todayUsage"),
-                            ...(!summary()
-                              ? { state: pendingState() }
-                              : {
-                                  value: activePlan()
-                                    ? `${activePlan()!.window5h.usedCredits.toLocaleString()} / ${activePlan()!.window5h.limitCredits.toLocaleString()}`
-                                    : fmtTokens(summary()!.usage.todayTokens),
-                                }),
-                          },
-                          {
-                            label: activePlan() ? t("codepuppy.sidebar.sevenDay") : t("codepuppy.sidebar.weekUsage"),
-                            ...(!summary()
-                              ? { state: pendingState() }
-                              : {
-                                  value: activePlan()
-                                    ? `${activePlan()!.window7d.usedCredits.toLocaleString()} / ${activePlan()!.window7d.limitCredits.toLocaleString()}`
-                                    : fmtTokens(summary()!.usage.weekTokens),
-                                }),
-                          },
-                          summary() && summary()!.usageSeries.length > 0
-                            ? { label: t("codepuppy.sidebar.fourteenDay"), value: <Sparkline data={summary()!.usageSeries.map((p) => p.tokens)} /> }
-                            : summary()
-                              ? { label: t("codepuppy.sidebar.fourteenDay"), value: t("codepuppy.sidebar.noData"), state: "unavailable" as const }
-                              : { label: t("codepuppy.sidebar.fourteenDay"), state: pendingState() },
-                        ]}
-                      />
-                    </Card>
-                  </div>
-                  <div class="codepuppy-acct-cta">
-                    <Show when={!acctIsPro()}>
-                      <button class="codepuppy-acct-btn primary" onClick={() => window.api.openLink(subscribeUrl())}>
-                        {t("codepuppy.sidebar.upgrade")}
-                      </button>
-                    </Show>
-                    <button class="codepuppy-acct-btn" onClick={() => window.api.openLink(rechargeUrl())}>
-                      {t("codepuppy.sidebar.recharge")}
-                    </button>
-                    <Show when={acctIsPro()}>
-                      <button class="codepuppy-acct-btn" onClick={() => window.api.openLink(subscribeUrl())}>
-                        {t("codepuppy.sidebar.manageSubscription")}
-                      </button>
-                    </Show>
-                  </div>
-                  <MenuCommon />
-                  <div class="codepuppy-acct-sep" />
-                  <button
-                    class="codepuppy-acct-item codepuppy-acct-danger"
-                    onClick={() => {
-                      setMenuOpen(false)
-                      void window.api.auth.logout()
-                    }}
-                  >
-                    <span class="codepuppy-acct-ic">⎋</span>{t("codepuppy.sidebar.signOut")}
-                  </button>
-                </Show>
-                <Show when={appVersion()}>
-                  <button type="button" class="codepuppy-acct-version" onClick={() => void copyBuildIdentity()}>
-                    <Show
-                      when={!versionCopied()}
-                      fallback={t("codepuppy.common.copied")}
-                    >
-                      {t("codepuppy.sidebar.version")} {appVersion()}
-                      <Show when={buildIdentity() && buildMarker(buildIdentity()!)}>
-                        {(marker) => (
-                          <span class="codepuppy-acct-version-tag" data-marker={marker()}>
-                            {t(marker() === "dev" ? "codepuppy.sidebar.buildMarker.dev" : "codepuppy.sidebar.buildMarker.local")}
-                          </span>
-                        )}
-                      </Show>
-                    </Show>
-                  </button>
-                </Show>
-              </div>
-            </Show>
-            {/* `#1687`:未恢复问题入口,账户按钮正上方(设计稿 `#problems`)。 */}
+            {/* `#1687`:未恢复问题入口(设计稿 `#problems`)。 */}
             <ProblemsEntry />
-            <button
-              type="button"
-              class="codepuppy-sidebar-account"
-              data-auth={authState().status === "logged-in" ? "in" : "out"}
-              onClick={() => setMenuOpen((o) => !o)}
-            >
-              <span class="codepuppy-acct-av" data-guest={authState().status === "logged-in" ? undefined : ""}>
-                {authState().status === "logged-in" ? acctInitial() : "?"}
-              </span>
-              <span class="codepuppy-sidebar-account-id">
-                <span class="codepuppy-sidebar-account-name">
-                  {authState().status === "logged-in" ? accountLabel() : t("codepuppy.auth.signIn")}
-                </span>
-                <span class="codepuppy-sidebar-account-sub">
-                  {authState().status === "logged-in" ? acctTierLabel() : t("codepuppy.sidebar.clickLogin")}
-                </span>
-              </span>
-              <svg class="codepuppy-acct-chev" viewBox="0 0 12 12" fill="none" aria-hidden="true">
-                <path
-                  d="M3 7.5L6 4.5L9 7.5"
-                  stroke="currentColor"
-                  stroke-width="1.4"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                />
-              </svg>
-            </button>
           </footer>
         </aside>
       </Show>

@@ -175,15 +175,11 @@
      which failed WCAG 1.4.11 (2.1:1); solid --a-accent is ≥6.3:1 vs adjacent. --a-accent-ring now unused. */
   --a-ring-focus: 0 0 0 1.5px var(--a-accent);
 
-  /* ── Premium polish (frontend-design pass) ───────────────────────────────
-     Quiet depth without color. Edge-light = a 1px "glass" top-highlight for raised /
-     tinted surfaces (composer, cards, modals, popovers) — barely there in light, the
-     signature lit-from-above edge in dark. Glow = an ≤4% accent wash for atmosphere
-     behind hero surfaces (home, empty states). Grain = a faint fractal-noise overlay
-     so the white canvas reads "crafted", not flat (Linear/Vercel register). */
+  /* ── Premium polish ───────────────────────────────────────────────────────
+     Edge-light = a 1px "glass" top-highlight for raised / tinted surfaces (composer, cards, modals,
+     popovers) — barely there in light, the signature lit-from-above edge in dark. The accent glow and
+     the grain overlay were retired with the 2026-11 shell (plain white working surface). */
   --a-edge-light: inset 0 1px 0 rgba(255, 255, 255, 0.65);
-  --a-glow-accent: radial-gradient(58% 48% at 50% 38%, color-mix(in srgb, var(--a-accent) 4%, transparent), transparent 72%);
-  --a-grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.022'/%3E%3C/svg%3E");
 
   /* ── Motion ──────────────────────────────────────────────────────────── */
   --a-dur-instant: 80ms;
@@ -198,6 +194,11 @@
   --a-rail-w: 48px;
   --a-topbar-h: 44px;
   --a-frame-gap: 8px;  /* working surface to the window's right/bottom edge */
+  /* macOS 26.3.1: NSWindow `_cornerRadius` of a titled + fullSizeContentView window without a toolbar
+     (= Electron titleBarStyle "hidden", windows.ts) is 16. The working surface sits --a-frame-gap inside
+     the window edge, so its radius is the window radius minus that gap. */
+  --a-window-radius: 16px;
+  --a-surface-radius: calc(var(--a-window-radius) - var(--a-frame-gap));
   --a-home-top: 40px;  /* window-button (macOS traffic-light) strip that full-window pages leave clear */
 
   /* ── Z-index scale ───────────────────────────────────────────────────── */

@@ -1,0 +1,92 @@
+/* pages 场景的静态外壳占位(顶栏 / 窄轨 / 工作面 / 侧栏),只为核对位置与留白;尺寸取新外壳令牌。 */
+html,
+body {
+  background: var(--a-bg-chrome);
+}
+.pv-root {
+  position: fixed;
+  inset: 0;
+  background: var(--a-bg-chrome);
+}
+.pv-topbar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: var(--a-topbar-h);
+  display: flex;
+  align-items: center;
+  font-size: var(--a-text-base);
+  color: var(--a-text);
+}
+.pv-topbar b {
+  position: absolute;
+  left: calc(var(--a-rail-w) + var(--codepuppy-sidebar-w, 248px) + 16px);
+  font-weight: var(--a-weight-medium);
+}
+.pv-lights {
+  display: flex;
+  gap: 8px;
+  padding-left: 18px;
+}
+.pv-lights i {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #ff5f57;
+}
+.pv-lights i:nth-child(2) {
+  background: #febc2e;
+}
+.pv-lights i:nth-child(3) {
+  background: #28c840;
+}
+.pv-rail {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: var(--a-rail-w);
+}
+.pv-box {
+  position: absolute;
+  top: var(--a-topbar-h);
+  left: var(--a-rail-w);
+  right: var(--a-frame-gap);
+  bottom: var(--a-frame-gap);
+  display: flex;
+  overflow: hidden;
+  border-radius: var(--a-radius-md);
+  background: var(--a-bg-canvas);
+  box-shadow: var(--a-shadow-xs), var(--a-edge-light);
+}
+.pv-side {
+  flex: none;
+  width: var(--codepuppy-sidebar-w, 248px);
+  border-right: 1px solid var(--a-divider);
+}
+.pv-main {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.pv-thread {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.pv-dock {
+  flex: none;
+  width: min(680px, calc(100% - 64px));
+  margin: 0 auto;
+  padding-bottom: 20px;
+}
+.pv-hero {
+  margin: 28vh 0 0;
+  text-align: center;
+  font-size: 28px;
+  font-weight: var(--a-weight-semibold);
+}

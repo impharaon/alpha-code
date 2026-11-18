@@ -157,6 +157,8 @@ export const dict = {
   "codepuppy.auto.untitled": "未命名任务",
   "codepuppy.auto.next": "下次",
   "codepuppy.auto.today": "今天",
+  "codepuppy.auto.tomorrow": "明天",
+  "codepuppy.auto.monthDay": "{{month}} 月 {{day}} 日",
   "codepuppy.auto.runningNow": "正在运行…",
   "codepuppy.auto.disabled": "已停用",
   "codepuppy.auto.neverRan": "尚未运行",

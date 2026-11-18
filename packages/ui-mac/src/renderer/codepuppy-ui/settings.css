@@ -58,7 +58,7 @@ body[data-codepuppy-sidebar="open"] .codepuppy-settings-page {
   height: 28px;
   flex: none;
   place-items: center;
-  margin: 0 calc(-1 * var(--a-space-1)) 5px 0;
+  margin: 0 0 5px;
   border: 0;
   border-radius: var(--a-radius-md);
   background: transparent;
@@ -244,6 +244,7 @@ body[data-codepuppy-sidebar="open"] .codepuppy-settings-page {
 }
 
 .codepuppy-settings-switch {
+  margin: 0;
   width: 34px;
   height: 20px;
   flex: none;

@@ -845,6 +845,10 @@
    结构在 packages/codepuppy-app/src/pages/session-not-found.tsx(只给数据钩子,版式在这里)。 */
 [data-codepuppy-session-not-found] {
   position: relative;
+  flex: 1;
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
 }
 
 [data-codepuppy-session-not-found] [data-codepuppy-not-found="body"] {

@@ -13,6 +13,7 @@
 //   · 回合级错误(非中断)→ turnError 行;session_status=retry → 工作过程实时标题写重试(`#1474`,不再另挂重试行);
 //   · 未知 part 类型 fail-closed:不渲染、不猜测(subtask 同上游 v1/v2 一致不渲染);
 //   · I7 有界:boundedText 把超大文本截断后才交给渲染管线(sanitizer/Shiki 不吃整串)。
+import { intlLocaleTag } from "../../i18n/intl-tag"
 import type {
   AssistantMessage,
   FilePart,
@@ -608,9 +609,7 @@ export function processSummaryOf(steps: readonly TimelineProcessStep[]): Process
 
 /** 脚注里的词元数:按界面语言取紧凑写法(中文「2.4万」、英文「24K」),不再硬写英文「24k」。 */
 export function formatTokenCount(count: number, locale: string): string {
-  // 应用的语言代号里 zht / br / no 不是 BCP47 标签,换成 Intl 认得的写法。
-  const tag = locale === "zht" ? "zh-Hant" : locale === "br" ? "pt-BR" : locale === "no" ? "nb" : locale
-  return new Intl.NumberFormat(tag, { notation: "compact", maximumFractionDigits: 1 }).format(count)
+  return new Intl.NumberFormat(intlLocaleTag(locale), { notation: "compact", maximumFractionDigits: 1 }).format(count)
 }
 
 /** 整轮用时:用户消息创建 → 最后一条助手消息完成。最后一条未完成 / 数值异常 → 缺席。 */

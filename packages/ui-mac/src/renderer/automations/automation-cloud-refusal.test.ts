@@ -798,7 +798,7 @@ describe("#1592 AC6:立即运行与 AI 解析的失败按结构码出文案,原�
     await flush()
 
     const [knownRow, unknownRow] = [...document.querySelectorAll(".codepuppy-auto-row-st")].map((el) => el.textContent ?? "")
-    expect(knownRow).toContain("上次失败 · 应用未就绪，本次未运行")
+    expect(knownRow).toMatch(/上次失败 · .+ · 应用未就绪，本次未运行/)
     expect(knownRow).not.toContain("scheduler")
     expect(unknownRow).toContain("上次失败")
     expect(unknownRow).not.toContain("JSON")

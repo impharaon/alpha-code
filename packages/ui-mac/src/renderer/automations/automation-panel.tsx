@@ -19,6 +19,7 @@ import { Svg } from "../extensions/ext-presentation"
 import { automationOpen, setAutomationOpen } from "./automation-state"
 import { automationActionCopy, scheduleRefusalCopy } from "./schedule-refusal-copy"
 import { cloudDisabledReasonCopy } from "./cloud-disabled-reason-copy"
+import { fmtWhen } from "./automation-when"
 import "./automation-panel.css"
 
 type ListedTask = AutomationTask & { nextFireAt: number | null; running: boolean }
@@ -85,15 +86,6 @@ function fromForm(form: ScheduleForm): AutomationSchedule | { error: string } {
 }
 
 const DOW_LABELS = ["日", "一", "二", "三", "四", "五", "六"]
-
-function fmtNext(ts: number | null): string {
-  if (!ts) return "—"
-  const d = new Date(ts)
-  const today = new Date()
-  const sameDay = d.toDateString() === today.toDateString()
-  const hm = `${pad(d.getHours())}:${pad(d.getMinutes())}`
-  return sameDay ? `${t("codepuppy.auto.today")} ${hm}` : `${d.getMonth() + 1}/${d.getDate()} ${hm}`
-}
 
 function statusDot(r: AutomationRunRecord | undefined): { cls: string; label: string } {
   if (!r) return { cls: "idle", label: t("codepuppy.auto.neverRan") }
@@ -478,7 +470,7 @@ export function AutomationPanel(props: {
                                 {task.running
                                   ? t("codepuppy.auto.runningNow")
                                   : task.enabled && !pausedAll()
-                                    ? `${t("codepuppy.auto.next")} ${fmtNext(task.nextFireAt)}`
+                                    ? `${t("codepuppy.auto.next")} ${fmtWhen(task.nextFireAt)}`
                                     : task.disabledReason === "consecutive_failures"
                                       ? t("codepuppy.auto.disabledBreaker", { n: AUTOMATION_DEFAULTS.failureBreaker })
                                       : t("codepuppy.auto.disabled")}
@@ -494,7 +486,7 @@ export function AutomationPanel(props: {
                                   )}
                                 </Show>
                                 <Show when={task.lastRun} fallback={dot().label}>
-                                  {dot().label}
+                                  {dot().label} · {fmtWhen(Date.parse(task.lastRun!.at))}
                                   {/* [#1592] 已知原因出人话;原始报错只留在运行记录,不上列表行。 */}
                                   <Show when={automationActionCopy(task.lastRun!.reasonCode)}>{(copy) => <> · {copy()}</>}</Show>
                                 </Show>

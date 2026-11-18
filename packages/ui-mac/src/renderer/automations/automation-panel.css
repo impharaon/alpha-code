@@ -136,6 +136,7 @@ body[data-codepuppy-sidebar="open"] .codepuppy-auto-page {
   white-space: nowrap;
 }
 .codepuppy-auto-check .codepuppy-settings-switch {
+  margin: 0;
   width: 28px;
   height: 16px;
   border: 0;

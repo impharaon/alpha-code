@@ -158,6 +158,8 @@ export const dict = {
   "codepuppy.auto.untitled": "Untitled task",
   "codepuppy.auto.next": "Next",
   "codepuppy.auto.today": "today",
+  "codepuppy.auto.tomorrow": "tomorrow",
+  "codepuppy.auto.monthDay": "{{month}}/{{day}}",
   "codepuppy.auto.runningNow": "Running…",
   "codepuppy.auto.disabled": "Disabled",
   "codepuppy.auto.neverRan": "Never ran",

@@ -396,17 +396,6 @@ export function CodePuppySettings(props: {
       >
         {/* 页头与定制中心 / 自动化同一套(#settings `.phd`):页签 + 右侧「保存更改」,底部发丝线;页名在顶栏,这里的 h1 只给读屏。 */}
         <header class="codepuppy-settings-head">
-          <button
-            ref={(element) => (closeButton = element)}
-            type="button"
-            class="codepuppy-settings-back"
-            aria-label={t("codepuppy.settings.back")}
-            onClick={close}
-          >
-            <svg aria-hidden="true" viewBox="0 0 24 24">
-              <path d="m15 18-6-6 6-6" />
-            </svg>
-          </button>
           <h1 id="codepuppy-settings-title" class="codepuppy-settings-sr">
             {t("codepuppy.settings.title")}
           </h1>
@@ -451,6 +440,17 @@ export function CodePuppySettings(props: {
               {saveError() ? t("codepuppy.settings.retrySave") : t("codepuppy.settings.save")}
             </Button>
           </Show>
+          <button
+            ref={(element) => (closeButton = element)}
+            type="button"
+            class="codepuppy-settings-back"
+            aria-label={t("codepuppy.settings.back")}
+            onClick={close}
+          >
+            <svg aria-hidden="true" viewBox="0 0 24 24">
+              <path d="M6 6l12 12M18 6L6 18" />
+            </svg>
+          </button>
         </header>
 
         <div class="codepuppy-settings-layout">

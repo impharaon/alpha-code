@@ -321,7 +321,16 @@ describe("REQ-126 AC2:覆盖层随导航关闭(真实宿主 × 真实点击)", (
 // 再跑一次、也不把覆盖层关掉。模拟重载 = 拆掉整页、模块状态回到初值,只有本窗口的 sessionStorage 留下(与真实重载同)。
 // 新开的窗口 / 冷启动没有存下的位置 ⇒ 照旧落到新对话、覆盖层关着。
 describe("I-11 BR-07:sidecar 换代引起的整页重载后仍在原处", () => {
-  async function reload() {
+  // 真实重载的页面由导航计时标为 "reload"(webContents.reload());新窗口 / 冷启动不是。测试进程里 sessionStorage 跨用例留存,
+  // 所以「是不是重载」只能照真实信号模拟,不能拿「存储里有东西」充数。
+  const navigationType = performance.getEntriesByType.bind(performance)
+  afterEach(() => {
+    performance.getEntriesByType = navigationType
+  })
+  async function reload(type: "reload" | "navigate" = "reload") {
+    performance.getEntriesByType = ((entry: string) => (entry === "navigation" ? [{ type }] : navigationType(entry))) as typeof performance.getEntriesByType
+    // 只有本窗口的 sessionStorage 跨过重载;拆页与把模块状态摆回初值都不能改动它(真实重载里模块是重新求值,不经 setter)。
+    const kept = Object.entries(sessionStorage)
     disposers.splice(0).reverse().forEach((dispose) => dispose())
     document.body.replaceChildren()
     const root = document.createElement("div")
@@ -329,6 +338,8 @@ describe("I-11 BR-07:sidecar 换代引起的整页重载后仍在原处", () => 
     document.body.append(root)
     extHubState.setExtHubOpen(false)
     extHubState.setHubSection("connectors")
+    sessionStorage.clear()
+    for (const [key, value] of kept) sessionStorage.setItem(key, value)
     const place = await import("../src/renderer/reload-place")
     extHubState.restoreHubAfterReload()
     const history = place.restoredHistory()
@@ -348,6 +359,15 @@ describe("I-11 BR-07:sidecar 换代引起的整页重载后仍在原处", () => 
     expect(overlayPresent(OVERLAYS[0]), "重载后定制中心被关掉了").toBe(true)
     expect(extHubState.hubSection()).toBe("skills")
     expect(history.get()).toBe(CURRENT_HREF)
+  })
+
+  test("新开的窗口(不是重载)即使存储里留着位置,也照旧从冷启动开始:不恢复定制中心、不恢复路由", async () => {
+    await mount(CURRENT_HREF)
+    await open(OVERLAYS[0])
+    await flush()
+    const history = await reload("navigate")
+    expect(overlayPresent(OVERLAYS[0])).toBe(false)
+    expect(history.get()).not.toBe(CURRENT_HREF)
   })
 
   test("定制中心关着时重载 → 路由不变,覆盖层仍关着", async () => {

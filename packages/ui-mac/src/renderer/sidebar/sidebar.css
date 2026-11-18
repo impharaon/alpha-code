@@ -14,7 +14,7 @@
  */
 
 :root {
-  --codepuppy-sidebar-w: 256px;
+  --codepuppy-sidebar-w: 248px;
 }
 
 /* ── opencode V2 chrome overrides (only while our sidebar is mounted) ─────────────────── */

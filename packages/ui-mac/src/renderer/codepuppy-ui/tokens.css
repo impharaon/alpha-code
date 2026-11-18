@@ -12,10 +12,11 @@
 
 :root {
   /* ── Neutral spine (light) — cool porcelain ──────────────────────────── */
-  --a-bg-canvas: #ffffff;          /* app background / main content */
-  --a-bg-subtle: #f6f7f9;          /* recessed areas, sidebars (cool porcelain) */
-  --a-bg-muted: #eceef1;           /* hover fills, inset fields */
-  --a-bg-inset: #e3e6ea;           /* pressed / track */
+  --a-bg-chrome: #f0f0f2;          /* window frame: topbar + rail */
+  --a-bg-canvas: #ffffff;          /* working surface (sidebar / main / right panel) */
+  --a-bg-subtle: #f7f7f8;          /* trays, filter fields */
+  --a-bg-muted: #ececee;           /* hover fills, segmented-control base */
+  --a-bg-inset: #e4e4e7;           /* slider track, switch off, idle send, avatar base */
   --a-surface: #ffffff;            /* cards, panels, popovers */
   --a-surface-raised: #ffffff;     /* modals (paired with shadow) */
   --a-scrim: rgba(15, 17, 21, 0.45);
@@ -23,21 +24,24 @@
   --a-media-scrim: rgba(15, 17, 21, 0.72);
   --a-text-on-media: #ffffff;
 
-  --a-border-faint: #eef0f3;       /* hairline dividers */
-  --a-border: #e4e6ea;             /* default control border */
-  --a-border-strong: #ced2d9;      /* emphasized / focus-adjacent */
+  --a-border-faint: #f0f0f2;
+  --a-border: #e4e4e7;             /* default control border */
+  --a-border-strong: #d4d4d8;      /* emphasized / slider stops */
+  --a-hairline: #ededf0;           /* horizontal separators */
+  --a-divider: rgba(15, 17, 21, 0.05); /* vertical split lines inside the working surface */
 
   --a-text: #18181b;               /* primary text */
   --a-text-secondary: #52525b;     /* labels, secondary */
-  --a-text-tertiary: #64656d;      /* placeholder, meta — C21 AC4: AA ≥4.5:1, worst 4.63 on --a-bg-inset */
-  --a-text-disabled: #b3b6bd;
+  --a-text-tertiary: #63636b;      /* placeholder, meta — C21 AC4: AA ≥4.5:1, worst 4.69 on --a-bg-inset */
+  --a-text-disabled: #a1a1aa;
   --a-text-on-accent: #ffffff;
 
   /* Layered-chrome overlays (sidebar / list rows) — translucent so hover/active/selected
      read clean over any background. Selected = the indigo accent tint. */
   --a-overlay-hover: rgba(15, 17, 21, 0.05);
   --a-overlay-active: rgba(15, 17, 21, 0.08);
-  --a-overlay-selected: var(--a-accent-subtle);
+  --a-overlay-selected: rgba(15, 17, 21, 0.06);   /* pressed state; selected rows use --a-overlay-active */
+  --a-monogram-bg: #efeff1;        /* list and brand icon base */
 
   /* ── Accent — single restrained indigo ──────────────────────────────── */
   --a-accent: #4f46e5;
@@ -191,6 +195,9 @@
   --a-ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
 
   /* ── Layout ──────────────────────────────────────────────────────────── */
+  --a-rail-w: 48px;
+  --a-topbar-h: 44px;
+  --a-frame-gap: 8px;  /* working surface to the window's right/bottom edge */
   --a-home-top: 40px;  /* window-button (macOS traffic-light) strip that full-window pages leave clear */
 
   /* ── Z-index scale ───────────────────────────────────────────────────── */
@@ -207,27 +214,31 @@
  * set by @opencode-ai/ui's theme context — so codepuppy-ui follows the app's light/dark toggle. */
 :root[data-color-scheme="dark"] {
   /* ── Neutral spine (dark) — cool graphite ────────────────────────────── */
-  --a-bg-canvas: #0a0b0d;
-  --a-bg-subtle: #0e0f11;
-  --a-bg-muted: #16171a;
-  --a-bg-inset: #1e2024;
-  --a-surface: #121316;
-  --a-surface-raised: #17181b;
+  --a-bg-chrome: #0e0e10;
+  --a-bg-canvas: #161618;
+  --a-bg-subtle: #131315;
+  --a-bg-muted: #222225;
+  --a-bg-inset: #28282c;
+  --a-surface: #1c1c1f;
+  --a-surface-raised: #1f1f22;
   --a-scrim: rgba(0, 0, 0, 0.60);
 
-  --a-border-faint: #1b1c20;
-  --a-border: #232428;
-  --a-border-strong: #34363c;
+  --a-border-faint: #1d1d20;
+  --a-border: #2a2a2e;
+  --a-border-strong: #3f3f46;
+  --a-hairline: #232327;
+  --a-divider: rgba(255, 255, 255, 0.05);
 
   --a-text: #fafafa;
   --a-text-secondary: #a1a1aa;
-  --a-text-tertiary: #86878f;      /* C21 AC4 (#478): AA ≥4.5:1, worst 4.57 on --a-bg-inset */
-  --a-text-disabled: #4f5158;
+  --a-text-tertiary: #909199;      /* C21 AC4 (#478): AA ≥4.5:1, worst 4.68 on --a-bg-inset */
+  --a-text-disabled: #52525b;
   --a-text-on-accent: #ffffff;
 
   --a-overlay-hover: rgba(255, 255, 255, 0.055);
   --a-overlay-active: rgba(255, 255, 255, 0.09);
-  --a-overlay-selected: var(--a-accent-subtle);
+  --a-overlay-selected: rgba(255, 255, 255, 0.07);
+  --a-monogram-bg: #26262a;
 
   --a-accent: #818cf8;
   --a-accent-hover: #6366f1;
@@ -279,23 +290,27 @@
 /* Follow the OS only when the app hasn't pinned a scheme (data-color-scheme set by opencode wins). */
 @media (prefers-color-scheme: dark) {
   :root:not([data-color-scheme="light"]):not([data-color-scheme="dark"]) {
-    --a-bg-canvas: #0a0b0d;
-    --a-bg-subtle: #0e0f11;
-    --a-bg-muted: #16171a;
-    --a-bg-inset: #1e2024;
-    --a-surface: #121316;
-    --a-surface-raised: #17181b;
+    --a-bg-chrome: #0e0e10;
+    --a-bg-canvas: #161618;
+    --a-bg-subtle: #131315;
+    --a-bg-muted: #222225;
+    --a-bg-inset: #28282c;
+    --a-surface: #1c1c1f;
+    --a-surface-raised: #1f1f22;
     --a-scrim: rgba(0, 0, 0, 0.60);
-    --a-border-faint: #1b1c20;
-    --a-border: #232428;
-    --a-border-strong: #34363c;
+    --a-border-faint: #1d1d20;
+    --a-border: #2a2a2e;
+    --a-border-strong: #3f3f46;
+    --a-hairline: #232327;
+    --a-divider: rgba(255, 255, 255, 0.05);
     --a-text: #fafafa;
     --a-text-secondary: #a1a1aa;
-    --a-text-tertiary: #86878f;    /* C21 AC4 (#478): AA ≥4.5:1, worst 4.57 on --a-bg-inset (OS-fallback dark block) */
-    --a-text-disabled: #4f5158;
+    --a-text-tertiary: #909199;    /* C21 AC4 (#478): AA ≥4.5:1, worst 4.68 on --a-bg-inset (OS-fallback dark block) */
+    --a-text-disabled: #52525b;
     --a-overlay-hover: rgba(255, 255, 255, 0.055);
     --a-overlay-active: rgba(255, 255, 255, 0.09);
-    --a-overlay-selected: var(--a-accent-subtle);
+    --a-overlay-selected: rgba(255, 255, 255, 0.07);
+    --a-monogram-bg: #26262a;
     --a-accent: #818cf8;
     --a-accent-hover: #6366f1;
     --a-accent-active: #4f46e5;

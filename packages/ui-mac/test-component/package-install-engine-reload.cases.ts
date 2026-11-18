@@ -314,7 +314,8 @@ const { injectDisabledOverrides } = await import("../src/main/ext-disabled-injec
 const { restoreMcpLeaf } = await import("../src/main/ext-config")
 const { codepuppyOfficeInstallCommand } = await import("../src/shared/office-advisories")
 const { deriveMcpEgressDestinations, setConfiguredEgressDestinations, isEgressAuthorizedForSidecar } = await import("../src/main/network-egress-derived")
-const { readMcpServerRecords } = await import("../src/main/mcp-server-records")
+const { generationMcpServerNames, readMcpServerRecordsForGeneration } = await import("../src/main/mcp-server-records")
+const { readPackageAllowSet } = await import("../../ext/src/gen-skill-paths")
 const { createReloadScheduler } = await import("../../ext/src/reload-scheduler")
 const { codepuppyGlobalRoot } = await import("../src/main/codepuppy-installs")
 
@@ -338,7 +339,7 @@ const { codepuppySidecar } = registerExtIpcHandlers(
       // Process boundary: boot producers reread this fixture's real ledger and records.
       startup = {}
       injectDisabledOverrides(startup, { userDataPath: userData, channel: "dev" })
-      setConfiguredEgressDestinations(deriveMcpEgressDestinations(readMcpServerRecords()))
+      setConfiguredEgressDestinations(deriveMcpEgressDestinations(readMcpServerRecordsForGeneration()))
       return true
     },
   },
@@ -536,6 +537,35 @@ test("② MCP 包管理页保存密钥,不重装且不请求重载", async () =>
   click(q('.codepuppy-ext-crumb-link'))
 })
 
+// I-11 v9-9:② 的 package:github 是本代中途装的(本代启动时没读到它的远程记录)⇒ 只收敛、不重载。换一代之后,它的远程定义
+// 进了本代内联层;再换凭据(引用带版本)⇒ 换代。开关从不换代。
+test("I-11 v9-9 replacing the credential of a remote connector this generation started with requests a new generation", async () => {
+  // A fresh generation's pre-fork read (server.ts) now includes package:github's remote record.
+  readMcpServerRecordsForGeneration()
+  const names = (await call("ext-installed-packages") as { packages: Array<{ packageId: string; components: Array<{ kind: string; name: string }> }> })
+    .packages.find((pack) => pack.packageId === "package:github")!.components.filter((component) => component.kind === "mcp").map((component) => component.name)
+  expect(names.length).toBeGreaterThan(0)
+  expect(names.every((name) => generationMcpServerNames().has(name))).toBe(true)
+  await waitFor(() => expect(q(`[data-installed-package="package:github"] [data-more]`)).toBeInstanceOf(HTMLElement))
+  click(q(`[data-installed-package="package:github"] [data-more]`))
+  click(q('[data-menu-item="manage"]'))
+  await waitFor(() => expect(q('[data-package-secret]')).toBeInstanceOf(HTMLElement))
+  click(q('[data-package-secret]'))
+  await waitFor(() => expect(q('input[type="password"]')).toBeInstanceOf(HTMLInputElement))
+  const input = q<HTMLInputElement>('input[type="password"]')!
+  input.value = "req810-secret-replaced"
+  input.dispatchEvent(new Event("input", { bubbles: true }))
+  const reloadsBefore = reloadRequests.length
+  const refreshesBefore = connectorRefreshes
+  click(q('[role="dialog"] .a-dialog-footer button'))
+  await waitFor(() => expect(q('input[type="password"]')).toBeNull())
+  await waitFor(() => expect(reloadRequests.length).toBe(reloadsBefore + 1))
+  const request = reloadRequests.at(-1)!
+  codepuppySidecar.receive({ type: "codepuppy.reload.report", generation: request.generation!, scope: "global", outcome: "reloaded", directories: [] }, () => {})
+  await waitFor(() => expect(connectorRefreshes).toBe(refreshesBefore + 1))
+  click(q('.codepuppy-ext-crumb-link'))
+})
+
 test("③ MCP 套件与包共用单一安装收口,一次出站且不重载", async () => {
   const reloadsBefore = reloadRequests.length
   const centralBefore = centralCalls.length
@@ -634,7 +664,9 @@ const pdfRow = () => q('[data-installed-row="mcp:codepuppy-pdf"]')!
 const meta = { v: 1 as const, name: "a.pdf", mime: "application/pdf", size: 2048, path: "attachments/00000000-0000-4000-8000-000000000000/a.pdf", reader: "pdf" as const }
 
 
-test("#1646 AC1 disable PDF waits for idle, then the fresh runtime blocks reading and the attachment shows why", async () => {
+// I-11 方案 A(design v9 §5「MCP 组件开关」):第一方 Office 的开关 = 持久写 + main 收敛;不重载、不换代、渲染进程不碰运行时。
+// 引擎侧的效果(重建与新 Location 仍随开关、已有会话调不到)由 managed-mcp-toggle.engine 的真引擎用例判。
+test("I-11 Office PDF switch from the Hub: durable write and allow-set flip both ways, with no reload, no connector restart and no renderer runtime call", async () => {
   for (const request of reloadRequests) codepuppySidecar.receive({ type: "codepuppy.reload.report", generation: request.generation, scope: "global", outcome: "reloaded", directories: [] }, () => {})
   await flush()
   connectorRefreshes = 0
@@ -648,50 +680,31 @@ test("#1646 AC1 disable PDF waits for idle, then the fresh runtime blocks readin
   startup = {}
   scheduler.register(join(tmp, "project"), {})
   codepuppySidecar.attach((request) => scheduler.request(request))
+  busy = true
   setHubSection("connectors")
   document.dispatchEvent(new Event("visibilitychange"))
   await waitFor(() => expect(pdfRow()).toBeInstanceOf(HTMLElement))
   await waitFor(() => expect(lastInstalls?.global?.some((entry) => entry.id === "mcp:codepuppy-pdf")).toBe(true))
   await flush()
+  const reloadsBefore = locationReloads
+  const allowed = () => readPackageAllowSet(globalRoot)?.mcp.find((entry) => entry.name === "codepuppy-pdf")?.enabled
+  expect(allowed()).toBe(true)
   click(pdfRow().querySelector('[data-more]'))
   click(pdfRow().querySelector('[data-menu-item="disable"]'))
-  await waitFor(() => expect(pdfRow().querySelector('[data-hub-reload-now]')).toBeInstanceOf(HTMLElement))
+  await waitFor(() => expect(findRecordV2(globalRoot, "mcp", "codepuppy-pdf")?.desiredState).toBe("disabled"))
+  expect(allowed()).toBe(false)
   await scheduler.settled()
-  expect(connectorRefreshes).toBe(0)
-  expect(liveMcpCalls).toBe(0)
-  expect(services()["codepuppy-pdf"]?.status).toBe("connected")
+  await waitFor(() => expect(pdfRow().querySelector('[data-enable-row]')).toBeInstanceOf(HTMLElement))
+  click(pdfRow().querySelector('[data-enable-row]'))
+  await waitFor(() => expect(findRecordV2(globalRoot, "mcp", "codepuppy-pdf")?.desiredState).toBe("enabled"))
+  expect(allowed()).toBe(true)
   busy = false
   scheduler.poke()
   await scheduler.settled()
-  await waitFor(() => expect(connectorRefreshes).toBe(1))
-  expect(startup.mcp?.servers?.["codepuppy-pdf"]?.disabled).toBe(true)
-  const { attachmentInstruction } = await import("../../ext/src/attachment-reader-hooks")
-  expect(attachmentInstruction(meta, tmp, services())).not.toContain("codepuppy-pdf_read_pdf")
-  const { attachmentReadOf } = await import("../src/renderer/codepuppy-ui/session-timeline/timeline-attachments")
-  const { TimelineAttachments } = await import("../src/renderer/codepuppy-ui/attachment-cards")
-  const host = document.body.appendChild(document.createElement("div"))
-  const dispose = render(() => createComponent(TimelineAttachments, { attachments: [{ partID: "pdf", name: meta.name, media: "file", label: "PDF", read: attachmentReadOf(meta, { directory: tmp, services: services(), tools: [], turnActive: true }) }] }), host)
-  expect(host.textContent).toContain(zh["codepuppy.attach.readFailedNotRunning"])
-  dispose(); host.remove()
-})
-
-test("#1646 AC2 enable from a disabled boot plus reload-now removes the startup override permanently", async () => {
-  busy = true
-  await waitFor(() => expect(pdfRow().querySelector('[data-enable-row]')).toBeInstanceOf(HTMLElement))
-  click(pdfRow().querySelector('[data-enable-row]'))
-  await waitFor(() => expect(pdfRow().querySelector('[data-hub-reload-now]')).toBeInstanceOf(HTMLElement))
-  expect(connectorRefreshes).toBe(1)
-  expect(startup?.mcp?.servers?.["codepuppy-pdf"]?.disabled).toBe(true)
-  click(pdfRow().querySelector('[data-hub-reload-now]'))
-  await waitFor(() => expect(connectorRefreshes).toBe(2))
-  expect(startup?.mcp?.servers?.["codepuppy-pdf"]).toBeUndefined()
+  expect(connectorRefreshes).toBe(0)
+  expect(locationReloads).toBe(reloadsBefore)
   expect(liveMcpCalls).toBe(0)
-  const { attachmentInstruction } = await import("../../ext/src/attachment-reader-hooks")
-  expect(attachmentInstruction(meta, tmp, services())).toContain("codepuppy-pdf_read_pdf")
-  await call("ext-reload-request", { scope: "global", items: [], reason: "user: reload now", force: true })
-  await scheduler.settled()
-  expect(startup?.mcp?.servers?.["codepuppy-pdf"]).toBeUndefined()
-  expect(attachmentInstruction(meta, tmp, services())).toContain("codepuppy-pdf_read_pdf")
+  expect(pdfRow().querySelector('[data-hub-reload-now]')).toBeNull()
 })
 
 test("#1646 AC4 custom connector waits for idle or reload-now and the new generation authorizes its destination", async () => {
@@ -725,7 +738,8 @@ test("#1646 AC4 custom connector waits for idle or reload-now and the new genera
 })
 
 
-test("#1652 AC1/AC2 Hub disable rejects only this connector's pending approvals and waits for idle", async () => {
+// I-11:关掉连接器时只有 main 的 convergeManagedMcp 拒它自己的待答审批(真引擎证明 3);定制中心不再发任何审批回复,也不换代。
+test("I-11 disabling dbhub-readonly while approvals wait: the Hub sends no approval reply and nothing restarts; main owns the rejection", async () => {
   const name = "dbhub-readonly"
   busy = true
   const before = connectorRefreshes
@@ -746,68 +760,17 @@ test("#1652 AC1/AC2 Hub disable rejects only this connector's pending approvals 
   await waitFor(() => expect(row()).toBeInstanceOf(HTMLElement))
   click(row()?.querySelector('[data-more]'))
   click(row()?.querySelector('[data-menu-item="disable"]'))
-  await waitFor(() => expect(row()?.querySelector('[data-hub-reload-now]')).toBeInstanceOf(HTMLElement))
-  await waitFor(() => expect(permissionReplies).toHaveLength(2))
-  expect(permissionReplies).toEqual([
-    { requestID: "per_db_1", reply: "reject", message: "连接器已停用", directory: projectA },
-    { requestID: "per_db_2", reply: "reject", message: "连接器已停用", directory: projectB },
-  ])
-  expect(Object.values(permissions).flat().map((request) => request.id)).toEqual(["per_other"])
-  expect(operations).toEqual(["ledger", "reply", "reply"])
+  await waitFor(() => expect(findRecordV2(globalRoot, "mcp", name)?.desiredState).toBe("disabled"))
   await scheduler.settled()
-  expect(connectorRefreshes).toBe(before)
-  expect(liveMcpCalls).toBe(0)
+  expect(permissionReplies).toEqual([])
+  expect(Object.values(permissions).flat().map((request) => request.id)).toEqual(["per_db_1", "per_db_2", "per_other"])
+  expect(operations).toEqual(["ledger"])
   busy = false
   scheduler.poke()
   await scheduler.settled()
-  await waitFor(() => expect(connectorRefreshes).toBe(before + 1))
+  expect(connectorRefreshes).toBe(before)
+  expect(liveMcpCalls).toBe(0)
   permissions = {}
-})
-
-
-test("#1652 audit: project A disable rejects project B approvals with the active locale after ledger commit", async () => {
-  const { setLocale } = await import("../src/renderer/i18n")
-  const [api, dispose] = solid.createRoot((dispose) => [realUseExtensions(
-    () => ({ baseUrl: "http://127.0.0.1:39131" }), () => true, () => projectA, directories,
-  ), dispose] as const)
-  await waitFor(() => expect(api.store.receipts.some((r) => r.name === "dbhub-readonly")).toBe(true))
-  const receipt = api.store.receipts.find((r) => r.name === "dbhub-readonly")!
-  permissions = { [projectA]: [approvalRequest("per_same", receipt.name, "ses_same")], [projectB]: [approvalRequest("per_same", receipt.name, "ses_same")] }
-  permissionReplies.length = 0
-  operations.length = 0
-  setLocale("en")
-  try {
-    expect((await api.setInstallState(receipt, "disabled")).ok).toBe(true)
-    expect(permissionReplies).toEqual([projectA, projectB].map((directory) => ({ directory, requestID: "per_same", reply: "reject", message: "Connector disabled" })))
-    expect(operations).toEqual(["ledger", "reply", "reply"])
-    expect(Object.values(permissions).flat()).toEqual([])
-  } finally { setLocale("zh"); dispose() }
-})
-
-for (const offline of [[projectA], [projectA, projectB]]) test(`#1652 audit: disable commits when permission lookup is offline in ${offline.length} directories`, async () => {
-  const receipt = hubApi.store.receipts.find((r) => r.name === "dbhub-readonly")!
-  permissions = { [projectB]: [approvalRequest("per_online", receipt.name, "ses_online")] }
-  offline.forEach((directory) => unavailable.add(directory))
-  permissionReplies.length = 0
-  operations.length = 0
-  try {
-    expect((await hubApi.setInstallState(receipt, "disabled")).ok).toBe(true)
-    expect(operations[0]).toBe("ledger")
-    expect(permissionReplies).toHaveLength(offline.includes(projectB) ? 0 : 1)
-    expect(findRecordV2(globalRoot, "mcp", receipt.name)?.desiredState).toBe("disabled")
-  } finally { unavailable.clear(); permissions = {} }
-})
-
-test("#1652 audit: a refused ledger write sends no permission rejection", async () => {
-  const receipt = hubApi.store.receipts.find((r) => r.name === "dbhub-readonly")!
-  permissions = { [projectA]: [approvalRequest("per_kept", receipt.name, "ses_kept")] }
-  permissionReplies.length = 0
-  refuseState = true
-  try {
-    expect((await hubApi.setInstallState(receipt, "disabled")).ok).toBe(false)
-    expect(permissionReplies).toEqual([])
-    expect(permissions[projectA]).toHaveLength(1)
-  } finally { refuseState = false; permissions = {} }
 })
 
 test("busy package switch forces the existing scheduler without a second reload action", async () => {
@@ -838,4 +801,26 @@ test("busy package switch forces the existing scheduler without a second reload 
     expect(await call("ext-install-package", "package:supabase")).toMatchObject({ ok: true })
     expect(requests.at(-1)?.items?.map((item) => item.id)).toEqual(expect.arrayContaining(["package:supabase", "skill:supabase", "mcp:supabase", "skill:supabase-postgres-best-practices"]))
   } finally { detach() }
+})
+
+// I-11 证明 6(对照):含 cloud 组件的包开关仍换代(云组件的启停决定每代冻结的注入与身份事实,design v9 §5)。
+test("I-11 proof 6 (control): a package with a cloud component still requests a new generation when toggled", async () => {
+  busy = false
+  scheduler.register(join(tmp, "project"), {})
+  codepuppySidecar.attach((request) => scheduler.request(request))
+  // The catalog cannot install a cloud package in this harness; the production ledger writer records the same graph.
+  const { applyPackageMutation } = await import("../src/main/ext-receipt-v2")
+  const { bundleOwner, computeInstalledGraphDigest } = await import("../src/main/ext-package-ledger-v3")
+  const node = { componentId: "cloud:image", kind: "cloud" as const, name: "image", required: true, manifestDigest: "sha256:" + "c".repeat(64) }
+  const graph = { packageId: "package:cloud-image", envelopeDigest: node.manifestDigest, installedGraphDigest: "", root: node, children: [] }
+  graph.installedGraphDigest = computeInstalledGraphDigest(graph)
+  expect(applyPackageMutation(globalRoot, {
+    operation: "install", transactionId: "i11-cloud-control", graphBeforeDigest: null, graphAfter: graph,
+    claimMutations: [{ op: "acquire", kind: "cloud", name: "image", owner: bundleOwner(graph.packageId, node.manifestDigest) }],
+    childRecordMutations: [{ op: "upsert", input: { id: node.componentId, kind: "cloud", name: "image", environment: "dev", scope: { kind: "global" }, desiredState: "enabled", origin: "catalog", version: "1.0.0", installedAt: "2026-11-18T00:00:00.000Z", manifestDigest: node.manifestDigest } }],
+  })).toMatchObject({ ok: true })
+  const before = connectorRefreshes
+  expect(await call("ext-set-package-state", { packageId: "package:cloud-image", state: "disabled" })).toMatchObject({ ok: true })
+  await scheduler.settled()
+  await waitFor(() => expect(connectorRefreshes).toBe(before + 1))
 })

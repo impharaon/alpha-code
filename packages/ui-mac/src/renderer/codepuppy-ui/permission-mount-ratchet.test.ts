@@ -152,15 +152,6 @@ describe("审批决定提交入口:单一引用面白名单棘轮(#619 R3 Blocke
       && calls.length === (source.match(/permission\.reply/g) ?? []).length
   }
 
-  test("#1652 Hub permission exception accepts only literal reject decisions", () => {
-    const source = normalize(readFileSync(resolve(root, "packages/ui-mac/src/renderer/extensions/use-extensions.ts"), "utf8"))
-    const file = "packages/ui-mac/src/renderer/extensions/use-extensions.ts"
-    expect(sanctionedEntry(file, "permission.reply", source)).toBe(true)
-    for (const reply of ["once", "always", "decision"]) {
-      expect(sanctionedEntry(file, "permission.reply", source.replace('reply:"reject"', `reply:"${reply}"`))).toBe(false)
-    }
-  })
-
   test("package MCP disable has a literal reject-only main reply entry", () => {
     const file = "packages/ui-mac/src/main/package-mcp-activation.ts"
     const source = normalize(readFileSync(resolve(root, file), "utf8"))
@@ -231,10 +222,8 @@ describe("审批决定提交入口:单一引用面白名单棘轮(#619 R3 Blocke
    *     在 2.x 引擎上的**唯一**物理出口;调用方只有适配器自己的路由(index.ts 建、routes.ts 用)。登记时按本棘轮的
    *     归一化把 codepuppy-app/src 与 ui-mac/src 的同一 token 引用面逐个核过:除本条外就是上面六条,没有别的新提交方。 */
   const SANCTIONED_ENTRY_HOLDERS = [
-    // #1652 AC2 explicitly requires connector disable to reject its pending approvals via the existing API.
-    // This entry only sends reject; the real Hub test checks the exact reply and connector identity.
-    { file: "packages/ui-mac/src/renderer/extensions/use-extensions.ts", token: "permission.reply", rejectOnly: true },
-    // #1724: same explicit disable authority for package-root actions; no grant is permitted.
+    // #1652 / #1724(I-11):turning a managed connector off rejects only its own pending approvals, and only main's
+    // convergeManagedMcp does it (the Hub's renderer entry was retired); no grant is permitted.
     { file: "packages/ui-mac/src/main/package-mcp-activation.ts", token: "permission.reply", rejectOnly: true },
     { file: "packages/codepuppy-app/src/context/permission-surface.tsx", token: "permission.reply" },
     { file: "packages/codepuppy-app/src/context/permission-v1-adapter.ts", token: "permission.reply" },

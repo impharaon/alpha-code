@@ -7,6 +7,7 @@ import {
   mkdtempSync,
   readFileSync,
   readdirSync,
+  renameSync,
   rmSync,
   statSync,
   symlinkSync,
@@ -392,6 +393,9 @@ test("desktop SQLite package without a DSN keeps an engine-visible definition ac
   const database = join(home, "sqlite-dsn-later.db")
   new Database(database).close()
   expect(await savePackageSecretsV1({ packageId: "package:dbhub-readonly", secrets: { "mcp:dbhub-readonly#DSN": `sqlite://${database}` } }, deps)).toMatchObject({ ok: true })
+  // I-11(v9-R2):the save no longer materializes; the IPC requests convergence, whose credential step runs without an engine too.
+  const { createManagedMcpConvergence } = await import("../src/main/package-mcp-activation")
+  await createManagedMcpConvergence({ root: () => root, awaitServer: async () => { throw Error("no engine in this case") }, directory: () => home })(["dbhub-readonly"])
   expect(await readPackageAuthorizationV1("package:dbhub-readonly", deps)).toMatchObject({ ok: true, items: [{ kind: "secret", saved: true }] })
   expect(leaf().enabled).not.toBe(false)
   engineKeeps(leaf())
@@ -905,34 +909,18 @@ test("real IPC previews/cancels without secrets, installs both recipes, stops be
       const runtime = officialConnectorConfig(root, name, versions[0]!).file
       expect(readFileSync(runtime, "utf8")).toBe("") // disabled configs remain parseable without decrypting a secret
       expect(contents(home).some((bytes) => bytes.includes(value))).toBe(false)
-      // #1652 AC1: approval waits are busy; both directions defer until idle or explicit force.
+      // I-11(design v9 §5「MCP 组件开关」):an official toggle is the durable write plus convergence — no reload
+      // request and no restart, whether or not answers are running. The credential step follows the ledger intent.
       busy = true
-      expect(
-        await handlers.get("ext-set-install-state")!({}, { type: "mcp", name, scope: "global", state: "enabled" }),
-      ).toMatchObject({ ok: true, reason: "reload-pending" })
-      await scheduler.settled()
-      expect(events).toEqual([])
-      expect(readFileSync(runtime, "utf8")).toBe("")
+      for (const [state, expected] of [["enabled", value], ["disabled", ""]] as const) {
+        const toggled = await handlers.get("ext-set-install-state")!({}, { type: "mcp", name, scope: "global", state })
+        expect(toggled).toMatchObject({ ok: true })
+        expect(toggled).not.toHaveProperty("reason")
+        await scheduler.settled()
+        expect(events).toEqual([])
+        expect(readFileSync(officialConnectorConfig(root, name, versions[0]!).file, "utf8")).toBe(expected)
+      }
       busy = false
-      scheduler.poke()
-      await scheduler.settled()
-      await new Promise((resolve) => setTimeout(resolve, 0))
-      expect(events).toEqual(["refresh"])
-      const enabledRuntime = officialConnectorConfig(root, name, versions[0]!).file
-      expect(readFileSync(enabledRuntime, "utf8")).toBe(value)
-      busy = true
-      expect(
-        await handlers.get("ext-set-install-state")!({}, { type: "mcp", name, scope: "global", state: "disabled" }),
-      ).toMatchObject({ ok: true, reason: "reload-pending" })
-      await scheduler.settled()
-      expect(events).toEqual(["refresh"])
-      expect(readFileSync(enabledRuntime, "utf8")).toBe(value)
-      await handlers.get("ext-reload-request")!({}, { scope: "global", items: [], reason: "user: reload now", force: true })
-      await scheduler.settled()
-      await new Promise((resolve) => setTimeout(resolve, 0))
-      expect(readFileSync(officialConnectorConfig(root, name, versions[0]!).file, "utf8")).toBe("")
-      expect(events).toEqual(["refresh", "refresh"])
-      events.length = 0
       // Make cleanup fail after configuration removal. The receipt must survive for retry.
       chmodSync(paths.secret, 0o755)
       expect(await handlers.get("ext-uninstall-package")!({}, `package:${name}`)).toMatchObject({ ok: false })
@@ -1009,7 +997,7 @@ test("review official recipe installs, changes token and toggles through runtime
   const { installDesktopPackageV1, savePackageSecretsV1 } = await import("../src/main/package-admission")
   const { resolveVerifiedPackageV1 } = await import("../src/main/package-installability")
   const { setPackageStateV1 } = await import("../src/main/ext-install-planner")
-  const { applyPackageMcpV1 } = await import("../src/main/package-mcp-activation")
+  const { createManagedMcpConvergence } = await import("../src/main/package-mcp-activation")
   const shipped = await Bun.file(join(import.meta.dir, "../src/renderer/extensions/codepuppy-catalog.json")).json()
   const envelope = shipped.packages.find((entry: CodePuppyPackageEnvelopeV1) => entry.prelude.packageId === "package:github-official")!
   // Unmodified pinned public payload, not a made-up third-party definition or a live PAT call.
@@ -1068,7 +1056,8 @@ export default {id:"test.official-runtime",setup:async(ctx)=>{
     const before = await tools()
     expect(before.names).toEqual([])
     expect(await installDesktopPackageV1("package:github-official", deps)).toMatchObject({ ok: true })
-    const apply = () => applyPackageMcpV1("package:github-official", slot.projectDirectory, { root: () => root, awaitServer: async () => connection })
+    const converge = createManagedMcpConvergence({ root: () => root, awaitServer: async () => connection, directory: () => slot.projectDirectory })
+    const apply = () => converge(["github-official"])
     await apply()
     expect((await tools()).names).toEqual([])
     const save = (value: string) => savePackageSecretsV1({ packageId: "package:github-official", secrets: { "mcp:github-official#GITHUB_PERSONAL_ACCESS_TOKEN": value } }, deps)
@@ -1094,3 +1083,231 @@ export default {id:"test.official-runtime",setup:async(ctx)=>{
     expect(reloads).toBe(0)
   } finally { await engine.close(); process.chdir(previous); globalThis.fetch = originalFetch; await echo.close() }
 }, 60000)
+
+// ── I-11 方案 A(alpha-code#1724;design v9 §4.4 / §5):官方配方的开关只经 convergeManagedMcp ────────────────────
+/** The unmodified pinned public package:github-official payload (same as the review case above). */
+async function githubOfficialDeps(rootOf: () => string, homeOf: () => string) {
+  const { resolveVerifiedPackageV1 } = await import("../src/main/package-installability")
+  const shipped = await Bun.file(join(import.meta.dir, "../src/renderer/extensions/codepuppy-catalog.json")).json()
+  const envelope = shipped.packages.find((entry: CodePuppyPackageEnvelopeV1) => entry.prelude.packageId === "package:github-official")!
+  const bytes = await Bun.file(join(import.meta.dir, "../test-fixtures/plugin-helper/catalog/package-github-official.json")).bytes()
+  expect(createHash("sha256").update(bytes).digest("hex")).toBe(envelope.components[0].payloadRef.sha256)
+  const catalog = { version: "i11-official", entries: [], packages: [envelope] }
+  return {
+    loadVerifiedCatalog: async () => ({ source: "remote" as const, catalog, snapshotDigest: "7".repeat(64) }),
+    root: rootOf, globalRoot: rootOf, userDataPath: join(homeOf(), "userData"), casBaseRoot: () => getCodePuppyEnvironment().casBaseRoot, environment: () => "dev" as const,
+    installability: { fetchPayload: async () => bytes }, advisoryGate: () => ({ allowed: true as const }),
+    resolvePackage: async (id: string, version: string) => ({ ...resolveVerifiedPackageV1(catalog, id, version), channel: "cache" as const }),
+  }
+}
+
+test("I-11 proof 7: a project-only dbhub whose SQLite file moved stays off in its matching project after startup; back in place, convergence turns it on", async () => {
+  const { installDesktopPackageV1, savePackageSecretsV1 } = await import("../src/main/package-admission")
+  const { resolveVerifiedPackageV1 } = await import("../src/main/package-installability")
+  const { createManagedMcpConvergence } = await import("../src/main/package-mcp-activation")
+  const { officialAvailabilityPublished } = await import("../src/main/official-connector-resources")
+  const { projectScopeIdentity } = await import("../src/main/ext-receipt-v2")
+  const { readPackageAllowSet } = await import("../../ext/src/gen-skill-paths")
+  const { managedMcpAllowedHere } = await import("../../ext/src/package-scope")
+  const f = await fixture("dbhub-readonly")
+  const catalog = { version: "i11-project-sqlite", entries: [], packages: [f.envelope] }
+  const project = join(home, "project-a")
+  mkdirSync(project)
+  const identity = projectScopeIdentity(project)
+  if (!identity.ok) throw Error(identity.reason)
+  const deps = {
+    loadVerifiedCatalog: async () => ({ source: "remote" as const, catalog, snapshotDigest: "7".repeat(64) }),
+    root: () => root, globalRoot: () => root, userDataPath: join(home, "userData"), casBaseRoot: () => join(home, "state"), environment: () => "dev" as const,
+    installability: { fetchPayload: async () => f.bytes }, advisoryGate: () => ({ allowed: true as const }),
+    resolvePackage: async (id: string, version: string) => ({ ...resolveVerifiedPackageV1(catalog, id, version), channel: "cache" as const }),
+    effect: identity.scope,
+  }
+  expect(await installDesktopPackageV1("package:dbhub-readonly", deps)).toMatchObject({ ok: true })
+  const database = join(home, "project-a.db")
+  new Database(database).close()
+  expect(await savePackageSecretsV1({ packageId: "package:dbhub-readonly", secrets: { "mcp:dbhub-readonly#DSN": `sqlite://${database}` } }, deps)).toMatchObject({ ok: true })
+  const converge = createManagedMcpConvergence({ root: () => root, awaitServer: async () => { throw Error("no engine in this case") }, directory: () => home })
+  await converge(["dbhub-readonly"])
+  const allowedInProject = () => managedMcpAllowedHere("dbhub-readonly", readPackageAllowSet(root), identity.scope.projectPath)
+  expect(allowedInProject()).toBe(true)
+  renameSync(database, database + ".moved")
+  // The next generation's pre-fork recovery (server.ts): restore, then wait for the allow-set republish before forking.
+  clearOfficialConnectorRuntime()
+  restoreCommittedOfficialConnectors()
+  await officialAvailabilityPublished()
+  expect(findRecordV2(root, "mcp", "dbhub-readonly")?.desiredState).toBe("enabled")
+  expect(readPackageAllowSet(root)?.scoped.some((entry) => entry.name === "dbhub-readonly")).toBe(false)
+  expect(allowedInProject()).toBe(false)
+  renameSync(database + ".moved", database)
+  await converge(["dbhub-readonly"])
+  expect(allowedInProject()).toBe(true)
+})
+
+test("I-11 ruling 1: a convergence parked across a startup recovery cannot leave a stale credential clear behind", async () => {
+  const { installDesktopPackageV1, savePackageSecretsV1 } = await import("../src/main/package-admission")
+  const { setPackageStateV1 } = await import("../src/main/ext-install-planner")
+  const { createManagedMcpConvergence } = await import("../src/main/package-mcp-activation")
+  const { officialAvailabilityPublished } = await import("../src/main/official-connector-resources")
+  const { readMcpLeafStrict } = await import("../src/main/ext-config")
+  const { collectMcpFileRefPaths } = await import("../src/main/codepuppy-mcp-secrets")
+  const { readPackageAllowSet } = await import("../../ext/src/gen-skill-paths")
+  const deps = await githubOfficialDeps(() => root, () => home)
+  expect(await installDesktopPackageV1("package:github-official", deps)).toMatchObject({ ok: true })
+  expect(await savePackageSecretsV1({ packageId: "package:github-official", secrets: { "mcp:github-official#GITHUB_PERSONAL_ACCESS_TOKEN": pat } }, deps)).toMatchObject({ ok: true })
+  const credential = () => {
+    const leaf = readMcpLeafStrict("github-official")
+    if (!leaf.ok || !leaf.value) throw Error("official leaf missing")
+    return readFileSync(collectMcpFileRefPaths(leaf.value)[0]!, "utf8")
+  }
+  const engine = Promise.withResolvers<{ url: string; username: string; password: string }>()
+  const converge = createManagedMcpConvergence({ root: () => root, awaitServer: () => engine.promise, directory: () => home })
+  // Run 1 reads the intent "disabled" when it starts and parks on the engine (it clears only after disconnecting).
+  expect(await setPackageStateV1({ packageId: "package:github-official", state: "disabled" }, deps)).toMatchObject({ ok: true })
+  const disabling = converge(["github-official"])
+  await Bun.sleep(50)
+  // The user turns it back on; that request is coalesced into one rerun behind run 1.
+  expect(await setPackageStateV1({ packageId: "package:github-official", state: "enabled" }, deps)).toMatchObject({ ok: true })
+  const enabling = converge(["github-official"])
+  // A sidecar respawn's pre-fork recovery runs now, outside the queue: synchronous, by the ledger intent.
+  clearOfficialConnectorRuntime()
+  restoreCommittedOfficialConnectors()
+  await officialAvailabilityPublished()
+  expect(credential()).toBe(pat)
+  engine.reject(Error("engine restarting"))
+  await Promise.all([disabling, enabling])
+  expect(credential()).toBe(pat)
+  expect(readPackageAllowSet(root)?.mcp).toEqual(expect.arrayContaining([{ name: "github-official", enabled: true }]))
+})
+
+test("I-11 official GitHub engine: off at startup, on at runtime without a restart; a failed disable write keeps the credential; later Locations follow", async () => {
+  if (process.env.CODEPUPPY_OFFICIAL_RUNTIME_CHILD !== "1") {
+    const result = Bun.spawnSync({ cmd: [process.execPath, "test", "--test-name-pattern", "I-11 official GitHub engine", import.meta.path], cwd: resolve(import.meta.dir, ".."), env: { ...process.env, CODEPUPPY_OFFICIAL_RUNTIME_CHILD: "1" } })
+    const output = result.stdout.toString() + result.stderr.toString()
+    if (result.exitCode !== 0) throw Error(output)
+    expect(output.match(/(\d+) pass\b/)?.[1], output).toBe("1")
+    return
+  }
+  const fs = await import("node:fs")
+  const { spyOn } = await import("bun:test")
+  const { codepuppyEngine, probeSetups, scriptedModel } = await import("./codepuppy-engine")
+  const { echoMcpHandler } = await import("../../core/test/fixture/mcp-echo")
+  const { installDesktopPackageV1, savePackageSecretsV1 } = await import("../src/main/package-admission")
+  const { setPackageStateV1 } = await import("../src/main/ext-install-planner")
+  const { createManagedMcpConvergence } = await import("../src/main/package-mcp-activation")
+  const { officialAvailabilityPublished } = await import("../src/main/official-connector-resources")
+  const { readMcpLeafStrict } = await import("../src/main/ext-config")
+  const { collectMcpFileRefPaths } = await import("../src/main/codepuppy-mcp-secrets")
+  const sandbox = engineSandbox()
+  await assertEngineSandboxed(sandbox)
+  const name = "official-i11"
+  __resetCodePuppyEnvironmentForTests()
+  delete process.env.CODEPUPPY_GLOBAL_DIR
+  initCodePuppyEnvironment({ isPackaged: false, channel: "dev", appDataDir: join(sandbox.root, `${name}-app`), baseRoot: join(sandbox.root, `${name}-state`, "codepuppy-state"), homeDir: sandbox.home })
+  const globalRoot = getCodePuppyEnvironment().mutableRoot
+  const deps = await githubOfficialDeps(() => globalRoot, () => join(sandbox.root, `${name}-app`))
+  expect(await installDesktopPackageV1("package:github-official", deps)).toMatchObject({ ok: true })
+  expect(await savePackageSecretsV1({ packageId: "package:github-official", secrets: { "mcp:github-official#GITHUB_PERSONAL_ACCESS_TOKEN": pat } }, deps)).toMatchObject({ ok: true })
+  expect(await setPackageStateV1({ packageId: "package:github-official", state: "disabled" }, deps)).toMatchObject({ ok: true })
+  // This generation's pre-fork recovery (server.ts) with the connector off.
+  clearOfficialConnectorRuntime()
+  restoreCommittedOfficialConnectors()
+  await officialAvailabilityPublished()
+  const echo = echoMcpHandler()
+  const originalFetch = globalThis.fetch
+  let unauthorized = 0
+  let toolCalls = 0
+  globalThis.fetch = (async (input, init) => {
+    const request = new Request(input, init)
+    if (new URL(request.url).hostname !== "api.githubcopilot.com") return originalFetch(input, init)
+    if (request.headers.get("authorization") !== `Bearer ${pat}`) {
+      unauthorized++
+      return new Response(null, { status: 401 })
+    }
+    if (request.method === "POST" && (await request.clone().text()).includes('"tools/call"')) toolCalls++
+    return echo.fetch(request)
+  }) as typeof fetch
+  const model = scriptedModel()
+  const host = codepuppyEngine({ sandbox, name, modelBaseURL: model.baseURL })
+  expect(host.injection.config.content).toContain("api.githubcopilot.com")
+  const running = await host.start()
+  try {
+    const connection = { url: running.url, username: "opencode", password: `cp-${name}` }
+    const converge = createManagedMcpConvergence({ root: () => globalRoot, awaitServer: async () => connection, directory: () => host.projectDirectory })
+    const at = (directory: string) => async (method: string, route: string, body?: unknown) => {
+      const response = await running.fetch(new Request(`http://codepuppy-sidecar.invalid${route}`, {
+        method, headers: { "x-opencode-directory": encodeURIComponent(directory), "content-type": "application/json" },
+        ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+      }))
+      const raw = await response.text()
+      return raw ? JSON.parse(raw) : undefined
+    }
+    const status = async (directory: string) => ((await at(directory)("GET", "/api/mcp"))?.data ?? []).find((server: { name: string }) => server.name === "github-official")?.status.status as string | undefined
+    const settle = async (directory: string, want: string) => {
+      let seen = await status(directory)
+      for (const end = Date.now() + 15000; seen !== want && Date.now() < end; await Bun.sleep(100)) seen = await status(directory)
+      return seen
+    }
+    const open = async (directory: string) => {
+      fs.mkdirSync(directory, { recursive: true })
+      return (await at(directory)("POST", "/api/session", { location: { directory }, model: { id: "m", providerID: "codepuppy" } })).data as { id: string }
+    }
+    const call = async (sessionID: string) => {
+      const send = at(host.projectDirectory)
+      await send("POST", `/api/session/${sessionID}/prompt`, { text: `CP-CALL ${JSON.stringify({ name: "execute", args: { code: 'return await tools["github-official"].echo({})' } })}` })
+      await send("POST", `/api/experimental/session/${sessionID}/wait`)
+      return toolCalls
+    }
+    const toggle = async (state: "enabled" | "disabled") => {
+      const result = await setPackageStateV1({ packageId: "package:github-official", state }, deps)
+      await converge(["github-official"])
+      return result
+    }
+    const credential = () => {
+      const leaf = readMcpLeafStrict("github-official")
+      if (!leaf.ok || !leaf.value) throw Error("official leaf missing")
+      return readFileSync(collectMcpFileRefPaths(leaf.value)[0]!, "utf8")
+    }
+    const session = await open(host.projectDirectory)
+    expect(await settle(host.projectDirectory, "disabled")).toBe("disabled")
+    const setups = probeSetups()
+    // Proof 4 (official): off at startup → on at runtime → callable from the existing session; a later Location follows.
+    expect(await toggle("enabled")).toMatchObject({ ok: true })
+    expect(await settle(host.projectDirectory, "connected")).toBe("connected")
+    expect(await call(session.id)).toBe(1)
+    const later = join(sandbox.root, `${name}-later`)
+    await open(later)
+    expect(await settle(later, "connected")).toBe("connected")
+    // Proof 8: the disable's config write fails after the ledger write; the ledger rolls back to on. The credential
+    // must survive (clearing never follows the request's direction) and a Location loaded afterwards still connects.
+    const rename = fs.renameSync
+    let failed = 0
+    const failing = spyOn(fs, "renameSync").mockImplementation((from, to) => {
+      if (String(to) === join(globalRoot, "codepuppy.jsonc") && failed++ === 0) throw new Error("injected config write failure")
+      return rename(from, to)
+    })
+    try {
+      expect((await toggle("disabled")).ok).toBe(false)
+    } finally {
+      failing.mockRestore()
+    }
+    expect(failed).toBe(1)
+    expect(findRecordV2(globalRoot, "mcp", "github-official")?.desiredState).toBe("enabled")
+    expect(credential()).toBe(pat)
+    const third = join(sandbox.root, `${name}-third`)
+    await open(third)
+    expect(await settle(third, "connected")).toBe("connected")
+    // Proof 4 (official), other direction: off → the existing session no longer reaches it.
+    expect(await toggle("disabled")).toMatchObject({ ok: true })
+    expect(await settle(host.projectDirectory, "disabled")).toBe("disabled")
+    expect(await call(session.id)).toBe(1)
+    expect(credential()).toBe("")
+    expect(unauthorized).toBe(0)
+    // Only the two Locations this test opened ran plugin setup; no existing Location was rebuilt.
+    expect(probeSetups()).toBe(setups + 2)
+  } finally {
+    await running.close()
+    model.stop()
+    globalThis.fetch = originalFetch
+    await echo.close()
+  }
+}, 120_000)

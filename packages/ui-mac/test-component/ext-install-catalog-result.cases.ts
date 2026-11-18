@@ -128,21 +128,25 @@ mock.module("../src/main/ext-mcp-activation", () => ({
   probeProjectMcpActivation: async () => "unverifiable" as const,
 }))
 
-// Keep the real runtime activation implementation; record the package identity at its main seam.
+// Keep the real runtime convergence; record the requested connector names at its single main entry (I-11).
 const activationModule = await import("../src/main/package-mcp-activation")
-const applyRuntime = activationModule.applyPackageMcpV1
-const removeRuntime = activationModule.removePackageMcpV1
+const createRuntime = activationModule.createManagedMcpConvergence
+const managedMcpNamesOf = activationModule.managedMcpNamesOf
 const packageAppliesAt = activationModule.packageAppliesAt
-const credentialActivations: string[] = []
+const credentialActivations: string[][] = []
 let heldRuntime: { entered(): void; release: Promise<void> } | undefined
 mock.module("../src/main/package-mcp-activation", () => ({
-  applyPackageMcpV1: async (...args: Parameters<typeof applyRuntime>) => { credentialActivations.push(args[0]); if(heldRuntime){heldRuntime.entered();await heldRuntime.release} return applyRuntime(...args) },
-  removePackageMcpV1: removeRuntime,
+  createManagedMcpConvergence: (deps: Parameters<typeof createRuntime>[0]) => {
+    const converge = createRuntime(deps)
+    return async (names: readonly string[]) => { credentialActivations.push([...names]); if(heldRuntime){heldRuntime.entered();await heldRuntime.release} return converge(names) }
+  },
+  managedMcpNamesOf,
   packageAppliesAt,
 }))
 
 const { initCodePuppyEnvironment } = await import("../src/main/codepuppy-environment")
 const { registerExtIpcHandlers } = await import("../src/main/ext-ipc")
+const { codepuppyGlobalRoot } = await import("../src/main/codepuppy-installs")
 
 delete process.env.CODEPUPPY_GLOBAL_DIR
 initCodePuppyEnvironment({
@@ -590,7 +594,8 @@ test("BC3 production account save re-applies the same standalone MCP package and
   const reloads=toSidecar.filter(message=>message.type==="codepuppy.reload.request").length
   const saved=await handlers.get("ext-save-package-secrets")!({sender:{id:1}},{packageId:result.packageId,secrets:{[item.prerequisiteId]:"bc3-production-invalid-token"}})
   expect(saved).toMatchObject({ok:true})
-  expect(credentialActivations.slice(before)).toEqual([result.packageId])
+  expect(credentialActivations.slice(before)).toEqual([managedMcpNamesOf(codepuppyGlobalRoot(), result.packageId)])
+  expect(credentialActivations.slice(before)[0]?.length).toBeGreaterThan(0)
   expect(toSidecar.filter(message=>message.type==="codepuppy.reload.request")).toHaveLength(reloads)
   expect(await read()).toMatchObject({ok:true,packageId:result.packageId,items:[{saved:true}]})
   expect(JSON.stringify(toSidecar)).not.toContain("bc3-production-invalid-token")

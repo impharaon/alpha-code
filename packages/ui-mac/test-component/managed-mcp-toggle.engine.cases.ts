@@ -2,17 +2,20 @@
 // 宿主:嵌进 sidecar 的那台 OpenCode 2,配置是生产 `injectCodePuppyConfig` 的产物(内联文档 + 显式文件),装着真 ext
 // (test-component/codepuppy-engine.ts)。本机 MCP 是 core 的真 stdio 夹具(codepuppy-mcp-startup-stdio.ts,每次 tools/call
 // 记一行);远程 MCP 是 core 的 `echoMcpHandler` 挂在本机一个真监听上。开关只走生产的持久写(setInstallStateByKey)与
-// main 的运行时入口;引擎状态一律经引擎自己的路由读回。本文件由 src/main/managed-mcp-toggle.engine.test.ts 起独立子进程跑。
+// main 的唯一运行时入口 convergeManagedMcp;引擎状态一律经引擎自己的路由读回。
+// 本文件由 src/main/managed-mcp-toggle.engine.test.ts 起独立子进程跑。
 import { afterAll, beforeAll, expect, test } from "bun:test"
 import fs from "node:fs"
 import path from "node:path"
 import { assertEngineSandboxed, engineSandbox } from "./engine-sandbox"
-import { codepuppyEngine, MCP_FIXTURE, scriptedModel, type Running } from "./codepuppy-engine"
+import { codepuppyEngine, MCP_FIXTURE, probeSetups, scriptedModel, type Running } from "./codepuppy-engine"
 import { echoMcpHandler } from "../../core/test/fixture/mcp-echo"
-import { findRecordV2, upsertRecordV2 } from "../src/main/ext-receipt-v2"
+import { findRecordV2, skillsEnabledPath, upsertRecordV2 } from "../src/main/ext-receipt-v2"
 import { setInstallStateByKey } from "../src/main/ext-install-planner"
 import { writeMcpServerTruth } from "../src/main/mcp-server-truth-write"
-import { applyPackageMcpV1 } from "../src/main/package-mcp-activation"
+import { createManagedMcpConvergence } from "../src/main/package-mcp-activation"
+import { tryAcquireBundleLock } from "../src/main/ext-bundle-lock"
+import { WORKSPACE_MARKER } from "../src/shared/office-advisories"
 import type { EngineConnection } from "../src/main/engine-authorization"
 
 const sandbox = engineSandbox()
@@ -44,7 +47,7 @@ type Listed = { name: string; status: { status: string } }
 /** 一台机器:账本记录在引擎启动之前就位(启动注入读的就是它们),codepuppy.jsonc 放本机定义,真源放远程定义。 */
 async function machine(
   name: string,
-  options: { local?: Record<string, "enabled" | "disabled">; remote?: Record<string, "enabled" | "disabled"> },
+  options: { local?: Record<string, "enabled" | "disabled">; remote?: Record<string, "enabled" | "disabled">; unmanagedProbe?: boolean },
 ) {
   const stateRoot = path.join(sandbox.root, `${name}-state`, "codepuppy-state")
   const root = path.join(stateRoot, "env", "dev")
@@ -65,8 +68,11 @@ async function machine(
     })
   const host = codepuppyEngine({
     sandbox, name, modelBaseURL: model.baseURL,
+    ...(options.unmanagedProbe ? { mcpCallLog: path.join(sandbox.root, `${name}-probe-calls.log`) } : {}),
     mcp: Object.fromEntries(local.map((server) => [server, {
-      type: "local", command: [process.execPath, MCP_FIXTURE], environment: { CODEPUPPY_MCP_CALL_LOG: calls },
+      // The Office identity carries the same `{workspace}` marker as its production command; ext's policy replaces it.
+      type: "local", command: [process.execPath, MCP_FIXTURE, ...(server.startsWith("codepuppy-") ? [WORKSPACE_MARKER] : [])],
+      environment: { CODEPUPPY_MCP_CALL_LOG: calls },
       ...(options.local![server] === "disabled" ? { enabled: false } : {}),
     }])),
   })
@@ -90,26 +96,31 @@ async function machine(
     for (const end = Date.now() + ms; !done(value) && Date.now() < end; await Bun.sleep(100)) value = await read()
     return value
   }
-  const sessionIn = async (directory = project) =>
-    (await at(directory)("POST", "/api/session", { location: { directory }, model: { id: "m", providerID: "codepuppy" } })).json.data as { id: string }
+  const sessionIn = async (directory = project, agent?: string) =>
+    (await at(directory)("POST", "/api/session", { location: { directory }, model: { id: "m", providerID: "codepuppy" }, ...(agent ? { agent } : {}) })).json.data as { id: string }
   /** 同一会话经 Code Mode 调一次 `<server>.echo`;返回这台机器的本机夹具累计收到的 tools/call 次数。 */
+  const callCount = () => (fs.existsSync(calls) ? fs.readFileSync(calls, "utf8").split("\n").filter((line) => line.trim()).length : 0)
   const callEcho = async (sessionID: string, server: string, directory = project) => {
     const send = at(directory)
     await send("POST", `/api/session/${sessionID}/prompt`, { text: `CP-CALL ${JSON.stringify({ name: "execute", args: { code: `return await tools[${JSON.stringify(server)}].echo({ text: "hi" })` } })}` })
     await send("POST", `/api/experimental/session/${sessionID}/wait`)
-    return fs.existsSync(calls) ? fs.readFileSync(calls, "utf8").split("\n").filter((line) => line.trim()).length : 0
+    return callCount()
   }
   const otherProject = path.join(sandbox.root, `${name}-other-project`)
   fs.mkdirSync(otherProject, { recursive: true })
-  /** 生产开关:持久写(账本 + 允许集 + codepuppy.jsonc 投影),再交 main 的运行时入口。 */
+  const write = (server: string, state: "enabled" | "disabled") => setInstallStateByKey({ type: "mcp", name: server, scope: "global", state }, {
+    globalRoot: () => root, advisoryGate: () => ({ allowed: true }), resolveEntry: async () => null,
+  })
+  const convergence = (through: EngineConnection = connection) =>
+    createManagedMcpConvergence({ root: () => root, awaitServer: async () => through, directory: () => project })
+  const converge = convergence()
+  /** 生产开关:持久写(账本 + 允许集 + codepuppy.jsonc 投影),再交 main 的唯一运行时入口(与 ext-ipc 同一顺序)。 */
   const toggle = async (server: string, state: "enabled" | "disabled") => {
-    expect(await setInstallStateByKey({ type: "mcp", name: server, scope: "global", state }, {
-      globalRoot: () => root, advisoryGate: () => ({ allowed: true }), resolveEntry: async () => null,
-    })).toMatchObject({ ok: true })
+    expect(await write(server, state)).toMatchObject({ ok: true })
     expect(findRecordV2(root, "mcp", server)?.desiredState).toBe(state)
-    await applyPackageMcpV1(`user:${server}`, project, { root: () => root, awaitServer: async () => connection })
+    await converge([server])
   }
-  return { root, project, otherProject, connection, running, at, status, until, sessionIn, callEcho, toggle }
+  return { root, project, otherProject, connection, running, at, status, until, sessionIn, callCount, callEcho, write, convergence, converge, toggle }
 }
 
 test("proof 1: a connector disabled at startup and enabled at runtime stays enabled after a Location rebuild and in another project", async () => {
@@ -160,17 +171,13 @@ test("proof 9: enable then disable of the same connector while the enable's add 
     },
   })
   try {
-    const through = { ...m.connection, url: `http://127.0.0.1:${proxy.port}` }
-    const deps = { root: () => m.root, awaitServer: async () => through }
-    const write = (state: "enabled" | "disabled") => setInstallStateByKey({ type: "mcp", name: "slow", scope: "global", state }, {
-      globalRoot: () => m.root, advisoryGate: () => ({ allowed: true }), resolveEntry: async () => null,
-    })
-    expect(await write("enabled")).toMatchObject({ ok: true })
-    const enabling = applyPackageMcpV1("user:slow", m.project, deps)
+    const converge = m.convergence({ ...m.connection, url: `http://127.0.0.1:${proxy.port}` })
+    expect(await m.write("slow", "enabled")).toMatchObject({ ok: true })
+    const enabling = converge(["slow"])
     for (let i = 0; i < 200 && held === 0; i++) await Bun.sleep(25)
     expect(held).toBe(1)
-    expect(await write("disabled")).toMatchObject({ ok: true })
-    const disabling = applyPackageMcpV1("user:slow", m.project, deps)
+    expect(await m.write("slow", "disabled")).toMatchObject({ ok: true })
+    const disabling = converge(["slow"])
     await Bun.sleep(300)
     release()
     await Promise.all([enabling, disabling])
@@ -181,4 +188,75 @@ test("proof 9: enable then disable of the same connector while the enable's add 
     release()
     proxy.stop(true)
   }
+}, 90_000)
+
+test("proof 3: toggling a connector off rejects only its own pending approval; another session's approval and answer go on, with no Location reload", async () => {
+  const m = await machine("approvals", { local: { alpha: "enabled", beta: "enabled" } })
+  expect(await m.until(() => m.status(), (s) => s.alpha === "connected" && s.beta === "connected")).toMatchObject({ alpha: "connected", beta: "connected" })
+  const send = m.at(m.project)
+  type Pending = { id: string; action: string }
+  const pendingOf = async (sessionID: string) => ((await send("GET", `/api/session/${sessionID}/permission`)).json?.data ?? []) as Pending[]
+  const waitPending = async (sessionID: string) => {
+    for (const end = Date.now() + 8000; Date.now() < end; await Bun.sleep(25)) {
+      const list = await pendingOf(sessionID)
+      if (list.length) return list
+    }
+    return []
+  }
+  const ask = async (server: string) => {
+    const session = await m.sessionIn(m.project, "codepuppy-ask")
+    await send("POST", `/api/session/${session.id}/prompt`, { text: `CP-CALL ${JSON.stringify({ name: "execute", args: { code: `return await tools[${JSON.stringify(server)}].echo({ text: "hi" })` } })}` })
+    const pending = await waitPending(session.id)
+    expect(pending.map((request) => request.action)).toEqual([`mcp:${server}:echo`])
+    return { session, request: pending[0]! }
+  }
+  const a = await ask("alpha")
+  const b = await ask("beta")
+  const setups = probeSetups()
+  // A refused durable write still requests convergence; the projection did not change, so nothing is rejected.
+  const held = tryAcquireBundleLock(m.root, { txId: "proof-3-busy-ledger" })
+  if (!held.ok) throw Error(held.reason)
+  try {
+    expect((await m.write("beta", "disabled")).ok).toBe(false)
+  } finally {
+    held.lock.release()
+  }
+  await m.converge(["beta"])
+  expect((await pendingOf(b.session.id)).map((request) => request.id)).toEqual([b.request.id])
+  await m.toggle("beta", "disabled")
+  expect(await pendingOf(b.session.id)).toEqual([])
+  expect((await pendingOf(a.session.id)).map((request) => request.id)).toEqual([a.request.id])
+  expect((await m.status()).beta).toBe("disabled")
+  expect(m.callCount()).toBe(0)
+  expect((await send("POST", `/api/session/${a.session.id}/permission/${a.request.id}/reply`, { decision: "once" })).status).toBeLessThan(300)
+  await send("POST", `/api/experimental/session/${a.session.id}/wait`)
+  // A's answer went on: its approved call reached alpha (the only server call in this machine) and the turn succeeded.
+  expect(m.callCount()).toBe(1)
+  const transcript = JSON.stringify((await send("GET", `/api/session/${a.session.id}/message`)).json)
+  expect(transcript).toContain('"tool":"alpha.echo","status":"completed"')
+  expect(transcript).toContain('"outcome":"succeeded"')
+  expect(probeSetups()).toBe(setups)
+}, 120_000)
+
+test("proof 4 (Office identity): codepuppy-pdf off at startup, on at runtime and callable, off again and unreachable from the same session, with no Location reload", async () => {
+  const m = await machine("office", { local: { "codepuppy-pdf": "disabled" } })
+  expect((await m.until(() => m.status(), (s) => s["codepuppy-pdf"] !== undefined && s["codepuppy-pdf"] !== "pending"))["codepuppy-pdf"]).toBe("disabled")
+  const session = await m.sessionIn()
+  const setups = probeSetups()
+  await m.toggle("codepuppy-pdf", "enabled")
+  expect((await m.until(() => m.status(), (s) => s["codepuppy-pdf"] === "connected"))["codepuppy-pdf"]).toBe("connected")
+  expect(await m.callEcho(session.id, "codepuppy-pdf")).toBe(1)
+  await m.toggle("codepuppy-pdf", "disabled")
+  expect((await m.until(() => m.status(), (s) => s["codepuppy-pdf"] === "disabled"))["codepuppy-pdf"]).toBe("disabled")
+  expect(await m.callEcho(session.id, "codepuppy-pdf")).toBe(1)
+  expect(probeSetups()).toBe(setups)
+}, 90_000)
+
+test("proof 5 (engine): with an unreadable allow-set a new Location starts every managed and unmanaged MCP disabled", async () => {
+  const m = await machine("unreadable", { local: { late: "enabled" }, unmanagedProbe: true })
+  expect(await m.until(() => m.status(), (s) => s.late === "connected" && s.probe === "connected")).toMatchObject({ late: "connected", probe: "connected" })
+  fs.writeFileSync(skillsEnabledPath(m.root), "{ not json")
+  await m.sessionIn(m.otherProject)
+  const later = await m.until(() => m.status(m.otherProject), (s) => s.late !== undefined && s.probe !== undefined && s.late !== "pending" && s.probe !== "pending")
+  expect(later).toMatchObject({ late: "disabled", probe: "disabled" })
 }, 90_000)

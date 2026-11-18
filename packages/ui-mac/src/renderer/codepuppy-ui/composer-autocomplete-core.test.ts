@@ -293,7 +293,22 @@ describe("buildAssembleRows — 装配弹窗(添加/AGENT/文件/扩展)", () =>
     ],
     primaries: [] as string[],
     files: [] as string[],
+    scope: "at" as "plus" | "files" | "at",
   }
+
+  test("界面优化 BR-04:「+」菜单只有 添加附件 / 计划模式 / 助手 —— 文件、扩展、终端行都不在(托盘与右栏接手)", () => {
+    const plus = buildAssembleRows({ ...base, scope: "plus", terminal: true, changedFiles: ["src/a.ts"] })
+    expect(plus.groups.map((g) => g.label)).toEqual(["添加", "AGENT"])
+    expect(plus.groups[0].rows.map((r) => (r.kind === "action" ? r.id : ""))).toEqual(["attach", "plan"])
+    expect(plus.flat.some((r) => r.kind === "file")).toBe(false)
+    expect(plus.flat.some((r) => r.kind === "action" && (r.id === "terminal" || r.id === "ext-market"))).toBe(false)
+  })
+
+  test("界面优化 BR-04:托盘「文件」= 只有文件一节(零查询钉 git 变更文件,与原「+」菜单的文件节同源)", () => {
+    const files = buildAssembleRows({ ...base, scope: "files", changedFiles: ["src/a.ts"] })
+    expect(files.groups.map((g) => g.label)).toEqual(["文件"])
+    expect(files.flat.map((r) => (r.kind === "file" ? r.path : ""))).toEqual(["src/a.ts"])
+  })
 
   test("home 默认:添加(附件+计划,无终端死行)+ AGENT + 文件提示 + 扩展单行;flat 不含提示行", () => {
     const { groups, flat } = buildAssembleRows(base)

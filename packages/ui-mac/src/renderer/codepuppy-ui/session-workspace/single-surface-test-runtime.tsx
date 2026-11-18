@@ -150,7 +150,8 @@ export function SingleSurfaceHarness() {
       identity.directory === HARNESS_IDENTITY.directory &&
       identity.sessionID === HARNESS_IDENTITY.sessionID,
   }
-  const projects = { sdk: () => recordingClient } as unknown as CodePuppyProjectsApi
+  // store:会话页托盘里的项目名读 projects.store(界面优化 BR-04);本场景没有项目。
+  const projects = { sdk: () => recordingClient, store: { projects: [] } } as unknown as CodePuppyProjectsApi
   return (
     <div data-harness-single-surface>
       <PermissionSurfaceMount />

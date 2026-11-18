@@ -151,6 +151,8 @@ export type AssembleRow =
 export type AssembleGroup = { label: string; rows: AssembleRow[]; hint?: string }
 
 /** 装配弹窗分节:添加(动作)/ AGENT(引用)/ 文件(引用)/ 扩展(动作)。
+ *  - `scope`(界面优化 BR-04):`plus` = 「+」按钮的菜单,只有 添加附件 / 计划模式 / 助手(文件、扩展、终端搬去输入框
+ *    下的托盘或右栏);`files` = 托盘「文件」,只有文件一节;`at` = 键入 `@` 的列表,保持原样(含文件搜索)。
  *  - 计划模式行随 planOn 变文案;权限档压 agent 时(readonly / ask,`#1413`)禁用并给出如实原因(不静默失效,C28);
  *  - 第三方主档(非 build/plan 的 primary)动态成模式项,无则不出现(拍板⑤);
  *  - 终端行只在终端命令可用的表面出现(home 未注册 → 整行不摆,不留死行),文案如实 = 打开
@@ -170,6 +172,7 @@ export function buildAssembleRows(input: {
   changedFiles?: string[]
   /** 终端面板在本表面是否可用(session=true / home=false)。 */
   terminal?: boolean
+  scope: "plus" | "files" | "at"
 }): { groups: AssembleGroup[]; flat: AssembleRow[] } {
   const q = input.query.toLowerCase()
   const hit = (...texts: Array<string | undefined>) => !q || texts.some((t) => (t ?? "").toLowerCase().includes(q))
@@ -183,7 +186,7 @@ export function buildAssembleRows(input: {
     desc: input.planOn ? "回到默认(build)" : "先出方案再动手(plan 档)",
     disabled: input.agentLocked ? "当前权限档固定使用它自己的 agent" : undefined,
   }
-  const actionRows = input.terminal ? [attach, term, plan] : [attach, plan]
+  const actionRows = input.terminal && input.scope === "at" ? [attach, term, plan] : [attach, plan]
   for (const r of actionRows) if (hit(r.kind === "action" ? r.label : "", (r as { desc?: string }).desc)) add.push(r)
   for (const name of input.primaries) {
     const row: AssembleRow = { kind: "mode", id: name, label: `${name} 模式`, desc: "切换本会话的主档", on: input.activeMode === name }
@@ -198,8 +201,11 @@ export function buildAssembleRows(input: {
   const files: AssembleRow[] = input.files.filter((p) => hit(p)).map((p): AssembleRow => ({ kind: "file", path: p }))
 
   const groups: AssembleGroup[] = []
-  if (add.length) groups.push({ label: "添加", rows: add })
-  if (agents.length) groups.push({ label: "AGENT", rows: agents })
+  if (input.scope !== "files") {
+    if (add.length) groups.push({ label: "添加", rows: add })
+    if (agents.length) groups.push({ label: "AGENT", rows: agents })
+  }
+  if (input.scope === "plus") return { groups, flat: groups.flatMap((g) => g.rows).filter((r) => !(r.kind === "action" && r.disabled)) }
   if (q) {
     if (files.length) groups.push({ label: "文件", rows: files })
   } else {
@@ -211,7 +217,7 @@ export function buildAssembleRows(input: {
     })
   }
   const ext: AssembleRow = { kind: "action", id: "ext-market", label: "扩展市场…", desc: "浏览连接器 / 技能 / 插件" }
-  if (hit(ext.kind === "action" ? ext.label : "", "连接器 技能 插件 扩展")) groups.push({ label: "扩展", rows: [ext] })
+  if (input.scope === "at" && hit(ext.kind === "action" ? ext.label : "", "连接器 技能 插件 扩展")) groups.push({ label: "扩展", rows: [ext] })
 
   const flat = groups.flatMap((g) => g.rows).filter((r) => !(r.kind === "action" && r.disabled))
   return { groups, flat }

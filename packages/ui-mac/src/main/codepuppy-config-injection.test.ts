@@ -357,7 +357,7 @@ describe("injectCodePuppyConfig —— 注入组合体的执行级闸门(#607)",
     const dir = path.join(root, "ext-store", key, "generations", generation)
     fs.mkdirSync(dir, { recursive: true })
     fs.writeFileSync(path.join(root, "ext-store", key, "current.json"), JSON.stringify({ generation }))
-    fs.writeFileSync(path.join(root, "skills-enabled.json"), JSON.stringify({ v: 2, keys: enabled, scoped: [] }))
+    fs.writeFileSync(path.join(root, "skills-enabled.json"), JSON.stringify({ v: 3, keys: enabled, scoped: [], mcp: [] }))
     return dir
   }
 

@@ -18,6 +18,7 @@ import type { EngineFetch } from "../src/main/in-process-engine"
 import { engineProjectTrust } from "../src/main/engine-project-trust"
 import { projectTrustIdentity } from "../src/main/project-trust-truth"
 import { recordProjectTrustDecision } from "../src/main/project-trust-truth-write"
+import { reconcileSkillsDerivation, skillsEnabledPath } from "../src/main/ext-receipt-v2"
 
 /** 真 stdio MCP 服务器(#1563 的夹具):列一个 `echo`,`CODEPUPPY_MCP_CALL_LOG` 记下每次 tools/call。 */
 export const MCP_FIXTURE = path.resolve(import.meta.dir, "../../core/test/fixture/codepuppy-mcp-startup-stdio.ts")
@@ -82,6 +83,9 @@ export type Probe = { ctx: any; runs: Record<string, number> }
 const PROBE_KEY = "__cpEngineProbe"
 /** 探针插件的状态(插件上下文 + 两个插件工具各被执行了几次);引擎在测试进程里,同一个 globalThis。 */
 export const probe = () => (globalThis as Record<string, unknown>)[PROBE_KEY] as Probe
+const PROBE_SETUPS_KEY = "__cpEngineProbeSetups"
+/** 探针插件在本进程里一共 setup 了几次:每个 Location 装载或重建都会再 setup 一次(判「没有 Location 重载」用)。 */
+export const probeSetups = () => ((globalThis as Record<string, unknown>)[PROBE_SETUPS_KEY] as number | undefined) ?? 0
 
 /** 假 main 收到的每一条消息(按到达顺序),判「安装请求到没到 main」用。 */
 export const fakeMainReceived: Array<{ type: string }> = []
@@ -199,6 +203,12 @@ export function codepuppyEngine(options: HostOptions) {
       }),
     )
   fakeMainPort()
+  // 生产启动对账在 fork 之前按账本发布允许集(ext-install-planner 的 boot reconcile → reconcileSkillsDerivation);
+  // ext 的 MCP 收口读它,读不到即停用一切非云、非项目 MCP(I-11,design v9 §4.4)。用例已经发布过的(账本写或手写的投影)原样留着。
+  if (!fs.existsSync(skillsEnabledPath(globalRoot))) {
+    const derived = reconcileSkillsDerivation(globalRoot)
+    if (!derived.ok) throw new Error(`allow-set publication failed: ${derived.reason}`)
+  }
 
   // 真 ext:2.x 只装目录形式的本地插件,入口 server.js 的 default 导出(packages/core/src/plugin/module.ts)
   const ext = path.join(sandbox.root, `${name}-ext`)
@@ -211,6 +221,7 @@ export function codepuppyEngine(options: HostOptions) {
     `export default { id: "codepuppy.test.engine-probe", setup: async (ctx) => {
   const state = { ctx, runs: ${JSON.stringify(Object.fromEntries(PROBE_TOOLS.map((tool) => [tool, 0])))} }
   globalThis.${PROBE_KEY} = state
+  globalThis.${PROBE_SETUPS_KEY} = (globalThis.${PROBE_SETUPS_KEY} ?? 0) + 1
   await ctx.tool.transform((editor) => {
     for (const name of ${JSON.stringify(PROBE_TOOLS)})
       editor.add({ name, description: name, input: { type: "object", properties: {} }, options: { codemode: false },

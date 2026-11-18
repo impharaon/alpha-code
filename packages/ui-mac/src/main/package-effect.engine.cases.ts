@@ -110,7 +110,7 @@ for (const initial of ["global", "project"] as const) test(`disabled managed ski
     const stale = readFileSync(h.file, "utf8")
     expect(await setPackageStateV1({ packageId: h.installed.packageId, state: "disabled" }, h.planner)).toMatchObject({ ok: true })
     await Bun.sleep(150) // Model an RPC round trip slower than the 100 ms watcher debounce.
-    expect(JSON.parse(readFileSync(join(h.root, "skills-enabled.json"), "utf8"))).toEqual({ v: 2, keys: [], scoped: [] })
+    expect(JSON.parse(readFileSync(join(h.root, "skills-enabled.json"), "utf8"))).toEqual({ v: 3, keys: [], scoped: [], mcp: [] })
     expect(readFileSync(h.file, "utf8")).toBe(stale)
     expect((await h.rpc("rebuild")).some((skill) => skill.name === "frontend-design")).toBe(false)
     // Watcher is paused: prove tail/evaluate exclusion with the stale explicit paths,
@@ -169,7 +169,7 @@ test("project MCP activates only in matching Locations and scope narrowing revok
     await until(() => h.rpc("tools"), items => items.includes("browser_close"))
     expect((await h.rpc("close", undefined, h.session.id)).content.some((part) => part.type === "text" && part.text.length > 0)).toBe(true)
     const projection = readFileSync(join(h.root, "skills-enabled.json"), "utf8")
-    writeFileSync(join(h.root, "skills-enabled.json"), JSON.stringify({ v: 2, keys: [], scoped: [] }))
+    writeFileSync(join(h.root, "skills-enabled.json"), JSON.stringify({ v: 3, keys: [], scoped: [], mcp: [{ name: "playwright", enabled: false }] }))
     await applyPackageMcpV1("claude:playwright", h.slot.projectDirectory, { root: () => h.root, awaitServer: h.awaitServer })
     await until(() => h.rpc("tools"), (items) => !items.includes("browser_close"))
     writeFileSync(join(h.root, "skills-enabled.json"), projection)

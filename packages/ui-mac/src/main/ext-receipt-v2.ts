@@ -22,7 +22,8 @@
 
 import * as fs from "node:fs"
 import * as path from "node:path"
-import { decodePackageAllowSet, type PackageAllowSetV2 } from "../../../ext/src/package-scope"
+import { decodePackageAllowSet, type PackageAllowSetV3 } from "../../../ext/src/package-scope"
+import { OFFICIAL_CONNECTOR_NAMES, type OfficialConnectorName } from "./official-connector-names"
 import type { InstallReceipt, InstallReceiptOrigin, InstallReceiptType } from "../preload/types"
 import { isExtensionName } from "../shared/extension-name"
 import type { AppEnvironment } from "./codepuppy-environment"
@@ -593,29 +594,52 @@ export function skillsEnabledPath(root: string): string {
   return path.join(root, SKILLS_ENABLED_FILE)
 }
 
-/** Records, package effects and claims are the authority; this is the sole v2 projection producer. */
-function enabledPackageAllowSet(records: readonly unknown[], graphs: readonly PackageGraphV1[], claims: readonly PackageClaimV1[]): PackageAllowSetV2 {
+/** I-11(design v9 §4.4「官方配方的可运行性」):本 main 进程里运行时凭据尚未按当前叶子物化的官方配方名;进程启动时为全部。
+ *  它不是开关意图,不进账本;只参与下面的投影(`mcp[].enabled` 与 `scoped` 都排除它)。只有按名的最终状态步骤
+ *  (official-connector-resources)改它,改完由调用方在 bundle 锁下经 reconcileSkillsDerivation 重发。 */
+const officialRuntimeUnavailable = new Set<string>(OFFICIAL_CONNECTOR_NAMES)
+
+/** 返回集合是否变了(变了才需要重发)。 */
+export function markOfficialRuntimeAvailable(name: OfficialConnectorName, available: boolean): boolean {
+  if (available === !officialRuntimeUnavailable.has(name)) return false
+  if (available) officialRuntimeUnavailable.delete(name)
+  else officialRuntimeUnavailable.add(name)
+  return true
+}
+
+/** Records, package effects and claims are the authority; this is the sole v3 projection producer. */
+function enabledPackageAllowSet(records: readonly unknown[], graphs: readonly PackageGraphV1[], claims: readonly PackageClaimV1[]): PackageAllowSetV3 {
   const valid = records.flatMap((record) => {
     const decoded = decodeRecordV2(record)
     return decoded.ok ? [decoded.record] : []
   })
   const keys = new Set<string>()
-  const scoped = new Map<string, PackageAllowSetV2["scoped"][number]>()
+  const scoped = new Map<string, PackageAllowSetV3["scoped"][number]>()
+  const mcp = new Map<string, boolean>()
   for (const record of valid) {
+    if (record.kind === "mcp" && record.scope.kind === "global" && !mcp.has(record.name)) mcp.set(record.name, false)
     if (record.desiredState !== "enabled" || (record.kind !== "skill" && record.kind !== "mcp")) continue
     const owners = graphs.filter((graph) => [graph.root, ...graph.children].some((node) => node.kind === record.kind && node.name === record.name))
     const independent = owners.length === 0 || findClaim(claims, record.kind, record.name)?.owners.some((owner) => {
       const parsed = parseOwnerToken(owner)
       return parsed?.kind === "standalone" || parsed?.kind === "legacy-protected"
     })
-    if (record.kind === "skill" && (independent || owners.some((graph) => graph.effect === undefined))) keys.add(`skill--${record.name}`)
+    const allProjects = independent || owners.some((graph) => graph.effect === undefined)
+    if (record.kind === "skill" && allProjects) keys.add(`skill--${record.name}`)
+    const unavailable = record.kind === "mcp" && officialRuntimeUnavailable.has(record.name)
+    if (record.kind === "mcp" && record.scope.kind === "global" && allProjects && !unavailable) mcp.set(record.name, true)
     for (const graph of owners) {
-      if (!graph.effect) continue
+      if (!graph.effect || unavailable) continue
       const entry = { kind: record.kind, name: record.name, projectPath: graph.effect.projectPath }
       scoped.set(canonicalJson(entry), entry)
     }
   }
-  return { v: 2, keys: [...keys].sort(), scoped: [...scoped].sort(([left], [right]) => left < right ? -1 : left > right ? 1 : 0).map(([, entry]) => entry) }
+  return {
+    v: 3,
+    keys: [...keys].sort(),
+    scoped: [...scoped].sort(([left], [right]) => left < right ? -1 : left > right ? 1 : 0).map(([, entry]) => entry),
+    mcp: [...mcp].sort(([left], [right]) => left < right ? -1 : left > right ? 1 : 0).map(([name, enabled]) => ({ name, enabled })),
+  }
 }
 
 function isAbsenceCode(e: unknown): boolean {
@@ -623,7 +647,7 @@ function isAbsenceCode(e: unknown): boolean {
   return code === "ENOENT" || code === "ENOTDIR"
 }
 
-function readDerivation(file: string): PackageAllowSetV2 | "absent" | "unknown" {
+function readDerivation(file: string): PackageAllowSetV3 | "absent" | "unknown" {
   let text: string
   try {
     text = fs.readFileSync(file, "utf8")
@@ -637,7 +661,7 @@ function readDerivation(file: string): PackageAllowSetV2 | "absent" | "unknown" 
   }
 }
 
-const derivationTextOf = (allowSet: PackageAllowSetV2): string => JSON.stringify(allowSet, null, 2) + "\n"
+const derivationTextOf = (allowSet: PackageAllowSetV3): string => JSON.stringify(allowSet, null, 2) + "\n"
 
 export type SkillsDerivationOutcome =
   | { ok: true }
@@ -709,11 +733,20 @@ function writeLedgerFile(
     const next = enabledPackageAllowSet(records, v3.packageGraphs, v3.claims)
     const cur = readDerivation(derivationFile)
     // Scope is part of each member's identity: all→project and alpha→beta both revoke before adding.
-    const intersection: PackageAllowSetV2 | undefined = cur === "absent" ? undefined : cur === "unknown" ? { v: 2, keys: [], scoped: [] } : {
-      v: 2,
-      keys: cur.keys.filter((key) => next.keys.includes(key)),
-      scoped: cur.scoped.filter((entry) => next.scoped.some((item) => item.kind === entry.kind && item.name === entry.name && item.projectPath === entry.projectPath)),
-    }
+    // MCP: union of both versions' names, enabled only where both versions say enabled (design v9 §4.4).
+    const narrowedMcp = (current: PackageAllowSetV3["mcp"]) =>
+      [...new Set([...current, ...next.mcp].map((entry) => entry.name))].sort().map((name) => ({
+        name,
+        enabled: current.some((entry) => entry.name === name && entry.enabled) && next.mcp.some((entry) => entry.name === name && entry.enabled),
+      }))
+    const intersection: PackageAllowSetV3 | undefined = cur === "absent" ? undefined : cur === "unknown"
+      ? { v: 3, keys: [], scoped: [], mcp: next.mcp.map((entry) => ({ name: entry.name, enabled: false })) }
+      : {
+        v: 3,
+        keys: cur.keys.filter((key) => next.keys.includes(key)),
+        scoped: cur.scoped.filter((entry) => next.scoped.some((item) => item.kind === entry.kind && item.name === entry.name && item.projectPath === entry.projectPath)),
+        mcp: narrowedMcp(cur.mcp),
+      }
     if (intersection && canonicalJson(intersection) !== canonicalJson(cur)) {
       try {
         writeFileAtomicSync(derivationFile, derivationTextOf(intersection))

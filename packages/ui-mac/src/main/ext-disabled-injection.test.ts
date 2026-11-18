@@ -2,13 +2,14 @@
 // disabled 扩展永不被引擎加载。真盘临时根,零 mock。
 // `#1667`:OpenCode 2 形状。MCP 按名字整条替换(只写 `enabled:false` 叶子会被丢弃),所以写完整的中和条目;
 // agent 写 `{ disabled: true }`;2.x 没有 v1 的 `mode` 键,那一面随之不再写。
+// I-11(design v9 §4.4「启动内联层」):受管全局 MCP 的开不开改由允许集 v3 经 ext 收口决定;这里对 MCP 只剩会话级授权的强制停用。
 import { afterEach, beforeEach, describe, expect, test } from "bun:test"
 import * as fs from "node:fs"
 import * as os from "node:os"
 import * as path from "node:path"
 import { injectDisabledOverrides } from "./ext-disabled-injection"
 import { NEUTRALIZED_MCP_SERVER } from "./mcp-default-deny"
-import { upsertRecordV2, type UpsertInput } from "./ext-receipt-v2"
+import { reconcileSkillsDerivation, skillsEnabledPath, upsertRecordV2, type UpsertInput } from "./ext-receipt-v2"
 
 let root: string
 let saved: string | undefined
@@ -36,23 +37,23 @@ const record = (over: Partial<UpsertInput> & { name: string; kind: UpsertInput["
 }
 
 describe("injectDisabledOverrides（主权注入）", () => {
-  test("disabled mcp → 注入完整的中和条目(disabled:true);disabled agent → {disabled:true}", () => {
+  test("I-11:账本停用的 global MCP 不再写进内联层(定义原样,开关由允许集决定);disabled agent → {disabled:true}", () => {
     record({ name: "m", kind: "mcp", configKey: "mcp.m", desiredState: "disabled" })
     record({ name: "a", kind: "agent", configKey: "agent.a", desiredState: "disabled" })
-    const config: { mcp?: { servers?: Record<string, unknown> }; agents?: Record<string, unknown> } = {}
+    const config: { mcp?: { servers?: Record<string, unknown> }; agents?: Record<string, unknown> } = { mcp: { servers: { m: { type: "local", command: ["x"] } } } }
     injectDisabledOverrides(config, { userDataPath: root, channel: "stable" })
-    expect(config.mcp!.servers!.m).toEqual({ ...NEUTRALIZED_MCP_SERVER })
+    expect(config.mcp!.servers!.m).toEqual({ type: "local", command: ["x"] })
     expect(config.agents!.a).toEqual({ disabled: true })
   })
 
-  test("已有治理定义 → MCP 保留 stdio 定义并禁用,开启时仍可连接;agent 保留其余字段只加 disabled", () => {
-    record({ name: "m", kind: "mcp", configKey: "mcp.m", desiredState: "disabled" })
+  test("会话级授权强制停用的 MCP 保留已有治理定义只加 disabled;agent 保留其余字段只加 disabled", () => {
+    record({ name: "m", kind: "mcp", configKey: "mcp.m", desiredState: "enabled" })
     record({ name: "a", kind: "agent", configKey: "agent.a", desiredState: "disabled" })
     const config = {
       mcp: { servers: { m: { type: "local", command: ["x"] } } as Record<string, unknown> },
       agents: { a: { description: "kept" } } as Record<string, unknown>,
     }
-    injectDisabledOverrides(config, { userDataPath: root, channel: "stable" })
+    injectDisabledOverrides(config, { userDataPath: root, channel: "stable", sessionGrantIds: () => ({ ok: true as const, ids: new Set(["mcp:m"]) }) })
     expect(config.mcp.servers.m).toEqual({ type: "local", command: ["x"], disabled: true })
     expect(config.agents.a).toEqual({ description: "kept", disabled: true })
   })
@@ -120,7 +121,7 @@ describe("#397 session-grant 强制(注入面)", () => {
   })
 })
 
-test("project-effect MCP remains disabled in the global injected config even when its package is enabled", async () => {
+test("project-effect MCP: the injection leaves it alone and the v3 projection keeps it off for all projects", async () => {
   const { applyPackageMutation } = await import("./ext-receipt-v2")
   const { bundleOwner, computeInstalledGraphDigest } = await import("./ext-package-ledger-v3")
   const node = { kind: "mcp" as const, name: "scoped", componentId: "mcp:scoped", required: true, manifestDigest: "sha256:" + "a".repeat(64) }
@@ -133,10 +134,13 @@ test("project-effect MCP remains disabled in the global injected config even whe
   }).ok).toBe(true)
   const config = { mcp: { servers: { scoped: { type: "remote", url: "https://example.test/mcp", disabled: false } } } }
   injectDisabledOverrides(config, { userDataPath: root, channel: "stable" })
-  expect(config.mcp.servers.scoped.disabled).toBe(true)
+  expect(config.mcp.servers.scoped.disabled).toBe(false)
+  const projection = JSON.parse(fs.readFileSync(skillsEnabledPath(root), "utf8"))
+  expect(projection.mcp).toEqual([{ name: "scoped", enabled: false }])
+  expect(projection.scoped).toEqual([{ kind: "mcp", name: "scoped", projectPath: root }])
 })
 
-test.each(["unattributable-record","broken-claims"])("R14 A8 disabled and project MCP stay disabled with %s", async defect => {
+test.each(["unattributable-record","broken-claims"])("R14 A8 disabled and project MCP stay off in the boot projection with %s", async defect => {
  const {applyPackageMutation,readPackageLedgerStateV1}=await import("./ext-receipt-v2")
  const {bundleOwner,computeInstalledGraphDigest}=await import("./ext-package-ledger-v3")
  record({name:"disabled-remote",kind:"mcp",configKey:"mcp.disabled-remote",desiredState:"disabled"})
@@ -149,9 +153,9 @@ test.each(["unattributable-record","broken-claims"])("R14 A8 disabled and projec
  if(defect==="unattributable-record")document.records.push(null)
  const text=JSON.stringify(document);fs.writeFileSync(file,text)
  expect(readPackageLedgerStateV1(root,{sideEffectFree:true}).ok).toBe(false)
- const config={mcp:{servers:{"disabled-remote":{type:"remote",url:"https://example.test/disabled",disabled:false},"scoped-remote":{type:"remote",url:"https://example.test/scoped",disabled:false}}}}
- injectDisabledOverrides(config,{userDataPath:root,channel:"stable"})
- expect(config.mcp.servers["disabled-remote"].disabled).toBe(true)
- expect(config.mcp.servers["scoped-remote"].disabled).toBe(true)
+ // I-11: the authority moved from the inline layer to the v3 projection the boot reconcile publishes and ext reads.
+ expect(reconcileSkillsDerivation(root).ok).toBe(true)
+ const projection=fs.existsSync(skillsEnabledPath(root))?JSON.parse(fs.readFileSync(skillsEnabledPath(root),"utf8")):undefined
+ for(const name of ["disabled-remote","scoped-remote"]) expect(projection?.mcp.some((entry:{name:string;enabled:boolean})=>entry.name===name&&entry.enabled)??false).toBe(false)
  expect(fs.readFileSync(file,"utf8")).toBe(text)
 })

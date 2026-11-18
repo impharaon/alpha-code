@@ -1277,4 +1277,6 @@ Q3/Q4 的代码事实：启动注入把账本停用的 MCP/助手写进引擎**�
 ### 偏离记录
 
 - 2026-11-18 · 被拒审批不带说明文字：编排器裁决 ② 曾要求 main 拒绝时带渲染进程原来的本地化原因，随后撤回。owner（2026-11-18）原话：「逻辑尽可能简洁，不必要的 连接器已停用的 说明是否有必要。」保持本节原计划：main 拒绝不带可选 `message` · 本提交。
-- 2026-11-18 · 红例经宿主跑：本机测试闸门只认 `*.test.ts`，所以宿主 `src/main/managed-mcp-toggle.engine.test.ts` 随红例一起落（条数在转绿时按实测钉），顺序第 1 步的命令改为 `bun test src/main/managed-mcp-toggle.engine.test.ts`。C′ 上实跑 3 fail：证明 1 重建后 `disabled`（Q3）、证明 2 重建后 `connected`（坐实 design「仍属推断」②）、证明 9 停在 `connected` · 本提交。
+- 2026-11-18 · 红例经宿主跑：本机测试闸门只认 `*.test.ts`，所以宿主 `src/main/managed-mcp-toggle.engine.test.ts` 随红例一起落（条数在转绿时按实测钉），顺序第 1 步的命令改为 `bun test src/main/managed-mcp-toggle.engine.test.ts`。C′ 上实跑 3 fail：证明 1 重建后 `disabled`（Q3）、证明 2 重建后 `connected`（坐实 design「仍属推断」②）、证明 9 停在 `connected` · `30d752f3db`。
+- 2026-11-18 · 新增纯常量模块 `packages/ui-mac/src/main/official-connector-names.ts`（不在改动表里）：允许集唯一写入方 `ext-receipt-v2.ts` 要用官方配方名算不可运行集合，它是纯 fs 模块且在 sidecar 的 import 闭包里，而 `official-connector-recipes.ts` 会带进钥匙串与子进程。名字只在新模块定义一次，`official-connector-recipes.ts` 原样再导出，导入方不变 · 本提交。
+- 2026-11-18 · `codepuppy-engine.ts` 只在用例还没有允许集时才用生产生产者发布（`composer-tier-matrix` 的技能翻代用例启动前手写了投影，无条件重写会抹掉它）· 本提交。

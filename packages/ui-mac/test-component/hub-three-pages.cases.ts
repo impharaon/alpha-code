@@ -238,7 +238,7 @@ test("catalog package owns one installed row across pages with its switch in the
   expect(q('[data-installed-row="skill:safe-refactor"]')).toBeInstanceOf(HTMLElement)
   expect(q('[data-group="project"] [data-installed-row="skill:supabase"]')?.textContent).toContain("supabase")
   const row = q('[data-installed-package="package:supabase"]')!
-  expect(qa("button", row).map((button) => button.textContent?.trim())).toEqual(["…"])
+  expect(qa("button", row).map((button) => button.getAttribute("data-more") ?? "")).toEqual(["package:package:supabase"])
   click(q("[data-more]", row))
   await waitFor(() => expect(q('[role="switch"]')).toBeInstanceOf(HTMLElement))
   expect(document.body.textContent).toContain("管理")
@@ -255,7 +255,8 @@ test("package plus installs directly before separate credentials without an inst
   mount()
   await waitFor(() => expect(q('[data-package-card="package:github"]')).toBeInstanceOf(HTMLElement))
   const card = q('[data-package-card="package:github"]')!
-  expect(q("button", card)?.textContent?.trim()).toBe("+")
+  expect(qa("button", card).map((button) => [button.hasAttribute("data-iact"), button.getAttribute("aria-label")?.startsWith("安装")])).toEqual([[true, true]])
+  expect(q("button svg", card)).toBeInstanceOf(SVGElement)
   click(q("button", card))
   await waitFor(() => expect(calls.installPackage).toEqual(["package:github"]))
   expect(document.body.textContent).not.toContain("确认安装")
@@ -401,7 +402,7 @@ test("AC1 定制中心顶层只有「连接器」「技能」「助手」三个�
     ["connectors", zh["codepuppy.ext.tabConnectors"]],
   ] as const) {
     click(q(`[data-tab="${key}"]`))
-    await waitFor(() => expect(q(".codepuppy-ext-pagehd h1")?.textContent).toBe(title))
+    await waitFor(() => expect(q(".codepuppy-ext-tab[data-active]")?.textContent).toBe(title))
     expect(q(`[data-tab="${key}"]`)?.hasAttribute("data-active")).toBe(true)
   }
   // 原页签的去处(批准稿「页签方案」表):套件与云能力是连接器页的两组。
@@ -418,10 +419,10 @@ test("AC2 每页只有标题、一行副标题、搜索框和「添加 ▾」;�
     ["agents", "codepuppy.ext.agentsSub", "codepuppy.ext.searchAgents"],
   ] as const) {
     click(q(`[data-tab="${key}"]`))
-    await waitFor(() => expect(q(".codepuppy-ext-pagehd .codepuppy-ext-sub")?.textContent).toBe(zh[sub]))
+    await waitFor(() => expect(q(".codepuppy-ext-ph-desc")?.textContent).toBe(zh[sub]))
     const head = q(".codepuppy-ext-pagehd")!
     expect(q<HTMLInputElement>("input[type='search']", head)?.placeholder).toBe(zh["codepuppy.ext.sourceSearchPlaceholder"])
-    expect(q("[data-more='add']", head)?.textContent).toBe(`${zh["codepuppy.ext.add"]} ▾`)
+    expect(q("[data-more='add']", head)?.textContent).toBe(zh["codepuppy.ext.add"])
     // 页上不再有筛选条、说明框;技能页「推荐 / 系统」两个分段都看一遍。
     for (const segment of key === "connectors" ? [null] : ["recommended", "system"]) {
       if (segment) click(q(`[data-segment="${segment}"]`))
@@ -502,7 +503,7 @@ test("AC5 每页顶部「已安装」一组,已装行的「…」含停用 / 移
   mount("skills")
   await waitFor(() => expect(q("[data-group='installed'] [data-installed-row='skill:safe-refactor']")).toBeInstanceOf(HTMLElement))
   // 「已安装」是这一页的第一组。
-  expect(q(".codepuppy-ext-pagehd ~ .codepuppy-ext-secrow .codepuppy-ext-overline")?.textContent).toBe(zh["codepuppy.ext.tabInstalled"])
+  expect(q(".codepuppy-ext-ph-desc + .codepuppy-ext-grp .codepuppy-ext-grp-toggle")?.textContent).toContain(zh["codepuppy.ext.tabInstalled"])
   const row = q("[data-installed-row='skill:safe-refactor']")!
   expect(await openMenu(q("[data-more]", row))).toEqual(["disable", "remove", "settings"])
   expect(qa("[data-menu] [data-menu-item]").map((item) => item.textContent)).toEqual([
@@ -564,7 +565,7 @@ test("AC6 需要令牌的扩展包仍可直接添加,安装与令牌填写分开
   await waitFor(() => expect(q("[data-package-card='package:github-official']")).toBeInstanceOf(HTMLElement))
   const row = q("[data-package-card='package:github-official']")!
   expect(q(".codepuppy-ext-kit-desc", row)?.textContent).toBe(sample.presentation.description)
-  expect(qa("button", row).map((button) => button.textContent?.trim())).toEqual(["+"])
+  expect(qa("button", row).map((button) => [button.hasAttribute("data-iact"), button.getAttribute("aria-label")?.startsWith("安装")])).toEqual([[true, true]])
   expect(row.textContent).not.toContain("GITHUB_PERSONAL_ACCESS_TOKEN")
   expect(document.body.textContent).not.toContain("需要先处理")
   expect(document.body.textContent).not.toContain("处理前置条件")
@@ -611,7 +612,7 @@ test("AC5 每页「已安装」组上的「全部更新」只更新这一页的�
   ]
   mount("connectors")
   await waitFor(() => expect(q("[data-installed-row='mcp:fetch'] [data-update-row]")).toBeInstanceOf(HTMLElement))
-  const updateAll = () => qa(".codepuppy-ext-secrow .codepuppy-ext-link").find((node) => node.textContent === zh["codepuppy.ext.updateAll"]) ?? null
+  const updateAll = () => qa(".codepuppy-ext-grp-h .codepuppy-ext-link").find((node) => node.textContent === zh["codepuppy.ext.updateAll"]) ?? null
   click(updateAll())
   // 连接器的更新走确认框重装(既有行为);技能一条都不许被碰。
   await waitFor(() => expect(q("[role='dialog']")).toBeInstanceOf(HTMLElement))
@@ -675,7 +676,7 @@ test("#1658 AC2 installed cloud catalog card says installed and cannot add again
     await installedCloud()
     if (!installed) { receipts = []; installedPackages = [] }
     mount()
-    await waitFor(() => expect(q(installed ? "[data-installed-package] [data-more]" : "[data-package-card] button")?.textContent).toBe(installed ? "…" : "+"))
+    await waitFor(() => expect(q(installed ? "[data-installed-package] [data-more]" : "[data-package-card] [data-iact]")).toBeInstanceOf(HTMLElement))
     if (installed) expect(q("[data-package-card]")).toBeNull()
     expect(calls.installCatalog).toEqual([])
   }
@@ -815,7 +816,8 @@ test("enabled package whose local connector failed to start shows a localized fa
   mcpStates.github = v1McpStatus({ status: "failed", error: "[codepuppy:handshake_timeout] Request timed out (handshake_timeout)" }) as typeof mcpStates.github
   hubRows = [hubRow(entry.root, "github", "mcp", "reload-pending", "not-loaded"), hubRow(entry.prelude.packageId, "github", "package", "reload-pending", "not-loaded")]
   mount()
-  await waitFor(() => expect(q('[data-installed-package] .codepuppy-ext-kit-desc[data-err]')?.textContent).toBe("未能启用：启动超时"))
+  await waitFor(() => expect(q('[data-installed-package] .codepuppy-ext-kit-desc[data-err]')?.textContent).toBe("启动超时"))
+  expect(q('[data-installed-package] [data-row-status]')?.textContent).toBe("未能启用")
   expect(q('[data-installed-package]')?.textContent).not.toContain("正在生效")
   expect(q('[data-installed-package] .codepuppy-ext-kit-desc')?.textContent).not.toContain("Request timed out")
 })
@@ -839,7 +841,8 @@ test("package whose last reload failed shows a localized short reason and keeps 
   const raw = "official-connector-needs-reentry: runtime refresh failed"
   hubRows = [{ ...hubRow(entry.root, "github", "mcp", "reload-pending"), stateReason: { code: "reload-failed", detail: raw } }]
   mount()
-  await waitFor(() => expect(q('[data-installed-package] .codepuppy-ext-kit-desc[data-err]')?.textContent).toBe("未能启用：上次未能生效"))
+  await waitFor(() => expect(q('[data-installed-package] .codepuppy-ext-kit-desc[data-err]')?.textContent).toBe("上次未能生效"))
+  expect(q('[data-installed-package] [data-row-status]')?.textContent).toBe("未能启用")
   expect(q('[data-installed-package] details')?.textContent).toContain(raw)
 })
 
@@ -936,7 +939,7 @@ test("package management uses the existing permission editor and removes once wi
   mount()
   await managePackage(entry.prelude.packageId)
   expect(q('[data-package-detail]')?.textContent).toContain("2 个技能 · 1 个连接器")
-  const permissionButton = qa('.codepuppy-settings-group button').find((button) => button.textContent === "更改")!
+  const permissionButton = qa('.codepuppy-ext-kv-sec button').find((button) => button.textContent === "更改")!
   click(permissionButton)
   expect(q('[data-tools-live]')).toBeInstanceOf(HTMLElement)
   expect(q('[data-tools-state="no-project"]')).toBeInstanceOf(HTMLElement)
@@ -978,7 +981,7 @@ test("graph marketplace source and notRunning facts reach the installed row and 
     mount()
     const source = ecosystem === "claude" ? "Claude 插件市场" : "Codex 插件市场"
     await waitFor(() => expect(q('[data-installed-package]')?.textContent).toContain(source))
-    expect(q('[data-installed-package]')?.textContent).toContain("未能启用：")
+    expect(q('[data-installed-package] [data-row-status]')?.textContent).toBe("未能启用")
     expect(q('[data-installed-package]')?.textContent).toContain("Code Puppy 不在引擎里运行第三方插件代码")
     await managePackage(entry.prelude.packageId)
     expect(q('[data-package-detail]')?.textContent).toContain(source)
@@ -1032,7 +1035,10 @@ test("package management navigation survives a closed hub and a later reopen", a
   expect(q('[data-package-detail]')).toBeNull()
   openPackageManagement(entry.prelude.packageId)
   await waitFor(() => expect(q('[data-package-detail]')?.getAttribute("data-package-detail")).toBe(entry.prelude.packageId))
-  click(q('.codepuppy-ext-close'))
+  // 顶级页面没有关闭按钮(冻结稿):Esc 先退出管理页、再离开定制中心(侧栏入口同样关闭)。
+  document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }))
+  await waitFor(() => expect(q('[data-package-detail]')).toBeNull())
+  document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }))
   await waitFor(() => expect(extHubOpen()).toBe(false))
   expect(q('[data-package-detail]')).toBeNull()
   openPackageManagement(entry.prelude.packageId)

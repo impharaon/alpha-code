@@ -1,0 +1,118 @@
+/* 「接入其它服务」对话框(冻结稿 `#hub-custom-service`):组件库 Dialog + Input + Button,字段竖排,标签在上。Tokens only. */
+.a-dialog-panel:has(> .a-dialog-body > .a-csd-form) {
+  width: min(480px, 92vw);
+}
+.a-dialog-panel:has(> .a-dialog-body > .a-csd-form) .a-dialog-header,
+.a-dialog-panel:has(> .a-dialog-body > .a-csd-form) .a-dialog-footer {
+  border-color: var(--a-hairline);
+}
+.a-csd-grow {
+  flex: 1;
+}
+.a-csd-fld {
+  margin-bottom: 14px;
+}
+.a-csd-fld:last-of-type {
+  margin-bottom: 0;
+}
+.a-csd-fld > label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+  font-size: var(--a-text-sm);
+  font-weight: var(--a-weight-medium);
+  color: var(--a-text);
+}
+.a-csd-fld .a-field {
+  --_h: 34px;
+}
+.a-csd-aside {
+  margin-left: auto;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--a-accent);
+  font: inherit;
+  font-weight: var(--a-weight-normal);
+  cursor: pointer;
+}
+.a-csd-help {
+  margin-top: 5px;
+  font-size: var(--a-text-xs);
+  color: var(--a-text-tertiary);
+}
+.a-csd-seg {
+  display: flex;
+  padding: 2px;
+  gap: 2px;
+  border-radius: var(--a-radius-sm);
+  background: var(--a-bg-muted);
+}
+.a-csd-seg button {
+  flex: 1;
+  padding: 5px 10px;
+  border: none;
+  border-radius: var(--a-radius-xs);
+  background: transparent;
+  color: var(--a-text-secondary);
+  font: inherit;
+  font-size: var(--a-text-sm);
+  text-align: center;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.a-csd-seg button[aria-pressed="true"] {
+  background: var(--a-surface);
+  color: var(--a-text);
+  box-shadow: var(--a-shadow-xs);
+}
+.a-csd-models {
+  flex-wrap: wrap;
+  height: auto;
+  min-height: var(--_h);
+  padding-top: 3px;
+  padding-bottom: 3px;
+}
+.a-csd-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 22px;
+  padding: 0 6px 0 8px;
+  border-radius: var(--a-radius-xs);
+  background: var(--a-bg-muted);
+  font-size: var(--a-text-xs);
+  color: var(--a-text);
+}
+.a-csd-chip button {
+  display: inline-flex;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--a-text-tertiary);
+  cursor: pointer;
+}
+.a-csd-chip svg {
+  width: 12px;
+  height: 12px;
+  stroke: currentColor;
+  stroke-width: 2.4;
+  fill: none;
+  stroke-linecap: round;
+}
+.a-csd-models .a-field-input {
+  min-width: 120px;
+  height: 22px;
+}
+.a-csd-status {
+  margin: 12px 0 0;
+  font-size: var(--a-text-xs);
+  color: var(--a-text-secondary);
+}
+.a-csd-status.ok {
+  color: var(--a-success);
+}
+.a-csd-status.err {
+  color: var(--a-error-on-subtle);
+}

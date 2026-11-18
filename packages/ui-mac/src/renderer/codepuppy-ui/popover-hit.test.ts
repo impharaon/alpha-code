@@ -40,7 +40,7 @@ describe("pathHitsPopover — REQ-061 composedPath 判定", () => {
     expect(pathHitsPopover([])).toBe(false)
   })
 
-  test("POP_CLASSES 覆盖两种弹层根形态(a-pop / a-pop-wrap)", () => {
-    expect([...POP_CLASSES]).toEqual(["a-pop", "a-pop-wrap"])
+  test("POP_CLASSES 覆盖弹层根形态(a-pop / a-pop-wrap)与弹层里发起的对话框(a-dialog-root)", () => {
+    expect([...POP_CLASSES]).toEqual(["a-pop", "a-pop-wrap", "a-dialog-root"])
   })
 })

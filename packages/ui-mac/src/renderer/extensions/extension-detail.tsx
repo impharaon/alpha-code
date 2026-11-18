@@ -17,7 +17,7 @@ import "../codepuppy-ui/settings.css"
 import { hubRowFor, hubStateView, type ExtensionsApi, type HubAgent } from "./use-extensions"
 import { CloudDispatchBox } from "./cloud-dispatch-box"
 import { CloudFormBox } from "./cloud-form-box"
-import { extensionError, catalogDescription, iconFor, iconForRow, PackageLogo, sourceLabel, typeLabel, Svg, LockIc } from "./ext-presentation"
+import { extensionError, catalogDescription, iconFor, iconForRow, PackageLogo, sourceLabel, typeLabel, Svg, LockIc, HubIc, RowStatus } from "./ext-presentation"
 import { ExtGrantedCapRow } from "./ext-authz"
 import { inventoryRowFor, inventoryInstallRow, ownershipRows, trustRows, runtimeSurfaceLabelKey, supportTierLabelKey, type PresentRow } from "./ext-inventory-present"
 import { derivePackFacts, formatPackBytes } from "./ext-pack-facts"
@@ -54,6 +54,8 @@ export function InstalledPackageDetail(props: {
   directory?: string
   menu: JSX.Element
   error?: string
+  /** 返回的去处(来源页签名),冻结稿 `#hub-manage` 的「‹ 连接器」。 */
+  crumb?: string
   onBack: () => void
 }) {
   const presentation = () => installedPackagePresentation(props.pack)
@@ -73,16 +75,19 @@ export function InstalledPackageDetail(props: {
     () => props.directory,
     (directory) => window.api.toolPolicy.inventory({ directory }),
   )
-  const policyText = () => {
+  const toolStates = () => {
     const result = policy()
-    if (!result?.ok) return t("codepuppy.ext.packagePolicyUnavailable")
-    const states = result.inventory.services
+    if (!result?.ok) return []
+    return result.inventory.services
       .filter((service) =>
         props.pack.components.some(
           (component) => component.kind === service.source && component.name === service.origin,
         ),
       )
       .flatMap((service) => service.tools.map((tool) => tool.effective.state))
+  }
+  const policyText = () => {
+    const states = toolStates()
     if (!states.length) return t("codepuppy.ext.packagePolicyUnavailable")
     return [...new Set(states)]
       .map((state) =>
@@ -115,20 +120,24 @@ export function InstalledPackageDetail(props: {
     }
   }
   const tokenAccount = () => { const entry = account(); return entry?.kind === "secret" ? entry : undefined }
+  // 名称旁的一个词:取第一件没做完的账户事。
+  const pending = () => {
+    const item = items().find((entry) => (entry.kind === "secret" ? !entry.saved : entry.kind === "mcp-oauth" ? !entry.authenticated : false))
+    if (!item) return undefined
+    return item.kind === "secret"
+      ? t(item.prerequisiteId === "mcp:dbhub-readonly#DSN" ? "codepuppy.ext.packagePendingSqliteAddress" : "codepuppy.ext.packagePendingToken")
+      : t("codepuppy.ext.packagePendingLogin")
+  }
   return (
     <div class="codepuppy-ext-detail" data-package-detail={props.pack.packageId}>
       <nav class="codepuppy-ext-crumbs">
         <button class="codepuppy-ext-crumb-link" onClick={props.onBack}>
-          <Svg d="M14 6l-6 6 6 6" />
-          {t("codepuppy.ext.back")}
+          <HubIc name="left" size={14} />
+          {props.crumb ?? t("codepuppy.ext.back")}
         </button>
-        <span>{props.label}</span>
       </nav>
       <header class="codepuppy-ext-dhead">
-        <span
-          class="codepuppy-ext-dhead-ic"
-          style={{ background: packageListingTextV1(props.view?.listing, "brandColor") ?? "var(--a-accent-solid)" }}
-        >
+        <span class="codepuppy-ext-dhead-ic">
           <PackageLogo listing={props.view?.listing} fallback={props.label} />
         </span>
         <div class="codepuppy-ext-dhead-body">
@@ -137,67 +146,52 @@ export function InstalledPackageDetail(props: {
           </div>
           <p class="codepuppy-ext-dabout">{props.view?.presentation.description}</p>
         </div>
+        <Show when={pending()}>{(text) => <RowStatus tone="warn" text={text()} />}</Show>
         <div class="codepuppy-ext-dhead-act">{props.menu}</div>
       </header>
-      <section class="codepuppy-settings-group">
-        <h3>{t("codepuppy.ext.packagePermissions")}</h3>
-        <div class="codepuppy-settings-row">
-          <div class="codepuppy-settings-row-copy">
-            <strong>{t("codepuppy.ext.packageUseTools")}</strong>
-            <small>{policyText()}</small>
-          </div>
-          <button class="codepuppy-ext-add" onClick={() => setEditingPolicy(!editingPolicy())}>
-            {t("codepuppy.ext.packageChange")}
-          </button>
-        </div>
-        <Show when={editingPolicy()}>
-          <CodePuppySettingsTools open active directory={props.directory} api={window.api.toolPolicy} />
-        </Show>
-      </section>
       <Show when={!authorization.loading}>
-        <section class="codepuppy-settings-group">
+        <section class="codepuppy-ext-kv-sec">
           <h3>{t("codepuppy.ext.packageAccounts")}</h3>
           <For each={items()}>
             {(item) => (
-              <div class="codepuppy-settings-row">
-                <div class="codepuppy-settings-row-copy">
-                  <strong>
-                    {t(item.kind === "secret" ? (item.prerequisiteId === "mcp:dbhub-readonly#DSN" ? "codepuppy.ext.packageSqliteAddress" : "codepuppy.ext.packageToken") : "codepuppy.ext.packageAccount", {
-                      name: props.label,
-                    })}
-                  </strong>
-                  <small>
-                    {item.kind === "secret"
-                      ? t(item.saved ? "codepuppy.ext.packageTokenSaved" : item.prerequisiteId === "mcp:dbhub-readonly#DSN" ? "codepuppy.ext.packagePendingSqliteAddress" : "codepuppy.ext.packagePendingToken")
-                      : item.kind === "mcp-oauth"
-                        ? t(
-                            item.authenticated
-                              ? "codepuppy.ext.packageAccountReady"
-                              : "codepuppy.ext.packagePendingLogin",
-                          )
-                        : t(item.ready ? "codepuppy.ext.packageAccountReady" : "codepuppy.ext.packagePendingLogin")}
-                  </small>
-                </div>
+              <div class="codepuppy-ext-kv-row">
+                <span class="k">
+                  {t(item.kind === "secret" ? (item.prerequisiteId === "mcp:dbhub-readonly#DSN" ? "codepuppy.ext.packageSqliteAddress" : "codepuppy.ext.packageToken") : "codepuppy.ext.packageAccount", {
+                    name: props.label,
+                  })}
+                </span>
+                <span class="v">
+                  {item.kind === "secret"
+                    ? t(item.saved ? "codepuppy.ext.packageTokenSaved" : item.prerequisiteId === "mcp:dbhub-readonly#DSN" ? "codepuppy.ext.packagePendingSqliteAddress" : "codepuppy.ext.packagePendingToken")
+                    : item.kind === "mcp-oauth"
+                      ? t(item.authenticated ? "codepuppy.ext.packageAccountReady" : "codepuppy.ext.packagePendingLogin")
+                      : t(item.ready ? "codepuppy.ext.packageAccountReady" : "codepuppy.ext.packagePendingLogin")}
+                  <Show when={item.kind === "mcp-oauth" && !item.authenticated}>
+                    <small>{t("codepuppy.ext.packageLoginBrowser", { name: props.label })}</small>
+                  </Show>
+                </span>
                 <Show when={item.kind !== "connection"}>
-                  <button
-                    class="codepuppy-ext-add"
-                    data-package-secret={item.kind === "secret" ? "" : undefined}
-                    data-package-login={item.kind === "mcp-oauth" ? "" : undefined}
-                    disabled={busy()}
-                    onClick={() => {
-                      setError("")
-                      setAccount(item)
-                      if (item.kind === "mcp-oauth") void submit()
-                    }}
-                  >
-                    {item.kind === "secret"
-                      ? t(item.saved ? "codepuppy.ext.packageChangeToken" : item.prerequisiteId === "mcp:dbhub-readonly#DSN" ? "codepuppy.ext.packageFillSqliteAddress" : "codepuppy.ext.packageFillToken")
-                      : t(
-                          item.kind === "mcp-oauth" && item.authenticated
-                            ? "codepuppy.ext.packageRelogin"
-                            : "codepuppy.ext.packageLogin",
-                        )}
-                  </button>
+                  <span class="act">
+                    <button
+                      class="codepuppy-ext-add"
+                      data-package-secret={item.kind === "secret" ? "" : undefined}
+                      data-package-login={item.kind === "mcp-oauth" ? "" : undefined}
+                      disabled={busy()}
+                      onClick={() => {
+                        setError("")
+                        setAccount(item)
+                        if (item.kind === "mcp-oauth") void submit()
+                      }}
+                    >
+                      {item.kind === "secret"
+                        ? t(item.saved ? "codepuppy.ext.packageChangeToken" : item.prerequisiteId === "mcp:dbhub-readonly#DSN" ? "codepuppy.ext.packageFillSqliteAddress" : "codepuppy.ext.packageFillToken")
+                        : t(
+                            item.kind === "mcp-oauth" && item.authenticated
+                              ? "codepuppy.ext.packageRelogin"
+                              : "codepuppy.ext.packageLogin",
+                          )}
+                    </button>
+                  </span>
                 </Show>
               </div>
             )}
@@ -207,51 +201,61 @@ export function InstalledPackageDetail(props: {
           </Show>
         </section>
       </Show>
-      <section class="codepuppy-settings-group">
+      <section class="codepuppy-ext-kv-sec">
+        <h3>{t("codepuppy.ext.packagePermissions")}</h3>
+        <div class="codepuppy-ext-kv-row">
+          <span class="k">{t("codepuppy.ext.packageUseTools")}</span>
+          <span class="v">
+            <Show when={toolStates().length} fallback={policyText()}>
+              {t("codepuppy.settings.toolsServiceSummary", { count: toolStates().length })}
+              <small>{policyText()}</small>
+            </Show>
+          </span>
+          <span class="act">
+            <button class="codepuppy-ext-add" data-variant="ghost" onClick={() => setEditingPolicy(!editingPolicy())}>
+              {t("codepuppy.ext.packageChange")}
+            </button>
+          </span>
+        </div>
+        <Show when={editingPolicy()}>
+          <CodePuppySettingsTools open active directory={props.directory} api={window.api.toolPolicy} />
+        </Show>
+      </section>
+      <section class="codepuppy-ext-kv-sec">
         <h3>{t("codepuppy.ext.packageAbout")}</h3>
-        <div class="codepuppy-settings-row">
-          <div class="codepuppy-settings-row-copy">
-            <strong>{t("codepuppy.ext.packageEffect")}</strong>
-            <small>{t(props.pack.effect ? "codepuppy.ext.packageEffectProject" : "codepuppy.ext.packageEffectAll")}</small>
-          </div>
+        <div class="codepuppy-ext-kv-row">
+          <span class="k">{t("codepuppy.ext.packageIncludes")}</span>
+          <span class="v">
+            {[...new Set(props.pack.components.map((component) => component.kind))]
+              .map((kind) =>
+                t("codepuppy.ext.packageComponentCount", {
+                  count: props.pack.components.filter((component) => component.kind === kind).length,
+                  kind: typeLabel(kind as InstallReceipt["type"]),
+                }),
+              )
+              .join(" · ")}
+          </span>
         </div>
-        <div class="codepuppy-settings-row">
-          <div class="codepuppy-settings-row-copy">
-            <strong>{t("codepuppy.ext.packageIncludes")}</strong>
-            <small>
-              {[...new Set(props.pack.components.map((component) => component.kind))]
-                .map((kind) =>
-                  t("codepuppy.ext.packageComponentCount", {
-                    count: props.pack.components.filter((component) => component.kind === kind).length,
-                    kind: typeLabel(kind as InstallReceipt["type"]),
-                  }),
-                )
-                .join(" · ")}
-            </small>
-          </div>
-        </div>
-        <div class="codepuppy-settings-row">
-          <div class="codepuppy-settings-row-copy">
-            <strong>{t("codepuppy.ext.packageSource")}</strong>
-            <small>{t(presentation().sourceKey)}</small>
+        <div class="codepuppy-ext-kv-row">
+          <span class="k">{t("codepuppy.ext.packageSource")}</span>
+          <span class="v">
+            {t(presentation().sourceKey)}
             <Show when={presentation().sourceDetail}>{(detail) => <small>{detail()}</small>}</Show>
-          </div>
+          </span>
         </div>
-        <div class="codepuppy-settings-row">
-          <div class="codepuppy-settings-row-copy">
-            <strong>{t("codepuppy.ext.detailVersion")}</strong>
-            <small>{props.pack.version}</small>
-          </div>
+        <div class="codepuppy-ext-kv-row">
+          <span class="k">{t("codepuppy.ext.detailVersion")}</span>
+          <span class="v">{props.pack.version}</span>
+        </div>
+        <div class="codepuppy-ext-kv-row">
+          <span class="k">{t("codepuppy.ext.packageEffect")}</span>
+          <span class="v">{t(props.pack.effect ? "codepuppy.ext.packageEffectProject" : "codepuppy.ext.packageEffectAll")}</span>
         </div>
         <For each={presentation().notRunning}>
           {(item) => (
-            <div class="codepuppy-settings-row">
-              <div class="codepuppy-settings-row-copy">
-                <strong>{item.sourceName}</strong>
-                <small class="codepuppy-ext-card-err">
-                  {t("codepuppy.ext.packageEnableFailed", { reason: t(item.reasonKey) })}
-                </small>
-              </div>
+            <div class="codepuppy-ext-kv-row">
+              <span class="k">{item.sourceName}</span>
+              <span class="v">{t("codepuppy.ext.packageEnableFailed", { reason: t(item.reasonKey) })}</span>
             </div>
           )}
         </For>
@@ -475,10 +479,7 @@ export function ExtensionDetail(props: {
         <header class="codepuppy-ext-dhead">
           {/* `#1287`:发布者签名的 logo 与品牌色。两者都缺时回落到原来的首字母 + 主题色 ——
               **回落是常态**,已发布的条目一个 listing 都没有。 */}
-          <span
-            class="codepuppy-ext-dhead-ic"
-            style={{ background: listingText("brandColor") ?? "var(--a-accent-solid)" }}
-          >
+          <span class="codepuppy-ext-dhead-ic">
             <PackageLogo listing={view().listing} fallback={view().presentation.displayName} />
           </span>
           <div class="codepuppy-ext-dhead-body">
@@ -964,7 +965,7 @@ export function ExtensionDetail(props: {
 
       {/* ── generic header:icon · 名称 · 来源 · 类型 · 许可证 · 版本 · 待核实 ── */}
       <header class="codepuppy-ext-dhead">
-        <span class="codepuppy-ext-dhead-ic" style={{ background: header().ic.color }}>
+        <span class="codepuppy-ext-dhead-ic">
           {header().ic.glyph}
         </span>
         <div class="codepuppy-ext-dhead-body">

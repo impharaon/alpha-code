@@ -95,6 +95,7 @@ import {
   type EngineModelRef,
 } from "./model-default-core"
 import { ModelPickPop } from "./codepuppy-composer-model"
+import { customServiceOpen } from "./custom-service-state"
 import { abortUserTurn } from "./session-workspace/user-stopped-turns"
 import { identityKey } from "./session-workspace/session-workspace-core"
 import { createModelContract, type ModelContract } from "./model-contract"
@@ -230,6 +231,8 @@ export function ChipPopover(props: {
     const next: JSX.CSSProperties = {
       position: "fixed",
       "z-index": "var(--a-z-dropdown)",
+      // 「接入其它服务」对话框开着时弹层先收起(只是看不见,对话框关掉后弹层随之关闭)。
+      visibility: customServiceOpen() ? "hidden" : undefined,
       "min-width": `${minW}px`,
       "max-width": `${Math.round(vw - 16)}px`,
     }
@@ -260,6 +263,8 @@ export function ChipPopover(props: {
   const onWindowKey = (event: KeyboardEvent) => {
     if (event.key !== "Escape" || event.defaultPrevented) return
     if (popover?.contains(event.target as Node)) return
+    // 弹层里发起的对话框(「接入其它服务」)自己处理 Esc:只关对话框,菜单留着。
+    if ((event.target as Element | null)?.closest?.(".a-dialog-root")) return
     event.preventDefault()
     event.stopPropagation()
     escape()

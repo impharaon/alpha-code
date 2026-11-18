@@ -89,6 +89,9 @@ describeDarwin("REQ-159 真引擎(OpenCode 2)+ 真 ext 在进程围栏下:三类
     userData = join(iso, "userData")
     globalRoot = join(iso, "codepuppy-state", "env", "dev")
     for (const d of [home, ws, esc, userData, globalRoot, join(userData, "engine-scratch-cwd")]) mkdirSync(d, { recursive: true })
+    // 生产启动对账在 fork 之前按账本发布允许集;ext 的 MCP 收口读它(读不到即停用一切非云、非项目 MCP,I-11)。
+    const { reconcileSkillsDerivation } = await import("./ext-receipt-v2")
+    expect(reconcileSkillsDerivation(globalRoot)).toEqual({ ok: true })
     spawnSync("git", ["init", "-q"], { cwd: ws })
     // ③ 生产 .node(现编,烤 buildId)与生产计划器(真试编译)。
     addon = buildFenceAddon({ out: join(iso, "resources", "codepuppy-fence", "codepuppy_fence.node"), buildId: `ac1321-engine-${Date.now()}` }).out

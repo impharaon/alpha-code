@@ -155,7 +155,7 @@ MCP 重装是产品流(确认框重装),允许覆盖(引擎前像可复原)而�
   自持 disabled 态 → **天然免疫「删/坏账本复活」**(账本不是运行时唯一权威,config 是)。
 - **skill 例外**:skill 不预加载,投影 = 引擎侧 config-hook 注入门(`skillGenerationLiveDirs`,
   只注入 **main 派生允许集** `skills-enabled.json` 里的 key;缺失/损坏/形状异常一律不注入 fail closed)。
-- **受管全局 MCP(I-11,`alpha-code#1724`;DESIGN-plugin-helper-and-hub v9 §4.4)**:同一份允许集(v3)带每条 global MCP
+- **受管全局 MCP(I-11,`#1724`;DESIGN-plugin-helper-and-hub v9 §4.4)**:同一份允许集(v3)带每条 global MCP
   记录的开启状态 `mcp: {name, enabled}[]`。引擎里开不开只由 ext 的 `mcp.transform` 按它在每次 Location 构建与 MCP 重算时
   收口(读不到即停用一切非云、非项目 MCP);运行时只经 main 的 `convergeManagedMcp`(按名串行)。codepuppy.jsonc 的
   `enabled:false` 照写,只为与账本一致,不再是生效面。

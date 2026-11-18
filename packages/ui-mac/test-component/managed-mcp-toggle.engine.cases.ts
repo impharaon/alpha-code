@@ -130,7 +130,7 @@ test("proof 1: a connector disabled at startup and enabled at runtime stays enab
   await m.toggle("late", "enabled")
   expect((await m.until(() => m.status(), (s) => s.late === "connected")).late).toBe("connected")
   expect(await m.callEcho(session.id, "late")).toBe(1)
-  expect((await m.at(m.project)("POST", "/api/location/reload", {})).status).toBeLessThan(300)
+  expect([200, 204]).toContain((await m.at(m.project)("POST", "/api/location/reload", {})).status)
   expect((await m.until(() => m.status(), (s) => s.late === "connected", 8000)).late).toBe("connected")
   await m.sessionIn(m.otherProject)
   expect((await m.until(() => m.status(m.otherProject), (s) => s.late === "connected", 8000)).late).toBe("connected")
@@ -141,7 +141,7 @@ test("proof 2: a remote connector record disabled at runtime stays disabled afte
   expect((await m.until(() => m.status(), (s) => s["remote-echo"] === "connected"))["remote-echo"]).toBe("connected")
   await m.toggle("remote-echo", "disabled")
   expect((await m.until(() => m.status(), (s) => s["remote-echo"] === "disabled"))["remote-echo"]).toBe("disabled")
-  expect((await m.at(m.project)("POST", "/api/location/reload", {})).status).toBeLessThan(300)
+  expect([200, 204]).toContain((await m.at(m.project)("POST", "/api/location/reload", {})).status)
   await Bun.sleep(1500)
   const requests = remoteRequests
   expect((await m.until(() => m.status(), (s) => s["remote-echo"] === "connected", 5000))["remote-echo"]).toBe("disabled")
@@ -228,7 +228,7 @@ test("proof 3: toggling a connector off rejects only its own pending approval; a
   expect((await pendingOf(a.session.id)).map((request) => request.id)).toEqual([a.request.id])
   expect((await m.status()).beta).toBe("disabled")
   expect(m.callCount()).toBe(0)
-  expect((await send("POST", `/api/session/${a.session.id}/permission/${a.request.id}/reply`, { decision: "once" })).status).toBeLessThan(300)
+  expect((await send("POST", `/api/session/${a.session.id}/permission/${a.request.id}/reply`, { decision: "once" })).status).toBe(204)
   await send("POST", `/api/experimental/session/${a.session.id}/wait`)
   // A's answer went on: its approved call reached alpha (the only server call in this machine) and the turn succeeded.
   expect(m.callCount()).toBe(1)

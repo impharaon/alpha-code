@@ -14,6 +14,7 @@ import {
   type JSX,
 } from "solid-js"
 import { CodePuppyBoundary } from "../codepuppy-boundary"
+import "../session-rail/rail-empty.css"
 import { t } from "../../i18n"
 import { rovingKey, rovingTabIndex } from "../roving-focus"
 import { acceptedEngineChannel, type CodePuppyTerminalEngineChannel } from "../session-rail/terminal/terminal-rail-core"

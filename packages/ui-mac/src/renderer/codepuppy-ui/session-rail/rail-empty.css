@@ -1,0 +1,72 @@
+/* 右栏四页(审查 / 文件 / 终端 / 产物)的空状态 —— 同一套几何(冻结稿 #right-panel-empty)。
+ * 图标顶端统一钉在整栏高度的 30% 处,多出的说明或按钮向下长,所以四页标题同一高度、切页不跳。
+ * 因此空状态的任何祖先都不得 position: 它要相对 .a-swk-rail-host(整栏)定位。
+ * 图标不加底、20px;标题 base 半粗、说明 sm 三级字。令牌 only。 */
+
+.a-rvw-empty,
+.a-srf-empty,
+.a-term-empty,
+.a-rart-empty {
+  position: absolute;
+  top: 30%;
+  right: 0;
+  left: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0 36px;
+  text-align: center;
+}
+
+.a-rvw-empty-ic,
+.a-srf-empty-icon,
+.a-term-empty-icon,
+.a-rart-empty-ic {
+  display: grid;
+  place-items: center;
+  margin-bottom: 12px;
+  color: var(--a-text-tertiary);
+}
+
+.a-rvw-empty .a-rvw-empty-ic svg,
+.a-srf-empty .a-srf-empty-icon svg,
+.a-term-empty .a-term-empty-icon svg,
+.a-rart-empty .a-rart-empty-ic svg {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.44;
+  color: inherit;
+}
+
+.a-rvw-empty b,
+.a-srf-empty b,
+.a-term-empty b,
+.a-rart-empty b {
+  margin: 0 0 4px;
+  color: var(--a-text);
+  font-size: var(--a-text-base);
+  font-weight: var(--a-weight-semibold);
+}
+
+.a-rvw-empty p,
+.a-srf-empty p,
+.a-term-empty p,
+.a-rart-empty p {
+  margin: 0;
+  color: var(--a-text-tertiary);
+  font-size: var(--a-text-sm);
+  line-height: var(--a-leading-normal);
+  text-wrap: pretty;
+}
+
+.a-rvw-empty .a-btn,
+.a-srf-empty .a-btn,
+.a-term-empty .a-btn,
+.a-rart-empty .a-btn,
+.a-rart-empty .a-wb-btn {
+  margin-top: 14px;
+}

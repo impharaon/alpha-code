@@ -4,14 +4,22 @@
 
 @import "./composer-shell.css"; /* 外壳(bg/border/radius/shadow/focus)单一来源 */
 
-/* ── 布局骨架 ── */
+/* ── 布局骨架 ──
+ * 界面优化 BR-04(冻结稿 #home / #session / #plus-menu,令牌与尺寸照稿):输入框 `.a-comp` 与它下面的托盘
+ * `.a-comp-tray` 装在 `.a-comp-wrap` 里;「+」/ `/` / `@` 菜单是 wrap 的子节点,按 wrap 定位
+ * (首页朝下:wrap 下沿 = 托盘下沿 +6px;对话页朝上:wrap 上沿 = 输入框上沿 −6px)。 */
+.a-comp-wrap {
+  position: relative;
+  width: 100%;
+}
 .a-comp {
-  position: relative; /* anchors the slash/@ autocomplete popover (.a-comp-auto) */
+  position: relative;
+  z-index: 2; /* 压在托盘之上:托盘上缘缩进输入框下沿 14px */
 }
 .a-comp-input {
   display: block;
   width: 100%;
-  min-height: 54px;
+  min-height: 62px;
   max-height: 220px;
   padding: 16px 18px 6px;
   border: 0;
@@ -35,11 +43,16 @@
 .a-comp-bar {
   display: flex;
   align-items: center;
-  gap: 6px;
-  min-height: 46px; /* 窄容器(会话页+审查面板)chips 换行时允许长高 —— 溢出框外=点不到(真机实测) */
+  gap: 4px;
+  min-height: 44px; /* 窄容器(会话页+审查面板)chips 换行时允许长高 —— 溢出框外=点不到(真机实测) */
   flex-wrap: wrap;
   row-gap: 0;
-  padding: 0 10px 0 8px;
+  padding: 6px 8px 8px 10px;
+}
+/* 对话页的输入区更矮(稿 .dock .comp-input) */
+[data-codepuppy-composer-wrap="session"] .a-comp-input {
+  min-height: 48px;
+  padding-top: 13px;
 }
 .a-comp-model-alert {
   display: flex;
@@ -171,13 +184,13 @@
   align-items: center;
   gap: 6px;
   height: 30px;
-  padding: 0 9px;
+  padding: 0 7px;
   border: 1px solid transparent;
   border-radius: var(--a-radius-md);
   background: transparent;
   color: var(--a-text-secondary);
   font-size: var(--a-text-sm);
-  font-weight: var(--a-weight-medium);
+  font-weight: var(--a-weight-normal);
   white-space: nowrap;
   transition:
     background var(--a-dur-fast) var(--a-ease-out),
@@ -188,10 +201,14 @@
   color: var(--a-text);
 }
 .a-chip .a-ic {
+  color: inherit;
+}
+.a-chip .a-chev {
   color: var(--a-text-tertiary);
 }
-.a-chip:hover .a-ic {
-  color: var(--a-text-secondary);
+.a-chip[aria-expanded="true"] {
+  background: var(--a-bg-muted);
+  color: var(--a-text);
 }
 /* 焦点圈治理(用户报障 2026-07-07「一直回归错误的样式」):鼠标/程序化点击留下的 :focus-visible
  * 肥紫圈在 chips 上永久压掉,键盘可达性改用细描边。 */
@@ -211,8 +228,8 @@
   width: 30px;
   justify-content: center;
 }
-.a-chip-model {
-  padding-left: 6px;
+.a-chip-perm {
+  font-weight: var(--a-weight-medium);
 }
 /* #1550:三档运行权限各一种颜色(tokens.css `--a-perm-*`),输入框入口、权限菜单每一行的图标、
  * 菜单选中态三处引用同一个 token —— 此前入口用警示黄 / 中性 / indigo,菜单选中态一律 indigo,
@@ -279,6 +296,7 @@
 }
 .a-comp-eff {
   font-variant-numeric: tabular-nums;
+  color: var(--a-text-tertiary);
 }
 .a-pico {
   width: 18px;
@@ -367,8 +385,9 @@
 
 /* ── 发送 / 中止 ── */
 .a-comp-send {
-  width: 32px;
-  height: 32px;
+  width: 30px;
+  height: 30px;
+  margin-left: 4px;
   border-radius: var(--a-radius-full);
   border: 0;
   display: grid;
@@ -391,15 +410,14 @@
 .a-comp-send[data-ready]:active {
   transform: scale(0.94);
 }
-/* 停止形态(已批稿:强调淡底 + 方块;I5 令牌白名单,零裸色) */
+/* 停止形态(界面优化稿 .send.is-stop:深色圆底 + 浅色方块;I5 令牌白名单,零裸色) */
 .a-comp-stop[data-ready] {
-  background: var(--a-accent-subtle);
-  color: var(--a-accent);
-  border: 1px solid var(--a-accent-border);
+  background: var(--a-text);
+  color: var(--a-bg-canvas);
   box-shadow: none;
 }
 .a-comp-stop[data-ready]:hover {
-  background: var(--a-accent-subtle);
+  background: var(--a-text);
 }
 
 /* ── 自建模型弹层 ── */
@@ -977,4 +995,209 @@
     transition-duration: 0ms !important;
   }
   .a-comp-model-spin { animation: none; }
+}
+
+/* ══ 界面优化 BR-04(冻结稿 docs/design/2026-11-18-ui-refresh:#home #session #plus-menu #session-popovers)══
+ * 图标线宽按尺寸(16 / 14 / 12 → 渲染约 1.2px),只在输入框与它的弹层里生效。 */
+.a-comp-wrap .a-ic,
+.a-pop-fixed .a-ic {
+  stroke-width: 1.8;
+}
+.a-comp-wrap .a-ic-sm,
+.a-pop-fixed .a-ic-sm {
+  stroke-width: 2.05;
+}
+.a-comp-wrap .a-chev,
+.a-pop-fixed .a-chev {
+  stroke-width: 2.4;
+}
+/* 模型按钮的品牌图标:单色小方块(稿 .brand-tile) */
+.a-comp-bar .a-brand {
+  background: var(--a-monogram-bg);
+  box-shadow: none;
+  color: var(--a-text-secondary);
+  border-radius: var(--a-radius-xs);
+}
+
+/* ── 托盘:项目 · 文件 · 插件。与输入框左右各缩 10px,上缘缩进输入框 14px;首个图标对齐「+」与占位字 ── */
+.a-comp-tray {
+  position: relative;
+  z-index: 1;
+  margin: -14px 10px 0;
+  padding: 18px 8px 5px 0;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  background: var(--a-bg-subtle);
+  border: 1px solid var(--a-hairline);
+  border-top: 0;
+  border-radius: 0 0 var(--a-radius-xl) var(--a-radius-xl);
+}
+/* 输入框还没挂起来时单独留着的托盘:不缩进到输入框下面,自己带完整的圆角与上边线 */
+.a-comp-tray[data-solo] {
+  margin-top: 8px;
+  padding-top: 5px;
+  border-top: 1px solid var(--a-hairline);
+  border-radius: var(--a-radius-xl);
+}
+.a-tray-btn,
+.a-comp-tray .a-ws-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 26px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: var(--a-radius-sm);
+  background: none;
+  box-shadow: none;
+  color: var(--a-text-secondary);
+  font-family: inherit;
+  font-size: var(--a-text-sm);
+  font-weight: var(--a-weight-normal);
+  white-space: nowrap;
+}
+.a-tray-btn:hover,
+.a-tray-btn[aria-expanded="true"],
+.a-comp-tray .a-ws-chip:hover {
+  background: var(--a-bg-muted);
+  color: var(--a-text);
+}
+.a-tray-btn.a-tray-static {
+  cursor: default;
+}
+.a-tray-btn.a-tray-static:hover {
+  background: none;
+  color: var(--a-text-secondary);
+}
+.a-comp-tray .a-ws-chip .a-ic {
+  color: inherit;
+}
+.a-comp-tray .a-ws-chip .a-chev {
+  color: var(--a-text-tertiary);
+}
+.a-comp-tray .a-home-ws {
+  margin: 0;
+  padding: 0;
+}
+.a-ui .a-tray-btn:focus-visible,
+.a-ui .a-comp-tray .a-ws-chip:focus-visible {
+  box-shadow: none;
+  outline: 1.5px solid var(--a-accent);
+  outline-offset: 1px;
+}
+/* 托盘里的项目选择弹层:首页朝下,从托盘下沿 +6px(托盘下内边距 5 + 边框 1 + 间距 6) */
+.a-comp-wrap[data-codepuppy-composer-wrap="home"] .a-comp-tray .a-pop-up {
+  bottom: auto;
+  top: calc(100% + 12px);
+  transform-origin: top left;
+  max-height: min(320px, 40vh);
+  overflow-y: auto;
+}
+
+/* ── 弹层:沿用 .a-pop / .a-pop-item,按稿统一边线、标题、项高与圆角(项圆角 = 弹层 11 − 内边距 6 → 6)── */
+.a-comp-wrap .a-pop,
+.a-pop-fixed {
+  border-color: var(--a-hairline);
+}
+.a-pop-fixed {
+  overflow-y: auto;
+}
+:is(.a-comp-wrap .a-pop, .a-pop-fixed) .a-pop-label {
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: var(--a-text-xs);
+  font-weight: var(--a-weight-medium);
+  padding: 8px 10px 4px;
+}
+:is(.a-comp-wrap .a-pop, .a-pop-fixed) .a-pop-item {
+  min-height: 34px;
+  padding: 0 10px;
+  border-radius: var(--a-radius-sm);
+}
+:is(.a-comp-wrap .a-pop, .a-pop-fixed) .a-pop-item[data-perm] {
+  padding-block: 7px;
+}
+:is(.a-comp-wrap .a-pop, .a-pop-fixed) .a-mpp-row {
+  min-height: 44px;
+}
+:is(.a-comp-wrap .a-pop, .a-pop-fixed) .a-pop-sep {
+  background: var(--a-hairline);
+}
+/* 弹层高度封顶在窗口内可用的空间里(ChipPopover 写 --a-pop-max-h):模型列表自己滚,弹层不被窗口裁切 */
+.a-pop-fixed .a-mpp {
+  max-height: min(560px, calc(var(--a-pop-max-h, 72vh) - 14px));
+}
+
+/* ── 「/」「@」「+」菜单(composer-autocomplete):首页朝下、对话页朝上,离托盘 / 输入框 6px ── */
+.a-comp-wrap[data-codepuppy-composer-wrap="home"] > .a-comp-auto {
+  top: calc(100% + 6px);
+  bottom: auto;
+  transform-origin: top left;
+}
+.a-comp-wrap[data-codepuppy-composer-wrap="session"] > .a-comp-auto {
+  bottom: calc(100% + 6px);
+}
+.a-comp-auto .a-pop-item.is-active {
+  background: var(--a-bg-muted);
+}
+.a-comp-auto .a-pop-item.is-active .a-auto-trig,
+.a-comp-auto .a-pop-item.is-active .a-auto-ic {
+  color: inherit;
+}
+/* 按钮入口(「+」/ 托盘「文件」):窄菜单,左缘 = 「+」按钮左缘(边框 1 + 行内边距 10),
+ * 图标 · 名称 · 说明三列,说明列左对齐;没有键位页脚 */
+.a-comp-auto[data-via="button"] {
+  left: 11px;
+  right: auto;
+  width: 340px;
+  max-width: calc(100% - 22px);
+}
+.a-comp-auto[data-via="button"] .a-comp-auto-scroll {
+  display: grid;
+  /* 第一列 max-content:行的左内边距(10)计入首列,图标才与名称之间留出列距 */
+  grid-template-columns: max-content minmax(72px, max-content) minmax(0, 1fr);
+  column-gap: 10px;
+  align-content: start;
+}
+.a-comp-auto[data-via="button"][data-scope="files"] .a-comp-auto-scroll {
+  grid-template-columns: max-content minmax(0, 1fr) auto;
+}
+.a-comp-auto[data-via="button"] .a-comp-sec,
+.a-comp-auto[data-via="button"] .a-comp-hint,
+.a-comp-auto[data-via="button"] .a-comp-empty,
+.a-comp-auto[data-via="button"] .a-pop-sep {
+  grid-column: 1 / -1;
+}
+.a-comp-auto[data-via="button"] .a-auto-tag {
+  display: none; /* 稿:「+」菜单只有 图标 · 名称 · 说明;状态已在输入框的计划 / 模式 chip 上 */
+}
+.a-comp-auto[data-via="button"] .a-auto-row {
+  display: grid;
+  grid-template-columns: subgrid;
+  grid-column: 1 / -1;
+  align-items: center;
+  min-height: 34px;
+  padding: 0 10px;
+  border-radius: var(--a-radius-sm);
+}
+.a-comp-auto[data-via="button"] .a-auto-nm,
+.a-comp-auto[data-via="button"] .a-auto-trig {
+  font-family: inherit;
+  font-size: var(--a-text-sm);
+  font-weight: var(--a-weight-normal);
+  color: var(--a-text);
+  white-space: nowrap;
+}
+.a-comp-auto[data-via="button"] .a-auto-desc {
+  color: var(--a-text-tertiary);
+}
+.a-comp-auto[data-via="button"] .a-auto-ic {
+  color: var(--a-text-secondary);
+}
+.a-comp-auto .a-comp-sec {
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: var(--a-text-xs);
+  font-weight: var(--a-weight-medium);
 }

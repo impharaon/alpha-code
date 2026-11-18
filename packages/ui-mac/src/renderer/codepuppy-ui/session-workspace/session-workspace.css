@@ -200,8 +200,7 @@
 }
 
 .a-swk-composer-host {
-  width: 100%;
-  max-width: 860px;
+  width: min(680px, calc(100% - 64px)); /* 界面优化稿 .dock:与对话内容同一公式 */
   margin: 0 auto;
 }
 
@@ -225,6 +224,11 @@
   font-size: var(--a-text-2xs);
   line-height: 1.45;
   color: var(--a-text-tertiary);
+}
+
+/* 界面优化稿 .dock-note:托盘下 6px(dock 的行距是 10) */
+.a-swk-dock > .a-swk-ai-disclaimer {
+  margin-top: -4px;
 }
 
 .a-swk-card {

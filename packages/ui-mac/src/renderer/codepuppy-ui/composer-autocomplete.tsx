@@ -106,6 +106,8 @@ export function createComposerAutocomplete(opts: {
   const [fileResults, setFileResults] = createSignal<string[]>([])
   // REQ-073:+ 按钮打开同一装配弹窗(button 模式,无 token;有 @token 时 token 视图优先)。
   const [buttonOpen, setButtonOpen] = createSignal(false)
+  // 界面优化 BR-04:同一个弹窗两个入口 —— 「+」按钮(添加附件 / 计划模式 / 助手)与托盘「文件」(只有文件一节)。
+  const [buttonScope, setButtonScope] = createSignal<"plus" | "files">("plus")
 
   // ── trigger detection (derived from text + caret; caret read lazily is fine because every
   //    caret-moving interaction also fires onInput/onKeyDown which re-runs the memo via text/version)
@@ -126,6 +128,11 @@ export function createComposerAutocomplete(opts: {
     // button 模式:合成零宽 at 视图(tokenStart = caret → 引用类选中即在光标处插入,拍板②)
     if (buttonOpen() && (!opts.modes || opts.modes.includes("at"))) return { mode: "at", query: "", tokenStart: caret, caret }
     return null
+  })
+  // 弹窗由按钮打开(「+」/ 托盘「文件」)而不是键入 `@`:列表按入口收窄、版式按「+」菜单(窄、说明列左对齐、无键位页脚)。
+  const viaButton = createMemo(() => {
+    const v = view()
+    return !!v && v.mode === "at" && buttonOpen() && v.query === "" && v.tokenStart === v.caret
   })
 
   // ── data sources ────────────────────────────────────────────────────────────
@@ -290,6 +297,7 @@ export function createComposerAutocomplete(opts: {
       files: fileResults(),
       changedFiles: changedFiles(),
       terminal: opts.surface === "session",
+      scope: viaButton() ? buttonScope() : "at",
     })
   })
   const items = createMemo<Item[]>(() => {
@@ -325,6 +333,8 @@ export function createComposerAutocomplete(opts: {
     const v = view()
     if (!v) return false
     if (items().length > 0) return true
+    // 托盘「文件」在没有变更文件时仍要打开,把「输入 @关键词 搜索」的提示摆出来 —— 不留一个点了没反应的按钮。
+    if (viaButton()) return true
     return v.query.length > 0
   })
   // #1476:与芯片菜单共用「同时只开一个」—— 本列表打开时关掉开着的芯片菜单;反之芯片打开时关掉本列表。
@@ -439,6 +449,8 @@ export function createComposerAutocomplete(opts: {
     // caret may move via arrows/home/end even without input — re-derive on the next microtask
     queueMicrotask(bump)
     if (!open()) return false
+    // 按钮入口、没有可选行(只有提示):回车 / 方向键属于输入框,不被菜单吞掉;Esc 仍然关菜单。
+    if (items().length === 0 && viaButton() && e.key !== "Escape") return false
     if (e.key === "ArrowDown" || e.key === "ArrowUp") {
       e.preventDefault()
       const n = items().length
@@ -477,16 +489,18 @@ export function createComposerAutocomplete(opts: {
   const onDocDown = (e: MouseEvent) => {
     if (!open()) return
     const t = e.target as Element | null
-    if (t && t.closest(".a-comp")) return
+    if (t && t.closest(".a-comp-wrap")) return
     closeFromOverlay()
   }
   document.addEventListener("mousedown", onDocDown)
   onCleanup(() => document.removeEventListener("mousedown", onDocDown))
 
   /** REQ-073:+ 按钮打开/收起统一装配弹窗(与 @ 同一组件;焦点回输入框保键盘导航)。 */
-  const toggleAssemble = () => {
+  const toggleAssemble = (scope: "plus" | "files" = "plus") => {
     setDismissed(null)
-    const next = !buttonOpen()
+    // 已开着同一入口的弹窗 = 收起;开着另一个入口的 = 就地换成这个入口的列表。
+    const next = !(buttonOpen() && buttonScope() === scope)
+    setButtonScope(scope)
     setButtonOpen(next)
     if (next) opts.textarea()?.focus()
   }
@@ -499,20 +513,30 @@ export function createComposerAutocomplete(opts: {
     project: "M1.8 4.2c0-.6.4-1 1-1h3.4l1.4 1.6h5.6c.6 0 1 .4 1 1v6c0 .6-.4 1-1 1H2.8c-.6 0-1-.4-1-1z",
     mcp: "M6 2v3.2 M10 2v3.2 M4.5 5.2h7v2.6a3.5 3.5 0 0 1-7 0z M8 11.3V14",
   }
+  // 装配弹窗里的图标(界面优化稿 #plus-menu 的线性图标,24 栅格;斜杠命令的节图标仍是上面 16 栅格那一套)。
   const AT_ICON: Record<"agent" | "file", string> = {
-    agent: "M8 8a2.6 2.6 0 1 0 0-5.2A2.6 2.6 0 0 0 8 8zm-5 5.4c.7-2.5 2.7-3.8 5-3.8s4.3 1.3 5 3.8",
-    file: "M4 1.8h5.2L12 4.6v9.6H4zM9.2 1.8v2.8H12",
+    agent: "M8.4 12a3.6 3.6 0 1 0 7.2 0 3.6 3.6 0 1 0-7.2 0M15.6 8.5v4.8a2.6 2.6 0 0 0 5.2 0V12a8.8 8.8 0 1 0-3.5 7",
+    file: "M14 3.5H7a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8.5ZM14 3.5v5h5",
   }
-  // 装配弹窗动作/模式行 icon(回形针 / 终端 / 清单 / 拼图 / 档位)
+  // 装配弹窗动作/模式行 icon(回形针 / 终端 / 清单 / 插件 / 模式)
   const ACTION_ICON: Record<string, string> = {
-    attach: "M13 7.5 8.2 12.3a3 3 0 0 1-4.2-4.2L9 3a2 2 0 0 1 2.9 2.9L7 10.8a1 1 0 0 1-1.5-1.5L10 4.8",
-    terminal: "M2.5 3.5h11v9h-11z M4.5 6l2 2-2 2 M8 10.5h3",
-    plan: "M5.5 4h8 M5.5 8h8 M5.5 12h8 M2.3 3.4l.8.8 1.3-1.4 M2.3 7.4l.8.8 1.3-1.4 M2.5 12h.01",
-    "ext-market": "M6 2.5H3.5a1 1 0 0 0-1 1V6 M10 2.5h2.5a1 1 0 0 1 1 1V6 M6 13.5H3.5a1 1 0 0 1-1-1V10 M10 13.5h2.5a1 1 0 0 0 1-1V10",
-    mode: "M2.5 5h7 M11.5 5H13.5 M9.5 3.5v3 M2.5 11h2 M6.5 11h7 M4.5 9.5v3",
+    attach: "m20 11.5-8 8a5 5 0 0 1-7-7l8.5-8.5a3.3 3.3 0 0 1 4.7 4.7L9.7 17.2a1.7 1.7 0 0 1-2.4-2.4l7.5-7.5",
+    terminal: "m5.5 8 4 4-4 4M12 16.5h6.5",
+    plan: "M10.5 6.5H20M10.5 12H20M10.5 17.5H20M4 6.5l1.4 1.4L8 5.3M4 12l1.4 1.4L8 10.8M4 17.5l1.4 1.4L8 16.3",
+    "ext-market": "M9 3.5V8M15 3.5V8M6.5 8h11v3.5a5.5 5.5 0 0 1-11 0ZM12 17v3.5",
+    mode: "M10.5 6.5H20M10.5 12H20M10.5 17.5H20M4 6.5l1.4 1.4L8 5.3M4 12l1.4 1.4L8 10.8M4 17.5l1.4 1.4L8 16.3",
   }
-  const Ic = (p: { d: string }) => (
-    <svg class="a-auto-ic" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+  const Ic = (p: { d: string; wide?: boolean }) => (
+    <svg
+      class="a-auto-ic"
+      viewBox={p.wide ? "0 0 24 24" : "0 0 16 16"}
+      fill="none"
+      stroke="currentColor"
+      stroke-width={p.wide ? 1.8 : 1.5}
+      stroke-linecap="round"
+      stroke-linejoin="round"
+      aria-hidden="true"
+    >
       <path d={p.d} />
     </svg>
   )
@@ -581,12 +605,12 @@ export function createComposerAutocomplete(opts: {
     if (it.kind === "action")
       return (
         <>
-          <Ic d={ACTION_ICON[it.id]} />
+          <Ic wide d={ACTION_ICON[it.id]} />
           <span class="a-auto-nm">{actionLabel(it)}</span>
           <Tooltip label={actionDescription(it)}>
             <span class="a-auto-desc">{actionDescription(it)}</span>
           </Tooltip>
-          <Show when={it.kbd}>
+          <Show when={it.kbd && !viaButton()}>
             <span class="a-auto-tag">{it.kbd}</span>
           </Show>
         </>
@@ -594,7 +618,7 @@ export function createComposerAutocomplete(opts: {
     if (it.kind === "mode")
       return (
         <>
-          <Ic d={ACTION_ICON.mode} />
+          <Ic wide d={ACTION_ICON.mode} />
           <span class="a-auto-nm">{t("codepuppy.autocomplete.mode", { name: it.id })}</span>
           <Tooltip label={t("codepuppy.autocomplete.modeDesc")}>
             <span class="a-auto-desc">{t("codepuppy.autocomplete.modeDesc")}</span>
@@ -609,19 +633,21 @@ export function createComposerAutocomplete(opts: {
     if (it.kind === "agent")
       return (
         <>
-          <Ic d={AT_ICON.agent} />
-          <span class="a-auto-trig">@{it.name}</span>
+          <Ic wide d={AT_ICON.agent} />
+          <span class="a-auto-trig">{viaButton() ? "" : "@"}{it.name}</span>
           <Tooltip label={agentDescription(it)}>
             <span class="a-auto-desc">{agentDescription(it)}</span>
           </Tooltip>
-          <span class="a-auto-tag" data-personal={it.tag === "个人" ? "" : undefined}>
-            {sourceLabel(it.tag)}
-          </span>
+          <Show when={!viaButton()}>
+            <span class="a-auto-tag" data-personal={it.tag === "个人" ? "" : undefined}>
+              {sourceLabel(it.tag)}
+            </span>
+          </Show>
         </>
       )
     return (
       <>
-        <Ic d={AT_ICON.file} />
+        <Ic wide d={AT_ICON.file} />
         <span class="a-auto-file">{it.path}</span>
         <span class="a-auto-desc">{t("codepuppy.autocomplete.file")}</span>
       </>
@@ -662,9 +688,30 @@ export function createComposerAutocomplete(opts: {
     )
   }
 
+  // 界面优化 BR-04:弹窗高度封顶在窗口内可用的空间里(首页朝下:到窗口下缘;对话页朝上:到窗口上缘),内部滚动。
+  const fitHeight = () => {
+    const el = document.getElementById(listboxId)
+    const wrap = el?.closest<HTMLElement>("[data-codepuppy-composer-wrap]")
+    if (!el || !wrap) return
+    const r = wrap.getBoundingClientRect()
+    const room = wrap.dataset.codepuppyComposerWrap === "home" ? window.innerHeight - r.bottom - 14 : r.top - 14
+    el.style.maxHeight = `${Math.max(120, Math.min(380, Math.floor(room)))}px`
+  }
+  createEffect(() => {
+    if (open()) queueMicrotask(fitHeight)
+  })
+  window.addEventListener("resize", fitHeight)
+  onCleanup(() => window.removeEventListener("resize", fitHeight))
+
   const Menu = (): JSX.Element => (
     <Show when={open()}>
-      <div id={listboxId} class="a-pop a-comp-auto" role="listbox">
+      <div
+        id={listboxId}
+        class="a-pop a-comp-auto"
+        role="listbox"
+        data-via={viaButton() ? "button" : "token"}
+        data-scope={viaButton() ? buttonScope() : undefined}
+      >
         <div class="a-comp-auto-scroll" ref={scrollEl}>
           <Show
             when={items().length > 0 || (view()?.mode === "at" && !view()?.query)}
@@ -679,9 +726,15 @@ export function createComposerAutocomplete(opts: {
               fallback={
                 /* REQ-073 装配弹窗:添加 / AGENT / 文件 / 扩展(禁用行可见不可选;文件节无查询给提示) */
                 <For each={assembleData()?.groups ?? []}>
-                  {(g) => (
+                  {(g, i) => (
                     <>
-                      <div class="a-comp-sec" role="presentation">{groupLabel(g.label)}</div>
+                      {/* 「+」菜单(稿 #plus-menu):第一组(添加附件 / 计划模式)不写标题,后面的组之间一条分隔线 */}
+                      <Show when={viaButton() && i() > 0}>
+                        <div class="a-pop-sep" role="separator" />
+                      </Show>
+                      <Show when={!(viaButton() && g.label === "添加")}>
+                        <div class="a-comp-sec" role="presentation">{groupLabel(g.label)}</div>
+                      </Show>
                       <Show when={g.hint}>
                         <div class="a-comp-hint">{groupHint(g.hint)}</div>
                       </Show>
@@ -708,21 +761,25 @@ export function createComposerAutocomplete(opts: {
             </Show>
           </Show>
         </div>
-        <div class="a-comp-foot">
-          <span>{t("codepuppy.autocomplete.selectHint")}</span>
-          <span>{t("codepuppy.autocomplete.confirmHint")}</span>
-          <span>{t("codepuppy.autocomplete.closeHint")}</span>
-          <span class="a-comp-foot-grow" />
-          <span class="a-comp-foot-hint">{view()?.mode === "slash" ? t("codepuppy.autocomplete.mentionHint") : t("codepuppy.autocomplete.commandHint")}</span>
-          <Show when={items().length > 0}>
-            <span>{t("codepuppy.autocomplete.itemCount", { count: items().length })}</span>
-          </Show>
-        </div>
+        <Show when={!viaButton()}>
+          <div class="a-comp-foot">
+            <span>{t("codepuppy.autocomplete.selectHint")}</span>
+            <span>{t("codepuppy.autocomplete.confirmHint")}</span>
+            <span>{t("codepuppy.autocomplete.closeHint")}</span>
+            <span class="a-comp-foot-grow" />
+            <span class="a-comp-foot-hint">{view()?.mode === "slash" ? t("codepuppy.autocomplete.mentionHint") : t("codepuppy.autocomplete.commandHint")}</span>
+            <Show when={items().length > 0}>
+              <span>{t("codepuppy.autocomplete.itemCount", { count: items().length })}</span>
+            </Show>
+          </div>
+        </Show>
       </div>
     </Show>
   )
 
-  return { open, assembleOpen: buttonOpen, activeDescendant, listboxId, onKeyDown, onInput, Menu, toggleAssemble }
+  /** 按钮入口的弹窗开着吗(可指定入口:`plus` = 「+」,`files` = 托盘「文件」)。 */
+  const assembleOpen = (scope?: "plus" | "files") => viaButton() && (!scope || buttonScope() === scope)
+  return { open, assembleOpen, activeDescendant, listboxId, onKeyDown, onInput, Menu, toggleAssemble }
 }
 
 function sourceLabel(tag: SourceTag) {
@@ -736,6 +793,7 @@ function groupLabel(label: string) {
   if (label === "内置命令") return t("codepuppy.autocomplete.groupBuiltin")
   if (label === "技能") return t("codepuppy.autocomplete.groupSkills")
   if (label === "项目") return t("codepuppy.autocomplete.groupProject")
+  if (label === "AGENT") return t("codepuppy.autocomplete.groupAgent")
   if (label === "添加") return t("codepuppy.autocomplete.groupAdd")
   if (label === "文件") return t("codepuppy.autocomplete.groupFiles")
   if (label === "扩展") return t("codepuppy.autocomplete.groupExtensions")

@@ -145,6 +145,7 @@ const {
   setComposerAgent,
   setComposerModel,
 } = await import("../src/renderer/codepuppy-ui/composer-state")
+const { extHubOpen, setExtHubOpen } = await import("../src/renderer/extensions/ext-hub-state")
 // #891 判据要跑**会话页那一侧的真实 adopt**(不是自己拼一条等价链):seed 写进去的钥匙,
 // 只有 SessionComposerMount 按 canonical 身份算出同一把时才认领得到。
 const { SessionComposerMount } = await import(
@@ -663,7 +664,7 @@ describe("#1590 新对话页:配置失效提示、标题与准备中占位", () 
   })
 
   test("AC4:输入框四处提示文案与批准稿 #home 表一致", () => {
-    expect(zh["codepuppy.composer.assemble"]).toBe("添加文件、上下文或模式")
+    expect(zh["codepuppy.composer.assemble"]).toBe("添加附件、计划模式或助手")
     expect(zh["codepuppy.composer.effortTitle"]).toBe("推理强度")
     expect(zh["codepuppy.composer.effortChainPending"]).toBe("模型读取中")
     expect(zh["codepuppy.composer.engineDefault"]).toBe("由模型决定")
@@ -1757,9 +1758,12 @@ describe("#1225 AI 生成内容标识:会话页输入框下方一行小字", () 
       expect(lines).toHaveLength(1)
       expect(lines[0]!.textContent?.trim()).toBe("内容由AI生成,仅供参考")
 
-      // 「下方」是可观察的 DOM 次序,不是散文:composer 与标识都是 dock 的直接子节点。
+      // 「下方」是可观察的 DOM 次序,不是散文:标识是 dock 的直接子节点,排在 composer(现在连同它下面的托盘
+      // 一起装在 `.a-comp-wrap` 里,界面优化 BR-04)之后。
       const kids = Array.from(dockRoot.children)
-      const composerIndex = kids.findIndex((el) => el.hasAttribute("data-codepuppy-composer"))
+      const composerIndex = kids.findIndex(
+        (el) => el.hasAttribute("data-codepuppy-composer") || el.querySelector(":scope > [data-codepuppy-composer]"),
+      )
       const disclaimerIndex = kids.findIndex((el) => el.hasAttribute("data-codepuppy-ai-disclaimer"))
       expect(composerIndex).toBeGreaterThanOrEqual(0)
       expect(disclaimerIndex).toBeGreaterThan(composerIndex)
@@ -1783,6 +1787,164 @@ describe("#1225 AI 生成内容标识:会话页输入框下方一行小字", () 
       setLocale("zh")
       mounted.dispose()
     }
+  })
+})
+
+/* ── 界面优化 BR-04 / AC-05:输入框下的托盘与「+」菜单 ──────────────────────────────────────
+   托盘(项目 · 文件 · 插件)首页、新对话页与会话页都有;「+」菜单只有 添加附件 / 计划模式 / 助手 ——
+   文件与扩展搬去了托盘。判据挂在真 DOM 上:真 CodePuppyComposer、真点击,看出现了什么、打开了什么。 */
+describe("界面优化 BR-04:托盘与「+」菜单", () => {
+  const IDENTITY = { serverKey: STORE_SERVER_KEY, directory: DEFAULT_WORKSPACE, sessionID: "session-tray" }
+  const trayOf = (host: HTMLElement) => host.querySelector<HTMLElement>("[data-codepuppy-composer-tray]")
+  const trayBtn = (host: HTMLElement, name: "files" | "plugins") =>
+    host.querySelector<HTMLButtonElement>(`[data-codepuppy-composer-tray] [data-tray="${name}"]`)
+  const plusBtn = (host: HTMLElement) => host.querySelector<HTMLButtonElement>(".a-comp-bar .a-chip-icon")!
+  const menu = (host: HTMLElement) => host.querySelector<HTMLElement>(".a-comp-auto")
+  const sectionLabels = (host: HTMLElement) =>
+    Array.from(host.querySelectorAll(".a-comp-auto .a-comp-sec")).map((el) => el.textContent?.trim())
+  const rowTexts = (host: HTMLElement) =>
+    Array.from(host.querySelectorAll(".a-comp-auto .a-auto-row")).map((el) => el.textContent ?? "")
+
+  function mountSessionDock() {
+    return mountDisposable(() =>
+      createComponent(SessionComposerDock, {
+        live: {
+          current: () => ({ identity: IDENTITY, project: "alpha-code", title: "会话", activity: "idle" }),
+          accepts: (candidate: typeof IDENTITY) =>
+            candidate.serverKey === IDENTITY.serverKey &&
+            candidate.directory === IDENTITY.directory &&
+            candidate.sessionID === IDENTITY.sessionID,
+        },
+        projects: projectsApi([project("alpha-code", "/ws/a")]),
+      } as never),
+    )
+  }
+  async function mountedSession() {
+    const mounted = mountSessionDock()
+    for (let i = 0; i < 20 && !textarea(mounted.host); i++) await flush()
+    expect(textarea(mounted.host), "composer 没挂起来 —— 本次测量作废").toBeTruthy()
+    return mounted
+  }
+
+  test("会话页:托盘贴在输入框下面、AI 标识之上;项目固定(只写名称,不是选择器),文件与插件可点", async () => {
+    const mounted = await mountedSession()
+    try {
+      const wrap = mounted.host.querySelector("[data-codepuppy-composer-wrap='session']")!
+      expect(wrap).toBeTruthy()
+      const kids = Array.from(wrap.children)
+      expect(kids[0]!.hasAttribute("data-codepuppy-composer")).toBe(true)
+      expect(kids[1]!.hasAttribute("data-codepuppy-composer-tray")).toBe(true)
+      const tray = trayOf(mounted.host)!
+      expect(tray.querySelector("button.a-ws-chip"), "会话里项目固定,不给选择器").toBeNull()
+      expect(tray.querySelector("[data-tray='project']")!.textContent?.trim().length).toBeGreaterThan(0)
+      expect(trayBtn(mounted.host, "files")!.textContent).toContain("文件")
+      expect(trayBtn(mounted.host, "plugins")!.textContent).toContain("插件")
+    } finally {
+      mounted.dispose()
+    }
+  })
+
+  test("「+」菜单:只有 添加附件 / 计划模式(+ 助手一节)—— 没有文件一节、扩展市场、终端行", async () => {
+    const mounted = await mountedSession()
+    try {
+      plusBtn(mounted.host).click()
+      await flush()
+      expect(menu(mounted.host)!.getAttribute("data-scope")).toBe("plus")
+      const rows = rowTexts(mounted.host).join("|")
+      expect(rows).toContain("添加附件")
+      expect(rows).toContain("计划模式")
+      expect(rows).not.toContain("扩展市场")
+      expect(rows).not.toContain("打开终端") // 会话页的 @ 列表里有,「+」菜单里没有(终端在右栏)
+      expect(sectionLabels(mounted.host)).not.toContain("文件")
+      expect(sectionLabels(mounted.host)).not.toContain("扩展")
+    } finally {
+      mounted.dispose()
+    }
+  })
+
+  test("托盘「文件」:打开同一个弹窗,只有文件一节(原「+」菜单的文件节);再点收起;与「+」互相切换", async () => {
+    const mounted = await mountedSession()
+    try {
+      trayBtn(mounted.host, "files")!.click()
+      await flush()
+      expect(menu(mounted.host)!.getAttribute("data-scope")).toBe("files")
+      expect(sectionLabels(mounted.host)).toEqual(["文件"])
+      expect(rowTexts(mounted.host).join("|")).not.toContain("添加附件")
+      expect(trayBtn(mounted.host, "files")!.getAttribute("aria-expanded")).toBe("true")
+
+      plusBtn(mounted.host).click() // 换成「+」的列表
+      await flush()
+      expect(menu(mounted.host)!.getAttribute("data-scope")).toBe("plus")
+      expect(trayBtn(mounted.host, "files")!.getAttribute("aria-expanded")).toBe("false")
+
+      plusBtn(mounted.host).click() // 再点 = 收起
+      await flush()
+      expect(menu(mounted.host)).toBeNull()
+    } finally {
+      mounted.dispose()
+    }
+  })
+
+  test("「+」菜单键盘行为不变:焦点留在输入框,↓ 移动选中行,Esc 收起", async () => {
+    const mounted = await mountedSession()
+    try {
+      const ta = textarea(mounted.host)!
+      plusBtn(mounted.host).click()
+      await flush()
+      const active = () =>
+        Array.from(mounted.host.querySelectorAll(".a-comp-auto .a-auto-row")).findIndex((el) => el.classList.contains("is-active"))
+      expect(active()).toBe(0)
+      ta.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true, cancelable: true }))
+      await flush()
+      expect(active()).toBe(1)
+      ta.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }))
+      await flush()
+      expect(menu(mounted.host)).toBeNull()
+    } finally {
+      mounted.dispose()
+    }
+  })
+
+  test("托盘「文件」在没有变更文件时也会打开(摆出「输入 @关键词」的提示),不留点了没反应的按钮", async () => {
+    const mounted = await mountedSession()
+    try {
+      trayBtn(mounted.host, "files")!.click()
+      await flush()
+      expect(menu(mounted.host), "文件弹窗没有打开").not.toBeNull()
+      expect(mounted.host.querySelector(".a-comp-auto .a-comp-hint")?.textContent ?? "").toContain("@")
+    } finally {
+      mounted.dispose()
+    }
+  })
+
+  test("托盘「插件」:打开扩展中心(原「+」菜单里「扩展市场」的同一动作)", async () => {
+    const mounted = await mountedSession()
+    try {
+      setExtHubOpen(false)
+      expect(extHubOpen()).toBe(false)
+      trayBtn(mounted.host, "plugins")!.click()
+      await flush()
+      expect(extHubOpen()).toBe(true)
+    } finally {
+      setExtHubOpen(false)
+      mounted.dispose()
+    }
+  })
+
+  test("新对话页(首页同款):项目选择器就在托盘里,选择行为不变;输入框还没挂起来时托盘单独留着", async () => {
+    setDraft({ server: STORE_SERVER_KEY, directory: "/ws/a" })
+    const host = mount(() => createComponent(DraftLeaf, { projects: projectsApi([project("alpha-code", "/ws/a")]) }))
+    await flush()
+    await flush()
+    expect(chipButton(host).closest("[data-codepuppy-composer-tray]"), "项目选择器应在托盘里").not.toBeNull()
+    expect(host.querySelector("[data-codepuppy-composer-wrap='home']")!.contains(chipButton(host))).toBe(true)
+    expect(trayBtn(host, "files")).not.toBeNull()
+    expect(trayBtn(host, "plugins")).not.toBeNull()
+    // 首页朝下的「+」菜单同样只有三类项
+    plusBtn(host).click()
+    await flush()
+    expect(sectionLabels(host)).not.toContain("文件")
+    expect(rowTexts(host).join("|")).not.toContain("扩展市场")
   })
 })
 

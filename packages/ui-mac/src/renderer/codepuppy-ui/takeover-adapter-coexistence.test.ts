@@ -139,17 +139,17 @@ describe("REQ-125 C7:ComposerTakeover 删除后零引用(棘轮)", () => {
     expect(card).not.toContain("questionV2Reply")
   })
 
-  test("审计修复轮棘轮:停止键走已批稿 accent 令牌", () => {
+  test("审计修复轮棘轮:停止键走已批稿令牌(界面优化稿 .send.is-stop:--a-text 底、--a-bg-canvas 方块)", () => {
     // (原「always 项目身份取会话精确 projectID」棘轮随 dock 审批卡删除而失去主体:
     // dock 已无任何放行动作;独立 Permission surface 的 always 项目身份由
     // PermissionDialog 自身的 fail-closed 用例锁定。)
     const dock = read(path.join(CODEPUPPY_UI, "session-workspace", "session-composer-dock.tsx"))
     expect(dock).not.toContain("project.worktree ===")
-    // minor:停止键配色 = 已批稿 --a-accent 系;禁 --a-danger 与裸色回退。
+    // minor:停止键配色 = 已批稿令牌(2026-11-18 界面优化稿起为深色圆底 + 浅色方块,此前是 --a-accent 淡底);禁 --a-danger 与裸色回退。
     const css = read(path.join(CODEPUPPY_UI, "codepuppy-composer.css"))
     expect(css).not.toContain("--a-danger")
     expect(css).toMatch(
-      /\.a-comp-stop\[data-ready\] \{\s*background: var\(--a-accent-subtle\);\s*color: var\(--a-accent\);\s*border: 1px solid var\(--a-accent-border\);/,
+      /\.a-comp-stop\[data-ready\] \{\s*background: var\(--a-text\);\s*color: var\(--a-bg-canvas\);/,
     )
   })
 

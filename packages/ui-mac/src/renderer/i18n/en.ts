@@ -1398,7 +1398,9 @@ export const dict = {
   "codepuppy.provider.saving": "Saving…",
   "codepuppy.provider.saveEnable": "Save and enable",
 
-  "codepuppy.composer.assemble": "Add files, context or a mode",
+  "codepuppy.composer.assemble": "Add an attachment, plan mode or an assistant",
+  "codepuppy.composer.trayFiles": "Files",
+  "codepuppy.composer.trayPlugins": "Plugins",
   "codepuppy.composer.permissions": "Runtime permissions",
   "codepuppy.composer.permAllow": "Approve all",
   "codepuppy.composer.permAllowHint": "All tools run directly, except folders outside the project and .env files.",
@@ -1519,6 +1521,7 @@ export const dict = {
   "codepuppy.autocomplete.groupBuiltin": "Built-in commands",
   "codepuppy.autocomplete.groupSkills": "Skills",
   "codepuppy.autocomplete.groupProject": "Project",
+  "codepuppy.autocomplete.groupAgent": "Assistants",
   "codepuppy.autocomplete.groupAdd": "Add",
   "codepuppy.autocomplete.groupFiles": "Files",
   "codepuppy.autocomplete.groupExtensions": "Extensions",

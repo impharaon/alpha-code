@@ -15,7 +15,7 @@ import { createEffect, createMemo, createSignal, Show, untrack } from "solid-js"
 import { useSearchParams } from "@solidjs/router"
 import { ServerConnection, useTabs } from "@opencode-ai/app"
 import { type CodePuppyProjectsApi } from "../sidebar/use-projects"
-import { CodePuppyComposer } from "./codepuppy-composer"
+import { CodePuppyComposer, ComposerTrayShell } from "./codepuppy-composer"
 import { createDefaultWorkspaceDir } from "./default-workspace"
 import { newSessionDraftStash } from "./new-session-draft-stash"
 import { CodePuppyWorkspaceChip, visibleWorkspaces, workspaceLabel } from "./workspace-chip"
@@ -104,6 +104,20 @@ export function CodePuppyNewSession(props: {
     tabs.updateDraft(props.draftId, { directory: dir })
   }
 
+  // 项目选择器(REQ-126 CODE-D;选中即写 draft 目录)。界面优化 BR-04:它在输入框下的托盘里 —— 输入框挂起来之前
+  // (目录准备中)托盘单独留着,准备期间照旧能选项目。
+  const workspaceChip = () => (
+    <CodePuppyWorkspaceChip
+      projects={projects()}
+      defaultWorkspace={defaultWs()}
+      value={activeWs()}
+      open={wsOpen()}
+      onOpenChange={setWsOpen}
+      onSelect={selectWorkspace}
+      readonly={wsReadonly()}
+    />
+  )
+
   return (
     <div class="a-ui a-home a-home--page" data-codepuppy-new-session>
       <div class="a-home-stage">
@@ -132,10 +146,13 @@ export function CodePuppyNewSession(props: {
             when={directory()}
             keyed
             fallback={
-              <div class="a-home-preparing" role="status" data-codepuppy-new-session-preparing>
-                <span class="a-home-preparing-spinner" aria-hidden="true" />
-                {t("codepuppy.newSession.preparing")}
-              </div>
+              <>
+                <div class="a-home-preparing" role="status" data-codepuppy-new-session-preparing>
+                  <span class="a-home-preparing-spinner" aria-hidden="true" />
+                  {t("codepuppy.newSession.preparing")}
+                </div>
+                <ComposerTrayShell solo>{workspaceChip()}</ComposerTrayShell>
+              </>
             }
           >
             {(dir) => (
@@ -156,6 +173,7 @@ export function CodePuppyNewSession(props: {
                   newSessionDraftStash.prune(liveDraftIds())
                 }}
                 onAttachmentReadPending={setAttachmentReadPending}
+                workspaceChip={workspaceChip()}
                 onSubmitted={(id) => {
                   // 已经发出去了,没有回访可言:晋升前清掉这条 draft 的暂存。
                   newSessionDraftStash.forget(props.draftId)
@@ -164,17 +182,6 @@ export function CodePuppyNewSession(props: {
               />
             )}
           </Show>
-
-          {/* workspace chip —— 与首页同源的受控组件(REQ-126 CODE-D)。选中即写 draft 目录。 */}
-          <CodePuppyWorkspaceChip
-            projects={projects()}
-            defaultWorkspace={defaultWs()}
-            value={activeWs()}
-            open={wsOpen()}
-            onOpenChange={setWsOpen}
-            onSelect={selectWorkspace}
-            readonly={wsReadonly()}
-          />
         </div>
       </div>
     </div>

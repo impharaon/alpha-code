@@ -153,6 +153,18 @@ export function CodePuppyHome(props: {
               // 未发送内容」交给 notice 模块,身份切换那一拍据此弹一句说明(导航等卸载不误报,
               // 判据见 home-draft-discard-notice.ts)。
               onDraftSnapshot={noteHomeComposerUnmountDraft}
+              // 界面优化 BR-04:项目选择器搬进输入框下的托盘(同一个受控组件、同一组条目)。
+              workspaceChip={
+                <CodePuppyWorkspaceChip
+                  projects={visibleProjects()}
+                  defaultWorkspace={defaultWs()}
+                  value={activeWs()}
+                  open={wsOpen()}
+                  onOpenChange={setWsOpen}
+                  onSelect={setChosenWs}
+                  readonly={wsReadonly()}
+                />
+              }
               onNeedWorkspace={() => {
                 // 零工作区不留死点(REQ-054①):任何需要工作区的控件都引导到选择器
                 setWsOpen(true)
@@ -176,17 +188,6 @@ export function CodePuppyHome(props: {
               }}
             />
           </Show>
-
-          {/* workspace chip —— 与新对话页同源的受控组件(REQ-126 CODE-D) */}
-          <CodePuppyWorkspaceChip
-            projects={visibleProjects()}
-            defaultWorkspace={defaultWs()}
-            value={activeWs()}
-            open={wsOpen()}
-            onOpenChange={setWsOpen}
-            onSelect={setChosenWs}
-            readonly={wsReadonly()}
-          />
         </div>
       </div>
     </div>

@@ -514,7 +514,7 @@ describe("#565 harness 复刻的原件形状锚点(renderer/index.tsx)", () => {
         "      <Show when={ready()} fallback={splash}>",
         "        <Show when={effectiveDefaultServer()} keyed>",
         "          {(key) => (",
-        "            <AppInterface defaultServer={key} servers={servers()} router={MemoryRouter} surfaces={surfaceComponents()}>",
+        "            <AppInterface defaultServer={key} servers={servers()} router={RestoredMemoryRouter} surfaces={surfaceComponents()}>",
       ].join("\n"),
     )
     // 整个 index.tsx 只允许这一个 keyed Show:

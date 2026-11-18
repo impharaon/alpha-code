@@ -46,6 +46,7 @@ import type { UpdaterState } from "@opencode-ai/app/updater"
 import { projectSidebarGroups } from "./project-display"
 import type { AuthState, AccountSummary } from "../../preload/types"
 import { setExtHubOpen, toggleExtHub } from "../extensions/ext-hub-state"
+import { rememberRoute, restoredRoute } from "../reload-place-store"
 import { setAutomationOpen, toggleAutomation } from "../automations/automation-state"
 import { setSettingsOpen } from "../codepuppy-ui/settings-state"
 import { dismissMenu, dismissMenuOnEscape, focusFirstMenuItem } from "./menu-a11y"
@@ -602,6 +603,8 @@ export function CodePuppySidebar(props: {
     const key = `${location.pathname}${location.search}`
     if (lastNavKey !== undefined && key !== lastNavKey) closeAllOverlays()
     lastNavKey = key
+    // I-11 / BR-07:sidecar 换代会整页重载;记下位置,重载后从这里起步(reload-place.ts)。
+    rememberRoute(key)
   })
 
   // Keep the open session marked "viewed" at its latest activity, so it never shows its own unread
@@ -837,9 +840,12 @@ export function CodePuppySidebar(props: {
   // composer 早在 ~1.1s 就已经挂上并起了一条注定被取消的模型链。released 挂在启动这一次
   // startDraft 的结算上(成功即已导航走;如实失败则首页当场拿回 composer),
   // 侧栏卸载也算结算 —— 见 launch-draft-handoff.ts 的纪律段。
-  beginLaunchDraftHandoff()
+  // I-11 / BR-07:本窗口整页重载(sidecar 换代)后路由已回到重载前的位置 —— 启动落地只属于冷启动,
+  // 这里不再开新 draft,也不关覆盖层(startDraft 会关);用户停在原处。
+  const resumed = restoredRoute() !== undefined
+  if (!resumed) beginLaunchDraftHandoff()
   onCleanup(endLaunchDraftHandoff)
-  let didLaunchNav = false
+  let didLaunchNav = resumed
   createEffect(() => {
     if (didLaunchNav || !store.ready) return
     didLaunchNav = true

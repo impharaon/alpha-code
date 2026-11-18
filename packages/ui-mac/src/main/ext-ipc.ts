@@ -1347,11 +1347,11 @@ export function registerExtIpcHandlers(
             const found = findMcpServerRecord(node.name)
             return !found.ok || found.record !== undefined
           })
-          const reloadItems = packageReloadItems(packageId)
+          const reloadItems = graph ? packageReloadItems(graph.packageId) : []
           const result = await uninstallPackageV1(packageId, { globalRoot: codepuppyGlobalRoot, installers: packageArtifactInstallers() })
           if (result.ok && graph) await removePackageMcpV1(graph, codepuppyUserWorkspaceDir(), awaitServer).catch(() => undefined)
           if (result.ok && launchConfigured)
-            reloads.request({ scope: "global", items: reloadItems, reason: `uninstalled package ${packageId}`, connectorChange: true })
+            reloads.request({ scope: "global", items: reloadItems, reason: `uninstalled package ${String(packageId)}`, connectorChange: true })
           return result
         } finally {
           if (official && !(await officialRuntime!.refresh()))

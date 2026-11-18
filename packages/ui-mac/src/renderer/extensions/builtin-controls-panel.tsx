@@ -17,9 +17,6 @@ import { extIpc } from "./ext-ipc"
 /** 引擎内置 command(REQ-037 机制核实面;上游冻结,变更随 sync retro 复核)。 */
 const BUILTIN_COMMANDS = ["init", "review"]
 
-/** 「系统」分段里应用自带条目的图标底色(批准稿 `#hub-skills` 系统行)。 */
-const BUILTIN_TINT = "#52525b"
-
 const DEFAULT_GOV: CodePuppyBuiltinPolicy = {
   version: 1,
   mode: "denylist",
@@ -205,8 +202,8 @@ export function BuiltinControlsPanel(props: {
                   .filter(Boolean)
                   .join(" · ") || t("codepuppy.ext.builtinAgentLabel")
               return (
-                <div class="codepuppy-ext-kit codepuppy-ext-man" data-gov-dim={disabled() || hidden() ? "" : undefined} data-builtin-agent={name}>
-                  <span class="codepuppy-ext-kit-ic" style={{ background: BUILTIN_TINT }}>
+                <div class="codepuppy-ext-kit" data-gov-dim={disabled() || hidden() ? "" : undefined} data-builtin-agent={name}>
+                  <span class="codepuppy-ext-kit-ic">
                     {(name[0] ?? "?").toUpperCase()}
                   </span>
                   <div class="codepuppy-ext-kit-body">
@@ -247,8 +244,8 @@ export function BuiltinControlsPanel(props: {
             {(name) => {
               const overridden = () => !!g().commands.override[name]
               return (
-                <div class="codepuppy-ext-kit codepuppy-ext-man" data-builtin-command={name}>
-                  <span class="codepuppy-ext-kit-ic" style={{ background: BUILTIN_TINT }}>
+                <div class="codepuppy-ext-kit" data-builtin-command={name}>
+                  <span class="codepuppy-ext-kit-ic">
                     /
                   </span>
                   <div class="codepuppy-ext-kit-body">

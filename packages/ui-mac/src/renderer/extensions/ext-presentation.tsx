@@ -107,6 +107,43 @@ export const SearchIc = () => (
     <path d="M21 21l-4-4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
   </svg>
 )
+/** 定制中心的线条图标(冻结稿 `#i-*`):24 视口,线宽随尺寸由 `extension-hub.css` 的 `.a-ic.ic-*` 给。 */
+const HUB_IC = {
+  plus: () => <path d="M12 5v14M5 12h14" />,
+  more: () => (
+    <>
+      <circle cx="6" cy="12" r="1.3" fill="currentColor" stroke="none" />
+      <circle cx="12" cy="12" r="1.3" fill="currentColor" stroke="none" />
+      <circle cx="18" cy="12" r="1.3" fill="currentColor" stroke="none" />
+    </>
+  ),
+  down: () => <path d="m6 9.5 6 6 6-6" />,
+  right: () => <path d="m9.5 18 6-6-6-6" />,
+  left: () => <path d="m14.5 18-6-6 6-6" />,
+  search: () => (
+    <>
+      <circle cx="11" cy="11" r="6.5" />
+      <path d="m20 20-4.2-4.2" />
+    </>
+  ),
+  loader: () => <path d="M12 3.5a8.5 8.5 0 1 1-8.5 8.5" />,
+}
+export const HubIc = (p: { name: keyof typeof HUB_IC; size?: 12 | 14 | 18 }) => (
+  <svg class={`a-ic${p.size ? ` ic-${p.size}` : ""}`} viewBox="0 0 24 24" aria-hidden="true">
+    {HUB_IC[p.name]()}
+  </svg>
+)
+/** 名称旁的安静状态字(冻结稿 `.st`):圆点 + 一个词;只有「未能启用」是红的,进行中换成转圈。 */
+export function RowStatus(p: { tone: "warn" | "err" | "off" | "progress"; text: string; attrs?: Record<string, string | undefined> }) {
+  return (
+    <span class="codepuppy-ext-st" data-tone={p.tone} data-row-status="" {...p.attrs}>
+      <Show when={p.tone === "progress"} fallback={<i aria-hidden="true" />}>
+        <HubIc name="loader" size={12} />
+      </Show>
+      {p.text}
+    </span>
+  )
+}
 export const LockIc = () => (
   <svg class="codepuppy-ic codepuppy-ic-xs" viewBox="0 0 24 24" fill="none" aria-hidden="true">
     <rect x="5" y="11" width="14" height="9" rx="2" stroke="currentColor" stroke-width="1.7" />
@@ -114,7 +151,8 @@ export const LockIc = () => (
   </svg>
 )
 
-export type MoreMenuItem = { key: string; label: string; onSelect: () => void; disabled?: boolean; danger?: boolean; checked?: boolean }
+/** `separatorAfter`:这一项之后画一条细线(冻结稿 `#hub-row-menu`:登录 | 开启、管理 | 移除);危险项前总有一条。 */
+export type MoreMenuItem = { key: string; label: string; onSelect: () => void; disabled?: boolean; danger?: boolean; checked?: boolean; separatorAfter?: boolean }
 
 // 同一时刻只开一个菜单:点开另一个「…」时上一个自动收起。
 const [openMenu, setOpenMenu] = createSignal<object | null>(null)
@@ -150,6 +188,7 @@ export function MoreMenu(p: {
       <button
         class="codepuppy-ext-add"
         data-variant={p.primary ? "primary" : undefined}
+        data-iact={p.trigger ? undefined : ""}
         data-more={p.id}
         aria-haspopup="menu"
         aria-expanded={open()}
@@ -161,12 +200,19 @@ export function MoreMenu(p: {
           setOpen(!open())
         }}
       >
-        {p.trigger ?? "…"}
+        <Show when={p.trigger} fallback={<HubIc name="more" />}>
+          {p.trigger}
+          <HubIc name="down" size={12} />
+        </Show>
       </button>
       <Show when={open()}>
         <div class="codepuppy-ext-menu" role="menu" data-menu={p.id}>
           <For each={p.items}>
-            {(item) => (
+            {(item, index) => (
+              <>
+              <Show when={index() > 0 && (item.danger || p.items[index() - 1]?.separatorAfter)}>
+                <div class="codepuppy-ext-menu-sep" role="separator" />
+              </Show>
               <Show
                 when={item.checked !== undefined}
                 fallback={
@@ -210,6 +256,7 @@ export function MoreMenu(p: {
                   />
                 </label>
               </Show>
+              </>
             )}
           </For>
         </div>

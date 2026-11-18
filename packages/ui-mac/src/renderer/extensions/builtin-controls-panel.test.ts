@@ -59,7 +59,7 @@ test.each([{ allowFactory: [] }, { allowFactory: ["customize-opencode"] }])("#15
     flash: () => {},
   }), host)
   await new Promise((resolve) => setTimeout(resolve, 0))
-  const rows = [...host.querySelectorAll(".codepuppy-ext-man")]
+  const rows = [...host.querySelectorAll(".codepuppy-ext-kit")]
   expect(host.querySelector(".codepuppy-ext-import-err")).toBeNull()
   expect(host.textContent).not.toContain("customize-opencode")
   expect(rows).toHaveLength(3)

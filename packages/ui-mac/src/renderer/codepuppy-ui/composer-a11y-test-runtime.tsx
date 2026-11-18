@@ -31,7 +31,7 @@ export function TwoChipsHarness() {
 }
 
 /** 菜单容器里装二级页(添加供应商):验证 Esc 先退一级。 */
-export function SubPageHarness(props: { onClosed: () => void }) {
+export function SubPageHarness(props: { onClosed: () => void; closeOnCustomDone?: boolean }) {
   const [open, setOpen] = createSignal(true)
   const [sub, setSub] = createSignal(true)
   let anchor: HTMLButtonElement | undefined
@@ -46,7 +46,12 @@ export function SubPageHarness(props: { onClosed: () => void }) {
             row
           </button>
           <Show when={sub()}>
-            <AddProvider catalog={null} onClose={() => setSub(false)} />
+            <AddProvider
+              catalog={null}
+              onClose={() => setSub(false)}
+              // 生产接线(输入框的模型选择器):对话框关掉后发起它的弹层随之关闭。
+              onCustomClosed={props.closeOnCustomDone ? () => (setOpen(false), props.onClosed()) : undefined}
+            />
           </Show>
         </ChipPopover>
       </Show>

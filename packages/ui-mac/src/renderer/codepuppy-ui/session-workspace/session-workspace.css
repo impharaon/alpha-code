@@ -42,30 +42,15 @@
   app-region: no-drag;
 }
 
-.a-swk-project-pill {
-  display: inline-flex;
+/* Breadcrumb "project / title" (frame #session). Renders into the window chrome's top-bar slot
+ * (sidebar/shell-chrome.tsx) — type scale and weight come from there — or into .a-swk-topbar when the
+ * workspace is mounted without the chrome. */
+.a-swk-topbar-content {
+  display: flex;
   align-items: center;
-  gap: 7px;
+  flex: 1;
   min-width: 0;
-  height: 28px;
-  padding: 0 8px;
-  border-radius: var(--a-radius-md);
-  color: var(--a-text-tertiary);
-  font-size: var(--a-text-sm);
-  font-weight: var(--a-weight-medium);
-}
-
-.a-swk-project-avatar {
-  display: grid;
-  place-items: center;
-  flex: none;
-  width: 17px;
-  height: 17px;
-  border-radius: 5px;
-  background: var(--a-accent-solid);
-  color: var(--a-text-on-accent);
-  font-size: 9px;
-  font-weight: var(--a-weight-bold);
+  gap: 0;
 }
 
 .a-swk-project-label,
@@ -76,23 +61,23 @@
 
 .a-swk-project-label {
   max-width: 180px;
+  color: var(--a-text-tertiary);
+  font-size: var(--a-text-base);
+  font-weight: var(--a-weight-normal);
 }
 
 .a-swk-separator {
   flex: none;
+  margin: 0 6px;
   color: var(--a-text-disabled);
-  font-size: var(--a-text-sm);
+  font-size: var(--a-text-base);
 }
 
 .a-swk-session-title {
-  height: 28px;
-  max-width: min(42vw, 420px);
-  padding: 3px 9px 0;
-  border-radius: var(--a-radius-md);
+  min-width: 0;
   color: var(--a-text);
-  font-size: var(--a-text-md);
-  font-weight: var(--a-weight-semibold);
-  letter-spacing: var(--a-tracking-tight);
+  font-size: var(--a-text-base);
+  font-weight: var(--a-weight-medium);
 }
 
 .a-swk-status {
@@ -200,8 +185,7 @@
 }
 
 .a-swk-composer-host {
-  width: 100%;
-  max-width: 860px;
+  width: min(680px, calc(100% - 64px)); /* 界面优化稿 .dock:与对话内容同一公式 */
   margin: 0 auto;
 }
 
@@ -225,6 +209,11 @@
   font-size: var(--a-text-2xs);
   line-height: 1.45;
   color: var(--a-text-tertiary);
+}
+
+/* 界面优化稿 .dock-note:托盘下 6px(dock 的行距是 10) */
+.a-swk-dock > .a-swk-ai-disclaimer {
+  margin-top: -4px;
 }
 
 .a-swk-card {
@@ -537,8 +526,9 @@
   max-width: calc(100% - 480px);
   min-height: 0;
   overflow: hidden;
-  border-left: 1px solid var(--a-border-faint);
-  background: var(--a-bg-subtle);
+  /* Part of the working surface: white, split from the conversation by --a-divider only (BR-01). */
+  border-left: 1px solid var(--a-divider);
+  background: var(--a-bg-canvas);
 }
 
 /* Left-edge resize hot zone: 6px, accent hairline on hover/drag/focus (approved form). */
@@ -577,41 +567,50 @@
 .a-swk-rail-tabs {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 18px;
   flex: none;
-  height: 46px;
-  padding: 0 10px;
-  border-bottom: 1px solid var(--a-border-faint);
+  height: var(--a-topbar-h);
+  padding: 0 16px;
+  border-bottom: 1px solid var(--a-hairline);
   background: var(--a-bg-canvas);
 }
 
 .a-swk-rail-tab {
+  position: relative;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  height: 30px;
-  padding: 0 11px;
+  height: var(--a-topbar-h);
+  padding: 0;
   border: 0;
-  border-radius: var(--a-radius-md);
   background: transparent;
   color: var(--a-text-secondary);
   font-family: inherit;
   font-size: var(--a-text-sm);
-  font-weight: var(--a-weight-medium);
+  font-weight: var(--a-weight-normal);
+  white-space: nowrap;
   cursor: pointer;
-  transition:
-    background var(--a-dur-fast) var(--a-ease-out),
-    color var(--a-dur-fast) var(--a-ease-out);
+  transition: color var(--a-dur-fast) var(--a-ease-out);
 }
 
 .a-swk-rail-tab:hover {
-  background: var(--a-bg-muted);
   color: var(--a-text);
 }
 
 .a-swk-rail-tab--on {
-  background: var(--a-accent-subtle);
-  color: var(--a-accent);
+  color: var(--a-text);
+  font-weight: var(--a-weight-medium);
+}
+
+/* 选中页签:中性下划线(不用强调色;冻结稿 #right-panel) */
+.a-swk-rail-tab--on::after {
+  content: "";
+  position: absolute;
+  right: 0;
+  bottom: -1px;
+  left: 0;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--a-text);
 }
 
 /* Fail-closed mid-state: a panel whose lane has not landed renders as a disabled tab. */
@@ -624,18 +623,11 @@
 /* Count badge (review = changed-file count); tinted along with the active capsule. */
 .a-swk-rail-tab-badge {
   flex: none;
-  padding: 0 6px;
-  border-radius: var(--a-radius-full);
-  background: var(--a-bg-muted);
+  margin-left: 5px;
   color: var(--a-text-tertiary);
   font-size: var(--a-text-2xs);
+  font-weight: var(--a-weight-normal);
   font-variant-numeric: tabular-nums;
-  line-height: 16px;
-}
-
-.a-swk-rail-tab--on .a-swk-rail-tab-badge {
-  background: color-mix(in srgb, var(--a-accent) 16%, transparent);
-  color: var(--a-accent);
 }
 
 /* Terminal breathing dot: any terminal running. */
@@ -643,39 +635,10 @@
   flex: none;
   width: 6px;
   height: 6px;
+  margin-right: 6px;
   border-radius: var(--a-radius-full);
   background: var(--a-success);
   animation: a-swk-status-pulse 1.4s var(--a-ease-in-out) infinite;
-}
-
-.a-swk-rail-close {
-  display: grid;
-  place-items: center;
-  flex: none;
-  width: 28px;
-  height: 28px;
-  margin-left: auto;
-  padding: 0;
-  border: 0;
-  border-radius: var(--a-radius-md);
-  background: transparent;
-  color: var(--a-text-tertiary);
-  cursor: pointer;
-}
-
-.a-swk-rail-close:hover {
-  background: var(--a-bg-muted);
-  color: var(--a-text);
-}
-
-.a-swk-rail-close svg {
-  width: 15px;
-  height: 15px;
-  fill: none;
-  stroke: currentColor;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  stroke-width: 1.8;
 }
 
 .a-swk-rail-panel {
@@ -839,4 +802,50 @@
 
 .a-swk-readonly-restart:hover {
   background: var(--a-bg-muted);
+}
+
+/* 找不到对话(新外壳稿 #not-found):图标 + 一句话 + 一个出口,钉在主区 30% 处;
+   结构在 packages/codepuppy-app/src/pages/session-not-found.tsx(只给数据钩子,版式在这里)。 */
+[data-codepuppy-session-not-found] {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
+}
+
+[data-codepuppy-session-not-found] [data-codepuppy-not-found="body"] {
+  position: absolute;
+  top: 30%;
+  right: 0;
+  left: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0 var(--a-space-6);
+  text-align: center;
+}
+
+[data-codepuppy-session-not-found] [data-codepuppy-not-found="icon"] {
+  width: 20px;
+  height: 20px;
+  margin-bottom: 14px;
+  fill: none;
+  stroke: var(--a-text-tertiary);
+  stroke-width: 1.44;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+[data-codepuppy-session-not-found] h4 {
+  margin: 0 0 6px;
+  color: var(--a-text);
+  font-size: var(--a-text-lg);
+  font-weight: var(--a-weight-semibold);
+}
+
+[data-codepuppy-session-not-found] p {
+  margin: 0 0 18px;
+  color: var(--a-text-tertiary);
+  font-size: var(--a-text-sm);
 }

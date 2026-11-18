@@ -1012,7 +1012,7 @@ describe("package detail production renderer path", () => {
       expect({
         catalogId: card.getAttribute("data-package-card"),
         prerequisite: card.getAttribute("data-prerequisite"),
-        action: card.querySelector("button")?.textContent?.trim(),
+        action: card.querySelector("button[data-iact]") ? "+" : card.querySelector("button")?.textContent?.trim(),
       }).toEqual({ catalogId: expected.catalogId, prerequisite: expected.prerequisite, action: expected.action })
       expect(card.querySelectorAll("button")).toHaveLength(1)
       expect(card.querySelector("[data-verdict], .codepuppy-ext-package-state, .codepuppy-ext-chip, .codepuppy-ext-meta")).toBeNull()

@@ -181,7 +181,7 @@ for (const box of ["form", "legacy", "code-review"] as const) {
   }, 60_000)
 }
 
-// 组件稿 #popover「改后」实测:卡片 282 × 164.5、四个文字行 25.5、走势行 36.5、读取中的值 11.5px。
+// 组件稿 #popover「改后」实测:卡片高 164.5(新外壳账户菜单 #account-menu:弹层宽 280、内边距 6、卡片两侧外边距 4 ⇒ 卡片宽 258)、四个文字行 25.5、走势行 36.5、读取中的值 11.5px。
 for (const theme of ["light", "dark"] as const) {
   test(`#1686 account popover card ${theme}: same geometry as the approved component frame`, async () => {
     for (const state of ["value", "pending"] as const) {
@@ -203,9 +203,9 @@ for (const theme of ["light", "dark"] as const) {
           }
         })
         await page.screenshot({ path: resolve(evidence, `popover-${state}-${theme}.png`) })
-        near(m.left, 15) // 弹层边框 1 + 外边距 14,与改前相同
+        near(m.left, 11) // 弹层边框 1 + 内边距 6 + 卡片外边距 4(新外壳 #account-menu 帧)
         near(m.top, 13) // 弹层边框 1 + padding-top 12(帧外壳)
-        near(m.width, 282)
+        near(m.width, 258) // 280 − 2 边框 − 12 内边距 − 8 外边距
         near(m.height, 164.5)
         expect(m.rows.slice(0, 4).every((height) => Math.abs(height - 25.5) <= 0.5)).toBe(true)
         near(m.rows[4]!, 36.5)

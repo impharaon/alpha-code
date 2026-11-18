@@ -1,25 +1,32 @@
 import { isAbsolute, join, relative, sep } from "node:path"
 
-export type PackageAllowSetV2 = {
-  v: 2
+/** main 派生、ext 只读的允许集(`skills-enabled.json`)。唯一定义与解码在这里,main 与 ext 共用。 */
+export type PackageAllowSetV3 = {
+  v: 3
   keys: string[]
   scoped: { kind: "skill" | "mcp"; name: string; projectPath: string }[]
+  /** 每条 global 范围 MCP 账本记录恰一项;按 name 升序,不重名(重名 = 读不到)。 */
+  mcp: { name: string; enabled: boolean }[]
 }
 
-export function decodePackageAllowSet(input: unknown): PackageAllowSetV2 | undefined {
-  if (!object(input) || input.v !== 2 || !Array.isArray(input.keys) || !Array.isArray(input.scoped)) return
+export function decodePackageAllowSet(input: unknown): PackageAllowSetV3 | undefined {
+  if (!object(input) || input.v !== 3 || !Array.isArray(input.keys) || !Array.isArray(input.scoped) || !Array.isArray(input.mcp)) return
   if (!input.keys.every((key: unknown): key is string => typeof key === "string")) return
-  if (!input.scoped.every((entry: unknown): entry is PackageAllowSetV2["scoped"][number] =>
+  if (!input.scoped.every((entry: unknown): entry is PackageAllowSetV3["scoped"][number] =>
     object(entry) && (entry.kind === "skill" || entry.kind === "mcp") &&
     typeof entry.name === "string" && typeof entry.projectPath === "string",
   )) return
-  return { v: 2, keys: input.keys, scoped: input.scoped }
+  if (!input.mcp.every((entry: unknown): entry is PackageAllowSetV3["mcp"][number] =>
+    object(entry) && typeof entry.name === "string" && typeof entry.enabled === "boolean",
+  )) return
+  if (new Set(input.mcp.map((entry) => entry.name)).size !== input.mcp.length) return
+  return { v: 3, keys: input.keys, scoped: input.scoped, mcp: input.mcp }
 }
 
 export function scopedPackageAllowedHere(
   kind: "skill" | "mcp",
   name: string,
-  allowSet: PackageAllowSetV2 | undefined,
+  allowSet: PackageAllowSetV3 | undefined,
   projectRoot: string | undefined,
 ): boolean {
   if (!allowSet || !projectRoot) return false
@@ -30,11 +37,17 @@ export function scopedPackageAllowedHere(
 /** Only for skills inside ext-store; factory, native and project skills bypass this predicate. */
 export function managedSkillAllowedHere(
   skill: { key: string; name: string },
-  allowSet: PackageAllowSetV2 | undefined,
+  allowSet: PackageAllowSetV3 | undefined,
   projectRoot: string | undefined,
 ): boolean {
   if (!allowSet) return false
   return allowSet.keys.includes(skill.key) || scopedPackageAllowedHere("skill", skill.name, allowSet, projectRoot)
+}
+
+/** 受管全局 MCP 在本 Location 开不开的唯一判定;ext 的 mcp.transform 与 main 的 convergeManagedMcp 共用。 */
+export function managedMcpAllowedHere(name: string, allowSet: PackageAllowSetV3 | undefined, projectRoot: string | undefined): boolean {
+  if (!allowSet) return false
+  return allowSet.mcp.some((entry) => entry.name === name && entry.enabled) || scopedPackageAllowedHere("mcp", name, allowSet, projectRoot)
 }
 
 export function managedSkillIdentity(path: string, globalRoot: string) {

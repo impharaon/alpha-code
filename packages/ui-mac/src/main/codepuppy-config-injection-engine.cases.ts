@@ -340,7 +340,7 @@ describe("接缝裁决 A / 裁决 r3 第 1 条:技能目录经显式文件的 sk
     fs.writeFileSync(path.join(root, "ext-store", key, "current.json"), JSON.stringify({ generation: genId }))
     return dir
   }
-  const enable = (...keys: string[]) => fs.writeFileSync(path.join(process.env.CODEPUPPY_GLOBAL_DIR!, "skills-enabled.json"), JSON.stringify({ v: 2, keys, scoped: [] }))
+  const enable = (...keys: string[]) => fs.writeFileSync(path.join(process.env.CODEPUPPY_GLOBAL_DIR!, "skills-enabled.json"), JSON.stringify({ v: 3, keys, scoped: [], mcp: [] }))
 
   test("出厂目录:启动时就在的技能出现;文件监听开着时,启动之后写进同一目录的技能几秒内出现(不重启)", async () => {
     const factory = path.join(sandbox.root, "factory-skills-watch")

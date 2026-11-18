@@ -522,3 +522,12 @@ table.spec{width:100%;border-collapse:collapse;margin-top:14px;font-size:var(--a
 .wschip svg{width:13px;height:13px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;color:var(--a-text-tertiary)}
 .wschip .ro{display:inline-flex;align-items:center;gap:4px;height:18px;padding:0 6px;border-radius:var(--a-radius-full);font-size:var(--a-text-2xs);font-weight:var(--a-weight-semibold);color:var(--a-warning);background:var(--a-warning-subtle)}
 .wschip .ro svg{width:9px;height:9px;color:inherit}
+
+/* ── 2026-11-18 新视觉方向(owner U-05 批准)的子帧:样式来自 ../../system/direction.css,与本页旧稿样式不同,所以装在子帧里 ── */
+.ux2-sec{margin-top:24px}
+.ux2-anchor{scroll-margin-top:72px;margin:28px 0 0}
+.ux2-anchor h3{margin:0 0 4px;font-size:16px}
+.ux2-anchor h3 code{font-size:12px;opacity:.6;font-weight:400}
+.ux2-anchor p{margin:0 0 10px;max-width:110ch;font-size:13px;line-height:1.6;opacity:.8}
+.ux2-scroll{overflow-x:auto;border-radius:12px}
+.ux2-if{display:block;width:1600px;border:0;background:transparent}

@@ -9,7 +9,8 @@ import {
 } from "./ext-config"
 import { collectMcpFileRefPaths } from "./codepuppy-mcp-secrets"
 import { codepuppyGlobalRoot } from "./engine-config-truth"
-import { findRecordV2 } from "./ext-receipt-v2"
+import { tryAcquireBundleLock } from "./ext-bundle-lock"
+import { findRecordV2, markOfficialRuntimeAvailable, reconcileSkillsDerivation } from "./ext-receipt-v2"
 import { probeTransactionJournals, type TxPreparedResourceV1 } from "./ext-transaction"
 import { removeMcpServerRecord, upsertMcpServerRecord } from "./mcp-server-lifecycle"
 // alpha-web#256: two closed recipes; only ciphertext survives a stopped application.
@@ -283,6 +284,69 @@ export function releaseOfficialConnectorResources(userDataPath: string, resource
   }
 }
 
+/** The live leaf names exactly one versioned runtime file of this connector; anything else cannot be restored. */
+function liveOfficialConnectorVersion(root: string, name: OfficialConnectorName): string {
+  const recovery = probeTransactionJournals(root)
+  if (recovery.unreadableDir || recovery.entries.some((entry) => !entry.terminal)) throw officialConnectorFailure()
+  const live = readMcpLeafStrict(name)
+  if (!live.ok || !live.value) throw officialConnectorFailure()
+  const refs = collectMcpFileRefPaths(live.value)
+  const file = refs[0]
+  if (refs.length !== 1 || !file || basename(dirname(dirname(file))) !== name) throw officialConnectorFailure()
+  const version = basename(dirname(file))
+  officialConnectorPaths(root, name, version)
+  return version
+}
+
+// I-11(design v9 §4.4「官方配方的可运行性」):不可运行集合改了之后,在 bundle 锁下按账本与集合重发允许集
+// (reconcileSkillsDerivation 同一路径,不改账本)。锁忙时有界重试;多次改动串成一条,每次都读最新集合。
+const REPUBLISH_ATTEMPTS = 100
+const REPUBLISH_RETRY_MS = 50
+let republished: Promise<boolean> = Promise.resolve(true)
+async function republishPackageAllowSet(): Promise<boolean> {
+  const root = codepuppyGlobalRoot()
+  for (let attempt = 0; attempt < REPUBLISH_ATTEMPTS; attempt++) {
+    const held = tryAcquireBundleLock(root, { txId: `official-runtime-${randomUUID()}` })
+    if (held.ok) {
+      try {
+        const derived = reconcileSkillsDerivation(root)
+        if (!derived.ok) console.warn(`official connector availability: allow-set republish failed: ${derived.reason}`)
+        return derived.ok
+      } finally {
+        held.lock.release()
+      }
+    }
+    await new Promise((resolve) => setTimeout(resolve, REPUBLISH_RETRY_MS))
+  }
+  console.warn("official connector availability: allow-set republish gave up while the ledger stayed busy; the next ledger write publishes it")
+  return false
+}
+function markAvailability(name: OfficialConnectorName, available: boolean) {
+  if (markOfficialRuntimeAvailable(name, available)) republished = republished.then(republishPackageAllowSet, republishPackageAllowSet)
+}
+/** Resolves once every availability change so far has been republished (or the bounded retry gave up). */
+export function officialAvailabilityPublished(): Promise<boolean> {
+  return republished
+}
+
+/**
+ * The per-name final-state step shared by convergeManagedMcp: the direction is the ledger intent read when the
+ * convergence run started, never the request's. Enabled = materialize from ciphertext; disabled = write empty.
+ * Returns whether the step succeeded; availability follows (only a materialized enabled connector is available).
+ */
+export function settleOfficialConnectorCredential(name: OfficialConnectorName, intent: "enabled" | "disabled"): boolean {
+  const root = codepuppyGlobalRoot()
+  let settled = false
+  try {
+    restoreOfficialConnector(root, name, liveOfficialConnectorVersion(root, name), intent)
+    settled = true
+  } catch {
+    if (intent === "enabled") console.warn(`official-connector-needs-reentry: ${name}`)
+  }
+  markAvailability(name, settled && intent === "enabled")
+  return settled
+}
+
 /** Rebind each committed connector independently; a credential failure must not stop the engine. */
 export function restoreCommittedOfficialConnectors() {
   const root = codepuppyGlobalRoot()
@@ -293,31 +357,29 @@ export function restoreCommittedOfficialConnectors() {
   }
   for (const name of OFFICIAL_CONNECTOR_NAMES) {
     const record = findRecordV2(root, "mcp", name)
-    if (!record) continue
+    if (!record) {
+      markAvailability(name, false)
+      continue
+    }
     let version = ""
     try {
-      const recovery = probeTransactionJournals(root)
-      if (recovery.unreadableDir || recovery.entries.some((entry) => !entry.terminal)) throw officialConnectorFailure()
-      const live = readMcpLeafStrict(name)
-      if (!live.ok || !live.value) throw officialConnectorFailure()
-      const refs = collectMcpFileRefPaths(live.value)
-      const file = refs[0]
-      if (refs.length !== 1 || !file || basename(dirname(dirname(file))) !== name) throw officialConnectorFailure()
-      version = basename(dirname(file))
-      officialConnectorPaths(root, name, version)
+      version = liveOfficialConnectorVersion(root, name)
       projectOfficialConnector(name, restoreOfficialConnector(root, name, version, record.desiredState))
+      markAvailability(name, record.desiredState === "enabled")
     } catch {
       // No secret, path or decryption error leaves this boundary. Empty refs remain parseable.
       console.warn(`official-connector-needs-reentry: ${name}`)
-      let disabled: Record<string, unknown> = { enabled: false }
+      markAvailability(name, false)
+      // I-11(v9-8):keep this version's complete definition (leaf + remote record, empty credential). The allow-set
+      // keeps it off; later Locations get the same trusted definition; the ledger intent is untouched.
+      let definition: Record<string, unknown> | undefined
       try {
-        disabled = restoreOfficialConnector(root, name, version, "disabled")
+        definition = restoreOfficialConnector(root, name, version, "disabled")
       } catch {
         // A missing/invalid recipe cannot safely provide a ref; the engine accepts disable-only leaves.
       }
-      projectOfficialConnector(name, disabled)
-      // Truth otherwise injects enabled:true even when the codepuppy.jsonc leaf is disabled.
-      if (!removeMcpServerRecord(name).ok) throw officialConnectorFailure()
+      // A disable-only leaf has no type, so projecting it also removes the remote record.
+      projectOfficialConnector(name, definition ?? { enabled: false })
     }
   }
   return [...runs.values()]

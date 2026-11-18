@@ -1,4 +1,5 @@
-import { readPackageAllowSet } from "../../../ext/src/gen-skill-paths"
+// I-11(design v9 §4.4「启动内联层」):受管全局 MCP 的开不开只由允许集 v3 经 ext 的 mcp.transform 决定;这里对 MCP 只为
+// 会话级授权的强制停用写 `disabled`(这类记录不能持久开启,没有会被它回退的开启)。agent 照旧。
 // #395(Codex r11 pivot → 主权注入):把全局账本 disabled 的 mcp/agent 覆盖写进 sidecar 注入的
 // OPENCODE_CONFIG_CONTENT。该 env 在引擎加载序 step 6(所有 in-scope 源之后:XDG / ~/.opencode /
 // agent-md·plugin-script 自动发现目录 / 项目)。mergeDeep later-wins 使 alpha 的 `enabled:false`/
@@ -13,7 +14,7 @@ import { readPackageAllowSet } from "../../../ext/src/gen-skill-paths"
 
 import { codepuppyGlobalRoot } from "./codepuppy-installs"
 import { readSessionGrantIdsSync, type SessionGrantOracle } from "./ext-curation-policy"
-import { readLedgerV2, readPackageLedgerStateV1 } from "./ext-receipt-v2"
+import { readLedgerV2 } from "./ext-receipt-v2"
 import type { ChannelName } from "./catalog-channels"
 import { NEUTRALIZED_MCP_SERVER, readCodePuppyMcpServers } from "./mcp-default-deny"
 import { tryCodePuppyBootstrap } from "@opencode/util/codepuppy-bootstrap"
@@ -30,10 +31,6 @@ export function injectDisabledOverrides(
   try {
     const root = codepuppyGlobalRoot()
     const { records } = readLedgerV2(root, { sideEffectFree: true })
-    const state = readPackageLedgerStateV1(root, { sideEffectFree: true })
-    const projectMcp = new Set(state.ok
-      ? state.packageGraphs.filter(graph => graph.effect).flatMap(graph => [graph.root, ...graph.children].filter(node => node.kind === "mcp").map(node => node.name))
-      : (readPackageAllowSet(root)?.scoped ?? []).filter(entry => entry.kind === "mcp").map(entry => entry.name))
     // r1-4:oracle 不可判定 ≠ 空集 —— 注入面尽力强制随包可识别子集并 loud;fail-closed 权威
     // 在 boot reconcile(不可判定 + 存在已启用 catalog 记录 = enforcementGap 阻断 sidecar,
     // 本函数在被阻断时根本不会执行到)。
@@ -56,7 +53,7 @@ export function injectDisabledOverrides(
     for (const r of records) {
       if (r.scope.kind !== "global") continue
       const sessionGrantForced = r.desiredState !== "disabled" && sessionGrantIds.has(r.id)
-      if (r.desiredState !== "disabled" && !sessionGrantForced && !(r.kind === "mcp" && projectMcp.has(r.name))) continue
+      if (!sessionGrantForced && (r.kind === "mcp" || r.desiredState !== "disabled")) continue
       if (sessionGrantForced)
         console.error(
           `[req104-397] ${r.kind} "${r.name}" is session-grant per curation but the ledger says enabled — forcing disabled in injection (persistent enable is illegal; per-session activation = #408)`,

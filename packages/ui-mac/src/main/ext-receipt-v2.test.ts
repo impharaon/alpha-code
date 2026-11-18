@@ -16,6 +16,7 @@ import {
   decodeRecordV2,
   findRecordV2,
   lookupForUninstall,
+  markOfficialRuntimeAvailable,
   migrateV1Ledger,
   probeLedgerForWrite,
   projectScopeIdentity,
@@ -779,22 +780,82 @@ describe("#336 skills projection final-publish lag — 判别式如实上报", (
     expect(derivationKeys()).not.toContain("skill--shrink")
   })
 
-  test("派生无变化(非 skill 写)不触发 publish:seam 失败不误报 projectionLag", () => {
-    const w = upsertRecordV2(root, upsertInput({ id: "mcp:plain", name: "plain", kind: "mcp" }), failingPublish)
+  test("派生无变化(非 skill / MCP 写)不触发 publish:seam 失败不误报 projectionLag", () => {
+    // I-11 起 v3 也投影 global MCP 的开启状态,所以「派生不变的写」取 agent 记录。
+    const w = upsertRecordV2(root, upsertInput({ id: "agent:plain", name: "plain", kind: "agent", configKey: "agent.plain" }), failingPublish)
     expect(w.ok).toBe(true)
     if (!w.ok) throw new Error("unreachable")
     // 首写时派生缺席→absent 也会做首建发布;先真建一次再验"无变化跳过"
-    const again = upsertRecordV2(root, upsertInput({ id: "mcp:plain2", name: "plain2", kind: "mcp" }))
+    const again = upsertRecordV2(root, upsertInput({ id: "agent:plain2", name: "plain2", kind: "agent", configKey: "agent.plain2" }))
     expect(again.ok).toBe(true)
-    const third = upsertRecordV2(root, upsertInput({ id: "mcp:plain3", name: "plain3", kind: "mcp" }), failingPublish)
+    const third = upsertRecordV2(root, upsertInput({ id: "agent:plain3", name: "plain3", kind: "agent", configKey: "agent.plain3" }), failingPublish)
     expect(third.ok).toBe(true)
     if (!third.ok) throw new Error("unreachable")
-    expect(third.projectionLag).toBeUndefined() // keys 集无变化(全 mcp)→ alreadyFinal 跳过 publish
+    expect(third.projectionLag).toBeUndefined() // 投影无变化(全 agent)→ alreadyFinal 跳过 publish
   })
 })
 
 // ── `#773`:V3 只读路径的一致失败(读不出来 ≠ 空)────────────────────────────────────────────
-describe("E2 package allow-set v2", () => {
+// ── I-11(design v9 §4.4):允许集 v3 的 `mcp` —— 受管全局 MCP 的开启状态 ─────────────────────────────
+describe("I-11 global MCP states in the v3 projection", () => {
+  const projection = () => JSON.parse(fs.readFileSync(skillsEnabledPath(root), "utf8"))
+  const mcpRecord = (name: string, desiredState: "enabled" | "disabled" = "enabled") =>
+    upsertInput({ id: `mcp:${name}`, name, kind: "mcp", configKey: `mcp.${name}`, desiredState })
+
+  test("every global MCP record has exactly one entry, sorted by name; on only while enabled", () => {
+    expect(upsertRecordsV2(root, [mcpRecord("zeta"), mcpRecord("alpha", "disabled")]).ok).toBe(true)
+    expect(projection().mcp).toEqual([{ name: "alpha", enabled: false }, { name: "zeta", enabled: true }])
+    expect(setDesiredStateV2(root, "mcp", "zeta", "disabled").ok).toBe(true)
+    expect(projection().mcp).toEqual([{ name: "alpha", enabled: false }, { name: "zeta", enabled: false }])
+  })
+
+  test("enabling an MCP whose final publish fails leaves it off in the engine-visible projection", () => {
+    expect(upsertRecordV2(root, mcpRecord("late", "disabled")).ok).toBe(true)
+    const result = setDesiredStateV2(root, "mcp", "late", "enabled", () => { throw new Error("injected final publish failure") })
+    expect(result.ok && result.projectionLag).toContain("final publish failed")
+    expect(findRecordV2(root, "mcp", "late")?.desiredState).toBe("enabled")
+    expect(projection().mcp).toEqual([{ name: "late", enabled: false }])
+  })
+
+  test("an official recipe stays off, in both mcp and scoped, until its runtime credentials are materialized", () => {
+    const effect = (() => {
+      const directory = path.join(root, "project")
+      fs.mkdirSync(directory, { recursive: true })
+      const identity = projectScopeIdentity(directory)
+      if (!identity.ok) throw new Error(identity.reason)
+      return identity.scope
+    })()
+    const input = mcpRecord("dbhub-readonly")
+    const node = { componentId: input.id, kind: "mcp" as const, name: input.name, required: true, manifestDigest: DIGEST_A }
+    const graph: PackageGraphV1 = { packageId: "package:dbhub-readonly", envelopeDigest: DIGEST_A, installedGraphDigest: "", root: node, children: [], effect }
+    graph.installedGraphDigest = computeInstalledGraphDigest(graph)
+    expect(upsertRecordV2(root, mcpRecord("github-official")).ok).toBe(true)
+    expect(applyPackageMutation(root, {
+      operation: "install", transactionId: "official-scope", graphBeforeDigest: null, graphAfter: graph,
+      claimMutations: [{ op: "acquire", kind: "mcp", name: node.name, owner: bundleOwner(graph.packageId, node.manifestDigest) }],
+      childRecordMutations: [{ op: "upsert", input }],
+    }).ok).toBe(true)
+    // A fresh main process has materialized nothing yet.
+    expect(projection().mcp).toEqual([{ name: "dbhub-readonly", enabled: false }, { name: "github-official", enabled: false }])
+    expect(projection().scoped).toEqual([])
+    try {
+      expect(markOfficialRuntimeAvailable("github-official", true)).toBe(true)
+      expect(markOfficialRuntimeAvailable("dbhub-readonly", true)).toBe(true)
+      expect(markOfficialRuntimeAvailable("dbhub-readonly", true)).toBe(false)
+      expect(reconcileSkillsDerivation(root).ok).toBe(true)
+      expect(projection().mcp).toEqual([{ name: "dbhub-readonly", enabled: false }, { name: "github-official", enabled: true }])
+      expect(projection().scoped).toEqual([{ kind: "mcp", name: "dbhub-readonly", projectPath: effect.projectPath }])
+      expect(markOfficialRuntimeAvailable("dbhub-readonly", false)).toBe(true)
+      expect(reconcileSkillsDerivation(root).ok).toBe(true)
+      expect(projection().scoped).toEqual([])
+    } finally {
+      markOfficialRuntimeAvailable("github-official", false)
+      markOfficialRuntimeAvailable("dbhub-readonly", false)
+    }
+  })
+})
+
+describe("E2 package allow-set v3", () => {
   // These are our own ledger/graph inputs, not fabricated provider definitions.
   const scopeFor = (name: string) => {
     const directory = path.join(root, name)
@@ -838,17 +899,17 @@ describe("E2 package allow-set v2", () => {
   test("E2 projects enabled package components by effect while records stay global", () => {
     const effect = scopeFor("alpha")
     seed(effect)
-    expect(projection()).toEqual({ v: 2, keys: [], scoped: entries(effect) })
+    expect(projection()).toEqual({ v: 3, keys: [], scoped: entries(effect), mcp: [{ name: "scope-mcp", enabled: false }] })
     expect(readLedgerV2(root).records.every((record) => record.scope.kind === "global")).toBe(true)
     expect(setDesiredStatesV2(root, ["scope-skill", "scope-mcp"].map((name) => ({ kind: name === "scope-skill" ? "skill" : "mcp", name, state: "disabled" }))).ok).toBe(true)
-    expect(projection()).toEqual({ v: 2, keys: [], scoped: [] })
+    expect(projection()).toEqual({ v: 3, keys: [], scoped: [], mcp: [{ name: "scope-mcp", enabled: false }] })
   })
 
   test("E2 a standalone owner retains its all-projects skill membership", () => {
     expect(upsertRecordV2(root, upsertInput({ id: "skill:scope-skill", name: "scope-skill", kind: "skill", configKey: undefined })).ok).toBe(true)
     const effect = scopeFor("alpha")
     seed(effect)
-    expect(projection()).toEqual({ v: 2, keys: ["skill--scope-skill"], scoped: entries(effect) })
+    expect(projection()).toEqual({ v: 3, keys: ["skill--scope-skill"], scoped: entries(effect), mcp: [{ name: "scope-mcp", enabled: false }] })
   })
 
   test.each(["all-to-project", "project-to-project"] as const)("E2 scope shrink publishes tuple intersection before ledger: %s", (mode) => {
@@ -865,9 +926,10 @@ describe("E2 package allow-set v2", () => {
     })
     try { expect(change(before, effect).ok).toBe(true) } finally { probe.mockRestore() }
     expect(writes.map((write) => write.file)).toEqual(["skills-enabled.json", "installs.json", "skills-enabled.json"])
-    expect(writes[0]?.data).toEqual({ v: 2, keys: ["skill--keep"], scoped: [] })
+    // all-to-project: the global MCP state is already off in the pre-ledger write (both versions must say on).
+    expect(writes[0]?.data).toEqual({ v: 3, keys: ["skill--keep"], scoped: [], mcp: [{ name: "scope-mcp", enabled: false }] })
     expect(writes[1]?.data).toMatchObject({ packageGraphs: [{ effect }] })
-    expect(writes[2]?.data).toEqual({ v: 2, keys: ["skill--keep"], scoped: entries(effect) })
+    expect(writes[2]?.data).toEqual({ v: 3, keys: ["skill--keep"], scoped: entries(effect), mcp: [{ name: "scope-mcp", enabled: false }] })
   })
 
   test("E2 ledger write failure leaves scope already narrowed and the old ledger unchanged", () => {
@@ -880,7 +942,8 @@ describe("E2 package allow-set v2", () => {
     })
     try { expect(change(before, scopeFor("alpha")).ok).toBe(false) } finally { probe.mockRestore() }
     expect(fs.readFileSync(ledgerFile(), "utf8")).toBe(ledger)
-    expect(projection()).toEqual({ v: 2, keys: [], scoped: [] })
+    // The ledger still says all projects (MCP on), yet the engine-visible projection is already narrower.
+    expect(projection()).toEqual({ v: 3, keys: [], scoped: [], mcp: [{ name: "scope-mcp", enabled: false }] })
   })
 
   test("E2 final publish failure reports projection lag and startup reconcile completes the scoped set", () => {
@@ -897,11 +960,11 @@ describe("E2 package allow-set v2", () => {
       expect(result.ok).toBe(true)
       expect(result.ok && result.warnings.join(" ")).toContain("final publish failed")
     } finally { probe.mockRestore() }
-    expect(projection()).toEqual({ v: 2, keys: [], scoped: [] })
+    expect(projection()).toEqual({ v: 3, keys: [], scoped: [], mcp: [{ name: "scope-mcp", enabled: false }] })
     const state = readPackageLedgerStateV1(root)
     expect(state.ok && state.packageGraphs[0]?.effect).toEqual(effect)
     expect(reconcileSkillsDerivation(root).ok).toBe(true)
-    expect(projection()).toEqual({ v: 2, keys: [], scoped: entries(effect) })
+    expect(projection()).toEqual({ v: 3, keys: [], scoped: entries(effect), mcp: [{ name: "scope-mcp", enabled: false }] })
   })
 
   test("E2 an unrecognized projection is emptied before the next ledger write", () => {
@@ -914,7 +977,7 @@ describe("E2 package allow-set v2", () => {
       rename(from, to)
     })
     try { expect(change(before, scopeFor("alpha")).ok).toBe(true) } finally { probe.mockRestore() }
-    expect(snapshots).toEqual([{ v: 2, keys: [], scoped: [] }])
+    expect(snapshots).toEqual([{ v: 3, keys: [], scoped: [], mcp: [{ name: "scope-mcp", enabled: false }] }])
   })
 })
 

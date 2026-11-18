@@ -28,6 +28,7 @@ import { afterAll, afterEach, beforeEach, describe, expect, mock, test } from "b
 import presetSolid from "babel-preset-solid"
 import type { CodePuppyProject, CodePuppyProjectsApi } from "../src/renderer/sidebar/use-projects"
 import { dict as zh } from "../src/renderer/i18n/zh"
+import bundledCatalog from "../src/renderer/extensions/codepuppy-catalog.json"
 
 GlobalRegistrator.register()
 const solid = await import("solid-js/dist/solid.js")
@@ -97,13 +98,20 @@ function sdkStub(): unknown {
 // —— preload 桥替身:renderer 侧一切 IPC 都经 window.api ——————————————————————
 // 形状明确的给真值(否则生产代码的 try/catch 会把"没数据"和"桥坏了"混为一谈);其余按名字
 // 分两类兜底:`on*`/`subscribe*` 返回退订函数,别的返回已 resolve 的 Promise。
+// I-17 用例要有一条已装连接器、并看得见「关闭」点下去时发出的那一次开关调用。
+let installedReceipts: unknown[] = []
+const setInstallStateCalls: unknown[] = []
 const EXPLICIT: Record<string, (...args: unknown[]) => unknown> = {
   "auth.getState": async () => ({ status: "logged-out", mode: "byok" }),
   "automations.list": async () => ({ tasks: [], state: { pausedAll: false }, loginItem: false }),
   "automations.cloudSync": async () => ({}),
   "account.summary": async () => null,
   endpoints: async () => ({}),
-  "ext.listInstalls": async () => ({ global: [], project: [] }),
+  "ext.listInstalls": async () => ({ global: installedReceipts, project: [], warnings: [] }),
+  "ext.setInstallState": async (...args: unknown[]) => {
+    setInstallStateCalls.push(args[0])
+    return { ok: true }
+  },
   "ext.inventoryView": async () => ({ rows: [] }),
   "ext.sessionGrants": async () => ({ grants: [] }),
   "ext.factorySkillIds": async () => [],
@@ -218,17 +226,18 @@ function overlayHostChildren(overlay: (typeof OVERLAYS)[number]): number {
   return document.querySelector(overlay.host)?.childElementCount ?? -1
 }
 
-function query<T extends Element>(selector: string): T {
-  const el = document.querySelector<T>(selector)
+function query<T extends Element>(selector: string, root: ParentNode = document): T {
+  const el = root.querySelector<T>(selector)
   if (!el) throw new Error(`未找到元素:${selector}`)
   return el
 }
 
 function navItem(label: string): HTMLElement {
   for (const el of document.querySelectorAll<HTMLElement>(".codepuppy-sidebar-nav .codepuppy-sidebar-nav-item")) {
-    if ((el.textContent ?? "").includes(label)) return el
+    // 窄轨按钮只有图标,名字在 aria-label 上。
+    if ((el.getAttribute("aria-label") ?? el.textContent ?? "").includes(label)) return el
   }
-  throw new Error(`侧栏 nav 项未找到:${label}`)
+  throw new Error(`窄轨 nav 项未找到:${label}`)
 }
 
 function click(el: Element) {
@@ -378,7 +387,49 @@ describe("I-11 BR-07:sidecar 换代引起的整页重载后仍在原处", () => 
   })
 })
 
-// `#1687`:未恢复问题入口挂在**生产**侧栏里(同一真实组合体)—— footer 里账户按钮正上方;
+// I-17(INT-plugin-helper-and-hub)/ SPEC-desktop-ui-refresh BR-06、BR-08、AC-06:定制中心是顶级页面。关闭一个不换代的连接器
+// (旧式单连接器 markitdown:main 不发重载,渲染进程只做断开)时用户必须还在定制中心、路由一个字不变。
+describe("I-17 / AC-06:顶级页面的定制中心", () => {
+  afterEach(() => {
+    installedReceipts = []
+    setInstallStateCalls.length = 0
+  })
+
+  test("定制中心是顶级页面:用壳的页面容器 .codepuppy-page,页内没有会话顶栏;从任意会话打开、关掉后回到原会话", async () => {
+    const history = await mount(CURRENT_HREF)
+    await open(OVERLAYS[0])
+    expect(overlayPresent(OVERLAYS[0]), "前提不成立:定制中心没打开").toBe(true)
+    const page = query<HTMLElement>(`${OVERLAYS[0].host} ${OVERLAYS[0].page}`)
+    expect(page.classList.contains("codepuppy-page")).toBe(true)
+    expect(page.dataset.topLevelPage).toBe("hub")
+    // 页内没有会话面包屑与右栏页签。
+    expect(page.querySelector("[data-codepuppy-session-workspace-topbar], .a-swk-topbar")).toBeNull()
+    // 再点一次定制中心入口 = 关闭,回到打开前的会话,路由没动。
+    await open(OVERLAYS[0])
+    expect(overlayPresent(OVERLAYS[0])).toBe(false)
+    expect(history.get()).toBe(CURRENT_HREF)
+  })
+
+  test("关闭一个不换代的连接器(markitdown):定制中心仍开着,路由不变,开关只发出一次", async () => {
+    installedReceipts = [
+      { id: "mcp:markitdown", name: "markitdown", type: "mcp", scope: "global", installedAt: "2026-10-30T00:00:00.000Z", origin: "catalog", version: bundledCatalog.version },
+    ]
+    const history = await mount(CURRENT_HREF)
+    await open(OVERLAYS[0])
+    await flush()
+    await flush()
+    const row = query<HTMLElement>('[data-installed-row="mcp:markitdown"]')
+    click(query<HTMLElement>("[data-more]", row))
+    await flush()
+    click(query<HTMLElement>('[data-menu-item="disable"]'))
+    for (let i = 0; i < 6; i++) await flush()
+    expect(setInstallStateCalls, "前提不成立:点「关闭」没有发出开关调用").toHaveLength(1)
+    expect(overlayPresent(OVERLAYS[0]), "关闭连接器后离开了定制中心").toBe(true)
+    expect(history.get()).toBe(CURRENT_HREF)
+  })
+})
+
+// `#1687`:未恢复问题入口挂在**生产**侧栏里(同一真实组合体)—— 侧栏 footer 里;
 // 侧栏收起时「显示侧边栏」按钮带小点与数量。入口自身的行为判据在
 // src/renderer/codepuppy-ui/problems-entry.test.ts;这里只钉生产挂载位置与收起态的小点。
 describe("#1687 未恢复问题入口在真实侧栏里", () => {
@@ -399,13 +450,15 @@ describe("#1687 未恢复问题入口在真实侧栏里", () => {
     await flush()
   }
 
-  test("入口在 footer 里、紧挨账户按钮之上;恢复后消失", async () => {
+  test("入口在侧栏 footer 里(账户已移到窄轨);恢复后消失", async () => {
     await mount(CURRENT_HREF)
     expect(document.querySelector(".codepuppy-problems-entry")).toBeNull()
     await foldOneProblem()
     const entry = query<HTMLButtonElement>(".codepuppy-sidebar-footer > .codepuppy-problems-entry")
     expect(entry.textContent).toContain(zh["codepuppy.problems.entry"].replace("{{count}}", "1"))
-    expect(entry.nextElementSibling?.classList.contains("codepuppy-sidebar-account")).toBe(true)
+    // 账户头像在窄轨上,不在侧栏 footer 里。
+    expect(document.querySelector(".codepuppy-sidebar-footer .codepuppy-sidebar-account")).toBeNull()
+    expect(document.querySelector(".codepuppy-rail .codepuppy-sidebar-account")).not.toBeNull()
     toastApi.resolveProblem(KEY)
     await flush()
     expect(document.querySelector(".codepuppy-problems-entry")).toBeNull()

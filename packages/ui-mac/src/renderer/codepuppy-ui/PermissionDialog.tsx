@@ -12,12 +12,12 @@ import { Portal } from "solid-js/web"
 import { isPermissionV1Fingerprint } from "../../../../codepuppy-app/src/context/permission-v1-adapter"
 import type { ToolPolicyApi } from "../../shared/tool-policy-wire"
 import { approvalToolOf, PROVENANCE_SOURCE_KEYS } from "./session-timeline/cards/tool-card-model"
-import { pluginSourceLabelKey } from "../extensions/ext-package-presentation"
-import type { PluginSourceIdV1 } from "../../main/plugin-sources"
+import { installSourceLabelKey } from "../extensions/ext-package-presentation"
 import { Button } from "./Button"
 import { permissionRiskOf } from "./permission-risk"
 import { RiskTag, type RiskTagLevel } from "./RiskTag"
 import { t } from "../i18n"
+import "./key-value-list.css"
 import "./permission-dialog.css"
 
 type I18nKey = Parameters<typeof t>[0]
@@ -274,20 +274,24 @@ export function PermissionDialog(props: {
       </Show>
       {/* v1 请求的 scope / expiresAt 是适配器为过核验补的形状,不是授权的范围与期限;那两样由下面的「记住」框按请求种类如实写。 */}
       <Show when={approval.kind === "v2"}>
-        <dl class="a-permission-facts" aria-label={t("codepuppy.permission.facts")}>
-          <div class="a-permission-fact" data-permission-fact="scope">
-            <dt>{t("codepuppy.permission.scope")}</dt>
-            <dd>{facts.scope ? scopeLabel(facts.scope) : t("codepuppy.permission.cannotVerify")}</dd>
-            <Show when={!facts.scope}>
-              <small>{t("codepuppy.permission.scopeMissing")}</small>
-            </Show>
+        <dl class="a-kv a-permission-facts" aria-label={t("codepuppy.permission.facts")}>
+          <div class="a-kv-row a-permission-fact" data-permission-fact="scope">
+            <dt class="a-kv-k">{t("codepuppy.permission.scope")}</dt>
+            <dd class="a-kv-v">
+              {facts.scope ? scopeLabel(facts.scope) : t("codepuppy.permission.cannotVerify")}
+              <Show when={!facts.scope}>
+                <small>{t("codepuppy.permission.scopeMissing")}</small>
+              </Show>
+            </dd>
           </div>
-          <div class="a-permission-fact" data-permission-fact="expiry">
-            <dt>{t("codepuppy.permission.expiry")}</dt>
-            <dd>{facts.expiry ? expiryLabel(facts.expiry.value) : t("codepuppy.permission.cannotVerify")}</dd>
-            <Show when={!facts.expiry}>
-              <small>{t("codepuppy.permission.expiryMissing")}</small>
-            </Show>
+          <div class="a-kv-row a-permission-fact" data-permission-fact="expiry">
+            <dt class="a-kv-k">{t("codepuppy.permission.expiry")}</dt>
+            <dd class="a-kv-v">
+              {facts.expiry ? expiryLabel(facts.expiry.value) : t("codepuppy.permission.cannotVerify")}
+              <Show when={!facts.expiry}>
+                <small>{t("codepuppy.permission.expiryMissing")}</small>
+              </Show>
+            </dd>
           </div>
         </dl>
       </Show>
@@ -342,7 +346,7 @@ export function PermissionDialog(props: {
 }
 
 /** 会话输入框的锚点:面板贴在它上方这么多像素。 */
-const PANEL_GAP = 12
+const PANEL_GAP = 8
 const COMPOSER_SELECTOR = '[data-codepuppy-composer="session"]'
 
 type PanelAnchor = { bottom: number; left: number; width: number }
@@ -452,9 +456,8 @@ function PermissionPanel(props: {
         >
           <header class="a-permission-panel-header">
             <span class="a-permission-panel-icon" aria-hidden="true">
-              <svg viewBox="0 0 16 16" width="16" height="16" fill="none">
-                <circle cx="8" cy="8" r="6.25" stroke="currentColor" stroke-width="1.5" />
-                <path d="M8 4.75V8l2.25 1.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+              <svg class="a-ic" viewBox="0 0 24 24">
+                <path d="M12 3.5 18.5 6v5.5c0 4.2-2.7 7.3-6.5 8.9-3.8-1.6-6.5-4.7-6.5-8.9V6Z" />
               </svg>
             </span>
             <div id={titleId} class="a-permission-panel-title">
@@ -700,10 +703,7 @@ function requestWhat(
 function installSubjectOf(request: PermissionV2Request) {
   const install = errorRecord(errorRecord(request.metadata?.policy)?.install)
   const name = typeof install?.name === "string" && install.name.trim() ? install.name : undefined
-  const source = install?.source
-  // 来源词表只在 ext-package-presentation 一份;wire 上的值不认识(含原型链上的键)时查不出字符串 ⇒ 不画。
-  const known = typeof source === "string" && source !== "local-folder" ? pluginSourceLabelKey(source as PluginSourceIdV1) : undefined
-  const sourceKey: I18nKey | undefined = source === "created" ? "codepuppy.ext.packageSourceMine" : typeof known === "string" ? known : undefined
+  const sourceKey: I18nKey | undefined = installSourceLabelKey(install?.source)
   return name && sourceKey ? { name, sourceKey } : undefined
 }
 
@@ -712,9 +712,23 @@ function resourceText(action: string, resource: string) {
   return action === "external_directory" ? resource.replace(/[\\/]\*$/, "") : resource
 }
 
-function expiryLabel(expiresAt: PermissionV2Request["expiresAt"]) {
+/** 期限写成人话:今天 / 明天 / 日期 + 时分(本地时区),不再露 ISO 与 UTC。`now` 只给测试定点用。 */
+export function expiryLabel(expiresAt: PermissionV2Request["expiresAt"], now: number = Date.now()) {
   if (expiresAt === null) return t("codepuppy.permission.neverExpires")
   const date = new Date(expiresAt)
   if (Number.isNaN(date.valueOf())) return String(expiresAt)
-  return date.toISOString().replace("T", " ").replace(".000Z", " UTC")
+  const pad = (value: number) => String(value).padStart(2, "0")
+  const time = `${pad(date.getHours())}:${pad(date.getMinutes())}`
+  const today = new Date(now)
+  const dayDiff = Math.round(
+    (new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime() -
+      new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime()) /
+      86_400_000,
+  )
+  if (dayDiff === 0) return t("codepuppy.permission.expiryToday", { time })
+  if (dayDiff === 1) return t("codepuppy.permission.expiryTomorrow", { time })
+  const parts = { month: date.getMonth() + 1, day: date.getDate(), time }
+  return date.getFullYear() === today.getFullYear()
+    ? t("codepuppy.permission.expiryDate", parts)
+    : t("codepuppy.permission.expiryDateYear", { ...parts, year: date.getFullYear() })
 }

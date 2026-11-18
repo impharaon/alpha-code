@@ -634,14 +634,14 @@ describe("#1592 AC1:「用 AI 解析」的结果显示解析出的周期,占位�
     await flush()
 
     const hint = query(".codepuppy-auto-hint").textContent ?? ""
-    expect(hint.startsWith("已识别:")).toBe(true)
+    expect(hint.startsWith("已识别：")).toBe(true)
     expect(hint.length).toBeGreaterThan("已识别:".length)
     expect(hint).not.toContain("{")
   })
 })
 
 describe("#1592 AC2:云端任务的手动运行如实标为「在本机试跑」", () => {
-  test("云端行按钮「在本机试跑」+ 悬停「在本机跑一次,不改云端排程」;本机行仍「立即运行」带每日上限;点击都调同一个 runNow", async () => {
+  test("云端行按钮「在本机试跑」+ 悬停「在本机跑一次，不改云端排程」;本机行仍「立即运行」带每日上限;点击都调同一个 runNow", async () => {
     runtime.queueListedTasks([localTask("auto-local"), cloudTask("auto-cloud", "sched_1")])
     disposers.push(runtime.render(() => runtime.AutomationRefusalHarness(), query<HTMLElement>("#root")))
     runtime.openPanel()
@@ -650,9 +650,9 @@ describe("#1592 AC2:云端任务的手动运行如实标为「在本机试跑」
     const local = query<HTMLButtonElement>("[data-codepuppy-auto-run-now='auto-local']")
     const cloud = query<HTMLButtonElement>("[data-codepuppy-auto-run-now='auto-cloud']")
     expect(local.textContent).toBe("立即运行")
-    expect(local.title).toBe("跑一次,计入每日 24 次上限")
+    expect(local.title).toBe("跑一次，计入每日 24 次上限")
     expect(cloud.textContent).toBe("在本机试跑")
-    expect(cloud.title).toBe("在本机跑一次,不改云端排程")
+    expect(cloud.title).toBe("在本机跑一次，不改云端排程")
 
     click(cloud)
     await flush()
@@ -677,7 +677,7 @@ describe("#1592 AC3:选「云端」时收起云端不看的三项,换成四行�
     await flush()
     expect(document.querySelector("[data-codepuppy-auto-local-fields]") === null).toBe(true)
     const note = query("[data-codepuppy-auto-cloud-note]").textContent ?? ""
-    for (const line of ["云端运行", "应用关着也按时运行", "只发送执行内容,不读项目文件", "结果在下次打开应用时存入项目", "单次运行有时长上限"]) {
+    for (const line of ["云端运行", "应用关着也按时运行", "只发送执行内容，不读项目文件", "结果在下次打开应用时存入项目", "单次运行有时长上限"]) {
       expect(note).toContain(line)
     }
 
@@ -785,7 +785,7 @@ describe("#1592 AC6:立即运行与 AI 解析的失败按结构码出文案,原�
     )!
     click(llm)
     await flush()
-    expect(errorLine()).toBe("没识别出周期,请手动选择")
+    expect(errorLine()).toBe("没识别出周期，请手动选择")
     expect(document.body.textContent).not.toContain("name/schedule/prompt")
   })
 
@@ -798,10 +798,35 @@ describe("#1592 AC6:立即运行与 AI 解析的失败按结构码出文案,原�
     await flush()
 
     const [knownRow, unknownRow] = [...document.querySelectorAll(".codepuppy-auto-row-st")].map((el) => el.textContent ?? "")
-    expect(knownRow).toContain("上次失败 · 应用未就绪,本次未运行")
+    expect(knownRow).toMatch(/上次失败 · .+ · 应用未就绪，本次未运行/)
     expect(knownRow).not.toContain("scheduler")
     expect(unknownRow).toContain("上次失败")
     expect(unknownRow).not.toContain("JSON")
+  })
+
+  test("#automation 列表:任务行 = 名称 + 一行「周期 · 项目 · 权限」+ 右侧下次与上次结果;顶部两项是设置页同款开关", async () => {
+    const task = { ...localTask("auto-row"), name: "检查未处理的 TODO", permissionProfile: "readonly" as const }
+    const standard = { ...localTask("auto-std"), name: "汇总上周提交", permissionProfile: "standard" as const }
+    runtime.queueListedTasks([task, standard])
+    disposers.push(runtime.render(() => runtime.AutomationRefusalHarness(), query<HTMLElement>("#root")))
+    runtime.openPanel()
+    await flush()
+
+    const rows = [...document.querySelectorAll(".codepuppy-auto-row")]
+    expect(rows).toHaveLength(2)
+    const ds = rows.map((row) => row.querySelector(".codepuppy-auto-row-ds")!.textContent!)
+    // 周期 · 项目 · 权限(权限是人话「只读」「可改文件」,不是 readonly / standard)
+    expect(ds[0]).toMatch(/ · .+ · 只读$/)
+    expect(ds[1]).toMatch(/ · .+ · 可改文件$/)
+    expect(ds.join("")).not.toMatch(/readonly|standard/)
+    expect(rows[0]!.querySelector(".codepuppy-auto-row-nm")!.textContent).toBe("检查未处理的 TODO")
+    expect(rows[0]!.querySelector(".codepuppy-auto-row-st")!.textContent).toContain("下次")
+    expect(document.querySelector(".codepuppy-auto-grp")!.textContent).toBe("任务2")
+    // 页头只有一枚页签,不再是「自动化」大标题;两个全局开关是设置页同款开关(不是原生复选框外观)
+    expect(document.querySelector(".codepuppy-auto-head .codepuppy-auto-tab")!.textContent).toBe("全部任务")
+    const switches = [...document.querySelectorAll<HTMLInputElement>(".codepuppy-auto-note input")]
+    expect(switches).toHaveLength(2)
+    expect(switches.every((input) => input.classList.contains("codepuppy-settings-switch"))).toBe(true)
   })
 
   test("每个本地动作码在 en 下是英文人话(不含中文),不认识的码回落 undefined", () => {
@@ -834,16 +859,16 @@ describe("#1592 AC6:立即运行与 AI 解析的失败按结构码出文案,原�
 describe("#1592 AC7:其余文字与批准稿文案对照表(自动化部分)一致", () => {
   test("zh 文案逐条对照", () => {
     const expected: Partial<Record<keyof typeof zh, string>> = {
-      "codepuppy.auto.offlineNote": "应用关着时,本机任务不运行",
+      "codepuppy.auto.offlineNote": "应用关着时，本机任务不运行",
       "codepuppy.auto.platformCost": "本机任务消耗平台额度",
       "codepuppy.auto.kind.cron": "自定义",
-      "codepuppy.auto.cronFormat": "格式:分 时 日 月 周",
+      "codepuppy.auto.cronFormat": "格式：分 时 日 月 周",
       "codepuppy.auto.fPrompt": "执行内容",
       "codepuppy.auto.fPermission": "权限",
       "codepuppy.auto.permStandard": "可改文件",
       "codepuppy.auto.execLocal": "本机",
-      "codepuppy.auto.permNote": "只读:不改文件、不运行命令",
-      "codepuppy.auto.permStandardNote": "可改文件、运行命令,拦截危险命令",
+      "codepuppy.auto.permNote": "只读：不改文件、不运行命令",
+      "codepuppy.auto.permStandardNote": "可改文件、运行命令，拦截危险命令",
       "codepuppy.auto.standardConfirm": "无人值守时可改文件、运行命令",
       "codepuppy.auto.standardConfirmOk": "确定",
       "codepuppy.auto.standardConfirmRevert": "改回只读",
@@ -854,15 +879,15 @@ describe("#1592 AC7:其余文字与批准稿文案对照表(自动化部分)一�
       "codepuppy.auto.runErrBusy": "另一个任务在运行",
       "codepuppy.auto.runErrDailyCap": "今日已达 {{cap}} 次上限",
       "codepuppy.auto.llmNeedsDir": "先选择项目",
-      "codepuppy.auto.parsedLlm": "已识别:{{desc}}",
+      "codepuppy.auto.parsedLlm": "已识别：{{desc}}",
       "codepuppy.auto.parseErrUnavailable": "AI 暂不可用",
       "codepuppy.auto.parseErrBlocked": "内容未通过安全审核",
       "codepuppy.auto.openRun": "打开结果",
       "codepuppy.auto.tplDaily": "每日总结模板",
-      "codepuppy.auto.disabledBreaker": "连续失败 {{n}} 次,已停用",
-      "codepuppy.auto.cloudErrFormUnsupported": "云端不支持此间隔,请改用本机",
+      "codepuppy.auto.disabledBreaker": "连续失败 {{n}} 次，已停用",
+      "codepuppy.auto.cloudErrFormUnsupported": "云端不支持此间隔，请改用本机",
       "codepuppy.auto.saving": "保存中…",
-      "codepuppy.auto.runReasonNotReady": "应用未就绪,本次未运行",
+      "codepuppy.auto.runReasonNotReady": "应用未就绪，本次未运行",
     }
     for (const [key, value] of Object.entries(expected)) expect(zh[key as keyof typeof zh], key).toBe(value)
   })

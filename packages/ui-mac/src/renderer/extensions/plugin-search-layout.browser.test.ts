@@ -39,7 +39,7 @@ test("the shipped search placeholder fits the approved header at the default win
       return { height: field.parentElement!.getBoundingClientRect().height, placeholder: field.placeholder, available: field.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight),
         required: context.measureText(field.placeholder).width + (parseFloat(style.letterSpacing) || 0) * Array.from(field.placeholder).length }
     })
-    expect(box.height).toBe(34)
+    expect(box.height).toBe(30) // 新外壳页头搜索框 30px(冻结稿 2026-11-18 .phd .a-field),原 34
     expect(box.placeholder).toBe("搜索插件、技能或 MCP")
     expect(box.available).toBeGreaterThanOrEqual(box.required)
   } finally { await page.close() }

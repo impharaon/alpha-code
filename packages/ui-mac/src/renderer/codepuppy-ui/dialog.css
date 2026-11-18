@@ -57,7 +57,7 @@
 
 /* Centre within the content area when the sidebar is open. */
 body[data-codepuppy-sidebar="open"] .a-dialog-root[data-beside-sidebar] .a-dialog-panel {
-  left: var(--codepuppy-sidebar-w, 260px);
+  left: var(--codepuppy-surface-left);
 }
 
 .a-dialog-header {

@@ -17,10 +17,15 @@
 // reaches providers.add and the truth file; catalog key entry unchanged). Keep this file free of the
 // canonical picker's module name: the REQ-090 takeover ratchet scans renderer sources for it as text.
 
-import { createMemo, createSignal, For, onMount, Show } from "solid-js"
+import { createEffect, createMemo, createSignal, For, onCleanup, onMount, Show } from "solid-js"
 import type { CodePuppyModelCatalog, ByokProvider, ProviderAddressRejection, ProviderKeyStatus, ProviderResult } from "../../shared/codepuppy-model-types"
 import { t } from "../i18n"
 import { BrandIcon } from "./brand-icon"
+import { Dialog } from "./Dialog"
+import { Button } from "./Button"
+import { Input } from "./Input"
+import "./model-picker-custom-service.css"
+import { setCustomServiceOpen } from "./custom-service-state"
 
 /** main 拒绝地址时带的类别 → 用户语言的原因(与出网围栏同一个判据函数给出的类别,`#1392`)。无类别 ⇒ undefined,用原文。 */
 const ADDRESS_REJECTION_KEY: Record<ProviderAddressRejection, Parameters<typeof t>[0]> = {
@@ -49,6 +54,8 @@ function slug(s: string): string {
 export function AddProvider(props: {
   catalog: CodePuppyModelCatalog | null
   onClose: () => void
+  /** 「接入其它服务」对话框关掉(取消 / 保存)之后:发起它的弹层随之关闭。 */
+  onCustomClosed?: () => void
   onSaved?: () => void
   /** When set, open straight into this provider's config form (e.g. clicking a 需 Key BYOK row). */
   initialId?: string
@@ -75,14 +82,17 @@ export function AddProvider(props: {
   })
 
   const isCustom = () => sel() === "custom"
-  const inForm = () => sel() !== null
+  // 「接入其它服务」是对话框(冻结稿 `#hub-custom-service`);只有目录内供应商的填 Key 表单留在选择器里。
+  const inForm = () => sel() !== null && sel() !== "custom"
+  createEffect(() => setCustomServiceOpen(isCustom()))
+  onCleanup(() => setCustomServiceOpen(false))
   // Key state for the provider currently open in the form (preset only; a fresh custom has none yet).
   const currentStatus = createMemo(() => {
     const s = sel()
     if (!s || s === "custom") return undefined
     return props.keyStatus?.[(s as ByokProvider).id]
   })
-  const title = () => (sel() === "custom" ? t("codepuppy.provider.customEndpoint") : sel() ? (sel() as ByokProvider).name : t("codepuppy.provider.addTitle"))
+  const title = () => (inForm() ? (sel() as ByokProvider).name : t("codepuppy.provider.addTitle"))
 
   function openPreset(p: ByokProvider) {
     setSel(p)
@@ -116,6 +126,11 @@ export function AddProvider(props: {
   let backBtn: HTMLButtonElement | undefined
   // 二级页滑入后焦点落在「返回」上:键盘用户能立刻 Esc / 回车退回,Esc 也一定落在本页的处理器里。
   onMount(() => queueMicrotask(() => backBtn?.isConnected && backBtn.focus()))
+  function closeCustom() {
+    setSel(null)
+    setError("")
+    props.onCustomClosed?.()
+  }
   function back() {
     if (inForm()) {
       setSel(null)
@@ -184,6 +199,7 @@ export function AddProvider(props: {
     setSaving(false)
     if (r.ok) {
       props.onSaved?.()
+      if (isCustom()) props.onCustomClosed?.()
       props.onClose()
     } else setError(addressRejectionText(r) ?? r.reason)
   }
@@ -210,6 +226,7 @@ export function AddProvider(props: {
   }
 
   return (
+    <>
     <div
       class="a-mpa"
       onClick={(e) => e.stopPropagation()}
@@ -268,22 +285,17 @@ export function AddProvider(props: {
             <input
               class="a-mpa-input"
               value={name()}
-              readOnly={!isCustom()}
-              onInput={(e) => setName(e.currentTarget.value)}
+              readOnly
               placeholder={t("codepuppy.provider.namePlaceholder")}
             />
           </div>
           <div class="a-mpa-field">
             <label>{t("codepuppy.provider.compatibility")}</label>
             <div class="a-mpa-compat">
-              <div class="opt" aria-pressed={compat() === "openai"} onClick={() => isCustom() && setCompat("openai")}>
+              <div class="opt" aria-pressed={compat() === "openai"}>
                 {t("codepuppy.provider.openaiCompatible")}
               </div>
-              <div
-                class="opt"
-                aria-pressed={compat() === "anthropic"}
-                onClick={() => isCustom() && setCompat("anthropic")}
-              >
+              <div class="opt" aria-pressed={compat() === "anthropic"}>
                 {t("codepuppy.provider.anthropicCompatible")}
               </div>
             </div>
@@ -344,41 +356,11 @@ export function AddProvider(props: {
             </Show>
           </div>
           <div class="a-mpa-field">
-            <label>
-              <Show when={isCustom()} fallback={t("codepuppy.provider.enabledModels", { count: models().length })}>
-                {t("codepuppy.provider.modelId")} <span class="req">*</span>
-              </Show>
-            </label>
+            <label>{t("codepuppy.provider.enabledModels", { count: models().length })}</label>
             <div class="a-mpa-modelchips">
-              <For each={models()}>
-                {(m) => (
-                  <span class="a-mpa-mc">
-                    {m}
-                    <Show when={isCustom()}>
-                      <b onClick={() => setModels(models().filter((x) => x !== m))}>×</b>
-                    </Show>
-                  </span>
-                )}
-              </For>
+              <For each={models()}>{(m) => <span class="a-mpa-mc">{m}</span>}</For>
             </div>
-            <Show when={isCustom()}>
-              <input
-                class="a-mpa-input mono"
-                value={modelInput()}
-                onInput={(e) => setModelInput(e.currentTarget.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    e.preventDefault()
-                    addModel()
-                  }
-                }}
-                placeholder={t("codepuppy.provider.modelPlaceholder")}
-                style={{ "margin-top": "6px" }}
-              />
-            </Show>
-            <Show when={!isCustom()}>
-              <p class="a-mpa-note">{t("codepuppy.provider.presetModelsNote")}</p>
-            </Show>
+            <p class="a-mpa-note">{t("codepuppy.provider.presetModelsNote")}</p>
           </div>
           <div class="a-mpa-testrow">
             <button class="a-mpa-testbtn" disabled={test().s === "testing"} onClick={runTest}>
@@ -408,6 +390,106 @@ export function AddProvider(props: {
         </div>
       </Show>
     </div>
+    <Dialog
+      open={isCustom()}
+      onClose={closeCustom}
+      title={t("codepuppy.provider.customEndpoint")}
+      footer={
+        <>
+          <Button variant="ghost" disabled={test().s === "testing"} onClick={runTest}>
+            {test().s === "testing" ? t("codepuppy.provider.testing") : t("codepuppy.provider.test")}
+          </Button>
+          <span class="a-csd-grow" />
+          <Button variant="secondary" onClick={closeCustom}>
+            {t("codepuppy.ext.cancel")}
+          </Button>
+          <Button variant="primary" loading={saving()} onClick={save}>
+            {saving() ? t("codepuppy.provider.saving") : t("codepuppy.provider.saveEnable")}
+          </Button>
+        </>
+      }
+    >
+      <div class="a-csd-form">
+        <div class="a-csd-fld">
+          <label>{t("codepuppy.provider.name")}</label>
+          <Input block value={name()} onInput={(e) => setName(e.currentTarget.value)} placeholder={t("codepuppy.provider.namePlaceholder")} />
+        </div>
+        <div class="a-csd-fld">
+          <label>{t("codepuppy.provider.compatibility")}</label>
+          <div class="a-csd-seg" role="group">
+            <button type="button" aria-pressed={compat() === "openai"} onClick={() => setCompat("openai")}>
+              {t("codepuppy.provider.openaiCompatible")}
+            </button>
+            <button type="button" aria-pressed={compat() === "anthropic"} onClick={() => setCompat("anthropic")}>
+              {t("codepuppy.provider.anthropicCompatible")}
+            </button>
+          </div>
+        </div>
+        <div class="a-csd-fld">
+          <label>{t("codepuppy.provider.baseUrl")}</label>
+          <Input block value={baseURL()} onInput={(e) => setBaseURL(e.currentTarget.value)} placeholder="https://api.example.com/v1" />
+          <div class="a-csd-help">{t("codepuppy.provider.addressHelp")}</div>
+          <Show when={compat() === "anthropic"}>
+            <div class="a-csd-help">{t("codepuppy.provider.anthropicUrlHint")}</div>
+          </Show>
+        </div>
+        <div class="a-csd-fld">
+          <label>
+            {t("codepuppy.provider.apiKey")}
+            <button type="button" class="a-csd-aside" onClick={() => setShowKey((v) => !v)}>
+              {showKey() ? t("codepuppy.provider.hideKey") : t("codepuppy.provider.showKey")}
+            </button>
+          </label>
+          <Input
+            block
+            type={showKey() ? "text" : "password"}
+            value={apiKey()}
+            onInput={(e) => setApiKey(e.currentTarget.value)}
+            placeholder="sk-..."
+          />
+          <div class="a-csd-help">{t("codepuppy.provider.keyHelp")}</div>
+        </div>
+        <div class="a-csd-fld">
+          <label>{t("codepuppy.provider.modelId")}</label>
+          <div class="a-field a-csd-models" data-block="">
+            <For each={models()}>
+              {(m) => (
+                <span class="a-csd-chip">
+                  {m}
+                  <button type="button" aria-label={t("codepuppy.common.remove")} onClick={() => setModels(models().filter((x) => x !== m))}>
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                      <path d="M6 6l12 12M18 6 6 18" />
+                    </svg>
+                  </button>
+                </span>
+              )}
+            </For>
+            <input
+              class="a-field-input"
+              value={modelInput()}
+              onInput={(e) => setModelInput(e.currentTarget.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault()
+                  addModel()
+                }
+              }}
+              placeholder={t("codepuppy.provider.modelPlaceholder")}
+            />
+          </div>
+        </div>
+        <Show when={test().s === "ok"}>
+          <p class="a-csd-status ok">✓ {test().msg}</p>
+        </Show>
+        <Show when={test().s === "err"}>
+          <p class="a-csd-status err">✗ {test().msg}</p>
+        </Show>
+        <Show when={error()}>
+          <p class="a-csd-status err">{error()}</p>
+        </Show>
+      </div>
+    </Dialog>
+    </>
   )
 }
 

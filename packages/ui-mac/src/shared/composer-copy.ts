@@ -7,10 +7,10 @@
 // are TS compiled by electron-vite, so one constant serves both worlds.
 
 /** What both composers promise. Kept true by REQ-038: home now has / commands and @ references. */
-export const COMPOSER_PLACEHOLDER = "问点什么,输入 / 调命令,@ 引用上下文…"
+export const COMPOSER_PLACEHOLDER = "问点什么，输入 / 调命令，@ 引用上下文…"
 
 /** REQ-073:计划模式开启时的占位(Codex 对标;Shift+Tab 与 chip ⊗ 同为退出口)。 */
-export const COMPOSER_PLACEHOLDER_PLAN = "描述任务,先生成计划再执行…(Shift+Tab 切回)"
+export const COMPOSER_PLACEHOLDER_PLAN = "描述任务，先生成计划再执行…（Shift+Tab 切回）"
 
 /** The exact upstream literal that brand-i18n rewrites at build time. Since frontend pin e11dbd020 the
  *  design composer reads it from packages/ui/src/i18n/en.ts (`ui.promptInput.placeholder.normal`) via

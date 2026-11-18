@@ -822,3 +822,12 @@ html[data-theme="dark"]{--a-error-on-subtle:#f87171;--a-warning-on-subtle:#fbbf2
 .pc-row .pc-col{flex:none;width:440px}
 .pc-col .pc-panel{margin:0}
 .pc-col .pc-cap{margin:8px 0 0;text-align:center;font-size:var(--a-text-xs);color:var(--a-text-tertiary)}
+
+/* ── 2026-11-18 新视觉方向(owner U-05 批准)的子帧:样式来自 ../../system/direction.css,与本页旧稿样式不同,所以装在子帧里 ── */
+.ux2-sec{margin-top:24px}
+.ux2-anchor{scroll-margin-top:72px;margin:28px 0 0}
+.ux2-anchor h3{margin:0 0 4px;font-size:16px}
+.ux2-anchor h3 code{font-size:12px;opacity:.6;font-weight:400}
+.ux2-anchor p{margin:0 0 10px;max-width:110ch;font-size:13px;line-height:1.6;opacity:.8}
+.ux2-scroll{overflow-x:auto;border-radius:12px}
+.ux2-if{display:block;width:1600px;border:0;background:transparent}

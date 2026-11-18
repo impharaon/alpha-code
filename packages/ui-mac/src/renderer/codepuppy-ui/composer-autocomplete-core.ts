@@ -109,14 +109,14 @@ export function sourceTag(origin: CommandOrigin, name: string, factorySkills: Re
 /** 出厂件/引擎内置命令的中文简介 —— 仅展示层映射(SKILL.md 英文 description 面向模型匹配保留);
  *  外来第三方如实原文、不机译(拍板③)。 */
 export const SLASH_DESC_ZH: Record<string, string> = {
-  init: "初始化项目说明(生成 AGENTS.md 引导)",
-  review: "审查代码改动(未提交 / 分支 / PR)",
-  agents: "打开 Agent 管理(消息内用 @ 指派)",
+  init: "初始化项目说明（生成 AGENTS.md 引导）",
+  review: "审查代码改动（未提交 / 分支 / PR）",
+  agents: "打开 Agent 管理（消息内用 @ 指派）",
   "skill-creator": "创建自定义技能",
   "agent-creator": "创建自定义 Agent",
-  "customize-codepuppy": "配置与定制 Code Puppy(连接器 / 技能 / 治理)",
-  "integrate-project": "导入外部生态内容(.claude / .agents)",
-  "codepuppy-workspace": "总结与记忆写入 ~/code-puppy 工作目录(Journal / Memory)",
+  "customize-codepuppy": "配置与定制 Code Puppy（连接器 / 技能 / 治理）",
+  "integrate-project": "导入外部生态内容（.claude / .agents）",
+  "codepuppy-workspace": "总结与记忆写入默认工作区「Code Puppy」（Journal / Memory）",
 }
 
 export function displayDescription(item: { trigger: string; description?: string; title?: string }): string {
@@ -139,7 +139,7 @@ export function rankSlashMatch(item: { trigger: string; description?: string; ti
 
 /** 引擎内置子 agent 的中文一句话简介(拍板⑦:保留但降噪;外来/自装如实原文)。 */
 export const SUBAGENT_DESC_ZH: Record<string, string> = {
-  general: "通用子任务:调研与多步骤执行",
+  general: "通用子任务：调研与多步骤执行",
   explore: "快速探索代码库、按模式找文件",
 }
 
@@ -151,6 +151,8 @@ export type AssembleRow =
 export type AssembleGroup = { label: string; rows: AssembleRow[]; hint?: string }
 
 /** 装配弹窗分节:添加(动作)/ AGENT(引用)/ 文件(引用)/ 扩展(动作)。
+ *  - `scope`(界面优化 BR-04):`plus` = 「+」按钮的菜单,只有 添加附件 / 计划模式 / 助手(文件、扩展、终端搬去输入框
+ *    下的托盘或右栏);`files` = 托盘「文件」,只有文件一节;`at` = 键入 `@` 的列表,保持原样(含文件搜索)。
  *  - 计划模式行随 planOn 变文案;权限档压 agent 时(readonly / ask,`#1413`)禁用并给出如实原因(不静默失效,C28);
  *  - 第三方主档(非 build/plan 的 primary)动态成模式项,无则不出现(拍板⑤);
  *  - 终端行只在终端命令可用的表面出现(home 未注册 → 整行不摆,不留死行),文案如实 = 打开
@@ -170,20 +172,21 @@ export function buildAssembleRows(input: {
   changedFiles?: string[]
   /** 终端面板在本表面是否可用(session=true / home=false)。 */
   terminal?: boolean
+  scope: "plus" | "files" | "at"
 }): { groups: AssembleGroup[]; flat: AssembleRow[] } {
   const q = input.query.toLowerCase()
   const hit = (...texts: Array<string | undefined>) => !q || texts.some((t) => (t ?? "").toLowerCase().includes(q))
   const add: AssembleRow[] = []
   const attach: AssembleRow = { kind: "action", id: "attach", label: "添加附件", desc: "选择图片 / PDF 作为附件", kbd: "↵" }
-  const term: AssembleRow = { kind: "action", id: "terminal", label: "打开终端", desc: "打开终端面板(输出不会自动进入上下文)" }
+  const term: AssembleRow = { kind: "action", id: "terminal", label: "打开终端", desc: "打开终端面板（输出不会自动进入上下文）" }
   const plan: AssembleRow = {
     kind: "action",
     id: "plan",
     label: input.planOn ? "关闭计划模式" : "计划模式",
-    desc: input.planOn ? "回到默认(build)" : "先出方案再动手(plan 档)",
+    desc: input.planOn ? "回到默认（build）" : "先出方案再动手（plan 档）",
     disabled: input.agentLocked ? "当前权限档固定使用它自己的 agent" : undefined,
   }
-  const actionRows = input.terminal ? [attach, term, plan] : [attach, plan]
+  const actionRows = input.terminal && input.scope === "at" ? [attach, term, plan] : [attach, plan]
   for (const r of actionRows) if (hit(r.kind === "action" ? r.label : "", (r as { desc?: string }).desc)) add.push(r)
   for (const name of input.primaries) {
     const row: AssembleRow = { kind: "mode", id: name, label: `${name} 模式`, desc: "切换本会话的主档", on: input.activeMode === name }
@@ -198,8 +201,11 @@ export function buildAssembleRows(input: {
   const files: AssembleRow[] = input.files.filter((p) => hit(p)).map((p): AssembleRow => ({ kind: "file", path: p }))
 
   const groups: AssembleGroup[] = []
-  if (add.length) groups.push({ label: "添加", rows: add })
-  if (agents.length) groups.push({ label: "AGENT", rows: agents })
+  if (input.scope !== "files") {
+    if (add.length) groups.push({ label: "添加", rows: add })
+    if (agents.length) groups.push({ label: "AGENT", rows: agents })
+  }
+  if (input.scope === "plus") return { groups, flat: groups.flatMap((g) => g.rows).filter((r) => !(r.kind === "action" && r.disabled)) }
   if (q) {
     if (files.length) groups.push({ label: "文件", rows: files })
   } else {
@@ -211,7 +217,7 @@ export function buildAssembleRows(input: {
     })
   }
   const ext: AssembleRow = { kind: "action", id: "ext-market", label: "扩展市场…", desc: "浏览连接器 / 技能 / 插件" }
-  if (hit(ext.kind === "action" ? ext.label : "", "连接器 技能 插件 扩展")) groups.push({ label: "扩展", rows: [ext] })
+  if (input.scope === "at" && hit(ext.kind === "action" ? ext.label : "", "连接器 技能 插件 扩展")) groups.push({ label: "扩展", rows: [ext] })
 
   const flat = groups.flatMap((g) => g.rows).filter((r) => !(r.kind === "action" && r.disabled))
   return { groups, flat }

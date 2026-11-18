@@ -28,6 +28,7 @@ Bun.plugin({
 })
 
 const runtime = await import("../src/renderer/codepuppy-ui/session-workspace/session-workspace-test-runtime")
+const rightPanel = await import("../src/renderer/codepuppy-ui/session-workspace/right-panel-state")
 const terminalPanelModule = await import("../src/renderer/codepuppy-ui/session-rail/terminal/terminal-rail-panel")
 const disposers: Array<() => void> = []
 
@@ -59,6 +60,19 @@ function mount() {
   disposers.push(solidWeb.render(() => runtime.SessionWorkspaceHarness(), host))
   return host
 }
+
+function mountWorkspaceRail() {
+  const host = document.createElement("div")
+  document.body.append(host)
+  disposers.push(solidWeb.render(() => runtime.WorkspaceRightPanelHarness(), host))
+  return host
+}
+
+const railTabs = (host: HTMLElement) =>
+  [...host.querySelectorAll<HTMLElement>("[data-codepuppy-session-rail-tab]")].map((tab) => ({
+    kind: tab.getAttribute("data-codepuppy-session-rail-tab"),
+    label: tab.textContent,
+  }))
 
 function mountQuestion() {
   const host = document.createElement("div")
@@ -148,6 +162,73 @@ describe("REQ-125 session workspace real Solid mount", () => {
     expect(runtime.terminalChannelCalls).toEqual(["requestFocus:pty_1", "cancelFocus", "requestFocus:pty_1"])
   })
 
+  // desktop-ui-refresh BR-05 / AC-02(右栏部分):首页右栏只有文件与终端,对话里四页齐全。
+  test("conversation rail has all four pages in order: 审查 / 文件 / 终端 / 产物", async () => {
+    const host = mount()
+    await flush()
+    expect(railTabs(host)).toEqual([
+      { kind: "review", label: "审查" },
+      { kind: "files", label: "文件" },
+      { kind: "terminal", label: "终端" },
+      { kind: "artifacts", label: "产物" },
+    ])
+  })
+
+  test("home rail (workspace panel) has exactly 文件 / 终端, even when review and artifacts renderers exist", async () => {
+    const host = mountWorkspaceRail()
+    await flush()
+    expect(railTabs(host)).toEqual([
+      { kind: "files", label: "文件" },
+      { kind: "terminal", label: "终端" },
+    ])
+    expect(host.querySelector("[data-codepuppy-session-rail-tab='review']")).toBeNull()
+    expect(host.querySelector("[data-codepuppy-session-rail-tab='artifacts']")).toBeNull()
+    expect(host.querySelector("[data-codepuppy-session-rail-panel='files']")).not.toBeNull()
+    // 点「终端」页签:终端内置面板接上(文件之外的另一页)。
+    host.querySelector<HTMLButtonElement>("[data-codepuppy-session-rail-tab='terminal']")!.click()
+    await flush()
+    expect(host.querySelector("[data-codepuppy-session-rail-panel='terminal']")).not.toBeNull()
+    expect(host.querySelector("[data-codepuppy-terminal-panel]")).not.toBeNull()
+    expect(host.querySelector("[data-harness-panel='review']")).toBeNull()
+  })
+
+  test("the rail open state is one app-wide signal: default closed; the top-right toggle seam opens and closes both rails", async () => {
+    rightPanel.setRightPanelOpen(false)
+    const home = mountWorkspaceRail()
+    const session = mount()
+    await flush()
+    // 默认收起(冻结稿 #home / #session 的默认态):两处都没有右栏。
+    expect(home.querySelector("[data-codepuppy-session-rail-host]")).toBeNull()
+    expect(session.querySelector("[data-codepuppy-session-rail-host]")).toBeNull()
+    expect(session.querySelectorAll<HTMLButtonElement>(".a-swk-panel-button")[1]!.getAttribute("aria-expanded")).toBe("false")
+
+    // 顶栏右侧开关只调 toggleRightPanel() —— 不碰右栏内部任何东西。
+    rightPanel.toggleRightPanel()
+    await flush()
+    expect(home.querySelector("[data-codepuppy-session-rail-host]")).not.toBeNull()
+    expect(session.querySelector("[data-codepuppy-session-rail-host]")).not.toBeNull()
+    expect(session.querySelectorAll<HTMLButtonElement>(".a-swk-panel-button")[1]!.getAttribute("aria-expanded")).toBe("true")
+
+    rightPanel.toggleRightPanel()
+    await flush()
+    expect(home.querySelector("[data-codepuppy-session-rail-host]")).toBeNull()
+    expect(session.querySelector("[data-codepuppy-session-rail-host]")).toBeNull()
+  })
+
+  test("the terminal focus handoff also follows a toggle that did not come from the rail itself", async () => {
+    const host = mount()
+    await flush()
+    host.querySelector<HTMLButtonElement>("[data-codepuppy-session-rail-tab='terminal']")!.click()
+    await flush()
+    expect(runtime.terminalChannelCalls).toEqual(["requestFocus:pty_1"])
+    rightPanel.setRightPanelOpen(false)
+    await flush()
+    expect(runtime.terminalChannelCalls).toEqual(["requestFocus:pty_1", "cancelFocus"])
+    rightPanel.setRightPanelOpen(true)
+    await flush()
+    expect(runtime.terminalChannelCalls).toEqual(["requestFocus:pty_1", "cancelFocus", "requestFocus:pty_1"])
+  })
+
   // `#1588` AC4(批准稿 #conv-header):状态读时间线同一个等待信号 —— 等你批准 / 等你回答 / 正在重试 / 正在生成;
   // 空闲不显示。期望文案是批准稿文案表的独立字面量。
   test("topbar status follows the timeline wait signal; idle renders no status", async () => {
@@ -194,11 +275,11 @@ describe("REQ-125 session workspace real Solid mount", () => {
     expect(status()!.getAttribute("role")).toBe("status")
   })
 
-  test("project avatar shows the project initial, and no legacy α glyph when the project name is missing", async () => {
+  test("breadcrumb shows the project name, and no legacy α glyph when the project name is missing", async () => {
     const host = mount()
     await flush()
-    const avatar = () => host.querySelector<HTMLElement>(".a-swk-project-avatar")!
-    expect(avatar().textContent).toBe("W")
+    const project = () => host.querySelector<HTMLElement>(".a-swk-project-label")!
+    expect(project().textContent).toMatch(/^workspace/i)
 
     runtime.setSessionWorkspaceSnapshot({
       identity: { serverKey: "sidecar", directory: "/tmp/workspace", sessionID: "ses_idle" },
@@ -207,7 +288,6 @@ describe("REQ-125 session workspace real Solid mount", () => {
       activity: "idle",
     })
     await flush()
-    expect(avatar().textContent).toBe("")
     expect(host.querySelector("[data-codepuppy-session-workspace-topbar]")!.textContent).not.toContain("α")
   })
 

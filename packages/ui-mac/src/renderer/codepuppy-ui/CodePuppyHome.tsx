@@ -10,6 +10,7 @@ import { useNavigate } from "@solidjs/router"
 import { type CodePuppyProjectsApi } from "../sidebar/use-projects"
 import { hrefFor } from "../../shared/route-manifest"
 import { CodePuppyComposer } from "./codepuppy-composer"
+import { HomeRightPanel } from "./home-right-panel"
 import { noteHomeComposerUnmountDraft } from "./home-draft-discard-notice"
 import { launchDraftPending } from "./launch-draft-handoff"
 import { createDefaultWorkspaceDir } from "./default-workspace"
@@ -21,15 +22,6 @@ import { ConfigBrokenBanner } from "./config-broken-banner"
 import { t } from "../i18n"
 import { markStartupTimeline } from "../startup-timeline"
 import "./home.css"
-
-function greeting(): string {
-  const h = new Date().getHours()
-  if (h < 5) return t("codepuppy.home.greetingLate")
-  if (h < 11) return t("codepuppy.home.greetingMorning")
-  if (h < 13) return t("codepuppy.home.greetingNoon")
-  if (h < 18) return t("codepuppy.home.greetingAfternoon")
-  return t("codepuppy.home.greetingEvening")
-}
 
 // 首页未发送的草稿跨重挂保持身份,成功发送后才开始下一份。
 let homeDraftSequence = 0
@@ -115,10 +107,6 @@ export function CodePuppyHome(props: {
   return (
     <div class="a-ui a-home a-home--page" data-codepuppy-home>
       <div class="a-home-stage">
-        <div class="a-home-ghost" aria-hidden="true">
-          {t("codepuppy.brand.wordmark")}
-        </div>
-
         <div class="a-home-center">
           <Show when={store.error}>
             <Banner
@@ -129,9 +117,7 @@ export function CodePuppyHome(props: {
             />
           </Show>
           <ConfigBrokenBanner />
-          <h1 class="a-home-greet">
-            {greeting()},<span class="a-home-greet-dim"> {t("codepuppy.home.prompt")}</span>
-          </h1>
+          <h1 class="a-home-greet">{t("codepuppy.newSession.heading")}</h1>
 
           {/* ── THE shared composer(与会话页同一组件,REQ-055)──────────────
               #1056:冷启动那一拍例外 —— 侧栏的启动效应必然把路由换到 `/new-session`
@@ -153,6 +139,18 @@ export function CodePuppyHome(props: {
               // 未发送内容」交给 notice 模块,身份切换那一拍据此弹一句说明(导航等卸载不误报,
               // 判据见 home-draft-discard-notice.ts)。
               onDraftSnapshot={noteHomeComposerUnmountDraft}
+              // 界面优化 BR-04:项目选择器搬进输入框下的托盘(同一个受控组件、同一组条目)。
+              workspaceChip={
+                <CodePuppyWorkspaceChip
+                  projects={visibleProjects()}
+                  defaultWorkspace={defaultWs()}
+                  value={activeWs()}
+                  open={wsOpen()}
+                  onOpenChange={setWsOpen}
+                  onSelect={setChosenWs}
+                  readonly={wsReadonly()}
+                />
+              }
               onNeedWorkspace={() => {
                 // 零工作区不留死点(REQ-054①):任何需要工作区的控件都引导到选择器
                 setWsOpen(true)
@@ -176,19 +174,10 @@ export function CodePuppyHome(props: {
               }}
             />
           </Show>
-
-          {/* workspace chip —— 与新对话页同源的受控组件(REQ-126 CODE-D) */}
-          <CodePuppyWorkspaceChip
-            projects={visibleProjects()}
-            defaultWorkspace={defaultWs()}
-            value={activeWs()}
-            open={wsOpen()}
-            onOpenChange={setWsOpen}
-            onSelect={setChosenWs}
-            readonly={wsReadonly()}
-          />
         </div>
       </div>
+      {/* BR-05:首页右栏 —— 当前项目(未选 = 默认工作区)的文件与终端;开合读全应用唯一的 right-panel-state。 */}
+      <HomeRightPanel directory={activeWs} serverKey={props.serverKey} />
     </div>
   )
 }

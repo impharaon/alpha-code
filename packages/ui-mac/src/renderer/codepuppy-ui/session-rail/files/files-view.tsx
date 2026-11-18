@@ -20,19 +20,26 @@ import { t } from "../../../i18n"
 import type { FileChangeKind, TreeEntry } from "./files-core"
 import type { FilesPanelState, SearchState } from "./files-state"
 
+// 图标是冻结稿 #right-panel 的那一套(文件 / 文件夹 / 展开的文件夹),单色,不再给文件夹上强调色。
 function FileIcon() {
   return (
     <svg class="a-srf-icon" viewBox="0 0 24 24" aria-hidden="true">
-      <path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z" />
-      <path d="M14 3v6h6" />
+      <path d="M14 3.5H7a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8.5Z" />
+      <path d="M14 3.5v5h5" />
     </svg>
   )
 }
 
-function FolderIcon() {
+function FolderIcon(props: { open?: boolean }) {
   return (
-    <svg class="a-srf-icon a-srf-icon--dir" viewBox="0 0 24 24" aria-hidden="true">
-      <path d="M3 7l2-3h5l2 3h7v11H3z" />
+    <svg class="a-srf-icon" viewBox="0 0 24 24" aria-hidden="true">
+      <Show
+        when={props.open}
+        fallback={<path d="M3.5 7.5a2 2 0 0 1 2-2h3.8l2 2h7.2a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2Z" />}
+      >
+        <path d="M3.5 17V7.5a2 2 0 0 1 2-2h3.8l2 2h6.2a2 2 0 0 1 2 2V11" />
+        <path d="M3.5 17l2.3-5.2a1.5 1.5 0 0 1 1.4-.8h13a1 1 0 0 1 .9 1.4L19 17.6a1.5 1.5 0 0 1-1.4.9H5a1.5 1.5 0 0 1-1.5-1.5Z" />
+      </Show>
     </svg>
   )
 }
@@ -55,7 +62,9 @@ function EmptyState(props: { title: string; detail: string }) {
   return (
     <div class="a-srf-empty">
       <span class="a-srf-empty-icon" aria-hidden="true">
-        <FolderIcon />
+        <svg viewBox="0 0 24 24">
+          <path d="M3.5 7.5a2 2 0 0 1 2-2h3.8l2 2h7.2a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2Z" />
+        </svg>
       </span>
       <b>{props.title}</b>
       <p>{props.detail}</p>
@@ -131,9 +140,9 @@ function DirRow(props: { state: FilesPanelState; entry: TreeEntry }) {
         onClick={() => props.state.toggleDir(props.entry.path)}
       >
         <svg class="a-srf-caret" viewBox="0 0 24 24" aria-hidden="true">
-          <path d="M9 6l6 6-6 6" />
+          <path d="m9.5 18 6-6-6-6" />
         </svg>
-        <FolderIcon />
+        <FolderIcon open={expanded()} />
         <span class="a-srf-name">{props.entry.name}</span>
       </button>
       <Show when={expanded()}>
@@ -194,7 +203,6 @@ function WorkspaceTree(props: { state: FilesPanelState }) {
   const root = () => props.state.dirState("")
   return (
     <section class="a-srf-tree-section" data-codepuppy-srf-tree aria-label={t("codepuppy.session.filesWorkspace")}>
-      <div class="a-srf-label">{t("codepuppy.session.filesWorkspace")}</div>
       <Show when={!root()?.error} fallback={<DirError state={props.state} path="" />}>
         <Show when={root()?.entries} fallback={<LoadingRow />}>
           {(entries) => (

@@ -18,7 +18,7 @@ afterEach(() => {
 
 /** main 侧派生允许集(生产流由 ext-receipt-v2 writeLedgerFile 与账本锁步写;此处直造文件)。 */
 function writeAllowList(names: string[]) {
-  writeFileSync(join(root, "skills-enabled.json"), JSON.stringify({ v: 2, keys: names.map((n) => `skill--${n}`), scoped: [] }))
+  writeFileSync(join(root, "skills-enabled.json"), JSON.stringify({ v: 3, keys: names.map((n) => `skill--${n}`), scoped: [], mcp: [] }))
 }
 
 /** 造一个 skill generation:ext-store/<key>/generations/<gen> + current.json 指针 + 允许集条目。
@@ -38,12 +38,12 @@ function makeGeneration(name: string, genId: string) {
 beforeEach(() => allowed.clear())
 
 describe("skillGenerationLiveDirs", () => {
-  test("E2 reads v2 keys plus scoped skills without injecting scoped MCPs", () => {
+  test("E2 reads v3 keys plus scoped skills without injecting scoped MCPs", () => {
     const global = makeGeneration("global", "gen-000001-111111")
     const scoped = makeGeneration("scoped", "gen-000001-222222")
     makeGeneration("mcp-only", "gen-000001-333333")
     writeFileSync(join(root, "skills-enabled.json"), JSON.stringify({
-      v: 2, keys: ["skill--global"], scoped: [
+      v: 3, mcp: [], keys: ["skill--global"], scoped: [
         { kind: "skill", name: "scoped", projectPath: "/projects/alpha" },
         { kind: "mcp", name: "mcp-only", projectPath: "/projects/alpha" },
       ],
@@ -118,9 +118,9 @@ describe("#395 允许集投影门(skills-enabled.json,fail closed)", () => {
     expect(skillGenerationLiveDirs(root)).toEqual([a]) // makeGeneration 已补允许集
     writeFileSync(join(root, "skills-enabled.json"), "{ not json")
     expect(skillGenerationLiveDirs(root)).toEqual([]) // 损坏 = 无 enabled 确证
-    writeFileSync(join(root, "skills-enabled.json"), JSON.stringify({ v: 2, keys: ["skill--solo"] }))
-    expect(skillGenerationLiveDirs(root)).toEqual([]) // 未知版本 fail closed
-    writeFileSync(join(root, "skills-enabled.json"), JSON.stringify({ v: 2, keys: "skill--solo", scoped: [] }))
+    writeFileSync(join(root, "skills-enabled.json"), JSON.stringify({ v: 2, keys: ["skill--solo"], scoped: [] }))
+    expect(skillGenerationLiveDirs(root)).toEqual([]) // 旧版本 fail closed(不兼容 v2)
+    writeFileSync(join(root, "skills-enabled.json"), JSON.stringify({ v: 3, keys: "skill--solo", scoped: [], mcp: [] }))
     expect(skillGenerationLiveDirs(root)).toEqual([]) // keys 非数组 fail closed
     rmSync(join(root, "skills-enabled.json"))
     expect(skillGenerationLiveDirs(root)).toEqual([]) // 缺失同理(升级空窗由 boot reconcile backfill)
@@ -139,7 +139,7 @@ describe("#395 允许集投影门(skills-enabled.json,fail closed)", () => {
     makeGeneration("keep", "gen-000001-000001")
     writeFileSync(
       join(root, "skills-enabled.json"),
-      JSON.stringify({ v: 2, keys: ["../../etc", "skill--", "skill--keep"], scoped: [] }),
+      JSON.stringify({ v: 3, keys: ["../../etc", "skill--", "skill--keep"], scoped: [], mcp: [] }),
     )
     const dirs = skillGenerationLiveDirs(root)
     expect(dirs.length).toBe(1)

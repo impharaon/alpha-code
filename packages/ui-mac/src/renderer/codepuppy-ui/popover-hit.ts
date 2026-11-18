@@ -11,7 +11,8 @@
 /** 结构性最小接口:任何带 classList.contains 的节点(真 DOM Element 天然满足;测试可用假对象)。 */
 type ClassLike = { classList?: { contains(cls: string): boolean } }
 
-export const POP_CLASSES = ["a-pop", "a-pop-wrap"] as const
+/** 弹层里发起的对话框(如模型选择器的「接入其它服务」)挂在 body 的 Portal 里,它里面的点击同样不是外部点击。 */
+export const POP_CLASSES = ["a-pop", "a-pop-wrap", "a-dialog-root"] as const
 
 /** composedPath 快照中是否含弹层节点(内部点击 → 不关层)。window/document 等无 classList 的
  *  路径节点直接跳过。 */

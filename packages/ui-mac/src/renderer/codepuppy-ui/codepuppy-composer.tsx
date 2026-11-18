@@ -95,9 +95,11 @@ import {
   type EngineModelRef,
 } from "./model-default-core"
 import { ModelPickPop } from "./codepuppy-composer-model"
+import { customServiceOpen } from "./custom-service-state"
 import { abortUserTurn } from "./session-workspace/user-stopped-turns"
 import { identityKey } from "./session-workspace/session-workspace-core"
 import { createModelContract, type ModelContract } from "./model-contract"
+import { visibleWorkspaces, workspaceLabel } from "./workspace-chip"
 import { byokEngineId, isByokEngineId } from "../../shared/codepuppy-model-types"
 import type { EffectiveCatalog } from "../../shared/codepuppy-model-types"
 import { composerModelFromRef, modelBrandOf, modelRefOf, withModelVariant } from "./model-picker-core"
@@ -163,6 +165,10 @@ function useChip() {
 
 const stop = (e: Event) => e.stopPropagation()
 
+/** 弹层离输入框 / 托盘的统一间距,以及离窗口边缘的留白(BR-04)。 */
+const POPOVER_GAP = 6
+const POPOVER_EDGE = 8
+
 /** 菜单里可用方向键走到的项(#1476)。二级页(添加供应商)打开时只在二级页内走。 */
 const MENU_ITEM_SELECTOR =
   "button.a-pop-item:not(:disabled), [role^='menuitem']:not([aria-disabled='true']), button.a-mpa-preset:not(:disabled)"
@@ -195,7 +201,10 @@ export function moveMenuFocus(scope: HTMLElement, event: KeyboardEvent): boolean
   return true
 }
 
-/* 逃出 overflow 裁剪的弹层(Portal 到 body、fixed 定位、朝上开)。
+/* 逃出 overflow 裁剪的弹层(Portal 到 body、fixed 定位)。
+ * 界面优化 BR-04 的统一锚点:锚在输入框里时,首页朝下开、下沿之下 6px 起(从托盘下沿);对话页朝上开、
+ * 下缘离输入框上沿 6px;高度封顶在窗口内可用的空间里、内部滚动 —— 弹层永远完整落在窗口内,不被裁切。
+ * 模型 / 推理强度弹层的右缘对齐发送键。不在输入框里(测试挂点)= 原样:朝上、离按钮 8px。
  * #1476 一套键盘 / 关闭规则:↑↓ 移动、回车选(原生 button)、Esc 关并把焦点还给触发按钮 ——
  * **无论焦点在哪**(焦点在弹层外时由 window 捕获阶段的监听兜住);点别处关(useChip);
  * 同时只开一个(overlay-stack);窗口尺寸变化时跟着重新定位。 */
@@ -216,15 +225,33 @@ export function ChipPopover(props: {
     layout()
     const r = a.getBoundingClientRect()
     const vw = window.innerWidth
+    const vh = window.innerHeight
+    const wrap = a.closest<HTMLElement>("[data-codepuppy-composer-wrap]")
+    const wr = wrap?.getBoundingClientRect()
     const next: JSX.CSSProperties = {
       position: "fixed",
-      bottom: `${Math.round(window.innerHeight - r.top + 8)}px`,
       "z-index": "var(--a-z-dropdown)",
+      // 「接入其它服务」对话框开着时弹层先收起(只是看不见,对话框关掉后弹层随之关闭)。
+      visibility: customServiceOpen() ? "hidden" : undefined,
       "min-width": `${minW}px`,
       "max-width": `${Math.round(vw - 16)}px`,
     }
-    if (props.align === "right") next.right = `${Math.round(Math.max(8, vw - r.right))}px`
-    else next.left = `${Math.round(Math.min(Math.max(8, r.left), vw - minW - 8))}px`
+    let room: number
+    if (wr && wrap?.dataset.codepuppyComposerWrap === "home") {
+      const top = Math.round(wr.bottom + POPOVER_GAP)
+      next.top = `${top}px`
+      room = vh - top - POPOVER_EDGE
+    } else {
+      const bottom = Math.round(vh - (wr ? wr.top : r.top) + (wr ? POPOVER_GAP : 8))
+      next.bottom = `${bottom}px`
+      room = vh - bottom - POPOVER_EDGE
+    }
+    next["max-height"] = `${Math.max(120, Math.floor(room))}px`
+    next["--a-pop-max-h"] = `${Math.max(120, Math.floor(room))}px`
+    if (props.align === "right") {
+      const send = wrap?.querySelector<HTMLElement>(".a-comp-send")?.getBoundingClientRect()
+      next.right = `${Math.round(Math.max(8, vw - (send ? send.right : r.right)))}px`
+    } else next.left = `${Math.round(Math.min(Math.max(8, r.left), vw - minW - 8))}px`
     return next
   }
   const escape = () => {
@@ -236,6 +263,8 @@ export function ChipPopover(props: {
   const onWindowKey = (event: KeyboardEvent) => {
     if (event.key !== "Escape" || event.defaultPrevented) return
     if (popover?.contains(event.target as Node)) return
+    // 弹层里发起的对话框(「接入其它服务」)自己处理 Esc:只关对话框,菜单留着。
+    if ((event.target as Element | null)?.closest?.(".a-dialog-root")) return
     event.preventDefault()
     event.stopPropagation()
     escape()
@@ -330,6 +359,22 @@ const StopSquare = () => (
     <rect x="7" y="7" width="10" height="10" rx="2" />
   </svg>
 )
+const FileGlyph = () => (
+  <svg class="a-ic a-ic-sm" viewBox={ico}>
+    <path d="M14 3.5H7a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8.5Z" />
+    <path d="M14 3.5v5h5" />
+  </svg>
+)
+const PlugGlyph = () => (
+  <svg class="a-ic a-ic-sm" viewBox={ico}>
+    <path d="M9 3.5V8M15 3.5V8M6.5 8h11v3.5a5.5 5.5 0 0 1-11 0ZM12 17v3.5" />
+  </svg>
+)
+const FolderGlyph = () => (
+  <svg class="a-ic a-ic-sm" viewBox={ico}>
+    <path d="M3.5 7.5a2 2 0 0 1 2-2h3.8l2 2h7.2a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2Z" />
+  </svg>
+)
 const TermGlyph = () => (
   <svg class="a-ic" viewBox={ico}>
     <path d="M4 17l6-5-6-5M12 19h8" />
@@ -352,6 +397,47 @@ function AddButton(props: { onOpen: () => void; expanded: boolean }) {
         <Plus />
       </button>
     </Tooltip>
+  )
+}
+
+/* ── 输入框下的托盘(界面优化 BR-04 / I-06):项目 · 文件 · 插件,贴着输入框下沿,首页与对话页都有。
+ * 项目:首页 / 新对话页由宿主传入选择器(`workspaceChip`,与此前输入框下那枚胶囊同一个组件、同一组条目);
+ * 对话页项目固定,只显示名称。文件 = 原「+」菜单里的文件一节(git 变更文件 + `@` 搜索);
+ * 插件 = 原「+」菜单里的「扩展市场」入口(setExtHubOpen)。同一动作,只是换了位置。 */
+/** 托盘的外壳。`solo` = 输入框还没挂起来(新对话页目录准备中)时单独留着的托盘,只放项目选择器。 */
+export function ComposerTrayShell(props: { solo?: boolean; children: JSX.Element }) {
+  return (
+    <div class="a-comp-tray" data-codepuppy-composer-tray data-solo={props.solo ? "" : undefined}>
+      {props.children}
+    </div>
+  )
+}
+
+function ComposerTray(props: {
+  project: JSX.Element
+  filesOpen: boolean
+  onFiles: () => void
+  onPlugins: () => void
+}) {
+  return (
+    <ComposerTrayShell>
+      {props.project}
+      <button
+        type="button"
+        class="a-tray-btn"
+        data-tray="files"
+        aria-haspopup="listbox"
+        aria-expanded={props.filesOpen}
+        onClick={() => props.onFiles()}
+      >
+        <FileGlyph />
+        {t("codepuppy.composer.trayFiles")}
+      </button>
+      <button type="button" class="a-tray-btn" data-tray="plugins" onClick={() => props.onPlugins()}>
+        <PlugGlyph />
+        {t("codepuppy.composer.trayPlugins")}
+      </button>
+    </ComposerTrayShell>
   )
 }
 
@@ -729,6 +815,9 @@ export type CodePuppyComposerProps = {
    *  **拦住**会导致重挂的操作(切目录)并明确提示,而不是让用户对着一个暂时空着的附件区发愣。
    *  (#663 起内容本身不会因重挂而丢:在途工单随草稿快照移交,见 `initialPendingReads`。) */
   onAttachmentReadPending?: (pending: boolean) => void
+  /** 界面优化 BR-04:托盘里的项目选择器(首页 / 新对话页的 `CodePuppyWorkspaceChip`)。缺席 = 项目固定
+   *  (对话页),托盘里只写项目名,不带箭头。 */
+  workspaceChip?: JSX.Element
 }
 
 // 附件 id 在**渲染进程内**唯一。#663 起读盘工单可跨实例移交,两个实例各自从 1 开始编号就会撞 id
@@ -1914,6 +2003,7 @@ export function CodePuppyComposerRuntime(props: CodePuppyComposerRuntimeProps) {
   return (
     // a-ui 作用域类保持随组件走:home 与 session 宿主布局各异,自带作用域才能保证焦点圈治理
     // (.a-ui .a-chip:focus…)与基础排版在任何挂点一致(用户报障 2026-07-07 的固化教训)。
+    <div class="a-ui a-comp-wrap" data-codepuppy-composer-wrap={props.mode}>
     <div
       class="a-ui a-comp"
       data-codepuppy-composer={props.mode}
@@ -1937,7 +2027,6 @@ export function CodePuppyComposerRuntime(props: CodePuppyComposerRuntimeProps) {
         void addFiles(e.dataTransfer?.files)
       }}
     >
-      <auto.Menu />
       <input
         ref={fileInputRef}
         type="file"
@@ -2068,7 +2157,7 @@ export function CodePuppyComposerRuntime(props: CodePuppyComposerRuntimeProps) {
         </Match>
       </Switch>
       <div class="a-comp-bar">
-        <AddButton expanded={auto.assembleOpen()} onOpen={() => auto.toggleAssemble()} />
+        <AddButton expanded={auto.assembleOpen("plus")} onOpen={() => auto.toggleAssemble("plus")} />
         <PermChip />
         <PlanChip />
         <div class="a-comp-grow" />
@@ -2133,6 +2222,21 @@ export function CodePuppyComposerRuntime(props: CodePuppyComposerRuntimeProps) {
           </Tooltip>
         </Show>
       </div>
+    </div>
+    <ComposerTray
+      project={
+        props.workspaceChip ?? (
+          <span class="a-tray-btn a-tray-static" data-tray="project">
+            <FolderGlyph />
+            {workspaceLabel(visibleWorkspaces(props.projects.store.projects), props.directory())}
+          </span>
+        )
+      }
+      filesOpen={auto.assembleOpen("files")}
+      onFiles={() => auto.toggleAssemble("files")}
+      onPlugins={() => setExtHubOpen(true)}
+    />
+    <auto.Menu />
     </div>
   )
 }

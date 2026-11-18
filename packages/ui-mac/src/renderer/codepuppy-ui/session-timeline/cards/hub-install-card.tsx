@@ -5,7 +5,7 @@ import { t } from "../../../i18n"
 import { extIpc } from "../../../extensions/ext-ipc"
 import { openPackageManagement } from "../../../extensions/ext-hub-state"
 import { PackageAccountDialog } from "../../../extensions/package-account-dialog"
-import { installedPackagePresentation, pluginInstallFailureKey } from "../../../extensions/ext-package-presentation"
+import { installedPackagePresentation, installSourceLabelKey, pluginInstallFailureKey } from "../../../extensions/ext-package-presentation"
 import type { TimelineRow } from "../timeline-model"
 import { useTimelineIntents } from "./timeline-intents"
 import { redactText } from "./tool-redactor"
@@ -104,8 +104,11 @@ export function HubInstallCard(props: { row: HubInstallRow }) {
       token: undefined as Extract<AccountItem, { kind: "secret" }> | undefined }
     if (call.operation === "search")
       return { ...base, state: "search", title: t("codepuppy.timeline.hub.searching", { name }) }
-    if (call.approval === "waiting") return { ...base, state: "awaiting", title: t("codepuppy.timeline.hub.awaitingApproval", { name }) }
-    if (call.approval === "declined") return { ...base, state: "declined", title: t("codepuppy.timeline.hub.declined", { name }) }
+    // 等你允许 / 已拒绝:卡上写名称与真实来源(执行闸记在调用上的那一个);来源不认识就不写。
+    const recorded = installSourceLabelKey(call.source)
+    const approvalBase = { ...base, source: recorded ? { sourceKey: recorded, notRunning: [] } : undefined }
+    if (call.approval === "waiting") return { ...approvalBase, state: "awaiting", title: t("codepuppy.timeline.hub.awaitingApproval", { name }) }
+    if (call.approval === "declined") return { ...approvalBase, state: "declined", title: t("codepuppy.timeline.hub.declined", { name }) }
     if (!call.requestId && !call.packageId)
       return { ...base, state: "result", title: call.result ?? t("codepuppy.timeline.hub.installing", { name }) }
     if (record?.stage === "failed")
@@ -187,49 +190,61 @@ export function HubInstallCard(props: { row: HubInstallRow }) {
   }
   return (
     <div class="a-tl-row" data-codepuppy-timeline-row="hubInstall">
-      <div class="a-tc-safe" role="status" aria-live="polite" data-install-state={presentation().state}>
-        <b>{presentation().title}</b>
-        <Show when={presentation().state === "pending"}>
-          <span>{t("codepuppy.timeline.hub.applying")}</span>
+      <div class="a-tc-safe a-tl-hcard" role="status" aria-live="polite" data-install-state={presentation().state}>
+        <Show when={presentation().state === "declined" || presentation().name}>
+          <span class="a-tl-hcard-mark" aria-hidden="true">
+            <Show when={presentation().state === "declined"} fallback={presentation().name.slice(0, 1).toUpperCase()}>
+              <svg viewBox="0 0 24 24">
+                <circle cx="12" cy="12" r="8.5" />
+                <path d="m6 6 12 12" />
+              </svg>
+            </Show>
+          </span>
         </Show>
-        <Show when={presentation().detail}>{(detail) => <span>{detail()}</span>}</Show>
-        <Show when={presentation().source}>
-          {(source) => (
-            <>
-              <span>
-                {t("codepuppy.ext.packageSource")}：{t(source().sourceKey)}
-              </span>
-              <For each={source().notRunning}>
-                {(item) => (
-                  <span>
-                    {safeText(item.sourceName)}：{t(item.reasonKey)}
-                  </span>
-                )}
-              </For>
-            </>
-          )}
-        </Show>
-        <Show when={presentation().login && intents.authenticateMcp}>
-          <div class="a-tc-actions"><button type="button" class="a-tc-open" data-package-login-action="" disabled={authBusy()} onClick={() => void login()}>
-            {t("codepuppy.timeline.hub.loginAction", { name: safeText(presentation().login!.serviceName) })}
-          </button></div>
-        </Show>
-        <Show when={presentation().token}>
-          {item => <div class="a-tc-actions"><button type="button" class="a-tc-open" data-package-token-action="" onClick={() => {
-            const packageId = presentation().packageId
-            if (packageId) setAccount({ packageId, label: safeText(item().serviceName), needId: item().prerequisiteId })
-          }}>{t("codepuppy.timeline.hub.tokenAction", { name: safeText(item().serviceName) })}</button></div>}
-        </Show>
-        <Show when={authError()}>{message => <span role="alert">{message()}</span>}</Show>
-        <Show when={presentation().manage}>
-          {(packageId) => (
-            <div class="a-tc-actions">
-              <button type="button" class="a-tc-open" onClick={() => openPackageManagement(packageId())}>
-                {t("codepuppy.timeline.hub.manage")}
-              </button>
-            </div>
-          )}
-        </Show>
+        <div class="a-tl-hcard-txt">
+          <b>{presentation().title}</b>
+          <Show when={presentation().state === "pending"}>
+            <span>{t("codepuppy.timeline.hub.applying")}</span>
+          </Show>
+          <Show when={presentation().detail}>{(detail) => <span>{detail()}</span>}</Show>
+          <Show when={presentation().source}>
+            {(source) => (
+              <>
+                <span>
+                  {t("codepuppy.ext.packageSource")}：{t(source().sourceKey)}
+                </span>
+                <For each={source().notRunning}>
+                  {(item) => (
+                    <span>
+                      {safeText(item.sourceName)}：{t(item.reasonKey)}
+                    </span>
+                  )}
+                </For>
+              </>
+            )}
+          </Show>
+          <Show when={presentation().login && intents.authenticateMcp}>
+            <div class="a-tc-actions"><button type="button" class="a-tc-open" data-package-login-action="" disabled={authBusy()} onClick={() => void login()}>
+              {t("codepuppy.timeline.hub.loginAction", { name: safeText(presentation().login!.serviceName) })}
+            </button></div>
+          </Show>
+          <Show when={presentation().token}>
+            {item => <div class="a-tc-actions"><button type="button" class="a-tc-open" data-package-token-action="" onClick={() => {
+              const packageId = presentation().packageId
+              if (packageId) setAccount({ packageId, label: safeText(item().serviceName), needId: item().prerequisiteId })
+            }}>{t("codepuppy.timeline.hub.tokenAction", { name: safeText(item().serviceName) })}</button></div>}
+          </Show>
+          <Show when={authError()}>{message => <span role="alert">{message()}</span>}</Show>
+          <Show when={presentation().manage}>
+            {(packageId) => (
+              <div class="a-tc-actions">
+                <button type="button" class="a-tc-open" onClick={() => openPackageManagement(packageId())}>
+                  {t("codepuppy.timeline.hub.manage")}
+                </button>
+              </div>
+            )}
+          </Show>
+        </div>
       </div>
       <Show when={account()}>
         {selected => <PackageAccountDialog packageId={selected().packageId} source={facts().pack?.source} label={selected().label} needId={selected().needId} save={intent => extIpc.savePackageSecrets(intent)} onClose={() => setAccount(null)} onSaved={() => refreshFacts()()} />}

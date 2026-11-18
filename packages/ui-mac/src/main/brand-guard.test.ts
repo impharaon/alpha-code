@@ -10,7 +10,7 @@
 //    ac#1571(REQ-236 D1)是应用名与 bundle id 那一刀:APP_NAMES `alpha-code` / `alpha-code Beta`
 //    → `Code Puppy` / `Code Puppy Beta` / dev `Code Puppy Dev`,bundle id `com.tide.alphacode*` → `com.tide.codepuppy*`;
 //    存量钥匙串条目由 keychain-name-migration.ts 改名迁移。冻结值随之改成新值,APP_IDS(userData)不动。
-// ② AC1/AC3 展示面坐标:逐点断言显示 "Code Puppy" / "CODE PUPPY",漏一格红一格。
+// ② AC1/AC3 展示面坐标:逐点断言显示 "Code Puppy",漏一格红一格。
 //
 // 变异自证(2026-08-29,见 PR):把 index.ts 的 APP_IDS.prod 改一个字符 → 本文件当场红;还原后绿。
 //
@@ -81,13 +81,13 @@ describe("AC1 展示面坐标 — ui-mac 自有面显示 Code Puppy", () => {
     const src = read("packages/ui-mac/src/renderer/i18n/en.ts")
     expect(src).toContain('"codepuppy.brand.product": "Code Puppy",')
     expect(src).toContain('"codepuppy.brand.short": "Code Puppy",')
-    expect(src).toContain('"codepuppy.brand.wordmark": "CODE PUPPY",')
+    expect(src).toContain('"codepuppy.brand.wordmark": "Code Puppy",')
   })
   test("i18n 品牌键 zh(product / short / wordmark)", () => {
     const src = read("packages/ui-mac/src/renderer/i18n/zh.ts")
     expect(src).toContain('"codepuppy.brand.product": "Code Puppy",')
     expect(src).toContain('"codepuppy.brand.short": "Code Puppy",')
-    expect(src).toContain('"codepuppy.brand.wordmark": "CODE PUPPY",')
+    expect(src).toContain('"codepuppy.brand.wordmark": "Code Puppy",')
   })
   test("i18n en 其余品牌文案五处", () => {
     const src = read("packages/ui-mac/src/renderer/i18n/en.ts")

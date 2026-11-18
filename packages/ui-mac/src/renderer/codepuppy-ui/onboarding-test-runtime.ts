@@ -1,0 +1,5 @@
+export { createComponent } from "solid-js"
+export { render } from "solid-js/web"
+export { CodePuppyOnboarding } from "./CodePuppyOnboarding"
+export { resetAuthRecoveryForTests } from "../auth-recovery"
+export { setLocale } from "../i18n"

@@ -1,4 +1,4 @@
-import { clearOfficialConnectorRuntime, clearOfficialConnectorRuntimeOnExit, restoreCommittedOfficialConnectors } from "./official-connector-resources"
+import { clearOfficialConnectorRuntime, clearOfficialConnectorRuntimeOnExit, officialAvailabilityPublished, restoreCommittedOfficialConnectors } from "./official-connector-resources"
 import { createHash } from "node:crypto"
 import { existsSync } from "node:fs"
 import { dirname, join } from "node:path"
@@ -27,7 +27,7 @@ import { syncSecretFiles } from "./codepuppy-secret-files"
 import { customProviderSecretValues } from "./codepuppy-byok-keys"
 import { ignoredConfigProviderBlocks, ignoredConfigRemoteMcpEntries } from "./ext-config"
 import { readCustomProviderRecords } from "./custom-provider-records"
-import { readMcpServerRecords } from "./mcp-server-records"
+import { readMcpServerRecordsForGeneration } from "./mcp-server-records"
 import { buildCodePuppyModelConfig } from "./codepuppy-models"
 import { pinAppliedCatalog } from "./codepuppy-live-allowlist"
 import { loadCodePuppySecrets } from "./codepuppy-secrets"
@@ -235,7 +235,7 @@ export function __resetIgnoredConfigProvidersLogForTests(): void {
 // mcp-servers/<env>.json)。两份经同一个准入函数派生,并成**一次**整份替换;日志一句点名全部,出处标签区分(`mcp:<name>`)。
 function refreshConfiguredEgressDestinations(userDataPath: string): void {
   try {
-    const mcpServers = tryGetCodePuppyEnvironment() || process.env.CODEPUPPY_GLOBAL_DIR ? readMcpServerRecords((line) => getLogger()?.warn(line)) : []
+    const mcpServers = tryGetCodePuppyEnvironment() || process.env.CODEPUPPY_GLOBAL_DIR ? readMcpServerRecordsForGeneration((line) => getLogger()?.warn(line)) : []
     const accepted = setConfiguredEgressDestinations([
       // main 自己的环境(applyAuthEnv 写的平台地址)—— sidecar 拿到的是同一个值经启动文档(`#1698`)
       ...deriveEgressDestinations(
@@ -553,6 +553,8 @@ export async function spawnLocalServer(
   const sidecar = join(dirname(fileURLToPath(import.meta.url)), "sidecar.js")
   rotateServerLogs()
   const runtimeGeneration = tryGetCodePuppyEnvironment() ? restoreCommittedOfficialConnectors() : []
+  // I-11(design v9 §4.4):官方配方的可运行性进了允许集;fork 之前等这次恢复带来的重发落盘,新一代的 Location 才读到它。
+  if (tryGetCodePuppyEnvironment()) await officialAvailabilityPublished()
   const child = (() => {
     try {
       return (options.fork ?? electronNs.utilityProcess.fork)(sidecar, [], {

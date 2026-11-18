@@ -78,8 +78,8 @@ const live = (code?: string) => ({
   data: { kind: "research", ...(code ? { code } : {}) },
 })
 const allowance =
-  "会员额度已用完。默认不会自动扣钱包余额,充值也不能恢复;可以等额度窗口重置,或到网站账户页打开「额度用完后用余额付」。"
-const wallet = "钱包余额不够这次任务要预留的金额。请先充值,或等在途任务结算后再试。"
+  "会员额度已用完。默认不会自动扣钱包余额，充值也不能恢复；可以等额度窗口重置，或到网站账户页打开「额度用完后用余额付」。"
+const wallet = "钱包余额不够这次任务要预留的金额。请先充值，或等在途任务结算后再试。"
 
 async function mount(error?: string, failureCode?: string, netLayer?: string) {
   const actions: string[] = []
@@ -147,11 +147,11 @@ const text = () => document.querySelector(".codepuppy-ext-card-err")?.textConten
 describe("`#1572` dispatch network failure says which step failed", () => {
   test("network + netLayer:dns ⇒ 「解析不了」那一句;没有层 ⇒ 原文案逐字不变", async () => {
     await mount("network", undefined, "dns")
-    expect(text()).toBe("解析不了 对方服务器,检查网络或代理软件后重试")
+    expect(text()).toBe("解析不了 对方服务器，检查网络或代理软件后重试")
     disposers.splice(0).forEach((dispose) => dispose())
     document.body.replaceChildren()
     await mount("network")
-    expect(text()).toBe("暂时连不上云端服务,稍后重试")
+    expect(text()).toBe("暂时连不上云端服务，稍后重试")
   })
 })
 
@@ -203,7 +203,7 @@ describe("REQ-232 AC5 cloud refusal reasons and actions", () => {
   })
   test("a suspended account gives contact copy without a payment action", async () => {
     await mount("account_suspended")
-    expect(text()).toBe("账户已被停用,请联系我们。")
+    expect(text()).toBe("账户已被停用，请联系我们。")
     expect(action()).toBeNull()
   })
   test("unknown and absent terminal codes keep the existing failure fallback", async () => {

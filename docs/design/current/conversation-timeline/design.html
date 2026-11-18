@@ -44,6 +44,25 @@
 </div>
 
 <div class="wrap">
+
+  <!-- ========== 2026-11-18 新视觉方向(owner U-05 批准;增量稿 2026-11-18-ui-refresh/ 已冻结) ========== -->
+  <section class="sec ux2-sec" id="direction-2026-11">
+    <div class="sec-head">
+      <div class="sec-kicker">2026-11-18 · 新视觉方向 · owner 批准（U-05「可以，按这个方向做」）</div>
+      <h2>新视觉方向：灰色外框 + 圆角纯白工作面</h2>
+      <p class="lede">本节各帧取代本页旧稿的版式与配色；行为与文字规则照旧，帧内另写的除外。增量稿（已冻结，含设计审计 R1 逐项核对与令牌终表）：<a href="../../2026-11-18-ui-refresh/frame.html">2026-11-18-ui-refresh/frame.html</a>。共享样式 <a href="../../system/direction.css">system/direction.css</a>。本页下方旧稿保留作历史对照，与本节冲突时以本节为准。</p>
+    </div>
+  <div class="ux2-anchor" id="install-card">
+    <h3>助手安装的批准卡 <code>#install-card</code></h3>
+    <p>左：等待允许；右：已拒绝，这一轮到此结束。助手在对话里要安装时：时间线写「等待你允许安装『名称』」，同时出现一张普通批准面板，只写名称与真实来源，只能允许一次；拒绝后时间线写「已拒绝，未安装『名称』」，这一轮结束。定制中心「+」不出现这张卡（规格 v5 BR-10）。</p>
+    <div class="ux2-scroll"><iframe class="ux2-if" src="frames/install-card.html" style="height:460px" title="助手安装的批准卡" loading="lazy"></iframe></div>
+  </div>
+  <div class="ux2-anchor" id="session">
+    <h3>会话页 <code>#session</code></h3>
+    <p>完整一页对话：上一轮助手发起的安装被拒绝（「已拒绝，未安装『名称』」）；这一轮的思考与操作步骤展开，最后一步等你允许；批准面板停在输入框上方，「期限」写成人话「今天 18:30 前」，按钮都在右边。输入框下仍有托盘（项目固定、文件、插件），「内容由 AI 生成」在托盘下面。 回答进行中发送键变成停止键（现有行为）。工具图标统一单色；工具类型色仍留在代码令牌里，只是时间线不再用。(帧在 <code>current/session-workspace/</code>)</p>
+    <div class="ux2-scroll"><iframe class="ux2-if" src="../session-workspace/frames/session.html" style="height:940px" title="会话页" loading="lazy"></iframe></div>
+  </div>
+  </section>
   <div class="sec-kicker">P0 · 时间线全量重做</div>
   <h2 class="t">把整条时间线统一成一套克制、信息密度高的 alpha 卡片语言</h2>
   <p class="lede">本稿覆盖经真机 DOM 核对的 <b>全部 ~52 个构件</b>(取代旧稿只覆盖 1/3)。设计取向:开发者工具应当<strong>安静、可扫读、密而不噪</strong> —— 中性灰底 + 单一克制 indigo 强调,工具按类型着色,运动只用在状态变化的高价值瞬间。每块都标注了真机 <span class="mono">data-component/data-slot</span> 钩子 + 接缝 + 现状(<span class="badge-st done" style="margin:0">已优化</span> / <span class="badge-st part" style="margin:0">部分</span> / <span class="badge-st gap" style="margin:0">裸样式</span>),因此它也是落地 spec。</p>

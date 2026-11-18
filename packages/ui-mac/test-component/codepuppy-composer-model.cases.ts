@@ -1375,7 +1375,7 @@ describe("ModelPickPop production component", () => {
     })
     expect(mounted.host.textContent).not.toContain(zh["codepuppy.model.serverUnreachable"])
 
-    // ① 续期因网络错误失败:横幅与平台行都换成「连不上服务器,正在自动重试」,行仍不可点。
+    // ① 续期因网络错误失败:横幅与平台行都换成「连不上服务器，正在自动重试」,行仍不可点。
     authNow = { ...authNow, refreshUnreachable: true }
     authListener?.(authNow)
     await waitFor(() => {
@@ -1691,17 +1691,22 @@ describe("ModelPickPop production component", () => {
     expect(custom?.tagName).toBe("BUTTON")
     click(custom)
     await flush()
-    const nameField = overlay().querySelector<HTMLInputElement>(`input[placeholder="${zh["codepuppy.provider.namePlaceholder"]}"]`)!
+    // 「接入其它服务」是对话框(冻结稿 `#hub-custom-service`),表单在对话框里、不在选择器里
+    const dialog = () => document.querySelector<HTMLElement>(".a-csd-form")!.closest<HTMLElement>("[role='dialog']")!
+    const inDialog = (text: string) =>
+      [...dialog().querySelectorAll<HTMLButtonElement>("button")].find((button) => button.textContent?.includes(text)) ?? null
+    expect(dialog().querySelector(".a-dialog-title")?.textContent).toBe(zh["codepuppy.provider.customEndpoint"])
+    const nameField = dialog().querySelector<HTMLInputElement>(`input[placeholder="${zh["codepuppy.provider.namePlaceholder"]}"]`)!
     expect(nameField.readOnly).toBe(false)
 
     // ② 填表 → 保存 → 真持久化
     input(nameField, "Custom Node")
-    input(overlay().querySelector<HTMLInputElement>('input[placeholder="https://api.example.com/v1"]')!, "https://custom.invalid/v1")
-    input(overlay().querySelector<HTMLInputElement>('input[placeholder="sk-..."]')!, "sk-1392-custom")
-    const modelInput = overlay().querySelector<HTMLInputElement>(`input[placeholder="${zh["codepuppy.provider.modelPlaceholder"]}"]`)!
+    input(dialog().querySelector<HTMLInputElement>('input[placeholder="https://api.example.com/v1"]')!, "https://custom.invalid/v1")
+    input(dialog().querySelector<HTMLInputElement>('input[placeholder="sk-..."]')!, "sk-1392-custom")
+    const modelInput = dialog().querySelector<HTMLInputElement>(`input[placeholder="${zh["codepuppy.provider.modelPlaceholder"]}"]`)!
     input(modelInput, "real-custom-model")
     modelInput.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, key: "Enter" }))
-    click(inOverlay(zh["codepuppy.provider.saveEnable"]))
+    click(inDialog(zh["codepuppy.provider.saveEnable"]))
 
     // ③ 刷新后的清单里出现那一行,可选
     await waitFor(() =>
@@ -1771,19 +1776,20 @@ describe("ModelPickPop production component", () => {
     await waitFor(() => expect(overlay().querySelector("[data-codepuppy-custom-endpoint-entry]")).not.toBeNull())
     click(overlay().querySelector<HTMLButtonElement>("[data-codepuppy-custom-endpoint-entry]"))
     await flush()
-    input(overlay().querySelector<HTMLInputElement>(`input[placeholder="${zh["codepuppy.provider.namePlaceholder"]}"]`)!, "Local Ollama")
-    input(overlay().querySelector<HTMLInputElement>('input[placeholder="https://api.example.com/v1"]')!, "http://localhost:11434")
-    input(overlay().querySelector<HTMLInputElement>('input[placeholder="sk-..."]')!, "sk-1392-local")
-    const modelInput = overlay().querySelector<HTMLInputElement>(`input[placeholder="${zh["codepuppy.provider.modelPlaceholder"]}"]`)!
+    const dialog = () => document.querySelector<HTMLElement>(".a-csd-form")!.closest<HTMLElement>("[role='dialog']")!
+    input(dialog().querySelector<HTMLInputElement>(`input[placeholder="${zh["codepuppy.provider.namePlaceholder"]}"]`)!, "Local Ollama")
+    input(dialog().querySelector<HTMLInputElement>('input[placeholder="https://api.example.com/v1"]')!, "http://localhost:11434")
+    input(dialog().querySelector<HTMLInputElement>('input[placeholder="sk-..."]')!, "sk-1392-local")
+    const modelInput = dialog().querySelector<HTMLInputElement>(`input[placeholder="${zh["codepuppy.provider.modelPlaceholder"]}"]`)!
     input(modelInput, "llama")
     modelInput.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, key: "Enter" }))
-    click(inOverlay(zh["codepuppy.provider.saveEnable"]))
-    await waitFor(() => expect(overlay().querySelector(".a-mpa-error")?.textContent).toBe(zh["codepuppy.provider.address.loopback"]))
+    click([...dialog().querySelectorAll<HTMLButtonElement>("button")].find((button) => button.textContent?.includes(zh["codepuppy.provider.saveEnable"])) ?? null)
+    await waitFor(() => expect(dialog().querySelector(".a-csd-status.err")?.textContent).toBe(zh["codepuppy.provider.address.loopback"]))
     // 拒在存密钥之前:库里没有它、真源没建、没 respawn;表单还开着(用户可以改地址再试)
     expect(getByokKey("local-ollama")).toBeUndefined()
     expect(existsSync(join(root, "codepuppy-state", "custom-providers"))).toBe(false)
     expect(refreshes).toBe(0)
-    expect(overlay().querySelector<HTMLInputElement>('input[placeholder="https://api.example.com/v1"]')?.value).toBe("http://localhost:11434")
+    expect(dialog().querySelector<HTMLInputElement>('input[placeholder="https://api.example.com/v1"]')?.value).toBe("http://localhost:11434")
     mounted.dispose()
   })
 
@@ -4110,7 +4116,7 @@ describe("#679 生产 picker 呈现平台双倍数 / 不可用两态", () => {
     mounted.dispose()
   })
 
-  // `#1556` AC9:「已下载」与「已应用」不同 ⇒ 弹层底部一行「模型清单已更新,将在引擎下次启动后生效」;相同 ⇒ 不出现。
+  // `#1556` AC9:「已下载」与「已应用」不同 ⇒ 弹层底部一行「模型清单已更新，将在引擎下次启动后生效」;相同 ⇒ 不出现。
   // 批准稿:frame.html#versions「新清单已下载,待生效」(中性色、无按钮)。两份目录任一份不同都算。
   test("`#1556` AC9:已下载 ≠ 已应用 ⇒ 底部一行待生效说明;相同 ⇒ 整块不出现", async () => {
     const footer = () => document.body.querySelector<HTMLElement>(".a-mpp-foot")

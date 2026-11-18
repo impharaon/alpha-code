@@ -1,7 +1,24 @@
-import { createEffect, createSignal, For, onCleanup, onMount, Show, type Accessor, type JSX } from "solid-js"
+import {
+  batch,
+  createComputed,
+  createEffect,
+  createMemo,
+  createSignal,
+  For,
+  mergeProps,
+  onCleanup,
+  onMount,
+  Show,
+  untrack,
+  type Accessor,
+  type JSX,
+} from "solid-js"
+import { Portal } from "solid-js/web"
 import { CodePuppyBoundary } from "../codepuppy-boundary"
+import "../session-rail/rail-empty.css"
 import { t } from "../../i18n"
 import { rovingKey, rovingTabIndex } from "../roving-focus"
+import { topbarTitleHost } from "../shell-chrome-state"
 import { acceptedEngineChannel, type CodePuppyTerminalEngineChannel } from "../session-rail/terminal/terminal-rail-core"
 import { TerminalRailPanel } from "../session-rail/terminal/terminal-rail-panel"
 import { terminalRailAnyRunning } from "../session-rail/terminal/terminal-rail-state"
@@ -12,6 +29,7 @@ import {
   readRailWidths,
   rememberRailWidth,
 } from "./rail-width"
+import { rightPanelOpen, setRightPanelOpen } from "./right-panel-state"
 import { sameSessionIdentity, type CodePuppySessionIdentity, type CodePuppySessionLiveSnapshot } from "./session-workspace-core"
 import type { TimelineMediaSource, TimelineTurnWait } from "../session-timeline/timeline-model"
 
@@ -85,6 +103,8 @@ export interface SessionRailMeta {
 }
 
 const RAIL_PANELS: readonly SessionRailPanel[] = ["review", "files", "terminal", "artifacts"]
+// 首页右栏(冻结稿 #home-right-panel,owner U-02):只有当前项目的文件与终端。
+const WORKSPACE_RAIL_PANELS: readonly SessionRailPanel[] = ["files", "terminal"]
 
 function railPanelLabel(panel: SessionRailPanel) {
   if (panel === "review") return t("codepuppy.session.review")
@@ -213,16 +233,12 @@ function WorkspaceTopbar(props: {
     return { kind: "running", label: t("codepuppy.session.statusRunning") }
   }
   const railOpen = () => props.panel() !== undefined
-  return (
-    <header class="a-swk-topbar" data-codepuppy-session-workspace-topbar>
-      <span class="a-swk-project-pill">
-        <span class="a-swk-project-avatar" aria-hidden="true">
-          {snapshot()?.project.slice(0, 1).toUpperCase()}
-        </span>
-        <span class="a-swk-project-label">{snapshot()?.project || t("codepuppy.session.session")}</span>
-      </span>
+  // The breadcrumb and status pills (frame #session: "project / title").
+  const crumb = () => (
+    <>
+      <span class="a-swk-project-label">{snapshot()?.project || t("codepuppy.session.session")}</span>
       <span class="a-swk-separator" aria-hidden="true">
-        ›
+        /
       </span>
       <span class="a-swk-session-title">{snapshot()?.title || t("codepuppy.session.session")}</span>
       <Show when={status()}>
@@ -243,63 +259,74 @@ function WorkspaceTopbar(props: {
         )}
       </Show>
       <WorkspaceReadonlyPill readonly={() => props.workspaceReadonly?.() === true} relaunch={props.relaunch} />
-      <span class="a-swk-grow" aria-hidden="true" />
-      <button
-        type="button"
-        class="a-swk-panel-button"
-        classList={{ "a-swk-panel-button--active": props.panel() === "terminal" }}
-        aria-label={t("codepuppy.session.terminal")}
-        aria-pressed={props.panel() === "terminal"}
-        aria-controls="codepuppy-session-rail-host"
-        disabled={!props.terminalAvailable}
-        onClick={props.toggleTerminal}
-      >
-        <svg viewBox="0 0 24 24" aria-hidden="true">
-          <path d="M4 17l6-6-6-6M12 19h8" />
-        </svg>
-      </button>
-      <span class="a-swk-control-separator" aria-hidden="true" />
-      <button
-        type="button"
-        class="a-swk-panel-button"
-        classList={{ "a-swk-panel-button--active": railOpen() }}
-        aria-label={railOpen() ? t("codepuppy.session.closeRail") : t("codepuppy.session.openRail")}
-        aria-expanded={railOpen()}
-        aria-controls="codepuppy-session-rail-host"
-        onClick={props.toggleRail}
-      >
-        <svg viewBox="0 0 24 24" aria-hidden="true">
-          <rect x="3" y="4" width="18" height="16" rx="2" />
-          <path d="M15 4v16" />
-        </svg>
-      </button>
-    </header>
+    </>
+  )
+  // With the window chrome mounted (production) the breadcrumb renders into its top-bar slot and the
+  // right-panel toggle is the chrome's (right-panel-state.ts). Without it (component
+  // harnesses) the workspace carries its own top bar, toggles included.
+  return (
+    <Show
+      when={topbarTitleHost()}
+      fallback={
+        <header class="a-swk-topbar" data-codepuppy-session-workspace-topbar>
+          {crumb()}
+          <span class="a-swk-grow" aria-hidden="true" />
+          <button
+            type="button"
+            class="a-swk-panel-button"
+            classList={{ "a-swk-panel-button--active": props.panel() === "terminal" }}
+            aria-label={t("codepuppy.session.terminal")}
+            aria-pressed={props.panel() === "terminal"}
+            aria-controls="codepuppy-session-rail-host"
+            disabled={!props.terminalAvailable}
+            onClick={props.toggleTerminal}
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M4 17l6-6-6-6M12 19h8" />
+            </svg>
+          </button>
+          <span class="a-swk-control-separator" aria-hidden="true" />
+          <button
+            type="button"
+            class="a-swk-panel-button"
+            classList={{ "a-swk-panel-button--active": railOpen() }}
+            aria-label={railOpen() ? t("codepuppy.session.closeRail") : t("codepuppy.session.openRail")}
+            aria-expanded={railOpen()}
+            aria-controls="codepuppy-session-rail-host"
+            onClick={props.toggleRail}
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <rect x="3" y="4" width="18" height="16" rx="2" />
+              <path d="M15 4v16" />
+            </svg>
+          </button>
+        </header>
+      }
+    >
+      {(host) => (
+        <Portal mount={host()}>
+          <div class="a-swk-topbar-content" data-codepuppy-session-workspace-topbar>
+            {crumb()}
+          </div>
+        </Portal>
+      )}
+    </Show>
   )
 }
 
-export function SessionWorkspaceShell(props: {
+/** 右栏需要的全部外部输入。会话页给四页、首页给「文件 + 终端」两页,同一份实现。 */
+export interface RightRailInput {
   live: CodePuppySessionLiveContext
-  /**
-   * C5:时间线(挂进 timeline 宿主;缺省 = 空宿主,组件测试哨位)。
-   * #568:renderer 形态收到 rail api,时间线卡片经 timeline-intents 联动右栏
-   * (write/edit pill → jumpToReview,媒体/产物行 → focusArtifact)。
-   */
-  timeline?: JSX.Element | ((rail: SessionRailApi) => JSX.Element)
-  /** C7:composer 停靠位内容(CodePuppyComposer 直挂,props 传入 —— 零 Portal/零选择器)。 */
-  composer?: () => JSX.Element
+  /** 本栏有哪几页(顺序即页签顺序)。会话页 = 全部四页;首页 = 文件、终端。 */
+  kinds: readonly SessionRailPanel[]
   panels?: SessionRailPanelRenderers
-  railMeta?: SessionRailMeta
   /** 真引擎 channel(#554 适配器投影;缺席 = 终端面板 fail-closed 空态)。 */
   terminalChannel?: Accessor<CodePuppyTerminalEngineChannel | undefined>
   /** REQ-159 `#1322`:这一代引擎装上了进程围栏(引擎自报,宿主经 sandbox-state 投影);缺席 = 终端面不告知。 */
   sandbox?: Accessor<boolean>
-  /** REQ-159 `#1322`:当前工作区写不进去(被围栏的引擎明确回报);缺席 = 无只读胶囊。 */
-  workspaceReadonly?: Accessor<boolean>
-  /** 只读弹层唯一的动作:重新启动(main 既有 relaunch);缺席 = 按钮无动作(harness)。 */
-  relaunch?: () => void
-  /** `#1588` AC4:回合在等你(审批 / 提问)—— 与时间线同一个信号,顶栏状态据此说;缺席 = 只按运行 / 重试说。 */
-  turnWait?: Accessor<TimelineTurnWait | undefined>
-}) {
+}
+
+function createRightRail(props: RightRailInput) {
   // Panel renderers: injected slot first; terminal falls back to the shell-built-in
   // C550 panel fed by the #554 engine-channel projection (absent = fail-closed empty
   // state; I8 via live.accepts). Every other absent slot stays a disabled tab and no
@@ -313,13 +340,14 @@ export function SessionWorkspaceShell(props: {
       )
     return undefined
   }
-  const available = (kind: SessionRailPanel) => rendererFor(kind) !== undefined
-  const firstAvailable = RAIL_PANELS.find(available)
-  const [panel, setPanel] = createSignal<SessionRailPanel | undefined>(firstAvailable)
-  const [lastPanel, setLastPanel] = createSignal<SessionRailPanel | undefined>(firstAvailable)
+  const available = (kind: SessionRailPanel) => props.kinds.includes(kind) && rendererFor(kind) !== undefined
+  const firstAvailable = props.kinds.find(available)
+  // 开合是全应用一份(right-panel-state.ts,顶栏右侧开关读写它);这里只管「停在哪一页」。
+  const [activeKind, setActiveKind] = createSignal<SessionRailPanel | undefined>(firstAvailable)
+  const panel = createMemo<SessionRailPanel | undefined>(() => (rightPanelOpen() ? activeKind() : undefined))
   // Panels visited while the rail is open stay mounted (hidden) so switching tabs does not throw
   // away panel state (tree expansion, scroll…). Closing the rail unmounts everything.
-  const [visited, setVisited] = createSignal<readonly SessionRailPanel[]>(firstAvailable ? [firstAvailable] : [])
+  const [visited, setVisited] = createSignal<readonly SessionRailPanel[]>([])
   const [reviewTarget, setReviewTarget] = createSignal<SessionRailReviewTarget>()
   const [artifactTarget, setArtifactTarget] = createSignal<ArtifactFocusRequest>()
   const [fileViewerTarget, setFileViewerTarget] = createSignal<SessionRailFileViewerTarget>()
@@ -340,15 +368,20 @@ export function SessionWorkspaceShell(props: {
   // window change; only the displayed width converges onto the current ceiling.
   const [widths, setWidths] = createSignal<Record<string, number>>(readRailWidths())
   const [resizing, setResizing] = createSignal(false)
-  // Measured width of `.a-swk-root` (window minus the project sidebar). 0 = not measured yet;
-  // the CSS twin `max-width: calc(100% - 480px)` caps the paint either way.
+  // Measured width of the rail's container (`.a-swk-root` on the session page; the home split
+  // on home — window minus the project sidebar). 0 = not measured yet; the CSS twin
+  // `max-width: calc(100% - 480px)` caps the paint either way.
   const [workspaceWidth, setWorkspaceWidth] = createSignal(0)
-  let rootEl: HTMLDivElement | undefined
-  const measureWorkspace = () => setWorkspaceWidth(rootEl?.clientWidth ?? 0)
+  let rootEl: HTMLElement | undefined
+  const setRoot = (el: HTMLElement | undefined) => {
+    rootEl = el
+  }
+  const measureWorkspace = (fallback?: HTMLElement | null) => setWorkspaceWidth((rootEl ?? fallback)?.clientWidth ?? 0)
   onMount(() => {
     measureWorkspace()
-    window.addEventListener("resize", measureWorkspace)
-    onCleanup(() => window.removeEventListener("resize", measureWorkspace))
+    const onResize = () => measureWorkspace()
+    window.addEventListener("resize", onResize)
+    onCleanup(() => window.removeEventListener("resize", onResize))
   })
   const railMax = () => railMaxWidth(workspaceWidth())
   const railWidth = () => {
@@ -358,6 +391,7 @@ export function SessionWorkspaceShell(props: {
   // #554 焦点交接请求端(上游 terminal.toggle 语义):终端面板从关到开 → 对当前激活实例发
   // 聚焦请求(须先于面板挂载,上游 Terminal 挂载时一次性消费);从开到关 → 撤销未消费的
   // 请求,防陈旧请求日后误触发。经 I8 闸:身份不被当前会话接受的 channel 一律不触碰。
+  // 开合可能来自顶栏开关(right-panel-state),所以挂在 panel 的变化上:纯计算先于挂载。
   const terminalFocusHandoff = (prev: SessionRailPanel | undefined, next: SessionRailPanel | undefined) => {
     if ((prev === "terminal") === (next === "terminal")) return
     const channel = acceptedEngineChannel(props.terminalChannel?.(), props.live.accepts)
@@ -365,18 +399,23 @@ export function SessionWorkspaceShell(props: {
     if (next === "terminal") channel.requestFocus(channel.activeID())
     else channel.cancelFocus()
   }
+  createComputed((previous: SessionRailPanel | undefined) => {
+    const next = panel()
+    untrack(() => terminalFocusHandoff(previous, next))
+    return next
+  }, untrack(panel))
+  createComputed(() => {
+    const next = panel()
+    setVisited((seen) => (next === undefined ? (seen.length === 0 ? seen : []) : seen.includes(next) ? seen : [...seen, next]))
+  })
   const openPanel = (next: SessionRailPanel) => {
     if (!available(next)) return
-    terminalFocusHandoff(panel(), next)
-    setLastPanel(next)
-    setPanel(next)
-    setVisited((seen) => (seen.includes(next) ? seen : [...seen, next]))
+    batch(() => {
+      setActiveKind(next)
+      setRightPanelOpen(true)
+    })
   }
-  const closeRail = () => {
-    terminalFocusHandoff(panel(), undefined)
-    setPanel(undefined)
-    setVisited([])
-  }
+  const closeRail = () => setRightPanelOpen(false)
   const toggleTerminal = () => {
     if (panel() === "terminal") {
       closeRail()
@@ -389,7 +428,7 @@ export function SessionWorkspaceShell(props: {
       closeRail()
       return
     }
-    const next = lastPanel() ?? firstAvailable
+    const next = activeKind()
     if (next) openPanel(next)
   }
   const rail: SessionRailApi = {
@@ -435,7 +474,7 @@ export function SessionWorkspaceShell(props: {
     activePanel: panel,
   }
 
-  const enabledPanels = () => RAIL_PANELS.filter(available)
+  const enabledPanels = () => props.kinds.filter(available)
   const onTabKey = (event: KeyboardEvent) =>
     rovingKey(event, "horizontal-tabs", enabledPanels(), panel(), (kind) => {
       openPanel(kind)
@@ -473,20 +512,168 @@ export function SessionWorkspaceShell(props: {
     rememberRailWidth(kind, next)
   }
 
+  return {
+    kinds: props.kinds,
+    rail,
+    panel,
+    visited,
+    available,
+    rendererFor,
+    openPanel,
+    toggleRail,
+    toggleTerminal,
+    setRoot,
+    measureWorkspace,
+    railWidth,
+    railMax,
+    resizing,
+    startResize,
+    onGripKey,
+    onTabKey,
+  }
+}
+
+type RightRailState = ReturnType<typeof createRightRail>
+
+function RightRail(props: {
+  state: RightRailState
+  reviewCount?: Accessor<number | undefined>
+  terminalRunning: Accessor<boolean>
+}) {
+  const state = props.state
+  const rail = state.rail
+  return (
+    <Show when={state.panel()}>
+      {(activePanel) => (
+        <aside
+          id="codepuppy-session-rail-host"
+          class="a-swk-rail-host"
+          data-codepuppy-session-rail-host
+          data-codepuppy-session-rail-panel={activePanel()}
+          aria-label={t("codepuppy.session.railHost")}
+          style={{ width: `${state.railWidth()}px` }}
+          ref={(element) => onMount(() => state.measureWorkspace(element.parentElement))}
+        >
+          <div
+            class="a-swk-rail-grip"
+            classList={{ "a-swk-rail-grip--active": state.resizing() }}
+            role="separator"
+            aria-orientation="vertical"
+            aria-label={t("codepuppy.session.railResize")}
+            aria-valuemin={RAIL_MIN_WIDTH}
+            aria-valuemax={state.railMax()}
+            aria-valuenow={state.railWidth()}
+            tabIndex={0}
+            onPointerDown={state.startResize}
+            onKeyDown={state.onGripKey}
+          />
+          <div class="a-swk-rail-tabs" role="tablist" aria-label={t("codepuppy.session.railTabs")}>
+            <For each={state.kinds}>
+              {(kind) => (
+                <button
+                  type="button"
+                  role="tab"
+                  id={`codepuppy-session-rail-tab-${kind}`}
+                  class="a-swk-rail-tab"
+                  classList={{ "a-swk-rail-tab--on": activePanel() === kind }}
+                  aria-selected={activePanel() === kind}
+                  aria-controls={`codepuppy-session-rail-panel-${kind}`}
+                  data-codepuppy-session-rail-tab={kind}
+                  disabled={!state.available(kind)}
+                  tabIndex={rovingTabIndex(activePanel() === kind)}
+                  onClick={() => state.openPanel(kind)}
+                  onKeyDown={state.onTabKey}
+                >
+                  <Show when={kind === "terminal" && props.terminalRunning()}>
+                    {/* State arrives via railMeta.terminalRunning — the accessor twin of the
+                        C550 panel's data-codepuppy-terminal-any-running root attribute. */}
+                    <span class="a-swk-rail-tab-dot" data-codepuppy-session-terminal-dot aria-hidden="true" />
+                  </Show>
+                  {railPanelLabel(kind)}
+                  <Show when={kind === "review" && (props.reviewCount?.() ?? 0) > 0}>
+                    <span class="a-swk-rail-tab-badge" data-codepuppy-session-review-count>
+                      {props.reviewCount?.()}
+                    </span>
+                  </Show>
+                </button>
+              )}
+            </For>
+          </div>
+          <For each={state.visited()}>
+            {(kind) => {
+              const renderPanel = state.rendererFor(kind)
+              if (!renderPanel) return undefined
+              return (
+                <div
+                  id={`codepuppy-session-rail-panel-${kind}`}
+                  class="a-swk-rail-panel"
+                  role="tabpanel"
+                  aria-labelledby={`codepuppy-session-rail-tab-${kind}`}
+                  data-codepuppy-session-rail-panel-host={kind}
+                  classList={{ "a-swk-rail-panel--hidden": state.panel() !== kind }}
+                >
+                  {/* #905:每个已访问面板各自的区域边界 —— 一个面板渲染期抛错,只降级该
+                      面板(可「重载此区域」),其余面板/时间线/composer 照常挂载。 */}
+                  <CodePuppyBoundary name={railPanelBoundaryName(kind)}>{renderPanel(rail)}</CodePuppyBoundary>
+                </div>
+              )
+            }}
+          </For>
+        </aside>
+      )}
+    </Show>
+  )
+}
+
+/**
+ * 首页右栏:只有「文件」「终端」两页,复用会话页同一套页签条、文件视图与终端视图
+ * (审查与产物只在对话里出现)。开合读全应用唯一的 right-panel-state。
+ * `live` 在首页是「当前项目」的身份(sessionID 为空),终端引擎照常据它盖章与验收。
+ */
+export function WorkspaceRightPanel(props: Omit<RightRailInput, "kinds">) {
+  const state = createRightRail(mergeProps(props, { kinds: WORKSPACE_RAIL_PANELS }))
+  return <RightRail state={state} terminalRunning={() => terminalRailAnyRunning() === true} />
+}
+
+export function SessionWorkspaceShell(props: {
+  live: CodePuppySessionLiveContext
+  /**
+   * C5:时间线(挂进 timeline 宿主;缺省 = 空宿主,组件测试哨位)。
+   * #568:renderer 形态收到 rail api,时间线卡片经 timeline-intents 联动右栏
+   * (write/edit pill → jumpToReview,媒体/产物行 → focusArtifact)。
+   */
+  timeline?: JSX.Element | ((rail: SessionRailApi) => JSX.Element)
+  /** C7:composer 停靠位内容(CodePuppyComposer 直挂,props 传入 —— 零 Portal/零选择器)。 */
+  composer?: () => JSX.Element
+  panels?: SessionRailPanelRenderers
+  railMeta?: SessionRailMeta
+  /** 真引擎 channel(#554 适配器投影;缺席 = 终端面板 fail-closed 空态)。 */
+  terminalChannel?: Accessor<CodePuppyTerminalEngineChannel | undefined>
+  /** REQ-159 `#1322`:这一代引擎装上了进程围栏(引擎自报,宿主经 sandbox-state 投影);缺席 = 终端面不告知。 */
+  sandbox?: Accessor<boolean>
+  /** REQ-159 `#1322`:当前工作区写不进去(被围栏的引擎明确回报);缺席 = 无只读胶囊。 */
+  workspaceReadonly?: Accessor<boolean>
+  /** 只读弹层唯一的动作:重新启动(main 既有 relaunch);缺席 = 按钮无动作(harness)。 */
+  relaunch?: () => void
+  /** `#1588` AC4:回合在等你(审批 / 提问)—— 与时间线同一个信号,顶栏状态据此说;缺席 = 只按运行 / 重试说。 */
+  turnWait?: Accessor<TimelineTurnWait | undefined>
+}) {
+  const right = createRightRail(mergeProps(props, { kinds: RAIL_PANELS }))
+  const rail = right.rail
   const reviewCount = () => props.railMeta?.reviewCount?.()
   // Production state path (integration audit Major-2): the panel-published projection is
   // the default truth; railMeta.terminalRunning stays the explicit override channel.
   const terminalRunning = () => (props.railMeta?.terminalRunning?.() ?? terminalRailAnyRunning()) === true
 
   return (
-    <div class="a-ui a-swk-root" data-codepuppy-session-workspace ref={rootEl}>
+    <div class="a-ui a-swk-root" data-codepuppy-session-workspace ref={right.setRoot}>
       <main class="a-swk-main">
         <WorkspaceTopbar
           live={props.live}
-          panel={panel}
-          terminalAvailable={available("terminal")}
-          toggleRail={toggleRail}
-          toggleTerminal={toggleTerminal}
+          panel={right.panel}
+          terminalAvailable={right.available("terminal")}
+          toggleRail={right.toggleRail}
+          toggleTerminal={right.toggleTerminal}
           workspaceReadonly={props.workspaceReadonly}
           relaunch={props.relaunch}
           turnWait={props.turnWait}
@@ -511,94 +698,7 @@ export function SessionWorkspaceShell(props: {
           </div>
         </section>
       </main>
-      <Show when={panel()}>
-        {(activePanel) => (
-          <aside
-            id="codepuppy-session-rail-host"
-            class="a-swk-rail-host"
-            data-codepuppy-session-rail-host
-            data-codepuppy-session-rail-panel={activePanel()}
-            aria-label={t("codepuppy.session.railHost")}
-            style={{ width: `${railWidth()}px` }}
-          >
-            <div
-              class="a-swk-rail-grip"
-              classList={{ "a-swk-rail-grip--active": resizing() }}
-              role="separator"
-              aria-orientation="vertical"
-              aria-label={t("codepuppy.session.railResize")}
-              aria-valuemin={RAIL_MIN_WIDTH}
-              aria-valuemax={railMax()}
-              aria-valuenow={railWidth()}
-              tabIndex={0}
-              onPointerDown={startResize}
-              onKeyDown={onGripKey}
-            />
-            <div class="a-swk-rail-tabs" role="tablist" aria-label={t("codepuppy.session.railTabs")}>
-              <For each={RAIL_PANELS}>
-                {(kind) => (
-                  <button
-                    type="button"
-                    role="tab"
-                    id={`codepuppy-session-rail-tab-${kind}`}
-                    class="a-swk-rail-tab"
-                    classList={{ "a-swk-rail-tab--on": activePanel() === kind }}
-                    aria-selected={activePanel() === kind}
-                    aria-controls={`codepuppy-session-rail-panel-${kind}`}
-                    data-codepuppy-session-rail-tab={kind}
-                    disabled={!available(kind)}
-                    tabIndex={rovingTabIndex(activePanel() === kind)}
-                    onClick={() => openPanel(kind)}
-                    onKeyDown={onTabKey}
-                  >
-                    <Show when={kind === "terminal" && terminalRunning()}>
-                      {/* State arrives via railMeta.terminalRunning — the accessor twin of the
-                          C550 panel's data-codepuppy-terminal-any-running root attribute. */}
-                      <span class="a-swk-rail-tab-dot" data-codepuppy-session-terminal-dot aria-hidden="true" />
-                    </Show>
-                    {railPanelLabel(kind)}
-                    <Show when={kind === "review" && (reviewCount() ?? 0) > 0}>
-                      <span class="a-swk-rail-tab-badge" data-codepuppy-session-review-count>
-                        {reviewCount()}
-                      </span>
-                    </Show>
-                  </button>
-                )}
-              </For>
-              <button
-                type="button"
-                class="a-swk-rail-close"
-                aria-label={t("codepuppy.session.closeRail")}
-                onClick={closeRail}
-              >
-                <svg viewBox="0 0 24 24" aria-hidden="true">
-                  <path d="M9 6l6 6-6 6" />
-                </svg>
-              </button>
-            </div>
-            <For each={visited()}>
-              {(kind) => {
-                const renderPanel = rendererFor(kind)
-                if (!renderPanel) return undefined
-                return (
-                  <div
-                    id={`codepuppy-session-rail-panel-${kind}`}
-                    class="a-swk-rail-panel"
-                    role="tabpanel"
-                    aria-labelledby={`codepuppy-session-rail-tab-${kind}`}
-                    data-codepuppy-session-rail-panel-host={kind}
-                    classList={{ "a-swk-rail-panel--hidden": panel() !== kind }}
-                  >
-                    {/* #905:每个已访问面板各自的区域边界 —— 一个面板渲染期抛错,只降级该
-                        面板(可「重载此区域」),其余面板/时间线/composer 照常挂载。 */}
-                    <CodePuppyBoundary name={railPanelBoundaryName(kind)}>{renderPanel(rail)}</CodePuppyBoundary>
-                  </div>
-                )
-              }}
-            </For>
-          </aside>
-        )}
-      </Show>
+      <RightRail state={right} reviewCount={reviewCount} terminalRunning={terminalRunning} />
     </div>
   )
 }

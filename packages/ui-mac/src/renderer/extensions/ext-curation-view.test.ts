@@ -164,9 +164,9 @@ describe("#1595 AC1 添加确认框的一句话", () => {
   const entry = (id: string) => catalog.entries.find((e) => e.id === id)!
   const now = "2026-10-30T00:00:00.000Z"
 
-  test("未审核的第三方连接器(mcp:fetch,official、无 curation)⇒「未经审核,装好后默认关闭」", () => {
+  test("未审核的第三方连接器(mcp:fetch,official、无 curation)⇒「未经审核，装好后默认关闭」", () => {
     expect(confirmNoteKey(entry("mcp:fetch"), catalog, now)).toBe("codepuppy.ext.confirmNoteUnreviewed")
-    expect(zh["codepuppy.ext.confirmNoteUnreviewed"]).toBe("未经审核,装好后默认关闭")
+    expect(zh["codepuppy.ext.confirmNoteUnreviewed"]).toBe("未经审核，装好后默认关闭")
   })
 
   test("装好即启用的条目(skill:safe-refactor,Code Puppy 自产)⇒「保存后立即生效」", () => {

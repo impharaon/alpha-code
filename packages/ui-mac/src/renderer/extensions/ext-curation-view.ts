@@ -146,7 +146,7 @@ export type ConfirmNoteKey = "codepuppy.ext.confirmNote" | "codepuppy.ext.confir
  * #1595 AC1:添加确认框的那一句。装好后是不是关着的,由 main 落账同一个分类器决定
  * (`initialDesiredState`,与 hub 的「已安装但未启用」提示同一组入参):
  * 装好即启用 →「保存后立即生效」;关着且已审核(curation 声明 default-disabled 等)→「装好后默认关闭」;
- * 关着且没审核 →「未经审核,装好后默认关闭」。
+ * 关着且没审核 →「未经审核，装好后默认关闭」。
  */
 export function confirmNoteKey(entry: CatalogEntry, catalog: Catalog, nowIso: string): ConfirmNoteKey {
   const status = curationOf(curationMapOf(catalog), entry.id)
@@ -163,7 +163,7 @@ export function confirmNoteKey(entry: CatalogEntry, catalog: Catalog, nowIso: st
 
 /**
  * #1595 AC1 包确认屏:与 main `package-admission.ts` 的落账同一入参(`{ origin: "catalog" }` + 组件类型,
- * 包没有 curation)逐个判断要装的组件;有一件会关着就说「未经审核,装好后默认关闭」。
+ * 包没有 curation)逐个判断要装的组件;有一件会关着就说「未经审核，装好后默认关闭」。
  */
 export function packageConfirmNoteKey(componentKinds: readonly string[]): ConfirmNoteKey {
   const anyDisabled = componentKinds.some((kind) => initialDesiredState({ origin: "catalog", kind }) === "disabled")

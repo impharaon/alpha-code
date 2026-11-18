@@ -142,7 +142,7 @@ describe("已应用目录 → picker 两组", () => {
     expect(reentry).toHaveLength(1)
     expect(reentry[0]?.availability).toBe("unavailable")
     // 独立字面量,不与 t() 同源:文案本身是 AC 的一部分。
-    expect(reentry[0]?.reason).toBe("密钥需重填:重新添加同名服务即可覆盖")
+    expect(reentry[0]?.reason).toBe("密钥需重填：重新添加同名服务即可覆盖")
     expect(reentry[0]?.reason).toBe(t("codepuppy.model.keyReentry"))
     const recovering = rows({ keyStatus, models, listState: "recovering" }).filter((row) => row.model.providerID === "my-endpoint")
     expect(recovering[0]?.availability).toBe("unavailable")

@@ -153,11 +153,11 @@ describe("composer accessibility behavior", () => {
   // 底部一句三档共同、任何档都越不过。文案逐字取自批准稿;英文词典必须有同一组键。
   test("#1638 AC4 / #1575 AC5 tier menu shows direct execution with folder and .env exceptions and shared boundaries", async () => {
     const approved = {
-      allow: "所有工具直接执行,项目外文件夹和 .env 除外。",
+      allow: "所有工具直接执行，项目外文件夹和 .env 除外。",
       ask: "改文件、运行命令、交给其它助手前询问。外部与云端工具按设置执行。",
-      readonly: "不能改文件、运行命令、交给其它助手。项目外文件夹不可访问;外部与云端工具每次询问。",
+      readonly: "不能改文件、运行命令、交给其它助手。项目外文件夹不可访问；外部与云端工具每次询问。",
     }
-    const boundary = "任何档都越不过:已停用的工具、未获准的网址、项目外写入。"
+    const boundary = "任何档都越不过：已停用的工具、未获准的网址、项目外写入。"
     expect(zh["codepuppy.composer.permAllowHint"]).toBe(approved.allow)
     expect(en["codepuppy.composer.permAllowHint"]).toBe("All tools run directly, except folders outside the project and .env files.")
     expect(zh["codepuppy.composer.permAskHint"]).toBe(approved.ask)
@@ -247,6 +247,28 @@ describe("composer accessibility behavior", () => {
     expect(pop.style.bottom).toBe(`${window.innerHeight - 300 + 8}px`)
   })
 
+  test("「接入其它服务」对话框开着时发起它的弹层收起,对话框关掉后弹层随之关闭", async () => {
+    let closed = 0
+    mount(() => runtime.SubPageHarness({ onClosed: () => closed++, closeOnCustomDone: true }))
+    await flush()
+    await flush()
+    const pop = document.querySelector<HTMLElement>(".a-pop-fixed")!
+    expect(pop.style.visibility).toBe("")
+    document.querySelector<HTMLButtonElement>("[data-codepuppy-custom-endpoint-entry]")!.click()
+    await flush()
+    expect(document.querySelector("[role='dialog']")).not.toBeNull()
+    expect(pop.style.visibility).toBe("hidden")
+    // 点对话框里的内容不会把弹层(及它里面的对话框)当成外部点击关掉。
+    document.querySelector<HTMLButtonElement>(".a-csd-seg button")!.click()
+    await flush()
+    expect(document.querySelector("[role='dialog']")).not.toBeNull()
+    keydown(document.querySelector("[role='dialog'] input")!, "Escape")
+    await flush()
+    expect(document.querySelector("[role='dialog']")).toBeNull()
+    expect(document.querySelector(".a-pop-fixed")).toBeNull()
+    expect(closed).toBe(1)
+  })
+
   test("#1476 sub-page Escape goes back one level before closing the menu", async () => {
     let closed = 0
     mount(() => runtime.SubPageHarness({ onClosed: () => closed++ }))
@@ -255,11 +277,13 @@ describe("composer accessibility behavior", () => {
     const back = document.querySelector<HTMLButtonElement>(".a-mpa-back")!
     expect(document.activeElement).toBe(back) // 二级页滑入,焦点在「返回」
 
-    // 进入自定义表单(第二级),Esc 退回供应商列表,菜单仍开着。
+    // 打开「接入其它服务」对话框(第二级),Esc 关掉对话框、退回供应商列表,菜单仍开着。
     document.querySelector<HTMLButtonElement>("[data-codepuppy-custom-endpoint-entry]")!.click()
     await flush()
-    keydown(document.querySelector(".a-mpa input") ?? back, "Escape")
+    expect(document.querySelector("[role='dialog']")).not.toBeNull()
+    keydown(document.querySelector("[role='dialog'] input")!, "Escape")
     await flush()
+    expect(document.querySelector("[role='dialog']")).toBeNull()
     expect(document.querySelector("[data-codepuppy-custom-endpoint-entry]")).not.toBeNull()
     expect(document.querySelector(".a-pop-fixed")).not.toBeNull()
     expect(closed).toBe(0)

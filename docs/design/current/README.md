@@ -17,6 +17,11 @@ Notable entries:
   frames are tracked in its §⑦ 待补 index). Add future timeline component
   frames there, not in the session-workspace page draft.
 
+- **2026-11-18 新视觉方向(owner 批准)**:各页顶部的 `#direction-2026-11` 节是当前权威,
+  帧装在 `<page>/frames/*.html` 子帧里,共享样式 [`../system/direction.css`](../system/direction.css);
+  新建了 [`automations/`](automations/design.html)、[`session-search/`](session-search/design.html)、
+  [`onboarding/`](onboarding/design.html)。冻结增量稿与审计核对:[`../2026-11-18-ui-refresh/frame.html`](../2026-11-18-ui-refresh/frame.html)。
+
 - **Which surface is which, and its codepuppy-vs-opencode status:** see
   [`../PAGE-MAP.md`](../PAGE-MAP.md).
 - **The two-layer model and workflow:** see [`../README.md`](../README.md).

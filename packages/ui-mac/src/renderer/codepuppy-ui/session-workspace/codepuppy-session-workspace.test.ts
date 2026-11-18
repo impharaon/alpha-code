@@ -221,21 +221,25 @@ describe("REQ-125 C1b I1 and Recovery static ratchets", () => {
     expect(composerMount).toContain("revision: edit.revision")
   })
 
-  test("workspace owns the single session-page titlebar and its drag region (#574)", () => {
+  test("the window chrome owns the single top bar and its drag region; the workspace only fills its title slot (#574)", () => {
     // 静态标记:session surface 声明自带顶栏 → 上游 NewLayout(pin+patch 通道)在 session
     // 路由跳过窗口 Titlebar;标记缺席(legacy / 上游默认叶)= Titlebar 原样。
     expect(tsx).toContain("Surface.ownsTitlebar = true")
     expect(upstreamApp).toContain("props.surfaces?.session?.ownsTitlebar === true")
-    // 顶栏即窗口拖拽区;交互件全部从拖拽区挖出。
+    // 新外壳(BR-01):常驻顶栏由窗口外框拥有(shell-chrome.tsx),即窗口拖拽区,交互件全部从拖拽区挖出;
+    // 工作区只把面包屑渲染进它的标题槽(shell-chrome-state 的 topbarTitleHost),没有外框时才自带 .a-swk-topbar。
+    const chromeCss = readFileSync(join(import.meta.dir, "../../sidebar/sidebar.css"), "utf8").replace(/\/\*[\s\S]*?\*\//g, "")
+    expect(chromeCss.match(/\.codepuppy-topbar \{[^}]*\}/)?.[0]).toContain("app-region: drag")
+    expect(chromeCss).toMatch(/\.codepuppy-topbar :is\([^)]*button[^)]*\) \{[^}]*app-region: no-drag/)
+    expect(shell).toContain("topbarTitleHost")
+    // 无外框的回退顶栏(组件用例)仍是拖拽区。
     expect(css.match(/\.a-swk-topbar \{[^}]*\}/)?.[0]).toContain("app-region: drag")
     expect(css).toMatch(/\.a-swk-topbar :is\([^)]*button[^)]*\) \{[^}]*app-region: no-drag/)
     // REQ-126 AC7(#658):浮动终端/审查开关整块退休 —— 原来 #574 只是用 CSS 把它在会话页
     // **遮**掉(命令随上游 session 叶退役,新对话页那份照样可见且无效)。控件没了,遮它的规则
     // 也必须没有:留着一条指向已删控件的隐藏规则,下次有人复活控件时会以为它还被管着。
     // 顶栏本身的行为闸(真挂载 + 真点)在 shell-commands.test.ts。
-    const sidebarCss = readFileSync(join(import.meta.dir, "../../sidebar/sidebar.css"), "utf8")
-    expect(sidebarCss.replace(/\/\*[\s\S]*?\*\//g, "")).not.toContain("codepuppy-topbar-right")
-    expect(sidebarCss).toContain('body[data-codepuppy-sidebar="collapsed"] .a-swk-topbar')
+    expect(chromeCss).not.toContain("codepuppy-topbar-right")
   })
 
   test("keeps the single session composition and existing Alpha Recovery boundary", () => {

@@ -139,17 +139,17 @@ describe("REQ-125 C7:ComposerTakeover 删除后零引用(棘轮)", () => {
     expect(card).not.toContain("questionV2Reply")
   })
 
-  test("审计修复轮棘轮:停止键走已批稿 accent 令牌", () => {
+  test("审计修复轮棘轮:停止键走已批稿令牌(界面优化稿 .send.is-stop:--a-text 底、--a-bg-canvas 方块)", () => {
     // (原「always 项目身份取会话精确 projectID」棘轮随 dock 审批卡删除而失去主体:
     // dock 已无任何放行动作;独立 Permission surface 的 always 项目身份由
     // PermissionDialog 自身的 fail-closed 用例锁定。)
     const dock = read(path.join(CODEPUPPY_UI, "session-workspace", "session-composer-dock.tsx"))
     expect(dock).not.toContain("project.worktree ===")
-    // minor:停止键配色 = 已批稿 --a-accent 系;禁 --a-danger 与裸色回退。
+    // minor:停止键配色 = 已批稿令牌(2026-11-18 界面优化稿起为深色圆底 + 浅色方块,此前是 --a-accent 淡底);禁 --a-danger 与裸色回退。
     const css = read(path.join(CODEPUPPY_UI, "codepuppy-composer.css"))
     expect(css).not.toContain("--a-danger")
     expect(css).toMatch(
-      /\.a-comp-stop\[data-ready\] \{\s*background: var\(--a-accent-subtle\);\s*color: var\(--a-accent\);\s*border: 1px solid var\(--a-accent-border\);/,
+      /\.a-comp-stop\[data-ready\] \{\s*background: var\(--a-text\);\s*color: var\(--a-bg-canvas\);/,
     )
   })
 
@@ -158,9 +158,15 @@ describe("REQ-125 C7:ComposerTakeover 删除后零引用(棘轮)", () => {
     for (const file of fs.readdirSync(dir).filter((name) => /\.(ts|tsx)$/.test(name) && !/\.test\./.test(name))) {
       const src = read(path.join(dir, file))
       for (const token of ["<Portal", "querySelector", "MutationObserver", "data-component="]) {
-        expect({ file, token, hit: src.includes(token) }).toEqual({ file, token, hit: false })
+        // 新外壳:会话页的面包屑经一个 Portal 进壳的常驻顶栏(壳自己的宿主节点),这是 shell 文件里**唯一**
+        // 允许的 Portal —— 它不碰输入框,也不收养上游 DOM;下面单独钉死它只有一处、且只装顶栏内容。
+        const allowed = file === "session-workspace-shell.tsx" && token === "<Portal"
+        expect({ file, token, hit: allowed ? false : src.includes(token) }).toEqual({ file, token, hit: false })
       }
     }
+    const shellSrc = read(path.join(dir, "session-workspace-shell.tsx"))
+    expect(shellSrc.match(/<Portal\b/g)?.length).toBe(1)
+    expect(shellSrc).toMatch(/<Portal mount=\{host\(\)\}>\s*<div class="a-swk-topbar-content" data-codepuppy-session-workspace-topbar>/)
     const workspace = read(path.join(dir, "codepuppy-session-workspace.tsx"))
     expect(workspace).toMatch(/<SessionComposerDock\b[\s\S]*?live=\{live\}[\s\S]*?projects=\{props\.projects\}/)
     const dock = read(path.join(dir, "session-composer-dock.tsx"))

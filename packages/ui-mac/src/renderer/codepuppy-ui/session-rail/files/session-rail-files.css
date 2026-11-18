@@ -31,11 +31,11 @@
   gap: 8px;
   flex: none;
   height: 30px;
-  margin: 10px 10px 6px;
+  margin: 10px 12px 0;
   padding: 0 10px;
-  border: 1px solid var(--a-border);
+  border: 1px solid var(--a-hairline);
   border-radius: var(--a-radius-md);
-  background: var(--a-surface);
+  background: var(--a-bg-subtle);
   color: var(--a-text-tertiary);
   font-size: var(--a-text-sm);
   transition:
@@ -48,10 +48,11 @@
   box-shadow: var(--a-ring-focus);
 }
 
-.a-srf-search-icon {
+.a-srf-root .a-srf-search-icon {
   flex: none;
-  width: 15px;
-  height: 15px;
+  width: 14px;
+  height: 14px;
+  stroke-width: 2.05;
 }
 
 .a-srf-search input {
@@ -113,8 +114,8 @@
 }
 
 .a-srf-opentab--on {
-  background: var(--a-accent-subtle);
-  color: var(--a-accent);
+  background: var(--a-bg-muted);
+  color: var(--a-text);
   font-weight: var(--a-weight-medium);
 }
 
@@ -175,29 +176,29 @@
   display: flex;
   flex-direction: column;
   flex: none;
-  padding: 4px 10px 14px;
+  padding: 6px 8px 14px;
 }
 
 .a-srf-tree {
   display: flex;
   flex-direction: column;
-  gap: 1px;
+  gap: 0;
 }
 
 /* role="listitem" 的外包层(C21 AC2)。行本身仍是原生 <button>;这层只承担列表语义,
    所以它必须完全透明地把原来的排布交回去:与 .a-srf-tree / .a-srf-indent 同为纵向 flex、
-   同样 1px 间距 —— 目录行与它展开的子层原本就是相邻的两个 flex 项。 */
+   同样零间距(行高自己撑出 28px,冻结稿的树行是紧挨的)—— 目录行与它展开的子层原本就是相邻的两个 flex 项。 */
 .a-srf-item {
   display: flex;
   flex-direction: column;
-  gap: 1px;
+  gap: 0;
   min-width: 0;
 }
 
 .a-srf-row {
   display: flex;
   align-items: center;
-  gap: 7px;
+  gap: 6px;
   flex: none;
   width: 100%;
   min-width: 0;
@@ -206,7 +207,7 @@
   border: 0;
   border-radius: var(--a-radius-md);
   background: transparent;
-  color: var(--a-text-secondary);
+  color: var(--a-text);
   font: inherit;
   font-size: var(--a-text-sm);
   cursor: pointer;
@@ -219,25 +220,26 @@
 }
 
 .a-srf-row--selected {
-  background: var(--a-accent-subtle);
-  color: var(--a-accent);
+  background: var(--a-bg-muted);
+  color: var(--a-text);
   font-weight: var(--a-weight-medium);
 }
 
 .a-srf-row--selected:hover {
-  background: var(--a-accent-subtle);
-  color: var(--a-accent);
+  background: var(--a-bg-muted);
+  color: var(--a-text);
 }
 
 .a-srf-row--ignored {
   opacity: 0.55;
 }
 
-.a-srf-caret {
+.a-srf-root .a-srf-caret {
   flex: none;
-  width: 13px;
-  height: 13px;
+  width: 12px;
+  height: 12px;
   color: var(--a-text-tertiary);
+  stroke-width: 2.4;
   transition: transform var(--a-dur-fast) var(--a-ease-out);
 }
 
@@ -247,26 +249,22 @@
 
 .a-srf-caret-spacer {
   flex: none;
-  width: 13px;
+  width: 12px;
 }
 
-.a-srf-icon {
+.a-srf-root .a-srf-icon {
   flex: none;
   width: 14px;
   height: 14px;
-  color: var(--a-text-tertiary);
-}
-
-.a-srf-icon--dir {
-  color: var(--a-accent);
+  color: var(--a-text-secondary);
+  stroke-width: 2.05;
 }
 
 .a-srf-name {
   overflow: hidden;
   min-width: 0;
   color: inherit;
-  font-family: var(--a-font-mono);
-  font-size: var(--a-text-xs);
+  font-size: inherit;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -296,21 +294,10 @@
 }
 
 .a-srf-indent {
-  position: relative;
   display: flex;
   flex-direction: column;
-  gap: 1px;
-  margin-left: 16px;
-}
-
-.a-srf-indent::before {
-  content: "";
-  position: absolute;
-  top: 2px;
-  bottom: 2px;
-  left: -2px;
-  width: 1px;
-  background: var(--a-border-faint);
+  gap: 0;
+  margin-left: 18px;
 }
 
 /* ── states ───────────────────────────────────────────────────────────────────────────── */
@@ -351,50 +338,9 @@
   background: var(--a-accent-subtle);
 }
 
-.a-srf-empty {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  padding: 30px;
-  text-align: center;
-}
-
-.a-srf-empty-icon {
-  display: grid;
-  place-items: center;
-  width: 40px;
-  height: 40px;
-  border-radius: var(--a-radius-lg);
-  background: var(--a-bg-muted);
-  color: var(--a-text-tertiary);
-}
-
-.a-srf-empty-icon .a-srf-icon {
-  width: 19px;
-  height: 19px;
-  color: inherit;
-}
-
-.a-srf-empty b {
-  color: var(--a-text);
-  font-size: var(--a-text-sm);
-  font-weight: var(--a-weight-medium);
-}
-
-.a-srf-empty p {
-  max-width: 30ch;
-  margin: 0;
-  color: var(--a-text-tertiary);
-  font-size: var(--a-text-xs);
-  line-height: var(--a-leading-snug);
-}
-
 /* ── REQ-108 file viewer(文件面板的下钻覆盖层)──────────────────────────────────────── */
 
 .a-srf-stack {
-  position: relative;
   display: flex;
   flex: 1;
   flex-direction: column;
@@ -409,9 +355,10 @@
   min-height: 0;
 }
 
+/* 相对整栏(.a-swk-rail-host)定位并让出页签条 —— 文件面板的空状态要把整栏当作唯一的定位祖先。 */
 .a-fv-root {
   position: absolute;
-  inset: 0;
+  inset: var(--a-topbar-h) 0 0;
   z-index: 1;
   display: flex;
   flex-direction: column;

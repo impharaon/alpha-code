@@ -15,7 +15,7 @@
   background: var(--a-surface) !important;
   border: 1px solid var(--a-border) !important;
   border-radius: var(--a-radius-2xl) !important;
-  box-shadow: var(--a-shadow-md), var(--a-edge-light) !important;
+  box-shadow: var(--a-shadow-sm) !important;
   transition:
     box-shadow var(--a-dur-base) var(--a-ease-out),
     border-color var(--a-dur-base) var(--a-ease-out) !important;
@@ -23,5 +23,5 @@
 .a-comp:focus-within,
 [data-component="prompt-input-v2"]:focus-within {
   border-color: var(--a-border-strong) !important;
-  box-shadow: var(--a-shadow-lg), var(--a-edge-light) !important;
+  box-shadow: var(--a-shadow-md) !important;
 }

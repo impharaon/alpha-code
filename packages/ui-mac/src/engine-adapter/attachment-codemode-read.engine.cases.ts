@@ -11,7 +11,7 @@
 //
 // 已知的坏(2026-11-13 实跑):timeline-attachments.ts 只认直接读取工具部件(修复前)⇒ 第一条两条入口都是 not-read(前提断言照过:
 // 读取桩收到一次调用、execute 部件记下了这个附件的路径),被拒那条两条入口都是 not-read;第二条照样绿。
-// 被拒那条的「读取失败:文件打不开」与 0.1.26 直接调用被拒时同一个结果(错误原文不含 is not available / timeout)。
+// 被拒那条的「读取失败：文件打不开」与 0.1.26 直接调用被拒时同一个结果(错误原文不含 is not available / timeout)。
 //
 // 本文件由同名 `.test.ts` 宿主起独立 `bun test` 子进程跑。HOME / XDG 全在临时沙箱里。
 import { afterAll, beforeAll, describe, expect, test } from "bun:test"

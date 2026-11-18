@@ -118,6 +118,8 @@ function FakeTerminal(props: {
 mock.module("@opencode-ai/app/surface/terminal", () => ({
   Terminal: FakeTerminal,
   useTerminal: () => currentEngine!.engine,
+  // 首页右栏用的目录绑定 provider:这里的用例不挂首页,透传子节点即可。
+  WorkspaceTerminalProvider: (props: { children: unknown }) => props.children,
 }))
 
 Bun.plugin({

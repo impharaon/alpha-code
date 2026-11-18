@@ -140,8 +140,9 @@ describe("ADR-027 typed surface seam anchors (frozen packages/app)", () => {
     }
     expect(pkg.exports["./surface/terminal"]).toBe("./src/surface/terminal.ts")
 
-    // 窄面的可机械验证形态:re-export 模块恰好四个符号,逐行钉死,禁止悄悄扩面。第四条
-    // (TerminalColors)是 #576 深底 seam:Terminal 的 `theme` palette 覆盖类型(ADR-027 修订)。
+    // 窄面的可机械验证形态:re-export 模块恰好五个符号,逐行钉死,禁止悄悄扩面。第四条
+    // (TerminalColors)是 #576 深底 seam:Terminal 的 `theme` palette 覆盖类型(ADR-027 修订)。第五条
+    // (WorkspaceTerminalProvider)是首页右栏(无会话、只有项目)的目录绑定 provider 对。
     const surfaceModule = readFileSync(join(APP_SRC, "surface/terminal.ts"), "utf8")
     const exportLines = surfaceModule.split("\n").filter((line) => line.startsWith("export"))
     expect(exportLines).toEqual([
@@ -149,6 +150,7 @@ describe("ADR-027 typed surface seam anchors (frozen packages/app)", () => {
       'export type { LocalPTY } from "@/context/terminal"',
       'export { Terminal } from "@/components/terminal"',
       'export type { TerminalColors } from "@/components/terminal"',
+      'export { WorkspaceTerminalProvider } from "./workspace-terminal"',
     ])
 
     // 指向的引擎源仍导出这些符号(锚点:上游改名/搬文件时此处先于运行时红)。

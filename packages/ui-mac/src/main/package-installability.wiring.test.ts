@@ -549,9 +549,9 @@ describe("package installability production wiring", () => {
     expect(shape.packages.map((item) => `${item.prelude.packageId}@${item.prelude.version}`)).toEqual([
       "package:cloud-image@1.0.0",
       "package:codepuppy-first@1.0.1",
-      "package:dbhub-readonly@1.0.0",
-      "package:github@1.0.1",
-      "package:github-official@1.0.0",
+      "package:dbhub-readonly@1.0.1",
+      "package:github@1.0.2",
+      "package:github-official@1.0.1",
       "package:supabase@1.0.0",
     ])
     expect((bundledCatalog as { entries: unknown[] }).entries.length).toBeGreaterThan(0)

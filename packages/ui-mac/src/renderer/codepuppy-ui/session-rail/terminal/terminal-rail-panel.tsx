@@ -3,14 +3,15 @@
 // (双主题恒深底)、脚条(运行状态 · 环境 · 沙箱 · 尺寸)。输出区内容由引擎经
 // `CodePuppyTerminalEngineChannel` 渲染;channel 缺席或未就绪 → fail-closed 空态。
 //
-// REQ-159 `#1322`(AC1):沙箱开启时脚条多一项、空态多一行 —— 「你的部分终端配置可能不生效」。
+// REQ-159 `#1322`(AC1):沙箱开启时脚条多一项 —— 「你的部分终端配置可能不生效」(界面优化 R3:空态不再重复这句,只留脚条与悬停层)。
 // 出现条件只认 `props.sandbox`(引擎自报,宿主经 sandbox-state 投影后用 props 递进来;本文件 I1 棘轮禁
 // window.api,所以不自己去问)。缺席 / false ⇒ 一个字都不出现:没有围栏就不说有。常驻、不可关闭、
 // 不弹窗 —— 与「zsh」同级的环境事实;整句解释在悬停层(title 兜底 + 非模态卡),窄于 360px 只留「沙箱开启」
-// (容器查询,见 terminal-rail.css)。判据钩子:`data-codepuppy-terminal-foot-sandbox` / `data-codepuppy-terminal-empty-sandbox`
+// (容器查询,见 terminal-rail.css)。判据钩子:`data-codepuppy-terminal-foot-sandbox`
 // (设计稿 2026-09-10-req159-sandbox-disclosure §3.1;反向用例 = 删掉脚条项必红,terminal-rail.cases.ts)。
 import { For, Show, createEffect, createMemo, onCleanup } from "solid-js"
 import { t } from "../../../i18n"
+import { Button } from "../../Button"
 import { rovingKey, rovingTabIndex } from "../../roving-focus"
 import type { CodePuppySessionIdentity } from "../../session-workspace/session-workspace-core"
 import {
@@ -123,29 +124,23 @@ export function TerminalRailPanel(props: {
         fallback={
           <div class="a-term-empty" data-codepuppy-terminal-empty>
             <span class="a-term-empty-icon" aria-hidden="true">
-              <svg class="a-term-icon" viewBox="0 0 24 24">
-                <path d="M4 17l6-6-6-6M12 19h8" />
+              <svg viewBox="0 0 24 24">
+                <path d="m5.5 8 4 4-4 4M12 16.5h6.5" />
               </svg>
             </span>
             <b>{t("codepuppy.terminal.emptyTitle")}</b>
             <p>{t("codepuppy.terminal.emptyBody")}</p>
-            <Show when={props.sandbox?.()}>
-              <p class="a-term-empty-sandbox" data-codepuppy-terminal-empty-sandbox>
-                <ShieldIcon />
-                <span>{t("codepuppy.terminal.sandboxEmpty")}</span>
-              </p>
-            </Show>
-            <button
+            <Button
               ref={(element) => (emptyNewButton = element)}
-              type="button"
-              class="a-term-empty-new"
+              variant="secondary"
+              size="sm"
               data-codepuppy-terminal-new
               disabled={engine() === undefined}
               onClick={() => engine()?.create()}
             >
               <PlusIcon />
               {t("codepuppy.terminal.new")}
-            </button>
+            </Button>
           </div>
         }
       >

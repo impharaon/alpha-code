@@ -106,6 +106,7 @@ mock.module("@opencode-ai/app", () => ({
   // dock 只从这个 barrel 取 ServerSDK/ServerSync/审批双通道;斜杠登记判据用不到审批面与
   // 模型用量环,全部给成惰性缺席(client 缺席 ⇒ modelContract.list 拒绝 ⇒ 用量环隐藏;
   // dir 上下文缺席 ⇒ 审批 feed 不建,fail-closed 无审批挂起)—— onSlashCommand 与它们无关。
+  useLayout: () => ({ tabs: () => ({ all: () => [], active: () => undefined }) }),
   useServerSDK: () => () => ({ client: undefined, ensureDirSdkContext: () => undefined }),
   useServerSync: () => () => ({ session: {
     data: { get message() { return { "session-9": dockMessages() } }, todo: {}, question: {}, info: {} },
@@ -116,6 +117,15 @@ mock.module("@opencode-ai/app", () => ({
 /** #894:叶真正跳去了哪里。路由本体不参与 —— 记的是叶交给 `useNavigate()` 的那个 href,
  *  再由生产的 `parseRoute` 读回去,编码与解码是两条相反的路,不构成自指等价链。 */
 const navigateCalls: string[] = []
+// 首页右栏(HomeRightPanel)被新对话页引入:终端窄导出换成空壳,免得把整套终端引擎与 codepuppy-ui 组件拉进来。
+mock.module("@opencode-ai/app/surface/terminal", () => ({
+  Terminal: () => null,
+  useTerminal: () => {
+    throw new Error("no terminal engine in this test")
+  },
+  WorkspaceTerminalProvider: (props: { children: unknown }) => props.children,
+}))
+
 mock.module("@solidjs/router", () => ({
   useSearchParams: () => [{}, () => {}],
   useNavigate: () => (href: string) => {
@@ -1984,7 +1994,7 @@ describe("REQ-159 #1322 workspace read-only tag on the chip (AC2)", () => {
     expect(badge).not.toBeNull()
     expect(badge!.textContent?.trim()).toBe("只读")
     expect(badge!.getAttribute("title")).toContain("这个项目现在写不进去")
-    expect(badge!.getAttribute("title")).toContain("重新启动 Code Puppy 后,它就会被算进去")
+    expect(badge!.getAttribute("title")).toContain("重新启动 Code Puppy 后，它就会被算进去")
     // 位置:目录名与折叠箭头之间(同一个 chip 按钮里,尾标在箭头之前)。
     const chip = chipButton(host)
     expect(chip.contains(badge!)).toBe(true)

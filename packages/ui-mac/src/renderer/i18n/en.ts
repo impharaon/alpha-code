@@ -1535,7 +1535,7 @@ export const dict = {
   "codepuppy.autocomplete.descAgentCreator": "Create a custom Agent",
   "codepuppy.autocomplete.descCustomizeCodePuppy": "Configure Code Puppy (connectors / skills / governance)",
   "codepuppy.autocomplete.descIntegrateProject": "Import external ecosystem content (.claude / .agents)",
-  "codepuppy.autocomplete.descCodePuppyWorkspace": "Summarize and write memories to the ~/code-puppy workspace",
+  "codepuppy.autocomplete.descCodePuppyWorkspace": "Summarize and write memories to the default workspace “Code Puppy”",
   "codepuppy.autocomplete.attach": "Add attachment",
   "codepuppy.autocomplete.attachDesc": "Choose an image or PDF attachment",
   "codepuppy.autocomplete.openTerminal": "Open terminal",

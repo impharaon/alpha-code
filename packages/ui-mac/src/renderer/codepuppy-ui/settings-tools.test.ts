@@ -320,11 +320,11 @@ describe("Alpha Settings 「工具」节", () => {
     expect(text(q("[data-tools-service='mcp:context7']"))).not.toContain(billingPrefix)
     // 对照:websearch 带真实计费数据,徽标还在(证明上面不是整个徽标被删掉)。
     expect(text(row("mcp:alpha-cloud:websearch"))).toContain(zhFill("codepuppy.settings.toolsBilling", { value: "metered" }))
-    expect(text(q("[data-tools-class='third-party-mcp']"))).toContain("全部批准下直接执行,其它档询问 · 是否收费由服务方决定")
-    expect(text(q("[data-tools-class='codepuppy-cloud']"))).toContain("全部批准下直接执行,其它档询问 · 云端调用可能计费;不能越过套餐限制")
-    expect(text(q("[data-tools-class='plugin']"))).toContain("全部批准下直接执行,其它档询问")
-    expect(text(row("mcp:context7:resolve-library-id"))).toContain("默认,全部批准下直接执行,其它档询问")
-    expect(text(q("[data-tools-service='mcp:context7']"))).toContain("继承:默认,全部批准下直接执行,其它档询问")
+    expect(text(q("[data-tools-class='third-party-mcp']"))).toContain("全部批准下直接执行，其它档询问 · 是否收费由服务方决定")
+    expect(text(q("[data-tools-class='codepuppy-cloud']"))).toContain("全部批准下直接执行，其它档询问 · 云端调用可能计费；不能越过套餐限制")
+    expect(text(q("[data-tools-class='plugin']"))).toContain("全部批准下直接执行，其它档询问")
+    expect(text(row("mcp:context7:resolve-library-id"))).toContain("默认，全部批准下直接执行，其它档询问")
+    expect(text(q("[data-tools-service='mcp:context7']"))).toContain("继承：默认，全部批准下直接执行，其它档询问")
     expect(zh["codepuppy.settings.toolsEffectiveAsk"]).toBe("询问")
     expect(en["codepuppy.settings.toolsEffectiveAsk"]).toBe("Ask")
     for (const key of ["toolsCapBundled", "toolsCapCloud", "toolsCapMcp", "toolsCapPlugin", "toolsReasonDefault", "toolsInheritedDefaultAsk"] as const)
@@ -361,7 +361,7 @@ describe("Alpha Settings 「工具」节", () => {
     const group = q("[data-tools-class='codepuppy-bundled']")!
     expect(group).not.toBeNull()
     expect(text(group.querySelector("h3"))).toBe("Code Puppy 文档工具")
-    expect(text(group)).toContain("全部批准下直接执行,其它档询问")
+    expect(text(group)).toContain("全部批准下直接执行，其它档询问")
     expect(text(row("mcp:codepuppy-word:read_docx"))).toContain(
       zhFill("codepuppy.settings.toolsEffective", {
         state: zh["codepuppy.settings.toolsEffectiveAsk"],

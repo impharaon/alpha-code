@@ -768,7 +768,7 @@ describe("REQ-236 #1575 中间按钮按请求种类", () => {
     const box = rememberBox()!
     expect(box.dataset.permissionRemember).toBe("session")
     expect(box.textContent).toContain(zh["codepuppy.permission.allowSession"])
-    expect(box.querySelector("b")?.textContent).toBe(`将记住:${what}`)
+    expect(box.querySelector("b")?.textContent).toBe(`将记住：${what}`)
     expect(box.querySelector("small")?.textContent).toBe("本次会话 · 重启后失效")
     // 原始规则不上卡:记住框里没有通配,整张卡没有「不过期」与「永久授权」。
     expect(box.textContent).not.toContain("*")
@@ -831,7 +831,7 @@ describe("REQ-236 #1575 中间按钮按请求种类", () => {
 
     expect(decision("always").textContent).toBe("在此项目中始终允许")
     expect(rememberBox()?.dataset.permissionRemember).toBe("project")
-    expect(rememberBox()?.querySelector("b")?.textContent).toBe("将记住:在此项目使用这个工具")
+    expect(rememberBox()?.querySelector("b")?.textContent).toBe("将记住：在此项目使用这个工具")
     expect(rememberBox()?.querySelector("small")?.textContent).toBe("当前项目 · 当前账户 · 可在设置里撤回")
     // 身份轴的 patterns 是放行键,不当资源显示。
     expect(card().querySelector('[data-permission-fact="resources"]')).toBeNull()
@@ -871,7 +871,7 @@ describe("REQ-236 #1575 中间按钮按请求种类", () => {
     await flush()
     expect(commands).toEqual([])
     expect(card()).not.toBeNull()
-    expect(document.querySelector('[data-permission-note="save-failed"]')?.textContent).toBe("没能保存,这次未放行")
+    expect(document.querySelector('[data-permission-note="save-failed"]')?.textContent).toBe("没能保存，这次未放行")
     expect(document.querySelector('[data-permission-note="save-failed"]')?.getAttribute("role")).toBe("alert")
     expect(decision("always").textContent).toBe("重试「在此项目中始终允许」")
     expect(decision("always").disabled).toBeFalse()
@@ -894,7 +894,7 @@ describe("REQ-236 #1575 中间按钮按请求种类", () => {
     await flush()
 
     expect(decision("always").disabled).toBeTrue()
-    expect(document.querySelector('[data-permission-note="project-missing"]')?.textContent).toBe("找不到当前项目,不能始终允许")
+    expect(document.querySelector('[data-permission-note="project-missing"]')?.textContent).toBe("找不到当前项目，不能始终允许")
     expect(rememberBox()).toBeNull()
     decision("always").click()
     await flush()
@@ -1018,7 +1018,7 @@ describe("REQ-236 #1575 中间按钮按请求种类", () => {
     await flush()
 
     expect(decision("always").disabled).toBeTrue()
-    expect(document.querySelector('[data-permission-note="project-missing"]')?.textContent).toBe("找不到当前项目,不能始终允许")
+    expect(document.querySelector('[data-permission-note="project-missing"]')?.textContent).toBe("找不到当前项目，不能始终允许")
     expect(rememberBox()).toBeNull()
     decision("always").click()
     await flush()
@@ -1092,7 +1092,7 @@ describe("REQ-236 #1575 中间按钮按请求种类", () => {
       expect(card().querySelector(`[data-permission-fact="${fact}"]`)).not.toBeNull()
     expect(card().querySelector('[data-permission-fact="subject"]')).toBeNull()
     // #1617 r1:页脚写人话(永久授权、不会自动过期),不露 grantExpiresAt = null 这类原始字段。
-    expect(document.querySelector(".a-permission-grant-note")?.textContent).toBe("「始终允许」会为当前项目创建永久授权,不会自动过期。")
+    expect(document.querySelector(".a-permission-grant-note")?.textContent).toBe("「始终允许」会为当前项目创建永久授权，不会自动过期。")
     expect(card().textContent).not.toContain("grantExpiresAt")
     decision("always").click()
     await flush()
@@ -1271,7 +1271,7 @@ describe("#1314 批准面板的风险标签", () => {
       .split(" ")
       .map((id) => document.getElementById(id)!.textContent)
       .join(" ")
-    expect(name).toBe("允许这次操作吗? 高风险")
+    expect(name).toBe("允许这次操作吗？ 高风险")
   })
 })
 

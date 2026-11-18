@@ -1168,13 +1168,13 @@ describe("REQ-125 C6 通用工具卡四态与分派", () => {
     expect(mcpCard.querySelector(".a-tl-pf-v")!.textContent).toBe("context7")
     const mcpSafe = mcpCard.querySelector("[data-codepuppy-safe-card]")!
     // `#1475` AC5:常驻的「详情未展示」挪进详情,改成一句写出来源的人话。
-    expect(mcpSafe.textContent).toBe("这个工具来自第三方(context7),我们不显示它收到和返回的内容。")
+    expect(mcpSafe.textContent).toBe("这个工具来自第三方（context7），我们不显示它收到和返回的内容。")
 
     const unknownCard = host.querySelector("[data-codepuppy-tool-card][data-category='unknown']")!
     // #1576:无快照按第三方说,来源只有三类。
     expect(unknownCard.querySelector(".a-tl-pf-v")).toBeNull()
     const unknownSafe = unknownCard.querySelector("[data-codepuppy-safe-card]")!
-    expect(unknownSafe.textContent).toBe("这个工具来自第三方,我们不显示它收到和返回的内容。")
+    expect(unknownSafe.textContent).toBe("这个工具来自第三方，我们不显示它收到和返回的内容。")
     // 失败只写「没成功」(行尾),不显示错误原文。
     expect(unknownCard.querySelector("[data-codepuppy-step-failure]")!.textContent).toBe("没成功")
     expect(unknownCard.textContent).not.toContain("boom-secret")
@@ -1186,7 +1186,7 @@ describe("REQ-125 C6 通用工具卡四态与分派", () => {
     expect(pluginCard.querySelector(".a-tl-pf-v")!.textContent).toBe("第三方插件")
     expect(pluginCard.querySelector("[data-codepuppy-step-source='plugin']")).not.toBeNull()
     expect(pluginCard.querySelector("[data-codepuppy-safe-card]")!.textContent).toBe(
-      "这个工具来自第三方插件,我们不显示它收到和返回的内容。",
+      "这个工具来自第三方插件，我们不显示它收到和返回的内容。",
     )
     expect(pluginCard.querySelector(".a-tl-pf-step")!.textContent).not.toContain("sample-plugin")
     // 降级卡的开发者详情仍保留排障能力(AC4):快照在场即陈列,默认折叠。
@@ -1309,7 +1309,7 @@ describe("REQ-125 C6 通用工具卡四态与分派", () => {
     expect(foot[0]!.parentElement!.lastElementChild).toBe(foot[0]!)
   })
 
-  test("#1214 AC2 审批超时呈现:mcp 降级卡出「审批已超时,未获批准」而非通用隐藏文案;错误原文零泄漏;普通错误不受影响", async () => {
+  test("#1214 AC2 审批超时呈现:mcp 降级卡出「审批已超时，未获批准」而非通用隐藏文案;错误原文零泄漏;普通错误不受影响", async () => {
     const host = mount()
     // 引擎 UnansweredError 的 message 形态(首行契约由 tool-card-provenance-gates.test.ts
     // 用真引擎构造钉住;此处按同形态字面量驱动 DOM 半场)。
@@ -1353,7 +1353,7 @@ describe("REQ-125 C6 通用工具卡四态与分派", () => {
     await openAll(host)
     const timeoutSafe = timeoutCard.querySelector("[data-codepuppy-safe-card]")!
     // 可辨识原因:包含「已超时」与「未获批准」两类词,替换回通用失败文案即红(#1214 AC2 变异判据)。
-    expect(timeoutSafe.textContent).toContain("审批已超时,未获批准")
+    expect(timeoutSafe.textContent).toContain("审批已超时，未获批准")
     expect(timeoutSafe.textContent).toContain("重新发起会再次询问")
     expect(timeoutSafe.textContent).not.toContain("错误详情已隐藏")
     expect(timeoutSafe.querySelector("[data-codepuppy-ask-timeout]")).not.toBeNull()
@@ -1365,7 +1365,7 @@ describe("REQ-125 C6 通用工具卡四态与分派", () => {
 
     const genericCard = host.querySelector("[data-codepuppy-tool-card][data-tool='context7_resolve-library-id']")!
     const genericSafe = genericCard.querySelector("[data-codepuppy-safe-card]")!
-    expect(genericSafe.textContent).toBe("这个工具来自第三方(context7),我们不显示它收到和返回的内容。")
+    expect(genericSafe.textContent).toBe("这个工具来自第三方（context7），我们不显示它收到和返回的内容。")
     expect(genericCard.querySelector("[data-codepuppy-step-failure]")!.textContent).toBe("没成功")
     expect(genericSafe.querySelector("[data-codepuppy-ask-timeout]")).toBeNull()
     expect(genericCard.textContent).not.toContain("ENOTREACHABLE")
@@ -1434,7 +1434,7 @@ describe("REQ-125 C6 通用工具卡四态与分派", () => {
     expect(grid.textContent).toContain("mod-0.ts")
     expect(grid.textContent).not.toContain("mod-62.ts")
     // 缺席提示在场,而计数 footer 整个不渲染:用户拿不到任何会低报总量的数字。
-    expect(card.querySelector(".a-tc-truncated")!.textContent).toBe("内容过长,已截断展示")
+    expect(card.querySelector(".a-tc-truncated")!.textContent).toBe("内容过长，已截断展示")
     expect(grid.querySelector(".a-tc-dircount")).toBeNull()
     expect(card.textContent).not.toContain("项")
   })
@@ -1680,7 +1680,7 @@ describe("REQ-125 C6 通用工具卡四态与分派", () => {
     expect(links.querySelectorAll(".a-tc-wr")).toHaveLength(3)
     // 缺 url 的那条整条不渲染(标题也不借尸还魂),但缺席这件事必须写在卡上。
     expect(card.textContent).not.toContain("标题在但 url 键不在")
-    expect(links.querySelector(".a-tc-truncated")!.textContent).toBe("内容过长,已截断展示")
+    expect(links.querySelector(".a-tc-truncated")!.textContent).toBe("内容过长，已截断展示")
   })
 
   test("工具级错误(matched 步骤):行尾写人话、失败不自动展开;详情里标题行 + 复制 + 正文;错误体先过 redactor", async () => {
@@ -2428,7 +2428,9 @@ describe("#568 回合末富脚注(A6/A7)", () => {
     const footnote = host.querySelector("[data-codepuppy-timeline-row='footnote']")!
     expect(footnote).not.toBeNull()
     expect(footnote.querySelector(".a-tl-fn-agent")!.textContent).toContain("全部批准")
-    expect(footnote.textContent).toContain("deepseek-reasoner")
+    // 脚注写模型显示名(与用户消息脚行同口径),不再露模型编号。
+    expect(footnote.textContent).toContain("DeepSeek Reasoner")
+    expect(footnote.textContent).not.toContain("deepseek-reasoner")
     // `#1473`:脚注不再写用时(只量最后一条助手消息,与整轮计时同名不同量);零 tokens 诚实缺席。
     expect(footnote.textContent).not.toContain("秒")
     expect(footnote.textContent).not.toContain("tokens")
@@ -3174,7 +3176,7 @@ describe("#589 真实继续生成闸门(生产绑定层挂载,SDK 层观察)", (
 
     const failed = host.querySelector(".a-tl-int-failed")
     expect(failed).not.toBeNull()
-    expect(failed!.textContent).toBe("发送失败,请重试")
+    expect(failed!.textContent).toBe("发送失败，请重试")
   })
 
   test("续发失败(admission 前拒绝,无任何 session_status 事件)不再静默:就地失败提示,重试成功即清除", async () => {
@@ -3188,7 +3190,7 @@ describe("#589 真实继续生成闸门(生产绑定层挂载,SDK 层观察)", (
     expect(sdkPromptCalls).toHaveLength(1)
     const failed = host.querySelector(".a-tl-int-failed")
     expect(failed).not.toBeNull()
-    expect(failed!.textContent).toBe("发送失败,请重试")
+    expect(failed!.textContent).toBe("发送失败，请重试")
 
     sdkPromptImpl = () => Promise.resolve({})
     host.querySelector<HTMLButtonElement>(".a-tl-int-continue")!.click()
@@ -3319,7 +3321,9 @@ describe("#591 富脚注:provider 图标 + 效率段", () => {
     const footnote = host.querySelector("[data-codepuppy-timeline-row='footnote']")!
     expect(footnote.querySelector(".a-tl-fn-prov")!.textContent).toBe("D")
     expect(footnote.querySelector(".a-tl-fn-agent")!.textContent).toContain("全部批准")
-    expect(footnote.textContent).toContain("deepseek-reasoner")
+    // 脚注写模型显示名(与用户消息脚行同口径),不再露模型编号。
+    expect(footnote.textContent).toContain("DeepSeek Reasoner")
+    expect(footnote.textContent).not.toContain("deepseek-reasoner")
     // 命中 3000/(3000+1000) = 75% → 高档,具体口径在统一提示里(#1476:不再用原生 title;
     // 键盘可聚焦,且经 aria-describedby 被读出)。
     const efficiency = [...footnote.querySelectorAll(".a-tl-fn-item")].find((el) => el.textContent === "高")!
@@ -3329,7 +3333,9 @@ describe("#591 富脚注:provider 图标 + 效率段", () => {
     expect(document.getElementById(efficiency.getAttribute("aria-describedby")!)!.textContent).toBe("缓存命中 75%")
     // `#1473`:用时移到工作过程摘要,脚注不再写。
     expect(footnote.textContent).not.toContain("秒")
-    expect(footnote.textContent).toContain("3.2k tokens")
+    // 词元数按界面语言写(中文不到「万」写整数,单位是中文「词元」),不再是英文「3.2k tokens」。
+    expect(footnote.textContent).toContain("3200词元")
+    expect(footnote.textContent).not.toMatch(/tokens/i)
 
     runtime.setTimelineRows(footnoteRows({ input: 1000, output: 2100, reasoning: 100, cache: { read: 0, write: 0 } }))
     await flush()
@@ -3615,8 +3621,8 @@ describe("#1474 进行中的工作过程:实时标题 / 最近两步 / 已等 / 
     expect(row.getAttribute("data-wait")).toBe("approval")
     expect(row.querySelector("[role='status']")).toBe(status)
     expect(titleOf(host)).toBe("等待你的决定")
-    expect(row.querySelector(".a-tl-pf-hint")!.textContent).toBe("生成已暂停,到审批窗口里选择")
-    expect(status.textContent).toBe("等待你的决定 生成已暂停,到审批窗口里选择")
+    expect(row.querySelector(".a-tl-pf-hint")!.textContent).toBe("生成已暂停，到审批窗口里选择")
+    expect(status.textContent).toBe("等待你的决定 生成已暂停，到审批窗口里选择")
     expect(row.querySelector(".a-tl-pf-sum .a-tl-pf-pulse")).toBeNull()
     expect(row.querySelector(".a-tl-pf-sum [data-codepuppy-process-segment='elapsed']")).toBeNull()
     expect(row.querySelector(".a-tl-pf-pause")!.getAttribute("aria-hidden")).toBe("true")
@@ -3628,7 +3634,7 @@ describe("#1474 进行中的工作过程:实时标题 / 最近两步 / 已等 / 
     await flush()
     expect(row.getAttribute("data-wait")).toBe("question")
     expect(titleOf(host)).toBe("等你回答")
-    expect(status.textContent).toBe("等你回答 生成已暂停,到输入框上方的提问卡回答")
+    expect(status.textContent).toBe("等你回答 生成已暂停，到输入框上方的提问卡回答")
     expect(row.querySelector("[data-codepuppy-process-step='tool']")!.getAttribute("data-tone")).toBe("run")
 
     runtime.setTimelineTurnWait(undefined)
@@ -3705,7 +3711,7 @@ describe("#1474 进行中的工作过程:实时标题 / 最近两步 / 已等 / 
     heard.push(status.textContent ?? "")
 
     expect(row.querySelector("[role='status']")).toBe(status)
-    expect(heard).toEqual(["正在生成", "正在生成", "等待你的决定 生成已暂停,到审批窗口里选择", "正在生成"])
+    expect(heard).toEqual(["正在生成", "正在生成", "等待你的决定 生成已暂停，到审批窗口里选择", "正在生成"])
     expect(heard.filter((text, index) => index === 0 || text !== heard[index - 1])).toHaveLength(3)
   })
 
@@ -4010,7 +4016,7 @@ describe("#1475 步骤行:动作名 · 对象 · 行尾 / 行内来源 / 提问 
     // #1576:快照没有 location ⇒ 非内置步骤行尾写「位置未知」。
     expect(lineText(mcpItem!)).toEqual({ verb: "fs-srv", object: "read", end: "位置未知" })
     expect(mcpItem!.querySelector("[data-codepuppy-safe-card]")!.textContent).toBe(
-      "这个工具来自第三方(fs-srv),我们不显示它收到和返回的内容。",
+      "这个工具来自第三方（fs-srv），我们不显示它收到和返回的内容。",
     )
     // 开发者详情仍在详情底部、默认折叠。
     expect(mcpItem!.querySelector<HTMLDetailsElement>("[data-codepuppy-dev-details]")!.open).toBe(false)
@@ -4110,7 +4116,7 @@ describe("#1475 步骤行:动作名 · 对象 · 行尾 / 行内来源 / 提问 
     const [bash, fetch] = [...host.querySelectorAll("[data-codepuppy-tool-card]")]
     expect(lineText(bash!)).toEqual({ verb: "运行", object: "清理构建目录", end: "没等到你批准" })
     const note = bash!.querySelector("[data-codepuppy-ask-timeout-card]")!
-    expect(note.querySelector("[data-codepuppy-ask-timeout]")!.textContent).toBe("审批已超时,未获批准")
+    expect(note.querySelector("[data-codepuppy-ask-timeout]")!.textContent).toBe("审批已超时，未获批准")
     expect(bash!.querySelector(".a-tc-err")).toBeNull()
     expect(bash!.textContent).not.toContain("常见原因")
     expect(bash!.textContent).not.toContain("没有**被放行")
@@ -4618,7 +4624,7 @@ describe("#1588 AC3 回合错误卡:五类按错误名与状态码认,标题与�
       runtime.getIntentLog().turnErrorExits.length = 0
       runtime.setTimelineRows(causeRows({ name: "APIError", data: { ...data, statusCode: 402, isRetryable: false } }))
       await flush()
-      expect(card(host).querySelector("b")!.textContent).toBe("这个模型暂时不可用,请换一个模型再试")
+      expect(card(host).querySelector("b")!.textContent).toBe("这个模型暂时不可用，请换一个模型再试")
       expect(visibleText(host)).not.toContain("余额或会员不足")
       expect(card(host).textContent).not.toContain("充值")
       expect(buttons(host).map((button) => button.textContent)).toEqual(["换模型"])
@@ -4643,10 +4649,10 @@ describe("#1588 AC3 回合错误卡:五类按错误名与状态码认,标题与�
 
   const table = [
     { error: { name: "APIError", data: { message: RAW, statusCode: 402, isRetryable: false } }, title: "余额或会员不足", actions: ["充值", "换模型"], exits: ["recharge", "chooseModel"] },
-    { error: { name: "APIError", data: { message: "Unauthorized", statusCode: 401, isRetryable: false } }, title: "登录或 Key 无效", actions: ["重新登录", "去设置"], exits: ["signIn", "openSettings"] },
-    { error: { name: "APIError", data: { message: "Forbidden", statusCode: 403, isRetryable: false } }, title: "登录或 Key 无效", actions: ["重新登录", "去设置"], exits: ["signIn", "openSettings"] },
-    { error: { name: "ProviderAuthError", data: { providerID: "deepseek", message: "invalid api key" } }, title: "登录或 Key 无效", actions: ["重新登录", "去设置"], exits: ["signIn", "openSettings"] },
-    { error: { name: "APIError", data: { message: "rate limited", statusCode: 429, isRetryable: true } }, title: "请求太频繁,稍后再试", actions: [], exits: [] },
+    { error: { name: "APIError", data: { message: "Unauthorized", statusCode: 401, isRetryable: false } }, title: "登录状态或 API 密钥无效", actions: ["重新登录", "去设置"], exits: ["signIn", "openSettings"] },
+    { error: { name: "APIError", data: { message: "Forbidden", statusCode: 403, isRetryable: false } }, title: "登录状态或 API 密钥无效", actions: ["重新登录", "去设置"], exits: ["signIn", "openSettings"] },
+    { error: { name: "ProviderAuthError", data: { providerID: "deepseek", message: "invalid api key" } }, title: "登录状态或 API 密钥无效", actions: ["重新登录", "去设置"], exits: ["signIn", "openSettings"] },
+    { error: { name: "APIError", data: { message: "rate limited", statusCode: 429, isRetryable: true } }, title: "请求太频繁，稍后再试", actions: [], exits: [] },
     { error: { name: "ContextOverflowError", data: { message: "prompt is too long" } }, title: "对话太长", actions: ["新对话", "换模型"], exits: ["newSession", "chooseModel"] },
   ]
 

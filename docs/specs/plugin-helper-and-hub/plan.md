@@ -1207,3 +1207,73 @@ Q3/Q4 的代码事实：启动注入把账本停用的 MCP/助手写进引擎**�
 
 - 2026-11-18 · 本片改为方案 C（编排器裁决）；方案 A 的改动、顺序与证明各行保留为待修订后的计划，不在本片实施 · `4dda3ef97f`。
 - 2026-11-18 · 红例模拟重载最初只保留 sessionStorage；测试进程里它跨用例留存，改为按真实信号（导航类型 reload）模拟并加「新窗口不恢复」对照（本车道自加用例的设置更正）· `5cb3ad8d6a`。
+
+## I-11 方案 A：开关只影响该连接器
+
+- 依据：[Issue alpha-code#1724](https://github.com/impharaon/alpha-code/issues/1724)；[SPEC-plugin-helper-and-hub v5](https://github.com/impharaon/alpha-work/blob/b21a02a48d4d2cc791e10a6a69f27f94d8174437/docs/specs/plugin-helper-and-hub/spec.md) AC-12、AC-13（待决 1「立即生效」）；[DESIGN-plugin-helper-and-hub v9](https://github.com/impharaon/alpha-work/blob/e297202ec050e62d9ecd1155d556c125f4e91fce/docs/specs/plugin-helper-and-hub/design.md)（fix-then-freeze）§2 G-21…G-30、§4.4「受管全局 MCP 的开启状态」（收口、启动内联层、官方配方的可运行性、运行时收敛）、§5「MCP 组件开关」与「生效范围投影」、§6、§10 v9-1…v9-9 与「实施须证明」、传播记录。代码基线 C′ = `alpha@4cc001ac84`（0.2.2，方案 C 已发）。本节取代上一节「改动（方案 A，暂缓）」及其顺序/证明各行；上一节「前提核实」Q1…Q4 原样复用，不重测。
+- 核对：待实施首个提交按编排器续派的 `Phase:` 行填写。
+
+### 改动
+
+| 文件 | 改什么 |
+| --- | --- |
+| `packages/ext/src/package-scope.ts` | 允许集 v3 的类型与唯一解码（design §4.4 代码块；只认 `v:3`）；新增 `managedMcpAllowedHere`；`managedSkillAllowedHere` / `scopedPackageAllowedHere` 改收 v3，判定不变 |
+| `packages/ext/src/gen-skill-paths.ts` | `readPackageAllowSet` 返回 v3；技能注入（`keys ∪ scoped(skill)`）不变 |
+| `packages/ext/src/plugin.ts` | `mcp.transform` 按 §4.4「收口」取代 `:349-356` 的 `scoped` 循环：跳过云 MCP 与本次 `applyProjectMcp` 返回的名字，其余按允许集设 `disabled` |
+| `packages/ui-mac/src/main/ext-receipt-v2.ts` | 唯一写入方 `enabledPackageAllowSet` 产出 v3（加 `mcp`，`scoped` 的 MCP 项同样排除不可运行官方配方名）；`writeLedgerFile` 收窄规则加 `mcp`；`readDerivation` 读 v3。本模块持有 `OfficialRuntimeUnavailableV1`（进程启动 = 全部官方配方名）与它的更新入口：先改集合，再在 bundle 锁下沿 `reconcileSkillsDerivation` 同一路径重发；锁忙时异步有界重试，调用方可等待其完成 |
+| `packages/ui-mac/src/main/ext-disabled-injection.ts` | MCP 只为会话级授权强制停用写 `disabled`；删去「账本停用」与「仅当前项目」两支及其允许集/包图读取；agent 不变 |
+| `packages/ui-mac/src/main/official-connector-resources.ts` | 把 `restoreCommittedOfficialConnectors` 循环体抽成按名的最终状态步骤（读该名账本意图，版本取自现有叶子；开 = `restoreOfficialConnector`，关 = 写空），按结果更新不可运行集合；启动循环与收敛共用它。启动恢复失败分支保留该版本完整定义（叶子与远程记录，凭据写空，叶子启停字段随账本），不再 `removeMcpServerRecord`；只有给不出完整定义时照旧 |
+| `packages/ui-mac/src/main/package-mcp-activation.ts` | `applyPackageMcpV1` / `removePackageMcpV1` 原处改造为 `convergeManagedMcp(names)`（§4.4「运行时收敛」）：main 里一个实例持有按名队列（同名串行、执行中再被请求则结束后再跑一次、不同名不互等）；每次执行开始时读已发布允许集、账本定义、已加载 Location；官方配方名在应用前（意图开）或断开后（意图关）跑上一行的凭据步骤并等重发完成；每个 Location 的项目根取法同 ext 的 `projectRootFor`（`projectDirectoryIdentity`）；关时只拒该名自己的待答审批再断开，名字不在账本则 remove；结果按引擎回读。`packageAppliesAt` 保留（`hub-view.ts:202,394` 在用） |
+| `packages/ui-mac/src/main/ext-ipc.ts` | 建上面那一个收敛实例；所有请求方改为对涉及的名字请求它：`setInstallState`（持久写返回后成败都请求；删去官方/第一方的 `connectorChange`、`reload-pending` 与 `officialRuntime` 前置拒绝）、`setPackageState`（同；技能等非 MCP 组件的重载与 cloud/agent/command 的 `connectorChange` 不变）、`savePackageSecrets`（请求收敛；名字在本代启动时 main 读到的远程记录集合里则另请求 `connectorChange`，v9-9）、`installFromSource`、重载报告后的重应用（`:149-157`）、离场组件与整包移除（取代 `removePackageMcpV1`）、`uninstallV2` 的全局 MCP。`persistMcp`、含远程记录的整包移除、官方包安装/卸载的 stop/refresh 不变 |
+| `packages/ui-mac/src/main/package-admission.ts` | `savePackageSecretsV1` 删去 `:603` 的直接 `restoreCommittedOfficialConnectors()`（物化改由收敛执行）；安装路径 `:1299` 不动 |
+| `packages/ui-mac/src/main/server.ts` | fork 前恢复之后等不可运行集合的重发完成再 fork；记下 `:238` 本代出网派生读到的远程记录名并只读暴露给 `ext-ipc` |
+| `packages/ui-mac/src/renderer/extensions/extension-hub.tsx` | 有账本记录的 MCP 开关（`runStateToggle`、`finishEnable`）不再调 `setMcpConnected`；`packBusy` 由单值改为一组包 ID。无账 live 条目、会话级授权、云 MCP 唤起不变 |
+| `packages/ui-mac/src/renderer/extensions/use-extensions.ts` | `setInstallState` 删去对 MCP 的拒审批循环（`:923-941`）；`uninstall` 对有账本记录的全局 MCP 不再 disconnect |
+| `packages/ui-mac/test-component/managed-mcp-toggle.engine.cases.ts`（新）+ `packages/ui-mac/src/main/managed-mcp-toggle.engine.test.ts`（新宿主，钉条数） | 真引擎证明：生产 `injectCodePuppyConfig` + 真 ext（`test-component/codepuppy-engine.ts`），真 stdio MCP `core/test/fixture/codepuppy-mcp-startup-stdio.ts`（每次 tools/call 记一行），远程端用 `core/test/fixture/mcp-echo` 处理器经进程内 fetch 替身；开关只经生产 set-state + `convergeManagedMcp` |
+| `packages/ui-mac/test-component/codepuppy-engine.ts` | 起引擎前用生产启动对账的同一生产者（`reconcileSkillsDerivation`）发布允许集——没有它 v3 收口会停掉夹具的 `probe`；加 Location 重载计数与按路由的派发拦截（证明 3、9） |
+| `packages/ui-mac/test-component/official-connectors.cases.ts` | review 用例的 `apply` 改为收敛；新增证明 4（官方部分）、7、8；「desktop SQLite package」用例保存后经收敛物化（原断言由 `savePackageSecretsV1` 内的直接恢复满足，属被替代行为） |
+| `packages/ui-mac/test-component/official-connectors-recovery.cases.ts` | 失败项断言改为：账本仍开、叶子与远程记录保留同一完整定义、凭据为空、允许集该名为关（原断言「叶子 `enabled:false`、记录被删」是被替代行为） |
+| `packages/ui-mac/test-component/package-install-engine-reload.cases.ts` | #1646 AC1/AC2 与 #1652 四条改写为新行为（0 次 `connectorChange`/重载请求、渲染进程 0 次 connect/disconnect/reply）；加证明 6 对照；v9-9 两向 |
+| `packages/ui-mac/src/renderer/codepuppy-ui/permission-mount-ratchet.test.ts` | 去掉 `use-extensions.ts` 的 reject-only 白名单项与「#1652 Hub permission exception…」用例（入口已不存在）；main 那一项保留 |
+| 机械同步的既有测试 | v3 形状 / 收敛入口 / 内联层不再写受管 MCP：`ext/src/package-scope.test.ts`、`gen-skill-paths.test.ts`、`plugin-host.test.ts`；ui-mac `ext-receipt-v2.test.ts`、`ext-disabled-injection.test.ts`、`ext-boot-reconcile.test.ts`、`ext-session-grants.test.ts`、`ext-set-state-tx.test.ts`、`install-from-source.test.ts`、`codepuppy-config-injection.test.ts`、`config-injection-throat.test.ts`、`engine-explicit-config.test.ts`、`package-mcp-activation.test.ts`、`codepuppy-config-injection-engine.cases.ts`、`composer-tier-matrix.engine.cases.ts`、`plugin-entrypoints.engine.cases.ts`、`package-effect.engine.cases.ts`、`install-from-source.engine.cases.ts`、`mcp-server-derivation.engine.cases.ts`、`test-component/package-mixed-bundle.wiring.cases.ts`、`test-component/ext-install-catalog-result.cases.ts`；每处只改编码旧行为或旧形状的断言 |
+| 文档 | design 传播记录点名的三处：`docs/contracts/extension-install-ledger.md:157,177,195`、`docs/specs/upgrade-extension-manifest/design.md:58`、`docs/architecture/2026-09-10-network-egress-on-process-fence.md:409`；`docs/architecture/constraints.md` 的 #1652 行（渲染进程拒审批入口消失后删行，该文件只记现存事实）；`scripts/gate-files.tsv` 新宿主一行与变动行的精确条数；本节偏离记录 |
+
+### 顺序
+
+1. **红例**（单独提交，不登记 gate-files）：`managed-mcp-toggle.engine.cases.ts` 的证明 1、2、9 先用 C′ 现有入口（set-state + `applyPackageMcpV1`）写，实跑记下失败输出（预期：1 回到 disabled、2 回到 connected、9 停在 connected）。跑：`cd packages/ui-mac && bun test --timeout 180000 test-component/managed-mcp-toggle.engine.cases.ts`。
+2. **投影与收口**（一个提交，ext 与 main 共用同一解码，不能分开落）：`package-scope.ts`、`gen-skill-paths.ts`、`plugin.ts`、`ext-receipt-v2.ts`（v3、收窄、不可运行集合与重发）、`ext-disabled-injection.ts`、`codepuppy-engine.ts` 发布允许集；同步上表 v3 / 内联层相关测试。跑：ext `bun test src/package-scope.test.ts src/gen-skill-paths.test.ts src/plugin-host.test.ts`；ui-mac `bun test src/main/ext-receipt-v2.test.ts src/main/ext-disabled-injection.test.ts src/main/ext-boot-reconcile.test.ts src/main/ext-session-grants.test.ts src/main/ext-set-state-tx.test.ts src/main/install-from-source.test.ts src/main/codepuppy-config-injection.test.ts src/main/config-injection-throat.test.ts src/main/engine-explicit-config.test.ts`，以及宿主 `src/main/codepuppy-config-injection-engine.test.ts`、`src/main/composer-tier-matrix.engine.test.ts`、`src/main/plugin-entrypoints.engine.test.ts`、`src/main/mcp-server-derivation.test.ts`、`src/main/package-effect.engine.test.ts`、`src/main/package-admission.parity.test.ts`（`package-mixed-bundle` wiring）。此时证明 1、2 转绿，9 仍红。
+3. **收敛与官方配方**：`package-mcp-activation.ts`、`official-connector-resources.ts`、`server.ts`、`package-admission.ts`、`ext-ipc.ts`；红例切到 `convergeManagedMcp`，补证明 3（引擎部分）、4（Office 部分）、5（引擎部分）、9，建宿主；`official-connectors*.cases.ts` 改写与证明 4（官方）、7、8。跑：`src/main/managed-mcp-toggle.engine.test.ts`、`src/main/official-connectors.test.ts`、`src/main/official-connectors-recovery.test.ts`、`src/main/package-effect.engine.test.ts`、`src/main/package-hub-lifecycle.engine.test.ts`、`src/main/install-from-source.engine.test.ts`、`src/main/ext-write-channels.test.ts`（`ext-install-catalog-result` 宿主）、`src/main/package-mcp-activation.test.ts`、`src/main/reload-coordinator.test.ts`、`src/main/hub-view.test.ts`。
+4. **渲染进程**：`extension-hub.tsx`、`use-extensions.ts`；改写 `package-install-engine-reload.cases.ts`（证明 3 wiring 部分、6、v9-9）与 permission 棘轮。跑：`src/renderer/extensions/package-install-engine-reload.test.ts`、`src/renderer/codepuppy-ui/permission-mount-ratchet.test.ts`、`src/renderer/extensions/hub-three-pages.test.ts`。
+5. **文档与登记**：传播三处、constraints 行、`gate-files.tsv` 精确条数（按实测写回）、本节偏离记录；跑 ext 与 ui-mac `bun run typecheck`、`python3 -I scripts/check-doc-links.py <改动的文档>`。
+
+### 风险
+
+- **允许集读不到即全停**（§5）作用于一切非云、非项目 MCP，含没有账本记录的 `codepuppy.jsonc` 条目。任何不经启动对账就起真 ext 的测试夹具都会因此变红；第 2 步让 `codepuppy-engine.ts` 走生产生产者发布允许集，并实跑上面列出的全部真引擎宿主，不靠改断言放行。
+- **不可运行集合在进程启动时为全部官方配方名**：启动对账先发布的允许集里官方配方为关，直到 fork 前恢复成功后重发放宽。重发锁忙时有界重试；放弃时只记一行，集合仍在内存里，之后任何账本写都按它算（只会更窄，不会更宽）。
+- **启动恢复与收敛的串行**：启动恢复保持同步、不进收敛队列——fork 前去等队列会与收敛里等待新 sidecar 的 `awaitServer` 互等。正确性仍按 §4.4 的论证成立：凭据步骤各是一段同步代码，彼此不会交错；停在引擎调用上的收敛恢复执行时若账本意图已变，那次变更必然已排上一次重跑，最后一次执行按最终投影。证明 8、9 覆盖这条论证依赖的两种交错。
+- **Office 真服务器不起**：随包 Python 运行时构建要十几分钟（`attachment-read-roundtrip.test.ts` 的 900 s 超时）。证明 4 的 Office 部分用 Office 身份的记录（`mcp:codepuppy-pdf`）配真 stdio 夹具、命令里带 `{workspace}` 占位，走的是 Office 开关真正经过的那几段（入口不换代、ext 收口、策略替换 `{workspace}`、运行时 add）；没有证明 server.py 自身，这一点在回报里如实写明。
+- **官方配方真引擎用例的根目录对齐**：`official-connectors.cases.ts` 的环境根（`initCodePuppyEnvironment`）与 `codepuppy-engine.ts` 的全局根必须是同一个；对不上时改为在该用例里直接调生产 `injectCodePuppyConfig` 组装内联文档与显式文件（`package-effect.engine.cases.ts` 的做法），不手写配置。
+- **被拒审批的说明文字**：渲染进程原来带本地化的「连接器已停用」；main 的拒绝与今天包开关路径一致，不带 `message`（协议里是可选字段）。不在本片补，回报里列为观察。
+- **范围**：预计实施 3–4 h；第 3 步最大。耗时翻倍即停下回报，不扩大。
+
+### 证明
+
+| AC | 测试/证据 | 缺少行为为什么会失败 |
+| --- | --- | --- |
+| AC-12（证明 1） | `managed-mcp-toggle`「启动时停用的连接器运行时开启后，Location 重建与另一个项目里仍开启」：账本停用起引擎 → set-state 开 + 收敛 → 已有会话可调用（调用计数 +1）→ `POST /api/location/reload` 后仍 connected → 另一项目目录的新 Location 里 connected | 去掉 ext 收口或内联层仍写受管 MCP 的 `disabled` ⇒ 重建后与新 Location 回到 disabled（Q3/Q4，第 1 步红例实测） |
+| AC-12（证明 2） | 同文件「远程连接器记录运行时关闭后，Location 重建仍关」：远程记录启动开启 → set-state 关 + 收敛 → 重建后与新 Location 都是 disabled，替身零新请求 | 去掉收口 ⇒ 内联层里 `enabled:true` 的定义在重建后重新连上 |
+| AC-13（证明 3） | 引擎：同文件「拨开关不取消另一会话的审批」：请求审批档下会话 A 停在另一工具的审批上、会话 B 停在被关连接器的审批上 → 关闭 → 只有 B 的请求被拒，A 的请求仍在，批准后 A 本轮正常结束；Location 重载计数 0；另一臂：账本锁被占、写入失败后请求收敛，B 的审批仍在。wiring：`package-install-engine-reload`「Office / 官方 / 普通连接器开关」：`connectorRefreshes` 不变、无重载请求、渲染进程 connect/disconnect/reply 均为 0 | 留着 `connectorChange` ⇒ 换代计数 +1（今天 #1646/#1652 用例正是断言这个）；按名判定写错 ⇒ A 也被拒；收敛携带请求方意图 ⇒ 写入失败那臂也拒了 B |
+| AC-12/13（证明 4） | Office：`managed-mcp-toggle`「Office 身份连接器启动关→开→可调用、开→关→已有会话调不到，不换代」；官方：`official-connectors`「官方 GitHub 启动关→运行时开→已有会话调用成功，开→关→调不到，之后加载的 Location 随开关；Location 重载 0」 | 去掉收口 ⇒ Office 重建后回到 disabled；官方开启不先物化凭据 ⇒ 替身收到空 Bearer 返回 401、调用失败；留着换代路径 ⇒ wiring 换代计数 +1 |
+| 证明 5（§5 失败态） | `plugin-host.test.ts`「允许集读不到或不认识：非云、非项目 MCP 全部停用」（缺失、坏 JSON、v2 形状、`mcp` 重名四种输入；云 MCP 与项目 MCP 照旧）；引擎：`managed-mcp-toggle` 写坏允许集后新建 Location，受管连接器与无账 `probe` 均为 disabled | 去掉「读不到即全停」分支 ⇒ 受管条目按配置文档层的启停值打开 |
+| 证明 6（对照） | `package-install-engine-reload`「含 cloud 组件的包（`package:cloud-image`）开关仍换代」：空闲后 `connectorRefreshes` +1 | 把 cloud 一并改成只收敛 ⇒ 计数不变 |
+| 证明 7 | `official-connectors`「仅当前项目的 dbhub：SQLite 移走后的下一代恢复，账本仍开、允许集 `scoped` 不含它、匹配项目里 `managedMcpAllowedHere` 为假；文件放回并收敛后为真」（`installDesktopPackageV1` 带 `effect`，真 SQLite 文件） | 去掉 `scoped` 对不可运行集合的排除 ⇒ 匹配项目里为真，会以空 DSN 启动 |
+| 证明 8 | `official-connectors`「已开启的官方 GitHub 关闭时配置写被迫失败、账本回滚为开：运行时凭据文件字节不变，之后加载的 Location 带原 PAT 连上」（`applyConfigImage` 只在这一次被替换为抛错） | 凭据清空按请求方向执行 ⇒ 文件为空，新 Location 收到空 Bearer、401 |
+| 证明 9 | `managed-mcp-toggle`「同一连接器开的 `add` 被拖住期间完成一次关：最终 disabled，与账本一致」（派发拦截把该名的 `PUT /api/experimental/mcp/:server` 挂起，关完成后放行） | 去掉按名串行 ⇒ 旧开的 `connect` 落在关的 `disconnect` 之后，停在 connected（第 1 步红例实测） |
+| §4.4 收窄 | `ext-receipt-v2.test.ts`「`mcp` 的收窄：两版名字取并集、两版都开才开；当前版不可知时全部为关；最终发布失败停在更窄态」（用现有 `SkillsFinalPublish` 注入面） | 收窄不含 `mcp` ⇒ 发布失败后新开启的名字已在允许集里为开 |
+| G-30 / v9-8 | `official-connectors-recovery`「启动恢复失败的官方配方保留完整定义」：GitHub 解密失败后远程记录与叶子仍是真实地址的完整定义、凭据为空、允许集为关，没有 `127.0.0.1:1` 中和条目 | 照旧删远程记录 ⇒ 记录缺失，之后加载的项目拿到中和条目 |
+| v9-9 | `package-install-engine-reload`「更换本代启动时已有的远程连接器凭据 ⇒ 换代；本代中途新装者第一次填令牌 ⇒ 只收敛」 | 不判本代启动集合 ⇒ 两向计数相同 |
+| AC-12/13 既有行为 | `package-hub-lifecycle.engine.test.ts`（技能开关进出可调用清单）、`package-effect.engine.test.ts`（仅当前项目隔离与去抖窗口）照旧全绿 | — |
+
+### 偏离记录
+
+暂无。

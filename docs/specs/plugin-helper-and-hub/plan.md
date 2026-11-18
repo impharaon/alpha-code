@@ -1211,7 +1211,7 @@ Q3/Q4 的代码事实：启动注入把账本停用的 MCP/助手写进引擎**�
 ## I-11 方案 A：开关只影响该连接器
 
 - 依据：[Issue alpha-code#1724](https://github.com/impharaon/alpha-code/issues/1724)；[SPEC-plugin-helper-and-hub v5](https://github.com/impharaon/alpha-work/blob/b21a02a48d4d2cc791e10a6a69f27f94d8174437/docs/specs/plugin-helper-and-hub/spec.md) AC-12、AC-13（待决 1「立即生效」）；[DESIGN-plugin-helper-and-hub v9](https://github.com/impharaon/alpha-work/blob/e297202ec050e62d9ecd1155d556c125f4e91fce/docs/specs/plugin-helper-and-hub/design.md)（fix-then-freeze）§2 G-21…G-30、§4.4「受管全局 MCP 的开启状态」（收口、启动内联层、官方配方的可运行性、运行时收敛）、§5「MCP 组件开关」与「生效范围投影」、§6、§10 v9-1…v9-9 与「实施须证明」、传播记录。代码基线 C′ = `alpha@4cc001ac84`（0.2.2，方案 C 已发）。本节取代上一节「改动（方案 A，暂缓）」及其顺序/证明各行；上一节「前提核实」Q1…Q4 原样复用，不重测。
-- 核对：待实施首个提交按编排器续派的 `Phase:` 行填写。
+- 核对：plan `98abd8a8f0` · 编排器 Claude Opus 5.5 · 通过（每条证明在且可失败，范围在派发内）。附裁决：① 启动（fork 前）恢复不进收敛队列，接受为设计「按名串行」的落地，须加一条「启动恢复期间请求收敛」不交错的测试；② 已撤回（见偏离记录）；③ `package-mcp-oauth.ts:76` 的运行时 add 须经收敛入口，若死锁或破坏 OAuth 流程则返回 `BLOCKED: design`；`package-admission.ts:1299` 的同步恢复保留。
 
 ### 改动
 
@@ -1276,4 +1276,5 @@ Q3/Q4 的代码事实：启动注入把账本停用的 MCP/助手写进引擎**�
 
 ### 偏离记录
 
-暂无。
+- 2026-11-18 · 被拒审批不带说明文字：编排器裁决 ② 曾要求 main 拒绝时带渲染进程原来的本地化原因，随后撤回。owner（2026-11-18）原话：「逻辑尽可能简洁，不必要的 连接器已停用的 说明是否有必要。」保持本节原计划：main 拒绝不带可选 `message` · 本提交。
+- 2026-11-18 · 红例经宿主跑：本机测试闸门只认 `*.test.ts`，所以宿主 `src/main/managed-mcp-toggle.engine.test.ts` 随红例一起落（条数在转绿时按实测钉），顺序第 1 步的命令改为 `bun test src/main/managed-mcp-toggle.engine.test.ts`。C′ 上实跑 3 fail：证明 1 重建后 `disabled`（Q3）、证明 2 重建后 `connected`（坐实 design「仍属推断」②）、证明 9 停在 `connected` · 本提交。

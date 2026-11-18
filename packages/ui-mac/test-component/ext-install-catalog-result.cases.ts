@@ -423,11 +423,15 @@ test("A3 canary stays in main secret files while the production tool/bridge/main
  const context={location:{directory:join(root,"workspace")},permission:{assert:async(input:unknown)=>{asks.push(input);throw Error("chat must not assert")}}}
  const ctx={sessionID:"ses_canary",messageID:"msg_canary",agent:"build",id:"call_canary",signal:new AbortController().signal,progress:async()=>{}}
  const args={id:canaryEntry.id}
- const install=createHubTools(bridge,context as never).find(tool=>tool.name==="codepuppy_hub_install")!
+ // I-10:执行闸的那一次审批由生产 policy.askInstall 承接(plugin-host.test.ts 的 I-10 用例判);这里记下它被调用、视为已允许,
+ // 它收到的调用身份同样进金丝雀扫描面。
+ const approvals:unknown[]=[]
+ const install=createHubTools(bridge,context as never,async call=>void approvals.push(call)).find(tool=>tool.name==="codepuppy_hub_install")!
  const result=await install.execute(args,ctx as never)
  expect(asks).toEqual([])
+ expect(approvals).toEqual([{sessionID:"ses_canary",messageID:"msg_canary",id:"call_canary"}])
  expect(result).toMatchObject({metadata:{packageId:canaryEntry.id,stage:"committed"}})
- for(const surface of [args,result,asks,wire,toSidecar])expect(JSON.stringify(surface)).not.toContain(value)
+ for(const surface of [args,result,asks,approvals,wire,toSidecar])expect(JSON.stringify(surface)).not.toContain(value)
  expect(wire.some(message=>(message as {type:string}).type==="codepuppy.hub.install.request")).toBe(true)
  expect(wire.some(message=>(message as {type:string}).type==="codepuppy.hub.request.reply")).toBe(true)
  expect(await bridge.packageAuthorization("not-in-ledger")).toMatchObject({ok:false})

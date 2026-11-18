@@ -64,6 +64,7 @@ import type { AuthorizationConfirmationWire, CapabilityDiffWire } from "../../sh
 import type { Catalog, CatalogEntry, InstalledState } from "./catalog-types"
 import type { AuthState, InstallReceipt, InstallReceiptType, ProvenanceRequest, InstalledPackageV1 } from "../../preload/types"
 import { hubSection, installedRowKey, setHubSection, takeHubLocateTarget, takePackageManagementTarget, type HubSection } from "./ext-hub-state"
+import { parseFailureCode } from "@opencode/schema/codepuppy-net-failure"
 import { extensionError, mcpFailureReason, catalogDescription, iconFor, iconForRow, MoreMenu, PackageLogo, typeLabel, Svg, SearchIc, type MoreMenuItem } from "./ext-presentation"
 import { inventoryInstallRow, healthPresentation } from "./ext-inventory-present"
 import { ExtensionDetail, InstalledPackageDetail, type DetailTarget } from "./extension-detail"
@@ -1617,13 +1618,15 @@ export function ExtensionHub(props: {
           pack().components.some((component) => component.componentId === row.id) &&
           row.stateReason?.code === "reload-failed",
       )
-      if (failedReload)
+      // `#1724`:main 的重载失败原因是内部文本(可能带引擎登记码);行上只说本地化的短原因,原文进开发者详情。
+      if (failedReload) {
+        const raw = failedReload.stateReason?.detail
         return {
           kind: "error" as const,
-          text: t("codepuppy.ext.packageEnableFailed", {
-            reason: failedReload.stateReason?.detail ?? t("codepuppy.ext.hubReasonFailed"),
-          }),
+          text: t("codepuppy.ext.packageEnableFailed", { reason: mcpFailureReason(raw ? parseFailureCode(raw)?.code : undefined) }),
+          raw,
         }
+      }
       // `#1724`:开启时缺令牌 / 缺登录的连接器在引擎里本来就连不上,hub-view 会一直给 reload-pending ——
       // 缺的前置项必须先说,不然行永远停在「正在生效」。
       const auth = pack().desiredState === "enabled" ? authorization() : undefined

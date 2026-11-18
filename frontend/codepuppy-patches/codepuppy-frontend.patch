@@ -2699,10 +2699,22 @@ index 8f91b46af..dcb1525da 100644
 +  "session.draft.missing.action": "Back to home",
  }
 diff --git a/packages/app/src/i18n/en.ts b/packages/app/src/i18n/en.ts
-index 62d4dc1ae..b9bfc4cb3 100644
+index 62d4dc1ae..95bb31db8 100644
 --- a/packages/app/src/i18n/en.ts
 +++ b/packages/app/src/i18n/en.ts
-@@ -736,6 +736,13 @@ export const dict = {
+@@ -670,8 +670,9 @@ export const dict = {
+   "session.tab.context": "Context",
+   "session.tab.unknown": "Unknown Session",
+   "session.panel.reviewAndFiles": "Review and files",
+-  "session.error.notFound": "This session cannot be found",
+-  "session.error.notFound.description": "This tab points to a session that no longer exists on this server.",
++  "session.error.notFound": "This conversation can't be found",
++  "session.error.notFound.description": "It may have been deleted.",
++  "session.error.notFound.newChat": "Back to a new conversation",
+   "session.error.notFound.closeTab": "Close Tab",
+   "session.error.serverConnection": "Can't connect to this server",
+   "session.review.filesChanged": "Files Changed {{count}}",
+@@ -736,6 +737,13 @@ export const dict = {
    "session.new.git.none": "No Git",
    "session.new.lastModified": "Last modified",
  
@@ -3394,10 +3406,22 @@ index 06fda4ce7..2692d9fd8 100644
 +  "session.draft.missing.action": "Back to home",
  }
 diff --git a/packages/app/src/i18n/zh.ts b/packages/app/src/i18n/zh.ts
-index b0ba04534..368b3ed00 100644
+index b0ba04534..dca7e60db 100644
 --- a/packages/app/src/i18n/zh.ts
 +++ b/packages/app/src/i18n/zh.ts
-@@ -800,6 +800,11 @@ export const dict = {
+@@ -745,8 +745,9 @@ export const dict = {
+   "session.tab.context": "上下文",
+   "session.tab.unknown": "未知会话",
+   "session.panel.reviewAndFiles": "审查和文件",
+-  "session.error.notFound": "找不到此会话",
+-  "session.error.notFound.description": "此标签页指向的会话已不存在于此服务器上。",
++  "session.error.notFound": "找不到这段对话",
++  "session.error.notFound.description": "它可能已经被删除。",
++  "session.error.notFound.newChat": "回到新对话",
+   "session.error.notFound.closeTab": "关闭标签页",
+   "session.error.serverConnection": "无法连接到此服务器",
+   "session.review.filesChanged": "{{count}} 个文件已更改",
+@@ -800,6 +801,11 @@ export const dict = {
    "session.new.workspace.existing": "工作区…",
    "session.new.git.none": "无 Git",
    "session.new.lastModified": "最后修改",
@@ -3410,10 +3434,22 @@ index b0ba04534..368b3ed00 100644
    "session.header.searchFiles": "搜索文件",
    "session.header.openIn": "打开方式",
 diff --git a/packages/app/src/i18n/zht.ts b/packages/app/src/i18n/zht.ts
-index 6cc3d5552..185f50e15 100644
+index 6cc3d5552..3f740e97a 100644
 --- a/packages/app/src/i18n/zht.ts
 +++ b/packages/app/src/i18n/zht.ts
-@@ -1220,4 +1220,9 @@ export const dict = {
+@@ -740,8 +740,9 @@ export const dict = {
+   "session.tab.context": "上下文",
+   "session.tab.unknown": "未知的工作階段",
+   "session.panel.reviewAndFiles": "檢閱與檔案",
+-  "session.error.notFound": "找不到此工作階段",
+-  "session.error.notFound.description": "此分頁指向的工作階段已不存在於此伺服器。",
++  "session.error.notFound": "找不到這段對話",
++  "session.error.notFound.description": "它可能已經被刪除。",
++  "session.error.notFound.newChat": "回到新對話",
+   "session.error.notFound.closeTab": "關閉分頁",
+   "session.error.serverConnection": "無法連線至此伺服器",
+   "session.review.filesChanged": "{{count}} 個檔案變更",
+@@ -1220,4 +1221,9 @@ export const dict = {
    "error.childStore.persistedProjectIconCreateFailed": "建立持續性專案圖示失敗",
    "error.childStore.storeCreateFailed": "建立儲存區失敗",
    "terminal.connectionLost.abnormalClose": "WebSocket 異常關閉：{{code}}",
@@ -4081,8 +4117,33 @@ index cb58b6f8b..1d9d85284 100644
    })
  })
  
+diff --git a/packages/app/src/pages/session-not-found.tsx b/packages/app/src/pages/session-not-found.tsx
+new file mode 100644
+index 000000000..571e61b6c
+--- /dev/null
++++ b/packages/app/src/pages/session-not-found.tsx
+@@ -0,0 +1,19 @@
++// 找不到对话(新外壳稿 #not-found):Code Puppy 自己的空状态,取代继承自上游的错误页 ——
++// 一句话 + 一个出口;不写服务器名、不露对话编号,没有「标签页」的说法。
++// 版式在 ui-mac 渲染层的 session-workspace.css(`data-codepuppy-session-not-found`),这里只出结构。
++export function SessionNotFound(props: { title: string; description: string; action: string; onAction: () => void }) {
++  return (
++    <div class="flex-1 min-h-0 overflow-hidden" data-codepuppy-session-not-found="">
++      <div data-codepuppy-not-found="body">
++        <svg data-codepuppy-not-found="icon" viewBox="0 0 24 24" aria-hidden="true">
++          <path d="M5 18.5V7a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H8Z" />
++        </svg>
++        <h4>{props.title}</h4>
++        <p>{props.description}</p>
++        <button type="button" class="a-btn" data-variant="secondary" data-size="md" onClick={props.onAction}>
++          {props.action}
++        </button>
++      </div>
++    </div>
++  )
++}
 diff --git a/packages/app/src/pages/session.tsx b/packages/app/src/pages/session.tsx
-index 2e647e0f4..6058cb560 100644
+index 2e647e0f4..5b38eee33 100644
 --- a/packages/app/src/pages/session.tsx
 +++ b/packages/app/src/pages/session.tsx
 @@ -16,6 +16,7 @@ import {
@@ -4093,6 +4154,31 @@ index 2e647e0f4..6058cb560 100644
    type ParentProps,
    untrack,
  } from "solid-js"
+@@ -32,7 +33,6 @@ import { Select } from "@opencode-ai/ui/select"
+ import { SelectV2 } from "@opencode-ai/ui/v2/select-v2"
+ import { isScrollKeyTarget, scrollKey, scrollKeyOwner } from "@opencode-ai/ui/scroll-view"
+ import { Tabs } from "@opencode-ai/ui/tabs"
+-import { ButtonV2 } from "@opencode-ai/ui/v2/button-v2"
+ import { createAutoScroll } from "@opencode-ai/ui/hooks"
+ import { previewSelectedLines } from "@opencode-ai/session-ui/pierre/selection-bridge"
+ import { Button } from "@opencode-ai/ui/button"
+@@ -53,7 +53,7 @@ import { PromptProvider, usePrompt } from "@/context/prompt"
+ import { usePlatform } from "@/context/platform"
+ import { SDKProvider, useSDK } from "@/context/sdk"
+ import { useServerSDK } from "@/context/server-sdk"
+-import { ServerConnection, serverName, useServer } from "@/context/server"
++import { ServerConnection, useServer } from "@/context/server"
+ import { useSettings } from "@/context/settings"
+ import { useSync } from "@/context/sync"
+ import { useTabs } from "@/context/tabs"
+@@ -103,6 +103,7 @@ import { legacySessionHref, requireServerKey, sessionHref } from "@/utils/sessio
+ import { useUsageExceededDialogs } from "./session/usage-exceeded-dialogs"
+ import { createSessionOwnership } from "./session/session-ownership"
+ import { createSessionLineage } from "./session/session-lineage"
++import { SessionNotFound } from "./session-not-found"
+ 
+ type FollowupItem = FollowupDraft & { id: string }
+ type FollowupEdit = Pick<FollowupItem, "id" | "prompt" | "context">
 @@ -156,7 +157,7 @@ export function SessionPage() {
  // remount around the server-scoped providers. Nothing here may key on the
  // session ID: session tabs on the same server share this route instance, and
@@ -4111,7 +4197,57 @@ index 2e647e0f4..6058cb560 100644
        </SessionRouteErrorBoundary>
      </TargetServerScopedProviders>
    )
-@@ -243,7 +244,7 @@ function SessionErrorFallback(props: { error: unknown; sessionID?: string; serve
+@@ -204,46 +205,26 @@ function SessionErrorFallback(props: { error: unknown; sessionID?: string; serve
+   const language = useLanguage()
+   const server = useServer()
+   const tabs = useTabs()
+-  const displayServer = createMemo(() => {
+-    const key = props.serverKey ?? server.key
+-    const conn = server.list.find((item) => ServerConnection.key(item) === key)
+-    return conn ? serverName(conn) : key
+-  })
+-  const closeTab = () => {
+-    if (!props.sessionID) return
+-    tabs.removeSessionTab({ server: props.serverKey ?? server.key, sessionId: props.sessionID })
++  const navigate = useNavigate()
++  // 回到新对话:丢掉这条找不到的对话留下的标签(若有),再回首页(= 新对话)。
++  const backToNewChat = () => {
++    if (props.sessionID) tabs.removeSessionTab({ server: props.serverKey ?? server.key, sessionId: props.sessionID })
++    navigate("/")
+   }
+   if (isCurrentSessionNotFoundError(props.error, props.sessionID)) {
+     return (
+-      <div class="flex-1 min-h-0 overflow-hidden">
+-        <div class="h-full px-6 pb-42 -mt-4 flex flex-col items-center justify-center text-center gap-4">
+-          <div class="flex flex-col items-center gap-2">
+-            <div class="text-16-medium text-text max-w-md">{language.t("session.error.notFound")}</div>
+-            <div class="text-13-regular text-text-weak max-w-md">
+-              {language.t("session.error.notFound.description")}
+-            </div>
+-          </div>
+-          <Show when={props.sessionID}>
+-            {(sessionID) => (
+-              <div class="max-w-full flex flex-col items-center gap-1">
+-                <div class="max-w-full text-11-regular text-text-faint break-all">{displayServer()}</div>
+-                <code class="max-w-full rounded-[4px] px-1 py-0.5 font-mono text-xs font-medium leading-4 text-text-base break-all bg-[color-mix(in_oklch,var(--v2-text-text-base)_8%,transparent)]">
+-                  {sessionID()}
+-                </code>
+-              </div>
+-            )}
+-          </Show>
+-          <ButtonV2 variant="neutral" size="normal" icon="xmark-small" onClick={closeTab}>
+-            {language.t("session.error.notFound.closeTab")}
+-          </ButtonV2>
+-        </div>
+-      </div>
++      <SessionNotFound
++        title={language.t("session.error.notFound")}
++        description={language.t("session.error.notFound.description")}
++        action={language.t("session.error.notFound.newChat")}
++        onAction={backToNewChat}
++      />
+     )
+   }
    return <ErrorPage error={props.error} />
  }
  
@@ -4120,7 +4256,7 @@ index 2e647e0f4..6058cb560 100644
    const params = useParams<{ serverKey: string; id: string }>()
    const tabs = useTabs()
    const sync = useServerSync()
-@@ -272,7 +273,7 @@ function ResolvedTargetSessionRoute() {
+@@ -272,7 +253,7 @@ function ResolvedTargetSessionRoute() {
      <Show when={directory()}>
        <SDKProvider directory={targetDirectory}>
          <DirectoryDataProvider directory={targetDirectory} server={serverKey}>
@@ -4129,7 +4265,7 @@ index 2e647e0f4..6058cb560 100644
          </DirectoryDataProvider>
        </SDKProvider>
      </Show>
-@@ -282,12 +283,18 @@ function ResolvedTargetSessionRoute() {
+@@ -282,12 +263,18 @@ function ResolvedTargetSessionRoute() {
  // Owns the workspace-identity remount. Must not include the session ID in the
  // key: SessionPage handles session changes reactively, and remounting here
  // destroys workspace-scoped state (terminal PTYs, file/prompt providers).
@@ -4150,7 +4286,7 @@ index 2e647e0f4..6058cb560 100644
      </Show>
    )
  }
-@@ -314,7 +321,7 @@ function MarkSessionNotificationsViewed(props: { sessionID?: () => string | unde
+@@ -314,7 +301,7 @@ function MarkSessionNotificationsViewed(props: { sessionID?: () => string | unde
    return null
  }
  
@@ -4528,21 +4664,44 @@ index c4c8c44a9..196d6ada2 100644
  
 diff --git a/packages/app/src/surface/terminal.ts b/packages/app/src/surface/terminal.ts
 new file mode 100644
-index 000000000..5d279ad62
+index 000000000..f814270b6
 --- /dev/null
 +++ b/packages/app/src/surface/terminal.ts
-@@ -0,0 +1,11 @@
+@@ -0,0 +1,13 @@
 +// Alpha narrow surface (ADR-027 revision 2026-07-24, REQ-125 #554/#576): terminal engine seam.
 +// Re-exports exactly the engine pieces the alpha session workspace may consume — the
 +// workspace-scoped PTY tab state (useTerminal), the Ghostty terminal embed (Terminal), the
 +// pty record type (LocalPTY), and the palette-override type (TerminalColors) the embed accepts
-+// via its optional `theme` prop (REQ-125 #576, always-dark stage). Nothing else: no
++// via its optional `theme` prop (REQ-125 #576, always-dark stage), and the directory-bound
++// provider pair for pages that have a project but no session (home right panel). Nothing else: no
 +// `./surface/*` wildcard, no pages/context subpaths. The single sanctioned consumer is the
 +// ui-mac terminal engine adapter; both sides are pinned by surface-seam-contract.test.ts.
 +export { useTerminal } from "@/context/terminal"
 +export type { LocalPTY } from "@/context/terminal"
 +export { Terminal } from "@/components/terminal"
 +export type { TerminalColors } from "@/components/terminal"
++export { WorkspaceTerminalProvider } from "./workspace-terminal"
+diff --git a/packages/app/src/surface/workspace-terminal.tsx b/packages/app/src/surface/workspace-terminal.tsx
+new file mode 100644
+index 000000000..4a24538e3
+--- /dev/null
++++ b/packages/app/src/surface/workspace-terminal.tsx
+@@ -0,0 +1,15 @@
++import type { ParentProps } from "solid-js"
++import { SDKProvider } from "@/context/sdk"
++import { TerminalProvider } from "@/context/terminal"
++
++// Alpha narrow surface (ADR-027 revision, desktop-ui-refresh BR-05): the home right panel has a
++// project but no session, so no session leaf wraps it. This is the same two providers the
++// session leaf uses (directory SDK + workspace-scoped PTY state), bound to one directory —
++// terminals opened here are the workspace's terminals, shared with that project's sessions.
++export function WorkspaceTerminalProvider(props: ParentProps<{ directory: string }>) {
++  return (
++    <SDKProvider directory={props.directory}>
++      <TerminalProvider>{props.children}</TerminalProvider>
++    </SDKProvider>
++  )
++}
 diff --git a/packages/app/src/utils/session-message.ts b/packages/app/src/utils/session-message.ts
 index eef9f4e6d..943feab84 100644
 --- a/packages/app/src/utils/session-message.ts

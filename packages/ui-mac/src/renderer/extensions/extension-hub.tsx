@@ -75,7 +75,7 @@ import { curatedOf, curationMapOf, curationOf, isArchived, isSessionGrant, split
 import { findSessionGrant, sessionGrantKeyOf, sessionRefusalRoute, sessionToggleView } from "./ext-session-toggle"
 import { curationActivationFacts, type Curation, type CurationStatus } from "../../shared/catalog-curation"
 import type { CatalogPackageViewV1 } from "../../shared/catalog-package-view"
-import { pluginInstallFailureKey, installedPackagePresentation, packageRetainedReasonKey } from "./ext-package-presentation"
+import { pluginInstallFailureKey, installedPackagePresentation, packageRetainedReasonKey, pluginSourceLabelKey } from "./ext-package-presentation"
 import { packageListingTextV1 } from "../../shared/host-extension-package-contract/decoder"
 import { extIpc } from "./ext-ipc"
 import { PROJECT_HIDDEN_DIR } from "../../shared/project-hidden-dir"
@@ -1627,7 +1627,8 @@ export function ExtensionHub(props: {
       return []
     }
     // 说明行只有一行;非目录来源(本地文件夹、我的插件、市场)把来源接在后面,同名的包才分得清。
-    const withSource = (text: string) => (pack().source ? `${text} · ${t(presentation().sourceKey)}` : text)
+    const withSource = (text: string) =>
+      pack().source && presentation().sourceKey !== pluginSourceLabelKey("catalog") ? `${text} · ${t(presentation().sourceKey)}` : text
     const description = () => withSource(baseDescription())
     const baseDescription = () => {
       const current = status()
@@ -1636,8 +1637,10 @@ export function ExtensionHub(props: {
       const state = rootHub()
       if (pack().components.some((component) => component.kind === "cloud") && state && state.state !== "available")
         return state.reasonKey ? `${t(state.textKey)} · ${t(state.reasonKey)}` : t(state.textKey)
+      const entry = installableEntries().find((candidate) => candidate.id === pack().packageId)
       return (
         view()?.presentation.description ??
+        (entry ? catalogDescription(entry) : undefined) ??
         pack()
           .components.map((component) => typeLabel(component.kind as InstallReceipt["type"]))
           .join(" · ")
@@ -1737,7 +1740,7 @@ export function ExtensionHub(props: {
               <RowStatus tone="err" text={t("codepuppy.ext.statusFailed")} />
             </Show>
           </div>
-          <div class="codepuppy-ext-kit-desc" data-err={showsFailure() || (!status() && presentation().notRunning.length > 0) ? "" : undefined}>
+          <div class="codepuppy-ext-kit-desc" data-err={showsFailure() ? "" : undefined}>
             {description()}
           </div>
           <Show when={failureDetail() ?? rootHub()?.detail}>
@@ -2371,6 +2374,7 @@ export function ExtensionHub(props: {
                   </Show>
                   <PackageFeedback />
                   <Skeleton />
+                  <Show when={(cloudReady() && cloudConnectorMatches() ? 1 : 0) + orderedPackages().length + installedPage().global.length > 0}>
                   <InstalledGroup
                     count={(cloudReady() && cloudConnectorMatches() ? 1 : 0) + orderedPackages().length + installedPage().global.length}
                   >
@@ -2382,6 +2386,7 @@ export function ExtensionHub(props: {
                       <For each={installedPage().global}>{(row) => <InstalledRow row={row} />}</For>
                     </div>
                   </InstalledGroup>
+                  </Show>
                   {/* `#784` R1 Major:扩展包清单读不出时**不许**同时说「还没有安装」—— 两条互相矛盾的信息摆在一起,
                       用户会当成东西丢了而去重装,而重装会撞上同名拒绝。 */}
                   <Show

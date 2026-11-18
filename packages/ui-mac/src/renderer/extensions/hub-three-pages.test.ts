@@ -17,4 +17,4 @@ test("定制中心三页结构:页签、页头、列表行、「添加 ▾」、
   expect(output).toContain(" 40 pass")
   expect(output).toContain(" 0 fail")
   expect(output).toMatch(/Ran 40 tests across 1 file/)
-})
+}, 120_000) // 子进程单跑就要 5 秒上下,默认 5 秒超时会在机器稍忙时误判

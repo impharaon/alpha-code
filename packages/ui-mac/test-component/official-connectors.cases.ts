@@ -358,6 +358,49 @@ test("desktop official package without an encrypted token stays pending after ru
   expect(await readPackageAuthorizationV1("package:github-official", deps)).toMatchObject({ ok: true, items: [{ kind: "secret", saved: true }] })
 })
 
+// `#1724`(签名 0.2.1 实测):SQLite 包装好但还没填 DSN 时,投影只剩 `{ enabled: false }`,
+// 2.x 引擎按「enabled-only legacy MCP entry」整条丢弃 —— 引擎里没有这个连接器,状态永远收不拢。
+// 判据用引擎自己的归一化(`@opencode/core/config/normalize`),两次重启后仍要是完整定义;填了 DSN 后要能开起来。
+test("desktop SQLite package without a DSN keeps an engine-visible definition across restarts and loads once the DSN is saved", async () => {
+  const { installDesktopPackageV1, readPackageAuthorizationV1, savePackageSecretsV1 } = await import("../src/main/package-admission")
+  const { resolveVerifiedPackageV1 } = await import("../src/main/package-installability")
+  const { ConfigNormalize } = await import("@opencode/core/config/normalize")
+  const f = await fixture("dbhub-readonly")
+  const catalog = { version: "r4-official-sqlite", entries: [], packages: [f.envelope] }
+  let version = 0
+  const deps = {
+    loadVerifiedCatalog: async () => ({ source: "remote" as const, catalog, snapshotDigest: "7".repeat(64) }),
+    root: () => root, globalRoot: () => root, userDataPath: join(home, "userData"), casBaseRoot: () => join(home, "state"), environment: () => "dev" as const,
+    installability: { fetchPayload: async () => f.bytes }, advisoryGate: () => ({ allowed: true as const }),
+    resolvePackage: async (id: string, version: string) => ({ ...resolveVerifiedPackageV1(catalog, id, version), channel: "cache" as const }),
+    secretVersionId: () => `v-desktop-sqlite-${version++}`,
+  }
+  const leaf = () => JSON.parse(readFileSync(join(root, "codepuppy.jsonc"), "utf8")).mcp["dbhub-readonly"] as Record<string, unknown>
+  const engineKeeps = (value: Record<string, unknown>) => {
+    const normalized = ConfigNormalize.normalize({ mcp: { "dbhub-readonly": value } })
+    expect(normalized.diagnostics.map((item) => item.message)).not.toContain("omitted enabled-only legacy MCP entry")
+    expect(normalized.type === "normalized" && JSON.stringify(normalized.encoded).includes("dbhub-readonly")).toBe(true)
+  }
+  expect(await installDesktopPackageV1("package:dbhub-readonly", deps)).toMatchObject({ ok: true })
+  for (const _restart of [1, 2]) {
+    clearOfficialConnectorRuntime()
+    restoreCommittedOfficialConnectors()
+    expect(leaf().enabled).toBe(false)
+    engineKeeps(leaf())
+  }
+  expect(await readPackageAuthorizationV1("package:dbhub-readonly", deps)).toMatchObject({ ok: true, items: [{ kind: "secret", saved: false }] })
+  const database = join(home, "sqlite-dsn-later.db")
+  new Database(database).close()
+  expect(await savePackageSecretsV1({ packageId: "package:dbhub-readonly", secrets: { "mcp:dbhub-readonly#DSN": `sqlite://${database}` } }, deps)).toMatchObject({ ok: true })
+  expect(await readPackageAuthorizationV1("package:dbhub-readonly", deps)).toMatchObject({ ok: true, items: [{ kind: "secret", saved: true }] })
+  expect(leaf().enabled).not.toBe(false)
+  engineKeeps(leaf())
+  const { collectMcpFileRefPaths } = await import("../src/main/codepuppy-mcp-secrets")
+  const refs = collectMcpFileRefPaths(leaf())
+  expect(refs).toHaveLength(1)
+  expect(readFileSync(refs[0]!, "utf8")).toBe(`sqlite://${database}`)
+})
+
 test("desktop official install and credential replacement do not publish a reserved remote name", async () => {
   const { installDesktopPackageV1, savePackageSecretsV1 } = await import("../src/main/package-admission")
   const { resolveVerifiedPackageV1 } = await import("../src/main/package-installability")

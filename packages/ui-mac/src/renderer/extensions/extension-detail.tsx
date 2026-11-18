@@ -162,13 +162,13 @@ export function InstalledPackageDetail(props: {
               <div class="codepuppy-settings-row">
                 <div class="codepuppy-settings-row-copy">
                   <strong>
-                    {t(item.kind === "secret" ? "codepuppy.ext.packageToken" : "codepuppy.ext.packageAccount", {
+                    {t(item.kind === "secret" ? (item.prerequisiteId === "mcp:dbhub-readonly#DSN" ? "codepuppy.ext.packageSqliteAddress" : "codepuppy.ext.packageToken") : "codepuppy.ext.packageAccount", {
                       name: props.label,
                     })}
                   </strong>
                   <small>
                     {item.kind === "secret"
-                      ? t(item.saved ? "codepuppy.ext.packageTokenSaved" : "codepuppy.ext.packagePendingToken")
+                      ? t(item.saved ? "codepuppy.ext.packageTokenSaved" : item.prerequisiteId === "mcp:dbhub-readonly#DSN" ? "codepuppy.ext.packagePendingSqliteAddress" : "codepuppy.ext.packagePendingToken")
                       : item.kind === "mcp-oauth"
                         ? t(
                             item.authenticated
@@ -191,7 +191,7 @@ export function InstalledPackageDetail(props: {
                     }}
                   >
                     {item.kind === "secret"
-                      ? t(item.saved ? "codepuppy.ext.packageChangeToken" : "codepuppy.ext.packageFillToken")
+                      ? t(item.saved ? "codepuppy.ext.packageChangeToken" : item.prerequisiteId === "mcp:dbhub-readonly#DSN" ? "codepuppy.ext.packageFillSqliteAddress" : "codepuppy.ext.packageFillToken")
                       : t(
                           item.kind === "mcp-oauth" && item.authenticated
                             ? "codepuppy.ext.packageRelogin"

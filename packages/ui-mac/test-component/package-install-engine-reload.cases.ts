@@ -351,6 +351,8 @@ codepuppySidecar.attach((message) => void reloadRequests.push(message as { type?
 
 // ── ⑦ renderer ↔ main 的桥:走生产 handler,不重写任何判定 ───────────────────────────────
 const SENDER: IpcSender = { id: 1, on: () => {}, once: () => {} }
+/** 渲染端最近一次读到的安装清单:点行之前先等它带上该收据,否则点到的是还没收据的实时行(走引擎直连,不经账本)。 */
+let lastInstalls: { global?: Array<{ id: string }> } | undefined
 const call = async (channel: string, ...args: unknown[]): Promise<unknown> => {
   const handler = handlers.get(channel)
   if (!handler) throw new Error(`handler not registered: ${channel}`)
@@ -386,7 +388,7 @@ const extBridge: Record<string, unknown> = {
     return result
   },
   persistMcp: (name: unknown, server: unknown, secrets: unknown) => call("ext-persist-mcp", name, server, secrets),
-  listInstalls: (projectDir?: unknown) => call("ext-list-installs", projectDir),
+  listInstalls: async (projectDir?: unknown) => (lastInstalls = await call("ext-list-installs", projectDir) as typeof lastInstalls),
   inventoryView: (projectDir?: unknown) => call("ext-inventory-view", projectDir),
   factorySkillIds: () => call("ext-factory-skill-ids"),
   sessionGrants: () => call("ext-session-grants"),
@@ -600,6 +602,15 @@ test("⑤ 出站计数相等:到达 IPC 的每一次安装都经过了收口方�
   // 也就是说「装完要重扫」这件事对本夹具是真需求,不是摆设。
   expect(fixture.envelope.components.map((component) => component.id)).toContain(LEAF_MCP_ID)
   expect((await hubApi.uninstallPackage("package:github")).ok).toBe(true)
+  // `#1724`:github 的远程连接器在启动配置里,整包移除要换一代引擎(connectorChange)。在这里让它走完,
+  // 不把一个在途的换代留给后面的用例。
+  const before = connectorRefreshes
+  busy = false
+  codepuppySidecar.attach((request) => scheduler.request(request))
+  await waitFor(() => expect(connectorRefreshes).toBe(before + 1))
+  await scheduler.settled()
+  busy = true
+  codepuppySidecar.attach((message) => void reloadRequests.push(message as { type?: string; generation?: number; scope?: unknown }))
   await flush()
 })
 
@@ -640,6 +651,8 @@ test("#1646 AC1 disable PDF waits for idle, then the fresh runtime blocks readin
   setHubSection("connectors")
   document.dispatchEvent(new Event("visibilitychange"))
   await waitFor(() => expect(pdfRow()).toBeInstanceOf(HTMLElement))
+  await waitFor(() => expect(lastInstalls?.global?.some((entry) => entry.id === "mcp:codepuppy-pdf")).toBe(true))
+  await flush()
   click(pdfRow().querySelector('[data-more]'))
   click(pdfRow().querySelector('[data-menu-item="disable"]'))
   await waitFor(() => expect(pdfRow().querySelector('[data-hub-reload-now]')).toBeInstanceOf(HTMLElement))

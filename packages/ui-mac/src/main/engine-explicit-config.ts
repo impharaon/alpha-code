@@ -18,6 +18,7 @@
 import * as fs from "node:fs"
 import * as path from "node:path"
 import { parse as parseJsonc, type ParseError } from "jsonc-parser"
+import { projectServerConfig } from "../../../ext/src/engine-transforms"
 import { readPackageLedgerStateV1 } from "./ext-receipt-v2"
 import { USER_DATA_LAYOUT } from "./user-data-layout"
 
@@ -34,6 +35,29 @@ export function explicitConfigPath(userDataPath: string): string {
 
 const isRecord = (value: unknown): value is Record<string, unknown> => !!value && typeof value === "object" && !Array.isArray(value)
 
+/**
+ * `#1724`(编排器裁决,DESIGN-plugin-helper-and-hub §10 方案 A):经包运行器启动的本地 MCP 第一次运行要先把包下载下来
+ * (markitdown 经 uvx 约 100 MB,0.2.1 实测本机网络 166 s),默认 30 s 的握手时钟会先到,而且每次超时都杀掉下载重来。
+ * 只放宽它们的 `timeout.startup`(目录 / 执行两段照旧);代价已接受:首次下载占着引擎的一个启动名额,真卡死的晚些报失败。
+ */
+export const RUNNER_FIRST_FETCH_STARTUP_MS = 300_000
+const PACKAGE_RUNNERS = new Set(["uvx", "npx", "bunx", "pnpx"])
+export function launchedByPackageRunner(config: { type?: unknown; command?: unknown }): boolean {
+  return config.type === "local" && Array.isArray(config.command) && typeof config.command[0] === "string" && PACKAGE_RUNNERS.has(path.basename(config.command[0]))
+}
+
+/** v1 形状的 `mcp.<name>` 只有一个管三段的 `timeout` 数字,只放宽启动段就要用 2.x 原生的 `mcp.servers.<name>`(同名只出现在一边)。 */
+function withRunnerStartup(mcp: Record<string, unknown>): Record<string, unknown> {
+  const servers: Record<string, unknown> = isRecord(mcp.servers) ? { ...mcp.servers } : {}
+  const next: Record<string, unknown> = {}
+  for (const [name, leaf] of Object.entries(mcp)) {
+    const config = name !== "servers" && name !== "timeout" && isRecord(leaf) && leaf.timeout === undefined && !(name in servers) && launchedByPackageRunner(leaf) ? projectServerConfig(leaf) : undefined
+    if (config) servers[name] = { ...config, timeout: { startup: RUNNER_FIRST_FETCH_STARTUP_MS } }
+    else if (name !== "servers") next[name] = leaf
+  }
+  return Object.keys(servers).length ? { ...next, servers } : next
+}
+
 /** 用户文件(可缺席)+ 我们这一层 ⇒ 显式文件的内容。用户文件解析不了 ⇒ 只放我们这一层,并给出原因。 */
 export function composeExplicitDocument(userText: string | undefined, layer: ExplicitLayer): { document: Record<string, unknown>; userError?: string } {
   let user: Record<string, unknown> = {}
@@ -45,6 +69,7 @@ export function composeExplicitDocument(userText: string | undefined, layer: Exp
     else user = parsed
   }
   const document: Record<string, unknown> = { $schema: "https://opencode.ai/config.json", ...user }
+  if (isRecord(user.mcp)) document.mcp = withRunnerStartup(user.mcp)
   // 用户文件的 skills 可能还是 v1 形状 `{ paths, urls }`(生产 boot 的 ensureSkillsPath 就这么写):按上游 normalize 的同一规则
   // 先摊成数组(paths 在前、urls 在后),再与出厂的取并集(审计 R1 第 3 条)。
   const strings = (value: unknown) => (Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [])

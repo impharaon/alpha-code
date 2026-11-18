@@ -65,7 +65,7 @@ export function PackageAccountDialog(props: {
   return (
     <Dialog open onClose={close} size="sm" title={t("codepuppy.ext.packageTokenTitle", { name: props.label })}
       footer={<Button variant="primary" loading={busy()} onClick={() => void submit()}>{t("codepuppy.ext.packageSaveToken")}</Button>}>
-      <p>{t("codepuppy.ext.packageTokenPurpose", { name: props.label })}</p>
+      <p>{t(props.needId === "mcp:dbhub-readonly#DSN" ? "codepuppy.ext.packageSqlitePurpose" : "codepuppy.ext.packageTokenPurpose", { name: props.label })}</p>
       <Show when={tokenUrl(props.packageId, props.source)}>
         {url => <button class="codepuppy-ext-link" onClick={() => void window.api.openLink(url())}>{t("codepuppy.ext.packageGithubTokenLink")}</button>}
       </Show>

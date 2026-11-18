@@ -23,6 +23,7 @@ import { evaluatePackageForHost, packageActionForReason } from "../src/main/pack
 import type { CatalogPackageViewV1 } from "../src/shared/catalog-package-view"
 import type { InstalledPackageV1 } from "../src/preload/types"
 import { dict as zh } from "../src/renderer/i18n/zh"
+import { v1McpStatus } from "../src/engine-adapter/opencode2/v1-shapes"
 
 GlobalRegistrator.register()
 const solid = await import("solid-js/dist/solid.js")
@@ -789,6 +790,57 @@ test("package idle switch converges from applying to off on the existing event a
   await waitFor(() => expect(calls.packageState).toHaveLength(2))
   await waitFor(() => expect(q('[data-installed-package]')?.textContent).toContain("待填令牌"))
   expect(q('[data-installed-row="mcp:github"]')).toBeNull()
+})
+
+// `#1724`(签名 0.2.1 实测 12-state-poll):缺令牌的 MCP 引擎侧连不上 ⇒ hub-view 一直给 reload-pending,
+// 行停在「正在生效」20 分钟以上。开启状态下缺前置项必须压过「待重载」,显示真实缺的东西。
+test("enabled package missing its token shows the prerequisite even while its connector row stays reload-pending", async () => {
+  reset()
+  const entry = await realInstalledPackage(0)
+  packageAuthorizationItems = [{ kind: "secret", componentId: entry.root, prerequisiteId: `${entry.root}#GITHUB_PERSONAL_ACCESS_TOKEN`, serviceName: "github", label: "GITHUB_PERSONAL_ACCESS_TOKEN", saved: false }]
+  mcpStates.github = { status: "failed", error: "MCP failed" }
+  hubRows = [hubRow(entry.root, "github", "mcp", "reload-pending", "not-loaded"), hubRow(entry.prelude.packageId, "github", "package", "reload-pending", "not-loaded")]
+  mount()
+  await waitFor(() => expect(q('[data-installed-package] [data-prerequisite]')?.textContent).toBe("待填令牌"))
+  expect(q('[data-installed-package]')?.textContent).not.toContain("正在生效")
+})
+
+// `#1724`(编排器裁决,BR-04 显示准确状态):本地 MCP 握手失败后,hub-view 的核验一直不过 ⇒ reload-pending,包行停在
+// 「正在生效」;失败原因若露出,也是引擎原文英文。失败要压过「待重载」,说的是本地化的短原因;原文留在开发者详情。
+// 引擎状态按真实形状经 engine-adapter 的 v1McpStatus(去掉 `[codepuppy:<码>]` 前缀、码进 `code`)。
+test("enabled package whose local connector failed to start shows a localized failure instead of applying forever", async () => {
+  reset()
+  const entry = await realInstalledPackage(0)
+  packageAuthorizationItems = [{ kind: "secret", componentId: entry.root, prerequisiteId: `${entry.root}#GITHUB_PERSONAL_ACCESS_TOKEN`, serviceName: "github", label: "GITHUB_PERSONAL_ACCESS_TOKEN", saved: true }]
+  mcpStates.github = v1McpStatus({ status: "failed", error: "[codepuppy:handshake_timeout] Request timed out (handshake_timeout)" }) as typeof mcpStates.github
+  hubRows = [hubRow(entry.root, "github", "mcp", "reload-pending", "not-loaded"), hubRow(entry.prelude.packageId, "github", "package", "reload-pending", "not-loaded")]
+  mount()
+  await waitFor(() => expect(q('[data-installed-package] .codepuppy-ext-kit-desc[data-err]')?.textContent).toBe("未能启用：启动超时"))
+  expect(q('[data-installed-package]')?.textContent).not.toContain("正在生效")
+  expect(q('[data-installed-package] .codepuppy-ext-kit-desc')?.textContent).not.toContain("Request timed out")
+})
+
+test("catalog connector row with a start failure shows the localized short reason, never the engine's English text", async () => {
+  reset()
+  receipts = [receipt("mcp:markitdown", "markitdown", "mcp")]
+  mcpStates.markitdown = v1McpStatus({ status: "failed", error: "[codepuppy:spawn_failed] Connection closed: MCP server process exited with code 3 (spawn_failed)" }) as typeof mcpStates.markitdown
+  hubRows = [hubRow("mcp:markitdown", "markitdown", "mcp", "reload-pending", "not-loaded")]
+  mount()
+  await waitFor(() => expect(q("[data-installed-row='mcp:markitdown'] .codepuppy-ext-kit-desc[data-err]")?.textContent).toBe("未能启动"))
+  expect(q("[data-installed-row='mcp:markitdown'] .codepuppy-ext-kit-desc")?.getAttribute("title")).toContain("exited with code 3")
+})
+
+// `#1724`(体验约定不露内部原因码;BR-04):重载失败时 main 给的是内部英文原因(如 `official-connector-needs-reentry…`),
+// 包行只说本地化的短原因,原文进开发者详情。
+test("package whose last reload failed shows a localized short reason and keeps main's raw reason in developer details", async () => {
+  reset()
+  const entry = await realInstalledPackage(0)
+  packageAuthorizationItems = [{ kind: "secret", componentId: entry.root, prerequisiteId: `${entry.root}#GITHUB_PERSONAL_ACCESS_TOKEN`, serviceName: "github", label: "GITHUB_PERSONAL_ACCESS_TOKEN", saved: true }]
+  const raw = "official-connector-needs-reentry: runtime refresh failed"
+  hubRows = [{ ...hubRow(entry.root, "github", "mcp", "reload-pending"), stateReason: { code: "reload-failed", detail: raw } }]
+  mount()
+  await waitFor(() => expect(q('[data-installed-package] .codepuppy-ext-kit-desc[data-err]')?.textContent).toBe("未能启用：上次未能生效"))
+  expect(q('[data-installed-package] details')?.textContent).toContain(raw)
 })
 
 test("package switch reflects failed and completed main results without a second apply action", async () => {

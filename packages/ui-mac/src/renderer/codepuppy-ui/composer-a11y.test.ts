@@ -255,11 +255,13 @@ describe("composer accessibility behavior", () => {
     const back = document.querySelector<HTMLButtonElement>(".a-mpa-back")!
     expect(document.activeElement).toBe(back) // 二级页滑入,焦点在「返回」
 
-    // 进入自定义表单(第二级),Esc 退回供应商列表,菜单仍开着。
+    // 打开「接入其它服务」对话框(第二级),Esc 关掉对话框、退回供应商列表,菜单仍开着。
     document.querySelector<HTMLButtonElement>("[data-codepuppy-custom-endpoint-entry]")!.click()
     await flush()
-    keydown(document.querySelector(".a-mpa input") ?? back, "Escape")
+    expect(document.querySelector("[role='dialog']")).not.toBeNull()
+    keydown(document.querySelector("[role='dialog'] input")!, "Escape")
     await flush()
+    expect(document.querySelector("[role='dialog']")).toBeNull()
     expect(document.querySelector("[data-codepuppy-custom-endpoint-entry]")).not.toBeNull()
     expect(document.querySelector(".a-pop-fixed")).not.toBeNull()
     expect(closed).toBe(0)

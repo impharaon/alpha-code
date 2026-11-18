@@ -1691,17 +1691,22 @@ describe("ModelPickPop production component", () => {
     expect(custom?.tagName).toBe("BUTTON")
     click(custom)
     await flush()
-    const nameField = overlay().querySelector<HTMLInputElement>(`input[placeholder="${zh["codepuppy.provider.namePlaceholder"]}"]`)!
+    // 「接入其它服务」是对话框(冻结稿 `#hub-custom-service`),表单在对话框里、不在选择器里
+    const dialog = () => document.querySelector<HTMLElement>(".a-csd-form")!.closest<HTMLElement>("[role='dialog']")!
+    const inDialog = (text: string) =>
+      [...dialog().querySelectorAll<HTMLButtonElement>("button")].find((button) => button.textContent?.includes(text)) ?? null
+    expect(dialog().querySelector(".a-dialog-title")?.textContent).toBe(zh["codepuppy.provider.customEndpoint"])
+    const nameField = dialog().querySelector<HTMLInputElement>(`input[placeholder="${zh["codepuppy.provider.namePlaceholder"]}"]`)!
     expect(nameField.readOnly).toBe(false)
 
     // ② 填表 → 保存 → 真持久化
     input(nameField, "Custom Node")
-    input(overlay().querySelector<HTMLInputElement>('input[placeholder="https://api.example.com/v1"]')!, "https://custom.invalid/v1")
-    input(overlay().querySelector<HTMLInputElement>('input[placeholder="sk-..."]')!, "sk-1392-custom")
-    const modelInput = overlay().querySelector<HTMLInputElement>(`input[placeholder="${zh["codepuppy.provider.modelPlaceholder"]}"]`)!
+    input(dialog().querySelector<HTMLInputElement>('input[placeholder="https://api.example.com/v1"]')!, "https://custom.invalid/v1")
+    input(dialog().querySelector<HTMLInputElement>('input[placeholder="sk-..."]')!, "sk-1392-custom")
+    const modelInput = dialog().querySelector<HTMLInputElement>(`input[placeholder="${zh["codepuppy.provider.modelPlaceholder"]}"]`)!
     input(modelInput, "real-custom-model")
     modelInput.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, key: "Enter" }))
-    click(inOverlay(zh["codepuppy.provider.saveEnable"]))
+    click(inDialog(zh["codepuppy.provider.saveEnable"]))
 
     // ③ 刷新后的清单里出现那一行,可选
     await waitFor(() =>
@@ -1771,19 +1776,20 @@ describe("ModelPickPop production component", () => {
     await waitFor(() => expect(overlay().querySelector("[data-codepuppy-custom-endpoint-entry]")).not.toBeNull())
     click(overlay().querySelector<HTMLButtonElement>("[data-codepuppy-custom-endpoint-entry]"))
     await flush()
-    input(overlay().querySelector<HTMLInputElement>(`input[placeholder="${zh["codepuppy.provider.namePlaceholder"]}"]`)!, "Local Ollama")
-    input(overlay().querySelector<HTMLInputElement>('input[placeholder="https://api.example.com/v1"]')!, "http://localhost:11434")
-    input(overlay().querySelector<HTMLInputElement>('input[placeholder="sk-..."]')!, "sk-1392-local")
-    const modelInput = overlay().querySelector<HTMLInputElement>(`input[placeholder="${zh["codepuppy.provider.modelPlaceholder"]}"]`)!
+    const dialog = () => document.querySelector<HTMLElement>(".a-csd-form")!.closest<HTMLElement>("[role='dialog']")!
+    input(dialog().querySelector<HTMLInputElement>(`input[placeholder="${zh["codepuppy.provider.namePlaceholder"]}"]`)!, "Local Ollama")
+    input(dialog().querySelector<HTMLInputElement>('input[placeholder="https://api.example.com/v1"]')!, "http://localhost:11434")
+    input(dialog().querySelector<HTMLInputElement>('input[placeholder="sk-..."]')!, "sk-1392-local")
+    const modelInput = dialog().querySelector<HTMLInputElement>(`input[placeholder="${zh["codepuppy.provider.modelPlaceholder"]}"]`)!
     input(modelInput, "llama")
     modelInput.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, key: "Enter" }))
-    click(inOverlay(zh["codepuppy.provider.saveEnable"]))
-    await waitFor(() => expect(overlay().querySelector(".a-mpa-error")?.textContent).toBe(zh["codepuppy.provider.address.loopback"]))
+    click([...dialog().querySelectorAll<HTMLButtonElement>("button")].find((button) => button.textContent?.includes(zh["codepuppy.provider.saveEnable"])) ?? null)
+    await waitFor(() => expect(dialog().querySelector(".a-csd-status.err")?.textContent).toBe(zh["codepuppy.provider.address.loopback"]))
     // 拒在存密钥之前:库里没有它、真源没建、没 respawn;表单还开着(用户可以改地址再试)
     expect(getByokKey("local-ollama")).toBeUndefined()
     expect(existsSync(join(root, "codepuppy-state", "custom-providers"))).toBe(false)
     expect(refreshes).toBe(0)
-    expect(overlay().querySelector<HTMLInputElement>('input[placeholder="https://api.example.com/v1"]')?.value).toBe("http://localhost:11434")
+    expect(dialog().querySelector<HTMLInputElement>('input[placeholder="https://api.example.com/v1"]')?.value).toBe("http://localhost:11434")
     mounted.dispose()
   })
 

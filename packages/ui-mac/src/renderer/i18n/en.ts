@@ -1381,6 +1381,8 @@ export const dict = {
   "codepuppy.provider.namePlaceholder": "For example, DeepSeek",
   "codepuppy.provider.compatibility": "Compatibility",
   "codepuppy.provider.baseUrl": "Base URL",
+  "codepuppy.provider.addressHelp": "Use the endpoint your provider gives you; local addresses (localhost, 127.0.0.1) are not supported.",
+  "codepuppy.provider.keyHelp": "Stored in this computer's dedicated key store.",
   "codepuppy.provider.apiKey": "API key",
   "codepuppy.provider.anthropicUrlHint": "End at /v1; requests use Base URL + /messages for both tests and sessions.",
   "codepuppy.provider.hideKey": "Hide",

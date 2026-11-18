@@ -236,6 +236,8 @@ export function ChipPopover(props: {
   const onWindowKey = (event: KeyboardEvent) => {
     if (event.key !== "Escape" || event.defaultPrevented) return
     if (popover?.contains(event.target as Node)) return
+    // 弹层里发起的对话框(「接入其它服务」)自己处理 Esc:只关对话框,菜单留着。
+    if ((event.target as Element | null)?.closest?.(".a-dialog-root")) return
     event.preventDefault()
     event.stopPropagation()
     escape()

@@ -110,7 +110,7 @@ test("E2 project-only MCP stays globally disabled through install and package-ro
     expect(persistedMcp(h.root, "context7")).toMatchObject({ enabled: false })
   }
   expect(JSON.parse(readFileSync(join(h.root, "skills-enabled.json"), "utf8"))).toEqual({
-    v: 2, keys: [], scoped: [{ kind: "mcp", name: "context7", projectPath: realpathSync(project) }],
+    v: 3, keys: [], scoped: [{ kind: "mcp", name: "context7", projectPath: realpathSync(project) }], mcp: [{ name: "context7", enabled: false }],
   })
   expect(readdirSync(project)).toEqual(["existing.json"])
   expect(readFileSync(join(project, "existing.json"), "utf8")).toBe("project bytes\n")
@@ -139,7 +139,7 @@ test("E2 project-only skill is stored globally and projected only as scoped", ()
   const state = readPackageLedgerStateV1(h.root)
   expect(state.ok && state.packageGraphs[0]?.effect).toEqual(identity.scope)
   expect(JSON.parse(readFileSync(join(h.root, "skills-enabled.json"), "utf8"))).toEqual({
-    v: 2, keys: [], scoped: [{ kind: "skill", name: "frontend-design", projectPath: identity.scope.projectPath }],
+    v: 3, keys: [], scoped: [{ kind: "skill", name: "frontend-design", projectPath: identity.scope.projectPath }], mcp: [],
   })
   expect(existsSync(join(project, ".codepuppy"))).toBe(false)
 }))

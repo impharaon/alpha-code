@@ -600,7 +600,7 @@ export async function savePackageSecretsV1(input: unknown, deps: PackageAdmissio
   if (published.ok) try {
     for (const build of builds) if (isOfficialConnector(build.receipt.name))
       projectOfficialConnector(build.receipt.name, build.items[0]!.config!.edits[0]!.value as Record<string, unknown>)
-    if (resources.some((resource) => resource.descriptor.store === "official-connectors")) restoreCommittedOfficialConnectors()
+    // I-11(v9-R2):凭据物化只在按名的最终状态步骤里;保存之后由调用方请求 convergeManagedMcp。
     const cleaned = withConfigWriteLock(() => {
       for (const resource of superseded) {
         if (resource.store === "official-connectors") {

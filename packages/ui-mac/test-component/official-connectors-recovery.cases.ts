@@ -46,7 +46,7 @@ const {
   clearOfficialConnectorRuntime,
   clearOfficialConnectorRuntimeOnExit,
 } = await import("../src/main/official-connector-resources")
-const { upsertRecordV2 } = await import("../src/main/ext-receipt-v2")
+const { findRecordV2, skillsEnabledPath, upsertRecordV2 } = await import("../src/main/ext-receipt-v2")
 const { writeWorkspaceTruth, fenceWorkspaceTruthPath } = await import("../src/main/process-fence-workspaces")
 const { spawnLocalServer } = await import("../src/main/server")
 const { creditDanglingSweepForSpawn } = await import("../src/main/dangling-sweep-latch")
@@ -169,7 +169,15 @@ test.each(["deleted workspace", "moved SQLite", "decryption failure"])(
         expect(refs).toHaveLength(1)
         expect(readFileSync(refs[0]!, "utf8")).toBe("")
         expect(readFileSync(collectMcpFileRefPaths(config[healthy])[0]!, "utf8").length).toBeGreaterThan(0)
-        if (failed === "github-official") expect(findMcpServerRecord(failed)).toEqual({ ok: true, record: undefined })
+        // I-11(v9-8):the failed connector keeps this version's complete definition and remote record (later Locations
+        // never get a neutralized entry); the allow-set the forked Locations read keeps it off, the healthy one on,
+        // and the ledger intent is untouched, so the next successful restore turns it back on by itself.
+        if (failed === "github-official")
+          expect(findMcpServerRecord(failed)).toMatchObject({ ok: true, record: { name: failed, url: config[failed].url, headers: config[failed].headers } })
+        expect(config[failed].type).toBe(failed === "github-official" ? "remote" : "local")
+        const allowSet = JSON.parse(readFileSync(skillsEnabledPath(root), "utf8"))
+        expect(allowSet.mcp).toEqual(expect.arrayContaining([{ name: failed, enabled: false }, { name: healthy, enabled: true }]))
+        expect(findRecordV2(root, "mcp", failed)?.desiredState).toBe("enabled")
       })
       expect(forks).toBe(1)
       expect(warnings).toContain(`official-connector-needs-reentry: ${failed}`)

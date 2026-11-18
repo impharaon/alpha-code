@@ -168,9 +168,8 @@ describe("REQ-136 wiring: only catalog MCP may submit Current project", () => {
     const uninstall = functionSlice(hook, "uninstall", "setInstallState")
     expect(uninstall).toContain('receipt.scope === "project"')
     expect(uninstall).toContain("requestReload({ directory: selectedProjectDir! }")
-    expect(uninstall.indexOf('receipt.scope === "project"')).toBeLessThan(
-      uninstall.indexOf("client?.mcp.disconnect"),
-    )
+    // I-11:全局 MCP 的运行时移除归 main 的 convergeManagedMcp;项目分支照旧在前、渲染进程不再按名断开全局连接器。
+    expect(uninstall).not.toContain("client?.mcp.disconnect")
     expect(source).toContain('res.reason === "reload-pending"')
     expect(source).toContain('t("codepuppy.ext.statePendingReload")')
   })

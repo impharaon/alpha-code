@@ -42,7 +42,7 @@ import { postActivationTail } from "./post-activation-tail"
 import type { AgentEditor } from "@opencode/plugin/promise/agent"
 import type { SkillEditor } from "@opencode/plugin/promise/skill"
 import { readPackageAllowSet } from "./gen-skill-paths"
-import { managedSkillAllowedHere, managedSkillIdentity, scopedPackageAllowedHere } from "./package-scope"
+import { managedMcpAllowedHere, managedSkillAllowedHere, managedSkillIdentity } from "./package-scope"
 import { modelFacts } from "./model-facts"
 import { createCloudVisionHooks } from "./cloud-vision-hooks"
 import { createAttachmentReaderHooks } from "./attachment-reader-hooks"
@@ -346,12 +346,15 @@ export const CodePuppyExt: Plugin.Plugin = {
         }
         let merged = true
         try {
-          applyProjectMcp(editor, extConfig().mcp, error)
+          const projectMcp = new Set(applyProjectMcp(editor, extConfig().mcp, error))
+          // I-11(design v9 §4.4「收口」):受管全局 MCP 开不开只看允许集,排在所有配置文档之后。读不到 ⇒ 非云、非项目 MCP 全停。
           const allowSet = readPackageAllowSet(bootstrap.paths.globalRoot)
-          for (const entry of allowSet?.scoped ?? []) {
-            if (entry.kind !== "mcp") continue
-            editor.update(entry.name, (config) => {
-              config.disabled = !scopedPackageAllowedHere("mcp", entry.name, allowSet, projectRootFor(directory)?.directory)
+          const managed = new Set(allowSet?.mcp.map((entry) => entry.name))
+          for (const [name] of editor.list()) {
+            if (name === bootstrap.cloudMcp?.name || projectMcp.has(name) || (allowSet && !managed.has(name))) continue
+            const disabled = !managedMcpAllowedHere(name, allowSet, projectRootFor(directory)?.directory)
+            editor.update(name, (config) => {
+              config.disabled = disabled
             })
           }
         } catch (cause) {

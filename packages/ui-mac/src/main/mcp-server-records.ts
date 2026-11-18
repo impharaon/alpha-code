@@ -42,6 +42,16 @@ export function readMcpServerRecords(log: (line: string) => void = defaultLog): 
   return read.ok ? read.servers : []
 }
 
+let generationNames: ReadonlySet<string> = new Set()
+/** main 每代 fork 前派生出网放行的那一次读取(server.ts);记下读到的名字 = 本代内联层里有哪些远程定义(I-11,design v9-9)。
+ *  只有 main 调;sidecar 的注入照旧调 readMcpServerRecords。 */
+export function readMcpServerRecordsForGeneration(log: (line: string) => void = defaultLog): McpServerRecord[] {
+  const records = readMcpServerRecords(log)
+  generationNames = new Set(records.map((record) => record.name))
+  return records
+}
+export const generationMcpServerNames = (): ReadonlySet<string> => generationNames
+
 /** sidecar 里没有 electron-log:console.warn 走 utilityProcess 的 stderr,由 main 收进 sidecar 日志;main 侧调用方传自己的 logger。 */
 function defaultLog(line: string): void {
   console.warn(line)

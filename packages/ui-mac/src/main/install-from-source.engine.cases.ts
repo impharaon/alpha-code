@@ -14,7 +14,8 @@ import { createSourceInstaller } from "./install-from-source"
 import { createPluginSources } from "./plugin-sources"
 import { fixtureFetch } from "../../test-fixtures/plugin-helper/source-fetch"
 import { makeRecoveryGate } from "./ext-recovery-gate"
-import { applyPackageMcpV1, removePackageMcpV1 } from "./package-mcp-activation"
+import { createManagedMcpConvergence, managedMcpNamesOf } from "./package-mcp-activation"
+import { uninstallPackageV1 } from "./ext-package-uninstall"
 import { readPackageLedgerStateV1 } from "./ext-receipt-v2"
 import { readMcpLeafStrict } from "./ext-config"
 import { setPackageStateV1 } from "./ext-install-planner"
@@ -74,7 +75,8 @@ export default { id:'test.slice-a-observer', setup:async(ctx)=>{
  expect(before.tools).toHaveLength(0)
  const sources=createPluginSources({catalog:async()=>[],fetch:fixtureFetch})
  const rootDeps={globalRoot:()=>globalRoot,advisoryGate:()=>({allowed:true as const}),resolvePackage:async()=>{throw Error('noncatalog')}}
- const deps={...rootDeps,casBaseRoot:()=>join(sandbox.root,'state'),environment:()=>"dev" as const,userDataPath:sandbox.root,sources,gate:makeRecoveryGate(()=>({})),catalogInstall:async()=>{throw Error('controlled catalog is empty')},activateMcp:(id:string)=>applyPackageMcpV1(id,slot.projectDirectory,{root:()=>globalRoot,awaitServer:async()=>({url:engine.url,username:'opencode',password:'slice-a-probe'})}),reloadSkills:()=>{throw Error('MCP-only install must not reload')},removeDeparting:()=>{}}
+ const converge=createManagedMcpConvergence({root:()=>globalRoot,awaitServer:async()=>({url:engine.url,username:'opencode',password:'slice-a-probe'}),directory:()=>slot.projectDirectory})
+ const deps={...rootDeps,casBaseRoot:()=>join(sandbox.root,'state'),environment:()=>"dev" as const,userDataPath:sandbox.root,sources,gate:makeRecoveryGate(()=>({})),catalogInstall:async()=>{throw Error('controlled catalog is empty')},activateMcp:(id:string)=>converge(managedMcpNamesOf(globalRoot,id)),reloadSkills:()=>{throw Error('MCP-only install must not reload')},removeDeparting:()=>{}}
  const install=createSourceInstaller(deps)
  const candidate=(await sources.searchSources('playwright')).candidates.find(row=>row.source==='claude-marketplace')!
  expect(await install({requestId:'engine_install_a2',source:{kind:'candidate',candidateId:candidate.id},effect:{kind:'all-projects'},via:'chat'})).toMatchObject({ok:true,packageId:'claude:playwright'})
@@ -121,13 +123,14 @@ export default { id:'test.slice-a-observer', setup:async(ctx)=>{
  if(stopped.tools.length===0)break
  if(Date.now()>end)throw Error('disconnect did not remove tools')
  }
- const state=readPackageLedgerStateV1(globalRoot)
- if(!state.ok)throw Error('ledger unreadable')
- await removePackageMcpV1(state.packageGraphs[0]!,slot.projectDirectory,async()=>({url:engine.url,username:'opencode',password:'slice-a-probe'}))
- expect((await client.mcp.list()).data.some(server=>server.name==='playwright')).toBe(false)
- const failure=await applyPackageMcpV1('claude:playwright',slot.projectDirectory,{root:()=>globalRoot,awaitServer:async()=>{throw Error('test engine unavailable')}})
+ const failure=await createManagedMcpConvergence({root:()=>globalRoot,awaitServer:async()=>{throw Error('test engine unavailable')},directory:()=>slot.projectDirectory})(['playwright'])
  expect(failure).toMatchObject([{name:'playwright',status:'unavailable'}])
  expect(readPackageLedgerStateV1(globalRoot)).toMatchObject({ok:true,packageGraphs:[{packageId:'claude:playwright'}]})
+ // Removal = the package leaves the ledger, then the one runtime entry converges the name away (ext-ipc's order).
+ const kept={ok:true as const}
+ expect(await uninstallPackageV1('claude:playwright',{globalRoot:()=>globalRoot,installers:{removeFsInstall:()=>({ok:true as const,files:[]}),removeMcpConfig:()=>kept,removeCommandConfig:()=>kept,removeMcpSecretsStrict:()=>kept,releaseCodePuppyConnectionBindings:()=>kept,removeInstallGrants:()=>({ok:true as const,removed:[]}),removePluginPath:()=>kept}})).toMatchObject({ok:true})
+ await converge(['playwright'])
+ expect((await client.mcp.list()).data.some(server=>server.name==='playwright')).toBe(false)
  }finally{await engine.close();process.chdir(previous);rmSync(sockets,{recursive:true,force:true})}
 },180000)
 
@@ -151,7 +154,7 @@ test('A2 real engine startup failure keeps the enabled package and exposes faile
  const converted=await convertPluginTree(capture)
  const {pluginRuntimeIdentity}=await import('./plugin-sources')
  const connect=async()=>({url:engine.url,username:'opencode',password:'a2-failure'})
- const installer=createSourceInstaller({globalRoot:()=>root,casBaseRoot:()=>join(sandbox.root,'failed-state'),environment:()=> 'dev',userDataPath:sandbox.root,advisoryGate:()=>({allowed:true}),resolvePackage:async()=>{throw Error('not catalog')},sources:{convertCandidate:async()=>({ok:true,...converted,capture,runtimeIdentity:pluginRuntimeIdentity(converted.package)}),catalogComparisons:async()=>[],release:()=>{}},catalogInstall:async()=>{throw Error('not catalog')},activateMcp:(id)=>applyPackageMcpV1(id,slot.projectDirectory,{root:()=>root,awaitServer:connect}),reloadSkills:()=>{throw Error('not skill')},removeDeparting:()=>{}})
+ const installer=createSourceInstaller({globalRoot:()=>root,casBaseRoot:()=>join(sandbox.root,'failed-state'),environment:()=> 'dev',userDataPath:sandbox.root,advisoryGate:()=>({allowed:true}),resolvePackage:async()=>{throw Error('not catalog')},sources:{convertCandidate:async()=>({ok:true,...converted,capture,runtimeIdentity:pluginRuntimeIdentity(converted.package)}),catalogComparisons:async()=>[],release:()=>{}},catalogInstall:async()=>{throw Error('not catalog')},activateMcp:(id)=>createManagedMcpConvergence({root:()=>root,awaitServer:connect,directory:()=>slot.projectDirectory})(managedMcpNamesOf(root,id)),reloadSkills:()=>{throw Error('not skill')},removeDeparting:()=>{}})
  expect(await installer({requestId:'failed_start_a2',source:{kind:'candidate',candidateId:'cand_controlled_failure'},effect:{kind:'all-projects'},via:'chat'})).toMatchObject({ok:true,packageId:'claude:playwright'})
  const client=engineClient(await connect())
  let observed

@@ -505,3 +505,51 @@ test("package command switch withdraws and restores the real engine declaration"
   await until(async () => (await commands()).includes("generic-bundle-command"), "re-enabled package command read-back")
   expect(await commands()).toContain("generic-bundle-command")
 })
+
+// Codex R1 #2(I-11,design v9 §5 第 3 步 / G-29):开启的持久写已发布「开」、窗口里建了一个 Location、随后配置写失败
+// 回滚 —— 经生产 IPC,失败结果同样请求收敛,那个 Location 最终为关。进程内引擎无法在 main 的同步写窗口里建 Location,
+// 所以窗口留下的状态由窗口自己会做的同一组生产账本写造出来(发布「开」→ 建 Location → 发布回滚,中间不收敛)。
+test("I-11 R1 #2: a Location built while a failed enable had published 'on' ends off once the production IPC failure converges", async () => {
+  const fs = await import("node:fs")
+  const { spyOn } = await import("bun:test")
+  const { findRecordV2, setDesiredStateV2, upsertRecordV2 } = await import("./ext-receipt-v2")
+  const { restoreMcpLeaf } = await import("./ext-config")
+  const { MCP_FIXTURE } = await import("../../test-component/codepuppy-engine")
+  const name = "window-probe"
+  expect(restoreMcpLeaf(name, { type: "local", command: [process.execPath, MCP_FIXTURE], enabled: false }).ok).toBe(true)
+  expect(upsertRecordV2(root, {
+    id: `user:${name}`, name, kind: "mcp", environment: "dev", scope: { kind: "global" },
+    desiredState: "disabled", origin: "created", configKey: `mcp.${name}`, installedAt: "2026-11-18T00:00:00.000Z",
+  }).ok).toBe(true)
+  const later = join(sandbox.root, "window-location")
+  fs.mkdirSync(later, { recursive: true })
+  const at = (method: string, route: string, body?: unknown) => running!.fetch(new Request(`http://codepuppy-sidecar.invalid${route}`, {
+    method, headers: { "x-opencode-directory": encodeURIComponent(later), "content-type": "application/json" },
+    ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+  }))
+  const statusInLater = async () => ((await (await at("GET", "/api/mcp")).json()).data as Array<{ name: string; status: { status: string } }>)
+    .find((entry) => entry.name === name)?.status.status
+  expect(setDesiredStateV2(root, "mcp", name, "enabled").ok).toBe(true)
+  await at("POST", "/api/session", { location: { directory: later }, model: { id: "m", providerID: "codepuppy" } })
+  await until(async () => (await statusInLater()) === "connected", "Location built inside the window connects")
+  expect(setDesiredStateV2(root, "mcp", name, "disabled").ok).toBe(true)
+  await Bun.sleep(500)
+  expect(await statusInLater()).toBe("connected")
+  // Production IPC: enable → ledger and allow-set publish "on" → the config write fails → ledger rolled back to off.
+  const rename = fs.renameSync
+  let failed = 0
+  const failing = spyOn(fs, "renameSync").mockImplementation((from, to) => {
+    if (String(to) === join(root, "codepuppy.jsonc") && failed++ === 0) throw new Error("injected config write failure")
+    return rename(from, to)
+  })
+  let result: unknown
+  try {
+    result = await invoke("ext-set-install-state", { type: "mcp", name, scope: "global", state: "enabled" })
+  } finally {
+    failing.mockRestore()
+  }
+  expect(failed).toBe(1)
+  expect(result).toMatchObject({ ok: false })
+  expect(findRecordV2(root, "mcp", name)?.desiredState).toBe("disabled")
+  await until(async () => (await statusInLater()) === "disabled", "the window's Location converged off after the failed write")
+}, 120_000)

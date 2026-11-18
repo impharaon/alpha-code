@@ -38,7 +38,6 @@ import { connectOutcome, grantsToReassert, sessionGrantKeyOf } from "./ext-sessi
 import { authenticatePackageMcp } from "./package-account-auth"
 import { extIpc } from "./ext-ipc"
 import { t } from "../i18n"
-import { approvalToolOf } from "../codepuppy-ui/session-timeline/cards/tool-card-model"
 import { subscribeRuntimeRecovery } from "../runtime-recovery"
 
 // Receipt provenance (REQ-018): catalog snapshot version recorded per install → update checks.
@@ -893,8 +892,7 @@ export function useExtensions(
       await Promise.all([loadInstalls(selectedProjectDir), loadStatus(), loadHubView()])
       return requested ? res : { ...res, reason: "reload-pending" }
     }
-    if (res.ok && receipt.type === "mcp")
-      await client?.mcp.disconnect({ name: receipt.name } as any).catch(() => {})
+    // I-11:main 在同一次卸载后经 convergeManagedMcp 把该名从已加载的 Location 移除。
     await Promise.all([loadStatus(), loadInstalls()])
     // fs/plugin removal needs a rescan(REQ-234 `#1529`:请 ext 调度器重载);cloud 只动账本(引擎无状态)无需重载。
     if (res.ok && receipt.type !== "mcp" && receipt.type !== "cloud") await requestReload("global", `uninstalled ${receipt.type} ${receipt.name}`)
@@ -920,26 +918,7 @@ export function useExtensions(
       ...(opts?.confirmExpiredReview ? { confirmExpiredReview: true } : {}),
     })
     if (!res.ok) return res
-    if (receipt.type === "mcp" && state === "disabled" && client) {
-      for (const directory of new Set([...(directories?.() ?? []), projectDir?.()].filter((dir): dir is string => !!dir))) {
-        try {
-          const { data } = await client.permission.list({ directory }, { throwOnError: true })
-          const replied = new Set<string>()
-          for (const request of data ?? []) {
-            const tool = approvalToolOf({
-              identity: request.metadata?.identity, authority: request.metadata?.authority,
-              location: request.metadata?.location, technicalId: request.permission,
-            })
-            if (tool?.connector !== receipt.name || replied.has(request.sessionID)) continue
-            await client.permission.reply({ directory, requestID: request.id, reply: "reject", message: t("codepuppy.ext.connectorDisabled") }, { throwOnError: true })
-            // The engine rejects the other pending requests in this session with the first rejection.
-            replied.add(request.sessionID)
-          }
-        } catch {
-          // The ledger is committed; an unavailable instance must not prevent disabling.
-        }
-      }
-    }
+    // I-11(design v9 §5):有账本记录的全局 MCP 由 main 收敛(只拒它自己的待答审批再断开),渲染进程不再拒审批或连断。
     await loadInstalls()
     // Codex r1 Blocker 3:账本已翻(committed),但 fs 类的运行面靠重载生效。REQ-234 `#1529`:重载交给 ext 调度器
     // (等会话空闲);请求没被受理才如实回 reload-pending,其余由该行的三档状态说。

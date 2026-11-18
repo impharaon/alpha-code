@@ -803,12 +803,12 @@ test("`#817` signed package children flip on through the production ext-set-inst
   // 安装后 skill / agent / mcp 三类可启停 child 均 disabled(catalog 首装缺省)—— #817 报的现场。
   expect(cfg().agent["generic-bundle-agent"].disable).toBe(true)
   expect(cfg().mcp["generic-bundle-remote"].enabled).toBe(false)
-  expect(allow()).toEqual({ v: 2, keys: [], scoped: [] })
+  expect(allow()).toEqual({ v: 3, keys: [], scoped: [], mcp: [{ name: "generic-bundle-remote", enabled: false }] })
 
   // skill:拨开 → 引擎允许集当场出现它。
   const skillOn = (await setState({ sender: { id: 1 } }, { type: "skill", name: "generic-bundle-skill", scope: "global", state: "enabled" })) as { ok: boolean; reason?: string }
   expect(skillOn.ok, skillOn.reason).toBe(true)
-  expect(allow()).toEqual({ v: 2, keys: ["skill--generic-bundle-skill"], scoped: [] })
+  expect(allow()).toEqual({ v: 3, keys: ["skill--generic-bundle-skill"], scoped: [], mcp: [{ name: "generic-bundle-remote", enabled: false }] })
 
   // agent:拨开 → disable 投影解除。
   const agentOn = (await setState({ sender: { id: 1 } }, { type: "agent", name: "generic-bundle-agent", scope: "global", state: "enabled" })) as { ok: boolean; reason?: string }
@@ -819,6 +819,8 @@ test("`#817` signed package children flip on through the production ext-set-inst
   const mcpOn = (await setState({ sender: { id: 1 } }, { type: "mcp", name: "generic-bundle-remote", scope: "global", state: "enabled" })) as { ok: boolean; reason?: string }
   expect(mcpOn.ok, mcpOn.reason).toBe(true)
   expect(cfg().mcp["generic-bundle-remote"].enabled).toBeUndefined()
+  // I-11:引擎里开不开由允许集 v3 决定,同一次持久写发布。
+  expect(allow()).toMatchObject({ mcp: [{ name: "generic-bundle-remote", enabled: true }] })
 
   // 拨回 disabled(反向投影仍通),为漂移负例归位。
   const mcpOff = (await setState({ sender: { id: 1 } }, { type: "mcp", name: "generic-bundle-remote", scope: "global", state: "disabled" })) as { ok: boolean }

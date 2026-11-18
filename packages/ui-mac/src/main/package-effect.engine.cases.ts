@@ -17,7 +17,8 @@ import type { CatalogEntry } from "../renderer/extensions/catalog-types"
 import { setPackageStateV1 } from "./ext-install-planner"
 import { applyPackageMutation, projectScopeIdentity, readPackageLedgerStateV1 } from "./ext-receipt-v2"
 import { computeInstalledGraphDigest } from "./ext-package-ledger-v3"
-import { applyPackageMcpV1, removePackageMcpV1 } from "./package-mcp-activation"
+import { createManagedMcpConvergence, managedMcpNamesOf } from "./package-mcp-activation"
+import { uninstallPackageV1 } from "./ext-package-uninstall"
 import type { EngineConnection } from "./engine-authorization"
 import { writeExplicitConfig, watchExplicitSources } from "./engine-explicit-config"
 
@@ -49,7 +50,9 @@ async function harness(name: string, scoped: boolean) {
   const planner = { globalRoot: () => root, advisoryGate: () => ({ allowed: true as const }), resolvePackage: async () => { throw Error("noncatalog fixture") } }
   let connection: EngineConnection | undefined
   const awaitServer = async () => { if (!connection) throw Error("engine not started"); return connection }
-  const install = createSourceInstaller({ ...planner, casBaseRoot: () => join(sandbox.root, name, "state"), environment: () => "dev", userDataPath: join(sandbox.root, name), sources, gate: makeRecoveryGate(() => ({})), catalogInstall: async () => { throw Error("empty catalog") }, activateMcp: (packageId) => applyPackageMcpV1(packageId, slot.projectDirectory, { root: () => root, awaitServer }), reloadSkills: () => {}, removeDeparting: () => {} })
+  const converge = createManagedMcpConvergence({ root: () => root, awaitServer, directory: () => slot.projectDirectory })
+  const apply = (packageId: string) => converge(managedMcpNamesOf(root, packageId))
+  const install = createSourceInstaller({ ...planner, casBaseRoot: () => join(sandbox.root, name, "state"), environment: () => "dev", userDataPath: join(sandbox.root, name), sources, gate: makeRecoveryGate(() => ({})), catalogInstall: async () => { throw Error("empty catalog") }, activateMcp: (packageId) => apply(packageId), reloadSkills: () => {}, removeDeparting: () => {} })
   const candidate = (await sources.searchSources("frontend-design")).candidates.find((row) => row.source === "claude-marketplace")!
   const installed = await install({ requestId: "effect_" + name, source: { kind: "candidate", candidateId: candidate.id }, effect: scoped ? { kind: "project", directory: slot.projectDirectory } : { kind: "all-projects" }, via: "chat" })
   expect(installed.ok).toBe(true)
@@ -95,7 +98,7 @@ export default {id:"test.package-effect",setup:async(ctx)=>{
     // resuming makes it reread that state, without editing any project file or package state.
     writeFileSync(user, readFileSync(user))
   }
-  return { root, other, slot, planner, installed, rpc, session, file, snapshots, sources, install, awaitServer, client, pauseWatcher, resumeWatcher, refreshes: () => refreshes, close: async () => { stop(); await engine.close(); process.chdir(previous) } }
+  return { root, other, slot, planner, installed, apply, converge, rpc, session, file, snapshots, sources, install, awaitServer, client, pauseWatcher, resumeWatcher, refreshes: () => refreshes, close: async () => { stop(); await engine.close(); process.chdir(previous) } }
 }
 
 for (const initial of ["global", "project"] as const) test(`disabled managed skill stays absent with stale explicit config (${initial})`, async () => {
@@ -110,7 +113,7 @@ for (const initial of ["global", "project"] as const) test(`disabled managed ski
     const stale = readFileSync(h.file, "utf8")
     expect(await setPackageStateV1({ packageId: h.installed.packageId, state: "disabled" }, h.planner)).toMatchObject({ ok: true })
     await Bun.sleep(150) // Model an RPC round trip slower than the 100 ms watcher debounce.
-    expect(JSON.parse(readFileSync(join(h.root, "skills-enabled.json"), "utf8"))).toEqual({ v: 2, keys: [], scoped: [] })
+    expect(JSON.parse(readFileSync(join(h.root, "skills-enabled.json"), "utf8"))).toEqual({ v: 3, keys: [], scoped: [], mcp: [] })
     expect(readFileSync(h.file, "utf8")).toBe(stale)
     expect((await h.rpc("rebuild")).some((skill) => skill.name === "frontend-design")).toBe(false)
     // Watcher is paused: prove tail/evaluate exclusion with the stale explicit paths,
@@ -169,11 +172,11 @@ test("project MCP activates only in matching Locations and scope narrowing revok
     await until(() => h.rpc("tools"), items => items.includes("browser_close"))
     expect((await h.rpc("close", undefined, h.session.id)).content.some((part) => part.type === "text" && part.text.length > 0)).toBe(true)
     const projection = readFileSync(join(h.root, "skills-enabled.json"), "utf8")
-    writeFileSync(join(h.root, "skills-enabled.json"), JSON.stringify({ v: 2, keys: [], scoped: [] }))
-    await applyPackageMcpV1("claude:playwright", h.slot.projectDirectory, { root: () => h.root, awaitServer: h.awaitServer })
+    writeFileSync(join(h.root, "skills-enabled.json"), JSON.stringify({ v: 3, keys: [], scoped: [], mcp: [{ name: "playwright", enabled: false }] }))
+    await h.apply("claude:playwright")
     await until(() => h.rpc("tools"), (items) => !items.includes("browser_close"))
     writeFileSync(join(h.root, "skills-enabled.json"), projection)
-    await applyPackageMcpV1("claude:playwright", h.slot.projectDirectory, { root: () => h.root, awaitServer: h.awaitServer })
+    await h.apply("claude:playwright")
     await until(() => h.rpc("tools"), (items) => items.includes("browser_close"))
     // Later/rebuilt Locations must consume the globally disabled leaf through ext's own scope transform.
     // `#1724`: a package-runner (npx) server reaches the engine as a native `mcp.servers` entry (startup-only timeout).
@@ -198,7 +201,7 @@ test("project MCP activates only in matching Locations and scope narrowing revok
       graph.installedGraphDigest = computeInstalledGraphDigest(graph)
       expect(applyPackageMutation(h.root, { operation: "update", transactionId: "mcp-effect", graphBeforeDigest: before.installedGraphDigest, graphAfter: graph, claimMutations: [], childRecordMutations: [] })).toMatchObject({ ok: true })
       before = graph
-      await applyPackageMcpV1(graph.packageId, h.slot.projectDirectory, { root: () => h.root, awaitServer: h.awaitServer })
+      await h.apply(graph.packageId)
     }
     await move()
     await until(() => h.rpc("tools", h.other), (items) => items.includes("browser_close"))
@@ -207,9 +210,12 @@ test("project MCP activates only in matching Locations and scope narrowing revok
     await until(() => h.rpc("tools", h.other), (items) => items.includes("browser_close"))
     expect(await h.rpc("tools", h.other)).toContain("browser_close")
     expect(await setPackageStateV1({ packageId: before.packageId, state: "disabled" }, h.planner)).toMatchObject({ ok: true })
-    await applyPackageMcpV1(before.packageId, h.slot.projectDirectory, { root: () => h.root, awaitServer: h.awaitServer })
+    await h.apply(before.packageId)
     await until(() => h.rpc("tools", h.other), (items) => !items.includes("browser_close"))
-    await removePackageMcpV1(before, h.slot.projectDirectory, h.awaitServer)
+    // Removal = the package leaves the ledger, then convergence removes the name everywhere (ext-ipc's order).
+    const kept = { ok: true as const }
+    expect(await uninstallPackageV1(before.packageId, { globalRoot: () => h.root, installers: { removeFsInstall: () => ({ ok: true as const, files: [] }), removeMcpConfig: () => kept, removeCommandConfig: () => kept, removeMcpSecretsStrict: () => kept, releaseCodePuppyConnectionBindings: () => kept, removeInstallGrants: () => ({ ok: true as const, removed: [] }), removePluginPath: () => kept } })).toMatchObject({ ok: true })
+    await h.converge(["playwright"])
     expect((await h.client.mcp.list()).data.some((server) => server.name === "playwright")).toBe(false)
     expect((await h.client.mcp.list({ location: { directory: h.other } })).data.some((server) => server.name === "playwright")).toBe(false)
     expect([snapshot(h.slot.projectDirectory), snapshot(h.other)]).toEqual(h.snapshots)
@@ -238,7 +244,7 @@ test("catalog item is usable only in project A and leaves both projects' config 
       installRemoteSkill: unexpected, removeFsInstall: unexpected, agentPresent: unexpected, downloadRemoteAsset: unexpected,
     },
   }
-  const apply = (packageId: string) => applyPackageMcpV1(packageId, h.slot.projectDirectory, { root: () => h.root, awaitServer: h.awaitServer })
+  const apply = h.apply
   const install = createSourceInstaller({
     ...native, userDataPath: h.root, sources: h.sources, gate: makeRecoveryGate(() => ({})), activateMcp: apply, reloadSkills: unexpected, removeDeparting: unexpected,
     catalogInstall: (id, request) => installCatalogFromSource(id, request, {

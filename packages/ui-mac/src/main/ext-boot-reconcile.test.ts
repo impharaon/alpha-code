@@ -283,7 +283,7 @@ describe("#395 enforcement gap（r11 pivot：只 plugin 落盘失败入 gap，mc
 
   test("skills 派生自愈:账本损坏且删不掉陈旧允许集 → staleAllowList(直接测 reconcileSkillsDerivation,不经锁)", () => {
     record({ name: "sk", kind: "skill", desiredState: "enabled" })
-    fs.writeFileSync(skillsEnabledPath(root), JSON.stringify({ v: 2, keys: ["skill--sk", "skill--ghost"], scoped: [] })) // 陈旧含 ghost
+    fs.writeFileSync(skillsEnabledPath(root), JSON.stringify({ v: 3, keys: ["skill--sk", "skill--ghost"], scoped: [], mcp: [] })) // 陈旧含 ghost
     fs.writeFileSync(path.join(root, "installs.json"), "corrupt") // 账本损坏 → 走删陈旧派生分支
     fs.chmodSync(root, 0o555) // 目录只读 → unlink 派生文件失败
     try {

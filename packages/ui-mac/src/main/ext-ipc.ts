@@ -1,6 +1,5 @@
 import type { ProjectConfigView } from "@opencode/schema/codepuppy-project-config"
 import { projectExecutableRows } from "./codepuppy-ext-trust"
-import { isCodePuppyOfficeCatalogId } from "../shared/office-advisories"
 import { isCloudMcpWithheld } from "./codepuppy-config-injection"
 import { isOfficialConnector } from "./official-connector-recipes"
 import { removeOfficialConnector, releaseOfficialConnectorResources } from "./official-connector-resources"
@@ -91,7 +90,8 @@ import { createPackageMcpOauthEngineV1 } from "./package-mcp-oauth"
 import { createPluginSources, installedPackageIdentity, type PreparePluginSourceResultV1 } from "./plugin-sources"
 import { createSourceInstaller, installCatalogFromSource } from "./install-from-source"
 import { createPackageDeclarationResolver } from "./package-declarations"
-import { applyPackageMcpV1, removePackageMcpV1 } from "./package-mcp-activation"
+import { createManagedMcpConvergence, managedMcpNamesOf } from "./package-mcp-activation"
+import { generationMcpServerNames } from "./mcp-server-records"
 import { findMcpServerRecord } from "./mcp-server-lifecycle"
 import { isInstallOutcomeV1, type InstallRequestV1 } from "../shared/plugin-install"
 import type { PackageAcceptedFactsV1 } from "./package-installability"
@@ -145,15 +145,17 @@ export function registerExtIpcHandlers(
       try { listener() } catch (error) { getLogger()?.warn(`ext-hub-view-changed listener failed: ${error instanceof Error ? error.message : String(error)}`) }
     }
   }
+  // I-11(design v9 §4.4「运行时收敛」):受管全局 MCP 的一切运行时操作只经这一个实例(按名串行,执行时读最终投影)。
+  const convergeManagedMcp = createManagedMcpConvergence({ root: codepuppyGlobalRoot, awaitServer, directory: codepuppyUserWorkspaceDir })
   const reloads = createReloadCoordinator({
     restartConnectors: () => officialRuntime?.refresh() ?? Promise.resolve(false),
     applyPackageMcp: async (items) => {
       const state = readPackageLedgerStateV1(codepuppyGlobalRoot(), { sideEffectFree: true })
       if (!state.ok) return
-      await Promise.all(state.packageGraphs.filter(graph => {
+      await convergeManagedMcp(state.packageGraphs.filter(graph => {
         const nodes = [graph.root, ...graph.children]
         return nodes.some(node => node.kind === "mcp") && (!items.length || items.some(item => item.id === graph.packageId || nodes.some(node => node.componentId === item.id)))
-      }).map(graph => applyPackageMcpV1(graph.packageId, codepuppyUserWorkspaceDir(), { root: codepuppyGlobalRoot, awaitServer })))
+      }).flatMap(graph => [graph.root, ...graph.children].filter(node => node.kind === "mcp").map(node => node.name)))
     },
     log: (line) => getLogger()?.log(line),
     onChange: notifyHubViewChanged,
@@ -1111,12 +1113,12 @@ export function registerExtIpcHandlers(
     }
   }
   ipcMain.handle(LOCAL_PACKAGE_READ_CHANNELS.preparePluginSource, (_event: IpcMainInvokeEvent, input: unknown) => preparePluginSource(input))
-  const activatePackageMcp = (packageId: string) => applyPackageMcpV1(packageId, codepuppyUserWorkspaceDir(), { root: codepuppyGlobalRoot, awaitServer })
+  const activatePackageMcp = (packageId: string) => convergeManagedMcp(managedMcpNamesOf(codepuppyGlobalRoot(), packageId))
   const reloadPackageSkills = (packageId: string) => reloads.request({ scope: "global", items: packageReloadItems(packageId), reason: `installed package content ${packageId}`, connectorChange: packageNeedsStartupRefresh(packageId) })
   const removeDepartingPackageComponents = async (children: Array<{ kind: string; name: string }>) => {
     const removed = packageChildFileCleanup(children)
     if (!removed.ok) getLogger().warn("Package departing content cleanup is pending")
-    if (children.length) await removePackageMcpV1({ root: children[0]!, children: children.slice(1) }, codepuppyUserWorkspaceDir(), awaitServer).catch(() => undefined)
+    await convergeManagedMcp(children.filter((child) => child.kind === "mcp").map((child) => child.name)).catch(() => undefined)
   }
   // Runtime work is completed below, after the recovery mutex has released.
   const sourceInstaller = createSourceInstaller({
@@ -1188,23 +1190,10 @@ export function registerExtIpcHandlers(
   // mcp/agent/plugin 在锁内做**持久化 config 投影普通原子写 + 账本翻转**(非事务;disable config 先、
   // enable 账本先,失败回滚,见 setInstallStateByKey),skill 纯账本翻转(投影经引擎注入门)。
   // 此处不得预持锁(会与 planner 内锁互斥死锁)。
-  const setInstallStateBody = async (intent: unknown) => {
-    // #397:enable 方向的 curation 闸需要 resolveEntry(已验 effective catalog)—— 直接用
-    // plannerDeps(自带 #314/#315 security browse-only 语义与懒冻结 advisory 视图)。
-    const official = !!intent && typeof intent === "object" && "name" in intent && typeof intent.name === "string" && isOfficialConnector(intent.name)
-    const decoded = decodeSetStateIntent(intent)
-    const firstParty = decoded.ok && decoded.intent.scope === "global" && decoded.intent.type === "mcp" && isCodePuppyOfficeCatalogId(`mcp:${decoded.intent.name}`)
-    if ((official || firstParty) && !officialRuntime) return { ok: false, reason: "official connector runtime unavailable" }
-    const result = await setInstallStateByKey(intent, plannerDeps())
-    if (result.ok && decoded.ok && (official || firstParty)) {
-      reloads.request({
-        scope: "global", items: [{ id: `mcp:${decoded.intent.name}`, scope: "global" }],
-        reason: `set mcp ${decoded.intent.name} ${decoded.intent.state}`, connectorChange: true,
-      })
-      return { ...result, reason: "reload-pending" }
-    }
-    return result
-  }
+  // #397:enable 方向的 curation 闸需要 resolveEntry(已验 effective catalog)—— 直接用
+  // plannerDeps(自带 #314/#315 security browse-only 语义与懒冻结 advisory 视图)。
+  // I-11:官方 / 第一方连接器同样只做持久写;运行时由写闸外的 convergeManagedMcp 收敛,不重载、不换代。
+  const setInstallStateBody = (intent: unknown) => setInstallStateByKey(intent, plannerDeps())
   // ADR-030(#372):收回路径的残留检测(只读)与显式清理(journal 在场 fail-closed;
   // generation-aware —— 删受控 ext-store + 对应账本,绝不落 flat 删除)。
   ipcMain.handle("ext-project-residuals-check", async (_event: IpcMainInvokeEvent, projectDir: unknown) => {
@@ -1349,7 +1338,7 @@ export function registerExtIpcHandlers(
           })
           const reloadItems = graph ? packageReloadItems(graph.packageId) : []
           const result = await uninstallPackageV1(packageId, { globalRoot: codepuppyGlobalRoot, installers: packageArtifactInstallers() })
-          if (result.ok && graph) await removePackageMcpV1(graph, codepuppyUserWorkspaceDir(), awaitServer).catch(() => undefined)
+          if (result.ok && graph) await convergeManagedMcp([graph.root, ...graph.children].filter((node) => node.kind === "mcp").map((node) => node.name)).catch(() => undefined)
           if (result.ok && launchConfigured)
             reloads.request({ scope: "global", items: reloadItems, reason: `uninstalled package ${String(packageId)}`, connectorChange: true })
           return result
@@ -1405,7 +1394,12 @@ export function registerExtIpcHandlers(
       return fn(...a)
     }
   ipcMain.handle(GATED_WRITE_CHANNELS.installCatalog, barrier(gatedWrite.installCatalog))
-  ipcMain.handle(GATED_WRITE_CHANNELS.uninstallV2, barrier(gatedWrite.uninstallV2))
+  ipcMain.handle(GATED_WRITE_CHANNELS.uninstallV2, barrier(async (intent: unknown) => {
+    const result = await gatedWrite.uninstallV2(intent)
+    const decoded = decodeUninstallIntent(intent)
+    if (decoded.ok && decoded.intent.scope === "global" && decoded.intent.type === "mcp") await convergeManagedMcp([decoded.intent.name])
+    return result
+  }))
   ipcMain.handle(GATED_WRITE_CHANNELS.uninstallPackage, barrier(gatedWrite.uninstallPackage))
   // A folder request keeps its captured candidate across retries. Only the picker/capture runs outside
   // the gate; the ordinary candidate install still passes through the same ledger barrier/write entry.
@@ -1459,18 +1453,33 @@ export function registerExtIpcHandlers(
     const result = await installFromSource({ requestId: "hub_" + randomUUID(), source: { kind: "catalog", catalogId: packageId }, effect: { kind: "all-projects" }, via: "hub" })
     return isInstallOutcomeV1(result) && !result.ok ? { ok: false, reason: result.detail } : result
   })
+  // I-11(design v9 §5「MCP 组件开关」第 3 步):凡可能发布过允许集的写,结束后(成功或失败)为涉及的名字请求一次收敛。
+  const packageIdOf = (intent: unknown) =>
+    intent && typeof intent === "object" && "packageId" in intent && typeof intent.packageId === "string" ? intent.packageId : undefined
   ipcMain.handle(GATED_WRITE_CHANNELS.setPackageState, barrier(async (intent: unknown) => {
     const result = await gatedWrite.setPackageState(intent)
-    if (result && typeof result === "object" && "ok" in result && result.ok) await activatePackageMcp((intent as { packageId: string }).packageId)
+    const packageId = packageIdOf(intent)
+    if (packageId) await activatePackageMcp(packageId)
     return result
   }))
   ipcMain.handle(GATED_WRITE_CHANNELS.savePackageSecrets, barrier(async (intent: unknown) => {
     const result = await gatedWrite.savePackageSecrets(intent)
-    if (result && typeof result === "object" && "ok" in result && result.ok) await activatePackageMcp((intent as { packageId: string }).packageId)
+    const packageId = packageIdOf(intent)
+    if (!packageId) return result
+    const names = managedMcpNamesOf(codepuppyGlobalRoot(), packageId)
+    await convergeManagedMcp(names)
+    // v9-9:换掉本代启动时已在内联层里的远程定义(凭据引用带版本)⇒ 换代;本代中途新装的只收敛。
+    if (result && typeof result === "object" && "ok" in result && result.ok && names.some((name) => generationMcpServerNames().has(name)))
+      reloads.request({ scope: "global", items: packageReloadItems(packageId), reason: `saved package credentials ${packageId}`, connectorChange: true })
     return result
   }))
   ipcMain.handle(GATED_WRITE_CHANNELS.rollback, barrier(gatedWrite.rollback))
-  ipcMain.handle(GATED_WRITE_CHANNELS.setInstallState, barrier(gatedWrite.setInstallState))
+  ipcMain.handle(GATED_WRITE_CHANNELS.setInstallState, barrier(async (intent: unknown) => {
+    const result = await gatedWrite.setInstallState(intent)
+    const decoded = decodeSetStateIntent(intent)
+    if (decoded.ok && decoded.intent.scope === "global" && decoded.intent.type === "mcp") await convergeManagedMcp([decoded.intent.name])
+    return result
+  }))
   ipcMain.handle(GATED_WRITE_CHANNELS.projectResidualsClean, barrier(gatedWrite.projectResidualsClean))
   ipcMain.handle(GATED_WRITE_CHANNELS.removeMcpLegacy, barrier(gatedWrite.removeMcpLegacy))
   ipcMain.handle(GATED_WRITE_CHANNELS.persistMcp, barrier(gatedWrite.persistMcp))

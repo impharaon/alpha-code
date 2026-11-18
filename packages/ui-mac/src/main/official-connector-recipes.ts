@@ -10,12 +10,10 @@ import { keychainBackend } from "./codepuppy-keychain-backend"
 // Source: DBHub v1.5.0 CLI migration template and https://dbhub.ai/config/toml .
 export const DBHUB_READONLY_TOML =
   '[[sources]]\nid = "default"\ndsn = "${DSN}"\n\n[[tools]]\nname = "execute_sql"\nsource = "default"\nreadonly = true\n'
-export const OFFICIAL_CONNECTOR_NAMES = ["github-official", "dbhub-readonly"] as const
-export type OfficialConnectorName = (typeof OFFICIAL_CONNECTOR_NAMES)[number]
+import type { OfficialConnectorName } from "./official-connector-names"
+export { OFFICIAL_CONNECTOR_NAMES, isOfficialConnector, type OfficialConnectorName } from "./official-connector-names"
 export const officialConnectorFailure = () =>
   new Error("official-connector-needs-reentry: secure storage or runtime prerequisite unavailable")
-export const isOfficialConnector = (name: string): name is OfficialConnectorName =>
-  OFFICIAL_CONNECTOR_NAMES.some((entry) => entry === name)
 export const insideDirectory = (root: string, target: string) => target === root || target.startsWith(root + sep)
 
 export function officialConnectorBackend() {

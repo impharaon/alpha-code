@@ -1398,7 +1398,7 @@ it.live("scope · parsed managed skills use positive membership before and after
     // Real pinned Claude skill; provenance and digest are in ui-mac/test-fixtures/plugin-helper/provenance.json.
     writeFileSync(join(generation, "SKILL.md"), readFileSync(join(fixtureRoot, "plugins/frontend-design/skills/frontend-design/SKILL.md")))
     const allow = (scoped: { kind: string; name: string; projectPath: string }[]) =>
-      writeFileSync(join(root, "skills-enabled.json"), JSON.stringify({ v: 2, keys: [], scoped }))
+      writeFileSync(join(root, "skills-enabled.json"), JSON.stringify({ v: 3, keys: [], scoped, mcp: [] }))
     allow([{ kind: "skill", name: "frontend-design", projectPath: directory }])
     const ext = yield* activateExtUntilFinished
     const plugins = yield* Plugins.Service
@@ -1425,16 +1425,73 @@ it.live("scope · MCP transforms enable only matching project members", () =>
     const root = join(scratch, "codepuppy-state", "env", "dev")
     const directory = realpathSync((yield* Location.Service).directory)
     const projection = join(root, "skills-enabled.json")
-    writeFileSync(projection, JSON.stringify({ v: 2, keys: [], scoped: [{ kind: "mcp", name: "managed", projectPath: directory }] }))
+    const managed = [{ name: "managed", enabled: false }]
+    writeFileSync(projection, JSON.stringify({ v: 3, keys: [], scoped: [{ kind: "mcp", name: "managed", projectPath: directory }], mcp: managed }))
     const mcp = recordingMcp({ managed: { type: "remote", url: "https://example.test/mcp", disabled: true }, unrelated: { type: "remote", url: "https://example.test/other", disabled: false } })
     yield* activate(CodePuppyExt, { mcp })
     expect(mcp.servers.get("managed")).toMatchObject({ disabled: false })
-    writeFileSync(projection, JSON.stringify({ v: 2, keys: [], scoped: [{ kind: "mcp", name: "managed", projectPath: join(directory, "other") }] }))
+    writeFileSync(projection, JSON.stringify({ v: 3, keys: [], scoped: [{ kind: "mcp", name: "managed", projectPath: join(directory, "other") }], mcp: managed }))
     mcp.rerun()
     expect(mcp.servers.get("managed")).toMatchObject({ disabled: true })
     expect(mcp.servers.get("unrelated")).toMatchObject({ disabled: false })
   }),
 )
+
+// I-11(design v9 §4.4「收口」):受管全局 MCP 开不开只看允许集 v3,压过配置文档层里的启停值;重算时重读。
+it.live("scope · managed global MCP state follows the v3 projection over any config-layer value and is reread on each recompute", () =>
+  Effect.gen(function* () {
+    env({})
+    const projection = join(scratch, "codepuppy-state", "env", "dev", "skills-enabled.json")
+    const publish = (on: boolean) =>
+      writeFileSync(projection, JSON.stringify({ v: 3, keys: [], scoped: [], mcp: [{ name: "late", enabled: on }, { name: "remote-echo", enabled: !on }] }))
+    publish(true)
+    const mcp = recordingMcp({
+      late: { type: "local", command: ["late-mcp"], disabled: true },
+      "remote-echo": { type: "remote", url: "https://example.test/mcp" },
+      unrelated: { type: "local", command: ["user-mcp"], disabled: false },
+    })
+    yield* activate(CodePuppyExt, { mcp })
+    expect(mcp.servers.get("late")).toMatchObject({ disabled: false })
+    expect(mcp.servers.get("remote-echo")).toMatchObject({ disabled: true })
+    publish(false)
+    mcp.rerun()
+    expect(mcp.servers.get("late")).toMatchObject({ disabled: true })
+    expect(mcp.servers.get("remote-echo")).toMatchObject({ disabled: false })
+    expect(mcp.servers.get("unrelated")).toMatchObject({ disabled: false })
+  }),
+)
+
+// I-11 证明 5(design v9 §5「生效范围投影」):允许集读不到或不认识 ⇒ 一切非云、非项目 MCP 停用;云 MCP 与项目 MCP 照旧。
+for (const [label, content] of [
+  ["missing", undefined],
+  ["not JSON", "{ not json"],
+  ["v2 shape", JSON.stringify({ v: 2, keys: [], scoped: [] })],
+  ["duplicate MCP names", JSON.stringify({ v: 3, keys: [], scoped: [], mcp: [{ name: "late", enabled: true }, { name: "late", enabled: true }] })],
+] as const)
+  it.live(`scope · an unreadable projection (${label}) disables every MCP except the cloud and project ones`, () =>
+    Effect.gen(function* () {
+      const token = join(scratch, "mcp-token-unreadable")
+      writeFileSync(token, "secret-token\n")
+      env({}, { killSwitch: true, cloudMcp: testCloudMcp("https://cloud.example/mcp", token) })
+      const directory = realpathSync((yield* Location.Service).directory)
+      mkdirSync(join(directory, ".codepuppy"), { recursive: true })
+      writeFileSync(join(directory, ".codepuppy", "codepuppy.jsonc"), JSON.stringify({ mcp: { proj: { type: "local", command: ["proj-mcp"] } } }))
+      decide(directory, true)
+      const projection = join(scratch, "codepuppy-state", "env", "dev", "skills-enabled.json")
+      if (content === undefined) rmSync(projection, { force: true })
+      else writeFileSync(projection, content)
+      const mcp = recordingMcp({
+        codepuppy: { type: "remote", url: "http://127.0.0.1:1/withheld", disabled: true },
+        late: { type: "local", command: ["late-mcp"], disabled: false },
+        unrelated: { type: "local", command: ["user-mcp"] },
+      })
+      yield* activate(CodePuppyExt, { mcp })
+      expect(mcp.servers.get("late")).toMatchObject({ disabled: true })
+      expect(mcp.servers.get("unrelated")).toMatchObject({ disabled: true })
+      expect(mcp.servers.get("codepuppy")).toEqual({ type: "remote", url: "https://cloud.example/mcp", oauth: false, headers: { Authorization: "Bearer secret-token" } })
+      expect(mcp.servers.get("proj")).toEqual({ type: "local", command: ["proj-mcp"] })
+    }),
+  )
 
 
 itWithPermission.live("D3/I-10 installing the user's own plugin asks once in every tier with its name and source; automation is denied before any ask", () => Effect.gen(function* () {

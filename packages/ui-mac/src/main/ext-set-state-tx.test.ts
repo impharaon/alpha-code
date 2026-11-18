@@ -331,7 +331,7 @@ describe("setInstallStateByKey(#817 签名 package child)", () => {
     )
     expect(en.ok).toBe(true)
     expect(findRecordV2(root, "skill", "psk")!.desiredState).toBe("enabled")
-    expect(readAllowSet()).toEqual({ v: 2, keys: ["skill--psk"], scoped: [] })
+    expect(readAllowSet()).toEqual({ v: 3, keys: ["skill--psk"], scoped: [], mcp: [] })
   })
 
   test("agent child:enable 解除 codepuppy.jsonc 的 disable:true 投影", async () => {
@@ -377,7 +377,7 @@ describe("setInstallStateByKey(#817 签名 package child)", () => {
     )
     expect(dis.ok).toBe(true)
     expect(findRecordV2(root, "skill", "poff")!.desiredState).toBe("disabled")
-    expect(readAllowSet()).toEqual({ v: 2, keys: [], scoped: [] })
+    expect(readAllowSet()).toEqual({ v: 3, keys: [], scoped: [], mcp: [] })
   })
 
   test("package-managed 但 record manifestDigest 漂移 ⇒ exact 候选=0 fail-closed;**resolveEntry 零调用**(绝不回退 legacy)", async () => {
@@ -630,7 +630,7 @@ describe("setInstallStateByKey(#1136 随包快照携带真实 package:bundled �
     )
     expect(en.ok).toBe(true)
     expect(findRecordV2(root, "skill", "codepuppy-first")!.desiredState).toBe("enabled")
-    expect(readAllowSet()).toEqual({ v: 2, keys: ["skill--codepuppy-first"], scoped: [] })
+    expect(readAllowSet()).toEqual({ v: 3, keys: ["skill--codepuppy-first"], scoped: [], mcp: [] })
   })
 
   test("已装 envelope 摘要与随包不同(同 packageId@version)⇒ 拒:content does not match;账本不动", async () => {
@@ -747,7 +747,7 @@ describe("setInstallStateByKey(#817 共有 child 存在量词)", () => {
       pid === b.packageId ? foundStub(b)(pid, ver) : { status: "missing", channel: "cache", anyVersionPresent: pid === a.packageId }
     const en = await setInstallStateByKey({ type: "skill", name: "shx", scope: "global", state: "enabled" }, pkgDeps({ resolvePackage: viaB }))
     expect(en.ok).toBe(true)
-    expect(readAllowSet()).toEqual({ v: 2, keys: ["skill--shx"], scoped: [] })
+    expect(readAllowSet()).toEqual({ v: 3, keys: ["skill--shx"], scoped: [], mcp: [] })
     // 反向(登记的设计内 fail-closed 边):后写者 B 下架,A 仍在但版本对不上 record ⇒ 全部候选失败 ⇒ 拒。
     const dis = await setInstallStateByKey({ type: "skill", name: "shx", scope: "global", state: "disabled" }, deps())
     expect(dis.ok).toBe(true)
@@ -765,7 +765,7 @@ describe("setInstallStateByKey(#817 共有 child 存在量词)", () => {
       expect(refused.code).toBe("curation-unverifiable")
       expect(refused.reason).toContain("update or reinstall")
     }
-    expect(readAllowSet()).toEqual({ v: 2, keys: [], scoped: [] })
+    expect(readAllowSet()).toEqual({ v: 3, keys: [], scoped: [], mcp: [] })
     expect(findRecordV2(root, "skill", "shx")!.desiredState).toBe("disabled")
   })
 })

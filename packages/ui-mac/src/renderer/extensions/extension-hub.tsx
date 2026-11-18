@@ -68,7 +68,7 @@ import { parseFailureCode } from "@opencode/schema/codepuppy-net-failure"
 import { extensionError, mcpFailureReason, catalogDescription, iconFor, iconForRow, MoreMenu, PackageLogo, typeLabel, Svg, HubIc, KitIc, lineIconFor, RowStatus, type MoreMenuItem } from "./ext-presentation"
 import { inventoryInstallRow, healthPresentation } from "./ext-inventory-present"
 import { ExtensionDetail, InstalledPackageDetail, type DetailTarget } from "./extension-detail"
-import { isCodePuppyOfficeCatalogId, officeAdvisoryFor, retiredCommunityOfficeFor } from "../../shared/office-advisories"
+import { officeAdvisoryFor, retiredCommunityOfficeFor } from "../../shared/office-advisories"
 // #397 PR-B:四级货架与策展呈现(纯派生层;解码真源 = shared/catalog-curation,fail-closed)。
 import { curatedOf, curationMapOf, curationOf, isArchived, isSessionGrant, splitBrowse } from "./ext-curation-view"
 // #408 PR-C:会话开关纯派生层(状态机 / 拒绝码路由;真源 = main grant 登记 + 本地连接结果)。
@@ -285,12 +285,8 @@ export function ExtensionHub(props: {
       pushToast({ kind: "error", title: extensionError(r.reason, "codepuppy.ext.error.enable") })
       return
     }
-    let mcPending = false
-    if (args.type === "mcp" && r.reason !== "reload-pending" && !isCodePuppyOfficeCatalogId(args.receipt.id)) {
-      const mc = await ext.setMcpConnected(args.name, true)
-      mcPending = mc.reason === "reload-pending"
-    }
-    if (r.reason === "reload-pending" || mcPending) pushToast({ kind: "info", title: t("codepuppy.ext.statePendingReload") })
+    // I-11:有账本记录的 MCP 由 main 在同一次开关里收敛到引擎,渲染进程不再自己连断。
+    if (r.reason === "reload-pending") pushToast({ kind: "info", title: t("codepuppy.ext.statePendingReload") })
     await refetchGovernance()
   }
   const proceedExpiredEnable = async (): Promise<void> => {
@@ -377,12 +373,8 @@ export function ExtensionHub(props: {
       pushToast({ kind: "error", title: extensionError(r.reason, "codepuppy.ext.error.toggle") })
       return
     }
-    let mcPending = false
-    if (args.type === "mcp" && r.reason !== "reload-pending" && !isCodePuppyOfficeCatalogId(args.receipt.id)) {
-      const mc = await ext.setMcpConnected(args.name, next === "enabled")
-      mcPending = mc.reason === "reload-pending"
-    }
-    if (r.reason === "reload-pending" || mcPending) pushToast({ kind: "info", title: t("codepuppy.ext.statePendingReload") })
+    // I-11:有账本记录的 MCP 由 main 在同一次开关里收敛到引擎(含拒掉它自己的待答审批),渲染进程不再自己连断。
+    if (r.reason === "reload-pending") pushToast({ kind: "info", title: t("codepuppy.ext.statePendingReload") })
     await refetchGovernance()
     // `#784`:包卡上的「未启用」由包图投影的 `desiredState` 画出,而它不在 governance 的
     // 指纹里 —— 不显式重取,开关拨完包卡不变,用户会以为没生效。
@@ -479,7 +471,16 @@ export function ExtensionHub(props: {
   const [marketplace, setMarketplace] = createSignal<Extract<PreparedPluginSourceV1, { kind: "marketplace" }> | null>(null)
   /** Keep the newly added package visible in the existing installed group. */
   const [highlightPackage, setHighlightPackage] = createSignal<string | null>(null)
-  const [packBusy, setPackBusy] = createSignal<string | null>(null)
+  // I-11:按包记忙(一组 ID)—— 只为不让同一行在请求未回时再次发起;正确性在 main 的按名收敛。
+  const [busyPackages, setBusyPackages] = createSignal<ReadonlySet<string>>(new Set())
+  const packBusy = (packageId: string) => busyPackages().has(packageId)
+  const markPackBusy = (packageId: string, busy: boolean) =>
+    setBusyPackages((current) => {
+      const next = new Set(current)
+      if (busy) next.add(packageId)
+      else next.delete(packageId)
+      return next
+    })
   const [packErr, setPackErr] = createSignal<Record<string, string>>({})
   /** 上一次整包移除**留下了什么、为什么**。
    *
@@ -541,12 +542,12 @@ export function ExtensionHub(props: {
   const runImportFolder = () => runPrepareSource({ kind: "folder" })
   // ── `#784` 第 7 跳:整包移除 ─────────────────────────────────────────────────────────────
   const runRemovePackage = async (packageId: string): Promise<void> => {
-    if (packBusy() === packageId) return
+    if (packBusy(packageId)) return
     // 名字要在**移除之前**取:成功之后这个包就从投影里消失了,再取只能拿到空。
     const state = installedPackages()
     const target = state && state.ok ? state.packages.find((pack) => pack.packageId === packageId) : undefined
     const label = target ? packLabel(target) : packageId
-    setPackBusy(packageId)
+    markPackBusy(packageId, true)
     setPackErr((prev) => ({ ...prev, [packageId]: "" }))
     try {
       const r = await ext.uninstallPackage(packageId)
@@ -567,7 +568,7 @@ export function ExtensionHub(props: {
         r.reloadPending ? "info" : "success",
       )
     } finally {
-      setPackBusy(null)
+      markPackBusy(packageId, false)
     }
   }
   const runImportDialog = () => runPrepareSource({ kind: "git", url: importInput().trim() })
@@ -1548,7 +1549,7 @@ export function ExtensionHub(props: {
       key: "package-state",
       label: t("codepuppy.ext.turnOn"),
       checked: pack.desiredState === "enabled",
-      disabled: packBusy() === pack.packageId,
+      disabled: packBusy(pack.packageId),
       onSelect: () => void runPackageToggle(pack),
     },
     {
@@ -1563,13 +1564,13 @@ export function ExtensionHub(props: {
       key: "remove-package",
       label: t("codepuppy.ext.remove"),
       danger: true,
-      disabled: packBusy() === pack.packageId,
+      disabled: packBusy(pack.packageId),
       onSelect: () => void runRemovePackage(pack.packageId),
     },
   ]
   const runPackageToggle = async (pack: InstalledPackageV1) => {
-    if (packBusy() === pack.packageId) return
-    setPackBusy(pack.packageId)
+    if (packBusy(pack.packageId)) return
+    markPackBusy(pack.packageId, true)
     setPackErr((current) => ({ ...current, [pack.packageId]: "" }))
     try {
       const result = await ext.setPackageState({
@@ -1583,7 +1584,7 @@ export function ExtensionHub(props: {
         }))
       await refetchPackages()
     } finally {
-      setPackBusy(null)
+      markPackBusy(pack.packageId, false)
     }
   }
   const InstalledPackageRow = (cp: { pack: InstalledPackageV1 }) => {
@@ -1649,7 +1650,7 @@ export function ExtensionHub(props: {
       )
     }
     const status = () => {
-      if (packBusy() === pack().packageId) return { kind: "progress" as const, text: t("codepuppy.ext.packageApplying") }
+      if (packBusy(pack().packageId)) return { kind: "progress" as const, text: t("codepuppy.ext.packageApplying") }
       const failedReload = ext.store.hubRows.find(
         (row) =>
           row.scope === "global" &&

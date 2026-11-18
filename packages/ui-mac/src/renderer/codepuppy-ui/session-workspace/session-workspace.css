@@ -847,7 +847,7 @@
   position: relative;
 }
 
-[data-codepuppy-session-not-found] [data-slot="not-found-body"] {
+[data-codepuppy-session-not-found] [data-codepuppy-not-found="body"] {
   position: absolute;
   top: 30%;
   right: 0;
@@ -859,7 +859,7 @@
   text-align: center;
 }
 
-[data-codepuppy-session-not-found] [data-slot="not-found-icon"] {
+[data-codepuppy-session-not-found] [data-codepuppy-not-found="icon"] {
   width: 20px;
   height: 20px;
   margin-bottom: 14px;

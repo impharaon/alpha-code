@@ -116,7 +116,7 @@ export const SLASH_DESC_ZH: Record<string, string> = {
   "agent-creator": "创建自定义 Agent",
   "customize-codepuppy": "配置与定制 Code Puppy(连接器 / 技能 / 治理)",
   "integrate-project": "导入外部生态内容(.claude / .agents)",
-  "codepuppy-workspace": "总结与记忆写入 ~/code-puppy 工作目录(Journal / Memory)",
+  "codepuppy-workspace": "总结与记忆写入默认工作区「Code Puppy」（Journal / Memory）",
 }
 
 export function displayDescription(item: { trigger: string; description?: string; title?: string }): string {

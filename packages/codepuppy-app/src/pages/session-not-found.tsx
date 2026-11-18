@@ -4,8 +4,8 @@
 export function SessionNotFound(props: { title: string; description: string; action: string; onAction: () => void }) {
   return (
     <div class="flex-1 min-h-0 overflow-hidden" data-codepuppy-session-not-found="">
-      <div data-slot="not-found-body">
-        <svg data-slot="not-found-icon" viewBox="0 0 24 24" aria-hidden="true">
+      <div data-codepuppy-not-found="body">
+        <svg data-codepuppy-not-found="icon" viewBox="0 0 24 24" aria-hidden="true">
           <path d="M5 18.5V7a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H8Z" />
         </svg>
         <h4>{props.title}</h4>

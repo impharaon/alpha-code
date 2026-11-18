@@ -4,6 +4,7 @@
 // 本文件只保留既有导出名,importers 免改动。上游 bump 后如见路由 404,查 manifest 而非这里。
 
 import { decodeDirectory, encodeDirectory, hrefFor } from "../../shared/route-manifest"
+import { workspaceDisplayName } from "../codepuppy-ui/default-workspace"
 
 export function base64UrlEncode(value: string): string {
   return encodeDirectory(value)
@@ -41,9 +42,9 @@ export function homeHref(): string {
   return hrefFor.home()
 }
 
-/** The basename a project shows in the sidebar (matches opencode's worktree → label). */
+/** The basename a project shows in the sidebar (matches opencode's worktree → label); the default workspace shows its one product name. */
 export function projectLabel(worktree: string): string {
   const trimmed = worktree.replace(/[\/\\]+$/, "")
   const base = trimmed.split(/[\/\\]/).pop()
-  return base && base.length > 0 ? base : trimmed
+  return workspaceDisplayName(worktree, base && base.length > 0 ? base : trimmed)
 }

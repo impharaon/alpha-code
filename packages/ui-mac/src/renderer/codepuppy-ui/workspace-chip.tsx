@@ -9,6 +9,7 @@
 
 import { For, onCleanup, Show } from "solid-js"
 import { projectLabel } from "../sidebar/route"
+import { isDefaultWorkspaceDir, workspaceDisplayName } from "./default-workspace"
 import type { CodePuppyProject } from "../sidebar/use-projects"
 import { pushToast } from "./Toast"
 import { t } from "../i18n"
@@ -21,7 +22,7 @@ export function visibleWorkspaces(projects: readonly CodePuppyProject[]): CodePu
 /** chip 与新对话页标题共用的目录标签:已注册项目取项目名,未注册目录取路径末段。 */
 export function workspaceLabel(projects: readonly CodePuppyProject[], dir: string | undefined): string {
   const project = projects.find((p) => p.worktree === dir)
-  return project?.name ?? (dir ? projectLabel(dir) : t("codepuppy.home.chooseWorkspace"))
+  return dir ? workspaceDisplayName(dir, project?.name ?? projectLabel(dir)) : t("codepuppy.home.chooseWorkspace")
 }
 
 export function CodePuppyWorkspaceChip(props: {
@@ -102,9 +103,12 @@ export function CodePuppyWorkspaceChip(props: {
                   onClick={() => choose(p.worktree)}
                 >
                   <span class="a-pico" style={{ background: p.color || "var(--a-accent)" }}>
-                    {p.name.slice(0, 1).toUpperCase()}
+                    {workspaceDisplayName(p.worktree, p.name).slice(0, 1).toUpperCase()}
                   </span>
-                  {p.name}
+                  {workspaceDisplayName(p.worktree, p.name)}
+                  <Show when={isDefaultWorkspaceDir(p.worktree)}>
+                    <span class="a-pop-desc">{t("codepuppy.home.defaultWorkspace")}</span>
+                  </Show>
                 </button>
               )}
             </For>

@@ -24,6 +24,8 @@ export const dict = {
   "codepuppy.ext.sourceInstallReadPending": "已添加，正在读取安装状态。",
   "codepuppy.timeline.hub.searching": "正在查找 {{name}}",
   "codepuppy.timeline.hub.installing": "正在安装 {{name}}",
+  "codepuppy.timeline.hub.awaitingApproval": "等待你允许安装『{{name}}』",
+  "codepuppy.timeline.hub.declined": "已拒绝，未安装『{{name}}』",
   "codepuppy.timeline.hub.added": "已添加『{{name}}』",
   "codepuppy.timeline.hub.applying": "正在生效",
   "codepuppy.timeline.hub.available": "{{name}} 已可用，可在定制中心管理。",

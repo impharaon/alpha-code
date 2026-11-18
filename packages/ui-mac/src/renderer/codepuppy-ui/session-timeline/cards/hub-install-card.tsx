@@ -104,6 +104,8 @@ export function HubInstallCard(props: { row: HubInstallRow }) {
       token: undefined as Extract<AccountItem, { kind: "secret" }> | undefined }
     if (call.operation === "search")
       return { ...base, state: "search", title: t("codepuppy.timeline.hub.searching", { name }) }
+    if (call.approval === "waiting") return { ...base, state: "awaiting", title: t("codepuppy.timeline.hub.awaitingApproval", { name }) }
+    if (call.approval === "declined") return { ...base, state: "declined", title: t("codepuppy.timeline.hub.declined", { name }) }
     if (!call.requestId && !call.packageId)
       return { ...base, state: "result", title: call.result ?? t("codepuppy.timeline.hub.installing", { name }) }
     if (record?.stage === "failed")

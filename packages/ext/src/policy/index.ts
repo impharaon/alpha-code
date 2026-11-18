@@ -19,7 +19,7 @@ import path from "node:path"
 import type { Plugin } from "@opencode/plugin"
 import { createCatalog } from "./catalog"
 import { attachDirectoryDisplay, attachUnattendedDenial, attachNetFailure, attachTerminal, displaySnapshot, wrapForDisplay } from "./display"
-import { confirm, decide, effectiveFor, gateWithoutToolCall, holdAsk, holdUnattendedDeny, isInstallAsk, pin, type GateDeps } from "./gate"
+import { confirm, decide, effectiveFor, gateWithoutToolCall, holdAsk, holdUnattendedDeny, isInstallAsk, pin, type GateCall, type GateDecision, type GateDeps } from "./gate"
 import {
   codeModeFacts,
   CODE_MODE_TOOL,
@@ -35,12 +35,18 @@ import { classifyPermissionRequest, RISK_METADATA_KEY } from "./risk"
 import { TOOL_POLICY_RPC_DEFINITION, toolPolicyHandlers } from "./rpc"
 import type { ToolDisplaySnapshotV1 } from "../../../schema/src/tool-identity"
 import { isCodePuppyPolicyRequest } from "../../../schema/src/codepuppy-tool-policy"
-import type { HubBridge } from "../hub-bridge"
+import type { HubBridge, HubInstallSubject } from "../hub-bridge"
 import { denyHubMutationForAutomation, hubInstallAsk } from "../hub-tools"
 
 export interface PolicyRegistration {
   /** Last statement of the extension's `setup`: registers the parts that must see every earlier registration. */
   readonly seal: () => Promise<void>
+  /**
+   * BR-10: Code Puppy's own install tools ask from inside their call, after recording what they install (the timeline
+   * card names it while the approval waits and after a decline). Resolves when allowed; a decline is rethrown as the
+   * engine raised it. A call the gate did not prepare is refused (fail-closed).
+   */
+  readonly askInstall: (callID: string) => Promise<void>
 }
 
 /** MCP argv placeholder replaced with the Location directory at spawn time (#1011, REQ-134). */
@@ -73,6 +79,8 @@ export async function registerPolicy(context: Plugin.Context, unattended: Unatte
   let early: ReadonlySet<string> | undefined
   const mcp = new Map<string, McpEntry & Record<string, unknown>>()
   const displays = new Map<string, ToolDisplaySnapshotV1>()
+  // BR-10: install calls the gate prepared — deferred to the tool's own ask, or already asked here (same-named unverified tool).
+  const installAsks = new Map<string, { decision: GateDecision; call: GateCall; install: { subject?: HubInstallSubject } } | "asked">()
   const codeModeDenials = new Map<string, UnattendedDenial | undefined>()
   const profile = (sessionID: string, agent?: string) => unattended.unattendedProfile(sessionID, agent, async () => (await context.session.get({ sessionID })).agent ?? "")
   const denied = (callID: string | undefined, denial: UnattendedDenial) => {
@@ -209,6 +217,12 @@ export async function registerPolicy(context: Plugin.Context, unattended: Unatte
   }) as never)
 
   return {
+    askInstall: async (callID) => {
+      const prepared = installAsks.get(callID)
+      if (!prepared) throw Error("not installed: this install has no prepared approval")
+      installAsks.delete(callID)
+      if (prepared !== "asked") await confirm(deps, prepared.decision, prepared.call, prepared.install)
+    },
     seal: async () => {
       // Configured MCP servers as OpenCode will run them, after every earlier transform (the extension's cloud entry).
       await context.mcp.transform((editor) => {
@@ -225,12 +239,16 @@ export async function registerPolicy(context: Plugin.Context, unattended: Unatte
           const decision = await decide(deps, event)
           const facts = decision.facts
           const install = facts.identity.source === "plugin" ? hubInstallAsk(event, facts.authority.kind === "codepuppy-bundled", installSubject) : undefined
-          await confirm(deps, decision, event, install)
+          // BR-10: the verified install tool asks from its own call (`askInstall`), once it has recorded what it installs.
+          if (install?.subject) installAsks.set(event.id, { decision, call: { tool: event.tool, sessionID: event.sessionID, agent: event.agent, messageID: event.messageID, id: event.id, input: event.input }, install })
+          else await confirm(deps, decision, event, install)
+          if (install && !install.subject) installAsks.set(event.id, "asked")
           displays.set(event.id, displaySnapshot(decision.facts))
           pin(event)
           if (event.tool === CODE_MODE_TOOL && await profile(event.sessionID, event.agent) !== undefined) codeModeDenials.set(event.id, undefined)
         } catch (error) {
           displays.delete(event.id)
+          installAsks.delete(event.id)
           throw error
         }
       })
@@ -247,6 +265,7 @@ export async function registerPolicy(context: Plugin.Context, unattended: Unatte
         attachDirectoryDisplay(event as never)
         attachTerminal(event as never, displays.get(event.id))
         displays.delete(event.id)
+        installAsks.delete(event.id)
       })
 
       await catalog.refresh()

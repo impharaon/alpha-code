@@ -48,15 +48,21 @@ const idInput = (description: string) => ({
   additionalProperties: false,
 })
 
-export function createHubTools(bridge: HubBridge, context: HubToolContext): ToolInfo[] {
+export function createHubTools(bridge: HubBridge, context: HubToolContext, askInstall: (callID: string) => Promise<void>): ToolInfo[] {
   const directory = context.location.directory
   const viewOf = (ctx: ToolContext) => bridge.view({ directory, sessionID: ctx.sessionID, agent: ctx.agent })
   const submit = async (ref: HubInstallRequest["ref"], scope: HubInstallRequest["scope"], ctx: ToolContext, action: string) => {
     denyHubMutationForAutomation(ctx.agent, action)
     if (!bridge.available) return result(HUB_UNAVAILABLE, { ok: false })
+    // BR-10:先把要装的名称与真实来源记在本次调用上(时间线卡在等待审批与拒绝之后都读它),再问一次;拒绝原样抛出、不交给 main。
+    const subject = ref.kind === "created" ? (ref.draft.name.trim() ? { name: ref.draft.name, source: "created" as const } : undefined) : bridge.installSubject(ref.id)
+    const named = subject ? { install: subject } : {}
+    // 进度更新原样成为工具状态的 metadata(core session/runner/publish-llm-event.ts progress),所以是扁平的键,时间线直接读。
+    await ctx.progress({ ...named, stage: "awaiting-approval" })
+    await askInstall(ctx.id)
     const requestId = randomUUID().replaceAll("-", "")
-    const metadata = { requestId, stage: "submitted" }
-    await ctx.progress({ metadata })
+    const metadata = { ...named, requestId, stage: "submitted" }
+    await ctx.progress(metadata)
     const accepted = await bridge.install({
       requestId,
       directory,

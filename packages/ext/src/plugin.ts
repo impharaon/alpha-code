@@ -158,7 +158,7 @@ export const CodePuppyExt: Plugin.Plugin = {
       await context.tool.transform((editor) => {
         for (const tool of createCodePuppyTools({ context, reloads, projectRootFor, readConsent: readProjectExtensionsConsent }))
           editor.add(tool)
-        for (const tool of createHubTools(hubBridge, context)) editor.add(tool)
+        for (const tool of createHubTools(hubBridge, context, policy.askInstall)) editor.add(tool)
       })
 
       // `#1419`(REQ-228):看不了图的模型 —— 图片送云端识图,模型可按编号 / 路径追问。登记簿按本 Location 建

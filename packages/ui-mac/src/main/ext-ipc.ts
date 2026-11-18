@@ -92,6 +92,7 @@ import { createPluginSources, installedPackageIdentity, type PreparePluginSource
 import { createSourceInstaller, installCatalogFromSource } from "./install-from-source"
 import { createPackageDeclarationResolver } from "./package-declarations"
 import { applyPackageMcpV1, removePackageMcpV1 } from "./package-mcp-activation"
+import { findMcpServerRecord } from "./mcp-server-lifecycle"
 import { isInstallOutcomeV1, type InstallRequestV1 } from "../shared/plugin-install"
 import type { PackageAcceptedFactsV1 } from "./package-installability"
 import { evaluatePackageForHost, validateCatalogPackageShape } from "./package-installability"
@@ -1340,8 +1341,17 @@ export function registerExtIpcHandlers(
         try {
           const state = readPackageLedgerStateV1(codepuppyGlobalRoot(), { sideEffectFree: true })
           const graph = state.ok && state.packageGraphs.find((entry) => entry.packageId === packageId)
+          // `#1724`:远程连接器的记录被注入进引擎的启动配置,进程内重载会按它把连接器拉回 —— 只有换一代引擎才会放下。
+          const launchConfigured = !official && !!graph && [graph.root, ...graph.children].some((node) => {
+            if (node.kind !== "mcp") return false
+            const found = findMcpServerRecord(node.name)
+            return !found.ok || found.record !== undefined
+          })
+          const reloadItems = packageReloadItems(packageId)
           const result = await uninstallPackageV1(packageId, { globalRoot: codepuppyGlobalRoot, installers: packageArtifactInstallers() })
           if (result.ok && graph) await removePackageMcpV1(graph, codepuppyUserWorkspaceDir(), awaitServer).catch(() => undefined)
+          if (result.ok && launchConfigured)
+            reloads.request({ scope: "global", items: reloadItems, reason: `uninstalled package ${packageId}`, connectorChange: true })
           return result
         } finally {
           if (official && !(await officialRuntime!.refresh()))

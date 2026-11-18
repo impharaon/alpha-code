@@ -1172,7 +1172,7 @@ export const dict = {
   "codepuppy.onboarding.inProgress": "In progress",
   "codepuppy.onboarding.continue": "Continue",
   "codepuppy.onboarding.login": "Sign in",
-  "codepuppy.onboarding.skipByok": "Skip and use your own key (BYOK)",
+  "codepuppy.onboarding.skipByok": "Skip and use your own API key",
 
   "codepuppy.permission.title": "Allow this action?",
   "codepuppy.riskTag.low": "Low risk",

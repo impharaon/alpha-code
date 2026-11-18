@@ -1150,7 +1150,7 @@ export const dict = {
   "codepuppy.onboarding.inProgress": "进行中",
   "codepuppy.onboarding.continue": "继续",
   "codepuppy.onboarding.login": "登录",
-  "codepuppy.onboarding.skipByok": "跳过,使用自带 Key(BYOK)",
+  "codepuppy.onboarding.skipByok": "跳过，使用自己的 API 密钥",
   "codepuppy.permission.title": "允许这次操作吗?",
   "codepuppy.riskTag.low": "低风险",
   "codepuppy.riskTag.medium": "中风险",

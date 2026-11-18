@@ -36,6 +36,7 @@ let host: Awaited<ReturnType<(typeof import("../../test-component/codepuppy-engi
 let main: ReturnType<(typeof import("./ext-ipc"))["registerExtIpcHandlers"]>
 let refreshFailure = ""
 let refreshes = 0
+let refreshEngine: () => Promise<boolean> = async () => false
 let locationReloads = 0
 const reloadRequests: ReloadRequestMessage[] = []
 const reloadReports: ReloadReportMessage[] = []
@@ -202,6 +203,30 @@ beforeAll(async () => {
     return running!.fetch(request)
   })
   const { registerExtIpcHandlers } = await import("./ext-ipc")
+  // The sidecar's connector refresh: a fresh engine with a freshly injected launch config.
+  refreshEngine = async () => {
+    try {
+      await running?.close()
+      const injection = injectCodePuppyConfig(
+        host.userData,
+        join(sandbox.root, "hub-lifecycle-ext"),
+        "stable",
+        codepuppyBootstrap().paths.userConfig ?? null,
+      )
+      const next = JSON.parse(injection.config.content) as typeof host.content
+      next.providers.codepuppy!.models = host.content.providers.codepuppy!.models
+      next.plugins = [...next.plugins, ...host.content.plugins.filter((entry) => entry.endsWith("-probe"))]
+      // A sidecar refresh replaces its launch config; absent keys must not survive the old fork.
+      for (const key of Object.keys(host.content)) Reflect.deleteProperty(host.content, key)
+      Object.assign(host.content, next)
+      running = await host.start()
+      refreshes++
+      return true
+    } catch (error) {
+      refreshFailure = error instanceof Error ? error.message : String(error)
+      throw error
+    }
+  }
   main = registerExtIpcHandlers(
     host.userData,
     "dev",
@@ -211,29 +236,7 @@ beforeAll(async () => {
       stop: async () => {
         await running?.close()
       },
-      refresh: async () => {
-        try {
-          await running?.close()
-          const injection = injectCodePuppyConfig(
-            host.userData,
-            join(sandbox.root, "hub-lifecycle-ext"),
-            "stable",
-            codepuppyBootstrap().paths.userConfig ?? null,
-          )
-          const next = JSON.parse(injection.config.content) as typeof host.content
-          next.providers.codepuppy!.models = host.content.providers.codepuppy!.models
-          next.plugins = [...next.plugins, ...host.content.plugins.filter((entry) => entry.endsWith("-probe"))]
-          // A sidecar refresh replaces its launch config; absent keys must not survive the old fork.
-          for (const key of Object.keys(host.content)) Reflect.deleteProperty(host.content, key)
-          Object.assign(host.content, next)
-          running = await host.start()
-          refreshes++
-          return true
-        } catch (error) {
-          refreshFailure = error instanceof Error ? error.message : String(error)
-          throw error
-        }
-      },
+      refresh: () => refreshEngine(),
     },
     async () => undefined,
   )
@@ -449,6 +452,28 @@ test("all package skills leave and return to the callable inventory and disappea
   expect(after.ok && after.records).toEqual([])
 }, 60_000)
 
+// `#1724`(签名 0.2.1 实测 19/20/21/28):远程连接器一旦进了引擎的启动配置(任何一次连接器刷新之后),整包移除只做
+// 运行时 remove + 进程内重载 —— 重载按启动配置把它原样拉回,定制中心留下 `mcp:supabase` 卡片 16 分钟以上。
+// 移除完成后引擎里不得再有它:不论重载还是换代,都不能把它带回来。
+test("removing a package whose remote connector is in the engine launch config leaves no live connector", async () => {
+  await action("ext-install-package", "package:supabase")
+  expect(await refreshEngine()).toBe(true)
+  await until(async () => !!(await mcpStatus("supabase")), "remote connector carried by the launch config")
+  const requested = reloadRequests.length
+  expect(await invoke("ext-uninstall-package", "package:supabase")).toMatchObject({ ok: true })
+  expect(await invoke("ext-reload-request", { scope: "global", items: [], reason: "uninstalled package package:supabase" })).toMatchObject({ ok: true })
+  await until(() => reloadRequests.length > requested, "removal reload requested")
+  const pending = reloadRequests.slice(requested)
+  await until(() => pending.every((request) => reloadReports.some((report) => report.generation === request.generation && report.outcome === "reloaded")), "removal reload reported")
+  await until(async () => {
+    const plugins = (await send("GET", "/api/plugin")).json.data as Array<{ id: string; state: { status: string } }>
+    return plugins.some((plugin) => plugin.id === "codepuppy.ext" && plugin.state.status === "active")
+  }, "engine ready after removal")
+  await until(async () => !(await mcpStatus("supabase")), "removed remote connector stays gone")
+  await Bun.sleep(500)
+  expect(await mcpStatus("supabase")).toBeUndefined()
+  if (refreshFailure) throw new Error(refreshFailure)
+}, 60_000)
 
 test("cloud-only package switch withdraws and restores real engine tools", async () => {
   const { syncSecretFiles } = await import("./codepuppy-secret-files")

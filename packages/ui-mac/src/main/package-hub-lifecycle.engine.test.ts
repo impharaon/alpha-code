@@ -17,6 +17,6 @@ test("desktop package lifecycle uses main IPC, the real ext scheduler and sandbo
   })
   const output = `${result.stdout.toString()}${result.stderr.toString()}`
   if (result.exitCode !== 0) throw new Error(output)
-  expect(output).toMatch(/\b5 pass\b/)
+  expect(output).toMatch(/\b6 pass\b/)
   expect(output).toMatch(/\b0 fail\b/)
 }, 240_000)

@@ -66,7 +66,7 @@ describe("Settings inventory", () => {
           )
         }),
         promisePlugin("codepuppy-ext", async (ctx: any) => {
-          const policy = await registerPolicy(ctx, createUnattendedState())
+          const policy = await registerPolicy(ctx, createUnattendedState(), () => undefined)
           await policy.seal()
         }),
         promisePlugin("config-agents", async (ctx: any) => {

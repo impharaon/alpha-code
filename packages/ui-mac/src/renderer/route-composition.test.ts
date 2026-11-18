@@ -57,7 +57,7 @@ describe("manifest-derived production route composition", () => {
     const entry = await Bun.file(join(import.meta.dir, "index.tsx")).text()
 
     expect(entry.match(/const productionRoutes = composeRoutes\(/g)).toHaveLength(1)
-    expect(entry.match(/router=\{MemoryRouter\}/g)).toHaveLength(1)
+    expect(entry.match(/router=\{RestoredMemoryRouter\}/g)).toHaveLength(1)
     expect(entry.match(/surfaces=\{surfaceComponents\(\)\}/g)).toHaveLength(1)
     // Each leaf is mounted unconditionally from the composition — no release gate can reappear
     // between the manifest and the seam.

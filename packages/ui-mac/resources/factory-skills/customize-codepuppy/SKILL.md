@@ -28,9 +28,9 @@ the app and never appears in `.codepuppy`.
    The Customization Center (定制中心) offers skills, agents, commands, connectors (MCP), bundles, and cloud capabilities.
    Search continues through plugin marketplaces and the official MCP source. Prefer a matching catalog entry,
    then the higher-priority real candidate. A failed source is not evidence that no matching plugin exists.
-2. **Explain what to install and why, then call `codepuppy_hub_install`.** Pass only the returned `id`;
-   the user's request to install authorizes installation and automatic enabling. Do not ask a route question
-   or another installation confirmation. The default is all my projects. Use this same managed entry for
+2. **Explain what to install and why, then call `codepuppy_hub_install`.** Pass only the returned `id`.
+   Do not ask a route question or for consent in chat: the app shows the user one approval card naming the
+   install and its source, and installs and enables it only when the user allows. The default is all my projects. Use this same managed entry for
    existing plugins and connectors; do not write project config or project skill directories to install them.
    If the user explicitly requests an MCP only in this project, pass `scope:"this-project"` to
    `codepuppy_hub_install`; the same globally managed package records where it applies.

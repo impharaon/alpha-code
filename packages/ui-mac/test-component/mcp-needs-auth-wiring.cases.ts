@@ -248,6 +248,13 @@ const authorizeButtons = () => Array.from(document.querySelectorAll<HTMLButtonEl
 /** `#1594`:平台云连接器在连接器页有自己的一行(见下面「云连接器卡」各条),不再同时出一条已装行;
  *  已装 MCP 行的判据因此用一个普通的、手动加的 server 名来跑(引擎报回来、没有安装记录的那一类)。 */
 const GENERIC_MCP = "docs-remote"
+/** `#1724`(BR-04,体验约定不露内部原因):行上只说本地化的短原因,引擎原文留在悬停 / 开发者详情。 */
+const genericDesc = () => document.querySelector<HTMLElement>(`[data-installed-row="mcp:${GENERIC_MCP}"] .codepuppy-ext-kit-desc`)
+async function expectLocalizedFailure(raw: string) {
+  await waitFor(() => expect(genericDesc()?.textContent).toBe(zh["codepuppy.ext.hubReasonFailed"]))
+  expect(genericDesc()?.getAttribute("title")).toContain(raw)
+  expect(genericDesc()?.textContent).not.toContain(raw)
+}
 
 test("needs_auth 的 MCP 行:状态说「需要重新登录」,并出现一颗真的能点的按钮", async () => {
   reset()
@@ -308,7 +315,7 @@ test("M1:端点 200 但 body 是 failed —— 必须说失败,绝不能说「�
   await waitFor(() => expect(authenticateCalls).toEqual([{ name: GENERIC_MCP }]))
   // 授权后这个 server 是 `failed`:`needs_auth` 确实不成立了 —— 按「不再 needs_auth」
   // 判成功的实现会在这里宣布成功,而用户的 MCP 根本用不了。
-  await waitFor(() => expect(document.body.textContent).toContain("token rejected by resource server"))
+  await expectLocalizedFailure("token rejected by resource server")
   await waitFor(() => expect(toastTexts().some((text) => text.includes(zh["codepuppy.ext.mcpAuthFailed"]))).toBe(true))
   expect(toastTexts().some((text) => text.includes(zh["codepuppy.ext.mcpAuthDone"]))).toBe(false)
   // failed 不是用户点一下能修好的状态 ⇒ 授权按钮不该留在那里假装还能救。
@@ -321,7 +328,7 @@ test("failed 的 MCP 行不出授权按钮(它不是用户点一下能修好的�
   engineStatus = { [GENERIC_MCP]: { status: "failed", error: "connect ECONNREFUSED" } }
   mount()
 
-  await waitFor(() => expect(document.body.textContent).toContain("connect ECONNREFUSED"))
+  await expectLocalizedFailure("connect ECONNREFUSED")
   expect(authorizeButtons().length).toBe(0)
 })
 
@@ -332,7 +339,7 @@ test("needs_client_registration 也不出授权按钮(缺 clientId,点一百次�
   }
   mount()
 
-  await waitFor(() => expect(document.body.textContent).toContain("dynamic client registration"))
+  await expectLocalizedFailure("dynamic client registration")
   expect(authorizeButtons().length).toBe(0)
   expect(document.body.textContent).not.toContain(zh["codepuppy.ext.mcpNeedsAuth"])
 })

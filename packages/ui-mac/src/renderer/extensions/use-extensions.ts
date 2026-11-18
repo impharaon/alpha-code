@@ -609,6 +609,7 @@ export function useExtensions(
           pending: isPending(info),
           error: statusError(info),
           repair: mcpRepair(name, info),
+          ...(statusTag(info) === "failed" && typeof (info as { code?: unknown }).code === "string" ? { code: (info as { code: string }).code } : {}),
         }
       }
       setStore("mcp", next)

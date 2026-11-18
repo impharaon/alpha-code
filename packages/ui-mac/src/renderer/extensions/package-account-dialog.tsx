@@ -1,14 +1,27 @@
 import { createEffect, createResource, createSignal, on, For, Show } from "solid-js"
-import type { ElectronAPI } from "../../preload/types"
+import type { ElectronAPI, InstalledPackageV1 } from "../../preload/types"
 import { Button } from "../codepuppy-ui/Button"
 import { Dialog } from "../codepuppy-ui/Dialog"
 import { t } from "../i18n"
 import { extIpc } from "./ext-ipc"
 import { extensionError } from "./ext-presentation"
 
+const GITHUB_TOKEN_URL = "https://github.com/settings/personal-access-tokens/new"
+
+/**
+ * BR-05: where the service issues the token, by the package's real identity — the signed catalog's GitHub
+ * packages, or GitHub's server in the official MCP Registry (namespace io.github.github, ownership verified at
+ * publication). A package name never establishes provenance.
+ */
+function tokenUrl(packageId: string, source: InstalledPackageV1["source"]) {
+  if (packageId === "package:github" || packageId === "package:github-official") return GITHUB_TOKEN_URL
+  if (source?.kind === "mcp-registry" && source.serverName === "io.github.github/github-mcp-server") return GITHUB_TOKEN_URL
+}
+
 /** Management and timeline use the same package-bound input and the existing main credential writer. */
 export function PackageAccountDialog(props: {
   packageId: string
+  source: InstalledPackageV1["source"]
   label: string
   needId: string
   save: ElectronAPI["ext"]["savePackageSecrets"]
@@ -52,9 +65,9 @@ export function PackageAccountDialog(props: {
   return (
     <Dialog open onClose={close} size="sm" title={t("codepuppy.ext.packageTokenTitle", { name: props.label })}
       footer={<Button variant="primary" loading={busy()} onClick={() => void submit()}>{t("codepuppy.ext.packageSaveToken")}</Button>}>
-      <p>{t("codepuppy.ext.packageTokenPurpose", { name: props.label })}</p>
-      <Show when={props.packageId === "package:github" || props.packageId === "package:github-official"}>
-        <button class="codepuppy-ext-link" onClick={() => void window.api.openLink("https://github.com/settings/personal-access-tokens/new")}>{t("codepuppy.ext.packageGithubTokenLink")}</button>
+      <p>{t(props.needId === "mcp:dbhub-readonly#DSN" ? "codepuppy.ext.packageSqlitePurpose" : "codepuppy.ext.packageTokenPurpose", { name: props.label })}</p>
+      <Show when={tokenUrl(props.packageId, props.source)}>
+        {url => <button class="codepuppy-ext-link" onClick={() => void window.api.openLink(url())}>{t("codepuppy.ext.packageGithubTokenLink")}</button>}
       </Show>
       <For each={fields()}>
         {item => (

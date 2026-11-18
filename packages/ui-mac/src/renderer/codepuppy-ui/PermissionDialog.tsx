@@ -12,6 +12,8 @@ import { Portal } from "solid-js/web"
 import { isPermissionV1Fingerprint } from "../../../../codepuppy-app/src/context/permission-v1-adapter"
 import type { ToolPolicyApi } from "../../shared/tool-policy-wire"
 import { approvalToolOf, PROVENANCE_SOURCE_KEYS } from "./session-timeline/cards/tool-card-model"
+import { pluginSourceLabelKey } from "../extensions/ext-package-presentation"
+import type { PluginSourceIdV1 } from "../../main/plugin-sources"
 import { Button } from "./Button"
 import { permissionRiskOf } from "./permission-risk"
 import { RiskTag, type RiskTagLevel } from "./RiskTag"
@@ -665,6 +667,9 @@ function requestWhat(
       location: request.metadata?.location,
       technicalId: request.action,
     })
+    // BR-10:助手发起的安装 —— Code Puppy 随附的安装工具,卡上只写要装的名称与真实来源(不写工具、编号或组件清单)。
+    const install = tool?.source === "builtin" ? installSubjectOf(request) : undefined
+    if (install) return { verb: "codepuppy.permission.verbInstall", line: { title: install.name, detail: t(install.sourceKey) }, delegate: false }
     const source = tool ? t(PROVENANCE_SOURCE_KEYS[tool.source]) : ""
     return {
       verb: "codepuppy.permission.verbTool",
@@ -689,6 +694,17 @@ function requestWhat(
     },
     delegate: true,
   }
+}
+
+/** 执行闸写进安装请求的名称与来源(`metadata.policy.install`,packages/ext/src/policy/gate.ts `confirm`);缺项或来源不认识 ⇒ 不画安装行。 */
+function installSubjectOf(request: PermissionV2Request) {
+  const install = errorRecord(errorRecord(request.metadata?.policy)?.install)
+  const name = typeof install?.name === "string" && install.name.trim() ? install.name : undefined
+  const source = install?.source
+  // 来源词表只在 ext-package-presentation 一份;wire 上的值不认识(含原型链上的键)时查不出字符串 ⇒ 不画。
+  const known = typeof source === "string" && source !== "local-folder" ? pluginSourceLabelKey(source as PluginSourceIdV1) : undefined
+  const sourceKey: I18nKey | undefined = source === "created" ? "codepuppy.ext.packageSourceMine" : typeof known === "string" ? known : undefined
+  return name && sourceKey ? { name, sourceKey } : undefined
 }
 
 /** 资源行:外部文件夹去掉末尾通配(与「将记住」同一写法),其余原样。 */

@@ -223,7 +223,9 @@ export function restoreOfficialConnector(
         writeProtected(next.file, value)
       }
     } else writeProtected(next.file, value)
-    if (name === "dbhub-readonly") {
+    // A disabled definition is never spawned; before its DSN is saved the template does not exist yet.
+    // The engine still needs the complete leaf (an enabled-only leaf is dropped). Enabling re-checks it.
+    if (name === "dbhub-readonly" && state === "enabled") {
       managedDirectory(paths.base, paths.config)
       directory(join(paths.config, "work"))
       if (

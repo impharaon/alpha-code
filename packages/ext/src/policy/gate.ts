@@ -142,16 +142,28 @@ export async function decide(deps: GateDeps, call: Pick<GateCall, "tool" | "sess
   return { facts, effective, revision: snapshot.revision, ruleset }
 }
 
+/** `askedBy` of an assistant-initiated install (BR-10): asked in every tier, once per call, never remembered. */
+export const INSTALL_ASKED_BY = "install"
+
+/** The ext evaluate hook's test for an install request the gate pinned (`confirm` with `install`). */
+export function isInstallAsk(metadata: Record<string, unknown> | undefined): boolean {
+  const policy = metadata?.[TOOL_POLICY_REQUEST_KEY]
+  return typeof policy === "object" && policy !== null && (policy as { askedBy?: unknown }).askedBy === INSTALL_ASKED_BY
+}
+
 /**
  * Tail of the chain: ask when needed with the input the implementation will receive, then decide again. Disabled
  * while the request waited ⇒ named deny; the binding changed (rebind, endpoint switch) ⇒ named deny, retry.
+ * `install` (BR-10, design plugin-helper-and-hub §4.6): asked like a rule that asks every time — this call only, nothing
+ * saved, the evaluate hook keeps it an ask in every tier (`isInstallAsk`); `subject` is what the card names.
  */
-export async function confirm(deps: GateDeps, decision: GateDecision, call: GateCall): Promise<void> {
+export async function confirm(deps: GateDeps, decision: GateDecision, call: GateCall, install?: { readonly subject?: { readonly name: string; readonly source: string } }): Promise<void> {
   const { facts } = decision
   const canonical = canonicalToolIdentity(facts.identity)
+  const rulesetAsks = install !== undefined || rulesetIdentityEffect(canonical, decision.ruleset) === "ask"
   const profile = await deps.profile(call.sessionID, call.agent)
   if (profile !== undefined) {
-    const verdict = unattendedGateVerdict(profile, { effective: decision.effective, rulesetAsks: rulesetIdentityEffect(canonical, decision.ruleset) === "ask", tool: facts.identity.name })
+    const verdict = unattendedGateVerdict(profile, { effective: decision.effective, rulesetAsks, tool: facts.identity.name })
     if (verdict.kind === "deny") {
       deps.denied(call.id, verdict.denial)
       throw unattendedToolError(facts, verdict.denial)
@@ -159,8 +171,8 @@ export async function confirm(deps: GateDeps, decision: GateDecision, call: Gate
     if (verdict.kind === "allow") return
   }
   const bindingDigest = subjectBindingDigest({ identity: facts.identity, authority: facts.authority, bindingDigest: facts.bindingDigest })
-  const askedBy = rulesetIdentityEffect(canonical, decision.ruleset) === "ask" ? "ruleset" : "policy"
-  const patterns = askedBy === "ruleset" ? [`call:${call.id}`] : [`${bindingDigest ?? "binding:unknown"}@${decision.revision}`]
+  const askedBy = install ? INSTALL_ASKED_BY : rulesetAsks ? "ruleset" : "policy"
+  const patterns = askedBy === "policy" ? [`${bindingDigest ?? "binding:unknown"}@${decision.revision}`] : [`call:${call.id}`]
   const metadata: Record<string, unknown> = {
     identity: facts.identity,
     authority: facts.authority,
@@ -169,7 +181,7 @@ export async function confirm(deps: GateDeps, decision: GateDecision, call: Gate
     ...(call.input !== undefined ? { args: call.input } : {}),
     // No digest (plugin and builtin tools) ⇒ no key: the engine lists pending requests over HTTP, and its encoder rejects
     // `undefined` at any depth, so the approval surface would never see this request.
-    [TOOL_POLICY_REQUEST_KEY]: { directory: deps.directory(), canonical, ...(bindingDigest ? { bindingDigest } : {}), askedBy },
+    [TOOL_POLICY_REQUEST_KEY]: { directory: deps.directory(), canonical, ...(bindingDigest ? { bindingDigest } : {}), askedBy, ...(install?.subject ? { install: install.subject } : {}) },
   }
   await deps.assert({
     sessionID: call.sessionID,

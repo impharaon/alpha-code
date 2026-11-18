@@ -331,7 +331,7 @@ export const TOOL_TEXT = {
   },
   codepuppy_hub_install: {
     readable: "codepuppy:hub_install",
-    description: "Install an ID returned by codepuppy_hub_search. Saying install authorizes installation: the app installs and turns it on without an installation confirmation. Default: all my projects. Never request tokens in chat or write project configuration. The result reports main's state; pending does not mean the install was cancelled.",
+    description: "Install an ID returned by codepuppy_hub_search. The user approves each install once on the ordinary approval card, which names it and its source; do not ask for consent in chat. Approved, the app installs and turns it on. Default: all my projects. Never request tokens in chat or write project configuration. The result reports main's state; pending does not mean the install was cancelled.",
     args: { id: "Exact catalog or main-issued candidate ID", scope: "all-projects by default; this-project only when explicitly requested" },
   },
   codepuppy_hub_create: {

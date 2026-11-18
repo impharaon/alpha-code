@@ -187,15 +187,27 @@ export type TimelineHubInstall = {
   requestId?: string
   packageId?: string
   result?: string
+  /** BR-10:这次安装正等用户在审批卡上允许,或已被拒绝(没有安装)。 */
+  approval?: "waiting" | "declined"
 }
+
+/** 引擎对用户拒绝的工具调用写下的固定原因(packages/core/src/session/runner/step.ts 的 declines)。 */
+const ENGINE_DECLINED_TOOL_CALL = "The user declined this tool call"
 
 function hubInstallOf(part: ToolPart): TimelineHubInstall | undefined {
   const operation = hubToolActionOf(part)
   if (!operation || (operation === "search" && (part.state.status === "completed" || part.state.status === "error"))) return
   const input = part.state.input
-  const name = input && typeof input === "object" ? operation === "search" ? input.query : input.id ?? input.name : undefined
-  const clean = typeof name === "string" ? redactText(name, 400) : undefined
   const metadata = "metadata" in part.state ? part.state.metadata : undefined
+  // 安装卡的名字只取工具记下的名称(或自制插件的草稿名),从不拿候选 / 目录编号当名字(规格「不显示内部编号」)。
+  const recorded = metadata?.install && typeof metadata.install === "object" ? (metadata.install as { name?: unknown }).name : undefined
+  const name = operation === "search" ? input?.query : typeof recorded === "string" ? recorded : input?.name
+  const clean = typeof name === "string" ? redactText(name, 400) : undefined
+  const awaiting = metadata?.stage === "awaiting-approval" && typeof metadata.requestId !== "string" && typeof recorded === "string"
+  const approval = !awaiting ? undefined
+    : part.state.status === "error" ? part.state.error === ENGINE_DECLINED_TOOL_CALL ? "declined" as const : undefined
+    : part.state.status === "completed" ? undefined
+    : "waiting" as const
   const raw = part.state.status === "completed" ? part.state.output : part.state.status === "error" ? part.state.error : undefined
   const result = typeof raw === "string" ? redactText(raw, 4000) : undefined
   return {
@@ -204,6 +216,7 @@ function hubInstallOf(part: ToolPart): TimelineHubInstall | undefined {
     ...(typeof metadata?.requestId === "string" ? { requestId: metadata.requestId } : {}),
     ...(typeof metadata?.packageId === "string" ? { packageId: metadata.packageId } : {}),
     ...(result?.ok ? { result: result.value } : {}),
+    ...(approval ? { approval } : {}),
   }
 }
 

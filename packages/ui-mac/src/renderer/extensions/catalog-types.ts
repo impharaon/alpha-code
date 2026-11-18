@@ -172,6 +172,8 @@ export interface InstalledState {
   /** MCP:引擎报的 `pending` —— 还在后台启动它,不是停用也不是失败(`#1563`)。 */
   pending?: boolean
   error?: string
+  /** MCP:引擎登记的失败码(engine-adapter v1McpStatus 从 `[codepuppy:<码>]` 前缀读出),界面据此选本地化的短原因(`#1724`)。 */
+  code?: string
   /** MCP:修复动作。`reinstall-app` = 第一方文档工具随包的运行环境不在(引擎报 failed / dependency_missing),
    *  能修好它的只有重新安装 Code Puppy —— 不是重载,也不是另装组件(`#1564` AC6)。 */
   repair?: "reinstall-app"

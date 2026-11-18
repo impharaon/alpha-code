@@ -64,7 +64,8 @@ import type { AuthorizationConfirmationWire, CapabilityDiffWire } from "../../sh
 import type { Catalog, CatalogEntry, InstalledState } from "./catalog-types"
 import type { AuthState, InstallReceipt, InstallReceiptType, ProvenanceRequest, InstalledPackageV1 } from "../../preload/types"
 import { hubSection, installedRowKey, setHubSection, takeHubLocateTarget, takePackageManagementTarget, type HubSection } from "./ext-hub-state"
-import { extensionError, catalogDescription, iconFor, iconForRow, MoreMenu, PackageLogo, typeLabel, Svg, SearchIc, type MoreMenuItem } from "./ext-presentation"
+import { parseFailureCode } from "@opencode/schema/codepuppy-net-failure"
+import { extensionError, mcpFailureReason, catalogDescription, iconFor, iconForRow, MoreMenu, PackageLogo, typeLabel, Svg, SearchIc, type MoreMenuItem } from "./ext-presentation"
 import { inventoryInstallRow, healthPresentation } from "./ext-inventory-present"
 import { ExtensionDetail, InstalledPackageDetail, type DetailTarget } from "./extension-detail"
 import { isCodePuppyOfficeCatalogId, officeAdvisoryFor, retiredCommunityOfficeFor } from "../../shared/office-advisories"
@@ -1617,13 +1618,37 @@ export function ExtensionHub(props: {
           pack().components.some((component) => component.componentId === row.id) &&
           row.stateReason?.code === "reload-failed",
       )
-      if (failedReload)
+      // `#1724`:main 的重载失败原因是内部文本(可能带引擎登记码);行上只说本地化的短原因,原文进开发者详情。
+      if (failedReload) {
+        const raw = failedReload.stateReason?.detail
         return {
           kind: "error" as const,
-          text: t("codepuppy.ext.packageEnableFailed", {
-            reason: failedReload.stateReason?.detail ?? t("codepuppy.ext.hubReasonFailed"),
-          }),
+          text: t("codepuppy.ext.packageEnableFailed", { reason: mcpFailureReason(raw ? parseFailureCode(raw)?.code : undefined) }),
+          raw,
         }
+      }
+      // `#1724`:开启时缺令牌 / 缺登录的连接器在引擎里本来就连不上,hub-view 会一直给 reload-pending ——
+      // 缺的前置项必须先说,不然行永远停在「正在生效」。
+      const auth = pack().desiredState === "enabled" ? authorization() : undefined
+      const missingSecret = auth?.ok ? auth.items.find((item) => item.kind === "secret" && !item.saved) : undefined
+      if (missingSecret)
+        return { kind: "prerequisite" as const, text: t(missingSecret.prerequisiteId === "mcp:dbhub-readonly#DSN" ? "codepuppy.ext.packagePendingSqliteAddress" : "codepuppy.ext.packagePendingToken") }
+      if (auth?.ok && auth.items.some((item) => item.kind === "mcp-oauth" && !item.authenticated))
+        return { kind: "prerequisite" as const, text: t("codepuppy.ext.packagePendingLogin") }
+      // `#1724`(BR-04):连接器在引擎里已经启动失败、又没有在途重载 ⇒ hub-view 的核验永远不过,「正在生效」不会收拢;
+      // 说出失败与本地化的短原因,引擎原文进开发者详情。
+      const live = pack().components.flatMap((component) =>
+        component.kind === "mcp" && ext.store.mcp[component.name] ? [ext.store.mcp[component.name]!] : [],
+      )
+      const failed = pack().desiredState === "enabled" ? live.find((item) => item.error && !item.needsAuth && !item.pending) : undefined
+      const reloading = ext.store.hubRows.some(
+        (row) =>
+          row.scope === "global" &&
+          pack().components.some((component) => component.componentId === row.id) &&
+          row.stateReason?.code === "reload-waiting",
+      )
+      if (failed && !reloading)
+        return { kind: "error" as const, text: t("codepuppy.ext.packageEnableFailed", { reason: mcpFailureReason(failed.code) }), raw: failed.error }
       if (
         ext.store.hubRows.some(
           (row) =>
@@ -1634,22 +1659,15 @@ export function ExtensionHub(props: {
       )
         return { kind: "progress" as const, text: t("codepuppy.ext.packageApplying") }
       if (pack().desiredState === "disabled") return { kind: "off" as const, text: t("codepuppy.ext.packageOff") }
-      const auth = authorization()
-      if (auth?.ok && auth.items.some((item) => item.kind === "secret" && !item.saved))
-        return { kind: "prerequisite" as const, text: t("codepuppy.ext.packagePendingToken") }
-      if (auth?.ok && auth.items.some((item) => item.kind === "mcp-oauth" && !item.authenticated))
-        return { kind: "prerequisite" as const, text: t("codepuppy.ext.packagePendingLogin") }
-      const live = pack().components.flatMap((component) =>
-        component.kind === "mcp" && ext.store.mcp[component.name] ? [ext.store.mcp[component.name]!] : [],
-      )
-      const failed = live.find((item) => item.error && !item.needsAuth)
-      if (failed)
-        return { kind: "error" as const, text: t("codepuppy.ext.packageEnableFailed", { reason: failed.error! }) }
       if (live.some((item) => item.needsAuth))
         return { kind: "prerequisite" as const, text: t("codepuppy.ext.packagePendingLogin") }
       if (live.some((item) => item.pending))
         return { kind: "progress" as const, text: t("codepuppy.ext.packageApplying") }
       return undefined
+    }
+    const failureDetail = () => {
+      const current = status()
+      return current && "raw" in current ? current.raw : undefined
     }
     const ic = () => iconForRow(undefined, "bundle", packLabel(pack()))
     return (
@@ -1688,7 +1706,7 @@ export function ExtensionHub(props: {
           </div>
           <Show when={pack().source}><small>{t(presentation().sourceKey)}</small></Show>
           <For each={presentation().notRunning}>{(item) => <p class="codepuppy-ext-card-err">{item.sourceName} · {t("codepuppy.ext.packageEnableFailed", { reason: t(item.reasonKey) })}</p>}</For>
-          <Show when={rootHub()?.detail}>
+          <Show when={failureDetail() ?? rootHub()?.detail}>
             {(detail) => (
               <details onClick={(event) => event.stopPropagation()}>
                 <summary>{t("codepuppy.settings.toolsDevDetails")}</summary>
@@ -1843,7 +1861,7 @@ export function ExtensionHub(props: {
     // 一行状态:取最要紧的那一件。
     const line = (): { text: string; err?: boolean; hub?: string; detail?: string } => {
       if (row.type === "mcp" && row.mcp?.error && !row.mcp.pending)
-        return { text: row.mcp.repair === "reinstall-app" ? t("codepuppy.ext.officeRuntimeMissing") : row.mcp.error, err: true }
+        return { text: row.mcp.repair === "reinstall-app" ? t("codepuppy.ext.officeRuntimeMissing") : mcpFailureReason(row.mcp.code), err: true, detail: row.mcp.error }
       // `#733`:`needs_auth` 不是「未连接」——它是一个用户能自己修好的状态。
       if (row.type === "mcp" && row.mcp?.needsAuth) return { text: t("codepuppy.ext.mcpNeedsAuth") }
       if (rowSessionGrant())

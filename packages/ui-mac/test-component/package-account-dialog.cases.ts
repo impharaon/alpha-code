@@ -78,3 +78,27 @@ test("BC4 changing the package target clears the previous input before a differe
  expect(writes).toEqual([{packageId:"second-package",secrets:{}}])
  expect(JSON.stringify(writes)).not.toContain("BC4_FIRST_PACKAGE_PRIVATE_TOKEN")
 })
+
+// I-15(alpha-code#1726 审查)/ BR-05:令牌窗写明服务的获取位置。官方 MCP 注册表来源的 GitHub 服务器(已验命名空间
+// io.github.github)与目录的 GitHub 包一样给「去 GitHub 获取」;其他服务、或只是名字叫 github 的本机包不给(名字不证明来源)。
+test("I-15 the official Registry GitHub server's token form links to where GitHub issues the token, like the catalog GitHub packages", async () => {
+ const opened: string[] = []
+ const show = (packageId: string, source: unknown) => {
+  document.body.innerHTML = ""
+  Object.assign(window, { api: { openLink: async (url: string) => { opened.push(url) }, ext: { packageAuthorization: async (id: string) => ({ ok: true, packageId: id, items: [field("TOKEN", "mcp_github")] }) } } })
+  const host = document.createElement("div"); document.body.append(host)
+  disposers.push(web.render(() => solid.createComponent(PackageAccountDialog, { packageId, source, label: "GitHub", needId: "TOKEN", save: async () => ({ ok: true }), onClose: () => {}, onSaved: () => {} } as never), host))
+ }
+ const link = () => Array.from(document.querySelectorAll<HTMLButtonElement>("button.codepuppy-ext-link")).find(button => button.textContent === "去 GitHub 获取")
+ const github = { kind: "mcp-registry", serverName: "io.github.github/github-mcp-server", version: "2.1.0", publisher: { kind: "github", account: "github" } }
+ for (const [packageId, source] of [["mcpreg:github-mcp-server", github], ["package:github", { kind: "catalog" }], ["package:github-official", { kind: "catalog" }]] as const) {
+  show(packageId, source); await flush()
+  expect([packageId, !!link()]).toEqual([packageId, true])
+  link()!.click(); await flush()
+ }
+ expect(opened).toEqual(Array(3).fill("https://github.com/settings/personal-access-tokens/new"))
+ for (const [packageId, source] of [["mcpreg:mcp", { kind: "mcp-registry", serverName: "com.figma.mcp/mcp", version: "1.0.3", publisher: { kind: "domain", domain: "figma.com" } }], ["local:github", { kind: "local-folder" }]] as const) {
+  show(packageId, source); await flush()
+  expect([packageId, !!link()]).toEqual([packageId, false])
+ }
+})

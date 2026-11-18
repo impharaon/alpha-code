@@ -7,6 +7,7 @@ import { projectDirectoryIdentity } from "../../../ext/src/project-config"
 import { projectServerConfig } from "../../../ext/src/engine-transforms"
 import type { EngineConnection } from "./engine-authorization"
 import { engineClient } from "./engine-client"
+import { launchedByPackageRunner, RUNNER_FIRST_FETCH_STARTUP_MS } from "./engine-explicit-config"
 import { readMcpLeafStrict } from "./ext-config"
 import { projectScopeIdentity, readPackageLedgerStateV1 } from "./ext-receipt-v2"
 import type { PackageGraphV1 } from "./ext-package-ledger-v3"
@@ -86,7 +87,8 @@ export async function applyPackageMcpV1(
                         status: "failed",
                         detail: "Installed connector definition is invalid",
                       }
-                    await client.experimental.mcp.add({ server: name, config: { ...config, disabled: false }, location })
+                    const startup = launchedByPackageRunner(config) && !config.timeout ? { timeout: { startup: RUNNER_FIRST_FETCH_STARTUP_MS } } : {}
+                    await client.experimental.mcp.add({ server: name, config: { ...config, ...startup, disabled: false }, location })
                     await client.experimental.mcp.connect({ server: name, location })
                   }
                   const server = (await client.mcp.list({ location })).data.find((server) => server.name === name)

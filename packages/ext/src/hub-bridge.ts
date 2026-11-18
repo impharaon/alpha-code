@@ -1,5 +1,5 @@
 import type { PackageAuthorizationResultV1 } from "../../ui-mac/src/shared/package-admission"
-import type { SourceSearchResultV1 } from "../../ui-mac/src/main/plugin-sources"
+import type { PluginSourceIdV1, SourceSearchResultV1 } from "../../ui-mac/src/main/plugin-sources"
 import { PLUGIN_SOURCE_SEARCH_REPLY_TIMEOUT_MS } from "../../ui-mac/src/shared/plugin-source-timing"
 // hub-bridge — REQ-234 `#1531`(基线 docs/design/2026-10-14-req234-hub-agent-install-baseline.md §2.2 / §2.6)。
 //
@@ -47,6 +47,9 @@ export type HubPort = {
 
 export type BridgeFailure = { ok: false; reason: "unavailable" | "timeout" | "error"; detail: string }
 
+/** BR-10:审批卡上「要装什么」—— main 在搜索结果里给出的名称与真实来源(自制插件为 `created`)。 */
+export type HubInstallSubject = { readonly name: string; readonly source: PluginSourceIdV1 | "created" }
+
 export type HubBridge = {
   readonly unattended: ReturnType<typeof createUnattendedState>
   readonly available: boolean
@@ -55,12 +58,16 @@ export type HubBridge = {
   install(input: Omit<HubInstallRequest, "type" | "id">): Promise<{ ok: true; accepted: true } | BridgeFailure>
   request(requestId: string): Promise<{ ok: true; record: HubRequestRecord | null } | BridgeFailure>
   packageAuthorization(packageId: string): Promise<PackageAuthorizationResultV1 | BridgeFailure>
+  /** 本进程里 main 搜索答过的候选(目录条目与 main 铸的编号)的名称与来源;没答过 ⇒ undefined。 */
+  installSubject(id: string): HubInstallSubject | undefined
   report(input: { generation: number; scope: ReloadScope; outcome: ReloadOutcome; directories: string[]; error?: string }): void
   /** main → ext 的重载请求交给谁。只能挂一个(调度器);挂上之前到达的请求按序缓存,挂上时补交。 */
   onReloadRequest(handler: (message: ReloadRequestMessage) => void): void
 }
 
 const DEFAULT_TIMEOUT_MS = 20_000
+/** 记住的候选条数上界(内存健壮性,不是用户限制):超出时忘掉最早的;忘掉的编号再装时请模型重新搜索。 */
+const REMEMBERED_SUBJECTS = 2048
 
 export function createHubBridge(
   port: HubPort | undefined,
@@ -73,6 +80,17 @@ export function createHubBridge(
   let reloadHandler: ((message: ReloadRequestMessage) => void) | undefined
   let seq = 0
   const unattended = createUnattendedState()
+  const subjects = new Map<string, HubInstallSubject>()
+  const remember = (result: SourceSearchResultV1) => {
+    for (const candidate of result.candidates) {
+      subjects.delete(candidate.id)
+      subjects.set(candidate.id, { name: candidate.displayName, source: candidate.source })
+    }
+    for (const id of subjects.keys()) {
+      if (subjects.size <= REMEMBERED_SUBJECTS) break
+      subjects.delete(id)
+    }
+  }
 
   port?.on("message", (event) => {
     const message = event?.data
@@ -143,7 +161,7 @@ export function createHubBridge(
             : { ok: false as const, reason: "error" as const, detail: "the app could not compute the view" }
         },
       ),
-    search: (input) => ask((id) => buildSourcesSearchRequest({ id, ...input }), (message) => { const reply = parseSourcesSearchReply(message); if (!reply) return; return "result" in reply ? { ok: true as const, result: reply.result } : { ok: false as const, reason: "error" as const, detail: reply.error } }, options.timeoutMs ?? PLUGIN_SOURCE_SEARCH_REPLY_TIMEOUT_MS),
+    search: (input) => ask((id) => buildSourcesSearchRequest({ id, ...input }), (message) => { const reply = parseSourcesSearchReply(message); if (!reply) return; if (!("result" in reply)) return { ok: false as const, reason: "error" as const, detail: reply.error }; remember(reply.result); return { ok: true as const, result: reply.result } }, options.timeoutMs ?? PLUGIN_SOURCE_SEARCH_REPLY_TIMEOUT_MS),
     install: (input) => ask((id) => buildHubInstallRequest({ id, ...input }), (message) => { const reply = parseHubInstallReply(message); if (!reply) return; return "accepted" in reply ? { ok: true as const, accepted: true as const } : { ok: false as const, reason: "error" as const, detail: reply.error } }),
     request: (requestId) =>
       ask(
@@ -157,6 +175,7 @@ export function createHubBridge(
         },
       ),
     packageAuthorization: (packageId) => ask((id) => buildPackageAuthorizationQuery(id, packageId), (message) => parsePackageAuthorizationReply(message)?.result),
+    installSubject: (id) => subjects.get(id),
     report(input) {
       if (!port) return
       try {

@@ -398,3 +398,18 @@ test("R12 B2 settled installs with neither package nor live stage show their too
     disposers.pop()!()
   }
 })
+
+// I-10 / 编排器裁决:等待审批时写明要装的名称与「等你允许」;拒绝后写明「已拒绝，未安装」与名称;都不出现候选编号,也不去读 main。
+test("I-10 an install awaiting approval and a declined install name the package, never the candidate id", async () => {
+  const h = harness(null)
+  const waiting = mount(row({ requestId: undefined, name: "GitHub", approval: "waiting" } as never))
+  await flush()
+  expect(waiting.textContent).toContain("等待你允许安装『GitHub』")
+  expect(waiting.textContent).not.toContain("正在安装")
+  const declined = mount(row({ requestId: undefined, name: "GitHub", phase: "error", approval: "declined", result: "The user declined this tool call" } as never))
+  await flush()
+  expect(declined.textContent).toContain("已拒绝，未安装『GitHub』")
+  expect(declined.textContent).not.toContain("The user declined")
+  for (const host of [waiting, declined]) expect(host.textContent).not.toContain("candidate-main-id")
+  expect(h.reads).toHaveLength(0)
+})

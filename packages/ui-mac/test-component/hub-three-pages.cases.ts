@@ -791,6 +791,19 @@ test("package idle switch converges from applying to off on the existing event a
   expect(q('[data-installed-row="mcp:github"]')).toBeNull()
 })
 
+// `#1724`(签名 0.2.1 实测 12-state-poll):缺令牌的 MCP 引擎侧连不上 ⇒ hub-view 一直给 reload-pending,
+// 行停在「正在生效」20 分钟以上。开启状态下缺前置项必须压过「待重载」,显示真实缺的东西。
+test("enabled package missing its token shows the prerequisite even while its connector row stays reload-pending", async () => {
+  reset()
+  const entry = await realInstalledPackage(0)
+  packageAuthorizationItems = [{ kind: "secret", componentId: entry.root, prerequisiteId: `${entry.root}#GITHUB_PERSONAL_ACCESS_TOKEN`, serviceName: "github", label: "GITHUB_PERSONAL_ACCESS_TOKEN", saved: false }]
+  mcpStates.github = { status: "failed", error: "MCP failed" }
+  hubRows = [hubRow(entry.root, "github", "mcp", "reload-pending", "not-loaded"), hubRow(entry.prelude.packageId, "github", "package", "reload-pending", "not-loaded")]
+  mount()
+  await waitFor(() => expect(q('[data-installed-package] [data-prerequisite]')?.textContent).toBe("待填令牌"))
+  expect(q('[data-installed-package]')?.textContent).not.toContain("正在生效")
+})
+
 test("package switch reflects failed and completed main results without a second apply action", async () => {
   reset()
   await realInstalledPackage(0, "disabled")

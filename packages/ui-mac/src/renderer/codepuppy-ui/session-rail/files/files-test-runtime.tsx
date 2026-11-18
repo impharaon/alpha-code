@@ -10,6 +10,7 @@ import {
   type CodePuppySessionIdentity,
   type CodePuppySessionLiveSnapshot,
 } from "../../session-workspace/session-workspace-core"
+import { setRightPanelOpen } from "../../session-workspace/right-panel-state"
 import {
   SessionWorkspaceShell,
   type CodePuppySessionLiveContext,
@@ -122,7 +123,10 @@ export function createShellHarness(panels: SessionRailPanelRenderers) {
     current,
     accepts: (candidate) => sameSessionIdentity(candidate, current()?.identity),
   }
-  const Shell = () => <SessionWorkspaceShell live={live} panels={panels} />
+  const Shell = () => {
+    setRightPanelOpen(true) // 右栏生产默认收起;这批用例验的是展开后的页签条
+    return <SessionWorkspaceShell live={live} panels={panels} />
+  }
   return { Shell, setSnapshot: setCurrent, identity }
 }
 

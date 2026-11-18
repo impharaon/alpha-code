@@ -21,6 +21,7 @@ body[data-codepuppy-sidebar="open"] .a-home {
 /* REQ-085/ADR-027: routed surface mode —— 正式叶页面在 upstream Layout 内成流布局,
  * 不再 fixed 覆盖;sidebar 偏移由外层布局负责,此处归零。 */
 .a-home--page {
+  display: flex;
   position: relative;
   top: 0;
   z-index: auto;
@@ -255,6 +256,8 @@ body[data-codepuppy-sidebar="open"] .a-home--page {
 .a-home-stage {
   position: relative;
   z-index: 1;
+  flex: 1;
+  min-width: 0;
   height: 100%;
   display: flex;
   align-items: center;

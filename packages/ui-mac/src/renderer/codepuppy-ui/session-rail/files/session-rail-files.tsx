@@ -16,11 +16,11 @@
  */
 
 import { useLayout, useServerSDK, useServerSync } from "@opencode-ai/app"
-import { createEffect, createMemo, onCleanup, Show, untrack } from "solid-js"
+import { createEffect, createMemo, createSignal, onCleanup, Show, untrack } from "solid-js"
 import type { CodePuppySessionLiveContext, SessionRailApi } from "../../session-workspace/session-workspace-shell"
 import { turnDiffsOf } from "../review/review-turn-diffs"
 import { sessionStateKey, statusByFile } from "./files-core"
-import { createFilesPanelState } from "./files-state"
+import { createFilesPanelState, type FilesPanelIO } from "./files-state"
 import { SessionRailFilesView } from "./files-view"
 import { createFileViewerIO, createFileViewerOverlayIO } from "./file-viewer-io"
 import { createFileViewerState } from "./file-viewer-state"
@@ -53,7 +53,6 @@ function FilesPanel(props: { live: CodePuppySessionLiveContext; rail: SessionRai
   const serverSync = useServerSync()
   const layout = useLayout()
 
-  const dirContext = createMemo(() => serverSDK().ensureDirSdkContext(identity.directory))
   const tabs = layout.tabs(() => sessionStateKey(serverSDK().scope, identity.directory, identity.sessionID))
   const changeKinds = createMemo(() =>
     statusByFile(turnDiffsOf(serverSync().session.data.message[identity.sessionID]), identity.directory),
@@ -66,8 +65,70 @@ function FilesPanel(props: { live: CodePuppySessionLiveContext; rail: SessionRai
     void serverSync().session.sync(identity.sessionID)
   })
 
-  const overlayIO = createFileViewerOverlayIO(identity.directory)
-  const viewer = createFileViewerState(createFileViewerIO(identity.directory))
+  return (
+    <WorkspaceFilesPanel
+      directory={identity.directory}
+      stillCurrent={() => props.live.accepts(identity)}
+      changeKinds={changeKinds}
+      openedTabs={{
+        all: () => tabs.all(),
+        active: () => tabs.active(),
+        open: (tab) => void tabs.open(tab),
+        close: (tab) => tabs.close(tab),
+        setActive: (tab) => tabs.setActive(tab),
+      }}
+      jumpToReview={(path) => props.rail.jumpToReview(path)}
+      rail={props.rail}
+    />
+  )
+}
+
+/**
+ * 首页右栏的「文件」:只认项目目录,没有会话 —— 没有改动标,「已打开」列表只活在本面板里。
+ * 其余(树、筛选、查看器、监听刷新)与会话页同一份 `WorkspaceFilesPanel`。
+ */
+export function HomeRailFiles(props: { directory: string; stillCurrent: () => boolean; rail: SessionRailApi }) {
+  const [opened, setOpened] = createSignal<string[]>([])
+  const [active, setActive] = createSignal<string | undefined>(undefined)
+  return (
+    <WorkspaceFilesPanel
+      directory={props.directory}
+      stillCurrent={props.stillCurrent}
+      changeKinds={() => new Map()}
+      openedTabs={{
+        all: opened,
+        active,
+        open: (tab) => {
+          setOpened((current) => (current.includes(tab) ? current : [...current, tab]))
+          setActive(tab)
+        },
+        close: (tab) => {
+          setOpened((current) => current.filter((item) => item !== tab))
+          setActive((current) => (current === tab ? undefined : current))
+        },
+        setActive: (tab) => setActive(tab),
+      }}
+      jumpToReview={() => {}}
+      rail={props.rail}
+    />
+  )
+}
+
+function WorkspaceFilesPanel(props: {
+  directory: string
+  /** 异步结果落地前的最后一道闸(会话页 = live.accepts(identity);首页 = 当前项目没换)。 */
+  stillCurrent: () => boolean
+  changeKinds: FilesPanelIO["changeKinds"]
+  openedTabs: FilesPanelIO["openedTabs"]
+  jumpToReview: (path: string) => void
+  rail: SessionRailApi
+}) {
+  const serverSDK = useServerSDK()
+  const directory = props.directory
+  const dirContext = createMemo(() => serverSDK().ensureDirSdkContext(directory))
+
+  const overlayIO = createFileViewerOverlayIO(directory)
+  const viewer = createFileViewerState(createFileViewerIO(directory))
   onCleanup(() => viewer.dispose())
 
   let treeLayer: HTMLDivElement | undefined
@@ -89,8 +150,8 @@ function FilesPanel(props: { live: CodePuppySessionLiveContext; rail: SessionRai
   }
 
   const state = createFilesPanelState({
-    root: identity.directory,
-    stillCurrent: () => props.live.accepts(identity),
+    root: directory,
+    stillCurrent: props.stillCurrent,
     listDir: (path) =>
       dirContext()
         .client.file.list({ path })
@@ -99,15 +160,9 @@ function FilesPanel(props: { live: CodePuppySessionLiveContext; rail: SessionRai
       dirContext()
         .client.find.files({ query, dirs: "false", limit: SEARCH_LIMIT }, { signal })
         .then((result: { data?: readonly unknown[] }) => result.data ?? []),
-    changeKinds,
-    openedTabs: {
-      all: () => tabs.all(),
-      active: () => tabs.active(),
-      open: (tab) => void tabs.open(tab),
-      close: (tab) => tabs.close(tab),
-      setActive: (tab) => tabs.setActive(tab),
-    },
-    jumpToReview: (path) => props.rail.jumpToReview(path),
+    changeKinds: props.changeKinds,
+    openedTabs: props.openedTabs,
+    jumpToReview: props.jumpToReview,
     openViewer,
     searchLimit: SEARCH_LIMIT,
   })
@@ -116,7 +171,7 @@ function FilesPanel(props: { live: CodePuppySessionLiveContext; rail: SessionRai
   // events on the directory channel; paths are re-proven relative before use).
   createEffect(() => {
     const off = dirContext().event.on("file.watcher.updated", (event) => {
-      if (!props.live.accepts(identity)) return
+      if (!props.stillCurrent()) return
       state.applyWatcher(event.properties.file, event.properties.event)
     })
     onCleanup(off)

@@ -186,6 +186,7 @@ const binding = await import("../src/renderer/codepuppy-ui/session-timeline/sess
 const composer = await import("../src/renderer/codepuppy-ui/composer-state")
 const previewFixture = await import("./inline-preview.fixture")
 const previewShell = await import("../src/renderer/codepuppy-ui/session-workspace/session-workspace-shell")
+const previewRightPanel = await import("../src/renderer/codepuppy-ui/session-workspace/right-panel-state")
 const previewFiles = await import("../src/renderer/codepuppy-ui/session-rail/files/session-rail-files")
 const previewArtifacts = await import("../src/renderer/codepuppy-ui/session-rail/artifacts/session-rail-artifacts")
 const i18n = await import("../src/renderer/i18n")
@@ -4133,6 +4134,7 @@ function mountInlinePreview(parts: unknown[]) {
   const live = { current: () => ({ identity, project: "workspace", title: "Preview", activity: "idle" as const }), accepts: (candidate: typeof identity) => candidate.sessionID === identity.sessionID }
   const host = document.createElement("div")
   document.body.append(host)
+  previewRightPanel.setRightPanelOpen(true) // 右栏生产默认收起;本组从展开态起步
   disposers.push(solidWeb.render(() => solid.createComponent(previewShell.SessionWorkspaceShell, {
     live,
     timeline: (rail) => solid.createComponent(binding.CodePuppySessionTimeline, { rail }),
@@ -4159,7 +4161,8 @@ test("AC1 #1503: closed rail shows each same-name PNG from its clicked media row
   const rows = [...host.querySelectorAll<HTMLButtonElement>("button.a-media-row")]
   expect(rows).toHaveLength(2)
   for (const index of [0, 1]) {
-    host.querySelector<HTMLButtonElement>(".a-swk-rail-close")!.click()
+    previewRightPanel.setRightPanelOpen(false) // 顶栏右栏开关走的就是这个信号
+    await settlePreview()
     expect(host.querySelector("[data-codepuppy-session-rail-host]")).toBeNull()
     rows[index].focus()
     rows[index].click()

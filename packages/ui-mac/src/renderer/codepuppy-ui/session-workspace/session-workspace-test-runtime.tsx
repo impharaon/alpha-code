@@ -3,6 +3,7 @@ import { createSignal } from "solid-js"
 import { render } from "solid-js/web"
 import type { CodePuppyTerminalEngineChannel } from "../session-rail/terminal/terminal-rail-core"
 import type { TimelineTurnWait } from "../session-timeline/timeline-model"
+import { setRightPanelOpen } from "./right-panel-state"
 import { SessionQuestionCard } from "./session-question-card"
 import { sameSessionIdentity, type CodePuppySessionLiveSnapshot } from "./session-workspace-core"
 import {
@@ -132,6 +133,8 @@ export function setSessionWorkspaceTurnWait(next: TimelineTurnWait | undefined) 
 }
 
 export function resetSessionWorkspaceSnapshot() {
+  // 右栏默认收起(生产默认);这批用例的前提是「右栏已展开」,个别用例自己验收起/展开。
+  setRightPanelOpen(true)
   setSnapshot(initial)
   setTurnWait(undefined)
   setReviewCount(undefined)

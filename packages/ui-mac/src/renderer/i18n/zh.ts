@@ -139,6 +139,8 @@ export const dict = {
   "codepuppy.sidebar.plugins": "定制中心",
   "codepuppy.sidebar.automation": "自动化",
   "codepuppy.sidebar.automationSoon": "自动化 —— 即将推出",
+  "codepuppy.auto.allTasks": "全部任务",
+  "codepuppy.auto.tasks": "任务",
   "codepuppy.auto.newTitle": "新建自动化任务",
   "codepuppy.auto.editTitle": "任务详情",
   "codepuppy.auto.offlineNote": "应用关着时,本机任务不运行",

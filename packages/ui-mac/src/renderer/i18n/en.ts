@@ -140,6 +140,8 @@ export const dict = {
   "codepuppy.sidebar.plugins": "Extension Hub",
   "codepuppy.sidebar.automation": "Automation",
   "codepuppy.sidebar.automationSoon": "Automation — coming soon",
+  "codepuppy.auto.allTasks": "All tasks",
+  "codepuppy.auto.tasks": "Tasks",
   "codepuppy.auto.newTitle": "New automation",
   "codepuppy.auto.editTitle": "Task details",
   "codepuppy.auto.offlineNote": "Local tasks don't run while the app is closed",

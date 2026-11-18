@@ -804,6 +804,31 @@ describe("#1592 AC6:立即运行与 AI 解析的失败按结构码出文案,原�
     expect(unknownRow).not.toContain("JSON")
   })
 
+  test("#automation 列表:任务行 = 名称 + 一行「周期 · 项目 · 权限」+ 右侧下次与上次结果;顶部两项是设置页同款开关", async () => {
+    const task = { ...localTask("auto-row"), name: "检查未处理的 TODO", permissionProfile: "readonly" as const }
+    const standard = { ...localTask("auto-std"), name: "汇总上周提交", permissionProfile: "standard" as const }
+    runtime.queueListedTasks([task, standard])
+    disposers.push(runtime.render(() => runtime.AutomationRefusalHarness(), query<HTMLElement>("#root")))
+    runtime.openPanel()
+    await flush()
+
+    const rows = [...document.querySelectorAll(".codepuppy-auto-row")]
+    expect(rows).toHaveLength(2)
+    const ds = rows.map((row) => row.querySelector(".codepuppy-auto-row-ds")!.textContent!)
+    // 周期 · 项目 · 权限(权限是人话「只读」「可改文件」,不是 readonly / standard)
+    expect(ds[0]).toMatch(/ · .+ · 只读$/)
+    expect(ds[1]).toMatch(/ · .+ · 可改文件$/)
+    expect(ds.join("")).not.toMatch(/readonly|standard/)
+    expect(rows[0]!.querySelector(".codepuppy-auto-row-nm")!.textContent).toBe("检查未处理的 TODO")
+    expect(rows[0]!.querySelector(".codepuppy-auto-row-st")!.textContent).toContain("下次")
+    expect(document.querySelector(".codepuppy-auto-grp")!.textContent).toBe("任务2")
+    // 页头只有一枚页签,不再是「自动化」大标题;两个全局开关是设置页同款开关(不是原生复选框外观)
+    expect(document.querySelector(".codepuppy-auto-head .codepuppy-auto-tab")!.textContent).toBe("全部任务")
+    const switches = [...document.querySelectorAll<HTMLInputElement>(".codepuppy-auto-note input")]
+    expect(switches).toHaveLength(2)
+    expect(switches.every((input) => input.classList.contains("codepuppy-settings-switch"))).toBe(true)
+  })
+
   test("每个本地动作码在 en 下是英文人话(不含中文),不认识的码回落 undefined", () => {
     const codes = [
       "automation-run-not-found",

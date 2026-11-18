@@ -362,6 +362,7 @@ export function AutomationPanel(props: {
     <Show when={openNow()}>
       <Portal mount={host}>
         <div class="a-ui codepuppy-auto-page" role="region" aria-label={t("codepuppy.sidebar.automation")}>
+          {/* 页头与定制中心 / 设置同一套(#automation `.phd`):一枚当前页签 + 底部发丝线;编辑页前面多一个返回面包屑。 */}
           <header class="codepuppy-auto-head">
             <div class="codepuppy-auto-head-t">
               <Show when={view() === "edit"}>
@@ -371,7 +372,7 @@ export function AutomationPanel(props: {
                 </button>
                 <span class="codepuppy-auto-crumb-sep">/</span>
               </Show>
-              <h1>{view() === "edit" ? (editing() ? t("codepuppy.auto.editTitle") : t("codepuppy.auto.newTitle")) : t("codepuppy.sidebar.automation")}</h1>
+              <h1 class="codepuppy-auto-tab">{view() === "edit" ? (editing() ? t("codepuppy.auto.editTitle") : t("codepuppy.auto.newTitle")) : t("codepuppy.auto.allTasks")}</h1>
             </div>
             <button class="codepuppy-auto-close" aria-label={t("codepuppy.ext.close")} onClick={() => setAutomationOpen(false)}>
               <Svg d="M6 6l12 12M18 6L6 18" />
@@ -384,8 +385,10 @@ export function AutomationPanel(props: {
                 {/* 诚实边界 + 全局开关行 */}
                 <div class="codepuppy-auto-note">
                   <span>{t("codepuppy.auto.offlineNote")}</span>
+                  <span class="codepuppy-auto-note-grow" />
                   <label class="codepuppy-auto-check">
                     <input
+                      class="codepuppy-settings-switch"
                       type="checkbox"
                       checked={loginItem()}
                       onChange={(e) => {
@@ -396,6 +399,7 @@ export function AutomationPanel(props: {
                   </label>
                   <label class="codepuppy-auto-check">
                     <input
+                      class="codepuppy-settings-switch"
                       type="checkbox"
                       checked={pausedAll()}
                       onChange={(e) => {
@@ -442,25 +446,35 @@ export function AutomationPanel(props: {
                     </div>
                   }
                 >
+                  <div class="codepuppy-auto-grp">
+                    {t("codepuppy.auto.tasks")}
+                    <span class="codepuppy-auto-grp-n">{tasks().length}</span>
+                  </div>
                   <div class="codepuppy-auto-list" data-paused={pausedAll() ? "" : undefined}>
                     <For each={tasks()}>
                       {(task) => {
                         const dot = () => statusDot(task.lastRun)
                         return (
-                          <div class="codepuppy-auto-row" data-clickable="" onClick={() => startEdit(task)}>
-                            <span class="codepuppy-auto-dot" data-st={task.running ? "run" : dot().cls} title={dot().label} />
+                          <div class="codepuppy-auto-row" data-clickable="" data-off={!task.enabled || pausedAll() ? "" : undefined} onClick={() => startEdit(task)}>
+                            <span class="codepuppy-auto-mono" data-st={task.running ? "run" : dot().cls} title={dot().label}>
+                              <Svg d="M4 5.5h16v14.5H4zM4 10h16M8.5 3.5v4M15.5 3.5v4" />
+                            </span>
                             <div class="codepuppy-auto-row-body">
                               <div class="codepuppy-auto-row-nm">
                                 <b>{task.name}</b>
-                                <span class="codepuppy-auto-pill">{describeSchedule(task.schedule)}</span>
-                                <span class="codepuppy-auto-pill" data-muted="">
-                                  {projectName(task.target.projectDir)}
-                                </span>
-                                <Show when={task.execution === "cloud"}>
-                                  <span class="codepuppy-auto-pill">☁ {t("codepuppy.auto.execCloud")}</span>
-                                </Show>
                               </div>
-                              <div class="codepuppy-auto-row-st">
+                              {/* 每个任务一行:周期 · 项目 · 权限(云端任务另标「云端」) */}
+                              <div class="codepuppy-auto-row-ds">
+                                {[
+                                  describeSchedule(task.schedule),
+                                  projectName(task.target.projectDir),
+                                  task.permissionProfile === "standard" ? t("codepuppy.auto.permStandard") : t("codepuppy.auto.permReadonly"),
+                                  ...(task.execution === "cloud" ? [t("codepuppy.auto.execCloud")] : []),
+                                ].join(" · ")}
+                              </div>
+                            </div>
+                            <div class="codepuppy-auto-row-st">
+                              <span class="codepuppy-auto-when">
                                 {task.running
                                   ? t("codepuppy.auto.runningNow")
                                   : task.enabled && !pausedAll()
@@ -468,22 +482,23 @@ export function AutomationPanel(props: {
                                     : task.disabledReason === "consecutive_failures"
                                       ? t("codepuppy.auto.disabledBreaker", { n: AUTOMATION_DEFAULTS.failureBreaker })
                                       : t("codepuppy.auto.disabled")}
+                              </span>
+                              <small>
                                 <Show when={task.cloudScheduleId && cloudStates().get(task.cloudScheduleId!)?.disabled_reason}>
                                   {(reason) => (
                                     <>
-                                      {" · "}
                                       {/* [#778] 每个停用理由各说各的;不认识的走兜底,不归进任何已知理由 */}
                                       {cloudDisabledReasonCopy(reason())}
+                                      <Show when={task.lastRun}>{" · "}</Show>
                                     </>
                                   )}
                                 </Show>
-                                <Show when={task.lastRun}>
-                                  {" · "}
+                                <Show when={task.lastRun} fallback={dot().label}>
                                   {dot().label}
                                   {/* [#1592] 已知原因出人话;原始报错只留在运行记录,不上列表行。 */}
                                   <Show when={automationActionCopy(task.lastRun!.reasonCode)}>{(copy) => <> · {copy()}</>}</Show>
                                 </Show>
-                              </div>
+                              </small>
                             </div>
                             <button
                               class="codepuppy-ext-inline-cta"

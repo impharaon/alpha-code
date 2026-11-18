@@ -11,29 +11,36 @@
 }
 
 .codepuppy-auto-page {
+  /* 新外壳:顶栏与窄轨常驻在外,页面铺在它们右 / 下的工作面里;侧栏开着时让出侧栏。 */
   position: fixed;
-  top: var(--a-home-top, 40px);
-  left: 0;
-  right: 0;
-  bottom: 0;
+  top: var(--a-topbar-h);
+  left: var(--a-rail-w);
+  right: var(--a-frame-gap);
+  bottom: var(--a-frame-gap);
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  border-radius: var(--a-radius-md);
   background: var(--a-bg-canvas);
+  box-shadow: var(--a-shadow-xs), var(--a-edge-light);
   color: var(--a-text);
   pointer-events: auto;
   animation: a-ext-in var(--a-dur-base) var(--a-ease-out);
 }
 body[data-codepuppy-sidebar="open"] .codepuppy-auto-page {
-  left: var(--codepuppy-sidebar-w, 260px);
+  left: calc(var(--a-rail-w) + var(--codepuppy-sidebar-w, 248px));
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
 }
 
+/* 页头(与定制中心 / 设置同一套):页签 + 底部发丝线,内容宽度同 .codepuppy-auto-center */
 .codepuppy-auto-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 14px 28px 10px;
-  border-bottom: 1px solid var(--a-border-faint);
+  width: min(880px, calc(100% - 80px));
+  margin: 18px auto 0;
+  border-bottom: 1px solid var(--a-hairline);
 }
 .codepuppy-auto-head-t {
   display: flex;
@@ -41,9 +48,26 @@ body[data-codepuppy-sidebar="open"] .codepuppy-auto-page {
   gap: 8px;
 }
 .codepuppy-auto-head-t h1 {
-  font-size: var(--a-text-lg);
-  font-weight: var(--a-weight-semibold);
   margin: 0;
+}
+.codepuppy-auto-tab {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  height: 40px;
+  font-size: var(--a-text-md);
+  font-weight: var(--a-weight-medium);
+  color: var(--a-text);
+}
+.codepuppy-auto-tab::after {
+  content: "";
+  position: absolute;
+  right: 0;
+  bottom: -1px;
+  left: 0;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--a-text);
 }
 .codepuppy-auto-crumb {
   display: inline-flex;
@@ -60,7 +84,7 @@ body[data-codepuppy-sidebar="open"] .codepuppy-auto-page {
   color: var(--a-text);
 }
 .codepuppy-auto-crumb-sep {
-  color: var(--a-text-tertiary);
+  color: var(--a-text-disabled);
 }
 .codepuppy-auto-close {
   display: inline-flex;
@@ -75,7 +99,7 @@ body[data-codepuppy-sidebar="open"] .codepuppy-auto-page {
   cursor: pointer;
 }
 .codepuppy-auto-close:hover {
-  background: var(--a-bg-muted);
+  background: var(--a-overlay-hover);
   color: var(--a-text);
 }
 
@@ -84,32 +108,45 @@ body[data-codepuppy-sidebar="open"] .codepuppy-auto-page {
   overflow-y: auto;
 }
 .codepuppy-auto-center {
-  max-width: 860px;
+  width: min(880px, calc(100% - 80px));
   margin: 0 auto;
-  padding: 18px 28px 60px;
+  padding: 0 0 60px;
 }
 
-/* 诚实边界 + 全局开关行 */
+/* 说明 + 两个开关:一行,无底色无边框(#automation `.auto-opts`) */
 .codepuppy-auto-note {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 20px;
   flex-wrap: wrap;
-  padding: 10px 14px;
-  background: var(--a-bg-muted);
-  border: 1px solid var(--a-border-faint);
-  border-radius: 10px;
+  margin: 14px 0 0;
   font-size: var(--a-text-sm);
-  color: var(--a-text-secondary);
+  color: var(--a-text-tertiary);
+}
+.codepuppy-auto-note-grow {
+  flex: 1;
 }
 .codepuppy-auto-check {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   font-size: var(--a-text-sm);
   color: var(--a-text-secondary);
   cursor: pointer;
   white-space: nowrap;
+}
+.codepuppy-auto-check .codepuppy-settings-switch {
+  width: 28px;
+  height: 16px;
+  border: 0;
+}
+.codepuppy-auto-check .codepuppy-settings-switch::before {
+  width: 12px;
+  height: 12px;
+  margin: 2px;
+}
+.codepuppy-auto-check .codepuppy-settings-switch:checked::before {
+  transform: translateX(12px);
 }
 .codepuppy-auto-hint {
   font-size: var(--a-text-sm);
@@ -122,21 +159,24 @@ body[data-codepuppy-sidebar="open"] .codepuppy-auto-page {
   margin: 10px 2px 0;
 }
 
-/* 一句话新建 */
+/* 一句话新建:输入框与「创建」同高(#automation `.auto-new`) */
 .codepuppy-auto-new {
   display: flex;
-  gap: 10px;
-  margin: 16px 0 20px;
+  gap: 8px;
+  margin: 16px 0 0;
 }
 .codepuppy-auto-nl {
   flex: 1;
-  height: 36px;
+  height: 34px;
   padding: 0 12px;
-  border: 1px solid var(--a-border);
+  border: 1px solid var(--a-hairline);
   border-radius: var(--a-radius-md);
-  background: var(--a-bg-base);
+  background: var(--a-bg-subtle);
   color: var(--a-text);
-  font-size: var(--a-text-md);
+  font-size: var(--a-text-base);
+}
+.codepuppy-auto-new .codepuppy-ext-add {
+  height: 34px;
 }
 .codepuppy-auto-nl:focus {
   outline: none;
@@ -157,40 +197,79 @@ body[data-codepuppy-sidebar="open"] .codepuppy-auto-page {
   font-size: var(--a-text-sm);
   margin: 6px 0 14px;
 }
+/* 模板 / 示例:安静的小幽灵钮 */
 .codepuppy-auto-example {
-  border: 1px dashed var(--a-border);
+  height: 26px;
+  margin-top: 10px;
+  padding: 0 var(--a-space-2);
+  border: 1px solid transparent;
+  border-radius: var(--a-radius-md);
   background: none;
   color: var(--a-text-secondary);
-  border-radius: var(--a-radius-md);
-  padding: 8px 14px;
   cursor: pointer;
-  font-size: var(--a-text-sm);
+  font-size: var(--a-text-xs);
 }
 .codepuppy-auto-example:hover {
+  background: var(--a-overlay-hover);
   color: var(--a-text);
-  border-color: var(--a-accent);
 }
 
-/* 任务列表 */
+/* 任务列表:每个任务一行 */
+.codepuppy-auto-grp {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  margin-top: 32px;
+  font-size: var(--a-text-xs);
+  font-weight: var(--a-weight-medium);
+  color: var(--a-text-secondary);
+}
+.codepuppy-auto-grp-n {
+  font-weight: var(--a-weight-normal);
+  color: var(--a-text-tertiary);
+}
 .codepuppy-auto-list[data-paused] {
   opacity: 0.55;
 }
 .codepuppy-auto-row {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 12px 14px;
-  border: 1px solid var(--a-border-faint);
-  border-radius: 10px;
-  margin-bottom: 8px;
-  background: var(--a-bg-base);
+  gap: 14px;
+  min-height: 64px;
+  margin: 0 -8px;
+  padding: 8px;
+  border-radius: var(--a-radius-lg);
 }
 .codepuppy-auto-row[data-clickable] {
   cursor: pointer;
 }
 .codepuppy-auto-row[data-clickable]:hover {
-  border-color: var(--a-border);
-  background: var(--a-bg-muted);
+  background: var(--a-overlay-hover);
+}
+.codepuppy-auto-mono {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: var(--a-radius-md);
+  background: var(--a-monogram-bg);
+  color: var(--a-text-secondary);
+}
+.codepuppy-auto-mono svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.codepuppy-auto-row[data-off] .codepuppy-auto-row-nm,
+.codepuppy-auto-row[data-off] .codepuppy-auto-row-st {
+  color: var(--a-text-tertiary);
 }
 .codepuppy-auto-dot {
   width: 8px;
@@ -227,30 +306,35 @@ body[data-codepuppy-sidebar="open"] .codepuppy-auto-page {
   min-width: 0;
 }
 .codepuppy-auto-row-nm {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: var(--a-text-md);
-}
-.codepuppy-auto-pill {
-  font-size: var(--a-text-xs);
-  padding: 1px 8px;
-  border-radius: var(--a-radius-full);
-  background: var(--a-accent-subtle, rgba(79, 70, 229, 0.12));
-  color: var(--a-accent);
-  white-space: nowrap;
-}
-.codepuppy-auto-pill[data-muted] {
-  background: var(--a-bg-muted);
-  color: var(--a-text-secondary);
-}
-.codepuppy-auto-row-st {
-  font-size: var(--a-text-sm);
-  color: var(--a-text-secondary);
-  margin-top: 2px;
   overflow: hidden;
+  font-size: var(--a-text-base);
+  font-weight: var(--a-weight-medium);
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.codepuppy-auto-row-nm b {
+  font-weight: inherit;
+}
+.codepuppy-auto-row-ds {
+  margin-top: 2px;
+  overflow: hidden;
+  font-size: var(--a-text-sm);
+  color: var(--a-text-tertiary);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* 右侧:下次 + 上次结果(云端停用理由等长句在小字里换行) */
+.codepuppy-auto-row-st {
+  flex: none;
+  width: 190px;
+  text-align: right;
+  font-size: var(--a-text-sm);
+  color: var(--a-text-secondary);
+}
+.codepuppy-auto-row-st small {
+  display: block;
+  font-size: var(--a-text-xs);
+  color: var(--a-text-tertiary);
 }
 
 /* 表单(预览卡) */

@@ -176,7 +176,8 @@ test("project MCP activates only in matching Locations and scope narrowing revok
     await applyPackageMcpV1("claude:playwright", h.slot.projectDirectory, { root: () => h.root, awaitServer: h.awaitServer })
     await until(() => h.rpc("tools"), (items) => items.includes("browser_close"))
     // Later/rebuilt Locations must consume the globally disabled leaf through ext's own scope transform.
-    await until(async () => JSON.parse(readFileSync(h.file, "utf8")), (document) => document.mcp?.playwright?.enabled === false)
+    // `#1724`: a package-runner (npx) server reaches the engine as a native `mcp.servers` entry (startup-only timeout).
+    await until(async () => JSON.parse(readFileSync(h.file, "utf8")), (document) => document.mcp?.servers?.playwright?.disabled === true)
     await h.client.location.reload()
     await until(() => h.rpc("tools"), (items) => items.includes("browser_close"))
     expect(await h.rpc("tools", h.other)).not.toContain("browser_close")

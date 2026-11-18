@@ -9,6 +9,8 @@ import type { InstallReceiptType } from "../../preload/types"
 import type { PackageListingV1 } from "../../shared/host-extension-package-contract/decoder"
 import { packageListingTextV1 } from "../../shared/host-extension-package-contract/decoder"
 import { t } from "../i18n"
+import { isNetFailureLayer } from "@opencode/schema/codepuppy-net-failure"
+import { netFailureCopy } from "../codepuppy-ui/net-failure-copy"
 
 // Presentational only — the catalog carries no icon glyph/color. Keyed by id, falling back to the
 // category tint + the displayName initial. (Kept here, not in the catalog, so the data file stays
@@ -350,4 +352,20 @@ export function extensionWarning(warning: string): string {
   if (warning.includes("removed your standalone claim and kept the files")) messages.push(t("codepuppy.ext.warning.sharedFiles"))
   if (warning.includes("skills allow-list final publish failed")) messages.push(t("codepuppy.ext.warning.reload"))
   return messages.length ? messages.join("\n") : t("codepuppy.ext.error.warningUnknown")
+}
+
+// `#1724`(BR-04):连接器启动失败的短原因。码由引擎登记(@opencode/schema/codepuppy-net-failure),网络层沿用
+// net-failure-copy 的同一套句子;认不出的码说「上次未能生效」。引擎原文只留在开发者详情 / 悬停。
+const MCP_START_FAILURE: Record<string, Parameters<typeof t>[0]> = {
+  workspace_missing: "codepuppy.ext.mcpFailure.workspaceMissing",
+  dependency_missing: "codepuppy.ext.mcpFailure.dependencyMissing",
+  spawn_failed: "codepuppy.ext.mcpFailure.spawnFailed",
+  handshake_timeout: "codepuppy.ext.mcpFailure.handshakeTimeout",
+  auth: "codepuppy.ext.mcpFailure.auth",
+  protocol: "codepuppy.ext.mcpFailure.protocol",
+  transport: "codepuppy.ext.mcpFailure.transport",
+}
+export function mcpFailureReason(code: string | undefined): string {
+  if (code && isNetFailureLayer(code)) return netFailureCopy(code)
+  return t(code && MCP_START_FAILURE[code] ? MCP_START_FAILURE[code] : "codepuppy.ext.hubReasonFailed")
 }

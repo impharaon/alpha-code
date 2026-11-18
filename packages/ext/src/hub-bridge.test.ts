@@ -127,6 +127,32 @@ test("A3 bridge pairs source search and direct install replies; malformed candid
 })
 
 
+test("I-10 the bridge remembers the name and real source main gave each searched candidate, for the install approval card", async () => {
+  const { buildSourcesSearchReply } = await import("../../ui-mac/src/main/codepuppy-sidecar-messages")
+  const wire = fakePort()
+  const bridge = createHubBridge(wire.port, { log: () => {} })
+  expect(bridge.installSubject("cand_ctx7")).toBeUndefined()
+  const candidate = (id: string, source: "catalog" | "claude-marketplace", displayName: string) => ({ id, source, name: displayName.toLowerCase(), displayName, description: "", kind: "plugin" as const, upstream: {} })
+  const result = { searchId: "search_a", query: "docs", sources: [], candidates: [candidate("cand_ctx7", "claude-marketplace", "Context7"), candidate("package:github", "catalog", "GitHub")] }
+  const search = bridge.search({ directory: "/work/a", query: "docs" })
+  wire.deliver(buildSourcesSearchReply(1, { result }))
+  await search
+  expect(bridge.installSubject("cand_ctx7")).toEqual({ name: "Context7", source: "claude-marketplace" })
+  expect(bridge.installSubject("package:github")).toEqual({ name: "GitHub", source: "catalog" })
+  // 拒收的应答不留下任何候选
+  const bad = bridge.search({ directory: "/work/a", query: "browser" })
+  wire.deliver(buildSourcesSearchReply(2, { result: { ...result, candidates: [{ ...candidate("cand_bad", "claude-marketplace", "Bad"), upstream: { token: "x" } } as never] } }))
+  await bad
+  expect(bridge.installSubject("cand_bad")).toBeUndefined()
+  // 一次很长的会话:记住的条数有上界,最早的先忘;刚搜到的总在
+  const many = Array.from({ length: 2100 }, (_, index) => candidate(`cand_${index}`, "claude-marketplace", `P${index}`))
+  const big = bridge.search({ directory: "/work/a", query: "many" })
+  wire.deliver(buildSourcesSearchReply(3, { result: { ...result, candidates: many } }))
+  await big
+  expect(bridge.installSubject("cand_ctx7")).toBeUndefined()
+  expect(bridge.installSubject("cand_2099")).toEqual({ name: "P2099", source: "claude-marketplace" })
+})
+
 test("R12 B5 source search has its own reply budget while ordinary reads keep 20 seconds",async()=>{
  const {jest}=await import("bun:test")
  const {buildSourcesSearchReply}=await import("../../ui-mac/src/main/codepuppy-sidecar-messages")
@@ -174,7 +200,7 @@ test("R14 chat search receives failed hung-source status within thirty seconds, 
  }})
  const wire=fakePort()
  const bridge=createHubBridge(wire.port)
- const tool=createHubTools(bridge,{location:{directory:"/work/a"}} as never).find(tool=>tool.name==="codepuppy_hub_search")!
+ const tool=createHubTools(bridge,{location:{directory:"/work/a"}} as never,async()=>{}).find(tool=>tool.name==="codepuppy_hub_search")!
  jest.useFakeTimers()
  let output:Awaited<ReturnType<typeof tool.execute>>|undefined
  const pending=tool.execute({query:"context7"},{} as never).then(value=>{output=value})

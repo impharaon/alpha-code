@@ -28,7 +28,8 @@ export const textOf = (content: unknown) =>
   typeof content === "string" ? content : Array.isArray(content) ? content.map((part: { text?: string }) => part?.text ?? "").join("") : ""
 
 /**
- * 模型桩。用户回合里写 `CP-CALL {"name":…,"args":…}` ⇒ 回一次那个工具调用;上一条是工具结果 ⇒ 回「done」;其余回「ok」。
+ * 模型桩。用户回合里写 `CP-CALL {"name":…,"args":…}` ⇒ 回一次那个工具调用;上一条是工具结果 ⇒ 回「done」,除非结果里夹着
+ * `CP-INJECTED-CALL {"name":…,"args":…}`(读到的文件、网页里藏的指令)⇒ 照它回一次工具调用;其余回「ok」。
  * 引擎的压缩请求 ⇒ 回一份按模板标题写的摘要。
  * 用户回合里写 `CP-OVERFLOW-ONCE` ⇒ 第一次这样的请求回 HTTP 400 `context_length_exceeded`(引擎认作上下文过长),之后照常。
  * 每次请求的工具表与消息都记在 `requests` 里。
@@ -49,7 +50,8 @@ export function scriptedModel() {
       const messages = body.messages ?? []
       requests.push({ tools: (body.tools ?? []).map((tool) => String(tool.function?.name)), messages })
       const headers = { "content-type": "text/event-stream" }
-      if (messages.at(-1)?.role === "tool") return new Response(text("done"), { headers })
+      const injected = messages.at(-1)?.role === "tool" ? textOf(messages.at(-1)?.content).match(/CP-INJECTED-CALL (\{.*\})/) : null
+      if (messages.at(-1)?.role === "tool" && !injected) return new Response(text("done"), { headers })
       const lastUser = textOf(messages.filter((message) => message.role === "user").at(-1)?.content)
       if (lastUser.includes("CP-OVERFLOW-ONCE") && !overflowed) {
         overflowed = true
@@ -61,7 +63,7 @@ export function scriptedModel() {
       // 引擎的压缩请求(core session/compaction.ts 的 SUMMARY_TEMPLATE):按模板的标题回一份摘要,否则压缩判失败
       if (lastUser.includes("<template>") && lastUser.includes("## Objective"))
         return new Response(text("## Objective\n- continue the user's work\n\n## Next Move\n1. (none)"), { headers })
-      const marker = lastUser.match(/CP-CALL (\{.*\})/)
+      const marker = injected ?? lastUser.match(/CP-CALL (\{.*\})/)
       if (!marker) return new Response(text("ok"), { headers })
       const call = JSON.parse(marker[1]!) as { name: string; args: Record<string, unknown> }
       const id = `call_cp_engine_${++calls}`
@@ -81,6 +83,9 @@ const PROBE_KEY = "__cpEngineProbe"
 /** 探针插件的状态(插件上下文 + 两个插件工具各被执行了几次);引擎在测试进程里,同一个 globalThis。 */
 export const probe = () => (globalThis as Record<string, unknown>)[PROBE_KEY] as Probe
 
+/** 假 main 收到的每一条消息(按到达顺序),判「安装请求到没到 main」用。 */
+export const fakeMainReceived: Array<{ type: string }> = []
+
 /** 定制中心安装要问 main 要目录视图:main 由一个假 parentPort 扮演(ext 在装载时取它,同 packages/ext/src/plugin-host.test.ts)。 */
 function fakeMainPort() {
   const holder = process as unknown as { parentPort?: unknown }
@@ -90,6 +95,7 @@ function fakeMainPort() {
   holder.parentPort = {
     postMessage: (message: { type: string; id: number; directory?: string }) =>
       queueMicrotask(() => {
+        fakeMainReceived.push(message)
         const reply =
           message.type === "codepuppy.hub.view.request"
             ? buildHubViewReply(message.id, { view: { directory: message.directory ?? "", rows: [row as never], warnings: [] } })

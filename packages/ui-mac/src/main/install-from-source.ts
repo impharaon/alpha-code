@@ -49,7 +49,7 @@ type Dependencies = Pick<
   "globalRoot" | "casBaseRoot" | "environment" | "advisoryGate" | "resolvePackage"
 > & {
   userDataPath: string
-  sources: Pick<ReturnType<typeof createPluginSources>, "convertCandidate" | "catalogComparisons" | "searchedSources">
+  sources: Pick<ReturnType<typeof createPluginSources>, "convertCandidate" | "catalogComparisons" | "searchedSources" | "release">
   catalogInstall(catalogId: string, request: InstallRequestV1): Promise<InstallOutcomeV1>
   activateMcp(packageId: string): Promise<unknown>
   reloadSkills(packageId: string): void
@@ -428,6 +428,8 @@ export function createSourceInstaller(deps: Dependencies) {
       }),
     )
     requests.set(request.requestId, { input: encoded, result: pending })
+    const source = request.source
+    if (source.kind === "candidate") void pending.then(() => deps.sources.release(source.candidateId))
     return pending
   }
 }

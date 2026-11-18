@@ -206,6 +206,10 @@ const getBase = (appId: string): Configuration => ({
     enableEmbeddedAsarIntegrityValidation: true,
     onlyLoadAppFromAsar: true,
     enableCookieEncryption: true,
+    // I-14:没有签名材料时 electron-builder 不签(见 mac.identity),而翻转 fuses 改写了 Electron 可执行文件、原签名失效,
+    // macOS 启动即杀。这一项让 @electron/fuses 翻转后立刻补本机 ad-hoc 签名(codesign --sign - --force --deep,不查钥匙串)。
+    // 有签名材料的正式包不加:它在 fuses 之后由 electron-builder 用 Developer ID 签名、公证。
+    ...(shouldSign ? {} : { resetAdHocDarwinSignature: true }),
   },
   mac: {
     artifactName: "codepuppy-${os}-${arch}.${ext}",
@@ -216,7 +220,8 @@ const getBase = (appId: string): Configuration => ({
     gatekeeperAssess: false,
     entitlements: "resources/entitlements.plist",
     entitlementsInherit: "resources/entitlements.plist",
-    // null => ad-hoc sign (no Developer ID, local dev builds). When signing, auto-discover the
+    // null => electron-builder skips signing (no Developer ID, local builds); the local ad-hoc signature comes from
+    // electronFuses.resetAdHocDarwinSignature right after the fuse flip (I-14). When signing, auto-discover the
     // "Developer ID Application" cert from the keychain (override with CODEPUPPY_SIGN_IDENTITY).
     identity: shouldSign ? (process.env.CODEPUPPY_SIGN_IDENTITY ?? undefined) : null,
     // electron-builder 26.x wants a boolean; notarytool creds/team come from env

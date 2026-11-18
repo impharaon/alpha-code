@@ -1,18 +1,40 @@
 // Session-transient open/close state for the Extension Hub (定制中心) overlay. A module-level
-// signal — there is a single hub — mirroring sidebar-state.ts. Deliberately NOT persisted: the
-// hub always starts closed on launch. Imported by codepuppy-sidebar.tsx (the toggle button) and
+// signal — there is a single hub — mirroring sidebar-state.ts. Not persisted across launches: the hub
+// always starts closed on launch; only a reload of the same window (a sidecar restart, I-11 / BR-07)
+// brings it back as it was (reload-place-store.ts). Imported by codepuppy-sidebar.tsx (the toggle button) and
 // renderer/index.tsx (to drive <ExtensionHub open=…/>).
 
 import { createSignal } from "solid-js"
+import { placeAfterReload, rememberHub } from "../reload-place-store"
 
-const [open, setOpen] = createSignal(false)
+const [open, setOpenSignal] = createSignal(false)
+/** I-11 / BR-07:开关状态与页签随本窗口的整页重载留下(reload-place.ts);新窗口与冷启动照旧关着。 */
+const setOpen = (value: boolean | ((prev: boolean) => boolean)) => {
+  const next = setOpenSignal(value)
+  rememberHub(next ? { section: section() } : undefined)
+  return next
+}
 
 // REQ-019 T1:hub 顶部横向 tab 分区(横向导航 + 详情面包屑)。`#1594`(REQ-236 批准稿 `#hub-tabs`):
 // 九个页签收成连接器 / 技能 / 助手三页 —— 推荐、套件、云能力成了连接器页的分组,已安装成了每页顶部一组,
 // 导入收进每页的「添加」下拉。模块级 = session 内记住上次分区,重开 hub 回到原处;不落盘(下次启动回「连接器」)。
 export type HubSection = "connectors" | "skills" | "agents"
 
-const [section, setSection] = createSignal<HubSection>("connectors")
+const [section, setSectionSignal] = createSignal<HubSection>("connectors")
+const setSection = (value: HubSection) => {
+  setSectionSignal(value)
+  if (open()) rememberHub({ section: value })
+}
+const HUB_SECTIONS: readonly HubSection[] = ["connectors", "skills", "agents"]
+
+/** 本窗口整页重载(sidecar 换代)之后回到重载前:定制中心开着就照旧开着、停在原页签。模块装载时调用一次。 */
+export function restoreHubAfterReload(): void {
+  const hub = placeAfterReload().hub
+  if (!hub) return
+  const saved = HUB_SECTIONS.find((value) => value === hub.section)
+  if (saved) setSectionSignal(saved)
+  setOpenSignal(true)
+}
 
 export function hubSection(): HubSection {
   return section()
@@ -81,3 +103,5 @@ export function toggleExtHub(): void {
   }
   setOpen((prev) => !prev)
 }
+
+restoreHubAfterReload()

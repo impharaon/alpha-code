@@ -61,7 +61,7 @@ const setup = (
         await ctx.mcp.transform((editor) => editor.set("unattended", { type: "remote", url: "http://127.0.0.1:1/mcp" }))
       }),
       promisePlugin("unattended-policy", async (ctx: Context) => {
-        const policy = await registerPolicy(ctx, state)
+        const policy = await registerPolicy(ctx, state, () => undefined)
         await policy.seal()
       }),
       promisePlugin("unattended-mcp", async (ctx: Context) => {

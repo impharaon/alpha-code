@@ -260,7 +260,7 @@ export function InstalledPackageDetail(props: {
         <p role="alert">{error() || props.error}</p>
       </Show>
       <Show when={tokenAccount()}>
-        {item => <PackageAccountDialog packageId={props.pack.packageId} label={props.label} needId={item().prerequisiteId} save={props.ext.savePackageSecrets} onClose={close} onSaved={async () => { await refetch() }} />}
+        {item => <PackageAccountDialog packageId={props.pack.packageId} source={props.pack.source} label={props.label} needId={item().prerequisiteId} save={props.ext.savePackageSecrets} onClose={close} onSaved={async () => { await refetch() }} />}
       </Show>
       <Dialog open={account()?.kind === "mcp-oauth"} onClose={close} size="sm" title={t("codepuppy.ext.packageLoginTitle", { name: props.label })}
         footer={<Button variant="primary" loading={busy()} onClick={() => void submit()}>{t("codepuppy.ext.packageLogin")}</Button>}>

@@ -307,6 +307,13 @@ export function createPluginSources(deps: { catalog: () => Promise<readonly Cand
     return pending
   }
   return {
+    /** I-15: an install of this candidate finished (either way). Its captured and converted bytes and the fetched archives are
+     *  dropped instead of living until the app exits; a later use of any candidate fetches again (robustness, not a limit). */
+    release(candidateId: string) {
+      captures.delete(candidateId)
+      conversions.delete(candidateId)
+      archives.clear()
+    },
     searchedSources(searchId: string) { return searches.get(searchId) },
     displayNameForId(id: string) { return [...candidates.values()].find(entry => entry.candidate.id === id)?.candidate.displayName ?? catalogRows.get(id)?.displayName },
     async prepareCapture(capture: Capture): Promise<PreparedPluginSourceV1> {

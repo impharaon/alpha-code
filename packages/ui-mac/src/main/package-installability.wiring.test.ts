@@ -168,9 +168,9 @@ describe("package installability production wiring", () => {
       },
     )
 
-    // 2(refresh 评两个 package)+ 2(browse 再 refresh)+ 2(detail 再 refresh)+ 1(preflight 只评命中的那个)
-    // = 7。四条入口若有任何一条改调独立副本,副本不会 push 进 calls,这里就短。
-    expect(calls).toEqual(Array(7).fill("evaluatePackageForHost"))
+    // 2(refresh 评两个 package)+ 2(browse 再 refresh)+ 0(detail 读 browse 载入的那一份,I-15)+ 1(preflight 只评命中的那个)
+    // = 5。四条入口若有任何一条改调独立副本,副本不会 push 进 calls,这里就短(detail 的视图正是 browse 用同一评估器算出的)。
+    expect(calls).toEqual(Array(5).fill("evaluatePackageForHost"))
     expect(preflight).toMatchObject({
       ok: false,
       package: {
@@ -179,6 +179,38 @@ describe("package installability production wiring", () => {
       },
     })
     expect(JSON.stringify(preflight)).not.toContain(canary)
+  })
+
+  // I-15(alpha-code#1726 审查):包行刷新读已载入的目录视图,不再每刷一行就重新拉远端目录(及其载荷)。
+  // 进定制中心时那一次载入照旧;之后的行刷新复用它。detail 改回每次 refresh ⇒ 计数涨,当场红。
+  test("I-15 a package row refresh reuses the loaded catalog instead of fetching it again", async () => {
+    const { envelope, bytes } = await producerPackage()
+    let refreshes = 0
+    const refresh = () => {
+      refreshes++
+      return evaluateRemoteCatalogPackages(rawResult(envelope), { packageInstallability: { fetchPayload: async () => bytes } })
+    }
+    const handlers = registeredHandlers(refresh)
+    const detail = async () => ((await handlers.get(PACKAGE_DETAIL_IPC_CHANNEL)!(undefined, envelope.prelude.packageId)) as CatalogPackageViewV1 | null)?.catalogId
+    // 还没载入过:第一次行刷新载入一次,之后复用
+    expect(await detail()).toBe(envelope.prelude.packageId)
+    expect(await detail()).toBe(envelope.prelude.packageId)
+    expect(refreshes).toBe(1)
+    // 进定制中心再载入一次;之后的行刷新读这一份
+    await handlers.get("ext-remote-catalog")!(undefined)
+    for (let row = 0; row < 3; row++) expect(await detail()).toBe(envelope.prelude.packageId)
+    expect(refreshes).toBe(2)
+  })
+
+  test("I-15 a row refresh after a load that found no catalog tries to load again", async () => {
+    const { envelope, bytes } = await producerPackage()
+    const results: RemoteCatalogResult[] = [{ source: "none", error: "offline", reasonClass: "availability" }, rawResult(envelope)]
+    let refreshes = 0
+    const refresh = () => evaluateRemoteCatalogPackages(results[refreshes++]!, { packageInstallability: { fetchPayload: async () => bytes } })
+    const handlers = registeredHandlers(refresh)
+    await handlers.get("ext-remote-catalog")!(undefined)
+    expect(((await handlers.get(PACKAGE_DETAIL_IPC_CHANNEL)!(undefined, envelope.prelude.packageId)) as CatalogPackageViewV1 | null)?.catalogId).toBe(envelope.prelude.packageId)
+    expect(refreshes).toBe(2)
   })
 
   test("actual registered IPC handlers return only the safe-view key whitelist", async () => {

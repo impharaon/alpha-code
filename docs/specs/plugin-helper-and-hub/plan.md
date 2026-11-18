@@ -1114,3 +1114,96 @@ r20 · ext 遗漏读取方与独立步骤诊断（接收 cb63f9e2f7，开始 202
 r20 残留引用检查：从 r19 的删除 diff 取得全部 82 路径，展开完整仓内路径/fixture-root 相对路径/归档相对成员路径及父目录，共 515 个 literal 模式，rg 同时搜索 packages/ext、packages/ui-mac、scripts，另加根 docs（排除秘密配置与依赖目录）。结果 571 行/153 文件，进一步区分 generic opencode.jsonc 等格式名后为 250 行；并补搜 plugin-helper/fixtureRoot 211 行。日志和模式清单在 /tmp/helper-install-r20/*reference-audit*.txt。唯一失效磁盘读取是上述 ext case，已修。其它命中分别为：临时 fixtureRoot/captureFixture 的有效读取；三份 provenance 中必须保留的真实归档成员名；来源/转换器与 safe projection 中的外部格式或包身份；独立 claude-plugin-corpus.json/census 的有效成员；冻结设计/历史收据中的上游或通用配置路径，均不把它们误改成机器路径。scripts 的登记指向仍存在的 catalog、factory skill 与测试文件，无新失效项。计划的当前样本表增加“归档成员身份，读取须走临时加载器”的说明，摘要表不改。修复清单只有 plugin-host.test.ts 的读取根，以及本计划的样本路径口径；无其它失效引用。
 
 r20 验证冻结规则：本修复提交就是以下各独立步骤的验证对象；测试期间不再编辑工作树，每条开始/结束记录同一 HEAD，实际 exit/count 与同 SHA 收据写入 /tmp/helper-install-r20/results.tsv 并在本轮返回提供，不为填写事后收据再造一个未验证提交。按 codepuppy-check.sh 原调用分别执行：六包 typecheck（consumer/ext/ui-mac/plugin/core/schema）；consumer check:vendor；bun-test-floor.sh 15 consumer、100 ext、带原 known-fails 的 3000 ui-mac src；bun-test-app.sh；完整非 update 的 assert-gate-files.sh；原 docs_gate_nul 与 docs_gate_links。仅对 bun test 注入 --max-concurrency 2，与其它 lane 的并发约束相同。每个步骤独立收集结果，任一步失败不会跳过后面的包，不执行 gate run/bin/check 或第 9 步的 worktree 创建。未改变测试数量，不应运行 --update；如诊断揭示新事实则依现有规则修复并重新冻结实际最终提交。
+
+## I-11 开关只影响该连接器（含：安装/开关后被弹出定制中心）
+
+- 依据：spec v4（alpha-work `d2345bb`）BR-07、AC-12、AC-13（待决 1 已定「立即生效」，design v7 §1）；design v7 §4.1 第 8 步、§5「生效方式」、§10「修订 v3→v4」行；意图 I-11（U-20 授权处理，来源 `packages/ext/src/reload-scheduler.ts:9`）；本派发的编排器裁决（包开关中 MCP 组件走现有运行时 add/connect/disconnect，技能保持现有重载，持久配置是后加载 Location 的真源）与 2026-11-18 补充（0.2.1 打包实测：安装/开关后整页重载、被弹回新对话页）；alpha-code#1724。
+- 核对：PLAN `4509b8f262` 返回 `BLOCKED: false premise`；编排器裁决（2026-11-18）：本片 = 方案 C（BR-07 缺陷修复：sidecar 换代引起的整页重载后用户仍在定制中心）；方案 A 待 design §4.4/§5 修订，本片不实施；并行车道（`fix/hub-status-removal-firstrun`）在整包移除含远端连接器时也会触发 `connectorChange` 换代，本片修复须对该路径同样成立。
+
+### 前提核实（真实引擎，临时目录，2026-11-18）
+
+探测文件 `/tmp/i11-probe/probe.test.ts`（不入库）：生产 `injectCodePuppyConfig` + 真 ext + 嵌入引擎（`test-component/codepuppy-engine.ts`），两台真 stdio MCP（`core/test/fixture/codepuppy-mcp-startup-stdio.ts`，每次 tools/call 记一行）。命令（cwd `packages/ui-mac`）：`bun test --timeout 120000 /tmp/i11-probe/probe.test.ts` → 1 pass。
+
+| 问题 | 观察 | 结论 |
+| --- | --- | --- |
+| Q1 运行时断开已开启的连接器 | `POST /api/experimental/mcp/probe/disconnect` 204，状态 connected → disabled；**同一会话**经 Code Mode 调 `tools.probe.echo`：断开前服务器收到 1 次，断开后再调仍是 1 次 | 成立：关掉后已有会话再也调不到它 |
+| Q1b 运行时连接与移除 | connect 204 → connected；`DELETE /api/experimental/mcp/probe` 204 → 从列表消失 | 成立 |
+| Q2 启动时被账本停用、之后开启 | 账本 `mcp:late` 启动时 disabled（生产注入写进内联层 `disabled:true`），翻为 enabled 后运行时 connect 204 → connected | 运行时可开 |
+| Q3 Location 重建（技能开关/安装发的那种） | `POST /api/location/reload` 后 `late` 回到 disabled | **不成立**：运行时状态不跨重建，启动时的内联层胜出 |
+| Q4 之后才加载的 Location（另一个项目） | 账本已是 enabled，新 Location 里 `late` 仍是 disabled | **不成立**：持久状态不是后加载 Location 的真源 |
+
+Q3/Q4 的代码事实：启动注入把账本停用的 MCP/助手写进引擎**内联层**（`ui-mac/src/main/codepuppy-config-injection.ts:648` 调 `ext-disabled-injection.ts:21`），内联层在 explicit/项目层之后加载、后者胜（`ui-mac/src/main/engine-explicit-config.ts:3-6`），且只在引擎启动时给出；ext 的 `mcp.transform` 只按允许集收口**仅当前项目**的包 MCP（`ext/src/plugin.ts:349-356`），全局开启状态没有逐 Location 的收口；重载后的重应用只覆盖该次重载的条目（`ui-mac/src/main/reload-coordinator.ts:164`、`ext-ipc.ts:149-155`）。这正是 #1646 让第一方/官方连接器开关整台引擎换代的原因（该票诊断：停用状态写在启动参数里，每次实例重载都合并旧值）。
+
+### 被弹出定制中心的原因
+
+1. **已证实：引擎换代 → 整页重载。** 链条：`connectorChange` 重载请求——`ext-ipc.ts:1114`（装后技能重载，包含 cloud/agent/command 组件时）、`:1201`（官方/第一方连接器开关）、`:1287`（包开关，含非 MCP 组件且含 cloud/agent/command 时，另带 `force`）、`:1361`（旧式连接器安装，恒为真）；以及 `installCatalog`/`uninstallPackage` 对 `package:github-official`、`package:dbhub-readonly` 直接 stop/refresh（`ext-ipc.ts:1295-1350`）→ `reload-coordinator.ts:131-150` 在 ext 报 reloaded 后调 `restartConnectors` → `ui-mac/src/main/index.ts:1040` `requestSidecarRespawn("connector-change")` → `index.ts:1630-1637` `mainWindow.webContents.reload()`。渲染进程的路由在内存里、定制中心开关（`renderer/extensions/ext-hub-state.ts`，刻意不持久）随重载归零，于是落到首页/新对话。打包实测日志：`/tmp/alpha-1118/verify021/run1/.../logs/20261118T023838/main.log` 10:45:02.345「installed package content package:cloud-image」→ 10:45:02.400「respawning sidecar { reason: 'connector-change' }」→ 10:45:08.217「sidecar respawned + renderer reloaded」。换代还会结束所有会话里正在进行的回答，比 Location 重载更重。
+   重载后被弹回新对话的直接机制（本片已证实并修复）：渲染进程用 `MemoryRouter`，重载后从「/」起步；定制中心开关是不持久的模块信号；侧栏的启动落地 `startDraft("launch")`（`renderer/sidebar/codepuppy-sidebar.tsx`）在项目列表就绪后开新 draft，并先 `closeAllOverlays()`。
+2. **尚未证实：不换代时也被关掉。** 10:53 关掉 `mcp:markitdown`（旧式单连接器，不在官方/第一方名单）时 main.log 没有 respawn 或 renderer reload；`setInstallStateBody` 对它不发重载，渲染进程只做 disconnect（`renderer/extensions/use-extensions.ts:738-753`）。窗口最后停在新对话页（`evidence/25-markitdown-off.png`）。已核实的关闭机制：侧栏对**任何**路由变化（pathname+search，含程序化导航与新对话 draft 切换）关闭全部覆盖层（`renderer/sidebar/codepuppy-sidebar.tsx:601-603`）。哪个引擎事件让定制中心背后的路由变了，留给第 1 步红例确定，不在此猜。
+
+### 需要裁决的设计缺口
+
+裁决里「持久配置是后加载 Location 的真源」与 Q3/Q4 不符；只把开关改成运行时 add/connect/disconnect、去掉换代，会让「启动时停用、之后开启」的连接器在下一次技能重载或打开另一个项目后又变回停用（反方向的「启动时开启、之后关掉」由 explicit 层的持久 `disabled` 承接，Q1 已覆盖已加载者）。可选：
+
+| 方案 | 做法 | 影响 |
+| --- | --- | --- |
+| A（建议） | 受管全局 MCP 的开启状态在每个 Location 构建时由 ext 从 main 发布的投影收口（与已有允许集 v2 同一发布顺序：先收窄 → 账本 → 发布），启动内联层不再写受管 MCP 的 `disabled`；开关 = 持久写 + 投影 + 对已加载 Location 走运行时路径 | 一份真源，重建与后加载都对；不重载、不换代。改动允许集 v2 形状（design §4.4/§5 冻结合同）与 ext 读取方，需设计修订 |
+| B | 保留启动内联层；每次重载报告后由 main 对**全部**受管连接器重应用运行时状态，并在新 Location 加载时由 ext 通知 main 重应用 | 新增侧车消息（§4.6 合同）；重建到重应用之间有旧状态窗口 |
+| C | 保留换代，只让换代后的整页重载回到原处 | 不解决 I-11（换代结束所有回答）；只适合下文必须换代的少数情形 |
+
+无论 A/B，含 cloud 组件的包仍需换代（云 MCP 定义在每代冻结的启动文档里，#1698），那一小类需要 C 式「重载后回到原处」或另行裁决。
+
+### 本片（方案 C）
+
+| 文件 | 改什么 |
+| --- | --- |
+| `packages/ui-mac/src/renderer/reload-place-store.ts`（新） | 本窗口 sessionStorage 里的位置：路由、定制中心开着时的页签；只在当前页面确由重载而来（`PerformanceNavigationTiming.type === "reload"`，`webContents.reload()` 即此）时才读出，新窗口与冷启动照旧 |
+| `packages/ui-mac/src/renderer/reload-place.ts`（新） | `restoredHistory()` / `RestoredMemoryRouter`：重载后 MemoryRouter 从存下的路由起步（裸「/」仍交给启动落地） |
+| `packages/ui-mac/src/renderer/extensions/ext-hub-state.ts` | 开关与页签随改随记，模块装载时按重载前恢复 |
+| `packages/ui-mac/src/renderer/sidebar/codepuppy-sidebar.tsx` | 路由 effect 记下路由；重载后跳过启动落地（不再开新 draft、不再关覆盖层） |
+| `packages/ui-mac/src/renderer/index.tsx`、`surface-remount-test-runtime.tsx`、`surface-remount.test.ts` | 根路由改用 `RestoredMemoryRouter`；复刻与 #565 形状锚点按其注释同步 |
+
+与触发原因无关（只看「这一页是重载来的」），所以并行车道的整包移除换代、以及其它换代重载（登录身份、服务商变化、崩溃自愈）同样停在原处。管理页（`extension-hub.tsx` 内的局部信号）不在本片恢复：该文件属并行车道的改动集。
+
+| 行为 | 测试/证据 | 缺少行为为什么会失败 |
+| --- | --- | --- |
+| BR-07 换代重载后仍在定制中心 | `test-component/overlay-close.cases.ts`「I-11 BR-07」（真实侧栏 + 真实 ExtensionHub + 真 @solidjs/router）：定制中心开着、在技能页时重载 → 仍开着、仍在技能页、路由不变、启动落地不关它；关着时重载 → 路由不变；非重载的新窗口即使存储里留着位置也照旧冷启动。宿主 `src/renderer/sidebar/overlay-close.test.ts` 下界 21 | 去掉重载后跳过启动落地 ⇒ 第一条红（实测）；不记/不恢复开关 ⇒ 第一条红；不判导航类型 ⇒ 第三条红 |
+
+### 改动（方案 A，暂缓：待 design §4.4/§5 修订，本片不实施）
+
+| 文件 | 改什么 |
+| --- | --- |
+| `packages/ui-mac/src/main/ext-disabled-injection.ts` | 不再把受管全局 MCP 记录写进启动内联层的 `disabled`（助手、插件不变） |
+| `packages/ui-mac/src/main/ext-receipt-v2.ts`、`packages/ext/src/gen-skill-paths.ts` | 允许集投影加受管 MCP 的开启状态（形状按设计修订）；沿既有发布顺序与 `projectionLag` |
+| `packages/ext/src/plugin.ts` | `mcp.transform` 按投影设受管 MCP 的 `disabled`：正向成员才开启，读不到即停用（与仅当前项目同一规则） |
+| `packages/ui-mac/src/main/ext-ipc.ts` | 连接器开关（`setInstallStateBody`）、旧式安装（`persistMcp`）、官方包装/卸载改走运行时路径（复用 `package-mcp-activation.ts` 的 `applyPackageMcpV1`/`removePackageMcpV1`，它已按记录 id 处理非包记录），不再发 `connectorChange`；包开关里的技能仍按现有 `force` 重载，`connectorChange` 只留给 cloud |
+| `packages/ui-mac/src/main/reload-coordinator.ts` | 重载后重应用覆盖全部受管连接器，而非仅该次条目 |
+| `packages/ui-mac/src/renderer/sidebar/codepuppy-sidebar.tsx` | 第 1 步红例定位后：引擎重同步引起的程序化路由改写不再关闭定制中心；用户导航照旧关闭 |
+
+### 顺序
+
+1. 红例先行（各自单独提交）：真实引擎用例重现 Q3/Q4（启动停用 → 开启 → Location 重建/后加载仍停用）；组件用例重现「定制中心打开时开关一个连接器 → 被关闭/路由改变」，记录导致路由变化的事件；main 用例断言连接器开关/安装不触发 `restartConnectors`。
+2. 投影与 ext 收口（方案 A 合同落地）+ 启动注入去掉受管 MCP；跑 ext `plugin-host.test.ts`、`gen-skill-paths.test.ts`、ui-mac `ext-disabled-injection.test.ts`、`package-effect.engine.test.ts`。
+3. ext-ipc 各入口改运行时路径、去掉 `connectorChange`；跑 `reload-coordinator.test.ts`、`package-hub-lifecycle.engine.test.ts`、`official-connectors` 相关宿主、`composer-tier-matrix.engine.test.ts`。
+4. 侧栏覆盖层收口修正；跑侧栏 overlay-close 参数化矩阵与定制中心组件宿主。
+5. gate-files 计数机械同步。
+
+### 风险
+
+- 去掉启动内联 `disabled` 后，项目里写的同名 MCP 若想重新开启受管停用项，只能被 ext 收口挡住；收口读不到投影时必须停用（失败方向更严）。
+- 运行时断开会拒掉该连接器挂着的审批（`applyPackageMcpV1` 已有）；正在回答的会话按待决 1「立即生效」处理，不再因 Location 重载被整体取消。
+- 官方连接器（github-official、dbhub-readonly）当前依赖换代清理运行时凭据环境；改运行时路径前须用现有官方配方引擎用例确认 add/connect 足够（#1726 已有「official recipe runtime activation without reloads」）。
+- 第一方 Office 连接器的启动环境覆盖（#1646）同属内联层，方案 A 须一并覆盖，否则仍需换代。
+
+### 证明
+
+| AC/行为 | 测试/证据 | 缺少行为为什么会失败 |
+| --- | --- | --- |
+| AC-12 空闲关/开/移除连接器 | 真实引擎：已有会话经 Code Mode 调用——关后服务器计数不涨、开后涨；Location 重载 0 次、`restartConnectors` 0 次；之后 `location/reload` 与新项目 Location 都随持久状态（含启动停用→开启方向，即今天红的 Q3/Q4） | 去掉 ext 收口 ⇒ Q3/Q4 回到 disabled；留着 `connectorChange` ⇒ 换代计数 1 |
+| AC-13 回答中改开关（立即生效） | 真实引擎：会话运行中关连接器，回答不被 Location 重载取消，该连接器的待批请求被拒、工具即刻不可调 | 走旧路径 ⇒ 运行中会话被取消（`aborted: Interaction cancelled because the location shut down`） |
+| BR-07 不被弹出 | 组件宿主：定制中心打开时安装/开关/移除连接器，伴随引擎重同步事件，定制中心保持打开、路由不变；main 侧渲染进程重载计数（`rendererReloadCount`）不变 | 去掉侧栏修正 ⇒ 第 1 步记录的事件让覆盖层关闭；保留换代 ⇒ 重载计数 +1 |
+| 技能开关不变 | 既有 `package-hub-lifecycle.engine` 技能进出可调用清单 | — |
+
+### 偏离记录
+
+- 2026-11-18 · 本片改为方案 C（编排器裁决）；方案 A 的改动、顺序与证明各行保留为待修订后的计划，不在本片实施 · `4dda3ef97f`。
+- 2026-11-18 · 红例模拟重载最初只保留 sessionStorage；测试进程里它跨用例留存，改为按真实信号（导航类型 reload）模拟并加「新窗口不恢复」对照（本车道自加用例的设置更正）· `5cb3ad8d6a`。

@@ -930,6 +930,58 @@ describe("REQ-236 #1575 中间按钮按请求种类", () => {
     expect(document.querySelector('[data-permission-note="every-time"]')).not.toBeNull()
   })
 
+  // I-10 / BR-10:助手发起的安装在任何档位都先出这张普通审批卡 —— 只写要装的名称与真实来源;不列工具名、内部编号、
+  // 组件权限清单,只能允许这一次。去掉 requestWhat 的安装分支 ⇒ 卡上只剩「使用工具 · 工具名」,名称与来源断言当场红。
+  test("I-10 安装请求:卡上只写名称与真实来源,只能允许一次,不露工具名与内部编号", async () => {
+    const own = {
+      canonical: "plugin:/Applications/Code Puppy.app/Contents/Resources/codepuppy-ext/plugin.js:codepuppy_hub_install",
+      identity: { source: "plugin", origin: "/Applications/Code Puppy.app/Contents/Resources/codepuppy-ext/plugin.js", name: "codepuppy_hub_install" },
+      authority: { kind: "codepuppy-bundled", bindingId: "plugin:codepuppy-ext", evidenceDigest: `sha256:${"a".repeat(64)}` },
+    }
+    const cases = [
+      { install: { name: "Context7", source: "claude-marketplace" }, title: "Context7", detail: "Claude 插件市场", id: "cand_7f3e2c9a" },
+      { install: { name: "GitHub", source: "catalog" }, title: "GitHub", detail: "定制中心", id: "package:github" },
+      { install: { name: "own-report", source: "created" }, title: "own-report", detail: "我的插件", id: "search_owned" },
+    ]
+    for (const item of cases) {
+      document.body.replaceChildren()
+      const permissionRequest = v1Identity("ruleset", { askedBy: "install", bindingDigest: undefined, install: item.install }, "build", own, null)
+      permissionRequest.metadata = { ...permissionRequest.metadata, args: { id: item.id, scope: "all-projects" } }
+      const { dispose } = mount(async (command) => receipt(command, permissionRequest), "prj_alpha", permissionRequest)
+      await flush()
+      expect(card().querySelector(".a-permission-verb")?.textContent).toBe("安装")
+      expect(card().querySelector(".a-permission-tool b")?.textContent).toBe(item.title)
+      expect(card().querySelector(".a-permission-tool small")?.textContent).toBe(item.detail)
+      expect([...document.querySelectorAll<HTMLElement>("[data-permission-decision]")].map((button) => button.dataset.permissionDecision)).toEqual(["reject", "once"])
+      expect(rememberBox()).toBeNull()
+      expect(card().querySelector('[data-permission-fact="resources"]')).toBeNull()
+      for (const hidden of [item.id, "codepuppy_hub_install", "call:", own.canonical, "sha256:"]) expect([hidden, card().textContent?.includes(hidden)]).toEqual([hidden, false])
+      dispose()
+    }
+  })
+
+  test("I-10 来源不认识或名称缺失、或工具不是随附的安装工具:不画安装行(不冒称来源)", async () => {
+    const own = {
+      canonical: "plugin:/x/plugin.js:codepuppy_hub_install",
+      identity: { source: "plugin", origin: "/x/plugin.js", name: "codepuppy_hub_install" },
+      authority: { kind: "codepuppy-bundled", bindingId: "plugin:codepuppy-ext", evidenceDigest: `sha256:${"a".repeat(64)}` },
+    }
+    const variants = [
+      { tool: own, install: { name: "GitHub", source: "toString" } },
+      { tool: own, install: { name: "  ", source: "catalog" } },
+      { tool: { ...own, authority: { kind: "not-asserted" } }, install: { name: "GitHub", source: "catalog" } },
+    ]
+    for (const variant of variants) {
+      document.body.replaceChildren()
+      const permissionRequest = v1Identity("ruleset", { askedBy: "install", bindingDigest: undefined, install: variant.install }, "build", variant.tool, null)
+      const { dispose } = mount(async (command) => receipt(command, permissionRequest), "prj_alpha", permissionRequest)
+      await flush()
+      expect(card().querySelector(".a-permission-verb")?.textContent).toBe("使用工具")
+      expect(card().textContent).not.toContain("定制中心")
+      dispose()
+    }
+  })
+
   test("AC5 i18n:审批卡新增的每一句中英文词典都有", () => {
     const keys = Object.keys(zh).filter((key) =>
       /^codepuppy\.permission\.(allow(Session|Project)|remember|listSeparator|sessionScope|projectScope|everyTime|projectMissing|delegationNote|saveFailed)/.test(key),

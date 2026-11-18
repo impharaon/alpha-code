@@ -35,7 +35,7 @@ import {
   type Platform,
 } from "@opencode-ai/app"
 import type { WslServersState } from "@opencode-ai/app/wsl/types"
-import { MemoryRouter } from "@solidjs/router"
+import { RestoredMemoryRouter } from "./reload-place"
 import { createEffect, createMemo, createResource, createSignal, onCleanup, Show } from "solid-js"
 import { render } from "solid-js/web"
 import type { SidecarGenerationState } from "../preload/types"
@@ -482,7 +482,7 @@ export function CodePuppySurfaceShell() {
             <AppInterface
               defaultServer={key}
               servers={servers()}
-              router={MemoryRouter}
+              router={RestoredMemoryRouter}
               // ConnectionGate 在 keyed Show 之下、路由树之上,但它的 refetch 只由用户按钮触发,
               // 不在收敛命题上(与 start-draft harness 同口径:不跑真健康探测)。
               disableHealthCheck

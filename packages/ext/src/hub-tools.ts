@@ -5,13 +5,30 @@ import type { Info as ToolInfo, ToolContext } from "@opencode/plugin/promise/too
 import { AUTOMATION_PROFILES } from "../../schema/src/codepuppy-unattended"
 import type { HubInstallRequest, HubRequestRecord, HubView, HubViewRow } from "../../ui-mac/src/main/codepuppy-sidecar-messages"
 import { TOOL_TEXT } from "./context-injection"
-import type { BridgeFailure, HubBridge } from "./hub-bridge"
+import type { BridgeFailure, HubBridge, HubInstallSubject } from "./hub-bridge"
 
 export const HUB_INSTALL_ACTION = "codepuppy_hub_install"
 export const HUB_CREATE_ACTION = "codepuppy_hub_create"
 export function denyHubMutationForAutomation(agent: string, action: string) {
   if (action !== HUB_INSTALL_ACTION && action !== HUB_CREATE_ACTION) return
   if (Object.hasOwn(AUTOMATION_PROFILES, agent)) throw Error("Permission denied: " + action)
+}
+/**
+ * BR-10(DESIGN-plugin-helper-and-hub v7 §4.6「安装前确认一次」):助手发起的安装在每个交互档位都问一次,经执行闸的普通审批卡。
+ * 别的工具 ⇒ undefined(照常判定)。安装工具 ⇒ 钉成每次询问;核验过的随包工具还带上卡上要写的名称与真实来源 —— 本进程没从
+ * main 的搜索里拿到过的编号无从写名,拒绝并请模型先搜索(搜过之后就认得)。
+ */
+export function hubInstallAsk(call: { tool: string; input: unknown }, verified: boolean, known: HubBridge["installSubject"]): { subject?: HubInstallSubject } | undefined {
+  if (call.tool !== HUB_INSTALL_ACTION && call.tool !== HUB_CREATE_ACTION) return
+  if (!verified) return {}
+  const input = call.input as { id?: unknown; name?: unknown } | undefined
+  const subject = call.tool === HUB_CREATE_ACTION
+    ? typeof input?.name === "string" && input.name.trim() ? { name: input.name, source: "created" as const } : undefined
+    : typeof input?.id === "string" ? known(input.id) : undefined
+  if (subject) return { subject }
+  throw Error(call.tool === HUB_CREATE_ACTION
+    ? "not installed: invalid-draft; the plugin needs a name"
+    : `not installed: ${HUB_INSTALL_OUTCOME.unknownEntry}; install an id returned by codepuppy_hub_search, searching again first`)
 }
 export const HUB_INSTALL_OUTCOME = {
   available: "installed; available",
@@ -31,15 +48,21 @@ const idInput = (description: string) => ({
   additionalProperties: false,
 })
 
-export function createHubTools(bridge: HubBridge, context: HubToolContext): ToolInfo[] {
+export function createHubTools(bridge: HubBridge, context: HubToolContext, askInstall: (callID: string) => Promise<void>): ToolInfo[] {
   const directory = context.location.directory
   const viewOf = (ctx: ToolContext) => bridge.view({ directory, sessionID: ctx.sessionID, agent: ctx.agent })
   const submit = async (ref: HubInstallRequest["ref"], scope: HubInstallRequest["scope"], ctx: ToolContext, action: string) => {
     denyHubMutationForAutomation(ctx.agent, action)
     if (!bridge.available) return result(HUB_UNAVAILABLE, { ok: false })
+    // BR-10:先把要装的名称与真实来源记在本次调用上(时间线卡在等待审批与拒绝之后都读它),再问一次;拒绝原样抛出、不交给 main。
+    const subject = ref.kind === "created" ? (ref.draft.name.trim() ? { name: ref.draft.name, source: "created" as const } : undefined) : bridge.installSubject(ref.id)
+    const named = subject ? { install: subject } : {}
+    // 进度更新原样成为工具状态的 metadata(core session/runner/publish-llm-event.ts progress),所以是扁平的键,时间线直接读。
+    await ctx.progress({ ...named, stage: "awaiting-approval" })
+    await askInstall(ctx.id)
     const requestId = randomUUID().replaceAll("-", "")
-    const metadata = { requestId, stage: "submitted" }
-    await ctx.progress({ metadata })
+    const metadata = { ...named, requestId, stage: "submitted" }
+    await ctx.progress(metadata)
     const accepted = await bridge.install({
       requestId,
       directory,

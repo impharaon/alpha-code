@@ -177,6 +177,7 @@ async function flush() {
 
 beforeEach(() => {
   localStorage.clear()
+  sessionStorage.clear()
   document.body.replaceChildren()
   const root = document.createElement("div")
   root.id = "root"
@@ -313,6 +314,68 @@ describe("REQ-126 AC2:覆盖层随导航关闭(真实宿主 × 真实点击)", (
       })
     }
   }
+})
+
+// I-11 / BR-07(编排器裁决 2026-11-18,方案 C):连接器改动让 sidecar 换代,main 随之整页重载渲染进程(index.ts 的
+// respawn)。重载后用户仍在定制中心:覆盖层仍开着、仍是原来的页签,路由不变;启动落地(新对话 draft)不在重载时
+// 再跑一次、也不把覆盖层关掉。模拟重载 = 拆掉整页、模块状态回到初值,只有本窗口的 sessionStorage 留下(与真实重载同)。
+// 新开的窗口 / 冷启动没有存下的位置 ⇒ 照旧落到新对话、覆盖层关着。
+describe("I-11 BR-07:sidecar 换代引起的整页重载后仍在原处", () => {
+  // 真实重载的页面由导航计时标为 "reload"(webContents.reload());新窗口 / 冷启动不是。测试进程里 sessionStorage 跨用例留存,
+  // 所以「是不是重载」只能照真实信号模拟,不能拿「存储里有东西」充数。
+  const navigationType = performance.getEntriesByType.bind(performance)
+  afterEach(() => {
+    performance.getEntriesByType = navigationType
+  })
+  async function reload(type: "reload" | "navigate" = "reload") {
+    performance.getEntriesByType = ((entry: string) => (entry === "navigation" ? [{ type }] : navigationType(entry))) as typeof performance.getEntriesByType
+    // 只有本窗口的 sessionStorage 跨过重载;拆页与把模块状态摆回初值都不能改动它(真实重载里模块是重新求值,不经 setter)。
+    const kept = Object.entries(sessionStorage)
+    disposers.splice(0).reverse().forEach((dispose) => dispose())
+    document.body.replaceChildren()
+    const root = document.createElement("div")
+    root.id = "root"
+    document.body.append(root)
+    extHubState.setExtHubOpen(false)
+    extHubState.setHubSection("connectors")
+    sessionStorage.clear()
+    for (const [key, value] of kept) sessionStorage.setItem(key, value)
+    const place = await import("../src/renderer/reload-place")
+    extHubState.restoreHubAfterReload()
+    const history = place.restoredHistory()
+    disposers.push(solidWeb.render(() => runtime.OverlayCloseHarness({ history, projects: makeProjects() }), document.getElementById("root")!))
+    await flush()
+    await flush()
+    return history
+  }
+
+  test("定制中心开着、在技能页时重载 → 仍开着、仍在技能页,路由不变,启动落地不关它", async () => {
+    await mount(CURRENT_HREF)
+    await open(OVERLAYS[0])
+    extHubState.setHubSection("skills")
+    await flush()
+    expect(overlayPresent(OVERLAYS[0]), "前提不成立:定制中心没打开").toBe(true)
+    const history = await reload()
+    expect(overlayPresent(OVERLAYS[0]), "重载后定制中心被关掉了").toBe(true)
+    expect(extHubState.hubSection()).toBe("skills")
+    expect(history.get()).toBe(CURRENT_HREF)
+  })
+
+  test("新开的窗口(不是重载)即使存储里留着位置,也照旧从冷启动开始:不恢复定制中心、不恢复路由", async () => {
+    await mount(CURRENT_HREF)
+    await open(OVERLAYS[0])
+    await flush()
+    const history = await reload("navigate")
+    expect(overlayPresent(OVERLAYS[0])).toBe(false)
+    expect(history.get()).not.toBe(CURRENT_HREF)
+  })
+
+  test("定制中心关着时重载 → 路由不变,覆盖层仍关着", async () => {
+    await mount(CURRENT_HREF)
+    const history = await reload()
+    expect(overlayPresent(OVERLAYS[0])).toBe(false)
+    expect(history.get()).toBe(CURRENT_HREF)
+  })
 })
 
 // `#1687`:未恢复问题入口挂在**生产**侧栏里(同一真实组合体)—— footer 里账户按钮正上方;

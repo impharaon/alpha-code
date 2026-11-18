@@ -81,11 +81,15 @@ export function registerPackageCatalogReadIpcHandlers(
   register: (channel: string, handler: (event: unknown, ...args: unknown[]) => unknown) => void,
   refresh: () => Promise<RemoteCatalogResult>,
 ) {
-  register("ext-remote-catalog", () => refresh().then(projectRemoteCatalogForRenderer))
+  // I-15:打开定制中心时载入目录;包行刷新读最近一次载入的视图(视图只由已验目录与本宿主算出),
+  // 还没载入过或那次什么都没取到时才载入。
+  let loaded: RemoteCatalogResult | undefined
+  const load = () => refresh().then((result) => (loaded = result))
+  register("ext-remote-catalog", () => load().then(projectRemoteCatalogForRenderer))
   register(PACKAGE_DETAIL_IPC_CHANNEL, (_event, catalogId) =>
     typeof catalogId !== "string"
       ? Promise.resolve(null)
-      : refresh().then((result) =>
+      : (loaded && loaded.source !== "none" ? Promise.resolve(loaded) : load()).then((result) =>
           result.source === "none"
             ? null
             : (result.packageViews?.find((view) => view.catalogId === catalogId) ?? null),

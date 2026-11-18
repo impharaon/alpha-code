@@ -18,7 +18,8 @@ import {
 import type { UpdaterState } from "@opencode-ai/app/updater"
 import * as Sentry from "@sentry/solid"
 import type { AsyncStorage } from "@solid-primitives/storage"
-import { MemoryRouter, useLocation } from "@solidjs/router"
+import { useLocation } from "@solidjs/router"
+import { RestoredMemoryRouter } from "./reload-place"
 import { createEffect, createMemo, createResource, createSignal, lazy, onCleanup, onMount, Show } from "solid-js"
 import { render } from "solid-js/web"
 import pkg from "../../package.json"
@@ -540,7 +541,7 @@ render(() => {
       <Show when={ready()} fallback={splash}>
         <Show when={effectiveDefaultServer()} keyed>
           {(key) => (
-            <AppInterface defaultServer={key} servers={servers()} router={MemoryRouter} surfaces={surfaceComponents()}>
+            <AppInterface defaultServer={key} servers={servers()} router={RestoredMemoryRouter} surfaces={surfaceComponents()}>
               {/* C28(S17 T4)崩溃边界下沉:上游 ErrorBoundary 在 AppBaseProviders 内包住全部 children,
                   alpha 任一注入件 throw 会整屏坠成上游 ErrorPage —— 逐个紧裹 CodePuppyBoundary(更内层先命中)
                   = 崩溃只降级该区域。探针 window.__codepuppyCrashProbe */}

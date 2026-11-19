@@ -2,7 +2,7 @@
 //
 // 引擎 sidecar 在 import 引擎之前把自己关进 seatbelt(sidecar.ts → process-fence-apply.ts),之后它
 // 派生的一切(shell 工具 / MCP stdio / LSP / PTY / formatter …)自动继承(勘破 §6.2 五条原语实测)。
-// 围栏装上之后**不能加宽**(勘破 §6.5),所以可写集必须在 apply 之前一次定好 —— 就是本文件渲染的这份。
+// 启动根在 apply 前确定;运行期只接受主进程绑定当前引擎签发的 X1 私有类扩展(设计 child-process-write-fence §4)。
 //
 // ── 行的来源:勘破 §8.2 的 19 行,逐字照抄,不照 §7.6 ──────────────────────────────
 // §8.2 是「跑通过的 profile」(装了 ext 的引擎在围栏里跑完五步工作负载),§7.6 是「写入面枚举」;
@@ -37,6 +37,8 @@
 // **排除**规则(HOME / 根 / HOME 的祖先 / 与应用状态根相关的路径),那是「拒绝该输入」而不是「解释它的文法」。
 
 import { isAbsolute, join, relative, resolve, sep } from "node:path"
+
+export const WORKSPACE_WRITE_EXTENSION_CLASS = "app.codepuppy.workspace-write"
 
 /**
  * 可写集的行 id(勘破 §8.2 的编号,W9 在那一轮就不存在)。process-fence-write-sites.tsv 的每一条
@@ -172,6 +174,8 @@ export function renderProcessFenceProfile(input: ProcessFenceProfileInput): stri
     `  (subpath "${join(home, "Library", "Caches", "bun")}")                  ; W17`,
     `  (subpath "${join(home, ".cache", "bun")}")                       ; W18`,
     ")",
+    `(allow file-write* (extension "${WORKSPACE_WRITE_EXTENSION_CLASS}"))                       ; X1 用户本次运行亲手打开的项目`,
+    `(deny file-issue-extension generic-issue-extension mach-issue-extension iokit-issue-extension ipc-posix-issue-extension (extension-class "${WORKSPACE_WRITE_EXTENSION_CLASS}")) ; X2 围栏内五种方式都签不出本类`,
     // ── 网络行:`#1334` Q1.2 逐字(顺序、形状都不改;`network-bind` 按 Q1.1 是冗余的,但它是 bind() 语义的显式声明)
     "(deny network*)                                          ; N1 出网默认全拒(含 DNS 的 unix socket,Q2)",
     '(allow network-bind (local ip "localhost:*"))             ; N2 sidecar 自己的 HTTP 服务器要 bind',

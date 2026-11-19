@@ -32,15 +32,19 @@ import { engineProjectTrust } from "./engine-project-trust"
 // profile 由 main 渲染 + 试编译(process-fence-plan.ts),这里原样 apply;装不上 = 本进程不起
 // (fail-closed,原因经 error IPC 报给 main)。判据在 process-fence-apply.test.ts(真 .node / 真 seatbelt /
 // Electron 的 node);本文件顶层的 registerHooks / getParentPort() 让它无法被 import,接线只能锚源码。
-import { applyProcessFence, type ProcessFenceStartInput } from "./process-fence-apply"
+import { applyProcessFence, loadFenceAddon, type FenceAddon, type ProcessFenceStartInput } from "./process-fence-apply"
 // REQ-159 `#1322`:工作区写探针 —— renderer 问「这个目录现在写得进去吗」,答案只能由**本进程**(被围栏的那一个)
 // 真写一次给出;main 没有被围栏,在那里探恒答可写。合同与执行都在 workspace-write-probe.ts。
 import {
   buildWriteProbeReply,
+  buildWriteGrantReply,
+  parseWriteGrantCommand,
   parseWriteProbeCommand,
   runWorkspaceWriteProbe,
   type WorkspaceWriteProbeCommand,
   type WorkspaceWriteProbeReply,
+  type WorkspaceWriteGrantCommand,
+  type WorkspaceWriteGrantReply,
 } from "./workspace-write-probe"
 
 // ADR-006 bridge ("two runtime worlds"). opencode's ToolRegistry dynamically imports a project's
@@ -99,7 +103,7 @@ type StartCommand = {
 }
 
 type StopCommand = SidecarStopCommand
-type SidecarCommand = StartCommand | StopCommand | WorkspaceWriteProbeCommand | ProjectConfigViewRequest
+type SidecarCommand = StartCommand | StopCommand | WorkspaceWriteProbeCommand | WorkspaceWriteGrantCommand | ProjectConfigViewRequest
 
 // #613:注入失败随 ready 上报(server.ts 持有同构镜像)——引擎照常起,但 main 必须知情。
 // ready 变体的形状与构造住在 sidecar-ready-message.ts(那里有真运行时闸门)。
@@ -108,6 +112,7 @@ type SidecarMessage =
   | { type: "stopped" }
   | { type: "error"; error: { message: string; stack?: string } }
   | WorkspaceWriteProbeReply
+  | WorkspaceWriteGrantReply
   | ProjectConfigViewReply
 
 type ParentPort = {
@@ -117,6 +122,7 @@ type ParentPort = {
 
 const parentPort = getParentPort()
 let engine: StoppableEngine | undefined
+let fenceAddon: FenceAddon | undefined
 let readProjectConfigView: typeof import("virtual:opencode-server")["projectConfigView"] | undefined
 
 parentPort.on("message", (event) => {
@@ -131,6 +137,17 @@ parentPort.on("message", (event) => {
     parentPort.postMessage(buildWriteProbeReply(command.id, runWorkspaceWriteProbe(command.directory)))
     return
   }
+  if (command.type === "grant-write") {
+    try {
+      const consumed = fenceAddon?.consumeExtension(command.token)
+      parentPort.postMessage(buildWriteGrantReply(command.id, consumed && consumed.handle >= 0
+        ? { outcome: "granted" }
+        : { outcome: "failed", detail: consumed ? `consume errno=${consumed.errno}` : "fence not installed" }))
+    } catch {
+      parentPort.postMessage(buildWriteGrantReply(command.id, { outcome: "failed", detail: "native consume failed" }))
+    }
+    return
+  }
   if (command.type === "project-config-view") {
     void answerProjectConfigView(command, { fetch: engine ? inProcessEngine() : undefined, view: readProjectConfigView }).then((reply) => parentPort.postMessage(reply))
     return
@@ -142,7 +159,7 @@ async function start(command: StartCommand) {
   try {
     // REQ-159:第一步就是把本进程关进围栏 —— 在写任何文件、import 引擎之前。装不上直接抛,
     // 走下面的 catch:error IPC + exit(1),main 据此宣告这一代失败(响亮,不静默降级成无围栏服务)。
-    installProcessFence(command)
+    fenceAddon = installProcessFence(command)
     // `#1698`(§4.2 第 2 步):解析并发布启动文档 —— 之后本进程里的注入、ext 与引擎只从它读 main 的决定。
     const bootstrap = acceptCodePuppyBootstrap(command.bootstrap)
     // #613:注入结果必须捕获并随 ready 上报 —— 注入失败 = 引擎起来了但整份 alpha 配置丢失
@@ -242,6 +259,7 @@ function installProcessFence(command: StartCommand) {
   console.log(
     `process fence applied: addon=${applied.buildId} libsandbox=${applied.libsandbox} profile=${applied.profileBytes}B — every process this engine spawns inherits it`,
   )
+  return loadFenceAddon(command.fence.addonPath)
 }
 
 function prepareSidecarEnv(bootstrap: CodePuppyBootstrap): CodePuppyConfigInjectionResult {
@@ -293,9 +311,10 @@ function useEnvProxy() {
 
 function parseCommand(value: unknown): SidecarCommand | undefined {
   if (!value || typeof value !== "object") return
-  const command = value as Partial<StartCommand | StopCommand | WorkspaceWriteProbeCommand | ProjectConfigViewRequest>
+  const command = value as Partial<StartCommand | StopCommand | WorkspaceWriteProbeCommand | WorkspaceWriteGrantCommand | ProjectConfigViewRequest>
   if (command.type === "stop") return parseSidecarStopCommand(value)
   if (command.type === "write-probe") return parseWriteProbeCommand(value)
+  if (command.type === "grant-write") return parseWriteGrantCommand(value)
   if (command.type === "project-config-view") return parseProjectConfigViewRequest(value)
   if (command.type !== "start") return
   if (typeof command.hostname !== "string") return

@@ -41,6 +41,74 @@ export type WorkspaceWriteProbeCommand = { type: "write-probe"; id: number; dire
 /** sidecar → main。 */
 export type WorkspaceWriteProbeReply = { type: "write-probe-result"; id: number } & WorkspaceWriteProbeResult
 
+export type WorkspaceWriteGrantCommand = { type: "grant-write"; id: number; token: string }
+export type WorkspaceWriteGrantReply = {
+  type: "grant-write-result"
+  id: number
+  outcome: "granted" | "failed"
+  /** Only errno/state information; never the token or the incoming message. */
+  detail?: string
+}
+
+export function parseWriteGrantCommand(value: unknown): WorkspaceWriteGrantCommand | undefined {
+  if (!value || typeof value !== "object") return
+  const command = value as Partial<WorkspaceWriteGrantCommand>
+  if (command.type !== "grant-write" || !Number.isSafeInteger(command.id)) return
+  if (typeof command.token !== "string" || command.token.length === 0) return
+  return { type: "grant-write", id: command.id!, token: command.token }
+}
+
+export function buildWriteGrantReply(id: number, result: Omit<WorkspaceWriteGrantReply, "type" | "id">): WorkspaceWriteGrantReply {
+  return { type: "grant-write-result", id, outcome: result.outcome, ...(result.detail ? { detail: result.detail } : {}) }
+}
+
+export function parseWriteGrantReply(value: unknown): WorkspaceWriteGrantReply | undefined {
+  if (!value || typeof value !== "object") return
+  const reply = value as Partial<WorkspaceWriteGrantReply>
+  if (reply.type !== "grant-write-result" || !Number.isSafeInteger(reply.id)) return
+  if (reply.outcome !== "granted" && reply.outcome !== "failed") return
+  return buildWriteGrantReply(reply.id!, { outcome: reply.outcome, ...(typeof reply.detail === "string" ? { detail: reply.detail } : {}) })
+}
+
+/** Main owns this one-way request book. Receiving a command can never issue an extension. */
+export function createWriteGrantRequester(post: (command: WorkspaceWriteGrantCommand) => void) {
+  const pending = new Map<number, { settle: (result: WorkspaceWriteGrantReply) => void; timer: ReturnType<typeof setTimeout> }>()
+  let seq = 0
+  let closed: string | undefined
+  const settle = (id: number, result: WorkspaceWriteGrantReply) => {
+    const entry = pending.get(id)
+    if (!entry) return false
+    pending.delete(id)
+    clearTimeout(entry.timer)
+    entry.settle(result)
+    return true
+  }
+  return {
+    request(token: string): Promise<WorkspaceWriteGrantReply> {
+      const id = ++seq
+      if (closed) return Promise.resolve(buildWriteGrantReply(id, { outcome: "failed", detail: closed }))
+      return new Promise((resolve) => {
+        const timer = setTimeout(() => settle(id, buildWriteGrantReply(id, { outcome: "failed", detail: "grant reply timed out" })), WRITE_PROBE_TIMEOUT_MS)
+        pending.set(id, { settle: resolve, timer })
+        try {
+          post({ type: "grant-write", id, token })
+        } catch {
+          // postMessage errors may include the command; do not log or return that text.
+          settle(id, buildWriteGrantReply(id, { outcome: "failed", detail: "could not reach the engine" }))
+        }
+      })
+    },
+    receive(value: unknown) {
+      const reply = parseWriteGrantReply(value)
+      return reply ? settle(reply.id, reply) : false
+    },
+    close(reason: string) {
+      closed = reason
+      for (const id of pending.keys()) settle(id, buildWriteGrantReply(id, { outcome: "failed", detail: reason }))
+    },
+  }
+}
+
 const OUTCOMES: ReadonlySet<string> = new Set<WorkspaceWriteProbeOutcome>(["writable", "denied", "unknown"])
 
 export function buildWriteProbeCommand(id: number, directory: string): WorkspaceWriteProbeCommand {

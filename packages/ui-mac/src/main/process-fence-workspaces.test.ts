@@ -20,7 +20,7 @@ import { createDeepLinkQueue } from "./deep-link-queue"
 
 const STATE_ROOT = "/Users/alpha/Library/Application Support/codepuppy-state"
 const eligibilityFixture = {
-  eligibility: { homeDir: "/Users/alpha", appStateRoot: STATE_ROOT, realpath: (p: string) => p, isDirectory: () => true },
+  eligibility: { homeDir: "/Users/alpha", appStateRoot: STATE_ROOT, realpath: (p: string) => resolve(p), stat: (p: string) => ({ dev: "fixture", ino: resolve(p) }), isDirectory: () => true },
   onWritableChanged: () => {},
 }
 
@@ -299,7 +299,7 @@ describe("用户打开登记是两个消费者的共同资格", () => {
       const result = await tracker.probeWrite({ server: "sidecar", directory: join(dir, "workspace") }, {
         fenced: true, grantWrite: async () => ({ outcome: "granted" }), probeWrite: async () => ({ outcome: "unknown" }),
       } as unknown as Parameters<typeof tracker.probeWrite>[1])
-      expect(result).toEqual({ outcome: "unknown", grant: "granted" })
+      expect(result).toEqual({ outcome: "unknown", grant: "failed", reason: "grant-failed" })
       expect(tracker.userOpened.has("sidecar", join(dir, "workspace"))).toBe(true)
     } finally {
       if (previous === undefined) delete process.env.CODEPUPPY_USER_WORKSPACE_DIR

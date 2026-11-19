@@ -17,7 +17,7 @@
 // `wrapEngineShell`(cfg.shell → sandbox-exec wrapper)与本围栏**同一次变更**拆装(基线 I2)。
 // ext 不再碰 cfg.shell 的判据在 packages/ext/src/codepuppy-ext-no-shell-layer.test.ts。
 //
-// ── 本文件只渲染字符串,不落盘、不读 store、不跑 sandbox-exec ──────────────────────────
+// ── 本文件渲染策略并判定目录身份,不落盘、不读 store、不跑 sandbox-exec ──────────────────────────
 // 工作区并集的来源 / 试编译 / 落盘在 process-fence-plan.ts;试编译本体在 process-fence-compile.ts;
 // 加载原生模块与 apply 在 process-fence-apply.ts。分层是为了让每一层各自可测:这里的判据是
 // 「渲染出的 profile 逐 token 等于 §8.2 的形状」(process-fence-profile.test.ts)。
@@ -36,7 +36,8 @@
 // 谓词在三处说谎。本文件里凡是「这个目录在不在可写集里」的问题都不回答;唯一例外是并集的
 // **排除**规则(HOME / 根 / HOME 的祖先 / 与应用状态根相关的路径),那是「拒绝该输入」而不是「解释它的文法」。
 
-import { isAbsolute, join, relative, resolve, sep } from "node:path"
+import { statSync } from "node:fs"
+import { dirname, isAbsolute, join, resolve } from "node:path"
 
 export const WORKSPACE_WRITE_EXTENSION_CLASS = "app.codepuppy.workspace-write"
 
@@ -202,8 +203,8 @@ export function renderProcessFenceProfile(input: ProcessFenceProfileInput): stri
 //   5. 排除 `/`、HOME、HOME 的任何祖先。放行 HOME = 没有围栏(U2 §4 表「不定价」的那一行)。
 //      用户若真把家目录当项目打开,走披露面(基线 §五 子票 4),不靠放宽。
 //   5b. 排除与**应用状态根**(`<appData>/codepuppy-state`,三个 env 根与 CAS 的父目录)相关的候选:同一路径、
-//      在它之内、或包含它(`#1390`)。比较在 **realpath 之后**做(APFS 大小写不敏感,`~/LIBRARY/application support` 词法
-//      比不出来;软链同理);realpath 拿不到(ENOENT 等)退回词法比较,**不因此放行**。这是 `#1390` 的第一步:候选那时还来自
+//      在它之内、或包含它(`#1390`)。比较在 **realpath 之后**按 device + inode 沿祖先链做(APFS 大小写不敏感,`~/LIBRARY/application support` 词法
+//      比不出来;软链、`/System/Volumes/Data` 拼写同理);realpath 拿不到(ENOENT 等)⇒ 不合格,**不退回词法放行**。这是 `#1390` 的第一步:候选那时还来自
 //      `opencode.global.dat`(W3 之下,**被围栏的引擎树自己写得了**),一条伪造的 draft 记录就能在下次启动把
 //      `~/Library/Application Support` 放进可写集。第二步(`#1394`,见 5c)把清单本身搬出了围栏可写处;本条留着做第二道闸 ——
 //      真源就算被写坏,状态根也进不来。
@@ -248,9 +249,11 @@ export type WorkspaceUnionInput = {
    * `#1390`:路径归一(生产 = `fs.realpathSync.native`)。**必须是 native**:Electron 内嵌 node(实测 v24.15.0,
    * electron 42.3.3)与 node 22 的 JS 实现 `fs.realpathSync` 只解软链、**不归一大小写**,`LIBRARY/application support`
    * 原样返回;`.native` 走 libc realpath(3),在 APFS 上给出盘上的真实大小写。bun 的两种都归一,所以只在 bun 里测
-   * 测不出这个差别 —— 生产接线不许换成 JS 版。抛出(ENOENT 等)⇒ 退回词法比较,不放行。
+   * 测不出这个差别 —— 生产接线不许换成 JS 版。抛出(ENOENT 等)⇒ 不合格,不退回词法路径放行。
    */
   realpath: (p: string) => string
+  /** Test filesystem metadata; production uses statSync with bigint identities. */
+  stat?: (p: string) => { dev: number | bigint | string; ino: number | bigint | string }
   maxWorkspaces?: number
 }
 
@@ -330,47 +333,95 @@ export function workspaceCandidatesFromStore(sources: WorkspaceUnionSources): st
   return out
 }
 
-function isAncestorOrSelf(ancestor: string, p: string): boolean {
-  const rel = relative(ancestor, p)
-  return rel === "" || (!rel.startsWith("..") && !isAbsolute(rel))
-}
+export type WorkspaceDirectoryInput = Pick<WorkspaceUnionInput, "homeDir" | "appStateRoot" | "realpath" | "isDirectory" | "stat">
 
-/** 双向包含:同一路径、a 在 b 之内、或 b 在 a 之内(与 codepuppy-environment.ts 的 related 同一谓词)。 */
-function related(a: string, b: string): boolean {
-  return isAncestorOrSelf(a, b) || isAncestorOrSelf(b, a)
-}
-
-/** 先 realpath 再 resolve;realpath 拿不到(不在盘上等)就退回词法形态 —— 比较照做,不因此放行(`#1390`)。 */
-function canonical(p: string, realpath: (p: string) => string): string {
-  try {
-    return resolve(realpath(p))
-  } catch {
-    return resolve(p)
-  }
-}
-
-export type WorkspaceDirectoryInput = Pick<WorkspaceUnionInput, "homeDir" | "appStateRoot" | "realpath" | "isDirectory">
-
-/** The one candidate predicate shared by W1 selection and explicit-open registration (rules 4/5/5b). */
-export function checkWorkspaceDirectory(input: WorkspaceDirectoryInput, raw: string):
+export type WorkspaceDirectoryCheck =
   | { eligible: true; directory: string }
-  | { eligible: false; reason: "home-or-app-state" | "not-a-directory"; detail: string } {
+  | { eligible: false; reason: "home-or-app-state" | "not-a-directory"; detail: string }
+
+/** APFS Data volume. Electron Node's realpath(3) keeps this spelling for firmlinked paths (`/Users/...`). */
+const DATA_VOLUME = "/System/Volumes/Data"
+
+/**
+ * The one identity / validity rule (INT-safety R7/R8) behind explicit-open registration, W1 selection,
+ * start-time seeding, quarantine and the runtime grant.
+ *  - Identity = the `realpath` result, with the Data-volume spelling collapsed only when the plain
+ *    spelling names the same device + inode.
+ *  - Protected relations (HOME, an ancestor of it, `/`, the app-state root, inside it or containing it)
+ *    compare device + inode along ancestor chains, never string prefixes: `/System/Volumes/Data/Users/<me>`
+ *    is refused exactly like HOME.
+ *  - `open`: the identity now (an explicit open, the default workspace, a literal path seen first).
+ *    `stored` = stillSelf: a stored identity stays valid only while it still resolves to itself and is a
+ *    directory; otherwise it is excluded (the caller logs it), never re-pointed at its new target.
+ * Synchronous by contract (design §4). Every call re-resolves; a caller that caches literal paths owns it.
+ */
+export function checkWorkspaceDirectory(input: WorkspaceDirectoryInput, raw: string, mode: "open" | "stored" = "open"): WorkspaceDirectoryCheck {
   if (!raw || !isAbsolute(raw)) return { eligible: false, reason: "not-a-directory", detail: "not an absolute path" }
-  const dir = canonical(raw, input.realpath)
-  if (dir === resolve(sep) || isAncestorOrSelf(dir, canonical(input.homeDir, input.realpath)))
-    return { eligible: false, reason: "home-or-app-state", detail: "would put HOME inside the writable set (fence would be void)" }
-  const appStateRoot = canonical(input.appStateRoot, input.realpath)
-  if (related(dir, appStateRoot)) return {
-    eligible: false,
-    reason: "home-or-app-state",
-    detail: `related to the app state root ${appStateRoot} (same path, inside it, or contains it)` +
-      (dir === resolve(raw) ? "" : ` (resolves to ${dir})`) +
-      " — the fence's own state must never be a workspace (#1390)",
+  const stat = input.stat ?? ((path: string) => statSync(path, { bigint: true }))
+  const objectId = (path: string) => {
+    const meta = stat(path)
+    return `${meta.dev}:${meta.ino}`
+  }
+  const sameObject = (a: string, b: string) => {
+    try {
+      return objectId(a) === objectId(b)
+    } catch {
+      return false // The other spelling does not exist: nothing to collapse or to add.
+    }
+  }
+  const canonical = (path: string) => {
+    const directory = resolve(input.realpath(path))
+    if (directory !== DATA_VOLUME && !directory.startsWith(`${DATA_VOLUME}/`)) return directory
+    const plain = directory.slice(DATA_VOLUME.length) || "/"
+    return sameObject(directory, plain) ? plain : directory
+  }
+  const chain = (path: string) => {
+    const out = [path]
+    while (out.at(-1) !== dirname(out.at(-1)!)) out.push(dirname(out.at(-1)!))
+    return out
+  }
+  // A protected directory and every ancestor, also along its Data-volume spelling: `/System/Volumes/Data`
+  // contains HOME through the firmlink although its inode is not `/`'s. A protected root that is not on
+  // disk is represented by its nearest existing ancestor (anything there would contain it).
+  const protectedIds = (path: string) => {
+    let base = resolve(path)
+    for (;;) {
+      try {
+        base = canonical(base)
+        break
+      } catch (error) {
+        if (base === dirname(base)) throw error
+        base = dirname(base)
+      }
+    }
+    const alias = resolve(`${DATA_VOLUME}${base}`)
+    return new Set([...chain(base), ...(sameObject(base, alias) ? chain(alias) : [])].map(objectId))
   }
   try {
-    if (input.isDirectory(dir)) return { eligible: true, directory: dir }
+    const directory = canonical(raw)
+    const self = objectId(directory)
+    if (protectedIds(input.homeDir).has(self))
+      return { eligible: false, reason: "home-or-app-state", detail: "would put HOME inside the writable set (fence would be void)" }
+    let state: string | undefined
+    try {
+      state = canonical(input.appStateRoot)
+    } catch {
+      // Not on disk yet: nothing can be inside it; containing it is checked through its ancestors below.
+    }
+    const stateId = state === undefined ? undefined : objectId(state)
+    if (protectedIds(input.appStateRoot).has(self) || (stateId !== undefined && chain(directory).some((entry) => objectId(entry) === stateId)))
+      return {
+        eligible: false,
+        reason: "home-or-app-state",
+        detail: `related to the app state root ${state ?? resolve(input.appStateRoot)} (same path, inside it, or contains it)` +
+          (directory === resolve(raw) ? "" : ` (resolves to ${directory})`) +
+          " — the fence's own state must never be a workspace (#1390)",
+      }
+    if (mode === "stored" && directory !== resolve(raw))
+      return { eligible: false, reason: "not-a-directory", detail: `stored workspace identity no longer resolves to itself (now ${directory})` }
+    if (input.isDirectory(directory)) return { eligible: true, directory }
   } catch {
-    // A vanished/unreadable directory cannot become an explicit-open grant.
+    // Missing / unreadable now ⇒ not eligible now. No lexical fallback ever grants a path.
   }
   return { eligible: false, reason: "not-a-directory", detail: "not a directory on disk" }
 }
@@ -382,7 +433,7 @@ export function selectWorkspaceUnion(input: WorkspaceUnionInput): WorkspaceUnion
   const excluded: WorkspaceExclusion[] = []
   const seen = new Set<string>()
   const candidates = [input.defaultWorkspace, ...input.candidates]
-  for (const raw of candidates) {
+  for (const [index, raw] of candidates.entries()) {
     if (typeof raw !== "string" || !isAbsolute(raw)) {
       excluded.push({ directory: String(raw), reason: "not an absolute path" })
       continue
@@ -390,7 +441,9 @@ export function selectWorkspaceUnion(input: WorkspaceUnionInput): WorkspaceUnion
     const dir = resolve(raw)
     if (seen.has(dir)) continue
     seen.add(dir)
-    const candidate = checkWorkspaceDirectory(input, dir)
+    // The default workspace is configuration, resolved now. Every truth entry is a stored identity:
+    // stillSelf, so an entry later replaced by a symlink is excluded rather than following it.
+    const candidate = checkWorkspaceDirectory(input, dir, index === 0 ? "open" : "stored")
     if (!candidate.eligible) {
       excluded.push({ directory: dir, reason: candidate.detail })
       continue

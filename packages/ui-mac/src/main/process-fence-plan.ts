@@ -27,6 +27,7 @@ import {
   type EngineRoots,
   type TrialCompile,
   type WorkspaceExclusion,
+  type WorkspaceDirectoryInput,
 } from "./process-fence-profile"
 
 export type ProcessFencePlan = {
@@ -67,6 +68,7 @@ export type PlanProcessFenceDeps = {
    */
   readWorkspaces: () => readonly string[]
   isDirectory: (p: string) => boolean
+  stat?: WorkspaceDirectoryInput["stat"]
   mkdirp: (p: string) => void
   compile: TrialCompile
   log: (line: string) => void
@@ -107,6 +109,7 @@ export function planProcessFence(input: PlanProcessFenceInput, deps: PlanProcess
     appStateRoot: deps.appStateRoot(),
     realpath: deps.realpath,
     isDirectory: deps.isDirectory,
+    stat: deps.stat,
   })
   if (union.selected.length === 0)
     throw new Error("process fence: the default workspace is not a directory on disk — refusing to fork an engine that could not write anywhere a user expects")

@@ -58,7 +58,16 @@ sidecar 消费,成功后才记本代账本;并发同目录合并,退出清理在
 
 资格由 `process-fence-workspaces.ts` 的 main 登记表持有。W1 默认目录(复用 codepuppyUserWorkspaceDir)和受信真源的有效启动目录初始化资格;运行期只有 M1 picker 和
 R1–R5 的具体打开动作能登记 `{server: "sidecar", directory}`。登记与启动并集复用 `checkWorkspaceDirectory` 的 4/5/5b
-判据,登记固定当时的 realpath;HOME/祖先和状态根按 canonical 路径判断。每次 grant 重验资格并以 canonical 目录签发/记账,签发后路径变化就丢弃令牌并报 grant-failed;停机前先判资格,不把不合格目录说成重开即可写。真源更新也按当前 canonical 目录过滤登记表;恢复、重载、SSE、深链接和 sidecar 消息只消费,不登记。
+判据。`checkWorkspaceDirectory`(`process-fence-profile.ts`)是唯一的身份 / 有效性规则:身份 = 登记那一刻 `realpathSync.native` 的
+canonical 字符串,`/System/Volumes/Data/...` 拼写仅在与普通拼写同 device + inode 时归一;HOME / 其祖先 / `/` / 状态根(同一、之内、包含)
+沿祖先链比较 device + inode(含 Data 卷拼写的祖先链),不作字符串前缀判定;不在盘上的保护根以最近的现存祖先代表。
+同一函数的 `stored` 模式即 stillSelf:存储的身份仍解析回它自己且仍是目录才有效,否则排除并点名记一行日志,绝不跟随新目标。
+生产 planner 的 W1 候选、启动时真源装载 / opened 播种、运行期签发前都同步走 stillSelf;检疫与真源过滤按身份比较,诚实的软链、`/tmp`、大小写变形路径不被检疫、不丢真源。
+tracker 按 literal 路径缓存首次解析,tab 写回与 probe 只解析没见过的路径;具体打开与 `has` 刷新缓存;三个安全决策点不信缓存。
+The first resolution of a path on an unreachable volume blocks as the existing synchronous directory checks do; not changed by this work.
+签发前先由围栏内真探针判断:已经能写(启动根之内或本代已放行)就不签发;`unknown` 不签发、答 grant-failed;只有明确 EPERM 拒写且 stillSelf 仍成立的身份才签发。
+围栏代码不能创建 / 移除 / 重命名它写不进的路径的组件,因此签发时解析的路径无从竞态;`server.ts` 签发后的 realpath 比较保留为便宜断言(变化即丢令牌、报 grant-failed),不是防护所依。
+停机前先判资格。恢复、重载、SSE、深链接和 sidecar 消息只消费,不登记。
 main 保留登记,所以 renderer 重载不丢资格;不通过引擎换代、页面重载或取消其它会话完成放行。
 
 已知的缺口(留给披露面 / owner):bash 用户的 `~/.bash_history` 不在集合里
@@ -239,7 +248,7 @@ owner 2026-09-09 裁决(`#1286`):终端配置降级与集合外工作区都**不
 | --- | --- | --- |
 | 合同 | `workspace-write-probe.ts` | main → sidecar `{type:"write-probe", id, directory}`,sidecar → main `{type:"write-probe-result", id, outcome, detail?}`;形状不对就当没有。`outcome` 三种:`writable`(写-删成功)/ `denied`(**EPERM** —— seatbelt 的拒绝就是这个码,`process-fence-apply.test.ts` B2 实测)/ `unknown`(其它一切:ENOENT、ENOTDIR、EACCES 是文件系统自己的权限位而不是围栏、超时、引擎不在) |
 | sidecar | `sidecar.ts` 消息循环 | 消费 main 发来的私有类令牌;写探针仍同步写 `.codepuppy-write-probe-<戳>`(`wx`)再删。登记根为 `W1+X1` |
-| main | `process-fence-workspaces.ts` → 当前 `server.ts` listener → `ipc.ts` / preload | probe 请求只有 `{server,directory}`,从不登记;先核资格并等消费,再让围栏内真探针执行。回复分开携带 `outcome`、`grant`、`reason`。远端/无围栏不触本机放行;原生失败和请求簿超时都给 `grant-failed` |
+| main | `process-fence-workspaces.ts` → 当前 `server.ts` listener → `ipc.ts` / preload | probe 请求只有 `{server,directory}`,从不登记;先核资格并在围栏内真探；已可写不签发，明确拒写才 fresh 重验身份、等消费并复探。回复分开携带 `outcome`、`grant`、`reason`。远端/无围栏不触本机放行;原生失败和请求簿超时都给 `grant-failed` |
 | renderer | `workspace-writable.ts` / `workspace-writable-core.ts` | 三个宿主共享消费核心;缓存键含引擎代、server、目录。资格通知使缓存失效,迟到回复不能覆盖新 entry。只有 M1/R1–R5 在具体动作处记录;恢复/观察不记录。picker 返回前等消费;composer 首次发送和 terminal create 等当前 entry,上限 1 s,超限动作继续、后台放行继续 |
 | renderer | `session-workspace-shell.tsx` / `workspace-chip.tsx` | `reason` 存在且 `outcome !== "writable"` 才显示两个只读钩子;正常可写路径均缺席。残余 popover 只有一句,chip title 同源;没有标题、脚注、重启按钮或 relaunch 动作 |
 

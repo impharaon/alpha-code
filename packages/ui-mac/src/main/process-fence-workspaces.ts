@@ -37,7 +37,7 @@
 
 import { dirname, isAbsolute, resolve } from "node:path"
 import type { AppEnvironment } from "./codepuppy-environment"
-import { checkWorkspaceDirectory, LOCAL_SIDECAR_SERVER_KEY, workspaceCandidatesFromStore, type WorkspaceDirectoryInput, type WorkspaceUnionSources } from "./process-fence-profile"
+import { checkWorkspaceDirectory, LOCAL_SIDECAR_SERVER_KEY, workspaceCandidatesFromStore, type WorkspaceDirectoryCheck, type WorkspaceDirectoryInput, type WorkspaceUnionSources } from "./process-fence-profile"
 import { codepuppyUserWorkspaceDir } from "./codepuppy-user-workspace"
 import type { SidecarListener } from "./server"
 import type { WorkspaceWritableChanged, WorkspaceWriteProbeRequest, WorkspaceWriteProbeResult } from "./workspace-write-probe"
@@ -190,11 +190,33 @@ export function bootFenceWorkspaceTruth(input: BootFenceWorkspaceTruthInput): Fe
   const state: WorkspaceUnionSources = { tabs: input.store.tabs, recent: input.store.recent, info: input.store.info }
   const fromStore = workspacesFromRendererTabs(state)
   const existing = readWorkspaceTruth(truthPath, fs)
+  // Every consumer goes through checkWorkspaceDirectory (process-fence-profile.ts), the one identity rule.
+  // `seen` caches a literal tab / probe path's identity at first sight (R8): unchanged tabs and repeated
+  // probes resolve nothing. An explicit open and `has` refresh it. The security decisions never trust it:
+  // start-time seeding, the planner and the grant re-resolve through stillSelf.
+  const seen = new Map<string, WorkspaceDirectoryCheck>()
+  const identity = (literal: string, fresh = false): WorkspaceDirectoryCheck => {
+    const known = fresh ? undefined : seen.get(literal)
+    if (known) return known
+    const result = checkWorkspaceDirectory(input.eligibility, literal)
+    seen.set(literal, result)
+    if (result.eligible) seen.set(result.directory, result)
+    return result
+  }
+  const stillSelf = (entry: string): WorkspaceDirectoryCheck => {
+    const result = checkWorkspaceDirectory(input.eligibility, entry, "stored")
+    if (!result.eligible) log(`process fence: workspace ${entry} excluded — ${result.detail}`)
+    return result
+  }
   let current: string[]
   let quarantined: string[] = []
   if (existing.ok) {
-    current = existing.workspaces
-    quarantined = fromStore.filter((d) => !current.includes(d))
+    // Seeding: a stored identity that no longer resolves to itself is excluded, never re-pointed.
+    current = existing.workspaces.filter((entry) => stillSelf(entry).eligible)
+    quarantined = fromStore.filter((literal) => {
+      const candidate = identity(literal)
+      return !candidate.eligible || !current.includes(candidate.directory)
+    })
     log(`process fence: workspace truth loaded — ${current.length} workspace(s) from ${truthPath}`)
     if (quarantined.length)
       log(
@@ -202,11 +224,14 @@ export function bootFenceWorkspaceTruth(input: BootFenceWorkspaceTruthInput): Fe
       )
   } else if (existing.absent) {
     try {
-      writeWorkspaceTruth(truthPath, fromStore, fs)
-      current = fromStore
+      current = [...new Set(fromStore.flatMap((literal) => {
+        const candidate = identity(literal)
+        return candidate.eligible ? [candidate.directory] : []
+      }))]
+      writeWorkspaceTruth(truthPath, current, fs)
       log(
-        `process fence: workspace truth seeded from the renderer tab store (first launch with #1394) — ${fromStore.length} workspace(s) written to ${truthPath}` +
-          (fromStore.length ? `: ${fromStore.join(", ")}` : ""),
+        `process fence: workspace truth seeded from the renderer tab store (first launch with #1394) — ${current.length} workspace(s) written to ${truthPath}` +
+          (current.length ? `: ${current.join(", ")}` : ""),
       )
     } catch (error) {
       current = []
@@ -218,18 +243,20 @@ export function bootFenceWorkspaceTruth(input: BootFenceWorkspaceTruthInput): Fe
       `process fence: workspace truth is unreadable — ${existing.reason}; leaving it untouched, the planner falls back to the default workspace only until the renderer's next tab change rewrites it`,
     )
   }
-  const quarantine = new Set(quarantined)
-  // Freeze identity at registration/boot. An alias later pointing elsewhere is not the opened directory.
-  const opened = new Set([codepuppyUserWorkspaceDir(process.env, input.eligibility.homeDir), ...current].flatMap((directory) => {
-    const candidate = checkWorkspaceDirectory(input.eligibility, directory)
+  // Quarantine compares identities: an honest project reached through a symlink, `/tmp` or another
+  // letter case is the truth entry it names, not a stranger.
+  const quarantine = new Set(quarantined.flatMap((literal) => {
+    const candidate = identity(literal)
     return candidate.eligible ? [candidate.directory] : []
   }))
+  const defaultWorkspace = checkWorkspaceDirectory(input.eligibility, codepuppyUserWorkspaceDir(process.env, input.eligibility.homeDir))
+  const opened = new Set([...current, ...(defaultWorkspace.eligible ? [defaultWorkspace.directory] : [])])
   const failed = new WeakMap<SidecarListener, Set<string>>()
 
   const recompute = () => {
-    const next = [...new Set(workspacesFromRendererTabs(state).flatMap((directory) => {
-      const candidate = checkWorkspaceDirectory(input.eligibility, directory)
-      return candidate.eligible && opened.has(candidate.directory) && !quarantine.has(directory) ? [candidate.directory] : []
+    const next = [...new Set(workspacesFromRendererTabs(state).flatMap((literal) => {
+      const candidate = identity(literal)
+      return candidate.eligible && opened.has(candidate.directory) && !quarantine.has(candidate.directory) ? [candidate.directory] : []
     }))]
     if (sameList(next, current)) return
     const added = next.filter((d) => !current.includes(d))
@@ -254,7 +281,8 @@ export function bootFenceWorkspaceTruth(input: BootFenceWorkspaceTruthInput): Fe
   const userOpened: UserOpenedRegistry = {
     register(target) {
       if (target.server !== LOCAL_SIDECAR_SERVER_KEY) return { eligible: false, reason: "not-local" }
-      const candidate = checkWorkspaceDirectory(input.eligibility, target.directory)
+      // The stored identity is the canonical directory at the moment of the open.
+      const candidate = identity(target.directory, true)
       if (!candidate.eligible) return { eligible: false, reason: candidate.reason }
       const change = { server: LOCAL_SIDECAR_SERVER_KEY, directory: candidate.directory }
       const added = !opened.has(candidate.directory)
@@ -265,41 +293,62 @@ export function bootFenceWorkspaceTruth(input: BootFenceWorkspaceTruthInput): Fe
     },
     has(server, directory) {
       if (server !== LOCAL_SIDECAR_SERVER_KEY) return false
-      const candidate = checkWorkspaceDirectory(input.eligibility, directory)
+      const candidate = identity(directory, true)
       return candidate.eligible && opened.has(candidate.directory)
     },
   }
 
-  const grantWrite: FenceWorkspaceTracker["grantWrite"] = async (target, sidecar) => {
-    if (sidecar ? !sidecar.fenced : process.platform !== "darwin") return { grant: "no-fence" }
-    if (target.server !== LOCAL_SIDECAR_SERVER_KEY) return { grant: "not-local" }
-    const candidate = checkWorkspaceDirectory(input.eligibility, target.directory)
+  const noteFailed = (sidecar: SidecarListener, directory: string) => {
+    const failures = failed.get(sidecar) ?? new Set<string>()
+    failures.add(directory)
+    failed.set(sidecar, failures)
+  }
+  const settle = async (target: WorkspaceWriteProbeRequest, sidecar: SidecarListener | null, answerProbe: boolean): Promise<WorkspaceWriteProbeResult> => {
+    if (sidecar ? !sidecar.fenced : process.platform !== "darwin") return { outcome: "unknown", grant: "no-fence" }
+    if (target.server !== LOCAL_SIDECAR_SERVER_KEY) return { outcome: "unknown", grant: "not-local" }
+    const candidate = identity(target.directory)
     if (!candidate.eligible || !opened.has(candidate.directory)) {
-      return { grant: "ineligible", reason: !candidate.eligible && candidate.reason === "home-or-app-state" ? "home-or-app-state" : "not-opened-by-you" }
+      const reason = !candidate.eligible && candidate.reason === "home-or-app-state" ? "home-or-app-state" : "not-opened-by-you"
+      return { ...(sidecar && answerProbe ? await sidecar.probeWrite(target.directory) : { outcome: "unknown" as const }), grant: "ineligible", reason }
     }
-    if (!sidecar) return { grant: "failed", reason: "grant-failed" }
+    if (!sidecar) return { outcome: "unknown", grant: "failed", reason: "grant-failed" }
     const directory = candidate.directory
+    // Issue only when needed (R7). The fenced probe runs first: a directory the fence already writes
+    // (inside a start-time root or an earlier grant) needs no extension, so none is issued. Only an
+    // EPERM-denied identity is granted, after a fresh stillSelf. Fenced code cannot create, remove or
+    // rename a path component it cannot write, so it cannot race the path resolved at issue time;
+    // server.ts's post-issue realpath comparison stays as a cheap assertion, not the protection.
+    // `unknown` is not "denied": nothing is issued and the answer is grant-failed.
+    const before = await sidecar.probeWrite(directory)
+    if (before.outcome === "writable") {
+      if (failed.get(sidecar)?.delete(directory)) input.onWritableChanged({ server: target.server, directory })
+      return { ...before, grant: "granted" }
+    }
+    if (before.outcome === "unknown") {
+      noteFailed(sidecar, directory)
+      return { ...before, grant: "failed", reason: "grant-failed" }
+    }
+    const valid = stillSelf(directory)
+    if (!valid.eligible) return { ...before, grant: "ineligible", reason: valid.reason === "home-or-app-state" ? "home-or-app-state" : "not-opened-by-you" }
     const result = await sidecar.grantWrite(directory)
+    const after = answerProbe ? await sidecar.probeWrite(target.directory) : before
     if (result.outcome === "failed") {
-      const failures = failed.get(sidecar) ?? new Set<string>()
-      failures.add(directory)
-      failed.set(sidecar, failures)
-      return { grant: "failed", reason: "grant-failed" }
+      noteFailed(sidecar, directory)
+      return { ...after, grant: "failed", reason: "grant-failed" }
     }
     if (failed.get(sidecar)?.delete(directory)) input.onWritableChanged({ server: target.server, directory })
-    return { grant: "granted" }
+    return { ...after, grant: "granted" }
   }
 
   return {
     truthPath,
     quarantined,
     userOpened,
-    grantWrite,
-    async probeWrite(target, sidecar) {
-      const status = await grantWrite(target, sidecar)
-      if (!sidecar || status.grant === "no-fence" || status.grant === "not-local") return { outcome: "unknown", ...status }
-      return { ...await sidecar.probeWrite(target.directory), ...status }
+    async grantWrite(target, sidecar) {
+      const { grant, reason } = await settle(target, sidecar, false)
+      return { grant, ...(reason ? { reason } : {}) }
     },
+    probeWrite: (target, sidecar) => settle(target, sidecar, true),
     noteRendererStoreSet(name, key, value) {
       const field = tabKey(name, key)
       if (!field) return

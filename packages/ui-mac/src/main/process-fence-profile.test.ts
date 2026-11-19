@@ -31,10 +31,9 @@ import {
 const HOME = "/Users/alpha"
 /** `#1390`:应用状态根 = 三个 env 根与 CAS 的父目录(codepuppy-environment.ts defaultCodePuppyBaseRoot)。 */
 const STATE_ROOT = `${HOME}/Library/Application Support/codepuppy-state`
-/** 假盘:这些路径不在盘上,realpath 抛 ENOENT ⇒ selectWorkspaceUnion 退回词法比较(生产对不存在的路径同一条路)。 */
-const noDisk = (p: string): string => {
-  throw Object.assign(new Error(`ENOENT: no such file or directory, realpath '${p}'`), { code: "ENOENT" })
-}
+/** Virtual filesystem: inode identities are path names; real-disk arms below use actual stat. */
+const noDisk = (p: string) => resolve(p)
+const virtualStat = (p: string) => ({ dev: "fixture", ino: resolve(p) })
 const roots = { home: HOME, dataHome: `${HOME}/.local/share`, cacheHome: `${HOME}/.cache`, configHome: `${HOME}/.config` }
 const base: ProcessFenceProfileInput = {
   workspaces: [`${HOME}/code-puppy`, "/Users/alpha/app/alpha-code"],
@@ -220,7 +219,7 @@ describe("selectWorkspaceUnion —— 并集裁剪规则(K=32,顺序 = 默认工
   }
 
   test("顺序:默认工作区第一,recent 第二,然后 tab 栏的 draft,再 info 的 session;非本地引擎 / 不存在 / HOME 及其祖先 / 相对路径逐条排除并给理由", () => {
-    const union = selectWorkspaceUnion({ appStateRoot: STATE_ROOT, realpath: noDisk, candidates: workspaceCandidatesFromStore(sources), defaultWorkspace: "/Users/alpha/code-puppy", homeDir: "/Users/alpha", isDirectory })
+    const union = selectWorkspaceUnion({ appStateRoot: STATE_ROOT, realpath: noDisk, stat: virtualStat, candidates: workspaceCandidatesFromStore(sources), defaultWorkspace: "/Users/alpha/code-puppy", homeDir: "/Users/alpha", isDirectory })
     expect(union.selected).toEqual([
       "/Users/alpha/code-puppy",
       "/Users/alpha/proj-recent",
@@ -245,14 +244,14 @@ describe("selectWorkspaceUnion —— 并集裁剪规则(K=32,顺序 = 默认工
       recent: { key: "draft:d" },
       info: { [sessionKey("x")]: { directory: "/Users/alpha/proj-a/" } },
     }
-    const union = selectWorkspaceUnion({ appStateRoot: STATE_ROOT, realpath: noDisk, candidates: workspaceCandidatesFromStore(dup), defaultWorkspace: "/Users/alpha/code-puppy", homeDir: "/Users/alpha", isDirectory })
+    const union = selectWorkspaceUnion({ appStateRoot: STATE_ROOT, realpath: noDisk, stat: virtualStat, candidates: workspaceCandidatesFromStore(dup), defaultWorkspace: "/Users/alpha/code-puppy", homeDir: "/Users/alpha", isDirectory })
     expect(union.selected).toEqual(["/Users/alpha/code-puppy", "/Users/alpha/proj-a"])
   })
 
   test("K 封顶:超过 MAX_WORKSPACES 的候选被排除并点名;默认工作区永远不会被顶掉", () => {
     const many = Array.from({ length: MAX_WORKSPACES + 5 }, (_, i) => `/Users/alpha/many-${i}`)
     const isDir = (p: string) => p === "/Users/alpha/code-puppy" || many.includes(p)
-    const union = selectWorkspaceUnion({ appStateRoot: STATE_ROOT, realpath: noDisk,
+    const union = selectWorkspaceUnion({ appStateRoot: STATE_ROOT, realpath: noDisk, stat: virtualStat,
       candidates: workspaceCandidatesFromStore({ tabs: many.map((d, i) => ({ type: "draft", draftID: `d${i}`, server: "sidecar", directory: d })), recent: undefined, info: undefined }),
       defaultWorkspace: "/Users/alpha/code-puppy",
       homeDir: "/Users/alpha",
@@ -264,7 +263,7 @@ describe("selectWorkspaceUnion —— 并集裁剪规则(K=32,顺序 = 默认工
   })
 
   test("store 形状容错:非 JSON 字符串 / 非数组 tabs / 缺 info ⇒ 只剩默认工作区,不抛", () => {
-    const union = selectWorkspaceUnion({ appStateRoot: STATE_ROOT, realpath: noDisk,
+    const union = selectWorkspaceUnion({ appStateRoot: STATE_ROOT, realpath: noDisk, stat: virtualStat,
       candidates: workspaceCandidatesFromStore({ tabs: "{not json", recent: 42, info: null }),
       defaultWorkspace: "/Users/alpha/code-puppy",
       homeDir: "/Users/alpha",
@@ -275,7 +274,7 @@ describe("selectWorkspaceUnion —— 并集裁剪规则(K=32,顺序 = 默认工
   })
 
   test("默认工作区本身不是目录 ⇒ selected 为空(planner 据此拒绝 fork)", () => {
-    const union = selectWorkspaceUnion({ appStateRoot: STATE_ROOT, realpath: noDisk, candidates: [], defaultWorkspace: "/Users/alpha/missing", homeDir: "/Users/alpha", isDirectory })
+    const union = selectWorkspaceUnion({ appStateRoot: STATE_ROOT, realpath: noDisk, stat: virtualStat, candidates: [], defaultWorkspace: "/Users/alpha/missing", homeDir: "/Users/alpha", isDirectory })
     expect(union.selected).toEqual([])
   })
 })
@@ -300,7 +299,7 @@ describe("`#1390` selectWorkspaceUnion —— 与应用状态根相关的候选�
       defaultWorkspace: `${HOME}/code-puppy`,
       homeDir: HOME,
       appStateRoot: STATE_ROOT,
-      realpath: noDisk,
+      realpath: noDisk, stat: virtualStat,
       // 盘上「都在」:排除只能来自状态根规则,不能借「不是目录」蒙混过关
       isDirectory: () => true,
       ...over,
@@ -356,18 +355,18 @@ describe("`#1390` selectWorkspaceUnion —— 与应用状态根相关的候选�
         }
       }
       const identity = (p: string) => p
-      const real = (directory: string, realpath: (p: string) => string) =>
-        selectWorkspaceUnion({ candidates: workspaceCandidatesFromStore(forged(directory)), defaultWorkspace: puppy, homeDir: home, appStateRoot: state, realpath, isDirectory: onDisk })
+      const real = (directory: string, realpath: (p: string) => string, stat?: WorkspaceUnionInput["stat"]) =>
+        selectWorkspaceUnion({ candidates: workspaceCandidatesFromStore(forged(directory)), defaultWorkspace: puppy, homeDir: home, appStateRoot: state, realpath, stat, isDirectory: onDisk })
 
       // 软链臂(任何平台都量得到)。对照:不归一 ⇒ 软链落进 selected —— 这就是洞;归一 ⇒ 排除,理由点名状态根并写出它解析到哪
-      expect(real(link, identity).selected).toEqual([puppy, link])
+      expect(real(link, identity, virtualStat).selected).toEqual([puppy, link])
       const linked = real(link, realpathSync.native)
       expect(linked.selected).toEqual([puppy])
       expect(linked.excluded).toEqual([{ directory: link, reason: expect.stringMatching(/^related to the app state root .* \(resolves to .*\/home\/Library\/Application Support\) — .* \(#1390\)$/) }])
 
       // 大小写臂:只有大小写不敏感的卷(APFS 默认)上这条变形路径才在盘上;CI 的 ext4 上它根本不存在,陷阱不存在于此 —— 如实分支
       if (onDisk(variant)) {
-        expect(real(variant, identity).selected).toEqual([puppy, variant]) // 洞:词法比较认不出它就是 …/Library/Application Support
+        expect(real(variant, identity, virtualStat).selected).toEqual([puppy, variant]) // 洞:词法比较认不出它就是 …/Library/Application Support
         const cased = real(variant, realpathSync.native)
         expect(cased.selected).toEqual([puppy])
         expect(cased.excluded).toEqual([{ directory: variant, reason: expect.stringMatching(/^related to the app state root .* \(resolves to .*\/home\/Library\/Application Support\) — .* \(#1390\)$/) }])
@@ -393,7 +392,7 @@ describe("`#1390` selectWorkspaceUnion —— 与应用状态根相关的候选�
       defaultWorkspace: `${HOME}/code-puppy`,
       homeDir: HOME,
       appStateRoot: STATE_ROOT,
-      realpath: noDisk,
+      realpath: noDisk, stat: virtualStat,
       isDirectory: () => true,
     })
     // ~/Library 之下但与 codepuppy-state 无关的目录(iCloud 文稿)也照常放行 —— 规则只认「相关」,不是「在 ~/Library 下」
@@ -461,7 +460,7 @@ describe("控制组:判据能测出已知的坏", () => {
     expect(subtractive.filter((l) => l.startsWith("(deny "))).not.toEqual(["(deny file-write*)", "(deny network*)"])
   })
   test("放宽一行(HOME 整个进 subpath)⇒ 并集规则红", () => {
-    const union = selectWorkspaceUnion({ appStateRoot: STATE_ROOT, realpath: noDisk,
+    const union = selectWorkspaceUnion({ appStateRoot: STATE_ROOT, realpath: noDisk, stat: virtualStat,
       candidates: workspaceCandidatesFromStore({ tabs: [{ type: "draft", draftID: "d", server: "sidecar", directory: "/Users/alpha" }], recent: undefined, info: undefined }),
       defaultWorkspace: join("/Users/alpha", "code-puppy"),
       homeDir: "/Users/alpha",

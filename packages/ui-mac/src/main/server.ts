@@ -619,6 +619,8 @@ export async function spawnLocalServer(
           getLogger()?.warn(`process fence: grant failed directory=${JSON.stringify(directory)} step=${issued.step} errno=${issued.errno}`)
           return { outcome: "failed", detail: `${issued.step} errno=${issued.errno}` }
         }
+        // Assertion, not the protection: the tracker issues only for an EPERM-denied identity it has just
+        // re-validated (stillSelf), and fenced code cannot rename components of a path it cannot write.
         if (realpathSync.native(directory) !== directory) {
           getLogger()?.warn(`process fence: grant failed directory=${JSON.stringify(directory)} step=realpath errno=unknown`)
           return { outcome: "failed", detail: "workspace path changed" }

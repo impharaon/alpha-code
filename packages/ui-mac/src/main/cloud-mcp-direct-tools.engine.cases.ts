@@ -14,7 +14,8 @@
 // 已知的坏(实测):云 MCP 定义不带 `codemode:false` ⇒ 模型请求的工具表里没有 `codepuppy_dispatch`,调用不成立,三处识别全空。
 //
 // 本文件由同名 `.test.ts` 宿主起独立 `bun test` 子进程跑。HOME / XDG 全在临时沙箱里;令牌是合成值,只发到本机端点。
-import { afterAll, beforeAll, describe, expect, test } from "bun:test"
+import { afterAll, beforeAll, describe, expect, mock, test } from "bun:test"
+import fs from "node:fs"
 import path from "node:path"
 import { assertEngineSandboxed, engineSandbox } from "../../test-component/engine-sandbox"
 import { codepuppyEngine, scriptedModel, type Running } from "../../test-component/codepuppy-engine"
@@ -70,6 +71,30 @@ const endpoint = Bun.serve({
   },
 })
 
+// ── 宿主取产物的云端 REST(main 的 codepuppy-cloud-jobs 走它):回包逐字取自生产;产物字节只给带租户凭据的请求,
+// 没带的照生产回 401 `{"error":"unauthorized"}`(0.2.3 里模型自己用 curl 去拿,落地的 circle.png 就是这 24 字节)。
+const TENANT = `SENTINEL-TENANT-${crypto.randomUUID()}`
+const ARTIFACTS = path.join(import.meta.dir, "../../test-component/fixtures/cloud-artifacts")
+const rest = Bun.serve({
+  hostname: "127.0.0.1",
+  port: 0,
+  fetch(request) {
+    const route = `${request.method} ${new URL(request.url).pathname}`
+    if (request.headers.get("authorization") !== `Bearer ${TENANT}`)
+      return new Response(samples.rest["unauthenticated content"], { status: 401, headers: { "content-type": "application/json" } })
+    const body = samples.rest[route as keyof typeof samples.rest]
+    if (body) return new Response(body, { headers: { "content-type": "application/json" } })
+    const artifact = /^GET \/v1\/cloud\/artifacts\/([a-z0-9_]+)\/content$/.exec(route)?.[1]
+    if (artifact && fs.existsSync(path.join(ARTIFACTS, artifact))) return new Response(fs.readFileSync(path.join(ARTIFACTS, artifact)))
+    return new Response("not found", { status: 404 })
+  },
+})
+// main 进程的身份与端点(electron 之外的那两样):登录后的租户凭据、云端地址。
+mock.module("./codepuppy-auth", () => ({ getAccessToken: () => TENANT, getAuthIdentityTag: () => "tenant" }))
+mock.module("./codepuppy-endpoints", () => ({ resolveEndpoints: () => ({ cloud: `http://127.0.0.1:${rest.port}` }) }))
+mock.module("./logging", () => ({ getLogger: () => ({ log: () => {}, warn: () => {}, error: () => {} }) }))
+mock.module("./codepuppy-contract-health", () => ({ reportContractFailure: () => {} }))
+
 let host: ReturnType<typeof codepuppyEngine>
 let running: Running | undefined
 let adapter: typeof fetch
@@ -123,6 +148,7 @@ afterAll(async () => {
   stream.abort()
   await running?.close().catch(() => undefined)
   endpoint.stop(true)
+  rest.stop(true)
   model.stop()
 })
 
@@ -175,6 +201,42 @@ describe("#1662 云工具是模型的直接工具:云端生图 / 数据分析回
   test("数据分析派发 ⇒ 桌面 run-watcher 命中这次受理的任务", async () => {
     const r = await turn(dispatch("data-analysis", { csv: "month,revenue\n2026-01,120\n", question: "average?" }))
     expect(hitsOf(r.events).map((hit) => ({ runId: hit.runId, source: hit.source }))).toContainEqual({ runId: "job_ccb255627759", source: "dispatch" })
+  }, 90_000)
+
+  test("数据分析派发 ⇒ 宿主照 run-watcher 的命中跟住任务,用租户凭据把产物存到本机:落地的 chart.png 是真 PNG", async () => {
+    const { createCloudRunTracker } = await import("./cloud-run-tracker")
+    const { downloadCloudArtifactTo, getCloudJobStatus, listCloudArtifacts } = await import("./codepuppy-cloud-jobs")
+    const { subscribeCloudJobEvents } = await import("./codepuppy-cloud-events")
+    const { finalizeArtifactWithQuota, initializeArtifactQuotaEnvironment, registerDownloadedArtifact, registeredArtifactNameOwner } = await import("./artifact-service")
+    await initializeArtifactQuotaEnvironment(host.userData) // main 启动时做的那一步(安装级 machine id)
+    const saved: Array<{ dir: string; files: string[] }> = []
+    const states: Array<{ runId: string; delivery: string }> = []
+    // 与 cloud-ipc.ts 的装配同一套生产函数(那个模块挂着 electron 的窗口与 IPC,这里只换掉广播)
+    const tracker = createCloudRunTracker({
+      identity: () => "tenant",
+      status: getCloudJobStatus,
+      artifacts: listCloudArtifacts,
+      subscribe: subscribeCloudJobEvents,
+      saveDeps: (directory, runId, signal) => ({
+        download: (artifact, targetPath, jobId) => downloadCloudArtifactTo({ artifact, targetPath, jobId, signal }, (input) => finalizeArtifactWithQuota(directory, runId, input)),
+        register: (input) => registerDownloadedArtifact(directory, runId, input),
+        artifactNameOwner: (name) => registeredArtifactNameOwner(directory, runId, name),
+      }),
+      afterSave: (_directory, _runId, manifest) => void (manifest.ok && saved.push({ dir: manifest.dir, files: manifest.files })),
+      broadcast: (state) => void states.push({ runId: state.runId, delivery: state.delivery.status }),
+      wait: async () => {},
+      log: () => {},
+    })
+    const r = await turn(dispatch("data-analysis", { csv: "month,revenue\n2026-01,120\n", question: "average?" }))
+    // renderer cloud-run-watcher.tsx 对每个命中做的那一步:受理的 dispatch 带归属,交给 main 的 tracker
+    for (const hit of hitsOf(r.events))
+      tracker.track({ directory: hit.directory, runId: hit.runId, ...(hit.source === "dispatch" && hit.sessionID ? { origin: { sessionID: hit.sessionID, messageID: hit.messageID, partID: hit.partID } } : {}) })
+    for (const until = Date.now() + 15_000; !states.some((state) => state.delivery === "saved" || state.delivery === "failed") && Date.now() < until; ) await Bun.sleep(50)
+    // 只判这张图:同一任务的 report.md 生产描述符写 size 0、实际 113 字节,下载按尺寸不符拒收(平台侧,另报),整次交付因此记 failed
+    expect(states.at(-1)?.runId).toBe("job_ccb255627759")
+    const chart = saved.flatMap((manifest) => manifest.files.map((file) => path.resolve(manifest.dir, file))).find((file) => file.endsWith("chart.png"))
+    expect(chart).toBeDefined()
+    expect([...fs.readFileSync(chart!).subarray(0, 8)]).toEqual([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])
   }, 90_000)
 
   test("云工具的调用记录带 codepuppy-cloud 权威(工具卡显示 Code Puppy 云来源,不是第三方)", async () => {

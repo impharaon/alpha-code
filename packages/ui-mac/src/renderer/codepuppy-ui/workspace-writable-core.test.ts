@@ -131,3 +131,53 @@ test("invalid replies cannot crash or manufacture a writable answer", async () =
   expect(tracker.answer(on())).toBe("unknown")
   expect(tracker.result(on())?.grant).toBe("failed")
 })
+
+test("first work waits for the exact current entry to settle", async () => {
+  const fake = deferred()
+  const tracker = createWorkspaceWritableTracker(fake.probe)
+  let started = false
+  const work = tracker.whenSettled(on()).then(() => { started = true })
+  await Promise.resolve()
+  expect(started).toBe(false)
+  expect(fake.calls).toEqual([{ server: "sidecar", directory: "/B" }])
+  await fake.answer(0, writable)
+  await work
+  expect(started).toBe(true)
+})
+
+test("first work has a 1 second upper bound, without turning a pending answer into a final grant", async () => {
+  const tracker = createWorkspaceWritableTracker(() => new Promise(() => {}))
+  const start = performance.now()
+  await tracker.whenSettled(on())
+  expect(performance.now() - start).toBeGreaterThanOrEqual(950)
+  expect(performance.now() - start).toBeLessThan(1800)
+  expect(tracker.answer(on())).toBe("pending")
+})
+
+test("notification during first-work wait follows the replacement request; the evicted reply cannot release work", async () => {
+  const fake = deferred()
+  const tracker = createWorkspaceWritableTracker(fake.probe)
+  let started = false
+  const work = tracker.whenSettled(on()).then(() => { started = true })
+  tracker.invalidate({ server: "sidecar", directory: "/B" })
+  await Promise.resolve()
+  await Promise.resolve()
+  expect(fake.calls).toHaveLength(2)
+  await fake.answer(0, denied)
+  expect(started).toBe(false)
+  await fake.answer(1, writable)
+  await work
+  expect(started).toBe(true)
+})
+
+test("no fence or identity waits for nothing; remote status settles without any local assumption", async () => {
+  const fake = deferred()
+  const tracker = createWorkspaceWritableTracker(fake.probe)
+  await tracker.whenSettled(on("/B", "sidecar", 1, false))
+  await tracker.whenSettled({ ...on(), server: undefined })
+  expect(fake.calls).toEqual([])
+  const remote = tracker.whenSettled(on("/B", "remote"))
+  await fake.answer(0, { outcome: "unknown", grant: "not-local" })
+  await remote
+  expect(tracker.result(on("/B", "remote"))).toEqual({ outcome: "unknown", grant: "not-local" })
+})

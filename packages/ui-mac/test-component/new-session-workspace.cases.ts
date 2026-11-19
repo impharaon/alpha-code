@@ -118,9 +118,11 @@ mock.module("@opencode-ai/app", () => ({
  *  再由生产的 `parseRoute` 读回去,编码与解码是两条相反的路,不构成自指等价链。 */
 const navigateCalls: string[] = []
 // 首页右栏(HomeRightPanel)被新对话页引入:终端窄导出换成空壳,免得把整套终端引擎与 codepuppy-ui 组件拉进来。
+let terminalSurface: Record<string, unknown> | undefined
 mock.module("@opencode-ai/app/surface/terminal", () => ({
   Terminal: () => null,
   useTerminal: () => {
+    if (terminalSurface) return terminalSurface
     throw new Error("no terminal engine in this test")
   },
   WorkspaceTerminalProvider: (props: { children: unknown }) => props.children,
@@ -432,6 +434,7 @@ function DraftLeaf(props: { projects: CodePuppyProjectsApi; draftId?: string; se
 }
 
 beforeEach(() => {
+  terminalSurface = undefined
   setDockMessages([])
   setDockHistoryLoading(false)
   setDockHistoryMore(false)
@@ -2140,4 +2143,56 @@ test("a same-renderer denied folder becomes writable on its open notification; r
   await flush()
   expect(records).toEqual(["/ws/a"])
   expect(host.querySelector("[data-codepuppy-workspace-chip-readonly]")).not.toBeNull()
+})
+
+
+for (const mode of ["home", "session", "command"] as const) test(`first ${mode} work waits for this workspace's pending grant`, async () => {
+  const asked: Array<{ server: string; directory: string }> = []
+  let release!: () => void
+  resetWorkspaceWritableForTests((input) => {
+    asked.push(input)
+    return new Promise((resolve) => { release = () => resolve({ outcome: "writable", grant: "granted" }) })
+  })
+  setSandboxStateForTests({ status: "ready", generation: 1, reason: "boot", fence: "applied" })
+  commandListEntries = [{ name: "helios-brief", description: "周报", source: "skill" }]
+  const projects = projectsApi([project("alpha-code", "/ws/a")])
+  const host = mode === "home" ? mount(() => createComponent(CodePuppyHome, { projects, serverKey: () => STORE_SERVER_KEY })) : mountSessionAt(projects, STORE_SERVER_KEY, "session-9").host
+  for (let i = 0; i < 30 && !textarea(host); i++) await flush()
+  type(textarea(host)!, mode === "command" ? "/helios-brief 本周" : "first work")
+  const send = () => host.querySelector<HTMLButtonElement>(".a-comp-send")!
+  for (let i = 0; i < 60 && send().disabled; i++) await flush()
+  expect(send().disabled).toBe(false)
+  send().click()
+  for (let i = 0; i < 6; i++) await flush()
+  expect(startChatCalls.length + promptAsyncCalls.length + sessionCommandCalls.length).toBe(0)
+  expect(asked).toEqual([{ server: STORE_SERVER_KEY, directory: DEFAULT_WORKSPACE }])
+  release()
+  for (let i = 0; i < 30 && startChatCalls.length + promptAsyncCalls.length + sessionCommandCalls.length === 0; i++) await flush()
+  expect(mode === "home" ? startChatCalls.length : mode === "command" ? sessionCommandCalls.length : promptAsyncCalls.length).toBe(1)
+})
+
+test("first terminal create waits for the adapter identity's grant, while existing terminal operations remain available", async () => {
+  const calls: string[] = []
+  terminalSurface = { ready: () => true, all: () => [], active: () => undefined, new: () => calls.push("new"), open: (id: string) => calls.push(`open:${id}`), requestFocus: () => {}, cancelFocus: () => {}, close: async () => {} }
+  let release!: () => void
+  const asked: Array<{ server: string; directory: string }> = []
+  resetWorkspaceWritableForTests((input) => {
+    asked.push(input)
+    return new Promise((resolve) => { release = () => resolve({ outcome: "writable", grant: "granted" }) })
+  })
+  setSandboxStateForTests({ status: "ready", generation: 1, reason: "boot", fence: "applied" })
+  const { useCodePuppyTerminalEngineChannel } = await import("../src/renderer/codepuppy-ui/session-rail/terminal/terminal-engine-adapter")
+  const host = mount(() => {
+    const channel = useCodePuppyTerminalEngineChannel(() => ({ identity: { serverKey: STORE_SERVER_KEY, directory: "/ws/terminal", sessionID: "session-9" } }) as never)
+    const button = document.createElement("button")
+    button.onclick = () => { channel()!.create(); channel()!.open("existing") }
+    return button
+  })
+  host.querySelector<HTMLButtonElement>("button")!.click()
+  await flush()
+  expect(calls).toEqual(["open:existing"])
+  expect(asked).toEqual([{ server: STORE_SERVER_KEY, directory: "/ws/terminal" }])
+  release()
+  await flush()
+  expect(calls).toEqual(["open:existing", "new"])
 })

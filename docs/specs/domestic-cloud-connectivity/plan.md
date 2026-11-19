@@ -58,7 +58,7 @@ last_reviewed: 2026-11-19
 1. **已有进程内状态会掩盖赋值缺陷。** 初次导入前准备继承环境；导出/未导出及混合组合用隔离子进程验证。用两次真实 spawn 装配核对新一代的地址、出网目的地与文档一致；不通过清空应用自填变量让测试“恢复”。
 2. **探测与发现刷新可能交错。** R4/R6 覆盖在途探测合并、发现值更新后的旧探测完成、定时恢复；同时保留一条真实时钟证据核对设计的切换上界，不只靠假时钟或手改路线文件。
 3. **凭据与 MCP authority 易被换址误伤。** E4/E5 在同一运行中引擎检查三处缝双向切换；额外向第三方、相似主机和兄弟路径发请求，判平台凭据零泄漏。只记合成凭据的匹配布尔值，不把 token 写日志。
-4. **测试必须真正停在网络边界。** 四种故障用本地 TLS/HTTP 服务器和真 TCP 连接注入；健康路由单独保持可用。可用既有 `timeout.headers` / `timeout.chunk` 模型配置缩短测试等待，不新增生产超时开关、不修改默认预算。定时选路另保留实际时间测量。
+4. **测试必须真正停在网络边界。** 四种故障用本地 TLS/HTTP 服务器和真 TCP 连接注入；健康路由单独保持可用。可用既有 provider `headerTimeout` / `chunkTimeout` 配置缩短测试等待，不新增生产超时开关、不修改默认预算。定时选路另保留实际时间测量。
 5. **编译默认地址仍是正式域名。** 测试保留其字面值，通过测试侧受控 transport / CONNECT dial 将所有目标送往回环 stand-in，未知目标在拨号前拒绝；不得依赖正式 DNS、请求生产健康接口或改系统 hosts。接线证据另用生产代理的真实日志，不能只有直接调用 `noteRelayFailureSignal` 的单测。
 6. **围栏证据不能被临时目录可写权放水。** F1 的状态根按真实布局生成，先核对不落 W1/W2/W3 的可写范围；使用这一代实际生成的 profile 和真实 addon。若该 profile 不能兑现设计，返回具体证据，不修改并行 lane 的围栏文件。
 7. **体量与集成。** 这是 M/L 跨四包改动，主要增量应是测试；server/index 只留端点/出网接线以便与并行 lane 合并。实现开始重新记时，每项证据后核对；预计时间/体量翻倍或冻结接口不足时返回具体 blocker。主进程体积棘轮若报告本次净增，向编排器提供文件级增量与理由，不顺手拆模块或改基线。
@@ -117,7 +117,7 @@ last_reviewed: 2026-11-19
 | 新 · `packages/ui-mac src/main/endpoint-route.test.ts` | gate 1；宿主 pin `6 pass / 0 fail`（R1～R6）。 |
 | 新 · `packages/ui-mac src/main/relay-wiring.test.ts` | gate 1；宿主 pin `3 pass / 0 fail`。 |
 | 新 · `packages/ui-mac src/main/cloud-events-route.test.ts` | gate 1；宿主 pin `1 pass / 0 fail`。 |
-| 新 · `packages/ui-mac src/main/endpoint-route.engine.test.ts` | gate 1；宿主 pin `6 pass / 0 fail`（E1～E6）。 |
+| 新 · `packages/ui-mac src/main/endpoint-route.engine.test.ts` | gate 1；宿主逐个启动六个独立子进程，每个 pin `1 pass / 0 fail`（E1～E6）；服务器、连接池、探测计时器逐例清理。 |
 | 新 · `packages/ui-mac src/main/endpoint-route-fence.engine.test.ts` | darwin 条件行 gate 1；宿主 pin `1 pass / 0 fail`（F1），非 darwin 明示未验证。 |
 | 不改数的相关行 | 368 plugin-host=51、375 token-hot=1（子项3）、379 cloud-credential-hot=1（子项5）、383 bootstrap-launch-parity=1、477 cloud-mcp-direct-tools=1，以及 339/340/344 的出网检查。新证明集中在新宿主，不靠删改旧计数腾位置。 |
 
@@ -127,3 +127,15 @@ last_reviewed: 2026-11-19
 - 2026-11-19 · F1 的临时目录放进该代已有 W2，显式测试数据库放进已有 W5；否则缓存目录下的自定义 TMPDIR 不在生产 profile 的系统临时目录许可内。仍由 `spawnLocalServer` 默认计划生成原样 profile，不修改围栏文件或规则；路线文件留在 W1/W2/W3 外。子进程显式继承隔离环境，清理由未受围栏的宿主负责。提交：本步骤提交。
 - 2026-11-19 · 增补 `scripts/old-name-exceptions.tsv`：真实 wire/provenance 的外部名称及跨仓票名被旧名扫描点名，按派单 Handling problems §1 同步机械登记，不改采集物、不放宽扫描。提交：本步骤提交。
 - 派生文档索引由编排器集成时按文档契约生成；未在本 lane 改索引。规格、设计和生产配置均未改。
+
+- 2026-11-19 · r2 一次带时间戳诊断定位到预算层级：`Provider.modelSettings` 会剔除模型上的 provider-only 字段，前轮两种模型注入均未改变有效预算。E2 在 1795087572649 发请求，直至测试 30 s 清理于 1795087602683 才 abort；不是产品无限等待的证据。实际默认响应头 300000 ms、块间 900000 ms 均长于测试期限。修正仅使用既有 harness 的 pre-start provider content 接缝设为各 500 ms，启动后断言有效配置，重试策略/延迟保持生产原值；每项独立子进程拥有自己的四个 TLS 服务器。诊断日志 `r2-diagnosis.{log,jsonl}` 位于本 lane 缓存。
+- 2026-11-19 · r2 E1 的前轮 59275 ms 只证明周期路径：旧夹具绕过真实 CONNECT 且故障期未让引擎发送。新夹具在真实生产代理下发送后，必须出现 `egress.connect` / `dial-failed` 并经生产日志回调触发即时探测；直连界限 6000 ms（并发 5 s 健康预算加 1 s 调度），恢复界限 65000 ms（60 s 周期加 5 s）；E4 另保留无拨号故障的纯周期路径 65000 ms 界限。所有 hostname 由代理既有 dial 测试接缝映射回环，未知目标拒绝，不触达生产 DNS。
+- 2026-11-19 · r2 按明确派单单独删除集成点误提交的 `scripts/gate-files.tsv-E`，提交 `d1b2182da8`；没有为该文件加入过扫描例外，故无对应例外可删。旧名扫描由 9 pass / 1 fail 恢复为 10 pass / 0 fail。
+- 2026-11-19 · r2 新夹具首次 E2 trace 显示自动标题请求与主回合并发，单次故障被标题腿先消耗，主回合随即成功且 retry 计数为零；现用已有 session `title` 字段命名测试会话，避免辅助腿争抢故障。E2/E3 同时要求真实 timeout retry 事件、重试请求间隔、发送地址/凭据与成功终态；不以单纯成功或测试清理 abort 充当超时证明。
+
+- 2026-11-19 · r2 E1～E6 反向臂均经缓存中的 `.test.ts` 聚焦宿主运行，结果为预期 exit 1（各子进程 0 pass / 1 fail），随后以 scoped `git restore` 恢复本 lane 生产文件并核对无 diff：E1 断开生产日志的即时信号→6 s 界限失败（`r2-reverse-no-signal.log`）；E2/E3 在 preferred 文件下强制 util 发 direct→接收地址失败（`r2-reverse-forced-direct-E{2,3}.log`）；E4 去掉 MCP transport 换址→周期切换后的 cloud-direct 请求缺席（`r2-reverse-no-mcp-route.log`）；E5 换址后才识别平台凭据→direct 的用途凭据失败（`r2-reverse-credential-after-route.log`）；E6 把默认入口也视为 relay→无中继惰性失败（`r2-reverse-always-relay.log`）。R1-01/R1-05/SSE 的红证据与 F1 围栏反证继续沿用已接收的步骤 1～3 / F1 提交，不重写判据。
+- 2026-11-19 · r2 宿主从一个含六项的子进程改成六个逐次启动、每个精确 1 pass / 0 fail 的独立子进程，gate 宿主仍精确 1。只在 `scripts/gate-files.tsv` 末尾追加该宿主；外部票名机械命中计数 `alpha-work` 8→9；原有各行不重排、不降地板。生产超时、重试、端点和围栏实现均无 r2 改动。
+
+**r2 最终实测（本仓切片，非住宅网络/真实云端验收）。** 在 `packages/ui-mac` 用 `TMPDIR=<本 lane 缓存>/tmp bun test --max-concurrency 2 src/main/endpoint-route.engine.test.ts`，exit 0：宿主 1 pass / 0 fail，六个独立子进程各精确 1 pass / 0 fail，188.46 s；每项四个服务器均关闭、连接数归零（清理有断言）。日志 `r2-engine-verified.log`。E1 引擎发送经真实 CONNECT 产生 dial-failed，45 ms ≤ 6000 ms 切 direct、57479 ms ≤ 65000 ms 恢复，同实例/会话继续且重启 0；E2/E3 的 timeout retry 事件距停滞分别 502/511 ms，记录的生产退避为 1760/1790 ms，下一次请求仍为 preferred；E4 仅 cloud 健康失败，59362 ms ≤ 65000 ms 周期切 direct，无 dial-failed 触发，恢复后再实际发送模型/vision/MCP；最新工具调用的 authority、非空 sha256 evidenceDigest 与幂等键在三阶段保持；E5 三类非目标节点只带自身 BYOK 凭据，平台凭据在两条路线均正确；E6 真引擎默认发送不新增路线字段/探针。AC-01 由 E6 和已接收 R1～R6 的本地发送依据支撑，住宅线路各 100 次对照仍交编排器/owner；AC-02 本地故障、热换路、身份与惰性证据完成，真实云端调用仍属后续试用。
+
+相关检查：ui-mac `bun typecheck` exit 0；`bun test --max-concurrency 2 src/main/old-name-scan.test.ts` exit 0、10 pass / 0 fail；仓根 `bash scripts/north-star-guard.sh` exit 0；`git diff --check` exit 0。分别见 `r2-typecheck-verified.log`、`r2-old-name-verified.log`、`r2-north-star.log`。步骤 1～3 与 F1 的接收版本 `f2fef2ff98`、`bdee779964`、`1cd8156566`、`4d8731c333` 未改：沿用 auth 64、jobs 20、SSE 1 的红/绿证据、F1 实际生成 profile 与既有相关/五包类型检查结果。无 gate/bin/check、生产接触或发布动作；无新遗留观察。r2 增量为两个测试文件约 397 行、gate 行/外部票名 pin、计划记录及独立授权删除；未新增计划外生产文件。

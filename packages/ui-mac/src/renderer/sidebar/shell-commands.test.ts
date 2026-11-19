@@ -274,6 +274,20 @@ describe("窗口外框(BR-01 / BR-02):窄轨与常驻顶栏", () => {
     expect(document.querySelector(".codepuppy-sidebar .codepuppy-sidebar-nav-item")).toBeNull()
   })
 
+  test("提示位置:窄轨按钮的提示在右侧,顶栏按钮的提示仍在下方", async () => {
+    await mountShell(() => runtime.CodePuppyShell())
+    const hover = async (el: Element) => {
+      el.dispatchEvent(new PointerEvent("pointerenter"))
+      await new Promise((resolve) => setTimeout(resolve, 450))
+      const placement = document.querySelector("[role='tooltip']")?.getAttribute("data-placement")
+      el.dispatchEvent(new PointerEvent("pointerleave"))
+      await flush()
+      return placement
+    }
+    expect(await hover(document.querySelector("[data-codepuppy-sidebar-nav='new-chat']")!)).toBe("right")
+    expect(await hover(document.querySelector("[data-codepuppy-topbar-action='sidebar']")!)).toBe("bottom")
+  })
+
   test("顶栏随页面换标题:新对话 → 设置(整页)→ 回到新对话;整页上没有右栏,开关收起", async () => {
     runtime.setHasProjects(false)
     await mountShell(() => runtime.CodePuppyShell())

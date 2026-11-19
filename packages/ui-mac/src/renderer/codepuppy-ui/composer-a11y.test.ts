@@ -390,6 +390,19 @@ describe("#1476 tooltip", () => {
     expect(document.querySelector("[role='tooltip']")).toBeNull()
   })
 
+  test("right placement (rail): the tip sits 8px to the right of the trigger, centred on its vertical middle", async () => {
+    mount(() => runtime.TooltipHarness({ placement: "right" }))
+    const trigger = document.querySelector<HTMLElement>("[data-tip-trigger]")!
+    trigger.getBoundingClientRect = () => ({ left: 10, right: 46, top: 100, bottom: 136, width: 36, height: 36, x: 10, y: 100, toJSON() {} })
+    trigger.dispatchEvent(new PointerEvent("pointerenter"))
+    await sleep(450)
+    const tip = document.querySelector<HTMLElement>("[role='tooltip']")!
+    expect(tip.getAttribute("data-placement")).toBe("right")
+    expect(tip.style.left).toBe("54px")
+    expect(tip.style.top).toBe("118px")
+    expect(tip.style.bottom).toBe("")
+  })
+
   test("copy button shows 已复制 with a green check for 1.5s after a successful copy", async () => {
     const copied: string[] = []
     Object.defineProperty(window.navigator, "clipboard", {

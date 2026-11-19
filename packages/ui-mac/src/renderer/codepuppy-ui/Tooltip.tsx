@@ -22,7 +22,7 @@ export const TOOLTIP_DELAY_MS = 400
 
 export function Tooltip(props: {
   label: string
-  placement?: "top" | "bottom"
+  placement?: "top" | "bottom" | "right"
   /** 强制显示(不等延迟),例如复制按钮点完后的确认。 */
   open?: boolean
   children: JSX.Element
@@ -88,6 +88,9 @@ export function Tooltip(props: {
   const style = (): JSX.CSSProperties => {
     const r = rect() ?? trigger()?.getBoundingClientRect()
     if (!r) return {}
+    // 右侧:窄轨按钮的提示贴在按钮右边、垂直居中(冻结稿 `.fr .a-tip`,8px 间距)。
+    if (props.placement === "right")
+      return { position: "fixed", top: `${Math.round(r.top + r.height / 2)}px`, left: `${Math.round(r.right + 8)}px` }
     const center = Math.round(r.left + r.width / 2)
     const left = `${Math.min(Math.max(8, center), Math.max(8, window.innerWidth - 8))}px`
     return props.placement === "bottom"

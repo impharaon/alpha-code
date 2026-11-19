@@ -300,6 +300,24 @@ describe("窗口外框(BR-01 / BR-02):窄轨与常驻顶栏", () => {
     expect(topbarTitle()).toBe("新对话")
   })
 
+  test("顶级页面开着时,侧栏不再高亮之前那条对话;离开后恢复", async () => {
+    runtime.seedSessions(2)
+    runtime.expandProject(runtime.FIXTURE_DIRECTORY)
+    await mountShell(() => runtime.CodePuppyShell())
+    runtime.navigateTo(hrefFor.session("sidecar", "ses_seed_1"))
+    await settle()
+    const active = () => document.querySelectorAll(".codepuppy-project-sessions .codepuppy-session-row[data-active]").length
+    expect(active()).toBe(1)
+    document.querySelector<HTMLButtonElement>("[data-codepuppy-sidebar-nav='hub']")!.click()
+    await settle()
+    expect(document.querySelector(".codepuppy-topbar-page")?.textContent).toBe("定制中心")
+    expect(active()).toBe(0)
+    expect(document.querySelector(".codepuppy-project-row[data-active]")).toBeNull()
+    document.querySelector<HTMLButtonElement>("[data-codepuppy-sidebar-nav='hub']")!.click()
+    await settle()
+    expect(active()).toBe(1)
+  })
+
   test("顶栏随页面换标题:新对话 → 设置(整页)→ 回到新对话;整页上没有右栏,开关收起", async () => {
     runtime.setHasProjects(false)
     await mountShell(() => runtime.CodePuppyShell())

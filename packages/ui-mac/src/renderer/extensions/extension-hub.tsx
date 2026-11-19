@@ -404,6 +404,15 @@ export function ExtensionHub(props: {
   // REQ-019 T2:详情页目标(catalog 条目或引擎 agent)。非空 = 当前 tab 内下钻显示详情页。
   const [detail, setDetail] = createSignal<DetailTarget | null>(null)
   const [managedPackageId, setManagedPackageId] = createSignal<string | null>(null)
+  // 管理页名称下的说明:与列表行同一来源(目录视图 → 目录条目 → 组成类型)。
+  const managedDescription = (pack: InstalledPackageV1) => {
+    const entry = installableEntries().find((candidate) => candidate.id === pack.packageId)
+    return (
+      catalog().packages?.find((view) => view.catalogId === pack.packageId)?.presentation.description ??
+      (entry ? catalogDescription(entry) : undefined) ??
+      pack.components.map((component) => typeLabel(component.kind as InstallReceipt["type"])).join(" · ")
+    )
+  }
   const managedPackage = () => { const state = installedPackages(); return state?.ok ? state.packages.find((pack) => pack.packageId === managedPackageId()) : undefined }
   createEffect(() => {
     if (!props.open()) return
@@ -2346,7 +2355,7 @@ export function ExtensionHub(props: {
                     sessionBusyFor={(id) => sessionBusy() === id}
                     onSessionToggle={runSessionToggle}
                   />}</Show>}>
-                    {(pack) => <InstalledPackageDetail pack={pack()} label={packLabel(pack())} crumb={sectionLabel()} view={catalog().packages?.find((view) => view.catalogId === pack().packageId)} ext={ext} directory={projectDir()} menu={<MoreMenu id={`manage:${pack().packageId}`} label={t("codepuppy.ext.packageManageName", { name: packLabel(pack()) })} items={packageMenu(pack())} />} error={packErr()[pack().packageId]} onBack={() => setManagedPackageId(null)} />}
+                    {(pack) => <InstalledPackageDetail pack={pack()} label={packLabel(pack())} crumb={sectionLabel()} view={catalog().packages?.find((view) => view.catalogId === pack().packageId)} description={managedDescription(pack())} ext={ext} directory={projectDir()} menu={<MoreMenu id={`manage:${pack().packageId}`} label={t("codepuppy.ext.packageManageName", { name: packLabel(pack()) })} items={packageMenu(pack())} />} error={packErr()[pack().packageId]} onBack={() => setManagedPackageId(null)} />}
                   </Show>
                 }
               >

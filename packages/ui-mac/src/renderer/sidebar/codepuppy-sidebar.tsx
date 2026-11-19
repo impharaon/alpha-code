@@ -206,6 +206,8 @@ export function CodePuppySidebar(props: {
 
   // Top-level pages (Customization Center, automation, settings) replace the working surface's content
   // and share the persistent top bar. Settings wins when several are open (it is opened last).
+  // While a top-level page is open nothing in the sidebar is "the conversation being viewed".
+  const viewingSessionId = () => (pageOpen() ? undefined : route().sessionId)
   const pageOpen = () => settingsOpen() || automationOpen() || extHubOpen()
   const pageTitle = (): string | undefined => {
     if (settingsOpen()) return t("codepuppy.sidebar.settings")
@@ -1334,7 +1336,7 @@ export function CodePuppySidebar(props: {
                   <div class="codepuppy-project" data-expanded={expanded() ? "" : undefined}>
                     <div
                       class="codepuppy-project-row"
-                      data-active={activeProject()?.worktree === project.worktree ? "" : undefined}
+                      data-active={!pageOpen() && activeProject()?.worktree === project.worktree ? "" : undefined}
                       data-menu={menuOpen() ? "" : undefined}
                       onClick={() => toggleProjectExpanded(project.worktree)}
                     >
@@ -1380,7 +1382,7 @@ export function CodePuppySidebar(props: {
                           {(session) => (
                             <div
                               class="codepuppy-session-row"
-                              data-active={route().sessionId === session.id ? "" : undefined}
+                              data-active={viewingSessionId() === session.id ? "" : undefined}
                             >
                               <Show
                                 when={editingSession() === session.id}
@@ -1389,7 +1391,7 @@ export function CodePuppySidebar(props: {
                                     <a
                                       class="codepuppy-session"
                                       href={sessionLink(session.id)}
-                                      data-active={route().sessionId === session.id ? "" : undefined}
+                                      data-active={viewingSessionId() === session.id ? "" : undefined}
                                       onClick={(e) => openSession(e, session.id)}
                                     >
                                       <span class="codepuppy-session-title">{sessionDisplayTitle(session.title)}</span>

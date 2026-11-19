@@ -181,7 +181,7 @@ body[data-codepuppy-sidebar="open"] :where(.codepuppy-ext-page) {
   min-height: 0;
   overflow-y: auto;
   padding: 0 0 56px;
-  scrollbar-gutter: stable; /* 切页签时内容不因滚动条出现而横移 */
+  scrollbar-gutter: stable both-edges; /* 切页签时内容不因滚动条出现而横移;两侧各留一份,880 栏仍居中(冻结稿无滚动条) */
   container-type: inline-size;
 }
 .codepuppy-ext-center {
@@ -1660,10 +1660,11 @@ body[data-codepuppy-sidebar="open"] :where(.codepuppy-ext-page) {
 }
 
 /* 未分级卡的 ghost 安装按钮(可装但不促装) */
+/* Quiet button (the manage page's 「更改」, frame #hub-manage): no outline until hovered. */
 .codepuppy-ext-add[data-variant="ghost"] {
   background: transparent;
   color: var(--a-text-secondary);
-  border: 1px solid var(--a-border);
+  border: 1px solid transparent;
 }
 
 /* 详情页:域名清单(mono,折叠展开) */

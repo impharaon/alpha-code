@@ -89,6 +89,7 @@ body[data-codepuppy-sidebar="open"] .codepuppy-auto-page {
 .codepuppy-auto-scroll {
   flex: 1;
   overflow-y: auto;
+  scrollbar-gutter: stable both-edges;
 }
 .codepuppy-auto-center {
   width: min(880px, calc(100% - 80px));

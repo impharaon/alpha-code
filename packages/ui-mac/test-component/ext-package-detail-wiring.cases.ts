@@ -1229,6 +1229,8 @@ describe("package detail production renderer path", () => {
     click(document.querySelector('[data-package-detail] .codepuppy-ext-dsub button'))
     await waitFor(() => expect(harness.installResults.at(-1)).toMatchObject({ ok: true }))
     await waitFor(() => expect(document.querySelector('[data-package-detail="package:renderer-ready"]')?.textContent).toContain(zh["codepuppy.ext.packagePermissions"]))
+    // 名称下有说明行(冻结稿 #hub-manage),来源与列表行相同。
+    expect(document.querySelector('[data-package-detail] .codepuppy-ext-dabout')?.textContent?.trim()).not.toBe("")
     // 没有账户 / 凭据的包不画账户段,也不显示「暂时无法读取账户状态」。
     expect(document.querySelector('[data-package-detail]')?.textContent).not.toContain(zh["codepuppy.ext.packageAccounts"])
     expect(document.querySelector('[data-package-detail]')?.textContent).not.toContain(zh["codepuppy.ext.packageAccountUnavailable"])

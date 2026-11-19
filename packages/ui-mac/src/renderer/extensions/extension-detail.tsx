@@ -50,6 +50,8 @@ export function InstalledPackageDetail(props: {
   pack: InstalledPackageV1
   label: string
   view?: CatalogPackageViewV1
+  /** 名称下那一行说明:与列表行同一来源(目录视图 → 目录条目 → 组成类型)。 */
+  description?: string
   ext: ExtensionsApi
   directory?: string
   menu: JSX.Element
@@ -144,9 +146,11 @@ export function InstalledPackageDetail(props: {
           <div class="codepuppy-ext-dhead-t">
             <h2>{props.label}</h2>
           </div>
-          <p class="codepuppy-ext-dabout">{props.view?.presentation.description}</p>
+          <p class="codepuppy-ext-dabout">{props.description ?? props.view?.presentation.description}</p>
         </div>
-        <Show when={pending()}>{(text) => <RowStatus tone="warn" text={text()} />}</Show>
+        <Show when={pending()} fallback={<Show when={props.pack.desiredState === "disabled"}><RowStatus tone="off" text={t("codepuppy.ext.packageOff")} /></Show>}>
+          {(text) => <RowStatus tone="warn" text={text()} />}
+        </Show>
         <div class="codepuppy-ext-dhead-act">{props.menu}</div>
       </header>
       {/* 只有带账户 / 凭据的包才画账户段:本地连接器没有账户,读不到状态也无话可说(冻结稿 #hub-manage 不画)。 */}

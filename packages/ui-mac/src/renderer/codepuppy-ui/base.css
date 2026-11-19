@@ -70,6 +70,22 @@
   background: transparent;
 }
 
+/* Full-page scroll bodies (Customization Center, automation, settings): the frame draws no scrollbar,
+ * so the thumb shows only while the pointer is over the page. The gutter stays (both edges, see each
+ * page), so the centred column never shifts. */
+.a-ui .codepuppy-ext-scroll::-webkit-scrollbar-thumb,
+.a-ui .codepuppy-auto-scroll::-webkit-scrollbar-thumb,
+.a-ui .codepuppy-settings-main::-webkit-scrollbar-thumb {
+  background: transparent;
+  background-clip: padding-box;
+}
+.a-ui .codepuppy-ext-scroll:hover::-webkit-scrollbar-thumb,
+.a-ui .codepuppy-auto-scroll:hover::-webkit-scrollbar-thumb,
+.a-ui .codepuppy-settings-main:hover::-webkit-scrollbar-thumb {
+  background: var(--a-border-strong);
+  background-clip: padding-box;
+}
+
 /* Overline / small label utility used across screens. */
 .a-overline {
   font-size: var(--a-text-2xs);

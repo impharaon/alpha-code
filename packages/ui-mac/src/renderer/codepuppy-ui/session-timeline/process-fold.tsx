@@ -29,6 +29,8 @@ import {
   useContext,
 } from "solid-js"
 import { t } from "../../i18n"
+import { netFailureBrief } from "../net-failure-copy"
+import type { NetFailureLayer } from "@opencode/schema/codepuppy-net-failure"
 import { StatBadge, stepLocationText, stepSourceIcon, ToolStepDetail, toolIcon } from "./cards/tool-cards"
 import {
   cappedItem,
@@ -391,7 +393,7 @@ export function ProcessRow(props: { row: Extract<TimelineRow, { kind: "process" 
 /** 实时标题:运行(当前动作 + 第 N 步 + 计时)/ 等你(琥珀,今天回合脚行的文案)/ 自动重试。 */
 function LiveHead(props: {
   wait?: TimelineTurnWait
-  retry?: { attempt: number; message: string }
+  retry?: { attempt: number; message: string; netLayer?: NetFailureLayer }
   action: ProcessLiveAction
   stepNumber: number
   elapsed: string
@@ -430,12 +432,11 @@ function LiveHead(props: {
               <span class="a-tl-pf-title" data-codepuppy-process-title>
                 {t("codepuppy.timeline.liveRetrying", { attempt: retry().attempt })}
               </span>
-              <Show when={retry().message}>
-                <span class="a-tl-pf-dot" aria-hidden="true" />
-                <span class="a-tl-pf-o" data-codepuppy-process-retry-reason>
-                  {retry().message}
-                </span>
-              </Show>
+              {/* 原因用用户的话:引擎认出的网络层写短语,认不出写一句中性的话;英文原文只在悬停提示(BR-07)。 */}
+              <span class="a-tl-pf-dot" aria-hidden="true" />
+              <span class="a-tl-pf-o" data-codepuppy-process-retry-reason title={retry().message || undefined}>
+                {retry().netLayer ? netFailureBrief(retry().netLayer!) : t("codepuppy.timeline.liveRetryReasonUnknown")}
+              </span>
               <span class="a-tl-pf-dot" aria-hidden="true" />
               <span class="a-tl-pf-num" data-codepuppy-process-segment="elapsed" aria-hidden="true">
                 {props.elapsed}

@@ -5,7 +5,7 @@
 // 前缀由 L4 的生产函数 `withFailureCode` 现做(不手写它的文法);消息形状取真引擎采样(fixtures/read-tool.json 的助手消息,
 // 补上 2.x `Session.StructuredError` 形状的 error)。
 import { describe, expect, test } from "bun:test"
-import { withFailureCode } from "@opencode/schema/codepuppy-net-failure"
+import { classifyNetFailure, withFailureCode } from "@opencode/schema/codepuppy-net-failure"
 import { CODEPUPPY_OFFICE_CONNECTORS } from "../shared/office-advisories"
 import { mcpRepair } from "../renderer/extensions/use-extensions"
 import { turnErrorOf } from "../renderer/codepuppy-ui/session-timeline/timeline-model"
@@ -54,6 +54,31 @@ describe("#1668 H2 登记失败码 → 0.1.26 读的字段", () => {
     expect(events.find((event) => event.type === "session.error")?.properties).toEqual({
       sessionID: "ses_1",
       error: { name: "UnknownError", data: { message: "connect ECONNREFUSED 10.0.0.1:443", metadata: { codepuppyNetLayer: "tcp" } } },
+    })
+  })
+
+  // 0.2.4 owner 报告:实时重试行写出了 `UND_ERR_CONNECT_TIMEOUT: Connect Timeout Error (…`。重试状态要像回合错误一样把层带给界面,
+  // 界面才能写「连接超时」而不是原文。消息由引擎结算点同一对生产函数现做(classifyNetFailure 认 undici 连接超时 → withFailureCode)。
+  test("重试状态(连接超时):文本去掉前缀,网络层随状态带到界面", async () => {
+    const events: V1Payload[] = []
+    const api = {
+      message: { list: async () => ({ data: [], cursor: {} }) },
+      session: { get: async ({ sessionID }: { sessionID: string }) => ({ id: sessionID, location: { directory: "/p" }, time: { created: 0, updated: 0 } }), diff: async () => [] },
+    }
+    const projector = createProjector(api as never, (_directory, payload) => events.push(payload), createReceiptLedger())
+    const undici = {
+      name: "ConnectTimeoutError",
+      code: "UND_ERR_CONNECT_TIMEOUT",
+      message: "Connect Timeout Error (attempted address: gateway.example.com:443, timeout: 10000ms)",
+    }
+    const net = classifyNetFailure({ message: "fetch failed", cause: undici }, { via: "other" })
+    expect(net).toEqual({ layer: "connect-timeout", code: "UND_ERR_CONNECT_TIMEOUT" })
+    const raw = `${undici.code}: ${undici.message}`
+    const error = { type: "provider.transport", message: withFailureCode(net!.layer, raw) }
+    await projector({ type: "session.retry.scheduled", location: { directory: "/p" }, data: { sessionID: "ses_1", attempt: 2, at: 5, error } } as never)
+    expect(events.find((event) => event.type === "session.status")?.properties).toEqual({
+      sessionID: "ses_1",
+      status: { type: "retry", attempt: 2, message: raw, metadata: { codepuppyNetLayer: "connect-timeout" }, next: 5 },
     })
   })
 })

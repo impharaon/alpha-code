@@ -35,6 +35,7 @@ import {
   TURN_DIFF_FILES_MAX,
   turnDiffsOf,
   turnErrorOf,
+  retryInputOf,
   TURN_ERROR_MAX_CHARS,
   USER_TEXT_MAX_CHARS,
 } from "./timeline-model"
@@ -148,7 +149,7 @@ function project(
   messages: Message[],
   parts: Record<string, Part[]>,
   status = "idle",
-  retry?: { attempt: number; message: string },
+  retry?: { attempt: number; message: string; netLayer?: "connect-timeout" },
 ) {
   return projectTimelineRows({ messages, partsOf: (id) => parts[id] ?? [], status, retry })
 }
@@ -880,6 +881,25 @@ describe("REQ-125 C5 行模型投影:消息 → 行", () => {
     const bounded = long[1]!
     if (bounded.kind !== "process") throw new Error("expected process row")
     expect(bounded.retry?.message).toHaveLength(RETRY_MESSAGE_MAX_CHARS)
+
+    // 引擎认出的网络层随重试带进行(界面据此写短语),也进 rev(同一次数、同一原文换了层要重画)。
+    const layered = project([userMsg("msg_u1", 1000)], { msg_u1: [textPart("prt_u1", "msg_u1", "开始")] }, "retry", {
+      attempt: 2,
+      message: "gateway 429",
+      netLayer: "connect-timeout",
+    })[1]!
+    if (layered.kind !== "process") throw new Error("expected process row")
+    expect(layered.retry).toEqual({ attempt: 2, message: "gateway 429", netLayer: "connect-timeout" })
+    expect(layered.rev).not.toBe(process.rev)
+
+    // 状态 → 输入:层取自适配层的 metadata.codepuppyNetLayer(与 session.error 同形),只认登记过的层名。
+    expect(retryInputOf({ attempt: 2, message: "raw", metadata: { codepuppyNetLayer: "connect-timeout" } })).toEqual({
+      attempt: 2,
+      message: "raw",
+      netLayer: "connect-timeout",
+    })
+    expect(retryInputOf({ attempt: 2, message: "raw", metadata: { codepuppyNetLayer: "made-up" } })).toEqual({ attempt: 2, message: "raw" })
+    expect(retryInputOf({ attempt: 1 })).toEqual({ attempt: 1, message: "" })
 
     const idle = project([userMsg("msg_u1", 1000)], { msg_u1: [textPart("prt_u1", "msg_u1", "开始")] }, "idle")
     expect(idle.some((row) => row.kind === "process")).toBe(false)

@@ -18,6 +18,23 @@ const COPY: Record<NetFailureLayer, Parameters<typeof t>[0]> = {
   timeout: "codepuppy.net.timeout",
 }
 
+const BRIEF: Record<NetFailureLayer, Parameters<typeof t>[0]> = {
+  policy: "codepuppy.net.brief.policy",
+  dns: "codepuppy.net.brief.dns",
+  tcp: "codepuppy.net.brief.tcp",
+  "connect-timeout": "codepuppy.net.brief.connectTimeout",
+  "tls-silent": "codepuppy.net.brief.tlsSilent",
+  "tls-failed": "codepuppy.net.brief.tlsFailed",
+  "tls-cert": "codepuppy.net.brief.tlsCert",
+  http: "codepuppy.net.brief.http",
+  timeout: "codepuppy.net.brief.timeout",
+}
+
+/** 这一层的短语,放进「正在重试 · 第 N 次」这种一行状态里:不带主机名,也不带下一步(程序正在自己重试)。 */
+export function netFailureBrief(layer: NetFailureLayer): string {
+  return t(BRIEF[layer])
+}
+
 /** 这一层的那句话;没有主机名(或拿不到可信的)时说「对方服务器」。 */
 export function netFailureCopy(layer: NetFailureLayer, host?: string): string {
   return t(COPY[layer], { host: host || t("codepuppy.net.hostFallback") })

@@ -38,7 +38,7 @@ PLAN 阶段只提交本文件。下表和命令均为实施安排，不代表已
 | `renderer/sidebar/codepuppy-sidebar.tsx`、`ui/workspace-chip.tsx`、`ui/codepuppy-session-search.tsx`、`renderer/automations/automation-panel.tsx` | 步骤 4 在 R1–R5 的具体打开动作先 await 登记再导航；R2 传整个会话行，R4 结果增加 directory，R5 使用任务目标目录及面板 server。 |
 | `ui/session-workspace/session-workspace-shell.tsx`、`ui/workspace-chip.tsx`、`renderer/i18n/zh.ts`、`renderer/i18n/en.ts` | 正常可写路径无两个只读钩子；残余原因只显示设计 §4 对应一句，移除标题、脚注、按钮及指定旧键；保留终端沙箱告知。 |
 | `packages/ext/src/policy/display.ts`、`packages/ext/src/context-injection.ts`、`packages/ext/src/context-injection-inventory.snapshot.txt` | 修正 `attachWriteDenied` 与 `sandbox.write-denied`，保留拒写后要求模型停止的能力；重生实际注入库存，不能手填字节数。归因规则见步骤 6。 |
-| `ui/session-timeline/cards/tool-cards.tsx`、`ui/session-timeline/cards/tool-card-model.ts`、`ui/session-timeline/process-fold.tsx`、`ui/session-timeline/session-timeline.tsx`、`ui/session-timeline/cards/timeline-intents.ts` | 对话拒写说明缩成一句，按已有可证事实呈现；传递已知目标所需的最小数据，删 `relaunch` timeline intent 及生产接线。 |
+| `ui/session-timeline/cards/tool-cards.tsx`、`ui/session-timeline/cards/tool-card-model.ts`、`ui/session-timeline/process-fold.tsx`、`ui/session-timeline/session-timeline.tsx`、`ui/session-timeline/cards/timeline-intents.ts` | r3 刷新基线已删 WriteDeniedNote / relaunch / marker；本 lane 不再修改这些生产文件或重建卡片，仅复核既有相关检查。 |
 | 同名相关 `*.test.ts`、`packages/ui-mac/test-component/{session-workspace,new-session-workspace,session-timeline}.cases.ts` 及各自 runtime、preload 组件 stub | 替换明确编码旧行为的断言；新增正反用例和所需桥接 stub。`.cases.ts` 仅由宿主启动。新验据宿主见「证明」。 |
 | `scripts/process-fence-write-sites.tsv`、`main/process-fence-write-sites.ts` 及其测试、`scripts/gate-files.tsv` | 探针写/删行同步到 `W1+X1`，根校验消费 profile 的 ID；仅按实际改动同步调用点、计数与受托关系。 |
 | `docs/architecture/2026-09-09-req159-process-fence.md` §2/§7/§8.2；`docs/design/2026-09-09-req159-process-fence-baseline.md` §三 I1 的事实陈述 | 仅完成设计 §6 点名的事实同步，保留历史批准与实验记录，不改其它设计、规则资产。`modules.md` 的包级落点不变。 |
@@ -65,10 +65,10 @@ PLAN 阶段只提交本文件。下表和命令均为实施安排，不代表已
    - `workspace-writable-core.test.ts` 验跨 server 缓存、通知、迟到回复和登记桥接；新 `ui/workspace-writable.component.test.ts` 宿主起 `test-component/workspace-writable.cases.ts` 挂真实组件，覆盖 R1–R5 与恢复/SSE/重挂只消费。真实窗口补证留步骤 7。
    - V4 增加 R1 建会话回复及目录解析各延迟 >8 s 仍可写、自动化历史打开可写；V5 增加改写目录后强制重载等待期点别处不登记、诚实重载仍可写。去 R1/R5 登记、restore 中新增登记、未分类新调用点分别作为坏臂。
 5. **首次工作的顺序。** 在上表两个真实调用点接共享 `whenSettled`，使用提交时冻结的 server/directory；延迟内、超限、切换身份和远端/无围栏各有用例。实际 prompt/startChat/command/terminal create 必须在约定等待之后，不以禁用按钮、隐藏 composer、重挂终端或改发送 API 实现。跑检查组 C；真引擎顺序在 V3 再核。
-6. **残余界面与本分支临时拒写提示一起收敛。** 先提交正常可写路径、三种残余状态及时间线旧按钮的红测试，再改壳、chip、双语文案和 interim 消息；跑检查组 D。
+6. **残余界面与本分支临时拒写提示一起收敛。** 先提交正常可写路径、三种残余状态和模型提示的红测试，再改壳、chip、双语文案和 interim 消息；跑检查组 D。r3 基线的时间线卡片、按钮、intent 已删，不重加。
    - 模型提示不再说启动时定死、重启后才可写或有重启按钮。已证实目标属于未亲手打开目录时，说明该事实，要求不要绕过、停止并告诉用户可用「打开项目」选中。
-   - **最小归因规则：裸 `EPERM` 或 shell 的 `Operation not permitted` 只证明操作被系统拒绝；相对路径只能按真实工具输入/位置解析，缺目标不得拿会话 cwd 代填。** 没有确切资格/可写事实时，模型收到中性的停止说明，对「未打开可用打开项目」采用条件句；用户侧只显示一次写入失败的事实句，不断言沙箱、未打开或重启可治。已拿到设计的确切 `reason` 时复用对应残余句。不能为文案新增 roots 清单、副本判定或跨层权限 API。shell 未知目标、可写根内的非围栏 EPERM 必须有反例；不得把未知错误变成用户的错误原因。
-   - `WriteDeniedNote` 保留单句且无按钮；删除 timeline `relaunch` intent、其接线与测试 runtime 中旧动作。模型停止提示仍经登记过的 tool-failure sink 注入；在 `packages/ext` 执行 `bun scripts/context-injection-inventory.ts --write`，用实际 inventory 输出更新库存快照。
+   - **最小归因规则：裸 `EPERM` 或 shell 的 `Operation not permitted` 只证明操作被系统拒绝；工具的已知目标也不等于 main 的用户打开登记事实。** 现有 ext 错误钩子没有该事实，一律只附中性停止说明；精确未打开片段保留登记、无事实不附。用户侧仅壳/chip 消费 main 的确切 `reason`，显示对应残余句。不能为文案新增 roots 清单、副本判定或跨层权限 API。shell 未知目标、可写根内的非围栏 EPERM 必须有反例；不得把未知错误变成用户的错误原因。
+   - 模型停止提示仍经登记过的 tool-failure sink 注入；在 `packages/ext` 执行 `bun scripts/context-injection-inventory.ts --write`，用实际 inventory 输出更新库存快照。UI census 防已删除卡片/intent/marker 回归。
 7. **真引擎与真实窗口整链验据。** 新 `main/project-writable.engine.test.ts` 宿主启动同名 `.cases.ts`，复用现有 engine sandbox、scripted model、真实 ext 和生产启动路径。跑 V3/V4/V5 及已知坏臂；窗口用隔离签名包的真实 Chromium，CDP 观测 DOM/导航与可信输入，用可信输入触发登记动作，不把脚本派发 click 当作用户操作证明。最终生产接线变化后重跑 G0/V7，记录放行往返 p50/p99；本机模型桩不使用真实账号。
 8. **事实文档、计数与收口。** 同步设计 §6 点名的架构/I1 事实，保留旧实验历史；更新本节偏离记录。仅对新增/变动检查同步 gate 行、精确子用例计数、调用点登记与 injection 库存。运行涉及包的 `bun typecheck`、`git diff --check` 及本节列出的受影响检查；不运行全仓 suite/full gate。提交后交编排者做独立 review、push/PR/merge。
 
@@ -111,7 +111,7 @@ PLAN 阶段只提交本文件。下表和命令均为实施安排，不代表已
 
 **计数钉与登记行：**
 
-| 位置（当前读码值） | 实施时同步 |
+| 位置（PLAN 初读基线；r3 刷新值及实际同步见续行记录） | 实施时同步 |
 | --- | --- |
 | `fence-write-denied.engine.test.ts` 的子用例精确 `3 pass / 0 fail`；`gate-files.tsv:147` 宿主 1 | 旧三条中重启和未知 shell 归因断言改为新行为；新增负例后按实际子条数写回宿主，gate 宿主仍为 1，改其旧行为说明。 |
 | `session-timeline.test.ts:51` 的 `125 pass`；gate 行 280 的宿主 12 | 替换旧拒写按钮用例并增加未知原因负例；按实际子条数同步 125，宿主数量有变才改 12；不删掉该计数来过门。 |
@@ -195,3 +195,25 @@ PLAN 阶段只提交本文件。下表和命令均为实施安排，不代表已
 - 2026-11-19 · 步骤 7 首次 fixture ext 未激活（engine-grant-bJPJ7a）；一次仅加日志的原样 setup 诊断（engine-grant-Ulq7ay）证实 Bun 启动时缓存的隔离 HOME 父目录不存在，requireCodePuppyGlobalRoot 的 realpath 得 ENOENT。先预建该父目录、移除诊断包装后，宿主 1 pass / 0 fail、内层 3 pass / 0 fail（step7-engine-second.log），引擎 PID 25741，B 实读 first-model/pty-existing/pty-new/mcp-existing 四文件，C 空，consume→first-work 次序可见；独立证据 engine-grant-9kzDkn。测试 peer 失败时显式退出并由宿主兜底清理自己持有的 child，避免遗留进程。
 - 2026-11-19 · 步骤 7 后端腿扩为 6 子例：补远端不触达本机、HOME/状态资格拒绝、停机 grant-failed；模型经真实 shell/SQLite 改写实际 session_v2.directory，再杀死引擎，显式 fixture 重启后 E 仍不入真源/围栏、0 落盘，main 仍登记的 B 可再放行。此处没有生产 index 自愈或 Chromium reload，仍待窗口证据。首跑 SQL shell 引号错使 UPDATE 未执行，修正夹具共用转义函数后保持真实 API location.directory 断言；不改引擎或放宽判官。
 - 2026-11-19 · 步骤 7 后端最终：`bun test --max-concurrency 2 src/main/project-writable.engine.test.ts` 宿主 1 pass / 0 fail、inner 6 pass / 0 fail（step7-engine-six-final.log）；`bun typecheck` exit 0（step7-ui-typecheck.log）。实际 `engine-grant-7rzKH7/proof.json` / events.json：引擎 47566→47609（仅杀引擎臂换代），旧 PTY 47569、MCP 47573，B 五文件、D picked.txt、C/E 空；流 started/released=true、cancelled=false，第一代引擎预期 SIGKILL、新一代正常 exit 0。去真源 opened.has 后 inner 5 pass / 1 fail，E 进入真源使判官红（step7-bad-truth-engine.log）；去 whenSettled 后 inner 4 pass / 2 fail，首次实际模型写入被拒（step7-bad-first-work-six.log），均已 scoped restore。gate 宿主 pin=1、inner 3→6；未扩大为窗口或 G0 证明。
+
+### r3 最终接线 G0/V7 复验与续行点（2026-11-19）
+
+- `cd packages/ui-mac && TMPDIR=<scratch> bun test --max-concurrency 2 src/main/process-fence-extension-packaged.test.ts`：宿主 1 pass / 0 fail、inner 1 pass / 0 fail、exit 0，总 1030.99 s；`step7-g0-final.log`，完整产物 `g0-zMPrUo/`（均在派单 scratch）。生产代码基于 `50e5b7dfcd`；仅测试 main 入口替换生成入口后本地打包，生产 sidecar/.node/profile 保持实际资源，不用替身代替签名链。
+- main PID **97989**；Electron **42.3.3**；`codesign --verify --deep --strict` exit **0**、runtime **0x10000**、生产 entitlements 键核对通过。身份仅哈希 **27D86FF5629B9296E616B333E798725A2E01B262**。`--publish never` / notarize=false，本地签名约 17 分钟，无上传/发布。
+- 实际打包 `.node` 的 buildId **fence-20261119T131104367Z**，SHA-256 **5f80c8f82f4f8bf8505478d04548def51335aeb2c483b45b38acb3e7f90d3732**（复读签名后资源计算）。
+
+| 臂 | 引擎 / 子进程 pid | 实读磁盘与退出 |
+| --- | --- | --- |
+| granted | 97993；已有 97995、新 97997 | B=existing.txt,new.txt；C 空；已有脚本末次 C 写 exit 1、新 B 写 exit 0；引擎 exit 0 |
+| control（不消费） | 97999；已有 98002、新 98004 | B/C 均空；两次写脚本 exit 1；引擎 exit 0 |
+| replay | 新一代 97998 | 绑定令牌消费失败，原 B 探针 denied；新 B/C 空；引擎 exit 0 |
+| selfIssue | 98005 | 50 个变体按冻结逐臂预期；C 空，helper/引擎 exit 0 |
+| badFileOnly | 98058 | C=generic.txt（零落盘判据红）；helper/引擎 exit 0 |
+| badNoDeny | 98062 | C=file.txt（零落盘判据红）；helper/引擎 exit 0 |
+
+- `result.json` 的顺序（ms）：ready **1101.938625** → 旧 child ready **1152.386167** → issue **1152.392833** → consume **1152.769917** → 旧写 **1172.951167** → 新写 **1182.922667**；全过程同一引擎 97993。首个消费往返 0.295791 ms。额外 **100** 个独立目录每个先 denied、签发消费后 writable；从 main 签发开始至生产 sidecar 消费应答计时，最近秩 p50 **0.063833 ms**、p99 **0.106750 ms**；原始 samplesMs 全留 result.json。实读这 100 目录均无探针残留。
+- `signing.json` / verify.log / signature.log / entitlements.log / package.log / runtime.log / unregister.log 保留原始脱敏证据。运行 main exit 0、`lsregister -u` exit 0；按报告所有 main/engine/子进程 pid 做 signal 0 核对，均已退出；B/C 清单另由宿主复读确认。生成 main 入口已恢复，打包用攻击二进制已删除；不触及安装版或其数据/凭据。
+- 本轮计数：新增 gate display=7、UI census=2、project-writable.engine host=1（inner=6）；拒写 engine host=1/inner=4，仅改旧说明；timeline host=12/inner=124、context=43、policy=68、库存=98 不变。继承步骤 2–5：新增 extension host=1/inner=6、IPC host=1/inner=10、core=14、navigation=5；既有 workspaces 12→15、search 29→32、automation 38→39、write-sites 两行 W1+X1；profile=26/write-sites=12 不变。G0 host=1/inner=1，本轮只加采样断言，gate 登记和总表收口仍在步骤 8。
+- 计划同步：r3 的卡片/intent/marker 已删决定写回本节正文，不再保留旧「WriteDeniedNote 留一句」安排；现有 ext 钩子无资格事实，一律中性停止。gate 拒写行的旧重启说明也已同步。必要测试辅助文件与两次夹具纠正见前述记录，没有生产合同/设计路线变更。
+- **PARTIAL 续行：步骤 6 完成；步骤 7 后端腿及最终 G0/V7 已通过，步骤 7 可信窗口仍未完成。** 下一步从隔离签名包 Chromium/CDP 的 R1–R5 真输入整链继续，含 R1 建会话/目录解析各 >8 s、R5 历史打开与自动运行/加载不登记、改写目录后的生产自愈/强制 reload 等待期点击、诚实 reload、工具深链接/远端负例及对应坏臂。然后步骤 8 的两份架构/I1 事实文档和最终登记/计数收口。现有 happy-dom、backend fixture restart、手工发送 main IPC 均不充当这些窗口证据。
+- 已核：Codex / GPT-6，自验；ui-mac/ext 包 typecheck exit 0；未运行 full gate/bin/check。遗留去向：timeline 宿主默认 5 s 期限现象及一次具名确认日志交编排者，本 lane 未改期限或行为断言；其余待办继续本 lane，OPTIONAL 无。全部前台命令结束后在干净提交边界交回。

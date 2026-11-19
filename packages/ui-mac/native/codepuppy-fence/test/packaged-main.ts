@@ -160,6 +160,26 @@ async function runGate() {
   await finishWrites(engine, existing)
   assert(await engine.probe(engine.B) === "writable", "B must be writable after consume")
   assert(await engine.probe(engine.C) === "denied", "C must remain denied")
+  // Measure fresh directories, bypassing neither native issuance nor the production sidecar
+  // message loop. Probes are outside the timed interval and remove their own files.
+  const samplesMs: number[] = []
+  for (let index = 0; index < 100; index++) {
+    const directory = join(engine.root, "grant-samples", String(index))
+    mkdirSync(directory, { recursive: true })
+    assert(await engine.probe(directory) === "denied", `latency sample ${index}: initially writable`)
+    const start = performance.now()
+    const sample = addon.issueFileExtensionToProcess(WORKSPACE_WRITE_EXTENSION_CLASS, directory, engine.child.pid!)
+    assert(sample.token !== null, `latency sample ${index}: issue failed`)
+    const reply = await engine.grants.request(sample.token)
+    const elapsed = performance.now() - start
+    assert(reply.outcome === "granted", `latency sample ${index}: consume failed`)
+    samplesMs.push(elapsed)
+    assert(await engine.probe(directory) === "writable", `latency sample ${index}: still denied`)
+    assert(readdirSync(directory).length === 0, `latency sample ${index}: probe left files`)
+  }
+  const ordered = [...samplesMs].sort((left, right) => left - right)
+  report.grantLatency = { samplesMs, count: samplesMs.length, p50Ms: ordered[49], p99Ms: ordered[98], interval: "main issue start through production sidecar consume reply" }
+  record("latency-complete", { pid: engine.child.pid, count: samplesMs.length, p50Ms: ordered[49], p99Ms: ordered[98] })
   arms.granted = { pid: engine.child.pid, existingPid: existing.pid, files: engine.files(), grant: granted, mainReplay }
   await engine.stop()
 

@@ -22,7 +22,7 @@ import { resolveCodePuppyStateBase } from "./codepuppy-environment"
 // Capture before applyAuthEnv can fill these. App-filled values are never user exports.
 let inherited: { model: boolean; cloud: boolean } | undefined
 export function inheritedEngineEndpointEnv() {
-  return inherited ??= { model: process.env.CODEPUPPY_BASE_URL !== undefined, cloud: process.env.CODEPUPPY_CLOUD_MCP_URL !== undefined }
+  return inherited ??= { model: Boolean(process.env.CODEPUPPY_BASE_URL), cloud: Boolean(process.env.CODEPUPPY_CLOUD_MCP_URL) }
 }
 export type EndpointRoute = "preferred" | "direct"
 let route: EndpointRoute = "preferred"

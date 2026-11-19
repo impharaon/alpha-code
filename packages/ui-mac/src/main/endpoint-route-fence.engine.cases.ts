@@ -10,7 +10,7 @@ import { codepuppyEngine, scriptedModel } from "../../test-component/codepuppy-e
 
 const sandbox = engineSandbox()
 const name = "fence-route"
-// Keep test temporary writes inside the existing W2 root; no production profile change.
+// Keep engine temporary writes together; route state is separately placed outside temp roots.
 process.env.TMPDIR = path.join(sandbox.root, `${name}-state`, "codepuppy-state", "env", "dev", "test-tmp")
 fs.mkdirSync(process.env.TMPDIR, { recursive: true })
 const userDataPath = path.join(sandbox.root, `${name}-userdata`)
@@ -41,7 +41,7 @@ test("F1 actual generation profile: engine reads main's atomic route; child writ
   delete process.env.CODEPUPPY_BASE_URL
   delete process.env.CODEPUPPY_CLOUD_MCP_URL
   for (const key of ["WEB", "PLATFORM", "ACCOUNT", "CLOUD", "MCP"]) delete process.env[`CODEPUPPY_${key}_URL`]
-  const environment = initCodePuppyEnvironment({ isPackaged: false, channel: "dev", appDataDir: path.join(sandbox.root, `${name}-state`), homeDir: sandbox.home })
+  const environment = initCodePuppyEnvironment({ isPackaged: false, channel: "dev", appDataDir: process.env.CODEPUPPY_TEST_ROUTE_FENCE_APP_DATA!, homeDir: sandbox.home })
   const model = scriptedModel()
   const originalFetch = globalThis.fetch
   const sent: string[] = []

@@ -49,6 +49,7 @@ import { publishProviderAllowList } from "../../../ext/src/provider-allow"
 import { skillGenerationLiveDirs } from "../../../ext/src/gen-skill-paths"
 import { disabledPackageComponents, explicitConfigPath, writeExplicitConfig, type ExplicitLayer } from "./engine-explicit-config"
 import { applyPromptTakeover } from "../../../ext/src/codepuppy-prompts"
+import { HUB_READ_ACTIONS } from "../../../ext/src/hub-tools"
 
 // Inject alpha-code's customizations into opencode via OPENCODE_CONFIG_CONTENT. This env var is
 // MERGED with the user's global/project config — it does NOT replace it (opencode config.ts
@@ -427,6 +428,8 @@ export function injectCodePuppyConfig(
             ["subagent", { "*": "deny", "codepuppy-readonly": "allow" }],
             ["mcp:*", "ask"],
             ["plugin:*", "ask"],
+            // BR-01 / BR-10(SPEC-plugin-helper-and-hub v5):助手的只读查找与状态工具不问;安装仍每档都问(hubInstallAsk)。
+            ...HUB_READ_ACTIONS.map((name): [string, "allow"] => [`plugin:*:${name}`, "allow"]),
           ]),
         },
       }
@@ -457,7 +460,8 @@ export function injectCodePuppyConfig(
         hidden: true,
         mode: "primary",
         permissions: rules([
-          ["tool-policy-default", "ask"],
+          // BR-01 / BR-10(SPEC-plugin-helper-and-hub v5):助手的只读查找与状态工具不问;安装仍每档都问(hubInstallAsk)。
+          ["tool-policy-default", { "*": "ask", ...Object.fromEntries(HUB_READ_ACTIONS.map((name) => [`plugin:*:${name}`, "allow" as const])) }],
           ["question", "allow"],
           ["plan_enter", "allow"],
           // 与另外三个 alpha agent 同形:显式写 websearch allow(defaults 的 `*` 本来就 allow,求值结果不变),

@@ -80,6 +80,20 @@ describe("已整理的面:没有原词", () => {
   })
 })
 
+describe("模型选择器 / 供应商 / 输入框:密钥与计划模式用中文说法(冻结稿 #picker、#hub-custom-service)", () => {
+  const SURFACES = ["codepuppy.model.", "codepuppy.provider.", "codepuppy.composer.", "codepuppy.autocomplete.", "codepuppy.search."]
+  test("zh 词典里这些面不含 KEY / Key / BYOK / plan 档", () => {
+    const bad = Object.entries(zh as Record<string, string>)
+      .filter(([key, value]) => SURFACES.some((prefix) => key.startsWith(prefix)) && /\b(KEY|Key|BYOK)\b|plan 档/.test(withoutPlaceholders(value)))
+      .map(([key, value]) => `${key}: ${value}`)
+    expect(bad).toEqual([])
+  })
+  test("坏样本必命中:旧文案「未配置 KEY · 点击配置」「自带 KEY(BYOK)」「先出方案再动手(plan 档)」", () => {
+    for (const old of ["未配置 KEY · 点击配置", "国内直连 · 自带 KEY(BYOK)", "先出方案再动手(plan 档)", "请填写 API Key"])
+      expect(/\b(KEY|Key|BYOK)\b|plan 档/.test(old)).toBe(true)
+  })
+})
+
 describe("逐字规定的文案", () => {
   test("aiDisclaimer 按键排除:原文保持半角,扫描不报,且确实在词典里(排除不是空转)", () => {
     const text = (zh as Record<string, string>)["codepuppy.session.aiDisclaimer"]

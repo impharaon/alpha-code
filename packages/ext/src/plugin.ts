@@ -2,7 +2,7 @@ import { existsSync, readFileSync, readdirSync } from "node:fs"
 import { join } from "node:path"
 import { pathToFileURL } from "node:url"
 import type { Plugin } from "@opencode/plugin"
-import { codepuppyBootstrap } from "../../util/src/codepuppy-bootstrap"
+import { codepuppyBootstrap, routePlatformUrl } from "../../util/src/codepuppy-bootstrap"
 import { registerPolicy } from "./policy/index"
 import {
   projectDirectoryIdentity,
@@ -292,7 +292,10 @@ export const CodePuppyExt: Plugin.Plugin = {
       // 那里加的头会被注入的占位 apiKey 盖掉;http.request 拿到的是鉴权之后、即将发出的请求(#1662 parity B4)。
       await context.session.hook("http.request", (event) => {
         const authorization = platformRequestCredentialHeader({ requestURL: event.request.url, platform: bootstrap.platform })
-        if (authorization) event.request.headers.set("authorization", authorization)
+        if (!authorization) return
+        event.request.headers.set("authorization", authorization)
+        const url = routePlatformUrl(event.request.url, bootstrap.platform.modelProxyBaseURL, bootstrap.platform.directModelProxyBaseURL, bootstrap.platform.routeRef)
+        if (url !== event.request.url) event.request = new Request(url, event.request)
       })
       // `#1662`:供应商白名单 · 请求这一道 —— 注入的放行集合之外的供应商,请求在发出之前拒掉(provider-allow.ts)。
       await context.session.hook("model.request", (event) => refuseOutsideProviderAllowList(event, providerAllowList()))

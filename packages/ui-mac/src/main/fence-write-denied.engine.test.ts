@@ -6,7 +6,7 @@ import { join } from "node:path"
 
 const describeDarwin = process.platform === "darwin"
 
-test.skipIf(!describeDarwin)("沙箱拒写:写文件工具与 shell 两条路径 + 可写项目对照(fence-write-denied.engine.cases.ts,3 条)", async () => {
+test.skipIf(!describeDarwin)("沙箱拒写:写文件工具与 shell 两条路径 + 项目外目标 + 可写项目对照(fence-write-denied.engine.cases.ts,4 条)", async () => {
   const scratch = join(import.meta.dir, "../../node_modules/.cache/fence-write-denied")
   try {
     const child = Bun.spawn({
@@ -20,7 +20,7 @@ test.skipIf(!describeDarwin)("沙箱拒写:写文件工具与 shell 两条路径
     const output = `${stdout}${stderr}`
     if (exitCode !== 0) throw new Error(output)
     expect(output.match(/(\d+) fail\b/)?.[1], output).toBe("0")
-    expect(output.match(/(\d+) pass\b/)?.[1], output).toBe("3")
+    expect(output.match(/(\d+) pass\b/)?.[1], output).toBe("4")
   } finally {
     rmSync(scratch, { recursive: true, force: true })
   }

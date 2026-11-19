@@ -118,6 +118,8 @@ export type HostOptions = {
   sandbox: EngineSandbox
   name: string
   modelBaseURL: string
+  directModelProxyBaseURL?: string
+  routeRef?: `{file:${string}}`
   /** 用户在 Code Puppy 里加的本地 MCP(codepuppy.jsonc 里的 `probe`,引擎经显式文件读它),每次 tools/call 记进这个文件。 */
   mcpCallLog?: string
   /** codepuppy.jsonc 里另加的 MCP 服务器(名字 → 定义);注入在 codepuppyEngine() 里就合并用户文件,所以要在这里给。 */
@@ -179,7 +181,7 @@ export function codepuppyEngine(options: HostOptions) {
     globalRoot,
     userData,
     engineConfigDirectory: engineGlobalConfigDirectory(process.env, sandbox.home),
-    platform: { credentialRef: secretFileRef(userData, "CODEPUPPY_API_KEY"), modelProxyBaseURL: options.modelBaseURL },
+    platform: { credentialRef: secretFileRef(userData, "CODEPUPPY_API_KEY"), modelProxyBaseURL: options.modelBaseURL, ...(options.directModelProxyBaseURL ? { directModelProxyBaseURL: options.directModelProxyBaseURL } : {}), ...(options.routeRef ? { routeRef: options.routeRef } : {}) },
     policyAccount: `acct:${createHash("sha256").update(`${name}-${Math.random()}`).digest("hex")}`,
     cloudMcp: options.cloudMcp,
     killSwitch: options.killSwitch,

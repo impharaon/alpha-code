@@ -17,6 +17,7 @@ import { engineDatabasePath, engineGlobalConfigDirectory } from "./engine-paths"
 import { engineDataDirectory, foreignOpenCodeData, legacyCredentialImportRefusal } from "./engine-legacy-credentials"
 import { CHANNEL } from "./constants"
 import { getAuthIdentityTag } from "./codepuppy-auth"
+import { noteRelayFailureSignal, preferredEndpoints, relayConfigured } from "./codepuppy-endpoints"
 import { installationMachineId } from "./artifact-service"
 import { tryGetCodePuppyEnvironment } from "./codepuppy-environment"
 import { buildCodePuppyBootstrap, usableExportedPaths } from "./codepuppy-bootstrap-build"
@@ -59,7 +60,7 @@ import type { ProcessFenceStartInput } from "./process-fence-apply"
 import { startEgressPolicyProxy, type EgressLogRecord, type EgressProxyHandle } from "./network-egress-proxy"
 // REQ-137 `#1379`:出网授权的**动态半场**。静态表装不下 BYOK 直连的目的地(它由用户配置了谁决定),
 // 所以放行集合从这一代要注入给引擎的那份有效配置里的 `provider.<id>.options.baseURL` 派生,fork 前整份替换。
-import { deriveEgressDestinations, deriveMcpEgressDestinations, setConfiguredEgressDestinations } from "./network-egress-derived"
+import { deriveEgressDestinations, deriveMcpEgressDestinations, egressDestinationFromBaseUrl, setConfiguredEgressDestinations } from "./network-egress-derived"
 // `#1412`:出网授权的**第三个半场** —— 用户当场批准的目的地。两条轴(`webfetch` 的 URL 与 `bash` 里命令
 // 自带的目的地)的目的地由模型即时生成,没有配置来源可派生,所以它们的真源只能是「用户点的那一下」。
 import { configureEgressGrantApproval, setUserEgressGrants } from "./network-egress-grants"
@@ -151,6 +152,10 @@ let egressProxySingleton: Promise<EgressProxyHandle> | undefined
 function ensureEgressPolicyProxy(): Promise<EgressProxyHandle> {
   if (!egressProxySingleton) {
     const log = (record: EgressLogRecord) => {
+      if (relayConfigured() && ((record.event === "egress.connect" && record.reason === "dial-failed") || record.event === "egress.tunnel-silent")) {
+        const endpoints = preferredEndpoints()
+        if ([endpoints.platform, endpoints.cloud].some((base) => new URL(base).hostname.toLowerCase() === record.host)) noteRelayFailureSignal()
+      }
       const line = `network egress ${JSON.stringify(record)}`
       // `#1412`:用户拒掉一个目的地,与代理自己拒掉一个目的地同级别 —— 两者都是「有东西没发出去」,
       // 都要在日志里显眼(「工具把数据发到未授权目的地时失败且可见」的可见就在这两行)。
@@ -251,6 +256,7 @@ function refreshConfiguredEgressDestinations(userDataPath: string): void {
         })?.provider,
       ),
       ...deriveMcpEgressDestinations(mcpServers),
+      ...[egressDestinationFromBaseUrl(process.env.CODEPUPPY_CLOUD_MCP_URL, "platform:cloud-mcp")].filter((destination) => destination !== undefined),
     ])
     getLogger()?.log(
       `network egress: ${accepted.length} configured destination(s) authorized for this generation — ` +

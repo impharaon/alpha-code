@@ -90,9 +90,6 @@ const harnessIntents = {
   get chooseModel() {
     return intentsEnabled() ? () => void intentLog.turnErrorExits.push("chooseModel") : undefined
   },
-  get relaunch() {
-    return intentsEnabled() ? () => void intentLog.turnErrorExits.push("relaunch") : undefined
-  },
 }
 
 export { render }

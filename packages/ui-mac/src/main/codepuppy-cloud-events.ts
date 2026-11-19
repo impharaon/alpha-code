@@ -29,10 +29,10 @@ export function subscribeCloudJobEvents(jobId: string, sink: (ev: CloudJobEvent)
   let stopped = false
   let lastId: string | null = null // C23 修:原样字符串(Number() 会丢非数字 id)
   let failures = 0 // 连续「失败或空转关闭」计数;收到任何事件即清零
-  const base = resolveEndpoints().cloud
 
   async function loop() {
     while (!stopped) {
+      const base = resolveEndpoints().cloud
       let token: string | undefined
       try {
         token = getAccessToken("cloud.read")

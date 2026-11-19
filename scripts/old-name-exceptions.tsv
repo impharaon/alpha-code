@@ -7,6 +7,10 @@
 # 扫描面、旧名判据与范围排除写在判官文件抬头,不在这里另抄。
 #
 # 每行五列,TAB 分隔:<文件> <命中词元> <处数> <类别> <理由>
+# Relay fixtures retain the actual external service/repository identifiers and delivery ticket owner.
+packages/ui-mac/src/main/fixtures/relay-route/health-cloud.json	alpha-cloud	1	external-anchor	#159: byte-identical captured /health service identifier; fixture provenance is recorded beside it.
+packages/ui-mac/src/main/fixtures/relay-route/provenance.json	impharaon/alpha-platform	1	external-anchor	#159: actual source repository identity for the captured health response.
+scripts/gate-files.tsv	alpha-work	9	external-anchor	#159: cross-repository issue identity for the relay behavior and exact-count gate entries.
 #   命中词元:这一行里每处旧名向两侧扩展到 [A-Za-z0-9_.-@/:] 的最大连续段,去重后按出现顺序以空格连接
 #             (packages/ui-mac/src/main/old-name-scan.ts 的 hitTokens);文件名本身的命中写「文件名」。
 #   处数:    这个文件里命中词元恰好相同的行有几行。按内容定位、不记行号 —— 文件里增删不相干的行,本表不用动;

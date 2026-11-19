@@ -159,6 +159,7 @@ import { factorySkillSources, reconcileFactorySkills, setFactorySkillDirsForFork
 import { runGlobalEcosystemGate } from "./ecosystem-gate"
 import {
   enableProxy,
+  applyAuthEnv,
   ensureFreshToken,
   getAuthRenewalTiming,
   getAuthState,
@@ -668,7 +669,7 @@ const main = Effect.gen(function* () {
   })
   // Load the endpoint resolver (userData pin + persisted login discovery) BEFORE initAuthEnv, so the
   // proxy URL it derives reflects discovery/pin, not just the hardcoded default. See codepuppy-endpoints.ts.
-  initEndpoints(app.getPath("userData"), reportContractFailure)
+  initEndpoints(app.getPath("userData"), reportContractFailure, (line) => logger.log(line))
   // ⚠️ initAuthEnv / initByokKeys 不能在这里调(REQ-002 联调实锤,2026-07-03):它们解密 safeStorage
   // 凭证,而 macOS 上 app ready 之前 safeStorage 不可用 → 解密静默失败 → 每次冷启动都"未登录"、
   // BYOK 钥匙库曾因此走明文兜底。已移至 whenReady 之后、sidecar fork 之前(见下)。
@@ -1441,6 +1442,7 @@ const main = Effect.gen(function* () {
     const { listener } = yield* Effect.promise(() => {
       const started = performance.now()
       markStartupTimeline("main.sidecar.boot.fork.start", { generation: spawnGen })
+      applyAuthEnv() // Refresh app-filled preferred addresses before egress and bootstrap derivation.
       const spawning = spawnLocalServer(hostname, port, password, {
         userDataPath: app.getPath("userData"),
         onStdout: (message) => writeLog("server", "stdout", { message }),
@@ -1593,6 +1595,7 @@ const main = Effect.gen(function* () {
       selfHeal = noteSpawn(selfHeal, Date.now())
       const started = performance.now()
       markStartupTimeline("main.sidecar.respawn.fork.start", { generation: spawnGen, reason: trigger })
+      applyAuthEnv() // Refresh app-filled preferred addresses before egress and bootstrap derivation.
       const spawning = spawnLocalServer(hostname, port, password, {
         userDataPath: app.getPath("userData"),
         onStdout: (message) => writeLog("server", "stdout", { message }),

@@ -87,17 +87,17 @@ async function authed<T>(
   try {
     const token = getAccessToken(purpose)
     if (!token) return { error: "not-authenticated" }
-    const base = cloudBase()
-    if (!base) return { error: "no-cloud-endpoint" }
+    if (!cloudBase()) return { error: "no-cloud-endpoint" }
+    const body = init?.body !== undefined ? JSON.stringify(init.body) : undefined
     const res = await fetchWithBoundedRetry(
       () =>
-        fetch(`${base}${path}`, {
+        fetch(`${cloudBase()}${path}`, {
           method: init?.method ?? "GET",
           headers: {
             authorization: `Bearer ${token}`,
             ...(init?.body !== undefined ? { "content-type": "application/json" } : {}),
           },
-          body: init?.body !== undefined ? JSON.stringify(init.body) : undefined,
+          body,
           signal: AbortSignal.timeout(15000),
         }),
       init?.maxAttempts ?? 1,
@@ -148,18 +148,18 @@ export async function dispatchExplicitCloudUpload(input: {
   uploadConsent?: string
 }): Promise<CloudResult<CloudDispatchResult>> {
   try {
-    const base = cloudBase()
-    if (!base) return { error: "no-cloud-endpoint" }
+    if (!cloudBase()) return { error: "no-cloud-endpoint" }
+    const body = JSON.stringify(input.body)
     const response = await fetchWithBoundedRetry(
       () =>
-        fetch(`${base}${CODEPUPPY_PATHS.cloudJobs}`, {
+        fetch(`${cloudBase()}${CODEPUPPY_PATHS.cloudJobs}`, {
           method: "POST",
           headers: {
             authorization: `Bearer ${input.accessToken}`,
             "content-type": "application/json",
             ...(input.uploadConsent ? { "x-codepuppy-upload-consent": input.uploadConsent } : {}),
           },
-          body: JSON.stringify(input.body),
+          body,
           signal: AbortSignal.timeout(15000),
         }),
       DISPATCH_MAX_ATTEMPTS,

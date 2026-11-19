@@ -1588,3 +1588,19 @@ describe("#1571 probeStoredAuthDecryption — 改名后自检,与 load() 同一�
     }
   })
 })
+
+// alpha-work#159 R1-05: an app-filled address must not masquerade as an inherited user export.
+test("app-filled engine addresses follow the latest preferred endpoints on the next generation", async () => {
+  const { initEndpoints } = await import("./codepuppy-endpoints")
+  process.env.DEV_PLATFORM_TOKEN = jwt("model.invoke", "relay-route")
+  const pin = join(dataPath, "codepuppy-endpoints.json")
+  writeFileSync(pin, JSON.stringify({ platform: "http://127.0.0.1:1/first", cloud: "http://127.0.0.1:1/first-cloud" }))
+  initEndpoints(dataPath, () => {})
+  initAuthEnv(dataPath)
+  expect(process.env.CODEPUPPY_BASE_URL).toBe("http://127.0.0.1:1/first/v1")
+  writeFileSync(pin, JSON.stringify({ platform: "http://127.0.0.1:1/second", cloud: "http://127.0.0.1:1/second-cloud" }))
+  initEndpoints(dataPath, () => {})
+  applyAuthEnv()
+  expect(process.env.CODEPUPPY_BASE_URL).toBe("http://127.0.0.1:1/second/v1")
+  expect(process.env.CODEPUPPY_CLOUD_MCP_URL).toBe("http://127.0.0.1:1/second-cloud/mcp")
+})

@@ -5,7 +5,7 @@
  * extension sovereignty gate and the engine display snapshot use one fact.
  */
 
-import { tryCodePuppyBootstrap, type CodePuppyBootstrap } from "@opencode/util/codepuppy-bootstrap"
+import { routePlatformUrl, tryCodePuppyBootstrap, type CodePuppyBootstrap } from "@opencode/util/codepuppy-bootstrap"
 
 /**
  * `#1698`(DESIGN-upgrade-bootstrap-config §4.3,G2):治理云 MCP 的名字与定义来自 Code Puppy 的启动文档(`cloudMcp`),不再来自
@@ -62,7 +62,7 @@ export function resolveFileRefs(value: unknown, readFile: (path: string) => stri
  * 续期之后它就是旧令牌。返回给 MCP SDK transport 的 `fetch` 选项:StreamableHTTP 与 SSE 的 POST、GET/SSE
  * 与重连、404 会话恢复全都经过它。读不到(DEF 缺席 / 无引用 / 文件缺席或为空)⇒ 本地答一个 401,请求不出网,
  * SDK 照它自己的路径报认证错误(无 authProvider 时为 `StreamableHTTPError(401)` / `SseError(401)`,
- * 引擎归为 `failed` + code `auth`,不重连)。IO 由调用方注入,本模块不碰文件系统。
+ * 引擎归为 `failed` + code `auth`,不重连)。凭据 IO 由调用方注入;路线现读委托共享的 routePlatformUrl。
  */
 export function governedCredentialFetch(
   cloudMcp: GovernedCloudMcp | undefined,
@@ -79,7 +79,8 @@ export function governedCredentialFetch(
       })
     const headers = new Headers(init?.headers)
     headers.set("authorization", authorization)
-    return fetchImpl(url, { ...init, headers })
+    const destination = routePlatformUrl(String(url), cloudMcp?.definition.url, cloudMcp?.directUrl, tryCodePuppyBootstrap()?.platform.routeRef)
+    return fetchImpl(destination, { ...init, headers })
   }
 }
 

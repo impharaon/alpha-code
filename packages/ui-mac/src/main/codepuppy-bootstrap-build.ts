@@ -11,6 +11,8 @@ import { materializeCloudMcpConfig } from "./cloud-sidecar-config"
 import { CLOUD_MCP_SERVER_NAME } from "./cloud-web-search"
 import { secretFileRef } from "./codepuppy-secret-files"
 import { engineDesktopToggles } from "./engine-server-options"
+import { CODEPUPPY_ENDPOINTS, CODEPUPPY_PATHS } from "../shared/codepuppy-config"
+import { endpointRouteRef } from "./codepuppy-endpoints"
 
 export type CodePuppyBootstrapInput = {
   userDataPath: string
@@ -64,6 +66,11 @@ export function buildCodePuppyBootstrap(input: CodePuppyBootstrapInput): CodePup
   // 空串同未设(今天 codepuppy-models.ts / 注入都按真值判这两个地址)
   const modelProxyBaseURL = credentialFree("CODEPUPPY_BASE_URL", env.CODEPUPPY_BASE_URL, input.log)
   const cloudMcpUrl = credentialFree("CODEPUPPY_CLOUD_MCP_URL", env.CODEPUPPY_CLOUD_MCP_URL, input.log)
+  const routeRef = endpointRouteRef()
+  const directModelProxyBaseURL = `${CODEPUPPY_ENDPOINTS.platform}${CODEPUPPY_PATHS.modelProxy}`
+  const directUrl = `${CODEPUPPY_ENDPOINTS.cloud}${CODEPUPPY_PATHS.mcpGateway}`
+  const alternateModel = routeRef && modelProxyBaseURL && modelProxyBaseURL !== directModelProxyBaseURL
+  const alternateCloud = routeRef && cloudMcpUrl && cloudMcpUrl !== directUrl
   return parseCodePuppyBootstrap({
     v: 1,
     paths: {
@@ -84,12 +91,13 @@ export function buildCodePuppyBootstrap(input: CodePuppyBootstrapInput): CodePup
       // REQ-236 `#1562`:平台模型请求的凭据只从这份文件现读(ext 的请求钩子);文档里只有引用
       credentialRef: secretFileRef(input.userDataPath, "CODEPUPPY_API_KEY"),
       ...(modelProxyBaseURL ? { modelProxyBaseURL } : {}),
+      ...(alternateModel ? { directModelProxyBaseURL, routeRef } : alternateCloud ? { routeRef } : {}),
       // 空串就是没导出
       ...(env.CODEPUPPY_DEFAULT_MODEL ? { defaultModelOverride: env.CODEPUPPY_DEFAULT_MODEL } : {}),
     },
     // R8:云 MCP 定义在 main 用同一个工厂算;定义恒带 {file:} 引用(是否代付仍由 sidecar 注入按密钥文件在场性判)
     ...(cloudMcpUrl
-      ? { cloudMcp: { name: CLOUD_MCP_SERVER_NAME, definition: materializeCloudMcpConfig(cloudMcpUrl, secretFileRef(input.userDataPath, "CODEPUPPY_MCP_TOKEN")) } }
+      ? { cloudMcp: { name: CLOUD_MCP_SERVER_NAME, definition: materializeCloudMcpConfig(cloudMcpUrl, secretFileRef(input.userDataPath, "CODEPUPPY_MCP_TOKEN")), ...(alternateCloud ? { directUrl } : {}) } }
       : {}),
     // ADR-009 B2 的能力总闸(两条腿的拒绝判决都等于它)
     webSearch: { killSwitch: on(env.CODEPUPPY_WEBSEARCH_DISABLE) },

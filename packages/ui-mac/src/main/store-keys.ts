@@ -8,6 +8,8 @@ export const PINCH_ZOOM_ENABLED_KEY = "pinchZoomEnabled"
 export const CLOUD_SCHEDULE_LAST_PULL_KEY = "codepuppyCloudScheduleLastPull"
 export const NEW_LAYOUT_SEEDED_KEY = "codepuppyNewLayoutSeeded"
 export const CUSTOM_AGENTS_SEEDED_KEY = "codepuppyCustomAgentsSeeded"
+/** 还没取回的云任务结果(cloud-run-tracker I9),跨退出重开存活。 */
+export const CLOUD_PENDING_RUNS_KEY = "codepuppyCloudPendingRuns"
 
 export const GENERIC_SETTINGS_ACCESS_ERROR =
   "default.dat/settings.v3 is reserved for the typed Settings adapter"

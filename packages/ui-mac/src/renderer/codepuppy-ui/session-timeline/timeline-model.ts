@@ -262,8 +262,9 @@ export type TimelineRow =
       startedAt: number
       /** `#1474` 活跃回合里回答已经开始输出(最后一次工具之后有文字)⇒ 工作过程自动收成一行。 */
       answering: boolean
-      /** `#1474` session_status=retry 的载荷:实时标题写「正在重试 · 第 N 次 · 原因」(不再另挂重试卡)。 */
-      retry?: { attempt: number; message: string }
+      /** `#1474` session_status=retry 的载荷:实时标题写「正在重试 · 第 N 次 · 原因」(不再另挂重试卡)。
+       *  原因 = 引擎认出的网络层的短语(`netLayer`),认不出写一句中性的话;`message` 原文只进悬停提示。 */
+      retry?: { attempt: number; message: string; netLayer?: NetFailureLayer }
       /** 回合失败(回合错误卡在外面)⇒ 摘要不写「哪里不顺」。 */
       turnFailed: boolean
       /** 整轮用时 = 用户消息创建 → 最后一条助手消息完成;未完成 / 时钟异常 → 缺席。 */
@@ -358,8 +359,8 @@ export interface TimelineProjectionInput {
   partsOf: (messageID: string) => readonly Part[]
   /** session_status[sessionID].type;缺省视为 "idle"。 */
   status: string
-  /** session_status[sessionID] 为 retry 时的载荷(attempt/message);`#1474` 起由工作过程的实时标题消费。 */
-  retry?: { attempt: number; message: string }
+  /** session_status[sessionID] 为 retry 时的载荷(attempt/message/引擎认出的网络层);`#1474` 起由工作过程的实时标题消费。 */
+  retry?: { attempt: number; message: string; netLayer?: NetFailureLayer }
   /** 斜杠命令来源登记(C7 可选供给;缺席 = 不出 chip,fail-closed)。 */
   slashOrigins?: readonly TimelineSlashOrigin[]
   /** REQ-236 `#1553`:附件读取结果的输入 —— 会话实例目录与本机读取工具的逐服务状态(缺席 = 不下「已读取 / 失败」结论)。 */
@@ -1097,8 +1098,10 @@ export function turnErrorOf(
   cause?: TurnErrorCause
   statusCode?: number
 } | undefined {
-  const failed = assistants.find((message) => message.error && message.error.name !== "MessageAbortedError")
-  if (!failed?.error) return undefined
+  // 回合的结局看最后一条助手消息:前面失败过、又被引擎续写或重试接过去的(core session/runner/step.ts Outcome.Continue),
+  // 这一轮并没有「没完成」。中断由中断行说,不出错误卡。
+  const failed = assistants.at(-1)
+  if (!failed?.error || failed.error.name === "MessageAbortedError") return undefined
   const data = (
     failed.error as {
       data?: { message?: unknown; responseBody?: unknown; statusCode?: unknown; metadata?: Record<string, unknown> }
@@ -1130,6 +1133,19 @@ export function turnErrorOf(
     ...(netUnattributed ? { netUnattributed: true as const } : {}),
     ...(cause ? { cause } : {}),
     ...(statusCode !== undefined ? { statusCode } : {}),
+  }
+}
+
+/**
+ * session_status=retry → 投影输入。引擎适配层把引擎认出的网络层放在 `metadata.codepuppyNetLayer`(与 session.error
+ * 同一形,engine-adapter/opencode2/events.ts);只认九个层名,其余当作认不出。
+ */
+export function retryInputOf(status: { attempt: number; message?: unknown; metadata?: unknown }): NonNullable<TimelineProjectionInput["retry"]> {
+  const layer = (status.metadata as { codepuppyNetLayer?: unknown } | undefined)?.codepuppyNetLayer
+  return {
+    attempt: status.attempt,
+    message: typeof status.message === "string" ? status.message : "",
+    ...(isNetFailureLayer(layer) ? { netLayer: layer } : {}),
   }
 }
 
@@ -1410,6 +1426,7 @@ export function projectTimelineRows(input: TimelineProjectionInput): TimelineRow
           ? {
               attempt: input.retry.attempt,
               message: boundedText(input.retry.message, RETRY_MESSAGE_MAX_CHARS).text,
+              ...(input.retry.netLayer ? { netLayer: input.retry.netLayer } : {}),
             }
           : undefined
       rows.push({
@@ -1419,7 +1436,7 @@ export function projectTimelineRows(input: TimelineProjectionInput): TimelineRow
           steps.map(processStepRevOf).join("|"),
           String(turnActive),
           String(answering),
-          retry ? `${retry.attempt}\u0000${retry.message}` : "",
+          retry ? `${retry.attempt}\u0000${retry.message}\u0000${retry.netLayer ?? ""}` : "",
           String(!!turnError),
           durationMs ?? "",
         ].join("§"),

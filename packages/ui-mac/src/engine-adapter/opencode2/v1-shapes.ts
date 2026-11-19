@@ -241,7 +241,8 @@ function withFailedTurns(source: readonly SessionMessageInfo[]): SessionMessageI
     if (message.type === "assistant") {
       agent = message.agent
       model = message.model
-      if (message.error) unreported = false
+      // 这条助手没带错误 = 前面带错误的那次已被引擎续写 / 重试接过去;之后回合再失败,要由 idle 上的错误来说。
+      unreported = !message.error
     }
     if (message.type !== "idle" || message.outcome !== "failed" || !message.error || !unreported) return message
     unreported = false
@@ -267,7 +268,11 @@ function withFailedTurns(source: readonly SessionMessageInfo[]): SessionMessageI
  *   · 中断与其余照冻结投影的名字。文本一律经 v1ErrorData 去掉登记码前缀。
  */
 function v1TurnError(frozen: NonNullable<AssistantMessage["error"]>, error: SessionStructuredError) {
-  const data = v1ErrorData(error.message)
+  const parsed = v1ErrorData(error.message)
+  // 联网失败而分类器认不出层(典型是回复读到一半断流:UND_ERR_BODY_TIMEOUT、对端关闭)⇒ 记 v1 的 `unattributed`,
+  // 卡片写「连接中途断开了」而不是把引擎的英文原文当正文(原文仍在 message,进开发者详情)。
+  const data =
+    error.type === "provider.transport" && !parsed.metadata ? { ...parsed, metadata: { codepuppyNetCode: "unattributed" } } : parsed
   if (frozen.name !== "MessageAbortedError" && error.status !== undefined)
     return { name: "APIError", data: { ...data, statusCode: error.status, ...(error.response ? { responseBody: error.response.body } : {}) } }
   if (frozen.name !== "MessageAbortedError" && error.type === "provider.auth") return { name: "ProviderAuthError", data }

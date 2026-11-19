@@ -18,6 +18,10 @@ import { environmentMutableRoot } from "./codepuppy-environment"
 import { GLOBAL_RENDERER_STORE, TABS_INFO_KEY, TABS_KEY, TABS_RECENT_KEY } from "./tabs-preclean"
 
 const STATE_ROOT = "/Users/alpha/Library/Application Support/codepuppy-state"
+const eligibilityFixture = {
+  eligibility: { homeDir: "/Users/alpha", appStateRoot: STATE_ROOT, realpath: (p: string) => p, isDirectory: () => true },
+  onWritableChanged: () => {},
+}
 
 function withTemp<T>(run: (dir: string) => T): T {
   const dir = realpathSync(mkdtempSync(join(tmpdir(), "fence-ws-")))
@@ -131,7 +135,7 @@ describe("bootFenceWorkspaceTruth —— 播种 / 装载 + 检疫 / 坏文件不
     withTemp((dir) => {
       const truthPath = join(dir, "fence-workspaces", "prod.json")
       const logs: string[] = []
-      const tracker = bootFenceWorkspaceTruth({ truthPath, store: seedStore, fs, log: (l) => void logs.push(l) })
+      const tracker = bootFenceWorkspaceTruth({ ...eligibilityFixture, truthPath, store: seedStore, fs, log: (l) => void logs.push(l) })
       expect(readFileSync(truthPath, "utf8")).toBe('{"v":1,"workspaces":["/Users/alpha/proj-b","/Users/alpha/proj-a","/Users/alpha/proj-c"]}\n')
       expect(tracker.quarantined).toEqual([])
       expect(logs).toEqual([
@@ -144,7 +148,7 @@ describe("bootFenceWorkspaceTruth —— 播种 / 装载 + 检疫 / 坏文件不
     withTemp((dir) => {
       const truthPath = join(dir, "prod.json")
       const logs: string[] = []
-      bootFenceWorkspaceTruth({ truthPath, store: { tabs: undefined, recent: undefined, info: undefined }, fs, log: (l) => void logs.push(l) })
+      bootFenceWorkspaceTruth({ ...eligibilityFixture, truthPath, store: { tabs: undefined, recent: undefined, info: undefined }, fs, log: (l) => void logs.push(l) })
       expect(readFileSync(truthPath, "utf8")).toBe('{"v":1,"workspaces":[]}\n')
       expect(logs[0]).toBe(`process fence: workspace truth seeded from the renderer tab store (first launch with #1394) — 0 workspace(s) written to ${truthPath}`)
     })
@@ -156,7 +160,7 @@ describe("bootFenceWorkspaceTruth —— 播种 / 装载 + 检疫 / 坏文件不
       writeWorkspaceTruth(truthPath, ["/Users/alpha/proj-a"], fs)
       const before = statSync(truthPath).mtimeMs
       const logs: string[] = []
-      const tracker = bootFenceWorkspaceTruth({
+      const tracker = bootFenceWorkspaceTruth({ ...eligibilityFixture,
         truthPath,
         store: { tabs: [draft("a", "/Users/alpha/proj-a"), draft("forged", "/Users/alpha/Library/LaunchAgents")], recent: { key: "draft:forged" }, info: {} },
         fs,
@@ -178,8 +182,9 @@ describe("bootFenceWorkspaceTruth —— 播种 / 装载 + 检疫 / 坏文件不
       writeWorkspaceTruth(truthPath, ["/Users/alpha/proj-a"], fs)
       const logs: string[] = []
       const forgedTabs = [draft("a", "/Users/alpha/proj-a"), draft("forged", "/Users/alpha/Library/LaunchAgents")]
-      const tracker = bootFenceWorkspaceTruth({ truthPath, store: { tabs: JSON.stringify(forgedTabs), recent: undefined, info: undefined }, fs, log: (l) => void logs.push(l) })
-      // 对照臂:先证明「IPC 写回会改真源」—— 用户新开一个目录
+      const tracker = bootFenceWorkspaceTruth({ ...eligibilityFixture, truthPath, store: { tabs: JSON.stringify(forgedTabs), recent: undefined, info: undefined }, fs, log: (l) => void logs.push(l) })
+      // 对照臂:具体打开动作先登记,tab 写回才可进真源。
+      tracker.userOpened.register({ server: "sidecar", directory: "/Users/alpha/proj-new" })
       tracker.noteRendererStoreSet(GLOBAL_RENDERER_STORE, TABS_KEY, JSON.stringify([...forgedTabs, draft("n", "/Users/alpha/proj-new")]))
       expect(readFileSync(truthPath, "utf8")).toBe('{"v":1,"workspaces":["/Users/alpha/proj-a","/Users/alpha/proj-new"]}\n')
       expect(logs.at(-1)).toBe(
@@ -195,7 +200,8 @@ describe("bootFenceWorkspaceTruth —— 播种 / 装载 + 检疫 / 坏文件不
       tracker.noteRendererStoreSet(GLOBAL_RENDERER_STORE, TABS_KEY, JSON.stringify([draft("forged", "/Users/alpha/Library/LaunchAgents"), draft("n", "/Users/alpha/proj-new")]))
       expect(readFileSync(truthPath, "utf8")).toBe('{"v":1,"workspaces":["/Users/alpha/proj-new"]}\n')
       expect(logs.at(-1)).toContain("removed: /Users/alpha/proj-a")
-      // session tab 的目录经 tabs.info 进来,同样受检疫
+      // session tab 的目录经 tabs.info 进来,同样要求已登记、受检疫。
+      tracker.userOpened.register({ server: "sidecar", directory: "/Users/alpha/proj-s" })
       tracker.noteRendererStoreSet(
         GLOBAL_RENDERER_STORE,
         TABS_INFO_KEY,
@@ -210,7 +216,7 @@ describe("bootFenceWorkspaceTruth —— 播种 / 装载 + 检疫 / 坏文件不
     withTemp((dir) => {
       const truthPath = join(dir, "prod.json")
       const logs: string[] = []
-      const tracker = bootFenceWorkspaceTruth({ truthPath, store: seedStore, fs, log: (l) => void logs.push(l) })
+      const tracker = bootFenceWorkspaceTruth({ ...eligibilityFixture, truthPath, store: seedStore, fs, log: (l) => void logs.push(l) })
       const before = statSync(truthPath).mtimeMs
       const seededLogs = logs.length
       tracker.noteRendererStoreSet("default.dat", TABS_KEY, JSON.stringify([draft("x", "/Users/alpha/elsewhere")]))
@@ -233,13 +239,14 @@ describe("bootFenceWorkspaceTruth —— 播种 / 装载 + 检疫 / 坏文件不
       const truthPath = join(dir, "prod.json")
       writeFileSync(truthPath, '{"v":1,"workspaces":"oops"}')
       const logs: string[] = []
-      const tracker = bootFenceWorkspaceTruth({ truthPath, store: seedStore, fs, log: (l) => void logs.push(l) })
+      const tracker = bootFenceWorkspaceTruth({ ...eligibilityFixture, truthPath, store: seedStore, fs, log: (l) => void logs.push(l) })
       expect(readFileSync(truthPath, "utf8")).toBe('{"v":1,"workspaces":"oops"}')
       expect(tracker.quarantined).toEqual([])
       expect(logs).toEqual([
         `process fence: workspace truth is unreadable — ${truthPath}: \`workspaces\` is not an array; leaving it untouched, the planner falls back to the default workspace only until the renderer's next tab change rewrites it`,
       ])
       expect(() => readWorkspaceTruthOrThrow(truthPath, fs)).toThrow("`workspaces` is not an array")
+      for (const directory of ["/Users/alpha/proj-a", "/Users/alpha/proj-b", "/Users/alpha/proj-c"]) tracker.userOpened.register({ server: "sidecar", directory })
       tracker.noteRendererStoreSet(GLOBAL_RENDERER_STORE, TABS_RECENT_KEY, JSON.stringify({ key: "draft:a" }))
       expect(readFileSync(truthPath, "utf8")).toBe('{"v":1,"workspaces":["/Users/alpha/proj-a","/Users/alpha/proj-b","/Users/alpha/proj-c"]}\n')
     })
@@ -257,8 +264,9 @@ describe("bootFenceWorkspaceTruth —— 播种 / 装载 + 检疫 / 坏文件不
         },
       }
       const logs: string[] = []
-      const tracker = bootFenceWorkspaceTruth({ truthPath, store: seedStore, fs: flaky, log: (l) => void logs.push(l) })
+      const tracker = bootFenceWorkspaceTruth({ ...eligibilityFixture, truthPath, store: seedStore, fs: flaky, log: (l) => void logs.push(l) })
       expect(fs.existsSync(truthPath)).toBe(false)
+      for (const directory of ["/Users/alpha/proj-a", "/Users/alpha/proj-b", "/Users/alpha/proj-c"]) tracker.userOpened.register({ server: "sidecar", directory })
       expect(logs[0]).toBe(
         `process fence: FAILED to seed the workspace truth at ${truthPath} — the planner falls back to the default workspace only until the renderer's next tab change writes it: ENOSPC: no space left on device`,
       )
@@ -272,4 +280,53 @@ describe("bootFenceWorkspaceTruth —— 播种 / 装载 + 检疫 / 坏文件不
       expect(readFileSync(truthPath, "utf8")).toBe('{"v":1,"workspaces":["/Users/alpha/proj-b","/Users/alpha/proj-a","/Users/alpha/proj-c"]}\n')
     })
   })
+})
+
+
+describe("用户打开登记是两个消费者的共同资格", () => {
+  test("恢复/SSE 的新目录不进真源;tab 先写回再登记也能立即重算;清 tab 不撤销本次运行资格", () => withTemp((dir) => {
+    const truthPath = join(dir, "truth.json")
+    writeWorkspaceTruth(truthPath, ["/Users/alpha/proj-a"], fs)
+    const changes: unknown[] = []
+    const tracker = bootFenceWorkspaceTruth({ ...eligibilityFixture, truthPath, store: {}, fs, log: () => {}, onWritableChanged: (change) => { changes.push(change) } })
+    expect(tracker.userOpened.has("sidecar", "/Users/alpha/proj-a")).toBe(true)
+    tracker.noteRendererStoreSet(GLOBAL_RENDERER_STORE, TABS_INFO_KEY, { "sidecar\n/session/s": { directory: "/Users/alpha/rewritten" } })
+    expect(readWorkspaceTruthOrThrow(truthPath, fs)).toEqual([])
+    expect(tracker.userOpened.has("sidecar", "/Users/alpha/rewritten")).toBe(false)
+    expect(tracker.userOpened.register({ server: "sidecar", directory: "/Users/alpha/rewritten/../rewritten" })).toEqual({ eligible: true, server: "sidecar", directory: "/Users/alpha/rewritten" })
+    expect(readWorkspaceTruthOrThrow(truthPath, fs)).toEqual(["/Users/alpha/rewritten"])
+    tracker.userOpened.register({ server: "sidecar", directory: "/Users/alpha/rewritten" })
+    expect(changes).toEqual([{ server: "sidecar", directory: "/Users/alpha/rewritten" }])
+    tracker.noteRendererStoreClear(GLOBAL_RENDERER_STORE)
+    expect(tracker.userOpened.has("sidecar", "/Users/alpha/rewritten")).toBe(true)
+    expect(readWorkspaceTruthOrThrow(truthPath, fs)).toEqual([])
+  }))
+
+  test("资格顺序:远端不查本机;HOME/祖先/根/状态相关路径和软链不能登记;目录检查失败不抛", () => withTemp((dir) => {
+    const checked: string[] = []
+    const tracker = bootFenceWorkspaceTruth({ ...eligibilityFixture, truthPath: join(dir, "truth.json"), store: {}, fs, log: () => {}, eligibility: {
+      ...eligibilityFixture.eligibility,
+      realpath: (p) => p === "/Users/alpha/alias" ? STATE_ROOT : p,
+      isDirectory: (p) => { checked.push(p); if (p.endsWith("missing")) throw new Error("ENOENT"); return true },
+    } })
+    expect(tracker.userOpened.register({ server: "remote", directory: "/Users/alpha/project" })).toEqual({ eligible: false, reason: "not-local" })
+    for (const directory of ["/", "/Users", "/Users/alpha", STATE_ROOT, `${STATE_ROOT}/env/dev`, "/Users/alpha/Library", "/Users/alpha/alias"]) {
+      expect(tracker.userOpened.register({ server: "sidecar", directory }), directory).toEqual({ eligible: false, reason: "home-or-app-state" })
+      expect(tracker.userOpened.has("sidecar", directory)).toBe(false)
+    }
+    expect(checked).toEqual([])
+    for (const directory of ["relative", "", "/Users/alpha/missing"]) expect(tracker.userOpened.register({ server: "sidecar", directory })).toEqual({ eligible: false, reason: "not-a-directory" })
+    expect(tracker.userOpened.has("remote", "/Users/alpha/proj-a")).toBe(false)
+  }))
+
+  test("检疫仍挡真源重播;用户具体打开可登记,不会把恢复本身误算成打开", () => withTemp((dir) => {
+    const truthPath = join(dir, "truth.json")
+    writeWorkspaceTruth(truthPath, [], fs)
+    const tracker = bootFenceWorkspaceTruth({ ...eligibilityFixture, truthPath, store: { tabs: [draft("x", "/Users/alpha/quarantined")] }, fs, log: () => {} })
+    tracker.noteRendererStoreSet(GLOBAL_RENDERER_STORE, TABS_RECENT_KEY, { key: "draft:x" })
+    expect(tracker.userOpened.has("sidecar", "/Users/alpha/quarantined")).toBe(false)
+    expect(tracker.userOpened.register({ server: "sidecar", directory: "/Users/alpha/quarantined" }).eligible).toBe(true)
+    expect(tracker.userOpened.has("sidecar", "/Users/alpha/quarantined")).toBe(true)
+    expect(readWorkspaceTruthOrThrow(truthPath, fs)).toEqual([])
+  }))
 })

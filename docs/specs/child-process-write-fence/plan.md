@@ -157,3 +157,5 @@ PLAN 阶段只提交本文件。下表和命令均为实施安排，不代表已
 - 2026-11-19 · 步骤 2 红证据：profile/write-sites/extension 宿主共 37 pass / 2 fail，exit 1（`step2-red.log`）；两条失败均为 X1 缺写根登记。新 V1/V2 子用例 6 pass / 0 fail：50 臂按冻结 V2 判定，C 0 文件；file-only/generic 与 no-deny/file 各落 1 文件；不绑定回放落盘使同一判官变红。测试辅助源码只在 native/test，update-file 与无绑定签发来自既有 r1/r2 真实实验，不加入生产导出。
 
 - 2026-11-19 · 步骤 2 完成：红提交 `74c49e192f` 后补 X1 根 ID、探针 write/remove 的 `W1+X1` 两行及根说明。检查组 A（7 个宿主）67 pass / 0 fail，新增宿主含 6 子例；登记同步后 write-sites 12 pass / 0 fail，ui-mac `bun typecheck` exit 0。证据 `step2-green.log` / `step2-ledger.log` / `step2-typecheck.log`；V2 原始 `extension-*/result.json` 保留实际 pid/errno/落盘。新增 gate 行 extension host=1，既有 profile=26、write-sites=12 不变；三个已知坏臂均实跑并落盘，没有修改生产 native 合同或扩大测试替身的证明范围。
+
+- 2026-11-19 · 步骤 3 红证据：workspaces 9 pass / 6 fail（缺登记权威），IPC 宿主 0 pass / 1 fail，内层 10 fail（新通道不存在、probe 缺 server/grant、picker 立即返回且没有放行）；原始 `step3-red.log` / `step3-ipc-red.log`。既有真源测试中的新打开动作改为显式登记，新增 SSE 目录过滤、tab 先于登记、检疫第二道闸和 HOME/状态/远端顺序用例；IPC 子例使用生产 handlers/tracker/listener，native 与 Electron 是隔离替身，不能代替 G0。

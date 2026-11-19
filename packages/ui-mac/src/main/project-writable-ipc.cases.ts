@@ -1,0 +1,233 @@
+// Same production handlers / truth tracker / spawnLocalServer listener. Electron UI and native
+// issuance are the narrow substitutes; actual kernel issuance is independently measured by G0/V2.
+import { afterEach, beforeEach, expect, mock, test } from "bun:test"
+import { EventEmitter } from "node:events"
+import { mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs"
+import { homedir } from "node:os"
+import { join } from "node:path"
+import { mockElectron } from "../../test-component/electron-mock"
+import type { WorkspaceWriteGrantCommand, WorkspaceWriteProbeCommand } from "./workspace-write-probe"
+
+const handlers = new Map<string, (...args: unknown[]) => unknown>()
+const events = new EventEmitter()
+const logs: string[] = []
+const issues: Array<{ cls: string; directory: string; pid: number }> = []
+const root = join(process.env.CODEPUPPY_TEST_REAL_HOME ?? homedir(), ".cache/alpha-orch/2026-11-19/impl-project-writable")
+mkdirSync(root, { recursive: true })
+let run = ""
+let selected: string[] = []
+let issueMode: "ok" | "throw" | "task_name_for_pid" | "task_info" | "issue" = "ok"
+let probeOutcome: "writable" | "denied" | "unknown" = "denied"
+const changed: unknown[] = []
+
+mockElectron(() => ({
+  app: { isPackaged: false, getPath: () => run, getVersion: () => "0.0.0-test", on: events.on.bind(events), off: events.off.bind(events), once: events.once.bind(events) },
+  ipcMain: { handle: (channel: string, handler: (...args: unknown[]) => unknown) => handlers.set(channel, handler), on: () => {} },
+  utilityProcess: { fork: () => { throw new Error("unexpected fork") } },
+  BrowserWindow: class {},
+  dialog: { showOpenDialog: async () => ({ canceled: selected.length === 0, filePaths: selected }) },
+}))
+mock.module("./windows", () => ({ createMainWindow: () => {}, getPinchZoomEnabled: () => false, setPinchZoomEnabled: () => {}, setTitlebar: () => {}, updateTitlebar: () => {} }))
+mock.module("./store", () => ({ getStore: () => ({ get: () => null, set: () => {}, delete: () => {}, clear: () => {} }) }))
+mock.module("./logging", () => ({ getLogger: () => ({ log: (line: unknown) => { logs.push(String(line)) }, warn: () => {}, error: () => {} }), write: () => {}, rotateServerLogs: () => {} }))
+const fenceModule = await import("./process-fence-apply")
+mock.module("./process-fence-apply", () => ({ ...fenceModule, loadFenceAddon: () => ({
+  issueFileExtensionToProcess: (cls: string, directory: string, pid: number) => {
+    issues.push({ cls, directory, pid })
+    if (issueMode === "throw") throw new Error("do not expose native exception text")
+    if (issueMode !== "ok") return { token: null, step: issueMode, errno: 5 }
+    return { token: "test-memory-only" }
+  },
+}) }))
+mock.module("./codepuppy-keychain-backend", () => ({ keychainBackend: () => ({ isEncryptionAvailable: () => true, encryptString: (value: string) => Buffer.from(value), decryptString: (value: Buffer) => value.toString() }) }))
+
+const { registerIpcHandlers } = await import("./ipc")
+const { bootFenceWorkspaceTruth } = await import("./process-fence-workspaces")
+const { spawnLocalServer } = await import("./server")
+const { creditDanglingSweepForSpawn, resetDanglingSweepLatchForTests } = await import("./dangling-sweep-latch")
+const { WORKSPACE_WRITE_EXTENSION_CLASS } = await import("./process-fence-profile")
+const { createWriteGrantRequester } = await import("./workspace-write-probe")
+
+class Child extends EventEmitter {
+  pid = 12345
+  stdout = new EventEmitter()
+  stderr = new EventEmitter()
+  grants: WorkspaceWriteGrantCommand[] = []
+  probes: WorkspaceWriteProbeCommand[] = []
+  grantMode: "ok" | "failed" | "hold" | "throw" = "ok"
+  postMessage(message: { type: string }) {
+    if (message.type === "start") queueMicrotask(() => this.emit("message", { type: "ready" }))
+    if (message.type === "grant-write") {
+      this.grants.push(message as WorkspaceWriteGrantCommand)
+      if (this.grantMode === "throw") throw new Error("test-memory-only must not reach diagnostics")
+      if (this.grantMode !== "hold") queueMicrotask(() => this.reply(this.grantMode === "ok" ? "granted" : "failed"))
+    }
+    if (message.type === "write-probe") {
+      this.probes.push(message as WorkspaceWriteProbeCommand)
+      const id = (message as WorkspaceWriteProbeCommand).id
+      queueMicrotask(() => this.emit("message", { type: "write-probe-result", id, outcome: probeOutcome }))
+    }
+    if (message.type === "stop") this.kill()
+  }
+  reply(outcome: "granted" | "failed") { this.emit("message", { type: "grant-write-result", id: this.grants.at(-1)!.id, outcome, ...(outcome === "failed" ? { detail: "consume errno=1" } : {}) }) }
+  kill() { this.emit("exit", 0) }
+}
+
+let child: Child
+let listener: Awaited<ReturnType<typeof spawnLocalServer>>["listener"]
+let tracker: ReturnType<typeof bootFenceWorkspaceTruth>
+const request = (directory = join(run, "B"), server = "sidecar") => ({ server, directory })
+const invoke = (channel: string, input?: unknown) => {
+  const handler = handlers.get(channel)
+  if (!handler) throw new Error(`missing IPC ${channel}`)
+  return handler({ sender: { id: 1 } }, input)
+}
+const probe = (input = request()) => tracker.probeWrite(input, listener)
+const register = (input = request()) => tracker.userOpened.register(input)
+
+beforeEach(async () => {
+  run = mkdtempSync(join(root, "main-writable-"))
+  selected = []
+  process.env.CODEPUPPY_GLOBAL_DIR = join(run, "state")
+  issues.length = logs.length = changed.length = 0
+  issueMode = "ok"
+  probeOutcome = "denied"
+  for (const directory of ["home", "B", "C", "state", "user-data"]) mkdirSync(join(run, directory))
+  tracker = bootFenceWorkspaceTruth({
+    truthPath: join(run, "truth.json"), store: { tabs: undefined, recent: undefined, info: undefined },
+    fs: { readFileSync, writeFileSync, mkdirSync, renameSync, rmSync }, log: (line) => { logs.push(line) },
+    eligibility: { homeDir: join(run, "home"), appStateRoot: join(run, "state"), realpath: (path) => path, isDirectory: () => true },
+    onWritableChanged: (change) => { changed.push(change) },
+  })
+  resetDanglingSweepLatchForTests()
+  creditDanglingSweepForSpawn()
+  child = new Child()
+  const result = await spawnLocalServer("127.0.0.1", 43210, "test-not-a-credential", {
+    userDataPath: join(run, "user-data"), egressProxy: async () => ({ port: 59999 }),
+    planFence: () => ({ profile: "(version 1)(allow default)(deny file-write*)", addonPath: join(run, "test.node") }),
+    fork: (() => child) as never, healthCheck: async () => true,
+  })
+  listener = result.listener
+  await result.health.wait
+  registerIpcHandlers({ fenceWorkspaces: tracker, probeWorkspaceWrite: probe,
+    updater: { subscribe: () => () => {} },
+  } as unknown as Parameters<typeof registerIpcHandlers>[0])
+})
+
+afterEach(async () => { await listener?.stop(); events.removeAllListeners("will-quit") })
+
+test("probe never registers; untrusted extra open cannot grant; record IPC registers before its reply", async () => {
+  expect(await invoke("workspace-write-probe", { ...request(), open: true })).toMatchObject({ outcome: "denied", grant: "ineligible", reason: "not-opened-by-you" })
+  expect(issues).toEqual([])
+  expect(tracker.userOpened.has("sidecar", request().directory)).toBe(false)
+  expect(invoke("workspace-open-record", request())).toEqual({ recorded: true })
+  expect(tracker.userOpened.has("sidecar", request().directory)).toBe(true)
+  expect(await invoke("workspace-write-probe", request())).toMatchObject({ grant: "granted" })
+})
+
+test("remote and no-fence do not touch native or local probe; HOME reason remains independent of probe outcome", async () => {
+  register()
+  expect(await probe(request(undefined, "remote"))).toEqual({ outcome: "unknown", grant: "not-local" })
+  expect(await tracker.probeWrite(request(), { ...listener, fenced: false })).toEqual({ outcome: "unknown", grant: "no-fence" })
+  expect(child.probes).toHaveLength(0)
+  expect(issues).toEqual([])
+  probeOutcome = "unknown"
+  expect(await probe(request(join(run, "home")))).toMatchObject({ outcome: "unknown", grant: "ineligible", reason: "home-or-app-state" })
+})
+
+test("simultaneous same-directory requests coalesce; only success is remembered in this engine generation", async () => {
+  register()
+  child.grantMode = "hold"
+  const first = probe()
+  const second = probe()
+  expect(issues).toEqual([{ cls: WORKSPACE_WRITE_EXTENSION_CLASS, directory: request().directory, pid: child.pid }])
+  expect(child.grants).toHaveLength(1)
+  child.reply("granted")
+  expect((await first).grant).toBe("granted")
+  expect((await second).grant).toBe("granted")
+  await probe()
+  expect(child.grants).toHaveLength(1)
+})
+
+test("native exceptions and every typed issue failure return grant-failed even if probe is unknown; retry can recover", async () => {
+  register()
+  probeOutcome = "unknown"
+  for (const mode of ["throw", "task_name_for_pid", "task_info", "issue"] as const) {
+    issueMode = mode
+    expect(await probe()).toMatchObject({ outcome: "unknown", grant: "failed", reason: "grant-failed" })
+  }
+  issueMode = "ok"
+  probeOutcome = "writable"
+  expect(await probe()).toEqual({ outcome: "writable", grant: "granted" })
+  expect(changed).toEqual([request(), request()])
+  expect(logs.join("\n")).not.toContain("test-memory-only")
+  expect(logs.join("\n")).not.toContain("do not expose native exception text")
+})
+
+test("consume failure/post exception can retry; child exit closes pending grant and never credits success", async () => {
+  register()
+  child.grantMode = "failed"
+  expect((await probe()).reason).toBe("grant-failed")
+  child.grantMode = "throw"
+  expect((await probe()).reason).toBe("grant-failed")
+  child.grantMode = "hold"
+  const pending = probe()
+  child.kill()
+  expect((await pending).reason).toBe("grant-failed")
+  expect((await probe()).reason).toBe("grant-failed")
+  expect(logs.join("\n")).not.toContain("test-memory-only")
+})
+
+test("picker including multiple directories registers and consumes before returning paths", async () => {
+  selected = [join(run, "B"), join(run, "C")]
+  expect(await invoke("open-directory-picker", { multiple: true })).toEqual(selected)
+  for (const directory of selected) expect(tracker.userOpened.has("sidecar", directory)).toBe(true)
+  expect(child.grants).toHaveLength(2)
+  expect(await probe()).toMatchObject({ grant: "granted" })
+  expect(child.grants).toHaveLength(2)
+})
+
+test("picker upper bound is 1 second; pending grant continues and later work joins it", async () => {
+  selected = [join(run, "B")]
+  child.grantMode = "hold"
+  const start = performance.now()
+  expect(await invoke("open-directory-picker")).toBe(selected[0])
+  expect(performance.now() - start).toBeGreaterThanOrEqual(950)
+  expect(performance.now() - start).toBeLessThan(1500)
+  const pending = probe()
+  expect(child.grants).toHaveLength(1)
+  child.reply("granted")
+  expect((await pending).grant).toBe("granted")
+})
+
+test("CODEPUPPY_OPEN_DIR follows the same registration/grant path; cancellation adds nothing", async () => {
+  const prior = process.env.CODEPUPPY_OPEN_DIR
+  try {
+    process.env.CODEPUPPY_OPEN_DIR = join(run, "B")
+    expect(await invoke("open-directory-picker")).toBe(join(run, "B"))
+    expect(child.grants).toHaveLength(1)
+  } finally {
+    if (prior === undefined) delete process.env.CODEPUPPY_OPEN_DIR
+    else process.env.CODEPUPPY_OPEN_DIR = prior
+  }
+  expect(await invoke("open-directory-picker")).toBeNull()
+  expect(tracker.userOpened.has("sidecar", join(run, "C"))).toBe(false)
+})
+
+test("bad IPC shapes fail closed; sidecar-originated record/issue commands have no reverse route", async () => {
+  for (const input of [null, "directory", {}, { server: "sidecar" }, { server: 3, directory: "/x" }]) {
+    expect(invoke("workspace-open-record", input)).toEqual({ recorded: false })
+    expect(await invoke("workspace-write-probe", input)).toMatchObject({ outcome: "unknown", grant: "ineligible" })
+  }
+  for (const type of ["workspace-open-record", "grant-write", "issue-write", "open-directory-picker"]) child.emit("message", { type, ...request() })
+  expect(issues).toEqual([])
+  expect(changed).toEqual([])
+  expect(tracker.userOpened.has("sidecar", request().directory)).toBe(false)
+})
+
+test("grant request book timeout is failed; no live sidecar is failed rather than ineligible", async () => {
+  const grants = createWriteGrantRequester(() => {})
+  expect((await grants.request("test-memory-only")).outcome).toBe("failed")
+  register()
+  expect(await tracker.probeWrite(request(), null)).toMatchObject({ outcome: "unknown", grant: "failed", reason: "grant-failed" })
+}, 10_000)

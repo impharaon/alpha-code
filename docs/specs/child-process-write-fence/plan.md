@@ -58,7 +58,7 @@ PLAN 阶段只提交本文件。下表和命令均为实施安排，不代表已
    - 按 [distribution.md](../../runbooks/distribution.md) 的 `build` / `package:mac` 路径本地打包：在 `packages/ui-mac` 用 `OPENCODE_CHANNEL=dev bun run build`，再以 `CODEPUPPY_SIGN=1`、签名身份哈希运行 `OPENCODE_CHANNEL=dev bun run package:mac --dir --publish never -c.mac.notarize=false -c.directories.output=<scratch>/packaged`。使用生产 hardened runtime、entitlements、fuses 和资源 `.node`；dev 只用于隔离身份及本地包，不冒充 prod release，不改发布源校验。签名日志先脱敏，结果只记录身份哈希、验证退出码、runtime flag、资源 buildId/摘要与 entitlements 比对，不打印身份名称。
    - 宿主从打包资源启动测试 main harness、生产 utilityProcess sidecar 和生产 `.node`，harness 的非产品接线只留测试中/临时包内。若需要给临时包加入 harness，完成修改后按同一签名规则重新签名再验证；不得用未签名修改后的包作证。
    - A 目录已在 W1，B/C 不在任一启动写根：sidecar 起子进程并等其 **exec 后 ready**；同一子进程在放行前写 B 失败；main 通过生产 `.node` 绑定 sidecar pid 签发，生产 sidecar 消费后，已有子进程和新子进程写 B 成功，C 仍 0 文件。另跑不消费对照，B/C 均 0 文件；覆盖自签矩阵和复制令牌跨进程失败，详见 V2。
-   - 入口命令：`cd packages/ui-mac && bun test src/main/process-fence-extension-packaged.test.ts`。记录每一臂实际文件清单、pid、ready/consume/write 的顺序和退出码。G0 任一必要臂失败即返回 `BLOCKED: design — G0 — <失败步骤与脱敏原文>`，不继续步骤 2，不改路线；不能把普通 C、Bun 或 `ELECTRON_RUN_AS_NODE` 的成功替代本闸。
+   - 入口命令：`cd packages/ui-mac && CODEPUPPY_TEST_SIGNED_FENCE=1 bun test src/main/process-fence-extension-packaged.test.ts`。记录每一臂实际文件清单、pid、ready/consume/write 的顺序和退出码。G0 任一必要臂失败即返回 `BLOCKED: design — G0 — <失败步骤与脱敏原文>`，不继续步骤 2，不改路线；不能把普通 C、Bun 或 `ELECTRON_RUN_AS_NODE` 的成功替代本闸。
 2. **固化底层防护与登记簿。** G0 过后扩充 `process-fence-profile.test.ts`、`process-fence-apply.test.ts` 和新 `main/process-fence-extension.test.ts` 宿主/`.cases.ts`；跑 V1/V2 全矩阵及路径语义负例。同步 X1 根登记和探针 `W1+X1`，运行检查组 A。新增检查先提交红测试，再提交实现，不在实现提交改掉红测试。
 3. **main 资格、真源与运行期放行。** 先加资格/真源和 IPC 的红用例；实现 workspaces、server、ipc、preload 及必要 index 接线；不改 `deep-link-queue.ts`，深链接只消费。新 `main/project-writable-ipc.test.ts` 起同名 `.cases.ts` 隔离 Electron mocks，实际调用生产 handlers、tracker 和 server 监听器。覆盖 picker 返回顺序、同时重复请求、超时/退出/异常、失败后成功通知、tab 先写后登记、检疫目录经 picker 正式登记、深链不能登记、远端不触达本机。运行检查组 B。
 4. **打开动作记录点，独立提交单元。** 依冻结设计 §4，在 M1 与 R1–R5 记录具体目标；renderer 唯一桥接 `recordWorkspaceOpen` 只由 R1–R5 调用并在导航/创建会话之前 await。不采样 `navigator.userActivation`，不使用入口键/草稿目录比较，probe 不登记。新增导航/选择调用点机器登记簿及结构检查，覆盖 P-15 的 record / consume 分类和记录函数的调用来源。
@@ -231,24 +231,24 @@ PLAN 阶段只提交本文件。下表和命令均为实施安排，不代表已
 - 同次 G0/V7：100 个独立目录签发至生产消费应答的 p50 **0.052042 ms**、p99 **0.112458 ms**（原始样本在 `g0-Lxlbnq/result.json`）；B 仅 existing.txt/new.txt、C 空；control/replay/selfIssue 均 0 越界文件，两个坏 profile 各 1。G0 与窗口副本 strict/deep 验签 exit 0、runtime=0x10000，身份哈希仍 **27D86FF5629B9296E616B333E798725A2E01B262**，窗口 signing.json/entitlements.log 已核。两副本注销 exit 0，按报告所有 main/engine/child pid signal 0 复核均已退出；无前台任务遗留。
 - 相关检查：ui-mac `bun typecheck` exit 0（`r4-ui-typecheck.log`）；`bun test --max-concurrency 2 src/main/gate-file-registry.test.ts src/main/project-writable-navigation.test.ts src/renderer/codepuppy-ui/workspace-writable-ui-census.test.ts` **30 pass / 0 fail**（`r4-related.log`）。只复用 ext 已核的 118/0 与 typecheck 0，r4 未改 ext，未重跑无关套件、gate 或 bin/check。
 
-### 最终 AC / 计数核对（spec v3 / r5）
+### 最终 AC / 计数核对（spec v3 / r6）
 
 | AC | 已有具名验据与命令结果 | 结论 |
 | --- | --- | --- |
-| AC-05 | `project-writable.engine.test.ts` host 1/0、inner 6/0（r3）；`bun test --max-concurrency 2 src/main/process-fence-extension-packaged.test.ts` host **1/0**、inner **3/0**（r5-window-final.log），M1/R1–R5、慢开、实际模型文件、无隐式 reload/换代；相关坏臂实红 | PASS |
-| AC-06 | 两个 UI 宿主与 census；r4 真 DOM 正常路径双钩子缺席、三句说明无按钮；`bun test --max-concurrency 2 src/main/process-fence-workspaces.test.ts src/main/gate-file-registry.test.ts src/main/project-writable-navigation.test.ts src/renderer/codepuppy-ui/workspace-writable-ui-census.test.ts` **46/0**（r5-related-final.log）；签名宿主同上 **1/0** | PASS |
-| AC-07 | V1/V2 extension host 1/0、inner 6/0（r2），签名 G0 50 臂/伪造/回放/坏 profile；backend SQL + 真实窗口 reload/中性点击不登记，观察中登记坏臂实际落盘；独立 main 深链队列交付和 tab 写回不登记、不进真源（上述相关命令 **46/0**，其中 workspaces **16/0**）；去真源过滤坏臂 **0/1**；签名宿主同上 **1/0** | PASS；交付不充当界面导航 |
-| AC-08 | main IPC inner 10、UI 三理由；r4 HOME、真实 task_name_for_pid 失败、真实请求簿超时均到 DOM 单句，模型目标写 0 | 签名宿主同上 **1/0**、inner **3/0**，v3 恢复出的改写目录实达 not-opened-by-you→M1 后同代同 renderer 可写；去 grant 坏臂独立 inner **2/1**，第三子例红；三种残余句全到 DOM 无按钮。PASS |
+| AC-05 | `bun test --max-concurrency 2 src/main/project-writable.engine.test.ts` host **1/0**、inner **9/0**（r6-optionals-green.log 同组）；`CODEPUPPY_TEST_SIGNED_FENCE=1 … bun test --max-concurrency 2 src/main/process-fence-extension-packaged.test.ts` host **1/0**、inner **3/0**（r6-signed-final.log），M1/R1–R5、慢开、实际模型文件、无隐式 reload/换代；延迟生产提交入口的顺序为组件证据，边界见 V3 行 | PASS |
+| AC-06 | 签名宿主同上 **1/0**：当前真实 DOM 正常路径双钩子缺席、三句说明无按钮；原 UI 宿主/census 证据继承。相关源码/登记检查 r6-related-final.log **109/0**，未重跑无改动的整套 UI | PASS |
+| AC-07 | V1/V2 extension host **1/0**、inner **6/0**（r6-harness-green.log）；签名 G0 自签 50 臂/回放/两个坏 profile；真实引擎 HOME/state/HOME-ancestor 重绑定红 **6/3**→绿 inner **9/0**，目标各由 1 个攻击文件→0，原 6 臂同过；main IPC inner **12/0**，签发中改路径丢 token、不入 ledger；main 深链不登记的 workspaces 用例在 **18/0** 中 | PASS |
+| AC-08 | signed host **1/0**、inner **3/0**：三个残余原因到 DOM、无按钮；恢复改写目录→M1 同代同 renderer 可写。`bun test --max-concurrency 2 src/main/project-writable-ipc.test.ts` host **1/0**、inner **12/0**，null sidecar 先判 HOME/未登记资格，默认 W1+unknown 不误称未打开（workspaces **18/0**） | PASS |
 
 下列是本 slice 的完整计数 / 登记变化（relay 行不重排、不计入本 lane）：
 
 | 位置 | 最终值 / 变化 |
 | --- | --- |
-| 新 gate 行 | extension host **1**（inner **6**）；project-writable IPC host **1**（inner **10**）；workspace-writable-core **14**；navigation **5**；ext display **7**；UI census **2**；project-writable engine host **1**（inner **6**）；G0/window packaged host **1**（inner 要求 **3/0**；不降钉） |
-| 既有 gate 计数 | workspaces **12→16**（r5 增加独立 main 深链不登记用例）；session-search **29→32**；automation-cloud-refusal **38→39** |
-| 同一新文件内的子计数演进 | core **10→14**；project-writable engine inner **3→6**；G0/window inner **1→3**（新增两个独立窗口判官） |
+| 新 gate 行 | extension host **1**（inner **6**）；project-writable IPC host **1**（inner **12**）；workspace-writable-core **14**；navigation **6**；ext display **7**；UI census **2**；project-writable engine host **1**（inner **9**）；G0/window packaged host opt-in **1**（inner **3/0**）；常规无开关自报 **0 pass / 1 skip**，登记 runner 精确核零并标本次未验证 |
+| 既有 gate 计数 | workspaces **12→18**（r5 深链、r6 canonical 身份与默认 W1）；gate registry **23→24**（签名 opt-in 条件判官）；session-search **29→32**；automation-cloud-refusal **38→39** |
+| 同一新文件内的子计数演进 | core **10→14**；project-writable engine inner **3→6→9**；IPC inner **10→12**；navigation **5→6**；G0/window inner **1→3**（新增两个独立窗口判官） |
 | 保持 | profile **26**、write-sites **12**、context-injection **43**、register-policy **68**、timeline host **12**/inner **124**、拒写 host **1**/inner **4**；其余既有相关宿主数不变 |
-| 机器登记 / 库存 | 两条 workspace probe write/remove 根 **W1→W1+X1**；导航调用点登记 **83**（r4 不改生产导航）；库存仍 **98**，write-denied **226 bytes**、write-refused **171 bytes**，由步骤 6 脚本生成 |
+| 机器登记 / 库存 | 两条 workspace probe write/remove 根 **W1→W1+X1**；导航调用点登记 **83**（r6 改为调用点键，分类不变）；库存 **98→97**，移除无 attach 点的 write-denied，write-refused **171 bytes**；现有库存脚本再生 |
 
 - 步骤 8：更新设计点名的架构 §2/§7/§8.2 及同文件受影响的判据表 §8.3、基线 I1；保留原始实测/U2 历史。基线补合同要求的 id/summary（原 kind=design 的 UI- 前缀，kind/status/路径不改）。G0 gate 行已追加。相对链接检查 `python3 scripts/check-doc-links.py <上述两文档> <plan.md>` exit 0，18 条均可解析；本仓无 scripts/docs_index.py，未造索引脚本。
 - 文档合同按解析出的 Alpha profile 跑，只读全 profile 结果见 `r4-docs-contract.json`；再对同一 checker 的 check_repo 入口核本 worktree，`r4-docs-own.json`。本轮两份事实文档无剩余 findings；plan 的 INT-safety unknown-id 在 `0869f67a48` 已存在，未擅改派单身份。其余既有文档/其它未提供 checkout 的错误不在本 lane 修复，不把该检查报全绿。
@@ -296,3 +296,14 @@ PLAN 阶段只提交本文件。下表和命令均为实施安排，不代表已
 
 - 小项实现：默认 W1 路径复用 codepuppyUserWorkspaceDir，在 boot 初始化资格时与受信真源共同走同一 canonical 谓词，不经新增记录点、不扩大启动 W1 之外的范围；unknown 探针不再给它 not-opened-by-you。移除无 attach 点的 WRITE_DENIED_ID/NOTE 与 registry 项，库存脚本再生 **98→97**，neutral stop 保留。导航 key 改为 file/owner/callee-or-reference/ordinal，83 个 AST 点逐项保留原分类，去掉函数体/参数源码的偶然耦合；新抗无关编辑例与原坏臂均在，navigation **6/0**。
 - 小项检查：r6-optionals-green.log 的 workspaces **18/0**、navigation **6/0**、IPC host **1/0**（inner **12/0**）、engine host **1/0**（inner **9/0**），合计 **26/0**；ext display/context/policy **118/0**（r6-ext-green.log），ext typecheck exit 0。ui-mac typecheck 首次发现本次重复导入了 server 已有的 realpathSync，删除重复导入后 r6-ui-typecheck-final.log exit **0**；无更改红测试来通过。
+
+- r6 最终签名命令（cwd packages/ui-mac）：`CODEPUPPY_TEST_SIGNED_FENCE=1 CODEPUPPY_PACKAGED_APP=<r1 已验收签名源包> bun test --max-concurrency 2 src/main/process-fence-extension-packaged.test.ts`，**本轮显式签名仅这一次，host 1/0、inner 3/0、exit 0，82.22 s**（review/r6-signed-final.log）。原生实现未改，G0 复用已验收 native/base；窗口仍重建当前 renderer/preload 和当前生产 main registry/IPC/server 后重签自己的副本，不以旧 main 接线替代修正验据。源包从未是安装版。
+- 签名小结果现位于 worktree/node_modules/.cache/project-writable/results：`signed-fence-7IACOU-result.json` / `signed-fence-7IACOU-window-window-result.json` / 两份 signing.json。strict/deep verify **0**、runtime **0x10000**、生产 entitlements 通过；身份仅哈希 **27D86FF5629B9296E616B333E798725A2E01B262**。G0 main **5308**、grant engine **5327**、已有 child **5349**；B=existing.txt/new.txt、C 空，control engine **5360** B/C 空，replay engine **5352** 被拒，selfIssue engine **5371** 的 50 臂 C 空；坏 file-only **5438** 的 C/generic.txt、no-deny **5454** 的 C/file.txt 各 1，helper/正常 engine exit 0。ready→issue→consume→已有/新 child 写的实际顺序和写脚本退出码保留在 result.events；不是以错误码代替落盘判官。100 次往返新样本 p50 **0.058500 ms** / p99 **0.109792 ms**。
+- 窗口 main **5533**、engine **5599**、app exit **0**、24 个输入全可信、show=false；M1/R1–R5、慢开、两重载防伪、三句残余与恢复→picker 后续全过。AC-08 picker 前后 renderer **5634**、engine **5599**、loads **5→5**，目标从 0 文件变为仅 window-restored-after.txt。两个 app 注销 exit 0；host 的 finally 已删除自己的 signed-fence 子树和 app 副本，根只剩 review/results。当前结果 JSON 的 **140** 个报告 PID 逐个 signal 0 均已退出。
+- 三软链最终绿结果（results/project-writable.engine-Gx5BhP-events.json）：HOME **2661→2706**、state **2706→2735**、HOME-ancestor **2735→2761**；先证目标不在任何写根，再 probe/实际模型写，全部目标零新文件、ineligible/home-or-app-state，生产 formatter 的冻结单句匹配。对照红结果中的同三目标各 1 个攻击文件（review/r6-engine-red-events.json）；不是空白 fake grant 或 mock 文件系统证明。主进程 null sidecar 的未登记/HOME 原因与签发中改路径不发 token/retry 用例均在 inner 12。
+- 最后相关检查（r6-related-final.log）：profile、plan、wiring、write-sites、gate registry、local-gate-parity 合计 **109/0**，23.94 s；未跑真实全 gate/bin/check。前面的 harness **33/0 + G0 skip**、小项 **26/0**、ext **118/0** 及两包 typecheck 0 共同覆盖本轮改动；数字已按上述最终表同步。
+- r6 文件范围补充：scripts/assert-gate-files.sh / gate-file-registry.test.ts 为 Minor 2 必要同调用链，增加具名 opt-in 与自报零条判官；distribution.md 为其发版操作入口。其余都在已许可文件/测试和文档中，没有 core/relay/秘密读保护变更。Minor 4 只纠正证据表述；默认目录、死注入项、83 个登记键三个接受小项均已处理。
+- 非阻塞观察：profile resolver 仍 **exit 2 / no_match**（review/r6-profile-resolution.log），继承 r5 的落点缺失，无法重跑全 profile 文档合同，交编排者；不冒充文档合同通过。相关测试日志打印 official-connector-resources.ts:356 的 orphan cleanup warning，测试全绿；仅记录日志观察、不调查或改该模块。timeline 的 5000 ms / 单跑 6.25 s、12/0 既有去向不变，本轮未改该文件或期限。
+
+- 无开关实跑 `env -u CODEPUPPY_TEST_SIGNED_FENCE bun test --max-concurrency 2 src/main/process-fence-extension-packaged.test.ts`：**0 pass / 1 skip / 0 fail，exit 0，22 ms**（review/r6-g0-default.log），没有创建临时树；常规门的同一行为由 registry 的 fixture 判官要求 =0 并标未验证。
+- 文档/差异收口：四份相关文档相对链接 **21 条全部通过**（review/r6-doc-links.log），git diff --check exit 0。核对人 Codex / GPT-6，自验；本轮审查项全部完成，既定 six record points / frozen API 形状不重开。只提交，由编排者 review / push / PR / merge；未读安装版数据/凭据、未发布/公证/上传，OPTIONAL 无未做项。

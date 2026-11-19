@@ -155,3 +155,5 @@ PLAN 阶段只提交本文件。下表和命令均为实施安排，不代表已
 - 2026-11-19 · r2 计划同步：冻结输入 `9d3601c2aa` / reviewed_sha `8370b2fa23`。步骤 4 改为 M1/R1–R5 具体动作登记；去掉深链修改、激活采样、入口键与草稿比较；probe 无 open。追加 sidebar/search/automation 同调用链落点及 P-15 结构登记簿、V4 慢响应和自动化历史臂、V5 重载点击与诚实重载臂。步骤 1 的 native/profile/grant 与 G0 验收不变；V2 旧接口和 flags=0x1 允许返回令牌，仍要求所有臂集合外 0 落盘。
 
 - 2026-11-19 · 步骤 2 红证据：profile/write-sites/extension 宿主共 37 pass / 2 fail，exit 1（`step2-red.log`）；两条失败均为 X1 缺写根登记。新 V1/V2 子用例 6 pass / 0 fail：50 臂按冻结 V2 判定，C 0 文件；file-only/generic 与 no-deny/file 各落 1 文件；不绑定回放落盘使同一判官变红。测试辅助源码只在 native/test，update-file 与无绑定签发来自既有 r1/r2 真实实验，不加入生产导出。
+
+- 2026-11-19 · 步骤 2 完成：红提交 `74c49e192f` 后补 X1 根 ID、探针 write/remove 的 `W1+X1` 两行及根说明。检查组 A（7 个宿主）67 pass / 0 fail，新增宿主含 6 子例；登记同步后 write-sites 12 pass / 0 fail，ui-mac `bun typecheck` exit 0。证据 `step2-green.log` / `step2-ledger.log` / `step2-typecheck.log`；V2 原始 `extension-*/result.json` 保留实际 pid/errno/落盘。新增 gate 行 extension host=1，既有 profile=26、write-sites=12 不变；三个已知坏臂均实跑并落盘，没有修改生产 native 合同或扩大测试替身的证明范围。

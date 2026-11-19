@@ -41,7 +41,7 @@ import { isAbsolute, join, relative, resolve, sep } from "node:path"
 export const WORKSPACE_WRITE_EXTENSION_CLASS = "app.codepuppy.workspace-write"
 
 /**
- * 可写集的行 id(勘破 §8.2 的编号,W9 在那一轮就不存在)。process-fence-write-sites.tsv 的每一条
+ * 可写集的行 id(勘破 §8.2 的 W 行及运行期 X1,W9 在那一轮就不存在)。process-fence-write-sites.tsv 的每一条
  * 写盘登记都要点名它落在哪一行之下;点不出来的写入点 = 新的写入根 = 要么加行(带实测)要么改代码。
  */
 export const WRITABLE_ROOT_IDS = {
@@ -63,6 +63,7 @@ export const WRITABLE_ROOT_IDS = {
   W17: "<HOME>/Library/Caches/bun(dev-only)",
   W18: "<HOME>/.cache/bun(dev-only)",
   W19: "<HOME>/.zcompdump*(regex):加了也不生效(§8.5 坑二),留着如实",
+  X1: "用户本次应用运行亲手打开的项目(主进程绑定当前引擎签发的私有类扩展)",
 } as const
 export type WritableRootId = keyof typeof WRITABLE_ROOT_IDS
 

@@ -163,7 +163,7 @@ export const signatureOf = (s: { file: string; api: string; firstArg: string }) 
 
 /**
  * 根列的合法取值:
- *   · 一个或多个 W-id(`W2+W6+W1`):写落在可写集这些行之下;
+ *   · 一个或多个 W/X-id(`W2+W6+W1` / `W1+X1`):写落在可写集这些行之下;
  *   · `arg`:路径来自调用方(通用 helper),具体根登记在调用方那一行;
  *   · `main-only`:这处代码住在 sidecar 的 import 闭包里,但**只有 main 进程会执行到它**(今天唯一的例子是
  *     codepuppy-environment.ts 的 initCodePuppyEnvironment 拓扑创建;server.ts:380 明写 sidecar 从不 init 它)。
@@ -210,7 +210,7 @@ export function renderLedger(sites: WriteSite[], previous: LedgerRow[]): string 
   for (const s of sites) if (!unique.has(signatureOf(s))) unique.set(signatureOf(s), s)
   const header = [
     "# REQ-159 (`#1321`) · AC3 —— alpha 在 sidecar 进程里的写盘调用点登记簿。",
-    "# 四列 TAB:<文件> <fs API> <第一个实参(归一化)> <根>。根 = process-fence-profile.ts 的 W-id(可 `+` 连多个)、",
+    "# 四列 TAB:<文件> <fs API> <第一个实参(归一化)> <根>。根 = process-fence-profile.ts 的 W/X-id(可 `+` 连多个)、",
     "# `arg`(路径来自调用方;具体根登记在调用方那一行)、或 `main-only`(在闭包里但只有 main 进程执行到,见 isValidRoot)。",
     "# 新行由 --write 生成时根填 TODO —— 评审必须改成真根;",
     "# 点不出根 = 新的写入根 = 要么给可写集加行(带实测),要么改代码。判据:process-fence-write-sites.test.ts。",

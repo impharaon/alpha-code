@@ -14,6 +14,7 @@ import { describe, expect, mock, test } from "bun:test"
 import type { RoutePurpose } from "@codepuppy/contracts-consumer"
 
 const BASE = "https://cloud.invalid"
+let activeBase = BASE
 const JOB = "job_test_0001"
 
 // 假 token 把 purpose 编进字符串,让假服务端能施行 claims.purpose === action。
@@ -23,7 +24,7 @@ const purposeOf = (bearer: string): string => bearer.replace(/^Bearer tok\./, ""
 /** 每次 getAccessToken 请求的 purpose(按调用序)。用于判「有没有多要 / 要了通配」。 */
 const requested: RoutePurpose[] = []
 /** 每次出网请求的 (path, bearer, body)。body 用于断言重试的每一发带的是**同一个**幂等键。 */
-const wire: Array<{ path: string; bearer: string; body?: string; headers?: Record<string, string> }> = []
+const wire: Array<{ path: string; origin: string; bearer: string; body?: string; headers?: Record<string, string> }> = []
 /** #400 注入的瞬态失败队列:每元素消费一次 —— "network" 抛(超时/断连形态),数字回该 HTTP 状态,
  *  对象回该状态 + 指定 body(#940:平台分类拒绝形态 `{ error, code }`)。 */
 const transientFailures: Array<"network" | "reset" | "dns" | number | { status: number; body: string }> = []
@@ -42,7 +43,7 @@ mock.module("./codepuppy-auth", () => ({
   getAuthIdentityTag: () => identityTag,
 }))
 mock.module("./codepuppy-endpoints", () => ({
-  resolveEndpoints: () => ({ cloud: BASE }),
+  resolveEndpoints: () => ({ cloud: activeBase }),
 }))
 /** #1551 AC7:main 侧 warn 日志行(按调用序)。 */
 const warns: string[] = []
@@ -140,7 +141,7 @@ globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) =>
   const path = url.pathname
   const headers = (init?.headers as Record<string, string> | undefined) ?? {}
   const bearer = String(headers.authorization ?? "")
-  wire.push({ path: path === "/v1/cloud/account-status" ? path + url.search : path, bearer, headers, ...(typeof init?.body === "string" ? { body: init.body } : {}) })
+  wire.push({ path: path === "/v1/cloud/account-status" ? path + url.search : path, origin: url.origin, bearer, headers, ...(typeof init?.body === "string" ? { body: init.body } : {}) })
   duringFetch?.()
   const injected = transientFailures.shift()
   if (injected === "network") throw new TypeError("fetch failed (injected transient)")
@@ -434,4 +435,22 @@ describe("alpha-code#1686 form preflight: GET /v1/cloud/account-status", () => {
       accountStatusBody = JSON.stringify(accountStatusFixture.value)
     }
   })
+})
+
+// alpha-work#159 R1-01: only the destination changes between attempts of the same intent.
+for (const upload of [false, true]) test(`relay route: ${upload ? "explicit upload" : "dispatch"} reselects the destination on retry without changing body, key or credential`, async () => {
+  wire.length = 0
+  transientFailures.push("network")
+  duringFetch = () => { activeBase = "https://direct.invalid" }
+  try {
+    expect(await (upload ? jobs.dispatchExplicitCloudUpload(UPLOAD_INPUT) : jobs.dispatchCloudJob(DISPATCH_ENVELOPE))).toMatchObject({ job_id: JOB })
+    expect(wire.map((item) => item.origin)).toEqual([BASE, "https://direct.invalid"])
+    expect(wire[1]!.body).toBe(wire[0]!.body)
+    expect(new Set(dispatchKeys()).size).toBe(1)
+    expect(wire.map((item) => item.bearer)).toEqual(["Bearer tok.cloud.dispatch", "Bearer tok.cloud.dispatch"])
+    if (upload) expect(wire[1]!.headers?.["x-codepuppy-upload-consent"]).toBe(UPLOAD_INPUT.uploadConsent)
+  } finally {
+    activeBase = BASE
+    duringFetch = undefined
+  }
 })

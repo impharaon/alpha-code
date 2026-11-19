@@ -12,6 +12,6 @@ test("cloud job action-selection cases run green in an isolated child process", 
   const output = `${result.stdout.toString()}${result.stderr.toString()}`
   if (result.exitCode !== 0) throw new Error(output)
   // `#1572`:请求出口的网络失败带 netLayer 且日志带层名(13 → 14);alpha-web#283 AC6 上传同意请求头(14 → 15)。
-  expect(output).toContain(" 18 pass")
+  expect(output).toContain(" 20 pass")
   expect(output).toContain(" 0 fail")
 })

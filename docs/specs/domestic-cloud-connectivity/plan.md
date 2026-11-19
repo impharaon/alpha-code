@@ -15,7 +15,7 @@ last_reviewed: 2026-11-19
 ## 桌面跟随中继入口并自动回直连
 
 - 依据：[alpha-work#159](https://github.com/impharaon/alpha-work/issues/159) 的 alpha-code 切片；[规格 v1](https://github.com/impharaon/alpha-work/blob/f5ad266ef294aa23e448be1e0b7ed6728346e21b/docs/specs/domestic-cloud-connectivity/spec.md) AC-01、AC-02；[设计 @ 815d27adb080b42a237a862046eb73c9b5d528cf](https://github.com/impharaon/alpha-work/blob/815d27adb080b42a237a862046eb73c9b5d528cf/docs/specs/domestic-cloud-connectivity/design.md) §2.3 F-04～F-12、§4.3、§5、§6、§8、§10（R1-01/02/05 修正，R1-03 按收窄处置）。实现起点 `alpha-code@4f61fde5de427925876149d7d1e8769f7ceb0e29`；已读 R1 审查缓存 `~/.cache/alpha-orch/2026-11-19/review-relay/out.log`。
-- 核对：待编排器核对；首次实现提交从续派 brief 的 `Phase:` 行填入计划提交、核对者/模型与结论。
+- 核对：IMPLEMENT — plan 654ffc4d39 · orchestrator / Claude Fable 5.2 · plan check passed（AC-01/AC-02 与设计 §8 每项证据均有会失败的证明；文件在允许范围内；未重述或改变决定）。冻结设计已并入 alpha-work main `2ead902`，技术内容相对所链 `815d27adb0` 不变。
 
 本节只安排该仓的实施与证明，接口和失败边界以所链设计为准。PLAN 提交只含本文件，不改代码、不运行测试；后续实现也不承担 DNS、nginx、Worker、alpha-web 配置、发版或生产探针。更新源、安装包、GitHub raw 属另一切片。并行围栏项目的 `process-fence-*.ts`、`sidecar.ts`、`ipc.ts`、`workspace-write-probe.ts` 不改；`server.ts` / 必需的 `index.ts` 接线只落端点与出网目的地。
 

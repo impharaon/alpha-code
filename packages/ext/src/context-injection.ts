@@ -508,7 +508,7 @@ const POLICY_DENY_DETAIL: Record<PolicyDenyReason, string | undefined> = Object.
 })
 export const policyDenyId = (reason: PolicyDenyReason) => `tool-failure.policy-deny.${reason}`
 
-function toolFailureFragments(): (TemplateFragment | WrapperFragment)[] {
+function toolFailureFragments(): (TemplateFragment | TextFragment | WrapperFragment)[] {
   return [
     ...Object.entries(WEB_SEARCH_FAILURE_PATTERNS).map(([kind, [label, http]]) =>
       http

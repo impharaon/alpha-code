@@ -1,121 +1,133 @@
-// REQ-159 (`#1322`) AC2 —— 「当前工作区写得进去吗」的四态状态机:探针未答 / 可写 / 未知 ⇒ 无标记;
-// 只有引擎明确回报 denied ⇒ 标记。还有三条纪律:沙箱没装不探、按引擎代分开缓存、同代同目录只探一次。
-import { describe, expect, test } from "bun:test"
-import type { WorkspaceWriteProbeResult } from "../../preload/types"
+import { expect, test } from "bun:test"
+import type { WorkspaceWriteProbeRequest, WorkspaceWriteProbeResult } from "../../preload/types"
 import { createWorkspaceWritableTracker } from "./workspace-writable-core"
 
-const deferredProbe = () => {
-  const calls: string[] = []
-  const pending = new Map<string, (result: WorkspaceWriteProbeResult) => void>()
-  const rejecters = new Map<string, (error: unknown) => void>()
-  const probe = (directory: string) => {
-    calls.push(directory)
-    return new Promise<WorkspaceWriteProbeResult>((resolve, reject) => {
-      pending.set(directory, resolve)
-      rejecters.set(directory, reject)
-    })
+const on = (directory = "/B", server = "sidecar", generation = 1, sandbox = true) => ({ generation, server, directory, sandbox })
+const deferred = () => {
+  const calls: WorkspaceWriteProbeRequest[] = []
+  const replies: Array<{ resolve: (result: WorkspaceWriteProbeResult) => void; reject: (error: Error) => void }> = []
+  const probe = (input: WorkspaceWriteProbeRequest) => {
+    calls.push(input)
+    return new Promise<WorkspaceWriteProbeResult>((resolve, reject) => { replies.push({ resolve, reject }) })
   }
-  const answer = async (directory: string, outcome: WorkspaceWriteProbeResult["outcome"]) => {
-    pending.get(directory)!({ outcome })
-    await Promise.resolve()
-    await Promise.resolve()
-  }
-  const fail = async (directory: string) => {
-    rejecters.get(directory)!(new Error("bridge down"))
-    await Promise.resolve()
-    await Promise.resolve()
-  }
-  return { probe, calls, answer, fail }
+  const answer = async (index: number, result: WorkspaceWriteProbeResult) => { replies[index]!.resolve(result); await Promise.resolve(); await Promise.resolve() }
+  return { calls, replies, probe, answer }
 }
+const denied: WorkspaceWriteProbeResult = { outcome: "denied", grant: "ineligible", reason: "not-opened-by-you" }
+const writable: WorkspaceWriteProbeResult = { outcome: "writable", grant: "granted" }
 
-const on = (directory: string | undefined, generation: number | undefined = 1, sandbox = true) => ({ generation, directory, sandbox })
+test("probe consumes the exact server/directory, once per generation; pending and writable have no marker", async () => {
+  const fake = deferred()
+  const tracker = createWorkspaceWritableTracker(fake.probe)
+  tracker.observe(on())
+  tracker.observe(on())
+  expect(fake.calls).toEqual([{ server: "sidecar", directory: "/B" }])
+  expect(tracker.answer(on())).toBe("pending")
+  expect(tracker.readonly(on())).toBe(false)
+  await fake.answer(0, writable)
+  expect(tracker.answer(on())).toBe("writable")
+  expect(tracker.readonly(on())).toBe(false)
+})
 
-describe("workspace writable tracker —— 四态与标记", () => {
-  test("集合外工作区:探针答 denied ⇒ 只读;答之前是 pending(无标记)", async () => {
-    const fake = deferredProbe()
-    const tracker = createWorkspaceWritableTracker(fake.probe)
-    tracker.observe(on("/ws/outside"))
-    expect(tracker.answer(on("/ws/outside"))).toBe("pending")
-    expect(tracker.readonly(on("/ws/outside"))).toBe(false)
-    await fake.answer("/ws/outside", "denied")
-    expect(tracker.answer(on("/ws/outside"))).toBe("denied")
-    expect(tracker.readonly(on("/ws/outside"))).toBe(true)
-  })
+test("cache separates servers and generations even for an identical directory", async () => {
+  const fake = deferred()
+  const tracker = createWorkspaceWritableTracker(fake.probe)
+  for (const observation of [on(), on("/B", "remote"), on("/B", "sidecar", 2)]) tracker.observe(observation)
+  expect(fake.calls).toEqual([{ server: "sidecar", directory: "/B" }, { server: "remote", directory: "/B" }, { server: "sidecar", directory: "/B" }])
+  await fake.answer(0, denied)
+  await fake.answer(1, { outcome: "unknown", grant: "not-local" })
+  await fake.answer(2, writable)
+  expect(tracker.readonly(on())).toBe(true)
+  expect(tracker.readonly(on("/B", "remote"))).toBe(false)
+  expect(tracker.readonly(on("/B", "sidecar", 2))).toBe(false)
+})
 
-  test("集合内工作区:探针答 writable ⇒ 无标记;答 unknown / 探针出错 ⇒ 同样无标记(未知 ≠ 只读)", async () => {
-    const fake = deferredProbe()
-    const tracker = createWorkspaceWritableTracker(fake.probe)
-    tracker.observe(on("/ws/inside"))
-    tracker.observe(on("/ws/odd"))
-    tracker.observe(on("/ws/broken"))
-    await fake.answer("/ws/inside", "writable")
-    await fake.answer("/ws/odd", "unknown")
-    await fake.fail("/ws/broken")
-    expect(tracker.answer(on("/ws/inside"))).toBe("writable")
-    expect(tracker.answer(on("/ws/odd"))).toBe("unknown")
-    expect(tracker.answer(on("/ws/broken"))).toBe("unknown")
-    for (const dir of ["/ws/inside", "/ws/odd", "/ws/broken"]) expect(tracker.readonly(on(dir)), dir).toBe(false)
-  })
+test("the single marker predicate requires a known reason and a non-writable outcome", async () => {
+  const fake = deferred()
+  const tracker = createWorkspaceWritableTracker(fake.probe)
+  const results: WorkspaceWriteProbeResult[] = [denied, { outcome: "unknown", grant: "failed", reason: "grant-failed" }, { outcome: "denied", grant: "granted" }, { outcome: "unknown", grant: "no-fence" }, { ...denied, outcome: "writable" }]
+  for (const [i, result] of results.entries()) {
+    tracker.observe(on(`/B${i}`))
+    await fake.answer(i, result)
+    expect(tracker.readonly(on(`/B${i}`))).toBe(i < 2)
+    expect(tracker.result(on(`/B${i}`))).toEqual(result)
+  }
+})
 
-  test("形状不对的应答(outcome 不是三种之一)按 unknown 收,不抛、不标", async () => {
-    const tracker = createWorkspaceWritableTracker(() => Promise.resolve({ outcome: "yes" } as unknown as WorkspaceWriteProbeResult))
-    tracker.observe(on("/ws/a"))
-    await Promise.resolve()
-    await Promise.resolve()
-    expect(tracker.answer(on("/ws/a"))).toBe("unknown")
-  })
+test("absent sandbox/generation/server/directory never probes", () => {
+  const fake = deferred()
+  const tracker = createWorkspaceWritableTracker(fake.probe)
+  for (const observation of [{ ...on(), generation: undefined }, { ...on(), server: undefined }, { ...on(), directory: undefined }, on("", "sidecar"), on("/B", "", 1), on("/B", "sidecar", 1, false)]) {
+    tracker.observe(observation)
+    expect(tracker.answer(observation)).toBe("unknown")
+    expect(tracker.readonly(observation)).toBe(false)
+  }
+  expect(fake.calls).toEqual([])
+})
 
-  test("沙箱没装 / 引擎不在 / 没有目录 ⇒ 不探(探针一次都不调),答 unknown", () => {
-    const fake = deferredProbe()
-    const tracker = createWorkspaceWritableTracker(fake.probe)
-    tracker.observe(on("/ws/a", 1, false))
-    // 显式写对象:`on()` 的默认参数会把显式 undefined 换成 1(JS 默认参语义),那不是这一格要测的形状
-    tracker.observe({ generation: undefined, directory: "/ws/a", sandbox: true })
-    tracker.observe(on(undefined, 1, true))
-    tracker.observe(on("", 1, true))
-    expect(fake.calls).toEqual([])
-    expect(tracker.answer(on("/ws/a", 1, false))).toBe("unknown")
-    expect(tracker.readonly(on("/ws/a", 1, false))).toBe(false)
-  })
+test("eligibility notification evicts a denial in the same generation and a fresh observation asks immediately", async () => {
+  const fake = deferred()
+  const tracker = createWorkspaceWritableTracker(fake.probe)
+  tracker.observe(on())
+  await fake.answer(0, denied)
+  tracker.invalidate({ server: "sidecar", directory: "/B" })
+  tracker.observe(on())
+  expect(fake.calls).toHaveLength(2)
+  await fake.answer(1, writable)
+  expect(tracker.readonly(on())).toBe(false)
+})
 
-  test("同代同目录只探一次;换代之后同一目录重新探,旧代的 denied 不带到新代", async () => {
-    const fake = deferredProbe()
-    const tracker = createWorkspaceWritableTracker(fake.probe)
-    tracker.observe(on("/ws/a", 1))
-    tracker.observe(on("/ws/a", 1))
-    tracker.observe(on("/ws/a", 1))
-    expect(fake.calls).toEqual(["/ws/a"])
-    await fake.answer("/ws/a", "denied")
-    expect(tracker.readonly(on("/ws/a", 1))).toBe(true)
-    // respawn ⇒ 新代:可写集重新取并集,答案必须重问
-    expect(tracker.readonly(on("/ws/a", 2))).toBe(false)
-    expect(tracker.answer(on("/ws/a", 2))).toBe("unknown")
-    tracker.observe(on("/ws/a", 2))
-    expect(fake.calls).toEqual(["/ws/a", "/ws/a"])
-    await fake.answer("/ws/a", "writable")
-    expect(tracker.readonly(on("/ws/a", 2))).toBe(false)
-    expect(tracker.readonly(on("/ws/a", 1))).toBe(true)
-  })
+test("late pending answer cannot overwrite the new request after notification", async () => {
+  const fake = deferred()
+  const tracker = createWorkspaceWritableTracker(fake.probe)
+  tracker.observe(on())
+  tracker.invalidate({ server: "sidecar", directory: "/B" })
+  tracker.observe(on())
+  await fake.answer(1, writable)
+  await fake.answer(0, denied)
+  expect(tracker.result(on())).toEqual(writable)
+})
 
-  test("onChange 在 pending 与落定时各响一次;reset 之后迟到的应答不得复活旧格", async () => {
-    const fake = deferredProbe()
-    let changes = 0
-    const tracker = createWorkspaceWritableTracker(fake.probe, () => changes++)
-    tracker.observe(on("/ws/a"))
-    expect(changes).toBe(1)
-    tracker.reset()
-    expect(changes).toBe(2)
-    await fake.answer("/ws/a", "denied")
-    expect(changes).toBe(2)
-    expect(tracker.answer(on("/ws/a"))).toBe("unknown")
-    expect(tracker.readonly(on("/ws/a"))).toBe(false)
-  })
+test("notification is scoped to its server/directory; reset rejects even a late reply for the same key", async () => {
+  const fake = deferred()
+  const tracker = createWorkspaceWritableTracker(fake.probe)
+  tracker.observe(on())
+  tracker.invalidate({ server: "remote", directory: "/B" })
+  tracker.observe(on())
+  expect(fake.calls).toHaveLength(1)
+  tracker.reset()
+  tracker.observe(on())
+  await fake.answer(0, denied)
+  expect(tracker.answer(on())).toBe("pending")
+  await fake.answer(1, writable)
+  expect(tracker.result(on())).toEqual(writable)
+})
 
-  test("探针同步抛出(桥坏了)⇒ 该格 unknown,不炸调用方", () => {
-    const tracker = createWorkspaceWritableTracker(() => {
-      throw new Error("no bridge")
-    })
-    expect(() => tracker.observe(on("/ws/a"))).not.toThrow()
-    expect(tracker.answer(on("/ws/a"))).toBe("unknown")
-  })
+test("IPC rejection is grant-failed even when its write outcome is unknown; notification permits recovery", async () => {
+  const fake = deferred()
+  const tracker = createWorkspaceWritableTracker(fake.probe)
+  tracker.observe(on())
+  fake.replies[0]!.reject(new Error("bridge down"))
+  await Promise.resolve()
+  await Promise.resolve()
+  expect(tracker.result(on())).toEqual({ outcome: "unknown", grant: "failed", reason: "grant-failed" })
+  expect(tracker.readonly(on())).toBe(true)
+  tracker.invalidate({ server: "sidecar", directory: "/B" })
+  tracker.observe(on())
+  await fake.answer(1, writable)
+  expect(tracker.result(on())).toEqual(writable)
+})
+
+test("synchronous probe throw is also grant-failed and never escapes to a host", () => {
+  const tracker = createWorkspaceWritableTracker(() => { throw new Error("bridge down") })
+  expect(() => tracker.observe(on())).not.toThrow()
+  expect(tracker.result(on())?.reason).toBe("grant-failed")
+})
+
+test("invalid replies cannot crash or manufacture a writable answer", async () => {
+  const tracker = createWorkspaceWritableTracker(async () => ({ outcome: "yes" }) as unknown as WorkspaceWriteProbeResult)
+  tracker.observe(on())
+  await Promise.resolve()
+  expect(tracker.answer(on())).toBe("unknown")
+  expect(tracker.result(on())?.grant).toBe("failed")
 })

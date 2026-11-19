@@ -150,6 +150,7 @@ export function CodePuppyHome(props: {
                   onOpenChange={setWsOpen}
                   onSelect={setChosenWs}
                   readonly={wsReadonly.readonly()}
+                  readonlyReason={wsReadonly.reason()}
                 />
               }
               onNeedWorkspace={() => {

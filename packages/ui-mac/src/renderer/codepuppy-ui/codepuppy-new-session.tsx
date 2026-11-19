@@ -116,6 +116,7 @@ export function CodePuppyNewSession(props: {
       onOpenChange={setWsOpen}
       onSelect={selectWorkspace}
       readonly={wsReadonly.readonly()}
+      readonlyReason={wsReadonly.reason()}
     />
   )
 

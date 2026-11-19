@@ -12,7 +12,8 @@ import { projectLabel } from "../sidebar/route"
 import { isDefaultWorkspaceDir, workspaceDisplayName } from "./default-workspace"
 import type { CodePuppyProject } from "../sidebar/use-projects"
 import { pushToast } from "./Toast"
-import { recordWorkspaceOpen } from "./workspace-writable"
+import type { WorkspaceWriteProbeResult } from "../../preload/types"
+import { recordWorkspaceOpen, workspaceReadonlyMessage } from "./workspace-writable"
 import { t } from "../i18n"
 
 /** 数据层已剔除垃圾 worktree,这里只再挡一次 "/"(与首页此前的过滤同义)。 */
@@ -43,6 +44,7 @@ export function CodePuppyWorkspaceChip(props: {
    * 判据钩子:`data-codepuppy-workspace-chip-readonly`。
    */
   readonly?: boolean
+  readonlyReason?: WorkspaceWriteProbeResult["reason"]
 }) {
   const onDoc = (e: MouseEvent) => {
     const target = e.target as Element | null
@@ -74,7 +76,7 @@ export function CodePuppyWorkspaceChip(props: {
             <span
               class="a-ws-chip-readonly"
               data-codepuppy-workspace-chip-readonly
-              title={`${t("codepuppy.workspace.readonlyTitle")}\n${t("codepuppy.workspace.readonlyBody")}`}
+              title={workspaceReadonlyMessage(props.readonlyReason)}
             >
               <LockIcon />
               {t("codepuppy.workspace.readonly")}

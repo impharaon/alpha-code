@@ -2,6 +2,7 @@
 // records an open; route resolution, restore, reload, SSE and probe observation never do.
 import { createEffect, createSignal, type Accessor } from "solid-js"
 import type { WorkspaceWriteProbeRequest, WorkspaceWriteProbeResult } from "../../preload/types"
+import { t } from "../i18n"
 import { sandboxApplied, sandboxGeneration } from "./sandbox-state"
 import { createWorkspaceWritableTracker, type WorkspaceWritableProbe, type WorkspaceWritableTracker } from "./workspace-writable-core"
 
@@ -44,4 +45,11 @@ export function resetWorkspaceWritableForTests(probe?: WorkspaceWritableProbe) {
   unsubscribe = undefined
   tracker = createWorkspaceWritableTracker(probe ?? bridgeProbe, () => setVersion((v) => v + 1))
   setVersion((v) => v + 1)
+}
+
+
+export function workspaceReadonlyMessage(reason: WorkspaceWriteProbeResult["reason"]): string | undefined {
+  if (reason === "home-or-app-state") return t("codepuppy.workspace.readonlyHome")
+  if (reason === "not-opened-by-you") return t("codepuppy.workspace.readonlyNotOpenedByYou")
+  if (reason === "grant-failed") return t("codepuppy.workspace.readonlyGrantFailed")
 }

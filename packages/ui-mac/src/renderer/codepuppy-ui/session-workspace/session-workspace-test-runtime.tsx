@@ -32,8 +32,6 @@ const [workspaceReadonly, setWorkspaceReadonly] = createSignal(false)
 const [workspaceReadonlyReason, setWorkspaceReadonlyReason] = createSignal<"home-or-app-state" | "not-opened-by-you" | "grant-failed">("not-opened-by-you")
 // `#1588` AC4:时间线同一个等待信号(生产由 dock 发布、workspace 持信号)。
 const [turnWait, setTurnWait] = createSignal<TimelineTurnWait | undefined>(undefined)
-/** `#1322`:只读弹层「重新启动」按钮真的调了宿主给的 relaunch 几次。 */
-export const relaunchCalls: number[] = []
 
 export { render }
 
@@ -80,7 +78,6 @@ export function SessionWorkspaceHarness() {
       terminalChannel={() => terminalChannel}
       workspaceReadonly={workspaceReadonly}
       workspaceReadonlyReason={workspaceReadonlyReason}
-      relaunch={() => void relaunchCalls.push(1)}
       turnWait={turnWait}
     />
   )
@@ -162,6 +159,5 @@ export function resetSessionWorkspaceSnapshot() {
   setReviewCount(undefined)
   setTerminalRunning(false)
   setWorkspaceReadonly(false)
-  relaunchCalls.splice(0)
   terminalChannelCalls.splice(0)
 }

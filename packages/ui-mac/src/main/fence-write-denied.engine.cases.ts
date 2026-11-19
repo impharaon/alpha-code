@@ -1,14 +1,8 @@
-// 0.2.4 验收第三轮 Unit 1 跟进(REQ-159 披露 I4);0.2.5 收窄:沙箱拒写时模型读到直说的一句、停下来告诉用户,不去绕。
-//
-// 真引擎(嵌入式 OpenCode 2)+ 生产三档注入 + 真 ext + 本机模型桩,**整个测试进程**在生产渲染的围栏 profile 下(真 .node、真 seatbelt):
-// 可写集 = 启动时的项目目录;网络只放行模型桩所在的回环端口(profile 的出网端口给它)。不在可写集里的已有目录 = 引擎启动之后才
-// 打开的项目。两种说法:
-//   · 写文件工具在本会话项目里被拒(EPERM、目标已知且在项目内)⇒「重启 Code Puppy 之前写不进这个项目,停下来告诉用户」;
-//   · 证据不足以归因(shell 的 `Operation not permitted` 不知道写的是哪儿;写文件工具的目标在本会话项目之外)⇒ 中性的一句
-//     「系统拒绝了这次写入,停下来告诉用户」,不说重启能解决。
-// 对照:启动时就在可写集里的项目,同样的写照常落盘、不接任何一句。界面不另加东西(顶栏既有的「只读」不在本文件判)。
-//
-// 本文件由同名 `.test.ts` 宿主起独立 `bun test` 子进程跑(围栏装上就不能拆,只能关在它自己的进程里)。darwin-only。
+// Real engine + production fence/native addon + ext + local scripted model. This child has no main
+// open-register channel. A refusal therefore gets a neutral stop instruction even for a known
+// project-relative target; EPERM can also come from filesystem/privacy rules. A separately owned
+// outside directory calibrates actual refusal, and the initial writable project is the positive arm.
+// Run only through fence-write-denied.engine.test.ts; sandbox installation is process-lifetime.
 import { afterAll, beforeAll, describe, expect, test } from "bun:test"
 import fs from "node:fs"
 import path from "node:path"
@@ -85,7 +79,7 @@ describeDarwin("沙箱拒写:模型读到直说的一句并停下(真引擎 + �
   }
 
   test("未放行目录内的写文件工具被拒:没有 main 登记事实时只要求模型停下,不声称原因或重启能解决", async () => {
-    // 不在本代可写集里的已有目录 = 引擎启动之后才打开的项目(可写集在启动那一刻定死)
+    // This target has not received a runtime grant in this fixture.
     const project = scratch
     const result = await turn(project, "write", { path: "a.txt", content: "x" })
     expect(fs.existsSync(path.join(project, "a.txt"))).toBe(false)

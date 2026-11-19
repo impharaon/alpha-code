@@ -16,6 +16,8 @@ import {
 import { Portal } from "solid-js/web"
 import { CodePuppyBoundary } from "../codepuppy-boundary"
 import "../session-rail/rail-empty.css"
+import type { WorkspaceWriteProbeResult } from "../../../preload/types"
+import { workspaceReadonlyMessage } from "../workspace-writable"
 import { t } from "../../i18n"
 import { rovingKey, rovingTabIndex } from "../roving-focus"
 import { topbarTitleHost } from "../shell-chrome-state"
@@ -137,11 +139,11 @@ function LockIcon() {
 /**
  * REQ-159 `#1322`(AC2):当前工作区**写不进去**时的只读胶囊 + 弹层。只读是工作区状态不是会话状态,
  * 所以是状态胶囊之后的另一枚胶囊,不是第三态。出现条件只认 `readonly()`(宿主经 workspace-writable 投影:
- * 只有被围栏的引擎明确回报写被拒才为 true;未答 / 可写 / 未知都是 false —— 未知 ≠ 只读)。
- * 悬停与点击都能开弹层;Esc / 再点 / 失焦关。弹层唯一的动作「重新启动」走宿主给的 relaunch(main 既有能力)。
+ * main 的 reason 已知且探针不是 writable 才为 true)。
+ * 悬停与点击打开单句说明;Esc / 再点 / 失焦关闭,没有操作按钮。
  * 判据钩子:`data-codepuppy-workspace-readonly`(设计稿 2026-09-10-req159-sandbox-disclosure §3.2)。
  */
-function WorkspaceReadonlyPill(props: { readonly: Accessor<boolean>; relaunch?: () => void }) {
+function WorkspaceReadonlyPill(props: { readonly: Accessor<boolean>; reason?: Accessor<WorkspaceWriteProbeResult["reason"]> }) {
   const [open, setOpen] = createSignal(false)
   const [hover, setHover] = createSignal(false)
   const visible = () => open() || hover()
@@ -189,19 +191,7 @@ function WorkspaceReadonlyPill(props: { readonly: Accessor<boolean>; relaunch?: 
             aria-describedby={READONLY_PILL_ID}
             onKeyDown={onKey}
           >
-            <b>{t("codepuppy.workspace.readonlyTitle")}</b>
-            <p>{t("codepuppy.workspace.readonlyBody")}</p>
-            <p class="a-swk-readonly-footnote">{t("codepuppy.workspace.readonlyFootnote")}</p>
-            <div class="a-swk-readonly-actions">
-              <button
-                type="button"
-                class="a-swk-readonly-restart"
-                data-codepuppy-workspace-readonly-restart
-                onClick={() => props.relaunch?.()}
-              >
-                {t("codepuppy.workspace.readonlyRestart")}
-              </button>
-            </div>
+            <p>{workspaceReadonlyMessage(props.reason?.())}</p>
           </div>
         </Show>
       </span>
@@ -217,7 +207,7 @@ function WorkspaceTopbar(props: {
   toggleTerminal: () => void
   /** REQ-159:当前工作区写不进去(引擎明确回报);缺席 = 无标记。 */
   workspaceReadonly?: Accessor<boolean>
-  relaunch?: () => void
+  workspaceReadonlyReason?: Accessor<WorkspaceWriteProbeResult["reason"]>
   /** `#1588` AC4:时间线同一个等待信号(审批 / 提问);缺席 = 只按运行 / 重试说。 */
   turnWait?: Accessor<TimelineTurnWait | undefined>
 }) {
@@ -258,7 +248,7 @@ function WorkspaceTopbar(props: {
           </span>
         )}
       </Show>
-      <WorkspaceReadonlyPill readonly={() => props.workspaceReadonly?.() === true} relaunch={props.relaunch} />
+      <WorkspaceReadonlyPill readonly={() => props.workspaceReadonly?.() === true} reason={props.workspaceReadonlyReason} />
     </>
   )
   // With the window chrome mounted (production) the breadcrumb renders into its top-bar slot and the
@@ -653,8 +643,7 @@ export function SessionWorkspaceShell(props: {
   sandbox?: Accessor<boolean>
   /** REQ-159 `#1322`:当前工作区写不进去(被围栏的引擎明确回报);缺席 = 无只读胶囊。 */
   workspaceReadonly?: Accessor<boolean>
-  /** 只读弹层唯一的动作:重新启动(main 既有 relaunch);缺席 = 按钮无动作(harness)。 */
-  relaunch?: () => void
+  workspaceReadonlyReason?: Accessor<WorkspaceWriteProbeResult["reason"]>
   /** `#1588` AC4:回合在等你(审批 / 提问)—— 与时间线同一个信号,顶栏状态据此说;缺席 = 只按运行 / 重试说。 */
   turnWait?: Accessor<TimelineTurnWait | undefined>
 }) {
@@ -675,7 +664,7 @@ export function SessionWorkspaceShell(props: {
           toggleRail={right.toggleRail}
           toggleTerminal={right.toggleTerminal}
           workspaceReadonly={props.workspaceReadonly}
-          relaunch={props.relaunch}
+          workspaceReadonlyReason={props.workspaceReadonlyReason}
           turnWait={props.turnWait}
         />
         <section

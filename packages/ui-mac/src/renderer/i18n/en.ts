@@ -1954,11 +1954,9 @@ export const dict = {
   "codepuppy.terminal.sandboxHoverBody":
     "The terminal can only write inside the current project and Code Puppy's own folders. Steps in your shell config that write caches to your home folder (completion caches, for example) are blocked silently — completion may feel slow or stop working. Settings that don't write files (aliases, prompt, PATH) work as usual. Network access works the same way: the assistant and the terminal can only reach registered addresses through Code Puppy's egress gate; anything else is refused and logged. Code Puppy's own traffic (model catalog, sign-in, update checks) is outside this sandbox and connects as before.",
   "codepuppy.workspace.readonly": "Read-only",
-  "codepuppy.workspace.readonlyTitle": "This project can't be written to right now",
-  "codepuppy.workspace.readonlyBody":
-    "The sandbox fixed which projects can be written to when Code Puppy started; this one was opened later — you can open and read it, but neither the assistant nor the terminal can change its files. Restart Code Puppy and it will be included.",
-  "codepuppy.workspace.readonlyFootnote": "Projects that can be written to normally don't show this badge.",
-  "codepuppy.workspace.readonlyRestart": "Restart Code Puppy",
+  "codepuppy.workspace.readonlyHome": "Your home folder and Code Puppy's own data folder can't be written as a whole project — open a specific folder inside instead.",
+  "codepuppy.workspace.readonlyNotOpenedByYou": "This folder wasn't opened by you in Code Puppy, so the assistant won't change it — choose it with \"Open project\" to make it writable.",
+  "codepuppy.workspace.readonlyGrantFailed": "This folder can't be written to right now; it will be writable the next time you open Code Puppy.",
   "codepuppy.review.panelLabel": "Review panel",
   "codepuppy.review.title": "Changes this turn",
   "codepuppy.review.viewMode": "Diff view",

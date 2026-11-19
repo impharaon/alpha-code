@@ -224,7 +224,7 @@ export function CodePuppySessionWorkspace(props: { projects: CodePuppyProjectsAp
           terminalChannel={terminalChannel}
           sandbox={sandboxApplied}
           workspaceReadonly={workspaceReadonly.readonly}
-          relaunch={() => window.api.relaunch()}
+          workspaceReadonlyReason={workspaceReadonly.reason}
           turnWait={turnWait}
         />
       </SessionLiveProvider>

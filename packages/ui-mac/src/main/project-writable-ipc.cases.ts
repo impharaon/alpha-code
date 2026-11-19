@@ -96,7 +96,7 @@ beforeEach(async () => {
   issueMode = "ok"
   probeOutcome = "denied"
   afterProbe = undefined
-  for (const directory of ["home", "B", "C", "state", "user-data"]) mkdirSync(join(run, directory))
+  for (const directory of ["home", "A", "A/inside", "B", "C", "state", "user-data"]) mkdirSync(join(run, directory))
   mkdirSync(process.env.CODEPUPPY_GLOBAL_DIR, { recursive: true })
   tracker = bootFenceWorkspaceTruth({
     truthPath: join(run, "truth.json"), store: { tabs: undefined, recent: undefined, info: undefined },
@@ -109,7 +109,8 @@ beforeEach(async () => {
   child = new Child()
   const result = await spawnLocalServer("127.0.0.1", 43210, "test-not-a-credential", {
     userDataPath: join(run, "user-data"), egressProxy: async () => ({ port: 59999 }),
-    planFence: () => ({ profile: "(version 1)(allow default)(deny file-write*)", addonPath: join(run, "test.node") }),
+    // A is this generation's only start-time root (the renderer's block form); B and C lie outside it.
+    planFence: () => ({ profile: `(version 1)\n(allow default)\n(deny file-write*)\n(allow file-write*\n  (subpath "${join(run, "A")}") ; W1\n)\n`, addonPath: join(run, "test.node") }),
     fork: (() => child) as never, healthCheck: async () => true,
   })
   listener = result.listener
@@ -169,9 +170,17 @@ test("simultaneous same-directory requests coalesce; only success is remembered 
 })
 
 test("already writable inside a start-time root needs no native issue or consume", async () => {
-  register()
+  register(request(join(run, "A", "inside")))
   probeOutcome = "writable"
-  expect(await probe()).toMatchObject({ outcome: "writable", grant: "granted" })
+  expect(await probe(request(join(run, "A", "inside")))).toMatchObject({ outcome: "writable", grant: "granted" })
+  expect(issues).toHaveLength(0)
+  expect(child.grants).toHaveLength(0)
+})
+
+test("inside a start-time root a denied probe never issues: the answer is grant-failed", async () => {
+  register(request(join(run, "A", "inside")))
+  probeOutcome = "denied"
+  expect(await probe(request(join(run, "A", "inside")))).toEqual({ outcome: "denied", grant: "failed", reason: "grant-failed" })
   expect(issues).toHaveLength(0)
   expect(child.grants).toHaveLength(0)
 })

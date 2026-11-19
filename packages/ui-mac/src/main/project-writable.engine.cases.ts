@@ -3,7 +3,7 @@
 import { afterAll, beforeAll, expect, test, mock } from "bun:test"
 import { fork } from "node:child_process"
 import { EventEmitter } from "node:events"
-import { existsSync, mkdirSync, readFileSync, readdirSync, realpathSync, renameSync, rmSync, writeFileSync } from "node:fs"
+import { existsSync, mkdirSync, readFileSync, readdirSync, realpathSync, renameSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { buildFenceAddon } from "../../scripts/build-fence-addon"
 import { mockElectron } from "../../test-component/electron-mock"
@@ -37,12 +37,29 @@ mock.module("./codepuppy-keychain-backend", () => ({ keychainBackend: () => ({ i
 const actualFence = await import("./process-fence-apply")
 const loadOriginalFenceAddon = actualFence.loadFenceAddon
 let nativeIssues = 0
+// Models fenced code that can write the registered path's parent: the path is a symlink to the target at the
+// instant of issue and the real directory again before main's post-issue comparison. Real issue, real kernel.
+let raceSwap: { directory: string; target: string } | undefined
 mock.module("./process-fence-apply", () => ({ ...actualFence, loadFenceAddon: (path: string) => {
   const original = loadOriginalFenceAddon(path)
   const wrapped = Object.create(original)
-  Object.defineProperty(wrapped, "issueFileExtensionToProcess", { value: (...args: Parameters<typeof original.issueFileExtensionToProcess>) => { nativeIssues++; return original.issueFileExtensionToProcess(...args) } })
+  Object.defineProperty(wrapped, "issueFileExtensionToProcess", { value: (...args: Parameters<typeof original.issueFileExtensionToProcess>) => {
+    nativeIssues++
+    const swap = raceSwap && args[1] === raceSwap.directory ? raceSwap : undefined
+    if (!swap) return original.issueFileExtensionToProcess(...args)
+    renameSync(swap.directory, `${swap.directory}-real`)
+    symlinkSync(swap.target, swap.directory)
+    try {
+      return original.issueFileExtensionToProcess(...args)
+    } finally {
+      rmSync(swap.directory)
+      renameSync(`${swap.directory}-real`, swap.directory)
+    }
+  } })
   return wrapped
 } }))
+// Directories whose fenced probe answers "denied" at main's seam (the probe saw a symlink to a protected target).
+const forcedDenied = new Set<string>()
 const { spawnLocalServer } = await import("./server")
 const { registerIpcHandlers } = await import("./ipc")
 const { bootFenceWorkspaceTruth, writeWorkspaceTruth, readWorkspaceTruthOrThrow } = await import("./process-fence-workspaces")
@@ -138,6 +155,10 @@ async function boot() {
       peer.postMessage = (message) => {
         if (message.type === "grant-write") record("grant-sent", { id: message.id, pid: child.pid })
         if (message.type === "write-probe") record("probe-sent", { directory: message.directory })
+        if (message.type === "write-probe" && forcedDenied.has(message.directory!)) {
+          queueMicrotask(() => peer.emit("message", { type: "write-probe-result", id: message.id, outcome: "denied", detail: "test: probe answered at main's seam" }))
+          return
+        }
         child.send(message)
       }
       peer.kill = () => { child.kill("SIGKILL") }
@@ -205,6 +226,47 @@ test("a project inside start-time W1 writes without any native issue call", asyn
   record("already-writable", { issued: nativeIssues - before, result, landed })
   expect(landed).toBe(true)
   expect(nativeIssues).toBe(before)
+})
+
+test("inside a writable root nothing is issued even when the probe says denied and the path is toggled around the issue", async () => {
+  const directory = join(A, "race-project"), target = join(run, "race-target")
+  mkdirSync(directory); mkdirSync(target)
+  expect(invoke("workspace-open-record", { server: "sidecar", directory })).toEqual({ recorded: true })
+  expect((await listener.probeWrite(target)).outcome).toBe("denied") // the stand-in is outside every root of this generation
+  forcedDenied.add(directory)
+  raceSwap = { directory, target }
+  const before = nativeIssues
+  const result = await tracker.probeWrite({ server: "sidecar", directory }, listener)
+  forcedDenied.delete(directory)
+  raceSwap = undefined
+  await write(target, "race-escape.txt")
+  setLocale("zh")
+  const files = readdirSync(target)
+  record("race-inside-root", { issued: nativeIssues - before, result, files })
+  expect(nativeIssues - before).toBe(0)
+  expect(files).toEqual([])
+  expect(result).toMatchObject({ outcome: "denied", grant: "failed", reason: "grant-failed" })
+  expect(workspaceReadonlyMessage(result.reason)).toBe("这个文件夹暂时写不进去，下次打开 Code Puppy 后即可写入。")
+})
+
+test("outside every writable root exactly one issue makes it writable; a directory inside that grant is not issued again", async () => {
+  const outside = join(run, "outside-project"), inner = join(outside, "inner")
+  mkdirSync(inner, { recursive: true })
+  expect(invoke("workspace-open-record", { server: "sidecar", directory: outside })).toEqual({ recorded: true })
+  const before = nativeIssues
+  const granted = await tracker.probeWrite({ server: "sidecar", directory: outside }, listener)
+  await write(outside, "outside.txt")
+  const issuedOutside = nativeIssues - before
+  expect(invoke("workspace-open-record", { server: "sidecar", directory: inner })).toEqual({ recorded: true })
+  const nested = await tracker.probeWrite({ server: "sidecar", directory: inner }, listener)
+  await write(inner, "inner.txt")
+  const issuedTotal = nativeIssues - before
+  record("outside-root", { issuedOutside, issuedTotal, granted, nested, files: readdirSync(outside), innerFiles: readdirSync(inner) })
+  expect(granted).toMatchObject({ outcome: "writable", grant: "granted" })
+  expect(nested).toMatchObject({ outcome: "writable", grant: "granted" })
+  expect(issuedOutside).toBe(1)
+  expect(issuedTotal).toBe(1)
+  expect(existsSync(join(outside, "outside.txt")) && existsSync(join(inner, "inner.txt"))).toBe(true)
 })
 
 test("main grants the same running engine; existing PTY/MCP and first model/new PTY write B, C stays empty and another streamed answer is not cancelled", async () => {

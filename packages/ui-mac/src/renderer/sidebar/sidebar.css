@@ -679,7 +679,8 @@ svg[viewBox="0 0 720.002 129.001"] {
   margin: 0 0 4px;
   font-size: var(--a-text-base);
   font-weight: var(--a-weight-semibold);
-  line-height: var(--a-leading-normal);
+  /* Frame #home-empty: the title keeps the heading leading (1.2, base.css); 1.55 put it ~2.3px lower. */
+  line-height: var(--a-leading-tight);
   color: var(--a-text);
 }
 .codepuppy-sidebar-empty-projects p {

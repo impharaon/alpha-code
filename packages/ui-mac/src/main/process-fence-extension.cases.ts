@@ -2,7 +2,6 @@ import { beforeAll, expect, test } from "bun:test"
 import { spawnSync } from "node:child_process"
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, symlinkSync, writeFileSync } from "node:fs"
 import { createRequire } from "node:module"
-import { homedir } from "node:os"
 import { dirname, join } from "node:path"
 import { buildFenceAddon } from "../../scripts/build-fence-addon"
 import { renderProcessFenceProfile, resolveEngineRoots, WORKSPACE_WRITE_EXTENSION_CLASS } from "./process-fence-profile"
@@ -22,9 +21,7 @@ type Report = {
 
 const require = createRequire(import.meta.url)
 const fixture = join(import.meta.dir, "../../native/codepuppy-fence/test")
-const root = join(process.env.CODEPUPPY_TEST_REAL_HOME ?? homedir(), ".cache/alpha-orch/2026-11-19/impl-project-writable")
-mkdirSync(root, { recursive: true })
-const run = mkdtempSync(join(root, "extension-"))
+const run = process.env.CODEPUPPY_EXTENSION_TEST_ROOT!
 const A = join(run, "A")
 const B = join(run, "Project")
 const C = join(run, "C")

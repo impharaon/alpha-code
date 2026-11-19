@@ -1,7 +1,6 @@
 // P-15's executable call-site inventory. This is a structural security check, not UI evidence.
 import { expect, test } from "bun:test"
 import { mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs"
-import { homedir } from "node:os"
 import { join, resolve } from "node:path"
 import ts from "typescript"
 
@@ -65,12 +64,10 @@ const ledger = readFileSync(join(repo, "scripts/project-writable-navigation.tsv"
   return { key: fields.slice(0, 4).join("\t"), kind: fields[4]! }
 })
 const missing = (sites: Site[], registered: Site[]) => sites.filter((site) => !registered.some((entry) => entry.key === site.key))
-// Keep the exact observed AST inventory available for review; never rewrite the checked-in ledger in a test.
-const scratch = join(process.env.CODEPUPPY_TEST_REAL_HOME ?? homedir(), ".cache/alpha-orch/2026-11-19/impl-project-writable")
-mkdirSync(scratch, { recursive: true })
-writeFileSync(join(scratch, "navigation-sites.json"), JSON.stringify(actual, null, 2))
-
 test("P-15: every navigation/selection and record-function reference is classified, with no stale/duplicate rows", () => {
+  const scratch = join(repo, "node_modules/.cache/project-writable/results")
+  mkdirSync(scratch, { recursive: true })
+  writeFileSync(join(scratch, "navigation-sites.json"), JSON.stringify(actual, null, 2))
   expect(actual.length).toBeGreaterThan(30)
   expect(missing(actual, ledger)).toEqual([])
   expect(missing(ledger, actual)).toEqual([])

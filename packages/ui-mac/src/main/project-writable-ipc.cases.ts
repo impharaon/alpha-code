@@ -3,7 +3,6 @@
 import { afterEach, beforeEach, expect, mock, test } from "bun:test"
 import { EventEmitter } from "node:events"
 import { mkdirSync, mkdtempSync, readFileSync, realpathSync, renameSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
-import { homedir } from "node:os"
 import { join } from "node:path"
 import { mockElectron } from "../../test-component/electron-mock"
 import type { WorkspaceWriteGrantCommand, WorkspaceWriteProbeCommand } from "./workspace-write-probe"
@@ -12,8 +11,7 @@ const handlers = new Map<string, (...args: unknown[]) => unknown>()
 const events = new EventEmitter()
 const logs: string[] = []
 const issues: Array<{ cls: string; directory: string; pid: number }> = []
-const root = join(process.env.CODEPUPPY_TEST_REAL_HOME ?? homedir(), ".cache/alpha-orch/2026-11-19/impl-project-writable")
-mkdirSync(root, { recursive: true })
+const root = process.env.CODEPUPPY_WRITABLE_IPC_ROOT!
 let run = ""
 let selected: string[] = []
 let issueMode: "ok" | "swap" | "throw" | "task_name_for_pid" | "task_info" | "issue" = "ok"
@@ -118,7 +116,7 @@ beforeEach(async () => {
   } as unknown as Parameters<typeof registerIpcHandlers>[0])
 })
 
-afterEach(async () => { await listener?.stop(); events.removeAllListeners("will-quit") })
+afterEach(async () => { await listener?.stop(); events.removeAllListeners("will-quit"); rmSync(run, { recursive: true, force: true }) })
 
 test("probe never registers; untrusted extra open cannot grant; record IPC registers before its reply", async () => {
   expect(await invoke("workspace-write-probe", { ...request(), open: true })).toMatchObject({ outcome: "denied", grant: "ineligible", reason: "not-opened-by-you" })

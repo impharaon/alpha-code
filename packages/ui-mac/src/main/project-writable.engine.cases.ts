@@ -4,7 +4,6 @@ import { afterAll, beforeAll, expect, test, mock } from "bun:test"
 import { fork } from "node:child_process"
 import { EventEmitter } from "node:events"
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, renameSync, rmSync, writeFileSync } from "node:fs"
-import { homedir } from "node:os"
 import { join } from "node:path"
 import { buildFenceAddon } from "../../scripts/build-fence-addon"
 import { mockElectron } from "../../test-component/electron-mock"
@@ -14,15 +13,12 @@ import { createWorkspaceWritableTracker } from "../renderer/codepuppy-ui/workspa
 import { workspaceReadonlyMessage } from "../renderer/codepuppy-ui/workspace-writable"
 import { setLocale } from "../renderer/i18n"
 
-const scratch = join(process.env.CODEPUPPY_TEST_REAL_HOME ?? homedir(), ".cache/alpha-orch/2026-11-19/impl-project-writable")
-mkdirSync(scratch, { recursive: true })
-const run = mkdtempSync(join(scratch, "engine-grant-"))
+const run = process.env.CODEPUPPY_WRITABLE_TEST_ROOT!
 const A = join(run, "A"), B = join(run, "B"), C = join(run, "C"), D = join(run, "D"), E = join(run, "rewritten")
 const install = join(run, "engine-install")
 const protectedHome = join(run, "protected", "home")
 const quote = (value: string) => `'${value.replace(/'/g, "'\\''")}'`
 const userData = join(run, "main-user-data")
-for (const directory of [A, B, C, D, E, install, protectedHome, join(install, "home"), userData, join(run, "state/env/dev")]) mkdirSync(directory, { recursive: true })
 const appEvents = new EventEmitter()
 const handlers = new Map<string, (...args: unknown[]) => unknown>()
 const log: string[] = []
@@ -69,12 +65,7 @@ let listener: Awaited<ReturnType<typeof spawnLocalServer>>["listener"]
 const childLogs: string[] = []
 const controller = new EventEmitter()
 const truthPath = join(run, "truth.json")
-writeWorkspaceTruth(truthPath, [A], { mkdirSync, writeFileSync, renameSync, rmSync })
-const tracker = bootFenceWorkspaceTruth({
-  truthPath, store: { tabs: [{ type: "draft", draftID: "a", server: "sidecar", directory: A }], recent: undefined, info: undefined }, fs: { readFileSync, writeFileSync, mkdirSync, renameSync, rmSync }, log: (line) => { log.push(line) },
-  eligibility: { homeDir: protectedHome, appStateRoot: join(run, "state"), realpath: realpathSync.native, isDirectory: (directory) => { try { return readdirSync(directory) !== undefined } catch { return false } } },
-  onWritableChanged: (change) => { record("changed", change); writable.invalidate(change); writable.observe(observation(change.directory)) },
-})
+let tracker: ReturnType<typeof bootFenceWorkspaceTruth>
 let generation = 1
 const observation = (directory: string) => ({ server: "sidecar", directory, generation, sandbox: true })
 const writable = createWorkspaceWritableTracker((input) => tracker.probeWrite(input, listener))
@@ -142,6 +133,14 @@ async function boot() {
 }
 
 beforeAll(async () => {
+  for (const directory of [A, B, C, D, E, install, protectedHome, join(install, "home"), userData, join(run, "state/env/dev")]) mkdirSync(directory, { recursive: true })
+  writeWorkspaceTruth(truthPath, [A], { mkdirSync, writeFileSync, renameSync, rmSync })
+  tracker = bootFenceWorkspaceTruth({
+    truthPath, store: { tabs: [{ type: "draft", draftID: "a", server: "sidecar", directory: A }], recent: undefined, info: undefined }, fs: { readFileSync, writeFileSync, mkdirSync, renameSync, rmSync }, log: (line) => { log.push(line) },
+    eligibility: { homeDir: protectedHome, appStateRoot: join(run, "state"), realpath: realpathSync.native, isDirectory: (directory) => { try { return readdirSync(directory) !== undefined } catch { return false } } },
+    onWritableChanged: (change) => { record("changed", change); writable.invalidate(change); writable.observe(observation(change.directory)) },
+  })
+
   process.env.CODEPUPPY_GLOBAL_DIR = join(run, "state/env/dev")
   addon = buildFenceAddon({ out: join(run, "codepuppy_fence.node"), buildId: `engine-grant-${Date.now()}` }).out
   await boot()

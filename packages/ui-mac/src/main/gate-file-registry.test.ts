@@ -302,6 +302,30 @@ describe("闸门文件登记簿完备性 (#647)", () => {
     expect(REGISTERED.length).toBeGreaterThanOrEqual(15)
   })
 
+  test("签名围栏发布条件:普通门要求宿主自报零条,显式启用才要求登记条数", () => {
+    const base = join(REPO_ROOT, "node_modules/.cache/project-writable")
+    mkdirSync(base, { recursive: true })
+    const fixture = mkdtempSync(join(base, "gate-release-"))
+    try {
+      mkdirSync(join(fixture, "scripts"))
+      cpSync(join(REPO_ROOT, "scripts/assert-gate-files.sh"), join(fixture, "scripts/assert-gate-files.sh"))
+      const rows = readFileSync(join(REPO_ROOT, "scripts/gate-files.tsv"), "utf8").split("\n").filter((line) => line && !line.startsWith("#"))
+      const release = rows.find((line) => line.includes("\tsrc/main/process-fence-extension-packaged.test.ts\t"))!
+      // Real registry rows; only the platform is removed to test the environment rule on every host OS.
+      writeFileSync(join(fixture, "scripts/gate-files.tsv"), [...rows.slice(0, 24), release.replace("[平台:darwin]", "")].join("\n") + "\n")
+      writeFileSync(join(fixture, "scripts/bun-test-floor.sh"), '#!/bin/bash\nprintf "%s\\t%s\\n" "$1" "$3" >> "$CALLS"\nif [ "$1" = "=0" ] && [ "${BAD_SELF_SKIP:-}" = "1" ]; then exit 1; fi\n')
+      for (const [enabled, bad, exit, expected] of [["", "", 2, "=0"], ["1", "", 0, "=1"], ["", "1", 1, "=0"]] as const) {
+        const calls = join(fixture, "calls")
+        writeFileSync(calls, "")
+        const result = Bun.spawnSync(["bash", join(fixture, "scripts/assert-gate-files.sh")], { env: { ...process.env, CALLS: calls, CODEPUPPY_TEST_SIGNED_FENCE: enabled, BAD_SELF_SKIP: bad } })
+        expect(result.exitCode, result.stderr.toString() + result.stdout.toString()).toBe(exit)
+        expect(readFileSync(calls, "utf8").trim().split("\n").at(-1)).toBe(`${expected}\tsrc/main/process-fence-extension-packaged.test.ts`)
+      }
+    } finally {
+      rmSync(fixture, { recursive: true, force: true })
+    }
+  })
+
   test("登记簿里的每个文件都真的存在(登记了一个已删的文件 = 登记簿在骗人)", () => {
     const missing = REGISTERED.filter((path) => !ALL_TESTS.includes(path))
     expect(missing, `登记簿指向不存在的测试文件:${missing.join(", ")}`).toEqual([])

@@ -182,15 +182,29 @@ while IFS=$'\t' read -r floor workdir path delegates guarantee || [ -n "${floor:
       ;;
   esac
 
+  # Local signing is release evidence, explicitly opted in; ordinary gates still verify the host self-skips.
+  manual=""
+  case "${guarantee:-}" in
+    *"[环境"*)
+      if [[ "$guarantee" == *"[环境:CODEPUPPY_TEST_SIGNED_FENCE=1]"* ]] && [ "$workdir/$path" = "packages/ui-mac/src/main/process-fence-extension-packaged.test.ts" ] && [ "$kind" = exact ]; then
+        manual="CODEPUPPY_TEST_SIGNED_FENCE=1"
+      else
+        echo "::error::$workdir/$path 的环境条件非法:只允许签名围栏宿主显式 CODEPUPPY_TEST_SIGNED_FENCE=1"
+        failed=1
+        continue
+      fi
+      ;;
+  esac
+
   checked=$((checked + 1))
 
   # `#1153`:登记了但本平台不适用。标注不是免检牌 —— 真跑该文件,要求它**自报 0 条**
   # (在位、恰好匹配 1 个文件、bun exit 0、0 pass;bun-test-floor.sh 的 =0 精确模式四者全断)。
   # 两个方向都抓:该跑的文件被误标 ⇒ 本平台 >0 条 ⇒ 红;文件被删 ⇒ 匹配 0 个文件 ⇒ 红。
-  if [ -n "$platform" ] && [ "$platform" != "$RUNTIME_PLATFORM" ]; then
-    echo "── [$checked] $workdir/$path (登记 $floor,[平台:$platform],本平台 $RUNTIME_PLATFORM)"
+  if { [ -n "$platform" ] && [ "$platform" != "$RUNTIME_PLATFORM" ]; } || { [ -n "$manual" ] && [ "${CODEPUPPY_TEST_SIGNED_FENCE:-}" != "1" ]; }; then
+    echo "── [$checked] $workdir/$path (登记 $floor,[平台:$platform],本平台 $RUNTIME_PLATFORM,显式条件 ${manual:-无})"
     if bash "$ROOT/scripts/bun-test-floor.sh" "=0" "$workdir" "$path"; then
-      echo "   ⊘ 本平台不适用:文件在位且自报 0 条,与 [平台:$platform] 相符 —— 该行的保证本次未被验证"
+      echo "   ⊘ 本平台不适用:文件在位且自报 0 条,与 [平台:$platform] / ${manual:-无额外条件} 相符 —— 该行的保证本次未被验证"
       na_count=$((na_count + 1))
       na_names="${na_names:+$na_names, }$workdir/$path"
     else

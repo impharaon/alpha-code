@@ -365,10 +365,11 @@ async function run() {
       },
     },
     egressProxy: async () => ({ port: modelPort }),
-    planFence: () => ({
+    fenceRun: tracker,
+    planFence: (input) => ({
       addonPath: join(process.resourcesPath, "codepuppy-fence/codepuppy_fence.node"),
       profile: renderProcessFenceProfile({
-        workspaces: [A, ...readWorkspaceTruthOrThrow(truthPath, { readFileSync })],
+        workspaces: [...new Set([A, ...readWorkspaceTruthOrThrow(truthPath, { readFileSync }), ...input.carriedWorkspaces])],
         codepuppyGlobalRoot: env.mutableRoot,
         userDataPath: engineData,
         stateHome: process.env.XDG_STATE_HOME!,

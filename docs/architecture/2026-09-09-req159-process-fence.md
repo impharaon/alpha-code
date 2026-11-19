@@ -70,6 +70,9 @@ The first resolution of a path on an unreachable volume blocks as the existing s
 ⇒ 永不签发,探针只报可写性:答 writable 即 granted,否则 grant-failed(被改指的身份按 stillSelf 给出更准的那一句),没有令牌。
 不在其中 ⇒ 它的任何祖先都不能被围栏代码创建 / 移除 / 重命名(某个祖先的父目录可写就会把它自己放进那个根),stillSelf 之后签发无从竞态;
 `server.ts` 签发后的 realpath 比较保留为断言(变化即丢令牌、报 grant-failed),不是防护所依。
+本次应用运行里任何一代因用户打开而可写过的目录(每代 W1 与每次签发尝试)记在 tracker 的运行内可写历史里:后来的代对它们一律不签发,
+planner 把它们并入下一代 W1 候选(经 `stored` 校验);只在内存,应用重启后只从真源开始。活过应用重启的孤儿进程是剩余风险 R-f(design §6)。
+真源条目在启动时只是「此刻不在盘上」(未挂载的卷)不算改指:留在真源与 opened 里,出现后同次运行即可写;只有解析到别处或落进保护位置才排除。
 停机前先判资格。恢复、重载、SSE、深链接和 sidecar 消息只消费,不登记。
 main 保留登记,所以 renderer 重载不丢资格;不通过引擎换代、页面重载或取消其它会话完成放行。
 

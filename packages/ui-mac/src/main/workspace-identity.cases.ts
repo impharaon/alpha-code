@@ -83,7 +83,7 @@ test("a truth entry missing at start (unmounted volume) stays opened and in the 
   expect(truthWhileMissing).toEqual([directory])
   expect(appeared).toEqual({ outcome: "writable", grant: "granted" })
   expect(issues.length - before).toBe(1) // not in this generation's roots when it appeared: one grant
-  expect(truthAfter).toEqual([directory])
+  expect(truthAfter).toEqual([directory, A]) // the opened default workspace joins; the restored entry is kept
 })
 
 test("the firmlink spelling of HOME is refused by runtime and the production planner", async () => {

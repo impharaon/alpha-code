@@ -106,21 +106,25 @@ beforeEach(async () => {
     eligibility: { homeDir: join(run, "home"), appStateRoot: join(run, "state"), realpath: realpathSync.native, isDirectory: () => true },
     onWritableChanged: (change) => { changed.push(change) },
   })
+  await spawnGeneration()
+  registerIpcHandlers({ fenceWorkspaces: tracker, probeWorkspaceWrite: probe, grantWorkspaceWrite: async (input) => { await tracker.grantWrite(input, listener) },
+    updater: { subscribe: () => () => {} },
+  } as unknown as Parameters<typeof registerIpcHandlers>[0])
+})
+
+async function spawnGeneration() {
   resetDanglingSweepLatchForTests()
   creditDanglingSweepForSpawn()
   child = new Child()
   const result = await spawnLocalServer("127.0.0.1", 43210, "test-not-a-credential", {
-    userDataPath: join(run, "user-data"), egressProxy: async () => ({ port: 59999 }),
-    // A is this generation's only start-time root (the renderer's block form); B and C lie outside it.
+    userDataPath: join(run, "user-data"), egressProxy: async () => ({ port: 59999 }), fenceRun: tracker,
+    // A is every generation's only start-time root here (the renderer's block form); B and C lie outside it.
     planFence: () => ({ profile: `(version 1)\n(allow default)\n(deny file-write*)\n(allow file-write*\n  (subpath "${join(run, "A")}") ; W1\n)\n`, addonPath: join(run, "test.node") }),
     fork: (() => child) as never, healthCheck: async () => true,
   })
   listener = result.listener
   await result.health.wait
-  registerIpcHandlers({ fenceWorkspaces: tracker, probeWorkspaceWrite: probe, grantWorkspaceWrite: async (input) => { await tracker.grantWrite(input, listener) },
-    updater: { subscribe: () => () => {} },
-  } as unknown as Parameters<typeof registerIpcHandlers>[0])
-})
+}
 
 afterEach(async () => { await listener?.stop(); events.removeAllListeners("will-quit"); rmSync(run, { recursive: true, force: true }) })
 
@@ -197,6 +201,17 @@ test("a directory inside another directory whose grant is still in flight is not
   expect(issues.map((issue) => issue.directory)).toEqual([request().directory])
   child.reply("granted")
   expect((await outer).grant).toBe("granted")
+  expect(issues).toHaveLength(1)
+})
+
+test("a directory issued in an earlier generation is never issued again in a later one, even when that W1 lacks it", async () => {
+  register()
+  expect(await probe()).toMatchObject({ outcome: "writable", grant: "granted" })
+  expect(tracker.carriedWorkspaces()).toEqual([join(run, "A"), request().directory])
+  await listener.stop()
+  consumed.clear() // a new generation is a new sandbox: the earlier consumption does not carry over
+  await spawnGeneration()
+  expect(await probe()).toEqual({ outcome: "denied", grant: "failed", reason: "grant-failed" })
   expect(issues).toHaveLength(1)
 })
 

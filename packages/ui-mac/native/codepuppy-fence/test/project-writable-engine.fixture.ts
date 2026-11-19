@@ -9,7 +9,9 @@ import { buildWriteGrantReply, buildWriteProbeReply, parseWriteGrantCommand, par
 
 const root = process.env.CODEPUPPY_WRITABLE_ENGINE_ROOT!
 const A = process.env.CODEPUPPY_WRITABLE_A!
-const B = process.env.CODEPUPPY_WRITABLE_B!
+// Never registered in any generation: the start-time self-check's known-outside directory. (B is the test's
+// project, and a project granted in an earlier generation is carried into later W1s, INT-safety R3.)
+const OUTSIDE = process.env.CODEPUPPY_WRITABLE_OUTSIDE!
 const sandbox = engineSandbox()
 let engine: Running | undefined
 let delayConsume = 0
@@ -44,7 +46,7 @@ process.on("message", async (value: unknown) => {
   starting = (async () => {
     await assertEngineSandboxed(sandbox)
     if (!commandFence) throw new Error("fixture refuses an unfenced start")
-    const applied = applyProcessFence(commandFence, { insideDir: A, outsideDir: B })
+    const applied = applyProcessFence(commandFence, { insideDir: A, outsideDir: OUTSIDE })
     engine = await host.start()
     send({ type: "fixture.ready", pid: process.pid, url: engine.url, authorization: engine.authorization, database: join(root, "engine.db"), buildId: applied.buildId })
     send({ type: "ready" })

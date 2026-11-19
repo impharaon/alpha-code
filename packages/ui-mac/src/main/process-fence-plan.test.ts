@@ -40,6 +40,7 @@ function harness(overrides: Partial<PlanProcessFenceDeps> = {}, existing = new S
     sidecarEnv: { HOME },
     addon: { packaged: true, resourcesPath: "/App/Contents/Resources", moduleDir: "/unused", exists: (p) => existing.has(p) },
     egressProxyPort: 4443,
+    carriedWorkspaces: [],
   }
   return { deps, input, made, logs }
 }

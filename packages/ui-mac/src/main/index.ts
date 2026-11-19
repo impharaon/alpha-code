@@ -1451,6 +1451,7 @@ const main = Effect.gen(function* () {
         timelineContext: "boot",
         generation: spawnGen,
         codepuppySidecar,
+        fenceRun: fenceWorkspaces, // INT-safety R3: this run's writable history carries into the next generation
       })
       void spawning.then(
         () =>
@@ -1604,6 +1605,7 @@ const main = Effect.gen(function* () {
         timelineContext: "respawn",
         generation: spawnGen,
         codepuppySidecar,
+        fenceRun: fenceWorkspaces, // INT-safety R3: this run's writable history carries into the next generation
       })
       void spawning.then(
         () =>

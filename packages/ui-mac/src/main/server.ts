@@ -74,7 +74,7 @@ import { loadFenceAddon } from "./process-fence-apply"
 import { processFenceRulesCover, processFenceWriteRules, WORKSPACE_WRITE_EXTENSION_CLASS, type ProcessFenceWriteRule } from "./process-fence-profile"
 import { codepuppyGlobalRoot, codepuppyJsoncPath } from "./engine-config-truth"
 import { ensureUserWorkspaceDir } from "./codepuppy-user-workspace"
-import { fenceWorkspaceTruthPath, readWorkspaceTruthOrThrow } from "./process-fence-workspaces"
+import { fenceWorkspaceTruthPath, readWorkspaceTruthOrThrow, type FenceRunWritable } from "./process-fence-workspaces"
 import { homedir } from "node:os"
 import { mkdirSync, readFileSync, realpathSync, statSync } from "node:fs"
 
@@ -133,7 +133,9 @@ type SpawnLocalServerOptions = {
    * 测试用假子进程时注入替身。返回 undefined 只允许在非 darwin(那里没有 seatbelt);darwin 上
    * 生产计划器要么给出计划、要么抛出 —— 抛出 = 这一代 fork 被拒(与 codepuppy-secrets sync 失败同一条路)。
    */
-  planFence?: (input: { userDataPath: string; sidecarEnv: Record<string, string>; egressProxyPort: number | undefined }) => ProcessFenceStartInput | undefined
+  planFence?: (input: ProductionFenceInput) => ProcessFenceStartInput | undefined
+  /** INT-safety R3: main's run-lifetime writable history (the workspace tracker). Absent ⇒ nothing is carried. */
+  fenceRun?: FenceRunWritable
   /**
    * REQ-137 `#1337`:策略代理的提供者。缺省 = 生产单例(ensureEgressPolicyProxy:本进程内真起一个,跨 fork 复用);
    * 测试注入一个假端口以免每条用例都起监听。reject = 这一代 fork 被拒。只在 darwin 上被调用 —— 围栏只在那里,
@@ -279,8 +281,10 @@ function refreshConfiguredEgressDestinations(userDataPath: string): void {
   }
 }
 
+type ProductionFenceInput = { userDataPath: string; sidecarEnv: Record<string, string>; egressProxyPort: number | undefined; carriedWorkspaces: readonly string[] }
+
 /** 生产计划器:把 electron / store / fs 接进 electron-free 的 planProcessFence。 */
-function planProductionFence(input: { userDataPath: string; sidecarEnv: Record<string, string>; egressProxyPort: number | undefined }): ProcessFencePlan | undefined {
+function planProductionFence(input: ProductionFenceInput): ProcessFencePlan | undefined {
   if (process.platform !== "darwin") return undefined
   if (input.egressProxyPort === undefined) throw new Error("process fence plan: no egress proxy port on darwin — the fence's only outbound door is unknown, refusing to plan")
   const moduleDir = dirname(fileURLToPath(import.meta.url))
@@ -290,6 +294,7 @@ function planProductionFence(input: { userDataPath: string; sidecarEnv: Record<s
       sidecarEnv: input.sidecarEnv,
       addon: { packaged: electronNs.app.isPackaged, resourcesPath: process.resourcesPath, moduleDir, exists: existsSync },
       egressProxyPort: input.egressProxyPort,
+      carriedWorkspaces: input.carriedWorkspaces,
     },
     {
       homeDir: homedir,
@@ -535,7 +540,7 @@ export async function spawnLocalServer(
     )
   let fence: ProcessFenceStartInput | undefined
   try {
-    fence = (options.planFence ?? planProductionFence)({ userDataPath: options.userDataPath, sidecarEnv, egressProxyPort })
+    fence = (options.planFence ?? planProductionFence)({ userDataPath: options.userDataPath, sidecarEnv, egressProxyPort, carriedWorkspaces: options.fenceRun?.carriedWorkspaces() ?? [] })
   } catch (error) {
     getLogger()?.error("process fence plan FAILED — refusing to fork the sidecar (fail closed; an unfenced engine must not start)", error)
     throw new Error(`process fence plan failed — sidecar fork refused: ${serializeError(error).message}`)
@@ -779,8 +784,7 @@ export async function spawnLocalServer(
 
   let stopping: Promise<void> | undefined
 
-  return {
-    listener: {
+  const listener: SidecarListener = {
       kill: () => {
         if (!exited) child.kill()
       },
@@ -801,7 +805,12 @@ export async function spawnLocalServer(
         ])
         return stopping
       },
-    },
+  }
+  // This generation's W1 members become part of the run's writable history before anything can ask about them.
+  options.fenceRun?.noteGeneration(listener, (writeRules ?? []).filter((rule) => rule.id === "W1" && rule.kind === "subpath").map((rule) => rule.value))
+
+  return {
+    listener,
     health: { wait },
     injectionFailure,
     // REQ-159 `#1322`:「围栏装上了」的信号,由**两个事实**共同给出 —— 本进程把计划放进了 start 命令

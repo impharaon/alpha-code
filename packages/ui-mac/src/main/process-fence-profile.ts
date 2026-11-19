@@ -196,18 +196,25 @@ export function renderProcessFenceProfile(input: ProcessFenceProfileInput): stri
 // 祖先链上任何一级被 subpath / literal / regex 盖住都算 —— 误判「覆盖」只会少一次签发(说明那一句),误判「不覆盖」才会给可被
 // 围栏代码改写的路径签发令牌。解析不认识的写法一律抛,调用方按「覆盖」处理。
 
-export type ProcessFenceWriteRule = { kind: "subpath" | "literal" | "regex"; value: string }
+/** `id` is the renderer's row comment (`W1` …), so a generation can name its own W1 members. */
+export type ProcessFenceWriteRule = { kind: "subpath" | "literal" | "regex"; value: string; id?: string }
 
 const WRITE_RULE = /\((subpath|literal) "([^"]*)"\)|\(regex #"([^"]*)"\)/g
 
-/** Strict inverse of renderProcessFenceProfile's write block. Any other `(allow file-write*` form throws. */
+/**
+ * Strict inverse of renderProcessFenceProfile's write block. Any other `(allow file-write*` form throws, and so does
+ * any `(deny file-write*` after the block: a later carve-out would make a covered path unwritable without telling us.
+ */
 export function processFenceWriteRules(profile: string): ProcessFenceWriteRule[] {
   const lines = profile.split("\n")
   const extension = `(allow file-write* (extension "${WORKSPACE_WRITE_EXTENSION_CLASS}"))`
   const rules: ProcessFenceWriteRule[] = []
+  let allowed = false
   for (let index = 0; index < lines.length; index++) {
     const line = lines[index]!
+    if (allowed && line.includes("(deny file-write*")) throw new Error(`process fence: file-write deny after the allow block: ${line}`)
     if (!line.includes("(allow file-write*")) continue
+    allowed = true
     if (line.startsWith(extension)) continue // X1 grants exist only through main's own ledger.
     if (line !== "(allow file-write*") throw new Error(`process fence: unrecognised file-write rule form: ${line}`)
     const end = lines.indexOf(")", index + 1)
@@ -216,9 +223,10 @@ export function processFenceWriteRules(profile: string): ProcessFenceWriteRule[]
       const found = [...entry.matchAll(WRITE_RULE)]
       const rest = entry.replace(WRITE_RULE, "").trim()
       if (!found.length || (rest && !rest.startsWith(";"))) throw new Error(`process fence: unrecognised file-write rule: ${entry}`)
+      const id = /^;\s*([WX]\d+)\b/.exec(rest)?.[1]
       for (const match of found) {
         if (match[3] !== undefined) new RegExp(match[3]) // an invalid pattern throws here, not at decision time
-        rules.push(match[3] !== undefined ? { kind: "regex", value: match[3] } : { kind: match[1] as "subpath" | "literal", value: match[2]! })
+        rules.push({ ...(match[3] !== undefined ? { kind: "regex" as const, value: match[3] } : { kind: match[1] as "subpath" | "literal", value: match[2]! }), ...(id ? { id } : {}) })
       }
     }
     index = end
@@ -384,7 +392,8 @@ export type WorkspaceDirectoryInput = Pick<WorkspaceUnionInput, "homeDir" | "app
 
 export type WorkspaceDirectoryCheck =
   | { eligible: true; directory: string }
-  | { eligible: false; reason: "home-or-app-state" | "not-a-directory"; detail: string }
+  /** `missing`: the path cannot be resolved right now (e.g. an unmounted volume) — unknown, not "elsewhere". */
+  | { eligible: false; reason: "home-or-app-state" | "not-a-directory"; detail: string; missing?: true }
 
 /** APFS Data volume. Electron Node's realpath(3) keeps this spelling for firmlinked paths (`/Users/...`). */
 const DATA_VOLUME = "/System/Volumes/Data"
@@ -399,7 +408,8 @@ const DATA_VOLUME = "/System/Volumes/Data"
  *    is refused exactly like HOME.
  *  - `open`: the identity now (an explicit open, the default workspace, a literal path seen first).
  *    `stored` = stillSelf: a stored identity stays valid only while it still resolves to itself and is a
- *    directory; otherwise it is excluded (the caller logs it), never re-pointed at its new target.
+ *    directory; otherwise it is excluded (the caller logs it), never re-pointed at its new target. A path that
+ *    cannot be resolved now is `missing`: never eligible now, but a stored entry is not dropped for it.
  * Synchronous by contract (design §4). Every call re-resolves; a caller that caches literal paths owns it.
  */
 export function checkWorkspaceDirectory(input: WorkspaceDirectoryInput, raw: string, mode: "open" | "stored" = "open"): WorkspaceDirectoryCheck {
@@ -444,8 +454,13 @@ export function checkWorkspaceDirectory(input: WorkspaceDirectoryInput, raw: str
     const alias = resolve(`${DATA_VOLUME}${base}`)
     return new Set([...chain(base), ...(sameObject(base, alias) ? chain(alias) : [])].map(objectId))
   }
+  let directory: string
   try {
-    const directory = canonical(raw)
+    directory = canonical(raw)
+  } catch {
+    return { eligible: false, reason: "not-a-directory", detail: "not on disk now", missing: true }
+  }
+  try {
     const self = objectId(directory)
     if (protectedIds(input.homeDir).has(self))
       return { eligible: false, reason: "home-or-app-state", detail: "would put HOME inside the writable set (fence would be void)" }

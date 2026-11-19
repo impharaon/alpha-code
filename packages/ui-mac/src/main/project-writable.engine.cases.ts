@@ -157,9 +157,9 @@ async function boot() {
     userDataPath: userData, egressProxy: async () => ({ port: modelProxy.port! }), healthCheck: async () => !!connection,
     fenceRun: tracker,
     // Both planners take main's carried run set from the spawn input, as the production planner does.
-    planFence: (input: { carriedWorkspaces?: readonly string[] }) => {
-      const carried = input.carriedWorkspaces ?? []
-      if (useProductionPlanner) return preparedPlan = planProcessFence({ userDataPath: install, sidecarEnv: { XDG_STATE_HOME: join(install, "state") }, egressProxyPort: modelProxy.port!, addon: { packaged: true, resourcesPath: run, moduleDir: run, exists: existsSync }, carriedWorkspaces: carried } as Parameters<typeof planProcessFence>[0], {
+    planFence: (input) => {
+      const carried = input.carriedWorkspaces
+      if (useProductionPlanner) return preparedPlan = planProcessFence({ userDataPath: install, sidecarEnv: { XDG_STATE_HOME: join(install, "state") }, egressProxyPort: modelProxy.port!, addon: { packaged: true, resourcesPath: run, moduleDir: run, exists: existsSync }, carriedWorkspaces: carried }, {
         homeDir: () => protectedHome, appStateRoot: () => join(run, "state"), codepuppyGlobalRoot: () => join(install, "state/env/dev"), defaultWorkspace: () => A,
         readWorkspaces: () => readWorkspaceTruthOrThrow(truthPath, { readFileSync }), realpath: realpathSync.native, isDirectory: (path) => { try { return readdirSync(path) !== undefined } catch { return false } },
         mkdirp: (path) => { mkdirSync(path, { recursive: true }) }, compile: () => ({ ok: true }), log: (line) => { log.push(line) },
@@ -168,7 +168,7 @@ async function boot() {
     },
     fork: ((_file: string, _args: string[], options: { env: Record<string, string> }) => {
       const peer = new EventEmitter() as EventEmitter & { pid: number; stdout: unknown; stderr: unknown; postMessage: (message: { type: string; id?: number; directory?: string }) => void; kill: () => void }
-      child = fork(join(import.meta.dir, "../../native/codepuppy-fence/test/project-writable-engine.fixture.ts"), [], { execPath: process.execPath, env: { ...options.env, HOME: join(install, "home"), TMPDIR: install, CODEPUPPY_WRITABLE_ENGINE_ROOT: install, CODEPUPPY_WRITABLE_A: A, CODEPUPPY_WRITABLE_B: B, CODEPUPPY_WRITABLE_MODEL_URL: `http://127.0.0.1:${modelProxy.port}/v1` }, stdio: ["ignore", "pipe", "pipe", "ipc"] })
+      child = fork(join(import.meta.dir, "../../native/codepuppy-fence/test/project-writable-engine.fixture.ts"), [], { execPath: process.execPath, env: { ...options.env, HOME: join(install, "home"), TMPDIR: install, CODEPUPPY_WRITABLE_ENGINE_ROOT: install, CODEPUPPY_WRITABLE_A: A, CODEPUPPY_WRITABLE_B: B, CODEPUPPY_WRITABLE_OUTSIDE: join(run, "self-check-outside"), CODEPUPPY_WRITABLE_MODEL_URL: `http://127.0.0.1:${modelProxy.port}/v1` }, stdio: ["ignore", "pipe", "pipe", "ipc"] })
       peer.pid = child.pid!
       peer.stdout = child.stdout; peer.stderr = child.stderr
       child.stdout?.on("data", (chunk) => { childLogs.push(String(chunk)) })
@@ -193,14 +193,14 @@ async function boot() {
       peer.kill = () => { child.kill("SIGKILL") }
       return peer
     }) as never,
-  } as Parameters<typeof spawnLocalServer>[3])
+  })
   listener = result.listener
   await result.health.wait
   record("ready", { pid: connection!.pid, buildId: connection!.buildId, generation })
 }
 
 beforeAll(async () => {
-  for (const directory of [A, B, C, D, E, install, protectedHome, join(install, "home"), userData, join(run, "state/env/dev")]) mkdirSync(directory, { recursive: true })
+  for (const directory of [A, B, C, D, E, join(run, "self-check-outside"), install, protectedHome, join(install, "home"), userData, join(run, "state/env/dev")]) mkdirSync(directory, { recursive: true })
   writeWorkspaceTruth(truthPath, [A], { mkdirSync, writeFileSync, renameSync, rmSync })
   tracker = bootFenceWorkspaceTruth({
     truthPath, store: { tabs: [{ type: "draft", draftID: "a", server: "sidecar", directory: A }], recent: undefined, info: undefined }, fs: { readFileSync, writeFileSync, mkdirSync, renameSync, rmSync }, log: (line) => { log.push(line) },

@@ -1830,6 +1830,48 @@ describe("REQ-125 C6 通用工具卡四态与分派", () => {
     expect(unrecognised.querySelector(".a-tc-error-body")!.textContent).toContain(raw)
   })
 
+  // 0.2.4 验收第三轮(REQ-159 披露 I4):写被沙箱拒(ext 写进 metadata 的 `codepuppyWriteDenied`)⇒ 过程行外、对话里直接摆出既有的
+  // 只读说明(顶栏只读弹层同一组文字)与「重新启动」;过程收起也看得见。没有这个标记的失败不出;宿主没接重启 ⇒ 只出说明不出按钮。
+  test("沙箱拒写:对话里摆出既有只读说明与「重新启动」(过程收起也在);无标记的失败不出;无重启入口不出按钮", async () => {
+    const host = mount()
+    runtime.setTimelineIntentsEnabled(true)
+    runtime.setTimelineRows(
+      assistantFixture([
+        toolPartFixture("prt_wd1", "write", {
+          status: "error",
+          input: { path: "a.txt" },
+          error: "Unable to write a.txt",
+          metadata: { codepuppyWriteDenied: { directory: "/Users/me/proj" } },
+          time: { start: 0, end: 1 },
+        }),
+      ]),
+    )
+    await flush()
+    const note = host.querySelector<HTMLElement>("[data-codepuppy-write-denied]")
+    expect(note, "收起的过程行外应直接看得见").not.toBeNull()
+    expect(note!.textContent).toContain(zhDict["codepuppy.workspace.readonlyTitle"])
+    expect(note!.textContent).toContain(zhDict["codepuppy.workspace.readonlyBody"])
+    const restart = note!.querySelector<HTMLButtonElement>("button")!
+    expect(restart.textContent).toBe(zhDict["codepuppy.workspace.readonlyRestart"])
+    const before = runtime.getIntentLog().turnErrorExits.length
+    restart.click()
+    await flush()
+    expect(runtime.getIntentLog().turnErrorExits.slice(before)).toEqual(["relaunch"])
+
+    runtime.setTimelineIntentsEnabled(false)
+    await flush()
+    expect(host.querySelector("[data-codepuppy-write-denied]")).not.toBeNull()
+    expect(host.querySelector("[data-codepuppy-write-denied] button")).toBeNull()
+
+    runtime.setTimelineRows(
+      assistantFixture([
+        toolPartFixture("prt_wd2", "write", { status: "error", input: { path: "a.txt" }, error: "Unable to write a.txt", time: { start: 0, end: 1 } }),
+      ]),
+    )
+    await flush()
+    expect(host.querySelector("[data-codepuppy-write-denied]")).toBeNull()
+  })
+
   test("edit diff 视图:jsdiff 行渲染 ±行号与 +/− 行;write 显示预览与总行数;补丁卡出徽章行", async () => {
     const host = mount()
     runtime.setTimelineRows(

@@ -508,7 +508,7 @@ const POLICY_DENY_DETAIL: Record<PolicyDenyReason, string | undefined> = Object.
 })
 export const policyDenyId = (reason: PolicyDenyReason) => `tool-failure.policy-deny.${reason}`
 
-function toolFailureFragments(): (TemplateFragment | WrapperFragment)[] {
+function toolFailureFragments(): (TemplateFragment | TextFragment | WrapperFragment)[] {
   return [
     ...Object.entries(WEB_SEARCH_FAILURE_PATTERNS).map(([kind, [label, http]]) =>
       http
@@ -526,6 +526,7 @@ function toolFailureFragments(): (TemplateFragment | WrapperFragment)[] {
           }),
     ),
     ...Object.entries(WEB_SEARCH_OFF_TEMPLATES).map(([id, template]) => defineTemplate({ id, sink: "tool-failure", template, maxBytes: CAP_DESCRIPTION })),
+    defineText({ id: WRITE_DENIED_ID, sink: "tool-failure", text: WRITE_DENIED_NOTE, maxBytes: CAP_DESCRIPTION }),
     ...(Object.entries(POLICY_DENY_DETAIL) as [PolicyDenyReason, string | undefined][]).map(([reason, detail]) =>
       defineTemplate({
         id: policyDenyId(reason),
@@ -540,6 +541,14 @@ function toolFailureFragments(): (TemplateFragment | WrapperFragment)[] {
 // 0.1.26 的 v1 引擎给每个 agent part 在用户消息里紧跟一段 synthetic 文本,叫模型调 task 工具派给那个助手(v0.1.26
 // packages/opencode/src/session/prompt.ts:1114-1128)。这里是同一句,工具名与参数名换成 2.x 的 `subagent` / `agent`
 // (core tool/plugin/subagent.ts)。`{name}` = 被点名助手的 id,整句按渲染结果量上限。
+/**
+ * 0.2.4 验收第三轮(REQ-159 披露 I4):写被沙箱拒(EPERM)时交回模型的话 —— 写文件工具的错误后面、shell 输出后面各接一句
+ * (policy/display.ts attachWriteDenied)。可写集在启动时定死,启动后打开的项目要重启才写得进;让模型停下来告诉用户,不去绕。
+ */
+export const WRITE_DENIED_ID = "sandbox.write-denied"
+export const WRITE_DENIED_NOTE =
+  "Code Puppy's sandbox refused this write (operation not permitted): this folder is not one Code Puppy can write right now. The folders Code Puppy can write are fixed when it starts, so a project opened after that cannot be written until Code Puppy is restarted. Do not try other ways to write it and do not look for workarounds outside the project; stop and tell the user that this folder cannot be written until they restart Code Puppy (the conversation shows a restart button), then try again."
+
 export const AGENT_MENTION_ID = "agent-mention.delegate"
 export const AGENT_MENTION_TEMPLATE = "Use the above message and context to generate a prompt and call the subagent tool with agent: {name}"
 

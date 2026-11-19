@@ -18,7 +18,7 @@ import os from "node:os"
 import path from "node:path"
 import type { Plugin } from "@opencode/plugin"
 import { createCatalog } from "./catalog"
-import { attachDirectoryDisplay, attachUnattendedDenial, attachNetFailure, attachTerminal, displaySnapshot, wrapForDisplay } from "./display"
+import { attachDirectoryDisplay, attachUnattendedDenial, attachNetFailure, attachTerminal, attachWriteDenied, displaySnapshot, wrapForDisplay } from "./display"
 import { confirm, decide, effectiveFor, gateWithoutToolCall, holdAsk, holdUnattendedDeny, isInstallAsk, pin, type GateCall, type GateDecision, type GateDeps } from "./gate"
 import {
   codeModeFacts,
@@ -268,6 +268,7 @@ export async function registerPolicy(context: Plugin.Context, unattended: Unatte
           codeModeDenials.delete(event.id)
         }
         attachNetFailure(event as never)
+        attachWriteDenied(event as never, context.location.directory)
         attachDirectoryDisplay(event as never)
         attachTerminal(event as never, displays.get(event.id))
         displays.delete(event.id)

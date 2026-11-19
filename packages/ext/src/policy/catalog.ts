@@ -21,7 +21,11 @@ import { effectiveFor, evaluate } from "./gate"
 import { CODE_MODE_TOOL, type ToolFacts } from "./identity"
 import type { ToolPolicySnapshot } from "./resolver"
 
-/** I9: the tier pseudo-action the injected tier-carrier agents carry (`codepuppy-config-injection.ts`, L5). */
+/**
+ * I9: the tier pseudo-action the injected tier-carrier agents carry (`codepuppy-config-injection.ts`, L5). Its resource is
+ * the tool's canonical identity, so a tier can waive the class-default ask for named tools only (BR-01: the helper's
+ * read-only tools in 请求审批); `*` covers every tool.
+ */
 export const TOOL_POLICY_DEFAULT = "tool-policy-default"
 
 /** Rules Code Puppy appends to one agent's configured rules. */
@@ -31,7 +35,6 @@ export function catalogRules(
   snapshot: ToolPolicySnapshot,
 ): PermissionRule[] {
   const rules: PermissionRule[] = []
-  const tierAllows = evaluate(TOOL_POLICY_DEFAULT, "*", configured).effect === "allow"
   for (const facts of tools) {
     let canonical: string
     try {
@@ -46,6 +49,8 @@ export function catalogRules(
       rules.push({ action: canonical, resource: "*", effect: "deny" })
       continue
     }
+    // The tier's waiver is read per tool: its resource is the canonical identity (`*` = every tool).
+    const tierAllows = evaluate(TOOL_POLICY_DEFAULT, canonical, configured).effect === "allow"
     if (effective.action === "ask" && !(effective.reason.kind === "default" && tierAllows))
       rules.push({ action: canonical, resource: "*", effect: "ask" })
   }

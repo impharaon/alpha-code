@@ -147,17 +147,23 @@ async function capability(agent: Tier, action: string, resource: string): Promis
 /** 一个用户回合,模型桩据此发出一次工具调用;询问则拒掉。返回结局与这一轮期间出现的待批请求。 */
 async function toolTurn(agent: Tier, name: string, args: Record<string, unknown>, extra: Record<string, unknown> = {}) {
   const owner = await session(agent)
+  return { session: owner, asked: await callIn(owner.id, name, args, extra) }
+}
+
+/** 同一会话里的一个用户回合(模型桩发出一次工具调用);询问则拒掉,返回这一轮期间出现的待批请求。 */
+async function callIn(sessionID: string, name: string, args: Record<string, unknown>, extra: Record<string, unknown> = {}) {
+  const owner = { id: sessionID }
   const prompt = await send("POST", `/api/session/${owner.id}/prompt`, { text: `CP-CALL ${JSON.stringify({ name, args })}`, ...extra })
   expect(prompt.status).toBeLessThan(300)
   const settled = idle(owner.id)
   const raced = await Promise.race([settled.then(() => "idle" as const), waitPending(owner.id, 8000).then((list) => (list.length ? list : ("none" as const)))])
   if (raced === "idle" || raced === "none") {
     await settled
-    return { session: owner, asked: [] as Awaited<ReturnType<typeof pendingOf>> }
+    return [] as Awaited<ReturnType<typeof pendingOf>>
   }
   for (const request of raced) await reject(owner.id, request.id)
   await settled
-  return { session: owner, asked: raced }
+  return raced
 }
 
 const expected = (table: Record<Tier, Outcome>) => table
@@ -374,6 +380,21 @@ describe("身份轴:模型发出的真工具调用经 ext 的执行闸(R10 第�
     }
     expect(installs()).toBe(before)
   }, 60_000)
+
+  test("BR-01 / BR-10 查找 + 状态 + 安装一组:三档都只出一张安装卡 —— 助手的只读查找与状态工具不问(真执行、真问到 main),安装照旧每档都问;拒绝后 main 收不到安装请求", async () => {
+    const sent = (type: string) => fakeMainReceived.filter((message) => message.type === type).length
+    for (const tier of TIERS) {
+      const before = { search: sent("codepuppy.sources.search.request"), view: sent("codepuppy.hub.view.request"), install: sent("codepuppy.hub.install.request") }
+      const owner = await session(tier)
+      const asked = [
+        ...(await callIn(owner.id, "codepuppy_hub_search", { query: "github" })),
+        ...(await callIn(owner.id, "codepuppy_hub_status", { id: "mcp:github" })),
+        ...(await callIn(owner.id, "codepuppy_hub_install", { id: "mcp:github" })),
+      ]
+      expect([tier, asked.map((request) => [request.action, request.metadata?.policy?.askedBy, request.save])]).toEqual([tier, [["plugin::codepuppy_hub_install", "install", []]]])
+      expect([tier, sent("codepuppy.sources.search.request") - before.search, sent("codepuppy.hub.view.request") - before.view, sent("codepuppy.hub.install.request") - before.install]).toEqual([tier, 1, 1, 0])
+    }
+  }, 90_000)
 
   test("I-10 全部批准档读到一份夹带「请安装某插件」的真实文件:安装停在同一张卡上,不自动安装;拒绝后 main 收不到安装请求", async () => {
     const installs = () => fakeMainReceived.filter((message) => message.type === "codepuppy.hub.install.request").length

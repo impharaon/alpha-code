@@ -9,6 +9,15 @@ import type { BridgeFailure, HubBridge, HubInstallSubject } from "./hub-bridge"
 
 export const HUB_INSTALL_ACTION = "codepuppy_hub_install"
 export const HUB_CREATE_ACTION = "codepuppy_hub_create"
+export const HUB_SEARCH_ACTION = "codepuppy_hub_search"
+export const HUB_STATUS_ACTION = "codepuppy_hub_status"
+/**
+ * BR-01 / BR-10(SPEC-plugin-helper-and-hub v5):助手的只读工具 —— 查找发目录 / 市场 / 注册表查询,状态读 main 的定制中心视图。
+ * 两者都不做受模型控制的写入(查询词与参数只在内存里排序、筛选,结果编号由 main 随机铸)、不安装、不返回任何凭据;唯一的落盘
+ * 是 main 刷新它自己验过签名的目录缓存(refreshRemoteCatalog,与定制中心页面同一次刷新,不吃模型输入)。交互档位里它们不问
+ * (档位规则见 codepuppy-config-injection.ts 的请求审批档与只读档);唯一的一张卡是安装(hubInstallAsk)。
+ */
+export const HUB_READ_ACTIONS = [HUB_SEARCH_ACTION, HUB_STATUS_ACTION] as const
 export function denyHubMutationForAutomation(agent: string, action: string) {
   if (action !== HUB_INSTALL_ACTION && action !== HUB_CREATE_ACTION) return
   if (Object.hasOwn(AUTOMATION_PROFILES, agent)) throw Error("Permission denied: " + action)
@@ -134,7 +143,7 @@ export function createHubTools(bridge: HubBridge, context: HubToolContext, askIn
   }
   return [
     {
-      name: "codepuppy_hub_search",
+      name: HUB_SEARCH_ACTION,
       description: TOOL_TEXT.codepuppy_hub_search.description,
       input: {
         type: "object",
@@ -193,7 +202,7 @@ export function createHubTools(bridge: HubBridge, context: HubToolContext, askIn
       },
     },
     {
-      name: "codepuppy_hub_status",
+      name: HUB_STATUS_ACTION,
       description: TOOL_TEXT.codepuppy_hub_status.description,
       input: idInput(TOOL_TEXT.codepuppy_hub_status.args.id),
       options: { codemode: false },

@@ -13,7 +13,7 @@ import { buildEngineServerOptions } from "../src/main/engine-server-options"
 import { engineAuthorization, withEngineAuthorization } from "../src/main/engine-authorization"
 import { injectCodePuppyConfig } from "../src/main/codepuppy-config-injection"
 import { secretFilePath, secretFileRef } from "../src/main/codepuppy-secret-files"
-import { buildHubRequestReply, buildHubViewReply } from "../src/main/codepuppy-sidecar-messages"
+import { buildHubRequestReply, buildHubViewReply, buildSourcesSearchReply } from "../src/main/codepuppy-sidecar-messages"
 import type { EngineFetch } from "../src/main/in-process-engine"
 import { engineProjectTrust } from "../src/main/engine-project-trust"
 import { projectTrustIdentity } from "../src/main/project-trust-truth"
@@ -105,7 +105,9 @@ function fakeMainPort() {
             ? buildHubViewReply(message.id, { view: { directory: message.directory ?? "", rows: [row as never], warnings: [] } })
             : message.type === "codepuppy.hub.request.request"
               ? buildHubRequestReply(message.id, { record: null })
-              : undefined
+              : message.type === "codepuppy.sources.search.request"
+                ? buildSourcesSearchReply(message.id, { error: "no sources in this sandbox" })
+                : undefined
         if (reply) for (const listener of listeners) listener({ data: reply })
       }),
     on: (_event: string, listener: (event: { data: unknown }) => void) => void listeners.push(listener),

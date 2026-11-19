@@ -186,6 +186,8 @@ export function CodePuppySessionTimeline(props: CodePuppySessionTimelineProps = 
   }
   const intents: TimelineIntents = {
     authenticateMcp: name => authenticatePackageMcp(serverSDK().client, name),
+    // 写被沙箱拒时对话里的「重新启动」:与顶栏只读弹层同一个 main 既有动作
+    relaunch: () => window.api.relaunch(),
     // 子任务卡「打开子会话」:route-manifest 构 href 失败即放弃(fail-closed,不裸拼路径)。
     openSession: (childSessionID) => {
       const identity = live.current()?.identity

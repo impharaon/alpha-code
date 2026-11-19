@@ -31,7 +31,7 @@ import {
 import { t } from "../../i18n"
 import { netFailureBrief } from "../net-failure-copy"
 import type { NetFailureLayer } from "@opencode/schema/codepuppy-net-failure"
-import { StatBadge, stepLocationText, stepSourceIcon, ToolStepDetail, toolIcon } from "./cards/tool-cards"
+import { StatBadge, stepLocationText, stepSourceIcon, ToolStepDetail, toolIcon, WriteDeniedNote } from "./cards/tool-cards"
 import {
   cappedItem,
   toolCardDispatchOf,
@@ -39,6 +39,7 @@ import {
   toolCardStatusOf,
   toolGroupVerbOf,
   toolStepLineOf,
+  writeDeniedOf,
   type ToolStepEnd,
   type ToolStepLine,
 } from "./cards/tool-card-model"
@@ -294,6 +295,8 @@ export function ProcessRow(props: { row: Extract<TimelineRow, { kind: "process" 
         }),
     ),
   )
+  // 0.2.4 验收第三轮:有一步写被沙箱拒 ⇒ 过程行外摆出只读说明(收起也看得见)
+  const writeDenied = createMemo(() => props.row.steps.some((step) => step.kind === "tool" && step.parts.some(writeDeniedOf)))
   const liveWindow = createMemo(() => liveWindowOf(props.row.steps))
   const allKey = () => `${processKey()}/all`
   const showAll = () => !active() || (state.get(allKey()) ?? false)
@@ -361,6 +364,9 @@ export function ProcessRow(props: { row: Extract<TimelineRow, { kind: "process" 
         <span class="a-tl-pf-sr" role="status">
           {statusText()}
         </span>
+      </Show>
+      <Show when={writeDenied()}>
+        <WriteDeniedNote />
       </Show>
       <Show when={open()}>
         <ProcessLiveContext.Provider value={live}>

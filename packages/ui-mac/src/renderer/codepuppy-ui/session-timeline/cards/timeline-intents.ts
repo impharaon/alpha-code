@@ -105,6 +105,8 @@ export interface TimelineIntents {
   newSession?: () => void
   /** `#1588`:输入框模型选择器的打开动作;composer 没登记时缺席,「换模型」不出。 */
   chooseModel?: () => void
+  /** 0.2.4 验收第三轮:写被沙箱拒时对话里那段只读说明的「重新启动」(main 既有 relaunch,与顶栏只读弹层同一动作);缺席即不出按钮。 */
+  relaunch?: () => void
 }
 
 export const TimelineIntentsContext = createContext<TimelineIntents>({})

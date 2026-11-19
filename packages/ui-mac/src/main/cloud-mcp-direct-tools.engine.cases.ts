@@ -6,8 +6,9 @@
 //
 // 宿主:test-component/codepuppy-engine.ts(生产注入 + 真 ext),桌面一侧走生产引擎适配器(engine-adapter createEngineFetch)拿事件流与
 // 消息,判据是 renderer 的三个生产识别函数本身。代付态:启动文档里的治理云 MCP 定义就是生产 `materializeCloudMcpConfig` 算的那一份
-// (登录铸的 `CODEPUPPY_MCP_TOKEN` 由生产 `syncSecretFiles` 写),指向本文件的本机 streamable-HTTP 端点;端点的工具表与各次调用的
-// 回执逐字取自生产云(test-component/fixtures/cloud-mcp-production-samples.json,来源写在文件里)。脚本模型照用户回合里的
+// (登录铸的 `CODEPUPPY_MCP_TOKEN` 由生产 `syncSecretFiles` 写),指向本文件的本机 streamable-HTTP 端点;端点的工具表是平台 vendored 的
+// 真实 tools/list(fixtures/cloud-mcp-tools),各次调用的回执逐字取自生产云(test-component/fixtures/cloud-mcp-production-samples.json,
+// 来源写在文件里)。脚本模型照用户回合里的
 // `CP-CALL` 直接调 `codepuppy_dispatch` / `codepuppy_artifacts` —— 与 0.1.x 模型看到的工具名相同。
 //
 // 已知的坏(实测):云 MCP 定义不带 `codemode:false` ⇒ 模型请求的工具表里没有 `codepuppy_dispatch`,调用不成立,三处识别全空。
@@ -25,6 +26,7 @@ import { artifactLinksOf, cloudImageOf } from "../renderer/codepuppy-ui/session-
 import { toolProvenanceOf } from "../renderer/codepuppy-ui/session-timeline/cards/tool-card-model"
 import { materializeCloudMcpConfig } from "./cloud-sidecar-config"
 import { CLOUD_MCP_SERVER_NAME } from "./cloud-web-search"
+import { CLOUD_MCP_TOOL_LIST } from "./fixtures/cloud-mcp-tools"
 import { secretFileRef, syncSecretFiles } from "./codepuppy-secret-files"
 
 const sandbox = engineSandbox()
@@ -52,7 +54,7 @@ const endpoint = Bun.serve({
         { jsonrpc: "2.0", id: message.id, result: { protocolVersion: "2025-06-18", capabilities: { tools: {} }, serverInfo: { name: "codepuppy-cloud", version: "1" } } },
         { headers: { "mcp-session-id": "S1" } },
       )
-    if (message.method === "tools/list") return Response.json({ jsonrpc: "2.0", id: message.id, result: { tools: samples.tools } })
+    if (message.method === "tools/list") return Response.json({ jsonrpc: "2.0", id: message.id, result: { tools: CLOUD_MCP_TOOL_LIST } })
     if (message.method === "tools/call") {
       const name = String(message.params?.name)
       const args = message.params?.arguments ?? {}

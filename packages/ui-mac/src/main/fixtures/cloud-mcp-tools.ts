@@ -12,4 +12,6 @@ export function platformCloudMcpTools(json: string): string[] {
   return listed.map((tool) => tool.name as string)
 }
 const VENDORED = fileURLToPath(new URL("../../../../codepuppy-contracts-consumer/vendor/alpha-platform-cloud-mcp/mcp-legacy-tools-list.json", import.meta.url))
+/** The whole vendored `tools/list` (descriptions, input schemas, annotations), for a stub that must list exactly what the platform lists. */
+export const CLOUD_MCP_TOOL_LIST: readonly Record<string, unknown>[] = JSON.parse(readFileSync(VENDORED, "utf8"))
 export const CLOUD_MCP_TOOLS: readonly string[] = platformCloudMcpTools(readFileSync(VENDORED, "utf8"))

@@ -187,7 +187,12 @@ export function SessionRouteErrorBoundary(
     <ResettingErrorBoundary
       resetOn={() => props.sessionID}
       fallback={(error) =>
-        settings.general.newLayoutDesigns() ? (
+        // 找不到对话:冻结稿 #not-found 没有内层卡片 —— 只留撑满的路由框,不画带阴影的圆角面板。
+        isCurrentSessionNotFoundError(error, props.sessionID) ? (
+          <SessionRouteFrame>
+            <SessionErrorFallback error={error} sessionID={props.sessionID} serverKey={props.serverKey} />
+          </SessionRouteFrame>
+        ) : settings.general.newLayoutDesigns() ? (
           <SessionRouteFrame padded={props.padded}>
             <SessionPanelFrame newLayout raised={!!props.sessionID}>
               <SessionErrorFallback error={error} sessionID={props.sessionID} serverKey={props.serverKey} />

@@ -3,3 +3,4 @@ export { ResettingErrorBoundary } from "../../../../codepuppy-app/src/pages/rout
 export { render } from "solid-js/web"
 export { SessionNotFound } from "../../../../codepuppy-app/src/pages/session-not-found"
 export { setLocale, t } from "../i18n"
+export { sessionNotFoundShown } from "../../../../codepuppy-app/src/surface/session-not-found-state"

@@ -1153,6 +1153,7 @@ export const dict = {
   "codepuppy.home.serverSwitched": "已切换服务器",
   "codepuppy.home.serverSwitchedDraftDiscarded": "刚才未发送的草稿未保留",
   "codepuppy.newSession.title": "新对话",
+  "codepuppy.session.notFoundTitle": "找不到对话",
   "codepuppy.newSession.heading": "我们要处理什么？",
   "codepuppy.newSession.preparing": "正在准备新对话…",
   "codepuppy.newSession.attachmentReadPending": "附件还在读取，此刻切换工作区会丢掉它 —— 稍等一下再切",

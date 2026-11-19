@@ -288,6 +288,18 @@ describe("窗口外框(BR-01 / BR-02):窄轨与常驻顶栏", () => {
     expect(await hover(document.querySelector("[data-codepuppy-topbar-action='sidebar']")!)).toBe("bottom")
   })
 
+  test("找不到对话页:顶栏写「找不到对话」,离开后回到新对话", async () => {
+    runtime.setHasProjects(false)
+    await mountShell(() => runtime.CodePuppyShell())
+    expect(topbarTitle()).toBe("新对话")
+    runtime.setSessionNotFoundShown(true)
+    await settle()
+    expect(topbarTitle()).toBe("找不到对话")
+    runtime.setSessionNotFoundShown(false)
+    await settle()
+    expect(topbarTitle()).toBe("新对话")
+  })
+
   test("顶栏随页面换标题:新对话 → 设置(整页)→ 回到新对话;整页上没有右栏,开关收起", async () => {
     runtime.setHasProjects(false)
     await mountShell(() => runtime.CodePuppyShell())

@@ -842,10 +842,12 @@
   color: var(--a-text);
   font-size: var(--a-text-lg);
   font-weight: var(--a-weight-semibold);
+  line-height: var(--a-leading-tight); /* frame `.a-ui h4`;without it the title inherits the body leading and sits ~5px low */
 }
 
 [data-codepuppy-session-not-found] p {
   margin: 0 0 18px;
   color: var(--a-text-tertiary);
   font-size: var(--a-text-sm);
+  line-height: var(--a-leading-normal);
 }

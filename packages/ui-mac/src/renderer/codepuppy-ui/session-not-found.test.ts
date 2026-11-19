@@ -18,6 +18,7 @@ type TestRuntime = {
   createComponent: typeof createComponent
   createSignal: typeof createSignal
   ResettingErrorBoundary: typeof ResettingErrorBoundary
+  sessionNotFoundShown: () => boolean
   render: typeof render
   SessionNotFound: typeof SessionNotFound
   setLocale: typeof setLocale
@@ -84,6 +85,14 @@ describe("找不到对话 #not-found", () => {
     expect([...page.querySelectorAll("button")].map((button) => button.textContent)).toEqual(["回到新对话"])
     expect(page.querySelector("code")).toBeNull()
     expect(page.textContent).not.toMatch(/Local Server|ses_|标签页|服务器/)
+  })
+
+  test("页面在场时告诉外壳(顶栏据此写「找不到对话」),离开即撤", () => {
+    expect(runtime.sessionNotFoundShown()).toBe(false)
+    mount(() => {})
+    expect(runtime.sessionNotFoundShown()).toBe(true)
+    disposers.splice(0).forEach((dispose) => dispose())
+    expect(runtime.sessionNotFoundShown()).toBe(false)
   })
 
   test("点「回到新对话」交给调用方的出口(只调用一次)", () => {

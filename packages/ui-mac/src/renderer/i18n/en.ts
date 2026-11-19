@@ -1174,6 +1174,7 @@ export const dict = {
   "codepuppy.home.serverSwitched": "Server switched",
   "codepuppy.home.serverSwitchedDraftDiscarded": "Your unsent draft was not kept",
   "codepuppy.newSession.title": "New chat",
+  "codepuppy.session.notFoundTitle": "Conversation not found",
   "codepuppy.newSession.heading": "What shall we work on?",
   "codepuppy.newSession.preparing": "Preparing a new chat…",
   "codepuppy.newSession.attachmentReadPending": "An attachment is still loading — switching workspaces would discard it. Try again in a moment.",

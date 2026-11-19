@@ -49,6 +49,7 @@ import { extHubOpen, setExtHubOpen, toggleExtHub } from "../extensions/ext-hub-s
 import { rememberRoute, restoredRoute } from "../reload-place-store"
 import { automationOpen, setAutomationOpen, toggleAutomation } from "../automations/automation-state"
 import { setSettingsOpen, settingsOpen } from "../codepuppy-ui/settings-state"
+import { sessionNotFoundShown } from "@opencode-ai/app/surface/session-not-found-state"
 import { dismissMenu, dismissMenuOnEscape, focusFirstMenuItem } from "./menu-a11y"
 import { ProblemsEntry } from "./problems-entry"
 import { Card } from "../codepuppy-ui/Card"
@@ -210,6 +211,8 @@ export function CodePuppySidebar(props: {
     if (settingsOpen()) return t("codepuppy.sidebar.settings")
     if (automationOpen()) return t("codepuppy.sidebar.automation")
     if (extHubOpen()) return t("codepuppy.sidebar.plugins")
+    // A missing conversation has no workspace to name itself: the chrome writes the title (frame #not-found).
+    if (sessionNotFoundShown()) return t("codepuppy.session.notFoundTitle")
     // A session names itself: the workspace renders its breadcrumb into the top bar.
     return parseRoute(location.pathname).kind === "session" ? undefined : t("codepuppy.newSession.title")
   }

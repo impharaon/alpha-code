@@ -33,6 +33,7 @@ import type { SettingsSurfaceApi } from "../codepuppy-ui/settings-authority-clie
 
 export { render }
 // 右栏开合信号(全应用唯一一份):顶栏右侧开关读写它;用例经运行时拿同一个模块实例。
+export { setSessionNotFoundShown } from "@opencode-ai/app/surface/session-not-found-state"
 export { rightPanelOpen, setRightPanelOpen } from "../codepuppy-ui/session-workspace/right-panel-state"
 export { PermChip }
 

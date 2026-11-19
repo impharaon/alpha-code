@@ -2474,12 +2474,15 @@ index df575b71f..32c3f1881 100644
            batch(() => {
              setStore("all", store.all.length, newTerminal)
 diff --git a/packages/app/src/i18n/am.ts b/packages/app/src/i18n/am.ts
-index bda48350e..88689bd78 100644
+index bda48350e..6998ed5cf 100644
 --- a/packages/app/src/i18n/am.ts
 +++ b/packages/app/src/i18n/am.ts
-@@ -696,6 +696,7 @@ export const dict = {
+@@ -694,8 +694,9 @@ export const dict = {
+   "session.tab.unknown": "ያልታወቀ ክፍለ ጊዜ",
+   "session.panel.reviewAndFiles": "ግምገማ እና ፋይሎች",
    "session.error.notFound": "ይህ ክፍለ ጊዜ ሊገኝ አይችልም",
-   "session.error.notFound.description": "ይህ ትር የሚያመለክተው በዚህ አገልጋይ ላይ ወደሌለው ክፍለ ጊዜ ነው።",
+-  "session.error.notFound.description": "ይህ ትር የሚያመለክተው በዚህ አገልጋይ ላይ ወደሌለው ክፍለ ጊዜ ነው።",
++  "session.error.notFound.description": "It may have been deleted.",
    "session.error.notFound.closeTab": "ትርን ዝጋ",
 +  "session.error.notFound.newSession": "Back to a new conversation",
    "session.error.serverConnection": "ከዚህ አገልጋይ ጋር መገናኘት አልተቻለም",
@@ -2496,12 +2499,17 @@ index bda48350e..88689bd78 100644
 +  "session.draft.missing.action": "Back to home",
  }
 diff --git a/packages/app/src/i18n/ar.ts b/packages/app/src/i18n/ar.ts
-index 3f55b3084..c32cdef6a 100644
+index 3f55b3084..6964f2c9a 100644
 --- a/packages/app/src/i18n/ar.ts
 +++ b/packages/app/src/i18n/ar.ts
-@@ -695,6 +695,7 @@ export const dict = {
-   "session.error.notFound": "لا يمكن العثور على هذه الجلسة",
-   "session.error.notFound.description": "يشير هذا التبويب إلى جلسة لم تعد موجودة على هذا الخادم.",
+@@ -692,9 +692,10 @@ export const dict = {
+   "session.tab.context": "سياق",
+   "session.tab.unknown": "جلسة غير معروفة",
+   "session.panel.reviewAndFiles": "المراجعة والملفات",
+-  "session.error.notFound": "لا يمكن العثور على هذه الجلسة",
+-  "session.error.notFound.description": "يشير هذا التبويب إلى جلسة لم تعد موجودة على هذا الخادم.",
++  "session.error.notFound": "تعذّر العثور على هذه المحادثة",
++  "session.error.notFound.description": "ربما تم حذفها.",
    "session.error.notFound.closeTab": "إغلاق علامة التبويب",
 +  "session.error.notFound.newSession": "العودة إلى محادثة جديدة",
    "session.error.serverConnection": "تعذر الاتصال بهذا الخادم",
@@ -2518,12 +2526,15 @@ index 3f55b3084..c32cdef6a 100644
 +  "session.draft.missing.action": "Back to home",
  }
 diff --git a/packages/app/src/i18n/az.ts b/packages/app/src/i18n/az.ts
-index d818ae57f..7610c4277 100644
+index d818ae57f..b8897e781 100644
 --- a/packages/app/src/i18n/az.ts
 +++ b/packages/app/src/i18n/az.ts
-@@ -718,6 +718,7 @@ export const dict = {
+@@ -716,8 +716,9 @@ export const dict = {
+   "session.tab.unknown": "Naməlum sessiya",
+   "session.panel.reviewAndFiles": "İcmal və fayllar",
    "session.error.notFound": "Bu sessiyanı tapmaq mümkün deyil",
-   "session.error.notFound.description": "Bu tab artıq bu serverdə olmayan sessiyaya işarə edir.",
+-  "session.error.notFound.description": "Bu tab artıq bu serverdə olmayan sessiyaya işarə edir.",
++  "session.error.notFound.description": "It may have been deleted.",
    "session.error.notFound.closeTab": "Tabı bağla",
 +  "session.error.notFound.newSession": "Back to a new conversation",
    "session.error.serverConnection": "Bu serverə qoşulmaq mümkün deyil",
@@ -2540,12 +2551,17 @@ index d818ae57f..7610c4277 100644
 +  "session.draft.missing.action": "Back to home",
  }
 diff --git a/packages/app/src/i18n/bg.ts b/packages/app/src/i18n/bg.ts
-index 7f63d1fa4..29424a46d 100644
+index 7f63d1fa4..91e6ec210 100644
 --- a/packages/app/src/i18n/bg.ts
 +++ b/packages/app/src/i18n/bg.ts
-@@ -714,6 +714,7 @@ export const dict = {
-   "session.error.notFound": "Тази сесия не може да бъде намерена",
-   "session.error.notFound.description": "Този раздел сочи към сесия, която вече не съществува на този сървър.",
+@@ -711,9 +711,10 @@ export const dict = {
+   "session.tab.context": "Контекст",
+   "session.tab.unknown": "Неизвестна сесия",
+   "session.panel.reviewAndFiles": "Преглед и файлове",
+-  "session.error.notFound": "Тази сесия не може да бъде намерена",
+-  "session.error.notFound.description": "Този раздел сочи към сесия, която вече не съществува на този сървър.",
++  "session.error.notFound": "Този разговор не може да бъде намерен",
++  "session.error.notFound.description": "Може да е бил изтрит.",
    "session.error.notFound.closeTab": "Затваряне на раздела",
 +  "session.error.notFound.newSession": "Назад към нов разговор",
    "session.error.serverConnection": "Не може да се свърже с този сървър",
@@ -2562,12 +2578,17 @@ index 7f63d1fa4..29424a46d 100644
 +  "session.draft.missing.action": "Back to home",
  }
 diff --git a/packages/app/src/i18n/bn.ts b/packages/app/src/i18n/bn.ts
-index 5f0698ab6..5367406e9 100644
+index 5f0698ab6..2a7815053 100644
 --- a/packages/app/src/i18n/bn.ts
 +++ b/packages/app/src/i18n/bn.ts
-@@ -708,6 +708,7 @@ export const dict: Record<string, string> = {
-   "session.error.notFound": "এই সেশন খুঁজে পাওয়া যাবে না",
-   "session.error.notFound.description": "এই ট্যাবটি এমন একটি সেশনের দিকে নির্দেশ করে যা এই সার্ভারে আর বিদ্যমান নেই।",
+@@ -705,9 +705,10 @@ export const dict: Record<string, string> = {
+   "session.tab.context": "প্রসঙ্গ",
+   "session.tab.unknown": "অজানা সেশন",
+   "session.panel.reviewAndFiles": "পর্যালোচনা এবং ফাইল",
+-  "session.error.notFound": "এই সেশন খুঁজে পাওয়া যাবে না",
+-  "session.error.notFound.description": "এই ট্যাবটি এমন একটি সেশনের দিকে নির্দেশ করে যা এই সার্ভারে আর বিদ্যমান নেই।",
++  "session.error.notFound": "এই কথোপকথন খুঁজে পাওয়া যাবে না",
++  "session.error.notFound.description": "এটি মুছে ফেলা হয়ে থাকতে পারে।",
    "session.error.notFound.closeTab": "ট্যাব বন্ধ করুন",
 +  "session.error.notFound.newSession": "নতুন কথোপকথনে ফিরে যান",
    "session.error.serverConnection": "এই সার্ভারের সাথে সংযোগ করা যাচ্ছে না৷",
@@ -2584,12 +2605,17 @@ index 5f0698ab6..5367406e9 100644
 +  "session.draft.missing.action": "Back to home",
  }
 diff --git a/packages/app/src/i18n/br.ts b/packages/app/src/i18n/br.ts
-index 09da845cc..b671feac9 100644
+index 09da845cc..b8d4a29e2 100644
 --- a/packages/app/src/i18n/br.ts
 +++ b/packages/app/src/i18n/br.ts
-@@ -702,6 +702,7 @@ export const dict = {
-   "session.error.notFound": "Esta sessão não foi encontrada",
-   "session.error.notFound.description": "Esta aba aponta para uma sessão que não existe mais neste servidor.",
+@@ -699,9 +699,10 @@ export const dict = {
+   "session.tab.context": "Contexto",
+   "session.tab.unknown": "Sessão desconhecida",
+   "session.panel.reviewAndFiles": "Revisão e arquivos",
+-  "session.error.notFound": "Esta sessão não foi encontrada",
+-  "session.error.notFound.description": "Esta aba aponta para uma sessão que não existe mais neste servidor.",
++  "session.error.notFound": "Não foi possível encontrar esta conversa",
++  "session.error.notFound.description": "Ela pode ter sido excluída.",
    "session.error.notFound.closeTab": "Fechar aba",
 +  "session.error.notFound.newSession": "Voltar para uma nova conversa",
    "session.error.serverConnection": "Não é possível conectar a este servidor",
@@ -2606,12 +2632,17 @@ index 09da845cc..b671feac9 100644
 +  "session.draft.missing.action": "Back to home",
  }
 diff --git a/packages/app/src/i18n/bs.ts b/packages/app/src/i18n/bs.ts
-index feb41c651..486db1f33 100644
+index feb41c651..bfbfcd396 100644
 --- a/packages/app/src/i18n/bs.ts
 +++ b/packages/app/src/i18n/bs.ts
-@@ -755,6 +755,7 @@ export const dict = {
-   "session.error.notFound": "Ova sesija nije pronađena",
-   "session.error.notFound.description": "Ova kartica upućuje na sesiju koja više ne postoji na ovom serveru.",
+@@ -752,9 +752,10 @@ export const dict = {
+   "session.tab.context": "Kontekst",
+   "session.tab.unknown": "Nepoznata sesija",
+   "session.panel.reviewAndFiles": "Pregled i datoteke",
+-  "session.error.notFound": "Ova sesija nije pronađena",
+-  "session.error.notFound.description": "Ova kartica upućuje na sesiju koja više ne postoji na ovom serveru.",
++  "session.error.notFound": "Ovaj razgovor nije pronađen",
++  "session.error.notFound.description": "Možda je obrisan.",
    "session.error.notFound.closeTab": "Zatvori karticu",
 +  "session.error.notFound.newSession": "Nazad na novi razgovor",
    "session.error.serverConnection": "Nije moguće povezati se s ovim serverom",
@@ -2628,12 +2659,17 @@ index feb41c651..486db1f33 100644
 +  "session.draft.missing.action": "Back to home",
  }
 diff --git a/packages/app/src/i18n/ca.ts b/packages/app/src/i18n/ca.ts
-index 21ad32560..aab9782fe 100644
+index 21ad32560..b3ca0a7f9 100644
 --- a/packages/app/src/i18n/ca.ts
 +++ b/packages/app/src/i18n/ca.ts
-@@ -714,6 +714,7 @@ export const dict = {
-   "session.error.notFound": "No es pot trobar aquesta sessió",
-   "session.error.notFound.description": "Aquesta pestanya apunta a una sessió que ja no existeix en aquest servidor.",
+@@ -711,9 +711,10 @@ export const dict = {
+   "session.tab.context": "Context",
+   "session.tab.unknown": "Sessió desconeguda",
+   "session.panel.reviewAndFiles": "Revisió i arxius",
+-  "session.error.notFound": "No es pot trobar aquesta sessió",
+-  "session.error.notFound.description": "Aquesta pestanya apunta a una sessió que ja no existeix en aquest servidor.",
++  "session.error.notFound": "No es pot trobar aquesta conversa",
++  "session.error.notFound.description": "Pot ser que s'hagi eliminat.",
    "session.error.notFound.closeTab": "Tanca la pestanya",
 +  "session.error.notFound.newSession": "Torna a una conversa nova",
    "session.error.serverConnection": "No es pot connectar a aquest servidor",
@@ -2650,12 +2686,17 @@ index 21ad32560..aab9782fe 100644
 +  "session.draft.missing.action": "Back to home",
  }
 diff --git a/packages/app/src/i18n/cs.ts b/packages/app/src/i18n/cs.ts
-index d79d4eb5a..5c7bd591b 100644
+index d79d4eb5a..59b4a45e0 100644
 --- a/packages/app/src/i18n/cs.ts
 +++ b/packages/app/src/i18n/cs.ts
-@@ -709,6 +709,7 @@ export const dict = {
-   "session.error.notFound": "Tuto relaci nelze najít",
-   "session.error.notFound.description": "Tato karta ukazuje na relaci, která již na tomto serveru neexistuje.",
+@@ -706,9 +706,10 @@ export const dict = {
+   "session.tab.context": "Kontext",
+   "session.tab.unknown": "Neznámá relace",
+   "session.panel.reviewAndFiles": "Recenze a soubory",
+-  "session.error.notFound": "Tuto relaci nelze najít",
+-  "session.error.notFound.description": "Tato karta ukazuje na relaci, která již na tomto serveru neexistuje.",
++  "session.error.notFound": "Tuto konverzaci nelze najít",
++  "session.error.notFound.description": "Možná byla smazána.",
    "session.error.notFound.closeTab": "Zavřít kartu",
 +  "session.error.notFound.newSession": "Zpět na novou konverzaci",
    "session.error.serverConnection": "K tomuto serveru se nelze připojit",
@@ -2672,12 +2713,17 @@ index d79d4eb5a..5c7bd591b 100644
 +  "session.draft.missing.action": "Back to home",
  }
 diff --git a/packages/app/src/i18n/da.ts b/packages/app/src/i18n/da.ts
-index 87737b094..c8224ce3d 100644
+index 87737b094..fa4916ded 100644
 --- a/packages/app/src/i18n/da.ts
 +++ b/packages/app/src/i18n/da.ts
-@@ -635,6 +635,7 @@ export const dict = {
-   "session.error.notFound": "Denne session kan ikke findes",
-   "session.error.notFound.description": "Denne fane henviser til en session, der ikke længere findes på denne server.",
+@@ -632,9 +632,10 @@ export const dict = {
+   "session.tab.context": "Kontekst",
+   "session.tab.unknown": "Ukendt session",
+   "session.panel.reviewAndFiles": "Gennemgang og filer",
+-  "session.error.notFound": "Denne session kan ikke findes",
+-  "session.error.notFound.description": "Denne fane henviser til en session, der ikke længere findes på denne server.",
++  "session.error.notFound": "Denne samtale kan ikke findes",
++  "session.error.notFound.description": "Den er muligvis blevet slettet.",
    "session.error.notFound.closeTab": "Luk fane",
 +  "session.error.notFound.newSession": "Tilbage til en ny samtale",
    "session.error.serverConnection": "Kan ikke oprette forbindelse til denne server",
@@ -2694,18 +2740,24 @@ index 87737b094..c8224ce3d 100644
 +  "session.draft.missing.action": "Back to home",
  }
 diff --git a/packages/app/src/i18n/de.ts b/packages/app/src/i18n/de.ts
-index 00849598c..86381cb33 100644
+index 00849598c..81064f0f0 100644
 --- a/packages/app/src/i18n/de.ts
 +++ b/packages/app/src/i18n/de.ts
-@@ -595,6 +595,7 @@ export const dict = {
-   "session.error.notFound.description":
-     "Dieser Tab verweist auf eine Sitzung, die auf diesem Server nicht mehr existiert.",
+@@ -591,10 +591,10 @@ export const dict = {
+   "session.tab.context": "Kontext",
+   "session.tab.unknown": "Unbekannte Sitzung",
+   "session.panel.reviewAndFiles": "Überprüfung und Dateien",
+-  "session.error.notFound": "Diese Sitzung wurde nicht gefunden",
+-  "session.error.notFound.description":
+-    "Dieser Tab verweist auf eine Sitzung, die auf diesem Server nicht mehr existiert.",
++  "session.error.notFound": "Diese Unterhaltung wurde nicht gefunden",
++  "session.error.notFound.description": "Sie wurde möglicherweise gelöscht.",
    "session.error.notFound.closeTab": "Tab schließen",
 +  "session.error.notFound.newSession": "Zurück zu einer neuen Unterhaltung",
    "session.error.serverConnection": "Verbindung zu diesem Server nicht möglich",
    "session.review.filesChanged": "Geänderte Dateien: {{count}}",
    "session.review.change.one": "Änderung",
-@@ -1182,4 +1183,9 @@ export const dict = {
+@@ -1182,4 +1182,9 @@ export const dict = {
    "help.tabs.persistence": "Wenn Sie die App erneut öffnen, sind Ihre Tabs weiterhin geöffnet.",
    "help.tabs.worktrees":
      "Das neue Design unterstützt Git-Worktrees noch nicht. Diese Funktion folgt in Kürze. Wenn Sie das bisherige Layout vorerst weiterverwenden möchten, können Sie in den Einstellungen zwischen den Layouts wechseln. Beachten Sie jedoch, dass das neue Layout in einigen Wochen dauerhaft verwendet wird.",
@@ -2745,12 +2797,15 @@ index 1aa9bd39f..7157bc2ac 100644
    "desktop.menu.app": "OpenCode",
    "desktop.menu.file": "File",
 diff --git a/packages/app/src/i18n/dv.ts b/packages/app/src/i18n/dv.ts
-index 27b5fea86..57ad524c9 100644
+index 27b5fea86..d05243e67 100644
 --- a/packages/app/src/i18n/dv.ts
 +++ b/packages/app/src/i18n/dv.ts
-@@ -720,6 +720,7 @@ export const dict = {
+@@ -718,8 +718,9 @@ export const dict = {
+   "session.tab.unknown": "ނޭނގޭ ސެޝަނެއް",
+   "session.panel.reviewAndFiles": "ރިވިއުކޮށް ފައިލްކުރުން",
    "session.error.notFound": "މި ސެޝަން ހޯދިފައެއް ނުވެއެވެ",
-   "session.error.notFound.description": "މި ޓެބުން އިޝާރާތް ކުރަނީ މި ސަރވަރގައި މިހާރު ނެތް ސެޝަނަކަށެވެ.",
+-  "session.error.notFound.description": "މި ޓެބުން އިޝާރާތް ކުރަނީ މި ސަރވަރގައި މިހާރު ނެތް ސެޝަނަކަށެވެ.",
++  "session.error.notFound.description": "It may have been deleted.",
    "session.error.notFound.closeTab": "Tab ބަންދުކުރުން",
 +  "session.error.notFound.newSession": "Back to a new conversation",
    "session.error.serverConnection": "މި ސަރވަރ އާއި ގުޅެވޭކަށް ނެތެވެ",
@@ -2767,12 +2822,15 @@ index 27b5fea86..57ad524c9 100644
 +  "session.draft.missing.action": "Back to home",
  }
 diff --git a/packages/app/src/i18n/dz.ts b/packages/app/src/i18n/dz.ts
-index 3b2ad46ca..d8bc0d537 100644
+index 3b2ad46ca..b597e7f83 100644
 --- a/packages/app/src/i18n/dz.ts
 +++ b/packages/app/src/i18n/dz.ts
-@@ -720,6 +720,7 @@ export const dict: Record<string, string> = {
+@@ -718,8 +718,9 @@ export const dict: Record<string, string> = {
+   "session.tab.unknown": "མ་ཤེས་པའི་ལཱ་ཡུན།",
+   "session.panel.reviewAndFiles": "བསྐྱར་ཞིབ་དང་ཡིག་སྣོད།",
    "session.error.notFound": "ལཱ་ཡུན་འདི་འཚོལ་མ་ཐོབ།",
-   "session.error.notFound.description": "མཆོང་ལྡེ་འདི་གིས་ སར་བར་འདི་གུ་ད་ལས་ཕར་མེད་པའི་ལཱ་ཡུན་ཅིག་ལུ་དཔག་འབདཝ་ཨིན།",
+-  "session.error.notFound.description": "མཆོང་ལྡེ་འདི་གིས་ སར་བར་འདི་གུ་ད་ལས་ཕར་མེད་པའི་ལཱ་ཡུན་ཅིག་ལུ་དཔག་འབདཝ་ཨིན།",
++  "session.error.notFound.description": "It may have been deleted.",
    "session.error.notFound.closeTab": "མཆོང་ལྡེ་ཁ་བསྡམས།",
 +  "session.error.notFound.newSession": "Back to a new conversation",
    "session.error.serverConnection": "སར་བར་འདི་ལུ་མཐུད་མི་ཚུགས།",
@@ -2789,18 +2847,24 @@ index 3b2ad46ca..d8bc0d537 100644
 +  "session.draft.missing.action": "Back to home",
  }
 diff --git a/packages/app/src/i18n/el.ts b/packages/app/src/i18n/el.ts
-index 8f91b46af..6da6cb11c 100644
+index 8f91b46af..11cbb0eed 100644
 --- a/packages/app/src/i18n/el.ts
 +++ b/packages/app/src/i18n/el.ts
-@@ -716,6 +716,7 @@ export const dict = {
-   "session.error.notFound.description":
-     "Αυτή η καρτέλα δείχνει μια περίοδο λειτουργίας που δεν υπάρχει πλέον σε αυτόν τον διακομιστή.",
+@@ -712,10 +712,10 @@ export const dict = {
+   "session.tab.context": "Πλαίσιο",
+   "session.tab.unknown": "Άγνωστη συνεδρία",
+   "session.panel.reviewAndFiles": "Επισκόπηση και αρχεία",
+-  "session.error.notFound": "Δεν μπορεί να βρεθεί αυτή η συνεδρία",
+-  "session.error.notFound.description":
+-    "Αυτή η καρτέλα δείχνει μια περίοδο λειτουργίας που δεν υπάρχει πλέον σε αυτόν τον διακομιστή.",
++  "session.error.notFound": "Δεν είναι δυνατή η εύρεση αυτής της συνομιλίας",
++  "session.error.notFound.description": "Ίσως έχει διαγραφεί.",
    "session.error.notFound.closeTab": "Κλείσιμο καρτέλας",
 +  "session.error.notFound.newSession": "Επιστροφή σε νέα συνομιλία",
    "session.error.serverConnection": "Δεν είναι δυνατή η σύνδεση σε αυτόν τον διακομιστή",
    "session.review.filesChanged": "Τα αρχεία άλλαξαν {{count}}",
    "session.review.change.one": "Αλλαγή",
-@@ -1170,4 +1171,9 @@ export const dict = {
+@@ -1170,4 +1170,9 @@ export const dict = {
    "workspace.reset.archived.many": "{{count}} θα αρχειοθετηθούν οι περίοδοι σύνδεσης.",
    "workspace.reset.note": "Αυτό θα επαναφέρει τον χώρο εργασίας ώστε να ταιριάζει με τον προεπιλεγμένο κλάδο.",
    "dialog.usageExceeded.dontShowAgain": "Να μην εμφανιστεί ξανά",
@@ -2843,12 +2907,17 @@ index 62d4dc1ae..746155cbf 100644
    "session.header.searchFiles": "Search files",
    "session.header.openIn": "Open in",
 diff --git a/packages/app/src/i18n/es.ts b/packages/app/src/i18n/es.ts
-index 9e9ff2c36..c513dd25f 100644
+index 9e9ff2c36..f99ed12be 100644
 --- a/packages/app/src/i18n/es.ts
 +++ b/packages/app/src/i18n/es.ts
-@@ -758,6 +758,7 @@ export const dict = {
-   "session.error.notFound": "No se encuentra esta sesión",
-   "session.error.notFound.description": "Esta pestaña apunta a una sesión que ya no existe en este servidor.",
+@@ -755,9 +755,10 @@ export const dict = {
+   "session.tab.context": "Contexto",
+   "session.tab.unknown": "Sesión desconocida",
+   "session.panel.reviewAndFiles": "Revisión y archivos",
+-  "session.error.notFound": "No se encuentra esta sesión",
+-  "session.error.notFound.description": "Esta pestaña apunta a una sesión que ya no existe en este servidor.",
++  "session.error.notFound": "No se encuentra esta conversación",
++  "session.error.notFound.description": "Puede que se haya eliminado.",
    "session.error.notFound.closeTab": "Cerrar pestaña",
 +  "session.error.notFound.newSession": "Volver a una conversación nueva",
    "session.error.serverConnection": "No se puede conectar a este servidor",
@@ -2865,12 +2934,17 @@ index 9e9ff2c36..c513dd25f 100644
 +  "session.draft.missing.action": "Back to home",
  }
 diff --git a/packages/app/src/i18n/et.ts b/packages/app/src/i18n/et.ts
-index d78296675..515de8649 100644
+index d78296675..92bf80102 100644
 --- a/packages/app/src/i18n/et.ts
 +++ b/packages/app/src/i18n/et.ts
-@@ -704,6 +704,7 @@ export const dict = {
-   "session.error.notFound": "Seda seanssi ei leitud",
-   "session.error.notFound.description": "See vahekaart osutab seansile, mida selles serveris enam ei eksisteeri.",
+@@ -701,9 +701,10 @@ export const dict = {
+   "session.tab.context": "Kontekst",
+   "session.tab.unknown": "Tundmatu seanss",
+   "session.panel.reviewAndFiles": "Ülevaatus ja failid",
+-  "session.error.notFound": "Seda seanssi ei leitud",
+-  "session.error.notFound.description": "See vahekaart osutab seansile, mida selles serveris enam ei eksisteeri.",
++  "session.error.notFound": "Seda vestlust ei leitud",
++  "session.error.notFound.description": "See on võib-olla kustutatud.",
    "session.error.notFound.closeTab": "Sule vahekaart",
 +  "session.error.notFound.newSession": "Tagasi uue vestluse juurde",
    "session.error.serverConnection": "Selle serveriga ei saa ühendust",
@@ -2887,12 +2961,17 @@ index d78296675..515de8649 100644
 +  "session.draft.missing.action": "Back to home",
  }
 diff --git a/packages/app/src/i18n/fa.ts b/packages/app/src/i18n/fa.ts
-index 0d3d721b5..c43b6750b 100644
+index 0d3d721b5..bf4d54669 100644
 --- a/packages/app/src/i18n/fa.ts
 +++ b/packages/app/src/i18n/fa.ts
-@@ -708,6 +708,7 @@ export const dict = {
-   "session.error.notFound": "این جلسه یافت نمی شود",
-   "session.error.notFound.description": "این تب به جلسه ای اشاره می کند که دیگر در این سرور وجود ندارد.",
+@@ -705,9 +705,10 @@ export const dict = {
+   "session.tab.context": "زمینه",
+   "session.tab.unknown": "جلسه ناشناخته",
+   "session.panel.reviewAndFiles": "بررسی و فایل ها",
+-  "session.error.notFound": "این جلسه یافت نمی شود",
+-  "session.error.notFound.description": "این تب به جلسه ای اشاره می کند که دیگر در این سرور وجود ندارد.",
++  "session.error.notFound": "این گفتگو یافت نمی شود",
++  "session.error.notFound.description": "ممکن است حذف شده باشد.",
    "session.error.notFound.closeTab": "Tab را ببندید",
 +  "session.error.notFound.newSession": "بازگشت به گفتگوی جدید",
    "session.error.serverConnection": "نمی توان به این سرور متصل شد",
@@ -2909,12 +2988,17 @@ index 0d3d721b5..c43b6750b 100644
 +  "session.draft.missing.action": "Back to home",
  }
 diff --git a/packages/app/src/i18n/fi.ts b/packages/app/src/i18n/fi.ts
-index aa9c92574..e6dc09c4e 100644
+index aa9c92574..ecc3a22d4 100644
 --- a/packages/app/src/i18n/fi.ts
 +++ b/packages/app/src/i18n/fi.ts
-@@ -606,6 +606,7 @@ export const dict = {
-   "session.error.notFound": "Tätä istuntoa ei löydy",
-   "session.error.notFound.description": "Tämä välilehti osoittaa istuntoon, jota ei enää ole tällä palvelimella.",
+@@ -603,9 +603,10 @@ export const dict = {
+   "session.tab.context": "Konteksti",
+   "session.tab.unknown": "Tuntematon istunto",
+   "session.panel.reviewAndFiles": "Tarkistus ja tiedostot",
+-  "session.error.notFound": "Tätä istuntoa ei löydy",
+-  "session.error.notFound.description": "Tämä välilehti osoittaa istuntoon, jota ei enää ole tällä palvelimella.",
++  "session.error.notFound": "Tätä keskustelua ei löydy",
++  "session.error.notFound.description": "Se on voitu poistaa.",
    "session.error.notFound.closeTab": "Sulje välilehti",
 +  "session.error.notFound.newSession": "Palaa uuteen keskusteluun",
    "session.error.serverConnection": "Ei voi muodostaa yhteyttä tähän palvelimeen",
@@ -2931,12 +3015,15 @@ index aa9c92574..e6dc09c4e 100644
 +  "session.draft.missing.action": "Back to home",
  }
 diff --git a/packages/app/src/i18n/fo.ts b/packages/app/src/i18n/fo.ts
-index 4329a35b4..24bbf2098 100644
+index 4329a35b4..56adae6a0 100644
 --- a/packages/app/src/i18n/fo.ts
 +++ b/packages/app/src/i18n/fo.ts
-@@ -709,6 +709,7 @@ export const dict = {
+@@ -707,8 +707,9 @@ export const dict = {
+   "session.tab.unknown": "Ókend seta",
+   "session.panel.reviewAndFiles": "Ummæli og skráir",
    "session.error.notFound": "Henda setan er ikki at finna",
-   "session.error.notFound.description": "Hesin flipin vísir á eina setu, sum ikki longur er til á hesum ambætaranum.",
+-  "session.error.notFound.description": "Hesin flipin vísir á eina setu, sum ikki longur er til á hesum ambætaranum.",
++  "session.error.notFound.description": "It may have been deleted.",
    "session.error.notFound.closeTab": "Lat flipan aftur",
 +  "session.error.notFound.newSession": "Back to a new conversation",
    "session.error.serverConnection": "Kann ikki seta samband við hendan ambætaran",
@@ -2953,12 +3040,17 @@ index 4329a35b4..24bbf2098 100644
 +  "session.draft.missing.action": "Back to home",
  }
 diff --git a/packages/app/src/i18n/fr.ts b/packages/app/src/i18n/fr.ts
-index 3c89860a4..eef197200 100644
+index 3c89860a4..45b78fc9e 100644
 --- a/packages/app/src/i18n/fr.ts
 +++ b/packages/app/src/i18n/fr.ts
-@@ -712,6 +712,7 @@ export const dict = {
-   "session.error.notFound": "Cette session est introuvable",
-   "session.error.notFound.description": "Cet onglet pointe vers une session qui n'existe plus sur ce serveur.",
+@@ -709,9 +709,10 @@ export const dict = {
+   "session.tab.context": "Contexte",
+   "session.tab.unknown": "Session inconnue",
+   "session.panel.reviewAndFiles": "Revue et fichiers",
+-  "session.error.notFound": "Cette session est introuvable",
+-  "session.error.notFound.description": "Cet onglet pointe vers une session qui n'existe plus sur ce serveur.",
++  "session.error.notFound": "Cette conversation est introuvable",
++  "session.error.notFound.description": "Elle a peut-être été supprimée.",
    "session.error.notFound.closeTab": "Fermer l'onglet",
 +  "session.error.notFound.newSession": "Retour à une nouvelle conversation",
    "session.error.serverConnection": "Impossible de se connecter à ce serveur",
@@ -2975,12 +3067,17 @@ index 3c89860a4..eef197200 100644
 +  "session.draft.missing.action": "Back to home",
  }
 diff --git a/packages/app/src/i18n/hi.ts b/packages/app/src/i18n/hi.ts
-index 0aaf8e14d..81ddfa92e 100644
+index 0aaf8e14d..9c338e4e9 100644
 --- a/packages/app/src/i18n/hi.ts
 +++ b/packages/app/src/i18n/hi.ts
-@@ -718,6 +718,7 @@ export const dict = {
-   "session.error.notFound": "यह सेशन नहीं मिल सका",
-   "session.error.notFound.description": "यह टैब एक सेशन की ओर इशारा करता है जो अब इस सर्वर पर मौजूद नहीं है।",
+@@ -715,9 +715,10 @@ export const dict = {
+   "session.tab.context": "कॉन्टेक्स्ट",
+   "session.tab.unknown": "अज्ञात सेशन",
+   "session.panel.reviewAndFiles": "समीक्षा और फ़ाइलें",
+-  "session.error.notFound": "यह सेशन नहीं मिल सका",
+-  "session.error.notFound.description": "यह टैब एक सेशन की ओर इशारा करता है जो अब इस सर्वर पर मौजूद नहीं है।",
++  "session.error.notFound": "यह बातचीत नहीं मिल सकी",
++  "session.error.notFound.description": "हो सकता है इसे हटा दिया गया हो।",
    "session.error.notFound.closeTab": "टैब बंद करें",
 +  "session.error.notFound.newSession": "नई बातचीत पर वापस जाएँ",
    "session.error.serverConnection": "इस सर्वर से कनेक्ट नहीं किया जा सकता",
@@ -2997,12 +3094,17 @@ index 0aaf8e14d..81ddfa92e 100644
 +  "session.draft.missing.action": "Back to home",
  }
 diff --git a/packages/app/src/i18n/hr.ts b/packages/app/src/i18n/hr.ts
-index 2130c88ad..024aac9a4 100644
+index 2130c88ad..e1e4dbb66 100644
 --- a/packages/app/src/i18n/hr.ts
 +++ b/packages/app/src/i18n/hr.ts
-@@ -716,6 +716,7 @@ export const dict = {
-   "session.error.notFound": "Ovu sesiju nije moguće pronaći",
-   "session.error.notFound.description": "Ova kartica ukazuje na sesiju koja više ne postoji na ovom poslužitelju.",
+@@ -713,9 +713,10 @@ export const dict = {
+   "session.tab.context": "Kontekst",
+   "session.tab.unknown": "Nepoznata sesija",
+   "session.panel.reviewAndFiles": "Pregled i datoteke",
+-  "session.error.notFound": "Ovu sesiju nije moguće pronaći",
+-  "session.error.notFound.description": "Ova kartica ukazuje na sesiju koja više ne postoji na ovom poslužitelju.",
++  "session.error.notFound": "Ovaj razgovor nije moguće pronaći",
++  "session.error.notFound.description": "Možda je izbrisan.",
    "session.error.notFound.closeTab": "Zatvori Tab",
 +  "session.error.notFound.newSession": "Natrag na novi razgovor",
    "session.error.serverConnection": "Ne mogu se spojiti na ovaj poslužitelj",
@@ -3019,12 +3121,17 @@ index 2130c88ad..024aac9a4 100644
 +  "session.draft.missing.action": "Back to home",
  }
 diff --git a/packages/app/src/i18n/hu.ts b/packages/app/src/i18n/hu.ts
-index 664abf8ee..1cccc2da2 100644
+index 664abf8ee..98bcdd84c 100644
 --- a/packages/app/src/i18n/hu.ts
 +++ b/packages/app/src/i18n/hu.ts
-@@ -714,6 +714,7 @@ export const dict = {
-   "session.error.notFound": "Ez a munkamenet nem található",
-   "session.error.notFound.description": "Ez a lap olyan munkamenetre mutat, amely már nem létezik ezen a kiszolgálón.",
+@@ -711,9 +711,10 @@ export const dict = {
+   "session.tab.context": "Kontextus",
+   "session.tab.unknown": "Ismeretlen munkamenet",
+   "session.panel.reviewAndFiles": "Áttekintés és fájlok",
+-  "session.error.notFound": "Ez a munkamenet nem található",
+-  "session.error.notFound.description": "Ez a lap olyan munkamenetre mutat, amely már nem létezik ezen a kiszolgálón.",
++  "session.error.notFound": "Ez a beszélgetés nem található",
++  "session.error.notFound.description": "Lehet, hogy törölték.",
    "session.error.notFound.closeTab": "Zárja be a Tab-t",
 +  "session.error.notFound.newSession": "Vissza egy új beszélgetéshez",
    "session.error.serverConnection": "Nem lehet csatlakozni ehhez a szerverhez",
@@ -3041,12 +3148,15 @@ index 664abf8ee..1cccc2da2 100644
 +  "session.draft.missing.action": "Back to home",
  }
 diff --git a/packages/app/src/i18n/hy.ts b/packages/app/src/i18n/hy.ts
-index 6eac43b5e..c61178310 100644
+index 6eac43b5e..7a29c0319 100644
 --- a/packages/app/src/i18n/hy.ts
 +++ b/packages/app/src/i18n/hy.ts
-@@ -713,6 +713,7 @@ export const dict = {
+@@ -711,8 +711,9 @@ export const dict = {
+   "session.tab.unknown": "Անհայտ նիստ",
+   "session.panel.reviewAndFiles": "Վերանայել և ֆայլեր",
    "session.error.notFound": "Այս նիստը հնարավոր չէ գտնել",
-   "session.error.notFound.description": "Այս ներդիրը ցույց է տալիս նիստ, որն այլևս գոյություն չունի այս սերվերում։",
+-  "session.error.notFound.description": "Այս ներդիրը ցույց է տալիս նիստ, որն այլևս գոյություն չունի այս սերվերում։",
++  "session.error.notFound.description": "It may have been deleted.",
    "session.error.notFound.closeTab": "Փակել ներդիրը",
 +  "session.error.notFound.newSession": "Back to a new conversation",
    "session.error.serverConnection": "Հնարավոր չէ միանալ այս սերվերին",
@@ -3063,12 +3173,17 @@ index 6eac43b5e..c61178310 100644
 +  "session.draft.missing.action": "Back to home",
  }
 diff --git a/packages/app/src/i18n/id.ts b/packages/app/src/i18n/id.ts
-index 96dc3c759..dd69f027f 100644
+index 96dc3c759..6bd00b7f8 100644
 --- a/packages/app/src/i18n/id.ts
 +++ b/packages/app/src/i18n/id.ts
-@@ -773,6 +773,7 @@ export const dict = {
-   "session.error.notFound": "Sesi ini tidak dapat ditemukan",
-   "session.error.notFound.description": "Tab ini mengarah ke sesi yang sudah tidak ada di server ini.",
+@@ -770,9 +770,10 @@ export const dict = {
+   "session.tab.context": "Konteks",
+   "session.tab.unknown": "Sesi Tidak Dikenal",
+   "session.panel.reviewAndFiles": "Tinjauan dan berkas",
+-  "session.error.notFound": "Sesi ini tidak dapat ditemukan",
+-  "session.error.notFound.description": "Tab ini mengarah ke sesi yang sudah tidak ada di server ini.",
++  "session.error.notFound": "Percakapan ini tidak dapat ditemukan",
++  "session.error.notFound.description": "Mungkin percakapan ini telah dihapus.",
    "session.error.notFound.closeTab": "Tutup Tab",
 +  "session.error.notFound.newSession": "Kembali ke percakapan baru",
    "session.error.serverConnection": "Tidak dapat terhubung ke server ini",
@@ -3085,12 +3200,15 @@ index 96dc3c759..dd69f027f 100644
 +  "session.draft.missing.action": "Back to home",
  }
 diff --git a/packages/app/src/i18n/is.ts b/packages/app/src/i18n/is.ts
-index a45ed9a40..69c66e7b0 100644
+index a45ed9a40..df42b24f8 100644
 --- a/packages/app/src/i18n/is.ts
 +++ b/packages/app/src/i18n/is.ts
-@@ -711,6 +711,7 @@ export const dict = {
+@@ -709,8 +709,9 @@ export const dict = {
+   "session.tab.unknown": "Óþekkt lota",
+   "session.panel.reviewAndFiles": "Yfirferð og skrár",
    "session.error.notFound": "Þessi lota finnst ekki",
-   "session.error.notFound.description": "Þessi flipi bendir á lotu sem er ekki lengur til á þessum netþjóni.",
+-  "session.error.notFound.description": "Þessi flipi bendir á lotu sem er ekki lengur til á þessum netþjóni.",
++  "session.error.notFound.description": "It may have been deleted.",
    "session.error.notFound.closeTab": "Lokaðu Tab",
 +  "session.error.notFound.newSession": "Back to a new conversation",
    "session.error.serverConnection": "Get ekki tengst þessum þjóni",
@@ -3107,12 +3225,17 @@ index a45ed9a40..69c66e7b0 100644
 +  "session.draft.missing.action": "Back to home",
  }
 diff --git a/packages/app/src/i18n/it.ts b/packages/app/src/i18n/it.ts
-index a093e1148..719d44b10 100644
+index a093e1148..9255a551a 100644
 --- a/packages/app/src/i18n/it.ts
 +++ b/packages/app/src/i18n/it.ts
-@@ -624,6 +624,7 @@ export const dict = {
-   "session.error.notFound": "Impossibile trovare questa sessione",
-   "session.error.notFound.description": "Questa scheda punta a una sessione che non esiste più su questo server.",
+@@ -621,9 +621,10 @@ export const dict = {
+   "session.tab.context": "Contesto",
+   "session.tab.unknown": "Sessione sconosciuta",
+   "session.panel.reviewAndFiles": "Revisione e file",
+-  "session.error.notFound": "Impossibile trovare questa sessione",
+-  "session.error.notFound.description": "Questa scheda punta a una sessione che non esiste più su questo server.",
++  "session.error.notFound": "Impossibile trovare questa conversazione",
++  "session.error.notFound.description": "Potrebbe essere stata eliminata.",
    "session.error.notFound.closeTab": "Chiudi scheda",
 +  "session.error.notFound.newSession": "Torna a una nuova conversazione",
    "session.error.serverConnection": "Impossibile connettersi a questo server",
@@ -3129,12 +3252,17 @@ index a093e1148..719d44b10 100644
 +  "session.draft.missing.action": "Back to home",
  }
 diff --git a/packages/app/src/i18n/ja.ts b/packages/app/src/i18n/ja.ts
-index b96e8b544..8ada03add 100644
+index b96e8b544..c1edc9686 100644
 --- a/packages/app/src/i18n/ja.ts
 +++ b/packages/app/src/i18n/ja.ts
-@@ -698,6 +698,7 @@ export const dict = {
-   "session.error.notFound": "このセッションが見つかりません",
-   "session.error.notFound.description": "このタブが参照するセッションは、このサーバーには存在しません。",
+@@ -695,9 +695,10 @@ export const dict = {
+   "session.tab.context": "コンテキスト",
+   "session.tab.unknown": "不明なセッション",
+   "session.panel.reviewAndFiles": "レビューとファイル",
+-  "session.error.notFound": "このセッションが見つかりません",
+-  "session.error.notFound.description": "このタブが参照するセッションは、このサーバーには存在しません。",
++  "session.error.notFound": "この会話が見つかりません",
++  "session.error.notFound.description": "削除された可能性があります。",
    "session.error.notFound.closeTab": "タブを閉じる",
 +  "session.error.notFound.newSession": "新しい会話に戻る",
    "session.error.serverConnection": "このサーバーに接続できません",
@@ -3151,12 +3279,15 @@ index b96e8b544..8ada03add 100644
 +  "session.draft.missing.action": "Back to home",
  }
 diff --git a/packages/app/src/i18n/ka.ts b/packages/app/src/i18n/ka.ts
-index be052930a..bdaca0815 100644
+index be052930a..b2453208c 100644
 --- a/packages/app/src/i18n/ka.ts
 +++ b/packages/app/src/i18n/ka.ts
-@@ -709,6 +709,7 @@ export const dict = {
+@@ -707,8 +707,9 @@ export const dict = {
+   "session.tab.unknown": "უცნობი სესია",
+   "session.panel.reviewAndFiles": "მიმოხილვა და ფაილები",
    "session.error.notFound": "ეს სესია ვერ მოიძებნა",
-   "session.error.notFound.description": "ეს ჩანართი მიუთითებს სესიაზე, რომელიც აღარ არსებობს ამ სერვერზე.",
+-  "session.error.notFound.description": "ეს ჩანართი მიუთითებს სესიაზე, რომელიც აღარ არსებობს ამ სერვერზე.",
++  "session.error.notFound.description": "It may have been deleted.",
    "session.error.notFound.closeTab": "ჩანართის დახურვა",
 +  "session.error.notFound.newSession": "Back to a new conversation",
    "session.error.serverConnection": "ამ სერვერთან დაკავშირება შეუძლებელია",
@@ -3173,12 +3304,15 @@ index be052930a..bdaca0815 100644
 +  "session.draft.missing.action": "Back to home",
  }
 diff --git a/packages/app/src/i18n/km.ts b/packages/app/src/i18n/km.ts
-index 7f1b61fe3..ca035c228 100644
+index 7f1b61fe3..144c92d0d 100644
 --- a/packages/app/src/i18n/km.ts
 +++ b/packages/app/src/i18n/km.ts
-@@ -706,6 +706,7 @@ export const dict = {
+@@ -704,8 +704,9 @@ export const dict = {
+   "session.tab.unknown": "សម័យមិនស្គាល់",
+   "session.panel.reviewAndFiles": "ពិនិត្យ និងឯកសារ",
    "session.error.notFound": "សម័យនេះមិនអាចរកឃើញទេ។",
-   "session.error.notFound.description": "ផ្ទាំងនេះចង្អុលទៅសម័យដែលលែងមាននៅលើម៉ាស៊ីនមេនេះ។",
+-  "session.error.notFound.description": "ផ្ទាំងនេះចង្អុលទៅសម័យដែលលែងមាននៅលើម៉ាស៊ីនមេនេះ។",
++  "session.error.notFound.description": "It may have been deleted.",
    "session.error.notFound.closeTab": "បិទផ្ទាំង",
 +  "session.error.notFound.newSession": "Back to a new conversation",
    "session.error.serverConnection": "មិនអាចភ្ជាប់ទៅម៉ាស៊ីនមេនេះទេ។",
@@ -3195,12 +3329,17 @@ index 7f1b61fe3..ca035c228 100644
 +  "session.draft.missing.action": "Back to home",
  }
 diff --git a/packages/app/src/i18n/ko.ts b/packages/app/src/i18n/ko.ts
-index b96fb4c59..1a6f44551 100644
+index b96fb4c59..e70a2ce0d 100644
 --- a/packages/app/src/i18n/ko.ts
 +++ b/packages/app/src/i18n/ko.ts
-@@ -998,6 +998,7 @@ export const dict = {
-   "session.error.notFound": "이 세션을 찾을 수 없습니다",
-   "session.error.notFound.description": "이 탭은 이 서버에 더 이상 존재하지 않는 세션을 가리킵니다.",
+@@ -995,9 +995,10 @@ export const dict = {
+   "home.providerTip": "75개 이상의 공급자에 연결하여 Claude, GPT, Gemini 등의 다른 모델을 사용하세요",
+ 
+   "session.tab.unknown": "알 수 없는 세션",
+-  "session.error.notFound": "이 세션을 찾을 수 없습니다",
+-  "session.error.notFound.description": "이 탭은 이 서버에 더 이상 존재하지 않는 세션을 가리킵니다.",
++  "session.error.notFound": "이 대화를 찾을 수 없습니다",
++  "session.error.notFound.description": "삭제되었을 수 있습니다.",
    "session.error.notFound.closeTab": "탭 닫기",
 +  "session.error.notFound.newSession": "새 대화로 돌아가기",
    "session.error.serverConnection": "이 서버에 연결할 수 없습니다",
@@ -3217,12 +3356,15 @@ index b96fb4c59..1a6f44551 100644
 +  "session.draft.missing.action": "Back to home",
  }
 diff --git a/packages/app/src/i18n/lo.ts b/packages/app/src/i18n/lo.ts
-index acdc26df0..68c197831 100644
+index acdc26df0..67bd8e08c 100644
 --- a/packages/app/src/i18n/lo.ts
 +++ b/packages/app/src/i18n/lo.ts
-@@ -704,6 +704,7 @@ export const dict = {
+@@ -702,8 +702,9 @@ export const dict = {
+   "session.tab.unknown": "ເຊດຊັນທີ່ບໍ່ຮູ້ຈັກ",
+   "session.panel.reviewAndFiles": "ການທົບທວນຄືນແລະໄຟລ໌",
    "session.error.notFound": "ບໍ່ພົບເຊດຊັນນີ້",
-   "session.error.notFound.description": "ແຖບນີ້ຊີ້ໄປຫາເຊດຊັນທີ່ບໍ່ມີຢູ່ໃນເຊີບເວີນີ້ແລ້ວ.",
+-  "session.error.notFound.description": "ແຖບນີ້ຊີ້ໄປຫາເຊດຊັນທີ່ບໍ່ມີຢູ່ໃນເຊີບເວີນີ້ແລ້ວ.",
++  "session.error.notFound.description": "It may have been deleted.",
    "session.error.notFound.closeTab": "ປິດແຖບ",
 +  "session.error.notFound.newSession": "Back to a new conversation",
    "session.error.serverConnection": "ບໍ່ສາມາດເຊື່ອມຕໍ່ກັບເຊີບເວີນີ້ໄດ້",
@@ -3239,12 +3381,17 @@ index acdc26df0..68c197831 100644
 +  "session.draft.missing.action": "Back to home",
  }
 diff --git a/packages/app/src/i18n/lt.ts b/packages/app/src/i18n/lt.ts
-index ba161eb31..4087ed3ee 100644
+index ba161eb31..74cc500cb 100644
 --- a/packages/app/src/i18n/lt.ts
 +++ b/packages/app/src/i18n/lt.ts
-@@ -715,6 +715,7 @@ export const dict = {
-   "session.error.notFound": "Šios sesijos rasti nepavyko",
-   "session.error.notFound.description": "Šis skirtukas nurodo seansą, kurio šiame serveryje nebėra.",
+@@ -712,9 +712,10 @@ export const dict = {
+   "session.tab.context": "Kontekstas",
+   "session.tab.unknown": "Nežinomas seansas",
+   "session.panel.reviewAndFiles": "Apžvalga ir failai",
+-  "session.error.notFound": "Šios sesijos rasti nepavyko",
+-  "session.error.notFound.description": "Šis skirtukas nurodo seansą, kurio šiame serveryje nebėra.",
++  "session.error.notFound": "Šio pokalbio rasti nepavyko",
++  "session.error.notFound.description": "Galbūt jis ištrintas.",
    "session.error.notFound.closeTab": "Uždarykite Tab",
 +  "session.error.notFound.newSession": "Grįžti į naują pokalbį",
    "session.error.serverConnection": "Nepavyksta prisijungti prie šio serverio",
@@ -3261,12 +3408,17 @@ index ba161eb31..4087ed3ee 100644
 +  "session.draft.missing.action": "Back to home",
  }
 diff --git a/packages/app/src/i18n/lv.ts b/packages/app/src/i18n/lv.ts
-index df4c5b2dc..516277336 100644
+index df4c5b2dc..9f23ac4a7 100644
 --- a/packages/app/src/i18n/lv.ts
 +++ b/packages/app/src/i18n/lv.ts
-@@ -710,6 +710,7 @@ export const dict = {
-   "session.error.notFound": "Šī sesija nav atrodama",
-   "session.error.notFound.description": "Šī cilne norāda uz sesiju, kas vairs neeksistē šajā serverī.",
+@@ -707,9 +707,10 @@ export const dict = {
+   "session.tab.context": "Konteksts",
+   "session.tab.unknown": "Nezināma sesija",
+   "session.panel.reviewAndFiles": "Pārskats un faili",
+-  "session.error.notFound": "Šī sesija nav atrodama",
+-  "session.error.notFound.description": "Šī cilne norāda uz sesiju, kas vairs neeksistē šajā serverī.",
++  "session.error.notFound": "Šī saruna nav atrodama",
++  "session.error.notFound.description": "Iespējams, tā ir dzēsta.",
    "session.error.notFound.closeTab": "Aizvērt cilni",
 +  "session.error.notFound.newSession": "Atpakaļ uz jaunu sarunu",
    "session.error.serverConnection": "Nevar izveidot savienojumu ar šo serveri",
@@ -3283,12 +3435,15 @@ index df4c5b2dc..516277336 100644
 +  "session.draft.missing.action": "Back to home",
  }
 diff --git a/packages/app/src/i18n/mk.ts b/packages/app/src/i18n/mk.ts
-index 01e60baa4..984aa6989 100644
+index 01e60baa4..6853341b3 100644
 --- a/packages/app/src/i18n/mk.ts
 +++ b/packages/app/src/i18n/mk.ts
-@@ -712,6 +712,7 @@ export const dict = {
+@@ -710,8 +710,9 @@ export const dict = {
+   "session.tab.unknown": "Непозната сесија",
+   "session.panel.reviewAndFiles": "Преглед и датотеки",
    "session.error.notFound": "Оваа сесија не може да се најде",
-   "session.error.notFound.description": "Оваа картичка укажува на сесија што повеќе не постои на овој сервер.",
+-  "session.error.notFound.description": "Оваа картичка укажува на сесија што повеќе не постои на овој сервер.",
++  "session.error.notFound.description": "It may have been deleted.",
    "session.error.notFound.closeTab": "Затвори ја картичката",
 +  "session.error.notFound.newSession": "Back to a new conversation",
    "session.error.serverConnection": "Не може да се поврзе со овој сервер",
@@ -3305,12 +3460,15 @@ index 01e60baa4..984aa6989 100644
 +  "session.draft.missing.action": "Back to home",
  }
 diff --git a/packages/app/src/i18n/mn.ts b/packages/app/src/i18n/mn.ts
-index 41c4fa085..534891e0f 100644
+index 41c4fa085..cc982f5c5 100644
 --- a/packages/app/src/i18n/mn.ts
 +++ b/packages/app/src/i18n/mn.ts
-@@ -714,6 +714,7 @@ export const dict = {
+@@ -712,8 +712,9 @@ export const dict = {
+   "session.tab.unknown": "Үл мэдэгдэх сесс",
+   "session.panel.reviewAndFiles": "Хяналт ба файлууд",
    "session.error.notFound": "Энэ сесс олдохгүй байна",
-   "session.error.notFound.description": "Энэ таб нь энэ сервер дээр байхгүй сессийг заадаг.",
+-  "session.error.notFound.description": "Энэ таб нь энэ сервер дээр байхгүй сессийг заадаг.",
++  "session.error.notFound.description": "It may have been deleted.",
    "session.error.notFound.closeTab": "Табыг хаах",
 +  "session.error.notFound.newSession": "Back to a new conversation",
    "session.error.serverConnection": "Энэ серверт холбогдох боломжгүй байна",
@@ -3327,12 +3485,17 @@ index 41c4fa085..534891e0f 100644
 +  "session.draft.missing.action": "Back to home",
  }
 diff --git a/packages/app/src/i18n/ms.ts b/packages/app/src/i18n/ms.ts
-index 2c3783d43..8f6f538cc 100644
+index 2c3783d43..c62beb668 100644
 --- a/packages/app/src/i18n/ms.ts
 +++ b/packages/app/src/i18n/ms.ts
-@@ -707,6 +707,7 @@ export const dict = {
-   "session.error.notFound": "Sesi ini tidak dapat ditemui",
-   "session.error.notFound.description": "Tab ini merujuk kepada sesi yang tidak lagi wujud pada pelayan ini.",
+@@ -704,9 +704,10 @@ export const dict = {
+   "session.tab.context": "Konteks",
+   "session.tab.unknown": "Sesi Tidak Diketahui",
+   "session.panel.reviewAndFiles": "Semak dan fail",
+-  "session.error.notFound": "Sesi ini tidak dapat ditemui",
+-  "session.error.notFound.description": "Tab ini merujuk kepada sesi yang tidak lagi wujud pada pelayan ini.",
++  "session.error.notFound": "Perbualan ini tidak dapat ditemui",
++  "session.error.notFound.description": "Ia mungkin telah dipadamkan.",
    "session.error.notFound.closeTab": "Tutup Tab",
 +  "session.error.notFound.newSession": "Kembali ke perbualan baharu",
    "session.error.serverConnection": "Tidak dapat berhubung dengan pelayan ini",
@@ -3349,12 +3512,15 @@ index 2c3783d43..8f6f538cc 100644
 +  "session.draft.missing.action": "Back to home",
  }
 diff --git a/packages/app/src/i18n/my.ts b/packages/app/src/i18n/my.ts
-index 6046f337f..dfed8bf21 100644
+index 6046f337f..cb89c3155 100644
 --- a/packages/app/src/i18n/my.ts
 +++ b/packages/app/src/i18n/my.ts
-@@ -716,6 +716,7 @@ export const dict = {
+@@ -714,8 +714,9 @@ export const dict = {
+   "session.tab.unknown": "အမည်မသိ ဆက်ရှင်",
+   "session.panel.reviewAndFiles": "ပြန်လည်သုံးသပ်ခြင်းနှင့် ဖိုင်များ",
    "session.error.notFound": "ဤစက်ရှင်ကို ရှာမတွေ့ပါ။",
-   "session.error.notFound.description": "ဤတဘ်သည် ဤဆာဗာတွင်မရှိတော့သော စက်ရှင်တစ်ခုကို ညွှန်ပြသည်။",
+-  "session.error.notFound.description": "ဤတဘ်သည် ဤဆာဗာတွင်မရှိတော့သော စက်ရှင်တစ်ခုကို ညွှန်ပြသည်။",
++  "session.error.notFound.description": "It may have been deleted.",
    "session.error.notFound.closeTab": "တဘ်ကို ပိတ်ပါ။",
 +  "session.error.notFound.newSession": "Back to a new conversation",
    "session.error.serverConnection": "ဤဆာဗာသို့ ချိတ်ဆက်၍မရပါ။",
@@ -3371,12 +3537,15 @@ index 6046f337f..dfed8bf21 100644
 +  "session.draft.missing.action": "Back to home",
  }
 diff --git a/packages/app/src/i18n/ne.ts b/packages/app/src/i18n/ne.ts
-index cc60bff9f..dd1d5eeeb 100644
+index cc60bff9f..4cad4ad9c 100644
 --- a/packages/app/src/i18n/ne.ts
 +++ b/packages/app/src/i18n/ne.ts
-@@ -709,6 +709,7 @@ export const dict: Record<string, string> = {
+@@ -707,8 +707,9 @@ export const dict: Record<string, string> = {
+   "session.tab.unknown": "अज्ञात सत्र",
+   "session.panel.reviewAndFiles": "समीक्षा र फाइलहरू",
    "session.error.notFound": "यो सत्र फेला पार्न सकिँदैन",
-   "session.error.notFound.description": "यो ट्याबले यो सर्भरमा अब अवस्थित नभएको सत्रलाई संकेत गर्छ।",
+-  "session.error.notFound.description": "यो ट्याबले यो सर्भरमा अब अवस्थित नभएको सत्रलाई संकेत गर्छ।",
++  "session.error.notFound.description": "It may have been deleted.",
    "session.error.notFound.closeTab": "ट्याब बन्द गर्नुहोस्",
 +  "session.error.notFound.newSession": "Back to a new conversation",
    "session.error.serverConnection": "यो सर्भरमा जडान गर्न सकिँदैन",
@@ -3393,12 +3562,17 @@ index cc60bff9f..dd1d5eeeb 100644
 +  "session.draft.missing.action": "Back to home",
  }
 diff --git a/packages/app/src/i18n/nl.ts b/packages/app/src/i18n/nl.ts
-index 6fb1dc09f..96d5ad5a3 100644
+index 6fb1dc09f..c94c0dc9e 100644
 --- a/packages/app/src/i18n/nl.ts
 +++ b/packages/app/src/i18n/nl.ts
-@@ -716,6 +716,7 @@ export const dict = {
-   "session.error.notFound": "Deze sessie kan niet worden gevonden",
-   "session.error.notFound.description": "Dit tabblad verwijst naar een sessie die niet meer bestaat op deze server.",
+@@ -713,9 +713,10 @@ export const dict = {
+   "session.tab.context": "Context",
+   "session.tab.unknown": "Onbekende sessie",
+   "session.panel.reviewAndFiles": "Beoordeling en bestanden",
+-  "session.error.notFound": "Deze sessie kan niet worden gevonden",
+-  "session.error.notFound.description": "Dit tabblad verwijst naar een sessie die niet meer bestaat op deze server.",
++  "session.error.notFound": "Dit gesprek kan niet worden gevonden",
++  "session.error.notFound.description": "Het is mogelijk verwijderd.",
    "session.error.notFound.closeTab": "Tabblad sluiten",
 +  "session.error.notFound.newSession": "Terug naar een nieuw gesprek",
    "session.error.serverConnection": "Kan geen verbinding maken met deze server",
@@ -3415,12 +3589,17 @@ index 6fb1dc09f..96d5ad5a3 100644
 +  "session.draft.missing.action": "Back to home",
  }
 diff --git a/packages/app/src/i18n/no.ts b/packages/app/src/i18n/no.ts
-index 11958029d..4068df0b6 100644
+index 11958029d..5bef6d4a8 100644
 --- a/packages/app/src/i18n/no.ts
 +++ b/packages/app/src/i18n/no.ts
-@@ -1211,6 +1211,7 @@ export const dict = {
-   "session.error.notFound": "Denne sesjonen finnes ikke",
-   "session.error.notFound.description": "Denne fanen peker til en sesjon som ikke lenger finnes på denne serveren.",
+@@ -1208,9 +1208,10 @@ export const dict = {
+     "Koble til over 75 leverandører for å bruke andre modeller, inkludert Claude, GPT, Gemini og flere",
+ 
+   "session.tab.unknown": "Ukjent sesjon",
+-  "session.error.notFound": "Denne sesjonen finnes ikke",
+-  "session.error.notFound.description": "Denne fanen peker til en sesjon som ikke lenger finnes på denne serveren.",
++  "session.error.notFound": "Denne samtalen finnes ikke",
++  "session.error.notFound.description": "Den kan ha blitt slettet.",
    "session.error.notFound.closeTab": "Lukk fane",
 +  "session.error.notFound.newSession": "Tilbake til en ny samtale",
    "session.error.serverConnection": "Kan ikke koble til denne serveren",
@@ -3437,12 +3616,15 @@ index 11958029d..4068df0b6 100644
 +  "session.draft.missing.action": "Back to home",
  } satisfies Partial<Record<Keys, string>>
 diff --git a/packages/app/src/i18n/pa.ts b/packages/app/src/i18n/pa.ts
-index 6298581c0..bad47a8d8 100644
+index 6298581c0..62534a83d 100644
 --- a/packages/app/src/i18n/pa.ts
 +++ b/packages/app/src/i18n/pa.ts
-@@ -718,6 +718,7 @@ export const dict = {
+@@ -716,8 +716,9 @@ export const dict = {
+   "session.tab.unknown": "نامعلوم سیشن",
+   "session.panel.reviewAndFiles": "جائزہ تے فائلاں",
    "session.error.notFound": "ایہہ سیشن نئیں لبیا جا سکدا",
-   "session.error.notFound.description": "ایہ ٹیب اک سیشن ول اشارہ کردا اے جہڑا ہن اس سرور تے موجود نئیں اے۔",
+-  "session.error.notFound.description": "ایہ ٹیب اک سیشن ول اشارہ کردا اے جہڑا ہن اس سرور تے موجود نئیں اے۔",
++  "session.error.notFound.description": "It may have been deleted.",
    "session.error.notFound.closeTab": "ٹیب بند کرو",
 +  "session.error.notFound.newSession": "Back to a new conversation",
    "session.error.serverConnection": "اس سرور نال جڑ نئیں سکدے",
@@ -3519,12 +3701,17 @@ index d2f1ed35d..185b23f93 100644
          expect(target[key].trim()).not.toBe("")
          expect(placeholders(target[key])).toEqual(["count"])
 diff --git a/packages/app/src/i18n/pl.ts b/packages/app/src/i18n/pl.ts
-index 9b3c92749..9b29c565a 100644
+index 9b3c92749..5f4568e2d 100644
 --- a/packages/app/src/i18n/pl.ts
 +++ b/packages/app/src/i18n/pl.ts
-@@ -702,6 +702,7 @@ export const dict = {
-   "session.error.notFound": "Nie można znaleźć tej sesji",
-   "session.error.notFound.description": "Ta karta wskazuje sesję, która nie istnieje już na tym serwerze.",
+@@ -699,9 +699,10 @@ export const dict = {
+   "session.tab.context": "Kontekst",
+   "session.tab.unknown": "Nieznana sesja",
+   "session.panel.reviewAndFiles": "Przegląd i pliki",
+-  "session.error.notFound": "Nie można znaleźć tej sesji",
+-  "session.error.notFound.description": "Ta karta wskazuje sesję, która nie istnieje już na tym serwerze.",
++  "session.error.notFound": "Nie można znaleźć tej rozmowy",
++  "session.error.notFound.description": "Mogła zostać usunięta.",
    "session.error.notFound.closeTab": "Zamknij kartę",
 +  "session.error.notFound.newSession": "Wróć do nowej rozmowy",
    "session.error.serverConnection": "Nie można połączyć się z tym serwerem",
@@ -3541,12 +3728,17 @@ index 9b3c92749..9b29c565a 100644
 +  "session.draft.missing.action": "Back to home",
  }
 diff --git a/packages/app/src/i18n/ro.ts b/packages/app/src/i18n/ro.ts
-index c84f9a4ee..80d1839e1 100644
+index c84f9a4ee..471486972 100644
 --- a/packages/app/src/i18n/ro.ts
 +++ b/packages/app/src/i18n/ro.ts
-@@ -709,6 +709,7 @@ export const dict = {
-   "session.error.notFound": "Această sesiune nu poate fi găsită",
-   "session.error.notFound.description": "Acest tab indică spre o sesiune care nu mai există pe acest server.",
+@@ -706,9 +706,10 @@ export const dict = {
+   "session.tab.context": "Context",
+   "session.tab.unknown": "Sesiune necunoscută",
+   "session.panel.reviewAndFiles": "Revizuire și fișiere",
+-  "session.error.notFound": "Această sesiune nu poate fi găsită",
+-  "session.error.notFound.description": "Acest tab indică spre o sesiune care nu mai există pe acest server.",
++  "session.error.notFound": "Această conversație nu poate fi găsită",
++  "session.error.notFound.description": "Este posibil să fi fost ștearsă.",
    "session.error.notFound.closeTab": "Închide tab-ul",
 +  "session.error.notFound.newSession": "Înapoi la o conversație nouă",
    "session.error.serverConnection": "Nu se poate conecta la acest server",
@@ -3563,12 +3755,17 @@ index c84f9a4ee..80d1839e1 100644
 +  "session.draft.missing.action": "Back to home",
  }
 diff --git a/packages/app/src/i18n/ru.ts b/packages/app/src/i18n/ru.ts
-index cf4fa8d8f..418ac4e36 100644
+index cf4fa8d8f..436354bda 100644
 --- a/packages/app/src/i18n/ru.ts
 +++ b/packages/app/src/i18n/ru.ts
-@@ -755,6 +755,7 @@ export const dict = {
-   "session.error.notFound": "Эта сессия не найдена",
-   "session.error.notFound.description": "Эта вкладка указывает на сессию, которой больше нет на этом сервере.",
+@@ -752,9 +752,10 @@ export const dict = {
+   "session.tab.context": "Контекст",
+   "session.tab.unknown": "Неизвестная сессия",
+   "session.panel.reviewAndFiles": "Обзор и файлы",
+-  "session.error.notFound": "Эта сессия не найдена",
+-  "session.error.notFound.description": "Эта вкладка указывает на сессию, которой больше нет на этом сервере.",
++  "session.error.notFound": "Этот диалог не найден",
++  "session.error.notFound.description": "Возможно, он был удалён.",
    "session.error.notFound.closeTab": "Закрыть вкладку",
 +  "session.error.notFound.newSession": "Вернуться к новому диалогу",
    "session.error.serverConnection": "Не удаётся подключиться к этому серверу",
@@ -3585,12 +3782,15 @@ index cf4fa8d8f..418ac4e36 100644
 +  "session.draft.missing.action": "Back to home",
  }
 diff --git a/packages/app/src/i18n/si.ts b/packages/app/src/i18n/si.ts
-index 00ca188b1..6688d5aa4 100644
+index 00ca188b1..86e908f14 100644
 --- a/packages/app/src/i18n/si.ts
 +++ b/packages/app/src/i18n/si.ts
-@@ -706,6 +706,7 @@ export const dict: Record<string, string> = {
+@@ -704,8 +704,9 @@ export const dict: Record<string, string> = {
+   "session.tab.unknown": "නොදන්නා සැසිය",
+   "session.panel.reviewAndFiles": "සමාලෝචනය සහ ගොනු",
    "session.error.notFound": "මෙම සැසිය සොයාගත නොහැක",
-   "session.error.notFound.description": "මෙම පටිත්ත මෙම සේවාදායකයේ තවදුරටත් නොපවතින සැසියක් වෙත යොමු කරයි.",
+-  "session.error.notFound.description": "මෙම පටිත්ත මෙම සේවාදායකයේ තවදුරටත් නොපවතින සැසියක් වෙත යොමු කරයි.",
++  "session.error.notFound.description": "It may have been deleted.",
    "session.error.notFound.closeTab": "ටැබය වසන්න",
 +  "session.error.notFound.newSession": "Back to a new conversation",
    "session.error.serverConnection": "මෙම සේවාදායකයට සම්බන්ධ විය නොහැක",
@@ -3607,12 +3807,17 @@ index 00ca188b1..6688d5aa4 100644
 +  "session.draft.missing.action": "Back to home",
  }
 diff --git a/packages/app/src/i18n/sk.ts b/packages/app/src/i18n/sk.ts
-index 9992e06cc..bd901383c 100644
+index 9992e06cc..fbc1bb7f3 100644
 --- a/packages/app/src/i18n/sk.ts
 +++ b/packages/app/src/i18n/sk.ts
-@@ -707,6 +707,7 @@ export const dict = {
-   "session.error.notFound": "Táto relácia sa nenašla",
-   "session.error.notFound.description": "Táto karta odkazuje na reláciu, ktorá už na tomto serveri neexistuje.",
+@@ -704,9 +704,10 @@ export const dict = {
+   "session.tab.context": "Kontext",
+   "session.tab.unknown": "Neznáma relácia",
+   "session.panel.reviewAndFiles": "Revízia a súbory",
+-  "session.error.notFound": "Táto relácia sa nenašla",
+-  "session.error.notFound.description": "Táto karta odkazuje na reláciu, ktorá už na tomto serveri neexistuje.",
++  "session.error.notFound": "Táto konverzácia sa nenašla",
++  "session.error.notFound.description": "Možno bola odstránená.",
    "session.error.notFound.closeTab": "Zavrieť kartu",
 +  "session.error.notFound.newSession": "Späť na novú konverzáciu",
    "session.error.serverConnection": "Nedá sa pripojiť k tomuto serveru",
@@ -3629,12 +3834,17 @@ index 9992e06cc..bd901383c 100644
 +  "session.draft.missing.action": "Back to home",
  }
 diff --git a/packages/app/src/i18n/sl.ts b/packages/app/src/i18n/sl.ts
-index 3c23fcd7f..5bad23124 100644
+index 3c23fcd7f..bcdf7ca91 100644
 --- a/packages/app/src/i18n/sl.ts
 +++ b/packages/app/src/i18n/sl.ts
-@@ -709,6 +709,7 @@ export const dict = {
-   "session.error.notFound": "Te seje ni mogoče najti",
-   "session.error.notFound.description": "Ta zavihek kaže na sejo, ki ne obstaja več na tem strežniku.",
+@@ -706,9 +706,10 @@ export const dict = {
+   "session.tab.context": "Kontekst",
+   "session.tab.unknown": "Neznana seja",
+   "session.panel.reviewAndFiles": "Pregled in datoteke",
+-  "session.error.notFound": "Te seje ni mogoče najti",
+-  "session.error.notFound.description": "Ta zavihek kaže na sejo, ki ne obstaja več na tem strežniku.",
++  "session.error.notFound": "Tega pogovora ni mogoče najti",
++  "session.error.notFound.description": "Morda je bil izbrisan.",
    "session.error.notFound.closeTab": "Zapri zavihek",
 +  "session.error.notFound.newSession": "Nazaj na nov pogovor",
    "session.error.serverConnection": "Ni mogoče vzpostaviti povezave s tem strežnikom",
@@ -3651,12 +3861,15 @@ index 3c23fcd7f..5bad23124 100644
 +  "session.draft.missing.action": "Back to home",
  }
 diff --git a/packages/app/src/i18n/sq.ts b/packages/app/src/i18n/sq.ts
-index ca94793ab..4edc09d81 100644
+index ca94793ab..78781239b 100644
 --- a/packages/app/src/i18n/sq.ts
 +++ b/packages/app/src/i18n/sq.ts
-@@ -711,6 +711,7 @@ export const dict = {
+@@ -709,8 +709,9 @@ export const dict = {
+   "session.tab.unknown": "Sesion i panjohur",
+   "session.panel.reviewAndFiles": "Rishikimi dhe dosjet",
    "session.error.notFound": "Ky sesion nuk mund të gjendet",
-   "session.error.notFound.description": "Kjo skedë tregon për një sesion që nuk ekziston më në këtë server.",
+-  "session.error.notFound.description": "Kjo skedë tregon për një sesion që nuk ekziston më në këtë server.",
++  "session.error.notFound.description": "It may have been deleted.",
    "session.error.notFound.closeTab": "Mbyll skedën",
 +  "session.error.notFound.newSession": "Back to a new conversation",
    "session.error.serverConnection": "Nuk mund të lidhet me këtë server",
@@ -3673,12 +3886,17 @@ index ca94793ab..4edc09d81 100644
 +  "session.draft.missing.action": "Back to home",
  }
 diff --git a/packages/app/src/i18n/sr.ts b/packages/app/src/i18n/sr.ts
-index f05916008..f60696e8d 100644
+index f05916008..ba3d738e3 100644
 --- a/packages/app/src/i18n/sr.ts
 +++ b/packages/app/src/i18n/sr.ts
-@@ -710,6 +710,7 @@ export const dict = {
-   "session.error.notFound": "Ова сесија није пронађена",
-   "session.error.notFound.description": "Ова картица указује на сесију која више не постоји на овом серверу.",
+@@ -707,9 +707,10 @@ export const dict = {
+   "session.tab.context": "Контекст",
+   "session.tab.unknown": "Непозната сесија",
+   "session.panel.reviewAndFiles": "Преглед и датотеке",
+-  "session.error.notFound": "Ова сесија није пронађена",
+-  "session.error.notFound.description": "Ова картица указује на сесију која више не постоји на овом серверу.",
++  "session.error.notFound": "Овај разговор није пронађен",
++  "session.error.notFound.description": "Можда је обрисан.",
    "session.error.notFound.closeTab": "Затвори картицу",
 +  "session.error.notFound.newSession": "Назад на нови разговор",
    "session.error.serverConnection": "Не могу да се повежем са овим сервером",
@@ -3695,12 +3913,17 @@ index f05916008..f60696e8d 100644
 +  "session.draft.missing.action": "Back to home",
  }
 diff --git a/packages/app/src/i18n/sv.ts b/packages/app/src/i18n/sv.ts
-index 39b363c6b..b24347bfc 100644
+index 39b363c6b..36d83d159 100644
 --- a/packages/app/src/i18n/sv.ts
 +++ b/packages/app/src/i18n/sv.ts
-@@ -713,6 +713,7 @@ export const dict = {
-   "session.error.notFound": "Denna session kan inte hittas",
-   "session.error.notFound.description": "Den här fliken pekar på en session som inte längre finns på den här servern.",
+@@ -710,9 +710,10 @@ export const dict = {
+   "session.tab.context": "Kontext",
+   "session.tab.unknown": "Okänd session",
+   "session.panel.reviewAndFiles": "Granskning och filer",
+-  "session.error.notFound": "Denna session kan inte hittas",
+-  "session.error.notFound.description": "Den här fliken pekar på en session som inte längre finns på den här servern.",
++  "session.error.notFound": "Den här konversationen kan inte hittas",
++  "session.error.notFound.description": "Den kan ha raderats.",
    "session.error.notFound.closeTab": "Stäng flik",
 +  "session.error.notFound.newSession": "Tillbaka till en ny konversation",
    "session.error.serverConnection": "Det går inte att ansluta till den här servern",
@@ -3717,12 +3940,15 @@ index 39b363c6b..b24347bfc 100644
 +  "session.draft.missing.action": "Back to home",
  }
 diff --git a/packages/app/src/i18n/tg.ts b/packages/app/src/i18n/tg.ts
-index ffa08409f..5a2b63109 100644
+index ffa08409f..1659c475c 100644
 --- a/packages/app/src/i18n/tg.ts
 +++ b/packages/app/src/i18n/tg.ts
-@@ -711,6 +711,7 @@ export const dict = {
+@@ -709,8 +709,9 @@ export const dict = {
+   "session.tab.unknown": "Сеанси номаълум",
+   "session.panel.reviewAndFiles": "Барраси ва файлҳо",
    "session.error.notFound": "Ин сессияро ёфтан мумкин нест",
-   "session.error.notFound.description": "Ин ҷадвал ба сессияе ишора мекунад, ки дигар дар ин сервер вуҷуд надорад.",
+-  "session.error.notFound.description": "Ин ҷадвал ба сессияе ишора мекунад, ки дигар дар ин сервер вуҷуд надорад.",
++  "session.error.notFound.description": "It may have been deleted.",
    "session.error.notFound.closeTab": "Варақаро пӯшед",
 +  "session.error.notFound.newSession": "Back to a new conversation",
    "session.error.serverConnection": "Ба ин сервер пайваст шудан мумкин нест",
@@ -3739,12 +3965,17 @@ index ffa08409f..5a2b63109 100644
 +  "session.draft.missing.action": "Back to home",
  }
 diff --git a/packages/app/src/i18n/th.ts b/packages/app/src/i18n/th.ts
-index 1a0e9db72..1f2a7cf8f 100644
+index 1a0e9db72..8c3fe04f8 100644
 --- a/packages/app/src/i18n/th.ts
 +++ b/packages/app/src/i18n/th.ts
-@@ -747,6 +747,7 @@ export const dict = {
-   "session.error.notFound": "ไม่พบเซสชันนี้",
-   "session.error.notFound.description": "แท็บนี้อ้างถึงเซสชันที่ไม่มีอยู่บนเซิร์ฟเวอร์นี้แล้ว",
+@@ -744,9 +744,10 @@ export const dict = {
+   "session.tab.context": "บริบท",
+   "session.tab.unknown": "เซสชันที่ไม่รู้จัก",
+   "session.panel.reviewAndFiles": "ตรวจสอบและไฟล์",
+-  "session.error.notFound": "ไม่พบเซสชันนี้",
+-  "session.error.notFound.description": "แท็บนี้อ้างถึงเซสชันที่ไม่มีอยู่บนเซิร์ฟเวอร์นี้แล้ว",
++  "session.error.notFound": "ไม่พบการสนทนานี้",
++  "session.error.notFound.description": "อาจถูกลบไปแล้ว",
    "session.error.notFound.closeTab": "ปิดแท็บ",
 +  "session.error.notFound.newSession": "กลับไปที่การสนทนาใหม่",
    "session.error.serverConnection": "ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์นี้",
@@ -3761,12 +3992,15 @@ index 1a0e9db72..1f2a7cf8f 100644
 +  "session.draft.missing.action": "Back to home",
  }
 diff --git a/packages/app/src/i18n/tk.ts b/packages/app/src/i18n/tk.ts
-index 2b144c6a2..7a0bc4d81 100644
+index 2b144c6a2..e9a01180b 100644
 --- a/packages/app/src/i18n/tk.ts
 +++ b/packages/app/src/i18n/tk.ts
-@@ -708,6 +708,7 @@ export const dict = {
+@@ -706,8 +706,9 @@ export const dict = {
+   "session.tab.unknown": "Näbelli sessiýa",
+   "session.panel.reviewAndFiles": "Gözden geçiriň we faýllary",
    "session.error.notFound": "Bu sessiýany tapyp bolmaýar",
-   "session.error.notFound.description": "Bu goýma, bu serwerde ýok bolan sessiýany görkezýär.",
+-  "session.error.notFound.description": "Bu goýma, bu serwerde ýok bolan sessiýany görkezýär.",
++  "session.error.notFound.description": "It may have been deleted.",
    "session.error.notFound.closeTab": "Tab ýapyň",
 +  "session.error.notFound.newSession": "Back to a new conversation",
    "session.error.serverConnection": "Bu serwere birigip bilemok",
@@ -3783,12 +4017,17 @@ index 2b144c6a2..7a0bc4d81 100644
 +  "session.draft.missing.action": "Back to home",
  }
 diff --git a/packages/app/src/i18n/tr.ts b/packages/app/src/i18n/tr.ts
-index 85623036e..fd4e1b296 100644
+index 85623036e..3888f39cf 100644
 --- a/packages/app/src/i18n/tr.ts
 +++ b/packages/app/src/i18n/tr.ts
-@@ -759,6 +759,7 @@ export const dict = {
-   "session.error.notFound": "Bu oturum bulunamıyor",
-   "session.error.notFound.description": "Bu sekme, artık bu sunucuda bulunmayan bir oturuma yönlendiriyor.",
+@@ -756,9 +756,10 @@ export const dict = {
+   "session.tab.context": "Bağlam",
+   "session.tab.unknown": "Bilinmeyen Oturum",
+   "session.panel.reviewAndFiles": "İnceleme ve dosyalar",
+-  "session.error.notFound": "Bu oturum bulunamıyor",
+-  "session.error.notFound.description": "Bu sekme, artık bu sunucuda bulunmayan bir oturuma yönlendiriyor.",
++  "session.error.notFound": "Bu sohbet bulunamıyor",
++  "session.error.notFound.description": "Silinmiş olabilir.",
    "session.error.notFound.closeTab": "Sekmeyi kapat",
 +  "session.error.notFound.newSession": "Yeni bir sohbete dön",
    "session.error.serverConnection": "Bu sunucuya bağlanılamıyor",
@@ -3805,12 +4044,17 @@ index 85623036e..fd4e1b296 100644
 +  "session.draft.missing.action": "Back to home",
  } satisfies Partial<Record<Keys, string>>
 diff --git a/packages/app/src/i18n/uk.ts b/packages/app/src/i18n/uk.ts
-index 54732a87b..569475c92 100644
+index 54732a87b..379f0bd90 100644
 --- a/packages/app/src/i18n/uk.ts
 +++ b/packages/app/src/i18n/uk.ts
-@@ -778,6 +778,7 @@ export const dict = {
-   "session.error.notFound": "Цю сесію не знайдено",
-   "session.error.notFound.description": "Ця вкладка посилається на сесію, якої більше немає на цьому сервері.",
+@@ -775,9 +775,10 @@ export const dict = {
+   "session.tab.context": "Контекст",
+   "session.tab.unknown": "Невідома сесія",
+   "session.panel.reviewAndFiles": "Огляд і файли",
+-  "session.error.notFound": "Цю сесію не знайдено",
+-  "session.error.notFound.description": "Ця вкладка посилається на сесію, якої більше немає на цьому сервері.",
++  "session.error.notFound": "Цей діалог не знайдено",
++  "session.error.notFound.description": "Можливо, його було видалено.",
    "session.error.notFound.closeTab": "Закрити вкладку",
 +  "session.error.notFound.newSession": "Повернутися до нового діалогу",
    "session.error.serverConnection": "Не вдається підключитися до цього сервера",
@@ -3827,12 +4071,17 @@ index 54732a87b..569475c92 100644
 +  "session.draft.missing.action": "Back to home",
  }
 diff --git a/packages/app/src/i18n/ur.ts b/packages/app/src/i18n/ur.ts
-index 2ab69e7ae..7f5248cb8 100644
+index 2ab69e7ae..1491c4d37 100644
 --- a/packages/app/src/i18n/ur.ts
 +++ b/packages/app/src/i18n/ur.ts
-@@ -719,6 +719,7 @@ export const dict = {
-   "session.error.notFound": "یہ سیشن نہیں مل سکتا",
-   "session.error.notFound.description": "یہ ٹیب ایک سیشن کی طرف اشارہ کرتا ہے جو اس سرور پر اب موجود نہیں ہے۔",
+@@ -716,9 +716,10 @@ export const dict = {
+   "session.tab.context": "سیاق و سباق",
+   "session.tab.unknown": "نامعلوم سیشن",
+   "session.panel.reviewAndFiles": "جائزہ اور فائلیں۔",
+-  "session.error.notFound": "یہ سیشن نہیں مل سکتا",
+-  "session.error.notFound.description": "یہ ٹیب ایک سیشن کی طرف اشارہ کرتا ہے جو اس سرور پر اب موجود نہیں ہے۔",
++  "session.error.notFound": "یہ گفتگو نہیں مل سکتی",
++  "session.error.notFound.description": "ہو سکتا ہے اسے حذف کر دیا گیا ہو۔",
    "session.error.notFound.closeTab": "ٹیب بند کریں",
 +  "session.error.notFound.newSession": "نئی گفتگو پر واپس جائیں",
    "session.error.serverConnection": "اس سرور سے منسلک نہیں ہو سکتا",
@@ -3849,12 +4098,15 @@ index 2ab69e7ae..7f5248cb8 100644
 +  "session.draft.missing.action": "Back to home",
  }
 diff --git a/packages/app/src/i18n/uz.ts b/packages/app/src/i18n/uz.ts
-index 8cb7097fc..c1204253a 100644
+index 8cb7097fc..89ff0f0b3 100644
 --- a/packages/app/src/i18n/uz.ts
 +++ b/packages/app/src/i18n/uz.ts
-@@ -712,6 +712,7 @@ export const dict = {
+@@ -710,8 +710,9 @@ export const dict = {
+   "session.tab.unknown": "Noma'lum sessiya",
+   "session.panel.reviewAndFiles": "Ko'rib chiqish va fayllar",
    "session.error.notFound": "Bu sessiya topilmadi",
-   "session.error.notFound.description": "Ushbu yorliq endi ushbu serverda mavjud bo'lmagan seansga ishora qiladi.",
+-  "session.error.notFound.description": "Ushbu yorliq endi ushbu serverda mavjud bo'lmagan seansga ishora qiladi.",
++  "session.error.notFound.description": "It may have been deleted.",
    "session.error.notFound.closeTab": "Tab ni yoping",
 +  "session.error.notFound.newSession": "Back to a new conversation",
    "session.error.serverConnection": "Bu serverga ulanib boʻlmadi",
@@ -3871,12 +4123,17 @@ index 8cb7097fc..c1204253a 100644
 +  "session.draft.missing.action": "Back to home",
  }
 diff --git a/packages/app/src/i18n/vi.ts b/packages/app/src/i18n/vi.ts
-index 06fda4ce7..f1ba35906 100644
+index 06fda4ce7..58379ab18 100644
 --- a/packages/app/src/i18n/vi.ts
 +++ b/packages/app/src/i18n/vi.ts
-@@ -718,6 +718,7 @@ export const dict = {
-   "session.error.notFound": "Không thể tìm thấy phiên này",
-   "session.error.notFound.description": "Tab này trỏ đến một phiên không còn tồn tại trên máy chủ này.",
+@@ -715,9 +715,10 @@ export const dict = {
+   "session.tab.context": "Ngữ cảnh",
+   "session.tab.unknown": "Phiên không xác định",
+   "session.panel.reviewAndFiles": "Xem lại và tệp",
+-  "session.error.notFound": "Không thể tìm thấy phiên này",
+-  "session.error.notFound.description": "Tab này trỏ đến một phiên không còn tồn tại trên máy chủ này.",
++  "session.error.notFound": "Không thể tìm thấy cuộc trò chuyện này",
++  "session.error.notFound.description": "Có thể nó đã bị xóa.",
    "session.error.notFound.closeTab": "Đóng tab",
 +  "session.error.notFound.newSession": "Quay lại cuộc trò chuyện mới",
    "session.error.serverConnection": "Không thể kết nối với máy chủ này",

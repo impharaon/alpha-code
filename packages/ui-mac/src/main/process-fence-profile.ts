@@ -356,16 +356,15 @@ export function checkWorkspaceDirectory(input: WorkspaceDirectoryInput, raw: str
   | { eligible: true; directory: string }
   | { eligible: false; reason: "home-or-app-state" | "not-a-directory"; detail: string } {
   if (!raw || !isAbsolute(raw)) return { eligible: false, reason: "not-a-directory", detail: "not an absolute path" }
-  const dir = resolve(raw)
-  if (dir === resolve(sep) || isAncestorOrSelf(dir, resolve(input.homeDir)))
+  const dir = canonical(raw, input.realpath)
+  if (dir === resolve(sep) || isAncestorOrSelf(dir, canonical(input.homeDir, input.realpath)))
     return { eligible: false, reason: "home-or-app-state", detail: "would put HOME inside the writable set (fence would be void)" }
   const appStateRoot = canonical(input.appStateRoot, input.realpath)
-  const canon = canonical(dir, input.realpath)
-  if (related(canon, appStateRoot)) return {
+  if (related(dir, appStateRoot)) return {
     eligible: false,
     reason: "home-or-app-state",
     detail: `related to the app state root ${appStateRoot} (same path, inside it, or contains it)` +
-      (canon === dir ? "" : ` (resolves to ${canon})`) +
+      (dir === resolve(raw) ? "" : ` (resolves to ${dir})`) +
       " — the fence's own state must never be a workspace (#1390)",
   }
   try {
@@ -396,11 +395,12 @@ export function selectWorkspaceUnion(input: WorkspaceUnionInput): WorkspaceUnion
       excluded.push({ directory: dir, reason: candidate.detail })
       continue
     }
+    if (selected.includes(candidate.directory)) continue
     if (selected.length >= max) {
       excluded.push({ directory: dir, reason: `beyond MAX_WORKSPACES=${max}` })
       continue
     }
-    selected.push(dir)
+    selected.push(candidate.directory)
   }
   return { selected, excluded, candidates: seen.size }
 }

@@ -58,7 +58,7 @@ sidecar 消费,成功后才记本代账本;并发同目录合并,退出清理在
 
 资格由 `process-fence-workspaces.ts` 的 main 登记表持有。已有受信真源的有效启动目录初始化登记;运行期只有 M1 picker 和
 R1–R5 的具体打开动作能登记 `{server: "sidecar", directory}`。登记与启动并集复用 `checkWorkspaceDirectory` 的 4/5/5b
-判据,HOME、状态根等不合格目录不能扩集。真源更新再过滤登记表;恢复、重载、SSE、深链接和 sidecar 消息只消费,不登记。
+判据,登记固定当时的 realpath;HOME/祖先和状态根按 canonical 路径判断。每次 grant 重验资格并以 canonical 目录签发/记账,签发后路径变化就丢弃令牌并报 grant-failed;停机前先判资格,不把不合格目录说成重开即可写。真源更新也按当前 canonical 目录过滤登记表;恢复、重载、SSE、深链接和 sidecar 消息只消费,不登记。
 main 保留登记,所以 renderer 重载不丢资格;不通过引擎换代、页面重载或取消其它会话完成放行。
 
 已知的缺口(留给披露面 / owner):bash 用户的 `~/.bash_history` 不在集合里

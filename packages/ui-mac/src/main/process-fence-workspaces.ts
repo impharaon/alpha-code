@@ -218,11 +218,18 @@ export function bootFenceWorkspaceTruth(input: BootFenceWorkspaceTruthInput): Fe
     )
   }
   const quarantine = new Set(quarantined)
-  const opened = new Set(current.filter((directory) => checkWorkspaceDirectory(input.eligibility, directory).eligible).map((directory) => resolve(directory)))
+  // Freeze identity at registration/boot. An alias later pointing elsewhere is not the opened directory.
+  const opened = new Set(current.flatMap((directory) => {
+    const candidate = checkWorkspaceDirectory(input.eligibility, directory)
+    return candidate.eligible ? [candidate.directory] : []
+  }))
   const failed = new WeakMap<SidecarListener, Set<string>>()
 
   const recompute = () => {
-    const next = workspacesFromRendererTabs(state).filter((d) => opened.has(d) && !quarantine.has(d))
+    const next = [...new Set(workspacesFromRendererTabs(state).flatMap((directory) => {
+      const candidate = checkWorkspaceDirectory(input.eligibility, directory)
+      return candidate.eligible && opened.has(candidate.directory) && !quarantine.has(directory) ? [candidate.directory] : []
+    }))]
     if (sameList(next, current)) return
     const added = next.filter((d) => !current.includes(d))
     const removed = current.filter((d) => !next.includes(d))
@@ -256,19 +263,21 @@ export function bootFenceWorkspaceTruth(input: BootFenceWorkspaceTruthInput): Fe
       return { eligible: true, server: LOCAL_SIDECAR_SERVER_KEY, directory: candidate.directory }
     },
     has(server, directory) {
-      return server === LOCAL_SIDECAR_SERVER_KEY && isAbsolute(directory) && opened.has(resolve(directory))
+      if (server !== LOCAL_SIDECAR_SERVER_KEY) return false
+      const candidate = checkWorkspaceDirectory(input.eligibility, directory)
+      return candidate.eligible && opened.has(candidate.directory)
     },
   }
 
   const grantWrite: FenceWorkspaceTracker["grantWrite"] = async (target, sidecar) => {
     if (sidecar ? !sidecar.fenced : process.platform !== "darwin") return { grant: "no-fence" }
     if (target.server !== LOCAL_SIDECAR_SERVER_KEY) return { grant: "not-local" }
-    if (!sidecar) return { grant: "failed", reason: "grant-failed" }
-    if (!userOpened.has(target.server, target.directory)) {
-      const candidate = checkWorkspaceDirectory(input.eligibility, target.directory)
+    const candidate = checkWorkspaceDirectory(input.eligibility, target.directory)
+    if (!candidate.eligible || !opened.has(candidate.directory)) {
       return { grant: "ineligible", reason: !candidate.eligible && candidate.reason === "home-or-app-state" ? "home-or-app-state" : "not-opened-by-you" }
     }
-    const directory = resolve(target.directory)
+    if (!sidecar) return { grant: "failed", reason: "grant-failed" }
+    const directory = candidate.directory
     const result = await sidecar.grantWrite(directory)
     if (result.outcome === "failed") {
       const failures = failed.get(sidecar) ?? new Set<string>()

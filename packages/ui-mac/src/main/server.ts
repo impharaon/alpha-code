@@ -1,6 +1,6 @@
 import { clearOfficialConnectorRuntime, clearOfficialConnectorRuntimeOnExit, officialAvailabilityPublished, restoreCommittedOfficialConnectors } from "./official-connector-resources"
 import { createHash } from "node:crypto"
-import { existsSync } from "node:fs"
+import { existsSync, realpathSync } from "node:fs"
 import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
 // `#1423`:**命名空间导入,不是具名导入** —— 这一行曾是仓内唯一的
@@ -601,6 +601,13 @@ export async function spawnLocalServer(
   const grantWrite: SidecarListener["grantWrite"] = (directory) => {
     if (exited || !child.pid) return Promise.resolve({ outcome: "failed", detail: "engine not running" })
     if (!fence) return Promise.resolve({ outcome: "failed", detail: "engine has no fence" })
+    try {
+      // The tracker supplies its freshly validated canonical identity. Never follow a later rebind.
+      if (realpathSync.native(directory) !== directory) throw new Error("workspace path changed")
+    } catch {
+      getLogger()?.warn(`process fence: grant failed directory=${JSON.stringify(directory)} step=realpath errno=unknown`)
+      return Promise.resolve({ outcome: "failed", detail: "workspace path changed" })
+    }
     if (grantedDirectories.has(directory)) return Promise.resolve({ outcome: "granted" })
     const pending = granting.get(directory)
     if (pending) return pending
@@ -611,6 +618,10 @@ export async function spawnLocalServer(
         if (issued.token === null) {
           getLogger()?.warn(`process fence: grant failed directory=${JSON.stringify(directory)} step=${issued.step} errno=${issued.errno}`)
           return { outcome: "failed", detail: `${issued.step} errno=${issued.errno}` }
+        }
+        if (realpathSync.native(directory) !== directory) {
+          getLogger()?.warn(`process fence: grant failed directory=${JSON.stringify(directory)} step=realpath errno=unknown`)
+          return { outcome: "failed", detail: "workspace path changed" }
         }
         const result = await writeGrants.request(issued.token)
         if (result.outcome === "granted" && !exited) {

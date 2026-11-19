@@ -46,6 +46,12 @@ async function boot(name: string, variant = "production") {
     XDG_DATA_HOME: join(home, "data"), XDG_CACHE_HOME: join(home, "cache"), XDG_CONFIG_HOME: join(home, "config"), XDG_STATE_HOME: join(home, "state"),
     NO_COLOR: "1",
   }
+  // These parents are outside the opencode-only write roots. Prepare the isolated
+  // installation layout before the production sidecar installs its fence.
+  for (const directory of [env.XDG_DATA_HOME, env.XDG_CACHE_HOME, env.XDG_CONFIG_HOME, env.XDG_STATE_HOME]) {
+    mkdirSync(join(directory, "opencode"), { recursive: true })
+  }
+  mkdirSync(env.TMPDIR, { recursive: true })
   let profile = renderProcessFenceProfile({ workspaces: [A], codepuppyGlobalRoot: globalRoot, userDataPath: userData, stateHome: env.XDG_STATE_HOME, roots: resolveEngineRoots(env, home), egressProxyPort: 59999 })
   if (variant === "file-only") profile = profile.replace(/\(deny file-issue-extension[\s\S]*?\(extension-class "[^"]+"\)\)/, `(deny file-issue-extension (extension-class "${WORKSPACE_WRITE_EXTENSION_CLASS}"))`)
   if (variant === "no-deny") profile = profile.replace(/\(deny file-issue-extension[\s\S]*?\(extension-class "[^"]+"\)\)/, "")
@@ -58,6 +64,8 @@ async function boot(name: string, variant = "production") {
   let ready = false
   let failure = ""
   let exited: number | undefined
+  let pid: number | undefined
+  child.once("spawn", () => { pid = child.pid; record("engine-spawn", { name, pid }) })
   const grants = createWriteGrantRequester((command) => child.postMessage(command))
   const probes = new Map<number, (outcome: string) => void>()
   let seq = 100_000
@@ -68,7 +76,7 @@ async function boot(name: string, variant = "production") {
     if (message?.type === "ready") { ready = true; record("engine-ready", { name, pid: child.pid }) }
     if (message?.type === "error") failure = message.error.message
   })
-  child.on("exit", (code) => { exited = code; grants.close(`exit ${code}`); record("engine-exit", { name, pid: child.pid, code }) })
+  child.on("exit", (code) => { exited = code; grants.close(`exit ${code}`); record("engine-exit", { name, pid, code }) })
   const port = 40000 + Math.floor(Math.random() * 10000)
   child.postMessage({
     type: "start", hostname: "127.0.0.1", port, password, fence: { profile, addonPath },
@@ -115,14 +123,20 @@ async function runGate() {
   report.addon = { path: addonPath, buildId: addon.buildId }
   const startExisting = async (engine: Awaited<ReturnType<typeof boot>>) => {
     const command = `echo $$ > ${quote(join(engine.A, "child.pid"))}; echo ready > ${quote(join(engine.A, "ready"))}; n=0; while [ ! -f ${quote(join(engine.A, "go"))} ] && [ $n -lt 500 ]; do sleep 0.02; n=$((n+1)); done; echo x > ${quote(join(engine.B, "existing.txt"))}; echo x > ${quote(join(engine.C, "existing.txt"))}; echo $? > ${quote(join(engine.A, "child.exit"))}`
-    await engine.shell(command)
-    await waitFor(() => existsSync(join(engine.A, "ready")), "exec child ready")
+    let failed: unknown
+    // The production shell endpoint waits for completion. Keep the HTTP call in flight
+    // while observing the child's ready marker, then join it only after releasing go.
+    const pending = engine.shell(command).catch((error) => { failed = error })
+    await waitFor(() => !!failed || existsSync(join(engine.A, "ready")), "exec child ready")
+    if (failed) throw failed
     const pid = Number(readFileSync(join(engine.A, "child.pid"), "utf8"))
+    process.kill(pid, 0)
     record("child-ready", { pid, enginePid: engine.child.pid })
-    return pid
+    return { pid, pending }
   }
-  const finishWrites = async (engine: Awaited<ReturnType<typeof boot>>) => {
+  const finishWrites = async (engine: Awaited<ReturnType<typeof boot>>, existing: Awaited<ReturnType<typeof startExisting>>) => {
     writeFileSync(join(engine.A, "go"), "go")
+    await existing.pending
     await waitFor(() => existsSync(join(engine.A, "child.exit")), "existing child write")
     record("existing-write", { pid: Number(readFileSync(join(engine.A, "child.pid"), "utf8")), exit: Number(readFileSync(join(engine.A, "child.exit"), "utf8")) })
     await engine.shell(`echo $$ > ${quote(join(engine.A, "new.pid"))}; echo x > ${quote(join(engine.B, "new.txt"))}; echo $? > ${quote(join(engine.A, "new.exit"))}`)
@@ -132,7 +146,7 @@ async function runGate() {
   const engine = await boot("granted")
   assert(await engine.probe(engine.B) === "denied", "B must be denied before grant")
   assert(await engine.probe(engine.C) === "denied", "C must be denied before grant")
-  const existingPid = await startExisting(engine)
+  const existing = await startExisting(engine)
   record("issue-start", { pid: engine.child.pid })
   const issued = addon.issueFileExtensionToProcess(WORKSPACE_WRITE_EXTENSION_CLASS, engine.B, engine.child.pid!)
   if (issued.token === null) throw new Error(`G0 issue failed: step=${issued.step} errno=${issued.errno}`)
@@ -143,10 +157,10 @@ async function runGate() {
   assert(granted.outcome === "granted", `G0 consume failed: ${granted.detail}`)
   const mainReplay = addon.consumeExtension(token)
   assert(mainReplay.handle === -1, "unfenced main must not consume the bound token")
-  await finishWrites(engine)
+  await finishWrites(engine, existing)
   assert(await engine.probe(engine.B) === "writable", "B must be writable after consume")
   assert(await engine.probe(engine.C) === "denied", "C must remain denied")
-  arms.granted = { pid: engine.child.pid, existingPid, files: engine.files(), grant: granted, mainReplay }
+  arms.granted = { pid: engine.child.pid, existingPid: existing.pid, files: engine.files(), grant: granted, mainReplay }
   await engine.stop()
 
   const replay = await boot("replay")
@@ -157,10 +171,10 @@ async function runGate() {
   await replay.stop()
 
   const control = await boot("control")
-  const controlPid = await startExisting(control)
+  const controlChild = await startExisting(control)
   record("no-consume", { pid: control.child.pid })
-  await finishWrites(control)
-  arms.control = { pid: control.child.pid, existingPid: controlPid, files: control.files() }
+  await finishWrites(control, controlChild)
+  arms.control = { pid: control.child.pid, existingPid: controlChild.pid, files: control.files() }
   const forged = await control.grants.request("G0-forged-not-a-token")
   assert(forged.outcome === "failed", "forged token must fail")
   assert(await control.probe(control.B) === "denied", "forged token must not make B writable")

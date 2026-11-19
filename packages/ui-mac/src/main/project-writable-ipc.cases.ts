@@ -215,6 +215,17 @@ test("a directory issued in an earlier generation is never issued again in a lat
   expect(issues).toHaveLength(1)
 })
 
+test("a token whose reply never arrived may have been consumed: the same generation never issues it again", async () => {
+  register()
+  child.grantMode = "hold"
+  expect(await probe()).toEqual({ outcome: "denied", grant: "failed", reason: "grant-failed" }) // the reply timed out
+  child.reply("granted") // the engine processes the queued grant late and really consumes it; main already gave up
+  child.grantMode = "ok"
+  expect(await probe()).toEqual({ outcome: "writable", grant: "granted" })
+  expect(issues).toHaveLength(1)
+  expect(child.grants).toHaveLength(1)
+}, 15_000)
+
 test("native exceptions and every typed issue failure return grant-failed even if probe is unknown; retry can recover", async () => {
   register()
   probeOutcome = "unknown"

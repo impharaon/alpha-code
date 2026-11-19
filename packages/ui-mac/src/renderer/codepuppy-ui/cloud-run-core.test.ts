@@ -177,19 +177,31 @@ describe("#1551 runStateToast", () => {
     delivery,
   })
 
-  test("失败不弹已回流:交付失败 → 错误提示,文案与 detail 都不含「已回流 / 已保存」", () => {
-    const toast = runStateToast(state({ status: "failed", failure: { scope: "download", artifactId: "art_1", code: "network" } }))
-    expect(toast).toMatchObject({ kind: "error", key: "codepuppy.cloud.runSaveFailed" })
-    const text = `${zh[toast!.key]} ${toast!.detail}`
+  test("失败不弹已回流:交付失败 → 错误提示,文案与说明都不含「已回流 / 已保存」", () => {
+    const toast = runStateToast(state({ status: "failed", failure: { scope: "verify", artifactId: "art_1", code: "sha256-mismatch" } }))
+    expect(toast).toMatchObject({ kind: "error", key: "codepuppy.cloud.runSaveFailed", detailKey: "codepuppy.cloud.runSaveFailedDetail" })
+    const text = `${zh[toast!.key]} ${zh[toast!.detailKey!]}`
     expect(text).not.toContain("已回流")
     expect(text).not.toContain("已保存")
-    expect(toast!.detail).toContain("network")
+  })
+
+  // 0.2.4 owner 报告「云任务结果回流失败 / job_a8d48c180ae2: network」:提示用用户的话,不露 `network` 与裸任务号。
+  test("还在自动重新获取(pending + 瞬态原因)⇒ 说「正在重新获取」;云端没有了 ⇒ 说清楚;任何提示都不露原始码与任务号", () => {
+    const refetching = runStateToast(state({ status: "pending", failure: { scope: "download", artifactId: "art_1", code: "network" } }))
+    expect(refetching).toEqual({ kind: "info", key: "codepuppy.cloud.runRefetching", detailKey: "codepuppy.cloud.runRefetchingDetail" })
+    const gone = runStateToast(state({ status: "failed", failure: { scope: "download", artifactId: "art_1", code: "not-found" } }))
+    expect(gone).toEqual({ kind: "error", key: "codepuppy.cloud.runSaveFailed", detailKey: "codepuppy.cloud.runGone" })
+    for (const toast of [refetching, gone, runStateToast(state({ status: "saved" }))]) {
+      const text = `${zh[toast!.key]} ${toast!.detailKey ? zh[toast!.detailKey] : ""} ${JSON.stringify(toast)}`
+      expect(text).not.toContain("network")
+      expect(text).not.toContain("job_fixture1")
+    }
   })
 
   test("saved 才说已回流;任务失败但记录已落盘 → 说结束而非成功;交付未落定不弹", () => {
     expect(runStateToast(state({ status: "saved" }))).toMatchObject({ kind: "success", key: "codepuppy.cloud.runSaved" })
     // #1591:界面文字不写目录名,路径由程序给出。
-    expect(`${zh["codepuppy.cloud.runSaved"]} ${runStateToast(state({ status: "saved" }))!.detail}`).not.toContain(PROJECT_HIDDEN_DIR)
+    expect(zh["codepuppy.cloud.runSaved"]).not.toContain(PROJECT_HIDDEN_DIR)
     expect(runStateToast(state({ status: "saved" }, { status: "failed" }))).toMatchObject({ kind: "info", key: "codepuppy.cloud.runEnded" })
     expect(runStateToast(state({ status: "pending" }))).toBeNull()
     expect(runStateToast(state({ status: "downloading" }))).toBeNull()

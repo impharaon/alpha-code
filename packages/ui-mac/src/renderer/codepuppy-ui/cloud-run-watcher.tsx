@@ -22,7 +22,7 @@ export function CloudRunWatcher(props: { server: Accessor<ServerInfo | undefined
   // message.part.updated 对同一 part 反复触发(流式):每个 part 只交给 main 一次。不按 runId 去重 ——
   // 失败后模型再查一次状态(新 part)就是一次新的交付机会;在途与否由 main 的单飞判断。
   const seenParts = new Set<string>()
-  // 本窗口交给 tracker 的 run → 上次弹过的交付结论(同一结论不重复弹;手动补下等别处触发的不弹)。
+  // 本窗口交给 tracker 的 run → 上次弹过的提示(同一提示不重复弹;别处触发的交付不弹)。
   const watched = new Map<string, string | undefined>()
 
   // tracker 要项目根:信封 directory 可能是 sandbox 目录,映射回所属项目的 worktree,找不到则原样用。
@@ -38,17 +38,20 @@ export function CloudRunWatcher(props: { server: Accessor<ServerInfo | undefined
       const key = `${state.directory}\0${state.runId}`
       if (!watched.has(key)) return
       const toast = runStateToast(state)
-      if (!toast || watched.get(key) === state.delivery.status) return
-      watched.set(key, state.delivery.status)
-      // `#1687` BR-01:保存失败是后台状态问题(8 秒收起、同一 run 只一条);同一 run 之后保存成功 = 恢复,
-      // 失败提示立即消失,再弹成功提示。
+      if (!toast) return
+      const shown = `${toast.key}\0${toast.detailKey ?? ""}`
+      if (watched.get(key) === shown) return
+      watched.set(key, shown)
+      const text = { title: t(toast.key), ...(toast.detailKey ? { detail: t(toast.detailKey) } : {}) }
+      // `#1687` BR-01:还在自动重新获取 / 保存失败是后台状态问题(8 秒收起、同一 run 只一条,后一句原地替换前一句);
+      // 同一 run 之后保存成功 = 恢复,提示立即消失,再弹成功提示。没有「重试」按钮:重取由宿主自动做(cloud-run-tracker I6)。
       const problemKey = `cloud-run\0${key}`
-      if (state.delivery.status === "failed") {
-        reportProblem({ key: problemKey, kind: toast.kind, title: t(toast.key), detail: toast.detail })
+      if (state.delivery.status !== "saved") {
+        reportProblem({ key: problemKey, kind: toast.kind, ...text })
         return
       }
       resolveProblem(problemKey)
-      pushToast({ kind: toast.kind, title: t(toast.key), detail: toast.detail })
+      pushToast({ kind: toast.kind, ...text })
     }),
   )
 

@@ -13,8 +13,7 @@ import * as fs from "node:fs"
 import * as path from "node:path"
 import { dispatchCloudJob, dispatchExplicitCloudUpload, getCloudJobStatus, cancelCloudJob, listCloudArtifacts, downloadCloudArtifactTo, getCloudAccountStatus } from "./codepuppy-cloud-jobs"
 import { isTerminalCloudEvent, subscribeCloudJobEvents } from "./codepuppy-cloud-events"
-import { backoffMs } from "./codepuppy-cloud-events-core"
-import { createCloudRunTracker, type CloudRunOrigin } from "./cloud-run-tracker"
+import { createCloudRunTracker, deliveryRetryDelayMs, type CloudRunOrigin } from "./cloud-run-tracker"
 // #420(REQ-115):云任务 completed / failed 终态 → 系统通知的唯一咽喉(去重、取消不通知都在里面)。
 import { noticeFromCloudEvent, noticeFromCloudStatus, notifyCloudJobFinished } from "./cloud-job-notify"
 import {
@@ -124,7 +123,7 @@ const tracker = createCloudRunTracker({
   saveDeps: runSaveDeps,
   afterSave: afterRunSaved,
   broadcast: (state) => broadcast("cloud-run-state", state),
-  wait: (attempt) => new Promise((resolve) => setTimeout(resolve, backoffMs(attempt))),
+  wait: (attempt) => new Promise((resolve) => setTimeout(resolve, deliveryRetryDelayMs(attempt))),
   log: (message) => getLogger().warn(message),
 })
 

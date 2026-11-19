@@ -1561,6 +1561,10 @@ describe("REQ-236 #1552 生图卡:派发调用事实 → cloudImage 行与显示
     expect(cloudImageViewOf(call, run("queued", "pending"), false)).toEqual({ state: "queued", since: 1_100 })
     expect(cloudImageViewOf(call, run("running", "pending"), false)).toEqual({ state: "running", since: 1_100 })
     expect(cloudImageViewOf(call, run("completed", "downloading"), false)).toEqual({ state: "saving" })
+    // 宿主在慢速自动重取(pending + 瞬态原因,cloud-run-tracker I6):卡片说「正在保存」,不出没存到本机 / 重新下载。
+    expect(
+      cloudImageViewOf(call, { job: { status: "completed" }, delivery: { status: "pending", failure: { scope: "download", code: "network" } } }, false),
+    ).toEqual({ state: "saving" })
     expect(cloudImageViewOf(call, run("completed", "saved"), false)).toEqual({ state: "saved" })
     expect(cloudImageViewOf(call, run("failed", "saved", { code: "image_safety_rejected" }), false)).toEqual({
       state: "failed",

@@ -92,22 +92,24 @@ export function extractCloudRunHit(event: unknown): CloudRunHit | null {
 }
 
 /**
- * 交付落定时该弹的提示(#1551 AC2):只在 saved / failed 时弹;交付失败绝不说「已回流 / 已保存」。
- * key 是 i18n 键,detail 不含路径之外的任何本地信息。
+ * 交付该弹的提示(#1551 AC2):saved / failed,以及宿主转入慢速自动重取时(pending + 瞬态原因,cloud-run-tracker I6)。
+ * 交付失败绝不说「已回流 / 已保存」。key / detailKey 都是 i18n 键:提示只用用户的话,不带原始失败码与任务号
+ * (0.2.4 owner 报告「云任务结果回流失败 / job_…: network」;码与任务号在 main 的交付日志里)。
  */
 export function runStateToast(state: CloudRunState): {
   kind: "success" | "info" | "error"
-  key: "codepuppy.cloud.runSaved" | "codepuppy.cloud.runEnded" | "codepuppy.cloud.runSaveFailed"
-  detail: string
+  key: "codepuppy.cloud.runSaved" | "codepuppy.cloud.runEnded" | "codepuppy.cloud.runSaveFailed" | "codepuppy.cloud.runRefetching"
+  detailKey?: "codepuppy.cloud.runRefetchingDetail" | "codepuppy.cloud.runGone" | "codepuppy.cloud.runSaveFailedDetail"
 } | null {
+  if (state.delivery.status === "pending" && state.delivery.failure)
+    return { kind: "info", key: "codepuppy.cloud.runRefetching", detailKey: "codepuppy.cloud.runRefetchingDetail" }
   if (state.delivery.status === "failed")
     return {
       kind: "error",
       key: "codepuppy.cloud.runSaveFailed",
-      detail: `${state.runId}: ${state.delivery.failure?.code ?? "unknown"}`,
+      detailKey: state.delivery.failure?.code === "not-found" ? "codepuppy.cloud.runGone" : "codepuppy.cloud.runSaveFailedDetail",
     }
   if (state.delivery.status !== "saved") return null
-  if (state.job.status === "completed")
-    return { kind: "success", key: "codepuppy.cloud.runSaved", detail: state.runId }
-  return { kind: "info", key: "codepuppy.cloud.runEnded", detail: state.runId }
+  if (state.job.status === "completed") return { kind: "success", key: "codepuppy.cloud.runSaved" }
+  return { kind: "info", key: "codepuppy.cloud.runEnded" }
 }

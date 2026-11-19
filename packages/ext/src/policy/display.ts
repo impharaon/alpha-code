@@ -14,6 +14,8 @@ import { Error as ToolError } from "@opencode/plugin/promise/tool"
 import { parseToolDisplaySnapshot, type ToolDisplaySnapshotV1 } from "../../../schema/src/tool-identity"
 import { classifyNetFailure, engineNetFailurePath } from "../../../schema/src/codepuppy-net-failure"
 import type { ToolFacts } from "./identity"
+import { dirname, resolve } from "node:path"
+import { WRITE_DENIED_NOTE } from "../context-injection"
 
 export const DISPLAY_KEY = "codepuppyDisplay"
 
@@ -79,6 +81,54 @@ export function attachTerminal(
     ...(event.error.error === undefined ? {} : { error: event.error.error }),
     metadata: { ...event.error.metadata, [DISPLAY_KEY]: display },
   })
+}
+
+export const WRITE_DENIED_KEY = "codepuppyWriteDenied"
+/** OpenCode 2 的写文件工具(权限动作 `edit`);它们在引擎进程里写盘,被围栏拒时是一次带 EPERM 原因的工具错误。 */
+const FILE_WRITE_TOOLS = new Set(["write", "edit", "patch"])
+
+/** seatbelt 拒写 = EPERM(workspace-write-probe.ts 同一判据;EACCES 是文件系统权限位,不归给沙箱)。沿原因链找。 */
+function deniedBySandbox(error: unknown, depth = 0): boolean {
+  if (!error || typeof error !== "object" || depth > 6) return false
+  const record = error as { code?: unknown; message?: unknown; cause?: unknown; error?: unknown }
+  if (record.code === "EPERM") return true
+  if (typeof record.message === "string" && /\bEPERM\b/.test(record.message)) return true
+  return deniedBySandbox(record.cause, depth + 1) || deniedBySandbox(record.error, depth + 1)
+}
+
+/**
+ * `execute.after` body(0.2.4 验收第三轮;REQ-159 披露 I4):写被沙箱拒时不留沉默的死路 —— 模型读到的结果后面接一句
+ * `WRITE_DENIED_NOTE`(重启之前写不进、停下来告诉用户),metadata 带 `codepuppyWriteDenied`,时间线那张卡据此摆出既有的
+ * 只读说明与「重新启动」。两条写路径:写文件工具失败(原因链里有 EPERM;`directory` = 被写文件所在目录)与 shell 输出里有
+ * `Operation not permitted`(子进程的写,命令照常结束;写到哪个目录从命令里看不出,不填)。其余调用原样不动。
+ */
+export function attachWriteDenied(
+  event:
+    | { tool: string; input?: unknown; status: "completed"; result: { output?: unknown; content?: unknown; metadata?: Record<string, unknown> } & Record<string, unknown> }
+    | { tool: string; input?: unknown; status: "error"; error: InstanceType<typeof ToolError> },
+  directory: string,
+) {
+  if (event.status === "error") {
+    if (!FILE_WRITE_TOOLS.has(event.tool) || event.error.metadata?.[WRITE_DENIED_KEY] !== undefined) return
+    if (!deniedBySandbox(event.error.error ?? event.error)) return
+    const target = (event.input as { path?: unknown } | undefined)?.path
+    event.error = new ToolError({
+      message: `${event.error.message}\n\n${WRITE_DENIED_NOTE}`,
+      ...(event.error.error === undefined ? {} : { error: event.error.error }),
+      metadata: { ...event.error.metadata, [WRITE_DENIED_KEY]: { directory: typeof target === "string" ? dirname(resolve(directory, target)) : directory } },
+    })
+    return
+  }
+  if (event.tool !== "shell" || event.result.metadata?.[WRITE_DENIED_KEY] !== undefined) return
+  const output = (event.result.output as { output?: unknown } | undefined)?.output
+  if (typeof output !== "string" || !/operation not permitted/i.test(output)) return
+  const content = event.result.content
+  const note = { type: "text", text: WRITE_DENIED_NOTE }
+  event.result = {
+    ...event.result,
+    content: Array.isArray(content) ? [...content, note] : typeof content === "string" ? `${content}\n\n${WRITE_DENIED_NOTE}` : [{ type: "text", text: output }, note],
+    metadata: { ...event.result.metadata, [WRITE_DENIED_KEY]: {} },
+  }
 }
 
 export const NET_FAILURE_KEY = "codepuppyNetFailure"

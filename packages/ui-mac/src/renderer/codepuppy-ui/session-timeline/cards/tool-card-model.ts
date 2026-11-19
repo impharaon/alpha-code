@@ -436,6 +436,12 @@ function inputOf(part: ToolPart): Record<string, unknown> {
   return typeof input === "object" && input !== null ? (input as Record<string, unknown>) : {}
 }
 
+/** 0.2.4 验收第三轮:ext 在写被沙箱拒的那一步写下 `codepuppyWriteDenied`(packages/ext/src/policy/display.ts attachWriteDenied)。 */
+export function writeDeniedOf(part: ToolPart): boolean {
+  const value = metadataOf(part).codepuppyWriteDenied
+  return typeof value === "object" && value !== null
+}
+
 function metadataOf(part: ToolPart): Record<string, unknown> {
   if (!("metadata" in part.state)) return {}
   const metadata = part.state.metadata

@@ -922,6 +922,35 @@ export function TurnErrorCard(props: { row: Extract<TimelineRow, { kind: "turnEr
   )
 }
 
+/**
+ * 0.2.4 验收第三轮(REQ-159 披露 I4):这一回合有一次写被沙箱拒 ⇒ 对话里直接摆出顶栏只读弹层的同一组文字与「重新启动」
+ * (既有 relaunch),外形用回合错误卡的既有样式 —— 不是新卡。宿主没接重启 ⇒ 只有说明。
+ */
+export function WriteDeniedNote() {
+  const intents = useTimelineIntents()
+  return (
+    <div class="a-turn-err" data-codepuppy-write-denied role="status">
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <circle cx="12" cy="12" r="9" />
+        <path d="M12 8v5M12 16h.01" />
+      </svg>
+      <div class="a-turn-err-content">
+        <b>{t("codepuppy.workspace.readonlyTitle")}</b>
+        <span>{t("codepuppy.workspace.readonlyBody")}</span>
+        <Show when={intents.relaunch}>
+          {(relaunch) => (
+            <span class="a-turn-err-acts">
+              <button type="button" class="a-turn-err-act" onClick={() => relaunch()()}>
+                {t("codepuppy.workspace.readonlyRestart")}
+              </button>
+            </span>
+          )}
+        </Show>
+      </div>
+    </div>
+  )
+}
+
 /** 认不出原因的回合错误:`#1588` 之前的呈现,逐字不变。 */
 function TurnErrorDefaultBody(props: { row: Extract<TimelineRow, { kind: "turnError" }> }) {
   return (

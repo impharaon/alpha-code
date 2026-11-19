@@ -8,8 +8,8 @@
 // 供数方全是生产的:main 的 `spawnLocalServer`(假 fork,记下它交给 sidecar 的 env 与 start 消息;启动文档的构建与 `syncSecretFiles`
 // 都在里面跑)→ 那份 env 里 Code Puppy 自己的键原样放进本进程(sidecar 里就是这份 env),start 消息里启动文档的云 MCP 与 kill-switch
 // 交给宿主发布(`#1698` G2:它们不再经 env)→ 生产 `injectCodePuppyConfig` → 嵌入式引擎 +
-// 真 ext(test-component/codepuppy-engine.ts)→ 模型桩记下第一次模型请求。本地腿看直连工具表;云端那条是 MCP 工具,2.x 默认进 Code Mode,
-// 看这次请求里交给模型的 Code Mode 目录(云 server 的工具出现在请求里 = 模型拿得到)。云 MCP 端点是本机的 streamable-HTTP 桩,列的是
+// 真 ext(test-component/codepuppy-engine.ts)→ 模型桩记下第一次模型请求。两条腿都看这次请求的直连工具表(云 MCP 定义带
+// codemode:false,云 server 的工具是直接工具,`#1662`)。云 MCP 端点是本机的 streamable-HTTP 桩,列的是
 // 平台 vendored 的真实工具名(fixtures/cloud-mcp-tools)。登录信封里的令牌都是合成值;钥匙串后端与 electron 一律 mock,不碰真机。
 // 已知的坏:kill-switch 下去掉注入写的那两条 deny(websearch / 云端 web search)⇒ 两条都回到工具表(判据确实能红)。
 //
@@ -54,7 +54,7 @@ const { spawnLocalServer } = await import("./server")
 const { creditDanglingSweepForSpawn, resetDanglingSweepLatchForTests } = await import("./dangling-sweep-latch")
 const { CLOUD_MCP_TOOLS } = await import("./fixtures/cloud-mcp-tools")
 const { CLOUD_WEB_SEARCH_REMOTE_TOOL } = await import("./cloud-web-search")
-const { codepuppyEngine, scriptedModel, textOf } = await import("../../test-component/codepuppy-engine")
+const { codepuppyEngine, scriptedModel } = await import("../../test-component/codepuppy-engine")
 const fakeFork = ((_file: string, _args: string[], options: Record<string, unknown>) => (forkCalls.push({ options }), new FakeChild())) as never
 const fakePlanFence = () => ({ profile: "(version 1)\n(allow default)\n(deny file-write*)\n", addonPath: "/nonexistent/codepuppy_fence.node" })
 
@@ -131,12 +131,11 @@ async function toolTable(state: State, name: string, mutate?: (content: Record<s
     await engine.send("POST", `/api/session/${sessionID}/prompt`, { text: "hello" })
     await engine.send("POST", `/api/experimental/session/${sessionID}/wait`)
     const request = model.requests.slice(before).toSorted((a, b) => b.tools.length - a.tools.length)[0]!
-    const seen = request.messages.map((message) => textOf(message.content)).join("\n")
     return {
       local: request.tools.includes("websearch"),
-      // 云 server 的 web_search 进了这次请求里交给模型的 Code Mode 目录(以云 server 的命名空间点名)
-      cloud: new RegExp(`codepuppy[._]${CLOUD_WEB_SEARCH_REMOTE_TOOL}\\b`).test(seen),
-      cloudServer: new RegExp(`codepuppy[._](?!${CLOUD_WEB_SEARCH_REMOTE_TOOL}\\b)[a-z_]+`).test(seen),
+      // 云 server 的工具是模型的直接工具(`#1662`:云 MCP 定义带 codemode:false),在这次请求的工具表里以云 server 的命名空间点名
+      cloud: request.tools.includes(`codepuppy_${CLOUD_WEB_SEARCH_REMOTE_TOOL}`),
+      cloudServer: CLOUD_MCP_TOOLS.some((tool) => tool !== CLOUD_WEB_SEARCH_REMOTE_TOOL && request.tools.includes(`codepuppy_${tool}`)),
     }
   } finally {
     await engine.close()

@@ -57,6 +57,7 @@ describe("`#1195` 云 MCP header 通道的纯工厂形状", () => {
       url: CLOUD_URL,
       headers: { Authorization: "Bearer {file:/ud/codepuppy-secrets/CODEPUPPY_MCP_TOKEN}" },
       oauth: false,
+      codemode: false,
     })
     // `oauth === false` 是引擎的分化判据(`packages/opencode/src/mcp/index.ts` 对 false 完全
     // 不构造 McpOAuthProvider、不碰 mcp-auth.json、不开 loopback)。`toEqual` 已排他,
@@ -78,7 +79,7 @@ describe("`#1195` 云 MCP header 通道的纯工厂形状", () => {
 
   test("缺席(ref=undefined):disabled:true、零凭证通道、零 {file:} 引用(引擎对缺席文件的引用会 fail-loud 掉整个 config 装载)", () => {
     const cfg = materializeCloudMcpConfig(CLOUD_URL, undefined)
-    expect(cfg).toEqual({ type: "remote", url: CLOUD_URL, disabled: true, oauth: false })
+    expect(cfg).toEqual({ type: "remote", url: CLOUD_URL, disabled: true, oauth: false, codemode: false })
     const serialized = JSON.stringify(cfg)
     expect(serialized).not.toContain("Authorization")
     expect(serialized).not.toContain("Bearer")
@@ -170,7 +171,7 @@ describe("`#1195` 生产注入面", () => {
     expect(inject().ok).toBe(true)
 
     // toEqual 排他:没有 headers、没有 oauth 对象、没有 {file:} 引用 —— 一个回退通道都不存在。
-    expect(injectedMcp().codepuppy).toEqual({ type: "remote", url: CLOUD_URL, disabled: true, oauth: false })
+    expect(injectedMcp().codepuppy).toEqual({ type: "remote", url: CLOUD_URL, disabled: true, oauth: false, codemode: false })
     // config 文本里连引用名都不出现(引擎对缺席文件的 {file:} 引用 fail-loud 掉整个装载)。
     expect(lastContent).not.toContain("CODEPUPPY_MCP_TOKEN")
     // 缺凭证 ⇒ 不代付 ⇒ 本地 keyless websearch 不被 deny(主权判据同轴,ADR-009 B1)。
@@ -228,6 +229,7 @@ describe("`#1195` 生产注入面", () => {
       url: CLOUD_URL,
       headers: { Authorization: `Bearer ${MCP_SECRET}` },
       oauth: false,
+      codemode: false,
     })
     expect(Schema.decodeUnknownSync(EngineRemoteSchema)(servers.get("codepuppy")).disabled).toBeUndefined()
     expect(JSON.stringify(servers.get("codepuppy"))).not.toContain("clientId")

@@ -33,12 +33,15 @@
 export function materializeCloudMcpConfig(url: string, mcpTokenFileRef: string | undefined) {
   // `#1667`:OpenCode 2 的 `Mcp.RemoteConfig` 形状(`packages/schema/src/mcp.ts`):v1 的 `enabled:false` 换成 `disabled:true`,
   // 启用态不写这个键。`oauth:false` 原样(2.x 仍接受字面量 false = 关掉交互式 OAuth)。
+  // `#1662`:`codemode:false` —— 云工具是模型的直接工具,不进 2.x 默认的 Code Mode;桌面的云任务跟踪、生图卡、产物行只认直接调用
+  // (DESIGN-upgrade-bootstrap-config §10 R34)。两种形状都带:缺席态被 `/connect` 重新连上时也是直接工具。
   if (!mcpTokenFileRef) {
     return {
       type: "remote" as const,
       url,
       disabled: true as const,
       oauth: false as const,
+      codemode: false as const,
     }
   }
   return {
@@ -46,5 +49,6 @@ export function materializeCloudMcpConfig(url: string, mcpTokenFileRef: string |
     url,
     headers: { Authorization: `Bearer ${mcpTokenFileRef}` },
     oauth: false as const,
+    codemode: false as const,
   }
 }

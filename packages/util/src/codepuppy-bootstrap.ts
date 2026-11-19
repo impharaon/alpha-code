@@ -57,6 +57,7 @@ export type CodePuppyBootstrap = {
       url: CredentialFreeUrl
       headers: { Authorization: `Bearer {file:${string}}` }
       oauth: false
+      codemode: false
     }
   }
   webSearch: { killSwitch: boolean }
@@ -295,9 +296,10 @@ function cloudMcpOf(value: unknown, at: string): NonNullable<CodePuppyBootstrap[
   const cloud = record(value, at)
   only(cloud, ["name", "definition"], at)
   const definition = record(cloud.definition, join(at, "definition"))
-  only(definition, ["type", "url", "headers", "oauth"], join(at, "definition"))
+  only(definition, ["type", "url", "headers", "oauth", "codemode"], join(at, "definition"))
   if (definition.type !== "remote") throw new CodePuppyBootstrapError("invalid", join(at, "definition.type"))
   if (definition.oauth !== false) throw new CodePuppyBootstrapError("invalid", join(at, "definition.oauth"))
+  if (definition.codemode !== false) throw new CodePuppyBootstrapError("invalid", join(at, "definition.codemode"))
   const headers = record(definition.headers, join(at, "definition.headers"))
   only(headers, ["Authorization"], join(at, "definition.headers"))
   const name = text(cloud.name, join(at, "name"))
@@ -309,6 +311,7 @@ function cloudMcpOf(value: unknown, at: string): NonNullable<CodePuppyBootstrap[
       url: credentialFreeUrl(definition.url, join(at, "definition.url")),
       headers: { Authorization: matching(BEARER_FILE_REF)(headers.Authorization, join(at, "definition.headers.Authorization")) as `Bearer {file:${string}}` },
       oauth: false,
+      codemode: false,
     },
   }
 }

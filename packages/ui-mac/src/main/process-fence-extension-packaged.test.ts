@@ -17,6 +17,6 @@ test.skipIf(process.platform !== "darwin")("G0: signed packaged main grants the 
   const [stdout, stderr, code] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
   const output = `${stdout}${stderr}`
   expect(code, output).toBe(0)
-  expect(output.match(/(\d+) pass\b/)?.[1], output).toBe("1")
+  expect(output.match(/(\d+) pass\b/)?.[1], output).toBe("3")
   expect(output.match(/(\d+) fail\b/)?.[1], output).toBe("0")
-}, 1_900_000)
+}, 2_200_000)

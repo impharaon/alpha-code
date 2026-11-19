@@ -4,6 +4,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, 
 import { join, resolve } from "node:path"
 import { buildFenceAddon } from "../../scripts/build-fence-addon"
 import { loadFenceAddon } from "./process-fence-apply"
+import { runPackagedWindowProof } from "../../native/codepuppy-fence/test/packaged-window-build"
 
 const root = process.env.CODEPUPPY_G0_ROOT!
 const ui = resolve(import.meta.dir, "../..")
@@ -12,6 +13,8 @@ const lsregister = "/System/Library/Frameworks/CoreServices.framework/Frameworks
 
 // Signing output may contain the identity's name. Discard those lines before storing or displaying it.
 const redact = (text: string) => text.split("\n").map((line) => /Developer ID Application|Authority=|signingIdentity=/.test(line) ? "[signing identity omitted]" : line).join("\n")
+let prepared: { appDir: string; run: string; identityHash: string } | undefined
+let windowReport: Awaited<ReturnType<typeof runPackagedWindowProof>> | undefined
 
 test("G0 production addon, signed Electron main, production sidecar, positive and known-bad arms", async () => {
   mkdirSync(root, { recursive: true })
@@ -42,23 +45,25 @@ test("G0 production addon, signed Electron main, production sidecar, positive an
     return output
   }
   await command("build", [process.execPath, "run", "build"], { ...buildEnv, OPENCODE_CHANNEL: "dev" })
-  const built = await Bun.build({ entrypoints: [join(fixtures, "packaged-main.ts")], target: "node", format: "esm", external: ["electron"] })
-  expect(built.success, built.logs.map(String).join("\n")).toBe(true)
-  const index = join(ui, "out/main/index.js")
-  const original = readFileSync(index)
-  const helper = join(ui, "out/main/chunks/assets/g0-issue-probe")
-  await command("attack-build", ["/usr/bin/clang", "-O2", "-mmacosx-version-min=11.0", join(fixtures, "issue-probe.c"), "-lsandbox", "-o", helper])
   const packaged = join(run, "packaged")
-  try {
-    writeFileSync(index, new Uint8Array(await built.outputs[0]!.arrayBuffer()))
-    await command("package", [process.execPath, "run", "package:mac", "--dir", "--publish", "never", "-c.mac.notarize=false", `-c.directories.output=${packaged}`], {
-      ...buildEnv, HOME: process.env.CODEPUPPY_TEST_REAL_HOME, OPENCODE_CHANNEL: "dev", CODEPUPPY_SIGN: "1", CODEPUPPY_SIGN_IDENTITY: identity!, CSC_KEYCHAIN: keychain,
-    })
-  } finally {
-    writeFileSync(index, original)
-    rmSync(helper, { force: true })
+  if (!process.env.CODEPUPPY_PACKAGED_APP) {
+    const built = await Bun.build({ entrypoints: [join(fixtures, "packaged-main.ts")], target: "node", format: "esm", external: ["electron"] })
+    expect(built.success, built.logs.map(String).join("\n")).toBe(true)
+    const index = join(ui, "out/main/index.js")
+    const original = readFileSync(index)
+    const helper = join(ui, "out/main/chunks/assets/g0-issue-probe")
+    await command("attack-build", ["/usr/bin/clang", "-O2", "-mmacosx-version-min=11.0", join(fixtures, "issue-probe.c"), "-lsandbox", "-o", helper])
+    try {
+      writeFileSync(index, new Uint8Array(await built.outputs[0]!.arrayBuffer()))
+      await command("package", [process.execPath, "run", "package:mac", "--dir", "--publish", "never", "-c.mac.notarize=false", `-c.directories.output=${packaged}`], {
+        ...buildEnv, HOME: process.env.CODEPUPPY_TEST_REAL_HOME, OPENCODE_CHANNEL: "dev", CODEPUPPY_SIGN: "1", CODEPUPPY_SIGN_IDENTITY: identity!, CSC_KEYCHAIN: keychain,
+      })
+    } finally {
+      writeFileSync(index, original)
+      rmSync(helper, { force: true })
+    }
   }
-  const appDir = join(packaged, "mac-arm64", readdirSync(join(packaged, "mac-arm64")).find((file) => file.endsWith(".app"))!)
+  const appDir = process.env.CODEPUPPY_PACKAGED_APP ? resolve(process.env.CODEPUPPY_PACKAGED_APP) : join(packaged, "mac-arm64", readdirSync(join(packaged, "mac-arm64")).find((file) => file.endsWith(".app"))!)
   await command("verify", ["/usr/bin/codesign", "--verify", "--deep", "--strict", appDir])
   const signature = await command("signature", ["/usr/bin/codesign", "-d", "--verbose=4", appDir])
   expect(signature).toMatch(/flags=0x10000\(runtime\)/)
@@ -103,5 +108,20 @@ test("G0 production addon, signed Electron main, production sidecar, positive an
   expect(report.arms.badFileOnly.files.C.length).toBeGreaterThan(0)
   expect(report.arms.badNoDeny.files.C.length).toBeGreaterThan(0)
   writeFileSync(join(run, "signing.json"), JSON.stringify({ identityHash: identity, verifyExit: 0, runtimeFlag: "0x10000", appDir }, null, 2))
+  prepared = { appDir, run, identityHash: identity! }
   console.log(`G0 PASS evidence=${run}`)
 }, 1_800_000)
+
+test("V4/V5/V6 production Chromium window: concrete opens, slow replies, reloads and residual reasons", async () => {
+  expect(prepared, "G0 must pass before the window proof").toBeDefined()
+  windowReport = await runPackagedWindowProof(prepared!)
+  expect(windowReport.arms.slice(0, 12).map((arm: { name: string }) => arm.name), windowReport.error ?? "window arms").toEqual(["M1", "R1", "R2", "R3", "R4", "R5", "slow-open", "rewritten-reload", "honest-reload", "home-or-app-state", "grant-failed-native", "grant-failed-timeout"])
+  console.log(`WINDOW PASS evidence=${prepared!.run}/window`)
+}, 300_000)
+
+test("AC-08 external deep link reaches the residual DOM then the picker makes that folder writable", () => {
+  expect(windowReport, "window proof did not run").toBeDefined()
+  expect(windowReport!.error, `window evidence=${prepared!.run}/window`).toBeUndefined()
+  expect(windowReport!.appExitCode).toBe(0)
+  expect(windowReport!.arms.slice(12).map((arm: { name: string }) => arm.name)).toEqual(["deep-link-before", "deep-link-after"])
+})

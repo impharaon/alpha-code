@@ -383,7 +383,8 @@ describe("身份轴:模型发出的真工具调用经 ext 的执行闸(R10 第�
 
   // 0.2.5 实包(请求审批)里状态工具仍弹卡:真用户的策略文档里留着旧版本「在此项目中始终允许」写下的工具级 enabled 记录,换版后
   // 绑定摘要不同 ⇒ 解析成 binding-changed 的 ask,档位的免审批只认 default 原因。所以这一格跑两遍:空文档一遍(三档),带着上一版
-  // 留下的记录(绑定摘要已过期)再一遍(三档)—— 两遍都只有安装那一张卡。
+  // 留下的记录(绑定摘要已过期)再一遍(三档)—— 两遍都只有安装那一张卡。这里的 ext 没经随包清单核验(来源为空、当前摘要缺席),
+  // 是「当前摘要缺席」那一臂;出货形态(核验身份、当前摘要非空、记录摘要不同)那一臂在 hub-read-approval-verified.engine.cases.ts。
   test("BR-01 / BR-10 查找 + 状态 + 安装一组:三档都只出一张安装卡 —— 助手的只读查找与状态工具不问(真执行、真问到 main),带着上一版留下的「始终允许」记录也一样;安装照旧每档都问;拒绝后 main 收不到安装请求", async () => {
     const sent = (type: string) => fakeMainReceived.filter((message) => message.type === type).length
     const round = async (label: string, tiers: readonly Tier[]) => {

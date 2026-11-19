@@ -143,6 +143,27 @@ export type HostOptions = {
   switches?: TestBootstrapInput["switches"]
   /** `#1713` 契约 C 的信任钩子;默认是 sidecar 用的生产读法(没有记录 ⇒ 未允许)。要一个已允许的项目,用 allowProject 记一条。 */
   projectTrust?: (directory: string) => boolean
+  /**
+   * true ⇒ 像出货那样给 ext 一份随包工具清单(启动文档 paths.extBundledManifest,ext 走生产的 bundledPluginTools 核验):ext 自己的工具
+   * 带上 ext 的来源与 codepuppy-bundled 授权,绑定摘要非空。清单照 ext 构建脚本的同一形状现写(工具名 = TOOL_TEXT 的键),模块摘要取
+   * ext 在源码树里实际装载的那个模块文件(policy/index.ts 的 import.meta.url —— 出货时是 dist/server.js)。缺省不给,ext 自家工具来源为空。
+   */
+  bundledManifest?: boolean
+}
+
+/** ext 在源码树里由策略模块(`policy/index.ts`)以自己的 import.meta.url 认出自己;出货时那是打包后的 dist/server.js。 */
+const EXT_POLICY_MODULE = path.resolve(import.meta.dir, "../../ext/src/policy/index.ts")
+
+function writeBundledManifest(file: string) {
+  // 同步取(codepuppyEngine 是同步的);只在要清单的用例里装载 ext 的文字表
+  const { TOOL_TEXT } = require("../../ext/src/context-injection") as typeof import("../../ext/src/context-injection")
+  const manifest = {
+    moduleSha256: createHash("sha256").update(fs.readFileSync(EXT_POLICY_MODULE)).digest("hex"),
+    tools: Object.keys(TOOL_TEXT).sort(),
+    readable: Object.fromEntries(Object.entries(TOOL_TEXT).map(([name, text]) => [name, text.readable])),
+  }
+  fs.mkdirSync(path.dirname(file), { recursive: true })
+  fs.writeFileSync(file, JSON.stringify(manifest))
 }
 
 /**
@@ -190,7 +211,10 @@ export function codepuppyEngine(options: HostOptions) {
     askTimeoutMs: options.askTimeoutMs,
     factoryDirs: options.factoryDirs,
     switches: options.switches,
+    // 文档要求扩展目录与清单成对出现(codepuppy-bootstrap 的校验);扩展目录就是下面装真 ext 的那一个
+    ...(options.bundledManifest ? { extPlugin: path.join(sandbox.root, `${name}-ext`), extBundledManifest: path.join(sandbox.root, `${name}-ext-bundled-tools.json`) } : {}),
   })
+  if (options.bundledManifest) writeBundledManifest(path.join(sandbox.root, `${name}-ext-bundled-tools.json`))
   const key = secretFilePath(userData, "CODEPUPPY_API_KEY")
   fs.mkdirSync(path.dirname(key), { recursive: true })
   fs.writeFileSync(key, `sk-cp-${name}`, { mode: 0o600 })

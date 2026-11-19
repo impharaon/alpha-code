@@ -161,7 +161,7 @@ src/components/prompt-input/submit.test.ts 9
 src/context/permission-auto-respond.test.ts 12
 src/context/server-session-restart.test.ts 2
 src/context/terminal-command.test.ts 1
-src/i18n/parity.test.ts 5
+src/i18n/parity.test.ts 6
 src/pages/layout/helpers.test.ts 24
 src/utils/session-route.test.ts 10
 src/utils/terminal-websocket-url.test.ts 3

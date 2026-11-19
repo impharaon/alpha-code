@@ -34,8 +34,8 @@
   --a-monogram-bg: #efeff1;
   --a-rail-w: 48px;
   --a-topbar-h: 44px;
-  --a-frame-gap: 8px;
-  --fr-window-r: 16px; /* 只模拟 macOS 窗口外圆角;实现时按目标系统实测,工作面圆角 = 窗口圆角 − 8px(审计 #19) */
+  --a-frame-gap: 4px; /* 工作面到窗口右 / 下缘;owner 2026-11-18/19 「最底部的和最右侧的灰色的宽度再减少一些。」 8px → 4px(冻结稿 frame.css 仍是 8px,以本文件为准) */
+  --fr-window-r: 16px; /* 只模拟 macOS 窗口外圆角;实现时按目标系统实测,工作面圆角 = 窗口圆角 − --a-frame-gap(审计 #19;gap 4px 时为 12px) */
 }
 .fr.is-dark {
   /* 深色:tokens.css 深色块原值照抄(画框只能按作用域切主题),改动项后注「原 …」 */

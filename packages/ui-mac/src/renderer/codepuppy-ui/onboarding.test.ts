@@ -106,6 +106,17 @@ describe("首次引导卡 #onboarding", () => {
     expect(root.textContent).not.toMatch(/BYOK|Key/)
   })
 
+  test("默认焦点不在任何按钮上:启动即在前台时,误触 Enter 不会发起登录", async () => {
+    mount()
+    await flush()
+    const active = document.activeElement as HTMLElement
+    expect(active).toBe(card())
+    expect(active.tagName).not.toBe("BUTTON")
+    active.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }))
+    await flush()
+    expect(started).toBe(0)
+  })
+
   test("跳过 = 收起并记住(不再弹);登录钮发起真实登录", async () => {
     mount()
     await flush()

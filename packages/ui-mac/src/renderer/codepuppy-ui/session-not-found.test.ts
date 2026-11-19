@@ -8,13 +8,17 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { pathToFileURL } from "node:url"
 import { build } from "vite"
-import type { createComponent } from "solid-js"
+import type { createComponent, createSignal } from "solid-js"
 import type { render } from "solid-js/web"
 import type { SessionNotFound } from "../../../../codepuppy-app/src/pages/session-not-found"
+import type { ResettingErrorBoundary } from "../../../../codepuppy-app/src/pages/route-error-boundary"
 import type { setLocale, t } from "../i18n"
 
 type TestRuntime = {
   createComponent: typeof createComponent
+  createSignal: typeof createSignal
+  ResettingErrorBoundary: typeof ResettingErrorBoundary
+  sessionNotFoundShown: () => boolean
   render: typeof render
   SessionNotFound: typeof SessionNotFound
   setLocale: typeof setLocale
@@ -62,7 +66,7 @@ function mount(onAction: () => void) {
           // 与 SessionErrorFallback 同一组键:这里取生产词典,词典里的词一变,这条就跟着看。
           title: runtime.t("session.error.notFound" as never),
           description: runtime.t("session.error.notFound.description" as never),
-          action: runtime.t("session.error.notFound.closeTab" as never),
+          action: runtime.t("session.error.notFound.newSession" as never),
           onAction,
         }),
       host,
@@ -83,10 +87,55 @@ describe("找不到对话 #not-found", () => {
     expect(page.textContent).not.toMatch(/Local Server|ses_|标签页|服务器/)
   })
 
+  test("页面在场时告诉外壳(顶栏据此写「找不到对话」),离开即撤", () => {
+    expect(runtime.sessionNotFoundShown()).toBe(false)
+    mount(() => {})
+    expect(runtime.sessionNotFoundShown()).toBe(true)
+    disposers.splice(0).forEach((dispose) => dispose())
+    expect(runtime.sessionNotFoundShown()).toBe(false)
+  })
+
   test("点「回到新对话」交给调用方的出口(只调用一次)", () => {
     const calls: string[] = []
     const host = mount(() => calls.push("back"))
     host.querySelector<HTMLButtonElement>("button")!.click()
     expect(calls).toEqual(["back"])
+  })
+})
+
+describe("找不到对话之后再点别的对话(AC-07 回归)", () => {
+  // 会话路由实例被同一 server 上所有对话共用,id 变了路由不重挂;错误边界不复位就会一直停在「找不到对话」。
+  test("id 换成另一条存在的对话 ⇒ 页面回到内容,不停在找不到页", () => {
+    const [id, setId] = runtime.createSignal("gone")
+    const host = document.createElement("div")
+    document.body.append(host)
+    const Page = () => {
+      const current = id()
+      if (current === "gone") throw new Error("not found")
+      const el = document.createElement("div")
+      el.dataset.page = current
+      return el
+    }
+    disposers.push(
+      runtime.render(
+        () =>
+          runtime.createComponent(runtime.ResettingErrorBoundary, {
+            resetOn: id,
+            fallback: () => {
+              const el = document.createElement("div")
+              el.dataset.fallback = ""
+              return el
+            },
+            get children() {
+              return runtime.createComponent(Page, {})
+            },
+          }),
+        host,
+      ),
+    )
+    expect(host.querySelector("[data-fallback]")).not.toBeNull()
+    setId("ses_ok")
+    expect(host.querySelector("[data-fallback]")).toBeNull()
+    expect(host.querySelector("[data-page='ses_ok']")).not.toBeNull()
   })
 })

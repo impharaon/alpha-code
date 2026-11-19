@@ -25,7 +25,7 @@ import type { render } from "solid-js/web"
 import type * as Runtime from "./shell-commands-test-runtime"
 import { RETIRED_MENU_COMMANDS, publishedMenuCommands } from "../../shared/desktop-menu-policy"
 import { homeHref, newSessionHref } from "./route"
-import { encodeDirectory, parseRoute } from "../../shared/route-manifest"
+import { encodeDirectory, hrefFor, parseRoute } from "../../shared/route-manifest"
 
 type TestRuntime = typeof Runtime & { render: typeof render }
 
@@ -156,7 +156,9 @@ describe("侧栏账户菜单「设置」:改接 alpha 自有设置面,与路由�
     await settle()
 
     expect(settingsSurface()).not.toBeNull()
-    expect(settingsSurface()!.getAttribute("role")).toBe("dialog")
+    // 设置是顶级页面(BR-01):壳的页面容器,不是模态框。
+    expect(settingsSurface()!.getAttribute("role")).toBe("region")
+    expect(settingsSurface()!.classList.contains("codepuppy-page")).toBe(true)
   })
 
   test("设置页的快捷键表里,一条已退休的命令 id 都不许出现", async () => {
@@ -198,6 +200,42 @@ describe("侧栏账户菜单「设置」:改接 alpha 自有设置面,与路由�
   })
 })
 
+describe("侧栏会话列表「显示更多」(冻结稿 #home)", () => {
+  const titles = () =>
+    Array.from(document.querySelectorAll(".codepuppy-project-sessions .codepuppy-session-title")).map((e) => e.textContent)
+  const more = () => document.querySelector<HTMLButtonElement>(".codepuppy-sessions-more")
+
+  test("超过四条:项目只画前四条与一行「显示更多」,点它展开其余、行消失", async () => {
+    runtime.seedSessions(6)
+    runtime.expandProject(runtime.FIXTURE_DIRECTORY)
+    await mountShell(() => runtime.CodePuppyShell())
+    expect(titles()).toEqual(["会话 1", "会话 2", "会话 3", "会话 4"])
+    expect(more()?.textContent).toBe("显示更多")
+    more()!.click()
+    await settle()
+    expect(titles()).toEqual(["会话 1", "会话 2", "会话 3", "会话 4", "会话 5", "会话 6"])
+    expect(more()).toBeNull()
+  })
+
+  test("正好四条:没有「显示更多」", async () => {
+    runtime.seedSessions(4)
+    runtime.expandProject(runtime.FIXTURE_DIRECTORY)
+    await mountShell(() => runtime.CodePuppyShell())
+    expect(titles().length).toBe(4)
+    expect(more()).toBeNull()
+  })
+
+  test("正在看的会话排在第四条之后:不藏在「显示更多」后面", async () => {
+    runtime.seedSessions(6)
+    runtime.expandProject(runtime.FIXTURE_DIRECTORY)
+    await mountShell(() => runtime.CodePuppyShell())
+    runtime.navigateTo(hrefFor.session("sidecar", "ses_seed_6"))
+    await settle()
+    expect(titles().length).toBe(6)
+    expect(more()).toBeNull()
+  })
+})
+
 describe("新对话页右上角「终端 / 审查」:连按钮一起退休", () => {
   test("落地路由上不存在这对浮动按钮,而左上角工具簇还在(证明壳确实渲染了)", async () => {
     await mountShell(() => runtime.CodePuppyShell())
@@ -234,6 +272,50 @@ describe("窗口外框(BR-01 / BR-02):窄轨与常驻顶栏", () => {
     expect(document.querySelector(".codepuppy-sidebar")).not.toBeNull()
     expect(document.querySelector(".codepuppy-sidebar [data-codepuppy-sidebar-nav]")).toBeNull()
     expect(document.querySelector(".codepuppy-sidebar .codepuppy-sidebar-nav-item")).toBeNull()
+  })
+
+  test("提示位置:窄轨按钮的提示在右侧,顶栏按钮的提示仍在下方", async () => {
+    await mountShell(() => runtime.CodePuppyShell())
+    const hover = async (el: Element) => {
+      el.dispatchEvent(new PointerEvent("pointerenter"))
+      await new Promise((resolve) => setTimeout(resolve, 450))
+      const placement = document.querySelector("[role='tooltip']")?.getAttribute("data-placement")
+      el.dispatchEvent(new PointerEvent("pointerleave"))
+      await flush()
+      return placement
+    }
+    expect(await hover(document.querySelector("[data-codepuppy-sidebar-nav='new-chat']")!)).toBe("right")
+    expect(await hover(document.querySelector("[data-codepuppy-topbar-action='sidebar']")!)).toBe("bottom")
+  })
+
+  test("找不到对话页:顶栏写「找不到对话」,离开后回到新对话", async () => {
+    runtime.setHasProjects(false)
+    await mountShell(() => runtime.CodePuppyShell())
+    expect(topbarTitle()).toBe("新对话")
+    runtime.setSessionNotFoundShown(true)
+    await settle()
+    expect(topbarTitle()).toBe("找不到对话")
+    runtime.setSessionNotFoundShown(false)
+    await settle()
+    expect(topbarTitle()).toBe("新对话")
+  })
+
+  test("顶级页面开着时,侧栏不再高亮之前那条对话;离开后恢复", async () => {
+    runtime.seedSessions(2)
+    runtime.expandProject(runtime.FIXTURE_DIRECTORY)
+    await mountShell(() => runtime.CodePuppyShell())
+    runtime.navigateTo(hrefFor.session("sidecar", "ses_seed_1"))
+    await settle()
+    const active = () => document.querySelectorAll(".codepuppy-project-sessions .codepuppy-session-row[data-active]").length
+    expect(active()).toBe(1)
+    document.querySelector<HTMLButtonElement>("[data-codepuppy-sidebar-nav='hub']")!.click()
+    await settle()
+    expect(document.querySelector(".codepuppy-topbar-page")?.textContent).toBe("定制中心")
+    expect(active()).toBe(0)
+    expect(document.querySelector(".codepuppy-project-row[data-active]")).toBeNull()
+    document.querySelector<HTMLButtonElement>("[data-codepuppy-sidebar-nav='hub']")!.click()
+    await settle()
+    expect(active()).toBe(1)
   })
 
   test("顶栏随页面换标题:新对话 → 设置(整页)→ 回到新对话;整页上没有右栏,开关收起", async () => {

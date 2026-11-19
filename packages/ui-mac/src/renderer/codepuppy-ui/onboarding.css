@@ -22,6 +22,7 @@
   box-shadow: var(--a-shadow-overlay);
   padding: 32px 32px 24px;
   text-align: center;
+  outline: none;
   animation: a-rise 0.5s var(--a-ease-out) both;
 }
 

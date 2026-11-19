@@ -20,6 +20,10 @@
   translate: -50% 0;
   animation: a-tip-in var(--a-dur-fast) var(--a-ease-out) both;
 }
+/* 右侧放置:坐标是触发控件右缘 + 8px 与它的垂直中心,签自己居中于该点的纵轴。 */
+.a-ui.a-tip[data-placement="right"] {
+  translate: 0 -50%;
+}
 @keyframes a-tip-in {
   from {
     opacity: 0;

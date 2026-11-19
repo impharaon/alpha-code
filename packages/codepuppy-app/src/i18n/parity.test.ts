@@ -146,6 +146,18 @@ describe("i18n parity", () => {
     }
   })
 
+  test("the not-found page action says it returns to a new conversation, never the tab-closing wording", async () => {
+    const source = await dictionary("./en.ts")
+    expect(source["session.error.notFound.newSession"]).toBe("Back to a new conversation")
+    for (const locale of appLocales) {
+      const target = await dictionary(`./${locale}.ts`)
+      expect(target["session.error.notFound.newSession"].trim()).not.toBe("")
+      if (locale === "zh" || locale === "zht") continue
+      // English text stands in where no translation is known; it must still not be the old "Close tab" meaning.
+      expect(target["session.error.notFound.newSession"]).not.toBe(target["session.error.notFound.closeTab"])
+    }
+  })
+
   test("changed-file summary keys preserve rendered English copy and localize complete phrases", async () => {
     const source = await dictionary("../../../codepuppy-ui/src/i18n/en.ts")
     expect(source["ui.sessionTurn.diffs.changed.one"].replace("{{count}}", "1")).toBe("1 Changed file")

@@ -103,6 +103,7 @@ import { legacySessionHref, requireServerKey, sessionHref } from "@/utils/sessio
 import { useUsageExceededDialogs } from "./session/usage-exceeded-dialogs"
 import { createSessionOwnership } from "./session/session-ownership"
 import { createSessionLineage } from "./session/session-lineage"
+import { ResettingErrorBoundary } from "@/pages/route-error-boundary"
 import { SessionNotFound } from "./session-not-found"
 
 type FollowupItem = FollowupDraft & { id: string }
@@ -183,9 +184,15 @@ export function SessionRouteErrorBoundary(
 ) {
   const settings = useSettings()
   return (
-    <ErrorBoundary
+    <ResettingErrorBoundary
+      resetOn={() => props.sessionID}
       fallback={(error) =>
-        settings.general.newLayoutDesigns() ? (
+        // 找不到对话:冻结稿 #not-found 没有内层卡片 —— 只留撑满的路由框,不画带阴影的圆角面板。
+        isCurrentSessionNotFoundError(error, props.sessionID) ? (
+          <SessionRouteFrame>
+            <SessionErrorFallback error={error} sessionID={props.sessionID} serverKey={props.serverKey} />
+          </SessionRouteFrame>
+        ) : settings.general.newLayoutDesigns() ? (
           <SessionRouteFrame padded={props.padded}>
             <SessionPanelFrame newLayout raised={!!props.sessionID}>
               <SessionErrorFallback error={error} sessionID={props.sessionID} serverKey={props.serverKey} />
@@ -197,7 +204,7 @@ export function SessionRouteErrorBoundary(
       }
     >
       {props.children}
-    </ErrorBoundary>
+    </ResettingErrorBoundary>
   )
 }
 
@@ -217,7 +224,7 @@ function SessionErrorFallback(props: { error: unknown; sessionID?: string; serve
         title={language.t("session.error.notFound")}
         description={language.t("session.error.notFound.description")}
         // 键沿用上游的 closeTab(新增键会破坏各语种键对齐判据);中 / 英 / 繁值已改成「回到新对话」。
-        action={language.t("session.error.notFound.closeTab")}
+        action={language.t("session.error.notFound.newSession")}
         onAction={backToNewChat}
       />
     )

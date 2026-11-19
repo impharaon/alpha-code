@@ -54,9 +54,37 @@
   border-color: var(--a-hairline);
   box-shadow: none;
 }
-.a-search .a-field-input {
+.a-search .a-field-input,
+.a-search .a-field-input:focus,
+.a-search .a-field-input:focus-visible {
   font-size: var(--a-text-md);
   caret-color: var(--a-accent);
+  outline: none;
+  box-shadow: none;
+}
+/* 「esc 关闭」in the input row, right-aligned (frame `.srch-in .kbd`); plain text, not a button. */
+.a-search-in {
+  position: relative;
+}
+.a-search-in .a-field-input {
+  padding-right: 64px;
+}
+.a-search-esc {
+  position: absolute;
+  top: 50%;
+  right: var(--a-space-4);
+  translate: 0 -50%;
+  font-size: var(--a-text-2xs);
+  color: var(--a-text-tertiary);
+  pointer-events: none;
+}
+.a-search-list {
+  padding: 6px;
+}
+.a-search-grp {
+  padding: 6px 10px 4px;
+  font-size: var(--a-text-xs);
+  color: var(--a-text-tertiary);
 }
 
 .a-search-empty {
@@ -73,17 +101,15 @@
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 2px;
   max-height: 46vh;
   overflow-y: auto;
-  padding: 6px;
 }
 
 .a-search-result {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
-  gap: var(--a-space-3);
+  gap: 10px;
   min-height: 36px;
   align-items: center;
   padding: 0 10px;
@@ -101,6 +127,11 @@
   box-shadow: var(--a-ring-focus);
 }
 
+.a-search-result-icon {
+  flex: none;
+  color: var(--a-text-tertiary);
+}
+
 .a-search-result-title {
   flex: 1 1 auto;
   min-width: 0;
@@ -108,6 +139,11 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.a-search-result-title mark {
+  background: none;
+  color: var(--a-text);
+  font-weight: var(--a-weight-semibold);
 }
 
 .a-search-result-project {
@@ -121,8 +157,10 @@
   background: var(--a-bg-muted);
 }
 
+/* 行尾时间:安静的次级值,与项目名并列右对齐(同名对话靠它分辨,#1589 AC4);不是一列表头。 */
 .a-search-result-time {
-  flex: 0 0 64px;
+  flex: 0 0 auto;
+  min-width: 64px;
   text-align: right;
   color: var(--a-text-tertiary);
   font-size: var(--a-text-xs);
@@ -131,20 +169,9 @@
 
 .a-search-keys {
   display: flex;
-  justify-content: flex-end;
-  gap: var(--a-space-3);
+  gap: 14px;
   padding: var(--a-space-2) var(--a-space-4);
   border-top: 1px solid var(--a-hairline);
   font-size: var(--a-text-2xs);
   color: var(--a-text-tertiary);
-}
-
-.a-search-keys kbd {
-  font-family: var(--a-font-sans);
-  padding: 0 5px;
-  margin-right: 3px;
-  border: 1px solid var(--a-border);
-  border-radius: 4px;
-  background: var(--a-bg-subtle);
-  color: var(--a-text-secondary);
 }

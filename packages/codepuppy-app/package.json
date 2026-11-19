@@ -12,7 +12,8 @@
     "./vite": "./vite.js",
     "./index.css": "./src/index.css",
     "./surface/session": "./src/pages/session.tsx",
-    "./surface/terminal": "./src/surface/terminal.ts"
+    "./surface/terminal": "./src/surface/terminal.ts",
+    "./surface/session-not-found-state": "./src/surface/session-not-found-state.ts"
   },
   "scripts": {
     "typecheck": "tsgo -b",

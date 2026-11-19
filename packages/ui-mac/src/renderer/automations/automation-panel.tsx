@@ -353,7 +353,7 @@ export function AutomationPanel(props: {
   return (
     <Show when={openNow()}>
       <Portal mount={host}>
-        <div class="a-ui codepuppy-auto-page" role="region" aria-label={t("codepuppy.sidebar.automation")}>
+        <div class="a-ui codepuppy-page codepuppy-auto-page" role="region" data-top-level-page="automation" aria-label={t("codepuppy.sidebar.automation")}>
           {/* 页头与定制中心 / 设置同一套(#automation `.phd`):一枚当前页签 + 底部发丝线;编辑页前面多一个返回面包屑。 */}
           <header class="codepuppy-auto-head">
             <div class="codepuppy-auto-head-t">
@@ -366,9 +366,6 @@ export function AutomationPanel(props: {
               </Show>
               <h1 class="codepuppy-auto-tab">{view() === "edit" ? (editing() ? t("codepuppy.auto.editTitle") : t("codepuppy.auto.newTitle")) : t("codepuppy.auto.allTasks")}</h1>
             </div>
-            <button class="codepuppy-auto-close" aria-label={t("codepuppy.ext.close")} onClick={() => setAutomationOpen(false)}>
-              <Svg d="M6 6l12 12M18 6L6 18" />
-            </button>
           </header>
 
           <div class="codepuppy-auto-scroll">

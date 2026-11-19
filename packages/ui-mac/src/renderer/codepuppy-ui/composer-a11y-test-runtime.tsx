@@ -63,9 +63,9 @@ export function ToastHarness() {
   return <ToastViewport />
 }
 
-export function TooltipHarness() {
+export function TooltipHarness(props: { placement?: "top" | "bottom" | "right" } = {}) {
   return (
-    <Tooltip label="缓存命中 82%">
+    <Tooltip label="缓存命中 82%" placement={props.placement}>
       <button type="button" data-tip-trigger>
         高
       </button>

@@ -281,10 +281,12 @@ test("installed package management keeps token entry available after closing its
   click(q('[data-installed-package="package:github"] [data-more]'))
   await waitFor(() => expect(q('[data-menu-item="manage"]')).toBeInstanceOf(HTMLElement))
   click(q('[data-menu-item="manage"]'))
-  await waitFor(() => expect(q(".codepuppy-ext-detail")?.textContent).toContain("账户"))
+  await waitFor(() => expect(q(".codepuppy-ext-detail")?.textContent).toContain("权限"))
   expect(q(".codepuppy-ext-detail")?.textContent).toContain("权限")
   expect(q(".codepuppy-ext-detail")?.textContent).toContain("关于")
   const openToken = () => click(q(".codepuppy-ext-detail [data-package-secret]"))
+  // 账户段在读到账户项之后才画。
+  await waitFor(() => expect(q(".codepuppy-ext-detail [data-package-secret]")).toBeInstanceOf(HTMLElement))
   openToken()
   await waitFor(() => expect(q('input[type="password"]')).toBeInstanceOf(HTMLInputElement))
   expect(q('[role="dialog"]')?.textContent).not.toContain("GITHUB_PERSONAL_ACCESS_TOKEN")
@@ -499,7 +501,7 @@ test("AC5 每页顶部「已安装」一组,已装行的「…」含停用 / 移
   reset()
   receipts = [receipt("skill:safe-refactor", "safe-refactor", "skill")]
   inventoryRows = [inventoryRow("skill:safe-refactor", "safe-refactor", "skill", "enabled")]
-  factorySkillIds = ["skill-creator"]
+  factorySkillIds = ["skill-creator", "agent-creator", "cloud-capabilities"]
   mount("skills")
   await waitFor(() => expect(q("[data-group='installed'] [data-installed-row='skill:safe-refactor']")).toBeInstanceOf(HTMLElement))
   // 「已安装」是这一页的第一组。
@@ -523,6 +525,11 @@ test("AC5 每页顶部「已安装」一组,已装行的「…」含停用 / 移
   // 技能页「系统」:出厂内置技能 + 内置命令,命令的「…」是「自定义」。
   click(q("[data-segment='system']"))
   await waitFor(() => expect(q("[data-factory-skill='skill-creator']")).toBeInstanceOf(HTMLElement))
+  // 应用自己起名的出厂技能显示中文名,id 只留在悬停提示里(技术详情才写 id)。
+  await waitFor(() => expect(q("[data-factory-skill='agent-creator']")).toBeInstanceOf(HTMLElement))
+  expect(q("[data-factory-skill='agent-creator'] b")!.textContent).toBe("助手创建助手")
+  expect(q("[data-factory-skill='agent-creator'] b")!.getAttribute("title")).toBe("agent-creator")
+  expect(q("[data-factory-skill='cloud-capabilities'] b")!.textContent).toBe("云端能力")
   await waitFor(() => expect(qa("[data-builtin-command]").map((n) => n.getAttribute("data-builtin-command"))).toEqual(["init", "review"]))
   expect(await openMenu(q("[data-builtin-command='init'] [data-more]"))).toEqual(["override"])
   click(q("[data-menu-item='override']"))
@@ -764,7 +771,7 @@ async function managePackage(packageId: string) {
   click(q(`[data-installed-package="${packageId}"] [data-more]`))
   await waitFor(() => expect(q('[data-menu-item="manage"]')).toBeInstanceOf(HTMLElement))
   click(q('[data-menu-item="manage"]'))
-  await waitFor(() => expect(q('[data-package-detail]')?.textContent).toContain(zh["codepuppy.ext.packageAccounts"]))
+  await waitFor(() => expect(q('[data-package-detail]')?.textContent).toContain(zh["codepuppy.ext.packagePermissions"]))
 }
 
 test("package idle switch converges from applying to off on the existing event and can turn on again", async () => {

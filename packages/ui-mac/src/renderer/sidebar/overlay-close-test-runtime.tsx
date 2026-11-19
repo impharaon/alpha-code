@@ -13,6 +13,9 @@ import { MemoryRouter, Route, createMemoryHistory, type MemoryHistory } from "@s
 import { CodePuppySidebar } from "./codepuppy-sidebar"
 import { ExtensionHub } from "../extensions/extension-hub"
 import { AutomationPanel } from "../automations/automation-panel"
+import { CodePuppySettings } from "../codepuppy-ui/settings"
+import { setSettingsOpen, settingsOpen } from "../codepuppy-ui/settings-state"
+import type { SettingsSurfaceApi } from "../codepuppy-ui/settings-authority-client"
 import { extHubOpen, setExtHubOpen } from "../extensions/ext-hub-state"
 import type { CodePuppyProjectsApi, ServerInfo } from "./use-projects"
 
@@ -24,12 +27,22 @@ export function OverlayCloseHarness(props: { history: MemoryHistory; projects: C
   // #925:生产里两者的 serverKey 都是 renderer/index.tsx 的 `projectsServerKey`;本闸门只测
   // 「覆盖层随导航关闭」,server 身份不是被测语义,给与 providers 替身一致的 "sidecar"。
   const serverKey = () => "sidecar"
+  // 设置页的数据层是传输:读一律保持未决(页面停在「加载中」),被测的只是它在不在 DOM 里。
+  const pending = () => new Promise<never>(() => {})
+  const settingsApi = {
+    settings: { read: pending, validate: pending, write: pending },
+    extensionStorage: { snapshot: pending, inspect: pending, collect: pending },
+    toolPolicy: {},
+  } as unknown as SettingsSurfaceApi
   // 侧栏与两个覆盖层在生产里是 AppInterface 下的兄弟(renderer/index.tsx:500-508),这里同构。
   const Shell = (p: { children?: JSX.Element }) => (
     <>
       <CodePuppySidebar projects={props.projects} serverKey={serverKey} />
       <ExtensionHub server={server} open={extHubOpen} onClose={() => setExtHubOpen(false)} />
       <AutomationPanel serverKey={serverKey} />
+      <div data-codepuppy-settings-host>
+        <CodePuppySettings open={settingsOpen()} onClose={() => setSettingsOpen(false)} api={settingsApi} />
+      </div>
       {p.children}
     </>
   )

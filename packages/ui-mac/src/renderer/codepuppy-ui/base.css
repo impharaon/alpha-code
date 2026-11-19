@@ -70,6 +70,17 @@
   background: transparent;
 }
 
+/* Full-page scroll bodies (Customization Center, automation, settings): use the platform's own scrollbars
+ * (overlay on macOS: the thumb shows while scrolling or hovering) instead of the 10px classic bar above, and
+ * reserve no gutter, so the centred column is centred in the page. A standard `scrollbar-color` makes Chromium
+ * ignore the ::-webkit-scrollbar rules for these containers. */
+.a-ui .codepuppy-ext-scroll,
+.a-ui .codepuppy-auto-scroll,
+.a-ui .codepuppy-settings-main {
+  scrollbar-gutter: auto;
+  scrollbar-color: var(--a-border-strong) transparent;
+}
+
 /* Overline / small label utility used across screens. */
 .a-overline {
   font-size: var(--a-text-2xs);

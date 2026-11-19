@@ -17,7 +17,7 @@ last_reviewed: 2026-11-19
 - 依据：[SPEC-child-process-write-fence v2 / AC-05 至 AC-08](https://github.com/impharaon/alpha-code/blob/8593c2701d94d29b9a5de3de1db44639220fb637/docs/specs/child-process-write-fence/spec.md)；[设计 §4、§5、§6、§10 / cadd657d29](https://github.com/impharaon/alpha-code/blob/cadd657d2925f686bd34045d5274d1007b5c18e4/docs/specs/child-process-write-fence/design.md)；2026-11-19 PLAN 派单及其 Decided point 5。读码基线为本集成分支 `4f61fde5de`，不把该分支现有 v1 spec 当作 v2 输入，也不复制尚待合入的设计。
 - 核对：Phase: IMPLEMENT — plan 6a1e42753b · orchestrator / Claude Fable 5.2 · plan check passed (every AC has proof with a failing arm; the three extra same-call-chain files `main/index.ts`, `ui/codepuppy-composer.tsx`, `ui/session-rail/terminal/terminal-engine-adapter.tsx` are accepted as necessary; no decision restated or changed). 2026-11-19 续派仅授权步骤 1/G0；native/profile/grant 契约沿用 cadd657d29，见证点尚待修订，不实施步骤 2–8。V2 按每臂实际落盘和 `r1-x2all-result.txt` 判定，不能要求所有签发都返回 NULL。
 
-本阶段只提交本文件。下表和命令均为实施安排，不代表已经运行或通过；文档影响归类为 architecture/decision，当前落点只有本计划。后续实现沿用现有组件形态，不增加界面状态或交互稿。
+PLAN 阶段只提交本文件。下表和命令均为实施安排，不代表已经运行或通过；文档影响归类为 architecture/decision。后续实现沿用现有组件形态，不增加界面状态或交互稿。
 
 ### 改动
 
@@ -124,4 +124,6 @@ last_reviewed: 2026-11-19
 ### 偏离记录
 
 - 2026-11-19 · PLAN 读码发现实际依赖注入、消息发送、终端创建分别在 `main/index.ts`、`ui/codepuppy-composer.tsx`、`ui/session-rail/terminal/terminal-engine-adapter.tsx`，初始枚举未点名；按派单 Handling problems §1 列为同调用链最小落点，交计划核对，尚未修改这些文件。其余设计决定不变。
-- 实施偏离：暂无。后续每次偏离与代码在同一提交更新本节并记录原因、相关 AC 和提交。
+- 2026-11-19 · 步骤 1 红证据 `f98d37f5be`：G0 缺生产签发导出、profile 缺 X1/X2，宿主与形状测试共 24 pass / 3 fail，exit 1；脱敏输出位于 `~/.cache/alpha-orch/2026-11-19/impl-project-writable/g0-red.log`。
+- 2026-11-19 · 步骤 1 harness 隔离接线：测试辅助源码落在 `native/codepuppy-fence/test/`；仅签名工具使用账户 HOME 与显式登录钥匙串（身份只记录哈希），app/sidecar 仍隔离 HOME、userData、XDG。前两份签名包均通过 deep/strict 验签，但在生产 sidecar 启动之前停住；第一份经 SIGTERM 退出 143，第二份经 SIGKILL 退出 137。第二份 `g0-VpBP22/startup-sample.txt` 实测停在 `SecItemAdd → defaultKeychainUI → AuthorizationCopyRights`，纠正先前对 ready 等待的推断。测试入口改用 ready 回调，并用 Chromium 测试开关 `--use-mock-keychain` 隔离 cookie 密钥存储；不改变生产签名、entitlements、fuses、围栏或 sidecar。两份副本均已 `lsregister -u`。生成的攻击辅助二进制在打包后删除，生成 main 入口恢复原字节。
+- 2026-11-19 · 步骤 1 必要消费者测试同步：`main/keychain-name-migration.test.ts` 未在步骤 1 初始枚举中；其 `loadFenceAddon` 假件须补两个新增导出，只修改该假件，过滤运行「生产加载器」用例为 1 pass / 0 fail、其余 25 条未运行，无真实钥匙串调用。生产原生 apply/试编译既有检查 15 pass / 0 fail，profile 26 pass / 0 fail。G0 运行臂结果另记，以上不作 G0 通过证据。

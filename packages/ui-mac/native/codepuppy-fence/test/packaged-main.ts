@@ -14,7 +14,7 @@ const reportPath = process.env.CODEPUPPY_G0_REPORT!
 app.setPath("userData", process.env.CODEPUPPY_G0_USER_DATA!)
 app.setAppLogsPath(join(run, "app-logs"))
 app.dock?.hide()
-const report: Record<string, unknown> = { runtime: process.versions, arms: {} }
+const report: Record<string, unknown> = { mainPid: process.pid, runtime: process.versions, arms: {} }
 const arms = report.arms as Record<string, unknown>
 const children: ReturnType<typeof utilityProcess.fork>[] = []
 const events: Array<Record<string, unknown>> = []
@@ -112,6 +112,7 @@ async function boot(name: string, variant = "production") {
 
 async function runGate() {
   const addon = loadFenceAddon(addonPath)
+  report.addon = { path: addonPath, buildId: addon.buildId }
   const startExisting = async (engine: Awaited<ReturnType<typeof boot>>) => {
     const command = `echo $$ > ${quote(join(engine.A, "child.pid"))}; echo ready > ${quote(join(engine.A, "ready"))}; n=0; while [ ! -f ${quote(join(engine.A, "go"))} ] && [ $n -lt 500 ]; do sleep 0.02; n=$((n+1)); done; echo x > ${quote(join(engine.B, "existing.txt"))}; echo x > ${quote(join(engine.C, "existing.txt"))}; echo $? > ${quote(join(engine.A, "child.exit"))}`
     await engine.shell(command)
@@ -188,14 +189,18 @@ async function runGate() {
   report.passed = true
 }
 
-await app.whenReady()
-try {
-  await runGate()
-} catch (error) {
-  report.error = error instanceof Error ? error.message : String(error)
+function finish(error?: unknown) {
+  if (error) report.error = error instanceof Error ? error.message : String(error)
   report.events = events
-} finally {
   for (const child of children) child.kill()
   writeFileSync(reportPath, JSON.stringify(report, null, 2))
   app.exit(report.error ? 1 : 0)
 }
+
+// Finish loading the harness entry before starting its ready callback.
+const readyDeadline = setTimeout(() => finish(new Error("G0 harness did not reach app.ready")), 15_000)
+void app.whenReady().then(async () => {
+  clearTimeout(readyDeadline)
+  record("main-ready", { pid: process.pid })
+  await runGate()
+}).then(() => finish(), finish)

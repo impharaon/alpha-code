@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test"
 import { execFileSync } from "node:child_process"
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, statfsSync, writeFileSync } from "node:fs"
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statfsSync, writeFileSync } from "node:fs"
 import { join, resolve } from "node:path"
 import { buildFenceAddon } from "../../scripts/build-fence-addon"
 import { loadFenceAddon } from "./process-fence-apply"
@@ -23,13 +23,18 @@ test("G0 production addon, signed Electron main, production sidecar, positive an
 
   const space = statfsSync(root)
   expect(Number(space.bavail) * Number(space.bsize), "G0 requires at least 8 GiB free before the build").toBeGreaterThanOrEqual(8 * 1024 ** 3)
-  const identity = execFileSync("security", ["find-identity", "-v", "-p", "codesigning"], { encoding: "utf8" })
+  const keychain = join(process.env.CODEPUPPY_TEST_REAL_HOME!, "Library/Keychains/login.keychain-db")
+  // Security's trust evaluation still uses HOME even with an explicit keychain. Only signing
+  // tools use the account home; the packaged app and every utilityProcess get isolated roots.
+  const identity = execFileSync("security", ["find-identity", "-v", "-p", "codesigning", keychain], { encoding: "utf8", env: { ...process.env, HOME: process.env.CODEPUPPY_TEST_REAL_HOME } })
     .split("\n").find((line) => line.includes("Developer ID Application"))?.match(/\b[0-9A-F]{40}\b/)?.[0]
   expect(identity, "G0 Developer ID identity hash not available").toBeDefined()
   const buildEnv = Object.fromEntries(Object.entries(process.env).filter(([key]) => !/^(SENTRY_|APPLE_|GH_|GITHUB_|CSC_|ALPHA_)/.test(key) && !["NODE_ENV", "CODEPUPPY_SIGN", "CODEPUPPY_SIGN_IDENTITY"].includes(key)))
   const command = async (name: string, cmd: string[], env = buildEnv) => {
     const child = Bun.spawn({ cmd, cwd: ui, env, stdout: "pipe", stderr: "pipe" })
+    const deadline = name === "runtime" ? setTimeout(() => child.kill("SIGKILL"), 600_000) : undefined
     const [stdout, stderr, code] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
+    clearTimeout(deadline)
     const output = redact(`${stdout}${stderr}`)
     writeFileSync(join(run, `${name}.log`), output)
     const failure = name === "runtime" && existsSync(join(run, "result.json")) ? readFileSync(join(run, "result.json"), "utf8") : output
@@ -47,10 +52,11 @@ test("G0 production addon, signed Electron main, production sidecar, positive an
   try {
     writeFileSync(index, new Uint8Array(await built.outputs[0]!.arrayBuffer()))
     await command("package", [process.execPath, "run", "package:mac", "--dir", "--publish", "never", "-c.mac.notarize=false", `-c.directories.output=${packaged}`], {
-      ...buildEnv, OPENCODE_CHANNEL: "dev", CODEPUPPY_SIGN: "1", CODEPUPPY_SIGN_IDENTITY: identity!,
+      ...buildEnv, HOME: process.env.CODEPUPPY_TEST_REAL_HOME, OPENCODE_CHANNEL: "dev", CODEPUPPY_SIGN: "1", CODEPUPPY_SIGN_IDENTITY: identity!, CSC_KEYCHAIN: keychain,
     })
   } finally {
     writeFileSync(index, original)
+    rmSync(helper, { force: true })
   }
   const appDir = join(packaged, "mac-arm64", readdirSync(join(packaged, "mac-arm64")).find((file) => file.endsWith(".app"))!)
   await command("verify", ["/usr/bin/codesign", "--verify", "--deep", "--strict", appDir])
@@ -73,7 +79,9 @@ test("G0 production addon, signed Electron main, production sidecar, positive an
     NO_COLOR: "1",
   }
   try {
-    await command("runtime", [join(executables, executable), "--no-first-run", "--disable-background-networking"], env)
+    // Chromium cookie encryption otherwise consults the default keychain before app.ready.
+    // This isolates that unrelated store; sandbox SPI, signatures and entitlements stay real.
+    await command("runtime", [join(executables, executable), "--no-first-run", "--disable-background-networking", "--use-mock-keychain"], env)
   } finally {
     await command("unregister", [lsregister, "-u", appDir])
   }

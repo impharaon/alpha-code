@@ -925,13 +925,15 @@ async function installDirect(harness: Awaited<ReturnType<typeof mountHarness>>, 
 async function openManagement(id: string) {
   click(document.querySelector(`[data-installed-package="${id}"] [data-more]`))
   click(document.querySelector('[data-menu-item="manage"]'))
-  await waitFor(() => expect(document.querySelector('[data-package-detail]')?.textContent).toContain("账户"))
+  await waitFor(() => expect(document.querySelector('[data-package-detail]')?.textContent).toContain(zh["codepuppy.ext.packagePermissions"]))
 }
 async function removeManaged() {
   click(document.querySelector('[data-package-detail] [data-more]'))
   click(document.querySelector('[data-menu-item="remove-package"]'))
 }
 async function openToken() {
+  // 账户段只在读到账户项之后才画 —— 先等它出现再点。
+  await waitFor(() => expect(document.querySelector('[data-package-secret]')).toBeInstanceOf(HTMLElement))
   click(document.querySelector('[data-package-secret]'))
   await waitFor(() => expect(document.querySelector('input[type="password"]')).toBeInstanceOf(HTMLInputElement))
 }
@@ -1226,7 +1228,10 @@ describe("package detail production renderer path", () => {
     await waitFor(() => expect(document.querySelector('[data-package-detail] .codepuppy-ext-dsub button')).toBeInstanceOf(HTMLElement))
     click(document.querySelector('[data-package-detail] .codepuppy-ext-dsub button'))
     await waitFor(() => expect(harness.installResults.at(-1)).toMatchObject({ ok: true }))
-    await waitFor(() => expect(document.querySelector('[data-package-detail="package:renderer-ready"]')?.textContent).toContain("账户"))
+    await waitFor(() => expect(document.querySelector('[data-package-detail="package:renderer-ready"]')?.textContent).toContain(zh["codepuppy.ext.packagePermissions"]))
+    // 没有账户 / 凭据的包不画账户段,也不显示「暂时无法读取账户状态」。
+    expect(document.querySelector('[data-package-detail]')?.textContent).not.toContain(zh["codepuppy.ext.packageAccounts"])
+    expect(document.querySelector('[data-package-detail]')?.textContent).not.toContain(zh["codepuppy.ext.packageAccountUnavailable"])
     expect(harness.installIntents).toEqual([{ catalogId: "package:renderer-ready" }])
     expect(document.querySelector('[data-package-authorization]')).toBeNull()
     const state = readPackageLedgerStateV1(harness.globalRoot)
@@ -1239,6 +1244,7 @@ describe("package detail production renderer path", () => {
       await installDirect(harness, "package:renderer-prerequisite")
       await extensions.setPackageState({ packageId: "package:renderer-prerequisite", state })
       await openManagement("package:renderer-prerequisite")
+      await waitFor(() => expect(document.querySelector('[data-package-detail]')?.textContent).toContain(zh["codepuppy.ext.packageAccounts"]))
       await openToken()
       fillManagementToken(secretCanary)
       expectNoCanaryAnywhere(secretCanary, consoleOutput)

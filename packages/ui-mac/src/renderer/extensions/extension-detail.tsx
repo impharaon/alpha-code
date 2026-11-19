@@ -149,7 +149,8 @@ export function InstalledPackageDetail(props: {
         <Show when={pending()}>{(text) => <RowStatus tone="warn" text={text()} />}</Show>
         <div class="codepuppy-ext-dhead-act">{props.menu}</div>
       </header>
-      <Show when={!authorization.loading}>
+      {/* 只有带账户 / 凭据的包才画账户段:本地连接器没有账户,读不到状态也无话可说(冻结稿 #hub-manage 不画)。 */}
+      <Show when={!authorization.loading && items().length > 0}>
         <section class="codepuppy-ext-kv-sec">
           <h3>{t("codepuppy.ext.packageAccounts")}</h3>
           <For each={items()}>
@@ -196,9 +197,6 @@ export function InstalledPackageDetail(props: {
               </div>
             )}
           </For>
-          <Show when={authorization() && !authorization()!.ok}>
-            <p role="alert">{t("codepuppy.ext.packageAccountUnavailable")}</p>
-          </Show>
         </section>
       </Show>
       <section class="codepuppy-ext-kv-sec">

@@ -587,6 +587,7 @@ export const dict = {
   "codepuppy.sidebar.settings": "Settings",
   "codepuppy.sidebar.help": "Help",
   "codepuppy.sidebar.more": "More",
+  "codepuppy.sidebar.showMore": "Show more",
   "codepuppy.sidebar.archive": "Archive",
   "codepuppy.sidebar.remove": "Remove from sidebar",
   "codepuppy.sidebar.globalProject": "Global",

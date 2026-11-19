@@ -96,6 +96,18 @@ const fixtureProject: CodePuppyProject = {
   loaded: true,
 }
 
+const defaultFixtureSessions = fixtureProject.sessions
+/** 「显示更多」用例:在挂载前把固定项目的会话数改成 `count` 条(最新在前),resetHarness 还原。 */
+export function seedSessions(count: number) {
+  fixtureProject.sessions = Array.from({ length: count }, (_, i) => ({
+    id: `ses_seed_${i + 1}`,
+    title: `会话 ${i + 1}`,
+    directory: FIXTURE_DIRECTORY,
+    projectID: "prj_alpha-code",
+    updated: 1000 - i,
+  }))
+}
+
 /* ── 可观察副作用的记录点(闸门读它们,不读源码)──────────────────────────────── */
 const [pickerCalls, setPickerCalls] = createSignal(0)
 const [createdIn, setCreatedIn] = createSignal<string[]>([])
@@ -505,6 +517,7 @@ export function installRootHost() {
 }
 
 export function resetHarness() {
+  fixtureProject.sessions = defaultFixtureSessions
   storageCells.clear()
   setPickerCalls(0)
   setCreatedIn([])

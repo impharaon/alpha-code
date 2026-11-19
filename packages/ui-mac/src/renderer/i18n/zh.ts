@@ -577,6 +577,7 @@ export const dict = {
   "codepuppy.sidebar.settings": "设置",
   "codepuppy.sidebar.help": "帮助",
   "codepuppy.sidebar.more": "更多",
+  "codepuppy.sidebar.showMore": "显示更多",
   "codepuppy.sidebar.archive": "归档",
   "codepuppy.sidebar.remove": "从侧边栏移除",
   "codepuppy.sidebar.globalProject": "全局",

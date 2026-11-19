@@ -480,6 +480,30 @@ svg[viewBox="0 0 720.002 129.001"] {
   flex-direction: column;
 }
 
+/* 「显示更多」 (frame `.row.more`): a quiet row under the first four conversations. */
+.codepuppy-sessions-more {
+  display: flex;
+  align-items: center;
+  height: 30px;
+  padding: 0 8px 0 32px;
+  border: 0;
+  border-radius: var(--a-radius-md);
+  background: transparent;
+  color: var(--a-text-tertiary);
+  font: inherit;
+  font-size: var(--a-text-sm);
+  text-align: left;
+  cursor: pointer;
+}
+.codepuppy-sessions-more:hover {
+  background: var(--a-overlay-hover);
+  color: var(--a-text);
+}
+.codepuppy-sessions-more:focus-visible {
+  outline: none;
+  box-shadow: var(--a-ring-focus);
+}
+
 /* Conversation row: the whole row carries hover/selected; the title is indented to sit under the
    project name (no connector line — the frame draws none). The right 22px slot holds the unread dot
    or, on hover, the "…" button. */

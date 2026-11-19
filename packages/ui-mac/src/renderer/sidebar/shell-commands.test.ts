@@ -25,7 +25,7 @@ import type { render } from "solid-js/web"
 import type * as Runtime from "./shell-commands-test-runtime"
 import { RETIRED_MENU_COMMANDS, publishedMenuCommands } from "../../shared/desktop-menu-policy"
 import { homeHref, newSessionHref } from "./route"
-import { encodeDirectory, parseRoute } from "../../shared/route-manifest"
+import { encodeDirectory, hrefFor, parseRoute } from "../../shared/route-manifest"
 
 type TestRuntime = typeof Runtime & { render: typeof render }
 
@@ -197,6 +197,42 @@ describe("侧栏账户菜单「设置」:改接 alpha 自有设置面,与路由�
 
     // 无人注册 → 上游 `run()` 静默返回。这正是 owner 报的「点了没反应」的形状。
     expect(settingsSurface()).toBeNull()
+  })
+})
+
+describe("侧栏会话列表「显示更多」(冻结稿 #home)", () => {
+  const titles = () =>
+    Array.from(document.querySelectorAll(".codepuppy-project-sessions .codepuppy-session-title")).map((e) => e.textContent)
+  const more = () => document.querySelector<HTMLButtonElement>(".codepuppy-sessions-more")
+
+  test("超过四条:项目只画前四条与一行「显示更多」,点它展开其余、行消失", async () => {
+    runtime.seedSessions(6)
+    runtime.expandProject(runtime.FIXTURE_DIRECTORY)
+    await mountShell(() => runtime.CodePuppyShell())
+    expect(titles()).toEqual(["会话 1", "会话 2", "会话 3", "会话 4"])
+    expect(more()?.textContent).toBe("显示更多")
+    more()!.click()
+    await settle()
+    expect(titles()).toEqual(["会话 1", "会话 2", "会话 3", "会话 4", "会话 5", "会话 6"])
+    expect(more()).toBeNull()
+  })
+
+  test("正好四条:没有「显示更多」", async () => {
+    runtime.seedSessions(4)
+    runtime.expandProject(runtime.FIXTURE_DIRECTORY)
+    await mountShell(() => runtime.CodePuppyShell())
+    expect(titles().length).toBe(4)
+    expect(more()).toBeNull()
+  })
+
+  test("正在看的会话排在第四条之后:不藏在「显示更多」后面", async () => {
+    runtime.seedSessions(6)
+    runtime.expandProject(runtime.FIXTURE_DIRECTORY)
+    await mountShell(() => runtime.CodePuppyShell())
+    runtime.navigateTo(hrefFor.session("sidecar", "ses_seed_6"))
+    await settle()
+    expect(titles().length).toBe(6)
+    expect(more()).toBeNull()
   })
 })
 

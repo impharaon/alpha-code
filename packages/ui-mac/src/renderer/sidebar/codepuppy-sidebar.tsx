@@ -106,6 +106,9 @@ async function copyText(text: string): Promise<boolean> {
  *  "sidecar" 这个字面量,上游改 key 算法时这里跟着变(改没了则 typecheck 红)。 */
 const EMBEDDED_SIDECAR_KEY = ServerConnection.key({ type: "sidecar", variant: "base", http: { url: "" } })
 
+/** Conversation rows a project draws before the quiet 「显示更多」 row (frame `#home`: four). */
+const SESSIONS_SHOWN = 4
+
 function closeAllOverlays(): void {
   setExtHubOpen(false)
   setAutomationOpen(false)
@@ -542,6 +545,15 @@ export function CodePuppySidebar(props: {
 
   // Projects visible in the sidebar = all known projects minus the ones the user archived/removed.
   const visibleProjects = createMemo(() => displayProjects().filter((p) => !isProjectHidden(p.worktree)))
+  // Projects whose full conversation list is expanded by 「显示更多」 (expand-only, as the frame draws it).
+  const [moreShown, setMoreShown] = createSignal<ReadonlySet<string>>(new Set())
+  /** A search or the open conversation never hides behind 「显示更多」. */
+  const allSessionsShown = (project: { worktree: string; sessions: { id: string }[] }) =>
+    moreShown().has(project.worktree) ||
+    searchQuery().trim() !== "" ||
+    project.sessions.findIndex((x) => x.id === route().sessionId) >= SESSIONS_SHOWN
+  const shownSessions = <S extends { id: string }>(project: { worktree: string; sessions: S[] }) =>
+    allSessionsShown(project) ? project.sessions : project.sessions.slice(0, SESSIONS_SHOWN)
   // Filter visible projects + their sessions by the search query. A project shows if its name
   // matches (then all its sessions show) or if any of its sessions' titles match (then only those).
   const searchedProjects = createMemo(() => {
@@ -1355,7 +1367,7 @@ export function CodePuppySidebar(props: {
                     <Show when={expanded()}>
                       <div class="codepuppy-project-sessions">
                         <For
-                          each={project.sessions}
+                          each={shownSessions(project)}
                           fallback={
                             <div class="codepuppy-sidebar-empty">
                               {project.loaded ? t("codepuppy.sidebar.noConversations") : t("codepuppy.sidebar.loading")}
@@ -1432,6 +1444,15 @@ export function CodePuppySidebar(props: {
                             </div>
                           )}
                         </For>
+                        <Show when={project.sessions.length > SESSIONS_SHOWN && !allSessionsShown(project)}>
+                          <button
+                            type="button"
+                            class="codepuppy-sessions-more"
+                            onClick={() => setMoreShown((prev) => new Set(prev).add(project.worktree))}
+                          >
+                            {t("codepuppy.sidebar.showMore")}
+                          </button>
+                        </Show>
                       </div>
                     </Show>
                   </div>

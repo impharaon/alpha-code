@@ -128,3 +128,24 @@ PLAN 阶段只提交本文件。下表和命令均为实施安排，不代表已
 - 2026-11-19 · 步骤 1 harness 隔离接线：测试辅助源码落在 `native/codepuppy-fence/test/`；仅签名工具使用账户 HOME 与显式登录钥匙串（身份只记录哈希），app/sidecar 仍隔离 HOME、userData、XDG。前两份签名包均通过 deep/strict 验签，但在生产 sidecar 启动之前停住；第一份经 SIGTERM 退出 143，第二份经 SIGKILL 退出 137。第二份 `g0-VpBP22/startup-sample.txt` 实测停在 `SecItemAdd → defaultKeychainUI → AuthorizationCopyRights`，纠正先前对 ready 等待的推断。测试入口改用 ready 回调，并用 Chromium 测试开关 `--use-mock-keychain` 隔离 cookie 密钥存储；不改变生产签名、entitlements、fuses、围栏或 sidecar。两份副本均已 `lsregister -u`。生成的攻击辅助二进制在打包后删除，生成 main 入口恢复原字节。
 - 2026-11-19 · 步骤 1 必要消费者测试同步：`main/keychain-name-migration.test.ts` 未在步骤 1 初始枚举中；其 `loadFenceAddon` 假件须补两个新增导出，只修改该假件，过滤运行「生产加载器」用例为 1 pass / 0 fail、其余 25 条未运行，无真实钥匙串调用。生产原生 apply/试编译既有检查 15 pass / 0 fail，profile 26 pass / 0 fail。G0 运行臂结果另记，以上不作 G0 通过证据。
 - 2026-11-19 · 步骤 1 临时目录与握手修正：第三包 `g0-1CqUez` 已在签名 utilityProcess 装上生产围栏，随后因 harness 未建 XDG 父目录而在 `mkdir .../home/config` 得到 EPERM，exit 1；改由 main 在 fork 前建立临时安装布局，不扩大 profile。第四包 `g0-jEsnyT` 新子进程写入成功、C 0 文件、50 自签变体 0 越界、两个坏 profile 各落 1 文件、绑定回放失败；宿主因已有子进程未落盘而红。其 `child.exit` mtime `1795086523073895376ns` 早于 `go` 的 `1795086523079061232ns`，证明错误在 harness 等待整个 `session.shell` 返回后才签发，不能作已运行子进程继承的反例。保持原落盘断言，改为 HTTP 请求在途时等待 ready、以 signal 0 确认 pid 存活，放行后才 join 请求；正反臂共用该流程。上述原始输出全部保留，G0 最终以修正握手后的宿主结果为准。`bun typecheck`（ui-mac）exit 0。
+
+**G0 最终结果（2026-11-19，代码 `43787399c1`）：PASS。** 仅完成步骤 1；步骤 2–8 未开始。红提交 `f98d37f5be`，harness 修正提交 `a119422af6` / `2baf2ba571`，生产实现提交 `43787399c1`。最终命令 `cd packages/ui-mac && bun test src/main/process-fence-extension-packaged.test.ts` 为 1 pass / 0 fail、exit 0；宿主强制核对独立 cases 的 1 pass / 0 fail。总耗时约 80 分钟，主要为 5 次本地签名构建及上述 harness 准备修正；未运行 full gate。
+
+证据根 `~/.cache/alpha-orch/2026-11-19/impl-project-writable/g0-HJJPak/`：`result.json` 为签名 main 实录，`g0-summary.json` 补记宿主结论、实际目录清单与退出码，`signing.json` / `signature.log` / `entitlements.log` / `package.log` 为签名及打包记录；外层输出 `../g0-run-5.log`。main pid **66859**，Electron **42.3.3** / Node **24.15.0**；生产 addon buildId **`fence-20261119T111113326Z`**。
+
+| 臂 | 生产 sidecar pid | 实际 B 文件 | 实际 C 文件 | 实际结果与退出 |
+| --- | --- | --- | --- | --- |
+| 放行 | 66928；已有子进程 66944、新子进程 66946 | `existing.txt`, `new.txt` | 空 | 签发成功、消费 granted；新写状态 0；sidecar exit 0 |
+| 不消费，同一写入流程 | 66958；已有子进程 66986、新子进程 67000 | 空 | 空 | 新写状态 1，伪造凭证失败且 B 探针仍 denied；sidecar exit 0 |
+| 退出后新一代回放 | 66947 | 空 | 空 | 旧 token 消费 failed / errno 1，旧 B 探针 denied；sidecar exit 0 |
+| 自签矩阵 | 67012 | 空 | 空 | 50 个实际变体写入均 errno 1；辅助程序 exit 0、sidecar exit 0 |
+| 已知坏：X2 只禁 file | 67101 | 空 | `generic.txt` | generic 自签/消费后写状态 0，安全判据可见越界；sidecar exit 0 |
+| 已知坏：去掉 X2 | 67107 | 空 | `file.txt` | file 自签/消费后写状态 0，安全判据可见越界；sidecar exit 0 |
+
+放行臂顺序（main 的 `performance.now()`，毫秒）：已有子进程 ready 且 signal 0 存活确认 **978.935041** → 签发开始 **978.940666** → sidecar 消费应答 **979.184791** → 已有进程写完 **996.405333** → 新进程写完 **1004.994166**。单次 grant 消息往返 **0.191959 ms**，不作为 p50/p99。独立文件时间也满足 `ready < go < child.exit`。`existing-write.exit=1` 是脚本最后一次写 C 的状态；utilityProcess 退出码由各 `engine-exit.code=0` 单列，不能混为一谈。未围栏 main 回放 handle=-1 / errno=1。
+
+矩阵保留真实例外：`legacy-file` / `legacy-mach` 返回 token、consume handle 分别 1 / 2，flags=0x1 返回 token、consume handle=0；三者实际写入仍 errno 1、C 0 文件。其余本类变体签发被拒。posix-ipc 在本机无签发导出，X2 操作名由真实试编译覆盖，没有虚构该 API 的用例。
+
+`codesign --verify --deep --strict` exit **0**，runtime flag **`0x10000(runtime)`**，entitlements 键与生产配置一致；签名身份仅记哈希 **`27D86FF5629B9296E616B333E798725A2E01B262`**。打包日志确认 `--publish never` 与 notarize 显式 false，未提交公证。main exit **0**；副本 `lsregister -u` exit **0**，无剩余测试 app 进程，生成 main 入口已恢复、攻击二进制已从构建输出删除。已复读实际磁盘清单，B/C 均无探针残留；未启动、修改或替换安装中的 app。
+
+相关检查：profile 26 pass；原生 apply + 试编译 15 pass；加载器消费者过滤用例 1 pass（25 条未运行）；ui-mac `bun typecheck` exit 0；`git diff --check` exit 0。后续 gate 登记、根登记、资格/界面/文案与架构事实同步仍按步骤 2–8 续派，当前不宣称 AC-05 至 AC-08 已整体交付。

@@ -656,6 +656,7 @@ import type {
   WorkspaceFileActionResult,
   WorkspaceFileChunkResult,
   WorkspaceFileOpenResult,
+  WorkspaceFileStatResult,
 } from "../shared/file-viewer"
 export type {
   FileViewerRefusal,
@@ -668,6 +669,7 @@ export type {
   WorkspaceFileActionResult,
   WorkspaceFileChunkResult,
   WorkspaceFileOpenResult,
+  WorkspaceFileStatResult,
 } from "../shared/file-viewer"
 
 /** REQ-098:App 运行环境快照,定义在 codepuppy-environment.ts(`#1709`:那份环境模块被 sidecar 里的 ext 引用,不能反过来
@@ -1284,6 +1286,8 @@ export type ElectronAPI = {
     openExternal: (directory: string, relPath: string) => Promise<WorkspaceFileActionResult>
     reveal: (directory: string, relPath: string) => Promise<WorkspaceFileActionResult>
     saveCopy: (directory: string, relPath: string) => Promise<WorkspaceFileActionResult>
+    /** 批量只查状态(与查看器打开同一个守卫;不读内容)。与入参同序同长。 */
+    stat: (directory: string, relPaths: string[]) => Promise<WorkspaceFileStatResult[]>
   }
   railPreview: {
     open: (

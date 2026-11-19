@@ -13,6 +13,7 @@ import type { CodePuppyProjectsApi } from "../../sidebar/use-projects"
 import { abortUserTurn } from "./user-stopped-turns"
 import { pushToast } from "../Toast"
 import { SessionRailArtifacts } from "../session-rail/artifacts/session-rail-artifacts"
+import { localArtifactsRevision, type SessionMessageWithParts } from "../session-rail/artifacts/local-artifacts"
 import { SessionRailFiles } from "../session-rail/files/session-rail-files"
 import { reviewChangeCount } from "../session-rail/review/review-core"
 import { turnDiffsOf } from "../session-rail/review/review-turn-diffs"
@@ -129,6 +130,23 @@ export function CodePuppySessionWorkspace(props: { projects: CodePuppyProjectsAp
         if (!result.data) throw new Error("session lookup failed")
         return result.data.parentID ?? null
       })
+  // DESIGN-local-session-artifacts §4.3:产物面板的本机产物读引擎持久化的整条会话(v1 `session.messages` 不带 limit,适配器升序拉全);
+  // 同步 store(只有分页窗口)只用来触发重读 —— 写成事实的修订串变了,面板就重读全量。
+  const sessionMessagesOf = (sessionID: string) =>
+    serverSDK()
+      .client.session.messages({ sessionID })
+      .then((result) => {
+        if (!result.data) throw new Error("session messages failed")
+        return result.data as readonly SessionMessageWithParts[]
+      })
+  const localRevision = createMemo(() => {
+    const identity = current()?.identity
+    if (!identity) return ""
+    const data = serverSync().session.data
+    return localArtifactsRevision(identity.directory, identity.sessionID, (sessionID) =>
+      (data.message[sessionID] ?? []).map((info) => ({ info, parts: data.part[info.id] ?? [] })),
+    )
+  })
   // #554:真引擎 channel(I8 三元身份铸造)。TerminalProvider 随上游 SessionProviders 包住
   // 本叶,适配器可直接消费;引擎或会话身份缺席时为 undefined,面板 fail-closed 空态。
   const terminalChannel = useCodePuppyTerminalEngineChannel(current)
@@ -192,7 +210,15 @@ export function CodePuppySessionWorkspace(props: { projects: CodePuppyProjectsAp
           panels={{
             review: (rail) => <SessionRailReviewPanel live={live} rail={rail} />,
             files: (rail) => <SessionRailFiles live={live} rail={rail} />,
-            artifacts: (rail) => <SessionRailArtifacts live={live} rail={rail} parentOf={sessionParentOf} />,
+            artifacts: (rail) => (
+              <SessionRailArtifacts
+                live={live}
+                rail={rail}
+                parentOf={sessionParentOf}
+                messagesOf={sessionMessagesOf}
+                localRevision={localRevision}
+              />
+            ),
           }}
           railMeta={{ reviewCount }}
           terminalChannel={terminalChannel}

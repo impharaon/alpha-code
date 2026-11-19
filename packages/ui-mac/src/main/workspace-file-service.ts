@@ -22,6 +22,7 @@ import {
   type WorkspaceFileActionResult,
   type WorkspaceFileChunkResult,
   type WorkspaceFileOpenResult,
+  type WorkspaceFileStatResult,
 } from "../shared/file-viewer"
 
 type ElectronFacade = Pick<typeof electronNs, "dialog" | "shell" | "ipcMain">
@@ -85,6 +86,15 @@ export function resolveWorkspaceFile(workspaceDir: string, relPath: string): Res
   if (real !== realRoot && !real.startsWith(realRoot + path.sep)) return { ok: false, code: "escapes-workspace" }
 
   return { ok: true, file: { abs, size: st.size, dev: st.dev, ino: st.ino } }
+}
+
+/** 逐项 = resolveWorkspaceFile(workspaceDir, rel);非字符串项 → invalid-path。与入参同序同长。不读内容、不开 fd。 */
+export function statWorkspaceFiles(workspaceDir: string, relPaths: readonly unknown[]): WorkspaceFileStatResult[] {
+  return relPaths.map((rel) => {
+    if (typeof rel !== "string") return { ok: false, code: "invalid-path" }
+    const resolved = resolveWorkspaceFile(workspaceDir, rel)
+    return resolved.ok ? { ok: true, size: resolved.file.size } : { ok: false, code: resolved.code }
+  })
 }
 
 // ---- 读取会话(fd 绑定;renderer 关闭/销毁即回收)----
@@ -265,6 +275,12 @@ export function registerWorkspaceFileIpcHandlers() {
   )
   electronRef.ipcMain.handle("workspace-file-close-read", (e: IpcMainInvokeEvent, readId: unknown) => {
     if (str(readId)) closeWorkspaceRead(readId, e.sender.id)
+  })
+  // 产物页本机产物行的状态(DESIGN-local-session-artifacts §4.5):dir 非字符串 → 每项 invalid-path;rels 非数组 → []。
+  electronRef.ipcMain.handle("workspace-file-stat", (_e: IpcMainInvokeEvent, dir: unknown, rels: unknown) => {
+    if (!Array.isArray(rels)) return [] satisfies WorkspaceFileStatResult[]
+    if (!str(dir)) return rels.map(() => ({ ok: false, code: "invalid-path" }) satisfies WorkspaceFileStatResult)
+    return statWorkspaceFiles(dir, rels)
   })
   electronRef.ipcMain.handle("workspace-file-open-external", (_e: IpcMainInvokeEvent, dir: unknown, rel: unknown) =>
     str(dir) && str(rel)

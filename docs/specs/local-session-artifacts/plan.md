@@ -58,4 +58,6 @@ last_reviewed: 2026-11-19
 | 任一会话读失败不出半份清单 | `local-artifacts.test.ts`:子会话读取 reject ⇒ 整份失败 | 吞掉子会话错误时返回部分清单 |
 
 ### 偏离记录
-暂无。
+- 2026-11-19 · `test-component/preload-stub.ts` 不用改(只列键名)· 文件清单少一项 · 本提交。
+- 2026-11-19 · 真引擎用例的 `patch` 回合点名 `gpt-5` 模型、其余回合点名 `m`:引擎只给 gpt-5 一类模型 `patch` 并同时拿走 `write` / `edit`(`packages/core/src/tool/plugin/patch.ts` context 钩子),不点名时沿用上一回合的模型 · 测试写法,不改设计 · 本提交。
+- 2026-11-19 · `session-rail-artifacts.css` 加 `.a-rart-local` / `.a-rart-local-head` 两条容器规则(本机区与云端内容并列时不吃满高度、自己滚动;标题行放「本次对话」标签),无新 token;行本身仍是 `codepuppy-wb-card` · 版面细节仍待 `delivery-ux`(design §10 待定)· 本提交。

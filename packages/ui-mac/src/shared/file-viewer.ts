@@ -55,6 +55,9 @@ export type WorkspaceFileChunkResult =
 
 export type WorkspaceFileActionResult = { ok: true } | { ok: false; code: FileViewerRefusal }
 
+/** 只查状态(不读内容、不开 fd):产物页本机产物行的「文件缺失」与查看器打开时用同一个守卫判定。 */
+export type WorkspaceFileStatResult = { ok: true; size: number } | { ok: false; code: FileViewerRefusal }
+
 // ---- 右栏叠放预览(html/pdf;WebContentsView)----
 
 /**

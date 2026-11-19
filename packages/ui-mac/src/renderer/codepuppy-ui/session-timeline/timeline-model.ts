@@ -1098,8 +1098,10 @@ export function turnErrorOf(
   cause?: TurnErrorCause
   statusCode?: number
 } | undefined {
-  const failed = assistants.find((message) => message.error && message.error.name !== "MessageAbortedError")
-  if (!failed?.error) return undefined
+  // 回合的结局看最后一条助手消息:前面失败过、又被引擎续写或重试接过去的(core session/runner/step.ts Outcome.Continue),
+  // 这一轮并没有「没完成」。中断由中断行说,不出错误卡。
+  const failed = assistants.at(-1)
+  if (!failed?.error || failed.error.name === "MessageAbortedError") return undefined
   const data = (
     failed.error as {
       data?: { message?: unknown; responseBody?: unknown; statusCode?: unknown; metadata?: Record<string, unknown> }

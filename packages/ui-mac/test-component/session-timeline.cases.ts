@@ -2272,13 +2272,25 @@ describe("REQ-125 C6 折叠组/错误/重试/媒体/产物行", () => {
     await flush()
     expect(turnText()).toContain(zhDict["codepuppy.net.dns"].replace("{{host}}", zhDict["codepuppy.net.hostFallback"]))
     expect(turnText()).toContain("解析不了")
-    expect(turnText()).not.toContain(raw)
-    expect(host.querySelector("[data-codepuppy-timeline-row='turn-error'] .a-turn-err-code")!.textContent).toBe("APIError")
+    // 0.2.4 owner「总是有这些报错」:说出了层的卡,错误名与引擎原文只进「开发者详情」(#1588 同一折叠),卡面不露 `APIError`。
+    const card = () => host.querySelector("[data-codepuppy-timeline-row='turn-error']")!
+    const faceText = () => {
+      const face = card().cloneNode(true) as Element
+      face.querySelector("details")?.remove()
+      return face.textContent ?? ""
+    }
+    expect(card().querySelector("details[data-codepuppy-dev-details] .a-turn-err-code")!.textContent).toBe(`APIError · ${raw}`)
+    expect(faceText()).not.toContain("APIError")
+    expect(faceText()).not.toContain(raw)
 
-    runtime.setTimelineRows(errorRowFor(raw, undefined, { codepuppyNetCode: "unattributed" }))
+    // 回复读到一半断流(实测原文):认不出层 ⇒ 「连接中途断开了」;原文只在开发者详情。
+    const midStream = "Connection lost while reading the response: UND_ERR_BODY_TIMEOUT: Body Timeout Error"
+    runtime.setTimelineRows(errorRowFor(midStream, undefined, { codepuppyNetCode: "unattributed" }))
     await flush()
     expect(turnText()).toContain(zhDict["codepuppy.net.unattributed"])
-    expect(turnText()).not.toContain(raw)
+    expect(faceText()).not.toContain("APIError")
+    expect(faceText()).not.toContain("UND_ERR")
+    expect(card().querySelector("details[data-codepuppy-dev-details] .a-turn-err-code")!.textContent).toBe(`APIError · ${midStream}`)
 
     for (const metadata of [undefined, { codepuppyNetLayer: "transport", codepuppyNetCode: "x" }, { codepuppyNetLayer: "http", codepuppyNetCode: "400" }]) {
       runtime.setTimelineRows(errorRowFor(raw, undefined, metadata))

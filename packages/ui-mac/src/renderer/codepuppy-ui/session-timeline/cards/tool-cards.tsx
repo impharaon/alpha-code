@@ -885,18 +885,25 @@ function TurnErrorActions(props: { cause: TurnErrorCause }) {
   )
 }
 
-function TurnErrorCauseBody(props: { row: Extract<TimelineRow, { kind: "turnError" }>; cause: TurnErrorCause }) {
+/** 错误名 / 状态码 / 服务原话只进这里(`#1588` 批准稿的「开发者详情」)。 */
+function TurnErrorDevDetails(props: { row: Extract<TimelineRow, { kind: "turnError" }> }) {
   const detail = () =>
     [props.row.name, props.row.statusCode].filter((item) => item !== undefined).join(" ") +
     (props.row.message ? ` · ${props.row.message}` : "")
   return (
+    <details class="a-turn-err-dev" data-codepuppy-dev-details>
+      <summary>{t("codepuppy.timeline.devDetails")}</summary>
+      <span class="a-turn-err-code">{detail()}</span>
+    </details>
+  )
+}
+
+function TurnErrorCauseBody(props: { row: Extract<TimelineRow, { kind: "turnError" }>; cause: TurnErrorCause }) {
+  return (
     <>
       <b>{t(TURN_ERROR_TITLE[props.cause])}</b>
       <TurnErrorActions cause={props.cause} />
-      <details class="a-turn-err-dev" data-codepuppy-dev-details>
-        <summary>{t("codepuppy.timeline.devDetails")}</summary>
-        <span class="a-turn-err-code">{detail()}</span>
-      </details>
+      <TurnErrorDevDetails row={props.row} />
     </>
   )
 }
@@ -950,7 +957,14 @@ function TurnErrorDefaultBody(props: { row: Extract<TimelineRow, { kind: "turnEr
       >
         {(denied) => <p>{t("codepuppy.timeline.turnErrorEgressBlocked", { authority: denied().authority })}</p>}
       </Show>
-      <span class="a-turn-err-code">{props.row.name}</span>
+      {/* 说出了联网失败卡在哪(或明确是中途断开)⇒ 错误名与引擎原文只进开发者详情(0.2.4 owner「总是有这些报错」);
+          围栏拒绝与认不出的保持已批帧的 mono 错误码。 */}
+      <Show
+        when={!props.row.egressDenied && turnNetCopy(props.row)}
+        fallback={<span class="a-turn-err-code">{props.row.name}</span>}
+      >
+        <TurnErrorDevDetails row={props.row} />
+      </Show>
     </>
   )
 }

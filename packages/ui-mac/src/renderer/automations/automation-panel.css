@@ -86,23 +86,6 @@ body[data-codepuppy-sidebar="open"] .codepuppy-auto-page {
 .codepuppy-auto-crumb-sep {
   color: var(--a-text-disabled);
 }
-.codepuppy-auto-close {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  border: none;
-  background: none;
-  border-radius: var(--a-radius-md);
-  color: var(--a-text-secondary);
-  cursor: pointer;
-}
-.codepuppy-auto-close:hover {
-  background: var(--a-overlay-hover);
-  color: var(--a-text);
-}
-
 .codepuppy-auto-scroll {
   flex: 1;
   overflow-y: auto;

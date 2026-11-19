@@ -2025,7 +2025,6 @@ export const dict = {
   "codepuppy.sidebar.clickLogin": "点此登录",
   "codepuppy.sidebar.sessionActions": "会话操作",
   "codepuppy.settings.title": "设置",
-  "codepuppy.settings.back": "返回应用",
   "codepuppy.settings.authorityStillActive": "仍使用上次保存的设置",
   "codepuppy.settings.unsaved": "有更改未保存",
   "codepuppy.settings.categories": "设置类别",

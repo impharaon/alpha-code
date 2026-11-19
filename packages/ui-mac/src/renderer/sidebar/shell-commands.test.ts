@@ -156,7 +156,9 @@ describe("侧栏账户菜单「设置」:改接 alpha 自有设置面,与路由�
     await settle()
 
     expect(settingsSurface()).not.toBeNull()
-    expect(settingsSurface()!.getAttribute("role")).toBe("dialog")
+    // 设置是顶级页面(BR-01):壳的页面容器,不是模态框。
+    expect(settingsSurface()!.getAttribute("role")).toBe("region")
+    expect(settingsSurface()!.classList.contains("codepuppy-page")).toBe(true)
   })
 
   test("设置页的快捷键表里,一条已退休的命令 id 都不许出现", async () => {

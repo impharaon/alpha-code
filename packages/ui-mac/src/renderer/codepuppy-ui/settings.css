@@ -52,35 +52,6 @@ body[data-codepuppy-sidebar="open"] .codepuppy-settings-page {
   border: 0;
 }
 
-.codepuppy-settings-back {
-  display: inline-grid;
-  width: 28px;
-  height: 28px;
-  flex: none;
-  place-items: center;
-  margin: 0 0 5px;
-  border: 0;
-  border-radius: var(--a-radius-md);
-  background: transparent;
-  color: var(--a-text-secondary);
-  cursor: pointer;
-}
-
-.codepuppy-settings-back:hover {
-  background: var(--a-overlay-hover);
-  color: var(--a-text);
-}
-
-.codepuppy-settings-back svg {
-  width: 16px;
-  height: 16px;
-  fill: none;
-  stroke: currentcolor;
-  stroke-width: 1.8;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-
 .codepuppy-settings-unsaved {
   display: inline-flex;
   align-items: center;

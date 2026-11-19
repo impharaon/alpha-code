@@ -2055,7 +2055,6 @@ export const dict = {
   "codepuppy.sidebar.sessionActions": "Conversation actions",
 
   "codepuppy.settings.title": "Settings",
-  "codepuppy.settings.back": "Back to app",
   "codepuppy.settings.authorityStillActive": "Your last saved settings are still in use",
   "codepuppy.settings.unsaved": "Unsaved changes",
   "codepuppy.settings.categories": "Settings categories",

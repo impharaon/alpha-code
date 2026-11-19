@@ -100,7 +100,7 @@ describe("Alpha Settings ownership ratchets", () => {
     expect(harness).not.toMatch(/digest|finishedAt|warning detail|\/Users\/|\bMB\b/)
   })
 
-  test("#1550 AC2 / 新外壳:设置页铺在常驻顶栏与窄轨之外,返回键不会落在 macOS 红绿灯下", async () => {
+  test("#1550 AC2 / 新外壳:设置页铺在常驻顶栏与窄轨之外,不会落在 macOS 红绿灯下,也不画退出键", async () => {
     // 原先设置页 `position: fixed; inset: 0` 铺满整窗,靠头部顶部留白让开红绿灯(#1550)。
     // 新外壳里红绿灯在常驻顶栏上,设置页是顶栏 / 窄轨右下方的工作面页面:顶边 = 顶栏高,左边 = 窄轨宽,
     // 不再盖住窗口按钮带 —— 让位由令牌 `--a-topbar-h` / `--a-rail-w` 承担(值在 tokens.css),不是碰巧写的数。
@@ -115,6 +115,6 @@ describe("Alpha Settings ownership ratchets", () => {
     // 灯的下沿 = y16 + 12px 直径 = 28,在顶栏高 44 之内:页面顶边在灯之下。
     expect(windows).toContain("trafficLightPosition: { x: 18, y: 16 }")
     const source = await settingsSurface.text()
-    expect(source.indexOf('class="codepuppy-settings-head"')).toBeLessThan(source.indexOf('class="codepuppy-settings-back"'))
+    expect(source).not.toContain("codepuppy-settings-back")
   })
 })

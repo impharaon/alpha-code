@@ -119,7 +119,8 @@ describe("renderProcessFenceProfile —— 勘破 §8.2 的 19 行,逐行全等"
     const ids = new Set(
       renderProcessFenceProfile(base)
         .split("\n")
-        .map((l) => /;\s*(W\d+)/.exec(l)?.[1])
+        // X2 is a deny rule, not a writable root.
+        .map((l) => /;\s*(W\d+|X1)\b/.exec(l)?.[1])
         .filter((x): x is string => !!x),
     )
     expect([...ids].sort()).toEqual(Object.keys(WRITABLE_ROOT_IDS).sort())

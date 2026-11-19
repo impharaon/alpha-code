@@ -22,6 +22,7 @@ import samples from "../../test-component/fixtures/cloud-mcp-production-samples.
 import { createEngineFetch } from "../engine-adapter/index"
 import { extractCloudRunHit } from "../renderer/codepuppy-ui/cloud-run-core"
 import { artifactLinksOf, cloudImageOf } from "../renderer/codepuppy-ui/session-timeline/timeline-model"
+import { toolProvenanceOf } from "../renderer/codepuppy-ui/session-timeline/cards/tool-card-model"
 import { materializeCloudMcpConfig } from "./cloud-sidecar-config"
 import { CLOUD_MCP_SERVER_NAME } from "./cloud-web-search"
 import { secretFileRef, syncSecretFiles } from "./codepuppy-secret-files"
@@ -172,6 +173,16 @@ describe("#1662 云工具是模型的直接工具:云端生图 / 数据分析回
   test("数据分析派发 ⇒ 桌面 run-watcher 命中这次受理的任务", async () => {
     const r = await turn(dispatch("data-analysis", { csv: "month,revenue\n2026-01,120\n", question: "average?" }))
     expect(hitsOf(r.events).map((hit) => ({ runId: hit.runId, source: hit.source }))).toContainEqual({ runId: "job_ccb255627759", source: "dispatch" })
+  }, 90_000)
+
+  test("云工具的调用记录带 codepuppy-cloud 权威(工具卡显示 Code Puppy 云来源,不是第三方)", async () => {
+    // 已知的坏(实测):引擎给每个配置里的 MCP 条目补一个合并后的 `timeout`(无全局缺省时是 `{}`,core config/plugin/mcp.ts),
+    // 治理核验要求条目与启动文档定义逐字相等 ⇒ 2.x 上云工具一律 not-asserted。
+    const r = await turn(call("codepuppy_artifacts", { job_id: "job_1748ae4cd98e" }))
+    const part = r.parts.find((item) => item.tool === "codepuppy_artifacts")
+    expect(part?.display?.identity).toEqual({ source: "mcp", origin: CLOUD_MCP_SERVER_NAME, name: "artifacts" })
+    expect(part?.display?.authority?.kind).toBe("codepuppy-cloud")
+    expect(toolProvenanceOf(part)).toEqual({ source: "codepuppy-cloud", location: { kind: "cloud" } })
   }, 90_000)
 
   test("取产物 ⇒ 时间线出产物行(名字与产物 id 是云端回执里的)", async () => {

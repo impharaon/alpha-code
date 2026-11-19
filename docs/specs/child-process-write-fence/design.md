@@ -3,13 +3,13 @@ id: DESIGN-child-process-write-fence
 title: 用户亲手打开的项目当场可写(不重启引擎)技术设计
 summary: 围栏 profile 在装上时多声明一条只认 Code Puppy 私有扩展类的写放行,并禁止围栏内以任何方式(文件 / 通用 / mach / iokit / posix-ipc 五种签发)签发该类;用户打开动作本身(系统目录选择器与 renderer 里枚举出的五个记录点)向主进程登记「本机引擎 + 目录」;主进程按资格签发只能由当前引擎进程消费的令牌,经既有窄消息交引擎消费,整棵进程树(含已在跑的终端与 MCP)当场可写,不换代;真源只收已登记的目录;重载、SSE、恢复与重挂不产生资格;「只读」与「重新启动」退出常规路径,剩余三种情形各一句话
 kind: tech-design
-status: draft
+status: approved
 spec: SPEC-child-process-write-fence
 spec_version: 2
 review:
-  rounds: 2
-  reviewed_sha: "cadd657d29"
-  verdict: ""
+  rounds: 3           # R1 审 15a54fe1a6(FIX-THEN-MERGE,1 Blocker + 6 Major);R2 审 15a54fe1a6..cadd657d29(FIX-THEN-MERGE,1 Blocker + 1 Major);R3 审 cadd657d29..c0706d75b4(确认,1 Major 功能缺口);处置见 §10
+  reviewed_sha: "8370b2fa23"
+  verdict: "R1/R2/R3 findings all dispositioned and corrected, frozen by orchestrator 2026-11-19"
 owners: [owner]
 last_reviewed: 2026-11-19
 ---

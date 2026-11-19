@@ -631,6 +631,15 @@ describe("Alpha route authority ratchet", () => {
       ).toEqual(["deep-link scheme literal outside the manifest"])
   })
 
+  test("pathname dispatch stays covered in product sources when test children are excluded", () => {
+    const source = 'if (pathname === "/health") respond()'
+    expect(
+      violationsFor({ path: join(sourceRoot, "main", "fixture.ts"), source }).map((entry) => entry.rule),
+    ).toEqual(["pathname dispatch must use parseRoute"])
+    for (const name of ["fixture.test.ts", "fixture.cases.ts"])
+      expect(violationsFor({ path: join(sourceRoot, "main", name), source })).toEqual([])
+  })
+
   test("Alpha sources do not reintroduce a parallel route or deep-link codec", async () => {
     expect((await sourcesUnder(sourceRoot)).flatMap(violationsFor)).toEqual([])
   })

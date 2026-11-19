@@ -230,3 +230,29 @@ PLAN 阶段只提交本文件。下表和命令均为实施安排，不代表已
 - 恢复后的最终命令同上：`r4-window-final.log` 内层 **2 pass / 1 fail**、107.67 s，宿主 exit **1**；失败仅具名 AC-08 外链 DOM 后续，G0 与 12 臂窗口子例均通过。`g0-Lxlbnq/window/window-result.json`：main **98905**、engine **98955**、23 个 click/keydown 全 isTrusted=true，show=false；前 7 个正常臂 loads=2，只有两次显式 reload 增至 4，engine pid 不变。三个理由均到 popover.textContent，popover 无按钮，全应用指定重启按钮缺席。rewritten/deep/failed/timeout/HOME 的目标 txt 均 0；deep 链接递送后再让真实模型写 link-escape.txt 也失败，登记 false，但其缓冲未消费，所以不报深链 UI 臂通过。
 - 同次 G0/V7：100 个独立目录签发至生产消费应答的 p50 **0.052042 ms**、p99 **0.112458 ms**（原始样本在 `g0-Lxlbnq/result.json`）；B 仅 existing.txt/new.txt、C 空；control/replay/selfIssue 均 0 越界文件，两个坏 profile 各 1。G0 与窗口副本 strict/deep 验签 exit 0、runtime=0x10000，身份哈希仍 **27D86FF5629B9296E616B333E798725A2E01B262**，窗口 signing.json/entitlements.log 已核。两副本注销 exit 0，按报告所有 main/engine/child pid signal 0 复核均已退出；无前台任务遗留。
 - 相关检查：ui-mac `bun typecheck` exit 0（`r4-ui-typecheck.log`）；`bun test --max-concurrency 2 src/main/gate-file-registry.test.ts src/main/project-writable-navigation.test.ts src/renderer/codepuppy-ui/workspace-writable-ui-census.test.ts` **30 pass / 0 fail**（`r4-related.log`）。只复用 ext 已核的 118/0 与 typecheck 0，r4 未改 ext，未重跑无关套件、gate 或 bin/check。
+
+### 最终 AC / 计数核对（r4，外链 UI seam 仍未闭合）
+
+| AC | 已有具名验据与命令结果 | 剩余 |
+| --- | --- | --- |
+| AC-05 | `project-writable.engine.test.ts` host 1/0、inner 6/0（r3）；`process-fence-extension-packaged.test.ts` 当前 G0 与窗口子例通过，M1/R1–R5、慢开、实际模型文件、无隐式 reload/换代；相关坏臂实红。裸宿主总 exit 1 是下行 AC-08 的第三子例 | 无新的 AC-05 待办 |
+| AC-06 | 两个 UI 宿主与 census；r4 真 DOM 正常路径双钩子缺席、三句说明无按钮；上述相关 30/0 | 无新的 AC-06 待办 |
+| AC-07 | V1/V2 extension host 1/0、inner 6/0（r2），签名 G0 50 臂/伪造/回放/坏 profile；backend SQL + 真实窗口 reload/中性点击不登记，观察中登记坏臂实际落盘；外链递送后模型写 0、目录不登记 | 不把未消费外链冒充已进入目录；消费者改动后需再核这一臂 |
+| AC-08 | main IPC inner 10、UI 三理由；r4 HOME、真实 task_name_for_pid 失败、真实请求簿超时均到 DOM 单句，模型目标写 0 | **外链进入目录→not-opened-by-you→picker 后可写** 缺当前 NewLayout 的 consume-only 消费落点；独立红测试保留，需设计/范围授权 |
+
+下列是本 slice 的完整计数 / 登记变化（relay 行不重排、不计入本 lane）：
+
+| 位置 | 最终值 / 变化 |
+| --- | --- |
+| 新 gate 行 | extension host **1**（inner **6**）；project-writable IPC host **1**（inner **10**）；workspace-writable-core **14**；navigation **5**；ext display **7**；UI census **2**；project-writable engine host **1**（inner **6**）；G0/window packaged host **1**（inner 要求 **3/0**，现 **2/1**，不降钉） |
+| 既有 gate 计数 | workspaces **12→15**；session-search **29→32**；automation-cloud-refusal **38→39** |
+| 同一新文件内的子计数演进 | core **10→14**；project-writable engine inner **3→6**；G0/window inner **1→3**（新增两个独立窗口判官） |
+| 保持 | profile **26**、write-sites **12**、context-injection **43**、register-policy **68**、timeline host **12**/inner **124**、拒写 host **1**/inner **4**；其余既有相关宿主数不变 |
+| 机器登记 / 库存 | 两条 workspace probe write/remove 根 **W1→W1+X1**；导航调用点登记 **83**（r4 不改生产导航）；库存仍 **98**，write-denied **226 bytes**、write-refused **171 bytes**，由步骤 6 脚本生成 |
+
+- 步骤 8：更新设计点名的架构 §2/§7/§8.2 及同文件受影响的判据表 §8.3、基线 I1；保留原始实测/U2 历史。基线补合同要求的 id/summary（原 kind=design 的 UI- 前缀，kind/status/路径不改）。G0 gate 行已追加。相对链接检查 `python3 scripts/check-doc-links.py <上述两文档> <plan.md>` exit 0，18 条均可解析；本仓无 scripts/docs_index.py，未造索引脚本。
+- 文档合同按解析出的 Alpha profile 跑，只读全 profile 结果见 `r4-docs-contract.json`；再对同一 checker 的 check_repo 入口核本 worktree，`r4-docs-own.json`。本轮两份事实文档无剩余 findings；plan 的 INT-safety unknown-id 在 `0869f67a48` 已存在，未擅改派单身份。其余既有文档/其它未提供 checkout 的错误不在本 lane 修复，不把该检查报全绿。
+- 非阻塞遗留：timeline 旧批次宿主到默认 **5000 ms** 期限（`step6-ui-green.log`），具名期限确认单跑 **6.25 s、12/0**（`step6-timeline-isolated.log`）；r4 不改测试/期限，交编排者。窗口 session 挂载还打印 `engine-adapter/contract/errors.ts:33` 的 unsupported GET /lsp（`window-result.json` console），交适配器 lane，未改。架构 §7 既有 #1391「零消费者」文字与当前 server/custom-provider 读端不符，交文档维护，不扩本次事实改动。OPTIONAL 无。
+- **最终续行点：PARTIAL / AC-08 SEAM-CHANGE-NEEDED。** 步骤 7 的独立窗口臂与步骤 8 已完成；仅待冻结设计明确当前 NewLayout 深链消费落点及允许文件，接入 consume-only 通路后，使保留的第三子例转绿（总 inner 3/0），并复核深链后的 picker 后续。已核 Codex / GPT-6，自验，不替代编排者的独立审计；未 push/PR/merge。
+
+- r4 窗口证据提交：`92adf89284`；步骤 8 事实文档与 G0 登记另提交。

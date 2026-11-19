@@ -54,6 +54,7 @@ const PATHS = {
       <path d="M3.5 17l2.3-5.2a1.5 1.5 0 0 1 1.4-.8h13a1 1 0 0 1 .9 1.4L19 17.6a1.5 1.5 0 0 1-1.4.9H5a1.5 1.5 0 0 1-1.5-1.5Z" />
     </>
   ),
+  msg: () => <path d="M5 18.5V7a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H8Z" />,
   more: () => (
     <>
       <circle cx="6" cy="12" r="1.3" fill="currentColor" stroke="none" />

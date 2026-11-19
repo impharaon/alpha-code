@@ -103,6 +103,7 @@ import { legacySessionHref, requireServerKey, sessionHref } from "@/utils/sessio
 import { useUsageExceededDialogs } from "./session/usage-exceeded-dialogs"
 import { createSessionOwnership } from "./session/session-ownership"
 import { createSessionLineage } from "./session/session-lineage"
+import { ResettingErrorBoundary } from "@/pages/route-error-boundary"
 import { SessionNotFound } from "./session-not-found"
 
 type FollowupItem = FollowupDraft & { id: string }
@@ -183,7 +184,8 @@ export function SessionRouteErrorBoundary(
 ) {
   const settings = useSettings()
   return (
-    <ErrorBoundary
+    <ResettingErrorBoundary
+      resetOn={() => props.sessionID}
       fallback={(error) =>
         settings.general.newLayoutDesigns() ? (
           <SessionRouteFrame padded={props.padded}>
@@ -197,7 +199,7 @@ export function SessionRouteErrorBoundary(
       }
     >
       {props.children}
-    </ErrorBoundary>
+    </ResettingErrorBoundary>
   )
 }
 

@@ -8,13 +8,16 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { pathToFileURL } from "node:url"
 import { build } from "vite"
-import type { createComponent } from "solid-js"
+import type { createComponent, createSignal } from "solid-js"
 import type { render } from "solid-js/web"
 import type { SessionNotFound } from "../../../../codepuppy-app/src/pages/session-not-found"
+import type { ResettingErrorBoundary } from "../../../../codepuppy-app/src/pages/route-error-boundary"
 import type { setLocale, t } from "../i18n"
 
 type TestRuntime = {
   createComponent: typeof createComponent
+  createSignal: typeof createSignal
+  ResettingErrorBoundary: typeof ResettingErrorBoundary
   render: typeof render
   SessionNotFound: typeof SessionNotFound
   setLocale: typeof setLocale
@@ -88,5 +91,42 @@ describe("找不到对话 #not-found", () => {
     const host = mount(() => calls.push("back"))
     host.querySelector<HTMLButtonElement>("button")!.click()
     expect(calls).toEqual(["back"])
+  })
+})
+
+describe("找不到对话之后再点别的对话(AC-07 回归)", () => {
+  // 会话路由实例被同一 server 上所有对话共用,id 变了路由不重挂;错误边界不复位就会一直停在「找不到对话」。
+  test("id 换成另一条存在的对话 ⇒ 页面回到内容,不停在找不到页", () => {
+    const [id, setId] = runtime.createSignal("gone")
+    const host = document.createElement("div")
+    document.body.append(host)
+    const Page = () => {
+      const current = id()
+      if (current === "gone") throw new Error("not found")
+      const el = document.createElement("div")
+      el.dataset.page = current
+      return el
+    }
+    disposers.push(
+      runtime.render(
+        () =>
+          runtime.createComponent(runtime.ResettingErrorBoundary, {
+            resetOn: id,
+            fallback: () => {
+              const el = document.createElement("div")
+              el.dataset.fallback = ""
+              return el
+            },
+            get children() {
+              return runtime.createComponent(Page, {})
+            },
+          }),
+        host,
+      ),
+    )
+    expect(host.querySelector("[data-fallback]")).not.toBeNull()
+    setId("ses_ok")
+    expect(host.querySelector("[data-fallback]")).toBeNull()
+    expect(host.querySelector("[data-page='ses_ok']")).not.toBeNull()
   })
 })

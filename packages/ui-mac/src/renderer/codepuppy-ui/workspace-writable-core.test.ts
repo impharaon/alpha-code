@@ -1,4 +1,4 @@
-import { expect, test } from "bun:test"
+import { expect, test, vi } from "bun:test"
 import type { WorkspaceWriteProbeRequest, WorkspaceWriteProbeResult } from "../../preload/types"
 import { createWorkspaceWritableTracker } from "./workspace-writable-core"
 
@@ -165,12 +165,26 @@ test("first work waits for the exact current entry to settle", async () => {
 })
 
 test("first work has a 1 second upper bound, without turning a pending answer into a final grant", async () => {
-  const tracker = createWorkspaceWritableTracker(() => new Promise(() => {}))
-  const start = performance.now()
-  await tracker.whenSettled(on())
-  expect(performance.now() - start).toBeGreaterThanOrEqual(950)
-  expect(performance.now() - start).toBeLessThan(1800)
-  expect(tracker.answer(on())).toBe("pending")
+  // Controlled time (bun fake timers drive both setTimeout and performance.now): the probe never answers,
+  // so only the bound can release first work — still waiting at 999 ms, released at exactly 1000 ms.
+  vi.useFakeTimers()
+  try {
+    const tracker = createWorkspaceWritableTracker(() => new Promise(() => {}))
+    let released = false
+    const work = tracker.whenSettled(on()).then(() => { released = true })
+    const flush = async () => { for (let i = 0; i < 5; i++) await Promise.resolve() }
+    await flush()
+    vi.advanceTimersByTime(999)
+    await flush()
+    expect(released).toBe(false)
+    vi.advanceTimersByTime(1)
+    await flush()
+    expect(released).toBe(true)
+    await work
+    expect(tracker.answer(on())).toBe("pending")
+  } finally {
+    vi.useRealTimers()
+  }
 })
 
 test("notification during first-work wait follows the replacement request; the evicted reply cannot release work", async () => {

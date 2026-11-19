@@ -1,6 +1,6 @@
 // Same production handlers / truth tracker / spawnLocalServer listener. Electron UI and native
 // issuance are the narrow substitutes; actual kernel issuance is independently measured by G0/V2.
-import { afterEach, beforeEach, expect, mock, test } from "bun:test"
+import { afterEach, beforeEach, expect, mock, test, vi } from "bun:test"
 import { EventEmitter } from "node:events"
 import { mkdirSync, mkdtempSync, readFileSync, realpathSync, renameSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
@@ -275,10 +275,28 @@ test("picker including multiple directories registers and consumes before return
 test("picker upper bound is 1 second; pending grant continues and later work joins it", async () => {
   selected = [join(run, "B")]
   child.grantMode = "hold"
-  const start = performance.now()
-  expect(await invoke("open-directory-picker")).toBe(selected[0])
-  expect(performance.now() - start).toBeGreaterThanOrEqual(950)
-  expect(performance.now() - start).toBeLessThan(1500)
+  // Controlled time (bun fake timers drive the picker's setTimeout): the grant is held and never answered
+  // here, so only the bound can return the picker — still waiting at 999 ms, returned at exactly 1000 ms.
+  vi.useFakeTimers()
+  try {
+    let returned: unknown
+    let done = false
+    const picked = Promise.resolve(invoke("open-directory-picker")).then((value) => { returned = value; done = true })
+    const turn = () => new Promise<void>((resolve) => setImmediate(resolve))
+    for (let i = 0; i < 100 && child.grants.length === 0; i++) await turn()
+    for (let i = 0; i < 3; i++) await turn()
+    expect(child.grants).toHaveLength(1)
+    vi.advanceTimersByTime(999)
+    for (let i = 0; i < 3; i++) await turn()
+    expect(done).toBe(false)
+    vi.advanceTimersByTime(1)
+    for (let i = 0; i < 3; i++) await turn()
+    expect(done).toBe(true)
+    await picked
+    expect(returned).toBe(selected[0])
+  } finally {
+    vi.useRealTimers()
+  }
   const pending = probe()
   expect(child.grants).toHaveLength(1)
   child.reply("granted")

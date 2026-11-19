@@ -103,7 +103,7 @@ export function seedSessions(count: number) {
     id: `ses_seed_${i + 1}`,
     title: `会话 ${i + 1}`,
     directory: FIXTURE_DIRECTORY,
-    projectID: "prj_alpha-code",
+    projectID: fixtureProject.id,
     updated: 1000 - i,
   }))
 }

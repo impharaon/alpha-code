@@ -901,3 +901,30 @@ describe("#1592 AC7:其余文字与批准稿文案对照表(自动化部分)一�
     }
   })
 })
+
+
+test("R5 automation-history open records the task directory before closing the panel or navigating; loading history records nothing", async () => {
+  // Existing task fixture; history uses the persisted AutomationRunRecord shape (shared/automation-types.ts).
+  const task = { ...cloudTask("history-open", "schedule-history"), history: [{ at: "2026-11-19T10:00:00.000Z", status: "ok" as const, sessionID: "ses_history" }] }
+  const recorded: Array<{ server: string; directory: string }> = []
+  let release!: () => void
+  window.api.recordWorkspaceOpen = (input) => {
+    recorded.push(input)
+    return new Promise((resolve) => { release = () => resolve({ recorded: true }) })
+  }
+  runtime.queueListedTasks([task])
+  disposers.push(runtime.render(() => runtime.AutomationRefusalHarness(), query<HTMLElement>("#root")))
+  runtime.openPanel()
+  await flush()
+  click(query(".codepuppy-auto-row"))
+  await flush()
+  expect(recorded).toEqual([])
+  const button = query<HTMLButtonElement>(".codepuppy-auto-hist-row .codepuppy-ext-link")
+  click(button)
+  await flush()
+  expect(recorded).toEqual([{ server: "sidecar", directory: task.target.projectDir }])
+  expect(document.body.contains(button)).toBe(true)
+  release()
+  await flush()
+  expect(document.body.contains(button)).toBe(false)
+})

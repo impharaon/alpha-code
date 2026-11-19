@@ -1,2 +1,85 @@
-# P-15 navigation / selection sites and record-function references; AST signatures, occurrence, classification.
-# Reviewed scope: ui-mac renderer plus the mounted app contexts enumerated in the structural host.
+# P-15 navigation / selection sites and entry-function references. Columns: file, owner, AST call/reference, occurrence, classification.
+# Consuming paths never register; R1/R4 include their DOM/menu wrappers openProject/openResult.
+packages/codepuppy-app/src/components/titlebar.tsx	back	navigate(next.to)	1	consume:user-consume
+packages/codepuppy-app/src/components/titlebar.tsx	forward	navigate(next.to)	1	consume:user-consume
+packages/codepuppy-app/src/components/titlebar.tsx	onClick	navigate(`/${params.dir}/session`)	1	consume:user-consume
+packages/codepuppy-app/src/context/notification.tsx	handleSessionIdle	input.navigate(href)	1	consume:engine
+packages/codepuppy-app/src/context/notification.tsx	handleSessionError	input.navigate(href)	1	consume:engine
+packages/codepuppy-app/src/context/tabs.tsx	navigateTab	navigate(href)	1	consume:user-consume
+packages/codepuppy-app/src/context/tabs.tsx	removeTab	navigate("/")	1	consume:user-consume
+packages/codepuppy-app/src/context/tabs.tsx	removeTab	navigateTab(nextTab)	1	consume:user-consume
+packages/codepuppy-app/src/context/tabs.tsx	newDraft	navigate(draftHref(draftID))	1	consume:user-consume
+packages/codepuppy-app/src/context/tabs.tsx	promoteDraft	navigateTab(next)	1	consume:user-consume
+packages/codepuppy-app/src/context/tabs.tsx	reopenClosedTab	navigateTab(entry.tab)	1	consume:user-consume
+packages/codepuppy-app/src/context/tabs.tsx	removeServer	navigate("/")	1	consume:engine
+packages/codepuppy-app/src/context/tabs.tsx	module	navigateTab(nextTab)	1	consume:engine
+packages/codepuppy-app/src/context/tabs.tsx	module	navigate("/")	1	consume:engine
+packages/codepuppy-app/src/context/tabs.tsx	toggleHome	navigateTab(tab)	1	consume:user-consume
+packages/codepuppy-app/src/context/tabs.tsx	toggleHome	navigate("/")	1	consume:user-consume
+packages/codepuppy-app/src/context/tabs.tsx	toggleHome	navigate("/")	2	consume:user-consume
+packages/codepuppy-app/src/pages/directory-layout.tsx	DirectoryDataProvider	navigate(`/${base64Encode(next)}${path}${location.search}${location.hash}`, { replace: true })	1	consume:restore
+packages/codepuppy-app/src/pages/directory-layout.tsx	onNavigateToSession	navigate(href(sessionID))	1	consume:restore
+packages/codepuppy-app/src/pages/directory-layout.tsx	Layout	navigate("/", { replace: true })	1	consume:restore
+packages/codepuppy-app/src/pages/layout.tsx	navigateWithSidebarReset	navigate(href)	1	consume:user-consume
+packages/codepuppy-app/src/pages/layout.tsx	useSDKNotificationToasts	navigate(href)	1	consume:engine
+packages/codepuppy-app/src/pages/layout.tsx	useSDKNotificationToasts	navigate(href)	2	consume:engine
+packages/codepuppy-app/src/pages/layout.tsx	useSDKNotificationToasts	navigate(href)	3	consume:engine
+packages/codepuppy-app/src/pages/layout.tsx	archiveSession	navigate(`/${params.dir}/session/${nextSession.id}`)	1	consume:engine
+packages/codepuppy-app/src/pages/layout.tsx	archiveSession	navigate(`/${params.dir}/session`)	1	consume:engine
+packages/codepuppy-app/src/pages/layout.tsx	closeProject	navigate("/")	1	consume:user-consume
+packages/codepuppy-app/src/pages/layout.tsx	resetWorkspace	navigate(href)	1	consume:user-consume
+packages/codepuppy-app/src/pages/layout/deep-links.ts	applyDeepLinks	handlers.navigate(link.href)	1	consume:deep-link
+packages/codepuppy-app/src/pages/session.tsx	backToNewChat	navigate("/")	1	consume:user-consume
+packages/codepuppy-app/src/pages/session.tsx	sessionPanelContent	navigate(params.serverKey ? sessionHref(requireServerKey(params.serverKey), id) : legacySessionHref(sdk().directory, id))	1	consume:engine
+packages/ui-mac/src/renderer/automations/automation-panel.tsx	AutomationPanel	reference openSession: openSession = async (task: ListedTask, rec: AutomationRunRecord) => { const sessionID = rec.sessionID if (!sessionID) return // #925:key 在点击那一刻取。缺席 ⇒ 引擎侧身份不成立(sidecar 未就绪/重启中)——run 列表走 // IPC 照样能显示,所以这里**到得了**;如实提示,不挑一个 server 瞎跳(fail-closed)。 const key = props.serverKey() if (!key) { pushToast({ kind: "error", title: t("codepuppy.home.engineUnavailable") }) return } await recordWorkspaceOpen(key, task.target.projectDir) setAutomationOpen(false) navigate(hrefFor.session(key, sessionID)) }	1	reference:R5
+packages/ui-mac/src/renderer/automations/automation-panel.tsx	openSession	recordWorkspaceOpen(key, task.target.projectDir)	1	record:R5
+packages/ui-mac/src/renderer/automations/automation-panel.tsx	openSession	navigate(hrefFor.session(key, sessionID))	1	consume:user-consume
+packages/ui-mac/src/renderer/automations/automation-panel.tsx	openSession	hrefFor.session(key, sessionID)	1	consume:user-consume
+packages/ui-mac/src/renderer/automations/automation-panel.tsx	onClick	reference openSession: openSession(editing()!, rec)	1	reference:R5
+packages/ui-mac/src/renderer/codepuppy-ui/CodePuppyHome.tsx	onSubmitted	navigate(hrefFor.session(submitted.serverKey, id))	1	consume:user-consume
+packages/ui-mac/src/renderer/codepuppy-ui/CodePuppyHome.tsx	onSubmitted	hrefFor.session(submitted.serverKey, id)	1	consume:user-consume
+packages/ui-mac/src/renderer/codepuppy-ui/codepuppy-composer.tsx	submit	props.projects.startChat(dir, body, req.parts.slice(1), { model: req.model, explicitModel: submittedExplicitModel, agent: req.agent, perm: submittedPerm, existingSessionID: reuseSessionID, onSessionCreated: (createdId) => { homePendingSession = { directory: dir, sessionID: createdId } }, })	1	consume:user-consume
+packages/ui-mac/src/renderer/codepuppy-ui/codepuppy-new-session.tsx	onSubmitted	props.promoteDraft({ directory: dir, sessionId: id })	1	consume:user-consume
+packages/ui-mac/src/renderer/codepuppy-ui/codepuppy-session-search.tsx	sessionSearchResults	hrefFor.session(serverKey, session.id)	1	consume:user-consume
+packages/ui-mac/src/renderer/codepuppy-ui/codepuppy-session-search.tsx	CodePuppySessionSearch	reference go: go = async (result: SessionSearchResult) => { const server = props.serverKey() const href = result.href if (!server) return await recordWorkspaceOpen(server, result.directory) setOpen(false) navigate(href) }	1	reference:R4
+packages/ui-mac/src/renderer/codepuppy-ui/codepuppy-session-search.tsx	go	recordWorkspaceOpen(server, result.directory)	1	record:R4
+packages/ui-mac/src/renderer/codepuppy-ui/codepuppy-session-search.tsx	go	navigate(href)	1	consume:user-consume
+packages/ui-mac/src/renderer/codepuppy-ui/codepuppy-session-search.tsx	CodePuppySessionSearch	reference openResult: openResult = (event: MouseEvent, result: SessionSearchResult) => { event.preventDefault() void go(result) }	1	reference:R4
+packages/ui-mac/src/renderer/codepuppy-ui/codepuppy-session-search.tsx	openResult	reference go: go(result)	1	reference:R4
+packages/ui-mac/src/renderer/codepuppy-ui/codepuppy-session-search.tsx	onKeyDown	reference go: go(result)	1	reference:R4
+packages/ui-mac/src/renderer/codepuppy-ui/codepuppy-session-search.tsx	onClick	reference openResult: openResult(event, result)	1	reference:R4
+packages/ui-mac/src/renderer/codepuppy-ui/session-timeline/session-timeline.tsx	CodePuppySessionTimeline	navigate(hrefFor.session(identity.serverKey, childSessionID))	1	consume:engine
+packages/ui-mac/src/renderer/codepuppy-ui/session-timeline/session-timeline.tsx	CodePuppySessionTimeline	hrefFor.session(identity.serverKey, childSessionID)	1	consume:engine
+packages/ui-mac/src/renderer/codepuppy-ui/session-workspace/session-composer-dock.tsx	onJump	navigate(href)	1	consume:engine
+packages/ui-mac/src/renderer/codepuppy-ui/workspace-chip.tsx	CodePuppyWorkspaceChip	reference choose: choose = async (directory: string) => { const server = props.server if (server) await recordWorkspaceOpen(server, directory) props.onOpenChange(false) props.onSelect(directory) }	1	reference:R3
+packages/ui-mac/src/renderer/codepuppy-ui/workspace-chip.tsx	choose	recordWorkspaceOpen(server, directory)	1	record:R3
+packages/ui-mac/src/renderer/codepuppy-ui/workspace-chip.tsx	choose	props.onSelect(directory)	1	consume:user-consume
+packages/ui-mac/src/renderer/codepuppy-ui/workspace-chip.tsx	onClick	reference choose: choose(props.defaultWorkspace!)	1	reference:R3
+packages/ui-mac/src/renderer/codepuppy-ui/workspace-chip.tsx	onClick	reference choose: choose(p.worktree)	1	reference:R3
+packages/ui-mac/src/renderer/codepuppy-ui/workspace-chip.tsx	onClick	props.onSelect(picked)	1	consume:user-consume
+packages/ui-mac/src/renderer/codepuppy-ui/workspace-writable.ts	recordWorkspaceOpen	window.api?.recordWorkspaceOpen({ server, directory })	1	bridge
+packages/ui-mac/src/renderer/sidebar/codepuppy-sidebar.tsx	CodePuppySidebar	startDraft("launch")	1	consume:restore
+packages/ui-mac/src/renderer/sidebar/codepuppy-sidebar.tsx	CodePuppySidebar	reference startChat: startChat = async (worktree: string) => { const submittedServerKey = props.serverKey() // REQ-126 AC2(#655 审计 Major):这条路径的导航发生在 `await createSession(...)` **之后**, // 而真实创建是多个 await(use-projects.ts:294-307)。只靠下面 navigate 里的咽喉点,慢请求 // 或未决请求期间覆盖层会一直压在目标页面上 —— owner 报的原始症状在这条路径上照样复现。 // 关闭属于**导航意图**,不属于导航结果,所以提到第一个 await 之前。 closeAllOverlays() setProjectExpanded(worktree, true) // #925:server 身份在**发起创建那一刻**定格 —— `createSession` 在 store 连着的 server 上建 // 会话,await 期间 store 可能改连别处(sidecar 重启换端口),完成后再读就是别人的 key。 // key 缺席 ⇒ store 无 client,创建注定失败:如实报失败,不建、不猜。 if (!submittedServerKey) { pushToast({ kind: "error", title: t("codepuppy.sidebar.newChatFailed") }) return } await recordWorkspaceOpen(submittedServerKey, worktree) const id = await createSession(worktree) // REQ-126 不变量 1(#656):失败**不再**回退到 `newSessionHref(worktree)` —— 那个 href 就是 // legacy admission 路由(sidebar/route.ts 的 directorySession),回退等于给 alpha 自己留了 // 第二条进 admission 的入口。失败就如实说失败,不假装"已经给你开了个草稿"。 // #925:导航消费创建那一刻的 server 快照,拼 canonical 的 `/server/:serverKey/session/:id`, // 不再走 legacy `/{目录}/session/{id}` 让壳按 active server 反推。 if (id) navigate(hrefFor.session(submittedServerKey, id)) else pushToast({ kind: "error", title: t("codepuppy.sidebar.newChatFailed") }) }	1	reference:R1
+packages/ui-mac/src/renderer/sidebar/codepuppy-sidebar.tsx	startChat	recordWorkspaceOpen(submittedServerKey, worktree)	1	record:R1
+packages/ui-mac/src/renderer/sidebar/codepuppy-sidebar.tsx	startChat	navigate(hrefFor.session(submittedServerKey, id))	1	consume:user-consume
+packages/ui-mac/src/renderer/sidebar/codepuppy-sidebar.tsx	startChat	hrefFor.session(submittedServerKey, id)	1	consume:user-consume
+packages/ui-mac/src/renderer/sidebar/codepuppy-sidebar.tsx	newChat	startDraft()	1	consume:user-consume
+packages/ui-mac/src/renderer/sidebar/codepuppy-sidebar.tsx	CodePuppySidebar	reference openProject: openProject = async () => { let picked: string | string[] | null = null try { picked = await window.api.openDirectoryPicker({ title: t("codepuppy.sidebar.openProject") }) } catch { pushToast({ kind: "error", title: t("codepuppy.home.openProjectFailed") }) return } const directory = Array.isArray(picked) ? picked[0] : picked if (typeof directory !== "string" || !directory) return await startChat(directory) }	1	reference:R1
+packages/ui-mac/src/renderer/sidebar/codepuppy-sidebar.tsx	openProject	startChat(directory)	1	consume:user-consume
+packages/ui-mac/src/renderer/sidebar/codepuppy-sidebar.tsx	openProject	reference startChat: startChat(directory)	1	reference:R1
+packages/ui-mac/src/renderer/sidebar/codepuppy-sidebar.tsx	CodePuppySidebar	reference openProject: openProject()	1	reference:R1
+packages/ui-mac/src/renderer/sidebar/codepuppy-sidebar.tsx	sessionLink	hrefFor.session(key, id)	1	consume:user-consume
+packages/ui-mac/src/renderer/sidebar/codepuppy-sidebar.tsx	CodePuppySidebar	reference openSession: openSession = async (e: MouseEvent, session: CodePuppySession) => { e.preventDefault() const server = props.serverKey() const sessionID = session.id if (!server) return await recordWorkspaceOpen(server, session.directory) navigate(hrefFor.session(server, sessionID)) }	1	reference:R2
+packages/ui-mac/src/renderer/sidebar/codepuppy-sidebar.tsx	openSession	recordWorkspaceOpen(server, session.directory)	1	record:R2
+packages/ui-mac/src/renderer/sidebar/codepuppy-sidebar.tsx	openSession	navigate(hrefFor.session(server, sessionID))	1	consume:user-consume
+packages/ui-mac/src/renderer/sidebar/codepuppy-sidebar.tsx	openSession	hrefFor.session(server, sessionID)	1	consume:user-consume
+packages/ui-mac/src/renderer/sidebar/codepuppy-sidebar.tsx	onBack	navigate(-1)	1	consume:user-consume
+packages/ui-mac/src/renderer/sidebar/codepuppy-sidebar.tsx	onForward	navigate(1)	1	consume:user-consume
+packages/ui-mac/src/renderer/sidebar/codepuppy-sidebar.tsx	onClick	navigate(homeHref())	1	consume:user-consume
+packages/ui-mac/src/renderer/sidebar/codepuppy-sidebar.tsx	onClick	reference openProject: openProject()	1	reference:R1
+packages/ui-mac/src/renderer/sidebar/codepuppy-sidebar.tsx	onClick	startChat(project.worktree)	1	consume:user-consume
+packages/ui-mac/src/renderer/sidebar/codepuppy-sidebar.tsx	onClick	reference startChat: startChat(project.worktree)	1	reference:R1
+packages/ui-mac/src/renderer/sidebar/codepuppy-sidebar.tsx	onClick	reference openSession: openSession(e, session)	1	reference:R2
+packages/ui-mac/src/renderer/sidebar/codepuppy-sidebar.tsx	onClick	reference openProject: openProject()	2	reference:R1
+packages/ui-mac/src/renderer/sidebar/route.ts	newSessionHref	hrefFor.directorySession(directory)	1	consume:user-consume
+packages/ui-mac/src/renderer/sidebar/route.ts	homeHref	hrefFor.home()	1	consume:user-consume

@@ -15,7 +15,7 @@ const roles = [
   { id: "R5", file: `${renderer}automations/automation-panel.tsx`, fn: "openSession" },
 ]
 const walk = (dir: string): string[] => readdirSync(join(repo, dir), { withFileTypes: true }).flatMap((entry): string[] => entry.isDirectory() ? walk(`${dir}/${entry.name}`) : /\.[jt]sx?$/.test(entry.name) && !/(?:\.test\.|\.cases\.|test-runtime|test-fixture)/.test(entry.name) ? [`${dir}/${entry.name}`] : [])
-const mountedAppContexts = ["context/tabs.tsx", "context/notification.tsx", "pages/directory-layout.tsx", "pages/session.tsx", "components/titlebar.tsx"].map((file) => `packages/codepuppy-app/src/${file}`)
+const mountedAppContexts = ["context/tabs.tsx", "context/notification.tsx", "pages/directory-layout.tsx", "pages/session.tsx", "components/titlebar.tsx", "pages/layout.tsx", "pages/layout/deep-links.ts"].map((file) => `packages/codepuppy-app/src/${file}`)
 const files = [...walk(renderer.slice(0, -1)), ...mountedAppContexts].sort()
 const compact = (node: ts.Node) => node.getText().replace(/\s+/g, " ")
 function owner(node: ts.Node): string {
@@ -51,7 +51,7 @@ function scan(file: string, source: string): Site[] {
       }
     }
     if (ts.isIdentifier(node)) {
-      const role = roles.find((role) => role.file === file && role.fn === node.text)
+      const role = roles.find((role) => role.file === file && (role.fn === node.text || (role.id === "R1" && node.text === "openProject") || (role.id === "R4" && node.text === "openResult")))
       if (role) add(node, `reference ${node.text}: ${compact(node.parent)}`, `reference:${role.id}`)
     }
     ts.forEachChild(node, visit)
@@ -97,7 +97,7 @@ test("each record point awaits recording before any other await/navigation/selec
     }
     visit(ast)
     expect(awaits[0] && compact(awaits[0]), role.id).toMatch(/^await recordWorkspaceOpen\(/)
-    for (const action of actions) expect(action.pos, `${role.id}: ${compact(action)}`).toBeGreaterThan(awaits[0]!.end)
+    for (const action of actions) expect(action.getStart(ast), `${role.id}: ${compact(action)}`).toBeGreaterThan(awaits[0]!.end)
   }
 })
 

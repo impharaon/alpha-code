@@ -1987,9 +1987,10 @@ describe("REQ-159 #1322 workspace read-only tag on the chip (AC2)", () => {
   /** 可控探针:按目录给答案,并记下问过谁。 */
   const probeStub = (answers: Record<string, "writable" | "denied" | "unknown">) => {
     const asked: string[] = []
-    resetWorkspaceWritableForTests(async (directory: string) => {
+    resetWorkspaceWritableForTests(async ({ directory }) => {
       asked.push(directory)
-      return { outcome: answers[directory] ?? "unknown" }
+      const outcome = answers[directory] ?? "unknown"
+      return { outcome, grant: outcome === "denied" ? "ineligible" : "granted", ...(outcome === "denied" ? { reason: "not-opened-by-you" } : {}) }
     })
     return asked
   }
@@ -2043,7 +2044,7 @@ describe("REQ-159 #1322 workspace read-only tag on the chip (AC2)", () => {
     const broken = mount(() => createComponent(DraftLeaf, { projects: projectsApi([project("alpha-code", "/ws/a")]) }))
     await flush()
     await flush()
-    expect(tag(broken)).toBeNull()
+    expect(tag(broken)).not.toBeNull() // IPC rejection carries grant-failed, even with outcome unknown.
 
     // 桥缺席(installApi 没给 workspaceWriteProbe)⇒ unknown ⇒ 无标记
     resetWorkspaceWritableForTests()
@@ -2076,4 +2077,67 @@ describe("REQ-159 #1322 workspace read-only tag on the chip (AC2)", () => {
     expect(tag(host)).not.toBeNull()
     expect(chipButton(host).contains(tag(host)!)).toBe(true)
   })
+})
+
+
+test("R3 records the clicked project's server/directory before selecting it", async () => {
+  const recorded: Array<{ server: string; directory: string }> = []
+  let release!: () => void
+  window.api.recordWorkspaceOpen = (input) => {
+    recorded.push(input)
+    return new Promise((resolve) => { release = () => resolve({ recorded: true }) })
+  }
+  const host = mount(() => createComponent(DraftLeaf, { projects: projectsApi([project("alpha-code", "/ws/a"), project("beta", "/ws/b")]) }))
+  await flush()
+  await openChipAndPick(host, "beta")
+  expect(recorded).toEqual([{ server: STORE_SERVER_KEY, directory: "/ws/b" }])
+  expect(draft().directory).toBe("/ws/a")
+  expect(updateDraftCalls).toEqual([])
+  release()
+  await flush()
+  await flush()
+  expect(draft().directory).toBe("/ws/b")
+})
+
+test("a same-renderer denied folder becomes writable on its open notification; restore and rewritten directories only consume", async () => {
+  const opened = new Set<string>()
+  const records: string[] = []
+  const probes: string[] = []
+  let changed!: (target: { server: string; directory: string }) => void
+  window.api.onWorkspaceWritableChanged = (cb) => { changed = cb; return () => {} }
+  window.api.workspaceWriteProbe = async (input) => {
+    probes.push(input.directory)
+    return opened.has(input.directory) ? { outcome: "writable", grant: "granted" } : { outcome: "denied", grant: "ineligible", reason: "not-opened-by-you" }
+  }
+  window.api.recordWorkspaceOpen = async (input) => {
+    records.push(input.directory)
+    opened.add(input.directory)
+    changed(input)
+    return { recorded: true }
+  }
+  setSandboxStateForTests({ status: "ready", generation: 1, reason: "boot", fence: "applied" })
+  const host = mount(() => createComponent(DraftLeaf, { projects: projectsApi([project("alpha-code", "/ws/a")]) }))
+  await flush()
+  await flush()
+  expect(host.querySelector("[data-codepuppy-workspace-chip-readonly]")).not.toBeNull()
+  expect(records).toEqual([])
+  const before = textarea(host)
+  await openChipAndPick(host, "alpha-code")
+  await flush()
+  expect(records).toEqual(["/ws/a"])
+  expect(probes).toEqual(["/ws/a", "/ws/a"])
+  expect(textarea(host)).toBe(before)
+  expect(host.querySelector("[data-codepuppy-workspace-chip-readonly]")).toBeNull()
+  // A renderer reload clears its cache, not main's register; no gesture/entry witness is sampled.
+  resetWorkspaceWritableForTests()
+  const restored = mount(() => createComponent(DraftLeaf, { projects: projectsApi([project("alpha-code", "/ws/a")]) }))
+  await flush()
+  await flush()
+  expect(restored.querySelector("[data-codepuppy-workspace-chip-readonly]")).toBeNull()
+  setDraft({ server: STORE_SERVER_KEY, directory: "/ws/rewritten" })
+  document.body.click()
+  await flush()
+  await flush()
+  expect(records).toEqual(["/ws/a"])
+  expect(host.querySelector("[data-codepuppy-workspace-chip-readonly]")).not.toBeNull()
 })

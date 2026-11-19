@@ -6,6 +6,6 @@ test("endpoint route authority cases", async () => {
   const [stdout, stderr, code] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
   const output = stdout + stderr
   expect(code, output).toBe(0)
-  expect(output).toContain("6 pass")
+  expect(output).toContain("7 pass")
   expect(output).toContain("0 fail")
 }, 30_000)

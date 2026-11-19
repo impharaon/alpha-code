@@ -121,4 +121,11 @@ test("W3 real dial-failed logs trigger a coalesced probe only for the preferred 
   proxyLog({ event: "egress.tunnel-closed", id: 1, at: "fixture", host: new URL(preferredEndpoints().cloud).hostname, port: 443, bytesUp: 1, bytesDown: 1, durationMs: 1 })
   await flush()
   expect(probes).toBe(recovered)
+  for (const host of ["registry.npmjs.org", new URL(preferredEndpoints().platform).hostname, new URL(preferredEndpoints().cloud).hostname]) {
+    const beforeSilent = probes
+    // Same record shape as the production proxy's TLS-silent watchdog emission.
+    proxyLog({ event: "egress.tunnel-silent", id: 2, at: "fixture", host, port: 443, bytesUp: 1, remote: "127.0.0.1", fakeIp: false })
+    await flush()
+    expect(probes).toBe(beforeSilent + (host.endsWith(".test") ? 2 : 0))
+  }
 })

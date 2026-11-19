@@ -2,7 +2,7 @@ import { expect, test } from "bun:test"
 import { basename, join, resolve } from "node:path"
 import { copyFileSync, existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs"
 
-test.skipIf(process.platform !== "darwin")("workspace identity: seeding, firmlinks, honest aliases and bounded filesystem resolution", async () => {
+test.skipIf(process.platform !== "darwin")("workspace identity: seeding, firmlinks, honest aliases and cached synchronous filesystem resolution", async () => {
   // The Electron Node fixture resolves the UI package's real installed dependencies.
   const base = resolve(import.meta.dir, "../../node_modules/.cache/project-writable")
   mkdirSync(join(base, "results"), { recursive: true })
@@ -13,7 +13,7 @@ test.skipIf(process.platform !== "darwin")("workspace identity: seeding, firmlin
     const output = `${stdout}${stderr}`
     writeFileSync(join(base, "results", `${basename(run)}.log`), output.slice(-32768))
     expect(code, output).toBe(0)
-    expect(output.match(/(\d+) pass\b/)?.[1], output).toBe("7")
+    expect(output.match(/(\d+) pass\b/)?.[1], output).toBe("6")
     expect(output.match(/(\d+) fail\b/)?.[1], output).toBe("0")
   } finally {
     if (existsSync(join(run, "result.json"))) copyFileSync(join(run, "result.json"), join(base, "results", `${basename(run)}-result.json`))

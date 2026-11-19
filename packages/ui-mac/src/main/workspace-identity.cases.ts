@@ -1,26 +1,14 @@
-// Real filesystem identities; simulated unreachable I/O is installed in both the old main
-// callback and the isolated resolver worker. No owner files are read or written.
-import { afterAll, beforeAll, expect, mock, test } from "bun:test"
+// Real filesystem identities in an isolated tree. No owner files are read or written.
+import { afterAll, beforeAll, expect, test } from "bun:test"
 import { createRequire } from "node:module"
 import { mkdirSync, readFileSync, realpathSync, renameSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs"
 import { dirname, join } from "node:path"
-import type { WorkerOptions } from "node:worker_threads"
 
 const root = process.env.CODEPUPPY_IDENTITY_TEST_ROOT!
 const home = join(root, "home"), state = join(root, "state"), A = join(root, "A")
-const blocked = join(root, "blocked"), cached = join(root, "cached")
-const counters = new SharedArrayBuffer(12)
-const values = new Int32Array(counters)
-Atomics.store(values, 1, 1)
+const cached = join(root, "cached"), newTab = join(root, "new-tab")
+const resolutions = new Map<string, number>()
 const require = createRequire(import.meta.url)
-const threads = require("node:worker_threads")
-const NativeWorker = threads.Worker
-mock.module("node:worker_threads", () => ({ ...threads, Worker: class extends NativeWorker {
-  constructor(source: string | URL, options: WorkerOptions = {}) {
-    const prefix = `const fixtureThreads=require('node:worker_threads');const fixtureFs=require('node:fs');const fixtureRealpath=fixtureFs.realpathSync.native;const fixture=fixtureThreads.workerData.fixture;fixtureFs.realpathSync.native=(p)=>{if(p===fixture.cached)Atomics.add(new Int32Array(fixture.counters),2,1);if(p===fixture.blocked&&Atomics.load(new Int32Array(fixture.counters),1)===0){Atomics.add(new Int32Array(fixture.counters),0,1);Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,600);}return fixtureRealpath(p);};`
-    super(prefix + String(source), { ...options, workerData: { ...options.workerData, fixture: { blocked, cached, counters } } })
-  }
-} }))
 const { bootFenceWorkspaceTruth, readWorkspaceTruthOrThrow, writeWorkspaceTruth } = await import("./process-fence-workspaces")
 const { GLOBAL_RENDERER_STORE, TABS_KEY } = await import("./tabs-preclean")
 const fs = { readFileSync, writeFileSync, mkdirSync, renameSync, rmSync }
@@ -30,11 +18,7 @@ const nativeRealpath = realpathSync.native
 const eligibility = {
   homeDir: home, appStateRoot: state,
   realpath: (path: string) => {
-    if (path === cached) Atomics.add(values, 2, 1)
-    if (path === blocked && Atomics.load(values, 1) === 0) {
-      Atomics.add(values, 0, 1)
-      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 600)
-    }
+    resolutions.set(path, (resolutions.get(path) ?? 0) + 1)
     return nativeRealpath(path)
   },
   isDirectory: (path: string) => statSync(path).isDirectory(),
@@ -49,7 +33,7 @@ const sidecar = {
   probeWrite: async (directory: string) => ({ outcome: writable.has(nativeRealpath(directory)) ? "writable" as const : "denied" as const }),
 } as unknown as Parameters<Awaited<ReturnType<typeof create>>["probeWrite"]>[1]
 beforeAll(() => {
-  for (const path of [home, state, A, blocked, cached, join(root, "Project"), join(root, "LaunchAgents")]) mkdirSync(path, { recursive: true })
+  for (const path of [home, state, A, cached, newTab, join(root, "Project"), join(root, "LaunchAgents")]) mkdirSync(path, { recursive: true })
   symlinkSync(join(root, "Project"), join(root, "work"))
   process.env.CODEPUPPY_USER_WORKSPACE_DIR = A
 })
@@ -112,39 +96,19 @@ for (const [name, directory] of [["symlink", join(root, "work")], ["tmp", "/tmp"
   })
 }
 
-test("unreachable lookup has a bound, other tabs respond, and the same registration recovers", async () => {
-  const truthPath = join(root, "unreachable.json")
-  writeWorkspaceTruth(truthPath, [], fs)
-  const tracker = await create(truthPath)
-  await tracker.userOpened.register({ server: "sidecar", directory: blocked })
-  await tracker.probeWrite({ server: "sidecar", directory: blocked }, sidecar)
-  Atomics.store(values, 1, 0)
-  const start = performance.now()
-  const waiting = tracker.probeWrite({ server: "sidecar", directory: blocked }, sidecar)
-  const other = await tracker.probeWrite({ server: "sidecar", directory: A }, sidecar)
-  const otherMs = performance.now() - start
-  const unavailable = await waiting
-  const elapsedMs = performance.now() - start
-  Atomics.store(values, 1, 1)
-  const recovered = await tracker.probeWrite({ server: "sidecar", directory: blocked }, sidecar)
-  proof.push({ name: "unreachable", elapsedMs, otherMs, other, unavailable, recovered, reached: Atomics.load(values, 0) })
-  expect(Atomics.load(values, 0)).toBeGreaterThan(0)
-  expect(otherMs).toBeLessThan(350)
-  expect(elapsedMs).toBeLessThan(550)
-  expect(other.outcome).toBe("writable")
-  expect(unavailable.grant).toBe("ineligible")
-  expect(recovered).toMatchObject({ outcome: "writable", grant: "granted" })
-})
-
 test("seen literal tab paths do not cause another disk walk on every store update", async () => {
   const truthPath = join(root, "cached.json")
   writeWorkspaceTruth(truthPath, [], fs)
   const tracker = await create(truthPath)
   await tracker.userOpened.register({ server: "sidecar", directory: cached })
   await tracker.noteRendererStoreSet(GLOBAL_RENDERER_STORE, TABS_KEY, [tab(cached)])
-  const before = Atomics.load(values, 2)
+  const before = (resolutions.get(cached) ?? 0)
   for (let i = 0; i < 10; i++) await tracker.noteRendererStoreSet(GLOBAL_RENDERER_STORE, TABS_KEY, [tab(cached)])
-  const extra = Atomics.load(values, 2) - before
-  proof.push({ name: "tab-resolution-cache", extra })
+  const extra = (resolutions.get(cached) ?? 0) - before
+  const newBefore = resolutions.get(newTab) ?? 0
+  await tracker.noteRendererStoreSet(GLOBAL_RENDERER_STORE, TABS_KEY, [tab(cached), tab(newTab)])
+  const newExtra = (resolutions.get(newTab) ?? 0) - newBefore
+  proof.push({ name: "tab-resolution-cache", extra, newExtra })
   expect(extra).toBe(0)
+  expect(newExtra).toBe(1)
 })

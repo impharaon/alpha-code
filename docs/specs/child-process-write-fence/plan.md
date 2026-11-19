@@ -322,3 +322,9 @@ PLAN 阶段只提交本文件。下表和命令均为实施安排，不代表已
 - 门的 summary、逐行消息和 codepuppy-check 的说明改为“本次未验证”，不再把未开签名开关误说成本平台不适用；只有文案/注释改变，计数与退出码不变。具名 registry fixture 复核 **24/0**（review/r7-conditional-message.log），没有执行真实 gate。
 - 小结果拷至 review/r7-identity-red-result.json、r7-engine-red-events.json、r7-engine-red-proof.json；临时 app/目录由各 host 清理，所有本轮真实引擎报告 pid 均已退出。新身份函数尚未实施，故五消费者仅列待接线点：runtime grant（workspaces.ts:273）、W1（profile.ts:379）、seed（workspaces.ts:223）、quarantine/recompute（workspaces.ts:197/238）、renderer invalidate（core.ts:89，通知子项已完成）。签名宿主本轮未运行：身份主链仍受上述冻结接缝阻塞，不拿旧接线的绿结果充当 R7 完成。
 - 后续从这个干净提交边界继续：先取得内部异步接缝裁定；再实现一个身份/有效性函数及五消费者，跑现有 red host 到全绿，最后一次签名 G0/窗口复验。登记、planner、播种的 Promise 裁定未返回前，不实现同步等 worker、临时 pending 假登记或另一条身份判定。已核 Codex / GPT-6，自验；当前结论 **BLOCKED: frozen synchronous identity seam**，不是 DONE。
+
+### r8：同步接缝裁定与修复
+
+- 核对：IMPLEMENT · r8 orchestrator receipt · HEAD 3d95eca94d；同步 register/has/planner/seeding 保持，失联卷有界要求及证据臂撤回，r7 异步接缝提议不实施。
+- 红证据复核：identity inner **0/6**（review/r8-identity-red.log）；保留播种、firmlink、三个诚实别名、缓存断言；十次 tab 更新仍额外解析 10 次，新增 tab 的首次解析应为 1 次。host inner 钉由 7 改 6 仅对应明确撤回的一臂。
+- 偏差：the first resolution of a path on an unreachable volume blocks as the existing synchronous directory checks do; not changed by this work

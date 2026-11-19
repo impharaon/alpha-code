@@ -160,8 +160,7 @@ test("notification during first-work wait follows the replacement request; the e
   let started = false
   const work = tracker.whenSettled(on()).then(() => { started = true })
   tracker.invalidate({ server: "sidecar", directory: "/B" })
-  await Promise.resolve()
-  await Promise.resolve()
+  for (let i = 0; i < 20 && fake.calls.length < 2; i++) await Promise.resolve()
   expect(fake.calls).toHaveLength(2)
   await fake.answer(0, denied)
   expect(started).toBe(false)

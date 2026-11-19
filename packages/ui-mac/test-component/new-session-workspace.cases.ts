@@ -2156,7 +2156,8 @@ for (const mode of ["home", "session", "command"] as const) test(`first ${mode} 
   setSandboxStateForTests({ status: "ready", generation: 1, reason: "boot", fence: "applied" })
   commandListEntries = [{ name: "helios-brief", description: "周报", source: "skill" }]
   const projects = projectsApi([project("alpha-code", "/ws/a")])
-  const host = mode === "home" ? mount(() => createComponent(CodePuppyHome, { projects, serverKey: () => STORE_SERVER_KEY })) : mountSessionAt(projects, STORE_SERVER_KEY, "session-9").host
+  let submittedServer = STORE_SERVER_KEY
+  const host = mode === "home" ? mount(() => createComponent(CodePuppyHome, { projects, serverKey: () => submittedServer })) : mountSessionAt(projects, STORE_SERVER_KEY, "session-9").host
   for (let i = 0; i < 30 && !textarea(host); i++) await flush()
   type(textarea(host)!, mode === "command" ? "/helios-brief 本周" : "first work")
   const send = () => host.querySelector<HTMLButtonElement>(".a-comp-send")!
@@ -2166,9 +2167,11 @@ for (const mode of ["home", "session", "command"] as const) test(`first ${mode} 
   for (let i = 0; i < 6; i++) await flush()
   expect(startChatCalls.length + promptAsyncCalls.length + sessionCommandCalls.length).toBe(0)
   expect(asked).toEqual([{ server: STORE_SERVER_KEY, directory: DEFAULT_WORKSPACE }])
+  submittedServer = "remote-after-the-click"
   release()
   for (let i = 0; i < 30 && startChatCalls.length + promptAsyncCalls.length + sessionCommandCalls.length === 0; i++) await flush()
   expect(mode === "home" ? startChatCalls.length : mode === "command" ? sessionCommandCalls.length : promptAsyncCalls.length).toBe(1)
+  if (mode === "home") expect(parseRoute(navigateCalls.at(-1)!)).toMatchObject({ serverKey: STORE_SERVER_KEY })
 })
 
 test("first terminal create waits for the adapter identity's grant, while existing terminal operations remain available", async () => {

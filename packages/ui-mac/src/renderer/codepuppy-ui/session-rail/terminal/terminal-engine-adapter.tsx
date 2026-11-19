@@ -1,3 +1,4 @@
+import { whenSettled } from "../../workspace-writable"
 // REQ-125 #554 —— 终端引擎 channel 适配器:I1 白名单通道的唯一引擎 import 点。
 //
 // 上游引擎经 ADR-027 修订(2026-07-24)的窄导出 `@opencode-ai/app/surface/terminal` 进入:
@@ -170,16 +171,22 @@ export function useCodePuppyTerminalEngineChannel(
     return { surface: resolved, EngineOutput: createEngineOutput(resolved) }
   })()
   const identity = createMemo(() => current()?.identity, undefined, { equals: sameIdentityProjection })
-  return createMemo(() =>
-    mintTerminalEngineChannel({
+  return createMemo(() => {
+    const channel = mintTerminalEngineChannel({
       engine,
       identity: identity(),
       labels: {
         numbered: (number) => t("codepuppy.terminal.titleNumbered", { number }),
         untitled: t("codepuppy.session.terminal"),
       },
-    }),
-  )
+    })
+    if (!channel) return undefined
+    return { ...channel, create: async () => {
+      const target = channel.identity
+      await whenSettled(target.serverKey, target.directory)
+      channel.create()
+    } }
+  })
 }
 
 /**

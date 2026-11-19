@@ -173,3 +173,12 @@ PLAN 阶段只提交本文件。下表和命令均为实施安排，不代表已
 - 2026-11-19 · 步骤 4 登记簿扫描实际 83 个调用/引用；除 P-15 列出的上下文，补入实际深链消费者 `codepuppy-app/src/pages/layout/deep-links.ts:applyDeepLinks` 及持有者 `pages/layout.tsx`（index.tsx 只发布 batch），只读扫描，不修改上游代码。R1 的 openProject、R4 的 openResult wrapper 引用也登记，防恢复代码通过 wrapper 触达记录点。gate：search 29→32、automation 38→39；新增 core=10、navigation=5，组件宿主数不变。
 
 - 2026-11-19 · 步骤 4 坏臂完成：去 R5 登记后结构与真实历史按钮用例均红（`step4-bad-r5-structural.log` / `step4-bad-r5-dom.log`，DOM 0 pass / 1 fail、38 filtered）；保留失效缓存时两个指定核心用例均红（`step4-bad-cache.log`），已 scoped restore。步骤 5 红证据 `step5-red.log`：核心缺 whenSettled 四条红，真实 home/prompt/command/terminal 四种首次工作均在消费前发生而红；该组件子进程 60 pass / 4 fail，宿主总 10 pass / 5 fail。
+
+- 2026-11-19 · 步骤 5 完成：真实 composer 的 home/prompt/command 分叉前调用共享 whenSettled（提交时冻结 server/directory），终端 adapter 仅包装 create，已有 open/输入不等。等待当前 entry，通知替换后继续等新 entry，总上限 1 s；不把超时写成成功。检查组 C 实际 10 文件 79 pass / 0 fail，new-session 子例 64 pass / 0 fail；ui-mac `bun typecheck` exit 0，`git diff --check` exit 0。`step5-green.log` / `step5-typecheck.log`；red `98cb0db652`。通知等待用例改为等待可观测的第二次请求，不依赖恰好两个 microtask，保留原次序与不提前执行断言；home 用例另核等待期 server accessor 改变仍按提交时 server 导航。gate core 10→14，其余该组宿主计数不变。
+
+### 本轮续行定位（r2 分段，步骤 5 完整提交边界）
+
+- 已完成步骤 2–5；已核：Codex / GPT-6，自验通过上述相关检查，未作独立审计。实现主线依冻结设计 `9d3601c2aa` / reviewed_sha `8370b2fa23`，没有重新定义契约。
+- 下一步 **6**：先加三种残余状态与时间线旧按钮的红测试，再收敛 i18n/壳/chip 和 interim model-stop/WriteDeniedNote；当前旧 copy 与 relaunch intent 尚未修改，AC-06/AC-08 不得报完成。然后步骤 **7**：真实引擎/可信窗口 V3–V5（含 R1 两段 >8 s、R5 历史打开、重载期间点击、各坏臂）、最终生产接线 G0/V7 与 p50/p99；步骤 **8** 架构/I1 事实和最终计数收口。
+- 最终 G0/V7 尚未重跑，本轮没有签名打包/应用副本启动；继承 G0 验收，不把此前单样本 0.192 ms 当最终 p50/p99。前台检查全部结束后交回，git 保持干净。原始日志与临时产物统一在派单 scratch 下；不触及安装版、用户数据或真实凭据，无 push/PR/merge。
+- 非阻塞补证：P-15 的深链发布与实际 consumer 位置已在调用点登记簿补全；去向为本 lane 已修扫描范围，不改冻结语义或上游代码。其它 OPTIONAL：无。

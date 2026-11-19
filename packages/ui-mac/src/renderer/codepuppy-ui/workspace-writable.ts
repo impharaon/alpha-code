@@ -34,6 +34,11 @@ export function useWorkspaceWritable(server: Accessor<string | undefined>, direc
   }
 }
 
+export function whenSettled(server: string | undefined, directory: string | undefined): Promise<void> {
+  subscribe()
+  return tracker.whenSettled(observationOf(server, directory))
+}
+
 export function resetWorkspaceWritableForTests(probe?: WorkspaceWritableProbe) {
   unsubscribe?.()
   unsubscribe = undefined

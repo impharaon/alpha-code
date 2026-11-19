@@ -1,15 +1,15 @@
 ---
 id: DESIGN-stored-credentials-fence
 title: 会话里的命令与工具读不到 Code Puppy 存的凭据 技术设计
-summary: 凭据文件留在原处;围栏对 Code Puppy 的凭据存放点与崩溃转储目录一律拒读拒写,连同它们的真实目标,并禁止改名其上的每一级目录(profile 最后的文件规则);引擎进程的值只来自主进程:启动消息带全表,续期后推全表,每次引擎配置装载各自向主进程拉全表再解析,只在一张封闭清单的凭据位置、按接收方记录绑定代入(本地连接器凭据的保证范围待裁决);配置里的 {file:} 引用一字不变;用户无感
+summary: 凭据文件留在原处;围栏对 Code Puppy 的凭据存放点与崩溃转储目录一律拒读拒写,连同它们的真实目标,并禁止改名其上的每一级目录(profile 最后的文件规则);引擎进程的值只来自主进程:启动消息带全表,续期后推全表,每次引擎配置装载各自向主进程拉全表再解析,只在一张封闭清单的凭据位置代入(内联文档 / 同名连接器条目);主进程不替别名读凭据;经可写引擎配置改变交付去向的一类残留由 INT-safety I-13 关闭;配置里的 {file:} 引用一字不变;用户无感
 kind: tech-design
-status: draft
+status: approved
 spec: SPEC-stored-credentials-fence
 spec_version: 0
 review:
-  rounds: 2           # R1:Codex(GPT-6)会话 01a1f358 审 0c2483fda7,F1–F7 采纳;R2:同会话确认 0c2483fda7..1b51d972a8,R2-1–R2-3 采纳、R2-4 编排器范围裁决(§10)
+  rounds: 3           # R1 审 0c2483fda7(F1–F7 采纳);R2 确认 ..1b51d972a8(R2-1–R2-3 采纳,R2-4 裁决 D9);R3 确认 ..2fccc6ae65(R3-1 并入 D10 残留类,R3-2–R3-4 采纳);Codex(GPT-6)会话 01a1f358
   reviewed_sha: "1b51d972a8"
-  verdict: "R2 FIX-THEN-MERGE;R2-1–R2-4 已按处置修订,本地连接器凭据的保证范围待编排器裁决(§10 待裁决)"
+  verdict: "R1–R3 的 finding 均已处置(§10);声明按编排器裁决 D10 收窄;残留类由 INT-safety I-13 关闭;编排器在 R3 后冻结"
 owners: [owner]
 last_reviewed: 2026-11-19
 ---
@@ -27,6 +27,7 @@ last_reviewed: 2026-11-19
   - **R-2** 同一批进程改不了、删不掉、挪不走这些凭据文件。
   - **R-3** 模型调用、连接器、登录 / 登出、运行中增删密钥与连接器、续期热应用照常;用户已存的密钥与登录升级后照常可用。
   - **R-4** 用户看不到任何变化:没有新步骤、提示、等待或设置。
+  - R-1–R-3 由下面「本设计的保证」(a)–(d) 落实;经可写引擎配置改变凭据交付去向的那一类不在其内(D10)。
 - 代码基线:`origin/alpha` @ `a20dadb942`(0.2.4)。平行设计:`design/project-writable`(DESIGN-child-process-write-fence 的 X1/X2),不依赖,落地位置见 §4.5。
 - 相邻意图 INT-safety I-13(引擎配置与全局配置目录在围栏内可写):不在范围;它与本设计的交点写在 §6 残留里。
 
@@ -36,7 +37,14 @@ last_reviewed: 2026-11-19
 - **G2 引擎自己保存的第三方远程连接器 OAuth 令牌不在本设计内。** 它们在引擎数据库的凭据表里(`packages/core/src/mcp/oauth.ts:289-330`),引擎进程本身在围栏里、每次连接都要读写它(P-01)。规格措辞宜写成「Code Puppy 自己的凭据存放点」(§4.3 的清单),把引擎库里的令牌写进残留;覆盖它是另一件事。
 - **G3 用途绑定规格 AC-04 的措辞。** 它把桌面云 MCP 令牌的取用点写成「文件通道」。本设计后文件仍是唯一来源(主进程读它),引擎进程里的取用点换成由它喂出的内存表;「取用点唯一」不变。措辞是否要改由编排器定。
 
-**待编排器裁决(R2-1,不需要 owner)**:保证覆盖哪几类凭据。按现有代码,凡接收方由一份引擎写不到的记录定义、且由引擎进程自己发出请求的凭据,都在保证内:平台凭据、云 MCP 令牌、BYOK 与自定义节点密钥、远程连接器(含官方 GitHub 连接器)的令牌。**本地(stdio)连接器**——扩展包与目录里的本地连接器、用户自己填的本地连接器、官方数据库连接器——拿到的凭据不在保证内:它们的定义只存在围栏可写的文件里,官方数据库配方虽写在代码里,运行的程序却由 `npx` 从围栏可写的 npm 缓存启动(P-21)。选项与建议见 §10「待裁决」。
+**本设计的保证(编排器裁决 D10,逐字供规格与告知 owner 使用)**
+
+- (a) 被围栏的进程树里,任何进程都读不到、拷不走、挪不走、改不了 Code Puppy 存在本机的凭据文件(C1:凭据存放点及其真实目标拒读拒写,其上每一级目录拒写,崩溃转储目录拒读拒写)。
+- (b) 引擎与 ext 拿到的凭据值只来自内存里的一张表;引擎每次装载配置之前,各自向主进程拉一次这张表(不合并;出错、超时、端口关闭都不用旧表,走既有的恢复路径)。
+- (c) 指向凭据存放点的引用,只在一张封闭清单的凭据位置被代入,并且:`codepuppy-secrets/` 下的凭据只从内存里的内联文档代入,连接器令牌只在同名的连接器条目里代入;在其它任何位置,它按普通读取处理,被拒绝。
+- (d) 主进程绝不替一个经别名(软链、相对路径、大小写变体、firmlink 写法)指向凭据文件的引用去读它。
+
+**不在本设计保证内的一类残留(D10)**:「对话改写围栏内可写的引擎配置,就能改变一份被合法代入的凭据被送到哪里(换掉连接器的命令、覆盖模型的 `package`,以及任何同类做法)。」关闭它的是 INT-safety I-13(引擎配置在围栏内不可写),由编排器排为下一份设计;本设计不设计它。已知的可写入口列在 §6 安全面,作为 I-13 的输入。R2 留下的「本地连接器凭据是否在保证内」由这条裁决吸收,不另需决定。
 
 ## 2. 地面真相
 
@@ -144,6 +152,10 @@ last_reviewed: 2026-11-19
 
 账本的防篡改摘要是可重算的 sha256(`ext-package-ledger-v3.ts:279-292`、`:361`),不是对会话的边界。「会话把伪造的包放进 `~/.npm/_npx` 后 `npx -y` 直接用它」未实测(推)。
 
+**P-22 别名在主进程眼里怎么认。**(测;`run/R3-realpath.out`)`fs.realpathSync.native` 能把工作区软链、相对路径、大小写变体都解析到存放点的真实路径,但 firmlink 写法 `/System/Volumes/Data/…` 原样返回;同一目录的三种写法(原路径、firmlink、大小写变体)`stat` 得到同一个 设备号/inode。⇒ 判断「是否指向存放点」要按设备号 + inode 比,不按路径前缀比。
+
+**P-23 模型级 `package` 能盖过 provider 级。**(读;Codex R3 指出,本设计抽查确认)配置里给某个模型写 `package`,装配时 `model.package` 优先于 `provider.package`(`packages/core/src/model.ts:210`;`packages/core/src/config/plugin/provider.ts:229`);内联投影只给 provider 级写包(`codepuppy-models.ts:311-324`);所选模型的模块拿到含密钥的 settings(`packages/core/src/model-resolver.ts:246`、`:296-303`)。⇒ 改写可写的引擎配置能把合法代入的 provider 密钥交给会话放的模块 —— 与 R2-1 的「换连接器命令」同属一类(D10)。
+
 ## 4. 接口契约
 
 ### 4.1 进程内凭据表(新文件 `packages/util/src/codepuppy-credentials.ts`)
@@ -156,9 +168,8 @@ last_reviewed: 2026-11-19
 export type CodePuppyCredentialEntry = {
   value: string // 文件原文(不 trim;读者照今天的做法 trim)
   use:
-    | { kind: "inline" }                   // codepuppy-secrets/*:平台、云、BYOK、自定义节点 —— 只在内联文档里代入
-    | { kind: "remote"; server: string }   // 被远程 MCP 真源里 `server` 那条记录引用的文件 —— 只在内联文档的 `server` 条目里代入
-    | { kind: "local"; server: string }    // 其余连接器存放点文件(本地连接器)—— 只在 `server` 条目里代入;不在保证内(§10 待裁决)
+    | { kind: "inline" }                    // codepuppy-secrets/*:平台、云、BYOK、自定义节点 —— 只从内存里的内联文档代入
+    | { kind: "connector"; server: string } // 连接器存放点里的文件 —— 只在名字为 `server` 的连接器条目里代入
 }
 /** 键 = path.resolve 之后的绝对路径(与各处产出的 `{file:}` 引用同一写法)。 */
 export type CodePuppyCredentials = Readonly<Record<string, CodePuppyCredentialEntry>>
@@ -181,16 +192,19 @@ export function readCodePuppyCredential(path: string): string
  *  (JSON 转义,值里每个 "{" 写成 \u007b,引擎随后的 {env:}/{file:} 两遍碰不到它);其余位置、其余记号一字不动,
  *  留给引擎自己的 {file:} 读法(C1 下读凭据路径 = EPERM = 空串 + warning)。按解析树定位,文本解析不了 ⇒ 原样返回。 */
 export function resolveCodePuppyCredentialRefs(text: string, document: "inline" | "explicit"): string
-/** 主进程直接应用路径(`package-mcp-activation.ts:109`)用:对一片 MCP 叶子按同一套绑定解析 `{file:}`,取代今天无条件解析的
- *  `resolveFileReferences`(`:154-164`)。origin = 叶子从哪读来。指向存放点的引用:条目 use 允许 ⇒ 代入值,否则代入空串并记名字;
- *  不指向存放点的引用 ⇒ readFile(今天的行为)。use 允许 = remote 只在 origin 为 "remote-truth"、server 相同、字段为 headers.* /
- *  oauth.client_secret;local 只在 server 相同、字段为 environment.* / headers.*;inline 永不。 */
+/** 主进程直接应用路径(`package-mcp-activation.ts:109`)用:对一片 MCP 叶子按同一套规则解析 `{file:}`,取代今天无条件解析的
+ *  `resolveFileReferences`(`:154-164`)。每个引用先问 isStoreTarget(p):
+ *    · 指向存放点、且 path.resolve(p) 正是表里某条的键、条目为 connector 且 server 等于本叶子的名字、字段为 environment.* /
+ *      headers.* / oauth.clientSecret(真源叶子是 v1 形状,`mcp-server-truth.ts:89`)/ oauth.client_secret ⇒ 代入值;
+ *    · 指向存放点的其它一切(inline 条目、别的 server、别的字段、经别名的写法)⇒ 代入空串并记名字,绝不读那个文件;
+ *    · 不指向存放点 ⇒ readFile(今天的行为)。 */
 export function resolveConnectorLeaf(input: {
   server: string
   leaf: Record<string, unknown>
-  origin: "remote-truth" | "local-config"
   table: CodePuppyCredentials
-  isStorePath: (path: string) => boolean
+  /** 主进程按 §4.5 给 C1 的同一份真实目标清单实现:把 p 求成真实路径(求不出 ⇒ 当作指向存放点),它自己或它的任一上级目录的
+   *  设备号 + inode 等于清单里某一项 ⇒ true(P-22:firmlink 写法的真实路径不同、inode 相同)。 */
+  isStoreTarget: (path: string) => boolean
   readFile: (path: string) => string
 }): Record<string, unknown>
 ```
@@ -221,16 +235,15 @@ export type CredentialStore = {
   path: string               // 与该存放点的 `{file:}` 引用同一写法的绝对路径
   kind: "dir" | "file"
   table: "secrets" | "connector-by-server" | "connector-by-run" | false   // 怎么进表;false = 只拦、不进表
+  // 实现方另由这份清单的真实目标(§4.5)得出 isStoreTarget(§4.1),C1 与主进程别名判断用同一份清单
 }
 /** userData 下六项(名字取自 USER_DATA_LAYOUT)+ `<userData>/Crashpad`(false)+ 官方连接器运行期目录
  *  (调用方算出才给;本模块不 import 官方连接器模块,那会把钥匙串带进 sidecar 闭包)。 */
 export function credentialStores(input: { userDataPath: string; officialRuntimeParent?: string }): CredentialStore[]
 /** 只读 table !== false 的目录下的**普通文件**(lstat;根以下不跟随任何软链,遇到软链条目只记名字、不进表),跳过 "." 开头的条目。
- *  use:codepuppy-secrets/<名> ⇒ { kind: "inline" };连接器存放点里的文件(codepuppy-mcp-secrets/<server>/…、<运行期目录>/<run>/<name>/…)
- *  ⇒ 远程 MCP 真源里同名记录的 headers / oauth 引用了它 ⇒ { kind: "remote", server },否则 { kind: "local", server }。
- *  remoteRefs = 主进程从远程 MCP 真源读出的「记录名 → 它引用的文件路径集合」(mcp-server-records.ts:40-43 的同一次读取)。
- *  目录不存在 = 没有条目;其它 IO 错误抛出。不记录值。 */
-export function readCredentialTable(stores: readonly CredentialStore[], remoteRefs: ReadonlyMap<string, ReadonlySet<string>>): Record<string, CodePuppyCredentialEntry>
+ *  use:codepuppy-secrets/<名> ⇒ { kind: "inline" };codepuppy-mcp-secrets/<server>/… ⇒ { kind: "connector", server };
+ *  <运行期目录>/<run>/<name>/… ⇒ { kind: "connector", server: name }。目录不存在 = 没有条目;其它 IO 错误抛出。不记录值。 */
+export function readCredentialTable(stores: readonly CredentialStore[]): Record<string, CodePuppyCredentialEntry>
 ```
 
 三个交接点(没有别的):
@@ -256,7 +269,7 @@ export function readCredentialTable(stores: readonly CredentialStore[], remoteRe
 | 官方运行期目录 | `restoreOfficialConnector` ← `restoreCommittedOfficialConnectors`(`server.ts:555` → T1;`package-admission.ts:1299` → P)、← `prepareOfficialConnector`(`ext-package-tx-builders.ts:440` → P)、← `settleOfficialConnectorCredential`(`package-mcp-activation.ts:72` 启用、`:84` 停用 → P) | fork 前 / 运行中 | 见左 |
 | | `clearOfficialConnectorRuntime`(`server.ts:400`、`:567`;`official-connector-resources.ts:136`)、`clearOfficialConnectorRuntimeOnExit`(`index.ts:720`;`server.ts:596`)、`sweepOfficialConnectorRuntime`(`official-connector-resources.ts:103`、`:354`)、`removeOfficialConnectorVersion`(`:260`、`:267`、`:283`)、`removeOfficialConnector`(`ext-ipc.ts:877`、`:985`) | 清理 / 卸载 | P / T1 |
 
-主进程运行中直接调引擎 `mcp.add` 的那条路(`package-mcp-activation.ts:109-113`)改用 `resolveConnectorLeaf`(§4.1):用同一张表、同一套绑定解析叶子,不再无条件读出叶子里每个 `{file:}`;叶子来自远程 MCP 真源时 origin 为 `"remote-truth"`,来自 `codepuppy.jsonc` 时为 `"local-config"`(`readMcpLeafStrict` 已经分得清,`ext-config.ts:543-549`)。之后的配置重载走 P。
+主进程运行中直接调引擎 `mcp.add` 的那条路(`package-mcp-activation.ts:109-113`)改用 `resolveConnectorLeaf`(§4.1):用同一张表、同一套规则解析叶子,不再无条件读出叶子里每个 `{file:}`,也不替经别名指向存放点的引用读文件(保证 (d))。顺序照旧:先解析、后 `projectServerConfig`,所以两种 OAuth 字段写法都认。之后的配置重载走 P。
 
 ### 4.4 引擎进程里的读者与凭据代入位置(封闭清单)
 
@@ -264,14 +277,15 @@ export function readCredentialTable(stores: readonly CredentialStore[], remoteRe
 
 C-a 的代入只在下列位置(F1);两份文档以外(全局、项目、托管、wellknown)一律不代入:
 
-| 位置 | 文档 | 允许的条目 | 在保证内 |
-| --- | --- | --- | --- |
-| `providers.<id>.settings.apiKey` | 内联 | `inline` | 是 |
-| `mcp.servers.<n>.headers.<h>` | 内联 | `inline`(云 MCP 的 Authorization);`remote`,server = n | 是 |
-| `mcp.servers.<n>.oauth.client_secret` | 内联 | `remote`,server = n | 是 |
-| `mcp.<n>.environment.<V>`、`mcp.servers.<n>.environment.<V>`、`mcp.<n>.headers.<h>`、`mcp.servers.<n>.headers.<h>` | 显式 | `local`,server = n | **否**(§10 待裁决) |
+| 位置 | 文档 | 允许的条目 |
+| --- | --- | --- |
+| `providers.<id>.settings.apiKey` | 内联 | `inline` |
+| `mcp.servers.<n>.headers.<h>` | 内联 | `inline`(云 MCP 的 Authorization);`connector`,server = n |
+| `mcp.<n>.headers.<h>`、`mcp.servers.<n>.headers.<h>` | 显式 | `connector`,server = n |
+| `mcp.<n>.environment.<V>`、`mcp.servers.<n>.environment.<V>` | 内联、显式 | `connector`,server = n |
+| `mcp.<n>.oauth.clientSecret`、`mcp.servers.<n>.oauth.client_secret` | 内联、显式 | `connector`,server = n |
 
-接收方绑定(R2-1):内联文档只由 sidecar 从启动文档、适配器表、自定义节点真源与远程 MCP 真源生成,会话改不了,所以 `inline` 与 `remote` 两类的接收方就是那几份记录定的接收方(P-21);这两类凭据永不在显式文件里、也永不在主进程从 `codepuppy.jsonc` 读出的叶子里代入。`local` 一类只按名字绑定:会话可以连同命令一起改写那条本地连接器条目,所以它不在保证内。清单之外的任何位置(例如 `agents.<名>.system`)上指向存放点的 `{file:}`,以及 use 不匹配的引用,都留给引擎自己读 ⇒ EPERM ⇒ 空串 + warning,值永不从表里出来。指向普通文件的 `{file:}` 照常工作。
+两条便宜的绑定(保证 (c)):`inline` 条目只从内存里的内联文档代入 —— 平台、云、BYOK、自定义节点的凭据永不从围栏可写的显式文件代入;`connector` 条目只在同名条目里代入 —— A 连接器条目引用 B 连接器的令牌不会被代入。清单之外的任何位置(例如 `agents.<名>.system`)上指向存放点的 `{file:}`,以及不满足绑定的引用,都留给引擎自己读 ⇒ EPERM ⇒ 空串 + warning,值永不从表里出来。指向普通文件的 `{file:}` 照常工作。被合法代入之后,凭据最终交给哪个程序或模块,由围栏可写的引擎配置决定 —— 那是 D10 的残留类,本设计不再加接收方绑定。
 
 | 读者 | 改法 | 表里没有时(既有行为) |
 | --- | --- | --- |
@@ -323,6 +337,7 @@ C-a 的代入只在下列位置(F1);两份文档以外(全局、项目、托管�
 | 拉取时端口关闭 | 这次装载按「表里没有」解析;这一代本就在结束,下一代从 T1 起重新装载 | 一行 |
 | 另一处装载拉取的回复迟到 | 每次装载只认自己的 id,迟到回复不发布、不被别的装载复用(R2-2) | — |
 | 位置上的条目不在表里 / use 不允许 / 不在清单位置 | 空串;provider 在注入时已按表判过不会被注入;连接器报认证失败 | 引擎 warning,记路径不记值 |
+| 主进程叶子里的引用经别名指向存放点,或求不出真实路径 | 空串,主进程不读那个文件 | 记名字 |
 | 启动消息缺表或形状不对 | 拒绝启动,本代失败 | error IPC |
 | 续期推送时没有子进程 / 发送抛 | 跳过,下一次 fork 带上 / `needs-structural` → 既有重启 | 既有 |
 | 已过期才续期时,推送晚到前的请求 | 带旧令牌,与今天「过期到续期写完」同一个恢复中窗口,只多 sidecar 处理消息的时间(P-20) | 既有 |
@@ -360,19 +375,27 @@ C-a 的代入只在下列位置(F1);两份文档以外(全局、项目、托管�
   - 每次请求都拉:每个模型 / 云 MCP 请求多一次进程间往返,五处同步读法改异步;续期提前量已覆盖推送晚到(P-20)。
   - R0 的「全文预处理」:把围栏可写的显式文件变成取值入口(F1)。
   - R1 的「并发拉取合成一次」:先发的回复可能是提交新版本之前的快照,被后一个 Location 的装载复用(R2-2)。
-  - 本地连接器凭据按名字绑定就算进保证:会话能连同命令改写条目(R2-1);把官方数据库连接器绑到配方叶子能挡住改写命令,但它启动的程序来自 W7 的 npm 缓存(P-21),绑定之后保证仍不成立 —— 不默认加,列为 §10 待裁决的选项。
+  - 逐类追加「接收方绑定」(R2 的 `remote` 归属、官方配方叶子比对、R3-1 提出的模型包钉死与最终接收方核对):每一轮都冒出一种经可写引擎配置改变交付去向的新做法,根在 INT-safety I-13;按 D10 收窄声明,不再追加。R2 加的 `remote` 归属一并撤掉(R3-2):它挡的「伪造同名本地条目」本身就属 D10 残留类,留着它还要多读一次远程真源、多一种失败形态,却不支撑保证里的任何一条。
   - 删掉明文镜像 `codepuppy-secrets/`:结果不需要动存放(§10 留档)。
 - 安全面:
-  - 威胁边界:对话启动的、被围栏的引擎进程树里的任何进程,经任何路径(软链、硬链、克隆、`/.vol`、firmlink、另一种路径写法、改名上级目录、Code Puppy 自己写在别处的副本)读、改、挪 §4.3 清单里的存放点。
+  - 威胁边界:对话启动的、被围栏的引擎进程树里的任何进程,经任何路径(软链、硬链、克隆、`/.vol`、firmlink、另一种路径写法、改名上级目录、Code Puppy 自己写在别处的副本、让未围栏的主进程替它读)读、改、挪 §4.3 清单里的存放点。保证 = §1 的 (a)–(d);不保证 = §1 的 D10 残留类。
   - 必须守住的不变量:
     - **I1** 被围栏的进程打不开清单里任何存放点及其真实目标,读写都不行;挪不动它们的任何上级目录;C1 是最后的文件规则、按真实路径渲染。
     - **I2** 凭据值不出现在 sidecar 环境、任何子进程环境(连接器自己配置的环境变量除外)、配置文本、Code Puppy 写在围栏可读处的任何文件、任何日志里。
     - **I3** sidecar 进程里的凭据值只来自主进程的 `start` / `credentials` 消息;sidecar 不读盘上的存放点。
-    - **I4** 配置里的凭据只在 §4.4 的封闭位置代入;`inline` 与 `remote` 两类只从内存里的内联文档代入(接收方由会话改不了的记录定义),永不从围栏可写的文件、也永不经主进程从 `codepuppy.jsonc` 读出的叶子代入。
+    - **I4** 配置里的凭据只在 §4.4 的封闭位置代入;`inline` 条目只从内存里的内联文档代入,`connector` 条目只在同名条目里代入;主进程直接应用路径守同一条规则。
     - **I5** 每次配置装载解析的是它自己那次拉取时盘上的内容(P);拉取不成功的装载不用旧表;续期之外,主进程不靠推送让引擎看到变化。
+    - **I6** 主进程不替经别名(软链、相对路径、大小写变体、firmlink 写法)指向存放点的引用读文件:按 C1 的同一份真实目标清单,以设备号 + inode 判断(P-22)。
   - 残留(每条一行,不设计缓解):
     - 连接器子进程合法拿到的、写在它自己环境里的令牌,它与它派生的进程看得到;连接器把令牌打到自己 stderr 时,引擎 debug 日志会记下(`stdio.ts:185`)。
-    - 本地连接器(扩展包 / 目录里的本地连接器、用户自己填的本地连接器、官方数据库连接器)拿到的凭据:会话改写围栏内可写的 `codepuppy.jsonc` / 显式文件里那条连接器的命令,或替换 npm 缓存里它要启动的包(推),凭据就进了会话的程序(P-21)。范围待编排器裁决(§10)。
+    - **D10 残留类**:对话改写围栏内可写的引擎配置,就能改变一份被合法代入的凭据被送到哪里(换掉连接器的命令、覆盖模型的 `package`,以及任何同类做法)。关闭它的是 INT-safety I-13。本轮查到的可写入口(I-13 的输入):
+      - `<codepuppyGlobalRoot>/codepuppy.jsonc`(W2):sidecar 合成显式文件(`engine-explicit-config.ts:11-17`、`:61-72`);主进程 `readMcpLeafStrict` 读本地连接器叶子(`ext-config.ts:537-549`)→ 直接应用路径(`package-mcp-activation.ts:106-113`)。本地连接器的命令、参数、cwd、environment、headers 都在这里(P-21)。
+      - `<userData>/codepuppy-engine-config/codepuppy-explicit.json`(W3):引擎显式槽,`config.ts:172` 装载;能写连接器条目与模型级 `package`(P-23)。
+      - 引擎全局配置目录 `<XDG_CONFIG_HOME>/opencode`(W6,`engine-paths.ts:34-36`):引擎按全局文档装载,同样能写 provider / 模型覆盖(推:与显式文件同一套逐文档合并)。
+      - `<codepuppyGlobalRoot>/installs.json`(W2):安装账本,主进程启停投影与连接器收敛据它决定应用哪些条目(`ext-receipt-v2.ts:3`、`:100`;`package-mcp-activation.ts:66-69`;`ext-install-planner.ts:3490-3506`)。
+      - `<codepuppyGlobalRoot>/skills-enabled.json`(W2):允许集,ext 的 MCP 收口与主进程收敛据它决定放行(`packages/ext/src/gen-skill-paths.ts:46-49`;`package-mcp-activation.ts:74`)。
+      - 项目里的 OpenCode 配置(工作区 W1):只在用户允许过的项目里放行可执行字段(ADR-049,`config.ts:277-281`)。
+      - 不是配置、但决定交付去向的程序位置:npm 缓存 `~/.npm`(W7,官方数据库连接器经 `npx` 启动,`official-connector-recipes.ts:79`)、uv 缓存 `<userData>/uv-cache`(W3,`server.ts:468`)。
     - 改动生效前做出的别名(硬链、APFS 克隆、拷贝,以及该 inode 的 `/.vol` 写法)仍可读(P-17):是生效前的既有暴露,不在保证内(编排器 R2-4 裁决);不做 inode 重建或密钥轮换。
     - 引擎进程内存:表与已解析的配置都在 sidecar 堆里;崩溃瞬间栈上的值可能进转储,转储目录对围栏内不可读,但用户主动导出的调试包(写到「下载」)带着转储与日志。
     - 用户自己装进引擎进程的插件,能调用同一个读者。
@@ -390,7 +413,7 @@ C-a 的代入只在下列位置(F1);两份文档以外(全局、项目、托管�
     - **E7** profile 以 C1 两块结尾、路径为真实路径、含已存在存放点的软链目标与全部上级目录。已知的坏:让 `codepuppy-secrets` 成为指向工作区的软链且渲染不含目标 ⇒ 读到(F2);经软链的 userData 不求真实路径 ⇒ 读到(P4)。
     - **E8** 带着既有登录与已存密钥的 userData 冷启动(不迁移任何文件):登录态、模型列表、连接器与升级前相同。
     - **E9** 跑完 E1–E6 后,主进程、sidecar、引擎日志里搜假值零命中(同一搜索在桩收到的请求头记录里能命中);围栏内连引擎端口失败;围栏内读 `Crashpad` 为 EPERM。
-    - **E10** 会话把显式文件改成在 `agents.build.system` 写 `{file:<平台凭据路径>}`、在本地连接器 A 的 environment 里写平台凭据、BYOK 密钥、远程连接器令牌与连接器 B 令牌的引用,再在设置里启用 A ⇒ 模型请求、引擎配置装载与主进程直接应用路径都只给空串(主进程按名字记日志),不是值。已知的坏:全文预处理 ⇒ 值进模型请求(F1);主进程照旧无条件解析叶子 ⇒ A 拿到平台凭据(R2-1)。
+    - **E10** 引用规则(保证 (c)(d)),经真实入口:会话把显式文件改成在 `agents.build.system` 写 `{file:<平台凭据路径>}`、在本地连接器 A 的 environment 里写平台凭据、BYOK 密钥与连接器 B 令牌的引用,再在设置里启用 A ⇒ 模型请求、引擎配置装载、主进程直接应用路径都只给空串,不是值;再在 A 里分别用「工作区里指向存放点的软链」「相对路径」「大小写变体」「`/System/Volumes/Data/…` 写法」引用 A 自己的令牌,经真实主进程应用路径 ⇒ 全部空串,主进程没有读那个文件(只记名字);远程真源叶子带 v1 `oauth.clientSecret` 时,经主进程应用路径后引擎拿到正确的 `client_secret`(R3-4)。已知的坏:全文预处理 ⇒ 值进模型请求(F1);主进程照旧无条件 `readFileSync` ⇒ 别名写法读到令牌(R3-3);只认 `client_secret` ⇒ 远程 OAuth 客户端密钥被换成空串(R3-4)。
     - **E11** 两个 Location 装载:延迟第一个装载那次拉取的回复 → 其间提交一个新连接器版本 → 第二个 Location 装载 ⇒ 第二个拿到新值。已知的坏:合并在途拉取 ⇒ 旧值(R2-2)。
     - **E12** 让主进程对某次拉取超过 10 秒不回复 ⇒ 这次装载里凭据位置为空(不是旧值),随后发生一次 `credential-change` 重启,新一代里该连接器拿到盘上当前值;端口关闭时同样不出现旧值。已知的坏:超时后用已发布的表 ⇒ 旧值留在配置里(R2-3)。
 
@@ -407,7 +430,7 @@ C-a 的代入只在下列位置(F1);两份文档以外(全局、项目、托管�
 | 送审前裁决(R1 后的当前版本) | 依据与适用版本 |
 | --- | --- |
 | D1 引擎进程的值只来自主进程:T1 启动种子、T2 续期推送、P 配置装载前拉取;不在装围栏前读盘 | P-04、P-05、P-12、P-18、P-20;`a20dadb942` |
-| D2 `{file:}` 引用一字不变;C-a 只在 §4.4 封闭位置代入,按接收方记录绑定:`inline` / `remote` 只在内联文档,`local` 只按名字(不在保证内);主进程直接应用路径用同一套绑定(`resolveConnectorLeaf`);其余读者换成表读法 | P-02、P-03、P-21;F1、R2-1 |
+| D2 `{file:}` 引用一字不变;C-a 只在 §4.4 封闭位置代入,`inline` 只从内联文档、`connector` 只在同名条目;主进程直接应用路径守同一规则并按设备号 + inode 拒绝别名(`resolveConnectorLeaf`);其余读者换成表读法 | P-02、P-03、P-22;F1、R3-2、R3-3、R3-4 |
 | D3 C1 = 清单存放点 + 已存在位置的真实目标(拒读拒写)+ 全部上级目录(拒写),放在 profile 最末、按真实路径渲染 | P-06、P-08、P-09、P-10、P-17、P-19 |
 | D4 表 = 进表目录里普通文件的全文,带 use;写者不加钩子 | P-04 写者表;§4.3 |
 | D5 失败沿用既有具名降级;拉取的错误、超时、端口关闭都不用旧表完成装载,错误与超时接既有 `credential-change` 重启;每次装载独立拉取;绝不落回可读文件 | P-03、P-11、P-18;§5;R2-2、R2-3 |
@@ -415,14 +438,8 @@ C-a 的代入只在下列位置(F1);两份文档以外(全局、项目、托管�
 | D7 不拦存在性测试、不动存放位置、不删镜像 | owner「不要设计的过于复杂」 |
 | D8 引擎库里的 OAuth 令牌不在本设计内,返还为 G2 | `oauth.ts:289-330` |
 | D9(编排器裁决 R2-4)保证从本改动装上那一刻起算。装上之前对话做出的硬链、克隆或拷贝是既有暴露:做出它的进程当时就能不受限地读到值,留下的别名不再透露任何新东西,对现有文件的任何规则也收不回已经离开它们的值。因此:不声称这些别名「只能由围栏外做出」;不加 inode 重建或任何轮换步骤(重建 inode 清不掉旧内容,轮换用户自己的密钥不能做成隐含的实现步骤);§2 照录实测(P-17)。owner 由编排器用白话告知此限;若要让旧副本失效,是另一条意图(需要轮换密钥) | 编排器 2026-11-19 对 R2-4 的裁决;P-07、P-17 |
+| D10(编排器裁决,R3)声明收窄。本设计保证且只保证 §1 的 (a)–(d);「对话改写围栏内可写的引擎配置,就能改变一份被合法代入的凭据被送到哪里(换掉连接器的命令、覆盖模型的 `package`,以及任何同类做法)」作为一类残留,不由本设计关闭,关闭它的是 INT-safety I-13(owner 2026-11-14 已批,尚未建),由编排器排为下一份设计。依据:R2-1、R3-1 连续三轮出现经可写配置改道的新做法,根在 I-13;在根打开时,接收方绑定关不住一个开放的类;owner「不要设计的过于复杂」。R2 的「本地连接器凭据是否在保证内」并入这条残留,不另需决定。不加包钉死或最终接收方核对 | 编排器对 R3 的裁决;P-21、P-23 |
 
-**待裁决(R2-1,编排器):本地连接器拿到的凭据是否在保证内**
-
-- 事实(P-21):本地连接器的凭据在设计上就要交给一个子进程;扩展包 / 目录里的本地连接器与用户自己填的本地连接器,其定义只在围栏可写的 `codepuppy.jsonc` 与 `installs.json` 里,现有代码里没有一份会话改不了的记录;官方数据库连接器的配方在代码里,但它启动的包来自围栏可写的 `~/.npm`(会话能否借此替换程序未实测,推)。
-- A(建议):裁定本地连接器凭据不在保证内,作为残留写进规格;保持它们按名字绑定、照常工作(不删能力);平台、云、BYOK、自定义节点与远程连接器凭据在保证内。零额外机制。
-- B:在 A 之上,把官方数据库连接器的 DSN 绑到主进程按配方算出的整片叶子(`official-connector-resources.ts:154-180`,比较时忽略 `enabled`),挡住「改写命令」;「替换缓存里的包」仍在,保证对它仍不成立。
-- C:让本地连接器进入保证:需要一份主进程独写的本地连接器定义真源(与 `#1381` 远程真源同形)并让它启动的程序不在围栏可写处 —— 属 INT-safety I-13 一类的另行授权工作,本设计不做。
-- 在裁决之前,本设计按「不在保证内」书写(§4.4 表、§6 残留),不把它记成已批准。
 
 | 轮/审查版本与范围 | 审计方 | finding 及处置 | 改了什么/验证证据 | 没改的及去向 |
 | --- | --- | --- | --- | --- |
@@ -433,10 +450,14 @@ C-a 的代入只在下列位置(F1);两份文档以外(全局、项目、托管�
 | 同上 | 同上 | F5 [Major] FIFO 不能证明先于文件监听 / 请求处理 —— 采纳并补测 | P-18:真 Electron parentPort,utility 忙时推送 20/20、19/20 看到旧值,拉取 0/20 ⇒ C-a 改为「拉取完成后再解析」(`f5/F5-F7-result.json`) | C-b–C-e 留推送,理由 P-20 |
 | 同上 | 同上 | F6 [Major] T3 失败后推送不会触发 `Config.reload` —— 采纳 | T3 删除;拉取让每次装载自取当前表;拉取失败接既有 `credential-change` 重启(§5) | — |
 | 同上 | 同上 | F7 [Major] 转储、配置接口、日志未证 —— 采纳并补测 | P-14、P-19:转储里未见假值,配置接口围栏内连不上,日志只记名字;`Crashpad` 加入 C1(转储照写,围栏内 EPERM);E9 查日志、配置接口与转储(`f5/F7-fenced.out`) | 栈上值可能进转储、用户导出的调试包、连接器 stderr debug 日志 → 残留 |
-| R2 / `0c2483fda7..1b51d972a8` / 修订部分 | Codex(GPT-6),会话 01a1f358,只读 | R2-1 [Major] 名字绑定仍把凭据交给被替换的程序;主进程直接应用路径无条件解析可写叶子 —— 采纳 | P-21 逐类列出接收方记录及其可写性;表条目改为 `inline` / `remote` / `local` 三类(`remote` 由远程 MCP 真源 `mcp-servers/<env>.json` 判定,`mcp-server-truth.ts:1-12`);`inline` 与 `remote` 只在内联文档代入;主进程路径改用 `resolveConnectorLeaf` 同一套绑定;E10 加主进程路径 | 本地连接器凭据 → §10 待裁决(建议 A) |
+| R2 / `0c2483fda7..1b51d972a8` / 修订部分 | Codex(GPT-6),会话 01a1f358,只读 | R2-1 [Major] 名字绑定仍把凭据交给被替换的程序;主进程直接应用路径无条件解析可写叶子 —— 采纳 | P-21 逐类列出接收方记录及其可写性;表条目改为 `inline` / `remote` / `local` 三类(`remote` 由远程 MCP 真源 `mcp-servers/<env>.json` 判定,`mcp-server-truth.ts:1-12`);`inline` 与 `remote` 只在内联文档代入;主进程路径改用 `resolveConnectorLeaf` 同一套绑定;E10 加主进程路径 | 本地连接器凭据 → 后由 D10 并入残留类 |
 | 同上 | 同上 | R2-2 [Major] 合并并发拉取会复用旧快照 —— 采纳 | §4.1 `refreshCodePuppyCredentials` 改为每次装载独立请求、只认自己的 id;§4.3 P 行;§5 迟到回复一行;§6 被否决的替代;E11 | — |
 | 同上 | 同上 | R2-3 [Major] 超时用旧表完成装载、没进恢复链 —— 采纳 | §4.1 超时 / 端口关闭也抛;§4.2 新增 `credentials.unavailable` → 主进程请求既有 `credential-change` 重启;§5 两行;D5;E12 | — |
 | 同上 | 同上 | R2-4 [Major] 预存别名的范围依据不成立 —— 编排器范围裁决 | D9 记裁决与依据;P-17 末段与 §6 残留改写为「生效前的既有暴露」;R1 F4 行的旧依据标为不成立;删去留档里「清空旧 inode」一行 | 旧副本失效若要做 → 另一条意图(需轮换密钥),由编排器转告 owner |
+| R3 / `1b51d972a8..2fccc6ae65` / 只看 R2-1 | Codex(GPT-6),会话 01a1f358,只读 | R3-1 [Major] 显式文件里的模型级 `package` 能把含密钥的 settings 交给会话放的模块 —— 按 D10 归入残留类 | P-23 记事实;§1、§6 残留类与 I-13 输入清单;不加包钉死或最终接收方核对 | 由 INT-safety I-13 关闭 |
+| 同上 | 同上 | R3-2 [Major] `remote` 归属会把旧版本降成 `local`、真源读错会折叠成空表 —— 采纳,取「撤掉 `remote` / `local` 分类」 | 表条目只剩 `inline` / `connector`;`readCredentialTable` 不再读远程真源;`resolveConnectorLeaf` 去掉 origin;理由见 §6 被否决的替代 | — |
+| 同上 | 同上 | R3-3 [Major] 主进程普通文件回退没有挡住别名 —— 采纳 | §4.1 `isStoreTarget` 用 C1 的同一份真实目标清单、按设备号 + inode 判断;P-22 实测 firmlink 写法 realpath 不同、inode 相同(`run/R3-realpath.out`);I6;E10 加软链、相对路径、大小写变体、firmlink 四种写法 | — |
+| 同上 | 同上 | R3-4 [Major] 真源叶子是 v1 `oauth.clientSecret`,只认 `client_secret` 会把合法密钥换成空串 —— 采纳 | §4.1 / §4.4 两种写法都认,顺序照旧先解析后 `projectServerConfig`;E10 加用例 | — |
 
 **留档**
 

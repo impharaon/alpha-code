@@ -693,6 +693,8 @@ svg[viewBox="0 0 720.002 129.001"] {
   overflow-wrap: anywhere;
 }
 .codepuppy-sidebar-open-project {
+  /* Frame `.side-empty .row`: a row at the base size — the empty-state wrapper is --a-text-sm and the button inherits it. */
+  font-size: var(--a-text-base);
   display: flex;
   align-items: center;
   gap: 8px;

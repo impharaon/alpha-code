@@ -266,6 +266,7 @@ export type CodePuppyBootstrap = {
       url: CredentialFreeUrl
       headers: { Authorization: `Bearer {file:${string}}` }
       oauth: false
+      codemode: false              // 云工具是模型的直接工具,不进 OpenCode 2 的 Code Mode(R34)
     }
   }
   webSearch: { killSwitch: boolean }
@@ -328,7 +329,7 @@ export function codepuppyEngineSettings(env: Record<string, string | undefined> 
 每个 bundle(sidecar、ext、引擎)各自编进一份本模块;发布的是一个普通对象,各 bundle 第一次读时用自己的解析器校验,所以任何两份不同提交构建出的
 bundle 混在一起,只要形状或版本不同,就在第一次读时失败,而不是读到缺字段。
 格式校验的意图:`platform.credentialRef` 与 `cloudMcp.definition.headers.Authorization` 只容得下 `{file:<路径>}` 引用;两个 URL 字段只容得下无凭据 URL;
-其余字段是路径、布尔、整数、枚举与模型 id。密钥值写不进这份文档 —— 塞进去会在构建或解析时失败,不只靠约定。
+`cloudMcp.definition` 的 `oauth` 与 `codemode` 都只容得下字面 `false`,缺席即拒;其余字段是路径、布尔、整数、枚举与模型 id。密钥值写不进这份文档 —— 塞进去会在构建或解析时失败,不只靠约定。
 仅测试的重置入口沿用 `__resetCodePuppyEnvironmentForTests` 的先例(`codepuppy-environment.ts:386`)。
 G4 把版本升到 2,`paths` 多一个必填的 `standaloneConfigDirectory: string`(§4.7);上面是 G1–G3 落地时的 v1 形状。
 
@@ -803,6 +804,7 @@ G4 后用户层在后、用户胜。这与命令一致,也是 `engine-explicit-c
 | R31（同上）共用模块的读取顺序为「快照 → 已发布文档 → 环境」，环境这一支只服务没有快照的单元测试；生产启动里它必须不可达，由决定记录测试断言 | 55 个既有测试依赖环境回退，逐个改写不产生价值；「已迁走的键没有剩余读者」的检查覆盖生产源码 |
 | R32（同上）P-13 的反向臂改在不装 ext 的真引擎上判；G4 可分 4a、4b（新增而未接入的文件）与 4c（一次切换）三个提交 | #1662 之后 ext 也拦白名单外的供应商，装着 ext 时「变可用」的反向臂红不了；4a、4b 不接入任何生产路径，回滚仍只需还原 4c |
 | R33（编排器(Claude Fable 5.2)裁决,2026-11-14）随包内容(出厂技能、命令、提示词)让模型在工具 shell 中使用的值属于 0.2.0 的既有行为,在 shell 子进程构建环境时从已发布启动文档派生为环境输出。集合精确、只枚举一处,当前只有 `CODEPUPPY_GLOBAL_DIR` = `paths.globalRoot`;sidecar / ext 的进程环境仍不含退役变量,Code Puppy 自身不读回投影变量;不扩到 MCP / formatter 等其它子进程 | r3 两树真实 shell 测量(3a8e25d6b8 有全局根、94c84d29d3 为空)与随包内容扫描,见 plan 段 0 / 段 1;AC-04「现有启动与权限行为与换代后主线逐项一致」。无需设计审查:通过启动文档恢复既有行为,没有新增模块、用户可见变化或输入通道;AC-02 保持。 |
+| R34（编排器(Claude Opus 5.5)裁决,2026-11-19,Refs #1662）`cloudMcp.definition` 加字面字段 `codemode: false`:Code Puppy 的云工具在 OpenCode 2.x 上是模型的直接工具调用,恢复 0.1.x 的行为。理由:桌面的云任务跟踪(`cloud-run-core.ts` `extractCloudRunHit`)、生图卡(`timeline-model.ts` `cloudImageOf`)与产物行(`artifactLinksOf`)只认直接的云 facade 调用;2.x 默认把 MCP 工具收进 Code Mode(`core/src/tool/mcp.ts` `codemode: tool.codemode !== false`),模型只能经 `execute` 调它们,三处全不命中。字段放进文档里的定义本身而不是只写在注入处:引擎条目要与文档定义逐字相等才铸 `codepuppy-cloud` 权威(`plugin/src/alpha-cloud-authority.ts` `governedMcpEvidence`)。已更新的消费方:`materializeCloudMcpConfig`(两种形状都带)、`parseCodePuppyBootstrap`(只容字面 false,缺席即拒)、ext `toServerConfig`(kill-switch 分支 `installCloudMcp` 装进去的条目带上它)、测试夹具 `testCloudMcp`(改用生产工厂)、`bootstrap-launch-parity.record.json`(注入文档的云条目多这一键,有意的行为变化)。文档工具(Word / Excel / PowerPoint / PDF)不在本条内,仍走 Code Mode | 红:`cloud-mcp-direct-tools.engine.test.ts`(提交 8526d5153f,未修代码上 4 条全红:工具表里没有 `codepuppy_dispatch`);修后同一测试绿。生产云实测(长期测试账号):直接调用的生图 job_468bf472ed5c、数据分析 job_b24d54f2db49 都被跟踪命中,生图卡受理态,产物行 image.png / chart.png / report.md;改前的 job_1748ae4cd98e / job_ccb255627759 经 `execute` 跑出了产物,桌面三处全空 |
 
 **本设计带来的 owner 可见变化**(按派发书「行为变了必须点名」):
 

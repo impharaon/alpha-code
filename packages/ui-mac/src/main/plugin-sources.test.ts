@@ -292,6 +292,22 @@ test("npm integrity mismatch is source-unreachable and failed queries retry", as
   expect(attempts).toBe(2)
 })
 
+test("an npm rate-limit answer mid-pagination is waited out, not reported as the source being unavailable", async () => {
+  // Recorded 2026-11-19 by replaying the app's paging for "Excel keywords:opencode-plugin" (total 3307 ⇒ 14 pages of 250):
+  // registry.npmjs.org answered page 12 with Cloudflare's rate limit — HTTP 429, `retry-after: 0`, text/plain "error code: 1015".
+  // The source then showed 「来源服务暂时不可用」 for every OpenCode result.
+  let searches = 0
+  const sources = (await sourcesModule()).createPluginSources({ catalog: async () => [], fetch: async (url) => {
+    if (url.includes("/-/v1/search?") && ++searches === 1)
+      return new Response("error code: 1015", { status: 429, headers: { "retry-after": "0", "content-type": "text/plain; charset=UTF-8" } })
+    return fixtureFetch(url)
+  } })
+  const result = await sources.searchSources("skills")
+  expect(result.sources.find((source) => source.source === "opencode-npm")).toMatchObject({ status: "ok" })
+  expect(result.candidates.some((entry) => entry.upstream.npm === npm.name)).toBe(true)
+  expect(searches).toBe(2)
+})
+
 test("signed GitHub package and external definition supply the catalog identity and version", async () => {
   const bytes = await Bun.file(join(fixtureRoot, "catalog/catalog.json")).bytes()
   const signature = Buffer.from((await Bun.file(join(fixtureRoot, "catalog/catalog.json.sig")).text()).trim(), "base64")

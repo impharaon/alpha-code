@@ -302,6 +302,7 @@ it.live("权威 · 云工具接入(M3):ARM+DEF 在场 ⇒ ext 的 mcp.transform 
       type: "remote",
       url: "https://cloud.example/mcp",
       oauth: false,
+      codemode: false,
       headers: { Authorization: "Bearer secret-token" },
     })
   }),
@@ -1488,7 +1489,7 @@ for (const [label, content] of [
       yield* activate(CodePuppyExt, { mcp })
       expect(mcp.servers.get("late")).toMatchObject({ disabled: true })
       expect(mcp.servers.get("unrelated")).toMatchObject({ disabled: true })
-      expect(mcp.servers.get("codepuppy")).toEqual({ type: "remote", url: "https://cloud.example/mcp", oauth: false, headers: { Authorization: "Bearer secret-token" } })
+      expect(mcp.servers.get("codepuppy")).toEqual({ type: "remote", url: "https://cloud.example/mcp", oauth: false, codemode: false, headers: { Authorization: "Bearer secret-token" } })
       expect(mcp.servers.get("proj")).toEqual({ type: "local", command: ["proj-mcp"] })
     }),
   )

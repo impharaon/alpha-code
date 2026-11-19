@@ -107,7 +107,7 @@ describe("buildCodePuppyBootstrap(G2:平台 / 云 / web search / 策略分区 / 
     expect(document.platform).toEqual({ credentialRef: secretFileRef("/u/data", "CODEPUPPY_API_KEY"), modelProxyBaseURL: "https://gw.example/v1", defaultModelOverride: "codepuppy/m" })
     expect(document.cloudMcp).toEqual({
       name: "codepuppy",
-      definition: { type: "remote", url: "https://cloud.example/mcp", headers: { Authorization: `Bearer ${secretFileRef("/u/data", "CODEPUPPY_MCP_TOKEN")}` }, oauth: false },
+      definition: { type: "remote", url: "https://cloud.example/mcp", headers: { Authorization: `Bearer ${secretFileRef("/u/data", "CODEPUPPY_MCP_TOKEN")}` }, oauth: false, codemode: false },
     })
     expect(document.webSearch).toEqual({ killSwitch: true })
     expect(document.policy).toEqual({ account })

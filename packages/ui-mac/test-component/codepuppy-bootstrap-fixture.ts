@@ -3,6 +3,7 @@
 import os from "node:os"
 import path from "node:path"
 import { buildCodePuppyBootstrap } from "../src/main/codepuppy-bootstrap-build"
+import { materializeCloudMcpConfig } from "../src/main/cloud-sidecar-config"
 import { codepuppyGlobalRoot } from "../src/main/codepuppy-installs"
 import { engineGlobalConfigDirectory } from "../src/main/engine-paths"
 import { publishProviderAllowList } from "../../ext/src/provider-allow"
@@ -19,7 +20,7 @@ export type TestBootstrapInput = Partial<Paths> &
   Pick<Paths, "globalRoot"> & {
     registryChannel?: CodePuppyBootstrap["registryChannel"]
     platform?: { credentialRef?: string; modelProxyBaseURL?: string; defaultModelOverride?: string }
-    cloudMcp?: CodePuppyBootstrap["cloudMcp"] | { name: string; definition: { type: "remote"; url: string; headers: { Authorization: string }; oauth: false } }
+    cloudMcp?: CodePuppyBootstrap["cloudMcp"] | { name: string; definition: { type: "remote"; url: string; headers: { Authorization: string }; oauth: false; codemode: false } }
     killSwitch?: boolean
     policyAccount?: string
     egressProxy?: string
@@ -90,7 +91,7 @@ export function unpublishTestBootstrap(): void {
 
 /** main 用 materializeCloudMcpConfig 写进文档的那份治理云 MCP(带 `{file:}` 引用的真定义)。 */
 export function testCloudMcp(url: string, tokenFile: string, name = "codepuppy") {
-  return { name, definition: { type: "remote" as const, url, headers: { Authorization: `Bearer {file:${tokenFile}}` }, oauth: false as const } }
+  return { name, definition: materializeCloudMcpConfig(url, `{file:${tokenFile}}`) }
 }
 
 /**

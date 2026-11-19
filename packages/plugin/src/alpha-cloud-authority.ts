@@ -125,6 +125,19 @@ function withDefinitionFileRefs(entry: unknown, definition: unknown): unknown {
 }
 
 /**
+ * #1662:OpenCode 2's config loader sets every configured server's `timeout` to the merged global defaults
+ * (`core/src/config/plugin/mcp.ts`), which is `{}` when no document sets any. An empty `timeout` changes nothing about
+ * the connection, so it is dropped when the definition has none; any non-empty timeout still has to match.
+ */
+function withoutEngineDefaults(entry: unknown, definition: unknown): unknown {
+  if (!entry || typeof entry !== "object" || Array.isArray(entry)) return entry
+  if ((definition as { timeout?: unknown } | null)?.timeout !== undefined) return entry
+  const { timeout, ...rest } = entry as Record<string, unknown>
+  const empty = !!timeout && typeof timeout === "object" && !Array.isArray(timeout) && Object.keys(timeout).length === 0
+  return empty ? rest : entry
+}
+
+/**
  * Display authority is stricter than the legacy web-search sovereignty owner
  * check: the complete invocation config must equal the verified definition,
  * not merely share its endpoint. The evidence is the definition itself (file
@@ -134,7 +147,7 @@ export function governedMcpEvidence(name: string, entry: unknown, cloudMcp: Gove
   if (!cloudMcp || !isGovernedMcpEntry(name, entry, cloudMcp)) return undefined
   try {
     const definition = cloudMcp.definition
-    if (canonicalJson(withDefinitionFileRefs(entry, definition)) !== canonicalJson(definition)) return undefined
+    if (canonicalJson(withoutEngineDefaults(withDefinitionFileRefs(entry, definition), definition)) !== canonicalJson(definition)) return undefined
     return canonicalJson({ kind: "codepuppy-cloud-mcp", name, definition })
   } catch {
     return undefined

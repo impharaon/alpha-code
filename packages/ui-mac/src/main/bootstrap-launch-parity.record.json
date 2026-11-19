@@ -539,7 +539,8 @@
             "headers": {
               "Authorization": "Bearer {file:<root>/parity-userdata/codepuppy-secrets/CODEPUPPY_MCP_TOKEN}"
             },
-            "oauth": false
+            "oauth": false,
+            "codemode": false
           }
         }
       }

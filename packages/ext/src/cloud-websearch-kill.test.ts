@@ -434,8 +434,8 @@ describe("installCloudMcp 单元判据", () => {
   test("装的是完整定义(2.x 形状:没有 enabled 键),{file:} 引用在这一层解析,整条替换同名条目,别的条目不动", () => {
     const target = editor({ cloud: { type: "remote", url: "http://127.0.0.1:1/withheld", disabled: true }, other: { type: "local", command: ["x"], disabled: true } })
     expect(installCloudMcp(target, armed, readToken)).toBe("cloud")
-    expect(target.servers.get("cloud")).toEqual({ type: "remote", url: CLOUD_URL, headers: { Authorization: "Bearer tok-live" }, oauth: false })
-    expect(Object.keys(target.servers.get("cloud") as object).sort()).toEqual(["headers", "oauth", "type", "url"])
+    expect(target.servers.get("cloud")).toEqual({ type: "remote", url: CLOUD_URL, headers: { Authorization: "Bearer tok-live" }, oauth: false, codemode: false })
+    expect(Object.keys(target.servers.get("cloud") as object).sort()).toEqual(["codemode", "headers", "oauth", "type", "url"])
     expect(target.servers.get("other")).toEqual({ type: "local", command: ["x"], disabled: true })
   })
 
@@ -456,9 +456,9 @@ describe("installCloudMcp 单元判据", () => {
   test("坏定义(不是 remote / 认证头不是 {file:} 引用 / 多键)进不了启动文档:解析就拒,ext 装不到它", () => {
     const base = { ...armed, cloudMcp: undefined } as Record<string, unknown>
     for (const definition of [
-      { type: "local", url: CLOUD_URL, headers: { Authorization: "Bearer {file:/t}" }, oauth: false },
-      { type: "remote", url: CLOUD_URL, headers: { Authorization: "Bearer tok-literal" }, oauth: false },
-      { type: "remote", url: CLOUD_URL, headers: { Authorization: "Bearer {file:/t}" }, oauth: false, enabled: true },
+      { type: "local", url: CLOUD_URL, headers: { Authorization: "Bearer {file:/t}" }, oauth: false, codemode: false },
+      { type: "remote", url: CLOUD_URL, headers: { Authorization: "Bearer tok-literal" }, oauth: false, codemode: false },
+      { type: "remote", url: CLOUD_URL, headers: { Authorization: "Bearer {file:/t}" }, oauth: false, codemode: false, enabled: true },
     ])
       expect(() => parseCodePuppyBootstrap({ ...base, cloudMcp: { name: "cloud", definition } })).toThrow(expect.objectContaining({ reason: "invalid" }))
   })

@@ -77,7 +77,16 @@ export function createPluginSources(deps: { catalog: () => Promise<readonly Cand
     const controller = new AbortController()
     try {
       return await sourceDeadline((async () => {
-        const response = await (deps.fetch ?? fetch)(url, { signal: signal ? AbortSignal.any([signal, controller.signal]) : controller.signal }).catch(() => { throw new SourceError("network", "Source request failed") })
+        const live = signal ? AbortSignal.any([signal, controller.signal]) : controller.signal
+        let response: Response
+        // A rate-limit answer (npm's Cloudflare 429 hits paging through thousands of opencode-plugin packages) is waited
+        // out and the same page asked again until the request deadline; it is not the source being unavailable.
+        for (let attempt = 1; ; attempt++) {
+          response = await (deps.fetch ?? fetch)(url, { signal: live }).catch(() => { throw new SourceError("network", "Source request failed") })
+          if (response.status !== 429) break
+          void response.body?.cancel().catch(() => undefined)
+          await rateLimitPause(Number(response.headers.get("retry-after")) * 1000, attempt, live)
+        }
         if (!response.ok) throw new SourceError("http", "Source returned HTTP " + response.status)
         if (Number(response.headers.get("content-length")) > SOURCE_DOWNLOAD_MAX_BYTES) {
           void response.body?.cancel().catch(() => undefined)
@@ -530,6 +539,17 @@ class SourceDeadline extends SourceError {
 class SourceSizeLimit extends SourceError {
   constructor() { super("format", "Source exceeded its archive resource budget") }
 }
+/** The server's Retry-After when it names one, otherwise a growing pause (0.5 s, 1 s, 2 s … at most 8 s); an abort ends it. */
+function rateLimitPause(retryAfterMs: number, attempt: number, signal: AbortSignal): Promise<void> {
+  const ms = Number.isFinite(retryAfterMs) && retryAfterMs > 0 ? retryAfterMs : Math.min(500 * 2 ** (attempt - 1), 8_000)
+  return new Promise((resolve, reject) => {
+    if (signal.aborted) return reject(new SourceError("network", "Source deadline exceeded"))
+    const timer = setTimeout(() => { signal.removeEventListener("abort", stop); resolve() }, ms)
+    const stop = () => { clearTimeout(timer); reject(new SourceError("network", "Source deadline exceeded")) }
+    signal.addEventListener("abort", stop, { once: true })
+  })
+}
+
 function sourceDeadline<T>(work: Promise<T>, duration: number): Promise<T> {
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => reject(new SourceDeadline()), duration)

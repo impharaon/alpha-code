@@ -132,6 +132,12 @@ describe("authority minting (ADR-041 §5)", () => {
     expect((authority as { evidenceDigest: string }).evidenceDigest).toMatch(/^sha256:[0-9a-f]{64}$/)
   })
 
+  test("the engine's empty merged timeout (OpenCode 2 adds `timeout: {}`) still mints; any real difference, a set timeout included, does not", () => {
+    expect(authorityForMcp("codepuppy-cloud", { ...cloudDef, timeout: {} } as never, cloudMcp, undefined)).toEqual(authorityForMcp("codepuppy-cloud", cloudDef as never, cloudMcp, undefined))
+    expect(authorityForMcp("codepuppy-cloud", { ...cloudDef, timeout: { execution: 1 } } as never, cloudMcp, undefined)).toEqual({ kind: "not-asserted" })
+    expect(authorityForMcp("codepuppy-cloud", { ...cloudDef, timeout: {}, codemode: true } as never, cloudMcp, undefined)).toEqual({ kind: "not-asserted" })
+  })
+
   test("a look-alike (same URL, other key; or same key, other URL) is not asserted", () => {
     expect(authorityForMcp("other-name", cloudDef as never, cloudMcp, undefined)).toEqual({ kind: "not-asserted" })
     expect(authorityForMcp("codepuppy-cloud", { ...cloudDef, url: "https://cloud.codepuppy.test.evil/mcp" } as never, cloudMcp, undefined)).toEqual({ kind: "not-asserted" })

@@ -293,6 +293,7 @@ describe("web search sovereignty at sidecar fork (#621)", () => {
       url: "https://cloud.example/mcp",
       headers: { Authorization: `Bearer {file:${secretFilePath(userDataPath, "CODEPUPPY_MCP_TOKEN")}}` },
       oauth: false,
+      codemode: false,
     })
     expect(JSON.stringify(killed.bootstrap)).not.toContain("mcp-token")
 

@@ -34,7 +34,8 @@ import {
   type McpOwnership,
 } from "./cloud-websearch-kill"
 import { createHubBridge, processParentPort, type HubBridge } from "./hub-bridge"
-import { createHubTools } from "./hub-tools"
+import { createHubTools, HUB_READ_ACTIONS } from "./hub-tools"
+import { TOOL_POLICY_DEFAULT } from "./policy/catalog"
 import { createReloadScheduler, type ReloadScheduler } from "./reload-scheduler"
 import { createCodePuppyTools } from "./codepuppy-tools"
 import { agentSampling, applyAgents, applyProjectMcp, commandDefinitions, removeAgents } from "./engine-transforms"
@@ -414,6 +415,14 @@ export const CodePuppyExt: Plugin.Plugin = {
             if (!placeAfterBase(id, agent.permissions as never, rules))
               error(`[@codepuppy/ext] ${id}: the engine's base rules changed shape; external_directory ask appended (user rules cannot relax it)`)
           })
+        // BR-01 / BR-10(SPEC-plugin-helper-and-hub v5):全部批准档同请求审批 / 只读档一样在档位伪动作上点名助手的只读查找与状态
+        // (那两档写在 ui-mac codepuppy-config-injection.ts;build 是引擎自己的 agent,经这里插在底座之后),上一版留下的「始终允许」
+        // 记录换绑之后它们也不回到询问(policy/catalog.ts)。安装 / 制作不在其列,照旧每档都问。
+        const hubReads = HUB_READ_ACTIONS.map((name) => ({ action: TOOL_POLICY_DEFAULT, resource: `plugin:*:${name}`, effect: "allow" as const }))
+        editor.update("build" as never, (agent) => {
+          if (!placeAfterBase("build", agent.permissions as never, hubReads))
+            error(`[@codepuppy/ext] build: the engine's base rules changed shape; hub read-only waiver appended`)
+        })
       })
       // REQ-067 / #1522:出厂禁用的技能 —— 从技能目录里拿掉(上游内置的那些在 ext 之前注册),并在权限评估里一律 deny
       // (覆盖之后才由配置目录装进来的同名技能)。

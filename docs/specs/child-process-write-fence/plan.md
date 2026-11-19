@@ -165,3 +165,5 @@ PLAN 阶段只提交本文件。下表和命令均为实施安排，不代表已
 - 2026-11-19 · 步骤 3 接线：共享规则 4/5/5b predicate、main 内存登记、真源过滤/登记重算、当前 listener 的成功账本/并发合并、grant 请求簿消息路由及退出关闭、M1 与 record IPC、preload 通知/合同和 index 注入。O1 只等 grant 消费（不等待 probe），最多 1 s，后台继续。检查组 B 加受影响 profile/write-sites 共 128 pass / 0 fail，内层 IPC 10 pass；workspaces pin 12→15，新 gate host=1。必要测试假件 `test-component/preload-stub.ts` 分类两个新 preload 键；真实 native 合同未改。包 typecheck 的 main 两项窄化错误已修，renderer 旧 probe 参数/桥缺 grant 尚待步骤 4 同步，不能把当前结果报成全包通过。
 
 - 2026-11-19 · 步骤 3 坏臂：移除真源 `opened.has` 过滤后 workspaces 14 pass / 1 fail，移除本机 server 判定后 IPC 宿主红；`step3-bad-truth.log` / `step3-bad-server.log`，两次均按文件 scoped restore 恢复。步骤 4 核心红测试 `step4-red.log`：新的 server 身份、通知失效/迟到回复、reason 判定、IPC 失败语义均在旧 tracker 上失败。R1/R5 实际路径分别是 `renderer/sidebar/` 与 `renderer/automations/`，已机械修正计划路径。
+
+- 2026-11-19 · 步骤 4 结构红证据：新增 `main/project-writable-navigation.test.ts` 与 `scripts/project-writable-navigation.tsv`（冻结 P-15 要求的机器登记簿），初始清单为空且 R1–R5 尚未调用登记，`step4-navigation-red.log` 红；控制臂已证明 restore 插入登记为 forbidden、新导航/记录函数引用不登记即红。扫描范围含 ui-mac 生产 renderer 与 P-15 点名的已挂载 app 上下文；实际 AST 清单保留在 scratch/navigation-sites.json，测试不改写仓库登记簿。

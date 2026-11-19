@@ -508,7 +508,7 @@ const POLICY_DENY_DETAIL: Record<PolicyDenyReason, string | undefined> = Object.
 })
 export const policyDenyId = (reason: PolicyDenyReason) => `tool-failure.policy-deny.${reason}`
 
-function toolFailureFragments(): (TemplateFragment | WrapperFragment)[] {
+function toolFailureFragments(): (TemplateFragment | TextFragment | WrapperFragment)[] {
   return [
     ...Object.entries(WEB_SEARCH_FAILURE_PATTERNS).map(([kind, [label, http]]) =>
       http
@@ -526,6 +526,8 @@ function toolFailureFragments(): (TemplateFragment | WrapperFragment)[] {
           }),
     ),
     ...Object.entries(WEB_SEARCH_OFF_TEMPLATES).map(([id, template]) => defineTemplate({ id, sink: "tool-failure", template, maxBytes: CAP_DESCRIPTION })),
+    defineText({ id: WRITE_DENIED_ID, sink: "tool-failure", text: WRITE_DENIED_NOTE, maxBytes: CAP_DESCRIPTION }),
+    defineText({ id: WRITE_REFUSED_ID, sink: "tool-failure", text: WRITE_REFUSED_NOTE, maxBytes: CAP_DESCRIPTION }),
     ...(Object.entries(POLICY_DENY_DETAIL) as [PolicyDenyReason, string | undefined][]).map(([reason, detail]) =>
       defineTemplate({
         id: policyDenyId(reason),
@@ -540,6 +542,19 @@ function toolFailureFragments(): (TemplateFragment | WrapperFragment)[] {
 // 0.1.26 的 v1 引擎给每个 agent part 在用户消息里紧跟一段 synthetic 文本,叫模型调 task 工具派给那个助手(v0.1.26
 // packages/opencode/src/session/prompt.ts:1114-1128)。这里是同一句,工具名与参数名换成 2.x 的 `subagent` / `agent`
 // (core tool/plugin/subagent.ts)。`{name}` = 被点名助手的 id,整句按渲染结果量上限。
+/**
+ * 0.2.4 验收第三轮(REQ-159 披露 I4),0.2.5 收窄:写被拒(EPERM)时交回模型的话,接在工具结果后面(policy/display.ts attachWriteDenied),
+ * 让模型停下来告诉用户,不去绕。两句,按证据选:
+ *   · `WRITE_DENIED_NOTE` —— 写文件工具在本会话项目里被拒(目标已知且在项目内):可写集在启动时定死,启动后打开的项目要重启才写得进;
+ *   · `WRITE_REFUSED_NOTE` —— 证据不足以归因(shell 的 `Operation not permitted` 不知写到哪儿;目标在本会话项目之外):只说被拒,不说重启。
+ */
+export const WRITE_DENIED_ID = "sandbox.write-denied"
+export const WRITE_DENIED_NOTE =
+  "Code Puppy's sandbox refused this write (operation not permitted): this project folder cannot be written until Code Puppy is restarted, because the folders Code Puppy can write are fixed when it starts. Do not try other ways to write it and do not look for workarounds outside the project; stop and tell the user that this folder cannot be written until they restart Code Puppy."
+export const WRITE_REFUSED_ID = "sandbox.write-refused"
+export const WRITE_REFUSED_NOTE =
+  "The system refused this write (operation not permitted). Do not try other ways to write it and do not look for workarounds; stop and tell the user which write was refused."
+
 export const AGENT_MENTION_ID = "agent-mention.delegate"
 export const AGENT_MENTION_TEMPLATE = "Use the above message and context to generate a prompt and call the subagent tool with agent: {name}"
 

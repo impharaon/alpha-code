@@ -11,7 +11,12 @@ import {
   parseCodePuppyBootstrap,
   publishCodePuppyBootstrap,
   tryCodePuppyBootstrap,
+  routePlatformUrl,
 } from "./codepuppy-bootstrap.js"
+
+import { mkdtempSync, writeFileSync, rmSync } from "node:fs"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
 
 const valid = () => ({
   v: 1,
@@ -230,4 +235,41 @@ describe("publish and read", () => {
     expect(() => codepuppyBootstrap()).toThrow(expect.objectContaining({ reason: "version" }))
     expect(() => tryCodePuppyBootstrap()).toThrow(expect.objectContaining({ reason: "version" }))
   })
+})
+
+
+test("relay bootstrap fields parse and remain optional", () => {
+  const base = valid()
+  const document = parseCodePuppyBootstrap({ ...base, platform: { ...base.platform, directModelProxyBaseURL: "https://direct.test/v1", routeRef: "{file:/state/endpoint-route/prod}" }, cloudMcp: { ...base.cloudMcp, directUrl: "https://direct-cloud.test/mcp" } })
+  expect(String(document.platform.directModelProxyBaseURL)).toBe("https://direct.test/v1")
+  expect(document.platform.routeRef).toBe("{file:/state/endpoint-route/prod}")
+  expect(String(document.cloudMcp?.directUrl)).toBe("https://direct-cloud.test/mcp")
+  expect(parseCodePuppyBootstrap(base).platform.routeRef).toBeUndefined()
+})
+
+test("relay bootstrap fields reject credential-bearing URLs and malformed references", () => {
+  const base = valid()
+  for (const value of ["http://remote.test", "https://user:password@direct.test", "https://direct.test?token=x"])
+    expect(() => parseCodePuppyBootstrap({ ...base, platform: { ...base.platform, directModelProxyBaseURL: value } })).toThrow(CodePuppyBootstrapError)
+  expect(() => parseCodePuppyBootstrap({ ...base, platform: { ...base.platform, routeRef: "direct" } })).toThrow(CodePuppyBootstrapError)
+  expect(() => parseCodePuppyBootstrap({ ...base, cloudMcp: { ...base.cloudMcp, directUrl: "https://direct.test#secret" } })).toThrow(CodePuppyBootstrapError)
+})
+
+test("route URL reads the file on every call, confines the prefix, and tolerates unavailable input", () => {
+  const root = mkdtempSync(join(tmpdir(), "route-url-"))
+  const file = join(root, "route")
+  const original = "https://relay.test/v1/chat/completions?x=1"
+  const route = (url = original) => routePlatformUrl(url, "https://relay.test/v1", "https://direct.test/v1", `{file:${file}}`)
+  try {
+    expect(route()).toBe(original)
+    writeFileSync(file, "preferred")
+    expect(route()).toBe(original)
+    writeFileSync(file, "direct")
+    expect(route()).toBe("https://direct.test/v1/chat/completions?x=1")
+    for (const url of ["https://relay.test.evil/v1/chat", "https://relay.test/v1x/chat", "https://byok.test/v1/chat"]) expect(route(url)).toBe(url)
+    expect(routePlatformUrl(original)).toBe(original)
+    expect(routePlatformUrl(original, "bad", "bad", `{file:${file}}`)).toBe(original)
+    writeFileSync(file, "unknown")
+    expect(route()).toBe(original)
+  } finally { rmSync(root, { recursive: true, force: true }) }
 })

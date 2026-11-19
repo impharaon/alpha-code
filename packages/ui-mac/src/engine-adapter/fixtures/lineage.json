@@ -1,30 +1,30 @@
 {
- "_source": "Sampled by `bun packages/ui-mac/test-fixtures/engine-adapter-sampler/sample.ts` (alpha-code#1668 L6) at 0948feb060: a real OpenCode 2 engine from this repo's packages/cli `serve`, isolated HOME/XDG, one git project, and the scripted OpenAI-compatible mock model next to the sampler. Message lineage: via the adapter, a prompt with agent build (2.x records agent-switched first; permission asks answered once), then summarize (compaction), then a composer shell command echo lineage. `final` = order=asc once the compaction settled and the shell exited.",
- "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-yRxaAN/proj",
- "sessionID": "ses_e0dfa507cffe17mgHoTfWF4B81",
+ "_source": "Sampled by `bun packages/ui-mac/test-fixtures/engine-adapter-sampler/sample.ts` (alpha-code#1668 L6) at bc85af83a2: a real OpenCode 2 engine from this repo's packages/cli `serve`, isolated HOME/XDG, one git project, and the scripted OpenAI-compatible mock model next to the sampler. Message lineage: via the adapter, a prompt with agent build (2.x records agent-switched first; permission asks answered once), then summarize (compaction), then a composer shell command echo lineage. `final` = order=asc once the compaction settled and the shell exited.",
+ "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-KHfZjs/proj",
+ "sessionID": "ses_e0c0b6f79ffetF8jWeSTOyXe6U",
  "final": [
   {
-   "id": "msg_1f205af85001mgNn0Q72MRVzYE",
+   "id": "msg_1f3f490880018obNKiawXgKjhC",
    "time": {
-    "created": 1795061821317
+    "created": 1795094253704
    },
    "type": "agent-switched",
    "agent": "build"
   },
   {
-   "id": "msg_1f205af86001FADifhrRZtOTIR",
+   "id": "msg_1f3f4908a0011DD0zeuclfg9qy",
    "time": {
-    "created": 1795061821320
+    "created": 1795094253708
    },
    "text": "say hello plainly",
    "type": "user"
   },
   {
-   "id": "msg_1f205af8c001RYBdUiS8F2tTgY",
+   "id": "msg_1f3f49091001GDvgraBogoMvud",
    "time": {
-    "created": 1795061821325,
-    "streamed": 1795061821451,
-    "completed": 1795061821459
+    "created": 1795094253714,
+    "streamed": 1795094253841,
+    "completed": 1795094253854
    },
    "type": "assistant",
    "agent": "build",
@@ -57,18 +57,18 @@
    }
   },
   {
-   "id": "msg_1f205b014001IkPBRaaDEk2B67",
+   "id": "msg_1f3f4911f002f66qJwba74q22i",
    "time": {
-    "created": 1795061821460
+    "created": 1795094253855
    },
    "type": "idle",
    "outcome": "succeeded"
   },
   {
    "type": "compaction",
-   "id": "msg_1f205b060001HmanIWCT2jZTZb",
+   "id": "msg_1f3f49157001y09ZRFET5ZQgv0",
    "time": {
-    "created": 1795061821539
+    "created": 1795094253915
    },
    "status": "failed",
    "reason": "manual",
@@ -88,24 +88,24 @@
    }
   },
   {
-   "id": "msg_1f205b26d0011i3PtbKMapoxQp",
+   "id": "msg_1f3f49369001qQ8hxX47mLv5wM",
    "time": {
-    "created": 1795061822061
+    "created": 1795094254441
    },
    "type": "idle",
    "outcome": "succeeded"
   },
   {
-   "id": "msg_1f205b2d9002S6mtWT89tTqbzF",
+   "id": "msg_1f3f49372002lBB3VI4k1XdnV0",
    "metadata": {
     "background": true
    },
    "time": {
-    "created": 1795061822169,
-    "completed": 1795061822173
+    "created": 1795094254450,
+    "completed": 1795094254454
    },
    "type": "shell",
-   "shellID": "sh_1f205b2d700156jy4BZJsGXjJt",
+   "shellID": "sh_1f3f49370001zynlVgWpnMFA5x",
    "command": "echo lineage",
    "status": "exited",
    "exit": 0,
@@ -127,7 +127,7 @@
    "packages/core": "39bb60e82a22a0d289c7fffe62414c4bfcbc2134",
    "packages/latex": "abcd38e17eb09d996d975964f46be0a2e758fdf4",
    "packages/merman": "3feaef89d940956096deb30e2b9f85f3fabdfe15",
-   "packages/plugin": "3453db7c178b8f2956da24095d44fbc5db6f31c8",
+   "packages/plugin": "d82062f713a03e48755e632f13d25a38707077a5",
    "packages/plugin-browser": "a3fd121205a803d1a82d97514cc09245010656cb",
    "packages/protocol": "3117071f374c96909ccc2250cd5333a11d521854",
    "packages/schema": "c24d8b246d201115b2dd08f2211d314fd650108c",
@@ -136,7 +136,7 @@
    "packages/theme": "0afba31d85d03fa7e34f8a98a38ccf355d6ec6c5",
    "packages/tui": "ceda52b2e7ba2f5d9c2a74814879eca606586a56",
    "packages/ui": "f2726368d2f8590af83a2101579f38be14d3497f",
-   "packages/util": "12fc8b23132d7d17e95f3d54b104e9e93de50dd0"
+   "packages/util": "770c32a77abb24f65c1baf70ba78da0fa1cd9d19"
   }
  }
 }

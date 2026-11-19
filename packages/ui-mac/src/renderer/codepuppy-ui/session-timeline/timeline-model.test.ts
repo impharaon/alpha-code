@@ -35,6 +35,7 @@ import {
   TURN_DIFF_FILES_MAX,
   turnDiffsOf,
   turnErrorOf,
+  retryInputOf,
   TURN_ERROR_MAX_CHARS,
   USER_TEXT_MAX_CHARS,
 } from "./timeline-model"
@@ -148,7 +149,7 @@ function project(
   messages: Message[],
   parts: Record<string, Part[]>,
   status = "idle",
-  retry?: { attempt: number; message: string },
+  retry?: { attempt: number; message: string; netLayer?: "connect-timeout" },
 ) {
   return projectTimelineRows({ messages, partsOf: (id) => parts[id] ?? [], status, retry })
 }
@@ -881,6 +882,25 @@ describe("REQ-125 C5 行模型投影:消息 → 行", () => {
     if (bounded.kind !== "process") throw new Error("expected process row")
     expect(bounded.retry?.message).toHaveLength(RETRY_MESSAGE_MAX_CHARS)
 
+    // 引擎认出的网络层随重试带进行(界面据此写短语),也进 rev(同一次数、同一原文换了层要重画)。
+    const layered = project([userMsg("msg_u1", 1000)], { msg_u1: [textPart("prt_u1", "msg_u1", "开始")] }, "retry", {
+      attempt: 2,
+      message: "gateway 429",
+      netLayer: "connect-timeout",
+    })[1]!
+    if (layered.kind !== "process") throw new Error("expected process row")
+    expect(layered.retry).toEqual({ attempt: 2, message: "gateway 429", netLayer: "connect-timeout" })
+    expect(layered.rev).not.toBe(process.rev)
+
+    // 状态 → 输入:层取自适配层的 metadata.codepuppyNetLayer(与 session.error 同形),只认登记过的层名。
+    expect(retryInputOf({ attempt: 2, message: "raw", metadata: { codepuppyNetLayer: "connect-timeout" } })).toEqual({
+      attempt: 2,
+      message: "raw",
+      netLayer: "connect-timeout",
+    })
+    expect(retryInputOf({ attempt: 2, message: "raw", metadata: { codepuppyNetLayer: "made-up" } })).toEqual({ attempt: 2, message: "raw" })
+    expect(retryInputOf({ attempt: 1 })).toEqual({ attempt: 1, message: "" })
+
     const idle = project([userMsg("msg_u1", 1000)], { msg_u1: [textPart("prt_u1", "msg_u1", "开始")] }, "idle")
     expect(idle.some((row) => row.kind === "process")).toBe(false)
   })
@@ -1541,6 +1561,10 @@ describe("REQ-236 #1552 生图卡:派发调用事实 → cloudImage 行与显示
     expect(cloudImageViewOf(call, run("queued", "pending"), false)).toEqual({ state: "queued", since: 1_100 })
     expect(cloudImageViewOf(call, run("running", "pending"), false)).toEqual({ state: "running", since: 1_100 })
     expect(cloudImageViewOf(call, run("completed", "downloading"), false)).toEqual({ state: "saving" })
+    // 宿主在慢速自动重取(pending + 瞬态原因,cloud-run-tracker I6):卡片说「正在保存」,不出没存到本机 / 重新下载。
+    expect(
+      cloudImageViewOf(call, { job: { status: "completed" }, delivery: { status: "pending", failure: { scope: "download", code: "network" } } }, false),
+    ).toEqual({ state: "saving" })
     expect(cloudImageViewOf(call, run("completed", "saved"), false)).toEqual({ state: "saved" })
     expect(cloudImageViewOf(call, run("failed", "saved", { code: "image_safety_rejected" }), false)).toEqual({
       state: "failed",

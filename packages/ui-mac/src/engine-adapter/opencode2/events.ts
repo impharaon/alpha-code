@@ -462,7 +462,8 @@ export function createProjector(
         type: "session.status",
         properties: {
           sessionID,
-          status: { type: "retry", attempt: data.attempt, message: v1ErrorData(data.error?.message ?? "").message, next: data.at },
+          // 网络层随状态带上(与 session.error 同一 metadata),实时重试行据此写短语而不是原文。
+          status: { type: "retry", attempt: data.attempt, ...v1ErrorData(data.error?.message ?? ""), next: data.at },
         },
       })
     if (type === "session.execution.failed")

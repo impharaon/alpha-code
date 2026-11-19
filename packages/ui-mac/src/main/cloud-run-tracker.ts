@@ -6,13 +6,17 @@
 //   · I3「已保存」= 列表请求成功 + 列出的每个描述符都已登记 + 每个条目现盘 sha256 复核通过;
 //     列表 / 下载 / 登记 / 复核任一失败都是交付失败,带失败范围与码;
 //   · I4 归属只由已受理的第一方 dispatch 写入(track 的 origin);查询类命中不传 origin、不改归属;
-//   · I6 只重试瞬态码(network / retryable / http-5xx),最多 DELIVERY_MAX_ATTEMPTS 次尝试;重试只重取与重下,
-//     永不重新派发任务;
+//   · I6 只重试瞬态码(network / retryable / http-5xx):先快后慢(deliveryRetryDelayMs),不判终局,直到落盘或遇到
+//     确定性失败(云端说没有了 = not-found 等);转入慢速后广播 pending + 这次的瞬态原因(界面说「正在重新获取」)。
+//     慢速等待中再次 track / retry 立刻叫醒。重试只重取与重下,永不重新派发任务(0.2.4 owner 2026-11-19:
+//     「不要给那么多重试按钮什么的，就是失败自动退避的规则应该合理」);
+//   · I9 还没取回的 run 记在待取清单里(带发起时的账户标签),跨退出重开存活;启动与每次登录身份变化时 resume
+//     接着取当前账户的那些。落盘或确定性失败即去掉;登录类失败(not-authenticated / unauthorized)留着等登录好了再取;
 //   · I7 同一 (directory, runId) 同时只有一个交付在跑(单飞);
 //   · I8 每个交付绑定启动时的登录身份代:状态回包、SSE 帧、下载开始、退避醒来都先比对,变了即丢弃;
 //     onAuthChanged 在身份代变化时 abort 在途下载、退订 SSE。同一账户的普通续期身份代不变,交付照常。
 
-import { terminalEventName } from "./codepuppy-cloud-events-core"
+import { backoffMs, terminalEventName } from "./codepuppy-cloud-events-core"
 import { saveCloudRun, type CloudRunManifest, type SaveRunDeps } from "./codepuppy-workdir"
 import { readArtifactManifest, type ArtifactRunOrigin } from "./artifact-manifest"
 import { recordRunOrigin, verifyArtifact } from "./artifact-service"
@@ -36,9 +40,16 @@ export type CloudRunState = {
   delivery: { status: "pending" | "downloading" | "saved" | "failed"; failure?: CloudRunDeliveryFailure }
 }
 
+/** 待取清单的一条:哪个项目里的哪个 run,由哪个账户发起(resume 只接着取当前账户的)。 */
+export type PendingCloudRun = { directory: string; runId: string; account: string }
+
 export type CloudRunTrackerDeps = {
   /** 登录身份代(登入/登出推进的 epoch + 稳定账户标签);变了 = 换了身份,旧交付作废。 */
   identity: () => string
+  /** 稳定账户标签(未登录 = 空串)。 */
+  account: () => string
+  /** 待取清单的持久化(生产 = 设置文件里的一个键);read 可能读到任何东西。 */
+  pending: { read: () => unknown; write: (runs: PendingCloudRun[]) => void }
   status: (runId: string) => Promise<CloudResult<CloudJobStatus>>
   artifacts: (runId: string) => Promise<CloudResult<CloudArtifactList>>
   subscribe: (runId: string, sink: (ev: CloudJobEvent) => void) => () => void
@@ -56,9 +67,19 @@ export type CloudRunTrackerDeps = {
   log: (message: string) => void
 }
 
-export const DELIVERY_MAX_ATTEMPTS = 3
+/** 快速阶段的尝试次数:间隔按 backoffMs 指数增长(1、2、4、8 秒,±50% 抖动)。 */
+export const DELIVERY_QUICK_ATTEMPTS = 5
+/** 快速阶段用完之后的低频重取间隔。 */
+export const DELIVERY_SLOW_GAP_MS = 2 * 60_000
+
+/** 第 attempt 次瞬态失败之后等多久:先快(网络抖一下就回来),后慢(长时间不通时低频再试,直到落盘或云端说没有了)。 */
+export function deliveryRetryDelayMs(attempt: number, rand: number = Math.random()): number {
+  return attempt < DELIVERY_QUICK_ATTEMPTS ? backoffMs(attempt, rand) : DELIVERY_SLOW_GAP_MS
+}
 const TRANSIENT_CODES = new Set(["network", "retryable"])
 const isTransient = (code: string) => TRANSIENT_CODES.has(code) || /^http-5\d\d$/.test(code)
+// 登录好了还能取到:失败照常广播,但不从待取清单里去掉。
+const SIGNED_OUT_CODES = new Set(["not-authenticated", "unauthorized"])
 const TERMINAL_STATUSES = new Set<string>(["completed", "failed", "cancelled"])
 // 平台分类码文法(platform-error-code.ts 同一形):只有这一形的失败码进 job.code。
 const CLASSIFICATION_CODE = /^[a-z][a-z0-9_]{2,63}$/
@@ -69,7 +90,7 @@ type Task = {
   runId: string
   identity: string
   ctrl: AbortController
-  /** 只在等 SSE 时存在:结束等待、回去重查一次状态。 */
+  /** 只在等 SSE 或退避时存在:结束等待、回去重查一次状态。 */
   wake?: () => void
 }
 
@@ -80,6 +101,29 @@ export function createCloudRunTracker(deps: CloudRunTrackerDeps) {
   const listed = new Map<string, string[]>()
   const keyOf = (directory: string, runId: string) => `${directory}\0${runId}`
   const alive = (task: Task) => !task.ctrl.signal.aborted && deps.identity() === task.identity
+
+  function pendingRuns(): PendingCloudRun[] {
+    const raw = deps.pending.read()
+    if (!Array.isArray(raw)) return []
+    return raw.filter(
+      (run): run is PendingCloudRun =>
+        !!run &&
+        typeof run === "object" &&
+        typeof run.directory === "string" &&
+        typeof run.runId === "string" &&
+        typeof run.account === "string",
+    )
+  }
+
+  function remember(directory: string, runId: string) {
+    const runs = pendingRuns()
+    if (runs.some((run) => run.directory === directory && run.runId === runId)) return
+    deps.pending.write([...runs, { directory, runId, account: deps.account() }])
+  }
+
+  function forget(directory: string, runId: string) {
+    deps.pending.write(pendingRuns().filter((run) => run.directory !== directory || run.runId !== runId))
+  }
 
   function publish(directory: string, runId: string, patch: { job?: CloudRunState["job"]; delivery: CloudRunState["delivery"] }) {
     const key = keyOf(directory, runId)
@@ -106,6 +150,7 @@ export function createCloudRunTracker(deps: CloudRunTrackerDeps) {
     }
     const task: Task = { key, directory, runId, identity: deps.identity(), ctrl: new AbortController() }
     inflight.set(key, task)
+    remember(directory, runId)
     publish(directory, runId, { delivery: { status: "pending" } })
     void deliver(task)
       .catch((error) => deps.log(`cloud-run-tracker: delivery for ${runId} threw: ${String(error)}`))
@@ -119,17 +164,27 @@ export function createCloudRunTracker(deps: CloudRunTrackerDeps) {
       const failure = await attemptOnce(task)
       if (!alive(task)) return
       if (!failure) {
+        forget(task.directory, task.runId)
         publish(task.directory, task.runId, { delivery: { status: "saved" } })
         return
       }
-      if (attempt >= DELIVERY_MAX_ATTEMPTS || !isTransient(failure.code)) {
+      if (!isTransient(failure.code)) {
         deps.log(
           `cloud-run-tracker: delivery of ${task.runId} failed after ${attempt} attempt(s): ${failure.scope} ${failure.code}`,
         )
+        if (!SIGNED_OUT_CODES.has(failure.code)) forget(task.directory, task.runId)
         publish(task.directory, task.runId, { delivery: { status: "failed", failure } })
         return
       }
-      await deps.wait(attempt)
+      if (attempt >= DELIVERY_QUICK_ATTEMPTS) {
+        deps.log(`cloud-run-tracker: delivery of ${task.runId} still failing after ${attempt} attempt(s): ${failure.scope} ${failure.code}`)
+        publish(task.directory, task.runId, { delivery: { status: "pending", failure } })
+      }
+      await new Promise<void>((resolve) => {
+        task.wake = resolve
+        void deps.wait(attempt).then(resolve)
+      })
+      task.wake = undefined
       if (!alive(task)) return
     }
   }
@@ -221,7 +276,14 @@ export function createCloudRunTracker(deps: CloudRunTrackerDeps) {
       }
       start(input.directory, input.runId)
     },
-    /** 时间线「重新下载」:与自动交付共用同一单飞;在途时什么都不做。 */
+    /** 启动时与登录身份变化后:接着取待取清单里当前账户的 run(在途的不动)。 */
+    resume() {
+      const account = deps.account()
+      if (!account) return
+      for (const run of pendingRuns())
+        if (run.account === account && !inflight.has(keyOf(run.directory, run.runId))) start(run.directory, run.runId)
+    },
+    /** 时间线「重新下载」:与自动交付共用同一单飞;在途时只叫醒正在等的那一步。 */
     retry(directory: string, runId: string) {
       start(directory, runId)
     },

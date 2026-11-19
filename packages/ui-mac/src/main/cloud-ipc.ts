@@ -13,8 +13,7 @@ import * as fs from "node:fs"
 import * as path from "node:path"
 import { dispatchCloudJob, dispatchExplicitCloudUpload, getCloudJobStatus, cancelCloudJob, listCloudArtifacts, downloadCloudArtifactTo, getCloudAccountStatus } from "./codepuppy-cloud-jobs"
 import { isTerminalCloudEvent, subscribeCloudJobEvents } from "./codepuppy-cloud-events"
-import { backoffMs } from "./codepuppy-cloud-events-core"
-import { createCloudRunTracker, type CloudRunOrigin } from "./cloud-run-tracker"
+import { createCloudRunTracker, deliveryRetryDelayMs, type CloudRunOrigin, type CloudRunTrackerDeps } from "./cloud-run-tracker"
 // #420(REQ-115):云任务 completed / failed 终态 → 系统通知的唯一咽喉(去重、取消不通知都在里面)。
 import { noticeFromCloudEvent, noticeFromCloudStatus, notifyCloudJobFinished } from "./cloud-job-notify"
 import {
@@ -104,10 +103,18 @@ function afterRunSaved(directory: string, runId: string, saved: CloudRunManifest
   broadcast("cloud-run-saved", { directory, runId })
 }
 
+let pendingStore: CloudRunTrackerDeps["pending"] | undefined
+
 // REQ-236 #1551:宿主自己跟住云任务直到产物落盘并核验(cloud-run-tracker.ts)。
 // 身份代 = 登入/登出推进的 epoch + 稳定账户标签;不比较含原始 accessToken 的 getAccessTokenIdentity 返回值。
 const tracker = createCloudRunTracker({
   identity: () => `${getAuthIdentityEpoch()}:${getAuthIdentityTag() ?? ""}`,
+  account: () => getAuthIdentityTag() ?? "",
+  // 跨退出重开存活的待取清单(I9);存储由 index.ts 在启动时交进来(resumeCloudRunDelivery),本模块不碰 electron-store。
+  pending: {
+    read: () => pendingStore?.read(),
+    write: (runs) => pendingStore?.write(runs),
+  },
   // #420:助手经 MCP 派发的任务没有界面订阅,tracker 的状态查询与 SSE 是 main 侧看得见它终态的地方,通知从这里发
   // (与界面派发两路都到时由 notify 的 jobId+终态去重只弹一次)。
   status: async (id) => {
@@ -124,13 +131,21 @@ const tracker = createCloudRunTracker({
   saveDeps: runSaveDeps,
   afterSave: afterRunSaved,
   broadcast: (state) => broadcast("cloud-run-state", state),
-  wait: (attempt) => new Promise((resolve) => setTimeout(resolve, backoffMs(attempt))),
+  wait: (attempt) => new Promise((resolve) => setTimeout(resolve, deliveryRetryDelayMs(attempt))),
   log: (message) => getLogger().warn(message),
 })
 
-/** main/index.ts 既有 onChanged 回调里调用:身份代变化 ⇒ 作废在途交付;同账户续期 ⇒ 什么都不做。 */
+/** main/index.ts 既有 onChanged 回调里调用:身份代变化 ⇒ 作废在途交付;然后接着取当前账户还没取回的结果
+ *  (冷启动令牌换好、换回原账户都走这里)。在途的交付不受打扰。 */
 export function onCloudAuthChanged() {
   tracker.onAuthChanged()
+  tracker.resume()
+}
+
+/** main/index.ts 启动时调用一次:交进待取清单的存储,上次退出时还没取回的云任务结果(任何任务种类)按同一退避接着取。 */
+export function resumeCloudRunDelivery(store: CloudRunTrackerDeps["pending"]) {
+  pendingStore = store
+  tracker.resume()
 }
 
 function isRunOrigin(value: unknown): value is CloudRunOrigin {

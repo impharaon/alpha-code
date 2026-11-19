@@ -242,6 +242,16 @@
               "action": "plugin:*",
               "resource": "*",
               "effect": "ask"
+            },
+            {
+              "action": "plugin:*:codepuppy_hub_search",
+              "resource": "*",
+              "effect": "allow"
+            },
+            {
+              "action": "plugin:*:codepuppy_hub_status",
+              "resource": "*",
+              "effect": "allow"
             }
           ]
         },
@@ -254,6 +264,16 @@
               "action": "tool-policy-default",
               "resource": "*",
               "effect": "ask"
+            },
+            {
+              "action": "tool-policy-default",
+              "resource": "plugin:*:codepuppy_hub_search",
+              "effect": "allow"
+            },
+            {
+              "action": "tool-policy-default",
+              "resource": "plugin:*:codepuppy_hub_status",
+              "effect": "allow"
             },
             {
               "action": "question",

@@ -30,7 +30,7 @@ import { getLogger } from "./logging"
 import { CODEPUPPY_PATHS, type CodePuppyEndpoints } from "../shared/codepuppy-config"
 import { deepLinkFor, matchAuthDeepLink } from "../shared/route-manifest"
 import { hasUsableLifetime, isTokenExpired, shouldRefreshToken } from "./codepuppy-auth-clock"
-import { decodeEndpointDiscovery, resolveEndpoints, setDiscoveredEndpoints } from "./codepuppy-endpoints"
+import { decodeEndpointDiscovery, inheritedEngineEndpointEnv, preferredEndpoints, resolveEndpoints, setDiscoveredEndpoints } from "./codepuppy-endpoints"
 import { reportContractFailure } from "./codepuppy-contract-health"
 import { parseAccessTokenIdentity } from "./codepuppy-auth-identity"
 import { errorOutcome, markStartupTimeline } from "./startup-timeline"
@@ -356,30 +356,31 @@ function publishAuthError(code: AuthErrorCode) {
   if (win && !win.isDestroyed()) win.webContents.send("auth-error", { code })
 }
 
-// Map the current token + mode onto the env vars the sidecar reads. URL vars are set-if-unset (honor a
-// user/dev export). TOKEN vars (CODEPUPPY_API_KEY / CODEPUPPY_CLOUD_TOKEN) are login-derived and written
+// Map the current token + mode onto the env vars the sidecar reads. Preserve inherited user URL exports;
+// app-filled addresses follow preferred endpoints on every generation. TOKEN vars are login-derived and written
 // AUTHORITATIVELY (A8): applyAuthEnv also runs before each in-session respawn — which snapshots the
 // CURRENT env, not a clean one — so the old set-if-unset left a STALE token after re-login (the proxy
 // 401'd until a full quit). On logout the token vars are cleared explicitly + the sidecar respawns
 // (see logout). DEV_PLATFORM_TOKEN acts as a static platform login.
 export function applyAuthEnv() {
+  const exported = inheritedEngineEndpointEnv()
   const devToken = devPlatformToken()
   // alpha-web#283 AC4:旧客户端 id 签出的凭据在强制刷新成功前一律不物化(连同下面的 MCP 凭证)——
   // 引擎拿不到它,就不会带着它去调平台。
   const loggedInPlatform =
     deriveState().status === "logged-in" &&
     (Boolean(devToken) || (stored.mode === "platform" && issuedToCurrentClient()))
-  const ep = resolveEndpoints()
+  const ep = preferredEndpoints()
   const base = ep.platform
   delete process.env.CODEPUPPY_API_KEY
   delete process.env.CODEPUPPY_CLOUD_TOKEN
   delete process.env.CODEPUPPY_MCP_TOKEN
   if (!loggedInPlatform || !base) return
-  if (!process.env.CODEPUPPY_BASE_URL) process.env.CODEPUPPY_BASE_URL = `${base}${CODEPUPPY_PATHS.modelProxy}`
+  if (!exported.model) process.env.CODEPUPPY_BASE_URL = `${base}${CODEPUPPY_PATHS.modelProxy}`
   // mcp: a discovered/pinned mcp URL wins; else derive from the CLOUD worker base (ADR-016: the MCP
   // facade lives on `alpha-cloud`, NOT the model gateway which 404s /mcp). ep.cloud always resolves
   // (has a default), so this points at alpha-cloud/mcp instead of the old gateway/mcp 404.
-  if (!process.env.CODEPUPPY_CLOUD_MCP_URL)
+  if (!exported.cloud)
     process.env.CODEPUPPY_CLOUD_MCP_URL = ep.mcp ?? `${ep.cloud ?? base}${CODEPUPPY_PATHS.mcpGateway}`
   // DEV_PLATFORM_TOKEN remains the single-token development fallback and is attempted for both
   // sidecar seams. Each attempt still requires the destination purpose, so a purpose-specific JWT

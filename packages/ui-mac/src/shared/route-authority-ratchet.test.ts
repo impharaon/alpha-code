@@ -140,7 +140,7 @@ function violationsFor(file: SourceFile) {
 
   // The frontend surface manifest is a descriptive ownership ledger: it does not register,
   // parse, or navigate routes. Executable route strings have only one exemption: the manifest.
-  if (![routeManifestPath, surfaceLedgerPath].includes(file.path) && !/\.test\.[cm]?[jt]sx?$/.test(file.path)) {
+  if (![routeManifestPath, surfaceLedgerPath].includes(file.path) && !/\.(test|cases)\.[cm]?[jt]sx?$/.test(file.path)) {
     ROUTE_LITERAL_RULES.forEach((entry) => {
       entry.pattern.lastIndex = 0
       if (entry.pattern.test(source)) violations.push({ path, rule: entry.rule })
@@ -629,6 +629,15 @@ describe("Alpha route authority ratchet", () => {
         }).map((entry) => entry.rule),
         scheme,
       ).toEqual(["deep-link scheme literal outside the manifest"])
+  })
+
+  test("pathname dispatch stays covered in product sources when test children are excluded", () => {
+    const source = 'if (pathname === "/health") respond()'
+    expect(
+      violationsFor({ path: join(sourceRoot, "main", "fixture.ts"), source }).map((entry) => entry.rule),
+    ).toEqual(["pathname dispatch must use parseRoute"])
+    for (const name of ["fixture.test.ts", "fixture.cases.ts"])
+      expect(violationsFor({ path: join(sourceRoot, "main", name), source })).toEqual([])
   })
 
   test("Alpha sources do not reintroduce a parallel route or deep-link codec", async () => {

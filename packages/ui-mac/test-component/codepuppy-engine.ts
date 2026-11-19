@@ -13,7 +13,7 @@ import { buildEngineServerOptions } from "../src/main/engine-server-options"
 import { engineAuthorization, withEngineAuthorization } from "../src/main/engine-authorization"
 import { injectCodePuppyConfig } from "../src/main/codepuppy-config-injection"
 import { secretFilePath, secretFileRef } from "../src/main/codepuppy-secret-files"
-import { buildHubRequestReply, buildHubViewReply } from "../src/main/codepuppy-sidecar-messages"
+import { buildHubRequestReply, buildHubViewReply, buildSourcesSearchReply } from "../src/main/codepuppy-sidecar-messages"
 import type { EngineFetch } from "../src/main/in-process-engine"
 import { engineProjectTrust } from "../src/main/engine-project-trust"
 import { projectTrustIdentity } from "../src/main/project-trust-truth"
@@ -105,7 +105,9 @@ function fakeMainPort() {
             ? buildHubViewReply(message.id, { view: { directory: message.directory ?? "", rows: [row as never], warnings: [] } })
             : message.type === "codepuppy.hub.request.request"
               ? buildHubRequestReply(message.id, { record: null })
-              : undefined
+              : message.type === "codepuppy.sources.search.request"
+                ? buildSourcesSearchReply(message.id, { error: "no sources in this sandbox" })
+                : undefined
         if (reply) for (const listener of listeners) listener({ data: reply })
       }),
     on: (_event: string, listener: (event: { data: unknown }) => void) => void listeners.push(listener),
@@ -116,6 +118,8 @@ export type HostOptions = {
   sandbox: EngineSandbox
   name: string
   modelBaseURL: string
+  directModelProxyBaseURL?: string
+  routeRef?: `{file:${string}}`
   /** 用户在 Code Puppy 里加的本地 MCP(codepuppy.jsonc 里的 `probe`,引擎经显式文件读它),每次 tools/call 记进这个文件。 */
   mcpCallLog?: string
   /** codepuppy.jsonc 里另加的 MCP 服务器(名字 → 定义);注入在 codepuppyEngine() 里就合并用户文件,所以要在这里给。 */
@@ -177,7 +181,7 @@ export function codepuppyEngine(options: HostOptions) {
     globalRoot,
     userData,
     engineConfigDirectory: engineGlobalConfigDirectory(process.env, sandbox.home),
-    platform: { credentialRef: secretFileRef(userData, "CODEPUPPY_API_KEY"), modelProxyBaseURL: options.modelBaseURL },
+    platform: { credentialRef: secretFileRef(userData, "CODEPUPPY_API_KEY"), modelProxyBaseURL: options.modelBaseURL, ...(options.directModelProxyBaseURL ? { directModelProxyBaseURL: options.directModelProxyBaseURL } : {}), ...(options.routeRef ? { routeRef: options.routeRef } : {}) },
     policyAccount: `acct:${createHash("sha256").update(`${name}-${Math.random()}`).digest("hex")}`,
     cloudMcp: options.cloudMcp,
     killSwitch: options.killSwitch,

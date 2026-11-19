@@ -212,8 +212,11 @@ describe("#1662 云工具是模型的直接工具:云端生图 / 数据分析回
     const saved: Array<{ dir: string; files: string[] }> = []
     const states: Array<{ runId: string; delivery: string }> = []
     // 与 cloud-ipc.ts 的装配同一套生产函数(那个模块挂着 electron 的窗口与 IPC,这里只换掉广播)
+    let pendingRuns: unknown
     const tracker = createCloudRunTracker({
       identity: () => "tenant",
+      account: () => "tenant",
+      pending: { read: () => pendingRuns, write: (runs) => void (pendingRuns = runs) },
       status: getCloudJobStatus,
       artifacts: listCloudArtifacts,
       subscribe: subscribeCloudJobEvents,

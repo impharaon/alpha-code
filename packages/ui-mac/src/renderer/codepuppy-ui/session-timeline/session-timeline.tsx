@@ -26,6 +26,7 @@ import { bindFocusArtifact, type TimelineEditUserMessageIntent, type TimelineInt
 import { SessionTimelineView, type TimelineDisplayNames } from "./session-timeline-view"
 import {
   projectTimelineRows,
+  retryInputOf,
   reuseTimelineRows,
   reviewPathOf,
   type SessionSlashOriginsFor,
@@ -145,10 +146,7 @@ export function CodePuppySessionTimeline(props: CodePuppySessionTimelineProps = 
       projectTimelineRows({
         ...projectImageSends(id, data.message[id] ?? [], (messageID) => data.part[messageID] ?? []),
         status: status?.type ?? "idle",
-        retry:
-          status?.type === "retry"
-            ? { attempt: status.attempt, message: typeof status.message === "string" ? status.message : "" }
-            : undefined,
+        retry: status?.type === "retry" ? retryInputOf(status) : undefined,
         slashOrigins: slashOrigins(),
         // REQ-236 `#1553`:附件读取结果的输入 —— 会话目录 + 本机读取工具的逐服务状态(引擎 mcp.status,事件驱动刷新)。
         // getter:只有真有暂存附件的消息才会读它,其余会话不为此拉起 MCP 状态查询。

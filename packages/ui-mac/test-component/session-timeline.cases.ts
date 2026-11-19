@@ -2171,7 +2171,10 @@ describe("REQ-125 C6 折叠组/错误/重试/媒体/产物行", () => {
     const process = host.querySelector("[data-codepuppy-timeline-row='process']")!
     expect(process.getAttribute("data-face")).toBe("retry")
     expect(process.querySelector("[data-codepuppy-process-title]")!.textContent).toBe("正在重试 · 第 2 次")
-    expect(process.querySelector("[data-codepuppy-process-retry-reason]")!.textContent).toBe("gateway 429")
+    // 认不出的原因不把原文写进标题行(SPEC-desktop-ui-refresh BR-07),原文只在悬停提示里。
+    const reason = process.querySelector("[data-codepuppy-process-retry-reason]")!
+    expect(reason.textContent).toBe("上次请求没有成功")
+    expect(reason.getAttribute("title")).toBe("gateway 429")
     expect(process.querySelectorAll(".a-tl-pf-pulse")).toHaveLength(0)
   })
 
@@ -2269,13 +2272,25 @@ describe("REQ-125 C6 折叠组/错误/重试/媒体/产物行", () => {
     await flush()
     expect(turnText()).toContain(zhDict["codepuppy.net.dns"].replace("{{host}}", zhDict["codepuppy.net.hostFallback"]))
     expect(turnText()).toContain("解析不了")
-    expect(turnText()).not.toContain(raw)
-    expect(host.querySelector("[data-codepuppy-timeline-row='turn-error'] .a-turn-err-code")!.textContent).toBe("APIError")
+    // 0.2.4 owner「总是有这些报错」:说出了层的卡,错误名与引擎原文只进「开发者详情」(#1588 同一折叠),卡面不露 `APIError`。
+    const card = () => host.querySelector("[data-codepuppy-timeline-row='turn-error']")!
+    const faceText = () => {
+      const face = card().cloneNode(true) as Element
+      face.querySelector("details")?.remove()
+      return face.textContent ?? ""
+    }
+    expect(card().querySelector("details[data-codepuppy-dev-details] .a-turn-err-code")!.textContent).toBe(`APIError · ${raw}`)
+    expect(faceText()).not.toContain("APIError")
+    expect(faceText()).not.toContain(raw)
 
-    runtime.setTimelineRows(errorRowFor(raw, undefined, { codepuppyNetCode: "unattributed" }))
+    // 回复读到一半断流(实测原文):认不出层 ⇒ 「连接中途断开了」;原文只在开发者详情。
+    const midStream = "Connection lost while reading the response: UND_ERR_BODY_TIMEOUT: Body Timeout Error"
+    runtime.setTimelineRows(errorRowFor(midStream, undefined, { codepuppyNetCode: "unattributed" }))
     await flush()
     expect(turnText()).toContain(zhDict["codepuppy.net.unattributed"])
-    expect(turnText()).not.toContain(raw)
+    expect(faceText()).not.toContain("APIError")
+    expect(faceText()).not.toContain("UND_ERR")
+    expect(card().querySelector("details[data-codepuppy-dev-details] .a-turn-err-code")!.textContent).toBe(`APIError · ${midStream}`)
 
     for (const metadata of [undefined, { codepuppyNetLayer: "transport", codepuppyNetCode: "x" }, { codepuppyNetLayer: "http", codepuppyNetCode: "400" }]) {
       runtime.setTimelineRows(errorRowFor(raw, undefined, metadata))
@@ -3356,7 +3371,7 @@ describe("#1474 进行中的工作过程:实时标题 / 最近两步 / 已等 / 
     parts?: unknown[]
     assistant?: Record<string, unknown>
     startedAt?: number
-    retry?: { attempt: number; message: string }
+    retry?: { attempt: number; message: string; netLayer?: "connect-timeout" }
   }) {
     const startedAt = input.startedAt ?? Date.now() - 65_000
     return model.projectTimelineRows({
@@ -3724,13 +3739,28 @@ describe("#1474 进行中的工作过程:实时标题 / 最近两步 / 已等 / 
     expect(host.querySelectorAll("[data-codepuppy-timeline-row='process']")).toHaveLength(1)
     expect(processOf(host)!.getAttribute("data-face")).toBe("retry")
     expect(titleOf(host)).toBe("正在重试 · 第 3 次")
-    expect(processOf(host)!.querySelector("[data-codepuppy-process-retry-reason]")!.textContent).toBe("rate limited")
+    expect(processOf(host)!.querySelector("[data-codepuppy-process-retry-reason]")!.textContent).toBe("上次请求没有成功")
+    expect(processOf(host)!.querySelector("[data-codepuppy-process-retry-reason]")!.getAttribute("title")).toBe("rate limited")
     expect(processOf(host)!.querySelector("[role='status']")!.textContent).toBe("正在重试 · 第 3 次")
 
     runtime.setTimelineRows(liveTurn({}))
     await flush()
     expect(processOf(host)!.getAttribute("data-face")).toBe("running")
     expect(titleOf(host)).toBe("正在思考")
+  })
+
+  // 0.2.4 owner 报告:「正在重试 · 第 2 次 • UND_ERR_CONNECT_TIMEOUT: Connect Timeout Error (… • 1:20」。
+  // 引擎认出的网络层写成一句短语;英文原文与错误码只进悬停提示。
+  test("自动重试(连接超时):原因写「连接超时」,原文只在悬停提示", async () => {
+    const host = mount()
+    const raw = "UND_ERR_CONNECT_TIMEOUT: Connect Timeout Error (attempted address: gateway.example.com:443, timeout: 10000ms)"
+    runtime.setTimelineRows(liveTurn({ status: "retry", retry: { attempt: 2, message: raw, netLayer: "connect-timeout" } }))
+    await flush()
+    expect(titleOf(host)).toBe("正在重试 · 第 2 次")
+    const reason = processOf(host)!.querySelector("[data-codepuppy-process-retry-reason]")!
+    expect(reason.textContent).toBe("连接超时")
+    expect(reason.getAttribute("title")).toBe(raw)
+    expect(processOf(host)!.textContent).not.toContain("UND_ERR")
   })
 
   test("结局同帧让位(#1399 保留):完成 → 脚注;停止 → 中断行;出错 → 错误卡;零正文 → 空回合行 —— 实时标题同帧消失", async () => {

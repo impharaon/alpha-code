@@ -102,10 +102,11 @@ export type EngineInternalDirectories = { scratch: string[]; defaultWorkspace: s
 export type SidecarGenerationReason = "boot" | "structural"
 
 /** REQ-159 `#1322`:工作区写探针的回答(合同本体在 main/workspace-write-probe.ts,这里是 renderer 可见的形状)。 */
-export type WorkspaceWriteProbeResult = {
-  outcome: "writable" | "denied" | "unknown"
-  detail?: string
-}
+export type WorkspaceWriteProbeResult = import("../main/workspace-write-probe").WorkspaceWriteProbeResult
+export type WorkspaceWriteProbeRequest = import("../main/workspace-write-probe").WorkspaceWriteProbeRequest
+export type WorkspaceOpenRecordRequest = import("../main/workspace-write-probe").WorkspaceOpenRecordRequest
+export type WorkspaceOpenRecordResult = import("../main/workspace-write-probe").WorkspaceOpenRecordResult
+export type WorkspaceWritableChanged = import("../main/workspace-write-probe").WorkspaceWritableChanged
 // #577:"failed" 是健康探测失败/超时的终态 —— consumer 拿到事实后自证(有界自探),
 // 而不是永远等一个不会再来的 "ready"。
 // #613:"injection-failed" 是与其并列的第三终态 —— 引擎就绪(健康线已过)但 alpha 配置注入
@@ -753,7 +754,9 @@ export type ElectronAPI = {
    * REQ-159 `#1322`:「这个目录现在写得进去吗」—— 由**被围栏的引擎进程**在该目录真写一次再删。
    * writable / denied(围栏 EPERM)/ unknown(引擎不在 / 超时 / 别的失败)。呈现层只在 denied 时标记。
    */
-  workspaceWriteProbe: (directory: string) => Promise<WorkspaceWriteProbeResult>
+  workspaceWriteProbe: (input: WorkspaceWriteProbeRequest) => Promise<WorkspaceWriteProbeResult>
+  recordWorkspaceOpen: (input: WorkspaceOpenRecordRequest) => Promise<WorkspaceOpenRecordResult>
+  onWorkspaceWritableChanged: (cb: (change: WorkspaceWritableChanged) => void) => () => void
   openFilePicker: (opts?: {
     multiple?: boolean
     title?: string

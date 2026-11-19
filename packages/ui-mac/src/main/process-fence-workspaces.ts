@@ -19,25 +19,27 @@
 // ── 谁写、什么时候写 ───────────────────────────────────────────────────────────────
 // ① 首次启动(文件不存在):从 electron store 播种一次 —— 那一刻的可写集与今天(`#1390` 之后)逐字等价,不引入新风险;日志一行可见。
 // ② 之后:只经 renderer → `store-set` / `store-delete` / `store-clear` IPC → main(ipc.ts → 本文件的 tracker)。围栏内的进程到不了 IPC;
-//    它能改的只有 `<userData>` 里那份 store 文件,而那份**从此不再喂给围栏**(server.ts 的 planner 只读本真源)。
+//    新增目录还必须已由具体打开动作登记;恢复/SSE/深链只能消费登记表(server.ts 的 planner 只读本真源)。
 //
 // ── 检疫:为什么不能只做「IPC 来什么写什么」 ────────────────────────────────────────
 // renderer 启动时从 store 恢复 tab(app/src/utils/persist.ts),伪造的那条也会被恢复成一个 tab;用户随后开/关任何 tab,renderer 把
 // **整个** `tabs` 数组经 IPC 写回 —— 伪造条目就顺着合法通路进了真源,洞只是晚一次重启。所以 boot 时把「store 里有、真源里没有」的目录
 // 记成本会话的**检疫名单**:它们永远不进真源,哪怕 renderer 原样写回;真源只按 renderer 报上来的状态增减**检疫名单之外**的目录。
-// 代价如实:用户若真想打开一个恰好被检疫的目录,得先关掉那个(伪造的)tab、重启、再打开 —— 本机零租户,接受;日志点名被检疫的是哪几条。
+// 检疫仍是本次运行真源重播的第二道闸;具体打开动作可以为该目录登记运行期资格,当场放行。日志点名检疫项。
 //
 // ── 真源解析失败(不是缺失)怎么办 ───────────────────────────────────────────────────
 // 不改写、不重新播种,记一行原因;这一代 planner 退到默认工作区(fail-closed);renderer 下一次 tab 变更按当时状态把它重写好(检疫名单为空)。
 // 理由:围栏内的进程写不到这个文件,「坏掉」不是攻击可达的状态,从 renderer 状态重建与首次播种同一信任;而永远锁在默认工作区会让用户
-// 手动删文件才能恢复。
+// 手动删文件才能恢复。新目录仍须具体打开登记,不能仅凭恢复的 renderer 数据重建资格。
 //
 // electron-free:fs / 日志由 index.ts 与 server.ts 注入;本文件不 import electron,也不进 sidecar 的 import 闭包
 // (process-fence-write-sites.test.ts 的集合自证会点名)。
 
 import { dirname, isAbsolute, resolve } from "node:path"
 import type { AppEnvironment } from "./codepuppy-environment"
-import { workspaceCandidatesFromStore, type WorkspaceUnionSources } from "./process-fence-profile"
+import { checkWorkspaceDirectory, LOCAL_SIDECAR_SERVER_KEY, workspaceCandidatesFromStore, type WorkspaceDirectoryInput, type WorkspaceUnionSources } from "./process-fence-profile"
+import type { SidecarListener } from "./server"
+import type { WorkspaceWritableChanged, WorkspaceWriteProbeRequest, WorkspaceWriteProbeResult } from "./workspace-write-probe"
 import { GLOBAL_RENDERER_STORE, TABS_INFO_KEY, TABS_KEY, TABS_RECENT_KEY } from "./tabs-preclean"
 
 export const FENCE_WORKSPACES_DIRNAME = "fence-workspaces"
@@ -139,6 +141,10 @@ export function workspacesFromRendererTabs(sources: WorkspaceUnionSources): stri
 
 export type FenceWorkspaceTracker = {
   readonly truthPath: string
+  readonly userOpened: UserOpenedRegistry
+  /** Consumers only: this path never records an open, including on failure/retry. */
+  grantWrite(input: WorkspaceWriteProbeRequest, sidecar: SidecarListener | null): Promise<Pick<WorkspaceWriteProbeResult, "grant" | "reason">>
+  probeWrite(input: WorkspaceWriteProbeRequest, sidecar: SidecarListener | null): Promise<WorkspaceWriteProbeResult>
   /** 本会话的检疫名单(见文件头):store 里有、boot 时真源里没有的目录。 */
   readonly quarantined: readonly string[]
   /** ipc.ts `store-set`:写完 electron store 之后调用;不是 opencode.global.dat 的三个 tab 键一律忽略。 */
@@ -149,12 +155,23 @@ export type FenceWorkspaceTracker = {
   noteRendererStoreClear(name: string): void
 }
 
+export type WorkspaceEligibility =
+  | { eligible: true; server: typeof LOCAL_SIDECAR_SERVER_KEY; directory: string }
+  | { eligible: false; reason: "not-local" | "home-or-app-state" | "not-a-directory" }
+
+export type UserOpenedRegistry = {
+  register(input: { server: string; directory: string }): WorkspaceEligibility
+  has(server: string, directory: string): boolean
+}
+
 export type BootFenceWorkspaceTruthInput = {
   truthPath: string
   /** electron store 里的三个 tab 键,由 index.ts 在 tier-1 预清之后读一次(之后本模块不再碰 store —— 它在 W3 之下)。 */
   store: WorkspaceUnionSources
   fs: WorkspaceTruthReadFs & WorkspaceTruthWriteFs
   log: (line: string) => void
+  eligibility: WorkspaceDirectoryInput
+  onWritableChanged: (change: WorkspaceWritableChanged) => void
 }
 
 const TAB_KEYS: Record<string, keyof WorkspaceUnionSources> = { [TABS_KEY]: "tabs", [TABS_RECENT_KEY]: "recent", [TABS_INFO_KEY]: "info" }
@@ -201,9 +218,11 @@ export function bootFenceWorkspaceTruth(input: BootFenceWorkspaceTruthInput): Fe
     )
   }
   const quarantine = new Set(quarantined)
+  const opened = new Set(current.filter((directory) => checkWorkspaceDirectory(input.eligibility, directory).eligible).map((directory) => resolve(directory)))
+  const failed = new WeakMap<SidecarListener, Set<string>>()
 
   const recompute = () => {
-    const next = workspacesFromRendererTabs(state).filter((d) => !quarantine.has(d))
+    const next = workspacesFromRendererTabs(state).filter((d) => opened.has(d) && !quarantine.has(d))
     if (sameList(next, current)) return
     const added = next.filter((d) => !current.includes(d))
     const removed = current.filter((d) => !next.includes(d))
@@ -224,9 +243,53 @@ export function bootFenceWorkspaceTruth(input: BootFenceWorkspaceTruthInput): Fe
   const tabKey = (name: string, key: string): keyof WorkspaceUnionSources | undefined =>
     name === GLOBAL_RENDERER_STORE ? TAB_KEYS[key] : undefined
 
+  const userOpened: UserOpenedRegistry = {
+    register(target) {
+      if (target.server !== LOCAL_SIDECAR_SERVER_KEY) return { eligible: false, reason: "not-local" }
+      const candidate = checkWorkspaceDirectory(input.eligibility, target.directory)
+      if (!candidate.eligible) return { eligible: false, reason: candidate.reason }
+      const change = { server: LOCAL_SIDECAR_SERVER_KEY, directory: candidate.directory }
+      const added = !opened.has(candidate.directory)
+      opened.add(candidate.directory)
+      recompute()
+      if (added) input.onWritableChanged(change)
+      return { eligible: true, server: LOCAL_SIDECAR_SERVER_KEY, directory: candidate.directory }
+    },
+    has(server, directory) {
+      return server === LOCAL_SIDECAR_SERVER_KEY && isAbsolute(directory) && opened.has(resolve(directory))
+    },
+  }
+
+  const grantWrite: FenceWorkspaceTracker["grantWrite"] = async (target, sidecar) => {
+    if (sidecar ? !sidecar.fenced : process.platform !== "darwin") return { grant: "no-fence" }
+    if (target.server !== LOCAL_SIDECAR_SERVER_KEY) return { grant: "not-local" }
+    if (!sidecar) return { grant: "failed", reason: "grant-failed" }
+    if (!userOpened.has(target.server, target.directory)) {
+      const candidate = checkWorkspaceDirectory(input.eligibility, target.directory)
+      return { grant: "ineligible", reason: !candidate.eligible && candidate.reason === "home-or-app-state" ? "home-or-app-state" : "not-opened-by-you" }
+    }
+    const directory = resolve(target.directory)
+    const result = await sidecar.grantWrite(directory)
+    if (result.outcome === "failed") {
+      const failures = failed.get(sidecar) ?? new Set<string>()
+      failures.add(directory)
+      failed.set(sidecar, failures)
+      return { grant: "failed", reason: "grant-failed" }
+    }
+    if (failed.get(sidecar)?.delete(directory)) input.onWritableChanged({ server: target.server, directory })
+    return { grant: "granted" }
+  }
+
   return {
     truthPath,
     quarantined,
+    userOpened,
+    grantWrite,
+    async probeWrite(target, sidecar) {
+      const status = await grantWrite(target, sidecar)
+      if (!sidecar || status.grant === "no-fence" || status.grant === "not-local") return { outcome: "unknown", ...status }
+      return { ...await sidecar.probeWrite(target.directory), ...status }
+    },
     noteRendererStoreSet(name, key, value) {
       const field = tabKey(name, key)
       if (!field) return

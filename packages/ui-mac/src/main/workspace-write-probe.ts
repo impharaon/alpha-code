@@ -29,17 +29,34 @@ import { join } from "node:path"
 
 export type WorkspaceWriteProbeOutcome = "writable" | "denied" | "unknown"
 
-export type WorkspaceWriteProbeResult = {
+/** Sidecar facts carry no grant/eligibility assertion. Main alone adds those fields. */
+export type WorkspaceWriteProbeFact = {
   outcome: WorkspaceWriteProbeOutcome
   /** 人读的原因(errno 码 / 超时 / 子进程状态)。呈现层不解析它,只进日志。 */
   detail?: string
+}
+
+export type WorkspaceWriteProbeRequest = { server: string; directory: string }
+export type WorkspaceOpenRecordRequest = { server: string; directory: string }
+export type WorkspaceOpenRecordResult = { recorded: boolean; reason?: "not-local" | "home-or-app-state" | "not-a-directory" }
+export type WorkspaceWritableChanged = { server: string; directory: string }
+export type WorkspaceWriteProbeResult = WorkspaceWriteProbeFact & {
+  grant: "granted" | "failed" | "ineligible" | "not-local" | "no-fence"
+  reason?: "home-or-app-state" | "not-opened-by-you" | "grant-failed"
+}
+
+export function parseWorkspaceTarget(value: unknown): WorkspaceWriteProbeRequest | undefined {
+  if (!value || typeof value !== "object") return
+  const input = value as Partial<WorkspaceWriteProbeRequest>
+  if (typeof input.server !== "string" || !input.server || typeof input.directory !== "string" || !input.directory || input.directory.includes("\0")) return
+  return { server: input.server, directory: input.directory }
 }
 
 /** main → sidecar。`id` 由 main 的请求簿分配,应答按它对号。 */
 export type WorkspaceWriteProbeCommand = { type: "write-probe"; id: number; directory: string }
 
 /** sidecar → main。 */
-export type WorkspaceWriteProbeReply = { type: "write-probe-result"; id: number } & WorkspaceWriteProbeResult
+export type WorkspaceWriteProbeReply = { type: "write-probe-result"; id: number } & WorkspaceWriteProbeFact
 
 export type WorkspaceWriteGrantCommand = { type: "grant-write"; id: number; token: string }
 export type WorkspaceWriteGrantReply = {
@@ -125,7 +142,7 @@ export function parseWriteProbeCommand(value: unknown): WorkspaceWriteProbeComma
   return { type: "write-probe", id: command.id, directory: command.directory }
 }
 
-export function buildWriteProbeReply(id: number, result: WorkspaceWriteProbeResult): WorkspaceWriteProbeReply {
+export function buildWriteProbeReply(id: number, result: WorkspaceWriteProbeFact): WorkspaceWriteProbeReply {
   return { type: "write-probe-result", id, outcome: result.outcome, ...(result.detail ? { detail: result.detail } : {}) }
 }
 
@@ -159,7 +176,7 @@ export type RunWorkspaceWriteProbeDeps = {
  * 那不是探针,是假探针(AC3 判据会把它当场拒掉)。
  * `wx`:文件已存在算失败而不是覆盖 —— 探针永远不碰用户自己的文件。
  */
-export function runWorkspaceWriteProbe(directory: string, deps: RunWorkspaceWriteProbeDeps = {}): WorkspaceWriteProbeResult {
+export function runWorkspaceWriteProbe(directory: string, deps: RunWorkspaceWriteProbeDeps = {}): WorkspaceWriteProbeFact {
   const stamp = deps.stamp ?? (() => `${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`)
   const file = join(directory, `.codepuppy-write-probe-${stamp()}`)
   const writeFile = deps.writeFile ?? ((p, data) => writeFileSync(p, data, { flag: "wx" }))
@@ -194,7 +211,7 @@ export const WRITE_PROBE_TIMEOUT_MS = 5_000
 
 export type WriteProbeRequester = {
   /** 发一条探针请求;超时 / 子进程已退出 / 形状不对的应答 ⇒ 都答 unknown,并说清原因。 */
-  request(directory: string): Promise<WorkspaceWriteProbeResult>
+  request(directory: string): Promise<WorkspaceWriteProbeFact>
   /** 喂进 sidecar 的每一条 message;不是探针应答就原样忽略(返回 false)。 */
   receive(message: unknown): boolean
   /** 子进程退出:所有在途请求立刻答 unknown。之后的 request 不再发,直接答 unknown。 */
@@ -206,10 +223,10 @@ export function createWriteProbeRequester(
   options: { timeoutMs?: number } = {},
 ): WriteProbeRequester {
   const timeoutMs = options.timeoutMs ?? WRITE_PROBE_TIMEOUT_MS
-  const pending = new Map<number, { settle: (result: WorkspaceWriteProbeResult) => void; timer: ReturnType<typeof setTimeout> }>()
+  const pending = new Map<number, { settle: (result: WorkspaceWriteProbeFact) => void; timer: ReturnType<typeof setTimeout> }>()
   let seq = 0
   let closed: string | undefined
-  const settle = (id: number, result: WorkspaceWriteProbeResult) => {
+  const settle = (id: number, result: WorkspaceWriteProbeFact) => {
     const entry = pending.get(id)
     if (!entry) return false
     pending.delete(id)
@@ -221,7 +238,7 @@ export function createWriteProbeRequester(
     request(directory) {
       if (closed) return Promise.resolve({ outcome: "unknown", detail: closed })
       const id = ++seq
-      return new Promise<WorkspaceWriteProbeResult>((resolve) => {
+      return new Promise<WorkspaceWriteProbeFact>((resolve) => {
         const timer = setTimeout(() => settle(id, { outcome: "unknown", detail: `no reply from the engine within ${timeoutMs}ms` }), timeoutMs)
         pending.set(id, { settle: resolve, timer })
         try {

@@ -349,12 +349,36 @@ function canonical(p: string, realpath: (p: string) => string): string {
   }
 }
 
+export type WorkspaceDirectoryInput = Pick<WorkspaceUnionInput, "homeDir" | "appStateRoot" | "realpath" | "isDirectory">
+
+/** The one candidate predicate shared by W1 selection and explicit-open registration (rules 4/5/5b). */
+export function checkWorkspaceDirectory(input: WorkspaceDirectoryInput, raw: string):
+  | { eligible: true; directory: string }
+  | { eligible: false; reason: "home-or-app-state" | "not-a-directory"; detail: string } {
+  if (!raw || !isAbsolute(raw)) return { eligible: false, reason: "not-a-directory", detail: "not an absolute path" }
+  const dir = resolve(raw)
+  if (dir === resolve(sep) || isAncestorOrSelf(dir, resolve(input.homeDir)))
+    return { eligible: false, reason: "home-or-app-state", detail: "would put HOME inside the writable set (fence would be void)" }
+  const appStateRoot = canonical(input.appStateRoot, input.realpath)
+  const canon = canonical(dir, input.realpath)
+  if (related(canon, appStateRoot)) return {
+    eligible: false,
+    reason: "home-or-app-state",
+    detail: `related to the app state root ${appStateRoot} (same path, inside it, or contains it)` +
+      (canon === dir ? "" : ` (resolves to ${canon})`) +
+      " — the fence's own state must never be a workspace (#1390)",
+  }
+  try {
+    if (input.isDirectory(dir)) return { eligible: true, directory: dir }
+  } catch {
+    // A vanished/unreadable directory cannot become an explicit-open grant.
+  }
+  return { eligible: false, reason: "not-a-directory", detail: "not a directory on disk" }
+}
+
 /** 并集选择(规则见上)。返回值里 `excluded` 逐条给理由,给 main 日志用。 */
 export function selectWorkspaceUnion(input: WorkspaceUnionInput): WorkspaceUnion {
   const max = input.maxWorkspaces ?? MAX_WORKSPACES
-  const home = resolve(input.homeDir)
-  const root = resolve(sep)
-  const appStateRoot = canonical(input.appStateRoot, input.realpath)
   const selected: string[] = []
   const excluded: WorkspaceExclusion[] = []
   const seen = new Set<string>()
@@ -367,25 +391,9 @@ export function selectWorkspaceUnion(input: WorkspaceUnionInput): WorkspaceUnion
     const dir = resolve(raw)
     if (seen.has(dir)) continue
     seen.add(dir)
-    if (dir === root || isAncestorOrSelf(dir, home)) {
-      // `/`、HOME、HOME 的祖先:放行它等于没有围栏。
-      excluded.push({ directory: dir, reason: "would put HOME inside the writable set (fence would be void)" })
-      continue
-    }
-    // 规则 5b(`#1390`):与应用状态根相关(同一路径 / 在它之内 / 包含它)的候选一律排除;归一之后再比。
-    const canon = canonical(dir, input.realpath)
-    if (related(canon, appStateRoot)) {
-      excluded.push({
-        directory: dir,
-        reason:
-          `related to the app state root ${appStateRoot} (same path, inside it, or contains it)` +
-          (canon === dir ? "" : ` (resolves to ${canon})`) +
-          " — the fence's own state must never be a workspace (#1390)",
-      })
-      continue
-    }
-    if (!input.isDirectory(dir)) {
-      excluded.push({ directory: dir, reason: "not a directory on disk" })
+    const candidate = checkWorkspaceDirectory(input, dir)
+    if (!candidate.eligible) {
+      excluded.push({ directory: dir, reason: candidate.detail })
       continue
     }
     if (selected.length >= max) {

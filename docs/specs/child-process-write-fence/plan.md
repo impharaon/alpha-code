@@ -161,3 +161,5 @@ PLAN 阶段只提交本文件。下表和命令均为实施安排，不代表已
 - 2026-11-19 · 步骤 3 红证据：workspaces 9 pass / 6 fail（缺登记权威），IPC 宿主 0 pass / 1 fail，内层 10 fail（新通道不存在、probe 缺 server/grant、picker 立即返回且没有放行）；原始 `step3-red.log` / `step3-ipc-red.log`。既有真源测试中的新打开动作改为显式登记，新增 SSE 目录过滤、tab 先于登记、检疫第二道闸和 HOME/状态/远端顺序用例；IPC 子例使用生产 handlers/tracker/listener，native 与 Electron 是隔离替身，不能代替 G0。
 
 - 2026-11-19 · 步骤 3 补 O1 红证据：`step3-picker-red.log` 中 picker 子例因额外触发 filesystem probe（应只等 consume）红，其余 9 子例通过。同时修正 fake child 的并发应答必须捕获各自 id（保留原断言）、临时全局根使用真实 `<base>/env/dev` 形状；不改产品合同。
+
+- 2026-11-19 · 步骤 3 接线：共享规则 4/5/5b predicate、main 内存登记、真源过滤/登记重算、当前 listener 的成功账本/并发合并、grant 请求簿消息路由及退出关闭、M1 与 record IPC、preload 通知/合同和 index 注入。O1 只等 grant 消费（不等待 probe），最多 1 s，后台继续。检查组 B 加受影响 profile/write-sites 共 128 pass / 0 fail，内层 IPC 10 pass；workspaces pin 12→15，新 gate host=1。必要测试假件 `test-component/preload-stub.ts` 分类两个新 preload 键；真实 native 合同未改。包 typecheck 的 main 两项窄化错误已修，renderer 旧 probe 参数/桥缺 grant 尚待步骤 4 同步，不能把当前结果报成全包通过。

@@ -68,7 +68,9 @@ import { askUserForEgressGrant } from "./egress-approval-dialog"
 // REQ-159 `#1322`:工作区写探针的 main 半场 —— 请求/应答簿记住在 workspace-write-probe.ts,这里只接线到子进程。
 import { createProjectConfigViewRequester } from "./project-config-view-message"
 import type { ProjectConfigView } from "@opencode/schema/codepuppy-project-config"
-import { createWriteProbeRequester, type WorkspaceWriteProbeResult } from "./workspace-write-probe"
+import { createWriteGrantRequester, createWriteProbeRequester, type WorkspaceWriteGrantReply, type WorkspaceWriteProbeFact } from "./workspace-write-probe"
+import { loadFenceAddon } from "./process-fence-apply"
+import { WORKSPACE_WRITE_EXTENSION_CLASS } from "./process-fence-profile"
 import { codepuppyGlobalRoot, codepuppyJsoncPath } from "./engine-config-truth"
 import { ensureUserWorkspaceDir } from "./codepuppy-user-workspace"
 import { fenceWorkspaceTruthPath, readWorkspaceTruthOrThrow } from "./process-fence-workspaces"
@@ -99,7 +101,10 @@ export type SidecarListener = {
    * REQ-159 `#1322`:让**被围栏的 sidecar** 在 `directory` 真写一次再删,回答 writable / denied / unknown。
    * 超时、进程已退出、应答形状不对 ⇒ unknown(呈现层 unknown = 无标记,不猜)。
    */
-  probeWrite: (directory: string) => Promise<WorkspaceWriteProbeResult>
+  probeWrite: (directory: string) => Promise<WorkspaceWriteProbeFact>
+  readonly fenced: boolean
+  /** Main's eligibility consumer is the sole caller; successful grants live only in this listener. */
+  grantWrite: (directory: string) => Promise<Omit<WorkspaceWriteGrantReply, "type" | "id">>
 }
 
 const SIDECAR_SERVICE_NAME = "opencode server"
@@ -584,11 +589,48 @@ export async function spawnLocalServer(
   // 子进程退出 ⇒ 在途请求全部答 unknown(不是「拒绝」,也不是「可写」)。
   const projectConfigViews = createProjectConfigViewRequester((command) => child.postMessage(command))
   const writeProbes = createWriteProbeRequester((command) => child.postMessage(command))
+  const writeGrants = createWriteGrantRequester((command) => child.postMessage(command))
+  const grantedDirectories = new Set<string>()
+  const granting = new Map<string, Promise<Omit<WorkspaceWriteGrantReply, "type" | "id">>>()
+  const grantWrite: SidecarListener["grantWrite"] = (directory) => {
+    if (exited || !child.pid) return Promise.resolve({ outcome: "failed", detail: "engine not running" })
+    if (!fence) return Promise.resolve({ outcome: "failed", detail: "engine has no fence" })
+    if (grantedDirectories.has(directory)) return Promise.resolve({ outcome: "granted" })
+    const pending = granting.get(directory)
+    if (pending) return pending
+    const started = performance.now()
+    const grant = (async (): ReturnType<SidecarListener["grantWrite"]> => {
+      try {
+        const issued = loadFenceAddon(fence.addonPath).issueFileExtensionToProcess(WORKSPACE_WRITE_EXTENSION_CLASS, directory, child.pid!)
+        if (issued.token === null) {
+          getLogger()?.warn(`process fence: grant failed directory=${JSON.stringify(directory)} step=${issued.step} errno=${issued.errno}`)
+          return { outcome: "failed", detail: `${issued.step} errno=${issued.errno}` }
+        }
+        const result = await writeGrants.request(issued.token)
+        if (result.outcome === "granted" && !exited) {
+          grantedDirectories.add(directory)
+          getLogger()?.log(`process fence: grant granted directory=${JSON.stringify(directory)} roundTripMs=${(performance.now() - started).toFixed(3)}`)
+          return { outcome: "granted" }
+        }
+        const errno = /^consume errno=(\d+)$/.exec(result.detail ?? "")?.[1] ?? "unknown"
+        getLogger()?.warn(`process fence: grant failed directory=${JSON.stringify(directory)} step=consume errno=${errno}`)
+        return { outcome: "failed", detail: result.detail ?? "engine exited during grant" }
+      } catch {
+        // An exception/post error can contain a token. Only owned, constant diagnostics cross this boundary.
+        getLogger()?.warn(`process fence: grant failed directory=${JSON.stringify(directory)} step=native-exception errno=unknown`)
+        return { outcome: "failed", detail: "native grant failed" }
+      }
+    })()
+    granting.set(directory, grant)
+    void grant.finally(() => granting.delete(directory))
+    return grant
+  }
   // REQ-234 `#1529`:`codepuppy.*` 分发与探针应答并列;不是本族的消息原样交还(返回 false)。
   const postCodePuppy = (message: CodePuppySidecarOutbound) => child.postMessage(message)
   child.on("message", (message: unknown) => {
     if (projectConfigViews.receive(message)) return
     if (writeProbes.receive(message)) return
+    if (writeGrants.receive(message)) return
     options.codepuppySidecar?.receive(message, postCodePuppy)
   })
   let detachCodePuppy: ((reason: string) => void) | undefined
@@ -598,6 +640,8 @@ export async function spawnLocalServer(
     electronNs.app.off("child-process-gone", onProcessGone)
     projectConfigViews.close()
     writeProbes.close(`sidecar exited with code ${code}`)
+    writeGrants.close(`sidecar exited with code ${code}`)
+    grantedDirectories.clear()
     detachCodePuppy?.(`sidecar exited with code ${code}`)
     options.onExit?.(code)
     exit.resolve(code)
@@ -705,6 +749,8 @@ export async function spawnLocalServer(
       },
       projectConfigView: (directory: string) => projectConfigViews.request(directory),
       probeWrite: (directory: string) => writeProbes.request(directory),
+      fenced: !!fence,
+      grantWrite,
       stop: () => {
         if (stopping) return stopping
         if (exited) return Promise.resolve()

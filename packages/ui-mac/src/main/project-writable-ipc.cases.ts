@@ -112,7 +112,7 @@ beforeEach(async () => {
   })
   listener = result.listener
   await result.health.wait
-  registerIpcHandlers({ fenceWorkspaces: tracker, probeWorkspaceWrite: probe,
+  registerIpcHandlers({ fenceWorkspaces: tracker, probeWorkspaceWrite: probe, grantWorkspaceWrite: async (input) => { await tracker.grantWrite(input, listener) },
     updater: { subscribe: () => () => {} },
   } as unknown as Parameters<typeof registerIpcHandlers>[0])
 })

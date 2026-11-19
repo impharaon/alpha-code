@@ -757,7 +757,7 @@ describe("REQ-159 main 侧接线:计划 → start 命令 → 拒 fork", () => {
       // 启动 1(本票落地后的第一次):store 里只有用户真开过的 proj ⇒ 播种,日志一行
       store.set(TABS_KEY, JSON.stringify([draftP]))
       store.set(TABS_RECENT_KEY, JSON.stringify({ key: "draft:p" }))
-      bootFenceWorkspaceTruth({ truthPath, store: readStore(), fs, log: (l) => void bootLogs.push(l) })
+      bootFenceWorkspaceTruth({ eligibility: { homeDir: home, appStateRoot: join(home, "app-state"), realpath: fs.realpathSync.native, isDirectory: (path) => fs.statSync(path).isDirectory() }, onWritableChanged: () => {}, truthPath, store: readStore(), fs, log: (l) => void bootLogs.push(l) })
       expect(readFileSync(truthPath, "utf8")).toBe(`{"v":1,"workspaces":["${proj}"]}\n`)
       expect(bootLogs).toEqual([`process fence: workspace truth seeded from the renderer tab store (first launch with #1394) — 1 workspace(s) written to ${truthPath}: ${proj}`])
 
@@ -771,7 +771,7 @@ describe("REQ-159 main 侧接线:计划 → start 命令 → 拒 fork", () => {
 
       // 启动 2:真源在 ⇒ 装载 + 检疫;生产计划器算出的 profile:含用户真开过的、含 ~/code-puppy、不含伪造目录
       bootLogs.length = 0
-      const tracker = bootFenceWorkspaceTruth({ truthPath, store: readStore(), fs, log: (l) => void bootLogs.push(l) })
+      const tracker = bootFenceWorkspaceTruth({ eligibility: { homeDir: home, appStateRoot: join(home, "app-state"), realpath: fs.realpathSync.native, isDirectory: (path) => fs.statSync(path).isDirectory() }, onWritableChanged: () => {}, truthPath, store: readStore(), fs, log: (l) => void bootLogs.push(l) })
       expect(tracker.quarantined).toEqual([forged])
       expect(bootLogs[1]).toContain("quarantined for this session")
       const gen1 = await spawnProfile(4320)
@@ -781,7 +781,8 @@ describe("REQ-159 main 侧接线:计划 → start 命令 → 拒 fork", () => {
       expect(gen1.profile).not.toContain("LaunchAgents")
       expect(gen1.planned).toContain("workspaces=2 (candidates=2, excluded=0, dropped=0)")
 
-      // renderer 从 store 恢复了那个伪造 tab,用户随后开了一个新目录 ⇒ 整个 tabs 数组经 IPC 写回:真源只多新开的那条,伪造条被检疫
+      // renderer 从 store 恢复了那个伪造 tab,用户随后亲手登记一个新目录 ⇒ 整个 tabs 数组经 IPC 写回:真源只多新开的那条,伪造条被检疫
+      tracker.userOpened.register({ server: "sidecar", directory: opened })
       tracker.noteRendererStoreSet(GLOBAL_RENDERER_STORE, TABS_KEY, JSON.stringify([draftP, draftForged, draftOpened]))
       expect(readFileSync(truthPath, "utf8")).toBe(`{"v":1,"workspaces":["${proj}","${opened}"]}\n`)
       const gen2 = await spawnProfile(4321)

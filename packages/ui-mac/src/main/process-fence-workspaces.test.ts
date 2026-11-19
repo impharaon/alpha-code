@@ -288,7 +288,7 @@ describe("用户打开登记是两个消费者的共同资格", () => {
     const truthPath = join(dir, "truth.json")
     writeWorkspaceTruth(truthPath, ["/Users/alpha/proj-a"], fs)
     const changes: unknown[] = []
-    const tracker = bootFenceWorkspaceTruth({ ...eligibilityFixture, truthPath, store: {}, fs, log: () => {}, onWritableChanged: (change) => { changes.push(change) } })
+    const tracker = bootFenceWorkspaceTruth({ ...eligibilityFixture, truthPath, store: { tabs: undefined, recent: undefined, info: undefined }, fs, log: () => {}, onWritableChanged: (change) => { changes.push(change) } })
     expect(tracker.userOpened.has("sidecar", "/Users/alpha/proj-a")).toBe(true)
     tracker.noteRendererStoreSet(GLOBAL_RENDERER_STORE, TABS_INFO_KEY, { "sidecar\n/session/s": { directory: "/Users/alpha/rewritten" } })
     expect(readWorkspaceTruthOrThrow(truthPath, fs)).toEqual([])
@@ -304,7 +304,7 @@ describe("用户打开登记是两个消费者的共同资格", () => {
 
   test("资格顺序:远端不查本机;HOME/祖先/根/状态相关路径和软链不能登记;目录检查失败不抛", () => withTemp((dir) => {
     const checked: string[] = []
-    const tracker = bootFenceWorkspaceTruth({ ...eligibilityFixture, truthPath: join(dir, "truth.json"), store: {}, fs, log: () => {}, eligibility: {
+    const tracker = bootFenceWorkspaceTruth({ ...eligibilityFixture, truthPath: join(dir, "truth.json"), store: { tabs: undefined, recent: undefined, info: undefined }, fs, log: () => {}, eligibility: {
       ...eligibilityFixture.eligibility,
       realpath: (p) => p === "/Users/alpha/alias" ? STATE_ROOT : p,
       isDirectory: (p) => { checked.push(p); if (p.endsWith("missing")) throw new Error("ENOENT"); return true },
@@ -322,7 +322,7 @@ describe("用户打开登记是两个消费者的共同资格", () => {
   test("检疫仍挡真源重播;用户具体打开可登记,不会把恢复本身误算成打开", () => withTemp((dir) => {
     const truthPath = join(dir, "truth.json")
     writeWorkspaceTruth(truthPath, [], fs)
-    const tracker = bootFenceWorkspaceTruth({ ...eligibilityFixture, truthPath, store: { tabs: [draft("x", "/Users/alpha/quarantined")] }, fs, log: () => {} })
+    const tracker = bootFenceWorkspaceTruth({ ...eligibilityFixture, truthPath, store: { tabs: [draft("x", "/Users/alpha/quarantined")], recent: undefined, info: undefined }, fs, log: () => {} })
     tracker.noteRendererStoreSet(GLOBAL_RENDERER_STORE, TABS_RECENT_KEY, { key: "draft:x" })
     expect(tracker.userOpened.has("sidecar", "/Users/alpha/quarantined")).toBe(false)
     expect(tracker.userOpened.register({ server: "sidecar", directory: "/Users/alpha/quarantined" }).eligible).toBe(true)

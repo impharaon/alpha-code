@@ -1,6 +1,6 @@
 import { clearOfficialConnectorRuntimeOnExit } from "./official-connector-resources"
 import { randomUUID } from "node:crypto"
-import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs"
+import { existsSync, mkdirSync, readFileSync, realpathSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs"
 import * as http from "node:http"
 import { createServer } from "node:net"
 import { homedir, tmpdir } from "node:os"
@@ -974,6 +974,15 @@ const main = Effect.gen(function* () {
   // **之前**(计划器读的是这里播好 / 装好的文件;IPC 一来就要有 tracker 接)。store 读挂不炸 boot:按空 store 处理并出声。
   const fenceWorkspaces = bootFenceWorkspaceTruth({
     truthPath: fenceWorkspaceTruthPath(codepuppyEnv.casBaseRoot, codepuppyEnv.environment),
+    eligibility: {
+      homeDir: homedir(), appStateRoot: codepuppyEnv.casBaseRoot, realpath: realpathSync.native,
+      isDirectory: (directory) => statSync(directory).isDirectory(),
+    },
+    onWritableChanged: (change) => {
+      for (const win of BrowserWindow.getAllWindows()) {
+        if (!win.webContents.isDestroyed()) win.webContents.send("workspace-writable-changed", change)
+      }
+    },
     store: (() => {
       try {
         const store = getStore(GLOBAL_RENDERER_STORE)
@@ -992,8 +1001,8 @@ const main = Effect.gen(function* () {
     killSidecar: () => killSidecar(),
     sidecarGenerationState: () => sidecarGeneration.get(),
     // REQ-159 `#1322`:探针必须在被围栏的 sidecar 里跑;没有活着的 sidecar 就如实答 unknown。
-    probeWorkspaceWrite: (directory) =>
-      server ? server.probeWrite(directory) : Promise.resolve({ outcome: "unknown", detail: "engine not running" }),
+    probeWorkspaceWrite: (input) => fenceWorkspaces.probeWrite(input, server),
+    grantWorkspaceWrite: async (input) => { await fenceWorkspaces.grantWrite(input, server) },
     relaunch,
     awaitInitialization: Effect.fnUntraced(
       function* () {

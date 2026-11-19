@@ -13,6 +13,7 @@ import {
   type RailPreviewClosedEvent,
   type RendererStartupMarkName,
   type SidecarGenerationState,
+  type WorkspaceWritableChanged,
   STARTUP_TIMELINE_CHANNEL,
   type StartupTimelineExtra,
   type WslServersEvent,
@@ -165,7 +166,13 @@ const api: ElectronAPI = {
   workspaceDefaultDir: () => ipcRenderer.invoke("codepuppy-workspace-default"),
   workspaceEnsureDefault: (dir) => ipcRenderer.invoke("codepuppy-workspace-ensure", dir),
   engineInternalDirectories: () => ipcRenderer.invoke("codepuppy-engine-internal-directories"),
-  workspaceWriteProbe: (directory) => ipcRenderer.invoke("workspace-write-probe", directory),
+  workspaceWriteProbe: (input) => ipcRenderer.invoke("workspace-write-probe", input),
+  recordWorkspaceOpen: (input) => ipcRenderer.invoke("workspace-open-record", input),
+  onWorkspaceWritableChanged: (cb) => {
+    const handler = (_: unknown, change: WorkspaceWritableChanged) => cb(change)
+    ipcRenderer.on("workspace-writable-changed", handler)
+    return () => ipcRenderer.removeListener("workspace-writable-changed", handler)
+  },
   openFilePicker: (opts) => ipcRenderer.invoke("open-file-picker", opts),
   readPickedFile: (token, path) => ipcRenderer.invoke("read-picked-file", token, path),
   releasePickedFiles: (token) => ipcRenderer.invoke("release-picked-files", token),

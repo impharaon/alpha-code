@@ -119,9 +119,18 @@ test("V4/V5/V6 production Chromium window: concrete opens, slow replies, reloads
   console.log(`WINDOW PASS evidence=${prepared!.run}/window`)
 }, 300_000)
 
-test("AC-08 external deep link reaches the residual DOM then the picker makes that folder writable", () => {
+test("AC-08 restored rewritten session shows the residual sentence then the picker grants it in place", () => {
   expect(windowReport, "window proof did not run").toBeDefined()
   expect(windowReport!.error, `window evidence=${prepared!.run}/window`).toBeUndefined()
   expect(windowReport!.appExitCode).toBe(0)
-  expect(windowReport!.arms.slice(12).map((arm: { name: string }) => arm.name)).toEqual(["deep-link-before", "deep-link-after"])
+  expect(windowReport!.arms.slice(12).map((arm: { name: string }) => arm.name)).toEqual(["restored-before", "restored-after"])
+  expect(windowReport!.arms[12].reason).toBe("not-opened-by-you")
+  const opened = windowReport!.restoredOpen
+  expect(opened.before.registered).toBe(false)
+  expect(opened.before.files).toEqual([])
+  expect(opened.after.registered).toBe(true)
+  expect(opened.after.files).toEqual(["window-restored-after.txt"])
+  expect(opened.after.enginePid).toBe(opened.before.enginePid)
+  expect(opened.after.rendererPid).toBe(opened.before.rendererPid)
+  expect(opened.after.loads).toBe(opened.before.loads)
 })

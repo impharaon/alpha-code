@@ -16,6 +16,7 @@ import {
 } from "./process-fence-workspaces"
 import { environmentMutableRoot } from "./codepuppy-environment"
 import { GLOBAL_RENDERER_STORE, TABS_INFO_KEY, TABS_KEY, TABS_RECENT_KEY } from "./tabs-preclean"
+import { createDeepLinkQueue } from "./deep-link-queue"
 
 const STATE_ROOT = "/Users/alpha/Library/Application Support/codepuppy-state"
 const eligibilityFixture = {
@@ -300,6 +301,24 @@ describe("用户打开登记是两个消费者的共同资格", () => {
     tracker.noteRendererStoreClear(GLOBAL_RENDERER_STORE)
     expect(tracker.userOpened.has("sidecar", "/Users/alpha/rewritten")).toBe(true)
     expect(readWorkspaceTruthOrThrow(truthPath, fs)).toEqual([])
+  }))
+
+  test("深链交付和 tab 写回只消费资格,不登记目录;具体打开后同一目录才进真源", () => withTemp((dir) => {
+    const truthPath = join(dir, "truth.json")
+    writeWorkspaceTruth(truthPath, [], fs)
+    const tracker = bootFenceWorkspaceTruth({ ...eligibilityFixture, truthPath, store: { tabs: [], recent: undefined, info: undefined }, fs, log: () => {} })
+    const queue = createDeepLinkQueue({ consumeAuth: () => false, deliver: () => false, schedule: () => {} })
+    // Wire samples OPEN_PROJECT / NEW_SESSION; fixture provenance is recorded in the slice plan.
+    queue.ingest(["opencode://open-project?directory=/Users/alpha/link-target", "opencode://new-session?directory=/Users/alpha/link-target"])
+    const batches = queue.consumeInitial(1)
+    expect(batches.flatMap((batch) => batch.links).map((link) => link.directory)).toEqual(["/Users/alpha/link-target", "/Users/alpha/link-target"])
+    for (const batch of batches) queue.acknowledge(1, batch.id)
+    tracker.noteRendererStoreSet(GLOBAL_RENDERER_STORE, TABS_KEY, [draft("linked", "/Users/alpha/link-target")])
+    expect(tracker.userOpened.has("sidecar", "/Users/alpha/link-target")).toBe(false)
+    expect(readWorkspaceTruthOrThrow(truthPath, fs)).toEqual([])
+    tracker.userOpened.register({ server: "sidecar", directory: "/Users/alpha/link-target" })
+    expect(tracker.userOpened.has("sidecar", "/Users/alpha/link-target")).toBe(true)
+    expect(readWorkspaceTruthOrThrow(truthPath, fs)).toEqual(["/Users/alpha/link-target"])
   }))
 
   test("资格顺序:远端不查本机;HOME/祖先/根/状态相关路径和软链不能登记;目录检查失败不抛", () => withTemp((dir) => {

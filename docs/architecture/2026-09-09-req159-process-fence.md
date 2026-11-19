@@ -195,13 +195,13 @@ U1 只出了 arm64,并明写将来出 Intel / universal 时若漏第二份,x64 �
 - 用户亲手打开启动集合外的合格项目后,由 main 当场签发、sidecar 消费,已有终端/MCP 和之后的助手写工具都可写;未放行目录仍拒写。
   2026-11-19 的签名、hardened-runtime G0 验过已有/新 child、另一目录零落盘、绑定回放、自签 50 臂与两个坏 profile 对照。
   每臂文件、pid、顺序与耗时见[实施验据](../specs/child-process-write-fence/plan.md)。
-- 当前新布局的深链接 UI 整链仍有缺口:main 已递送并由 renderer 缓冲,但现有消费者只挂在 `LegacyLayout`;
-  默认 `NewLayout` 不消费该缓冲。真实窗口中链接未进入目标目录,因此「链接到达后显示未亲手打开、再选中可写」尚未取得证据。
-  这不授予目录写资格;修复需冻结设计补充当前布局的消费落点,不能以旧布局代替验收。
+- 项目深链接已由 main 递送并由 renderer 缓冲,现有消费者只挂在 `LegacyLayout`;默认 `NewLayout` 不消费该缓冲
+  (`packages/codepuppy-app/src/pages/layout-new.tsx:10`)。此能力属于编排者记录的 pending intent,不在本变更补齐。
+  深链交付和 tab 写回不产生写资格;spec v3 的 AC-08 以恢复出目录被改写的会话到达未登记目录,显示说明后经「打开项目」选中,同代同 renderer 当场可写。
 - **`#1394` 之后仍然开着的(如实)**:①首次播种信任当时 store 里已有的内容 —— 升级前已被塞进去的伪造条会一起搬过去
   (与 `#1390` 之后的可写集等价,没有更坏);②围栏内的代码仍能往 `opencode.global.dat` 塞条目,renderer 会把它恢复成一个用户没开过的
   tab —— 它写不进去、也进不了真源(检疫),但这条通路本身没堵,界面上也没有标它可疑;③被检疫的目录若恰是用户后来真想打开的,
-  要先关掉那个 tab、重启、再打开;④catalog 看门狗的探针目录(`catalog-liveness.ts`)仍从 store 解析 —— 它只决定探哪个目录的
+  可经「打开项目」正式登记,在本次引擎运行中当场可写;④catalog 看门狗的探针目录(`catalog-liveness.ts`)仍从 store 解析 —— 它只决定探哪个目录的
   catalog,不决定可写集;⑤真源文件坏掉(不是攻击可达的状态)时这一代只剩 `~/code-puppy`,直到 renderer 下一次 tab 变更把它重写好。
   端到端判据(`process-fence-wiring.test.ts`)在 bun 里对着生产计划器跑,fork 是假子进程;**没有**在真 Electron 主进程里冷启动一次
   取证 —— 「index.ts 在预清之后、注册 IPC 之前播种」与「ipc.ts 三个通道写完都通知 tracker」两跳是源码锚,不是行为判据。
@@ -264,4 +264,4 @@ ext 的工具错误钩子没有 main 登记事实;裸 EPERM 或 shell 输出只�
 | `test-component/new-session-workspace.cases.ts`(宿主 `new-session-workspace.component.test.ts`) | 全平台 | chip 与顶栏同一 reason 判据;真实首次 home/prompt/command/terminal 工作等消费;普通未知或桥缺席不伪造只读原因 |
 | `workspace-writable-core.test.ts` / `sandbox-state.test.ts` | 全平台 | server/目录/代次缓存、通知失效、迟到应答、1 s 首次工作上限;沙箱投影只认在线 + fence 字段 |
 | `project-writable.engine.test.ts` | darwin | 真引擎/ext/围栏、已有 PTY/MCP、首个模型工作与新 PTY、另一个流不取消;真实 SQL 改写后重启不收伪造目录 |
-| `process-fence-extension-packaged.test.ts` | darwin 本地签名包 | G0 / V7、50 自签臂、坏 profile、回放、100 次往返;真实 Chromium/CDP 的 M1/R1–R5、慢响应、重载和三句说明。AC-08 新布局深链 UI 用例独立保留红证据,见 §7 |
+| `process-fence-extension-packaged.test.ts` | darwin 本地签名包 | G0 / V7、50 自签臂、坏 profile、回放、100 次往返;真实 Chromium/CDP 的 M1/R1–R5、慢响应、重载和三句说明。AC-08 恢复出的改写目录先显示未亲手打开、零落盘,再经 M1 同代同 renderer 可写；深链不登记另由 main 小用例守住（spec v3） |

@@ -135,6 +135,7 @@ export async function runPackagedWindowProof(input: { appDir: string; run: strin
     const report = JSON.parse(readFileSync(resultPath, "utf8"))
     report.appExitCode = code
     report.modelRequestCount = model.requests.length
+    writeFileSync(resultPath, JSON.stringify(report, null, 2))
     expect(report.windowVisible).toBe(false)
     expect(model.requests.length).toBeGreaterThan(0)
     expect(report.inputs.length).toBeGreaterThan(0)

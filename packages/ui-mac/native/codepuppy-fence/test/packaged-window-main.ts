@@ -57,7 +57,7 @@ const userData = join(root, "user-data"),
   engineData = join(root, "engine-data"),
   A = join(root, "A")
 const directories = Object.fromEntries(
-  ["M1", "R1", "R2", "R3", "R4", "R5", "slow", "deep", "rewritten", "failed", "timeout"].map((name) => [
+  ["M1", "R1", "R2", "R3", "R4", "R5", "slow", "rewritten", "failed", "timeout"].map((name) => [
     name,
     join(root, name),
   ]),
@@ -715,17 +715,17 @@ async function run() {
   const place = await evaluate<{ route: string }>("JSON.parse(sessionStorage.getItem('codepuppy.place.v1'))")
   const selected = /\/session\/([^/?]+)/.exec(place.route)?.[1]
   assert(selected, "slow open did not navigate to a real session")
-  const rewrite = async (directory: string) => {
-    const sql = `UPDATE session_v2 SET directory='${directory.replace(/'/g, "''")}' WHERE id='${selected}';`
+  const rewrite = async (session: string, directory: string) => {
+    const sql = `UPDATE session_v2 SET directory='${directory.replace(/'/g, "''")}' WHERE id='${session}';`
     await modelShell(directories.R1, `/usr/bin/sqlite3 ${shellQuote(join(engineData, "engine.db"))} ${shellQuote(sql)}`)
     assert(
-      (await api("GET", `/api/session/${selected}`)).data.location.directory === directory,
+      (await api("GET", `/api/session/${session}`)).data.location.directory === directory,
       "model SQL did not rewrite the real session",
     )
   }
   const recordCount = () => events.filter((event) => event.event === "record-ipc").length
   const unchangedRecords = recordCount()
-  await rewrite(directories.rewritten)
+  await rewrite(selected, directories.rewritten)
   reloadSession = selected
   directoryGate = undefined
   await win.webContents.debugger.sendCommand("Fetch.enable", {
@@ -764,7 +764,7 @@ async function run() {
     files: readdirSync(directories.rewritten).filter((file) => file !== ".git"),
     recorded: false,
   })
-  await rewrite(directories.slow)
+  await rewrite(selected, directories.slow)
   reloadSession = ""
   const beforeHonest = loads
   win.webContents.reload()
@@ -826,17 +826,42 @@ async function run() {
     "timeout arm did not drop a real grant message",
   )
   grantFault = undefined
-  await click("document.querySelector('.codepuppy-sidebar-section > span:first-child')")
-  // Same production queue/decoder/delivery boundary as an OS open-url, without routing links
-  // through LaunchServices to the owner's installed app. Wire sample: deep-link-queue.test.ts.
-  links.ingest([`opencode://new-session?directory=${encodeURIComponent(directories.deep)}`])
-  assert(!tracker.userOpened.has("sidecar", directories.deep), "external link registered a project")
-  assert(!(await modelWrite(directories.deep, "link-escape.txt")), "external link allowed a model write")
-  report.deepLinkFence = { registered: false, files: readdirSync(directories.deep).filter((file) => file !== ".git") }
-  await residual("deep-link-before", directories.deep, "not-opened-by-you")
-  assert(!tracker.userOpened.has("sidecar", directories.deep), "external link registered a project")
-  await pick(directories.deep)
-  await normal("deep-link-after", directories.deep)
+  // Spec v3: a rewritten session restored by the current layout is a reachable,
+  // unregistered directory. Reload is setup; the subsequent picker must not reload again.
+  const currentPlace = await evaluate<{ route: string }>("JSON.parse(sessionStorage.getItem('codepuppy.place.v1'))")
+  const restoredSession = /\/session\/([^/?]+)/.exec(currentPlace.route)?.[1]
+  assert(restoredSession, "residual session route missing")
+  await rewrite(restoredSession, directories.rewritten)
+  const beforeRestore = loads
+  win.webContents.reload()
+  await waitFor(() => loads > beforeRestore, "AC-08 rewritten session restored")
+  await residual("restored-before", directories.rewritten, "not-opened-by-you")
+  const before = {
+    enginePid: engine!.pid,
+    rendererPid: win.webContents.getOSProcessId(),
+    loads,
+    registered: tracker.userOpened.has("sidecar", directories.rewritten),
+    files: readdirSync(directories.rewritten).filter((file) => file !== ".git"),
+  }
+  assert(!before.registered && before.files.length === 0, "restored target was granted before the picker")
+  assert(
+    !readWorkspaceTruthOrThrow(truthPath, { readFileSync }).includes(directories.rewritten),
+    "restored target entered truth before the picker",
+  )
+  baseline.loads = loads
+  await pick(directories.rewritten)
+  await normal("restored-after", directories.rewritten)
+  report.restoredOpen = {
+    directory: directories.rewritten,
+    before,
+    after: {
+      enginePid: engine!.pid,
+      rendererPid: win.webContents.getOSProcessId(),
+      loads,
+      registered: tracker.userOpened.has("sidecar", directories.rewritten),
+      files: readdirSync(directories.rewritten).filter((file) => file !== ".git"),
+    },
+  }
   report.passed = true
   report.dom = await evaluate("document.body.innerText")
   await finish()

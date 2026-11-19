@@ -86,7 +86,8 @@ export function createWorkspaceWritableTracker(probe: WorkspaceWritableProbe, on
     },
     invalidate(change) {
       for (const [key, entry] of answers) {
-        if (entry.target.server === change.server && entry.target.directory === change.directory) {
+        const refused = entry.result?.grant === "ineligible" || entry.result?.grant === "failed"
+        if (entry.target.server === change.server && (entry.target.directory === change.directory || refused)) {
           answers.delete(key)
           entry.finish()
         }

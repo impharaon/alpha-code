@@ -202,14 +202,13 @@ fi
 # llm / core / opencode 那几个只在这一步执行,别的步骤一条都不覆盖它们。
 echo "▶ [6/14] assert gate files (逐个点名;整包地板抓不到单个闸门文件消失)"
 # `#1153`:三档结局(与 [2/14]/[9/14]/[10/14] 同形):0 全部适用行已验证 / 1 真失守拦住 /
-# 2 门绿但存在「本平台不适用」的平台条件行(darwin-only 的 sandbox-exec 语料在非 darwin 上
-# 自报 0 条,登记簿验证标注相符后记「未验证」)。本机是 darwin 而今天登记的平台条件行全是
-# darwin ⇒ 本地到不了第 2 档;到得了的是 CI(ubuntu),那边同一脚本同样按三档消费。
+# 2 门绿但有条件行的保证本次未验证:平台不适用或签名发布宿主未显式启用时,
+# 自报 0 条,登记簿验证与条件相符。darwin 未开签名开关也会到第 2 档。
 bash scripts/assert-gate-files.sh
 gate_files_rc=$?
 case "$gate_files_rc" in
 0) echo "    ✓ gate files" ;;
-2) unverified=1 ;; # 脚本自己打了「本平台不适用」清单;不拦 push,但总结行不许再说「全绿」
+2) unverified=1 ;; # 脚本打印「本次未验证」清单;不拦 push,但总结行不许再说「全绿」
 *) echo "    ✗ gate files failed"; fail=1 ;;
 esac
 unset gate_files_rc

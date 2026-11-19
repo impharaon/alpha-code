@@ -712,7 +712,7 @@ export const dict = {
   "session.tab.unknown": "Үл мэдэгдэх сесс",
   "session.panel.reviewAndFiles": "Хяналт ба файлууд",
   "session.error.notFound": "Энэ сесс олдохгүй байна",
-  "session.error.notFound.description": "Энэ таб нь энэ сервер дээр байхгүй сессийг заадаг.",
+  "session.error.notFound.description": "It may have been deleted.",
   "session.error.notFound.closeTab": "Табыг хаах",
   "session.error.notFound.newSession": "Back to a new conversation",
   "session.error.serverConnection": "Энэ серверт холбогдох боломжгүй байна",

@@ -714,7 +714,7 @@ export const dict = {
   "session.tab.unknown": "အမည်မသိ ဆက်ရှင်",
   "session.panel.reviewAndFiles": "ပြန်လည်သုံးသပ်ခြင်းနှင့် ဖိုင်များ",
   "session.error.notFound": "ဤစက်ရှင်ကို ရှာမတွေ့ပါ။",
-  "session.error.notFound.description": "ဤတဘ်သည် ဤဆာဗာတွင်မရှိတော့သော စက်ရှင်တစ်ခုကို ညွှန်ပြသည်။",
+  "session.error.notFound.description": "It may have been deleted.",
   "session.error.notFound.closeTab": "တဘ်ကို ပိတ်ပါ။",
   "session.error.notFound.newSession": "Back to a new conversation",
   "session.error.serverConnection": "ဤဆာဗာသို့ ချိတ်ဆက်၍မရပါ။",

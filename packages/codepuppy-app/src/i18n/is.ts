@@ -709,7 +709,7 @@ export const dict = {
   "session.tab.unknown": "Óþekkt lota",
   "session.panel.reviewAndFiles": "Yfirferð og skrár",
   "session.error.notFound": "Þessi lota finnst ekki",
-  "session.error.notFound.description": "Þessi flipi bendir á lotu sem er ekki lengur til á þessum netþjóni.",
+  "session.error.notFound.description": "It may have been deleted.",
   "session.error.notFound.closeTab": "Lokaðu Tab",
   "session.error.notFound.newSession": "Back to a new conversation",
   "session.error.serverConnection": "Get ekki tengst þessum þjóni",

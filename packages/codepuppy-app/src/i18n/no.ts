@@ -1208,8 +1208,8 @@ export const dict = {
     "Koble til over 75 leverandører for å bruke andre modeller, inkludert Claude, GPT, Gemini og flere",
 
   "session.tab.unknown": "Ukjent sesjon",
-  "session.error.notFound": "Denne sesjonen finnes ikke",
-  "session.error.notFound.description": "Denne fanen peker til en sesjon som ikke lenger finnes på denne serveren.",
+  "session.error.notFound": "Denne samtalen finnes ikke",
+  "session.error.notFound.description": "Den kan ha blitt slettet.",
   "session.error.notFound.closeTab": "Lukk fane",
   "session.error.notFound.newSession": "Tilbake til en ny samtale",
   "session.error.serverConnection": "Kan ikke koble til denne serveren",

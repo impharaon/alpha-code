@@ -716,7 +716,7 @@ export const dict = {
   "session.tab.unknown": "Naməlum sessiya",
   "session.panel.reviewAndFiles": "İcmal və fayllar",
   "session.error.notFound": "Bu sessiyanı tapmaq mümkün deyil",
-  "session.error.notFound.description": "Bu tab artıq bu serverdə olmayan sessiyaya işarə edir.",
+  "session.error.notFound.description": "It may have been deleted.",
   "session.error.notFound.closeTab": "Tabı bağla",
   "session.error.notFound.newSession": "Back to a new conversation",
   "session.error.serverConnection": "Bu serverə qoşulmaq mümkün deyil",

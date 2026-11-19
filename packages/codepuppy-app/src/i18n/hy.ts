@@ -711,7 +711,7 @@ export const dict = {
   "session.tab.unknown": "Անհայտ նիստ",
   "session.panel.reviewAndFiles": "Վերանայել և ֆայլեր",
   "session.error.notFound": "Այս նիստը հնարավոր չէ գտնել",
-  "session.error.notFound.description": "Այս ներդիրը ցույց է տալիս նիստ, որն այլևս գոյություն չունի այս սերվերում։",
+  "session.error.notFound.description": "It may have been deleted.",
   "session.error.notFound.closeTab": "Փակել ներդիրը",
   "session.error.notFound.newSession": "Back to a new conversation",
   "session.error.serverConnection": "Հնարավոր չէ միանալ այս սերվերին",

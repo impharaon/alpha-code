@@ -702,7 +702,7 @@ export const dict = {
   "session.tab.unknown": "ເຊດຊັນທີ່ບໍ່ຮູ້ຈັກ",
   "session.panel.reviewAndFiles": "ການທົບທວນຄືນແລະໄຟລ໌",
   "session.error.notFound": "ບໍ່ພົບເຊດຊັນນີ້",
-  "session.error.notFound.description": "ແຖບນີ້ຊີ້ໄປຫາເຊດຊັນທີ່ບໍ່ມີຢູ່ໃນເຊີບເວີນີ້ແລ້ວ.",
+  "session.error.notFound.description": "It may have been deleted.",
   "session.error.notFound.closeTab": "ປິດແຖບ",
   "session.error.notFound.newSession": "Back to a new conversation",
   "session.error.serverConnection": "ບໍ່ສາມາດເຊື່ອມຕໍ່ກັບເຊີບເວີນີ້ໄດ້",

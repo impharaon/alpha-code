@@ -718,7 +718,7 @@ export const dict: Record<string, string> = {
   "session.tab.unknown": "མ་ཤེས་པའི་ལཱ་ཡུན།",
   "session.panel.reviewAndFiles": "བསྐྱར་ཞིབ་དང་ཡིག་སྣོད།",
   "session.error.notFound": "ལཱ་ཡུན་འདི་འཚོལ་མ་ཐོབ།",
-  "session.error.notFound.description": "མཆོང་ལྡེ་འདི་གིས་ སར་བར་འདི་གུ་ད་ལས་ཕར་མེད་པའི་ལཱ་ཡུན་ཅིག་ལུ་དཔག་འབདཝ་ཨིན།",
+  "session.error.notFound.description": "It may have been deleted.",
   "session.error.notFound.closeTab": "མཆོང་ལྡེ་ཁ་བསྡམས།",
   "session.error.notFound.newSession": "Back to a new conversation",
   "session.error.serverConnection": "སར་བར་འདི་ལུ་མཐུད་མི་ཚུགས།",

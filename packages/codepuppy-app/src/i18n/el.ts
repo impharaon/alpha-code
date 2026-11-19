@@ -712,9 +712,8 @@ export const dict = {
   "session.tab.context": "Πλαίσιο",
   "session.tab.unknown": "Άγνωστη συνεδρία",
   "session.panel.reviewAndFiles": "Επισκόπηση και αρχεία",
-  "session.error.notFound": "Δεν μπορεί να βρεθεί αυτή η συνεδρία",
-  "session.error.notFound.description":
-    "Αυτή η καρτέλα δείχνει μια περίοδο λειτουργίας που δεν υπάρχει πλέον σε αυτόν τον διακομιστή.",
+  "session.error.notFound": "Δεν είναι δυνατή η εύρεση αυτής της συνομιλίας",
+  "session.error.notFound.description": "Ίσως έχει διαγραφεί.",
   "session.error.notFound.closeTab": "Κλείσιμο καρτέλας",
   "session.error.notFound.newSession": "Επιστροφή σε νέα συνομιλία",
   "session.error.serverConnection": "Δεν είναι δυνατή η σύνδεση σε αυτόν τον διακομιστή",

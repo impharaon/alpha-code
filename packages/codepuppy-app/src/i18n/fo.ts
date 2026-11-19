@@ -707,7 +707,7 @@ export const dict = {
   "session.tab.unknown": "Ókend seta",
   "session.panel.reviewAndFiles": "Ummæli og skráir",
   "session.error.notFound": "Henda setan er ikki at finna",
-  "session.error.notFound.description": "Hesin flipin vísir á eina setu, sum ikki longur er til á hesum ambætaranum.",
+  "session.error.notFound.description": "It may have been deleted.",
   "session.error.notFound.closeTab": "Lat flipan aftur",
   "session.error.notFound.newSession": "Back to a new conversation",
   "session.error.serverConnection": "Kann ikki seta samband við hendan ambætaran",

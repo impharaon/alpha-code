@@ -710,7 +710,7 @@ export const dict = {
   "session.tab.unknown": "Noma'lum sessiya",
   "session.panel.reviewAndFiles": "Ko'rib chiqish va fayllar",
   "session.error.notFound": "Bu sessiya topilmadi",
-  "session.error.notFound.description": "Ushbu yorliq endi ushbu serverda mavjud bo'lmagan seansga ishora qiladi.",
+  "session.error.notFound.description": "It may have been deleted.",
   "session.error.notFound.closeTab": "Tab ni yoping",
   "session.error.notFound.newSession": "Back to a new conversation",
   "session.error.serverConnection": "Bu serverga ulanib boʻlmadi",

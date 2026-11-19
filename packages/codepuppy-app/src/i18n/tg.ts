@@ -709,7 +709,7 @@ export const dict = {
   "session.tab.unknown": "Сеанси номаълум",
   "session.panel.reviewAndFiles": "Барраси ва файлҳо",
   "session.error.notFound": "Ин сессияро ёфтан мумкин нест",
-  "session.error.notFound.description": "Ин ҷадвал ба сессияе ишора мекунад, ки дигар дар ин сервер вуҷуд надорад.",
+  "session.error.notFound.description": "It may have been deleted.",
   "session.error.notFound.closeTab": "Варақаро пӯшед",
   "session.error.notFound.newSession": "Back to a new conversation",
   "session.error.serverConnection": "Ба ин сервер пайваст шудан мумкин нест",

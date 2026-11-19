@@ -718,7 +718,7 @@ export const dict = {
   "session.tab.unknown": "ނޭނގޭ ސެޝަނެއް",
   "session.panel.reviewAndFiles": "ރިވިއުކޮށް ފައިލްކުރުން",
   "session.error.notFound": "މި ސެޝަން ހޯދިފައެއް ނުވެއެވެ",
-  "session.error.notFound.description": "މި ޓެބުން އިޝާރާތް ކުރަނީ މި ސަރވަރގައި މިހާރު ނެތް ސެޝަނަކަށެވެ.",
+  "session.error.notFound.description": "It may have been deleted.",
   "session.error.notFound.closeTab": "Tab ބަންދުކުރުން",
   "session.error.notFound.newSession": "Back to a new conversation",
   "session.error.serverConnection": "މި ސަރވަރ އާއި ގުޅެވޭކަށް ނެތެވެ",

@@ -169,7 +169,8 @@ body[data-codepuppy-sidebar="open"] .codepuppy-settings-page {
   margin-top: 26px;
 }
 
-.codepuppy-settings-group > h3 {
+/* base.css `.a-ui :is(h1..h4) { margin: 0 }` has the same specificity and may load later; the extra ancestor keeps this margin. */
+.codepuppy-settings-main .codepuppy-settings-group > h3 {
   margin: 0 0 4px;
   color: var(--a-text-secondary);
   font-size: var(--a-text-xs);

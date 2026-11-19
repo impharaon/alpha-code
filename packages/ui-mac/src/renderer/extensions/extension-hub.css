@@ -1928,7 +1928,8 @@ body[data-codepuppy-sidebar="open"] :where(.codepuppy-ext-page) {
 .codepuppy-ext-kv-sec {
   margin-top: 8px;
 }
-.codepuppy-ext-kv-sec > h3 {
+/* base.css `.a-ui :is(h1..h4) { margin: 0 }` has the same specificity and may load later; the extra ancestor keeps this margin. */
+.codepuppy-ext-detail .codepuppy-ext-kv-sec > h3 {
   margin: 0 0 4px;
   font-size: var(--a-text-xs);
   font-weight: var(--a-weight-medium);

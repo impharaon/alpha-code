@@ -837,7 +837,7 @@
   stroke-linejoin: round;
 }
 
-[data-codepuppy-session-not-found] h4 {
+[data-codepuppy-session-not-found] [data-codepuppy-not-found="body"] h4 {
   margin: 0 0 6px;
   color: var(--a-text);
   font-size: var(--a-text-lg);

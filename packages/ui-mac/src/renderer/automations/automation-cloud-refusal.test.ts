@@ -859,8 +859,9 @@ describe("#1592 AC6:立即运行与 AI 解析的失败按结构码出文案,原�
 describe("#1592 AC7:其余文字与批准稿文案对照表(自动化部分)一致", () => {
   test("zh 文案逐条对照", () => {
     const expected: Partial<Record<keyof typeof zh, string>> = {
-      "codepuppy.auto.offlineNote": "应用关着时，本机任务不运行",
-      "codepuppy.auto.platformCost": "本机任务消耗平台额度",
+      // 冻结稿 #automation(界面版本):整句句末有「。」。
+      "codepuppy.auto.offlineNote": "应用关着时，本机任务不运行。",
+      "codepuppy.auto.platformCost": "本机任务消耗平台额度。",
       "codepuppy.auto.kind.cron": "自定义",
       "codepuppy.auto.cronFormat": "格式：分 时 日 月 周",
       "codepuppy.auto.fPrompt": "执行内容",

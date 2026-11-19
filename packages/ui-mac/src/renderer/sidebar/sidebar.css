@@ -675,7 +675,8 @@ svg[viewBox="0 0 720.002 129.001"] {
   margin-bottom: 10px;
   color: var(--a-text-tertiary);
 }
-.codepuppy-sidebar-empty-projects h4 {
+/* base.css `.a-ui :is(h1..h4) { margin: 0 }` has the same specificity and may load later; the extra ancestor keeps this margin. */
+.codepuppy-sidebar .codepuppy-sidebar-empty-projects h4 {
   margin: 0 0 4px;
   font-size: var(--a-text-base);
   font-weight: var(--a-weight-semibold);

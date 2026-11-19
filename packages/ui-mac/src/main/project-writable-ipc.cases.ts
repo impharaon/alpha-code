@@ -2,7 +2,7 @@
 // issuance are the narrow substitutes; actual kernel issuance is independently measured by G0/V2.
 import { afterEach, beforeEach, expect, mock, test } from "bun:test"
 import { EventEmitter } from "node:events"
-import { mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs"
+import { mkdirSync, mkdtempSync, readFileSync, realpathSync, renameSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
 import { homedir } from "node:os"
 import { join } from "node:path"
 import { mockElectron } from "../../test-component/electron-mock"
@@ -16,7 +16,7 @@ const root = join(process.env.CODEPUPPY_TEST_REAL_HOME ?? homedir(), ".cache/alp
 mkdirSync(root, { recursive: true })
 let run = ""
 let selected: string[] = []
-let issueMode: "ok" | "throw" | "task_name_for_pid" | "task_info" | "issue" = "ok"
+let issueMode: "ok" | "swap" | "throw" | "task_name_for_pid" | "task_info" | "issue" = "ok"
 let probeOutcome: "writable" | "denied" | "unknown" = "denied"
 const changed: unknown[] = []
 
@@ -35,7 +35,8 @@ mock.module("./process-fence-apply", () => ({ ...fenceModule, loadFenceAddon: ()
   issueFileExtensionToProcess: (cls: string, directory: string, pid: number) => {
     issues.push({ cls, directory, pid })
     if (issueMode === "throw") throw new Error("do not expose native exception text")
-    if (issueMode !== "ok") return { token: null, step: issueMode, errno: 5 }
+    if (issueMode !== "ok" && issueMode !== "swap") return { token: null, step: issueMode, errno: 5 }
+    if (issueMode === "swap") { renameSync(directory, `${directory}-original`); symlinkSync(join(run, "C"), directory) }
     return { token: "test-memory-only" }
   },
 }) }))
@@ -99,7 +100,7 @@ beforeEach(async () => {
   tracker = bootFenceWorkspaceTruth({
     truthPath: join(run, "truth.json"), store: { tabs: undefined, recent: undefined, info: undefined },
     fs: { readFileSync, writeFileSync, mkdirSync, renameSync, rmSync }, log: (line) => { logs.push(line) },
-    eligibility: { homeDir: join(run, "home"), appStateRoot: join(run, "state"), realpath: (path) => path, isDirectory: () => true },
+    eligibility: { homeDir: join(run, "home"), appStateRoot: join(run, "state"), realpath: realpathSync.native, isDirectory: () => true },
     onWritableChanged: (change) => { changed.push(change) },
   })
   resetDanglingSweepLatchForTests()
@@ -126,6 +127,19 @@ test("probe never registers; untrusted extra open cannot grant; record IPC regis
   expect(invoke("workspace-open-record", request())).toEqual({ recorded: true })
   expect(tracker.userOpened.has("sidecar", request().directory)).toBe(true)
   expect(await invoke("workspace-write-probe", request())).toMatchObject({ grant: "granted" })
+})
+
+test("a path changed during issuance drops the token before send and leaves the ledger retryable", async () => {
+  register()
+  issueMode = "swap"
+  expect(await probe()).toMatchObject({ grant: "failed", reason: "grant-failed" })
+  expect(issues).toHaveLength(1)
+  expect(child.grants).toHaveLength(0)
+  rmSync(request().directory)
+  renameSync(`${request().directory}-original`, request().directory)
+  issueMode = "ok"
+  expect(await probe()).toMatchObject({ grant: "granted" })
+  expect(child.grants).toHaveLength(1)
 })
 
 test("remote and no-fence do not touch native or local probe; HOME reason remains independent of probe outcome", async () => {
@@ -227,6 +241,12 @@ test("bad IPC shapes fail closed; sidecar-originated record/issue commands have 
   expect(issues).toEqual([])
   expect(changed).toEqual([])
   expect(tracker.userOpened.has("sidecar", request().directory)).toBe(false)
+})
+
+test("eligibility precedes a missing sidecar: HOME and unregistered directories keep their real reason", async () => {
+  expect(await tracker.probeWrite(request(join(run, "home")), null)).toEqual({ outcome: "unknown", grant: "ineligible", reason: "home-or-app-state" })
+  expect(await tracker.probeWrite(request(), null)).toEqual({ outcome: "unknown", grant: "ineligible", reason: "not-opened-by-you" })
+  expect(issues).toEqual([])
 })
 
 test("grant request book timeout is failed; no live sidecar is failed rather than ineligible", async () => {

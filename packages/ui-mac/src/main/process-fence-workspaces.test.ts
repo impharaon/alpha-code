@@ -3,7 +3,7 @@
 
 import { describe, expect, test } from "bun:test"
 import * as fs from "node:fs"
-import { mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from "node:fs"
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join, relative } from "node:path"
 import {
@@ -319,6 +319,30 @@ describe("用户打开登记是两个消费者的共同资格", () => {
     tracker.userOpened.register({ server: "sidecar", directory: "/Users/alpha/link-target" })
     expect(tracker.userOpened.has("sidecar", "/Users/alpha/link-target")).toBe(true)
     expect(readWorkspaceTruthOrThrow(truthPath, fs)).toEqual(["/Users/alpha/link-target"])
+  }))
+
+  test("登记冻结当时的 canonical 目录;别名改指未打开目录后 has 和真源都不接受它", () => withTemp((dir) => {
+    for (const name of ["home", "state", "project", "other"]) mkdirSync(join(dir, name))
+    const alias = join(dir, "alias")
+    symlinkSync(join(dir, "project"), alias)
+    const truthPath = join(dir, "truth.json")
+    writeWorkspaceTruth(truthPath, [], fs)
+    const tracker = bootFenceWorkspaceTruth({ truthPath, store: { tabs: [], recent: undefined, info: undefined }, fs, log: () => {}, onWritableChanged: () => {}, eligibility: {
+      homeDir: join(dir, "home"), appStateRoot: join(dir, "state"), realpath: realpathSync.native, isDirectory: (path) => statSync(path).isDirectory(),
+    } })
+    // The alias is not quarantined: it arrives after boot, before the concrete open.
+    tracker.noteRendererStoreSet(GLOBAL_RENDERER_STORE, TABS_KEY, [draft("alias", alias)])
+    expect(tracker.userOpened.register({ server: "sidecar", directory: alias })).toEqual({ eligible: true, server: "sidecar", directory: join(dir, "project") })
+    expect(tracker.userOpened.has("sidecar", join(dir, "project"))).toBe(true)
+    expect(readWorkspaceTruthOrThrow(truthPath, fs)).toEqual([join(dir, "project")])
+    rmSync(alias)
+    symlinkSync(join(dir, "other"), alias)
+    expect(tracker.userOpened.has("sidecar", alias)).toBe(false)
+    tracker.noteRendererStoreSet(GLOBAL_RENDERER_STORE, TABS_KEY, [draft("alias", alias)])
+    expect(readWorkspaceTruthOrThrow(truthPath, fs)).toEqual([])
+    rmSync(alias)
+    symlinkSync(join(dir, "home"), alias)
+    expect(tracker.userOpened.register({ server: "sidecar", directory: alias })).toEqual({ eligible: false, reason: "home-or-app-state" })
   }))
 
   test("资格顺序:远端不查本机;HOME/祖先/根/状态相关路径和软链不能登记;目录检查失败不抛", () => withTemp((dir) => {

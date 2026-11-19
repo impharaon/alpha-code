@@ -274,3 +274,10 @@ PLAN 阶段只提交本文件。下表和命令均为实施安排，不代表已
 - 收口：相对链接检查 `python3 scripts/check-doc-links.py docs/architecture/2026-09-09-req159-process-fence.md docs/design/2026-09-09-req159-process-fence-baseline.md docs/specs/child-process-write-fence/plan.md` exit **0**（19 条，`r5-doc-links.log`）；`git diff --check` exit **0**。已核 Codex / GPT-6，自验 AC-05 至 AC-08 全部具名验据通过；既定路线不重开。交编排者独立 review / push / PR / merge，本 lane 只提交。OPTIONAL 无。
 
 - 环境观察：末次合同复读时，原已解析并使用过的 Alpha profile `/Users/pharaon/app/wt/alpha-work-docs-lightsail-entry-relay/governance/delivery-profile.yml` 已不存在；只做一次 resolver 复核，exit **2 / no_match**（`r5-profile-resolve-final.log`）。未重建其它 worktree/profile；本轮此前已完成的合同输出仍保存在上述 r5 两份 JSON，不把末次复读报为成功，交编排者恢复 profile 落点。
+
+### r6：独立审查修正
+
+- 输入 `78ac263b41`，继承 Opus 的已持有结论；仅处理已接受的 1 Blocker / 3 Minor 及小项。先提交旧实现上的三种软链重绑定真实引擎红臂（登记 D→围栏 PTY 替换 D→杀引擎→新代探针/模型实写）和 null sidecar 原因顺序红臂，再修生产代码。资格与真源使用登记时的 canonical path；每次运行期放行重验 canonical 资格，签发后、发送令牌前再验路径未变。
+- 其它差异安排：签名 G0 改显式 opt-in、普通 gate 不构建签名；测试落点改 worktree/node_modules/.cache 并清理大产物，无 import 时写盘；AC-05/V3 的首次消息/终端延迟顺序按真实证据改述为组件证明，后端仅证明直接 tracker 等待和消费后新 PTY，不扩生产入口。所有变动均为本次已接受审查范围。
+
+- 红证据（旧生产代码未改）：`bun test --max-concurrency 2 src/main/project-writable.engine.test.ts` host exit 1 / inner **6 pass、3 fail**（r6-engine-red.log）；HOME、state、HOME-ancestor 三臂的真实目标各实际落盘一个攻击文件，grant=granted / probe=writable，跨代 pid 和落盘事实已拷入 worktree/node_modules/.cache/project-writable/review/r6-engine-red-events.json。`bun test --max-concurrency 2 src/main/project-writable-ipc.test.ts src/main/process-fence-workspaces.test.ts` 的 null sidecar 原因、签发中路径替换与 canonical 登记断言均红（r6-main-red.log）；其中 null sidecar 原始单宿主 inner **10/1**（r6-ipc-red.log）。这些命令只经 test.ts 宿主起 cases。红测试计数：engine inner 6→9、IPC 10→12、workspaces 16→17，并同步 gate 行。

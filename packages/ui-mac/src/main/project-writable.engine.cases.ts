@@ -11,15 +11,18 @@ import { mockElectron } from "../../test-component/electron-mock"
 import { scriptedModel, textOf } from "../../test-component/codepuppy-engine"
 import { renderProcessFenceProfile, resolveEngineRoots } from "./process-fence-profile"
 import { createWorkspaceWritableTracker } from "../renderer/codepuppy-ui/workspace-writable-core"
+import { workspaceReadonlyMessage } from "../renderer/codepuppy-ui/workspace-writable"
+import { setLocale } from "../renderer/i18n"
 
 const scratch = join(process.env.CODEPUPPY_TEST_REAL_HOME ?? homedir(), ".cache/alpha-orch/2026-11-19/impl-project-writable")
 mkdirSync(scratch, { recursive: true })
 const run = mkdtempSync(join(scratch, "engine-grant-"))
 const A = join(run, "A"), B = join(run, "B"), C = join(run, "C"), D = join(run, "D"), E = join(run, "rewritten")
 const install = join(run, "engine-install")
+const protectedHome = join(run, "protected", "home")
 const quote = (value: string) => `'${value.replace(/'/g, "'\\''")}'`
 const userData = join(run, "main-user-data")
-for (const directory of [A, B, C, D, E, install, join(install, "home"), userData, join(run, "state/env/dev")]) mkdirSync(directory, { recursive: true })
+for (const directory of [A, B, C, D, E, install, protectedHome, join(install, "home"), userData, join(run, "state/env/dev")]) mkdirSync(directory, { recursive: true })
 const appEvents = new EventEmitter()
 const handlers = new Map<string, (...args: unknown[]) => unknown>()
 const log: string[] = []
@@ -69,7 +72,7 @@ const truthPath = join(run, "truth.json")
 writeWorkspaceTruth(truthPath, [A], { mkdirSync, writeFileSync, renameSync, rmSync })
 const tracker = bootFenceWorkspaceTruth({
   truthPath, store: { tabs: [{ type: "draft", draftID: "a", server: "sidecar", directory: A }], recent: undefined, info: undefined }, fs: { readFileSync, writeFileSync, mkdirSync, renameSync, rmSync }, log: (line) => { log.push(line) },
-  eligibility: { homeDir: join(install, "home"), appStateRoot: join(run, "state"), realpath: realpathSync.native, isDirectory: (directory) => { try { return readdirSync(directory) !== undefined } catch { return false } } },
+  eligibility: { homeDir: protectedHome, appStateRoot: join(run, "state"), realpath: realpathSync.native, isDirectory: (directory) => { try { return readdirSync(directory) !== undefined } catch { return false } } },
   onWritableChanged: (change) => { record("changed", change); writable.invalidate(change); writable.observe(observation(change.directory)) },
 })
 let generation = 1
@@ -235,7 +238,7 @@ test("remote requests do not touch the local engine; HOME/app-state recording is
   expect(await tracker.probeWrite({ server: "remote", directory: C }, listener)).toEqual({ outcome: "unknown", grant: "not-local" })
   expect(events).toHaveLength(count)
   const grants = events.filter((event) => event.event === "grant-sent").length
-  for (const directory of [join(install, "home"), join(run, "state")]) {
+  for (const directory of [protectedHome, join(run, "state")]) {
     expect(invoke("workspace-open-record", { server: "sidecar", directory })).toEqual({ recorded: false, reason: "home-or-app-state" })
     expect(await tracker.probeWrite({ server: "sidecar", directory }, listener)).toMatchObject({ grant: "ineligible", reason: "home-or-app-state" })
   }
@@ -285,6 +288,33 @@ test("a model rewrites session_v2.directory and kills its engine: the restored d
   await write(B, "honest-reload.txt")
   expect(readFileSync(join(B, "honest-reload.txt"), "utf8")).toBe("x")
 })
+
+for (const [kind, target] of [["home", protectedHome], ["state", join(run, "state")], ["home-ancestor", join(run, "protected")]]) {
+  test(`registered directory replaced by a symlink to ${kind} cannot expand the next generation`, async () => {
+    const directory = join(A, `swap-${kind}`)
+    mkdirSync(directory)
+    expect(invoke("workspace-open-record", { server: "sidecar", directory })).toEqual({ recorded: true })
+    expect(await tracker.probeWrite({ server: "sidecar", directory }, listener)).toMatchObject({ grant: "granted" })
+    const previousPid = connection!.pid
+    const exited = new Promise<void>((resolve) => child.once("exit", () => resolve()))
+    await api("POST", "/api/pty", { cwd: A, command: "/bin/sh", args: ["-c", `mv ${quote(directory)} ${quote(`${directory}-original`)} && ln -s ${quote(target!)} ${quote(directory)} && kill -KILL ${previousPid}`] }).catch(() => undefined)
+    await exited
+    expect(realpathSync.native(directory)).toBe(target!)
+    generation++
+    await boot()
+    // Calibrate the new W1 before issuing: even the HOME-like target is outside every write root.
+    expect((await listener.probeWrite(target!)).outcome).toBe("denied")
+    const result = await tracker.probeWrite({ server: "sidecar", directory }, listener)
+    const name = `symlink-${kind}.txt`
+    await write(directory, name)
+    setLocale("zh")
+    const sentence = workspaceReadonlyMessage(result.reason)
+    record("symlink-rebind", { kind, previousPid, pid: connection!.pid, directory, target, result, landed: existsSync(join(target!, name)), sentence })
+    expect(existsSync(join(target!, name))).toBe(false)
+    expect(result).toMatchObject({ outcome: "denied", grant: "ineligible", reason: "home-or-app-state" })
+    expect(sentence).toBe("主目录和 Code Puppy 自己的数据目录不能整个作为项目写入，请打开里面的具体文件夹。")
+  })
+}
 
 test("a stopped real sidecar reports grant-failed independently of an unknown probe outcome", async () => {
   await listener.stop()

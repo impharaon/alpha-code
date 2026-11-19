@@ -15,7 +15,7 @@ last_reviewed: 2026-11-19
 ## INT-safety：项目可写增量
 
 - 依据：[SPEC-child-process-write-fence v2 / AC-05 至 AC-08](https://github.com/impharaon/alpha-code/blob/8593c2701d94d29b9a5de3de1db44639220fb637/docs/specs/child-process-write-fence/spec.md)；[设计 §4、§5、§6、§10 / cadd657d29](https://github.com/impharaon/alpha-code/blob/cadd657d2925f686bd34045d5274d1007b5c18e4/docs/specs/child-process-write-fence/design.md)；2026-11-19 PLAN 派单及其 Decided point 5。读码基线为本集成分支 `4f61fde5de`，不把该分支现有 v1 spec 当作 v2 输入，也不复制尚待合入的设计。
-- 核对：待编排者核对；首个实施提交按续派简报的 `Phase:` 原文填写计划提交、核对者及模型、结论。实施开始前须收到冻结设计的 R2 回执；仅对其相对于上述输入的变化调整本节，见证点独立在步骤 4。
+- 核对：Phase: IMPLEMENT — plan 6a1e42753b · orchestrator / Claude Fable 5.2 · plan check passed (every AC has proof with a failing arm; the three extra same-call-chain files `main/index.ts`, `ui/codepuppy-composer.tsx`, `ui/session-rail/terminal/terminal-engine-adapter.tsx` are accepted as necessary; no decision restated or changed). 2026-11-19 续派仅授权步骤 1/G0；native/profile/grant 契约沿用 cadd657d29，见证点尚待修订，不实施步骤 2–8。V2 按每臂实际落盘和 `r1-x2all-result.txt` 判定，不能要求所有签发都返回 NULL。
 
 本阶段只提交本文件。下表和命令均为实施安排，不代表已经运行或通过；文档影响归类为 architecture/decision，当前落点只有本计划。后续实现沿用现有组件形态，不增加界面状态或交互稿。
 

@@ -87,6 +87,8 @@ describe("renderProcessFenceProfile —— 勘破 §8.2 的 19 行,逐行全等"
       `(subpath "${HOME}/Library/Caches/bun")`,
       `(subpath "${HOME}/.cache/bun")`,
       ")",
+      '(allow file-write* (extension "app.codepuppy.workspace-write"))',
+      '(deny file-issue-extension generic-issue-extension mach-issue-extension iokit-issue-extension ipc-posix-issue-extension (extension-class "app.codepuppy.workspace-write"))',
       ...NETWORK_LINES(4443),
     ])
   })
@@ -94,7 +96,11 @@ describe("renderProcessFenceProfile —— 勘破 §8.2 的 19 行,逐行全等"
   test("`#1337` 网络行:Q1.2 四行逐字、顺序不变、deny 在前 allow 在后、N4 的端口就是传入的代理端口;只写加法(没有第二条 deny)", () => {
     const out = tokens(renderProcessFenceProfile({ ...base, egressProxyPort: 61234 }))
     expect(out.slice(-4)).toEqual(NETWORK_LINES(61234))
-    expect(out.filter((l) => l.startsWith("(deny "))).toEqual(["(deny file-write*)", "(deny network*)"])
+    expect(out.filter((l) => l.startsWith("(deny "))).toEqual([
+      "(deny file-write*)",
+      '(deny file-issue-extension generic-issue-extension mach-issue-extension iokit-issue-extension ipc-posix-issue-extension (extension-class "app.codepuppy.workspace-write"))',
+      "(deny network*)",
+    ])
     expect(out.filter((l) => /network-outbound/.test(l))).toEqual([`(allow network-outbound (remote ip "localhost:61234"))`])
     // DNS 刻意不放行:没有 mDNSResponder 那一行(`#1334` Q3:解析搬到代理那一侧)
     expect(renderProcessFenceProfile(base)).not.toContain("mDNSResponder")

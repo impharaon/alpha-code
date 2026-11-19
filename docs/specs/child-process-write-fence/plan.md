@@ -159,3 +159,5 @@ PLAN 阶段只提交本文件。下表和命令均为实施安排，不代表已
 - 2026-11-19 · 步骤 2 完成：红提交 `74c49e192f` 后补 X1 根 ID、探针 write/remove 的 `W1+X1` 两行及根说明。检查组 A（7 个宿主）67 pass / 0 fail，新增宿主含 6 子例；登记同步后 write-sites 12 pass / 0 fail，ui-mac `bun typecheck` exit 0。证据 `step2-green.log` / `step2-ledger.log` / `step2-typecheck.log`；V2 原始 `extension-*/result.json` 保留实际 pid/errno/落盘。新增 gate 行 extension host=1，既有 profile=26、write-sites=12 不变；三个已知坏臂均实跑并落盘，没有修改生产 native 合同或扩大测试替身的证明范围。
 
 - 2026-11-19 · 步骤 3 红证据：workspaces 9 pass / 6 fail（缺登记权威），IPC 宿主 0 pass / 1 fail，内层 10 fail（新通道不存在、probe 缺 server/grant、picker 立即返回且没有放行）；原始 `step3-red.log` / `step3-ipc-red.log`。既有真源测试中的新打开动作改为显式登记，新增 SSE 目录过滤、tab 先于登记、检疫第二道闸和 HOME/状态/远端顺序用例；IPC 子例使用生产 handlers/tracker/listener，native 与 Electron 是隔离替身，不能代替 G0。
+
+- 2026-11-19 · 步骤 3 补 O1 红证据：`step3-picker-red.log` 中 picker 子例因额外触发 filesystem probe（应只等 consume）红，其余 9 子例通过。同时修正 fake child 的并发应答必须捕获各自 id（保留原断言）、临时全局根使用真实 `<base>/env/dev` 形状；不改产品合同。

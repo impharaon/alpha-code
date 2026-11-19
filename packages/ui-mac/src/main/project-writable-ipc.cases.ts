@@ -60,7 +60,9 @@ class Child extends EventEmitter {
     if (message.type === "grant-write") {
       this.grants.push(message as WorkspaceWriteGrantCommand)
       if (this.grantMode === "throw") throw new Error("test-memory-only must not reach diagnostics")
-      if (this.grantMode !== "hold") queueMicrotask(() => this.reply(this.grantMode === "ok" ? "granted" : "failed"))
+      const id = (message as WorkspaceWriteGrantCommand).id
+      const outcome = this.grantMode === "ok" ? "granted" : "failed"
+      if (this.grantMode !== "hold") queueMicrotask(() => this.emit("message", { type: "grant-write-result", id, outcome }))
     }
     if (message.type === "write-probe") {
       this.probes.push(message as WorkspaceWriteProbeCommand)
@@ -88,11 +90,12 @@ const register = (input = request()) => tracker.userOpened.register(input)
 beforeEach(async () => {
   run = mkdtempSync(join(root, "main-writable-"))
   selected = []
-  process.env.CODEPUPPY_GLOBAL_DIR = join(run, "state")
+  process.env.CODEPUPPY_GLOBAL_DIR = join(run, "state/env/dev")
   issues.length = logs.length = changed.length = 0
   issueMode = "ok"
   probeOutcome = "denied"
   for (const directory of ["home", "B", "C", "state", "user-data"]) mkdirSync(join(run, directory))
+  mkdirSync(process.env.CODEPUPPY_GLOBAL_DIR, { recursive: true })
   tracker = bootFenceWorkspaceTruth({
     truthPath: join(run, "truth.json"), store: { tabs: undefined, recent: undefined, info: undefined },
     fs: { readFileSync, writeFileSync, mkdirSync, renameSync, rmSync }, log: (line) => { logs.push(line) },
@@ -183,6 +186,7 @@ test("picker including multiple directories registers and consumes before return
   expect(await invoke("open-directory-picker", { multiple: true })).toEqual(selected)
   for (const directory of selected) expect(tracker.userOpened.has("sidecar", directory)).toBe(true)
   expect(child.grants).toHaveLength(2)
+  expect(child.probes).toHaveLength(0) // O1 waits for consume, not a later filesystem probe.
   expect(await probe()).toMatchObject({ grant: "granted" })
   expect(child.grants).toHaveLength(2)
 })

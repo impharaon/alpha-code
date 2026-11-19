@@ -31,7 +31,7 @@
 // (路径 / 文件名)。Read 那一步走的就是引擎自己的权限判定;没读过的路径在这里只会得到一句「先用 Read 读它」。
 // 登记簿按会话建,内容哈希去重;进程重启后由 `experimental.chat.messages.transform` 从历史消息里重建。
 
-import { codepuppyBootstrap, type CodePuppyBootstrap } from "../../util/src/codepuppy-bootstrap"
+import { codepuppyBootstrap, routePlatformUrl, type CodePuppyBootstrap } from "../../util/src/codepuppy-bootstrap"
 import { createHash } from "node:crypto"
 import { readFileSync } from "node:fs"
 import path from "node:path"
@@ -68,8 +68,9 @@ export function cloudVisionToolId(bootstrap: CodePuppyBootstrap = codepuppyBoots
 
 /** 平台节点地址(启动文档 platform.modelProxyBaseURL,`<platform>/v1`)的 origin + 识图路由;没有 = 未登录平台 / BYOK 态。 */
 export function cloudVisionEndpoint(bootstrap: CodePuppyBootstrap = codepuppyBootstrap()): string | undefined {
-  const base = bootstrap.platform.modelProxyBaseURL
-  if (!base) return undefined
+  const preferred = bootstrap.platform.modelProxyBaseURL
+  if (!preferred) return undefined
+  const base = routePlatformUrl(preferred, preferred, bootstrap.platform.directModelProxyBaseURL, bootstrap.platform.routeRef)
   try {
     return new URL(CLOUD_VISION_ROUTE, new URL(base).origin).toString()
   } catch {

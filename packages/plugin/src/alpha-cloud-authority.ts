@@ -5,7 +5,7 @@
  * extension sovereignty gate and the engine display snapshot use one fact.
  */
 
-import { tryCodePuppyBootstrap, type CodePuppyBootstrap } from "@opencode/util/codepuppy-bootstrap"
+import { routePlatformUrl, tryCodePuppyBootstrap, type CodePuppyBootstrap } from "@opencode/util/codepuppy-bootstrap"
 
 /**
  * `#1698`(DESIGN-upgrade-bootstrap-config §4.3,G2):治理云 MCP 的名字与定义来自 Code Puppy 的启动文档(`cloudMcp`),不再来自
@@ -79,7 +79,8 @@ export function governedCredentialFetch(
       })
     const headers = new Headers(init?.headers)
     headers.set("authorization", authorization)
-    return fetchImpl(url, { ...init, headers })
+    const destination = routePlatformUrl(String(url), cloudMcp?.definition.url, cloudMcp?.directUrl, tryCodePuppyBootstrap()?.platform.routeRef)
+    return fetchImpl(destination, { ...init, headers })
   }
 }
 

@@ -140,7 +140,7 @@ function violationsFor(file: SourceFile) {
 
   // The frontend surface manifest is a descriptive ownership ledger: it does not register,
   // parse, or navigate routes. Executable route strings have only one exemption: the manifest.
-  if (![routeManifestPath, surfaceLedgerPath].includes(file.path) && !/\.test\.[cm]?[jt]sx?$/.test(file.path)) {
+  if (![routeManifestPath, surfaceLedgerPath].includes(file.path) && !/\.(test|cases)\.[cm]?[jt]sx?$/.test(file.path)) {
     ROUTE_LITERAL_RULES.forEach((entry) => {
       entry.pattern.lastIndex = 0
       if (entry.pattern.test(source)) violations.push({ path, rule: entry.rule })

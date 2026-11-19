@@ -9,8 +9,10 @@ import { initCodePuppyEnvironment } from "./codepuppy-environment"
 // every nonfixture host is refused, including compiled defaults. No real DNS/network is used.
 const originalFetch = globalThis.fetch
 const health = await Bun.file(new URL("./fixtures/relay-route/health-cloud.json", import.meta.url)).text()
+const gatewayHealth = await Bun.file(new URL("./fixtures/relay-route/health-gateway.json", import.meta.url)).text()
+const sample = (url: string) => url.includes("gateway") ? gatewayHealth : health
 const calls: string[] = []
-let respond: (url: string, init?: RequestInit) => Promise<Response> = async () => new Response(health, { headers: { "content-type": "application/json" } })
+let respond: (url: string, init?: RequestInit) => Promise<Response> = async (url) => new Response(sample(url), { headers: { "content-type": "application/json" } })
 globalThis.fetch = (async (input: Request | string | URL, init?: RequestInit) => {
   const url = String(input)
   if (!new URL(url).hostname.endsWith(".test")) throw new Error("unexpected test destination")
@@ -61,6 +63,11 @@ test("R1 no relay and explicit environment override stay inert", async () => {
     mock.module(${JSON.stringify(join(import.meta.dir, "logging.ts"))}, () => ({ getLogger: () => ({ log() {}, warn() {}, error() {} }) }));
     const endpoints = await import(${JSON.stringify(join(import.meta.dir, "codepuppy-endpoints.ts"))});
     const { applyAuthEnv, initAuthEnv } = await import(${JSON.stringify(join(import.meta.dir, "codepuppy-auth.ts"))});
+    const health = await Bun.file(${JSON.stringify(join(import.meta.dir, "fixtures/relay-route/health-cloud.json"))}).text();
+    globalThis.fetch = (async (input) => {
+      if (!new URL(String(input)).hostname.endsWith('.test')) throw new Error('nonfixture destination');
+      return new Response(health, { headers: { 'content-type': 'application/json' } });
+    }) as typeof fetch;
     const model = process.env.CODEPUPPY_BASE_URL, cloud = process.env.CODEPUPPY_CLOUD_MCP_URL;
     test("inherited values survive while app-filled values refresh", () => {
       const data = mkdtempSync(join(tmpdir(), "inherited-"));
@@ -70,13 +77,13 @@ test("R1 no relay and explicit environment override stay inert", async () => {
         endpoints.initEndpoints(data, () => {});
         initAuthEnv(data);
         applyAuthEnv();
-        expect(endpoints.relayConfigured()).toBe(false);
-        expect(process.env.CODEPUPPY_BASE_URL).toBe(model ?? 'https://gateway-' + version + '.test/v1');
-        expect(process.env.CODEPUPPY_CLOUD_MCP_URL).toBe(cloud ?? 'https://cloud-' + version + '.test/mcp');
+        expect(process.env.CODEPUPPY_BASE_URL).toBe(model || 'https://gateway-' + version + '.test/v1');
+        expect(process.env.CODEPUPPY_CLOUD_MCP_URL).toBe(cloud || 'https://cloud-' + version + '.test/mcp');
+        expect(endpoints.relayConfigured()).toBe(!Boolean(model || cloud));
       }
     });
   `)
-  for (const exports of [{ CODEPUPPY_BASE_URL: "https://model-export.test/v1" }, { CODEPUPPY_CLOUD_MCP_URL: "https://cloud-export.test/mcp" }, { CODEPUPPY_BASE_URL: "https://model-export.test/v1", CODEPUPPY_CLOUD_MCP_URL: "https://cloud-export.test/mcp" }]) {
+  for (const exports of [{ CODEPUPPY_BASE_URL: "https://model-export.test/v1" }, { CODEPUPPY_CLOUD_MCP_URL: "https://cloud-export.test/mcp" }, { CODEPUPPY_BASE_URL: "https://model-export.test/v1", CODEPUPPY_CLOUD_MCP_URL: "https://cloud-export.test/mcp" }, { CODEPUPPY_BASE_URL: "" }, { CODEPUPPY_CLOUD_MCP_URL: "" }, { CODEPUPPY_BASE_URL: "", CODEPUPPY_CLOUD_MCP_URL: "" }, { CODEPUPPY_BASE_URL: "", CODEPUPPY_CLOUD_MCP_URL: "https://cloud-export.test/mcp" }, { CODEPUPPY_BASE_URL: "https://model-export.test/v1", CODEPUPPY_CLOUD_MCP_URL: "" }]) {
     const env = { ...process.env }
     delete env.CODEPUPPY_BASE_URL
     delete env.CODEPUPPY_CLOUD_MCP_URL
@@ -98,15 +105,47 @@ test("R2 all three routed addresses switch together, leaving web/account and pre
 test("R3 both health entries require bounded, recognizable JSON; application 503 remains healthy", async () => {
   for (const entry of ["gateway", "cloud"]) for (const variant of ["ready", "unready", "html", "forbidden", "gateway-error", "missing", "json", "oversize", "tls"]) {
     respond = async (url) => {
-      if (!url.includes(entry) || variant === "ready") return Response.json(JSON.parse(health))
-      if (variant === "unready") return Response.json(JSON.parse(health), { status: 503 })
+      if (!url.includes(entry) || variant === "ready") return Response.json(JSON.parse(sample(url)))
+      if (variant === "unready") return Response.json(JSON.parse(sample(url)), { status: 503 })
       if (variant === "tls") throw new TypeError("fixture TLS failure")
-      return new Response(variant === "missing" ? "{}" : variant === "json" ? "{" : variant === "oversize" ? " ".repeat(65537) : "<html>challenge</html>", { status: variant === "forbidden" ? 403 : variant === "gateway-error" ? 502 : 200, headers: { "content-type": variant === "html" ? "text/html" : "application/json" } })
+      return new Response(variant === "missing" ? "{}" : variant === "json" ? "{" : variant === "oversize" ? JSON.stringify({ ...JSON.parse(sample(url)), padding: " ".repeat(65537) }) : "<html>challenge</html>", { status: variant === "forbidden" ? 403 : variant === "gateway-error" ? 502 : 200, headers: { "content-type": variant === "html" ? "text/html" : "application/json" } })
     }
     configure(preferred)
     await flush()
     expect([entry, variant, endpoints.currentRoute()]).toEqual([entry, variant, ["ready", "unready"].includes(variant) ? "preferred" : "direct"])
   }
+})
+
+test("R3 body deadline covers 200 headers followed by an unending valid health body", async () => {
+  vi.useFakeTimers()
+  for (const entry of ["gateway", "cloud"]) {
+    const bodies: ReadableStreamDefaultController<Uint8Array>[] = []
+    respond = async (url, init) => {
+      if (!url.includes(entry)) return Response.json(JSON.parse(sample(url)))
+      return new Response(new ReadableStream<Uint8Array>({
+        start(controller) {
+          bodies.push(controller)
+          controller.enqueue(new TextEncoder().encode(sample(url)))
+          init?.signal?.addEventListener("abort", () => controller.error(new Error("fixture body aborted")), { once: true })
+        },
+      }), { headers: { "content-type": "application/json" } })
+    }
+    try {
+      configure(preferred)
+      await flush()
+      expect(endpoints.currentRoute()).toBe("preferred")
+      vi.advanceTimersByTime(4999)
+      await flush()
+      expect(endpoints.currentRoute()).toBe("preferred")
+      vi.advanceTimersByTime(1)
+      await flush()
+      expect(endpoints.currentRoute()).toBe("direct")
+    } finally {
+      bodies.forEach((controller) => controller.error(new Error("fixture cleanup")))
+      await flush()
+    }
+  }
+  vi.useRealTimers()
 })
 
 test("R4 initial, periodic and coalesced immediate probes obey the deadline and recover", async () => {
@@ -120,7 +159,7 @@ test("R4 initial, periodic and coalesced immediate probes obey the deadline and 
   vi.advanceTimersByTime(5000)
   await flush()
   expect(endpoints.currentRoute()).toBe("direct")
-  respond = async () => Response.json(JSON.parse(health))
+  respond = async (url) => Response.json(JSON.parse(sample(url)))
   vi.advanceTimersByTime(55_000)
   await flush()
   expect(endpoints.currentRoute()).toBe("preferred")
@@ -152,14 +191,16 @@ test("R5 route file is canonical, private, atomic-word-only and reset on initial
 
 test("R6 a late old probe cannot overwrite the route for newly discovered preferred endpoints", async () => {
   configure()
+  const before = logs.length
   const release = Promise.withResolvers<Response>()
   respond = async () => release.promise.then((response) => response.clone())
   endpoints.setDiscoveredEndpoints({ schema_version: 1, ...CODEPUPPY_ENDPOINTS, ...preferred })
-  respond = async () => Response.json(JSON.parse(health))
+  respond = async (url) => Response.json(JSON.parse(sample(url)))
   endpoints.setDiscoveredEndpoints({ schema_version: 1, ...CODEPUPPY_ENDPOINTS, platform: "https://new-gateway.test", cloud: "https://new-cloud.test" })
   release.resolve(new Response(null, { status: 502 }))
   await flush()
   expect(endpoints.currentRoute()).toBe("preferred")
+  expect(logs.slice(before).some((line) => line.includes("-> direct"))).toBe(false)
   expect(endpoints.preferredEndpoints().platform).toBe("https://new-gateway.test")
   expect(calls.some((url) => url === "https://new-cloud.test/health")).toBe(true)
 })

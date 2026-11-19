@@ -4,5 +4,14 @@
     "commit": "428fda9ea9",
     "path": "docs/verification/2026-10-15-ap522-real-materials/evidence/ap544-rerun/health-before.json",
     "use": "Captured cloud /health response; both endpoint probes consume readiness.state. Negative cases explicitly mutate this input."
+  },
+  "health-gateway.json": {
+    "repository": "impharaon/alpha-platform",
+    "capture": "2026-11-19 relay-ops/p4/post-alpha-gateway-hk.json",
+    "source": "Gateway Worker /health response captured by the authorized relay operations lane; no capture is performed by this test.",
+    "removed_fields": [
+      "relay_client_ip"
+    ],
+    "use": "Actual gateway readiness.state sample; JSON padding and hanging-body cases are explicit transport/body mutations."
   }
 }

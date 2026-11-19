@@ -41,7 +41,8 @@ export function CodePuppyOnboarding() {
     <Show when={!dismissed()}>
       <Portal>
         <div class="a-ui a-ob" data-codepuppy-onboarding>
-          <div class="a-ob-card">
+          {/* 默认焦点放在卡片本身(中性元素):窗口一启动就在前台,误触的 Enter 不该落在「登录」上发起登录。 */}
+          <div class="a-ob-card" tabindex="-1" ref={(el) => queueMicrotask(() => el.focus())}>
             <img class="a-ob-mark" src={brandMark} alt="" />
             <h3 class="a-ob-title">{t("codepuppy.onboarding.title")}</h3>
             <p class="a-ob-sub">{t("codepuppy.onboarding.subtitle")}</p>

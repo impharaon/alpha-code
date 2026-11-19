@@ -421,6 +421,7 @@ status.
 | `SPEC-route-manifest-authority` | [specs/route-manifest-authority/spec.md](specs/route-manifest-authority/spec.md) | 应用导航由一份页面清单决定，保留历史条款、有效裁决和交付证据边界。 | approved |
 | `SPEC-session-results-workspace` | [specs/session-results-workspace/spec.md](specs/session-results-workspace/spec.md) | 会话右栏统一查看文件、产物和修改，保留历史条款、有效裁决和交付证据边界。 | approved |
 | `SPEC-startup-model-availability` | [specs/startup-model-availability/spec.md](specs/startup-model-availability/spec.md) | 启动时及时出现可用模型且不显示虚假失败，保留历史条款、有效裁决和交付证据边界。 | approved |
+| `DESIGN-stored-credentials-fence` | [specs/stored-credentials-fence/design.md](specs/stored-credentials-fence/design.md) | 凭据文件留在原处;围栏对 Code Puppy 的凭据存放点(userData 下六项与官方连接器运行期明文目录)一律拒读拒写(profile 的最后一条文件规则,按真实路径渲染);引擎进程要用的值只由主进程经既有的主进程↔引擎进程窄消息交给它(启动消息带全表,续期热应用与连接器写密钥之后再推全表),进程内一份只读表供引擎配置装载、ext 与云连接器现读;配置里的 {file:} 引用一字不变;用户无感,不新增步骤、等待与设置 | draft |
 | `SPEC-timeline-artifact-links` | [specs/timeline-artifact-links/spec.md](specs/timeline-artifact-links/spec.md) | 对话中的本地产物可以直接打开右栏预览，保留历史条款、有效裁决和交付证据边界。 | approved |
 | `SPEC-tool-card-provenance` | [specs/tool-card-provenance/spec.md](specs/tool-card-provenance/spec.md) | 工具卡按真实来源展示调用并保护敏感字段，保留历史条款、有效裁决和交付证据边界。 | approved |
 | `SPEC-tool-inventory-identity` | [specs/tool-inventory-identity/spec.md](specs/tool-inventory-identity/spec.md) | 工具清单和授权身份随实际来源变化，保留历史条款、有效裁决和交付证据边界。 | approved |

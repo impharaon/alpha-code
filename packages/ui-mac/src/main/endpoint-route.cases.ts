@@ -49,6 +49,41 @@ test("R1 no relay and explicit environment override stay inert", async () => {
   expect(endpoints.resolveEndpoints().platform).toBe("https://exported.test")
   expect(calls).toEqual([])
   delete process.env.CODEPUPPY_PLATFORM_URL
+  // A fresh process is essential: capture the user exports before the application's first fill.
+  const fixture = join(root, "inherited-endpoints.test.ts")
+  writeFileSync(fixture, `
+    import { expect, mock, test } from "bun:test";
+    import { writeFileSync, mkdtempSync } from "node:fs";
+    import { tmpdir } from "node:os";
+    import { join } from "node:path";
+    import { mockElectron } from ${JSON.stringify(join(import.meta.dir, "../../test-component/electron-mock.ts"))};
+    mockElectron(() => ({ app: { isPackaged: false, getVersion: () => "test" }, shell: {}, BrowserWindow: class {}, ipcMain: { handle() {} } }));
+    mock.module(${JSON.stringify(join(import.meta.dir, "logging.ts"))}, () => ({ getLogger: () => ({ log() {}, warn() {}, error() {} }) }));
+    const endpoints = await import(${JSON.stringify(join(import.meta.dir, "codepuppy-endpoints.ts"))});
+    const { applyAuthEnv, initAuthEnv } = await import(${JSON.stringify(join(import.meta.dir, "codepuppy-auth.ts"))});
+    const model = process.env.CODEPUPPY_BASE_URL, cloud = process.env.CODEPUPPY_CLOUD_MCP_URL;
+    test("inherited values survive while app-filled values refresh", () => {
+      const data = mkdtempSync(join(tmpdir(), "inherited-"));
+      process.env.DEV_PLATFORM_TOKEN = Buffer.from('{}').toString('base64url') + '.' + Buffer.from(JSON.stringify({ schema_version: 1, iss: 'codepuppy-web', aud: 'codepuppy-platform-api', sub: 'fixture', token_use: 'platform_access', purpose: 'model.invoke', scope: ['model.invoke'], iat: 1, exp: 2, jti: 'export' })).toString('base64url') + '.signature';
+      for (const version of ['one', 'two']) {
+        writeFileSync(join(data, 'codepuppy-endpoints.json'), JSON.stringify({ platform: 'https://gateway-' + version + '.test', cloud: 'https://cloud-' + version + '.test' }));
+        endpoints.initEndpoints(data, () => {});
+        initAuthEnv(data);
+        applyAuthEnv();
+        expect(endpoints.relayConfigured()).toBe(false);
+        expect(process.env.CODEPUPPY_BASE_URL).toBe(model ?? 'https://gateway-' + version + '.test/v1');
+        expect(process.env.CODEPUPPY_CLOUD_MCP_URL).toBe(cloud ?? 'https://cloud-' + version + '.test/mcp');
+      }
+    });
+  `)
+  for (const exports of [{ CODEPUPPY_BASE_URL: "https://model-export.test/v1" }, { CODEPUPPY_CLOUD_MCP_URL: "https://cloud-export.test/mcp" }, { CODEPUPPY_BASE_URL: "https://model-export.test/v1", CODEPUPPY_CLOUD_MCP_URL: "https://cloud-export.test/mcp" }]) {
+    const env = { ...process.env }
+    delete env.CODEPUPPY_BASE_URL
+    delete env.CODEPUPPY_CLOUD_MCP_URL
+    const child = Bun.spawnSync([process.execPath, "test", "--max-concurrency", "2", fixture], { cwd: join(import.meta.dir, "../.."), env: { ...env, ...exports } })
+    expect(child.exitCode, child.stderr.toString()).toBe(0)
+    expect(child.stderr.toString()).toContain("1 pass")
+  }
 })
 
 test("R2 all three routed addresses switch together, leaving web/account and preferred intact", async () => {

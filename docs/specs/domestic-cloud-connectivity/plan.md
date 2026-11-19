@@ -43,6 +43,7 @@ last_reviewed: 2026-11-19
 | `packages/ui-mac/test-component/codepuppy-bootstrap-fixture.ts`、`packages/ui-mac/test-component/codepuppy-engine.ts` | 仅让现有测试输入传递本次新增 bootstrap 字段；不另建一套引擎启动装配。 |
 | `packages/ui-mac/src/main/fixtures/relay-route/`（需要的脱敏 wire 样本，新） | 保存健康响应等实际输入与来源元数据；优先复用既有 vendored producer fixtures。无日志、凭据或机器绝对路径入库。 |
 | `scripts/gate-files.tsv` | 只同步下述相关精确条数和新宿主登记；不改门实现、不新增 CI job。 |
+| `scripts/old-name-exceptions.tsv`（机械登记） | 保留真实健康响应及 provenance 的外部身份、gate 注释的跨仓票名；只登记本次新增命中。 |
 | `docs/specs/domestic-cloud-connectivity/plan.md` | 首次实现提交补核对行；实际偏离与对应代码同提交记录。 |
 
 ### 顺序
@@ -122,4 +123,7 @@ last_reviewed: 2026-11-19
 
 ### 偏离记录
 
-暂无。计划文档的派生索引由编排器集成时按文档契约生成；本 PLAN 阶段仅提交本文件。
+- 2026-11-19 · 实施步骤 4 分提交：停滞夹具先后尝试既有模型配置与模型 transform 的短预算；E2 单跑通过，但组合运行仍在响应头等待，E2/E3 各 30 s 超时，后续 E4 受阻。按派单“同一修正失败两次”停止调整并返回 PARTIAL，不把组合检查记绿。未发布该宿主/其 gate 行，草稿保存于 `~/.cache/alpha-orch/2026-11-19/impl-relay/desktop/endpoint-route.engine.{cases,test}.draft.ts`；原输出 `engine-route.log`。其中 E1 独立记录拒连后 59275 ms 切直连、恢复后 60023 ms 回 preferred、引擎重启 0 次；这不代替剩余 E2～E6 的组合证明。未改生产默认预算或新增停滞信号。提交：本步骤提交。
+- 2026-11-19 · F1 的临时目录放进该代已有 W2，显式测试数据库放进已有 W5；否则缓存目录下的自定义 TMPDIR 不在生产 profile 的系统临时目录许可内。仍由 `spawnLocalServer` 默认计划生成原样 profile，不修改围栏文件或规则；路线文件留在 W1/W2/W3 外。子进程显式继承隔离环境，清理由未受围栏的宿主负责。提交：本步骤提交。
+- 2026-11-19 · 增补 `scripts/old-name-exceptions.tsv`：真实 wire/provenance 的外部名称及跨仓票名被旧名扫描点名，按派单 Handling problems §1 同步机械登记，不改采集物、不放宽扫描。提交：本步骤提交。
+- 派生文档索引由编排器集成时按文档契约生成；未在本 lane 改索引。规格、设计和生产配置均未改。

@@ -27,7 +27,7 @@ import { registerIpcHandlers, sendMenuCommand } from "./ipc"
 import { registerExtIpcHandlers } from "./ext-ipc"
 import { refreshRemoteCatalog } from "./remote-catalog"
 import { registerAccountIpcHandlers } from "./account-ipc"
-import { onCloudAuthChanged, registerCloudIpcHandlers } from "./cloud-ipc"
+import { onCloudAuthChanged, registerCloudIpcHandlers, resumeCloudRunDelivery } from "./cloud-ipc"
 import { registerArtifactIpcHandlers } from "./artifact-ipc"
 import { initializeArtifactQuotaEnvironment } from "./artifact-service"
 import { registerHtmlPreviewIpcHandlers } from "./html-preview-host"
@@ -52,6 +52,7 @@ import {
   write as writeLog,
 } from "./logging"
 import { getStore } from "./store"
+import { CLOUD_PENDING_RUNS_KEY } from "./store-keys"
 import { GLOBAL_RENDERER_STORE, TABS_INFO_KEY, TABS_KEY, TABS_RECENT_KEY, runTabsPreclean } from "./tabs-preclean"
 import { bootFenceWorkspaceTruth, fenceWorkspaceTruthPath } from "./process-fence-workspaces"
 import { checkSessionExistsViaFetch } from "./tabs-preclean-io"
@@ -1061,6 +1062,11 @@ const main = Effect.gen(function* () {
   registerSettingsIpcHandlers(casGcConfig)
   registerAccountIpcHandlers()
   registerCloudIpcHandlers()
+  // 上次退出时还没取回的云任务结果按同一退避接着取(cloud-run-tracker I9);令牌还没换好时由 onChanged 再接一次。
+  resumeCloudRunDelivery({
+    read: () => getStore().get(CLOUD_PENDING_RUNS_KEY),
+    write: (runs) => getStore().set(CLOUD_PENDING_RUNS_KEY, runs),
+  })
   // REQ-093(#185):run artifact manifest 只读查询面(artifacts.json + 磁盘 reconcile)。
   registerArtifactIpcHandlers()
   // REQ-096(#188):隔离 HTML preview 控制通道(main-owned 一次性静态 host,html-preview-host.ts)。

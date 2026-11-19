@@ -66,6 +66,9 @@ function harness(over: {
   downloads?: Download[]
   register?: SaveRunDeps["register"]
   wait?: (attempt: number) => Promise<void>
+  /** 跨「重启」共用的待取清单(生产 = 设置文件里的一个键)。 */
+  pending?: { runs: unknown }
+  account?: string
 } = {}) {
   const states: CloudRunState[] = []
   const calls: string[] = []
@@ -76,8 +79,16 @@ function harness(over: {
   const lists = [...(over.lists ?? [LIST])]
   const downloads = [...(over.downloads ?? [writeOk()])]
   const ref = { identity: "1:acct-a" }
+  const pending = over.pending ?? { runs: undefined }
   const deps: CloudRunTrackerDeps = {
     identity: () => ref.identity,
+    account: () => over.account ?? "acct-a",
+    pending: {
+      read: () => pending.runs,
+      write: (runs) => {
+        pending.runs = structuredClone(runs)
+      },
+    },
     status:
       over.status ??
       (async (runId) => {
@@ -279,6 +290,56 @@ describe("AC3 transient failures retry (bounded), deterministic ones do not, and
     await h.settled()
     expect(h.waits).toEqual([1])
     expect(h.last()?.delivery.status).toBe("saved")
+  })
+})
+
+// 编排 2026-11-19:退出重开之后,还没取回的云任务结果(任何任务种类)要在启动时按同一退避自动接着取。
+describe("pending results survive a restart", () => {
+  const network = async (): Promise<ArtifactDownloadOutcome> => ({ ok: false, error: "network", detail: "Connect Timeout Error" })
+  const stuck = () => new Promise<void>(() => {})
+
+  test("退出前还在重取 ⇒ 重开后 resume 接着取并落盘;落盘后从待取清单里去掉", async () => {
+    const store = { runs: undefined as unknown }
+    const before = harness({ pending: store, downloads: [network], wait: stuck })
+    before.tracker.track({ directory: projectDir, runId: RUN })
+    await until(() => before.calls.includes("download"), "first download")
+    expect(store.runs).toEqual([{ directory: projectDir, runId: RUN, account: "acct-a" }])
+
+    // 「重开」:新的 tracker,同一份待取清单,网络好了。没有任何卡片或助手调用 track。
+    const after = harness({ pending: store })
+    after.tracker.resume()
+    await after.settled()
+    expect(after.last()?.delivery.status).toBe("saved")
+    expect(fs.readFileSync(savedFile(), "utf8")).toBe(CONTENT)
+    expect(store.runs).toEqual([])
+  })
+
+  test("云端说没有了 ⇒ 去掉;登录问题(not-authenticated)⇒ 留着,等登录好了再接着取", async () => {
+    const gone = { runs: undefined as unknown }
+    const h = harness({ pending: gone, downloads: [async () => ({ ok: false, error: "not-found" })] })
+    h.tracker.track({ directory: projectDir, runId: RUN })
+    await h.settled()
+    expect(gone.runs).toEqual([])
+
+    const signedOut = { runs: undefined as unknown }
+    const cold = harness({ pending: signedOut, statuses: [{ error: "not-authenticated" }] })
+    cold.tracker.track({ directory: projectDir, runId: RUN })
+    await cold.settled()
+    expect(cold.last()?.delivery.status).toBe("failed")
+    expect(signedOut.runs).toEqual([{ directory: projectDir, runId: RUN, account: "acct-a" }])
+  })
+
+  test("只接着取当前账户的;清单坏了不崩", async () => {
+    const other = harness({ pending: { runs: [{ directory: projectDir, runId: RUN, account: "acct-b" }] } })
+    other.tracker.resume()
+    expect(other.tracker.isDelivering(projectDir, RUN)).toBe(false)
+    expect(other.calls).toEqual([])
+
+    for (const runs of [undefined, "x", [null, 3, { directory: projectDir }]]) {
+      const h = harness({ pending: { runs } })
+      expect(() => h.tracker.resume()).not.toThrow()
+      expect(h.calls).toEqual([])
+    }
   })
 })
 

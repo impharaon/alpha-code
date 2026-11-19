@@ -265,8 +265,12 @@ composer 入口:`renderer/alpha-ui/alpha-composer.tsx:830-847` `readFiles` → `
    `alpha-workdir.ts:331-333`(列表失败)、`:352-355`(下载失败)、`:368`(登记失败)都写入 `failures`;`ok:true` 语义收窄为「status.json 已写」。
 4. 交付结论:`failures` 为空 **且** 第 1 步的完整集合核验通过 ⇒ `saved`;否则 `failed`(带第一条失败的 `scope/code`)。列表失败时描述符集合未知,
    **不得**判 saved。
-5. 瞬态失败(`network`、`retryable`、`http-5xx`)最多再试 2 次,间隔取 `alpha-cloud-events-core.ts:19` `backoffMs`;`sha256-mismatch`、
-   `unverifiable`、`over-limit`、`not-found`、`forbidden`、`unauthorized` 不重试。下载重试**永不重新派发**。
+5. 瞬态失败(`network`、`retryable`、`http-5xx`)不判终局,先快后慢一直自动重取(`cloud-run-tracker.ts` `deliveryRetryDelayMs`):前 5 次间隔取
+   `backoffMs`(1、2、4、8 秒,±50% 抖动),之后每 2 分钟一次,直到落盘或遇到确定性失败;转入慢速后广播 `pending` + 这次的瞬态原因(界面说
+   「正在重新获取」),慢速等待中再次 track / retry 立刻叫醒。`sha256-mismatch`、`unverifiable`、`over-limit`、`not-found`、`forbidden`、
+   `unauthorized` 不重试。没取回的 run 记在待取清单(带账户标签,存设置文件),跨退出重开存活:启动与登录身份变化时接着取当前账户的;
+   落盘或确定性失败即去掉,登录类失败(`not-authenticated`、`unauthorized`)留着等登录好了再取。下载重试**永不重新派发**。
+   (0.2.4 owner 2026-11-19:「不要给那么多重试按钮什么的，就是失败自动退避的规则应该合理」。)
 6. 每次状态变化向所有窗口广播 `cloud-run-state`:`{ directory, runId, sessionID|null, job: { status, code? }, delivery: { status: "pending"|"downloading"|"saved"|"failed", failure?: { scope, artifactId?, code } } }`;
    另给 `cloud-run-state-get(directory, runId)` 供重载后取快照。
 
@@ -386,7 +390,7 @@ Office 二进制**永不**以 file part 进入模型请求。不做宿主自动�
 | PDF 继续 data URL,只在发送前提示「模型读不了」 | 对所有注入模型都读不了(§1.5),等于宣布 PDF 不可用,而本机工具就在那 |
 | 附件存到应用私有目录 | 本机读取工具只认授权工作区(`server.py:310-312`),授权工作区 = 实例目录 |
 | metadata 存绝对路径或含隐藏目录名的路径 | 隐藏目录改名、项目移动后失效;两端各自拼路径会匹配不上(R1 F4) |
-| 下载失败时整轮自动无限重试 | 确定性失败(校验不符、越界、404)重试只会掩盖;限瞬态码、限次数 |
+| 下载失败时整轮自动无限重试 | 确定性失败(校验不符、越界、404)重试只会掩盖;只重试瞬态码,先快后慢 |
 
 ---
 
@@ -402,7 +406,7 @@ Office 二进制**永不**以 file part 进入模型请求。不做宿主自动�
 | I3 | 「已保存」= 列表成功 + 完整描述符集合都已登记 + 每个条目现盘 `verifyArtifact` 通过;列表失败、登记失败、复核失败都是交付失败 | tracker 第 1、4 步 |
 | I4 | 归属只由**已受理的**第一方 dispatch part 产生,sessionID 取自该 part;查询类调用不写归属;先写者胜;无归属不得显示在「本次对话」 | `recordRunOrigin`;watcher `source` 判别;面板过滤 |
 | I5 | 任意 job_id 都只能读到当前登录账户自己的任务(平台按账户授权,他人任务 404);进入路径前过 `isSafeRunId` | 平台既有;`cloud-ipc.ts:122` 同款校验 |
-| I6 | 自动重试只针对瞬态码,最多 3 次尝试;下载重试**永不重新派发**任务(不产生新扣费) | tracker 重试表 |
+| I6 | 自动重试只针对瞬态码,先快后慢直到落盘或确定性失败,未取回的跨退出重开接着取;下载重试**永不重新派发**任务(不产生新扣费) | tracker 重试表 + 待取清单 |
 | I7 | 同一 `(directory, runId)` 同时只有一个交付在跑;面板手动下载与时间线重试共用这一协调 | tracker 单飞 + `already-downloading` |
 | I8 | 每个交付任务绑定启动时的身份代;状态回包、SSE 帧、下载开始、退避醒来都先比对,变了即丢弃;换代时 abort 在途下载 | tracker + `main/index.ts:729` 接线 |
 | I9 | 附件暂存路径恒在 `<实例目录>/<隐藏目录>/attachments/<uuid>/` 内,文件名净化,≤20 MiB,只在用户动作时写 | `composer-attachment-stage.ts` 复用 `safeResolveInAlpha` + `sanitizeArtifactName` |
@@ -461,7 +465,7 @@ R1 的 Q1–Q5 已有答案并落进正文(见 §八),本轮无新增征询。
 | 产物面板默认只看「本次对话」 | 改切换的初始值 |
 | Office/PDF 附件复制进项目隐藏目录(`<隐藏目录>/attachments/`) | 恢复 composer 对这几类的拒收 + 引导 @ |
 
-另有两个常量默认:文本附件上限 256 KiB、自动下载最多 3 次尝试。
+另有常量默认:文本附件上限 256 KiB;自动下载快速阶段 5 次、之后每 2 分钟重取一次(原「最多 3 次尝试」已按 owner 2026-11-19 原话改为不判终局)。
 
 ## 七、仍是推断、没跑过的断言
 

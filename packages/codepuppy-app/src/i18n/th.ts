@@ -747,6 +747,7 @@ export const dict = {
   "session.error.notFound": "ไม่พบเซสชันนี้",
   "session.error.notFound.description": "แท็บนี้อ้างถึงเซสชันที่ไม่มีอยู่บนเซิร์ฟเวอร์นี้แล้ว",
   "session.error.notFound.closeTab": "ปิดแท็บ",
+  "session.error.notFound.newSession": "กลับไปที่การสนทนาใหม่",
   "session.error.serverConnection": "ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์นี้",
   "session.review.filesChanged": "{{count}} ไฟล์ที่เปลี่ยนแปลง",
   "session.review.change.one": "การเปลี่ยนแปลง",

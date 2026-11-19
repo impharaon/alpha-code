@@ -718,6 +718,7 @@ export const dict = {
   "session.error.notFound": "Bu sessiyanı tapmaq mümkün deyil",
   "session.error.notFound.description": "Bu tab artıq bu serverdə olmayan sessiyaya işarə edir.",
   "session.error.notFound.closeTab": "Tabı bağla",
+  "session.error.notFound.newSession": "Back to a new conversation",
   "session.error.serverConnection": "Bu serverə qoşulmaq mümkün deyil",
   "session.review.filesChanged": "{{count}} fayl dəyişdi",
   "session.review.change.one": "Dəyişiklik",

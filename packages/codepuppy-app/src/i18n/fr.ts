@@ -712,6 +712,7 @@ export const dict = {
   "session.error.notFound": "Cette session est introuvable",
   "session.error.notFound.description": "Cet onglet pointe vers une session qui n'existe plus sur ce serveur.",
   "session.error.notFound.closeTab": "Fermer l'onglet",
+  "session.error.notFound.newSession": "Retour à une nouvelle conversation",
   "session.error.serverConnection": "Impossible de se connecter à ce serveur",
   "session.review.filesChanged": "{{count}} fichiers modifiés",
   "session.review.change.one": "Modification",

@@ -698,6 +698,7 @@ export const dict = {
   "session.error.notFound": "このセッションが見つかりません",
   "session.error.notFound.description": "このタブが参照するセッションは、このサーバーには存在しません。",
   "session.error.notFound.closeTab": "タブを閉じる",
+  "session.error.notFound.newSession": "新しい会話に戻る",
   "session.error.serverConnection": "このサーバーに接続できません",
   "session.review.filesChanged": "変更されたファイル: {{count}}件",
   "session.review.change.one": "変更",

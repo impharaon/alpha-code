@@ -716,6 +716,7 @@ export const dict = {
   "session.error.notFound.description":
     "Αυτή η καρτέλα δείχνει μια περίοδο λειτουργίας που δεν υπάρχει πλέον σε αυτόν τον διακομιστή.",
   "session.error.notFound.closeTab": "Κλείσιμο καρτέλας",
+  "session.error.notFound.newSession": "Επιστροφή σε νέα συνομιλία",
   "session.error.serverConnection": "Δεν είναι δυνατή η σύνδεση σε αυτόν τον διακομιστή",
   "session.review.filesChanged": "Τα αρχεία άλλαξαν {{count}}",
   "session.review.change.one": "Αλλαγή",

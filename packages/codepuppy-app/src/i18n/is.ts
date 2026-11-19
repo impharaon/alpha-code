@@ -711,6 +711,7 @@ export const dict = {
   "session.error.notFound": "Þessi lota finnst ekki",
   "session.error.notFound.description": "Þessi flipi bendir á lotu sem er ekki lengur til á þessum netþjóni.",
   "session.error.notFound.closeTab": "Lokaðu Tab",
+  "session.error.notFound.newSession": "Back to a new conversation",
   "session.error.serverConnection": "Get ekki tengst þessum þjóni",
   "session.review.filesChanged": "Skráum breytt {{count}}",
   "session.review.change.one": "Breyta",

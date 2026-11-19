@@ -716,6 +716,7 @@ export const dict = {
   "session.error.notFound": "ဤစက်ရှင်ကို ရှာမတွေ့ပါ။",
   "session.error.notFound.description": "ဤတဘ်သည် ဤဆာဗာတွင်မရှိတော့သော စက်ရှင်တစ်ခုကို ညွှန်ပြသည်။",
   "session.error.notFound.closeTab": "တဘ်ကို ပိတ်ပါ။",
+  "session.error.notFound.newSession": "Back to a new conversation",
   "session.error.serverConnection": "ဤဆာဗာသို့ ချိတ်ဆက်၍မရပါ။",
   "session.review.filesChanged": "ဖိုင်များကို {{count}} ပြောင်းထားသည်။",
   "session.review.change.one": "ပြောင်းလဲခြင်း။",

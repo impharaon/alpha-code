@@ -743,6 +743,7 @@ export const dict = {
   "session.error.notFound": "找不到這段對話",
   "session.error.notFound.description": "它可能已經被刪除。",
   "session.error.notFound.closeTab": "回到新對話",
+  "session.error.notFound.newSession": "回到新對話",
   "session.error.serverConnection": "無法連線至此伺服器",
   "session.review.filesChanged": "{{count}} 個檔案變更",
   "session.review.change.one": "變更",

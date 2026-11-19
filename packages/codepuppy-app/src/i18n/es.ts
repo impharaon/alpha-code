@@ -758,6 +758,7 @@ export const dict = {
   "session.error.notFound": "No se encuentra esta sesión",
   "session.error.notFound.description": "Esta pestaña apunta a una sesión que ya no existe en este servidor.",
   "session.error.notFound.closeTab": "Cerrar pestaña",
+  "session.error.notFound.newSession": "Volver a una conversación nueva",
   "session.error.serverConnection": "No se puede conectar a este servidor",
   "session.review.filesChanged": "Archivos modificados: {{count}}",
   "session.review.change.one": "Cambio",

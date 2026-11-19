@@ -778,6 +778,7 @@ export const dict = {
   "session.error.notFound": "Цю сесію не знайдено",
   "session.error.notFound.description": "Ця вкладка посилається на сесію, якої більше немає на цьому сервері.",
   "session.error.notFound.closeTab": "Закрити вкладку",
+  "session.error.notFound.newSession": "Повернутися до нового діалогу",
   "session.error.serverConnection": "Не вдається підключитися до цього сервера",
   "session.review.filesChanged": "Змінено файлів: {{count}}",
   "session.review.change.one": "Зміна",

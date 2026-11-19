@@ -719,6 +719,7 @@ export const dict = {
   "session.error.notFound": "یہ سیشن نہیں مل سکتا",
   "session.error.notFound.description": "یہ ٹیب ایک سیشن کی طرف اشارہ کرتا ہے جو اس سرور پر اب موجود نہیں ہے۔",
   "session.error.notFound.closeTab": "ٹیب بند کریں",
+  "session.error.notFound.newSession": "نئی گفتگو پر واپس جائیں",
   "session.error.serverConnection": "اس سرور سے منسلک نہیں ہو سکتا",
   "session.review.filesChanged": "تبدیل شدہ فائلیں: {{count}}",
   "session.review.change.one": "تبدیلی",

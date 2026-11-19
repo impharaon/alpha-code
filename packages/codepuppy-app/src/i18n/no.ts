@@ -1211,6 +1211,7 @@ export const dict = {
   "session.error.notFound": "Denne sesjonen finnes ikke",
   "session.error.notFound.description": "Denne fanen peker til en sesjon som ikke lenger finnes på denne serveren.",
   "session.error.notFound.closeTab": "Lukk fane",
+  "session.error.notFound.newSession": "Tilbake til en ny samtale",
   "session.error.serverConnection": "Kan ikke koble til denne serveren",
   "session.review.noUncommittedChanges": "Ingen endringer som ikke er sjekket inn ennå",
   "session.review.noBranchChanges": "Ingen grenendringer ennå",

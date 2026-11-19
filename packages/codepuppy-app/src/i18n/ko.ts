@@ -998,6 +998,7 @@ export const dict = {
   "session.error.notFound": "이 세션을 찾을 수 없습니다",
   "session.error.notFound.description": "이 탭은 이 서버에 더 이상 존재하지 않는 세션을 가리킵니다.",
   "session.error.notFound.closeTab": "탭 닫기",
+  "session.error.notFound.newSession": "새 대화로 돌아가기",
   "session.error.serverConnection": "이 서버에 연결할 수 없습니다",
   "session.review.noUncommittedChanges": "아직 커밋되지 않은 변경 사항이 없습니다",
   "session.review.noBranchChanges": "아직 브랜치 변경 사항이 없습니다",

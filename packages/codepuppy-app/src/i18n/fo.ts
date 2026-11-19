@@ -709,6 +709,7 @@ export const dict = {
   "session.error.notFound": "Henda setan er ikki at finna",
   "session.error.notFound.description": "Hesin flipin vísir á eina setu, sum ikki longur er til á hesum ambætaranum.",
   "session.error.notFound.closeTab": "Lat flipan aftur",
+  "session.error.notFound.newSession": "Back to a new conversation",
   "session.error.serverConnection": "Kann ikki seta samband við hendan ambætaran",
   "session.review.filesChanged": "Fílur broyttar {{count}}",
   "session.review.change.one": "Broyting",

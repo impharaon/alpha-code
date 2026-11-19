@@ -716,6 +716,7 @@ export const dict = {
   "session.error.notFound": "Ovu sesiju nije moguće pronaći",
   "session.error.notFound.description": "Ova kartica ukazuje na sesiju koja više ne postoji na ovom poslužitelju.",
   "session.error.notFound.closeTab": "Zatvori Tab",
+  "session.error.notFound.newSession": "Natrag na novi razgovor",
   "session.error.serverConnection": "Ne mogu se spojiti na ovaj poslužitelj",
   "session.review.filesChanged": "Datoteke promijenjene {{count}}",
   "session.review.change.one": "Promijeniti",

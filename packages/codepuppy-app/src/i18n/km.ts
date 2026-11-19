@@ -706,6 +706,7 @@ export const dict = {
   "session.error.notFound": "សម័យនេះមិនអាចរកឃើញទេ។",
   "session.error.notFound.description": "ផ្ទាំងនេះចង្អុលទៅសម័យដែលលែងមាននៅលើម៉ាស៊ីនមេនេះ។",
   "session.error.notFound.closeTab": "បិទផ្ទាំង",
+  "session.error.notFound.newSession": "Back to a new conversation",
   "session.error.serverConnection": "មិនអាចភ្ជាប់ទៅម៉ាស៊ីនមេនេះទេ។",
   "session.review.filesChanged": "ឯកសារបានផ្លាស់ប្តូរ {{count}}",
   "session.review.change.one": "ការផ្លាស់ប្តូរ",

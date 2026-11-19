@@ -706,6 +706,7 @@ export const dict: Record<string, string> = {
   "session.error.notFound": "මෙම සැසිය සොයාගත නොහැක",
   "session.error.notFound.description": "මෙම පටිත්ත මෙම සේවාදායකයේ තවදුරටත් නොපවතින සැසියක් වෙත යොමු කරයි.",
   "session.error.notFound.closeTab": "ටැබය වසන්න",
+  "session.error.notFound.newSession": "Back to a new conversation",
   "session.error.serverConnection": "මෙම සේවාදායකයට සම්බන්ධ විය නොහැක",
   "session.review.filesChanged": "ගොනු {{count}} වෙනස් කරන ලදී",
   "session.review.change.one": "වෙනස් කරන්න",

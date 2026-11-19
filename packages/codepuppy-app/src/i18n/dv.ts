@@ -720,6 +720,7 @@ export const dict = {
   "session.error.notFound": "މި ސެޝަން ހޯދިފައެއް ނުވެއެވެ",
   "session.error.notFound.description": "މި ޓެބުން އިޝާރާތް ކުރަނީ މި ސަރވަރގައި މިހާރު ނެތް ސެޝަނަކަށެވެ.",
   "session.error.notFound.closeTab": "Tab ބަންދުކުރުން",
+  "session.error.notFound.newSession": "Back to a new conversation",
   "session.error.serverConnection": "މި ސަރވަރ އާއި ގުޅެވޭކަށް ނެތެވެ",
   "session.review.filesChanged": "ފައިލްތައް ބަދަލުވެއްޖެ {{count}}",
   "session.review.change.one": "ބަދަލު",

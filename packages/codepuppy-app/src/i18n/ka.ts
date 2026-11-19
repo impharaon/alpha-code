@@ -709,6 +709,7 @@ export const dict = {
   "session.error.notFound": "ეს სესია ვერ მოიძებნა",
   "session.error.notFound.description": "ეს ჩანართი მიუთითებს სესიაზე, რომელიც აღარ არსებობს ამ სერვერზე.",
   "session.error.notFound.closeTab": "ჩანართის დახურვა",
+  "session.error.notFound.newSession": "Back to a new conversation",
   "session.error.serverConnection": "ამ სერვერთან დაკავშირება შეუძლებელია",
   "session.review.filesChanged": "ფაილები შეიცვალა {{count}}",
   "session.review.change.one": "შეცვლა",

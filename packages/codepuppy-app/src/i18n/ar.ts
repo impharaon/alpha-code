@@ -695,6 +695,7 @@ export const dict = {
   "session.error.notFound": "لا يمكن العثور على هذه الجلسة",
   "session.error.notFound.description": "يشير هذا التبويب إلى جلسة لم تعد موجودة على هذا الخادم.",
   "session.error.notFound.closeTab": "إغلاق علامة التبويب",
+  "session.error.notFound.newSession": "العودة إلى محادثة جديدة",
   "session.error.serverConnection": "تعذر الاتصال بهذا الخادم",
   "session.review.filesChanged": "الملفات المتغيرة: {{count}}",
   "session.review.change.one": "تغيير",

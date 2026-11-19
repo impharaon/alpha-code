@@ -773,6 +773,7 @@ export const dict = {
   "session.error.notFound": "Sesi ini tidak dapat ditemukan",
   "session.error.notFound.description": "Tab ini mengarah ke sesi yang sudah tidak ada di server ini.",
   "session.error.notFound.closeTab": "Tutup Tab",
+  "session.error.notFound.newSession": "Kembali ke percakapan baru",
   "session.error.serverConnection": "Tidak dapat terhubung ke server ini",
   "session.review.filesChanged": "{{count}} Berkas Berubah",
   "session.review.change.one": "Perubahan",

@@ -702,6 +702,7 @@ export const dict = {
   "session.error.notFound": "Nie można znaleźć tej sesji",
   "session.error.notFound.description": "Ta karta wskazuje sesję, która nie istnieje już na tym serwerze.",
   "session.error.notFound.closeTab": "Zamknij kartę",
+  "session.error.notFound.newSession": "Wróć do nowej rozmowy",
   "session.error.serverConnection": "Nie można połączyć się z tym serwerem",
   "session.review.filesChanged": "Zmieniono {{count}} plików",
   "session.review.change.one": "Zmiana",

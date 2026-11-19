@@ -704,6 +704,7 @@ export const dict = {
   "session.error.notFound": "Seda seanssi ei leitud",
   "session.error.notFound.description": "See vahekaart osutab seansile, mida selles serveris enam ei eksisteeri.",
   "session.error.notFound.closeTab": "Sule vahekaart",
+  "session.error.notFound.newSession": "Tagasi uue vestluse juurde",
   "session.error.serverConnection": "Selle serveriga ei saa ühendust",
   "session.review.filesChanged": "Muudetud failid {{count}}",
   "session.review.change.one": "Muuda",

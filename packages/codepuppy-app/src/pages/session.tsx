@@ -217,7 +217,7 @@ function SessionErrorFallback(props: { error: unknown; sessionID?: string; serve
         title={language.t("session.error.notFound")}
         description={language.t("session.error.notFound.description")}
         // 键沿用上游的 closeTab(新增键会破坏各语种键对齐判据);中 / 英 / 繁值已改成「回到新对话」。
-        action={language.t("session.error.notFound.closeTab")}
+        action={language.t("session.error.notFound.newSession")}
         onAction={backToNewChat}
       />
     )

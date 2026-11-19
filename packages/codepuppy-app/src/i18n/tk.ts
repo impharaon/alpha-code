@@ -708,6 +708,7 @@ export const dict = {
   "session.error.notFound": "Bu sessiýany tapyp bolmaýar",
   "session.error.notFound.description": "Bu goýma, bu serwerde ýok bolan sessiýany görkezýär.",
   "session.error.notFound.closeTab": "Tab ýapyň",
+  "session.error.notFound.newSession": "Back to a new conversation",
   "session.error.serverConnection": "Bu serwere birigip bilemok",
   "session.review.filesChanged": "Faýllar üýtgedildi {{count}}",
   "session.review.change.one": "Üýtget",

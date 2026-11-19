@@ -72,7 +72,7 @@ describe("已整理的面:没有原词", () => {
   })
 
   test("找不到对话不写服务器名、对话编号与「标签页」", () => {
-    const text = ["session.error.notFound", "session.error.notFound.description", "session.error.notFound.closeTab"]
+    const text = ["session.error.notFound", "session.error.notFound.description", "session.error.notFound.newSession"]
       .map((key) => (appZh as Record<string, string>)[key])
       .join("")
     expect(text).toBe("找不到这段对话它可能已经被删除。回到新对话")

@@ -716,6 +716,7 @@ export const dict = {
   "session.error.notFound": "Deze sessie kan niet worden gevonden",
   "session.error.notFound.description": "Dit tabblad verwijst naar een sessie die niet meer bestaat op deze server.",
   "session.error.notFound.closeTab": "Tabblad sluiten",
+  "session.error.notFound.newSession": "Terug naar een nieuw gesprek",
   "session.error.serverConnection": "Kan geen verbinding maken met deze server",
   "session.review.filesChanged": "Gewijzigde bestanden: {{count}}",
   "session.review.change.one": "Wijziging",

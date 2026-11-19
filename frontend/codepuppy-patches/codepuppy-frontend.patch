@@ -8,21 +8,22 @@ index f1caabbcc..c51f7ce70 100644
 -preload = ["./happydom.ts"]
 +preload = ["../ui/test/solid-jsx.ts", "./happydom.ts"]
 diff --git a/packages/app/package.json b/packages/app/package.json
-index 6d38562a1..3050677ad 100644
+index 6d38562a1..db1357d13 100644
 --- a/packages/app/package.json
 +++ b/packages/app/package.json
-@@ -10,7 +10,9 @@
+@@ -10,7 +10,10 @@
      "./updater": "./src/updater.ts",
      "./wsl/types": "./src/wsl/types.ts",
      "./vite": "./vite.js",
 -    "./index.css": "./src/index.css"
 +    "./index.css": "./src/index.css",
 +    "./surface/session": "./src/pages/session.tsx",
-+    "./surface/terminal": "./src/surface/terminal.ts"
++    "./surface/terminal": "./src/surface/terminal.ts",
++    "./surface/session-not-found-state": "./src/surface/session-not-found-state.ts"
    },
    "scripts": {
      "typecheck": "tsgo -b",
-@@ -33,35 +35,35 @@
+@@ -33,35 +36,35 @@
    "license": "MIT",
    "devDependencies": {
      "@happy-dom/global-registrator": "20.0.11",
@@ -71,7 +72,7 @@ index 6d38562a1..3050677ad 100644
      "@shikijs/transformers": "3.9.2",
      "@solid-primitives/active-element": "2.1.3",
      "@solid-primitives/audio": "1.4.2",
-@@ -72,26 +74,26 @@
+@@ -72,26 +75,26 @@
      "@solid-primitives/resize-observer": "2.1.5",
      "@solid-primitives/scheduled": "1.5.3",
      "@solid-primitives/scroll": "2.1.3",
@@ -4865,16 +4866,59 @@ index cb58b6f8b..1d9d85284 100644
    })
  })
  
+diff --git a/packages/app/src/pages/route-error-boundary.tsx b/packages/app/src/pages/route-error-boundary.tsx
+new file mode 100644
+index 000000000..a29c81585
+--- /dev/null
++++ b/packages/app/src/pages/route-error-boundary.tsx
+@@ -0,0 +1,33 @@
++import { createEffect, ErrorBoundary, on, type JSX, type ParentProps } from "solid-js"
++
++// A Solid ErrorBoundary stays on its fallback until it is reset, and the session route instance is
++// shared by every conversation on a server (the route does not remount when the id changes). Without a
++// reset, one "conversation not found" leaves the route stuck on that page whatever the user opens next.
++// `resetOn` is the identity the failure belongs to (the session id): when it changes, the boundary
++// goes back to its children.
++export function ResettingErrorBoundary(
++  props: ParentProps<{ resetOn: () => unknown; fallback: (error: unknown) => JSX.Element }>,
++) {
++  let reset: (() => void) | undefined
++  createEffect(
++    on(
++      props.resetOn,
++      () => {
++        const pending = reset
++        reset = undefined
++        pending?.()
++      },
++      { defer: true },
++    ),
++  )
++  return (
++    <ErrorBoundary
++      fallback={(error, resetBoundary) => {
++        reset = resetBoundary
++        return props.fallback(error)
++      }}
++    >
++      {props.children}
++    </ErrorBoundary>
++  )
++}
 diff --git a/packages/app/src/pages/session-not-found.tsx b/packages/app/src/pages/session-not-found.tsx
 new file mode 100644
-index 000000000..571e61b6c
+index 000000000..a2ac61dad
 --- /dev/null
 +++ b/packages/app/src/pages/session-not-found.tsx
-@@ -0,0 +1,19 @@
+@@ -0,0 +1,23 @@
++import { onCleanup } from "solid-js"
++import { setSessionNotFoundShown } from "../surface/session-not-found-state"
 +// 找不到对话(新外壳稿 #not-found):Code Puppy 自己的空状态,取代继承自上游的错误页 ——
 +// 一句话 + 一个出口;不写服务器名、不露对话编号,没有「标签页」的说法。
 +// 版式在 ui-mac 渲染层的 session-workspace.css(`data-codepuppy-session-not-found`),这里只出结构。
 +export function SessionNotFound(props: { title: string; description: string; action: string; onAction: () => void }) {
++  setSessionNotFoundShown(true)
++  onCleanup(() => setSessionNotFoundShown(false))
 +  return (
 +    <div class="flex-1 min-h-0 overflow-hidden" data-codepuppy-session-not-found="">
 +      <div data-codepuppy-not-found="body">
@@ -4891,7 +4935,7 @@ index 000000000..571e61b6c
 +  )
 +}
 diff --git a/packages/app/src/pages/session.tsx b/packages/app/src/pages/session.tsx
-index 2e647e0f4..e0029f542 100644
+index 2e647e0f4..5bcf7cc7a 100644
 --- a/packages/app/src/pages/session.tsx
 +++ b/packages/app/src/pages/session.tsx
 @@ -16,6 +16,7 @@ import {
@@ -4919,15 +4963,16 @@ index 2e647e0f4..e0029f542 100644
  import { useSettings } from "@/context/settings"
  import { useSync } from "@/context/sync"
  import { useTabs } from "@/context/tabs"
-@@ -103,6 +103,7 @@ import { legacySessionHref, requireServerKey, sessionHref } from "@/utils/sessio
+@@ -103,6 +103,8 @@ import { legacySessionHref, requireServerKey, sessionHref } from "@/utils/sessio
  import { useUsageExceededDialogs } from "./session/usage-exceeded-dialogs"
  import { createSessionOwnership } from "./session/session-ownership"
  import { createSessionLineage } from "./session/session-lineage"
++import { ResettingErrorBoundary } from "@/pages/route-error-boundary"
 +import { SessionNotFound } from "./session-not-found"
  
  type FollowupItem = FollowupDraft & { id: string }
  type FollowupEdit = Pick<FollowupItem, "id" | "prompt" | "context">
-@@ -156,7 +157,7 @@ export function SessionPage() {
+@@ -156,7 +158,7 @@ export function SessionPage() {
  // remount around the server-scoped providers. Nothing here may key on the
  // session ID: session tabs on the same server share this route instance, and
  // workspace-scoped state (terminal, directory providers) lives below.
@@ -4936,7 +4981,7 @@ index 2e647e0f4..e0029f542 100644
    const params = useParams<{ serverKey: string; id: string }>()
    const serverSync = useServerSync()
    const directory = createMemo(() => serverSync().session.lineage.peek(params.id)?.session.directory)
-@@ -166,7 +167,7 @@ export function TargetSessionRouteContent() {
+@@ -166,7 +168,7 @@ export function TargetSessionRouteContent() {
      <TargetServerScopedProviders directory={directory} sessionID={() => params.id}>
        <TargetSessionSettingsCommand />
        <SessionRouteErrorBoundary sessionID={params.id} serverKey={requireServerKey(params.serverKey)} padded>
@@ -4945,7 +4990,34 @@ index 2e647e0f4..e0029f542 100644
        </SessionRouteErrorBoundary>
      </TargetServerScopedProviders>
    )
-@@ -204,46 +205,27 @@ function SessionErrorFallback(props: { error: unknown; sessionID?: string; serve
+@@ -182,9 +184,15 @@ export function SessionRouteErrorBoundary(
+ ) {
+   const settings = useSettings()
+   return (
+-    <ErrorBoundary
++    <ResettingErrorBoundary
++      resetOn={() => props.sessionID}
+       fallback={(error) =>
+-        settings.general.newLayoutDesigns() ? (
++        // 找不到对话:冻结稿 #not-found 没有内层卡片 —— 只留撑满的路由框,不画带阴影的圆角面板。
++        isCurrentSessionNotFoundError(error, props.sessionID) ? (
++          <SessionRouteFrame>
++            <SessionErrorFallback error={error} sessionID={props.sessionID} serverKey={props.serverKey} />
++          </SessionRouteFrame>
++        ) : settings.general.newLayoutDesigns() ? (
+           <SessionRouteFrame padded={props.padded}>
+             <SessionPanelFrame newLayout raised={!!props.sessionID}>
+               <SessionErrorFallback error={error} sessionID={props.sessionID} serverKey={props.serverKey} />
+@@ -196,7 +204,7 @@ export function SessionRouteErrorBoundary(
+       }
+     >
+       {props.children}
+-    </ErrorBoundary>
++    </ResettingErrorBoundary>
+   )
+ }
+ 
+@@ -204,46 +212,27 @@ function SessionErrorFallback(props: { error: unknown; sessionID?: string; serve
    const language = useLanguage()
    const server = useServer()
    const tabs = useTabs()
@@ -5005,7 +5077,7 @@ index 2e647e0f4..e0029f542 100644
    const params = useParams<{ serverKey: string; id: string }>()
    const tabs = useTabs()
    const sync = useServerSync()
-@@ -272,7 +254,7 @@ function ResolvedTargetSessionRoute() {
+@@ -272,7 +261,7 @@ function ResolvedTargetSessionRoute() {
      <Show when={directory()}>
        <SDKProvider directory={targetDirectory}>
          <DirectoryDataProvider directory={targetDirectory} server={serverKey}>
@@ -5014,7 +5086,7 @@ index 2e647e0f4..e0029f542 100644
          </DirectoryDataProvider>
        </SDKProvider>
      </Show>
-@@ -282,12 +264,18 @@ function ResolvedTargetSessionRoute() {
+@@ -282,12 +271,18 @@ function ResolvedTargetSessionRoute() {
  // Owns the workspace-identity remount. Must not include the session ID in the
  // key: SessionPage handles session changes reactively, and remounting here
  // destroys workspace-scoped state (terminal PTYs, file/prompt providers).
@@ -5035,7 +5107,7 @@ index 2e647e0f4..e0029f542 100644
      </Show>
    )
  }
-@@ -314,7 +302,7 @@ function MarkSessionNotificationsViewed(props: { sessionID?: () => string | unde
+@@ -314,7 +309,7 @@ function MarkSessionNotificationsViewed(props: { sessionID?: () => string | unde
    return null
  }
  
@@ -5411,6 +5483,20 @@ index c4c8c44a9..196d6ada2 100644
      )
    }
  
+diff --git a/packages/app/src/surface/session-not-found-state.ts b/packages/app/src/surface/session-not-found-state.ts
+new file mode 100644
+index 000000000..5fbd469fb
+--- /dev/null
++++ b/packages/app/src/surface/session-not-found-state.ts
+@@ -0,0 +1,8 @@
++import { createSignal } from "solid-js"
++
++// The window chrome (ui-mac top bar) names the page: while the "conversation not found" page is on
++// screen it reads this to write 「找不到对话」 in the top bar. One window, one page: a module signal.
++const [shown, setShown] = createSignal(false)
++
++export const sessionNotFoundShown = shown
++export const setSessionNotFoundShown = setShown
 diff --git a/packages/app/src/surface/terminal.ts b/packages/app/src/surface/terminal.ts
 new file mode 100644
 index 000000000..f814270b6

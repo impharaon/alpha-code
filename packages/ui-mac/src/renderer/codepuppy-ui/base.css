@@ -70,20 +70,15 @@
   background: transparent;
 }
 
-/* Full-page scroll bodies (Customization Center, automation, settings): the frame draws no scrollbar,
- * so the thumb shows only while the pointer is over the page. The gutter stays (both edges, see each
- * page), so the centred column never shifts. */
-.a-ui .codepuppy-ext-scroll::-webkit-scrollbar-thumb,
-.a-ui .codepuppy-auto-scroll::-webkit-scrollbar-thumb,
-.a-ui .codepuppy-settings-main::-webkit-scrollbar-thumb {
-  background: transparent;
-  background-clip: padding-box;
-}
-.a-ui .codepuppy-ext-scroll:hover::-webkit-scrollbar-thumb,
-.a-ui .codepuppy-auto-scroll:hover::-webkit-scrollbar-thumb,
-.a-ui .codepuppy-settings-main:hover::-webkit-scrollbar-thumb {
-  background: var(--a-border-strong);
-  background-clip: padding-box;
+/* Full-page scroll bodies (Customization Center, automation, settings): use the platform's own scrollbars
+ * (overlay on macOS: the thumb shows while scrolling or hovering) instead of the 10px classic bar above, and
+ * reserve no gutter, so the centred column is centred in the page. A standard `scrollbar-color` makes Chromium
+ * ignore the ::-webkit-scrollbar rules for these containers. */
+.a-ui .codepuppy-ext-scroll,
+.a-ui .codepuppy-auto-scroll,
+.a-ui .codepuppy-settings-main {
+  scrollbar-gutter: auto;
+  scrollbar-color: var(--a-border-strong) transparent;
 }
 
 /* Overline / small label utility used across screens. */

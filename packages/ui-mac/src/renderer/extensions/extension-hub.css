@@ -181,7 +181,6 @@ body[data-codepuppy-sidebar="open"] :where(.codepuppy-ext-page) {
   min-height: 0;
   overflow-y: auto;
   padding: 0 0 56px;
-  scrollbar-gutter: stable both-edges; /* 切页签时内容不因滚动条出现而横移;两侧各留一份,880 栏仍居中(冻结稿无滚动条) */
   container-type: inline-size;
 }
 .codepuppy-ext-center {

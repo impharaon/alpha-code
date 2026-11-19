@@ -1130,6 +1130,8 @@ export const dict = {
   "codepuppy.search.loading": "对话列表读取中…",
   "codepuppy.search.group": "对话",
   "codepuppy.search.titleOnly": "按标题搜索",
+  "codepuppy.search.date": "{{month}}月{{day}}日",
+  "codepuppy.search.dateYear": "{{year}}年{{month}}月{{day}}日",
   "codepuppy.search.keySelect": "选择",
   "codepuppy.search.keyOpen": "打开",
   "codepuppy.search.keyClose": "关闭",

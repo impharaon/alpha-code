@@ -34,6 +34,7 @@ import type { CodePuppyProject, CodePuppyProjectsApi, CodePuppyProjectsStore } f
 import { sessionDisplayTitle } from "./session-title"
 import { projectSidebarGroups } from "../sidebar/project-display"
 import { ShellIcon } from "./shell-icons"
+import { runMomentOf } from "./session-rail/artifacts/artifacts-core"
 import "./session-search.css"
 
 /** 上游命令面板的命令 id;`command.show()` 与 mod+k 都派发到它。 */
@@ -91,6 +92,15 @@ export function sessionListPending(
   serverKey: string | undefined,
 ): boolean {
   return !serverKey || !store.ready || store.projects.some((project) => !project.loaded)
+}
+
+/** 行尾时间:今天 HH:MM / 昨天 HH:MM / 月日(分档沿用产物面板的 `runMomentOf`)。分得清同名对话(#1589 AC4)。 */
+export function sessionSearchTime(updated: number, now: Date): string {
+  const moment = runMomentOf(new Date(updated).toISOString(), now)!
+  if (moment.kind === "today") return t("codepuppy.session.artifactsRunToday", { time: moment.time })
+  if (moment.kind === "yesterday") return t("codepuppy.session.artifactsRunYesterday", { time: moment.time })
+  if (moment.kind === "date") return t("codepuppy.search.date", { month: String(moment.month), day: String(moment.day) })
+  return t("codepuppy.search.dateYear", { year: String(moment.year), month: String(moment.month), day: String(moment.day) })
 }
 
 /** 标题里与关键词相同的片段(不分大小写)标出来,其余原样 —— 冻结稿 #search 的「定价」加粗。 */
@@ -238,6 +248,7 @@ export function CodePuppySessionSearch(props: {
                       </For>
                     </span>
                     <span class="a-search-result-project">{result.project}</span>
+                    <span class="a-search-result-time">{sessionSearchTime(result.updated, new Date())}</span>
                   </a>
                 </li>
               )}

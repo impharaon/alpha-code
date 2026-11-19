@@ -18,7 +18,7 @@ import { createEffect, createSignal } from "solid-js"
 import { createStore } from "solid-js/store"
 import { render } from "solid-js/web"
 import { CodePuppySessionSearch } from "./codepuppy-session-search"
-export { highlightSegments } from "./codepuppy-session-search"
+export { highlightSegments, sessionSearchTime } from "./codepuppy-session-search"
 import { CodePuppySidebar } from "../sidebar/codepuppy-sidebar"
 import type { CodePuppyProject, CodePuppyProjectsApi, CodePuppyProjectsStore } from "../sidebar/use-projects"
 

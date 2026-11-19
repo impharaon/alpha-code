@@ -352,6 +352,32 @@ describe("#1589 AC3:方向键选择、回车打开,焦点留在输入框", () =>
   })
 })
 
+describe("#1589 AC4:每条结果带项目名与最近更新时间", () => {
+  // 固定「现在」= 2026-10-30 15:00(本地时区),三种分档各一条。
+  const now = new Date(2026, 9, 30, 15, 0)
+
+  test("今天 HH:MM", () => {
+    expect(runtime.sessionSearchTime(new Date(2026, 9, 30, 9, 12).getTime(), now)).toBe("今天 09:12")
+  })
+
+  test("昨天 HH:MM", () => {
+    expect(runtime.sessionSearchTime(new Date(2026, 9, 29, 22, 40).getTime(), now)).toBe("昨天 22:40")
+  })
+
+  test("更早:月日", () => {
+    expect(runtime.sessionSearchTime(new Date(2026, 8, 21, 6, 29).getTime(), now)).toBe("9月21日")
+  })
+
+  test("结果行渲染项目名与时间(时间是安静的行尾值)", async () => {
+    await openViaSidebarButton()
+    await type("整理架构图")
+
+    const row = rowFor("ses_new")!
+    expect(row.querySelector(".a-search-result-project")!.textContent).toBe("alpha-code")
+    expect(row.querySelector(".a-search-result-time")!.textContent).toBe(runtime.sessionSearchTime(30, new Date()))
+  })
+})
+
 describe("冻结稿 #search:结果分组、关键词加粗、行里只有项目名", () => {
   test("highlightSegments 按不分大小写的关键词切开标题,每处命中都标出", () => {
     expect(runtime.highlightSegments("把定价表改成定价", "定价")).toEqual([
@@ -367,7 +393,7 @@ describe("冻结稿 #search:结果分组、关键词加粗、行里只有项目�
     expect(runtime.highlightSegments("无关", "")).toEqual([{ text: "无关", match: false }])
   })
 
-  test("结果有「对话」组头,标题里的关键词是 <mark>,行里有项目名、没有时间列", async () => {
+  test("结果有「对话」组头,标题里的关键词是 <mark>,行里有项目名", async () => {
     await openViaSidebarButton()
     await type("整理架构图")
 
@@ -375,7 +401,6 @@ describe("冻结稿 #search:结果分组、关键词加粗、行里只有项目�
     const row = rowFor("ses_new")!
     expect(row.querySelector(".a-search-result-title mark")!.textContent).toBe("整理架构图")
     expect(row.querySelector(".a-search-result-project")!.textContent).toBe("alpha-code")
-    expect(row.querySelector(".a-search-result-time")).toBeNull()
   })
 })
 

@@ -157,6 +157,16 @@
   background: var(--a-bg-muted);
 }
 
+/* 行尾时间:安静的次级值,与项目名并列右对齐(同名对话靠它分辨,#1589 AC4);不是一列表头。 */
+.a-search-result-time {
+  flex: 0 0 auto;
+  min-width: 64px;
+  text-align: right;
+  color: var(--a-text-tertiary);
+  font-size: var(--a-text-xs);
+  font-variant-numeric: tabular-nums;
+}
+
 .a-search-keys {
   display: flex;
   gap: 14px;

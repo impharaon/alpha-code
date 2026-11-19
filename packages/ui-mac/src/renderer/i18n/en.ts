@@ -1150,6 +1150,8 @@ export const dict = {
   "codepuppy.search.loading": "Loading chats…",
   "codepuppy.search.group": "Conversations",
   "codepuppy.search.titleOnly": "Search by title",
+  "codepuppy.search.date": "{{month}}/{{day}}",
+  "codepuppy.search.dateYear": "{{year}}-{{month}}-{{day}}",
   "codepuppy.search.keySelect": "Select",
   "codepuppy.search.keyOpen": "Open",
   "codepuppy.search.keyClose": "Close",

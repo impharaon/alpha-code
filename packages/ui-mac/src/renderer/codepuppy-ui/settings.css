@@ -122,7 +122,6 @@ body[data-codepuppy-sidebar="open"] .codepuppy-settings-page {
   min-width: 0;
   flex: 1;
   overflow: auto;
-  scrollbar-gutter: stable both-edges;
   padding: 0 0 var(--a-space-16);
 }
 

@@ -71,7 +71,7 @@ import { createProjectConfigViewRequester } from "./project-config-view-message"
 import type { ProjectConfigView } from "@opencode/schema/codepuppy-project-config"
 import { createWriteGrantRequester, createWriteProbeRequester, type WorkspaceWriteGrantReply, type WorkspaceWriteProbeFact } from "./workspace-write-probe"
 import { loadFenceAddon } from "./process-fence-apply"
-import { WORKSPACE_WRITE_EXTENSION_CLASS } from "./process-fence-profile"
+import { processFenceRulesCover, processFenceWriteRules, WORKSPACE_WRITE_EXTENSION_CLASS, type ProcessFenceWriteRule } from "./process-fence-profile"
 import { codepuppyGlobalRoot, codepuppyJsoncPath } from "./engine-config-truth"
 import { ensureUserWorkspaceDir } from "./codepuppy-user-workspace"
 import { fenceWorkspaceTruthPath, readWorkspaceTruthOrThrow } from "./process-fence-workspaces"
@@ -106,6 +106,12 @@ export type SidecarListener = {
   readonly fenced: boolean
   /** Main's eligibility consumer is the sole caller; successful grants live only in this listener. */
   grantWrite: (directory: string) => Promise<Omit<WorkspaceWriteGrantReply, "type" | "id">>
+  /**
+   * Whether this generation's sandbox already writes `directory` (or an ancestor) by main's own knowledge: the
+   * rules of the profile main rendered and applied, plus this generation's finished and in-flight grants. String
+   * containment only — never the fenced probe, never the candidate's filesystem state. True ⇒ never issue.
+   */
+  generationWrites: (directory: string) => boolean
 }
 
 const SIDECAR_SERVICE_NAME = "opencode server"
@@ -598,6 +604,18 @@ export async function spawnLocalServer(
   const writeGrants = createWriteGrantRequester((command) => child.postMessage(command))
   const grantedDirectories = new Set<string>()
   const granting = new Map<string, Promise<Omit<WorkspaceWriteGrantReply, "type" | "id">>>()
+  // The one source of this generation's write roots: the exact profile bytes it applies, parsed by the renderer's
+  // module. An unrecognised form leaves this undefined, and every directory then counts as covered (no issue).
+  let writeRules: ProcessFenceWriteRule[] | undefined
+  try {
+    writeRules = fence ? processFenceWriteRules(fence.profile) : undefined
+  } catch (error) {
+    getLogger()?.warn(`process fence: cannot read this generation's write rules — runtime grants are disabled for it: ${serializeError(error).message}`)
+  }
+  // Another directory's grant in flight counts too: once consumed, its subtree is fenced-writable before main hears
+  // back. The same directory's own in-flight grant is joined instead (grantWrite coalesces; nothing new is issued).
+  const generationWrites: SidecarListener["generationWrites"] = (directory) =>
+    !writeRules || processFenceRulesCover([...writeRules, ...[...grantedDirectories, ...[...granting.keys()].filter((pending) => pending !== directory)].map((value) => ({ kind: "subpath" as const, value }))], directory)
   const grantWrite: SidecarListener["grantWrite"] = (directory) => {
     if (exited || !child.pid) return Promise.resolve({ outcome: "failed", detail: "engine not running" })
     if (!fence) return Promise.resolve({ outcome: "failed", detail: "engine has no fence" })
@@ -619,8 +637,8 @@ export async function spawnLocalServer(
           getLogger()?.warn(`process fence: grant failed directory=${JSON.stringify(directory)} step=${issued.step} errno=${issued.errno}`)
           return { outcome: "failed", detail: `${issued.step} errno=${issued.errno}` }
         }
-        // Assertion, not the protection: the tracker issues only for an EPERM-denied identity it has just
-        // re-validated (stillSelf), and fenced code cannot rename components of a path it cannot write.
+        // Assertion, not the protection: the tracker issues only for an identity outside every root this generation
+        // writes, just re-validated by stillSelf; fenced code cannot rename components of such a path.
         if (realpathSync.native(directory) !== directory) {
           getLogger()?.warn(`process fence: grant failed directory=${JSON.stringify(directory)} step=realpath errno=unknown`)
           return { outcome: "failed", detail: "workspace path changed" }
@@ -770,6 +788,7 @@ export async function spawnLocalServer(
       probeWrite: (directory: string) => writeProbes.request(directory),
       fenced: !!fence,
       grantWrite,
+      generationWrites,
       stop: () => {
         if (stopping) return stopping
         if (exited) return Promise.resolve()

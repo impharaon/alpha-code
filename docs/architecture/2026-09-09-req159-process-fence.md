@@ -65,8 +65,11 @@ canonical 字符串,`/System/Volumes/Data/...` 拼写仅在与普通拼写同 de
 生产 planner 的 W1 候选、启动时真源装载 / opened 播种、运行期签发前都同步走 stillSelf;检疫与真源过滤按身份比较,诚实的软链、`/tmp`、大小写变形路径不被检疫、不丢真源。
 tracker 按 literal 路径缓存首次解析,tab 写回与 probe 只解析没见过的路径;具体打开与 `has` 刷新缓存;三个安全决策点不信缓存。
 The first resolution of a path on an unreachable volume blocks as the existing synchronous directory checks do; not changed by this work.
-签发前先由围栏内真探针判断:已经能写(启动根之内或本代已放行)就不签发;`unknown` 不签发、答 grant-failed;只有明确 EPERM 拒写且 stillSelf 仍成立的身份才签发。
-围栏代码不能创建 / 移除 / 重命名它写不进的路径的组件,因此签发时解析的路径无从竞态;`server.ts` 签发后的 realpath 比较保留为便宜断言(变化即丢令牌、报 grant-failed),不是防护所依。
+要不要签发由 main 自己的知识静态决定,不看围栏内探针:本代 apply 的 profile 写块(`processFenceWriteRules` 从渲染出的那份字节解析回规则,
+唯一来源,不另立清单)加本代已放行与其它目录在途放行的目录(`server.ts` 监听器的 `generationWrites`)。规范身份落在其中(祖先链、大小写折叠,偏向判「覆盖」)
+⇒ 永不签发,探针只报可写性:答 writable 即 granted,否则 grant-failed(被改指的身份按 stillSelf 给出更准的那一句),没有令牌。
+不在其中 ⇒ 它的任何祖先都不能被围栏代码创建 / 移除 / 重命名(某个祖先的父目录可写就会把它自己放进那个根),stillSelf 之后签发无从竞态;
+`server.ts` 签发后的 realpath 比较保留为断言(变化即丢令牌、报 grant-failed),不是防护所依。
 停机前先判资格。恢复、重载、SSE、深链接和 sidecar 消息只消费,不登记。
 main 保留登记,所以 renderer 重载不丢资格;不通过引擎换代、页面重载或取消其它会话完成放行。
 
@@ -248,7 +251,7 @@ owner 2026-09-09 裁决(`#1286`):终端配置降级与集合外工作区都**不
 | --- | --- | --- |
 | 合同 | `workspace-write-probe.ts` | main → sidecar `{type:"write-probe", id, directory}`,sidecar → main `{type:"write-probe-result", id, outcome, detail?}`;形状不对就当没有。`outcome` 三种:`writable`(写-删成功)/ `denied`(**EPERM** —— seatbelt 的拒绝就是这个码,`process-fence-apply.test.ts` B2 实测)/ `unknown`(其它一切:ENOENT、ENOTDIR、EACCES 是文件系统自己的权限位而不是围栏、超时、引擎不在) |
 | sidecar | `sidecar.ts` 消息循环 | 消费 main 发来的私有类令牌;写探针仍同步写 `.codepuppy-write-probe-<戳>`(`wx`)再删。登记根为 `W1+X1` |
-| main | `process-fence-workspaces.ts` → 当前 `server.ts` listener → `ipc.ts` / preload | probe 请求只有 `{server,directory}`,从不登记;先核资格并在围栏内真探；已可写不签发，明确拒写才 fresh 重验身份、等消费并复探。回复分开携带 `outcome`、`grant`、`reason`。远端/无围栏不触本机放行;原生失败和请求簿超时都给 `grant-failed` |
+| main | `process-fence-workspaces.ts` → 当前 `server.ts` listener → `ipc.ts` / preload | probe 请求只有 `{server,directory}`,从不登记;先核资格；身份落在本代写根（渲染出的 profile 写块 + 本代放行）内则不签发、只探，否则 fresh 重验身份、签发、等消费再探。回复分开携带 `outcome`、`grant`、`reason`。远端/无围栏不触本机放行;原生失败和请求簿超时都给 `grant-failed` |
 | renderer | `workspace-writable.ts` / `workspace-writable-core.ts` | 三个宿主共享消费核心;缓存键含引擎代、server、目录。资格通知使缓存失效,迟到回复不能覆盖新 entry。只有 M1/R1–R5 在具体动作处记录;恢复/观察不记录。picker 返回前等消费;composer 首次发送和 terminal create 等当前 entry,上限 1 s,超限动作继续、后台放行继续 |
 | renderer | `session-workspace-shell.tsx` / `workspace-chip.tsx` | `reason` 存在且 `outcome !== "writable"` 才显示两个只读钩子;正常可写路径均缺席。残余 popover 只有一句,chip title 同源;没有标题、脚注、重启按钮或 relaunch 动作 |
 

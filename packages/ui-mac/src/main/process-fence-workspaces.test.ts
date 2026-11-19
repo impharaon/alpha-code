@@ -297,7 +297,7 @@ describe("用户打开登记是两个消费者的共同资格", () => {
         homeDir: join(dir, "home"), appStateRoot: join(dir, "state"), realpath: realpathSync.native, isDirectory: (path) => statSync(path).isDirectory(),
       } })
       const result = await tracker.probeWrite({ server: "sidecar", directory: join(dir, "workspace") }, {
-        fenced: true, grantWrite: async () => ({ outcome: "granted" }), probeWrite: async () => ({ outcome: "unknown" }),
+        fenced: true, grantWrite: async () => ({ outcome: "granted" }), probeWrite: async () => ({ outcome: "unknown" }), generationWrites: (directory: string) => directory === join(dir, "workspace"),
       } as unknown as Parameters<typeof tracker.probeWrite>[1])
       expect(result).toEqual({ outcome: "unknown", grant: "failed", reason: "grant-failed" })
       expect(tracker.userOpened.has("sidecar", join(dir, "workspace"))).toBe(true)

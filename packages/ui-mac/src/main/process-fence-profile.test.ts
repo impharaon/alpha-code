@@ -19,6 +19,8 @@ import {
   WRITABLE_ROOT_IDS,
   assertEgressProxyPort,
   assertSeatbeltSafePath,
+  processFenceRulesCover,
+  processFenceWriteRules,
   renderProcessFenceProfile,
   resolveEngineRoots,
   selectWorkspaceUnion,
@@ -151,6 +153,51 @@ describe("renderProcessFenceProfile —— 勘破 §8.2 的 19 行,逐行全等"
     expect(() => renderProcessFenceProfile({ ...base, workspaces: ['/ws/"evil'] })).toThrow(/workspace\[0\]/)
     // 控制组:正常路径(含空格)通过
     expect(assertSeatbeltSafePath("/Users/a b/c", "x")).toBe("/Users/a b/c")
+  })
+})
+
+describe("签发判定的唯一来源:本代 apply 的 profile 解析回写规则,判据偏向判「覆盖」", () => {
+  test("渲染出的写块逐条还原(含 W13 一行三条、W14/W15 literal + regex);X1 扩展行不算规则;未知写法抛;包含按祖先链、大小写折叠", () => {
+    const rules = processFenceWriteRules(renderProcessFenceProfile(base))
+    expect(rules).toEqual([
+      { kind: "subpath", value: "/Users/alpha/code-puppy" },
+      { kind: "subpath", value: "/Users/alpha/app/alpha-code" },
+      { kind: "subpath", value: "/Users/alpha/Library/Application Support/codepuppy-state/env/prod" },
+      { kind: "subpath", value: "/Users/alpha/Library/Application Support/ai.opencode.desktop" },
+      { kind: "subpath", value: "/Users/alpha/.local/share/opencode" },
+      { kind: "subpath", value: "/Users/alpha/.cache/opencode" },
+      { kind: "subpath", value: "/Users/alpha/.config/opencode" },
+      { kind: "subpath", value: "/Users/alpha/.npm" },
+      { kind: "regex", value: "^/Users/alpha/\\.zsh_history" },
+      { kind: "subpath", value: "/Users/alpha/.zsh_sessions" },
+      { kind: "regex", value: "^/Users/alpha/\\.zcompdump" },
+      { kind: "subpath", value: "/private/tmp" },
+      { kind: "subpath", value: "/private/var/folders" },
+      { kind: "literal", value: "/dev/null" },
+      { kind: "literal", value: "/dev/stdout" },
+      { kind: "literal", value: "/dev/stderr" },
+      { kind: "literal", value: "/dev/tty" },
+      { kind: "regex", value: "^/dev/fd/" },
+      { kind: "literal", value: "/dev/ptmx" },
+      { kind: "regex", value: "^/dev/ttys" },
+      { kind: "subpath", value: "/Users/alpha/.opencode" },
+      { kind: "subpath", value: "/Users/alpha/Library/Caches/bun" },
+      { kind: "subpath", value: "/Users/alpha/.cache/bun" },
+    ])
+    expect(processFenceWriteRules("(version 1)(allow default)(deny file-write*)")).toEqual([])
+    for (const bad of [
+      '(version 1)\n(allow file-write* (subpath "/Users/alpha"))\n',
+      '(version 1)\n(allow file-write*\n  (prefix "/Users/alpha") ; W1\n)\n',
+      '(version 1)\n(allow file-write*\n  (subpath "/x") (require-not (vnode-type SYMLINK)) ; W1\n)\n',
+      '(version 1)\n(allow file-write*\n  (subpath "/x") ; W1\n',
+    ]) expect(() => processFenceWriteRules(bad), bad).toThrow()
+    // Inside a root (any depth, any letter case) or under a regex row ⇒ covered; a sibling sharing a prefix ⇒ not.
+    for (const covered of ["/Users/alpha/code-puppy", "/Users/alpha/code-puppy/deep/x", "/USERS/ALPHA/CODE-PUPPY/x", "/private/tmp/p", "/Users/alpha/.zsh_history-dir/p"])
+      expect(processFenceRulesCover(rules, covered), covered).toBe(true)
+    for (const outside of ["/Users/alpha/code-puppy2", "/Users/alpha/proj", "/Users/alpha", "/tmp/p", "/Users/alpha/Library/Application Support"])
+      expect(processFenceRulesCover(rules, outside), outside).toBe(false)
+    // A literal on an ancestor makes that ancestor writable, so everything below it counts as covered.
+    expect(processFenceRulesCover([{ kind: "literal", value: "/Users/alpha/p" }], "/Users/alpha/p/q")).toBe(true)
   })
 })
 

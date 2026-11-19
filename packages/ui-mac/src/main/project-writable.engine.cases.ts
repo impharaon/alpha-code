@@ -252,8 +252,8 @@ test("inside a writable root nothing is issued even when the probe says denied a
 test("outside every writable root exactly one issue makes it writable; a directory inside that grant is not issued again", async () => {
   const outside = join(run, "outside-project"), inner = join(outside, "inner")
   mkdirSync(inner, { recursive: true })
+  const before = nativeIssues // the renderer's own re-probe on the registration notice may issue during the record call
   expect(invoke("workspace-open-record", { server: "sidecar", directory: outside })).toEqual({ recorded: true })
-  const before = nativeIssues
   const granted = await tracker.probeWrite({ server: "sidecar", directory: outside }, listener)
   await write(outside, "outside.txt")
   const issuedOutside = nativeIssues - before

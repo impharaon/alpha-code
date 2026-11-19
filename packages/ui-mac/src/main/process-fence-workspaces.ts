@@ -40,7 +40,7 @@ import type { AppEnvironment } from "./codepuppy-environment"
 import { checkWorkspaceDirectory, LOCAL_SIDECAR_SERVER_KEY, workspaceCandidatesFromStore, type WorkspaceDirectoryCheck, type WorkspaceDirectoryInput, type WorkspaceUnionSources } from "./process-fence-profile"
 import { codepuppyUserWorkspaceDir } from "./codepuppy-user-workspace"
 import type { SidecarListener } from "./server"
-import type { WorkspaceWritableChanged, WorkspaceWriteProbeRequest, WorkspaceWriteProbeResult } from "./workspace-write-probe"
+import type { WorkspaceWritableChanged, WorkspaceWriteProbeFact, WorkspaceWriteProbeRequest, WorkspaceWriteProbeResult } from "./workspace-write-probe"
 import { GLOBAL_RENDERER_STORE, TABS_INFO_KEY, TABS_KEY, TABS_RECENT_KEY } from "./tabs-preclean"
 
 export const FENCE_WORKSPACES_DIRNAME = "fence-workspaces"
@@ -313,31 +313,37 @@ export function bootFenceWorkspaceTruth(input: BootFenceWorkspaceTruthInput): Fe
     }
     if (!sidecar) return { outcome: "unknown", grant: "failed", reason: "grant-failed" }
     const directory = candidate.directory
-    // Issue only when needed (R7). The fenced probe runs first: a directory the fence already writes
-    // (inside a start-time root or an earlier grant) needs no extension, so none is issued. Only an
-    // EPERM-denied identity is granted, after a fresh stillSelf. Fenced code cannot create, remove or
-    // rename a path component it cannot write, so it cannot race the path resolved at issue time;
-    // server.ts's post-issue realpath comparison stays as a cheap assertion, not the protection.
-    // `unknown` is not "denied": nothing is issued and the answer is grant-failed.
-    const before = await sidecar.probeWrite(directory)
-    if (before.outcome === "writable") {
-      if (failed.get(sidecar)?.delete(directory)) input.onWritableChanged({ server: target.server, directory })
-      return { ...before, grant: "granted" }
-    }
-    if (before.outcome === "unknown") {
+    const probe = async (): Promise<WorkspaceWriteProbeFact> => answerProbe ? await sidecar.probeWrite(target.directory) : { outcome: "unknown" }
+    // Does it need a grant? Decided from main's own knowledge, never from the fenced probe (R9). Inside a root this
+    // generation already writes (its rendered profile, or a grant of this generation) ⇒ never issue: fenced code may
+    // be able to rename that path's components, so a probe there proves nothing about what an issue would resolve.
+    // The probe only reports writability. Not writable ⇒ no token exists; stillSelf only names the reason (a rebound
+    // path keeps its precise sentence), otherwise grant-failed.
+    if (sidecar.generationWrites(directory)) {
+      if (!answerProbe) return { outcome: "unknown", grant: "granted" }
+      const fact = await probe()
+      if (fact.outcome === "writable") {
+        if (failed.get(sidecar)?.delete(directory)) input.onWritableChanged({ server: target.server, directory })
+        return { ...fact, grant: "granted" }
+      }
+      const self = stillSelf(directory)
+      if (!self.eligible) return { ...fact, grant: "ineligible", reason: self.reason === "home-or-app-state" ? "home-or-app-state" : "not-opened-by-you" }
       noteFailed(sidecar, directory)
-      return { ...before, grant: "failed", reason: "grant-failed" }
+      return { ...fact, grant: "failed", reason: "grant-failed" }
     }
+    // Outside every such root, none of its ancestors can be created, removed or renamed by fenced code (an ancestor
+    // whose parent were writable would put the directory itself inside that root), so stillSelf followed by the issue
+    // cannot be raced. server.ts's post-issue realpath comparison stays as an assertion only.
     const valid = stillSelf(directory)
-    if (!valid.eligible) return { ...before, grant: "ineligible", reason: valid.reason === "home-or-app-state" ? "home-or-app-state" : "not-opened-by-you" }
+    if (!valid.eligible) return { ...await probe(), grant: "ineligible", reason: valid.reason === "home-or-app-state" ? "home-or-app-state" : "not-opened-by-you" }
     const result = await sidecar.grantWrite(directory)
-    const after = answerProbe ? await sidecar.probeWrite(target.directory) : before
+    const fact = await probe()
     if (result.outcome === "failed") {
       noteFailed(sidecar, directory)
-      return { ...after, grant: "failed", reason: "grant-failed" }
+      return { ...fact, grant: "failed", reason: "grant-failed" }
     }
     if (failed.get(sidecar)?.delete(directory)) input.onWritableChanged({ server: target.server, directory })
-    return { ...after, grant: "granted" }
+    return { ...fact, grant: "granted" }
   }
 
   return {

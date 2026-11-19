@@ -31,6 +31,8 @@ const sidecar = {
   fenced: true,
   grantWrite: async (directory: string) => { issues.push(directory); writable.add(directory); return { outcome: "granted" as const } },
   probeWrite: async (directory: string) => ({ outcome: writable.has(nativeRealpath(directory)) ? "writable" as const : "denied" as const }),
+  // The stand-in sandbox writes exactly the roots in `writable` (main's own list for this generation).
+  generationWrites: (directory: string) => [...writable].some((root) => directory === root || directory.startsWith(`${root}/`)),
 } as unknown as Parameters<Awaited<ReturnType<typeof create>>["probeWrite"]>[1]
 beforeAll(() => {
   for (const path of [home, state, A, cached, newTab, join(root, "Project"), join(root, "LaunchAgents")]) mkdirSync(path, { recursive: true })

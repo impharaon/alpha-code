@@ -15,9 +15,10 @@ const root = process.env.CODEPUPPY_WRITABLE_IPC_ROOT!
 let run = ""
 let selected: string[] = []
 let issueMode: "ok" | "swap" | "throw" | "task_name_for_pid" | "task_info" | "issue" = "ok"
-let afterProbe: "writable" | "denied" | "unknown" | undefined
 let probeOutcome: "writable" | "denied" | "unknown" = "denied"
 const changed: unknown[] = []
+// Kernel model: a consumed grant makes its directory writable for the fenced probe.
+const consumed = new Set<string>()
 
 mockElectron(() => ({
   app: { isPackaged: false, getPath: () => run, getVersion: () => "0.0.0-test", on: events.on.bind(events), off: events.off.bind(events), once: events.once.bind(events) },
@@ -62,17 +63,18 @@ class Child extends EventEmitter {
       if (this.grantMode === "throw") throw new Error("test-memory-only must not reach diagnostics")
       const id = (message as WorkspaceWriteGrantCommand).id
       const outcome = this.grantMode === "ok" ? "granted" : "failed"
+      if (outcome === "granted") consumed.add(issues.at(-1)!.directory)
       if (this.grantMode !== "hold") queueMicrotask(() => this.emit("message", { type: "grant-write-result", id, outcome }))
     }
     if (message.type === "write-probe") {
       this.probes.push(message as WorkspaceWriteProbeCommand)
       const id = (message as WorkspaceWriteProbeCommand).id
-      const outcome = this.probes.length > 1 && afterProbe ? afterProbe : probeOutcome
+      const outcome = consumed.has((message as WorkspaceWriteProbeCommand).directory) ? "writable" : probeOutcome
       queueMicrotask(() => this.emit("message", { type: "write-probe-result", id, outcome }))
     }
     if (message.type === "stop") this.kill()
   }
-  reply(outcome: "granted" | "failed") { this.emit("message", { type: "grant-write-result", id: this.grants.at(-1)!.id, outcome, ...(outcome === "failed" ? { detail: "consume errno=1" } : {}) }) }
+  reply(outcome: "granted" | "failed") { if (outcome === "granted") consumed.add(issues.at(-1)!.directory); this.emit("message", { type: "grant-write-result", id: this.grants.at(-1)!.id, outcome, ...(outcome === "failed" ? { detail: "consume errno=1" } : {}) }) }
   kill() { this.emit("exit", 0) }
 }
 
@@ -93,9 +95,9 @@ beforeEach(async () => {
   selected = []
   process.env.CODEPUPPY_GLOBAL_DIR = join(run, "state/env/dev")
   issues.length = logs.length = changed.length = 0
+  consumed.clear()
   issueMode = "ok"
   probeOutcome = "denied"
-  afterProbe = undefined
   for (const directory of ["home", "A", "A/inside", "B", "C", "state", "user-data"]) mkdirSync(join(run, directory))
   mkdirSync(process.env.CODEPUPPY_GLOBAL_DIR, { recursive: true })
   tracker = bootFenceWorkspaceTruth({
@@ -159,7 +161,6 @@ test("simultaneous same-directory requests coalesce; only success is remembered 
   child.grantMode = "hold"
   const first = probe()
   const second = probe()
-  await Bun.sleep(0) // Production probes reply before any issue request.
   expect(issues).toEqual([{ cls: WORKSPACE_WRITE_EXTENSION_CLASS, directory: request().directory, pid: child.pid }])
   expect(child.grants).toHaveLength(1)
   child.reply("granted")
@@ -185,17 +186,29 @@ test("inside a start-time root a denied probe never issues: the answer is grant-
   expect(child.grants).toHaveLength(0)
 })
 
+test("a directory inside another directory whose grant is still in flight is not issued", async () => {
+  const inner = join(run, "B", "inner")
+  mkdirSync(inner)
+  register()
+  register(request(inner))
+  child.grantMode = "hold"
+  const outer = probe()
+  expect(await probe(request(inner))).toEqual({ outcome: "denied", grant: "failed", reason: "grant-failed" })
+  expect(issues.map((issue) => issue.directory)).toEqual([request().directory])
+  child.reply("granted")
+  expect((await outer).grant).toBe("granted")
+  expect(issues).toHaveLength(1)
+})
+
 test("native exceptions and every typed issue failure return grant-failed even if probe is unknown; retry can recover", async () => {
   register()
-  afterProbe = "unknown"
+  probeOutcome = "unknown"
   for (const mode of ["throw", "task_name_for_pid", "task_info", "issue"] as const) {
     issueMode = mode
-    child.probes.length = 0
     expect(await probe()).toMatchObject({ outcome: "unknown", grant: "failed", reason: "grant-failed" })
   }
   issueMode = "ok"
   probeOutcome = "writable"
-  afterProbe = undefined
   expect(await probe()).toEqual({ outcome: "writable", grant: "granted" })
   expect(changed).toEqual([request(), request()])
   expect(logs.join("\n")).not.toContain("test-memory-only")
@@ -210,7 +223,6 @@ test("consume failure/post exception can retry; child exit closes pending grant 
   expect((await probe()).reason).toBe("grant-failed")
   child.grantMode = "hold"
   const pending = probe()
-  await Bun.sleep(0)
   child.kill()
   expect((await pending).reason).toBe("grant-failed")
   expect((await probe()).reason).toBe("grant-failed")
@@ -222,7 +234,7 @@ test("picker including multiple directories registers and consumes before return
   expect(await invoke("open-directory-picker", { multiple: true })).toEqual(selected)
   for (const directory of selected) expect(tracker.userOpened.has("sidecar", directory)).toBe(true)
   expect(child.grants).toHaveLength(2)
-  expect(child.probes).toHaveLength(2) // One fence probe per directory before deciding whether to issue.
+  expect(child.probes).toHaveLength(0) // O1 waits for consume, not a later filesystem probe.
   expect(await probe()).toMatchObject({ grant: "granted" })
   expect(child.grants).toHaveLength(2)
 })

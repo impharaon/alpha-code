@@ -33,8 +33,9 @@
 //
 // ── 不要手写 `(subpath …)` 的 TypeScript 替身 ────────────────────────────────────────
 // U2 裁决 §5.2 实测 seatbelt 的 subpath 按路径分段、解析软链、随卷的大小写策略匹配,字符串
-// 谓词在三处说谎。本文件里凡是「这个目录在不在可写集里」的问题都不回答;唯一例外是并集的
-// **排除**规则(HOME / 根 / HOME 的祖先 / 与应用状态根相关的路径),那是「拒绝该输入」而不是「解释它的文法」。
+// 谓词在三处说谎。本文件里凡是「这个目录在不在可写集里」的问题都不回答;例外只有两处,都是「拒绝」而不是「放行」:并集的
+// **排除**规则(HOME / 根 / HOME 的祖先 / 与应用状态根相关的路径),以及运行期签发前的静态包含判定(见「签发判定」一节,
+// 只用来决定**不**签发,判据偏向判「覆盖」)。
 
 import { statSync } from "node:fs"
 import { dirname, isAbsolute, join, resolve } from "node:path"
@@ -185,6 +186,52 @@ export function renderProcessFenceProfile(input: ProcessFenceProfileInput): stri
     `(allow network-outbound (remote ip "localhost:${egressProxyPort}"))     ; N4 唯一出口:loopback 上的策略代理(main 进程内)`,
   ]
   return lines.join("\n") + "\n"
+}
+
+// ── 签发判定:这一代已经写得到哪里(只用来拒绝签发)────────────────────────────────────
+//
+// 运行期签发(process-fence-workspaces.ts)要先回答「这个目录在不在本代可写范围里」—— 在范围里的永不签发。答案只取 main
+// 自己的知识:本代 apply 的那份 profile 正是本文件渲染的字节,这里把它的 `(allow file-write*` 块解析回规则(唯一来源,不另立清单),
+// 再加上本代已放行 / 正在放行的目录。不看 sidecar 的探针,也不看候选目录此刻在盘上的样子。判据偏向判「覆盖」:大小写折叠、
+// 祖先链上任何一级被 subpath / literal / regex 盖住都算 —— 误判「覆盖」只会少一次签发(说明那一句),误判「不覆盖」才会给可被
+// 围栏代码改写的路径签发令牌。解析不认识的写法一律抛,调用方按「覆盖」处理。
+
+export type ProcessFenceWriteRule = { kind: "subpath" | "literal" | "regex"; value: string }
+
+const WRITE_RULE = /\((subpath|literal) "([^"]*)"\)|\(regex #"([^"]*)"\)/g
+
+/** Strict inverse of renderProcessFenceProfile's write block. Any other `(allow file-write*` form throws. */
+export function processFenceWriteRules(profile: string): ProcessFenceWriteRule[] {
+  const lines = profile.split("\n")
+  const extension = `(allow file-write* (extension "${WORKSPACE_WRITE_EXTENSION_CLASS}"))`
+  const rules: ProcessFenceWriteRule[] = []
+  for (let index = 0; index < lines.length; index++) {
+    const line = lines[index]!
+    if (!line.includes("(allow file-write*")) continue
+    if (line.startsWith(extension)) continue // X1 grants exist only through main's own ledger.
+    if (line !== "(allow file-write*") throw new Error(`process fence: unrecognised file-write rule form: ${line}`)
+    const end = lines.indexOf(")", index + 1)
+    if (end < 0) throw new Error("process fence: unterminated (allow file-write* block")
+    for (const entry of lines.slice(index + 1, end)) {
+      const found = [...entry.matchAll(WRITE_RULE)]
+      const rest = entry.replace(WRITE_RULE, "").trim()
+      if (!found.length || (rest && !rest.startsWith(";"))) throw new Error(`process fence: unrecognised file-write rule: ${entry}`)
+      for (const match of found) {
+        if (match[3] !== undefined) new RegExp(match[3]) // an invalid pattern throws here, not at decision time
+        rules.push(match[3] !== undefined ? { kind: "regex", value: match[3] } : { kind: match[1] as "subpath" | "literal", value: match[2]! })
+      }
+    }
+    index = end
+  }
+  return rules
+}
+
+/** Whether `directory` or any of its ancestors is writable under `rules` (case-folded: the conservative side). */
+export function processFenceRulesCover(rules: readonly ProcessFenceWriteRule[], directory: string): boolean {
+  const chain = [resolve(directory)]
+  while (chain.at(-1) !== dirname(chain.at(-1)!)) chain.push(dirname(chain.at(-1)!))
+  return chain.some((path) => rules.some((rule) =>
+    rule.kind === "regex" ? new RegExp(rule.value, "i").test(path) : resolve(rule.value).toLowerCase() === path.toLowerCase()))
 }
 
 // ── W1:启动时并集 ────────────────────────────────────────────────────────────────

@@ -190,6 +190,8 @@ describe("签发判定的唯一来源:本代 apply 的 profile 解析回写规�
       '(version 1)\n(allow file-write*\n  (prefix "/Users/alpha") ; W1\n)\n',
       '(version 1)\n(allow file-write*\n  (subpath "/x") (require-not (vnode-type SYMLINK)) ; W1\n)\n',
       '(version 1)\n(allow file-write*\n  (subpath "/x") ; W1\n',
+      // A carve-out after the allow block would silently stop grants inside it.
+      '(version 1)\n(deny file-write*)\n(allow file-write*\n  (subpath "/x") ; W1\n)\n(deny file-write* (subpath "/x/secret"))\n',
     ]) expect(() => processFenceWriteRules(bad), bad).toThrow()
     // Inside a root (any depth, any letter case) or under a regex row ⇒ covered; a sibling sharing a prefix ⇒ not.
     for (const covered of ["/Users/alpha/code-puppy", "/Users/alpha/code-puppy/deep/x", "/USERS/ALPHA/CODE-PUPPY/x", "/private/tmp/p", "/Users/alpha/.zsh_history-dir/p"])

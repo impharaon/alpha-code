@@ -30,7 +30,13 @@ const issues: string[] = []
 const sidecar = {
   fenced: true,
   grantWrite: async (directory: string) => { issues.push(directory); writable.add(directory); return { outcome: "granted" as const } },
-  probeWrite: async (directory: string) => ({ outcome: writable.has(nativeRealpath(directory)) ? "writable" as const : "denied" as const }),
+  probeWrite: async (directory: string) => {
+    try {
+      return { outcome: writable.has(nativeRealpath(directory)) ? "writable" as const : "denied" as const }
+    } catch {
+      return { outcome: "unknown" as const } // ENOENT: the sidecar's probe answers unknown for a missing directory
+    }
+  },
   // The stand-in sandbox writes exactly the roots in `writable` (main's own list for this generation).
   generationWrites: (directory: string) => [...writable].some((root) => directory === root || directory.startsWith(`${root}/`)),
 } as unknown as Parameters<Awaited<ReturnType<typeof create>>["probeWrite"]>[1]
@@ -56,6 +62,28 @@ test("a replaced truth entry is neither seeded nor granted on a new app start", 
   expect(has).toBe(false)
   expect(result.grant).toBe("ineligible")
   expect(issues.length).toBe(before)
+})
+
+test("a truth entry missing at start (unmounted volume) stays opened and in the truth, and is writable once it appears", async () => {
+  const directory = join(root, "volume", "project")
+  const truthPath = join(root, "missing.json")
+  writeWorkspaceTruth(truthPath, [directory], fs)
+  writable.clear(); writable.add(A)
+  const tracker = await create(truthPath, [tab(directory)])
+  const before = issues.length
+  const missing = { quarantine: tracker.quarantined, has: await tracker.userOpened.has("sidecar", directory), probe: await tracker.probeWrite({ server: "sidecar", directory }, sidecar) }
+  await tracker.noteRendererStoreSet(GLOBAL_RENDERER_STORE, TABS_KEY, [tab(directory)])
+  const truthWhileMissing = readWorkspaceTruthOrThrow(truthPath, fs)
+  mkdirSync(directory, { recursive: true })
+  const appeared = await tracker.probeWrite({ server: "sidecar", directory }, sidecar)
+  await tracker.noteRendererStoreSet(GLOBAL_RENDERER_STORE, TABS_KEY, [tab(directory), tab(A)])
+  const truthAfter = readWorkspaceTruthOrThrow(truthPath, fs)
+  proof.push({ name: "missing-at-start", missing, truthWhileMissing, appeared, truthAfter, issued: issues.length - before })
+  expect(missing).toEqual({ quarantine: [], has: true, probe: { outcome: "unknown", grant: "failed" } })
+  expect(truthWhileMissing).toEqual([directory])
+  expect(appeared).toEqual({ outcome: "writable", grant: "granted" })
+  expect(issues.length - before).toBe(1) // not in this generation's roots when it appeared: one grant
+  expect(truthAfter).toEqual([directory])
 })
 
 test("the firmlink spelling of HOME is refused by runtime and the production planner", async () => {

@@ -45,6 +45,15 @@ mock.module("./process-fence-apply", () => ({ ...actualFence, loadFenceAddon: (p
   const wrapped = Object.create(original)
   Object.defineProperty(wrapped, "issueFileExtensionToProcess", { value: (...args: Parameters<typeof original.issueFileExtensionToProcess>) => {
     nativeIssues++
+    const survivor = survivorSwap && args[1] === survivorSwap.directory ? survivorSwap : undefined
+    if (survivor) {
+      askSurvivor(survivor.control, "toggle", "toggled")
+      try {
+        return original.issueFileExtensionToProcess(...args)
+      } finally {
+        askSurvivor(survivor.control, "restore", "restored")
+      }
+    }
     const swap = raceSwap && args[1] === raceSwap.directory ? raceSwap : undefined
     if (!swap) return original.issueFileExtensionToProcess(...args)
     renameSync(swap.directory, `${swap.directory}-real`)
@@ -58,6 +67,20 @@ mock.module("./process-fence-apply", () => ({ ...actualFence, loadFenceAddon: (p
   } })
   return wrapped
 } }))
+// A process started in an earlier generation toggles the path at main's issue instant (R3): main asks the survivor
+// through a control directory and waits for its acknowledgement, synchronously, around the real issue call.
+let survivorSwap: { directory: string; control: string } | undefined
+const askSurvivor = (control: string, request: string, ack: string) => {
+  writeFileSync(join(control, request), "")
+  const end = Date.now() + 10_000
+  const pause = new Int32Array(new SharedArrayBuffer(4))
+  while (!existsSync(join(control, ack))) {
+    if (existsSync(join(control, "error"))) throw new Error(`survivor failed: ${readFileSync(join(control, "error"), "utf8")}`)
+    if (Date.now() > end) throw new Error(`survivor did not answer ${request}`)
+    Atomics.wait(pause, 0, 0, 5)
+  }
+  rmSync(join(control, ack))
+}
 // Directories whose fenced probe answers "denied" at main's seam (the probe saw a symlink to a protected target).
 const forcedDenied = new Set<string>()
 const { spawnLocalServer } = await import("./server")
@@ -129,14 +152,20 @@ let preparedPlan: Awaited<ReturnType<typeof planProcessFence>> | undefined
 async function boot() {
   connection = undefined
   resetDanglingSweepLatchForTests(); creditDanglingSweepForSpawn()
-  if (useProductionPlanner) preparedPlan = await planProcessFence({ userDataPath: install, sidecarEnv: { XDG_STATE_HOME: join(install, "state") }, egressProxyPort: modelProxy.port!, addon: { packaged: true, resourcesPath: run, moduleDir: run, exists: existsSync } }, {
-    homeDir: () => protectedHome, appStateRoot: () => join(run, "state"), codepuppyGlobalRoot: () => join(install, "state/env/dev"), defaultWorkspace: () => A,
-    readWorkspaces: () => readWorkspaceTruthOrThrow(truthPath, { readFileSync }), realpath: realpathSync.native, isDirectory: (path) => { try { return readdirSync(path) !== undefined } catch { return false } },
-    mkdirp: (path) => { mkdirSync(path, { recursive: true }) }, compile: () => ({ ok: true }), log: (line) => { log.push(line) },
-  })
+  preparedPlan = undefined
   const result = await spawnLocalServer("127.0.0.1", 43210, "test-only", {
     userDataPath: userData, egressProxy: async () => ({ port: modelProxy.port! }), healthCheck: async () => !!connection,
-    planFence: () => preparedPlan ?? ({ addonPath: addon, profile: renderProcessFenceProfile({ workspaces: [A, ...readWorkspaceTruthOrThrow(truthPath, { readFileSync })], codepuppyGlobalRoot: join(install, "state/env/dev"), userDataPath: install, stateHome: join(install, "state"), roots: resolveEngineRoots({}, join(install, "home")), egressProxyPort: modelProxy.port! }) }),
+    fenceRun: tracker,
+    // Both planners take main's carried run set from the spawn input, as the production planner does.
+    planFence: (input: { carriedWorkspaces?: readonly string[] }) => {
+      const carried = input.carriedWorkspaces ?? []
+      if (useProductionPlanner) return preparedPlan = planProcessFence({ userDataPath: install, sidecarEnv: { XDG_STATE_HOME: join(install, "state") }, egressProxyPort: modelProxy.port!, addon: { packaged: true, resourcesPath: run, moduleDir: run, exists: existsSync }, carriedWorkspaces: carried } as Parameters<typeof planProcessFence>[0], {
+        homeDir: () => protectedHome, appStateRoot: () => join(run, "state"), codepuppyGlobalRoot: () => join(install, "state/env/dev"), defaultWorkspace: () => A,
+        readWorkspaces: () => readWorkspaceTruthOrThrow(truthPath, { readFileSync }), realpath: realpathSync.native, isDirectory: (path) => { try { return readdirSync(path) !== undefined } catch { return false } },
+        mkdirp: (path) => { mkdirSync(path, { recursive: true }) }, compile: () => ({ ok: true }), log: (line) => { log.push(line) },
+      })
+      return { addonPath: addon, profile: renderProcessFenceProfile({ workspaces: [...new Set([A, ...readWorkspaceTruthOrThrow(truthPath, { readFileSync }), ...carried])], codepuppyGlobalRoot: join(install, "state/env/dev"), userDataPath: install, stateHome: join(install, "state"), roots: resolveEngineRoots({}, join(install, "home")), egressProxyPort: modelProxy.port! }) }
+    },
     fork: ((_file: string, _args: string[], options: { env: Record<string, string> }) => {
       const peer = new EventEmitter() as EventEmitter & { pid: number; stdout: unknown; stderr: unknown; postMessage: (message: { type: string; id?: number; directory?: string }) => void; kill: () => void }
       child = fork(join(import.meta.dir, "../../native/codepuppy-fence/test/project-writable-engine.fixture.ts"), [], { execPath: process.execPath, env: { ...options.env, HOME: join(install, "home"), TMPDIR: install, CODEPUPPY_WRITABLE_ENGINE_ROOT: install, CODEPUPPY_WRITABLE_A: A, CODEPUPPY_WRITABLE_B: B, CODEPUPPY_WRITABLE_MODEL_URL: `http://127.0.0.1:${modelProxy.port}/v1` }, stdio: ["ignore", "pipe", "pipe", "ipc"] })
@@ -164,7 +193,7 @@ async function boot() {
       peer.kill = () => { child.kill("SIGKILL") }
       return peer
     }) as never,
-  })
+  } as Parameters<typeof spawnLocalServer>[3])
   listener = result.listener
   await result.health.wait
   record("ready", { pid: connection!.pid, buildId: connection!.buildId, generation })
@@ -405,6 +434,59 @@ test("production planner and a new app start exclude a registered entry rebound 
   expect(files).toEqual([])
   expect(seeded).toBe(false)
   expect(result.grant).toBe("ineligible")
+})
+
+test("a directory granted in an earlier generation of this run is carried: no new issue, in the next W1, a survivor of that generation cannot redirect it", async () => {
+  const directory = join(run, "carried-project"), target = join(run, "carried-target")
+  const control = join(install, "survivor-ctl"), park = join(install, "parked-carried")
+  mkdirSync(directory); mkdirSync(target); mkdirSync(control, { recursive: true })
+  expect(invoke("workspace-open-record", { server: "sidecar", directory })).toEqual({ recorded: true }) // no tab: never in the truth
+  expect(await tracker.probeWrite({ server: "sidecar", directory }, listener)).toMatchObject({ outcome: "writable", grant: "granted" })
+  // Generation N's sandbox (with the consumed grant) is inherited by a background process that outlives the engine.
+  const loop = `echo $$ > ${quote(join(control, "pid"))}; while :; do ` +
+    `if [ -f ${quote(join(control, "toggle"))} ]; then rm ${quote(join(control, "toggle"))}; { mv ${quote(directory)} ${quote(park)} && ln -s ${quote(target)} ${quote(directory)} && touch ${quote(join(control, "toggled"))}; } || echo toggle > ${quote(join(control, "error"))}; fi; ` +
+    `if [ -f ${quote(join(control, "restore"))} ]; then rm ${quote(join(control, "restore"))}; { rm ${quote(directory)} && mv ${quote(park)} ${quote(directory)} && touch ${quote(join(control, "restored"))}; } || echo restore > ${quote(join(control, "error"))}; fi; ` +
+    `[ -f ${quote(join(control, "stop"))} ] && exit 0; sleep 0.01; done`
+  // Own session (no process-group or hang-up kill when the PTY or the engine goes); the sandbox survives exec.
+  await api("POST", "/api/pty", { cwd: A, command: "/bin/sh", args: ["-c", `/usr/bin/perl -MPOSIX -e 'exit if fork; POSIX::setsid(); exec @ARGV' /bin/sh -c ${quote(loop)} < /dev/null > /dev/null 2>&1`] })
+  await waitFor(() => existsSync(join(control, "pid")) && readFileSync(join(control, "pid"), "utf8").trim().length > 0, "survivor started")
+  const survivorPid = Number(readFileSync(join(control, "pid"), "utf8"))
+  const alive = (pid: number) => { try { process.kill(pid, 0); return true } catch { return false } }
+  const previousPid = connection!.pid
+  try {
+    const exited = new Promise<void>((resolve) => child.once("exit", () => resolve()))
+    child.kill("SIGKILL")
+    await exited
+    generation++
+    useProductionPlanner = true
+    survivorSwap = { directory, control }
+    await boot()
+    const survived = alive(survivorPid)
+    expect(survived, "a process of the previous generation must outlive the engine").toBe(true)
+    const before = nativeIssues
+    const result = await tracker.probeWrite({ server: "sidecar", directory }, listener)
+    survivorSwap = undefined
+    await write(directory, "new-generation.txt")
+    const landed = existsSync(join(directory, "new-generation.txt"))
+    askSurvivor(control, "toggle", "toggled")
+    const toggled = realpathSync.native(directory)
+    await write(directory, "through-toggle.txt")
+    const files = readdirSync(target)
+    askSurvivor(control, "restore", "restored")
+    record("carried-generation", { previousPid, pid: connection!.pid, survivorPid, survived, issued: nativeIssues - before, workspaces: preparedPlan?.workspaces, result, landed, toggled, files })
+    expect(survived).toBe(true)
+    expect(nativeIssues - before).toBe(0)
+    expect(preparedPlan!.workspaces).toContain(directory)
+    expect(result).toMatchObject({ outcome: "writable", grant: "granted" })
+    expect(landed).toBe(true)
+    expect(toggled).toBe(target)
+    expect(files).toEqual([])
+  } finally {
+    survivorSwap = undefined
+    useProductionPlanner = false
+    writeFileSync(join(control, "stop"), "")
+    if (alive(survivorPid)) process.kill(survivorPid, "SIGKILL")
+  }
 })
 
 for (const [kind, target] of [["home", protectedHome], ["state", join(run, "state")], ["home-ancestor", join(run, "protected")]]) {

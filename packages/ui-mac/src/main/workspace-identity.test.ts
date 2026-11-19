@@ -13,7 +13,7 @@ test.skipIf(process.platform !== "darwin")("workspace identity: seeding, firmlin
     const output = `${stdout}${stderr}`
     writeFileSync(join(base, "results", `${basename(run)}.log`), output.slice(-32768))
     expect(code, output).toBe(0)
-    expect(output.match(/(\d+) pass\b/)?.[1], output).toBe("6")
+    expect(output.match(/(\d+) pass\b/)?.[1], output).toBe("7")
     expect(output.match(/(\d+) fail\b/)?.[1], output).toBe("0")
   } finally {
     if (existsSync(join(run, "result.json"))) copyFileSync(join(run, "result.json"), join(base, "results", `${basename(run)}-result.json`))

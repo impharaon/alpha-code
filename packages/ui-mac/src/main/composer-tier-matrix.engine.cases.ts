@@ -383,7 +383,7 @@ describe("身份轴:模型发出的真工具调用经 ext 的执行闸(R10 第�
 
   // 0.2.5 实包(请求审批)里状态工具仍弹卡:真用户的策略文档里留着旧版本「在此项目中始终允许」写下的工具级 enabled 记录,换版后
   // 绑定摘要不同 ⇒ 解析成 binding-changed 的 ask,档位的免审批只认 default 原因。所以这一格跑两遍:空文档一遍(三档),带着上一版
-  // 留下的记录(绑定摘要已过期)再一遍(请求审批、只读)—— 两遍都只有安装那一张卡。
+  // 留下的记录(绑定摘要已过期)再一遍(三档)—— 两遍都只有安装那一张卡。
   test("BR-01 / BR-10 查找 + 状态 + 安装一组:三档都只出一张安装卡 —— 助手的只读查找与状态工具不问(真执行、真问到 main),带着上一版留下的「始终允许」记录也一样;安装照旧每档都问;拒绝后 main 收不到安装请求", async () => {
     const sent = (type: string) => fakeMainReceived.filter((message) => message.type === type).length
     const round = async (label: string, tiers: readonly Tier[]) => {
@@ -403,8 +403,7 @@ describe("身份轴:模型发出的真工具调用经 ext 的执行闸(R10 第�
     const stale = ["codepuppy_hub_search", "codepuppy_hub_status"].map((name) => ({ level: "tool", canonical: `plugin::${name}` }) as const)
     for (const selector of stale) await store!.setRecord({ selector, state: "enabled", bindingDigest: `sha256:${"0".repeat(64)}` } as never)
     try {
-      // 全部批准档不在这一遍:那里过期的 enabled 记录照通用的换绑守卫回到询问(任何工具都一样,不是这两只特有的),另报待定。
-      await round("上一版留下的始终允许记录", [ASK, READONLY])
+      await round("上一版留下的始终允许记录", TIERS)
     } finally {
       for (const selector of stale) await store!.removeRecord(selector as never)
     }

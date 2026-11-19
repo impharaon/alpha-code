@@ -29,6 +29,7 @@ const [reviewCount, setReviewCount] = createSignal<number | undefined>(undefined
 const [terminalRunning, setTerminalRunning] = createSignal(false)
 // `#1322`:只读状态(生产由 workspace-writable 投影:只有被围栏的引擎明确回报 denied 才为 true)。
 const [workspaceReadonly, setWorkspaceReadonly] = createSignal(false)
+const [workspaceReadonlyReason, setWorkspaceReadonlyReason] = createSignal<"home-or-app-state" | "not-opened-by-you" | "grant-failed">("not-opened-by-you")
 // `#1588` AC4:时间线同一个等待信号(生产由 dock 发布、workspace 持信号)。
 const [turnWait, setTurnWait] = createSignal<TimelineTurnWait | undefined>(undefined)
 /** `#1322`:只读弹层「重新启动」按钮真的调了宿主给的 relaunch 几次。 */
@@ -78,6 +79,7 @@ export function SessionWorkspaceHarness() {
       railMeta={{ reviewCount, terminalRunning }}
       terminalChannel={() => terminalChannel}
       workspaceReadonly={workspaceReadonly}
+      workspaceReadonlyReason={workspaceReadonlyReason}
       relaunch={() => void relaunchCalls.push(1)}
       turnWait={turnWait}
     />
@@ -143,7 +145,8 @@ export function setSessionWorkspaceTerminalRunning(next: boolean) {
   setTerminalRunning(next)
 }
 
-export function setSessionWorkspaceReadonly(next: boolean) {
+export function setSessionWorkspaceReadonly(next: boolean, reason: "home-or-app-state" | "not-opened-by-you" | "grant-failed" = "not-opened-by-you") {
+  setWorkspaceReadonlyReason(reason)
   setWorkspaceReadonly(next)
 }
 

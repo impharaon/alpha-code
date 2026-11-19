@@ -15,7 +15,7 @@ last_reviewed: 2026-11-19
 ## INT-safety：项目可写增量
 
 - 依据：[SPEC-child-process-write-fence v2 / AC-05 至 AC-08](https://github.com/impharaon/alpha-code/blob/8593c2701d94d29b9a5de3de1db44639220fb637/docs/specs/child-process-write-fence/spec.md)；[冻结设计 §4、§5、§6、§10](design.md)（approved / reviewed_sha `8370b2fa23`，由 `9d3601c2aa` 合入）；2026-11-19 PLAN 派单及其 Decided point 5。读码基线为本集成分支 `4f61fde5de`；当前实现以本 worktree 已合入的冻结设计和 spec v2 为输入。
-- 核对：Phase: IMPLEMENT — plan 6a1e42753b · orchestrator / Claude Fable 5.2 · plan check passed (every AC has proof with a failing arm; the three extra same-call-chain files `main/index.ts`, `ui/codepuppy-composer.tsx`, `ui/session-rail/terminal/terminal-engine-adapter.tsx` are accepted as necessary; no decision restated or changed). 2026-11-19 r1 仅实施步骤 1/G0，已验收；r2 授权按冻结设计实施步骤 2–8，六个打开动作记录点替换激活采样，探针与真源只消费登记。V2 按每臂实际落盘和 `r1-x2all-result.txt` 判定，不能要求所有签发都返回 NULL。
+- 核对：Phase: IMPLEMENT — plan 6a1e42753b · orchestrator / Claude Fable 5.2 · plan check passed (every AC has proof with a failing arm; the three extra same-call-chain files `main/index.ts`, `ui/codepuppy-composer.tsx`, `ui/session-rail/terminal/terminal-engine-adapter.tsx` are accepted as necessary; no decision restated or changed). 2026-11-19 r1 仅实施步骤 1/G0，已验收；r2 授权按冻结设计实施步骤 2–8；r3 在刷新基线 `bf4dff645e` 继续步骤 6–8，六个打开动作记录点替换激活采样，探针与真源只消费登记。V2 按每臂实际落盘和 `r1-x2all-result.txt` 判定，不能要求所有签发都返回 NULL。
 
 PLAN 阶段只提交本文件。下表和命令均为实施安排，不代表已经运行或通过；文档影响归类为 architecture/decision。后续实现沿用现有组件形态，不增加界面状态或交互稿。
 
@@ -182,3 +182,7 @@ PLAN 阶段只提交本文件。下表和命令均为实施安排，不代表已
 - 下一步 **6**：先加三种残余状态与时间线旧按钮的红测试，再收敛 i18n/壳/chip 和 interim model-stop/WriteDeniedNote；当前旧 copy 与 relaunch intent 尚未修改，AC-06/AC-08 不得报完成。然后步骤 **7**：真实引擎/可信窗口 V3–V5（含 R1 两段 >8 s、R5 历史打开、重载期间点击、各坏臂）、最终生产接线 G0/V7 与 p50/p99；步骤 **8** 架构/I1 事实和最终计数收口。
 - 最终 G0/V7 尚未重跑，本轮没有签名打包/应用副本启动；继承 G0 验收，不把此前单样本 0.192 ms 当最终 p50/p99。前台检查全部结束后交回，git 保持干净。原始日志与临时产物统一在派单 scratch 下；不触及安装版、用户数据或真实凭据，无 push/PR/merge。
 - 非阻塞补证：P-15 的深链发布与实际 consumer 位置已在调用点登记簿补全；去向为本 lane 已修扫描范围，不改冻结语义或上游代码。其它 OPTIONAL：无。
+
+- 2026-11-19 · r3 刷新输入：`bf4dff645e`（0.2.5 release 合入）。继承步骤 2–5 及其自验证据；按 `ce6198be1b` / `28ed924cb2`，时间线 WriteDeniedNote/relaunch/marker 已删除，不重建。步骤 6 只改壳/chip 三句残余说明与两个模型片段；时间线 inner pin 保持 124，拒写 engine inner 保持 4，库存基线 98。relay 路由不在本 lane，已知 endpoint-route-fence.engine 的默认 TMPDIR 红不处理。
+- 2026-11-19 · 步骤 6 最小归因规则：ext 的 execute.after 只持有工具错误、输入路径和会话目录，不持有 main 的用户打开登记事实；EPERM（含项目内的已知目标）及 shell 输出均不足以断言未打开，因此这些现有钩子统一附中性 `sandbox.write-refused` 并要求停止、不绕过。保留并重写注册片段 `sandbox.write-denied` 为未打开/「打开项目」说明，但没有可信登记事实就不附它；不新增跨层查询、roots 副本、metadata 凭证或不可达的假事实分支。
+- 2026-11-19 · 步骤 6 红证据：ext display 4 pass / 3 fail（`step6-model-red.log`）；UI 13 pass / 4 fail（`step6-ui-red.log`）；真引擎/围栏/ext 内层 3 pass / 1 fail，旧重启文字确实进入模型工具结果（`step6-engine-red.log`）。该 engine fixture 原先依赖系统临时目录天然可写；移到派单 scratch 后先在 Global.Path.tmp mkdir EPERM，修正 fixture 的 W3 为其整棵隔离安装状态 sandbox.root，拒写目标仍在独立宿主 scratch 并以实际 EPERM 校准，不改生产 profile。所有新临时目录移至派单 scratch，宿主独占清理。

@@ -19,7 +19,7 @@ import { applyProcessFence } from "./process-fence-apply"
 import { renderProcessFenceProfile, resolveEngineRoots } from "./process-fence-profile"
 
 const describeDarwin = process.platform === "darwin" && fs.existsSync("/usr/bin/sandbox-exec") ? describe : describe.skip
-const RESTART = /until Code Puppy is restarted/i
+const RESTART = /restart(?:ed|ing)?|fixed when it starts/i
 const NEUTRAL = /The system refused this write/i
 
 describeDarwin("沙箱拒写:模型读到直说的一句并停下(真引擎 + 真围栏 + 真 ext)", () => {
@@ -35,14 +35,16 @@ describeDarwin("沙箱拒写:模型读到直说的一句并停下(真引擎 + �
     fenced = host.projectDirectory
     // 集合外:不在 /private/tmp、$TMPDIR、沙箱 HOME 之下(那几处在可写集里)
     // 宿主跑完删掉这棵树(围栏下本进程删不了集合外的东西)
-    const base = path.resolve(import.meta.dir, "../../node_modules/.cache/fence-write-denied")
+    const base = process.env.CODEPUPPY_WRITE_REFUSAL_ROOT!
     fs.mkdirSync(base, { recursive: true })
     scratch = fs.realpathSync(fs.mkdtempSync(path.join(base, "fence-denied-")))
     const addon = buildFenceAddon({ out: path.join(scratch, "codepuppy_fence.node"), buildId: `fence-denied-${Date.now()}` }).out
     const profile = renderProcessFenceProfile({
       workspaces: [fenced],
       codepuppyGlobalRoot: path.join(sandbox.root, "fence-denied-state", "codepuppy-state", "env", "dev"),
-      userDataPath: host.userData,
+      // All disposable engine installation state (including Global.Path.tmp) is inside this W3 root.
+      // Refusal targets remain in the separate host-owned scratch tree and are calibrated below.
+      userDataPath: sandbox.root,
       stateHome: process.env.XDG_STATE_HOME!,
       roots: resolveEngineRoots(process.env, sandbox.home),
       egressProxyPort: Number(new URL(model.baseURL).port),
@@ -82,14 +84,14 @@ describeDarwin("沙箱拒写:模型读到直说的一句并停下(真引擎 + �
     return { toolText, state: part?.state as { metadata?: Record<string, unknown> } | undefined }
   }
 
-  test("启动后打开的项目(不在本代可写集):写文件工具在项目里被拒 ⇒ 模型读到「重启之前写不进、停下告诉用户」;步骤不带界面标记", async () => {
+  test("未放行目录内的写文件工具被拒:没有 main 登记事实时只要求模型停下,不声称原因或重启能解决", async () => {
     // 不在本代可写集里的已有目录 = 引擎启动之后才打开的项目(可写集在启动那一刻定死)
     const project = scratch
     const result = await turn(project, "write", { path: "a.txt", content: "x" })
     expect(fs.existsSync(path.join(project, "a.txt"))).toBe(false)
-    expect(result.toolText).toMatch(RESTART)
+    expect(result.toolText).not.toMatch(RESTART)
     expect(result.toolText).toMatch(/tell the user/i)
-    expect(result.toolText).not.toMatch(NEUTRAL)
+    expect(result.toolText).toMatch(NEUTRAL)
     expect(result.state?.metadata?.codepuppyWriteDenied).toBeUndefined()
   }, 60_000)
 

@@ -2015,8 +2015,7 @@ describe("REQ-159 #1322 workspace read-only tag on the chip (AC2)", () => {
     const badge = tag(host)
     expect(badge).not.toBeNull()
     expect(badge!.textContent?.trim()).toBe("只读")
-    expect(badge!.getAttribute("title")).toContain("这个项目现在写不进去")
-    expect(badge!.getAttribute("title")).toContain("重新启动 Code Puppy 后，它就会被算进去")
+    expect(badge!.getAttribute("title")).toBe("这个文件夹不是你在 Code Puppy 里亲手打开的，助手不会改动它；用「打开项目」选中它就能写入。")
     // 位置:目录名与折叠箭头之间(同一个 chip 按钮里,尾标在箭头之前)。
     const chip = chipButton(host)
     expect(chip.contains(badge!)).toBe(true)

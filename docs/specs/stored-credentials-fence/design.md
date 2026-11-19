@@ -5,7 +5,7 @@ summary: 凭据文件留在原处;围栏对 Code Puppy 的凭据存放点与崩�
 kind: tech-design
 status: approved
 spec: SPEC-stored-credentials-fence
-spec_version: 0
+spec_version: 1
 review:
   rounds: 3           # R1 审 0c2483fda7(F1–F7 采纳);R2 确认 ..1b51d972a8(R2-1–R2-3 采纳,R2-4 裁决 D9);R3 确认 ..2fccc6ae65(R3-1 并入 D10 残留类,R3-2–R3-4 采纳);Codex(GPT-6)会话 01a1f358
   reviewed_sha: "044c5076df"

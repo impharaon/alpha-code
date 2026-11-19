@@ -1,6 +1,6 @@
 import { clearOfficialConnectorRuntime, clearOfficialConnectorRuntimeOnExit, officialAvailabilityPublished, restoreCommittedOfficialConnectors } from "./official-connector-resources"
 import { createHash } from "node:crypto"
-import { existsSync, realpathSync } from "node:fs"
+import { existsSync } from "node:fs"
 import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
 // `#1423`:**命名空间导入,不是具名导入** —— 这一行曾是仓内唯一的

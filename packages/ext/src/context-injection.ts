@@ -526,7 +526,6 @@ function toolFailureFragments(): (TemplateFragment | TextFragment | WrapperFragm
           }),
     ),
     ...Object.entries(WEB_SEARCH_OFF_TEMPLATES).map(([id, template]) => defineTemplate({ id, sink: "tool-failure", template, maxBytes: CAP_DESCRIPTION })),
-    defineText({ id: WRITE_DENIED_ID, sink: "tool-failure", text: WRITE_DENIED_NOTE, maxBytes: CAP_DESCRIPTION }),
     defineText({ id: WRITE_REFUSED_ID, sink: "tool-failure", text: WRITE_REFUSED_NOTE, maxBytes: CAP_DESCRIPTION }),
     ...(Object.entries(POLICY_DENY_DETAIL) as [PolicyDenyReason, string | undefined][]).map(([reason, detail]) =>
       defineTemplate({
@@ -544,12 +543,9 @@ function toolFailureFragments(): (TemplateFragment | TextFragment | WrapperFragm
 // (core tool/plugin/subagent.ts)。`{name}` = 被点名助手的 id,整句按渲染结果量上限。
 /**
  * Runtime write refusals must stop the model instead of triggering workaround attempts.
- * WRITE_DENIED_NOTE requires the main open-register fact; EPERM/project-relative paths alone do not establish it.
- * The current execute.after hook has no such fact, so it uses WRITE_REFUSED_NOTE for every observed refusal.
+ * EPERM/project-relative paths do not establish the main open-register fact.
+ * The execute.after hook uses this neutral instruction for every observed refusal.
  */
-export const WRITE_DENIED_ID = "sandbox.write-denied"
-export const WRITE_DENIED_NOTE =
-  'This location is not inside a project the user opened in Code Puppy. Do not try other ways to write it and do not look for workarounds; stop and tell the user they can choose the folder with "Open project" to make it writable.'
 export const WRITE_REFUSED_ID = "sandbox.write-refused"
 export const WRITE_REFUSED_NOTE =
   "The system refused this write (operation not permitted). Do not try other ways to write it and do not look for workarounds; stop and tell the user which write was refused."

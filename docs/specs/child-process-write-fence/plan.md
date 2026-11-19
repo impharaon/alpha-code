@@ -67,7 +67,7 @@ PLAN 阶段只提交本文件。下表和命令均为实施安排，不代表已
 5. **首次工作的顺序。** 在上表两个真实调用点接共享 `whenSettled`，使用提交时冻结的 server/directory；延迟内、超限、切换身份和远端/无围栏各有用例。实际 prompt/startChat/command/terminal create 必须在约定等待之后，不以禁用按钮、隐藏 composer、重挂终端或改发送 API 实现。跑检查组 C；真引擎顺序在 V3 再核。
 6. **残余界面与本分支临时拒写提示一起收敛。** 先提交正常可写路径、三种残余状态和模型提示的红测试，再改壳、chip、双语文案和 interim 消息；跑检查组 D。r3 基线的时间线卡片、按钮、intent 已删，不重加。
    - 模型提示不再说启动时定死、重启后才可写或有重启按钮。已证实目标属于未亲手打开目录时，说明该事实，要求不要绕过、停止并告诉用户可用「打开项目」选中。
-   - **最小归因规则：裸 `EPERM` 或 shell 的 `Operation not permitted` 只证明操作被系统拒绝；工具的已知目标也不等于 main 的用户打开登记事实。** 现有 ext 错误钩子没有该事实，一律只附中性停止说明；精确未打开片段保留登记、无事实不附。用户侧仅壳/chip 消费 main 的确切 `reason`，显示对应残余句。不能为文案新增 roots 清单、副本判定或跨层权限 API。shell 未知目标、可写根内的非围栏 EPERM 必须有反例；不得把未知错误变成用户的错误原因。
+   - **最小归因规则：裸 `EPERM` 或 shell 的 `Operation not permitted` 只证明操作被系统拒绝；工具的已知目标也不等于 main 的用户打开登记事实。** 现有 ext 错误钩子没有该事实，只注册并附中性停止说明；没有 attach 点的精确未打开片段在 r6 移除。用户侧仅壳/chip 消费 main 的确切 `reason`，显示对应残余句。不能为文案新增 roots 清单、副本判定或跨层权限 API。shell 未知目标、可写根内的非围栏 EPERM 必须有反例；不得把未知错误变成用户的错误原因。
    - 模型停止提示仍经登记过的 tool-failure sink 注入；在 `packages/ext` 执行 `bun scripts/context-injection-inventory.ts --write`，用实际 inventory 输出更新库存快照。UI census 防已删除卡片/intent/marker 回归。
 7. **真引擎与真实窗口整链验据。** 新 `main/project-writable.engine.test.ts` 宿主启动同名 `.cases.ts`，复用现有 engine sandbox、scripted model、真实 ext 和生产启动路径。跑 V3/V4/V5 及已知坏臂；窗口用隔离签名包的真实 Chromium，CDP 观测 DOM/导航与可信输入，用可信输入触发登记动作，不把脚本派发 click 当作用户操作证明。最终生产接线变化后重跑 G0/V7，记录放行往返 p50/p99；本机模型桩不使用真实账号。
 8. **事实文档、计数与收口。** 同步设计 §6 点名的架构/I1 事实，保留旧实验历史；更新本节偏离记录。仅对新增/变动检查同步 gate 行、精确子用例计数、调用点登记与 injection 库存。运行涉及包的 `bun typecheck`、`git diff --check` 及本节列出的受影响检查；不运行全仓 suite/full gate。提交后交编排者做独立 review、push/PR/merge。
@@ -293,3 +293,6 @@ PLAN 阶段只提交本文件。下表和命令均为实施安排，不代表已
 - 接受小项的红证据：W1 默认工作区从唯一默认路径供给者取得，unknown 探针现误回 not-opened-by-you，`process-fence-workspaces.test.ts` 具名新例 **0/1**（r6-default-red.log）；无实际 attach 点的 sandbox.write-denied 仍在注入 registry，display **6/1**（r6-inventory-red.log）。先提交红测试，workspaces 17→18、display 仍 7；后续移除死片段并由现有库存脚本再生 snapshot。
 
 - 导航登记小项可局部处理：新增“无关函数体编辑不改变调用点键”回归例，旧 scanner 把整个函数体放进 reference key，**5 pass / 1 fail**（r6-navigation-red.log）。改键前保留实际 83 项 AST 输出与原 ledger；按同一 AST 调用点逐项迁移原分类，仍保留漏分类/恢复误登记坏臂；gate 5→6。默认工作区修正使 boot 多一次既有默认路径校验，旧“请求不查盘”例改为与 boot 后快照比较，仍断言远端/HOME 请求零新增查盘，不改新红测试。
+
+- 小项实现：默认 W1 路径复用 codepuppyUserWorkspaceDir，在 boot 初始化资格时与受信真源共同走同一 canonical 谓词，不经新增记录点、不扩大启动 W1 之外的范围；unknown 探针不再给它 not-opened-by-you。移除无 attach 点的 WRITE_DENIED_ID/NOTE 与 registry 项，库存脚本再生 **98→97**，neutral stop 保留。导航 key 改为 file/owner/callee-or-reference/ordinal，83 个 AST 点逐项保留原分类，去掉函数体/参数源码的偶然耦合；新抗无关编辑例与原坏臂均在，navigation **6/0**。
+- 小项检查：r6-optionals-green.log 的 workspaces **18/0**、navigation **6/0**、IPC host **1/0**（inner **12/0**）、engine host **1/0**（inner **9/0**），合计 **26/0**；ext display/context/policy **118/0**（r6-ext-green.log），ext typecheck exit 0。ui-mac typecheck 首次发现本次重复导入了 server 已有的 realpathSync，删除重复导入后 r6-ui-typecheck-final.log exit **0**；无更改红测试来通过。

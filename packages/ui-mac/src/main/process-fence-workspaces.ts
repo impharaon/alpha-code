@@ -38,6 +38,7 @@
 import { dirname, isAbsolute, resolve } from "node:path"
 import type { AppEnvironment } from "./codepuppy-environment"
 import { checkWorkspaceDirectory, LOCAL_SIDECAR_SERVER_KEY, workspaceCandidatesFromStore, type WorkspaceDirectoryInput, type WorkspaceUnionSources } from "./process-fence-profile"
+import { codepuppyUserWorkspaceDir } from "./codepuppy-user-workspace"
 import type { SidecarListener } from "./server"
 import type { WorkspaceWritableChanged, WorkspaceWriteProbeRequest, WorkspaceWriteProbeResult } from "./workspace-write-probe"
 import { GLOBAL_RENDERER_STORE, TABS_INFO_KEY, TABS_KEY, TABS_RECENT_KEY } from "./tabs-preclean"
@@ -219,7 +220,7 @@ export function bootFenceWorkspaceTruth(input: BootFenceWorkspaceTruthInput): Fe
   }
   const quarantine = new Set(quarantined)
   // Freeze identity at registration/boot. An alias later pointing elsewhere is not the opened directory.
-  const opened = new Set(current.flatMap((directory) => {
+  const opened = new Set([codepuppyUserWorkspaceDir(process.env, input.eligibility.homeDir), ...current].flatMap((directory) => {
     const candidate = checkWorkspaceDirectory(input.eligibility, directory)
     return candidate.eligible ? [candidate.directory] : []
   }))

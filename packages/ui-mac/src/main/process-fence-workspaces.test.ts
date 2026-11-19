@@ -374,12 +374,13 @@ describe("用户打开登记是两个消费者的共同资格", () => {
       realpath: (p) => p === "/Users/alpha/alias" ? STATE_ROOT : p,
       isDirectory: (p) => { checked.push(p); if (p.endsWith("missing")) throw new Error("ENOENT"); return true },
     } })
+    const startupChecks = [...checked]
     expect(tracker.userOpened.register({ server: "remote", directory: "/Users/alpha/project" })).toEqual({ eligible: false, reason: "not-local" })
     for (const directory of ["/", "/Users", "/Users/alpha", STATE_ROOT, `${STATE_ROOT}/env/dev`, "/Users/alpha/Library", "/Users/alpha/alias"]) {
       expect(tracker.userOpened.register({ server: "sidecar", directory }), directory).toEqual({ eligible: false, reason: "home-or-app-state" })
       expect(tracker.userOpened.has("sidecar", directory)).toBe(false)
     }
-    expect(checked).toEqual([])
+    expect(checked).toEqual(startupChecks)
     for (const directory of ["relative", "", "/Users/alpha/missing"]) expect(tracker.userOpened.register({ server: "sidecar", directory })).toEqual({ eligible: false, reason: "not-a-directory" })
     expect(tracker.userOpened.has("remote", "/Users/alpha/proj-a")).toBe(false)
   }))

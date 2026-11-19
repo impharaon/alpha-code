@@ -41,17 +41,17 @@ function scan(file: string, source: string): Site[] {
     if (ts.isCallExpression(node)) {
       const callee = compact(node.expression)
       const name = ts.isIdentifier(node.expression) ? node.expression.text : ts.isPropertyAccessExpression(node.expression) ? node.expression.name.text : ""
-      if (["navigate", "navigateTab", "startChat", "startDraft", "promoteDraft"].includes(name) || /^hrefFor\./.test(callee)) add(node, `${callee}(${node.arguments.map(compact).join(", ")})`, "navigate")
-      if (name === "onSelect" && file.endsWith("workspace-chip.tsx")) add(node, `${callee}(${node.arguments.map(compact).join(", ")})`, "navigate")
+      if (["navigate", "navigateTab", "startChat", "startDraft", "promoteDraft"].includes(name) || /^hrefFor\./.test(callee)) add(node, callee, "navigate")
+      if (name === "onSelect" && file.endsWith("workspace-chip.tsx")) add(node, callee, "navigate")
       if (name === "recordWorkspaceOpen") {
         const role = roles.find((role) => role.file === file && role.fn === owner(node))
         const bridge = file === `${renderer}codepuppy-ui/workspace-writable.ts` && owner(node) === "recordWorkspaceOpen" && !ts.isIdentifier(node.expression)
-        add(node, `${callee}(${node.arguments.map(compact).join(", ")})`, role ? `record:${role.id}` : bridge ? "bridge" : "forbidden")
+        add(node, callee, role ? `record:${role.id}` : bridge ? "bridge" : "forbidden")
       }
     }
     if (ts.isIdentifier(node)) {
       const role = roles.find((role) => role.file === file && (role.fn === node.text || (role.id === "R1" && node.text === "openProject") || (role.id === "R4" && node.text === "openResult")))
-      if (role) add(node, `reference ${node.text}: ${compact(node.parent)}`, `reference:${role.id}`)
+      if (role) add(node, `reference ${node.text}`, `reference:${role.id}`)
     }
     ts.forEachChild(node, visit)
   }

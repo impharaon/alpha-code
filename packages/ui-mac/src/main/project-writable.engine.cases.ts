@@ -3,7 +3,7 @@
 import { afterAll, beforeAll, expect, test, mock } from "bun:test"
 import { fork } from "node:child_process"
 import { EventEmitter } from "node:events"
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, renameSync, rmSync, writeFileSync } from "node:fs"
+import { existsSync, mkdirSync, readFileSync, readdirSync, realpathSync, renameSync, rmSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { buildFenceAddon } from "../../scripts/build-fence-addon"
 import { mockElectron } from "../../test-component/electron-mock"

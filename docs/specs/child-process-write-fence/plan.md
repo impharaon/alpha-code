@@ -291,3 +291,5 @@ PLAN 阶段只提交本文件。下表和命令均为实施安排，不代表已
 - 常规宿主检查 r6-harness-green.log：engine/IPC/extension/拒写、navigation、registry 共 **33 pass / 1 skip / 0 fail**（19.53 s），skip 为未开签名开关的 G0；检查后 project-writable 根只剩 results/review，没有残留大目录。registry 用例数 23→24。恢复拒写原落点后单跑 **1/0**（r6-refusal-location.log）。显式签名宿主留到全部生产修正结束仅跑一次。
 
 - 接受小项的红证据：W1 默认工作区从唯一默认路径供给者取得，unknown 探针现误回 not-opened-by-you，`process-fence-workspaces.test.ts` 具名新例 **0/1**（r6-default-red.log）；无实际 attach 点的 sandbox.write-denied 仍在注入 registry，display **6/1**（r6-inventory-red.log）。先提交红测试，workspaces 17→18、display 仍 7；后续移除死片段并由现有库存脚本再生 snapshot。
+
+- 导航登记小项可局部处理：新增“无关函数体编辑不改变调用点键”回归例，旧 scanner 把整个函数体放进 reference key，**5 pass / 1 fail**（r6-navigation-red.log）。改键前保留实际 83 项 AST 输出与原 ledger；按同一 AST 调用点逐项迁移原分类，仍保留漏分类/恢复误登记坏臂；gate 5→6。默认工作区修正使 boot 多一次既有默认路径校验，旧“请求不查盘”例改为与 boot 后快照比较，仍断言远端/HOME 请求零新增查盘，不改新红测试。

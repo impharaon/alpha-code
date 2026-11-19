@@ -109,3 +109,9 @@ test("known bad: recording from a restore site is forbidden even if someone adds
   const bad = scan(`${renderer}reload-place.ts`, 'async function restore() { await recordWorkspaceOpen("sidecar", "/X"); }')
   expect(bad.some((site) => site.kind === "forbidden")).toBe(true)
 })
+
+test("a call-site key survives unrelated edits to the containing function body", () => {
+  const before = scan(roles[0]!.file, 'async function startChat(directory) { await recordWorkspaceOpen("sidecar", directory); navigate(directory); }')
+  const after = scan(roles[0]!.file, 'async function startChat(directory) { const unrelated = 1; await recordWorkspaceOpen("sidecar", directory); navigate(directory); }')
+  expect(before.map((site) => site.key)).toEqual(after.map((site) => site.key))
+})

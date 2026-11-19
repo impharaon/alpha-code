@@ -5,7 +5,7 @@ summary: 围栏 profile 在装上时多声明一条只认 Code Puppy 私有扩�
 kind: tech-design
 status: approved
 spec: SPEC-child-process-write-fence
-spec_version: 2
+spec_version: 3
 review:
   rounds: 3           # R1 审 15a54fe1a6(FIX-THEN-MERGE,1 Blocker + 6 Major);R2 审 15a54fe1a6..cadd657d29(FIX-THEN-MERGE,1 Blocker + 1 Major);R3 审 cadd657d29..c0706d75b4(确认,1 Major 功能缺口);处置见 §10
   reviewed_sha: "8370b2fa23"

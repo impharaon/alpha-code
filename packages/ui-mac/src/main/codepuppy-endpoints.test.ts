@@ -2,7 +2,7 @@
 // resolves into CODEPUPPY_BASE_URL — the bearer-carrying proxy target — so a tampered plain-http or
 // attacker host must be REJECTED (fall through to the hardcoded default), never exfil the JWT.
 
-import { afterEach, beforeEach, describe, expect, test } from "bun:test"
+import { afterAll, afterEach, beforeEach, describe, expect, test } from "bun:test"
 import * as fs from "node:fs"
 import * as os from "node:os"
 import * as path from "node:path"
@@ -13,6 +13,14 @@ import { initEndpoints, resolveEndpoints, setDiscoveredEndpoints } from "./codep
 const ENV_KEYS = ["CODEPUPPY_WEB_URL", "CODEPUPPY_PLATFORM_URL", "CODEPUPPY_ACCOUNT_URL", "CODEPUPPY_CLOUD_URL", "CODEPUPPY_MCP_URL"]
 const saved: Record<string, string | undefined> = {}
 const contractFailures: unknown[] = []
+// These existing parser fixtures deliberately use nonlocal addresses. The new health IO must
+// never resolve those names or the unchanged compiled cloud host during this unit suite.
+const originalFetch = globalThis.fetch
+globalThis.fetch = (async () => { throw new Error("endpoint parser fixture: no network") }) as typeof fetch
+afterAll(() => {
+  initEndpoints(tmp, reportContractFailure)
+  globalThis.fetch = originalFetch
+})
 let tmp = ""
 
 const reportContractFailure = (error: unknown) => {

@@ -19,7 +19,7 @@ type Paths = CodePuppyBootstrap["paths"]
 export type TestBootstrapInput = Partial<Paths> &
   Pick<Paths, "globalRoot"> & {
     registryChannel?: CodePuppyBootstrap["registryChannel"]
-    platform?: { credentialRef?: string; modelProxyBaseURL?: string; defaultModelOverride?: string }
+    platform?: { credentialRef?: string; modelProxyBaseURL?: string; defaultModelOverride?: string; directModelProxyBaseURL?: string; routeRef?: `{file:${string}}` }
     cloudMcp?: CodePuppyBootstrap["cloudMcp"] | { name: string; definition: { type: "remote"; url: string; headers: { Authorization: string }; oauth: false; codemode: false } }
     killSwitch?: boolean
     policyAccount?: string

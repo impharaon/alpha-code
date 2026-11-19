@@ -12,11 +12,24 @@
 // The renderer no longer imports the constant directly — it reads the resolved set over IPC
 // (endpoints-ipc.ts → window.api.endpoints). Pure node (fs only); no electron import.
 
-import * as fs from "node:fs"
-import * as path from "node:path"
+import fs from "node:fs"
+import path from "node:path"
 import { ContractIncompatibleError } from "@codepuppy/contracts-consumer"
-import { CODEPUPPY_ENDPOINTS, type CodePuppyEndpoints } from "../shared/codepuppy-config"
+import { CODEPUPPY_ENDPOINTS, CODEPUPPY_PATHS, type CodePuppyEndpoints } from "../shared/codepuppy-config"
 import { USER_DATA_LAYOUT } from "./user-data-layout"
+import { resolveCodePuppyStateBase } from "./codepuppy-environment"
+
+// Capture before applyAuthEnv can fill these. App-filled values are never user exports.
+let inherited: { model: boolean; cloud: boolean } | undefined
+export function inheritedEngineEndpointEnv() {
+  return inherited ??= { model: process.env.CODEPUPPY_BASE_URL !== undefined, cloud: process.env.CODEPUPPY_CLOUD_MCP_URL !== undefined }
+}
+export type EndpointRoute = "preferred" | "direct"
+let route: EndpointRoute = "preferred"
+let revision = 0
+let interval: ReturnType<typeof setInterval> | undefined
+let probe: Promise<void> | undefined
+let routeLog: (line: string) => void = () => {}
 
 const ENV_KEYS: Record<keyof CodePuppyEndpoints, string> = {
   web: "CODEPUPPY_WEB_URL",
@@ -91,10 +104,13 @@ function readDiscovery(file: string, reportContractFailure: (error: unknown) => 
 
 /** Called once at startup (index.ts), AFTER preferAppEnv and BEFORE initAuthEnv — so applyAuthEnv
  *  resolves the proxy URL with the pin + persisted discovery already loaded. */
-export function initEndpoints(dataPath: string, reportContractFailure: (error: unknown) => void) {
+export function initEndpoints(dataPath: string, reportContractFailure: (error: unknown) => void, log: (line: string) => void = () => {}) {
   userDataPath = dataPath
   override = readPartial(overrideFile())
   discovered = readDiscovery(discoveredFile(), reportContractFailure)
+  routeLog = log
+  route = "preferred"
+  configureRoute()
 }
 
 /** ① The alpha-web /auth/token response carries
@@ -109,6 +125,7 @@ export function setDiscoveredEndpoints(payload: unknown) {
   } catch {
     /* persistence is best-effort; the validated in-memory discovery remains authoritative */
   }
+  configureRoute()
 }
 
 export function decodeEndpointDiscovery(payload: unknown): CodePuppyEndpoints {
@@ -148,6 +165,12 @@ export function decodeEndpointDiscovery(payload: unknown): CodePuppyEndpoints {
  *  login discovery > hardcoded default. `mcp` is omitted unless someone provides it; callers derive
  *  `${cloud}/mcp`. */
 export function resolveEndpoints(): CodePuppyEndpoints {
+  const endpoints = preferredEndpoints()
+  if (currentRoute() !== "direct") return endpoints
+  return { ...endpoints, platform: CODEPUPPY_ENDPOINTS.platform, cloud: CODEPUPPY_ENDPOINTS.cloud, mcp: `${CODEPUPPY_ENDPOINTS.cloud}${CODEPUPPY_PATHS.mcpGateway}` }
+}
+
+export function preferredEndpoints(): CodePuppyEndpoints {
   const pick = (k: keyof CodePuppyEndpoints): string | undefined =>
     strip(process.env[ENV_KEYS[k]]) ?? override[k] ?? discovered[k]
   const mcp = pick("mcp")
@@ -158,4 +181,100 @@ export function resolveEndpoints(): CodePuppyEndpoints {
     cloud: pick("cloud") ?? CODEPUPPY_ENDPOINTS.cloud,
     ...(mcp ? { mcp } : {}),
   }
+}
+
+export function relayConfigured(): boolean {
+  const exported = inheritedEngineEndpointEnv()
+  if (exported.model || exported.cloud || Object.values(ENV_KEYS).some((key) => strip(process.env[key]))) return false
+  const endpoints = preferredEndpoints()
+  return endpoints.platform !== CODEPUPPY_ENDPOINTS.platform || endpoints.cloud !== CODEPUPPY_ENDPOINTS.cloud
+}
+
+export function currentRoute(): EndpointRoute {
+  return relayConfigured() ? route : "preferred"
+}
+
+/** Same path is published to the engine; no consumer derives it a second time. */
+export function endpointRouteRef(): `{file:${string}}` | undefined {
+  if (!relayConfigured()) return undefined
+  const state = resolveCodePuppyStateBase("endpoint route")
+  return state.ok ? `{file:${path.join(state.casBaseRoot, "endpoint-route", state.environment)}}` : undefined
+}
+
+export function noteRelayFailureSignal(): void {
+  void probeRelay("egress-failure")
+}
+
+function configureRoute() {
+  revision++
+  clearInterval(interval)
+  interval = undefined
+  if (!relayConfigured()) return
+  publishRoute(route, "configured")
+  interval = setInterval(() => void probeRelay("periodic"), 60_000)
+  interval.unref()
+  void probeRelay("configured")
+}
+
+function probeRelay(reason: string): Promise<void> | undefined {
+  if (!relayConfigured()) return
+  if (probe) return probe
+  const version = revision
+  const endpoints = preferredEndpoints()
+  probe = Promise.all([entryHealthy(endpoints.platform), entryHealthy(endpoints.cloud)]).then((healthy) => {
+    if (version === revision && relayConfigured()) publishRoute(healthy.every(Boolean) ? "preferred" : "direct", reason)
+  }).finally(() => {
+    probe = undefined
+    if (version !== revision) void probeRelay("endpoints-changed")
+  })
+  return probe
+}
+
+async function entryHealthy(base: string): Promise<boolean> {
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), 5000)
+  let reader: ReadableStreamDefaultReader<Uint8Array> | undefined
+  let response: Response | undefined
+  try {
+    response = await fetch(`${base}/health`, { signal: controller.signal, redirect: "error" })
+    if (![200, 503].includes(response.status) || !/^application\/(?:[\w.-]+\+)?json(?:\s*;|$)/i.test(response.headers.get("content-type") ?? "")) return false
+    reader = response.body?.getReader()
+    if (!reader) return false
+    const chunks: Uint8Array[] = []
+    let size = 0
+    for (;;) {
+      const chunk = await reader.read()
+      if (chunk.done) break
+      size += chunk.value.byteLength
+      if (size > 65_536) return false
+      chunks.push(chunk.value)
+    }
+    const body: unknown = JSON.parse(Buffer.concat(chunks).toString("utf8"))
+    return isRecord(body) && isRecord(body.readiness) && typeof body.readiness.state === "string"
+  } catch {
+    return false
+  } finally {
+    clearTimeout(timer)
+    if (reader) void reader.cancel().catch(() => {})
+    else if (response?.body) void response.body.cancel().catch(() => {})
+  }
+}
+
+function publishRoute(next: EndpointRoute, reason: string) {
+  const previous = route
+  const ref = endpointRouteRef()
+  if (ref && (next !== route || reason === "configured" || !fs.existsSync(ref.slice(6, -1)))) {
+    const file = ref.slice(6, -1)
+    const temporary = `${file}.${process.pid}.tmp`
+    try {
+      fs.mkdirSync(path.dirname(file), { recursive: true, mode: 0o700 })
+      fs.writeFileSync(temporary, next, { mode: 0o600 })
+      fs.chmodSync(temporary, 0o600)
+      fs.renameSync(temporary, file)
+    } catch {
+      routeLog("endpoint route publication failed")
+    }
+  }
+  route = next
+  if (previous !== next) routeLog(`endpoint route ${previous} -> ${next} (${reason})`)
 }

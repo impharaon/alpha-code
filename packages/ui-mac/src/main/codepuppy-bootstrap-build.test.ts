@@ -219,3 +219,45 @@ describe("usableExportedPaths:相对的路径变量当没设", () => {
     expect(lines).toEqual(["bootstrap: HOME ignored (not an absolute path)"])
   })
 })
+
+
+test("no relay keeps direct alternatives and route reference absent", () => {
+  const document = buildCodePuppyBootstrap(input({ env: { CODEPUPPY_BASE_URL: "https://alpha-gateway.tidelabs.click/v1", CODEPUPPY_CLOUD_MCP_URL: "https://alpha-cloud.tidelabs.click/mcp" } }))
+  expect(document.platform.directModelProxyBaseURL).toBeUndefined()
+  expect(document.platform.routeRef).toBeUndefined()
+  expect(document.cloudMcp?.directUrl).toBeUndefined()
+})
+
+test("relay bootstrap carries compiled direct addresses and the single authority's route reference", async () => {
+  const { mkdirSync, mkdtempSync, writeFileSync, rmSync } = await import("node:fs")
+  const { tmpdir } = await import("node:os")
+  const { join } = await import("node:path")
+  const { initCodePuppyEnvironment, __resetCodePuppyEnvironmentForTests } = await import("./codepuppy-environment")
+  const { initEndpoints, endpointRouteRef } = await import("./codepuppy-endpoints")
+  const { CODEPUPPY_ENDPOINTS, CODEPUPPY_PATHS } = await import("../shared/codepuppy-config")
+  const root = mkdtempSync(join(tmpdir(), "bootstrap-route-"))
+  const originalFetch = globalThis.fetch
+  const originalRoot = process.env.CODEPUPPY_GLOBAL_DIR
+  globalThis.fetch = (async () => Response.json(await Bun.file(new URL("./fixtures/relay-route/health-cloud.json", import.meta.url)).json())) as typeof fetch
+  try {
+    delete process.env.CODEPUPPY_GLOBAL_DIR
+    mkdirSync(join(root, "home"))
+    initCodePuppyEnvironment({ isPackaged: true, channel: "prod", appDataDir: join(root, "appData"), homeDir: join(root, "home") })
+    writeFileSync(join(root, "codepuppy-endpoints.json"), JSON.stringify({ platform: "https://relay-model.test", cloud: "https://relay-cloud.test" }))
+    initEndpoints(root, () => {})
+    const document = buildCodePuppyBootstrap(input({ env: { CODEPUPPY_BASE_URL: "https://relay-model.test/v1", CODEPUPPY_CLOUD_MCP_URL: "https://relay-cloud.test/mcp" } }))
+    expect(document.platform.directModelProxyBaseURL).toBe(`${CODEPUPPY_ENDPOINTS.platform}${CODEPUPPY_PATHS.modelProxy}`)
+    expect(document.platform.routeRef).toBe(endpointRouteRef())
+    expect(document.cloudMcp?.directUrl).toBe(`${CODEPUPPY_ENDPOINTS.cloud}${CODEPUPPY_PATHS.mcpGateway}`)
+    expect(document.cloudMcp?.definition.url).toBe("https://relay-cloud.test/mcp")
+  } finally {
+    process.env.CODEPUPPY_PLATFORM_URL = CODEPUPPY_ENDPOINTS.platform
+    initEndpoints(root, () => {})
+    delete process.env.CODEPUPPY_PLATFORM_URL
+    __resetCodePuppyEnvironmentForTests()
+    if (originalRoot === undefined) delete process.env.CODEPUPPY_GLOBAL_DIR
+    else process.env.CODEPUPPY_GLOBAL_DIR = originalRoot
+    globalThis.fetch = originalFetch
+    rmSync(root, { recursive: true, force: true })
+  }
+})

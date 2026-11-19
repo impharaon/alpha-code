@@ -3,11 +3,12 @@
 // 启动文档 `CodePuppyBootstrap`(DESIGN-upgrade-bootstrap-config §4.1):Code Puppy 主进程交给 sidecar、ext 与引擎里 Code Puppy 代码的
 // 决定,每代 sidecar 一份、只在内存里。main 构建,sidecar 解析并发布,其余只读。每个 bundle(sidecar、ext、引擎)各自编进一份本模块,
 // 第一次读时用自己的解析器校验已发布的对象 —— 两份不同提交构建出的 bundle 混在一起,形状或版本不同就在第一次读时失败。
-// 本文件只 import `node:path`:它会进 ext bundle 与 sidecar 的 import 闭包,不带写盘点。
+// 本文件会进 ext bundle 与 sidecar 的 import 闭包;路线文件只在请求边界读,不带写盘点。
 //
 // 字段按迁移键组落地(design §9):G1 —— 路径与通道;G2 —— 平台、云、网络;G3 —— 开关与引擎设置。
 // 唯一读环境的地方是无文档宿主的兼容入口 `codepuppyEngineSettings`(仓内 CLI 宿主、core 单测;sidecar 里文档先于引擎发布,到不了)。
 import path from "node:path"
+import { readFileSync } from "node:fs"
 
 export const CODEPUPPY_BOOTSTRAP_VERSION = 1
 
@@ -44,11 +45,14 @@ export type CodePuppyBootstrap = {
     /** 平台模型凭据文件的引用,不是凭据 */
     credentialRef: `{file:${string}}`
     modelProxyBaseURL?: CredentialFreeUrl
+    directModelProxyBaseURL?: CredentialFreeUrl
+    routeRef?: `{file:${string}}`
     /** 非空的模型 id;缺席 = 没导出(用目录默认)。空串就是没导出 */
     defaultModelOverride?: string
   }
   /** main 解析出合格的云 MCP 地址时在场 */
   cloudMcp?: {
+    directUrl?: CredentialFreeUrl
     /** 配置里那一条 MCP 的名字 */
     name: string
     /** 带凭据通道的完整定义;认证只在 header 的引用里 */
@@ -174,8 +178,10 @@ export function parseCodePuppyBootstrap(value: unknown): CodePuppyBootstrap {
   const userConfig = optional(paths, "userConfig", "paths", absolute)
   const registryChannel = optional(root, "registryChannel", "", channel)
   const platform = record(root.platform, "platform")
-  only(platform, ["credentialRef", "modelProxyBaseURL", "defaultModelOverride"], "platform")
+  only(platform, ["credentialRef", "modelProxyBaseURL", "defaultModelOverride", "directModelProxyBaseURL", "routeRef"], "platform")
   const modelProxyBaseURL = optional(platform, "modelProxyBaseURL", "platform", credentialFreeUrl)
+  const directModelProxyBaseURL = optional(platform, "directModelProxyBaseURL", "platform", credentialFreeUrl)
+  const routeRef = optional(platform, "routeRef", "platform", matching(FILE_REF)) as `{file:${string}}` | undefined
   const defaultModelOverride = optional(platform, "defaultModelOverride", "platform", nonEmptyText)
   const cloudMcp = optional(root, "cloudMcp", "", cloudMcpOf)
   const webSearch = record(root.webSearch, "webSearch")
@@ -215,6 +221,8 @@ export function parseCodePuppyBootstrap(value: unknown): CodePuppyBootstrap {
     platform: {
       credentialRef: matching(FILE_REF)(platform.credentialRef, "platform.credentialRef") as `{file:${string}}`,
       ...(modelProxyBaseURL === undefined ? {} : { modelProxyBaseURL }),
+      ...(directModelProxyBaseURL === undefined ? {} : { directModelProxyBaseURL }),
+      ...(routeRef === undefined ? {} : { routeRef }),
       ...(defaultModelOverride === undefined ? {} : { defaultModelOverride }),
     },
     ...(cloudMcp === undefined ? {} : { cloudMcp }),
@@ -294,7 +302,8 @@ function absolute(value: unknown, at: string): string {
 
 function cloudMcpOf(value: unknown, at: string): NonNullable<CodePuppyBootstrap["cloudMcp"]> {
   const cloud = record(value, at)
-  only(cloud, ["name", "definition"], at)
+  only(cloud, ["name", "definition", "directUrl"], at)
+  const directUrl = optional(cloud, "directUrl", at, credentialFreeUrl)
   const definition = record(cloud.definition, join(at, "definition"))
   only(definition, ["type", "url", "headers", "oauth", "codemode"], join(at, "definition"))
   if (definition.type !== "remote") throw new CodePuppyBootstrapError("invalid", join(at, "definition.type"))
@@ -306,6 +315,7 @@ function cloudMcpOf(value: unknown, at: string): NonNullable<CodePuppyBootstrap[
   if (name === "") throw new CodePuppyBootstrapError("invalid", join(at, "name"))
   return {
     name,
+    ...(directUrl === undefined ? {} : { directUrl }),
     definition: {
       type: "remote",
       url: credentialFreeUrl(definition.url, join(at, "definition.url")),
@@ -313,6 +323,27 @@ function cloudMcpOf(value: unknown, at: string): NonNullable<CodePuppyBootstrap[
       oauth: false,
       codemode: false,
     },
+  }
+}
+
+/** Request-boundary read only: an unavailable route leaves the original destination intact. */
+export function routePlatformUrl(url: string, preferredBase?: string, directBase?: string, routeRef?: string): string {
+  if (!preferredBase || !directBase || !routeRef || !FILE_REF.test(routeRef)) return url
+  try {
+    if (readFileSync(routeRef.slice(6, -1), "utf8") !== "direct") return url
+    const preferred = new URL(preferredBase)
+    const request = new URL(url)
+    preferred.hostname = preferred.hostname.replace(/\.$/, "")
+    request.hostname = request.hostname.replace(/\.$/, "")
+    const prefix = preferred.pathname.replace(/\/+$/, "")
+    if (request.origin !== preferred.origin || (request.pathname !== prefix && !request.pathname.startsWith(`${prefix}/`))) return url
+    const direct = new URL(directBase)
+    direct.pathname = direct.pathname.replace(/\/+$/, "") + request.pathname.slice(prefix.length)
+    direct.search = request.search
+    direct.hash = request.hash
+    return direct.toString()
+  } catch {
+    return url
   }
 }
 

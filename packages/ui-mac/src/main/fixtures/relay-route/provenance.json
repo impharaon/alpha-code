@@ -1,0 +1,8 @@
+{
+  "health-cloud.json": {
+    "repository": "impharaon/alpha-platform",
+    "commit": "428fda9ea9",
+    "path": "docs/verification/2026-10-15-ap522-real-materials/evidence/ap544-rerun/health-before.json",
+    "use": "Captured cloud /health response; both endpoint probes consume readiness.state. Negative cases explicitly mutate this input."
+  }
+}

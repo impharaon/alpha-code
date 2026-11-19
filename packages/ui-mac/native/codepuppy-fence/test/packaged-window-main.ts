@@ -366,17 +366,21 @@ async function run() {
     },
     egressProxy: async () => ({ port: modelPort }),
     fenceRun: tracker,
-    planFence: (input) => ({
+    planFence: (input) => {
+      const workspaces = [...new Set([A, ...readWorkspaceTruthOrThrow(truthPath, { readFileSync }), ...input.carriedWorkspaces])]
+      return {
       addonPath: join(process.resourcesPath, "codepuppy-fence/codepuppy_fence.node"),
+      workspaces,
       profile: renderProcessFenceProfile({
-        workspaces: [...new Set([A, ...readWorkspaceTruthOrThrow(truthPath, { readFileSync }), ...input.carriedWorkspaces])],
+        workspaces,
         codepuppyGlobalRoot: env.mutableRoot,
         userDataPath: engineData,
         stateHome: process.env.XDG_STATE_HOME!,
         roots: resolveEngineRoots(process.env, home),
         egressProxyPort: modelPort,
       }),
-    }),
+      }
+    },
     fork: (file, args, options) => {
       engine = utilityProcess.fork(file, args, options)
       const post = engine.postMessage.bind(engine)

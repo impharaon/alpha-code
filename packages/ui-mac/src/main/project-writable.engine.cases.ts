@@ -164,7 +164,8 @@ async function boot() {
         readWorkspaces: () => readWorkspaceTruthOrThrow(truthPath, { readFileSync }), realpath: realpathSync.native, isDirectory: (path) => { try { return readdirSync(path) !== undefined } catch { return false } },
         mkdirp: (path) => { mkdirSync(path, { recursive: true }) }, compile: () => ({ ok: true }), log: (line) => { log.push(line) },
       })
-      return { addonPath: addon, profile: renderProcessFenceProfile({ workspaces: [...new Set([A, ...readWorkspaceTruthOrThrow(truthPath, { readFileSync }), ...carried])], codepuppyGlobalRoot: join(install, "state/env/dev"), userDataPath: install, stateHome: join(install, "state"), roots: resolveEngineRoots({}, join(install, "home")), egressProxyPort: modelProxy.port! }) }
+      const workspaces = [...new Set([A, ...readWorkspaceTruthOrThrow(truthPath, { readFileSync }), ...carried])]
+      return { addonPath: addon, workspaces, profile: renderProcessFenceProfile({ workspaces, codepuppyGlobalRoot: join(install, "state/env/dev"), userDataPath: install, stateHome: join(install, "state"), roots: resolveEngineRoots({}, join(install, "home")), egressProxyPort: modelProxy.port! }) }
     },
     fork: ((_file: string, _args: string[], options: { env: Record<string, string> }) => {
       const peer = new EventEmitter() as EventEmitter & { pid: number; stdout: unknown; stderr: unknown; postMessage: (message: { type: string; id?: number; directory?: string }) => void; kill: () => void }

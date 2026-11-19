@@ -64,7 +64,7 @@ class Child extends EventEmitter {
       const id = (message as WorkspaceWriteGrantCommand).id
       const outcome = this.grantMode === "ok" ? "granted" : "failed"
       if (outcome === "granted") consumed.add(issues.at(-1)!.directory)
-      if (this.grantMode !== "hold") queueMicrotask(() => this.emit("message", { type: "grant-write-result", id, outcome }))
+      if (this.grantMode !== "hold") queueMicrotask(() => this.emit("message", { type: "grant-write-result", id, outcome, ...(outcome === "failed" ? { detail: "consume errno=1" } : {}) }))
     }
     if (message.type === "write-probe") {
       this.probes.push(message as WorkspaceWriteProbeCommand)
@@ -119,7 +119,7 @@ async function spawnGeneration() {
   const result = await spawnLocalServer("127.0.0.1", 43210, "test-not-a-credential", {
     userDataPath: join(run, "user-data"), egressProxy: async () => ({ port: 59999 }), fenceRun: tracker,
     // A is every generation's only start-time root here (the renderer's block form); B and C lie outside it.
-    planFence: () => ({ profile: `(version 1)\n(allow default)\n(deny file-write*)\n(allow file-write*\n  (subpath "${join(run, "A")}") ; W1\n)\n`, addonPath: join(run, "test.node") }),
+    planFence: () => ({ profile: `(version 1)\n(allow default)\n(deny file-write*)\n(allow file-write*\n  (subpath "${join(run, "A")}") ; W1\n)\n`, addonPath: join(run, "test.node"), workspaces: [join(run, "A")] }),
     fork: (() => child) as never, healthCheck: async () => true,
   })
   listener = result.listener
@@ -241,17 +241,24 @@ test("native exceptions and every typed issue failure return grant-failed even i
   expect(logs.join("\n")).not.toContain("do not expose native exception text")
 })
 
-test("consume failure/post exception can retry; child exit closes pending grant and never credits success", async () => {
+test("a definite consume failure can retry; a post exception or child exit leaves the token possibly consumed, never re-issued or credited", async () => {
   register()
-  child.grantMode = "failed"
+  child.grantMode = "failed" // the sidecar answers "consume errno=1": definitely not consumed
   expect((await probe()).reason).toBe("grant-failed")
-  child.grantMode = "throw"
+  child.grantMode = "throw" // the token was handed to postMessage, which threw: it may have been delivered
   expect((await probe()).reason).toBe("grant-failed")
+  expect(child.grants).toHaveLength(2)
+  child.grantMode = "ok"
+  expect(await probe()).toEqual({ outcome: "denied", grant: "failed", reason: "grant-failed" }) // covered now: no third token
+  expect(child.grants).toHaveLength(2)
+  const other = request(join(run, "C"))
+  register(other)
   child.grantMode = "hold"
-  const pending = probe()
+  const pending = probe(other)
   child.kill()
   expect((await pending).reason).toBe("grant-failed")
-  expect((await probe()).reason).toBe("grant-failed")
+  expect((await probe(other)).reason).toBe("grant-failed")
+  expect(issues.map((issue) => issue.directory)).toEqual([request().directory, request().directory, other.directory])
   expect(logs.join("\n")).not.toContain("test-memory-only")
 })
 

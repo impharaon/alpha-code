@@ -196,8 +196,7 @@ export function renderProcessFenceProfile(input: ProcessFenceProfileInput): stri
 // 祖先链上任何一级被 subpath / literal / regex 盖住都算 —— 误判「覆盖」只会少一次签发(说明那一句),误判「不覆盖」才会给可被
 // 围栏代码改写的路径签发令牌。解析不认识的写法一律抛,调用方按「覆盖」处理。
 
-/** `id` is the renderer's row comment (`W1` …), so a generation can name its own W1 members. */
-export type ProcessFenceWriteRule = { kind: "subpath" | "literal" | "regex"; value: string; id?: string }
+export type ProcessFenceWriteRule = { kind: "subpath" | "literal" | "regex"; value: string }
 
 const WRITE_RULE = /\((subpath|literal) "([^"]*)"\)|\(regex #"([^"]*)"\)/g
 
@@ -223,10 +222,9 @@ export function processFenceWriteRules(profile: string): ProcessFenceWriteRule[]
       const found = [...entry.matchAll(WRITE_RULE)]
       const rest = entry.replace(WRITE_RULE, "").trim()
       if (!found.length || (rest && !rest.startsWith(";"))) throw new Error(`process fence: unrecognised file-write rule: ${entry}`)
-      const id = /^;\s*([WX]\d+)\b/.exec(rest)?.[1]
       for (const match of found) {
         if (match[3] !== undefined) new RegExp(match[3]) // an invalid pattern throws here, not at decision time
-        rules.push({ ...(match[3] !== undefined ? { kind: "regex" as const, value: match[3] } : { kind: match[1] as "subpath" | "literal", value: match[2]! }), ...(id ? { id } : {}) })
+        rules.push(match[3] !== undefined ? { kind: "regex", value: match[3] } : { kind: match[1] as "subpath" | "literal", value: match[2]! })
       }
     }
     index = end

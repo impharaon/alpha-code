@@ -157,32 +157,32 @@ describe("renderProcessFenceProfile —— 勘破 §8.2 的 19 行,逐行全等"
 })
 
 describe("签发判定的唯一来源:本代 apply 的 profile 解析回写规则,判据偏向判「覆盖」", () => {
-  test("渲染出的写块逐条还原(含行 id、W13 一行三条、W14/W15 literal + regex);X1 扩展行不算规则;未知写法与块后的写拒绝抛;包含按祖先链、大小写折叠", () => {
+  test("渲染出的写块逐条还原(含 W13 一行三条、W14/W15 literal + regex);X1 扩展行不算规则;未知写法与块后的写拒绝抛;包含按祖先链、大小写折叠", () => {
     const rules = processFenceWriteRules(renderProcessFenceProfile(base))
     expect(rules).toEqual([
-      { kind: "subpath", value: "/Users/alpha/code-puppy", id: "W1" },
-      { kind: "subpath", value: "/Users/alpha/app/alpha-code", id: "W1" },
-      { kind: "subpath", value: "/Users/alpha/Library/Application Support/codepuppy-state/env/prod", id: "W2" },
-      { kind: "subpath", value: "/Users/alpha/Library/Application Support/ai.opencode.desktop", id: "W3" },
-      { kind: "subpath", value: "/Users/alpha/.local/share/opencode", id: "W4" },
-      { kind: "subpath", value: "/Users/alpha/.cache/opencode", id: "W5" },
-      { kind: "subpath", value: "/Users/alpha/.config/opencode", id: "W6" },
-      { kind: "subpath", value: "/Users/alpha/.npm", id: "W7" },
-      { kind: "regex", value: "^/Users/alpha/\\.zsh_history", id: "W8" },
-      { kind: "subpath", value: "/Users/alpha/.zsh_sessions", id: "W10" },
-      { kind: "regex", value: "^/Users/alpha/\\.zcompdump", id: "W19" },
-      { kind: "subpath", value: "/private/tmp", id: "W11" },
-      { kind: "subpath", value: "/private/var/folders", id: "W12" },
-      { kind: "literal", value: "/dev/null", id: "W13" },
-      { kind: "literal", value: "/dev/stdout", id: "W13" },
-      { kind: "literal", value: "/dev/stderr", id: "W13" },
-      { kind: "literal", value: "/dev/tty", id: "W14" },
-      { kind: "regex", value: "^/dev/fd/", id: "W14" },
-      { kind: "literal", value: "/dev/ptmx", id: "W15" },
-      { kind: "regex", value: "^/dev/ttys", id: "W15" },
-      { kind: "subpath", value: "/Users/alpha/.opencode", id: "W16" },
-      { kind: "subpath", value: "/Users/alpha/Library/Caches/bun", id: "W17" },
-      { kind: "subpath", value: "/Users/alpha/.cache/bun", id: "W18" },
+      { kind: "subpath", value: "/Users/alpha/code-puppy" },
+      { kind: "subpath", value: "/Users/alpha/app/alpha-code" },
+      { kind: "subpath", value: "/Users/alpha/Library/Application Support/codepuppy-state/env/prod" },
+      { kind: "subpath", value: "/Users/alpha/Library/Application Support/ai.opencode.desktop" },
+      { kind: "subpath", value: "/Users/alpha/.local/share/opencode" },
+      { kind: "subpath", value: "/Users/alpha/.cache/opencode" },
+      { kind: "subpath", value: "/Users/alpha/.config/opencode" },
+      { kind: "subpath", value: "/Users/alpha/.npm" },
+      { kind: "regex", value: "^/Users/alpha/\\.zsh_history" },
+      { kind: "subpath", value: "/Users/alpha/.zsh_sessions" },
+      { kind: "regex", value: "^/Users/alpha/\\.zcompdump" },
+      { kind: "subpath", value: "/private/tmp" },
+      { kind: "subpath", value: "/private/var/folders" },
+      { kind: "literal", value: "/dev/null" },
+      { kind: "literal", value: "/dev/stdout" },
+      { kind: "literal", value: "/dev/stderr" },
+      { kind: "literal", value: "/dev/tty" },
+      { kind: "regex", value: "^/dev/fd/" },
+      { kind: "literal", value: "/dev/ptmx" },
+      { kind: "regex", value: "^/dev/ttys" },
+      { kind: "subpath", value: "/Users/alpha/.opencode" },
+      { kind: "subpath", value: "/Users/alpha/Library/Caches/bun" },
+      { kind: "subpath", value: "/Users/alpha/.cache/bun" },
     ])
     expect(processFenceWriteRules("(version 1)(allow default)(deny file-write*)")).toEqual([])
     for (const bad of [

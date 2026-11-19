@@ -133,7 +133,7 @@ type SpawnLocalServerOptions = {
    * 测试用假子进程时注入替身。返回 undefined 只允许在非 darwin(那里没有 seatbelt);darwin 上
    * 生产计划器要么给出计划、要么抛出 —— 抛出 = 这一代 fork 被拒(与 codepuppy-secrets sync 失败同一条路)。
    */
-  planFence?: (input: ProductionFenceInput) => ProcessFenceStartInput | undefined
+  planFence?: (input: ProductionFenceInput) => PlannedFence | undefined
   /** INT-safety R3: main's run-lifetime writable history (the workspace tracker). Absent ⇒ nothing is carried. */
   fenceRun?: FenceRunWritable
   /**
@@ -280,6 +280,9 @@ function refreshConfiguredEgressDestinations(userDataPath: string): void {
     )
   }
 }
+
+/** The plan's own W1 list (the authority that rendered the profile) travels with it; required when fenceRun is set. */
+type PlannedFence = ProcessFenceStartInput & { workspaces?: readonly string[] }
 
 type ProductionFenceInput = { userDataPath: string; sidecarEnv: Record<string, string>; egressProxyPort: number | undefined; carriedWorkspaces: readonly string[] }
 
@@ -538,13 +541,15 @@ export async function spawnLocalServer(
     getLogger()?.warn(
       `engine data directory ${dataDir} also holds other OpenCode data (${foreign.join(", ")}) — Code Puppy shares this directory with standalone OpenCode installs (S7); it reads only ${databasePath}`,
     )
-  let fence: ProcessFenceStartInput | undefined
+  let fence: PlannedFence | undefined
   try {
     fence = (options.planFence ?? planProductionFence)({ userDataPath: options.userDataPath, sidecarEnv, egressProxyPort, carriedWorkspaces: options.fenceRun?.carriedWorkspaces() ?? [] })
   } catch (error) {
     getLogger()?.error("process fence plan FAILED — refusing to fork the sidecar (fail closed; an unfenced engine must not start)", error)
     throw new Error(`process fence plan failed — sidecar fork refused: ${serializeError(error).message}`)
   }
+  if (fence && options.fenceRun && !fence.workspaces)
+    throw new Error("process fence plan carries no workspace list — this generation's W1 could not join the run's writable history, sidecar fork refused")
   if (!fence && process.platform === "darwin")
     throw new Error("process fence plan returned nothing on darwin — sidecar fork refused (an unfenced engine must not start)")
   // `#1698`(DESIGN-upgrade-bootstrap-config §4.2 / §4.4):这一代交给 sidecar、ext 与引擎的决定收成一份启动文档,随 start 消息走,
@@ -609,6 +614,10 @@ export async function spawnLocalServer(
   const writeGrants = createWriteGrantRequester((command) => child.postMessage(command))
   const grantedDirectories = new Set<string>()
   const granting = new Map<string, Promise<Omit<WorkspaceWriteGrantReply, "type" | "id">>>()
+  // Tokens handed to the engine without a definite answer (reply timeout, child exit, post exception, any reply other
+  // than "consume errno=N"): the engine may still consume them, so for this generation such a directory counts as
+  // covered and is never issued again. A definite consume failure, or a failure before any token existed, may retry.
+  const possiblyConsumed = new Set<string>()
   // The one source of this generation's write roots: the exact profile bytes it applies, parsed by the renderer's
   // module. An unrecognised form leaves this undefined, and every directory then counts as covered (no issue).
   let writeRules: ProcessFenceWriteRule[] | undefined
@@ -620,7 +629,7 @@ export async function spawnLocalServer(
   // Another directory's grant in flight counts too: once consumed, its subtree is fenced-writable before main hears
   // back. The same directory's own in-flight grant is joined instead (grantWrite coalesces; nothing new is issued).
   const generationWrites: SidecarListener["generationWrites"] = (directory) =>
-    !writeRules || processFenceRulesCover([...writeRules, ...[...grantedDirectories, ...[...granting.keys()].filter((pending) => pending !== directory)].map((value) => ({ kind: "subpath" as const, value }))], directory)
+    !writeRules || processFenceRulesCover([...writeRules, ...[...grantedDirectories, ...possiblyConsumed, ...[...granting.keys()].filter((pending) => pending !== directory)].map((value) => ({ kind: "subpath" as const, value }))], directory)
   const grantWrite: SidecarListener["grantWrite"] = (directory) => {
     if (exited || !child.pid) return Promise.resolve({ outcome: "failed", detail: "engine not running" })
     if (!fence) return Promise.resolve({ outcome: "failed", detail: "engine has no fence" })
@@ -654,8 +663,9 @@ export async function spawnLocalServer(
           getLogger()?.log(`process fence: grant granted directory=${JSON.stringify(directory)} roundTripMs=${(performance.now() - started).toFixed(3)}`)
           return { outcome: "granted" }
         }
-        const errno = /^consume errno=(\d+)$/.exec(result.detail ?? "")?.[1] ?? "unknown"
-        getLogger()?.warn(`process fence: grant failed directory=${JSON.stringify(directory)} step=consume errno=${errno}`)
+        const errno = /^consume errno=(\d+)$/.exec(result.detail ?? "")?.[1]
+        if (errno === undefined) possiblyConsumed.add(directory)
+        getLogger()?.warn(`process fence: grant failed directory=${JSON.stringify(directory)} step=consume errno=${errno ?? "unknown"}`)
         return { outcome: "failed", detail: result.detail ?? "engine exited during grant" }
       } catch {
         // An exception/post error can contain a token. Only owned, constant diagnostics cross this boundary.
@@ -806,8 +816,8 @@ export async function spawnLocalServer(
         return stopping
       },
   }
-  // This generation's W1 members become part of the run's writable history before anything can ask about them.
-  options.fenceRun?.noteGeneration(listener, (writeRules ?? []).filter((rule) => rule.id === "W1" && rule.kind === "subpath").map((rule) => rule.value))
+  // This generation's W1 (the plan's own list) joins the run's writable history before anything can ask about it.
+  if (fence?.workspaces) options.fenceRun?.noteGeneration(listener, fence.workspaces)
 
   return {
     listener,

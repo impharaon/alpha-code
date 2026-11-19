@@ -675,6 +675,24 @@ describe("three-state ask (I7a) — nothing runs before approval", () => {
       expect(counts.probe).toBe(0)
     }),
   )
+
+  // Codex 审查(fix/hub-status-approval R1/1 #1):换绑守卫只为 Code Puppy 自己点名的助手只读查找 / 状态让路。用户在配置里给
+  // tool-policy-default 写一条点名插件的放行(这里 `plugin:*`),一个普通插件工具带着绑定已过期的 enabled 记录照旧要问。
+  it.live("binding-changed: a user tool-policy-default rule naming plugin tools does not lift the rebind guard of an ordinary plugin tool", () =>
+    Effect.gen(function* () {
+      const { session } = yield* setup({
+        rules: [ALLOW_ALL, { action: "tool-policy-default", resource: "plugin:*", effect: "allow" }],
+        records: [{ selector: { level: "tool", canonical: ID_PLUGIN_PROBE }, state: "enabled", bindingDigest: `sha256:${"0".repeat(64)}` }],
+      })
+      const permission = yield* Permission.Service
+      const fiber = yield* Effect.forkChild(callRaw(session.id, ALIAS_PROBE))
+      const [request] = yield* pending
+      expect(request?.action).toBe(ID_PLUGIN_PROBE)
+      yield* permission.reply({ requestID: request!.id, reply: "reject" })
+      yield* E.Fiber.await(fiber)
+      expect(counts.probe).toBe(0)
+    }),
+  )
 })
 
 describe("display snapshot (I7b) — state.metadata.codepuppyDisplay", () => {

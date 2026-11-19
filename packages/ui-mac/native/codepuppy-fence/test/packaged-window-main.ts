@@ -11,6 +11,7 @@ import {
   renameSync,
   rmSync,
   statSync,
+  symlinkSync,
   writeFileSync,
 } from "node:fs"
 import { join } from "node:path"
@@ -809,8 +810,10 @@ async function run() {
       enginePid: engine!.pid,
     })
   }
-  await pick(home)
-  await residual("home-or-app-state", home, "home-or-app-state")
+  const firmlinkHome = `/System/Volumes/Data${home}`
+  assert(statSync(firmlinkHome, { bigint: true }).ino === statSync(home, { bigint: true }).ino, "HOME firmlink sample differs")
+  await pick(firmlinkHome)
+  await residual("home-or-app-state", firmlinkHome, "home-or-app-state")
   grantFault = "native"
   await pick(directories.failed)
   await residual("grant-failed-native", directories.failed, "grant-failed")
@@ -828,38 +831,42 @@ async function run() {
   grantFault = undefined
   // Spec v3: a rewritten session restored by the current layout is a reachable,
   // unregistered directory. Reload is setup; the subsequent picker must not reload again.
+  const restoredAlias = join(root, "restored-alias")
+  symlinkSync(directories.rewritten, restoredAlias)
   const currentPlace = await evaluate<{ route: string }>("JSON.parse(sessionStorage.getItem('codepuppy.place.v1'))")
   const restoredSession = /\/session\/([^/?]+)/.exec(currentPlace.route)?.[1]
   assert(restoredSession, "residual session route missing")
-  await rewrite(restoredSession, directories.rewritten)
+  await rewrite(restoredSession, restoredAlias)
   const beforeRestore = loads
   win.webContents.reload()
   await waitFor(() => loads > beforeRestore, "AC-08 rewritten session restored")
-  await residual("restored-before", directories.rewritten, "not-opened-by-you")
+  await residual("restored-before", restoredAlias, "not-opened-by-you")
   const before = {
     enginePid: engine!.pid,
     rendererPid: win.webContents.getOSProcessId(),
     loads,
-    registered: tracker.userOpened.has("sidecar", directories.rewritten),
-    files: readdirSync(directories.rewritten).filter((file) => file !== ".git"),
+    registered: tracker.userOpened.has("sidecar", restoredAlias),
+    files: readdirSync(restoredAlias).filter((file) => file !== ".git"),
   }
   assert(!before.registered && before.files.length === 0, "restored target was granted before the picker")
   assert(
-    !readWorkspaceTruthOrThrow(truthPath, { readFileSync }).includes(directories.rewritten),
+    // The truth stores canonical identities: check the directory the alias names, not its spelling.
+    !readWorkspaceTruthOrThrow(truthPath, { readFileSync }).includes(realpathSync.native(restoredAlias)),
     "restored target entered truth before the picker",
   )
   baseline.loads = loads
-  await pick(directories.rewritten)
-  await normal("restored-after", directories.rewritten)
+  await pick(restoredAlias)
+  await normal("restored-after", restoredAlias)
   report.restoredOpen = {
-    directory: directories.rewritten,
+    directory: restoredAlias,
+    canonical: realpathSync.native(restoredAlias),
     before,
     after: {
       enginePid: engine!.pid,
       rendererPid: win.webContents.getOSProcessId(),
       loads,
-      registered: tracker.userOpened.has("sidecar", directories.rewritten),
-      files: readdirSync(directories.rewritten).filter((file) => file !== ".git"),
+      registered: tracker.userOpened.has("sidecar", restoredAlias),
+      files: readdirSync(restoredAlias).filter((file) => file !== ".git"),
     },
   }
   report.passed = true

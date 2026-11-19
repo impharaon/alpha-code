@@ -430,6 +430,8 @@ export function injectCodePuppyConfig(
             ["plugin:*", "ask"],
             // BR-01 / BR-10(SPEC-plugin-helper-and-hub v5):助手的只读查找与状态工具不问;安装仍每档都问(hubInstallAsk)。
             ...HUB_READ_ACTIONS.map((name): [string, "allow"] => [`plugin:*:${name}`, "allow"]),
+            // 同一条免审批也写在档位伪动作上(只点这两只的名):上一版留下的「始终允许」记录换绑之后不会让它们回到询问(catalog.ts)。
+            ["tool-policy-default", Object.fromEntries(HUB_READ_ACTIONS.map((name) => [`plugin:*:${name}`, "allow" as const]))],
           ]),
         },
       }

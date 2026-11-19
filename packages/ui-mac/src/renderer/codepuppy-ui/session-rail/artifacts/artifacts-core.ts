@@ -7,6 +7,10 @@
 import type { ArtifactCard, RunArtifactUsage } from "../../artifact-workbench/workbench-core"
 import type { CodePuppySessionIdentity } from "../../session-workspace/session-workspace-core"
 import { cloudImageViewOf, type CloudImageRunFacts, type CloudImageView } from "../../session-timeline/timeline-model"
+import { labelOf } from "../../session-timeline/timeline-attachments"
+import { splitViewerPath } from "../files/file-viewer-core"
+import type { FileViewerRefusal } from "../../../../shared/file-viewer"
+import type { LocalArtifact } from "./local-artifacts"
 
 /**
  * #660:两种空是两个事实,不得合并 —— `empty` = 这个项目一次云任务都没有(连切换条都不画,
@@ -26,6 +30,11 @@ export type ArtifactsPhase =
   | "empty-scope"
   /** REQ-236 `#1552`:选中的这次还没交付完(排队 / 生成 / 正在保存 / 没存到本机)—— 显示交付状态,不说「没有产物」。 */
   | "run-status"
+  /** DESIGN-local-session-artifacts §4.4:范围里没有云端 run,只有本机写成的文档。 */
+  | "local-only"
+
+/** 本次对话的本机产物清单(local-artifacts.ts readLocalArtifacts);任一会话读失败 = ok:false,不出半份。 */
+export type LocalArtifactsResult = { ok: true; items: LocalArtifact[] } | { ok: false }
 
 /**
  * Honest panel phase from the three read channels. Fail-closed: anything not proven readable
@@ -43,10 +52,17 @@ export function artifactsPhaseOf(input: {
   scopeHidesRuns?: boolean
   /** REQ-236 `#1552`:宿主 tracker 对选中 run 的交付态(runDeliveryOf);undefined = 已交付或宿主不知道。 */
   delivery?: RunDelivery
+  /** 本机产物清单;undefined = 还没回答。 */
+  local?: LocalArtifactsResult
 }): ArtifactsPhase {
   if (input.usage === undefined) return "loading"
   if (!input.usage.ok) return "error"
-  if (input.runId === undefined) return input.scopeHidesRuns ? "empty-scope" : "empty"
+  if (input.runId === undefined) {
+    if (input.local === undefined) return "loading"
+    if (!input.local.ok) return "error"
+    if (input.local.items.length > 0) return "local-only"
+    return input.scopeHidesRuns ? "empty-scope" : "empty"
+  }
   if (input.list === undefined) return "loading"
   if (!input.list.ok) return "error"
   if (input.cardCount > 0) return "cards"
@@ -119,6 +135,43 @@ export function runRowModelOf(usage: RunArtifactUsage, index: number, now: Date)
     diskBytes: usage.diskBytes,
     missingCount: usage.missingCount,
     readOnly: usage.readOnly,
+  }
+}
+
+// ---------------------------------------------------------------------------
+// DESIGN-local-session-artifacts §4.4/§4.5:本机产物行
+// ---------------------------------------------------------------------------
+
+/** present = 文件在;missing = 查到不存在(「文件缺失」,不可点);unknown = 还没查 / 查询出错 / 其他拒绝码(可点,查看器给真状态)。 */
+export type LocalFileState = "present" | "missing" | "unknown"
+
+export interface LocalArtifactRow {
+  /** 身份;点击时原样交给 rail.openFileViewer。 */
+  path: string
+  name: string
+  /** splitViewerPath 的 dir,根目录为 ""。 */
+  dir: string
+  /** DOCX / PDF / HTML / MD … */
+  label: string
+  moment: RunMoment | null
+  file: LocalFileState
+}
+
+/** 状态通道的结果 → 行状态:ok → present;not-found → missing;其余拒绝码 / 没有结果 → unknown。 */
+export function localFileStateOf(stat: { ok: true } | { ok: false; code: FileViewerRefusal } | undefined): LocalFileState {
+  if (!stat) return "unknown"
+  if (stat.ok) return "present"
+  return stat.code === "not-found" ? "missing" : "unknown"
+}
+
+export function localArtifactRowOf(item: LocalArtifact, file: LocalFileState, now: Date): LocalArtifactRow {
+  return {
+    path: item.path,
+    name: item.name,
+    dir: splitViewerPath(item.path).dir,
+    label: labelOf(item.name, ""),
+    moment: runMomentOf(new Date(item.writtenAt).toISOString(), now),
+    file,
   }
 }
 

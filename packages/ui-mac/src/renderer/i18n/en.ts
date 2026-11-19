@@ -1918,6 +1918,7 @@ export const dict = {
   "codepuppy.session.artifactsScopeSession": "This chat",
   "codepuppy.session.artifactsScopeProject": "Whole project",
   "codepuppy.session.artifactsOwnerThis": "This chat",
+  "codepuppy.session.artifactsLocalTitle": "Made on this computer",
   "codepuppy.session.artifactsOwnerOther": "Another chat",
   "codepuppy.session.artifactsOwnerNone": "Source not recorded",
   "codepuppy.session.artifactsScopeEmptyTitle": "Nothing generated in this chat yet",

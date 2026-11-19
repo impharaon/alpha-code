@@ -383,6 +383,7 @@ const api: ElectronAPI = {
     openExternal: (directory, relPath) => ipcRenderer.invoke("workspace-file-open-external", directory, relPath),
     reveal: (directory, relPath) => ipcRenderer.invoke("workspace-file-reveal", directory, relPath),
     saveCopy: (directory, relPath) => ipcRenderer.invoke("workspace-file-save-copy", directory, relPath),
+    stat: (directory, relPaths) => ipcRenderer.invoke("workspace-file-stat", directory, relPaths),
   },
   railPreview: {
     open: (directory, relPath, kind, bounds) => ipcRenderer.invoke("rail-preview-open", directory, relPath, kind, bounds),

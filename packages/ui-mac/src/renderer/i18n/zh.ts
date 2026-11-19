@@ -1894,6 +1894,7 @@ export const dict = {
   "codepuppy.session.artifactsScopeSession": "本次对话",
   "codepuppy.session.artifactsScopeProject": "项目全部",
   "codepuppy.session.artifactsOwnerThis": "本次对话",
+  "codepuppy.session.artifactsLocalTitle": "在本机生成",
   "codepuppy.session.artifactsOwnerOther": "另一个对话",
   "codepuppy.session.artifactsOwnerNone": "来源未记录",
   "codepuppy.session.artifactsScopeEmptyTitle": "这次对话还没有生成过文件",

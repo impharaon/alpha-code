@@ -30,6 +30,7 @@ import {
   type ArtifactSaveReceipt,
   type ArtifactsPhase,
   type ArtifactsScope,
+  type LocalArtifactRow,
   type RunDelivery,
   type RunMoment,
   type RunOwner,
@@ -42,6 +43,10 @@ const SCOPES: readonly ArtifactsScope[] = ["session", "project"]
 export interface ArtifactsPanelViewProps {
   phase: ArtifactsPhase
   errorReason?: string
+  /** DESIGN-local-session-artifacts §4.4:本次对话里于本机写成的文档(范围条之下、云端 run 条之上)。 */
+  local: { status: "loading" } | { status: "error" } | { status: "ready"; rows: readonly LocalArtifactRow[] }
+  /** 打开一份本机产物 = 文件面板的查看器(rail.openFileViewer)。 */
+  onOpenLocal: (path: string) => void
   /** REQ-236 #1552 AC4: this chat (with its descendants) vs. the whole project. */
   scope: ArtifactsScope
   onScope: (scope: ArtifactsScope) => void
@@ -179,6 +184,7 @@ export function SessionRailArtifactsView(props: ArtifactsPanelViewProps) {
       props.onScope(next)
       document.getElementById(`a-rart-scope-${next}`)?.focus()
     })
+  const localRows = () => (props.local.status === "ready" ? props.local.rows : [])
   const cardEls = new Map<string, HTMLElement>()
   const selectedCard = createMemo(() => props.cards.find((card) => card.key === props.selectedKey) ?? null)
   const barRow = createMemo(() => props.runs.find((row) => row.runId === props.selectedRunId))
@@ -417,6 +423,64 @@ export function SessionRailArtifactsView(props: ArtifactsPanelViewProps) {
               <path d="M20 5v6h-6" />
             </svg>
           </button>
+        </div>
+      </Show>
+      {/* DESIGN-local-session-artifacts §4.4:本机清单读不到、但云端那边有内容 —— 只在本机区说读不到 + 重试;两边都没有内容时走 error 阶段。 */}
+      <Show when={props.local.status === "error" && props.phase !== "loading" && props.phase !== "error"}>
+        <div class="a-rart-status" data-artifacts-local-failed>
+          <div class="a-wb-notice" data-kind="error">
+            {t("codepuppy.wb.listFailed")}
+          </div>
+          <button type="button" class="a-wb-btn" onClick={props.onRetry}>
+            {t("codepuppy.wb.retry")}
+          </button>
+        </div>
+      </Show>
+      {/* §4.4「在本机生成」:最近写成在前;行复用产物卡片行。「文件缺失」的行保留名字与位置、不可点。 */}
+      <Show when={props.phase !== "loading" && localRows().length > 0}>
+        <div class={props.phase === "local-only" ? "a-rart-scroll" : "a-rart-local"} data-artifacts-local>
+          <div class="a-rart-label a-rart-local-head">
+            {t("codepuppy.session.artifactsLocalTitle")}
+            <Show when={props.scope === "project"}>
+              <span class="a-rart-runrow-tag" data-run-owner="this">
+                {t(OWNER_LABEL_KEYS.this)}
+              </span>
+            </Show>
+          </div>
+          <ul class="codepuppy-wb-cardlist" role="list">
+            <For each={localRows()}>
+              {(row) => (
+                <li class="codepuppy-wb-card" data-state={row.file === "missing" ? "missing" : undefined}>
+                  <button
+                    type="button"
+                    class="codepuppy-wb-card-main"
+                    data-local-artifact={row.path}
+                    data-local-file={row.file}
+                    disabled={row.file === "missing"}
+                    onClick={() => props.onOpenLocal(row.path)}
+                  >
+                    <span class="codepuppy-wb-card-name" title={row.path}>
+                      {row.name}
+                    </span>
+                    <span class="codepuppy-wb-card-meta">
+                      <span class="a-wb-chip">{row.label}</span>
+                      <Show when={row.file === "missing"}>
+                        <span class="a-wb-chip" data-state="missing">
+                          {t(STATE_LABEL_KEYS.missing)}
+                        </span>
+                      </Show>
+                      <Show when={row.dir}>
+                        <span class="codepuppy-wb-card-size" title={row.dir}>
+                          {row.dir}
+                        </span>
+                      </Show>
+                      <Show when={row.moment}>{(moment) => <span class="codepuppy-wb-card-size">{momentLabel(moment())}</span>}</Show>
+                    </span>
+                  </button>
+                </li>
+              )}
+            </For>
+          </ul>
         </div>
       </Show>
       {/* #660 run bar: outside the scroll column on purpose — an unreadable run must not

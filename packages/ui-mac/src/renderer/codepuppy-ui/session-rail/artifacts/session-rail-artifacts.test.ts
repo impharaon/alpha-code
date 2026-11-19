@@ -30,7 +30,8 @@ describe("REQ-125 C4 artifacts panel real Solid mount", () => {
     // `#906`:时间线第 N 行 → 面板选中第 N 个(联动两半都是生产实现)(21 → 22)。
     // REQ-236 #1552:tabs 用例改写为「结果优先 + 技术详情折叠」;+ 真容器的本次对话 / 项目全部(22 → 23)。
     // #1591:+ 产物右栏警告与出错文字三条(23 → 26)。
-    expect(output).toContain("26 pass")
+    // DESIGN-local-session-artifacts:+ 本机产物三条(26 → 29)。
+    expect(output).toContain("29 pass")
     expect(output).toContain("0 fail")
   })
 })
@@ -112,9 +113,12 @@ describe("REQ-125 C4 verbatim workbench embed (I5) and channel discipline", () =
       "onRunState",
       "retry",
     ])
-    // And no third face at all: every window.api usage in the container is one of the two.
+    // DESIGN-local-session-artifacts §4.5:本机产物行的「文件缺失」只经只读的 workspaceFile.stat(与查看器同一个守卫);
+    // 打开走 rail.openFileViewer,不开第二条读取通道。
+    expect([...new Set(callsOf("workspaceFile"))]).toEqual(["stat"])
+    // And no fourth face at all: every window.api usage in the container is one of the three.
     const faces = [...wiring.matchAll(/window\.api\.(\w+)/g)].map((match) => match[1]!)
-    expect([...new Set(faces)].sort()).toEqual(["cloud", "runArtifacts"])
+    expect([...new Set(faces)].sort()).toEqual(["cloud", "runArtifacts", "workspaceFile"])
     // The view is channel-free — the harness mounts it without any preload bridge.
     expect(view).not.toContain("window.api")
   })
@@ -232,7 +236,7 @@ describe("REQ-236 #1552 AC4 本次对话 / 项目全部:归属从记录的会话
     expect(calls).toBe(SCOPE_ANCESTRY_MAX_DEPTH)
     // 范围为空但项目里有 run ⇒ 「本次对话还没有生成过文件」,不是项目级空态。
     const phase = (scopeHidesRuns: boolean) =>
-      artifactsPhaseOf({ usage: { ok: true }, runId: undefined, list: undefined, cloud: undefined, cardCount: 0, scopeHidesRuns })
+      artifactsPhaseOf({ usage: { ok: true }, runId: undefined, list: undefined, cloud: undefined, cardCount: 0, scopeHidesRuns, local: { ok: true, items: [] } })
     expect(phase(true)).toBe("empty-scope")
     expect(phase(false)).toBe("empty")
   })

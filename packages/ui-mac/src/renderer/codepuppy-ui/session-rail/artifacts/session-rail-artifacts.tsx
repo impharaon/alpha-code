@@ -14,7 +14,7 @@
 // switch remounts it and every in-flight async result dies with the old mount. The
 // timeline→artifacts linkage mount point consumes `rail.artifactTarget` (focusArtifact),
 // selecting and DOM-focusing the matching card; Esc returns focus to the stored origin.
-import { createEffect, createMemo, createResource, createSignal, onCleanup, Show, untrack } from "solid-js"
+import { createEffect, createMemo, createResource, createSignal, onCleanup, Show, untrack, type Accessor } from "solid-js"
 import type { ArtifactReadRef, CloudRunState } from "../../../../preload/types"
 import {
   deriveCards,
@@ -37,29 +37,54 @@ import {
   artifactsPhaseOf,
   createRunOwnership,
   findArtifactCard,
+  localArtifactRowOf,
+  localFileStateOf,
   runDeliveryOf,
   runRowModelOf,
   type ArtifactSaveReceipt,
   type ArtifactsScope,
+  type LocalArtifactsResult,
   type RunOwner,
 } from "./artifacts-core"
 import { SessionRailArtifactsView } from "./artifacts-panel-view"
+import { readLocalArtifacts, type SessionMessageWithParts } from "./local-artifacts"
 
 /** REQ-236 `#1552`:会话的父会话(生产 = v1 `session.get` 的 parentID);缺席 = 只认归属会话本身。 */
 export type SessionParentOf = (sessionID: string) => Promise<string | null | undefined>
 
-export function SessionRailArtifacts(props: { live: CodePuppySessionLiveContext; rail: SessionRailApi; parentOf?: SessionParentOf }) {
+/** DESIGN-local-session-artifacts §4.3:一个会话的全部消息(生产 = v1 `session.messages` 不带 limit);读不到即 reject。 */
+export type SessionMessagesOf = (sessionID: string) => Promise<readonly SessionMessageWithParts[]>
+
+type ArtifactsPanelProps = {
+  live: CodePuppySessionLiveContext
+  rail: SessionRailApi
+  parentOf?: SessionParentOf
+  /** 缺席 = 不显示本机产物区。 */
+  messagesOf?: SessionMessagesOf
+  /** 同步 store 里写成事实的修订串(localArtifactsRevision);变了就重读。 */
+  localRevision?: Accessor<string>
+}
+
+export function SessionRailArtifacts(props: ArtifactsPanelProps) {
   // Key the whole panel on the session identity triple (I8): switching session/workspace/
   // server remounts with fresh resources, so no artifact data can leak across sessions.
   const identityKey = createMemo(() => artifactsIdentityKeyOf(props.live.current()?.identity))
   return (
     <Show when={identityKey()} keyed>
-      {(_key) => <ArtifactsPanel live={props.live} rail={props.rail} parentOf={props.parentOf} />}
+      {(_key) => (
+        <ArtifactsPanel
+          live={props.live}
+          rail={props.rail}
+          parentOf={props.parentOf}
+          messagesOf={props.messagesOf}
+          localRevision={props.localRevision}
+        />
+      )}
     </Show>
   )
 }
 
-function ArtifactsPanel(props: { live: CodePuppySessionLiveContext; rail: SessionRailApi; parentOf?: SessionParentOf }) {
+function ArtifactsPanel(props: ArtifactsPanelProps) {
   // Under the keyed <Show> above the identity is fixed for this component's lifetime.
   const identity = props.live.current()!.identity
   const [tick, setTick] = createSignal(0)
@@ -220,6 +245,47 @@ function ArtifactsPanel(props: { live: CodePuppySessionLiveContext; rail: Sessio
     })
   })
 
+  // DESIGN-local-session-artifacts §4.3:本次对话(含子代理会话)里于本机写成的文档 —— 引擎持久化的消息全量重读、推导;
+  // 键 = 刷新按钮(tick)+ 同步 store 里写成事实的修订串。任一会话读失败 = 整份失败(不出半份清单)。
+  const messagesOf = props.messagesOf
+  const [localRes] = createResource(
+    () => (messagesOf ? { tick: tick(), revision: props.localRevision?.() ?? "" } : false),
+    async (): Promise<LocalArtifactsResult> => {
+      try {
+        return { ok: true, items: await readLocalArtifacts(identity.directory, identity.sessionID, messagesOf!) }
+      } catch {
+        return { ok: false }
+      }
+    },
+  )
+  const local = (): LocalArtifactsResult | undefined => (messagesOf ? localRes() : { ok: true, items: [] })
+  // §4.5:行上的「文件缺失」与查看器打开时同一个守卫(main 的 workspace-file-stat);每次清单更新与刷新各查一次。
+  const [statRes] = createResource(
+    () => {
+      const result = localRes()
+      return result?.ok && result.items.length > 0 ? { paths: result.items.map((item) => item.path), tick: tick() } : false
+    },
+    async ({ paths }) => {
+      try {
+        const results = await window.api.workspaceFile.stat(identity.directory, paths)
+        return new Map(paths.map((path, index) => [path, localFileStateOf(results[index])]))
+      } catch {
+        return new Map<string, ReturnType<typeof localFileStateOf>>()
+      }
+    },
+  )
+  const localView = createMemo(() => {
+    const result = local()
+    if (result === undefined) return { status: "loading" as const }
+    if (!result.ok) return { status: "error" as const }
+    const now = new Date()
+    const states = statRes()
+    return {
+      status: "ready" as const,
+      rows: result.items.map((item) => localArtifactRowOf(item, states?.get(item.path) ?? "unknown", now)),
+    }
+  })
+
   const phase = createMemo(() =>
     artifactsPhaseOf({
       // The session scope is not "loaded" until ownership has resolved (never flash another chat's run).
@@ -232,6 +298,7 @@ function ArtifactsPanel(props: { live: CodePuppySessionLiveContext; rail: Sessio
       // keeps the phase at loading, cloud failure renders "platform unavailable", never "empty".
       cloud: runId() ? cloudRes() : undefined,
       cardCount: cards().length,
+      local: local(),
     }),
   )
 
@@ -522,6 +589,8 @@ function ArtifactsPanel(props: { live: CodePuppySessionLiveContext; rail: Sessio
     <SessionRailArtifactsView
       phase={phase()}
       errorReason={errorReasonOf(usageRes(), listRes())}
+      local={localView()}
+      onOpenLocal={(path) => props.rail.openFileViewer(path)}
       scope={scope()}
       onScope={setScope}
       owners={owners()}

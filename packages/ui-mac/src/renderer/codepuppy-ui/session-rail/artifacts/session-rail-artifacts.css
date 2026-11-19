@@ -298,6 +298,22 @@
   min-height: 0;
 }
 
+/* DESIGN-local-session-artifacts §4.4:「在本机生成」区与云端内容并列时不吃满高度,自己滚动。 */
+.a-rart-local {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 40%;
+  padding: 12px 12px 0;
+  overflow-y: auto;
+}
+
+.a-rart-local-head {
+  display: flex;
+  align-items: center;
+}
+
 .a-rart-status {
   display: flex;
   flex-direction: column;

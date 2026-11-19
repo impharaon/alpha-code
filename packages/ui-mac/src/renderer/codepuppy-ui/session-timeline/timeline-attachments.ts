@@ -9,7 +9,7 @@
 //   「已读取」当且仅当同一会话里有一次该读取工具(按 identity:mcp / 第一方 Office 服务名 / 远端工具名,不按别名)的
 //   **成功**调用,且它的 `input.path` 经 normalizePosixPath 后等于 attachmentAbsolutePath(会话目录, metadata.path)——
 //   与 ext 写进读取指令的是同一个函数。`read_pdf` 成功但每页都是空串 ⇒「读到 0 字」。
-//   `#1669`:经 Code Mode 的读取(`execute` 部件里引擎记下的内层调用,同一工具、同一路径)同样算数,见 readCallsOf。
+//   `#1669`:经 Code Mode 的读取(`execute` 部件里引擎记下的内层调用,同一工具、同一路径)同样算数,见 officeCallsOf。
 //   没有调用时看本机读取工具的逐服务状态(引擎 mcp.status,当下重新取):不可用 ⇒「读取失败:没有启动」;
 //   回合还在跑 ⇒ 准备中「等待本机读取工具」/ 就绪「已存到本机，等助手读取」;回合结束 ⇒「这一轮助手没有读取」。
 import type { FilePart, Part } from "../../../engine-adapter/contract/v1"
@@ -53,7 +53,8 @@ export type TimelineAttachmentContext = {
 
 type ReadInput = TimelineAttachmentContext & { tools: readonly Part[]; turnActive: boolean }
 
-function labelOf(name: string, mime: string) {
+/** 类型角标(DOCX / PDF / PNG …);附件卡与产物页本机产物行共用。 */
+export function labelOf(name: string, mime: string) {
   if (mime.startsWith("image/")) return mime.slice("image/".length).toUpperCase()
   if (mime === "application/pdf") return "PDF"
   const base = name.split("/").at(-1) ?? name
@@ -72,30 +73,31 @@ function dataUrlBytes(url: string): number | undefined {
 
 type ToolLike = { type?: unknown; display?: { identity?: { source?: unknown; origin?: unknown; name?: unknown } }; state?: { status?: unknown; input?: { path?: unknown }; output?: unknown; error?: unknown } }
 
-type ReadState = NonNullable<ToolLike["state"]>
+export type OfficeCallState = NonNullable<ToolLike["state"]>
 
 const isTargetPath = (path: unknown, target: string) => typeof path === "string" && normalizePosixPath(path) === target
 
 /**
- * 这个部件里对该读取工具、该路径的调用(状态)。`#1669`:2.x 引擎的 MCP 工具默认进 Code Mode,读取发生在保留名 `execute`
- * 部件的程序里(packages/core/src/tool.ts:403 不许别的直接工具叫 execute);引擎把每次内层调用记成 `metadata.toolCalls[]`
- * `{ tool: <Code Mode 路径>, status, input }`(packages/core/src/codemode/tool.ts progressHooks,随部件持久化)。路径是
- * `<namespace(服务名)>.<工具名>`(codemode/tool.ts qualifiedName、tool/mcp.ts namespace);第一方读取的服务名与工具名本来就只含
- * `[a-zA-Z0-9_-]`,规范化后不变。内层调用只有状态没有错误原文 ⇒ 失败归「文件打不开」;没有输出 ⇒ 不判「读到 0 字」。
+ * 这个部件里对第一方 Office 服务 `server` 的工具 `tool` 的调用(状态与入参)。附件「已读取」与产物页的本机产物共用这一份
+ * (design local-session-artifacts §4.2;按路径过滤留在调用方)。`#1669`:2.x 引擎的 MCP 工具默认进 Code Mode,调用发生在
+ * 保留名 `execute` 部件的程序里(packages/core/src/tool.ts:403 不许别的直接工具叫 execute);引擎把每次内层调用记成
+ * `metadata.toolCalls[]` `{ tool: <Code Mode 路径>, status, input }`(packages/core/src/codemode/tool.ts progressHooks,随部件持久化)。
+ * 路径是 `<namespace(服务名)>.<工具名>`(codemode/tool.ts qualifiedName、tool/mcp.ts namespace);第一方的服务名与工具名本来就只含
+ * `[a-zA-Z0-9_-]`,规范化后不变。内层调用只有状态没有错误原文与输出。直接 MCP 调用按 identity 认(不按别名)。
  */
-function readCallsOf(part: Part, server: string, tool: string, target: string): ReadState[] {
+export function officeCallsOf(part: Part, server: string, tool: string): OfficeCallState[] {
   const p = part as ToolLike & { tool?: unknown }
   if (p.type !== "tool") return []
   if (p.tool === "execute") {
     const calls = (p.state as { metadata?: { toolCalls?: unknown } } | undefined)?.metadata?.toolCalls
     if (!Array.isArray(calls)) return []
     return calls.flatMap((call: { tool?: unknown; status?: unknown; input?: { path?: unknown } } | null) =>
-      call?.tool === `${server}.${tool}` && isTargetPath(call.input?.path, target) ? [{ status: call.status, input: call.input }] : [],
+      call?.tool === `${server}.${tool}` ? [{ status: call.status, input: call.input }] : [],
     )
   }
   const identity = p.display?.identity
   if (identity?.source !== "mcp" || identity.origin !== server || identity.name !== tool) return []
-  return isTargetPath(p.state?.input?.path, target) ? [p.state!] : []
+  return p.state ? [p.state] : []
 }
 
 /** `read_pdf` 的结果 `{ path, pages: string[] }`(server.py):每页都是空串 = 文本层为空(多半是扫描件)。 */
@@ -112,7 +114,9 @@ export function attachmentReadOf(meta: StagedAttachmentMeta, input: ReadInput): 
   const server = attachmentReaderServer(meta.reader)
   const tool = ATTACHMENT_READ_TOOL[meta.reader]
   const target = input.directory ? attachmentAbsolutePath(input.directory, meta.path) : undefined
-  const calls = target ? input.tools.flatMap((part) => readCallsOf(part, server, tool, target)) : []
+  const calls = target
+    ? input.tools.flatMap((part) => officeCallsOf(part, server, tool).filter((call) => isTargetPath(call.input?.path, target)))
+    : []
   const done = calls.find((state) => state.status === "completed")
   if (done) return meta.reader === "pdf" && pdfTextEmpty(done.output) ? { kind: "empty" } : { kind: "read" }
   const failed = calls.findLast((state) => state.status === "error")

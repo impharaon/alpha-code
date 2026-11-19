@@ -25,6 +25,7 @@ function harness(overrides: Partial<PlanProcessFenceDeps> = {}, existing = new S
     appStateRoot: () => STATE_ROOT,
     // 假盘上的路径不在盘上;这里用恒等让并集走词法比较(真 realpath 的判据在 process-fence-profile.test.ts ④)
     realpath: (p) => p,
+    stat: (p) => ({ dev: "fixture", ino: p }),
     defaultWorkspace: () => `${HOME}/code-puppy`,
     // `#1394`:清单来自真源(顺序即优先级:recent 的 proj-b 在前),不再是 store 的三个键
     readWorkspaces: () => [`${HOME}/proj-b`, `${HOME}/proj-a`],
@@ -39,6 +40,7 @@ function harness(overrides: Partial<PlanProcessFenceDeps> = {}, existing = new S
     sidecarEnv: { HOME },
     addon: { packaged: true, resourcesPath: "/App/Contents/Resources", moduleDir: "/unused", exists: (p) => existing.has(p) },
     egressProxyPort: 4443,
+    carriedWorkspaces: [],
   }
   return { deps, input, made, logs }
 }

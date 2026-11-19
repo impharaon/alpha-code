@@ -152,7 +152,7 @@ export function CodePuppySessionWorkspace(props: { projects: CodePuppyProjectsAp
   const terminalChannel = useCodePuppyTerminalEngineChannel(current)
   // REQ-159 `#1322`:「这个目录成为当前工作区」在会话页的唯一咽喉 = live 身份里的 directory(deep link /
   // 侧栏 draft 晋升 / 直接导航都落在这里)。探针由被围栏的引擎执行;只有它明确回报写被拒才为 true。
-  const workspaceReadonly = useWorkspaceWritable(() => current()?.identity.directory)
+  const workspaceReadonly = useWorkspaceWritable(() => current()?.identity.serverKey, () => current()?.identity.directory)
 
   // Review tab badge = changed-file count from the same turn-level projection the review
   // panel consumes (REQ-142: `turnDiffsOf` over the synced message store), through the same
@@ -223,8 +223,8 @@ export function CodePuppySessionWorkspace(props: { projects: CodePuppyProjectsAp
           railMeta={{ reviewCount }}
           terminalChannel={terminalChannel}
           sandbox={sandboxApplied}
-          workspaceReadonly={workspaceReadonly}
-          relaunch={() => window.api.relaunch()}
+          workspaceReadonly={workspaceReadonly.readonly}
+          workspaceReadonlyReason={workspaceReadonly.reason}
           turnWait={turnWait}
         />
       </SessionLiveProvider>

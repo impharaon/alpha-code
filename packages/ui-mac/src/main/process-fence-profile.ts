@@ -2,7 +2,7 @@
 //
 // 引擎 sidecar 在 import 引擎之前把自己关进 seatbelt(sidecar.ts → process-fence-apply.ts),之后它
 // 派生的一切(shell 工具 / MCP stdio / LSP / PTY / formatter …)自动继承(勘破 §6.2 五条原语实测)。
-// 围栏装上之后**不能加宽**(勘破 §6.5),所以可写集必须在 apply 之前一次定好 —— 就是本文件渲染的这份。
+// 启动根在 apply 前确定;运行期只接受主进程绑定当前引擎签发的 X1 私有类扩展(设计 child-process-write-fence §4)。
 //
 // ── 行的来源:勘破 §8.2 的 19 行,逐字照抄,不照 §7.6 ──────────────────────────────
 // §8.2 是「跑通过的 profile」(装了 ext 的引擎在围栏里跑完五步工作负载),§7.6 是「写入面枚举」;
@@ -17,7 +17,7 @@
 // `wrapEngineShell`(cfg.shell → sandbox-exec wrapper)与本围栏**同一次变更**拆装(基线 I2)。
 // ext 不再碰 cfg.shell 的判据在 packages/ext/src/codepuppy-ext-no-shell-layer.test.ts。
 //
-// ── 本文件只渲染字符串,不落盘、不读 store、不跑 sandbox-exec ──────────────────────────
+// ── 本文件渲染策略并判定目录身份,不落盘、不读 store、不跑 sandbox-exec ──────────────────────────
 // 工作区并集的来源 / 试编译 / 落盘在 process-fence-plan.ts;试编译本体在 process-fence-compile.ts;
 // 加载原生模块与 apply 在 process-fence-apply.ts。分层是为了让每一层各自可测:这里的判据是
 // 「渲染出的 profile 逐 token 等于 §8.2 的形状」(process-fence-profile.test.ts)。
@@ -33,13 +33,17 @@
 //
 // ── 不要手写 `(subpath …)` 的 TypeScript 替身 ────────────────────────────────────────
 // U2 裁决 §5.2 实测 seatbelt 的 subpath 按路径分段、解析软链、随卷的大小写策略匹配,字符串
-// 谓词在三处说谎。本文件里凡是「这个目录在不在可写集里」的问题都不回答;唯一例外是并集的
-// **排除**规则(HOME / 根 / HOME 的祖先 / 与应用状态根相关的路径),那是「拒绝该输入」而不是「解释它的文法」。
+// 谓词在三处说谎。本文件里凡是「这个目录在不在可写集里」的问题都不回答;例外只有两处,都是「拒绝」而不是「放行」:并集的
+// **排除**规则(HOME / 根 / HOME 的祖先 / 与应用状态根相关的路径),以及运行期签发前的静态包含判定(见「签发判定」一节,
+// 只用来决定**不**签发,判据偏向判「覆盖」)。
 
-import { isAbsolute, join, relative, resolve, sep } from "node:path"
+import { statSync } from "node:fs"
+import { dirname, isAbsolute, join, resolve } from "node:path"
+
+export const WORKSPACE_WRITE_EXTENSION_CLASS = "app.codepuppy.workspace-write"
 
 /**
- * 可写集的行 id(勘破 §8.2 的编号,W9 在那一轮就不存在)。process-fence-write-sites.tsv 的每一条
+ * 可写集的行 id(勘破 §8.2 的 W 行及运行期 X1,W9 在那一轮就不存在)。process-fence-write-sites.tsv 的每一条
  * 写盘登记都要点名它落在哪一行之下;点不出来的写入点 = 新的写入根 = 要么加行(带实测)要么改代码。
  */
 export const WRITABLE_ROOT_IDS = {
@@ -61,6 +65,7 @@ export const WRITABLE_ROOT_IDS = {
   W17: "<HOME>/Library/Caches/bun(dev-only)",
   W18: "<HOME>/.cache/bun(dev-only)",
   W19: "<HOME>/.zcompdump*(regex):加了也不生效(§8.5 坑二),留着如实",
+  X1: "用户本次应用运行亲手打开的项目(主进程绑定当前引擎签发的私有类扩展)",
 } as const
 export type WritableRootId = keyof typeof WRITABLE_ROOT_IDS
 
@@ -172,6 +177,8 @@ export function renderProcessFenceProfile(input: ProcessFenceProfileInput): stri
     `  (subpath "${join(home, "Library", "Caches", "bun")}")                  ; W17`,
     `  (subpath "${join(home, ".cache", "bun")}")                       ; W18`,
     ")",
+    `(allow file-write* (extension "${WORKSPACE_WRITE_EXTENSION_CLASS}"))                       ; X1 用户本次运行亲手打开的项目`,
+    `(deny file-issue-extension generic-issue-extension mach-issue-extension iokit-issue-extension ipc-posix-issue-extension (extension-class "${WORKSPACE_WRITE_EXTENSION_CLASS}")) ; X2 围栏内五种方式都签不出本类`,
     // ── 网络行:`#1334` Q1.2 逐字(顺序、形状都不改;`network-bind` 按 Q1.1 是冗余的,但它是 bind() 语义的显式声明)
     "(deny network*)                                          ; N1 出网默认全拒(含 DNS 的 unix socket,Q2)",
     '(allow network-bind (local ip "localhost:*"))             ; N2 sidecar 自己的 HTTP 服务器要 bind',
@@ -179,6 +186,58 @@ export function renderProcessFenceProfile(input: ProcessFenceProfileInput): stri
     `(allow network-outbound (remote ip "localhost:${egressProxyPort}"))     ; N4 唯一出口:loopback 上的策略代理(main 进程内)`,
   ]
   return lines.join("\n") + "\n"
+}
+
+// ── 签发判定:这一代已经写得到哪里(只用来拒绝签发)────────────────────────────────────
+//
+// 运行期签发(process-fence-workspaces.ts)要先回答「这个目录在不在本代可写范围里」—— 在范围里的永不签发。答案只取 main
+// 自己的知识:本代 apply 的那份 profile 正是本文件渲染的字节,这里把它的 `(allow file-write*` 块解析回规则(唯一来源,不另立清单),
+// 再加上本代已放行 / 正在放行的目录。不看 sidecar 的探针,也不看候选目录此刻在盘上的样子。判据偏向判「覆盖」:大小写折叠、
+// 祖先链上任何一级被 subpath / literal / regex 盖住都算 —— 误判「覆盖」只会少一次签发(说明那一句),误判「不覆盖」才会给可被
+// 围栏代码改写的路径签发令牌。解析不认识的写法一律抛,调用方按「覆盖」处理。
+
+export type ProcessFenceWriteRule = { kind: "subpath" | "literal" | "regex"; value: string }
+
+const WRITE_RULE = /\((subpath|literal) "([^"]*)"\)|\(regex #"([^"]*)"\)/g
+
+/**
+ * Strict inverse of renderProcessFenceProfile's write block. Any other `(allow file-write*` form throws, and so does
+ * any `(deny file-write*` after the block: a later carve-out would make a covered path unwritable without telling us.
+ */
+export function processFenceWriteRules(profile: string): ProcessFenceWriteRule[] {
+  const lines = profile.split("\n")
+  const extension = `(allow file-write* (extension "${WORKSPACE_WRITE_EXTENSION_CLASS}"))`
+  const rules: ProcessFenceWriteRule[] = []
+  let allowed = false
+  for (let index = 0; index < lines.length; index++) {
+    const line = lines[index]!
+    if (allowed && line.includes("(deny file-write*")) throw new Error(`process fence: file-write deny after the allow block: ${line}`)
+    if (!line.includes("(allow file-write*")) continue
+    allowed = true
+    if (line.startsWith(extension)) continue // X1 grants exist only through main's own ledger.
+    if (line !== "(allow file-write*") throw new Error(`process fence: unrecognised file-write rule form: ${line}`)
+    const end = lines.indexOf(")", index + 1)
+    if (end < 0) throw new Error("process fence: unterminated (allow file-write* block")
+    for (const entry of lines.slice(index + 1, end)) {
+      const found = [...entry.matchAll(WRITE_RULE)]
+      const rest = entry.replace(WRITE_RULE, "").trim()
+      if (!found.length || (rest && !rest.startsWith(";"))) throw new Error(`process fence: unrecognised file-write rule: ${entry}`)
+      for (const match of found) {
+        if (match[3] !== undefined) new RegExp(match[3]) // an invalid pattern throws here, not at decision time
+        rules.push(match[3] !== undefined ? { kind: "regex", value: match[3] } : { kind: match[1] as "subpath" | "literal", value: match[2]! })
+      }
+    }
+    index = end
+  }
+  return rules
+}
+
+/** Whether `directory` or any of its ancestors is writable under `rules` (case-folded: the conservative side). */
+export function processFenceRulesCover(rules: readonly ProcessFenceWriteRule[], directory: string): boolean {
+  const chain = [resolve(directory)]
+  while (chain.at(-1) !== dirname(chain.at(-1)!)) chain.push(dirname(chain.at(-1)!))
+  return chain.some((path) => rules.some((rule) =>
+    rule.kind === "regex" ? new RegExp(rule.value, "i").test(path) : resolve(rule.value).toLowerCase() === path.toLowerCase()))
 }
 
 // ── W1:启动时并集 ────────────────────────────────────────────────────────────────
@@ -197,8 +256,8 @@ export function renderProcessFenceProfile(input: ProcessFenceProfileInput): stri
 //   5. 排除 `/`、HOME、HOME 的任何祖先。放行 HOME = 没有围栏(U2 §4 表「不定价」的那一行)。
 //      用户若真把家目录当项目打开,走披露面(基线 §五 子票 4),不靠放宽。
 //   5b. 排除与**应用状态根**(`<appData>/codepuppy-state`,三个 env 根与 CAS 的父目录)相关的候选:同一路径、
-//      在它之内、或包含它(`#1390`)。比较在 **realpath 之后**做(APFS 大小写不敏感,`~/LIBRARY/application support` 词法
-//      比不出来;软链同理);realpath 拿不到(ENOENT 等)退回词法比较,**不因此放行**。这是 `#1390` 的第一步:候选那时还来自
+//      在它之内、或包含它(`#1390`)。比较在 **realpath 之后**按 device + inode 沿祖先链做(APFS 大小写不敏感,`~/LIBRARY/application support` 词法
+//      比不出来;软链、`/System/Volumes/Data` 拼写同理);realpath 拿不到(ENOENT 等)⇒ 不合格,**不退回词法放行**。这是 `#1390` 的第一步:候选那时还来自
 //      `opencode.global.dat`(W3 之下,**被围栏的引擎树自己写得了**),一条伪造的 draft 记录就能在下次启动把
 //      `~/Library/Application Support` 放进可写集。第二步(`#1394`,见 5c)把清单本身搬出了围栏可写处;本条留着做第二道闸 ——
 //      真源就算被写坏,状态根也进不来。
@@ -243,9 +302,11 @@ export type WorkspaceUnionInput = {
    * `#1390`:路径归一(生产 = `fs.realpathSync.native`)。**必须是 native**:Electron 内嵌 node(实测 v24.15.0,
    * electron 42.3.3)与 node 22 的 JS 实现 `fs.realpathSync` 只解软链、**不归一大小写**,`LIBRARY/application support`
    * 原样返回;`.native` 走 libc realpath(3),在 APFS 上给出盘上的真实大小写。bun 的两种都归一,所以只在 bun 里测
-   * 测不出这个差别 —— 生产接线不许换成 JS 版。抛出(ENOENT 等)⇒ 退回词法比较,不放行。
+   * 测不出这个差别 —— 生产接线不许换成 JS 版。抛出(ENOENT 等)⇒ 不合格,不退回词法路径放行。
    */
   realpath: (p: string) => string
+  /** Test filesystem metadata; production uses statSync with bigint identities. */
+  stat?: (p: string) => { dev: number | bigint | string; ino: number | bigint | string }
   maxWorkspaces?: number
 }
 
@@ -325,36 +386,114 @@ export function workspaceCandidatesFromStore(sources: WorkspaceUnionSources): st
   return out
 }
 
-function isAncestorOrSelf(ancestor: string, p: string): boolean {
-  const rel = relative(ancestor, p)
-  return rel === "" || (!rel.startsWith("..") && !isAbsolute(rel))
-}
+export type WorkspaceDirectoryInput = Pick<WorkspaceUnionInput, "homeDir" | "appStateRoot" | "realpath" | "isDirectory" | "stat">
 
-/** 双向包含:同一路径、a 在 b 之内、或 b 在 a 之内(与 codepuppy-environment.ts 的 related 同一谓词)。 */
-function related(a: string, b: string): boolean {
-  return isAncestorOrSelf(a, b) || isAncestorOrSelf(b, a)
-}
+export type WorkspaceDirectoryCheck =
+  | { eligible: true; directory: string }
+  /** `missing`: the path cannot be resolved right now (e.g. an unmounted volume) — unknown, not "elsewhere". */
+  | { eligible: false; reason: "home-or-app-state" | "not-a-directory"; detail: string; missing?: true }
 
-/** 先 realpath 再 resolve;realpath 拿不到(不在盘上等)就退回词法形态 —— 比较照做,不因此放行(`#1390`)。 */
-function canonical(p: string, realpath: (p: string) => string): string {
-  try {
-    return resolve(realpath(p))
-  } catch {
-    return resolve(p)
+/** APFS Data volume. Electron Node's realpath(3) keeps this spelling for firmlinked paths (`/Users/...`). */
+const DATA_VOLUME = "/System/Volumes/Data"
+
+/**
+ * The one identity / validity rule (INT-safety R7/R8) behind explicit-open registration, W1 selection,
+ * start-time seeding, quarantine and the runtime grant.
+ *  - Identity = the `realpath` result, with the Data-volume spelling collapsed only when the plain
+ *    spelling names the same device + inode.
+ *  - Protected relations (HOME, an ancestor of it, `/`, the app-state root, inside it or containing it)
+ *    compare device + inode along ancestor chains, never string prefixes: `/System/Volumes/Data/Users/<me>`
+ *    is refused exactly like HOME.
+ *  - `open`: the identity now (an explicit open, the default workspace, a literal path seen first).
+ *    `stored` = stillSelf: a stored identity stays valid only while it still resolves to itself and is a
+ *    directory; otherwise it is excluded (the caller logs it), never re-pointed at its new target. A path that
+ *    cannot be resolved now is `missing`: never eligible now, but a stored entry is not dropped for it.
+ * Synchronous by contract (design §4). Every call re-resolves; a caller that caches literal paths owns it.
+ */
+export function checkWorkspaceDirectory(input: WorkspaceDirectoryInput, raw: string, mode: "open" | "stored" = "open"): WorkspaceDirectoryCheck {
+  if (!raw || !isAbsolute(raw)) return { eligible: false, reason: "not-a-directory", detail: "not an absolute path" }
+  const stat = input.stat ?? ((path: string) => statSync(path, { bigint: true }))
+  const objectId = (path: string) => {
+    const meta = stat(path)
+    return `${meta.dev}:${meta.ino}`
   }
+  const sameObject = (a: string, b: string) => {
+    try {
+      return objectId(a) === objectId(b)
+    } catch {
+      return false // The other spelling does not exist: nothing to collapse or to add.
+    }
+  }
+  const canonical = (path: string) => {
+    const directory = resolve(input.realpath(path))
+    if (directory !== DATA_VOLUME && !directory.startsWith(`${DATA_VOLUME}/`)) return directory
+    const plain = directory.slice(DATA_VOLUME.length) || "/"
+    return sameObject(directory, plain) ? plain : directory
+  }
+  const chain = (path: string) => {
+    const out = [path]
+    while (out.at(-1) !== dirname(out.at(-1)!)) out.push(dirname(out.at(-1)!))
+    return out
+  }
+  // A protected directory and every ancestor, also along its Data-volume spelling: `/System/Volumes/Data`
+  // contains HOME through the firmlink although its inode is not `/`'s. A protected root that is not on
+  // disk is represented by its nearest existing ancestor (anything there would contain it).
+  const protectedIds = (path: string) => {
+    let base = resolve(path)
+    for (;;) {
+      try {
+        base = canonical(base)
+        break
+      } catch (error) {
+        if (base === dirname(base)) throw error
+        base = dirname(base)
+      }
+    }
+    const alias = resolve(`${DATA_VOLUME}${base}`)
+    return new Set([...chain(base), ...(sameObject(base, alias) ? chain(alias) : [])].map(objectId))
+  }
+  let directory: string
+  try {
+    directory = canonical(raw)
+  } catch {
+    return { eligible: false, reason: "not-a-directory", detail: "not on disk now", missing: true }
+  }
+  try {
+    const self = objectId(directory)
+    if (protectedIds(input.homeDir).has(self))
+      return { eligible: false, reason: "home-or-app-state", detail: "would put HOME inside the writable set (fence would be void)" }
+    let state: string | undefined
+    try {
+      state = canonical(input.appStateRoot)
+    } catch {
+      // Not on disk yet: nothing can be inside it; containing it is checked through its ancestors below.
+    }
+    const stateId = state === undefined ? undefined : objectId(state)
+    if (protectedIds(input.appStateRoot).has(self) || (stateId !== undefined && chain(directory).some((entry) => objectId(entry) === stateId)))
+      return {
+        eligible: false,
+        reason: "home-or-app-state",
+        detail: `related to the app state root ${state ?? resolve(input.appStateRoot)} (same path, inside it, or contains it)` +
+          (directory === resolve(raw) ? "" : ` (resolves to ${directory})`) +
+          " — the fence's own state must never be a workspace (#1390)",
+      }
+    if (mode === "stored" && directory !== resolve(raw))
+      return { eligible: false, reason: "not-a-directory", detail: `stored workspace identity no longer resolves to itself (now ${directory})` }
+    if (input.isDirectory(directory)) return { eligible: true, directory }
+  } catch {
+    // Missing / unreadable now ⇒ not eligible now. No lexical fallback ever grants a path.
+  }
+  return { eligible: false, reason: "not-a-directory", detail: "not a directory on disk" }
 }
 
 /** 并集选择(规则见上)。返回值里 `excluded` 逐条给理由,给 main 日志用。 */
 export function selectWorkspaceUnion(input: WorkspaceUnionInput): WorkspaceUnion {
   const max = input.maxWorkspaces ?? MAX_WORKSPACES
-  const home = resolve(input.homeDir)
-  const root = resolve(sep)
-  const appStateRoot = canonical(input.appStateRoot, input.realpath)
   const selected: string[] = []
   const excluded: WorkspaceExclusion[] = []
   const seen = new Set<string>()
   const candidates = [input.defaultWorkspace, ...input.candidates]
-  for (const raw of candidates) {
+  for (const [index, raw] of candidates.entries()) {
     if (typeof raw !== "string" || !isAbsolute(raw)) {
       excluded.push({ directory: String(raw), reason: "not an absolute path" })
       continue
@@ -362,32 +501,19 @@ export function selectWorkspaceUnion(input: WorkspaceUnionInput): WorkspaceUnion
     const dir = resolve(raw)
     if (seen.has(dir)) continue
     seen.add(dir)
-    if (dir === root || isAncestorOrSelf(dir, home)) {
-      // `/`、HOME、HOME 的祖先:放行它等于没有围栏。
-      excluded.push({ directory: dir, reason: "would put HOME inside the writable set (fence would be void)" })
+    // The default workspace is configuration, resolved now. Every truth entry is a stored identity:
+    // stillSelf, so an entry later replaced by a symlink is excluded rather than following it.
+    const candidate = checkWorkspaceDirectory(input, dir, index === 0 ? "open" : "stored")
+    if (!candidate.eligible) {
+      excluded.push({ directory: dir, reason: candidate.detail })
       continue
     }
-    // 规则 5b(`#1390`):与应用状态根相关(同一路径 / 在它之内 / 包含它)的候选一律排除;归一之后再比。
-    const canon = canonical(dir, input.realpath)
-    if (related(canon, appStateRoot)) {
-      excluded.push({
-        directory: dir,
-        reason:
-          `related to the app state root ${appStateRoot} (same path, inside it, or contains it)` +
-          (canon === dir ? "" : ` (resolves to ${canon})`) +
-          " — the fence's own state must never be a workspace (#1390)",
-      })
-      continue
-    }
-    if (!input.isDirectory(dir)) {
-      excluded.push({ directory: dir, reason: "not a directory on disk" })
-      continue
-    }
+    if (selected.includes(candidate.directory)) continue
     if (selected.length >= max) {
       excluded.push({ directory: dir, reason: `beyond MAX_WORKSPACES=${max}` })
       continue
     }
-    selected.push(dir)
+    selected.push(candidate.directory)
   }
   return { selected, excluded, candidates: seen.size }
 }

@@ -1928,11 +1928,9 @@ export const dict = {
   "codepuppy.terminal.sandboxHoverBody":
     "终端只能写入当前项目和 Code Puppy 自己的目录。你的 shell 配置里凡是要往主目录写缓存的步骤（例如补全缓存）会被拦下，而且不会报错 —— 表现通常是补全变慢或不灵。不写文件的设置（别名、提示符、PATH）照常生效。联网也一样：助手和终端只能经 Code Puppy 的出网闸门访问已登记的地址，其它地址会被拒绝并留下记录；Code Puppy 应用自身的联网（模型目录、登录、检查更新）不在这道沙箱之内，照常直连。",
   "codepuppy.workspace.readonly": "只读",
-  "codepuppy.workspace.readonlyTitle": "这个项目现在写不进去",
-  "codepuppy.workspace.readonlyBody":
-    "沙箱允许写入的项目在 Code Puppy 启动时就定下了；这个项目是之后打开的 —— 打得开、读得了，但助手和终端都改不了它里面的文件。重新启动 Code Puppy 后，它就会被算进去。",
-  "codepuppy.workspace.readonlyFootnote": "能正常写入的项目不会有这个标记。",
-  "codepuppy.workspace.readonlyRestart": "重新启动 Code Puppy",
+  "codepuppy.workspace.readonlyHome": "主目录和 Code Puppy 自己的数据目录不能整个作为项目写入，请打开里面的具体文件夹。",
+  "codepuppy.workspace.readonlyNotOpenedByYou": "这个文件夹不是你在 Code Puppy 里亲手打开的，助手不会改动它；用「打开项目」选中它就能写入。",
+  "codepuppy.workspace.readonlyGrantFailed": "这个文件夹暂时写不进去，下次打开 Code Puppy 后即可写入。",
   "codepuppy.review.panelLabel": "审查面板",
   "codepuppy.review.title": "本回合变更",
   "codepuppy.review.viewMode": "对照视图",

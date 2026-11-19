@@ -101,6 +101,7 @@ describeDarwin("REQ-159 真引擎(OpenCode 2)+ 真 ext 在进程围栏下:三类
         sidecarEnv: { HOME: home, XDG_DATA_HOME: join(home, ".local", "share"), XDG_CACHE_HOME: join(home, ".cache"), XDG_CONFIG_HOME: join(home, ".config"), XDG_STATE_HOME: userData },
         addon: { packaged: true, resourcesPath: join(iso, "resources"), moduleDir: "/unused", exists: existsSync },
         egressProxyPort: egressProxy.port,
+        carriedWorkspaces: [],
       },
       {
         homeDir: () => home,

@@ -1,79 +1,101 @@
-// REQ-159 `#1322`(AC2)—— 「当前工作区写得进去吗」的纯状态机(零 Solid、零 window,bun 直接可测)。
-//
-// 四态与呈现(设计 §3.2):探针未答 / 可写 / 未知 ⇒ **无标记**;只有引擎明确回报 denied ⇒ 标记。
-// 三条纪律:
-//   · 只在沙箱真装上时才探(sandbox=false ⇒ 不探、不标 —— 非 darwin 上探针会答 writable 或 EACCES,
-//     两者都不是「沙箱把它挡住了」,而披露文案把原因归给沙箱);
-//   · 答案按「引擎代 + 目录」缓存:换代(respawn)之后可写集重新取并集,旧代的 denied 不许带到新代;
-//   · 一个目录同一代只探一次;在途时再问就是 pending(无标记),不重复发。
-// 探针的执行方是 preload 桥背后**被围栏的 sidecar**(main/workspace-write-probe.ts);这里不认识路径,
-// 也不做任何字符串比较 —— `#1317` 实测那四种形状的错都来自字符串判据。
-
-import type { WorkspaceWriteProbeResult } from "../../preload/types"
+// A consumer of main's eligibility register. Observing/restoring a directory never records an open.
+import type { WorkspaceWritableChanged, WorkspaceWriteProbeRequest, WorkspaceWriteProbeResult } from "../../preload/types"
 
 export type WorkspaceWritableAnswer = "pending" | "writable" | "denied" | "unknown"
-
-export type WorkspaceWritableProbe = (directory: string) => Promise<WorkspaceWriteProbeResult>
-
+export type WorkspaceWritableProbe = (input: WorkspaceWriteProbeRequest) => Promise<WorkspaceWriteProbeResult>
 export type WorkspaceWritableObservation = {
-  /** 在线引擎的代号;undefined = 引擎不在 ⇒ 不探(unknown)。 */
   generation: number | undefined
+  server: string | undefined
   directory: string | undefined
-  /** 引擎自报装上了围栏;false ⇒ 不探(unknown)。 */
   sandbox: boolean
 }
-
 export type WorkspaceWritableTracker = {
-  /** 「这个目录成为当前工作区」那一拍调一次(幂等):该代该目录没问过就发一次探针。 */
   observe(input: WorkspaceWritableObservation): void
-  /** 当前答案;不满足探测前提 = unknown。 */
   answer(input: WorkspaceWritableObservation): WorkspaceWritableAnswer
-  /** 呈现层判据:只有 denied 才是只读。 */
+  result(input: WorkspaceWritableObservation): WorkspaceWriteProbeResult | undefined
   readonly(input: WorkspaceWritableObservation): boolean
+  whenSettled(input: WorkspaceWritableObservation): Promise<void>
+  invalidate(change: WorkspaceWritableChanged): void
   reset(): void
 }
 
-const keyOf = (generation: number, directory: string) => `${generation}\u0000${directory}`
+type Entry = { target: WorkspaceWriteProbeRequest; result?: WorkspaceWriteProbeResult; done: Promise<void>; finish: () => void }
+const keyOf = (input: WorkspaceWritableObservation) => JSON.stringify([input.generation, input.server, input.directory])
+const failed: WorkspaceWriteProbeResult = { outcome: "unknown", grant: "failed", reason: "grant-failed" }
 
-function eligible(input: WorkspaceWritableObservation): input is WorkspaceWritableObservation & { generation: number; directory: string } {
-  return input.sandbox && input.generation !== undefined && typeof input.directory === "string" && input.directory.length > 0
+function eligible(input: WorkspaceWritableObservation): input is WorkspaceWritableObservation & { generation: number; server: string; directory: string } {
+  return input.sandbox && input.generation !== undefined && !!input.server && !!input.directory
+}
+
+/** One marker predicate for both UI hooks; an EPERM alone cannot assert a cause. */
+export function workspaceIsReadonly(result: WorkspaceWriteProbeResult | undefined): boolean {
+  return !!result?.reason && result.outcome !== "writable"
 }
 
 export function createWorkspaceWritableTracker(probe: WorkspaceWritableProbe, onChange: () => void = () => {}): WorkspaceWritableTracker {
-  const answers = new Map<string, WorkspaceWritableAnswer>()
-  const settle = (key: string, next: WorkspaceWritableAnswer) => {
-    // 只有仍在 pending 的那一格才收答案 —— reset 之后迟到的应答不得复活旧格。
-    if (answers.get(key) !== "pending") return
-    answers.set(key, next)
+  const answers = new Map<string, Entry>()
+  const settle = (key: string, entry: Entry, result: WorkspaceWriteProbeResult) => {
+    // Identity, rather than pending text, rejects replies from an evicted request with the same key.
+    if (answers.get(key) !== entry || entry.result) return
+    entry.result = result && ["writable", "denied", "unknown"].includes(result.outcome) && ["granted", "failed", "ineligible", "not-local", "no-fence"].includes(result.grant) ? result : failed
+    entry.finish()
     onChange()
   }
   return {
     observe(input) {
       if (!eligible(input)) return
-      const key = keyOf(input.generation, input.directory)
+      const key = keyOf(input)
       if (answers.has(key)) return
-      answers.set(key, "pending")
+      const pending = Promise.withResolvers<void>()
+      const entry: Entry = { target: { server: input.server, directory: input.directory }, done: pending.promise, finish: pending.resolve }
+      answers.set(key, entry)
       onChange()
-      let outcome: Promise<WorkspaceWriteProbeResult>
       try {
-        outcome = probe(input.directory)
+        probe(entry.target).then((result) => settle(key, entry, result), () => settle(key, entry, failed))
       } catch {
-        settle(key, "unknown")
-        return
+        settle(key, entry, failed)
       }
-      outcome.then(
-        (result) => settle(key, result?.outcome === "writable" || result?.outcome === "denied" ? result.outcome : "unknown"),
-        () => settle(key, "unknown"),
-      )
     },
     answer(input) {
       if (!eligible(input)) return "unknown"
-      return answers.get(keyOf(input.generation, input.directory)) ?? "unknown"
+      const entry = answers.get(keyOf(input))
+      return entry ? entry.result?.outcome ?? "pending" : "unknown"
+    },
+    result(input) {
+      return eligible(input) ? answers.get(keyOf(input))?.result : undefined
     },
     readonly(input) {
-      return this.answer(input) === "denied"
+      return workspaceIsReadonly(this.result(input))
+    },
+    async whenSettled(input) {
+      if (!eligible(input)) return
+      const deadline = performance.now() + 1000
+      this.observe(input)
+      while (true) {
+        const entry = answers.get(keyOf(input))
+        if (!entry || entry.result) return
+        const remaining = deadline - performance.now()
+        if (remaining <= 0) return
+        let timer: ReturnType<typeof setTimeout> | undefined
+        await Promise.race([entry.done, new Promise<void>((resolve) => { timer = setTimeout(resolve, remaining) })]).finally(() => clearTimeout(timer))
+        if (performance.now() >= deadline || answers.get(keyOf(input)) === entry) return
+        // A notification/reset replaced the entry while work was waiting. Follow the new
+        // request within the original deadline; an old reply must never release first work.
+        this.observe(input)
+      }
+    },
+    invalidate(change) {
+      for (const [key, entry] of answers) {
+        const refused = entry.result?.grant === "ineligible" || entry.result?.grant === "failed"
+        if (entry.target.server === change.server && (entry.target.directory === change.directory || refused)) {
+          answers.delete(key)
+          entry.finish()
+        }
+      }
+      onChange()
     },
     reset() {
+      for (const entry of answers.values()) entry.finish()
       answers.clear()
       onChange()
     },

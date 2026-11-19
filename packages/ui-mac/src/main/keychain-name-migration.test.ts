@@ -241,7 +241,12 @@ describe("nativeKeychainPort:OSStatus 只区分 0 / -25300 / -25299 (R21-4)", ()
       module.exports = { apply: () => ({ rc: 0, error: "" }), buildId: "test", libsandbox: "x", ...extra }
     }
     expect(() => loadFenceAddon(import.meta.path, exportsOf({}))).toThrow(/keychain rename functions/)
-    const full = loadFenceAddon(import.meta.path, exportsOf({ keychainItemStatus: () => 0, keychainRenameItem: () => 0 }))
+    const full = loadFenceAddon(import.meta.path, exportsOf({
+      keychainItemStatus: () => 0,
+      keychainRenameItem: () => 0,
+      issueFileExtensionToProcess: () => ({ token: null, errno: 1, step: "issue" }),
+      consumeExtension: () => ({ handle: -1, errno: 1 }),
+    }))
     expect(nativeKeychainPort(() => full).exists(PROD_TARGET)).toBe(true)
   })
 

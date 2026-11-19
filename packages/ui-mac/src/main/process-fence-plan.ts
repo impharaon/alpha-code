@@ -27,6 +27,7 @@ import {
   type EngineRoots,
   type TrialCompile,
   type WorkspaceExclusion,
+  type WorkspaceDirectoryInput,
 } from "./process-fence-profile"
 
 export type ProcessFencePlan = {
@@ -50,6 +51,13 @@ export type PlanProcessFenceInput = {
    * 渲染进 profile 的 N4 行;没有它就没有计划(fail-closed)。
    */
   egressProxyPort: number
+  /**
+   * INT-safety R3: canonical directories fenced code could already write in an earlier generation of this app run
+   * because the user opened them (main's run-lifetime set, process-fence-workspaces.ts). Appended after the truth
+   * entries and validated the same way (`stored`: an entry that no longer resolves to itself is excluded). Never
+   * persisted: an app restart starts from the truth file alone.
+   */
+  carriedWorkspaces: readonly string[]
 }
 
 export type PlanProcessFenceDeps = {
@@ -67,6 +75,7 @@ export type PlanProcessFenceDeps = {
    */
   readWorkspaces: () => readonly string[]
   isDirectory: (p: string) => boolean
+  stat?: WorkspaceDirectoryInput["stat"]
   mkdirp: (p: string) => void
   compile: TrialCompile
   log: (line: string) => void
@@ -101,12 +110,13 @@ export function planProcessFence(input: PlanProcessFenceInput, deps: PlanProcess
     candidates = []
   }
   const union = selectWorkspaceUnion({
-    candidates,
+    candidates: [...candidates, ...input.carriedWorkspaces],
     defaultWorkspace: deps.defaultWorkspace(),
     homeDir: home,
     appStateRoot: deps.appStateRoot(),
     realpath: deps.realpath,
     isDirectory: deps.isDirectory,
+    stat: deps.stat,
   })
   if (union.selected.length === 0)
     throw new Error("process fence: the default workspace is not a directory on disk — refusing to fork an engine that could not write anywhere a user expects")

@@ -71,7 +71,7 @@ export function CodePuppyNewSession(props: {
   const defaultWs = createDefaultWorkspaceDir()
   const activeWs = createMemo(() => directory() || defaultWs())
   // REQ-159 `#1322`:chip 选目录 / 侧栏 draft 目标解析都落在 draft 的 directory 上 —— 这里就是新对话页的咽喉。
-  const wsReadonly = useWorkspaceWritable(activeWs)
+  const wsReadonly = useWorkspaceWritable(props.serverKey, activeWs)
   const [wsOpen, setWsOpen] = createSignal(false)
   const [attachmentReadPending, setAttachmentReadPending] = createSignal(false)
 
@@ -108,13 +108,15 @@ export function CodePuppyNewSession(props: {
   // (目录准备中)托盘单独留着,准备期间照旧能选项目。
   const workspaceChip = () => (
     <CodePuppyWorkspaceChip
+      server={props.serverKey()}
       projects={projects()}
       defaultWorkspace={defaultWs()}
       value={activeWs()}
       open={wsOpen()}
       onOpenChange={setWsOpen}
       onSelect={selectWorkspace}
-      readonly={wsReadonly()}
+      readonly={wsReadonly.readonly()}
+      readonlyReason={wsReadonly.reason()}
     />
   )
 

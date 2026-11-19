@@ -17,7 +17,7 @@ import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test"
 import { EventEmitter } from "node:events"
 import { createHash } from "node:crypto"
 import * as fs from "node:fs"
-import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs"
+import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
 import * as net from "node:net"
 import { tmpdir } from "node:os"
 import { dirname, join, resolve } from "node:path"
@@ -689,7 +689,7 @@ describe("REQ-159 main 侧接线:计划 → start 命令 → 拒 fork", () => {
     forged: string
     opened: string
     truthPath: string
-    spawnProfile: (port: number) => Promise<{ profile: string; planned: string }>
+    spawnProfile: (port: number, fenceRun?: Parameters<typeof spawnLocalServer>[3]["fenceRun"]) => Promise<{ profile: string; planned: string }>
   }
   const withFenceHarness = async (run: (h: FenceHarness) => Promise<void>) => {
     const root = realpathSync(userDataPath)
@@ -711,7 +711,7 @@ describe("REQ-159 main 侧接线:计划 → start 命令 → 拒 fork", () => {
     process.env.CODEPUPPY_OPENCODE_HOME = join(home, "dot-opencode")
     process.env.OPENCODE_CONFIG_DIR = join(home, "xdg-opencode")
     __resetCodePuppyEnvironmentForTests()
-    const spawnProfile = async (port: number) => {
+    const spawnProfile = async (port: number, fenceRun?: Parameters<typeof spawnLocalServer>[3]["fenceRun"]) => {
       const child = new RecordingChild()
       creditDanglingSweepForSpawn()
       logLines.length = 0
@@ -720,6 +720,7 @@ describe("REQ-159 main 侧接线:计划 → start 命令 → 拒 fork", () => {
         healthCheck: async () => true,
         fork: (() => child) as unknown as typeof import("electron").utilityProcess.fork,
         egressProxy: fakeEgress(),
+        fenceRun,
       })
       await result.health.wait
       const start = child.wire.find((m) => (m as { type?: string }).type === "start") as { fence?: { profile: string } }
@@ -757,7 +758,7 @@ describe("REQ-159 main 侧接线:计划 → start 命令 → 拒 fork", () => {
       // 启动 1(本票落地后的第一次):store 里只有用户真开过的 proj ⇒ 播种,日志一行
       store.set(TABS_KEY, JSON.stringify([draftP]))
       store.set(TABS_RECENT_KEY, JSON.stringify({ key: "draft:p" }))
-      bootFenceWorkspaceTruth({ truthPath, store: readStore(), fs, log: (l) => void bootLogs.push(l) })
+      bootFenceWorkspaceTruth({ eligibility: { homeDir: home, appStateRoot: join(home, "app-state"), realpath: fs.realpathSync.native, isDirectory: (path) => fs.statSync(path).isDirectory() }, onWritableChanged: () => {}, truthPath, store: readStore(), fs, log: (l) => void bootLogs.push(l) })
       expect(readFileSync(truthPath, "utf8")).toBe(`{"v":1,"workspaces":["${proj}"]}\n`)
       expect(bootLogs).toEqual([`process fence: workspace truth seeded from the renderer tab store (first launch with #1394) — 1 workspace(s) written to ${truthPath}: ${proj}`])
 
@@ -771,7 +772,7 @@ describe("REQ-159 main 侧接线:计划 → start 命令 → 拒 fork", () => {
 
       // 启动 2:真源在 ⇒ 装载 + 检疫;生产计划器算出的 profile:含用户真开过的、含 ~/code-puppy、不含伪造目录
       bootLogs.length = 0
-      const tracker = bootFenceWorkspaceTruth({ truthPath, store: readStore(), fs, log: (l) => void bootLogs.push(l) })
+      const tracker = bootFenceWorkspaceTruth({ eligibility: { homeDir: home, appStateRoot: join(home, "app-state"), realpath: fs.realpathSync.native, isDirectory: (path) => fs.statSync(path).isDirectory() }, onWritableChanged: () => {}, truthPath, store: readStore(), fs, log: (l) => void bootLogs.push(l) })
       expect(tracker.quarantined).toEqual([forged])
       expect(bootLogs[1]).toContain("quarantined for this session")
       const gen1 = await spawnProfile(4320)
@@ -781,7 +782,8 @@ describe("REQ-159 main 侧接线:计划 → start 命令 → 拒 fork", () => {
       expect(gen1.profile).not.toContain("LaunchAgents")
       expect(gen1.planned).toContain("workspaces=2 (candidates=2, excluded=0, dropped=0)")
 
-      // renderer 从 store 恢复了那个伪造 tab,用户随后开了一个新目录 ⇒ 整个 tabs 数组经 IPC 写回:真源只多新开的那条,伪造条被检疫
+      // renderer 从 store 恢复了那个伪造 tab,用户随后亲手登记一个新目录 ⇒ 整个 tabs 数组经 IPC 写回:真源只多新开的那条,伪造条被检疫
+      tracker.userOpened.register({ server: "sidecar", directory: opened })
       tracker.noteRendererStoreSet(GLOBAL_RENDERER_STORE, TABS_KEY, JSON.stringify([draftP, draftForged, draftOpened]))
       expect(readFileSync(truthPath, "utf8")).toBe(`{"v":1,"workspaces":["${proj}","${opened}"]}\n`)
       const gen2 = await spawnProfile(4321)
@@ -808,6 +810,22 @@ describe("REQ-159 main 侧接线:计划 → start 命令 → 拒 fork", () => {
       expect(broken.profile).not.toContain(`(subpath "${proj}")`)
       expect(broken.planned).toContain("workspaces=1 (candidates=1, excluded=0, dropped=0)")
       expect(logLines.find((l) => l.includes("workspace truth unavailable"))).toContain(`${truthPath}: not JSON`)
+    })
+  })
+
+  test("INT-safety R3:生产计划器收下运行内可写历史(不在真源也进 W1,经 stored 校验:换成软链的被排除),并把本代 W1 交回", async () => {
+    if (!darwin) return
+    await withFenceHarness(async ({ home, proj, opened, truthPath, spawnProfile }) => {
+      writeWorkspaceTruth(truthPath, [proj], fs)
+      const rebound = join(home, "rebound")
+      mkdirSync(join(home, "rebound-target"))
+      symlinkSync(join(home, "rebound-target"), rebound)
+      const noted: string[][] = []
+      const gen = await spawnProfile(4324, { carriedWorkspaces: () => [opened, rebound], noteGeneration: (_listener, workspaces) => { noted.push([...workspaces]) } })
+      expect(gen.profile).toContain(`(subpath "${opened}")`)
+      expect(gen.profile).not.toContain("rebound")
+      expect(gen.planned).toContain("workspaces=3 (candidates=4, excluded=1, dropped=0)")
+      expect(noted).toEqual([[join(home, "code-puppy"), proj, opened]])
     })
   })
 

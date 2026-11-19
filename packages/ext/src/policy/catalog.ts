@@ -20,6 +20,7 @@ import type { PermissionRule } from "./managed"
 import { effectiveFor, evaluate } from "./gate"
 import { CODE_MODE_TOOL, type ToolFacts } from "./identity"
 import type { ToolPolicySnapshot } from "./resolver"
+import { HUB_READ_ACTIONS } from "../hub-tools"
 
 /**
  * I9: the tier pseudo-action the injected tier-carrier agents carry (`codepuppy-config-injection.ts`, L5). Its resource is
@@ -50,9 +51,15 @@ export function catalogRules(
       continue
     }
     // The tier's waiver is read per tool: its resource is the canonical identity (`*` = every tool).
-    const tierAllows = evaluate(TOOL_POLICY_DEFAULT, canonical, configured).effect === "allow"
-    if (effective.action === "ask" && !(effective.reason.kind === "default" && tierAllows))
-      rules.push({ action: canonical, resource: "*", effect: "ask" })
+    const tier = evaluate(TOOL_POLICY_DEFAULT, canonical, configured)
+    // BR-01 / BR-10: the helper's read-only lookup and status tools, which Code Puppy's own tier rules exempt, never ask in
+    // an interactive tier — a user's earlier enable whose binding has since changed (every release re-digests the bundled
+    // extension) cannot make them stricter. Every other tool keeps the rebind guard, whatever tier rule matched.
+    const hubRead = facts.identity.source === "plugin" && (HUB_READ_ACTIONS as readonly string[]).includes(facts.identity.name)
+    const waived =
+      tier.effect === "allow" &&
+      (effective.reason.kind === "default" || (effective.reason.kind === "binding-changed" && hubRead))
+    if (effective.action === "ask" && !waived) rules.push({ action: canonical, resource: "*", effect: "ask" })
   }
   return rules
 }

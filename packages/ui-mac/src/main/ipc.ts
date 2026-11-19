@@ -13,6 +13,7 @@ import type {
   SidecarGenerationState,
   TitlebarTheme,
   WorkspaceWriteProbeResult,
+  WorkspaceWriteProbeRequest,
 } from "../preload/types"
 import type { DeepLinkBatch } from "./deep-link-queue"
 import { getCodePuppyEnvironment } from "./codepuppy-environment"
@@ -32,6 +33,8 @@ import { isManagedRunArtifactPath } from "./artifact-external-open"
 import { assertGenericStoreAccess } from "./store-keys"
 import { registerStartupTimelineIpc } from "./startup-timeline"
 import type { FenceWorkspaceTracker } from "./process-fence-workspaces"
+import { parseWorkspaceTarget } from "./workspace-write-probe"
+import { LOCAL_SIDECAR_SERVER_KEY } from "./process-fence-profile"
 
 const pickerFilters = (ext?: string[]) => {
   if (!ext || ext.length === 0) return undefined
@@ -44,7 +47,8 @@ type Deps = {
   killSidecar: () => Promise<void> | void
   sidecarGenerationState: () => SidecarGenerationState
   /** REQ-159 `#1322`:转给当前 sidecar 的写探针;没有活着的 sidecar 时答 unknown。 */
-  probeWorkspaceWrite: (directory: string) => Promise<WorkspaceWriteProbeResult>
+  probeWorkspaceWrite: (input: WorkspaceWriteProbeRequest) => Promise<WorkspaceWriteProbeResult>
+  grantWorkspaceWrite: (input: WorkspaceWriteProbeRequest) => Promise<void>
   relaunch: () => void
   awaitInitialization: () => Promise<ServerReadyData>
   /** `rendererId` is the invoking webContents id: deep-link ownership is keyed on that identity. */
@@ -70,7 +74,7 @@ type Deps = {
    * 是那份清单**唯一**合法的更新通路(围栏内的进程到不了 IPC;它能改的只有 store 文件,而那份不再喂给围栏)。
    * 写完 store 再通知它;不是那三个键的写入它自己忽略。
    */
-  fenceWorkspaces: Pick<FenceWorkspaceTracker, "noteRendererStoreSet" | "noteRendererStoreDelete" | "noteRendererStoreClear">
+  fenceWorkspaces: Pick<FenceWorkspaceTracker, "userOpened" | "noteRendererStoreSet" | "noteRendererStoreDelete" | "noteRendererStoreClear">
   auth: {
     getState: () => AuthState
     start: () => Promise<void>
@@ -90,12 +94,17 @@ export function registerIpcHandlers(deps: Deps) {
   ipcMain.handle("codepuppy-environment", () => getCodePuppyEnvironment())
   ipcMain.handle("kill-sidecar", () => deps.killSidecar())
   ipcMain.handle("sidecar-generation-state", () => deps.sidecarGenerationState())
-  // REQ-159 `#1322`:目录来自 renderer(untrusted):不是非空字符串就答 unknown,不猜、不 throw。
-  ipcMain.handle("workspace-write-probe", (_event: IpcMainInvokeEvent, directory: unknown) =>
-    typeof directory === "string" && directory.length > 0
-      ? deps.probeWorkspaceWrite(directory)
-      : ({ outcome: "unknown", detail: "invalid directory" } satisfies WorkspaceWriteProbeResult),
-  )
+  // The probe consumes eligibility; only the concrete open-action channel may register it.
+  ipcMain.handle("workspace-write-probe", (_event: IpcMainInvokeEvent, value: unknown) => {
+    const target = parseWorkspaceTarget(value)
+    return target ? deps.probeWorkspaceWrite(target) : ({ outcome: "unknown", grant: "ineligible", detail: "invalid workspace target" } satisfies WorkspaceWriteProbeResult)
+  })
+  ipcMain.handle("workspace-open-record", (_event: IpcMainInvokeEvent, value: unknown) => {
+    const target = parseWorkspaceTarget(value)
+    if (!target) return { recorded: false }
+    const result = deps.fenceWorkspaces.userOpened.register(target)
+    return result.eligible ? { recorded: true } : { recorded: false, reason: result.reason }
+  })
   ipcMain.handle("await-initialization", () => deps.awaitInitialization())
   ipcMain.handle("consume-initial-deep-links", (event: IpcMainInvokeEvent) =>
     deps.consumeInitialDeepLinks(event.sender.id),
@@ -187,18 +196,21 @@ export function registerIpcHandlers(deps: Deps) {
     async (_event: IpcMainInvokeEvent, opts?: { multiple?: boolean; title?: string; defaultPath?: string }) => {
       // alpha-code: CODEPUPPY_OPEN_DIR short-circuits the native dialog with a fixed
       // directory (used to auto-open a default project / for headless verification).
-      if (process.env.CODEPUPPY_OPEN_DIR) {
-        const dir = process.env.CODEPUPPY_OPEN_DIR
-        return opts?.multiple ? [dir] : dir
-      }
       // REQ-071/ADR-025:全部目录选择器统一默认落 ~/Alpha(调用方显式 defaultPath 优先)。
       // 打开选择器即「首次需要」→ lazy 供给;供给失败(如同名文件占位)退回系统默认,不阻断。
-      const result = await dialog.showOpenDialog({
+      const result = process.env.CODEPUPPY_OPEN_DIR ? { canceled: false, filePaths: [process.env.CODEPUPPY_OPEN_DIR] } : await dialog.showOpenDialog({
         properties: ["openDirectory", ...(opts?.multiple ? ["multiSelections" as const] : []), "createDirectory"],
         title: opts?.title ?? "Choose a folder",
         defaultPath: opts?.defaultPath ?? ensureUserWorkspaceDir() ?? undefined,
       })
       if (result.canceled) return null
+      const grants = result.filePaths.map((directory) => {
+        const registered = deps.fenceWorkspaces.userOpened.register({ server: LOCAL_SIDECAR_SERVER_KEY, directory })
+        return registered.eligible ? deps.grantWorkspaceWrite({ server: registered.server, directory: registered.directory }) : Promise.resolve()
+      })
+      // O1: preserve the picker's upper bound while a slow grant continues in the current generation.
+      let timer: ReturnType<typeof setTimeout> | undefined
+      await Promise.race([Promise.all(grants), new Promise<void>((resolve) => { timer = setTimeout(resolve, 1000) })]).finally(() => clearTimeout(timer))
       return opts?.multiple ? result.filePaths : result.filePaths[0]
     },
   )

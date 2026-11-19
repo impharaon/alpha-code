@@ -1,0 +1,85 @@
+# P-15 navigation / selection sites and entry-function references. Columns: file, owner, AST call/reference, occurrence, classification.
+# Consuming paths never register; R1/R4 include their DOM/menu wrappers openProject/openResult.
+packages/codepuppy-app/src/components/titlebar.tsx	back	navigate	1	consume:user-consume
+packages/codepuppy-app/src/components/titlebar.tsx	forward	navigate	1	consume:user-consume
+packages/codepuppy-app/src/components/titlebar.tsx	onClick	navigate	1	consume:user-consume
+packages/codepuppy-app/src/context/notification.tsx	handleSessionIdle	input.navigate	1	consume:engine
+packages/codepuppy-app/src/context/notification.tsx	handleSessionError	input.navigate	1	consume:engine
+packages/codepuppy-app/src/context/tabs.tsx	navigateTab	navigate	1	consume:user-consume
+packages/codepuppy-app/src/context/tabs.tsx	removeTab	navigate	1	consume:user-consume
+packages/codepuppy-app/src/context/tabs.tsx	removeTab	navigateTab	1	consume:user-consume
+packages/codepuppy-app/src/context/tabs.tsx	newDraft	navigate	1	consume:user-consume
+packages/codepuppy-app/src/context/tabs.tsx	promoteDraft	navigateTab	1	consume:user-consume
+packages/codepuppy-app/src/context/tabs.tsx	reopenClosedTab	navigateTab	1	consume:user-consume
+packages/codepuppy-app/src/context/tabs.tsx	removeServer	navigate	1	consume:engine
+packages/codepuppy-app/src/context/tabs.tsx	module	navigateTab	1	consume:engine
+packages/codepuppy-app/src/context/tabs.tsx	module	navigate	1	consume:engine
+packages/codepuppy-app/src/context/tabs.tsx	toggleHome	navigateTab	1	consume:user-consume
+packages/codepuppy-app/src/context/tabs.tsx	toggleHome	navigate	1	consume:user-consume
+packages/codepuppy-app/src/context/tabs.tsx	toggleHome	navigate	2	consume:user-consume
+packages/codepuppy-app/src/pages/directory-layout.tsx	DirectoryDataProvider	navigate	1	consume:restore
+packages/codepuppy-app/src/pages/directory-layout.tsx	onNavigateToSession	navigate	1	consume:restore
+packages/codepuppy-app/src/pages/directory-layout.tsx	Layout	navigate	1	consume:restore
+packages/codepuppy-app/src/pages/layout.tsx	navigateWithSidebarReset	navigate	1	consume:user-consume
+packages/codepuppy-app/src/pages/layout.tsx	useSDKNotificationToasts	navigate	1	consume:engine
+packages/codepuppy-app/src/pages/layout.tsx	useSDKNotificationToasts	navigate	2	consume:engine
+packages/codepuppy-app/src/pages/layout.tsx	useSDKNotificationToasts	navigate	3	consume:engine
+packages/codepuppy-app/src/pages/layout.tsx	archiveSession	navigate	1	consume:engine
+packages/codepuppy-app/src/pages/layout.tsx	archiveSession	navigate	2	consume:engine
+packages/codepuppy-app/src/pages/layout.tsx	closeProject	navigate	1	consume:user-consume
+packages/codepuppy-app/src/pages/layout.tsx	resetWorkspace	navigate	1	consume:user-consume
+packages/codepuppy-app/src/pages/layout/deep-links.ts	applyDeepLinks	handlers.navigate	1	consume:deep-link
+packages/codepuppy-app/src/pages/session.tsx	backToNewChat	navigate	1	consume:user-consume
+packages/codepuppy-app/src/pages/session.tsx	sessionPanelContent	navigate	1	consume:engine
+packages/ui-mac/src/renderer/automations/automation-panel.tsx	AutomationPanel	reference openSession	1	reference:R5
+packages/ui-mac/src/renderer/automations/automation-panel.tsx	openSession	recordWorkspaceOpen	1	record:R5
+packages/ui-mac/src/renderer/automations/automation-panel.tsx	openSession	navigate	1	consume:user-consume
+packages/ui-mac/src/renderer/automations/automation-panel.tsx	openSession	hrefFor.session	1	consume:user-consume
+packages/ui-mac/src/renderer/automations/automation-panel.tsx	onClick	reference openSession	1	reference:R5
+packages/ui-mac/src/renderer/codepuppy-ui/CodePuppyHome.tsx	onSubmitted	navigate	1	consume:user-consume
+packages/ui-mac/src/renderer/codepuppy-ui/CodePuppyHome.tsx	onSubmitted	hrefFor.session	1	consume:user-consume
+packages/ui-mac/src/renderer/codepuppy-ui/codepuppy-composer.tsx	submit	props.projects.startChat	1	consume:user-consume
+packages/ui-mac/src/renderer/codepuppy-ui/codepuppy-new-session.tsx	onSubmitted	props.promoteDraft	1	consume:user-consume
+packages/ui-mac/src/renderer/codepuppy-ui/codepuppy-session-search.tsx	sessionSearchResults	hrefFor.session	1	consume:user-consume
+packages/ui-mac/src/renderer/codepuppy-ui/codepuppy-session-search.tsx	CodePuppySessionSearch	reference go	1	reference:R4
+packages/ui-mac/src/renderer/codepuppy-ui/codepuppy-session-search.tsx	go	recordWorkspaceOpen	1	record:R4
+packages/ui-mac/src/renderer/codepuppy-ui/codepuppy-session-search.tsx	go	navigate	1	consume:user-consume
+packages/ui-mac/src/renderer/codepuppy-ui/codepuppy-session-search.tsx	CodePuppySessionSearch	reference openResult	1	reference:R4
+packages/ui-mac/src/renderer/codepuppy-ui/codepuppy-session-search.tsx	openResult	reference go	1	reference:R4
+packages/ui-mac/src/renderer/codepuppy-ui/codepuppy-session-search.tsx	onKeyDown	reference go	1	reference:R4
+packages/ui-mac/src/renderer/codepuppy-ui/codepuppy-session-search.tsx	onClick	reference openResult	1	reference:R4
+packages/ui-mac/src/renderer/codepuppy-ui/session-timeline/session-timeline.tsx	CodePuppySessionTimeline	navigate	1	consume:engine
+packages/ui-mac/src/renderer/codepuppy-ui/session-timeline/session-timeline.tsx	CodePuppySessionTimeline	hrefFor.session	1	consume:engine
+packages/ui-mac/src/renderer/codepuppy-ui/session-workspace/session-composer-dock.tsx	onJump	navigate	1	consume:engine
+packages/ui-mac/src/renderer/codepuppy-ui/workspace-chip.tsx	CodePuppyWorkspaceChip	reference choose	1	reference:R3
+packages/ui-mac/src/renderer/codepuppy-ui/workspace-chip.tsx	choose	recordWorkspaceOpen	1	record:R3
+packages/ui-mac/src/renderer/codepuppy-ui/workspace-chip.tsx	choose	props.onSelect	1	consume:user-consume
+packages/ui-mac/src/renderer/codepuppy-ui/workspace-chip.tsx	onClick	reference choose	1	reference:R3
+packages/ui-mac/src/renderer/codepuppy-ui/workspace-chip.tsx	onClick	reference choose	2	reference:R3
+packages/ui-mac/src/renderer/codepuppy-ui/workspace-chip.tsx	onClick	props.onSelect	1	consume:user-consume
+packages/ui-mac/src/renderer/codepuppy-ui/workspace-writable.ts	recordWorkspaceOpen	window.api?.recordWorkspaceOpen	1	bridge
+packages/ui-mac/src/renderer/sidebar/codepuppy-sidebar.tsx	CodePuppySidebar	startDraft	1	consume:restore
+packages/ui-mac/src/renderer/sidebar/codepuppy-sidebar.tsx	CodePuppySidebar	reference startChat	1	reference:R1
+packages/ui-mac/src/renderer/sidebar/codepuppy-sidebar.tsx	startChat	recordWorkspaceOpen	1	record:R1
+packages/ui-mac/src/renderer/sidebar/codepuppy-sidebar.tsx	startChat	navigate	1	consume:user-consume
+packages/ui-mac/src/renderer/sidebar/codepuppy-sidebar.tsx	startChat	hrefFor.session	1	consume:user-consume
+packages/ui-mac/src/renderer/sidebar/codepuppy-sidebar.tsx	newChat	startDraft	1	consume:user-consume
+packages/ui-mac/src/renderer/sidebar/codepuppy-sidebar.tsx	CodePuppySidebar	reference openProject	1	reference:R1
+packages/ui-mac/src/renderer/sidebar/codepuppy-sidebar.tsx	openProject	startChat	1	consume:user-consume
+packages/ui-mac/src/renderer/sidebar/codepuppy-sidebar.tsx	openProject	reference startChat	1	reference:R1
+packages/ui-mac/src/renderer/sidebar/codepuppy-sidebar.tsx	CodePuppySidebar	reference openProject	2	reference:R1
+packages/ui-mac/src/renderer/sidebar/codepuppy-sidebar.tsx	sessionLink	hrefFor.session	1	consume:user-consume
+packages/ui-mac/src/renderer/sidebar/codepuppy-sidebar.tsx	CodePuppySidebar	reference openSession	1	reference:R2
+packages/ui-mac/src/renderer/sidebar/codepuppy-sidebar.tsx	openSession	recordWorkspaceOpen	1	record:R2
+packages/ui-mac/src/renderer/sidebar/codepuppy-sidebar.tsx	openSession	navigate	1	consume:user-consume
+packages/ui-mac/src/renderer/sidebar/codepuppy-sidebar.tsx	openSession	hrefFor.session	1	consume:user-consume
+packages/ui-mac/src/renderer/sidebar/codepuppy-sidebar.tsx	onBack	navigate	1	consume:user-consume
+packages/ui-mac/src/renderer/sidebar/codepuppy-sidebar.tsx	onForward	navigate	1	consume:user-consume
+packages/ui-mac/src/renderer/sidebar/codepuppy-sidebar.tsx	onClick	navigate	1	consume:user-consume
+packages/ui-mac/src/renderer/sidebar/codepuppy-sidebar.tsx	onClick	reference openProject	1	reference:R1
+packages/ui-mac/src/renderer/sidebar/codepuppy-sidebar.tsx	onClick	startChat	1	consume:user-consume
+packages/ui-mac/src/renderer/sidebar/codepuppy-sidebar.tsx	onClick	reference startChat	1	reference:R1
+packages/ui-mac/src/renderer/sidebar/codepuppy-sidebar.tsx	onClick	reference openSession	1	reference:R2
+packages/ui-mac/src/renderer/sidebar/codepuppy-sidebar.tsx	onClick	reference openProject	2	reference:R1
+packages/ui-mac/src/renderer/sidebar/route.ts	newSessionHref	hrefFor.directorySession	1	consume:user-consume
+packages/ui-mac/src/renderer/sidebar/route.ts	homeHref	hrefFor.home	1	consume:user-consume

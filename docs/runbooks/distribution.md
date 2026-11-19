@@ -44,6 +44,8 @@ grep -cE '(^|[^A-Za-z0-9_])ALPHA_|\.alpha-code-signing' ~/.codepuppy-signing/sig
 - `notarize` 是 boolean(electron-builder 26.x);team/凭证走 env。
 - prebuild 会 `patch-server-version.ts` 把内嵌 server 的 `InstallationVersion` 从 `local` 改成真实版本(A4:否则 `@opencode-ai/plugin@local` 装不上,带 `.opencode` 插件的项目首个请求卡住)。
 
+围栏相关改动发版前，在 `packages/ui-mac` 显式运行 `CODEPUPPY_TEST_SIGNED_FENCE=1 bun test src/main/process-fence-extension-packaged.test.ts`（本地签名、`--publish never`、关闭公证）；普通 gate 只核对未启用时宿主自报 0 条，不构建或签名；临时 app/目录会清理，小结果保留在 worktree 的 `node_modules/.cache/project-writable/results/`。
+
 ## 1. 发一个版本(权威步骤)
 
 从 0.1.26 起只出 Apple 芯片(arm64)Mac 包(#1496)。在 arm64 打包机上照下列步骤执行;

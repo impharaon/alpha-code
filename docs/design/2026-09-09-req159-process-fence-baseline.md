@@ -1,10 +1,12 @@
 ---
+id: UI-req159-process-fence-baseline
+summary: REQ-159 进程围栏基线与后续受控项目写扩展的不变量。
 title: REQ-159 方案基线:引擎进程自打沙箱(路一)
 kind: design
 status: accepted
 owners:
   - alpha-code desktop maintainers
-last_reviewed: 2026-09-09
+last_reviewed: 2026-11-19
 review_after: 2026-12-09
 ---
 
@@ -52,8 +54,14 @@ review_after: 2026-12-09
 
 ## 三、安全面:整类边界与必须守住的不变量
 
-**I1 — 可写集是唯一权威,且只能收紧不能加宽。** seatbelt 装上之后无法放宽(§6.5)。可写集以
-§8.2 的 19 行为准;其中 7 行经逐行消融证明**不放行即致命**(4 行让引擎起不来 · `<alphaGlobalRoot>`
+**I1 — 可写集与资格只有一处权威,扩集只能来自用户亲手打开。**
+装上之后只能经主进程签发、绑定当前引擎进程的私有类令牌加宽,且只加宽到用户本次运行亲手打开的本机项目。
+运行期资格与真源过滤共用 main 登记表及 4/5/5b 判据;围栏内不能自签本类,恢复、重载、深链接和引擎消息不登记。
+这是[2026-11-19 已批准的 v2 增量](../specs/child-process-write-fence/design.md)对旧 I1「只能收紧不能加宽」事实前提的替代;
+原始勘破与 U2 决定书保留其历史语境。实际代码、签名包正反臂及界面证据范围见
+[当前架构](../architecture/2026-09-09-req159-process-fence.md)与[实施验据](../specs/child-process-write-fence/plan.md)。
+
+原固定写根仍以当时 §8.2 的 W 行实测为基础;其中 7 行经逐行消融证明**不放行即致命**(4 行让引擎起不来 · `<alphaGlobalRoot>`
 让注入整份丢失 · `/dev/ptmx` 让终端 500 · `<HOME>/.npm` **静默失败**:provider 装不上而 health 仍 200)。
 另 6 行本轮**未证伪 ≠ 可删**,删减需各自出实测。
 

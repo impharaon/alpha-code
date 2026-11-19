@@ -10,6 +10,7 @@
 // session 专属数据(live 运行态/上下文用量/审批挂起/斜杠捕获)一律经 sessionDock props 从
 // typed 通道注入(基线 I1/I2/I8);2.5s status 轮询与上游 ring DOM 收养已删。
 
+import { whenSettled } from "./workspace-writable"
 import {
   createEffect,
   createMemo,
@@ -1840,6 +1841,8 @@ export function CodePuppyComposerRuntime(props: CodePuppyComposerRuntimeProps) {
         setBlockedText(body)
         return
       }
+      await whenSettled(submittedServerKey, dir)
+      if (interrupted()) return
       if (props.mode === "home") {
         // REQ-085(#259):目录不变才复用上一次的孤儿 session——换目录等于放弃它,老实重建。
         const reuseSessionID =

@@ -687,62 +687,37 @@ describe("REQ-159 #1322 workspace read-only disclosure on the topbar (AC2)", () 
     expect(pop(host)).toBeNull()
   })
 
-  test("outside the writable set: a 只读 pill sits right after the status pill (role=status); hover and click open the popover; restart calls the host relaunch; Esc closes; state-driven", async () => {
+  const reasons = [
+    ["home-or-app-state", "主目录和 Code Puppy 自己的数据目录不能整个作为项目写入，请打开里面的具体文件夹。"],
+    ["not-opened-by-you", "这个文件夹不是你在 Code Puppy 里亲手打开的，助手不会改动它；用「打开项目」选中它就能写入。"],
+    ["grant-failed", "这个文件夹暂时写不进去，下次打开 Code Puppy 后即可写入。"],
+  ] as const
+  for (const [reason, sentence] of reasons) test(`${reason}: residual disclosure is exactly one sentence without title, footnote or action`, async () => {
     const host = mount()
+    runtime.setSessionWorkspaceSnapshot({ identity: { serverKey: "sidecar", directory: "/workspace", sessionID: "ses_idle" }, project: "workspace", title: "整理架构说明", activity: "running" })
+    runtime.setSessionWorkspaceReadonly(true, reason)
     await flush()
-    // `#1588` AC4:空闲不显示状态胶囊 —— 位置断言放在生成中(状态胶囊在场)时做。
-    runtime.setSessionWorkspaceSnapshot({
-      identity: { serverKey: "sidecar", directory: "/tmp/workspace", sessionID: "ses_idle" },
-      project: "workspace",
-      title: "整理架构说明",
-      activity: "running",
-    })
-    runtime.setSessionWorkspaceReadonly(true)
-    await flush()
-
     const status = host.querySelector<HTMLElement>("[data-codepuppy-session-status]")!
-    const badge = pill(host)
-    expect(badge).not.toBeNull()
-    expect(badge!.getAttribute("role")).toBe("status")
-    expect(badge!.textContent?.trim()).toBe("只读")
-    // 位置:状态胶囊之后、紧跟其后(同一个 header 里,状态胶囊的下一个兄弟就是它的宿主)。
-    expect(status.nextElementSibling?.contains(badge!)).toBe(true)
-    expect(badge!.closest("header")?.hasAttribute("data-codepuppy-session-workspace-topbar")).toBe(true)
-    // 未开:弹层不在。
+    const badge = pill(host)!
+    expect(badge.textContent?.trim()).toBe("只读")
+    expect(status.nextElementSibling?.contains(badge)).toBe(true)
     expect(pop(host)).toBeNull()
-
-    // 悬停开
-    badge!.parentElement!.dispatchEvent(new MouseEvent("mouseenter", { bubbles: false }))
+    badge.parentElement!.dispatchEvent(new MouseEvent("mouseenter", { bubbles: false }))
     await flush()
-    expect(pop(host)).not.toBeNull()
-    expect(pop(host)!.getAttribute("aria-describedby")).toBe(badge!.id)
-    expect(pop(host)!.querySelector("b")?.textContent).toBe("这个项目现在写不进去")
-    expect(pop(host)!.textContent).toContain("这个项目是之后打开的 —— 打得开、读得了")
-    expect(pop(host)!.textContent).toContain("能正常写入的项目不会有这个标记。")
-    badge!.parentElement!.dispatchEvent(new MouseEvent("mouseleave", { bubbles: false }))
+    expect(pop(host)!.textContent).toBe(sentence)
+    expect(pop(host)!.querySelectorAll("p")).toHaveLength(1)
+    expect(pop(host)!.querySelectorAll("b, button, .a-swk-readonly-footnote")).toHaveLength(0)
+    badge.parentElement!.dispatchEvent(new MouseEvent("mouseleave", { bubbles: false }))
     await flush()
     expect(pop(host)).toBeNull()
-
-    // 点击开;唯一的动作「重新启动」真的调了宿主的 relaunch(生产 = window.api.relaunch)。
-    badge!.click()
+    badge.click()
     await flush()
-    expect(pop(host)).not.toBeNull()
-    const restart = pop(host)!.querySelector<HTMLButtonElement>("[data-codepuppy-workspace-readonly-restart]")!
-    expect(restart.textContent?.trim()).toBe("重新启动 Code Puppy")
-    expect(runtime.relaunchCalls).toHaveLength(0)
-    restart.click()
-    await flush()
-    expect(runtime.relaunchCalls).toHaveLength(1)
-
-    // Esc 关
-    badge!.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }))
+    expect(pop(host)!.textContent).toBe(sentence)
+    badge.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }))
     await flush()
     expect(pop(host)).toBeNull()
-
-    // 切回可写(切换工作区 / 重启后):胶囊与弹层一起消失。
     runtime.setSessionWorkspaceReadonly(false)
     await flush()
     expect(pill(host)).toBeNull()
-    expect(pop(host)).toBeNull()
   })
 })

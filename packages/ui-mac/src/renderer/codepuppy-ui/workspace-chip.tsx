@@ -12,6 +12,8 @@ import { projectLabel } from "../sidebar/route"
 import { isDefaultWorkspaceDir, workspaceDisplayName } from "./default-workspace"
 import type { CodePuppyProject } from "../sidebar/use-projects"
 import { pushToast } from "./Toast"
+import type { WorkspaceWriteProbeResult } from "../../preload/types"
+import { recordWorkspaceOpen, workspaceReadonlyMessage } from "./workspace-writable"
 import { t } from "../i18n"
 
 /** 数据层已剔除垃圾 worktree,这里只再挡一次 "/"(与首页此前的过滤同义)。 */
@@ -27,6 +29,7 @@ export function workspaceLabel(projects: readonly CodePuppyProject[], dir: strin
 
 export function CodePuppyWorkspaceChip(props: {
   /** 已过滤的项目列表(visibleWorkspaces)。 */
+  server: string | undefined
   projects: readonly CodePuppyProject[]
   /** 默认对话目录 `~/Alpha`;未注册为项目时作为常驻首项(ADR-025)。 */
   defaultWorkspace: string | undefined
@@ -41,6 +44,7 @@ export function CodePuppyWorkspaceChip(props: {
    * 判据钩子:`data-codepuppy-workspace-chip-readonly`。
    */
   readonly?: boolean
+  readonlyReason?: WorkspaceWriteProbeResult["reason"]
 }) {
   const onDoc = (e: MouseEvent) => {
     const target = e.target as Element | null
@@ -50,7 +54,9 @@ export function CodePuppyWorkspaceChip(props: {
   document.addEventListener("click", onDoc)
   onCleanup(() => document.removeEventListener("click", onDoc))
   const stop = (e: Event) => e.stopPropagation()
-  const choose = (directory: string) => {
+  const choose = async (directory: string) => {
+    const server = props.server
+    if (server) await recordWorkspaceOpen(server, directory)
     props.onOpenChange(false)
     props.onSelect(directory)
   }
@@ -70,7 +76,7 @@ export function CodePuppyWorkspaceChip(props: {
             <span
               class="a-ws-chip-readonly"
               data-codepuppy-workspace-chip-readonly
-              title={`${t("codepuppy.workspace.readonlyTitle")}\n${t("codepuppy.workspace.readonlyBody")}`}
+              title={workspaceReadonlyMessage(props.readonlyReason)}
             >
               <LockIcon />
               {t("codepuppy.workspace.readonly")}

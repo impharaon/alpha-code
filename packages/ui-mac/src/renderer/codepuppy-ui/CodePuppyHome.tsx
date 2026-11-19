@@ -63,7 +63,7 @@ export function CodePuppyHome(props: {
     chosenWs() ?? (defaultWs.loading ? undefined : (defaultWs() ?? visibleProjects()[0]?.worktree)),
   )
   // REQ-159 `#1322`:首页 chip 是只读状态的第二宿主(与新对话页同源);咽喉同样是「当前生效目录」。
-  const wsReadonly = useWorkspaceWritable(activeWs)
+  const wsReadonly = useWorkspaceWritable(props.serverKey, activeWs)
   const activeWsSource = createMemo<"chosen" | "project" | "default" | "none">(() =>
     chosenWs()
       ? "chosen"
@@ -142,13 +142,15 @@ export function CodePuppyHome(props: {
               // 界面优化 BR-04:项目选择器搬进输入框下的托盘(同一个受控组件、同一组条目)。
               workspaceChip={
                 <CodePuppyWorkspaceChip
+                  server={props.serverKey()}
                   projects={visibleProjects()}
                   defaultWorkspace={defaultWs()}
                   value={activeWs()}
                   open={wsOpen()}
                   onOpenChange={setWsOpen}
                   onSelect={setChosenWs}
-                  readonly={wsReadonly()}
+                  readonly={wsReadonly.readonly()}
+                  readonlyReason={wsReadonly.reason()}
                 />
               }
               onNeedWorkspace={() => {

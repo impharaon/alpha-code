@@ -1,3 +1,4 @@
+import { recordWorkspaceOpen } from "./workspace-writable"
 // REQ-126 CODE-F(#659)—— alpha 自有会话搜索,并由**壳**注册 `command.palette`。
 //
 // 为什么存在:侧栏「搜索」调 `command.show()` → `run("command.palette")`,而上游 `run` 是
@@ -48,6 +49,7 @@ export interface SessionSearchResult {
   updated: number
   /** server 限定的 canonical 会话路由。结果来自哪个 server,href 就钉在哪个 server 上。 */
   href: string
+  directory: string
 }
 
 /**
@@ -73,6 +75,7 @@ export function sessionSearchResults(
         updated: session.updated,
         result: {
           sessionID: session.id,
+          directory: session.directory,
           title,
           project: project.name,
           updated: session.updated,
@@ -157,14 +160,18 @@ export function CodePuppySessionSearch(props: {
     return result ? optionId(result.sessionID) : undefined
   }
 
-  const go = (href: string) => {
+  const go = async (result: SessionSearchResult) => {
+    const server = props.serverKey()
+    const href = result.href
+    if (!server) return
+    await recordWorkspaceOpen(server, result.directory)
     setOpen(false)
     navigate(href)
   }
 
-  const openResult = (event: MouseEvent, href: string) => {
+  const openResult = (event: MouseEvent, result: SessionSearchResult) => {
     event.preventDefault()
-    go(href)
+    void go(result)
   }
 
   // 焦点始终留在输入框:↑↓ 只移动选中,回车打开选中;无结果时回车什么都不做。
@@ -181,7 +188,7 @@ export function CodePuppySessionSearch(props: {
     if (event.key === "Enter" && !event.isComposing) {
       event.preventDefault()
       const result = results()[selected()]
-      if (result) go(result.href)
+      if (result) void go(result)
     }
   }
 
@@ -239,7 +246,7 @@ export function CodePuppySessionSearch(props: {
                     classList={{ "a-search-result--selected": index() === selected() }}
                     href={result.href}
                     data-codepuppy-session-search-result={result.sessionID}
-                    onClick={(event) => openResult(event, result.href)}
+                    onClick={(event) => openResult(event, result)}
                   >
                     <ShellIcon name="msg" size={14} class="a-search-result-icon" />
                     <span class="a-search-result-title">

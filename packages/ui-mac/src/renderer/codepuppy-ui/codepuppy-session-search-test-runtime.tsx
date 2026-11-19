@@ -65,7 +65,8 @@ export const FIXTURE_PROJECTS: CodePuppyProject[] = [
  * 才测得出来。只喂壳真正读的那一面(store);本闸门路径不触达其余 API。
  */
 const [store, setStore] = createStore<CodePuppyProjectsStore>({ projects: [], ready: true, error: false })
-const projects = { store, reload: async () => {} } as unknown as CodePuppyProjectsApi
+export const createdDirectories: string[] = []
+const projects = { store, reload: async () => {}, createSession: async (directory: string) => { createdDirectories.push(directory); return "ses_opened" } } as unknown as CodePuppyProjectsApi
 
 /** 项目已列出、但各项目的对话还没读到(`loaded: false`、会话为空)。 */
 export function unloadSessions() {
@@ -169,6 +170,7 @@ export function installRootHost() {
 }
 
 export function resetHarness() {
+  createdDirectories.length = 0
   loadSessions()
   setServerKey(SIDECAR_SERVER_KEY)
   setRouterPath("")

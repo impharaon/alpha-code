@@ -1,3 +1,4 @@
+import { recordWorkspaceOpen } from "../codepuppy-ui/workspace-writable"
 // 自动化(定时任务)面板 —— REQ-021 A1 的全部用户面:任务列表 / 一句话新建(确定性解析 →
 // 预览卡逐字段可改)/ 详情(编辑 + 运行历史 + 回跳会话)。全页覆盖内容区(镜像 extension-hub
 // 的 Portal 形制);数据全走 window.api.automations(调度与执行在 main),本组件零引擎耦合。
@@ -335,8 +336,9 @@ export function AutomationPanel(props: {
     backToList()
   }
 
-  const openSession = (_task: ListedTask, rec: AutomationRunRecord) => {
-    if (!rec.sessionID) return
+  const openSession = async (task: ListedTask, rec: AutomationRunRecord) => {
+    const sessionID = rec.sessionID
+    if (!sessionID) return
     // #925:key 在点击那一刻取。缺席 ⇒ 引擎侧身份不成立(sidecar 未就绪/重启中)——run 列表走
     // IPC 照样能显示,所以这里**到得了**;如实提示,不挑一个 server 瞎跳(fail-closed)。
     const key = props.serverKey()
@@ -344,8 +346,9 @@ export function AutomationPanel(props: {
       pushToast({ kind: "error", title: t("codepuppy.home.engineUnavailable") })
       return
     }
+    await recordWorkspaceOpen(key, task.target.projectDir)
     setAutomationOpen(false)
-    navigate(hrefFor.session(key, rec.sessionID))
+    navigate(hrefFor.session(key, sessionID))
   }
 
   const projectName = (dir: string) => dir.split("/").filter(Boolean).pop() ?? dir

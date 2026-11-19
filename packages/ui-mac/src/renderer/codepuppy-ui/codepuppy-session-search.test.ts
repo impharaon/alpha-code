@@ -468,3 +468,44 @@ test("#1648 AC1 global 里的非 git 搜索结果按真实目录显示项目名,
   for (const name of names) expect(sidebar).toContain(name)
   expect(rowFor("ses_global_0")!.getAttribute("href")).toBe(hrefFor.session(runtime.SIDECAR_SERVER_KEY, "ses_global_0"))
 })
+
+
+for (const point of ["R1", "R2", "R4"] as const) test(`${point}: a concrete user open awaits recording for its target before creating/navigating`, async () => {
+  await mountShell(() => runtime.CodePuppyShell())
+  const recorded: Array<{ server: string; directory: string }> = []
+  let release!: () => void
+  window.api.recordWorkspaceOpen = (input) => {
+    recorded.push(input)
+    return new Promise((resolve) => { release = () => resolve({ recorded: true }) })
+  }
+  const before = runtime.routerPath()
+  let href: string | undefined
+  if (point === "R1") {
+    document.querySelector<HTMLButtonElement>(".codepuppy-project-add")!.click()
+  } else if (point === "R2") {
+    if (!document.querySelector("a.codepuppy-session")) {
+      document.querySelector<HTMLElement>(".codepuppy-project-row")!.click()
+      await settle()
+    }
+    const link = document.querySelector<HTMLAnchorElement>("a.codepuppy-session")!
+    href = link.getAttribute("href")!
+    link.click()
+  } else {
+    searchButton()!.click()
+    await flush()
+    await type("整理")
+    const link = rows()[0]!
+    href = link.getAttribute("href")!
+    link.click()
+  }
+  await settle()
+  expect(recorded).toEqual([{ server: "sidecar", directory: runtime.FIXTURE_DIRECTORY }])
+  expect(runtime.createdDirectories).toEqual([])
+  expect(runtime.routerPath()).toBe(before)
+  release()
+  await settle()
+  if (point === "R1") {
+    expect(runtime.createdDirectories).toEqual([runtime.FIXTURE_DIRECTORY])
+    expect(runtime.routerPath()).toBe(hrefFor.session("sidecar", "ses_opened"))
+  } else expect(runtime.routerPath()).toBe(href!)
+})

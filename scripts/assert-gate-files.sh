@@ -182,21 +182,35 @@ while IFS=$'\t' read -r floor workdir path delegates guarantee || [ -n "${floor:
       ;;
   esac
 
+  # Local signing is release evidence, explicitly opted in; ordinary gates still verify the host self-skips.
+  manual=""
+  case "${guarantee:-}" in
+    *"[环境"*)
+      if [[ "$guarantee" == *"[环境:CODEPUPPY_TEST_SIGNED_FENCE=1]"* ]] && [ "$workdir/$path" = "packages/ui-mac/src/main/process-fence-extension-packaged.test.ts" ] && [ "$kind" = exact ]; then
+        manual="CODEPUPPY_TEST_SIGNED_FENCE=1"
+      else
+        echo "::error::$workdir/$path 的环境条件非法:只允许签名围栏宿主显式 CODEPUPPY_TEST_SIGNED_FENCE=1"
+        failed=1
+        continue
+      fi
+      ;;
+  esac
+
   checked=$((checked + 1))
 
-  # `#1153`:登记了但本平台不适用。标注不是免检牌 —— 真跑该文件,要求它**自报 0 条**
+  # 平台或显式发布条件未满足。标注不是免检牌 —— 真跑该文件,要求它**自报 0 条**
   # (在位、恰好匹配 1 个文件、bun exit 0、0 pass;bun-test-floor.sh 的 =0 精确模式四者全断)。
   # 两个方向都抓:该跑的文件被误标 ⇒ 本平台 >0 条 ⇒ 红;文件被删 ⇒ 匹配 0 个文件 ⇒ 红。
-  if [ -n "$platform" ] && [ "$platform" != "$RUNTIME_PLATFORM" ]; then
-    echo "── [$checked] $workdir/$path (登记 $floor,[平台:$platform],本平台 $RUNTIME_PLATFORM)"
+  if { [ -n "$platform" ] && [ "$platform" != "$RUNTIME_PLATFORM" ]; } || { [ -n "$manual" ] && [ "${CODEPUPPY_TEST_SIGNED_FENCE:-}" != "1" ]; }; then
+    echo "── [$checked] $workdir/$path (登记 $floor,[平台:$platform],本平台 $RUNTIME_PLATFORM,显式条件 ${manual:-无})"
     if bash "$ROOT/scripts/bun-test-floor.sh" "=0" "$workdir" "$path"; then
-      echo "   ⊘ 本平台不适用:文件在位且自报 0 条,与 [平台:$platform] 相符 —— 该行的保证本次未被验证"
+      echo "   ⊘ 本次未验证:文件在位且自报 0 条,与 [平台:$platform] / ${manual:-无额外条件} 相符 —— 该行的保证本次未被验证"
       na_count=$((na_count + 1))
       na_names="${na_names:+$na_names, }$workdir/$path"
     else
-      echo "::error::$workdir/$path 的 [平台:$platform] 标注与实测不符:要么该文件在本平台($RUNTIME_PLATFORM)真的会跑(>0 条 —— 摘掉标注并跑 --update 登记真实条数),要么文件被删/坏了(见上方输出)。标注不是免检牌。"
+      echo "::error::$workdir/$path 的条件 [平台:$platform] / ${manual:-无额外条件} 与实测不符:本次不应执行却自报 >0 条,或文件已删/损坏(见上方输出)。不得删条件避红。"
       if [ "$MODE" = update ]; then
-        echo "::error::--update 中止:平台标注与实测不符 —— all-or-nothing,一条都不写回"
+        echo "::error::--update 中止:条件标注与实测不符 —— all-or-nothing,一条都不写回"
         exit 1
       fi
       failed=1
@@ -274,9 +288,9 @@ fi
 
 [ "$failed" -eq 0 ] || exit 1
 if [ "$na_count" -gt 0 ]; then
-  # `#1153` 第三档:门绿,但平台条件行的保证本次未被验证 —— 总结行不许说「全部」,退出码 2
+  # 第三档:门绿,但平台/显式发布条件行的保证本次未验证 —— 总结不许说「全部」,退出码 2
   # 供消费方(codepuppy-check [6/10] / codepuppy-ci 的 assert gate files 步)记「未验证」不拦。
-  echo "⚠️  $((checked - na_count)) 个闸门文件在位且真的跑过(条数与登记精确一致);另 $na_count 个为平台条件闸,本平台($RUNTIME_PLATFORM)不适用 —— 已验证其自报 0 条与标注相符,但其保证本次未被验证:$na_names"
+  echo "⚠️  $((checked - na_count)) 个闸门文件在位且真的跑过(条数与登记精确一致);另 $na_count 个条件闸的保证本次未验证 —— 已验证其自报 0 条与条件标注相符:$na_names"
   exit 2
 fi
 echo "✓ $checked 个闸门文件全部在位且真的跑过(条数与登记精确一致)"

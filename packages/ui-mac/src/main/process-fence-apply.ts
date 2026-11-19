@@ -32,6 +32,10 @@ export type FenceAddon = {
   apply: (profile: string) => { rc: number; error: string }
   buildId: string
   libsandbox: string
+  issueFileExtensionToProcess: (extClass: string, path: string, pid: number) =>
+    | { token: string }
+    | { token: null; errno: number; step: "task_name_for_pid" | "task_info" | "issue" }
+  consumeExtension: (token: string) => { handle: number; errno: number }
   /** `#1571` 钥匙串改名(native/codepuppy-fence/keychain_rename.c;main 进程用,返回 OSStatus)。 */
   keychainItemStatus: (service: string, account: string) => number
   keychainRenameItem: (fromService: string, fromAccount: string, toService: string, toAccount: string) => number
@@ -71,6 +75,8 @@ export function loadFenceAddon(addonPath: string, dlopen: ApplyProcessFenceDeps[
     throw new ProcessFenceError(`native module at ${addonPath} does not export apply()/buildId`)
   if (typeof exports.keychainItemStatus !== "function" || typeof exports.keychainRenameItem !== "function")
     throw new ProcessFenceError(`native module at ${addonPath} does not export the keychain rename functions (stale build?)`)
+  if (typeof exports.issueFileExtensionToProcess !== "function" || typeof exports.consumeExtension !== "function")
+    throw new ProcessFenceError(`native module at ${addonPath} does not export the workspace extension functions (stale build?)`)
   return exports as FenceAddon
 }
 

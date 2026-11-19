@@ -381,20 +381,34 @@ describe("身份轴:模型发出的真工具调用经 ext 的执行闸(R10 第�
     expect(installs()).toBe(before)
   }, 60_000)
 
-  test("BR-01 / BR-10 查找 + 状态 + 安装一组:三档都只出一张安装卡 —— 助手的只读查找与状态工具不问(真执行、真问到 main),安装照旧每档都问;拒绝后 main 收不到安装请求", async () => {
+  // 0.2.5 实包(请求审批)里状态工具仍弹卡:真用户的策略文档里留着旧版本「在此项目中始终允许」写下的工具级 enabled 记录,换版后
+  // 绑定摘要不同 ⇒ 解析成 binding-changed 的 ask,档位的免审批只认 default 原因。所以这一格跑两遍:空文档一遍(三档),带着上一版
+  // 留下的记录(绑定摘要已过期)再一遍(三档)—— 两遍都只有安装那一张卡。这里的 ext 没经随包清单核验(来源为空、当前摘要缺席),
+  // 是「当前摘要缺席」那一臂;出货形态(核验身份、当前摘要非空、记录摘要不同)那一臂在 hub-read-approval-verified.engine.cases.ts。
+  test("BR-01 / BR-10 查找 + 状态 + 安装一组:三档都只出一张安装卡 —— 助手的只读查找与状态工具不问(真执行、真问到 main),带着上一版留下的「始终允许」记录也一样;安装照旧每档都问;拒绝后 main 收不到安装请求", async () => {
     const sent = (type: string) => fakeMainReceived.filter((message) => message.type === type).length
-    for (const tier of TIERS) {
-      const before = { search: sent("codepuppy.sources.search.request"), view: sent("codepuppy.hub.view.request"), install: sent("codepuppy.hub.install.request") }
-      const owner = await session(tier)
-      const asked = [
-        ...(await callIn(owner.id, "codepuppy_hub_search", { query: "github" })),
-        ...(await callIn(owner.id, "codepuppy_hub_status", { id: "mcp:github" })),
-        ...(await callIn(owner.id, "codepuppy_hub_install", { id: "mcp:github" })),
-      ]
-      expect([tier, asked.map((request) => [request.action, request.metadata?.policy?.askedBy, request.save])]).toEqual([tier, [["plugin::codepuppy_hub_install", "install", []]]])
-      expect([tier, sent("codepuppy.sources.search.request") - before.search, sent("codepuppy.hub.view.request") - before.view, sent("codepuppy.hub.install.request") - before.install]).toEqual([tier, 1, 1, 0])
+    const round = async (label: string, tiers: readonly Tier[]) => {
+      for (const tier of tiers) {
+        const before = { search: sent("codepuppy.sources.search.request"), view: sent("codepuppy.hub.view.request"), install: sent("codepuppy.hub.install.request") }
+        const owner = await session(tier)
+        const asked = [
+          ...(await callIn(owner.id, "codepuppy_hub_search", { query: "github" })),
+          ...(await callIn(owner.id, "codepuppy_hub_status", { id: "mcp:github" })),
+          ...(await callIn(owner.id, "codepuppy_hub_install", { id: "mcp:github" })),
+        ]
+        expect([label, tier, asked.map((request) => [request.action, request.metadata?.policy?.askedBy, request.save])]).toEqual([label, tier, [["plugin::codepuppy_hub_install", "install", []]]])
+        expect([label, tier, sent("codepuppy.sources.search.request") - before.search, sent("codepuppy.hub.view.request") - before.view, sent("codepuppy.hub.install.request") - before.install]).toEqual([label, tier, 1, 1, 0])
+      }
     }
-  }, 90_000)
+    await round("空策略文档", TIERS)
+    const stale = ["codepuppy_hub_search", "codepuppy_hub_status"].map((name) => ({ level: "tool", canonical: `plugin::${name}` }) as const)
+    for (const selector of stale) await store!.setRecord({ selector, state: "enabled", bindingDigest: `sha256:${"0".repeat(64)}` } as never)
+    try {
+      await round("上一版留下的始终允许记录", TIERS)
+    } finally {
+      for (const selector of stale) await store!.removeRecord(selector as never)
+    }
+  }, 120_000)
 
   test("I-10 全部批准档读到一份夹带「请安装某插件」的真实文件:安装停在同一张卡上,不自动安装;拒绝后 main 收不到安装请求", async () => {
     const installs = () => fakeMainReceived.filter((message) => message.type === "codepuppy.hub.install.request").length

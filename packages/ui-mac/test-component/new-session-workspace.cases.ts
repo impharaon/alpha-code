@@ -118,9 +118,11 @@ mock.module("@opencode-ai/app", () => ({
  *  再由生产的 `parseRoute` 读回去,编码与解码是两条相反的路,不构成自指等价链。 */
 const navigateCalls: string[] = []
 // 首页右栏(HomeRightPanel)被新对话页引入:终端窄导出换成空壳,免得把整套终端引擎与 codepuppy-ui 组件拉进来。
+let terminalSurface: Record<string, unknown> | undefined
 mock.module("@opencode-ai/app/surface/terminal", () => ({
   Terminal: () => null,
   useTerminal: () => {
+    if (terminalSurface) return terminalSurface
     throw new Error("no terminal engine in this test")
   },
   WorkspaceTerminalProvider: (props: { children: unknown }) => props.children,
@@ -432,6 +434,7 @@ function DraftLeaf(props: { projects: CodePuppyProjectsApi; draftId?: string; se
 }
 
 beforeEach(() => {
+  terminalSurface = undefined
   setDockMessages([])
   setDockHistoryLoading(false)
   setDockHistoryMore(false)
@@ -1987,9 +1990,10 @@ describe("REQ-159 #1322 workspace read-only tag on the chip (AC2)", () => {
   /** 可控探针:按目录给答案,并记下问过谁。 */
   const probeStub = (answers: Record<string, "writable" | "denied" | "unknown">) => {
     const asked: string[] = []
-    resetWorkspaceWritableForTests(async (directory: string) => {
+    resetWorkspaceWritableForTests(async ({ directory }) => {
       asked.push(directory)
-      return { outcome: answers[directory] ?? "unknown" }
+      const outcome = answers[directory] ?? "unknown"
+      return { outcome, grant: outcome === "denied" ? "ineligible" : "granted", ...(outcome === "denied" ? { reason: "not-opened-by-you" } : {}) }
     })
     return asked
   }
@@ -2011,8 +2015,7 @@ describe("REQ-159 #1322 workspace read-only tag on the chip (AC2)", () => {
     const badge = tag(host)
     expect(badge).not.toBeNull()
     expect(badge!.textContent?.trim()).toBe("只读")
-    expect(badge!.getAttribute("title")).toContain("这个项目现在写不进去")
-    expect(badge!.getAttribute("title")).toContain("重新启动 Code Puppy 后，它就会被算进去")
+    expect(badge!.getAttribute("title")).toBe("这个文件夹不是你在 Code Puppy 里亲手打开的，助手不会改动它；用「打开项目」选中它就能写入。")
     // 位置:目录名与折叠箭头之间(同一个 chip 按钮里,尾标在箭头之前)。
     const chip = chipButton(host)
     expect(chip.contains(badge!)).toBe(true)
@@ -2043,7 +2046,7 @@ describe("REQ-159 #1322 workspace read-only tag on the chip (AC2)", () => {
     const broken = mount(() => createComponent(DraftLeaf, { projects: projectsApi([project("alpha-code", "/ws/a")]) }))
     await flush()
     await flush()
-    expect(tag(broken)).toBeNull()
+    expect(tag(broken)).not.toBeNull() // IPC rejection carries grant-failed, even with outcome unknown.
 
     // 桥缺席(installApi 没给 workspaceWriteProbe)⇒ unknown ⇒ 无标记
     resetWorkspaceWritableForTests()
@@ -2076,4 +2079,122 @@ describe("REQ-159 #1322 workspace read-only tag on the chip (AC2)", () => {
     expect(tag(host)).not.toBeNull()
     expect(chipButton(host).contains(tag(host)!)).toBe(true)
   })
+})
+
+
+test("R3 records the clicked project's server/directory before selecting it", async () => {
+  const recorded: Array<{ server: string; directory: string }> = []
+  let release!: () => void
+  window.api.recordWorkspaceOpen = (input) => {
+    recorded.push(input)
+    return new Promise((resolve) => { release = () => resolve({ recorded: true }) })
+  }
+  const host = mount(() => createComponent(DraftLeaf, { projects: projectsApi([project("alpha-code", "/ws/a"), project("beta", "/ws/b")]) }))
+  await flush()
+  await openChipAndPick(host, "beta")
+  expect(recorded).toEqual([{ server: STORE_SERVER_KEY, directory: "/ws/b" }])
+  expect(draft().directory).toBe("/ws/a")
+  expect(updateDraftCalls).toEqual([])
+  release()
+  await flush()
+  await flush()
+  expect(draft().directory).toBe("/ws/b")
+})
+
+test("a same-renderer denied folder becomes writable on its open notification; restore and rewritten directories only consume", async () => {
+  const opened = new Set<string>()
+  const records: string[] = []
+  const probes: string[] = []
+  let changed!: (target: { server: string; directory: string }) => void
+  window.api.onWorkspaceWritableChanged = (cb) => { changed = cb; return () => {} }
+  window.api.workspaceWriteProbe = async (input) => {
+    probes.push(input.directory)
+    return opened.has(input.directory) ? { outcome: "writable", grant: "granted" } : { outcome: "denied", grant: "ineligible", reason: "not-opened-by-you" }
+  }
+  window.api.recordWorkspaceOpen = async (input) => {
+    records.push(input.directory)
+    opened.add(input.directory)
+    changed(input)
+    return { recorded: true }
+  }
+  setSandboxStateForTests({ status: "ready", generation: 1, reason: "boot", fence: "applied" })
+  const host = mount(() => createComponent(DraftLeaf, { projects: projectsApi([project("alpha-code", "/ws/a")]) }))
+  await flush()
+  await flush()
+  expect(host.querySelector("[data-codepuppy-workspace-chip-readonly]")).not.toBeNull()
+  expect(records).toEqual([])
+  const before = textarea(host)
+  await openChipAndPick(host, "alpha-code")
+  await flush()
+  expect(records).toEqual(["/ws/a"])
+  expect(probes).toEqual(["/ws/a", "/ws/a"])
+  expect(textarea(host)).toBe(before)
+  expect(host.querySelector("[data-codepuppy-workspace-chip-readonly]")).toBeNull()
+  // A renderer reload clears its cache, not main's register; no gesture/entry witness is sampled.
+  resetWorkspaceWritableForTests()
+  const restored = mount(() => createComponent(DraftLeaf, { projects: projectsApi([project("alpha-code", "/ws/a")]) }))
+  await flush()
+  await flush()
+  expect(restored.querySelector("[data-codepuppy-workspace-chip-readonly]")).toBeNull()
+  setDraft({ server: STORE_SERVER_KEY, directory: "/ws/rewritten" })
+  document.body.click()
+  await flush()
+  await flush()
+  expect(records).toEqual(["/ws/a"])
+  expect(host.querySelector("[data-codepuppy-workspace-chip-readonly]")).not.toBeNull()
+})
+
+
+for (const mode of ["home", "session", "command"] as const) test(`first ${mode} work waits for this workspace's pending grant`, async () => {
+  const asked: Array<{ server: string; directory: string }> = []
+  let release!: () => void
+  resetWorkspaceWritableForTests((input) => {
+    asked.push(input)
+    return new Promise((resolve) => { release = () => resolve({ outcome: "writable", grant: "granted" }) })
+  })
+  setSandboxStateForTests({ status: "ready", generation: 1, reason: "boot", fence: "applied" })
+  commandListEntries = [{ name: "helios-brief", description: "周报", source: "skill" }]
+  const projects = projectsApi([project("alpha-code", "/ws/a")])
+  let submittedServer = STORE_SERVER_KEY
+  const host = mode === "home" ? mount(() => createComponent(CodePuppyHome, { projects, serverKey: () => submittedServer })) : mountSessionAt(projects, STORE_SERVER_KEY, "session-9").host
+  for (let i = 0; i < 30 && !textarea(host); i++) await flush()
+  type(textarea(host)!, mode === "command" ? "/helios-brief 本周" : "first work")
+  const send = () => host.querySelector<HTMLButtonElement>(".a-comp-send")!
+  for (let i = 0; i < 60 && send().disabled; i++) await flush()
+  expect(send().disabled).toBe(false)
+  send().click()
+  for (let i = 0; i < 6; i++) await flush()
+  expect(startChatCalls.length + promptAsyncCalls.length + sessionCommandCalls.length).toBe(0)
+  expect(asked).toEqual([{ server: STORE_SERVER_KEY, directory: DEFAULT_WORKSPACE }])
+  submittedServer = "remote-after-the-click"
+  release()
+  for (let i = 0; i < 30 && startChatCalls.length + promptAsyncCalls.length + sessionCommandCalls.length === 0; i++) await flush()
+  expect(mode === "home" ? startChatCalls.length : mode === "command" ? sessionCommandCalls.length : promptAsyncCalls.length).toBe(1)
+  if (mode === "home") expect(parseRoute(navigateCalls.at(-1)!)).toMatchObject({ serverKey: STORE_SERVER_KEY })
+})
+
+test("first terminal create waits for the adapter identity's grant, while existing terminal operations remain available", async () => {
+  const calls: string[] = []
+  terminalSurface = { ready: () => true, all: () => [], active: () => undefined, new: () => calls.push("new"), open: (id: string) => calls.push(`open:${id}`), requestFocus: () => {}, cancelFocus: () => {}, close: async () => {} }
+  let release!: () => void
+  const asked: Array<{ server: string; directory: string }> = []
+  resetWorkspaceWritableForTests((input) => {
+    asked.push(input)
+    return new Promise((resolve) => { release = () => resolve({ outcome: "writable", grant: "granted" }) })
+  })
+  setSandboxStateForTests({ status: "ready", generation: 1, reason: "boot", fence: "applied" })
+  const { useCodePuppyTerminalEngineChannel } = await import("../src/renderer/codepuppy-ui/session-rail/terminal/terminal-engine-adapter")
+  const host = mount(() => {
+    const channel = useCodePuppyTerminalEngineChannel(() => ({ identity: { serverKey: STORE_SERVER_KEY, directory: "/ws/terminal", sessionID: "session-9" } }) as never)
+    const button = document.createElement("button")
+    button.onclick = () => { channel()!.create(); channel()!.open("existing") }
+    return button
+  })
+  host.querySelector<HTMLButtonElement>("button")!.click()
+  await flush()
+  expect(calls).toEqual(["open:existing"])
+  expect(asked).toEqual([{ server: STORE_SERVER_KEY, directory: "/ws/terminal" }])
+  release()
+  await flush()
+  expect(calls).toEqual(["open:existing", "new"])
 })

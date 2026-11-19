@@ -1,3 +1,4 @@
+import { recordWorkspaceOpen } from "../codepuppy-ui/workspace-writable"
 // The alpha Codex-style left sidebar. Rendered (via Portal) from inside AppInterface's child
 // tree, so it has the router (useNavigate/useLocation) and opencode's command context, while
 // its data comes from the SDK (see use-projects.ts). It replaces opencode's own chrome: the
@@ -885,6 +886,7 @@ export function CodePuppySidebar(props: {
   // sidebar) so the new conversation appears in the project immediately, then navigate into it.
   // If creation fails we fall back to opencode's draft route.
   const startChat = async (worktree: string) => {
+    const submittedServerKey = props.serverKey()
     // REQ-126 AC2(#655 审计 Major):这条路径的导航发生在 `await createSession(...)` **之后**,
     // 而真实创建是多个 await(use-projects.ts:294-307)。只靠下面 navigate 里的咽喉点,慢请求
     // 或未决请求期间覆盖层会一直压在目标页面上 —— owner 报的原始症状在这条路径上照样复现。
@@ -894,11 +896,11 @@ export function CodePuppySidebar(props: {
     // #925:server 身份在**发起创建那一刻**定格 —— `createSession` 在 store 连着的 server 上建
     // 会话,await 期间 store 可能改连别处(sidecar 重启换端口),完成后再读就是别人的 key。
     // key 缺席 ⇒ store 无 client,创建注定失败:如实报失败,不建、不猜。
-    const submittedServerKey = props.serverKey()
     if (!submittedServerKey) {
       pushToast({ kind: "error", title: t("codepuppy.sidebar.newChatFailed") })
       return
     }
+    await recordWorkspaceOpen(submittedServerKey, worktree)
     const id = await createSession(worktree)
     // REQ-126 不变量 1(#656):失败**不再**回退到 `newSessionHref(worktree)` —— 那个 href 就是
     // legacy admission 路由(sidebar/route.ts 的 directorySession),回退等于给 alpha 自己留了
@@ -968,10 +970,13 @@ export function CodePuppySidebar(props: {
     return key ? hrefFor.session(key, id) : undefined
   }
 
-  const openSession = (e: MouseEvent, id: string) => {
+  const openSession = async (e: MouseEvent, session: CodePuppySession) => {
     e.preventDefault()
-    const href = sessionLink(id)
-    if (href) navigate(href)
+    const server = props.serverKey()
+    const sessionID = session.id
+    if (!server) return
+    await recordWorkspaceOpen(server, session.directory)
+    navigate(hrefFor.session(server, sessionID))
   }
 
   return (
@@ -1392,7 +1397,7 @@ export function CodePuppySidebar(props: {
                                       class="codepuppy-session"
                                       href={sessionLink(session.id)}
                                       data-active={viewingSessionId() === session.id ? "" : undefined}
-                                      onClick={(e) => openSession(e, session.id)}
+                                      onClick={(e) => openSession(e, session)}
                                     >
                                       <span class="codepuppy-session-title">{sessionDisplayTitle(session.title)}</span>
                                     </a>

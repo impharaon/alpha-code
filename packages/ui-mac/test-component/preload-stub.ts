@@ -104,6 +104,8 @@ export type AbsentOnPurposeKey =
   | "sidecarGeneration"
   | "ext"
   | "workspaceWriteProbe"
+  | "recordWorkspaceOpen"
+  | "onWorkspaceWritableChanged"
   | "startupTimeline"
   // ② 按需由消费方经 extras 注入(返回值就是该文件的判据)
   | "workspaceDefaultDir"

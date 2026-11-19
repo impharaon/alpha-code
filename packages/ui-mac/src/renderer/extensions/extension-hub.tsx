@@ -404,6 +404,15 @@ export function ExtensionHub(props: {
   // REQ-019 T2:详情页目标(catalog 条目或引擎 agent)。非空 = 当前 tab 内下钻显示详情页。
   const [detail, setDetail] = createSignal<DetailTarget | null>(null)
   const [managedPackageId, setManagedPackageId] = createSignal<string | null>(null)
+  // 管理页名称下的说明:与列表行同一来源(目录视图 → 目录条目 → 组成类型)。
+  const managedDescription = (pack: InstalledPackageV1) => {
+    const entry = installableEntries().find((candidate) => candidate.id === pack.packageId)
+    return (
+      catalog().packages?.find((view) => view.catalogId === pack.packageId)?.presentation.description ??
+      (entry ? catalogDescription(entry) : undefined) ??
+      pack.components.map((component) => typeLabel(component.kind as InstallReceipt["type"])).join(" · ")
+    )
+  }
   const managedPackage = () => { const state = installedPackages(); return state?.ok ? state.packages.find((pack) => pack.packageId === managedPackageId()) : undefined }
   createEffect(() => {
     if (!props.open()) return
@@ -1483,6 +1492,17 @@ export function ExtensionHub(props: {
     )
   }
 
+  // 出厂内置技能的显示名:应用自己起的名字用中文,id 只留在悬停提示与技术详情里。
+  const FACTORY_NAME_KEYS = {
+    "plugin-helper": "codepuppy.ext.pluginHelperName",
+    "agent-creator": "codepuppy.ext.factoryName.agent-creator",
+    "customize-codepuppy": "codepuppy.ext.factoryName.customize-codepuppy",
+    "integrate-project": "codepuppy.ext.factoryName.integrate-project",
+    "codepuppy-workspace": "codepuppy.ext.factoryName.codepuppy-workspace",
+    "cloud-capabilities": "codepuppy.ext.factoryName.cloud-capabilities",
+    "office-docs": "codepuppy.ext.factoryName.office-docs",
+  } as const
+  const factoryDisplayName = (id: string) => (id in FACTORY_NAME_KEYS ? t(FACTORY_NAME_KEYS[id as keyof typeof FACTORY_NAME_KEYS]) : id)
   // 出厂内置技能(skill-creator 等):技能页「系统」分段。有目录条目的可进详情页。
   const FactorySkillRow = (cp: { name: string }) => {
     const entry = () => installableEntries().find((e) => e.type === "skill" && e.name === cp.name)
@@ -1497,7 +1517,7 @@ export function ExtensionHub(props: {
         <span class="codepuppy-ext-kit-ic"><KitIc id={cp.name === "plugin-helper" ? cp.name : entry()?.id} glyph={ic.glyph} /></span>
         <div class="codepuppy-ext-kit-body">
           <div class="codepuppy-ext-kit-ttl">
-            <b title={cp.name}>{entry()?.displayName ?? (cp.name === "plugin-helper" ? t("codepuppy.ext.pluginHelperName") : cp.name)}</b>
+            <b title={cp.name}>{entry()?.displayName ?? factoryDisplayName(cp.name)}</b>
           </div>
           <div class="codepuppy-ext-kit-desc">{entry() ? catalogDescription(entry()!) : t(cp.name === "plugin-helper" ? "codepuppy.ext.pluginHelperDescription" : "codepuppy.ext.factoryBuiltin")}</div>
         </div>
@@ -2346,7 +2366,7 @@ export function ExtensionHub(props: {
                     sessionBusyFor={(id) => sessionBusy() === id}
                     onSessionToggle={runSessionToggle}
                   />}</Show>}>
-                    {(pack) => <InstalledPackageDetail pack={pack()} label={packLabel(pack())} crumb={sectionLabel()} view={catalog().packages?.find((view) => view.catalogId === pack().packageId)} ext={ext} directory={projectDir()} menu={<MoreMenu id={`manage:${pack().packageId}`} label={t("codepuppy.ext.packageManageName", { name: packLabel(pack()) })} items={packageMenu(pack())} />} error={packErr()[pack().packageId]} onBack={() => setManagedPackageId(null)} />}
+                    {(pack) => <InstalledPackageDetail pack={pack()} label={packLabel(pack())} crumb={sectionLabel()} view={catalog().packages?.find((view) => view.catalogId === pack().packageId)} description={managedDescription(pack())} ext={ext} directory={projectDir()} menu={<MoreMenu id={`manage:${pack().packageId}`} label={t("codepuppy.ext.packageManageName", { name: packLabel(pack()) })} items={packageMenu(pack())} />} error={packErr()[pack().packageId]} onBack={() => setManagedPackageId(null)} />}
                   </Show>
                 }
               >

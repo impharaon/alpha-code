@@ -137,6 +137,7 @@ const runtime = await import("../src/renderer/sidebar/overlay-close-test-runtime
 const { hrefFor } = await import("../src/shared/route-manifest")
 const extHubState = await import("../src/renderer/extensions/ext-hub-state")
 const automationState = await import("../src/renderer/automations/automation-state")
+const settingsState = await import("../src/renderer/codepuppy-ui/settings-state")
 const toastApi = await import("../src/renderer/codepuppy-ui/Toast")
 const sidebarState = await import("../src/renderer/sidebar/sidebar-state")
 
@@ -174,6 +175,8 @@ function makeProjects(overrides?: { createSession?: () => Promise<string | undef
 const OVERLAYS = [
   { name: "定制中心 ExtensionHub", navLabel: zh["codepuppy.sidebar.plugins"], host: "[data-codepuppy-ext-hub]", page: ".codepuppy-ext-page" },
   { name: "自动化 AutomationPanel", navLabel: zh["codepuppy.sidebar.automation"], host: "[data-codepuppy-automations]", page: ".codepuppy-auto-page" },
+  // 设置是顶级页面(BR-01),没有退出键:离开它只有导航。入口是账户菜单里的「设置」,不是窄轨按钮。
+  { name: "设置 CodePuppySettings", navLabel: zh["codepuppy.sidebar.settings"], host: "[data-codepuppy-settings-host]", page: "[data-codepuppy-settings]" },
 ] as const
 
 const disposers: Array<() => void> = []
@@ -192,6 +195,7 @@ beforeEach(() => {
   document.body.append(root)
   extHubState.setExtHubOpen(false)
   automationState.setAutomationOpen(false)
+  settingsState.setSettingsOpen(false)
 })
 
 afterEach(() =>
@@ -246,7 +250,11 @@ function click(el: Element) {
 
 /** 真的点侧栏那个 nav 项来打开覆盖层 —— 不用信号直接置位,开与关走同一条生产路径。 */
 async function open(overlay: (typeof OVERLAYS)[number]) {
-  click(navItem(overlay.navLabel))
+  if (overlay.page === "[data-codepuppy-settings]") {
+    click(query(".codepuppy-rail-avatar"))
+    await flush()
+    click(query('[data-codepuppy-acct-item="settings"]'))
+  } else click(navItem(overlay.navLabel))
   await flush()
 }
 
@@ -287,7 +295,7 @@ const NAVIGATIONS: Array<{
 ]
 
 describe("REQ-126 AC2:覆盖层随导航关闭(真实宿主 × 真实点击)", () => {
-  test("前提自检:两个覆盖层都能挂起来,且默认不在场", async () => {
+  test("前提自检:每个覆盖层都能挂起来,且默认不在场", async () => {
     await mount(CURRENT_HREF)
     for (const overlay of OVERLAYS) {
       expect(document.querySelector(overlay.host), `${overlay.name} 的 portal 宿主未挂载`).not.toBeNull()
@@ -407,6 +415,25 @@ describe("I-17 / AC-06:顶级页面的定制中心", () => {
     // 再点一次定制中心入口 = 关闭,回到打开前的会话,路由没动。
     await open(OVERLAYS[0])
     expect(overlayPresent(OVERLAYS[0])).toBe(false)
+    expect(history.get()).toBe(CURRENT_HREF)
+  })
+
+  test("BR-01 自动化与设置也是顶级页面:用壳的页面容器 .codepuppy-page,顶栏写页名,页内没有退出键;进入另一页即离开", async () => {
+    const history = await mount(CURRENT_HREF)
+    for (const overlay of OVERLAYS.slice(1)) {
+      await open(overlay)
+      const page = query<HTMLElement>(`${overlay.host} ${overlay.page}`)
+      expect(page.classList.contains("codepuppy-page"), `${overlay.name} 没用 .codepuppy-page`).toBe(true)
+      const title = overlay.page === ".codepuppy-auto-page" ? zh["codepuppy.sidebar.automation"] : zh["codepuppy.sidebar.settings"]
+      expect(query(".codepuppy-topbar-page").textContent).toBe(title)
+      // 冻结稿没有画退出键:页头里除页签 / 保存 / 面包屑外没有「关闭」类按钮。
+      expect(page.querySelector(".codepuppy-auto-close, .codepuppy-settings-back"), `${overlay.name} 还画着退出键`).toBeNull()
+      expect(page.querySelector(`[aria-label="${zh["codepuppy.ext.close"]}"]`)).toBeNull()
+    }
+    // 设置开着时点窄轨「定制中心」:设置被替换(同一时刻只有一页)。
+    await open(OVERLAYS[0])
+    expect(overlayPresent(OVERLAYS[2])).toBe(false)
+    expect(overlayPresent(OVERLAYS[0])).toBe(true)
     expect(history.get()).toBe(CURRENT_HREF)
   })
 

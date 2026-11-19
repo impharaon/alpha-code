@@ -5,7 +5,7 @@
  * verify-before-open, the timeline focus mount point, and identity-keyed remounts (I8).
  */
 
-import { createSignal } from "solid-js"
+import { createSignal, type Accessor } from "solid-js"
 import type { ArtifactCard, DownloadPhase } from "../../artifact-workbench/workbench-core"
 import type { PreviewContext } from "../../artifact-workbench/renderers/renderer-views"
 import {
@@ -18,9 +18,17 @@ import {
   type CodePuppySessionLiveContext,
   type SessionRailApi,
 } from "../../session-workspace/session-workspace-shell"
-import type { ArtifactSaveReceipt, ArtifactsPhase, ArtifactsScope, RunDelivery, RunOwner, RunRowModel } from "./artifacts-core"
+import type {
+  ArtifactSaveReceipt,
+  ArtifactsPhase,
+  ArtifactsScope,
+  LocalArtifactRow,
+  RunDelivery,
+  RunOwner,
+  RunRowModel,
+} from "./artifacts-core"
 import { SessionRailArtifactsView } from "./artifacts-panel-view"
-import { SessionRailArtifacts, type SessionParentOf } from "./session-rail-artifacts"
+import { SessionRailArtifacts, type SessionMessagesOf, type SessionParentOf } from "./session-rail-artifacts"
 
 export function fakeCard(input: Partial<ArtifactCard> & { key: string; name: string }): ArtifactCard {
   return { state: "verified", bytes: 1024, warnings: [], downloadable: false, ...input }
@@ -57,7 +65,9 @@ export function createArtifactsViewHarness() {
   const [deliveries, setDeliveries] = createSignal<Record<string, RunDelivery>>({})
   const [saveReceipt, setSaveReceipt] = createSignal<ArtifactSaveReceipt | null>(null)
   const [verifyFailure, setVerifyFailure] = createSignal<string | undefined>()
+  const [local, setLocal] = createSignal<ArtifactsPanelLocal>({ status: "ready", rows: [] })
   const calls = {
+    openLocal: [] as string[],
     scope: [] as ArtifactsScope[],
     retryDelivery: 0,
     save: 0,
@@ -76,6 +86,10 @@ export function createArtifactsViewHarness() {
     <SessionRailArtifactsView
       phase={phase()}
       errorReason={errorReason()}
+      local={local()}
+      onOpenLocal={(path) => {
+        calls.openLocal.push(path)
+      }}
       scope={scope()}
       onScope={(next) => {
         calls.scope.push(next)
@@ -154,8 +168,11 @@ export function createArtifactsViewHarness() {
     setDeliveries,
     setSaveReceipt,
     setVerifyFailure,
+    setLocal,
   }
 }
+
+type ArtifactsPanelLocal = { status: "loading" } | { status: "error" } | { status: "ready"; rows: readonly LocalArtifactRow[] }
 
 function snapshotFor(sessionID: string): CodePuppySessionLiveSnapshot {
   return {
@@ -167,7 +184,11 @@ function snapshotFor(sessionID: string): CodePuppySessionLiveSnapshot {
 }
 
 /** Real shell + real artifacts container; the cases file supplies the fake preload channel. */
-export function createArtifactsShellHarness(options?: { parentOf?: SessionParentOf }) {
+export function createArtifactsShellHarness(options?: {
+  parentOf?: SessionParentOf
+  messagesOf?: SessionMessagesOf
+  localRevision?: Accessor<string>
+}) {
   const [current, setCurrent] = createSignal<CodePuppySessionLiveSnapshot | undefined>(snapshotFor("ses_a"))
   const live: CodePuppySessionLiveContext = {
     current,
@@ -187,7 +208,15 @@ export function createArtifactsShellHarness(options?: { parentOf?: SessionParent
             </button>
           )
         },
-        artifacts: (rail) => <SessionRailArtifacts live={live} rail={rail} parentOf={options?.parentOf} />,
+        artifacts: (rail) => (
+          <SessionRailArtifacts
+            live={live}
+            rail={rail}
+            parentOf={options?.parentOf}
+            messagesOf={options?.messagesOf}
+            localRevision={options?.localRevision}
+          />
+        ),
       }}
     />
   )

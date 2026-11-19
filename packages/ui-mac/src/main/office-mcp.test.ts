@@ -364,6 +364,25 @@ describe.skipIf(!darwin)("REQ-133 Alpha first-party Office MCP resources", () =>
     180_000,
   )
 
+  testFormat("pdf")(
+    "write_pdf keeps Chinese text: read back as the same characters from an embedded TrueType font, long lines wrapped inside the page",
+    async () => {
+      // 已知的坏(验证实测):字体写死 Helvetica ⇒ 每个汉字都是方框,读回是「■■■ ■■ PDF ■■」,产物里没有嵌入任何字体。
+      const path = join(workspace, "chinese.pdf")
+      // 90 个汉字:11 pt 下约 990 pt 宽,A4 去掉两侧 54 pt 边距只有约 487 pt —— 一行放不下,必须折行。
+      const long = "云端生成的中文报告正文".repeat(9)
+      const pages = ["第一页 中文 PDF 内容", long]
+      const messages = await exchange(commandFor("pdf"), [initialize(), call(2, "write_pdf", { path, pages }), call(3, "read_pdf", { path })])
+      expect(payload(messages, 2).pagesWritten).toBe(2)
+      const read = payload(messages, 3).pages as string[]
+      expect(read.map((page) => page.replace(/\s+/g, ""))).toEqual(pages.map((page) => page.replace(/\s+/g, "")))
+      expect(read[1]!.trim().split("\n").length).toBeGreaterThan(1)
+      // 字体嵌入在产物本身里(TrueType 字形流),不靠看图的机器上碰巧有这个字体。
+      expect(await Bun.file(path).text()).toContain("/FontFile2")
+    },
+    180_000,
+  )
+
   test("absolute paths with traversal segments are rejected before format code runs", async () => {
     const path = `${workspace}/nested/../escape.docx`
     const messages = await exchange(

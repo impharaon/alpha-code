@@ -193,7 +193,7 @@
   /* ── Layout ──────────────────────────────────────────────────────────── */
   --a-rail-w: 48px;
   --a-topbar-h: 44px;
-  --a-frame-gap: 8px;  /* working surface to the window's right/bottom edge */
+  --a-frame-gap: 4px;  /* working surface to the window's right/bottom edge (owner 2026-11-18/19: gray band narrowed 8 → 4px) */
   /* macOS 26.3.1: NSWindow `_cornerRadius` of a titled + fullSizeContentView window without a toolbar
      (= Electron titleBarStyle "hidden", windows.ts) is 16. The working surface sits --a-frame-gap inside
      the window edge, so its radius is the window radius minus that gap. */

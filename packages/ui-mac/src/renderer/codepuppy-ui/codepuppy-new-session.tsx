@@ -21,6 +21,7 @@ import { newSessionDraftStash } from "./new-session-draft-stash"
 import { CodePuppyWorkspaceChip, visibleWorkspaces } from "./workspace-chip"
 import { useWorkspaceWritable } from "./workspace-writable"
 import { Banner } from "./Banner"
+import { HomeRightPanel } from "./home-right-panel"
 import { ConfigBrokenBanner } from "./config-broken-banner"
 import { pushToast } from "./Toast"
 import { t } from "../i18n"
@@ -177,6 +178,8 @@ export function CodePuppyNewSession(props: {
           </Show>
         </div>
       </div>
+      {/* BR-05:新对话页是用户实际落到的「首页」—— 右栏(文件 / 终端)与首页同一组件,开合读同一个信号。 */}
+      <HomeRightPanel directory={activeWs} serverKey={props.serverKey} />
     </div>
   )
 }

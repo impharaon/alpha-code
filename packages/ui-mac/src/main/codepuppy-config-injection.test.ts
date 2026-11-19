@@ -650,7 +650,7 @@ describe("web search 主权在 2.x 权限规则里仍成立(#223)", () => {
     givenLoggedInWithByok()
     doc.cloudMcpUrl = "https://cloud.example/mcp"
     const { config } = inject(EXT_DIR)
-    expect(config.mcp?.servers?.codepuppy).toEqual({ type: "remote", url: "https://cloud.example/mcp", disabled: true, oauth: false })
+    expect(config.mcp?.servers?.codepuppy).toEqual({ type: "remote", url: "https://cloud.example/mcp", disabled: true, oauth: false, codemode: false })
   })
 
   test("`#1698` 继承/伪造的旧云 MCP 交接变量与地址变量不再有人读:注入面只按启动文档写云 server", () => {

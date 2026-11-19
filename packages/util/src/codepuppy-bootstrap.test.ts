@@ -40,6 +40,7 @@ const valid = () => ({
       url: "https://cloud.codepuppy.example/mcp",
       headers: { Authorization: "Bearer {file:/u/data/codepuppy-secrets/CODEPUPPY_MCP_TOKEN}" },
       oauth: false,
+      codemode: false,
     },
   },
   webSearch: { killSwitch: false },
@@ -128,6 +129,12 @@ describe("G2 fields: secrets cannot be written into the document", () => {
       reason: "invalid",
       path: "cloudMcp.definition.headers.Cookie",
     })
+  })
+
+  test("the cloud definition keeps its tools direct (codemode false); absent or true is invalid", () => {
+    const { codemode: _, ...rest } = valid().cloudMcp.definition
+    expect(failure({ ...valid(), cloudMcp: { ...valid().cloudMcp, definition: rest } })).toMatchObject({ reason: "invalid", path: "cloudMcp.definition.codemode" })
+    expect(failure({ ...valid(), cloudMcp: { ...valid().cloudMcp, definition: { ...rest, codemode: true } } })).toMatchObject({ reason: "invalid", path: "cloudMcp.definition.codemode" })
   })
 
   test("the two URL fields accept only credential-free URLs", () => {

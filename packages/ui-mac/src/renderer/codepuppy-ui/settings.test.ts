@@ -542,16 +542,19 @@ describe("Alpha Settings real Solid render", () => {
     expect(document.querySelector("[data-codepuppy-settings]")).not.toBeNull()
   })
 
-  test("keeps keyboard focus within the full-page surface", async () => {
+  test("BR-01 设置是顶级页面:在 .codepuppy-page 容器里,没有退出键,键盘焦点不被圈住(侧栏与窄轨仍可达)", async () => {
     mount(api())
     await flush()
     const surface = document.querySelector<HTMLElement>("[data-codepuppy-settings]")!
+    expect(surface.classList.contains("codepuppy-page")).toBe(true)
+    expect(surface.getAttribute("role")).toBe("region")
+    expect(surface.getAttribute("aria-modal")).toBeNull()
+    expect(surface.querySelector(".codepuppy-settings-back, [aria-label='返回应用']")).toBeNull()
     const focusable = Array.from(surface.querySelectorAll<HTMLElement>("button:not([disabled]), input:not([disabled])"))
     focusable[0]!.focus()
-    focusable[0]!.dispatchEvent(
-      new KeyboardEvent("keydown", { key: "Tab", shiftKey: true, bubbles: true, cancelable: true }),
-    )
-    expect(document.activeElement).toBe(focusable.at(-1))
+    const shiftTab = new KeyboardEvent("keydown", { key: "Tab", shiftKey: true, bubbles: true, cancelable: true })
+    focusable[0]!.dispatchEvent(shiftTab)
+    expect(shiftTab.defaultPrevented).toBe(false)
   })
 })
 

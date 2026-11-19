@@ -4,6 +4,8 @@ import {
   artifactsIdentityKeyOf,
   artifactsPhaseOf,
   findArtifactCard,
+  localArtifactRowOf,
+  localFileStateOf,
   runMomentOf,
   runRowModelOf,
   shortRunId,
@@ -12,6 +14,41 @@ import {
 function card(input: Partial<ArtifactCard> & { key: string }): ArtifactCard {
   return { name: input.key, state: "verified", bytes: 1, warnings: [], downloadable: false, ...input }
 }
+
+describe("DESIGN-local-session-artifacts §4.4 没有 run 那一支看本机清单", () => {
+  const noRun = { usage: { ok: true }, runId: undefined, list: undefined, cloud: undefined, cardCount: 0 }
+  const item = { path: "out/r.md", name: "r.md", writtenAt: 1, sessionID: "ses", partID: "prt" }
+  test("本机未回答 = loading;读失败 = error;有本机产物 = local-only;都没有 = 原来的空态", () => {
+    expect(artifactsPhaseOf(noRun)).toBe("loading")
+    expect(artifactsPhaseOf({ ...noRun, local: { ok: false } })).toBe("error")
+    expect(artifactsPhaseOf({ ...noRun, local: { ok: true, items: [item] } })).toBe("local-only")
+    expect(artifactsPhaseOf({ ...noRun, local: { ok: true, items: [item] }, scopeHidesRuns: true })).toBe("local-only")
+    expect(artifactsPhaseOf({ ...noRun, local: { ok: true, items: [] }, scopeHidesRuns: true })).toBe("empty-scope")
+    expect(artifactsPhaseOf({ ...noRun, local: { ok: true, items: [] } })).toBe("empty")
+  })
+
+  test("有 run 的各支不看本机清单", () => {
+    const base = { usage: { ok: true }, runId: "job_1", list: { ok: true }, cloud: { ok: true } }
+    expect(artifactsPhaseOf({ ...base, cardCount: 1, local: { ok: false } })).toBe("cards")
+    expect(artifactsPhaseOf({ ...base, cardCount: 0 })).toBe("empty-run")
+  })
+
+  test("行状态:ok → present;not-found → 文件缺失;其余拒绝码与没有结果 → unknown(可点,查看器给真状态)", () => {
+    expect(localFileStateOf({ ok: true })).toBe("present")
+    expect(localFileStateOf({ ok: false, code: "not-found" })).toBe("missing")
+    expect(localFileStateOf({ ok: false, code: "symlink" })).toBe("unknown")
+    expect(localFileStateOf(undefined)).toBe("unknown")
+    const now = new Date(2026, 10, 19, 15, 0)
+    expect(localArtifactRowOf({ ...item, path: "out/q3.xlsx", name: "q3.xlsx", writtenAt: new Date(2026, 10, 19, 9, 5).getTime() }, "missing", now)).toEqual({
+      path: "out/q3.xlsx",
+      name: "q3.xlsx",
+      dir: "out/",
+      label: "XLSX",
+      moment: { kind: "today", time: "09:05" },
+      file: "missing",
+    })
+  })
+})
 
 describe("REQ-125 C4 artifacts phase (fail-closed)", () => {
   const base = { usage: { ok: true }, runId: "job_1", list: { ok: true }, cloud: { ok: true } }
@@ -24,7 +61,8 @@ describe("REQ-125 C4 artifacts phase (fail-closed)", () => {
   })
 
   test("两种空是两个相位:没有任何 run = empty;这一次已证实没有产物 = empty-run(#660)", () => {
-    expect(artifactsPhaseOf({ usage: { ok: true }, runId: undefined, list: undefined, cloud: undefined, cardCount: 0 })).toBe("empty")
+    const none = { ok: true as const, items: [] }
+    expect(artifactsPhaseOf({ usage: { ok: true }, runId: undefined, list: undefined, cloud: undefined, cardCount: 0, local: none })).toBe("empty")
     expect(artifactsPhaseOf({ ...base, cardCount: 0 })).toBe("empty-run")
     expect(artifactsPhaseOf({ ...base, cardCount: 2 })).toBe("cards")
   })

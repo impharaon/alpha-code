@@ -4,6 +4,6 @@
   "entries": 26,
   "sha256": "17c4c1bbcbc68f445827c38458393dc657dddc1ba8cba5047eeda6a0c52931bf",
   "source": "https://codepuppy.cn/catalog/v1/catalog.json",
-  "fetchedAt": "2026-11-18T11:44:33.480Z",
+  "fetchedAt": "2026-11-19T06:19:24.434Z",
   "_note": "由 scripts/sync-catalog-snapshot.mjs 生成;codepuppy-catalog.json 禁手编(REQ-046),上架/撤架唯一动作在 alpha-web catalog-src。"
 }

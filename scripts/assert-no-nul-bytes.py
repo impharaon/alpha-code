@@ -73,6 +73,9 @@ EXCLUDED_PREFIXES = (
     # seed.lock.json 一起保证,内容也不是本仓作者写的(实测含 TrueType 字体与 UTF-8 文本)。
     # 它既不是「源文件」,也没人能在不改文件名的前提下往里塞东西。
     "packages/ui-mac/resources/extension-seed/blobs/",
+    # 云端产物的真实生产采样:文件名是云端 artifact id(无扩展名,所以 BINARY_SUFFIXES 罩不住),
+    # 内容是云端返回的真 PNG 字节,用来断言宿主落地的文件是真 PNG。不是源文件,不能改写。
+    "packages/ui-mac/test-component/fixtures/cloud-artifacts/",
 )
 
 # 扫描文件数的地板。当前实际约 7.3k;取 4000 留大余量,只抓**灾难性丢失**

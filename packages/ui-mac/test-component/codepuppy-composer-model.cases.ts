@@ -1010,7 +1010,7 @@ describe("CodePuppyComposer production model seam", () => {
     await waitFor(() => expect(document.body.textContent).toContain(zh["codepuppy.model.keyReadFailed"]))
     failing = false
     const retry = [...document.body.querySelectorAll<HTMLButtonElement>('button')].find((button) =>
-      button.closest('[role="alert"]')?.textContent?.includes("KEY 状态读取失败"),
+      button.closest('[role="alert"]')?.textContent?.includes(zh["codepuppy.model.keyFailed"]),
     )
     click(retry ?? null)
 
@@ -1168,7 +1168,7 @@ describe("ModelPickPop production component", () => {
       expect(mounted.host.textContent).toContain(zh["codepuppy.model.engineConnecting"])
     })
     expect(mounted.host.textContent).not.toContain(zh["codepuppy.model.accountFailed"])
-    expect(mounted.host.textContent).not.toContain("未配置 KEY")
+    expect(mounted.host.textContent).not.toContain(zh["codepuppy.model.keyMissing"])
     expect(mounted.host.textContent).not.toContain("需登录")
     expect(mounted.host.textContent).not.toContain("余额不足")
     const keyAlert = [...mounted.host.querySelectorAll('[role="alert"]')].find((node) =>

@@ -108,6 +108,8 @@ type FakeOptions = {
   sessionByRun?: Record<string, string | null>
   /** REQ-236 #1552: tracker snapshot per run (cloud.getRunState); default null. */
   runState?: (run: string) => unknown
+  /** DESIGN-local-session-artifacts §4.5: workspaceFile.stat answer per path; default = present. */
+  stat?: (path: string) => unknown
 }
 
 function installFakeRunArtifacts(entriesByRun: Record<string, unknown[]>, options?: FakeOptions) {
@@ -120,6 +122,7 @@ function installFakeRunArtifacts(entriesByRun: Record<string, unknown[]>, option
     download: [] as string[],
     cancel: [] as string[],
     retry: [] as string[],
+    stat: [] as string[][],
   }
   const runSavedListeners = new Set<(e: { directory: string; runId: string }) => void>()
   const progressListeners = new Set<(p: unknown) => void>()
@@ -136,6 +139,12 @@ function installFakeRunArtifacts(entriesByRun: Record<string, unknown[]>, option
   })
   const runStateListeners = new Set<(state: unknown) => void>()
   ;(window as never as Record<string, unknown>).api = {
+    workspaceFile: {
+      stat: async (_dir: string, paths: string[]) => {
+        calls.stat.push(paths)
+        return paths.map((path) => (options?.stat ? options.stat(path) : { ok: true, size: 5 }))
+      },
+    },
     runArtifacts: {
       projectUsage: async () => {
         calls.projectUsage += 1
@@ -1194,5 +1203,122 @@ describe("REQ-236 #1552 本次对话 / 项目全部(真容器,真 shell)", () =>
     await flushTimers()
     expect(host.querySelector("[data-artifacts-scope]")!.getAttribute("data-artifacts-scope")).toBe("session")
     expect(await runRows()).toEqual(["job_b"])
+  })
+})
+
+// ── DESIGN-local-session-artifacts:本机产物(真容器、真 shell;消息页形状取自真引擎经生产适配器读回的那一页)──────────────
+const LOCAL_DIR = DIR
+const builtinDisplay = (name: string) => ({ identity: { source: "builtin", origin: "", name }, technicalId: name, authority: { kind: "not-asserted" }, location: { kind: "local" } })
+let localSeq = 0
+function writePart(path: string, end: number) {
+  return { id: `prt_l${++localSeq}`, sessionID: "ses_a", messageID: "msg_l", type: "tool", tool: "write", callID: `c${localSeq}`, display: builtinDisplay("write"), state: { status: "completed", input: { path, filePath: path, content: "x" }, metadata: {}, time: { start: end - 1, end } } }
+}
+function officePart(path: string, end: number) {
+  return { id: `prt_l${++localSeq}`, sessionID: "ses_a", messageID: "msg_l", type: "tool", tool: "execute", callID: `c${localSeq}`, state: { status: "completed", input: { code: "" }, metadata: { toolCalls: [{ tool: "codepuppy-excel.write_xlsx", status: "completed", input: { path } }] }, time: { start: end - 1, end } } }
+}
+const localPage = (...parts: unknown[]) => [{ info: { id: "msg_l", sessionID: "ses_a", role: "assistant" }, parts }]
+const at = (hour: number, minute: number) => new Date(2026, 10, 19, hour, minute).getTime()
+
+describe("DESIGN-local-session-artifacts 产物页的本机产物(真容器,真 shell)", () => {
+  test("没有云端 run:「在本机生成」按最近在前列出;文件缺失的行标「文件缺失」不可点;点在的那行进文件面板查看器", async () => {
+    const fake = installFakeRunArtifacts({}, { stat: (path) => (path === "out/q3.xlsx" ? { ok: false, code: "not-found" } : { ok: true, size: 5 }) })
+    const shell = runtime.createArtifactsShellHarness({
+      messagesOf: async () => localPage(officePart(`${LOCAL_DIR}/out/q3.xlsx`, at(9, 5)), writePart("report.md", at(10, 30)), writePart("src/app.ts", at(11, 0))),
+    })
+    const host = mount(shell.Shell)
+    await openArtifactsTab(host)
+    await flushTimers()
+
+    expect(host.querySelector("[data-codepuppy-session-artifacts]")!.getAttribute("data-artifacts-phase")).toBe("local-only")
+    const section = host.querySelector("[data-artifacts-local]")!
+    expect(section.querySelector(".a-rart-label")!.textContent).toBe(i18n.t("codepuppy.session.artifactsLocalTitle"))
+    const rows = [...section.querySelectorAll<HTMLButtonElement>("[data-local-artifact]")]
+    expect(rows.map((row) => row.getAttribute("data-local-artifact"))).toEqual(["report.md", "out/q3.xlsx"])
+    expect(fake.calls.stat).toEqual([["report.md", "out/q3.xlsx"]])
+    const missing = rows[1]!
+    expect(missing.getAttribute("data-local-file")).toBe("missing")
+    expect(missing.disabled).toBe(true)
+    expect(missing.querySelector(".a-wb-chip[data-state='missing']")!.textContent).toBe(i18n.t("codepuppy.wb.state.missing"))
+    expect(missing.textContent).toContain("out/")
+    expect(rows[0]!.getAttribute("data-local-file")).toBe("present")
+    expect(rows[0]!.querySelector(".a-wb-chip[data-state='missing']")).toBeNull()
+
+    missing.click()
+    await flush()
+    expect(shell.rail().fileViewerTarget()).toBeUndefined()
+    rows[0]!.click()
+    await flushTimers()
+    expect(shell.rail().fileViewerTarget()?.file).toBe("report.md")
+  })
+
+  test("和云端 run 并列:本机区在 run 条之上;「项目全部」下标「本次对话」;没有本机产物也没有 run 时空态文案不变", async () => {
+    installFakeRunArtifacts({ job_a: [manifestEntry("art-a", "云端报告.md")] }, { updatedAtByRun: { job_a: "2026-11-19T01:00:00Z" } })
+    const shell = runtime.createArtifactsShellHarness({ messagesOf: async () => localPage(writePart("page.html", at(9, 0))) })
+    const host = mount(shell.Shell)
+    await openArtifactsTab(host)
+    await flushTimers()
+
+    const local = host.querySelector("[data-artifacts-local]")!
+    const runbar = host.querySelector("[data-artifacts-runbar]")!
+    expect(local.compareDocumentPosition(runbar) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(host.querySelector("[data-codepuppy-session-artifacts]")!.getAttribute("data-artifacts-phase")).toBe("cards")
+    expect(local.querySelector("[data-run-owner]")).toBeNull()
+    host.querySelector<HTMLButtonElement>("[data-scope='project']")!.click()
+    await flushTimers()
+    expect(host.querySelector("[data-artifacts-local] [data-run-owner='this']")!.textContent).toBe(i18n.t("codepuppy.session.artifactsOwnerThis"))
+    unmountAll()
+
+    installFakeRunArtifacts({})
+    const empty = runtime.createArtifactsShellHarness({ messagesOf: async () => localPage(writePart("src/app.ts", at(9, 0))) })
+    const emptyHost = mount(empty.Shell)
+    await openArtifactsTab(emptyHost)
+    await flushTimers()
+    expect(emptyHost.querySelector("[data-codepuppy-session-artifacts]")!.getAttribute("data-artifacts-phase")).toBe("empty")
+    expect(emptyHost.querySelector("[data-artifacts-empty] p")!.textContent).toBe(i18n.t("codepuppy.session.artifactsEmptyDetail"))
+    expect(emptyHost.querySelector("[data-artifacts-local]")).toBeNull()
+  })
+
+  test("同步 store 出现新的写成事实 ⇒ 重读全量,新文档出现;读失败:有 run 时只在本机区说读不到 + 重试,没有 run 时是 error", async () => {
+    installFakeRunArtifacts({})
+    let parts: unknown[] = [writePart("a.md", at(9, 0))]
+    let reads = 0
+    const [revision, setRevision] = solid.createSignal("a")
+    const shell = runtime.createArtifactsShellHarness({
+      messagesOf: async () => {
+        reads += 1
+        return localPage(...parts)
+      },
+      localRevision: revision,
+    })
+    const host = mount(shell.Shell)
+    await openArtifactsTab(host)
+    await flushTimers()
+    const paths = () => [...host.querySelectorAll("[data-local-artifact]")].map((row) => row.getAttribute("data-local-artifact"))
+    expect(paths()).toEqual(["a.md"])
+    const before = reads
+    parts = [...parts, writePart("b.md", at(9, 30))]
+    setRevision("b")
+    await flushTimers()
+    await flushTimers()
+    expect(reads).toBe(before + 1)
+    expect(paths()).toEqual(["b.md", "a.md"])
+    unmountAll()
+
+    installFakeRunArtifacts({ job_a: [manifestEntry("art-a", "云端报告.md")] })
+    const failing = runtime.createArtifactsShellHarness({ messagesOf: async () => Promise.reject(new Error("offline")) })
+    const failingHost = mount(failing.Shell)
+    await openArtifactsTab(failingHost)
+    await flushTimers()
+    expect(failingHost.querySelector("[data-codepuppy-session-artifacts]")!.getAttribute("data-artifacts-phase")).toBe("cards")
+    expect(failingHost.querySelector("[data-artifacts-local-failed]")!.textContent).toContain(i18n.t("codepuppy.wb.listFailed"))
+    unmountAll()
+
+    installFakeRunArtifacts({})
+    const failingEmpty = runtime.createArtifactsShellHarness({ messagesOf: async () => Promise.reject(new Error("offline")) })
+    const failingEmptyHost = mount(failingEmpty.Shell)
+    await openArtifactsTab(failingEmptyHost)
+    await flushTimers()
+    expect(failingEmptyHost.querySelector("[data-codepuppy-session-artifacts]")!.getAttribute("data-artifacts-phase")).toBe("error")
+    expect(failingEmptyHost.querySelector("[data-artifacts-local-failed]")).toBeNull()
   })
 })

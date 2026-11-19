@@ -72,11 +72,25 @@ describe("已整理的面:没有原词", () => {
   })
 
   test("找不到对话不写服务器名、对话编号与「标签页」", () => {
-    const text = ["session.error.notFound", "session.error.notFound.description", "session.error.notFound.closeTab"]
+    const text = ["session.error.notFound", "session.error.notFound.description", "session.error.notFound.newSession"]
       .map((key) => (appZh as Record<string, string>)[key])
       .join("")
     expect(text).toBe("找不到这段对话它可能已经被删除。回到新对话")
     expect(text).not.toMatch(/Local Server|ses_|标签页|服务器/)
+  })
+})
+
+describe("模型选择器 / 供应商 / 输入框:密钥与计划模式用中文说法(冻结稿 #picker、#hub-custom-service)", () => {
+  const SURFACES = ["codepuppy.model.", "codepuppy.provider.", "codepuppy.composer.", "codepuppy.autocomplete.", "codepuppy.search."]
+  test("zh 词典里这些面不含 KEY / Key / BYOK / plan 档", () => {
+    const bad = Object.entries(zh as Record<string, string>)
+      .filter(([key, value]) => SURFACES.some((prefix) => key.startsWith(prefix)) && /\b(KEY|Key|BYOK)\b|plan 档/.test(withoutPlaceholders(value)))
+      .map(([key, value]) => `${key}: ${value}`)
+    expect(bad).toEqual([])
+  })
+  test("坏样本必命中:旧文案「未配置 KEY · 点击配置」「自带 KEY(BYOK)」「先出方案再动手(plan 档)」", () => {
+    for (const old of ["未配置 KEY · 点击配置", "国内直连 · 自带 KEY(BYOK)", "先出方案再动手(plan 档)", "请填写 API Key"])
+      expect(/\b(KEY|Key|BYOK)\b|plan 档/.test(old)).toBe(true)
   })
 })
 

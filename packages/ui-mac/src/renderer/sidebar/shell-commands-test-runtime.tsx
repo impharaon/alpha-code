@@ -33,6 +33,7 @@ import type { SettingsSurfaceApi } from "../codepuppy-ui/settings-authority-clie
 
 export { render }
 // 右栏开合信号(全应用唯一一份):顶栏右侧开关读写它;用例经运行时拿同一个模块实例。
+export { setSessionNotFoundShown } from "@opencode-ai/app/surface/session-not-found-state"
 export { rightPanelOpen, setRightPanelOpen } from "../codepuppy-ui/session-workspace/right-panel-state"
 export { PermChip }
 
@@ -94,6 +95,18 @@ const fixtureProject: CodePuppyProject = {
     { id: "ses_one", title: "已有会话", directory: FIXTURE_DIRECTORY, projectID: "prj_alpha-code", updated: 10 },
   ],
   loaded: true,
+}
+
+const defaultFixtureSessions = fixtureProject.sessions
+/** 「显示更多」用例:在挂载前把固定项目的会话数改成 `count` 条(最新在前),resetHarness 还原。 */
+export function seedSessions(count: number) {
+  fixtureProject.sessions = Array.from({ length: count }, (_, i) => ({
+    id: `ses_seed_${i + 1}`,
+    title: `会话 ${i + 1}`,
+    directory: FIXTURE_DIRECTORY,
+    projectID: fixtureProject.id,
+    updated: 1000 - i,
+  }))
 }
 
 /* ── 可观察副作用的记录点(闸门读它们,不读源码)──────────────────────────────── */
@@ -505,6 +518,7 @@ export function installRootHost() {
 }
 
 export function resetHarness() {
+  fixtureProject.sessions = defaultFixtureSessions
   storageCells.clear()
   setPickerCalls(0)
   setCreatedIn([])

@@ -470,6 +470,24 @@ afterEach(() => {
 
 afterAll(() => GlobalRegistrator.unregister())
 
+describe("desktop-ui-refresh AC-02 新对话页右栏", () => {
+  test("顶栏右栏开关打开后,新对话页(与首页同组件)出现文件 / 终端右栏;关上即消失", async () => {
+    const rightPanel = await import("../src/renderer/codepuppy-ui/session-workspace/right-panel-state")
+    rightPanel.setRightPanelOpen(false)
+    const host = mount(() => createComponent(DraftLeaf, { projects: projectsApi([project("alpha-code", "/ws/a")]) }))
+    await flush()
+    expect(host.querySelector("[data-codepuppy-session-rail-host]")).toBeNull()
+    rightPanel.setRightPanelOpen(true)
+    await flush()
+    await flush()
+    const tabs = [...host.querySelectorAll("[data-codepuppy-session-rail-tab]")].map((tab) => tab.textContent)
+    expect(tabs).toEqual(["文件", "终端"])
+    rightPanel.setRightPanelOpen(false)
+    await flush()
+    expect(host.querySelector("[data-codepuppy-session-rail-host]")).toBeNull()
+  })
+})
+
 describe("REQ-126 CODE-D 新对话页工作区选择器", () => {
   test("选中项目 ⇒ draft 目录真的换了(updateDraft 收到新目录,页面随之改显示)", async () => {
     const host = mount(() => createComponent(DraftLeaf, { projects: projectsApi([project("alpha-code", "/ws/a"), project("beta", "/ws/b")]) }))

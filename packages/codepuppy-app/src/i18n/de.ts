@@ -591,10 +591,10 @@ export const dict = {
   "session.tab.context": "Kontext",
   "session.tab.unknown": "Unbekannte Sitzung",
   "session.panel.reviewAndFiles": "Überprüfung und Dateien",
-  "session.error.notFound": "Diese Sitzung wurde nicht gefunden",
-  "session.error.notFound.description":
-    "Dieser Tab verweist auf eine Sitzung, die auf diesem Server nicht mehr existiert.",
+  "session.error.notFound": "Diese Unterhaltung wurde nicht gefunden",
+  "session.error.notFound.description": "Sie wurde möglicherweise gelöscht.",
   "session.error.notFound.closeTab": "Tab schließen",
+  "session.error.notFound.newSession": "Zurück zu einer neuen Unterhaltung",
   "session.error.serverConnection": "Verbindung zu diesem Server nicht möglich",
   "session.review.filesChanged": "Geänderte Dateien: {{count}}",
   "session.review.change.one": "Änderung",

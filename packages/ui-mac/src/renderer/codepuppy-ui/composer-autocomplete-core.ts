@@ -183,7 +183,7 @@ export function buildAssembleRows(input: {
     kind: "action",
     id: "plan",
     label: input.planOn ? "关闭计划模式" : "计划模式",
-    desc: input.planOn ? "回到默认（build）" : "先出方案再动手（plan 档）",
+    desc: input.planOn ? "回到默认（build）" : "先出方案再动手",
     disabled: input.agentLocked ? "当前权限档固定使用它自己的 agent" : undefined,
   }
   const actionRows = input.terminal && input.scope === "at" ? [attach, term, plan] : [attach, plan]

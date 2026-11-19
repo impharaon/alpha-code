@@ -13,7 +13,7 @@ const doc = (input: { reference?: string; baseURL?: boolean } = {}) =>
     globalRoot: root,
     platform: input.baseURL === false ? {} : { modelProxyBaseURL: "https://gateway.invalid/v1" },
     ...(input.reference
-      ? { cloudMcp: { name: "codepuppy", definition: { type: "remote", url: "https://cloud.invalid/mcp", headers: { Authorization: `Bearer ${input.reference}` }, oauth: false } } }
+      ? { cloudMcp: { name: "codepuppy", definition: { type: "remote", url: "https://cloud.invalid/mcp", headers: { Authorization: `Bearer ${input.reference}` }, oauth: false, codemode: false } } }
       : {}),
   })
 

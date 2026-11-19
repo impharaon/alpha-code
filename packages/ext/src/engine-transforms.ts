@@ -34,16 +34,17 @@ const isObj = (value: unknown): value is Record<string, unknown> => !!value && t
 export function toServerConfig(entry: unknown): Mcp.ServerConfig | undefined {
   if (!isObj(entry)) return undefined
   const disabled = entry.enabled === false ? { disabled: true } : {}
+  const codemode = typeof entry.codemode === "boolean" ? { codemode: entry.codemode } : {}
   const stringRecord = (value: unknown) =>
     isObj(value) && Object.values(value).every((item) => typeof item === "string") ? (value as Record<string, string>) : undefined
   if (entry.type === "local" && Array.isArray(entry.command) && entry.command.every((item) => typeof item === "string")) {
     const environment = stringRecord(entry.environment)
-    return { type: "local", command: entry.command as string[], ...(environment ? { environment } : {}), ...disabled } as Mcp.ServerConfig
+    return { type: "local", command: entry.command as string[], ...(environment ? { environment } : {}), ...codemode, ...disabled } as Mcp.ServerConfig
   }
   if (entry.type === "remote" && typeof entry.url === "string") {
     const headers = stringRecord(entry.headers)
     const oauth = entry.oauth === false ? { oauth: false as const } : isObj(entry.oauth) ? { oauth: entry.oauth } : {}
-    return { type: "remote", url: entry.url, ...(headers ? { headers } : {}), ...oauth, ...disabled } as Mcp.ServerConfig
+    return { type: "remote", url: entry.url, ...(headers ? { headers } : {}), ...oauth, ...codemode, ...disabled } as Mcp.ServerConfig
   }
   return undefined
 }
@@ -63,7 +64,6 @@ export function projectServerConfig(entry: unknown): Mcp.ServerConfig | undefine
     ...(base.type === "local" && typeof entry.cwd === "string" ? { cwd: entry.cwd } : {}),
     ...(base.type === "remote" ? oauthOf(entry.oauth) : {}),
     ...(entry.enabled === true ? { disabled: false } : {}),
-    ...(typeof entry.codemode === "boolean" ? { codemode: entry.codemode } : {}),
     ...(typeof entry.timeout === "number" ? { timeout: { startup: entry.timeout, catalog: entry.timeout, execution: entry.timeout } } : {}),
   } as Mcp.ServerConfig
 }

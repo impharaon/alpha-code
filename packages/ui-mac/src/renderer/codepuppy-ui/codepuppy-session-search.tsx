@@ -33,6 +33,7 @@ import { hrefFor } from "../../shared/route-manifest"
 import type { CodePuppyProject, CodePuppyProjectsApi, CodePuppyProjectsStore } from "../sidebar/use-projects"
 import { sessionDisplayTitle } from "./session-title"
 import { projectSidebarGroups } from "../sidebar/project-display"
+import { ShellIcon } from "./shell-icons"
 import { runMomentOf } from "./session-rail/artifacts/artifacts-core"
 import "./session-search.css"
 
@@ -93,13 +94,29 @@ export function sessionListPending(
   return !serverKey || !store.ready || store.projects.some((project) => !project.loaded)
 }
 
-/** 行尾时间:今天 HH:MM / 昨天 HH:MM / 月日(分档沿用产物面板的 `runMomentOf`)。 */
+/** 行尾时间:今天 HH:MM / 昨天 HH:MM / 月日(分档沿用产物面板的 `runMomentOf`)。分得清同名对话(#1589 AC4)。 */
 export function sessionSearchTime(updated: number, now: Date): string {
   const moment = runMomentOf(new Date(updated).toISOString(), now)!
   if (moment.kind === "today") return t("codepuppy.session.artifactsRunToday", { time: moment.time })
   if (moment.kind === "yesterday") return t("codepuppy.session.artifactsRunYesterday", { time: moment.time })
   if (moment.kind === "date") return t("codepuppy.search.date", { month: String(moment.month), day: String(moment.day) })
   return t("codepuppy.search.dateYear", { year: String(moment.year), month: String(moment.month), day: String(moment.day) })
+}
+
+/** 标题里与关键词相同的片段(不分大小写)标出来,其余原样 —— 冻结稿 #search 的「定价」加粗。 */
+export function highlightSegments(title: string, query: string): Array<{ text: string; match: boolean }> {
+  const needle = query.trim().toLowerCase()
+  if (!needle) return [{ text: title, match: false }]
+  const lower = title.toLowerCase()
+  const parts: Array<{ text: string; match: boolean }> = []
+  let from = 0
+  for (let at = lower.indexOf(needle); at !== -1; at = lower.indexOf(needle, from)) {
+    if (at > from) parts.push({ text: title.slice(from, at), match: false })
+    parts.push({ text: title.slice(at, at + needle.length), match: true })
+    from = at + needle.length
+  }
+  if (from < title.length) parts.push({ text: title.slice(from), match: false })
+  return parts
 }
 
 export function CodePuppySessionSearch(props: {
@@ -176,22 +193,27 @@ export function CodePuppySessionSearch(props: {
       closeLabel={t("codepuppy.common.close")}
     >
       <div class="a-search" data-codepuppy-session-search>
-        <Input
-          block
-          type="search"
-          autofocus
-          value={query()}
-          placeholder={t("codepuppy.search.placeholder")}
-          aria-label={t("codepuppy.search.placeholder")}
-          data-codepuppy-session-search-input
-          onInput={(event) => setQuery(event.currentTarget.value)}
-          onKeyDown={onKeyDown}
-          role="combobox"
-          aria-expanded={results().length > 0}
-          aria-controls="a-search-results"
-          aria-activedescendant={activeDescendant()}
-          icon={<Icon name="magnifying-glass" />}
-        />
+        <div class="a-search-in">
+          <Input
+            block
+            type="text"
+            autofocus
+            value={query()}
+            placeholder={t("codepuppy.search.placeholder")}
+            aria-label={t("codepuppy.search.placeholder")}
+            data-codepuppy-session-search-input
+            onInput={(event) => setQuery(event.currentTarget.value)}
+            onKeyDown={onKeyDown}
+            role="combobox"
+            aria-expanded={results().length > 0}
+            aria-controls="a-search-results"
+            aria-activedescendant={activeDescendant()}
+            icon={<Icon name="magnifying-glass" />}
+          />
+          <span class="a-search-esc" aria-hidden="true">
+            esc {t("codepuppy.search.keyClose")}
+          </span>
+        </div>
         <Show
           when={results().length > 0}
           fallback={
@@ -204,6 +226,10 @@ export function CodePuppySessionSearch(props: {
             </p>
           }
         >
+          <div class="a-search-list">
+          <div class="a-search-grp" aria-hidden="true">
+            {t("codepuppy.search.group")}
+          </div>
           <ul class="a-search-results" id="a-search-results" role="listbox" ref={list}>
             <For each={results()}>
               {(result, index) => (
@@ -215,7 +241,12 @@ export function CodePuppySessionSearch(props: {
                     data-codepuppy-session-search-result={result.sessionID}
                     onClick={(event) => openResult(event, result.href)}
                   >
-                    <span class="a-search-result-title">{result.title}</span>
+                    <ShellIcon name="msg" size={14} class="a-search-result-icon" />
+                    <span class="a-search-result-title">
+                      <For each={highlightSegments(result.title, query())}>
+                        {(part) => (part.match ? <mark>{part.text}</mark> : part.text)}
+                      </For>
+                    </span>
                     <span class="a-search-result-project">{result.project}</span>
                     <span class="a-search-result-time">{sessionSearchTime(result.updated, new Date())}</span>
                   </a>
@@ -223,21 +254,12 @@ export function CodePuppySessionSearch(props: {
               )}
             </For>
           </ul>
+          </div>
         </Show>
         <div class="a-search-keys" aria-hidden="true">
-          <span>
-            <kbd>↑</kbd>
-            <kbd>↓</kbd>
-            {t("codepuppy.search.keySelect")}
-          </span>
-          <span>
-            <kbd>↵</kbd>
-            {t("codepuppy.search.keyOpen")}
-          </span>
-          <span>
-            <kbd>esc</kbd>
-            {t("codepuppy.search.keyClose")}
-          </span>
+          <span>↑↓ {t("codepuppy.search.keySelect")}</span>
+          <span>↵ {t("codepuppy.search.keyOpen")}</span>
+          <span>{t("codepuppy.search.titleOnly")}</span>
         </div>
       </div>
     </Dialog>

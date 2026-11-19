@@ -206,7 +206,7 @@ describe("REQ-125 C1 I1:上游 session 叶消费者归零", () => {
     const importers: string[] = []
     for (const f of walk(RENDERER)) {
       const src = read(f)
-      if (src.includes("@opencode-ai/app/surface/session")) importers.push(f)
+      if (/["']@opencode-ai\/app\/surface\/session["']/.test(src)) importers.push(f)
     }
     expect(importers.map((file) => path.relative(RENDERER, file))).toEqual([])
   })

@@ -92,7 +92,7 @@ function RailButton(props: {
   badge?: number
 }) {
   return (
-    <Tooltip label={props.label} placement="bottom">
+    <Tooltip label={props.label} placement="right">
       <button
         type="button"
         class="codepuppy-rail-btn codepuppy-sidebar-nav-item"

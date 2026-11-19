@@ -44,6 +44,7 @@ const {
   resolveWorkspaceFile,
   revealWorkspaceFile,
   saveWorkspaceFileCopy,
+  statWorkspaceFiles,
   __setWorkspaceFileElectron,
   __workspaceReadCount,
 } = await import("./workspace-file-service")
@@ -296,5 +297,37 @@ describe("IPC wiring validates arguments and scopes sessions to the sender", () 
     expect(Buffer.from(chunk.bytes!).toString("utf8")).toBe("abc")
     await ipcHandlers.get("workspace-file-close-read")!(event, opened.readId)
     expect(__workspaceReadCount()).toBe(0)
+  })
+})
+
+describe("DESIGN-local-session-artifacts §4.5 stat:产物页本机产物行的状态与查看器同一个守卫", () => {
+  test("同序同长;删掉文件后由 ok 变 not-found;symlink / 越根 / 非字符串照查看器的拒绝码;不开 fd", () => {
+    write("out/report.docx", "12345")
+    fs.writeFileSync(path.join(outside, "x.md"), "x")
+    fs.symlinkSync(path.join(root, "out/report.docx"), path.join(root, "link.docx"))
+    const rels = ["out/report.docx", "link.docx", "../x.md", 7, "gone.md"]
+    expect(statWorkspaceFiles(root, rels)).toEqual([
+      { ok: true, size: 5 },
+      { ok: false, code: "symlink" },
+      { ok: false, code: "invalid-path" },
+      { ok: false, code: "invalid-path" },
+      { ok: false, code: "not-found" },
+    ])
+    fs.rmSync(path.join(root, "out/report.docx"))
+    expect(statWorkspaceFiles(root, ["out/report.docx"])).toEqual([{ ok: false, code: "not-found" }])
+    expect(__workspaceReadCount()).toBe(0)
+  })
+
+  test("IPC:dir 非字符串 → 每项 invalid-path;rels 非数组 → [];正常入参交给 statWorkspaceFiles", async () => {
+    registerWorkspaceFileIpcHandlers()
+    const stat = ipcHandlers.get("workspace-file-stat")!
+    const event = { sender: { id: 78, once: () => {} } }
+    write("a.md", "abc")
+    expect(await stat(event, 5, ["a.md", "b.md"])).toEqual([
+      { ok: false, code: "invalid-path" },
+      { ok: false, code: "invalid-path" },
+    ])
+    expect(await stat(event, root, "a.md")).toEqual([])
+    expect(await stat(event, root, ["a.md", "b.md"])).toEqual([{ ok: true, size: 3 }, { ok: false, code: "not-found" }])
   })
 })

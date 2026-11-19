@@ -49,6 +49,7 @@ import { extHubOpen, setExtHubOpen, toggleExtHub } from "../extensions/ext-hub-s
 import { rememberRoute, restoredRoute } from "../reload-place-store"
 import { automationOpen, setAutomationOpen, toggleAutomation } from "../automations/automation-state"
 import { setSettingsOpen, settingsOpen } from "../codepuppy-ui/settings-state"
+import { sessionNotFoundShown } from "@opencode-ai/app/surface/session-not-found-state"
 import { dismissMenu, dismissMenuOnEscape, focusFirstMenuItem } from "./menu-a11y"
 import { ProblemsEntry } from "./problems-entry"
 import { Card } from "../codepuppy-ui/Card"
@@ -105,6 +106,9 @@ async function copyText(text: string): Promise<boolean> {
 /** 内嵌 sidecar 的稳定 server key,由上游自己的 `ServerConnection.key` 派生 —— 不硬编码
  *  "sidecar" 这个字面量,上游改 key 算法时这里跟着变(改没了则 typecheck 红)。 */
 const EMBEDDED_SIDECAR_KEY = ServerConnection.key({ type: "sidecar", variant: "base", http: { url: "" } })
+
+/** Conversation rows a project draws before the quiet 「显示更多」 row (frame `#home`: four). */
+const SESSIONS_SHOWN = 4
 
 function closeAllOverlays(): void {
   setExtHubOpen(false)
@@ -202,11 +206,15 @@ export function CodePuppySidebar(props: {
 
   // Top-level pages (Customization Center, automation, settings) replace the working surface's content
   // and share the persistent top bar. Settings wins when several are open (it is opened last).
+  // While a top-level page is open nothing in the sidebar is "the conversation being viewed".
+  const viewingSessionId = () => (pageOpen() ? undefined : route().sessionId)
   const pageOpen = () => settingsOpen() || automationOpen() || extHubOpen()
   const pageTitle = (): string | undefined => {
     if (settingsOpen()) return t("codepuppy.sidebar.settings")
     if (automationOpen()) return t("codepuppy.sidebar.automation")
     if (extHubOpen()) return t("codepuppy.sidebar.plugins")
+    // A missing conversation has no workspace to name itself: the chrome writes the title (frame #not-found).
+    if (sessionNotFoundShown()) return t("codepuppy.session.notFoundTitle")
     // A session names itself: the workspace renders its breadcrumb into the top bar.
     return parseRoute(location.pathname).kind === "session" ? undefined : t("codepuppy.newSession.title")
   }
@@ -542,6 +550,15 @@ export function CodePuppySidebar(props: {
 
   // Projects visible in the sidebar = all known projects minus the ones the user archived/removed.
   const visibleProjects = createMemo(() => displayProjects().filter((p) => !isProjectHidden(p.worktree)))
+  // Projects whose full conversation list is expanded by 「显示更多」 (expand-only, as the frame draws it).
+  const [moreShown, setMoreShown] = createSignal<ReadonlySet<string>>(new Set())
+  /** A search or the open conversation never hides behind 「显示更多」. */
+  const allSessionsShown = (project: { worktree: string; sessions: { id: string }[] }) =>
+    moreShown().has(project.worktree) ||
+    searchQuery().trim() !== "" ||
+    project.sessions.findIndex((x) => x.id === route().sessionId) >= SESSIONS_SHOWN
+  const shownSessions = <S extends { id: string }>(project: { worktree: string; sessions: S[] }) =>
+    allSessionsShown(project) ? project.sessions : project.sessions.slice(0, SESSIONS_SHOWN)
   // Filter visible projects + their sessions by the search query. A project shows if its name
   // matches (then all its sessions show) or if any of its sessions' titles match (then only those).
   const searchedProjects = createMemo(() => {
@@ -1319,7 +1336,7 @@ export function CodePuppySidebar(props: {
                   <div class="codepuppy-project" data-expanded={expanded() ? "" : undefined}>
                     <div
                       class="codepuppy-project-row"
-                      data-active={activeProject()?.worktree === project.worktree ? "" : undefined}
+                      data-active={!pageOpen() && activeProject()?.worktree === project.worktree ? "" : undefined}
                       data-menu={menuOpen() ? "" : undefined}
                       onClick={() => toggleProjectExpanded(project.worktree)}
                     >
@@ -1355,7 +1372,7 @@ export function CodePuppySidebar(props: {
                     <Show when={expanded()}>
                       <div class="codepuppy-project-sessions">
                         <For
-                          each={project.sessions}
+                          each={shownSessions(project)}
                           fallback={
                             <div class="codepuppy-sidebar-empty">
                               {project.loaded ? t("codepuppy.sidebar.noConversations") : t("codepuppy.sidebar.loading")}
@@ -1365,7 +1382,7 @@ export function CodePuppySidebar(props: {
                           {(session) => (
                             <div
                               class="codepuppy-session-row"
-                              data-active={route().sessionId === session.id ? "" : undefined}
+                              data-active={viewingSessionId() === session.id ? "" : undefined}
                             >
                               <Show
                                 when={editingSession() === session.id}
@@ -1374,7 +1391,7 @@ export function CodePuppySidebar(props: {
                                     <a
                                       class="codepuppy-session"
                                       href={sessionLink(session.id)}
-                                      data-active={route().sessionId === session.id ? "" : undefined}
+                                      data-active={viewingSessionId() === session.id ? "" : undefined}
                                       onClick={(e) => openSession(e, session.id)}
                                     >
                                       <span class="codepuppy-session-title">{sessionDisplayTitle(session.title)}</span>
@@ -1432,6 +1449,15 @@ export function CodePuppySidebar(props: {
                             </div>
                           )}
                         </For>
+                        <Show when={project.sessions.length > SESSIONS_SHOWN && !allSessionsShown(project)}>
+                          <button
+                            type="button"
+                            class="codepuppy-sessions-more"
+                            onClick={() => setMoreShown((prev) => new Set(prev).add(project.worktree))}
+                          >
+                            {t("codepuppy.sidebar.showMore")}
+                          </button>
+                        </Show>
                       </div>
                     </Show>
                   </div>

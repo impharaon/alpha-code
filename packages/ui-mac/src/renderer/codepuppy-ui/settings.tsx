@@ -95,7 +95,6 @@ export function CodePuppySettings(props: {
   const [saveError, setSaveError] = createSignal<string | null>(null)
   const [saved, setSaved] = createSignal(false)
   const [storage, setStorage] = createSignal<ExtensionStorageSnapshot>({ state: "not-run", result: null })
-  let closeButton: HTMLButtonElement | undefined
   let surface: HTMLDivElement | undefined
   let errorSummary: HTMLDivElement | undefined
   let restoreFocus: HTMLElement | null = null
@@ -214,11 +213,11 @@ export function CodePuppySettings(props: {
     setSection("general")
     loadSettings()
     loadStorage()
-    queueMicrotask(() => closeButton?.focus())
+    queueMicrotask(() => surface?.focus())
   })
 
-  // #1173:本面自报 role=dialog + aria-modal=true 且 position:fixed/inset:0 —— 它是强模态,
-  // 但不走 dialog-core 的模态栈,所以在这里自己上报,否则右栏的原生叠放预览会盖在它上面。
+  // #1173:本页是铺满工作面的全页(顶级页面,无退出键,侧栏与窄轨仍可点),但右栏的原生叠放预览
+  // 在 DOM 之外,不上报的话会盖在它上面 —— 它不走 dialog-core 的模态栈,所以在这里自己上报。
   createEffect(() => {
     if (!props.open) return
     onCleanup(enterModal())
@@ -235,28 +234,6 @@ export function CodePuppySettings(props: {
       event.preventDefault()
       close()
       return
-    }
-    if (event.key !== "Tab" || !surface) return
-    const focusable = Array.from(
-      surface.querySelectorAll<HTMLElement>(
-        'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [href], [tabindex]:not([tabindex="-1"])',
-      ),
-    )
-    const first = focusable[0]
-    const last = focusable.at(-1)
-    if (!first || !last) {
-      event.preventDefault()
-      surface.focus()
-      return
-    }
-    if (event.shiftKey && document.activeElement === first) {
-      event.preventDefault()
-      last.focus()
-      return
-    }
-    if (!event.shiftKey && document.activeElement === last) {
-      event.preventDefault()
-      first.focus()
     }
   }
   document.addEventListener("keydown", onKeyDown)
@@ -387,9 +364,8 @@ export function CodePuppySettings(props: {
     <Show when={props.open}>
       <div
         ref={(element) => (surface = element)}
-        class="a-ui codepuppy-settings-page"
-        role="dialog"
-        aria-modal="true"
+        class="a-ui codepuppy-page codepuppy-settings-page"
+        role="region"
         aria-labelledby="codepuppy-settings-title"
         tabIndex={-1}
         data-codepuppy-settings
@@ -440,17 +416,6 @@ export function CodePuppySettings(props: {
               {saveError() ? t("codepuppy.settings.retrySave") : t("codepuppy.settings.save")}
             </Button>
           </Show>
-          <button
-            ref={(element) => (closeButton = element)}
-            type="button"
-            class="codepuppy-settings-back"
-            aria-label={t("codepuppy.settings.back")}
-            onClick={close}
-          >
-            <svg aria-hidden="true" viewBox="0 0 24 24">
-              <path d="M6 6l12 12M18 6L6 18" />
-            </svg>
-          </button>
         </header>
 
         <div class="codepuppy-settings-layout">

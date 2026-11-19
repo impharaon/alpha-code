@@ -132,9 +132,12 @@ export function watchExplicitSources(input: {
   log: (line: string) => void
 }): () => void {
   let timer: ReturnType<typeof setTimeout> | undefined
+  const allowSet = path.join(input.root, "skills-enabled.json")
+  let lastAllowSet = readUser(allowSet)
   let lastUser = readUser(input.userConfig)
   let lastWritten = readUser(input.file)
   const refresh = () => {
+    lastAllowSet = readUser(allowSet)
     const text = readUser(input.userConfig)
     const { document, userError } = composeExplicitDocument(text, { ...input.layer, skills: input.skills() })
     if (userError && text !== undefined && text !== lastUser) {
@@ -153,19 +156,30 @@ export function watchExplicitSources(input: {
       input.log(`[alpha-code#1667] could not rewrite ${input.file}: ${error instanceof Error ? error.message : String(error)}`)
     }
   }
+  const schedule = () => {
+    clearTimeout(timer)
+    timer = setTimeout(refresh, 100)
+  }
+  const refreshAllowSet = () => {
+    if (readUser(allowSet) !== lastAllowSet) schedule()
+  }
   let watcher: fs.FSWatcher | undefined
   try {
     watcher = fs.watch(input.root, { recursive: true }, (_event, name) => {
       if (name !== null && !isExplicitInput(String(name), input.userConfig, input.root)) return
-      clearTimeout(timer)
-      timer = setTimeout(refresh, 100)
+      if (name === "skills-enabled.json") return refreshAllowSet()
+      schedule()
     })
   } catch (error) {
     input.log(`[alpha-code#1667] cannot watch ${input.root}: ${error instanceof Error ? error.message : String(error)}`)
   }
+  // Atomic disable/enable writes can be coalesced by the recursive directory watcher. Observe the
+  // allow-list file's state too, so a missed enable event cannot leave the explicit skills withdrawn.
+  fs.watchFile(allowSet, { interval: 100 }, refreshAllowSet)
   return () => {
     clearTimeout(timer)
     watcher?.close()
+    fs.unwatchFile(allowSet, refreshAllowSet)
   }
 }
 

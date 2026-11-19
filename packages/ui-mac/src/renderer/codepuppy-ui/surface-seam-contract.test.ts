@@ -105,7 +105,7 @@ describe("ADR-027 typed surface seam anchors (frozen packages/app)", () => {
   })
 
   test("narrow session-leaf channel survives (REQ-088 C1, frontend-freeze-base-3)", () => {
-    // exports map 的 surface 子路径恰好两条(逐案评审的窄导出),指向源文件;不得扩成
+    // exports map 的 surface 子路径恰好三条(逐案评审的窄导出;session-not-found-state 是只含一个纯函数的状态窄面),指向源文件;不得扩成
     // ./surface/* 通配,也不得新增 pages/context 子路径(ADR-027 修订 2026-07-13/2026-07-24,
     // ADR-029 L3 逐案纪律)。
     const pkg = JSON.parse(readFileSync(join(import.meta.dir, "../../../../codepuppy-app/package.json"), "utf8")) as {
@@ -113,7 +113,7 @@ describe("ADR-027 typed surface seam anchors (frozen packages/app)", () => {
     }
     expect(pkg.exports["./surface/session"]).toBe("./src/pages/session.tsx")
     const surfaceSubpaths = Object.keys(pkg.exports).filter((key) => key.startsWith("./surface/"))
-    expect(surfaceSubpaths).toEqual(["./surface/session", "./surface/terminal"])
+    expect(surfaceSubpaths).toEqual(["./surface/session", "./surface/terminal", "./surface/session-not-found-state"])
     expect(Object.keys(pkg.exports).some((key) => key.includes("pages") || key.includes("context"))).toBe(false)
     // 该模块仅有 default 一个导出(session Page 组件)—— 窄面的可机械验证形态。
     const sessionLeaf = readFileSync(join(APP_SRC, "pages/session.tsx"), "utf8")

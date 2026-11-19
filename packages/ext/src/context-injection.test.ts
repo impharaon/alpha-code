@@ -302,7 +302,7 @@ describe("③a 配置域 transform 咽喉:ext 写进 agent / command / mcp 的�
     writeFileSync(token, "tok-cloud\n")
     republish({ killSwitch: true, cloudMcp: testCloudMcp("https://cloud.invalid/mcp", token) })
     const after = await extWrites({ codepuppy: WITHHELD_CLOUD_MCP })
-    expect(after.mcp.codepuppy).toEqual({ type: "remote", url: "https://cloud.invalid/mcp", headers: { Authorization: "Bearer tok-cloud" }, oauth: false })
+    expect(after.mcp.codepuppy).toEqual({ type: "remote", url: "https://cloud.invalid/mcp", headers: { Authorization: "Bearer tok-cloud" }, oauth: false, codemode: false })
     expect(unexplainedWrites(after)).toEqual([])
     // Package off: main omits its effective server, so the kill-switch rearm must not resurrect it.
     const off = await extWrites()

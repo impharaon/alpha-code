@@ -73,10 +73,9 @@ describe("#1173 producers and the single consumer are wired", () => {
     })
   })
 
-  test("the settings surface reports presence (it declares aria-modal but is not on the dialog stack)", () => {
+  test("the settings page reports presence (a full page over the workspace, not on the dialog stack)", () => {
     expect(settings).toContain(`import { enterModal } from "./modal-presence"`)
     expect(settings).toContain("onCleanup(enterModal())")
-    expect(settings).toContain(`aria-modal="true"`)
   })
 
   test("the rail overlay is the consumer and forwards to the guarded main-side channel", () => {

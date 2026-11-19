@@ -673,6 +673,7 @@ export const dict = {
   "session.error.notFound": "This conversation can't be found",
   "session.error.notFound.description": "It may have been deleted.",
   "session.error.notFound.closeTab": "Back to a new conversation",
+  "session.error.notFound.newSession": "Back to a new conversation",
   "session.error.serverConnection": "Can't connect to this server",
   "session.review.filesChanged": "Files Changed {{count}}",
   "session.review.change.one": "Change",

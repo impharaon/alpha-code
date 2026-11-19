@@ -36,6 +36,14 @@ DOCX_MAX_MARGIN_MM = 100.0
 DOCX_DEFAULT_EAST_ASIA_FONT = "宋体"
 DOCX_MAX_HEADING_LEVEL = 9
 DOCX_FONT_NAME_RE = re.compile(r"^[^\x00-\x1f\x7f<>&\"']{1,64}$")
+PDF_MARGIN = 54
+PDF_FONT_SIZE = 11
+# macOS system fonts with TrueType outlines and Simplified Chinese glyphs, as (name, file, subfont index in the .ttc).
+# Hiragino Sans GB has PostScript outlines, which reportlab cannot embed.
+PDF_CJK_FONTS = (
+    ("STHeitiSC-Light", "/System/Library/Fonts/STHeiti Light.ttc", 1),
+    ("STSongti-SC-Regular", "/System/Library/Fonts/Supplemental/Songti.ttc", 6),
+)
 
 
 def main(argv: list[str]) -> int:
@@ -716,25 +724,57 @@ def write_pdf(path: Path, arguments: dict[str, Any]) -> dict[str, Any]:
 
 def render_text_pdf(path: Path, pages: list[str]) -> None:
     from reportlab.lib.pagesizes import A4
+    from reportlab.pdfbase import pdfmetrics
     from reportlab.pdfgen import canvas
 
+    font = pdf_text_font()
+    width, height = A4
+    room = width - 2 * PDF_MARGIN
     pdf = canvas.Canvas(str(path), pagesize=A4)
-    _, height = A4
     for page in pages:
-        text = pdf.beginText(54, height - 54)
-        text.setFont("Helvetica", 11)
+        text = pdf.beginText(PDF_MARGIN, height - PDF_MARGIN)
+        text.setFont(font, PDF_FONT_SIZE)
         for source_line in page.splitlines() or [""]:
-            chunks = [source_line[index : index + 95] for index in range(0, len(source_line), 95)] or [""]
-            for chunk in chunks:
-                if text.getY() < 54:
+            for chunk in wrap_to_width(source_line, room, lambda value: pdfmetrics.stringWidth(value, font, PDF_FONT_SIZE)):
+                if text.getY() < PDF_MARGIN:
                     pdf.drawText(text)
                     pdf.showPage()
-                    text = pdf.beginText(54, height - 54)
-                    text.setFont("Helvetica", 11)
+                    text = pdf.beginText(PDF_MARGIN, height - PDF_MARGIN)
+                    text.setFont(font, PDF_FONT_SIZE)
                 text.textLine(chunk)
         pdf.drawText(text)
         pdf.showPage()
     pdf.save()
+
+
+def pdf_text_font() -> str:
+    """The first CJK-capable system font reportlab can embed (TrueType outlines); the font goes into the PDF itself.
+    Without one, reportlab's built-in STSong-Light CID font still names every Chinese character (the viewer supplies
+    the glyphs) instead of Helvetica's boxes."""
+    from reportlab.pdfbase import pdfmetrics
+    from reportlab.pdfbase.cidfonts import UnicodeCIDFont
+    from reportlab.pdfbase.ttfonts import TTFError, TTFont
+
+    for name, file, index in PDF_CJK_FONTS:
+        try:
+            pdfmetrics.registerFont(TTFont(name, file, subfontIndex=index))
+            return name
+        except TTFError:
+            continue
+    pdfmetrics.registerFont(UnicodeCIDFont("STSong-Light"))
+    return "STSong-Light"
+
+
+def wrap_to_width(line: str, room: float, measure: Callable[[str], float]) -> list[str]:
+    chunks: list[str] = []
+    current = ""
+    for character in line:
+        if current and measure(current + character) > room:
+            chunks.append(current)
+            current = ""
+        current += character
+    chunks.append(current)
+    return chunks
 
 
 def replace_file(path: Path, write: Callable[[Path], None]) -> None:

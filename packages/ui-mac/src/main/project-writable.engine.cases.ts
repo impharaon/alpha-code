@@ -15,10 +15,11 @@ import { createWorkspaceWritableTracker } from "../renderer/codepuppy-ui/workspa
 const scratch = join(process.env.CODEPUPPY_TEST_REAL_HOME ?? homedir(), ".cache/alpha-orch/2026-11-19/impl-project-writable")
 mkdirSync(scratch, { recursive: true })
 const run = mkdtempSync(join(scratch, "engine-grant-"))
-const A = join(run, "A"), B = join(run, "B"), C = join(run, "C"), D = join(run, "D")
+const A = join(run, "A"), B = join(run, "B"), C = join(run, "C"), D = join(run, "D"), E = join(run, "rewritten")
 const install = join(run, "engine-install")
+const quote = (value: string) => `'${value.replace(/'/g, "'\\''")}'`
 const userData = join(run, "main-user-data")
-for (const directory of [A, B, C, D, install, join(install, "home"), userData, join(run, "state/env/dev")]) mkdirSync(directory, { recursive: true })
+for (const directory of [A, B, C, D, E, install, join(install, "home"), userData, join(run, "state/env/dev")]) mkdirSync(directory, { recursive: true })
 const appEvents = new EventEmitter()
 const handlers = new Map<string, (...args: unknown[]) => unknown>()
 const log: string[] = []
@@ -36,6 +37,7 @@ mock.module("./codepuppy-keychain-backend", () => ({ keychainBackend: () => ({ i
 const { spawnLocalServer } = await import("./server")
 const { registerIpcHandlers } = await import("./ipc")
 const { bootFenceWorkspaceTruth, writeWorkspaceTruth, readWorkspaceTruthOrThrow } = await import("./process-fence-workspaces")
+const { GLOBAL_RENDERER_STORE, TABS_INFO_KEY } = await import("./tabs-preclean")
 const { creditDanglingSweepForSpawn, resetDanglingSweepLatchForTests } = await import("./dangling-sweep-latch")
 
 const model = scriptedModel()
@@ -70,12 +72,13 @@ const tracker = bootFenceWorkspaceTruth({
   eligibility: { homeDir: join(install, "home"), appStateRoot: join(run, "state"), realpath: realpathSync.native, isDirectory: (directory) => { try { return readdirSync(directory) !== undefined } catch { return false } } },
   onWritableChanged: (change) => { record("changed", change); writable.invalidate(change); writable.observe(observation(change.directory)) },
 })
-const observation = (directory: string) => ({ server: "sidecar", directory, generation: 1, sandbox: true })
+let generation = 1
+const observation = (directory: string) => ({ server: "sidecar", directory, generation, sandbox: true })
 const writable = createWorkspaceWritableTracker((input) => tracker.probeWrite(input, listener))
-const invoke = (channel: string, input?: unknown) => {
+const invoke = (channel: string, ...inputs: unknown[]) => {
   const handler = handlers.get(channel)
   if (!handler) throw new Error(`missing IPC ${channel}`)
-  return handler({ sender: { id: 1 } }, input)
+  return handler({ sender: { id: 1 } }, ...inputs)
 }
 const waitFor = async (condition: () => boolean, why: string) => {
   const end = Date.now() + 20_000
@@ -99,9 +102,9 @@ async function write(directory: string, name: string) {
   return model.requests.slice(before).flatMap((request) => request.messages.filter((message) => message.role === "tool").map((message) => textOf(message.content))).join("\n")
 }
 
-beforeAll(async () => {
-  process.env.CODEPUPPY_GLOBAL_DIR = join(run, "state/env/dev")
-  const addon = buildFenceAddon({ out: join(run, "codepuppy_fence.node"), buildId: `engine-grant-${Date.now()}` }).out
+let addon = ""
+async function boot() {
+  connection = undefined
   resetDanglingSweepLatchForTests(); creditDanglingSweepForSpawn()
   const result = await spawnLocalServer("127.0.0.1", 43210, "test-only", {
     userDataPath: userData, egressProxy: async () => ({ port: modelProxy.port! }), healthCheck: async () => !!connection,
@@ -132,8 +135,14 @@ beforeAll(async () => {
   })
   listener = result.listener
   await result.health.wait
+  record("ready", { pid: connection!.pid, buildId: connection!.buildId, generation })
+}
+
+beforeAll(async () => {
+  process.env.CODEPUPPY_GLOBAL_DIR = join(run, "state/env/dev")
+  addon = buildFenceAddon({ out: join(run, "codepuppy_fence.node"), buildId: `engine-grant-${Date.now()}` }).out
+  await boot()
   registerIpcHandlers({ fenceWorkspaces: tracker, probeWorkspaceWrite: (input) => tracker.probeWrite(input, listener), grantWorkspaceWrite: async (input) => { await tracker.grantWrite(input, listener) }, updater: { subscribe: () => () => {} } } as unknown as Parameters<typeof registerIpcHandlers>[0])
-  record("ready", { pid: connection!.pid, buildId: connection!.buildId })
 }, 90_000)
 afterAll(async () => {
   releaseStream?.()
@@ -144,7 +153,7 @@ afterAll(async () => {
     enginePids: events.filter((event) => event.event === "ready").map((event) => event.pid),
     oldPtyPid: existsSync(join(A, "pty-pid")) ? Number(readFileSync(join(A, "pty-pid"), "utf8")) : null,
     oldMcp: existsSync(join(A, "mcp-after.json")) ? JSON.parse(readFileSync(join(A, "mcp-after.json"), "utf8")) : null,
-    files: { B: readdirSync(B), C: readdirSync(C), D: readdirSync(D) },
+    files: { B: readdirSync(B), C: readdirSync(C), D: readdirSync(D), rewritten: readdirSync(E) },
     stream: { started: streamStarted, released: streamReleased, cancelled: streamCancelled },
     exits: events.filter((event) => event.event === "exit"),
   }, null, 2))
@@ -167,7 +176,6 @@ test("unregistered model write is refused with zero files; child-originated regi
 })
 
 test("main grants the same running engine; existing PTY/MCP and first model/new PTY write B, C stays empty and another streamed answer is not cancelled", async () => {
-  const quote = (value: string) => `'${value.replace(/'/g, "'\\''")}'`
   const initialPid = connection!.pid
   const ptyCommand = `echo $$ > ${quote(join(A, "pty-pid"))}; echo x > ${quote(join(B, "pty-before.txt"))}; echo ready > ${quote(join(A, "pty-ready"))}; while [ ! -f ${quote(join(A, "go"))} ]; do sleep .01; done; echo x > ${quote(join(B, "pty-existing.txt"))}; echo x > ${quote(join(C, "pty-existing.txt"))}`
   await api("POST", "/api/pty", { cwd: A, command: "/bin/sh", args: ["-c", ptyCommand] })
@@ -178,7 +186,8 @@ test("main grants the same running engine; existing PTY/MCP and first model/new 
   expect(readdirSync(B)).toEqual([])
   const other = await session(A)
   await api("POST", `/api/session/${other}/prompt`, { text: "CP-HOLD-STREAM" })
-  const completion = api("POST", `/api/experimental/session/${other}/wait`)
+  let completionFailure: unknown
+  const completion = api("POST", `/api/experimental/session/${other}/wait`).catch((error) => { completionFailure = error })
   await waitFor(() => streamStarted, "other response streaming")
   child.send({ type: "fixture.delay", ms: 180 })
   expect(invoke("workspace-open-record", { server: "sidecar", directory: B })).toEqual({ recorded: true })
@@ -196,6 +205,7 @@ test("main grants the same running engine; existing PTY/MCP and first model/new 
   expect(streamReleased).toBe(false)
   expect(streamCancelled).toBe(false)
   releaseStream!(); await completion
+  expect(completionFailure).toBeUndefined()
   const first = events.findIndex((event) => event.event === "first-work")
   const consumed = events.findIndex((event) => event.event === "consumed")
   expect(consumed).toBeGreaterThan(-1)
@@ -216,4 +226,67 @@ test("a same-generation refused directory becomes writable through picker regist
   expect(readFileSync(join(D, "picked.txt"), "utf8")).toBe("x")
   expect(connection!.pid).toBe(pid)
   expect(readdirSync(C)).toEqual([])
+})
+
+
+test("remote requests do not touch the local engine; HOME/app-state recording is ineligible", async () => {
+  const count = events.length
+  expect(invoke("workspace-open-record", { server: "remote", directory: C })).toEqual({ recorded: false, reason: "not-local" })
+  expect(await tracker.probeWrite({ server: "remote", directory: C }, listener)).toEqual({ outcome: "unknown", grant: "not-local" })
+  expect(events).toHaveLength(count)
+  const grants = events.filter((event) => event.event === "grant-sent").length
+  for (const directory of [join(install, "home"), join(run, "state")]) {
+    expect(invoke("workspace-open-record", { server: "sidecar", directory })).toEqual({ recorded: false, reason: "home-or-app-state" })
+    expect(await tracker.probeWrite({ server: "sidecar", directory }, listener)).toMatchObject({ grant: "ineligible", reason: "home-or-app-state" })
+  }
+  expect(events.filter((event) => event.event === "grant-sent")).toHaveLength(grants)
+  expect(readdirSync(C)).toEqual([])
+})
+
+test("a model rewrites session_v2.directory and kills its engine: the restored directory stays outside truth/W1; an honest registered directory remains writable", async () => {
+  // session_v2.directory is the actual text column observed in the fixture DB and core/session/sql.ts.
+  const rewritten = await session(B)
+  invoke("store-set", GLOBAL_RENDERER_STORE, TABS_INFO_KEY, { [`sidecar\n/session/${rewritten}`]: { directory: B } })
+  expect(readWorkspaceTruthOrThrow(truthPath, { readFileSync })).toContain(B)
+  const sql = `UPDATE session_v2 SET directory='${E.replace(/'/g, "''")}' WHERE id='${rewritten}';`
+  const mutation = await session(A)
+  await api("POST", `/api/session/${mutation}/prompt`, { text: `CP-CALL ${JSON.stringify({ name: "shell", args: { command: `/usr/bin/sqlite3 ${quote(connection!.database)} ${quote(sql)}` } })}` })
+  const completed = api("POST", `/api/experimental/session/${mutation}/wait`)
+  let done = false
+  void completed.then(() => { done = true })
+  for (let i = 0; i < 200 && !done; i++) {
+    const pending = await api<{ data: Array<{ id: string }> }>("GET", `/api/session/${mutation}/permission`)
+    for (const request of pending.data) await api("POST", `/api/session/${mutation}/permission/${request.id}/reply`, { decision: "once" })
+    if (!done) await Bun.sleep(20)
+  }
+  await completed
+  const changed = await api<{ data: { location: { directory: string } } }>("GET", `/api/session/${rewritten}`)
+  expect(changed.data.location.directory, JSON.stringify(changed)).toBe(E)
+  invoke("store-set", GLOBAL_RENDERER_STORE, TABS_INFO_KEY, { [`sidecar\n/session/${rewritten}`]: { directory: E } })
+  expect(readWorkspaceTruthOrThrow(truthPath, { readFileSync })).not.toContain(E)
+  expect(tracker.userOpened.has("sidecar", E)).toBe(false)
+  const first = child
+  const previousPid = connection!.pid
+  const exited = new Promise<void>((resolve) => first.once("exit", () => resolve()))
+  const crash = await session(A)
+  await api("POST", `/api/session/${crash}/prompt`, { text: `CP-CALL ${JSON.stringify({ name: "shell", args: { command: `kill -KILL ${previousPid}` } })}` }).catch(() => undefined)
+  await exited
+  expect(first.signalCode).toBe("SIGKILL")
+  generation++
+  // Explicit fixture restart: the production index self-heal and real document reload remain window evidence.
+  await boot()
+  expect(connection!.pid).not.toBe(previousPid)
+  const restored = await api<{ data: { location: { directory: string } } }>("GET", `/api/session/${rewritten}`)
+  expect(restored.data.location.directory).toBe(E)
+  expect(await tracker.probeWrite({ server: "sidecar", directory: E }, listener)).toMatchObject({ outcome: "denied", grant: "ineligible", reason: "not-opened-by-you" })
+  await write(E, "rewritten.txt")
+  expect(readdirSync(E)).toEqual([])
+  expect(await tracker.probeWrite({ server: "sidecar", directory: B }, listener)).toMatchObject({ outcome: "writable", grant: "granted" })
+  await write(B, "honest-reload.txt")
+  expect(readFileSync(join(B, "honest-reload.txt"), "utf8")).toBe("x")
+})
+
+test("a stopped real sidecar reports grant-failed independently of an unknown probe outcome", async () => {
+  await listener.stop()
+  expect(await tracker.probeWrite({ server: "sidecar", directory: B }, listener)).toMatchObject({ outcome: "unknown", grant: "failed", reason: "grant-failed" })
 })

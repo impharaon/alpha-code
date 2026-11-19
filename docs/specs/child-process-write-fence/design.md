@@ -1,7 +1,7 @@
 ---
 id: DESIGN-child-process-write-fence
 title: 用户亲手打开的项目当场可写(不重启引擎)技术设计
-summary: 围栏 profile 在装上时多声明一条只认 Code Puppy 私有扩展类的写放行,并禁止围栏内以任何方式(文件 / 通用 / mach / iokit / posix-ipc 五种签发)签发该类;用户打开动作本身(系统目录选择器与 renderer 里枚举出的四个记录点)向主进程登记「本机引擎 + 目录」;主进程按资格签发只能由当前引擎进程消费的令牌,经既有窄消息交引擎消费,整棵进程树(含已在跑的终端与 MCP)当场可写,不换代;真源只收已登记的目录;重载、SSE、恢复与重挂不产生资格;「只读」与「重新启动」退出常规路径,剩余三种情形各一句话
+summary: 围栏 profile 在装上时多声明一条只认 Code Puppy 私有扩展类的写放行,并禁止围栏内以任何方式(文件 / 通用 / mach / iokit / posix-ipc 五种签发)签发该类;用户打开动作本身(系统目录选择器与 renderer 里枚举出的五个记录点)向主进程登记「本机引擎 + 目录」;主进程按资格签发只能由当前引擎进程消费的令牌,经既有窄消息交引擎消费,整棵进程树(含已在跑的终端与 MCP)当场可写,不换代;真源只收已登记的目录;重载、SSE、恢复与重挂不产生资格;「只读」与「重新启动」退出常规路径,剩余三种情形各一句话
 kind: tech-design
 status: draft
 spec: SPEC-child-process-write-fence
@@ -101,7 +101,9 @@ E4 LaunchServices 在围栏内可达:`/usr/bin/sandbox-exec -f net.sb /usr/bin/o
 | chip 选择器分支(`workspace-chip.tsx:126-128`) | 系统对话框 | 选中路径 | 已由 M1 记录 |
 | 侧栏导航 `:908`(startChat 建会话后) | R1 之后 | 引擎创建的会话 | 只消费 |
 | 首页发送后 `CodePuppyHome.tsx:173`、新对话页 `promoteDraft` `codepuppy-new-session.tsx:174` | 用户发送 | 发送时的工作区(已由 R3 / M1 记录,或默认工作区,或深链接带来的目录) | 只消费 |
-| 子任务卡进入子会话 `session-timeline.tsx:196`、子会话回父会话 `session-composer-dock.tsx:275`、自动化运行记录 `automation-panel.tsx:348` | 用户点击 | 引擎回报的会话目录 | 只消费(收窄:不产生新资格) |
+| 自动化历史「打开会话」`openSession(task, rec)`(`automation-panel.tsx:338-349`;唯一引用 `:817` 按钮 `onClick`) | 用户点击 | 该运行所属任务的 `target.projectDir`(`shared/automation-types.ts:34-35`) | **记录(R5)**(R3 补) |
+| 自动调度触发的运行(main 的调度器按 `target.projectDir` 建会话)、历史列表加载 | 定时器 / 面板打开时读取 | 任务文件 | 只消费(不导航、不登记) |
+| 子任务卡进入子会话 `session-timeline.tsx:196`、子会话回父会话 `session-composer-dock.tsx:275` | 用户点击 | 引擎回报的会话目录 | 只消费(收窄:不产生新资格) |
 | 后退 / 前进 / 主页 `codepuppy-sidebar.tsx:1114`、`:1115`、`:1267`;新对话 `:915` | 用户点击 | 历史条目 / 默认工作区 | 只消费 |
 | 启动草稿 `codepuppy-sidebar.tsx:869` | 启动时自动 | 默认工作区(W1 恒含) | 只消费(恢复类) |
 | 重载回原处 `reload-place.ts:11-17`(`RestoredMemoryRouter`,`index.tsx:544`) | 重载后自动 | 会话记录 | 只消费(恢复类) |
@@ -110,7 +112,7 @@ E4 LaunchServices 在围栏内可达:`/usr/bin/sandbox-exec -f net.sb /usr/bin/o
 | `codepuppy-app/src/context/notification.tsx:363`、`:401`(通知点击) | 用户点系统通知,目标来自引擎事件 | 引擎会话 | 只消费(引擎驱动) |
 | `codepuppy-app/src/pages/directory-layout.tsx:42`、`:67`、`:111`;`pages/session.tsx:219`、`:2161`;`components/titlebar.tsx:144`、`:151`、`:519` | 旧路由规范化 / 会话不存在回首页 / 上游标题栏 | 路由 / 引擎数据 | 只消费 |
 
-结论:没有一个所有用户打开动作共用的窄点 —— 用户打开动作分布在 M1 与四个 renderer 函数(R1–R4)上;四个函数只被列出的 DOM 事件处理与菜单命令引用。**引擎来源的事件(SSE、会话事件、子任务会话、通知)驱动的导航都直接调 `navigate` / `navigateTab`,没有一条经过 R1–R4 或 M1**(上表引擎驱动各行)。
+结论:没有一个所有用户打开动作共用的窄点 —— 用户打开动作分布在 M1 与五个 renderer 函数(R1–R5)上;五个函数只被列出的 DOM 事件处理与菜单命令引用。**引擎来源的事件(SSE、会话事件、子任务会话、通知)与自动调度驱动的导航 / 会话都不经过 R1–R5 或 M1**(上表引擎驱动与只消费各行)。自动化任务文件在 `codepuppyGlobalRoot()/automations`(`main/codepuppy-automations.ts:16-17`),属 W2,围栏内写得了 ⇒ R5 记录的目录与侧栏会话行的目录同属 R-a 类(用户的点击落在可被模型改写的数据上)。
 
 ## 4. 接口契约
 
@@ -177,7 +179,7 @@ export type WorkspaceEligibility =
   | { eligible: false; reason: "not-local" | "home-or-app-state" | "not-a-directory" }
 
 export type UserOpenedRegistry = {
-  /** 只由记录点调用:main 的选择器处理函数直接调;renderer 的 R1–R4 经 `workspace-open-record` IPC。 */
+  /** 只由记录点调用:main 的选择器处理函数直接调;renderer 的 R1–R5 经 `workspace-open-record` IPC。 */
   register(input: { server: string; directory: string }): WorkspaceEligibility
   /** 已登记(或 boot 时已在真源里)的「本机引擎 + 目录」。 */
   has(server: string, directory: string): boolean
@@ -200,18 +202,19 @@ export type UserOpenedRegistry = {
 | R2 | 侧栏 `openSession`(`:971-975`;改为接收该行会话,不只是 id) | (`props.serverKey()`, 该行 `session.directory`) | 导航之前 |
 | R3 | chip `choose(directory)`(`workspace-chip.tsx:53-56`) | (宿主的 server, 所点项的目录) | `onSelect` 之前 |
 | R4 | 会话搜索 `go`(`codepuppy-session-search.tsx:160-163`;改为接收结果,结果补 `directory`) | (serverKey, 该结果会话的 `session.directory`) | 导航之前 |
+| R5 | 自动化历史「打开会话」`openSession(task, rec)`(`automation-panel.tsx:338-349`,唯一引用 `:817`) | (点击那一刻的 `props.serverKey()`, `task.target.projectDir`) | 导航之前(R3 补) |
 
 ```ts
 // renderer → main,新通道 `workspace-open-record`;main 处理函数同步调用 register,不 await
 export type WorkspaceOpenRecordRequest = { server: string; directory: string } // renderer 输入不可信:形状不对 ⇒ { recorded: false }
 export type WorkspaceOpenRecordResult = { recorded: boolean; reason?: "not-local" | "home-or-app-state" | "not-a-directory" }
-// renderer helper(唯一调用入口):recordWorkspaceOpen(server: string, directory: string): Promise<void>
+// renderer helper(唯一调用入口,只在 R1–R5 里调用):recordWorkspaceOpen(server: string, directory: string): Promise<void>
 ```
 
-- R1–R4 先 `await recordWorkspaceOpen(...)`(一次 IPC 往返,毫秒级,界面无等待态),再导航 / 选择 / 建会话。登记按目录记,与会话创建、目录解析要多久无关 ⇒ 合法的打开无论引擎多慢都成立;宿主之后哪一刻解析出这个目录,咽喉都消费得到。
+- R1–R5 先 `await recordWorkspaceOpen(...)`(一次 IPC 往返,毫秒级,界面无等待态),再导航 / 选择 / 建会话。登记按目录记,与会话创建、目录解析要多久无关 ⇒ 合法的打开无论引擎多慢都成立;宿主之后哪一刻解析出这个目录,咽喉都消费得到。
 - 冻结:登记的就是动作那一刻的目标目录。之后会话目录被改写(SSE、重新取数、重载后从引擎重读)得到的新目录没有登记 ⇒ 不放行,显示 `not-opened-by-you` 那句。
-- 恢复 / 重载 / 自愈 / 深链接 / 引擎驱动的导航:都直接设路由或调 `navigate` / `navigateTab`,从不调用 R1–R4 或 M1(P-15);它们在 V5 的调用点登记簿里分别标为 restore / deep-link / engine,不产生任何记录。main 的登记表在本次运行内保留 ⇒ 诚实的重载照旧可写,被改写的目录不会变得有资格。
-- **收窄后的认定(决定)。**算作「用户打开」的只有 M1 与 R1–R4,即 spec AC-05 的原文 `用户经「打开项目」选中它，或从项目列表、侧栏进入它或它的对话`,外加从搜索结果进入对话。经子任务卡、父子会话跳转、自动化运行记录、系统通知、tab 栏、后退 / 前进 / 主页、发送后的跳转到达的目录不产生新资格:它们若已登记(或在 W1)照常可写,否则显示 `not-opened-by-you` 那句。
+- 恢复 / 重载 / 自愈 / 深链接 / 引擎驱动的导航:都直接设路由或调 `navigate` / `navigateTab`,从不调用 R1–R5 或 M1(P-15);自动调度触发的运行与历史加载同样不经过记录点;它们在 V5 的调用点登记簿里分别标为 restore / deep-link / engine,不产生任何记录。main 的登记表在本次运行内保留 ⇒ 诚实的重载照旧可写,被改写的目录不会变得有资格。
+- **收窄后的认定(决定)。**算作「用户打开」的只有 M1 与 R1–R5,即 spec AC-05 的原文 `用户经「打开项目」选中它，或从项目列表、侧栏进入它或它的对话`,外加从搜索结果、自动化历史「打开会话」进入对话。经子任务卡、父子会话跳转、系统通知、tab 栏、后退 / 前进 / 主页、发送后的跳转到达的目录不产生新资格:它们若已登记(或在 W1)照常可写,否则显示 `not-opened-by-you` 那句。
 - R1 的观测形状改动撤回:`WorkspaceWritableObservation` 保持 `{ sandbox, generation, server, directory }`,没有 `entry`、没有激活采样、没有草稿目录比较。
 - `CODEPUPPY_OPEN_DIR`:只有启动 Electron 主进程的一方(开发 / 测试 harness / 操作者)能设;被围栏的进程树是主进程的子进程,改不了主进程的环境。它让对话框不出现,所以它是启动者的声明,不是系统 UI 的见证;在 M1 照样登记。
 
@@ -287,7 +290,7 @@ renderer tracker 收到后丢掉该 `(引擎代, server, directory)` 的缓存;�
 | `grant-write` 合同与 sidecar 消费 | 写探针合同所在处 + `sidecar.ts` 消息循环 | 原生模块 | `workspace-write-probe.ts:39-76`;`sidecar.ts:122-138` |
 | 放行编排、账本、资格变化通知 | `server.ts` 监听器(请求簿)+ `ipc.ts` 处理函数 + preload | 上面三者 | `createWriteProbeRequester`(`server.ts:586`)、`listener.probeWrite`(`:707`)、`ipc.ts:94-98`、`:185-207` |
 | `recordWorkspaceOpen`、缓存键、`whenSettled`、标记判定 | renderer `workspace-writable-core.ts` / `workspace-writable.ts` | preload | 既有咽喉(三个宿主) |
-| 四个记录点(侧栏 `startChat` / `openSession`、chip `choose`、搜索 `go`);三个宿主的「开始工作」等待;只读胶囊 / 尾标 / 文案 | `codepuppy-sidebar.tsx`、`workspace-chip.tsx`、`codepuppy-session-search.tsx`、`codepuppy-session-workspace.tsx`、`CodePuppyHome.tsx`、`codepuppy-new-session.tsx`、`session-workspace-shell.tsx`、`i18n` | renderer 咽喉核 | 既有 `useWorkspaceWritable`;P-15 枚举 |
+| 五个记录点(侧栏 `startChat` / `openSession`、chip `choose`、搜索 `go`、自动化历史 `openSession`);三个宿主的「开始工作」等待;只读胶囊 / 尾标 / 文案 | `codepuppy-sidebar.tsx`、`workspace-chip.tsx`、`codepuppy-session-search.tsx`、`automations/automation-panel.tsx`、`codepuppy-session-workspace.tsx`、`CodePuppyHome.tsx`、`codepuppy-new-session.tsx`、`session-workspace-shell.tsx`、`i18n` | renderer 咽喉核 | 既有 `useWorkspaceWritable`;P-15 枚举 |
 
 - 新目录 / 新模块:无;`docs/architecture/modules.md` 的 `packages/ui-mac/` 行不变。
 - 收敛:运行期放行与真源过滤消费同一份登记表;本机判据、规则 4/5/5b、类名各只有一份(K2)。
@@ -302,19 +305,19 @@ renderer tracker 收到后丢掉该 `(引擎代, server, directory)` 的缓存;�
   - 以「页面当前目录」作为用户打开的证据(送审稿):改写会话目录 + 重载即可无手势获得资格(P-08、P-09)。
   - R1 的见证(咽喉核在新入口出现时采样 `navigator.userActivation.isActive`):激活是窗口级的限时状态,不绑定导航目标 —— 重载等待期间点一下启动遮罩(`codepuppy-app/src/app.tsx:587`),会话叶等目录解析完才挂载(`pages/session.tsx:240`、`:261`),被改写的目录就带着激活被登记;反过来,慢引擎让合法打开超出激活窗口而被判成「不是你打开的」(R2)。
   - 主进程监听窗口输入事件作见证:同样不绑定目标。
-  - 一个所有打开动作共用的窄点:P-15 枚举证明不存在;改为 M1 + R1–R4 五处记录,加 V5 登记簿兜住新增调用点。
+  - 一个所有打开动作共用的窄点:P-15 枚举证明不存在;改为 M1 + R1–R5 六处记录,加 V5 登记簿兜住新增调用点。
   - 由主进程代写、每项目一个引擎、每条命令外包新沙箱、把 W1 预放宽到代码根目录:理由同送审稿(面过大 / 嵌套 seatbelt 不可行 / 等于没有围栏)。
 - 安全面:
   - **威胁边界。** 被围栏的引擎进程树(运行模型产生的代码与命令,能改引擎库、能向 LaunchServices 发 URL、能逼出崩溃自愈)一侧;主进程、renderer(既有信任,与 `store-set` 同级)、系统 UI 另一侧。
   - **规格里的安全承诺(逐字)。** SPEC-tool-write-fence BR-01:「工具派生进程越界写文件时会失败。」SPEC-child-process-write-fence BR-02:「MCP stdio 派生的进程越界写入失败,而不是静默成功。」BR-05(v2):「只有用户本人的打开动作能扩大可写范围；模型、对话里的命令、连接器进程和外部链接都扩大不了。」可写集成员身份由 U2 决定书 §4 第 3 条定义:「用户打开集合外的新文件夹 ⇒ **不换代、不阻止、如实告知**(§5),并把该目录写进集合,**下次启动即生效**。」⇒ 用户打开的项目本来就是集合成员,本设计把「下次启动」改成「当场」,并把「谁算用户打开」收紧为登记表。
-  - **必须守住的不变量。** S1 只有主进程能签发本类令牌:围栏内五种签发方式、全部 flags 都签不出(E5);伪造令牌消费失败(E1);`update_file` 不能改指向(E5)。S2 X1 只认本类(E2、E5 旧接口行)。S3 令牌绑定当前引擎进程:复制回放、新一代、未围栏进程都消费不了(E6)。S4 资格只在 M1 与 R1–R4 这五个记录点、按该动作的具体目标目录登记为「本机引擎 + 目录」;咽喉与真源只消费;SSE、恢复、重载、自愈、重挂、深链接、检疫目录、引擎驱动的导航、任何 sidecar → main 消息、外部目录卡片批准都到不了记录点(P-15),不产生资格;远端会话不产生本机资格。S5 运行期放行只给已登记目录,真源也只收已登记目录 ⇒ 运行期从不比下一代 W1 能含的更宽(W1 的 K=32 / 字节封顶只是尺寸裁剪)。S6 HOME / 祖先 / `/` / 应用状态根相关目录永不登记。
+  - **必须守住的不变量。** S1 只有主进程能签发本类令牌:围栏内五种签发方式、全部 flags 都签不出(E5);伪造令牌消费失败(E1);`update_file` 不能改指向(E5)。S2 X1 只认本类(E2、E5 旧接口行)。S3 令牌绑定当前引擎进程:复制回放、新一代、未围栏进程都消费不了(E6)。S4 资格只在 M1 与 R1–R5 这六个记录点、按该动作的具体目标目录登记为「本机引擎 + 目录」;咽喉与真源只消费;SSE、恢复、重载、自愈、重挂、深链接、检疫目录、引擎驱动的导航、自动调度的运行、任何 sidecar → main 消息、外部目录卡片批准都到不了记录点(P-15),不产生资格;远端会话不产生本机资格。S5 运行期放行只给已登记目录,真源也只收已登记目录 ⇒ 运行期从不比下一代 W1 能含的更宽(W1 的 K=32 / 字节封顶只是尺寸裁剪)。S6 HOME / 祖先 / `/` / 应用状态根相关目录永不登记。
   - **今天的同类洞一并关闭。** P-08 的「改写会话目录 → tab 写回 → 真源 → 逼自愈」与 E4 的「工具发深链接 → tab → 真源」两条链,都在真源只收已登记目录这一步断开。代价(spec v2「用户会碰到的限制」已写):只经外部链接到达、用户没亲手打开过的文件夹不自动可写,用「打开项目」选中即可。
-  - **剩余风险。** R-a 用户点击落在模型布置的内容上(伪造的项目条目、会话行显示的目录本身被改写):用户确有动作,目录来自点击那一刻列表里的引擎数据;与今天的真源同类,本设计不更宽(S5)。点击之后才改写的目录、发送后引擎替换的目录都不在登记表里,不放行。R-b 被围栏的工具经 LaunchServices 让未被围栏的应用替它执行(推,未实跑),与本设计无关的现有围栏缺口。R-c 已由测(编排者)覆盖到签名 + hardened runtime 的普通程序;真正的签名 Electron main → utilityProcess + 生产 `.node` 形态由实施入口闸证明(下)。R-d、R-e 已测(E8、E7)。
+  - **剩余风险。** R-a 用户点击落在模型布置的内容上(伪造的项目条目、会话行显示的目录本身被改写、W2 下自动化任务文件里的 `target.projectDir` 被改写):用户确有动作,目录来自点击那一刻列表里的引擎数据;与今天的真源同类,本设计不更宽(S5)。点击之后才改写的目录、发送后引擎替换的目录都不在登记表里,不放行。R-b 被围栏的工具经 LaunchServices 让未被围栏的应用替它执行(推,未实跑),与本设计无关的现有围栏缺口。R-c 已由测(编排者)覆盖到签名 + hardened runtime 的普通程序;真正的签名 Electron main → utilityProcess + 生产 `.node` 形态由实施入口闸证明(下)。R-d、R-e 已测(E8、E7)。
   - **实施入口闸(第一步,未过不进行其余实施)。** G0:用发版命令签名(Developer ID + hardened runtime + 生产 entitlements)的真 Electron 主进程 fork 生产 utilityProcess sidecar,加载生产 `.node`、装生产 profile;sidecar 先起一个已 exec 并报 ready 的子进程;主进程按 sidecar pid 绑定签发、sidecar 消费;已有子进程与新子进程都写进目标;集合外与未放行目录 0 落盘;sidecar 内五种方式自签本类全被拒;复制的令牌在另一个进程消费失败。**G0 不过 ⇒ 第二条在出货形态上不成立:实施方返回 `BLOCKED: design — G0 — <失败臂与原文>`,由编排者带给 owner;不自行改走第一条。**
   - **实施必须拿出的证据(每条都要能失败)。**
-    - AC-05:V3 真引擎 —— 打开一个不在 W1 的目录;放行前已开着的终端、已启动的 MCP stdio 子进程与之后的 shell 工具都写得进;把放行人为延迟到上限之内,第一条消息与第一个新终端都排在放行之后;引擎不换代、renderer 不重载、另一个对话里正在跑的回答不中断;对照臂不放行 → EPERM、0 落盘。V4 —— 同一代、同一 renderer 里先被拒(`not-opened-by-you`),再用选择器选中 → 不重载即写得进;**打开响应超过任何激活窗口也必须放行**:把 R1 的 `createSession` 应答与会话目录解析各人为延迟到 8 s 以上,目录照样当场可写、无标记(对照:去掉 R1 的记录调用 → `not-opened-by-you`)。
+    - AC-05:V3 真引擎 —— 打开一个不在 W1 的目录;放行前已开着的终端、已启动的 MCP stdio 子进程与之后的 shell 工具都写得进;把放行人为延迟到上限之内,第一条消息与第一个新终端都排在放行之后;引擎不换代、renderer 不重载、另一个对话里正在跑的回答不中断;对照臂不放行 → EPERM、0 落盘。V4 —— 同一代、同一 renderer 里先被拒(`not-opened-by-you`),再用选择器选中 → 不重载即写得进;**打开响应超过任何激活窗口也必须放行**:把 R1 的 `createSession` 应答与会话目录解析各人为延迟到 8 s 以上,目录照样当场可写、无标记(对照:去掉 R1 的记录调用 → `not-opened-by-you`);**自动化历史「打开会话」**:任务的项目 X 不在本次启动的可写集、本次运行也没经选择器选过,点「打开会话」→ 当场可写、无标记(对照:去掉 R5 的记录调用 → `not-opened-by-you`);同一任务的自动调度运行与历史加载不产生登记。
     - AC-06:V6a 可写路径上两个只读钩子缺席,全应用没有「重新启动 Code Puppy」按钮。
-    - AC-07:V1 渲染出的 profile 逐行含 X1、X2(五个操作名);已知的坏:只禁 file 签发的 X2 下围栏内 generic 自签落盘(E5 左列)、去掉 X2 时 file 自签落盘(E1 `nodeny`)——两臂必须红。V2 在生产 profile + 生产 `.node` + Electron 内嵌 node 下逐臂跑 E5,预期按臂定(R2 修订):本类的有效签发 —— file ×4(含 `_to_self` / `_to_process` / `_by_pid`)、`related_file` 三种操作名、generic ×3、mach ×3、iokit ×3、除 0x1 外每个能签的 flag 位 —— 一律返回 NULL;保留接口与空能力结果 —— 旧接口 `sandbox_issue_fs_extension` / `sandbox_issue_mach_extension`(只发苹果类)与 `issue_file` flags 0x1(handle=0)—— 允许返回令牌;**所有臂**消费后集合外 0 落盘(实读磁盘);伪造令牌失败;已知的坏:不绑进程的令牌在第二个进程回放落盘(E6),绑定令牌同样回放 → EPERM。V5 间接链 —— 改写当前会话的 `session_v2.directory` 为 X、逼一次崩溃自愈与 renderer 重载 → X 不放行、0 落盘、真源不收 X;**重载等待期间用户在窗口里点别处(启动遮罩、侧栏非记录区域)也不放行 X**;同一流程不改写目录(诚实重载)→ 原目录照旧可写;用户刚点击过别处后工具发深链接打开 X → 不放行;远端会话的同名本机目录 → 不放行;sidecar → main 任一消息都走不到登记或签发。结构判据:一份导航 / 选择调用点登记簿(P-15 那张表的机器可读形态,按 `navigate(` / `hrefFor.*(` / `navigateTab(` / `startChat(` / `startDraft(` / `promoteDraft(` / chip `onSelect` 扫 `packages/ui-mac/src/renderer` 与 `codepuppy-app` 的已挂载上下文),每个调用点标 record / consume(restore / deep-link / engine / user-consume);新增未登记调用点 ⇒ 红;`recordWorkspaceOpen` 只许在 R1–R4 里调用、R1–R4 只许被登记的 DOM 事件处理 / 菜单命令引用,新增调用或引用 ⇒ 红;控制臂:把 `recordWorkspaceOpen` 加进一个 restore 类调用点必须红。
+    - AC-07:V1 渲染出的 profile 逐行含 X1、X2(五个操作名);已知的坏:只禁 file 签发的 X2 下围栏内 generic 自签落盘(E5 左列)、去掉 X2 时 file 自签落盘(E1 `nodeny`)——两臂必须红。V2 在生产 profile + 生产 `.node` + Electron 内嵌 node 下逐臂跑 E5,预期按臂定(R2 修订):本类的有效签发 —— file ×4(含 `_to_self` / `_to_process` / `_by_pid`)、`related_file` 三种操作名、generic ×3、mach ×3、iokit ×3、除 0x1 外每个能签的 flag 位 —— 一律返回 NULL;保留接口与空能力结果 —— 旧接口 `sandbox_issue_fs_extension` / `sandbox_issue_mach_extension`(只发苹果类)与 `issue_file` flags 0x1(handle=0)—— 允许返回令牌;**所有臂**消费后集合外 0 落盘(实读磁盘);伪造令牌失败;已知的坏:不绑进程的令牌在第二个进程回放落盘(E6),绑定令牌同样回放 → EPERM。V5 间接链 —— 改写当前会话的 `session_v2.directory` 为 X、逼一次崩溃自愈与 renderer 重载 → X 不放行、0 落盘、真源不收 X;**重载等待期间用户在窗口里点别处(启动遮罩、侧栏非记录区域)也不放行 X**;同一流程不改写目录(诚实重载)→ 原目录照旧可写;用户刚点击过别处后工具发深链接打开 X → 不放行;远端会话的同名本机目录 → 不放行;sidecar → main 任一消息都走不到登记或签发。结构判据:一份导航 / 选择调用点登记簿(P-15 那张表的机器可读形态,按 `navigate(` / `hrefFor.*(` / `navigateTab(` / `startChat(` / `startDraft(` / `promoteDraft(` / chip `onSelect` 扫 `packages/ui-mac/src/renderer` 与 `codepuppy-app` 的已挂载上下文),每个调用点标 record / consume(restore / deep-link / engine / user-consume);新增未登记调用点 ⇒ 红;`recordWorkspaceOpen` 只许在 R1–R5 里调用、R1–R5 只许被登记的 DOM 事件处理 / 菜单命令引用,新增调用或引用 ⇒ 红;控制臂:把 `recordWorkspaceOpen` 加进一个 restore 类调用点必须红。
     - AC-08:V6b 三种情形各自到达那一句:主目录 / 状态根;深链接送来的目录(含之后用选择器选中即当场可写);放行失败两种注入 —— 原生异常(如 `task_name_for_pid` 失败)与请求簿超时 —— 都显示 `grant-failed` 那句,而不是无标记。
 
 ## 8. 拆分决定
@@ -332,7 +335,7 @@ renderer tracker 收到后丢掉该 `(引擎代, server, directory)` 的缓存;�
 | 1. 选第二条:运行期以私有类沙箱扩展当场放行,不换代;第一条不实现、不作兜底 | E1–E8(测,`A`,macOS 26.3.1);owner 2026-11-19「如果第二条可行，就选第二条」 |
 | 2. 私有类 `app.codepuppy.workspace-write`;X2 限本类、五种签发操作一起禁(R1 修订) | E2 对照臂;E5 |
 | 3. 令牌绑定当前引擎进程(审计令牌,经 `task_name_for_pid` 取得),只走 `grant-write` 消息(R1 新增) | E6 |
-| 4. 资格在 M1 与 R1–R4 五个记录点按动作的具体目标登记为「本机引擎 + 目录」;运行期放行与真源都只消费登记表;恢复 / 深链接 / 引擎驱动导航到不了记录点(R2 修订,替换 R1 的激活采样) | P-08、P-09、P-15;§4「记录点」 |
+| 4. 资格在 M1 与 R1–R5 六个记录点按动作的具体目标登记为「本机引擎 + 目录」;运行期放行与真源都只消费登记表;恢复 / 深链接 / 引擎驱动导航 / 自动调度到不了记录点(R2 修订替换 R1 的激活采样;R3 补 R5) | P-08、P-09、P-15;§4「记录点」 |
 | 5. 顺序:选择器在返回前放行;宿主的「开始工作」动作等放行结束,上限 1 s;已在运行的工作靠放行落地后继承(R1 修订) | E7 已 exec 子进程;E8 签发耗时;§5 |
 | 6. 「只读」胶囊与 chip 尾标退出常规路径;剩余三种情形各一句话;删除「重新启动 Code Puppy」按钮 | owner 2026-11-19「这个交互逻辑我觉得有点乱。我希望可以尽量用户无感」取代 2026-09-10 批准原文 `保留弹层里的「重新启动 Alpha」按钮`;spec v2 BR-04、BR-06 |
 | 7. 失败独立上报:main 捕获原生异常与超时,`grant: "failed"` 不依赖探针答 `denied`;失败答案非终态,资格变化通知使缓存失效并重问(R1 修订) | P-09、P-11 |
@@ -349,6 +352,7 @@ renderer tracker 收到后丢掉该 `(引擎代, server, directory)` 的缓存;�
 | 同上 | 同上 | F7 [Major] E2 没测到已 exec 的终端 / MCP;R-c/R-d/R-e 未测 —— 测 | E7:已 exec 并报 ready 的子进程消费后可写(对照 0 落盘);软链 / 大小写两向可写,软链跳出负例 EPERM;E8:第 2 589 次消费 ENOMEM(只是读数);R-c 引用测(编排者)`rc-hardened/`;真签名 Electron 形态改为入口闸 G0 | G0 由实施方第一步跑 |
 | R2 / `15a54fe1a6..cadd657d29` / R1 修订部分 | Codex(GPT-6)只读审计,RECOMMEND FIX-THEN-MERGE;编排者两项都采纳;F2–F7 与 G0 本轮未发现新缺陷 | R2-1 [Blocker] 窗口近期有输入不等于用户打开了该入口(重载等待期点遮罩即登记被改写的目录;慢引擎让合法打开超出激活窗口)—— 修 | 撤回激活采样与入口键;§4 改为在打开动作处登记:M1 + R1–R4,`workspace-open-record` 新通道,`WorkspaceWriteProbeRequest` 去掉 `open`;P-15 枚举全部导航 / 选择调用点并分类,引擎驱动的路径都不经过记录点;收窄认定为 M1 + R1–R4;V4「响应超过激活窗口仍放行」、V5「重载等待期点别处不放行」与调用点登记簿结构判据 | R-a(点击那一刻列表里的引擎数据本身被伪造)仍是剩余风险 |
 | 同上 | 同上 | R2-2 [Major] V2「全部方式全 NULL」与 E5 自己的证据冲突(旧接口两类与 flags 0x1 返回令牌但不放宽)—— 修 | V2 逐臂定预期:本类有效签发被拒(NULL);保留接口 / 空能力结果允许返回令牌;所有臂消费后集合外 0 落盘 | — |
+| R3 / `cadd657d29..c0706d75b4` / R2 修订部分 | Codex(GPT-6)只读确认:R2-1、R2-2 已修好,无新安全发现(四个 renderer 记录函数的现有引用都来自点击 / 回车处理;没有恢复、深链接或引擎事件调用方;`CODEPUPPY_OPEN_DIR` 仍只来自主进程启动环境);编排者采纳下列一项后冻结 | R3-1 [Major] 自动化历史「打开会话」(`automation-panel.tsx:817` → `:338`)是普通的用户打开动作却没有记录点,项目不在启动可写集时被判「不是你打开的」—— 修 | 新增记录点 R5(记录该运行所属任务的 `target.projectDir`,导航之前);P-15 分类、§4 记录点表、S4、R-a、V5 调用点登记簿(R1–R5)与 V4 一臂同步;自动调度与历史加载仍只消费 | — |
 
 **留档**
 

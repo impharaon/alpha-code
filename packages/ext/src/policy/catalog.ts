@@ -50,9 +50,14 @@ export function catalogRules(
       continue
     }
     // The tier's waiver is read per tool: its resource is the canonical identity (`*` = every tool).
-    const tierAllows = evaluate(TOOL_POLICY_DEFAULT, canonical, configured).effect === "allow"
-    if (effective.action === "ask" && !(effective.reason.kind === "default" && tierAllows))
-      rules.push({ action: canonical, resource: "*", effect: "ask" })
+    const tier = evaluate(TOOL_POLICY_DEFAULT, canonical, configured)
+    // A tier that names this tool (resource ≠ `*`) needs no approval for it, so a user's earlier enable whose binding has
+    // since changed (every release re-digests the bundled extension) cannot make it stricter than the tier. A `*` waiver
+    // keeps the rebind guard: a changed binding of an enabled tool asks again.
+    const waived =
+      tier.effect === "allow" &&
+      (effective.reason.kind === "default" || (effective.reason.kind === "binding-changed" && tier.resource !== "*"))
+    if (effective.action === "ask" && !waived) rules.push({ action: canonical, resource: "*", effect: "ask" })
   }
   return rules
 }

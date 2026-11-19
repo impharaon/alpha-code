@@ -403,6 +403,32 @@ describe("#1476 tooltip", () => {
     expect(tip.style.bottom).toBe("")
   })
 
+  test("a tip centred near the window edge is shifted back inside (8px margin) on the left and on the right", async () => {
+    const original = Element.prototype.getBoundingClientRect
+    let tipRect = { left: -20, right: 60 }
+    Element.prototype.getBoundingClientRect = function (this: Element) {
+      if (this.getAttribute("role") === "tooltip") return { ...tipRect, top: 0, bottom: 20, width: 80, height: 20, x: tipRect.left, y: 0, toJSON() {} } as DOMRect
+      return original.call(this)
+    }
+    try {
+      for (const [rect, shift] of [
+        [{ left: -20, right: 60 }, 28],
+        [{ left: window.innerWidth - 70, right: window.innerWidth + 10 }, -18],
+      ] as const) {
+        tipRect = rect
+        mount(() => runtime.TooltipHarness({ placement: "bottom" }))
+        const trigger = document.querySelector<HTMLElement>("[data-tip-trigger]")!
+        trigger.dispatchEvent(new PointerEvent("pointerenter"))
+        await sleep(450)
+        expect(document.querySelector<HTMLElement>("[role='tooltip']")!.style.translate).toBe(`calc(-50% + ${shift}px) 0`)
+        trigger.dispatchEvent(new PointerEvent("pointerleave"))
+        await flush()
+      }
+    } finally {
+      Element.prototype.getBoundingClientRect = original
+    }
+  })
+
   test("copy button shows 已复制 with a green check for 1.5s after a successful copy", async () => {
     const copied: string[] = []
     Object.defineProperty(window.navigator, "clipboard", {

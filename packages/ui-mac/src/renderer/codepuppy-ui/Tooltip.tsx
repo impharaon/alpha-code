@@ -20,6 +20,19 @@ import "./tooltip.css"
  */
 export const TOOLTIP_DELAY_MS = 400
 
+const WINDOW_MARGIN = 8
+
+/** 签居中于触发控件,靠近窗口左 / 右缘时会被裁掉一半:量出实际宽度,水平方向平移到窗口内(留 8px)。 */
+function keepInWindow(tip: HTMLElement) {
+  const box = tip.getBoundingClientRect()
+  const over = WINDOW_MARGIN - box.left
+  const under = box.right - (window.innerWidth - WINDOW_MARGIN)
+  const shift = over > 0 ? over : under > 0 ? -under : 0
+  if (!shift) return
+  const vertical = tip.dataset.placement === "right" ? "-50%" : "0"
+  tip.style.translate = `calc(${tip.dataset.placement === "right" ? "0px" : "-50%"} + ${Math.round(shift)}px) ${vertical}`
+}
+
 export function Tooltip(props: {
   label: string
   placement?: "top" | "bottom" | "right"
@@ -108,7 +121,13 @@ export function Tooltip(props: {
       </Show>
       <Show when={visible()}>
         <Portal>
-          <span class="a-ui a-tip" role="tooltip" data-placement={props.placement ?? "top"} style={style()}>
+          <span
+            class="a-ui a-tip"
+            role="tooltip"
+            data-placement={props.placement ?? "top"}
+            style={style()}
+            ref={(tip) => queueMicrotask(() => keepInWindow(tip))}
+          >
             {props.label}
           </span>
         </Portal>

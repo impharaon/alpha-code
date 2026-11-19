@@ -307,3 +307,13 @@ PLAN 阶段只提交本文件。下表和命令均为实施安排，不代表已
 
 - 无开关实跑 `env -u CODEPUPPY_TEST_SIGNED_FENCE bun test --max-concurrency 2 src/main/process-fence-extension-packaged.test.ts`：**0 pass / 1 skip / 0 fail，exit 0，22 ms**（review/r6-g0-default.log），没有创建临时树；常规门的同一行为由 registry 的 fixture 判官要求 =0 并标未验证。
 - 文档/差异收口：四份相关文档相对链接 **21 条全部通过**（review/r6-doc-links.log），git diff --check exit 0。核对人 Codex / GPT-6，自验；本轮审查项全部完成，既定 six record points / frozen API 形状不重开。只提交，由编排者 review / push / PR / merge；未读安装版数据/凭据、未发布/公证/上传，OPTIONAL 无未做项。
+
+### r7：单一身份规则的红证据与异步接缝
+
+- 输入 `bfb5b62a35`，R2 发现已接受，尚未改生产身份逻辑。新回归统一等待返回（对旧同步值也成立），便于接缝裁定后原样驱动同一实现；不逐点修补 planner/seed 的身份逻辑。
+- 已复现的旧行为：workspace-identity host exit 1 / inner **0 pass、7 fail**（review/r7-identity-red.log）。新 app 读旧真源把 D→LaunchAgents 认作已登记、签发 1 次；诚实 symlink、`/tmp`、case 三条各过两次重启，均出现 quarantine/真源丢失；模拟失联真实解析依赖令 main 与其它目录查询耗时约 **604 ms**；同一 tab 连续十次写回额外 realpath **10 次**。
+- firmlink 必须在 Electron Node 验：Bun 实测 native realpath 把 Data/HOME 归一成 HOME，不能拿它充当 Node 的反向臂。新 fixture 在 Electron **Node 24.15.0** 调生产 tracker/planner，Data 拼写保持 Data；同 dev/ino 为真，旧 register 返回 eligible:true、runtime 调用一次 issue、planner 将 Data/HOME 写入 W1。仅读写隔离 cache 树的 HOME/状态夹具，不读取安装版数据/凭据；未把该 Node 单测当作签名 G0。
+- 真引擎生产 planner 红证据（review/r7-engine-red.log）：原 9 臂过、新 2 臂红（inner **9/2**）；真实围栏 PTY 替换 D 后杀引擎，`planProcessFence` 输出 W1 含 LaunchAgents 替身，新 engine 实际产出 **planner-escape.txt**，同真源新 app 的 seeded=true；另一个启动 W1 内项目已能实际写文件，但仍调用原生 issue **1 次**。真实 .node 的方法只作计数包装，没有替换其实现。此前三条 r6 HOME/state/ancestor 臂仍过。
+- 通知/无需签发的独立红证据：IPC inner **12/1**；renderer core **14/1**（同组 r7-probe-cache-red.log）。core 新例要求同 server 的 ineligible/failed 别名全部失效、writable 与其它 server 保留；不是靠删缓存判官。计数同步：engine inner **9→11**、IPC **12→13**、core **14→15**；新增 identity host **1**、inner **7**，均不降钉。
+- **BLOCKED 的冻结接缝**：design.md:183 `register(input): WorkspaceEligibility`、:185 `has(...): boolean`；现有 profile.ts:355/379、plan.ts:75、workspaces.ts:188 均是同步真实结果。R7 第 5 条要求三处 security decision 每次重新解析，而且失联卷不能阻塞 main。同步等 worker / Atomics.wait 仍会阻塞 main，先返回 pending/稍后偷偷登记又会改冻结语义；本 lane 不采用这两种替代。已发出澄清，未收到裁定时不改该接缝。
+- 所需最小裁定：允许内部 registry、共享 identity/predicate、planner、truth 初始化/更新返回 Promise，由现有 main handlers/boot/spawn 链 await；保留 IPC 回复/消息、native API、六记录点和 UI 步骤。拟以一个异步身份函数统管 canonical + firmlink 归一、dev/ino 祖先比较、stillSelf、按 literal 缓存与 fresh 三处重验；文件系统查询在独立 worker 进行，由 main 异步期限结束并排除当次不可达项，后续 fresh 查询可恢复。issue 前先 probe，writable 不签发，仅明确拒写且身份有效才 issue，post-check 只作便宜断言。该方案尚未实施或宣称通过。

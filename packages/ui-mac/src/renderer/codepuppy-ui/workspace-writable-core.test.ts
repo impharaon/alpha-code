@@ -16,6 +16,25 @@ const deferred = () => {
 const denied: WorkspaceWriteProbeResult = { outcome: "denied", grant: "ineligible", reason: "not-opened-by-you" }
 const writable: WorkspaceWriteProbeResult = { outcome: "writable", grant: "granted" }
 
+test("canonical change evicts every ineligible/failed alias of that server, retaining writable and other-server entries", async () => {
+  const fake = deferred()
+  const tracker = createWorkspaceWritableTracker(fake.probe)
+  const targets = [on("/alias"), on("/failed"), on("/positive"), { ...on("/remote"), server: "remote" }]
+  for (const input of targets) tracker.observe(input)
+  await fake.answer(0, denied)
+  await fake.answer(1, { outcome: "unknown", grant: "failed", reason: "grant-failed" })
+  await fake.answer(2, writable)
+  await fake.answer(3, denied)
+  tracker.invalidate({ server: "sidecar", directory: "/canonical/project" })
+  for (const input of targets) tracker.observe(input)
+  expect(fake.calls).toHaveLength(6)
+  await fake.answer(4, writable)
+  await fake.answer(5, writable)
+  expect(tracker.readonly(targets[0]!)).toBe(false)
+  expect(tracker.readonly(targets[1]!)).toBe(false)
+  expect(tracker.readonly(targets[3]!)).toBe(true)
+})
+
 test("probe consumes the exact server/directory, once per generation; pending and writable have no marker", async () => {
   const fake = deferred()
   const tracker = createWorkspaceWritableTracker(fake.probe)

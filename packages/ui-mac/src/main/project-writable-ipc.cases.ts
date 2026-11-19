@@ -164,6 +164,14 @@ test("simultaneous same-directory requests coalesce; only success is remembered 
   expect(child.grants).toHaveLength(1)
 })
 
+test("already writable inside a start-time root needs no native issue or consume", async () => {
+  register()
+  probeOutcome = "writable"
+  expect(await probe()).toMatchObject({ outcome: "writable", grant: "granted" })
+  expect(issues).toHaveLength(0)
+  expect(child.grants).toHaveLength(0)
+})
+
 test("native exceptions and every typed issue failure return grant-failed even if probe is unknown; retry can recover", async () => {
   register()
   probeOutcome = "unknown"

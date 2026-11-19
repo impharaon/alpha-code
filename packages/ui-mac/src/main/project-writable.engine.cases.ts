@@ -9,6 +9,7 @@ import { buildFenceAddon } from "../../scripts/build-fence-addon"
 import { mockElectron } from "../../test-component/electron-mock"
 import { scriptedModel, textOf } from "../../test-component/codepuppy-engine"
 import { renderProcessFenceProfile, resolveEngineRoots } from "./process-fence-profile"
+import { planProcessFence } from "./process-fence-plan"
 import { createWorkspaceWritableTracker } from "../renderer/codepuppy-ui/workspace-writable-core"
 import { workspaceReadonlyMessage } from "../renderer/codepuppy-ui/workspace-writable"
 import { setLocale } from "../renderer/i18n"
@@ -33,6 +34,15 @@ mock.module("./windows", () => ({ createMainWindow: () => {}, getPinchZoomEnable
 mock.module("./logging", () => ({ getLogger: () => ({ log: (line: unknown) => { log.push(String(line)) }, warn: (line: unknown) => { log.push(String(line)) }, error: () => {} }), write: () => {}, rotateServerLogs: () => {} }))
 mock.module("./store", () => ({ getStore: () => ({ get: () => null, set: () => {}, delete: () => {}, clear: () => {} }) }))
 mock.module("./codepuppy-keychain-backend", () => ({ keychainBackend: () => ({ isEncryptionAvailable: () => true, encryptString: (value: string) => Buffer.from(value), decryptString: (value: Buffer) => value.toString() }) }))
+const actualFence = await import("./process-fence-apply")
+const loadOriginalFenceAddon = actualFence.loadFenceAddon
+let nativeIssues = 0
+mock.module("./process-fence-apply", () => ({ ...actualFence, loadFenceAddon: (path: string) => {
+  const original = loadOriginalFenceAddon(path)
+  const wrapped = Object.create(original)
+  Object.defineProperty(wrapped, "issueFileExtensionToProcess", { value: (...args: Parameters<typeof original.issueFileExtensionToProcess>) => { nativeIssues++; return original.issueFileExtensionToProcess(...args) } })
+  return wrapped
+} }))
 const { spawnLocalServer } = await import("./server")
 const { registerIpcHandlers } = await import("./ipc")
 const { bootFenceWorkspaceTruth, writeWorkspaceTruth, readWorkspaceTruthOrThrow } = await import("./process-fence-workspaces")
@@ -97,12 +107,19 @@ async function write(directory: string, name: string) {
 }
 
 let addon = ""
+let useProductionPlanner = false
+let preparedPlan: Awaited<ReturnType<typeof planProcessFence>> | undefined
 async function boot() {
   connection = undefined
   resetDanglingSweepLatchForTests(); creditDanglingSweepForSpawn()
+  if (useProductionPlanner) preparedPlan = await planProcessFence({ userDataPath: install, sidecarEnv: { XDG_STATE_HOME: join(install, "state") }, egressProxyPort: modelProxy.port!, addon: { packaged: true, resourcesPath: run, moduleDir: run, exists: existsSync } }, {
+    homeDir: () => protectedHome, appStateRoot: () => join(run, "state"), codepuppyGlobalRoot: () => join(install, "state/env/dev"), defaultWorkspace: () => A,
+    readWorkspaces: () => readWorkspaceTruthOrThrow(truthPath, { readFileSync }), realpath: realpathSync.native, isDirectory: (path) => { try { return readdirSync(path) !== undefined } catch { return false } },
+    mkdirp: (path) => { mkdirSync(path, { recursive: true }) }, compile: () => ({ ok: true }), log: (line) => { log.push(line) },
+  })
   const result = await spawnLocalServer("127.0.0.1", 43210, "test-only", {
     userDataPath: userData, egressProxy: async () => ({ port: modelProxy.port! }), healthCheck: async () => !!connection,
-    planFence: () => ({ addonPath: addon, profile: renderProcessFenceProfile({ workspaces: [A, ...readWorkspaceTruthOrThrow(truthPath, { readFileSync })], codepuppyGlobalRoot: join(install, "state/env/dev"), userDataPath: install, stateHome: join(install, "state"), roots: resolveEngineRoots({}, join(install, "home")), egressProxyPort: modelProxy.port! }) }),
+    planFence: () => preparedPlan ?? ({ addonPath: addon, profile: renderProcessFenceProfile({ workspaces: [A, ...readWorkspaceTruthOrThrow(truthPath, { readFileSync })], codepuppyGlobalRoot: join(install, "state/env/dev"), userDataPath: install, stateHome: join(install, "state"), roots: resolveEngineRoots({}, join(install, "home")), egressProxyPort: modelProxy.port! }) }),
     fork: ((_file: string, _args: string[], options: { env: Record<string, string> }) => {
       const peer = new EventEmitter() as EventEmitter & { pid: number; stdout: unknown; stderr: unknown; postMessage: (message: { type: string; id?: number; directory?: string }) => void; kill: () => void }
       child = fork(join(import.meta.dir, "../../native/codepuppy-fence/test/project-writable-engine.fixture.ts"), [], { execPath: process.execPath, env: { ...options.env, HOME: join(install, "home"), TMPDIR: install, CODEPUPPY_WRITABLE_ENGINE_ROOT: install, CODEPUPPY_WRITABLE_A: A, CODEPUPPY_WRITABLE_B: B, CODEPUPPY_WRITABLE_MODEL_URL: `http://127.0.0.1:${modelProxy.port}/v1` }, stdio: ["ignore", "pipe", "pipe", "ipc"] })
@@ -142,7 +159,7 @@ beforeAll(async () => {
   })
 
   process.env.CODEPUPPY_GLOBAL_DIR = join(run, "state/env/dev")
-  addon = buildFenceAddon({ out: join(run, "codepuppy_fence.node"), buildId: `engine-grant-${Date.now()}` }).out
+  addon = buildFenceAddon({ out: join(run, "codepuppy-fence/codepuppy_fence.node"), buildId: `engine-grant-${Date.now()}` }).out
   await boot()
   registerIpcHandlers({ fenceWorkspaces: tracker, probeWorkspaceWrite: (input) => tracker.probeWrite(input, listener), grantWorkspaceWrite: async (input) => { await tracker.grantWrite(input, listener) }, updater: { subscribe: () => () => {} } } as unknown as Parameters<typeof registerIpcHandlers>[0])
 }, 90_000)
@@ -175,6 +192,19 @@ test("unregistered model write is refused with zero files; child-originated regi
   expect(tracker.userOpened.has("sidecar", C)).toBe(false)
   expect(await tracker.probeWrite({ server: "sidecar", directory: C }, listener)).toMatchObject({ grant: "ineligible", outcome: "denied" })
   expect(readdirSync(C)).toEqual([])
+})
+
+test("a project inside start-time W1 writes without any native issue call", async () => {
+  const directory = join(A, "already-writable")
+  mkdirSync(directory)
+  const before = nativeIssues
+  await invoke("workspace-open-record", { server: "sidecar", directory })
+  const result = await tracker.probeWrite({ server: "sidecar", directory }, listener)
+  await write(directory, "inside.txt")
+  const landed = existsSync(join(directory, "inside.txt"))
+  record("already-writable", { issued: nativeIssues - before, result, landed })
+  expect(landed).toBe(true)
+  expect(nativeIssues).toBe(before)
 })
 
 test("main grants the same running engine; existing PTY/MCP and first model/new PTY write B, C stays empty and another streamed answer is not cancelled", async () => {
@@ -286,6 +316,33 @@ test("a model rewrites session_v2.directory and kills its engine: the restored d
   expect(await tracker.probeWrite({ server: "sidecar", directory: B }, listener)).toMatchObject({ outcome: "writable", grant: "granted" })
   await write(B, "honest-reload.txt")
   expect(readFileSync(join(B, "honest-reload.txt"), "utf8")).toBe("x")
+})
+
+test("production planner and a new app start exclude a registered entry rebound to LaunchAgents", async () => {
+  const directory = join(A, "planner-project"), target = join(run, "LaunchAgents")
+  mkdirSync(directory); mkdirSync(target)
+  await invoke("workspace-open-record", { server: "sidecar", directory })
+  await invoke("store-set", GLOBAL_RENDERER_STORE, TABS_INFO_KEY, { "sidecar\n/session/planner": { directory } })
+  expect(readWorkspaceTruthOrThrow(truthPath, { readFileSync })).toContain(directory)
+  const previousPid = connection!.pid
+  const exited = new Promise<void>((resolve) => child.once("exit", () => resolve()))
+  await api("POST", "/api/pty", { cwd: A, command: "/bin/sh", args: ["-c", `mv ${quote(directory)} ${quote(`${directory}-old`)} && ln -s ${quote(target)} ${quote(directory)} && kill -KILL ${previousPid}`] }).catch(() => undefined)
+  await exited
+  generation++
+  useProductionPlanner = true
+  await boot()
+  const fresh = await bootFenceWorkspaceTruth({ truthPath, store: { tabs: [{ type: "draft", draftID: "restored", server: "sidecar", directory }], recent: undefined, info: undefined }, fs: { readFileSync, writeFileSync, mkdirSync, renameSync, rmSync }, eligibility: { homeDir: protectedHome, appStateRoot: join(run, "state"), realpath: realpathSync.native, isDirectory: (path) => { try { return readdirSync(path) !== undefined } catch { return false } } }, log: (line) => { log.push(line) }, onWritableChanged: () => {} })
+  const seeded = await fresh.userOpened.has("sidecar", directory)
+  const result = await fresh.probeWrite({ server: "sidecar", directory }, listener)
+  await write(directory, "planner-escape.txt")
+  const files = readdirSync(target)
+  record("planner-rebind", { previousPid, pid: connection!.pid, workspaces: preparedPlan!.workspaces, excluded: preparedPlan!.excluded, seeded, result, files })
+  useProductionPlanner = false
+  preparedPlan = undefined
+  await invoke("store-set", GLOBAL_RENDERER_STORE, TABS_INFO_KEY, {})
+  expect(files).toEqual([])
+  expect(seeded).toBe(false)
+  expect(result.grant).toBe("ineligible")
 })
 
 for (const [kind, target] of [["home", protectedHome], ["state", join(run, "state")], ["home-ancestor", join(run, "protected")]]) {

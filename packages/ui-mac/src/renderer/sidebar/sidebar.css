@@ -46,7 +46,7 @@ body[data-codepuppy-sidebar] #opencode-titlebar-right [aria-controls="review-pan
  * is the upstream shell's <main>; the sidebar is fixed on top of its left edge. Cosmetic coupling:
  * re-point the class fragments on an upstream rename.
  *
- * Window radius on this macOS is 16 (tokens.css --a-window-radius), so the surface radius is 8.
+ * Window radius on this macOS is 16 (tokens.css --a-window-radius), so the surface radius is 16 - --a-frame-gap (12 at the 4px gap).
  * Full-page overlays (Customization Center, automation, settings) use --codepuppy-surface-left etc.
  * below to fill the same surface. */
 :root {

@@ -111,6 +111,10 @@ describe("Alpha Settings ownership ratchets", () => {
     expect(page).not.toContain("inset: 0;")
     const tokens = await Bun.file(join(root, "src/renderer/codepuppy-ui/tokens.css")).text()
     expect(tokens).toMatch(/--a-topbar-h:\s*44px;/)
+    // owner 2026-11-18/19:右 / 下灰边 4px;工作面圆角 = 窗口圆角 16 − gap(同心),不是另写的数。
+    expect(tokens).toMatch(/--a-frame-gap:\s*4px;/)
+    expect(tokens).toMatch(/--a-window-radius:\s*16px;/)
+    expect(tokens).toMatch(/--a-surface-radius:\s*calc\(var\(--a-window-radius\) - var\(--a-frame-gap\)\);/)
     const windows = await Bun.file(join(root, "src/main/windows.ts")).text()
     // 灯的下沿 = y16 + 12px 直径 = 28,在顶栏高 44 之内:页面顶边在灯之下。
     expect(windows).toContain("trafficLightPosition: { x: 18, y: 16 }")

@@ -289,3 +289,5 @@ PLAN 阶段只提交本文件。下表和命令均为实施安排，不代表已
 - Scratch：G0、engine、extension、IPC 由 host 在 worktree/node_modules/.cache/project-writable 创建独立子树并 finally 清理，只把小 JSON 和截断日志留 results；IPC 每例也清理；navigation 的诊断 JSON 改到 test 回调内写 results，不再 import 写盘。拒写 host 恢复原 packages/ui-mac/node_modules/.cache/fence-write-denied 路径并清理。显式传入的已验收 CODEPUPPY_PACKAGED_APP 是调用方源包，host 只清理自己创建/重签的副本，不删除源包。
 - Minor 4 选更小且真实的修正：已改主 V3 行为组件证据边界，不增加新 adapter 整链臂。后端 180 ms 仅直接 tracker 等待；生产 composer/terminal 首次顺序继承已核组件证据。
 - 常规宿主检查 r6-harness-green.log：engine/IPC/extension/拒写、navigation、registry 共 **33 pass / 1 skip / 0 fail**（19.53 s），skip 为未开签名开关的 G0；检查后 project-writable 根只剩 results/review，没有残留大目录。registry 用例数 23→24。恢复拒写原落点后单跑 **1/0**（r6-refusal-location.log）。显式签名宿主留到全部生产修正结束仅跑一次。
+
+- 接受小项的红证据：W1 默认工作区从唯一默认路径供给者取得，unknown 探针现误回 not-opened-by-you，`process-fence-workspaces.test.ts` 具名新例 **0/1**（r6-default-red.log）；无实际 attach 点的 sandbox.write-denied 仍在注入 registry，display **6/1**（r6-inventory-red.log）。先提交红测试，workspaces 17→18、display 仍 7；后续移除死片段并由现有库存脚本再生 snapshot。

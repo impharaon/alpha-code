@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test"
 import { Tool } from "../../../schema/src/tool"
 import { attachWriteDenied } from "./display"
-import { WRITE_DENIED_NOTE, WRITE_REFUSED_NOTE } from "../context-injection"
+import { CONTEXT_INJECTIONS, WRITE_REFUSED_NOTE } from "../context-injection"
 
 // The real plugin Error constructor; error shape/cause chain matches the real-engine fixture
 // ui-mac/src/main/fence-write-denied.engine.cases.ts. No synthetic main eligibility authority.
@@ -9,7 +9,6 @@ const errorEvent = (tool: string, input: unknown, error: unknown) => ({ tool, in
 const eperm = () => Object.assign(new Error("operation not permitted"), { code: "EPERM" })
 const neutral = (event: ReturnType<typeof errorEvent>) => {
   expect(event.error.message).toContain(WRITE_REFUSED_NOTE)
-  expect(event.error.message).not.toContain(WRITE_DENIED_NOTE)
   expect(event.error.message).not.toMatch(/restart|fixed when|wasn't opened|not inside a project/i)
   expect(event.error.message).toMatch(/stop and tell the user/i)
 }
@@ -48,9 +47,6 @@ test("shell refusal has no known write target: append a neutral stop instruction
   expect(event.result.metadata).toEqual({ existing: true })
   expect(JSON.stringify(event.result)).not.toMatch(/restart|codepuppyWriteDenied/i)
 })
-test("registered precise snippet describes an unopened project and Open project, never restart", () => {
-  expect(WRITE_DENIED_NOTE).toMatch(/not (?:inside|within) a project .*user.*opened.*Code Puppy/i)
-  expect(WRITE_DENIED_NOTE).toMatch(/Open project/)
-  expect(WRITE_DENIED_NOTE).toMatch(/stop and tell the user/i)
-  expect(WRITE_DENIED_NOTE).not.toMatch(/restart|fixed when/i)
+test("an unopened-project snippet with no attach point is absent from the injection registry", () => {
+  expect(CONTEXT_INJECTIONS.some((entry) => entry.id === "sandbox.write-denied")).toBe(false)
 })

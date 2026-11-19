@@ -5,7 +5,7 @@ import { describe, expect, test } from "bun:test"
 import * as fs from "node:fs"
 import { mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
-import { join, relative } from "node:path"
+import { join, relative, resolve } from "node:path"
 import {
   bootFenceWorkspaceTruth,
   fenceWorkspaceTruthPath,
@@ -285,6 +285,28 @@ describe("bootFenceWorkspaceTruth —— 播种 / 装载 + 检疫 / 坏文件不
 
 
 describe("用户打开登记是两个消费者的共同资格", () => {
+  test("启动默认工作区已经在 W1:unknown 探针不谎称它未被用户打开", async () => {
+    const base = resolve(import.meta.dir, "../../../../node_modules/.cache/project-writable")
+    mkdirSync(base, { recursive: true })
+    const dir = realpathSync(mkdtempSync(join(base, "default-workspace-")))
+    const previous = process.env.CODEPUPPY_USER_WORKSPACE_DIR
+    try {
+      for (const name of ["home", "state", "workspace"]) mkdirSync(join(dir, name))
+      process.env.CODEPUPPY_USER_WORKSPACE_DIR = join(dir, "workspace")
+      const tracker = bootFenceWorkspaceTruth({ truthPath: join(dir, "truth.json"), store: { tabs: [], recent: undefined, info: undefined }, fs, log: () => {}, onWritableChanged: () => {}, eligibility: {
+        homeDir: join(dir, "home"), appStateRoot: join(dir, "state"), realpath: realpathSync.native, isDirectory: (path) => statSync(path).isDirectory(),
+      } })
+      const result = await tracker.probeWrite({ server: "sidecar", directory: join(dir, "workspace") }, {
+        fenced: true, grantWrite: async () => ({ outcome: "granted" }), probeWrite: async () => ({ outcome: "unknown" }),
+      } as unknown as Parameters<typeof tracker.probeWrite>[1])
+      expect(result).toEqual({ outcome: "unknown", grant: "granted" })
+      expect(tracker.userOpened.has("sidecar", join(dir, "workspace"))).toBe(true)
+    } finally {
+      if (previous === undefined) delete process.env.CODEPUPPY_USER_WORKSPACE_DIR
+      if (previous !== undefined) process.env.CODEPUPPY_USER_WORKSPACE_DIR = previous
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
   test("恢复/SSE 的新目录不进真源;tab 先写回再登记也能立即重算;清 tab 不撤销本次运行资格", () => withTemp((dir) => {
     const truthPath = join(dir, "truth.json")
     writeWorkspaceTruth(truthPath, ["/Users/alpha/proj-a"], fs)

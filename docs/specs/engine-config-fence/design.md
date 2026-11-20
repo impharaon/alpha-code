@@ -5,7 +5,7 @@ summary: 围栏 profile 最末加一块只拒写的 CF(一张封闭清单:Code P
 kind: tech-design
 status: approved
 spec: SPEC-engine-config-fence
-spec_version: 1
+spec_version: 2
 review:
   rounds: 2           # R1 审 4875af11e2 全文;R2 审 4875af11e2..6e372bc83f 修订范围(同一 Claude Opus 审查员,只读,非作者)
   reviewed_sha: "6e372bc83f"

@@ -180,7 +180,7 @@ U1 只出了 arm64,并明写将来出 Intel / universal 时若漏第二份,x64 �
 | `process-fence-apply.test.ts` | darwin | x64 两片判据;四类原语正反臂(Electron 的 node);AC4 五种失败 |
 | `process-fence-wiring.test.ts` | 全平台 | 计划 → start 命令 → 拒 fork;sidecar.ts 接线锚;`#1394` 端到端(darwin):伪造记录真写进 `opencode.global.dat` ⇒ **生产计划器**的 profile 不含它(AC4①③),写进真源 ⇒ 含它(AC4②),真源坏 ⇒ 只剩默认工作区;planner / ipc.ts / index.ts 接线锚 |
 | `process-fence-write-sites.test.ts` | 全平台 | AC3 登记簿 == 扫描;四条控制臂 |
-| `process-fence-zsh-startup.test.ts` | darwin | D15 三臂(生产 profile + 生产 .node,假主目录):补回 W10/W19 时写入落盘且围栏外 zsh 执行标记;生产 profile 两处 EPERM、不执行;应用终端形状(PTY 上 `zsh -l`,三种 rc)两份 profile 下逐字节相同 |
+| `process-fence-zsh-startup.test.ts` | darwin | D15 三臂(生产 profile + 生产 .node,假主目录):补回 W10/W19 时写入落盘且围栏外 zsh 执行标记;生产 profile 两处 EPERM、不执行;应用终端形状(PTY 上 `zsh -l`,三种 rc)两份 profile 下逐字节相同;仿 oh-my-zsh 的 rc(重建)在生产 profile 下多一行 `rm: … Operation not permitted`(已知可见变化) |
 | `custom-provider-truth.test.ts` | 全平台 | `#1391` 自定义节点真源(读端):I2 —— 真源路径不在可写集任何固定行之下(对着渲染出的 profile 逐条规则枚举 W-id,15 个固定 id 手写登记;默认 / 覆盖 base × 两种 XDG_STATE_HOME;控制臂塞一行罩住状态根即点名);严格读十六种坏形状各拒且日志一行,缺失 = 没有记录 |
 | `custom-provider-truth-write.test.ts` | 全平台 | `#1391` 写端:字节固定、原子(rename / write 中途抛 ⇒ 旧内容不动)、坏记录不落盘;写模块不在 sidecar import 闭包里(生产 `sidecarSourceFiles` 实测 + 合成三文件控制臂) |
 | `custom-provider-truth-fence.test.ts` | darwin | `#1391` I2 的真裁判:生产 profile 交给真 sandbox-exec,围栏内写 / 建目录 / mv 进真源全拦、零落盘;W2 / W3 落盘;bare 臂写得进 |

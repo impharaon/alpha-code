@@ -451,7 +451,15 @@ PLAN 阶段按派单写在临时文件里，没有提交；本节由实施阶段
 
 ### 偏离记录
 
-暂无。
+证据目录:`~/.cache/alpha-orch/2026-11-19/impl-fence-slice4/evidence/`(下称 `EV/`)与 `…/mutations/`(下称 `MU/`)。
+
+- 2026-11-20 · 红 `f304e031c0`(`EV/c1-red-*.log`):core `plan.test.ts` 3 红 9 绿;ui-mac 单元 15 红;写入矩阵 AC-08 两条红(受保护集里没有 `~/.opencode`;已知坏的变换找不到 CF-9 那一行);真引擎 fresh 臂 AC-08 红,计划提醒点名 `<沙箱 HOME>/.opencode/plan`;北极星守卫点名 `plan.test.ts`。真引擎的红是直接跑 cases(`-t "fresh machine"`)得到的,不经宿主;这样跑会多一条「(unnamed)」失败:测试隔离预载的临时根在围栏里删不掉,因为它是受保护位置的上级目录节点。经宿主跑没有这一条(宿主把已隔离的环境传给子进程)。绿 `29471f04af`;夹具 `8edc690501`。
+- 2026-11-20 · 计划里的检查组 B 有一条 `server.test.ts` 用例(`OPENCODE_CONFIG_DIR="."`)在新工作树上红,原因是没有构建 `packages/ext/dist`,与片 ② 偏离记录里那条观察相同;`bun run build`(packages/ext,产物被 git 忽略)之后转绿。
+- 2026-11-20 · M3(补回 W16)发现提交 `f304e031c0` 里 BR-05 用例的一条断言写宽了:`/…\.opencode(\/proj)?"\)\s+; W1/` 会匹配 W16 行的 `; W16`。改成行尾锚定 `; W1$`(`m` 标志)· 本提交。
+- 2026-11-20 · 变异(`MU/`,每次只改一处,用 `git restore` 复原):M1 换回上游 `plan.ts` ⇒ `plan.test.ts` 三条红;真引擎 fresh 臂 AC-08 红(提醒点名 `~/.opencode/plan`)。另做一次 M1 探针(临时把断言改成打印):模型照提醒往 `~/.opencode/plan/cf-plan.md` 写,写文件卡片是失败态,原文 `Unable to write …/.opencode/plan/cf-plan.md` 加「The system refused this write (operation not permitted)」;新位置没有文件;`~/.opencode` 仍不存在,尽管沙箱在 W12 之下,挡住它的只有 CF-9。设计 P-13 原来是由代码推出、未在真引擎上跑的一句,至此实测成立(`MU/M1-probe-fresh.log`)。M2 清单去掉 CF-9 ⇒ 计划器 5 条红(含 BR-05 资格判定)、profile 7 条红,写入矩阵 AC-08 两条红,红在结构断言上;CF-9 那一行在行为上承重,由已知坏臂「只去掉 CF-9 + 运行期放行 ⇒ 写入落地」证明。M3 补回 W16 ⇒ profile 形状与 id、往返两条、custom-provider-truth、write-sites 共 6 条红,写入矩阵 AC-08 production 红在「放行块里没有 `~/.opencode`」那条断言上;围栏行为不变,因为 CF-9 写在后面。M4 去掉预建跳过 ⇒ 计划器两条红(精确预建列表、`:221`),真引擎 fresh 臂两条都红(完整启动之后、写完计划之后 `~/.opencode` 都存在了)。
+- 2026-11-20 · 夹具重采(`8edc690501`,`EV/c3-fixture-diff.txt`,比对脚本 `EV/c3-fixture-diff.py`):因本片改变的只有 catalog、passthrough、routes 里计划助手的放行路径各一处。其余差异逐类写在提交说明里。与片 ① 的一点不同:`events.json` 115 帧的类型集合相同,但三个 Location 并发重载的广播(帧 76–92)交错顺序不同;回放它的适配器测试照绿。
+- 2026-11-20 · 编排器要求核的一件事(`CODEPUPPY_JSONC_TRUTH_DISABLE=1`,`MU/truth-disable-probe.log`;探针在 worktree 的 `node_modules/.cache` 下用假 HOME,不提交):主进程的安装物写入 `mcpPluginTargetPath()` → `~/.opencode/opencode.jsonc` 照常成功,并建出 `~/.opencode`(主进程不在围栏里,CF-9 只在 sidecar 的 profile 里)。之后用同一台假机器的生产计划围栏子进程核对:读这份文件照常;追加它、在 `~/.opencode` 里新建文件都是 EPERM,这正是 CF-9 要的拒绝。围栏内没有原来能用、现在失败的东西:写盘登记簿里没有任何 sidecar 写者落在 W16 / `~/.opencode`;引擎里唯一建 `.opencode` 的是 `plan.ts`,已移走;引擎读插件目录只 stat,不写(`config/plugin/source.ts`);主进程之后的写入(安装、停用)仍在主进程。探针中途发现一件事:这个运行时里改 `process.env.HOME` 不会让 `os.homedir()` 跟着变,第一次尝试解析到了真实主目录,断言在写入之前停下,真实主目录没有被碰(事后核对 `~/.opencode` 仍不存在)。第二次改用桥的测试覆盖变量 `CODEPUPPY_OPENCODE_HOME` 指向假主目录。
+
 
 ### 可选(不做)
 

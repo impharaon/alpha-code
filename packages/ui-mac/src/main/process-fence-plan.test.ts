@@ -457,7 +457,7 @@ describeDarwin("planProcessFence", () => {
       { directory: `${HOME}/.opencode/proj`, reason: `inside the protected engine configuration location ${HOME}/.opencode` },
     ])
     expect(plan.profile).not.toContain(`(subpath "${HOME}/.config/opencode/plugin")`)
-    expect(plan.profile).not.toMatch(/\(subpath "[^"]*\/\.opencode(\/proj)?"\)\s+; W1/)
+    expect(plan.profile).not.toMatch(/\(subpath "[^"]*\/\.opencode(\/proj)?"\)\s+; W1$/m)
   })
 
   test("dev 形态:addonPath 解析到 native/codepuppy-fence/build/(相对 out/main)", () => {

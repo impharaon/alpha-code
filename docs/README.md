@@ -373,6 +373,7 @@ status.
 | `SPEC-build-identity` | [specs/build-identity/spec.md](specs/build-identity/spec.md) | 报问题时能复制准确的构建身份，验收边界来自原始需求。 | approved |
 | `SPEC-byok-output-limits` | [specs/byok-output-limits/spec.md](specs/byok-output-limits/spec.md) | 自带密钥的模型按自己的实测上限输出，保留历史条款、有效裁决和交付证据边界。 | approved |
 | `SPEC-child-process-write-fence` | [specs/child-process-write-fence/spec.md](specs/child-process-write-fence/spec.md) | 连接器与语言服务的子进程也受写入范围约束，保留历史条款、有效裁决和交付证据边界。 | approved |
+| `SPEC-engine-config-fence` | [specs/engine-config-fence/spec.md](specs/engine-config-fence/spec.md) | 被围栏的进程树写不进决定「运行什么程序、哪些工具不问就放行、凭据交给谁」的配置位置；引擎不采用引擎库里三类跨回合的放行记录；写者改在主进程；计划文件改存引擎数据目录。 | draft |
 | `SPEC-cloud-job-desktop-notifications` | [specs/cloud-job-desktop-notifications/spec.md](specs/cloud-job-desktop-notifications/spec.md) | 用户能收到任务结果并在桌面设置里关闭通知。 | approved |
 | `PLAN-cloud-job-form-preflight` | [specs/cloud-job-form-preflight/plan.md](specs/cloud-job-form-preflight/plan.md) | alpha-code#1686 一段:拷入 AccountStatusV1、主进程只读预检 IPC、组件库卡片与名称 — 值列表(账户弹层改用)、两种发送框的预检区与按钮行右移 | active |
 | `SPEC-connector-workspace-following` | [specs/connector-workspace-following/spec.md](specs/connector-workspace-following/spec.md) | 连接器跟随当前会话所在项目目录，保留历史条款、有效裁决和交付证据边界。 | approved |

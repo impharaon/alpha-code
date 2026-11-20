@@ -84,10 +84,7 @@ test.skipIf(process.platform !== "darwin")("C1 真引擎:三档里 shell 与读�
   } finally {
     rmSync(join(base, "run"), { recursive: true, force: true })
     // each arm's stand-in system temp directory (a store can only be removed from outside the fence); a known-bad arm may have moved it into the sandbox
-    for (const output of Object.values(outputs)) {
-      const temp = output.match(/^SCF-ENGINE (\{.*\})$/m)?.[1]
-      const runtimeTemp = temp ? (JSON.parse(temp) as { runtimeTemp?: string }).runtimeTemp : undefined
-      if (runtimeTemp?.includes("/scf-T-")) rmSync(runtimeTemp, { recursive: true, force: true })
-    }
+    for (const output of Object.values(outputs))
+      for (const [, runtimeTemp] of output.matchAll(/^SCF-TEMP (\/\S*\/scf-T-[\w]+)$/gm)) rmSync(runtimeTemp!, { recursive: true, force: true })
   }
 }, 2_400_000)

@@ -123,6 +123,7 @@ async function machine() {
   // (宿主事后在围栏外删它)
   const systemTemp = fs.realpathSync.native(Bun.spawnSync(["getconf", "DARWIN_USER_TEMP_DIR"]).stdout.toString().trim())
   const runtimeTemp = fs.mkdtempSync(path.join(systemTemp, "scf-T-"))
+  console.log(`SCF-TEMP ${runtimeTemp}`) // the host removes it whatever happens next
   const runtimeParent = path.join(runtimeTemp, `codepuppy-connectors-${process.getuid?.()}-${createHash("sha256").update(globalRoot).digest("hex").slice(0, 16)}`)
   const dump = path.join(sandbox.root, `${NAME}-env.jsonl`)
   const connectorRef = (server: string, value: string) => {
@@ -212,7 +213,7 @@ async function machine() {
   fs.writeFileSync(path.join(run, "profile.sb"), profile)
   applyProcessFence({ addonPath: plan.addonPath, profile }, { insideDir: host.projectDirectory, outsideDir: run })
   const rules = processFenceWriteRules(profile)
-  console.log(`SCF-ENGINE ${JSON.stringify({ arm: ARM, pid: process.pid, c1: rules.deny.filter((rule) => profile.slice(c1).includes(`"${rule.value}"`)), runtimeTemp })}`)
+  console.log(`SCF-ENGINE ${JSON.stringify({ arm: ARM, pid: process.pid, c1: rules.deny.filter((rule) => profile.slice(c1).includes(`"${rule.value}"`)) })}`)
   running = await host.start()
   return { host, main, userData, globalRoot, stateRoot, runtimeParent, runtimeTemp, platformKey, aliases, files, dump }
 }

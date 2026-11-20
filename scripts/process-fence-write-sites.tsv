@@ -44,6 +44,7 @@ packages/ui-mac/src/main/catalog-channels.ts	writeFileSync	tmp	W3
 packages/ui-mac/src/main/engine-explicit-config.ts	mkdirSync	dir	main-only
 packages/ui-mac/src/main/engine-explicit-config.ts	mkdirSync	path.dirname(file)	main-only
 packages/ui-mac/src/main/engine-explicit-config.ts	mkdirSync	path.dirname(input.userConfig)	main-only
+packages/ui-mac/src/main/engine-explicit-config.ts	mkdirSync	path.join(input.userDataPath, USER_DATA_LAYOUT.engineConfig)	main-only
 packages/ui-mac/src/main/engine-explicit-config.ts	renameSync	temporary	main-only
 packages/ui-mac/src/main/engine-explicit-config.ts	rmSync	engineModelsPath(input.userDataPath)	main-only
 packages/ui-mac/src/main/engine-explicit-config.ts	rmSync	modelsPath	main-only

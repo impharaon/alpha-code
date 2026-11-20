@@ -441,7 +441,7 @@ export function preferAppEnv(userDataPath: string) {
 // 变没变」(codepuppy-secret-files.applyPlatformCredentialsHot);还没 fork 过 = undefined。
 let forkedSecrets: ReadonlySet<string> | undefined
 
-// SPEC-engine-config-fence BR-03:当前这一代的显式文件监听(main 里跑)。新的一次 spawn 先停掉上一份 —— 盖住「起了监听、fork 却被拒」那一代。
+// SPEC-engine-config-fence BR-03:当前这一代的显式文件监听(main 里跑)。fork 抛出时当场停;下一次 spawn 也先停掉上一份(兜底)。
 let explicitConfigWatch: (() => void) | undefined
 
 export function forkedSecretNames(): ReadonlySet<string> | undefined {
@@ -600,23 +600,6 @@ export async function spawnLocalServer(
     env: process.env,
     log: (line) => getLogger()?.warn(line),
   })
-  // SPEC-engine-config-fence BR-03(DESIGN-engine-config-fence §4.4、§5):显式文件、模型底表与种子 codepuppy.jsonc 由 main 在 fork 前按
-  // 这一份启动文档写(sidecar 只读,这些位置随后在围栏里写不到);没有模型底表的一代删掉上一代留下的 models.json。写或删失败 ⇒ 与密钥
-  // 文件、已应用目录同一条路径拒绝 fork,不退回 sidecar 里写。写完即起显式文件的监听(codepuppy.jsonc 手改、main 装技能 ⇒ 重写,
-  // 引擎不重启就生效),本代子进程退出时停;fork 前失败留下的那一份由下一次 spawn 先停掉。
-  let engineConfig: ReturnType<typeof writeEngineConfigForFork>
-  try {
-    engineConfig = writeEngineConfigForFork(bootstrap)
-  } catch (error) {
-    const message = serializeError(error).message
-    getLogger()?.error(`[I-13] engine config files could not be written — refusing to fork: ${message}`)
-    throw new Error(`engine config files could not be written — sidecar fork refused: ${message}`)
-  }
-  if (engineConfig.files.userError)
-    getLogger()?.warn(`[alpha-code#1667] ${bootstrap.paths.userConfig} is not valid (${engineConfig.files.userError}); the engine sees only Code Puppy's explicit layer`)
-  explicitConfigWatch?.()
-  const stopExplicitConfigWatch = watchExplicitSources({ ...engineConfig.watch, log: (line) => getLogger()?.warn(line) })
-  explicitConfigWatch = stopExplicitConfigWatch
   let fence: PlannedFence | undefined
   try {
     fence = (options.planFence ?? planProductionFence)({ userDataPath: options.userDataPath, sidecarEnv, egressProxyPort, carriedWorkspaces: options.fenceRun?.carriedWorkspaces() ?? [], engineConfigDirectory: bootstrap.paths.engineConfigDirectory })
@@ -635,6 +618,25 @@ export async function spawnLocalServer(
   const runtimeGeneration = tryGetCodePuppyEnvironment() ? restoreCommittedOfficialConnectors() : []
   // I-11(design v9 §4.4):官方配方的可运行性进了允许集;fork 之前等这次恢复带来的重发落盘,新一代的 Location 才读到它。
   if (tryGetCodePuppyEnvironment()) await officialAvailabilityPublished()
+  // SPEC-engine-config-fence BR-03(DESIGN-engine-config-fence §4.4、§5):显式文件、模型底表与种子 codepuppy.jsonc 由 main 按这一份启动文档
+  // 写(sidecar 只读,这些位置在围栏里写不到);没有模型底表的一代删掉上一代留下的 models.json。合成排在 fork 之前的最后一步:上面的官方
+  // 连接器恢复会改写 codepuppy.jsonc(这一代的 {file:} 引用)与允许集,显式文件必须由改写之后的内容合成,不能指望监听去追。计划围栏不读这
+  // 几个文件(受保护目录由计划器自己预建)。写或删失败 ⇒ 先清掉这一代的官方连接器运行期目录,再与密钥文件、已应用目录同一条路径拒绝 fork,
+  // 不退回 sidecar 里写。写完即起显式文件的监听(codepuppy.jsonc 手改、main 装技能 ⇒ 重写,引擎不重启就生效),本代子进程退出时停。
+  let engineConfig: ReturnType<typeof writeEngineConfigForFork>
+  try {
+    engineConfig = writeEngineConfigForFork(bootstrap)
+  } catch (error) {
+    clearOfficialConnectorRuntime(runtimeGeneration)
+    const message = serializeError(error).message
+    getLogger()?.error(`[I-13] engine config files could not be written — refusing to fork: ${message}`)
+    throw new Error(`engine config files could not be written — sidecar fork refused: ${message}`)
+  }
+  if (engineConfig.files.userError)
+    getLogger()?.warn(`[alpha-code#1667] ${bootstrap.paths.userConfig} is not valid (${engineConfig.files.userError}); the engine sees only Code Puppy's explicit layer`)
+  explicitConfigWatch?.()
+  const stopExplicitConfigWatch = watchExplicitSources({ ...engineConfig.watch, log: (line) => getLogger()?.warn(line) })
+  explicitConfigWatch = stopExplicitConfigWatch
   const child = (() => {
     try {
       return (options.fork ?? electronNs.utilityProcess.fork)(sidecar, [], {
@@ -645,6 +647,8 @@ export async function spawnLocalServer(
       })
     } catch (error) {
       clearOfficialConnectorRuntime(runtimeGeneration)
+      stopExplicitConfigWatch()
+      if (explicitConfigWatch === stopExplicitConfigWatch) explicitConfigWatch = undefined
       throw error
     }
   })()

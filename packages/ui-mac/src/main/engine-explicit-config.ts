@@ -186,6 +186,8 @@ export function watchExplicitSources(input: {
       if (name === "skills-enabled.json") return refreshAllowSet()
       schedule()
     })
+    // 监听跑在 main 里:一个没人接的 error 会成为 Electron main 进程的未捕获异常。记一行,应用照常(技能允许集还有 watchFile 兜底)。
+    watcher.on("error", (error) => input.log(`[alpha-code#1667] stopped watching ${input.root} for engine config inputs: ${error instanceof Error ? error.message : String(error)}`))
   } catch (error) {
     input.log(`[alpha-code#1667] cannot watch ${input.root}: ${error instanceof Error ? error.message : String(error)}`)
   }
@@ -354,6 +356,8 @@ export function writeEngineConfigFiles(input: {
   layer: ExplicitLayer
   models: CodePuppyModelConfig | undefined
 }): EngineConfigFiles {
+  // 引擎配置目录 0700(模型底表与显式文件都在里面);recursive 的 mode 只作用于新建的那一级。
+  fs.mkdirSync(path.join(input.userDataPath, USER_DATA_LAYOUT.engineConfig), { recursive: true, mode: 0o700 })
   if (input.userConfig !== undefined) {
     fs.mkdirSync(path.dirname(input.userConfig), { recursive: true })
     if (!fs.existsSync(input.userConfig)) fs.writeFileSync(input.userConfig, SEED_DOCUMENT)

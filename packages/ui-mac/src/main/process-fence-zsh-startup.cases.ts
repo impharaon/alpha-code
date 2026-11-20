@@ -7,7 +7,8 @@
 //   known bad  = the production profile with W10/W19 put back: the write lands and an unfenced zsh runs the marker;
 //   production = the same writes are EPERM and the marker never runs;
 //   app terminal = fenced `zsh -l` on a PTY with the sidecar-shaped environment, rc empty / compinit / compinit -C:
-//                  the transcript is byte-identical under both profiles.
+//                  the transcript is byte-identical under both profiles; with an oh-my-zsh-shaped rc (reconstruction)
+//                  the production profile adds exactly one `rm: … Operation not permitted` line (known visible change).
 // Everything lives under the worktree's node_modules/.cache (outside the fence: /private/tmp and $TMPDIR are W11/W12).
 // The real HOME, its shell rc files and the Code Puppy user-data directory are never touched.
 
@@ -99,9 +100,10 @@ function dumpArm(profileFile: string) {
 }
 
 // Each command is typed after zsh's line editor announces it is ready (bracketed paste on), so the transcript does not
-// depend on machine load. The `touch` line shows the PTY shell really runs inside the fence. Bun's stdin pipe is a socket,
-// which `script` refuses (tcgetattr: Operation not supported on socket); bash hands it a real pipe instead.
-const TYPED = ["echo __READY__", 'ls -a "$HOME" | tr "\\n" " "; echo', 'touch "$HOME/.fence-probe"', "exit 0"]
+// depend on machine load. `whence -w compdef` shows whether the rc really ran compinit; the `touch` line shows the PTY
+// shell really runs inside the fence. Bun's stdin pipe is a socket, which `script` refuses (tcgetattr: Operation not
+// supported on socket); bash hands it a real pipe instead.
+const TYPED = ["echo __READY__", 'ls -a "$HOME" | tr "\\n" " "; echo', "whence -w compdef", 'touch "$HOME/.fence-probe"', "exit 0"]
 const LINE_EDITOR_READY = "\x1b[?2004h"
 
 async function appTerminal(profileFile: string) {
@@ -166,6 +168,53 @@ test("production profile: both fenced writes are EPERM, nothing lands, the unfen
   expect(dump).toEqual({ write: { status: 1, out: `sh: ${dumpFile}: Operation not permitted` }, landed: false, executed: false })
 })
 
+// oh-my-zsh's dump refresh, RECONSTRUCTED from the review's description (no oh-my-zsh copy on this machine; nothing is
+// downloaded): oh-my-zsh.sh compares the dump's `#omz revision` / `#omz fpath` lines, on mismatch runs
+// `command rm -f "$ZSH_COMPDUMP"`, then `compinit -i -d "$ZSH_COMPDUMP"`, then appends the two lines with
+// `tee -a … &>/dev/null`. ZSH_COMPDUMP is fixed to `-x-5.9` here instead of `-<short host>-<zsh version>`.
+const OMZ_DUMP = ".zcompdump-x-5.9"
+const OMZ_RC = [
+  `ZSH_COMPDUMP="\${ZDOTDIR:-$HOME}/${OMZ_DUMP}"`,
+  'zcompdump_revision="#omz revision: test"',
+  'zcompdump_fpath="#omz fpath: $fpath"',
+  'if ! command grep -q -Fx "$zcompdump_revision" "$ZSH_COMPDUMP" 2>/dev/null \\',
+  '   || ! command grep -q -Fx "$zcompdump_fpath" "$ZSH_COMPDUMP" 2>/dev/null; then',
+  '  command rm -f "$ZSH_COMPDUMP"',
+  "  zcompdump_refresh=1",
+  "fi",
+  "autoload -Uz compinit",
+  'compinit -i -d "$ZSH_COMPDUMP"',
+  "if (( $zcompdump_refresh )) \\",
+  '  || ! command grep -q -Fx "$zcompdump_revision" "$ZSH_COMPDUMP" 2>/dev/null; then',
+  '  tee -a "$ZSH_COMPDUMP" &>/dev/null <<EOF',
+  "",
+  "$zcompdump_revision",
+  "$zcompdump_fpath",
+  "EOF",
+  "fi",
+  "unset zcompdump_revision zcompdump_fpath zcompdump_refresh",
+  "",
+].join("\n")
+
+test("app terminal, oh-my-zsh-shaped rc (reconstruction) — KNOWN VISIBLE CHANGE: the production profile prints exactly one extra startup line `rm: <dump>: Operation not permitted`, nothing else differs", async () => {
+  // A dump as an earlier start leaves it: a real compinit dump (unfenced, fake HOME) + metadata for another fpath.
+  const seed = () => {
+    const made = spawnSync("/usr/bin/env", ["-i", ...shellEnv(), "/bin/zsh", "-fc", 'autoload -Uz compinit && compinit -i -d "$1"', "zsh", join(home, OMZ_DUMP)], { encoding: "utf8", timeout: 60_000 })
+    expect(made.status, made.stderr).toBe(0)
+    writeFileSync(join(home, OMZ_DUMP), "\n#omz revision: test\n#omz fpath: /not-this-fpath\n", { flag: "a" })
+  }
+  reset(OMZ_RC)
+  seed()
+  const before = await appTerminal(profiles.knownBad)
+  reset(OMZ_RC)
+  seed()
+  const after = await appTerminal(profiles.production)
+  console.log(`AC-07 app terminal rc=oh-my-zsh-shaped: known bad ${JSON.stringify(before)}`)
+  console.log(`AC-07 app terminal rc=oh-my-zsh-shaped: production ${JSON.stringify(after)}`)
+  expect(before).toContain("\r\ncompdef: function\r\n")
+  expect(after).toBe(`rm: ${join(home, OMZ_DUMP)}: Operation not permitted\r\n${before}`)
+}, 120_000)
+
 test("app terminal shape: fenced login zsh on a PTY prints byte-identical output under both profiles for rc empty / compinit / compinit -C", async () => {
   for (const [name, rc] of [["none", undefined], ["compinit", "autoload -Uz compinit\ncompinit\n"], ["compinit-C", COMPINIT_C]] as const) {
     reset(rc)
@@ -175,6 +224,7 @@ test("app terminal shape: fenced login zsh on a PTY prints byte-identical output
     const listing = after.match(/^\. \.\. .*$/m)?.[0]?.trim()
     console.log(`AC-07 app terminal rc=${name}: identical=${before === after} bytes=${after.length} home listing="${listing}"`)
     expect(after).toContain("__READY__\r\n")
+    expect(after).toContain(`\r\ncompdef: ${rc === undefined ? "none" : "function"}\r\n`)
     expect(after).toContain(`touch: ${join(home, ".fence-probe")}: Operation not permitted`)
     expect(after, name).toBe(before)
   }

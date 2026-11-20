@@ -16,7 +16,7 @@
 // mkdir 四个根(data/config/state/tmp/log/bin/repos)。所以 main 在这里把 W4/W5/W6/W7 建好;
 // W2/W3 由 main 的 boot 序早已建好;`~/code-puppy` 走 ensureUserWorkspaceDir(唯一的 lazy 供给点)。
 // **刻意不建** W16(`~/.opencode`:engine-config-truth 对它有 junk-only 判定,凭空建一个会改行为)、
-// W10/W17/W18(生产到不了 / dev-only)。
+// W17/W18(dev-only)。
 
 import { join } from "node:path"
 import { resolveFenceAddonPath, type FenceAddonResolveInput } from "./process-fence-apply"

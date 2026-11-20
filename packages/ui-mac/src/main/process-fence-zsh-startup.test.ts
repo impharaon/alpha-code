@@ -13,7 +13,7 @@ test.skipIf(process.platform !== "darwin")("AC-07 fenced writes to ~/.zsh_sessio
     const output = `${stdout}${stderr}`
     writeFileSync(join(base, "results", `${basename(run)}.log`), output.slice(-32768))
     expect(code, output).toBe(0)
-    expect(output.match(/(\d+) pass\b/)?.[1], output).toBe("4")
+    expect(output.match(/(\d+) pass\b/)?.[1], output).toBe("5")
     expect(output.match(/(\d+) fail\b/)?.[1], output).toBe("0")
   } finally {
     rmSync(run, { recursive: true, force: true })

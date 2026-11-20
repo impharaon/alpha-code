@@ -143,6 +143,10 @@ export function planConfigFence(
       } catch {
         rules = [{ kind: "literal", path: envFile }]
       }
+      // 终审第 2 条:落在 /dev 下的(常见的 /dev/null 表示「没有文件」)不出这一行 —— 读它是空,写它不改变主进程读到的任何东西,
+      // 而拒写 /dev/null 会让引擎与子进程的 >/dev/null、忽略的 stdio 全部 EPERM。软链指到 /dev 下同样不出。
+      const underDev = (path: string) => path === "/dev" || path.startsWith("/dev/")
+      if ([envFile, ...rules.map((rule) => (rule.kind === "dat-files" ? rule.dir : rule.path))].some(underDev)) continue
       for (const rule of rules) {
         try {
           for (const path of [rule.kind === "dat-files" ? rule.dir : rule.path, ...(rule.via ?? [])]) assertSeatbeltSafePath(path, "CODEPUPPY_ENV_FILE")

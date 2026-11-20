@@ -169,3 +169,6 @@ last_reviewed: 2026-11-20
   - 收口：事实文档与 `gate-files.tsv` `0ecfd84019`(两个新宿主各 1 行；改动行按实测写回条数，过时的 W2 说法改掉)。登记层检查与 15 个改动行的 `bun-test-floor.sh =N` 全绿(`evidence/floor/`);ui-mac `tsgo -b` 干净；`git diff --check` 干净。签名形态宿主一次：宿主 1 pass / 0 fail,内层 3 pass / 0 fail,734 s(`evidence/unitC-signed-form.log`)。
   - 模块体量：`packages/ui-mac/src/main` 实测 68,861(片起点 68,465,单元 B 结束 68,767;本单元 +94,主要是 `preplanConfigFenceRoots`、`userEnvFile`、计划器的 env 文件与配置路径节点);不改棘轮行。
   - 观察(不属本片，未改):计划器的 `homeDir` 用 `os.homedir()`,启动文档用 `usableExportedPaths` 的 HOME;只有 HOME 被导出为相对路径时两者不同(审查 B 第 2 条只要求计划前的资格判定与计划器同源，这一处没动)。
+- 2026-11-20 · 终审(`c7fd4eefdf..3af6988000`)处置,新提交:
+  1. B-2 用例不再对 bun 启动时的真实 HOME 跑 mkdir / realpath:集合比较改比计划器那一步的输入位置,诚实项目那条用假 HOME(`d2e4b5c681`)。
+  2. `$CODEPUPPY_ENV_FILE` 的真实路径落在 `/dev` 下(含经软链)⇒ 不出这一行;红 `evidence/final2-red-*.log`(三项实测 EPERM)→ 绿(本提交)。

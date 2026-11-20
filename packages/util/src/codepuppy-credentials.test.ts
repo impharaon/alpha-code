@@ -225,11 +225,12 @@ describe("resolveCodePuppyCredentialRefs —— 封闭清单位置", () => {
     expect(resolveCodePuppyCredentialRefs(broken, "inline")).toBe(broken)
   })
 
-  test("值 trim 后 JSON 转义,每个 { 写成 \\u007b(引擎随后的 {env:}/{file:} 碰不到它);同一串里不代入的引用原样留着", () => {
+  test("值 trim 后 JSON 转义,每个 { 与 } 写成 \\u007b / \\u007d(引擎随后的 {env:}/{file:} 碰不到它);同一串里不代入的引用原样留着", () => {
     publishCodePuppyCredentials({ [OWN]: { value: ' a"b\\{env:HOME}{file:/etc/x}\n', use: { kind: "connector", server: "alpha" } } })
     const text = resolveCodePuppyCredentialRefs(doc({ mcp: { alpha: { environment: { T: `x {file:${OWN}} y {file:/w/plain}` } } } }), "explicit")
     expect(text).not.toContain("{env:HOME}")
-    expect(text).toContain("\\u007benv:HOME}")
+    expect(text).toContain("\\u007benv:HOME\\u007d")
+    expect(text).not.toContain("env:HOME}")
     expect(parse(text).mcp.alpha.environment.T).toBe('x a"b\\{env:HOME}{file:/etc/x} y {file:/w/plain}')
   })
 })

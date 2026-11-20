@@ -146,6 +146,13 @@ const connectorOf = (server: string): Allowed => (entry) => entry.use.kind === "
 const inlineEntry: Allowed = (entry) => entry.use.kind === "inline"
 
 type Json = Record<string, unknown>
+const strictJson = (text: string): unknown => {
+  try {
+    return JSON.parse(text)
+  } catch {
+    return undefined
+  }
+}
 const objectAt = (value: unknown, key: string): Json | undefined => {
   const next = isRecord(value) ? value[key] : undefined
   return isRecord(next) ? next : undefined
@@ -186,19 +193,15 @@ function positions(root: Json, document: "inline" | "explicit"): Array<[Json, st
 
 /**
  * 引擎配置装载用(§4.4)。只在封闭清单的位置上、且条目的 use 允许该位置时,把整串或串内的 `{file:<路径>}` 换成值(trim 后 JSON 转义,值里每个
- * "{" 写成 \u007b,引擎随后的 {env:}/{file:} 两遍碰不到它);其余位置、其余记号一字不动,留给引擎自己的 {file:} 读法(C1 下读凭据路径 =
- * EPERM = 空串 + warning)。按解析树定位:这两份文档都是主进程用 JSON.stringify 写出的严格 JSON;解析不了(含注释的 JSONC 等)⇒ 原样返回。
- * 什么都没代入 ⇒ 原文;代入了 ⇒ 重新序列化(键序不变)。
+ * "{" 与 "}" 写成 \u007b / \u007d,引擎随后的 {env:}/{file:} 两遍碰不到它);其余位置、其余记号一字不动,留给引擎自己的 {file:} 读法(C1 下读凭据
+ * 路径 = EPERM = 空串 + warning)。按解析树定位;`parse` 解析文本,解析不了返回 undefined ⇒ 原样返回。缺省是严格 JSON;引擎配置装载传入
+ * JSONC 解析器(注入失败时显式槽装的是用户原样的 codepuppy.jsonc,可能带注释与尾逗号),由调用方点名记一行。
+ * 什么都没代入 ⇒ 原文;代入了 ⇒ 整份按 JSON 重新序列化(键序不变,注释不保留)。
  */
-export function resolveCodePuppyCredentialRefs(text: string, document: "inline" | "explicit"): string {
+export function resolveCodePuppyCredentialRefs(text: string, document: "inline" | "explicit", parse: (text: string) => unknown = strictJson): string {
   const table = publishedTable()
   if (!table || !text.includes("{file:")) return text
-  let root: unknown
-  try {
-    root = JSON.parse(text)
-  } catch {
-    return text
-  }
+  const root = parse(text)
   if (!isRecord(root)) return text
   const literals: string[] = []
   const nonce = globalThis.crypto.randomUUID()
@@ -210,7 +213,7 @@ export function resolveCodePuppyCredentialRefs(text: string, document: "inline" 
       const entry = path.isAbsolute(expanded) ? table[path.resolve(expanded)] : undefined
       if (!entry || !allowed(entry)) return token
       changed = true
-      literals.push(JSON.stringify(entry.value.trim()).slice(1, -1).replace(/\{/g, "\\u007b"))
+      literals.push(JSON.stringify(entry.value.trim()).slice(1, -1).replace(/\{/g, "\\u007b").replace(/\}/g, "\\u007d"))
       return `\u0000${nonce}:${literals.length - 1}\u0000`
     })
     if (changed) holder[key] = next

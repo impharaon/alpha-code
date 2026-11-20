@@ -32,7 +32,7 @@ import { readMcpServerRecordsForGeneration } from "./mcp-server-records"
 import { buildCodePuppyModelConfig } from "./codepuppy-models"
 import { watchExplicitSources, writeEngineConfigForFork } from "./engine-explicit-config"
 import { pinAppliedCatalog } from "./codepuppy-live-allowlist"
-import { loadCodePuppySecrets } from "./codepuppy-secrets"
+import { loadCodePuppySecrets, userEnvFile } from "./codepuppy-secrets"
 import { posixModesEffective } from "./platform"
 import { pollUntilHealthy } from "./health-poll"
 import { getLogger, rotateServerLogs, write } from "./logging"
@@ -295,6 +295,8 @@ type ProductionFenceInput = {
   carriedWorkspaces: readonly string[]
   /** SPEC-engine-config-fence CF-8:the start document's engineConfigDirectory (the same value). */
   engineConfigDirectory: string
+  /** CF-4 (实现期修订 2 A):the env file main reads at start (codepuppy-secrets.ts userEnvFile — the one authority); unset = absent. */
+  envFile?: string
 }
 
 // SPEC-engine-config-fence BR-05 / DESIGN §4.3:资格判定(checkWorkspaceDirectory)要的受保护配置目录。用最近一次计划渲染进 profile 的那一份;
@@ -339,6 +341,7 @@ function planProductionFence(input: ProductionFenceInput): ProcessFencePlan | un
       egressProxyPort: input.egressProxyPort,
       carriedWorkspaces: input.carriedWorkspaces,
       engineConfigDirectory: input.engineConfigDirectory,
+      ...(input.envFile ? { envFile: input.envFile } : {}),
     },
     {
       homeDir: homedir,
@@ -611,7 +614,7 @@ export async function spawnLocalServer(
   })
   let fence: PlannedFence | undefined
   try {
-    fence = (options.planFence ?? planProductionFence)({ userDataPath: options.userDataPath, sidecarEnv, egressProxyPort, carriedWorkspaces: options.fenceRun?.carriedWorkspaces() ?? [], engineConfigDirectory: bootstrap.paths.engineConfigDirectory })
+    fence = (options.planFence ?? planProductionFence)({ userDataPath: options.userDataPath, sidecarEnv, egressProxyPort, carriedWorkspaces: options.fenceRun?.carriedWorkspaces() ?? [], engineConfigDirectory: bootstrap.paths.engineConfigDirectory, ...(userEnvFile(process.env) ? { envFile: userEnvFile(process.env) } : {}) })
   } catch (error) {
     getLogger()?.error("process fence plan FAILED — refusing to fork the sidecar (fail closed; an unfenced engine must not start)", error)
     throw new Error(`process fence plan failed — sidecar fork refused: ${serializeError(error).message}`)

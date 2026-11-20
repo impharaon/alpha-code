@@ -894,6 +894,40 @@ describe("#1698 不合格的导出值被忽略,启动照常", () => {
     })
 })
 
+// 实现期修订 2 A:主进程启动时读的 $CODEPUPPY_ENV_FILE(userEnvFile —— loadCodePuppySecrets 用的同一个来源)交给计划器,进 CF-4。
+describe("修订 2 A:CODEPUPPY_ENV_FILE 交给计划器", () => {
+  const planInputs = async () => {
+    const seen: Array<{ envFile?: string }> = []
+    creditDanglingSweepForSpawn()
+    const result = await spawnLocalServer("127.0.0.1", 4096, "password", {
+      userDataPath,
+      healthCheck: async () => true,
+      planFence: (input: { envFile?: string }) => {
+        seen.push(input)
+        return fakePlanFence()
+      },
+      fork: fakeFork,
+    })
+    await result.health.wait
+    await result.listener.stop()
+    return seen
+  }
+  test("设置(绝对 / 相对)⇒ 计划输入带同一份路径(相对按 cwd);不设 ⇒ 没有这一项", async () => {
+    const saved = process.env.CODEPUPPY_ENV_FILE
+    try {
+      process.env.CODEPUPPY_ENV_FILE = join(userDataPath, "elsewhere", "cp.env")
+      expect((await planInputs()).map((input) => input.envFile)).toEqual([join(userDataPath, "elsewhere", "cp.env")])
+      process.env.CODEPUPPY_ENV_FILE = "relative/cp.env"
+      expect((await planInputs()).map((input) => input.envFile)).toEqual([resolve(process.cwd(), "relative/cp.env")])
+      delete process.env.CODEPUPPY_ENV_FILE
+      expect((await planInputs()).map((input) => "envFile" in input)).toEqual([false])
+    } finally {
+      if (saved === undefined) delete process.env.CODEPUPPY_ENV_FILE
+      else process.env.CODEPUPPY_ENV_FILE = saved
+    }
+  })
+})
+
 // 审查 B 第 2 条(SPEC-engine-config-fence BR-05):本运行第一次计划之前,资格判定用的受保护配置目录与计划器、启动文档同一个来源 ——
 // 用户导出的相对 OPENCODE_CONFIG_DIR / XDG_CONFIG_HOME 当没设(usableExportedPaths),不按主进程 cwd 解析。否则 cwd 被当成受保护目录,
 // 真源里 cwd 之下的诚实项目在 boot 时被检疫、第一次切 tab 就从真源删掉。

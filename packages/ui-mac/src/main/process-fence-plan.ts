@@ -20,9 +20,10 @@
 // **刻意不建** W16(`~/.opencode`:engine-config-truth 对它有 junk-only 判定,凭空建一个会改行为)、
 // W17/W18(dev-only)。
 
-import { basename, dirname, join } from "node:path"
+import { basename, dirname, join, resolve } from "node:path"
 import { resolveFenceAddonPath, type FenceAddonResolveInput } from "./process-fence-apply"
 import {
+  assertSeatbeltSafePath,
   configFenceLocations,
   resolveEngineRoots,
   selectWorkspaceUnion,
@@ -66,6 +67,8 @@ export type PlanProcessFenceInput = {
   carriedWorkspaces: readonly string[]
   /** SPEC-engine-config-fence CF-8:server.ts 交给启动文档的同一个值(engineGlobalConfigDirectory(exported.env, exported.home))。 */
   engineConfigDirectory: string
+  /** CF-4 的另一份(实现期修订 2 A):主进程启动时读的 `$CODEPUPPY_ENV_FILE`(codepuppy-secrets.ts userEnvFile);没设为空。 */
+  envFile?: string
 }
 
 /**
@@ -74,10 +77,11 @@ export type PlanProcessFenceInput = {
  * 别的错误照常抛 ⇒ 计划失败 ⇒ 拒 fork。返回渲染用的规则与其中的目录位置(资格判定用)。手渲染 profile 的测试夹具也走这里。
  */
 export function planConfigFence(
-  input: { userDataPath: string; appStateRoot: string; codepuppyGlobalRoot: string; engineConfigDirectory: string; roots: EngineRoots },
+  input: { userDataPath: string; appStateRoot: string; codepuppyGlobalRoot: string; engineConfigDirectory: string; roots: EngineRoots; envFile?: string },
   deps: Pick<PlanProcessFenceDeps, "realpath" | "mkdirp">,
 ): { configFence: ConfigFenceRule[]; configFenceRoots: string[] } {
   const locations = configFenceLocations({ ...input, configHome: input.roots.configHome, home: input.roots.home })
+  const envFile = input.envFile ? resolve(input.envFile) : undefined
   for (const location of locations) if (location.kind === "subpath") deps.mkdirp(location.path)
   const target = (path: string) => {
     try {
@@ -91,9 +95,38 @@ export function planConfigFence(
   const add = (rule: ConfigFenceRule) => {
     if (!configFence.some((known) => JSON.stringify(known) === JSON.stringify(rule))) configFence.push(rule)
   }
+  /** 一个目录的真实路径;不在盘上 = 最深一级已存在祖先的真实路径接上余下部分。 */
+  const within = (directory: string): string => {
+    try {
+      return deps.realpath(directory)
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException)?.code !== "ENOENT" || dirname(directory) === directory) throw error
+      return join(within(dirname(directory)), basename(directory))
+    }
+  }
   for (const location of locations) {
     if (location.kind === "dat-files") {
       add({ kind: "dat-files", dir: deps.realpath(location.dir) })
+      continue
+    }
+    if (location.path === envFile && location.kind === "literal") {
+      // 实现期修订 2 A:这一项从不让计划失败 —— 上级目录不在盘上照样成规则(literal 挡住新建,上级目录块挡住建出中间目录);解析出错就按
+      // 设置的路径写;写不进 profile 的路径(引号、反斜杠、换行)不写。
+      const rules: ConfigFenceRule[] = []
+      try {
+        const placed = join(within(dirname(envFile)), basename(envFile))
+        rules.push({ kind: "literal", path: placed })
+        const real = target(envFile)
+        if (real !== undefined && real !== placed) rules.push({ kind: "literal", path: real })
+      } catch {
+        rules.splice(0, rules.length, { kind: "literal", path: envFile })
+      }
+      for (const rule of rules) {
+        try {
+          assertSeatbeltSafePath(rule.kind === "dat-files" ? rule.dir : rule.path, "CODEPUPPY_ENV_FILE")
+          add(rule)
+        } catch {}
+      }
       continue
     }
     const placed = join(deps.realpath(dirname(location.path)), basename(location.path))
@@ -145,7 +178,7 @@ export function planProcessFence(input: PlanProcessFenceInput, deps: PlanProcess
   }
   const appStateRoot = deps.appStateRoot()
   const fenceSet = planConfigFence(
-    { userDataPath: input.userDataPath, appStateRoot, codepuppyGlobalRoot, engineConfigDirectory: input.engineConfigDirectory, roots },
+    { userDataPath: input.userDataPath, appStateRoot, codepuppyGlobalRoot, engineConfigDirectory: input.engineConfigDirectory, roots, ...(input.envFile ? { envFile: input.envFile } : {}) },
     deps,
   )
 

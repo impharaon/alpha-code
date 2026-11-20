@@ -25,11 +25,20 @@ import { USER_DATA_LAYOUT } from "./user-data-layout"
 
 type SecretsLogger = { log: (message: string) => void }
 
+/**
+ * 用户指定的环境文件(`$CODEPUPPY_ENV_FILE`),相对路径按主进程当前目录解析(与 readFileSync 一致)。唯一来源:启动时读它的
+ * loadCodePuppySecrets 与把它放进受保护配置集的围栏计划(server.ts → planProcessFence,DESIGN-engine-config-fence CF-4 / 实现期修订 2 A)。
+ */
+export function userEnvFile(env: Record<string, string | undefined>): string | undefined {
+  const value = env.CODEPUPPY_ENV_FILE
+  return value ? path.resolve(value) : undefined
+}
+
 export function loadCodePuppySecrets(userDataPath: string, logger?: SecretsLogger) {
   if (process.env.CODEPUPPY_SECRETS_DISABLE) return
 
   const candidates = [
-    process.env.CODEPUPPY_ENV_FILE,
+    userEnvFile(process.env),
     path.join(userDataPath, USER_DATA_LAYOUT.envFile),
   ].filter((value): value is string => Boolean(value))
 

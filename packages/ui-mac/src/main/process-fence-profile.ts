@@ -117,6 +117,8 @@ export function configFenceLocations(input: {
   engineConfigDirectory: string
   configHome: string
   home: string
+  /** CF-4 的另一份:用户设置的 `$CODEPUPPY_ENV_FILE`(codepuppy-secrets.ts 的 userEnvFile;实现期修订 2 A)。 */
+  envFile?: string
 }): ConfigFenceRule[] {
   const inUserData = (name: string) => join(input.userDataPath, name)
   const configDirectories = [...new Set([resolve(input.engineConfigDirectory), resolve(input.configHome, "opencode")])]
@@ -126,6 +128,7 @@ export function configFenceLocations(input: {
     { kind: "subpath", path: inUserData(USER_DATA_LAYOUT.engineConfig) }, // CF-2 显式文件与模型底表
     { kind: "literal", path: inUserData(USER_DATA_LAYOUT.shellEnv) }, // CF-3
     { kind: "literal", path: inUserData(USER_DATA_LAYOUT.envFile) }, // CF-4
+    ...(input.envFile ? [{ kind: "literal" as const, path: resolve(input.envFile) }] : []), // CF-4 $CODEPUPPY_ENV_FILE
     { kind: "literal", path: inUserData(USER_DATA_LAYOUT.endpoints) }, // CF-5
     { kind: "literal", path: inUserData(USER_DATA_LAYOUT.discoveredEndpoints) }, // CF-5
     { kind: "subpath", path: inUserData(USER_DATA_LAYOUT.connections) }, // CF-6

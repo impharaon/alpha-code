@@ -240,17 +240,18 @@ describeDarwin("planProcessFence", () => {
   })
 
   test("修订 2 A:上级目录不在盘上 ⇒ 取最深一级已存在祖先的真实路径接上余下部分,计划照常;任何解析错误、引号路径都不让计划失败", () => {
+    // 最深一级已存在的祖先 ~/secret-root 是指到别处的软链
     const missing = harness({
       realpath: (p) => {
-        if (p.startsWith(`${HOME}/missing`)) throw enoent(p)
-        return p === HOME ? "/Volumes/home/alpha" : p.startsWith(`${HOME}/`) ? `/Volumes/home/alpha${p.slice(HOME.length)}` : p
+        if (p.startsWith(`${HOME}/secret-root/missing`)) throw enoent(p)
+        return p === `${HOME}/secret-root` ? "/Volumes/secret" : p
       },
     })
-    missing.input.envFile = `${HOME}/missing/dir/cp.env`
+    missing.input.envFile = `${HOME}/secret-root/missing/dir/cp.env`
     const deny = processFenceWriteRules(planProcessFence(missing.input, missing.deps).profile).deny
-    expect(deny).toContainEqual({ kind: "literal", value: "/Volumes/home/alpha/missing/dir/cp.env" })
-    expect(deny).toContainEqual({ kind: "literal", value: "/Volumes/home/alpha/missing/dir" })
-    expect(deny).toContainEqual({ kind: "literal", value: "/Volumes/home/alpha/missing" })
+    expect(deny).toContainEqual({ kind: "literal", value: "/Volumes/secret/missing/dir/cp.env" })
+    expect(deny).toContainEqual({ kind: "literal", value: "/Volumes/secret/missing/dir" })
+    expect(deny).toContainEqual({ kind: "literal", value: "/Volumes/secret/missing" })
     const failing = harness({ realpath: (p) => { if (p.includes("/odd/")) throw Object.assign(new Error("EACCES"), { code: "EACCES" }); return p } })
     failing.input.envFile = `${HOME}/odd/x/cp.env`
     expect(processFenceWriteRules(planProcessFence(failing.input, failing.deps).profile).deny).toContainEqual({ kind: "literal", value: `${HOME}/odd/x/cp.env` })

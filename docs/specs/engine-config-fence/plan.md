@@ -140,6 +140,7 @@ PLAN 阶段只提交本文件。下面的命令与结论分两类:「实测」�
 - 2026-11-20 · L1 删掉的 `saved` 绑定(`permission.ts:180`,`const saved = yield* PermissionSaved.Service`)同样只服务于 `savedRules`;两处删除原位各补一行 `codepuppy(I-13 L1)` 标注,写明上游原来那一行(审查 Minor:ADR-047 说本文件只在标注处改动,上游同步靠这些标注) · 提交 I。
 - 2026-11-20 · 审查 Minor:`unattended-policy.test.ts`「T1 allow 对无工具调用的原始 ask 与直接 return 不等价」把原始动作的 ask 写在会话行上,L2 之后引擎第一次判定已是 allow,删掉 `gate.ts` 的回写它也照绿,证明失效;改为写在 agent 规则里(选项 `agentRawAsk`),删回写 ⇒ 红(`IMP/ko-WRITEBACK-new.log`;旧写法同一突变下照绿,`IMP/ko-WRITEBACK-old.log`) · 提交 I。
 - 2026-11-20 · 审查 Minor:AC-03 的 wellknown 那条在判「列表里没有 planted」之前,先断言 `/api/mcp` 回 200 且 `data` 是数组,错误响应不再让它空过 · 提交 I。
+- 2026-11-20 · `packages/ext/src/policy/unattended-policy.test.ts` 登记进 `scripts/gate-files.tsv`(精确条数 20):闸门文件 `session-row-rules.test.ts` 的正文提到它,而它既未登记、也不在 `NOT_GATES` / `REFERENCED_BUT_UNREGISTERED`,`gate-file-registry.test.ts` 的分类绊线因此红(编排器合并 ⓪ + ① 时发现)。按编排器裁决把它当闸门登记:本片改过它两条,其中 T1 那条是审查依据的证据;它也是登记册 `unattended-run-permissions` 的证明文件 · 提交 J。
 - 2026-11-20 · 设计 §6 E7 的前提不成立(编排器裁决 3):M2 七个在会话行上写 `allow *` 的真引擎用例(package-effect、created-plugin、install-from-source、package-mcp-oauth、plugin-entrypoints、endpoint-route 与 `test-component/official-connectors.cases.ts:1044`)在 L1–L3 之后照样全绿,本片不改它们;提交 B 之后在本分支上复跑确认。设计 E7 那句「改成在 agent 层给放行」请设计方更正 · 提交 B。
 - 2026-11-20 · `test-fixtures/engine-adapter-sampler/sample.ts:212` 在会话行上写 `ask *`,L2 之后不再强制询问;它是录样本的脚本,不是测试,按裁决 5 不动,以后重录样本时注意 · 提交 B。
 - 2026-11-20 · `config.test.ts` 的 5 条已知红(名单见 M4)按裁决 4 只列名、不加判官;同一份名单写进登记册 `engine-db-records-not-honoured` 的 `note` 和 ADR-047 config.ts 那一行 · 提交 B。

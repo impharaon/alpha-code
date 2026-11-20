@@ -198,6 +198,9 @@ async function machine(arm: Arm) {
   const configDir = host.slot.configDirectory
   const policyTarget = { file: "", partition: { account: "", workspace: "" } }
   let main: Awaited<ReturnType<typeof startMain>> | undefined
+  // SPEC-stored-credentials-fence: the second outside-the-fence helper — the credential "main" that answers the pulls (Bun IPC); the
+  // tool-policy writes go to the other one over its own port (toMain). Both start before the fence; both stop on every exit path.
+  let credentials: Awaited<ReturnType<typeof serveCredentialsFromOutside>> | undefined
   if (!fresh) {
     // a keyed provider whose receiver is the model stub (as the injection writes a user key; the value is fake), allowed in both layers,
     // and the explicit file rewritten with it — still main, still before the fence
@@ -270,12 +273,13 @@ async function machine(arm: Arm) {
         expect(processFenceRulesCover(rules, file), file).toBe(false)
     fs.writeFileSync(path.join(run, "profile.sb"), profile)
     // SPEC-stored-credentials-fence: C1 refuses this process its own credential stores once fenced — main (outside the fence) answers the pulls
-    await serveCredentialsFromOutside()
+    credentials = await serveCredentialsFromOutside()
     applyProcessFence({ addonPath: plan.addonPath, profile }, { insideDir: ws, outsideDir: run })
     console.log(`CF-ENGINE ${JSON.stringify({ arm, pid: process.pid, deny: rules.deny, sandboxRoot: sandbox.root })}`)
-    return { host, main, ws, jsonc, configDir, globalRoot, userData, roots, home, callLog, policyTarget, bootstrap, plan: { ...plan, profile }, log }
+    return { host, main, credentials, ws, jsonc, configDir, globalRoot, userData, roots, home, callLog, policyTarget, bootstrap, plan: { ...plan, profile }, log }
   } catch (error) {
     await main?.stop()
+    credentials?.stop()
     throw error
   }
 }
@@ -440,6 +444,7 @@ describe.if(ARM === "production")("production: 0.2.6-shaped data, the production
   afterAll(async () => {
     await running?.close().catch(() => undefined)
     await m?.main?.stop()
+    m?.credentials?.stop()
     model.stop()
   })
 
@@ -618,6 +623,7 @@ describe.if(ARM === "fresh")("fresh machine: no engine data directory, no ~/.ope
   }, 240_000)
   afterAll(async () => {
     await running?.close().catch(() => undefined)
+    m?.credentials?.stop()
     model.stop()
   })
 
@@ -706,6 +712,7 @@ describe.if(ARM === "control")("known bad: the protected set removed (W2 / W6 pu
   afterAll(async () => {
     await running?.close().catch(() => undefined)
     await m?.main?.stop()
+    m?.credentials?.stop()
     model.stop()
   })
 
@@ -752,6 +759,7 @@ describe.if(ARM === "noprecreate")("known bad: the protected directories are not
     } catch (error) {
       failure = error
     }
+    m.credentials?.stop()
     model.stop()
     console.log(`[noprecreate] ${failure instanceof Error ? failure.message : String(failure)}`)
     expect(String(failure instanceof Error ? failure.message : failure)).toMatch(/EPERM/)

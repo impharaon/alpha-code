@@ -90,6 +90,7 @@ afterAll(async () => {
   // E1: what every store file must still hold when the host checks it outside every fence (main's own renewal is the only legitimate change)
   if (m) console.log(`SCF-STORES ${JSON.stringify(Object.fromEntries(Object.entries(m.files).map(([file, value]) => [file, createHash("sha256").update(value).digest("hex")])))}`)
   await running?.close().catch(() => undefined)
+  m?.main?.stop()
   gateway.stop(true)
 })
 

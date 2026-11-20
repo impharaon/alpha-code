@@ -1007,6 +1007,48 @@
       "note": "Known red by design, not taken over (the disposition of orchestrator ruling 甲 for I-05, applied to I-13 by the orchestrator 2026-11-20). L1: 64 upstream cases that seed a saved approval (saved.add / saved.update) and expect it to allow — 44 in packages/core/test/permission.test.ts, 20 in packages/core/test/tool-shell.test.ts — pinned by name in packages/ext/src/policy/session-grant-upstream-reds.test.ts. L3: five upstream cases in packages/core/test/config/config.test.ts that expect a wellknown document to load; the gate does not run that file: \"layers integration documents below remote and user config and reloads when they change\", \"keeps only the policies of documents from integrations managed policy denies\", \"tolerates unavailable authenticated wellknown config and reloads it later\", \"keeps the last resolved wellknown config across failures and restarts until its source is removed\", \"logs redacted source-aware diagnostics for every config source\". Reproduce: cd packages/core && bun test test/permission.test.ts test/tool-shell.test.ts test/config/config.test.ts. Rollback: revert the I-13 slice as one commit (permission.ts L1/L2 and config.ts L3 with their tests)."
     },
     {
+      "id": "plan-directory-in-engine-data",
+      "decision": "计划助手的计划文件写在引擎数据目录 <XDG_DATA_HOME>/opencode/plan(界面显示为 ~/.local/share/opencode/plan/);~/.opencode 整个受保护,任何进程(包括应用自己)都不建它(SPEC-engine-config-fence BR-07)。",
+      "adr": [
+        "ADR-047",
+        "ADR-048"
+      ],
+      "lane": "INT-safety I-13 (SPEC-engine-config-fence slice ④)",
+      "takeovers": [
+        "packages/core/src/plugin/plan.ts",
+        "packages/core/test/plugin/plan.test.ts"
+      ],
+      "approval": {
+        "quote": "我建议 A：改存到引擎数据目录",
+        "date": "2026-11-20",
+        "by": "owner (relayed by the orchestrator: the owner's choice among three options, A = move plan files to the engine data directory)",
+        "reason": "SPEC-engine-config-fence v3 BR-07 / AC-08; DESIGN-engine-config-fence §4.8 and D13: upstream hard-codes ~/.opencode/plan inside the plan plugin, and with ~/.opencode protected as a whole (CF-9) and W16 deleted, the plan agent could not write plan files any more unless this one value moves."
+      },
+      "mechanism": {
+        "file": "packages/core/src/plugin/plan.ts",
+        "ladder": "L3 (re-taken file, one value: codepuppy(I-13 D13) at plan.ts:31 — the plan directory is path.join(global.data, \"plan\"); the persisted Plan-mode reminder, the plan agent's edit allowance and the refusal text all carry that value. A plugin hook can add an allow rule but cannot change the reminder that tells the model where to write. The upstream test plan.test.ts pins that directory and is re-taken with it, :27 only. The fence side — CF-9 for the whole ~/.opencode, W16 deleted, the planner never pre-creates ~/.opencode — lives in packages/ui-mac/src/main/process-fence-profile.ts / process-fence-plan.ts, L0 Code Puppy code.)"
+      },
+      "tests": [
+        {
+          "file": "packages/core/test/plugin/plan.test.ts",
+          "name": "injects enter and leave reminders on agent switches"
+        },
+        {
+          "file": "packages/core/test/plugin/plan.test.ts",
+          "name": "allows edits only inside the Plan directory"
+        },
+        {
+          "file": "packages/core/test/plugin/plan.test.ts",
+          "name": "rewrites blocked mutation failures with the Plan directory"
+        },
+        {
+          "file": "packages/ui-mac/src/main/engine-config-fence.engine.test.ts",
+          "name": "AC-04 / AC-06 / AC-08 real engine inside the production fence: attacks refused, ordinary work and restart fine, cold start on 0.2.6 data and a fresh machine, the plan file under the engine data directory with ~/.opencode never created; known-bad arms flip; no protected-location denial from the engine process"
+        }
+      ],
+      "note": "Reverse arm (ADR-048): with the upstream plan.ts restored (git show 33f94fce96:packages/core/src/plugin/plan.ts) the three plan.test.ts cases turn red (the reminder, the edit allowance and the refusal text name ~/.opencode/plan), and the real-engine host turns red in its fresh arm: the Plan-mode reminder names <HOME>/.opencode/plan, the model's write there is refused by CF-9 and no plan file appears under the engine data directory. Reproduce: cd packages/core && bun test test/plugin/plan.test.ts; cd packages/ui-mac && bun test src/main/engine-config-fence.engine.test.ts."
+    },
+    {
       "id": "adr041-collision-rejection",
       "decision": "Alias / identity collisions are rejected, never last-wins (ADR-041 decision 2).",
       "adr": [

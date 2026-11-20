@@ -28,7 +28,7 @@ export const Plugin = define({
   id: "opencode.plan",
   effect: Effect.fn(function* (ctx) {
     const global = yield* Global.Service
-    const directory = path.join(global.home, ".opencode", "plan")
+    const directory = path.join(global.data, "plan") // codepuppy(I-13 D13): plan files live under the engine data directory, never ~/.opencode, which is protected and created by nobody (SPEC-engine-config-fence BR-07, DESIGN-engine-config-fence §4.8)
     const enterReminder = enter(directory)
     yield* ctx.agent.transform((editor) => {
       editor.update(plan, (item) => {

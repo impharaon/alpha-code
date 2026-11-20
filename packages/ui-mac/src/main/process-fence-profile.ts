@@ -9,7 +9,8 @@
 // 两者差两条,其中 zsh 存历史走 `.zsh_history.new` 再改名 —— 照 §7.6 原文立闸,用户每开一次终端
 // 看一条 `failed to write history file`。逐行消融结论(§8.2 表):W2/W3/W4/W5/W6/W15 去掉引擎/注入/
 // 终端直接死,W7 去掉 **静默**(provider 装不上而 health 仍 200),W8 去掉每开终端一条报错;
-// W11–W14 / W16–W18 本轮**未证伪 ≠ 可删**,删减各自要实测(基线 I1)。本文件不做那个判定。
+// W11–W14 / W17–W18 本轮**未证伪 ≠ 可删**,删减各自要实测(基线 I1)。本文件不做那个判定。W16(`~/.opencode`)已删:计划目录移到引擎数据目录,
+// 围栏里再没有写者要它,它整个是受保护配置位置 CF-9(DESIGN-engine-config-fence D13)。
 //
 // ── 与 REQ-138 那层的关系:替换,不叠加 ─────────────────────────────────────────────
 // 嵌套 seatbelt 只在编译后策略完全相同时放行,否则 `sandbox_apply: Operation not permitted`、exit 71、
@@ -48,7 +49,8 @@ export const WORKSPACE_WRITE_EXTENSION_CLASS = "app.codepuppy.workspace-write"
  * 可写集的行 id(勘破 §8.2 的 W 行及运行期 X1,W9 在那一轮就不存在)。W2(当前环境根)与 W6(`<XDG_CONFIG_HOME>/opencode`)已删:
  * 两处都是受保护配置位置,写者已在 main(DESIGN-engine-config-fence §4.2、D2)。W10 `~/.zsh_sessions` 与 W19 `~/.zcompdump*` 已删
  * (DESIGN-engine-config-fence D15):围栏外的 shell 会执行它们的内容(Apple Terminal 的 zsh 恢复会话、带 compinit 的 rc 读 dump),
- * 应用内终端不需要它们(process-fence-zsh-startup.test.ts)。process-fence-write-sites.tsv 的每一条
+ * 应用内终端不需要它们(process-fence-zsh-startup.test.ts)。W16 `~/.opencode` 已删(D13):计划助手的计划目录移到了引擎数据目录(W4 之下),
+ * `~/.opencode` 整个是受保护配置位置 CF-9。process-fence-write-sites.tsv 的每一条
  * 写盘登记都要点名它落在哪一行之下;点不出来的写入点 = 新的写入根 = 要么加行(带实测)要么改代码。
  */
 export const WRITABLE_ROOT_IDS = {
@@ -63,7 +65,6 @@ export const WRITABLE_ROOT_IDS = {
   W13: "/dev/null /dev/stdout /dev/stderr",
   W14: "/dev/tty ^/dev/fd/",
   W15: "/dev/ptmx ^/dev/ttys:PTY 靠它(§6.4)",
-  W16: "<HOME>/.opencode:§7.6 B 段的桥",
   W17: "<HOME>/Library/Caches/bun(dev-only)",
   W18: "<HOME>/.cache/bun(dev-only)",
   X1: "用户本次应用运行亲手打开的项目(主进程绑定当前引擎签发的私有类扩展)",
@@ -107,7 +108,7 @@ export function resolveEngineRoots(env: Record<string, string | undefined>, home
 export type ConfigFenceRule = ({ kind: "subpath" | "literal"; path: string } | { kind: "dat-files"; dir: string }) & { via?: readonly string[] }
 
 /**
- * CF-1–8、CF-10 的原始位置(还不是真实路径;片 ④ / ③ 再加 `~/.opencode` 与工具策略目录)。名字取 USER_DATA_LAYOUT 与 store 常量。
+ * CF-1–10 的原始位置(还不是真实路径;片 ③ 再加工具策略目录)。名字取 USER_DATA_LAYOUT 与 store 常量。
  * 环境根恒列(在状态根之内时是一条冗余规则);两个引擎配置目录相同只列一份。顺序即渲染顺序。
  */
 export function configFenceLocations(input: {
@@ -137,9 +138,15 @@ export function configFenceLocations(input: {
     { kind: "literal", path: inUserData(UPDATER_STORE) }, // CF-7
     { kind: "dat-files", dir: input.userDataPath }, // CF-7 界面设置存储 *.dat
     ...configDirectories.map((path) => ({ kind: "subpath" as const, path })), // CF-8
+    { kind: "subpath", path: homeOpencodeDirectory(input.home) }, // CF-9 整个 ~/.opencode(谁都不建它,计划器不预建)
     { kind: "literal", path: join(input.home, "opencode.json") }, // CF-10
     { kind: "literal", path: join(input.home, "opencode.jsonc") }, // CF-10
   ]
+}
+
+/** CF-9 的路径(DESIGN §4.1、D13):`~/.opencode` 整个受保护,任何进程都不建它(BR-07)。位置清单与计划器的预建跳过共用这一处写法。 */
+export function homeOpencodeDirectory(home: string): string {
+  return join(home, ".opencode")
 }
 
 export type ProcessFenceProfileInput = {
@@ -223,7 +230,6 @@ export function renderProcessFenceProfile(input: ProcessFenceProfileInput): stri
     `  (literal "/dev/null") (literal "/dev/stdout") (literal "/dev/stderr")   ; W13`,
     `  (literal "/dev/tty") (regex #"^/dev/fd/")              ; W14`,
     `  (literal "/dev/ptmx") (regex #"^/dev/ttys")            ; W15`,
-    `  (subpath "${join(home, ".opencode")}")                           ; W16`,
     `  (subpath "${join(home, "Library", "Caches", "bun")}")                  ; W17`,
     `  (subpath "${join(home, ".cache", "bun")}")                       ; W18`,
     ")",

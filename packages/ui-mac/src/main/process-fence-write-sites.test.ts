@@ -30,6 +30,17 @@ const MAIN_ONLY_SITES = [
   ["codepuppy-environment.ts", "mkdirSync", "directory"],
   ["codepuppy-environment.ts", "rmdirSync", "directory"],
   ["codepuppy-secret-files.ts", "openSync", "file"],
+  // SPEC-stored-credentials-fence §4.5:凭据存放点在 C1 之下,围栏内写不到;这些写者只由 main 调用(syncSecretFiles / writeSecretFileAtomic /
+  // applyPlatformCredentialsHot,闭包判据见下方 I2)
+  ["codepuppy-secret-files.ts", "chmodSync", "dir"],
+  ["codepuppy-secret-files.ts", "chmodSync", "temp"],
+  ["codepuppy-secret-files.ts", "mkdirSync", "dir"],
+  ["codepuppy-secret-files.ts", "openSync", "temp"],
+  ["codepuppy-secret-files.ts", "renameSync", "temp"],
+  ["codepuppy-secret-files.ts", "rmSync", "file"],
+  ["codepuppy-secret-files.ts", "rmSync", "path.join(dir, leftover)"],
+  ["codepuppy-secret-files.ts", "rmSync", "temp"],
+  ["codepuppy-secret-files.ts", "writeFileSync", "fd"],
   ["codepuppy-installs.ts", "mkdirSync", "root"],
   ["codepuppy-installs.ts", "renameSync", "file"],
   ["engine-explicit-config.ts", "chmodSync", "engineConfigDirectory"],
@@ -76,8 +87,8 @@ function valueImports(rel: string, module: RegExp): { names: string[]; source: t
 // 用扫描器算出的同一个 sidecar 闭包。
 describe("I2:main-only 写者在 sidecar 闭包里没有调用方", () => {
   const closure = sidecarSourceFiles(repoRoot)
-  test("闭包里没有文件拿到 readCredentialTable / readRegularFileNoFollow(凭据存放点只由 main 读,SPEC-stored-credentials-fence I3;后者的 openSync 是只读打开)", () => {
-    const readers = new Set(["readCredentialTable", "readRegularFileNoFollow", "*", "default"])
+  test("闭包里没有文件拿到读写凭据存放点的函数(readCredentialTable / readRegularFileNoFollow / syncSecretFiles / writeSecretFileAtomic / applyPlatformCredentialsHot;凭据存放点只由 main 读写,SPEC-stored-credentials-fence I3;readRegularFileNoFollow 的 openSync 是只读打开)", () => {
+    const readers = new Set(["readCredentialTable", "readRegularFileNoFollow", "syncSecretFiles", "writeSecretFileAtomic", "applyPlatformCredentialsHot", "*", "default"])
     const importers: string[] = []
     const offenders: string[] = []
     for (const rel of closure) {

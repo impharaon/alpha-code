@@ -29,6 +29,7 @@ import {
   trimUntilCompiles,
   workspaceCandidatesFromStore,
   type ConfigFenceRule,
+  type CredentialStoreRule,
   type ProcessFenceProfileInput,
   type ProcessFenceWriteRule,
   type WorkspaceUnionInput,
@@ -45,6 +46,18 @@ const USER_DATA = `${HOME}/Library/Application Support/ai.opencode.desktop`
 const GLOBAL = `${HOME}/Library/Application Support/codepuppy-state/env/prod`
 /** SPEC-engine-config-fence:受保护配置集,由生产的位置清单给出(这里没有软链,真实路径 = 原路径;软链与真实路径的判据在 process-fence-plan.test.ts)。 */
 const CF: ConfigFenceRule[] = configFenceLocations({ userDataPath: USER_DATA, appStateRoot: STATE_ROOT, codepuppyGlobalRoot: GLOBAL, engineConfigDirectory: `${HOME}/.config/opencode`, configHome: roots.configHome, home: HOME })
+/** DESIGN-stored-credentials-fence §4.5 的 C1 输入(已是真实路径;生产由 planCredentialStores 从 credentialStores() 算出)。 */
+const OFFICIAL_RUNTIME = "/private/var/folders/xy/T/codepuppy-connectors-501-abcdef"
+const C1: CredentialStoreRule[] = [
+  { kind: "subpath", path: `${USER_DATA}/codepuppy-secrets` },
+  { kind: "subpath", path: `${USER_DATA}/codepuppy-mcp-secrets` },
+  { kind: "literal", path: `${USER_DATA}/codepuppy.env` },
+  { kind: "literal", path: `${USER_DATA}/codepuppy-auth.json` },
+  { kind: "literal", path: `${USER_DATA}/codepuppy-pkce.json` },
+  { kind: "literal", path: `${USER_DATA}/codepuppy-byok-keys.json` },
+  { kind: "subpath", path: `${USER_DATA}/Crashpad` },
+  { kind: "subpath", path: OFFICIAL_RUNTIME },
+]
 const base: ProcessFenceProfileInput = {
   workspaces: [`${HOME}/code-puppy`, "/Users/alpha/app/alpha-code"],
   codepuppyGlobalRoot: GLOBAL,
@@ -53,6 +66,7 @@ const base: ProcessFenceProfileInput = {
   roots,
   egressProxyPort: 4443,
   configFence: CF,
+  credentialStores: C1,
 }
 /** 一个受保护位置都没有的形状:只判别的行时用(空清单两块都不渲染)。 */
 const noFence = () => [] as string[]
@@ -77,6 +91,14 @@ const CF_LINES = [
   `(literal "${HOME}/opencode.jsonc"))`,
   `(deny file-write* ${[`${HOME}/Library/Application Support`, `${HOME}/Library`, HOME, "/Users", `${STATE_ROOT}/env`, STATE_ROOT, USER_DATA, `${HOME}/.config`].map((p) => `(literal "${p}")`).join(" ")})`,
 ]
+/** C1 两块的逐行期望(独立字面量):拒读拒写的存放点按清单顺序;上级目录按首次出现、从父目录到 `/` 之前。 */
+const C1_ANCESTORS = [`${HOME}/Library/Application Support/ai.opencode.desktop`, `${HOME}/Library/Application Support`, `${HOME}/Library`, HOME, "/Users", "/private/var/folders/xy/T", "/private/var/folders/xy", "/private/var/folders", "/private/var", "/private"]
+const C1_LINES = [
+  "(deny file-read* file-write*",
+  ...C1.map((rule, i) => `(${rule.kind} "${rule.path}")${i === C1.length - 1 ? ")" : ""}`),
+  `(deny file-write* ${C1_ANCESTORS.map((p) => `(literal "${p}")`).join(" ")})`,
+]
+const C1_RULES: ProcessFenceWriteRule[] = [...C1.map((rule) => ({ kind: rule.kind, value: rule.path })), ...C1_ANCESTORS.map((value) => ({ kind: "literal" as const, value }))]
 /** 同一份期望,写成解析器的 deny 规则(E9 往返)。 */
 const CF_DENY: ProcessFenceWriteRule[] = [
   ...CF_LINES.slice(1, -1).map((line) => {
@@ -127,6 +149,7 @@ describe("renderProcessFenceProfile —— 勘破 §8.2 的行(W10/W19 已删,D1
       '(deny file-issue-extension generic-issue-extension mach-issue-extension iokit-issue-extension ipc-posix-issue-extension (extension-class "app.codepuppy.workspace-write"))',
       ...NETWORK_LINES(4443),
       ...CF_LINES,
+      ...C1_LINES,
     ])
   })
 
@@ -137,9 +160,12 @@ describe("renderProcessFenceProfile —— 勘破 §8.2 的行(W10/W19 已删,D1
     const cf = lines.indexOf("(deny file-write*", n4)
     expect(x1).toBeGreaterThan(-1)
     expect(cf).toBe(n4 + 1)
-    expect(lines.slice(cf)).toEqual(CF_LINES)
+    expect(lines.slice(cf)).toEqual([...CF_LINES, ...C1_LINES]) // C1 是全文最后的文件规则(stored-credentials-fence §4.5)
     expect(lines.slice(cf).some((l) => l.startsWith("(allow"))).toBe(false)
-    expect(tokens(renderProcessFenceProfile({ ...base, configFence: [] })).at(-1)).toBe(NETWORK_LINES(4443).at(-1))
+    expect(tokens(renderProcessFenceProfile({ ...base, configFence: [], credentialStores: [] })).at(-1)).toBe(NETWORK_LINES(4443).at(-1))
+    // C1 单独在场(受保护集为空)时也紧接在网络行之后;C1 为空 ⇒ 两块都不渲染
+    expect(tokens(renderProcessFenceProfile({ ...base, configFence: [] })).slice(-C1_LINES.length)).toEqual(C1_LINES)
+    expect(tokens(renderProcessFenceProfile({ ...base, credentialStores: [] })).slice(-CF_LINES.length)).toEqual(CF_LINES)
     expect(() => renderProcessFenceProfile({ ...base, configFence: [{ kind: "literal", path: '/Users/alpha/"x' }] })).toThrow(/configFence\[0\]/)
     expect(() => renderProcessFenceProfile({ ...base, configFence: [{ kind: "dat-files", dir: "relative" }] })).toThrow(/configFence\[0\]/)
   })
@@ -179,8 +205,8 @@ describe("renderProcessFenceProfile —— 勘破 §8.2 的行(W10/W19 已删,D1
 
   test("`#1337` 网络行:Q1.2 四行逐字、顺序不变、deny 在前 allow 在后、N4 的端口就是传入的代理端口;只写加法(没有第二条 deny)", () => {
     // 受保护集两块渲染在 N4 之后(SPEC-engine-config-fence);网络行本身的形状在没有受保护集的形状上判,有受保护集时它们紧贴在两块之前
-    expect(tokens(renderProcessFenceProfile({ ...base, egressProxyPort: 61234 })).slice(-(CF_LINES.length + 4), -CF_LINES.length)).toEqual(NETWORK_LINES(61234))
-    const out = tokens(renderProcessFenceProfile({ ...base, egressProxyPort: 61234, configFence: [] }))
+    expect(tokens(renderProcessFenceProfile({ ...base, egressProxyPort: 61234 })).slice(-(CF_LINES.length + C1_LINES.length + 4), -(CF_LINES.length + C1_LINES.length))).toEqual(NETWORK_LINES(61234))
+    const out = tokens(renderProcessFenceProfile({ ...base, egressProxyPort: 61234, configFence: [], credentialStores: [] }))
     expect(out.slice(-4)).toEqual(NETWORK_LINES(61234))
     expect(out.filter((l) => l.startsWith("(deny "))).toEqual([
       "(deny file-write*)",
@@ -265,45 +291,17 @@ describe("签发判定的唯一来源:本代 apply 的 profile 解析回写规�
   ]
 
   test("E9 往返:生产渲染(含受保护集)→ 解析 ⇒ allow 逐条还原写块(W13 一行三条、W14/W15 literal + regex),deny 与渲染输入(规则 + 上级目录)逐条相等;X1 扩展行不算规则", () => {
-    expect(processFenceWriteRules(renderProcessFenceProfile(base))).toEqual({ allow: ALLOW, deny: CF_DENY })
-    expect(processFenceWriteRules(renderProcessFenceProfile({ ...base, configFence: [] }))).toEqual({ allow: ALLOW, deny: [] })
+    expect(processFenceWriteRules(renderProcessFenceProfile(base))).toEqual({ allow: ALLOW, deny: [...CF_DENY, ...C1_RULES] })
+    expect(processFenceWriteRules(renderProcessFenceProfile({ ...base, credentialStores: [] }))).toEqual({ allow: ALLOW, deny: CF_DENY })
+    expect(processFenceWriteRules(renderProcessFenceProfile({ ...base, configFence: [], credentialStores: [] }))).toEqual({ allow: ALLOW, deny: [] })
     expect(processFenceWriteRules("(version 1)(allow default)(deny file-write*)")).toEqual({ allow: [], deny: [] })
   })
 
-  // DESIGN-stored-credentials-fence §4.5 的 C1 两块:渲染在 N4 之后,与受保护集同侧;表头 `(deny file-read* file-write*` 与 `(deny file-write*`,
-  // 收尾括号落在最后一条条目的行末、其后带 `; C1` 注释,上级目录块一行可写多条。这里照那份设计的排版代入假路径(那份渲染器还没落地)。
-  const C1_TEXT = [
-    "(deny file-read* file-write*",
-    `  (subpath "${USER_DATA}/codepuppy-secrets")`,
-    `  (subpath "${USER_DATA}/codepuppy-mcp-secrets")`,
-    `  (literal "${USER_DATA}/codepuppy.env")`,
-    `  (literal "${USER_DATA}/codepuppy-auth.json")`,
-    `  (literal "${USER_DATA}/codepuppy-pkce.json")`,
-    `  (literal "${USER_DATA}/codepuppy-byok-keys.json")`,
-    `  (subpath "${USER_DATA}/Crashpad")`,
-    `  (subpath "/private/var/folders/xy/T/codepuppy-connectors-501-abcdef"))`,
-    "(deny file-write*",
-    `  (literal "${HOME}/Library/Application Support") (literal "${HOME}/Library") (literal "${HOME}") (literal "/Users")`,
-    `  (literal "${USER_DATA}") (literal "/private/var/folders/xy/T") (literal "/private/var/folders/xy"))      ; C1`,
-    "",
-  ].join("\n")
-  const C1_DENY: ProcessFenceWriteRule[] = [
-    { kind: "subpath", value: `${USER_DATA}/codepuppy-secrets` },
-    { kind: "subpath", value: `${USER_DATA}/codepuppy-mcp-secrets` },
-    { kind: "literal", value: `${USER_DATA}/codepuppy.env` },
-    { kind: "literal", value: `${USER_DATA}/codepuppy-auth.json` },
-    { kind: "literal", value: `${USER_DATA}/codepuppy-pkce.json` },
-    { kind: "literal", value: `${USER_DATA}/codepuppy-byok-keys.json` },
-    { kind: "subpath", value: `${USER_DATA}/Crashpad` },
-    { kind: "subpath", value: "/private/var/folders/xy/T/codepuppy-connectors-501-abcdef" },
-    ...[`${HOME}/Library/Application Support`, `${HOME}/Library`, HOME, "/Users", USER_DATA, "/private/var/folders/xy/T", "/private/var/folders/xy"].map((value) => ({ kind: "literal" as const, value })),
-  ]
-
-  test("E9 往返(受保护集 + C1 样本):C1 两块排在受保护集之后或之前,deny 都逐条等于两份输入按出现顺序拼起来", () => {
-    const profile = renderProcessFenceProfile(base)
-    expect(processFenceWriteRules(profile + C1_TEXT)).toEqual({ allow: ALLOW, deny: [...CF_DENY, ...C1_DENY] })
-    const n4 = profile.indexOf("(deny file-write*\n", profile.indexOf("(allow network-outbound"))
-    expect(processFenceWriteRules(profile.slice(0, n4) + C1_TEXT + profile.slice(n4))).toEqual({ allow: ALLOW, deny: [...C1_DENY, ...CF_DENY] })
+  // DESIGN-stored-credentials-fence §4.5 / D11:C1 两块由唯一渲染点写在受保护集之后,表头 `(deny file-read* file-write*` 与 `(deny file-write*`;
+  // 运行期放行的解析器认得这两种形状,deny 逐条等于两份输入(受保护集,再 C1)按出现顺序拼起来 —— C1 在场时新打开的项目照样签得出放行。
+  test("E9 / D11 往返(受保护集 + C1,真渲染):deny 逐条等于两份输入按出现顺序拼起来;C1 的路径带引号即拒渲染", () => {
+    expect(processFenceWriteRules(renderProcessFenceProfile(base))).toEqual({ allow: ALLOW, deny: [...CF_DENY, ...C1_RULES] })
+    expect(() => renderProcessFenceProfile({ ...base, credentialStores: [{ kind: "literal", path: '/x/"y' }] })).toThrow(/credentialStores\[0\]/)
   })
 
   test("文法只认渲染点写出的形状:其余任何含 file-write 的表头、条目或行都抛(调用方按「本代不签发」处理)", () => {
@@ -718,7 +716,7 @@ describe("控制组:判据能测出已知的坏", () => {
     expect(rendered).not.toEqual(tokens(renderProcessFenceProfile(base)))
   })
   test("`#1337` 少 N3(inbound)或多一条减法 deny ⇒ 网络行判据红(老勘破 §5 那两行 / 减法组合正是 `#1334` 实测的两种坏)", () => {
-    const good = tokens(renderProcessFenceProfile({ ...base, configFence: [] })) // 网络行的形状在没有受保护集的形状上判(见上)
+    const good = tokens(renderProcessFenceProfile({ ...base, configFence: [], credentialStores: [] })) // 网络行的形状在没有受保护集的形状上判(见上)
     expect(good.slice(-4)).toEqual(NETWORK_LINES(4443))
     const sec5 = good.filter((l) => !l.includes("network-inbound"))
     expect(sec5.slice(-4)).not.toEqual(NETWORK_LINES(4443))

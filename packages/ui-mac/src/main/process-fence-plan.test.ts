@@ -10,6 +10,7 @@ import { join, resolve } from "node:path"
 import { planConfigFence, planProcessFence, type PlanProcessFenceDeps, type PlanProcessFenceInput } from "./process-fence-plan"
 import { processFenceRulesCover, processFenceWriteRules, type ProcessFenceWriteRule } from "./process-fence-profile"
 import { loadCodePuppySecrets, userEnvFile } from "./codepuppy-secrets"
+import { credentialStores } from "./codepuppy-secret-files"
 
 const describeDarwin = process.platform === "darwin" ? describe : describe.skip
 
@@ -19,6 +20,7 @@ const GLOBAL = `${HOME}/Library/Application Support/codepuppy-state/env/prod`
 /** `#1390`:应用状态根 = GLOBAL 的父目录的父目录(三个 env 根与 CAS 的父)。 */
 const STATE_ROOT = `${HOME}/Library/Application Support/codepuppy-state`
 const ADDON = "/App/Contents/Resources/codepuppy-fence/codepuppy_fence.node"
+const OFFICIAL_RUNTIME = "/private/var/folders/xy/T/codepuppy-connectors-501-ab"
 
 function harness(overrides: Partial<PlanProcessFenceDeps> = {}, existing = new Set<string>([ADDON])) {
   const made: string[] = []
@@ -51,6 +53,8 @@ function harness(overrides: Partial<PlanProcessFenceDeps> = {}, existing = new S
     carriedWorkspaces: [],
     // SPEC-engine-config-fence:server.ts 交给启动文档的同一个值(engineGlobalConfigDirectory)
     engineConfigDirectory: `${HOME}/.config/opencode`,
+    // SPEC-stored-credentials-fence §4.5:server.ts 交的同一份存放点清单(官方运行期父目录算得出时给)
+    credentialStores: credentialStores({ userDataPath: USER_DATA, officialRuntimeParent: OFFICIAL_RUNTIME }),
   }
   return { deps, input, made, logs }
 }
@@ -65,6 +69,22 @@ function ancestorsOf(anchors: string[]): string[] {
 }
 
 describeDarwin("planProcessFence", () => {
+  test("SPEC-stored-credentials-fence C1:存放点清单经 planCredentialStores 落到真实路径,渲染成 profile 最后两块(拒读拒写块 + 上级目录拒写块);日志带条数;userData 的真实路径求不出 ⇒ 计划抛(拒 fork)", () => {
+    const h = harness()
+    const plan = planProcessFence(h.input, h.deps)
+    const tail = plan.profile.trimEnd().split("\n").slice(-10)
+    expect(tail[0]).toBe("(deny file-read* file-write*")
+    expect(tail.slice(1, 9).map((line) => line.replace(/\)?\s*(;.*)?$/, "").trim())).toEqual([
+      `(subpath "${USER_DATA}/codepuppy-secrets"`, `(subpath "${USER_DATA}/codepuppy-mcp-secrets"`, `(literal "${USER_DATA}/codepuppy.env"`,
+      `(literal "${USER_DATA}/codepuppy-auth.json"`, `(literal "${USER_DATA}/codepuppy-pkce.json"`, `(literal "${USER_DATA}/codepuppy-byok-keys.json"`,
+      `(subpath "${USER_DATA}/Crashpad"`, `(subpath "${OFFICIAL_RUNTIME}"`,
+    ])
+    expect(tail[9]!.startsWith("(deny file-write* ")).toBe(true)
+    expect(h.logs.some((l) => /credentialStores=8 rules/.test(l))).toBe(true)
+    const broken = harness({ realpath: (p) => (p === USER_DATA ? (() => { throw enoent(p) })() : p) })
+    expect(() => planProcessFence(broken.input, broken.deps)).toThrow(/ENOENT/)
+  })
+
   test("正向:并集 = 默认 → recent → tab 栏;父目录 W4/W5/W7 与受保护目录预建;addonPath 解析到 extraResources;日志一行账", () => {
     const h = harness()
     const plan = planProcessFence(h.input, h.deps)

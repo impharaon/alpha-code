@@ -1,6 +1,6 @@
 // SPEC-engine-config-fence AC-01 (DESIGN-engine-config-fence E1): every way a fenced process might change one protected
 // configuration location. Test-only helper, compiled by process-fence-config-fence.cases.ts; never part of the product.
-// It follows the design-time experiment wops.c (~/.cache/alpha-orch/2026-11-19/config-fence-design/src/wops.c).
+// It follows the design-time experiment program wops.c (design evidence kept outside the repository).
 //   config-fence-ops <label> file <target> <ws>   target = a protected file (a literal location, or a file inside a protected directory)
 //   config-fence-ops <label> dir <dir> <ws>       dir    = a protected directory
 //   config-fence-ops <label> create <path> <ws>   path   = an absent protected location (literal)

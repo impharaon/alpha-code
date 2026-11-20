@@ -904,7 +904,7 @@ packages/ui-mac/src/main/codepuppy-bridge.ts	audits/2026-07-03-req004-alpha-brid
 packages/ui-mac/src/main/codepuppy-cloud-jobs.ts	alpha-platform	3	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/ui-mac/src/main/codepuppy-cloud-jobs.ts	alpha-web	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/ui-mac/src/main/codepuppy-cloud-schedules.ts	/Alpha	1	historical	ADR-025 历史目录名 Alpha 的路径字面量或原名记录，本票冻结路径名，不作为现行品牌改写
-packages/ui-mac/src/main/codepuppy-config-injection.ts	alpha-code	6	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+packages/ui-mac/src/main/codepuppy-config-injection.ts	alpha-code	5	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/ui-mac/src/main/codepuppy-config-injection.ts	alpha-web	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/ui-mac/src/main/codepuppy-config-injection.ts	alpha-platform	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/ui-mac/src/main/codepuppy-endpoints.ts	alpha-gateway.tidelabs.click	1	external-anchor	Cloudflare worker / 主机名(alpha-gateway / alpha-cloud.tidelabs.click),owner D2 未裁,不改
@@ -928,7 +928,7 @@ packages/ui-mac/src/main/engine-config-truth-boot.ts	.alpha	1	retired-guard	认�
 packages/ui-mac/src/main/engine-config-truth-boot.ts	.alpha-bak-	1	migration-source	清理用户盘上旧版留下的 *.alpha-bak-* 残留文件,识别旧名才能删掉它们
 packages/ui-mac/src/main/engine-config-truth-boot.ts	opencode.jsonc.alpha-bak opencode.json.alpha-bak	1	migration-source	清理用户盘上旧版留下的 *.alpha-bak-* 残留文件,识别旧名才能删掉它们
 packages/ui-mac/src/main/engine-config-truth.ts	alpha-keychain	1	migration-source	旧版配置文件里的钥匙串标记识别器(PROVIDER_KEYCHAIN_MARKER),派发书判断点 1:持久化取值不改值
-packages/ui-mac/src/main/engine-explicit-config.ts	alpha-code	3	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+packages/ui-mac/src/main/engine-explicit-config.ts	alpha-code	4	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/ui-mac/src/main/ext-cas.ts	jinjunnn/alpha-work	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/ui-mac/src/main/ext-install-planner.ts	jinjunnn/alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/ui-mac/src/main/ext-seed.ts	:alpha-web	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
@@ -1018,6 +1018,7 @@ packages/ui-mac/src/main/process-fence-workspaces.ts	/code-puppy	1	user-content	
 packages/ui-mac/src/main/rail-preview-host.ts	alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/ui-mac/src/main/release-manifest.ts	alpha-work	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/ui-mac/src/main/remote-catalog.ts	alpha-web	2	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+packages/ui-mac/src/main/server.ts	alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/ui-mac/src/main/server.ts	/code-puppy	1	user-content	用户默认工作目录 ~/code-puppy:owner 现有工作区与绑定它的会话(派发书判断点 1)
 packages/ui-mac/src/main/source-text-anchors.ts	/code-puppy	1	user-content	用户默认工作目录 ~/code-puppy:owner 现有工作区与绑定它的会话(派发书判断点 1)
 packages/ui-mac/src/main/source-text-anchors.ts	alpha-code	1	historical	说明品牌守卫要拦的旧应用名 alpha-code(应用名本身由 #1571 改)

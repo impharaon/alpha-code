@@ -55,7 +55,8 @@ import {
 import { providerAllowList, publishProviderAllowList } from "../../../ext/src/provider-allow"
 import { publishTestBootstrap, testCloudMcp, unpublishTestBootstrap } from "../../test-component/codepuppy-bootstrap-fixture"
 import type { CodePuppyBootstrap } from "@opencode/util/codepuppy-bootstrap"
-import { handOverCredentials } from "../../test-component/credential-table"
+import { handOverCredentials, mainCredentialTable } from "../../test-component/credential-table"
+import { publishCodePuppyCredentials } from "@opencode/util/codepuppy-credentials"
 const CLOUD_DISPATCH_TOOL_ID = cloudMcpToolId("cloud_dispatch")
 
 // 注入读到的每一个 env 输入 + 它自己写出的 env 输出:逐个快照/清空/还原,
@@ -493,6 +494,30 @@ describe("injectCodePuppyConfig —— 注入组合体的执行级闸门(#607)",
     const { config } = inject(EXT_DIR)
     expect(config.providers?.codepuppy?.settings?.apiKey).toBe(PLATFORM_API_KEY_PLACEHOLDER)
     expect(config.policies).toContainEqual({ action: "provider.use", resource: "codepuppy", effect: "allow" })
+  })
+
+  // SPEC-stored-credentials-fence §4.4 C-f(② 审查第 5 条 (ii)):sidecar 里的在场性只问主进程交来的表 —— 盘上有、表里没有 ⇒ 当作没有
+  test("C-f:自定义节点的 key 与云 MCP 令牌都在盘上、主进程交来的表里没有 ⇒ 节点不注入、不代付(云 MCP 定义不启用);表里有 ⇒ 注入、代付", () => {
+    givenLoggedInWithByok()
+    plantSecret("CODEPUPPY_MCP_TOKEN", "mcp-token-value")
+    doc.cloudMcpUrl = "https://cloud.example/mcp"
+    const truthPath = path.join(tmp, "codepuppy-state", "custom-providers", "dev.json")
+    fs.mkdirSync(path.dirname(truthPath), { recursive: true })
+    fs.writeFileSync(truthPath, JSON.stringify({ v: 1, providers: [{ id: "on-disk", name: "On Disk", compat: "openai", baseURL: "https://on-disk.example/v1", models: ["m"] }] }))
+    plantSecret(customProviderSecretName("on-disk"), "sk-on-disk-only")
+    const injectWithTable = (table: Parameters<typeof publishCodePuppyCredentials>[0]) => {
+      publishDoc()
+      writeEngineConfigForFork(codepuppyBootstrap())
+      publishCodePuppyCredentials(table)
+      return JSON.parse(injectCodePuppyConfig(userData, EXT_DIR, "stable", codepuppyBootstrap().paths.userConfig ?? null).config.content) as Injected
+    }
+    const withoutTable = injectWithTable({})
+    expect(withoutTable.providers?.["on-disk"]).toBeUndefined()
+    expect(withoutTable.mcp?.servers?.codepuppy).toHaveProperty("disabled", true)
+    handOverCredentials(userData)
+    const withTable = injectWithTable(mainCredentialTable())
+    expect(withTable.providers?.["on-disk"]).toBeDefined()
+    expect(withTable.mcp?.servers?.codepuppy).not.toHaveProperty("disabled")
   })
 
   test("反向闸门:注入内部抛错时失败必须出声、以 ok:false 离开,产物只剩治理底线,且正向闸门的断言体真的转红", () => {

@@ -24,8 +24,8 @@ import { buildCodePuppyBootstrap, usableExportedPaths } from "./codepuppy-bootst
 import { exportedFlag } from "@opencode/util/codepuppy-bootstrap"
 import { factorySkillDirsForFork } from "./factory-skills"
 import { resourcesRoot } from "./ext-fs-installer"
-import { credentialStores, readCredentialTable, syncSecretFiles } from "./codepuppy-secret-files"
-import { officialRuntimeParent } from "./official-connector-recipes"
+import { syncSecretFiles } from "./codepuppy-secret-files"
+import { buildCredentialTable } from "./codepuppy-credential-table"
 import { answerCredentialsMessage, type CredentialsMessage } from "./sidecar-credentials"
 import { customProviderSecretValues } from "./codepuppy-byok-keys"
 import { ignoredConfigProviderBlocks, ignoredConfigRemoteMcpEntries } from "./ext-config"
@@ -160,22 +160,8 @@ type SpawnLocalServerOptions = {
   requestRespawn?: (trigger: "credential-change") => void
 }
 
-/**
- * DESIGN-stored-credentials-fence §4.3:Code Puppy 凭据存放点的整表,主进程现读。官方连接器运行期目录算不出(那里本来就没有官方运行期)⇒
- * 不给该项。T1(start)、回复拉取(P)与续期推送(T2)都用它;不记录任何值,软链条目与读不出的条目只记路径(实现期修订 1:从不抛)。
- * `log` 由每一代自己的去重包一层,同一行每代只记一次。
- */
-function credentialTable(userDataPath: string, log: (line: string) => void) {
-  let runtimeParent: string | undefined
-  if (tryGetCodePuppyEnvironment()) {
-    try {
-      runtimeParent = officialRuntimeParent(codepuppyGlobalRoot())
-    } catch {
-      runtimeParent = undefined
-    }
-  }
-  return readCredentialTable(credentialStores({ userDataPath, ...(runtimeParent ? { officialRuntimeParent: runtimeParent } : {}) }), log)
-}
+/** DESIGN-stored-credentials-fence §4.3:T1 / P / T2 的整表(codepuppy-credential-table.ts,测试里扮演 main 的也用它)。 */
+const credentialTable = buildCredentialTable
 
 // T2:当前这一代 sidecar 的推送口(start 发出之后才有;子进程退出即撤)。
 let pushCredentialTable: (() => void) | undefined

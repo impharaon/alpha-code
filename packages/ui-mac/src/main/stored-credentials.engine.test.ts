@@ -4,7 +4,7 @@
 import { expect, test } from "bun:test"
 import { join } from "node:path"
 
-test("凭据经装载前拉取从内存表来;运行中新增 / 删除 / 表与盘不同都按表;扣住的回复不让另一 Location 用旧值;超时与端口关闭不用旧表并请求 credential-change(stored-credentials.engine.cases.ts,3 条)", async () => {
+test("凭据经装载前拉取从内存表来;运行中新增 / 删除 / 表与盘不同都按表;扣住的回复不让另一 Location 用旧值;超时与端口关闭不用旧表并请求 credential-change;存放点里一项读不出不挡引擎(stored-credentials.engine.cases.ts,4 条)", async () => {
   const child = Bun.spawn({
     cmd: [process.execPath, "test", "--timeout", "200000", join(import.meta.dir, "stored-credentials.engine.cases.ts")],
     cwd: join(import.meta.dir, "../.."),
@@ -16,5 +16,5 @@ test("凭据经装载前拉取从内存表来;运行中新增 / 删除 / 表与�
   const output = `${stdout}${stderr}`
   if (exitCode !== 0) throw new Error(output)
   expect(output.match(/(\d+) fail\b/)?.[1], output).toBe("0")
-  expect(output.match(/(\d+) pass\b/)?.[1], output).toBe("3")
+  expect(output.match(/(\d+) pass\b/)?.[1], output).toBe("4")
 }, 400_000)

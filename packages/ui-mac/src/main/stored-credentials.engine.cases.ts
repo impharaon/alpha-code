@@ -218,3 +218,23 @@ test(`AC-05 / E12:main ${CREDENTIALS_PULL_TIMEOUT_MS / 1000} 秒不回复 ⇒ �
   wire.close("sidecar stopping")
   expect((await closing).token).toBe("FAKE-CRED-alpha-after-close")
 }, 180_000)
+
+test("实现期修订 1:存放点里一项读不出(mode 000)⇒ 引擎照常起,别的凭据照常(连接器拿到令牌);那一项按不在表里处理,不请求重启", async () => {
+  const name = "stored-unreadable"
+  const userData = path.join(sandbox.root, `${name}-userdata`)
+  const locked = writeMcpSecretVersioned(userData, "zz", "v-0000aaaa", "TOKEN", "FAKE-CRED-locked")
+  if (!locked.ok) throw Error(locked.reason)
+  const lockedFile = locked.ref.slice("{file:".length, -1)
+  fs.chmodSync(lockedFile, 0o000)
+  try {
+    const m = await machine(name)
+    const wire = channel()
+    wire.install()
+    expect(await m.load()).toEqual({ status: "connected", token: "FAKE-CRED-alpha-1" })
+    const { mainCredentialTable: table } = await import("../../test-component/credential-table")
+    expect(table()[lockedFile]).toBeUndefined()
+    expect(wire.respawns).toEqual([])
+  } finally {
+    fs.chmodSync(lockedFile, 0o600)
+  }
+}, 120_000)

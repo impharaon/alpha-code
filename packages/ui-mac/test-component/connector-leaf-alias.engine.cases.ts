@@ -195,7 +195,7 @@ test("AC-04: enabling connectors in settings substitutes only each connector's o
   for (const value of [...Object.values(FAKE), `sk-cp-${name}`]) for (const line of logged) expect(line.includes(value)).toBe(false)
 }, 120_000)
 
-test("① 审查 R1 第 3 条 / 第 7 条:存放点里有一项读不出(EACCES)⇒ 不带 {file:} 的连接器照常应用;带 {file:} 的这次应用为不可用,不退回无条件读文件", async () => {
+test("① 审查 R1 第 3 / 7 条、实现期修订 1:连接器自己的令牌读不出(EACCES)⇒ 不带 {file:} 的连接器照常应用;带 {file:} 的照常应用、那个引用为空,不退回无条件读文件", async () => {
   const name = "leaf-unreadable"
   const userData = path.join(sandbox.root, `${name}-userdata`)
   const root = path.join(sandbox.root, `${name}-state`, "codepuppy-state", "env", "dev")
@@ -219,12 +219,11 @@ test("① 审查 R1 第 3 条 / 第 7 条:存放点里有一项读不出(EACCES)
   })
   const running = await host.start()
   engines.push(running)
-  // an entry in a store that main cannot read
-  const locked = writeMcpSecretVersioned(userData, "zz", "v-0000aaaa", "LOCKED", "FAKE-CRED-locked")
-  if (!locked.ok) throw Error(locked.reason)
-  fs.chmodSync(locked.ref.slice("{file:".length, -1), 0o000)
+  // secretc's own token becomes unreadable for main (mode 000): that entry is absent from the table (design amendment 1)
+  const lockedFile = own.ref.slice("{file:".length, -1)
+  fs.chmodSync(lockedFile, 0o000)
   const connection: EngineConnection = { url: running.url, username: "opencode", password: `cp-${name}` }
-  const added = new Set<string>()
+  const added = new Map<string, { config: { environment?: Record<string, string> } }>()
   const proxy = Bun.serve({
     hostname: "127.0.0.1",
     port: 0,
@@ -232,7 +231,7 @@ test("① 审查 R1 第 3 条 / 第 7 条:存放点里有一项读不出(EACCES)
       const url = new URL(request.url)
       const body = request.method === "GET" || request.method === "HEAD" ? undefined : await request.arrayBuffer()
       const server = /^\/api\/experimental\/mcp\/([^/]+)$/.exec(url.pathname)?.[1]
-      if (request.method === "PUT" && server) added.add(decodeURIComponent(server))
+      if (request.method === "PUT" && server && body) added.set(decodeURIComponent(server), JSON.parse(new TextDecoder().decode(body)))
       return fetch(new Request(new URL(url.pathname + url.search, connection.url), { method: request.method, headers: request.headers, body }))
     },
   })
@@ -250,9 +249,10 @@ test("① 审查 R1 第 3 条 / 第 7 条:存放点里有一项读不出(EACCES)
     }
   } finally {
     proxy.stop(true)
-    fs.chmodSync(locked.ref.slice("{file:".length, -1), 0o600)
+    fs.chmodSync(lockedFile, 0o600)
   }
-  expect([...added]).toEqual(["plainc"])
+  expect([...added.keys()].sort()).toEqual(["plainc", "secretc"])
+  expect(added.get("secretc")?.config.environment).toEqual({ TOKEN: "" })
   expect(results.plainc!.every((result) => result.status !== "unavailable")).toBe(true)
-  expect(results.secretc!.map((result) => result.status)).toEqual(results.secretc!.map(() => "unavailable"))
+  expect(results.secretc!.every((result) => result.status !== "unavailable")).toBe(true)
 }, 120_000)

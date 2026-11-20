@@ -730,28 +730,46 @@ describe("spawnLocalServer", () => {
     delete process.env.CODEPUPPY_API_KEY
   })
 
-  test("I-20:拉取时主进程读不出表 ⇒ 回 error(不含值)并请求 credential-change;fork 时读不出表 ⇒ 本代失败、子进程被杀", async () => {
+  // 实现期修订 1(编排器裁决 2026-11-20,② 审查区外观察):存放点里单项读不出或目录列不出 ⇒ 按该项不在表里处理并记名字,不拒 fork、不回错误
+  test("I-20 修订 1:存放点里一项读不出(mode 000)、一个目录列不出(mode 000)⇒ start 照常带其余整表;拉取照常回复(不回 error、不请求重启);日志点名路径与 errno、不含值", async () => {
+    process.env.CODEPUPPY_API_KEY = "FAKE-platform-readable"
+    const store = join(userDataPath, "codepuppy-mcp-secrets")
+    const readable = join(store, "alpha", "v-0000aaaa", "OK")
+    const locked = join(store, "alpha", "v-0000aaaa", "TOKEN")
+    const unlistable = join(store, "bravo")
+    mkdirSync(join(unlistable, "v-0000aaaa"), { recursive: true })
+    writeFileSync(join(unlistable, "v-0000aaaa", "TOKEN"), "FAKE-behind-unlistable")
+    mkdirSync(join(store, "alpha", "v-0000aaaa"), { recursive: true })
+    writeFileSync(readable, "FAKE-readable-connector")
+    writeFileSync(locked, "FAKE-locked")
+    chmodSync(locked, 0o000)
+    chmodSync(unlistable, 0o000)
     const child = new CredentialChild()
     const respawns: string[] = []
-    const result = await spawnWith(child, respawns)
-    await result.health.wait
-    const store = join(userDataPath, "codepuppy-mcp-secrets")
-    writeFileSync(store, "not a directory")
-    child.emit("message", { type: "credentials.request", id: 3 })
-    expect(child.posted.at(-1)).toEqual({ type: "credentials", id: 3, error: "credential table unavailable" })
-    expect(respawns).toEqual(["credential-change"])
-    await result.listener.stop()
-
-    const doomed = new CredentialChild()
-    let killed = 0
-    doomed.kill = () => {
-      killed++
-      queueMicrotask(() => doomed.emit("exit", 0))
+    warned.length = 0
+    try {
+      const result = await spawnWith(child, respawns)
+      await result.health.wait
+      const start = child.posted.find((message) => message.type === "start")!
+      expect(start.credentials[secretFilePath(userDataPath, "CODEPUPPY_API_KEY")]?.value).toBe("FAKE-platform-readable")
+      expect(start.credentials[readable]?.value).toBe("FAKE-readable-connector")
+      expect(start.credentials[locked]).toBeUndefined()
+      expect(Object.keys(start.credentials).some((key) => key.startsWith(unlistable))).toBe(false)
+      child.emit("message", { type: "credentials.request", id: 3 })
+      expect(child.posted.at(-1)).toMatchObject({ type: "credentials", id: 3 })
+      expect(child.posted.at(-1)!.credentials[locked]).toBeUndefined()
+      expect(child.posted.at(-1)!.credentials[readable]?.value).toBe("FAKE-readable-connector")
+      expect(respawns).toEqual([])
+      expect(warned.filter((line) => line.includes(locked) && line.includes("EACCES"))).toHaveLength(1) // once per generation, not per pull
+      expect(warned.filter((line) => line.includes(unlistable) && line.includes("EACCES"))).toHaveLength(1)
+      for (const line of warned) expect(line.includes("FAKE-")).toBe(false)
+      await result.listener.stop()
+    } finally {
+      chmodSync(locked, 0o600)
+      chmodSync(unlistable, 0o700)
+      rmSync(store, { recursive: true, force: true })
+      delete process.env.CODEPUPPY_API_KEY
     }
-    await expect(spawnWith(doomed, [])).rejects.toThrow(/Code Puppy credential table could not be read — sidecar start refused/)
-    expect(doomed.posted.some((message) => message.type === "start")).toBe(false)
-    expect(killed).toBe(1)
-    rmSync(store)
   })
 
   // SPEC-engine-config-fence BR-03 / AC-05 第一句(DESIGN-engine-config-fence §4.4、§5):显式文件、模型底表与种子由 main 在 fork 前写;

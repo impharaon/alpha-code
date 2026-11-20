@@ -564,3 +564,24 @@ test("userData itself is a symlink living in a project: protected files are refu
   for (const marker of ["RM-FAILED", "MV-LINK-FAILED", "MV-APPS-FAILED", "OTHERS-OK"]) expect(result.out, result.out).toContain(marker)
   expect(readFileSync(join(link, "codepuppy.env"), "utf8")).toBe("FAKE=1\n")
 })
+
+test("终审第 2 条: CODEPUPPY_ENV_FILE=/dev/null — the plan emits no row for it, so the fenced tree can still write /dev/null and spawn children with ignored stdio", () => {
+  const t = tree("devnull")
+  const plan = planFor(t, { envFile: "/dev/null" })
+  const result = fenced(
+    plan.profile,
+    [
+      "/bin/sh",
+      "-c",
+      [
+        "echo x > /dev/null && echo DEVNULL-OK || echo DEVNULL-FAILED",
+        "/usr/bin/true < /dev/null > /dev/null 2>&1 && echo REDIRECT-OK || echo REDIRECT-FAILED",
+        `'${process.execPath}' -e 'const r = require("node:child_process").spawnSync("/usr/bin/true", [], { stdio: "ignore" }); console.log(r.status === 0 ? "SPAWN-IGNORE-OK" : "SPAWN-IGNORE-FAILED " + r.error)'`,
+      ].join("\n"),
+    ],
+    t.ws,
+  )
+  console.log(`[devnull] ${result.out.split("\n").filter((line) => /-(OK|FAILED)/.test(line)).join(" | ")}`)
+  for (const marker of ["DEVNULL-OK", "REDIRECT-OK", "SPAWN-IGNORE-OK"]) expect(result.out, result.out).toContain(marker)
+  expect(processFenceWriteRules(plan.profile).deny.filter((rule) => rule.value.startsWith("/dev"))).toEqual([])
+})

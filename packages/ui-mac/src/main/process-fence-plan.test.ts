@@ -262,6 +262,20 @@ describeDarwin("planProcessFence", () => {
     expect(() => planProcessFence(quoted.input, quoted.deps)).not.toThrow()
   })
 
+  test("终审第 2 条:CODEPUPPY_ENV_FILE=/dev/null(或别的 /dev 下的路径)⇒ 不出这一行 —— 拒写 /dev/null 会让引擎与子进程的 >/dev/null、忽略的 stdio 全部失败", () => {
+    const baseline = processFenceWriteRules(planProcessFence(harness().input, harness().deps).profile).deny
+    for (const envFile of ["/dev/null", "/dev/fd/3", "/dev/stdout"]) {
+      const h = harness()
+      h.input.envFile = envFile
+      const deny = processFenceWriteRules(planProcessFence(h.input, h.deps).profile).deny
+      expect([envFile, deny]).toEqual([envFile, baseline])
+    }
+    // 软链指到 /dev/null 也一样:真实路径在 /dev 下就不出这一行(链本身也不冻结)
+    const linked = harness({ realpath: (p) => (p === `${HOME}/cp.env` ? "/dev/null" : p) })
+    linked.input.envFile = `${HOME}/cp.env`
+    expect(processFenceWriteRules(planProcessFence(linked.input, linked.deps).profile).deny).toEqual(baseline)
+  })
+
   test("修订 2 A:文件在工作区里 ⇒ 工作区照常可写,只有那份文件与它路径上的目录节点被拒;同一文件夹里别的文件、子文件夹照常", () => {
     const h = harness()
     h.input.envFile = `${HOME}/proj-a/conf/cp.env`

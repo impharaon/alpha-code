@@ -114,6 +114,39 @@ describe("codepuppy(I-20) config load: the in-process table at the closed list o
     ),
   )
 
+  it.live("② review item 4: an explicit-slot document that is JSONC (a comment and a trailing comma — the user's raw codepuppy.jsonc when injection failed) still gets its closed positions from the table", () =>
+    withTempDir((tmp) =>
+      Effect.gen(function* () {
+        const s = stores(tmp.path)
+        yield* Effect.promise(() => writeDisk(s.own, "FAKE-disk-alpha"))
+        installCodePuppyCredentialSource(async () => ({ [s.own]: { value: "FAKE-table-alpha", use: { kind: "connector", server: "alpha" } } }))
+        const explicit = path.join(tmp.path, "explicit.jsonc")
+        yield* Effect.promise(() =>
+          fs.writeFile(explicit, `{
+  // the user's own connector
+  "mcp": { "alpha": { "type": "local", "command": ["alpha-mcp"], "environment": { "OWN": "{file:${s.own}}", }, }, },
+}
+`),
+        )
+        expect(yield* loadEntries(tmp.path, { file: explicit })).toContain('"OWN":"FAKE-table-alpha"')
+      }),
+    ),
+  )
+
+  it.live("② review item 5 (i): a BYOK provider's settings.apiKey in the inline document takes the table's value, not the disk's", () =>
+    withTempDir((tmp) =>
+      Effect.gen(function* () {
+        const s = stores(tmp.path)
+        yield* Effect.promise(() => writeDisk(s.platform, "FAKE-disk-byok"))
+        installCodePuppyCredentialSource(async () => ({ [s.platform]: { value: "FAKE-table-byok", use: { kind: "inline" } } }))
+        const content = JSON.stringify({ providers: { deepseek: { package: "aisdk:@ai-sdk/openai-compatible", settings: { baseURL: "https://api.deepseek.invalid/v1", apiKey: `{file:${s.platform}}` } } } })
+        const entries = yield* loadEntries(tmp.path, { content })
+        expect(entries).toContain('"apiKey":"FAKE-table-byok"')
+        expect(entries).not.toContain("FAKE-disk-byok")
+      }),
+    ),
+  )
+
   it.live("a failed pull substitutes nothing — never the table published before — and the next load pulls again", () =>
     withTempDir((tmp) =>
       Effect.gen(function* () {

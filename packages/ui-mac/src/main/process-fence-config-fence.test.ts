@@ -14,7 +14,7 @@ test.skipIf(process.platform !== "darwin")("AC-01 protected configuration locati
     const output = `${stdout}${stderr}`
     writeFileSync(join(base, "results", `${basename(run)}.log`), output.slice(-65536))
     expect(code, output).toBe(0)
-    expect(output.match(/(\d+) pass\b/)?.[1], output).toBe("12")
+    expect(output.match(/(\d+) pass\b/)?.[1], output).toBe("13")
     expect(output.match(/(\d+) fail\b/)?.[1], output).toBe("0")
   } finally {
     rmSync(run, { recursive: true, force: true })

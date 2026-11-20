@@ -585,3 +585,33 @@ test("终审第 2 条: CODEPUPPY_ENV_FILE=/dev/null — the plan emits no row fo
   for (const marker of ["DEVNULL-OK", "REDIRECT-OK", "SPAWN-IGNORE-OK"]) expect(result.out, result.out).toContain(marker)
   expect(processFenceWriteRules(plan.profile).deny.filter((rule) => rule.value.startsWith("/dev"))).toEqual([])
 })
+
+test("终审第 3 条: a two-hop link chain inside a project (XDG_CONFIG_HOME = W/a/b, W/a → W/real-a, W/real-a/b → the real config) — swapping W/real-a for a staged folder whose b points elsewhere is refused; known bad — without the real-location chain of each configured node the swap lands and the engine would read another configuration", () => {
+  const setup = () => {
+    const t = tree("twohop")
+    const W = t.ws
+    mkdirSync(join(W, "cfg-real", "opencode"), { recursive: true })
+    writeFileSync(join(W, "cfg-real", "opencode", "opencode.json"), "{}")
+    mkdirSync(join(W, "evil", "opencode"), { recursive: true })
+    writeFileSync(join(W, "evil", "opencode", "opencode.json"), '{"plugin":["evil"]}')
+    mkdirSync(join(W, "real-a"), { recursive: true })
+    symlinkSync(join(W, "cfg-real"), join(W, "real-a", "b"))
+    symlinkSync(join(W, "real-a"), join(W, "a"))
+    return { t, W, configHome: join(W, "a", "b") }
+  }
+  const swap = (W: string) => `mkdir '${W}/stage' && ln -s '${W}/evil' '${W}/stage/b' && mv '${W}/real-a' '${W}/old' && mv '${W}/stage' '${W}/real-a'`
+  const arm = (transform: (profile: string, W: string) => string) => {
+    const x = setup()
+    const plan = planFor(x.t, { configHome: x.configHome })
+    const result = fenced(transform(plan.profile, realpathSync(x.W)), ["/bin/sh", "-c", `(${swap(x.W)}) && echo SWAP-OK || echo SWAP-FAILED`], x.t.ws)
+    return { landed: result.out.includes("SWAP-OK"), reads: readFileSync(join(x.configHome, "opencode", "opencode.json"), "utf8"), profile: plan.profile, W: realpathSync(x.W) }
+  }
+  const production = arm((profile) => profile)
+  console.log(`[two-hop production] ${JSON.stringify({ landed: production.landed, reads: production.reads })}`)
+  expect({ landed: production.landed, reads: production.reads }).toEqual({ landed: false, reads: "{}" })
+  expect(processFenceWriteRules(production.profile).deny).toContainEqual({ kind: "literal", value: `${production.W}/real-a` })
+  // known bad: today's (pre-fix) computation — the configured path's nodes only, not the real-location chain of each node
+  const withoutChain = (profile: string, W: string) => profile.split("\n").map((line) => (line.includes("; CF 上级目录节点") ? line.replace(` (literal "${W}/real-a")`, "") : line)).join("\n")
+  const bad = arm(withoutChain)
+  expect({ landed: bad.landed, reads: bad.reads }).toEqual({ landed: true, reads: '{"plugin":["evil"]}' })
+})

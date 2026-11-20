@@ -337,6 +337,22 @@ describeDarwin("planProcessFence", () => {
     expect(plan.configFenceRoots).toContain(`${HOME}/real-cfg/opencode`)
   })
 
+  test("终审第 3 条:两跳软链(配置路径 W/a/b,W/a → W/real-a,W/real-a/b → 真实目录)⇒ 每个配置路径节点所在真实位置的上级链也冻结(W/real-a 在内)", () => {
+    const W = `${HOME}/proj-a`
+    const realpath = (p: string) => {
+      for (const [from, to] of [[`${W}/a/b`, `${W}/cfg-real`], [`${W}/real-a/b`, `${W}/cfg-real`], [`${W}/a`, `${W}/real-a`]] as const)
+        if (p === from || p.startsWith(`${from}/`)) return to + p.slice(from.length)
+      return p
+    }
+    const h = harness({ realpath })
+    h.input.sidecarEnv = { HOME, XDG_CONFIG_HOME: `${W}/a/b` }
+    h.input.engineConfigDirectory = `${W}/a/b/opencode`
+    const deny = processFenceWriteRules(planProcessFence(h.input, h.deps).profile).deny
+    expect(deny).toContainEqual({ kind: "subpath", value: `${W}/cfg-real/opencode` })
+    for (const node of [`${W}/a`, `${W}/real-a/b`, `${W}/real-a`, W]) expect(deny, node).toContainEqual({ kind: "literal", value: node })
+    expect(new Set(deny.map((rule) => `${rule.kind}:${rule.value}`)).size).toBe(deny.length)
+  })
+
   test("修订 2 B:两种写法指同一个节点按身份去重(大小写变体 ⇒ 只列真实写法);配置路径与真实路径相同 ⇒ 规则与上级目录块不变", () => {
     const upper = `${HOME}/PROJ-A`
     const realpath = (p: string) => {

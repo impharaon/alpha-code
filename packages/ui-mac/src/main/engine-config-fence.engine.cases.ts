@@ -409,6 +409,8 @@ async function shellPolicyAttacks(m: Machine, turns: ReturnType<typeof engineTur
   )
   const outcomes = result.tool.match(/A3-(OVERWRITE|MOVE|BESIDE)-(LANDED|REFUSED)/g) ?? []
   console.log(`[A3 shell ${ARM}] ${JSON.stringify(outcomes)}`)
+  // the host's window-completeness trace: only this last shell command touches that name (the fenced direct-write child writes elsewhere)
+  console.log(`CF-ENGINE-A3-BESIDE ${path.basename(beside)}`)
   return { outcomes, tool: result.tool, beside }
 }
 

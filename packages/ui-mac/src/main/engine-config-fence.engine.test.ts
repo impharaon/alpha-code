@@ -61,11 +61,16 @@ test.skipIf(process.platform !== "darwin")("AC-04 / AC-06 / AC-08 real engine in
     // E5: the system sandbox log for the production run
     const meta = JSON.parse(outputs.production!.match(/^CF-ENGINE (\{.*\})$/m)![1]!) as { pid: number; deny: Deny[]; sandboxRoot: string }
     // the kernel's reports reach the log store asynchronously: read until the calibration entries are there (bounded), then judge that read
-    // 片 ③:the last attacks inside the window are the conversation's shell rewrites of the tool policy document; the reading is judged
-    // only once their denials are in the log, so it covers the whole window (the settings-page writes through main come just before them)
+    // 片 ③:the window's last denial is the conversation's last shell command — a new document BESIDE the policy file (cases
+    // shellPolicyAttacks prints its name). The reading is judged only once THAT denial is in the log: any denial in the tool policy
+    // directory would not do, because the fenced direct-write child (E6 known bad) writes there earlier (审查 R1 Minor). Everything
+    // judged in the window — the settings-page writes through main, the direct write, the shell attacks — comes before it.
     const policyRules = meta.deny.filter((rule) => rule.kind === "subpath" && rule.value.endsWith("/codepuppy-tool-policy"))
     expect(policyRules).toHaveLength(1)
-    const lastInWindow = (denial: { pid: number; path: string }) => denial.pid !== meta.pid && inProtected(policyRules, denial.path)
+    const besideName = outputs.production!.match(/^CF-ENGINE-A3-BESIDE (\S+)$/m)?.[1]
+    expect(besideName, "the production arm prints the name of its last shell attack's target").toBeDefined()
+    const besideTarget = join(policyRules[0]!.value, besideName!)
+    const lastInWindow = (denial: { pid: number; path: string }) => denial.pid !== meta.pid && denial.path === besideTarget
     let denials: Array<{ process: string; pid: number; operation: string; path: string }> = []
     for (let attempt = 0; attempt < 10; attempt++) {
       await Bun.sleep(3_000)
@@ -86,7 +91,7 @@ test.skipIf(process.platform !== "darwin")("AC-04 / AC-06 / AC-08 real engine in
     writeFileSync(join(base, "results", "sandbox-denials.json"), JSON.stringify({ window, enginePid: meta.pid, fromEngine, fromChildren }, null, 1))
     console.log(`[E5] engine pid ${meta.pid}: ${fromEngine.length} protected-location write denials; its fenced children (the attacks): ${fromChildren.length}`)
     expect(fromChildren.length, "calibration: the attack commands' denials must be in the log, or the log was not read").toBeGreaterThan(0)
-    expect(fromChildren.some(lastInWindow), "calibration: the window's last attacks (the shell rewrites of the tool policy document) must be in the log").toBe(true)
+    expect(fromChildren.some(lastInWindow), `calibration: the window's last denial (the shell attack creating ${besideTarget}) must be in the log`).toBe(true)
     expect(fromEngine).toEqual([])
 
     // 片 ③:after the window end the write tool (inside the engine process) attacked the tool policy directory — that denial from the

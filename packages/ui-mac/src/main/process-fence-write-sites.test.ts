@@ -46,7 +46,17 @@ const MAIN_ONLY_SITES = [
   ["ext-receipt-v2.ts", "renameSync", "file"],
   ["ext-receipt-v2.ts", "unlinkSync", "file"],
   ["ext-receipt-v2.ts", "writeFileSync", "evidence"],
-].map(([file, api, firstArg]) => signatureOf({ file: `packages/ui-mac/src/main/${file}`, api: api!, firstArg: firstArg! }))
+]
+  .map(([file, api, firstArg]) => signatureOf({ file: `packages/ui-mac/src/main/${file}`, api: api!, firstArg: firstArg! }))
+  .concat(
+    // SPEC-engine-config-fence BR-03 / 片 ③(DESIGN §4.5):工具策略文档的两个写者 —— 在应用里只由 main 经窄消息调用(server.ts → receiveToolPolicyWrite)
+    [
+      ["packages/ext/src/policy/store.ts", "mkdirSync", "path.dirname(file)"],
+      ["packages/ext/src/policy/store.ts", "renameSync", "file"],
+      ["packages/ext/src/policy/store.ts", "renameSync", "tmp"],
+      ["packages/ext/src/policy/store.ts", "writeFileSync", "tmp"],
+    ].map(([file, api, firstArg]) => signatureOf({ file: file!, api: api!, firstArg: firstArg! })),
+  )
 
 /** 一个源文件从某个模块拿到的值绑定(静态 import 与 `await import()` 的解构;整块拿 = "*";type-only 不算)。 */
 function valueImports(rel: string, module: RegExp): { names: string[]; source: ts.SourceFile } {
@@ -88,6 +98,26 @@ describe("I2:main-only 写者在 sidecar 闭包里没有调用方", () => {
     expect(offenders).toEqual([])
     // 手段是活的:注入模块确实从那里拿路径函数(拿到的只有读的)
     expect(importers).toContain("packages/ui-mac/src/main/codepuppy-config-injection.ts")
+  })
+
+  // 片 ③(DESIGN §4.5、§4.7;措辞经编排器接受):§4.5 冻结的缺省写者(CLI 与单测用)就在 resolver.ts 里直接调这两个写者,而 resolver.ts 在闭包里 ——
+  // 所以判据是「闭包里拿到它们的只有 resolver.ts」;生产里 registerPolicy 在有 parentPort 时传 main 的写者(插件宿主与 RPC 用例判)。
+  test("闭包里拿到工具策略写者 savePolicyDocument / resetPolicyDocument 的只有 resolver.ts(缺省写者);没有文件拿到 main 侧的接收函数 receiveToolPolicyWrite,也没有文件整块 import store.ts", () => {
+    const writers = new Set(["savePolicyDocument", "resetPolicyDocument"])
+    const holders: string[] = []
+    const importers: string[] = []
+    const offenders: string[] = []
+    for (const rel of closure) {
+      if (rel.endsWith("/ext/src/policy/store.ts")) continue
+      const { names } = valueImports(rel, rel.startsWith("packages/ext/src/policy/") ? /^\.\/store(\.ts)?$/ : /(^|\/)policy\/store(\.ts)?$/)
+      if (names.length) importers.push(rel)
+      if (names.some((name) => writers.has(name))) holders.push(rel)
+      for (const name of names) if (name === "receiveToolPolicyWrite" || name === "*" || name === "default") offenders.push(`${rel}: ${name}`)
+    }
+    expect(offenders).toEqual([])
+    expect(holders).toEqual(["packages/ext/src/policy/resolver.ts"])
+    // 手段是活的:闭包里确实有别的文件从 store.ts 拿值(只拿摘要函数)
+    expect(importers).toContain("packages/ext/src/policy/identity.ts")
   })
 
   test("闭包里对安装账本的读只有两处,都带 sideEffectFree: true(不写证据文件);闭包里没有文件拿到账本模块别的值", () => {

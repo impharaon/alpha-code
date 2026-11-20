@@ -1,4 +1,4 @@
-// SPEC-engine-config-fence AC-04 (without tool policy) and AC-06; DESIGN-engine-config-fence E3 (without A3), E5, E8. Run only through
+// SPEC-engine-config-fence AC-04, AC-05 (tool policy), AC-06, AC-08 ③; DESIGN-engine-config-fence E3, E5, E6, E8, E11. Run only through
 // engine-config-fence.engine.test.ts: the fence is process-lifetime, so every arm is its own `bun test` child (CODEPUPPY_CF_ENGINE_ARM).
 //
 // Real embedded engine + real ext + production injection (test-component/codepuppy-engine.ts, which writes the engine config the way
@@ -14,7 +14,13 @@
 //                document, settings store file, applied catalog): cold start the same; E5 (the sidecar-shaped injection inside the fence
 //                writes nothing; writing the explicit file from inside the fence is EPERM); A1a / A1b / A2 refused while model and
 //                connector calls work; install / disable / enable through main, a hand edit and a skill install apply without restart;
-//                restart works. The host reads the system sandbox log for this run (no protected-location denial from this pid).
+//                restart works. Tool policy (片 ③, A3 / E6): the settings page changes two rows at once, removes one and resets —
+//                through the production client → engine RPC → ext → hub bridge → this process's parent port → the unfenced "main"
+//                (main's production receiveToolPolicyWrite); ext writing directly inside the fence is EPERM; the conversation's shell
+//                rewrites of the document are refused. The host reads the system sandbox log for this run up to the window end the
+//                last test prints (no protected-location denial from this pid); after it, the conversation's write tool — running in
+//                the engine, so in this pid — is refused, and the host checks that this pid's denial on the tool policy directory is
+//                in the log (the reading sees engine-pid denials at all).
 //   fresh        fresh-machine shape (no <XDG_DATA_HOME>/opencode, no ~/.opencode, no codepuppy.jsonc): the planner pre-creates, main
 //                seeds, the engine starts and answers; ~/.opencode still absent. AC-08 (BR-07): in the 全部批准 tier with the plan agent
 //                chosen (request built by the composer, sent through the production adapter), the plan reminder names
@@ -23,6 +29,7 @@
 //   control      known bad: the production plan with the protected set removed (W2 / W6 put back as in 0.2.6) — the three attacks land.
 //                Note: here they land through W12, because the engine sandbox lives under the system temp root (/private/var/folders);
 //                the arm proves that without the blocks after the allow block nothing stops them, not that W2 / W6 are the row used.
+//                The same shell and write-tool rewrites of the tool policy document land (the echo tool stops asking).
 //   noprecreate  known bad: fresh-machine shape, the planner's mkdirp skips the protected directories — the engine cannot start (EPERM
 //                creating its global config directory).
 import { afterAll, beforeAll, describe, expect, test } from "bun:test"
@@ -44,7 +51,8 @@ import { readMcpLeafStrict } from "./ext-config"
 import { engineModelsPath, explicitConfigPath, writeExplicitConfig, type ExplicitLayer } from "./engine-explicit-config"
 import { injectCodePuppyConfig } from "./codepuppy-config-injection"
 import { pinAppliedCatalog, writeCatalogSnapshot } from "./codepuppy-live-allowlist"
-import { policyFilePath } from "../../../ext/src/policy/store"
+import { loadPolicyDocument, policyFilePath } from "../../../ext/src/policy/store"
+import { createToolPolicyClient } from "./tool-policy-client"
 import { defaultPolicyBaseDir } from "../../../ext/src/policy/resolver"
 import { policyWorkspace } from "../../../ext/src/policy/index"
 import { publishProviderAllowList, providerAllowList } from "../../../ext/src/provider-allow"
@@ -69,10 +77,16 @@ import path from "node:path"
 import readline from "node:readline"
 import { explicitSkillDirs, watchExplicitSources } from ${JSON.stringify(path.join(import.meta.dir, "engine-explicit-config.ts"))}
 import { writeConfigTextAtomic } from ${JSON.stringify(path.join(import.meta.dir, "ext-config.ts"))}
+import { receiveToolPolicyWrite } from ${JSON.stringify(path.join(import.meta.dir, "../../../ext/src/policy/store.ts"))}
 const input = JSON.parse(process.argv[1])
 const stop = watchExplicitSources({ file: input.file, root: input.root, userConfig: input.userConfig, layer: input.layer, skills: () => explicitSkillDirs(input.factoryDirs, input.root), log: (line) => process.stderr.write(line + "\\n") })
 readline.createInterface({ input: process.stdin }).on("line", (line) => {
   const message = JSON.parse(line)
+  // the engine's parent port (片 ③): main's production receiver writes the tool policy document and answers on the port
+  if (message.op === "port") {
+    receiveToolPolicyWrite(message.message, { baseDir: input.policyBaseDir, post: (reply) => process.stdout.write(JSON.stringify({ port: reply }) + "\\n"), log: (line) => process.stderr.write(line + "\\n") })
+    return
+  }
   try {
     if (message.op === "config") {
       const result = writeConfigTextAtomic(message.path, fs.readFileSync(message.path, "utf8"), message.text)
@@ -93,11 +107,12 @@ process.stdout.write(JSON.stringify({ id: 0, ok: true }) + "\\n")
 `
 
 /** The unfenced "main": spawned before the fence; production watcher + main's writes. */
-async function startMain(input: { file: string; root: string; userConfig?: string; layer: ExplicitLayer; factoryDirs: readonly string[] }) {
+async function startMain(input: { file: string; root: string; userConfig?: string; layer: ExplicitLayer; factoryDirs: readonly string[]; policyBaseDir: string }, onPort: (reply: unknown) => void) {
   const child = spawn(process.execPath, ["-e", MAIN, JSON.stringify(input)], { stdio: ["pipe", "pipe", "inherit"] })
   const waiting = new Map<number, (value: { ok?: true; error?: string }) => void>()
   readline.createInterface({ input: child.stdout! }).on("line", (line) => {
     const message = JSON.parse(line)
+    if (message.port) return onPort(message.port)
     waiting.get(message.id)?.(message)
     waiting.delete(message.id)
   })
@@ -116,6 +131,8 @@ async function startMain(input: { file: string; root: string; userConfig?: strin
     /** the user's editor rewriting the file in place. */
     edit: (file: string, text: string) => send("edit", file, text),
     stop: () => send("stop", "").catch(() => undefined).finally(() => child.kill()),
+    /** what the engine posts on its parent port, handed to main */
+    port: (message: unknown) => child.stdin!.write(`${JSON.stringify({ op: "port", message })}\n`),
   }
 }
 
@@ -156,6 +173,15 @@ async function machine(arm: Arm) {
     fs.writeFileSync(explicitConfigPath(userData), JSON.stringify({ mcp: { stale: { type: "local", command: ["/usr/bin/false"] } } }))
     fs.writeFileSync(engineModelsPath(userData), "{}")
   }
+  // 片 ③:the engine's parent port (Electron's utilityProcess port in production). The harness would install its own fake main; this one
+  // must be in place first: it hands the tool policy write requests to the unfenced "main" below (other requests are not answered here).
+  const portListeners: Array<(event: { data: unknown }) => void> = []
+  let toMain: ((message: unknown) => void) | undefined
+  if (!fresh)
+    (process as unknown as { parentPort?: unknown }).parentPort = {
+      postMessage: (message: unknown) => toMain?.(message),
+      on: (_event: string, listener: (event: { data: unknown }) => void) => void portListeners.push(listener),
+    }
   const host = codepuppyEngine({
     sandbox,
     name: NAME,
@@ -185,7 +211,11 @@ async function machine(arm: Arm) {
     policyTarget.file = policyFilePath(defaultPolicyBaseDir(path.join(roots.dataHome, "opencode")), policyTarget.partition)
     fs.mkdirSync(path.dirname(policyTarget.file), { recursive: true })
     fs.writeFileSync(policyTarget.file, JSON.stringify({ version: 1, partition: policyTarget.partition, records: [{ selector: { level: "class", class: "third-party-mcp" }, state: "enabled" }] }))
-    main = await startMain({ file: host.explicit.file, root: host.explicit.root, userConfig: host.explicit.userConfig, layer: host.explicit.layer, factoryDirs: bootstrap.skills.factoryDirs })
+    main = await startMain(
+      { file: host.explicit.file, root: host.explicit.root, userConfig: host.explicit.userConfig, layer: host.explicit.layer, factoryDirs: bootstrap.skills.factoryDirs, policyBaseDir: path.dirname(policyTarget.file) },
+      (reply) => queueMicrotask(() => portListeners.forEach((listener) => listener({ data: reply }))),
+    )
+    toMain = main.port
   }
 
   fs.mkdirSync(ROOT, { recursive: true })
@@ -193,7 +223,7 @@ async function machine(arm: Arm) {
   const resources = path.join(run, "resources")
   buildFenceAddon({ out: path.join(resources, "codepuppy-fence", "codepuppy_fence.node"), buildId: `cf-engine-${arm}-${Date.now()}` })
   const protectedDirectories = new Set(
-    configFenceLocations({ userDataPath: userData, appStateRoot: stateRoot, codepuppyGlobalRoot: globalRoot, engineConfigDirectory: configDir, configHome: roots.configHome, home })
+    configFenceLocations({ userDataPath: userData, appStateRoot: stateRoot, codepuppyGlobalRoot: globalRoot, engineConfigDirectory: configDir, configHome: roots.configHome, home, dataHome: roots.dataHome })
       .filter((location) => location.kind === "subpath")
       .map((location) => location.path),
   )
@@ -230,7 +260,9 @@ async function machine(arm: Arm) {
   const rules = processFenceWriteRules(profile)
   // the layout is honest: the engine sandbox is writable before the protected blocks (W12), the protected files are not after them
   expect(processFenceRulesCover({ allow: rules.allow, deny: [] }, sandbox.root), sandbox.root).toBe(true)
-  if (arm !== "control") for (const file of [explicitConfigPath(userData), jsonc, path.join(configDir, "opencode.json")]) expect(processFenceRulesCover(rules, file), file).toBe(false)
+  if (arm !== "control")
+    for (const file of [explicitConfigPath(userData), jsonc, path.join(configDir, "opencode.json"), policyFilePath(defaultPolicyBaseDir(path.join(roots.dataHome, "opencode")), { account: "a", workspace: "w" })])
+      expect(processFenceRulesCover(rules, file), file).toBe(false)
   fs.writeFileSync(path.join(run, "profile.sb"), profile)
   applyProcessFence({ addonPath: plan.addonPath, profile }, { insideDir: ws, outsideDir: run })
   console.log(`CF-ENGINE ${JSON.stringify({ arm, pid: process.pid, deny: rules.deny, sandboxRoot: sandbox.root })}`)
@@ -242,7 +274,8 @@ function engineTurns(m: Machine, running: () => Running) {
   const send = (method: string, route: string, body?: unknown) => running().send(method, route, body)
   const pending = async (sid: string) => ((await send("GET", `/api/session/${sid}/permission`)).json?.data ?? []) as Array<{ id: string; action: string }>
   const platformModel = Object.keys((m.host.content.providers.codepuppy?.models ?? {}) as Record<string, unknown>)[0] ?? "m"
-  async function turn(agent: string, name: string, args: Record<string, unknown>, modelRef = { id: platformModel, providerID: "codepuppy" }) {
+  /** `answer`: what the user replies to every approval this turn asks for (default: reject). */
+  async function turn(agent: string, name: string, args: Record<string, unknown>, modelRef = { id: platformModel, providerID: "codepuppy" }, answer: "reject" | "once" = "reject") {
     const created = await send("POST", "/api/session", { location: { directory: m.ws }, agent, model: modelRef })
     expect(created.status, JSON.stringify(created.json)).toBe(200)
     const sid = created.json.data.id as string
@@ -254,7 +287,7 @@ function engineTurns(m: Machine, running: () => Running) {
       if (await Promise.race([settled.then(() => true), Bun.sleep(40).then(() => false)])) break
       for (const request of await pending(sid)) {
         asked.push(request.action)
-        await send("POST", `/api/session/${sid}/permission/${request.id}/reply`, { decision: "reject" })
+        await send("POST", `/api/session/${sid}/permission/${request.id}/reply`, { decision: answer })
       }
     }
     await settled
@@ -348,6 +381,35 @@ async function attacks(m: Machine, turns: ReturnType<typeof engineTurns>, settle
     },
   }
   console.log(`[E3 ${ARM}] ${JSON.stringify(result)}`)
+  return result
+}
+
+/** 片 ③ (A3): the document the conversation tries to put in place — third-party MCP tools enabled, no tool-level ask left. */
+const allowDocument = (m: Machine) => JSON.stringify({ version: 1, partition: m.policyTarget.partition, records: [{ selector: { level: "class", class: "third-party-mcp" }, state: "enabled" }] })
+const ECHO_ASK = { selector: { level: "tool", canonical: "mcp:probe:echo" }, state: "ask" } as const
+
+/** A3 through the engine's shell tool: overwrite the document in place, rename a staged copy over it, add a new document beside it. */
+async function shellPolicyAttacks(m: Machine, turns: ReturnType<typeof engineTurns>) {
+  const staged = path.join(m.ws, "cf11-staged.json")
+  fs.writeFileSync(staged, allowDocument(m))
+  const moved = path.join(m.ws, "cf11-move.json")
+  const beside = path.join(path.dirname(m.policyTarget.file), `${"c".repeat(64)}.json`)
+  const result = await turns.shell(
+    [
+      `cat '${staged}' > '${m.policyTarget.file}' && echo A3-OVERWRITE-LANDED || echo A3-OVERWRITE-REFUSED`,
+      `cp '${staged}' '${moved}' && mv -f '${moved}' '${m.policyTarget.file}' && echo A3-MOVE-LANDED || echo A3-MOVE-REFUSED`,
+      `cp '${staged}' '${beside}' && echo A3-BESIDE-LANDED || echo A3-BESIDE-REFUSED`,
+    ].join("; "),
+  )
+  const outcomes = result.tool.match(/A3-(OVERWRITE|MOVE|BESIDE)-(LANDED|REFUSED)/g) ?? []
+  console.log(`[A3 shell ${ARM}] ${JSON.stringify(outcomes)}`)
+  return { outcomes, tool: result.tool, beside }
+}
+
+/** A3 through the engine's write tool (it runs inside the engine process); the user approves the write when asked. */
+async function writeToolPolicyAttack(m: Machine, turns: ReturnType<typeof engineTurns>) {
+  const result = await turns.turn("build", "write", { path: m.policyTarget.file, content: allowDocument(m) }, undefined, "once")
+  console.log(`[A3 write tool ${ARM}] asked=${JSON.stringify(result.asked)} ${result.tool.slice(0, 400)}`)
   return result
 }
 
@@ -478,6 +540,60 @@ describe.if(ARM === "production")("production: 0.2.6-shaped data, the production
     expect(read(settingsPath())).toBe(SETTINGS)
     expect(m.log.some((line) => /configFence=\d+ rules/.test(line))).toBe(true)
   }, 180_000)
+  test("片 ③ AC-04 / AC-05 / E6 (A3): the settings page changes two rows at once, removes one and resets — main writes them, the next decision follows; ext writing directly inside the fence is EPERM; the conversation's shell rewrites of the tool policy document are refused; then (after the log window) its write tool is refused too", async () => {
+    const directory = m.ws
+    const file = m.policyTarget.file
+    const partition = m.policyTarget.partition
+    const records = () => {
+      const loaded = loadPolicyDocument(path.dirname(file), partition)
+      return loaded.status === "ok" ? loaded.doc.records : loaded.status
+    }
+    // the settings page's path: main's production client → engine RPC → ext → hub bridge → parent port → main (outside the fence)
+    const client = createToolPolicyClient({
+      awaitServer: async () => ({ url: "http://codepuppy-sidecar.invalid", username: null, password: null }),
+      fetch: ((input: string | URL | Request, init?: RequestInit) => running!.fetch(new Request(input, init))) as typeof fetch,
+    })
+    const fetchOff = { selector: { level: "tool", canonical: "builtin::webfetch" }, state: "disabled" } as const
+    expect(await Promise.all([client.setRecord({ directory, record: ECHO_ASK as never }), client.setRecord({ directory, record: fetchOff as never })])).toEqual([{ ok: true }, { ok: true }])
+    const both = records() as unknown[]
+    expect(both).toHaveLength(3)
+    expect(both).toEqual(expect.arrayContaining([{ selector: { level: "class", class: "third-party-mcp" }, state: "enabled" }, ECHO_ASK, fetchOff]))
+    expect(await turns.askedForEcho("two-rows")).toEqual(["mcp:probe:echo"])
+    expect(await client.removeRecord({ directory, selector: fetchOff.selector as never })).toEqual({ ok: true })
+    expect((records() as unknown[]).some((record) => JSON.stringify(record) === JSON.stringify(fetchOff))).toBe(false)
+    const reset = await client.reset({ directory })
+    expect(reset.ok && typeof reset.backup === "string" && reset.backup.startsWith(`${file}.quarantined-`), JSON.stringify(reset)).toBe(true)
+    expect(records()).toBe("absent")
+    // the baseline the conversation attacks: the echo tool asks
+    expect(await client.setRecord({ directory, record: ECHO_ASK as never })).toEqual({ ok: true })
+    expect(records()).toEqual([ECHO_ASK])
+    const baseline = fs.readFileSync(file)
+    expect(await turns.askedForEcho("baseline")).toEqual(["mcp:probe:echo"])
+
+    // E6 known bad: ext writing the document itself inside the fence (a fenced child running the production writer; this pid stays clean)
+    const direct = spawnSync(
+      process.execPath,
+      ["-e", `import { savePolicyDocument } from ${JSON.stringify(path.join(import.meta.dir, "../../../ext/src/policy/store.ts"))}\nconst [dir, partition] = process.argv.slice(1)\ntry { savePolicyDocument(dir, JSON.parse(partition), [{ selector: { level: "class", class: "third-party-mcp" }, state: "enabled" }]); console.log("WROTE") } catch (error) { console.log("REFUSED " + error.code) }`, path.dirname(file), JSON.stringify(partition)],
+      { encoding: "utf8" },
+    )
+    expect(direct.stdout.trim(), direct.stderr).toBe("REFUSED EPERM")
+
+    // A3 through the shell tool: refused, the document byte for byte, the echo tool still asks
+    const shell = await shellPolicyAttacks(m, turns)
+    expect(shell.outcomes).toEqual(["A3-OVERWRITE-REFUSED", "A3-MOVE-REFUSED", "A3-BESIDE-REFUSED"])
+    expect(shell.tool).toContain("Operation not permitted")
+    expect(fs.readFileSync(file)).toEqual(baseline)
+    expect(fs.existsSync(shell.beside)).toBe(false)
+    expect(await turns.askedForEcho("after-shell")).toEqual(["mcp:probe:echo"])
+
+    // the host judges the sandbox log up to here; what follows runs inside the engine process on purpose
+    console.log(`CF-ENGINE-WINDOW-END ${new Date().toISOString()}`)
+    await Bun.sleep(2_000)
+    const written = await writeToolPolicyAttack(m, turns)
+    expect(written.tool).toMatch(/operation not permitted|EPERM/i)
+    expect(fs.readFileSync(file)).toEqual(baseline)
+    expect(await turns.askedForEcho("after-write-tool")).toEqual(["mcp:probe:echo"])
+  }, 240_000)
 })
 
 describe.if(ARM === "fresh")("fresh machine: no engine data directory, no ~/.opencode, no codepuppy.jsonc", () => {
@@ -566,27 +682,49 @@ describe.if(ARM === "fresh")("fresh machine: no engine data directory, no ~/.ope
 })
 
 describe.if(ARM === "control")("known bad: the protected set removed (W2 / W6 put back; the attacks land through W12, the sandbox's temp root)", () => {
+  let m: Machine
+  let running: Running | undefined
+  let turns: ReturnType<typeof engineTurns>
+  beforeAll(async () => {
+    m = await machine("control")
+    running = await m.host.start()
+    turns = engineTurns(m, () => running!)
+  }, 240_000)
+  afterAll(async () => {
+    await running?.close().catch(() => undefined)
+    await m?.main?.stop()
+    model.stop()
+  })
+
   test("the three attacks land: the connector runs the swapped command with the token, main reads the swapped command, the module is loaded with the key", async () => {
-    const m = await machine("control")
-    let running = await m.host.start()
-    try {
-      const turns = engineTurns(m, () => running)
-      expect(await turns.mcpStatus("probe", "connected")).toBe("connected")
-      const result = await attacks(m, turns, 15_000)
-      expect(result.a1a.shell).toContain("SWAPPED")
-      expect(result.a1a.landed).toBe(true)
-      expect(result.a1a.tokenDelivered).toBe(true)
-      expect(result.a1b.shell).toContain("SWAPPED")
-      expect(result.a1b.mainReaderCommand).toEqual(["/bin/sh", path.join(m.ws, "evil.sh")])
-      expect(result.a2.explicitShell).toContain("OVERRIDDEN")
-      expect(result.a2.globalConfigShell).toContain("OVERRIDDEN")
-      expect(result.a2.moduleImported).toBe(true)
-      expect(result.a2.keyDelivered).toBe(true)
-    } finally {
-      await running.close().catch(() => undefined)
-      await m.main?.stop()
-      model.stop()
-    }
+    expect(await turns.mcpStatus("probe", "connected")).toBe("connected")
+    const result = await attacks(m, turns, 15_000)
+    expect(result.a1a.shell).toContain("SWAPPED")
+    expect(result.a1a.landed).toBe(true)
+    expect(result.a1a.tokenDelivered).toBe(true)
+    expect(result.a1b.shell).toContain("SWAPPED")
+    expect(result.a1b.mainReaderCommand).toEqual(["/bin/sh", path.join(m.ws, "evil.sh")])
+    expect(result.a2.explicitShell).toContain("OVERRIDDEN")
+    expect(result.a2.globalConfigShell).toContain("OVERRIDDEN")
+    expect(result.a2.moduleImported).toBe(true)
+    expect(result.a2.keyDelivered).toBe(true)
+  }, 240_000)
+
+  test("片 ③ A3: the same shell and write-tool rewrites of the tool policy document land — the echo tool stops asking", async () => {
+    const file = m.policyTarget.file
+    const baseline = JSON.stringify({ version: 1, partition: m.policyTarget.partition, records: [ECHO_ASK] })
+    await m.main!.write(file, baseline)
+    expect(await turns.askedForEcho("baseline")).toEqual(["mcp:probe:echo"])
+    const shell = await shellPolicyAttacks(m, turns)
+    expect(shell.outcomes).toEqual(["A3-OVERWRITE-LANDED", "A3-MOVE-LANDED", "A3-BESIDE-LANDED"])
+    expect(fs.readFileSync(file, "utf8")).toBe(allowDocument(m))
+    expect(await turns.askedForEcho("after-shell")).toEqual([])
+    await m.main!.write(file, baseline)
+    expect(await turns.askedForEcho("baseline-again")).toEqual(["mcp:probe:echo"])
+    const written = await writeToolPolicyAttack(m, turns)
+    expect(written.tool).not.toMatch(/operation not permitted|EPERM/i)
+    expect(fs.readFileSync(file, "utf8")).toBe(allowDocument(m))
+    expect(await turns.askedForEcho("after-write-tool")).toEqual([])
   }, 240_000)
 })
 

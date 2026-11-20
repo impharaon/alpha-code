@@ -932,10 +932,14 @@ describe("修订 2 A:CODEPUPPY_ENV_FILE 交给计划器", () => {
 // 真源里 cwd 之下的诚实项目在 boot 时被检疫、第一次切 tab 就从真源删掉。
 describe("审查 B 第 2 条:计划之前的受保护配置目录 = 计划器的受保护目录", () => {
   const variables = ["OPENCODE_CONFIG_DIR", "XDG_CONFIG_HOME"] as const
-  const withEnv = async <T>(values: Partial<Record<(typeof variables)[number], string>>, run: () => Promise<T> | T): Promise<T> => {
-    const saved = Object.fromEntries(variables.map((name) => [name, process.env[name]]))
+  // XDG_DATA_HOME (CF-11, 片 ③) is only ever set to an absolute scratch path, never unset: without it the engine data directory falls back
+  // to os.homedir() — the developer's real one, which the test-isolation preload cannot pin — and spawnLocalServer reads that directory
+  type Variable = (typeof variables)[number] | "XDG_DATA_HOME"
+  const withEnv = async <T>(values: Partial<Record<Variable, string>>, run: () => Promise<T> | T): Promise<T> => {
+    const names: Variable[] = [...variables, ...(values.XDG_DATA_HOME !== undefined ? (["XDG_DATA_HOME"] as const) : [])]
+    const saved = Object.fromEntries(names.map((name) => [name, process.env[name]]))
     try {
-      for (const name of variables) {
+      for (const name of names) {
         if (values[name] === undefined) delete process.env[name]
         else process.env[name] = values[name]
       }
@@ -949,13 +953,14 @@ describe("审查 B 第 2 条:计划之前的受保护配置目录 = 计划器的
   }
   const inputs = () => ({ userDataPath, appStateRoot: join(userDataPath, "codepuppy-state"), codepuppyGlobalRoot: process.env.CODEPUPPY_GLOBAL_DIR! })
 
-  const rows: Array<{ label: string; values: (base: string) => Partial<Record<(typeof variables)[number], string>> }> = [
+  const rows: Array<{ label: string; values: (base: string) => Partial<Record<Variable, string>> }> = [
     { label: "both unset", values: () => ({}) },
     { label: "OPENCODE_CONFIG_DIR absolute", values: (base) => ({ OPENCODE_CONFIG_DIR: join(base, "exported-config") }) },
     { label: "OPENCODE_CONFIG_DIR=.", values: () => ({ OPENCODE_CONFIG_DIR: "." }) },
     { label: "OPENCODE_CONFIG_DIR relative", values: () => ({ OPENCODE_CONFIG_DIR: "cfg/sub" }) },
     { label: "XDG_CONFIG_HOME absolute", values: (base) => ({ XDG_CONFIG_HOME: join(base, "xdg-config") }) },
     { label: "XDG_CONFIG_HOME relative", values: () => ({ XDG_CONFIG_HOME: "rel-config" }) },
+    { label: "XDG_DATA_HOME absolute", values: (base) => ({ XDG_DATA_HOME: join(base, "xdg-data") }) },
   ]
   for (const row of rows)
     test(`${row.label}: the pre-plan roots equal the planner's protected directories for the same environment`, async () => {
@@ -980,9 +985,12 @@ describe("审查 B 第 2 条:计划之前的受保护配置目录 = 计划器的
           // os.homedir() is the HOME this process started with — the developer's real one, which the test-isolation preload
           // cannot pin (I-08) — so nothing here may mkdir or realpath under it (final review item 1)
           const subpaths = (rules: ReturnType<typeof configFenceLocations>) => rules.flatMap((rule) => (rule.kind === "subpath" ? [rule.path] : []))
-          const planner = subpaths(configFenceLocations({ ...inputs(), engineConfigDirectory: planned!.engineConfigDirectory, configHome: resolveEngineRoots(planned!.sidecarEnv, homedir()).configHome, home: homedir() }))
+          const planner = subpaths(configFenceLocations({ ...inputs(), engineConfigDirectory: planned!.engineConfigDirectory, configHome: resolveEngineRoots(planned!.sidecarEnv, homedir()).configHome, home: homedir(), dataHome: resolveEngineRoots(planned!.sidecarEnv, homedir()).dataHome }))
           const before = preplanConfigFenceRoots({ env: process.env, home: homedir(), ...inputs() })
           expect([...new Set(before)].sort()).toEqual([...new Set(planner)].sort())
+          // CF-11 (片 ③):both sides put the tool policy directory under the exported data home
+          const dataHome = row.values(base).XDG_DATA_HOME
+          if (dataHome) expect(before).toContain(join(dataHome, "opencode", "codepuppy-tool-policy"))
         })
       } finally {
         rmSync(base, { recursive: true, force: true })

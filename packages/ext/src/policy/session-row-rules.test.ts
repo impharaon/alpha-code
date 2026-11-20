@@ -2,8 +2,10 @@
 // `deny` entries take part — at every read of the row. The engine database is writable from inside the fence, so the row
 // can be planted. This file covers the extension's read: `ruleset()` in index.ts hands the gate "agent rules + session-row
 // rules", and an unattended run that the gate allows never reaches the engine's own decision (gate.ts `confirm`), so a
-// planted session-row allow there would beat an agent's identity deny on its own. The engine's read is
-// packages/core/test/codepuppy-engine-db-records.test.ts.
+// planted session-row allow there would beat an agent's identity deny on its own. It also covers the engine's session
+// context (packages/core/src/session/context.ts `select`): it merges the session row into the rules that decide which tools,
+// skills and connector descriptions a request gets, and a plugin tool whose only guard is a whole-tool deny on its permission
+// action has no other check. The engine's decision read is packages/core/test/codepuppy-engine-db-records.test.ts.
 // Harness: the production permission service, Promise adapter and execution chain (policy-host.cases.ts), as
 // unattended-policy.test.ts uses it. The tool is plugin-registered with the MCP layer's mark (the ext gives it an MCP
 // identity) and its executor makes no engine permission call, so the outcome is the extension's decision.
@@ -13,7 +15,7 @@ import { AUTOMATION_PROFILES, type UnattendedProfile } from "../../../schema/src
 import { buildUnattendedLive } from "../../../ui-mac/src/main/codepuppy-sidecar-messages"
 import { registerPolicy } from "./index"
 import { createUnattendedState } from "./unattended"
-import { E, isolate, it, Location, Plugin, PluginHooks, promisePlugin, publishPolicyAccount, seedProject, Session, Tool, mcpToolMark } from "./policy-host.cases"
+import { E, isolate, it, Location, Plugin, PluginHooks, promisePlugin, publishPolicyAccount, seedProject, Session, SessionContext, Tool, mcpToolMark } from "./policy-host.cases"
 
 const { Effect, Exit, Cause } = E
 beforeAll(isolate)
@@ -103,3 +105,84 @@ for (const profile of [undefined, "standard"] as const)
       expect(result.refusal).toMatch(profile === undefined ? /Permission denied: mcp:unattended:write/ : /cap-hard-deny/)
     }),
   )
+
+const PERMISSION = "probe_action"
+
+/**
+ * One request's selection in a fresh 全部批准-tier session, with `row` planted on the session row: two plugin tools guarded only
+ * by a whole-tool rule on their permission action — one offered directly, one through the Code Mode catalogue — and a call
+ * of each through the selection's own tools, the path a model request takes.
+ */
+const select = (agentRules: Rule[], row: Rule[]) =>
+  Effect.gen(function* () {
+    const location = yield* Location.Service
+    const plugins = yield* Plugin.Service
+    const state = createUnattendedState()
+    publishPolicyAccount(`session-row-${crypto.randomUUID()}`)
+    const counts = { runs: 0 }
+    yield* plugins.activate([
+      promisePlugin("session-row-config", async (ctx: Context) => {
+        await ctx.agent.transform((editor) => {
+          for (const name of [...Object.keys(AUTOMATION_PROFILES), "build"]) editor.update(name, (draft) => draft.permissions.push(...agentRules))
+        })
+      }),
+      promisePlugin("session-row-policy", async (ctx: Context) => {
+        const policy = await registerPolicy(ctx, state, () => undefined)
+        await policy.seal()
+      }),
+      promisePlugin("session-row-probe", async (ctx: Context) => {
+        await ctx.tool.transform((editor) => {
+          for (const [name, codemode] of [["probe_direct", false], ["probe_catalogue", true]] as const)
+            editor.add({
+              name,
+              description: "plugin tool guarded only by a whole-tool rule on its permission action",
+              input: { type: "object", properties: {} },
+              options: { codemode, permission: PERMISSION },
+              execute: async () => {
+                counts.runs++
+                return { content: "ran" }
+              },
+            })
+        })
+      }),
+    ])
+    yield* plugins.awaitActivation
+    yield* seedProject
+    const sessions = yield* Session.Service
+    const session = yield* sessions.create({ location: { directory: location.directory }, agent: "build" } as never)
+    if (row.length) yield* sessions.setPermissions({ sessionID: session.id, permissions: row } as never)
+    const hooks = yield* PluginHooks.Service
+    yield* hooks.trigger("session", "prompt", { sessionID: session.id, messageID: "msg_1", prompt: { text: "go" }, delivery: "queue" } as never)
+    const context = yield* SessionContext.Service
+    const selection = yield* context.select(session.id)
+    const run = (name: string, input: unknown) =>
+      selection.tools
+        .execute({ sessionID: session.id, agent: "build", messageID: "msg_1", call: { type: "tool-call", id: `call_${crypto.randomUUID()}`, name, input } })
+        .pipe(Effect.exit)
+    yield* run("probe_direct", {})
+    yield* run("execute", { code: "return await tools.probe_catalogue({})" })
+    return {
+      direct: selection.tools.definitions.some((definition: { name: string }) => definition.name === "probe_direct"),
+      catalogue: JSON.stringify(selection.tools.codeModeCatalog ?? {}).includes("probe_catalogue"),
+      runs: counts.runs,
+    }
+  })
+
+it.live("control: with no rule against it, the plugin tool is in the request, directly and in the Code Mode catalogue, and runs", () =>
+  Effect.gen(function* () {
+    expect(yield* select([allow], [])).toEqual({ direct: true, catalogue: true, runs: 2 })
+  }),
+)
+
+it.live("a planted session-row allow does not bring back a plugin tool the agent denies by its permission action: absent from the request and the Code Mode catalogue, it cannot run", () =>
+  Effect.gen(function* () {
+    const deny: Rule = { action: PERMISSION, resource: "*", effect: "deny" }
+    expect(yield* select([allow, deny], [{ action: PERMISSION, resource: "*", effect: "allow" }])).toEqual({ direct: false, catalogue: false, runs: 0 })
+  }),
+)
+
+it.live("a session-row deny on a plugin tool's permission action, the product's own kind of row write, still takes it out of the request", () =>
+  Effect.gen(function* () {
+    expect(yield* select([allow], [{ action: PERMISSION, resource: "*", effect: "deny" }])).toEqual({ direct: false, catalogue: false, runs: 0 })
+  }),
+)

@@ -1,7 +1,7 @@
 ---
 id: PLAN-engine-config-fence
 title: 对话改不了决定运行什么程序、哪些工具免问、凭据交给谁的配置 实施计划
-summary: 片 ①:引擎不再采用引擎库里的项目级已存批准、会话行上的 allow / ask 规则与 wellknown 缓存的配置文档(L1–L3),只改两个已接管的引擎文件;片 ②——受保护配置集渲染进围栏 profile 末尾，运行期放行认得拒写块，资格判定拦受保护位置之内，围栏内写者移到主进程；其余各片另起一节。
+summary: 片 ①:引擎不再采用引擎库里的项目级已存批准、会话行上的 allow / ask 规则与 wellknown 缓存的配置文档(L1–L3),只改两个已接管的引擎文件;片 ②——受保护配置集渲染进围栏 profile 末尾，运行期放行认得拒写块，资格判定拦受保护位置之内，围栏内写者移到主进程；片 ④——计划文件移到引擎数据目录(接管上游 plan.ts 的路径一值)，`~/.opencode` 整个受保护、谁都不建，删 W16；其余各片另起一节。
 kind: plan
 status: active
 spec: SPEC-engine-config-fence
@@ -327,3 +327,133 @@ PLAN 阶段只提交本文件。下面的命令与结论分两类:「实测」�
   3. 计划器用例在假路径上一律注入假 `lstat`(`5847dc202a`)。
   2. 残留(编排器裁决，不再在本片补这一族):**R10** —— 只出现在某条软链**存放的目标文字**里、本身又是可写项目里另一条软链的目录(例:`XDG_CONFIG_HOME=/W/a`,`/W/a → /W/s/t`,`/W/s → /W/real-s` 时的 `/W/s`)不冻结;冻结的是配置路径的每个节点、真实路径的每个节点、以及每个配置路径节点所在真实位置的上级链。闭合 = INT-safety I-27(一次逐段解析，收集走过的每个目录项)。写入矩阵宿主里有一条与 R8 并列的保证外对照臂(断言落地，I-27 闭合时翻转)。**R11** —— 绝对路径含 `"`、`\` 或控制字符的 `via` 节点写不进 profile，不冻结(位置自己的规则不受影响;env 文件自己的路径写不进时同样不保护);计划时记一行 `process fence: protected configuration — N path(s) cannot be written into the profile … : "<路径>", …` 逐个点名(红 `evidence/r2-r11-red.log` → 绿)。
   计数:`process-fence-plan` 26 → 27,`process-fence-config-fence` 内层 13 → 15。
+
+## 片 ④：计划文件移到引擎数据目录，`~/.opencode` 整个受保护、谁都不建
+
+- 依据：规格 `docs/specs/engine-config-fence/spec.md` v3(owner 2026-11-20 批准)的 BR-07、AC-08 与「用户会碰到的限制」第四条；冻结设计 `docs/specs/engine-config-fence/design.md`(approved；读的是参考树 `feat/config-fence-core` @ `7e2c8a098d`)§1 (a) 末句、§2 P-13 / P-14、§4.1 CF-9、§4.2 W 行(删 W16)、§4.3(不预建 `~/.opencode`；资格判定)、§4.8、§6 I4 / E2 / E11、§10 D12 ④ / D13(D4 已撤回)；意图 impharaon/alpha-work `docs/intents/INT-safety.md` I-13。这次新增上游接管的同意：owner 2026-11-20 回复编排器给的三个选项「我建议 A：改存到引擎数据目录」(A = 计划文件改存到引擎数据目录)。派单没有给 Issue 编号。读码基线是参考树 `7e2c8a098d`(主线 `6fd2f359a1` + 片 ②)。实施工作树从片 ② 合入后的主线建，下文行号都按参考树。
+- 核对：Phase: IMPLEMENT — plan(临时文件 `~/.cache/alpha-orch/2026-11-19/impl-fence-slice4/plan-section.md`)· 编排器 / Claude Fable 5.2 · 通过(对 BR-07 / AC-08 与冻结设计核对)。裁决：`plan.test.ts` 按成对接管(改 `:27`、两条都进清单)；ADR-047「精确接管面」加一行获准，逐字引用 owner 同意原话，`.claude/rules` 下不改别处(权威保持表的计数照旧不动)；`server.ts:215-216`、`network-egress-derived.ts:23-24` 两处过时注释准在文档 / 登记那个提交里只改注释；CF-9 的预建跳过与 M4 必做，fresh 臂在完整启动之后与写计划之后都断言 `~/.opencode` 不存在；`CODEPUPPY_JSONC_TRUTH_DISABLE=1` 的观察不写代码，记进本节观察，另核一件事并回报(见「观察」)。实施工作树 `feat/config-fence-plan-dir` 从 `origin/alpha` `69c1267835`(片 ② 已合入,#1735)建，与参考树 `7e2c8a098d` 的树相同，行号不变。
+
+PLAN 阶段按派单写在临时文件里，没有提交；本节由实施阶段第一次提交放进 plan.md。路径前缀 `main/` = `packages/ui-mac/src/main/`。下面的命令都是实施安排，还没有在实施分支上运行。约定沿用片 ①、片 ②：先提交红测试，再提交实现；宿主 `*.test.ts` 起同名 `.cases.ts`。
+
+### 计划阶段核过的代码事实(只读参考树)
+
+| 编号 | 事实 | 对本片的影响 |
+| --- | --- | --- |
+| F1 | `packages/core/src/plugin/plan.ts:31` 是唯一的目录值。`:14-21` 的提醒、`:40` 的编辑放行、`:50` 的拒绝文案都取同一个 `directory`。这个文件与上游父 `33f94fce96` 逐字相同 | 接管只改 `:31` 一行 |
+| F2 | 引擎的 `global.data` = `<XDG_DATA_HOME>/opencode`(`packages/util/src/global-roots.ts`)。Global 装载时会递归建它(`packages/util/src/global.ts:63-73`)。计划器的父目录预建循环本来就建它(`main/process-fence-plan.ts:233-240`)。写文件工具会自动建缺失的上级目录(`packages/core/src/tool/plugin/write.ts:51`) | 计划器不用为新位置多建任何东西 |
+| F3 | `main/process-fence-plan.ts:88` 的预建循环对清单里**每一个** subpath 位置都调 `mkdirp` | CF-9 是 subpath。不排除它，就会把 `~/.opencode` 建出来，所以必须显式跳过 |
+| F4 | `packages/core/test/plugin/plan.test.ts` 的六处钉都从 `:27` 的 `planDirectory` 派生。接管之后只有 `:164`、`:252`、`:287` 三条会变红，钉的分别是提醒正文、编辑放行、拒绝文案。`:245`(激活时不建目录)和 `:264`(external_directory 放行)换了路径照样绿 | 按仓库先例，被接管的值所在的上游测试随源文件成对接管(`oauth/page.ts` 与 `oauth-page.test.ts`；`to-session-error.ts` 与 `session-runner-retry.test.ts`)，设计 §4.8 也是这样写的。片 ① 的钉住已知红名单用于「大量上游用例间接依赖被改行为」(64 条)，不适用这里。改法：只把 `:27` 改成 `path.join(Global.make().data, "plan")`。测试交给插件的 Global 服务本来就是 `Global.make()` 展开(`:104`)，数据根来自测试隔离预载的临时根 |
+| F5 | 登记册里的每个证明文件，都必须在 `scripts/gate-files.tsv` 有一行写明精确条数(`scripts/assert-authority-proofs.sh`)。`plan.test.ts` 今天不在闸门里，共 12 条 | 新增一行，条数 12 |
+| F6 | 引擎适配器夹具记下了 `packages/core` 的 tree id，由 `packages/ui-mac/src/engine-adapter/fixture-identity.test.ts` 核对。17 个夹具今天都等于参考树的 `01c91dddf7`。引擎路径有未提交改动时，采样器拒绝运行 | 改了 core，就要在接管提交**之后**全量重采。三份样本里有旧路径(`catalog`、`passthrough`、`routes` 里计划助手的 `edit <沙箱 HOME>/.opencode/plan/*`)。它们只是数据，夹具的消费方不断言它 |
+| F7 | 写盘登记簿 `scripts/process-fence-write-sites.tsv` 里没有落在 W16 的行；sidecar 闭包里也没有写 `~/.opencode` 的写者 | 登记簿的行不变，只把 W16 加进根合法性用例的非法名单 |
+| F8 | 资格判定用的受保护根，都取自同一份位置清单：计划之后是计划器的 `configFenceRoots`，计划之前是 `main/server.ts:319` 的 `preplanConfigFenceRoots` | CF-9 进了清单就进了资格判定，资格判定的代码不改 |
+| F9 | 引擎这一侧只有 `plan.ts` 会建 `.opencode`(在 `packages/core/src`、`packages/server/src`、`packages/util/src` 里 grep `"\.opencode"`)。ext 的「工作区外先问」只加在 build 与 codepuppy-ask 上(`packages/ext/src/external-directory-rule.ts:20`)，计划助手保留引擎底座的 external_directory 放行 | 真引擎用例里，计划助手写新位置预期不会弹审批 |
+| F10 | 真引擎宿主 `main/engine-config-fence.engine.cases.ts` 的 fresh 臂已经是全新机器形状(没有数据目录、没有 `~/.opencode`)，用生产计划器 + 生产 .node 把进程关进围栏，引擎跑在围栏里。引擎沙箱在系统临时目录下(W12 之下)，所以那里的 `~/.opencode` 只靠 CF-9 挡。围栏里的进程只许向代理端口出网 | 真引擎用例放在 fresh 臂；适配器接在 `running.fetch` 上做进程内分发，不走网络 |
+
+### 改动
+
+**生产代码**
+
+| 文件 | 改什么 |
+| --- | --- |
+| `packages/core/src/plugin/plan.ts` | 把 `:31` 改成 `path.join(global.data, "plan")`，行尾加 `codepuppy(I-13 D13)` 标注(一句理由，指向设计 §4.8)。提醒、放行、拒绝文案跟着同一个值走，不另改文字 |
+| `main/process-fence-profile.ts` | ① 新增导出 `homeOpencodeDirectory(home)` = `join(home, ".opencode")`。这是 CF-9 路径唯一的写法，清单与计划器共用。② `configFenceLocations` 在 CF-8 之后、CF-10 之前(`:139` 与 `:140` 之间)加 `{ kind: "subpath", path: homeOpencodeDirectory(input.home) }`；函数说明(`:109-111`)同步改。③ 删掉渲染行 `:226` 的 W16 与 `WRITABLE_ROOT_IDS.W16`(`:66`)，`:48-52` 的说明与文件头 `:12` 同步 |
+| `main/process-fence-plan.ts` | `planConfigFence` 的预建循环(`:88`)跳过 `homeOpencodeDirectory(input.roots.home)`(F3)；文件头 `:14-21` 改述：W16 已删，`~/.opencode` 是 CF-9，谁都不建 |
+
+**接管登记(ADR-029 §3 / ADR-047 / ADR-048)**
+
+| 文件 | 改什么 |
+| --- | --- |
+| `scripts/north-star-guard.sh` | `UPSTREAM_EXCLUDES` 末尾加 `packages/core/src/plugin/plan.ts`、`packages/core/test/plugin/plan.test.ts` 两条。前置注释写明：I-13 D13、owner 原话、为什么挂不了钩子、改动面(源文件一行 + 测试 `:27` 一行)、判据 |
+| `.claude/rules/adrs/ADR-047-opencode2-engine-generation.md` 「精确接管面」 | 只追加一行，不改别的行(编排器核对时批准;逐字引用 owner 同意原话「我建议 A：改存到引擎数据目录」,2026-11-20,A = 计划文件改存到引擎数据目录)。五列：路径两条；为什么挂不了钩子(目录在插件内部算出，同一个值写进存档的提醒、编辑放行与拒绝文案；插件能另加一条放行，改不了告诉模型往哪写的那句提醒)；守卫(`UPSTREAM_EXCLUDES` 两条；对上游原文件，`plan.test.ts` 三条与真引擎 fresh 臂会红)；回滚(两个文件换回 `33f94fce96` 的版本，再删掉两条清单；必须与 CF-9、W16 在同一个提交里回退，D12 ④)；归属(I-13 片 ④)。「权威保持表」的计数不改(片 ① 已交编排器) |
+| `docs/architecture/codepuppy-authority-registry.json` | 新增一项 `plan-directory-in-engine-data`：decision；adr `ADR-047`、`ADR-048`；lane；takeovers 两条；approval(quote「我建议 A：改存到引擎数据目录」，2026-11-20，by owner(经编排器转达)，reason)；mechanism 是 `packages/core/src/plugin/plan.ts`，ladder 为 L3 的一值接管；tests 是 `plan.test.ts` 的三条用例名(`injects enter and leave reminders on agent switches`、`allows edits only inside the Plan directory`、`rewrites blocked mutation failures with the Plan directory`)加真引擎宿主 `main/engine-config-fence.engine.test.ts` 的宿主用例名；note 写反向臂与复现命令 |
+| `scripts/gate-files.tsv` | 新增一行 `12	packages/core	test/plugin/plan.test.ts`(登记册的证明文件)。`process-fence-config-fence` 15 → 17；`engine-config-fence.engine` 的 fresh 1 → 2。`process-fence-profile`、`process-fence-plan`、`process-fence-write-sites`、`custom-provider-truth` 这几行只改描述里的 W16、固定 id 数(13 → 12)和受保护集说法，条数不变，按实测写回 |
+| `main/server.ts:215-216`、`main/network-egress-derived.ts:23-24`(编排器准改) | 只改注释:这三条配置路径(`codepuppy.jsonc`、`<XDG_CONFIG_HOME>/opencode`、`~/.opencode`)现在都在受保护配置集里、围栏内不可写,不再说它们在可写集 W2 / W6 / W16 之下;主进程不读它们的理由照旧 |
+| `docs/architecture/2026-09-09-req159-process-fence.md` | 事实同步：`:54` 写明 W16 已删；受保护配置集一段(`:56-62`)加 CF-9(整个 `~/.opencode`，不预建)；加一句计划文件在引擎数据目录(W4 之下)；测试表里 `process-fence-profile`、`process-fence-plan`、`process-fence-config-fence`、`engine-config-fence.engine` 四行补上本片的判据 |
+
+**测试与夹具**
+
+| 文件 | 改什么 |
+| --- | --- |
+| `packages/core/test/plugin/plan.test.ts` | 只改 `:27`(F4)。12 条 |
+| `main/process-fence-profile.test.ts` | 逐行形状去掉 W16(`:122`)；`CF_LINES` 在 `.config/opencode` 之后加 `(subpath "${HOME}/.opencode")`(上级目录块不变，HOME 本来就在)；id 集合去掉 W16(`:207`)；往返用例的 ALLOW 去掉 `.opencode`(`:257`)；「位置清单」用例(`:163`)改成断言 CF-9 在清单里、排在 CF-8 之后，用例名去掉「不含 ~/.opencode」。条数不变，35 |
+| `main/process-fence-plan.test.ts` | 日志条数 `configFence=14` → 15(`:81`)、15 → 16(`:234`)；两处 `configFenceRoots` 精确列表加 `${HOME}/.opencode`(`:184`、`:219`)；BR-05 用例(`:450`)的真源再放 `~/.opencode` 与 `~/.opencode/proj`，两条都应进 excluded，并点名 `${HOME}/.opencode`。`:68` 的精确 `made` 列表、`:86` 与 `:221` 的「不建 `.opencode`」断言都不动，它们就是「不预建」的判据。条数不变，27 |
+| `main/process-fence-write-sites.test.ts` | 根合法性用例(`:196-198`)把 W16 列为非法，用例名同步。条数不变 |
+| `main/custom-provider-truth.test.ts` | `FIXED_ROW_IDS` 去掉 W16(`:82`)；`:97` 用例名里的「13 个」改成「12 个」。条数不变 |
+| `packages/ui-mac/native/codepuppy-fence/test/config-fence-ops.c` | 新模式 `create-dir <path>`，`path` 是一个尚不存在的受保护目录位置。三种手法：`mkdir-p`(先建它，再建 `plan`)；`rename-dir-into`(把工作区里备好的目录改名过去，里面装着 `opencode.json` 与 `plugin/x.js`)；`clone-dir-at`(把同一个目录 `clonefile` 过去)。哪种成功了，就按已知结构拆掉，下一种单独判。注释里不写缓存路径 |
+| `main/process-fence-config-fence.cases.ts` | `OPS` 加 `"create-dir"`。`granted()` 加一个可选的 `prepare`：在 build 之后、起围栏子进程之前，在围栏外运行，用来预置 `~/.opencode`。新增两条用例(见「证明」AC-08 ① ②)和两种已知坏变换：`todaysRows`(在放行块 W15 之后补回 W16 行，并删掉受保护块里 CF-9 那一行)；`withoutCf9`(只删 CF-9 那一行，W16 仍然删掉)。宿主 `main/process-fence-config-fence.test.ts` 的钉 15 → 17 |
+| `main/engine-config-fence.engine.cases.ts` | fresh 臂改成在 `beforeAll` 里起机器与引擎，在 `afterAll` 里收；原 AC-06 ③ 用例的断言不变。新增 AC-08 用例(见「证明」)。头注释的 fresh 一段补一句。宿主 `ARMS.fresh` 1 → 2，宿主用例名加上 AC-08 |
+| `packages/ui-mac/src/engine-adapter/fixtures/*.json`(17 个)、`scripts/old-name-exceptions.tsv` | 用 README 里的采样器全量重采(F6)，逐个比对，每一类差异都写进偏离记录。`events.json` 里采样 CLI 的路径词元会随新工作树改变，旧名例外那一行跟着换，同片 ① 的处理 |
+
+不改：资格判定代码(F8)；写盘登记簿的行(F7)；`codepuppy-config-injection.ts` 与 ext(F9)；采样器脚本；「清除数据」；任何文案与配置。
+
+### 顺序
+
+1. **C0 计划**：本节进 plan.md，front-matter 的 summary 加上片 ④，并填好「核对」行。
+2. **C1 测试先红(按构造必红)，不改生产代码**：表里所有测试与夹具改动(夹具除外)，包括 C 程序的新模式。在未改的代码上运行，红输出存进 `~/.cache/alpha-orch/2026-11-19/impl-fence-slice4/evidence/c1-red-*.log`：
+   - `cd packages/core && bun test test/plugin/plan.test.ts`：3 红(`:164`、`:252`、`:287`)、9 绿；
+   - ui-mac 单元：profile(形状、id、CF 清单、往返)、plan(条数、列表、BR-05)、write-sites(W16 仍合法)、custom-provider-truth(固定 id)都红；
+   - 写入矩阵宿主：AC-08 production 红(W16 在，`~/.opencode` 建得出来)，known bad 绿；
+   - 真引擎 fresh 臂(直接以 `CODEPUPPY_CF_ENGINE_ARM=fresh CODEPUPPY_CF_ENGINE_ROOT=<worktree>/node_modules/.cache/engine-config-fence/run` 跑 cases，省掉其余三臂)：AC-08 红(提醒点名 `<HOME>/.opencode/plan`，文件写到了那里，`~/.opencode` 被建出)。
+   - `bash scripts/north-star-guard.sh` 点名 `plan.test.ts`(C1 改了上游测试、清单还没加)，这一步也是按构造必红。
+3. **C2 实现(D12 ④ 的原子单元，三件事同一个提交)**：`plan.ts`、`process-fence-profile.ts`、`process-fence-plan.ts`、守卫两条、ADR-047 一行、登记册一项、`gate-files.tsv`、事实文档。之后跑下面的相关检查组 A–D，全绿。只有 `fixture-identity.test.ts` 按构造是红的：core 的 tree id 变了，C3 修复。
+4. **C3 重采夹具**：采样器要求引擎路径没有未提交改动，所以放在 C2 之后。采样大约 30 秒，会联网取 opencode 免费模型目录，与片 ① 相同。重采后 17 个夹具逐个比对(屏蔽 id、时间、端口、临时目录与 slug)。预期只有这几类差别：`_engine`；三份样本里计划助手的放行从 `<沙箱 HOME>/.opencode/plan/*` 变成 `<沙箱 HOME>/.local/share/opencode/plan/*`；工作树路径与分支；联网模型目录的漂移；时序。逐类写进偏离记录，再跑检查组 E 与 `old-name-scan.test.ts`。
+5. **变异运行(不提交，每次只改一处，用 `git restore` 复原；输出存 `~/.cache/alpha-orch/2026-11-19/impl-fence-slice4/mutations/`)**：
+   - M1：`plan.ts` 换回上游原文件(`git show 33f94fce96:packages/core/src/plugin/plan.ts`)⇒ `plan.test.ts` 三条红，真引擎 fresh 臂 AC-08 红。这也是登记册的反向臂。
+   - M2：清单去掉 CF-9(W16 仍删)⇒ plan BR-05、profile `CF_LINES`、写入矩阵的 X1 子臂红。
+   - M3：补回 W16 行(保留 CF-9)⇒ profile 形状与 id、custom-provider-truth、write-sites 红。
+   - M4：去掉预建跳过 ⇒ `process-fence-plan.test.ts:68` 与 `:221` 红。
+6. **收口**：core 与 ui-mac 类型检查、`git diff --check`、新增与改动的闸门行各跑一次 `bun-test-floor.sh`。登记层检查和每一个闸门步骤，等编排器给出 `GATE_ALLOW_FULL` 时再逐个跑。签名形态宿主跑一次(`CODEPUPPY_TEST_SIGNED_FENCE=1 bun test src/main/process-fence-extension-packaged.test.ts`，约 12 分钟)，因为它的夹具经 `planConfigFence` 带上了 CF-9。
+
+**相关检查**(都在 `packages/ui-mac` 下执行，只传宿主 `*.test.ts`；机器上有完整门在跑时，bun 加 `--max-concurrency 2`)：
+
+- A core：`cd packages/core && bun test test/plugin/plan.test.ts`；`bun run --cwd packages/core typecheck`。
+- B 单元：`bun test src/main/process-fence-profile.test.ts src/main/process-fence-plan.test.ts src/main/process-fence-write-sites.test.ts src/main/custom-provider-truth.test.ts src/main/process-fence-workspaces.test.ts src/main/server.test.ts src/main/process-fence-compile.test.ts src/main/process-fence-apply.test.ts src/main/process-fence-wiring.test.ts src/main/workspace-write-probe.test.ts src/main/workspace-write-probe-fence.test.ts src/main/network-egress-fence.test.ts src/main/mcp-server-truth.test.ts src/main/egress-grant-truth.test.ts src/main/project-trust-truth-fence.test.ts src/main/custom-provider-truth-fence.test.ts src/main/process-fence-zsh-startup.test.ts src/main/process-fence-extension.test.ts src/main/engine-explicit-config.test.ts`。其中 `server.test.ts` 核对计划器与计划前的受保护根是同一份；`process-fence-compile` 把受保护集交给真 `sandbox-exec` 试编译。
+- C 围栏 / 真引擎宿主(串行)：`bun test src/main/process-fence-config-fence.test.ts src/main/engine-config-fence.engine.test.ts src/main/fence-write-denied.engine.test.ts src/main/project-writable.engine.test.ts src/main/engine-db-records.engine.test.ts src/main/process-fence-engine.test.ts`。
+- D 守卫与登记：`bun test src/main/north-star-guard.test.ts src/main/local-gate-parity.test.ts src/main/north-star-drift-metrics.test.ts src/main/sync-upstream-owned-files.test.ts src/main/sync-upstream-takeover-isolation.test.ts src/main/gate-file-registry.test.ts`；`bash scripts/north-star-guard.sh`(仓根)；`cd packages/ext && bun test src/policy/authority-registry.test.ts`。
+- E 夹具：`bun test src/engine-adapter/fixture-identity.test.ts src/engine-adapter/contract-cases.test.ts src/engine-adapter/projection-parity.test.ts src/engine-adapter/passthrough-reads.test.ts src/engine-adapter/routes-coverage.test.ts src/main/old-name-scan.test.ts`，以及采样器 README 列出的九个适配器测试。
+- 收口：`bun run --cwd packages/ui-mac typecheck`(ui-mac 的类型检查不含 `*.test.ts` / `*.cases.ts`，所以 B–E 必须实际跑)；`git diff --check`；`bash scripts/bun-test-floor.sh <N> <目录> <文件>` 对新行与改过的行各跑一次。
+
+### 风险
+
+- **预建陷阱(F3)**：CF-9 进了清单，现有循环就会建出 `~/.opencode`。跳过它和 CF-9 在同一个提交里。精确 `made` 列表(`process-fence-plan.test.ts:68`)与 M4 能看见漏掉跳过的情况。
+- **与片 ③ 改同一组位置**：两片都会改位置清单、`CF_LINES`、计划器的条数与列表、`gate-files.tsv` 的行。后合入的那一片按实测重算这些数，不手抄。
+- **真引擎的计划回合可能遇到策略询问**：F9 推断不会问。如果实测问了，用例记下 `asked` 并失败，我把它作为发现交回。不自动批准，也不加规则。
+- **夹具重采**：会有联网目录的漂移和工作树路径的变化，每一类差异都要解释；还要同步旧名例外一行。
+- **写入矩阵的已知坏 `todaysRows`**：它依赖「HOME 的上级目录 literal 只冻结节点本身，不挡在 HOME 里新建条目」。片 ② 的 E2 已经证明 `.zsh_history` 的改名覆盖在这条 literal 下照常。如果实测被挡，就是测量结果，我交回，不放宽断言。
+- **真引擎宿主耗时与机器负载**：C1 的红只跑 fresh 臂；完整宿主在 C2 之后跑一次、M1 再跑一次；按机器纪律串行运行，有门在跑时限并发。
+- **受保护资产**：ADR-047 在 `.claude/rules` 下。按派单只追加一行，编排器核对计划时确认。
+- **模块体量**：生产代码在 `packages/ui-mac/src/main` 约 +6 行，测试约 +200 行。不改棘轮行，在回执里如实报告。
+- **待决意图项 I-30(计划目录换成软链 + 路径串放行)在新位置上的样子**：`<XDG_DATA_HOME>/opencode` 在 W4 之下，围栏里照样能把 `plan` 建成或换成软链，与今天 `~/.opencode/plan` 在 W16 之下一样。计划助手的放行仍是路径串 `<数据目录>/plan/*`：`FileAccess` 只做词法归一，不解析软链，`plan/../x` 归一后不匹配这条放行，所以经链写入落在链目标上，由目标所在位置的围栏规则判定。链到工作区时落地，与今天相同(`DOT3.out` e1)；链到受保护位置时按解析后的路径被拒(e3–e5)，今天 P0 下这三种都成功，所以比今天好。链到引擎数据目录里的其他文件，与今天经 `~/.opencode/plan` 链过去的结果相同；而且能建这条链的命令本来就能直接写那里。结论：没有变坏，本片也不碰它。
+
+### 证明
+
+| AC | 测试 / 证据 | 缺少行为为什么会失败 |
+| --- | --- | --- |
+| AC-08 ①：`~/.opencode` 不存在时，任何形式都建不出它，事后仍不存在 | `process-fence-config-fence.test.ts` → cases 新用例「AC-08 production」：生产计划器 + 生产渲染 + 生产 .node；假 HOME 里没有 `~/.opencode`。`create` 模式六种(普通文件、软链、mkdir、文件改名过去、硬链、文件 clone)加 `create-dir` 模式三种(mkdir -p、备好的目录改名过去、备好的目录 clone 过去)全部 `FAIL 1`；事后在围栏外 `lstat` 得到 ENOENT | 同一宿主的「AC-08 known bad」：在 `todaysRows`(今天的规则：W16 在，没有 CF-9)下，这九种全部 `OK`，这是正向对照，事后由助手程序拆掉。去掉预建跳过(M4)⇒ 精确 `made` 列表红 |
+| AC-08 ②：`~/.opencode` 已存在时，其下任何写入被拒，读取照常 | 同一条新用例：在围栏外预置 `~/.opencode/{opencode.json, plan/old.md, plugin/}`。`file` 模式(`plan/old.md`、`opencode.json`)和 `dir` 模式(`~/.opencode`、`plan/`)全部 `FAIL 1`；围栏内 `cat plan/old.md` 读出原文；事后字节、目录列表与权限都不变。再用运行期放行(X1)签发 `~/.opencode` 本身之后写入，仍然 `FAIL 1` | `todaysRows` 下，追加、截断、新建再改名覆盖、删除、在目录里新建都 `OK`。`withoutCf9`(W16 仍删)加 X1 ⇒ 写入 `OK`，说明 CF-9 那一行本身是承重的 |
+| AC-08 ③：在「全部批准」档选「计划」并要求写计划时，文件写在 `~/.local/share/opencode/plan/`，写文件卡片显示这个路径 | `engine-config-fence.engine.test.ts` fresh 臂的新用例。环境：全新机器形状；生产计划器 + 生产 .node 把进程关进围栏；真嵌入式引擎 + 真 ext + 生产注入。请求按界面的方式发出：用生产 `buildPromptRequest({ perm: "allow", agent: "plan" })` 构造(先断言 `permLocksAgent("allow")` 为 false，即计划可选)，经生产 `createEngineFetch`(接在 `running.fetch` 上)与 v2 客户端发出。第一轮发「写一份计划」，从模型桩收到的请求里取出计划提醒点名的目录，断言它等于 `<XDG_DATA_HOME>/opencode/plan` 且不含 `.opencode`。第二轮让模型桩照这个目录写 `cf-plan.md`。断言：没有审批请求；盘上文件内容正确；经适配器读回的 v1 消息里，写文件部件的 `state.input.filePath` 正是该路径且状态为完成；生产卡片模型 `toolCardHeadOf` 给出 `{ kind: "write", status: "success", target: "cf-plan.md", detail: "<XDG_DATA_HOME>/opencode/plan/" }`；`~/.opencode` 仍不存在。在真实主目录下，卡片的 `redactPath` 会把 `/Users/<名>` 写成 `~`，显示为 `~/.local/share/opencode/plan/` | M1(换回上游 `plan.ts`)：提醒点名 `<HOME>/.opencode/plan`，模型桩照提醒写过去，被 CF-9 拒绝(F10：沙箱在 W12 之下，只有 CF-9 挡)。新位置没有文件，卡片显示失败 ⇒ 用例红；`plan.test.ts` 三条同时红 |
+| BR-07：谁都不建 `.opencode` | `process-fence-plan.test.ts:68` 的精确预建列表，以及 `:86`、`:221`；fresh 臂在完整启动之后(AC-06 ③)与写完计划之后(AC-08)都断言 `~/.opencode` 不存在 | M4 ⇒ 精确列表红 |
+| BR-07 / BR-05：`~/.opencode` 或它里面的文件夹当项目 | `process-fence-plan.test.ts` BR-05 用例：真源里的 `~/.opencode` 与 `~/.opencode/proj` 都进 excluded，并点名 `${HOME}/.opencode`。资格判定用的是生产清单给出的根，界面文案沿用既有的 `protected-config` 那一句 | M2(清单去掉 CF-9)⇒ 两条都进了 workspaces，用例红 |
+| 接管登记 | `bash scripts/north-star-guard.sh`：加清单之前点名两个文件，加两条之后零命中；`authority-registry.test.ts` 绿；`bun-test-floor.sh 12 packages/core test/plugin/plan.test.ts` 精确 12 条 | 清单少一条 ⇒ 守卫点名那个文件；登记册的用例名写错 ⇒ 判官红；证明文件不在闸门登记簿里 ⇒ `assert-authority-proofs.sh` 红 |
+| 删 W16(放行块如实反映可写范围) | `process-fence-profile.test.ts` 的形状与 id 集合；`custom-provider-truth.test.ts` 的固定 id；`process-fence-write-sites.test.ts` 把 W16 判为非法 | M3 ⇒ 三者都红。在围栏实验里 CF-9 写在 W16 之后，补回 W16 不改变拒绝结果；删这一行是为了让放行块如实，理由同片 ② 删 W2 / W6 |
+| 夹具对得上引擎源码 | `fixture-identity.test.ts` 与检查组 E | C2 之后、C3 之前按构造必红(core 的 tree id 变了) |
+
+### 体量与时间
+
+- 文件：生产 3 个；接管登记与文档 5 个(守卫、ADR-047、登记册、`gate-files.tsv`、事实文档)；测试 7 个加 1 个 C 程序；plan.md；17 个重采夹具加旧名例外一行。人工改动大约 20 个文件。
+- 行数：生产约 +8 / −4；登记与文档约 +60；测试约 +260 / −15(写入矩阵两条用例约 110，C 程序约 35，真引擎用例约 90，其余是一两行的同步)；本节约 130。
+- 时间：C1 约 1.5 小时(含两个宿主的红运行)；C2 约 1 小时；C3 约 45 分钟；变异约 1 小时(含一次真引擎宿主)；收口约 1 小时，另加签名形态宿主约 12 分钟。合计约 5–6 小时，符合 M。
+
+### 观察(不属本片,不改代码)
+
+- `packages/ui-mac/src/main/ext-config.ts:121-139`、`:436`:运维逃生阀 `CODEPUPPY_JSONC_TRUTH_DISABLE=1` 置位时,主进程把安装物写进 `~/.opencode/opencode.jsonc`,并递归建出 `~/.opencode`。BR-07 的字面是「任何进程，包括应用自己，都不在任何层级创建 `.opencode`」;设计 CF-9 一行只点名已退役的旧桥(`bridgeItem` 在源码里没有调用方)。编排器裁决:本片不改代码,由编排器记进设计留档与意图待决项。本片另核一件事并回报:CF-9 在场且置了这个开关时,主进程那次写入是否照常成功(主进程在围栏外),围栏内是否因此有原来能用、现在失败的东西(结果写在偏离记录)。
+
+### 偏离记录
+
+暂无。
+
+### 可选(不做)
+
+- 给计划目录另写一个 Code Puppy 自有的 core 判官。现在上游测试接管后只改了一行，加上真引擎用例已经够用。
+- 加一条单元断言：真实主目录下卡片显示 `~/.local/share/opencode/plan/`。这是卡片既有的脱敏行为，不是本片的改动。

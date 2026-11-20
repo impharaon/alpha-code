@@ -24,6 +24,19 @@ export function officialConnectorBackend() {
   return value
 }
 
+/**
+ * The runtime directory's path, purely computed (DESIGN-stored-credentials-fence §4.5, implementation amendment 2): the fence rule C1
+ * and the credential table list this path whatever the availability check in officialRuntimeParent says at plan time — the plaintext
+ * is written later, when the check is evaluated again.
+ */
+export function officialRuntimeParentPath(root: string) {
+  return join(
+    realpathSync.native(tmpdir()),
+    `codepuppy-connectors-${process.getuid?.()}-${createHash("sha256").update(root).digest("hex").slice(0, 16)}`,
+  )
+}
+
+/** The materialising path's check, then the same path: throws while the runtime directory must not be used. */
 export function officialRuntimeParent(root: string) {
   const temp = realpathSync.native(tmpdir())
   if (
@@ -48,11 +61,7 @@ export function officialRuntimeParent(root: string) {
     )
       throw officialConnectorFailure()
   }
-  const parent = join(
-    temp,
-    `codepuppy-connectors-${process.getuid?.()}-${createHash("sha256").update(root).digest("hex").slice(0, 16)}`,
-  )
-  return parent
+  return officialRuntimeParentPath(root)
 }
 
 export function officialNodeCommand() {

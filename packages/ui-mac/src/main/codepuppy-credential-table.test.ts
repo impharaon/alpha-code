@@ -73,7 +73,7 @@ test("官方连接器运行期目录:没有环境根 ⇒ 不列;有环境根、�
         codepuppyGlobalRoot: () => root,
         appStateRoot: () => dirname(dirname(root)),
         realpath: (p) => realpathSync.native(p),
-        defaultWorkspace: () => project,
+        defaultWorkspace: () => (mkdirSync(join(tmp, "default-workspace"), { recursive: true }), join(tmp, "default-workspace")),
         readWorkspaces: () => [project],
         isDirectory: (p) => statSync(p).isDirectory(),
         mkdirp: (p) => void mkdirSync(p, { recursive: true }),

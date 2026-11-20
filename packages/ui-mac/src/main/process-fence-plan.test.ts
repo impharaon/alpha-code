@@ -370,13 +370,28 @@ describeDarwin("planProcessFence", () => {
     expect(deny.some((rule) => rule.value.includes('"'))).toBe(false)
   })
 
+  test("终审第 6a 条:节点按 device + inode 判「同一对象」,不按小写字符串 —— 区分大小写的卷上,指向只差大小写的兄弟目录的软链节点照样冻结", () => {
+    const link = `${HOME}/proj-a/Cfg`
+    const sibling = `${HOME}/proj-a/cfg`
+    const realpath = (p: string) => (p === link || p.startsWith(`${link}/`) ? sibling + p.slice(link.length) : p)
+    const lstat = (p: string) => ({ dev: 1, ino: p === link ? "link-inode" : `dir:${p}` })
+    const h = harness({ realpath, lstat })
+    h.input.sidecarEnv = { HOME, XDG_CONFIG_HOME: link }
+    h.input.engineConfigDirectory = `${link}/opencode`
+    const deny = processFenceWriteRules(planProcessFence(h.input, h.deps).profile).deny
+    expect(deny).toContainEqual({ kind: "subpath", value: `${sibling}/opencode` })
+    expect(deny).toContainEqual({ kind: "literal", value: link })
+  })
+
   test("修订 2 B:两种写法指同一个节点按身份去重(大小写变体 ⇒ 只列真实写法);配置路径与真实路径相同 ⇒ 规则与上级目录块不变", () => {
     const upper = `${HOME}/PROJ-A`
     const realpath = (p: string) => {
       if (p === `${upper}/cfglink` || p.startsWith(`${upper}/cfglink/`)) return `${HOME}/real-cfg${p.slice(`${upper}/cfglink`.length)}`
       return p === upper || p.startsWith(`${upper}/`) ? `${HOME}/proj-a${p.slice(upper.length)}` : p
     }
-    const h = harness({ realpath })
+    // node identity (not followed): a case variant is the same object; the link node is its own object
+    const lstat = (p: string) => ({ dev: 1, ino: p === `${HOME}/proj-a/cfglink` ? "link" : p.toLowerCase() })
+    const h = harness({ realpath, lstat })
     h.input.sidecarEnv = { HOME, XDG_CONFIG_HOME: `${upper}/cfglink` }
     h.input.engineConfigDirectory = `${upper}/cfglink/opencode`
     const deny = processFenceWriteRules(planProcessFence(h.input, h.deps).profile).deny

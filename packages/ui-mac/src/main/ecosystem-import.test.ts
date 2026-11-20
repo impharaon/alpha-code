@@ -20,6 +20,7 @@ import {
 import { PROJECT_HIDDEN_DIR } from "../shared/project-hidden-dir"
 import { ECOSYSTEM_COMPATIBILITY_PLUGIN, injectCodePuppyConfig } from "./codepuppy-config-injection"
 import { publishMainBootstrap, unpublishTestBootstrap } from "../../test-component/codepuppy-bootstrap-fixture"
+import { handOverCredentials } from "../../test-component/credential-table"
 
 let tmp: string
 const savedEnv: Record<string, string | undefined> = {}
@@ -56,6 +57,7 @@ describe("外部生态 default-deny —— T1(注入的移除指令 + 逃生)", 
   const plugins = () => {
     const userData = path.join(tmp, "userdata")
     publishMainBootstrap({ userData, engineConfigDirectory: path.join(tmp, "engine-config") })
+    handOverCredentials(userData) // SPEC-stored-credentials-fence:sidecar 在注入之前发布主进程交来的整表(T1)
     return (JSON.parse(injectCodePuppyConfig(userData, undefined, "stable", codepuppyBootstrap().paths.userConfig ?? null).config.content) as { plugins: string[] }).plugins
   }
   test("默认:注入配置的 plugins 里有 -opencode.config.compatibility(.claude / .agents 两类技能根的唯一装载者被移除)", () => {

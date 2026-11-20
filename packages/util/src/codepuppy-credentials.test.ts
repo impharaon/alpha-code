@@ -1,6 +1,17 @@
 // DESIGN-stored-credentials-fence §4.1:进程内凭据表的消息校验与主进程直接应用路径的叶子解析。值都是一眼可辨的假值。
-import { describe, expect, test } from "bun:test"
-import { parseCodePuppyCredentials, resolveConnectorLeaf, type CodePuppyCredentials } from "./codepuppy-credentials.js"
+import { afterEach, describe, expect, test } from "bun:test"
+import {
+  __resetCodePuppyCredentialsForTests,
+  codepuppyCredential,
+  installCodePuppyCredentialSource,
+  parseCodePuppyCredentials,
+  publishCodePuppyCredentials,
+  readCodePuppyCredential,
+  refreshCodePuppyCredentials,
+  resolveCodePuppyCredentialRefs,
+  resolveConnectorLeaf,
+  type CodePuppyCredentials,
+} from "./codepuppy-credentials.js"
 
 const STORE = "/u/data/codepuppy-mcp-secrets"
 const OWN = `${STORE}/alpha/v-0000aaaa/TOKEN`
@@ -115,5 +126,110 @@ describe("parseCodePuppyCredentials", () => {
       expect(message).toMatch(/^Code Puppy credentials: /)
       expect(message).not.toContain("FAKE-v")
     }
+  })
+})
+
+// ── sidecar 进程里的表与引擎配置装载时的代入(设计 §4.1、§4.4)────────────────────────────────────────────
+
+afterEach(() => __resetCodePuppyCredentialsForTests())
+
+describe("进程内表与读者", () => {
+  test("发布前什么都没有;发布后精确查(~/ 展开、path.resolve),整表替换;readCodePuppyCredential 没有就抛,消息不带路径与值", () => {
+    expect(codepuppyCredential(INLINE)).toBeUndefined()
+    expect(() => readCodePuppyCredential(INLINE)).toThrow(/^Code Puppy credential is not available$/)
+    publishCodePuppyCredentials(table)
+    expect(codepuppyCredential(INLINE)).toBe("FAKE-platform")
+    expect(codepuppyCredential("/u/data/codepuppy-secrets/../codepuppy-secrets/CODEPUPPY_API_KEY")).toBe("FAKE-platform")
+    publishCodePuppyCredentials({})
+    expect(codepuppyCredential(INLINE)).toBeUndefined()
+    let message = ""
+    try {
+      readCodePuppyCredential(INLINE)
+    } catch (error) {
+      message = (error as Error).message
+    }
+    expect(message).not.toContain(INLINE)
+  })
+
+  test("refresh:没装来源什么都不做;装了 ⇒ 每次调用各拉一次、成功才发布;拉取抛 ⇒ 抛,已发布的旧表不被改", async () => {
+    publishCodePuppyCredentials(table)
+    await refreshCodePuppyCredentials()
+    expect(codepuppyCredential(INLINE)).toBe("FAKE-platform")
+    let pulls = 0
+    let next: CodePuppyCredentials | Error = { [INLINE]: { value: "FAKE-renewed", use: { kind: "inline" } } }
+    installCodePuppyCredentialSource(async () => {
+      pulls++
+      if (next instanceof Error) throw next
+      return next
+    })
+    await Promise.all([refreshCodePuppyCredentials(), refreshCodePuppyCredentials()])
+    expect(pulls).toBe(2) // 两次装载各自拉,不合并
+    expect(codepuppyCredential(INLINE)).toBe("FAKE-renewed")
+    next = new Error("no reply")
+    await expect(refreshCodePuppyCredentials()).rejects.toThrow("no reply")
+    expect(codepuppyCredential(INLINE)).toBe("FAKE-renewed")
+  })
+})
+
+describe("resolveCodePuppyCredentialRefs —— 封闭清单位置", () => {
+  const doc = (value: unknown) => JSON.stringify(value, null, 2)
+  const parse = (text: string) => JSON.parse(text)
+
+  test("内联文档:provider apiKey 只代入 inline;mcp.servers.<n>.headers 代入 inline 与同名 connector;environment / client_secret 只代入同名 connector", () => {
+    publishCodePuppyCredentials(table)
+    const out = parse(
+      resolveCodePuppyCredentialRefs(
+        doc({
+          providers: { deepseek: { settings: { apiKey: `{file:${INLINE}}` } }, other: { settings: { apiKey: `{file:${OWN}}` } } },
+          mcp: {
+            servers: {
+              codepuppy: { headers: { Authorization: `Bearer {file:${INLINE}}` } },
+              alpha: { headers: { X: `{file:${OWN}}` }, environment: { T: `{file:${OWN}}`, P: `{file:${INLINE}}` }, oauth: { client_secret: `{file:${OWN}}` } },
+            },
+          },
+        }),
+        "inline",
+      ),
+    )
+    expect(out.providers).toEqual({ deepseek: { settings: { apiKey: "FAKE-platform" } }, other: { settings: { apiKey: `{file:${OWN}}` } } })
+    expect(out.mcp.servers.codepuppy.headers.Authorization).toBe("Bearer FAKE-platform")
+    expect(out.mcp.servers.alpha).toEqual({ headers: { X: "FAKE-alpha" }, environment: { T: "FAKE-alpha", P: `{file:${INLINE}}` }, oauth: { client_secret: "FAKE-alpha" } })
+  })
+
+  test("显式文件:inline 条目一处也不代入(平台、BYOK 永不从显式文件出来);mcp.<n> 的 headers / environment / clientSecret 只代入同名 connector;A 条目引用 B 的令牌不代入", () => {
+    publishCodePuppyCredentials(table)
+    const out = parse(
+      resolveCodePuppyCredentialRefs(
+        doc({
+          providers: { deepseek: { settings: { apiKey: `{file:${INLINE}}` } } },
+          mcp: {
+            alpha: { headers: { X: `{file:${OWN}}`, P: `{file:${INLINE}}` }, environment: { T: `{file:${OWN}}`, B: `{file:${OTHER}}` }, oauth: { clientSecret: `{file:${OWN}}` } },
+            servers: { bravo: { headers: { X: `{file:${OTHER}}` }, environment: { A: `{file:${OWN}}` } } },
+          },
+        }),
+        "explicit",
+      ),
+    )
+    expect(out.providers.deepseek.settings.apiKey).toBe(`{file:${INLINE}}`)
+    expect(out.mcp.alpha).toEqual({ headers: { X: "FAKE-alpha", P: `{file:${INLINE}}` }, environment: { T: "FAKE-alpha", B: `{file:${OTHER}}` }, oauth: { clientSecret: "FAKE-alpha" } })
+    expect(out.mcp.servers.bravo).toEqual({ headers: { X: "FAKE-bravo" }, environment: { A: `{file:${OWN}}` } })
+  })
+
+  test("清单之外的位置一字不动(例如 agents.<名>.system、命令、url),留给引擎自己读;没有表 / 文本解析不了 ⇒ 原样", () => {
+    const text = doc({ agents: { build: { system: `{file:${INLINE}}` } }, mcp: { alpha: { command: ["x", `{file:${OWN}}`], url: `{file:${OWN}}` } } })
+    expect(resolveCodePuppyCredentialRefs(text, "explicit")).toBe(text)
+    publishCodePuppyCredentials(table)
+    expect(resolveCodePuppyCredentialRefs(text, "explicit")).toBe(text)
+    expect(resolveCodePuppyCredentialRefs(text, "inline")).toBe(text)
+    const broken = `{ "providers": { "p": { "settings": { "apiKey": "{file:${INLINE}}" } } }`
+    expect(resolveCodePuppyCredentialRefs(broken, "inline")).toBe(broken)
+  })
+
+  test("值 trim 后 JSON 转义,每个 { 写成 \\u007b(引擎随后的 {env:}/{file:} 碰不到它);同一串里不代入的引用原样留着", () => {
+    publishCodePuppyCredentials({ [OWN]: { value: ' a"b\\{env:HOME}{file:/etc/x}\n', use: { kind: "connector", server: "alpha" } } })
+    const text = resolveCodePuppyCredentialRefs(doc({ mcp: { alpha: { environment: { T: `x {file:${OWN}} y {file:/w/plain}` } } } }), "explicit")
+    expect(text).not.toContain("{env:HOME}")
+    expect(text).toContain("\\u007benv:HOME}")
+    expect(parse(text).mcp.alpha.environment.T).toBe('x a"b\\{env:HOME}{file:/etc/x} y {file:/w/plain}')
   })
 })

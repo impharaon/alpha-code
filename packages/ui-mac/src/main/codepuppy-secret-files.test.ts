@@ -8,6 +8,7 @@ import * as fs from "node:fs"
 import * as os from "node:os"
 import * as path from "node:path"
 import {
+  applyPlatformCredentialsHot,
   credentialStores,
   customProviderSecretName,
   hasSecretFile,
@@ -199,5 +200,21 @@ describe("credentialStores / readCredentialTable", () => {
     expect(readCredentialTable(credentialStores({ userDataPath: path.join(tmp, "nowhere") }))).toEqual({})
     fs.writeFileSync(path.join(tmp, "codepuppy-secrets"), "not a directory")
     expect(() => readCredentialTable(credentialStores({ userDataPath: tmp }))).toThrow()
+  })
+})
+
+// DESIGN-stored-credentials-fence §4.3 T2:续期热写之后把整表推给 sidecar;推送失败按结构性重启。
+describe("applyPlatformCredentialsHot —— T2 推送", () => {
+  test("写入与回读摘要都通过之后推一次;推送抛 ⇒ needs-structural;还没 fork 过 ⇒ 不写也不推", () => {
+    const forked = new Set(syncSecretFiles(tmp, { CODEPUPPY_API_KEY: "FAKE-1" }).written)
+    let pushed = 0
+    expect(applyPlatformCredentialsHot(tmp, { CODEPUPPY_API_KEY: "FAKE-2" }, forked, () => void pushed++)).toBe("applied")
+    expect(pushed).toBe(1)
+    expect(fs.readFileSync(secretFilePath(tmp, "CODEPUPPY_API_KEY"), "utf8")).toBe("FAKE-2")
+    expect(applyPlatformCredentialsHot(tmp, { CODEPUPPY_API_KEY: "FAKE-3" }, forked, () => {
+      throw new Error("channel gone")
+    })).toBe("needs-structural")
+    expect(applyPlatformCredentialsHot(tmp, { CODEPUPPY_API_KEY: "FAKE-4" }, undefined, () => void pushed++)).toBe("applied")
+    expect(pushed).toBe(1)
   })
 })

@@ -15,7 +15,9 @@
 //   ② 热应用 B(不重启、不重连)⇒ 同一会话上的下一个 POST 带 B,其间没有 initialize;
 //   ③ 端点断开 GET 流 ⇒ SDK 在同一会话上重连 GET,带的是 B;
 //   ④ 热应用 C,端点让会话过期 ⇒ 同一会话上的那个 POST 收到 404,引擎重新 initialize,新会话上的每个请求都带 C;
-//   ⑤ 删掉凭据文件 ⇒ 同一条连接上的下一个请求不出网(端点零请求、没有重新 initialize),引擎记下 401。
+//   ⑤ 删掉凭据文件(main 随后推来的整表里没有它)⇒ 同一条连接上的下一个请求不出网(端点零请求、没有重新 initialize),引擎记下 401。
+// SPEC-stored-credentials-fence 起值来自主进程交来的进程内凭据表(fork 时 T1,续期写盘后整表推送 T2;宿主的 main 那一侧是
+// test-component/credential-table.ts),不读文件。
 // 已知的坏(实测,`#1662` r6):凭据在建连时读一次(把 codepuppy(#1562) 块的读文件改成每条连接只读一次)⇒ ② ③ 带的仍是 A、⑤ 照样出网;
 // r3 的那一条(连接不经 governedCredentialFetch ⇒ `{file:}` 只在装配置时解析一次)同样红在 ②。
 //
@@ -25,6 +27,7 @@ import fs from "node:fs"
 import path from "node:path"
 import { assertEngineSandboxed, engineSandbox } from "../../test-component/engine-sandbox"
 import { codepuppyEngine, scriptedModel, type Running } from "../../test-component/codepuppy-engine"
+import { handOverCredentials } from "../../test-component/credential-table"
 import { testCloudMcp } from "../../test-component/codepuppy-bootstrap-fixture"
 import { applyPlatformCredentialsHot, secretFilePath, syncSecretFiles } from "./codepuppy-secret-files"
 
@@ -131,7 +134,7 @@ describe("REQ-236 #1562 云连接器:同一条连接上每个请求现读凭据,
   }, 30_000)
 
   test("② 热应用 B(不重连)⇒ 同一会话上的下一个 POST 带 B,其间没有 initialize", async () => {
-    expect(applyPlatformCredentialsHot(userData, { CODEPUPPY_MCP_TOKEN: TOKEN_B, CODEPUPPY_API_KEY: API_KEY }, forked)).toBe("applied")
+    expect(applyPlatformCredentialsHot(userData, { CODEPUPPY_MCP_TOKEN: TOKEN_B, CODEPUPPY_API_KEY: API_KEY }, forked, () => handOverCredentials())).toBe("applied")
     const mark = hits.length
     listChanged()
     const post = await waitHit(mark, (hit) => hit.rpc === "tools/list")
@@ -148,7 +151,7 @@ describe("REQ-236 #1562 云连接器:同一条连接上每个请求现读凭据,
   }, 30_000)
 
   test("④ 热应用 C,会话过期 ⇒ 那个 POST 收到 404,引擎重新 initialize,新会话上的每个请求都带 C", async () => {
-    expect(applyPlatformCredentialsHot(userData, { CODEPUPPY_MCP_TOKEN: TOKEN_C, CODEPUPPY_API_KEY: API_KEY }, forked)).toBe("applied")
+    expect(applyPlatformCredentialsHot(userData, { CODEPUPPY_MCP_TOKEN: TOKEN_C, CODEPUPPY_API_KEY: API_KEY }, forked, () => handOverCredentials())).toBe("applied")
     const mark = hits.length
     expired.add(session)
     listChanged()
@@ -165,6 +168,7 @@ describe("REQ-236 #1562 云连接器:同一条连接上每个请求现读凭据,
 
   test("⑤ 删掉凭据文件 ⇒ 同一条连接上的下一个请求不出网(引擎记下 HTTP 401),不重新 initialize", async () => {
     fs.rmSync(secretFilePath(userData, "CODEPUPPY_MCP_TOKEN"))
+    handOverCredentials() // main 推来的整表里不再有它(只删文件不推,引擎进程里仍是上一张表)
     const mark = hits.length
     // 引擎在本进程里,它的日志走 stdout / stderr / console —— 这一步期间全部记下来(照常输出),证明请求确实被发起、在出网前被拒
     const logged: string[] = []

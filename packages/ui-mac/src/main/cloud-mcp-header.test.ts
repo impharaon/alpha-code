@@ -36,6 +36,7 @@ import { secretFilePath, secretFileRef } from "./codepuppy-secret-files"
 // kill-switch 下**最终**进配置的那一份不是注入面写的,是 ext 写回的(#733 审计 B1 的教训原样
 // 继承):只断 main 的 config / 文档里的定义 = 断中间产物。这里 import 生产件本体,让最后一跳真的执行。
 import { installCloudMcp } from "../../../ext/src/cloud-websearch-kill"
+import { handOverCredentials } from "../../test-component/credential-table"
 
 /** 2.x `mcp.transform` 编辑器的最小面(installCloudMcp 只用 set):起点是注入面写进配置的那几条。 */
 function mcpEditor(initial: Record<string, unknown>) {
@@ -129,6 +130,7 @@ describe("`#1195` 生产注入面", () => {
   let doc: CodePuppyBootstrap
   const inject = (extPluginPath?: string) => {
     doc = publishMainBootstrap({ userData })
+    handOverCredentials(userData) // SPEC-stored-credentials-fence:sidecar 在注入之前发布主进程交来的整表(T1)
     const result = injectCodePuppyConfig(userData, extPluginPath, "stable", codepuppyBootstrap().paths.userConfig ?? null)
     lastContent = result.config.content
     return result

@@ -55,6 +55,7 @@ import {
 import { providerAllowList, publishProviderAllowList } from "../../../ext/src/provider-allow"
 import { publishTestBootstrap, testCloudMcp, unpublishTestBootstrap } from "../../test-component/codepuppy-bootstrap-fixture"
 import type { CodePuppyBootstrap } from "@opencode/util/codepuppy-bootstrap"
+import { handOverCredentials } from "../../test-component/credential-table"
 const CLOUD_DISPATCH_TOOL_ID = cloudMcpToolId("cloud_dispatch")
 
 // 注入读到的每一个 env 输入 + 它自己写出的 env 输出:逐个快照/清空/还原,
@@ -184,6 +185,7 @@ type Injected = {
 function inject(extPluginPath?: string) {
   publishDoc()
   const main = writeEngineConfigForFork(codepuppyBootstrap())
+  handOverCredentials(userData) // SPEC-stored-credentials-fence:sidecar 在注入之前发布主进程交来的整表(T1)
   const result = injectCodePuppyConfig(userData, extPluginPath, "stable", codepuppyBootstrap().paths.userConfig ?? null)
   // `#1667`(编排器裁决 r1 第 2 条、C7 重裁):`config.file` 是 main 合成的显式文件;出厂命令、skills 与第一层 policies 在那里。
   const explicit = result.config.file && fs.existsSync(result.config.file) ? (JSON.parse(fs.readFileSync(result.config.file, "utf8")) as Injected & { $schema?: string; command?: unknown }) : undefined
@@ -258,6 +260,7 @@ describe("injectCodePuppyConfig —— 注入组合体的执行级闸门(#607)",
 
   test("`#1698` 注入没有无文档模式:没发布启动文档 ⇒ 直接抛(sidecar 的 start() 报错退出),不按「未登录、开关全关」猜", () => {
     unpublishTestBootstrap()
+    handOverCredentials(userData) // SPEC-stored-credentials-fence:sidecar 在注入之前发布主进程交来的整表(T1)
     expect(() => injectCodePuppyConfig(userData, EXT_DIR, "stable", null)).toThrow(expect.objectContaining({ reason: "unpublished" }))
   })
 
@@ -531,6 +534,7 @@ describe("injectCodePuppyConfig —— 注入组合体的执行级闸门(#607)",
     const truth = codepuppyBootstrap().paths.userConfig!
     const engineConfig = path.join(userData, "codepuppy-engine-config")
     // 没有 main 那一步:注入照常 ok,一个文件也不建;显式槽仍指向 main 写的那个位置,底表缺席
+    handOverCredentials(userData) // SPEC-stored-credentials-fence:sidecar 在注入之前发布主进程交来的整表(T1)
     const bare = injectCodePuppyConfig(userData, EXT_DIR, "stable", truth)
     expect(bare.ok).toBe(true)
     expect(fs.existsSync(engineConfig)).toBe(false)
@@ -540,6 +544,7 @@ describe("injectCodePuppyConfig —— 注入组合体的执行级闸门(#607)",
     // main 写过之后:注入给出同一对路径,且不改写它们的任何一个字节
     writeEngineConfigForFork(codepuppyBootstrap())
     const before = [explicitConfigPath(userData), engineModelsPath(userData), truth].map((file) => [fs.readFileSync(file, "utf8"), fs.statSync(file).mtimeMs])
+    handOverCredentials(userData) // SPEC-stored-credentials-fence:sidecar 在注入之前发布主进程交来的整表(T1)
     const after = injectCodePuppyConfig(userData, EXT_DIR, "stable", truth)
     expect(after.ok).toBe(true)
     expect(after.config.file).toBe(explicitConfigPath(userData))

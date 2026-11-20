@@ -21,6 +21,7 @@ import * as path from "node:path"
 import { CODEPUPPY_BEHAVIOR_MD } from "./codepuppy-behavior"
 import { injectCodePuppyConfig } from "./codepuppy-config-injection"
 import { publishMainBootstrap, unpublishTestBootstrap } from "../../test-component/codepuppy-bootstrap-fixture"
+import { handOverCredentials } from "../../test-component/credential-table"
 
 const MANAGED = [
   "CODEPUPPY_JSONC_TRUTH_DISABLE",
@@ -91,6 +92,7 @@ afterEach(() => {
 function inject(): { instructions: string[]; model: unknown; behaviorFile: string; behaviorBody: string | null } {
   // `#1698` G2:默认模型覆盖由 main 的构建器从它的环境(这里就是 process.env)写进启动文档,sidecar 在注入前发布
   publishMainBootstrap({ userData })
+  handOverCredentials(userData) // SPEC-stored-credentials-fence:sidecar 在注入之前发布主进程交来的整表(T1)
   const result = injectCodePuppyConfig(userData, undefined, "stable", codepuppyBootstrap().paths.userConfig ?? null)
   expect(result.ok ? true : result.error).toBe(true)
   // `#1667`:注入产物不再进环境变量,引擎从结果的 `config.content` 拿(sidecar 放进 `start()` 的选项)。

@@ -6,6 +6,7 @@ import { join, parse, resolve } from "node:path"
 import { writeCustomProviderTruth } from "./custom-provider-truth-write"
 import { mockElectron } from "../../test-component/electron-mock"
 import { __resetCodePuppyBootstrapForTests, parseCodePuppyBootstrap, publishCodePuppyBootstrap, type CodePuppyBootstrap, codepuppyBootstrap } from "@opencode/util/codepuppy-bootstrap"
+import { handOverCredentials } from "../../test-component/credential-table"
 
 // `#1698`:每次 fork 交给 sidecar 的 start 消息(启动文档在它的 `bootstrap` 里)。
 const startCalls: Array<{ type: "start"; bootstrap: CodePuppyBootstrap }> = []
@@ -72,7 +73,7 @@ mock.module("./codepuppy-keychain-backend", () => ({
 const { applyPlatformCredentialsHot, hasSecretFile, secretFilePath } = await import("./codepuppy-secret-files")
 const { clearByokKeys, initByokKeys, storeByokKey } = await import("./codepuppy-byok-keys")
 const { writeShellEnvCache } = await import("./shell-env-cache")
-const { forkedSecretNames, preferAppEnv, preplanConfigFenceRoots, spawnLocalServer } = await import("./server")
+const { forkedSecretNames, preferAppEnv, preplanConfigFenceRoots, pushCredentialsToSidecar, spawnLocalServer } = await import("./server")
 const { configFenceLocations, resolveEngineRoots } = await import("./process-fence-profile")
 const { bootFenceWorkspaceTruth, readWorkspaceTruthOrThrow, writeWorkspaceTruth } = await import("./process-fence-workspaces")
 const { GLOBAL_RENDERER_STORE, TABS_KEY } = await import("./tabs-preclean")
@@ -353,6 +354,7 @@ describe("`#1411` / `#1443` web search 按账户态的在场性", () => {
       )
       // 先证明注入真的跑成了 —— 它有一层函数级 catch,拿一份空配置当结论正是本文件要防的那类假绿。
       // `#1662` parity B1:2.x 的注入返回 `{ config: { content, file }, explicit }`(内联文档交给 start(),不再写 OPENCODE_CONFIG_CONTENT)。
+      handOverCredentials(userDataPath) // SPEC-stored-credentials-fence:sidecar 在注入之前发布主进程交来的整表(T1)
       const { config } = injectCodePuppyConfig(userDataPath, undefined, "stable", codepuppyBootstrap().paths.userConfig ?? null)
       const parsed = JSON.parse(config.content) as EngineConfigShape
       expect(Object.keys(parsed.agents ?? {}).length).toBeGreaterThan(0)
@@ -667,10 +669,89 @@ describe("spawnLocalServer", () => {
     expect(JSON.stringify(bootstrap)).not.toContain("test-platform-key")
     expect([...(forkedSecretNames() ?? [])]).toEqual(expect.arrayContaining(["CODEPUPPY_API_KEY", "CODEPUPPY_MCP_TOKEN"]))
     // 同一份 fork 集合下的续期 ⇒ 热写生效(凭据文件就地换新)。
-    expect(applyPlatformCredentialsHot(userDataPath, { ...process.env, CODEPUPPY_API_KEY: "next-key" }, forkedSecretNames())).toBe(
+    expect(applyPlatformCredentialsHot(userDataPath, { ...process.env, CODEPUPPY_API_KEY: "next-key" }, forkedSecretNames(), pushCredentialsToSidecar)).toBe(
       "applied",
     )
     expect(readFileSync(secretFilePath(userDataPath, "CODEPUPPY_API_KEY"), "utf8")).toBe("next-key")
+  })
+
+  // DESIGN-stored-credentials-fence §4.2 / §4.3:T1 随 start 交存放点整表;引擎装载前的拉取同步应答当刻盘上的表;续期整表推送;拉取超时
+  // (credentials.unavailable)⇒ credential-change 重启;子进程退出后推送跳过。值都是一眼可辨的假值。
+  class CredentialChild extends FakeChild {
+    posted: Array<Record<string, any>> = []
+    override postMessage(message: { type: string }) {
+      this.posted.push(message as Record<string, any>)
+      super.postMessage(message)
+    }
+  }
+  const spawnWith = async (child: CredentialChild, respawns: string[]) => {
+    creditDanglingSweepForSpawn()
+    return spawnLocalServer("127.0.0.1", 4099, "password", {
+      userDataPath,
+      healthCheck: async () => true,
+      planFence: fakePlanFence,
+      fork: (() => child) as unknown as typeof import("electron").utilityProcess.fork,
+      requestRespawn: (trigger) => void respawns.push(trigger),
+    })
+  }
+
+  test("I-20 T1 / P / T2:start 带存放点整表;credentials.request 同步回复当刻盘上的表;续期推整表;unavailable ⇒ credential-change;退出后推送跳过", async () => {
+    process.env.CODEPUPPY_API_KEY = "FAKE-platform-A"
+    const child = new CredentialChild()
+    const respawns: string[] = []
+    const result = await spawnWith(child, respawns)
+    await result.health.wait
+    const key = secretFilePath(userDataPath, "CODEPUPPY_API_KEY")
+    const start = child.posted.find((message) => message.type === "start")!
+    expect(start.credentials[key]).toEqual({ value: "FAKE-platform-A", use: { kind: "inline" } })
+    expect(JSON.stringify(start.bootstrap)).not.toContain("FAKE-platform-A")
+
+    writeFileSync(key, "FAKE-platform-B")
+    const before = child.posted.length
+    child.emit("message", { type: "credentials.request", id: 7 })
+    expect(child.posted).toHaveLength(before + 1) // 收到与回复之间没有 await
+    expect(child.posted.at(-1)).toMatchObject({ type: "credentials", id: 7 })
+    expect(child.posted.at(-1)!.credentials[key].value).toBe("FAKE-platform-B")
+
+    expect(applyPlatformCredentialsHot(userDataPath, { ...process.env, CODEPUPPY_API_KEY: "FAKE-platform-C" }, forkedSecretNames(), pushCredentialsToSidecar)).toBe("applied")
+    const pushed = child.posted.at(-1)!
+    expect(pushed.type).toBe("credentials")
+    expect("id" in pushed).toBe(false)
+    expect(pushed.credentials[key].value).toBe("FAKE-platform-C")
+
+    expect(respawns).toEqual([])
+    child.emit("message", { type: "credentials.unavailable", id: 8 })
+    expect(respawns).toEqual(["credential-change"])
+
+    await result.listener.stop()
+    const after = child.posted.length
+    pushCredentialsToSidecar()
+    expect(child.posted).toHaveLength(after)
+    delete process.env.CODEPUPPY_API_KEY
+  })
+
+  test("I-20:拉取时主进程读不出表 ⇒ 回 error(不含值)并请求 credential-change;fork 时读不出表 ⇒ 本代失败、子进程被杀", async () => {
+    const child = new CredentialChild()
+    const respawns: string[] = []
+    const result = await spawnWith(child, respawns)
+    await result.health.wait
+    const store = join(userDataPath, "codepuppy-mcp-secrets")
+    writeFileSync(store, "not a directory")
+    child.emit("message", { type: "credentials.request", id: 3 })
+    expect(child.posted.at(-1)).toEqual({ type: "credentials", id: 3, error: "credential table unavailable" })
+    expect(respawns).toEqual(["credential-change"])
+    await result.listener.stop()
+
+    const doomed = new CredentialChild()
+    let killed = 0
+    doomed.kill = () => {
+      killed++
+      queueMicrotask(() => doomed.emit("exit", 0))
+    }
+    await expect(spawnWith(doomed, [])).rejects.toThrow(/Code Puppy credential table could not be read — sidecar start refused/)
+    expect(doomed.posted.some((message) => message.type === "start")).toBe(false)
+    expect(killed).toBe(1)
+    rmSync(store)
   })
 
   // SPEC-engine-config-fence BR-03 / AC-05 第一句(DESIGN-engine-config-fence §4.4、§5):显式文件、模型底表与种子由 main 在 fork 前写;

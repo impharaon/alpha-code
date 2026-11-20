@@ -16,6 +16,7 @@
 import { publishTestBootstrap, testCloudMcp, unpublishTestBootstrap, type TestBootstrapInput } from "../../ui-mac/test-component/codepuppy-bootstrap-fixture"
 import { afterEach, beforeEach, describe, expect, spyOn, test } from "bun:test"
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, writeFileSync } from "node:fs"
+import { __resetCodePuppyCredentialsForTests, publishCodePuppyCredentials } from "../../util/src/codepuppy-credentials"
 import { tmpdir } from "node:os"
 import { join, resolve } from "node:path"
 import { Effect } from "effect"
@@ -152,8 +153,11 @@ afterEach(() => {
     else process.env[k] = v
   }
   unpublishTestBootstrap()
+  __resetCodePuppyCredentialsForTests()
   rmSync(root, { recursive: true, force: true })
 })
+/** SPEC-stored-credentials-fence:主进程把凭据随整表交给引擎进程(T1);ext 的读法只认这张表。盘上的文件在这里只是引用的目标路径。 */
+const handOver = (file: string, value: string) => publishCodePuppyCredentials({ [file]: { value, use: { kind: "inline" } } })
 
 /** 本文件为之设了咽喉的通路。② 要求它与「真 CodePuppyExt 注册且分类为 context」的集合逐字相等。 */
 const THROATED = ["agent.transform", "command.transform", "mcp.transform", "session.compaction", "session.context", "session.generate", "session.http.request", "session.prompt", "session.title", "skill.transform", "tool.execute.after", "tool.execute.before", "tool.transform", "websearch.transform"].sort()
@@ -300,6 +304,7 @@ describe("③a 配置域 transform 咽喉:ext 写进 agent / command / mcp 的�
   test("云 MCP 定义落在声明过的引用 /mcp 下(ARM + DEF 在场时 ext 装进去)", async () => {
     const token = join(root, "cloud-token")
     writeFileSync(token, "tok-cloud\n")
+    handOver(token, "tok-cloud\n")
     republish({ killSwitch: true, cloudMcp: testCloudMcp("https://cloud.invalid/mcp", token) })
     const after = await extWrites({ codepuppy: WITHHELD_CLOUD_MCP })
     expect(after.mcp.codepuppy).toEqual({ type: "remote", url: "https://cloud.invalid/mcp", headers: { Authorization: "Bearer tok-cloud" }, oauth: false, codemode: false })
@@ -471,6 +476,7 @@ describe("③b system 咽喉:输出 == 输入 + 登记过的替换,一个字不�
       expect(offline[1]).toBe(VISION_SYSTEM_NOTE_OFFLINE_TEXT)
       const token = join(root, "mcp-token")
       writeFileSync(token, "tok-throat\n")
+      handOver(token, "tok-throat\n")
       republish({ platform: { modelProxyBaseURL: "https://gateway.invalid/v1" }, cloudMcp: testCloudMcp("https://cloud.invalid/mcp", token) })
       const online = systemOf(yield* runContext(input, BLIND))
       expect(unexplainedSystem(input, online)).toEqual([])
@@ -543,8 +549,10 @@ describe("③c 工具表咽喉:每个 description 都是登记项,登记项也�
         cloud_tools_enabled: false,
         login_hint: "在 CodePuppy 左侧栏账户区点「登录」,或打开定制中心的云端页点登录;登录完成后下一条消息起云端工具可用。",
       })
-      // The desktop producer's shape (main writes it into the bootstrap document); an existing directory makes a file-content read throw.
+      // The desktop producer's shape (main writes it into the bootstrap document). Presence is asked of the credential table main hands over
+      // (SPEC-stored-credentials-fence), never of the file: the reference's target here is a directory, so any content read would throw.
       republish({ platform: { modelProxyBaseURL: "https://gateway.invalid/v1" }, cloudMcp: testCloudMcp("https://cloud.invalid/mcp", root) })
+      handOver(root, "tok-access\n")
       const ready = text(yield* call())
       expect(ready).toMatchObject({ logged_in: true, state: "ready", cloud_tools_enabled: false })
       expect(JSON.stringify(ready)).not.toContain(root)
@@ -573,6 +581,7 @@ describe("③d tool.execute.after 咽喉:工具结果回模型的路上,alpha �
     Effect.gen(function* () {
       const token = join(root, "cloud-token")
       writeFileSync(token, "tok-cloud\n")
+      handOver(token, "tok-cloud\n")
       republish({ killSwitch: true, cloudMcp: testCloudMcp("https://cloud.invalid/mcp", token) })
       const mcp = recordingMcp()
       yield* activate(CodePuppyExt, { mcp })
@@ -820,6 +829,7 @@ describe("③j session.http.request 咽喉:即将发出的请求上 alpha 只换
     Effect.gen(function* () {
       const token = join(root, "platform-token")
       writeFileSync(token, "plat-throat\n")
+      handOver(token, "plat-throat\n")
       republish({ platform: { modelProxyBaseURL: "https://gateway.invalid/v1", credentialRef: `{file:${token}}` } })
       yield* activate(CodePuppyExt)
       const hooks = yield* PluginHooks.Service

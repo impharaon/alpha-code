@@ -38,7 +38,7 @@ import { dirname, join, resolve } from "node:path"
 import { __resetEgressGrantsForTests } from "./network-egress-grants"
 import { startEgressPolicyProxy, type EgressLogRecord, type EgressProxyHandle } from "./network-egress-proxy"
 import { sidecarEgressProxyEnv } from "./sidecar-env"
-import { secretFilePath } from "./codepuppy-secret-files"
+import { credentialStores, readCredentialTable, secretFilePath } from "./codepuppy-secret-files"
 import { buildCodePuppyBootstrap } from "./codepuppy-bootstrap-build"
 import { writeEngineConfigForFork } from "./engine-explicit-config"
 import { ISOLATED_KEYS, isInside, isolatedEnv, testRoot } from "../../../../scripts/test-isolation/env"
@@ -217,6 +217,8 @@ describeDarwin("`#1572` AC4 真栈:Electron 内嵌 node + 真出网代理 + 真 
     }
     // SPEC-engine-config-fence BR-03:显式文件、模型底表与种子由 main 在 fork 前按同一份启动文档写(驱动扮演的 sidecar 只读)
     writeEngineConfigForFork(input.bootstrap as Parameters<typeof writeEngineConfigForFork>[0])
+    // SPEC-stored-credentials-fence T1:main 在 start 消息里交给 sidecar 的整表(生产读法)
+    input.credentials = readCredentialTable(credentialStores({ userDataPath: userData }))
     engine = spawn(electron, [join(driverDir, "engine-driver.js"), JSON.stringify(input)], { cwd: workspace, env, stdio: ["ignore", "pipe", "pipe"] })
     engine.stdout?.on("data", (c: Buffer) => engineLog.push(c.toString()))
     engine.stderr?.on("data", (c: Buffer) => engineLog.push(c.toString()))

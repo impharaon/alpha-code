@@ -119,6 +119,15 @@ function snapshot() {
   return { files, listings, absent }
 }
 
+/** config-fence-ops: the operations each mode reports (one line each). A missing or extra line means the helper broke, not «refused». */
+const OPS = {
+  file: ["append", "truncate", "write-new-then-rename-over", "rename-workspace-file-over", "swap", "rename-away", "hardlink-alias", "chmod", "unlink"],
+  dir: ["create-inside", "mkdir-child", "hardlink-into", "clone-into", "symlink-into", "rename-dir-away", "chmod-dir"],
+  create: ["create", "symlink-at", "mkdir-at", "rename-into", "hardlink-at", "clone-at"],
+  ancestor: ["rename-ancestor-away"],
+  vol: ["vol-append", "vol-rename-over"],
+} as const
+
 /** The attack script: every location × every operation, every spelling, every ancestor node. */
 function matrix() {
   const calls: Array<[string, "file" | "dir" | "create" | "ancestor" | "vol", string]> = [
@@ -240,6 +249,9 @@ function attack(profile: string) {
   }
   // every location answered: a missing label means the matrix itself broke (not «refused»)
   for (const [label] of calls) expect([...results.keys()].some((key) => key.startsWith(`${label}:`)), `${label}\n${out}`).toBe(true)
+  // exactly the attempts the matrix asks for (final review 6b): a dropped operation in the helper, or a vol-stat failure, turns this red
+  const expected = calls.flatMap(([label, mode]) => OPS[mode].map((op) => `${label}:${op}`))
+  expect([...results.keys()].sort()).toEqual(expected.sort())
   const landed = [...results].filter(([, result]) => result === "OK").map(([key]) => key)
   console.log(`[E1] ${calls.length} locations / spellings, ${results.size} attempts, ${landed.length} landed${landed.length ? `: ${landed.join(" ")}` : ""}`)
   return results
@@ -308,7 +320,7 @@ test("production: every attack on every protected location, every spelling and e
   for (const label of ["cf5-discovered", "cf10-jsonc", "cf7-new-dat", "cf7-new-DAT", "cf7-new-Dat", "spell-case-new-endpoints"])
     for (const op of ["create", "symlink-at", "mkdir-at", "rename-into", "hardlink-at", "clone-at"]) expect(results.get(`${label}:${op}`), `${label}:${op}`).toBe("FAIL 1")
   for (const key of ["spell-case-dat:append", "cf7-dat:unlink", "anc-home:rename-ancestor-away", "anc-userdata:rename-ancestor-away", "anc-config:rename-ancestor-away"]) expect(results.get(key), key).toBe("FAIL 1")
-  expect(results.size).toBeGreaterThan(200)
+  expect(results.size).toBe(matrix().reduce((sum, [, mode]) => sum + OPS[mode].length, 0))
   // attack() rebuilt the tree before running; the snapshot taken outside the fence afterwards must equal a fresh tree's
   const after = snapshot()
   expect(after.files.map(({ file, text, mode }) => ({ file, text, mode }))).toEqual(before.files.map(({ file, text, mode }) => ({ file, text, mode })))
@@ -324,6 +336,11 @@ test("known bad — the protected set removed, W2 / W6 restored (today's rows): 
   for (const label of ["cf2-dir", "cf8-xdg-dir", "cf6-target-dir", "cf1-env"]) expect(results.get(`${label}:create-inside`), label).toBe("OK")
   for (const label of ["cf7-new-dat", "cf7-new-DAT", "cf5-discovered"]) expect(results.get(`${label}:create`), label).toBe("OK")
   expect(results.get("anc-userdata:rename-ancestor-away")).toBe("OK")
+  // positive controls for the helper (final review 6c): where nothing protects the location, EVERY operation of each mode succeeds —
+  // so a «FAIL» in the production arm is the fence, not an operation that cannot work; the firmlink spellings reach the same objects
+  for (const [label, mode] of [["cf3", "file"], ["cf2-dir", "dir"], ["cf5-discovered", "create"], ["spell-firmlink-cf2", "file"], ["spell-firmlink-cf8", "file"]] as const)
+    if (mode !== "file" || !label.startsWith("spell-firmlink") || existsSync(`/System/Volumes/Data${userData}`))
+      for (const op of OPS[mode]) expect(results.get(`${label}:${op}`), `${label}:${op}`).toBe("OK")
   // what today's rows never covered stays refused (HOME, the state root itself, an exported config directory): CF-10 is listed so the
   // guarantee does not depend on those details
   for (const key of ["cf10-json:append", "cf1-state:create-inside", "cf8-cfg:append"]) expect(results.get(key), key).toBe("FAIL 1")
@@ -390,7 +407,8 @@ async function granted(profile: string, directory: string, command: string[], ti
 }
 
 test("X1 (AC-02 at the fence): ~/.config — itself an ancestor node, so it goes through the issue path — granted (and issued twice, harmlessly): other files land, the protected location is still refused; known bad — X1 rendered after the protected blocks ⇒ the protected location is written", async () => {
-  const command = (label: string) => ["/bin/sh", "-c", `mkdir -p '${join(configHome, "other-app")}' && echo x > '${join(configHome, "other-app", "x")}' && echo other-app-written; '${ops}' ${label} file '${join(xdgConfig, "opencode.json")}' '${ws}'; '${ops}' ${label}-anc ancestor '${xdgConfig}' '${ws}'`]
+  // ${label}-cfghome renames the GRANTED ancestor node itself (final review 5): only the ancestors block (after X1) stops that
+  const command = (label: string) => ["/bin/sh", "-c", `mkdir -p '${join(configHome, "other-app")}' && echo x > '${join(configHome, "other-app", "x")}' && echo other-app-written; '${ops}' ${label} file '${join(xdgConfig, "opencode.json")}' '${ws}'; '${ops}' ${label}-anc ancestor '${xdgConfig}' '${ws}'; '${ops}' ${label}-cfghome ancestor '${configHome}' '${ws}'`]
   // ~/.config is an ancestor node of <XDG_CONFIG_HOME>/opencode: its literal deny keeps it «not covered», so main issues for it and may
   // issue once more for a possibly consumed token (server.ts possiblyConsumed, D14) — two extensions for the same folder, consumed both
   expect(processFenceRulesCover(processFenceWriteRules(plan.profile), configHome)).toBe(false)
@@ -398,9 +416,11 @@ test("X1 (AC-02 at the fence): ~/.config — itself an ancestor node, so it goes
   expect(production.out).toContain("other-app-written")
   for (const op of ["append", "truncate", "write-new-then-rename-over", "rename-workspace-file-over", "swap", "unlink"]) expect(production.results.get(`x1:${op}`), op).toBe("FAIL 1")
   expect(production.results.get("x1-anc:rename-ancestor-away")).toBe("FAIL 1")
+  expect(production.results.get("x1-cfghome:rename-ancestor-away")).toBe("FAIL 1")
   const bad = await granted(x1AfterBlocks(plan.profile), configHome, command("x1"))
   expect(bad.out).toContain("other-app-written")
   expect(bad.results.get("x1:append")).toBe("OK")
+  expect(bad.results.get("x1-cfghome:rename-ancestor-away")).toBe("OK")
 })
 
 test("E2: under the same profile the engine and its children keep writing (state, database and -wal, logs, cache, ~/.npm, uv-cache, workspace, other userData files; mkdir -p on an existing protected directory); R8 control: a user's nested symlink inside a protected directory still writes to its target", () => {

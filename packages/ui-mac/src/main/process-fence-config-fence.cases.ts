@@ -660,3 +660,25 @@ test("确认审查 R2 第 1 条: CODEPUPPY_ENV_FILE is a project symlink to /dev
   for (const marker of ["THROUGH-OK", "DEVNULL-OK", "RM-FAILED", "REPLACE-FAILED"]) expect(result.out, result.out).toContain(marker)
   expect(lstatSync(link).isSymbolicLink()).toBe(true)
 })
+
+test("OUTSIDE the guarantee (residual R10, a documented boundary like R8 — not asserted as refused): a symlink that appears only inside another link's stored target text (XDG_CONFIG_HOME = W/a, W/a → W/s/t, W/s → W/real-s) is not frozen; replacing W/s re-points the configuration", () => {
+  const t = tree("r10")
+  const W = t.ws
+  mkdirSync(join(W, "real-s", "t", "opencode"), { recursive: true })
+  writeFileSync(join(W, "real-s", "t", "opencode", "opencode.json"), "{}")
+  mkdirSync(join(W, "evil-s", "t", "opencode"), { recursive: true })
+  writeFileSync(join(W, "evil-s", "t", "opencode", "opencode.json"), '{"plugin":["evil"]}')
+  symlinkSync(join(W, "real-s"), join(W, "s"))
+  symlinkSync(join(W, "s", "t"), join(W, "a"))
+  const plan = planFor(t, { configHome: join(W, "a") })
+  const deny = processFenceWriteRules(plan.profile).deny
+  // frozen: every node of the configured path, of the real path, and the real ancestor chain of each configured-path node …
+  for (const node of [join(realpathSync(W), "a"), join(realpathSync(W), "real-s"), join(realpathSync(W), "real-s", "t")]) expect(deny, node).toContainEqual({ kind: "literal", value: node })
+  // … but not W/s, which only appears inside W/a's target text (closure: INT-safety I-27, one component-wise resolution)
+  expect(deny).not.toContainEqual({ kind: "literal", value: join(realpathSync(W), "s") })
+  const result = fenced(plan.profile, ["/bin/sh", "-c", `rm '${join(W, "s")}' && ln -s '${join(W, "evil-s")}' '${join(W, "s")}' && echo R10-LANDED || echo R10-REFUSED`], W)
+  console.log(`[R10 outside the guarantee] ${result.out.includes("R10-LANDED") ? "landed" : "refused"}; the engine would read ${readFileSync(join(W, "a", "opencode", "opencode.json"), "utf8")}`)
+  // documents today's boundary: when I-27 closes it, this arm flips and must be rewritten as a refused arm
+  expect(result.out).toContain("R10-LANDED")
+  expect(readFileSync(join(W, "a", "opencode", "opencode.json"), "utf8")).toBe('{"plugin":["evil"]}')
+})

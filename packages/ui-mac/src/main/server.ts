@@ -25,7 +25,7 @@ import { exportedFlag } from "@opencode/util/codepuppy-bootstrap"
 import { factorySkillDirsForFork } from "./factory-skills"
 import { resourcesRoot } from "./ext-fs-installer"
 import { syncSecretFiles } from "./codepuppy-secret-files"
-import { buildCredentialTable } from "./codepuppy-credential-table"
+import { buildCredentialTable, mainCredentialStores } from "./codepuppy-credential-table"
 import { answerCredentialsMessage, type CredentialsMessage } from "./sidecar-credentials"
 import { customProviderSecretValues } from "./codepuppy-byok-keys"
 import { ignoredConfigProviderBlocks, ignoredConfigRemoteMcpEntries } from "./ext-config"
@@ -361,6 +361,8 @@ function planProductionFence(input: ProductionFenceInput): ProcessFencePlan | un
       carriedWorkspaces: input.carriedWorkspaces,
       engineConfigDirectory: input.engineConfigDirectory,
       ...(input.envFile ? { envFile: input.envFile } : {}),
+      // DESIGN-stored-credentials-fence §4.5:C1 的存放点与 T1 / P / T2 的表同一份清单
+      credentialStores: mainCredentialStores(input.userDataPath),
     },
     {
       homeDir: homedir,

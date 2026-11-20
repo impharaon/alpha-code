@@ -22,7 +22,7 @@ test.skipIf(process.platform !== "darwin")("C1 真引擎:三档里 shell 与读�
   rmSync(base, { recursive: true, force: true })
   mkdirSync(join(base, "results"), { recursive: true })
   const outputs: Record<string, string> = {}
-  let window: { from: Date; to: Date } | undefined
+  const windows: Record<string, { from: Date; to: Date }> = {}
   try {
     for (const [arm, expected] of Object.entries(ARMS)) {
       const from = new Date(Date.now() - 1_000)
@@ -40,37 +40,45 @@ test.skipIf(process.platform !== "darwin")("C1 真引擎:三档里 shell 与读�
       expect([arm, code], output.slice(-20_000)).toEqual([arm, 0])
       expect([arm, output.match(/(\d+) pass\b/)?.[1]], output.slice(-20_000)).toEqual([arm, String(expected)])
       expect([arm, output.match(/(\d+) fail\b/)?.[1]], output.slice(-20_000)).toEqual([arm, "0"])
+      windows[arm] = { from, to: new Date(Date.now() + 1_000) }
       if (arm === "production") {
-        window = { from, to: new Date(Date.now() + 1_000) }
         // E1: every fake credential file is byte-for-byte what it was, checked outside every fence
-        const meta = JSON.parse(output.match(/^SCF-ENGINE (\{.*\})$/m)![1]!) as { files: Record<string, string> }
-        for (const [file, digest] of Object.entries(meta.files)) expect([file, createHash("sha256").update(readFileSync(file, "utf8")).digest("hex")]).toEqual([file, digest])
+        const stores = JSON.parse(output.match(/^SCF-STORES (\{.*\})$/m)![1]!) as Record<string, string>
+        expect(Object.keys(stores).length).toBeGreaterThanOrEqual(8)
+        for (const [file, digest] of Object.entries(stores)) expect([file, createHash("sha256").update(readFileSync(file, "utf8")).digest("hex")]).toEqual([file, digest])
       }
     }
 
-    // E2 / E5: the system sandbox log for the production run
-    const meta = JSON.parse(outputs.production!.match(/^SCF-ENGINE (\{.*\})$/m)![1]!) as { pid: number; c1: Rule[] }
-    let denials: Array<{ pid: number; operation: string; path: string }> = []
-    for (let attempt = 0; attempt < 10; attempt++) {
-      await Bun.sleep(3_000)
-      const shown = spawnSync("log", ["show", "--start", stamp(window!.from), "--end", stamp(window!.to), "--style", "compact", "--predicate", 'eventMessage CONTAINS "deny(1) file-"'], { encoding: "utf8", maxBuffer: 256 * 1024 * 1024 })
-      expect(shown.status, shown.stderr).toBe(0)
-      writeFileSync(join(base, "results", "log-show.txt"), `${stamp(window!.from)} → ${stamp(window!.to)}\n${shown.stdout}`)
-      denials = shown.stdout
-        .split("\n")
-        .flatMap((line) => {
-          const match = /Sandbox: \S+\((\d+)\) deny\(1\) (file-[\w-]+) (\/.*)$/.exec(line)
-          return match ? [{ pid: Number(match[1]), operation: match[2]!, path: match[3]!.trim() }] : []
-        })
-        .filter((denial) => inStore(meta.c1, denial.path))
-      if (denials.some((denial) => denial.pid !== meta.pid)) break
+    // E2 / E5: the system sandbox log, per arm window — denials on a C1 path, split by the engine process (the case process) and its children
+    const denialsOf = async (arm: "production" | "tools", calibrated: (split: { engine: number; children: number }) => boolean) => {
+      const meta = JSON.parse(outputs[arm]!.match(/^SCF-ENGINE (\{.*\})$/m)![1]!) as { pid: number; c1: Rule[] }
+      const window = windows[arm]!
+      let split = { engine: [] as string[], children: [] as string[] }
+      for (let attempt = 0; attempt < 10; attempt++) {
+        await Bun.sleep(3_000)
+        const shown = spawnSync("log", ["show", "--start", stamp(window.from), "--end", stamp(window.to), "--style", "compact", "--predicate", 'eventMessage CONTAINS "deny(1) file-"'], { encoding: "utf8", maxBuffer: 256 * 1024 * 1024 })
+        expect(shown.status, shown.stderr).toBe(0)
+        writeFileSync(join(base, "results", `log-show-${arm}.txt`), `${stamp(window.from)} → ${stamp(window.to)}\n${shown.stdout}`)
+        const denials = shown.stdout
+          .split("\n")
+          .flatMap((line) => {
+            const match = /Sandbox: \S+\((\d+)\) deny\(1\) (file-[\w-]+) (\/.*)$/.exec(line)
+            return match ? [{ pid: Number(match[1]), line: `${match[2]} ${match[3]!.trim()}`, path: match[3]!.trim() }] : []
+          })
+          .filter((denial) => inStore(meta.c1, denial.path))
+        split = { engine: denials.filter((denial) => denial.pid === meta.pid).map((denial) => denial.line), children: denials.filter((denial) => denial.pid !== meta.pid).map((denial) => denial.line) }
+        if (calibrated({ engine: split.engine.length, children: split.children.length })) break
+      }
+      writeFileSync(join(base, "results", `sandbox-denials-${arm}.json`), JSON.stringify({ window, enginePid: meta.pid, ...split }, null, 1))
+      console.log(`[E2/E5 ${arm}] engine pid ${meta.pid}: ${split.engine.length} denials on credential stores; its fenced children: ${split.children.length}`)
+      return split
     }
-    const fromEngine = denials.filter((denial) => denial.pid === meta.pid)
-    const fromChildren = denials.filter((denial) => denial.pid !== meta.pid)
-    writeFileSync(join(base, "results", "sandbox-denials.json"), JSON.stringify({ window, enginePid: meta.pid, fromEngine, fromChildren }, null, 1))
-    console.log(`[E2/E5] engine pid ${meta.pid}: ${fromEngine.length} denials on credential stores; its fenced children (the attacks): ${fromChildren.length}`)
-    expect(fromChildren.length, "calibration: the attack commands' denials must be in the log, or the log was not read").toBeGreaterThan(0)
-    expect(fromEngine).toEqual([])
+    // calibration of the criterion itself: in the tools arm the engine's own read tool (in-process) is refused on a store — those denials carry the engine pid
+    const tools = await denialsOf("tools", (split) => split.engine > 0)
+    expect(tools.engine.length, "calibration: an in-process read of a store under C1 must show up as an engine-pid denial").toBeGreaterThan(0)
+    const production = await denialsOf("production", (split) => split.children > 0)
+    expect(production.children.length, "calibration: the attack commands' denials must be in the log, or the log was not read").toBeGreaterThan(0)
+    expect(production.engine).toEqual([])
   } finally {
     rmSync(join(base, "run"), { recursive: true, force: true })
   }

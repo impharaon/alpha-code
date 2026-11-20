@@ -30,6 +30,7 @@ import {
   selectWorkspaceUnion,
   trimUntilCompiles,
   type ConfigFenceRule,
+  type CredentialStoreRule,
   type EngineRoots,
   type TrialCompile,
   type WorkspaceExclusion,
@@ -70,6 +71,8 @@ export type PlanProcessFenceInput = {
   engineConfigDirectory: string
   /** CF-4 的另一份(实现期修订 2 A):主进程启动时读的 `$CODEPUPPY_ENV_FILE`(codepuppy-secrets.ts userEnvFile);没设为空。 */
   envFile?: string
+  /** DESIGN-stored-credentials-fence §4.5:Code Puppy 的凭据存放点(codepuppy-secret-files.ts credentialStores(),未解析);计划器落成 C1。 */
+  credentialStores: readonly { path: string; kind: "dir" | "file" }[]
 }
 
 /**
@@ -273,8 +276,10 @@ export function planProcessFence(input: PlanProcessFenceInput, deps: PlanProcess
   if (union.selected.length === 0)
     throw new Error("process fence: the default workspace is not a directory on disk — refusing to fork an engine that could not write anywhere a user expects")
 
+  // DESIGN-stored-credentials-fence §4.5:存放点落到真实路径(userData 的真实路径求不出 ⇒ 抛 ⇒ 拒 fork)
+  const credentialRules = planCredentialStores(input.credentialStores, deps)
   const trimmed = trimUntilCompiles(
-    { workspaces: union.selected, codepuppyGlobalRoot, userDataPath: input.userDataPath, roots, stateHome, egressProxyPort: input.egressProxyPort, configFence: fenceSet.configFence },
+    { workspaces: union.selected, codepuppyGlobalRoot, userDataPath: input.userDataPath, roots, stateHome, egressProxyPort: input.egressProxyPort, configFence: fenceSet.configFence, credentialStores: credentialRules },
     deps.compile,
   )
   const addonPath = resolveFenceAddonPath(input.addon)
@@ -290,7 +295,7 @@ export function planProcessFence(input: PlanProcessFenceInput, deps: PlanProcess
     configFenceRoots: fenceSet.configFenceRoots,
   }
   deps.log(
-    `process fence planned: workspaces=${plan.workspaces.length} (candidates=${union.candidates}, excluded=${plan.excluded.length}, dropped=${plan.dropped.length}), egressProxyPort=${input.egressProxyPort}, configFence=${fenceSet.configFence.length} rules, profile=${plan.profileBytes}B, compile attempts=${plan.attempts}` +
+    `process fence planned: workspaces=${plan.workspaces.length} (candidates=${union.candidates}, excluded=${plan.excluded.length}, dropped=${plan.dropped.length}), egressProxyPort=${input.egressProxyPort}, configFence=${fenceSet.configFence.length} rules, credentialStores=${credentialRules.length} rules, profile=${plan.profileBytes}B, compile attempts=${plan.attempts}` +
       (plan.dropped.length ? ` — dropped (oldest first): ${[...plan.dropped].reverse().join(", ")}; last compiler error: ${trimmed.lastFailure}` : "") +
       (plan.excluded.length ? ` — excluded: ${plan.excluded.map((e) => `${e.directory} (${e.reason})`).join("; ")}` : ""),
   )
@@ -300,7 +305,7 @@ export function planProcessFence(input: PlanProcessFenceInput, deps: PlanProcess
 // ── DESIGN-stored-credentials-fence §4.5:凭据存放点的真实目标清单 ────────────────────────────────────────────────
 // 围栏 C1 与主进程的别名判断(package-mcp-activation.ts 的 isStoreTarget,设计 §4.1)用同一份清单。
 
-export type CredentialStoreRule = { kind: "subpath" | "literal"; path: string }
+export type { CredentialStoreRule }
 
 /**
  * 每个存放点写成「真实上级目录 + 名字」;位置已存在且解析到别处(软链)时再加它的真实目标。上级目录求不出真实路径 ⇒ 抛(调用方拒绝 fork /

@@ -1,6 +1,6 @@
 // SPEC-stored-credentials-fence 自关围栏的真引擎用例里的「main」:在用例进程装围栏之前起(所以它在围栏外),经 Bun IPC 应答引擎装载配置之前的拉取
 // (生产 answerCredentialsMessage + 生产 buildCredentialTable),并替用例做 main 才能做的事:写凭据存放点(生产写者)、续期后推整表、经生产
-// createManagedMcpConvergence 启停连接器。参数 = JSON { userData: string[] }。只碰测试沙箱里的假凭据。
+// createManagedMcpConvergence 启停连接器、结构性重启前重写显式文件。参数 = JSON { userData: string[] }。只碰测试沙箱里的假凭据。
 import fs from "node:fs"
 import path from "node:path"
 import { answerCredentialsMessage, type CredentialsMessage } from "../src/main/sidecar-credentials"
@@ -25,11 +25,18 @@ process.on("message", async (message: any) => {
       writeSecretFileAtomic(path.dirname(message.file), path.basename(message.file), message.value)
     } else if (message.op === "remove") fs.rmSync(message.file, { force: true, recursive: true })
     else if (message.op === "push") send({ type: "credentials", credentials: table() })
+    else if (message.op === "fork-config") {
+      // a structural restart: main rewrites the explicit file (its provider policies follow the stored keys) before the next sidecar generation
+      const { writeEngineConfigForFork } = await import("../src/main/engine-explicit-config")
+      const { parseCodePuppyBootstrap, publishCodePuppyBootstrap, tryCodePuppyBootstrap } = await import("@opencode/util/codepuppy-bootstrap")
+      if (!tryCodePuppyBootstrap()) publishCodePuppyBootstrap(parseCodePuppyBootstrap(message.bootstrap)) // main's start document (the case process published it)
+      writeEngineConfigForFork(tryCodePuppyBootstrap()!)
+    }
     else if (message.op === "converge") {
       const { createManagedMcpConvergence } = await import("../src/main/package-mcp-activation")
       const { setInstallStateByKey } = await import("../src/main/ext-install-planner")
       process.env.CODEPUPPY_GLOBAL_DIR = message.root
-      const written = await setInstallStateByKey({ type: "mcp", name: message.server, scope: "global", state: message.state }, { globalRoot: () => message.root, advisoryGate: () => ({ allowed: true }), resolveEntry: async () => null })
+      const written = await setInstallStateByKey({ type: "mcp", name: message.server, scope: "global", state: message.state }, { globalRoot: () => message.root, advisoryGate: () => ({ allowed: true }), resolveEntry: async () => null, resolvePackage: async () => { throw new Error("a user connector has no catalog package") } })
       if (!written.ok) throw new Error(written.reason)
       result = await createManagedMcpConvergence({ root: () => message.root, awaitServer: async () => message.connection, directory: () => message.directory, userDataPath: () => message.userData })([message.server])
     } else if (message.op === "respawns") result = respawns
@@ -38,4 +45,5 @@ process.on("message", async (message: any) => {
     send({ op: "reply", id: message.id, error: error instanceof Error ? error.message : String(error) })
   }
 })
+process.once("disconnect", () => process.exit(0)) // the case process is gone
 send({ op: "ready" })

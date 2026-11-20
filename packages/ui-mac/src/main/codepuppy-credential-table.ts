@@ -11,6 +11,11 @@ import { officialRuntimeParent } from "./official-connector-recipes"
  * 路径(实现期修订 1:从不抛);不记录任何值。`log` 由调用方去重(server.ts 每代一次)。
  */
 export function buildCredentialTable(userDataPath: string, log: (line: string) => void): CodePuppyCredentials {
+  return readCredentialTable(mainCredentialStores(userDataPath), log)
+}
+
+/** main 的存放点清单:官方连接器运行期父目录算得出才给(设计 §4.5:officialRuntimeParent() 抛 ⇒ 不给该项)。表与 C1 用同一份。 */
+export function mainCredentialStores(userDataPath: string) {
   let runtimeParent: string | undefined
   if (tryGetCodePuppyEnvironment()) {
     try {
@@ -19,5 +24,5 @@ export function buildCredentialTable(userDataPath: string, log: (line: string) =
       runtimeParent = undefined
     }
   }
-  return readCredentialTable(credentialStores({ userDataPath, ...(runtimeParent ? { officialRuntimeParent: runtimeParent } : {}) }), log)
+  return credentialStores({ userDataPath, ...(runtimeParent ? { officialRuntimeParent: runtimeParent } : {}) })
 }

@@ -53,8 +53,8 @@ function harness(overrides: Partial<PlanProcessFenceDeps> = {}, existing = new S
     carriedWorkspaces: [],
     // SPEC-engine-config-fence:server.ts 交给启动文档的同一个值(engineGlobalConfigDirectory)
     engineConfigDirectory: `${HOME}/.config/opencode`,
-    // SPEC-stored-credentials-fence §4.5:server.ts 交的同一份存放点清单(官方运行期父目录算得出时给)
-    credentialStores: credentialStores({ userDataPath: USER_DATA, officialRuntimeParent: OFFICIAL_RUNTIME }),
+    // SPEC-stored-credentials-fence §4.5:受保护集这几条只判自己那一轴,存放点清单空(空 ⇒ C1 两块不渲染);C1 的测试自己给 server.ts 交的那份
+    credentialStores: [],
   }
   return { deps, input, made, logs }
 }
@@ -71,10 +71,11 @@ function ancestorsOf(anchors: string[]): string[] {
 describeDarwin("planProcessFence", () => {
   test("SPEC-stored-credentials-fence C1:存放点清单经 planCredentialStores 落到真实路径,渲染成 profile 最后两块(拒读拒写块 + 上级目录拒写块);日志带条数;userData 的真实路径求不出 ⇒ 计划抛(拒 fork)", () => {
     const h = harness()
+    h.input.credentialStores = credentialStores({ userDataPath: USER_DATA, officialRuntimeParent: OFFICIAL_RUNTIME })
     const plan = planProcessFence(h.input, h.deps)
     const tail = plan.profile.trimEnd().split("\n").slice(-10)
     expect(tail[0]).toBe("(deny file-read* file-write*")
-    expect(tail.slice(1, 9).map((line) => line.replace(/\)?\s*(;.*)?$/, "").trim())).toEqual([
+    expect(tail.slice(1, 9).map((line) => line.replace(/\)?\)\s*(;.*)?$/, "").trim())).toEqual([
       `(subpath "${USER_DATA}/codepuppy-secrets"`, `(subpath "${USER_DATA}/codepuppy-mcp-secrets"`, `(literal "${USER_DATA}/codepuppy.env"`,
       `(literal "${USER_DATA}/codepuppy-auth.json"`, `(literal "${USER_DATA}/codepuppy-pkce.json"`, `(literal "${USER_DATA}/codepuppy-byok-keys.json"`,
       `(subpath "${USER_DATA}/Crashpad"`, `(subpath "${OFFICIAL_RUNTIME}"`,
@@ -82,6 +83,7 @@ describeDarwin("planProcessFence", () => {
     expect(tail[9]!.startsWith("(deny file-write* ")).toBe(true)
     expect(h.logs.some((l) => /credentialStores=8 rules/.test(l))).toBe(true)
     const broken = harness({ realpath: (p) => (p === USER_DATA ? (() => { throw enoent(p) })() : p) })
+    broken.input.credentialStores = h.input.credentialStores
     expect(() => planProcessFence(broken.input, broken.deps)).toThrow(/ENOENT/)
   })
 

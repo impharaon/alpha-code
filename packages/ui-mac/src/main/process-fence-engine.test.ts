@@ -44,6 +44,7 @@ import { startEgressPolicyProxy, type EgressLogRecord, type EgressProxyHandle } 
 import { sidecarEgressProxyEnv } from "./sidecar-env"
 import { buildReloadRequest } from "./codepuppy-sidecar-messages"
 import { engineAuthorization } from "./engine-authorization"
+import { credentialStores } from "./codepuppy-secret-files"
 
 const describeDarwin = process.platform === "darwin" && existsSync("/usr/bin/sandbox-exec") ? describe : describe.skip
 const repoRoot = resolve(import.meta.dir, "../../../..")
@@ -107,6 +108,7 @@ describeDarwin("REQ-159 真引擎(OpenCode 2)+ 真 ext 在进程围栏下:三类
         egressProxyPort: egressProxy.port,
         carriedWorkspaces: [],
         engineConfigDirectory: join(home, ".config", "opencode"),
+        credentialStores: credentialStores({ userDataPath: userData }),
       },
       {
         homeDir: () => home,

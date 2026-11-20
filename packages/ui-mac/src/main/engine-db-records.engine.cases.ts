@@ -14,9 +14,11 @@ import path from "node:path"
 import { buildFenceAddon } from "../../scripts/build-fence-addon"
 import { assertEngineSandboxed, engineSandbox } from "../../test-component/engine-sandbox"
 import { codepuppyEngine, scriptedModel, textOf, type Running } from "../../test-component/codepuppy-engine"
+import { serveCredentialsFromOutside } from "../../test-component/credential-table"
 import { applyProcessFence } from "./process-fence-apply"
 import { renderProcessFenceProfile, resolveEngineRoots } from "./process-fence-profile"
-import { planConfigFence } from "./process-fence-plan"
+import { planConfigFence, planCredentialStores } from "./process-fence-plan"
+import { credentialStores } from "./codepuppy-secret-files"
 
 const describeDarwin = process.platform === "darwin" && fs.existsSync("/usr/bin/sandbox-exec") ? describe : describe.skip
 const ASK_TIER = "codepuppy-ask"
@@ -56,7 +58,11 @@ describeDarwin("引擎库里植入的三类记录不放行、不装载(真引擎
         { userDataPath: host.userData, appStateRoot: path.dirname(path.dirname(codepuppyGlobalRoot)), codepuppyGlobalRoot, engineConfigDirectory: host.slot.configDirectory, roots },
         { realpath: (p) => fs.realpathSync.native(p), mkdirp: (p) => void fs.mkdirSync(p, { recursive: true }) },
       ).configFence,
+      // SPEC-stored-credentials-fence:生产 profile 同样带 C1(这台引擎自己的凭据存放点,生产计划器那一步落真实路径)
+      credentialStores: planCredentialStores(credentialStores({ userDataPath: host.userData }), { realpath: (p) => fs.realpathSync.native(p) }),
     })
+    // SPEC-stored-credentials-fence: C1 refuses this process its own credential stores once fenced — main (outside the fence) answers the pulls
+    await serveCredentialsFromOutside()
     applyProcessFence({ addonPath: addon, profile }, { insideDir: fenced, outsideDir: scratch })
     running = await host.start()
     expect(() => fs.writeFileSync(path.join(scratch, "probe"), "x")).toThrow(/EPERM|operation not permitted/i)

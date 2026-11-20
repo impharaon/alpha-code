@@ -38,7 +38,7 @@ describeSandbox("I2 真围栏:custom-providers/<env>.json 在生产 profile 下�
     writeFileSync(
       profileFile,
       // `#1337`:生产 profile 含网络行;这里不出网,给一个没人听的端口即可。
-      renderProcessFenceProfile({ workspaces: [join(scratch, "ws")], codepuppyGlobalRoot: envRoot, userDataPath: userData, stateHome: userData, roots: resolveEngineRoots({}, homedir()), egressProxyPort: 4443 , configFence: [] }),
+      renderProcessFenceProfile({ workspaces: [join(scratch, "ws")], codepuppyGlobalRoot: envRoot, userDataPath: userData, stateHome: userData, roots: resolveEngineRoots({}, homedir()), egressProxyPort: 4443 , configFence: [], credentialStores: [], credentialStores: [] }),
     )
   })
 

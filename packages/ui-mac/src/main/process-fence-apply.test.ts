@@ -68,6 +68,7 @@ describeDarwin("REQ-159 process fence —— 真 .node / 真 seatbelt / Electron
       egressProxyPort: 4443,
       // 受保护集的判据在 process-fence-config-fence / process-fence-profile;本文件判派生原语与 apply 的自证
       configFence: [],
+      credentialStores: [],
     })
     profileFile = join(scratch, "fence.sb")
     writeFileSync(profileFile, profile)
@@ -180,7 +181,7 @@ describeDarwin("REQ-159 process fence —— 真 .node / 真 seatbelt / Electron
     if (!line) throw new Error(`apply-driver printed nothing (status ${res.status}); stderr: ${res.stderr}`)
     return { status: res.status, out: JSON.parse(line) as { ok: boolean; name?: string; message?: string; result?: { buildId: string; libsandbox: string; profileBytes: number } } }
   }
-  const goodProfile = () => renderProcessFenceProfile({ workspaces: [ws], codepuppyGlobalRoot: globalRoot, userDataPath: userData, stateHome: userData, roots: resolveEngineRoots({}, homedir()), egressProxyPort: 4443, configFence: [] })
+  const goodProfile = () => renderProcessFenceProfile({ workspaces: [ws], codepuppyGlobalRoot: globalRoot, userDataPath: userData, stateHome: userData, roots: resolveEngineRoots({}, homedir()), egressProxyPort: 4443, configFence: [], credentialStores: [] })
 
   test("D 正向:生产 profile ⇒ ok,回报 buildId / libsandbox / 字节数,进程退出 0", () => {
     const r = runApply(goodProfile())

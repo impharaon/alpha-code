@@ -86,6 +86,8 @@ beforeAll(async () => {
   await assertEngineSandboxed(sandbox)
 })
 afterAll(async () => {
+  // E1: what every store file must still hold when the host checks it outside every fence (main's own renewal is the only legitimate change)
+  if (m) console.log(`SCF-STORES ${JSON.stringify(Object.fromEntries(Object.entries(m.files).map(([file, value]) => [file, createHash("sha256").update(value).digest("hex")])))}`)
   await running?.close().catch(() => undefined)
   gateway.stop(true)
 })
@@ -130,8 +132,9 @@ async function machine() {
     environment: { TOKEN: ref, ...extra, CODEPUPPY_ENV_DUMP: dump, CODEPUPPY_ENV_DUMP_VARS: ["TOKEN", ...Object.keys(extra)].join(",") },
   })
   const platformKey = secretFilePath(userData, "CODEPUPPY_API_KEY")
-  // the runtime BYOK flow: a custom provider whose key is not stored yet (its key arrives at run time through main)
-  writeCustomProviderTruth(path.join(stateRoot, "custom-providers", "dev.json"), [{ id: "scfbyok", name: "scfbyok", compat: "openai", baseURL, models: ["m"] }], {
+  // the runtime BYOK flow: a custom provider whose key is not stored yet (its key arrives at run time through main); its own address
+  // (the platform header hook treats a provider whose baseURL equals the platform's as the platform)
+  writeCustomProviderTruth(path.join(stateRoot, "custom-providers", "dev.json"), [{ id: "scfbyok", name: "scfbyok", compat: "openai", baseURL: `${baseURL.replace(/\/v1$/, "")}/byok/v1`, models: ["m"] }], {
     mkdirSync: fs.mkdirSync, writeFileSync: fs.writeFileSync, renameSync: fs.renameSync, rmSync: fs.rmSync,
   })
   for (const [server, desiredState] of [["alpha", "enabled"], ["beta", "disabled"]] as const) {
@@ -179,7 +182,7 @@ async function machine() {
       userDataPath: userData,
       sidecarEnv: process.env,
       addon: { packaged: true, resourcesPath: resources, moduleDir: "/unused", exists: fs.existsSync },
-      egressProxyPort: gateway.port,
+      egressProxyPort: gateway.port!,
       carriedWorkspaces: [],
       engineConfigDirectory: host.slot.configDirectory,
       credentialStores: credentialStores({ userDataPath: userData, officialRuntimeParent: runtimeParent }),
@@ -204,7 +207,7 @@ async function machine() {
   fs.writeFileSync(path.join(run, "profile.sb"), profile)
   applyProcessFence({ addonPath: plan.addonPath, profile }, { insideDir: host.projectDirectory, outsideDir: run })
   const rules = processFenceWriteRules(profile)
-  console.log(`SCF-ENGINE ${JSON.stringify({ arm: ARM, pid: process.pid, files: Object.fromEntries(Object.entries(files).map(([file, value]) => [file, createHash("sha256").update(value).digest("hex")])), c1: rules.deny.filter((rule) => profile.slice(c1).includes(`"${rule.value}"`)) })}`)
+  console.log(`SCF-ENGINE ${JSON.stringify({ arm: ARM, pid: process.pid, c1: rules.deny.filter((rule) => profile.slice(c1).includes(`"${rule.value}"`)) })}`)
   running = await host.start()
   return { host, main, userData, globalRoot, stateRoot, runtimeParent, platformKey, aliases, files, dump }
 }
@@ -215,8 +218,8 @@ let m: Machine
 async function turn(agent: string, call: { name: string; args: Record<string, unknown> } | undefined, opts: { approve?: boolean; model?: { id: string; providerID: string }; directory?: string } = {}) {
   const directory = opts.directory ?? m.host.projectDirectory
   const send = (method: string, route: string, body?: unknown) =>
-    running!.fetch(new Request(`http://codepuppy-sidecar.invalid${route}`, { method, headers: { "x-opencode-directory": encodeURIComponent(directory), "content-type": "application/json" }, ...(body === undefined ? {} : { body: JSON.stringify(body) }) }))
-      .then(async (response) => ({ status: response.status, json: await response.text().then((raw) => (raw ? JSON.parse(raw) : undefined)) }))
+    Promise.resolve(running!.fetch(new Request(`http://codepuppy-sidecar.invalid${route}`, { method, headers: { "x-opencode-directory": encodeURIComponent(directory), "content-type": "application/json" }, ...(body === undefined ? {} : { body: JSON.stringify(body) }) })))
+      .then(async (response: Response) => ({ status: response.status, json: await response.text().then((raw: string) => (raw ? JSON.parse(raw) : undefined)) }))
   const created = await send("POST", "/api/session", { location: { directory }, agent, model: opts.model ?? { id: "m", providerID: "codepuppy" } })
   const sid = created.json.data.id as string
   const before = seen.length
@@ -283,12 +286,14 @@ if (ARM === "production")
     expect(dumped().some((line) => line.env.TOKEN === FAKE.connector)).toBe(true)
     // renewal: main rewrites the platform credential and pushes the whole table (T2); the next request carries the new value
     expect(await m.main!.request({ op: "renew", userData: m.userData, env: { CODEPUPPY_API_KEY: FAKE.platform2 } })).toBe("applied")
+    m.files[m.platformKey] = FAKE.platform2
     for (let i = 0; i < 100; i++) await Bun.sleep(20)
     const renewed = await turn("build", undefined)
     expect([...new Set(renewed.requests.map((request) => request.authorization))]).toEqual([`Bearer ${FAKE.platform2}`])
     // a key added at run time: main stores it, the structural restart re-injects with the new generation's table
     await m.main!.request({ op: "write-secret", file: secretFilePath(m.userData, customProviderSecretName("scfbyok")), value: FAKE.byok })
     await running!.close()
+    await m.main!.request({ op: "fork-config", bootstrap: codepuppyBootstrap() })
     await m.host.reinject()
     running = await m.host.start()
     const byok = await turn("build", undefined, { model: { id: "m", providerID: "scfbyok" } })
@@ -297,6 +302,7 @@ if (ARM === "production")
     // … and removed at run time: the next generation does not offer it
     await m.main!.request({ op: "remove", file: secretFilePath(m.userData, customProviderSecretName("scfbyok")) })
     await running!.close()
+    await m.main!.request({ op: "fork-config", bootstrap: codepuppyBootstrap() })
     await m.host.reinject()
     running = await m.host.start()
     expect(m.host.content.providers.scfbyok).toBeUndefined()
@@ -318,11 +324,15 @@ if (ARM === "tools" || ARM === "control")
     const auth = path.join(m.userData, "codepuppy-auth.json")
     fs.symlinkSync(auth, path.join(ws, "link-auth-tool"))
     const bodies: string[] = []
+    const reads: Array<{ tier: string; via: string; leaked: boolean; asked: string[]; tool: string }> = []
     for (const tier of TIERS)
-      for (const target of [path.join(ws, "link-auth-tool"), auth]) {
+      for (const [via, target] of [["workspace-symlink", path.join(ws, "link-auth-tool")], ["direct", auth]] as const) {
         const result = await turn(tier, { name: "read", args: { path: target } }, { approve: true })
         bodies.push(...result.requests.map((request) => request.body))
+        // printed without any value: a leaked read shows only that it leaked
+        reads.push({ tier, via, leaked: leaked(result.tool).length > 0, asked: result.asked, tool: leaked(result.tool).length ? "<value>" : result.tool.slice(0, 160) })
       }
+    console.log(`SCF-READS ${JSON.stringify(reads)}`)
     const shell = await turn("build", { name: "shell", args: { command: `cat '${auth}'`, description: "scf read" } })
     bodies.push(...shell.requests.map((request) => request.body))
     // AC-03: the conversation writes a reference into the project's own config (fence-writable) at a non-listed position, then reloads
@@ -335,12 +345,20 @@ if (ARM === "tools" || ARM === "control")
     bodies.push(system)
     const dumped = fs.readFileSync(m.dump, "utf8").split("\n").filter(Boolean).map((line) => JSON.parse(line) as { env: Record<string, string | null> }).at(-1)!
     if (ARM === "tools") {
+      // every tier, both spellings: the read itself fails at the file system (a tool execution error), not at a permission prompt
+      expect(reads.map((read) => [read.tier, read.via, read.leaked, read.tool.includes('"type":"tool.execution"') && read.tool.includes("Unable to read")])).toEqual(
+        TIERS.flatMap((tier) => [[tier, "workspace-symlink", false, true], [tier, "direct", false, true]]),
+      )
       expect(leaked(bodies.join("\n"))).toEqual([])
       expect(project).toContain("PROJECT-SYSTEM[]")
       expect(explicit).toContain("EXPLICIT-SYSTEM[]")
       expect(dumped.env).toMatchObject({ TOKEN: FAKE.connector, PLATFORM: "", OTHER: "" })
     } else {
-      expect(leaked(bodies.join("\n"))).toContain(FAKE.auth) // the read tool / shell read it
+      // without C1 the same reads return the value in every tier — except the read-only tier's direct path, which its own policy refuses
+      expect(reads.map((read) => [read.tier, read.via, read.leaked])).toEqual(
+        TIERS.flatMap((tier) => [[tier, "workspace-symlink", true], [tier, "direct", tier !== "codepuppy-readonly"]]),
+      )
+      expect(leaked(bodies.join("\n"))).toContain(FAKE.auth)
       expect(project).toContain(`PROJECT-SYSTEM[${FAKE.platform}]`) // the project config reference leaks without C1
     }
   }, 240_000)

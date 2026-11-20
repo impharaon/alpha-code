@@ -33,11 +33,13 @@ import readline from "node:readline"
 import { buildFenceAddon } from "../../scripts/build-fence-addon"
 import { assertEngineSandboxed, engineSandbox } from "../../test-component/engine-sandbox"
 import { codepuppyEngine, MCP_FIXTURE, policyStore, probe, scriptedModel, textOf, type Running } from "../../test-component/codepuppy-engine"
+import { serveCredentialsFromOutside } from "../../test-component/credential-table"
 import { codepuppyBootstrap } from "@opencode/util/codepuppy-bootstrap"
 import { Hash } from "@opencode/util/hash"
 import { applyProcessFence } from "./process-fence-apply"
 import { trialCompileProfile } from "./process-fence-compile"
 import { planConfigFence, planProcessFence } from "./process-fence-plan"
+import { credentialStores } from "./codepuppy-secret-files"
 import { engineGlobalConfigDirectory } from "./engine-paths"
 import { configFenceLocations, processFenceRulesCover, processFenceWriteRules, resolveEngineRoots } from "./process-fence-profile"
 import { readMcpLeafStrict } from "./ext-config"
@@ -206,6 +208,7 @@ async function machine(arm: Arm) {
       egressProxyPort: Number(new URL(model.baseURL).port),
       carriedWorkspaces: [],
       engineConfigDirectory: configDir,
+      credentialStores: credentialStores({ userDataPath: userData }),
     },
     {
       homeDir: () => home,
@@ -232,6 +235,8 @@ async function machine(arm: Arm) {
   expect(processFenceRulesCover({ allow: rules.allow, deny: [] }, sandbox.root), sandbox.root).toBe(true)
   if (arm !== "control") for (const file of [explicitConfigPath(userData), jsonc, path.join(configDir, "opencode.json")]) expect(processFenceRulesCover(rules, file), file).toBe(false)
   fs.writeFileSync(path.join(run, "profile.sb"), profile)
+  // SPEC-stored-credentials-fence: C1 refuses this process its own credential stores once fenced — main (outside the fence) answers the pulls
+  await serveCredentialsFromOutside()
   applyProcessFence({ addonPath: plan.addonPath, profile }, { insideDir: ws, outsideDir: run })
   console.log(`CF-ENGINE ${JSON.stringify({ arm, pid: process.pid, deny: rules.deny, sandboxRoot: sandbox.root })}`)
   return { host, main, ws, jsonc, configDir, globalRoot, userData, roots, home, callLog, policyTarget, bootstrap, plan: { ...plan, profile }, log }

@@ -175,7 +175,7 @@ describe("renderProcessFenceProfile —— 勘破 §8.2 的行(W10/W19 已删,D1
       { kind: "subpath" as const, path: "/r/cfg/opencode", via: ["/w/proj/link", "/w/proj"] },
       { kind: "literal" as const, path: "/w/other/x", via: ["/w/proj"] },
     ]
-    const profile = renderProcessFenceProfile({ ...base, configFence })
+    const profile = renderProcessFenceProfile({ ...base, configFence, credentialStores: [] })
     const ancestors = profile.split("\n").find((line) => line.includes("; CF 上级目录节点"))!
     expect(ancestors).toBe('(deny file-write* (literal "/r/cfg") (literal "/r") (literal "/w/proj/link") (literal "/w/proj") (literal "/w/other") (literal "/w"))      ; CF 上级目录节点')
     expect(processFenceWriteRules(profile).deny).toEqual([
@@ -683,8 +683,8 @@ describe("trimUntilCompiles —— 试编译封顶,从尾部丢,丢到底仍失�
     expect(r.lastFailure).toMatch(/exceeds maximum \(65535\)/)
     expect(tokens(r.profile)).not.toContain(`(subpath "/Users/alpha/c")`)
     expect(tokens(r.profile)).not.toContain(`(subpath "/Users/alpha/b")`)
-    // SPEC-engine-config-fence E9:裁剪只丢工作区,受保护集原样(每次试编译都带着)
-    expect(tokens(r.profile).slice(-CF_LINES.length)).toEqual(CF_LINES)
+    // SPEC-engine-config-fence E9:裁剪只丢工作区,受保护集原样(每次试编译都带着);stored-credentials-fence §4.5:C1 同样原样、仍在最后
+    expect(tokens(r.profile).slice(-(CF_LINES.length + C1_LINES.length))).toEqual([...CF_LINES, ...C1_LINES])
   })
 
   test("默认工作区不可丢:字节墙丢到只剩 1 个仍失败 ⇒ 抛,消息带编译器原文与账目(fail-closed 到「引擎不起」)", () => {

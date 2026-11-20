@@ -58,6 +58,7 @@ export async function serveCredentialsFromOutside(): Promise<{ request: (op: Rec
     },
   })
   const requester = createCredentialRequester((message) => child.send(message))
+  process.once("exit", () => child.kill())
   await started
   let next = 0
   outside = {

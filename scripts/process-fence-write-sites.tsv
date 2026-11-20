@@ -21,17 +21,18 @@ packages/ui-mac/src/main/codepuppy-environment.ts	rmdirSync	directory	main-only
 packages/ui-mac/src/main/codepuppy-installs.ts	mkdirSync	root	main-only
 packages/ui-mac/src/main/codepuppy-installs.ts	renameSync	file	main-only
 packages/ui-mac/src/main/codepuppy-live-allowlist.ts	mkdirSync	userDataPath	W3
-packages/ui-mac/src/main/codepuppy-secret-files.ts	chmodSync	dir	W3
-packages/ui-mac/src/main/codepuppy-secret-files.ts	chmodSync	temp	W3
-packages/ui-mac/src/main/codepuppy-secret-files.ts	mkdirSync	dir	W3
+# SPEC-stored-credentials-fence §4.5:凭据存放点在 C1 之下(围栏内拒读拒写),这些写盘点只有 main 执行(syncSecretFiles / writeSecretFileAtomic / applyPlatformCredentialsHot;I2 结构判据见 process-fence-write-sites.test.ts)。
+packages/ui-mac/src/main/codepuppy-secret-files.ts	chmodSync	dir	main-only
+packages/ui-mac/src/main/codepuppy-secret-files.ts	chmodSync	temp	main-only
+packages/ui-mac/src/main/codepuppy-secret-files.ts	mkdirSync	dir	main-only
 # SPEC-stored-credentials-fence(片 ① 审查 R1 第 1 条):readRegularFileNoFollow 以 O_RDONLY | O_NOFOLLOW 打开(只读,扫描器按 API 名记作写盘点);只有 main 的 readCredentialTable 与连接器读法调用它,sidecar 闭包里没有文件拿到这两个函数(process-fence-write-sites.test.ts I2)。
 packages/ui-mac/src/main/codepuppy-secret-files.ts	openSync	file	main-only
-packages/ui-mac/src/main/codepuppy-secret-files.ts	openSync	temp	W3
-packages/ui-mac/src/main/codepuppy-secret-files.ts	renameSync	temp	W3
-packages/ui-mac/src/main/codepuppy-secret-files.ts	rmSync	file	W3
-packages/ui-mac/src/main/codepuppy-secret-files.ts	rmSync	path.join(dir, leftover)	W3
-packages/ui-mac/src/main/codepuppy-secret-files.ts	rmSync	temp	W3
-packages/ui-mac/src/main/codepuppy-secret-files.ts	writeFileSync	fd	W3
+packages/ui-mac/src/main/codepuppy-secret-files.ts	openSync	temp	main-only
+packages/ui-mac/src/main/codepuppy-secret-files.ts	renameSync	temp	main-only
+packages/ui-mac/src/main/codepuppy-secret-files.ts	rmSync	file	main-only
+packages/ui-mac/src/main/codepuppy-secret-files.ts	rmSync	path.join(dir, leftover)	main-only
+packages/ui-mac/src/main/codepuppy-secret-files.ts	rmSync	temp	main-only
+packages/ui-mac/src/main/codepuppy-secret-files.ts	writeFileSync	fd	main-only
 packages/ui-mac/src/main/codepuppy-workdir.ts	mkdirSync	artifactsDir	W1
 packages/ui-mac/src/main/codepuppy-workdir.ts	mkdirSync	dir	W1
 packages/ui-mac/src/main/codepuppy-workdir.ts	mkdirSync	root	W1

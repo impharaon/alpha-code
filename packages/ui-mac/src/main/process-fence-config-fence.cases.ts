@@ -27,6 +27,7 @@ import { loadFenceAddon } from "./process-fence-apply"
 import { trialCompileProfile } from "./process-fence-compile"
 import { planProcessFence, type ProcessFencePlan } from "./process-fence-plan"
 import { processFenceRulesCover, processFenceWriteRules, WORKSPACE_WRITE_EXTENSION_CLASS } from "./process-fence-profile"
+import { credentialStores } from "./codepuppy-secret-files"
 
 const run = process.env.CODEPUPPY_CONFIG_FENCE_TEST_ROOT!
 const home = join(run, "home")
@@ -231,6 +232,7 @@ function planFor(t: ReturnType<typeof tree>, options: { userData?: string; envFi
       egressProxyPort: 59999,
       carriedWorkspaces: [],
       engineConfigDirectory: join(config, "opencode"),
+      credentialStores: credentialStores({ userDataPath }),
       ...(options.envFile ? { envFile: options.envFile } : {}),
     },
     {
@@ -271,7 +273,8 @@ const blocksBeforeAllow = (profile: string) => {
   const blocks = profile.slice(cfBlocks(profile))
   return profile.slice(0, cfBlocks(profile)).replace("(deny file-write*)\n", `(deny file-write*)\n${blocks}`)
 }
-const withoutAncestors = (profile: string) => profile.split("\n").filter((line) => !line.includes("; CF 上级目录节点")).join("\n")
+// stored-credentials-fence §4.5: the production profile also ends with C1, whose own ancestors block covers userData too — "no ancestors block" drops both
+const withoutAncestors = (profile: string) => profile.split("\n").filter((line) => !line.includes("; CF 上级目录节点") && !line.includes("; C1 上级目录节点")).join("\n")
 const x1AfterBlocks = (profile: string) => {
   const line = profile.split("\n").find((entry) => entry.startsWith(X1_LINE))!
   return `${profile.split("\n").filter((entry) => entry !== line).join("\n")}${line}\n`
@@ -325,6 +328,7 @@ beforeAll(() => {
       egressProxyPort: 59999,
       carriedWorkspaces: [],
       engineConfigDirectory: cfgDir,
+      credentialStores: credentialStores({ userDataPath: userData }),
     },
     {
       homeDir: () => home, codepuppyGlobalRoot: () => env, appStateRoot: () => state, realpath: (path) => realpathSync.native(path),

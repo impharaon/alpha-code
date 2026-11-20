@@ -3,6 +3,7 @@ import { mkdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync, r
 import { join } from "node:path"
 import { bootFenceWorkspaceTruth, writeWorkspaceTruth } from "./process-fence-workspaces"
 import { planProcessFence } from "./process-fence-plan"
+import { credentialStores } from "./codepuppy-secret-files"
 
 const root = process.env.CODEPUPPY_IDENTITY_TEST_ROOT!
 const home = join(root, "home"), state = join(root, "state"), A = join(root, "A")
@@ -15,7 +16,7 @@ let issues = 0
 const runtime = await tracker.probeWrite({ server: "sidecar", directory: alternate }, {
   fenced: true, grantWrite: async () => { issues++; return { outcome: "granted" } }, probeWrite: async () => ({ outcome: "denied" }), generationWrites: () => false,
 } as unknown as Parameters<typeof tracker.probeWrite>[1])
-const planned = await planProcessFence({ userDataPath: join(root, "install"), sidecarEnv: {}, egressProxyPort: 59999, addon: { packaged: true, resourcesPath: root, moduleDir: root, exists: () => true }, carriedWorkspaces: [], engineConfigDirectory: join(home, ".config", "opencode") }, {
+const planned = await planProcessFence({ userDataPath: join(root, "install"), sidecarEnv: {}, egressProxyPort: 59999, addon: { packaged: true, resourcesPath: root, moduleDir: root, exists: () => true }, carriedWorkspaces: [], engineConfigDirectory: join(home, ".config", "opencode"), credentialStores: credentialStores({ userDataPath: join(root, "install") }) }, {
   homeDir: () => home, appStateRoot: () => state, codepuppyGlobalRoot: () => join(state, "env/dev"), defaultWorkspace: () => A,
   readWorkspaces: () => [alternate], realpath: realpathSync.native, isDirectory: (path) => statSync(path).isDirectory(), mkdirp: (path) => void mkdirSync(path, { recursive: true }), compile: () => ({ ok: true }), log: () => {},
 })

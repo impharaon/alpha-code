@@ -173,7 +173,15 @@ export type ProcessFenceProfileInput = {
    * 它们每一级上级目录节点一块 —— 放在最后,任何放行都盖不过它们(X1 在前)。生产计划器恒给非空;空列表两块都不渲染。
    */
   configFence: readonly ConfigFenceRule[]
+  /**
+   * DESIGN-stored-credentials-fence §4.5 C1:Code Puppy 的凭据存放点(已是真实路径,含软链位置的真实目标;计划器 planCredentialStores 给)。
+   * 渲染成全文最后两块 —— 拒读拒写的存放点一块、它们每一级上级目录节点拒写一块(挡住把 userData / 临时目录整个改名搬走)。空列表两块都不渲染。
+   */
+  credentialStores: readonly CredentialStoreRule[]
 }
+
+/** C1 的一条:存放点目录(subpath)或文件(literal),真实路径。 */
+export type CredentialStoreRule = { kind: "subpath" | "literal"; path: string }
 
 /** 端口必须是 1..65535 的整数 —— 渲染进 `(remote ip "localhost:<port>")` 的是字面量,不是表达式;坏值 = 坏 profile。 */
 export function assertEgressProxyPort(port: unknown): number {
@@ -214,6 +222,7 @@ export function renderProcessFenceProfile(input: ProcessFenceProfileInput): stri
       ? { kind: "dat-files", dir: assertSeatbeltSafePath(rule.dir, `configFence[${i}]`), ...via }
       : { kind: rule.kind, path: assertSeatbeltSafePath(rule.path, `configFence[${i}]`), ...via }
   })
+  const credentialStores = input.credentialStores.map((rule, i): CredentialStoreRule => ({ kind: rule.kind, path: assertSeatbeltSafePath(rule.path, `credentialStores[${i}]`) }))
 
   const lines: string[] = [
     "(version 1)",
@@ -243,6 +252,7 @@ export function renderProcessFenceProfile(input: ProcessFenceProfileInput): stri
     '(allow network-inbound (local ip "localhost:*"))          ; N3 …还要 accept —— 缺它 listen() EPERM(Q1.1)',
     `(allow network-outbound (remote ip "localhost:${egressProxyPort}"))     ; N4 唯一出口:loopback 上的策略代理(main 进程内)`,
     ...renderConfigFence(configFence),
+    ...renderCredentialFence(credentialStores),
   ]
   return lines.join("\n") + "\n"
 }
@@ -266,6 +276,22 @@ function renderConfigFence(rules: readonly ConfigFenceRule[]): string[] {
     "(deny file-write*",
     ...rules.map((rule, i) => `  ${entry(rule)}${i === rules.length - 1 ? ")                                         ; CF 受保护配置" : ""}`),
     ...(ancestors.length ? [`(deny file-write* ${ancestors.map((node) => `(literal "${node}")`).join(" ")})      ; CF 上级目录节点`] : []),
+  ]
+}
+
+/**
+ * DESIGN-stored-credentials-fence §4.5 C1:凭据存放点拒读拒写一块,它们每一级上级目录(从父目录起到 `/` 之前,去重)拒写一块 —— 全文最后的文件规则
+ * (显式规则后写者胜;P-08)。排版与受保护集同一种文法(processFenceWriteRules 认得:表头在行首,收尾括号落在最后一条条目的行末,其后可带注释;
+ * 上级目录块一行写完)。存在性测试不拦(P-13)。
+ */
+function renderCredentialFence(rules: readonly CredentialStoreRule[]): string[] {
+  if (!rules.length) return []
+  const ancestors: string[] = []
+  for (const rule of rules) for (let node = dirname(rule.path); node !== dirname(node); node = dirname(node)) if (!ancestors.includes(node)) ancestors.push(node)
+  return [
+    "(deny file-read* file-write*",
+    ...rules.map((rule, i) => `  (${rule.kind} "${rule.path}")${i === rules.length - 1 ? ")                                         ; C1 凭据存放点" : ""}`),
+    `(deny file-write* ${ancestors.map((node) => `(literal "${node}")`).join(" ")})      ; C1 上级目录节点`,
   ]
 }
 

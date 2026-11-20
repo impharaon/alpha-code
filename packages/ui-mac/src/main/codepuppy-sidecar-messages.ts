@@ -1,6 +1,7 @@
 import type { PackageAuthorizationResultV1 } from "../shared/package-admission"
 import { isInstallOutcomeV1, type InstallOutcomeV1, type CreatedPluginDraftV1 } from "../shared/plugin-install"
 import type { SourceSearchResultV1, CandidateV1, SourceStatusV1 } from "./plugin-sources"
+import type { ToolPolicyPartition, ToolPolicyRecord } from "../../../schema/src/codepuppy-tool-policy"
 
 // Main ↔ sidecar contract: source lookup, ID-only installation, main-owned progress and reload messages.
 // Shared by ext and ui-mac; no filesystem or Electron dependencies. Build/parse pairs reject malformed payloads.
@@ -673,4 +674,57 @@ export function parsePackageAuthorizationReply(value: unknown): PackageAuthoriza
     if (!fields || Object.keys(item).some(key => !["kind", "componentId", "prerequisiteId", "serviceName", "label", ...fields].includes(key))) return
   }
   return buildPackageAuthorizationReply(value.id, result as Extract<PackageAuthorizationResultV1, { ok: true }>)
+}
+
+// ── 工具策略改写(SPEC-engine-config-fence BR-03,DESIGN-engine-config-fence §4.5、D7)─────────────────────────────────────
+// 工具策略目录在受保护集里,围栏内的 ext 写不了它:设置页的改写由 ext 经本通道交给 main 写,main 写完再回复。读仍在 ext(每次判定现读)。
+// 这一对消息由 server.ts 接收链上自己的那一环处理(main 跑的是 ext/policy/store.ts 的 receiveToolPolicyWrite),不进上面的 hub 入站族。
+// 只查形状;记录本身由写者在落盘前按完整 schema 解码(savePolicyDocument)。
+
+export type ToolPolicyWriteRequest =
+  | { type: "codepuppy.tool-policy.write.request"; id: number; op: "save"; partition: ToolPolicyPartition; records: ToolPolicyRecord[] }
+  | { type: "codepuppy.tool-policy.write.request"; id: number; op: "reset"; partition: ToolPolicyPartition }
+export type ToolPolicyWriteReply =
+  | { type: "codepuppy.tool-policy.write.reply"; id: number; ok: true; backup?: string }
+  | { type: "codepuppy.tool-policy.write.reply"; id: number; error: string } // 不含文档内容
+
+export function buildToolPolicyWriteRequest(
+  input: { id: number; partition: ToolPolicyPartition } & ({ op: "save"; records: readonly ToolPolicyRecord[] } | { op: "reset" }),
+): ToolPolicyWriteRequest {
+  const partition = { account: input.partition.account, workspace: input.partition.workspace }
+  return input.op === "save"
+    ? { type: "codepuppy.tool-policy.write.request", id: input.id, op: "save", partition, records: [...input.records] }
+    : { type: "codepuppy.tool-policy.write.request", id: input.id, op: "reset", partition }
+}
+
+/** main 侧:ext 的工具策略写请求。形状不对 ⇒ undefined(接收方回 error 并记一行)。 */
+export function parseToolPolicyWriteRequest(value: unknown): ToolPolicyWriteRequest | undefined {
+  if (!isRecord(value) || value.type !== "codepuppy.tool-policy.write.request" || !isId(value.id)) return
+  const partition = value.partition
+  if (!isRecord(partition) || Object.keys(partition).some((key) => key !== "account" && key !== "workspace")) return
+  if (!isText(partition.account) || !isText(partition.workspace)) return
+  const parsed = { account: partition.account, workspace: partition.workspace }
+  if (value.op === "reset" && Object.keys(value).every((key) => ["type", "id", "op", "partition"].includes(key)))
+    return { type: "codepuppy.tool-policy.write.request", id: value.id, op: "reset", partition: parsed }
+  if (value.op !== "save" || Object.keys(value).some((key) => !["type", "id", "op", "partition", "records"].includes(key))) return
+  if (!Array.isArray(value.records) || !value.records.every(isRecord)) return
+  return { type: "codepuppy.tool-policy.write.request", id: value.id, op: "save", partition: parsed, records: value.records as ToolPolicyRecord[] }
+}
+
+export function buildToolPolicyWriteReply(id: number, result: { ok: true; backup?: string } | { error: string }): ToolPolicyWriteReply {
+  return "error" in result
+    ? { type: "codepuppy.tool-policy.write.reply", id, error: result.error }
+    : { type: "codepuppy.tool-policy.write.reply", id, ok: true, ...(result.backup !== undefined ? { backup: result.backup } : {}) }
+}
+
+/** ext 侧:main 对工具策略写请求的应答。 */
+export function parseToolPolicyWriteReply(value: unknown): ToolPolicyWriteReply | undefined {
+  if (!isRecord(value) || value.type !== "codepuppy.tool-policy.write.reply" || !isId(value.id)) return
+  if ("error" in value)
+    return isText(value.error) && Object.keys(value).every((key) => ["type", "id", "error"].includes(key))
+      ? { type: "codepuppy.tool-policy.write.reply", id: value.id, error: value.error }
+      : undefined
+  if (value.ok !== true || Object.keys(value).some((key) => !["type", "id", "ok", "backup"].includes(key))) return
+  if (value.backup !== undefined && !isText(value.backup)) return
+  return buildToolPolicyWriteReply(value.id, { ok: true, ...(typeof value.backup === "string" ? { backup: value.backup } : {}) })
 }

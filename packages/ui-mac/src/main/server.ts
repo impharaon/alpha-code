@@ -80,6 +80,8 @@ import { ensureUserWorkspaceDir } from "./codepuppy-user-workspace"
 import { fenceWorkspaceTruthPath, readWorkspaceTruthOrThrow, type FenceRunWritable } from "./process-fence-workspaces"
 import { homedir } from "node:os"
 import { mkdirSync, readFileSync, realpathSync, statSync } from "node:fs"
+import { defaultPolicyBaseDir } from "../../../ext/src/policy/resolver"
+import { receiveToolPolicyWrite } from "../../../ext/src/policy/store"
 
 export type HealthCheck = { wait: Promise<void> }
 
@@ -344,6 +346,7 @@ export function preplanConfigFenceRoots(input: { env: Record<string, string | un
     engineConfigDirectory: engineGlobalConfigDirectory(exported.env, exported.home),
     configHome: resolveEngineRoots(exported.env, exported.home).configHome,
     home: exported.home,
+    dataHome: resolveEngineRoots(exported.env, exported.home).dataHome,
   }).flatMap((rule) => (rule.kind === "subpath" ? [rule.path] : []))
 }
 
@@ -785,11 +788,14 @@ export async function spawnLocalServer(
     },
     log: (line: string) => getLogger()?.warn(line),
   }
+  // SPEC-engine-config-fence BR-03(DESIGN-engine-config-fence §4.5):ext 的工具策略改写由 main 写进这一代 sidecar 环境算出的数据目录(ext 读的同一处),写完再回复
+  const toolPolicyBaseDir = defaultPolicyBaseDir(dataDir)
   child.on("message", (message: unknown) => {
     if (projectConfigViews.receive(message)) return
     if (writeProbes.receive(message)) return
     if (writeGrants.receive(message)) return
     if (answerCredentialsMessage(message, credentialReplies)) return
+    if (receiveToolPolicyWrite(message, { baseDir: toolPolicyBaseDir, post: (reply) => child.postMessage(reply), log: (line) => getLogger()?.warn(line) })) return
     options.codepuppySidecar?.receive(message, postCodePuppy)
   })
   let detachCodePuppy: ((reason: string) => void) | undefined

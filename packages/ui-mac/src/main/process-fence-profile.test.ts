@@ -45,7 +45,7 @@ const roots = { home: HOME, dataHome: `${HOME}/.local/share`, cacheHome: `${HOME
 const USER_DATA = `${HOME}/Library/Application Support/ai.opencode.desktop`
 const GLOBAL = `${HOME}/Library/Application Support/codepuppy-state/env/prod`
 /** SPEC-engine-config-fence:受保护配置集,由生产的位置清单给出(这里没有软链,真实路径 = 原路径;软链与真实路径的判据在 process-fence-plan.test.ts)。 */
-const CF: ConfigFenceRule[] = configFenceLocations({ userDataPath: USER_DATA, appStateRoot: STATE_ROOT, codepuppyGlobalRoot: GLOBAL, engineConfigDirectory: `${HOME}/.config/opencode`, configHome: roots.configHome, home: HOME })
+const CF: ConfigFenceRule[] = configFenceLocations({ userDataPath: USER_DATA, appStateRoot: STATE_ROOT, codepuppyGlobalRoot: GLOBAL, engineConfigDirectory: `${HOME}/.config/opencode`, configHome: roots.configHome, home: HOME, dataHome: roots.dataHome })
 /** DESIGN-stored-credentials-fence §4.5 的 C1 输入(已是真实路径;生产由 planCredentialStores 从 credentialStores() 算出)。 */
 const OFFICIAL_RUNTIME = "/private/var/folders/xy/T/codepuppy-connectors-501-abcdef"
 const C1: CredentialStoreRule[] = [
@@ -71,6 +71,8 @@ const base: ProcessFenceProfileInput = {
 /** 一个受保护位置都没有的形状:只判别的行时用(空清单两块都不渲染)。 */
 const noFence = () => [] as string[]
 
+/** 上级目录节点(按首次出现,从父目录到 `/` 之前);末尾三个是 CF-11(工具策略目录,片 ③)带进来的。 */
+const ANCESTORS = [`${HOME}/Library/Application Support`, `${HOME}/Library`, HOME, "/Users", `${STATE_ROOT}/env`, STATE_ROOT, USER_DATA, `${HOME}/.config`, `${HOME}/.local/share/opencode`, `${HOME}/.local/share`, `${HOME}/.local`]
 /** 受保护集两块的逐行期望(独立字面量 —— 不从渲染器取):规则按清单顺序,上级目录按首次出现、从父目录到 `/` 之前。 */
 const CF_LINES = [
   "(deny file-write*",
@@ -88,8 +90,9 @@ const CF_LINES = [
   `(subpath "${HOME}/.config/opencode")`,
   `(subpath "${HOME}/.opencode")`,
   `(literal "${HOME}/opencode.json")`,
-  `(literal "${HOME}/opencode.jsonc"))`,
-  `(deny file-write* ${[`${HOME}/Library/Application Support`, `${HOME}/Library`, HOME, "/Users", `${STATE_ROOT}/env`, STATE_ROOT, USER_DATA, `${HOME}/.config`].map((p) => `(literal "${p}")`).join(" ")})`,
+  `(literal "${HOME}/opencode.jsonc")`,
+  `(subpath "${HOME}/.local/share/opencode/codepuppy-tool-policy"))`,
+  `(deny file-write* ${ANCESTORS.map((p) => `(literal "${p}")`).join(" ")})`,
 ]
 /** C1 两块的逐行期望(独立字面量):拒读拒写的存放点按清单顺序;上级目录按首次出现、从父目录到 `/` 之前。 */
 const C1_ANCESTORS = [`${HOME}/Library/Application Support/ai.opencode.desktop`, `${HOME}/Library/Application Support`, `${HOME}/Library`, HOME, "/Users", "/private/var/folders/xy/T", "/private/var/folders/xy", "/private/var/folders", "/private/var", "/private"]
@@ -105,7 +108,7 @@ const CF_DENY: ProcessFenceWriteRule[] = [
     const m = /^\((subpath|literal) "([^"]*)"\)\)?$|^\(regex #"([^"]*)"\)\)?$/.exec(line)!
     return m[3] !== undefined ? { kind: "regex" as const, value: m[3] } : { kind: m[1] as "subpath" | "literal", value: m[2]! }
   }),
-  ...[`${HOME}/Library/Application Support`, `${HOME}/Library`, HOME, "/Users", `${STATE_ROOT}/env`, STATE_ROOT, USER_DATA, `${HOME}/.config`].map((value) => ({ kind: "literal" as const, value })),
+  ...ANCESTORS.map((value) => ({ kind: "literal" as const, value })),
 ]
 
 /** `#1334` Q1.2 的四行(逐字,独立字面量 —— 不从渲染器取);端口是唯一的参数。 */
@@ -186,9 +189,9 @@ describe("renderProcessFenceProfile —— 勘破 §8.2 的行(W10/W19 已删,D1
     expect(() => renderProcessFenceProfile({ ...base, configFence: [{ kind: "subpath", path: "/r/x", via: ['/w/"x'] }] })).toThrow(/configFence\[0\]/)
   })
 
-  test("位置清单:CF-1–10(名字取 USER_DATA_LAYOUT 与 store 常量);两个引擎配置目录相同只列一份,用户导出 OPENCODE_CONFIG_DIR 时两份都列;整个 ~/.opencode 是 CF-9(subpath,排在 CF-8 之后、CF-10 之前,片 ④);不含工具策略目录(片 ③)", () => {
-    const list = (engineConfigDirectory: string) =>
-      configFenceLocations({ userDataPath: USER_DATA, appStateRoot: STATE_ROOT, codepuppyGlobalRoot: GLOBAL, engineConfigDirectory, configHome: roots.configHome, home: HOME })
+  test("位置清单:CF-1–11(名字取 USER_DATA_LAYOUT 与 store 常量);两个引擎配置目录相同只列一份,用户导出 OPENCODE_CONFIG_DIR 时两份都列;整个 ~/.opencode 是 CF-9(subpath,排在 CF-8 之后、CF-10 之前,片 ④);工具策略目录 <XDG_DATA_HOME>/opencode/codepuppy-tool-policy 是 CF-11,排在最后(片 ③)", () => {
+    const list = (engineConfigDirectory: string, dataHome = roots.dataHome) =>
+      configFenceLocations({ userDataPath: USER_DATA, appStateRoot: STATE_ROOT, codepuppyGlobalRoot: GLOBAL, engineConfigDirectory, configHome: roots.configHome, home: HOME, dataHome })
     expect(list(`${HOME}/.config/opencode`).filter((rule) => rule.kind === "subpath" && rule.path.endsWith("/opencode"))).toEqual([{ kind: "subpath", path: `${HOME}/.config/opencode` }])
     expect(list("/Volumes/cfg/opencode").filter((rule) => rule.kind === "subpath" && rule.path.endsWith("/opencode"))).toEqual([
       { kind: "subpath", path: "/Volumes/cfg/opencode" },
@@ -200,7 +203,10 @@ describe("renderProcessFenceProfile —— 勘破 §8.2 的行(W10/W19 已删,D1
     expect(list(`${HOME}/.opencode`).filter((rule) => "neverCreate" in rule)).toEqual([{ kind: "subpath", path: `${HOME}/.opencode`, neverCreate: true }])
     expect(paths.indexOf(`${HOME}/.opencode`)).toBe(paths.indexOf(`${HOME}/.config/opencode`) + 1)
     expect(paths.indexOf(`${HOME}/opencode.json`)).toBe(paths.indexOf(`${HOME}/.opencode`) + 1)
-    expect(JSON.stringify(list(`${HOME}/.config/opencode`))).not.toMatch(/codepuppy-tool-policy/)
+    // CF-11 (片 ③):the tool policy directory under the engine data directory, last; it follows an exported XDG_DATA_HOME
+    expect(list(`${HOME}/.config/opencode`).at(-1)).toEqual({ kind: "subpath", path: `${HOME}/.local/share/opencode/codepuppy-tool-policy` })
+    expect(paths.indexOf(`${HOME}/.local/share/opencode/codepuppy-tool-policy`)).toBe(paths.indexOf(`${HOME}/opencode.jsonc`) + 1)
+    expect(list(`${HOME}/.config/opencode`, "/Volumes/d").at(-1)).toEqual({ kind: "subpath", path: "/Volumes/d/opencode/codepuppy-tool-policy" })
   })
 
   test("`#1337` 网络行:Q1.2 四行逐字、顺序不变、deny 在前 allow 在后、N4 的端口就是传入的代理端口;只写加法(没有第二条 deny)", () => {
@@ -247,7 +253,8 @@ describe("renderProcessFenceProfile —— 勘破 §8.2 的行(W10/W19 已删,D1
   })
 
   test("state 根:等于 userDataPath 时不出第二行;用户导出 XDG_STATE_HOME 时多一行 W3", () => {
-    expect(tokens(renderProcessFenceProfile(base)).filter((l) => l.includes("/opencode\")") && l.includes("state"))).toEqual([])
+    // the allow rows only: the protected ancestors line (片 ③ adds <XDG_DATA_HOME>/opencode next to the state root) is not a W3 row
+    expect(tokens(renderProcessFenceProfile(base)).filter((l) => l.startsWith("(subpath ") && l.includes("/opencode\")") && l.includes("state"))).toEqual([])
     const out = tokens(renderProcessFenceProfile({ ...base, stateHome: "/Volumes/data/state" }))
     expect(out).toContain(`(subpath "/Volumes/data/state/opencode")`)
   })

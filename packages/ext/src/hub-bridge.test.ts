@@ -218,3 +218,49 @@ test("R14 chat search receives failed hung-source status within thirty seconds, 
   expect(result.candidates.some((candidate:{name:string})=>candidate.name==="context7")).toBe(true)
  }finally{release(await fixtureFetch("https://raw.githubusercontent.com/openai/plugins/main/.agents/plugins/marketplace.json"));await responding;await pending;jest.useRealTimers()}
 })
+
+// SPEC-engine-config-fence BR-03 / DESIGN-engine-config-fence §4.5:工具策略的写者走这同一个桥(同一个监听、同一个 id 空间、同一个超时);请求过得了
+// main 侧的解析,应答由 main 侧的构造器造。没有 parentPort ⇒ 没有这个写者(registerPolicy 退回直接写,CLI / 单测)。
+describe("hub-bridge — tool policy writer (I-13)", () => {
+  const partition = { account: "acct:1", workspace: "/work/a" }
+  const records = [{ selector: { level: "tool", canonical: "builtin::shell" }, state: "disabled" }] as never
+
+  test("only with a port; save / reset go out as main parses them and settle on main's reply: ok, ok with backup, error, malformed, no answer", async () => {
+    const messages = await import("../../ui-mac/src/main/codepuppy-sidecar-messages")
+    expect(createHubBridge(undefined).toolPolicy).toBeUndefined()
+    const { port, sent, deliver } = fakePort()
+    const lines: string[] = []
+    const bridge = createHubBridge(port, { timeoutMs: 50, log: (line) => void lines.push(line) })
+    const writer = bridge.toolPolicy!
+    const saved = writer.save(partition, records)
+    expect(messages.parseToolPolicyWriteRequest(sent[0])).toEqual({ type: "codepuppy.tool-policy.write.request", id: 1, op: "save", partition, records })
+    deliver(messages.buildToolPolicyWriteReply(1, { ok: true }))
+    expect(await saved).toBeUndefined()
+    const reset = writer.reset(partition)
+    expect(messages.parseToolPolicyWriteRequest(sent[1])).toEqual({ type: "codepuppy.tool-policy.write.request", id: 2, op: "reset", partition })
+    deliver(messages.buildToolPolicyWriteReply(2, { ok: true, backup: "/d/x.json.quarantined-1" }))
+    expect(await reset).toEqual({ backup: "/d/x.json.quarantined-1" })
+    const refused = writer.save(partition, records).catch((error: Error) => error)
+    deliver(messages.buildToolPolicyWriteReply(3, { error: "EACCES: permission denied, open '/d/x.json.tmp'" }))
+    expect(String(await refused)).toContain("EACCES: permission denied")
+    const malformed = writer.save(partition, records).catch((error: Error) => error)
+    deliver({ type: "codepuppy.tool-policy.write.reply", id: 4, ok: "yes" })
+    expect(await malformed).toBeInstanceOf(Error)
+    const silent = await writer.reset(partition).catch((error: Error) => error)
+    expect(String(silent)).toContain("did not answer in time")
+    expect(lines.filter((line) => line.includes("tool policy write"))).toHaveLength(3)
+  })
+
+  test("one id space with the hub requests: a view request and a tool policy write in flight, answered in reverse order, each settles with its own reply", async () => {
+    const messages = await import("../../ui-mac/src/main/codepuppy-sidecar-messages")
+    const { port, sent, deliver } = fakePort()
+    const bridge = createHubBridge(port, { log: () => {} })
+    const viewing = bridge.view({ directory: "/work/a" })
+    const saving = bridge.toolPolicy!.save(partition, records)
+    expect(sent.map((message) => (message as { id: number }).id)).toEqual([1, 2])
+    deliver(messages.buildToolPolicyWriteReply(2, { ok: true }))
+    deliver(buildHubViewReply(1, { view }))
+    expect(await saving).toBeUndefined()
+    expect(await viewing).toEqual({ ok: true, view })
+  })
+})

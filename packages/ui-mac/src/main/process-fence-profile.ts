@@ -41,6 +41,7 @@
 import { statSync } from "node:fs"
 import { dirname, isAbsolute, join, resolve } from "node:path"
 import { SETTINGS_STORE, UPDATER_STORE } from "./store-keys"
+import { defaultPolicyBaseDir } from "../../../ext/src/policy/resolver"
 import { USER_DATA_LAYOUT } from "./user-data-layout"
 
 export const WORKSPACE_WRITE_EXTENSION_CLASS = "app.codepuppy.workspace-write"
@@ -56,7 +57,7 @@ export const WORKSPACE_WRITE_EXTENSION_CLASS = "app.codepuppy.workspace-write"
 export const WRITABLE_ROOT_IDS = {
   W1: "工作区(启动时并集,每个工作区一条 subpath)",
   W3: "<userDataPath>(opencode/locks/**、engine-scratch-cwd、uv-cache …;其中的受保护配置位置由 profile 末尾的拒写块拿回)",
-  W4: "<XDG_DATA_HOME>/opencode:上游引擎 log / *.db / -wal / -shm / repos",
+  W4: "<XDG_DATA_HOME>/opencode:上游引擎 log / *.db / -wal / -shm / repos / plan(其中的工具策略目录由 profile 末尾的拒写块拿回,CF-11)",
   W5: "<XDG_CACHE_HOME>/opencode:bin / models.json / packages",
   W7: "<HOME>/.npm:@npmcli/arborist 的 cacache,不随 XDG",
   W8: "<HOME>/.zsh_history*(regex):登录 shell 存历史含 .zsh_history.new(§8.5 坑一)",
@@ -115,7 +116,7 @@ export type ConfigFenceRule = ({ kind: "subpath" | "literal"; path: string } | {
 export type ConfigFenceLocation = ConfigFenceRule & { neverCreate?: true }
 
 /**
- * CF-1–10 的原始位置(还不是真实路径;片 ③ 再加工具策略目录)。名字取 USER_DATA_LAYOUT 与 store 常量。
+ * CF-1–11 的原始位置(还不是真实路径)。名字取 USER_DATA_LAYOUT、store 常量与 ext 的工具策略目录名(defaultPolicyBaseDir:ext 读、main 写的同一处)。
  * 环境根恒列(在状态根之内时是一条冗余规则);两个引擎配置目录相同只列一份。顺序即渲染顺序。
  */
 export function configFenceLocations(input: {
@@ -126,6 +127,8 @@ export function configFenceLocations(input: {
   engineConfigDirectory: string
   configHome: string
   home: string
+  /** 引擎的数据根(resolveEngineRoots 的 dataHome:`XDG_DATA_HOME` 或 `~/.local/share`);CF-11 在它的 `opencode/` 之下。 */
+  dataHome: string
   /** CF-4 的另一份:用户设置的 `$CODEPUPPY_ENV_FILE`(codepuppy-secrets.ts 的 userEnvFile;实现期修订 2 A)。 */
   envFile?: string
 }): ConfigFenceLocation[] {
@@ -148,6 +151,8 @@ export function configFenceLocations(input: {
     { kind: "subpath", path: join(input.home, ".opencode"), neverCreate: true }, // CF-9 整个 ~/.opencode(应用从不建它,计划器不预建)
     { kind: "literal", path: join(input.home, "opencode.json") }, // CF-10
     { kind: "literal", path: join(input.home, "opencode.jsonc") }, // CF-10
+    // CF-11 工具策略文档(启用 / 每次询问 / 停用):在 W4 之下,写者在 main(经 codepuppy.tool-policy.write.* 窄消息,片 ③)
+    { kind: "subpath", path: defaultPolicyBaseDir(join(input.dataHome, "opencode")) },
   ]
 }
 

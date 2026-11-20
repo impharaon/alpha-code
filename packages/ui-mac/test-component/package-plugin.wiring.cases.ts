@@ -435,13 +435,16 @@ test("@codepuppy/ext 不受影响:引擎侧接缝走 start() 的 config.content,
   writeFileSync(join(extPath, "server.js"), "export default {}\n")
   const { publishMainBootstrap, unpublishTestBootstrap } = await import("./codepuppy-bootstrap-fixture")
   publishMainBootstrap({ userData }) // sidecar 在注入之前发布启动文档(`#1698`)
+  // main 在 fork 前写种子与显式文件(SPEC-engine-config-fence BR-03),sidecar 再注入
+  const { writeEngineConfigForFork } = await import("../src/main/engine-explicit-config")
+  writeEngineConfigForFork(codepuppyBootstrap())
   const injected = injectCodePuppyConfig(userData, extPath, "dev", codepuppyBootstrap().paths.userConfig ?? null)
   unpublishTestBootstrap()
   expect(injected.ok).toBe(true)
   const engineConfig = JSON.parse(injected.config.content) as { plugins?: string[] }
   // ① alpha 自有 ext 确实进了引擎会读的那份配置(start() 的 config.content),且是唯一的插件;
   expect(engineConfig.plugins?.filter((entry) => !entry.startsWith("-"))).toEqual([extPath])
-  // ② 而磁盘上的 `codepuppy.jsonc` 里没有它 —— 注入只 seed 了一个 `{$schema}`。
+  // ② 而磁盘上的 `codepuppy.jsonc` 里没有它 —— main 只 seed 了一个 `{$schema}`,注入不写它。
   //    咽喉若误伤这条接缝,①会红;咽喉若其实拦不住磁盘写,②会红。
   expect(readConfigStrict().plugin).toBeUndefined()
   expect(readConfigStrict().plugins).toBeUndefined()

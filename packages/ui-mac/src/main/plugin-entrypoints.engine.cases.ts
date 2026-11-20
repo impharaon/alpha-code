@@ -155,9 +155,11 @@ beforeAll(async () => {
   main.codepuppySidecar.attach(message => { wire.push(message); for (const listener of listeners) listener({ data: message }) })
   await main.ledgerReady
   const { injectCodePuppyConfig } = await import("./codepuppy-config-injection")
-  const { explicitSkillDirs, watchExplicitSources } = await import("./engine-explicit-config")
+  const { watchExplicitSources, writeEngineConfigForFork } = await import("./engine-explicit-config")
+  // 与生产同序(SPEC-engine-config-fence BR-03):main 写显式文件并起监听,sidecar 再注入
+  const explicit = writeEngineConfigForFork(codepuppyBootstrap()).watch
   const injection = injectCodePuppyConfig(host.userData, join(sandbox.root, "plugin-entrypoints-ext"), "stable", codepuppyBootstrap().paths.userConfig ?? null)
-  stopWatching = watchExplicitSources({ ...injection.explicit!, skills: explicitSkillDirs, log: line => logs.push(line) })
+  stopWatching = watchExplicitSources({ ...explicit, log: line => logs.push(line) })
   // Pass the existing embedder transport explicitly; Effect's default fetch may predate
   // this suite's override. The config, ext, database and probe still come from the real harness.
   const { startEngine } = await import("../../engine/engine-embed")

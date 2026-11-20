@@ -11,21 +11,25 @@
 // 这一个显式槽原本装的是当前环境的 `codepuppy.jsonc`(用户经 Code Puppy 装的 agent / command / mcp 的真源,REQ-059 G1)。
 // 2.x 只有一个显式槽,所以这里每次启动把两样合成一份文件,放在 Code Puppy 自己的 userData 下(`codepuppy-engine-config/`):
 // 用户文件原样在下,上面三样按「用户已有的同名命令不覆盖、skills 取并集、我们的 policies 排在用户的之后」合进去。
-// `codepuppy.jsonc` 运行中被改(main 装东西、用户手改)、技能翻代 / 新装 / 停用时,sidecar 的监听重写这份合成文件,引擎对显式
+// `codepuppy.jsonc` 运行中被改(main 装东西、用户手改)、技能翻代 / 新装 / 停用时,main 的监听重写这份合成文件,引擎对显式
 // 文件的监听再重载配置(`packages/core/src/config/watch.ts`),技能插件随配置更新重新取源 —— 都不用重启。用户文件解析不了:启动时只写我们这三样并记一行;运行中改坏
 // 则保留上一份好的合成结果并记一行(不让一次手误把用户装的东西整份撤掉)。
 // 已知边界:用户文件里**相对路径**的 `{file:./x}` 引用会按合成文件所在目录解析(Code Puppy 自己写的引用都是绝对路径)。
+//
+// SPEC-engine-config-fence BR-03(DESIGN-engine-config-fence §4.4):这份文件、模型底表与种子 `codepuppy.jsonc` 只由 **main** 写 ——
+// fork 前 writeEngineConfigForFork 写一次,监听在 main 里跑;sidecar 只用同一对路径函数(explicitConfigPath / engineModelsPath)读。
+// 这些位置随后进围栏 profile 末尾的拒写块,被围栏的引擎树写不到。写或删失败原样抛,server.ts 据此拒绝 fork。
 import * as fs from "node:fs"
 import * as path from "node:path"
 import { parse as parseJsonc, type ParseError } from "jsonc-parser"
-import { codepuppyBootstrap } from "@opencode/util/codepuppy-bootstrap"
+import type { CodePuppyBootstrap } from "@opencode/util/codepuppy-bootstrap"
+import { applyPromptTakeover } from "../../../ext/src/codepuppy-prompts"
 import { projectServerConfig } from "../../../ext/src/engine-transforms"
 import { factorySkillPaths } from "../../../ext/src/factory-paths"
 import { skillGenerationLiveDirs } from "../../../ext/src/gen-skill-paths"
 import { CODEPUPPY_V2_CATALOG_READY_PROVIDER_ID } from "../shared/codepuppy-config"
 import { PROJECT_HIDDEN_DIR } from "../shared/project-hidden-dir"
-import type { CodePuppyModelConfig } from "./codepuppy-models"
-import { codepuppyGlobalRoot } from "./engine-config-truth"
+import { buildCodePuppyModelConfig, engineModelConfig, type CodePuppyModelConfig } from "./codepuppy-models"
 import { readPackageLedgerStateV1 } from "./ext-receipt-v2"
 import { USER_DATA_LAYOUT } from "./user-data-layout"
 
@@ -38,6 +42,11 @@ export type ExplicitLayer = { policies: ExplicitPolicy[]; commands: Record<strin
 
 export function explicitConfigPath(userDataPath: string): string {
   return path.join(userDataPath, USER_DATA_LAYOUT.engineConfig, EXPLICIT_CONFIG_FILE)
+}
+
+/** 模型底表(#857):与显式文件同目录;main 写,sidecar 以「文件在」判这一代有没有底表。 */
+export function engineModelsPath(userDataPath: string): string {
+  return path.join(userDataPath, USER_DATA_LAYOUT.engineConfig, "models.json")
 }
 
 const isRecord = (value: unknown): value is Record<string, unknown> => !!value && typeof value === "object" && !Array.isArray(value)
@@ -126,8 +135,8 @@ function isExplicitInput(name: string, userConfig: string | undefined, root: str
 /**
  * 运行中:输入一变就重写显式文件(去抖 100ms)。输入 = 用户的 `codepuppy.jsonc`(main 装东西、用户手改),以及决定 `skills` 的
  * 技能允许集 `skills-enabled.json` 与各技能键的 `current.json`(翻代 / 新装 / 停用,`#1667` 编排器裁决 r3 第 1 条)—— 都在当前
- * 环境根下,所以只监听这一棵树(递归),按文件名筛。`skills` 每次由 `skills()` 现算(codepuppy-config-injection.ts 的
- * explicitSkillDirs,与注入同一个算法)。用户文件改坏了 ⇒ 不重写(保留上一份好的)并记一行。返回停止函数。
+ * 环境根下,所以只监听这一棵树(递归),按文件名筛。`skills` 每次由 `skills()` 现算(explicitSkillDirs,与 fork 前那一次同一个
+ * 算法)。只在 main 里跑(server.ts 每代起、子进程退出时停)。用户文件改坏了 ⇒ 不重写(保留上一份好的)并记一行。返回停止函数。
  * 监听的是目录而不是文件:main 的原子写是 rename,盯文件本身会在第一次换名后失联。
  */
 export function watchExplicitSources(input: {
@@ -221,13 +230,14 @@ export const PROJECT_SKILLS_ENTRY = `./${PROJECT_HIDDEN_DIR}/skills`
 /**
  * `#1667`(编排器裁决 r3 第 1 条):显式文件 `skills` 的唯一算法 —— 出厂技能目录(main 启动时算好、`#1698` 起在启动文档的
  * `skills.factoryDirs`)+ 已启用技能当前那一代的真实目录(ext 的 skillGenerationLiveDirs:过账本 enabled 门、读 `current.json`)+ 项目技能目录
- * (PROJECT_SKILLS_ENTRY)。注入时算一次,sidecar 的监听在翻代 / 新装 / 停用时再算(engine-explicit-config.ts 的 watchExplicitSources)。
+ * (PROJECT_SKILLS_ENTRY)。main 在 fork 前算一次,main 的监听在翻代 / 新装 / 停用时再算(watchExplicitSources);两处都从同一份启动文档
+ * 取出厂目录与当前环境根(SPEC-engine-config-fence BR-03)。
  */
-export function explicitSkillDirs(): string[] {
+export function explicitSkillDirs(factoryDirs: readonly string[], root: string): string[] {
   return [
     ...new Set([
-      ...factorySkillPaths(codepuppyBootstrap().skills.factoryDirs),
-      ...skillGenerationLiveDirs(codepuppyGlobalRoot()),
+      ...factorySkillPaths(factoryDirs),
+      ...skillGenerationLiveDirs(root),
       PROJECT_SKILLS_ENTRY,
     ]),
   ]
@@ -315,7 +325,7 @@ function governedModelsBase(config: { enabled_providers?: unknown; provider?: un
 
 export function materializeGovernedModelsBase(userDataPath: string, config: CodePuppyModelConfig): string | undefined {
   const dir = path.join(userDataPath, USER_DATA_LAYOUT.engineConfig)
-  const modelsPath = path.join(dir, "models.json")
+  const modelsPath = engineModelsPath(userDataPath)
   const base = governedModelsBase(config)
   if (!Object.keys(base).length) {
     fs.rmSync(modelsPath, { force: true })
@@ -324,4 +334,63 @@ export function materializeGovernedModelsBase(userDataPath: string, config: Code
   fs.mkdirSync(dir, { recursive: true, mode: 0o700 })
   fs.writeFileSync(modelsPath, `${JSON.stringify(base, null, 2)}\n`, { mode: 0o600 })
   return modelsPath
+}
+
+/** fork 前写出的引擎配置文件;`userError` = 用户的 codepuppy.jsonc 解析不了(只写了 Code Puppy 那一层,调用方照旧记一行)。 */
+export type EngineConfigFiles = { explicitConfig: string; models?: string; userError?: string }
+
+/** 全新机器上 codepuppy.jsonc 的种子(与 0.2.6 注入写的同一份字节)。 */
+const SEED_DOCUMENT = JSON.stringify({ $schema: "https://opencode.ai/config.json" }, null, 2)
+
+/**
+ * 只在 main 执行(DESIGN-engine-config-fence §4.4):codepuppy.jsonc 缺席且未置逃生阀(`userConfig` 缺席)时先写种子;再合成并原子写显式文件;
+ * 有模型底表就写,没有(含 CODEPUPPY_MODELS_DISABLE、投影不全)就删掉上一代留下的 models.json —— 围栏内建不出它,所以 sidecar 以
+ * 「文件在」判这一代有没有底表。任何 IO 错误原样抛(Node 的消息带路径与 errno,不带内容)。
+ */
+export function writeEngineConfigFiles(input: {
+  userDataPath: string
+  root: string
+  userConfig?: string
+  layer: ExplicitLayer
+  models: CodePuppyModelConfig | undefined
+}): EngineConfigFiles {
+  if (input.userConfig !== undefined) {
+    fs.mkdirSync(path.dirname(input.userConfig), { recursive: true })
+    if (!fs.existsSync(input.userConfig)) fs.writeFileSync(input.userConfig, SEED_DOCUMENT)
+  }
+  const explicitConfig = explicitConfigPath(input.userDataPath)
+  const { userError } = writeExplicitConfig(explicitConfig, input.userConfig, input.layer, input.root)
+  const models = input.models ? materializeGovernedModelsBase(input.userDataPath, input.models) : undefined
+  if (!input.models) fs.rmSync(engineModelsPath(input.userDataPath), { force: true })
+  return { explicitConfig, ...(models ? { models } : {}), ...(userError ? { userError } : {}) }
+}
+
+/**
+ * main 的 fork 前一步(server.ts;测试宿主同序调用):显式层的三样从这一代的启动文档算 —— 平台地址、默认模型覆盖、逃生开关、出厂技能目录
+ * 与当前环境根都取文档里 main 已判好的值,与 sidecar 注入读的是同一份。policies = 模型投影的 provider 白名单(内联文档里那份是第二层),
+ * commands = 出厂 /init、/review(提示词逃生门置位时不写),skills = explicitSkillDirs。写完返回监听要的输入(除 log)。
+ */
+export function writeEngineConfigForFork(bootstrap: CodePuppyBootstrap) {
+  const root = bootstrap.paths.globalRoot
+  const userConfig = bootstrap.paths.userConfig
+  const factoryDirs = bootstrap.skills.factoryDirs
+  const models = buildCodePuppyModelConfig(bootstrap.paths.userData, {
+    baseURL: bootstrap.platform.modelProxyBaseURL,
+    defaultModel: bootstrap.platform.defaultModelOverride,
+    disabled: bootstrap.switches.modelsDisabled,
+  })
+  const layer: ExplicitLayer = { policies: models ? engineModelConfig(models).policies : [], commands: {}, skills: explicitSkillDirs(factoryDirs, root) }
+  // 出厂 /init、/review 的模板来自 ext 的 applyPromptTakeover(同一份文字),写成 `commands` 条目;`review` 在子任务里跑(2.x 原生键 `subagent`)。
+  if (!bootstrap.switches.promptRebrandDisabled) {
+    const takeover: { command?: Record<string, { template: string; description?: string; subtask?: boolean }> } = {}
+    applyPromptTakeover(takeover)
+    layer.commands = Object.fromEntries(
+      Object.entries(takeover.command ?? {}).map(([name, { subtask, ...command }]) => [name, { ...command, ...(subtask ? { subagent: true } : {}) }]),
+    )
+  }
+  const files = writeEngineConfigFiles({ userDataPath: bootstrap.paths.userData, root, ...(userConfig ? { userConfig } : {}), layer, models })
+  return {
+    files,
+    watch: { file: files.explicitConfig, root, ...(userConfig ? { userConfig } : {}), layer, skills: () => explicitSkillDirs(factoryDirs, root) },
+  }
 }

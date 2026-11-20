@@ -35,6 +35,8 @@ import { join, resolve } from "node:path"
 import { buildFenceAddon } from "../../scripts/build-fence-addon"
 import { trialCompileProfile } from "./process-fence-compile"
 import { planProcessFence } from "./process-fence-plan"
+import { writeEngineConfigForFork } from "./engine-explicit-config"
+import { testBootstrap } from "../../test-component/codepuppy-bootstrap-fixture"
 // `#1337`:真引擎在围栏下的出网只剩策略代理那一扇门 —— 这里起**生产的**代理并按生产 sidecarEgressProxyEnv 给引擎 env,
 // 与出货形态同一条路;判据仍只看文件轴(网络轴在 network-egress-fence.test.ts)。`#1454`:代理的授权**注入为全拒**
 // (authorize=false、requestGrant=not-asked),不接注册表 —— 本文件不依赖本机能不能出网。
@@ -92,6 +94,8 @@ describeDarwin("REQ-159 真引擎(OpenCode 2)+ 真 ext 在进程围栏下:三类
     // 生产启动对账在 fork 之前按账本发布允许集;ext 的 MCP 收口读它(读不到即停用一切非云、非项目 MCP,I-11)。
     const { reconcileSkillsDerivation } = await import("./ext-receipt-v2")
     expect(reconcileSkillsDerivation(globalRoot)).toEqual({ ok: true })
+    // SPEC-engine-config-fence BR-03:显式文件、模型底表与种子由 main 在 fork 前写(驱动扮演 sidecar,只读);启动文档与驱动发布的那一份同形
+    writeEngineConfigForFork(testBootstrap({ globalRoot, userData, extPlugin: extDir, extBundledManifest: join(extDir, "bundled-tools.json"), engineConfigDirectory: join(home, ".config", "opencode") }))
     spawnSync("git", ["init", "-q"], { cwd: ws })
     // ③ 生产 .node(现编,烤 buildId)与生产计划器(真试编译)。
     addon = buildFenceAddon({ out: join(iso, "resources", "codepuppy-fence", "codepuppy_fence.node"), buildId: `ac1321-engine-${Date.now()}` }).out

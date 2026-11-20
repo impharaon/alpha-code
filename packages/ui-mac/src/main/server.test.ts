@@ -702,7 +702,7 @@ describe("spawnLocalServer", () => {
     expect(() => readFileSync(models)).toThrow()
   })
 
-  test("BR-03 / E7:fork 前 main 写好显式文件与种子并跑监听 —— 子进程活着时手改 codepuppy.jsonc ⇒ main 重写显式文件;子进程退出后不再跟", async () => {
+  test("BR-03 / E7:fork 前 main 写好显式文件与种子并跑监听 —— 子进程活着时手改 codepuppy.jsonc、main 装一个技能 ⇒ main 重写显式文件;子进程退出后不再跟", async () => {
     const explicit = join(userDataPath, "codepuppy-engine-config", "codepuppy-explicit.json")
     const userConfig = join(process.env.CODEPUPPY_GLOBAL_DIR!, "codepuppy.jsonc")
     const result = await spawnLocalServer("127.0.0.1", 4096, "password", { userDataPath, healthCheck: async () => true, planFence: fakePlanFence, fork: fakeFork })
@@ -721,6 +721,14 @@ describe("spawnLocalServer", () => {
     await new Promise((resolve) => setTimeout(resolve, 250)) // 递归目录监听起来要一点时间
     edit("while-alive")
     expect(await waitFor(() => commands().includes("while-alive"))).toBe(true)
+    // main 装一个技能(ext-transaction 的姿势:生成目录 + current.json 指向它 + 允许集里有这个键)⇒ 显式文件的 skills 跟着重写
+    const root = process.env.CODEPUPPY_GLOBAL_DIR!
+    const generation = join(root, "ext-store", "skill--installed", "generations", "gen-000001-abcdef")
+    mkdirSync(generation, { recursive: true })
+    writeFileSync(join(root, "ext-store", "skill--installed", "current.json"), JSON.stringify({ generation: "gen-000001-abcdef" }))
+    writeFileSync(join(root, "skills-enabled.json"), JSON.stringify({ v: 3, keys: ["skill--installed"], scoped: [], mcp: [] }))
+    const skills = () => (JSON.parse(readFileSync(explicit, "utf8")) as { skills?: string[] }).skills ?? []
+    expect(await waitFor(() => skills().some((entry) => entry.endsWith(join("skill--installed", "generations", "gen-000001-abcdef"))))).toBe(true)
     await result.listener.stop()
     edit("after-exit")
     await new Promise((resolve) => setTimeout(resolve, 400))

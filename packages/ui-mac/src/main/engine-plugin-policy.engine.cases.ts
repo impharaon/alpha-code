@@ -10,7 +10,7 @@ import { allowProject } from "../../test-component/codepuppy-engine"
 import { buildEngineServerOptions } from "./engine-server-options"
 import { withEngineAuthorization } from "./engine-authorization"
 import { injectCodePuppyConfig, type CodePuppyConfigInjectionResult } from "./codepuppy-config-injection"
-import { writeExplicitConfig } from "./engine-explicit-config"
+import { writeEngineConfigForFork, writeExplicitConfig } from "./engine-explicit-config"
 import { customProviderSecretName, secretFilePath } from "./codepuppy-secret-files"
 import { assertExtPluginActive } from "./sidecar-ext-ready"
 import type { EngineFetch } from "./in-process-engine"
@@ -149,10 +149,13 @@ for (const arm of ["allowed", "unallowed"] as const) {
   describe(`#1713 插件 ${arm === "allowed" ? "允许" : "未允许"}臂`, () => {
     let projects: Awaited<ReturnType<typeof fixture>>
     let injection: CodePuppyConfigInjectionResult
+    let explicit: ReturnType<typeof writeEngineConfigForFork>["watch"]
     let engine: Awaited<ReturnType<typeof engineWith>>
 
     test("项目插件:目录、配置条目、自带已同意、自写 allow、上级目录与同名 / 包名 / 通配路径按生产信任生效", async () => {
       projects = await fixture(arm)
+      // 与生产同序(SPEC-engine-config-fence BR-03):main 在 fork 前写显式文件,sidecar 再注入
+      explicit = writeEngineConfigForFork(codepuppyBootstrap()).watch
       injection = injectCodePuppyConfig(userData, ext, "stable", codepuppyBootstrap().paths.userConfig ?? null)
       expect(injection.ok).toBe(true)
       engine = await engineWith(arm, injection.config, injection.models.file)
@@ -180,10 +183,10 @@ for (const arm of ["allowed", "unallowed"] as const) {
       expect(engine.ran()).not.toContain("global-user-denied")
       const file = path.join(root, `${arm}-without-user-deny.json`)
       // 同一用户文件与同一层,只去掉用户的 deny;其余字段(含用户插件)原样。
-      const user = JSON.parse(fs.readFileSync(injection.explicit!.userConfig!, "utf8")) as { policies?: unknown[] }
+      const user = JSON.parse(fs.readFileSync(explicit.userConfig!, "utf8")) as { policies?: unknown[] }
       const userFile = path.join(root, `${arm}-user-without-deny.json`)
       write(userFile, JSON.stringify({ ...user, policies: [] }))
-      writeExplicitConfig(file, userFile, injection.explicit!.layer, injection.explicit!.root)
+      writeExplicitConfig(file, userFile, explicit.layer, explicit.root)
       const opposite = await engineWith(`${arm}-without-user-deny`, { ...injection.config, file }, injection.models.file)
       await opposite.open(projects.p1)
       expect(opposite.ran()).toContain("global-user-denied")

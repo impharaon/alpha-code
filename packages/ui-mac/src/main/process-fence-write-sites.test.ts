@@ -49,8 +49,10 @@ describe("AC3 登记簿 == 扫描(生产源码)", () => {
   test("每一行的根都合法,且没有 TODO", () => {
     expect(diff.invalidRoot.map((r) => `${signatureOf(r)}\t${r.root}`)).toEqual([])
     expect(ledger.filter((r) => r.root === "TODO").map(signatureOf)).toEqual([])
-    // `main-only` 只许给 codepuppy-environment.ts(见 isValidRoot 的说明);别处用它就是给真写入点开豁免。
-    expect(ledger.filter((r) => r.root === "main-only" && !r.file.endsWith("codepuppy-environment.ts")).map(signatureOf)).toEqual([])
+    // `main-only` 只许给登记过的那几个模块(见 isValidRoot 的说明);别处用它就是给真写入点开豁免。
+    // DESIGN-engine-config-fence §4.7:引擎配置文件与安装账本的写者只在 main(SPEC-engine-config-fence BR-03)。
+    const mainOnlyModules = ["codepuppy-environment.ts", "engine-explicit-config.ts", "codepuppy-installs.ts", "ext-receipt-v2.ts"].map((name) => `packages/ui-mac/src/main/${name}`)
+    expect(ledger.filter((r) => r.root === "main-only" && !mainOnlyModules.includes(r.file)).map(signatureOf)).toEqual([])
   })
 
   test("集合自证:闭包含 sidecar 真 import 的模块与 ext 全部源码;不含 main 进程入口与测试文件", () => {

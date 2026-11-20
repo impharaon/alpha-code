@@ -207,6 +207,9 @@ beforeAll(async () => {
   refreshEngine = async () => {
     try {
       await running?.close()
+      // 与生产换代同序(SPEC-engine-config-fence BR-03):main 先按同一份启动文档写显式文件与模型底表,sidecar 再注入
+      const { writeEngineConfigForFork } = await import("./engine-explicit-config")
+      writeEngineConfigForFork(codepuppyBootstrap())
       const injection = injectCodePuppyConfig(
         host.userData,
         join(sandbox.root, "hub-lifecycle-ext"),
@@ -245,11 +248,10 @@ beforeAll(async () => {
     for (const listener of listeners) listener({ data: message })
   })
   await main.ledgerReady
-  // sidecar.ts starts this watcher before the engine. The old connector refresh happened
-  // to re-inject paths; runtime MCP activation must exercise the real in-process path too.
-  const { explicitSkillDirs, watchExplicitSources } = await import("./engine-explicit-config")
-  if (!host.injection.explicit) throw Error("missing explicit config inputs")
-  stopWatching = watchExplicitSources({ ...host.injection.explicit, skills: explicitSkillDirs, log: line => consoleLines.push(line) })
+  // main (server.ts) starts this watcher right after writing the explicit file, before the fork. The old connector refresh
+  // happened to re-inject paths; runtime MCP activation must exercise the real in-process path too.
+  const { watchExplicitSources } = await import("./engine-explicit-config")
+  stopWatching = watchExplicitSources({ ...host.explicit, log: line => consoleLines.push(line) })
   running = await host.start()
   const { policyStore } = await import("../../test-component/codepuppy-engine")
   initialPolicy = JSON.stringify((await (await policyStore()).snapshot()).user)

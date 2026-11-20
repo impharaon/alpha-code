@@ -234,14 +234,3 @@ describe("fork 前主进程写引擎配置(writeEngineConfigFiles)", () => {
     expect(() => writeEngineConfigFiles({ ...stuck, layer: LAYER, models: undefined })).toThrow(engineModelsPath(stuck.userDataPath))
   })
 })
-
-// 分类与「这处锚守不住什么」登记在 ./source-text-anchors.ts。
-test("ANCHOR (not a gate): sidecar.ts 在 import 引擎之前、拿到注入结果之后就开始监听 codepuppy.jsonc(watchExplicitSources)", () => {
-  const sidecar = fs.readFileSync(path.join(import.meta.dir, "sidecar.ts"), "utf8")
-  const injection = sidecar.indexOf("const injection = prepareSidecarEnv(")
-  const watch = sidecar.indexOf("watchExplicitSources({ ...injection.explicit")
-  const engine = sidecar.indexOf('await import("virtual:opencode-server")')
-  expect(injection).toBeGreaterThan(-1)
-  expect(watch).toBeGreaterThan(injection)
-  expect(engine).toBeGreaterThan(watch)
-})

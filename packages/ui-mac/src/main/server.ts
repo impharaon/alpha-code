@@ -30,6 +30,7 @@ import { ignoredConfigProviderBlocks, ignoredConfigRemoteMcpEntries } from "./ex
 import { readCustomProviderRecords } from "./custom-provider-records"
 import { readMcpServerRecordsForGeneration } from "./mcp-server-records"
 import { buildCodePuppyModelConfig } from "./codepuppy-models"
+import { watchExplicitSources, writeEngineConfigForFork } from "./engine-explicit-config"
 import { pinAppliedCatalog } from "./codepuppy-live-allowlist"
 import { loadCodePuppySecrets } from "./codepuppy-secrets"
 import { posixModesEffective } from "./platform"
@@ -409,6 +410,9 @@ export function preferAppEnv(userDataPath: string) {
 // 变没变」(codepuppy-secret-files.applyPlatformCredentialsHot);还没 fork 过 = undefined。
 let forkedSecrets: ReadonlySet<string> | undefined
 
+// SPEC-engine-config-fence BR-03:当前这一代的显式文件监听(main 里跑)。新的一次 spawn 先停掉上一份 —— 盖住「起了监听、fork 却被拒」那一代。
+let explicitConfigWatch: (() => void) | undefined
+
 export function forkedSecretNames(): ReadonlySet<string> | undefined {
   return forkedSecrets
 }
@@ -541,17 +545,6 @@ export async function spawnLocalServer(
     getLogger()?.warn(
       `engine data directory ${dataDir} also holds other OpenCode data (${foreign.join(", ")}) — Code Puppy shares this directory with standalone OpenCode installs (S7); it reads only ${databasePath}`,
     )
-  let fence: PlannedFence | undefined
-  try {
-    fence = (options.planFence ?? planProductionFence)({ userDataPath: options.userDataPath, sidecarEnv, egressProxyPort, carriedWorkspaces: options.fenceRun?.carriedWorkspaces() ?? [] })
-  } catch (error) {
-    getLogger()?.error("process fence plan FAILED — refusing to fork the sidecar (fail closed; an unfenced engine must not start)", error)
-    throw new Error(`process fence plan failed — sidecar fork refused: ${serializeError(error).message}`)
-  }
-  if (fence && options.fenceRun && !fence.workspaces)
-    throw new Error("process fence plan carries no workspace list — this generation's W1 could not join the run's writable history, sidecar fork refused")
-  if (!fence && process.platform === "darwin")
-    throw new Error("process fence plan returned nothing on darwin — sidecar fork refused (an unfenced engine must not start)")
   // `#1698`(DESIGN-upgrade-bootstrap-config §4.2 / §4.4):这一代交给 sidecar、ext 与引擎的决定收成一份启动文档,随 start 消息走,
   // 不进环境。构建失败(结构性缺陷,例如资源根 realpath 失败)⇒ 抛 ⇒ 与上面各项同一条拒 fork 路。
   // #397:catalog 通道在 MAIN 侧从冻结快照取 —— sidecar 进程没有快照。tryGet 仅为纯单测兜底(缺省 → sidecar loud 跳过 override 注入)。
@@ -576,6 +569,34 @@ export async function spawnLocalServer(
     env: process.env,
     log: (line) => getLogger()?.warn(line),
   })
+  // SPEC-engine-config-fence BR-03(DESIGN-engine-config-fence §4.4、§5):显式文件、模型底表与种子 codepuppy.jsonc 由 main 在 fork 前按
+  // 这一份启动文档写(sidecar 只读,这些位置随后在围栏里写不到);没有模型底表的一代删掉上一代留下的 models.json。写或删失败 ⇒ 与密钥
+  // 文件、已应用目录同一条路径拒绝 fork,不退回 sidecar 里写。写完即起显式文件的监听(codepuppy.jsonc 手改、main 装技能 ⇒ 重写,
+  // 引擎不重启就生效),本代子进程退出时停;fork 前失败留下的那一份由下一次 spawn 先停掉。
+  let engineConfig: ReturnType<typeof writeEngineConfigForFork>
+  try {
+    engineConfig = writeEngineConfigForFork(bootstrap)
+  } catch (error) {
+    const message = serializeError(error).message
+    getLogger()?.error(`[I-13] engine config files could not be written — refusing to fork: ${message}`)
+    throw new Error(`engine config files could not be written — sidecar fork refused: ${message}`)
+  }
+  if (engineConfig.files.userError)
+    getLogger()?.warn(`[alpha-code#1667] ${bootstrap.paths.userConfig} is not valid (${engineConfig.files.userError}); the engine sees only Code Puppy's explicit layer`)
+  explicitConfigWatch?.()
+  const stopExplicitConfigWatch = watchExplicitSources({ ...engineConfig.watch, log: (line) => getLogger()?.warn(line) })
+  explicitConfigWatch = stopExplicitConfigWatch
+  let fence: PlannedFence | undefined
+  try {
+    fence = (options.planFence ?? planProductionFence)({ userDataPath: options.userDataPath, sidecarEnv, egressProxyPort, carriedWorkspaces: options.fenceRun?.carriedWorkspaces() ?? [] })
+  } catch (error) {
+    getLogger()?.error("process fence plan FAILED — refusing to fork the sidecar (fail closed; an unfenced engine must not start)", error)
+    throw new Error(`process fence plan failed — sidecar fork refused: ${serializeError(error).message}`)
+  }
+  if (fence && options.fenceRun && !fence.workspaces)
+    throw new Error("process fence plan carries no workspace list — this generation's W1 could not join the run's writable history, sidecar fork refused")
+  if (!fence && process.platform === "darwin")
+    throw new Error("process fence plan returned nothing on darwin — sidecar fork refused (an unfenced engine must not start)")
 
   const sidecar = join(dirname(fileURLToPath(import.meta.url)), "sidecar.js")
   rotateServerLogs()
@@ -688,6 +709,8 @@ export async function spawnLocalServer(
   let detachCodePuppy: ((reason: string) => void) | undefined
   child.once("exit", (code) => {
     clearOfficialConnectorRuntimeOnExit(runtimeGeneration)
+    stopExplicitConfigWatch()
+    if (explicitConfigWatch === stopExplicitConfigWatch) explicitConfigWatch = undefined
     exited = true
     electronNs.app.off("child-process-gone", onProcessGone)
     projectConfigViews.close()

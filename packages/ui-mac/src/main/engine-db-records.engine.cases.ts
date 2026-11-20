@@ -159,7 +159,13 @@ describeDarwin("引擎库里植入的三类记录不放行、不装载(真引擎
     // Reload the configuration: an engine restart on the same database (configuration loads at startup).
     await running!.close()
     running = await host.start()
-    const servers = async () => (((await send("GET", "/api/mcp")).json?.data ?? []) as Array<{ name: string }>).map((server) => server.name)
+    // The list must really be the engine's answer: an error response would make "not listed" hold trivially.
+    const servers = async () => {
+      const listed = await send("GET", "/api/mcp")
+      expect(listed.status).toBe(200)
+      expect(Array.isArray(listed.json?.data)).toBe(true)
+      return (listed.json.data as Array<{ name: string }>).map((server) => server.name)
+    }
     for (let i = 0; i < 30; i++) {
       if ((await servers()).includes("planted")) break
       await Bun.sleep(100)

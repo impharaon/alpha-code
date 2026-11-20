@@ -41,6 +41,7 @@ const setup = (
     disabled?: boolean
     changed?: boolean
     agentAsk?: boolean
+    agentRawAsk?: boolean
     laterAsk?: boolean
     fixedDeny?: boolean
   } = {},
@@ -62,6 +63,9 @@ const setup = (
                 // A ruleset-axis ask on the tool's identity. Written by the agent's rules, not the session row: since I-13 L2
                 // only a session row's deny entries take part (packages/ext/src/policy/session-row-rules.test.ts).
                 ...(options.agentAsk ? [{ action: "mcp:unattended:write", resource: "*", effect: "ask" as const }] : []),
+                // An ask on the raw permission action (not the identity), so the engine's first verdict is ask while the
+                // ruleset axis does not ask; also on the agent's rules since I-13 L2.
+                ...(options.agentRawAsk ? [{ action: "unattended_write", resource: "*", effect: "ask" as const }] : []),
               ),
             )
         })
@@ -360,12 +364,7 @@ it.effect("在册会话切换 agent 后仅按 none 拒绝,缺省 agent 也读真
 
 it.effect("T1 allow 对无工具调用的原始 ask 与直接 return 不等价", () =>
   Effect.gen(function* () {
-    const host = yield* setup("standard", { ask: true })
-    const sessions = yield* Session.Service
-    yield* sessions.setPermissions({
-      sessionID: host.session.id,
-      permissions: [{ action: "unattended_write", resource: "*", effect: "ask" }],
-    })
+    const host = yield* setup("standard", { ask: true, agentRawAsk: true })
     const permission = yield* Permission.Service
     const result = yield* host.immediate(
       permission

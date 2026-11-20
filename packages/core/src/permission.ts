@@ -174,8 +174,10 @@ const layer = Layer.effect(
   Service,
   Effect.gen(function* () {
     const bus = yield* Bus.Service
+    // codepuppy(I-13 L1): upstream's `const location = yield* Location.Service` was here; only the removed saved-approval merge used it.
     const agents = yield* Agent.Service
     const sessions = yield* SessionStore.Service
+    // codepuppy(I-13 L1): upstream's `const saved = yield* PermissionSaved.Service` was here; only the removed saved-approval merge used it.
     const hooks = yield* PluginHooks.Service
     const pending = new Map<ID, Pending>()
     // codepuppy(#1128 §4.4, I-05) ── "allow for this session" as in 0.1.26: an always reply grants (action, each save

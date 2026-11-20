@@ -40,7 +40,8 @@ const setup = (
     ask?: boolean
     disabled?: boolean
     changed?: boolean
-    sessionAsk?: boolean
+    agentAsk?: boolean
+    agentRawAsk?: boolean
     laterAsk?: boolean
     fixedDeny?: boolean
   } = {},
@@ -56,7 +57,17 @@ const setup = (
       promisePlugin("unattended-config", async (ctx: Context) => {
         await ctx.agent.transform((editor) => {
           for (const name of [...Object.keys(AUTOMATION_PROFILES), "build"])
-            editor.update(name, (draft) => draft.permissions.push(allow))
+            editor.update(name, (draft) =>
+              draft.permissions.push(
+                allow,
+                // A ruleset-axis ask on the tool's identity. Written by the agent's rules, not the session row: since I-13 L2
+                // only a session row's deny entries take part (packages/ext/src/policy/session-row-rules.test.ts).
+                ...(options.agentAsk ? [{ action: "mcp:unattended:write", resource: "*", effect: "ask" as const }] : []),
+                // An ask on the raw permission action (not the identity), so the engine's first verdict is ask while the
+                // ruleset axis does not ask; also on the agent's rules since I-13 L2.
+                ...(options.agentRawAsk ? [{ action: "unattended_write", resource: "*", effect: "ask" as const }] : []),
+              ),
+            )
         })
         await ctx.mcp.transform((editor) => editor.set("unattended", { type: "remote", url: "http://127.0.0.1:1/mcp" }))
       }),
@@ -91,9 +102,6 @@ const setup = (
     const session = yield* sessions.create({
       location: { directory: location.directory },
       agent,
-      ...(options.sessionAsk
-        ? { permissions: [{ action: "mcp:unattended:write", resource: "*", effect: "ask" }] }
-        : {}),
       ...(options.fixedDeny
         ? {
             permissions: ["read", "subagent", "external_directory"].map((action) => ({
@@ -178,7 +186,7 @@ for (const item of [
   { profile: "readonly" as const, options: { ask: true }, reason: "readonly" },
   { profile: "standard" as const, options: { disabled: true }, reason: "needs-confirmation" },
   { profile: "standard" as const, options: { changed: true }, reason: "needs-confirmation" },
-  { profile: "standard" as const, options: { sessionAsk: true }, reason: "refused" },
+  { profile: "standard" as const, options: { agentAsk: true }, reason: "refused" },
   { profile: "none" as const, options: { ask: true }, reason: "refused" },
 ])
   it.effect(`${item.profile} ${JSON.stringify(item.options)} 立即具名拒绝,没有计时器推进或副作用`, () =>
@@ -356,12 +364,7 @@ it.effect("在册会话切换 agent 后仅按 none 拒绝,缺省 agent 也读真
 
 it.effect("T1 allow 对无工具调用的原始 ask 与直接 return 不等价", () =>
   Effect.gen(function* () {
-    const host = yield* setup("standard", { ask: true })
-    const sessions = yield* Session.Service
-    yield* sessions.setPermissions({
-      sessionID: host.session.id,
-      permissions: [{ action: "unattended_write", resource: "*", effect: "ask" }],
-    })
+    const host = yield* setup("standard", { ask: true, agentRawAsk: true })
     const permission = yield* Permission.Service
     const result = yield* host.immediate(
       permission

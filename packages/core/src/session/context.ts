@@ -133,7 +133,7 @@ const layer = Layer.effect(
       const agent = yield* agents.select(session.agent)
       if (!agent.info) return yield* new AgentNotFoundError({ sessionID: session.id, agent: session.agent ?? agent.id })
       // Session permissions narrow discovery the same way they narrow the tool snapshot.
-      const permissions = Permission.merge(agent.info.permissions, session.permissions ?? [])
+      const permissions = Permission.merge(agent.info.permissions, (session.permissions ?? []).filter((rule) => rule.effect === "deny")) // codepuppy(I-13 L2): only the session row's deny entries narrow a request (DESIGN-engine-config-fence D16)
       const loaded = yield* Effect.all(
         {
           tools: registry.snapshot(permissions),

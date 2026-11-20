@@ -1,6 +1,6 @@
 // `#1667`(#1662 L5;编排器裁决 1667 评论 6738814516 第 2 条、C7 重裁 6741122824):显式文件层的合成与运行中重写
 // (engine-explicit-config.ts)。真引擎上的层序判据在 codepuppy-config-injection-engine.cases.ts。
-import { afterEach, describe, expect, test } from "bun:test"
+import { afterEach, describe, expect, spyOn, test } from "bun:test"
 import * as fs from "node:fs"
 import * as os from "node:os"
 import * as path from "node:path"
@@ -131,6 +131,27 @@ describe("运行中:输入一变就重写显式文件", () => {
     expect("three" in (read().commands ?? {})).toBe(false)
   })
 
+  // 监听跑在 main 里(SPEC-engine-config-fence BR-03):FSWatcher 的 error 没有监听者就是 Electron main 进程的未捕获异常(审查 A 第 4 条)。
+  test("FSWatcher 报错 ⇒ 记一行具名日志、不抛,停止照常", () => {
+    const root = tempDir()
+    const file = path.join(root, "..", `${path.basename(root)}-engine`, "codepuppy-explicit.json")
+    dirs.push(path.dirname(file))
+    writeExplicitConfig(file, undefined, LAYER, root)
+    const real = fs.watch
+    let watcher: fs.FSWatcher | undefined
+    const spy = spyOn(fs, "watch").mockImplementation(((...args: Parameters<typeof fs.watch>) => (watcher = real(...args))) as typeof fs.watch)
+    const logs: string[] = []
+    const stop = watchExplicitSources({ file, root, layer: LAYER, skills: () => LAYER.skills, log: (line) => logs.push(line) })
+    spy.mockRestore()
+    try {
+      expect(watcher).toBeDefined()
+      expect(() => watcher!.emit("error", Object.assign(new Error("EMFILE: too many open files, watch"), { code: "EMFILE" }))).not.toThrow()
+      expect(logs).toEqual([`[alpha-code#1667] stopped watching ${root} for engine config inputs: EMFILE: too many open files, watch`])
+    } finally {
+      stop()
+    }
+  })
+
   test("`#1667` 裁决 r3:skills-enabled.json 或某个技能键的 current.json 一变 ⇒ skills 现算并重写;别的文件变了不重写", async () => {
     const root = tempDir()
     const file = path.join(root, "..", `${path.basename(root)}-engine`, "codepuppy-explicit.json")
@@ -179,6 +200,11 @@ describe("fork 前主进程写引擎配置(writeEngineConfigFiles)", () => {
     const { userDataPath, root, userConfig } = setup()
     const files = writeEngineConfigFiles({ userDataPath, root, userConfig, layer: LAYER, models: MODELS })
     expect(fs.readFileSync(userConfig, "utf8")).toBe(SEED)
+    // 全新机器:引擎配置目录建成 0700(与 0.2.6 由模型底表那一步先建时相同;审查 A 第 2 条)
+    expect(fs.statSync(path.dirname(files.explicitConfig)).mode & 0o777).toBe(0o700)
+    const hatchFresh = setup()
+    const noModels = writeEngineConfigFiles({ userDataPath: hatchFresh.userDataPath, root: hatchFresh.root, layer: LAYER, models: undefined })
+    expect(fs.statSync(path.dirname(noModels.explicitConfig)).mode & 0o777).toBe(0o700)
     expect(files).toEqual({ explicitConfig: explicitConfigPath(userDataPath), models: engineModelsPath(userDataPath) })
     expect(engineModelsPath(userDataPath)).toBe(path.join(userDataPath, "codepuppy-engine-config", "models.json"))
     expect(JSON.parse(fs.readFileSync(files.explicitConfig, "utf8"))).toEqual(composeExplicitDocument(SEED, LAYER).document)

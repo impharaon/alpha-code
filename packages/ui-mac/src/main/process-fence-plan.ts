@@ -95,6 +95,12 @@ export function planConfigFence(
   const add = (rule: ConfigFenceRule) => {
     if (!configFence.some((known) => JSON.stringify(known) === JSON.stringify(rule))) configFence.push(rule)
   }
+  const anchorOf = (rule: ConfigFenceRule) => (rule.kind === "dat-files" ? join(rule.dir, "x") : rule.path)
+  const chain = (anchor: string) => {
+    const nodes: string[] = []
+    for (let node = dirname(anchor); node !== dirname(node); node = dirname(node)) nodes.push(node)
+    return nodes
+  }
   /** 一个目录的真实路径;不在盘上 = 最深一级已存在祖先的真实路径接上余下部分。 */
   const within = (directory: string): string => {
     try {
@@ -104,35 +110,51 @@ export function planConfigFence(
       return join(within(dirname(directory)), basename(directory))
     }
   }
+  /**
+   * 一个节点在真实上级目录之下的身份:已存在且不是软链 ⇒ 它的真实写法(大小写、firmlink 按身份归一);软链(或尚不存在)⇒ 链节点自己的名字。
+   */
+  const node = (path: string) => {
+    const spelled = join(within(dirname(path)), basename(path))
+    const real = target(path)
+    return real !== undefined && real.toLowerCase() === spelled.toLowerCase() ? real : spelled
+  }
+  /** 实现期修订 2 B:位置的配置路径(未解析)上、不在这几条规则真实路径上的目录节点,按身份去重,挂在这个位置的第一条规则上。 */
+  const withVia = (location: ConfigFenceRule, rules: ConfigFenceRule[]) => {
+    if (!rules.length) return rules
+    const real = new Set(rules.flatMap((rule) => chain(anchorOf(rule))))
+    const via = [...new Set(chain(anchorOf(location)).map(node))].filter((n) => !real.has(n))
+    return via.length ? [{ ...rules[0]!, via }, ...rules.slice(1)] : rules
+  }
   for (const location of locations) {
     if (location.kind === "dat-files") {
-      add({ kind: "dat-files", dir: deps.realpath(location.dir) })
+      for (const rule of withVia(location, [{ kind: "dat-files", dir: deps.realpath(location.dir) }])) add(rule)
       continue
     }
     if (location.path === envFile && location.kind === "literal") {
       // 实现期修订 2 A:这一项从不让计划失败 —— 上级目录不在盘上照样成规则(literal 挡住新建,上级目录块挡住建出中间目录);解析出错就按
       // 设置的路径写;写不进 profile 的路径(引号、反斜杠、换行)不写。
-      const rules: ConfigFenceRule[] = []
+      let rules: ConfigFenceRule[] = []
       try {
         const placed = join(within(dirname(envFile)), basename(envFile))
         rules.push({ kind: "literal", path: placed })
         const real = target(envFile)
         if (real !== undefined && real !== placed) rules.push({ kind: "literal", path: real })
+        rules = withVia(location, rules)
       } catch {
-        rules.splice(0, rules.length, { kind: "literal", path: envFile })
+        rules = [{ kind: "literal", path: envFile }]
       }
       for (const rule of rules) {
         try {
-          assertSeatbeltSafePath(rule.kind === "dat-files" ? rule.dir : rule.path, "CODEPUPPY_ENV_FILE")
+          for (const path of [rule.kind === "dat-files" ? rule.dir : rule.path, ...(rule.via ?? [])]) assertSeatbeltSafePath(path, "CODEPUPPY_ENV_FILE")
           add(rule)
         } catch {}
       }
       continue
     }
     const placed = join(deps.realpath(dirname(location.path)), basename(location.path))
-    add({ kind: location.kind, path: placed })
     const real = target(location.path)
-    if (real !== undefined && real !== placed) add({ kind: location.kind, path: real })
+    const rules: ConfigFenceRule[] = [{ kind: location.kind, path: placed }, ...(real !== undefined && real !== placed ? [{ kind: location.kind, path: real }] : [])]
+    for (const rule of withVia(location, rules)) add(rule)
   }
   return { configFence, configFenceRoots: configFence.flatMap((rule) => (rule.kind === "subpath" ? [rule.path] : [])) }
 }

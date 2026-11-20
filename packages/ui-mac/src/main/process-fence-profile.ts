@@ -101,9 +101,10 @@ export function resolveEngineRoots(env: Record<string, string | undefined>, home
 
 /**
  * 受保护配置集 CF 的一条(DESIGN-engine-config-fence §4.1 / §4.2)。交给渲染器的路径都已是真实路径(计划器负责,process-fence-plan.ts 的
- * planConfigFence);`dat-files` = dir 下一层的 `*.dat`(扩展名不分大小写,界面设置存储,CF-7)。
+ * planConfigFence);`dat-files` = dir 下一层的 `*.dat`(扩展名不分大小写,界面设置存储,CF-7)。`via` = 这个位置的配置路径(未解析)上、
+ * 不在真实路径上的目录节点(实现期修订 2 B:例如住在项目里的软链节点与它上面的项目文件夹),计划器已按身份去重;只进上级目录块。
  */
-export type ConfigFenceRule = { kind: "subpath" | "literal"; path: string } | { kind: "dat-files"; dir: string }
+export type ConfigFenceRule = ({ kind: "subpath" | "literal"; path: string } | { kind: "dat-files"; dir: string }) & { via?: readonly string[] }
 
 /**
  * CF-1–8、CF-10 的原始位置(还不是真实路径;片 ④ / ③ 再加 `~/.opencode` 与工具策略目录)。名字取 USER_DATA_LAYOUT 与 store 常量。
@@ -198,9 +199,12 @@ export function renderProcessFenceProfile(input: ProcessFenceProfileInput): stri
   const stateHome = assertSeatbeltSafePath(input.stateHome, "XDG_STATE_HOME")
   const egressProxyPort = assertEgressProxyPort(input.egressProxyPort)
   const homeRe = regexLiteral(home)
-  const configFence = input.configFence.map((rule, i): ConfigFenceRule =>
-    rule.kind === "dat-files" ? { kind: "dat-files", dir: assertSeatbeltSafePath(rule.dir, `configFence[${i}]`) } : { kind: rule.kind, path: assertSeatbeltSafePath(rule.path, `configFence[${i}]`) },
-  )
+  const configFence = input.configFence.map((rule, i): ConfigFenceRule => {
+    const via = rule.via?.length ? { via: rule.via.map((node) => assertSeatbeltSafePath(node, `configFence[${i}]`)) } : {}
+    return rule.kind === "dat-files"
+      ? { kind: "dat-files", dir: assertSeatbeltSafePath(rule.dir, `configFence[${i}]`), ...via }
+      : { kind: rule.kind, path: assertSeatbeltSafePath(rule.path, `configFence[${i}]`), ...via }
+  })
 
   const lines: string[] = [
     "(version 1)",
@@ -237,17 +241,19 @@ export function renderProcessFenceProfile(input: ProcessFenceProfileInput): stri
 
 /**
  * SPEC-engine-config-fence BR-01 / DESIGN §4.2:受保护集的两块拒写,写在 N4 之后 —— 显式规则后写者胜,所以它们之后不许再有任何文件写的放行。
- * 第一块是规则本身;第二块是每条规则锚点(dat-files 取 `dir/x`)的每一级上级目录,从父目录起到 `/` 之前,去重,只冻结节点本身(目录里新建 /
- * 改名 / 删文件照常)。排版就是 processFenceWriteRules 的文法:表头在行首,收尾括号落在最后一条条目的行末,其后可带注释;上级目录块一行写完。
+ * 第一块是规则本身;第二块是每条规则锚点(dat-files 取 `dir/x`)的每一级上级目录,从父目录起到 `/` 之前,再接上它的 `via`(配置路径上的节点,
+ * 实现期修订 2 B),去重,只冻结节点本身(目录里新建 / 改名 / 删文件照常;节点是软链时冻结的是链本身)。排版就是 processFenceWriteRules 的文法:表头在行首,收尾括号落在最后一条条目的行末,其后可带注释;上级目录块一行写完。
  */
 function renderConfigFence(rules: readonly ConfigFenceRule[]): string[] {
   if (!rules.length) return []
   const entry = (rule: ConfigFenceRule) =>
     rule.kind === "dat-files" ? `(regex #"^${regexLiteral(rule.dir)}/[^/]+\\.[dD][aA][tT]$")` : `(${rule.kind} "${rule.path}")`
   const ancestors: string[] = []
-  for (const rule of rules)
+  for (const rule of rules) {
     for (let node = dirname(rule.kind === "dat-files" ? join(rule.dir, "x") : rule.path); node !== dirname(node); node = dirname(node))
       if (!ancestors.includes(node)) ancestors.push(node)
+    for (const node of rule.via ?? []) if (!ancestors.includes(node)) ancestors.push(node)
+  }
   return [
     "(deny file-write*",
     ...rules.map((rule, i) => `  ${entry(rule)}${i === rules.length - 1 ? ")                                         ; CF 受保护配置" : ""}`),

@@ -126,7 +126,16 @@ export function planConfigFence(
     if (!rules.length) return rules
     const real = new Set(rules.flatMap((rule) => chain(anchorOf(rule))))
     const nodes = chain(anchorOf(location)).map(node)
-    const via = [...new Set(nodes.flatMap((n) => [n, ...chain(n)]))].filter((n) => !real.has(n))
+    // 终审第 4 条:写不进 profile 的节点(引号、反斜杠、换行)只丢它自己 —— 规则本身与其余节点照留,计划不因它失败
+    const writable = (n: string) => {
+      try {
+        assertSeatbeltSafePath(n, "via")
+        return true
+      } catch {
+        return false
+      }
+    }
+    const via = [...new Set(nodes.flatMap((n) => [n, ...chain(n)]))].filter((n) => !real.has(n) && writable(n))
     return via.length ? [{ ...rules[0]!, via }, ...rules.slice(1)] : rules
   }
   for (const location of locations) {
@@ -153,7 +162,7 @@ export function planConfigFence(
       if ([envFile, ...rules.map((rule) => (rule.kind === "dat-files" ? rule.dir : rule.path))].some(underDev)) continue
       for (const rule of rules) {
         try {
-          for (const path of [rule.kind === "dat-files" ? rule.dir : rule.path, ...(rule.via ?? [])]) assertSeatbeltSafePath(path, "CODEPUPPY_ENV_FILE")
+          assertSeatbeltSafePath(rule.kind === "dat-files" ? rule.dir : rule.path, "CODEPUPPY_ENV_FILE")
           add(rule)
         } catch {}
       }

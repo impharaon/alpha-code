@@ -61,7 +61,7 @@ const tokens = (profile: string) =>
     .map((l) => l.replace(/\s*;.*$/, "").trim())
     .filter(Boolean)
 
-describe("renderProcessFenceProfile —— 勘破 §8.2 的 19 行,逐行全等", () => {
+describe("renderProcessFenceProfile —— 勘破 §8.2 的行(W10/W19 已删,D15),逐行全等", () => {
   test("两个工作区 + 生产根:输出 = §8.2 形状(参数已代入),无多无少", () => {
     expect(tokens(renderProcessFenceProfile(base))).toEqual([
       "(version 1)",
@@ -77,8 +77,6 @@ describe("renderProcessFenceProfile —— 勘破 §8.2 的 19 行,逐行全等"
       `(subpath "${HOME}/.config/opencode")`,
       `(subpath "${HOME}/.npm")`,
       `(regex #"^/Users/alpha/\\.zsh_history")`,
-      `(subpath "${HOME}/.zsh_sessions")`,
-      `(regex #"^/Users/alpha/\\.zcompdump")`,
       `(subpath "/private/tmp")`,
       `(subpath "/private/var/folders")`,
       `(literal "/dev/null") (literal "/dev/stdout") (literal "/dev/stderr")`,
@@ -169,8 +167,6 @@ describe("签发判定的唯一来源:本代 apply 的 profile 解析回写规�
       { kind: "subpath", value: "/Users/alpha/.config/opencode" },
       { kind: "subpath", value: "/Users/alpha/.npm" },
       { kind: "regex", value: "^/Users/alpha/\\.zsh_history" },
-      { kind: "subpath", value: "/Users/alpha/.zsh_sessions" },
-      { kind: "regex", value: "^/Users/alpha/\\.zcompdump" },
       { kind: "subpath", value: "/private/tmp" },
       { kind: "subpath", value: "/private/var/folders" },
       { kind: "literal", value: "/dev/null" },

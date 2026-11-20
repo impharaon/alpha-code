@@ -188,6 +188,13 @@ last_reviewed: 2026-11-20
 - 测试设施:BYOK 节点用自己的地址(与平台同址会被平台凭据头钩子当成平台);运行中增删密钥的结构性重启前由围栏外 main 重写显式文件(`fork-config`,生产里 server 每次 fork 都写);E1 用收尾时的期望(main 的续期是唯一合法改动);E9 断言五个臂的输出里没有任何假值;沙箱日志判据加 tools 窗口作校准(引擎自己的读文件工具在存放点上留下引擎 pid 的拒绝)。
 - O2:官方连接器运行期存放点放进真引擎布局 —— 在本机真实的每用户临时目录(`getconf DARWIN_USER_TEMP_DIR`,W12 之内)里建一个代用「系统临时目录」`scf-T-*`,其下按生产形状 `codepuppy-connectors-<uid>-<hash>` 放假运行期文件,经 `credentialStores({ officialRuntimeParent })` 交计划器;不经也不改 `officialRuntimeParent`(测试进程的 tmpdir 在 userData 的上级链上,那样 C1 的上级目录块无从单独证明)。宿主事后在围栏外删掉。没有另加围栏组件臂。
 - E7 的软链用例在片 ① 的 `process-fence-credential-stores.test.ts`(planCredentialStores),不在 profile / plan 单测。
+- 计划外的测试设施(③ 审查 Minor 4 补记):`test-component/codepuppy-engine.ts` 的 `start()` 每一代先 `await startCredentials()`(没有围栏外 main 时就是原来的 handOverCredentials,45 个用它的用例文件行为不变),新增 `reinject()`(结构性重启的 sidecar 那一侧:新一代 T1 之后重新注入);`test-component/credential-table.ts` 的围栏外模式(`serveCredentialsFromOutside` / `startCredentials`);`test-component/credential-main-helper.ts`(围栏外 main:生产应答、读表、写者、convergence、续期推送、结构性重启前重写显式文件);`test-component/widen-credential-refs.preload.ts`(widen 臂的已知的坏:装载时把代入改成全文,锚点不在即抛)。
+- ③ 审查 R1(独立审计 RECOMMEND MERGE,4 Minor)处置:
+  - Minor 1 / 3 → 实现期修订 2(见上面「存放点清单」一条与 design §10):先红 `99473d2a4c`(新 `codepuppy-credential-table.test.ts` 测生产函数本身:打开的项目文件夹包含系统临时目录时清单里没有运行期目录),修 `9813e94082` 转绿;去掉修复再跑仍红。围栏组件臂没有另建:这个场景的两半各有判据 —— 「路径总在 C1 里」由本单测经生产计划器判,「C1 里的运行期目录围栏内读不到」由新宿主 production 臂判。
+  - Minor 2:control 臂逐条判 18 项(read0–read8、软链、硬链、克隆、覆盖写、改名、删除、搬走运行期目录与其上级临时目录)都成功,只有搬走 userData 两个臂都失败(受保护集的上级目录块冻结 userData 本身,不算 C1 的证明);只读档改判它自己的规则:shell 工具根本不给这一档(引擎回「No tool named "shell" is currently available」,不询问)。
+  - Minor 4:`gate-files.tsv` 新宿主行改成 production 3 并补注入失败那条与 control 的逐条判据;profile 行删掉已不存在的「C1 样本,两种先后」;本节补记上面的测试设施。
+  - 小项:三处重复的 `credentialStores: []` 键删掉;`process-fence-plan.test.ts` C1 用例删掉证明不了 C1 的那一段(受保护集的计划先抛),标题指向 `process-fence-credential-stores.test.ts`;新宿主开跑前删掉自己前缀的旧 `scf-T-*`。
+  - 编排器另转意图、不在本分支:存放点上预先放的软链环或指向带引号路径的软链让每次 fork 都拒绝;其它环境(prod / beta / dev)的运行期目录不在本实例的 C1 里;`package-mcp-activation.ts` 第二次自建同一份清单。
 - 证据 `~/.cache/alpha-orch/2026-11-19/impl-secrets/evidence/r4/`。新宿主 5 个臂 production 3 / tools 1 / control 2 / widen 1 / notable 1 全过,31 s;production 窗口引擎 pid 在存放点上 0 条拒绝、攻击子进程 40 条(读数据、读元数据、写数据、删除);tools 窗口引擎 pid 9 条。变异(各自还原):① 不渲染 C1 ⇒ profile / plan 单测 7 红、宿主红;② 去掉 C1 上级目录块 ⇒ profile 单测 6 红、宿主 `move-runtime-temp` 落地;③ C1 渲染到放行块之前 ⇒ profile 单测 6 红、宿主覆盖写 / 改名 / 搬走运行期目录落地(读仍被拒);④ 解析器不认读写表头 ⇒ profile 单测 4 红、`project-writable` 3 红(D11);⑤ server 不给清单 ⇒ `endpoint-route-fence` 红;⑥ 计划器丢掉 C1 ⇒ plan 单测与宿主红;⑦ 引擎读者先读盘再查表 ⇒ 功能全过但 production 窗口出现 6 条引擎 pid 拒绝,宿主红;⑧ 显式文档不代入连接器 environment ⇒ AC-02 连接器与注入失败那条都红。
 
 ## 与并行车道共用的文件(SPEC-engine-config-fence 片 ③:工具策略写消息 + CF-11)

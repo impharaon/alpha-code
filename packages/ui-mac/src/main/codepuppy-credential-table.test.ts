@@ -29,7 +29,7 @@ afterAll(() => {
 const runtimeDirectoryOf = (root: string) =>
   join(realpathSync.native(tmpdir()), `codepuppy-connectors-${process.getuid?.()}-${createHash("sha256").update(root).digest("hex").slice(0, 16)}`)
 
-test("官方连接器运行期目录:没有环境根 ⇒ 不列;有环境根、而一个打开的项目文件夹包含系统临时目录(可用性检查此刻抛)⇒ 照样列入 C1 与表的清单,计划渲染不抛,目录里的令牌进表", () => {
+test.skipIf(process.platform !== "darwin")("官方连接器运行期目录:没有环境根 ⇒ 不列;有环境根、而一个打开的项目文件夹包含系统临时目录(可用性检查此刻抛)⇒ 照样列入 C1 与表的清单,计划渲染不抛,目录里的令牌进表", () => {
   mkdirSync(userData, { recursive: true })
   __resetCodePuppyEnvironmentForTests()
   delete process.env.CODEPUPPY_GLOBAL_DIR

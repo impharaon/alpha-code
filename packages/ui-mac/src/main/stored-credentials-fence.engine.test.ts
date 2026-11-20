@@ -5,7 +5,7 @@
 import { expect, test } from "bun:test"
 import { spawnSync } from "node:child_process"
 import { createHash } from "node:crypto"
-import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
+import { mkdirSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs"
 import { join, resolve } from "node:path"
 
 type Rule = { kind: "subpath" | "literal" | "regex"; value: string }
@@ -21,6 +21,9 @@ test.skipIf(process.platform !== "darwin")("C1 真引擎:三档里 shell 与读�
   const base = resolve(import.meta.dir, "../../../../node_modules/.cache/stored-credentials-fence")
   rmSync(base, { recursive: true, force: true })
   mkdirSync(join(base, "results"), { recursive: true })
+  // stand-in system temp directories an aborted earlier run of this host left behind (its own prefix only)
+  const systemTemp = realpathSync.native(spawnSync("getconf", ["DARWIN_USER_TEMP_DIR"], { encoding: "utf8" }).stdout.trim())
+  for (const entry of readdirSync(systemTemp)) if (/^scf-T-\w+$/.test(entry)) rmSync(join(systemTemp, entry), { recursive: true, force: true })
   const outputs: Record<string, string> = {}
   const windows: Record<string, { from: Date; to: Date }> = {}
   try {

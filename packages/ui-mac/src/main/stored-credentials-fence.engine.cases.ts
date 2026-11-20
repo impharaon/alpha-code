@@ -276,7 +276,8 @@ if (ARM === "production")
     m = await machine()
     for (const tier of TIERS) {
       const result = await turn(tier, { name: "shell", args: { command: attackScript(), description: "scf probe" } }, { approve: tier === "codepuppy-ask" })
-      if (tier === "codepuppy-readonly") expect(result.tool.includes(":OK"), tier).toBe(false) // the read-only tier refuses the command itself
+      // the read-only tier's own policy: the shell tool is not offered to it at all (no prompt, the engine names the missing tool)
+      if (tier === "codepuppy-readonly") expect([result.asked, /No tool named \\?"shell\\?" is currently available/.test(result.tool)], result.tool.slice(0, 300)).toEqual([[], true])
       else for (const op of OPS) expect([tier, op, result.tool.includes(`${op}:FAIL`)], result.tool.slice(0, 2000)).toEqual([tier, op, true])
       expect([tier, leaked(result.requests.map((request) => request.body).join("\n"))]).toEqual([tier, []])
     }
@@ -391,9 +392,13 @@ if (ARM === "tools" || ARM === "control")
   }, 240_000)
 
 if (ARM === "control")
-  test("control(去掉 C1):shell 的同一组攻击里直接读、软链、硬链、克隆、覆盖写都成功", async () => {
+  test("control(去掉 C1):shell 的同一组攻击逐条成功(每一种写法都真能读到 / 写到,production 臂里的「失败」才算是 C1 拦的);搬走 userData 两个臂都被受保护集的上级目录块拦", async () => {
     const result = await turn("build", { name: "shell", args: { command: attackScript(), description: "scf probe" } })
-    for (const op of ["read0", "read1", "symlink", "hardlink", "clone", "overwrite", "move-runtime-temp"]) expect([op, result.tool.includes(`${op}:OK`)], result.tool.slice(0, 2000)).toEqual([op, true])
+    // every spelling and operation lands without C1 — read0–read8 (platform key, auth, codepuppy.env, the key store, the dump, the
+    // runtime token, case variant, /.vol, firmlink) included — except moving userData: the config-fence ancestors block (CF) freezes
+    // userData itself in both arms, so that one is not a C1 proof
+    const expected = OPS.map((op) => [op, op === "move-userdata" ? "FAIL" : "OK"])
+    expect(OPS.map((op) => [op, result.tool.includes(`${op}:OK`) ? "OK" : result.tool.includes(`${op}:FAIL`) ? "FAIL" : "missing"]), result.tool.slice(0, 2000).replace(/FAKE-CRED-[\w-]+/g, "<value>")).toEqual(expected)
   }, 240_000)
 
 if (ARM === "widen")

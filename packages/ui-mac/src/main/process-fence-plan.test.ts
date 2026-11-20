@@ -69,7 +69,7 @@ function ancestorsOf(anchors: string[]): string[] {
 }
 
 describeDarwin("planProcessFence", () => {
-  test("SPEC-stored-credentials-fence C1:存放点清单经 planCredentialStores 落到真实路径,渲染成 profile 最后两块(拒读拒写块 + 上级目录拒写块);日志带条数;userData 的真实路径求不出 ⇒ 计划抛(拒 fork)", () => {
+  test("SPEC-stored-credentials-fence C1:存放点清单经 planCredentialStores 落到真实路径,渲染成 profile 最后两块(拒读拒写块 + 上级目录拒写块);日志带条数(存放点真实路径求不出 ⇒ planCredentialStores 抛:process-fence-credential-stores.test.ts)", () => {
     const h = harness()
     h.input.credentialStores = credentialStores({ userDataPath: USER_DATA, officialRuntimeParent: OFFICIAL_RUNTIME })
     const plan = planProcessFence(h.input, h.deps)
@@ -82,9 +82,6 @@ describeDarwin("planProcessFence", () => {
     ])
     expect(tail[9]!.startsWith("(deny file-write* ")).toBe(true)
     expect(h.logs.some((l) => /credentialStores=8 rules/.test(l))).toBe(true)
-    const broken = harness({ realpath: (p) => (p === USER_DATA ? (() => { throw enoent(p) })() : p) })
-    broken.input.credentialStores = h.input.credentialStores
-    expect(() => planProcessFence(broken.input, broken.deps)).toThrow(/ENOENT/)
   })
 
   test("正向:并集 = 默认 → recent → tab 栏;父目录 W4/W5/W7 与受保护目录预建;addonPath 解析到 extraResources;日志一行账", () => {

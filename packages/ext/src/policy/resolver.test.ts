@@ -681,6 +681,26 @@ describe("store with a writer (I-13: main writes over the narrow channel)", () =
     expect(onDisk(baseDir)).toEqual([shell, fetchTool])
   })
 
+  // 审查 R1 可选项(编排器采纳):同一项目的两个 Location 各有一个存储，写的却是同一份文档(同一个分区)。写要等 main 回复之后，存储 A 的
+  // 「读」与 main 落 A 的写之间隔着一次往返，存储 B 在其间读到旧文档、覆盖掉 A 的记录，两个调用方都拿到 ok —— 链必须是进程内每份文档一条。
+  test("W4 two stores over the same document (two Locations of one project): concurrent setRecord for two tools ⇒ both records on disk; a failed write in one store fails only its caller, the other store's write still lands", async () => {
+    const baseDir = tmpdir("codepuppy-policy-writer-")
+    const main = mainWriter(baseDir, [30, 0])
+    const here = storeWith(baseDir, main)
+    const there = storeWith(baseDir, main)
+    await Promise.all([here.setRecord(shell), there.setRecord(fetchTool)])
+    expect(onDisk(baseDir)).toEqual([shell, fetchTool])
+
+    const second = tmpdir("codepuppy-policy-writer-")
+    const working = mainWriter(second, [20])
+    const refusing = storeWith(second, { save: async () => Promise.reject(new Error("EACCES: permission denied, open '/d/x.json.tmp'")), reset: working.reset })
+    const fine = storeWith(second, working)
+    const [failed, landed] = await Promise.allSettled([refusing.setRecord(shell), fine.setRecord(fetchTool)])
+    expect([failed.status, (failed as PromiseRejectedResult).reason?.kind]).toEqual(["rejected", "io"])
+    expect(landed.status).toBe("fulfilled")
+    expect(onDisk(second)).toEqual([fetchTool])
+  })
+
   test("W3 a failed write fails only its own caller (ToolPolicyWriteError io with the writer's reason); the next one in the chain still writes", async () => {
     const baseDir = tmpdir("codepuppy-policy-writer-")
     const main = mainWriter(baseDir)

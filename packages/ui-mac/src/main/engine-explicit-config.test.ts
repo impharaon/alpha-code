@@ -8,6 +8,8 @@ import { Schema } from "effect"
 import { Config as ConfigSchema } from "@opencode/schema/config"
 import { ConfigNormalize } from "@opencode/core/config/normalize"
 import { ensureSkillsPath } from "./engine-config-truth"
+import { planConfigFence } from "./process-fence-plan"
+import { resolveEngineRoots } from "./process-fence-profile"
 import { composeExplicitDocument, engineModelsPath, explicitConfigPath, watchExplicitSources, writeEngineConfigFiles, writeExplicitConfig, type ExplicitLayer } from "./engine-explicit-config"
 
 const LAYER: ExplicitLayer = {
@@ -210,6 +212,22 @@ describe("fork 前主进程写引擎配置(writeEngineConfigFiles)", () => {
     expect(JSON.parse(fs.readFileSync(files.explicitConfig, "utf8"))).toEqual(composeExplicitDocument(SEED, LAYER).document)
     const base = JSON.parse(fs.readFileSync(files.models!, "utf8")) as Record<string, { models?: Record<string, unknown> }>
     expect(Object.keys(base.codepuppy!.models!)).toEqual(["m"])
+  })
+
+  test("生产顺序(审查 B 第 1 条):计划器先用生产 mkdirp 预建引擎配置目录(没有 mode,按 umask 落成 0755),之后 main 写配置 ⇒ 目录仍收成 0700", () => {
+    const { userDataPath, root, userConfig } = setup()
+    const home = path.join(path.dirname(userDataPath), "home")
+    const roots = resolveEngineRoots({ HOME: home }, home)
+    // server.ts 的生产 mkdirp 与计划器的调用,原样
+    planConfigFence(
+      { userDataPath, appStateRoot: path.dirname(path.dirname(root)), codepuppyGlobalRoot: root, engineConfigDirectory: path.join(roots.configHome, "opencode"), roots },
+      { realpath: (p) => fs.realpathSync.native(p), mkdirp: (p) => void fs.mkdirSync(p, { recursive: true }) },
+    )
+    const directory = path.join(userDataPath, "codepuppy-engine-config")
+    // 场景是真的:计划器那一步已经把目录建成了别的权限
+    expect(fs.statSync(directory).mode & 0o777).not.toBe(0o700)
+    writeEngineConfigFiles({ userDataPath, root, userConfig, layer: LAYER, models: MODELS })
+    expect(fs.statSync(directory).mode & 0o777).toBe(0o700)
   })
 
   test("已有的 codepuppy.jsonc 原样不动;逃生阀(没有 userConfig)不写种子;用户文件坏了 ⇒ 只写我们这一层并把原因交回", () => {

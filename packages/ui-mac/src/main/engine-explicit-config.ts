@@ -356,8 +356,11 @@ export function writeEngineConfigFiles(input: {
   layer: ExplicitLayer
   models: CodePuppyModelConfig | undefined
 }): EngineConfigFiles {
-  // 引擎配置目录 0700(模型底表与显式文件都在里面);recursive 的 mode 只作用于新建的那一级。
-  fs.mkdirSync(path.join(input.userDataPath, USER_DATA_LAYOUT.engineConfig), { recursive: true, mode: 0o700 })
+  // 引擎配置目录 0700(模型底表与显式文件都在里面)。生产顺序里计划器先按 umask 预建了它(planConfigFence),mkdir 的 mode 不再起作用,
+  // 所以建完再收一次权限(同 codepuppy-connection-store.ts 的写法)。
+  const engineConfigDirectory = path.join(input.userDataPath, USER_DATA_LAYOUT.engineConfig)
+  fs.mkdirSync(engineConfigDirectory, { recursive: true, mode: 0o700 })
+  fs.chmodSync(engineConfigDirectory, 0o700)
   if (input.userConfig !== undefined) {
     fs.mkdirSync(path.dirname(input.userConfig), { recursive: true })
     if (!fs.existsSync(input.userConfig)) fs.writeFileSync(input.userConfig, SEED_DOCUMENT)

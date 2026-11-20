@@ -41,10 +41,11 @@ packages/ui-mac/src/main/catalog-channels.ts	writeFileSync	tmp	W3
 # SPEC-engine-config-fence BR-03 / DESIGN §4.7:显式配置文件 <userDataPath>/<engineConfig>/codepuppy-explicit.json、同目录的模型底表 models.json 与种子
 # codepuppy.jsonc 只由 main 写(fork 前 writeEngineConfigForFork、main 里的 watchExplicitSources)。模块在 sidecar 闭包里只因为注入要用路径函数与
 # disabledPackageComponents(只读,sideEffectFree)。
+packages/ui-mac/src/main/engine-explicit-config.ts	chmodSync	engineConfigDirectory	main-only
 packages/ui-mac/src/main/engine-explicit-config.ts	mkdirSync	dir	main-only
 packages/ui-mac/src/main/engine-explicit-config.ts	mkdirSync	path.dirname(file)	main-only
 packages/ui-mac/src/main/engine-explicit-config.ts	mkdirSync	path.dirname(input.userConfig)	main-only
-packages/ui-mac/src/main/engine-explicit-config.ts	mkdirSync	path.join(input.userDataPath, USER_DATA_LAYOUT.engineConfig)	main-only
+packages/ui-mac/src/main/engine-explicit-config.ts	mkdirSync	engineConfigDirectory	main-only
 packages/ui-mac/src/main/engine-explicit-config.ts	renameSync	temporary	main-only
 packages/ui-mac/src/main/engine-explicit-config.ts	rmSync	engineModelsPath(input.userDataPath)	main-only
 packages/ui-mac/src/main/engine-explicit-config.ts	rmSync	modelsPath	main-only

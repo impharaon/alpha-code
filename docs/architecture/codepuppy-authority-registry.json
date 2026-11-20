@@ -1007,6 +1007,42 @@
       "note": "Known red by design, not taken over (the disposition of orchestrator ruling 甲 for I-05, applied to I-13 by the orchestrator 2026-11-20). L1: 64 upstream cases that seed a saved approval (saved.add / saved.update) and expect it to allow — 44 in packages/core/test/permission.test.ts, 20 in packages/core/test/tool-shell.test.ts — pinned by name in packages/ext/src/policy/session-grant-upstream-reds.test.ts. L3: five upstream cases in packages/core/test/config/config.test.ts that expect a wellknown document to load; the gate does not run that file: \"layers integration documents below remote and user config and reloads when they change\", \"keeps only the policies of documents from integrations managed policy denies\", \"tolerates unavailable authenticated wellknown config and reloads it later\", \"keeps the last resolved wellknown config across failures and restarts until its source is removed\", \"logs redacted source-aware diagnostics for every config source\". Reproduce: cd packages/core && bun test test/permission.test.ts test/tool-shell.test.ts test/config/config.test.ts. Rollback: revert the I-13 slice as one commit (permission.ts L1/L2 and config.ts L3 with their tests)."
     },
     {
+      "id": "stored-credentials-in-memory",
+      "decision": "引擎进程里(引擎与 ext)凭据的值与在场性只来自主进程交来的进程内凭据表:fork 时随 start 交整表,续期写盘后整表推送,引擎每次装载显式文件与内联内容之前各自向主进程拉一次整表;配置里的 {file:} 只在封闭清单的凭据位置、按条目的接收方绑定代入(inline 条目只从内联文档,连接器条目只在同名条目),其它位置与其它文档留给引擎自己的读法;拉取出错、超时、端口关闭都不用旧表,错误与超时接既有 credential-change 重启(SPEC-stored-credentials-fence BR-02、BR-03、BR-05)。",
+      "adr": [
+        "ADR-047"
+      ],
+      "lane": "INT-safety I-20 (SPEC-stored-credentials-fence slice ②)",
+      "takeovers": [
+        "packages/core/src/config.ts",
+        "packages/core/src/mcp/client.ts"
+      ],
+      "approval": {
+        "quote": "两份都批准",
+        "date": "2026-11-20",
+        "by": "owner",
+        "reason": "SPEC-stored-credentials-fence v1 (with SPEC-engine-config-fence v1; INT-safety I-20, owner 2026-11-19「按照你的建议，不要设计的过于复杂。」); DESIGN-stored-credentials-fence §4.4 / §6 place the load-time pull and the closed-list substitution in the two documents' load points of the already re-taken packages/core/src/config.ts and the governed cloud connector's read in the already re-taken packages/core/src/mcp/client.ts. No new upstream takeover."
+      },
+      "mechanism": {
+        "file": "packages/util/src/codepuppy-credentials.ts",
+        "ladder": "L3 (re-taken files, annotated: codepuppy(I-20) in packages/core/src/config.ts — the explicit file and the inline content pull the table before their own load and substitute only at the closed list of positions, other documents untouched; codepuppy(#1562, I-20) in packages/core/src/mcp/client.ts — the governed cloud connector's per-request credential comes from readCodePuppyCredential) + Code Puppy-owned util table (globalThis slots, one reader per bundle) + main ↔ sidecar messages (packages/ui-mac/src/main/sidecar-credentials.ts; T1 in server.ts start, T2 after applyPlatformCredentialsHot, pulls answered synchronously) + the extension's five default readers switched to the table"
+      },
+      "tests": [
+        {
+          "file": "packages/core/test/codepuppy-stored-credentials.test.ts",
+          "name": "listed positions take the table's value (not the disk's); an unlisted position, an inline entry in the explicit file and another connector's token are left to the engine's own read"
+        },
+        {
+          "file": "packages/core/test/codepuppy-stored-credentials.test.ts",
+          "name": "a failed pull substitutes nothing — never the table published before — and the next load pulls again"
+        },
+        {
+          "file": "packages/ui-mac/src/main/stored-credentials.engine.test.ts",
+          "name": "凭据经装载前拉取从内存表来;运行中新增 / 删除 / 表与盘不同都按表;扣住的回复不让另一 Location 用旧值;超时与端口关闭不用旧表并请求 credential-change(stored-credentials.engine.cases.ts,3 条)"
+        }
+      ]
+    },
+    {
       "id": "adr041-collision-rejection",
       "decision": "Alias / identity collisions are rejected, never last-wins (ADR-041 decision 2).",
       "adr": [
@@ -1145,7 +1181,7 @@
     },
     {
       "id": "l1r-platform-credential-header",
-      "decision": "The platform credential header is added only to platform-provider requests (P6 / S5).",
+      "decision": "The platform credential header is added only to platform-provider requests (P6 / S5). Since SPEC-stored-credentials-fence the credential is read on every request from the in-process credential table the main process hands over (T1) and re-pushes after a renewal (T2), never from the file.",
       "adr": [
         "ADR-041"
       ],
@@ -1175,7 +1211,7 @@
     },
     {
       "id": "cloud-connector-credential-per-request",
-      "decision": "Code Puppy's governed cloud connector reads its credential file on every request, so a same-identity renewal applied hot (no engine restart) is used by the next request, and a missing file fails with an auth error without sending (#1562).",
+      "decision": "Code Puppy's governed cloud connector reads its credential on every request, so a same-identity renewal applied hot (no engine restart) is used by the next request, and a missing credential fails with an auth error without sending (#1562). Since SPEC-stored-credentials-fence the value comes from the in-process credential table the main process hands over and re-pushes after a renewal, never from the file.",
       "adr": [
         "ADR-047"
       ],

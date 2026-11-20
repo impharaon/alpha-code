@@ -23,7 +23,9 @@ const stamp = (date: Date) => {
 const inProtected = (deny: readonly Deny[], path: string) =>
   deny.some((rule) => (rule.kind === "subpath" ? path === rule.value || path.startsWith(`${rule.value}/`) : rule.kind === "literal" ? path === rule.value : new RegExp(rule.value).test(path)))
 
-test.skipIf(process.platform !== "darwin")("AC-04 / AC-05 / AC-06 / AC-08 real engine inside the production fence: attacks refused (the tool policy rewrites among them), the settings page changing the tool policy through main, ordinary work and restart fine, cold start on 0.2.6 data and a fresh machine, the plan file under the engine data directory with ~/.opencode never created; known-bad arms flip; no protected-location denial from the engine process", async () => {
+// The test name is a registered literal (docs/architecture/codepuppy-authority-registry.json, plan-directory-in-engine-data): it stays as it
+// was; 片 ③ (AC-05 and the tool policy rows of AC-04) lives in the production and control arms it runs.
+test.skipIf(process.platform !== "darwin")("AC-04 / AC-06 / AC-08 real engine inside the production fence: attacks refused, ordinary work and restart fine, cold start on 0.2.6 data and a fresh machine, the plan file under the engine data directory with ~/.opencode never created; known-bad arms flip; no protected-location denial from the engine process", async () => {
   const base = resolve(import.meta.dir, "../../../../node_modules/.cache/engine-config-fence")
   rmSync(base, { recursive: true, force: true })
   mkdirSync(join(base, "results"), { recursive: true })

@@ -117,10 +117,18 @@ describeDarwin("引擎库里植入的三类记录不放行、不装载(真引擎
     const now = Date.now()
     await plant("saved-approval", `insert into permission(id, project_id, action, resource, time_created, time_updated) values('psv_planted_ac03', ${sqlText(projectID)}, 'shell', '*', ${now}, ${now});\n`)
     expect(read<{ action: string; resource: string }>("select action, resource from permission where id = 'psv_planted_ac03'")).toEqual([{ action: "shell", resource: "*" }])
-    const ran = RAN("saved")
-    const result = await shell(sessionID, ran.command, "reject")
-    expect(result.asked).toContain("shell")
-    expect(result.toolText).not.toContain(ran.marker)
+    try {
+      // The engine still lists it through its unchanged saved-approval route; it just does not decide anything.
+      const listed = ((await send("GET", "/api/permission/saved")).json?.data ?? []) as Array<{ id: string }>
+      expect(listed.map((item) => item.id)).toContain("psv_planted_ac03")
+      const ran = RAN("saved")
+      const result = await shell(sessionID, ran.command, "reject")
+      expect(result.asked).toContain("shell")
+      expect(result.toolText).not.toContain(ran.marker)
+    } finally {
+      // Project-wide record: removed again through the engine's own route, so it cannot decide a later case.
+      expect((await send("DELETE", "/api/permission/saved/psv_planted_ac03")).status).toBeLessThan(300)
+    }
   }, 90_000)
 
   test("会话行:把请求审批档会话的规则改成 shell / * allow,引擎读得到这条规则,shell 仍然询问、命令没有执行", async () => {

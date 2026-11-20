@@ -88,7 +88,8 @@ PLAN 阶段只提交本文件。下面的命令与结论分两类:「实测」�
 
 4. **D16 · ext 读取处,测试先红(提交 C)**:`session-row-rules.test.ts` 与它的闸门行(精确条数 4)。在没有过滤的 ext 上运行,E4 第一臂红(工具执行了,`writes` 为 1),其余三条绿。
 5. **D16 · ext 过滤(提交 D,不改提交 C 的测试)**:`index.ts` 的返回点过滤、登记册 `engine-db-records-not-honoured` 补上机制与证明、本节的 D16 修订。跑 `session-row-rules.test.ts`、`unattended-policy.test.ts`、`register-policy.test.ts`、`authority-registry.test.ts` 与 ext 类型检查。撤掉这一处过滤 ⇒ E4 第一臂红。
-6. **待定 · 会话上下文(提交 E / F,要等 owner 同意 `session/context.ts` 接管)**:E 先提交 E4 第二臂(红),F 再提交 `:136` 一行加登记义务。
+6. **AC-03 反向臂隔离(提交 E)**:「已存批准」那条用完即经引擎路由删掉植入的记录(见偏离记录)。
+7. **待定 · 会话上下文(提交 F / G,要等 owner 同意 `session/context.ts` 接管)**:F 先提交 E4 第二臂(红),G 再提交 `:136` 一行加登记义务。
 
 相关检查(只跑这些,不跑整包、不跑门;机器上有门在跑时 bun 加 `--max-concurrency 2`):
 
@@ -118,6 +119,15 @@ PLAN 阶段只提交本文件。下面的命令与结论分两类:「实测」�
 | BR-02 冻结的面 | core L1 条断言已存批准照样能列出;AC-03 宿主断言 `GET /api/session/:id` 照样返回会话行规则 | 改动如果误伤了服务或路由,列出或读取就会失败 |
 | BR-04(本片能碰坏的部分) | core L2 条断言会话行 `deny` 照样拒绝;`session-grant*.test.ts` 断言「始终允许」的会话内放行照常;M2 七个宿主复跑全绿 | L2 如果把 `deny` 也滤掉,自动化解析会话的 `deny subagent` 就失效,core 断言红;会话内放行一旦受影响,`session-grant` 的前几条就红 |
 
+### 反向臂实测(步骤 3,2026-11-20,每次只撤一条,用 `git restore` 恢复;日志在 `IMP/ko-*.log`)
+
+| 撤掉 | core `codepuppy-engine-db-records.test.ts` | AC-03 宿主子进程 | 其他 |
+| --- | --- | --- | --- |
+| L1 | L1 条红,2 pass / 1 fail | 「已存批准」条红(`asked` 为 `[]`),2 pass / 1 fail | — |
+| L2 | L2 条红,2 pass / 1 fail | 「会话行」条红(`asked` 为 `[]`),2 pass / 1 fail | `session-grant.test.ts` 改名后的两条红 |
+| L3(`config.ts` 换回 `887748b52c`) | L3 条红,2 pass / 1 fail | 「wellknown」条红(`/api/mcp` 里有 `planted`),2 pass / 1 fail | — |
+| ext 过滤 | — | — | `session-row-rules.test.ts` 的 E4 第一臂红(`writes` 为 1),3 pass / 1 fail |
+
 ### 偏离记录
 
 - 2026-11-20 · core 测试 L3 的对照由「集成文档」改为「内联文档」 · 集成文档会丢掉本地服务器(`packages/core/src/config/integration.ts:115-120`),拿它作对照永远看不到连接器,对照就不成立 · 提交 A。
@@ -127,6 +137,7 @@ PLAN 阶段只提交本文件。下面的命令与结论分两类:「实测」�
 - 2026-11-20 · `config.test.ts` 的 5 条已知红(名单见 M4)按裁决 4 只列名、不加判官;同一份名单写进登记册 `engine-db-records-not-honoured` 的 `note` 和 ADR-047 config.ts 那一行 · 提交 B。
 
 - 2026-11-20 · 设计返还 D16(编排器批准扩大范围):`packages/ext/src/policy/index.ts` 与新测试 `session-row-rules.test.ts` 加入本片;`session/context.ts:136` 待 owner 同意,本片不碰 `packages/core/src/session/` · 提交 C、D。
+- 2026-11-20 · AC-03 用例「已存批准」那条结束时经引擎自己的路由 `DELETE /api/permission/saved/:id` 删掉植入的记录,并先断言 `GET /api/permission/saved` 列得出它 · 第一次撤 L1 时,这条项目级记录留到了下一条「会话行」,两条一起红,反向臂就分不开;删掉之后撤 L1 只红它自己。修复之前的代码上三条照样全红 · 提交 E。
 - 2026-11-20 · D16 带出 `unattended-policy.test.ts` 一条:它用会话行上的 ask 证明标准档的规则轴 ask 立即拒绝,写的正是被取代的行为(没有任何产品写者会在会话行上写 ask)。改为写在 agent 规则里,保证不变,用例名里的选项随之改名;该用例名不在登记册与闸门登记簿里 · 提交 D。
 
 ### 可选(不做)

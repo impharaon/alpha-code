@@ -1,6 +1,6 @@
 import { Schema } from "effect"
 import { ToolIdentity } from "@opencode/schema/tool-identity"
-import { readFileSync, realpathSync, statSync } from "node:fs"
+import { realpathSync, statSync } from "node:fs"
 import { resolveConnectorLeaf, type CodePuppyCredentials } from "@opencode/util/codepuppy-credentials"
 import { readPackageAllowSet } from "../../../ext/src/gen-skill-paths"
 import { managedMcpAllowedHere } from "../../../ext/src/package-scope"
@@ -12,11 +12,11 @@ import { launchedByPackageRunner, RUNNER_FIRST_FETCH_STARTUP_MS } from "./engine
 import { readMcpLeafStrict } from "./ext-config"
 import { projectScopeIdentity, readPackageLedgerStateV1 } from "./ext-receipt-v2"
 import type { PackageGraphV1 } from "./ext-package-ledger-v3"
-import { credentialStores, readCredentialTable } from "./codepuppy-secret-files"
+import { credentialStores, readCredentialTable, readRegularFileNoFollow } from "./codepuppy-secret-files"
 import { isOfficialConnector } from "./official-connector-names"
 import { officialRuntimeParent } from "./official-connector-recipes"
 import { officialAvailabilityPublished, settleOfficialConnectorCredential } from "./official-connector-resources"
-import { credentialStoreTarget, planCredentialStores } from "./process-fence-plan"
+import { credentialReferenceGuard, planCredentialStores } from "./process-fence-plan"
 
 export type PackageMcpActivationV1 = { directory: string; name: string; status: string; detail?: string }
 
@@ -118,7 +118,10 @@ async function applyAt(
       const leaf = readMcpLeafStrict(name)
       if (!leaf.ok || !leaf.value)
         return { directory: target, name, status: "unavailable", detail: "Installed connector definition is unavailable" }
-      const config = projectServerConfig(resolveConnectorLeaf({ server: name, leaf: leaf.value, ...credentials() }))
+      // The credential table is read only for a definition that references a file (review R1 item 3: one unreadable store entry must not
+      // make a connector without credentials unavailable).
+      const resolved = JSON.stringify(leaf.value).includes("{file:") ? resolveConnectorLeaf({ server: name, leaf: leaf.value, ...credentials() }) : leaf.value
+      const config = projectServerConfig(resolved)
       if (!config) return { directory: target, name, status: "failed", detail: "Installed connector definition is invalid" }
       const startup = launchedByPackageRunner(config) && !config.timeout ? { timeout: { startup: RUNNER_FIRST_FETCH_STARTUP_MS } } : {}
       await client.experimental.mcp.add({ server: name, config: { ...config, ...startup, disabled: false }, location })
@@ -180,11 +183,13 @@ export function connectorCredentials(deps: Pick<ManagedMcpConvergenceDeps, "root
   }
   const stores = credentialStores({ userDataPath: deps.userDataPath(), ...(runtimeParent ? { officialRuntimeParent: runtimeParent } : {}) })
   const realpath = (p: string) => realpathSync.native(p)
-  const table: CodePuppyCredentials = readCredentialTable(stores, deps.log)
-  return {
-    table,
-    isStoreTarget: credentialStoreTarget(planCredentialStores(stores, { realpath }), { realpath, stat: (p) => statSync(p, { bigint: true }) }),
-    readFile: (file) => readFileSync(file, "utf8"),
+  const identities = new Set<string>()
+  const table: CodePuppyCredentials = readCredentialTable(stores, deps.log, identities)
+  const guard = credentialReferenceGuard(planCredentialStores(stores, { realpath }), identities, {
+    realpath,
+    stat: (p) => statSync(p, { bigint: true }),
+    readRegular: readRegularFileNoFollow,
     ...(deps.log ? { log: deps.log } : {}),
-  }
+  })
+  return { table, isStoreTarget: guard.isStoreTarget, readFile: guard.readFile, ...(deps.log ? { log: deps.log } : {}) }
 }

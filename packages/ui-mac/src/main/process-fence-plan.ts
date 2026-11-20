@@ -328,14 +328,23 @@ export function planCredentialStores(
 }
 
 /**
- * 由真实目标清单得出「这个路径是否指向某个存放点」(设计 §4.1 isStoreTarget、P-22):把路径求成真实路径(求不出 ⇒ 当作指向存放点),
- * 它自己或它的任一上级目录的 device + inode 等于清单里某一项 ⇒ true。按身份比,不按路径前缀比:firmlink 写法的真实路径不同、inode 相同;
- * 硬链同理。清单里不在盘上的项没有身份,不参与比较。
+ * 主进程直接应用连接器时的引用判断与读法(设计 §4.1 isStoreTarget、P-22;片 ① 审查 R1 第 1、4 条),由真实目标清单与存放点里普通文件的身份得出:
+ *   · isStoreTarget(p):把 p 求成真实路径(求不出 ⇒ 当作指向存放点);它自己的 device + inode 是某个存放点或存放点里的某个文件、或它的任一上级目录是
+ *     某个存放点 ⇒ true。按身份比,不按路径前缀比:firmlink 写法的真实路径不同、inode 相同;指向存放点里某个文件的硬链、`/.vol/<dev>/<ino>` 写法同理。
+ *     判为 false 时记下这次判定的真实路径与身份;
+ *   · readFile(p):只读判定过的那一个 —— 按记下的真实路径、最后一级不跟随软链打开,描述符的身份必须等于判定时的身份且不是存放点里的任何一项,
+ *     才从描述符读出;判定与读取之间被换掉(换成指向存放点的软链、换掉上级目录)、没判过 ⇒ 空串并记一行(不含值)。
  */
-export function credentialStoreTarget(
+export function credentialReferenceGuard(
   rules: readonly CredentialStoreRule[],
-  deps: { realpath: (p: string) => string; stat: (p: string) => { dev: number | bigint; ino: number | bigint } },
-): (path: string) => boolean {
+  fileIdentities: ReadonlySet<string>,
+  deps: {
+    realpath: (p: string) => string
+    stat: (p: string) => { dev: number | bigint; ino: number | bigint }
+    readRegular: (p: string) => { value: string; identity: string } | undefined
+    log?: (line: string) => void
+  },
+): { isStoreTarget: (path: string) => boolean; readFile: (path: string) => string } {
   const identity = (p: string) => {
     try {
       const meta = deps.stat(p)
@@ -344,19 +353,39 @@ export function credentialStoreTarget(
       return undefined
     }
   }
-  const stores = new Set(rules.map((rule) => identity(rule.path)).filter((id): id is string => id !== undefined))
-  return (path) => {
-    let node: string
-    try {
-      node = deps.realpath(resolve(path))
-    } catch {
-      return true
-    }
-    for (;;) {
-      const id = identity(node)
-      if (id !== undefined && stores.has(id)) return true
-      if (dirname(node) === node) return false
-      node = dirname(node)
-    }
+  const stores = new Set([...rules.map((rule) => identity(rule.path)).filter((id): id is string => id !== undefined), ...fileIdentities])
+  const judged = new Map<string, { real: string; id: string }>()
+  return {
+    isStoreTarget: (path) => {
+      let real: string
+      try {
+        real = deps.realpath(resolve(path))
+      } catch {
+        return true
+      }
+      const id = identity(real)
+      if (id === undefined) return true
+      for (let node = real; ; node = dirname(node)) {
+        const nodeId = node === real ? id : identity(node)
+        if (nodeId !== undefined && stores.has(nodeId)) return true
+        if (dirname(node) === node) break
+      }
+      judged.set(path, { real, id })
+      return false
+    },
+    readFile: (path) => {
+      const was = judged.get(path)
+      let read: { value: string; identity: string } | undefined
+      try {
+        read = was ? deps.readRegular(was.real) : undefined
+      } catch {
+        read = undefined
+      }
+      if (!was || !read || read.identity !== was.id || stores.has(read.identity)) {
+        deps.log?.("connector credential reference: the referenced file changed after it was checked (or could not be opened as that file) — not read")
+        return ""
+      }
+      return read.value
+    },
   }
 }

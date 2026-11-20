@@ -76,7 +76,7 @@ export function resolveConnectorLeaf(input: {
       if (!input.isStoreTarget(file)) return input.readFile(file)
       const entry = path.isAbsolute(file) && path.resolve(file) === file ? input.table[file] : undefined
       if (entry?.use.kind === "connector" && entry.use.server === input.server && credentialField(at)) return entry.value
-      input.log?.(`connector ${JSON.stringify(input.server)}: a credential reference at ${at.join(".") || "(root)"} was not substituted (not this connector's own credential field)`)
+      input.log?.(`connector ${JSON.stringify(input.server)}: a reference at ${at.join(".") || "(root)"} was not substituted (it points into a Code Puppy credential store, or cannot be resolved, and is not this connector's own credential in its exact spelling)`)
       return ""
     })
   const walk = (value: unknown, at: readonly string[]): unknown => {

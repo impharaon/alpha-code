@@ -227,12 +227,40 @@ export function credentialStores(input: { userDataPath: string; officialRuntimeP
   ]
 }
 
+/** 一个文件节点的身份(device + inode;bigint,与 stat / fstat 的 bigint 读数同一写法)。 */
+export function fileIdentity(meta: { dev: bigint | number; ino: bigint | number }): string {
+  return `${meta.dev}:${meta.ino}`
+}
+
 /**
- * 只读 table !== false 的目录下的普通文件(逐项 lstat;根以下不跟随任何软链,软链条目只记名字、不进表),跳过 "." 开头的条目。
- * use:codepuppy-secrets/<名> ⇒ inline;codepuppy-mcp-secrets/<server>/… ⇒ connector(server);<运行期目录>/<run>/<name>/… ⇒ connector(name)。
- * 目录不存在 = 没有条目;其它 IO 错误抛出。不记录值;`log` 只收相对路径。
+ * 读一个普通文件,且读的就是打开的那一个:最后一级不跟随软链(O_NOFOLLOW)打开,fstat 这个描述符,必须是普通文件,值从描述符读出。返回值与描述符
+ * 的身份;最后一级是软链、不在、不是普通文件 ⇒ undefined;其它 IO 错误抛出。主进程的凭据读法都走它(片 ① 审查 R1 第 1 条:不先判再按路径重开)。
  */
-export function readCredentialTable(stores: readonly CredentialStore[], log?: (line: string) => void): Record<string, CodePuppyCredentialEntry> {
+export function readRegularFileNoFollow(file: string): { value: string; identity: string } | undefined {
+  let fd: number
+  try {
+    fd = fs.openSync(file, fs.constants.O_RDONLY | fs.constants.O_NOFOLLOW)
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException)?.code
+    if (code === "ELOOP" || code === "ENOENT" || code === "ENOTDIR" || code === "EMLINK") return undefined
+    throw error
+  }
+  try {
+    const meta = fs.fstatSync(fd, { bigint: true })
+    if (!meta.isFile()) return undefined
+    return { value: fs.readFileSync(fd, "utf8"), identity: fileIdentity(meta) }
+  } finally {
+    fs.closeSync(fd)
+  }
+}
+
+/**
+ * 只读 table !== false 的目录下的普通文件(逐项 lstat;根以下不跟随任何软链,软链条目只记名字、不进表),跳过 "." 开头的条目;值经
+ * readRegularFileNoFollow 从打开的描述符读出。use:codepuppy-secrets/<名> ⇒ inline;codepuppy-mcp-secrets/<server>/… ⇒ connector(server);
+ * <运行期目录>/<run>/<name>/… ⇒ connector(name)。`identities`(可省)收下走到的每个普通文件的 device + inode —— 主进程的别名判断据它认出指向
+ * 存放点里某个文件的硬链与 /.vol 写法。目录不存在 = 没有条目;其它 IO 错误抛出。不记录值;`log` 只收相对路径。
+ */
+export function readCredentialTable(stores: readonly CredentialStore[], log?: (line: string) => void, identities?: Set<string>): Record<string, CodePuppyCredentialEntry> {
   const table: Record<string, CodePuppyCredentialEntry> = {}
   for (const store of stores) {
     if (store.table === false) continue
@@ -250,7 +278,7 @@ export function readCredentialTable(stores: readonly CredentialStore[], log?: (l
         if (name.startsWith(".")) continue
         const file = path.join(dir, name)
         const rel = [...segments, name]
-        const meta = fs.lstatSync(file)
+        const meta = fs.lstatSync(file, { bigint: true })
         if (meta.isSymbolicLink()) {
           log?.(`credential store: symbolic link entry not read: ${path.basename(root)}/${rel.join("/")}`)
           continue
@@ -260,13 +288,21 @@ export function readCredentialTable(stores: readonly CredentialStore[], log?: (l
           continue
         }
         if (!meta.isFile()) continue
+        identities?.add(fileIdentity(meta))
         const use: CodePuppyCredentialEntry["use"] | undefined =
           kind === "secrets"
             ? { kind: "inline" }
             : kind === "connector-by-server"
               ? rel.length >= 2 ? { kind: "connector", server: rel[0]! } : undefined
               : rel.length >= 3 ? { kind: "connector", server: rel[1]! } : undefined
-        if (use) table[file] = { value: fs.readFileSync(file, "utf8"), use }
+        if (!use) continue
+        const read = readRegularFileNoFollow(file)
+        if (!read) {
+          log?.(`credential store: entry changed while being read, not read: ${path.basename(root)}/${rel.join("/")}`)
+          continue
+        }
+        identities?.add(read.identity)
+        table[file] = { value: read.value, use }
       }
     }
     visit(root, [])

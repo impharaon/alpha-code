@@ -4,8 +4,8 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test"
 import * as fs from "node:fs"
 import * as os from "node:os"
 import * as path from "node:path"
-import { credentialStores } from "./codepuppy-secret-files"
-import { credentialStoreTarget, planCredentialStores } from "./process-fence-plan"
+import { credentialStores, readCredentialTable, readRegularFileNoFollow } from "./codepuppy-secret-files"
+import { credentialReferenceGuard, planCredentialStores } from "./process-fence-plan"
 
 const realpath = (p: string) => fs.realpathSync.native(p)
 const stat = (p: string) => fs.statSync(p, { bigint: true })
@@ -48,21 +48,25 @@ describe("planCredentialStores", () => {
   })
 })
 
-describe("credentialStoreTarget", () => {
+describe("credentialReferenceGuard.isStoreTarget", () => {
   // firmlink 写法与大小写不敏感的 APFS 是 macOS 的事实
-  test.skipIf(process.platform !== "darwin")("by identity: the canonical path, a workspace symlink, a relative path, a case variant, the firmlink spelling and a hard link all point into a store; an unrelated file does not; an unresolvable path counts as a store", () => {
+  test.skipIf(process.platform !== "darwin")("by identity: the canonical path, a workspace symlink, a relative path, a case variant, the firmlink spelling, a hard link to a file-type store (codepuppy.env) and a hard link to a file inside a directory-type store all point into a store; an unrelated file does not; an unresolvable path counts as a store", () => {
     const token = path.join(userData, "codepuppy-mcp-secrets", "alpha", "v-0000aaaa", "TOKEN")
     const workspace = path.join(base, "workspace")
     fs.mkdirSync(workspace)
     fs.symlinkSync(token, path.join(workspace, "link"))
     fs.symlinkSync(path.join(userData, "codepuppy-mcp-secrets"), path.join(workspace, "dir-link"))
     fs.linkSync(path.join(userData, "codepuppy.env"), path.join(workspace, "hard"))
+    fs.linkSync(token, path.join(workspace, "hard-inner"))
     fs.writeFileSync(path.join(workspace, "notes.txt"), "plain")
     const caseVariant = token.replace("codepuppy-mcp-secrets", "CODEPUPPY-MCP-SECRETS")
     const firmlink = path.join("/System/Volumes/Data", token)
     // the spellings really open the store file on this machine (APFS is case-insensitive; /System/Volumes/Data is the data volume)
     for (const alias of [caseVariant, firmlink]) expect(fs.readFileSync(alias, "utf8")).toBe("FAKE-alpha")
-    const isStoreTarget = credentialStoreTarget(planCredentialStores(credentialStores({ userDataPath: userData }), { realpath }), { realpath, stat })
+    const stores = credentialStores({ userDataPath: userData })
+    const identities = new Set<string>()
+    readCredentialTable(stores, undefined, identities)
+    const { isStoreTarget } = credentialReferenceGuard(planCredentialStores(stores, { realpath }), identities, { realpath, stat, readRegular: readRegularFileNoFollow })
     for (const p of [
       token,
       path.join(workspace, "link"),
@@ -71,6 +75,7 @@ describe("credentialStoreTarget", () => {
       caseVariant,
       firmlink,
       path.join(workspace, "hard"),
+      path.join(workspace, "hard-inner"),
       path.join(userData, "codepuppy-mcp-secrets", "alpha", "v-0000aaaa", "NOT-YET"),
     ])
       expect(isStoreTarget(p), p).toBe(true)

@@ -4,8 +4,12 @@
 // 试编译丢尾、原生模块缺失即拒、默认工作区不在盘上即拒。真编译器与真 profile 的判据在别的文件。
 
 import { describe, expect, test } from "bun:test"
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs"
+import { tmpdir } from "node:os"
+import { join, resolve } from "node:path"
 import { planConfigFence, planProcessFence, type PlanProcessFenceDeps, type PlanProcessFenceInput } from "./process-fence-plan"
-import { processFenceWriteRules, type ProcessFenceWriteRule } from "./process-fence-profile"
+import { processFenceRulesCover, processFenceWriteRules, type ProcessFenceWriteRule } from "./process-fence-profile"
+import { loadCodePuppySecrets, userEnvFile } from "./codepuppy-secrets"
 
 const describeDarwin = process.platform === "darwin" ? describe : describe.skip
 
@@ -210,6 +214,88 @@ describeDarwin("planProcessFence", () => {
     expect(plan.configFenceRoots).toEqual([STATE_ROOT, "/Volumes/dev/codepuppy-env", `${USER_DATA}/codepuppy-engine-config`, `${USER_DATA}/codepuppy-connections`, "/Volumes/cfg/opencode", `${HOME}/.config/opencode`])
     expect(outside.made).toContain("/Volumes/cfg/opencode")
     expect(outside.made.some((d) => d.endsWith("/.opencode"))).toBe(false)
+  })
+
+  // DESIGN-engine-config-fence 实现期修订 2 A:CODEPUPPY_ENV_FILE 指向的那份并入 CF-4(literal + 上级目录节点),这一项从不让计划失败
+  test("修订 2 A:设置了 CODEPUPPY_ENV_FILE ⇒ 那份文件一条 literal(真实路径)加它的上级目录节点;不设 ⇒ 规则不变", () => {
+    const unset = planProcessFence(harness().input, harness().deps)
+    const set = harness()
+    set.input.envFile = `${HOME}/secrets/cp.env`
+    const plan = planProcessFence(set.input, set.deps)
+    const deny = processFenceWriteRules(plan.profile).deny
+    expect(deny).toContainEqual({ kind: "literal", value: `${HOME}/secrets/cp.env` })
+    expect(deny).toContainEqual({ kind: "literal", value: `${HOME}/secrets` })
+    expect(processFenceWriteRules(unset.profile).deny.some((rule) => rule.value.includes("/secrets"))).toBe(false)
+    expect(set.logs.some((line) => /configFence=15 rules/.test(line))).toBe(true)
+    // 与 <userData>/codepuppy.env 是同一份 ⇒ 不重复
+    const same = harness()
+    same.input.envFile = `${USER_DATA}/codepuppy.env`
+    expect(processFenceWriteRules(planProcessFence(same.input, same.deps).profile).deny.filter((rule) => rule.value === `${USER_DATA}/codepuppy.env`)).toHaveLength(1)
+    // 本身是软链 ⇒ 再加真实目标
+    const linked = harness({ realpath: (p) => (p === `${HOME}/secrets/cp.env` ? `${HOME}/dotfiles/cp.env` : p) })
+    linked.input.envFile = `${HOME}/secrets/cp.env`
+    const linkedDeny = processFenceWriteRules(planProcessFence(linked.input, linked.deps).profile).deny
+    expect(linkedDeny).toContainEqual({ kind: "literal", value: `${HOME}/secrets/cp.env` })
+    expect(linkedDeny).toContainEqual({ kind: "literal", value: `${HOME}/dotfiles/cp.env` })
+  })
+
+  test("修订 2 A:上级目录不在盘上 ⇒ 取最深一级已存在祖先的真实路径接上余下部分,计划照常;任何解析错误、引号路径都不让计划失败", () => {
+    const missing = harness({
+      realpath: (p) => {
+        if (p.startsWith(`${HOME}/missing`)) throw enoent(p)
+        return p === HOME ? "/Volumes/home/alpha" : p.startsWith(`${HOME}/`) ? `/Volumes/home/alpha${p.slice(HOME.length)}` : p
+      },
+    })
+    missing.input.envFile = `${HOME}/missing/dir/cp.env`
+    const deny = processFenceWriteRules(planProcessFence(missing.input, missing.deps).profile).deny
+    expect(deny).toContainEqual({ kind: "literal", value: "/Volumes/home/alpha/missing/dir/cp.env" })
+    expect(deny).toContainEqual({ kind: "literal", value: "/Volumes/home/alpha/missing/dir" })
+    expect(deny).toContainEqual({ kind: "literal", value: "/Volumes/home/alpha/missing" })
+    const failing = harness({ realpath: (p) => { if (p.includes("/odd/")) throw Object.assign(new Error("EACCES"), { code: "EACCES" }); return p } })
+    failing.input.envFile = `${HOME}/odd/x/cp.env`
+    expect(processFenceWriteRules(planProcessFence(failing.input, failing.deps).profile).deny).toContainEqual({ kind: "literal", value: `${HOME}/odd/x/cp.env` })
+    const quoted = harness()
+    quoted.input.envFile = `${HOME}/we"ird/cp.env`
+    expect(() => planProcessFence(quoted.input, quoted.deps)).not.toThrow()
+  })
+
+  test("修订 2 A:文件在工作区里 ⇒ 工作区照常可写,只有那份文件与它路径上的目录节点被拒;同一文件夹里别的文件、子文件夹照常", () => {
+    const h = harness()
+    h.input.envFile = `${HOME}/proj-a/conf/cp.env`
+    const plan = planProcessFence(h.input, h.deps)
+    expect(plan.workspaces).toContain(`${HOME}/proj-a`)
+    const rules = processFenceWriteRules(plan.profile)
+    expect(rules.deny).toContainEqual({ kind: "literal", value: `${HOME}/proj-a/conf/cp.env` })
+    expect(processFenceRulesCover(rules, `${HOME}/proj-a/conf/other`)).toBe(true)
+    expect(processFenceRulesCover(rules, `${HOME}/proj-a/src`)).toBe(true)
+    // 路径上的目录节点本身(运行期放行按既有上级目录节点处理:走签发路径)
+    expect(processFenceRulesCover(rules, `${HOME}/proj-a/conf`)).toBe(false)
+    expect(processFenceRulesCover(rules, `${HOME}/proj-a`)).toBe(false)
+  })
+
+  test("修订 2 A:一个来源 —— 计划器与主进程读的是同一份:相对路径按主进程当前目录解析,loadCodePuppySecrets 读的正是 userEnvFile 给的那份", () => {
+    expect(userEnvFile({})).toBeUndefined()
+    expect(userEnvFile({ CODEPUPPY_ENV_FILE: "" })).toBeUndefined()
+    expect(userEnvFile({ CODEPUPPY_ENV_FILE: "/abs/cp.env" })).toBe("/abs/cp.env")
+    const cwd = realpathSync(mkdtempSync(join(tmpdir(), "cf-envfile-")))
+    const previous = { cwd: process.cwd(), file: process.env.CODEPUPPY_ENV_FILE, disable: process.env.CODEPUPPY_SECRETS_DISABLE, probe: process.env.CF13_ENV_FILE_PROBE }
+    try {
+      process.chdir(cwd)
+      mkdirSync(join(cwd, "rel"))
+      writeFileSync(join(cwd, "rel", "cp.env"), "CF13_ENV_FILE_PROBE=read\n")
+      delete process.env.CODEPUPPY_SECRETS_DISABLE
+      delete process.env.CF13_ENV_FILE_PROBE
+      process.env.CODEPUPPY_ENV_FILE = "rel/cp.env"
+      expect(userEnvFile(process.env)).toBe(resolve(cwd, "rel/cp.env"))
+      loadCodePuppySecrets(join(cwd, "no-user-data"))
+      expect(process.env.CF13_ENV_FILE_PROBE).toBe("read")
+    } finally {
+      process.chdir(previous.cwd)
+      for (const [name, value] of [["CODEPUPPY_ENV_FILE", previous.file], ["CODEPUPPY_SECRETS_DISABLE", previous.disable], ["CF13_ENV_FILE_PROBE", previous.probe]] as const)
+        if (value === undefined) delete process.env[name]
+        else process.env[name] = value
+      rmSync(cwd, { recursive: true, force: true })
+    }
   })
 
   test("BR-05:真源里一条记录落在受保护配置位置之内 ⇒ 不进 workspaces、不进 profile,进 excluded 并点名位置", () => {

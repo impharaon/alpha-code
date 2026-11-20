@@ -448,6 +448,8 @@ PLAN 阶段按派单写在临时文件里，没有提交；本节由实施阶段
 - 2026-11-20 · 单元 A 多一条测试(计划的测试表里没有):`ext/plugin-host.test.ts` 在 OpenCode 2 真插件宿主里装生产默认导出、带一个假 parentPort,经 RPC 的 `setRecord` ⇒ port 上恰一条工具策略写请求，由 main 的生产接收函数写盘，下一次读到。理由：计划里「`plugin.ts` 把桥的写者交给 `registerPolicy`」这一接线(变异 M2)只有单元 B 的真引擎臂能抓到；这一条让单元 A 自己就有判据。gate-files `plugin-host` 51 → 52。
 - 2026-11-20 · §4.7 的结构断言措辞(编排器已接受，单元 B 落地):设计写「sidecar 闭包里没有任何文件 import 这些写者」,但 §4.5 冻结的缺省写者(CLI 与单测用)就在 `resolver.ts` 里直接调 `savePolicyDocument` / `resetPolicyDocument`,而 `resolver.ts` 在闭包里;所以判据写成「闭包里拿到这两个写者的只有 `resolver.ts`,没有文件拿到 `receiveToolPolicyWrite`」。
 
+- 2026-11-20 · 单元 A 证据(证据目录 `~/.cache/alpha-orch/2026-11-19/impl-fence-slice3/`,下称 `S3/`):红 `16f5fb7df3`(`S3/evidence/c1-red-ext.log`:ext 6 红;`c1-red-ui-mac.log`:消息与 server 共 3 红)→ 绿 `1e5d6d702a`,插件宿主接线一条 `5a66f0a7dd`。两条并发用例(`resolver.test.ts` W2、`tool-policy-rpc.test.ts` 并发臂)在红提交上是绿的：那时存储忽略写者、同步直写，不会竞争；它们能失败由变异 M1 证明。`server.test.ts` 的 `OPENCODE_CONFIG_DIR="."` 一条在新工作树上红，原因同片 ② 记过的那条(没有构建 `packages/ext/dist`),`bun run build` 之后绿。变异(`S3/mutations/`,每次只改一处，用 `git restore` 复原):M1 去掉串行链 ⇒ W2 与 RPC 并发臂红(丢一条);M2 `plugin.ts` 不传写者 ⇒ 插件宿主那条红(port 上零请求);M3 `server.ts` 链里去掉这一环 ⇒ server 两条红;M4 接收函数吞掉写错误照回 ok ⇒ RPC 与 server 的 AC-05 两条红;M6 桥的写者另挂监听、另起 id 计数 ⇒ hub-bridge 两条红(串号那条即目标)。检查：ext 相关 16 个测试文件、ui-mac 相关 6 个测试文件全绿;`bun run typecheck`(ext、ui-mac)干净;`git diff --check` 干净。
+
 ### 可选(不做)
 
 - 让共享引擎宿主的假 parentPort 也用生产接收函数答工具策略写请求(F5)。今天没有消费方需要，而且改了它，44 个消费方就都成了相关测试。

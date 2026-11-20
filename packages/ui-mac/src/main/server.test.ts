@@ -73,8 +73,7 @@ const { applyPlatformCredentialsHot, hasSecretFile, secretFilePath } = await imp
 const { clearByokKeys, initByokKeys, storeByokKey } = await import("./codepuppy-byok-keys")
 const { writeShellEnvCache } = await import("./shell-env-cache")
 const { forkedSecretNames, preferAppEnv, preplanConfigFenceRoots, spawnLocalServer } = await import("./server")
-const { planConfigFence } = await import("./process-fence-plan")
-const { resolveEngineRoots } = await import("./process-fence-profile")
+const { configFenceLocations, resolveEngineRoots } = await import("./process-fence-profile")
 const { bootFenceWorkspaceTruth, readWorkspaceTruthOrThrow, writeWorkspaceTruth } = await import("./process-fence-workspaces")
 const { GLOBAL_RENDERER_STORE, TABS_KEY } = await import("./tabs-preclean")
 const { requestCatalogRefresh } = await import("./catalog-refresher")
@@ -976,18 +975,13 @@ describe("审查 B 第 2 条:计划之前的受保护配置目录 = 计划器的
           })
           await result.health.wait
           await result.listener.stop()
-          // the planner's own step (planProcessFence: resolveEngineRoots(sidecarEnv, homedir()) + the start document's directory)
-          const planner = planConfigFence(
-            { ...inputs(), engineConfigDirectory: planned!.engineConfigDirectory, roots: resolveEngineRoots(planned!.sidecarEnv, homedir()) },
-            { realpath: (p) => realpathSync.native(p), mkdirp: (p) => void mkdirSync(p, { recursive: true }) },
-          ).configFenceRoots
-          const before = preplanConfigFenceRoots({ env: process.env, home: homedir(), ...inputs() }).map((p) => {
-            try {
-              return realpathSync.native(p)
-            } catch {
-              return p
-            }
-          })
+          // the planner's own inputs (planProcessFence hands planConfigFence the start document's directory and
+          // resolveEngineRoots(sidecarEnv, homedir())), compared as locations BEFORE the planner resolves them on disk: in bun
+          // os.homedir() is the HOME this process started with — the developer's real one, which the test-isolation preload
+          // cannot pin (I-08) — so nothing here may mkdir or realpath under it (final review item 1)
+          const subpaths = (rules: ReturnType<typeof configFenceLocations>) => rules.flatMap((rule) => (rule.kind === "subpath" ? [rule.path] : []))
+          const planner = subpaths(configFenceLocations({ ...inputs(), engineConfigDirectory: planned!.engineConfigDirectory, configHome: resolveEngineRoots(planned!.sidecarEnv, homedir()).configHome, home: homedir() }))
+          const before = preplanConfigFenceRoots({ env: process.env, home: homedir(), ...inputs() })
           expect([...new Set(before)].sort()).toEqual([...new Set(planner)].sort())
         })
       } finally {
@@ -1005,6 +999,8 @@ describe("审查 B 第 2 条:计划之前的受保护配置目录 = 计划器的
     try {
       process.chdir(cwd)
       await withEnv({ OPENCODE_CONFIG_DIR: "." }, () => {
+        // an isolated HOME (never the process's start HOME, I-08): the case is about the relative OPENCODE_CONFIG_DIR only
+        const home = join(userDataPath, "home")
         const truthPath = join(userDataPath, "fence-workspaces", "dev.json")
         const fs = { readFileSync, writeFileSync, mkdirSync, renameSync, rmSync }
         writeWorkspaceTruth(truthPath, [project, other], fs)
@@ -1015,9 +1011,9 @@ describe("审查 B 第 2 条:计划之前的受保护配置目录 = 计划器的
           fs,
           log: () => {},
           eligibility: {
-            homeDir: homedir(),
+            homeDir: home,
             appStateRoot: inputs().appStateRoot,
-            configFenceRoots: () => preplanConfigFenceRoots({ env: process.env, home: homedir(), ...inputs() }),
+            configFenceRoots: () => preplanConfigFenceRoots({ env: process.env, home, ...inputs() }),
             realpath: (p) => realpathSync.native(p),
             isDirectory: () => true,
           },

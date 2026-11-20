@@ -17,8 +17,8 @@
 // `~/code-puppy` 走 ensureUserWorkspaceDir(唯一的 lazy 供给点)。受保护配置集里的目录(状态根、环境根、引擎配置目录、连接记录、
 // 两个引擎全局配置目录 —— 后者就是原来的 W6)由 planConfigFence 预建:它们与每一级上级目录节点都被末尾的拒写块冻结,引擎与子进程在
 // 其中只能得到 EEXIST(SPEC-engine-config-fence I4)。
-// **刻意不建** W16(`~/.opencode`:engine-config-truth 对它有 junk-only 判定,凭空建一个会改行为)、
-// W17/W18(dev-only)。
+// **刻意不建** `~/.opencode`:它整个是受保护配置位置 CF-9,任何进程都不建它(BR-07;W16 已删,计划目录在引擎数据目录下,
+// 这里本来就预建数据目录,`plan` 由写文件工具懒建);W17/W18(dev-only)也不建。
 
 import { lstatSync } from "node:fs"
 import { basename, dirname, join, resolve } from "node:path"
@@ -85,7 +85,9 @@ export function planConfigFence(
   const unexpressed: string[] = []
   const locations = configFenceLocations({ ...input, configHome: input.roots.configHome, home: input.roots.home })
   const envFile = input.envFile ? resolve(input.envFile) : undefined
-  for (const location of locations) if (location.kind === "subpath") deps.mkdirp(location.path)
+  // CF-9 那一条不预建(BR-07:应用从不建 `~/.opencode`;不存在时 subpath 规则照样挡住任何形式的新建)。按这一条跳过,不按路径串:
+  // 用户把同一个目录指定为引擎全局配置目录(CF-8)时照常预建(审查 R1)
+  for (const location of locations) if (location.kind === "subpath" && !location.neverCreate) deps.mkdirp(location.path)
   const target = (path: string) => {
     try {
       return deps.realpath(path)

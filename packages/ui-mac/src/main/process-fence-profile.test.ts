@@ -72,6 +72,7 @@ const CF_LINES = [
   `(literal "${USER_DATA}/opencode.updater")`,
   `(regex #"^/Users/alpha/Library/Application Support/ai\\.opencode\\.desktop/[^/]+\\.[dD][aA][tT]$")`,
   `(subpath "${HOME}/.config/opencode")`,
+  `(subpath "${HOME}/.opencode")`,
   `(literal "${HOME}/opencode.json")`,
   `(literal "${HOME}/opencode.jsonc"))`,
   `(deny file-write* ${[`${HOME}/Library/Application Support`, `${HOME}/Library`, HOME, "/Users", `${STATE_ROOT}/env`, STATE_ROOT, USER_DATA, `${HOME}/.config`].map((p) => `(literal "${p}")`).join(" ")})`,
@@ -119,7 +120,6 @@ describe("renderProcessFenceProfile —— 勘破 §8.2 的行(W10/W19 已删,D1
       `(literal "/dev/null") (literal "/dev/stdout") (literal "/dev/stderr")`,
       `(literal "/dev/tty") (regex #"^/dev/fd/")`,
       `(literal "/dev/ptmx") (regex #"^/dev/ttys")`,
-      `(subpath "${HOME}/.opencode")`,
       `(subpath "${HOME}/Library/Caches/bun")`,
       `(subpath "${HOME}/.cache/bun")`,
       ")",
@@ -160,15 +160,21 @@ describe("renderProcessFenceProfile —— 勘破 §8.2 的行(W10/W19 已删,D1
     expect(() => renderProcessFenceProfile({ ...base, configFence: [{ kind: "subpath", path: "/r/x", via: ['/w/"x'] }] })).toThrow(/configFence\[0\]/)
   })
 
-  test("位置清单:CF-1–8、CF-10(名字取 USER_DATA_LAYOUT 与 store 常量);两个引擎配置目录相同只列一份,用户导出 OPENCODE_CONFIG_DIR 时两份都列;不含 ~/.opencode 与工具策略目录(片 ④ / ③)", () => {
+  test("位置清单:CF-1–10(名字取 USER_DATA_LAYOUT 与 store 常量);两个引擎配置目录相同只列一份,用户导出 OPENCODE_CONFIG_DIR 时两份都列;整个 ~/.opencode 是 CF-9(subpath,排在 CF-8 之后、CF-10 之前,片 ④);不含工具策略目录(片 ③)", () => {
     const list = (engineConfigDirectory: string) =>
       configFenceLocations({ userDataPath: USER_DATA, appStateRoot: STATE_ROOT, codepuppyGlobalRoot: GLOBAL, engineConfigDirectory, configHome: roots.configHome, home: HOME })
-    expect(list(`${HOME}/.config/opencode`).filter((rule) => rule.kind === "subpath" && rule.path.endsWith("opencode"))).toEqual([{ kind: "subpath", path: `${HOME}/.config/opencode` }])
-    expect(list("/Volumes/cfg/opencode").filter((rule) => rule.kind === "subpath" && rule.path.endsWith("opencode"))).toEqual([
+    expect(list(`${HOME}/.config/opencode`).filter((rule) => rule.kind === "subpath" && rule.path.endsWith("/opencode"))).toEqual([{ kind: "subpath", path: `${HOME}/.config/opencode` }])
+    expect(list("/Volumes/cfg/opencode").filter((rule) => rule.kind === "subpath" && rule.path.endsWith("/opencode"))).toEqual([
       { kind: "subpath", path: "/Volumes/cfg/opencode" },
       { kind: "subpath", path: `${HOME}/.config/opencode` },
     ])
-    expect(JSON.stringify(list(`${HOME}/.config/opencode`))).not.toMatch(/\.opencode"|codepuppy-tool-policy/)
+    const paths = list(`${HOME}/.config/opencode`).map((rule) => (rule.kind === "dat-files" ? rule.dir : rule.path))
+    expect(list(`${HOME}/.config/opencode`)).toContainEqual({ kind: "subpath", path: `${HOME}/.opencode`, neverCreate: true })
+    // only CF-9 carries the marker (the pre-create skip is bound to that entry, not to a path string)
+    expect(list(`${HOME}/.opencode`).filter((rule) => "neverCreate" in rule)).toEqual([{ kind: "subpath", path: `${HOME}/.opencode`, neverCreate: true }])
+    expect(paths.indexOf(`${HOME}/.opencode`)).toBe(paths.indexOf(`${HOME}/.config/opencode`) + 1)
+    expect(paths.indexOf(`${HOME}/opencode.json`)).toBe(paths.indexOf(`${HOME}/.opencode`) + 1)
+    expect(JSON.stringify(list(`${HOME}/.config/opencode`))).not.toMatch(/codepuppy-tool-policy/)
   })
 
   test("`#1337` 网络行:Q1.2 四行逐字、顺序不变、deny 在前 allow 在后、N4 的端口就是传入的代理端口;只写加法(没有第二条 deny)", () => {
@@ -204,7 +210,7 @@ describe("renderProcessFenceProfile —— 勘破 §8.2 的行(W10/W19 已删,D1
         .filter((x): x is string => !!x),
     )
     expect([...ids].sort()).toEqual(Object.keys(WRITABLE_ROOT_IDS).sort())
-    expect(Object.keys(WRITABLE_ROOT_IDS).sort()).toEqual(["W1", "W11", "W12", "W13", "W14", "W15", "W16", "W17", "W18", "W3", "W4", "W5", "W7", "W8", "X1"])
+    expect(Object.keys(WRITABLE_ROOT_IDS).sort()).toEqual(["W1", "W11", "W12", "W13", "W14", "W15", "W17", "W18", "W3", "W4", "W5", "W7", "W8", "X1"])
   })
 
   test("XDG 根跟着 env 走:用户导出 XDG_DATA_HOME 时 W4 指向它,不再是 ~/.local/share", () => {
@@ -254,7 +260,6 @@ describe("签发判定的唯一来源:本代 apply 的 profile 解析回写规�
     { kind: "regex", value: "^/dev/fd/" },
     { kind: "literal", value: "/dev/ptmx" },
     { kind: "regex", value: "^/dev/ttys" },
-    { kind: "subpath", value: "/Users/alpha/.opencode" },
     { kind: "subpath", value: "/Users/alpha/Library/Caches/bun" },
     { kind: "subpath", value: "/Users/alpha/.cache/bun" },
   ]

@@ -175,3 +175,5 @@ last_reviewed: 2026-11-20
   3. 配置路径每个节点所在真实位置的上级链也进上级目录块(两跳软链的中间真实目录);红 `evidence/final3-red-*.log`(生产臂实测换掉、读到 evil)→ 绿(本提交)。
   4. 写不进 profile 的配置路径节点(引号等)逐个丢,规则与其余节点照留(env 文件的 literal 不再整条丢;配置目录经这样的软链时计划不再失败);红 `evidence/final4-red.log` → 绿(本提交)。
   6a. 配置路径节点「同一对象」按 device + inode(`lstat`,计划器依赖里新增可选的 `lstat`,生产默认 `lstatSync` bigint),不再按小写字符串;红 `evidence/final6a-red.log` → 绿(本提交)。
+  5 / 6b / 6c. 写入矩阵:已放行的 `~/.config` 本身改名(生产拒、X1 在后的已知坏通过);每次攻击的结果集合与矩阵逐条相等;去掉受保护集的已知坏臂里文件 / 目录 / 新建各一个位置与两种 firmlink 写法的每种手法都 OK(`a9e8de01ba`)。
+  7. 措辞:真引擎宿主的对照臂经 W12 落地(沙箱在系统临时目录下),不是补回的 W2 / W6;写入矩阵覆盖的写法按位置写明;`custom-provider-truth.test.ts` 的固定 id 数改成 13。`gate-files.tsv`:`process-fence-plan` 22 → 26,`process-fence-config-fence` 内层 11 → 13。

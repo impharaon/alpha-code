@@ -1,6 +1,6 @@
 // `#1391` —— 自定义节点真源(读端)的判据。
 //   ① I2:真源路径不在可写集任何**固定行**之下 —— 对着生产渲染器渲染的 profile(受保护集 CF 按空渲染:本文件只判别的行),枚举 `(allow file-write*` 块里每条规则的 W-id
-//      (18 个固定 id 手写登记;W1 是运行时成员,由 `#1390` 规则 5b 兜,本条不含),默认 base 与 dev 覆盖 base、XDG_STATE_HOME
+//      (13 个固定 id 手写登记 —— 基线 18 条去掉 W10/W19(D15)与 W2/W6(SPEC-engine-config-fence D2);W1 是运行时成员,由 `#1390` 规则 5b 兜,本条不含),默认 base 与 dev 覆盖 base、XDG_STATE_HOME
 //      两种形态都过。词法判据偏向判「覆盖」(大小写不敏感、按路径段比);「覆盖」的最终裁判是 seatbelt 本身,在
 //      custom-provider-truth-fence.test.ts 真跑。每条「不覆盖」都先证明手段测得出「覆盖」。
 //   ② 严格读:缺失 = 没有记录(ok、空清单、零日志);坏 JSON / 版本不对 / providers 不是数组 / 字段不合法 / 同 id 重复 ⇒

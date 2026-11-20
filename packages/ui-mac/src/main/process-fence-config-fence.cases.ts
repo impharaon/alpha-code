@@ -128,7 +128,7 @@ const OPS = {
   vol: ["vol-append", "vol-rename-over"],
 } as const
 
-/** The attack script: every location × every operation, every spelling, every ancestor node. */
+/** The attack script: every location × every operation, every ancestor node, and the other spellings: a workspace symlink (cf2, cf4), letter case (cf3, cf4, cf5 new, cf7 .dat), the /System/Volumes/Data firmlink (cf2, cf8), /.vol/<dev>/<ino> (cf2, cf3, cf7 .dat). */
 function matrix() {
   const calls: Array<[string, "file" | "dir" | "create" | "ancestor" | "vol", string]> = [
     ["cf1-jsonc", "file", join(env, "codepuppy.jsonc")],
@@ -309,7 +309,7 @@ test("layout: the fake tree is under no writable row except the workspace (W1) a
   expect(plan.profile).not.toContain("; W6")
 })
 
-test("production: every attack on every protected location, every spelling and every ancestor node is refused with EPERM; afterwards nothing changed on disk", () => {
+test("production: every operation on every protected location and every ancestor node, and the other spellings (symlink, case, firmlink, /.vol on the locations listed in matrix()), is refused with EPERM; afterwards nothing changed on disk", () => {
   build()
   const before = snapshot()
   const results = attack(plan.profile)

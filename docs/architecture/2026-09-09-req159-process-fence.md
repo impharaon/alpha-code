@@ -201,8 +201,8 @@ U1 只出了 arm64,并明写将来出 Intel / universal 时若漏第二份,x64 �
 | `custom-provider-truth.test.ts` | 全平台 | `#1391` 自定义节点真源(读端):I2 —— 真源路径不在可写集任何固定行之下(对着渲染出的 profile 逐条规则枚举 W-id,13 个固定 id 手写登记;默认 / 覆盖 base × 两种 XDG_STATE_HOME;控制臂塞一行罩住状态根即点名);严格读十六种坏形状各拒且日志一行,缺失 = 没有记录 |
 | `custom-provider-truth-write.test.ts` | 全平台 | `#1391` 写端:字节固定、原子(rename / write 中途抛 ⇒ 旧内容不动)、坏记录不落盘;写模块不在 sidecar import 闭包里(生产 `sidecarSourceFiles` 实测 + 合成三文件控制臂) |
 | `custom-provider-truth-fence.test.ts` | darwin | `#1391` I2 的真裁判:生产渲染器的 profile(受保护集按空)交给真 sandbox-exec,围栏内写 / 建目录 / mv 进真源全拦、零落盘;W3 落盘;bare 臂写得进 |
-| `process-fence-config-fence.test.ts` | darwin | SPEC-engine-config-fence AC-01:生产计划器 + 生产 .node,受保护集每个位置 × 每种手法 × 每种写法(软链、大小写、firmlink、`/.vol`、改名上级目录)全部 EPERM、事后围栏外读盘不变;`$CODEPUPPY_ENV_FILE`、项目里的配置路径软链、userData 本身是软链;五个已知坏臂各自翻转;E2 引擎日常写入照常;R8 保证外对照 |
-| `engine-config-fence.engine.test.ts` | darwin | AC-04 / AC-06:真引擎关在生产围栏里,三项攻击被拒而模型 / 连接器调用、经 main 的安装 / 停用 / 启用、手改与装技能不重启生效、重启都照常;0.2.6 形状冷启动与全新机器;已知坏臂(0.2.6 的行、不预建)翻转;系统沙箱日志里引擎进程零条受保护位置拒绝(攻击子进程的拒绝作校准) |
+| `process-fence-config-fence.test.ts` | darwin | SPEC-engine-config-fence AC-01:生产计划器 + 生产 .node,受保护集每个位置 × 每种手法、每一级上级目录;另外的写法 —— 工作区软链(cf2、cf4)、大小写(cf3、cf4、cf5 新建、cf7 .dat)、firmlink(cf2、cf8)、`/.vol`(cf2、cf3、cf7 .dat) —— 全部 EPERM、事后围栏外读盘不变;`$CODEPUPPY_ENV_FILE`、项目里的配置路径软链、userData 本身是软链;五个已知坏臂各自翻转;E2 引擎日常写入照常;R8 保证外对照 |
+| `engine-config-fence.engine.test.ts` | darwin | AC-04 / AC-06:真引擎关在生产围栏里,三项攻击被拒而模型 / 连接器调用、经 main 的安装 / 停用 / 启用、手改与装技能不重启生效、重启都照常;0.2.6 形状冷启动与全新机器;已知坏臂(去掉受保护集 —— 攻击经 W12 落地,沙箱在系统临时目录下;不预建)翻转;系统沙箱日志里引擎进程零条受保护位置拒绝(攻击子进程的拒绝作校准) |
 | `process-fence-engine.test.ts` | darwin | **真引擎 + 真 ext** 在生产 .node 围栏下:shell 工具 / PTY / MCP 三条真消费方界外 0 落盘、界内落盘;AC2 shell 工具照常执行、`cfg.shell` 不指向 wrapper |
 | `packages/ext/src/codepuppy-ext-no-shell-layer.test.ts` | 全平台 | REQ-138 层已拆:生产 config 钩子不碰 `cfg.shell` |
 

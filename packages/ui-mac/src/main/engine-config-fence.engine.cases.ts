@@ -17,8 +17,9 @@
 //                restart works. The host reads the system sandbox log for this run (no protected-location denial from this pid).
 //   fresh        fresh-machine shape (no <XDG_DATA_HOME>/opencode, no ~/.opencode, no codepuppy.jsonc): the planner pre-creates, main
 //                seeds, the engine starts and answers; ~/.opencode still absent.
-//   control      known bad: the production plan with the protected set removed and W2 / W6 restored (the 0.2.6 rows) — the three
-//                attacks land.
+//   control      known bad: the production plan with the protected set removed (W2 / W6 put back as in 0.2.6) — the three attacks land.
+//                Note: here they land through W12, because the engine sandbox lives under the system temp root (/private/var/folders);
+//                the arm proves that without the blocks after the allow block nothing stops them, not that W2 / W6 are the row used.
 //   noprecreate  known bad: fresh-machine shape, the planner's mkdirp skips the protected directories — the engine cannot start (EPERM
 //                creating its global config directory).
 import { afterAll, beforeAll, describe, expect, test } from "bun:test"
@@ -483,7 +484,7 @@ describe.if(ARM === "fresh")("fresh machine: no engine data directory, no ~/.ope
   }, 240_000)
 })
 
-describe.if(ARM === "control")("known bad: the 0.2.6 rows (protected set removed, W2 / W6 restored)", () => {
+describe.if(ARM === "control")("known bad: the protected set removed (W2 / W6 put back; the attacks land through W12, the sandbox's temp root)", () => {
   test("the three attacks land: the connector runs the swapped command with the token, main reads the swapped command, the module is loaded with the key", async () => {
     const m = await machine("control")
     let running = await m.host.start()

@@ -21,7 +21,7 @@ import * as path from "node:path"
 import { CODEPUPPY_AGENT_TEXT } from "./codepuppy-agents"
 import { CODEPUPPY_BEHAVIOR_MD } from "./codepuppy-behavior"
 import { buildCodePuppyCapabilities, buildCodePuppyIdentity } from "./codepuppy-identity"
-import { buildCodePuppyModelConfig, engineModelConfig, type CodePuppyModelConfig } from "./codepuppy-models"
+import { buildCodePuppyModelConfig, engineModelConfig } from "./codepuppy-models"
 // `hasSecretFile` 是 ADR-009 的「平台代付」判据(见下方 `platformPays`,`#1195` 起换轴到 `CODEPUPPY_MCP_TOKEN` 文件 ——
 // 凭证在场性与代付判据从此是同一件事)。云 MCP 定义里的 `{file:…CODEPUPPY_MCP_TOKEN}` 引用由 main 写进启动文档(`#1698` R8)。
 import { hasSecretFile } from "./codepuppy-secret-files"
@@ -39,16 +39,9 @@ import { remoteMcpLeaf } from "./mcp-server-truth"
 import { projectServerConfig } from "../../../ext/src/engine-transforms"
 import { materializeCloudMcpConfig } from "./cloud-sidecar-config"
 import type { ChannelName } from "./catalog-channels"
-import { CODEPUPPY_V2_CATALOG_READY_PROVIDER_ID } from "../shared/codepuppy-config"
-import { PROJECT_HIDDEN_DIR } from "../shared/project-hidden-dir"
 import { USER_DATA_LAYOUT } from "./user-data-layout"
-// `#1667`(#1665 L3 交回的接缝裁决 A / C,编排器 2026-11-09):出厂技能目录、技能生成的 live 目录与出厂 /init、/review 命令
-// 由 main 写进这份内联配置文档(2.x 插件接口给不了等价挂点)。路径与命令内容仍以 ext 那三个纯函数为唯一来源,这里只引用。
-import { factorySkillPaths } from "../../../ext/src/factory-paths"
 import { publishProviderAllowList } from "../../../ext/src/provider-allow"
-import { skillGenerationLiveDirs } from "../../../ext/src/gen-skill-paths"
-import { disabledPackageComponents, explicitConfigPath, writeExplicitConfig, type ExplicitLayer } from "./engine-explicit-config"
-import { applyPromptTakeover } from "../../../ext/src/codepuppy-prompts"
+import { disabledPackageComponents, engineModelsPath, explicitConfigPath } from "./engine-explicit-config"
 import { HUB_READ_ACTIONS } from "../../../ext/src/hub-tools"
 
 // Inject alpha-code's customizations into opencode via OPENCODE_CONFIG_CONTENT. This env var is
@@ -86,39 +79,15 @@ export type CodePuppyConfigInjectionFailure = { message: string; stack?: string 
  * `start()` 选项的三样:`config.content`、`config.file`、`models.file`(engine-server-options.ts)。
  */
 export type CodePuppyConfigInjectionOutput = {
-  config: { content: string; file?: string }
-  models: { file?: string }
   /**
-   * `#1667`(编排器裁决 r1 第 2 条、C7 重裁):`config.file` 是 main 每次启动合成的显式文件(engine-explicit-config.ts)。
-   * sidecar 据此监听用户的 `codepuppy.jsonc`,它一变就重写合成文件。注入失败时没有这一项(显式槽直接给用户文件)。
+   * `config.file` 是 main 在 fork 前合成的显式文件(engine-explicit-config.ts 的 writeEngineConfigForFork);注入失败时显式槽直接给用户的
+   * codepuppy.jsonc。SPEC-engine-config-fence BR-03:本模块不写这两个文件、不写种子,只用同一对路径函数推出它们。
    */
-  explicit?: { file: string; root: string; userConfig?: string; layer: ExplicitLayer }
+  config: { content: string; file?: string }
+  /** main 写了模型底表才有(它在这一代没有底表时删掉旧文件,围栏内建不出它 ⇒ 「文件在」= 这一代有底表)。 */
+  models: { file?: string }
 }
 
-/**
- * `#1667`(编排器裁决 2026-11-12):项目技能目录。2.x 把显式文件里**相对**的 `skills` 条目按会话所在的项目目录解析
- * (`packages/core/src/config/plugin/skill.ts` 的 `sources()`)并监听它,所以这一条让每个项目看到、也只看到自己的
- * `.codepuppy/skills`(ecosystem-import 把项目导入的技能放在那里),导入后不用重启。v1 由 ext 合并项目 `codepuppy.jsonc` 的
- * `skills.paths`,不看 consent(ext `project-config.ts` 的信任门只管 mcp 与 agent 的控制字段);2.x 的插件接口没有加技能目录的挂点。
- * 与 v1 的三处差别(已裁决接受):① 目录在、项目 `codepuppy.jsonc` 里没写注册,也会加载;② 项目在 `skills.paths` 里写的其它条目
- * 不生效;③ ext 的项目身份检查不适用 —— 软链照跟,会话位置是 HOME 时读 `~/.codepuppy/skills`。
- */
-export const PROJECT_SKILLS_ENTRY = `./${PROJECT_HIDDEN_DIR}/skills`
-
-/**
- * `#1667`(编排器裁决 r3 第 1 条):显式文件 `skills` 的唯一算法 —— 出厂技能目录(main 启动时算好、`#1698` 起在启动文档的
- * `skills.factoryDirs`)+ 已启用技能当前那一代的真实目录(ext 的 skillGenerationLiveDirs:过账本 enabled 门、读 `current.json`)+ 项目技能目录
- * (PROJECT_SKILLS_ENTRY)。注入时算一次,sidecar 的监听在翻代 / 新装 / 停用时再算(engine-explicit-config.ts 的 watchExplicitSources)。
- */
-export function explicitSkillDirs(): string[] {
-  return [
-    ...new Set([
-      ...factorySkillPaths(codepuppyBootstrap().skills.factoryDirs),
-      ...skillGenerationLiveDirs(codepuppyGlobalRoot()),
-      PROJECT_SKILLS_ENTRY,
-    ]),
-  ]
-}
 export type CodePuppyConfigInjectionResult = CodePuppyConfigInjectionOutput &
   ({ ok: true } | { ok: false; error: CodePuppyConfigInjectionFailure })
 
@@ -222,19 +191,10 @@ export function injectCodePuppyConfig(
   // 本轮没走到写云服务那一处(无云 URL / 注入失败)⇒ 配置里没有中和条目。
   cloudMcpWithheld = false
   try {
-    // REQ-059 G1:引擎经 OPENCODE_CONFIG 加载当前环境的 codepuppy.jsonc(mcp/plugin/
-    // provider/治理键)。文件通道 → dispose 重建重读文件 = 安装免重启;merge 序 XDG 后(压 provider)/
-    // 项目前(可覆盖);junk 循环不扫单文件 → 当前环境根零引擎垃圾(T0 spike 判定)。全新机器 seed
-    // {$schema},否则 loadFile 指向不存在文件。逃生阀置位(userConfig 为 null)不注入(回 REQ-018 home walk 行为,
-    // ext-config 写入目标也随之回退,两侧一致 —— 两侧读的是 main 的同一次判定,`#1698`)。
-    const truth = userConfig
-    if (truth !== null) {
-      fs.mkdirSync(path.dirname(truth), { recursive: true })
-      if (!fs.existsSync(truth)) {
-        fs.writeFileSync(truth, JSON.stringify({ $schema: "https://opencode.ai/config.json" }, null, 2))
-      }
-      file = truth
-    }
+    // REQ-059 G1:引擎经显式槽加载当前环境的 codepuppy.jsonc(mcp/plugin/治理键)。全新机器上的种子 {$schema} 由 main 在 fork 前写
+    // (SPEC-engine-config-fence BR-03,engine-explicit-config.ts writeEngineConfigFiles)。逃生阀置位(userConfig 为 null)不注入
+    // (回 REQ-018 home walk 行为,ext-config 写入目标也随之回退,两侧一致 —— 两侧读的是 main 的同一次判定,`#1698`)。
+    if (userConfig !== null) file = userConfig
 
     const config: EngineConfig = { $schema: "https://opencode.ai/config.json", ...governanceFloor(extPluginPath, bootstrap.switches.ecosystemInherit) }
     // `#1698` G2:平台地址、默认模型覆盖、云 MCP 定义与 kill-switch 都来自启动文档(见函数开头)。
@@ -327,8 +287,6 @@ export function injectCodePuppyConfig(
       /* unreadable dir → skip (imported instructions simply stay dark this fork) */
     }
 
-    // `#1667`(C7 重裁):显式文件层要写的三样,出自这一次计算(engine-explicit-config.ts 抬头讲层序)。
-    const layer: ExplicitLayer = { policies: [], commands: {}, skills: [] }
     const models = buildCodePuppyModelConfig(userDataPath, {
       baseURL: bootstrap.platform.modelProxyBaseURL,
       defaultModel: bootstrap.platform.defaultModelOverride,
@@ -336,33 +294,18 @@ export function injectCodePuppyConfig(
     })
     if (models) {
       // `#1667`:同一份投影,写成 2.x 的 `providers` / `policies`(`provider.use`)/ `model`(codepuppy-models.ts engineModelConfig)。
-      // `policies` 写两处:显式文件那份比项目配置先加载、项目里的 allow 盖不过(第一层);内联这份是第二层。
+      // `policies` 写两处:显式文件那份(main 在 fork 前按同一份启动文档算)比项目配置先加载、项目里的 allow 盖不过(第一层);内联这份是第二层。
       const engine = engineModelConfig(models)
       config.providers = engine.providers
       config.policies = engine.policies
-      layer.policies = engine.policies
       if (engine.model) config.model = engine.model
       // `#1662`:同一份放行集合交给 ext 在供应商表上再执行一次 —— 全局配置目录在显式文件之前载入,它的放行句压得过上面的策略
       // (packages/ext/src/provider-allow.ts)。`#1698` R30:经进程内交接发布(冻结、不进环境),sidecar 里注入与引擎、ext 同进程。
       publishProviderAllowList(engine.policies.filter((policy) => policy.effect === "allow").map((policy) => policy.resource))
     } else publishProviderAllowList(undefined)
 
-    //   4b. `#1667`(接缝裁决 A;编排器裁决 r1 第 2 条、r3 第 1 条):出厂技能目录与已安装技能当前那一代的**真实目录**写成显式文件的
-    //       `skills`(explicitSkillDirs)。翻代 / 新装 / 停用时 sidecar 的监听重算并重写显式文件(engine-explicit-config.ts),
-    //       2.x 的技能插件在配置更新时重新取源 —— 不重启就生效(沙箱真引擎实测)。不用软链(owner 2026-07-07「不用 symlink」)。
-    layer.skills = explicitSkillDirs()
-
-    //   4c. `#1667`(接缝裁决 C):出厂 /init、/review 的模板来自 ext 的 applyPromptTakeover(同一份文字),写成 `commands` 条目,
-    //       由 core 自己的 `opencode.config.command` 实现模板文法与子任务(`review` 在子任务里跑:v1 的 `subtask: true`,2.x 原生键
-    //       `subagent`)。逃生门与 ext 的提示词转写同一个:CODEPUPPY_PROMPT_REBRAND_DISABLE=1。
-    //       写进显式文件(编排器裁决 r1 第 2 条):项目里的同名命令胜过它,它胜过上游内置的。
-    if (!switches.promptRebrandDisabled) {
-      const takeover: { command?: Record<string, { template: string; description?: string; subtask?: boolean }> } = {}
-      applyPromptTakeover(takeover)
-      layer.commands = Object.fromEntries(
-        Object.entries(takeover.command ?? {}).map(([name, { subtask, ...command }]) => [name, { ...command, ...(subtask ? { subagent: true } : {}) }]),
-      )
-    }
+    //   4b / 4c. 显式文件的 `skills`(出厂技能目录 + 已启用技能当前那一代 + 项目技能目录)与出厂 /init、/review 由 main 在 fork 前写、
+    //       main 的监听在翻代 / 新装 / 停用时重写(engine-explicit-config.ts writeEngineConfigForFork / watchExplicitSources)。
 
     //   5. 自动化 readonly agent(REQ-021 A1.5 / ADR-022)。无人值守执行的硬前提 = 零 ask:
     //      permission 静态配死(V1 schema:pattern→action 对象,agent 级合并),不依赖运行时弹窗。
@@ -666,16 +609,12 @@ export function injectCodePuppyConfig(
       injectedMcpNames,
     })
 
-    const modelsFile = models ? materializeGovernedModelsBase(userDataPath, models) : undefined
-    // 显式槽:用户的 codepuppy.jsonc(有的话)+ 上面那一层,合成一份写进 Code Puppy 自己的 userData(engine-explicit-config.ts)。
-    const explicitFile = explicitConfigPath(userDataPath)
-    const written = writeExplicitConfig(explicitFile, file, layer, codepuppyGlobalRoot())
-    if (written.userError) console.warn(`[alpha-code#1667] ${file} is not valid (${written.userError}); the engine sees only Code Puppy's explicit layer`)
+    // 显式槽与模型底表:main 在 fork 前写好的那两个文件(engine-explicit-config.ts);这里只推出路径,底表以文件在缺为准。
+    const modelsFile = engineModelsPath(userDataPath)
     return {
       ok: true,
-      config: { content: JSON.stringify(config), file: explicitFile },
-      models: modelsFile ? { file: modelsFile } : {},
-      explicit: { file: explicitFile, root: codepuppyGlobalRoot(), ...(file ? { userConfig: file } : {}), layer },
+      config: { content: JSON.stringify(config), file: explicitConfigPath(userDataPath) },
+      models: fs.existsSync(modelsFile) ? { file: modelsFile } : {},
     }
   } catch (error) {
     // #613:catch 保留(sidecar 照常起,候选形态③),但失败必须离开本进程:
@@ -698,97 +637,4 @@ export function injectCodePuppyConfig(
       models: {},
     }
   }
-}
-
-// #857:Code Puppy 的模型治理生效时,注入的 provider 表已经描述了每一个可用的内置 provider / 模型。让 ModelsDev 落回随包快照,
-// 第一次请求还要先解码并物化 6,132 条无关条目(签名打包矩阵里 2.8-6.1 s)。所以从**同一份**投影机械地物化一份最小的
-// models.dev 底表,经 `start()` 的 `models.file` 交给引擎(`#1667`;v1 时代经 `OPENCODE_MODELS_PATH`)。投影里缺了某个已启用的
-// 用户 / 文件 provider 时 governedModelsBase 返回 {}、不带就绪标记 —— 这时不给文件,保留保守的晚到屏障,而不是先露出半套。
-// 空底表也必须不给:ModelsDev 把磁盘上的 `{}` 当作有值,会绕过随包快照。这里不读也不写任何 key 字段。
-// CODEPUPPY_MODELS_DISABLE 仍是真逃生门:那时根本不进这里。
-// (2026-07-23 为 v2 读侧另写 `OPENCODE_CONFIG_DIR/opencode.json(c)` 的半代次桥已随 `#1667` 删除,清点表 C4:只剩一个代次,
-// 配置只写一份,就是上面的注入。)
-type V1ProjectedModel = { name?: unknown }
-type V1ProjectedProvider = {
-  name?: unknown
-  npm?: unknown
-  api?: unknown
-  options?: { baseURL?: unknown }
-  models?: unknown
-}
-
-function governedModelsBase(config: { enabled_providers?: unknown; provider?: unknown }): Record<string, unknown> {
-  const enabled = Array.isArray(config.enabled_providers)
-    ? config.enabled_providers.filter((id): id is string => typeof id === "string")
-    : []
-  const providers = (config.provider ?? {}) as Record<string, V1ProjectedProvider>
-
-  // An enabled id without a complete provider/model projection is a user/file-owned provider.
-  // Do not publish the early marker for a partial set: the renderer will keep waiting for the
-  // ordinary ConfigProvider commit, which has already merged those file sources.
-  if (
-    enabled.some((id) => {
-      const item = providers[id]
-      return !item || !item.models || typeof item.models !== "object" || Array.isArray(item.models)
-    })
-  )
-    return {}
-
-  const base: Record<string, unknown> = {}
-  for (const id of enabled) {
-    const item = providers[id]!
-    const npm = typeof item.npm === "string" ? item.npm : undefined
-    const api =
-      typeof item.options?.baseURL === "string"
-        ? item.options.baseURL
-        : typeof item.api === "string"
-          ? item.api
-          : undefined
-    const modelProvider = npm || api ? { ...(npm ? { npm } : {}), ...(api ? { api } : {}) } : undefined
-    const models = Object.fromEntries(
-      Object.entries(item.models as Record<string, V1ProjectedModel>).map(([modelID, model]) => [
-        modelID,
-        {
-          id: modelID,
-          name: typeof model.name === "string" ? model.name : modelID,
-          release_date: "1970-01-01",
-          attachment: false,
-          reasoning: false,
-          temperature: false,
-          tool_call: false,
-          limit: { context: 0, output: 0 },
-          modalities: { input: [], output: [] },
-          ...(modelProvider ? { provider: modelProvider } : {}),
-        },
-      ]),
-    )
-    base[id] = {
-      id,
-      name: typeof item.name === "string" ? item.name : id,
-      env: [],
-      ...(api ? { api } : {}),
-      ...(npm ? { npm } : {}),
-      models,
-    }
-  }
-  base[CODEPUPPY_V2_CATALOG_READY_PROVIDER_ID] = {
-    id: CODEPUPPY_V2_CATALOG_READY_PROVIDER_ID,
-    name: "Code Puppy catalog readiness marker",
-    env: [],
-    models: {},
-  }
-  return base
-}
-
-function materializeGovernedModelsBase(userDataPath: string, config: CodePuppyModelConfig): string | undefined {
-  const dir = path.join(userDataPath, USER_DATA_LAYOUT.engineConfig)
-  const modelsPath = path.join(dir, "models.json")
-  const base = governedModelsBase(config)
-  if (!Object.keys(base).length) {
-    fs.rmSync(modelsPath, { force: true })
-    return undefined
-  }
-  fs.mkdirSync(dir, { recursive: true, mode: 0o700 })
-  fs.writeFileSync(modelsPath, `${JSON.stringify(base, null, 2)}\n`, { mode: 0o600 })
-  return modelsPath
 }

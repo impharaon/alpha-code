@@ -12,6 +12,7 @@ import { engineGlobalConfigDirectory } from "../src/main/engine-paths"
 import { buildEngineServerOptions } from "../src/main/engine-server-options"
 import { engineAuthorization, withEngineAuthorization } from "../src/main/engine-authorization"
 import { injectCodePuppyConfig } from "../src/main/codepuppy-config-injection"
+import { writeEngineConfigForFork } from "../src/main/engine-explicit-config"
 import { secretFilePath, secretFileRef } from "../src/main/codepuppy-secret-files"
 import { buildHubRequestReply, buildHubViewReply, buildSourcesSearchReply } from "../src/main/codepuppy-sidecar-messages"
 import type { EngineFetch } from "../src/main/in-process-engine"
@@ -259,6 +260,9 @@ export function codepuppyEngine(options: HostOptions) {
   )
 
   const withExt = options.ext !== false
+  // 与生产同序(SPEC-engine-config-fence BR-03):main 在 fork 前按同一份启动文档写显式文件、模型底表与种子,sidecar 再注入。
+  // `explicit` 是 main 的监听用的输入(server.ts 每代起的那一份)。
+  const explicit = writeEngineConfigForFork(codepuppyBootstrap()).watch
   const injection = injectCodePuppyConfig(userData, withExt ? ext : undefined, "stable", codepuppyBootstrap().paths.userConfig ?? null)
   const content = JSON.parse(injection.config.content) as { plugins: string[]; providers: Record<string, { models?: Record<string, unknown> }> }
   content.plugins = [...content.plugins, probeDir]
@@ -312,7 +316,7 @@ export function codepuppyEngine(options: HostOptions) {
       close: () => engine.close(),
     }
   }
-  return { start, slot, projectDirectory: slot.projectDirectory, userData, injection, content }
+  return { start, slot, projectDirectory: slot.projectDirectory, userData, injection, explicit, content }
 }
 
 /** ext 的策略存储(数据根 / 账户 / 工作区与 registerPolicy 同一套);ext 模块在沙箱就位之后才装载。 */

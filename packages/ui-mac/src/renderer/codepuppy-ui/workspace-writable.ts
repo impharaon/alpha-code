@@ -50,6 +50,8 @@ export function resetWorkspaceWritableForTests(probe?: WorkspaceWritableProbe) {
 
 export function workspaceReadonlyMessage(reason: WorkspaceWriteProbeResult["reason"]): string | undefined {
   if (reason === "home-or-app-state") return t("codepuppy.workspace.readonlyHome")
+  // SPEC-engine-config-fence BR-05:受保护配置位置本身或其内(状态根之内仍是上一句)
+  if (reason === "protected-config") return t("codepuppy.workspace.readonlyProtectedConfig")
   if (reason === "not-opened-by-you") return t("codepuppy.workspace.readonlyNotOpenedByYou")
   if (reason === "grant-failed") return t("codepuppy.workspace.readonlyGrantFailed")
 }

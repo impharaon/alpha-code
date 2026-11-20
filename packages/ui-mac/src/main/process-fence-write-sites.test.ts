@@ -9,7 +9,8 @@
 
 import { describe, expect, test } from "bun:test"
 import { readFileSync } from "node:fs"
-import { resolve } from "node:path"
+import { join, resolve } from "node:path"
+import ts from "typescript"
 import {
   FS_WRITE_APIS,
   diffLedger,
@@ -23,6 +24,95 @@ import {
 
 const repoRoot = resolve(import.meta.dir, "../../../..")
 const ledgerPath = resolve(repoRoot, "scripts", "process-fence-write-sites.tsv")
+
+/** 登记为 `main-only` 的写盘点,逐条钉住(文件 · fs API · 归一化的第一个实参)。 */
+const MAIN_ONLY_SITES = [
+  ["codepuppy-environment.ts", "mkdirSync", "directory"],
+  ["codepuppy-environment.ts", "rmdirSync", "directory"],
+  ["codepuppy-installs.ts", "mkdirSync", "root"],
+  ["codepuppy-installs.ts", "renameSync", "file"],
+  ["engine-explicit-config.ts", "chmodSync", "engineConfigDirectory"],
+  ["engine-explicit-config.ts", "mkdirSync", "dir"],
+  ["engine-explicit-config.ts", "mkdirSync", "path.dirname(file)"],
+  ["engine-explicit-config.ts", "mkdirSync", "path.dirname(input.userConfig)"],
+  ["engine-explicit-config.ts", "mkdirSync", "engineConfigDirectory"],
+  ["engine-explicit-config.ts", "renameSync", "temporary"],
+  ["engine-explicit-config.ts", "rmSync", "engineModelsPath(input.userDataPath)"],
+  ["engine-explicit-config.ts", "rmSync", "modelsPath"],
+  ["engine-explicit-config.ts", "writeFileSync", "input.userConfig"],
+  ["engine-explicit-config.ts", "writeFileSync", "modelsPath"],
+  ["engine-explicit-config.ts", "writeFileSync", "temporary"],
+  ["ext-receipt-v2.ts", "mkdirSync", "root"],
+  ["ext-receipt-v2.ts", "renameSync", "file"],
+  ["ext-receipt-v2.ts", "unlinkSync", "file"],
+  ["ext-receipt-v2.ts", "writeFileSync", "evidence"],
+].map(([file, api, firstArg]) => signatureOf({ file: `packages/ui-mac/src/main/${file}`, api: api!, firstArg: firstArg! }))
+
+/** 一个源文件从某个模块拿到的值绑定(静态 import 与 `await import()` 的解构;整块拿 = "*";type-only 不算)。 */
+function valueImports(rel: string, module: RegExp): { names: string[]; source: ts.SourceFile } {
+  const source = ts.createSourceFile(rel, readFileSync(join(repoRoot, rel), "utf8"), ts.ScriptTarget.Latest, true)
+  const names: string[] = []
+  const visit = (node: ts.Node) => {
+    if (ts.isImportDeclaration(node) && ts.isStringLiteral(node.moduleSpecifier) && module.test(node.moduleSpecifier.text) && !node.importClause?.isTypeOnly) {
+      const bindings = node.importClause?.namedBindings
+      if (node.importClause?.name) names.push("default")
+      if (bindings && ts.isNamespaceImport(bindings)) names.push("*")
+      if (bindings && ts.isNamedImports(bindings)) for (const element of bindings.elements) if (!element.isTypeOnly) names.push((element.propertyName ?? element.name).text)
+    }
+    if (ts.isCallExpression(node) && node.expression.kind === ts.SyntaxKind.ImportKeyword && node.arguments[0] && ts.isStringLiteral(node.arguments[0]) && module.test(node.arguments[0].text)) {
+      const holder = ts.isAwaitExpression(node.parent) ? node.parent.parent : node.parent
+      if (ts.isVariableDeclaration(holder) && ts.isObjectBindingPattern(holder.name))
+        for (const element of holder.name.elements) names.push(((element.propertyName ?? element.name) as ts.Identifier).text)
+      else names.push("*")
+    }
+    ts.forEachChild(node, visit)
+  }
+  visit(source)
+  return { names, source }
+}
+
+// SPEC-engine-config-fence BR-03 / I2(片 ② 单元 A 审查第 3 条):登记簿只记「写盘点在哪」;「这些写盘点在 sidecar 里有没有调用方」由结构判据守 ——
+// 用扫描器算出的同一个 sidecar 闭包。
+describe("I2:main-only 写者在 sidecar 闭包里没有调用方", () => {
+  const closure = sidecarSourceFiles(repoRoot)
+  test("闭包里除 engine-explicit-config.ts 自己,没有文件拿到 writeExplicitConfig / watchExplicitSources / writeEngineConfigFiles / writeEngineConfigForFork / materializeGovernedModelsBase(也不整块 import 那个模块)", () => {
+    const writers = new Set(["writeExplicitConfig", "watchExplicitSources", "writeEngineConfigFiles", "writeEngineConfigForFork", "materializeGovernedModelsBase", "*", "default"])
+    const importers: string[] = []
+    const offenders: string[] = []
+    for (const rel of closure) {
+      if (rel.endsWith("/engine-explicit-config.ts")) continue
+      const { names } = valueImports(rel, /(^|\/)engine-explicit-config(\.ts)?$/)
+      if (names.length) importers.push(rel)
+      for (const name of names) if (writers.has(name)) offenders.push(`${rel}: ${name}`)
+    }
+    expect(offenders).toEqual([])
+    // 手段是活的:注入模块确实从那里拿路径函数(拿到的只有读的)
+    expect(importers).toContain("packages/ui-mac/src/main/codepuppy-config-injection.ts")
+  })
+
+  test("闭包里对安装账本的读只有两处,都带 sideEffectFree: true(不写证据文件);闭包里没有文件拿到账本模块别的值", () => {
+    const reads = new Set(["readPackageLedgerStateV1", "readLedgerV2"])
+    const calls: string[] = []
+    const offenders: string[] = []
+    for (const rel of closure) {
+      if (rel.endsWith("/ext-receipt-v2.ts")) continue
+      const { names, source } = valueImports(rel, /(^|\/)ext-receipt-v2(\.ts)?$/)
+      for (const name of names) if (!reads.has(name)) offenders.push(`${rel}: imports ${name}`)
+      const visit = (node: ts.Node) => {
+        if (ts.isCallExpression(node) && ts.isIdentifier(node.expression) && reads.has(node.expression.text) && names.includes(node.expression.text)) {
+          const safe = node.arguments.some((argument) => ts.isObjectLiteralExpression(argument) && argument.properties.some((property) =>
+            ts.isPropertyAssignment(property) && ts.isIdentifier(property.name) && property.name.text === "sideEffectFree" && property.initializer.kind === ts.SyntaxKind.TrueKeyword))
+          calls.push(`${rel}: ${node.expression.text}`)
+          if (!safe) offenders.push(`${rel}: ${node.expression.text} without sideEffectFree: true`)
+        }
+        ts.forEachChild(node, visit)
+      }
+      visit(source)
+    }
+    expect(offenders).toEqual([])
+    expect(calls.sort()).toEqual(["packages/ui-mac/src/main/engine-explicit-config.ts: readPackageLedgerStateV1", "packages/ui-mac/src/main/ext-disabled-injection.ts: readLedgerV2"])
+  })
+})
 
 describe("AC3 登记簿 == 扫描(生产源码)", () => {
   const sites = scanRepository(repoRoot)
@@ -49,8 +139,10 @@ describe("AC3 登记簿 == 扫描(生产源码)", () => {
   test("每一行的根都合法,且没有 TODO", () => {
     expect(diff.invalidRoot.map((r) => `${signatureOf(r)}\t${r.root}`)).toEqual([])
     expect(ledger.filter((r) => r.root === "TODO").map(signatureOf)).toEqual([])
-    // `main-only` 只许给 codepuppy-environment.ts(见 isValidRoot 的说明);别处用它就是给真写入点开豁免。
-    expect(ledger.filter((r) => r.root === "main-only" && !r.file.endsWith("codepuppy-environment.ts")).map(signatureOf)).toEqual([])
+    // `main-only` 按完整签名钉住(见 isValidRoot 的说明):同一个模块里新出现的写盘点不能顺手登记成 main-only,要先在这里写明它为什么
+    // 只在 main 执行。DESIGN-engine-config-fence §4.7:引擎配置文件与安装账本的写者只在 main(SPEC-engine-config-fence BR-03);
+    // 「sidecar 里没有它们的调用方」由下面的结构判据守。
+    expect(ledger.filter((r) => r.root === "main-only").map(signatureOf).sort()).toEqual([...MAIN_ONLY_SITES].sort())
   })
 
   test("集合自证:闭包含 sidecar 真 import 的模块与 ext 全部源码;不含 main 进程入口与测试文件", () => {
@@ -101,9 +193,9 @@ describe("控制臂:扫描器测得出已知的坏", () => {
     expect(scanWriteSites("synthetic/e.ts", src)).toEqual([])
   })
 
-  test("根列合法性:W-id / W-id+W-id / arg / main-only 合法;W9(不存在)/ W10、W19(已删)/ TODO / 空 非法", () => {
-    for (const ok of ["W1", "W2+W6+W1", "arg", "main-only", "W18", "X1", "W1+X1"]) expect(isValidRoot(ok), ok).toBe(true)
-    for (const bad of ["W9", "W10", "W19", "TODO", "", "W1+W9", "home"]) expect(isValidRoot(bad), bad).toBe(false)
+  test("根列合法性:W-id / W-id+W-id / arg / main-only 合法;W9(不存在)/ W2、W6、W10、W19(已删)/ TODO / 空 非法", () => {
+    for (const ok of ["W1", "W3+W4+W1", "arg", "main-only", "W18", "X1", "W1+X1"]) expect(isValidRoot(ok), ok).toBe(true)
+    for (const bad of ["W9", "W2", "W6", "W2+W1", "W10", "W19", "TODO", "", "W1+W9", "home"]) expect(isValidRoot(bad), bad).toBe(false)
   })
 
   test("写 API 集合含两套(sync / promises)的核心成员", () => {

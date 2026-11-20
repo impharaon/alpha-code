@@ -28,7 +28,6 @@ import fs from "node:fs"
 import path from "node:path"
 import { assertEngineSandboxed, engineSandbox } from "../../test-component/engine-sandbox"
 import { allowProject, codepuppyEngine, fakeMainReceived, policyStore, probe, scriptedModel, textOf, type Running } from "../../test-component/codepuppy-engine"
-import { explicitSkillDirs } from "./codepuppy-config-injection"
 import { watchExplicitSources } from "./engine-explicit-config"
 
 const sandbox = engineSandbox()
@@ -626,7 +625,7 @@ describe("R2:用户在四处写的 external_directory 放行照 v1 胜出(全部
     const g1 = generation("gen-000001-aaaaaa")
     fs.writeFileSync(path.join(root, "skills-enabled.json"), JSON.stringify({ v: 3, keys: ["skill--cp-r2"], scoped: [], mcp: [] }))
     const host = codepuppyEngine({ sandbox, name, modelBaseURL: model.baseURL, filewatcher: true })
-    const stop = watchExplicitSources({ ...host.injection.explicit!, skills: explicitSkillDirs, log: () => {} })
+    const stop = watchExplicitSources({ ...host.explicit, log: () => {} })
     const engine = await host.start()
     try {
       expect(await outcomeOn(engine, host.projectDirectory, BUILD, `${g1}/*`)).toBe("allow")

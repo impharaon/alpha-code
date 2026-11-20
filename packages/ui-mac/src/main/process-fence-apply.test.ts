@@ -5,8 +5,8 @@
 // 四块:
 //   A. x64 判据(票面硬要求四):生产构建出来的 .node 必须同时有 arm64 与 x86_64 两片,且两片都导出
 //      N-API 入口;先拿一个**只编 arm64** 的 thin 文件证明判据会红。
-//   B. AC1 的四类派生原语(shell / cross-spawn 深度 2 / detached / PTY 缺省与带 command)在**生产渲染的
-//      profile** 下越界写入 0 落盘、界内落盘;同一探针不套围栏全部落盘(正样本臂)。跑在 Electron 的
+//   B. AC1 的四类派生原语(shell / cross-spawn 深度 2 / detached / PTY 缺省与带 command)在**生产渲染器渲染的
+//      profile**(受保护集 CF 按空渲染:本文件只判别的行)下越界写入 0 落盘、界内落盘;同一探针不套围栏全部落盘(正样本臂)。跑在 Electron 的
 //      node 里 —— 与 utilityProcess 同一份运行时(node 24 / modules 146)。
 //   C. AC4 fail-closed 且响亮:经**生产的** applyProcessFence —— 编译失败的 profile / 缺 deny 的 profile /
 //      模块不在 / 装上但集合外仍写得进(围栏是空的)/ 装上但 cwd 写不进 —— 五种失败各自抛、原因可读。
@@ -57,7 +57,7 @@ describeDarwin("REQ-159 process fence —— 真 .node / 真 seatbelt / Electron
     globalRoot = join(scratch, "codepuppy-state", "env", "dev")
     mkdirSync(userData, { recursive: true })
     mkdirSync(globalRoot, { recursive: true })
-    // 生产渲染的 profile:W1 = 本测试的 ws;其余根 = 真 HOME 的 XDG 形状(生产形状)+ 临时 userData / globalRoot。
+    // 生产渲染器渲染的 profile(受保护集按空):W1 = 本测试的 ws;其余根 = 真 HOME 的 XDG 形状(生产形状)+ 临时 userData / globalRoot。
     const profile = renderProcessFenceProfile({
       workspaces: [ws],
       codepuppyGlobalRoot: globalRoot,
@@ -66,6 +66,8 @@ describeDarwin("REQ-159 process fence —— 真 .node / 真 seatbelt / Electron
       roots: resolveEngineRoots({}, homedir()),
       // `#1337`:生产 profile 含网络行;本文件只判文件轴,给一个没人听的端口即可(网络轴判据在 network-egress-fence.test.ts)。
       egressProxyPort: 4443,
+      // 受保护集的判据在 process-fence-config-fence / process-fence-profile;本文件判派生原语与 apply 的自证
+      configFence: [],
     })
     profileFile = join(scratch, "fence.sb")
     writeFileSync(profileFile, profile)
@@ -178,7 +180,7 @@ describeDarwin("REQ-159 process fence —— 真 .node / 真 seatbelt / Electron
     if (!line) throw new Error(`apply-driver printed nothing (status ${res.status}); stderr: ${res.stderr}`)
     return { status: res.status, out: JSON.parse(line) as { ok: boolean; name?: string; message?: string; result?: { buildId: string; libsandbox: string; profileBytes: number } } }
   }
-  const goodProfile = () => renderProcessFenceProfile({ workspaces: [ws], codepuppyGlobalRoot: globalRoot, userDataPath: userData, stateHome: userData, roots: resolveEngineRoots({}, homedir()), egressProxyPort: 4443 })
+  const goodProfile = () => renderProcessFenceProfile({ workspaces: [ws], codepuppyGlobalRoot: globalRoot, userDataPath: userData, stateHome: userData, roots: resolveEngineRoots({}, homedir()), egressProxyPort: 4443, configFence: [] })
 
   test("D 正向:生产 profile ⇒ ok,回报 buildId / libsandbox / 字节数,进程退出 0", () => {
     const r = runApply(goodProfile())

@@ -9,7 +9,7 @@ import { buildFenceAddon } from "../../scripts/build-fence-addon"
 import { mockElectron } from "../../test-component/electron-mock"
 import { scriptedModel, textOf } from "../../test-component/codepuppy-engine"
 import { renderProcessFenceProfile, resolveEngineRoots } from "./process-fence-profile"
-import { planProcessFence } from "./process-fence-plan"
+import { planConfigFence, planProcessFence } from "./process-fence-plan"
 import { createWorkspaceWritableTracker } from "../renderer/codepuppy-ui/workspace-writable-core"
 import { workspaceReadonlyMessage } from "../renderer/codepuppy-ui/workspace-writable"
 import { setLocale } from "../renderer/i18n"
@@ -83,7 +83,7 @@ const askSurvivor = (control: string, request: string, ack: string) => {
 }
 // Directories whose fenced probe answers "denied" at main's seam (the probe saw a symlink to a protected target).
 const forcedDenied = new Set<string>()
-const { spawnLocalServer } = await import("./server")
+const { currentConfigFenceRoots, spawnLocalServer } = await import("./server")
 const { registerIpcHandlers } = await import("./ipc")
 const { bootFenceWorkspaceTruth, writeWorkspaceTruth, readWorkspaceTruthOrThrow } = await import("./process-fence-workspaces")
 const { GLOBAL_RENDERER_STORE, TABS_INFO_KEY } = await import("./tabs-preclean")
@@ -159,13 +159,20 @@ async function boot() {
     // Both planners take main's carried run set from the spawn input, as the production planner does.
     planFence: (input) => {
       const carried = input.carriedWorkspaces
-      if (useProductionPlanner) return preparedPlan = planProcessFence({ userDataPath: install, sidecarEnv: { XDG_STATE_HOME: join(install, "state") }, egressProxyPort: modelProxy.port!, addon: { packaged: true, resourcesPath: run, moduleDir: run, exists: existsSync }, carriedWorkspaces: carried }, {
+      if (useProductionPlanner) return preparedPlan = planProcessFence({ userDataPath: install, sidecarEnv: { XDG_STATE_HOME: join(install, "state") }, egressProxyPort: modelProxy.port!, addon: { packaged: true, resourcesPath: run, moduleDir: run, exists: existsSync }, carriedWorkspaces: carried, engineConfigDirectory: join(protectedHome, ".config", "opencode") }, {
         homeDir: () => protectedHome, appStateRoot: () => join(run, "state"), codepuppyGlobalRoot: () => join(install, "state/env/dev"), defaultWorkspace: () => A,
         readWorkspaces: () => readWorkspaceTruthOrThrow(truthPath, { readFileSync }), realpath: realpathSync.native, isDirectory: (path) => { try { return readdirSync(path) !== undefined } catch { return false } },
         mkdirp: (path) => { mkdirSync(path, { recursive: true }) }, compile: () => ({ ok: true }), log: (line) => { log.push(line) },
       })
       const workspaces = [...new Set([A, ...readWorkspaceTruthOrThrow(truthPath, { readFileSync }), ...carried])]
-      return { addonPath: addon, workspaces, profile: renderProcessFenceProfile({ workspaces, codepuppyGlobalRoot: join(install, "state/env/dev"), userDataPath: install, stateHome: join(install, "state"), roots: resolveEngineRoots({}, join(install, "home")), egressProxyPort: modelProxy.port! }) }
+      // SPEC-engine-config-fence:手渲染这一臂同样带生产的受保护配置集(生产计划器那一步落真实路径、预建目录)
+      const roots = resolveEngineRoots({}, join(install, "home"))
+      const fenceSet = planConfigFence(
+        // the engine's global config directory exported outside every write root (OPENCODE_CONFIG_DIR): the E9 arms open the folder that contains it
+        { userDataPath: install, appStateRoot: join(run, "state"), codepuppyGlobalRoot: join(install, "state/env/dev"), engineConfigDirectory: join(run, "user-config", "opencode"), roots },
+        { realpath: (path) => realpathSync.native(path), mkdirp: (path) => { mkdirSync(path, { recursive: true }) } },
+      )
+      return { addonPath: addon, workspaces, configFenceRoots: fenceSet.configFenceRoots, profile: renderProcessFenceProfile({ workspaces, codepuppyGlobalRoot: join(install, "state/env/dev"), userDataPath: install, stateHome: join(install, "state"), roots, egressProxyPort: modelProxy.port!, configFence: fenceSet.configFence }) }
     },
     fork: ((_file: string, _args: string[], options: { env: Record<string, string> }) => {
       const peer = new EventEmitter() as EventEmitter & { pid: number; stdout: unknown; stderr: unknown; postMessage: (message: { type: string; id?: number; directory?: string }) => void; kill: () => void }
@@ -205,7 +212,7 @@ beforeAll(async () => {
   writeWorkspaceTruth(truthPath, [A], { mkdirSync, writeFileSync, renameSync, rmSync })
   tracker = bootFenceWorkspaceTruth({
     truthPath, store: { tabs: [{ type: "draft", draftID: "a", server: "sidecar", directory: A }], recent: undefined, info: undefined }, fs: { readFileSync, writeFileSync, mkdirSync, renameSync, rmSync }, log: (line) => { log.push(line) },
-    eligibility: { homeDir: protectedHome, appStateRoot: join(run, "state"), realpath: realpathSync.native, isDirectory: (directory) => { try { return readdirSync(directory) !== undefined } catch { return false } } },
+    eligibility: { homeDir: protectedHome, appStateRoot: join(run, "state"), configFenceRoots: currentConfigFenceRoots, realpath: realpathSync.native, isDirectory: (directory) => { try { return readdirSync(directory) !== undefined } catch { return false } } },
     onWritableChanged: (change) => { record("changed", change); writable.invalidate(change); writable.observe(observation(change.directory)) },
   })
 
@@ -297,6 +304,40 @@ test("outside every writable root exactly one issue makes it writable; a directo
   expect(issuedOutside).toBe(1)
   expect(issuedTotal).toBe(1)
   expect(existsSync(join(outside, "outside.txt")) && existsSync(join(inner, "inner.txt"))).toBe(true)
+})
+
+// SPEC-engine-config-fence AC-02 / BR-05(DESIGN E9):this generation's profile carries the protected set (planConfigFence, above) and the
+// grant path still issues for a newly opened project (the test above). A folder that IS a protected location or lies inside one is ineligible
+// with its own sentence and zero native issue; a folder that CONTAINS one is granted, its other files land, the protected location stays
+// refused (the protected blocks come after X1). Known bad: without the protected-location relation the inside folder gets an issue (M2);
+// with the 0.2.6 parser the generation's grants are off and the test above fails (M1).
+test("E9: a folder inside a protected configuration location is ineligible (protected-config, its sentence, zero issue); a folder containing one is granted, other files land, the protected location stays refused", async () => {
+  const container = join(run, "user-config"), protectedDir = join(container, "opencode"), inside = join(protectedDir, "plugin")
+  mkdirSync(inside, { recursive: true })
+  writeFileSync(join(protectedDir, "opencode.json"), "{}\n")
+  const pid = connection!.pid
+  const before = nativeIssues
+  for (const directory of [protectedDir, inside]) {
+    expect(invoke("workspace-open-record", { server: "sidecar", directory }), directory).toEqual({ recorded: false, reason: "protected-config" })
+    const refused = await tracker.probeWrite({ server: "sidecar", directory }, listener)
+    expect(refused, directory).toMatchObject({ grant: "ineligible", reason: "protected-config" })
+    setLocale("zh")
+    expect(workspaceReadonlyMessage(refused.reason)).toBe("这个文件夹是 Code Puppy 或引擎存放配置的位置，对话里不能写入。")
+  }
+  expect(nativeIssues - before).toBe(0)
+  expect(invoke("workspace-open-record", { server: "sidecar", directory: container })).toEqual({ recorded: true })
+  expect(await tracker.probeWrite({ server: "sidecar", directory: container }, listener)).toMatchObject({ outcome: "writable", grant: "granted" })
+  expect(nativeIssues - before).toBe(1)
+  mkdirSync(join(container, "other-app"), { recursive: true })
+  await write(container, "other-app/x.txt")
+  const intoProtected = await write(container, "opencode/opencode.json")
+  await write(container, "opencode/new.txt")
+  record("e9-protected", { pid, issued: nativeIssues - before, otherApp: readdirSync(join(container, "other-app")), protectedFiles: readdirSync(protectedDir).sort() })
+  expect(existsSync(join(container, "other-app", "x.txt"))).toBe(true)
+  expect(readFileSync(join(protectedDir, "opencode.json"), "utf8")).toBe("{}\n")
+  expect(readdirSync(protectedDir).sort()).toEqual(["opencode.json", "plugin"])
+  expect(intoProtected).toMatch(/Unable to write|Operation not permitted|EPERM/i)
+  expect(connection!.pid).toBe(pid)
 })
 
 test("main grants the same running engine; existing PTY/MCP and first model/new PTY write B, C stays empty and another streamed answer is not cancelled", async () => {
@@ -423,7 +464,7 @@ test("production planner and a new app start exclude a registered entry rebound 
   generation++
   useProductionPlanner = true
   await boot()
-  const fresh = await bootFenceWorkspaceTruth({ truthPath, store: { tabs: [{ type: "draft", draftID: "restored", server: "sidecar", directory }], recent: undefined, info: undefined }, fs: { readFileSync, writeFileSync, mkdirSync, renameSync, rmSync }, eligibility: { homeDir: protectedHome, appStateRoot: join(run, "state"), realpath: realpathSync.native, isDirectory: (path) => { try { return readdirSync(path) !== undefined } catch { return false } } }, log: (line) => { log.push(line) }, onWritableChanged: () => {} })
+  const fresh = await bootFenceWorkspaceTruth({ truthPath, store: { tabs: [{ type: "draft", draftID: "restored", server: "sidecar", directory }], recent: undefined, info: undefined }, fs: { readFileSync, writeFileSync, mkdirSync, renameSync, rmSync }, eligibility: { homeDir: protectedHome, appStateRoot: join(run, "state"), configFenceRoots: currentConfigFenceRoots, realpath: realpathSync.native, isDirectory: (path) => { try { return readdirSync(path) !== undefined } catch { return false } } }, log: (line) => { log.push(line) }, onWritableChanged: () => {} })
   const seeded = await fresh.userOpened.has("sidecar", directory)
   const result = await fresh.probeWrite({ server: "sidecar", directory }, listener)
   await write(directory, "planner-escape.txt")

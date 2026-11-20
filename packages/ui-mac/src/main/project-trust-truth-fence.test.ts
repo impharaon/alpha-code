@@ -1,8 +1,8 @@
-// `#1709` —— 项目扩展信任记录「只有 main 写、引擎写不到」的真裁判:生产渲染的围栏 profile 交给真 /usr/bin/sandbox-exec
+// `#1709` —— 项目扩展信任记录「只有 main 写、引擎写不到」的真裁判:生产渲染器渲染的围栏 profile(受保护集 CF 按空渲染:本文件只判别的行)交给真 /usr/bin/sandbox-exec
 // (与 sidecar 里 sandbox_init 同一个 libsandbox)。围栏内(= 引擎进程:agent 的写文件工具、已信任项目的插件)建记录目录、在记录目录的
-// 位置放符号链接、写记录文件、在记录目录建文件、在记录路径放符号链接、先在可写的 W2 造好(文件或链接)再 mv 进来 ⇒ 全部
-// Operation not permitted、盘上零落盘。控制臂:同一 profile 下 W2(env/<env>)与 W3(userData)写得进 —— 围栏是活的,而且引擎
-// 能在 W2 里写一份「看着合法」的伪造记录;就算有一条链接指向它,读端也不跟(project-trust-truth.ts 拒符号链接)。bare 臂:不套围栏
+// 位置放符号链接、写记录文件、在记录目录建文件、在记录路径放符号链接、先在可写的 W3 造好(文件或链接)再 mv 进来 ⇒ 全部
+// Operation not permitted、盘上零落盘。控制臂:同一 profile 下 W3(userData)写得进、env/<env> 写不进(W2 已删,SPEC-engine-config-fence
+// D2)—— 围栏是活的,而且引擎能在 W3 里写一份「看着合法」的伪造记录;就算有一条链接指向它,读端也不跟(project-trust-truth.ts 拒符号链接)。bare 臂:不套围栏
 // (= main 进程的形态)经生产写端落盘并读回,写好之后围栏内覆盖写 / 删除仍被拦。
 // 布局纪律(勘破 §7.4 / `#1322`):假的状态根放在**真 HOME** 之下 —— /private/tmp 与 $TMPDIR 在可写集里,放那儿「写不进」测不出来。
 // darwin-only;别的平台上整份 describe.skip(gate-files.tsv 按 [平台:darwin] 登记)。不需要 Electron 二进制。
@@ -31,7 +31,7 @@ const landed = (path: string) => {
   }
 }
 
-describeSandbox("#1709 真围栏:project-trust/<env>.json 在生产 profile 下写不进、链接放不进;W2 / W3 写得进", () => {
+describeSandbox("#1709 真围栏:project-trust/<env>.json 在生产 profile 下写不进、链接放不进;W3 写得进", () => {
   let scratch = ""
   let stateRoot = ""
   let envRoot = ""
@@ -54,7 +54,7 @@ describeSandbox("#1709 真围栏:project-trust/<env>.json 在生产 profile 下�
     writeFileSync(
       profileFile,
       // `#1337`:生产 profile 含网络行;这里不出网,给一个没人听的端口即可。
-      renderProcessFenceProfile({ workspaces: [workspace], codepuppyGlobalRoot: envRoot, userDataPath: userData, stateHome: userData, roots: resolveEngineRoots({}, homedir()), egressProxyPort: 4443 }),
+      renderProcessFenceProfile({ workspaces: [workspace], codepuppyGlobalRoot: envRoot, userDataPath: userData, stateHome: userData, roots: resolveEngineRoots({}, homedir()), egressProxyPort: 4443 , configFence: [] }),
     )
     __resetCodePuppyEnvironmentForTests()
     publishTestBootstrap({ globalRoot: envRoot })
@@ -78,33 +78,32 @@ describeSandbox("#1709 真围栏:project-trust/<env>.json 在生产 profile 下�
     expect(landed(landing), script).toBe(false)
   }
 
-  test("记录目录还不存在时,围栏内建它、或在它的位置放一条指向 W2 的符号链接 ⇒ 都不许", () => {
+  test("记录目录还不存在时,围栏内建它、或在它的位置放一条指向 W3 的符号链接 ⇒ 都不许", () => {
     expect(landed(recordDir)).toBe(false)
     denied(`mkdir "${recordDir}"`, recordDir)
-    denied(`ln -s "${envRoot}" "${recordDir}"`, recordDir)
+    denied(`ln -s "${userData}" "${recordDir}"`, recordDir)
   })
 
-  test("记录目录在(main 建的)时,围栏内写记录、在目录里建文件、在记录路径放链接、从 W2 mv 文件或链接进来 ⇒ 都不许,零落盘", () => {
+  test("记录目录在(main 建的)时,围栏内写记录、在目录里建文件、在记录路径放链接、从 W3 mv 文件或链接进来 ⇒ 都不许,零落盘", () => {
     attempt(false, `mkdir -p "${recordDir}"`)
     denied(`printf '{"v":1,"projects":{}}' > "${record}"`, record)
     denied(`printf x > "${recordDir}/forged.json"`, join(recordDir, "forged.json"))
-    denied(`ln -s "${envRoot}/forged.json" "${record}"`, record)
-    // 先在可写处(W2)造好,再 rename 进来 —— 目录项的写在目标目录上,同样拦住
-    denied(`printf x > "${envRoot}/staged.json" && mv "${envRoot}/staged.json" "${record}"`, record)
-    denied(`ln -s "${envRoot}/staged.json" "${envRoot}/staged-link" && mv "${envRoot}/staged-link" "${record}"`, record)
-    // mv 那两臂的第一步真的落在 W2 里了(证明是第二步被拦,不是第一步没跑)
-    expect(readFileSync(join(envRoot, "staged.json"), "utf8")).toBe("x")
-    expect(landed(join(envRoot, "staged-link"))).toBe(true)
+    denied(`ln -s "${userData}/forged.json" "${record}"`, record)
+    // 先在可写处(W3)造好,再 rename 进来 —— 目录项的写在目标目录上,同样拦住
+    denied(`printf x > "${userData}/staged.json" && mv "${userData}/staged.json" "${record}"`, record)
+    denied(`ln -s "${userData}/staged.json" "${userData}/staged-link" && mv "${userData}/staged-link" "${record}"`, record)
+    // mv 那两臂的第一步真的落在 W3 里了(证明是第二步被拦,不是第一步没跑)
+    expect(readFileSync(join(userData, "staged.json"), "utf8")).toBe("x")
+    expect(landed(join(userData, "staged-link"))).toBe(true)
   })
 
-  test("控制臂:同一 profile 下 W2 / W3 写得进(引擎能在 W2 造一份合法形状的伪造记录);就算记录路径上有链接指向它,读端也不认", () => {
-    for (const target of [join(envRoot, "probe"), join(userData, "probe")]) {
-      const r = attempt(true, `printf x > "${target}"`)
-      expect(r.status, target).toBe(0)
-      expect(readFileSync(target, "utf8"), target).toBe("x")
-    }
+  test("控制臂:同一 profile 下 W3 写得进、环境根写不进(W2 已删)(引擎能在 W3 造一份合法形状的伪造记录);就算记录路径上有链接指向它,读端也不认", () => {
+    const r = attempt(true, `printf x > "${join(userData, "probe")}"`)
+    expect(r.status).toBe(0)
+    expect(readFileSync(join(userData, "probe"), "utf8")).toBe("x")
+    denied(`printf x > "${join(envRoot, "probe")}"`, join(envRoot, "probe"))
     const me = projectTrustIdentity(workspace)!
-    const forged = join(envRoot, "forged-record.json")
+    const forged = join(userData, "forged-record.json")
     const body = JSON.stringify({ v: 1, projects: { [me.directory]: { ino: me.ino, version: 1, granted: true, decidedAt: "x" } } })
     expect(attempt(true, `printf '%s' '${body}' > "${forged}"`).status).toBe(0)
     expect(readProjectTrustTruth(forged).ok).toBe(true) // 伪造的那份本身是合法形状
@@ -130,7 +129,7 @@ describeSandbox("#1709 真围栏:project-trust/<env>.json 在生产 profile 下�
     expect(readFileSync(record).equals(before)).toBe(true)
   })
 
-  test("审计 Major:围栏内把 W2 根目录本身挪到围栏外、原地换成指向它的链接,再在旁边写一份伪造记录 ⇒ 挪得动(实测),但 sidecar(无快照)按字面推出的记录位置不经过它,读不到伪造记录;状态根与记录目录本身挪不动", () => {
+  test("审计 Major:围栏内把环境根本身挪到围栏外、原地换成指向它的链接,再在旁边写一份伪造记录 ⇒ W2 删掉之后挪不动(此前实测挪得动);sidecar(无快照)按字面推出的记录位置不经过它,读不到伪造记录;状态根与记录目录本身挪不动", () => {
     // 记录路径上真正的祖先:状态根与 project-trust/ —— 围栏内都挪不动
     const parked = mkdtempSync(join("/private/tmp", "ac1709-parked-"))
     denied(`mv "${recordDir}" "${parked}/project-trust"`, join(parked, "project-trust"))
@@ -146,7 +145,8 @@ describeSandbox("#1709 真围栏:project-trust/<env>.json 在生产 profile 下�
     try {
       const swap = attempt(true, `mkdir -p "${join(elsewhere, "env")}" && mv "${envRoot}" "${forgedEnv}" && ln -s "${forgedEnv}" "${envRoot}"`)
       const forge = attempt(true, `mkdir -p "${join(elsewhere, "project-trust")}" && printf '%s' '${body}' > "${forgedRecord}"`)
-      console.log(`[#1709 fence measurement] swap W2 root: status=${swap.status} stderr=${JSON.stringify(swap.stderr)}; root is now ${lstatSync(envRoot).isSymbolicLink() ? "a symlink" : "the real directory"}; forge: status=${forge.status}`)
+      console.log(`[#1709 fence measurement] swap env root: status=${swap.status} stderr=${JSON.stringify(swap.stderr)}; root is now ${lstatSync(envRoot).isSymbolicLink() ? "a symlink" : "the real directory"}; forge: status=${forge.status}`)
+      expect(swap.status).not.toBe(0) // W2 已删:环境根在围栏里挪不动了
       expect(forge.status).toBe(0) // 围栏外的伪造记录确实写得出来(/private/tmp 在可写集里)
       expect(readProjectTrustEntry(me, () => {})).toBeUndefined()
     } finally {

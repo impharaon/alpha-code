@@ -1,4 +1,6 @@
 export const SETTINGS_STORE = "opencode.settings"
+/** 更新器设置的 electron-store 名(userData 根下的文件名);store 与围栏的受保护配置清单都取这一个(SPEC-engine-config-fence CF-7)。 */
+export const UPDATER_STORE = "opencode.updater"
 export const RENDERER_SETTINGS_STORE = "default.dat"
 export const RENDERER_SETTINGS_KEY = "settings.v3"
 export const DEFAULT_SERVER_URL_KEY = "defaultServerUrl"

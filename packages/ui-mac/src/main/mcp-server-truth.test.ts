@@ -1,8 +1,8 @@
 // `#1381` —— 远程 MCP 服务器真源(读端 + 写端)的判据,与 custom-provider-truth(-write).test.ts 同形:
-//   ① I2:真源路径 <casBaseRoot>/mcp-servers/<env>.json 不在可写集任何**固定行**之下 —— 对着生产渲染的 profile 枚举
+//   ① I2:真源路径 <casBaseRoot>/mcp-servers/<env>.json 不在可写集任何**固定行**之下 —— 对着生产渲染器渲染的 profile(受保护集 CF 按空渲染:本文件只判别的行)枚举
 //      `(allow file-write*` 块里每条规则的 W-id(17 个固定 id;W1 是运行时成员,由 `#1390` 规则 5b 兜),默认 base 与 dev 覆盖 base、
 //      XDG_STATE_HOME 两种形态都过;词法判据偏向判「覆盖」。「覆盖」的最终裁判是 seatbelt 本身 —— custom-provider-truth-fence.test.ts
-//      对同一个父目录下的兄弟文件真跑过,两个真源在围栏眼里是同一条规则(W2 只罩 env/<env>)。
+//      对同一个父目录下的兄弟文件真跑过,两个真源在围栏眼里是同一条规则(状态根之下没有放行行;W2 已删)。
 //   ② 严格读:缺失 = 没有记录(ok、absent、空清单、零日志);坏 JSON / 版本不对 / servers 不是数组 / 字段不合法 / 同名重复 / 多余的键 ⇒
 //      ok:false(**不是空数组**)且日志恰一行说得出原因;读错(EISDIR)也拒不当缺失。
 //   ③ 写:落盘字节固定字面量、无临时文件残留、原子(rename / write 中途抛 ⇒ 盘上仍是旧内容)、坏记录不落盘(连目录都不建)。
@@ -77,6 +77,7 @@ const profileFor = (stateRoot: string, env: "prod" | "dev", over: Partial<Proces
     stateHome: USER_DATA,
     roots: { home: HOME, dataHome: `${HOME}/.local/share`, cacheHome: `${HOME}/.cache`, configHome: `${HOME}/.config` },
     egressProxyPort: 4443,
+    configFence: [],
     ...over,
   })
 
@@ -100,21 +101,19 @@ describe("真源位置(I2):<casBaseRoot>/mcp-servers/<env>.json 不在可写集�
     }
   })
 
-  test("默认 base 与覆盖 base、两种 XDG_STATE_HOME 形态:没有任何固定行覆盖真源文件或它的目录(逐条规则,W1 除外);对照:W2 罩着 codepuppy.jsonc", () => {
+  test("默认 base 与覆盖 base、两种 XDG_STATE_HOME 形态:没有任何固定行覆盖真源文件或它的目录(逐条规则,W1 除外);对照:W3 罩着 userData 里的文件", () => {
     for (const [stateRoot, env] of [
       [DEFAULT_STATE_ROOT, "prod"],
       [OVERRIDE_STATE_ROOT, "dev"],
     ] as const) {
       for (const stateHome of [USER_DATA, `${HOME}/.local/state`]) {
         const rules = fileWriteRules(profileFor(stateRoot, env, { stateHome })).filter((r) => r.id !== "W1")
-        expect(rules.length, `${stateRoot}/${env}/${stateHome}`).toBeGreaterThanOrEqual(17)
+        expect(rules.length, `${stateRoot}/${env}/${stateHome}`).toBeGreaterThanOrEqual(15)
         const truth = mcpServerTruthPath(stateRoot, env)
         const dir = join(stateRoot, "mcp-servers")
         expect(rules.filter((r) => covers(r, truth)).map(describeRule), `truth file ${truth}`).toEqual([])
         expect(rules.filter((r) => covers(r, dir)).map(describeRule), `truth dir ${dir}`).toEqual([])
-        expect(rules.filter((r) => covers(r, join(environmentMutableRoot(env, stateRoot), "codepuppy.jsonc"))).map(describeRule)).toEqual([
-          `W2 subpath ${environmentMutableRoot(env, stateRoot)}`,
-        ])
+        expect(rules.filter((r) => covers(r, join(USER_DATA, "codepuppy-identity.md"))).map(describeRule)).toEqual([`W3 subpath ${USER_DATA}`])
       }
     }
   })

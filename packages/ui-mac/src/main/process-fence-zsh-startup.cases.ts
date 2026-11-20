@@ -2,7 +2,8 @@
 // content that a shell OUTSIDE the fence later executes. Apple Terminal's zsh sources `~/.zsh_sessions/<id>.session`;
 // an rc with `compinit -C` sources `~/.zcompdump`. Run only through process-fence-zsh-startup.test.ts.
 //
-// Production render (renderProcessFenceProfile) + production fence (fat .node from the production build script, applied
+// "Production profile" below = the production render (renderProcessFenceProfile) with an empty protected set (configFence: [];
+// this file judges the zsh rows only) + production fence (fat .node from the production build script, applied
 // by applyProcessFence in a bun child; everything that child spawns inherits the seatbelt). Three arms in a fake HOME:
 //   known bad  = the production profile with W10/W19 put back: the write lands and an unfenced zsh runs the marker;
 //   production = the same writes are EPERM and the marker never runs;
@@ -41,6 +42,8 @@ process.exit(spawnSync(command[0], command.slice(1), { stdio: "inherit" }).statu
 const production = renderProcessFenceProfile({
   workspaces: [ws], codepuppyGlobalRoot: join(run, "state"), userDataPath: join(run, "userData"), stateHome: join(run, "userData"),
   roots: resolveEngineRoots({}, home), egressProxyPort: 59999,
+  // 本文件判 W10 / W19 两行;受保护配置集的判据在 process-fence-config-fence / process-fence-profile
+  configFence: [],
 })
 
 /** Today's rows back in place, derived from the production text: W10 after W8, W19 = the W8 regex with the dump's name. */
@@ -141,7 +144,7 @@ beforeAll(() => {
 test("layout: the fake HOME and the run root are under no writable row of either profile; only the known-bad variant covers the session file and the dump", () => {
   const productionRules = processFenceWriteRules(production)
   const knownBadRules = processFenceWriteRules(knownBad)
-  expect(knownBadRules.length).toBe(productionRules.length + 2)
+  expect(knownBadRules.allow.length).toBe(productionRules.allow.length + 2)
   for (const rules of [productionRules, knownBadRules]) {
     expect(processFenceRulesCover(rules, home), home).toBe(false)
     expect(processFenceRulesCover(rules, run), run).toBe(false)

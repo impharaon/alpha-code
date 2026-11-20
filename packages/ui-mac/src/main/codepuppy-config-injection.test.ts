@@ -36,6 +36,7 @@ import { Permission } from "@opencode/schema/permission"
 import { ConfigNormalize } from "@opencode/core/config/normalize"
 import { CODEPUPPY_V2_CATALOG_READY_PROVIDER_ID } from "../shared/codepuppy-config"
 import { ECOSYSTEM_COMPATIBILITY_PLUGIN, ENGINE_EXPERIMENTAL_FLAGS, injectCodePuppyConfig, isCloudMcpWithheld } from "./codepuppy-config-injection"
+import { engineModelsPath, explicitConfigPath, writeEngineConfigForFork } from "./engine-explicit-config"
 import { customProviderSecretName, secretFilePath } from "./codepuppy-secret-files"
 import { writeMcpServerTruth } from "./mcp-server-truth-write"
 import { NEUTRALIZED_MCP_SERVER } from "./mcp-default-deny"
@@ -179,12 +180,14 @@ type Injected = {
   command?: unknown
 }
 
+/** 与生产同序(SPEC-engine-config-fence BR-03):main 在 fork 前按同一份启动文档写显式文件、模型底表与种子,sidecar 再注入。 */
 function inject(extPluginPath?: string) {
   publishDoc()
+  const main = writeEngineConfigForFork(codepuppyBootstrap())
   const result = injectCodePuppyConfig(userData, extPluginPath, "stable", codepuppyBootstrap().paths.userConfig ?? null)
   // `#1667`(编排器裁决 r1 第 2 条、C7 重裁):`config.file` 是 main 合成的显式文件;出厂命令、skills 与第一层 policies 在那里。
   const explicit = result.config.file && fs.existsSync(result.config.file) ? (JSON.parse(fs.readFileSync(result.config.file, "utf8")) as Injected & { $schema?: string; command?: unknown }) : undefined
-  return { result, config: JSON.parse(result.config.content) as Injected, explicit }
+  return { result, config: JSON.parse(result.config.content) as Injected, explicit, main }
 }
 
 const allows = (rules: Rule[] | undefined, action: string, resource = "*") =>
@@ -234,13 +237,13 @@ describe("injectCodePuppyConfig —— 注入组合体的执行级闸门(#607)",
   test("正向闸门:生产 composition 跑通,结果携带 model/policies/providers/四个 alpha agent/{file:} ref", () => {
     givenLoggedInWithByok()
 
-    const { result } = inject(EXT_DIR)
+    const { result, main } = inject(EXT_DIR)
 
     expect(result.ok).toBe(true)
     assertInjectedFacts(result.config.content, userData)
     // `config.file` 是 main 合成的显式文件(Code Puppy 自己的 userData 下),当前环境的 codepuppy.jsonc 在里面;治理过的模型目录快照经 `models.file`。
     expect(result.config.file).toBe(path.join(userData, "codepuppy-engine-config", "codepuppy-explicit.json"))
-    expect(result.explicit?.userConfig).toBe(path.join(process.env.CODEPUPPY_GLOBAL_DIR!, "codepuppy.jsonc"))
+    expect(main.watch.userConfig).toBe(path.join(process.env.CODEPUPPY_GLOBAL_DIR!, "codepuppy.jsonc"))
     expect(result.models.file).toBe(path.join(userData, "codepuppy-engine-config", "models.json"))
     // #857:早到的 models.dev 底表从**同一份**投影机械派生:每个 provider 的模型集合与注入的 providers 相同,带就绪标记,不带 key。
     const raw = fs.readFileSync(result.models.file!, "utf8")
@@ -420,6 +423,15 @@ describe("injectCodePuppyConfig —— 注入组合体的执行级闸门(#607)",
     expect(fs.existsSync(path.join(userData, "codepuppy-engine-config", "models.json"))).toBe(false)
   })
 
+  test("E5 逃生阀臂:上一代留下了 models.json,这一代置 CODEPUPPY_MODELS_DISABLE ⇒ main 在 fork 前删掉它,注入不给 models.file", () => {
+    givenLoggedInWithByok()
+    expect(inject(EXT_DIR).result.models.file).toBe(engineModelsPath(userData))
+    setSwitch("modelsDisabled")
+    const { result } = inject(EXT_DIR)
+    expect(result.models.file).toBeUndefined()
+    expect(fs.existsSync(engineModelsPath(userData))).toBe(false)
+  })
+
   test("#1392 codepuppy.jsonc 里的 provider 块不进注入面;真源一条记录以 2.x 形状进 providers 与 provider.use", () => {
     givenLoggedInWithByok()
     fs.writeFileSync(
@@ -513,20 +525,27 @@ describe("injectCodePuppyConfig —— 注入组合体的执行级闸门(#607)",
     expect(() => assertInjectedFacts(result.config.content, brokenUserData)).toThrow()
   })
 
-  test("#613 反向闸门:models.json 写不进去 ⇒ ok:false(不是可忽略的局部降级),错误自证抛点", () => {
+  test("BR-03 / I2:注入不写受保护位置 —— 不写种子、显式文件与模型底表(main 在 fork 前写);路径由 sidecar 自己推出,底表以文件在缺为准", () => {
     givenLoggedInWithByok()
-    fs.writeFileSync(path.join(userData, "codepuppy-engine-config"), "")
-    const originalWarn = console.warn
-    console.warn = () => {}
-    let result: ReturnType<typeof injectCodePuppyConfig>
     publishDoc()
-    try {
-      result = injectCodePuppyConfig(userData, EXT_DIR, "stable", codepuppyBootstrap().paths.userConfig ?? null)
-    } finally {
-      console.warn = originalWarn
-    }
-    expect(result.ok).toBe(false)
-    if (!result.ok) expect(result.error.message).toContain("codepuppy-engine-config")
+    const truth = codepuppyBootstrap().paths.userConfig!
+    const engineConfig = path.join(userData, "codepuppy-engine-config")
+    // 没有 main 那一步:注入照常 ok,一个文件也不建;显式槽仍指向 main 写的那个位置,底表缺席
+    const bare = injectCodePuppyConfig(userData, EXT_DIR, "stable", truth)
+    expect(bare.ok).toBe(true)
+    expect(fs.existsSync(engineConfig)).toBe(false)
+    expect(fs.existsSync(truth)).toBe(false)
+    expect(bare.config.file).toBe(explicitConfigPath(userData))
+    expect(bare.models.file).toBeUndefined()
+    // main 写过之后:注入给出同一对路径,且不改写它们的任何一个字节
+    writeEngineConfigForFork(codepuppyBootstrap())
+    const before = [explicitConfigPath(userData), engineModelsPath(userData), truth].map((file) => [fs.readFileSync(file, "utf8"), fs.statSync(file).mtimeMs])
+    const after = injectCodePuppyConfig(userData, EXT_DIR, "stable", truth)
+    expect(after.ok).toBe(true)
+    expect(after.config.file).toBe(explicitConfigPath(userData))
+    expect(after.models.file).toBe(engineModelsPath(userData))
+    expect([explicitConfigPath(userData), engineModelsPath(userData), truth].map((file) => [fs.readFileSync(file, "utf8"), fs.statSync(file).mtimeMs])).toEqual(before)
+    expect("explicit" in after).toBe(false)
   })
 
   // #613 接线锚(R1 后收窄):sidecar.ts 无法被 bun import(首个 import 即 registerHooks,

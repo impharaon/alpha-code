@@ -188,6 +188,27 @@ test.each(["deleted workspace", "moved SQLite", "decryption failure"])(
     }
   },
 )
+// SPEC-engine-config-fence BR-03(片 ② 单元 A 审查 Major):每次 spawn 先清掉上一代的运行期目录,再由恢复建这一代的新目录并把新的
+// {file:} 引用写进 codepuppy.jsonc。fork 那一刻 main 写的显式文件必须是按恢复之后的 codepuppy.jsonc 合成的 —— 引用指向这一代的文件、
+// 文件在;按恢复之前合成则引用的是刚被清掉的上一代文件(引擎把缺失的 {file:} 当空串,官方数据库连接器带着空 DSN 起来)。
+test("the explicit engine config at fork is composed after the official connector restore: its DSN reference is this generation's file and it exists", async () => {
+  const database = join(home, "fixture.db")
+  new Database(database).close()
+  seed("dbhub-readonly", `sqlite://${database}`)
+  const refOf = (text: string) => /\{file:([^}]*dbhub-readonly[^}]*\/DSN)\}/.exec(text)?.[1]
+  const previous = refOf(readFileSync(join(root, "codepuppy.jsonc"), "utf8"))
+  expect(previous).toBeDefined()
+  let atFork: { ref?: string; exists?: boolean; jsonc?: string } = {}
+  const result = await spawn(new Child(), () => {
+    const ref = refOf(readFileSync(join(home, "userData", "codepuppy-engine-config", "codepuppy-explicit.json"), "utf8"))
+    atFork = { ref, exists: ref !== undefined && existsSync(ref), jsonc: refOf(readFileSync(join(root, "codepuppy.jsonc"), "utf8")) }
+  })
+  expect(atFork.jsonc).not.toBe(previous)
+  expect(atFork.ref).toBe(atFork.jsonc)
+  expect(atFork.exists).toBe(true)
+  await result.listener.stop()
+})
+
 test("startup sweeps stale runtime roots even with no installed connector", async () => {
   const parent = dirname(officialRuntimeRoot(root))
   clearOfficialConnectorRuntime()

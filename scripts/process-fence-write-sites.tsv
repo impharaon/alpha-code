@@ -12,17 +12,14 @@ packages/ext/src/policy/store.ts	mkdirSync	path.dirname(file)	W4
 packages/ext/src/policy/store.ts	renameSync	file	W4
 packages/ext/src/policy/store.ts	renameSync	tmp	W4
 packages/ext/src/policy/store.ts	writeFileSync	tmp	W4
-packages/ui-mac/src/main/codepuppy-config-injection.ts	mkdirSync	dir	W3
-packages/ui-mac/src/main/codepuppy-config-injection.ts	mkdirSync	path.dirname(truth)	W2
 packages/ui-mac/src/main/codepuppy-config-injection.ts	mkdirSync	userDataPath	W3
-packages/ui-mac/src/main/codepuppy-config-injection.ts	rmSync	modelsPath	W3
 packages/ui-mac/src/main/codepuppy-config-injection.ts	writeFileSync	file	W3
-packages/ui-mac/src/main/codepuppy-config-injection.ts	writeFileSync	modelsPath	W3
-packages/ui-mac/src/main/codepuppy-config-injection.ts	writeFileSync	truth	W2
 packages/ui-mac/src/main/codepuppy-environment.ts	mkdirSync	directory	main-only
 packages/ui-mac/src/main/codepuppy-environment.ts	rmdirSync	directory	main-only
-packages/ui-mac/src/main/codepuppy-installs.ts	mkdirSync	root	W2
-packages/ui-mac/src/main/codepuppy-installs.ts	renameSync	file	W2
+# DESIGN-engine-config-fence §4.7:安装账本(codepuppy-installs.ts、ext-receipt-v2.ts)只由 main 写;sidecar 闭包里只有读法 readPackageLedgerStateV1,
+# 两处调用(engine-explicit-config.ts、ext-disabled-injection.ts)都带 sideEffectFree: true,不写证据文件。
+packages/ui-mac/src/main/codepuppy-installs.ts	mkdirSync	root	main-only
+packages/ui-mac/src/main/codepuppy-installs.ts	renameSync	file	main-only
 packages/ui-mac/src/main/codepuppy-live-allowlist.ts	mkdirSync	userDataPath	W3
 packages/ui-mac/src/main/codepuppy-secret-files.ts	chmodSync	dir	W3
 packages/ui-mac/src/main/codepuppy-secret-files.ts	chmodSync	temp	W3
@@ -41,10 +38,20 @@ packages/ui-mac/src/main/codepuppy-workdir.ts	writeFileSync	tmp	W1
 packages/ui-mac/src/main/catalog-channels.ts	mkdirSync	userDataPath	W3
 packages/ui-mac/src/main/catalog-channels.ts	renameSync	tmp	W3
 packages/ui-mac/src/main/catalog-channels.ts	writeFileSync	tmp	W3
-# `#1662` sidecar 重写的显式配置文件(engine-explicit-config.ts writeAtomic):<userDataPath>/<engineConfig>/codepuppy-explicit.json。
-packages/ui-mac/src/main/engine-explicit-config.ts	mkdirSync	path.dirname(file)	W3
-packages/ui-mac/src/main/engine-explicit-config.ts	renameSync	temporary	W3
-packages/ui-mac/src/main/engine-explicit-config.ts	writeFileSync	temporary	W3
+# SPEC-engine-config-fence BR-03 / DESIGN §4.7:显式配置文件 <userDataPath>/<engineConfig>/codepuppy-explicit.json、同目录的模型底表 models.json 与种子
+# codepuppy.jsonc 只由 main 写(fork 前 writeEngineConfigForFork、main 里的 watchExplicitSources)。模块在 sidecar 闭包里只因为注入要用路径函数与
+# disabledPackageComponents(只读,sideEffectFree)。
+packages/ui-mac/src/main/engine-explicit-config.ts	chmodSync	engineConfigDirectory	main-only
+packages/ui-mac/src/main/engine-explicit-config.ts	mkdirSync	dir	main-only
+packages/ui-mac/src/main/engine-explicit-config.ts	mkdirSync	path.dirname(file)	main-only
+packages/ui-mac/src/main/engine-explicit-config.ts	mkdirSync	path.dirname(input.userConfig)	main-only
+packages/ui-mac/src/main/engine-explicit-config.ts	mkdirSync	engineConfigDirectory	main-only
+packages/ui-mac/src/main/engine-explicit-config.ts	renameSync	temporary	main-only
+packages/ui-mac/src/main/engine-explicit-config.ts	rmSync	engineModelsPath(input.userDataPath)	main-only
+packages/ui-mac/src/main/engine-explicit-config.ts	rmSync	modelsPath	main-only
+packages/ui-mac/src/main/engine-explicit-config.ts	writeFileSync	input.userConfig	main-only
+packages/ui-mac/src/main/engine-explicit-config.ts	writeFileSync	modelsPath	main-only
+packages/ui-mac/src/main/engine-explicit-config.ts	writeFileSync	temporary	main-only
 packages/ui-mac/src/main/ext-atomic-fs.ts	mkdirSync	dir	arg
 packages/ui-mac/src/main/ext-atomic-fs.ts	mkdirSync	path.dirname(to)	arg
 packages/ui-mac/src/main/ext-atomic-fs.ts	openSync	dir	arg
@@ -52,10 +59,10 @@ packages/ui-mac/src/main/ext-atomic-fs.ts	openSync	file	arg
 packages/ui-mac/src/main/ext-atomic-fs.ts	renameSync	from	arg
 packages/ui-mac/src/main/ext-atomic-fs.ts	renameSync	tmp	arg
 packages/ui-mac/src/main/ext-atomic-fs.ts	writeFileSync	tmp	arg
-packages/ui-mac/src/main/ext-receipt-v2.ts	mkdirSync	root	W2
-packages/ui-mac/src/main/ext-receipt-v2.ts	renameSync	file	W2
-packages/ui-mac/src/main/ext-receipt-v2.ts	unlinkSync	file	W2
-packages/ui-mac/src/main/ext-receipt-v2.ts	writeFileSync	evidence	W2
+packages/ui-mac/src/main/ext-receipt-v2.ts	mkdirSync	root	main-only
+packages/ui-mac/src/main/ext-receipt-v2.ts	renameSync	file	main-only
+packages/ui-mac/src/main/ext-receipt-v2.ts	unlinkSync	file	main-only
+packages/ui-mac/src/main/ext-receipt-v2.ts	writeFileSync	evidence	main-only
 packages/ui-mac/src/main/process-fence-apply.ts	rmSync	p	W3
 packages/ui-mac/src/main/process-fence-apply.ts	writeFileSync	p	W3
 packages/ui-mac/src/main/remote-catalog.ts	mkdirSync	userDataPath	W3

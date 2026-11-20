@@ -17,7 +17,8 @@ import {
 import { join } from "node:path"
 import { createServer } from "node:net"
 import { execFileSync } from "node:child_process"
-import { spawnLocalServer } from "../../../src/main/server"
+import { currentConfigFenceRoots, spawnLocalServer } from "../../../src/main/server"
+import { planConfigFence } from "../../../src/main/process-fence-plan"
 import { registerIpcHandlers } from "../../../src/main/ipc"
 import { initCodePuppyEnvironment } from "../../../src/main/codepuppy-environment"
 import {
@@ -87,6 +88,7 @@ const tracker = bootFenceWorkspaceTruth({
   eligibility: {
     homeDir: home,
     appStateRoot: env.casBaseRoot,
+    configFenceRoots: currentConfigFenceRoots,
     realpath: realpathSync.native,
     isDirectory: (path) => {
       try {
@@ -368,16 +370,24 @@ async function run() {
     fenceRun: tracker,
     planFence: (input) => {
       const workspaces = [...new Set([A, ...readWorkspaceTruthOrThrow(truthPath, { readFileSync }), ...input.carriedWorkspaces])]
+      // SPEC-engine-config-fence:生产 profile 带受保护配置集(生产计划器那一步落真实路径、预建目录),资格判定读同一份目录位置
+      const roots = resolveEngineRoots(process.env, home)
+      const fenceSet = planConfigFence(
+        { userDataPath: engineData, appStateRoot: env.casBaseRoot, codepuppyGlobalRoot: env.mutableRoot, engineConfigDirectory: input.engineConfigDirectory, roots },
+        { realpath: (path) => realpathSync.native(path), mkdirp: (path) => void mkdirSync(path, { recursive: true }) },
+      )
       return {
       addonPath: join(process.resourcesPath, "codepuppy-fence/codepuppy_fence.node"),
       workspaces,
+      configFenceRoots: fenceSet.configFenceRoots,
       profile: renderProcessFenceProfile({
         workspaces,
         codepuppyGlobalRoot: env.mutableRoot,
         userDataPath: engineData,
         stateHome: process.env.XDG_STATE_HOME!,
-        roots: resolveEngineRoots(process.env, home),
+        roots,
         egressProxyPort: modelPort,
+        configFence: fenceSet.configFence,
       }),
       }
     },

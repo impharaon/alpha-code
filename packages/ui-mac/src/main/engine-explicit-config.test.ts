@@ -1,6 +1,6 @@
 // `#1667`(#1662 L5;编排器裁决 1667 评论 6738814516 第 2 条、C7 重裁 6741122824):显式文件层的合成与运行中重写
 // (engine-explicit-config.ts)。真引擎上的层序判据在 codepuppy-config-injection-engine.cases.ts。
-import { afterEach, describe, expect, test } from "bun:test"
+import { afterEach, describe, expect, spyOn, test } from "bun:test"
 import * as fs from "node:fs"
 import * as os from "node:os"
 import * as path from "node:path"
@@ -8,7 +8,9 @@ import { Schema } from "effect"
 import { Config as ConfigSchema } from "@opencode/schema/config"
 import { ConfigNormalize } from "@opencode/core/config/normalize"
 import { ensureSkillsPath } from "./engine-config-truth"
-import { composeExplicitDocument, watchExplicitSources, writeExplicitConfig, type ExplicitLayer } from "./engine-explicit-config"
+import { planConfigFence } from "./process-fence-plan"
+import { resolveEngineRoots } from "./process-fence-profile"
+import { composeExplicitDocument, engineModelsPath, explicitConfigPath, watchExplicitSources, writeEngineConfigFiles, writeExplicitConfig, type ExplicitLayer } from "./engine-explicit-config"
 
 const LAYER: ExplicitLayer = {
   policies: [
@@ -131,6 +133,27 @@ describe("运行中:输入一变就重写显式文件", () => {
     expect("three" in (read().commands ?? {})).toBe(false)
   })
 
+  // 监听跑在 main 里(SPEC-engine-config-fence BR-03):FSWatcher 的 error 没有监听者就是 Electron main 进程的未捕获异常(审查 A 第 4 条)。
+  test("FSWatcher 报错 ⇒ 记一行具名日志、不抛,停止照常", () => {
+    const root = tempDir()
+    const file = path.join(root, "..", `${path.basename(root)}-engine`, "codepuppy-explicit.json")
+    dirs.push(path.dirname(file))
+    writeExplicitConfig(file, undefined, LAYER, root)
+    const real = fs.watch
+    let watcher: fs.FSWatcher | undefined
+    const spy = spyOn(fs, "watch").mockImplementation(((...args: Parameters<typeof fs.watch>) => (watcher = real(...args))) as typeof fs.watch)
+    const logs: string[] = []
+    const stop = watchExplicitSources({ file, root, layer: LAYER, skills: () => LAYER.skills, log: (line) => logs.push(line) })
+    spy.mockRestore()
+    try {
+      expect(watcher).toBeDefined()
+      expect(() => watcher!.emit("error", Object.assign(new Error("EMFILE: too many open files, watch"), { code: "EMFILE" }))).not.toThrow()
+      expect(logs).toEqual([`[alpha-code#1667] stopped watching ${root} for engine config inputs: EMFILE: too many open files, watch`])
+    } finally {
+      stop()
+    }
+  })
+
   test("`#1667` 裁决 r3:skills-enabled.json 或某个技能键的 current.json 一变 ⇒ skills 现算并重写;别的文件变了不重写", async () => {
     const root = tempDir()
     const file = path.join(root, "..", `${path.basename(root)}-engine`, "codepuppy-explicit.json")
@@ -160,13 +183,98 @@ describe("运行中:输入一变就重写显式文件", () => {
   })
 })
 
-// 分类与「这处锚守不住什么」登记在 ./source-text-anchors.ts。
-test("ANCHOR (not a gate): sidecar.ts 在 import 引擎之前、拿到注入结果之后就开始监听 codepuppy.jsonc(watchExplicitSources)", () => {
-  const sidecar = fs.readFileSync(path.join(import.meta.dir, "sidecar.ts"), "utf8")
-  const injection = sidecar.indexOf("const injection = prepareSidecarEnv(")
-  const watch = sidecar.indexOf("watchExplicitSources({ ...injection.explicit")
-  const engine = sidecar.indexOf('await import("virtual:opencode-server")')
-  expect(injection).toBeGreaterThan(-1)
-  expect(watch).toBeGreaterThan(injection)
-  expect(engine).toBeGreaterThan(watch)
+// SPEC-engine-config-fence BR-03 / AC-05(DESIGN-engine-config-fence §4.4):主进程在 fork 前写显式文件、模型底表与种子 ——
+// sidecar 从此只读。种子的字节与 0.2.6 注入写的逐字相同;写或删失败原样抛(消息带路径与 errno,不带内容),server.ts 据此拒绝 fork。
+describe("fork 前主进程写引擎配置(writeEngineConfigFiles)", () => {
+  const SEED = JSON.stringify({ $schema: "https://opencode.ai/config.json" }, null, 2)
+  /** 一个完整投影的 provider(governedModelsBase 才给就绪底表)。 */
+  const MODELS = {
+    enabled_providers: ["codepuppy"],
+    provider: { codepuppy: { name: "Code Puppy", npm: "@ai-sdk/openai-compatible", options: { baseURL: "https://gateway.example.invalid/v1" }, models: { m: { name: "M" } } } },
+  }
+  const setup = () => {
+    const base = tempDir()
+    const root = path.join(base, "codepuppy-state", "env", "dev")
+    return { userDataPath: path.join(base, "userdata"), root, userConfig: path.join(root, "codepuppy.jsonc") }
+  }
+
+  test("codepuppy.jsonc 缺席 ⇒ 先写种子(与 0.2.6 同一份字节),再写显式文件与模型底表;返回两条路径", () => {
+    const { userDataPath, root, userConfig } = setup()
+    const files = writeEngineConfigFiles({ userDataPath, root, userConfig, layer: LAYER, models: MODELS })
+    expect(fs.readFileSync(userConfig, "utf8")).toBe(SEED)
+    // 全新机器:引擎配置目录建成 0700(与 0.2.6 由模型底表那一步先建时相同;审查 A 第 2 条)
+    expect(fs.statSync(path.dirname(files.explicitConfig)).mode & 0o777).toBe(0o700)
+    const hatchFresh = setup()
+    const noModels = writeEngineConfigFiles({ userDataPath: hatchFresh.userDataPath, root: hatchFresh.root, layer: LAYER, models: undefined })
+    expect(fs.statSync(path.dirname(noModels.explicitConfig)).mode & 0o777).toBe(0o700)
+    expect(files).toEqual({ explicitConfig: explicitConfigPath(userDataPath), models: engineModelsPath(userDataPath) })
+    expect(engineModelsPath(userDataPath)).toBe(path.join(userDataPath, "codepuppy-engine-config", "models.json"))
+    expect(JSON.parse(fs.readFileSync(files.explicitConfig, "utf8"))).toEqual(composeExplicitDocument(SEED, LAYER).document)
+    const base = JSON.parse(fs.readFileSync(files.models!, "utf8")) as Record<string, { models?: Record<string, unknown> }>
+    expect(Object.keys(base.codepuppy!.models!)).toEqual(["m"])
+  })
+
+  test("生产顺序(审查 B 第 1 条):计划器先用生产 mkdirp 预建引擎配置目录(没有 mode,按 umask 落成 0755),之后 main 写配置 ⇒ 目录仍收成 0700", () => {
+    const { userDataPath, root, userConfig } = setup()
+    const home = path.join(path.dirname(userDataPath), "home")
+    const roots = resolveEngineRoots({ HOME: home }, home)
+    // server.ts 的生产 mkdirp 与计划器的调用,原样
+    planConfigFence(
+      { userDataPath, appStateRoot: path.dirname(path.dirname(root)), codepuppyGlobalRoot: root, engineConfigDirectory: path.join(roots.configHome, "opencode"), roots },
+      { realpath: (p) => fs.realpathSync.native(p), mkdirp: (p) => void fs.mkdirSync(p, { recursive: true }) },
+    )
+    const directory = path.join(userDataPath, "codepuppy-engine-config")
+    // 场景是真的:计划器那一步已经把目录建成了别的权限
+    expect(fs.statSync(directory).mode & 0o777).not.toBe(0o700)
+    writeEngineConfigFiles({ userDataPath, root, userConfig, layer: LAYER, models: MODELS })
+    expect(fs.statSync(directory).mode & 0o777).toBe(0o700)
+  })
+
+  test("已有的 codepuppy.jsonc 原样不动;逃生阀(没有 userConfig)不写种子;用户文件坏了 ⇒ 只写我们这一层并把原因交回", () => {
+    const { userDataPath, root, userConfig } = setup()
+    fs.mkdirSync(root, { recursive: true })
+    fs.writeFileSync(userConfig, "{ broken")
+    const files = writeEngineConfigFiles({ userDataPath, root, userConfig, layer: LAYER, models: MODELS })
+    expect(fs.readFileSync(userConfig, "utf8")).toBe("{ broken")
+    expect(files.userError).toContain("JSONC parse error")
+    expect(JSON.parse(fs.readFileSync(files.explicitConfig, "utf8"))).toEqual(composeExplicitDocument(undefined, LAYER).document)
+
+    const hatch = setup()
+    writeEngineConfigFiles({ userDataPath: hatch.userDataPath, root: hatch.root, layer: LAYER, models: MODELS })
+    expect(fs.existsSync(hatch.userConfig)).toBe(false)
+  })
+
+  test("E5 逃生阀臂:盘上留着上一代的 models.json,这一代没有模型底表(CODEPUPPY_MODELS_DISABLE 或投影不全)⇒ fork 前删掉,不给路径", () => {
+    const { userDataPath, root, userConfig } = setup()
+    writeEngineConfigFiles({ userDataPath, root, userConfig, layer: LAYER, models: MODELS })
+    expect(fs.existsSync(engineModelsPath(userDataPath))).toBe(true)
+    const disabled = writeEngineConfigFiles({ userDataPath, root, userConfig, layer: LAYER, models: undefined })
+    expect(disabled.models).toBeUndefined()
+    expect(fs.existsSync(engineModelsPath(userDataPath))).toBe(false)
+
+    writeEngineConfigFiles({ userDataPath, root, userConfig, layer: LAYER, models: MODELS })
+    const partial = writeEngineConfigFiles({ userDataPath, root, userConfig, layer: LAYER, models: { enabled_providers: ["user-file-provider"], provider: {} } })
+    expect(partial.models).toBeUndefined()
+    expect(fs.existsSync(engineModelsPath(userDataPath))).toBe(false)
+  })
+
+  test("AC-05:写不进(引擎配置目录是个普通文件)或删不掉(models.json 是非空目录)⇒ 原样抛,消息带路径与 errno,不带内容", () => {
+    const blocked = setup()
+    fs.mkdirSync(blocked.userDataPath, { recursive: true })
+    fs.writeFileSync(path.join(blocked.userDataPath, "codepuppy-engine-config"), "secret-looking-content")
+    let error: unknown
+    try {
+      writeEngineConfigFiles({ ...blocked, layer: LAYER, models: MODELS })
+    } catch (caught) {
+      error = caught
+    }
+    expect(error).toBeInstanceOf(Error)
+    expect(String((error as Error).message)).toContain(path.join(blocked.userDataPath, "codepuppy-engine-config"))
+    expect(String((error as NodeJS.ErrnoException).code)).toMatch(/^E[A-Z]+$/)
+    expect(String((error as Error).message)).not.toContain("secret-looking-content")
+
+    const stuck = setup()
+    fs.mkdirSync(path.join(engineModelsPath(stuck.userDataPath), "occupied"), { recursive: true })
+    expect(() => writeEngineConfigFiles({ ...stuck, layer: LAYER, models: undefined })).toThrow(engineModelsPath(stuck.userDataPath))
+  })
 })

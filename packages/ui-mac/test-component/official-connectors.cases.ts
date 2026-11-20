@@ -460,7 +460,7 @@ test("prepared journal crash recovery removes only uncommitted official versions
 })
 
 test("DBHub 1.5.0 real stdio SELECT 1 succeeds, writes fail, only execute_sql exists, and uninstall preserves the database", async () => {
-  // The production profile grants all system temp writes, so a temp-only test cannot prove TOML protection.
+  // The production render (protected set empty: this case judges the TOML location only) grants all system temp writes, so a temp-only test cannot prove TOML protection.
   // `#1662`: under the shared test-isolation preload (I-08) both HOME and `userInfo().homedir` point into the
   // temp root, so the fixture lives in this package's git-ignored node_modules/.cache instead: outside every
   // writable root of the profile, and outside the developer's real HOME directories.
@@ -544,6 +544,7 @@ test("DBHub 1.5.0 real stdio SELECT 1 succeeds, writes fail, only execute_sql ex
           stateHome: join(home, "userData"),
           roots: resolveEngineRoots({}, home),
           egressProxyPort: 9,
+          configFence: [],
         }),
       )
       const paths = officialConnectorPaths(root, "dbhub-readonly", "v-sqlite")

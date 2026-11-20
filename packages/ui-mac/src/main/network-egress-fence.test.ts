@@ -1,5 +1,5 @@
 // REQ-137 (`#1337`) —— AC1 的**强制半场** + AC4:真 .node(生产构建脚本现编)、真 seatbelt、真策略代理
-// (生产 startEgressPolicyProxy)、**Electron 内嵌 node**(= utilityProcess 的运行时),profile 由生产渲染器渲染
+// (生产 startEgressPolicyProxy)、**Electron 内嵌 node**(= utilityProcess 的运行时),profile 由生产渲染器渲染(受保护集 CF 按空渲染:本文件只判别的行)
 // (`#1334` Q1.2 的四行网络规则 + 可写集),env 由生产 sidecarEgressProxyEnv 给出。
 // darwin-only;CI(ubuntu)上自报 skip,由 gate-files.tsv 按 [平台:darwin] 登记。
 //
@@ -80,7 +80,7 @@ describeDarwin("REQ-137 #1337 强制半场 —— 真 .node / 真 seatbelt / 真
     closedV6Port = (v6.address() as net.AddressInfo).port
     await new Promise<void>((r) => v6.close(() => r()))
 
-    // 生产渲染的 profile:可写集 = 本测试的 ws + 真 HOME 的 XDG 形状;网络行 = Q1.2 四行,端口 = 上面这个真代理。
+    // 生产渲染器渲染的 profile(受保护集按空):可写集 = 本测试的 ws + 真 HOME 的 XDG 形状;网络行 = Q1.2 四行,端口 = 上面这个真代理。
     profileFile = join(scratch, "fence.sb")
     writeFileSync(
       profileFile,
@@ -91,6 +91,7 @@ describeDarwin("REQ-137 #1337 强制半场 —— 真 .node / 真 seatbelt / 真
         stateHome: userData,
         roots: resolveEngineRoots({}, homedir()),
         egressProxyPort: proxyPort,
+        configFence: [],
       }),
     )
     // 不经 require("electron")(bun 的 mock.module 是进程级的,全量跑时别的文件 mock 掉的 electron 会漏进来);

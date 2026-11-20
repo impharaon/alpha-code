@@ -39,22 +39,23 @@
 
 import { statSync } from "node:fs"
 import { dirname, isAbsolute, join, resolve } from "node:path"
+import { SETTINGS_STORE, UPDATER_STORE } from "./store-keys"
+import { USER_DATA_LAYOUT } from "./user-data-layout"
 
 export const WORKSPACE_WRITE_EXTENSION_CLASS = "app.codepuppy.workspace-write"
 
 /**
- * 可写集的行 id(勘破 §8.2 的 W 行及运行期 X1,W9 在那一轮就不存在)。W10 `~/.zsh_sessions` 与 W19 `~/.zcompdump*` 已删
+ * 可写集的行 id(勘破 §8.2 的 W 行及运行期 X1,W9 在那一轮就不存在)。W2(当前环境根)与 W6(`<XDG_CONFIG_HOME>/opencode`)已删:
+ * 两处都是受保护配置位置,写者已在 main(DESIGN-engine-config-fence §4.2、D2)。W10 `~/.zsh_sessions` 与 W19 `~/.zcompdump*` 已删
  * (DESIGN-engine-config-fence D15):围栏外的 shell 会执行它们的内容(Apple Terminal 的 zsh 恢复会话、带 compinit 的 rc 读 dump),
  * 应用内终端不需要它们(process-fence-zsh-startup.test.ts)。process-fence-write-sites.tsv 的每一条
  * 写盘登记都要点名它落在哪一行之下;点不出来的写入点 = 新的写入根 = 要么加行(带实测)要么改代码。
  */
 export const WRITABLE_ROOT_IDS = {
   W1: "工作区(启动时并集,每个工作区一条 subpath)",
-  W2: "<codepuppyGlobalRoot> = <appData>/codepuppy-state/env/<env>",
-  W3: "<userDataPath>(含 codepuppy-engine-config/**、opencode/locks/**、engine-scratch-cwd)",
+  W3: "<userDataPath>(opencode/locks/**、engine-scratch-cwd、uv-cache …;其中的受保护配置位置由 profile 末尾的拒写块拿回)",
   W4: "<XDG_DATA_HOME>/opencode:上游引擎 log / *.db / -wal / -shm / repos",
   W5: "<XDG_CACHE_HOME>/opencode:bin / models.json / packages",
-  W6: "<XDG_CONFIG_HOME>/opencode:第二份 provider 安装(勘破 §7.4 坑一)",
   W7: "<HOME>/.npm:@npmcli/arborist 的 cacache,不随 XDG",
   W8: "<HOME>/.zsh_history*(regex):登录 shell 存历史含 .zsh_history.new(§8.5 坑一)",
   W11: "/private/tmp",
@@ -98,9 +99,53 @@ export function resolveEngineRoots(env: Record<string, string | undefined>, home
   }
 }
 
+/**
+ * 受保护配置集 CF 的一条(DESIGN-engine-config-fence §4.1 / §4.2)。交给渲染器的路径都已是真实路径(计划器负责,process-fence-plan.ts 的
+ * planConfigFence);`dat-files` = dir 下一层的 `*.dat`(扩展名不分大小写,界面设置存储,CF-7)。`via` = 这个位置的配置路径(未解析)上、
+ * 不在真实路径上的目录节点(实现期修订 2 B:例如住在项目里的软链节点与它上面的项目文件夹),计划器已按身份去重;只进上级目录块。
+ */
+export type ConfigFenceRule = ({ kind: "subpath" | "literal"; path: string } | { kind: "dat-files"; dir: string }) & { via?: readonly string[] }
+
+/**
+ * CF-1–8、CF-10 的原始位置(还不是真实路径;片 ④ / ③ 再加 `~/.opencode` 与工具策略目录)。名字取 USER_DATA_LAYOUT 与 store 常量。
+ * 环境根恒列(在状态根之内时是一条冗余规则);两个引擎配置目录相同只列一份。顺序即渲染顺序。
+ */
+export function configFenceLocations(input: {
+  userDataPath: string
+  appStateRoot: string
+  codepuppyGlobalRoot: string
+  /** server.ts 交给启动文档的同一个值(engineGlobalConfigDirectory:OPENCODE_CONFIG_DIR 或 <XDG_CONFIG_HOME>/opencode)。 */
+  engineConfigDirectory: string
+  configHome: string
+  home: string
+  /** CF-4 的另一份:用户设置的 `$CODEPUPPY_ENV_FILE`(codepuppy-secrets.ts 的 userEnvFile;实现期修订 2 A)。 */
+  envFile?: string
+}): ConfigFenceRule[] {
+  const inUserData = (name: string) => join(input.userDataPath, name)
+  const configDirectories = [...new Set([resolve(input.engineConfigDirectory), resolve(input.configHome, "opencode")])]
+  return [
+    { kind: "subpath", path: input.appStateRoot }, // CF-1 Code Puppy 状态根
+    { kind: "subpath", path: input.codepuppyGlobalRoot }, // CF-1 当前环境根
+    { kind: "subpath", path: inUserData(USER_DATA_LAYOUT.engineConfig) }, // CF-2 显式文件与模型底表
+    { kind: "literal", path: inUserData(USER_DATA_LAYOUT.shellEnv) }, // CF-3
+    { kind: "literal", path: inUserData(USER_DATA_LAYOUT.envFile) }, // CF-4
+    ...(input.envFile ? [{ kind: "literal" as const, path: resolve(input.envFile) }] : []), // CF-4 $CODEPUPPY_ENV_FILE
+    { kind: "literal", path: inUserData(USER_DATA_LAYOUT.endpoints) }, // CF-5
+    { kind: "literal", path: inUserData(USER_DATA_LAYOUT.discoveredEndpoints) }, // CF-5
+    { kind: "subpath", path: inUserData(USER_DATA_LAYOUT.connections) }, // CF-6
+    { kind: "literal", path: inUserData(SETTINGS_STORE) }, // CF-7
+    { kind: "literal", path: inUserData(UPDATER_STORE) }, // CF-7
+    { kind: "dat-files", dir: input.userDataPath }, // CF-7 界面设置存储 *.dat
+    ...configDirectories.map((path) => ({ kind: "subpath" as const, path })), // CF-8
+    { kind: "literal", path: join(input.home, "opencode.json") }, // CF-10
+    { kind: "literal", path: join(input.home, "opencode.jsonc") }, // CF-10
+  ]
+}
+
 export type ProcessFenceProfileInput = {
   /** W1:启动时并集,顺序即优先级(裁剪从尾部丢)。 */
   workspaces: readonly string[]
+  /** 当前环境根:W2 删掉之后不再渲染进放行块,它作为 CF-1 的一条由计划器放进 configFence(冻结设计「既有字段不变」)。 */
   codepuppyGlobalRoot: string
   userDataPath: string
   /**
@@ -114,6 +159,11 @@ export type ProcessFenceProfileInput = {
    * 起代理再渲染(server.ts),所以这里永远是一个已经在听的真端口;没有端口就没有 profile(fail-closed)。
    */
   egressProxyPort: number
+  /**
+   * SPEC-engine-config-fence BR-01:受保护配置集(已是真实路径,含软链位置的真实目标)。渲染成 N4 之后的两块拒写 —— 规则一块、
+   * 它们每一级上级目录节点一块 —— 放在最后,任何放行都盖不过它们(X1 在前)。生产计划器恒给非空;空列表两块都不渲染。
+   */
+  configFence: readonly ConfigFenceRule[]
 }
 
 /** 端口必须是 1..65535 的整数 —— 渲染进 `(remote ip "localhost:<port>")` 的是字面量,不是表达式;坏值 = 坏 profile。 */
@@ -130,7 +180,7 @@ export function assertSeatbeltSafePath(p: string, what: string): string {
   return p
 }
 
-/** 只有 HOME 会进 regex 行。把正则元字符转义掉,免得 `/Users/j.doe` 的 `.` 变成「任意一个字符」。 */
+/** HOME(W8)与 userData(CF-7)会进 regex 行。把正则元字符转义掉,免得 `/Users/j.doe` 的 `.` 变成「任意一个字符」。 */
 function regexLiteral(p: string): string {
   return p.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
 }
@@ -142,15 +192,19 @@ function regexLiteral(p: string): string {
  */
 export function renderProcessFenceProfile(input: ProcessFenceProfileInput): string {
   const ws = input.workspaces.map((w, i) => assertSeatbeltSafePath(w, `workspace[${i}]`))
-  const codepuppyGlobalRoot = assertSeatbeltSafePath(input.codepuppyGlobalRoot, "codepuppyGlobalRoot")
   const userDataPath = assertSeatbeltSafePath(input.userDataPath, "userDataPath")
   const home = assertSeatbeltSafePath(input.roots.home, "HOME")
   const dataHome = assertSeatbeltSafePath(input.roots.dataHome, "XDG_DATA_HOME")
   const cacheHome = assertSeatbeltSafePath(input.roots.cacheHome, "XDG_CACHE_HOME")
-  const configHome = assertSeatbeltSafePath(input.roots.configHome, "XDG_CONFIG_HOME")
   const stateHome = assertSeatbeltSafePath(input.stateHome, "XDG_STATE_HOME")
   const egressProxyPort = assertEgressProxyPort(input.egressProxyPort)
   const homeRe = regexLiteral(home)
+  const configFence = input.configFence.map((rule, i): ConfigFenceRule => {
+    const via = rule.via?.length ? { via: rule.via.map((node) => assertSeatbeltSafePath(node, `configFence[${i}]`)) } : {}
+    return rule.kind === "dat-files"
+      ? { kind: "dat-files", dir: assertSeatbeltSafePath(rule.dir, `configFence[${i}]`), ...via }
+      : { kind: rule.kind, path: assertSeatbeltSafePath(rule.path, `configFence[${i}]`), ...via }
+  })
 
   const lines: string[] = [
     "(version 1)",
@@ -158,12 +212,10 @@ export function renderProcessFenceProfile(input: ProcessFenceProfileInput): stri
     "(deny file-write*)",
     "(allow file-write*",
     ...ws.map((w) => `  (subpath "${w}")                                  ; W1`),
-    `  (subpath "${codepuppyGlobalRoot}")                          ; W2`,
     `  (subpath "${userDataPath}")                             ; W3`,
     ...(stateHome === userDataPath ? [] : [`  (subpath "${join(stateHome, "opencode")}")               ; W3 (XDG_STATE_HOME)`]),
     `  (subpath "${join(dataHome, "opencode")}")               ; W4`,
     `  (subpath "${join(cacheHome, "opencode")}")               ; W5`,
-    `  (subpath "${join(configHome, "opencode")}")               ; W6`,
     `  (subpath "${join(home, ".npm")}")                                ; W7`,
     `  (regex #"^${homeRe}/\\.zsh_history")                       ; W8`,
     `  (subpath "/private/tmp")                               ; W11`,
@@ -182,60 +234,140 @@ export function renderProcessFenceProfile(input: ProcessFenceProfileInput): stri
     '(allow network-bind (local ip "localhost:*"))             ; N2 sidecar 自己的 HTTP 服务器要 bind',
     '(allow network-inbound (local ip "localhost:*"))          ; N3 …还要 accept —— 缺它 listen() EPERM(Q1.1)',
     `(allow network-outbound (remote ip "localhost:${egressProxyPort}"))     ; N4 唯一出口:loopback 上的策略代理(main 进程内)`,
+    ...renderConfigFence(configFence),
   ]
   return lines.join("\n") + "\n"
+}
+
+/**
+ * SPEC-engine-config-fence BR-01 / DESIGN §4.2:受保护集的两块拒写,写在 N4 之后 —— 显式规则后写者胜,所以它们之后不许再有任何文件写的放行。
+ * 第一块是规则本身;第二块是每条规则锚点(dat-files 取 `dir/x`)的每一级上级目录,从父目录起到 `/` 之前,再接上它的 `via`(配置路径上的节点,
+ * 实现期修订 2 B),去重,只冻结节点本身(目录里新建 / 改名 / 删文件照常;节点是软链时冻结的是链本身)。排版就是 processFenceWriteRules 的文法:表头在行首,收尾括号落在最后一条条目的行末,其后可带注释;上级目录块一行写完。
+ */
+function renderConfigFence(rules: readonly ConfigFenceRule[]): string[] {
+  if (!rules.length) return []
+  const entry = (rule: ConfigFenceRule) =>
+    rule.kind === "dat-files" ? `(regex #"^${regexLiteral(rule.dir)}/[^/]+\\.[dD][aA][tT]$")` : `(${rule.kind} "${rule.path}")`
+  const ancestors: string[] = []
+  for (const rule of rules) {
+    for (let node = dirname(rule.kind === "dat-files" ? join(rule.dir, "x") : rule.path); node !== dirname(node); node = dirname(node))
+      if (!ancestors.includes(node)) ancestors.push(node)
+    for (const node of rule.via ?? []) if (!ancestors.includes(node)) ancestors.push(node)
+  }
+  return [
+    "(deny file-write*",
+    ...rules.map((rule, i) => `  ${entry(rule)}${i === rules.length - 1 ? ")                                         ; CF 受保护配置" : ""}`),
+    ...(ancestors.length ? [`(deny file-write* ${ancestors.map((node) => `(literal "${node}")`).join(" ")})      ; CF 上级目录节点`] : []),
+  ]
 }
 
 // ── 签发判定:这一代已经写得到哪里(只用来拒绝签发)────────────────────────────────────
 //
 // 运行期签发(process-fence-workspaces.ts)要先回答「这个目录在不在本代可写范围里」—— 在范围里的永不签发。答案只取 main
-// 自己的知识:本代 apply 的那份 profile 正是本文件渲染的字节,这里把它的 `(allow file-write*` 块解析回规则(唯一来源,不另立清单),
-// 再加上本代已放行 / 正在放行的目录。不看 sidecar 的探针,也不看候选目录此刻在盘上的样子。判据偏向判「覆盖」:大小写折叠、
-// 祖先链上任何一级被 subpath / literal / regex 盖住都算 —— 误判「覆盖」只会少一次签发(说明那一句),误判「不覆盖」才会给可被
-// 围栏代码改写的路径签发令牌。解析不认识的写法一律抛,调用方按「覆盖」处理。
+// 自己的知识:本代 apply 的那份 profile 正是本文件渲染的字节,这里把它的写规则解析回来(唯一来源,不另立清单),再加上本代已放行 /
+// 正在放行的目录。不看 sidecar 的探针,也不看候选目录此刻在盘上的样子。放行块之后的拒写块(受保护配置集与它的上级目录块;
+// DESIGN-stored-credentials-fence 的 C1 两块同一种排版)读成 deny:在某条 allow 之下、且不在任何 deny 之下才算「覆盖」
+// (DESIGN-engine-config-fence §4.2、D14)。判据偏向判「覆盖」:大小写折叠、祖先链上任何一级被 allow 盖住都算 —— 误判「覆盖」只会少一次
+// 签发(说明那一句),误判「不覆盖」才会给可被围栏代码改写的路径签发令牌;deny 一侧的折叠只会让 deny 多盖,结果是多签一次,而 X1 盖不过
+// 末尾的拒写块,多签不放开任何受保护位置。解析不认识的写法一律抛,调用方按「覆盖」处理(本代不签发)。
 
 export type ProcessFenceWriteRule = { kind: "subpath" | "literal" | "regex"; value: string }
+export type ProcessFenceWriteRules = { allow: ProcessFenceWriteRule[]; deny: ProcessFenceWriteRule[] }
 
 const WRITE_RULE = /\((subpath|literal) "([^"]*)"\)|\(regex #"([^"]*)"\)/g
+/** 渲染点写出的两种拒写表头(受保护集与上级目录块、C1 的上级目录块;C1 的读写块)。必须在行首,后面紧跟空格或行尾。 */
+const DENY_HEADERS = ["(deny file-write*", "(deny file-read* file-write*"] as const
+/** 通配操作 `file*`(含写)出现在任何 allow / deny 形式里:渲染点从不写它(审查 B 第 3 条)。 */
+const WILDCARD_FILE_OPERATION = /\((?:allow|deny)(?:\s+[\w*-]+)*?\s+file\*(?=[\s)]|$)/
 
 /**
- * Strict inverse of renderProcessFenceProfile's write block. Any other `(allow file-write*` form throws, and so does
- * any `(deny file-write*` after the block: a later carve-out would make a covered path unwritable without telling us.
+ * 一段只由三种条目与空白组成的文本 ⇒ 条目;别的任何东西(过滤器、别的写法)或一条都没有 ⇒ 抛。`comment`:余下的文字可以是一个 `;` 注释
+ * (放行块的条目行带 `; Wn`;路径里本身可以有 `;`,所以先去掉条目再看余下的)。拒写块的块体里不许注释。
  */
-export function processFenceWriteRules(profile: string): ProcessFenceWriteRule[] {
+function writeRuleEntries(text: string, where: string, comment = false): ProcessFenceWriteRule[] {
+  const found = [...text.matchAll(WRITE_RULE)]
+  const rest = text.replace(WRITE_RULE, "").trim()
+  if (!found.length || (rest && !(comment && rest.startsWith(";")))) throw new Error(`process fence: unrecognised file-write rule: ${where}`)
+  return found.map((match) => {
+    if (match[3] !== undefined) new RegExp(match[3]) // an invalid pattern throws here, not at decision time
+    return match[3] !== undefined ? { kind: "regex" as const, value: match[3] } : { kind: match[1] as "subpath" | "literal", value: match[2]! }
+  })
+}
+
+/** 从表头之后起,到括号配平处为止(只数 `"…"` 与 `#"…"` 之外的括号);返回块体、收尾所在行与收尾之后的余下文字。 */
+function denyBlock(lines: readonly string[], start: number, header: string): { body: string; end: number; rest: string } {
+  let depth = 1
+  let body = ""
+  for (let index = start; index < lines.length; index++) {
+    const text = index === start ? lines[index]!.slice(header.length) : lines[index]!
+    let quoted = false
+    for (let at = 0; at < text.length; at++) {
+      const char = text[at]
+      if (quoted) {
+        if (char === '"') quoted = false
+      } else if (char === '"') quoted = true
+      else if (char === "(") depth++
+      else if (char === ")" && --depth === 0) return { body: body + text.slice(0, at), end: index, rest: text.slice(at + 1) }
+    }
+    if (quoted) throw new Error(`process fence: unterminated string in a file-write deny block: ${text}`)
+    body += `${text}\n`
+  }
+  throw new Error(`process fence: unterminated ${header} block`)
+}
+
+/**
+ * renderProcessFenceProfile 的严格逆。放行块:形状照旧(表头单独一行、条目带 `; Wn` 注释、`)` 单独一行),X1 扩展行不算规则。
+ * 放行块之后只认渲染点写出的拒写块 —— 表头在行首、恰为 `(deny file-write*` 或 `(deny file-read* file-write*`;条目只有
+ * `(subpath "…")`、`(literal "…")`、`(regex #"…")`;块在引号外括号配平处结束,收尾括号可以落在最后一条条目的行末,其后只许 `;` 注释;
+ * 整块写在一行同样合法;条目进 deny。第一个拒写块之后再出现任何文件写的放行(含 X1 行),或任何别的含 `file-write` 的行、表头、条目,都抛。
+ * 通配操作 `file*` 也含写:写在 profile 任何位置都抛。只涉及读的规则不改写集,照旧忽略。
+ */
+export function processFenceWriteRules(profile: string): ProcessFenceWriteRules {
   const lines = profile.split("\n")
   const extension = `(allow file-write* (extension "${WORKSPACE_WRITE_EXTENSION_CLASS}"))`
-  const rules: ProcessFenceWriteRule[] = []
+  const allow: ProcessFenceWriteRule[] = []
+  const deny: ProcessFenceWriteRule[] = []
   let allowed = false
+  let denied = false
   for (let index = 0; index < lines.length; index++) {
     const line = lines[index]!
-    if (allowed && line.includes("(deny file-write*")) throw new Error(`process fence: file-write deny after the allow block: ${line}`)
-    if (!line.includes("(allow file-write*")) continue
+    if (WILDCARD_FILE_OPERATION.test(line)) throw new Error(`process fence: wildcard file operation (includes writes) the renderer never writes: ${line}`)
+    const header = allowed ? DENY_HEADERS.find((candidate) => line.startsWith(candidate) && (line.length === candidate.length || line[candidate.length] === " ")) : undefined
+    if (header) {
+      const block = denyBlock(lines, index, header)
+      const rest = block.rest.trim()
+      if (rest && !rest.startsWith(";")) throw new Error(`process fence: unrecognised text after a file-write deny block: ${block.rest}`)
+      deny.push(...writeRuleEntries(block.body, line))
+      denied = true
+      index = block.end
+      continue
+    }
+    if (!line.includes("file-write")) continue
+    if (!allowed && !line.includes("(allow file-write*")) continue // the global `(deny file-write*)` before the allow block
+    if (denied) throw new Error(`process fence: file-write rule after the protected deny blocks: ${line}`)
+    if (!line.includes("(allow file-write*")) throw new Error(`process fence: unrecognised file-write rule form: ${line}`)
     allowed = true
     if (line.startsWith(extension)) continue // X1 grants exist only through main's own ledger.
     if (line !== "(allow file-write*") throw new Error(`process fence: unrecognised file-write rule form: ${line}`)
     const end = lines.indexOf(")", index + 1)
     if (end < 0) throw new Error("process fence: unterminated (allow file-write* block")
-    for (const entry of lines.slice(index + 1, end)) {
-      const found = [...entry.matchAll(WRITE_RULE)]
-      const rest = entry.replace(WRITE_RULE, "").trim()
-      if (!found.length || (rest && !rest.startsWith(";"))) throw new Error(`process fence: unrecognised file-write rule: ${entry}`)
-      for (const match of found) {
-        if (match[3] !== undefined) new RegExp(match[3]) // an invalid pattern throws here, not at decision time
-        rules.push(match[3] !== undefined ? { kind: "regex", value: match[3] } : { kind: match[1] as "subpath" | "literal", value: match[2]! })
-      }
-    }
+    for (const entry of lines.slice(index + 1, end)) allow.push(...writeRuleEntries(entry, entry, true))
     index = end
   }
-  return rules
+  return { allow, deny }
 }
 
-/** Whether `directory` or any of its ancestors is writable under `rules` (case-folded: the conservative side). */
-export function processFenceRulesCover(rules: readonly ProcessFenceWriteRule[], directory: string): boolean {
+/**
+ * 已覆盖 = 某条 allow 盖住 directory 或其祖先(subpath / literal 等于、regex 命中;一个祖先上的 literal 让那个祖先可写,所以其下全算),
+ * 且没有 deny 盖住它(subpath / regex 盖住 directory 或其祖先、literal 只在等于 directory 时算)。大小写折叠。
+ */
+export function processFenceRulesCover(rules: ProcessFenceWriteRules, directory: string): boolean {
   const chain = [resolve(directory)]
   while (chain.at(-1) !== dirname(chain.at(-1)!)) chain.push(dirname(chain.at(-1)!))
-  return chain.some((path) => rules.some((rule) =>
-    rule.kind === "regex" ? new RegExp(rule.value, "i").test(path) : resolve(rule.value).toLowerCase() === path.toLowerCase()))
+  const hits = (rule: ProcessFenceWriteRule, path: string) =>
+    rule.kind === "regex" ? new RegExp(rule.value, "i").test(path) : resolve(rule.value).toLowerCase() === path.toLowerCase()
+  if (!chain.some((path) => rules.allow.some((rule) => hits(rule, path)))) return false
+  return !rules.deny.some((rule) => (rule.kind === "literal" ? hits(rule, chain[0]!) : chain.some((path) => hits(rule, path))))
 }
 
 // ── W1:启动时并集 ────────────────────────────────────────────────────────────────
@@ -296,6 +428,12 @@ export type WorkspaceUnionInput = {
    * 与它相关的候选一律排除(规则 5b)。由 server.ts 从冻结的环境快照取来传入;本模块不解析它。
    */
   appStateRoot: string
+  /**
+   * SPEC-engine-config-fence BR-05 / DESIGN §4.3:受保护配置集里的目录位置(含软链位置的真实目标)—— 计划器渲染进 profile 的同一份;
+   * 本运行尚未计划时由同一个位置清单按主进程环境现算(server.ts 的 currentConfigFenceRoots);非 darwin 为空。每次判定都调一次。
+   * 与其中某个根是同一对象或在其内的候选不合格(原因 protected-config);包含它们的照常(末尾的拒写块盖过 X1)。
+   */
+  configFenceRoots: () => readonly string[]
   /**
    * `#1390`:路径归一(生产 = `fs.realpathSync.native`)。**必须是 native**:Electron 内嵌 node(实测 v24.15.0,
    * electron 42.3.3)与 node 22 的 JS 实现 `fs.realpathSync` 只解软链、**不归一大小写**,`LIBRARY/application support`
@@ -384,12 +522,12 @@ export function workspaceCandidatesFromStore(sources: WorkspaceUnionSources): st
   return out
 }
 
-export type WorkspaceDirectoryInput = Pick<WorkspaceUnionInput, "homeDir" | "appStateRoot" | "realpath" | "isDirectory" | "stat">
+export type WorkspaceDirectoryInput = Pick<WorkspaceUnionInput, "homeDir" | "appStateRoot" | "configFenceRoots" | "realpath" | "isDirectory" | "stat">
 
 export type WorkspaceDirectoryCheck =
   | { eligible: true; directory: string }
   /** `missing`: the path cannot be resolved right now (e.g. an unmounted volume) — unknown, not "elsewhere". */
-  | { eligible: false; reason: "home-or-app-state" | "not-a-directory"; detail: string; missing?: true }
+  | { eligible: false; reason: "home-or-app-state" | "protected-config" | "not-a-directory"; detail: string; missing?: true }
 
 /** APFS Data volume. Electron Node's realpath(3) keeps this spelling for firmlinked paths (`/Users/...`). */
 const DATA_VOLUME = "/System/Volumes/Data"
@@ -399,7 +537,8 @@ const DATA_VOLUME = "/System/Volumes/Data"
  * start-time seeding, quarantine and the runtime grant.
  *  - Identity = the `realpath` result, with the Data-volume spelling collapsed only when the plain
  *    spelling names the same device + inode.
- *  - Protected relations (HOME, an ancestor of it, `/`, the app-state root, inside it or containing it)
+ *  - Protected relations (HOME, an ancestor of it, `/`, the app-state root, inside it or containing it; then a
+ *    protected engine-configuration location or inside it — `protected-config`, SPEC-engine-config-fence BR-05)
  *    compare device + inode along ancestor chains, never string prefixes: `/System/Volumes/Data/Users/<me>`
  *    is refused exactly like HOME.
  *  - `open`: the identity now (an explicit open, the default workspace, a literal path seen first).
@@ -475,6 +614,22 @@ export function checkWorkspaceDirectory(input: WorkspaceDirectoryInput, raw: str
           (directory === resolve(raw) ? "" : ` (resolves to ${directory})`) +
           " — the fence's own state must never be a workspace (#1390)",
       }
+    // After the HOME / app-state relations (a folder inside the state root keeps that reason and sentence): the same object
+    // as a protected configuration location, or inside it. A root that is not on disk has nothing inside it.
+    for (const root of input.configFenceRoots()) {
+      let rootId: string
+      try {
+        rootId = objectId(canonical(root))
+      } catch {
+        continue
+      }
+      if (chain(directory).some((entry) => objectId(entry) === rootId))
+        return {
+          eligible: false,
+          reason: "protected-config",
+          detail: `inside the protected engine configuration location ${root}` + (directory === resolve(raw) ? "" : ` (resolves to ${directory})`),
+        }
+    }
     if (mode === "stored" && directory !== resolve(raw))
       return { eligible: false, reason: "not-a-directory", detail: `stored workspace identity no longer resolves to itself (now ${directory})` }
     if (input.isDirectory(directory)) return { eligible: true, directory }

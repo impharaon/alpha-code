@@ -13,17 +13,23 @@
 // ── 父目录必须由未被围栏的一方预先建好(勘破 §6.3.1 第 3 条)────────────────────────
 // `(subpath "<X>/.local/share/opencode")` 放行的是该目录**之下**;`<X>/.local/share` 不存在时,
 // 被围栏的引擎 `mkdir -p` 会在父层 EPERM —— 而 packages/core/src/global.ts 在**模块装载时**就
-// mkdir 四个根(data/config/state/tmp/log/bin/repos)。所以 main 在这里把 W4/W5/W6/W7 建好;
-// W2/W3 由 main 的 boot 序早已建好;`~/code-puppy` 走 ensureUserWorkspaceDir(唯一的 lazy 供给点)。
+// mkdir 四个根(data/config/state/tmp/log/bin/repos)。所以 main 在这里把 W4/W5/W7 建好;W3 由 main 的 boot 序早已建好;
+// `~/code-puppy` 走 ensureUserWorkspaceDir(唯一的 lazy 供给点)。受保护配置集里的目录(状态根、环境根、引擎配置目录、连接记录、
+// 两个引擎全局配置目录 —— 后者就是原来的 W6)由 planConfigFence 预建:它们与每一级上级目录节点都被末尾的拒写块冻结,引擎与子进程在
+// 其中只能得到 EEXIST(SPEC-engine-config-fence I4)。
 // **刻意不建** W16(`~/.opencode`:engine-config-truth 对它有 junk-only 判定,凭空建一个会改行为)、
 // W17/W18(dev-only)。
 
-import { join } from "node:path"
+import { lstatSync } from "node:fs"
+import { basename, dirname, join, resolve } from "node:path"
 import { resolveFenceAddonPath, type FenceAddonResolveInput } from "./process-fence-apply"
 import {
+  assertSeatbeltSafePath,
+  configFenceLocations,
   resolveEngineRoots,
   selectWorkspaceUnion,
   trimUntilCompiles,
+  type ConfigFenceRule,
   type EngineRoots,
   type TrialCompile,
   type WorkspaceExclusion,
@@ -39,6 +45,8 @@ export type ProcessFencePlan = {
   attempts: number
   profileBytes: number
   roots: EngineRoots & { codepuppyGlobalRoot: string; userDataPath: string; stateHome: string }
+  /** 受保护配置集里的目录位置(含真实目标),与渲染进 profile 的同一份;资格判定的 configFenceRoots 用它(server.ts)。 */
+  configFenceRoots: string[]
 }
 
 export type PlanProcessFenceInput = {
@@ -58,6 +66,136 @@ export type PlanProcessFenceInput = {
    * persisted: an app restart starts from the truth file alone.
    */
   carriedWorkspaces: readonly string[]
+  /** SPEC-engine-config-fence CF-8:server.ts 交给启动文档的同一个值(engineGlobalConfigDirectory(exported.env, exported.home))。 */
+  engineConfigDirectory: string
+  /** CF-4 的另一份(实现期修订 2 A):主进程启动时读的 `$CODEPUPPY_ENV_FILE`(codepuppy-secrets.ts userEnvFile);没设为空。 */
+  envFile?: string
+}
+
+/**
+ * DESIGN-engine-config-fence §4.3:受保护配置集落到真实路径。目录位置先预建;每个位置写成「真实上级目录 + 名字」,位置已存在且解析到
+ * 别处(软链)时再加真实目标(同一种规则)。realpath 报 ENOENT = 位置不在盘上(literal / subpath 对尚不存在的路径同样挡住新建);
+ * 别的错误照常抛 ⇒ 计划失败 ⇒ 拒 fork。返回渲染用的规则与其中的目录位置(资格判定用)。手渲染 profile 的测试夹具也走这里。
+ */
+export function planConfigFence(
+  input: { userDataPath: string; appStateRoot: string; codepuppyGlobalRoot: string; engineConfigDirectory: string; roots: EngineRoots; envFile?: string },
+  deps: Pick<PlanProcessFenceDeps, "realpath" | "mkdirp" | "lstat">,
+): { configFence: ConfigFenceRule[]; configFenceRoots: string[]; unexpressed: string[] } {
+  /** 残留 R11:写不进 profile(引号、反斜杠、控制字符)因而不被冻结 / 保护的路径,计划器记一行点名。 */
+  const unexpressed: string[] = []
+  const locations = configFenceLocations({ ...input, configHome: input.roots.configHome, home: input.roots.home })
+  const envFile = input.envFile ? resolve(input.envFile) : undefined
+  for (const location of locations) if (location.kind === "subpath") deps.mkdirp(location.path)
+  const target = (path: string) => {
+    try {
+      return deps.realpath(path)
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException)?.code === "ENOENT") return undefined
+      throw error
+    }
+  }
+  const configFence: ConfigFenceRule[] = []
+  const add = (rule: ConfigFenceRule) => {
+    if (!configFence.some((known) => JSON.stringify(known) === JSON.stringify(rule))) configFence.push(rule)
+  }
+  const anchorOf = (rule: ConfigFenceRule) => (rule.kind === "dat-files" ? join(rule.dir, "x") : rule.path)
+  const chain = (anchor: string) => {
+    const nodes: string[] = []
+    for (let node = dirname(anchor); node !== dirname(node); node = dirname(node)) nodes.push(node)
+    return nodes
+  }
+  /** 一个目录的真实路径;不在盘上 = 最深一级已存在祖先的真实路径接上余下部分。 */
+  const within = (directory: string): string => {
+    try {
+      return deps.realpath(directory)
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException)?.code !== "ENOENT" || dirname(directory) === directory) throw error
+      return join(within(dirname(directory)), basename(directory))
+    }
+  }
+  const lstat = deps.lstat ?? ((path: string) => lstatSync(path, { bigint: true }))
+  /** 节点本身(不跟软链)的 device + inode;拿不到为空。 */
+  const identity = (path: string) => {
+    try {
+      const meta = lstat(path)
+      return `${meta.dev}:${meta.ino}`
+    } catch {
+      return undefined
+    }
+  }
+  /**
+   * 一个节点在真实上级目录之下的身份:与它的真实路径是同一对象(device + inode;大小写、firmlink 按身份归一)⇒ 真实写法;软链或尚不存在
+   * ⇒ 链节点自己的名字(终审第 6a 条:不按小写字符串判,区分大小写的卷上指向只差大小写的兄弟的链节点照样留下)。
+   */
+  const node = (path: string) => {
+    const spelled = join(within(dirname(path)), basename(path))
+    const real = target(path)
+    if (real === undefined || real === spelled) return real ?? spelled
+    const self = identity(spelled)
+    return self !== undefined && self === identity(real) ? real : spelled
+  }
+  /**
+   * 实现期修订 2 B:位置的配置路径(未解析)上、不在这几条规则真实路径上的目录节点,按身份去重,挂在这个位置的第一条规则上。终审第 3 条:
+   * 每个配置路径节点所在的真实位置的上级链也算进来(两跳软链时,中间那一跳的真实目录既不在配置路径上、也不在最终真实路径上)。
+   */
+  const withVia = (location: ConfigFenceRule, rules: ConfigFenceRule[]) => {
+    if (!rules.length) return rules
+    const real = new Set(rules.flatMap((rule) => chain(anchorOf(rule))))
+    const nodes = chain(anchorOf(location)).map(node)
+    // 终审第 4 条:写不进 profile 的节点(引号、反斜杠、换行)只丢它自己 —— 规则本身与其余节点照留,计划不因它失败
+    const writable = (n: string) => {
+      try {
+        assertSeatbeltSafePath(n, "via")
+        return true
+      } catch {
+        if (!unexpressed.includes(n)) unexpressed.push(n)
+        return false
+      }
+    }
+    const via = [...new Set(nodes.flatMap((n) => [n, ...chain(n)]))].filter((n) => !real.has(n) && writable(n))
+    return via.length ? [{ ...rules[0]!, via }, ...rules.slice(1)] : rules
+  }
+  for (const location of locations) {
+    if (location.kind === "dat-files") {
+      for (const rule of withVia(location, [{ kind: "dat-files", dir: deps.realpath(location.dir) }])) add(rule)
+      continue
+    }
+    if (location.path === envFile && location.kind === "literal") {
+      // 实现期修订 2 A:这一项从不让计划失败 —— 上级目录不在盘上照样成规则(literal 挡住新建,上级目录块挡住建出中间目录);解析出错就按
+      // 设置的路径写;写不进 profile 的路径(引号、反斜杠、换行)不写。
+      let rules: ConfigFenceRule[] = []
+      try {
+        const placed = join(within(dirname(envFile)), basename(envFile))
+        rules.push({ kind: "literal", path: placed })
+        const real = target(envFile)
+        if (real !== undefined && real !== placed) rules.push({ kind: "literal", path: real })
+        rules = withVia(location, rules)
+      } catch {
+        rules = [{ kind: "literal", path: envFile }]
+      }
+      // 终审第 2 条:落在 /dev 下的规则(常见的 /dev/null 表示「没有文件」)不出 —— 读它是空,写它不改变主进程读到的任何东西,而拒写
+      // /dev/null 会让引擎与子进程的 >/dev/null、忽略的 stdio 全部 EPERM。确认审查 R2 第 1 条:只丢 /dev 下的那条;env 文件是指到 /dev 下的
+      // 软链时,链节点自己的 literal 与它的路径节点照留(经链写入按解析后的目标判,照样到 /dev/null;删链、换链被拒)。
+      const underDev = (path: string) => path === "/dev" || path.startsWith("/dev/")
+      const ruleBase = (rule: ConfigFenceRule) => (rule.kind === "dat-files" ? rule.dir : rule.path)
+      if (underDev(envFile) || (rules[0] && underDev(ruleBase(rules[0])))) continue
+      rules = rules.filter((rule) => !underDev(ruleBase(rule)))
+      for (const rule of rules) {
+        try {
+          assertSeatbeltSafePath(rule.kind === "dat-files" ? rule.dir : rule.path, "CODEPUPPY_ENV_FILE")
+          add(rule)
+        } catch {
+          unexpressed.push(rule.kind === "dat-files" ? rule.dir : rule.path)
+        }
+      }
+      continue
+    }
+    const placed = join(deps.realpath(dirname(location.path)), basename(location.path))
+    const real = target(location.path)
+    const rules: ConfigFenceRule[] = [{ kind: location.kind, path: placed }, ...(real !== undefined && real !== placed ? [{ kind: location.kind, path: real }] : [])]
+    for (const rule of withVia(location, rules)) add(rule)
+  }
+  return { configFence, configFenceRoots: configFence.flatMap((rule) => (rule.kind === "subpath" ? [rule.path] : [])), unexpressed }
 }
 
 export type PlanProcessFenceDeps = {
@@ -76,6 +214,8 @@ export type PlanProcessFenceDeps = {
   readWorkspaces: () => readonly string[]
   isDirectory: (p: string) => boolean
   stat?: WorkspaceDirectoryInput["stat"]
+  /** The node itself, not followed (受保护集配置路径节点的身份,终审第 6a 条); production uses lstatSync with bigint identities. */
+  lstat?: (p: string) => { dev: number | bigint | string; ino: number | bigint | string }
   mkdirp: (p: string) => void
   compile: TrialCompile
   log: (line: string) => void
@@ -94,12 +234,21 @@ export function planProcessFence(input: PlanProcessFenceInput, deps: PlanProcess
   for (const dir of [
     join(roots.dataHome, "opencode"),
     join(roots.cacheHome, "opencode"),
-    join(roots.configHome, "opencode"),
     join(home, ".npm"),
     ...(stateHome === input.userDataPath ? [] : [join(stateHome, "opencode")]),
   ]) {
     deps.mkdirp(dir)
   }
+  const appStateRoot = deps.appStateRoot()
+  const fenceSet = planConfigFence(
+    { userDataPath: input.userDataPath, appStateRoot, codepuppyGlobalRoot, engineConfigDirectory: input.engineConfigDirectory, roots, ...(input.envFile ? { envFile: input.envFile } : {}) },
+    deps,
+  )
+
+  if (fenceSet.unexpressed.length)
+    deps.log(
+      `process fence: protected configuration — ${fenceSet.unexpressed.length} path(s) cannot be written into the profile (quote, backslash or control character) and are not protected: ${fenceSet.unexpressed.map((path) => JSON.stringify(path)).join(", ")}`,
+    )
 
   let candidates: readonly string[]
   try {
@@ -113,7 +262,8 @@ export function planProcessFence(input: PlanProcessFenceInput, deps: PlanProcess
     candidates: [...candidates, ...input.carriedWorkspaces],
     defaultWorkspace: deps.defaultWorkspace(),
     homeDir: home,
-    appStateRoot: deps.appStateRoot(),
+    appStateRoot,
+    configFenceRoots: () => fenceSet.configFenceRoots,
     realpath: deps.realpath,
     isDirectory: deps.isDirectory,
     stat: deps.stat,
@@ -122,7 +272,7 @@ export function planProcessFence(input: PlanProcessFenceInput, deps: PlanProcess
     throw new Error("process fence: the default workspace is not a directory on disk — refusing to fork an engine that could not write anywhere a user expects")
 
   const trimmed = trimUntilCompiles(
-    { workspaces: union.selected, codepuppyGlobalRoot, userDataPath: input.userDataPath, roots, stateHome, egressProxyPort: input.egressProxyPort },
+    { workspaces: union.selected, codepuppyGlobalRoot, userDataPath: input.userDataPath, roots, stateHome, egressProxyPort: input.egressProxyPort, configFence: fenceSet.configFence },
     deps.compile,
   )
   const addonPath = resolveFenceAddonPath(input.addon)
@@ -135,9 +285,10 @@ export function planProcessFence(input: PlanProcessFenceInput, deps: PlanProcess
     attempts: trimmed.attempts,
     profileBytes: Buffer.byteLength(trimmed.profile),
     roots: { ...roots, codepuppyGlobalRoot, userDataPath: input.userDataPath, stateHome },
+    configFenceRoots: fenceSet.configFenceRoots,
   }
   deps.log(
-    `process fence planned: workspaces=${plan.workspaces.length} (candidates=${union.candidates}, excluded=${plan.excluded.length}, dropped=${plan.dropped.length}), egressProxyPort=${input.egressProxyPort}, profile=${plan.profileBytes}B, compile attempts=${plan.attempts}` +
+    `process fence planned: workspaces=${plan.workspaces.length} (candidates=${union.candidates}, excluded=${plan.excluded.length}, dropped=${plan.dropped.length}), egressProxyPort=${input.egressProxyPort}, configFence=${fenceSet.configFence.length} rules, profile=${plan.profileBytes}B, compile attempts=${plan.attempts}` +
       (plan.dropped.length ? ` — dropped (oldest first): ${[...plan.dropped].reverse().join(", ")}; last compiler error: ${trimmed.lastFailure}` : "") +
       (plan.excluded.length ? ` — excluded: ${plan.excluded.map((e) => `${e.directory} (${e.reason})`).join("; ")}` : ""),
   )

@@ -68,6 +68,7 @@ import {
 import { CODEPUPPY_AGENT_TEXT } from "./codepuppy-agents"
 import { CODEPUPPY_BEHAVIOR_MD } from "./codepuppy-behavior"
 import { injectCodePuppyConfig } from "./codepuppy-config-injection"
+import { writeEngineConfigForFork } from "./engine-explicit-config"
 import { secretFilePath } from "./codepuppy-secret-files"
 import { CLOUD_MCP_SERVER_NAME, CLOUD_WEB_SEARCH_TOOL_ID, LOCAL_WEB_SEARCH_TOOL_ID, WITHHELD_CLOUD_MCP } from "./cloud-web-search"
 import { publishMainBootstrap, unpublishTestBootstrap } from "../../test-component/codepuppy-bootstrap-fixture"
@@ -300,12 +301,13 @@ function run(extPluginPath?: string): Run {
   const before: Cfg = {}
   // `#1698` G2:平台地址 / 默认模型 / 云 MCP / kill-switch 由 main 的构建器从它的环境(这里就是 process.env)写进启动文档,sidecar 在注入前发布
   publishMainBootstrap({ userData, factorySkillDirs })
+  // SPEC-engine-config-fence BR-03:显式文件那一层由 main 在 fork 前按同一份文档写(与生产同序),sidecar 再注入
+  const { layer } = writeEngineConfigForFork(codepuppyBootstrap()).watch
   const result = injectCodePuppyConfig(userData, extPluginPath, "stable", codepuppyBootstrap().paths.userConfig ?? null)
   expect(result.ok).toBe(true)
   // `#1667`(裁决 r1 第 2 条、C7 重裁):main 交给引擎的字分两处 —— 内联文档,与显式文件里 Code Puppy 那一层(出厂命令、skills、
   // 第一层 policies;显式文件里其余的是用户 codepuppy.jsonc 的字,按来源不判)。判官看两处合起来的那一份。
   const inline = JSON.parse(result.config.content) as Cfg
-  const layer = result.explicit!.layer
   expect(layer.policies).toEqual((inline.policies as unknown[] | undefined) ?? [])
   const after: Cfg = {
     ...inline,

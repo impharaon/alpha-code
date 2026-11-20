@@ -47,8 +47,10 @@ mockElectron(() => ({
 }))
 // main 的 warn 行(`#1698`:构建器忽略一个导出值时记的那一行在这里判)
 const warned: string[] = []
+// main 的 error 行(SPEC-engine-config-fence AC-05:引擎配置写不进时拒绝 fork 的那一行在这里判)
+const errored: string[] = []
 mock.module("./logging", () => ({
-  getLogger: () => ({ log: () => {}, warn: (...args: unknown[]) => void warned.push(args.map(String).join(" ")), error: () => {} }),
+  getLogger: () => ({ log: () => {}, warn: (...args: unknown[]) => void warned.push(args.map(String).join(" ")), error: (...args: unknown[]) => void errored.push(args.map(String).join(" ")) }),
   write: () => {},
   rotateServerLogs: () => {},
 }))
@@ -70,7 +72,10 @@ mock.module("./codepuppy-keychain-backend", () => ({
 const { applyPlatformCredentialsHot, hasSecretFile, secretFilePath } = await import("./codepuppy-secret-files")
 const { clearByokKeys, initByokKeys, storeByokKey } = await import("./codepuppy-byok-keys")
 const { writeShellEnvCache } = await import("./shell-env-cache")
-const { forkedSecretNames, preferAppEnv, spawnLocalServer } = await import("./server")
+const { forkedSecretNames, preferAppEnv, preplanConfigFenceRoots, spawnLocalServer } = await import("./server")
+const { configFenceLocations, resolveEngineRoots } = await import("./process-fence-profile")
+const { bootFenceWorkspaceTruth, readWorkspaceTruthOrThrow, writeWorkspaceTruth } = await import("./process-fence-workspaces")
+const { GLOBAL_RENDERER_STORE, TABS_KEY } = await import("./tabs-preclean")
 const { requestCatalogRefresh } = await import("./catalog-refresher")
 const { appliedCatalogPath, writeCatalogSnapshot } = await import("./codepuppy-live-allowlist")
 // REQ-159 `#1321`:生产 spawnLocalServer 在 fork 前做围栏计划(真 store / 真 sandbox-exec / 真原生模块路径);
@@ -103,6 +108,7 @@ const managedEnv = [
   "CODEPUPPY_ENV_FILE",
   "CODEPUPPY_SECRETS_DISABLE",
   "CODEPUPPY_WEBSEARCH_DISABLE",
+  "CODEPUPPY_MODELS_DISABLE",
   ...keylessWebSearchFlags,
   "OPENCODE_EXPERIMENTAL",
 ] as const
@@ -667,6 +673,72 @@ describe("spawnLocalServer", () => {
     expect(readFileSync(secretFilePath(userDataPath, "CODEPUPPY_API_KEY"), "utf8")).toBe("next-key")
   })
 
+  // SPEC-engine-config-fence BR-03 / AC-05 第一句(DESIGN-engine-config-fence §4.4、§5):显式文件、模型底表与种子由 main 在 fork 前写;
+  // 写不进或该删的 models.json 删不掉 ⇒ 与密钥文件、已应用目录同一条路径拒绝 fork,留一行具名日志,不退回 sidecar 里去写。
+  test("AC-05:引擎配置目录写不进 ⇒ 拒绝 fork,日志恰一行 [I-13] 并点名路径", async () => {
+    const blocked = join(userDataPath, "codepuppy-engine-config")
+    writeFileSync(blocked, "")
+    errored.length = 0
+    await expect(
+      spawnLocalServer("127.0.0.1", 4096, "password", { userDataPath, healthCheck: async () => true, planFence: fakePlanFence, fork: fakeFork }),
+    ).rejects.toThrow(/engine config files could not be written — sidecar fork refused/)
+    expect(forkCalls).toHaveLength(0)
+    const lines = errored.filter((line) => line.startsWith("[I-13] engine config files could not be written — refusing to fork:"))
+    expect(lines).toHaveLength(1)
+    expect(lines[0]).toContain(blocked)
+  })
+
+  test("AC-05 / E5:模型底表该删(CODEPUPPY_MODELS_DISABLE)却删不掉 ⇒ 同样拒绝 fork;删得掉时 fork 前已删", async () => {
+    const models = join(userDataPath, "codepuppy-engine-config", "models.json")
+    mkdirSync(join(models, "occupied"), { recursive: true })
+    process.env.CODEPUPPY_MODELS_DISABLE = "1"
+    errored.length = 0
+    await expect(
+      spawnLocalServer("127.0.0.1", 4096, "password", { userDataPath, healthCheck: async () => true, planFence: fakePlanFence, fork: fakeFork }),
+    ).rejects.toThrow(/engine config files could not be written — sidecar fork refused/)
+    expect(forkCalls).toHaveLength(0)
+    expect(errored.filter((line) => line.startsWith("[I-13] engine config files could not be written — refusing to fork:") && line.includes(models))).toHaveLength(1)
+    rmSync(models, { recursive: true })
+    writeFileSync(models, "{}")
+    await forkSidecar()
+    expect(forkCalls).toHaveLength(1)
+    expect(() => readFileSync(models)).toThrow()
+  })
+
+  test("BR-03 / E7:fork 前 main 写好显式文件与种子并跑监听 —— 子进程活着时手改 codepuppy.jsonc、main 装一个技能 ⇒ main 重写显式文件;子进程退出后不再跟", async () => {
+    const explicit = join(userDataPath, "codepuppy-engine-config", "codepuppy-explicit.json")
+    const userConfig = join(process.env.CODEPUPPY_GLOBAL_DIR!, "codepuppy.jsonc")
+    const result = await spawnLocalServer("127.0.0.1", 4096, "password", { userDataPath, healthCheck: async () => true, planFence: fakePlanFence, fork: fakeFork })
+    await result.health.wait
+    expect(JSON.parse(readFileSync(userConfig, "utf8"))).toEqual({ $schema: "https://opencode.ai/config.json" })
+    const commands = () => Object.keys((JSON.parse(readFileSync(explicit, "utf8")) as { commands?: Record<string, unknown> }).commands ?? {})
+    expect(commands()).toEqual(["init", "review"])
+    const edit = (name: string) => {
+      writeFileSync(`${userConfig}.tmp`, JSON.stringify({ commands: { [name]: { template: name } } }))
+      renameSync(`${userConfig}.tmp`, userConfig)
+    }
+    const waitFor = async (predicate: () => boolean) => {
+      for (const until = Date.now() + 3_000; Date.now() < until; await new Promise((resolve) => setTimeout(resolve, 25))) if (predicate()) return true
+      return predicate()
+    }
+    await new Promise((resolve) => setTimeout(resolve, 250)) // 递归目录监听起来要一点时间
+    edit("while-alive")
+    expect(await waitFor(() => commands().includes("while-alive"))).toBe(true)
+    // main 装一个技能(ext-transaction 的姿势:生成目录 + current.json 指向它 + 允许集里有这个键)⇒ 显式文件的 skills 跟着重写
+    const root = process.env.CODEPUPPY_GLOBAL_DIR!
+    const generation = join(root, "ext-store", "skill--installed", "generations", "gen-000001-abcdef")
+    mkdirSync(generation, { recursive: true })
+    writeFileSync(join(root, "ext-store", "skill--installed", "current.json"), JSON.stringify({ generation: "gen-000001-abcdef" }))
+    writeFileSync(join(root, "skills-enabled.json"), JSON.stringify({ v: 3, keys: ["skill--installed"], scoped: [], mcp: [] }))
+    const skills = () => (JSON.parse(readFileSync(explicit, "utf8")) as { skills?: string[] }).skills ?? []
+    expect(await waitFor(() => skills().some((entry) => entry.endsWith(join("skill--installed", "generations", "gen-000001-abcdef"))))).toBe(true)
+    await result.listener.stop()
+    edit("after-exit")
+    await new Promise((resolve) => setTimeout(resolve, 400))
+    expect(commands()).toContain("while-alive")
+    expect(commands()).not.toContain("after-exit")
+  })
+
   test("forks the sidecar in the userData scratch directory", async () => {
     const result = await spawnLocalServer("127.0.0.1", 4096, "password", {
       userDataPath,
@@ -819,6 +891,144 @@ describe("#1698 不合格的导出值被忽略,启动照常", () => {
         }
       }
     })
+})
+
+// 实现期修订 2 A:主进程启动时读的 $CODEPUPPY_ENV_FILE(userEnvFile —— loadCodePuppySecrets 用的同一个来源)交给计划器,进 CF-4。
+describe("修订 2 A:CODEPUPPY_ENV_FILE 交给计划器", () => {
+  const planInputs = async () => {
+    const seen: Array<{ envFile?: string }> = []
+    creditDanglingSweepForSpawn()
+    const result = await spawnLocalServer("127.0.0.1", 4096, "password", {
+      userDataPath,
+      healthCheck: async () => true,
+      planFence: (input: { envFile?: string }) => {
+        seen.push(input)
+        return fakePlanFence()
+      },
+      fork: fakeFork,
+    })
+    await result.health.wait
+    await result.listener.stop()
+    return seen
+  }
+  test("设置(绝对 / 相对)⇒ 计划输入带同一份路径(相对按 cwd);不设 ⇒ 没有这一项", async () => {
+    const saved = process.env.CODEPUPPY_ENV_FILE
+    try {
+      process.env.CODEPUPPY_ENV_FILE = join(userDataPath, "elsewhere", "cp.env")
+      expect((await planInputs()).map((input) => input.envFile)).toEqual([join(userDataPath, "elsewhere", "cp.env")])
+      process.env.CODEPUPPY_ENV_FILE = "relative/cp.env"
+      expect((await planInputs()).map((input) => input.envFile)).toEqual([resolve(process.cwd(), "relative/cp.env")])
+      delete process.env.CODEPUPPY_ENV_FILE
+      expect((await planInputs()).map((input) => "envFile" in input)).toEqual([false])
+    } finally {
+      if (saved === undefined) delete process.env.CODEPUPPY_ENV_FILE
+      else process.env.CODEPUPPY_ENV_FILE = saved
+    }
+  })
+})
+
+// 审查 B 第 2 条(SPEC-engine-config-fence BR-05):本运行第一次计划之前,资格判定用的受保护配置目录与计划器、启动文档同一个来源 ——
+// 用户导出的相对 OPENCODE_CONFIG_DIR / XDG_CONFIG_HOME 当没设(usableExportedPaths),不按主进程 cwd 解析。否则 cwd 被当成受保护目录,
+// 真源里 cwd 之下的诚实项目在 boot 时被检疫、第一次切 tab 就从真源删掉。
+describe("审查 B 第 2 条:计划之前的受保护配置目录 = 计划器的受保护目录", () => {
+  const variables = ["OPENCODE_CONFIG_DIR", "XDG_CONFIG_HOME"] as const
+  const withEnv = async <T>(values: Partial<Record<(typeof variables)[number], string>>, run: () => Promise<T> | T): Promise<T> => {
+    const saved = Object.fromEntries(variables.map((name) => [name, process.env[name]]))
+    try {
+      for (const name of variables) {
+        if (values[name] === undefined) delete process.env[name]
+        else process.env[name] = values[name]
+      }
+      return await run()
+    } finally {
+      for (const [name, value] of Object.entries(saved)) {
+        if (value === undefined) delete process.env[name]
+        else process.env[name] = value
+      }
+    }
+  }
+  const inputs = () => ({ userDataPath, appStateRoot: join(userDataPath, "codepuppy-state"), codepuppyGlobalRoot: process.env.CODEPUPPY_GLOBAL_DIR! })
+
+  const rows: Array<{ label: string; values: (base: string) => Partial<Record<(typeof variables)[number], string>> }> = [
+    { label: "both unset", values: () => ({}) },
+    { label: "OPENCODE_CONFIG_DIR absolute", values: (base) => ({ OPENCODE_CONFIG_DIR: join(base, "exported-config") }) },
+    { label: "OPENCODE_CONFIG_DIR=.", values: () => ({ OPENCODE_CONFIG_DIR: "." }) },
+    { label: "OPENCODE_CONFIG_DIR relative", values: () => ({ OPENCODE_CONFIG_DIR: "cfg/sub" }) },
+    { label: "XDG_CONFIG_HOME absolute", values: (base) => ({ XDG_CONFIG_HOME: join(base, "xdg-config") }) },
+    { label: "XDG_CONFIG_HOME relative", values: () => ({ XDG_CONFIG_HOME: "rel-config" }) },
+  ]
+  for (const row of rows)
+    test(`${row.label}: the pre-plan roots equal the planner's protected directories for the same environment`, async () => {
+      const base = realpathSync(mkdtempSync(join(tmpdir(), "cf-roots-")))
+      try {
+        await withEnv(row.values(base), async () => {
+          let planned: { sidecarEnv: Record<string, string | undefined>; engineConfigDirectory: string } | undefined
+          creditDanglingSweepForSpawn()
+          const result = await spawnLocalServer("127.0.0.1", 4096, "password", {
+            userDataPath,
+            healthCheck: async () => true,
+            planFence: (input: { sidecarEnv: Record<string, string | undefined>; engineConfigDirectory: string }) => {
+              planned = input
+              return fakePlanFence()
+            },
+            fork: fakeFork,
+          })
+          await result.health.wait
+          await result.listener.stop()
+          // the planner's own inputs (planProcessFence hands planConfigFence the start document's directory and
+          // resolveEngineRoots(sidecarEnv, homedir())), compared as locations BEFORE the planner resolves them on disk: in bun
+          // os.homedir() is the HOME this process started with — the developer's real one, which the test-isolation preload
+          // cannot pin (I-08) — so nothing here may mkdir or realpath under it (final review item 1)
+          const subpaths = (rules: ReturnType<typeof configFenceLocations>) => rules.flatMap((rule) => (rule.kind === "subpath" ? [rule.path] : []))
+          const planner = subpaths(configFenceLocations({ ...inputs(), engineConfigDirectory: planned!.engineConfigDirectory, configHome: resolveEngineRoots(planned!.sidecarEnv, homedir()).configHome, home: homedir() }))
+          const before = preplanConfigFenceRoots({ env: process.env, home: homedir(), ...inputs() })
+          expect([...new Set(before)].sort()).toEqual([...new Set(planner)].sort())
+        })
+      } finally {
+        rmSync(base, { recursive: true, force: true })
+      }
+    })
+
+  test("OPENCODE_CONFIG_DIR=. with the app started from a folder holding an honest project: it stays eligible and stays in the truth across boot and one tab change", async () => {
+    const cwd = realpathSync(mkdtempSync(join(tmpdir(), "cf-cwd-")))
+    const project = join(cwd, "honest-project")
+    const other = join(cwd, "other-project")
+    mkdirSync(project)
+    mkdirSync(other)
+    const previous = process.cwd()
+    try {
+      process.chdir(cwd)
+      await withEnv({ OPENCODE_CONFIG_DIR: "." }, () => {
+        // an isolated HOME (never the process's start HOME, I-08): the case is about the relative OPENCODE_CONFIG_DIR only
+        const home = join(userDataPath, "home")
+        const truthPath = join(userDataPath, "fence-workspaces", "dev.json")
+        const fs = { readFileSync, writeFileSync, mkdirSync, renameSync, rmSync }
+        writeWorkspaceTruth(truthPath, [project, other], fs)
+        const draft = (id: string, directory: string) => ({ type: "draft", draftID: id, server: "sidecar", directory })
+        const tracker = bootFenceWorkspaceTruth({
+          truthPath,
+          store: { tabs: JSON.stringify([draft("p", project), draft("o", other)]), recent: undefined, info: undefined },
+          fs,
+          log: () => {},
+          eligibility: {
+            homeDir: home,
+            appStateRoot: inputs().appStateRoot,
+            configFenceRoots: () => preplanConfigFenceRoots({ env: process.env, home, ...inputs() }),
+            realpath: (p) => realpathSync.native(p),
+            isDirectory: () => true,
+          },
+          onWritableChanged: () => {},
+        })
+        expect(tracker.quarantined).toEqual([])
+        // one tab change (the user closes the other project): the honest one stays in the truth
+        tracker.noteRendererStoreSet(GLOBAL_RENDERER_STORE, TABS_KEY, JSON.stringify([draft("p", project)]))
+        expect(readWorkspaceTruthOrThrow(truthPath, { readFileSync })).toEqual([project])
+      })
+    } finally {
+      process.chdir(previous)
+      rmSync(cwd, { recursive: true, force: true })
+    }
+  })
 })
 
 // `#1667`(#1662 L5;编排器裁决 alpha-code#1666 评论 6737930969 第 2 条 `l1r-telemetry-credential`,#1562):fork 时真交给

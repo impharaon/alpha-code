@@ -15,7 +15,7 @@ test.skipIf(process.platform !== "darwin")(
     })
     const output = `${result.stdout.toString()}${result.stderr.toString()}`
     if (result.exitCode !== 0) throw new Error(output)
-    expect(output).toMatch(/\b6 pass\b/)
+    expect(output).toMatch(/\b7 pass\b/)
     expect(output).toMatch(/\b0 fail\b/)
   },
   60_000,

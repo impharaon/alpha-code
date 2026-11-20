@@ -214,11 +214,6 @@ export const DOWNGRADED_ANCHORS: Record<string, SourceTextEntry> = {
     evidence: "#1667",
     lines: 1,
   },
-  "packages/ui-mac/src/main/engine-explicit-config.test.ts": {
-    why: "`#1667`(裁决 r1 第 2 条)最后一条锚 sidecar.ts 拿到注入结果之后、import 引擎之前调用 watchExplicitSources —— codepuppy.jsonc 运行中被改时由它重写合成的显式文件。两个不会让它变红的变异:①调用写在了一个永远不执行的分支里(文本顺序不变);②传给它的 layer 不是注入那一次算出的那份。sidecar.ts 顶层有副作用,import 不得;同文件前几条真执行合成与重写,真引擎上的「改了不用重启就看得见」在 codepuppy-config-injection-engine.cases.ts。",
-    evidence: "#1667",
-    lines: 1,
-  },
   "packages/ui-mac/src/main/sidecar-stop.test.ts": {
     why: "锚 sidecar.ts 的 stop 是否接在共享执行器上(含两条负全称:sidecar.ts 不得再出现 listener.stop(),sidecar.ts / sidecar-stop.ts 不得再出现 v1 的全局 dispose 路由 —— 2.x 下 404,`#1667` OOR-2)。两个不会让它变红的变异:①把 stopSidecarEngine 的实现改成直接 return;②在别的模块里再关一次引擎。sidecar.ts 顶层有副作用,import 不得;同 describe 里上面几条才是真行为判据,这一条只保证生产真的接在那上面。",
     evidence: "#911",

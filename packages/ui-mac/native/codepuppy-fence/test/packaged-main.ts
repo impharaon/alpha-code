@@ -1,12 +1,13 @@
 // G0 main harness. It replaces only a generated main entry before packaging/signing.
 // All sidecars below execute the packaged production sidecar.js, not a test engine substitute.
 import { app, utilityProcess } from "electron"
-import { mkdirSync, readFileSync, readdirSync, writeFileSync, existsSync } from "node:fs"
+import { mkdirSync, readFileSync, readdirSync, realpathSync, writeFileSync, existsSync } from "node:fs"
 import { join } from "node:path"
 import { buildCodePuppyBootstrap } from "../../../src/main/codepuppy-bootstrap-build"
 import { engineAuthorization } from "../../../src/main/engine-authorization"
 import { loadFenceAddon } from "../../../src/main/process-fence-apply"
 import { renderProcessFenceProfile, resolveEngineRoots, WORKSPACE_WRITE_EXTENSION_CLASS } from "../../../src/main/process-fence-profile"
+import { planConfigFence } from "../../../src/main/process-fence-plan"
 import { buildWriteProbeCommand, createWriteGrantRequester, parseWriteProbeReply } from "../../../src/main/workspace-write-probe"
 
 const run = process.env.CODEPUPPY_G0_RUN!
@@ -52,7 +53,13 @@ async function boot(name: string, variant = "production") {
     mkdirSync(join(directory, "opencode"), { recursive: true })
   }
   mkdirSync(env.TMPDIR, { recursive: true })
-  let profile = renderProcessFenceProfile({ workspaces: [A], codepuppyGlobalRoot: globalRoot, userDataPath: userData, stateHome: env.XDG_STATE_HOME, roots: resolveEngineRoots(env, home), egressProxyPort: 59999 })
+  // SPEC-engine-config-fence:生产 profile 带受保护配置集(生产计划器那一步落真实路径、预建目录)
+  const roots = resolveEngineRoots(env, home)
+  const configFence = planConfigFence(
+    { userDataPath: userData, appStateRoot: join(root, "codepuppy-state"), codepuppyGlobalRoot: globalRoot, engineConfigDirectory: join(roots.configHome, "opencode"), roots },
+    { realpath: (path) => realpathSync.native(path), mkdirp: (path) => void mkdirSync(path, { recursive: true }) },
+  ).configFence
+  let profile = renderProcessFenceProfile({ workspaces: [A], codepuppyGlobalRoot: globalRoot, userDataPath: userData, stateHome: env.XDG_STATE_HOME, roots, egressProxyPort: 59999, configFence })
   if (variant === "file-only") profile = profile.replace(/\(deny file-issue-extension[\s\S]*?\(extension-class "[^"]+"\)\)/, `(deny file-issue-extension (extension-class "${WORKSPACE_WRITE_EXTENSION_CLASS}"))`)
   if (variant === "no-deny") profile = profile.replace(/\(deny file-issue-extension[\s\S]*?\(extension-class "[^"]+"\)\)/, "")
   // Keep the test helper outside asar: it is an independently executed Mach-O signed with the package.

@@ -3,6 +3,7 @@ import { createSignal } from "solid-js"
 import { render } from "solid-js/web"
 import type { CodePuppyTerminalEngineChannel } from "../session-rail/terminal/terminal-rail-core"
 import type { TimelineTurnWait } from "../session-timeline/timeline-model"
+import type { WorkspaceWriteProbeResult } from "../../../preload/types"
 import { setRightPanelOpen } from "./right-panel-state"
 import { SessionQuestionCard } from "./session-question-card"
 import { sameSessionIdentity, type CodePuppySessionLiveSnapshot } from "./session-workspace-core"
@@ -29,7 +30,9 @@ const [reviewCount, setReviewCount] = createSignal<number | undefined>(undefined
 const [terminalRunning, setTerminalRunning] = createSignal(false)
 // `#1322`:只读状态(生产由 workspace-writable 投影:只有被围栏的引擎明确回报 denied 才为 true)。
 const [workspaceReadonly, setWorkspaceReadonly] = createSignal(false)
-const [workspaceReadonlyReason, setWorkspaceReadonlyReason] = createSignal<"home-or-app-state" | "not-opened-by-you" | "grant-failed">("not-opened-by-you")
+/** 生产的原因联合(main 的 workspace-write-probe.ts 经 preload 转出),测试运行时不另抄一份。 */
+type ReadonlyReason = NonNullable<WorkspaceWriteProbeResult["reason"]>
+const [workspaceReadonlyReason, setWorkspaceReadonlyReason] = createSignal<ReadonlyReason>("not-opened-by-you")
 // `#1588` AC4:时间线同一个等待信号(生产由 dock 发布、workspace 持信号)。
 const [turnWait, setTurnWait] = createSignal<TimelineTurnWait | undefined>(undefined)
 
@@ -142,7 +145,7 @@ export function setSessionWorkspaceTerminalRunning(next: boolean) {
   setTerminalRunning(next)
 }
 
-export function setSessionWorkspaceReadonly(next: boolean, reason: "home-or-app-state" | "not-opened-by-you" | "grant-failed" = "not-opened-by-you") {
+export function setSessionWorkspaceReadonly(next: boolean, reason: ReadonlyReason = "not-opened-by-you") {
   setWorkspaceReadonlyReason(reason)
   setWorkspaceReadonly(next)
 }

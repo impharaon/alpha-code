@@ -16,6 +16,7 @@ import { assertEngineSandboxed, engineSandbox } from "../../test-component/engin
 import { codepuppyEngine, scriptedModel, textOf, type Running } from "../../test-component/codepuppy-engine"
 import { applyProcessFence } from "./process-fence-apply"
 import { renderProcessFenceProfile, resolveEngineRoots } from "./process-fence-profile"
+import { planConfigFence } from "./process-fence-plan"
 
 const describeDarwin = process.platform === "darwin" && fs.existsSync("/usr/bin/sandbox-exec") ? describe : describe.skip
 const ASK_TIER = "codepuppy-ask"
@@ -39,14 +40,22 @@ describeDarwin("引擎库里植入的三类记录不放行、不装载(真引擎
     fs.mkdirSync(base, { recursive: true })
     const scratch = fs.realpathSync(fs.mkdtempSync(path.join(base, "db-records-")))
     const addon = buildFenceAddon({ out: path.join(scratch, "codepuppy_fence.node"), buildId: `db-records-${Date.now()}` }).out
+    const roots = resolveEngineRoots(process.env, sandbox.home)
+    const codepuppyGlobalRoot = path.join(sandbox.root, "db-records-state", "codepuppy-state", "env", "dev")
     const profile = renderProcessFenceProfile({
       workspaces: [fenced],
-      codepuppyGlobalRoot: path.join(sandbox.root, "db-records-state", "codepuppy-state", "env", "dev"),
+      codepuppyGlobalRoot,
       // The engine database lives under the sandbox root, writable as the data directory is in production.
       userDataPath: sandbox.root,
       stateHome: process.env.XDG_STATE_HOME!,
-      roots: resolveEngineRoots(process.env, sandbox.home),
+      roots,
       egressProxyPort: Number(new URL(model.baseURL).port),
+      // SPEC-engine-config-fence slice ②: the production protected set (production planner step: real paths, pre-created
+      // directories), over this engine's own userData, state root and global configuration directory
+      configFence: planConfigFence(
+        { userDataPath: host.userData, appStateRoot: path.dirname(path.dirname(codepuppyGlobalRoot)), codepuppyGlobalRoot, engineConfigDirectory: host.slot.configDirectory, roots },
+        { realpath: (p) => fs.realpathSync.native(p), mkdirp: (p) => void fs.mkdirSync(p, { recursive: true }) },
+      ).configFence,
     })
     applyProcessFence({ addonPath: addon, profile }, { insideDir: fenced, outsideDir: scratch })
     running = await host.start()

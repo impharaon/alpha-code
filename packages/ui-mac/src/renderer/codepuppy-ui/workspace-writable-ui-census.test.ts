@@ -8,6 +8,8 @@ const copy = [
   ["codepuppy.workspace.readonlyHome", "主目录和 Code Puppy 自己的数据目录不能整个作为项目写入，请打开里面的具体文件夹。", "Your home folder and Code Puppy's own data folder can't be written as a whole project — open a specific folder inside instead."],
   ["codepuppy.workspace.readonlyNotOpenedByYou", "这个文件夹不是你在 Code Puppy 里亲手打开的，助手不会改动它；用「打开项目」选中它就能写入。", 'This folder wasn\'t opened by you in Code Puppy, so the assistant won\'t change it — choose it with "Open project" to make it writable.'],
   ["codepuppy.workspace.readonlyGrantFailed", "这个文件夹暂时写不进去，下次打开 Code Puppy 后即可写入。", "This folder can't be written to right now; it will be writable the next time you open Code Puppy."],
+  // SPEC-engine-config-fence v1/v2「用户会碰到的限制」第二条(zh 逐字取规格;en 是同组三句写法的译文)
+  ["codepuppy.workspace.readonlyProtectedConfig", "这个文件夹是 Code Puppy 或引擎存放配置的位置，对话里不能写入。", "This folder is where Code Puppy or the engine keeps its configuration, so conversations can't write to it."],
 ] as const
 
 test("frozen residual copy has exactly its approved bilingual sentences and the retired keys are absent", () => {

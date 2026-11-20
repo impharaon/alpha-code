@@ -11,6 +11,8 @@ import { assertEngineSandboxed, engineSandbox } from "../../test-component/engin
 import { codepuppyEngine, scriptedModel, textOf, type Running } from "../../test-component/codepuppy-engine"
 import { applyProcessFence } from "./process-fence-apply"
 import { renderProcessFenceProfile, resolveEngineRoots } from "./process-fence-profile"
+import { planConfigFence } from "./process-fence-plan"
+import { engineGlobalConfigDirectory } from "./engine-paths"
 
 const describeDarwin = process.platform === "darwin" && fs.existsSync("/usr/bin/sandbox-exec") ? describe : describe.skip
 const RESTART = /restart(?:ed|ing)?|fixed when it starts/i
@@ -33,15 +35,22 @@ describeDarwin("沙箱拒写:模型读到直说的一句并停下(真引擎 + �
     fs.mkdirSync(base, { recursive: true })
     scratch = fs.realpathSync(fs.mkdtempSync(path.join(base, "fence-denied-")))
     const addon = buildFenceAddon({ out: path.join(scratch, "codepuppy_fence.node"), buildId: `fence-denied-${Date.now()}` }).out
+    const roots = resolveEngineRoots(process.env, sandbox.home)
+    const codepuppyGlobalRoot = path.join(sandbox.root, "fence-denied-state", "codepuppy-state", "env", "dev")
     const profile = renderProcessFenceProfile({
       workspaces: [fenced],
-      codepuppyGlobalRoot: path.join(sandbox.root, "fence-denied-state", "codepuppy-state", "env", "dev"),
+      codepuppyGlobalRoot,
       // All disposable engine installation state (including Global.Path.tmp) is inside this W3 root.
       // Refusal targets remain in the separate host-owned scratch tree and are calibrated below.
       userDataPath: sandbox.root,
       stateHome: process.env.XDG_STATE_HOME!,
-      roots: resolveEngineRoots(process.env, sandbox.home),
+      roots,
       egressProxyPort: Number(new URL(model.baseURL).port),
+      // SPEC-engine-config-fence:生产 profile 带受保护集(生产计划器那一步落真实路径、预建目录)
+      configFence: planConfigFence(
+        { userDataPath: sandbox.root, appStateRoot: path.join(sandbox.root, "fence-denied-state", "codepuppy-state"), codepuppyGlobalRoot, engineConfigDirectory: engineGlobalConfigDirectory(process.env, sandbox.home), roots },
+        { realpath: (p) => fs.realpathSync.native(p), mkdirp: (p) => void fs.mkdirSync(p, { recursive: true }) },
+      ).configFence,
     })
     applyProcessFence({ addonPath: addon, profile }, { insideDir: fenced, outsideDir: scratch })
     running = await host.start()

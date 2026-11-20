@@ -691,6 +691,8 @@ describe("REQ-159 #1322 workspace read-only disclosure on the topbar (AC2)", () 
     ["home-or-app-state", "主目录和 Code Puppy 自己的数据目录不能整个作为项目写入，请打开里面的具体文件夹。"],
     ["not-opened-by-you", "这个文件夹不是你在 Code Puppy 里亲手打开的，助手不会改动它；用「打开项目」选中它就能写入。"],
     ["grant-failed", "这个文件夹暂时写不进去，下次打开 Code Puppy 后即可写入。"],
+    // SPEC-engine-config-fence BR-05 / 用户会碰到的限制第二条:受保护配置位置本身或其内的文件夹,一句、无按钮,位置与样式同上三句
+    ["protected-config", "这个文件夹是 Code Puppy 或引擎存放配置的位置，对话里不能写入。"],
   ] as const
   for (const [reason, sentence] of reasons) test(`${reason}: residual disclosure is exactly one sentence without title, footnote or action`, async () => {
     const host = mount()

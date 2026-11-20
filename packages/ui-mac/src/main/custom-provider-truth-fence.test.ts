@@ -1,6 +1,6 @@
-// `#1391` —— I2 的真裁判:生产渲染的 profile 交给真 /usr/bin/sandbox-exec(与 sidecar 里 sandbox_init 同一个 libsandbox,
-// process-fence-compile.ts 文件头),围栏内往真源写 / 在真源目录建文件 / 在状态根建目录 / 从 W2 mv 进来 ⇒ Operation not permitted、
-// 盘上零落盘;控制臂:同一 profile 下往 W2(env/<env>)与 W3(userData)写 ⇒ 落盘(围栏是活的,不是「什么都写不进」);
+// `#1391` —— I2 的真裁判:生产渲染器渲染的 profile(受保护集 CF 按空渲染:本文件只判别的行)交给真 /usr/bin/sandbox-exec(与 sidecar 里 sandbox_init 同一个 libsandbox,
+// process-fence-compile.ts 文件头),围栏内往真源写 / 在真源目录建文件 / 在状态根建目录 / 从 W3 mv 进来 ⇒ Operation not permitted、
+// 盘上零落盘;控制臂:同一 profile 下往 W3(userData)写 ⇒ 落盘(围栏是活的,不是「什么都写不进」),env/<env> 不再可写(W2 已删);
 // bare 臂:不套围栏(= main 进程的形态)经生产 writeCustomProviderTruth 落盘并读回(拒绝来自围栏,不是布局)。
 // 布局纪律(勘破 §7.4 / `#1322`):假的状态根放在**真 HOME** 之下 —— /private/tmp 与 $TMPDIR 在可写集里(W11 / W12),放那儿「写不进」测不出来。
 // darwin-only;CI(ubuntu)上自报 skip,gate-files.tsv 按 [平台:darwin] 登记。不需要 Electron 二进制,worktree 里也能跑。
@@ -19,7 +19,7 @@ import { renderProcessFenceProfile, resolveEngineRoots } from "./process-fence-p
 
 const describeSandbox = process.platform === "darwin" && existsSync(SANDBOX_EXEC) ? describe : describe.skip
 
-describeSandbox("I2 真围栏:custom-providers/<env>.json 在生产 profile 下写不进,W2 / W3 写得进", () => {
+describeSandbox("I2 真围栏:custom-providers/<env>.json 在生产 profile 下写不进,W3 写得进", () => {
   let scratch = ""
   let stateRoot = ""
   let envRoot = ""
@@ -38,7 +38,7 @@ describeSandbox("I2 真围栏:custom-providers/<env>.json 在生产 profile 下�
     writeFileSync(
       profileFile,
       // `#1337`:生产 profile 含网络行;这里不出网,给一个没人听的端口即可。
-      renderProcessFenceProfile({ workspaces: [join(scratch, "ws")], codepuppyGlobalRoot: envRoot, userDataPath: userData, stateHome: userData, roots: resolveEngineRoots({}, homedir()), egressProxyPort: 4443 }),
+      renderProcessFenceProfile({ workspaces: [join(scratch, "ws")], codepuppyGlobalRoot: envRoot, userDataPath: userData, stateHome: userData, roots: resolveEngineRoots({}, homedir()), egressProxyPort: 4443 , configFence: [] }),
     )
   })
 
@@ -53,14 +53,14 @@ describeSandbox("I2 真围栏:custom-providers/<env>.json 在生产 profile 下�
     return { status: res.status, stderr: (res.stderr ?? "").trim() }
   }
 
-  test("围栏内:写真源文件 / 在真源目录建文件 / 在状态根建目录 / 从 W2 mv 进真源 ⇒ 全部 Operation not permitted,盘上零落盘", () => {
+  test("围栏内:写真源文件 / 在真源目录建文件 / 在状态根建目录 / 从 W3 mv 进真源 ⇒ 全部 Operation not permitted,盘上零落盘", () => {
     const truth = customProviderTruthPath(stateRoot, "prod")
     const denied = [
       [`printf '{"v":1,"providers":[]}' > "${truth}"`, truth],
       [`printf x > "${truthDir}/forged.json"`, join(truthDir, "forged.json")],
       [`mkdir "${stateRoot}/custom-providers-forged"`, join(stateRoot, "custom-providers-forged")],
-      // 先在可写处(W2)造好,再 rename 进来 —— 目录项的写在目标目录上,同样拦住
-      [`printf x > "${envRoot}/staged.json" && mv "${envRoot}/staged.json" "${truth}"`, truth],
+      // 先在可写处(W3;W2 已删,SPEC-engine-config-fence D2)造好,再 rename 进来 —— 目录项的写在目标目录上,同样拦住
+      [`printf x > "${userData}/staged.json" && mv "${userData}/staged.json" "${truth}"`, truth],
     ] as const
     for (const [script, landing] of denied) {
       const r = attempt(true, script)
@@ -68,17 +68,18 @@ describeSandbox("I2 真围栏:custom-providers/<env>.json 在生产 profile 下�
       expect(r.stderr, script).toContain("Operation not permitted")
       expect(existsSync(landing), script).toBe(false)
     }
-    // mv 那一臂的第一步真的落在 W2 里了(证明是第二步被拦,不是第一步没跑)
-    expect(readFileSync(join(envRoot, "staged.json"), "utf8")).toBe("x")
+    // mv 那一臂的第一步真的落在 W3 里了(证明是第二步被拦,不是第一步没跑)
+    expect(readFileSync(join(userData, "staged.json"), "utf8")).toBe("x")
     expect(fs.readdirSync(truthDir)).toEqual([])
   })
 
-  test("控制臂:同一 profile 下 W2 与 W3 落盘;bare 臂:不套围栏经生产 writeCustomProviderTruth 落盘并读回", () => {
-    for (const target of [join(envRoot, "probe"), join(userData, "probe")]) {
-      const r = attempt(true, `printf x > "${target}"`)
-      expect(r.status, target).toBe(0)
-      expect(readFileSync(target, "utf8"), target).toBe("x")
-    }
+  test("控制臂:同一 profile 下 W3 落盘(环境根不再可写:W2 已删,SPEC-engine-config-fence D2);bare 臂:不套围栏经生产 writeCustomProviderTruth 落盘并读回", () => {
+    const r = attempt(true, `printf x > "${join(userData, "probe")}"`)
+    expect(r.status).toBe(0)
+    expect(readFileSync(join(userData, "probe"), "utf8")).toBe("x")
+    const envProbe = attempt(true, `printf x > "${join(envRoot, "probe")}"`)
+    expect(envProbe.stderr).toContain("Operation not permitted")
+    expect(existsSync(join(envRoot, "probe"))).toBe(false)
     const truth = customProviderTruthPath(stateRoot, "prod")
     const bare = attempt(false, `printf x > "${truthDir}/bare-probe.json"`)
     expect(bare.status).toBe(0)

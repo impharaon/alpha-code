@@ -10,20 +10,29 @@ import { existsSync } from "node:fs"
 import { homedir, tmpdir } from "node:os"
 import { join } from "node:path"
 import { SANDBOX_EXEC, trialCompileProfile } from "./process-fence-compile"
+import { planConfigFence } from "./process-fence-plan"
 import { renderProcessFenceProfile, resolveEngineRoots } from "./process-fence-profile"
 
 const describeSandbox = process.platform === "darwin" && existsSync(SANDBOX_EXEC) ? describe : describe.skip
 
 describeSandbox("trialCompileProfile —— 真 sandbox-exec", () => {
   const home = homedir()
+  const roots = resolveEngineRoots({}, home)
+  const userDataPath = join(home, "Library", "Application Support", "ai.opencode.desktop.dev")
+  const codepuppyGlobalRoot = join(home, "Library", "Application Support", "codepuppy-state", "env", "dev")
   const input = {
     workspaces: [join(home, "code-puppy"), tmpdir()],
-    codepuppyGlobalRoot: join(home, "Library", "Application Support", "codepuppy-state", "env", "dev"),
-    userDataPath: join(home, "Library", "Application Support", "ai.opencode.desktop.dev"),
-    stateHome: join(home, "Library", "Application Support", "ai.opencode.desktop.dev"),
-    roots: resolveEngineRoots({}, home),
+    codepuppyGlobalRoot,
+    userDataPath,
+    stateHome: userDataPath,
+    roots,
     // `#1337`:网络行也进真编译器(一个没人听的端口就够 —— 这里只编译,不连)。
     egressProxyPort: 4443,
+    // SPEC-engine-config-fence:受保护集两块(regex / literal / subpath 与上级目录块)同样进真编译器;只编译,不碰盘(恒等 realpath、不建目录)
+    configFence: planConfigFence(
+      { userDataPath, appStateRoot: join(home, "Library", "Application Support", "codepuppy-state"), codepuppyGlobalRoot, engineConfigDirectory: join(roots.configHome, "opencode"), roots },
+      { realpath: (p) => p, mkdirp: () => {} },
+    ).configFence,
   }
 
   test("[已知的坏 ①] 撞 65535 字节墙的 profile ⇒ ok:false,原因含 `exceeds maximum`", () => {

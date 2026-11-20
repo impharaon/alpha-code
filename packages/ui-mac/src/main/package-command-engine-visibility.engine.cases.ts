@@ -13,6 +13,7 @@ import { assertEngineSandboxed, engineSandbox, engineSlot } from "../../test-com
 import { buildEngineServerOptions } from "./engine-server-options"
 import { withEngineAuthorization } from "./engine-authorization"
 import { injectCodePuppyConfig } from "./codepuppy-config-injection"
+import { writeEngineConfigForFork } from "./engine-explicit-config"
 import { publishMainBootstrap } from "../../test-component/codepuppy-bootstrap-fixture"
 import type { EngineFetch } from "./in-process-engine"
 import { engineProjectTrust } from "./engine-project-trust"
@@ -40,6 +41,7 @@ test(`#840 engine read on OpenCode 2: the package command is ${EXPECT}`, async (
   const userData = path.join(sandbox.root, "user-data")
   fs.mkdirSync(userData, { recursive: true })
   publishMainBootstrap({ userData }) // sidecar 在注入之前发布启动文档(`#1698`)
+  writeEngineConfigForFork(codepuppyBootstrap()) // main 在 fork 前写显式文件(SPEC-engine-config-fence BR-03)
   const injection = injectCodePuppyConfig(userData, undefined, "stable", codepuppyBootstrap().paths.userConfig ?? null)
   const { startEngine } = await import("../../engine/engine-embed")
   const slot = engineSlot(sandbox, "req840")

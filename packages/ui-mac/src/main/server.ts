@@ -30,8 +30,9 @@ import { ignoredConfigProviderBlocks, ignoredConfigRemoteMcpEntries } from "./ex
 import { readCustomProviderRecords } from "./custom-provider-records"
 import { readMcpServerRecordsForGeneration } from "./mcp-server-records"
 import { buildCodePuppyModelConfig } from "./codepuppy-models"
+import { watchExplicitSources, writeEngineConfigForFork } from "./engine-explicit-config"
 import { pinAppliedCatalog } from "./codepuppy-live-allowlist"
-import { loadCodePuppySecrets } from "./codepuppy-secrets"
+import { loadCodePuppySecrets, userEnvFile } from "./codepuppy-secrets"
 import { posixModesEffective } from "./platform"
 import { pollUntilHealthy } from "./health-poll"
 import { getLogger, rotateServerLogs, write } from "./logging"
@@ -71,7 +72,7 @@ import { createProjectConfigViewRequester } from "./project-config-view-message"
 import type { ProjectConfigView } from "@opencode/schema/codepuppy-project-config"
 import { createWriteGrantRequester, createWriteProbeRequester, type WorkspaceWriteGrantReply, type WorkspaceWriteProbeFact } from "./workspace-write-probe"
 import { loadFenceAddon } from "./process-fence-apply"
-import { processFenceRulesCover, processFenceWriteRules, WORKSPACE_WRITE_EXTENSION_CLASS, type ProcessFenceWriteRule } from "./process-fence-profile"
+import { configFenceLocations, processFenceRulesCover, processFenceWriteRules, resolveEngineRoots, WORKSPACE_WRITE_EXTENSION_CLASS, type ProcessFenceWriteRules } from "./process-fence-profile"
 import { codepuppyGlobalRoot, codepuppyJsoncPath } from "./engine-config-truth"
 import { ensureUserWorkspaceDir } from "./codepuppy-user-workspace"
 import { fenceWorkspaceTruthPath, readWorkspaceTruthOrThrow, type FenceRunWritable } from "./process-fence-workspaces"
@@ -281,10 +282,51 @@ function refreshConfiguredEgressDestinations(userDataPath: string): void {
   }
 }
 
-/** The plan's own W1 list (the authority that rendered the profile) travels with it; required when fenceRun is set. */
-type PlannedFence = ProcessFenceStartInput & { workspaces?: readonly string[] }
+/**
+ * The plan's own W1 list (the authority that rendered the profile) travels with it; required when fenceRun is set.
+ * `configFenceRoots`: the protected configuration directories that same plan rendered (eligibility reads them, below).
+ */
+type PlannedFence = ProcessFenceStartInput & { workspaces?: readonly string[]; configFenceRoots?: readonly string[] }
 
-type ProductionFenceInput = { userDataPath: string; sidecarEnv: Record<string, string>; egressProxyPort: number | undefined; carriedWorkspaces: readonly string[] }
+type ProductionFenceInput = {
+  userDataPath: string
+  sidecarEnv: Record<string, string>
+  egressProxyPort: number | undefined
+  carriedWorkspaces: readonly string[]
+  /** SPEC-engine-config-fence CF-8:the start document's engineConfigDirectory (the same value). */
+  engineConfigDirectory: string
+  /** CF-4 (实现期修订 2 A):the env file main reads at start (codepuppy-secrets.ts userEnvFile — the one authority); unset = absent. */
+  envFile?: string
+}
+
+// SPEC-engine-config-fence BR-05 / DESIGN §4.3:资格判定(checkWorkspaceDirectory)要的受保护配置目录。用最近一次计划渲染进 profile 的那一份;
+// 本运行还没计划过(boot 时装载工作区真源)就用同一个位置清单按主进程环境现算(资格判定按 device + inode 比,软链目标由它自己解析)。
+// 非 darwin 没有围栏,为空;冻结环境还没初始化(只有单测会这样)也为空 —— 末尾的拒写块不依赖这份清单,它只决定签不签、显示哪一句。
+let plannedConfigFenceRoots: readonly string[] | undefined
+export function currentConfigFenceRoots(): readonly string[] {
+  if (process.platform !== "darwin") return []
+  if (plannedConfigFenceRoots) return plannedConfigFenceRoots
+  const info = tryGetCodePuppyEnvironment()
+  if (!info) return []
+  return preplanConfigFenceRoots({ env: process.env, home: homedir(), userDataPath: electronNs.app.getPath("userData"), appStateRoot: info.casBaseRoot, codepuppyGlobalRoot: codepuppyGlobalRoot() })
+}
+
+/**
+ * 计划之前的受保护配置目录(审查 B 第 2 条):路径变量与主目录经 spawnLocalServer 的同一个函数(usableExportedPaths)取 —— 用户导出的相对
+ * OPENCODE_CONFIG_DIR / XDG_CONFIG_HOME 当没设,与启动文档的 engineConfigDirectory、计划器的受保护目录是同一个来源,不按主进程的 cwd 解析。
+ * 不记日志:每次资格判定都调它,被忽略的变量由 fork 那一步记一行。
+ */
+export function preplanConfigFenceRoots(input: { env: Record<string, string | undefined>; home: string; userDataPath: string; appStateRoot: string; codepuppyGlobalRoot: string }): string[] {
+  const exported = usableExportedPaths({ env: input.env, home: input.home, log: () => {} })
+  return configFenceLocations({
+    userDataPath: input.userDataPath,
+    appStateRoot: input.appStateRoot,
+    codepuppyGlobalRoot: input.codepuppyGlobalRoot,
+    engineConfigDirectory: engineGlobalConfigDirectory(exported.env, exported.home),
+    configHome: resolveEngineRoots(exported.env, exported.home).configHome,
+    home: exported.home,
+  }).flatMap((rule) => (rule.kind === "subpath" ? [rule.path] : []))
+}
 
 /** 生产计划器:把 electron / store / fs 接进 electron-free 的 planProcessFence。 */
 function planProductionFence(input: ProductionFenceInput): ProcessFencePlan | undefined {
@@ -298,6 +340,8 @@ function planProductionFence(input: ProductionFenceInput): ProcessFencePlan | un
       addon: { packaged: electronNs.app.isPackaged, resourcesPath: process.resourcesPath, moduleDir, exists: existsSync },
       egressProxyPort: input.egressProxyPort,
       carriedWorkspaces: input.carriedWorkspaces,
+      engineConfigDirectory: input.engineConfigDirectory,
+      ...(input.envFile ? { envFile: input.envFile } : {}),
     },
     {
       homeDir: homedir,
@@ -408,6 +452,9 @@ export function preferAppEnv(userDataPath: string) {
 // REQ-236 §2.1-1(`#1562`):最近一次 fork 时写进 {file:} 通道的凭据名。续期热应用据它判「凭据在场性
 // 变没变」(codepuppy-secret-files.applyPlatformCredentialsHot);还没 fork 过 = undefined。
 let forkedSecrets: ReadonlySet<string> | undefined
+
+// SPEC-engine-config-fence BR-03:当前这一代的显式文件监听(main 里跑)。fork 抛出时当场停;下一次 spawn 也先停掉上一份(兜底)。
+let explicitConfigWatch: (() => void) | undefined
 
 export function forkedSecretNames(): ReadonlySet<string> | undefined {
   return forkedSecrets
@@ -541,17 +588,6 @@ export async function spawnLocalServer(
     getLogger()?.warn(
       `engine data directory ${dataDir} also holds other OpenCode data (${foreign.join(", ")}) — Code Puppy shares this directory with standalone OpenCode installs (S7); it reads only ${databasePath}`,
     )
-  let fence: PlannedFence | undefined
-  try {
-    fence = (options.planFence ?? planProductionFence)({ userDataPath: options.userDataPath, sidecarEnv, egressProxyPort, carriedWorkspaces: options.fenceRun?.carriedWorkspaces() ?? [] })
-  } catch (error) {
-    getLogger()?.error("process fence plan FAILED — refusing to fork the sidecar (fail closed; an unfenced engine must not start)", error)
-    throw new Error(`process fence plan failed — sidecar fork refused: ${serializeError(error).message}`)
-  }
-  if (fence && options.fenceRun && !fence.workspaces)
-    throw new Error("process fence plan carries no workspace list — this generation's W1 could not join the run's writable history, sidecar fork refused")
-  if (!fence && process.platform === "darwin")
-    throw new Error("process fence plan returned nothing on darwin — sidecar fork refused (an unfenced engine must not start)")
   // `#1698`(DESIGN-upgrade-bootstrap-config §4.2 / §4.4):这一代交给 sidecar、ext 与引擎的决定收成一份启动文档,随 start 消息走,
   // 不进环境。构建失败(结构性缺陷,例如资源根 realpath 失败)⇒ 抛 ⇒ 与上面各项同一条拒 fork 路。
   // #397:catalog 通道在 MAIN 侧从冻结快照取 —— sidecar 进程没有快照。tryGet 仅为纯单测兜底(缺省 → sidecar loud 跳过 override 注入)。
@@ -576,12 +612,43 @@ export async function spawnLocalServer(
     env: process.env,
     log: (line) => getLogger()?.warn(line),
   })
+  let fence: PlannedFence | undefined
+  try {
+    fence = (options.planFence ?? planProductionFence)({ userDataPath: options.userDataPath, sidecarEnv, egressProxyPort, carriedWorkspaces: options.fenceRun?.carriedWorkspaces() ?? [], engineConfigDirectory: bootstrap.paths.engineConfigDirectory, ...(userEnvFile(process.env) ? { envFile: userEnvFile(process.env) } : {}) })
+  } catch (error) {
+    getLogger()?.error("process fence plan FAILED — refusing to fork the sidecar (fail closed; an unfenced engine must not start)", error)
+    throw new Error(`process fence plan failed — sidecar fork refused: ${serializeError(error).message}`)
+  }
+  if (fence && options.fenceRun && !fence.workspaces)
+    throw new Error("process fence plan carries no workspace list — this generation's W1 could not join the run's writable history, sidecar fork refused")
+  if (!fence && process.platform === "darwin")
+    throw new Error("process fence plan returned nothing on darwin — sidecar fork refused (an unfenced engine must not start)")
+  if (fence?.configFenceRoots) plannedConfigFenceRoots = fence.configFenceRoots
 
   const sidecar = join(dirname(fileURLToPath(import.meta.url)), "sidecar.js")
   rotateServerLogs()
   const runtimeGeneration = tryGetCodePuppyEnvironment() ? restoreCommittedOfficialConnectors() : []
   // I-11(design v9 §4.4):官方配方的可运行性进了允许集;fork 之前等这次恢复带来的重发落盘,新一代的 Location 才读到它。
   if (tryGetCodePuppyEnvironment()) await officialAvailabilityPublished()
+  // SPEC-engine-config-fence BR-03(DESIGN-engine-config-fence §4.4、§5):显式文件、模型底表与种子 codepuppy.jsonc 由 main 按这一份启动文档
+  // 写(sidecar 只读,这些位置在围栏里写不到);没有模型底表的一代删掉上一代留下的 models.json。合成排在 fork 之前的最后一步:上面的官方
+  // 连接器恢复会改写 codepuppy.jsonc(这一代的 {file:} 引用)与允许集,显式文件必须由改写之后的内容合成,不能指望监听去追。计划围栏不读这
+  // 几个文件(受保护目录由计划器自己预建)。写或删失败 ⇒ 先清掉这一代的官方连接器运行期目录,再与密钥文件、已应用目录同一条路径拒绝 fork,
+  // 不退回 sidecar 里写。写完即起显式文件的监听(codepuppy.jsonc 手改、main 装技能 ⇒ 重写,引擎不重启就生效),本代子进程退出时停。
+  let engineConfig: ReturnType<typeof writeEngineConfigForFork>
+  try {
+    engineConfig = writeEngineConfigForFork(bootstrap)
+  } catch (error) {
+    clearOfficialConnectorRuntime(runtimeGeneration)
+    const message = serializeError(error).message
+    getLogger()?.error(`[I-13] engine config files could not be written — refusing to fork: ${message}`)
+    throw new Error(`engine config files could not be written — sidecar fork refused: ${message}`)
+  }
+  if (engineConfig.files.userError)
+    getLogger()?.warn(`[alpha-code#1667] ${bootstrap.paths.userConfig} is not valid (${engineConfig.files.userError}); the engine sees only Code Puppy's explicit layer`)
+  explicitConfigWatch?.()
+  const stopExplicitConfigWatch = watchExplicitSources({ ...engineConfig.watch, log: (line) => getLogger()?.warn(line) })
+  explicitConfigWatch = stopExplicitConfigWatch
   const child = (() => {
     try {
       return (options.fork ?? electronNs.utilityProcess.fork)(sidecar, [], {
@@ -592,6 +659,8 @@ export async function spawnLocalServer(
       })
     } catch (error) {
       clearOfficialConnectorRuntime(runtimeGeneration)
+      stopExplicitConfigWatch()
+      if (explicitConfigWatch === stopExplicitConfigWatch) explicitConfigWatch = undefined
       throw error
     }
   })()
@@ -616,11 +685,14 @@ export async function spawnLocalServer(
   const granting = new Map<string, Promise<Omit<WorkspaceWriteGrantReply, "type" | "id">>>()
   // Tokens handed to the engine without a definite answer (reply timeout, child exit, post exception, any reply other
   // than "consume errno=N"): the engine may still consume them, so for this generation such a directory counts as
-  // covered and is never issued again. A definite consume failure, or a failure before any token existed, may retry.
+  // covered and is not issued again — except a directory that is itself a node of the protected ancestors block (its
+  // literal deny keeps it uncovered), which can be issued once more; a second extension for the same directory is
+  // harmless (DESIGN-engine-config-fence D14). A definite consume failure, or a failure before any token existed, may retry.
   const possiblyConsumed = new Set<string>()
   // The one source of this generation's write roots: the exact profile bytes it applies, parsed by the renderer's
-  // module. An unrecognised form leaves this undefined, and every directory then counts as covered (no issue).
-  let writeRules: ProcessFenceWriteRule[] | undefined
+  // module (its allow rules and, after them, the protected deny blocks). An unrecognised form leaves this undefined, and
+  // every directory then counts as covered (no issue).
+  let writeRules: ProcessFenceWriteRules | undefined
   try {
     writeRules = fence ? processFenceWriteRules(fence.profile) : undefined
   } catch (error) {
@@ -629,7 +701,7 @@ export async function spawnLocalServer(
   // Another directory's grant in flight counts too: once consumed, its subtree is fenced-writable before main hears
   // back. The same directory's own in-flight grant is joined instead (grantWrite coalesces; nothing new is issued).
   const generationWrites: SidecarListener["generationWrites"] = (directory) =>
-    !writeRules || processFenceRulesCover([...writeRules, ...[...grantedDirectories, ...possiblyConsumed, ...[...granting.keys()].filter((pending) => pending !== directory)].map((value) => ({ kind: "subpath" as const, value }))], directory)
+    !writeRules || processFenceRulesCover({ allow: [...writeRules.allow, ...[...grantedDirectories, ...possiblyConsumed, ...[...granting.keys()].filter((pending) => pending !== directory)].map((value) => ({ kind: "subpath" as const, value }))], deny: writeRules.deny }, directory)
   const grantWrite: SidecarListener["grantWrite"] = (directory) => {
     if (exited || !child.pid) return Promise.resolve({ outcome: "failed", detail: "engine not running" })
     if (!fence) return Promise.resolve({ outcome: "failed", detail: "engine has no fence" })
@@ -688,6 +760,8 @@ export async function spawnLocalServer(
   let detachCodePuppy: ((reason: string) => void) | undefined
   child.once("exit", (code) => {
     clearOfficialConnectorRuntimeOnExit(runtimeGeneration)
+    stopExplicitConfigWatch()
+    if (explicitConfigWatch === stopExplicitConfigWatch) explicitConfigWatch = undefined
     exited = true
     electronNs.app.off("child-process-gone", onProcessGone)
     projectConfigViews.close()

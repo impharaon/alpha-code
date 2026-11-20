@@ -4,7 +4,7 @@
 // 派生的一切(shell 工具 / MCP stdio / LSP / PTY / formatter …)自动继承(勘破 §6.2 五条原语实测)。
 // 启动根在 apply 前确定;运行期只接受主进程绑定当前引擎签发的 X1 私有类扩展(设计 child-process-write-fence §4)。
 //
-// ── 行的来源:勘破 §8.2 的 19 行,逐字照抄,不照 §7.6 ──────────────────────────────
+// ── 行的来源:勘破 §8.2 的 19 行,逐字照抄,不照 §7.6(其后 W10 / W19 按 D15 删掉)────────
 // §8.2 是「跑通过的 profile」(装了 ext 的引擎在围栏里跑完五步工作负载),§7.6 是「写入面枚举」;
 // 两者差两条,其中 zsh 存历史走 `.zsh_history.new` 再改名 —— 照 §7.6 原文立闸,用户每开一次终端
 // 看一条 `failed to write history file`。逐行消融结论(§8.2 表):W2/W3/W4/W5/W6/W15 去掉引擎/注入/
@@ -43,7 +43,9 @@ import { dirname, isAbsolute, join, resolve } from "node:path"
 export const WORKSPACE_WRITE_EXTENSION_CLASS = "app.codepuppy.workspace-write"
 
 /**
- * 可写集的行 id(勘破 §8.2 的 W 行及运行期 X1,W9 在那一轮就不存在)。process-fence-write-sites.tsv 的每一条
+ * 可写集的行 id(勘破 §8.2 的 W 行及运行期 X1,W9 在那一轮就不存在)。W10 `~/.zsh_sessions` 与 W19 `~/.zcompdump*` 已删
+ * (DESIGN-engine-config-fence D15):围栏外的 shell 会执行它们的内容(Apple Terminal 的 zsh 恢复会话、带 compinit 的 rc 读 dump),
+ * 应用内终端不需要它们(process-fence-zsh-startup.test.ts)。process-fence-write-sites.tsv 的每一条
  * 写盘登记都要点名它落在哪一行之下;点不出来的写入点 = 新的写入根 = 要么加行(带实测)要么改代码。
  */
 export const WRITABLE_ROOT_IDS = {
@@ -55,7 +57,6 @@ export const WRITABLE_ROOT_IDS = {
   W6: "<XDG_CONFIG_HOME>/opencode:第二份 provider 安装(勘破 §7.4 坑一)",
   W7: "<HOME>/.npm:@npmcli/arborist 的 cacache,不随 XDG",
   W8: "<HOME>/.zsh_history*(regex):登录 shell 存历史含 .zsh_history.new(§8.5 坑一)",
-  W10: "<HOME>/.zsh_sessions:生产接线到不了(§8.6),留着无害",
   W11: "/private/tmp",
   W12: "/private/var/folders($TMPDIR)",
   W13: "/dev/null /dev/stdout /dev/stderr",
@@ -64,7 +65,6 @@ export const WRITABLE_ROOT_IDS = {
   W16: "<HOME>/.opencode:§7.6 B 段的桥",
   W17: "<HOME>/Library/Caches/bun(dev-only)",
   W18: "<HOME>/.cache/bun(dev-only)",
-  W19: "<HOME>/.zcompdump*(regex):加了也不生效(§8.5 坑二),留着如实",
   X1: "用户本次应用运行亲手打开的项目(主进程绑定当前引擎签发的私有类扩展)",
 } as const
 export type WritableRootId = keyof typeof WRITABLE_ROOT_IDS
@@ -136,7 +136,7 @@ function regexLiteral(p: string): string {
 }
 
 /**
- * 渲染 profile —— 勘破 §8.2 的 19 行,参数已代入(不用 `(param …)`:sidecar 里 `sandbox_init` 不带
+ * 渲染 profile —— 勘破 §8.2 的行(去掉 W10 / W19,见 WRITABLE_ROOT_IDS),参数已代入(不用 `(param …)`:sidecar 里 `sandbox_init` 不带
  * 参数表,而且把根写死进文本才能让「试编译的」与「apply 的」是同一串字节)。
  * 顺序、注释 id 与 §8.2 一致,便于对照;注释在编译期被剥离,不影响策略(§6.5 第 9 行实测)。
  */
@@ -166,8 +166,6 @@ export function renderProcessFenceProfile(input: ProcessFenceProfileInput): stri
     `  (subpath "${join(configHome, "opencode")}")               ; W6`,
     `  (subpath "${join(home, ".npm")}")                                ; W7`,
     `  (regex #"^${homeRe}/\\.zsh_history")                       ; W8`,
-    `  (subpath "${join(home, ".zsh_sessions")}")                       ; W10`,
-    `  (regex #"^${homeRe}/\\.zcompdump")                         ; W19`,
     `  (subpath "/private/tmp")                               ; W11`,
     `  (subpath "/private/var/folders")                       ; W12`,
     `  (literal "/dev/null") (literal "/dev/stdout") (literal "/dev/stderr")   ; W13`,

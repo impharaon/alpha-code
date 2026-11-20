@@ -71,7 +71,8 @@ const { injectCodePuppyConfig } = await import("./codepuppy-config-injection")
 const { buildEngineServerOptions } = await import("./engine-server-options")
 const { setFactorySkillDirsForFork } = await import("./factory-skills")
 const { withEngineAuthorization } = await import("./engine-authorization")
-const { secretFilePath } = await import("./codepuppy-secret-files")
+const { credentialStores, readCredentialTable, secretFilePath } = await import("./codepuppy-secret-files")
+const { installCodePuppyCredentialSource, parseCodePuppyCredentials, publishCodePuppyCredentials } = await import("@opencode/util/codepuppy-credentials")
 const { engineNetFailurePath } = await import("@opencode/schema/codepuppy-net-failure")
 const { CLOUD_MCP_TOOLS } = await import("./fixtures/cloud-mcp-tools")
 const fakeFork = ((_file: string, _args: string[], options: Record<string, unknown>) => (forkCalls.push({ options }), new FakeChild())) as never
@@ -184,6 +185,9 @@ function sidecarStep(launched: Awaited<ReturnType<typeof launch>>) {
   for (const key of Object.keys(process.env)) if (key.startsWith("CODEPUPPY_")) delete process.env[key]
   for (const [key, value] of Object.entries(launched.forkEnv)) if (key.startsWith("CODEPUPPY_") && value !== undefined) process.env[key] = value
   const bootstrap = acceptCodePuppyBootstrap(launched.start.bootstrap)
+  // SPEC-stored-credentials-fence(sidecar.ts start() 同序):发布 start 消息里 main 交来的整表(T1);引擎装载配置之前的拉取由 main 的生产读法应答(P)
+  publishCodePuppyCredentials(parseCodePuppyCredentials(launched.start.credentials))
+  installCodePuppyCredentialSource(async () => readCredentialTable(credentialStores({ userDataPath: bootstrap.paths.userData })))
   return {
     userData: bootstrap.paths.userData,
     initialDirectory: bootstrap.paths.initialDirectory,

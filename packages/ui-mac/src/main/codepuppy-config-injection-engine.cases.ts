@@ -43,6 +43,7 @@ import { engineGlobalConfigDirectory } from "./engine-paths"
 import { homedir } from "node:os"
 import { engineProjectTrust } from "./engine-project-trust"
 import { allowProject } from "../../test-component/codepuppy-engine"
+import { handOverCredentials } from "../../test-component/credential-table"
 
 const sandbox = engineSandbox()
 const PASSWORD = "cp-l5-injection-engine"
@@ -137,6 +138,7 @@ const publishPlatformBaseURL = (url: string) => publishMainEnv({ env: { CODEPUPP
  */
 const inject = () => {
   const explicit = writeEngineConfigForFork(codepuppyBootstrap()).watch
+  handOverCredentials(userData) // SPEC-stored-credentials-fence:sidecar 在注入之前发布主进程交来的整表(T1),引擎装载前现拉(P)
   return { ...injectCodePuppyConfig(userData, undefined, "stable", codepuppyBootstrap().paths.userConfig ?? null), explicit }
 }
 

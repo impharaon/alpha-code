@@ -38,6 +38,8 @@ function channel() {
   let dropNext = false
   const held: Array<() => void> = []
   const requests: number[] = []
+  /** main 交出的表与盘上不同时用(判「这个值经这次拉取从表里来」,而不是拉取失败后引擎自己从盘上读到的)。 */
+  let overlay: Record<string, string> = {}
   const toSidecar = (message: CredentialsMessage) => {
     const deliver = () => ("id" in message ? requester.receive(message) : publishCodePuppyCredentials(message.credentials))
     if (holdNext && "id" in message) {
@@ -55,7 +57,11 @@ function channel() {
             return
           }
         }
-        answerCredentialsMessage(message, { table: mainCredentialTable, post: toSidecar, respawn: () => void respawns.push("credential-change"), log: (line) => void log.push(line) })
+        const table = () => {
+          const read = mainCredentialTable()
+          return Object.fromEntries(Object.entries(read).map(([file, entry]) => [file, file in overlay ? { ...entry, value: overlay[file]! } : entry]))
+        }
+        answerCredentialsMessage(message, { table, post: toSidecar, respawn: () => void respawns.push("credential-change"), log: (line) => void log.push(line) })
       }),
     (line) => void log.push(line),
   )
@@ -65,6 +71,7 @@ function channel() {
     drop: () => void (dropNext = true),
     release: () => held.splice(0).forEach((deliver) => deliver()),
     pending: () => held.length,
+    overlay: (values: Record<string, string>) => void (overlay = values),
     close: (reason: string) => requester.close(reason),
     respawns,
     requests,
@@ -166,13 +173,19 @@ test("AC-05 / E11:一次装载的拉取回复被扣住,其间提交新版本,另
   const delayed = m.load() // its pull's reply is held
   for (let i = 0; i < 250 && wire.pending() === 0; i++) await Bun.sleep(20)
   expect(wire.pending()).toBe(1)
-  m.commit(m.token("v-0000dddd", "FAKE-CRED-alpha-3"))
-  expect(await m.load()).toEqual({ status: "connected", token: "FAKE-CRED-alpha-3" })
+  const third = m.token("v-0000dddd", "FAKE-CRED-alpha-3-on-disk")
+  m.commit(third)
+  // main's table says another value for it: the second Location gets it only through its own, unheld pull (a pull that waited for the held
+  // one and then timed out would leave the engine to read the disk value — slice ② interim)
+  wire.overlay({ [third.slice("{file:".length, -1)]: "FAKE-CRED-alpha-3-from-table" })
+  const started = Date.now()
+  expect(await m.load()).toEqual({ status: "connected", token: "FAKE-CRED-alpha-3-from-table" })
+  expect(Date.now() - started).toBeLessThan(CREDENTIALS_PULL_TIMEOUT_MS)
   wire.release()
   await delayed
   expect(wire.log.some((line) => line.includes("not published"))).toBe(true)
   // the published table did not fall back to the held (older) snapshot: the next load still sees the new version
-  expect((await m.load()).token).toBe("FAKE-CRED-alpha-3")
+  expect((await m.load()).token).toBe("FAKE-CRED-alpha-3-from-table")
 }, 120_000)
 
 test(`AC-05 / E12:main ${CREDENTIALS_PULL_TIMEOUT_MS / 1000} 秒不回复 ⇒ 这次装载不用旧表(盘上新值,不是表里旧值)、引擎发 credentials.unavailable、main 请求 credential-change;重启后的新一代拿到当前值;端口关闭同样不用旧表`, async () => {

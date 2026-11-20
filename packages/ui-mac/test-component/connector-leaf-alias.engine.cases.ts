@@ -191,5 +191,68 @@ test("AC-04: enabling connectors in settings substitutes only each connector's o
   expect(refusals.map((line) => /at (\S+) was/.exec(line)?.[1]).sort()).toEqual(
     ["environment.BYOK", "environment.OTHER_CONNECTOR", "environment.PLATFORM", "environment.VIA_CASE", "environment.VIA_FIRMLINK", "environment.VIA_LINK", "environment.VIA_RELATIVE", "headers.X-Via-Link"].sort(),
   )
-  for (const value of Object.values(FAKE)) for (const line of logged) expect(line.includes(value)).toBe(false)
+  // the shared host's platform credential (codepuppy-engine.ts writes `sk-cp-<name>`) is one of the refused values too (review R1 item 6)
+  for (const value of [...Object.values(FAKE), `sk-cp-${name}`]) for (const line of logged) expect(line.includes(value)).toBe(false)
+}, 120_000)
+
+test("① 审查 R1 第 3 条 / 第 7 条:存放点里有一项读不出(EACCES)⇒ 不带 {file:} 的连接器照常应用;带 {file:} 的这次应用为不可用,不退回无条件读文件", async () => {
+  const name = "leaf-unreadable"
+  const userData = path.join(sandbox.root, `${name}-userdata`)
+  const root = path.join(sandbox.root, `${name}-state`, "codepuppy-state", "env", "dev")
+  fs.mkdirSync(root, { recursive: true })
+  process.env.CODEPUPPY_GLOBAL_DIR = root
+  const own = writeMcpSecretVersioned(userData, "secretc", "v-0000aaaa", "TOKEN", FAKE.alpha)
+  if (!own.ok) throw Error(own.reason)
+  for (const server of ["plainc", "secretc"]) {
+    const written = upsertRecordV2(root, {
+      id: `user:${server}`, name: server, kind: "mcp", environment: "dev", scope: { kind: "global" },
+      desiredState: "disabled", origin: "created", configKey: `mcp.${server}`, installedAt: "2026-11-20T00:00:00.000Z",
+    })
+    if (!written.ok) throw Error(written.reason)
+  }
+  const host = codepuppyEngine({
+    sandbox, name, modelBaseURL: model.baseURL,
+    mcp: {
+      plainc: { type: "local", command: [process.execPath, MCP_FIXTURE], enabled: false },
+      secretc: { type: "local", command: [process.execPath, MCP_FIXTURE], enabled: false, environment: { TOKEN: own.ref } },
+    },
+  })
+  const running = await host.start()
+  engines.push(running)
+  // an entry in a store that main cannot read
+  const locked = writeMcpSecretVersioned(userData, "zz", "v-0000aaaa", "LOCKED", "FAKE-CRED-locked")
+  if (!locked.ok) throw Error(locked.reason)
+  fs.chmodSync(locked.ref.slice("{file:".length, -1), 0o000)
+  const connection: EngineConnection = { url: running.url, username: "opencode", password: `cp-${name}` }
+  const added = new Set<string>()
+  const proxy = Bun.serve({
+    hostname: "127.0.0.1",
+    port: 0,
+    fetch: async (request) => {
+      const url = new URL(request.url)
+      const body = request.method === "GET" || request.method === "HEAD" ? undefined : await request.arrayBuffer()
+      const server = /^\/api\/experimental\/mcp\/([^/]+)$/.exec(url.pathname)?.[1]
+      if (request.method === "PUT" && server) added.add(decodeURIComponent(server))
+      return fetch(new Request(new URL(url.pathname + url.search, connection.url), { method: request.method, headers: request.headers, body }))
+    },
+  })
+  const results: Record<string, Array<{ status: string; detail?: string }>> = {}
+  try {
+    const converge = createManagedMcpConvergence({
+      root: () => root, awaitServer: async () => ({ ...connection, url: `http://127.0.0.1:${proxy.port}` }),
+      directory: () => host.projectDirectory, userDataPath: () => userData,
+    })
+    for (const server of ["plainc", "secretc"]) {
+      expect(await setInstallStateByKey({ type: "mcp", name: server, scope: "global", state: "enabled" }, {
+        globalRoot: () => root, advisoryGate: () => ({ allowed: true }), resolveEntry: async () => null,
+      })).toMatchObject({ ok: true })
+      results[server] = await converge([server])
+    }
+  } finally {
+    proxy.stop(true)
+    fs.chmodSync(locked.ref.slice("{file:".length, -1), 0o600)
+  }
+  expect([...added]).toEqual(["plainc"])
+  expect(results.plainc!.every((result) => result.status !== "unavailable")).toBe(true)
+  expect(results.secretc!.map((result) => result.status)).toEqual(results.secretc!.map(() => "unavailable"))
 }, 120_000)

@@ -12,6 +12,6 @@ test.skipIf(process.platform !== "darwin")("main's direct apply path never reads
   })
   const output = `${result.stdout.toString()}${result.stderr.toString()}`
   if (result.exitCode !== 0) throw new Error(output)
-  expect(output.match(/(\d+) pass\b/)?.[1], output).toBe("1")
+  expect(output.match(/(\d+) pass\b/)?.[1], output).toBe("2")
   expect(output.match(/(\d+) fail\b/)?.[1], output).toBe("0")
 }, 240_000)

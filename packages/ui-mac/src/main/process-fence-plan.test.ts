@@ -4,7 +4,8 @@
 // 试编译丢尾、原生模块缺失即拒、默认工作区不在盘上即拒。真编译器与真 profile 的判据在别的文件。
 
 import { describe, expect, test } from "bun:test"
-import { planProcessFence, type PlanProcessFenceDeps, type PlanProcessFenceInput } from "./process-fence-plan"
+import { planConfigFence, planProcessFence, type PlanProcessFenceDeps, type PlanProcessFenceInput } from "./process-fence-plan"
+import { processFenceWriteRules, type ProcessFenceWriteRule } from "./process-fence-profile"
 
 const describeDarwin = process.platform === "darwin" ? describe : describe.skip
 
@@ -41,12 +42,23 @@ function harness(overrides: Partial<PlanProcessFenceDeps> = {}, existing = new S
     addon: { packaged: true, resourcesPath: "/App/Contents/Resources", moduleDir: "/unused", exists: (p) => existing.has(p) },
     egressProxyPort: 4443,
     carriedWorkspaces: [],
+    // SPEC-engine-config-fence:server.ts 交给启动文档的同一个值(engineGlobalConfigDirectory)
+    engineConfigDirectory: `${HOME}/.config/opencode`,
   }
   return { deps, input, made, logs }
 }
 
+/** ENOENT 形状的 realpath 失败(位置不在盘上)。 */
+const enoent = (p: string) => Object.assign(new Error(`ENOENT: no such file or directory, realpath '${p}'`), { code: "ENOENT" })
+/** 独立于渲染器的上级目录算法:每个锚点从父目录起到 `/` 之前,按首次出现去重。 */
+function ancestorsOf(anchors: string[]): string[] {
+  const out: string[] = []
+  for (const anchor of anchors) for (let a = anchor.slice(0, anchor.lastIndexOf("/")); a.length > 0; a = a.slice(0, a.lastIndexOf("/"))) if (!out.includes(a)) out.push(a)
+  return out
+}
+
 describeDarwin("planProcessFence", () => {
-  test("正向:并集 = 默认 → recent → tab 栏;父目录 W4/W5/W6/W7 预建;addonPath 解析到 extraResources;日志一行账", () => {
+  test("正向:并集 = 默认 → recent → tab 栏;父目录 W4/W5/W7 与受保护目录预建;addonPath 解析到 extraResources;日志一行账", () => {
     const h = harness()
     const plan = planProcessFence(h.input, h.deps)
     expect(plan.workspaces).toEqual([`${HOME}/code-puppy`, `${HOME}/proj-b`, `${HOME}/proj-a`])
@@ -54,8 +66,12 @@ describeDarwin("planProcessFence", () => {
     expect(plan.dropped).toEqual([])
     expect(plan.attempts).toBe(1)
     expect(plan.profileBytes).toBe(Buffer.byteLength(plan.profile))
-    expect(h.made).toEqual([`${HOME}/.local/share/opencode`, `${HOME}/.cache/opencode`, `${HOME}/.config/opencode`, `${HOME}/.npm`])
-    expect(h.logs.some((l) => /process fence planned: workspaces=3 \(candidates=3, excluded=0, dropped=0\), egressProxyPort=4443/.test(l))).toBe(true)
+    // SPEC-engine-config-fence I4:围栏冻结的每个目录节点在 fork 前已存在(引擎 Global 的 mkdir 只会得到 EEXIST);~/.opencode 谁都不建
+    expect(h.made).toEqual([
+      `${HOME}/.local/share/opencode`, `${HOME}/.cache/opencode`, `${HOME}/.npm`,
+      STATE_ROOT, GLOBAL, `${USER_DATA}/codepuppy-engine-config`, `${USER_DATA}/codepuppy-connections`, `${HOME}/.config/opencode`,
+    ])
+    expect(h.logs.some((l) => /process fence planned: workspaces=3 \(candidates=3, excluded=0, dropped=0\), egressProxyPort=4443, configFence=14 rules/.test(l))).toBe(true)
     // `#1337`:计划里的 profile 带着那扇门(N4 = 传入的代理端口),不是别的端口
     expect(plan.profile).toContain('(allow network-outbound (remote ip "localhost:4443"))')
     expect(plan.profile).toContain("(deny network*)")
@@ -147,6 +163,61 @@ describeDarwin("planProcessFence", () => {
     const planned = h.logs.find((l) => l.startsWith("process fence planned:"))
     expect(planned).toContain("workspaces=1 (candidates=2, excluded=1, dropped=0)")
     expect(planned).toContain("— excluded: /Users/alpha/Library/Application Support (related to the app state root /Users/alpha/Library/Application Support/codepuppy-state")
+  })
+
+  test("SPEC-engine-config-fence E9:计划出的 profile 带受保护集两块(N4 之后),解析回来 deny = 计划给的规则 + 全部上级目录;configFenceRoots = 其中的目录位置", () => {
+    const h = harness()
+    const plan = planProcessFence(h.input, h.deps)
+    const cf = planConfigFence({ userDataPath: USER_DATA, appStateRoot: STATE_ROOT, codepuppyGlobalRoot: GLOBAL, engineConfigDirectory: `${HOME}/.config/opencode`, roots: plan.roots }, { realpath: (p) => p, mkdirp: () => {} })
+    const asRule = (rule: (typeof cf.configFence)[number]): ProcessFenceWriteRule =>
+      rule.kind === "dat-files" ? { kind: "regex", value: `^${rule.dir.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}/[^/]+\\.[dD][aA][tT]$` } : { kind: rule.kind, value: rule.path }
+    const anchors = cf.configFence.map((rule) => (rule.kind === "dat-files" ? `${rule.dir}/x` : rule.path))
+    expect(processFenceWriteRules(plan.profile).deny).toEqual([...cf.configFence.map(asRule), ...ancestorsOf(anchors).map((value) => ({ kind: "literal" as const, value }))])
+    expect(plan.profile.indexOf("(deny file-write*\n", plan.profile.indexOf("(allow network-outbound"))).toBeGreaterThan(0)
+    expect(plan.configFenceRoots).toEqual([STATE_ROOT, GLOBAL, `${USER_DATA}/codepuppy-engine-config`, `${USER_DATA}/codepuppy-connections`, `${HOME}/.config/opencode`])
+    expect(plan.configFenceRoots).toEqual(cf.configFenceRoots)
+  })
+
+  test("真实路径:每个位置写成「真实上级目录 + 名字」;位置本身是软链 ⇒ 再加它的真实目标(同一种规则);不在盘上(ENOENT)⇒ 只写位置;别的 realpath 错误 ⇒ 抛(拒 fork)", () => {
+    const REAL_UD = "/Volumes/data/userdata"
+    const TARGET = `${HOME}/dotfiles/engine-config`
+    const realpath = (p: string) => {
+      if (p === `${USER_DATA}/codepuppy-engine-config`) return TARGET
+      if (p === `${USER_DATA}/codepuppy.env`) throw enoent(p)
+      return p.startsWith(USER_DATA) ? REAL_UD + p.slice(USER_DATA.length) : p
+    }
+    const h = harness({ realpath })
+    const plan = planProcessFence(h.input, h.deps)
+    const deny = processFenceWriteRules(plan.profile).deny
+    // 软链位置:链本身(真实上级目录 + 名字)与真实目标都在
+    expect(deny).toContainEqual({ kind: "subpath", value: `${REAL_UD}/codepuppy-engine-config` })
+    expect(deny).toContainEqual({ kind: "subpath", value: TARGET })
+    expect(plan.configFenceRoots).toContain(TARGET)
+    // 不在盘上的 literal 只写「真实上级目录 + 名字」(literal 对尚不存在的文件同样挡住新建)
+    expect(deny).toContainEqual({ kind: "literal", value: `${REAL_UD}/codepuppy.env` })
+    // 经软链的 userData:规则里只有真实路径,没有链路径的写法
+    expect(deny.filter((rule) => rule.value.includes(USER_DATA))).toEqual([])
+    expect(deny).toContainEqual({ kind: "regex", value: "^/Volumes/data/userdata/[^/]+\\.[dD][aA][tT]$" })
+    // 别的 realpath 错误 ⇒ 抛(既有「计划失败 ⇒ 拒 fork」路径)
+    const denied = harness({ realpath: (p) => { if (p === `${HOME}/opencode.json`) throw Object.assign(new Error("EACCES"), { code: "EACCES" }); return p } })
+    expect(() => planProcessFence(denied.input, denied.deps)).toThrow(/EACCES/)
+  })
+
+  test("环境根恒列(在状态根之内时多一条冗余规则);用户导出 OPENCODE_CONFIG_DIR ⇒ 两个配置目录都列都预建", () => {
+    const outside = harness({ codepuppyGlobalRoot: () => "/Volumes/dev/codepuppy-env" })
+    outside.input.engineConfigDirectory = "/Volumes/cfg/opencode"
+    const plan = planProcessFence(outside.input, outside.deps)
+    expect(plan.configFenceRoots).toEqual([STATE_ROOT, "/Volumes/dev/codepuppy-env", `${USER_DATA}/codepuppy-engine-config`, `${USER_DATA}/codepuppy-connections`, "/Volumes/cfg/opencode", `${HOME}/.config/opencode`])
+    expect(outside.made).toContain("/Volumes/cfg/opencode")
+    expect(outside.made.some((d) => d.endsWith("/.opencode"))).toBe(false)
+  })
+
+  test("BR-05:真源里一条记录落在受保护配置位置之内 ⇒ 不进 workspaces、不进 profile,进 excluded 并点名位置", () => {
+    const h = harness({ readWorkspaces: () => [`${HOME}/.config/opencode/plugin`, `${HOME}/proj-a`], isDirectory: () => true })
+    const plan = planProcessFence(h.input, h.deps)
+    expect(plan.workspaces).toEqual([`${HOME}/code-puppy`, `${HOME}/proj-a`])
+    expect(plan.excluded).toEqual([{ directory: `${HOME}/.config/opencode/plugin`, reason: `inside the protected engine configuration location ${HOME}/.config/opencode` }])
+    expect(plan.profile).not.toContain(`(subpath "${HOME}/.config/opencode/plugin")`)
   })
 
   test("dev 形态:addonPath 解析到 native/codepuppy-fence/build/(相对 out/main)", () => {

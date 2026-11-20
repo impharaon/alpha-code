@@ -20,7 +20,7 @@ import { createDeepLinkQueue } from "./deep-link-queue"
 
 const STATE_ROOT = "/Users/alpha/Library/Application Support/codepuppy-state"
 const eligibilityFixture = {
-  eligibility: { homeDir: "/Users/alpha", appStateRoot: STATE_ROOT, realpath: (p: string) => resolve(p), stat: (p: string) => ({ dev: "fixture", ino: resolve(p) }), isDirectory: () => true },
+  eligibility: { homeDir: "/Users/alpha", appStateRoot: STATE_ROOT, configFenceRoots: () => [] as string[], realpath: (p: string) => resolve(p), stat: (p: string) => ({ dev: "fixture", ino: resolve(p) }), isDirectory: () => true },
   onWritableChanged: () => {},
 }
 
@@ -294,7 +294,7 @@ describe("用户打开登记是两个消费者的共同资格", () => {
       for (const name of ["home", "state", "workspace"]) mkdirSync(join(dir, name))
       process.env.CODEPUPPY_USER_WORKSPACE_DIR = join(dir, "workspace")
       const tracker = bootFenceWorkspaceTruth({ truthPath: join(dir, "truth.json"), store: { tabs: [], recent: undefined, info: undefined }, fs, log: () => {}, onWritableChanged: () => {}, eligibility: {
-        homeDir: join(dir, "home"), appStateRoot: join(dir, "state"), realpath: realpathSync.native, isDirectory: (path) => statSync(path).isDirectory(),
+        homeDir: join(dir, "home"), appStateRoot: join(dir, "state"), configFenceRoots: () => [], realpath: realpathSync.native, isDirectory: (path) => statSync(path).isDirectory(),
       } })
       const result = await tracker.probeWrite({ server: "sidecar", directory: join(dir, "workspace") }, {
         fenced: true, grantWrite: async () => ({ outcome: "granted" }), probeWrite: async () => ({ outcome: "unknown" }), generationWrites: (directory: string) => directory === join(dir, "workspace"),
@@ -350,7 +350,7 @@ describe("用户打开登记是两个消费者的共同资格", () => {
     const truthPath = join(dir, "truth.json")
     writeWorkspaceTruth(truthPath, [], fs)
     const tracker = bootFenceWorkspaceTruth({ truthPath, store: { tabs: [], recent: undefined, info: undefined }, fs, log: () => {}, onWritableChanged: () => {}, eligibility: {
-      homeDir: join(dir, "home"), appStateRoot: join(dir, "state"), realpath: realpathSync.native, isDirectory: (path) => statSync(path).isDirectory(),
+      homeDir: join(dir, "home"), appStateRoot: join(dir, "state"), configFenceRoots: () => [], realpath: realpathSync.native, isDirectory: (path) => statSync(path).isDirectory(),
     } })
     // The alias is not quarantined: it arrives after boot, before the concrete open.
     tracker.noteRendererStoreSet(GLOBAL_RENDERER_STORE, TABS_KEY, [draft("alias", alias)])
@@ -384,6 +384,41 @@ describe("用户打开登记是两个消费者的共同资格", () => {
     for (const directory of ["relative", "", "/Users/alpha/missing"]) expect(tracker.userOpened.register({ server: "sidecar", directory })).toEqual({ eligible: false, reason: "not-a-directory" })
     expect(tracker.userOpened.has("remote", "/Users/alpha/proj-a")).toBe(false)
   }))
+
+  // SPEC-engine-config-fence BR-05 / DESIGN §4.3:受保护配置位置本身与其内的文件夹不合格,原因是专属的 protected-config(界面据此显示那一句);
+  // 状态根之内仍是 home-or-app-state(既有判定在前);包含受保护位置的文件夹照常登记并签发。真源里已有的这类条目在装载时被排除。
+  test("BR-05:受保护位置本身 / 其内 ⇒ register 与 probe 都回 protected-config、零签发;包含它 ⇒ 照常签发;状态根之内仍是 home-or-app-state;真源里的旧条目装载时排除", async () => {
+    const dir = realpathSync(mkdtempSync(join(tmpdir(), "fence-ws-")))
+    try {
+      const CONFIG = "/Users/alpha/.config/opencode"
+      const truthPath = join(dir, "truth.json")
+      writeWorkspaceTruth(truthPath, [`${CONFIG}/old-project`, "/Users/alpha/proj-a"], fs)
+      const logs: string[] = []
+      const issued: string[] = []
+      const tracker = bootFenceWorkspaceTruth({ ...eligibilityFixture, truthPath, store: { tabs: undefined, recent: undefined, info: undefined }, fs, log: (line) => void logs.push(line), eligibility: {
+        ...eligibilityFixture.eligibility, configFenceRoots: () => [CONFIG, `${STATE_ROOT}/env/dev`],
+      } })
+      expect(logs).toContain(`process fence: workspace ${CONFIG}/old-project excluded — inside the protected engine configuration location ${CONFIG}`)
+      expect(tracker.userOpened.has("sidecar", `${CONFIG}/old-project`)).toBe(false)
+      const sidecar = {
+        fenced: true,
+        grantWrite: async (directory: string) => { issued.push(directory); return { outcome: "granted" as const } },
+        probeWrite: async () => ({ outcome: "writable" as const }),
+        generationWrites: () => false,
+      } as unknown as Parameters<typeof tracker.probeWrite>[1]
+      for (const directory of [CONFIG, `${CONFIG}/plugin`]) {
+        expect(tracker.userOpened.register({ server: "sidecar", directory }), directory).toEqual({ eligible: false, reason: "protected-config" })
+        expect(await tracker.probeWrite({ server: "sidecar", directory }, sidecar), directory).toMatchObject({ grant: "ineligible", reason: "protected-config" })
+        expect(await tracker.grantWrite({ server: "sidecar", directory }, sidecar), directory).toEqual({ grant: "ineligible", reason: "protected-config" })
+      }
+      expect(tracker.userOpened.register({ server: "sidecar", directory: `${STATE_ROOT}/env/dev/x` })).toEqual({ eligible: false, reason: "home-or-app-state" })
+      expect(tracker.userOpened.register({ server: "sidecar", directory: "/Users/alpha/.config" })).toEqual({ eligible: true, server: "sidecar", directory: "/Users/alpha/.config" })
+      expect(await tracker.probeWrite({ server: "sidecar", directory: "/Users/alpha/.config" }, sidecar)).toMatchObject({ outcome: "writable", grant: "granted" })
+      expect(issued).toEqual(["/Users/alpha/.config"])
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
 
   test("检疫仍挡真源重播;用户具体打开可登记,不会把恢复本身误算成打开", () => withTemp((dir) => {
     const truthPath = join(dir, "truth.json")

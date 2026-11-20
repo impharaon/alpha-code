@@ -15,6 +15,8 @@ import { join, resolve } from "node:path"
 import {
   COMPILE_BYTE_WALL,
   LOCAL_SIDECAR_SERVER_KEY,
+  checkWorkspaceDirectory,
+  configFenceLocations,
   MAX_WORKSPACES,
   WRITABLE_ROOT_IDS,
   assertEgressProxyPort,
@@ -26,7 +28,9 @@ import {
   selectWorkspaceUnion,
   trimUntilCompiles,
   workspaceCandidatesFromStore,
+  type ConfigFenceRule,
   type ProcessFenceProfileInput,
+  type ProcessFenceWriteRule,
   type WorkspaceUnionInput,
 } from "./process-fence-profile"
 
@@ -37,14 +41,49 @@ const STATE_ROOT = `${HOME}/Library/Application Support/codepuppy-state`
 const noDisk = (p: string) => resolve(p)
 const virtualStat = (p: string) => ({ dev: "fixture", ino: resolve(p) })
 const roots = { home: HOME, dataHome: `${HOME}/.local/share`, cacheHome: `${HOME}/.cache`, configHome: `${HOME}/.config` }
+const USER_DATA = `${HOME}/Library/Application Support/ai.opencode.desktop`
+const GLOBAL = `${HOME}/Library/Application Support/codepuppy-state/env/prod`
+/** SPEC-engine-config-fence:受保护配置集,由生产的位置清单给出(这里没有软链,真实路径 = 原路径;软链与真实路径的判据在 process-fence-plan.test.ts)。 */
+const CF: ConfigFenceRule[] = configFenceLocations({ userDataPath: USER_DATA, appStateRoot: STATE_ROOT, codepuppyGlobalRoot: GLOBAL, engineConfigDirectory: `${HOME}/.config/opencode`, configHome: roots.configHome, home: HOME })
 const base: ProcessFenceProfileInput = {
   workspaces: [`${HOME}/code-puppy`, "/Users/alpha/app/alpha-code"],
-  codepuppyGlobalRoot: `${HOME}/Library/Application Support/codepuppy-state/env/prod`,
-  userDataPath: `${HOME}/Library/Application Support/ai.opencode.desktop`,
-  stateHome: `${HOME}/Library/Application Support/ai.opencode.desktop`,
+  codepuppyGlobalRoot: GLOBAL,
+  userDataPath: USER_DATA,
+  stateHome: USER_DATA,
   roots,
   egressProxyPort: 4443,
+  configFence: CF,
 }
+/** 一个受保护位置都没有的形状:只判别的行时用(空清单两块都不渲染)。 */
+const noFence = () => [] as string[]
+
+/** 受保护集两块的逐行期望(独立字面量 —— 不从渲染器取):规则按清单顺序,上级目录按首次出现、从父目录到 `/` 之前。 */
+const CF_LINES = [
+  "(deny file-write*",
+  `(subpath "${STATE_ROOT}")`,
+  `(subpath "${GLOBAL}")`,
+  `(subpath "${USER_DATA}/codepuppy-engine-config")`,
+  `(literal "${USER_DATA}/codepuppy-shell-env.json")`,
+  `(literal "${USER_DATA}/codepuppy.env")`,
+  `(literal "${USER_DATA}/codepuppy-endpoints.json")`,
+  `(literal "${USER_DATA}/codepuppy-discovered-endpoints.json")`,
+  `(subpath "${USER_DATA}/codepuppy-connections")`,
+  `(literal "${USER_DATA}/opencode.settings")`,
+  `(literal "${USER_DATA}/opencode.updater")`,
+  `(regex #"^/Users/alpha/Library/Application Support/ai\\.opencode\\.desktop/[^/]+\\.[dD][aA][tT]$")`,
+  `(subpath "${HOME}/.config/opencode")`,
+  `(literal "${HOME}/opencode.json")`,
+  `(literal "${HOME}/opencode.jsonc"))`,
+  `(deny file-write* ${[`${HOME}/Library/Application Support`, `${HOME}/Library`, HOME, "/Users", `${STATE_ROOT}/env`, STATE_ROOT, USER_DATA, `${HOME}/.config`].map((p) => `(literal "${p}")`).join(" ")})`,
+]
+/** 同一份期望,写成解析器的 deny 规则(E9 往返)。 */
+const CF_DENY: ProcessFenceWriteRule[] = [
+  ...CF_LINES.slice(1, -1).map((line) => {
+    const m = /^\((subpath|literal) "([^"]*)"\)\)?$|^\(regex #"([^"]*)"\)\)?$/.exec(line)!
+    return m[3] !== undefined ? { kind: "regex" as const, value: m[3] } : { kind: m[1] as "subpath" | "literal", value: m[2]! }
+  }),
+  ...[`${HOME}/Library/Application Support`, `${HOME}/Library`, HOME, "/Users", `${STATE_ROOT}/env`, STATE_ROOT, USER_DATA, `${HOME}/.config`].map((value) => ({ kind: "literal" as const, value })),
+]
 
 /** `#1334` Q1.2 的四行(逐字,独立字面量 —— 不从渲染器取);端口是唯一的参数。 */
 const NETWORK_LINES = (port: number) => [
@@ -70,11 +109,9 @@ describe("renderProcessFenceProfile —— 勘破 §8.2 的行(W10/W19 已删,D1
       "(allow file-write*",
       `(subpath "${HOME}/code-puppy")`,
       `(subpath "/Users/alpha/app/alpha-code")`,
-      `(subpath "${HOME}/Library/Application Support/codepuppy-state/env/prod")`,
       `(subpath "${HOME}/Library/Application Support/ai.opencode.desktop")`,
       `(subpath "${HOME}/.local/share/opencode")`,
       `(subpath "${HOME}/.cache/opencode")`,
-      `(subpath "${HOME}/.config/opencode")`,
       `(subpath "${HOME}/.npm")`,
       `(regex #"^/Users/alpha/\\.zsh_history")`,
       `(subpath "/private/tmp")`,
@@ -89,7 +126,33 @@ describe("renderProcessFenceProfile —— 勘破 §8.2 的行(W10/W19 已删,D1
       '(allow file-write* (extension "app.codepuppy.workspace-write"))',
       '(deny file-issue-extension generic-issue-extension mach-issue-extension iokit-issue-extension ipc-posix-issue-extension (extension-class "app.codepuppy.workspace-write"))',
       ...NETWORK_LINES(4443),
+      ...CF_LINES,
     ])
+  })
+
+  test("SPEC-engine-config-fence BR-01:受保护集两块在 N4 之后(也就在 X1 之后),之后再没有任何文件写的放行;空清单两块都不渲染;路径里的引号 / 相对路径拒绝渲染", () => {
+    const lines = tokens(renderProcessFenceProfile(base))
+    const x1 = lines.findIndex((l) => l.includes('(extension "app.codepuppy.workspace-write")'))
+    const n4 = lines.findIndex((l) => l.startsWith("(allow network-outbound"))
+    const cf = lines.indexOf("(deny file-write*", n4)
+    expect(x1).toBeGreaterThan(-1)
+    expect(cf).toBe(n4 + 1)
+    expect(lines.slice(cf)).toEqual(CF_LINES)
+    expect(lines.slice(cf).some((l) => l.startsWith("(allow"))).toBe(false)
+    expect(tokens(renderProcessFenceProfile({ ...base, configFence: [] })).at(-1)).toBe(NETWORK_LINES(4443).at(-1))
+    expect(() => renderProcessFenceProfile({ ...base, configFence: [{ kind: "literal", path: '/Users/alpha/"x' }] })).toThrow(/configFence\[0\]/)
+    expect(() => renderProcessFenceProfile({ ...base, configFence: [{ kind: "dat-files", dir: "relative" }] })).toThrow(/configFence\[0\]/)
+  })
+
+  test("位置清单:CF-1–8、CF-10(名字取 USER_DATA_LAYOUT 与 store 常量);两个引擎配置目录相同只列一份,用户导出 OPENCODE_CONFIG_DIR 时两份都列;不含 ~/.opencode 与工具策略目录(片 ④ / ③)", () => {
+    const list = (engineConfigDirectory: string) =>
+      configFenceLocations({ userDataPath: USER_DATA, appStateRoot: STATE_ROOT, codepuppyGlobalRoot: GLOBAL, engineConfigDirectory, configHome: roots.configHome, home: HOME })
+    expect(list(`${HOME}/.config/opencode`).filter((rule) => rule.kind === "subpath" && rule.path.endsWith("opencode"))).toEqual([{ kind: "subpath", path: `${HOME}/.config/opencode` }])
+    expect(list("/Volumes/cfg/opencode").filter((rule) => rule.kind === "subpath" && rule.path.endsWith("opencode"))).toEqual([
+      { kind: "subpath", path: "/Volumes/cfg/opencode" },
+      { kind: "subpath", path: `${HOME}/.config/opencode` },
+    ])
+    expect(JSON.stringify(list(`${HOME}/.config/opencode`))).not.toMatch(/\.opencode"|codepuppy-tool-policy/)
   })
 
   test("`#1337` 网络行:Q1.2 四行逐字、顺序不变、deny 在前 allow 在后、N4 的端口就是传入的代理端口;只写加法(没有第二条 deny)", () => {
@@ -123,6 +186,7 @@ describe("renderProcessFenceProfile —— 勘破 §8.2 的行(W10/W19 已删,D1
         .filter((x): x is string => !!x),
     )
     expect([...ids].sort()).toEqual(Object.keys(WRITABLE_ROOT_IDS).sort())
+    expect(Object.keys(WRITABLE_ROOT_IDS).sort()).toEqual(["W1", "W11", "W12", "W13", "W14", "W15", "W16", "W17", "W18", "W3", "W4", "W5", "W7", "W8", "X1"])
   })
 
   test("XDG 根跟着 env 走:用户导出 XDG_DATA_HOME 时 W4 指向它,不再是 ~/.local/share", () => {
@@ -155,47 +219,113 @@ describe("renderProcessFenceProfile —— 勘破 §8.2 的行(W10/W19 已删,D1
 })
 
 describe("签发判定的唯一来源:本代 apply 的 profile 解析回写规则,判据偏向判「覆盖」", () => {
-  test("渲染出的写块逐条还原(含 W13 一行三条、W14/W15 literal + regex);X1 扩展行不算规则;未知写法与块后的写拒绝抛;包含按祖先链、大小写折叠", () => {
-    const rules = processFenceWriteRules(renderProcessFenceProfile(base))
-    expect(rules).toEqual([
-      { kind: "subpath", value: "/Users/alpha/code-puppy" },
-      { kind: "subpath", value: "/Users/alpha/app/alpha-code" },
-      { kind: "subpath", value: "/Users/alpha/Library/Application Support/codepuppy-state/env/prod" },
-      { kind: "subpath", value: "/Users/alpha/Library/Application Support/ai.opencode.desktop" },
-      { kind: "subpath", value: "/Users/alpha/.local/share/opencode" },
-      { kind: "subpath", value: "/Users/alpha/.cache/opencode" },
-      { kind: "subpath", value: "/Users/alpha/.config/opencode" },
-      { kind: "subpath", value: "/Users/alpha/.npm" },
-      { kind: "regex", value: "^/Users/alpha/\\.zsh_history" },
-      { kind: "subpath", value: "/private/tmp" },
-      { kind: "subpath", value: "/private/var/folders" },
-      { kind: "literal", value: "/dev/null" },
-      { kind: "literal", value: "/dev/stdout" },
-      { kind: "literal", value: "/dev/stderr" },
-      { kind: "literal", value: "/dev/tty" },
-      { kind: "regex", value: "^/dev/fd/" },
-      { kind: "literal", value: "/dev/ptmx" },
-      { kind: "regex", value: "^/dev/ttys" },
-      { kind: "subpath", value: "/Users/alpha/.opencode" },
-      { kind: "subpath", value: "/Users/alpha/Library/Caches/bun" },
-      { kind: "subpath", value: "/Users/alpha/.cache/bun" },
-    ])
-    expect(processFenceWriteRules("(version 1)(allow default)(deny file-write*)")).toEqual([])
+  const ALLOW: ProcessFenceWriteRule[] = [
+    { kind: "subpath", value: "/Users/alpha/code-puppy" },
+    { kind: "subpath", value: "/Users/alpha/app/alpha-code" },
+    { kind: "subpath", value: "/Users/alpha/Library/Application Support/ai.opencode.desktop" },
+    { kind: "subpath", value: "/Users/alpha/.local/share/opencode" },
+    { kind: "subpath", value: "/Users/alpha/.cache/opencode" },
+    { kind: "subpath", value: "/Users/alpha/.npm" },
+    { kind: "regex", value: "^/Users/alpha/\\.zsh_history" },
+    { kind: "subpath", value: "/private/tmp" },
+    { kind: "subpath", value: "/private/var/folders" },
+    { kind: "literal", value: "/dev/null" },
+    { kind: "literal", value: "/dev/stdout" },
+    { kind: "literal", value: "/dev/stderr" },
+    { kind: "literal", value: "/dev/tty" },
+    { kind: "regex", value: "^/dev/fd/" },
+    { kind: "literal", value: "/dev/ptmx" },
+    { kind: "regex", value: "^/dev/ttys" },
+    { kind: "subpath", value: "/Users/alpha/.opencode" },
+    { kind: "subpath", value: "/Users/alpha/Library/Caches/bun" },
+    { kind: "subpath", value: "/Users/alpha/.cache/bun" },
+  ]
+
+  test("E9 往返:生产渲染(含受保护集)→ 解析 ⇒ allow 逐条还原写块(W13 一行三条、W14/W15 literal + regex),deny 与渲染输入(规则 + 上级目录)逐条相等;X1 扩展行不算规则", () => {
+    expect(processFenceWriteRules(renderProcessFenceProfile(base))).toEqual({ allow: ALLOW, deny: CF_DENY })
+    expect(processFenceWriteRules(renderProcessFenceProfile({ ...base, configFence: [] }))).toEqual({ allow: ALLOW, deny: [] })
+    expect(processFenceWriteRules("(version 1)(allow default)(deny file-write*)")).toEqual({ allow: [], deny: [] })
+  })
+
+  // DESIGN-stored-credentials-fence §4.5 的 C1 两块:渲染在 N4 之后,与受保护集同侧;表头 `(deny file-read* file-write*` 与 `(deny file-write*`,
+  // 收尾括号落在最后一条条目的行末、其后带 `; C1` 注释,上级目录块一行可写多条。这里照那份设计的排版代入假路径(那份渲染器还没落地)。
+  const C1_TEXT = [
+    "(deny file-read* file-write*",
+    `  (subpath "${USER_DATA}/codepuppy-secrets")`,
+    `  (subpath "${USER_DATA}/codepuppy-mcp-secrets")`,
+    `  (literal "${USER_DATA}/codepuppy.env")`,
+    `  (literal "${USER_DATA}/codepuppy-auth.json")`,
+    `  (literal "${USER_DATA}/codepuppy-pkce.json")`,
+    `  (literal "${USER_DATA}/codepuppy-byok-keys.json")`,
+    `  (subpath "${USER_DATA}/Crashpad")`,
+    `  (subpath "/private/var/folders/xy/T/codepuppy-connectors-501-abcdef"))`,
+    "(deny file-write*",
+    `  (literal "${HOME}/Library/Application Support") (literal "${HOME}/Library") (literal "${HOME}") (literal "/Users")`,
+    `  (literal "${USER_DATA}") (literal "/private/var/folders/xy/T") (literal "/private/var/folders/xy"))      ; C1`,
+    "",
+  ].join("\n")
+  const C1_DENY: ProcessFenceWriteRule[] = [
+    { kind: "subpath", value: `${USER_DATA}/codepuppy-secrets` },
+    { kind: "subpath", value: `${USER_DATA}/codepuppy-mcp-secrets` },
+    { kind: "literal", value: `${USER_DATA}/codepuppy.env` },
+    { kind: "literal", value: `${USER_DATA}/codepuppy-auth.json` },
+    { kind: "literal", value: `${USER_DATA}/codepuppy-pkce.json` },
+    { kind: "literal", value: `${USER_DATA}/codepuppy-byok-keys.json` },
+    { kind: "subpath", value: `${USER_DATA}/Crashpad` },
+    { kind: "subpath", value: "/private/var/folders/xy/T/codepuppy-connectors-501-abcdef" },
+    ...[`${HOME}/Library/Application Support`, `${HOME}/Library`, HOME, "/Users", USER_DATA, "/private/var/folders/xy/T", "/private/var/folders/xy"].map((value) => ({ kind: "literal" as const, value })),
+  ]
+
+  test("E9 往返(受保护集 + C1 样本):C1 两块排在受保护集之后或之前,deny 都逐条等于两份输入按出现顺序拼起来", () => {
+    const profile = renderProcessFenceProfile(base)
+    expect(processFenceWriteRules(profile + C1_TEXT)).toEqual({ allow: ALLOW, deny: [...CF_DENY, ...C1_DENY] })
+    const n4 = profile.indexOf("(deny file-write*\n", profile.indexOf("(allow network-outbound"))
+    expect(processFenceWriteRules(profile.slice(0, n4) + C1_TEXT + profile.slice(n4))).toEqual({ allow: ALLOW, deny: [...C1_DENY, ...CF_DENY] })
+  })
+
+  test("文法只认渲染点写出的形状:其余任何含 file-write 的表头、条目或行都抛(调用方按「本代不签发」处理)", () => {
+    const profile = renderProcessFenceProfile(base)
+    const head = profile.slice(0, profile.indexOf("(deny network*)"))
     for (const bad of [
       '(version 1)\n(allow file-write* (subpath "/Users/alpha"))\n',
       '(version 1)\n(allow file-write*\n  (prefix "/Users/alpha") ; W1\n)\n',
       '(version 1)\n(allow file-write*\n  (subpath "/x") (require-not (vnode-type SYMLINK)) ; W1\n)\n',
       '(version 1)\n(allow file-write*\n  (subpath "/x") ; W1\n',
-      // A carve-out after the allow block would silently stop grants inside it.
-      '(version 1)\n(deny file-write*)\n(allow file-write*\n  (subpath "/x") ; W1\n)\n(deny file-write* (subpath "/x/secret"))\n',
-    ]) expect(() => processFenceWriteRules(bad), bad).toThrow()
-    // Inside a root (any depth, any letter case) or under a regex row ⇒ covered; a sibling sharing a prefix ⇒ not.
-    for (const covered of ["/Users/alpha/code-puppy", "/Users/alpha/code-puppy/deep/x", "/USERS/ALPHA/CODE-PUPPY/x", "/private/tmp/p", "/Users/alpha/.zsh_history-dir/p"])
+      // 拒写块的条目只有三种;多一个过滤器、一种别的写法、块内注释、空块、未收尾,都抛
+      `${profile}(deny file-write* (subpath "/x") (require-not (vnode-type SYMLINK)))\n`,
+      `${profile}(deny file-write* (prefix "/x"))\n`,
+      `${profile}(deny file-write*\n  (subpath "/x") ; why\n  (literal "/y"))\n`,
+      `${profile}(deny file-write*\n)\n`,
+      `${profile}(deny file-write*)\n`,
+      `${profile}(deny file-write*\n  (subpath "/x")\n`,
+      `${profile}(deny file-write* (subpath "/x")) (allow default)\n`,
+      // 别的表头:只写 data、写在别的位置、读写顺序反过来
+      `${profile}(deny file-write-data (subpath "/x"))\n`,
+      `${profile}  (deny file-write* (subpath "/x"))\n`,
+      `${profile}(deny file-write* file-read* (subpath "/x"))\n`,
+      // 拒写块之后再出现任何文件写的放行(含 X1 行):它会盖过受保护集,覆盖判定就不再成立
+      `${profile}(allow file-write* (extension "app.codepuppy.workspace-write"))\n`,
+      `${profile}(allow file-write*\n  (subpath "/x") ; W1\n)\n`,
+      `${head}${profile.slice(profile.indexOf("(deny file-write*\n", profile.indexOf("(allow network-outbound")))}(allow file-write* (extension "app.codepuppy.workspace-write"))\n`,
+    ]) expect(() => processFenceWriteRules(bad), bad.slice(-160)).toThrow()
+  })
+
+  test("覆盖判定:在 allow 下、且不在任何 deny 下才算覆盖;subpath / regex deny 盖住目录或其祖先,literal deny 只在等于目录时算;大小写折叠", () => {
+    const rules = processFenceWriteRules(renderProcessFenceProfile(base))
+    // Inside an allow root (any depth, any letter case) or under a regex row ⇒ covered; a sibling sharing a prefix ⇒ not.
+    for (const covered of ["/Users/alpha/code-puppy", "/Users/alpha/code-puppy/deep/x", "/USERS/ALPHA/CODE-PUPPY/x", "/private/tmp/p", "/Users/alpha/.zsh_history-dir/p", `${USER_DATA}/uv-cache`])
       expect(processFenceRulesCover(rules, covered), covered).toBe(true)
     for (const outside of ["/Users/alpha/code-puppy2", "/Users/alpha/proj", "/Users/alpha", "/tmp/p", "/Users/alpha/Library/Application Support"])
       expect(processFenceRulesCover(rules, outside), outside).toBe(false)
-    // A literal on an ancestor makes that ancestor writable, so everything below it counts as covered.
-    expect(processFenceRulesCover([{ kind: "literal", value: "/Users/alpha/p" }], "/Users/alpha/p/q")).toBe(true)
+    // 受保护位置与其内(W3 罩着 userData,受保护集把其中几处拿回来);userData 本身被 literal 冻结 ⇒ 不算覆盖(多签一次,X1 盖不过受保护集)
+    for (const denied of [`${USER_DATA}/codepuppy-engine-config`, `${USER_DATA}/codepuppy-engine-config/x`, `${USER_DATA}/CODEPUPPY-CONNECTIONS/a`, `${USER_DATA}/default.dat`, USER_DATA])
+      expect(processFenceRulesCover(rules, denied), denied).toBe(false)
+    // A literal on an ancestor makes that ancestor writable, so everything below it counts as covered — an allow literal.
+    expect(processFenceRulesCover({ allow: [{ kind: "literal", value: "/Users/alpha/p" }], deny: [] }, "/Users/alpha/p/q")).toBe(true)
+    // …while a literal deny freezes only the node itself
+    expect(processFenceRulesCover({ allow: [{ kind: "subpath", value: "/a" }], deny: [{ kind: "literal", value: "/a/b" }] }, "/a/b/c")).toBe(true)
+    expect(processFenceRulesCover({ allow: [{ kind: "subpath", value: "/a" }], deny: [{ kind: "literal", value: "/a/b" }] }, "/a/b")).toBe(false)
+    expect(processFenceRulesCover({ allow: [], deny: [] }, "/a")).toBe(false)
   })
 })
 
@@ -264,7 +394,7 @@ describe("selectWorkspaceUnion —— 并集裁剪规则(K=32,顺序 = 默认工
   }
 
   test("顺序:默认工作区第一,recent 第二,然后 tab 栏的 draft,再 info 的 session;非本地引擎 / 不存在 / HOME 及其祖先 / 相对路径逐条排除并给理由", () => {
-    const union = selectWorkspaceUnion({ appStateRoot: STATE_ROOT, realpath: noDisk, stat: virtualStat, candidates: workspaceCandidatesFromStore(sources), defaultWorkspace: "/Users/alpha/code-puppy", homeDir: "/Users/alpha", isDirectory })
+    const union = selectWorkspaceUnion({ appStateRoot: STATE_ROOT, configFenceRoots: noFence, realpath: noDisk, stat: virtualStat, candidates: workspaceCandidatesFromStore(sources), defaultWorkspace: "/Users/alpha/code-puppy", homeDir: "/Users/alpha", isDirectory })
     expect(union.selected).toEqual([
       "/Users/alpha/code-puppy",
       "/Users/alpha/proj-recent",
@@ -289,14 +419,14 @@ describe("selectWorkspaceUnion —— 并集裁剪规则(K=32,顺序 = 默认工
       recent: { key: "draft:d" },
       info: { [sessionKey("x")]: { directory: "/Users/alpha/proj-a/" } },
     }
-    const union = selectWorkspaceUnion({ appStateRoot: STATE_ROOT, realpath: noDisk, stat: virtualStat, candidates: workspaceCandidatesFromStore(dup), defaultWorkspace: "/Users/alpha/code-puppy", homeDir: "/Users/alpha", isDirectory })
+    const union = selectWorkspaceUnion({ appStateRoot: STATE_ROOT, configFenceRoots: noFence, realpath: noDisk, stat: virtualStat, candidates: workspaceCandidatesFromStore(dup), defaultWorkspace: "/Users/alpha/code-puppy", homeDir: "/Users/alpha", isDirectory })
     expect(union.selected).toEqual(["/Users/alpha/code-puppy", "/Users/alpha/proj-a"])
   })
 
   test("K 封顶:超过 MAX_WORKSPACES 的候选被排除并点名;默认工作区永远不会被顶掉", () => {
     const many = Array.from({ length: MAX_WORKSPACES + 5 }, (_, i) => `/Users/alpha/many-${i}`)
     const isDir = (p: string) => p === "/Users/alpha/code-puppy" || many.includes(p)
-    const union = selectWorkspaceUnion({ appStateRoot: STATE_ROOT, realpath: noDisk, stat: virtualStat,
+    const union = selectWorkspaceUnion({ appStateRoot: STATE_ROOT, configFenceRoots: noFence, realpath: noDisk, stat: virtualStat,
       candidates: workspaceCandidatesFromStore({ tabs: many.map((d, i) => ({ type: "draft", draftID: `d${i}`, server: "sidecar", directory: d })), recent: undefined, info: undefined }),
       defaultWorkspace: "/Users/alpha/code-puppy",
       homeDir: "/Users/alpha",
@@ -308,7 +438,7 @@ describe("selectWorkspaceUnion —— 并集裁剪规则(K=32,顺序 = 默认工
   })
 
   test("store 形状容错:非 JSON 字符串 / 非数组 tabs / 缺 info ⇒ 只剩默认工作区,不抛", () => {
-    const union = selectWorkspaceUnion({ appStateRoot: STATE_ROOT, realpath: noDisk, stat: virtualStat,
+    const union = selectWorkspaceUnion({ appStateRoot: STATE_ROOT, configFenceRoots: noFence, realpath: noDisk, stat: virtualStat,
       candidates: workspaceCandidatesFromStore({ tabs: "{not json", recent: 42, info: null }),
       defaultWorkspace: "/Users/alpha/code-puppy",
       homeDir: "/Users/alpha",
@@ -319,7 +449,7 @@ describe("selectWorkspaceUnion —— 并集裁剪规则(K=32,顺序 = 默认工
   })
 
   test("默认工作区本身不是目录 ⇒ selected 为空(planner 据此拒绝 fork)", () => {
-    const union = selectWorkspaceUnion({ appStateRoot: STATE_ROOT, realpath: noDisk, stat: virtualStat, candidates: [], defaultWorkspace: "/Users/alpha/missing", homeDir: "/Users/alpha", isDirectory })
+    const union = selectWorkspaceUnion({ appStateRoot: STATE_ROOT, configFenceRoots: noFence, realpath: noDisk, stat: virtualStat, candidates: [], defaultWorkspace: "/Users/alpha/missing", homeDir: "/Users/alpha", isDirectory })
     expect(union.selected).toEqual([])
   })
 })
@@ -344,6 +474,7 @@ describe("`#1390` selectWorkspaceUnion —— 与应用状态根相关的候选�
       defaultWorkspace: `${HOME}/code-puppy`,
       homeDir: HOME,
       appStateRoot: STATE_ROOT,
+      configFenceRoots: noFence,
       realpath: noDisk, stat: virtualStat,
       // 盘上「都在」:排除只能来自状态根规则,不能借「不是目录」蒙混过关
       isDirectory: () => true,
@@ -401,7 +532,7 @@ describe("`#1390` selectWorkspaceUnion —— 与应用状态根相关的候选�
       }
       const identity = (p: string) => p
       const real = (directory: string, realpath: (p: string) => string, stat?: WorkspaceUnionInput["stat"]) =>
-        selectWorkspaceUnion({ candidates: workspaceCandidatesFromStore(forged(directory)), defaultWorkspace: puppy, homeDir: home, appStateRoot: state, realpath, stat, isDirectory: onDisk })
+        selectWorkspaceUnion({ candidates: workspaceCandidatesFromStore(forged(directory)), defaultWorkspace: puppy, homeDir: home, appStateRoot: state, configFenceRoots: noFence, realpath, stat, isDirectory: onDisk })
 
       // 软链臂(任何平台都量得到)。对照:不归一 ⇒ 软链落进 selected —— 这就是洞;归一 ⇒ 排除,理由点名状态根并写出它解析到哪
       expect(real(link, identity, virtualStat).selected).toEqual([puppy, link])
@@ -437,12 +568,68 @@ describe("`#1390` selectWorkspaceUnion —— 与应用状态根相关的候选�
       defaultWorkspace: `${HOME}/code-puppy`,
       homeDir: HOME,
       appStateRoot: STATE_ROOT,
+      configFenceRoots: noFence,
       realpath: noDisk, stat: virtualStat,
       isDirectory: () => true,
     })
     // ~/Library 之下但与 codepuppy-state 无关的目录(iCloud 文稿)也照常放行 —— 规则只认「相关」,不是「在 ~/Library 下」
     expect(union.selected).toEqual(["/Users/alpha/code-puppy", "/Users/alpha/proj-a", "/Users/alpha/app/alpha-code", "/Users/alpha/Library/Mobile Documents/notes"])
     expect(union.excluded).toEqual([])
+  })
+})
+
+describe("SPEC-engine-config-fence BR-05:受保护配置位置本身与其内的文件夹不合格(原因 protected-config),包含它的文件夹照常", () => {
+  const CONFIG = `${HOME}/.config/opencode`
+  const input = (over: Partial<WorkspaceUnionInput> = {}) => ({
+    homeDir: HOME, appStateRoot: STATE_ROOT, configFenceRoots: () => [CONFIG, GLOBAL], realpath: noDisk, stat: virtualStat, isDirectory: () => true, ...over,
+  })
+
+  test("同一对象 / 在其内 ⇒ protected-config 并点名位置;包含它 ⇒ 合格;状态根之内仍是 home-or-app-state(既有判定在前);根不在盘上 ⇒ 跳过", () => {
+    for (const directory of [CONFIG, `${CONFIG}/plugin`, `${CONFIG}/plugin/deep`])
+      expect(checkWorkspaceDirectory(input(), directory), directory).toEqual({ eligible: false, reason: "protected-config", detail: `inside the protected engine configuration location ${CONFIG}` })
+    expect(checkWorkspaceDirectory(input(), `${HOME}/.config`)).toEqual({ eligible: true, directory: `${HOME}/.config` })
+    expect(checkWorkspaceDirectory(input(), `${HOME}/.config/opencode-other`)).toEqual({ eligible: true, directory: `${HOME}/.config/opencode-other` })
+    expect(checkWorkspaceDirectory(input(), `${GLOBAL}/x`)).toMatchObject({ eligible: false, reason: "home-or-app-state" })
+    const missingRoot = (p: string) => {
+      if (resolve(p) === CONFIG) throw Object.assign(new Error("ENOENT"), { code: "ENOENT" })
+      return resolve(p)
+    }
+    expect(checkWorkspaceDirectory(input({ realpath: missingRoot }), `${HOME}/proj`)).toEqual({ eligible: true, directory: `${HOME}/proj` })
+    // 并集同一判法:真源里落在受保护位置之内的条目被排除并记账
+    const union = selectWorkspaceUnion({ ...input(), candidates: [`${CONFIG}/plugin`, `${HOME}/proj`], defaultWorkspace: `${HOME}/code-puppy` })
+    expect(union.selected).toEqual([`${HOME}/code-puppy`, `${HOME}/proj`])
+    expect(union.excluded).toEqual([{ directory: `${CONFIG}/plugin`, reason: `inside the protected engine configuration location ${CONFIG}` }])
+  })
+
+  test("身份按 device + inode(真盘 + 生产的 realpathSync.native):软链、大小写变形、/System/Volumes/Data 写法都认得出同一个位置;每次判定现解析", () => {
+    const tree = realpathSync.native(mkdtempSync(join(tmpdir(), "cf-eligibility-")))
+    try {
+      const home = join(tree, "home")
+      const config = join(home, ".config", "opencode")
+      const elsewhere = join(home, "dotfiles")
+      for (const d of [join(config, "plugin"), join(home, "code-puppy"), elsewhere]) mkdirSync(d, { recursive: true })
+      const link = join(home, "link-to-config")
+      symlinkSync(config, link)
+      const real = { homeDir: home, appStateRoot: join(tree, "state"), configFenceRoots: () => [config], realpath: (p: string) => realpathSync.native(p), isDirectory: (p: string) => statSync(p).isDirectory() }
+      for (const directory of [config, join(config, "plugin"), link, join(link, "plugin")])
+        expect(checkWorkspaceDirectory(real, directory), directory).toMatchObject({ eligible: false, reason: "protected-config" })
+      const data = `/System/Volumes/Data${config}`
+      if (statSync(data, { throwIfNoEntry: false })) {
+        expect(checkWorkspaceDirectory(real, data)).toMatchObject({ eligible: false, reason: "protected-config" })
+        expect(checkWorkspaceDirectory({ ...real, configFenceRoots: () => [data] }, join(config, "plugin"))).toMatchObject({ eligible: false, reason: "protected-config" })
+      } else console.log(`[cf-eligibility] firmlink arm not measurable here: ${data} is not on disk`)
+      const variant = join(home, ".CONFIG", "OPENCODE")
+      if (statSync(variant, { throwIfNoEntry: false })) expect(checkWorkspaceDirectory(real, variant)).toMatchObject({ eligible: false, reason: "protected-config" })
+      // 包含受保护位置的文件夹照常合格
+      expect(checkWorkspaceDirectory(real, join(home, ".config"))).toEqual({ eligible: true, directory: join(home, ".config") })
+      // 现解析:位置被换成别处的目录之后,原来的文件夹按新身份判,不沿用上一次的答案
+      rmSync(config, { recursive: true })
+      symlinkSync(elsewhere, config)
+      expect(checkWorkspaceDirectory(real, elsewhere)).toMatchObject({ eligible: false, reason: "protected-config" })
+      expect(checkWorkspaceDirectory({ ...real, configFenceRoots: () => [] }, elsewhere)).toEqual({ eligible: true, directory: elsewhere })
+    } finally {
+      rmSync(tree, { recursive: true, force: true })
+    }
   })
 })
 
@@ -467,6 +654,8 @@ describe("trimUntilCompiles —— 试编译封顶,从尾部丢,丢到底仍失�
     expect(r.lastFailure).toMatch(/exceeds maximum \(65535\)/)
     expect(tokens(r.profile)).not.toContain(`(subpath "/Users/alpha/c")`)
     expect(tokens(r.profile)).not.toContain(`(subpath "/Users/alpha/b")`)
+    // SPEC-engine-config-fence E9:裁剪只丢工作区,受保护集原样(每次试编译都带着)
+    expect(tokens(r.profile).slice(-CF_LINES.length)).toEqual(CF_LINES)
   })
 
   test("默认工作区不可丢:字节墙丢到只剩 1 个仍失败 ⇒ 抛,消息带编译器原文与账目(fail-closed 到「引擎不起」)", () => {
@@ -505,7 +694,7 @@ describe("控制组:判据能测出已知的坏", () => {
     expect(subtractive.filter((l) => l.startsWith("(deny "))).not.toEqual(["(deny file-write*)", "(deny network*)"])
   })
   test("放宽一行(HOME 整个进 subpath)⇒ 并集规则红", () => {
-    const union = selectWorkspaceUnion({ appStateRoot: STATE_ROOT, realpath: noDisk, stat: virtualStat,
+    const union = selectWorkspaceUnion({ appStateRoot: STATE_ROOT, configFenceRoots: noFence, realpath: noDisk, stat: virtualStat,
       candidates: workspaceCandidatesFromStore({ tabs: [{ type: "draft", draftID: "d", server: "sidecar", directory: "/Users/alpha" }], recent: undefined, info: undefined }),
       defaultWorkspace: join("/Users/alpha", "code-puppy"),
       homeDir: "/Users/alpha",

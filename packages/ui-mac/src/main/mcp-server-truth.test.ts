@@ -1,5 +1,5 @@
 // `#1381` —— 远程 MCP 服务器真源(读端 + 写端)的判据,与 custom-provider-truth(-write).test.ts 同形:
-//   ① I2:真源路径 <casBaseRoot>/mcp-servers/<env>.json 不在可写集任何**固定行**之下 —— 对着生产渲染的 profile 枚举
+//   ① I2:真源路径 <casBaseRoot>/mcp-servers/<env>.json 不在可写集任何**固定行**之下 —— 对着生产渲染器渲染的 profile(受保护集 CF 按空渲染:本文件只判别的行)枚举
 //      `(allow file-write*` 块里每条规则的 W-id(17 个固定 id;W1 是运行时成员,由 `#1390` 规则 5b 兜),默认 base 与 dev 覆盖 base、
 //      XDG_STATE_HOME 两种形态都过;词法判据偏向判「覆盖」。「覆盖」的最终裁判是 seatbelt 本身 —— custom-provider-truth-fence.test.ts
 //      对同一个父目录下的兄弟文件真跑过,两个真源在围栏眼里是同一条规则(状态根之下没有放行行;W2 已删)。

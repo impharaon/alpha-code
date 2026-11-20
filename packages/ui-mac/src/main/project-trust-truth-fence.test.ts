@@ -1,4 +1,4 @@
-// `#1709` —— 项目扩展信任记录「只有 main 写、引擎写不到」的真裁判:生产渲染的围栏 profile 交给真 /usr/bin/sandbox-exec
+// `#1709` —— 项目扩展信任记录「只有 main 写、引擎写不到」的真裁判:生产渲染器渲染的围栏 profile(受保护集 CF 按空渲染:本文件只判别的行)交给真 /usr/bin/sandbox-exec
 // (与 sidecar 里 sandbox_init 同一个 libsandbox)。围栏内(= 引擎进程:agent 的写文件工具、已信任项目的插件)建记录目录、在记录目录的
 // 位置放符号链接、写记录文件、在记录目录建文件、在记录路径放符号链接、先在可写的 W3 造好(文件或链接)再 mv 进来 ⇒ 全部
 // Operation not permitted、盘上零落盘。控制臂:同一 profile 下 W3(userData)写得进、env/<env> 写不进(W2 已删,SPEC-engine-config-fence

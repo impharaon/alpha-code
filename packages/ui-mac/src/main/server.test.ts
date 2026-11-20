@@ -72,7 +72,11 @@ mock.module("./codepuppy-keychain-backend", () => ({
 const { applyPlatformCredentialsHot, hasSecretFile, secretFilePath } = await import("./codepuppy-secret-files")
 const { clearByokKeys, initByokKeys, storeByokKey } = await import("./codepuppy-byok-keys")
 const { writeShellEnvCache } = await import("./shell-env-cache")
-const { forkedSecretNames, preferAppEnv, spawnLocalServer } = await import("./server")
+const { forkedSecretNames, preferAppEnv, preplanConfigFenceRoots, spawnLocalServer } = await import("./server")
+const { planConfigFence } = await import("./process-fence-plan")
+const { resolveEngineRoots } = await import("./process-fence-profile")
+const { bootFenceWorkspaceTruth, readWorkspaceTruthOrThrow, writeWorkspaceTruth } = await import("./process-fence-workspaces")
+const { GLOBAL_RENDERER_STORE, TABS_KEY } = await import("./tabs-preclean")
 const { requestCatalogRefresh } = await import("./catalog-refresher")
 const { appliedCatalogPath, writeCatalogSnapshot } = await import("./codepuppy-live-allowlist")
 // REQ-159 `#1321`:生产 spawnLocalServer 在 fork 前做围栏计划(真 store / 真 sandbox-exec / 真原生模块路径);
@@ -888,6 +892,113 @@ describe("#1698 不合格的导出值被忽略,启动照常", () => {
         }
       }
     })
+})
+
+// 审查 B 第 2 条(SPEC-engine-config-fence BR-05):本运行第一次计划之前,资格判定用的受保护配置目录与计划器、启动文档同一个来源 ——
+// 用户导出的相对 OPENCODE_CONFIG_DIR / XDG_CONFIG_HOME 当没设(usableExportedPaths),不按主进程 cwd 解析。否则 cwd 被当成受保护目录,
+// 真源里 cwd 之下的诚实项目在 boot 时被检疫、第一次切 tab 就从真源删掉。
+describe("审查 B 第 2 条:计划之前的受保护配置目录 = 计划器的受保护目录", () => {
+  const variables = ["OPENCODE_CONFIG_DIR", "XDG_CONFIG_HOME"] as const
+  const withEnv = async <T>(values: Partial<Record<(typeof variables)[number], string>>, run: () => Promise<T> | T): Promise<T> => {
+    const saved = Object.fromEntries(variables.map((name) => [name, process.env[name]]))
+    try {
+      for (const name of variables) {
+        if (values[name] === undefined) delete process.env[name]
+        else process.env[name] = values[name]
+      }
+      return await run()
+    } finally {
+      for (const [name, value] of Object.entries(saved)) {
+        if (value === undefined) delete process.env[name]
+        else process.env[name] = value
+      }
+    }
+  }
+  const inputs = () => ({ userDataPath, appStateRoot: join(userDataPath, "codepuppy-state"), codepuppyGlobalRoot: process.env.CODEPUPPY_GLOBAL_DIR! })
+
+  const rows: Array<{ label: string; values: (base: string) => Partial<Record<(typeof variables)[number], string>> }> = [
+    { label: "both unset", values: () => ({}) },
+    { label: "OPENCODE_CONFIG_DIR absolute", values: (base) => ({ OPENCODE_CONFIG_DIR: join(base, "exported-config") }) },
+    { label: "OPENCODE_CONFIG_DIR=.", values: () => ({ OPENCODE_CONFIG_DIR: "." }) },
+    { label: "OPENCODE_CONFIG_DIR relative", values: () => ({ OPENCODE_CONFIG_DIR: "cfg/sub" }) },
+    { label: "XDG_CONFIG_HOME absolute", values: (base) => ({ XDG_CONFIG_HOME: join(base, "xdg-config") }) },
+    { label: "XDG_CONFIG_HOME relative", values: () => ({ XDG_CONFIG_HOME: "rel-config" }) },
+  ]
+  for (const row of rows)
+    test(`${row.label}: the pre-plan roots equal the planner's protected directories for the same environment`, async () => {
+      const base = realpathSync(mkdtempSync(join(tmpdir(), "cf-roots-")))
+      try {
+        await withEnv(row.values(base), async () => {
+          let planned: { sidecarEnv: Record<string, string | undefined>; engineConfigDirectory: string } | undefined
+          creditDanglingSweepForSpawn()
+          const result = await spawnLocalServer("127.0.0.1", 4096, "password", {
+            userDataPath,
+            healthCheck: async () => true,
+            planFence: (input: { sidecarEnv: Record<string, string | undefined>; engineConfigDirectory: string }) => {
+              planned = input
+              return fakePlanFence()
+            },
+            fork: fakeFork,
+          })
+          await result.health.wait
+          await result.listener.stop()
+          // the planner's own step (planProcessFence: resolveEngineRoots(sidecarEnv, homedir()) + the start document's directory)
+          const planner = planConfigFence(
+            { ...inputs(), engineConfigDirectory: planned!.engineConfigDirectory, roots: resolveEngineRoots(planned!.sidecarEnv, homedir()) },
+            { realpath: (p) => realpathSync.native(p), mkdirp: (p) => void mkdirSync(p, { recursive: true }) },
+          ).configFenceRoots
+          const before = preplanConfigFenceRoots({ env: process.env, home: homedir(), ...inputs() }).map((p) => {
+            try {
+              return realpathSync.native(p)
+            } catch {
+              return p
+            }
+          })
+          expect([...new Set(before)].sort()).toEqual([...new Set(planner)].sort())
+        })
+      } finally {
+        rmSync(base, { recursive: true, force: true })
+      }
+    })
+
+  test("OPENCODE_CONFIG_DIR=. with the app started from a folder holding an honest project: it stays eligible and stays in the truth across boot and one tab change", async () => {
+    const cwd = realpathSync(mkdtempSync(join(tmpdir(), "cf-cwd-")))
+    const project = join(cwd, "honest-project")
+    const other = join(cwd, "other-project")
+    mkdirSync(project)
+    mkdirSync(other)
+    const previous = process.cwd()
+    try {
+      process.chdir(cwd)
+      await withEnv({ OPENCODE_CONFIG_DIR: "." }, () => {
+        const truthPath = join(userDataPath, "fence-workspaces", "dev.json")
+        const fs = { readFileSync, writeFileSync, mkdirSync, renameSync, rmSync }
+        writeWorkspaceTruth(truthPath, [project, other], fs)
+        const draft = (id: string, directory: string) => ({ type: "draft", draftID: id, server: "sidecar", directory })
+        const tracker = bootFenceWorkspaceTruth({
+          truthPath,
+          store: { tabs: JSON.stringify([draft("p", project), draft("o", other)]), recent: undefined, info: undefined },
+          fs,
+          log: () => {},
+          eligibility: {
+            homeDir: homedir(),
+            appStateRoot: inputs().appStateRoot,
+            configFenceRoots: () => preplanConfigFenceRoots({ env: process.env, home: homedir(), ...inputs() }),
+            realpath: (p) => realpathSync.native(p),
+            isDirectory: () => true,
+          },
+          onWritableChanged: () => {},
+        })
+        expect(tracker.quarantined).toEqual([])
+        // one tab change (the user closes the other project): the honest one stays in the truth
+        tracker.noteRendererStoreSet(GLOBAL_RENDERER_STORE, TABS_KEY, JSON.stringify([draft("p", project)]))
+        expect(readWorkspaceTruthOrThrow(truthPath, { readFileSync })).toEqual([project])
+      })
+    } finally {
+      process.chdir(previous)
+      rmSync(cwd, { recursive: true, force: true })
+    }
+  })
 })
 
 // `#1667`(#1662 L5;编排器裁决 alpha-code#1666 评论 6737930969 第 2 条 `l1r-telemetry-credential`,#1562):fork 时真交给

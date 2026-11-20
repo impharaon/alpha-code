@@ -1,4 +1,4 @@
-// `#1391` —— I2 的真裁判:生产渲染的 profile 交给真 /usr/bin/sandbox-exec(与 sidecar 里 sandbox_init 同一个 libsandbox,
+// `#1391` —— I2 的真裁判:生产渲染器渲染的 profile(受保护集 CF 按空渲染:本文件只判别的行)交给真 /usr/bin/sandbox-exec(与 sidecar 里 sandbox_init 同一个 libsandbox,
 // process-fence-compile.ts 文件头),围栏内往真源写 / 在真源目录建文件 / 在状态根建目录 / 从 W3 mv 进来 ⇒ Operation not permitted、
 // 盘上零落盘;控制臂:同一 profile 下往 W3(userData)写 ⇒ 落盘(围栏是活的,不是「什么都写不进」),env/<env> 不再可写(W2 已删);
 // bare 臂:不套围栏(= main 进程的形态)经生产 writeCustomProviderTruth 落盘并读回(拒绝来自围栏,不是布局)。

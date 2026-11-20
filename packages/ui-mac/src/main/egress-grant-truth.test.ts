@@ -1,5 +1,5 @@
 // `#1412` —— 用户批准的出网目的地真源(读端 + 写端 + 闭包)的判据,与 mcp-server-truth.test.ts 同形:
-//   ① I3:真源路径 `<casBaseRoot>/egress-grants/<env>.json` 不在可写集任何**固定行**之下 —— 对着生产渲染的
+//   ① I3:真源路径 `<casBaseRoot>/egress-grants/<env>.json` 不在可写集任何**固定行**之下 —— 对着生产渲染器渲染的(受保护集 CF 按空渲染:本文件只判别的行)
 //      profile 枚举 `(allow file-write*` 块里每条规则的 W-id,默认 base / 覆盖 base / 两种 XDG_STATE_HOME 都过。
 //      这一条是整个方案的地基:放在可写根之下 = 围栏内的代码可以给自己批准出网(confused deputy)。
 //      对照臂:同一批规则里 W3 确实罩着 userData 里的文件 —— 证明这个手段判得出「覆盖」(W2 已删,SPEC-engine-config-fence D2)。

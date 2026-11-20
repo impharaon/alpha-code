@@ -306,14 +306,23 @@ export function currentConfigFenceRoots(): readonly string[] {
   if (plannedConfigFenceRoots) return plannedConfigFenceRoots
   const info = tryGetCodePuppyEnvironment()
   if (!info) return []
-  const home = homedir()
+  return preplanConfigFenceRoots({ env: process.env, home: homedir(), userDataPath: electronNs.app.getPath("userData"), appStateRoot: info.casBaseRoot, codepuppyGlobalRoot: codepuppyGlobalRoot() })
+}
+
+/**
+ * 计划之前的受保护配置目录(审查 B 第 2 条):路径变量与主目录经 spawnLocalServer 的同一个函数(usableExportedPaths)取 —— 用户导出的相对
+ * OPENCODE_CONFIG_DIR / XDG_CONFIG_HOME 当没设,与启动文档的 engineConfigDirectory、计划器的受保护目录是同一个来源,不按主进程的 cwd 解析。
+ * 不记日志:每次资格判定都调它,被忽略的变量由 fork 那一步记一行。
+ */
+export function preplanConfigFenceRoots(input: { env: Record<string, string | undefined>; home: string; userDataPath: string; appStateRoot: string; codepuppyGlobalRoot: string }): string[] {
+  const exported = usableExportedPaths({ env: input.env, home: input.home, log: () => {} })
   return configFenceLocations({
-    userDataPath: electronNs.app.getPath("userData"),
-    appStateRoot: info.casBaseRoot,
-    codepuppyGlobalRoot: codepuppyGlobalRoot(),
-    engineConfigDirectory: engineGlobalConfigDirectory(process.env, home),
-    configHome: resolveEngineRoots(process.env, home).configHome,
-    home,
+    userDataPath: input.userDataPath,
+    appStateRoot: input.appStateRoot,
+    codepuppyGlobalRoot: input.codepuppyGlobalRoot,
+    engineConfigDirectory: engineGlobalConfigDirectory(exported.env, exported.home),
+    configHome: resolveEngineRoots(exported.env, exported.home).configHome,
+    home: exported.home,
   }).flatMap((rule) => (rule.kind === "subpath" ? [rule.path] : []))
 }
 
@@ -673,7 +682,9 @@ export async function spawnLocalServer(
   const granting = new Map<string, Promise<Omit<WorkspaceWriteGrantReply, "type" | "id">>>()
   // Tokens handed to the engine without a definite answer (reply timeout, child exit, post exception, any reply other
   // than "consume errno=N"): the engine may still consume them, so for this generation such a directory counts as
-  // covered and is never issued again. A definite consume failure, or a failure before any token existed, may retry.
+  // covered and is not issued again — except a directory that is itself a node of the protected ancestors block (its
+  // literal deny keeps it uncovered), which can be issued once more; a second extension for the same directory is
+  // harmless (DESIGN-engine-config-fence D14). A definite consume failure, or a failure before any token existed, may retry.
   const possiblyConsumed = new Set<string>()
   // The one source of this generation's write roots: the exact profile bytes it applies, parsed by the renderer's
   // module (its allow rules and, after them, the protected deny blocks). An unrecognised form leaves this undefined, and

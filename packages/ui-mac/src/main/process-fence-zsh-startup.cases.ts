@@ -2,7 +2,8 @@
 // content that a shell OUTSIDE the fence later executes. Apple Terminal's zsh sources `~/.zsh_sessions/<id>.session`;
 // an rc with `compinit -C` sources `~/.zcompdump`. Run only through process-fence-zsh-startup.test.ts.
 //
-// Production render (renderProcessFenceProfile) + production fence (fat .node from the production build script, applied
+// "Production profile" below = the production render (renderProcessFenceProfile) with an empty protected set (configFence: [];
+// this file judges the zsh rows only) + production fence (fat .node from the production build script, applied
 // by applyProcessFence in a bun child; everything that child spawns inherits the seatbelt). Three arms in a fake HOME:
 //   known bad  = the production profile with W10/W19 put back: the write lands and an unfenced zsh runs the marker;
 //   production = the same writes are EPERM and the marker never runs;

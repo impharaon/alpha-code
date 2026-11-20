@@ -64,11 +64,12 @@ last_reviewed: 2026-11-20
 ### 偏离记录
 - 2026-11-20 · 测试位置:util 的单测按该包惯例放在 `packages/util/src/codepuppy-credentials.test.ts`(计划写的是 `packages/util/test/`);计划器两个新导出的单测放进新文件 `packages/ui-mac/src/main/process-fence-credential-stores.test.ts`,不加进 `process-fence-plan.test.ts`(后者在闸门登记簿里钉精确条数 27,又与工具策略那一路共用)· 提交 `49b47fd063`。
 - 2026-11-20 · 签名:`resolveConnectorLeaf` 的输入与 `readCredentialTable` 各多一个可选 `log`(只收连接器名与字段位置 / 相对路径,不含值)—— 设计 §5 的「记名字」需要一个出口,设计 §4.1 / §4.3 其余形参不变;`ManagedMcpConvergenceDeps` 除 O4 的必填 `userDataPath` 外也多一个可选 `log`,`ext-ipc.ts` 接到主进程日志 · 提交 `d514173de1`。
-- 2026-11-20 · 构造点是 10 处不是 7 处:`ext-ipc.ts` 1 处 + 测试 9 处(`official-connectors.cases.ts` 有 5 处)。其中两处带真引擎的官方连接器用例先建出 `userData`(主进程的 userData 总在;这两个用例原先没建,真实目标清单求不出它的真实路径)· 提交 `d514173de1`。
+- 2026-11-20 · 构造点不是 7 处:既有 11 处(`ext-ipc.ts` 1、`install-from-source.engine.cases.ts` 3、`package-effect.engine.cases.ts` 1、`managed-mcp-toggle.engine.cases.ts` 1、`official-connectors.cases.ts` 5),外加新用例 `connector-leaf-alias.engine.cases.ts` 2 处(审查 R1 第 5 条订正;原写「10 处」数错)。其中两处带真引擎的官方连接器用例先建出 `userData`(主进程的 userData 总在;这两个用例原先没建,真实目标清单求不出它的真实路径)· 提交 `d514173de1`。
 - 2026-11-20 · 计划外文件 `packages/ui-mac/src/main/logging.ts`:崩溃转储目录名收成 `codepuppy-secret-files.ts` 的 `CRASH_DUMPS_DIR`,存放点清单与 crashReporter 用同一个名字(不进 `USER_DATA_LAYOUT`:升级迁移逐项枚举那张表)· 提交 `d514173de1`。
 - 2026-11-20 · 实现细节:直接应用路径每次收敛只在某个 Location 真要应用启用的定义时才读一次表(停用不打开任何存放点);相对路径写法一律按别名给空串(引用必须已是 path.resolve 之后的绝对路径才可能等于表里的键)· 提交 `d514173de1`。
 - 2026-11-20 · 新宿主与真盘身份用例只在 darwin 跑(firmlink 写法与大小写不敏感的卷是 macOS 的事实),登记簿行带 `[平台:darwin]`,非 darwin 自报 skip · 提交:紧随 `d514173de1` 的登记提交。
 - 2026-11-20 · 证据:红 `49b47fd063`(`evidence/s1-red-*.log`:新导出不存在;旧读法把四种别名、别的连接器、平台凭据、BYOK 密钥的假值都交给了引擎);绿 `d514173de1`。变异(都已 `git restore`):M1 恢复无条件读文件 ⇒ 真引擎用例七个字段读到假值、util 4 条红;M2 按路径前缀判存放点 ⇒ 软链、大小写、firmlink 三个字段读到假值、身份用例红;M3 只认 `client_secret` ⇒ 远程 `client_secret` 变空、util 1 条红(`evidence/mutations/M1–M3-*.log`)。
+- 2026-11-20 · 审查 R1(独立 Claude Opus 审计,`67e9ab35ba`,FIX-THEN-MERGE)修复,范围 `4fcdb44da6..b69ecd146c`:先导出 `connectorCredentials`(行为不变)作确定性用例的入口;红 `91424fe93b`;修 `b69ecd146c`。第 1 条:判过的引用由 `credentialReferenceGuard.readFile` 按判定时的真实路径 O_NOFOLLOW 打开、fstat 身份须等于判定时且不在存放点身份集里才从描述符读出(`credentialStoreTarget` 由它取代);`readCredentialTable` 改用同一读法 `readRegularFileNoFollow`,并多一个可选形参收集存放点里普通文件的身份(第 4 条:目录型存放点里文件的硬链与 `/.vol` 写法被认出)。第 3 条:没有 `{file:` 的定义不读表。第 7 条:拒绝日志原因改写;`/.vol/<dev>/<ino>` 实测臂(本机 `realpathSync.native` 求成规范路径);表读不出 ⇒ 这次应用不可用、不退回无条件读。第 2 条:util 单测进闸门登记簿(12 条)。第 6 条:日志判据加上共享宿主的平台凭据假值。变异(都已 `git restore`):按路径重开 ⇒ 两条换文件用例红;身份集不含文件 ⇒ 两条硬链用例红;不判 `{file:` ⇒ 读不出那条真引擎用例红(`evidence/mutations/R1a–R1c.log`)。
 
 ## 片 ②:引擎与 ext 只从主进程交来的内存表取凭据
 

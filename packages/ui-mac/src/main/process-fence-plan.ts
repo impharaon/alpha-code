@@ -80,7 +80,9 @@ export type PlanProcessFenceInput = {
 export function planConfigFence(
   input: { userDataPath: string; appStateRoot: string; codepuppyGlobalRoot: string; engineConfigDirectory: string; roots: EngineRoots; envFile?: string },
   deps: Pick<PlanProcessFenceDeps, "realpath" | "mkdirp" | "lstat">,
-): { configFence: ConfigFenceRule[]; configFenceRoots: string[] } {
+): { configFence: ConfigFenceRule[]; configFenceRoots: string[]; unexpressed: string[] } {
+  /** 残留 R11:写不进 profile(引号、反斜杠、控制字符)因而不被冻结 / 保护的路径,计划器记一行点名。 */
+  const unexpressed: string[] = []
   const locations = configFenceLocations({ ...input, configHome: input.roots.configHome, home: input.roots.home })
   const envFile = input.envFile ? resolve(input.envFile) : undefined
   for (const location of locations) if (location.kind === "subpath") deps.mkdirp(location.path)
@@ -146,6 +148,7 @@ export function planConfigFence(
         assertSeatbeltSafePath(n, "via")
         return true
       } catch {
+        if (!unexpressed.includes(n)) unexpressed.push(n)
         return false
       }
     }
@@ -181,7 +184,9 @@ export function planConfigFence(
         try {
           assertSeatbeltSafePath(rule.kind === "dat-files" ? rule.dir : rule.path, "CODEPUPPY_ENV_FILE")
           add(rule)
-        } catch {}
+        } catch {
+          unexpressed.push(rule.kind === "dat-files" ? rule.dir : rule.path)
+        }
       }
       continue
     }
@@ -190,7 +195,7 @@ export function planConfigFence(
     const rules: ConfigFenceRule[] = [{ kind: location.kind, path: placed }, ...(real !== undefined && real !== placed ? [{ kind: location.kind, path: real }] : [])]
     for (const rule of withVia(location, rules)) add(rule)
   }
-  return { configFence, configFenceRoots: configFence.flatMap((rule) => (rule.kind === "subpath" ? [rule.path] : [])) }
+  return { configFence, configFenceRoots: configFence.flatMap((rule) => (rule.kind === "subpath" ? [rule.path] : [])), unexpressed }
 }
 
 export type PlanProcessFenceDeps = {
@@ -239,6 +244,11 @@ export function planProcessFence(input: PlanProcessFenceInput, deps: PlanProcess
     { userDataPath: input.userDataPath, appStateRoot, codepuppyGlobalRoot, engineConfigDirectory: input.engineConfigDirectory, roots, ...(input.envFile ? { envFile: input.envFile } : {}) },
     deps,
   )
+
+  if (fenceSet.unexpressed.length)
+    deps.log(
+      `process fence: protected configuration — ${fenceSet.unexpressed.length} path(s) cannot be written into the profile (quote, backslash or control character) and are not protected: ${fenceSet.unexpressed.map((path) => JSON.stringify(path)).join(", ")}`,
+    )
 
   let candidates: readonly string[]
   try {

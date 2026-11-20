@@ -8,8 +8,10 @@ import * as fs from "node:fs"
 import * as os from "node:os"
 import * as path from "node:path"
 import {
+  credentialStores,
   customProviderSecretName,
   hasSecretFile,
+  readCredentialTable,
   secretEnvVars,
   secretFilePath,
   secretFileRef,
@@ -149,5 +151,53 @@ describe("secretFileRef", () => {
     } finally {
       fs.rmSync(spaced, { recursive: true, force: true })
     }
+  })
+})
+
+// DESIGN-stored-credentials-fence §4.3:存放点清单与进程内凭据表(值都是一眼可辨的假值)。
+describe("credentialStores / readCredentialTable", () => {
+  test("the list: six userData names, Crashpad (not tabled) and the official runtime directory only when given", () => {
+    const stores = credentialStores({ userDataPath: "/u" })
+    expect(stores).toEqual([
+      { path: "/u/codepuppy-secrets", kind: "dir", table: "secrets" },
+      { path: "/u/codepuppy-mcp-secrets", kind: "dir", table: "connector-by-server" },
+      { path: "/u/codepuppy.env", kind: "file", table: false },
+      { path: "/u/codepuppy-auth.json", kind: "file", table: false },
+      { path: "/u/codepuppy-pkce.json", kind: "file", table: false },
+      { path: "/u/codepuppy-byok-keys.json", kind: "file", table: false },
+      { path: "/u/Crashpad", kind: "dir", table: false },
+    ])
+    expect(credentialStores({ userDataPath: "/u", officialRuntimeParent: "/t/codepuppy-connectors-501-ab" }).at(-1)).toEqual({ path: "/t/codepuppy-connectors-501-ab", kind: "dir", table: "connector-by-run" })
+  })
+
+  test("reads regular files with their use; skips dot entries, symbolic links (named, not read) and files outside a connector directory; untabled stores are never opened", () => {
+    const runtime = path.join(tmp, "runtime")
+    const write = (file: string, value: string) => {
+      fs.mkdirSync(path.dirname(file), { recursive: true })
+      fs.writeFileSync(file, value)
+    }
+    write(path.join(tmp, "codepuppy-secrets", "CODEPUPPY_API_KEY"), "FAKE-platform\n")
+    write(path.join(tmp, "codepuppy-secrets", ".CODEPUPPY_API_KEY.1.tmp"), "FAKE-half")
+    write(path.join(tmp, "codepuppy-mcp-secrets", "alpha", "v-0000aaaa", "TOKEN"), "FAKE-alpha")
+    write(path.join(tmp, "codepuppy-mcp-secrets", "stray"), "FAKE-stray")
+    write(path.join(runtime, "1-run", "github-official", "v1", "TOKEN"), "FAKE-github")
+    write(path.join(runtime, "loose"), "FAKE-loose")
+    write(path.join(tmp, "elsewhere"), "FAKE-elsewhere")
+    fs.symlinkSync(path.join(tmp, "elsewhere"), path.join(tmp, "codepuppy-mcp-secrets", "alpha", "v-0000aaaa", "LINKED"))
+    write(path.join(tmp, "codepuppy-auth.json"), "FAKE-auth")
+    const logged: string[] = []
+    const table = readCredentialTable(credentialStores({ userDataPath: tmp, officialRuntimeParent: runtime }), (line) => logged.push(line))
+    expect(table).toEqual({
+      [path.join(tmp, "codepuppy-secrets", "CODEPUPPY_API_KEY")]: { value: "FAKE-platform\n", use: { kind: "inline" } },
+      [path.join(tmp, "codepuppy-mcp-secrets", "alpha", "v-0000aaaa", "TOKEN")]: { value: "FAKE-alpha", use: { kind: "connector", server: "alpha" } },
+      [path.join(runtime, "1-run", "github-official", "v1", "TOKEN")]: { value: "FAKE-github", use: { kind: "connector", server: "github-official" } },
+    })
+    expect(logged).toEqual(["credential store: symbolic link entry not read: codepuppy-mcp-secrets/alpha/v-0000aaaa/LINKED"])
+  })
+
+  test("a missing store directory has no entries; another IO error is thrown", () => {
+    expect(readCredentialTable(credentialStores({ userDataPath: path.join(tmp, "nowhere") }))).toEqual({})
+    fs.writeFileSync(path.join(tmp, "codepuppy-secrets"), "not a directory")
+    expect(() => readCredentialTable(credentialStores({ userDataPath: tmp }))).toThrow()
   })
 })

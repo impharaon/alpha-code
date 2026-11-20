@@ -33,6 +33,7 @@ import { writeMcpSecretVersioned } from "./codepuppy-mcp-secrets"
 import { writeCustomProviderTruth } from "./custom-provider-truth-write"
 import { writeEngineConfigForFork } from "./engine-explicit-config"
 import { upsertRecordV2 } from "./ext-receipt-v2"
+import { injectCodePuppyConfig } from "./codepuppy-config-injection"
 
 type Arm = "production" | "tools" | "control" | "widen" | "notable"
 const ARM = process.env.CODEPUPPY_SCF_ARM as Arm
@@ -117,8 +118,12 @@ async function machine() {
   const stateRoot = path.join(sandbox.root, `${NAME}-state`, "codepuppy-state")
   const globalRoot = path.join(stateRoot, "env", "dev")
   fs.mkdirSync(globalRoot, { recursive: true })
-  // O2:官方连接器运行期目录与生产同形 —— 系统临时目录下的 codepuppy-connectors-<uid>-<hash>(真实路径;本沙箱就在系统临时目录下)
-  const runtimeParent = path.join(fs.realpathSync.native(sandbox.root), `codepuppy-connectors-${process.getuid?.()}-${createHash("sha256").update(globalRoot).digest("hex").slice(0, 16)}`)
+  // O2:官方连接器运行期目录与生产同形 —— 一个「系统临时目录」下的 codepuppy-connectors-<uid>-<hash>(真实路径)。这个临时目录建在本机真实
+  // 系统临时目录(W12 之内、可写)里、不在 userData 的上级链上(生产里 T 与 ~/Library 也不在一条链上),所以把它整个改名搬走只有 C1 的上级目录块拦
+  // (宿主事后在围栏外删它)
+  const systemTemp = fs.realpathSync.native(Bun.spawnSync(["getconf", "DARWIN_USER_TEMP_DIR"]).stdout.toString().trim())
+  const runtimeTemp = fs.mkdtempSync(path.join(systemTemp, "scf-T-"))
+  const runtimeParent = path.join(runtimeTemp, `codepuppy-connectors-${process.getuid?.()}-${createHash("sha256").update(globalRoot).digest("hex").slice(0, 16)}`)
   const dump = path.join(sandbox.root, `${NAME}-env.jsonl`)
   const connectorRef = (server: string, value: string) => {
     const written = writeMcpSecretVersioned(userData, server, "v-0000aaaa", "TOKEN", value)
@@ -207,9 +212,9 @@ async function machine() {
   fs.writeFileSync(path.join(run, "profile.sb"), profile)
   applyProcessFence({ addonPath: plan.addonPath, profile }, { insideDir: host.projectDirectory, outsideDir: run })
   const rules = processFenceWriteRules(profile)
-  console.log(`SCF-ENGINE ${JSON.stringify({ arm: ARM, pid: process.pid, c1: rules.deny.filter((rule) => profile.slice(c1).includes(`"${rule.value}"`)) })}`)
+  console.log(`SCF-ENGINE ${JSON.stringify({ arm: ARM, pid: process.pid, c1: rules.deny.filter((rule) => profile.slice(c1).includes(`"${rule.value}"`)), runtimeTemp })}`)
   running = await host.start()
-  return { host, main, userData, globalRoot, stateRoot, runtimeParent, platformKey, aliases, files, dump }
+  return { host, main, userData, globalRoot, stateRoot, runtimeParent, runtimeTemp, platformKey, aliases, files, dump }
 }
 
 type Machine = Awaited<ReturnType<typeof machine>>
@@ -258,10 +263,11 @@ function attackScript(): string {
     `rm -f ${q(path.join(m.userData, "codepuppy-pkce.json"))} 2>/dev/null; test -e ${q(path.join(m.userData, "codepuppy-pkce.json"))} 2>/dev/null; ls ${q(m.userData)} 2>/dev/null | grep -q codepuppy-pkce.json && echo "delete:FAIL" || echo "delete:OK"`,
     `mv ${q(m.userData)} ${q(path.join(ws, "moved-userdata"))} 2>/dev/null && echo "move-userdata:OK" || echo "move-userdata:FAIL"`,
     `mv ${q(m.runtimeParent)} ${q(path.join(ws, "moved-runtime"))} 2>/dev/null && echo "move-runtime-parent:OK" || echo "move-runtime-parent:FAIL"`,
+    `mv ${q(m.runtimeTemp)} ${q(path.join(ws, "moved-runtime-temp"))} 2>/dev/null && echo "move-runtime-temp:OK" || echo "move-runtime-temp:FAIL"`,
   ]
   return lines.join("\n")
 }
-const OPS = ["read0", "read1", "read2", "read3", "read4", "read5", "read6", "read7", "read8", "symlink", "hardlink", "clone", "overwrite", "rename", "delete", "move-userdata", "move-runtime-parent"]
+const OPS = ["read0", "read1", "read2", "read3", "read4", "read5", "read6", "read7", "read8", "symlink", "hardlink", "clone", "overwrite", "rename", "delete", "move-userdata", "move-runtime-parent", "move-runtime-temp"]
 const leaked = (text: string) => Object.values(FAKE).filter((value) => text.includes(value))
 
 if (ARM === "production")
@@ -317,6 +323,26 @@ if (ARM === "production")
     expect(await m.main!.request({ op: "respawns" })).toEqual([])
   }, 240_000)
 
+if (ARM === "production")
+  test("注入失败那条路(显式槽直接给用户自己的 codepuppy.jsonc、内联只剩治理底线):C1 之下连接器照样从表里拿到自己的令牌", async () => {
+    await running!.close()
+    // the production injection, forced down its catch the way its unit test does (a userData whose parent is a file)
+    const parent = path.join(m.host.projectDirectory, "parent-is-a-file")
+    fs.writeFileSync(parent, "")
+    const failed = injectCodePuppyConfig(path.join(parent, "userdata"), path.join(sandbox.root, `${NAME}-ext`), "stable", codepuppyBootstrap().paths.userConfig ?? null)
+    expect(failed.ok).toBe(false)
+    expect(failed.config.file).toBe(path.join(m.globalRoot, "codepuppy.jsonc"))
+    const content = m.host.content as unknown as Record<string, unknown>
+    for (const key of Object.keys(content)) delete content[key]
+    Object.assign(content, JSON.parse(failed.config.content))
+    m.host.injection.config.file = failed.config.file
+    const lines = () => fs.readFileSync(m.dump, "utf8").split("\n").filter(Boolean).map((line) => JSON.parse(line) as { env: Record<string, string | null> })
+    const before = lines().length
+    running = await m.host.start()
+    for (let i = 0; i < 200 && !lines().slice(before).some((line) => line.env.TOKEN === FAKE.connector); i++) await Bun.sleep(50)
+    expect(lines().slice(before).some((line) => line.env.TOKEN === FAKE.connector)).toBe(true)
+  }, 240_000)
+
 if (ARM === "tools" || ARM === "control")
   test(ARM === "tools" ? "AC-01(读文件工具)三档 × 工作区软链 / 直接路径:全部读不到;AC-03:项目配置与显式文件非清单位置的引用、连接器 A 里别人的凭据都只得到空串,请求里没有值" : "control(去掉 C1):读文件工具与 shell 读得到,项目配置里的引用泄漏 —— 证明手段测得出", async () => {
     m = await machine()
@@ -366,7 +392,7 @@ if (ARM === "tools" || ARM === "control")
 if (ARM === "control")
   test("control(去掉 C1):shell 的同一组攻击里直接读、软链、硬链、克隆、覆盖写都成功", async () => {
     const result = await turn("build", { name: "shell", args: { command: attackScript(), description: "scf probe" } })
-    for (const op of ["read0", "read1", "symlink", "hardlink", "clone", "overwrite"]) expect([op, result.tool.includes(`${op}:OK`)], result.tool.slice(0, 2000)).toEqual([op, true])
+    for (const op of ["read0", "read1", "symlink", "hardlink", "clone", "overwrite", "move-runtime-temp"]) expect([op, result.tool.includes(`${op}:OK`)], result.tool.slice(0, 2000)).toEqual([op, true])
   }, 240_000)
 
 if (ARM === "widen")

@@ -180,7 +180,15 @@ last_reviewed: 2026-11-20
 | E7 | `process-fence-profile.test.ts`、`process-fence-plan.test.ts` 的软链存放点与经软链 userData 用例 | 渲染不含软链目标或不求真实路径 ⇒ 对应用例红 |
 
 ### 偏离记录
-暂无。
+- 存放点清单:`server.ts` `planProductionFence` 不内联 `credentialStores(...)`,改调 `codepuppy-credential-table.ts` 新导出的 `mainCredentialStores(userDataPath)`;`buildCredentialTable` 也改用它 —— 交给引擎的表与 C1 同一份清单(官方父目录抛 ⇒ 两边同时不列)。改动表外多一个文件。
+- 调用点:`process-fence-compile.test.ts` 不传 `[]`,改经生产 `planCredentialStores` 让 C1 两块也进真编译器;计划器的直接调用点(`process-fence-config-fence.cases.ts`、`engine-config-fence.engine.cases.ts`、`process-fence-engine.test.ts`、`workspace-identity-firmlink.fixture.ts`)因输入必填各加原始清单;`process-fence-plan.test.ts` 的公共夹具给 `[]`,只判受保护集那几条不受 C1 影响,C1 的用例自己给 server 那一份。
+- `process-fence-config-fence.cases.ts`「没有上级目录块」的已知的坏同时去掉 C1 的上级目录行(两块都盖着 userData,只去一块攻击落不了地)。
+- 自关围栏的宿主,改了四个(装围栏之前 `serveCredentialsFromOutside()`):`engine-config-fence`、`engine-db-records`、`fence-write-denied`、`endpoint-route-fence` —— 改之前各自红在 `LoadAPIKeyError`(用例进程在 C1 下读不到自己的存放点,表成空)。没改的:`project-writable`(夹具引擎的 userData 不是计划里那份,C1 盖的是 `install` 的存放点;原样绿,D11 证据成立)、`process-fence-engine`、`process-fence-config-fence`(无引擎)、`process-fence-extension`、`process-fence-zsh-startup`、`official-connectors`(原样绿)。`endpoint-route-fence` 另加两句:生产 `planProductionFence` 出的 profile 含本代 userData 的 `codepuppy-secrets`、最后一行是 C1 上级目录块(server 接线的证据)。
+- 新宿主的回合直接走引擎会话接口并带档位助手(`build` / `codepuppy-ask` / `codepuppy-readonly`),不经界面的 `buildPromptRequest`;档位语义就是这三个助手的规则。production 臂多一条:注入失败那条路(生产 `injectCodePuppyConfig` 以 userData 父路径是文件逼进 catch,显式槽 = 用户自己的 `codepuppy.jsonc`、内联 = 治理底线)在 C1 下连接器照样从表里拿到令牌(从片 ② 带来的复核项)。
+- 测试设施:BYOK 节点用自己的地址(与平台同址会被平台凭据头钩子当成平台);运行中增删密钥的结构性重启前由围栏外 main 重写显式文件(`fork-config`,生产里 server 每次 fork 都写);E1 用收尾时的期望(main 的续期是唯一合法改动);E9 断言五个臂的输出里没有任何假值;沙箱日志判据加 tools 窗口作校准(引擎自己的读文件工具在存放点上留下引擎 pid 的拒绝)。
+- O2:官方连接器运行期存放点放进真引擎布局 —— 在本机真实的每用户临时目录(`getconf DARWIN_USER_TEMP_DIR`,W12 之内)里建一个代用「系统临时目录」`scf-T-*`,其下按生产形状 `codepuppy-connectors-<uid>-<hash>` 放假运行期文件,经 `credentialStores({ officialRuntimeParent })` 交计划器;不经也不改 `officialRuntimeParent`(测试进程的 tmpdir 在 userData 的上级链上,那样 C1 的上级目录块无从单独证明)。宿主事后在围栏外删掉。没有另加围栏组件臂。
+- E7 的软链用例在片 ① 的 `process-fence-credential-stores.test.ts`(planCredentialStores),不在 profile / plan 单测。
+- 证据 `~/.cache/alpha-orch/2026-11-19/impl-secrets/evidence/r4/`。新宿主 5 个臂 production 3 / tools 1 / control 2 / widen 1 / notable 1 全过,31 s;production 窗口引擎 pid 在存放点上 0 条拒绝、攻击子进程 40 条(读数据、读元数据、写数据、删除);tools 窗口引擎 pid 9 条。变异(各自还原):① 不渲染 C1 ⇒ profile / plan 单测 7 红、宿主红;② 去掉 C1 上级目录块 ⇒ profile 单测 6 红、宿主 `move-runtime-temp` 落地;③ C1 渲染到放行块之前 ⇒ profile 单测 6 红、宿主覆盖写 / 改名 / 搬走运行期目录落地(读仍被拒);④ 解析器不认读写表头 ⇒ profile 单测 4 红、`project-writable` 3 红(D11);⑤ server 不给清单 ⇒ `endpoint-route-fence` 红;⑥ 计划器丢掉 C1 ⇒ plan 单测与宿主红;⑦ 引擎读者先读盘再查表 ⇒ 功能全过但 production 窗口出现 6 条引擎 pid 拒绝,宿主红;⑧ 显式文档不代入连接器 environment ⇒ AC-02 连接器与注入失败那条都红。
 
 ## 与并行车道共用的文件(SPEC-engine-config-fence 片 ③:工具策略写消息 + CF-11)
 

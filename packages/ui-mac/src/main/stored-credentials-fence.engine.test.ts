@@ -9,7 +9,7 @@ import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { join, resolve } from "node:path"
 
 type Rule = { kind: "subpath" | "literal" | "regex"; value: string }
-const ARMS = { production: 2, tools: 1, control: 2, widen: 1, notable: 1 } as const
+const ARMS = { production: 3, tools: 1, control: 2, widen: 1, notable: 1 } as const
 const stamp = (date: Date) => {
   const pad = (n: number) => String(n).padStart(2, "0")
   return `${date.getUTCFullYear()}-${pad(date.getUTCMonth() + 1)}-${pad(date.getUTCDate())} ${pad(date.getUTCHours())}:${pad(date.getUTCMinutes())}:${pad(date.getUTCSeconds())}+0000`
@@ -40,6 +40,8 @@ test.skipIf(process.platform !== "darwin")("C1 真引擎:三档里 shell 与读�
       expect([arm, code], output.slice(-20_000)).toEqual([arm, 0])
       expect([arm, output.match(/(\d+) pass\b/)?.[1]], output.slice(-20_000)).toEqual([arm, String(expected)])
       expect([arm, output.match(/(\d+) fail\b/)?.[1]], output.slice(-20_000)).toEqual([arm, "0"])
+      // E9: no fake credential value in the engine's, the extension's or main's log output (every arm, the known-bad ones included)
+      expect([arm, output.match(/FAKE-CRED-[\w-]+/g)?.length ?? 0]).toEqual([arm, 0])
       windows[arm] = { from, to: new Date(Date.now() + 1_000) }
       if (arm === "production") {
         // E1: every fake credential file is byte-for-byte what it was, checked outside every fence
@@ -81,5 +83,11 @@ test.skipIf(process.platform !== "darwin")("C1 真引擎:三档里 shell 与读�
     expect(production.engine).toEqual([])
   } finally {
     rmSync(join(base, "run"), { recursive: true, force: true })
+    // each arm's stand-in system temp directory (a store can only be removed from outside the fence); a known-bad arm may have moved it into the sandbox
+    for (const output of Object.values(outputs)) {
+      const temp = output.match(/^SCF-ENGINE (\{.*\})$/m)?.[1]
+      const runtimeTemp = temp ? (JSON.parse(temp) as { runtimeTemp?: string }).runtimeTemp : undefined
+      if (runtimeTemp?.includes("/scf-T-")) rmSync(runtimeTemp, { recursive: true, force: true })
+    }
   }
 }, 2_400_000)

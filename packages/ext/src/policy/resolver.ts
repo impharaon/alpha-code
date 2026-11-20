@@ -29,6 +29,7 @@ import { managedCapDenies, readManagedPolicy, type ManagedPolicyResult } from ".
 import {
   canonicalJsonDigest,
   loadPolicyDocument,
+  policyFilePath,
   resetPolicyDocument,
   savePolicyDocument,
   type PolicyLoadResult,
@@ -236,6 +237,26 @@ export interface ToolPolicyStore {
   readonly reset: () => Promise<{ backup?: string }>
 }
 
+/**
+ * Review R1 #7 (DESIGN §4.5) and the slice-③ review's optional item: with the write answered by another process, two changes to ONE
+ * document would each read the same old version and the later reply would drop the earlier record — also across stores: two Locations
+ * of one project each have a store and write the same partition's document. So there is one «read → check → await the write» chain per
+ * document file in the process. It lives on globalThis (the extension module is evaluated once per Location, plugin.ts PROCESS_STATE_KEY);
+ * an entry goes when its chain is idle.
+ */
+const WRITE_CHAINS_KEY = Symbol.for("codepuppy.ext.tool-policy.write-chains")
+function documentChain<T>(file: string, run: () => Promise<T>): Promise<T> {
+  const holder = globalThis as { [WRITE_CHAINS_KEY]?: Map<string, Promise<unknown>> }
+  const chains = (holder[WRITE_CHAINS_KEY] ??= new Map())
+  const next = (chains.get(file) ?? Promise.resolve()).then(run)
+  const tail = next.catch(() => undefined)
+  chains.set(file, tail)
+  void tail.then(() => {
+    if (chains.get(file) === tail) chains.delete(file)
+  })
+  return next
+}
+
 export function createToolPolicyStore(options: ToolPolicyStoreOptions): ToolPolicyStore {
   const managedRead = options.managed ?? (() => readManagedPolicy())
   const partition = (): ToolPolicyPartition => ({ account: options.account(), workspace: options.workspace() })
@@ -261,19 +282,11 @@ export function createToolPolicyStore(options: ToolPolicyStoreOptions): ToolPoli
     save: async (part, records) => savePolicyDocument(options.baseDir, part, records),
     reset: async (part) => resetPolicyDocument(options.baseDir, part),
   }
-  // Review R1 #7 (DESIGN §4.5): with the write answered by another process, two changes would each read the same old document and
-  // the later reply would drop the earlier record. One chain per store: a whole «read → check → await the write» finishes before the
-  // next starts; a failure fails its own caller only and the chain goes on.
-  let tail: Promise<unknown> = Promise.resolve()
-  const serial = <T>(run: () => Promise<T>): Promise<T> => {
-    const next = tail.then(run)
-    tail = next.catch(() => undefined)
-    return next
-  }
-
-  const mutate = (description: string, change: (records: readonly ToolPolicyRecord[]) => readonly ToolPolicyRecord[]) =>
-    serial(async () => {
-      const part = partition()
+  // One chain per document (documentChain): a whole «read → check → await the write» finishes before the next change to the same file
+  // starts, whichever store asked; a failure fails its own caller only and the chain goes on.
+  const mutate = (description: string, change: (records: readonly ToolPolicyRecord[]) => readonly ToolPolicyRecord[]) => {
+    const part = partition()
+    return documentChain(policyFilePath(options.baseDir, part), async () => {
       const loaded = loadPolicyDocument(options.baseDir, part)
       if (loaded.status === "quarantined")
         throw new ToolPolicyWriteError(
@@ -287,6 +300,7 @@ export function createToolPolicyStore(options: ToolPolicyStoreOptions): ToolPoli
         throw new ToolPolicyWriteError("io", error instanceof Error ? error.message : String(error))
       }
     })
+  }
 
   return {
     snapshot,
@@ -305,7 +319,10 @@ export function createToolPolicyStore(options: ToolPolicyStoreOptions): ToolPoli
         const key = selectorKey(renamedSelector(selector))
         return renamedRecords(records).records.filter((item) => selectorKey(item.selector) !== key)
       }),
-    reset: () => serial(() => write.reset(partition())),
+    reset: () => {
+      const part = partition()
+      return documentChain(policyFilePath(options.baseDir, part), () => write.reset(part))
+    },
   }
 }
 

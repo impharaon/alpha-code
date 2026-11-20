@@ -1957,6 +1957,7 @@ export const dict = {
   "codepuppy.workspace.readonlyHome": "Your home folder and Code Puppy's own data folder can't be written as a whole project — open a specific folder inside instead.",
   "codepuppy.workspace.readonlyNotOpenedByYou": "This folder wasn't opened by you in Code Puppy, so the assistant won't change it — choose it with \"Open project\" to make it writable.",
   "codepuppy.workspace.readonlyGrantFailed": "This folder can't be written to right now; it will be writable the next time you open Code Puppy.",
+  "codepuppy.workspace.readonlyProtectedConfig": "This folder is where Code Puppy or the engine keeps its configuration, so conversations can't write to it.",
   "codepuppy.review.panelLabel": "Review panel",
   "codepuppy.review.title": "Changes this turn",
   "codepuppy.review.viewMode": "Diff view",

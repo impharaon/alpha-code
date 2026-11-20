@@ -1931,6 +1931,7 @@ export const dict = {
   "codepuppy.workspace.readonlyHome": "主目录和 Code Puppy 自己的数据目录不能整个作为项目写入，请打开里面的具体文件夹。",
   "codepuppy.workspace.readonlyNotOpenedByYou": "这个文件夹不是你在 Code Puppy 里亲手打开的，助手不会改动它；用「打开项目」选中它就能写入。",
   "codepuppy.workspace.readonlyGrantFailed": "这个文件夹暂时写不进去，下次打开 Code Puppy 后即可写入。",
+  "codepuppy.workspace.readonlyProtectedConfig": "这个文件夹是 Code Puppy 或引擎存放配置的位置，对话里不能写入。",
   "codepuppy.review.panelLabel": "审查面板",
   "codepuppy.review.title": "本回合变更",
   "codepuppy.review.viewMode": "对照视图",

@@ -110,7 +110,8 @@ export const CodePuppyExt: Plugin.Plugin = {
     // `#1698`(DESIGN-upgrade-bootstrap-config §4.2 第 5 步、§4.3):第一步用本 bundle 的解析器读 sidecar 发布的启动文档 —— 没有、
     // 版本或形状不符 ⇒ 抛 ⇒ 本插件 failed ⇒ sidecar 拒报 ready。只读一份冻结的文档,不挂任何钩子,不改 I3 的挂钩次序。
     const bootstrap = codepuppyBootstrap()
-    const policy = await registerPolicy(context, processState().hubBridge.unattended, processState().hubBridge.installSubject)
+    // SPEC-engine-config-fence BR-03:工具策略文档由 main 写 —— 有 parentPort 时桥给出 main 的写者(DESIGN-engine-config-fence §4.5)
+    const policy = await registerPolicy(context, processState().hubBridge.unattended, processState().hubBridge.installSubject, processState().hubBridge.toolPolicy)
     const directory = context.location.directory
     const { hubBridge, reloads } = processState()
     const registration = {}

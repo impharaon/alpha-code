@@ -11,6 +11,9 @@
 //   quarantined: a bad record that might have been a deny is never silently ignored. Recovery is `reset` (the bad file
 //   moves to a `.quarantined-<ts>` backup and defaults return), surfaced in Settings.
 // · Writes are atomic: tmp + rename.
+// · SPEC-engine-config-fence BR-03 (DESIGN §4.5, CF-11): the directory is protected configuration, so in the app the writers run in
+//   main only — main receives the extension's request over the narrow channel (`receiveToolPolicyWrite`, below) and calls them.
+//   The store's default writer still calls them in-process for the CLI and unit tests (resolver.ts).
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs"
 import { createHash } from "node:crypto"
 import path from "node:path"
@@ -21,6 +24,11 @@ import {
   type ToolPolicyPartition,
   type ToolPolicyRecord,
 } from "../../../schema/src/codepuppy-tool-policy"
+import {
+  buildToolPolicyWriteReply,
+  parseToolPolicyWriteRequest,
+  type ToolPolicyWriteReply,
+} from "../../../ui-mac/src/main/codepuppy-sidecar-messages"
 
 /** Canonical JSON (sorted keys, undefined dropped); non-JSON values fail loudly. */
 export function canonicalJson(value: unknown): string {
@@ -109,4 +117,43 @@ export function resetPolicyDocument(baseDir: string, partition: ToolPolicyPartit
   const backup = `${file}.quarantined-${Date.now()}`
   renameSync(file, backup)
   return { backup }
+}
+
+/**
+ * Main's side of the narrow channel (SPEC-engine-config-fence BR-03, DESIGN-engine-config-fence §4.5): the extension inside the fence
+ * sends `codepuppy.tool-policy.write.request`; main writes with the same two writers and replies after the write. Returns false for any
+ * other message (the caller's chain goes on). A malformed request is answered with an error when it carries an id, and logged. A failed
+ * write is answered with an error and logged in one line; the reply names the path and errno, never document content. Lives here, next
+ * to the writers it calls, so that main and an outside-the-fence test helper run the same function (server.ts imports Electron).
+ */
+export function receiveToolPolicyWrite(
+  message: unknown,
+  deps: { baseDir: string; post: (reply: ToolPolicyWriteReply) => void; log: (line: string) => void },
+): boolean {
+  if (!message || typeof message !== "object" || (message as { type?: unknown }).type !== "codepuppy.tool-policy.write.request") return false
+  const request = parseToolPolicyWriteRequest(message)
+  if (!request) {
+    const id = (message as { id?: unknown }).id
+    deps.log("[I-13] tool policy write request is malformed — nothing written")
+    if (typeof id === "number" && Number.isSafeInteger(id) && id >= 0) deps.post(buildToolPolicyWriteReply(id, { error: "malformed tool policy write request" }))
+    return true
+  }
+  let reply: ToolPolicyWriteReply
+  try {
+    if (request.op === "save") {
+      savePolicyDocument(deps.baseDir, request.partition, request.records)
+      reply = buildToolPolicyWriteReply(request.id, { ok: true })
+    } else {
+      const { backup } = resetPolicyDocument(deps.baseDir, request.partition)
+      reply = buildToolPolicyWriteReply(request.id, backup === undefined ? { ok: true } : { ok: true, backup })
+    }
+  } catch (error) {
+    // fs errors carry the path and errno and nothing of the file; anything else (a schema rejection) is named by its class only
+    const reason =
+      error instanceof Error && typeof (error as NodeJS.ErrnoException).code === "string" ? error.message.slice(0, 1024) : `tool policy document rejected (${error instanceof Error ? error.name : typeof error})`
+    deps.log(`[I-13] tool policy ${request.op} failed: ${reason}`)
+    reply = buildToolPolicyWriteReply(request.id, { error: reason })
+  }
+  deps.post(reply)
+  return true
 }

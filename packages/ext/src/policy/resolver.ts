@@ -215,6 +215,18 @@ export interface ToolPolicyStoreOptions {
   readonly workspace: () => string
   /** Managed cap reader (production: `readManagedPolicy()`; the system directory cannot be replaced by env). */
   readonly managed?: () => Promise<ManagedPolicyResult>
+  /**
+   * Who writes the document (SPEC-engine-config-fence BR-03, DESIGN §4.5). Production: main, over the narrow channel (the hub bridge's
+   * writer; `registerPolicy` passes it when the process has a parent port) — the directory is protected configuration the fenced
+   * extension cannot write. Absent: `savePolicyDocument` / `resetPolicyDocument` directly (CLI, unit tests). Reads stay here.
+   */
+  readonly write?: ToolPolicyWriter
+}
+
+/** The document writer behind `setRecord` / `removeRecord` / `reset` (DESIGN-engine-config-fence §4.5). */
+export type ToolPolicyWriter = {
+  save(partition: ToolPolicyPartition, records: readonly ToolPolicyRecord[]): Promise<void>
+  reset(partition: ToolPolicyPartition): Promise<{ backup?: string }>
 }
 
 export interface ToolPolicyStore {
@@ -245,21 +257,36 @@ export function createToolPolicyStore(options: ToolPolicyStoreOptions): ToolPoli
     return { partition: part, managed, user: userLayerFrom(loaded), load: loaded, revision }
   }
 
-  const mutate = async (description: string, change: (records: readonly ToolPolicyRecord[]) => readonly ToolPolicyRecord[]) => {
-    const part = partition()
-    const loaded = loadPolicyDocument(options.baseDir, part)
-    if (loaded.status === "quarantined")
-      throw new ToolPolicyWriteError(
-        "quarantined",
-        `refusing to ${description}: policy document is quarantined (${loaded.reason}); reset to defaults first`,
-      )
-    const records = loaded.status === "ok" ? loaded.doc.records : []
-    try {
-      savePolicyDocument(options.baseDir, part, change(records))
-    } catch (error) {
-      throw new ToolPolicyWriteError("io", error instanceof Error ? error.message : String(error))
-    }
+  const write: ToolPolicyWriter = options.write ?? {
+    save: async (part, records) => savePolicyDocument(options.baseDir, part, records),
+    reset: async (part) => resetPolicyDocument(options.baseDir, part),
   }
+  // Review R1 #7 (DESIGN §4.5): with the write answered by another process, two changes would each read the same old document and
+  // the later reply would drop the earlier record. One chain per store: a whole «read → check → await the write» finishes before the
+  // next starts; a failure fails its own caller only and the chain goes on.
+  let tail: Promise<unknown> = Promise.resolve()
+  const serial = <T>(run: () => Promise<T>): Promise<T> => {
+    const next = tail.then(run)
+    tail = next.catch(() => undefined)
+    return next
+  }
+
+  const mutate = (description: string, change: (records: readonly ToolPolicyRecord[]) => readonly ToolPolicyRecord[]) =>
+    serial(async () => {
+      const part = partition()
+      const loaded = loadPolicyDocument(options.baseDir, part)
+      if (loaded.status === "quarantined")
+        throw new ToolPolicyWriteError(
+          "quarantined",
+          `refusing to ${description}: policy document is quarantined (${loaded.reason}); reset to defaults first`,
+        )
+      const records = loaded.status === "ok" ? loaded.doc.records : []
+      try {
+        await write.save(part, change(records))
+      } catch (error) {
+        throw new ToolPolicyWriteError("io", error instanceof Error ? error.message : String(error))
+      }
+    })
 
   return {
     snapshot,
@@ -278,7 +305,7 @@ export function createToolPolicyStore(options: ToolPolicyStoreOptions): ToolPoli
         const key = selectorKey(renamedSelector(selector))
         return renamedRecords(records).records.filter((item) => selectorKey(item.selector) !== key)
       }),
-    reset: async () => resetPolicyDocument(options.baseDir, partition()),
+    reset: () => serial(() => write.reset(partition())),
   }
 }
 

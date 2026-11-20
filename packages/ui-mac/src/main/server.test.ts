@@ -1084,7 +1084,8 @@ describe("I-13 tool policy writes from the sidecar go through main", () => {
       healthCheck: async () => true,
       planFence: fakePlanFence,
       fork: ((file: string, args: string[], options: Record<string, unknown>) => (forkCalls.push({ file, args, options }), (child = new RecordingChild()))) as never,
-      codepuppySidecar: { receive: (message) => (hub.push(message), true), attach: () => () => {} },
+      // like the real host (hub-view.ts): only the `codepuppy.*` family is its business
+      codepuppySidecar: { receive: (message) => String((message as { type?: unknown })?.type).startsWith("codepuppy.") && (hub.push(message), true), attach: () => () => {} },
     })
     await result.health.wait
     const env = (forkCalls.at(-1)?.options.env ?? {}) as Record<string, string | undefined>

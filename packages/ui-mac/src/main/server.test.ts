@@ -1058,3 +1058,92 @@ describe("#1562 fork 给 sidecar 的环境里没有 OTEL_*", () => {
     expect(Object.keys(env).filter((name) => /^otel_/i.test(name))).toEqual([])
   })
 })
+
+// SPEC-engine-config-fence BR-03 / AC-05 / DESIGN-engine-config-fence §4.5 / E6:sidecar 里的 ext 经 parentPort 发 `codepuppy.tool-policy.write.request`,
+// main 在 child 的 message 链上接住、写盘、写完再回复。文档落在 fork 交给 sidecar 的那份环境算出的数据目录 —— 也就是 ext 读的位置。
+describe("I-13 tool policy writes from the sidecar go through main", () => {
+  const { policyFilePath, loadPolicyDocument } = require("../../../ext/src/policy/store") as typeof import("../../../ext/src/policy/store")
+  const { defaultPolicyBaseDir } = require("../../../ext/src/policy/resolver") as typeof import("../../../ext/src/policy/resolver")
+  const partition = { account: "acct:server-test", workspace: "/work/server-test" }
+  const shell = { selector: { level: "tool", canonical: "builtin::shell" }, state: "disabled" }
+
+  /** A sidecar stand-in that keeps everything main posts to it; the hub host only records what reaches it. */
+  async function spawned() {
+    const posted: Array<Record<string, unknown>> = []
+    const hub: unknown[] = []
+    let child: FakeChild | undefined
+    class RecordingChild extends FakeChild {
+      override postMessage(message: { type: string }) {
+        posted.push(message as Record<string, unknown>)
+        super.postMessage(message)
+      }
+    }
+    creditDanglingSweepForSpawn()
+    const result = await spawnLocalServer("127.0.0.1", 4099, "password", {
+      userDataPath,
+      healthCheck: async () => true,
+      planFence: fakePlanFence,
+      fork: ((file: string, args: string[], options: Record<string, unknown>) => (forkCalls.push({ file, args, options }), (child = new RecordingChild()))) as never,
+      codepuppySidecar: { receive: (message) => (hub.push(message), true), attach: () => () => {} },
+    })
+    await result.health.wait
+    const env = (forkCalls.at(-1)?.options.env ?? {}) as Record<string, string | undefined>
+    // the data directory comes from the isolated XDG_DATA_HOME (the test-isolation preload), never from the developer's real home
+    expect(env.XDG_DATA_HOME, "the fork env carries the isolated XDG_DATA_HOME").toBeDefined()
+    expect(env.XDG_DATA_HOME!.startsWith(`${homedir()}/`)).toBe(false)
+    const baseDir = defaultPolicyBaseDir(join(env.XDG_DATA_HOME!, "opencode"))
+    const send = (message: unknown) => child!.emit("message", message)
+    const replies = () => posted.filter((message) => message.type === "codepuppy.tool-policy.write.reply")
+    return { result, baseDir, send, replies, hub }
+  }
+
+  test("E6: a save and a reset from the sidecar are written where ext reads them, then answered (ok; ok with the backup)", async () => {
+    const { result, baseDir, send, replies, hub } = await spawned()
+    try {
+      send({ type: "codepuppy.tool-policy.write.request", id: 11, op: "save", partition, records: [shell] })
+      const loaded = loadPolicyDocument(baseDir, partition)
+      expect(loaded.status === "ok" ? loaded.doc.records : loaded).toEqual([shell])
+      expect(replies()).toEqual([{ type: "codepuppy.tool-policy.write.reply", id: 11, ok: true }])
+      send({ type: "codepuppy.tool-policy.write.request", id: 12, op: "reset", partition })
+      expect(loadPolicyDocument(baseDir, partition).status).toBe("absent")
+      const reset = replies()[1] as { id: number; ok: boolean; backup: string }
+      expect([reset.id, reset.ok, reset.backup.startsWith(`${policyFilePath(baseDir, partition)}.quarantined-`)]).toEqual([12, true, true])
+      expect(hub).toEqual([])
+    } finally {
+      await result.listener.stop()
+      rmSync(baseDir, { recursive: true, force: true })
+    }
+  })
+
+  test("AC-05: main cannot write ⇒ an error reply naming the path and errno, the old document byte for byte, one named line; a malformed request ⇒ an error reply and one line; other codepuppy.* messages still reach the hub host", async () => {
+    const { result, baseDir, send, replies, hub } = await spawned()
+    try {
+      send({ type: "codepuppy.tool-policy.write.request", id: 21, op: "save", partition, records: [shell] })
+      const file = policyFilePath(baseDir, partition)
+      const before = readFileSync(file)
+      warned.length = 0
+      chmodSync(baseDir, 0o500)
+      try {
+        send({ type: "codepuppy.tool-policy.write.request", id: 22, op: "save", partition, records: [] })
+      } finally {
+        chmodSync(baseDir, 0o700)
+      }
+      const refused = replies()[1] as { id: number; error: string }
+      expect(refused.id).toBe(22)
+      expect(refused.error).toContain("EACCES")
+      expect(refused.error).toContain(baseDir)
+      expect(readFileSync(file)).toEqual(before)
+      expect(warned.filter((line) => line.startsWith("[I-13] tool policy save failed:"))).toHaveLength(1)
+      send({ type: "codepuppy.tool-policy.write.request", id: 23, op: "save", partition: { account: "a" } })
+      expect(replies()[2]).toMatchObject({ type: "codepuppy.tool-policy.write.reply", id: 23 })
+      expect(typeof (replies()[2] as { error?: unknown }).error).toBe("string")
+      expect(warned.filter((line) => line.startsWith("[I-13] tool policy write request is malformed"))).toHaveLength(1)
+      const other = { type: "codepuppy.hub.request.request", id: 24, requestId: "req_aaaaaaaa" }
+      send(other)
+      expect(hub).toEqual([other])
+    } finally {
+      await result.listener.stop()
+      rmSync(baseDir, { recursive: true, force: true })
+    }
+  })
+})

@@ -598,6 +598,11 @@ PLAN 阶段按派单写在临时文件里，没有提交；本节由实施阶段
 - 2026-11-20 · 送审前逐步跑闸(编排器给了 GATE_ALLOW_FULL;日志在 `S3/gate/`):六个包的类型检查全 0;`check:vendor` 0;contracts-consumer 整包 65 条 0;ext 整包 670 条 0(第一次 669 / 1 红:authority-registry 判官按名字找片 ④ 登记的证明用例,单元 B 改了真引擎宿主的用例名,`e7da2499f6` 还原，见下一条;`test-ext-run1-red.log`);ui-mac 整包带 known-fails 6951 条 0 失败;app 0;`assert-gate-files.sh` 387 个闸门文件条数精确，退出 2 只因签名形态宿主未开开关(下面单独跑);`north-star-guard.sh` 0;`docs-gates.sh`(NUL、链接)0;seed assets 0;`fixture-identity` 与 `old-name-scan` 15 条 0;签名形态宿主 `CODEPUPPY_TEST_SIGNED_FENCE=1` 内层 3 / 3、762 s。
 - 2026-11-20 · 真引擎宿主的用例名是权威登记册 `plan-directory-in-engine-data` 里的字面量，单元 B 改名让 ext 整包红;名字还原(登记册不改),片 ③ 的内容在它跑的 production / control 两臂里。gate-files 两行开头的旧条数与 AC 范围随后同步(只改描述)。
 
+- 2026-11-20 · 审查 R1(独立 Claude Opus 审查员，快照 `143bc58d60`,RECOMMEND MERGE)处置，新提交:
+  1. (Minor)宿主的窗口完整性判据原来是「非引擎 pid、路径在工具策略目录」,更早的围栏内直写子进程(E6 已知坏)也满足它，日志只送到那里就会提前判。改成只认最后一条 shell 命令(旁边新建的那份文档)的拒绝,cases 打印它的名字(`2f67bfb7fe`)。变异：宿主找一个不存在的名字 ⇒ 读满十次后校准断言红(`S3/mutations/R3-trace-absent.log`)。宿主重跑 `bun-test-floor.sh =1` 绿(窗口内引擎 pid 0 条，子进程 9 条;窗口后引擎 pid 1 条)。
+  2. §4.5 的『`createToolPolicyStore` 内一条链』落成『进程内每份文档一条链』(审查 R1 可选项，编排器采纳：跨 Location 的丢失更新是本片新出现的)。同一项目的两个 Location 各有一个存储、写同一份文档;链挂在 globalThis 上按文档路径登记(ext 每个 Location 求值一次，同 `PROCESS_STATE_KEY`),空闲即删。红 `df2430700a`(`resolver.test.ts` W4:两个存储并发 `setRecord` 丢了一条;`S3/evidence/r3-red-w4.log`)→ 绿 `c70901bccd`。变异：链退回每个存储一条 ⇒ W4 红(`S3/mutations/R3-per-store-chains.log`)。gate-files `resolver` 35 → 36。
+  重跑(`S3/gate/r3-*.log`):`resolver` =36、`tool-policy-rpc` =8、`plugin-host` =52、`register-policy` =69、ext 整包 671 条 0 失败、ext / ui-mac 类型检查 0、`engine-config-fence.engine` =1。没采纳：main 只收本代账户的写请求(超出 AC 的加固，编排器记给意图)。
+
 ### 可选(不做)
 
 - 让共享引擎宿主的假 parentPort 也用生产接收函数答工具策略写请求(F5)。今天没有消费方需要，而且改了它，44 个消费方就都成了相关测试。

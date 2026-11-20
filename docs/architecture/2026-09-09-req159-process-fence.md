@@ -55,16 +55,29 @@ LSP / PTY / formatter …)自动继承;REQ-138 那层(`cfg.shell` → `sandbox-e
   改存到引擎数据目录 `<XDG_DATA_HOME>/opencode/plan`(W4 之下,写文件工具懒建),`~/.opencode` 整个是受保护配置位置 CF-9。
 
 **受保护配置集**(SPEC-engine-config-fence `docs/specs/engine-config-fence/spec.md`,设计 `docs/specs/engine-config-fence/design.md`,两份另行合入主线)。
-渲染点在 N4 之后、profile 最后写两块拒写(显式规则后写者胜,之后不许再有任何文件写的放行,X1 在它们之前):第一块是规则
+渲染点在 N4 之后写两块拒写(显式规则后写者胜,之后不许再有任何文件写的放行,X1 在它们之前;其后只有下面的 C1 两块):第一块是规则
 —— CF-1 状态根与当前环境根(恒列)、CF-2 `<userData>/codepuppy-engine-config`(显式文件与模型底表)、CF-3 / CF-4 / CF-5 / CF-7 的
 literal(shell 环境缓存、`codepuppy.env` 与用户设置的 `$CODEPUPPY_ENV_FILE` 那份、两份端点文件、两个 store 文件)、CF-6 连接器目录、
-CF-7 `<userData>/*.dat`(扩展名不分大小写)、CF-8 引擎全局配置目录与 `<XDG_CONFIG_HOME>/opencode`、CF-9 整个 `~/.opencode`、CF-10 `~/opencode.json(c)`;第二块是
+CF-7 `<userData>/*.dat`(扩展名不分大小写)、CF-8 引擎全局配置目录与 `<XDG_CONFIG_HOME>/opencode`、CF-9 整个 `~/.opencode`、CF-10 `~/opencode.json(c)`、CF-11 工具策略目录 `<XDG_DATA_HOME>/opencode/codepuppy-tool-policy`(在 W4 之下,靠这一块拿回);第二块是
 每条规则每一级上级目录节点(沿真实路径与配置路径各算一遍,再加每个配置路径节点所在真实位置的上级链,只冻结节点本身;不冻结的:只出现在某条软链目标文字里的软链目录(残留 R10),以及写不进 profile 的节点 —— 路径含引号、反斜杠或控制字符,计划时一行日志点名(残留 R11))。计划器(`process-fence-plan.ts` `planConfigFence`)落真实路径、
 给软链位置加真实目标、预建目录位置(CF-9 `~/.opencode` 不预建:任何进程都不建它,不存在时 subpath 规则挡住任何形式的新建);`$CODEPUPPY_ENV_FILE` 那一项从不让计划失败,落在 `/dev` 下的那条规则不出(链节点照留)。这些文件的写者都在 main:
 `engine-explicit-config.ts` 的 `writeEngineConfigFiles`(fork 之前、官方连接器恢复之后写种子、显式文件与模型底表,引擎配置目录 0700;
 写不进 ⇒ `[I-13] engine config files could not be written — refusing to fork`)与 main 里的 `watchExplicitSources`;sidecar 的注入不写盘。
+工具策略文档(CF-11)也由 main 写:设置页的改写经 RPC 到 ext,ext 经 parentPort 的 `codepuppy.tool-policy.write.request`(`codepuppy-sidecar-messages.ts`,
+走 hub 桥同一个监听与 id 空间)交给 main,`server.ts` 接收链上调 `ext/policy/store.ts` 的 `receiveToolPolicyWrite` 写进本代 sidecar 环境算出的数据目录,
+写完再回复;写不进 ⇒ 回 error(路径与 errno)、main 记一行 `[I-13] tool policy <op> failed`,设置页显示写入失败、盘上旧文档不变。读仍在 ext;
+`createToolPolicyStore` 里一条串行链,两处改写不会互相覆盖。
 运行期放行的判据把这两块读成 deny(在某条 allow 之下、且不在任何 deny 之下才算覆盖;literal 只在等于目录时算);受保护位置本身或其内的
 文件夹资格为 `protected-config`(界面那一句「这个文件夹是 Code Puppy 或引擎存放配置的位置，对话里不能写入。」),包含它的文件夹照常放行。
+
+**凭据存放点(C1)**(SPEC-stored-credentials-fence `docs/specs/stored-credentials-fence/spec.md`,设计同目录 `design.md` §4.5)。
+同一个渲染点在受保护集之后、profile 最末写两块:第一块拒读拒写(表头 `(deny file-read* file-write*`,运行期放行的判据同样读成 deny)——
+`<userData>/codepuppy-secrets`、`<userData>/codepuppy-mcp-secrets`、`<userData>/Crashpad` 与官方连接器运行期父目录
+`<realpath(tmpdir)>/codepuppy-connectors-<uid>-<hash>`(算不出就不列)的 subpath,`codepuppy.env`、`codepuppy-auth.json`、
+`codepuppy-pkce.json`、`codepuppy-byok-keys.json` 的 literal;第二块是这些存放点每一级上级目录节点拒写(一行)。清单唯一来源是
+`codepuppy-secret-files.ts` `credentialStores`,main 的 `codepuppy-credential-table.ts` `mainCredentialStores` 同一份既读成交给引擎的内存表、又经
+`process-fence-plan.ts` `planCredentialStores` 落成真实路径(含软链位置的真实目标)交给计划器。围栏内的引擎与 ext 不再读这些文件:凭据只来自
+main 交来的内存表(fork 时整表、续期后整表推送、每次装载配置之前拉一次);这些存放点的写者只在 main(`codepuppy-secret-files.ts` 九个写盘点登记为 main-only)。
 
 2026-11-19 的[项目可写增量](../specs/child-process-write-fence/design.md)另加 **X1 / X2**。X1 只接受
 `WORKSPACE_WRITE_EXTENSION_CLASS` 的写扩展;X2 对同一私有类拒绝 file / generic / mach / iokit / ipc-posix 五种签发。
@@ -191,7 +204,7 @@ U1 只出了 arm64,并明写将来出 Intel / universal 时若漏第二份,x64 �
 
 | 文件 | 跑在哪 | 守什么 |
 | --- | --- | --- |
-| `process-fence-profile.test.ts` | 全平台 | §8.2 形状逐行全等(W2 / W6 / W16 已删);位置清单含整个 `~/.opencode`(CF-9);受保护集两块在 N4 之后、上级目录去重、带配置路径节点;写规则解析往返(含兄弟设计 C1 样本)与拒绝形状(含通配 `file*`);覆盖判定带 deny;`protected-config` 资格;XDG 对着真 xdg-basedir;并集规则(吃 candidates 列表,`#1394`);试编译丢尾 |
+| `process-fence-profile.test.ts` | 全平台 | §8.2 形状逐行全等(W2 / W6 / W16 已删);位置清单含整个 `~/.opencode`(CF-9);受保护集两块在 N4 之后、上级目录去重、带配置路径节点;C1 两块在受保护集之后、是全文最后的文件规则;写规则解析往返(受保护集 + C1 真渲染)与拒绝形状(含通配 `file*`);覆盖判定带 deny;`protected-config` 资格;XDG 对着真 xdg-basedir;并集规则(吃 candidates 列表,`#1394`);试编译丢尾 |
 | `process-fence-compile.test.ts` | darwin | 真 sandbox-exec:已知的坏(65535 墙 / 语法错)必红,§8.2 + 32 工作区必绿 |
 | `process-fence-plan.test.ts` | darwin | 父目录预建与受保护目录预建、受保护集真实路径 / 软链目标 / 配置路径节点 / `$CODEPUPPY_ENV_FILE`、坏软链目录位置拒 fork、从不预建 `~/.opencode`(CF-9)、真源拿不到出声并退到默认工作区(`#1394`)、三种 fail-closed、两种 addonPath、真源里指向状态根祖先或受保护位置之内仍排除 |
 | `process-fence-workspaces.test.ts` | 全平台 | `#1394` 真源:位置不在任何可写行之下;原子写 / 严格读(七种坏形状);播种(AC4④)、装载 + 检疫、检疫挡得住 renderer 写回、只认三个 tab 键、坏文件不动、写失败不抛 |
@@ -202,8 +215,9 @@ U1 只出了 arm64,并明写将来出 Intel / universal 时若漏第二份,x64 �
 | `custom-provider-truth.test.ts` | 全平台 | `#1391` 自定义节点真源(读端):I2 —— 真源路径不在可写集任何固定行之下(对着渲染出的 profile 逐条规则枚举 W-id,12 个固定 id 手写登记;默认 / 覆盖 base × 两种 XDG_STATE_HOME;控制臂塞一行罩住状态根即点名);严格读十六种坏形状各拒且日志一行,缺失 = 没有记录 |
 | `custom-provider-truth-write.test.ts` | 全平台 | `#1391` 写端:字节固定、原子(rename / write 中途抛 ⇒ 旧内容不动)、坏记录不落盘;写模块不在 sidecar import 闭包里(生产 `sidecarSourceFiles` 实测 + 合成三文件控制臂) |
 | `custom-provider-truth-fence.test.ts` | darwin | `#1391` I2 的真裁判:生产渲染器的 profile(受保护集按空)交给真 sandbox-exec,围栏内写 / 建目录 / mv 进真源全拦、零落盘;W3 落盘;bare 臂写得进 |
-| `process-fence-config-fence.test.ts` | darwin | SPEC-engine-config-fence AC-01:生产计划器 + 生产 .node,受保护集每个位置 × 每种手法、每一级上级目录;另外的写法 —— 工作区软链(cf2、cf4)、大小写(cf3、cf4、cf5 新建、cf7 .dat)、firmlink(cf2、cf8)、`/.vol`(cf2、cf3、cf7 .dat) —— 全部 EPERM、事后围栏外读盘不变;`$CODEPUPPY_ENV_FILE`、项目里的配置路径软链、userData 本身是软链;五个已知坏臂各自翻转;E2 引擎日常写入照常;R8 保证外对照;AC-08:`~/.opencode` 不存在时任何形式都建不出、存在时其下写入全拒(签了运行期放行也一样)而读照常,引擎数据目录下的计划目录懒建、写入照常,已知坏(补回 W16、去掉 CF-9)全部落地 |
-| `engine-config-fence.engine.test.ts` | darwin | AC-04 / AC-06 / AC-08:真引擎关在生产围栏里;全新机器上「全部批准」档选计划,计划文件落在 `<XDG_DATA_HOME>/opencode/plan`、写文件卡片显示该路径、`~/.opencode` 始终不存在;三项攻击被拒而模型 / 连接器调用、经 main 的安装 / 停用 / 启用、手改与装技能不重启生效、重启都照常;0.2.6 形状冷启动与全新机器;已知坏臂(去掉受保护集 —— 攻击经 W12 落地,沙箱在系统临时目录下;不预建)翻转;系统沙箱日志里引擎进程零条受保护位置拒绝(攻击子进程的拒绝作校准) |
+| `process-fence-config-fence.test.ts` | darwin | SPEC-engine-config-fence AC-01:生产计划器 + 生产 .node,受保护集每个位置 × 每种手法、每一级上级目录;另外的写法 —— 工作区软链(cf2、cf4)、大小写(cf3、cf4、cf5 新建、cf7 .dat)、firmlink(cf2、cf8)、`/.vol`(cf2、cf3、cf7 .dat);CF-11 工具策略目录与它的三个上级节点(含 W4 的根)× 每种手法与软链 / 大小写 / firmlink / `/.vol` 写法 —— 全部 EPERM、事后围栏外读盘不变;`$CODEPUPPY_ENV_FILE`、项目里的配置路径软链、userData 本身是软链;五个已知坏臂各自翻转;E2 引擎日常写入照常;R8 保证外对照;AC-08:`~/.opencode` 不存在时任何形式都建不出、存在时其下写入全拒(签了运行期放行也一样)而读照常,引擎数据目录下的计划目录懒建、写入照常,已知坏(补回 W16、去掉 CF-9)全部落地;已知坏「去掉 CF-11 一行及只由它带来的上级节点」⇒ 同样的攻击全部落地,运行期放行签发 `<XDG_DATA_HOME>` 之后策略文档仍拒 |
+| `engine-config-fence.engine.test.ts` | darwin | AC-04 / AC-05 / AC-06 / AC-08:真引擎关在生产围栏里;设置页经生产客户端 → RPC → ext → parentPort → 围栏外的 main(生产接收函数)同时改两行、删一行、重置都照常,ext 在围栏内直接写 ⇒ EPERM,对话经 shell 与写文件工具改工具策略为放行全部被拒(对照臂全部落地);全新机器上「全部批准」档选计划,计划文件落在 `<XDG_DATA_HOME>/opencode/plan`、写文件卡片显示该路径、`~/.opencode` 始终不存在;三项攻击被拒而模型 / 连接器调用、经 main 的安装 / 停用 / 启用、手改与装技能不重启生效、重启都照常;0.2.6 形状冷启动与全新机器;已知坏臂(去掉受保护集 —— 攻击经 W12 落地,沙箱在系统临时目录下;不预建)翻转;系统沙箱日志里引擎进程零条受保护位置拒绝(攻击子进程的拒绝作校准;判定窗口止于写文件工具攻击之前,之后另读一次,断言引擎进程在工具策略目录的那条拒绝读得到) |
+| `stored-credentials-fence.engine.test.ts` | darwin | SPEC-stored-credentials-fence AC-01 / AC-02 / AC-03:真引擎关在生产围栏里(受保护集 + C1),main 是围栏外辅助进程;三档 shell 与读文件工具对每个存放点的直接路径 / 大小写 / `/.vol` / firmlink / 软链 / 硬链 / 克隆 / 覆盖写 / 改名 / 删除 / 搬走上级目录全部失败、事后围栏外逐字节原样;模型、连接器、续期、运行中增删密钥、经 main 启停连接器、注入失败那条路都从表里拿到凭据;系统沙箱日志里引擎 pid 在存放点上零拒绝(读文件工具臂作校准);非清单位置的引用只得空串;去掉 C1 / 全文代入 / C1 在而没有表三个已知的坏 |
 | `process-fence-engine.test.ts` | darwin | **真引擎 + 真 ext** 在生产 .node 围栏下:shell 工具 / PTY / MCP 三条真消费方界外 0 落盘、界内落盘;AC2 shell 工具照常执行、`cfg.shell` 不指向 wrapper |
 | `packages/ext/src/codepuppy-ext-no-shell-layer.test.ts` | 全平台 | REQ-138 层已拆:生产 config 钩子不碰 `cfg.shell` |
 

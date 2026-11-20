@@ -29,6 +29,18 @@ const ledgerPath = resolve(repoRoot, "scripts", "process-fence-write-sites.tsv")
 const MAIN_ONLY_SITES = [
   ["codepuppy-environment.ts", "mkdirSync", "directory"],
   ["codepuppy-environment.ts", "rmdirSync", "directory"],
+  ["codepuppy-secret-files.ts", "openSync", "file"],
+  // SPEC-stored-credentials-fence §4.5:凭据存放点在 C1 之下,围栏内写不到;这些写者只由 main 调用(syncSecretFiles / writeSecretFileAtomic /
+  // applyPlatformCredentialsHot,闭包判据见下方 I2)
+  ["codepuppy-secret-files.ts", "chmodSync", "dir"],
+  ["codepuppy-secret-files.ts", "chmodSync", "temp"],
+  ["codepuppy-secret-files.ts", "mkdirSync", "dir"],
+  ["codepuppy-secret-files.ts", "openSync", "temp"],
+  ["codepuppy-secret-files.ts", "renameSync", "temp"],
+  ["codepuppy-secret-files.ts", "rmSync", "file"],
+  ["codepuppy-secret-files.ts", "rmSync", "path.join(dir, leftover)"],
+  ["codepuppy-secret-files.ts", "rmSync", "temp"],
+  ["codepuppy-secret-files.ts", "writeFileSync", "fd"],
   ["codepuppy-installs.ts", "mkdirSync", "root"],
   ["codepuppy-installs.ts", "renameSync", "file"],
   ["engine-explicit-config.ts", "chmodSync", "engineConfigDirectory"],
@@ -46,7 +58,17 @@ const MAIN_ONLY_SITES = [
   ["ext-receipt-v2.ts", "renameSync", "file"],
   ["ext-receipt-v2.ts", "unlinkSync", "file"],
   ["ext-receipt-v2.ts", "writeFileSync", "evidence"],
-].map(([file, api, firstArg]) => signatureOf({ file: `packages/ui-mac/src/main/${file}`, api: api!, firstArg: firstArg! }))
+]
+  .map(([file, api, firstArg]) => signatureOf({ file: `packages/ui-mac/src/main/${file}`, api: api!, firstArg: firstArg! }))
+  .concat(
+    // SPEC-engine-config-fence BR-03 / 片 ③(DESIGN §4.5):工具策略文档的两个写者 —— 在应用里只由 main 经窄消息调用(server.ts → receiveToolPolicyWrite)
+    [
+      ["packages/ext/src/policy/store.ts", "mkdirSync", "path.dirname(file)"],
+      ["packages/ext/src/policy/store.ts", "renameSync", "file"],
+      ["packages/ext/src/policy/store.ts", "renameSync", "tmp"],
+      ["packages/ext/src/policy/store.ts", "writeFileSync", "tmp"],
+    ].map(([file, api, firstArg]) => signatureOf({ file: file!, api: api!, firstArg: firstArg! })),
+  )
 
 /** 一个源文件从某个模块拿到的值绑定(静态 import 与 `await import()` 的解构;整块拿 = "*";type-only 不算)。 */
 function valueImports(rel: string, module: RegExp): { names: string[]; source: ts.SourceFile } {
@@ -75,6 +97,21 @@ function valueImports(rel: string, module: RegExp): { names: string[]; source: t
 // 用扫描器算出的同一个 sidecar 闭包。
 describe("I2:main-only 写者在 sidecar 闭包里没有调用方", () => {
   const closure = sidecarSourceFiles(repoRoot)
+  test("闭包里没有文件拿到读写凭据存放点的函数(readCredentialTable / readRegularFileNoFollow / syncSecretFiles / writeSecretFileAtomic / applyPlatformCredentialsHot;凭据存放点只由 main 读写,SPEC-stored-credentials-fence I3;readRegularFileNoFollow 的 openSync 是只读打开)", () => {
+    const readers = new Set(["readCredentialTable", "readRegularFileNoFollow", "syncSecretFiles", "writeSecretFileAtomic", "applyPlatformCredentialsHot", "*", "default"])
+    const importers: string[] = []
+    const offenders: string[] = []
+    for (const rel of closure) {
+      if (rel.endsWith("/codepuppy-secret-files.ts")) continue
+      const { names } = valueImports(rel, /(^|\/)codepuppy-secret-files(\.ts)?$/)
+      if (names.length) importers.push(rel)
+      for (const name of names) if (readers.has(name)) offenders.push(`${rel}: ${name}`)
+    }
+    expect(offenders).toEqual([])
+    // 手段是活的:模型投影确实从那里拿凭据路径函数(拿到的只有路径与在场判断)
+    expect(importers).toContain("packages/ui-mac/src/main/codepuppy-models.ts")
+  })
+
   test("闭包里除 engine-explicit-config.ts 自己,没有文件拿到 writeExplicitConfig / watchExplicitSources / writeEngineConfigFiles / writeEngineConfigForFork / materializeGovernedModelsBase(也不整块 import 那个模块)", () => {
     const writers = new Set(["writeExplicitConfig", "watchExplicitSources", "writeEngineConfigFiles", "writeEngineConfigForFork", "materializeGovernedModelsBase", "*", "default"])
     const importers: string[] = []
@@ -88,6 +125,26 @@ describe("I2:main-only 写者在 sidecar 闭包里没有调用方", () => {
     expect(offenders).toEqual([])
     // 手段是活的:注入模块确实从那里拿路径函数(拿到的只有读的)
     expect(importers).toContain("packages/ui-mac/src/main/codepuppy-config-injection.ts")
+  })
+
+  // 片 ③(DESIGN §4.5、§4.7;措辞经编排器接受):§4.5 冻结的缺省写者(CLI 与单测用)就在 resolver.ts 里直接调这两个写者,而 resolver.ts 在闭包里 ——
+  // 所以判据是「闭包里拿到它们的只有 resolver.ts」;生产里 registerPolicy 在有 parentPort 时传 main 的写者(插件宿主与 RPC 用例判)。
+  test("闭包里拿到工具策略写者 savePolicyDocument / resetPolicyDocument 的只有 resolver.ts(缺省写者);没有文件拿到 main 侧的接收函数 receiveToolPolicyWrite,也没有文件整块 import store.ts", () => {
+    const writers = new Set(["savePolicyDocument", "resetPolicyDocument"])
+    const holders: string[] = []
+    const importers: string[] = []
+    const offenders: string[] = []
+    for (const rel of closure) {
+      if (rel.endsWith("/ext/src/policy/store.ts")) continue
+      const { names } = valueImports(rel, rel.startsWith("packages/ext/src/policy/") ? /^\.\/store(\.ts)?$/ : /(^|\/)policy\/store(\.ts)?$/)
+      if (names.length) importers.push(rel)
+      if (names.some((name) => writers.has(name))) holders.push(rel)
+      for (const name of names) if (name === "receiveToolPolicyWrite" || name === "*" || name === "default") offenders.push(`${rel}: ${name}`)
+    }
+    expect(offenders).toEqual([])
+    expect(holders).toEqual(["packages/ext/src/policy/resolver.ts"])
+    // 手段是活的:闭包里确实有别的文件从 store.ts 拿值(只拿摘要函数)
+    expect(importers).toContain("packages/ext/src/policy/identity.ts")
   })
 
   test("闭包里对安装账本的读只有两处,都带 sideEffectFree: true(不写证据文件);闭包里没有文件拿到账本模块别的值", () => {

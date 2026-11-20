@@ -146,7 +146,7 @@ export function registerExtIpcHandlers(
     }
   }
   // I-11(design v9 §4.4「运行时收敛」):受管全局 MCP 的一切运行时操作只经这一个实例(按名串行,执行时读最终投影)。
-  const convergeManagedMcp = createManagedMcpConvergence({ root: codepuppyGlobalRoot, awaitServer, directory: codepuppyUserWorkspaceDir })
+  const convergeManagedMcp = createManagedMcpConvergence({ root: codepuppyGlobalRoot, awaitServer, directory: codepuppyUserWorkspaceDir, userDataPath: () => userDataPath, log: (line) => getLogger()?.warn(line) })
   const reloads = createReloadCoordinator({
     restartConnectors: () => officialRuntime?.refresh() ?? Promise.resolve(false),
     applyPackageMcp: async (items) => {

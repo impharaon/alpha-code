@@ -9,6 +9,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { LoadAPIKeyError } from "@ai-sdk/provider"
 import { platformCredentialHeader, platformRequestCredentialHeader } from "./platform-credential-header"
+import { __resetCodePuppyCredentialsForTests, publishCodePuppyCredentials } from "../../util/src/codepuppy-credentials"
 
 const GW = "https://gw.example/v1"
 const SENTINEL = "SENTINEL-PLATFORM-CREDENTIAL-41b7"
@@ -20,7 +21,12 @@ beforeEach(() => {
   keyFile = join(root, "codepuppy-secrets", "CODEPUPPY_API_KEY")
   mkdirSync(join(root, "codepuppy-secrets"), { recursive: true })
 })
-afterEach(() => rmSync(root, { recursive: true, force: true }))
+afterEach(() => {
+  rmSync(root, { recursive: true, force: true })
+  __resetCodePuppyCredentialsForTests()
+})
+/** SPEC-stored-credentials-fence:主进程把整表交给引擎进程(T1 / 续期推送 T2);缺省的读法只认这张表。 */
+const handOver = (value: string | undefined) => publishCodePuppyCredentials(value === undefined ? {} : { [keyFile]: { value, use: { kind: "inline" } } })
 
 // `#1698`:平台节点地址与凭据引用来自启动文档的 platform(此前是两个环境变量)。坏形状(缺引用、字面令牌)解析器本来就收不进文档,
 // 这里直接构造对象,判这一层自己也不把它们当凭据。
@@ -42,23 +48,27 @@ function expectLoadApiKeyError(run: () => unknown) {
 }
 
 describe("platformCredentialHeader —— 判据", () => {
-  test("平台节点 + 文件在 ⇒ 每次调用现读文件,换文件后立刻是新值", () => {
-    writeFileSync(keyFile, `${SENTINEL}-A\n`)
+  test("平台节点 + 表里有 ⇒ 每次调用现读进程内凭据表,换表(续期推送)后立刻是新值;盘上同一路径的文件不读", () => {
+    writeFileSync(keyFile, `${SENTINEL}-ON-DISK`)
+    handOver(`${SENTINEL}-A\n`)
     const platform = platformWith(`{file:${keyFile}}`)
     expect(platformCredentialHeader({ providerBaseURL: GW, platform })).toBe(`Bearer ${SENTINEL}-A`)
-    writeFileSync(keyFile, `${SENTINEL}-B`)
+    handOver(`${SENTINEL}-B`)
     expect(platformCredentialHeader({ providerBaseURL: GW, platform })).toBe(`Bearer ${SENTINEL}-B`)
   })
 
-  test("文件缺席 / 为空 ⇒ LoadAPIKeyError,不回落任何值", () => {
+  test("表里没有 / 为空 ⇒ LoadAPIKeyError,不回落任何值(盘上有文件也一样)", () => {
     const platform = platformWith(`{file:${keyFile}}`)
+    writeFileSync(keyFile, SENTINEL)
     expectLoadApiKeyError(() => platformCredentialHeader({ providerBaseURL: GW, platform }))
-    writeFileSync(keyFile, "  \n")
+    handOver(undefined)
+    expectLoadApiKeyError(() => platformCredentialHeader({ providerBaseURL: GW, platform }))
+    handOver("  \n")
     expectLoadApiKeyError(() => platformCredentialHeader({ providerBaseURL: GW, platform }))
   })
 
   test("引用缺席 / 不是 {file:} 形状(哪怕是一个字面令牌)⇒ LoadAPIKeyError,字面值绝不当凭据发出", () => {
-    writeFileSync(keyFile, SENTINEL)
+    handOver(SENTINEL)
     expectLoadApiKeyError(() => platformCredentialHeader({ providerBaseURL: GW, platform: platformWith(undefined) }))
     expectLoadApiKeyError(() => platformCredentialHeader({ providerBaseURL: GW, platform: platformWith(SENTINEL) }))
     expectLoadApiKeyError(() => platformCredentialHeader({ providerBaseURL: GW, platform: platformWith(`prefix {file:${keyFile}}`) }))

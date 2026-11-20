@@ -26,6 +26,7 @@
 import { createHash, randomBytes } from "node:crypto"
 import * as fs from "node:fs"
 import * as path from "node:path"
+import type { CodePuppyCredentialEntry } from "@opencode/util/codepuppy-credentials"
 import { BYOK_ADAPTERS } from "./byok-adapters"
 import { USER_DATA_LAYOUT } from "./user-data-layout"
 
@@ -164,12 +165,14 @@ export type HotApplyOutcome = "applied" | "needs-structural"
  * `applied`,下一次 fork 的 syncSecretFiles 自然带上 env 里的新值。两份热凭据的在场集合与 fork 时不同
  * (凭据出现或消失)⇒ `needs-structural`:平台 provider 与云 MCP 条目是否存在是 fork 时定的,热写改不了。
  * 任一写入或回读摘要不一致 ⇒ `needs-structural`(热写失败,由结构性重启的 syncSecretFiles 再写一次)。
- * 只返回结论,不记录任何值。
+ * DESIGN-stored-credentials-fence §4.3 T2:写入与回读摘要都通过之后 `push()` 把整表推给当前 sidecar(引擎进程只从那张表读凭据;没有子进程时
+ * push 什么都不做);push 抛 ⇒ `needs-structural`。只返回结论,不记录任何值。
  */
 export function applyPlatformCredentialsHot(
   userDataPath: string,
   env: NodeJS.ProcessEnv,
   forked: ReadonlySet<string> | undefined,
+  push: () => void,
 ): HotApplyOutcome {
   if (!forked) return "applied"
   const present = HOT_CREDENTIALS.filter((name) => env[name])
@@ -182,6 +185,7 @@ export function applyPlatformCredentialsHot(
       writeSecretFileAtomic(dir, name, value)
       if (digest(fs.readFileSync(path.join(dir, name), "utf8")) !== digest(value)) return "needs-structural"
     }
+    push()
   } catch {
     return "needs-structural"
   }
@@ -190,4 +194,132 @@ export function applyPlatformCredentialsHot(
 
 function digest(value: string) {
   return createHash("sha256").update(value).digest("hex")
+}
+
+// ── DESIGN-stored-credentials-fence §4.3:Code Puppy 的凭据存放点与进程内凭据表 ─────────────────────────────
+
+/** 崩溃转储目录(userData 下;logging.ts 用同一个名字交给 crashReporter)。 */
+export const CRASH_DUMPS_DIR = "Crashpad"
+
+export type CredentialStore = {
+  /** 与该存放点的 `{file:}` 引用同一写法的绝对路径。 */
+  path: string
+  kind: "dir" | "file"
+  /** 怎么进表;false = 只拦、不进表。 */
+  table: "secrets" | "connector-by-server" | "connector-by-run" | false
+}
+
+/**
+ * userData 下六项(名字取自 USER_DATA_LAYOUT)+ `<userData>/Crashpad`(不进表)+ 官方连接器运行期目录(调用方算出才给;本模块不 import 官方
+ * 连接器模块,那会把钥匙串带进 sidecar 闭包)。主进程的别名判断(isStoreTarget)与围栏 C1 用同一份清单。
+ */
+export function credentialStores(input: { userDataPath: string; officialRuntimeParent?: string }): CredentialStore[] {
+  const at = (name: string) => path.join(input.userDataPath, name)
+  return [
+    { path: at(USER_DATA_LAYOUT.secrets), kind: "dir", table: "secrets" },
+    { path: at(USER_DATA_LAYOUT.mcpSecrets), kind: "dir", table: "connector-by-server" },
+    { path: at(USER_DATA_LAYOUT.envFile), kind: "file", table: false },
+    { path: at(USER_DATA_LAYOUT.auth), kind: "file", table: false },
+    { path: at(USER_DATA_LAYOUT.pkce), kind: "file", table: false },
+    { path: at(USER_DATA_LAYOUT.byokKeys), kind: "file", table: false },
+    { path: at(CRASH_DUMPS_DIR), kind: "dir", table: false },
+    ...(input.officialRuntimeParent ? [{ path: input.officialRuntimeParent, kind: "dir" as const, table: "connector-by-run" as const }] : []),
+  ]
+}
+
+/** 一个文件节点的身份(device + inode;bigint,与 stat / fstat 的 bigint 读数同一写法)。 */
+export function fileIdentity(meta: { dev: bigint | number; ino: bigint | number }): string {
+  return `${meta.dev}:${meta.ino}`
+}
+
+/**
+ * 读一个普通文件,且读的就是打开的那一个:最后一级不跟随软链(O_NOFOLLOW)打开,fstat 这个描述符,必须是普通文件,值从描述符读出。返回值与描述符
+ * 的身份;最后一级是软链、不在、不是普通文件 ⇒ undefined;其它 IO 错误抛出。主进程的凭据读法都走它(片 ① 审查 R1 第 1 条:不先判再按路径重开)。
+ */
+export function readRegularFileNoFollow(file: string): { value: string; identity: string } | undefined {
+  let fd: number
+  try {
+    fd = fs.openSync(file, fs.constants.O_RDONLY | fs.constants.O_NOFOLLOW)
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException)?.code
+    if (code === "ELOOP" || code === "ENOENT" || code === "ENOTDIR" || code === "EMLINK") return undefined
+    throw error
+  }
+  try {
+    const meta = fs.fstatSync(fd, { bigint: true })
+    if (!meta.isFile()) return undefined
+    return { value: fs.readFileSync(fd, "utf8"), identity: fileIdentity(meta) }
+  } finally {
+    fs.closeSync(fd)
+  }
+}
+
+/**
+ * 只读 table !== false 的目录下的普通文件(逐项 lstat;根以下不跟随任何软链,软链条目只记名字、不进表),跳过 "." 开头的条目;值经
+ * readRegularFileNoFollow 从打开的描述符读出。use:codepuppy-secrets/<名> ⇒ inline;codepuppy-mcp-secrets/<server>/… ⇒ connector(server);
+ * <运行期目录>/<run>/<name>/… ⇒ connector(name)。`identities`(可省)收下走到的每个普通文件的 device + inode —— 主进程的别名判断据它认出指向
+ * 存放点里某个文件的硬链与 /.vol 写法。目录不存在 = 没有条目;实现期修订 1(编排器裁决 2026-11-20):单项读不出、目录列不出 ⇒ 那些条目按不在
+ * 表里处理并记一行(路径与 errno),从不抛 —— 一个读不出的凭据只影响它自己。不记录值;调用方负责每代只记一次同一行。
+ */
+export function readCredentialTable(stores: readonly CredentialStore[], log?: (line: string) => void, identities?: Set<string>): Record<string, CodePuppyCredentialEntry> {
+  const table: Record<string, CodePuppyCredentialEntry> = {}
+  for (const store of stores) {
+    if (store.table === false) continue
+    const root = path.resolve(store.path)
+    const kind = store.table
+    const errno = (error: unknown) => (error as NodeJS.ErrnoException)?.code ?? "error"
+    const visit = (dir: string, segments: readonly string[]) => {
+      let names: string[]
+      try {
+        names = fs.readdirSync(dir)
+      } catch (error) {
+        if (!(segments.length === 0 && errno(error) === "ENOENT")) log?.(`credential store: cannot list ${dir} (${errno(error)}) — its entries are treated as absent`)
+        return
+      }
+      for (const name of names.sort()) {
+        if (name.startsWith(".")) continue
+        const file = path.join(dir, name)
+        const rel = [...segments, name]
+        let meta: fs.BigIntStats
+        try {
+          meta = fs.lstatSync(file, { bigint: true })
+        } catch (error) {
+          if (errno(error) !== "ENOENT") log?.(`credential store: cannot read ${file} (${errno(error)}) — treated as absent`)
+          continue
+        }
+        if (meta.isSymbolicLink()) {
+          log?.(`credential store: symbolic link entry not read: ${file}`)
+          continue
+        }
+        if (meta.isDirectory()) {
+          visit(file, rel)
+          continue
+        }
+        if (!meta.isFile()) continue
+        identities?.add(fileIdentity(meta))
+        const use: CodePuppyCredentialEntry["use"] | undefined =
+          kind === "secrets"
+            ? { kind: "inline" }
+            : kind === "connector-by-server"
+              ? rel.length >= 2 ? { kind: "connector", server: rel[0]! } : undefined
+              : rel.length >= 3 ? { kind: "connector", server: rel[1]! } : undefined
+        if (!use) continue
+        let read: ReturnType<typeof readRegularFileNoFollow>
+        try {
+          read = readRegularFileNoFollow(file)
+        } catch (error) {
+          log?.(`credential store: cannot read ${file} (${errno(error)}) — treated as absent`)
+          continue
+        }
+        if (!read) {
+          log?.(`credential store: entry changed while being read, not read: ${file}`)
+          continue
+        }
+        identities?.add(read.identity)
+        table[file] = { value: read.value, use }
+      }
+    }
+    visit(root, [])
+  }
+  return table
 }

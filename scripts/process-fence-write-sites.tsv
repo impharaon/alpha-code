@@ -8,10 +8,12 @@ packages/ext/src/codepuppy-tools.ts	mkdirSync	root	W1
 packages/ext/src/codepuppy-tools.ts	renameSync	join(root, "codepuppy.jsonc.tmp")	W1
 packages/ext/src/codepuppy-tools.ts	writeFileSync	join(root, "codepuppy.jsonc.tmp")	W1
 # `#1662` ext 的工具策略存储(policy/store.ts,随 #1666 搬进 ext):<XDG_DATA_HOME>/opencode/codepuppy-tool-policy/<digest>.json(policy/index.ts 的 dataRoot + resolver.ts 的 defaultPolicyBaseDir)。
-packages/ext/src/policy/store.ts	mkdirSync	path.dirname(file)	W4
-packages/ext/src/policy/store.ts	renameSync	file	W4
-packages/ext/src/policy/store.ts	renameSync	tmp	W4
-packages/ext/src/policy/store.ts	writeFileSync	tmp	W4
+# SPEC-engine-config-fence 片 ③(DESIGN §4.5、§4.7):这个目录是受保护配置 CF-11,写者只由 main 调用 —— sidecar 里的 ext 经 hub 桥发 codepuppy.tool-policy.write.request,
+# main 在 server.ts 的接收链上调 store.ts 的 receiveToolPolicyWrite;闭包里只有 resolver.ts 的缺省写者(CLI 与单测)拿到这两个写者(process-fence-write-sites.test.ts 的结构判据)。
+packages/ext/src/policy/store.ts	mkdirSync	path.dirname(file)	main-only
+packages/ext/src/policy/store.ts	renameSync	file	main-only
+packages/ext/src/policy/store.ts	renameSync	tmp	main-only
+packages/ext/src/policy/store.ts	writeFileSync	tmp	main-only
 packages/ui-mac/src/main/codepuppy-config-injection.ts	mkdirSync	userDataPath	W3
 packages/ui-mac/src/main/codepuppy-config-injection.ts	writeFileSync	file	W3
 packages/ui-mac/src/main/codepuppy-environment.ts	mkdirSync	directory	main-only
@@ -21,15 +23,18 @@ packages/ui-mac/src/main/codepuppy-environment.ts	rmdirSync	directory	main-only
 packages/ui-mac/src/main/codepuppy-installs.ts	mkdirSync	root	main-only
 packages/ui-mac/src/main/codepuppy-installs.ts	renameSync	file	main-only
 packages/ui-mac/src/main/codepuppy-live-allowlist.ts	mkdirSync	userDataPath	W3
-packages/ui-mac/src/main/codepuppy-secret-files.ts	chmodSync	dir	W3
-packages/ui-mac/src/main/codepuppy-secret-files.ts	chmodSync	temp	W3
-packages/ui-mac/src/main/codepuppy-secret-files.ts	mkdirSync	dir	W3
-packages/ui-mac/src/main/codepuppy-secret-files.ts	openSync	temp	W3
-packages/ui-mac/src/main/codepuppy-secret-files.ts	renameSync	temp	W3
-packages/ui-mac/src/main/codepuppy-secret-files.ts	rmSync	file	W3
-packages/ui-mac/src/main/codepuppy-secret-files.ts	rmSync	path.join(dir, leftover)	W3
-packages/ui-mac/src/main/codepuppy-secret-files.ts	rmSync	temp	W3
-packages/ui-mac/src/main/codepuppy-secret-files.ts	writeFileSync	fd	W3
+# SPEC-stored-credentials-fence §4.5:凭据存放点在 C1 之下(围栏内拒读拒写),这些写盘点只有 main 执行(syncSecretFiles / writeSecretFileAtomic / applyPlatformCredentialsHot;I2 结构判据见 process-fence-write-sites.test.ts)。
+packages/ui-mac/src/main/codepuppy-secret-files.ts	chmodSync	dir	main-only
+packages/ui-mac/src/main/codepuppy-secret-files.ts	chmodSync	temp	main-only
+packages/ui-mac/src/main/codepuppy-secret-files.ts	mkdirSync	dir	main-only
+# SPEC-stored-credentials-fence(片 ① 审查 R1 第 1 条):readRegularFileNoFollow 以 O_RDONLY | O_NOFOLLOW 打开(只读,扫描器按 API 名记作写盘点);只有 main 的 readCredentialTable 与连接器读法调用它,sidecar 闭包里没有文件拿到这两个函数(process-fence-write-sites.test.ts I2)。
+packages/ui-mac/src/main/codepuppy-secret-files.ts	openSync	file	main-only
+packages/ui-mac/src/main/codepuppy-secret-files.ts	openSync	temp	main-only
+packages/ui-mac/src/main/codepuppy-secret-files.ts	renameSync	temp	main-only
+packages/ui-mac/src/main/codepuppy-secret-files.ts	rmSync	file	main-only
+packages/ui-mac/src/main/codepuppy-secret-files.ts	rmSync	path.join(dir, leftover)	main-only
+packages/ui-mac/src/main/codepuppy-secret-files.ts	rmSync	temp	main-only
+packages/ui-mac/src/main/codepuppy-secret-files.ts	writeFileSync	fd	main-only
 packages/ui-mac/src/main/codepuppy-workdir.ts	mkdirSync	artifactsDir	W1
 packages/ui-mac/src/main/codepuppy-workdir.ts	mkdirSync	dir	W1
 packages/ui-mac/src/main/codepuppy-workdir.ts	mkdirSync	root	W1

@@ -122,3 +122,24 @@ export function createSidecarRespawnQueue(run: (trigger: SidecarRespawnTrigger) 
     return active
   }
 }
+
+/**
+ * SPEC-stored-credentials-fence §4.2(② 审查第 1 条):引擎拉取凭据表超时 / 主进程读不出表时请求的 credential-change 重启。boot 那一代的请求可能
+ * 早于 main 的重启队列建好 —— 记下,队列建好(attach)时补发一次(同 index.ts 的 pendingAuthRespawn);之后的请求直接转给队列。
+ */
+export function createDeferredRespawn() {
+  let target: ((trigger: SidecarRespawnTrigger) => unknown) | undefined
+  let pending: SidecarRespawnTrigger | undefined
+  return {
+    request(trigger: SidecarRespawnTrigger): void {
+      if (target) void target(trigger)
+      else pending ??= trigger
+    },
+    attach(queue: (trigger: SidecarRespawnTrigger) => unknown): void {
+      target = queue
+      const replay = pending
+      pending = undefined
+      if (replay) void queue(replay)
+    },
+  }
+}

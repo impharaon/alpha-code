@@ -9,9 +9,9 @@ spec_version: 1
 review:
   rounds: 3           # R1 审 0c2483fda7(F1–F7 采纳);R2 确认 ..1b51d972a8(R2-1–R2-3 采纳,R2-4 裁决 D9);R3 确认 ..2fccc6ae65(R3-1 并入 D10 残留类,R3-2–R3-4 采纳);Codex(GPT-6)会话 01a1f358
   reviewed_sha: "044c5076df"
-  verdict: "R1–R3 的 finding 均已处置(§10);声明按编排器裁决 D10 收窄;残留类由 INT-safety I-13 关闭;编排器在 R3 后冻结"
+  verdict: "R1–R3 的 finding 均已处置(§10);声明按编排器裁决 D10 收窄;残留类由 INT-safety I-13 关闭;编排器在 R3 后冻结;冻结后落入实现期修订 1(存放点里单项读不出或目录列不出 ⇒ 按该项不在表里处理并记名字,不拒 fork;编排器 2026-11-20 对片 ② 审查区外观察的裁决)与实现期修订 2(官方连接器运行期目录恒按纯计算的路径列入 C1 与表,可用性检查只留在物化路径;编排器 2026-11-20 对片 ③ 审查 Minor 1 的裁决)"
 owners: [owner]
-last_reviewed: 2026-11-19
+last_reviewed: 2026-11-20
 ---
 
 # DESIGN-stored-credentials-fence｜会话里的命令与工具读不到 Code Puppy 存的凭据 技术设计
@@ -238,11 +238,12 @@ export type CredentialStore = {
   // 实现方另由这份清单的真实目标(§4.5)得出 isStoreTarget(§4.1),C1 与主进程别名判断用同一份清单
 }
 /** userData 下六项(名字取自 USER_DATA_LAYOUT)+ `<userData>/Crashpad`(false)+ 官方连接器运行期目录
- *  (调用方算出才给;本模块不 import 官方连接器模块,那会把钥匙串带进 sidecar 闭包)。 */
+ *  (调用方按纯计算的路径给,不看可用性检查,见 §4.5 实现期修订 2;本模块不 import 官方连接器模块,那会把钥匙串带进 sidecar 闭包)。 */
 export function credentialStores(input: { userDataPath: string; officialRuntimeParent?: string }): CredentialStore[]
 /** 只读 table !== false 的目录下的**普通文件**(lstat;根以下不跟随任何软链,遇到软链条目只记名字、不进表),跳过 "." 开头的条目。
  *  use:codepuppy-secrets/<名> ⇒ { kind: "inline" };codepuppy-mcp-secrets/<server>/… ⇒ { kind: "connector", server };
- *  <运行期目录>/<run>/<name>/… ⇒ { kind: "connector", server: name }。目录不存在 = 没有条目;其它 IO 错误抛出。不记录值。 */
+ *  <运行期目录>/<run>/<name>/… ⇒ { kind: "connector", server: name }。目录不存在 = 没有条目;单项读不出、目录列不出 ⇒ 那些条目按不在表里处理,
+ *  记一行(路径与 errno),从不抛(实现期修订 1)。不记录值。 */
 export function readCredentialTable(stores: readonly CredentialStore[]): Record<string, CodePuppyCredentialEntry>
 ```
 
@@ -250,7 +251,7 @@ export function readCredentialTable(stores: readonly CredentialStore[]): Record<
 
 | 交接点 | 何时 | 谁读它 | 失败 |
 | --- | --- | --- | --- |
-| T1 种子 | `server.ts` fork 之后发 `start` 时同步建表(在 `restoreCommittedOfficialConnectors`(`server.ts:555`)之后) | 注入的在场判断、ext 与云的首读 | 建表抛 ⇒ 杀子进程、本代失败 |
+| T1 种子 | `server.ts` fork 之后发 `start` 时同步建表(在 `restoreCommittedOfficialConnectors`(`server.ts:555`)之后) | 注入的在场判断、ext 与云的首读 | 读不出的条目按不在表里(实现期修订 1);start 消息缺表或形状不对 ⇒ 本代失败 |
 | T2 续期推送 | `applyPlatformCredentialsHot` 写入与回读摘要通过之后,推整表 | C-b–C-e 每请求现读 | 没有子进程 ⇒ 跳过;发送抛 ⇒ `needs-structural` |
 | P 装载前拉取 | 引擎每次装载显式文件或内联内容、且文档里有清单位置上的 `{file:}` 时,先 `refreshCodePuppyCredentials()`;每次装载各自请求,不合并 | C-a | 回错误 / 超时 / 端口关闭 ⇒ 这次按「表里没有」解析,绝不用旧表;错误与超时都接既有 `credential-change` 重启,新一代重新装载 |
 
@@ -298,7 +299,7 @@ C-a 的代入只在下列位置(F1);两份文档以外(全局、项目、托管�
 
 ### 4.5 围栏 profile:C1
 
-渲染器 `renderProcessFenceProfile` 增加输入 `credentialStores: readonly { path: string; kind: "dir" | "file" }[]`(已是真实路径),由 `process-fence-plan.ts` 从 §4.3 的 `credentialStores()` 得到:对每个存放点,写入「真实上级目录 + 名字」;若该位置已存在且解析到别处(软链),再写入它的真实目标(F2)。userData 的真实路径用计划已有的 `deps.realpath`(`fs.realpathSync.native`);求不出 ⇒ 拒绝 fork。`officialRuntimeParent()` 抛 ⇒ 不给该项。渲染两块,都放在 **profile 最末(N4 之后)**:
+渲染器 `renderProcessFenceProfile` 增加输入 `credentialStores: readonly { path: string; kind: "dir" | "file" }[]`(已是真实路径),由 `process-fence-plan.ts` 从 §4.3 的 `credentialStores()` 得到:对每个存放点,写入「真实上级目录 + 名字」;若该位置已存在且解析到别处(软链),再写入它的真实目标(F2)。userData 的真实路径用计划已有的 `deps.realpath`(`fs.realpathSync.native`);求不出 ⇒ 拒绝 fork。官方连接器运行期目录恒按纯计算的路径(`<realpath(tmpdir)>/codepuppy-connectors-<uid>-<hash(环境根)>`,`officialRuntimeParentPath()`)给出,不因计划时 `officialRuntimeParent()` 的可用性检查抛而不给;那项检查只留在物化(写明文)路径上。只有路径本身算不出 —— 没有环境根,或系统临时目录求不出真实路径 —— 才不给该项,那时物化路径同样走不通(实现期修订 2)。渲染两块,都放在 **profile 最末(N4 之后)**:
 
 ```
 (deny file-read* file-write*
@@ -332,7 +333,7 @@ C-a 的代入只在下列位置(F1);两份文档以外(全局、项目、托管�
 
 | 失败窗口 | 结果 | 日志 |
 | --- | --- | --- |
-| 拉取时主进程读不出表 | 这次装载按「表里没有」解析;主进程请求既有 `credential-change` 重启,新一代 T1 重建(仍读不出 ⇒ 拒 fork,既有响亮失败);用户无需操作 | 主进程错误一行 |
+| 存放点里单项读不出 / 目录列不出(实现期修订 1) | 那些条目按不在表里处理:T1、拉取回复、续期推送照常带其余的表;只有那一项凭据与「文件缺席」同一结果(该凭据自己的具名错误),不拒 fork、不请求重启 | 每代一行,点名路径与 errno,不含值 |
 | 拉取 10 秒无回复(主进程卡住) | 这次装载按「表里没有」解析,不用旧表;sidecar 发 `credentials.unavailable`,主进程处理到它时请求同一个 `credential-change` 重启,新一代重新装载(R2-3) | 错误一行 |
 | 拉取时端口关闭 | 这次装载按「表里没有」解析;这一代本就在结束,下一代从 T1 起重新装载 | 一行 |
 | 另一处装载拉取的回复迟到 | 每次装载只认自己的 id,迟到回复不发布、不被别的装载复用(R2-2) | — |
@@ -341,7 +342,7 @@ C-a 的代入只在下列位置(F1);两份文档以外(全局、项目、托管�
 | 启动消息缺表或形状不对 | 拒绝启动,本代失败 | error IPC |
 | 续期推送时没有子进程 / 发送抛 | 跳过,下一次 fork 带上 / `needs-structural` → 既有重启 | 既有 |
 | 已过期才续期时,推送晚到前的请求 | 带旧令牌,与今天「过期到续期写完」同一个恢复中窗口,只多 sidecar 处理消息的时间(P-20) | 既有 |
-| fork 时建表失败 / 真实路径求不出 | 拒绝 fork | 既有 |
+| userData 真实路径求不出(C1 要它) | 拒绝 fork | 既有 |
 | 存放点里出现软链条目 | 不进表 | 记名字 |
 
 任何失败都不会落回可读文件。任何日志都不写值。
@@ -440,6 +441,8 @@ C-a 的代入只在下列位置(F1);两份文档以外(全局、项目、托管�
 | D9(编排器裁决 R2-4)保证从本改动装上那一刻起算。装上之前对话做出的硬链、克隆或拷贝是既有暴露:做出它的进程当时就能不受限地读到值,留下的别名不再透露任何新东西,对现有文件的任何规则也收不回已经离开它们的值。因此:不声称这些别名「只能由围栏外做出」;不加 inode 重建或任何轮换步骤(重建 inode 清不掉旧内容,轮换用户自己的密钥不能做成隐含的实现步骤);§2 照录实测(P-17)。owner 由编排器用白话告知此限;若要让旧副本失效,是另一条意图(需要轮换密钥) | 编排器 2026-11-19 对 R2-4 的裁决;P-07、P-17 |
 | D10(编排器裁决,R3)声明收窄。本设计保证且只保证 §1 的 (a)–(d);「对话改写围栏内可写的引擎配置,就能改变一份被合法代入的凭据被送到哪里(换掉连接器的命令、覆盖模型的 `package`,以及任何同类做法)」作为一类残留,不由本设计关闭,关闭它的是 INT-safety I-13(owner 2026-11-14 已批,尚未建),由编排器排为下一份设计。依据:R2-1、R3-1 连续三轮出现经可写配置改道的新做法,根在 I-13;在根打开时,接收方绑定关不住一个开放的类;owner「不要设计的过于复杂」。R2 的「本地连接器凭据是否在保证内」并入这条残留,不另需决定。不加包钉死或最终接收方核对 | 编排器对 R3 的裁决;P-21、P-23 |
 | D11(编排器裁决,2026-11-20)与已合入主线的运行期放行相容。C1 的拒绝行渲染在放行块之后,而主线 `origin/alpha@887748b52c` 的 `processFenceWriteRules`(`packages/ui-mac/src/main/process-fence-profile.ts:214`)对放行块之后的任何 `(deny file-write*` 抛错,`server.ts:624-628` 随即停用运行期放行。实现 C1 时按 DESIGN-engine-config-fence §4.2 的同一条解析规则处理(只认唯一渲染点渲染出的拒绝块,其余照旧抛错),两份设计任一先合入都成立;证据加一条:C1 在场时新打开的项目仍拿得到放行。 | DESIGN-engine-config-fence 设计审查 R1 的范围外观察(Claude Opus 审查员,2026-11-20);编排器核对了 `:214` |
+| 实现期修订 1(编排器裁决,2026-11-20,② 审查区外观察):存放点里单项读不出或目录列不出 ⇒ 按该项不在表里处理并记名字,不拒 fork;理由:规格没有这条限制(「用户会碰到的限制:无」、BR-05),改动前只影响那一个凭据。仍拒 fork 的只剩 userData 真实路径求不出(C1 要它)与 start 消息坏了;主进程直接应用路径同理(读不出的那一项引用为空、不退回无条件读) | §4.3、§5 两行随之改写;`readCredentialTable` 从不抛 |
+| 实现期修订 2（编排器裁决，2026-11-20，③ 审查 Minor 1）：官方连接器运行期目录的路径恒按纯计算列入 C1 与表，可用性检查只留在物化路径；理由：计划时判一次与运行中现判会错开，错开时令牌明文在围栏内可读 | §4.3 `credentialStores` 注释与 §4.5 一句随之改写;`officialRuntimeParentPath()` 是路径,`officialRuntimeParent()` = 检查 + 同一路径;证明 `packages/ui-mac/src/main/codepuppy-credential-table.test.ts` |
 
 
 | 轮/审查版本与范围 | 审计方 | finding 及处置 | 改了什么/验证证据 | 没改的及去向 |

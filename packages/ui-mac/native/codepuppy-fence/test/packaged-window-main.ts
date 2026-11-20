@@ -18,7 +18,7 @@ import { join } from "node:path"
 import { createServer } from "node:net"
 import { execFileSync } from "node:child_process"
 import { currentConfigFenceRoots, spawnLocalServer } from "../../../src/main/server"
-import { planConfigFence } from "../../../src/main/process-fence-plan"
+import { planConfigFence, planCredentialStores } from "../../../src/main/process-fence-plan"
 import { registerIpcHandlers } from "../../../src/main/ipc"
 import { initCodePuppyEnvironment } from "../../../src/main/codepuppy-environment"
 import {
@@ -47,6 +47,7 @@ import { unattendedRuns } from "../../../src/main/codepuppy-unattended"
 import { parseUnattendedAck } from "../../../src/main/codepuppy-sidecar-messages"
 import type { FenceAddon } from "../../../src/main/process-fence-apply"
 import { dict } from "../../../src/renderer/i18n/zh"
+import { credentialStores } from "../../../src/main/codepuppy-secret-files"
 const root = process.env.CODEPUPPY_WINDOW_RUN!
 const report: Record<string, unknown> = { mainPid: process.pid, arms: [], events: [], console: [] }
 const events = report.events as Array<Record<string, unknown>>
@@ -388,6 +389,7 @@ async function run() {
         roots,
         egressProxyPort: modelPort,
         configFence: fenceSet.configFence,
+        credentialStores: planCredentialStores(credentialStores({ userDataPath: engineData }), { realpath: (p) => realpathSync.native(p) }),
       }),
       }
     },

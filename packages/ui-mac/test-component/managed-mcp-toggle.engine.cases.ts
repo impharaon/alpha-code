@@ -112,7 +112,7 @@ async function machine(
     globalRoot: () => root, advisoryGate: () => ({ allowed: true }), resolveEntry: async () => null,
   })
   const convergence = (through: EngineConnection = connection) =>
-    createManagedMcpConvergence({ root: () => root, awaitServer: async () => through, directory: () => project })
+    createManagedMcpConvergence({ root: () => root, awaitServer: async () => through, directory: () => project, userDataPath: () => host.userData })
   const converge = convergence()
   /** 生产开关:持久写(账本 + 允许集 + codepuppy.jsonc 投影),再交 main 的唯一运行时入口(与 ext-ipc 同一顺序)。 */
   const toggle = async (server: string, state: "enabled" | "disabled") => {

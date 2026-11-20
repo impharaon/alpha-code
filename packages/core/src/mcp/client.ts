@@ -1,6 +1,6 @@
 export * as McpClient from "./client.js"
 
-import { readFile } from "node:fs/promises" // codepuppy(#1562)
+import { readCodePuppyCredential } from "@opencode/util/codepuppy-credentials" // codepuppy(#1562, I-20)
 import { pathToFileURL } from "node:url"
 import {
   Client,
@@ -370,12 +370,13 @@ export const connect = Effect.fnUntraced(function* (options: ConnectOptions) {
     }
     const { McpOAuth } = yield* Effect.promise(() => import("./oauth.js"))
     const logged = yield* McpOAuth.loggedFetch({ server, directory: options.directory })
-    // codepuppy(#1562) ── Code Puppy's governed cloud connector reads its credential file on every request (v1
-    // mcp/index.ts did the same): the literal the config loader substituted is the old token after a hot renewal.
+    // codepuppy(#1562, I-20) ── Code Puppy's governed cloud connector reads its credential on every request (v1 mcp/index.ts did the
+    // same): the literal the config loader substituted is the old token after a hot renewal. I-20: the value comes from the in-process
+    // credential table the main process hands over and re-pushes after a renewal, never from the file (DESIGN-stored-credentials-fence §4.4).
     // #1698: the governed definition comes from Code Puppy's published bootstrap document, not the process environment.
     const cloudMcp = tryCodePuppyBootstrap()?.cloudMcp
     const fetch = isGovernedMcpEntry(server, config, cloudMcp)
-      ? governedCredentialFetch(cloudMcp, (file) => readFile(file, "utf8"), (input, init) => logged(input, init))
+      ? governedCredentialFetch(cloudMcp, async (file) => readCodePuppyCredential(file), (input, init) => logged(input, init)) // codepuppy(I-20): the in-process table (DESIGN-stored-credentials-fence §4.4 C-b)
       : logged
     // codepuppy ── end
     // Servers that bundle their own Code Mode (Cloudflare and others) expose raw tools when asked

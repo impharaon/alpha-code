@@ -105,7 +105,8 @@ const inputModalities = (image: boolean): InputModalities => ({ input: image ? [
  * (`packages/core/src/config/variable.ts`),空串在 `model-resolver.ts` 里就是「不鉴权」—— 请求会不带凭据发出去。
  * 只判有没有,不把值带出这个函数。
  */
-function hasUsableKey(userDataPath: string, varName: string): boolean {
+function hasUsableKey(userDataPath: string, varName: string, credential?: CredentialLookup): boolean {
+  if (credential) return (credential(secretFilePath(userDataPath, varName)) ?? "").trim().length > 0
   if (!hasSecretFile(userDataPath, varName)) return false
   try {
     return fs.readFileSync(secretFilePath(userDataPath, varName), "utf8").trim().length > 0
@@ -132,7 +133,9 @@ export type CodePuppyModelConfig = {
  * (`platform.modelProxyBaseURL` / `platform.defaultModelOverride` / `switches.modelsDisabled`),main 的出网放行派生从 main 自己的
  * 环境取(applyAuthEnv 写的地址与运维导出的开关)。本模块不读环境里的这些键。`defaultModel` 空串就是没给(用目录默认)。
  */
-export type ModelConfigInputs = { baseURL?: string; defaultModel?: string; disabled?: boolean }
+/** DESIGN-stored-credentials-fence §4.4 C-f:sidecar 里凭据的在场与值只问进程内凭据表(codepuppyCredential);主进程调用方不给 ⇒ 照旧读盘。 */
+export type CredentialLookup = (path: string) => string | undefined
+export type ModelConfigInputs = { baseURL?: string; defaultModel?: string; disabled?: boolean; credential?: CredentialLookup }
 
 export function buildCodePuppyModelConfig(userDataPath: string, platform: ModelConfigInputs = {}): CodePuppyModelConfig | undefined {
   if (platform.disabled) return undefined
@@ -155,7 +158,7 @@ export function buildCodePuppyModelConfig(userDataPath: string, platform: ModelC
   // syncSecretFiles at fork, A6). No key file → not injected, so the picker only shows keyed BYOK nodes.
   // Calls go DIRECT to the provider's baseURL (never via the gateway).
   for (const p of applied.byokProviders) {
-    if (!p.keyEnv || !hasUsableKey(userDataPath, p.keyEnv)) continue
+    if (!p.keyEnv || !hasUsableKey(userDataPath, p.keyEnv, platform.credential)) continue
     const npm = p.compat === "anthropic" ? "@ai-sdk/anthropic" : "@ai-sdk/openai-compatible"
     // REQ-153 #1236:`reasoning` 是引擎 `capabilities.reasoning` 的唯一来源(config schema
     // core/src/v1/config/provider.ts:14,消费 provider/provider.ts:1457;models.dev 对 `<id>-byok`
@@ -196,7 +199,7 @@ export function buildCodePuppyModelConfig(userDataPath: string, platform: ModelC
   // AND the key file exists (a URL with no key would only produce doomed 401 calls).
   // REQ-001:模型清单以已应用的网关目录为准(registry 真实 id + V3 `display`);没有有效快照 ⇒ 节点照注入、
   // 模型表为空(`#1556` AC1:不回退随包清单)。
-  if (platform.baseURL && hasSecretFile(userDataPath, "CODEPUPPY_API_KEY")) {
+  if (platform.baseURL && (platform.credential ? platform.credential(secretFilePath(userDataPath, "CODEPUPPY_API_KEY")) !== undefined : hasSecretFile(userDataPath, "CODEPUPPY_API_KEY"))) {
     const pp = applied.platformProvider
     // REQ-127 #681:平台段走与 picker 完全相同的那一份投影。此前这里自制 nameById/variantsById/source
     // 三段装配,于是「什么算有效缓存」有两份定义 —— 空缓存时 picker 给 0 行、引擎配置给静态 9 行。
@@ -260,7 +263,7 @@ export function buildCodePuppyModelConfig(userDataPath: string, platform: ModelC
   for (const record of readCustomProviderRecords()) {
     if (Object.prototype.hasOwnProperty.call(provider, record.id)) continue
     const secret = customProviderSecretName(record.id)
-    if (!hasUsableKey(userDataPath, secret)) continue
+    if (!hasUsableKey(userDataPath, secret, platform.credential)) continue
     // REQ-228 #1420:只有用户在记录里显式声明的模型能看图(custom-provider-truth.ts `imageInput`);自定义地址上的同名模型
     // 不一定是 models.dev 里那一个,所以不猜。
     const models: Record<string, { name: string; modalities: InputModalities }> = {}

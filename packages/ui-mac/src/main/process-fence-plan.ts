@@ -15,7 +15,7 @@
 // 被围栏的引擎 `mkdir -p` 会在父层 EPERM —— 而 packages/core/src/global.ts 在**模块装载时**就
 // mkdir 四个根(data/config/state/tmp/log/bin/repos)。所以 main 在这里把 W4/W5/W7 建好;W3 由 main 的 boot 序早已建好;
 // `~/code-puppy` 走 ensureUserWorkspaceDir(唯一的 lazy 供给点)。受保护配置集里的目录(状态根、环境根、引擎配置目录、连接记录、
-// 两个引擎全局配置目录 —— 后者就是原来的 W6)由 planConfigFence 预建:它们与每一级上级目录节点都被末尾的拒写块冻结,引擎与子进程在
+// 两个引擎全局配置目录 —— 后者就是原来的 W6 —— 与工具策略目录 CF-11)由 planConfigFence 预建:它们与每一级上级目录节点都被末尾的拒写块冻结,引擎与子进程在
 // 其中只能得到 EEXIST(SPEC-engine-config-fence I4)。
 // **刻意不建** `~/.opencode`:它整个是受保护配置位置 CF-9,任何进程都不建它(BR-07;W16 已删,计划目录在引擎数据目录下,
 // 这里本来就预建数据目录,`plan` 由写文件工具懒建);W17/W18(dev-only)也不建。
@@ -30,6 +30,7 @@ import {
   selectWorkspaceUnion,
   trimUntilCompiles,
   type ConfigFenceRule,
+  type CredentialStoreRule,
   type EngineRoots,
   type TrialCompile,
   type WorkspaceExclusion,
@@ -70,6 +71,8 @@ export type PlanProcessFenceInput = {
   engineConfigDirectory: string
   /** CF-4 的另一份(实现期修订 2 A):主进程启动时读的 `$CODEPUPPY_ENV_FILE`(codepuppy-secrets.ts userEnvFile);没设为空。 */
   envFile?: string
+  /** DESIGN-stored-credentials-fence §4.5:Code Puppy 的凭据存放点(codepuppy-secret-files.ts credentialStores(),未解析);计划器落成 C1。 */
+  credentialStores: readonly { path: string; kind: "dir" | "file" }[]
 }
 
 /**
@@ -83,7 +86,7 @@ export function planConfigFence(
 ): { configFence: ConfigFenceRule[]; configFenceRoots: string[]; unexpressed: string[] } {
   /** 残留 R11:写不进 profile(引号、反斜杠、控制字符)因而不被冻结 / 保护的路径,计划器记一行点名。 */
   const unexpressed: string[] = []
-  const locations = configFenceLocations({ ...input, configHome: input.roots.configHome, home: input.roots.home })
+  const locations = configFenceLocations({ ...input, configHome: input.roots.configHome, home: input.roots.home, dataHome: input.roots.dataHome })
   const envFile = input.envFile ? resolve(input.envFile) : undefined
   // CF-9 那一条不预建(BR-07:应用从不建 `~/.opencode`;不存在时 subpath 规则照样挡住任何形式的新建)。按这一条跳过,不按路径串:
   // 用户把同一个目录指定为引擎全局配置目录(CF-8)时照常预建(审查 R1)
@@ -273,8 +276,10 @@ export function planProcessFence(input: PlanProcessFenceInput, deps: PlanProcess
   if (union.selected.length === 0)
     throw new Error("process fence: the default workspace is not a directory on disk — refusing to fork an engine that could not write anywhere a user expects")
 
+  // DESIGN-stored-credentials-fence §4.5:存放点落到真实路径(userData 的真实路径求不出 ⇒ 抛 ⇒ 拒 fork)
+  const credentialRules = planCredentialStores(input.credentialStores, deps)
   const trimmed = trimUntilCompiles(
-    { workspaces: union.selected, codepuppyGlobalRoot, userDataPath: input.userDataPath, roots, stateHome, egressProxyPort: input.egressProxyPort, configFence: fenceSet.configFence },
+    { workspaces: union.selected, codepuppyGlobalRoot, userDataPath: input.userDataPath, roots, stateHome, egressProxyPort: input.egressProxyPort, configFence: fenceSet.configFence, credentialStores: credentialRules },
     deps.compile,
   )
   const addonPath = resolveFenceAddonPath(input.addon)
@@ -290,9 +295,104 @@ export function planProcessFence(input: PlanProcessFenceInput, deps: PlanProcess
     configFenceRoots: fenceSet.configFenceRoots,
   }
   deps.log(
-    `process fence planned: workspaces=${plan.workspaces.length} (candidates=${union.candidates}, excluded=${plan.excluded.length}, dropped=${plan.dropped.length}), egressProxyPort=${input.egressProxyPort}, configFence=${fenceSet.configFence.length} rules, profile=${plan.profileBytes}B, compile attempts=${plan.attempts}` +
+    `process fence planned: workspaces=${plan.workspaces.length} (candidates=${union.candidates}, excluded=${plan.excluded.length}, dropped=${plan.dropped.length}), egressProxyPort=${input.egressProxyPort}, configFence=${fenceSet.configFence.length} rules, credentialStores=${credentialRules.length} rules, profile=${plan.profileBytes}B, compile attempts=${plan.attempts}` +
       (plan.dropped.length ? ` — dropped (oldest first): ${[...plan.dropped].reverse().join(", ")}; last compiler error: ${trimmed.lastFailure}` : "") +
       (plan.excluded.length ? ` — excluded: ${plan.excluded.map((e) => `${e.directory} (${e.reason})`).join("; ")}` : ""),
   )
   return plan
+}
+
+// ── DESIGN-stored-credentials-fence §4.5:凭据存放点的真实目标清单 ────────────────────────────────────────────────
+// 围栏 C1 与主进程的别名判断(package-mcp-activation.ts 的 isStoreTarget,设计 §4.1)用同一份清单。
+
+export type { CredentialStoreRule }
+
+/**
+ * 每个存放点写成「真实上级目录 + 名字」;位置已存在且解析到别处(软链)时再加它的真实目标。上级目录求不出真实路径 ⇒ 抛(调用方拒绝 fork /
+ * 这次应用失败);位置本身不在盘上(ENOENT)只给第一条。
+ */
+export function planCredentialStores(
+  stores: readonly { path: string; kind: "dir" | "file" }[],
+  deps: { realpath: (p: string) => string },
+): CredentialStoreRule[] {
+  const rules: CredentialStoreRule[] = []
+  const add = (rule: CredentialStoreRule) => {
+    if (!rules.some((known) => known.kind === rule.kind && known.path === rule.path)) rules.push(rule)
+  }
+  for (const store of stores) {
+    const kind = store.kind === "dir" ? "subpath" : "literal"
+    const placed = join(deps.realpath(dirname(store.path)), basename(store.path))
+    add({ kind, path: placed })
+    let real: string | undefined
+    try {
+      real = deps.realpath(store.path)
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException)?.code !== "ENOENT") throw error
+    }
+    if (real !== undefined && real !== placed) add({ kind, path: real })
+  }
+  return rules
+}
+
+/**
+ * 主进程直接应用连接器时的引用判断与读法(设计 §4.1 isStoreTarget、P-22;片 ① 审查 R1 第 1、4 条),由真实目标清单与存放点里普通文件的身份得出:
+ *   · isStoreTarget(p):把 p 求成真实路径(求不出 ⇒ 当作指向存放点);它自己的 device + inode 是某个存放点或存放点里的某个文件、或它的任一上级目录是
+ *     某个存放点 ⇒ true。按身份比,不按路径前缀比:firmlink 写法的真实路径不同、inode 相同;指向存放点里某个文件的硬链、`/.vol/<dev>/<ino>` 写法同理。
+ *     判为 false 时记下这次判定的真实路径与身份;
+ *   · readFile(p):只读判定过的那一个 —— 按记下的真实路径、最后一级不跟随软链打开,描述符的身份必须等于判定时的身份且不是存放点里的任何一项,
+ *     才从描述符读出;判定与读取之间被换掉(换成指向存放点的软链、换掉上级目录)、没判过 ⇒ 空串并记一行(不含值)。
+ */
+export function credentialReferenceGuard(
+  rules: readonly CredentialStoreRule[],
+  fileIdentities: ReadonlySet<string>,
+  deps: {
+    realpath: (p: string) => string
+    stat: (p: string) => { dev: number | bigint; ino: number | bigint }
+    readRegular: (p: string) => { value: string; identity: string } | undefined
+    log?: (line: string) => void
+  },
+): { isStoreTarget: (path: string) => boolean; readFile: (path: string) => string } {
+  const identity = (p: string) => {
+    try {
+      const meta = deps.stat(p)
+      return `${meta.dev}:${meta.ino}`
+    } catch {
+      return undefined
+    }
+  }
+  const stores = new Set([...rules.map((rule) => identity(rule.path)).filter((id): id is string => id !== undefined), ...fileIdentities])
+  const judged = new Map<string, { real: string; id: string }>()
+  return {
+    isStoreTarget: (path) => {
+      let real: string
+      try {
+        real = deps.realpath(resolve(path))
+      } catch {
+        return true
+      }
+      const id = identity(real)
+      if (id === undefined) return true
+      for (let node = real; ; node = dirname(node)) {
+        const nodeId = node === real ? id : identity(node)
+        if (nodeId !== undefined && stores.has(nodeId)) return true
+        if (dirname(node) === node) break
+      }
+      judged.set(path, { real, id })
+      return false
+    },
+    readFile: (path) => {
+      const was = judged.get(path)
+      let read: { value: string; identity: string } | undefined
+      try {
+        read = was ? deps.readRegular(was.real) : undefined
+      } catch {
+        read = undefined
+      }
+      if (!was || !read || read.identity !== was.id || stores.has(read.identity)) {
+        deps.log?.("connector credential reference: the referenced file changed after it was checked (or could not be opened as that file) — not read")
+        return ""
+      }
+      return read.value
+    },
+  }
 }

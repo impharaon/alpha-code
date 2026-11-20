@@ -17,6 +17,10 @@
 // AC-08 (BR-07, DESIGN §4.8 / E11): the whole ~/.opencode is CF-9 — absent, no creation form makes it; present, nothing under it
 // can be written (also under a run-time grant for it), reads work; the plan directory now lives under the engine data directory.
 // Known bad: today's rows (W16 back, CF-9 out) — every creation and write lands; CF-9 out alone — a grant for it lets writes land.
+//
+// CF-11 (片 ③, DESIGN §4.1 / §4.5): the tool policy directory <XDG_DATA_HOME>/opencode/codepuppy-tool-policy (under W4) is in the matrix like
+// every other location, with its three ancestor nodes (the W4 root among them) and every spelling. Known bad: its row and the ancestor
+// nodes only it brings removed ⇒ the same attacks land. A run-time grant for <XDG_DATA_HOME> leaves the policy document refused.
 
 import { beforeAll, expect, test } from "bun:test"
 import { spawnSync } from "node:child_process"
@@ -27,6 +31,7 @@ import { loadFenceAddon } from "./process-fence-apply"
 import { trialCompileProfile } from "./process-fence-compile"
 import { planProcessFence, type ProcessFencePlan } from "./process-fence-plan"
 import { processFenceRulesCover, processFenceWriteRules, WORKSPACE_WRITE_EXTENSION_CLASS } from "./process-fence-profile"
+import { credentialStores } from "./codepuppy-secret-files"
 
 const run = process.env.CODEPUPPY_CONFIG_FENCE_TEST_ROOT!
 const home = join(run, "home")
@@ -39,6 +44,9 @@ const dataHome = join(home, ".local", "share")
 const cacheHome = join(home, ".cache")
 const configHome = join(home, ".config")
 const xdgConfig = join(configHome, "opencode")
+/** CF-11: the tool policy directory and one partition's document in it (the file name is a sha256, as policyFilePath writes it). */
+const policyDir = join(dataHome, "opencode", "codepuppy-tool-policy")
+const policyDoc = join(policyDir, `${"a".repeat(64)}.json`)
 /** OPENCODE_CONFIG_DIR exported elsewhere: the engine's global config directory is not the XDG one, both are protected. */
 const cfgDir = join(home, "cfg-dir", "opencode")
 /** CF-6 is itself a symlink into the workspace: its real target must be protected too. */
@@ -98,6 +106,7 @@ function build() {
   put(join(xdgConfig, "opencode.json"), "{}\n")
   put(join(cfgDir, "opencode.json"), "{}\n")
   put(join(home, "opencode.json"), "{}\n")
+  put(policyDoc, '{"version":1,"partition":{"account":"anonymous","workspace":"/w"},"records":[]}\n')
   // R8 control: a symlink the user placed inside a protected directory, pointing at a writable place
   mkdirSync(join(ws, "dotfiles-plugin"), { recursive: true })
   symlinkSync(join(ws, "dotfiles-plugin"), join(xdgConfig, "plugin"))
@@ -112,12 +121,12 @@ function snapshot() {
     join(env, "codepuppy.jsonc"), join(state, "cas", "blob"), join(userData, "codepuppy-engine-config", "codepuppy-explicit.json"),
     join(userData, "codepuppy-engine-config", "models.json"), join(userData, "codepuppy-shell-env.json"), join(userData, "codepuppy.env"),
     join(userData, "codepuppy-endpoints.json"), join(userData, "opencode.settings"), join(userData, "opencode.updater"), join(userData, "default.dat"),
-    join(linkedTarget, "record.json"), join(xdgConfig, "opencode.json"), join(cfgDir, "opencode.json"), join(home, "opencode.json"),
+    join(linkedTarget, "record.json"), join(xdgConfig, "opencode.json"), join(cfgDir, "opencode.json"), join(home, "opencode.json"), policyDoc,
   ].map((file) => ({ file, text: readFileSync(file, "utf8"), mode: statSync(file).mode, ino: statSync(file).ino }))
-  const listings = [state, env, join(userData, "codepuppy-engine-config"), linkedTarget, xdgConfig, cfgDir, userData, appSupport, home].map((directory) => ({
+  const listings = [state, env, join(userData, "codepuppy-engine-config"), linkedTarget, xdgConfig, cfgDir, userData, appSupport, home, policyDir, join(dataHome, "opencode")].map((directory) => ({
     directory, entries: readdirSync(directory).sort(), mode: statSync(directory).mode,
   }))
-  const absent = [join(userData, "codepuppy-discovered-endpoints.json"), join(home, "opencode.jsonc"), join(userData, "new.dat"), join(home, ".opencode")].map((path) => ({
+  const absent = [join(userData, "codepuppy-discovered-endpoints.json"), join(home, "opencode.jsonc"), join(userData, "new.dat"), join(home, ".opencode"), join(policyDir, `${"b".repeat(64)}.json`)].map((path) => ({
     path, present: existsSync(path) || (() => { try { lstatSync(path); return true } catch { return false } })(),
   }))
   return { files, listings, absent }
@@ -133,7 +142,7 @@ const OPS = {
   vol: ["vol-append", "vol-rename-over"],
 } as const
 
-/** The attack script: every location × every operation, every ancestor node, and the other spellings: a workspace symlink (cf2, cf4), letter case (cf3, cf4, cf5 new, cf7 .dat), the /System/Volumes/Data firmlink (cf2, cf8), /.vol/<dev>/<ino> (cf2, cf3, cf7 .dat). */
+/** The attack script: every location × every operation, every ancestor node, and the other spellings: a workspace symlink (cf2, cf4, cf11), letter case (cf3, cf4, cf5 new, cf7 .dat, cf11), the /System/Volumes/Data firmlink (cf2, cf8, cf11), /.vol/<dev>/<ino> (cf2, cf3, cf7 .dat, cf11). */
 function matrix() {
   const calls: Array<[string, "file" | "dir" | "create" | "ancestor" | "vol", string]> = [
     ["cf1-jsonc", "file", join(env, "codepuppy.jsonc")],
@@ -161,6 +170,9 @@ function matrix() {
     ["cf8-cfg-dir", "dir", cfgDir],
     ["cf10-json", "file", join(home, "opencode.json")],
     ["cf10-jsonc", "create", join(home, "opencode.jsonc")],
+    ["cf11-doc", "file", policyDoc],
+    ["cf11-dir", "dir", policyDir],
+    ["cf11-new-doc", "create", join(policyDir, `${"b".repeat(64)}.json`)],
     ["anc-userdata", "ancestor", userData],
     ["anc-appsupport", "ancestor", appSupport],
     ["anc-library", "ancestor", join(home, "Library")],
@@ -168,6 +180,9 @@ function matrix() {
     ["anc-config", "ancestor", configHome],
     ["anc-cfg-parent", "ancestor", join(home, "cfg-dir")],
     ["anc-home", "ancestor", home],
+    ["anc-data-opencode", "ancestor", join(dataHome, "opencode")],
+    ["anc-data-home", "ancestor", dataHome],
+    ["anc-local", "ancestor", join(home, ".local")],
     // other spellings of the same objects: a symlink in the workspace, letter case, the Data-volume firmlink, /.vol/<dev>/<ino>
     ["spell-link-cf4", "file", join(ws, "via-userdata", "codepuppy.env")],
     ["spell-link-cf2", "file", join(ws, "via-userdata", "codepuppy-engine-config", "codepuppy-explicit.json")],
@@ -175,22 +190,26 @@ function matrix() {
     ["spell-case-dat", "file", join(userData, "DEFAULT.DAT")],
     ["spell-case-cf3", "file", join(userData, "CODEPUPPY-SHELL-ENV.JSON")],
     ["spell-case-new-endpoints", "create", join(userData, "CODEPUPPY-DISCOVERED-ENDPOINTS.JSON")],
+    ["spell-link-cf11", "file", join(ws, "via-data", "codepuppy-tool-policy", `${"a".repeat(64)}.json`)],
+    ["spell-case-cf11", "file", join(dataHome, "opencode", "CODEPUPPY-TOOL-POLICY", `${"a".repeat(64)}.json`)],
     ...(existsSync(`/System/Volumes/Data${userData}`)
       ? ([
           ["spell-firmlink-cf2", "file", `/System/Volumes/Data${join(userData, "codepuppy-engine-config", "codepuppy-explicit.json")}`],
           ["spell-firmlink-cf8", "file", `/System/Volumes/Data${join(xdgConfig, "opencode.json")}`],
+          ["spell-firmlink-cf11", "file", `/System/Volumes/Data${policyDoc}`],
         ] as const)
       : []),
     ["vol-cf2", "vol", join(userData, "codepuppy-engine-config", "codepuppy-explicit.json")],
     ["vol-cf3", "vol", join(userData, "codepuppy-shell-env.json")],
     ["vol-dat", "vol", join(userData, "default.dat")],
+    ["vol-cf11", "vol", policyDoc],
   ]
   return calls
 }
 
 function script(calls: ReturnType<typeof matrix>) {
   const quote = (value: string) => `'${value.replaceAll("'", "'\\''")}'`
-  return [`ln -sfn ${quote(userData)} ${quote(join(ws, "via-userdata"))} 2>/dev/null`, ...calls.map(([label, mode, path]) => [ops, label, mode, path, ws].map(quote).join(" "))].join("\n")
+  return [`ln -sfn ${quote(userData)} ${quote(join(ws, "via-userdata"))} 2>/dev/null`, `ln -sfn ${quote(join(dataHome, "opencode"))} ${quote(join(ws, "via-data"))} 2>/dev/null`, ...calls.map(([label, mode, path]) => [ops, label, mode, path, ws].map(quote).join(" "))].join("\n")
 }
 
 function fenced(profile: string, command: string[], inside = ws) {
@@ -231,6 +250,7 @@ function planFor(t: ReturnType<typeof tree>, options: { userData?: string; envFi
       egressProxyPort: 59999,
       carriedWorkspaces: [],
       engineConfigDirectory: join(config, "opencode"),
+      credentialStores: credentialStores({ userDataPath }),
       ...(options.envFile ? { envFile: options.envFile } : {}),
     },
     {
@@ -271,7 +291,8 @@ const blocksBeforeAllow = (profile: string) => {
   const blocks = profile.slice(cfBlocks(profile))
   return profile.slice(0, cfBlocks(profile)).replace("(deny file-write*)\n", `(deny file-write*)\n${blocks}`)
 }
-const withoutAncestors = (profile: string) => profile.split("\n").filter((line) => !line.includes("; CF 上级目录节点")).join("\n")
+// stored-credentials-fence §4.5: the production profile also ends with C1, whose own ancestors block covers userData too — "no ancestors block" drops both
+const withoutAncestors = (profile: string) => profile.split("\n").filter((line) => !line.includes("; CF 上级目录节点") && !line.includes("; C1 上级目录节点")).join("\n")
 const x1AfterBlocks = (profile: string) => {
   const line = profile.split("\n").find((entry) => entry.startsWith(X1_LINE))!
   return `${profile.split("\n").filter((entry) => entry !== line).join("\n")}${line}\n`
@@ -308,6 +329,21 @@ const dotOpencodeState = () =>
     const meta = statSync(path)
     return { path, mode: meta.mode, entries: meta.isDirectory() ? readdirSync(path).sort() : undefined, text: meta.isDirectory() ? undefined : readFileSync(path, "utf8") }
   })
+/** CF-11 out (known bad): its row and the ancestor nodes only it brings (<XDG_DATA_HOME>/opencode, <XDG_DATA_HOME>, ~/.local). */
+const withoutCf11 = (profile: string) => {
+  const lines = profile.split("\n")
+  const at = lines.findIndex((line) => line.trim().startsWith(`(subpath "${policyDir}")`))
+  expect(at, profile).toBeGreaterThan(0)
+  // it is the last row: its line also closes the block, so the closing paren moves to the row before it
+  lines[at - 1] = `${lines[at - 1]})`
+  lines.splice(at, 1)
+  const ancestors = lines.findIndex((line) => line.includes("; CF 上级目录节点"))
+  for (const node of [join(dataHome, "opencode"), dataHome, join(home, ".local")]) {
+    expect(lines[ancestors], node).toContain(` (literal "${node}")`)
+    lines[ancestors] = lines[ancestors]!.replace(` (literal "${node}")`, "")
+  }
+  return lines.join("\n")
+}
 const withoutLinkTarget = (profile: string) => profile.split("\n").filter((line) => line.trim() !== `(subpath "${realpathSync(linkedTarget)}")`).join("\n")
 
 beforeAll(() => {
@@ -325,6 +361,7 @@ beforeAll(() => {
       egressProxyPort: 59999,
       carriedWorkspaces: [],
       engineConfigDirectory: cfgDir,
+      credentialStores: credentialStores({ userDataPath: userData }),
     },
     {
       homeDir: () => home, codepuppyGlobalRoot: () => env, appStateRoot: () => state, realpath: (path) => realpathSync.native(path),
@@ -340,6 +377,11 @@ test("layout: the fake tree is under no writable row except the workspace (W1) a
   for (const path of [home, appSupport, state, env, configHome, xdgConfig, cfgDir, run]) expect(processFenceRulesCover({ allow: rules.allow, deny: [] }, path), path).toBe(false)
   expect(processFenceRulesCover({ allow: rules.allow, deny: [] }, join(userData, "codepuppy.env"))).toBe(true)
   expect(processFenceRulesCover({ allow: rules.allow, deny: [] }, join(linkedTarget, "record.json"))).toBe(true)
+  // CF-11 lies under W4: the allow block alone covers the policy document, the protected rows take it back (the row is load-bearing)
+  expect(processFenceRulesCover({ allow: rules.allow, deny: [] }, policyDoc)).toBe(true)
+  expect(processFenceRulesCover(rules, policyDoc)).toBe(false)
+  expect(rules.deny).toContainEqual({ kind: "subpath", value: policyDir })
+  expect(plan.configFenceRoots).toContain(policyDir)
   expect(plan.configFenceRoots).toContain(realpathSync(linkedTarget))
   expect(rules.deny).toContainEqual({ kind: "subpath", value: realpathSync(linkedTarget) })
   expect(plan.profile).not.toContain("; W2")
@@ -469,8 +511,8 @@ test("E2: under the same profile the engine and its children keep writing (state
     `mkdir -p '${join(dataHome, "opencode", "log")}' && echo x > '${join(dataHome, "opencode", "log", "a.log")}'`,
     `echo x > '${join(cacheHome, "opencode", "pkg")}' && echo x > '${join(home, ".npm", "x")}' && echo x > '${join(userData, "uv-cache", "x")}'`,
     `echo x > '${join(ws, "x")}' && echo x > '${join(userData, "new.txt")}' && mv '${join(userData, "new.txt")}' '${join(userData, "moved.txt")}' && rm '${join(userData, "moved.txt")}' && echo y >> '${join(userData, "other.txt")}'`,
-    `mkdir -p '${xdgConfig}' '${cfgDir}' '${join(userData, "codepuppy-engine-config")}' '${state}'`,
-    `'${process.execPath}' -e 'for (const d of process.argv.slice(1)) require("fs").mkdirSync(d, { recursive: true })' '${xdgConfig}' '${cfgDir}' '${join(userData, "codepuppy-engine-config")}'`,
+    `mkdir -p '${xdgConfig}' '${cfgDir}' '${join(userData, "codepuppy-engine-config")}' '${state}' '${policyDir}'`,
+    `'${process.execPath}' -e 'for (const d of process.argv.slice(1)) require("fs").mkdirSync(d, { recursive: true })' '${xdgConfig}' '${cfgDir}' '${join(userData, "codepuppy-engine-config")}' '${policyDir}'`,
     `echo r8 > '${join(xdgConfig, "plugin", "x.js")}'`,
     // the HOME node is frozen, its contents are not: the zsh history rename-over (W8) still works
     `echo h > '${join(home, ".zsh_history.new")}' && mv '${join(home, ".zsh_history.new")}' '${join(home, ".zsh_history")}'`,
@@ -803,4 +845,25 @@ test("OUTSIDE the guarantee (residual R10, a documented boundary like R8 — not
   // documents today's boundary: when I-27 closes it, this arm flips and must be rewritten as a refused arm
   expect(result.out).toContain("R10-LANDED")
   expect(readFileSync(join(W, "a", "opencode", "opencode.json"), "utf8")).toBe('{"plugin":["evil"]}')
+})
+
+test("CF-11 (片 ③): known bad — the tool policy row and the ancestor nodes only it brings removed ⇒ every attack on the policy document, the directory, a new document, the W4 root node and the other spellings lands; a run-time grant for <XDG_DATA_HOME> lets other files land while the document stays refused", async () => {
+  // the production arm above refuses every one of these labels (every attempt FAIL 1); here the same attempts without the row
+  const bad = attack(withoutCf11(plan.profile))
+  const files = ["cf11-doc", "spell-link-cf11", "spell-case-cf11", ...(existsSync(`/System/Volumes/Data${userData}`) ? ["spell-firmlink-cf11"] : [])]
+  for (const label of files) for (const op of OPS.file) expect(bad.get(`${label}:${op}`), `${label}:${op}`).toBe("OK")
+  for (const op of OPS.dir) expect(bad.get(`cf11-dir:${op}`), `cf11-dir:${op}`).toBe("OK")
+  for (const op of OPS.create) expect(bad.get(`cf11-new-doc:${op}`), `cf11-new-doc:${op}`).toBe("OK")
+  for (const op of OPS.vol) expect(bad.get(`vol-cf11:${op}`), `vol-cf11:${op}`).toBe("OK")
+  expect(bad.get("anc-data-opencode:rename-ancestor-away")).toBe("OK")
+  // the rest of the protected set is untouched by the transform
+  expect(bad.get("cf4:append")).toBe("FAIL 1")
+
+  // BR-01 last sentence for CF-11: the user opens <XDG_DATA_HOME> as a project at run time (an ancestor node ⇒ the issue path)
+  expect(processFenceRulesCover(processFenceWriteRules(plan.profile), dataHome)).toBe(false)
+  const command = ["/bin/sh", "-c", `mkdir -p '${join(dataHome, "other-app")}' && echo x > '${join(dataHome, "other-app", "x")}' && echo other-app-written; '${ops}' x11 file '${policyDoc}' '${ws}'; '${ops}' x11-dir dir '${policyDir}' '${ws}'`]
+  const production = await granted(plan.profile, dataHome, command)
+  expect(production.out).toContain("other-app-written")
+  for (const op of OPS.file) expect(production.results.get(`x11:${op}`), `x11:${op}`).toBe("FAIL 1")
+  for (const op of OPS.dir) expect(production.results.get(`x11-dir:${op}`), `x11-dir:${op}`).toBe("FAIL 1")
 })

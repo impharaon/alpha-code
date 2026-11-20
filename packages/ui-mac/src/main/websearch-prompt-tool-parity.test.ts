@@ -56,6 +56,7 @@ import { injectCodePuppyConfig } from "./codepuppy-config-injection"
 import { secretFilePath } from "./codepuppy-secret-files"
 import { CLOUD_MCP_SERVER_NAME, CLOUD_WEB_SEARCH_TOOL_ID, LOCAL_WEB_SEARCH_TOOL_ID } from "./cloud-web-search"
 import { publishMainBootstrap, unpublishTestBootstrap } from "../../test-component/codepuppy-bootstrap-fixture"
+import { handOverCredentials } from "../../test-component/credential-table"
 
 // 注入读到的 env 输入 + 它自己写出的 env 输出:逐个快照/清空/还原(与同目录两个注入测试同一份清单)。
 const MANAGED = [
@@ -143,6 +144,7 @@ type Injected = ReturnType<typeof injectCodePuppyConfig>
 const inject = (): Injected =>
   silently(() => {
     publishMainBootstrap({ userData })
+    handOverCredentials(userData) // SPEC-stored-credentials-fence:sidecar 在注入之前发布主进程交来的整表(T1)
     return injectCodePuppyConfig(userData, undefined, "stable", codepuppyBootstrap().paths.userConfig ?? null)
   })
 

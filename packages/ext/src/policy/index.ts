@@ -10,7 +10,7 @@
 //   session.hook     catalog prune / tail rules execute.after    display snapshot on terminal states; network
 //                                               layer on a failed call (#1572 AC4)
 //   permission.hook  risk facts on every ask; Code Puppy's own asks held against later hooks
-//   rpc              codepuppy.tool-policy (I5)
+//   rpc              codepuppy.tool-policy (I5); the writes go to main over the parent port (I-13, DESIGN-engine-config-fence §4.5)
 import { codepuppyBootstrap } from "../../../util/src/codepuppy-bootstrap"
 import { type UnattendedDenial, type UnattendedProfile } from "../../../schema/src/codepuppy-unattended"
 import type { UnattendedState } from "./unattended"
@@ -30,7 +30,7 @@ import {
   type ToolFacts,
 } from "./identity"
 import type { PermissionRule } from "./managed"
-import { createToolPolicyStore, defaultPolicyBaseDir, type McpEntry } from "./resolver"
+import { createToolPolicyStore, defaultPolicyBaseDir, type McpEntry, type ToolPolicyWriter } from "./resolver"
 import { classifyPermissionRequest, RISK_METADATA_KEY } from "./risk"
 import { TOOL_POLICY_RPC_DEFINITION, toolPolicyHandlers } from "./rpc"
 import type { ToolDisplaySnapshotV1 } from "../../../schema/src/tool-identity"
@@ -68,7 +68,11 @@ export function policyWorkspace(location: Plugin.Context["location"]): string {
 
 
 
-export async function registerPolicy(context: Plugin.Context, unattended: UnattendedState, installSubject: HubBridge["installSubject"]): Promise<PolicyRegistration> {
+/**
+ * `toolPolicy`: who writes the tool policy document (SPEC-engine-config-fence BR-03, DESIGN §4.5). The extension passes the hub bridge's
+ * writer — main, over the parent port — whenever the process has one; absent (CLI, test hosts) the store writes directly.
+ */
+export async function registerPolicy(context: Plugin.Context, unattended: UnattendedState, installSubject: HubBridge["installSubject"], toolPolicy?: ToolPolicyWriter): Promise<PolicyRegistration> {
   const env = process.env
   // `#1698`:随包清单与 Office 清单的路径、云 MCP 定义、账户分区来自 sidecar 发布的启动文档(冻结,一代不变)
   const bootstrap = codepuppyBootstrap()
@@ -77,6 +81,7 @@ export async function registerPolicy(context: Plugin.Context, unattended: Unatte
     // `#1698` G2:账户分区来自启动文档(main 按当刻登录态算的哈希),缺席 = anonymous
     account: () => bootstrap.policy.account ?? "anonymous",
     workspace: () => policyWorkspace(context.location),
+    write: toolPolicy,
   })
   const extOrigin = extModulePath(import.meta.url)
   const bundled = loadBundledTools(import.meta.url, bootstrap.paths.extBundledManifest)

@@ -8,7 +8,7 @@
 import { publishTestBootstrap, testCloudMcp, unpublishTestBootstrap } from "../../ui-mac/test-component/codepuppy-bootstrap-fixture"
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test"
 import { createHash } from "node:crypto"
-import { mkdirSync, mkdtempSync, realpathSync, rmSync, unlinkSync, writeFileSync } from "node:fs"
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { Effect, Exit } from "effect"
@@ -21,6 +21,7 @@ import CodePuppyExt from "./plugin"
 import { activate, it } from "./plugin-host.harness"
 import { VisionSession, visionRequestBody } from "./cloud-vision"
 import { compressForVision } from "./vision-image"
+import { __resetCodePuppyCredentialsForTests, publishCodePuppyCredentials } from "../../util/src/codepuppy-credentials"
 
 type Recorded = { path: string; authorization: string | null; body: Record<string, unknown> }
 type Reply = { status: number; body: unknown }
@@ -101,7 +102,9 @@ beforeEach(() => {
     delete process.env[k]
   }
   tokenFile = join(root, "mcp-token")
-  writeFileSync(tokenFile, "tok-vision-123\n")
+  writeFileSync(tokenFile, "tok-vision-ON-DISK-not-read\n")
+  // SPEC-stored-credentials-fence:引擎进程里凭据只来自主进程交来的进程内凭据表(T1);盘上的文件不读
+  publishCodePuppyCredentials({ [tokenFile]: { value: "tok-vision-123\n", use: { kind: "inline" } } })
   // 与 ui-mac 每次 fork 写进启动文档的同形:平台 base(gateway 主机 + /v1)、云 server 名与带 {file:} 凭据的云 MCP 定义
   docState.base = `http://127.0.0.1:${server.port}/v1`
   docState.cloud = true
@@ -116,6 +119,7 @@ afterEach(() => {
     else process.env[k] = v
   }
   unpublishTestBootstrap()
+  __resetCodePuppyCredentialsForTests()
   rmSync(root, { recursive: true, force: true })
 })
 
@@ -374,7 +378,7 @@ describe("云端不可用 ⇒ 说得出原因的话(与 #1411 同一根轴:云 M
     { name: "413 image_too_large ⇒ 云端拒收", setup: () => void (reply = () => ({ status: 413, body: { error: { message: "too large", code: "image_too_large" } } })), calls: 1, text: "〔图片 #1 a.png 未能识别:云端拒收了这张图片(格式或大小不合要求)〕" },
     { name: "未登录:没有云 MCP 定义 ⇒ 不出网", setup: () => void ((docState.cloud = false), publishDoc()), calls: 0, text: "〔图片 #1 a.png 未能识别:云端识图不可用 —— 尚未登录 Code Puppy 账号〕" },
     { name: "未登录:没有平台 base(BYOK 态)⇒ 不出网", setup: () => void ((docState.base = undefined), publishDoc()), calls: 0, text: "〔图片 #1 a.png 未能识别:云端识图不可用 —— 尚未登录 Code Puppy 账号〕" },
-    { name: "凭据文件读不到 ⇒ 不出网、说凭据", setup: () => unlinkSync(tokenFile), calls: 0, text: "〔图片 #1 a.png 未能识别:云端识图不可用 —— 登录凭据无效或已过期,请重新登录〕" },
+    { name: "凭据不在主进程交来的表里 ⇒ 不出网、说凭据", setup: () => publishCodePuppyCredentials({}), calls: 0, text: "〔图片 #1 a.png 未能识别:云端识图不可用 —— 登录凭据无效或已过期,请重新登录〕" },
     { name: "连不上(loopback 上没人听的端口)⇒ 网络", setup: () => void ((docState.base = "http://127.0.0.1:1/v1"), publishDoc()), calls: 0, text: "〔图片 #1 a.png 未能识别:连不上云端识图服务,请检查网络〕" },
   ]
   for (const c of cases)

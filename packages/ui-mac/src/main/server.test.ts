@@ -6,6 +6,7 @@ import { join, parse, resolve } from "node:path"
 import { writeCustomProviderTruth } from "./custom-provider-truth-write"
 import { mockElectron } from "../../test-component/electron-mock"
 import { __resetCodePuppyBootstrapForTests, parseCodePuppyBootstrap, publishCodePuppyBootstrap, type CodePuppyBootstrap, codepuppyBootstrap } from "@opencode/util/codepuppy-bootstrap"
+import { handOverCredentials } from "../../test-component/credential-table"
 
 // `#1698`:每次 fork 交给 sidecar 的 start 消息(启动文档在它的 `bootstrap` 里)。
 const startCalls: Array<{ type: "start"; bootstrap: CodePuppyBootstrap }> = []
@@ -72,7 +73,7 @@ mock.module("./codepuppy-keychain-backend", () => ({
 const { applyPlatformCredentialsHot, hasSecretFile, secretFilePath } = await import("./codepuppy-secret-files")
 const { clearByokKeys, initByokKeys, storeByokKey } = await import("./codepuppy-byok-keys")
 const { writeShellEnvCache } = await import("./shell-env-cache")
-const { forkedSecretNames, preferAppEnv, preplanConfigFenceRoots, spawnLocalServer } = await import("./server")
+const { forkedSecretNames, preferAppEnv, preplanConfigFenceRoots, pushCredentialsToSidecar, spawnLocalServer } = await import("./server")
 const { configFenceLocations, resolveEngineRoots } = await import("./process-fence-profile")
 const { bootFenceWorkspaceTruth, readWorkspaceTruthOrThrow, writeWorkspaceTruth } = await import("./process-fence-workspaces")
 const { GLOBAL_RENDERER_STORE, TABS_KEY } = await import("./tabs-preclean")
@@ -353,6 +354,7 @@ describe("`#1411` / `#1443` web search 按账户态的在场性", () => {
       )
       // 先证明注入真的跑成了 —— 它有一层函数级 catch,拿一份空配置当结论正是本文件要防的那类假绿。
       // `#1662` parity B1:2.x 的注入返回 `{ config: { content, file }, explicit }`(内联文档交给 start(),不再写 OPENCODE_CONFIG_CONTENT)。
+      handOverCredentials(userDataPath) // SPEC-stored-credentials-fence:sidecar 在注入之前发布主进程交来的整表(T1)
       const { config } = injectCodePuppyConfig(userDataPath, undefined, "stable", codepuppyBootstrap().paths.userConfig ?? null)
       const parsed = JSON.parse(config.content) as EngineConfigShape
       expect(Object.keys(parsed.agents ?? {}).length).toBeGreaterThan(0)
@@ -667,10 +669,120 @@ describe("spawnLocalServer", () => {
     expect(JSON.stringify(bootstrap)).not.toContain("test-platform-key")
     expect([...(forkedSecretNames() ?? [])]).toEqual(expect.arrayContaining(["CODEPUPPY_API_KEY", "CODEPUPPY_MCP_TOKEN"]))
     // 同一份 fork 集合下的续期 ⇒ 热写生效(凭据文件就地换新)。
-    expect(applyPlatformCredentialsHot(userDataPath, { ...process.env, CODEPUPPY_API_KEY: "next-key" }, forkedSecretNames())).toBe(
+    expect(applyPlatformCredentialsHot(userDataPath, { ...process.env, CODEPUPPY_API_KEY: "next-key" }, forkedSecretNames(), pushCredentialsToSidecar)).toBe(
       "applied",
     )
     expect(readFileSync(secretFilePath(userDataPath, "CODEPUPPY_API_KEY"), "utf8")).toBe("next-key")
+  })
+
+  // DESIGN-stored-credentials-fence §4.2 / §4.3:T1 随 start 交存放点整表;引擎装载前的拉取同步应答当刻盘上的表;续期整表推送;拉取超时
+  // (credentials.unavailable)⇒ credential-change 重启;子进程退出后推送跳过。值都是一眼可辨的假值。
+  class CredentialChild extends FakeChild {
+    posted: Array<Record<string, any>> = []
+    override postMessage(message: { type: string }) {
+      this.posted.push(message as Record<string, any>)
+      super.postMessage(message)
+    }
+  }
+  const spawnWith = async (child: CredentialChild, respawns: string[]) => {
+    creditDanglingSweepForSpawn()
+    return spawnLocalServer("127.0.0.1", 4099, "password", {
+      userDataPath,
+      healthCheck: async () => true,
+      planFence: fakePlanFence,
+      fork: (() => child) as unknown as typeof import("electron").utilityProcess.fork,
+      requestRespawn: (trigger) => void respawns.push(trigger),
+    })
+  }
+
+  test("I-20 T1 / P / T2:start 带存放点整表;credentials.request 同步回复当刻盘上的表;续期推整表;unavailable ⇒ credential-change;退出后推送跳过", async () => {
+    process.env.CODEPUPPY_API_KEY = "FAKE-platform-A"
+    const child = new CredentialChild()
+    const respawns: string[] = []
+    const result = await spawnWith(child, respawns)
+    await result.health.wait
+    const key = secretFilePath(userDataPath, "CODEPUPPY_API_KEY")
+    const start = child.posted.find((message) => message.type === "start")!
+    expect(start.credentials[key]).toEqual({ value: "FAKE-platform-A", use: { kind: "inline" } })
+    expect(JSON.stringify(start.bootstrap)).not.toContain("FAKE-platform-A")
+
+    writeFileSync(key, "FAKE-platform-B")
+    const before = child.posted.length
+    child.emit("message", { type: "credentials.request", id: 7 })
+    expect(child.posted).toHaveLength(before + 1) // 收到与回复之间没有 await
+    expect(child.posted.at(-1)).toMatchObject({ type: "credentials", id: 7 })
+    expect(child.posted.at(-1)!.credentials[key].value).toBe("FAKE-platform-B")
+
+    expect(applyPlatformCredentialsHot(userDataPath, { ...process.env, CODEPUPPY_API_KEY: "FAKE-platform-C" }, forkedSecretNames(), pushCredentialsToSidecar)).toBe("applied")
+    const pushed = child.posted.at(-1)!
+    expect(pushed.type).toBe("credentials")
+    expect("id" in pushed).toBe(false)
+    expect(pushed.credentials[key].value).toBe("FAKE-platform-C")
+
+    expect(respawns).toEqual([])
+    child.emit("message", { type: "credentials.unavailable", id: 8 })
+    expect(respawns).toEqual(["credential-change"])
+
+    await result.listener.stop()
+    const after = child.posted.length
+    pushCredentialsToSidecar()
+    expect(child.posted).toHaveLength(after)
+    delete process.env.CODEPUPPY_API_KEY
+  })
+
+  // ② 审查第 1 条 (b):一次卡住会发两次 unavailable(一次装载拉两份文档、几个 Location 同时装载)⇒ 每一代只请求一次重启
+  test("I-20:同一代里 credentials.unavailable 来几次都只请求一次 credential-change", async () => {
+    const child = new CredentialChild()
+    const respawns: string[] = []
+    const result = await spawnWith(child, respawns)
+    await result.health.wait
+    child.emit("message", { type: "credentials.unavailable", id: 1 })
+    child.emit("message", { type: "credentials.unavailable", id: 2 })
+    child.emit("message", { type: "credentials.unavailable", id: 3 })
+    expect(respawns).toEqual(["credential-change"])
+    await result.listener.stop()
+  })
+
+  // 实现期修订 1(编排器裁决 2026-11-20,② 审查区外观察):存放点里单项读不出或目录列不出 ⇒ 按该项不在表里处理并记名字,不拒 fork、不回错误
+  test("I-20 修订 1:存放点里一项读不出(mode 000)、一个目录列不出(mode 000)⇒ start 照常带其余整表;拉取照常回复(不回 error、不请求重启);日志点名路径与 errno、不含值", async () => {
+    process.env.CODEPUPPY_API_KEY = "FAKE-platform-readable"
+    const store = join(userDataPath, "codepuppy-mcp-secrets")
+    const readable = join(store, "alpha", "v-0000aaaa", "OK")
+    const locked = join(store, "alpha", "v-0000aaaa", "TOKEN")
+    const unlistable = join(store, "bravo")
+    mkdirSync(join(unlistable, "v-0000aaaa"), { recursive: true })
+    writeFileSync(join(unlistable, "v-0000aaaa", "TOKEN"), "FAKE-behind-unlistable")
+    mkdirSync(join(store, "alpha", "v-0000aaaa"), { recursive: true })
+    writeFileSync(readable, "FAKE-readable-connector")
+    writeFileSync(locked, "FAKE-locked")
+    chmodSync(locked, 0o000)
+    chmodSync(unlistable, 0o000)
+    const child = new CredentialChild()
+    const respawns: string[] = []
+    warned.length = 0
+    try {
+      const result = await spawnWith(child, respawns)
+      await result.health.wait
+      const start = child.posted.find((message) => message.type === "start")!
+      expect(start.credentials[secretFilePath(userDataPath, "CODEPUPPY_API_KEY")]?.value).toBe("FAKE-platform-readable")
+      expect(start.credentials[readable]?.value).toBe("FAKE-readable-connector")
+      expect(start.credentials[locked]).toBeUndefined()
+      expect(Object.keys(start.credentials).some((key) => key.startsWith(unlistable))).toBe(false)
+      child.emit("message", { type: "credentials.request", id: 3 })
+      expect(child.posted.at(-1)).toMatchObject({ type: "credentials", id: 3 })
+      expect(child.posted.at(-1)!.credentials[locked]).toBeUndefined()
+      expect(child.posted.at(-1)!.credentials[readable]?.value).toBe("FAKE-readable-connector")
+      expect(respawns).toEqual([])
+      expect(warned.filter((line) => line.includes(locked) && line.includes("EACCES"))).toHaveLength(1) // once per generation, not per pull
+      expect(warned.filter((line) => line.includes(unlistable) && line.includes("EACCES"))).toHaveLength(1)
+      for (const line of warned) expect(line.includes("FAKE-")).toBe(false)
+      await result.listener.stop()
+    } finally {
+      chmodSync(locked, 0o600)
+      chmodSync(unlistable, 0o700)
+      rmSync(store, { recursive: true, force: true })
+      delete process.env.CODEPUPPY_API_KEY
+    }
   })
 
   // SPEC-engine-config-fence BR-03 / AC-05 第一句(DESIGN-engine-config-fence §4.4、§5):显式文件、模型底表与种子由 main 在 fork 前写;
@@ -932,10 +1044,14 @@ describe("修订 2 A:CODEPUPPY_ENV_FILE 交给计划器", () => {
 // 真源里 cwd 之下的诚实项目在 boot 时被检疫、第一次切 tab 就从真源删掉。
 describe("审查 B 第 2 条:计划之前的受保护配置目录 = 计划器的受保护目录", () => {
   const variables = ["OPENCODE_CONFIG_DIR", "XDG_CONFIG_HOME"] as const
-  const withEnv = async <T>(values: Partial<Record<(typeof variables)[number], string>>, run: () => Promise<T> | T): Promise<T> => {
-    const saved = Object.fromEntries(variables.map((name) => [name, process.env[name]]))
+  // XDG_DATA_HOME (CF-11, 片 ③) is only ever set to an absolute scratch path, never unset: without it the engine data directory falls back
+  // to os.homedir() — the developer's real one, which the test-isolation preload cannot pin — and spawnLocalServer reads that directory
+  type Variable = (typeof variables)[number] | "XDG_DATA_HOME"
+  const withEnv = async <T>(values: Partial<Record<Variable, string>>, run: () => Promise<T> | T): Promise<T> => {
+    const names: Variable[] = [...variables, ...(values.XDG_DATA_HOME !== undefined ? (["XDG_DATA_HOME"] as const) : [])]
+    const saved = Object.fromEntries(names.map((name) => [name, process.env[name]]))
     try {
-      for (const name of variables) {
+      for (const name of names) {
         if (values[name] === undefined) delete process.env[name]
         else process.env[name] = values[name]
       }
@@ -949,13 +1065,14 @@ describe("审查 B 第 2 条:计划之前的受保护配置目录 = 计划器的
   }
   const inputs = () => ({ userDataPath, appStateRoot: join(userDataPath, "codepuppy-state"), codepuppyGlobalRoot: process.env.CODEPUPPY_GLOBAL_DIR! })
 
-  const rows: Array<{ label: string; values: (base: string) => Partial<Record<(typeof variables)[number], string>> }> = [
+  const rows: Array<{ label: string; values: (base: string) => Partial<Record<Variable, string>> }> = [
     { label: "both unset", values: () => ({}) },
     { label: "OPENCODE_CONFIG_DIR absolute", values: (base) => ({ OPENCODE_CONFIG_DIR: join(base, "exported-config") }) },
     { label: "OPENCODE_CONFIG_DIR=.", values: () => ({ OPENCODE_CONFIG_DIR: "." }) },
     { label: "OPENCODE_CONFIG_DIR relative", values: () => ({ OPENCODE_CONFIG_DIR: "cfg/sub" }) },
     { label: "XDG_CONFIG_HOME absolute", values: (base) => ({ XDG_CONFIG_HOME: join(base, "xdg-config") }) },
     { label: "XDG_CONFIG_HOME relative", values: () => ({ XDG_CONFIG_HOME: "rel-config" }) },
+    { label: "XDG_DATA_HOME absolute", values: (base) => ({ XDG_DATA_HOME: join(base, "xdg-data") }) },
   ]
   for (const row of rows)
     test(`${row.label}: the pre-plan roots equal the planner's protected directories for the same environment`, async () => {
@@ -980,9 +1097,12 @@ describe("审查 B 第 2 条:计划之前的受保护配置目录 = 计划器的
           // os.homedir() is the HOME this process started with — the developer's real one, which the test-isolation preload
           // cannot pin (I-08) — so nothing here may mkdir or realpath under it (final review item 1)
           const subpaths = (rules: ReturnType<typeof configFenceLocations>) => rules.flatMap((rule) => (rule.kind === "subpath" ? [rule.path] : []))
-          const planner = subpaths(configFenceLocations({ ...inputs(), engineConfigDirectory: planned!.engineConfigDirectory, configHome: resolveEngineRoots(planned!.sidecarEnv, homedir()).configHome, home: homedir() }))
+          const planner = subpaths(configFenceLocations({ ...inputs(), engineConfigDirectory: planned!.engineConfigDirectory, configHome: resolveEngineRoots(planned!.sidecarEnv, homedir()).configHome, home: homedir(), dataHome: resolveEngineRoots(planned!.sidecarEnv, homedir()).dataHome }))
           const before = preplanConfigFenceRoots({ env: process.env, home: homedir(), ...inputs() })
           expect([...new Set(before)].sort()).toEqual([...new Set(planner)].sort())
+          // CF-11 (片 ③):both sides put the tool policy directory under the exported data home
+          const dataHome = row.values(base).XDG_DATA_HOME
+          if (dataHome) expect(before).toContain(join(dataHome, "opencode", "codepuppy-tool-policy"))
         })
       } finally {
         rmSync(base, { recursive: true, force: true })
@@ -1056,5 +1176,95 @@ describe("#1562 fork 给 sidecar 的环境里没有 OTEL_*", () => {
     const env = await forkSidecar()
     expect(env.PATH).toBeDefined() // 拿到的确实是 fork 用的那份环境
     expect(Object.keys(env).filter((name) => /^otel_/i.test(name))).toEqual([])
+  })
+})
+
+// SPEC-engine-config-fence BR-03 / AC-05 / DESIGN-engine-config-fence §4.5 / E6:sidecar 里的 ext 经 parentPort 发 `codepuppy.tool-policy.write.request`,
+// main 在 child 的 message 链上接住、写盘、写完再回复。文档落在 fork 交给 sidecar 的那份环境算出的数据目录 —— 也就是 ext 读的位置。
+describe("I-13 tool policy writes from the sidecar go through main", () => {
+  const { policyFilePath, loadPolicyDocument } = require("../../../ext/src/policy/store") as typeof import("../../../ext/src/policy/store")
+  const { defaultPolicyBaseDir } = require("../../../ext/src/policy/resolver") as typeof import("../../../ext/src/policy/resolver")
+  const partition = { account: "acct:server-test", workspace: "/work/server-test" }
+  const shell = { selector: { level: "tool", canonical: "builtin::shell" }, state: "disabled" }
+
+  /** A sidecar stand-in that keeps everything main posts to it; the hub host only records what reaches it. */
+  async function spawned() {
+    const posted: Array<Record<string, unknown>> = []
+    const hub: unknown[] = []
+    let child: FakeChild | undefined
+    class RecordingChild extends FakeChild {
+      override postMessage(message: { type: string }) {
+        posted.push(message as Record<string, unknown>)
+        super.postMessage(message)
+      }
+    }
+    creditDanglingSweepForSpawn()
+    const result = await spawnLocalServer("127.0.0.1", 4099, "password", {
+      userDataPath,
+      healthCheck: async () => true,
+      planFence: fakePlanFence,
+      fork: ((file: string, args: string[], options: Record<string, unknown>) => (forkCalls.push({ file, args, options }), (child = new RecordingChild()))) as never,
+      // like the real host (hub-view.ts): only the `codepuppy.*` family is its business
+      codepuppySidecar: { receive: (message) => String((message as { type?: unknown })?.type).startsWith("codepuppy.") && (hub.push(message), true), attach: () => () => {} },
+    })
+    await result.health.wait
+    const env = (forkCalls.at(-1)?.options.env ?? {}) as Record<string, string | undefined>
+    // the data directory comes from the isolated XDG_DATA_HOME (the test-isolation preload), never from the developer's real home
+    expect(env.XDG_DATA_HOME, "the fork env carries the isolated XDG_DATA_HOME").toBeDefined()
+    expect(env.XDG_DATA_HOME!.startsWith(`${homedir()}/`)).toBe(false)
+    const baseDir = defaultPolicyBaseDir(join(env.XDG_DATA_HOME!, "opencode"))
+    const send = (message: unknown) => child!.emit("message", message)
+    const replies = () => posted.filter((message) => message.type === "codepuppy.tool-policy.write.reply")
+    return { result, baseDir, send, replies, hub }
+  }
+
+  test("E6: a save and a reset from the sidecar are written where ext reads them, then answered (ok; ok with the backup)", async () => {
+    const { result, baseDir, send, replies, hub } = await spawned()
+    try {
+      send({ type: "codepuppy.tool-policy.write.request", id: 11, op: "save", partition, records: [shell] })
+      const loaded = loadPolicyDocument(baseDir, partition)
+      expect(loaded.status === "ok" ? loaded.doc.records : loaded).toEqual([shell])
+      expect(replies()).toEqual([{ type: "codepuppy.tool-policy.write.reply", id: 11, ok: true }])
+      send({ type: "codepuppy.tool-policy.write.request", id: 12, op: "reset", partition })
+      expect(loadPolicyDocument(baseDir, partition).status).toBe("absent")
+      const reset = replies()[1] as { id: number; ok: boolean; backup: string }
+      expect([reset.id, reset.ok, reset.backup.startsWith(`${policyFilePath(baseDir, partition)}.quarantined-`)]).toEqual([12, true, true])
+      expect(hub).toEqual([])
+    } finally {
+      await result.listener.stop()
+      rmSync(baseDir, { recursive: true, force: true })
+    }
+  })
+
+  test("AC-05: main cannot write ⇒ an error reply naming the path and errno, the old document byte for byte, one named line; a malformed request ⇒ an error reply and one line; other codepuppy.* messages still reach the hub host", async () => {
+    const { result, baseDir, send, replies, hub } = await spawned()
+    try {
+      send({ type: "codepuppy.tool-policy.write.request", id: 21, op: "save", partition, records: [shell] })
+      const file = policyFilePath(baseDir, partition)
+      const before = readFileSync(file)
+      warned.length = 0
+      chmodSync(baseDir, 0o500)
+      try {
+        send({ type: "codepuppy.tool-policy.write.request", id: 22, op: "save", partition, records: [] })
+      } finally {
+        chmodSync(baseDir, 0o700)
+      }
+      const refused = replies()[1] as { id: number; error: string }
+      expect(refused.id).toBe(22)
+      expect(refused.error).toContain("EACCES")
+      expect(refused.error).toContain(baseDir)
+      expect(readFileSync(file)).toEqual(before)
+      expect(warned.filter((line) => line.startsWith("[I-13] tool policy save failed:"))).toHaveLength(1)
+      send({ type: "codepuppy.tool-policy.write.request", id: 23, op: "save", partition: { account: "a" } })
+      expect(replies()[2]).toMatchObject({ type: "codepuppy.tool-policy.write.reply", id: 23 })
+      expect(typeof (replies()[2] as { error?: unknown }).error).toBe("string")
+      expect(warned.filter((line) => line.startsWith("[I-13] tool policy write request is malformed"))).toHaveLength(1)
+      const other = { type: "codepuppy.hub.request.request", id: 24, requestId: "req_aaaaaaaa" }
+      send(other)
+      expect(hub).toEqual([other])
+    } finally {
+      await result.listener.stop()
+      rmSync(baseDir, { recursive: true, force: true })
+    }
   })
 })

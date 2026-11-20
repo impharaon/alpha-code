@@ -5,8 +5,9 @@ import { createRequire } from "node:module"
 import { dirname, join } from "node:path"
 import { buildFenceAddon } from "../../scripts/build-fence-addon"
 import { renderProcessFenceProfile, resolveEngineRoots, WORKSPACE_WRITE_EXTENSION_CLASS } from "./process-fence-profile"
-import { planConfigFence } from "./process-fence-plan"
+import { planConfigFence, planCredentialStores } from "./process-fence-plan"
 import { realpathSync } from "node:fs"
+import { credentialStores } from "./codepuppy-secret-files"
 
 type WriteResult = { writes: string[] }
 type ConsumeResult = { handle: number; errno: number }
@@ -58,6 +59,8 @@ beforeAll(() => {
       { userDataPath: join(run, "userData"), appStateRoot: join(run, "state"), codepuppyGlobalRoot: join(run, "state", "env", "dev"), engineConfigDirectory: join(roots.configHome, "opencode"), roots },
       { realpath: (p) => realpathSync.native(p), mkdirp: (p) => void mkdirSync(p, { recursive: true }) },
     ).configFence,
+    // SPEC-stored-credentials-fence:生产 profile 同样带 C1(生产计划器那一步落真实路径)
+    credentialStores: planCredentialStores(credentialStores({ userDataPath: join(run, "userData") }), { realpath: (p) => realpathSync.native(p) }),
   })
   const issueDeny = /\(deny file-issue-extension[^\n]+\(extension-class "[^"]+"\)\)/
   const config = join(run, "config.json")

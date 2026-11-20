@@ -1,7 +1,7 @@
 ---
 id: PLAN-engine-config-fence
 title: 对话改不了决定运行什么程序、哪些工具免问、凭据交给谁的配置 实施计划
-summary: 片 ①:引擎不再采用引擎库里的项目级已存批准、会话行上的 allow / ask 规则与 wellknown 缓存的配置文档(L1–L3),只改两个已接管的引擎文件;片 ②——受保护配置集渲染进围栏 profile 末尾，运行期放行认得拒写块，资格判定拦受保护位置之内，围栏内写者移到主进程；片 ④——计划文件移到引擎数据目录(接管上游 plan.ts 的路径一值)，`~/.opencode` 整个受保护、谁都不建，删 W16；其余各片另起一节。
+summary: 片 ①:引擎不再采用引擎库里的项目级已存批准、会话行上的 allow / ask 规则与 wellknown 缓存的配置文档(L1–L3),只改两个已接管的引擎文件;片 ②——受保护配置集渲染进围栏 profile 末尾，运行期放行认得拒写块，资格判定拦受保护位置之内，围栏内写者移到主进程；片 ④——计划文件移到引擎数据目录(接管上游 plan.ts 的路径一值)，`~/.opencode` 整个受保护、谁都不建，删 W16；片 ③——工具策略改写由主进程经既有窄消息执行，工具策略目录进受保护集(CF-11);其余各片另起一节。
 kind: plan
 status: active
 spec: SPEC-engine-config-fence
@@ -467,3 +467,143 @@ PLAN 阶段按派单写在临时文件里，没有提交；本节由实施阶段
 
 - 给计划目录另写一个 Code Puppy 自有的 core 判官。现在上游测试接管后只改了一行，加上真引擎用例已经够用。
 - 加一条单元断言：真实主目录下卡片显示 `~/.local/share/opencode/plan/`。这是卡片既有的脱敏行为，不是本片的改动。
+
+## 片 ③：工具策略改写由主进程经既有窄消息执行，工具策略目录进受保护集(CF-11)
+
+- 依据：规格 `docs/specs/engine-config-fence/spec.md` v3(owner 2026-11-20 批准)里本片负责的工具策略部分：BR-01、BR-03、BR-04；AC-01 对新位置 CF-11(每种手法 × 每种路径写法，加它的上级目录节点)；AC-04 的「把工具策略改成放行」失败、「在设置页改工具策略(含同时改两行)」正常、系统沙箱日志里没有来自引擎进程的受保护位置拒绝；AC-05 第二句；AC-06 的「工具策略与升级前相同」。这几条 AC 的其余部分已由片 ② 交付。冻结设计 `docs/specs/engine-config-fence/design.md`(approved；读的是只读参考树 `5b2ffac85b` = 主线 `69c1267835` + 片 ④)：§4.1 CF-11 一行、§4.2、§4.3(预建循环含 CF-11)、§4.5、§5 里提到工具策略的两行、§6 E6(含并发臂与两条已知坏)、§10 D7、D12 ③、审查表「R1 第 7 项」。意图：impharaon/alpha-work `docs/intents/INT-safety.md` I-13。派单没有给 Issue 编号。用户会碰到的限制：本片不新增(既有一条「对话里的工具与命令不能直接改受保护位置」已经覆盖)。
+- 核对：Phase: IMPLEMENT — plan(临时文件 `~/.cache/alpha-orch/2026-11-19/impl-fence-slice3/plan-section.md`)· 编排器 / Claude Fable 5.2 · 通过(每一部分 AC 都有点名的证明与已知坏臂；文件在范围内，另两个同链文件带理由；消息形状与串行规则同设计 §4.5；没有投机的东西)。裁决:`hub-bridge.ts` + `plugin.ts` 作为同链文件、`registerPolicy` 加可选第四个参数 —— 接受;`receiveToolPolicyWrite` 住在 `ext/policy/store.ts`、由 `server.ts` 接收链调用 —— 作为落点细节接受(设计的契约保持可见：消息类型在 `codepuppy-sidecar-messages.ts`,main 执行，写完再回复);§4.7 结构断言改写为「sidecar 闭包里只有 `resolver.ts` 拿到 `savePolicyDocument` / `resetPolicyDocument`,没有文件拿到 main 侧接收函数」—— 接受，记进偏离记录(理由：设计 §4.5 冻结了 `resolver.ts` 里的缺省写者);沙箱日志窗口止于写文件工具攻击之前、终点之后正向断言引擎 pid 的拒绝读得到 —— 接受；桥的 20 s 超时与共享宿主的假 parentPort —— 照所述接受，不改。分两轮：本轮只做单元 A(C0–C2);单元 B 等编排器把含片 ④ 的主线合进本分支之后再做。实施工作树 `feat/config-fence-tool-policy` 从主线 `69c1267835` 建(不含片 ④;单元 A 涉及的文件与参考树只差注释)。
+
+PLAN 阶段按派单写在临时文件里，没有提交；本节由实施阶段第一次提交放进 plan.md，同一提交在 front-matter 的 summary 里加上片 ③。路径前缀 `main/` = `packages/ui-mac/src/main/`，`ext/` = `packages/ext/src/`。下面的命令都是实施安排，还没有在实施分支上运行；行号都按参考树。约定沿用片 ①、②、④：先提交红测试，再提交实现；宿主 `*.test.ts` 起同名 `.cases.ts`，`.cases.ts` 不单独执行。
+
+### 计划阶段核过的代码事实(只读参考树)
+
+| 编号 | 事实 | 对本片的影响 |
+| --- | --- | --- |
+| F1 | ext 一侧 parentPort 上只有一个监听，也只有一个请求 id 空间：`ext/hub-bridge.ts:95-114`(按 `id` 找在途请求)、`:120-150`(`ask`：自增 id、超时 20 s)。`processState()` 在模块求值时建一次(`ext/plugin.ts:64-82`)，`registerPolicy` 已经从它拿 `unattended` 与 `installSubject`(`:113`) | 工具策略写者必须走这个桥的 `ask`。另挂一个监听、另起 id 计数，会与定制中心的在途请求撞号(桥按 id 结算，会把工具策略的应答当成视图应答)，而且每个 Location 会多挂一个监听。所以要改 `hub-bridge.ts`、`plugin.ts` 两个同链文件，见「改动」 |
+| F2 | main 一侧的接收链是 `main/server.ts:755-760` 的 `child.on("message")`：项目配置视图 → 写探针 → 写签发 → `codepuppySidecar.receive`。设计 §4.5 引的是 `887748b52c` 的 `:682-686`，只是行号漂移，是同一条链。`hub-view.ts:519-523` 遇到不认识的 `codepuppy.*` 会丢弃并记一行 | 新的一环放在 `codepuppySidecar.receive` 之前。新消息不进 `CodePuppySidecarInbound` / `Outbound` 两个联合，hub-view 的分发与类型都不动(也少和凭据那条 lane 撞) |
+| F3 | 本代 sidecar 环境算出的数据目录在 `main/server.ts:581` 已经有了：`dataDir = engineDataDirectory(exported.env, exported.home)`，即 `<XDG_DATA_HOME 或 HOME/.local/share>/opencode`。被忽略的相对路径变量在 `:577-579` 已从 sidecar 环境里删掉；ext 读文档用的是同一份环境(`ext/policy/index.ts:59-62`、`:76`) | main 的 `baseDir = defaultPolicyBaseDir(dataDir)`，与 ext 读的、与围栏保护的是同一个位置 |
+| F4 | 设置页的重置失败：RPC `reset` 不映射错误(`ext/policy/rpc.ts:181-185`)，引擎回 500，main 客户端把它归成 `write-failed`(`main/tool-policy-client.ts:50`、`:80-85`)，设置页显示失败(`renderer/codepuppy-ui/settings-tools.tsx:315-337`) | 重置走 main 之后失败照旧经这条路径，不另加错误映射。`setRecord` / `removeRecord` 写失败经 `ToolPolicyWriteError("io")` 得到 `writeFailed`(`rpc.ts:138-142`) |
+| F5 | 共享引擎宿主 `test-component/codepuppy-engine.ts:95-114`、`:234` 已经装了一个假 parentPort(只答定制中心三种消息)。改动之后，用这个宿主的引擎测试里，ext 都会拿到桥的写者。核过：没有任何宿主消费方经 ext 的 RPC 写工具策略(`setRecord` / `removeRecord` / `reset` 只有 `rpc.ts` 调；引擎用例里的 `policyStore()` 是宿主自建的直写存储，不经 ext)，所以这个变化对它们没有作用 | 不改共享宿主。`engine-config-fence` 在宿主之前装自己的 parentPort(宿主见到已有就不装)，把工具策略写请求转给围栏外的「main」辅助进程 |
+| F6 | 写盘登记簿里 `ext/policy/store.ts` 四行的根今天是 W4(`scripts/process-fence-write-sites.tsv:10-14`)；`main-only` 名单按签名钉在 `main/process-fence-write-sites.test.ts:29-50`；结构判据在 `:76-117` | 四行改成 `main-only`，名单加四条。设计 §4.7 的结构断言写的是「闭包里没有文件 import 这些写者」，但 §4.5 冻结了缺省写者在 `resolver.ts` 里直接调这两个函数，`resolver.ts` 在 sidecar 闭包里。所以本片的结构断言写成：闭包里拿到 `savePolicyDocument` / `resetPolicyDocument` 的只有 `resolver.ts`，没有任何文件拿到 main 的接收函数 |
+| F7 | `configFenceLocations` 今天还不收 `dataHome`(片 ② 差异 D-5 留给本片)。调用方：`process-fence-plan.ts:87`、`server.ts:322`(`preplanConfigFenceRoots`)、`engine-config-fence.engine.cases.ts:196`、`server.test.ts:983`、`process-fence-profile.test.ts:47`、`:165`。`planConfigFence` 的输入已经带着整个 `roots`；它的预建循环(`process-fence-plan.ts:89`)对每个 subpath 位置都 `mkdirp`，只跳过 CF-9 | 加必填 `dataHome`。CF-11 是 subpath，自动被预建，循环不用改 |
+| F8 | CF-11 新带进三个上级目录节点：`<XDG_DATA_HOME>/opencode`(就是 W4 的根)、`<XDG_DATA_HOME>`、`~/.local`。只冻结节点本身，引擎库、`-wal`、日志照常能在里面新建。片 ② 的 E2 已经在 `<XDG_DATA_HOME>/opencode` 下写库与日志(`process-fence-config-fence.cases.ts:468-469`)；设计 §4.8 也记了「数据目录节点被 CF-11 的上级目录块冻结」 | 预期没有行为变化；E2 在新 profile 下重跑就是证据 |
+| F9 | 引擎的写文件工具在引擎进程里执行(嵌入式引擎的 pid 就是 cases 进程的 pid)。宿主的日志判据是「引擎 pid 在受保护位置的拒绝为 0」(`engine-config-fence.engine.test.ts:44`、`:71-76`)，窗口是整个 production 臂 | 用写文件工具做的攻击必然在引擎 pid 上留下拒绝。安排：它放在 production 臂最后，cases 在它之前打印窗口终点，宿主只判终点之前的部分；终点之后另读一次，断言引擎 pid 在 CF-11 有拒绝(引擎 pid 的拒绝确实读得到) |
+
+### 改动
+
+**生产代码**
+
+| 文件 | 改什么 |
+| --- | --- |
+| `main/codepuppy-sidecar-messages.ts` | 在文件末尾单独一块，加冻结的 `ToolPolicyWriteRequest` / `ToolPolicyWriteReply`(§4.5)和四个函数：`buildToolPolicyWriteRequest`、`parseToolPolicyWriteRequest`(main 侧，形状不对返回 undefined)、`buildToolPolicyWriteReply`、`parseToolPolicyWriteReply`(ext 侧)。只查形状：id、op、分区两个字符串、records 是对象数组。完整 schema 校验留给写者(`savePolicyDocument` 先过 `parseToolPolicyDocument`)。`ToolPolicyPartition` / `ToolPolicyRecord` 只做类型 import。两个联合与 `parseCodePuppySidecarInbound` 不动 |
+| `ext/policy/store.ts` | 新增 `receiveToolPolicyWrite(message, { baseDir, post, log }): boolean`，这是 main 执行的接收函数：不是本类型就返回 false；形状不对时，有合法 id 就回 `error`，记一行；`save` 调 `savePolicyDocument`，`reset` 调 `resetPolicyDocument`，写完再回 `ok`(重置时带 `backup`)；写失败回 `error` 并记一行 `[I-13] tool policy <op> failed: …`。错误文字：fs 错误用 Node 的消息(路径加 errno)，其它错误只写错误类名，不带文档内容。放在这里的理由：围栏外的测试辅助进程(普通 bun，不能 import 带 electron 的 `server.ts`)要跑的就是生产这一份；它和它调用的两个写者在同一个模块里 |
+| `ext/policy/resolver.ts` | 冻结的 `ToolPolicyWriter` 类型，以及 `ToolPolicyStoreOptions.write?`(缺省时直接调 `savePolicyDocument` / `resetPolicyDocument`，给 CLI 和单测用)。`createToolPolicyStore` 里只留一条 promise 链：`setRecord`、`removeRecord`、`reset` 都接在链尾；`mutate` 先读、做隔离判断、再等 `write.save`，整个做完才轮到下一个；前一个失败不打断链。写者抛错时，save 包成 `ToolPolicyWriteError("io", message)`，reset 原样抛(F4) |
+| `ext/policy/index.ts` | `registerPolicy` 加可选的第四个参数 `toolPolicy?: ToolPolicyWriter`，原样交给 `createToolPolicyStore({ …, write })`。读仍在 ext |
+| `ext/hub-bridge.ts`(同链，F1) | `HubBridge` 加可选成员 `toolPolicy?: ToolPolicyWriter`，只在有 port 时提供。`save` / `reset` 走同一个 `ask`(共用 id 空间与超时)，按 `parseToolPolicyWriteReply` 结算：`ok` ⇒ 返回(重置时带 `backup`)；`error`、超时、应答形状不对、发不出去 ⇒ 记一行 `[@codepuppy/ext] tool policy write: …` 并抛 Error(带原因) |
+| `ext/plugin.ts`(registerPolicy 的接线处) | `registerPolicy(context, …unattended, …installSubject, processState().hubBridge.toolPolicy)`。I3 的先后不变 |
+| `main/server.ts` | 在 `dataDir` 之后算出 `toolPolicyBaseDir = defaultPolicyBaseDir(dataDir)`(F3)。`:755` 的链里，`codepuppySidecar.receive` 之前加一环：`if (receiveToolPolicyWrite(message, { baseDir: toolPolicyBaseDir, post: (reply) => child.postMessage(reply), log: (line) => getLogger()?.warn(line) })) return`。`preplanConfigFenceRoots`(`:322`)给位置清单传 `dataHome: resolveEngineRoots(exported.env, exported.home).dataHome` |
+| `main/process-fence-profile.ts` | `configFenceLocations` 加必填输入 `dataHome`，在 CF-10 之后加 `{ kind: "subpath", path: defaultPolicyBaseDir(join(input.dataHome, "opencode")) }`(CF-11；目录名只取 ext 的 `defaultPolicyBaseDir` 这一处，不另写字面量)。函数说明从「CF-1–10」改成「CF-1–11」。`WRITABLE_ROOT_IDS.W4` 的说明补半句：「其中的工具策略目录由 profile 末尾的拒写块拿回」(与 W3 同样的写法) |
+| `main/process-fence-plan.ts` | `planConfigFence` 调位置清单时加 `dataHome: input.roots.dataHome`。预建循环不用改(F7)；文件头的预建说明补上 CF-11 |
+| `scripts/process-fence-write-sites.tsv`、`main/process-fence-write-sites.ts` | `store.ts` 四行的根改成 `main-only`，上方注释改成：由 main 经窄消息执行(`server.ts` → `receiveToolPolicyWrite`)；sidecar 里的 ext 经桥发消息。`isValidRoot` 的说明里，`main-only` 举例补上工具策略写者(只改注释) |
+| `docs/architecture/2026-09-09-req159-process-fence.md` | 事实同步：受保护集那一段加 CF-11；写者在 main(经 `codepuppy.tool-policy.write.*`)；测试表里 `process-fence-config-fence`、`engine-config-fence.engine` 两行补上本片的判据 |
+| `scripts/gate-files.tsv` | 改过的行按实测精确条数写回(见「证明」末尾) |
+
+**测试与夹具**
+
+| 文件 | 改什么 |
+| --- | --- |
+| `main/codepuppy-sidecar-messages.test.ts` | 新增 1 条：请求的两种 op 和应答的三种形状(ok、带 backup 的 ok、error)，build 之后都能被另一侧的 parse 原样还原；id、op、分区、records 形状不对时一律返回 undefined；新消息不属于 `parseCodePuppySidecarInbound` 的族 |
+| `ext/hub-bridge.test.ts` | 新增 2 条：① 有 port 才有 `toolPolicy`；`save` 发出的请求能过 main 侧的解析；ok、backup、error、形状不对、超时各自正确结算(后四种抛错，带原因)。② 一个定制中心视图请求和一个工具策略写同时在途、应答倒序到达时，两者各自结算、不串号 |
+| `ext/policy/resolver.test.ts` | 新增 3 条：① 注入写者时，`setRecord` / `removeRecord` / `reset` 都到写者手里，带 ext 读出并改好的整份记录；缺省写者的既有用例不动。② 并发臂：写者是异步的(用微任务回复，模拟跨进程)，不等第一个就连发两次 `setRecord`(两个不同工具)，两条记录都在盘上。同一用例里有一条对照：测试里按改动之前的写法(读、改、等写，不排队)用同一个写者并发两次，后回的覆盖了先回的，丢一条。这证明这个写者的时序真能把串行的缺失暴露出来。③ 第一个写失败(调用方拿到 `ToolPolicyWriteError("io")`)，第二个照常写入 |
+| `ext/policy/tool-policy-rpc.test.ts` | 新增 3 条，都经引擎的 RPC 注册表：`registerPolicy(ctx, unattended, undefined, bridge.toolPolicy)`，桥接在一个内存 port 上，port 的另一头是生产的 `receiveToolPolicyWrite`(真目录)。① `setRecord` / `removeRecord` / `reset` 由接收函数落盘，紧接着的 `snapshot` 读到新文档；ext 进程自己没有写(写者桩记下调用)。② 接收函数的目录改成只读(`chmod 0500`)：`setRecord`、`removeRecord` 得到 `write-failed`，`reset` 得到 RPC 失败，盘上旧文档的字节不变。③ 两次并发 `setRecord` 都落盘 |
+| `main/server.test.ts` | 新增 2 条，加预建表 2 行：① 真 `spawnLocalServer` + 假子进程：ready 之后，子进程发出 save / reset 请求；文档落在 `policyFilePath(defaultPolicyBaseDir(join(<fork 拿到的 sidecar 环境里的 XDG_DATA_HOME>, "opencode")), 分区)`，也就是 ext 读的那个位置；子进程收到 `ok`(重置时带 backup)。写之前先断言目标在测试的临时根里。② 注入失败：目录只读 ⇒ 子进程收到 `error`，带路径与 errno，盘上旧字节不变，warn 恰一行；形状不对、id 合法 ⇒ 回 `error` 并记一行；别的 `codepuppy.*` 消息照旧交给 `codepuppySidecar.receive`。预建根表(`:950-990`，`:960` 起逐行生成用例)加 `XDG_DATA_HOME` 绝对、相对两行，并给计划器那一侧的清单传 `dataHome` |
+| `main/process-fence-profile.test.ts` | `CF` 与位置清单用例传 `dataHome`；`CF_LINES` 的规则块末尾加 `(subpath "${HOME}/.local/share/opencode/codepuppy-tool-policy")`，上级目录行末尾加 `${HOME}/.local/share/opencode`、`${HOME}/.local/share`、`${HOME}/.local`；「位置清单」用例把「不含工具策略目录(片 ③)」翻成「CF-11 在清单末尾」(`:163`、`:175`)。往返用例自动带上 CF-11。条数不变 |
+| `main/process-fence-plan.test.ts` | 精确预建列表(`:77-80`)加 CF-11 目录；`configFence=15` → 16(`:81`)、16 → 17(`:234`)；两份精确的 `configFenceRoots`(`:184`、`:219`)加 CF-11 |
+| `main/process-fence-write-sites.test.ts` | `MAIN_ONLY_SITES` 加 `store.ts` 四条(这一组用完整路径)；根合法性用例不变；新增 1 条结构判据(F6)：sidecar 闭包里拿到 `savePolicyDocument` / `resetPolicyDocument` 的只有 `ext/policy/resolver.ts`；没有任何文件拿到 `receiveToolPolicyWrite` |
+| `main/process-fence-config-fence.cases.ts`(宿主钉 17 → 18) | `build()` 放一份工具策略文档；`snapshot()` 加这份文档和策略目录的列表；矩阵加 CF-11：`cf11-doc` file、`cf11-dir` dir、`cf11-new-doc` create，上级节点 `anc-data-opencode`、`anc-data-home`、`anc-local`，以及各种写法：工作区软链(脚本前置 `ln -sfn <数据目录>/opencode <ws>/via-data`)、大小写(`CODEPUPPY-TOOL-POLICY`)、firmlink(有 Data 卷时)、`/.vol`。布局用例加一句：策略目录只看放行块时在 W4 之下(覆盖)，算上拒写块就不覆盖了，说明拒写那一行是承重的。E2 的「对已存在受保护目录 `mkdir -p`」两行加策略目录。新增 1 条用例：已知坏 `withoutCf11`(删掉 CF-11 那条规则，以及上级目录行里只由它带来的三个节点)⇒ 文档的追加、截断、新建再改名覆盖、工作区文件改名覆盖、交换、删除，目录里新建，create 六种手法，软链、大小写、`/.vol` 写法，以及 `anc-data-opencode` 改名移走，全部 `OK`；同一用例里，运行期放行签发 `<XDG_DATA_HOME>` 之后，其中别的文件落盘，策略文档仍是 `FAIL 1` |
+| `main/engine-config-fence.engine.cases.ts` | 位置清单调用(`:196`)传 `dataHome`。非 fresh 的臂在 `codepuppyEngine()` 之前装自己的 parentPort：把 `codepuppy.tool-policy.write.request` 转给 MAIN 辅助进程；辅助进程加一个操作，调生产的 `receiveToolPolicyWrite`(`baseDir` = 该沙箱的 `defaultPolicyBaseDir(<数据目录>/opencode)`)，应答原路送回。turn 助手加一个可选参数：批准这一轮的审批(`decision: "once"`)。production 臂末尾新增 1 条用例，control 臂新增 1 条用例(见「证明」AC-04)。文件头说明补上本片 |
+| `main/engine-config-fence.engine.test.ts` | `ARMS.production` 4 → 5，`control` 1 → 2。production 的判定窗口终点改用 cases 打印的 `CF-ENGINE-WINDOW-END <ms>`(必须有)；终点之后到臂结束另读一次日志，断言引擎 pid 在 CF-11 下至少有一条写拒绝(F9)。头注释同步 |
+
+不改：`packages/core`(引擎源码身份不变，不用重采夹具)；共享引擎宿主(F5)；hub-view 的分发与两个消息联合(F2)；资格判定代码(CF-11 进了清单就进了资格判定，片 ④ F8 同理)；任何文案与配置。
+
+### 顺序
+
+1. **C0 计划**：本节进 plan.md，summary 加上片 ③，填好「核对」行。
+2. **C1 单元 A 测试先红(按构造必红)**：消息、桥、resolver、RPC、server、写盘登记簿的新用例。新导出不存在，或 `store.ts` 的根仍是 W4，所以红。红输出存到 `~/.cache/alpha-orch/2026-11-19/impl-fence-slice3/evidence/c1-red-*.log`。
+3. **C2 单元 A 绿：写入搬到 main，围栏不变**。改 `codepuppy-sidecar-messages.ts`、`store.ts`、`resolver.ts`、`index.ts`、`hub-bridge.ts`、`plugin.ts`、`server.ts` 的接收链(登记簿挪到 C4,见偏离记录)。跑检查组 A、B。这一步单独看也是可用状态：工具策略照常能改，只是由 main 来写。CF-11 必须排在它后面，否则设置页会写不进去(D12 ③)。
+4. **C3 单元 B 测试先红(按构造必红)**：profile / plan / server 预建表的 CF-11 断言；写入矩阵的 CF-11 项(production 臂红：W4 之下写得进)与 `withoutCf11`；真引擎的两条新用例与宿主改动(production 臂红：对话的 shell 攻击写进去了)。红输出存证。
+5. **C4 单元 B 绿：CF-11 进受保护集**。改 `process-fence-profile.ts`、`process-fence-plan.ts`、`server.ts` 的预建根、`engine-config-fence.engine.cases.ts:196`。跑检查组 B、C。
+6. **变异(不提交；每次只改一处，用 `git restore` 复原；输出存到 `…/impl-fence-slice3/mutations/`)**：
+   - M1 去掉 promise 链 ⇒ resolver 并发用例与 RPC 并发用例红(丢一条)。
+   - M2 `plugin.ts` 不传桥的写者 ⇒ 真引擎 production 臂：设置页 `setRecord` 得到 `write-failed`(围栏内 EPERM)，宿主日志判据在窗口里看到引擎 pid 的拒绝 ⇒ 红。
+   - M3 `server.ts` 链里去掉这一环 ⇒ server 两条红(没有应答，没有落盘)。
+   - M4 接收函数吞掉写错误、照样回 `ok` ⇒ server 失败臂、RPC 失败臂红。
+   - M5 位置清单去掉 CF-11 ⇒ profile / plan 红；写入矩阵 production 臂的 CF-11 项落地；真引擎 production 的攻击用例红。
+   - M6 桥的写者另挂监听、另起 id 计数 ⇒ hub-bridge 串号用例红。
+   - M7 预建循环跳过 CF-11 ⇒ plan 精确预建列表红。
+7. **C5 收口**：事实文档、`gate-files.tsv`、本节的偏离记录与证据路径。跑 ui-mac 与 ext 的类型检查、`git diff --check`，新行与改过的行各跑一次 `bun-test-floor.sh`。签名形态宿主跑一次(`CODEPUPPY_TEST_SIGNED_FENCE=1 bun test src/main/process-fence-extension-packaged.test.ts`，约 12 分钟)：它的夹具经 `planConfigFence` 带上 CF-11，而且会真打包 main，能验 main 新 import 的 ext 模块打得进包。登记层检查和每一个闸门步骤，等编排器给出 `GATE_ALLOW_FULL` 时再逐个跑。
+
+**相关检查**(只传宿主 `*.test.ts`；机器上有完整门在跑时加 `--max-concurrency 2`)：
+
+- A ext(在 `packages/ext` 下)：`bun test src/policy/resolver.test.ts src/policy/tool-policy-rpc.test.ts src/policy/register-policy.test.ts src/policy/inventory.test.ts src/policy/unattended-policy.test.ts src/policy/session-row-rules.test.ts src/policy/risk.test.ts src/hub-bridge.test.ts src/hub-tools.test.ts src/plugin-host.test.ts src/plugin-setup-order.test.ts src/policy/authority-registry.test.ts`；`bun run typecheck`。`hub-tools.test.ts` 手写了一个 `HubBridge` 对象，`plugin-host` 装了假 parentPort，所以它们算相关测试。
+- B ui-mac 单元(在 `packages/ui-mac` 下)：`bun test src/main/codepuppy-sidecar-messages.test.ts src/main/hub-view.test.ts src/main/server.test.ts src/main/tool-policy-client.test.ts src/main/process-fence-profile.test.ts src/main/process-fence-plan.test.ts src/main/process-fence-write-sites.test.ts src/main/process-fence-workspaces.test.ts src/main/process-fence-compile.test.ts src/main/process-fence-apply.test.ts src/main/process-fence-wiring.test.ts src/main/engine-explicit-config.test.ts src/main/custom-provider-truth.test.ts src/main/gate-file-registry.test.ts`。
+- C 围栏与真引擎宿主(串行)：`bun test src/main/process-fence-config-fence.test.ts src/main/engine-config-fence.engine.test.ts src/main/project-writable.engine.test.ts src/main/fence-write-denied.engine.test.ts src/main/endpoint-route-fence.engine.test.ts src/main/engine-db-records.engine.test.ts src/main/process-fence-engine.test.ts src/main/process-fence-extension.test.ts`(都经生产计划器，profile 多了 CF-11 和三个上级节点)；再从共享宿主的消费方里抽两个和工具策略有关的跑一次：`src/main/bootstrap-launch-parity.engine.test.ts`(经 RPC 读清单)、`src/main/composer-tier-matrix.engine.test.ts`。
+- 收口：`bun run --cwd packages/ui-mac typecheck`(不含 `*.test.ts` / `*.cases.ts`，所以 B、C 必须实际跑)；`bun run --cwd packages/ext typecheck`；`git diff --check`。
+
+### 风险
+
+- **两条 lane 改同一组文件**：凭据那条 lane 也会在同一条窄通道上加消息。本片的加法都放在独立的块里：消息文件末尾一块，不碰两个联合；`server.ts` 的接收链只加一行，外加一个常量；`hub-bridge.ts` 只加一个可选成员；`plugin.ts` 只多一个实参。后合入的一方 rebase 时按块合并。另外两边都会改 `scripts/gate-files.tsv`、写盘登记簿与事实文档：后合入的一方按实测重算条数，不手抄。
+- **CF-11 带来新的冻结节点**(F8)：`<XDG_DATA_HOME>/opencode`、`<XDG_DATA_HOME>`、`~/.local`。有的测试夹具用真 `realpath`、`mkdirp` 却什么都不建；树里如果没有 `<数据目录>/opencode`，计划器会在 `realpath(上级目录)` 处报 ENOENT。片 ② 处理 CF-8 时同类夹具已经按「真 mkdirp 或恒等 realpath」对齐过，检查组 C 能看出有没有漏网的。围栏内删不掉测试隔离预载的临时根，这件事片 ④ 已经记过；只经宿主跑。
+- **写文件工具的攻击在引擎 pid 上**(F9)：用窗口终点把它排除在判定之外，同时在终点之后正向断言引擎 pid 的拒绝读得到，所以判据比今天更能失败，不是放宽。窗口里仍然包括启动、模型调用、连接器调用、经 main 的安装 / 停用 / 启用、重启、设置页同时改两行、重置，以及 shell 攻击。
+- **桥的 20 s 超时**：main 是同步写盘，收到就回，正常情况下碰不到超时。只有 main 卡住超过 20 s 才会出现「设置页显示失败，但 main 事后写了」；下一次打开设置页读到的就是盘上的真实状态。这是桥既有的超时，不另加机制。
+- **共享宿主的假 parentPort**(F5)：对现有消费方没有作用。以后如果有消费方经 ext 的 RPC 写工具策略，会在 20 s 后响亮地得到 `write-failed`，不会静默。
+- **main 包多了 ext 的 resolver 模块图**(`defaultPolicyBaseDir` 所在的模块会带进 `managed.ts` 与 `core/src/util/wildcard`)：类型检查与签名形态宿主(会真打包)能看出来。main 早就 import `@opencode/core` 与 schema，预计没有问题。
+- **受保护资产与真实数据**：所有臂都用假 HOME 与沙箱数据目录；server 用例写之前先断言目标在测试的临时根里(named import 的 `homedir()` 不被预载钉住，所以数据目录只取 `XDG_DATA_HOME`)。
+- **机器纪律**：真引擎与围栏宿主串行跑；有完整门在跑时限制并发。
+
+### 证明
+
+| AC | 测试 / 证据 | 缺少行为为什么会失败 |
+| --- | --- | --- |
+| AC-01(CF-11) | `process-fence-config-fence.test.ts` → cases，生产计划器 + 生产渲染 + 生产 .node。production 臂：策略文档 × file 九种手法、策略目录 × dir 七种、新文档 × create 六种；三个上级节点改名移走；工作区软链、大小写、firmlink、`/.vol` 写法 —— 全部 `FAIL 1`，事后在围栏外读盘，字节、列表、权限不变。布局用例：拒写行承重。E2 在同一 profile 下照常(数据目录节点被冻结之后，库、`-wal`、日志照写)；`mkdir -p` 已存在的策略目录照常 | 同一宿主里的 `withoutCf11`：上面各手法与 `anc-data-opencode` 改名全部 `OK`(正向对照，说明 production 的 FAIL 来自 CF-11，不是手法本身不灵)。M5 ⇒ production 臂的 CF-11 项落地 |
+| AC-04「把工具策略改成放行」失败，「在设置页改工具策略(含同时改两行)」正常，沙箱日志无引擎进程拒绝 | `engine-config-fence.engine.test.ts` production 臂的新用例(真嵌入引擎 + 真 ext + 生产注入；cases 进程用生产计划器与生产 .node 关进围栏；main 是围栏外的辅助进程，跑生产的 `receiveToolPolicyWrite`)。设置页这一路：生产的 `createToolPolicyClient`(fetch 接在 `running.fetch` 上)→ 引擎 RPC → ext → 桥 → main。① 同时改两行(`mcp:probe:echo` 设为每次询问，另一个工具设为停用)⇒ 两次都 ok，盘上两条都在，下一次「请求审批」档调 echo 会问；`removeRecord`、`reset` 都 ok(重置有 backup)，再设回每次询问作为攻击前的基线。② E6 已知坏：一个围栏内子进程直接调生产的 `savePolicyDocument` ⇒ `REFUSED EPERM`，文档不变。③ 对话经引擎的 shell 工具(直接覆盖、在工作区写好再 `mv` 过去、在目录里新建)把文档改成 `third-party-mcp` 一类放行 ⇒ 输出 EPERM，字节不变，echo 仍问。④ 打印窗口终点之后，对话经写文件工具改同一份文档(审批给批准)⇒ 工具卡失败、带「operation not permitted」，字节不变，echo 仍问。宿主：窗口内引擎 pid 在受保护位置的拒绝为 0，攻击子进程的拒绝 > 0；终点之后引擎 pid 在 CF-11 的拒绝 > 0 | control 臂的新用例(生产 profile 去掉受保护块)：先由 main 辅助进程写好同样的基线，同一套 shell 与写文件攻击全部落地，echo 不再问。三项里任一项在 control 臂没成功，宿主就红。M2 ⇒ 设置页写失败、窗口里出现引擎 pid 的拒绝 |
+| AC-05 第二句：工具策略写失败 ⇒ 设置页收到失败，盘上旧文档不变 | `server.test.ts`：生产接收链 + 只读目录 ⇒ 回 `error`(带路径与 errno)、warn 恰一行、旧字节不变。`tool-policy-rpc.test.ts`：同样的注入经 RPC ⇒ `setRecord` / `removeRecord` 得到 `write-failed`，`reset` 得到 RPC 失败(main 客户端把它归成 `write-failed`，F4，既有 `tool-policy-client.test.ts`)，旧字节不变。对照(围栏内直接写)：上一行里的 ② | M4 ⇒ 两条失败臂都红。去掉 `mutate` 里对写者错误的包装 ⇒ 不再是 `write-failed` |
+| AC-06「工具策略与升级前相同」 | production 臂既有的 AC-06 ①：0.2.6 形状的工具策略文档(第三方 MCP 放行)冷启动之后照样决定(echo 不问；清空之后问；还原之后不问)。现在它跑在带 CF-11 的 profile 下：文档位置与格式不变，计划器的预建不碰已有文件，ext 照读 | 位置或读法变了 ⇒ 分区或判定断言红。本片不迁移任何东西 |
+| E6 串行(审查 R1 第 7 项) | `resolver.test.ts` ②(带测试内对照)与 `tool-policy-rpc.test.ts` ③：不等第一个就连发两次 `setRecord`(两个不同工具)⇒ 两条都在盘上；前一个失败不打断链(`resolver.test.ts` ③) | 测试内对照(不排队的旧写法)丢一条；M1 ⇒ 两条用例红 |
+| 接收链与消息形状 | `server.test.ts` ①：文档落在 ext 读的位置，`ok` 回给子进程；`codepuppy-sidecar-messages.test.ts`；`hub-bridge.test.ts` ①② | M3 ⇒ server 红；M6 ⇒ 串号用例红 |
+| 预建与清单(§4.3) | `process-fence-plan.test.ts` 的精确预建列表与 `configFenceRoots`；`process-fence-profile.test.ts` 的逐行形状与往返；`server.test.ts` 预建根表的 `XDG_DATA_HOME` 两行(计划前的根与计划器同源) | M7 ⇒ 预建列表红；M5 ⇒ 形状与清单红 |
+| I2 写者只在 main(§4.7) | `process-fence-write-sites.test.ts`：`store.ts` 四行按签名钉成 `main-only`；结构判据(F6) | 往另一个 ext 文件里临时加一个 `savePolicyDocument` 的 import ⇒ 结构判据红(变异时顺带做) |
+
+`gate-files.tsv` 预计要改的行(实施时按实测写回)：`resolver.test.ts` 32 → 35，`tool-policy-rpc.test.ts` 5 → 8，`process-fence-write-sites.test.ts` 14 → 15，`process-fence-plan.test.ts` 27(条数不变，改描述)，`process-fence-profile.test.ts` 35(同上)；`process-fence-config-fence` 与 `engine-config-fence.engine` 两个宿主各 1 条不变，内层钉在宿主里(18；production 5 / control 2)，描述补上本片。`hub-bridge.test.ts`、`codepuppy-sidecar-messages.test.ts`、`server.test.ts` 今天不在登记簿里，不新增。
+
+### 体量与时间
+
+- 文件：生产 11 个(其中两个是同链文件：`hub-bridge.ts`、`plugin.ts`)；测试 11 个；文档与登记 3 个；plan.md。大约 26 个文件。
+- 行数：生产约 +170 / −10；测试约 +480 / −20(写入矩阵约 70，真引擎两条用例加辅助进程与宿主约 170，ext 三份约 150，server 约 70)；本节约 120。
+- 时间：C1 约 1 小时；C2 约 1.5 小时；C3 约 1.5 小时(含两个宿主的红运行)；C4 约 1 小时；变异约 1 小时(含一次真引擎宿主)；收口约 1 小时，另加签名形态宿主约 12 分钟。合计约 6–7 小时，符合 M。
+
+### 偏离记录
+
+- 2026-11-20 · 编排器核对后分两轮(本提交):单元 A = C0–C2;单元 B = C3–C5,在主线合入片 ④ 之后开始(片 ④ 的复审修正把计划器的预建跳过绑在 CF-9 那一条位置上，不再按路径字符串，单元 B 开工前重读那段循环)。写盘登记簿 `store.ts` 四行改 `main-only`、`MAIN_ONLY_SITES` 与结构判据,从 C1 / C2 挪到 C3 / C4:单元 A 里 CF-11 还没进受保护集,W4 照样罩着工具策略目录，这四行今天的根仍然如实，而且 `receiveToolPolicyWrite` 不新增任何写盘调用点，登记簿判据不受影响。`server.test.ts` 预建根表的 `XDG_DATA_HOME` 两行同样归单元 B。
+- 2026-11-20 · 单元 A 多一条测试(计划的测试表里没有):`ext/plugin-host.test.ts` 在 OpenCode 2 真插件宿主里装生产默认导出、带一个假 parentPort,经 RPC 的 `setRecord` ⇒ port 上恰一条工具策略写请求，由 main 的生产接收函数写盘，下一次读到。理由：计划里「`plugin.ts` 把桥的写者交给 `registerPolicy`」这一接线(变异 M2)只有单元 B 的真引擎臂能抓到；这一条让单元 A 自己就有判据。gate-files `plugin-host` 51 → 52。
+- 2026-11-20 · §4.7 的结构断言措辞(编排器已接受，单元 B 落地):设计写「sidecar 闭包里没有任何文件 import 这些写者」,但 §4.5 冻结的缺省写者(CLI 与单测用)就在 `resolver.ts` 里直接调 `savePolicyDocument` / `resetPolicyDocument`,而 `resolver.ts` 在闭包里;所以判据写成「闭包里拿到这两个写者的只有 `resolver.ts`,没有文件拿到 `receiveToolPolicyWrite`」。
+
+- 2026-11-20 · 单元 A 证据(证据目录 `~/.cache/alpha-orch/2026-11-19/impl-fence-slice3/`,下称 `S3/`):红 `16f5fb7df3`(`S3/evidence/c1-red-ext.log`:ext 6 红;`c1-red-ui-mac.log`:消息与 server 共 3 红)→ 绿 `1e5d6d702a`,插件宿主接线一条 `5a66f0a7dd`。两条并发用例(`resolver.test.ts` W2、`tool-policy-rpc.test.ts` 并发臂)在红提交上是绿的：那时存储忽略写者、同步直写，不会竞争；它们能失败由变异 M1 证明。`server.test.ts` 的 `OPENCODE_CONFIG_DIR="."` 一条在新工作树上红，原因同片 ② 记过的那条(没有构建 `packages/ext/dist`),`bun run build` 之后绿。变异(`S3/mutations/`,每次只改一处，用 `git restore` 复原):M1 去掉串行链 ⇒ W2 与 RPC 并发臂红(丢一条);M2 `plugin.ts` 不传写者 ⇒ 插件宿主那条红(port 上零请求);M3 `server.ts` 链里去掉这一环 ⇒ server 两条红;M4 接收函数吞掉写错误照回 ok ⇒ RPC 与 server 的 AC-05 两条红;M6 桥的写者另挂监听、另起 id 计数 ⇒ hub-bridge 两条红(串号那条即目标)。检查：ext 相关 16 个测试文件、ui-mac 相关 6 个测试文件全绿;`bun run typecheck`(ext、ui-mac)干净;`git diff --check` 干净。
+
+- 2026-11-20 · 单元 B 在主线合入片 ④(`6bd79ca8d8`)之后做。预建循环已改为按 CF-9 那一条的 `neverCreate` 跳过;CF-11 是普通 subpath,原样被预建,循环不用改(F7 的结论不变，措辞按合入后的代码)。片 ④ 的写入矩阵 AC-08 用例本来就在 `<XDG_DATA_HOME>/opencode/plan` 懒建并写计划文件，现在它跑在 CF-11 与三个被冻结的上级节点之下，照样绿 —— 这就是编排器要的「计划目录写入照常」那一臂，没有另加。
+- 2026-11-20 · 单元 B 证据(`S3/`):红 `e8bd127ae2`(`S3/evidence/c3-red-unit.log` 14 红;`c3-red-matrix-host.log`:production 臂 52 次落地，全是 CF-11 各项，布局用例与 `withoutCf11` 红;`c3-red-engine-production.log`:production 臂在 machine() 的布局检查处红 —— 策略文档在放行块之下)→ 绿 `a487008895`。写入矩阵(`c4-green-matrix-inner.log`,内层 18 条):production 334 次尝试 0 次落地;`withoutCf11` 52 次落地;运行期放行签发 `<XDG_DATA_HOME>` 后别的文件落盘、策略文档仍 EPERM。真引擎宿主(`c4-green-engine-results/`,production 5 / fresh 2 / control 2 / noprecreate 1):窗口内引擎 pid 0 条受保护位置拒绝，攻击子进程 9 条(含围栏内直写的那个子进程与三条 shell 改写);窗口之后引擎 pid 在工具策略目录 1 条(写文件工具;它先问了 `external_directory`,用例给了批准);control 臂 shell 三条与写文件工具全部落地、echo 不再问。
+- 2026-11-20 · 单元 B 计划外的改动(都是同链、按实测):① `engine-config-fence.engine.cases.ts` 的 machine() 在起了 main 辅助进程之后失败时先停掉它(`98170b9744`)—— 红运行里 machine() 在布局检查处抛错,afterAll 拿不到辅助进程，它继承着 cases 的 stderr 成了孤儿，宿主等了 13 分钟，杀掉它才收尾。② 宿主的窗口判定改成等窗口里最后的攻击(对工具策略的 shell 改写)进了日志再判，窗口终点放宽一秒,cases 在打印终点之后等 3 s 再动写文件工具 —— 第一次绿运行里，读到第一批子进程拒绝就判了，三条 shell 改写与直写子进程都还没进日志(子进程 5 条),窗口后半段(设置页经 main 的写入就在这里)等于没判。③ `process-fence-profile.test.ts` 的 state 根用例只在放行行里找 W3:CF-11 带来的上级节点行同时含 `<数据根>/opencode` 与状态根，旧的子串过滤把它当成了 W3 行。④ `server.test.ts` 预建根表只加 `XDG_DATA_HOME` 绝对路径一行，没加相对路径：相对路径会被忽略、数据目录退回 `os.homedir()`(bun 里是开发者真实的主目录，预载钉不住),而 spawnLocalServer 会去读那个目录里的引擎库。
+- 2026-11-20 · 单元 B 变异(`S3/mutations/`,每次只改一处，`git restore` 复原):M5 位置清单去掉 CF-11 ⇒ profile / plan / server 共 13 条红，写入矩阵宿主 3 条红(布局、production、`withoutCf11`);引擎层面的 M5 就是红提交的状态(production 在布局检查处红),攻击落地由 control 臂证明。M7 预建跳过 CF-11 ⇒ plan 3 条红(精确预建列表、XDG 那条，以及 CF-9 软链那条 —— 真 realpath 下数据目录不在盘上)。I2:往 `ext/policy/identity.ts` 临时加一个 `savePolicyDocument` 的 import ⇒ 结构判据红。gate-files:`process-fence-write-sites` 14 → 15;`process-fence-config-fence`、`engine-config-fence.engine` 两行条数不变(宿主各 1 条，内层钉在宿主里:18;production 5 / control 2),描述补上本片;`process-fence-profile` 35、`process-fence-plan` 29 条数不变、描述补上。事实文档 `docs/architecture/2026-09-09-req159-process-fence.md` 同步。
+
+- 2026-11-20 · 送审前逐步跑闸(编排器给了 GATE_ALLOW_FULL;日志在 `S3/gate/`):六个包的类型检查全 0;`check:vendor` 0;contracts-consumer 整包 65 条 0;ext 整包 670 条 0(第一次 669 / 1 红:authority-registry 判官按名字找片 ④ 登记的证明用例,单元 B 改了真引擎宿主的用例名,`e7da2499f6` 还原，见下一条;`test-ext-run1-red.log`);ui-mac 整包带 known-fails 6951 条 0 失败;app 0;`assert-gate-files.sh` 387 个闸门文件条数精确，退出 2 只因签名形态宿主未开开关(下面单独跑);`north-star-guard.sh` 0;`docs-gates.sh`(NUL、链接)0;seed assets 0;`fixture-identity` 与 `old-name-scan` 15 条 0;签名形态宿主 `CODEPUPPY_TEST_SIGNED_FENCE=1` 内层 3 / 3、762 s。
+- 2026-11-20 · 真引擎宿主的用例名是权威登记册 `plan-directory-in-engine-data` 里的字面量，单元 B 改名让 ext 整包红;名字还原(登记册不改),片 ③ 的内容在它跑的 production / control 两臂里。gate-files 两行开头的旧条数与 AC 范围随后同步(只改描述)。
+
+- 2026-11-20 · 审查 R1(独立 Claude Opus 审查员，快照 `143bc58d60`,RECOMMEND MERGE)处置，新提交:
+  1. (Minor)宿主的窗口完整性判据原来是「非引擎 pid、路径在工具策略目录」,更早的围栏内直写子进程(E6 已知坏)也满足它，日志只送到那里就会提前判。改成只认最后一条 shell 命令(旁边新建的那份文档)的拒绝,cases 打印它的名字(`2f67bfb7fe`)。变异：宿主找一个不存在的名字 ⇒ 读满十次后校准断言红(`S3/mutations/R3-trace-absent.log`)。宿主重跑 `bun-test-floor.sh =1` 绿(窗口内引擎 pid 0 条，子进程 9 条;窗口后引擎 pid 1 条)。
+  2. §4.5 的『`createToolPolicyStore` 内一条链』落成『进程内每份文档一条链』(审查 R1 可选项，编排器采纳：跨 Location 的丢失更新是本片新出现的)。同一项目的两个 Location 各有一个存储、写同一份文档;链挂在 globalThis 上按文档路径登记(ext 每个 Location 求值一次，同 `PROCESS_STATE_KEY`),空闲即删。红 `df2430700a`(`resolver.test.ts` W4:两个存储并发 `setRecord` 丢了一条;`S3/evidence/r3-red-w4.log`)→ 绿 `c70901bccd`。变异：链退回每个存储一条 ⇒ W4 红(`S3/mutations/R3-per-store-chains.log`)。gate-files `resolver` 35 → 36。
+  重跑(`S3/gate/r3-*.log`):`resolver` =36、`tool-policy-rpc` =8、`plugin-host` =52、`register-policy` =69、ext 整包 671 条 0 失败、ext / ui-mac 类型检查 0、`engine-config-fence.engine` =1。没采纳：main 只收本代账户的写请求(超出 AC 的加固，编排器记给意图)。
+
+### 可选(不做)
+
+- 让共享引擎宿主的假 parentPort 也用生产接收函数答工具策略写请求(F5)。今天没有消费方需要，而且改了它，44 个消费方就都成了相关测试。
+- 按项目共享一条串行链(同一个 git 项目下的两个目录各有一个 Location 和一个存储，会写同一份文档)。设计定的是「`createToolPolicyStore` 内一条链」；设置页一次只对着一个目录。

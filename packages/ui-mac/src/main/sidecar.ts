@@ -27,6 +27,10 @@ import { acceptCodePuppyBootstrap, assertEngineReadsBootstrap } from "./sidecar-
 import { answerProjectConfigView } from "./sidecar-project-config-view"
 import { parseProjectConfigViewRequest, type ProjectConfigViewRequest, type ProjectConfigViewReply } from "./project-config-view-message"
 import { engineProjectTrust } from "./engine-project-trust"
+// DESIGN-stored-credentials-fence §4.2:本进程里凭据的值只来自主进程 —— start 消息带全表(T1)、续期推全表(T2)、引擎每次装载配置之前拉全表(P)。
+// 合同与请求方在 sidecar-credentials.ts(可 import、有单测);表本身挂在 util 的 globalThis 槽上,ext 与引擎各自读。
+import { installCodePuppyCredentialSource, parseCodePuppyCredentials, publishCodePuppyCredentials } from "@opencode/util/codepuppy-credentials"
+import { createCredentialRequester, parseCredentialsMessage, type CredentialsMessage, type CredentialsRequest, type CredentialsUnavailable } from "./sidecar-credentials"
 // REQ-159 `#1321`:进程围栏。本进程在 import 引擎之前把自己关进 seatbelt,之后派生的一切继承。
 // profile 由 main 渲染 + 试编译(process-fence-plan.ts),这里原样 apply;装不上 = 本进程不起
 // (fail-closed,原因经 error IPC 报给 main)。判据在 process-fence-apply.test.ts(真 .node / 真 seatbelt /
@@ -99,10 +103,15 @@ type StartCommand = {
    * 坏了走与「darwin 缺围栏」同一条响亮失败路。
    */
   bootstrap: unknown
+  /**
+   * DESIGN-stored-credentials-fence §4.2 T1:Code Puppy 凭据存放点的整表(`{}` 合法)。只在内存里;`start()` 在注入与 import 引擎之前解析并发布,
+   * 坏了走与「darwin 缺围栏」同一条响亮失败路。
+   */
+  credentials: unknown
 }
 
 type StopCommand = SidecarStopCommand
-type SidecarCommand = StartCommand | StopCommand | WorkspaceWriteProbeCommand | WorkspaceWriteGrantCommand | ProjectConfigViewRequest
+type SidecarCommand = StartCommand | StopCommand | WorkspaceWriteProbeCommand | WorkspaceWriteGrantCommand | ProjectConfigViewRequest | CredentialsMessage
 
 // #613:注入失败随 ready 上报(server.ts 持有同构镜像)——引擎照常起,但 main 必须知情。
 // ready 变体的形状与构造住在 sidecar-ready-message.ts(那里有真运行时闸门)。
@@ -113,6 +122,8 @@ type SidecarMessage =
   | WorkspaceWriteProbeReply
   | WorkspaceWriteGrantReply
   | ProjectConfigViewReply
+  | CredentialsRequest
+  | CredentialsUnavailable
 
 type ParentPort = {
   postMessage(message: SidecarMessage): void
@@ -123,11 +134,18 @@ const parentPort = getParentPort()
 let engine: StoppableEngine | undefined
 let fenceAddon: FenceAddon | undefined
 let readProjectConfigView: typeof import("virtual:opencode-server")["projectConfigView"] | undefined
+const credentials = createCredentialRequester((message) => parentPort.postMessage(message))
 
 parentPort.on("message", (event) => {
   const command = parseCommand(event.data)
   if (!command) return
+  if (command.type === "credentials") {
+    if ("id" in command) credentials.receive(command)
+    else publishCodePuppyCredentials(command.credentials) // T2 续期推送
+    return
+  }
   if (command.type === "stop") {
+    credentials.close("sidecar stopping")
     void stop()
     return
   }
@@ -159,6 +177,9 @@ async function start(command: StartCommand) {
     // REQ-159:第一步就是把本进程关进围栏 —— 在写任何文件、import 引擎之前。装不上直接抛,
     // 走下面的 catch:error IPC + exit(1),main 据此宣告这一代失败(响亮,不静默降级成无围栏服务)。
     fenceAddon = installProcessFence(command)
+    // DESIGN-stored-credentials-fence §4.2 T1:在注入与 import 引擎之前发布主进程交来的整表,再装上「装载前拉取」的来源(P)。
+    publishCodePuppyCredentials(parseCodePuppyCredentials(command.credentials))
+    installCodePuppyCredentialSource(() => credentials.pull())
     // `#1698`(§4.2 第 2 步):解析并发布启动文档 —— 之后本进程里的注入、ext 与引擎只从它读 main 的决定。
     const bootstrap = acceptCodePuppyBootstrap(command.bootstrap)
     // #613:注入结果必须捕获并随 ready 上报 —— 注入失败 = 引擎起来了但整份 alpha 配置丢失
@@ -314,6 +335,11 @@ function parseCommand(value: unknown): SidecarCommand | undefined {
   if (command.type === "write-probe") return parseWriteProbeCommand(value)
   if (command.type === "grant-write") return parseWriteGrantCommand(value)
   if (command.type === "project-config-view") return parseProjectConfigViewRequest(value)
+  if ((value as { type?: unknown }).type === "credentials") {
+    const message = parseCredentialsMessage(value)
+    if (!message) console.warn("Code Puppy credentials: a malformed credentials message from main was dropped")
+    return message
+  }
   if (command.type !== "start") return
   if (typeof command.hostname !== "string") return
   if (typeof command.port !== "number") return
@@ -326,6 +352,7 @@ function parseCommand(value: unknown): SidecarCommand | undefined {
     password: command.password,
     ...(fence ? { fence } : {}),
     bootstrap: command.bootstrap,
+    credentials: command.credentials,
   }
 }
 

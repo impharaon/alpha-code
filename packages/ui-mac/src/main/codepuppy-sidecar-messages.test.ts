@@ -238,3 +238,46 @@ test("R13 B3 package authorization messages reject malformed inputs and credenti
   for (const bad of [{ ...reply, result: { ok: true, packageId: "claude:github", items: [{ ...item, path: "/private" }] } }, { ...reply, result: { ok: true, packageId: "claude:github", items: [{ ...item, authenticated: "false" }] } }])
     expect(messages.parsePackageAuthorizationReply(bad)).toBeUndefined()
 })
+
+// SPEC-engine-config-fence BR-03 / DESIGN-engine-config-fence §4.5:工具策略改写经这条窄通道交给 main 写。请求与应答各自一对 build / parse,
+// 形状不对一律 undefined;这两种消息由 server.ts 接收链上自己的那一环处理,不进 hub 的入站族。
+test("I-13 tool policy write: requests (save / reset) and replies (ok / ok with backup / error) round-trip; malformed shapes are discarded; the request is not part of the hub inbound family", async () => {
+  const messages = await import("./codepuppy-sidecar-messages")
+  const partition = { account: "acct:1", workspace: "/work/a" }
+  const records = [{ selector: { level: "tool", canonical: "builtin::shell" }, state: "disabled" }] as never
+  const save = messages.buildToolPolicyWriteRequest({ id: 4, op: "save", partition, records })
+  expect(save).toEqual({ type: "codepuppy.tool-policy.write.request", id: 4, op: "save", partition, records })
+  expect(messages.parseToolPolicyWriteRequest(save)).toEqual(save)
+  const reset = messages.buildToolPolicyWriteRequest({ id: 5, op: "reset", partition })
+  expect(reset).toEqual({ type: "codepuppy.tool-policy.write.request", id: 5, op: "reset", partition })
+  expect(messages.parseToolPolicyWriteRequest(reset)).toEqual(reset)
+  for (const bad of [
+    { ...save, id: -1 },
+    { ...save, op: "delete" },
+    { ...save, partition: { account: "acct:1" } },
+    { ...save, partition: { ...partition, extra: "x" } },
+    { ...save, records: "all" },
+    { ...save, records: [null] },
+    { ...reset, records: [] },
+    { ...save, type: "codepuppy.tool-policy.write.reply" },
+    "codepuppy.tool-policy.write.request",
+  ])
+    expect(messages.parseToolPolicyWriteRequest(bad), JSON.stringify(bad)).toBeUndefined()
+  expect(messages.parseCodePuppySidecarInbound(save)).toBeUndefined()
+
+  for (const reply of [
+    messages.buildToolPolicyWriteReply(4, { ok: true }),
+    messages.buildToolPolicyWriteReply(5, { ok: true, backup: "/d/x.json.quarantined-1" }),
+    messages.buildToolPolicyWriteReply(6, { error: "EACCES: permission denied, open '/d/x.json.tmp'" }),
+  ])
+    expect(messages.parseToolPolicyWriteReply(reply)).toEqual(reply)
+  expect(messages.buildToolPolicyWriteReply(4, { ok: true })).toEqual({ type: "codepuppy.tool-policy.write.reply", id: 4, ok: true })
+  for (const bad of [
+    { type: "codepuppy.tool-policy.write.reply", id: 4, ok: "yes" },
+    { type: "codepuppy.tool-policy.write.reply", id: 4, ok: true, backup: 3 },
+    { type: "codepuppy.tool-policy.write.reply", id: 4, error: "" },
+    { type: "codepuppy.tool-policy.write.reply", id: 4 },
+    { type: "codepuppy.tool-policy.write.request", id: 4, ok: true },
+  ])
+    expect(messages.parseToolPolicyWriteReply(bad), JSON.stringify(bad)).toBeUndefined()
+})

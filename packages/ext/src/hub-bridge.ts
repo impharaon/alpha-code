@@ -15,7 +15,10 @@ import { PLUGIN_SOURCE_SEARCH_REPLY_TIMEOUT_MS } from "../../ui-mac/src/shared/p
 // 取不到 parentPort(CLI / 测试宿主)⇒ `available: false`,三个工具如实说「本宿主不可用」,不猜。
 
 import { createUnattendedState } from "./policy/unattended"
+import type { ToolPolicyWriter } from "./policy/resolver"
 import {
+  buildToolPolicyWriteRequest,
+  parseToolPolicyWriteReply,
   buildPackageAuthorizationQuery,
   parsePackageAuthorizationReply,
   buildUnattendedAck,
@@ -63,6 +66,11 @@ export type HubBridge = {
   report(input: { generation: number; scope: ReloadScope; outcome: ReloadOutcome; directories: string[]; error?: string }): void
   /** main → ext 的重载请求交给谁。只能挂一个(调度器);挂上之前到达的请求按序缓存,挂上时补交。 */
   onReloadRequest(handler: (message: ReloadRequestMessage) => void): void
+  /**
+   * SPEC-engine-config-fence BR-03(DESIGN-engine-config-fence §4.5):工具策略文档的写者 —— main 写、写完再回复,走本桥同一个监听、同一个 id 空间
+   * 与超时。只在有 parentPort 时有;main 回 error、超时、应答形状不对或发不出去 ⇒ 记一行并抛(存储包成 ToolPolicyWriteError("io"))。
+   */
+  readonly toolPolicy?: ToolPolicyWriter
 }
 
 const DEFAULT_TIMEOUT_MS = 20_000
@@ -147,9 +155,32 @@ export function createHubBridge(
     })
   }
 
+  const writeToolPolicy = async (build: (id: number) => unknown): Promise<{ backup?: string }> => {
+    const result = await ask(build, (message) => {
+      const reply = parseToolPolicyWriteReply(message)
+      if (!reply) return
+      return "error" in reply
+        ? { ok: false as const, reason: "error" as const, detail: reply.error }
+        : { ok: true as const, ...(reply.backup !== undefined ? { backup: reply.backup } : {}) }
+    })
+    if (!result.ok) {
+      log(`[@codepuppy/ext] tool policy write: ${result.reason} — ${result.detail}`)
+      throw new Error(`the app could not write the tool policy document: ${result.detail}`)
+    }
+    return result.backup !== undefined ? { backup: result.backup } : {}
+  }
+
   return {
     unattended,
     available: !!port,
+    ...(port
+      ? {
+          toolPolicy: {
+            save: async (partition, records) => void (await writeToolPolicy((id) => buildToolPolicyWriteRequest({ id, op: "save", partition, records }))),
+            reset: (partition) => writeToolPolicy((id) => buildToolPolicyWriteRequest({ id, op: "reset", partition })),
+          } satisfies ToolPolicyWriter,
+        }
+      : {}),
     view: (input) =>
       ask(
         (id) => buildHubViewRequest({ id, ...input }),

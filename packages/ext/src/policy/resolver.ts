@@ -29,6 +29,7 @@ import { managedCapDenies, readManagedPolicy, type ManagedPolicyResult } from ".
 import {
   canonicalJsonDigest,
   loadPolicyDocument,
+  policyFilePath,
   resetPolicyDocument,
   savePolicyDocument,
   type PolicyLoadResult,
@@ -215,6 +216,18 @@ export interface ToolPolicyStoreOptions {
   readonly workspace: () => string
   /** Managed cap reader (production: `readManagedPolicy()`; the system directory cannot be replaced by env). */
   readonly managed?: () => Promise<ManagedPolicyResult>
+  /**
+   * Who writes the document (SPEC-engine-config-fence BR-03, DESIGN §4.5). Production: main, over the narrow channel (the hub bridge's
+   * writer; `registerPolicy` passes it when the process has a parent port) — the directory is protected configuration the fenced
+   * extension cannot write. Absent: `savePolicyDocument` / `resetPolicyDocument` directly (CLI, unit tests). Reads stay here.
+   */
+  readonly write?: ToolPolicyWriter
+}
+
+/** The document writer behind `setRecord` / `removeRecord` / `reset` (DESIGN-engine-config-fence §4.5). */
+export type ToolPolicyWriter = {
+  save(partition: ToolPolicyPartition, records: readonly ToolPolicyRecord[]): Promise<void>
+  reset(partition: ToolPolicyPartition): Promise<{ backup?: string }>
 }
 
 export interface ToolPolicyStore {
@@ -222,6 +235,26 @@ export interface ToolPolicyStore {
   readonly setRecord: (record: ToolPolicyRecord) => Promise<void>
   readonly removeRecord: (selector: ToolPolicySelector) => Promise<void>
   readonly reset: () => Promise<{ backup?: string }>
+}
+
+/**
+ * Review R1 #7 (DESIGN §4.5) and the slice-③ review's optional item: with the write answered by another process, two changes to ONE
+ * document would each read the same old version and the later reply would drop the earlier record — also across stores: two Locations
+ * of one project each have a store and write the same partition's document. So there is one «read → check → await the write» chain per
+ * document file in the process. It lives on globalThis (the extension module is evaluated once per Location, plugin.ts PROCESS_STATE_KEY);
+ * an entry goes when its chain is idle.
+ */
+const WRITE_CHAINS_KEY = Symbol.for("codepuppy.ext.tool-policy.write-chains")
+function documentChain<T>(file: string, run: () => Promise<T>): Promise<T> {
+  const holder = globalThis as { [WRITE_CHAINS_KEY]?: Map<string, Promise<unknown>> }
+  const chains = (holder[WRITE_CHAINS_KEY] ??= new Map())
+  const next = (chains.get(file) ?? Promise.resolve()).then(run)
+  const tail = next.catch(() => undefined)
+  chains.set(file, tail)
+  void tail.then(() => {
+    if (chains.get(file) === tail) chains.delete(file)
+  })
+  return next
 }
 
 export function createToolPolicyStore(options: ToolPolicyStoreOptions): ToolPolicyStore {
@@ -245,20 +278,28 @@ export function createToolPolicyStore(options: ToolPolicyStoreOptions): ToolPoli
     return { partition: part, managed, user: userLayerFrom(loaded), load: loaded, revision }
   }
 
-  const mutate = async (description: string, change: (records: readonly ToolPolicyRecord[]) => readonly ToolPolicyRecord[]) => {
+  const write: ToolPolicyWriter = options.write ?? {
+    save: async (part, records) => savePolicyDocument(options.baseDir, part, records),
+    reset: async (part) => resetPolicyDocument(options.baseDir, part),
+  }
+  // One chain per document (documentChain): a whole «read → check → await the write» finishes before the next change to the same file
+  // starts, whichever store asked; a failure fails its own caller only and the chain goes on.
+  const mutate = (description: string, change: (records: readonly ToolPolicyRecord[]) => readonly ToolPolicyRecord[]) => {
     const part = partition()
-    const loaded = loadPolicyDocument(options.baseDir, part)
-    if (loaded.status === "quarantined")
-      throw new ToolPolicyWriteError(
-        "quarantined",
-        `refusing to ${description}: policy document is quarantined (${loaded.reason}); reset to defaults first`,
-      )
-    const records = loaded.status === "ok" ? loaded.doc.records : []
-    try {
-      savePolicyDocument(options.baseDir, part, change(records))
-    } catch (error) {
-      throw new ToolPolicyWriteError("io", error instanceof Error ? error.message : String(error))
-    }
+    return documentChain(policyFilePath(options.baseDir, part), async () => {
+      const loaded = loadPolicyDocument(options.baseDir, part)
+      if (loaded.status === "quarantined")
+        throw new ToolPolicyWriteError(
+          "quarantined",
+          `refusing to ${description}: policy document is quarantined (${loaded.reason}); reset to defaults first`,
+        )
+      const records = loaded.status === "ok" ? loaded.doc.records : []
+      try {
+        await write.save(part, change(records))
+      } catch (error) {
+        throw new ToolPolicyWriteError("io", error instanceof Error ? error.message : String(error))
+      }
+    })
   }
 
   return {
@@ -278,7 +319,10 @@ export function createToolPolicyStore(options: ToolPolicyStoreOptions): ToolPoli
         const key = selectorKey(renamedSelector(selector))
         return renamedRecords(records).records.filter((item) => selectorKey(item.selector) !== key)
       }),
-    reset: async () => resetPolicyDocument(options.baseDir, partition()),
+    reset: () => {
+      const part = partition()
+      return documentChain(policyFilePath(options.baseDir, part), () => write.reset(part))
+    },
   }
 }
 

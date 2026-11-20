@@ -14,6 +14,7 @@ import { engineAuthorization, withEngineAuthorization } from "../src/main/engine
 import { injectCodePuppyConfig } from "../src/main/codepuppy-config-injection"
 import { writeEngineConfigForFork } from "../src/main/engine-explicit-config"
 import { secretFilePath, secretFileRef } from "../src/main/codepuppy-secret-files"
+import { handOverCredentials, startCredentials } from "./credential-table"
 import { buildHubRequestReply, buildHubViewReply, buildSourcesSearchReply } from "../src/main/codepuppy-sidecar-messages"
 import type { EngineFetch } from "../src/main/in-process-engine"
 import { engineProjectTrust } from "../src/main/engine-project-trust"
@@ -260,19 +261,33 @@ export function codepuppyEngine(options: HostOptions) {
   )
 
   const withExt = options.ext !== false
+  // SPEC-stored-credentials-fence:main 的 T1 + P(credential-table.ts)—— 注入(C-f 只问表)之前发布,之后每次配置装载各自现读。
+  handOverCredentials(userData)
   // 与生产同序(SPEC-engine-config-fence BR-03):main 在 fork 前按同一份启动文档写显式文件、模型底表与种子,sidecar 再注入。
   // `explicit` 是 main 的监听用的输入(server.ts 每代起的那一份)。
   const explicit = writeEngineConfigForFork(codepuppyBootstrap()).watch
+  const project = (injected: ReturnType<typeof injectCodePuppyConfig>) => {
+    const next = JSON.parse(injected.config.content) as { plugins: string[]; providers: Record<string, { models?: Record<string, unknown> }> }
+    next.plugins = [...next.plugins, probeDir]
+    // 沙箱里没有已应用的平台目录,平台节点的模型表是空的(`#1556`);补一个模型只为能发出请求
+    if (options.platformModels !== null) next.providers.codepuppy!.models = options.platformModels ?? { m: { name: "m" } }
+    return next
+  }
   const injection = injectCodePuppyConfig(userData, withExt ? ext : undefined, "stable", codepuppyBootstrap().paths.userConfig ?? null)
-  const content = JSON.parse(injection.config.content) as { plugins: string[]; providers: Record<string, { models?: Record<string, unknown> }> }
-  content.plugins = [...content.plugins, probeDir]
-  // 沙箱里没有已应用的平台目录,平台节点的模型表是空的(`#1556`);补一个模型只为能发出请求
-  if (options.platformModels !== null) content.providers.codepuppy!.models = options.platformModels ?? { m: { name: "m" } }
+  const content = project(injection)
+  /** 结构性重启的 sidecar 那一侧(SPEC-stored-credentials-fence:新一代 T1 之后重新注入,C-f 只问表);下一次 start() 用新的内联文档。 */
+  const reinject = async () => {
+    await startCredentials()
+    const next = project(injectCodePuppyConfig(userData, withExt ? ext : undefined, "stable", codepuppyBootstrap().paths.userConfig ?? null))
+    for (const key of Object.keys(content)) delete (content as Record<string, unknown>)[key]
+    Object.assign(content, next)
+  }
 
   const slot = { ...engineSlot(sandbox, name), ...(options.databasePath ? { databasePath: options.databasePath } : {}) }
   for (const [file, body] of Object.entries(options.projectFiles ?? {})) fs.writeFileSync(path.join(slot.projectDirectory, file), body)
 
   const start = async (): Promise<Running> => {
+    await startCredentials() // T1:每一代 start 都随 start 消息带当刻的整表(围栏外 main 在场时经它)
     const { startEngine } = await import("../engine/engine-embed")
     let fetch: EngineFetch | undefined
     const password = `cp-${name}`
@@ -316,7 +331,7 @@ export function codepuppyEngine(options: HostOptions) {
       close: () => engine.close(),
     }
   }
-  return { start, slot, projectDirectory: slot.projectDirectory, userData, injection, explicit, content }
+  return { start, reinject, slot, projectDirectory: slot.projectDirectory, userData, injection, explicit, content }
 }
 
 /** ext 的策略存储(数据根 / 账户 / 工作区与 registerPolicy 同一套);ext 模块在沙箱就位之后才装载。 */

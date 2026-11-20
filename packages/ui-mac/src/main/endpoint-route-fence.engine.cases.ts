@@ -7,6 +7,8 @@ import type { ProcessFenceStartInput } from "./process-fence-apply"
 import { mockElectron } from "../../test-component/electron-mock"
 import { engineSandbox, assertEngineSandboxed } from "../../test-component/engine-sandbox"
 import { codepuppyEngine, scriptedModel } from "../../test-component/codepuppy-engine"
+import { serveCredentialsFromOutside } from "../../test-component/credential-table"
+import { processFenceWriteRules } from "./process-fence-profile"
 
 const sandbox = engineSandbox()
 const name = "fence-route"
@@ -78,6 +80,11 @@ test("F1 actual generation profile: engine reads main's atomic route; child writ
   expect(file.startsWith(userDataPath + path.sep)).toBe(false)
   expect(file.startsWith(environment.mutableRoot + path.sep)).toBe(false)
   expect(fs.readFileSync(file, "utf8")).toBe("preferred")
+  // SPEC-stored-credentials-fence: server.ts's planProductionFence fed C1 — this generation's credential stores are in the profile, last
+  expect(processFenceWriteRules(start!.fence.profile).deny).toContainEqual({ kind: "subpath", value: path.join(fs.realpathSync.native(userDataPath), "codepuppy-secrets") })
+  expect(start!.fence.profile.trimEnd().split("\n").at(-1)).toContain("; C1 上级目录节点")
+  // C1 refuses this process its own credential stores once fenced — main (outside the fence) answers the pulls
+  await serveCredentialsFromOutside()
   applyProcessFence(start!.fence, { insideDir: host.projectDirectory, outsideDir: path.dirname(file) })
   const running = await host.start()
   const turn = async () => {

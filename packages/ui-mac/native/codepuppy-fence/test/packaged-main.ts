@@ -4,10 +4,11 @@ import { app, utilityProcess } from "electron"
 import { mkdirSync, readFileSync, readdirSync, realpathSync, writeFileSync, existsSync } from "node:fs"
 import { join } from "node:path"
 import { buildCodePuppyBootstrap } from "../../../src/main/codepuppy-bootstrap-build"
+import { credentialStores, readCredentialTable } from "../../../src/main/codepuppy-secret-files"
 import { engineAuthorization } from "../../../src/main/engine-authorization"
 import { loadFenceAddon } from "../../../src/main/process-fence-apply"
 import { renderProcessFenceProfile, resolveEngineRoots, WORKSPACE_WRITE_EXTENSION_CLASS } from "../../../src/main/process-fence-profile"
-import { planConfigFence } from "../../../src/main/process-fence-plan"
+import { planConfigFence, planCredentialStores } from "../../../src/main/process-fence-plan"
 import { buildWriteProbeCommand, createWriteGrantRequester, parseWriteProbeReply } from "../../../src/main/workspace-write-probe"
 
 const run = process.env.CODEPUPPY_G0_RUN!
@@ -59,7 +60,7 @@ async function boot(name: string, variant = "production") {
     { userDataPath: userData, appStateRoot: join(root, "codepuppy-state"), codepuppyGlobalRoot: globalRoot, engineConfigDirectory: join(roots.configHome, "opencode"), roots },
     { realpath: (path) => realpathSync.native(path), mkdirp: (path) => void mkdirSync(path, { recursive: true }) },
   ).configFence
-  let profile = renderProcessFenceProfile({ workspaces: [A], codepuppyGlobalRoot: globalRoot, userDataPath: userData, stateHome: env.XDG_STATE_HOME, roots, egressProxyPort: 59999, configFence })
+  let profile = renderProcessFenceProfile({ workspaces: [A], codepuppyGlobalRoot: globalRoot, userDataPath: userData, stateHome: env.XDG_STATE_HOME, roots, egressProxyPort: 59999, configFence, credentialStores: planCredentialStores(credentialStores({ userDataPath: userData }), { realpath: (path) => realpathSync.native(path) }) })
   if (variant === "file-only") profile = profile.replace(/\(deny file-issue-extension[\s\S]*?\(extension-class "[^"]+"\)\)/, `(deny file-issue-extension (extension-class "${WORKSPACE_WRITE_EXTENSION_CLASS}"))`)
   if (variant === "no-deny") profile = profile.replace(/\(deny file-issue-extension[\s\S]*?\(extension-class "[^"]+"\)\)/, "")
   // Keep the test helper outside asar: it is an independently executed Mach-O signed with the package.
@@ -87,6 +88,8 @@ async function boot(name: string, variant = "production") {
   const port = 40000 + Math.floor(Math.random() * 10000)
   child.postMessage({
     type: "start", hostname: "127.0.0.1", port, password, fence: { profile, addonPath },
+    // SPEC-stored-credentials-fence T1:start 必带 main 交来的凭据整表(生产读法)
+    credentials: readCredentialTable(credentialStores({ userDataPath: userData })),
     bootstrap: buildCodePuppyBootstrap({
       userDataPath: userData, globalRoot, userConfig: join(globalRoot, "codepuppy.jsonc"), initialDirectory: A,
       databasePath: join(userData, "engine.db"), engineConfigDirectory: join(userData, "engine-config"),

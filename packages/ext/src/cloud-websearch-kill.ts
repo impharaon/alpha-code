@@ -110,7 +110,7 @@
 // `internet_archive_search` 一类第三方工具(与 AC4 反向)。改**实现**为真正的相邻判定。
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { readFileSync } from "node:fs"
+import { readCodePuppyCredential } from "../../util/src/codepuppy-credentials"
 import type { MCPEditor } from "@opencode/plugin/promise/mcp"
 import { toServerConfig } from "./engine-transforms"
 import { computeMcpOwnership, type McpOwnership, resolveFileRefs, UNVERIFIED_MCP_OWNERSHIP } from "@opencode/plugin/alpha-cloud-authority"
@@ -377,7 +377,7 @@ export { resolveFileRefs }
 export function installCloudMcp(
   editor: Pick<MCPEditor, "set">,
   bootstrap: CodePuppyBootstrap = codepuppyBootstrap(),
-  readFile: (path: string) => string = (path) => readFileSync(path, "utf8"),
+  readFile: (path: string) => string = readCodePuppyCredential, // DESIGN-stored-credentials-fence §4.4 C-d:进程内凭据表
 ): string | undefined {
   if (!cloudMcpArmed(bootstrap) || !bootstrap.cloudMcp) return undefined
   const name = bootstrap.cloudMcp.name

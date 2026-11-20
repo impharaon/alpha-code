@@ -17,6 +17,7 @@ import type { EngineFetch } from "./in-process-engine"
 import { engineProjectTrust } from "./engine-project-trust"
 import { codepuppyBootstrap } from "@opencode/util/codepuppy-bootstrap"
 import { publishTestBootstrap } from "../../test-component/codepuppy-bootstrap-fixture"
+import { handOverCredentials } from "../../test-component/credential-table"
 
 const sandbox = engineSandbox()
 const PASSWORD = "cp-1713-plugin-trust"
@@ -156,6 +157,7 @@ for (const arm of ["allowed", "unallowed"] as const) {
       projects = await fixture(arm)
       // 与生产同序(SPEC-engine-config-fence BR-03):main 在 fork 前写显式文件,sidecar 再注入
       explicit = writeEngineConfigForFork(codepuppyBootstrap()).watch
+      handOverCredentials(userData) // SPEC-stored-credentials-fence:sidecar 在注入之前发布主进程交来的整表(T1),引擎装载前现拉(P)
       injection = injectCodePuppyConfig(userData, ext, "stable", codepuppyBootstrap().paths.userConfig ?? null)
       expect(injection.ok).toBe(true)
       engine = await engineWith(arm, injection.config, injection.models.file)

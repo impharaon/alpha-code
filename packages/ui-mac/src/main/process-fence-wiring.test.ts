@@ -214,7 +214,7 @@ describe.skipIf(!darwin)("#1504 Office cache under the unchanged process fence",
         profile = renderProcessFenceProfile({
           workspaces: [workspace], codepuppyGlobalRoot: isolated.CODEPUPPY_GLOBAL_DIR,
           userDataPath: input.userDataPath, stateHome: isolated.XDG_STATE_HOME,
-          roots: resolveEngineRoots(input.sidecarEnv, isolated.HOME), egressProxyPort: input.egressProxyPort!, configFence: [],
+          roots: resolveEngineRoots(input.sidecarEnv, isolated.HOME), egressProxyPort: input.egressProxyPort!, configFence: [], credentialStores: [],
         })
         return { profile, addonPath: "/unused-by-sandbox-exec" }
       },

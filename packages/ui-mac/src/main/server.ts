@@ -25,6 +25,8 @@ import { exportedFlag } from "@opencode/util/codepuppy-bootstrap"
 import { factorySkillDirsForFork } from "./factory-skills"
 import { resourcesRoot } from "./ext-fs-installer"
 import { syncSecretFiles } from "./codepuppy-secret-files"
+import { buildCredentialTable, mainCredentialStores } from "./codepuppy-credential-table"
+import { answerCredentialsMessage, type CredentialsMessage } from "./sidecar-credentials"
 import { customProviderSecretValues } from "./codepuppy-byok-keys"
 import { ignoredConfigProviderBlocks, ignoredConfigRemoteMcpEntries } from "./ext-config"
 import { readCustomProviderRecords } from "./custom-provider-records"
@@ -78,6 +80,8 @@ import { ensureUserWorkspaceDir } from "./codepuppy-user-workspace"
 import { fenceWorkspaceTruthPath, readWorkspaceTruthOrThrow, type FenceRunWritable } from "./process-fence-workspaces"
 import { homedir } from "node:os"
 import { mkdirSync, readFileSync, realpathSync, statSync } from "node:fs"
+import { defaultPolicyBaseDir } from "../../../ext/src/policy/resolver"
+import { receiveToolPolicyWrite } from "../../../ext/src/policy/store"
 
 export type HealthCheck = { wait: Promise<void> }
 
@@ -151,6 +155,22 @@ type SpawnLocalServerOptions = {
     receive(message: unknown, post: (message: CodePuppySidecarOutbound) => void): boolean
     attach(post: (message: CodePuppySidecarOutbound) => void): (reason: string) => void
   }
+  /**
+   * DESIGN-stored-credentials-fence §4.2:引擎拉取凭据表超时(`credentials.unavailable`)或主进程读不出表时,请求既有的 `credential-change` 重启
+   * (index.ts 接到 requestSidecarRespawn:既有队列与自愈阶梯,有界)。
+   */
+  requestRespawn?: (trigger: "credential-change") => void
+}
+
+/** DESIGN-stored-credentials-fence §4.3:T1 / P / T2 的整表(codepuppy-credential-table.ts,测试里扮演 main 的也用它)。 */
+const credentialTable = buildCredentialTable
+
+// T2:当前这一代 sidecar 的推送口(start 发出之后才有;子进程退出即撤)。
+let pushCredentialTable: (() => void) | undefined
+
+/** DESIGN-stored-credentials-fence §4.3 T2:续期写盘之后把整表推给当前子进程。没有子进程 ⇒ 跳过;发送抛 ⇒ 抛(调用方按 needs-structural)。 */
+export function pushCredentialsToSidecar(): void {
+  pushCredentialTable?.()
 }
 
 // ── REQ-137:策略代理单例(main 进程内,围栏外)──────────────────────────────────────────
@@ -326,6 +346,7 @@ export function preplanConfigFenceRoots(input: { env: Record<string, string | un
     engineConfigDirectory: engineGlobalConfigDirectory(exported.env, exported.home),
     configHome: resolveEngineRoots(exported.env, exported.home).configHome,
     home: exported.home,
+    dataHome: resolveEngineRoots(exported.env, exported.home).dataHome,
   }).flatMap((rule) => (rule.kind === "subpath" ? [rule.path] : []))
 }
 
@@ -343,6 +364,8 @@ function planProductionFence(input: ProductionFenceInput): ProcessFencePlan | un
       carriedWorkspaces: input.carriedWorkspaces,
       engineConfigDirectory: input.engineConfigDirectory,
       ...(input.envFile ? { envFile: input.envFile } : {}),
+      // DESIGN-stored-credentials-fence §4.5:C1 的存放点与 T1 / P / T2 的表同一份清单
+      credentialStores: mainCredentialStores(input.userDataPath),
     },
     {
       homeDir: homedir,
@@ -752,14 +775,40 @@ export async function spawnLocalServer(
   }
   // REQ-234 `#1529`:`codepuppy.*` 分发与探针应答并列;不是本族的消息原样交还(返回 false)。
   const postCodePuppy = (message: CodePuppySidecarOutbound) => child.postMessage(message)
+  // DESIGN-stored-credentials-fence §4.2:引擎装载配置之前的拉取 —— 同步建表并回复(收到与回复之间没有 await)。
+  let credentialRespawnRequested = false
+  const credentialReplies = {
+    table: () => credentialTable(options.userDataPath, credentialLog),
+    post: (message: CredentialsMessage) => child.postMessage(message),
+    // 一次卡住会来好几次(一次装载拉两份文档、几个 Location 同时装载):每一代只请求一次重启(② 审查第 1 条)
+    respawn: () => {
+      if (credentialRespawnRequested) return
+      credentialRespawnRequested = true
+      options.requestRespawn?.("credential-change")
+    },
+    log: (line: string) => getLogger()?.warn(line),
+  }
+  // SPEC-engine-config-fence BR-03(DESIGN-engine-config-fence §4.5):ext 的工具策略改写由 main 写进这一代 sidecar 环境算出的数据目录(ext 读的同一处),写完再回复
+  const toolPolicyBaseDir = defaultPolicyBaseDir(dataDir)
   child.on("message", (message: unknown) => {
     if (projectConfigViews.receive(message)) return
     if (writeProbes.receive(message)) return
     if (writeGrants.receive(message)) return
+    if (answerCredentialsMessage(message, credentialReplies)) return
+    if (receiveToolPolicyWrite(message, { baseDir: toolPolicyBaseDir, post: (reply) => child.postMessage(reply), log: (line) => getLogger()?.warn(line) })) return
     options.codepuppySidecar?.receive(message, postCodePuppy)
   })
   let detachCodePuppy: ((reason: string) => void) | undefined
+  // 实现期修订 1:读不出的条目、软链条目每代只记一次(拉取每次装载都来)
+  const credentialLines = new Set<string>()
+  const credentialLog = (line: string) => {
+    if (credentialLines.has(line)) return
+    credentialLines.add(line)
+    getLogger()?.warn(line)
+  }
+  const pushThisGeneration = () => child.postMessage({ type: "credentials", credentials: credentialTable(options.userDataPath, credentialLog) } satisfies CredentialsMessage)
   child.once("exit", (code) => {
+    if (pushCredentialTable === pushThisGeneration) pushCredentialTable = undefined
     clearOfficialConnectorRuntimeOnExit(runtimeGeneration)
     stopExplicitConfigWatch()
     if (explicitConfigWatch === stopExplicitConfigWatch) explicitConfigWatch = undefined
@@ -833,15 +882,19 @@ export async function spawnLocalServer(
     child.on("message", onMessage)
     child.on("exit", onExit)
     refreshTimeout()
+    // DESIGN-stored-credentials-fence §4.3 T1:fork 之后同步建表、随 start 交过去(官方连接器运行期已在上面恢复)。读不出的条目按不在表里(修订 1)。
+    const credentials = credentialTable(options.userDataPath, credentialLog)
     child.postMessage({
       type: "start",
       hostname,
       port,
       password,
       bootstrap,
+      credentials,
       // REQ-159:profile 全文 + 模块路径。sidecar 在 import 引擎之前 apply;缺席(darwin)即拒绝启动。
       ...(fence ? { fence: { profile: fence.profile, addonPath: fence.addonPath } } : {}),
     })
+    if (!exited) pushCredentialTable = pushThisGeneration
   }).catch((error) => {
     if (!exited) child.kill()
     throw error

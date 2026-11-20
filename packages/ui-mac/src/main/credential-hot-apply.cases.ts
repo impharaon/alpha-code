@@ -13,6 +13,9 @@ import type { RoutePurpose } from "@codepuppy/contracts-consumer"
 import type { SidecarGenerationState } from "../preload/types"
 
 const logged: string[] = []
+// SPEC-stored-credentials-fence T2:index.ts 把 pushCredentialsToSidecar 交给 applyPlatformCredentialsHot(写盘与回读摘要通过之后整表推给 sidecar)
+let pushes = 0
+const push = () => void pushes++
 const record = (message: unknown, meta?: unknown) => logged.push(`${String(message)} ${JSON.stringify(meta ?? null)}`)
 const logger = { log: record, warn: record, error: record }
 
@@ -188,10 +191,11 @@ afterEach(() => {
 describe("AC1 同身份普通续期热应用,不重启引擎", () => {
   test("连续三次续期:凭据文件逐代换成新值,respawn 恰好 0 次,平台态一次 recovering 都没有,每次回报 applied", async () => {
     const forked = loginAndFork(true)
+    pushes = 0
     setAuthDeps({
       getWindow: fakeWindow,
       respawn: (trigger) => respawns.push(trigger),
-      applyCredentials: () => applyPlatformCredentialsHot(dataPath, process.env, forked),
+      applyCredentials: () => applyPlatformCredentialsHot(dataPath, process.env, forked, push),
     })
     for (const round of ["SENTINEL-R1", "SENTINEL-R2", "SENTINEL-R3"]) {
       const renewal = serveRenewal(round, true)
@@ -202,6 +206,7 @@ describe("AC1 同身份普通续期热应用,不重启引擎", () => {
       expect(getAuthState().platformStatus).toBe("ready")
     }
     expect(respawns).toEqual([])
+    expect(pushes).toBe(3) // 每次热写之后整表推给 sidecar 一次
     expect(statuses()).not.toContain("recovering")
     expect(statuses()).toContain("ready")
   })
@@ -243,7 +248,7 @@ describe("AC4 凭据在场性改变或热写失败 ⇒ structural,只认捕获�
     setAuthDeps({
       getWindow: fakeWindow,
       respawn: (trigger) => void request(trigger),
-      applyCredentials: () => applyPlatformCredentialsHot(dataPath, process.env, forked),
+      applyCredentials: () => applyPlatformCredentialsHot(dataPath, process.env, forked, push),
     })
     return { terminals, request }
   }

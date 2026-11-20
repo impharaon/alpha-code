@@ -19,6 +19,7 @@ import { environmentMutableRoot } from "./codepuppy-environment"
 import { readMcpServerRecords, resolveMcpServerTruthLocation } from "./mcp-server-records"
 import { writeMcpServerTruth } from "./mcp-server-truth-write"
 import { deriveMcpEgressDestinations, isEgressAuthorizedForSidecar, setConfiguredEgressDestinations } from "./network-egress-derived"
+import { handOverCredentials } from "../../test-component/credential-table"
 
 const MANAGED = [
   "OPENCODE_CONFIG",
@@ -118,6 +119,7 @@ function injectedMcp(): { content: string; mcp: McpMap; stderr: string[] } {
   let content: string
   try {
     publishMainBootstrap({ userData }) // sidecar 在注入之前发布启动文档
+    handOverCredentials(userData) // SPEC-stored-credentials-fence:sidecar 在注入之前发布主进程交来的整表(T1)
     const result = injectCodePuppyConfig(userData, undefined, "stable", codepuppyBootstrap().paths.userConfig ?? null)
     expect(result.ok).toBe(true)
     content = result.config.content

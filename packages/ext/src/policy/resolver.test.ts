@@ -617,4 +617,112 @@ describe("#1644 grant partitions", () => {
   })
 })
 
+// SPEC-engine-config-fence BR-03 / DESIGN-engine-config-fence §4.5 / E6:sidecar 里的 ext 自己不写工具策略文档 —— 写交给注入的写者(生产是经窄消息的
+// main);读、隔离判断仍在 ext。一个存储里只有一条 promise 链:一次「读 → 判断 → 等写回复」做完才轮到下一次(审查 R1 第 7 项),前一次失败不打断链。
+describe("store with a writer (I-13: main writes over the narrow channel)", () => {
+  const PART = { account: "acct-writer", workspace: "ws-writer" }
+  const shell = { selector: { level: "tool", canonical: "builtin::shell" }, state: "disabled" } as ToolPolicyRecord
+  const fetchTool = { selector: { level: "tool", canonical: "builtin::webfetch" }, state: "ask" } as ToolPolicyRecord
+  const storeWith = (baseDir: string, write: Parameters<typeof createToolPolicyStore>[0]["write"]) =>
+    createToolPolicyStore({ baseDir, account: () => PART.account, workspace: () => PART.workspace, managed: async () => ({ status: "ok", ruleset: [], sources: [] }), write })
+  const onDisk = (baseDir: string) => {
+    const loaded = loadPolicyDocument(baseDir, PART)
+    return loaded.status === "ok" ? loaded.doc.records : loaded.status
+  }
+  /** main's side, asynchronous like a reply over the port: writes when the timer fires, `delays` in call order. */
+  const mainWriter = (baseDir: string, delays: number[] = []) => {
+    const calls: unknown[] = []
+    return {
+      calls,
+      save: (partition: typeof PART, records: readonly ToolPolicyRecord[]) =>
+        new Promise<void>((resolve) => {
+          calls.push({ op: "save", partition, records })
+          setTimeout(() => (savePolicyDocument(baseDir, partition, records), resolve()), delays.shift() ?? 0)
+        }),
+      reset: async (partition: typeof PART) => (calls.push({ op: "reset", partition }), resetPolicyDocument(baseDir, partition)),
+    }
+  }
+
+  test("W1 setRecord / removeRecord / reset reach the writer with the records ext read and changed; ext itself writes nothing; the next snapshot reads what the writer wrote", async () => {
+    const baseDir = tmpdir("codepuppy-policy-writer-")
+    const calls: unknown[] = []
+    const recordOnly = storeWith(baseDir, { save: async (partition, records) => void calls.push({ op: "save", partition, records }), reset: async (partition) => (calls.push({ op: "reset", partition }), { backup: "/elsewhere/b" }) })
+    await recordOnly.setRecord(shell)
+    expect(calls).toEqual([{ op: "save", partition: PART, records: [shell] }])
+    expect(onDisk(baseDir)).toBe("absent")
+    expect(await recordOnly.reset()).toEqual({ backup: "/elsewhere/b" })
+    expect(calls.at(-1)).toEqual({ op: "reset", partition: PART })
+
+    const main = mainWriter(baseDir)
+    const policy = storeWith(baseDir, main)
+    await policy.setRecord(shell)
+    await policy.setRecord(fetchTool)
+    expect((await policy.snapshot()).user).toEqual({ status: "ok", records: [shell, fetchTool] })
+    await policy.removeRecord(shell.selector)
+    expect(main.calls.at(-1)).toEqual({ op: "save", partition: PART, records: [fetchTool] })
+    expect(onDisk(baseDir)).toEqual([fetchTool])
+    expect((await policy.reset()).backup).toContain(".quarantined-")
+    expect(onDisk(baseDir)).toBe("absent")
+  })
+
+  test("W2 concurrency: two setRecord for two tools without awaiting the first ⇒ both records on disk; control — the same writer with the unserialised read-modify-write loses one", async () => {
+    const control = tmpdir("codepuppy-policy-writer-")
+    const raw = mainWriter(control, [30, 0])
+    const unserialised = (record: ToolPolicyRecord) => {
+      const loaded = loadPolicyDocument(control, PART)
+      return raw.save(PART, [...(loaded.status === "ok" ? loaded.doc.records : []), record])
+    }
+    await Promise.all([unserialised(shell), unserialised(fetchTool)])
+    expect(onDisk(control)).toEqual([shell])
+
+    const baseDir = tmpdir("codepuppy-policy-writer-")
+    const policy = storeWith(baseDir, mainWriter(baseDir, [30, 0]))
+    await Promise.all([policy.setRecord(shell), policy.setRecord(fetchTool)])
+    expect(onDisk(baseDir)).toEqual([shell, fetchTool])
+  })
+
+  // 审查 R1 可选项(编排器采纳):同一项目的两个 Location 各有一个存储，写的却是同一份文档(同一个分区)。写要等 main 回复之后，存储 A 的
+  // 「读」与 main 落 A 的写之间隔着一次往返，存储 B 在其间读到旧文档、覆盖掉 A 的记录，两个调用方都拿到 ok —— 链必须是进程内每份文档一条。
+  test("W4 two stores over the same document (two Locations of one project): concurrent setRecord for two tools ⇒ both records on disk; a failed write in one store fails only its caller, the other store's write still lands", async () => {
+    const baseDir = tmpdir("codepuppy-policy-writer-")
+    const main = mainWriter(baseDir, [30, 0])
+    const here = storeWith(baseDir, main)
+    const there = storeWith(baseDir, main)
+    await Promise.all([here.setRecord(shell), there.setRecord(fetchTool)])
+    expect(onDisk(baseDir)).toEqual([shell, fetchTool])
+
+    const second = tmpdir("codepuppy-policy-writer-")
+    const working = mainWriter(second, [20])
+    const refusing = storeWith(second, { save: async () => Promise.reject(new Error("EACCES: permission denied, open '/d/x.json.tmp'")), reset: working.reset })
+    const fine = storeWith(second, working)
+    const [failed, landed] = await Promise.allSettled([refusing.setRecord(shell), fine.setRecord(fetchTool)])
+    expect([failed.status, (failed as PromiseRejectedResult).reason?.kind]).toEqual(["rejected", "io"])
+    expect(landed.status).toBe("fulfilled")
+    expect(onDisk(second)).toEqual([fetchTool])
+  })
+
+  test("W3 a failed write fails only its own caller (ToolPolicyWriteError io with the writer's reason); the next one in the chain still writes", async () => {
+    const baseDir = tmpdir("codepuppy-policy-writer-")
+    const main = mainWriter(baseDir)
+    let refuse = true
+    const policy = storeWith(baseDir, {
+      save: async (partition, records) => {
+        if (refuse) {
+          refuse = false
+          throw new Error("EACCES: permission denied, open '/d/x.json.tmp'")
+        }
+        await main.save(partition, records)
+      },
+      reset: main.reset,
+    })
+    const [first, second] = await Promise.allSettled([policy.setRecord(shell), policy.setRecord(fetchTool)])
+    expect(first.status).toBe("rejected")
+    const error = (first as PromiseRejectedResult).reason
+    expect(error).toBeInstanceOf(ToolPolicyWriteError)
+    expect([(error as ToolPolicyWriteError).kind, (error as Error).message]).toEqual(["io", "EACCES: permission denied, open '/d/x.json.tmp'"])
+    expect(second.status).toBe("fulfilled")
+    expect(onDisk(baseDir)).toEqual([fetchTool])
+  })
+})
+
 void [classDefaultState, classifyTool, parseToolPolicyDocument, selectorMatches, toPermissionAction, resetPolicyDocument, PARTITION, cloudSubject, bundledSubject, NO_CAPS, NO_USER]

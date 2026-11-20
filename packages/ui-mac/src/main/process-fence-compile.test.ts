@@ -10,8 +10,9 @@ import { existsSync } from "node:fs"
 import { homedir, tmpdir } from "node:os"
 import { join } from "node:path"
 import { SANDBOX_EXEC, trialCompileProfile } from "./process-fence-compile"
-import { planConfigFence } from "./process-fence-plan"
+import { planConfigFence, planCredentialStores } from "./process-fence-plan"
 import { renderProcessFenceProfile, resolveEngineRoots } from "./process-fence-profile"
+import { credentialStores } from "./codepuppy-secret-files"
 
 const describeSandbox = process.platform === "darwin" && existsSync(SANDBOX_EXEC) ? describe : describe.skip
 
@@ -33,6 +34,8 @@ describeSandbox("trialCompileProfile —— 真 sandbox-exec", () => {
       { userDataPath, appStateRoot: join(home, "Library", "Application Support", "codepuppy-state"), codepuppyGlobalRoot, engineConfigDirectory: join(roots.configHome, "opencode"), roots },
       { realpath: (p) => p, mkdirp: () => {} },
     ).configFence,
+    // SPEC-stored-credentials-fence:C1 两块(拒读拒写块 + 上级目录块)同样进真编译器;只编译,不碰盘
+    credentialStores: planCredentialStores(credentialStores({ userDataPath, officialRuntimeParent: join(tmpdir(), "codepuppy-connectors-501-0123456789abcdef") }), { realpath: (p) => p }),
   }
 
   test("[已知的坏 ①] 撞 65535 字节墙的 profile ⇒ ok:false,原因含 `exceeds maximum`", () => {

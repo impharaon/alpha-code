@@ -50,7 +50,7 @@ async function harness(name: string, scoped: boolean) {
   const planner = { globalRoot: () => root, advisoryGate: () => ({ allowed: true as const }), resolvePackage: async () => { throw Error("noncatalog fixture") } }
   let connection: EngineConnection | undefined
   const awaitServer = async () => { if (!connection) throw Error("engine not started"); return connection }
-  const converge = createManagedMcpConvergence({ root: () => root, awaitServer, directory: () => slot.projectDirectory })
+  const converge = createManagedMcpConvergence({ root: () => root, awaitServer, directory: () => slot.projectDirectory, userDataPath: () => join(sandbox.root, name) })
   const apply = (packageId: string) => converge(managedMcpNamesOf(root, packageId))
   const install = createSourceInstaller({ ...planner, casBaseRoot: () => join(sandbox.root, name, "state"), environment: () => "dev", userDataPath: join(sandbox.root, name), sources, gate: makeRecoveryGate(() => ({})), catalogInstall: async () => { throw Error("empty catalog") }, activateMcp: (packageId) => apply(packageId), reloadSkills: () => {}, removeDeparting: () => {} })
   const candidate = (await sources.searchSources("frontend-design")).candidates.find((row) => row.source === "claude-marketplace")!

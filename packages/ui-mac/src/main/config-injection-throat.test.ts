@@ -73,6 +73,7 @@ import { secretFilePath } from "./codepuppy-secret-files"
 import { CLOUD_MCP_SERVER_NAME, CLOUD_WEB_SEARCH_TOOL_ID, LOCAL_WEB_SEARCH_TOOL_ID, WITHHELD_CLOUD_MCP } from "./cloud-web-search"
 import { publishMainBootstrap, unpublishTestBootstrap } from "../../test-component/codepuppy-bootstrap-fixture"
 import { tryCodePuppyBootstrap, codepuppyBootstrap } from "@opencode/util/codepuppy-bootstrap"
+import { handOverCredentials } from "../../test-component/credential-table"
 
 // 注入读到的每一个 env 输入 + 它自己写出的 env 输出:逐个快照 / 清空 / 还原(与 codepuppy-config-injection.test.ts 同一份清单)。
 const MANAGED = [
@@ -303,6 +304,7 @@ function run(extPluginPath?: string): Run {
   publishMainBootstrap({ userData, factorySkillDirs })
   // SPEC-engine-config-fence BR-03:显式文件那一层由 main 在 fork 前按同一份文档写(与生产同序),sidecar 再注入
   const { layer } = writeEngineConfigForFork(codepuppyBootstrap()).watch
+  handOverCredentials(userData) // SPEC-stored-credentials-fence:sidecar 在注入之前发布主进程交来的整表(T1)
   const result = injectCodePuppyConfig(userData, extPluginPath, "stable", codepuppyBootstrap().paths.userConfig ?? null)
   expect(result.ok).toBe(true)
   // `#1667`(裁决 r1 第 2 条、C7 重裁):main 交给引擎的字分两处 —— 内联文档,与显式文件里 Code Puppy 那一层(出厂命令、skills、

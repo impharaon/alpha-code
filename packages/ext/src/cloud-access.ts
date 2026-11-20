@@ -1,4 +1,4 @@
-import { existsSync } from "node:fs"
+import { codepuppyCredential } from "../../util/src/codepuppy-credentials"
 import { codepuppyBootstrap, type CodePuppyBootstrap } from "../../util/src/codepuppy-bootstrap"
 import { FILE_REF } from "@opencode/plugin/alpha-cloud-authority"
 import { CLOUD_ACCESS_LOGIN_HINT } from "./context-injection"
@@ -10,7 +10,7 @@ export function cloudMcpAuthorization(bootstrap: CodePuppyBootstrap = codepuppyB
 
 export function cloudAccessState(
   bootstrap: CodePuppyBootstrap = codepuppyBootstrap(),
-  exists: (path: string) => boolean = existsSync,
+  exists: (path: string) => boolean = (path) => codepuppyCredential(path) !== undefined, // DESIGN-stored-credentials-fence §4.4 C-e:在场性只问表
 ): { state: "logged-out" | "credential-missing" | "ready"; loginHint: string } {
   const path = bootstrap.platform.modelProxyBaseURL ? FILE_REF.exec(cloudMcpAuthorization(bootstrap) ?? "")?.[1] : undefined
   return {

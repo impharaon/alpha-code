@@ -6,7 +6,9 @@
 // `applyPlatformCredentialsHot`(续期时)写。假网关只认这两个合成令牌,别的(含注入写的占位 apiKey)一律 401 —— 与真网关同一结论。
 //   ① 令牌 A ⇒ 网关收到的每个请求都带 `Bearer A`(占位值一次都不上线);
 //   ② 热应用令牌 B(不重启)⇒ 下一轮每个请求都带 `Bearer B`,一个 A 都没有;
-//   ③ 删掉凭据文件 ⇒ 这一轮以 ext 的具名错误失败,网关一个请求都没收到(发出前被拒,不回落);
+//   ③ 删掉凭据文件(main 随后推来的整表里没有它)⇒ 这一轮以 ext 的具名错误失败,网关一个请求都没收到(发出前被拒,不回落);
+//   SPEC-stored-credentials-fence 起引擎进程只从主进程交来的内存表读凭据:fork 时随 start 交整表(T1),续期写盘后整表推送(T2,
+//   生产 applyPlatformCredentialsHot 的 push 形参;宿主的 main 那一侧是 test-component/credential-table.ts);
 //   ④ 反向臂:同一份配置不装 ext ⇒ 网关收到的是占位值、被拒 —— 证明 ①② 的令牌确实来自 ext,不是配置里藏着凭据;
 //   哨兵臂:两个令牌一次都不出现在引擎的日志输出与 HTTP 响应体里。
 //   ⑤ 平台节点地址的写法变体(`#1662` parity r6 Codex R1 Major 1):平台节点地址写成大写主机 / 显式默认端口 / 末尾斜杠 /
@@ -22,6 +24,7 @@ import fs from "node:fs"
 import path from "node:path"
 import { assertEngineSandboxed, engineSandbox } from "../../test-component/engine-sandbox"
 import { codepuppyEngine, type Running } from "../../test-component/codepuppy-engine"
+import { handOverCredentials } from "../../test-component/credential-table"
 import { PLATFORM_API_KEY_PLACEHOLDER } from "./codepuppy-models"
 import { applyPlatformCredentialsHot, customProviderSecretName, secretFilePath, syncSecretFiles } from "./codepuppy-secret-files"
 import { writeCustomProviderTruth } from "./custom-provider-truth-write"
@@ -125,7 +128,7 @@ describe("REQ-236 #1562 续期热应用:同一个引擎实例里换凭据文件"
       expect([...new Set(first.hits)]).toEqual(["A"])
       expect(first.outcome).toBe("succeeded")
 
-      expect(applyPlatformCredentialsHot(host.userData, { CODEPUPPY_API_KEY: TOKEN_B }, forked)).toBe("applied")
+      expect(applyPlatformCredentialsHot(host.userData, { CODEPUPPY_API_KEY: TOKEN_B }, forked, () => handOverCredentials())).toBe("applied")
       expect(fs.readFileSync(secretFilePath(host.userData, "CODEPUPPY_API_KEY"), "utf8") === TOKEN_B).toBe(true)
       const second = await turn(engine, host.projectDirectory)
       expect(second.hits.length).toBeGreaterThan(0)
@@ -133,6 +136,7 @@ describe("REQ-236 #1562 续期热应用:同一个引擎实例里换凭据文件"
       expect(second.outcome).toBe("succeeded")
 
       fs.rmSync(secretFilePath(host.userData, "CODEPUPPY_API_KEY"))
+      handOverCredentials() // main 推来的整表里不再有它(只删文件不推,引擎进程里仍是上一张表)
       const third = await turn(engine, host.projectDirectory)
       expect(third.hits).toEqual([])
       expect(third.outcome).toBe("failed")

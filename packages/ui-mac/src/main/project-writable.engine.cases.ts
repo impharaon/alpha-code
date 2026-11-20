@@ -9,10 +9,11 @@ import { buildFenceAddon } from "../../scripts/build-fence-addon"
 import { mockElectron } from "../../test-component/electron-mock"
 import { scriptedModel, textOf } from "../../test-component/codepuppy-engine"
 import { renderProcessFenceProfile, resolveEngineRoots } from "./process-fence-profile"
-import { planConfigFence, planProcessFence } from "./process-fence-plan"
+import { planConfigFence, planProcessFence, planCredentialStores } from "./process-fence-plan"
 import { createWorkspaceWritableTracker } from "../renderer/codepuppy-ui/workspace-writable-core"
 import { workspaceReadonlyMessage } from "../renderer/codepuppy-ui/workspace-writable"
 import { setLocale } from "../renderer/i18n"
+import { credentialStores } from "./codepuppy-secret-files"
 
 const run = process.env.CODEPUPPY_WRITABLE_TEST_ROOT!
 const A = join(run, "A"), B = join(run, "B"), C = join(run, "C"), D = join(run, "D"), E = join(run, "rewritten")
@@ -159,7 +160,7 @@ async function boot() {
     // Both planners take main's carried run set from the spawn input, as the production planner does.
     planFence: (input) => {
       const carried = input.carriedWorkspaces
-      if (useProductionPlanner) return preparedPlan = planProcessFence({ userDataPath: install, sidecarEnv: { XDG_STATE_HOME: join(install, "state") }, egressProxyPort: modelProxy.port!, addon: { packaged: true, resourcesPath: run, moduleDir: run, exists: existsSync }, carriedWorkspaces: carried, engineConfigDirectory: join(protectedHome, ".config", "opencode") }, {
+      if (useProductionPlanner) return preparedPlan = planProcessFence({ userDataPath: install, sidecarEnv: { XDG_STATE_HOME: join(install, "state") }, egressProxyPort: modelProxy.port!, addon: { packaged: true, resourcesPath: run, moduleDir: run, exists: existsSync }, carriedWorkspaces: carried, engineConfigDirectory: join(protectedHome, ".config", "opencode"), credentialStores: credentialStores({ userDataPath: install }) }, {
         homeDir: () => protectedHome, appStateRoot: () => join(run, "state"), codepuppyGlobalRoot: () => join(install, "state/env/dev"), defaultWorkspace: () => A,
         readWorkspaces: () => readWorkspaceTruthOrThrow(truthPath, { readFileSync }), realpath: realpathSync.native, isDirectory: (path) => { try { return readdirSync(path) !== undefined } catch { return false } },
         mkdirp: (path) => { mkdirSync(path, { recursive: true }) }, compile: () => ({ ok: true }), log: (line) => { log.push(line) },
@@ -172,7 +173,7 @@ async function boot() {
         { userDataPath: install, appStateRoot: join(run, "state"), codepuppyGlobalRoot: join(install, "state/env/dev"), engineConfigDirectory: join(run, "user-config", "opencode"), roots },
         { realpath: (path) => realpathSync.native(path), mkdirp: (path) => { mkdirSync(path, { recursive: true }) } },
       )
-      return { addonPath: addon, workspaces, configFenceRoots: fenceSet.configFenceRoots, profile: renderProcessFenceProfile({ workspaces, codepuppyGlobalRoot: join(install, "state/env/dev"), userDataPath: install, stateHome: join(install, "state"), roots, egressProxyPort: modelProxy.port!, configFence: fenceSet.configFence }) }
+      return { addonPath: addon, workspaces, configFenceRoots: fenceSet.configFenceRoots, profile: renderProcessFenceProfile({ workspaces, codepuppyGlobalRoot: join(install, "state/env/dev"), userDataPath: install, stateHome: join(install, "state"), roots, egressProxyPort: modelProxy.port!, configFence: fenceSet.configFence, credentialStores: planCredentialStores(credentialStores({ userDataPath: install }), { realpath: (path) => realpathSync.native(path) }) }) }
     },
     fork: ((_file: string, _args: string[], options: { env: Record<string, string> }) => {
       const peer = new EventEmitter() as EventEmitter & { pid: number; stdout: unknown; stderr: unknown; postMessage: (message: { type: string; id?: number; directory?: string }) => void; kill: () => void }

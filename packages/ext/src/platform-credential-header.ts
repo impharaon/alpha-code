@@ -4,19 +4,19 @@
 // 被替换成字面量,再被 provider.ts 的 SDK 缓存按 options 哈希留住 —— 文件改了引擎也不读,只能重启引擎换血
 // (owner 机器上四小时 25 次)。现在注入面只给平台 provider 一个固定的非凭据占位 apiKey
 // (ui-mac `codepuppy-models.ts` PLATFORM_API_KEY_PLACEHOLDER),真凭据由本钩子每次请求从
-// 启动文档 `platform.credentialRef`(main 每次 fork 写成 `{file:<userData>/codepuppy-secrets/CODEPUPPY_API_KEY}`)指向的文件读出,
+// 启动文档 `platform.credentialRef`(main 每次 fork 写成 `{file:<userData>/codepuppy-secrets/CODEPUPPY_API_KEY}`)所引用的那一项从进程内凭据表读出(主进程交来、续期后整表推来;SPEC-stored-credentials-fence,不读文件),
 // 写成即将发出的那个 HTTP 请求的 `authorization`。OpenCode 2 上:路由层在 `session.hook["model.request"]` 之后才按 apiKey 写
 // Authorization(`packages/ai/src/route/auth.ts` 的 `Headers.setAll`),那里加的头会被占位值盖掉;`session.hook["http.request"]`
 // 拿到的是鉴权之后的请求,在那里写才上线(`#1662` parity B4 实测:改之前网关收到的恰好是占位值)。
 //
-// 读不到(引用缺席 / 不是 `{file:}` 形状 / 文件缺席或为空)⇒ 抛 `@ai-sdk/provider` 的 `LoadAPIKeyError`:
+// 读不到(引用缺席 / 不是 `{file:}` 形状 / 表里没有或为空)⇒ 抛 `@ai-sdk/provider` 的 `LoadAPIKeyError`:
 // 请求不发出,这一轮以这句具名错误失败(嵌入式引擎实测:网关零请求),界面按现有认证错误给出重试 /
 // 重新登录。**绝不**回落:SDK 缓存与 provider options 里只有占位值,结构上无旧值可用(I5)。
 // 只作用于平台代理节点(与输出上限同一个判据 `isPlatformProvider`);第三方与 BYOK 节点不碰。
 // 错误消息不含路径与任何文件内容。
 
 import { codepuppyBootstrap, type CodePuppyBootstrap } from "../../util/src/codepuppy-bootstrap"
-import { readFileSync } from "node:fs"
+import { readCodePuppyCredential } from "../../util/src/codepuppy-credentials"
 import { LoadAPIKeyError } from "@ai-sdk/provider"
 import { FILE_REF } from "@opencode/plugin/alpha-cloud-authority"
 import { isPlatformProvider } from "./platform-output-cap"
@@ -29,7 +29,8 @@ type Platform = CodePuppyBootstrap["platform"]
  */
 export function platformCredentialHeader(input: { providerBaseURL: unknown; platform: Platform; readFile?: (path: string) => string }): string | undefined {
   if (!isPlatformProvider({ providerBaseURL: input.providerBaseURL, codepuppyBaseURL: input.platform.modelProxyBaseURL })) return undefined
-  const token = readCredential(input.platform.credentialRef, input.readFile ?? ((path) => readFileSync(path, "utf8")))
+  // DESIGN-stored-credentials-fence §4.4 C-c:值只来自主进程交来的进程内凭据表(续期后主进程整表推来),不读文件。
+  const token = readCredential(input.platform.credentialRef, input.readFile ?? readCodePuppyCredential)
   if (!token)
     throw new LoadAPIKeyError({
       // 措辞刻意避开引擎重试表的关键词(`opencode/src/session/retry.ts`:非 APIError 的消息含 unavailable / exhausted 等

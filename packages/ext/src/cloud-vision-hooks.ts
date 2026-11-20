@@ -22,7 +22,7 @@
 // (基线 §2-B 第 6 条:代价是多一次识图,不会漏识)。
 
 import { codepuppyBootstrap, type CodePuppyBootstrap } from "../../util/src/codepuppy-bootstrap"
-import { readFileSync } from "node:fs"
+import { readCodePuppyCredential } from "../../util/src/codepuppy-credentials"
 import path from "node:path"
 import {
   CLOUD_VISION_FALLBACK_ON_REFUSAL,
@@ -103,7 +103,7 @@ const withContent = (message: MessageLike, content: unknown[]) => new message.co
 
 export function createCloudVisionHooks(deps: CloudVisionHookDeps) {
   const bootstrap = () => deps.bootstrap ?? codepuppyBootstrap()
-  const readFile = deps.readFile ?? ((p: string) => readFileSync(p, "utf8"))
+  const readFile = deps.readFile ?? readCodePuppyCredential // DESIGN-stored-credentials-fence §4.4 C-d:进程内凭据表
   const sessions = new Map<string, VisionSession>()
   const sessionFor = (sessionID: string): VisionSession => {
     let s = sessions.get(sessionID)

@@ -23,6 +23,7 @@ import { createStore } from "solid-js/store"
 import { applyDirectoryEvent } from "../../../codepuppy-app/src/context/global-sync/event-reducer"
 import { assertEngineSandboxed, engineSandbox } from "../../test-component/engine-sandbox"
 import { codepuppyEngine, type Running } from "../../test-component/codepuppy-engine"
+import { handOverCredentials } from "../../test-component/credential-table"
 import { pinAppliedCatalog } from "../main/codepuppy-live-allowlist"
 import { secretFilePath } from "../main/codepuppy-secret-files"
 import { projectTimelineRows, type TimelineRow } from "../renderer/codepuppy-ui/session-timeline/timeline-model"
@@ -60,6 +61,7 @@ const stub = Bun.serve({
     if (mode === "tool-then-lose" && body.tools?.length) {
       mode = "ok"
       fs.rmSync(credentialFile)
+      handOverCredentials() // SPEC-stored-credentials-fence:引擎进程只认主进程推来的整表;这张表里不再有平台凭据
       const call = { index: 0, id: "call_cp1669", type: "function", function: { name: "cp_probe", arguments: "{}" } }
       return new Response(chunk({ role: "assistant", tool_calls: [call] }, null) + chunk({}, "tool_calls") + "data: [DONE]\n\n", { headers: { "content-type": "text/event-stream" } })
     }
@@ -237,9 +239,11 @@ describe("#1669 失败的回合:嵌入式引擎 → 生产适配器 → 冻结�
     credentialFile = secretFilePath(host.userData, "CODEPUPPY_API_KEY")
     const credential = fs.readFileSync(credentialFile)
     fs.rmSync(credentialFile)
+    handOverCredentials() // SPEC-stored-credentials-fence:main 删掉文件并推来不含它的整表
     const sessionID = await failedTurn("credential gone", { model: PLATFORM })
     await expectShown(sessionID, { name: "ProviderAuthError", cause: "auth", statusCode: undefined })
     fs.writeFileSync(credentialFile, credential, { mode: 0o600 })
+    handOverCredentials()
   }, 60_000)
 
   test("第一步做完、凭据在两步之间没了(第二步零请求):工作过程留着,回合错误行仍是登录或 Key 无效(auth)", async () => {

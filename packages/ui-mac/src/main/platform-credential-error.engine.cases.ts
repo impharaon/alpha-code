@@ -15,6 +15,7 @@ import fs from "node:fs"
 import { assertEngineSandboxed, engineSandbox } from "../../test-component/engine-sandbox"
 import { codepuppyEngine, type Running } from "../../test-component/codepuppy-engine"
 import { secretFilePath, syncSecretFiles } from "./codepuppy-secret-files"
+import { handOverCredentials } from "../../test-component/credential-table"
 
 const sandbox = engineSandbox()
 const TOKEN = `SENTINEL-PLATFORM-ERROR-${crypto.randomUUID()}`
@@ -70,6 +71,7 @@ describe("REQ-236 AC3:平台凭据出错 ⇒ 失败一次、带名字,不进退�
   test("① 凭据文件缺席 ⇒ 网关零请求,具名失败,2 秒内结束", async () => {
     const file = secretFilePath(host.userData, "CODEPUPPY_API_KEY")
     fs.rmSync(file)
+    handOverCredentials() // SPEC-stored-credentials-fence:引擎进程只认主进程推来的整表;这张表里没有平台凭据
     try {
       const result = await turn()
       expect(result.requests).toBe(0)
@@ -78,6 +80,7 @@ describe("REQ-236 AC3:平台凭据出错 ⇒ 失败一次、带名字,不进退�
       expect(result.ms).toBeLessThan(2000)
     } finally {
       fs.writeFileSync(file, TOKEN, { mode: 0o600 })
+      handOverCredentials()
     }
   }, 30_000)
 

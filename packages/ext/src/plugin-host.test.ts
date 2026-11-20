@@ -9,6 +9,7 @@ import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSy
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { LoadAPIKeyError } from "@ai-sdk/provider"
+import { __resetCodePuppyCredentialsForTests, publishCodePuppyCredentials } from "../../util/src/codepuppy-credentials"
 import { Cause, Effect, Exit, Fiber, Layer } from "effect"
 import { Agent } from "../../core/src/agent.ts"
 import { Location } from "../../core/src/location.ts"
@@ -40,6 +41,8 @@ import { STAGED_ATTACHMENT_PART_NAME, stagedAttachmentPart } from "./staged-atta
 import { canonicalToolIdentity } from "../../schema/src/tool-identity"
 import { policyWorkspace } from "./policy/index"
 import { createToolPolicyStore, defaultPolicyBaseDir } from "./policy/resolver"
+import { receiveToolPolicyWrite } from "./policy/store"
+import { Rpc } from "../../core/src/rpc.ts"
 import { Message } from "../../ai/src/schema/messages.ts"
 import { ToolFailure } from "../../ai/src/schema/errors.ts"
 import { projectTrustIdentity } from "../../ui-mac/src/main/project-trust-truth"
@@ -76,7 +79,10 @@ const decide = (directory: string, granted: boolean) => {
 const SELF_GRANTED = JSON.stringify({ extensionsConsent: { version: 1, granted: true, decidedAt: "2026-11-01T00:00:00.000Z" } })
 afterEach(() => {
   unpublishTestBootstrap()
+  __resetCodePuppyCredentialsForTests()
 })
+/** SPEC-stored-credentials-fence:主进程把凭据随整表交给引擎进程(T1;续期 T2 再推整表)。ext 的读法只认这张表,文件路径只是引用的键。 */
+const handOver = (file: string, value: string) => publishCodePuppyCredentials({ [file]: { value, use: { kind: "inline" } } })
 
 const ids = {
   sessionID: Session.ID.make("ses_codepuppy_ext_host"),
@@ -292,6 +298,7 @@ it.live("权威 · 云工具接入(M3):ARM+DEF 在场 ⇒ ext 的 mcp.transform 
   Effect.gen(function* () {
     const token = join(scratch, "mcp-token")
     writeFileSync(token, "secret-token\n")
+    handOver(token, "secret-token\n")
     env({}, { killSwitch: true, cloudMcp: testCloudMcp("https://cloud.example/mcp", token) })
     const neutralised = { type: "remote", url: "http://127.0.0.1:1/withheld", disabled: true }
     const without = recordingMcp({ codepuppy: neutralised })
@@ -322,6 +329,7 @@ it.live("权威 · 云工具准入:治理云 server 上的 web search 只按本 
   Effect.gen(function* () {
     const token = join(scratch, "mcp-token-admission")
     writeFileSync(token, "secret-token\n")
+    handOver(token, "secret-token\n")
     // `#1698`:web search 的判决只有 kill-switch 一个信号(「只有本地信号」的漂移态不再存在);治理 / 冒名的区分体现在拒绝理由上 ——
     // 治理云工具只拿 kill-switch 那一句,冒名的拿到点名「按名字认出的工具」的第三方那一句。
     env({}, { killSwitch: true, cloudMcp: testCloudMcp("https://cloud.example/mcp", token, "cloud") })
@@ -485,7 +493,8 @@ it.live("P5:直连 BYOK 节点按逐模型实读上限抬(同一 provider 的两
 it.live("P6 / S5:平台凭据头只对平台节点、每次现读;别的节点不带;反向臂:不装 ext ⇒ 不带", () =>
   Effect.gen(function* () {
     const ref = join(scratch, "platform-token")
-    writeFileSync(ref, "plat-1\n")
+    writeFileSync(ref, "plat-ON-DISK-not-read\n")
+    handOver(ref, "plat-1\n")
     env({}, { platform: { modelProxyBaseURL: "https://gateway.codepuppy.test/v1", credentialRef: `{file:${ref}}` } })
     const hooks = yield* PluginHooks.Service
     // 2.x 的 http.request 拿到的是路由层鉴权之后、即将发出的请求(Authorization 已是注入的占位 apiKey)
@@ -499,12 +508,12 @@ it.live("P6 / S5:平台凭据头只对平台节点、每次现读;别的节点�
     expect(yield* sent("https://gateway.codepuppy.test/v1/chat/completions")).toBe("Bearer placeholder")
     yield* activate(CodePuppyExt)
     expect(yield* sent("https://gateway.codepuppy.test/v1/chat/completions")).toBe("Bearer plat-1")
-    writeFileSync(ref, "plat-2\n")
+    handOver(ref, "plat-2\n") // 续期:main 写盘后整表推来(T2)
     expect(yield* sent("https://gateway.codepuppy.test/v1/chat/completions")).toBe("Bearer plat-2")
     expect(yield* sent("https://api.other.test/v1/chat/completions")).toBe("Bearer placeholder")
     expect(yield* sent("https://gateway.codepuppy.test/v1evil/chat/completions")).toBe("Bearer placeholder")
-    // 凭据文件没了 ⇒ 钩子抛 LoadAPIKeyError(请求不发出),消息不带路径、不带令牌,不回落旧值。
-    rmSync(ref)
+    // 表里没有了(登出后主进程推来的表不含它)⇒ 钩子抛 LoadAPIKeyError(请求不发出),消息不带路径、不带令牌,不回落旧值。
+    publishCodePuppyCredentials({})
     const failed = yield* hooks.trigger("session", "http.request", request("https://gateway.codepuppy.test/v1/chat/completions")).pipe(Effect.exit)
     expect(Exit.isFailure(failed)).toBe(true)
     const thrown = Exit.isFailure(failed) ? Cause.squash(failed.cause) : undefined
@@ -525,12 +534,17 @@ const hubHost = (options: { manifest: boolean }) =>
     const savedState = holder[PROCESS_STATE_KEY]
     const listeners: Array<(event: { data: unknown }) => void> = []
     const installs: unknown[] = []
+    // SPEC-engine-config-fence BR-03:main 收到的工具策略写请求(由 main 的生产接收函数写进 ext 读的那个数据目录)
+    const toolPolicyWrites: unknown[] = []
     const row = { id: "mcp:github", scope: null, name: "github", kind: "mcp", displayName: "GitHub", description: "repos", installed: false, enabled: false, state: "not-installed", authorization: "none" }
     const candidate = { id: "mcp:github", source: "catalog", name: "github", displayName: "GitHub", description: "repos", kind: "mcp", upstream: {} } as const
     const port = {
       postMessage: (message: { type: string; id: number; directory?: string; query?: string }) =>
         queueMicrotask(() => {
           if (message.type === "codepuppy.hub.install.request") installs.push(message)
+          if (message.type === "codepuppy.tool-policy.write.request") toolPolicyWrites.push(message)
+          const toPort = (data: unknown) => listeners.forEach((listener) => listener({ data }))
+          if (receiveToolPolicyWrite(message, { baseDir: defaultPolicyBaseDir(join(process.env.XDG_DATA_HOME!, "opencode")), post: toPort, log: () => {} })) return
           const reply =
             message.type === "codepuppy.sources.search.request"
               ? buildSourcesSearchReply(message.id, { result: { searchId: "search_github", query: message.query ?? "", sources: [{ source: "catalog", status: "ok", matched: 1, skipped: 0 }], candidates: [candidate, { id: "cand_ctx7", source: "claude-marketplace", name: "context7", displayName: "Context7", description: "docs", kind: "plugin", upstream: {} }] } })
@@ -569,8 +583,29 @@ const hubHost = (options: { manifest: boolean }) =>
         })
       },
     })
-    return { installs }
+    return { installs, toolPolicyWrites }
   })
+
+itWithPermission.live("I-13(SPEC-engine-config-fence BR-03):有 parentPort 时，ext 的工具策略改写交给 main —— 经 RPC 的 setRecord 在 port 上发一条写请求,main 的生产接收函数写盘,ext 下一次读到", () =>
+  Effect.gen(function* () {
+    const account = `acct:${createHash("sha256").update(String(Math.random())).digest("hex")}`
+    env({}, { policyAccount: account })
+    const { toolPolicyWrites } = yield* hubHost({ manifest: false })
+    yield* activate(CodePuppyExt)
+    const record = { selector: { level: "class", class: "plugin" }, state: "ask" }
+    const rpc = yield* Rpc.Service
+    const exit = yield* rpc.call("codepuppy.tool-policy", "setRecord", record).pipe(Effect.exit)
+    expect(Exit.isSuccess(exit), JSON.stringify(exit)).toBe(true)
+    expect(toolPolicyWrites).toEqual([expect.objectContaining({ type: "codepuppy.tool-policy.write.request", op: "save", records: [record] })])
+    const location = yield* Location.Service
+    const store = createToolPolicyStore({
+      baseDir: defaultPolicyBaseDir(join(process.env.XDG_DATA_HOME!, "opencode")),
+      account: () => account,
+      workspace: () => policyWorkspace(location as never),
+    })
+    expect((yield* Effect.promise(() => store.snapshot())).user).toEqual({ status: "ok", records: [record] })
+  }),
+)
 
 /**
  * 一次 `codepuppy_hub_install` 调用里用户看到的审批:每出现一条待批请求就记下并按 `answer` 回复,直到调用结束。
@@ -1473,6 +1508,7 @@ for (const [label, content] of [
     Effect.gen(function* () {
       const token = join(scratch, "mcp-token-unreadable")
       writeFileSync(token, "secret-token\n")
+      handOver(token, "secret-token\n")
       env({}, { killSwitch: true, cloudMcp: testCloudMcp("https://cloud.example/mcp", token) })
       const directory = realpathSync((yield* Location.Service).directory)
       mkdirSync(join(directory, ".codepuppy"), { recursive: true })

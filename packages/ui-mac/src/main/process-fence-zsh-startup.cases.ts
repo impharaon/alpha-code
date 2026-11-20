@@ -44,6 +44,7 @@ const production = renderProcessFenceProfile({
   roots: resolveEngineRoots({}, home), egressProxyPort: 59999,
   // 本文件判 W10 / W19 两行;受保护配置集的判据在 process-fence-config-fence / process-fence-profile
   configFence: [],
+  credentialStores: [],
 })
 
 /** Today's rows back in place, derived from the production text: W10 after W8, W19 = the W8 regex with the dump's name. */

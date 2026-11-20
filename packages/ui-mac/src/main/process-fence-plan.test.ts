@@ -10,6 +10,7 @@ import { join, resolve } from "node:path"
 import { planConfigFence, planProcessFence, type PlanProcessFenceDeps, type PlanProcessFenceInput } from "./process-fence-plan"
 import { processFenceRulesCover, processFenceWriteRules, type ProcessFenceWriteRule } from "./process-fence-profile"
 import { loadCodePuppySecrets, userEnvFile } from "./codepuppy-secrets"
+import { credentialStores } from "./codepuppy-secret-files"
 
 const describeDarwin = process.platform === "darwin" ? describe : describe.skip
 
@@ -19,6 +20,7 @@ const GLOBAL = `${HOME}/Library/Application Support/codepuppy-state/env/prod`
 /** `#1390`:应用状态根 = GLOBAL 的父目录的父目录(三个 env 根与 CAS 的父)。 */
 const STATE_ROOT = `${HOME}/Library/Application Support/codepuppy-state`
 const ADDON = "/App/Contents/Resources/codepuppy-fence/codepuppy_fence.node"
+const OFFICIAL_RUNTIME = "/private/var/folders/xy/T/codepuppy-connectors-501-ab"
 
 function harness(overrides: Partial<PlanProcessFenceDeps> = {}, existing = new Set<string>([ADDON])) {
   const made: string[] = []
@@ -51,6 +53,8 @@ function harness(overrides: Partial<PlanProcessFenceDeps> = {}, existing = new S
     carriedWorkspaces: [],
     // SPEC-engine-config-fence:server.ts 交给启动文档的同一个值(engineGlobalConfigDirectory)
     engineConfigDirectory: `${HOME}/.config/opencode`,
+    // SPEC-stored-credentials-fence §4.5:受保护集这几条只判自己那一轴,存放点清单空(空 ⇒ C1 两块不渲染);C1 的测试自己给 server.ts 交的那份
+    credentialStores: [],
   }
   return { deps, input, made, logs }
 }
@@ -65,6 +69,21 @@ function ancestorsOf(anchors: string[]): string[] {
 }
 
 describeDarwin("planProcessFence", () => {
+  test("SPEC-stored-credentials-fence C1:存放点清单经 planCredentialStores 落到真实路径,渲染成 profile 最后两块(拒读拒写块 + 上级目录拒写块);日志带条数(存放点真实路径求不出 ⇒ planCredentialStores 抛:process-fence-credential-stores.test.ts)", () => {
+    const h = harness()
+    h.input.credentialStores = credentialStores({ userDataPath: USER_DATA, officialRuntimeParent: OFFICIAL_RUNTIME })
+    const plan = planProcessFence(h.input, h.deps)
+    const tail = plan.profile.trimEnd().split("\n").slice(-10)
+    expect(tail[0]).toBe("(deny file-read* file-write*")
+    expect(tail.slice(1, 9).map((line) => line.replace(/\)?\)\s*(;.*)?$/, "").trim())).toEqual([
+      `(subpath "${USER_DATA}/codepuppy-secrets"`, `(subpath "${USER_DATA}/codepuppy-mcp-secrets"`, `(literal "${USER_DATA}/codepuppy.env"`,
+      `(literal "${USER_DATA}/codepuppy-auth.json"`, `(literal "${USER_DATA}/codepuppy-pkce.json"`, `(literal "${USER_DATA}/codepuppy-byok-keys.json"`,
+      `(subpath "${USER_DATA}/Crashpad"`, `(subpath "${OFFICIAL_RUNTIME}"`,
+    ])
+    expect(tail[9]!.startsWith("(deny file-write* ")).toBe(true)
+    expect(h.logs.some((l) => /credentialStores=8 rules/.test(l))).toBe(true)
+  })
+
   test("正向:并集 = 默认 → recent → tab 栏;父目录 W4/W5/W7 与受保护目录预建;addonPath 解析到 extraResources;日志一行账", () => {
     const h = harness()
     const plan = planProcessFence(h.input, h.deps)
@@ -77,8 +96,10 @@ describeDarwin("planProcessFence", () => {
     expect(h.made).toEqual([
       `${HOME}/.local/share/opencode`, `${HOME}/.cache/opencode`, `${HOME}/.npm`,
       STATE_ROOT, GLOBAL, `${USER_DATA}/codepuppy-engine-config`, `${USER_DATA}/codepuppy-connections`, `${HOME}/.config/opencode`,
+      // CF-11(片 ③):工具策略目录,像其它目录位置一样预建
+      `${HOME}/.local/share/opencode/codepuppy-tool-policy`,
     ])
-    expect(h.logs.some((l) => /process fence planned: workspaces=3 \(candidates=3, excluded=0, dropped=0\), egressProxyPort=4443, configFence=15 rules/.test(l))).toBe(true)
+    expect(h.logs.some((l) => /process fence planned: workspaces=3 \(candidates=3, excluded=0, dropped=0\), egressProxyPort=4443, configFence=16 rules/.test(l))).toBe(true)
     // `#1337`:计划里的 profile 带着那扇门(N4 = 传入的代理端口),不是别的端口
     expect(plan.profile).toContain('(allow network-outbound (remote ip "localhost:4443"))')
     expect(plan.profile).toContain("(deny network*)")
@@ -92,6 +113,9 @@ describeDarwin("planProcessFence", () => {
     const plan = planProcessFence(h.input, h.deps)
     expect(h.made).toContain("/Volumes/s/opencode")
     expect(h.made).toContain("/Volumes/d/opencode")
+    // CF-11 follows the exported data home (where ext reads and main writes the tool policy)
+    expect(h.made).toContain("/Volumes/d/opencode/codepuppy-tool-policy")
+    expect(plan.configFenceRoots).toContain("/Volumes/d/opencode/codepuppy-tool-policy")
     expect(plan.profile).toContain(`(subpath "/Volumes/s/opencode")`)
     expect(plan.roots.stateHome).toBe("/Volumes/s")
   })
@@ -181,7 +205,7 @@ describeDarwin("planProcessFence", () => {
     const anchors = cf.configFence.map((rule) => (rule.kind === "dat-files" ? `${rule.dir}/x` : rule.path))
     expect(processFenceWriteRules(plan.profile).deny).toEqual([...cf.configFence.map(asRule), ...ancestorsOf(anchors).map((value) => ({ kind: "literal" as const, value }))])
     expect(plan.profile.indexOf("(deny file-write*\n", plan.profile.indexOf("(allow network-outbound"))).toBeGreaterThan(0)
-    expect(plan.configFenceRoots).toEqual([STATE_ROOT, GLOBAL, `${USER_DATA}/codepuppy-engine-config`, `${USER_DATA}/codepuppy-connections`, `${HOME}/.config/opencode`, `${HOME}/.opencode`])
+    expect(plan.configFenceRoots).toEqual([STATE_ROOT, GLOBAL, `${USER_DATA}/codepuppy-engine-config`, `${USER_DATA}/codepuppy-connections`, `${HOME}/.config/opencode`, `${HOME}/.opencode`, `${HOME}/.local/share/opencode/codepuppy-tool-policy`])
     expect(plan.configFenceRoots).toEqual(cf.configFenceRoots)
   })
 
@@ -216,7 +240,7 @@ describeDarwin("planProcessFence", () => {
     const outside = harness({ codepuppyGlobalRoot: () => "/Volumes/dev/codepuppy-env" })
     outside.input.engineConfigDirectory = "/Volumes/cfg/opencode"
     const plan = planProcessFence(outside.input, outside.deps)
-    expect(plan.configFenceRoots).toEqual([STATE_ROOT, "/Volumes/dev/codepuppy-env", `${USER_DATA}/codepuppy-engine-config`, `${USER_DATA}/codepuppy-connections`, "/Volumes/cfg/opencode", `${HOME}/.config/opencode`, `${HOME}/.opencode`])
+    expect(plan.configFenceRoots).toEqual([STATE_ROOT, "/Volumes/dev/codepuppy-env", `${USER_DATA}/codepuppy-engine-config`, `${USER_DATA}/codepuppy-connections`, "/Volumes/cfg/opencode", `${HOME}/.config/opencode`, `${HOME}/.opencode`, `${HOME}/.local/share/opencode/codepuppy-tool-policy`])
     expect(outside.made).toContain("/Volumes/cfg/opencode")
     expect(outside.made.some((d) => d.endsWith("/.opencode"))).toBe(false)
   })
@@ -231,7 +255,7 @@ describeDarwin("planProcessFence", () => {
     expect(deny).toContainEqual({ kind: "literal", value: `${HOME}/secrets/cp.env` })
     expect(deny).toContainEqual({ kind: "literal", value: `${HOME}/secrets` })
     expect(processFenceWriteRules(unset.profile).deny.some((rule) => rule.value.includes("/secrets"))).toBe(false)
-    expect(set.logs.some((line) => /configFence=16 rules/.test(line))).toBe(true)
+    expect(set.logs.some((line) => /configFence=17 rules/.test(line))).toBe(true)
     // 与 <userData>/codepuppy.env 是同一份 ⇒ 不重复
     const same = harness()
     same.input.envFile = `${USER_DATA}/codepuppy.env`

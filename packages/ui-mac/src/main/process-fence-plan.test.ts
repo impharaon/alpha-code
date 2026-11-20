@@ -273,10 +273,14 @@ describeDarwin("planProcessFence", () => {
       const deny = processFenceWriteRules(planProcessFence(h.input, h.deps).profile).deny
       expect([envFile, deny]).toEqual([envFile, baseline])
     }
-    // 软链指到 /dev/null 也一样:真实路径在 /dev 下就不出这一行(链本身也不冻结)
-    const linked = harness({ realpath: (p) => (p === `${HOME}/cp.env` ? "/dev/null" : p) })
-    linked.input.envFile = `${HOME}/cp.env`
-    expect(processFenceWriteRules(planProcessFence(linked.input, linked.deps).profile).deny).toEqual(baseline)
+    // 确认审查 R2 第 1 条:env 文件是指到 /dev/null 的软链(项目里的 cp.env → /dev/null)⇒ 只丢落在 /dev 下的那条(真实目标);链节点自己的
+    // literal 与它路径上的节点照留 —— 否则对话删掉这条链、写一个普通文件,主进程下次启动就读它
+    const linked = harness({ realpath: (p) => (p === `${HOME}/proj-a/cp.env` ? "/dev/null" : p) })
+    linked.input.envFile = `${HOME}/proj-a/cp.env`
+    const linkedDeny = processFenceWriteRules(planProcessFence(linked.input, linked.deps).profile).deny
+    expect(linkedDeny).toContainEqual({ kind: "literal", value: `${HOME}/proj-a/cp.env` })
+    expect(linkedDeny).toContainEqual({ kind: "literal", value: `${HOME}/proj-a` })
+    expect(linkedDeny.filter((rule) => rule.value === "/dev" || rule.value.startsWith("/dev/"))).toEqual([])
   })
 
   test("修订 2 A:文件在工作区里 ⇒ 工作区照常可写,只有那份文件与它路径上的目录节点被拒;同一文件夹里别的文件、子文件夹照常", () => {

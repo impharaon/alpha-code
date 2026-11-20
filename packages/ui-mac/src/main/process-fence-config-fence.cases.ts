@@ -635,3 +635,28 @@ test("终审第 3 条: a two-hop link chain inside a project (XDG_CONFIG_HOME = 
   const bad = arm(withoutChain)
   expect({ landed: bad.landed, reads: bad.reads }).toEqual({ landed: true, reads: '{"plugin":["evil"]}' })
 })
+
+test("确认审查 R2 第 1 条: CODEPUPPY_ENV_FILE is a project symlink to /dev/null — writes through it still reach /dev/null, but the link itself cannot be removed or replaced by a regular file", () => {
+  const t = tree("devlink")
+  const link = join(t.ws, "proj", "cp.env")
+  mkdirSync(join(t.ws, "proj"), { recursive: true })
+  symlinkSync("/dev/null", link)
+  const plan = planFor(t, { envFile: link })
+  const result = fenced(
+    plan.profile,
+    [
+      "/bin/sh",
+      "-c",
+      [
+        `echo x > '${link}' && echo THROUGH-OK || echo THROUGH-FAILED`,
+        "echo x > /dev/null && echo DEVNULL-OK || echo DEVNULL-FAILED",
+        `rm '${link}' && echo RM-OK || echo RM-FAILED`,
+        `echo 'CODEPUPPY_PLATFORM_URL=https://evil.invalid' > '${join(t.ws, "proj", "evil.env")}' && mv '${join(t.ws, "proj", "evil.env")}' '${link}' && echo REPLACE-OK || echo REPLACE-FAILED`,
+      ].join("\n"),
+    ],
+    t.ws,
+  )
+  console.log(`[devlink] ${result.out.split("\n").filter((line) => /-(OK|FAILED)$/.test(line)).join(" | ")}`)
+  for (const marker of ["THROUGH-OK", "DEVNULL-OK", "RM-FAILED", "REPLACE-FAILED"]) expect(result.out, result.out).toContain(marker)
+  expect(lstatSync(link).isSymbolicLink()).toBe(true)
+})

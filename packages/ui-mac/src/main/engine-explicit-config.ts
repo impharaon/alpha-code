@@ -1,7 +1,7 @@
 // `#1667`(#1662 L5;编排器裁决 1667 评论 6738814516 第 2 条、C7 重裁 6741122824):引擎配置的**显式文件层**。
 //
-// OpenCode 2 的配置文档加载顺序(`packages/core/src/config.ts` 的 load 返回序):managedPolicies → integrated → wellknown →
-// global → explicit(`start()` 的 `config.file`)→ direct → project → content(内联)→ managedSettings。设置项后加载的胜出,
+// OpenCode 2 的配置文档加载顺序(`packages/core/src/config.ts` 的 load 返回序):managedPolicies → integrated → global →
+// explicit(`start()` 的 `config.file`)→ direct → project → content(内联)→ managedSettings(wellknown 文档不装载,I-13 L3)。设置项后加载的胜出,
 // policy 先加载的胜出(`packages/core/src/managed-policy.ts`:文档倒序拼起来,`findLast` 命中)。于是:
 //   · 出厂 `/init`、`/review` 与 `skills` 放这一层 ⇒ 项目里写的同名命令胜过出厂的,出厂的胜过上游内置的(v1 的「用户治理 >
 //     出厂 > 上游内置」);

@@ -175,57 +175,7 @@ export const layer = (options?: Options) =>
         return new Document({ type: "document", path: AbsolutePath.make(filepath), info: gate ? gate.decoded(info, filepath) : info }) // codepuppy(ADR-049)
       })
 
-      const loadWellknownEntry = Effect.fnUntraced(function* (entry: WellKnown.Entry) {
-        const auth = entry.manifest.auth
-        const credential = (yield* credentials.list(entry.integrationID)).at(-1)
-        const variables = auth && credential?.value.type === "key" ? { [auth.env]: credential.value.key } : undefined
-        // A failed refresh, including a missing credential, keeps the last resolved config so remote providers
-        // and allowlists do not disappear; only removing the source clears it.
-        const configs = yield* (
-          variables ? wellknown.resolve(entry, variables) : Effect.fail(new Error("No usable wellknown credential"))
-        ).pipe(
-          Effect.catch((error) =>
-            Effect.logWarning("failed to load wellknown config", { source: entry.origin, error }).pipe(
-              Effect.andThen(wellknown.cached(entry.origin)),
-            ),
-          ),
-        )
-        return yield* Effect.forEach(configs, (config) =>
-          ConfigVariable.substitute({
-            type: "virtual",
-            source: entry.origin,
-            dir: entry.origin,
-            text: JSON.stringify(config),
-            env: variables,
-          }).pipe(
-            Effect.flatMap((text) => parseInfo(text, entry.origin)),
-            Effect.map((info) =>
-              info
-                ? new ConfigIntegration.WellKnownDocument({
-                    type: "document",
-                    info,
-                    integrationID: entry.integrationID,
-                  })
-                : undefined,
-            ),
-          ),
-        ).pipe(Effect.map((documents) => documents.filter((document) => document !== undefined)))
-      })
-
-      const loadWellknown = Effect.fn("Config.loadWellknown")(function* () {
-        const entries = yield* wellknown
-          .entries()
-          .pipe(
-            Effect.catch((error) =>
-              Effect.logWarning("failed to discover wellknown config", { error }).pipe(Effect.as([] as const)),
-            ),
-          )
-        return yield* Effect.forEach(entries, (entry) =>
-          loadWellknownEntry(entry).pipe(
-            Effect.map((documents) => ({ integrationID: entry.integrationID, documents })),
-          ),
-        )
-      })
+      // codepuppy(I-13 L3): loadWellknownEntry / loadWellknown removed — wellknown documents are not loaded (see load()).
 
       // `integration.use` decides whether an integration may supply anything. Only managed policies can withhold the
       // documents an integration delivers, so a project file can never strip the Console document carrying org policy.
@@ -350,26 +300,14 @@ export const layer = (options?: Options) =>
             ),
           ),
         )
-        const wellknownDocuments = yield* Effect.forEach(yield* loadWellknown().pipe(Effect.orDie), (entry) =>
-          supplies(lockdown, entry.integrationID).pipe(
-            Effect.map((allowed) =>
-              allowed
-                ? entry.documents
-                : entry.documents.map(
-                    (document) =>
-                      new ConfigIntegration.WellKnownDocument({
-                        ...document,
-                        info: new Info({ policies: document.info.policies }),
-                      }),
-                  ),
-            ),
-          ),
-        )
+        // codepuppy(I-13 L3) ── no wellknown documents: their sources, cached manifests and cached documents live in the engine
+        // database, which a fenced process can write, and a cached document can start a local MCP server. Code Puppy registers no
+        // wellknown source. The WellKnown service, plugin and refresh are untouched. DESIGN-engine-config-fence §4.6, D8.
+        // codepuppy ── end
         return yield* gate.finish([ // codepuppy(ADR-049)
           ...managedPolicies,
           ...gate.documents(), // codepuppy(ADR-049)
           ...integrated,
-          ...wellknownDocuments.flat(),
           ...globalSupplementary,
           ...explicit,
           ...direct,

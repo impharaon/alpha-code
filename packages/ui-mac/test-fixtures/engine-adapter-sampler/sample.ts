@@ -52,9 +52,8 @@ writeFileSync(join(project, ".env"), "SECRET=1\n")
 writeFileSync(join(project, "other.env"), "X=1\n")
 for (const args of [["init", "-q"], ["add", "a.txt"], ["-c", "user.email=s@s", "-c", "user.name=s", "commit", "-qm", "init"]])
   Bun.spawnSync(["git", ...args], { cwd: project })
-writeFileSync(
-  join(home, ".config/opencode/opencode.json"),
-  JSON.stringify({
+const globalConfigPath = join(home, ".config/opencode/opencode.json")
+const globalConfig = {
     model: "mock/m",
     providers: {
       mock: {
@@ -69,8 +68,8 @@ writeFileSync(
       },
     },
     commands: { hello: { template: "say hello plainly", description: "Say hello" } },
-  }),
-)
+  }
+writeFileSync(globalConfigPath, JSON.stringify(globalConfig))
 
 const model = startMockModel(MODEL_PORT)
 const engine = Bun.spawn(
@@ -206,44 +205,15 @@ const write = (name: string, value: Record<string, unknown>) =>
 
 try {
   // `#1697` 放回 r4:与 permission-reply 剧本同样走真引擎公开的创建/读取审批 API,不手写上游响应。
+  // The approval-actions session is still created first, as before, so the session lists other scenarios record keep their
+  // shape. Its wildcard ask on the session row no longer decides anything (I-13 L2: only a session row's deny entries take
+  // part), so the requests themselves are sampled at the end of the run under an agent whose rules ask (see below).
+  let approvalSession: string | undefined
   if (run("approval-actions")) {
-    const sessionID = (await call("POST", "/api/session", {
+    approvalSession = (await call("POST", "/api/session", {
       location: { directory: project },
       permissions: [{ action: "*", resource: "*", effect: "ask" }],
     })).data.id as string
-    const cases = [
-      { name: "shell", action: "shell", resources: ["echo parity"], save: ["echo *"] },
-      { name: "subagent", action: "subagent", resources: ["general"], save: ["general"] },
-      {
-        name: "policy",
-        action: "shell",
-        resources: ["echo policy"],
-        save: ["echo *"],
-        metadata: {
-          identity: { kind: "builtin", name: "shell" },
-          authority: { kind: "engine" },
-          policy: { canonical: "shell", askedBy: "policy" },
-          codepuppyRisk: "low",
-        },
-      },
-    ]
-    const sampled = []
-    for (const { name, ...payload } of cases) {
-      const created = await exchange("POST", `/api/session/${sessionID}/permission`, payload)
-      if (created.status !== 200 || created.body.data.effect !== "ask")
-        throw new Error(`approval-actions ${name}: ${created.status} ${JSON.stringify(created.body)}`)
-      const current = await exchange("GET", `/api/session/${sessionID}/permission/${created.body.data.id}`)
-      if (current.status !== 200) throw new Error(`approval-actions ${name}: GET ${current.status}`)
-      sampled.push({ name, request: current.body.data })
-    }
-    write("approval-actions.json", {
-      _source: source(
-        "Approval action parity: a fresh session has a wildcard ask ruleset. POST /api/session/:id/permission creates shell and subagent capability requests without policy metadata, plus a shell request with the frozen I7a metadata.policy keys supplied to the public API; each request here is the raw GET /api/session/:id/permission/:requestID response. " +
-          "This samples the engine's public permission API, as permission-reply does, not a model/tool invocation; no ext runs here. The comparison's expected v1 actions come from the Code Puppy command/delegation cards, never from the translator's response.",
-      ),
-      cases: sampled,
-    })
-    await call("POST", `/api/session/${sessionID}/permission/${sampled[0]!.request.id}/reply`, { decision: "reject" })
   }
 
   if (run("base")) {
@@ -1018,6 +988,57 @@ try {
       mcp.stop()
       autoAllow = false
     }
+  }
+
+  // `#1697` 放回 r4, I-13 L2: the approval requests are created through the engine's public permission API, in the session
+  // created first, under a sampler-only agent whose rules ask for everything. The agent is added to the global config only
+  // now, after every scenario that records the agent list, so catalog / passthrough / routes keep their agent lists.
+  if (approvalSession !== undefined) {
+    const sessionID = approvalSession
+    writeFileSync(
+      globalConfigPath,
+      JSON.stringify({ ...globalConfig, agents: { "approval-ask": { description: "Sampler only: every request asks", permissions: [{ action: "*", resource: "*", effect: "ask" }] } } }),
+    )
+    await call("POST", `/api/location/reload?${loc}`)
+    for (let i = 0; ; i++) {
+      const agents = (await call("GET", `/api/agent?${loc}`)).data as Array<{ id: string }>
+      if (agents.some((agent) => agent.id === "approval-ask")) break
+      if (i >= 100) throw new Error("approval-actions: the sampler-only agent approval-ask never loaded")
+      await Bun.sleep(100)
+    }
+    const cases = [
+      { name: "shell", action: "shell", resources: ["echo parity"], save: ["echo *"] },
+      { name: "subagent", action: "subagent", resources: ["general"], save: ["general"] },
+      {
+        name: "policy",
+        action: "shell",
+        resources: ["echo policy"],
+        save: ["echo *"],
+        metadata: {
+          identity: { kind: "builtin", name: "shell" },
+          authority: { kind: "engine" },
+          policy: { canonical: "shell", askedBy: "policy" },
+          codepuppyRisk: "low",
+        },
+      },
+    ]
+    const sampled = []
+    for (const { name, ...payload } of cases) {
+      const created = await exchange("POST", `/api/session/${sessionID}/permission`, { ...payload, agent: "approval-ask" })
+      if (created.status !== 200 || created.body.data.effect !== "ask")
+        throw new Error(`approval-actions ${name}: ${created.status} ${JSON.stringify(created.body)}`)
+      const current = await exchange("GET", `/api/session/${sessionID}/permission/${created.body.data.id}`)
+      if (current.status !== 200) throw new Error(`approval-actions ${name}: GET ${current.status}`)
+      sampled.push({ name, request: current.body.data })
+    }
+    write("approval-actions.json", {
+      _source: source(
+        "Approval action parity: POST /api/session/:id/permission, under a sampler-only agent whose rules ask for every request (added to the global config after every other scenario; a session-row ask no longer decides anything since I-13 L2), creates shell and subagent capability requests without policy metadata, plus a shell request with the frozen I7a metadata.policy keys supplied to the public API; each request here is the raw GET /api/session/:id/permission/:requestID response. " +
+          "This samples the engine's public permission API, as permission-reply does, not a model/tool invocation; no ext runs here. The comparison's expected v1 actions come from the Code Puppy command/delegation cards, never from the translator's response.",
+      ),
+      cases: sampled,
+    })
+    await call("POST", `/api/session/${sessionID}/permission/${sampled[0]!.request.id}/reply`, { decision: "reject" })
   }
 
   console.log(`fixtures written to ${OUT}`)

@@ -8,8 +8,9 @@
 //   · document axis — `resolveToolPolicy`: caps → user selector → class default.
 //   deny  ⇒ a named `Tool.Error` (canonical + reason) before any later hook or side effect.
 //   ask   ⇒ one identity-axis request through `permission.assert` (the I7a envelope). The document-axis ask is a rule
-//           Code Puppy places after every configured rule (catalog.ts), so OpenCode's saved "always" approvals for the
-//           same binding + revision still discharge it, exactly as v1's appended ask rule did.
+//           Code Puppy places after every configured rule (catalog.ts), so an "allow for this session" grant for the same
+//           binding + revision (the permission service's in-memory session grant, I-05) still discharges it; the project's
+//           saved approvals take no part since I-13 L1.
 //   allow ⇒ no identity prompt; the ruleset axis and the tool's own ability checks stay as they are.
 //
 // Two positions (lane seams I3): `decide` runs first in the chain (`registerPolicy`), so a denied call reaches no other

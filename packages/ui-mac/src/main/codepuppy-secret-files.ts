@@ -26,6 +26,7 @@
 import { createHash, randomBytes } from "node:crypto"
 import * as fs from "node:fs"
 import * as path from "node:path"
+import type { CodePuppyCredentialEntry } from "@opencode/util/codepuppy-credentials"
 import { BYOK_ADAPTERS } from "./byok-adapters"
 import { USER_DATA_LAYOUT } from "./user-data-layout"
 
@@ -190,4 +191,82 @@ export function applyPlatformCredentialsHot(
 
 function digest(value: string) {
   return createHash("sha256").update(value).digest("hex")
+}
+
+// ── DESIGN-stored-credentials-fence §4.3:Code Puppy 的凭据存放点与进程内凭据表 ─────────────────────────────
+
+/** 崩溃转储目录(userData 下;logging.ts 用同一个名字交给 crashReporter)。 */
+export const CRASH_DUMPS_DIR = "Crashpad"
+
+export type CredentialStore = {
+  /** 与该存放点的 `{file:}` 引用同一写法的绝对路径。 */
+  path: string
+  kind: "dir" | "file"
+  /** 怎么进表;false = 只拦、不进表。 */
+  table: "secrets" | "connector-by-server" | "connector-by-run" | false
+}
+
+/**
+ * userData 下六项(名字取自 USER_DATA_LAYOUT)+ `<userData>/Crashpad`(不进表)+ 官方连接器运行期目录(调用方算出才给;本模块不 import 官方
+ * 连接器模块,那会把钥匙串带进 sidecar 闭包)。主进程的别名判断(isStoreTarget)与围栏 C1 用同一份清单。
+ */
+export function credentialStores(input: { userDataPath: string; officialRuntimeParent?: string }): CredentialStore[] {
+  const at = (name: string) => path.join(input.userDataPath, name)
+  return [
+    { path: at(USER_DATA_LAYOUT.secrets), kind: "dir", table: "secrets" },
+    { path: at(USER_DATA_LAYOUT.mcpSecrets), kind: "dir", table: "connector-by-server" },
+    { path: at(USER_DATA_LAYOUT.envFile), kind: "file", table: false },
+    { path: at(USER_DATA_LAYOUT.auth), kind: "file", table: false },
+    { path: at(USER_DATA_LAYOUT.pkce), kind: "file", table: false },
+    { path: at(USER_DATA_LAYOUT.byokKeys), kind: "file", table: false },
+    { path: at(CRASH_DUMPS_DIR), kind: "dir", table: false },
+    ...(input.officialRuntimeParent ? [{ path: input.officialRuntimeParent, kind: "dir" as const, table: "connector-by-run" as const }] : []),
+  ]
+}
+
+/**
+ * 只读 table !== false 的目录下的普通文件(逐项 lstat;根以下不跟随任何软链,软链条目只记名字、不进表),跳过 "." 开头的条目。
+ * use:codepuppy-secrets/<名> ⇒ inline;codepuppy-mcp-secrets/<server>/… ⇒ connector(server);<运行期目录>/<run>/<name>/… ⇒ connector(name)。
+ * 目录不存在 = 没有条目;其它 IO 错误抛出。不记录值;`log` 只收相对路径。
+ */
+export function readCredentialTable(stores: readonly CredentialStore[], log?: (line: string) => void): Record<string, CodePuppyCredentialEntry> {
+  const table: Record<string, CodePuppyCredentialEntry> = {}
+  for (const store of stores) {
+    if (store.table === false) continue
+    const root = path.resolve(store.path)
+    const kind = store.table
+    const visit = (dir: string, segments: readonly string[]) => {
+      let names: string[]
+      try {
+        names = fs.readdirSync(dir)
+      } catch (error) {
+        if (segments.length === 0 && (error as NodeJS.ErrnoException)?.code === "ENOENT") return
+        throw error
+      }
+      for (const name of names.sort()) {
+        if (name.startsWith(".")) continue
+        const file = path.join(dir, name)
+        const rel = [...segments, name]
+        const meta = fs.lstatSync(file)
+        if (meta.isSymbolicLink()) {
+          log?.(`credential store: symbolic link entry not read: ${path.basename(root)}/${rel.join("/")}`)
+          continue
+        }
+        if (meta.isDirectory()) {
+          visit(file, rel)
+          continue
+        }
+        if (!meta.isFile()) continue
+        const use: CodePuppyCredentialEntry["use"] | undefined =
+          kind === "secrets"
+            ? { kind: "inline" }
+            : kind === "connector-by-server"
+              ? rel.length >= 2 ? { kind: "connector", server: rel[0]! } : undefined
+              : rel.length >= 3 ? { kind: "connector", server: rel[1]! } : undefined
+        if (use) table[file] = { value: fs.readFileSync(file, "utf8"), use }
+      }
+    }
+    visit(root, [])
+  }
+  return table
 }

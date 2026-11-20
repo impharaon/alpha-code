@@ -395,7 +395,7 @@ test("desktop SQLite package without a DSN keeps an engine-visible definition ac
   expect(await savePackageSecretsV1({ packageId: "package:dbhub-readonly", secrets: { "mcp:dbhub-readonly#DSN": `sqlite://${database}` } }, deps)).toMatchObject({ ok: true })
   // I-11(v9-R2):the save no longer materializes; the IPC requests convergence, whose credential step runs without an engine too.
   const { createManagedMcpConvergence } = await import("../src/main/package-mcp-activation")
-  await createManagedMcpConvergence({ root: () => root, awaitServer: async () => { throw Error("no engine in this case") }, directory: () => home })(["dbhub-readonly"])
+  await createManagedMcpConvergence({ root: () => root, awaitServer: async () => { throw Error("no engine in this case") }, directory: () => home, userDataPath: () => join(home, "userData") })(["dbhub-readonly"])
   expect(await readPackageAuthorizationV1("package:dbhub-readonly", deps)).toMatchObject({ ok: true, items: [{ kind: "secret", saved: true }] })
   expect(leaf().enabled).not.toBe(false)
   engineKeeps(leaf())
@@ -1057,7 +1057,8 @@ export default {id:"test.official-runtime",setup:async(ctx)=>{
     const before = await tools()
     expect(before.names).toEqual([])
     expect(await installDesktopPackageV1("package:github-official", deps)).toMatchObject({ ok: true })
-    const converge = createManagedMcpConvergence({ root: () => root, awaitServer: async () => connection, directory: () => slot.projectDirectory })
+    mkdirSync(deps.userDataPath, { recursive: true }) // main's userData always exists; the credential stores (none here) live in it
+    const converge = createManagedMcpConvergence({ root: () => root, awaitServer: async () => connection, directory: () => slot.projectDirectory, userDataPath: () => deps.userDataPath })
     const apply = () => converge(["github-official"])
     await apply()
     expect((await tools()).names).toEqual([])
@@ -1127,7 +1128,7 @@ test("I-11 proof 7: a project-only dbhub whose SQLite file moved stays off in it
   const database = join(home, "project-a.db")
   new Database(database).close()
   expect(await savePackageSecretsV1({ packageId: "package:dbhub-readonly", secrets: { "mcp:dbhub-readonly#DSN": `sqlite://${database}` } }, deps)).toMatchObject({ ok: true })
-  const converge = createManagedMcpConvergence({ root: () => root, awaitServer: async () => { throw Error("no engine in this case") }, directory: () => home })
+  const converge = createManagedMcpConvergence({ root: () => root, awaitServer: async () => { throw Error("no engine in this case") }, directory: () => home, userDataPath: () => join(home, "userData") })
   await converge(["dbhub-readonly"])
   const allowedInProject = () => managedMcpAllowedHere("dbhub-readonly", readPackageAllowSet(root), identity.scope.projectPath)
   expect(allowedInProject()).toBe(true)
@@ -1161,7 +1162,8 @@ test("I-11 ruling 1: a convergence parked across a startup recovery cannot leave
     return readFileSync(collectMcpFileRefPaths(leaf.value)[0]!, "utf8")
   }
   const engine = Promise.withResolvers<{ url: string; username: string; password: string }>()
-  const converge = createManagedMcpConvergence({ root: () => root, awaitServer: () => engine.promise, directory: () => home })
+  mkdirSync(deps.userDataPath, { recursive: true }) // main's userData always exists; the credential stores (none here) live in it
+  const converge = createManagedMcpConvergence({ root: () => root, awaitServer: () => engine.promise, directory: () => home, userDataPath: () => deps.userDataPath })
   // Run 1 reads the intent "disabled" when it starts and parks on the engine (it clears only after disconnecting).
   expect(await setPackageStateV1({ packageId: "package:github-official", state: "disabled" }, deps)).toMatchObject({ ok: true })
   const disabling = converge(["github-official"])
@@ -1233,7 +1235,7 @@ test("I-11 official GitHub engine: off at startup, on at runtime without a resta
   const running = await host.start()
   try {
     const connection = { url: running.url, username: "opencode", password: `cp-${name}` }
-    const converge = createManagedMcpConvergence({ root: () => globalRoot, awaitServer: async () => connection, directory: () => host.projectDirectory })
+    const converge = createManagedMcpConvergence({ root: () => globalRoot, awaitServer: async () => connection, directory: () => host.projectDirectory, userDataPath: () => host.userData })
     const at = (directory: string) => async (method: string, route: string, body?: unknown) => {
       const response = await running.fetch(new Request(`http://codepuppy-sidecar.invalid${route}`, {
         method, headers: { "x-opencode-directory": encodeURIComponent(directory), "content-type": "application/json" },

@@ -5,6 +5,7 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, s
 import { ZipWriter, BlobWriter, BlobReader } from "@zip.js/zip.js"
 import { dirname, join } from "node:path"
 import { homedir } from "node:os"
+import { CRASH_DUMPS_DIR } from "./codepuppy-secret-files"
 
 const MAX_LOG_AGE_DAYS = 7
 const TAIL_LINES = 1000
@@ -40,7 +41,7 @@ export function initLogging() {
 }
 
 export function initCrashReporter() {
-  const dir = join(app.getPath("userData"), "Crashpad")
+  const dir = join(app.getPath("userData"), CRASH_DUMPS_DIR)
   mkdirSync(dir, { recursive: true })
   app.setPath("crashDumps", dir)
   crashReporter.start({ uploadToServer: false, compress: true })

@@ -1,6 +1,7 @@
 import { Schema } from "effect"
 import { ToolIdentity } from "@opencode/schema/tool-identity"
-import { readFileSync } from "node:fs"
+import { readFileSync, realpathSync, statSync } from "node:fs"
+import { resolveConnectorLeaf, type CodePuppyCredentials } from "@opencode/util/codepuppy-credentials"
 import { readPackageAllowSet } from "../../../ext/src/gen-skill-paths"
 import { managedMcpAllowedHere } from "../../../ext/src/package-scope"
 import { projectDirectoryIdentity } from "../../../ext/src/project-config"
@@ -11,8 +12,11 @@ import { launchedByPackageRunner, RUNNER_FIRST_FETCH_STARTUP_MS } from "./engine
 import { readMcpLeafStrict } from "./ext-config"
 import { projectScopeIdentity, readPackageLedgerStateV1 } from "./ext-receipt-v2"
 import type { PackageGraphV1 } from "./ext-package-ledger-v3"
+import { credentialStores, readCredentialTable } from "./codepuppy-secret-files"
 import { isOfficialConnector } from "./official-connector-names"
+import { officialRuntimeParent } from "./official-connector-recipes"
 import { officialAvailabilityPublished, settleOfficialConnectorCredential } from "./official-connector-resources"
+import { credentialStoreTarget, planCredentialStores } from "./process-fence-plan"
 
 export type PackageMcpActivationV1 = { directory: string; name: string; status: string; detail?: string }
 
@@ -21,6 +25,10 @@ export type ManagedMcpConvergenceDeps = {
   awaitServer(): Promise<EngineConnection>
   /** Main's own Location; converged even before anything loaded it, next to every loaded Location. */
   directory(): string
+  /** Code Puppy's userData: where the credential stores live (DESIGN-stored-credentials-fence §4.3). */
+  userDataPath(): string
+  /** Names only, never values: credential references this path refused to read (design §5). */
+  log?(line: string): void
 }
 
 /** MCP names of an installed package (by package ID) or of one standalone record (by record ID). */
@@ -76,7 +84,10 @@ async function converge(name: string, deps: ManagedMcpConvergenceDeps): Promise<
   try {
     const client = engineClient(await deps.awaitServer())
     const directories = [...new Set([directory, ...(await client.debug.location.list()).map((location) => location.directory)])]
-    results = await Promise.all(directories.map((target) => applyAt(client, target, name, record, graph, allowSet)))
+    // Read once per run, and only when some Location applies an enabled definition (a disable never opens a store).
+    let read: ConnectorCredentials | undefined
+    const credentials = () => (read ??= connectorCredentials(deps))
+    results = await Promise.all(directories.map((target) => applyAt(client, target, name, record, graph, allowSet, credentials)))
   } catch {
     results = [{ directory, name, status: "unavailable", detail: "Engine is unavailable; installed content is retained" }]
   }
@@ -94,6 +105,7 @@ async function applyAt(
   record: { desiredState: string } | undefined,
   graph: PackageGraphV1 | undefined,
   allowSet: ReturnType<typeof readPackageAllowSet>,
+  credentials: () => ConnectorCredentials,
 ): Promise<PackageMcpActivationV1> {
   const location = { directory: target }
   try {
@@ -106,7 +118,7 @@ async function applyAt(
       const leaf = readMcpLeafStrict(name)
       if (!leaf.ok || !leaf.value)
         return { directory: target, name, status: "unavailable", detail: "Installed connector definition is unavailable" }
-      const config = projectServerConfig(resolveFileReferences(leaf.value))
+      const config = projectServerConfig(resolveConnectorLeaf({ server: name, leaf: leaf.value, ...credentials() }))
       if (!config) return { directory: target, name, status: "failed", detail: "Installed connector definition is invalid" }
       const startup = launchedByPackageRunner(config) && !config.timeout ? { timeout: { startup: RUNNER_FIRST_FETCH_STARTUP_MS } } : {}
       await client.experimental.mcp.add({ server: name, config: { ...config, ...startup, disabled: false }, location })
@@ -151,15 +163,28 @@ export function packageAppliesAt(graph: Pick<PackageGraphV1, "effect"> | undefin
   return identity.ok && identity.scope.projectPath === graph.effect.projectPath && identity.scope.projectPathHash === graph.effect.projectPathHash
 }
 
-function resolveFileReferences(value: Record<string, unknown>): Record<string, unknown> {
-  const resolve = (input: unknown): unknown => {
-    if (typeof input === "string")
-      return input.replace(/\{file:([^}]+)\}/g, (_match, file: string) => readFileSync(file, "utf8"))
-    if (Array.isArray(input)) return input.map(resolve)
-    if (input && typeof input === "object")
-      return Object.fromEntries(Object.entries(input).map(([key, item]) => [key, resolve(item)]))
-    return input
+type ConnectorCredentials = Omit<Parameters<typeof resolveConnectorLeaf>[0], "server" | "leaf">
+
+/**
+ * DESIGN-stored-credentials-fence §4.3 / (d): the table of Code Puppy's credential stores, read now, and the store-target test built from
+ * the same real-target list the fence's C1 uses. A reference into a store is substituted only as this connector's own credential field in
+ * its exact spelling; every other reference into a store becomes an empty string and its file is never opened (resolveConnectorLeaf).
+ * The only leaf is main's registered, validated one; never a renderer/sidecar-supplied file path.
+ */
+function connectorCredentials(deps: ManagedMcpConvergenceDeps): ConnectorCredentials {
+  let runtimeParent: string | undefined
+  try {
+    runtimeParent = officialRuntimeParent(deps.root())
+  } catch {
+    runtimeParent = undefined // no official runtime storage point here (design §4.5: the entry is simply not given)
   }
-  // The only input is main's registered, validated leaf; never a renderer/sidecar-supplied file path.
-  return resolve(value) as Record<string, unknown>
+  const stores = credentialStores({ userDataPath: deps.userDataPath(), ...(runtimeParent ? { officialRuntimeParent: runtimeParent } : {}) })
+  const realpath = (p: string) => realpathSync.native(p)
+  const table: CodePuppyCredentials = readCredentialTable(stores, deps.log)
+  return {
+    table,
+    isStoreTarget: credentialStoreTarget(planCredentialStores(stores, { realpath }), { realpath, stat: (p) => statSync(p, { bigint: true }) }),
+    readFile: (file) => readFileSync(file, "utf8"),
+    ...(deps.log ? { log: deps.log } : {}),
+  }
 }

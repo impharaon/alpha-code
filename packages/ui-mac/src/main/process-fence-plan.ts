@@ -294,3 +294,69 @@ export function planProcessFence(input: PlanProcessFenceInput, deps: PlanProcess
   )
   return plan
 }
+
+// ── DESIGN-stored-credentials-fence §4.5:凭据存放点的真实目标清单 ────────────────────────────────────────────────
+// 围栏 C1 与主进程的别名判断(package-mcp-activation.ts 的 isStoreTarget,设计 §4.1)用同一份清单。
+
+export type CredentialStoreRule = { kind: "subpath" | "literal"; path: string }
+
+/**
+ * 每个存放点写成「真实上级目录 + 名字」;位置已存在且解析到别处(软链)时再加它的真实目标。上级目录求不出真实路径 ⇒ 抛(调用方拒绝 fork /
+ * 这次应用失败);位置本身不在盘上(ENOENT)只给第一条。
+ */
+export function planCredentialStores(
+  stores: readonly { path: string; kind: "dir" | "file" }[],
+  deps: { realpath: (p: string) => string },
+): CredentialStoreRule[] {
+  const rules: CredentialStoreRule[] = []
+  const add = (rule: CredentialStoreRule) => {
+    if (!rules.some((known) => known.kind === rule.kind && known.path === rule.path)) rules.push(rule)
+  }
+  for (const store of stores) {
+    const kind = store.kind === "dir" ? "subpath" : "literal"
+    const placed = join(deps.realpath(dirname(store.path)), basename(store.path))
+    add({ kind, path: placed })
+    let real: string | undefined
+    try {
+      real = deps.realpath(store.path)
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException)?.code !== "ENOENT") throw error
+    }
+    if (real !== undefined && real !== placed) add({ kind, path: real })
+  }
+  return rules
+}
+
+/**
+ * 由真实目标清单得出「这个路径是否指向某个存放点」(设计 §4.1 isStoreTarget、P-22):把路径求成真实路径(求不出 ⇒ 当作指向存放点),
+ * 它自己或它的任一上级目录的 device + inode 等于清单里某一项 ⇒ true。按身份比,不按路径前缀比:firmlink 写法的真实路径不同、inode 相同;
+ * 硬链同理。清单里不在盘上的项没有身份,不参与比较。
+ */
+export function credentialStoreTarget(
+  rules: readonly CredentialStoreRule[],
+  deps: { realpath: (p: string) => string; stat: (p: string) => { dev: number | bigint; ino: number | bigint } },
+): (path: string) => boolean {
+  const identity = (p: string) => {
+    try {
+      const meta = deps.stat(p)
+      return `${meta.dev}:${meta.ino}`
+    } catch {
+      return undefined
+    }
+  }
+  const stores = new Set(rules.map((rule) => identity(rule.path)).filter((id): id is string => id !== undefined))
+  return (path) => {
+    let node: string
+    try {
+      node = deps.realpath(resolve(path))
+    } catch {
+      return true
+    }
+    for (;;) {
+      const id = identity(node)
+      if (id !== undefined && stores.has(id)) return true
+      if (dirname(node) === node) return false
+      node = dirname(node)
+    }
+  }
+}

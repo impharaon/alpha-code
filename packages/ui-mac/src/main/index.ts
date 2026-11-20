@@ -188,6 +188,7 @@ import {
   createSidecarRespawnQueue,
   planUnhealthyForkRetry,
   type SidecarRespawnTrigger,
+  createDeferredRespawn,
 } from "./sidecar-lifecycle"
 import { armBootGenerationTerminal, createSidecarGenerationState, type SidecarGenerationState } from "./sidecar-generation"
 
@@ -750,6 +751,8 @@ const main = Effect.gen(function* () {
   const serverReady = Deferred.makeUnsafe<EngineConnection, unknown>()
   let authScheduler: ReturnType<typeof createAuthRenewalScheduler> | null = null
   let pendingAuthRespawn: SidecarRespawnTrigger | null = null
+  // SPEC-stored-credentials-fence §4.2:引擎拉取凭据表超时 / 主进程读不出表 ⇒ credential-change;boot 那一代早于重启队列,记下、队列建好后补发
+  const credentialRespawn = createDeferredRespawn()
 
   yield* Effect.promise(() => app.whenReady())
   markStartupTimeline("main.app.ready")
@@ -1456,7 +1459,7 @@ const main = Effect.gen(function* () {
         codepuppySidecar,
         fenceRun: fenceWorkspaces, // INT-safety R3: this run's writable history carries into the next generation
         // DESIGN-stored-credentials-fence §4.2:引擎拉取凭据表超时 / 主进程读不出表 ⇒ 既有的 credential-change 重启
-        requestRespawn: (trigger) => void requestSidecarRespawn?.(trigger),
+        requestRespawn: (trigger) => credentialRespawn.request(trigger),
       })
       void spawning.then(
         () =>
@@ -1612,7 +1615,7 @@ const main = Effect.gen(function* () {
         codepuppySidecar,
         fenceRun: fenceWorkspaces, // INT-safety R3: this run's writable history carries into the next generation
         // DESIGN-stored-credentials-fence §4.2:引擎拉取凭据表超时 / 主进程读不出表 ⇒ 既有的 credential-change 重启
-        requestRespawn: (trigger) => void requestSidecarRespawn?.(trigger),
+        requestRespawn: (trigger) => credentialRespawn.request(trigger),
       })
       void spawning.then(
         () =>
@@ -1679,6 +1682,7 @@ const main = Effect.gen(function* () {
   const respawnSidecar = createSidecarRespawnQueue(doRespawnSidecar)
 
   requestSidecarRespawn = respawnSidecar // B5:崩溃自愈复用同一互斥/合并入口
+  credentialRespawn.attach(respawnSidecar)
   if (pendingAuthRespawn && bootForkTokenGeneration !== getTokenGeneration()) void respawnSidecar(pendingAuthRespawn)
   pendingAuthRespawn = null
   setProviderLifecycleDeps({ refreshRuntime: () => respawnSidecar("provider-change") })

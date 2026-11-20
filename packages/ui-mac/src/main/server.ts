@@ -784,10 +784,16 @@ export async function spawnLocalServer(
   // REQ-234 `#1529`:`codepuppy.*` 分发与探针应答并列;不是本族的消息原样交还(返回 false)。
   const postCodePuppy = (message: CodePuppySidecarOutbound) => child.postMessage(message)
   // DESIGN-stored-credentials-fence §4.2:引擎装载配置之前的拉取 —— 同步建表并回复(收到与回复之间没有 await)。
+  let credentialRespawnRequested = false
   const credentialReplies = {
     table: () => credentialTable(options.userDataPath, credentialLog),
     post: (message: CredentialsMessage) => child.postMessage(message),
-    respawn: () => options.requestRespawn?.("credential-change"),
+    // 一次卡住会来好几次(一次装载拉两份文档、几个 Location 同时装载):每一代只请求一次重启(② 审查第 1 条)
+    respawn: () => {
+      if (credentialRespawnRequested) return
+      credentialRespawnRequested = true
+      options.requestRespawn?.("credential-change")
+    },
     log: (line: string) => getLogger()?.warn(line),
   }
   child.on("message", (message: unknown) => {

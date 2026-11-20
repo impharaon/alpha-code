@@ -118,11 +118,15 @@ export function planConfigFence(
     const real = target(path)
     return real !== undefined && real.toLowerCase() === spelled.toLowerCase() ? real : spelled
   }
-  /** 实现期修订 2 B:位置的配置路径(未解析)上、不在这几条规则真实路径上的目录节点,按身份去重,挂在这个位置的第一条规则上。 */
+  /**
+   * 实现期修订 2 B:位置的配置路径(未解析)上、不在这几条规则真实路径上的目录节点,按身份去重,挂在这个位置的第一条规则上。终审第 3 条:
+   * 每个配置路径节点所在的真实位置的上级链也算进来(两跳软链时,中间那一跳的真实目录既不在配置路径上、也不在最终真实路径上)。
+   */
   const withVia = (location: ConfigFenceRule, rules: ConfigFenceRule[]) => {
     if (!rules.length) return rules
     const real = new Set(rules.flatMap((rule) => chain(anchorOf(rule))))
-    const via = [...new Set(chain(anchorOf(location)).map(node))].filter((n) => !real.has(n))
+    const nodes = chain(anchorOf(location)).map(node)
+    const via = [...new Set(nodes.flatMap((n) => [n, ...chain(n)]))].filter((n) => !real.has(n))
     return via.length ? [{ ...rules[0]!, via }, ...rules.slice(1)] : rules
   }
   for (const location of locations) {

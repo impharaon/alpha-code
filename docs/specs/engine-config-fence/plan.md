@@ -180,3 +180,6 @@ last_reviewed: 2026-11-20
 - 2026-11-20 · 确认审查 R2(`3af6988000..611815ad0e`,RECOMMEND MERGE)处置,新提交:
   1. env 文件是指到 `/dev` 下的软链时只丢 `/dev` 下那条,链节点 literal 与路径节点照留(上一轮钉住的「链本身也不冻结」改正);红 `evidence/r2-1-red-*.log`(删链、换成普通文件都成功)→ 绿(本提交;经链写入照样到 `/dev/null`,删链 / 改名覆盖 EPERM)。
   3. 计划器用例在假路径上一律注入假 `lstat`(`5847dc202a`)。
+  2. 残留(编排器裁决，不再在本片补这一族):**R10** —— 只出现在某条软链**存放的目标文字**里、本身又是可写项目里另一条软链的目录(例:`XDG_CONFIG_HOME=/W/a`,`/W/a → /W/s/t`,`/W/s → /W/real-s` 时的 `/W/s`)不冻结;冻结的是配置路径的每个节点、真实路径的每个节点、以及每个配置路径节点所在真实位置的上级链。闭合 = INT-safety I-27(一次逐段解析，收集走过的每个目录项)。写入矩阵宿主里有一条与 R8 并列的保证外对照臂(断言落地，I-27 闭合时翻转)。**R11** —— 绝对路径含 `"`、`\` 或控制字符的 `via` 节点写不进 profile，不冻结(位置自己的规则不受影响;env 文件自己的路径写不进时同样不保护);计划时记一行 `process fence: protected configuration — N path(s) cannot be written into the profile … : "<路径>", …` 逐个点名(红 `evidence/r2-r11-red.log` → 绿)。
+  计数:`process-fence-plan` 26 → 27,`process-fence-config-fence` 内层 13 → 15。
+

@@ -58,8 +58,8 @@ LSP / PTY / formatter …)自动继承;REQ-138 那层(`cfg.shell` → `sandbox-e
 —— CF-1 状态根与当前环境根(恒列)、CF-2 `<userData>/codepuppy-engine-config`(显式文件与模型底表)、CF-3 / CF-4 / CF-5 / CF-7 的
 literal(shell 环境缓存、`codepuppy.env` 与用户设置的 `$CODEPUPPY_ENV_FILE` 那份、两份端点文件、两个 store 文件)、CF-6 连接器目录、
 CF-7 `<userData>/*.dat`(扩展名不分大小写)、CF-8 引擎全局配置目录与 `<XDG_CONFIG_HOME>/opencode`、CF-10 `~/opencode.json(c)`;第二块是
-每条规则每一级上级目录节点(沿真实路径与配置路径各算一遍,只冻结节点本身)。计划器(`process-fence-plan.ts` `planConfigFence`)落真实路径、
-给软链位置加真实目标、预建目录位置(不预建 `~/.opencode`);`$CODEPUPPY_ENV_FILE` 那一项从不让计划失败。这些文件的写者都在 main:
+每条规则每一级上级目录节点(沿真实路径与配置路径各算一遍,再加每个配置路径节点所在真实位置的上级链,只冻结节点本身;不冻结的:只出现在某条软链目标文字里的软链目录(残留 R10),以及写不进 profile 的节点 —— 路径含引号、反斜杠或控制字符,计划时一行日志点名(残留 R11))。计划器(`process-fence-plan.ts` `planConfigFence`)落真实路径、
+给软链位置加真实目标、预建目录位置(不预建 `~/.opencode`);`$CODEPUPPY_ENV_FILE` 那一项从不让计划失败,落在 `/dev` 下的那条规则不出(链节点照留)。这些文件的写者都在 main:
 `engine-explicit-config.ts` 的 `writeEngineConfigFiles`(fork 之前、官方连接器恢复之后写种子、显式文件与模型底表,引擎配置目录 0700;
 写不进 ⇒ `[I-13] engine config files could not be written — refusing to fork`)与 main 里的 `watchExplicitSources`;sidecar 的注入不写盘。
 运行期放行的判据把这两块读成 deny(在某条 allow 之下、且不在任何 deny 之下才算覆盖;literal 只在等于目录时算);受保护位置本身或其内的

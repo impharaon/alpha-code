@@ -309,7 +309,15 @@ describe("签发判定的唯一来源:本代 apply 的 profile 解析回写规�
       `${profile}(allow file-write* (extension "app.codepuppy.workspace-write"))\n`,
       `${profile}(allow file-write*\n  (subpath "/x") ; W1\n)\n`,
       `${head}${profile.slice(profile.indexOf("(deny file-write*\n", profile.indexOf("(allow network-outbound")))}(allow file-write* (extension "app.codepuppy.workspace-write"))\n`,
+      // 通配操作 `file*` 含写(审查 B 第 3 条):渲染点从不写它,写在 profile 任何位置都抛 —— 拒写块之后、放行块之前、与读操作并列
+      `${profile}(allow file* (subpath "/x"))\n`,
+      `${profile}(deny file* (subpath "/x"))\n`,
+      `${profile}(allow file-read* file* (subpath "/x"))\n`,
+      `(version 1)\n(allow file* (subpath "/x"))\n${profile.slice("(version 1)\n".length)}`,
+      `${head}(allow file*\n  (subpath "/x")\n)\n${profile.slice(head.length)}`,
     ]) expect(() => processFenceWriteRules(bad), bad.slice(-160)).toThrow()
+    // 读规则不受影响:读不改写集,渲染点今天不写读规则;兄弟设计 C1 的读写表头照收(上一个用例),单独的读规则照旧忽略
+    expect(processFenceWriteRules(`${profile}(allow file-read* (subpath "/x"))\n(deny file-read-data (literal "/y"))\n`)).toEqual(processFenceWriteRules(profile))
   })
 
   test("覆盖判定:在 allow 下、且不在任何 deny 下才算覆盖;subpath / regex deny 盖住目录或其祖先,literal deny 只在等于目录时算;大小写折叠", () => {

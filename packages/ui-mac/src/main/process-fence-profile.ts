@@ -268,6 +268,8 @@ export type ProcessFenceWriteRules = { allow: ProcessFenceWriteRule[]; deny: Pro
 const WRITE_RULE = /\((subpath|literal) "([^"]*)"\)|\(regex #"([^"]*)"\)/g
 /** 渲染点写出的两种拒写表头(受保护集与上级目录块、C1 的上级目录块;C1 的读写块)。必须在行首,后面紧跟空格或行尾。 */
 const DENY_HEADERS = ["(deny file-write*", "(deny file-read* file-write*"] as const
+/** 通配操作 `file*`(含写)出现在任何 allow / deny 形式里:渲染点从不写它(审查 B 第 3 条)。 */
+const WILDCARD_FILE_OPERATION = /\((?:allow|deny)(?:\s+[\w*-]+)*?\s+file\*(?=[\s)]|$)/
 
 /**
  * 一段只由三种条目与空白组成的文本 ⇒ 条目;别的任何东西(过滤器、别的写法)或一条都没有 ⇒ 抛。`comment`:余下的文字可以是一个 `;` 注释
@@ -309,6 +311,7 @@ function denyBlock(lines: readonly string[], start: number, header: string): { b
  * 放行块之后只认渲染点写出的拒写块 —— 表头在行首、恰为 `(deny file-write*` 或 `(deny file-read* file-write*`;条目只有
  * `(subpath "…")`、`(literal "…")`、`(regex #"…")`;块在引号外括号配平处结束,收尾括号可以落在最后一条条目的行末,其后只许 `;` 注释;
  * 整块写在一行同样合法;条目进 deny。第一个拒写块之后再出现任何文件写的放行(含 X1 行),或任何别的含 `file-write` 的行、表头、条目,都抛。
+ * 通配操作 `file*` 也含写:写在 profile 任何位置都抛。只涉及读的规则不改写集,照旧忽略。
  */
 export function processFenceWriteRules(profile: string): ProcessFenceWriteRules {
   const lines = profile.split("\n")
@@ -319,6 +322,7 @@ export function processFenceWriteRules(profile: string): ProcessFenceWriteRules 
   let denied = false
   for (let index = 0; index < lines.length; index++) {
     const line = lines[index]!
+    if (WILDCARD_FILE_OPERATION.test(line)) throw new Error(`process fence: wildcard file operation (includes writes) the renderer never writes: ${line}`)
     const header = allowed ? DENY_HEADERS.find((candidate) => line.startsWith(candidate) && (line.length === candidate.length || line[candidate.length] === " ")) : undefined
     if (header) {
       const block = denyBlock(lines, index, header)

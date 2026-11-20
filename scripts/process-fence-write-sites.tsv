@@ -12,12 +12,9 @@ packages/ext/src/policy/store.ts	mkdirSync	path.dirname(file)	W4
 packages/ext/src/policy/store.ts	renameSync	file	W4
 packages/ext/src/policy/store.ts	renameSync	tmp	W4
 packages/ext/src/policy/store.ts	writeFileSync	tmp	W4
-packages/ui-mac/src/main/codepuppy-config-injection.ts	mkdirSync	dir	W3
 packages/ui-mac/src/main/codepuppy-config-injection.ts	mkdirSync	path.dirname(truth)	W2
 packages/ui-mac/src/main/codepuppy-config-injection.ts	mkdirSync	userDataPath	W3
-packages/ui-mac/src/main/codepuppy-config-injection.ts	rmSync	modelsPath	W3
 packages/ui-mac/src/main/codepuppy-config-injection.ts	writeFileSync	file	W3
-packages/ui-mac/src/main/codepuppy-config-injection.ts	writeFileSync	modelsPath	W3
 packages/ui-mac/src/main/codepuppy-config-injection.ts	writeFileSync	truth	W2
 packages/ui-mac/src/main/codepuppy-environment.ts	mkdirSync	directory	main-only
 packages/ui-mac/src/main/codepuppy-environment.ts	rmdirSync	directory	main-only
@@ -41,9 +38,12 @@ packages/ui-mac/src/main/codepuppy-workdir.ts	writeFileSync	tmp	W1
 packages/ui-mac/src/main/catalog-channels.ts	mkdirSync	userDataPath	W3
 packages/ui-mac/src/main/catalog-channels.ts	renameSync	tmp	W3
 packages/ui-mac/src/main/catalog-channels.ts	writeFileSync	tmp	W3
-# `#1662` sidecar 重写的显式配置文件(engine-explicit-config.ts writeAtomic):<userDataPath>/<engineConfig>/codepuppy-explicit.json。
+# `#1662` sidecar 重写的显式配置文件(engine-explicit-config.ts writeAtomic):<userDataPath>/<engineConfig>/codepuppy-explicit.json;模型底表 models.json 同目录(materializeGovernedModelsBase)。
+packages/ui-mac/src/main/engine-explicit-config.ts	mkdirSync	dir	W3
 packages/ui-mac/src/main/engine-explicit-config.ts	mkdirSync	path.dirname(file)	W3
 packages/ui-mac/src/main/engine-explicit-config.ts	renameSync	temporary	W3
+packages/ui-mac/src/main/engine-explicit-config.ts	rmSync	modelsPath	W3
+packages/ui-mac/src/main/engine-explicit-config.ts	writeFileSync	modelsPath	W3
 packages/ui-mac/src/main/engine-explicit-config.ts	writeFileSync	temporary	W3
 packages/ui-mac/src/main/ext-atomic-fs.ts	mkdirSync	dir	arg
 packages/ui-mac/src/main/ext-atomic-fs.ts	mkdirSync	path.dirname(to)	arg

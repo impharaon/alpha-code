@@ -21,7 +21,7 @@ import * as path from "node:path"
 import { CODEPUPPY_AGENT_TEXT } from "./codepuppy-agents"
 import { CODEPUPPY_BEHAVIOR_MD } from "./codepuppy-behavior"
 import { buildCodePuppyCapabilities, buildCodePuppyIdentity } from "./codepuppy-identity"
-import { buildCodePuppyModelConfig, engineModelConfig, type CodePuppyModelConfig } from "./codepuppy-models"
+import { buildCodePuppyModelConfig, engineModelConfig } from "./codepuppy-models"
 // `hasSecretFile` 是 ADR-009 的「平台代付」判据(见下方 `platformPays`,`#1195` 起换轴到 `CODEPUPPY_MCP_TOKEN` 文件 ——
 // 凭证在场性与代付判据从此是同一件事)。云 MCP 定义里的 `{file:…CODEPUPPY_MCP_TOKEN}` 引用由 main 写进启动文档(`#1698` R8)。
 import { hasSecretFile } from "./codepuppy-secret-files"
@@ -39,15 +39,11 @@ import { remoteMcpLeaf } from "./mcp-server-truth"
 import { projectServerConfig } from "../../../ext/src/engine-transforms"
 import { materializeCloudMcpConfig } from "./cloud-sidecar-config"
 import type { ChannelName } from "./catalog-channels"
-import { CODEPUPPY_V2_CATALOG_READY_PROVIDER_ID } from "../shared/codepuppy-config"
-import { PROJECT_HIDDEN_DIR } from "../shared/project-hidden-dir"
 import { USER_DATA_LAYOUT } from "./user-data-layout"
 // `#1667`(#1665 L3 交回的接缝裁决 A / C,编排器 2026-11-09):出厂技能目录、技能生成的 live 目录与出厂 /init、/review 命令
 // 由 main 写进这份内联配置文档(2.x 插件接口给不了等价挂点)。路径与命令内容仍以 ext 那三个纯函数为唯一来源,这里只引用。
-import { factorySkillPaths } from "../../../ext/src/factory-paths"
 import { publishProviderAllowList } from "../../../ext/src/provider-allow"
-import { skillGenerationLiveDirs } from "../../../ext/src/gen-skill-paths"
-import { disabledPackageComponents, explicitConfigPath, writeExplicitConfig, type ExplicitLayer } from "./engine-explicit-config"
+import { disabledPackageComponents, explicitConfigPath, explicitSkillDirs, materializeGovernedModelsBase, writeExplicitConfig, type ExplicitLayer } from "./engine-explicit-config"
 import { applyPromptTakeover } from "../../../ext/src/codepuppy-prompts"
 import { HUB_READ_ACTIONS } from "../../../ext/src/hub-tools"
 
@@ -95,30 +91,6 @@ export type CodePuppyConfigInjectionOutput = {
   explicit?: { file: string; root: string; userConfig?: string; layer: ExplicitLayer }
 }
 
-/**
- * `#1667`(编排器裁决 2026-11-12):项目技能目录。2.x 把显式文件里**相对**的 `skills` 条目按会话所在的项目目录解析
- * (`packages/core/src/config/plugin/skill.ts` 的 `sources()`)并监听它,所以这一条让每个项目看到、也只看到自己的
- * `.codepuppy/skills`(ecosystem-import 把项目导入的技能放在那里),导入后不用重启。v1 由 ext 合并项目 `codepuppy.jsonc` 的
- * `skills.paths`,不看 consent(ext `project-config.ts` 的信任门只管 mcp 与 agent 的控制字段);2.x 的插件接口没有加技能目录的挂点。
- * 与 v1 的三处差别(已裁决接受):① 目录在、项目 `codepuppy.jsonc` 里没写注册,也会加载;② 项目在 `skills.paths` 里写的其它条目
- * 不生效;③ ext 的项目身份检查不适用 —— 软链照跟,会话位置是 HOME 时读 `~/.codepuppy/skills`。
- */
-export const PROJECT_SKILLS_ENTRY = `./${PROJECT_HIDDEN_DIR}/skills`
-
-/**
- * `#1667`(编排器裁决 r3 第 1 条):显式文件 `skills` 的唯一算法 —— 出厂技能目录(main 启动时算好、`#1698` 起在启动文档的
- * `skills.factoryDirs`)+ 已启用技能当前那一代的真实目录(ext 的 skillGenerationLiveDirs:过账本 enabled 门、读 `current.json`)+ 项目技能目录
- * (PROJECT_SKILLS_ENTRY)。注入时算一次,sidecar 的监听在翻代 / 新装 / 停用时再算(engine-explicit-config.ts 的 watchExplicitSources)。
- */
-export function explicitSkillDirs(): string[] {
-  return [
-    ...new Set([
-      ...factorySkillPaths(codepuppyBootstrap().skills.factoryDirs),
-      ...skillGenerationLiveDirs(codepuppyGlobalRoot()),
-      PROJECT_SKILLS_ENTRY,
-    ]),
-  ]
-}
 export type CodePuppyConfigInjectionResult = CodePuppyConfigInjectionOutput &
   ({ ok: true } | { ok: false; error: CodePuppyConfigInjectionFailure })
 
@@ -698,97 +670,4 @@ export function injectCodePuppyConfig(
       models: {},
     }
   }
-}
-
-// #857:Code Puppy 的模型治理生效时,注入的 provider 表已经描述了每一个可用的内置 provider / 模型。让 ModelsDev 落回随包快照,
-// 第一次请求还要先解码并物化 6,132 条无关条目(签名打包矩阵里 2.8-6.1 s)。所以从**同一份**投影机械地物化一份最小的
-// models.dev 底表,经 `start()` 的 `models.file` 交给引擎(`#1667`;v1 时代经 `OPENCODE_MODELS_PATH`)。投影里缺了某个已启用的
-// 用户 / 文件 provider 时 governedModelsBase 返回 {}、不带就绪标记 —— 这时不给文件,保留保守的晚到屏障,而不是先露出半套。
-// 空底表也必须不给:ModelsDev 把磁盘上的 `{}` 当作有值,会绕过随包快照。这里不读也不写任何 key 字段。
-// CODEPUPPY_MODELS_DISABLE 仍是真逃生门:那时根本不进这里。
-// (2026-07-23 为 v2 读侧另写 `OPENCODE_CONFIG_DIR/opencode.json(c)` 的半代次桥已随 `#1667` 删除,清点表 C4:只剩一个代次,
-// 配置只写一份,就是上面的注入。)
-type V1ProjectedModel = { name?: unknown }
-type V1ProjectedProvider = {
-  name?: unknown
-  npm?: unknown
-  api?: unknown
-  options?: { baseURL?: unknown }
-  models?: unknown
-}
-
-function governedModelsBase(config: { enabled_providers?: unknown; provider?: unknown }): Record<string, unknown> {
-  const enabled = Array.isArray(config.enabled_providers)
-    ? config.enabled_providers.filter((id): id is string => typeof id === "string")
-    : []
-  const providers = (config.provider ?? {}) as Record<string, V1ProjectedProvider>
-
-  // An enabled id without a complete provider/model projection is a user/file-owned provider.
-  // Do not publish the early marker for a partial set: the renderer will keep waiting for the
-  // ordinary ConfigProvider commit, which has already merged those file sources.
-  if (
-    enabled.some((id) => {
-      const item = providers[id]
-      return !item || !item.models || typeof item.models !== "object" || Array.isArray(item.models)
-    })
-  )
-    return {}
-
-  const base: Record<string, unknown> = {}
-  for (const id of enabled) {
-    const item = providers[id]!
-    const npm = typeof item.npm === "string" ? item.npm : undefined
-    const api =
-      typeof item.options?.baseURL === "string"
-        ? item.options.baseURL
-        : typeof item.api === "string"
-          ? item.api
-          : undefined
-    const modelProvider = npm || api ? { ...(npm ? { npm } : {}), ...(api ? { api } : {}) } : undefined
-    const models = Object.fromEntries(
-      Object.entries(item.models as Record<string, V1ProjectedModel>).map(([modelID, model]) => [
-        modelID,
-        {
-          id: modelID,
-          name: typeof model.name === "string" ? model.name : modelID,
-          release_date: "1970-01-01",
-          attachment: false,
-          reasoning: false,
-          temperature: false,
-          tool_call: false,
-          limit: { context: 0, output: 0 },
-          modalities: { input: [], output: [] },
-          ...(modelProvider ? { provider: modelProvider } : {}),
-        },
-      ]),
-    )
-    base[id] = {
-      id,
-      name: typeof item.name === "string" ? item.name : id,
-      env: [],
-      ...(api ? { api } : {}),
-      ...(npm ? { npm } : {}),
-      models,
-    }
-  }
-  base[CODEPUPPY_V2_CATALOG_READY_PROVIDER_ID] = {
-    id: CODEPUPPY_V2_CATALOG_READY_PROVIDER_ID,
-    name: "Code Puppy catalog readiness marker",
-    env: [],
-    models: {},
-  }
-  return base
-}
-
-function materializeGovernedModelsBase(userDataPath: string, config: CodePuppyModelConfig): string | undefined {
-  const dir = path.join(userDataPath, USER_DATA_LAYOUT.engineConfig)
-  const modelsPath = path.join(dir, "models.json")
-  const base = governedModelsBase(config)
-  if (!Object.keys(base).length) {
-    fs.rmSync(modelsPath, { force: true })
-    return undefined
-  }
-  fs.mkdirSync(dir, { recursive: true, mode: 0o700 })
-  fs.writeFileSync(modelsPath, `${JSON.stringify(base, null, 2)}\n`, { mode: 0o600 })
-  return modelsPath
 }

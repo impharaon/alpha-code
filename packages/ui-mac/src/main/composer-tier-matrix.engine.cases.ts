@@ -28,8 +28,7 @@ import fs from "node:fs"
 import path from "node:path"
 import { assertEngineSandboxed, engineSandbox } from "../../test-component/engine-sandbox"
 import { allowProject, codepuppyEngine, fakeMainReceived, policyStore, probe, scriptedModel, textOf, type Running } from "../../test-component/codepuppy-engine"
-import { explicitSkillDirs } from "./codepuppy-config-injection"
-import { watchExplicitSources } from "./engine-explicit-config"
+import { explicitSkillDirs, watchExplicitSources } from "./engine-explicit-config"
 
 const sandbox = engineSandbox()
 const FACTORY_SKILLS = path.join(sandbox.root, "factory-skills")

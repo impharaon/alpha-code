@@ -154,8 +154,8 @@ beforeAll(async () => {
   main = registerExtIpcHandlers(host.userData, "dev", async () => ({ url: running!.url, username: "opencode", password: "cp-plugin-entrypoints" }), sandbox.home, undefined, async () => undefined)
   main.codepuppySidecar.attach(message => { wire.push(message); for (const listener of listeners) listener({ data: message }) })
   await main.ledgerReady
-  const { injectCodePuppyConfig, explicitSkillDirs } = await import("./codepuppy-config-injection")
-  const { watchExplicitSources } = await import("./engine-explicit-config")
+  const { injectCodePuppyConfig } = await import("./codepuppy-config-injection")
+  const { explicitSkillDirs, watchExplicitSources } = await import("./engine-explicit-config")
   const injection = injectCodePuppyConfig(host.userData, join(sandbox.root, "plugin-entrypoints-ext"), "stable", codepuppyBootstrap().paths.userConfig ?? null)
   stopWatching = watchExplicitSources({ ...injection.explicit!, skills: explicitSkillDirs, log: line => logs.push(line) })
   // Pass the existing embedder transport explicitly; Effect's default fetch may predate

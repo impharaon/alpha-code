@@ -247,8 +247,7 @@ beforeAll(async () => {
   await main.ledgerReady
   // sidecar.ts starts this watcher before the engine. The old connector refresh happened
   // to re-inject paths; runtime MCP activation must exercise the real in-process path too.
-  const { explicitSkillDirs } = await import("./codepuppy-config-injection")
-  const { watchExplicitSources } = await import("./engine-explicit-config")
+  const { explicitSkillDirs, watchExplicitSources } = await import("./engine-explicit-config")
   if (!host.injection.explicit) throw Error("missing explicit config inputs")
   stopWatching = watchExplicitSources({ ...host.injection.explicit, skills: explicitSkillDirs, log: line => consoleLines.push(line) })
   running = await host.start()

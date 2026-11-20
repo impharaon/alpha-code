@@ -15,7 +15,7 @@ last_reviewed: 2026-11-20
 ## 片 ②：受保护配置集与认得它的运行期放行，围栏内写者移到主进程
 
 - 依据：规格 `docs/specs/engine-config-fence/spec.md` v1(owner 2026-11-20「两份都批准」)的 BR-01、BR-03(不含工具策略)、BR-04、BR-05，AC-01、AC-02、AC-04(不含工具策略)、AC-05 第一句、AC-06，以及「用户会碰到的限制」第二条那句说明；冻结设计 `docs/specs/engine-config-fence/design.md` @ `3f36883278`(approved，两轮审查)的 §1 (a)(c)、§2、§4.1 CF-1–8 与 CF-10、§4.2、§4.3、§4.4、§4.7、§5、§6 的 I1/I2/I4/I5 与 E1、E2、E3(无 A3)、E5、E7、E8、E9，§10 D2/D3/D5/D6/D11/D12 ②/D14；意图 impharaon/alpha-work `docs/intents/INT-safety.md` I-13。两份文件另行合入主线，本分支不复制，所以下文按路径@提交引用，不建链接。读码基线 `bd206c6bca`(`origin/alpha` `887748b52c` + 片 ⓪)。不在本片：CF-9、W16 与计划目录(片 ④)，CF-11 与工具策略写消息(片 ③)，L1–L3(片 ①)。
-- 核对：待核对(实施的第一个提交按 resume brief 的 Phase 行填写)。
+- 核对：Phase: IMPLEMENT — plan `5c1525b1a9` · 编排器 / Claude Fable 5.2 · 通过(对 SPEC v1 与冻结设计核对；D-1…D-6 全部接受，D-6 附条件：启动文档内容与计划出的 profile 对任何输入都不变，既有一致性记录不重采；按单元 A → B+C 两次审查点推进)。
 
 路径前缀 `main/` = `packages/ui-mac/src/main/`，`ui/` = `packages/ui-mac/src/renderer/codepuppy-ui/`，`i18n/` = `packages/ui-mac/src/renderer/i18n/`。PLAN 阶段只提交本文件；下列命令都是实施安排，尚未运行。约定沿用 [child-process-write-fence 的计划](../child-process-write-fence/plan.md)：先提交红测试再提交实现，宿主 `*.test.ts` 起同名 `.cases.ts`，`.cases.ts` 不单独执行。
 
@@ -141,4 +141,5 @@ last_reviewed: 2026-11-20
 
 ### 偏离记录
 
-暂无。
+- 2026-11-20 · 单元 A 开头加一个纯搬家提交(不在原顺序里)：`PROJECT_SKILLS_ENTRY`、`explicitSkillDirs`、`governedModelsBase`(连同两个投影类型与 `#857` 注释)搬到 `engine-explicit-config.ts`，另把同块的 `materializeGovernedModelsBase` 一起搬(D-3 名单外，同样逐字节不变，只加 `export` 供注入模块引用；单元 A 的 `writeEngineConfigFiles` 复用它写模型底表)。importer 只改 import 行；写盘登记簿里随代码换文件的三行根仍是 W3(根在后一个提交改)。逐字节核对：从 `bd206c6bca` 的注入模块取原 24 行与 92 行，与新文件同一段逐行比较全等，唯一差别是 `export `(`~/.cache/alpha-orch/2026-11-19/impl-fence-slice2/evidence/move-byte-equivalence.txt`)。
+- 2026-11-20 · 观察(编排器裁决：记录、不加机制，设计另加留档)：CF 位置本身是悬空软链时 `realpath` 报 `ENOENT`，计划器按「不存在」只保护链本身，链指向的、尚不存在的目标不在规则里。围栏内建不出这种链(位置本身被拒)，只有改动前的会话或用户自己能留下它，与残留 R6 / R8 同类。

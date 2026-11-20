@@ -20,6 +20,7 @@
 // **刻意不建** W16(`~/.opencode`:engine-config-truth 对它有 junk-only 判定,凭空建一个会改行为)、
 // W17/W18(dev-only)。
 
+import { lstatSync } from "node:fs"
 import { basename, dirname, join, resolve } from "node:path"
 import { resolveFenceAddonPath, type FenceAddonResolveInput } from "./process-fence-apply"
 import {
@@ -78,7 +79,7 @@ export type PlanProcessFenceInput = {
  */
 export function planConfigFence(
   input: { userDataPath: string; appStateRoot: string; codepuppyGlobalRoot: string; engineConfigDirectory: string; roots: EngineRoots; envFile?: string },
-  deps: Pick<PlanProcessFenceDeps, "realpath" | "mkdirp">,
+  deps: Pick<PlanProcessFenceDeps, "realpath" | "mkdirp" | "lstat">,
 ): { configFence: ConfigFenceRule[]; configFenceRoots: string[] } {
   const locations = configFenceLocations({ ...input, configHome: input.roots.configHome, home: input.roots.home })
   const envFile = input.envFile ? resolve(input.envFile) : undefined
@@ -110,13 +111,26 @@ export function planConfigFence(
       return join(within(dirname(directory)), basename(directory))
     }
   }
+  const lstat = deps.lstat ?? ((path: string) => lstatSync(path, { bigint: true }))
+  /** 节点本身(不跟软链)的 device + inode;拿不到为空。 */
+  const identity = (path: string) => {
+    try {
+      const meta = lstat(path)
+      return `${meta.dev}:${meta.ino}`
+    } catch {
+      return undefined
+    }
+  }
   /**
-   * 一个节点在真实上级目录之下的身份:已存在且不是软链 ⇒ 它的真实写法(大小写、firmlink 按身份归一);软链(或尚不存在)⇒ 链节点自己的名字。
+   * 一个节点在真实上级目录之下的身份:与它的真实路径是同一对象(device + inode;大小写、firmlink 按身份归一)⇒ 真实写法;软链或尚不存在
+   * ⇒ 链节点自己的名字(终审第 6a 条:不按小写字符串判,区分大小写的卷上指向只差大小写的兄弟的链节点照样留下)。
    */
   const node = (path: string) => {
     const spelled = join(within(dirname(path)), basename(path))
     const real = target(path)
-    return real !== undefined && real.toLowerCase() === spelled.toLowerCase() ? real : spelled
+    if (real === undefined || real === spelled) return real ?? spelled
+    const self = identity(spelled)
+    return self !== undefined && self === identity(real) ? real : spelled
   }
   /**
    * 实现期修订 2 B:位置的配置路径(未解析)上、不在这几条规则真实路径上的目录节点,按身份去重,挂在这个位置的第一条规则上。终审第 3 条:
@@ -192,6 +206,8 @@ export type PlanProcessFenceDeps = {
   readWorkspaces: () => readonly string[]
   isDirectory: (p: string) => boolean
   stat?: WorkspaceDirectoryInput["stat"]
+  /** The node itself, not followed (受保护集配置路径节点的身份,终审第 6a 条); production uses lstatSync with bigint identities. */
+  lstat?: (p: string) => { dev: number | bigint | string; ino: number | bigint | string }
   mkdirp: (p: string) => void
   compile: TrialCompile
   log: (line: string) => void

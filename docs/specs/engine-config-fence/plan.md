@@ -174,3 +174,4 @@ last_reviewed: 2026-11-20
   2. `$CODEPUPPY_ENV_FILE` 的真实路径落在 `/dev` 下(含经软链)⇒ 不出这一行;红 `evidence/final2-red-*.log`(三项实测 EPERM)→ 绿(本提交)。
   3. 配置路径每个节点所在真实位置的上级链也进上级目录块(两跳软链的中间真实目录);红 `evidence/final3-red-*.log`(生产臂实测换掉、读到 evil)→ 绿(本提交)。
   4. 写不进 profile 的配置路径节点(引号等)逐个丢,规则与其余节点照留(env 文件的 literal 不再整条丢;配置目录经这样的软链时计划不再失败);红 `evidence/final4-red.log` → 绿(本提交)。
+  6a. 配置路径节点「同一对象」按 device + inode(`lstat`,计划器依赖里新增可选的 `lstat`,生产默认 `lstatSync` bigint),不再按小写字符串;红 `evidence/final6a-red.log` → 绿(本提交)。

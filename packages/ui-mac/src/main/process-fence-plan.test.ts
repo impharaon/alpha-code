@@ -353,6 +353,23 @@ describeDarwin("planProcessFence", () => {
     expect(new Set(deny.map((rule) => `${rule.kind}:${rule.value}`)).size).toBe(deny.length)
   })
 
+  test("终审第 4 条:配置路径上一个写不进 profile 的节点(名字里有引号的软链)只丢那一个节点 —— env 文件的 literal 照留;配置目录位置照常计划,不因它拒 fork", () => {
+    const quoted = `${HOME}/My "dots"`
+    const realpath = (p: string) => (p === quoted || p.startsWith(`${quoted}/`) ? `${HOME}/proj-a/dots${p.slice(quoted.length)}` : p)
+    const env = harness({ realpath })
+    env.input.envFile = `${quoted}/cp.env`
+    const envDeny = processFenceWriteRules(planProcessFence(env.input, env.deps).profile).deny
+    expect(envDeny).toContainEqual({ kind: "literal", value: `${HOME}/proj-a/dots/cp.env` })
+    expect(envDeny.some((rule) => rule.value.includes('"'))).toBe(false)
+    const cfg = harness({ realpath })
+    cfg.input.sidecarEnv = { HOME, XDG_CONFIG_HOME: quoted }
+    cfg.input.engineConfigDirectory = `${quoted}/opencode`
+    const plan = planProcessFence(cfg.input, cfg.deps)
+    const deny = processFenceWriteRules(plan.profile).deny
+    expect(deny).toContainEqual({ kind: "subpath", value: `${HOME}/proj-a/dots/opencode` })
+    expect(deny.some((rule) => rule.value.includes('"'))).toBe(false)
+  })
+
   test("修订 2 B:两种写法指同一个节点按身份去重(大小写变体 ⇒ 只列真实写法);配置路径与真实路径相同 ⇒ 规则与上级目录块不变", () => {
     const upper = `${HOME}/PROJ-A`
     const realpath = (p: string) => {

@@ -4,6 +4,7 @@ import { app, utilityProcess } from "electron"
 import { mkdirSync, readFileSync, readdirSync, realpathSync, writeFileSync, existsSync } from "node:fs"
 import { join } from "node:path"
 import { buildCodePuppyBootstrap } from "../../../src/main/codepuppy-bootstrap-build"
+import { credentialStores, readCredentialTable } from "../../../src/main/codepuppy-secret-files"
 import { engineAuthorization } from "../../../src/main/engine-authorization"
 import { loadFenceAddon } from "../../../src/main/process-fence-apply"
 import { renderProcessFenceProfile, resolveEngineRoots, WORKSPACE_WRITE_EXTENSION_CLASS } from "../../../src/main/process-fence-profile"
@@ -87,6 +88,8 @@ async function boot(name: string, variant = "production") {
   const port = 40000 + Math.floor(Math.random() * 10000)
   child.postMessage({
     type: "start", hostname: "127.0.0.1", port, password, fence: { profile, addonPath },
+    // SPEC-stored-credentials-fence T1:start 必带 main 交来的凭据整表(生产读法)
+    credentials: readCredentialTable(credentialStores({ userDataPath: userData })),
     bootstrap: buildCodePuppyBootstrap({
       userDataPath: userData, globalRoot, userConfig: join(globalRoot, "codepuppy.jsonc"), initialDirectory: A,
       databasePath: join(userData, "engine.db"), engineConfigDirectory: join(userData, "engine-config"),

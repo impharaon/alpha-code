@@ -178,9 +178,10 @@ test("AC-05 / E11:一次装载的拉取回复被扣住,其间提交新版本,另
   // main's table says another value for it: the second Location gets it only through its own, unheld pull (a pull that waited for the held
   // one and then timed out would leave the engine to read the disk value — slice ② interim)
   wire.overlay({ [third.slice("{file:".length, -1)]: "FAKE-CRED-alpha-3-from-table" })
-  const started = Date.now()
   expect(await m.load()).toEqual({ status: "connected", token: "FAKE-CRED-alpha-3-from-table" })
-  expect(Date.now() - started).toBeLessThan(CREDENTIALS_PULL_TIMEOUT_MS)
+  // time-free: when the second load is back, the withheld reply is still withheld and no pull has timed out
+  expect(wire.pending()).toBe(1)
+  expect(wire.log.some((line) => line.includes("had no reply"))).toBe(false)
   wire.release()
   await delayed
   expect(wire.log.some((line) => line.includes("not published"))).toBe(true)

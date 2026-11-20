@@ -31,6 +31,9 @@ function harness(overrides: Partial<PlanProcessFenceDeps> = {}, existing = new S
     // 假盘上的路径不在盘上;这里用恒等让并集走词法比较(真 realpath 的判据在 process-fence-profile.test.ts ④)
     realpath: (p) => p,
     stat: (p) => ({ dev: "fixture", ino: p }),
+    // the node itself, not followed: on the fake disk every spelling is its own object (a test that needs «same object under another
+    // spelling» injects its own) — never the host's lstatSync on these fake paths (final review R2 item 3)
+    lstat: (p) => ({ dev: "fixture", ino: p }),
     defaultWorkspace: () => `${HOME}/code-puppy`,
     // `#1394`:清单来自真源(顺序即优先级:recent 的 proj-b 在前),不再是 store 的三个键
     readWorkspaces: () => [`${HOME}/proj-b`, `${HOME}/proj-a`],
@@ -172,7 +175,7 @@ describeDarwin("planProcessFence", () => {
   test("SPEC-engine-config-fence E9:计划出的 profile 带受保护集两块(N4 之后),解析回来 deny = 计划给的规则 + 全部上级目录;configFenceRoots = 其中的目录位置", () => {
     const h = harness()
     const plan = planProcessFence(h.input, h.deps)
-    const cf = planConfigFence({ userDataPath: USER_DATA, appStateRoot: STATE_ROOT, codepuppyGlobalRoot: GLOBAL, engineConfigDirectory: `${HOME}/.config/opencode`, roots: plan.roots }, { realpath: (p) => p, mkdirp: () => {} })
+    const cf = planConfigFence({ userDataPath: USER_DATA, appStateRoot: STATE_ROOT, codepuppyGlobalRoot: GLOBAL, engineConfigDirectory: `${HOME}/.config/opencode`, roots: plan.roots }, { realpath: (p) => p, mkdirp: () => {}, lstat: (p) => ({ dev: "fixture", ino: p }) })
     const asRule = (rule: (typeof cf.configFence)[number]): ProcessFenceWriteRule =>
       rule.kind === "dat-files" ? { kind: "regex", value: `^${rule.dir.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}/[^/]+\\.[dD][aA][tT]$` } : { kind: rule.kind, value: rule.path }
     const anchors = cf.configFence.map((rule) => (rule.kind === "dat-files" ? `${rule.dir}/x` : rule.path))
@@ -400,7 +403,7 @@ describeDarwin("planProcessFence", () => {
     expect(deny.filter((rule) => rule.value.includes("PROJ-A"))).toEqual([])
     const plain = harness()
     const plan = planProcessFence(plain.input, plain.deps)
-    const cf = planConfigFence({ userDataPath: USER_DATA, appStateRoot: STATE_ROOT, codepuppyGlobalRoot: GLOBAL, engineConfigDirectory: `${HOME}/.config/opencode`, roots: plan.roots }, { realpath: (p) => p, mkdirp: () => {} })
+    const cf = planConfigFence({ userDataPath: USER_DATA, appStateRoot: STATE_ROOT, codepuppyGlobalRoot: GLOBAL, engineConfigDirectory: `${HOME}/.config/opencode`, roots: plan.roots }, { realpath: (p) => p, mkdirp: () => {}, lstat: (p) => ({ dev: "fixture", ino: p }) })
     expect(cf.configFence.some((rule) => "via" in rule)).toBe(false)
   })
 

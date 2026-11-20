@@ -108,6 +108,13 @@ export function resolveEngineRoots(env: Record<string, string | undefined>, home
 export type ConfigFenceRule = ({ kind: "subpath" | "literal"; path: string } | { kind: "dat-files"; dir: string }) & { via?: readonly string[] }
 
 /**
+ * configFenceLocations 列出的一个位置。`neverCreate` 只标在 CF-9 那一条上:应用从不建 `~/.opencode`(BR-07),计划器的预建按这一条
+ * 跳过 —— 绑定在这一条上,不按路径串比:用户经 OPENCODE_CONFIG_DIR 亲自把同一个目录指定为引擎全局配置目录时,CF-8 那一条照常预建,
+ * 怎么拼写都一样(审查 R1,编排器裁决)。
+ */
+export type ConfigFenceLocation = ConfigFenceRule & { neverCreate?: true }
+
+/**
  * CF-1–10 的原始位置(还不是真实路径;片 ③ 再加工具策略目录)。名字取 USER_DATA_LAYOUT 与 store 常量。
  * 环境根恒列(在状态根之内时是一条冗余规则);两个引擎配置目录相同只列一份。顺序即渲染顺序。
  */
@@ -121,7 +128,7 @@ export function configFenceLocations(input: {
   home: string
   /** CF-4 的另一份:用户设置的 `$CODEPUPPY_ENV_FILE`(codepuppy-secrets.ts 的 userEnvFile;实现期修订 2 A)。 */
   envFile?: string
-}): ConfigFenceRule[] {
+}): ConfigFenceLocation[] {
   const inUserData = (name: string) => join(input.userDataPath, name)
   const configDirectories = [...new Set([resolve(input.engineConfigDirectory), resolve(input.configHome, "opencode")])]
   return [
@@ -138,15 +145,10 @@ export function configFenceLocations(input: {
     { kind: "literal", path: inUserData(UPDATER_STORE) }, // CF-7
     { kind: "dat-files", dir: input.userDataPath }, // CF-7 界面设置存储 *.dat
     ...configDirectories.map((path) => ({ kind: "subpath" as const, path })), // CF-8
-    { kind: "subpath", path: homeOpencodeDirectory(input.home) }, // CF-9 整个 ~/.opencode(谁都不建它,计划器不预建)
+    { kind: "subpath", path: join(input.home, ".opencode"), neverCreate: true }, // CF-9 整个 ~/.opencode(应用从不建它,计划器不预建)
     { kind: "literal", path: join(input.home, "opencode.json") }, // CF-10
     { kind: "literal", path: join(input.home, "opencode.jsonc") }, // CF-10
   ]
-}
-
-/** CF-9 的路径(DESIGN §4.1、D13):`~/.opencode` 整个受保护,任何进程都不建它(BR-07)。位置清单与计划器的预建跳过共用这一处写法。 */
-export function homeOpencodeDirectory(home: string): string {
-  return join(home, ".opencode")
 }
 
 export type ProcessFenceProfileInput = {

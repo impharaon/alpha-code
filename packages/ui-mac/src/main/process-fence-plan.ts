@@ -26,7 +26,6 @@ import { resolveFenceAddonPath, type FenceAddonResolveInput } from "./process-fe
 import {
   assertSeatbeltSafePath,
   configFenceLocations,
-  homeOpencodeDirectory,
   resolveEngineRoots,
   selectWorkspaceUnion,
   trimUntilCompiles,
@@ -86,9 +85,9 @@ export function planConfigFence(
   const unexpressed: string[] = []
   const locations = configFenceLocations({ ...input, configHome: input.roots.configHome, home: input.roots.home })
   const envFile = input.envFile ? resolve(input.envFile) : undefined
-  // CF-9 `~/.opencode` 不预建(BR-07:谁都不建它;不存在时 subpath 规则照样挡住任何形式的新建)
-  const neverCreated = homeOpencodeDirectory(input.roots.home)
-  for (const location of locations) if (location.kind === "subpath" && location.path !== neverCreated) deps.mkdirp(location.path)
+  // CF-9 那一条不预建(BR-07:应用从不建 `~/.opencode`;不存在时 subpath 规则照样挡住任何形式的新建)。按这一条跳过,不按路径串:
+  // 用户把同一个目录指定为引擎全局配置目录(CF-8)时照常预建(审查 R1)
+  for (const location of locations) if (location.kind === "subpath" && !location.neverCreate) deps.mkdirp(location.path)
   const target = (path: string) => {
     try {
       return deps.realpath(path)

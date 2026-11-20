@@ -169,7 +169,9 @@ describe("renderProcessFenceProfile —— 勘破 §8.2 的行(W10/W19 已删,D1
       { kind: "subpath", path: `${HOME}/.config/opencode` },
     ])
     const paths = list(`${HOME}/.config/opencode`).map((rule) => (rule.kind === "dat-files" ? rule.dir : rule.path))
-    expect(list(`${HOME}/.config/opencode`)).toContainEqual({ kind: "subpath", path: `${HOME}/.opencode` })
+    expect(list(`${HOME}/.config/opencode`)).toContainEqual({ kind: "subpath", path: `${HOME}/.opencode`, neverCreate: true })
+    // only CF-9 carries the marker (the pre-create skip is bound to that entry, not to a path string)
+    expect(list(`${HOME}/.opencode`).filter((rule) => "neverCreate" in rule)).toEqual([{ kind: "subpath", path: `${HOME}/.opencode`, neverCreate: true }])
     expect(paths.indexOf(`${HOME}/.opencode`)).toBe(paths.indexOf(`${HOME}/.config/opencode`) + 1)
     expect(paths.indexOf(`${HOME}/opencode.json`)).toBe(paths.indexOf(`${HOME}/.opencode`) + 1)
     expect(JSON.stringify(list(`${HOME}/.config/opencode`))).not.toMatch(/codepuppy-tool-policy/)

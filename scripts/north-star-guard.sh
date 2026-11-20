@@ -181,6 +181,11 @@ UPSTREAM_EXCLUDES=(
   # #1713 / ADR-049:md 读取点只调用同一闸门;判据与复核清单同上。
   ':(exclude)packages/core/src/config/plugin/skill.ts'
   ':(exclude)packages/core/src/config/plugin/agent.ts'
+  # INT-safety I-13 L2 / DESIGN-engine-config-fence D16(owner 2026-11-20 经编排器转达:「两件都同意」):会话行上的规则只有 deny 参与。
+  # 会话上下文在 select 内部把会话行并进决定本次请求有哪些工具、技能与连接器说明的规则,插件钩子在那之后才拿到工具表,改不了这次合并;
+  # 接管面只有 :136 那一行的 `codepuppy(I-13 L2)` 行尾标注。判据 packages/ext/src/policy/session-row-rules.test.ts 的会话上下文三条
+  # (上游原文件 ⇒ E4 第二臂红)。
+  ':(exclude)packages/core/src/session/context.ts'
 )
 
 # ── UPSTREAM_PATHS 里住着的 Code Puppy 自有文件:结构性谓词,不是逐文件清单(`#1085` / ADR-043)──

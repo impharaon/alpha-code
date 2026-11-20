@@ -9,10 +9,9 @@
 //
 // sidecar 进程里(设计 §4.2–§4.4):表由主进程的 `start` 消息带来(T1)、续期时整表推来(T2)、每次引擎配置装载之前各自拉一次(P)。
 // 与启动文档同一种交接:表与拉取函数各挂一个 globalThis 槽,sidecar、ext、引擎三个 bundle 各编一份读法。引擎进程里凭据的值与在场性只从
-// 这张表来;配置里的 `{file:}` 只在封闭清单的位置、且条目的 use 允许该位置时代入(resolveCodePuppyCredentialRefs)。
+// 这张表来;配置里的 `{file:}` 只在封闭清单的位置、且条目的 use 允许该位置时代入(resolveCodePuppyCredentialRefs)。只 import node:path、node:os。
 import os from "node:os"
 import path from "node:path"
-import { parseTree, type Node, type ParseError } from "jsonc-parser"
 
 /** 一项凭据:值,以及它的接收方由哪份记录定义(主进程建表时判定,设计 §4.3)。 */
 export type CodePuppyCredentialEntry = {
@@ -146,42 +145,41 @@ type Allowed = (entry: CodePuppyCredentialEntry) => boolean
 const connectorOf = (server: string): Allowed => (entry) => entry.use.kind === "connector" && entry.use.server === server
 const inlineEntry: Allowed = (entry) => entry.use.kind === "inline"
 
-function child(node: Node | undefined, key: string): Node | undefined {
-  if (node?.type !== "object") return undefined
-  return node.children?.find((property) => property.children?.[0]?.value === key)?.children?.[1]
-}
-function properties(node: Node | undefined): Array<[string, Node]> {
-  if (node?.type !== "object") return []
-  return (node.children ?? []).flatMap((property) => {
-    const key = property.children?.[0]?.value
-    const value = property.children?.[1]
-    return typeof key === "string" && value ? [[key, value] as [string, Node]] : []
-  })
+type Json = Record<string, unknown>
+const objectAt = (value: unknown, key: string): Json | undefined => {
+  const next = isRecord(value) ? value[key] : undefined
+  return isRecord(next) ? next : undefined
 }
 
-/** 封闭清单(设计 §4.4 表):每个位置上的字符串节点与允许的条目。两份文档以外的文档调用方根本不交进来。 */
-function positions(root: Node, document: "inline" | "explicit"): Array<[Node, Allowed]> {
-  const out: Array<[Node, Allowed]> = []
-  const strings = (node: Node | undefined, allowed: Allowed) => {
-    for (const [, value] of properties(node)) if (value.type === "string") out.push([value, allowed])
+/**
+ * 封闭清单(设计 §4.4 表):每个位置是「某个对象的某个字符串字段」与允许的条目。两份文档以外的文档调用方根本不交进来。
+ * 返回 [所在对象, 字段名, 允许的条目]。
+ */
+function positions(root: Json, document: "inline" | "explicit"): Array<[Json, string, Allowed]> {
+  const out: Array<[Json, string, Allowed]> = []
+  const strings = (holder: Json | undefined, allowed: Allowed) => {
+    for (const key of Object.keys(holder ?? {})) if (typeof holder![key] === "string") out.push([holder!, key, allowed])
   }
-  const one = (node: Node | undefined, allowed: Allowed) => {
-    if (node?.type === "string") out.push([node, allowed])
+  const one = (holder: Json | undefined, key: string, allowed: Allowed) => {
+    if (holder && typeof holder[key] === "string") out.push([holder, key, allowed])
   }
-  if (document === "inline") for (const [, provider] of properties(child(root, "providers"))) one(child(child(provider, "settings"), "apiKey"), inlineEntry)
-  const mcp = child(root, "mcp")
-  for (const [name, server] of properties(child(mcp, "servers"))) {
+  if (document === "inline") for (const id of Object.keys(objectAt(root, "providers") ?? {})) one(objectAt(objectAt(objectAt(root, "providers"), id), "settings"), "apiKey", inlineEntry)
+  const mcp = objectAt(root, "mcp")
+  const servers = objectAt(mcp, "servers")
+  for (const name of Object.keys(servers ?? {})) {
+    const server = objectAt(servers, name)
     const connector = connectorOf(name)
-    strings(child(server, "headers"), document === "inline" ? (entry) => inlineEntry(entry) || connector(entry) : connector)
-    strings(child(server, "environment"), connector)
-    one(child(child(server, "oauth"), "client_secret"), connector)
+    strings(objectAt(server, "headers"), document === "inline" ? (entry) => inlineEntry(entry) || connector(entry) : connector)
+    strings(objectAt(server, "environment"), connector)
+    one(objectAt(server, "oauth"), "client_secret", connector)
   }
-  for (const [name, server] of properties(mcp)) {
+  for (const name of Object.keys(mcp ?? {})) {
     if (name === "servers") continue
+    const server = objectAt(mcp, name)
     const connector = connectorOf(name)
-    if (document === "explicit") strings(child(server, "headers"), connector)
-    strings(child(server, "environment"), connector)
-    one(child(child(server, "oauth"), "clientSecret"), connector)
+    if (document === "explicit") strings(objectAt(server, "headers"), connector)
+    strings(objectAt(server, "environment"), connector)
+    one(objectAt(server, "oauth"), "clientSecret", connector)
   }
   return out
 }
@@ -189,37 +187,37 @@ function positions(root: Node, document: "inline" | "explicit"): Array<[Node, Al
 /**
  * 引擎配置装载用(§4.4)。只在封闭清单的位置上、且条目的 use 允许该位置时,把整串或串内的 `{file:<路径>}` 换成值(trim 后 JSON 转义,值里每个
  * "{" 写成 \u007b,引擎随后的 {env:}/{file:} 两遍碰不到它);其余位置、其余记号一字不动,留给引擎自己的 {file:} 读法(C1 下读凭据路径 =
- * EPERM = 空串 + warning)。按解析树定位,文本解析不了 ⇒ 原样返回。
+ * EPERM = 空串 + warning)。按解析树定位:这两份文档都是主进程用 JSON.stringify 写出的严格 JSON;解析不了(含注释的 JSONC 等)⇒ 原样返回。
+ * 什么都没代入 ⇒ 原文;代入了 ⇒ 重新序列化(键序不变)。
  */
 export function resolveCodePuppyCredentialRefs(text: string, document: "inline" | "explicit"): string {
   const table = publishedTable()
   if (!table || !text.includes("{file:")) return text
-  const errors: ParseError[] = []
-  const root = parseTree(text, errors, { allowTrailingComma: true, disallowComments: false })
-  if (!root || errors.length) return text
-  const edits: Array<{ offset: number; length: number; literal: string }> = []
-  for (const [node, allowed] of positions(root, document)) {
-    const value = node.value as string
+  let root: unknown
+  try {
+    root = JSON.parse(text)
+  } catch {
+    return text
+  }
+  if (!isRecord(root)) return text
+  const literals: string[] = []
+  const nonce = globalThis.crypto.randomUUID()
+  for (const [holder, key, allowed] of positions(root as Json, document)) {
+    const value = holder[key] as string
     let changed = false
-    let literal = ""
-    let cursor = 0
-    for (const match of value.matchAll(FILE_REF)) {
-      const file = match[1]!
+    const next = value.replace(FILE_REF, (token, file: string) => {
       const expanded = file.startsWith("~/") ? path.join(os.homedir(), file.slice(2)) : file
       const entry = path.isAbsolute(expanded) ? table[path.resolve(expanded)] : undefined
-      if (!entry || !allowed(entry)) continue
-      literal += JSON.stringify(value.slice(cursor, match.index)).slice(1, -1)
-      literal += JSON.stringify(entry.value.trim()).slice(1, -1).replace(/\{/g, "\\u007b")
-      cursor = match.index! + match[0].length
+      if (!entry || !allowed(entry)) return token
       changed = true
-    }
-    if (!changed) continue
-    literal += JSON.stringify(value.slice(cursor)).slice(1, -1)
-    edits.push({ offset: node.offset, length: node.length, literal: `"${literal}"` })
+      literals.push(JSON.stringify(entry.value.trim()).slice(1, -1).replace(/\{/g, "\\u007b"))
+      return `\u0000${nonce}:${literals.length - 1}\u0000`
+    })
+    if (changed) holder[key] = next
   }
-  let out = text
-  for (const edit of edits.sort((a, b) => b.offset - a.offset)) out = out.slice(0, edit.offset) + edit.literal + out.slice(edit.offset + edit.length)
-  return out
+  if (!literals.length) return text
+  // the sentinels contain only characters JSON.stringify writes back verbatim except the NUL bytes, which it writes as \u0000
+  return JSON.stringify(root).replace(new RegExp(`\\\\u0000${nonce}:(\\d+)\\\\u0000`, "g"), (_match, index: string) => literals[Number(index)]!)
 }
 
 /** 仅测试:撤掉已发布的表与拉取函数。 */

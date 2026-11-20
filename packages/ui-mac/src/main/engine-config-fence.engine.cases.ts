@@ -594,7 +594,7 @@ describe.if(ARM === "production")("production: 0.2.6-shaped data, the production
 
     // the host judges the sandbox log up to here; what follows runs inside the engine process on purpose
     console.log(`CF-ENGINE-WINDOW-END ${new Date().toISOString()}`)
-    await Bun.sleep(2_000)
+    await Bun.sleep(3_000)
     const written = await writeToolPolicyAttack(m, turns)
     expect(written.tool).toMatch(/operation not permitted|EPERM/i)
     expect(fs.readFileSync(file)).toEqual(baseline)

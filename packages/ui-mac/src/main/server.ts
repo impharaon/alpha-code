@@ -328,6 +328,7 @@ export function preplanConfigFenceRoots(input: { env: Record<string, string | un
     engineConfigDirectory: engineGlobalConfigDirectory(exported.env, exported.home),
     configHome: resolveEngineRoots(exported.env, exported.home).configHome,
     home: exported.home,
+    dataHome: resolveEngineRoots(exported.env, exported.home).dataHome,
   }).flatMap((rule) => (rule.kind === "subpath" ? [rule.path] : []))
 }
 

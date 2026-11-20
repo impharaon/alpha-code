@@ -227,7 +227,8 @@ describe("renderProcessFenceProfile —— 勘破 §8.2 的行(W10/W19 已删,D1
   })
 
   test("state 根:等于 userDataPath 时不出第二行;用户导出 XDG_STATE_HOME 时多一行 W3", () => {
-    expect(tokens(renderProcessFenceProfile(base)).filter((l) => l.includes("/opencode\")") && l.includes("state"))).toEqual([])
+    // the allow rows only: the protected ancestors line (片 ③ adds <XDG_DATA_HOME>/opencode next to the state root) is not a W3 row
+    expect(tokens(renderProcessFenceProfile(base)).filter((l) => l.startsWith("(subpath ") && l.includes("/opencode\")") && l.includes("state"))).toEqual([])
     const out = tokens(renderProcessFenceProfile({ ...base, stateHome: "/Volumes/data/state" }))
     expect(out).toContain(`(subpath "/Volumes/data/state/opencode")`)
   })

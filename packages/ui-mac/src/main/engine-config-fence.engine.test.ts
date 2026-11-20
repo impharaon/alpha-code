@@ -50,14 +50,20 @@ test.skipIf(process.platform !== "darwin")("AC-04 / AC-05 / AC-06 / AC-08 real e
       if (arm === "production") {
         const end = output.match(/^CF-ENGINE-WINDOW-END (\S+)$/m)?.[1]
         expect(end, "the production arm prints where the judged window ends").toBeDefined()
-        window = { from, to: new Date(end!) }
-        tail = { from: new Date(end!), to: new Date(Date.now() + 1_000) }
+        // `log show` takes whole seconds: one second past the marker still ends before the write tool (the cases wait 3 s after it)
+        window = { from, to: new Date(Date.parse(end!) + 1_000) }
+        tail = { from: new Date(Date.parse(end!) + 1_000), to: new Date(Date.now() + 1_000) }
       }
     }
 
     // E5: the system sandbox log for the production run
     const meta = JSON.parse(outputs.production!.match(/^CF-ENGINE (\{.*\})$/m)![1]!) as { pid: number; deny: Deny[]; sandboxRoot: string }
     // the kernel's reports reach the log store asynchronously: read until the calibration entries are there (bounded), then judge that read
+    // 片 ③:the last attacks inside the window are the conversation's shell rewrites of the tool policy document; the reading is judged
+    // only once their denials are in the log, so it covers the whole window (the settings-page writes through main come just before them)
+    const policyRules = meta.deny.filter((rule) => rule.kind === "subpath" && rule.value.endsWith("/codepuppy-tool-policy"))
+    expect(policyRules).toHaveLength(1)
+    const lastInWindow = (denial: { pid: number; path: string }) => denial.pid !== meta.pid && inProtected(policyRules, denial.path)
     let denials: Array<{ process: string; pid: number; operation: string; path: string }> = []
     for (let attempt = 0; attempt < 10; attempt++) {
       await Bun.sleep(3_000)
@@ -71,19 +77,18 @@ test.skipIf(process.platform !== "darwin")("AC-04 / AC-05 / AC-06 / AC-08 real e
           return match ? [{ process: match[1]!, pid: Number(match[2]), operation: match[3]!, path: match[4]!.trim() }] : []
         })
         .filter((denial) => inProtected(meta.deny, denial.path))
-      if (denials.some((denial) => denial.pid !== meta.pid)) break
+      if (denials.some(lastInWindow)) break
     }
     const fromEngine = denials.filter((denial) => denial.pid === meta.pid)
     const fromChildren = denials.filter((denial) => denial.pid !== meta.pid)
     writeFileSync(join(base, "results", "sandbox-denials.json"), JSON.stringify({ window, enginePid: meta.pid, fromEngine, fromChildren }, null, 1))
     console.log(`[E5] engine pid ${meta.pid}: ${fromEngine.length} protected-location write denials; its fenced children (the attacks): ${fromChildren.length}`)
     expect(fromChildren.length, "calibration: the attack commands' denials must be in the log, or the log was not read").toBeGreaterThan(0)
+    expect(fromChildren.some(lastInWindow), "calibration: the window's last attacks (the shell rewrites of the tool policy document) must be in the log").toBe(true)
     expect(fromEngine).toEqual([])
 
     // 片 ③:after the window end the write tool (inside the engine process) attacked the tool policy directory — that denial from the
     // engine pid must be in the log, or «zero from the engine» above could not have failed
-    const policyRules = meta.deny.filter((rule) => rule.kind === "subpath" && rule.value.endsWith("/codepuppy-tool-policy"))
-    expect(policyRules).toHaveLength(1)
     let fromEngineAfter: typeof denials = []
     for (let attempt = 0; attempt < 10 && !fromEngineAfter.length; attempt++) {
       await Bun.sleep(3_000)

@@ -193,13 +193,29 @@ describe("credentialStores / readCredentialTable", () => {
       [path.join(tmp, "codepuppy-mcp-secrets", "alpha", "v-0000aaaa", "TOKEN")]: { value: "FAKE-alpha", use: { kind: "connector", server: "alpha" } },
       [path.join(runtime, "1-run", "github-official", "v1", "TOKEN")]: { value: "FAKE-github", use: { kind: "connector", server: "github-official" } },
     })
-    expect(logged).toEqual(["credential store: symbolic link entry not read: codepuppy-mcp-secrets/alpha/v-0000aaaa/LINKED"])
+    expect(logged).toEqual([`credential store: symbolic link entry not read: ${path.join(tmp, "codepuppy-mcp-secrets", "alpha", "v-0000aaaa", "LINKED")}`])
   })
 
-  test("a missing store directory has no entries; another IO error is thrown", () => {
+  test("a missing store directory has no entries; an unlistable store and an unreadable entry are absent and named (amendment 1), never thrown", () => {
     expect(readCredentialTable(credentialStores({ userDataPath: path.join(tmp, "nowhere") }))).toEqual({})
     fs.writeFileSync(path.join(tmp, "codepuppy-secrets"), "not a directory")
-    expect(() => readCredentialTable(credentialStores({ userDataPath: tmp }))).toThrow()
+    const locked = path.join(tmp, "codepuppy-mcp-secrets", "alpha", "v-0000aaaa", "TOKEN")
+    fs.mkdirSync(path.dirname(locked), { recursive: true })
+    fs.writeFileSync(locked, "FAKE-locked")
+    fs.writeFileSync(path.join(path.dirname(locked), "OK"), "FAKE-ok")
+    fs.chmodSync(locked, 0o000)
+    const logged: string[] = []
+    try {
+      expect(readCredentialTable(credentialStores({ userDataPath: tmp }), (line) => void logged.push(line))).toEqual({
+        [path.join(path.dirname(locked), "OK")]: { value: "FAKE-ok", use: { kind: "connector", server: "alpha" } },
+      })
+    } finally {
+      fs.chmodSync(locked, 0o600)
+    }
+    expect(logged).toEqual([
+      `credential store: cannot list ${path.join(tmp, "codepuppy-secrets")} (ENOTDIR) — its entries are treated as absent`,
+      `credential store: cannot read ${locked} (EACCES) — treated as absent`,
+    ])
   })
 })
 

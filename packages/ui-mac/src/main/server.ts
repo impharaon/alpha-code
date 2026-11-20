@@ -162,9 +162,10 @@ type SpawnLocalServerOptions = {
 
 /**
  * DESIGN-stored-credentials-fence §4.3:Code Puppy 凭据存放点的整表,主进程现读。官方连接器运行期目录算不出(那里本来就没有官方运行期)⇒
- * 不给该项。T1(start)、回复拉取(P)与续期推送(T2)都用它;不记录任何值,软链条目只记名字。
+ * 不给该项。T1(start)、回复拉取(P)与续期推送(T2)都用它;不记录任何值,软链条目与读不出的条目只记路径(实现期修订 1:从不抛)。
+ * `log` 由每一代自己的去重包一层,同一行每代只记一次。
  */
-function credentialTable(userDataPath: string) {
+function credentialTable(userDataPath: string, log: (line: string) => void) {
   let runtimeParent: string | undefined
   if (tryGetCodePuppyEnvironment()) {
     try {
@@ -173,7 +174,7 @@ function credentialTable(userDataPath: string) {
       runtimeParent = undefined
     }
   }
-  return readCredentialTable(credentialStores({ userDataPath, ...(runtimeParent ? { officialRuntimeParent: runtimeParent } : {}) }), (line) => getLogger()?.warn(line))
+  return readCredentialTable(credentialStores({ userDataPath, ...(runtimeParent ? { officialRuntimeParent: runtimeParent } : {}) }), log)
 }
 
 // T2:当前这一代 sidecar 的推送口(start 发出之后才有;子进程退出即撤)。
@@ -784,7 +785,7 @@ export async function spawnLocalServer(
   const postCodePuppy = (message: CodePuppySidecarOutbound) => child.postMessage(message)
   // DESIGN-stored-credentials-fence §4.2:引擎装载配置之前的拉取 —— 同步建表并回复(收到与回复之间没有 await)。
   const credentialReplies = {
-    table: () => credentialTable(options.userDataPath),
+    table: () => credentialTable(options.userDataPath, credentialLog),
     post: (message: CredentialsMessage) => child.postMessage(message),
     respawn: () => options.requestRespawn?.("credential-change"),
     log: (line: string) => getLogger()?.warn(line),
@@ -797,7 +798,14 @@ export async function spawnLocalServer(
     options.codepuppySidecar?.receive(message, postCodePuppy)
   })
   let detachCodePuppy: ((reason: string) => void) | undefined
-  const pushThisGeneration = () => child.postMessage({ type: "credentials", credentials: credentialTable(options.userDataPath) } satisfies CredentialsMessage)
+  // 实现期修订 1:读不出的条目、软链条目每代只记一次(拉取每次装载都来)
+  const credentialLines = new Set<string>()
+  const credentialLog = (line: string) => {
+    if (credentialLines.has(line)) return
+    credentialLines.add(line)
+    getLogger()?.warn(line)
+  }
+  const pushThisGeneration = () => child.postMessage({ type: "credentials", credentials: credentialTable(options.userDataPath, credentialLog) } satisfies CredentialsMessage)
   child.once("exit", (code) => {
     if (pushCredentialTable === pushThisGeneration) pushCredentialTable = undefined
     clearOfficialConnectorRuntimeOnExit(runtimeGeneration)
@@ -873,15 +881,8 @@ export async function spawnLocalServer(
     child.on("message", onMessage)
     child.on("exit", onExit)
     refreshTimeout()
-    // DESIGN-stored-credentials-fence §4.3 T1:fork 之后同步建表、随 start 交过去(官方连接器运行期已在上面恢复)。建表抛 ⇒ 本代失败。
-    let credentials: ReturnType<typeof credentialTable>
-    try {
-      credentials = credentialTable(options.userDataPath)
-    } catch (error) {
-      getLogger()?.error("Code Puppy credential table could not be read — refusing this generation (fail closed)", error)
-      fail(new Error(`Code Puppy credential table could not be read — sidecar start refused: ${serializeError(error).message}`))
-      return
-    }
+    // DESIGN-stored-credentials-fence §4.3 T1:fork 之后同步建表、随 start 交过去(官方连接器运行期已在上面恢复)。读不出的条目按不在表里(修订 1)。
+    const credentials = credentialTable(options.userDataPath, credentialLog)
     child.postMessage({
       type: "start",
       hostname,

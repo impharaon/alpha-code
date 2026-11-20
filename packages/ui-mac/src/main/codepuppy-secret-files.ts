@@ -258,7 +258,8 @@ export function readRegularFileNoFollow(file: string): { value: string; identity
  * 只读 table !== false 的目录下的普通文件(逐项 lstat;根以下不跟随任何软链,软链条目只记名字、不进表),跳过 "." 开头的条目;值经
  * readRegularFileNoFollow 从打开的描述符读出。use:codepuppy-secrets/<名> ⇒ inline;codepuppy-mcp-secrets/<server>/… ⇒ connector(server);
  * <运行期目录>/<run>/<name>/… ⇒ connector(name)。`identities`(可省)收下走到的每个普通文件的 device + inode —— 主进程的别名判断据它认出指向
- * 存放点里某个文件的硬链与 /.vol 写法。目录不存在 = 没有条目;其它 IO 错误抛出。不记录值;`log` 只收相对路径。
+ * 存放点里某个文件的硬链与 /.vol 写法。目录不存在 = 没有条目;实现期修订 1(编排器裁决 2026-11-20):单项读不出、目录列不出 ⇒ 那些条目按不在
+ * 表里处理并记一行(路径与 errno),从不抛 —— 一个读不出的凭据只影响它自己。不记录值;调用方负责每代只记一次同一行。
  */
 export function readCredentialTable(stores: readonly CredentialStore[], log?: (line: string) => void, identities?: Set<string>): Record<string, CodePuppyCredentialEntry> {
   const table: Record<string, CodePuppyCredentialEntry> = {}
@@ -266,21 +267,28 @@ export function readCredentialTable(stores: readonly CredentialStore[], log?: (l
     if (store.table === false) continue
     const root = path.resolve(store.path)
     const kind = store.table
+    const errno = (error: unknown) => (error as NodeJS.ErrnoException)?.code ?? "error"
     const visit = (dir: string, segments: readonly string[]) => {
       let names: string[]
       try {
         names = fs.readdirSync(dir)
       } catch (error) {
-        if (segments.length === 0 && (error as NodeJS.ErrnoException)?.code === "ENOENT") return
-        throw error
+        if (!(segments.length === 0 && errno(error) === "ENOENT")) log?.(`credential store: cannot list ${dir} (${errno(error)}) — its entries are treated as absent`)
+        return
       }
       for (const name of names.sort()) {
         if (name.startsWith(".")) continue
         const file = path.join(dir, name)
         const rel = [...segments, name]
-        const meta = fs.lstatSync(file, { bigint: true })
+        let meta: fs.BigIntStats
+        try {
+          meta = fs.lstatSync(file, { bigint: true })
+        } catch (error) {
+          if (errno(error) !== "ENOENT") log?.(`credential store: cannot read ${file} (${errno(error)}) — treated as absent`)
+          continue
+        }
         if (meta.isSymbolicLink()) {
-          log?.(`credential store: symbolic link entry not read: ${path.basename(root)}/${rel.join("/")}`)
+          log?.(`credential store: symbolic link entry not read: ${file}`)
           continue
         }
         if (meta.isDirectory()) {
@@ -296,9 +304,15 @@ export function readCredentialTable(stores: readonly CredentialStore[], log?: (l
               ? rel.length >= 2 ? { kind: "connector", server: rel[0]! } : undefined
               : rel.length >= 3 ? { kind: "connector", server: rel[1]! } : undefined
         if (!use) continue
-        const read = readRegularFileNoFollow(file)
+        let read: ReturnType<typeof readRegularFileNoFollow>
+        try {
+          read = readRegularFileNoFollow(file)
+        } catch (error) {
+          log?.(`credential store: cannot read ${file} (${errno(error)}) — treated as absent`)
+          continue
+        }
         if (!read) {
-          log?.(`credential store: entry changed while being read, not read: ${path.basename(root)}/${rel.join("/")}`)
+          log?.(`credential store: entry changed while being read, not read: ${file}`)
           continue
         }
         identities?.add(read.identity)

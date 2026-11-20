@@ -390,6 +390,24 @@ describeDarwin("planProcessFence", () => {
     expect(deny).toContainEqual({ kind: "literal", value: link })
   })
 
+  test("确认审查 R2 残留 R11:写不进 profile 的路径(配置路径节点、env 文件本身)不被冻结 —— 计划时一行日志逐个点名(只写路径),不是静默", () => {
+    const quoted = `${HOME}/My "dots"`
+    const realpath = (p: string) => (p === quoted || p.startsWith(`${quoted}/`) ? `${HOME}/proj-a/dots${p.slice(quoted.length)}` : p)
+    const h = harness({ realpath })
+    h.input.sidecarEnv = { HOME, XDG_CONFIG_HOME: quoted }
+    h.input.engineConfigDirectory = `${quoted}/opencode`
+    h.input.envFile = `${HOME}/we"ird/cp.env`
+    planProcessFence(h.input, h.deps)
+    const lines = h.logs.filter((line) => line.includes("cannot be written into the profile"))
+    expect(lines).toHaveLength(1)
+    expect(lines[0]).toContain(JSON.stringify(quoted))
+    expect(lines[0]).toContain(JSON.stringify(`${HOME}/we"ird/cp.env`))
+    // nothing unexpressible ⇒ no such line
+    const plain = harness()
+    planProcessFence(plain.input, plain.deps)
+    expect(plain.logs.some((line) => line.includes("cannot be written into the profile"))).toBe(false)
+  })
+
   test("修订 2 B:两种写法指同一个节点按身份去重(大小写变体 ⇒ 只列真实写法);配置路径与真实路径相同 ⇒ 规则与上级目录块不变", () => {
     const upper = `${HOME}/PROJ-A`
     const realpath = (p: string) => {

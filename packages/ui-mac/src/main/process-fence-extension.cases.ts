@@ -5,6 +5,8 @@ import { createRequire } from "node:module"
 import { dirname, join } from "node:path"
 import { buildFenceAddon } from "../../scripts/build-fence-addon"
 import { renderProcessFenceProfile, resolveEngineRoots, WORKSPACE_WRITE_EXTENSION_CLASS } from "./process-fence-profile"
+import { planConfigFence } from "./process-fence-plan"
+import { realpathSync } from "node:fs"
 
 type WriteResult = { writes: string[] }
 type ConsumeResult = { handle: number; errno: number }
@@ -47,9 +49,15 @@ beforeAll(() => {
     const built = spawnSync("clang", args, { encoding: "utf8" })
     expect(built.status, built.stderr).toBe(0)
   }
+  // SPEC-engine-config-fence:生产 profile 带受保护集(经生产计划器那一步落到真实路径),X1 / X2 的矩阵在它在场时照样成立
+  const roots = resolveEngineRoots({}, join(run, "home"))
   const production = renderProcessFenceProfile({
     workspaces: [A], codepuppyGlobalRoot: join(run, "state"), userDataPath: join(run, "userData"),
-    stateHome: join(run, "userData"), roots: resolveEngineRoots({}, join(run, "home")), egressProxyPort: 59999,
+    stateHome: join(run, "userData"), roots, egressProxyPort: 59999,
+    configFence: planConfigFence(
+      { userDataPath: join(run, "userData"), appStateRoot: join(run, "state"), codepuppyGlobalRoot: join(run, "state", "env", "dev"), engineConfigDirectory: join(roots.configHome, "opencode"), roots },
+      { realpath: (p) => realpathSync.native(p), mkdirp: (p) => void mkdirSync(p, { recursive: true }) },
+    ).configFence,
   })
   const issueDeny = /\(deny file-issue-extension[^\n]+\(extension-class "[^"]+"\)\)/
   const config = join(run, "config.json")

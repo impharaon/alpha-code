@@ -72,7 +72,7 @@ import { createProjectConfigViewRequester } from "./project-config-view-message"
 import type { ProjectConfigView } from "@opencode/schema/codepuppy-project-config"
 import { createWriteGrantRequester, createWriteProbeRequester, type WorkspaceWriteGrantReply, type WorkspaceWriteProbeFact } from "./workspace-write-probe"
 import { loadFenceAddon } from "./process-fence-apply"
-import { processFenceRulesCover, processFenceWriteRules, WORKSPACE_WRITE_EXTENSION_CLASS, type ProcessFenceWriteRule } from "./process-fence-profile"
+import { configFenceLocations, processFenceRulesCover, processFenceWriteRules, resolveEngineRoots, WORKSPACE_WRITE_EXTENSION_CLASS, type ProcessFenceWriteRules } from "./process-fence-profile"
 import { codepuppyGlobalRoot, codepuppyJsoncPath } from "./engine-config-truth"
 import { ensureUserWorkspaceDir } from "./codepuppy-user-workspace"
 import { fenceWorkspaceTruthPath, readWorkspaceTruthOrThrow, type FenceRunWritable } from "./process-fence-workspaces"
@@ -282,10 +282,40 @@ function refreshConfiguredEgressDestinations(userDataPath: string): void {
   }
 }
 
-/** The plan's own W1 list (the authority that rendered the profile) travels with it; required when fenceRun is set. */
-type PlannedFence = ProcessFenceStartInput & { workspaces?: readonly string[] }
+/**
+ * The plan's own W1 list (the authority that rendered the profile) travels with it; required when fenceRun is set.
+ * `configFenceRoots`: the protected configuration directories that same plan rendered (eligibility reads them, below).
+ */
+type PlannedFence = ProcessFenceStartInput & { workspaces?: readonly string[]; configFenceRoots?: readonly string[] }
 
-type ProductionFenceInput = { userDataPath: string; sidecarEnv: Record<string, string>; egressProxyPort: number | undefined; carriedWorkspaces: readonly string[] }
+type ProductionFenceInput = {
+  userDataPath: string
+  sidecarEnv: Record<string, string>
+  egressProxyPort: number | undefined
+  carriedWorkspaces: readonly string[]
+  /** SPEC-engine-config-fence CF-8:the start document's engineConfigDirectory (the same value). */
+  engineConfigDirectory: string
+}
+
+// SPEC-engine-config-fence BR-05 / DESIGN §4.3:资格判定(checkWorkspaceDirectory)要的受保护配置目录。用最近一次计划渲染进 profile 的那一份;
+// 本运行还没计划过(boot 时装载工作区真源)就用同一个位置清单按主进程环境现算(资格判定按 device + inode 比,软链目标由它自己解析)。
+// 非 darwin 没有围栏,为空;冻结环境还没初始化(只有单测会这样)也为空 —— 末尾的拒写块不依赖这份清单,它只决定签不签、显示哪一句。
+let plannedConfigFenceRoots: readonly string[] | undefined
+export function currentConfigFenceRoots(): readonly string[] {
+  if (process.platform !== "darwin") return []
+  if (plannedConfigFenceRoots) return plannedConfigFenceRoots
+  const info = tryGetCodePuppyEnvironment()
+  if (!info) return []
+  const home = homedir()
+  return configFenceLocations({
+    userDataPath: electronNs.app.getPath("userData"),
+    appStateRoot: info.casBaseRoot,
+    codepuppyGlobalRoot: codepuppyGlobalRoot(),
+    engineConfigDirectory: engineGlobalConfigDirectory(process.env, home),
+    configHome: resolveEngineRoots(process.env, home).configHome,
+    home,
+  }).flatMap((rule) => (rule.kind === "subpath" ? [rule.path] : []))
+}
 
 /** 生产计划器:把 electron / store / fs 接进 electron-free 的 planProcessFence。 */
 function planProductionFence(input: ProductionFenceInput): ProcessFencePlan | undefined {
@@ -299,6 +329,7 @@ function planProductionFence(input: ProductionFenceInput): ProcessFencePlan | un
       addon: { packaged: electronNs.app.isPackaged, resourcesPath: process.resourcesPath, moduleDir, exists: existsSync },
       egressProxyPort: input.egressProxyPort,
       carriedWorkspaces: input.carriedWorkspaces,
+      engineConfigDirectory: input.engineConfigDirectory,
     },
     {
       homeDir: homedir,
@@ -588,7 +619,7 @@ export async function spawnLocalServer(
   explicitConfigWatch = stopExplicitConfigWatch
   let fence: PlannedFence | undefined
   try {
-    fence = (options.planFence ?? planProductionFence)({ userDataPath: options.userDataPath, sidecarEnv, egressProxyPort, carriedWorkspaces: options.fenceRun?.carriedWorkspaces() ?? [] })
+    fence = (options.planFence ?? planProductionFence)({ userDataPath: options.userDataPath, sidecarEnv, egressProxyPort, carriedWorkspaces: options.fenceRun?.carriedWorkspaces() ?? [], engineConfigDirectory: bootstrap.paths.engineConfigDirectory })
   } catch (error) {
     getLogger()?.error("process fence plan FAILED — refusing to fork the sidecar (fail closed; an unfenced engine must not start)", error)
     throw new Error(`process fence plan failed — sidecar fork refused: ${serializeError(error).message}`)
@@ -597,6 +628,7 @@ export async function spawnLocalServer(
     throw new Error("process fence plan carries no workspace list — this generation's W1 could not join the run's writable history, sidecar fork refused")
   if (!fence && process.platform === "darwin")
     throw new Error("process fence plan returned nothing on darwin — sidecar fork refused (an unfenced engine must not start)")
+  if (fence?.configFenceRoots) plannedConfigFenceRoots = fence.configFenceRoots
 
   const sidecar = join(dirname(fileURLToPath(import.meta.url)), "sidecar.js")
   rotateServerLogs()
@@ -640,8 +672,9 @@ export async function spawnLocalServer(
   // covered and is never issued again. A definite consume failure, or a failure before any token existed, may retry.
   const possiblyConsumed = new Set<string>()
   // The one source of this generation's write roots: the exact profile bytes it applies, parsed by the renderer's
-  // module. An unrecognised form leaves this undefined, and every directory then counts as covered (no issue).
-  let writeRules: ProcessFenceWriteRule[] | undefined
+  // module (its allow rules and, after them, the protected deny blocks). An unrecognised form leaves this undefined, and
+  // every directory then counts as covered (no issue).
+  let writeRules: ProcessFenceWriteRules | undefined
   try {
     writeRules = fence ? processFenceWriteRules(fence.profile) : undefined
   } catch (error) {
@@ -650,7 +683,7 @@ export async function spawnLocalServer(
   // Another directory's grant in flight counts too: once consumed, its subtree is fenced-writable before main hears
   // back. The same directory's own in-flight grant is joined instead (grantWrite coalesces; nothing new is issued).
   const generationWrites: SidecarListener["generationWrites"] = (directory) =>
-    !writeRules || processFenceRulesCover([...writeRules, ...[...grantedDirectories, ...possiblyConsumed, ...[...granting.keys()].filter((pending) => pending !== directory)].map((value) => ({ kind: "subpath" as const, value }))], directory)
+    !writeRules || processFenceRulesCover({ allow: [...writeRules.allow, ...[...grantedDirectories, ...possiblyConsumed, ...[...granting.keys()].filter((pending) => pending !== directory)].map((value) => ({ kind: "subpath" as const, value }))], deny: writeRules.deny }, directory)
   const grantWrite: SidecarListener["grantWrite"] = (directory) => {
     if (exited || !child.pid) return Promise.resolve({ outcome: "failed", detail: "engine not running" })
     if (!fence) return Promise.resolve({ outcome: "failed", detail: "engine has no fence" })

@@ -16,7 +16,7 @@ const logs: string[] = []
 const proof: Record<string, unknown>[] = []
 const nativeRealpath = realpathSync.native
 const eligibility = {
-  homeDir: home, appStateRoot: state,
+  homeDir: home, appStateRoot: state, configFenceRoots: () => [],
   realpath: (path: string) => {
     resolutions.set(path, (resolutions.get(path) ?? 0) + 1)
     return nativeRealpath(path)

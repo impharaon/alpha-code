@@ -91,6 +91,7 @@ describeDarwin("REQ-137 #1337 强制半场 —— 真 .node / 真 seatbelt / 真
         stateHome: userData,
         roots: resolveEngineRoots({}, homedir()),
         egressProxyPort: proxyPort,
+        configFence: [],
       }),
     )
     // 不经 require("electron")(bun 的 mock.module 是进程级的,全量跑时别的文件 mock 掉的 electron 会漏进来);

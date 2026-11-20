@@ -13,17 +13,21 @@
 // ── 父目录必须由未被围栏的一方预先建好(勘破 §6.3.1 第 3 条)────────────────────────
 // `(subpath "<X>/.local/share/opencode")` 放行的是该目录**之下**;`<X>/.local/share` 不存在时,
 // 被围栏的引擎 `mkdir -p` 会在父层 EPERM —— 而 packages/core/src/global.ts 在**模块装载时**就
-// mkdir 四个根(data/config/state/tmp/log/bin/repos)。所以 main 在这里把 W4/W5/W6/W7 建好;
-// W2/W3 由 main 的 boot 序早已建好;`~/code-puppy` 走 ensureUserWorkspaceDir(唯一的 lazy 供给点)。
+// mkdir 四个根(data/config/state/tmp/log/bin/repos)。所以 main 在这里把 W4/W5/W7 建好;W3 由 main 的 boot 序早已建好;
+// `~/code-puppy` 走 ensureUserWorkspaceDir(唯一的 lazy 供给点)。受保护配置集里的目录(状态根、环境根、引擎配置目录、连接记录、
+// 两个引擎全局配置目录 —— 后者就是原来的 W6)由 planConfigFence 预建:它们与每一级上级目录节点都被末尾的拒写块冻结,引擎与子进程在
+// 其中只能得到 EEXIST(SPEC-engine-config-fence I4)。
 // **刻意不建** W16(`~/.opencode`:engine-config-truth 对它有 junk-only 判定,凭空建一个会改行为)、
 // W17/W18(dev-only)。
 
-import { join } from "node:path"
+import { basename, dirname, join } from "node:path"
 import { resolveFenceAddonPath, type FenceAddonResolveInput } from "./process-fence-apply"
 import {
+  configFenceLocations,
   resolveEngineRoots,
   selectWorkspaceUnion,
   trimUntilCompiles,
+  type ConfigFenceRule,
   type EngineRoots,
   type TrialCompile,
   type WorkspaceExclusion,
@@ -39,6 +43,8 @@ export type ProcessFencePlan = {
   attempts: number
   profileBytes: number
   roots: EngineRoots & { codepuppyGlobalRoot: string; userDataPath: string; stateHome: string }
+  /** 受保护配置集里的目录位置(含真实目标),与渲染进 profile 的同一份;资格判定的 configFenceRoots 用它(server.ts)。 */
+  configFenceRoots: string[]
 }
 
 export type PlanProcessFenceInput = {
@@ -58,6 +64,44 @@ export type PlanProcessFenceInput = {
    * persisted: an app restart starts from the truth file alone.
    */
   carriedWorkspaces: readonly string[]
+  /** SPEC-engine-config-fence CF-8:server.ts 交给启动文档的同一个值(engineGlobalConfigDirectory(exported.env, exported.home))。 */
+  engineConfigDirectory: string
+}
+
+/**
+ * DESIGN-engine-config-fence §4.3:受保护配置集落到真实路径。目录位置先预建;每个位置写成「真实上级目录 + 名字」,位置已存在且解析到
+ * 别处(软链)时再加真实目标(同一种规则)。realpath 报 ENOENT = 位置不在盘上(literal / subpath 对尚不存在的路径同样挡住新建);
+ * 别的错误照常抛 ⇒ 计划失败 ⇒ 拒 fork。返回渲染用的规则与其中的目录位置(资格判定用)。手渲染 profile 的测试夹具也走这里。
+ */
+export function planConfigFence(
+  input: { userDataPath: string; appStateRoot: string; codepuppyGlobalRoot: string; engineConfigDirectory: string; roots: EngineRoots },
+  deps: Pick<PlanProcessFenceDeps, "realpath" | "mkdirp">,
+): { configFence: ConfigFenceRule[]; configFenceRoots: string[] } {
+  const locations = configFenceLocations({ ...input, configHome: input.roots.configHome, home: input.roots.home })
+  for (const location of locations) if (location.kind === "subpath") deps.mkdirp(location.path)
+  const target = (path: string) => {
+    try {
+      return deps.realpath(path)
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException)?.code === "ENOENT") return undefined
+      throw error
+    }
+  }
+  const configFence: ConfigFenceRule[] = []
+  const add = (rule: ConfigFenceRule) => {
+    if (!configFence.some((known) => JSON.stringify(known) === JSON.stringify(rule))) configFence.push(rule)
+  }
+  for (const location of locations) {
+    if (location.kind === "dat-files") {
+      add({ kind: "dat-files", dir: deps.realpath(location.dir) })
+      continue
+    }
+    const placed = join(deps.realpath(dirname(location.path)), basename(location.path))
+    add({ kind: location.kind, path: placed })
+    const real = target(location.path)
+    if (real !== undefined && real !== placed) add({ kind: location.kind, path: real })
+  }
+  return { configFence, configFenceRoots: configFence.flatMap((rule) => (rule.kind === "subpath" ? [rule.path] : [])) }
 }
 
 export type PlanProcessFenceDeps = {
@@ -94,12 +138,16 @@ export function planProcessFence(input: PlanProcessFenceInput, deps: PlanProcess
   for (const dir of [
     join(roots.dataHome, "opencode"),
     join(roots.cacheHome, "opencode"),
-    join(roots.configHome, "opencode"),
     join(home, ".npm"),
     ...(stateHome === input.userDataPath ? [] : [join(stateHome, "opencode")]),
   ]) {
     deps.mkdirp(dir)
   }
+  const appStateRoot = deps.appStateRoot()
+  const fenceSet = planConfigFence(
+    { userDataPath: input.userDataPath, appStateRoot, codepuppyGlobalRoot, engineConfigDirectory: input.engineConfigDirectory, roots },
+    deps,
+  )
 
   let candidates: readonly string[]
   try {
@@ -113,7 +161,8 @@ export function planProcessFence(input: PlanProcessFenceInput, deps: PlanProcess
     candidates: [...candidates, ...input.carriedWorkspaces],
     defaultWorkspace: deps.defaultWorkspace(),
     homeDir: home,
-    appStateRoot: deps.appStateRoot(),
+    appStateRoot,
+    configFenceRoots: () => fenceSet.configFenceRoots,
     realpath: deps.realpath,
     isDirectory: deps.isDirectory,
     stat: deps.stat,
@@ -122,7 +171,7 @@ export function planProcessFence(input: PlanProcessFenceInput, deps: PlanProcess
     throw new Error("process fence: the default workspace is not a directory on disk — refusing to fork an engine that could not write anywhere a user expects")
 
   const trimmed = trimUntilCompiles(
-    { workspaces: union.selected, codepuppyGlobalRoot, userDataPath: input.userDataPath, roots, stateHome, egressProxyPort: input.egressProxyPort },
+    { workspaces: union.selected, codepuppyGlobalRoot, userDataPath: input.userDataPath, roots, stateHome, egressProxyPort: input.egressProxyPort, configFence: fenceSet.configFence },
     deps.compile,
   )
   const addonPath = resolveFenceAddonPath(input.addon)
@@ -135,9 +184,10 @@ export function planProcessFence(input: PlanProcessFenceInput, deps: PlanProcess
     attempts: trimmed.attempts,
     profileBytes: Buffer.byteLength(trimmed.profile),
     roots: { ...roots, codepuppyGlobalRoot, userDataPath: input.userDataPath, stateHome },
+    configFenceRoots: fenceSet.configFenceRoots,
   }
   deps.log(
-    `process fence planned: workspaces=${plan.workspaces.length} (candidates=${union.candidates}, excluded=${plan.excluded.length}, dropped=${plan.dropped.length}), egressProxyPort=${input.egressProxyPort}, profile=${plan.profileBytes}B, compile attempts=${plan.attempts}` +
+    `process fence planned: workspaces=${plan.workspaces.length} (candidates=${union.candidates}, excluded=${plan.excluded.length}, dropped=${plan.dropped.length}), egressProxyPort=${input.egressProxyPort}, configFence=${fenceSet.configFence.length} rules, profile=${plan.profileBytes}B, compile attempts=${plan.attempts}` +
       (plan.dropped.length ? ` — dropped (oldest first): ${[...plan.dropped].reverse().join(", ")}; last compiler error: ${trimmed.lastFailure}` : "") +
       (plan.excluded.length ? ` — excluded: ${plan.excluded.map((e) => `${e.directory} (${e.reason})`).join("; ")}` : ""),
   )

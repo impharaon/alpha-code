@@ -9,7 +9,7 @@ import { buildFenceAddon } from "../../scripts/build-fence-addon"
 import { mockElectron } from "../../test-component/electron-mock"
 import { scriptedModel, textOf } from "../../test-component/codepuppy-engine"
 import { renderProcessFenceProfile, resolveEngineRoots } from "./process-fence-profile"
-import { planProcessFence } from "./process-fence-plan"
+import { planConfigFence, planProcessFence } from "./process-fence-plan"
 import { createWorkspaceWritableTracker } from "../renderer/codepuppy-ui/workspace-writable-core"
 import { workspaceReadonlyMessage } from "../renderer/codepuppy-ui/workspace-writable"
 import { setLocale } from "../renderer/i18n"
@@ -83,7 +83,7 @@ const askSurvivor = (control: string, request: string, ack: string) => {
 }
 // Directories whose fenced probe answers "denied" at main's seam (the probe saw a symlink to a protected target).
 const forcedDenied = new Set<string>()
-const { spawnLocalServer } = await import("./server")
+const { currentConfigFenceRoots, spawnLocalServer } = await import("./server")
 const { registerIpcHandlers } = await import("./ipc")
 const { bootFenceWorkspaceTruth, writeWorkspaceTruth, readWorkspaceTruthOrThrow } = await import("./process-fence-workspaces")
 const { GLOBAL_RENDERER_STORE, TABS_INFO_KEY } = await import("./tabs-preclean")
@@ -159,13 +159,19 @@ async function boot() {
     // Both planners take main's carried run set from the spawn input, as the production planner does.
     planFence: (input) => {
       const carried = input.carriedWorkspaces
-      if (useProductionPlanner) return preparedPlan = planProcessFence({ userDataPath: install, sidecarEnv: { XDG_STATE_HOME: join(install, "state") }, egressProxyPort: modelProxy.port!, addon: { packaged: true, resourcesPath: run, moduleDir: run, exists: existsSync }, carriedWorkspaces: carried }, {
+      if (useProductionPlanner) return preparedPlan = planProcessFence({ userDataPath: install, sidecarEnv: { XDG_STATE_HOME: join(install, "state") }, egressProxyPort: modelProxy.port!, addon: { packaged: true, resourcesPath: run, moduleDir: run, exists: existsSync }, carriedWorkspaces: carried, engineConfigDirectory: join(protectedHome, ".config", "opencode") }, {
         homeDir: () => protectedHome, appStateRoot: () => join(run, "state"), codepuppyGlobalRoot: () => join(install, "state/env/dev"), defaultWorkspace: () => A,
         readWorkspaces: () => readWorkspaceTruthOrThrow(truthPath, { readFileSync }), realpath: realpathSync.native, isDirectory: (path) => { try { return readdirSync(path) !== undefined } catch { return false } },
         mkdirp: (path) => { mkdirSync(path, { recursive: true }) }, compile: () => ({ ok: true }), log: (line) => { log.push(line) },
       })
       const workspaces = [...new Set([A, ...readWorkspaceTruthOrThrow(truthPath, { readFileSync }), ...carried])]
-      return { addonPath: addon, workspaces, profile: renderProcessFenceProfile({ workspaces, codepuppyGlobalRoot: join(install, "state/env/dev"), userDataPath: install, stateHome: join(install, "state"), roots: resolveEngineRoots({}, join(install, "home")), egressProxyPort: modelProxy.port! }) }
+      // SPEC-engine-config-fence:手渲染这一臂同样带生产的受保护配置集(生产计划器那一步落真实路径、预建目录)
+      const roots = resolveEngineRoots({}, join(install, "home"))
+      const fenceSet = planConfigFence(
+        { userDataPath: install, appStateRoot: join(run, "state"), codepuppyGlobalRoot: join(install, "state/env/dev"), engineConfigDirectory: join(roots.configHome, "opencode"), roots },
+        { realpath: (path) => realpathSync.native(path), mkdirp: (path) => { mkdirSync(path, { recursive: true }) } },
+      )
+      return { addonPath: addon, workspaces, configFenceRoots: fenceSet.configFenceRoots, profile: renderProcessFenceProfile({ workspaces, codepuppyGlobalRoot: join(install, "state/env/dev"), userDataPath: install, stateHome: join(install, "state"), roots, egressProxyPort: modelProxy.port!, configFence: fenceSet.configFence }) }
     },
     fork: ((_file: string, _args: string[], options: { env: Record<string, string> }) => {
       const peer = new EventEmitter() as EventEmitter & { pid: number; stdout: unknown; stderr: unknown; postMessage: (message: { type: string; id?: number; directory?: string }) => void; kill: () => void }
@@ -205,7 +211,7 @@ beforeAll(async () => {
   writeWorkspaceTruth(truthPath, [A], { mkdirSync, writeFileSync, renameSync, rmSync })
   tracker = bootFenceWorkspaceTruth({
     truthPath, store: { tabs: [{ type: "draft", draftID: "a", server: "sidecar", directory: A }], recent: undefined, info: undefined }, fs: { readFileSync, writeFileSync, mkdirSync, renameSync, rmSync }, log: (line) => { log.push(line) },
-    eligibility: { homeDir: protectedHome, appStateRoot: join(run, "state"), realpath: realpathSync.native, isDirectory: (directory) => { try { return readdirSync(directory) !== undefined } catch { return false } } },
+    eligibility: { homeDir: protectedHome, appStateRoot: join(run, "state"), configFenceRoots: currentConfigFenceRoots, realpath: realpathSync.native, isDirectory: (directory) => { try { return readdirSync(directory) !== undefined } catch { return false } } },
     onWritableChanged: (change) => { record("changed", change); writable.invalidate(change); writable.observe(observation(change.directory)) },
   })
 
@@ -423,7 +429,7 @@ test("production planner and a new app start exclude a registered entry rebound 
   generation++
   useProductionPlanner = true
   await boot()
-  const fresh = await bootFenceWorkspaceTruth({ truthPath, store: { tabs: [{ type: "draft", draftID: "restored", server: "sidecar", directory }], recent: undefined, info: undefined }, fs: { readFileSync, writeFileSync, mkdirSync, renameSync, rmSync }, eligibility: { homeDir: protectedHome, appStateRoot: join(run, "state"), realpath: realpathSync.native, isDirectory: (path) => { try { return readdirSync(path) !== undefined } catch { return false } } }, log: (line) => { log.push(line) }, onWritableChanged: () => {} })
+  const fresh = await bootFenceWorkspaceTruth({ truthPath, store: { tabs: [{ type: "draft", draftID: "restored", server: "sidecar", directory }], recent: undefined, info: undefined }, fs: { readFileSync, writeFileSync, mkdirSync, renameSync, rmSync }, eligibility: { homeDir: protectedHome, appStateRoot: join(run, "state"), configFenceRoots: currentConfigFenceRoots, realpath: realpathSync.native, isDirectory: (path) => { try { return readdirSync(path) !== undefined } catch { return false } } }, log: (line) => { log.push(line) }, onWritableChanged: () => {} })
   const seeded = await fresh.userOpened.has("sidecar", directory)
   const result = await fresh.probeWrite({ server: "sidecar", directory }, listener)
   await write(directory, "planner-escape.txt")

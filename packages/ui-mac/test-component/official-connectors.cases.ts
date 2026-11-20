@@ -544,6 +544,7 @@ test("DBHub 1.5.0 real stdio SELECT 1 succeeds, writes fail, only execute_sql ex
           stateHome: join(home, "userData"),
           roots: resolveEngineRoots({}, home),
           egressProxyPort: 9,
+          configFence: [],
         }),
       )
       const paths = officialConnectorPaths(root, "dbhub-readonly", "v-sqlite")

@@ -2,7 +2,7 @@
 //   ① I3:真源路径 `<casBaseRoot>/egress-grants/<env>.json` 不在可写集任何**固定行**之下 —— 对着生产渲染的
 //      profile 枚举 `(allow file-write*` 块里每条规则的 W-id,默认 base / 覆盖 base / 两种 XDG_STATE_HOME 都过。
 //      这一条是整个方案的地基:放在可写根之下 = 围栏内的代码可以给自己批准出网(confused deputy)。
-//      对照臂:同一批规则里 W2 确实罩着 `codepuppy.jsonc` —— 证明这个手段判得出「覆盖」。
+//      对照臂:同一批规则里 W3 确实罩着 userData 里的文件 —— 证明这个手段判得出「覆盖」(W2 已删,SPEC-engine-config-fence D2)。
 //   ② I8 严格读:缺失 = 没批准过(ok、absent、空清单、零日志);坏 JSON / 版本不对 / grants 不是数组 /
 //      字段不合法 / 同一 host:port 重复 / 多余的键 ⇒ ok:false(**不是空数组**)且日志恰一行说得出原因。
 //   ③ 写:落盘字节固定字面量、无临时文件残留、原子(rename 中途抛 ⇒ 盘上仍是旧内容)、坏记录不落盘(连目录都不建)。
@@ -77,6 +77,7 @@ const profileFor = (stateRoot: string, env: "prod" | "dev", over: Partial<Proces
     stateHome: USER_DATA,
     roots: { home: HOME, dataHome: `${HOME}/.local/share`, cacheHome: `${HOME}/.cache`, configHome: `${HOME}/.config` },
     egressProxyPort: 4443,
+    configFence: [],
     ...over,
   })
 
@@ -101,21 +102,19 @@ describe("真源位置(I3):<casBaseRoot>/egress-grants/<env>.json 不在可写�
     }
   })
 
-  test("默认 base 与覆盖 base、两种 XDG_STATE_HOME:没有任何固定行覆盖真源文件或它的目录(W1 除外);对照:W2 罩着 codepuppy.jsonc", () => {
+  test("默认 base 与覆盖 base、两种 XDG_STATE_HOME:没有任何固定行覆盖真源文件或它的目录(W1 除外);对照:W3 罩着 userData 里的文件", () => {
     for (const [stateRoot, env] of [
       [DEFAULT_STATE_ROOT, "prod"],
       [OVERRIDE_STATE_ROOT, "dev"],
     ] as const) {
       for (const stateHome of [USER_DATA, `${HOME}/.local/state`]) {
         const rules = fileWriteRules(profileFor(stateRoot, env, { stateHome })).filter((r) => r.id !== "W1")
-        expect(rules.length, `${stateRoot}/${env}/${stateHome}`).toBeGreaterThanOrEqual(17)
+        expect(rules.length, `${stateRoot}/${env}/${stateHome}`).toBeGreaterThanOrEqual(15)
         const truth = egressGrantTruthPath(stateRoot, env)
         const dir = join(stateRoot, "egress-grants")
         expect(rules.filter((r) => covers(r, truth)).map(describeRule), `truth file ${truth}`).toEqual([])
         expect(rules.filter((r) => covers(r, dir)).map(describeRule), `truth dir ${dir}`).toEqual([])
-        expect(rules.filter((r) => covers(r, join(environmentMutableRoot(env, stateRoot), "codepuppy.jsonc"))).map(describeRule)).toEqual([
-          `W2 subpath ${environmentMutableRoot(env, stateRoot)}`,
-        ])
+        expect(rules.filter((r) => covers(r, join(USER_DATA, "codepuppy-identity.md"))).map(describeRule)).toEqual([`W3 subpath ${USER_DATA}`])
       }
     }
   })

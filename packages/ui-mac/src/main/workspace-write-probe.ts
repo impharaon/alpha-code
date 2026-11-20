@@ -38,11 +38,12 @@ export type WorkspaceWriteProbeFact = {
 
 export type WorkspaceWriteProbeRequest = { server: string; directory: string }
 export type WorkspaceOpenRecordRequest = { server: string; directory: string }
-export type WorkspaceOpenRecordResult = { recorded: boolean; reason?: "not-local" | "home-or-app-state" | "not-a-directory" }
+export type WorkspaceOpenRecordResult = { recorded: boolean; reason?: "not-local" | "home-or-app-state" | "protected-config" | "not-a-directory" }
 export type WorkspaceWritableChanged = { server: string; directory: string }
 export type WorkspaceWriteProbeResult = WorkspaceWriteProbeFact & {
   grant: "granted" | "failed" | "ineligible" | "not-local" | "no-fence"
-  reason?: "home-or-app-state" | "not-opened-by-you" | "grant-failed"
+  /** `protected-config`: the folder is a protected engine-configuration location or inside one (SPEC-engine-config-fence BR-05). */
+  reason?: "home-or-app-state" | "protected-config" | "not-opened-by-you" | "grant-failed"
 }
 
 export function parseWorkspaceTarget(value: unknown): WorkspaceWriteProbeRequest | undefined {

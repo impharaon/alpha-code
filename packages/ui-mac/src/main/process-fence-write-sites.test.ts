@@ -103,9 +103,9 @@ describe("控制臂:扫描器测得出已知的坏", () => {
     expect(scanWriteSites("synthetic/e.ts", src)).toEqual([])
   })
 
-  test("根列合法性:W-id / W-id+W-id / arg / main-only 合法;W9(不存在)/ W10、W19(已删)/ TODO / 空 非法", () => {
-    for (const ok of ["W1", "W2+W6+W1", "arg", "main-only", "W18", "X1", "W1+X1"]) expect(isValidRoot(ok), ok).toBe(true)
-    for (const bad of ["W9", "W10", "W19", "TODO", "", "W1+W9", "home"]) expect(isValidRoot(bad), bad).toBe(false)
+  test("根列合法性:W-id / W-id+W-id / arg / main-only 合法;W9(不存在)/ W2、W6、W10、W19(已删)/ TODO / 空 非法", () => {
+    for (const ok of ["W1", "W3+W4+W1", "arg", "main-only", "W18", "X1", "W1+X1"]) expect(isValidRoot(ok), ok).toBe(true)
+    for (const bad of ["W9", "W2", "W6", "W2+W1", "W10", "W19", "TODO", "", "W1+W9", "home"]) expect(isValidRoot(bad), bad).toBe(false)
   })
 
   test("写 API 集合含两套(sync / promises)的核心成员", () => {

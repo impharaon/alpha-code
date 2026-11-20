@@ -103,7 +103,7 @@ beforeEach(async () => {
   tracker = bootFenceWorkspaceTruth({
     truthPath: join(run, "truth.json"), store: { tabs: undefined, recent: undefined, info: undefined },
     fs: { readFileSync, writeFileSync, mkdirSync, renameSync, rmSync }, log: (line) => { logs.push(line) },
-    eligibility: { homeDir: join(run, "home"), appStateRoot: join(run, "state"), realpath: realpathSync.native, isDirectory: () => true },
+    eligibility: { homeDir: join(run, "home"), appStateRoot: join(run, "state"), configFenceRoots: () => [], realpath: realpathSync.native, isDirectory: () => true },
     onWritableChanged: (change) => { changed.push(change) },
   })
   await spawnGeneration()

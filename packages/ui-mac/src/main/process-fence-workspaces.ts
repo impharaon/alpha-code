@@ -165,7 +165,15 @@ export type FenceRunWritable = Pick<FenceWorkspaceTracker, "carriedWorkspaces" |
 
 export type WorkspaceEligibility =
   | { eligible: true; server: typeof LOCAL_SIDECAR_SERVER_KEY; directory: string }
-  | { eligible: false; reason: "not-local" | "home-or-app-state" | "not-a-directory" }
+  | { eligible: false; reason: "not-local" | "home-or-app-state" | "protected-config" | "not-a-directory" }
+
+/**
+ * The residual sentence a refused directory gets: HOME / the app-state root and a protected configuration location
+ * (SPEC-engine-config-fence BR-05) each have their own; anything else that is not registered reads "not opened by you".
+ */
+function ineligibleReason(reason: Exclude<WorkspaceDirectoryCheck, { eligible: true }>["reason"]): "home-or-app-state" | "protected-config" | "not-opened-by-you" {
+  return reason === "home-or-app-state" || reason === "protected-config" ? reason : "not-opened-by-you"
+}
 
 export type UserOpenedRegistry = {
   register(input: { server: string; directory: string }): WorkspaceEligibility
@@ -235,7 +243,7 @@ export function bootFenceWorkspaceTruth(input: BootFenceWorkspaceTruthInput): Fe
     carried.set(directory, generations)
   }
   const carriedFromOtherGenerations = (directory: string, generation: SidecarListener) =>
-    processFenceRulesCover([...carried].filter(([, generations]) => [...generations].some((other) => other !== generation)).map(([value]) => ({ kind: "subpath" as const, value })), directory)
+    processFenceRulesCover({ allow: [...carried].filter(([, generations]) => [...generations].some((other) => other !== generation)).map(([value]) => ({ kind: "subpath" as const, value })), deny: [] }, directory)
   let current: string[]
   let quarantined: string[] = []
   if (existing.ok) {
@@ -345,7 +353,7 @@ export function bootFenceWorkspaceTruth(input: BootFenceWorkspaceTruthInput): Fe
       return { ...(sidecar && answerProbe ? await sidecar.probeWrite(target.directory) : { outcome: "unknown" as const }), grant: "failed" }
     }
     if (!candidate.eligible || !opened.has(candidate.directory)) {
-      const reason = !candidate.eligible && candidate.reason === "home-or-app-state" ? "home-or-app-state" : "not-opened-by-you"
+      const reason = candidate.eligible ? "not-opened-by-you" : ineligibleReason(candidate.reason)
       return { ...(sidecar && answerProbe ? await sidecar.probeWrite(target.directory) : { outcome: "unknown" as const }), grant: "ineligible", reason }
     }
     if (!sidecar) return { outcome: "unknown", grant: "failed", reason: "grant-failed" }
@@ -366,7 +374,7 @@ export function bootFenceWorkspaceTruth(input: BootFenceWorkspaceTruthInput): Fe
         return { ...fact, grant: "granted" }
       }
       const self = stillSelf(directory)
-      if (!self.eligible) return { ...fact, grant: "ineligible", reason: self.reason === "home-or-app-state" ? "home-or-app-state" : "not-opened-by-you" }
+      if (!self.eligible) return { ...fact, grant: "ineligible", reason: ineligibleReason(self.reason) }
       noteFailed(sidecar, directory)
       return { ...fact, grant: "failed", reason: "grant-failed" }
     }
@@ -374,7 +382,7 @@ export function bootFenceWorkspaceTruth(input: BootFenceWorkspaceTruthInput): Fe
     // whose parent were writable would put the directory itself inside that root), so stillSelf followed by the issue
     // cannot be raced. server.ts's post-issue realpath comparison stays as an assertion only.
     const valid = stillSelf(directory)
-    if (!valid.eligible) return { ...await probe(), grant: "ineligible", reason: valid.reason === "home-or-app-state" ? "home-or-app-state" : "not-opened-by-you" }
+    if (!valid.eligible) return { ...await probe(), grant: "ineligible", reason: ineligibleReason(valid.reason) }
     carry(directory, sidecar) // an attempt may already have produced a consumed token in this generation
     const result = await sidecar.grantWrite(directory)
     const fact = await probe()

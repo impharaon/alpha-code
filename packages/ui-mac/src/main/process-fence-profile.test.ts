@@ -156,7 +156,9 @@ describe("renderProcessFenceProfile —— 勘破 §8.2 的行(W10/W19 已删,D1
   })
 
   test("`#1337` 网络行:Q1.2 四行逐字、顺序不变、deny 在前 allow 在后、N4 的端口就是传入的代理端口;只写加法(没有第二条 deny)", () => {
-    const out = tokens(renderProcessFenceProfile({ ...base, egressProxyPort: 61234 }))
+    // 受保护集两块渲染在 N4 之后(SPEC-engine-config-fence);网络行本身的形状在没有受保护集的形状上判,有受保护集时它们紧贴在两块之前
+    expect(tokens(renderProcessFenceProfile({ ...base, egressProxyPort: 61234 })).slice(-(CF_LINES.length + 4), -CF_LINES.length)).toEqual(NETWORK_LINES(61234))
+    const out = tokens(renderProcessFenceProfile({ ...base, egressProxyPort: 61234, configFence: [] }))
     expect(out.slice(-4)).toEqual(NETWORK_LINES(61234))
     expect(out.filter((l) => l.startsWith("(deny "))).toEqual([
       "(deny file-write*)",
@@ -687,7 +689,8 @@ describe("控制组:判据能测出已知的坏", () => {
     expect(rendered).not.toEqual(tokens(renderProcessFenceProfile(base)))
   })
   test("`#1337` 少 N3(inbound)或多一条减法 deny ⇒ 网络行判据红(老勘破 §5 那两行 / 减法组合正是 `#1334` 实测的两种坏)", () => {
-    const good = tokens(renderProcessFenceProfile(base))
+    const good = tokens(renderProcessFenceProfile({ ...base, configFence: [] })) // 网络行的形状在没有受保护集的形状上判(见上)
+    expect(good.slice(-4)).toEqual(NETWORK_LINES(4443))
     const sec5 = good.filter((l) => !l.includes("network-inbound"))
     expect(sec5.slice(-4)).not.toEqual(NETWORK_LINES(4443))
     const subtractive = [...good, '(deny network-outbound (remote ip "localhost:1234"))']

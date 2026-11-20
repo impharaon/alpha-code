@@ -214,7 +214,7 @@ describe.skipIf(!darwin)("#1504 Office cache under the unchanged process fence",
         profile = renderProcessFenceProfile({
           workspaces: [workspace], codepuppyGlobalRoot: isolated.CODEPUPPY_GLOBAL_DIR,
           userDataPath: input.userDataPath, stateHome: isolated.XDG_STATE_HOME,
-          roots: resolveEngineRoots(input.sidecarEnv, isolated.HOME), egressProxyPort: input.egressProxyPort!,
+          roots: resolveEngineRoots(input.sidecarEnv, isolated.HOME), egressProxyPort: input.egressProxyPort!, configFence: [],
         })
         return { profile, addonPath: "/unused-by-sandbox-exec" }
       },
@@ -758,7 +758,7 @@ describe("REQ-159 main 侧接线:计划 → start 命令 → 拒 fork", () => {
       // 启动 1(本票落地后的第一次):store 里只有用户真开过的 proj ⇒ 播种,日志一行
       store.set(TABS_KEY, JSON.stringify([draftP]))
       store.set(TABS_RECENT_KEY, JSON.stringify({ key: "draft:p" }))
-      bootFenceWorkspaceTruth({ eligibility: { homeDir: home, appStateRoot: join(home, "app-state"), realpath: fs.realpathSync.native, isDirectory: (path) => fs.statSync(path).isDirectory() }, onWritableChanged: () => {}, truthPath, store: readStore(), fs, log: (l) => void bootLogs.push(l) })
+      bootFenceWorkspaceTruth({ eligibility: { homeDir: home, appStateRoot: join(home, "app-state"), configFenceRoots: () => [], realpath: fs.realpathSync.native, isDirectory: (path) => fs.statSync(path).isDirectory() }, onWritableChanged: () => {}, truthPath, store: readStore(), fs, log: (l) => void bootLogs.push(l) })
       expect(readFileSync(truthPath, "utf8")).toBe(`{"v":1,"workspaces":["${proj}"]}\n`)
       expect(bootLogs).toEqual([`process fence: workspace truth seeded from the renderer tab store (first launch with #1394) — 1 workspace(s) written to ${truthPath}: ${proj}`])
 
@@ -772,7 +772,7 @@ describe("REQ-159 main 侧接线:计划 → start 命令 → 拒 fork", () => {
 
       // 启动 2:真源在 ⇒ 装载 + 检疫;生产计划器算出的 profile:含用户真开过的、含 ~/code-puppy、不含伪造目录
       bootLogs.length = 0
-      const tracker = bootFenceWorkspaceTruth({ eligibility: { homeDir: home, appStateRoot: join(home, "app-state"), realpath: fs.realpathSync.native, isDirectory: (path) => fs.statSync(path).isDirectory() }, onWritableChanged: () => {}, truthPath, store: readStore(), fs, log: (l) => void bootLogs.push(l) })
+      const tracker = bootFenceWorkspaceTruth({ eligibility: { homeDir: home, appStateRoot: join(home, "app-state"), configFenceRoots: () => [], realpath: fs.realpathSync.native, isDirectory: (path) => fs.statSync(path).isDirectory() }, onWritableChanged: () => {}, truthPath, store: readStore(), fs, log: (l) => void bootLogs.push(l) })
       expect(tracker.quarantined).toEqual([forged])
       expect(bootLogs[1]).toContain("quarantined for this session")
       const gen1 = await spawnProfile(4320)

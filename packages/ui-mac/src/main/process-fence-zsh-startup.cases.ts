@@ -41,6 +41,8 @@ process.exit(spawnSync(command[0], command.slice(1), { stdio: "inherit" }).statu
 const production = renderProcessFenceProfile({
   workspaces: [ws], codepuppyGlobalRoot: join(run, "state"), userDataPath: join(run, "userData"), stateHome: join(run, "userData"),
   roots: resolveEngineRoots({}, home), egressProxyPort: 59999,
+  // 本文件判 W10 / W19 两行;受保护配置集的判据在 process-fence-config-fence / process-fence-profile
+  configFence: [],
 })
 
 /** Today's rows back in place, derived from the production text: W10 after W8, W19 = the W8 regex with the dump's name. */
@@ -141,7 +143,7 @@ beforeAll(() => {
 test("layout: the fake HOME and the run root are under no writable row of either profile; only the known-bad variant covers the session file and the dump", () => {
   const productionRules = processFenceWriteRules(production)
   const knownBadRules = processFenceWriteRules(knownBad)
-  expect(knownBadRules.length).toBe(productionRules.length + 2)
+  expect(knownBadRules.allow.length).toBe(productionRules.allow.length + 2)
   for (const rules of [productionRules, knownBadRules]) {
     expect(processFenceRulesCover(rules, home), home).toBe(false)
     expect(processFenceRulesCover(rules, run), run).toBe(false)

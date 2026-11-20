@@ -61,6 +61,7 @@ import { createDbMenuActions, runDbPreflightBoot } from "./db-safety-boot"
 import { createDataClearAction } from "./data-clear-boot"
 import { createMenu } from "./menu"
 import {
+  currentConfigFenceRoots,
   forkedSecretNames,
   getDefaultServerUrl,
   preferAppEnv,
@@ -976,7 +977,7 @@ const main = Effect.gen(function* () {
   const fenceWorkspaces = bootFenceWorkspaceTruth({
     truthPath: fenceWorkspaceTruthPath(codepuppyEnv.casBaseRoot, codepuppyEnv.environment),
     eligibility: {
-      homeDir: homedir(), appStateRoot: codepuppyEnv.casBaseRoot, realpath: realpathSync.native,
+      homeDir: homedir(), appStateRoot: codepuppyEnv.casBaseRoot, configFenceRoots: currentConfigFenceRoots, realpath: realpathSync.native,
       isDirectory: (directory) => statSync(directory).isDirectory(),
     },
     onWritableChanged: (change) => {

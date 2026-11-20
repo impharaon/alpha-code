@@ -74,11 +74,12 @@ const profileFor = (stateRoot: string, env: "prod" | "dev", over: Partial<Proces
     stateHome: USER_DATA,
     roots: { home: HOME, dataHome: `${HOME}/.local/share`, cacheHome: `${HOME}/.cache`, configHome: `${HOME}/.config` },
     egressProxyPort: 4443,
+    configFence: [],
     ...over,
   })
 
-/** 可写集的固定行(`#1383` 基线 §1.1「18 条静态行」;W10/W19 后由 D15 删掉),手写 —— 将来加一行,这里先红,再回答「它罩不罩得到真源」。 */
-const FIXED_ROW_IDS = ["W2", "W3", "W4", "W5", "W6", "W7", "W8", "W11", "W12", "W13", "W14", "W15", "W16", "W17", "W18"]
+/** 可写集的固定行(`#1383` 基线 §1.1「18 条静态行」;W10/W19 后由 D15 删掉,W2/W6 由 SPEC-engine-config-fence D2 删掉),手写 —— 将来加一行,这里先红,再回答「它罩不罩得到真源」。 */
+const FIXED_ROW_IDS = ["W3", "W4", "W5", "W7", "W8", "W11", "W12", "W13", "W14", "W15", "W16", "W17", "W18"]
 
 describe("真源位置(I2):<casBaseRoot>/custom-providers/<env>.json 不在可写集任何固定行之下", () => {
   test("路径 = <casBaseRoot>/custom-providers/<env>.json;与三个 env 根、cas/、fence-workspaces/ 同级(相对每个都以 .. 开头)", () => {
@@ -93,7 +94,7 @@ describe("真源位置(I2):<casBaseRoot>/custom-providers/<env>.json 不在可�
     }
   })
 
-  test("固定行的枚举是完备的:WRITABLE_ROOT_IDS 去掉 W1 与 X1 = 手写的 15 个 id(+W3 的 XDG_STATE_HOME 形态仍是 W3)= 渲染出的 profile 里的 id 集合", () => {
+  test("固定行的枚举是完备的:WRITABLE_ROOT_IDS 去掉 W1 与 X1 = 手写的 13 个 id(+W3 的 XDG_STATE_HOME 形态仍是 W3)= 渲染出的 profile 里的 id 集合", () => {
     // W1 (start-time union) and X1 (runtime grant class, its own extension line outside the block) are runtime
     // membership, not fixed rows; X1 is registered so the write-site registry can name the probe's root W1+X1.
     expect(Object.keys(WRITABLE_ROOT_IDS).filter((id) => id !== "W1" && id !== "X1").sort()).toEqual([...FIXED_ROW_IDS].sort())
@@ -112,15 +113,13 @@ describe("真源位置(I2):<casBaseRoot>/custom-providers/<env>.json 不在可�
       for (const stateHome of [USER_DATA, `${HOME}/.local/state`]) {
         const rules = fileWriteRules(profileFor(stateRoot, env, { stateHome })).filter((r) => r.id !== "W1")
         // 至少要真的看过 17 条规则以上,否则「没覆盖」是空集上的真
-        expect(rules.length, `${stateRoot}/${env}/${stateHome}`).toBeGreaterThanOrEqual(17)
+        expect(rules.length, `${stateRoot}/${env}/${stateHome}`).toBeGreaterThanOrEqual(15)
         const truth = customProviderTruthPath(stateRoot, env)
         const dir = join(stateRoot, "custom-providers")
         expect(rules.filter((r) => covers(r, truth)).map(describeRule), `truth file ${truth}`).toEqual([])
         expect(rules.filter((r) => covers(r, dir)).map(describeRule), `truth dir ${dir}`).toEqual([])
-        // 对照:同一批规则里 W2 确实罩着 codepuppy.jsonc 的家(手段不是对什么都答「没覆盖」)
-        expect(rules.filter((r) => covers(r, join(environmentMutableRoot(env, stateRoot), "codepuppy.jsonc"))).map(describeRule)).toEqual([
-          `W2 subpath ${environmentMutableRoot(env, stateRoot)}`,
-        ])
+        // 对照:同一批规则里 W3 确实罩着 userData 里的文件(手段不是对什么都答「没覆盖」;W2 已删,SPEC-engine-config-fence D2)
+        expect(rules.filter((r) => covers(r, join(USER_DATA, "codepuppy-identity.md"))).map(describeRule)).toEqual([`W3 subpath ${USER_DATA}`])
       }
     }
   })
@@ -131,16 +130,16 @@ describe("真源位置(I2):<casBaseRoot>/custom-providers/<env>.json 不在可�
     const inject = (line: string) => profile.replace("(allow file-write*\n", `(allow file-write*\n${line}\n`)
     const offenders = (p: string) => fileWriteRules(p).filter((r) => r.id !== "W1" && covers(r, truth)).map(describeRule)
     expect(offenders(profile)).toEqual([])
-    expect(offenders(inject(`  (subpath "${DEFAULT_STATE_ROOT}")   ; W2`))).toEqual([`W2 subpath ${DEFAULT_STATE_ROOT}`])
+    expect(offenders(inject(`  (subpath "${DEFAULT_STATE_ROOT}")   ; W99`))).toEqual([`W99 subpath ${DEFAULT_STATE_ROOT}`])
     expect(offenders(inject(`  (subpath "/users/alpha/library/application support/codepuppy-state/custom-providers")   ; W3`))).toEqual([
       "W3 subpath /users/alpha/library/application support/codepuppy-state/custom-providers",
     ])
     expect(offenders(inject(`  (regex #"^/Users/alpha/Library")   ; W8`))).toEqual(["W8 regex ^/Users/alpha/Library"])
     expect(offenders(inject(`  (literal "${truth}")   ; W13`))).toEqual([`W13 literal ${truth}`])
     // 字符串前缀不算覆盖:`codepuppy-state-2` 不是 `codepuppy-state` 的子路径(按段比,不是 startsWith)
-    expect(offenders(inject(`  (subpath "${DEFAULT_STATE_ROOT}-2")   ; W2`))).toEqual([])
+    expect(offenders(inject(`  (subpath "${DEFAULT_STATE_ROOT}-2")   ; W99`))).toEqual([])
     expect(() => fileWriteRules(inject(`  (subpath "${DEFAULT_STATE_ROOT}")`))).toThrow("without a W-id")
-    expect(() => fileWriteRules(inject(`  (allow-something "${DEFAULT_STATE_ROOT}")   ; W2`))).toThrow("no parsable rule")
+    expect(() => fileWriteRules(inject(`  (allow-something "${DEFAULT_STATE_ROOT}")   ; W99`))).toThrow("no parsable rule")
   })
 })
 

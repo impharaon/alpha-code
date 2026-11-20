@@ -8,7 +8,7 @@ import { Schema } from "effect"
 import { Config as ConfigSchema } from "@opencode/schema/config"
 import { ConfigNormalize } from "@opencode/core/config/normalize"
 import { ensureSkillsPath } from "./engine-config-truth"
-import { composeExplicitDocument, watchExplicitSources, writeExplicitConfig, type ExplicitLayer } from "./engine-explicit-config"
+import { composeExplicitDocument, engineModelsPath, explicitConfigPath, watchExplicitSources, writeEngineConfigFiles, writeExplicitConfig, type ExplicitLayer } from "./engine-explicit-config"
 
 const LAYER: ExplicitLayer = {
   policies: [
@@ -157,6 +157,81 @@ describe("运行中:输入一变就重写显式文件", () => {
     } finally {
       stop()
     }
+  })
+})
+
+// SPEC-engine-config-fence BR-03 / AC-05(DESIGN-engine-config-fence §4.4):主进程在 fork 前写显式文件、模型底表与种子 ——
+// sidecar 从此只读。种子的字节与 0.2.6 注入写的逐字相同;写或删失败原样抛(消息带路径与 errno,不带内容),server.ts 据此拒绝 fork。
+describe("fork 前主进程写引擎配置(writeEngineConfigFiles)", () => {
+  const SEED = JSON.stringify({ $schema: "https://opencode.ai/config.json" }, null, 2)
+  /** 一个完整投影的 provider(governedModelsBase 才给就绪底表)。 */
+  const MODELS = {
+    enabled_providers: ["codepuppy"],
+    provider: { codepuppy: { name: "Code Puppy", npm: "@ai-sdk/openai-compatible", options: { baseURL: "https://gateway.example.invalid/v1" }, models: { m: { name: "M" } } } },
+  }
+  const setup = () => {
+    const base = tempDir()
+    const root = path.join(base, "codepuppy-state", "env", "dev")
+    return { userDataPath: path.join(base, "userdata"), root, userConfig: path.join(root, "codepuppy.jsonc") }
+  }
+
+  test("codepuppy.jsonc 缺席 ⇒ 先写种子(与 0.2.6 同一份字节),再写显式文件与模型底表;返回两条路径", () => {
+    const { userDataPath, root, userConfig } = setup()
+    const files = writeEngineConfigFiles({ userDataPath, root, userConfig, layer: LAYER, models: MODELS })
+    expect(fs.readFileSync(userConfig, "utf8")).toBe(SEED)
+    expect(files).toEqual({ explicitConfig: explicitConfigPath(userDataPath), models: engineModelsPath(userDataPath) })
+    expect(engineModelsPath(userDataPath)).toBe(path.join(userDataPath, "codepuppy-engine-config", "models.json"))
+    expect(JSON.parse(fs.readFileSync(files.explicitConfig, "utf8"))).toEqual(composeExplicitDocument(SEED, LAYER).document)
+    const base = JSON.parse(fs.readFileSync(files.models!, "utf8")) as Record<string, { models?: Record<string, unknown> }>
+    expect(Object.keys(base.codepuppy!.models!)).toEqual(["m"])
+  })
+
+  test("已有的 codepuppy.jsonc 原样不动;逃生阀(没有 userConfig)不写种子;用户文件坏了 ⇒ 只写我们这一层并把原因交回", () => {
+    const { userDataPath, root, userConfig } = setup()
+    fs.mkdirSync(root, { recursive: true })
+    fs.writeFileSync(userConfig, "{ broken")
+    const files = writeEngineConfigFiles({ userDataPath, root, userConfig, layer: LAYER, models: MODELS })
+    expect(fs.readFileSync(userConfig, "utf8")).toBe("{ broken")
+    expect(files.userError).toContain("JSONC parse error")
+    expect(JSON.parse(fs.readFileSync(files.explicitConfig, "utf8"))).toEqual(composeExplicitDocument(undefined, LAYER).document)
+
+    const hatch = setup()
+    writeEngineConfigFiles({ userDataPath: hatch.userDataPath, root: hatch.root, layer: LAYER, models: MODELS })
+    expect(fs.existsSync(hatch.userConfig)).toBe(false)
+  })
+
+  test("E5 逃生阀臂:盘上留着上一代的 models.json,这一代没有模型底表(CODEPUPPY_MODELS_DISABLE 或投影不全)⇒ fork 前删掉,不给路径", () => {
+    const { userDataPath, root, userConfig } = setup()
+    writeEngineConfigFiles({ userDataPath, root, userConfig, layer: LAYER, models: MODELS })
+    expect(fs.existsSync(engineModelsPath(userDataPath))).toBe(true)
+    const disabled = writeEngineConfigFiles({ userDataPath, root, userConfig, layer: LAYER, models: undefined })
+    expect(disabled.models).toBeUndefined()
+    expect(fs.existsSync(engineModelsPath(userDataPath))).toBe(false)
+
+    writeEngineConfigFiles({ userDataPath, root, userConfig, layer: LAYER, models: MODELS })
+    const partial = writeEngineConfigFiles({ userDataPath, root, userConfig, layer: LAYER, models: { enabled_providers: ["user-file-provider"], provider: {} } })
+    expect(partial.models).toBeUndefined()
+    expect(fs.existsSync(engineModelsPath(userDataPath))).toBe(false)
+  })
+
+  test("AC-05:写不进(引擎配置目录是个普通文件)或删不掉(models.json 是非空目录)⇒ 原样抛,消息带路径与 errno,不带内容", () => {
+    const blocked = setup()
+    fs.mkdirSync(blocked.userDataPath, { recursive: true })
+    fs.writeFileSync(path.join(blocked.userDataPath, "codepuppy-engine-config"), "secret-looking-content")
+    let error: unknown
+    try {
+      writeEngineConfigFiles({ ...blocked, layer: LAYER, models: MODELS })
+    } catch (caught) {
+      error = caught
+    }
+    expect(error).toBeInstanceOf(Error)
+    expect(String((error as Error).message)).toContain(path.join(blocked.userDataPath, "codepuppy-engine-config"))
+    expect(String((error as NodeJS.ErrnoException).code)).toMatch(/^E[A-Z]+$/)
+    expect(String((error as Error).message)).not.toContain("secret-looking-content")
+
+    const stuck = setup()
+    fs.mkdirSync(path.join(engineModelsPath(stuck.userDataPath), "occupied"), { recursive: true })
+    expect(() => writeEngineConfigFiles({ ...stuck, layer: LAYER, models: undefined })).toThrow(engineModelsPath(stuck.userDataPath))
   })
 })
 

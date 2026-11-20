@@ -47,8 +47,10 @@ mockElectron(() => ({
 }))
 // main 的 warn 行(`#1698`:构建器忽略一个导出值时记的那一行在这里判)
 const warned: string[] = []
+// main 的 error 行(SPEC-engine-config-fence AC-05:引擎配置写不进时拒绝 fork 的那一行在这里判)
+const errored: string[] = []
 mock.module("./logging", () => ({
-  getLogger: () => ({ log: () => {}, warn: (...args: unknown[]) => void warned.push(args.map(String).join(" ")), error: () => {} }),
+  getLogger: () => ({ log: () => {}, warn: (...args: unknown[]) => void warned.push(args.map(String).join(" ")), error: (...args: unknown[]) => void errored.push(args.map(String).join(" ")) }),
   write: () => {},
   rotateServerLogs: () => {},
 }))
@@ -103,6 +105,7 @@ const managedEnv = [
   "CODEPUPPY_ENV_FILE",
   "CODEPUPPY_SECRETS_DISABLE",
   "CODEPUPPY_WEBSEARCH_DISABLE",
+  "CODEPUPPY_MODELS_DISABLE",
   ...keylessWebSearchFlags,
   "OPENCODE_EXPERIMENTAL",
 ] as const
@@ -665,6 +668,64 @@ describe("spawnLocalServer", () => {
       "applied",
     )
     expect(readFileSync(secretFilePath(userDataPath, "CODEPUPPY_API_KEY"), "utf8")).toBe("next-key")
+  })
+
+  // SPEC-engine-config-fence BR-03 / AC-05 第一句(DESIGN-engine-config-fence §4.4、§5):显式文件、模型底表与种子由 main 在 fork 前写;
+  // 写不进或该删的 models.json 删不掉 ⇒ 与密钥文件、已应用目录同一条路径拒绝 fork,留一行具名日志,不退回 sidecar 里去写。
+  test("AC-05:引擎配置目录写不进 ⇒ 拒绝 fork,日志恰一行 [I-13] 并点名路径", async () => {
+    const blocked = join(userDataPath, "codepuppy-engine-config")
+    writeFileSync(blocked, "")
+    errored.length = 0
+    await expect(
+      spawnLocalServer("127.0.0.1", 4096, "password", { userDataPath, healthCheck: async () => true, planFence: fakePlanFence, fork: fakeFork }),
+    ).rejects.toThrow(/engine config files could not be written — sidecar fork refused/)
+    expect(forkCalls).toHaveLength(0)
+    const lines = errored.filter((line) => line.startsWith("[I-13] engine config files could not be written — refusing to fork:"))
+    expect(lines).toHaveLength(1)
+    expect(lines[0]).toContain(blocked)
+  })
+
+  test("AC-05 / E5:模型底表该删(CODEPUPPY_MODELS_DISABLE)却删不掉 ⇒ 同样拒绝 fork;删得掉时 fork 前已删", async () => {
+    const models = join(userDataPath, "codepuppy-engine-config", "models.json")
+    mkdirSync(join(models, "occupied"), { recursive: true })
+    process.env.CODEPUPPY_MODELS_DISABLE = "1"
+    errored.length = 0
+    await expect(
+      spawnLocalServer("127.0.0.1", 4096, "password", { userDataPath, healthCheck: async () => true, planFence: fakePlanFence, fork: fakeFork }),
+    ).rejects.toThrow(/engine config files could not be written — sidecar fork refused/)
+    expect(forkCalls).toHaveLength(0)
+    expect(errored.filter((line) => line.startsWith("[I-13] engine config files could not be written — refusing to fork:") && line.includes(models))).toHaveLength(1)
+    rmSync(models, { recursive: true })
+    writeFileSync(models, "{}")
+    await forkSidecar()
+    expect(forkCalls).toHaveLength(1)
+    expect(() => readFileSync(models)).toThrow()
+  })
+
+  test("BR-03 / E7:fork 前 main 写好显式文件与种子并跑监听 —— 子进程活着时手改 codepuppy.jsonc ⇒ main 重写显式文件;子进程退出后不再跟", async () => {
+    const explicit = join(userDataPath, "codepuppy-engine-config", "codepuppy-explicit.json")
+    const userConfig = join(process.env.CODEPUPPY_GLOBAL_DIR!, "codepuppy.jsonc")
+    const result = await spawnLocalServer("127.0.0.1", 4096, "password", { userDataPath, healthCheck: async () => true, planFence: fakePlanFence, fork: fakeFork })
+    await result.health.wait
+    expect(JSON.parse(readFileSync(userConfig, "utf8"))).toEqual({ $schema: "https://opencode.ai/config.json" })
+    const commands = () => Object.keys((JSON.parse(readFileSync(explicit, "utf8")) as { commands?: Record<string, unknown> }).commands ?? {})
+    expect(commands()).toEqual(["init", "review"])
+    const edit = (name: string) => {
+      writeFileSync(`${userConfig}.tmp`, JSON.stringify({ commands: { [name]: { template: name } } }))
+      renameSync(`${userConfig}.tmp`, userConfig)
+    }
+    const waitFor = async (predicate: () => boolean) => {
+      for (const until = Date.now() + 3_000; Date.now() < until; await new Promise((resolve) => setTimeout(resolve, 25))) if (predicate()) return true
+      return predicate()
+    }
+    await new Promise((resolve) => setTimeout(resolve, 250)) // 递归目录监听起来要一点时间
+    edit("while-alive")
+    expect(await waitFor(() => commands().includes("while-alive"))).toBe(true)
+    await result.listener.stop()
+    edit("after-exit")
+    await new Promise((resolve) => setTimeout(resolve, 400))
+    expect(commands()).toContain("while-alive")
+    expect(commands()).not.toContain("after-exit")
   })
 
   test("forks the sidecar in the userData scratch directory", async () => {

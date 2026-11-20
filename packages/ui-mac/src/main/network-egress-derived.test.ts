@@ -213,10 +213,10 @@ describe("AC2 没配过的地址仍被拒 —— 判据先证明它测得出已�
 })
 
 // ── `#1380` R1 Blocker:动态半场的输入里不许出现「被围栏的引擎树写得了的文件」 ──────────────
-// provider 块的三条读取路径逐条落在 seatbelt 的可写集里:
-//   codepuppy.jsonc                                   ← process-fence-profile.ts W2  (codepuppyGlobalRoot)
-//   <OPENCODE_CONFIG_DIR | XDG_CONFIG_HOME>/opencode ← W6  (configHome/opencode)
-//   ~/.opencode(CODEPUPPY_OPENCODE_HOME 可重定向)       ← W16 (home/.opencode)
+// provider 块的三条读取路径当初逐条落在 seatbelt 的可写集里(三行现已删,三处都是受保护配置位置,SPEC-engine-config-fence):
+//   codepuppy.jsonc                                   ← 原 W2(codepuppyGlobalRoot),现 CF-1
+//   <OPENCODE_CONFIG_DIR | XDG_CONFIG_HOME>/opencode ← 原 W6(configHome/opencode),现 CF-8
+//   ~/.opencode(CODEPUPPY_OPENCODE_HOME 可重定向)       ← 原 W16(home/.opencode),现 CF-9
 // 引擎树里任意一段代码(bash 工具 / 仓库自带 plugin / MCP stdio 子进程)写一行 baseURL,下一代 fork
 // 就给它铸出一条出网通道 —— confused deputy,围栏对任意目的地开口,而产品披露「只能访问已登记的地址」
 // (network-egress-disclosure.test.ts)当场变成假话。

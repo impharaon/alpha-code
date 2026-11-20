@@ -186,6 +186,13 @@ UPSTREAM_EXCLUDES=(
   # 接管面只有 :136 那一行的 `codepuppy(I-13 L2)` 行尾标注。判据 packages/ext/src/policy/session-row-rules.test.ts 的会话上下文三条
   # (上游原文件 ⇒ E4 第二臂红)。
   ':(exclude)packages/core/src/session/context.ts'
+  # INT-safety I-13 D13 / SPEC-engine-config-fence BR-07(owner 2026-11-20 在编排器给的三个选项里选 A,原话:「我建议 A：改存到引擎数据目录」):
+  # 计划助手的计划文件放在引擎数据目录(global.data/plan),~/.opencode 整个受保护、谁都不建。目录在插件内部算出,同一个值写进存档的提醒、编辑放行
+  # 与拒绝文案;插件能另加一条放行,改不了告诉模型往哪写的那句提醒。接管面只有 plan.ts:31 那一个值(`codepuppy(I-13 D13)` 行尾标注);上游
+  # plan.test.ts 钉的正是这个目录,随源文件成对接管,只改 :27 的期望目录。判据:该测试的提醒 / 编辑放行 / 拒绝文案三条与真引擎
+  # packages/ui-mac/src/main/engine-config-fence.engine.test.ts 的 fresh 臂(上游原文件 ⇒ 都红)。
+  ':(exclude)packages/core/src/plugin/plan.ts'
+  ':(exclude)packages/core/test/plugin/plan.test.ts'
 )
 
 # ── UPSTREAM_PATHS 里住着的 Code Puppy 自有文件:结构性谓词,不是逐文件清单(`#1085` / ADR-043)──

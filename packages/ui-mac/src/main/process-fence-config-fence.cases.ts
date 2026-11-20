@@ -13,6 +13,10 @@
 // blocks before the allow block; no ancestors block; X1 rendered after the protected blocks; a symlinked location rendered
 // without its target. Outside the guarantee (R8, an explicit control, not a failure): a symlink the user placed INSIDE a
 // protected directory, pointing at a writable place, still writes to its target.
+//
+// AC-08 (BR-07, DESIGN §4.8 / E11): the whole ~/.opencode is CF-9 — absent, no creation form makes it; present, nothing under it
+// can be written (also under a run-time grant for it), reads work; the plan directory now lives under the engine data directory.
+// Known bad: today's rows (W16 back, CF-9 out) — every creation and write lands; CF-9 out alone — a grant for it lets writes land.
 
 import { beforeAll, expect, test } from "bun:test"
 import { spawnSync } from "node:child_process"
@@ -125,6 +129,7 @@ const OPS = {
   dir: ["create-inside", "mkdir-child", "hardlink-into", "clone-into", "symlink-into", "rename-dir-away", "chmod-dir"],
   create: ["create", "symlink-at", "mkdir-at", "rename-into", "hardlink-at", "clone-at"],
   ancestor: ["rename-ancestor-away"],
+  "create-dir": ["mkdir-p", "rename-dir-into", "clone-dir-at"],
   vol: ["vol-append", "vol-rename-over"],
 } as const
 
@@ -271,6 +276,38 @@ const x1AfterBlocks = (profile: string) => {
   const line = profile.split("\n").find((entry) => entry.startsWith(X1_LINE))!
   return `${profile.split("\n").filter((entry) => entry !== line).join("\n")}${line}\n`
 }
+/** CF-9 (DESIGN §4.1): the whole ~/.opencode. */
+const dotOpencode = join(home, ".opencode")
+/** CF-9 alone taken out of the protected block (W16 stays deleted). */
+const withoutCf9 = (profile: string) => {
+  const lines = profile.split("\n")
+  const at = lines.flatMap((line, index) => (line.trim() === `(subpath "${dotOpencode}")` ? [index] : []))
+  expect(at.length, profile).toBe(1)
+  return lines.filter((_, index) => index !== at[0]).join("\n")
+}
+/** Today's rows for ~/.opencode (AC-08 known bad): W16 back in the allow block, no CF-9. */
+const todaysRows = (profile: string) => withoutCf9(profile).replace(/^(.*; W15)$/m, `$1\n  (subpath "${dotOpencode}")   ; W16`)
+const onDisk = (path: string) => {
+  try {
+    lstatSync(path)
+    return true
+  } catch {
+    return false
+  }
+}
+/** A machine that already has ~/.opencode (an earlier version's plan folder among it); made outside the fence. */
+function seedDotOpencode() {
+  mkdirSync(join(dotOpencode, "plan"), { recursive: true })
+  mkdirSync(join(dotOpencode, "plugin"), { recursive: true })
+  writeFileSync(join(dotOpencode, "opencode.json"), "{}\n")
+  writeFileSync(join(dotOpencode, "plan", "old.md"), "# old plan\n")
+  writeFileSync(join(dotOpencode, "plugin", "p.js"), "export default {}\n")
+}
+const dotOpencodeState = () =>
+  [dotOpencode, join(dotOpencode, "plan"), join(dotOpencode, "plugin"), join(dotOpencode, "opencode.json"), join(dotOpencode, "plan", "old.md"), join(dotOpencode, "plugin", "p.js")].map((path) => {
+    const meta = statSync(path)
+    return { path, mode: meta.mode, entries: meta.isDirectory() ? readdirSync(path).sort() : undefined, text: meta.isDirectory() ? undefined : readFileSync(path, "utf8") }
+  })
 const withoutLinkTarget = (profile: string) => profile.split("\n").filter((line) => line.trim() !== `(subpath "${realpathSync(linkedTarget)}")`).join("\n")
 
 beforeAll(() => {
@@ -370,8 +407,9 @@ test("symlinked location: its real target is refused through either path; known 
 })
 
 /** Run `command` fenced, after this process issued the fenced child `times` run-time grants (X1) for `directory`. */
-async function granted(profile: string, directory: string, command: string[], times = 1) {
+async function granted(profile: string, directory: string, command: string[], times = 1, prepare?: () => void) {
   build()
+  prepare?.()
   const profileFile = join(run, `profile-grant-${Math.random().toString(36).slice(2)}.sb`)
   writeFileSync(profileFile, profile)
   const child = Bun.spawn([process.execPath, "-e", GRANT_DRIVER, addon, profileFile, ws, ...command], { cwd: ws, stdin: "pipe", stdout: "pipe", stderr: "pipe" })
@@ -446,6 +484,90 @@ test("E2: under the same profile the engine and its children keep writing (state
   // R8 (outside the guarantee, design §1 (a) / §6): the write followed the user's link to its writable target
   expect(readFileSync(join(ws, "dotfiles-plugin", "x.js"), "utf8")).toBe("r8\n")
   expect(readFileSync(join(home, ".zsh_history"), "utf8")).toBe("h\n")
+})
+
+test("AC-08 production (BR-07): ~/.opencode absent — a regular file, symlink, mkdir, mkdir -p, hard link, a file or a prepared directory renamed or cloned onto it are all refused and it is still absent; present — every write under it is refused (also under a run-time grant for it), reads work; the plan directory under the engine data directory is created lazily and written", async () => {
+  // in the protected set as the whole directory, and nothing pre-created it
+  expect(processFenceWriteRules(plan.profile).deny).toContainEqual({ kind: "subpath", value: dotOpencode })
+  expect(processFenceWriteRules(plan.profile).allow.some((rule) => rule.value === dotOpencode)).toBe(false)
+  expect(plan.configFenceRoots).toContain(dotOpencode)
+  build()
+  expect(onDisk(dotOpencode)).toBe(false)
+  const planDir = join(dataHome, "opencode", "plan")
+  const absent = fenced(plan.profile, [
+    "/bin/sh",
+    "-c",
+    [
+      `'${ops}' cf9 create '${dotOpencode}' '${ws}'`,
+      `'${ops}' cf9-dir create-dir '${dotOpencode}' '${ws}'`,
+      // the write tool's shape: missing parents created, then the file; and write-temp-then-rename over it
+      `'${process.execPath}' -e 'const fs = require("fs"), p = require("path"), d = process.argv[1]; fs.mkdirSync(d, { recursive: true }); fs.writeFileSync(p.join(d, "a.md"), "# plan a\\n"); fs.writeFileSync(p.join(d, ".b.tmp"), "# plan b\\n"); fs.renameSync(p.join(d, ".b.tmp"), p.join(d, "b.md")); console.log("PLAN-WRITTEN")' '${planDir}'`,
+    ].join("\n"),
+  ])
+  expect(absent.status, absent.out).toBe(0)
+  const created = parsed(absent.out)
+  const creation = [...OPS.create.map((op) => `cf9:${op}`), ...OPS["create-dir"].map((op) => `cf9-dir:${op}`)]
+  expect(creation.map((key) => [key, created.get(key)])).toEqual(creation.map((key) => [key, "FAIL 1"]))
+  expect(onDisk(dotOpencode)).toBe(false)
+  expect(absent.out).toContain("PLAN-WRITTEN")
+  expect(readFileSync(join(planDir, "a.md"), "utf8")).toBe("# plan a\n")
+  expect(readFileSync(join(planDir, "b.md"), "utf8")).toBe("# plan b\n")
+
+  build()
+  seedDotOpencode()
+  const before = dotOpencodeState()
+  const present = fenced(plan.profile, [
+    "/bin/sh",
+    "-c",
+    [
+      `'${ops}' cf9-old file '${join(dotOpencode, "plan", "old.md")}' '${ws}'`,
+      `'${ops}' cf9-json file '${join(dotOpencode, "opencode.json")}' '${ws}'`,
+      `'${ops}' cf9-root dir '${dotOpencode}' '${ws}'`,
+      `'${ops}' cf9-plan dir '${join(dotOpencode, "plan")}' '${ws}'`,
+      `'${ops}' cf9-plugin dir '${join(dotOpencode, "plugin")}' '${ws}'`,
+      `cat '${join(dotOpencode, "plan", "old.md")}' && echo READ-OK`,
+    ].join("\n"),
+  ])
+  expect(present.status, present.out).toBe(0)
+  const writes = parsed(present.out)
+  const expected = [
+    ...["cf9-old", "cf9-json"].flatMap((label) => OPS.file.map((op) => `${label}:${op}`)),
+    ...["cf9-root", "cf9-plan", "cf9-plugin"].flatMap((label) => OPS.dir.map((op) => `${label}:${op}`)),
+  ]
+  expect([...writes.keys()].sort()).toEqual([...expected].sort())
+  expect(expected.map((key) => [key, writes.get(key)])).toEqual(expected.map((key) => [key, "FAIL 1"]))
+  expect(present.out).toContain("# old plan\nREAD-OK")
+  expect(dotOpencodeState()).toEqual(before)
+
+  // a run-time grant (X1) for ~/.opencode itself does not open it: the protected blocks come after X1
+  const grantedWrites = await granted(plan.profile, dotOpencode, ["/bin/sh", "-c", `'${ops}' x9 file '${join(dotOpencode, "plan", "old.md")}' '${ws}'; '${ops}' x9-dir dir '${dotOpencode}' '${ws}'`], 1, seedDotOpencode)
+  for (const op of OPS.file) expect(grantedWrites.results.get(`x9:${op}`), `x9:${op}`).toBe("FAIL 1")
+  for (const op of OPS.dir) expect(grantedWrites.results.get(`x9-dir:${op}`), `x9-dir:${op}`).toBe("FAIL 1")
+  expect(readFileSync(join(dotOpencode, "plan", "old.md"), "utf8")).toBe("# old plan\n")
+})
+
+test("AC-08 known bad — today's rows (W16 back, CF-9 out): every creation form lands and writes under an existing ~/.opencode land; CF-9 out alone (W16 stays deleted): a run-time grant for ~/.opencode lets writes under it land", async () => {
+  const today = todaysRows(plan.profile)
+  expect(processFenceWriteRules(today).allow).toContainEqual({ kind: "subpath", value: dotOpencode })
+  expect(processFenceWriteRules(today).deny.some((rule) => rule.value === dotOpencode)).toBe(false)
+  build()
+  const absent = fenced(today, ["/bin/sh", "-c", `'${ops}' cf9 create '${dotOpencode}' '${ws}'\n'${ops}' cf9-dir create-dir '${dotOpencode}' '${ws}'`])
+  const created = parsed(absent.out)
+  const creation = [...OPS.create.map((op) => `cf9:${op}`), ...OPS["create-dir"].map((op) => `cf9-dir:${op}`)]
+  expect(creation.map((key) => [key, created.get(key)])).toEqual(creation.map((key) => [key, "OK"]))
+  expect(onDisk(dotOpencode)).toBe(false) // the helper removed what each attempt made
+
+  build()
+  seedDotOpencode()
+  const present = fenced(today, ["/bin/sh", "-c", `'${ops}' cf9-old file '${join(dotOpencode, "plan", "old.md")}' '${ws}'\n'${ops}' cf9-root dir '${dotOpencode}' '${ws}'`])
+  const writes = parsed(present.out)
+  for (const op of ["append", "truncate", "write-new-then-rename-over", "rename-workspace-file-over", "unlink"]) expect(writes.get(`cf9-old:${op}`), `cf9-old:${op}`).toBe("OK")
+  for (const op of ["create-inside", "mkdir-child"]) expect(writes.get(`cf9-root:${op}`), `cf9-root:${op}`).toBe("OK")
+
+  // the CF-9 line on its own: W16 stays deleted, so only a grant reaches ~/.opencode — and without CF-9 it opens it
+  const loose = await granted(withoutCf9(plan.profile), dotOpencode, ["/bin/sh", "-c", `'${ops}' x9 file '${join(dotOpencode, "plan", "old.md")}' '${ws}'; '${ops}' x9-dir dir '${dotOpencode}' '${ws}'`], 1, seedDotOpencode)
+  for (const op of ["append", "truncate", "write-new-then-rename-over", "unlink"]) expect(loose.results.get(`x9:${op}`), `x9:${op}`).toBe("OK")
+  expect(loose.results.get("x9-dir:create-inside")).toBe("OK")
 })
 
 test("修订 2 A: CODEPUPPY_ENV_FILE inside a project — append (a platform URL), rename-over, delete and renaming a directory on its path are refused; a sibling file in the same folder lands; a file under a not-yet-existing directory plans fine and cannot be created; known bad — the row removed ⇒ the writes land", () => {

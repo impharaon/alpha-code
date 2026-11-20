@@ -4,6 +4,8 @@
 //   config-fence-ops <label> file <target> <ws>   target = a protected file (a literal location, or a file inside a protected directory)
 //   config-fence-ops <label> dir <dir> <ws>       dir    = a protected directory
 //   config-fence-ops <label> create <path> <ws>   path   = an absent protected location (literal)
+//   config-fence-ops <label> create-dir <path> <ws> path = an absent protected directory location (AC-08: mkdir -p, a prepared
+//                                                         directory renamed or cloned onto it)
 //   config-fence-ops <label> ancestor <node> <ws> node   = an ancestor directory node of a protected location
 //   config-fence-ops <label> vol <target> <ws>    target reached through /.vol/<dev>/<ino> spellings
 // One line per attempt: "<label>:<op>\tOK" or "<label>:<op>\tFAIL <errno>". Anything an attempt manages to create is removed
@@ -107,6 +109,48 @@ static void create_ops(const char *path, const char *ws) {
   if (report("clone-at", clonefile(src, path, 0)) == 0) unlink(path);
 }
 
+/* A prepared directory in the workspace, shaped like a configuration directory: opencode.json and plugin/x.js. */
+static int prepared(const char *ws, char *dir, size_t size) {
+  char p[4096];
+  snprintf(dir, size, "%s/cf-into-dir", ws);
+  mkdir(dir, 0755);
+  snprintf(p, sizeof p, "%s/opencode.json", dir);
+  if (put(p, "{\"plugin\":[\"x\"]}") < 0) return -1;
+  snprintf(p, sizeof p, "%s/plugin", dir);
+  mkdir(p, 0755);
+  snprintf(p, sizeof p, "%s/plugin/x.js", dir);
+  return put(p, "export default {}");
+}
+/* Remove that known shape again (whatever an attempt managed to put at `dir`). */
+static void unprepare(const char *dir) {
+  char p[4096];
+  snprintf(p, sizeof p, "%s/plugin/x.js", dir);
+  unlink(p);
+  snprintf(p, sizeof p, "%s/plugin", dir);
+  rmdir(p);
+  snprintf(p, sizeof p, "%s/opencode.json", dir);
+  unlink(p);
+  rmdir(dir);
+}
+
+static void create_dir_ops(const char *path, const char *ws) {
+  char p[4096], src[4096];
+  int rc = mkdir(path, 0755);
+  if (rc == 0) {
+    snprintf(p, sizeof p, "%s/plan", path);
+    rc = mkdir(p, 0755);
+    rmdir(p);
+    rmdir(path);
+  }
+  report("mkdir-p", rc);
+  if (prepared(ws, src, sizeof src) < 0) report("rename-dir-into", -1);
+  else if (report("rename-dir-into", rename(src, path)) == 0) unprepare(path);
+  unprepare(src);
+  if (prepared(ws, src, sizeof src) < 0) report("clone-dir-at", -1);
+  else if (report("clone-dir-at", clonefile(src, path, 0)) == 0) unprepare(path);
+  unprepare(src);
+}
+
 static void ancestor_ops(const char *node, const char *ws) {
   char q[4096];
   snprintf(q, sizeof q, "%s/cf-ancestor-moved", ws);
@@ -132,12 +176,13 @@ static void vol_ops(const char *t, const char *ws) {
 
 int main(int argc, char **argv) {
   setvbuf(stdout, NULL, _IONBF, 0);
-  if (argc < 5) { fprintf(stderr, "usage: config-fence-ops <label> <file|dir|create|ancestor|vol> <path> <ws>\n"); return 64; }
+  if (argc < 5) { fprintf(stderr, "usage: config-fence-ops <label> <file|dir|create|create-dir|ancestor|vol> <path> <ws>\n"); return 64; }
   label = argv[1];
   const char *mode = argv[2], *path = argv[3], *ws = argv[4];
   if (!strcmp(mode, "file")) file_ops(path, ws);
   else if (!strcmp(mode, "dir")) dir_ops(path, ws);
   else if (!strcmp(mode, "create")) create_ops(path, ws);
+  else if (!strcmp(mode, "create-dir")) create_dir_ops(path, ws);
   else if (!strcmp(mode, "ancestor")) ancestor_ops(path, ws);
   else if (!strcmp(mode, "vol")) vol_ops(path, ws);
   else return 64;

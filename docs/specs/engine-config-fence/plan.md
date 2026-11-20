@@ -15,7 +15,7 @@ last_reviewed: 2026-11-20
 ## 片 ①:引擎不认三类库内记录(L1–L3)
 
 - 依据:SPEC-engine-config-fence v1(owner 2026-11-20 批准)BR-02、AC-03,以及 BR-04 中本片可能碰坏的部分;DESIGN-engine-config-fence §2 P-06、§4.6、§6 I3 / E4 / E7、§10 D8、D9、D12 ①(两份文件 @ `3f36883278`,在 `docs/credential-and-config-fence` 工作树,另行合入主线,所以这里不写链接);INT-safety I-13;派单没有给 Issue 编号。读码基线 `origin/alpha` @ `887748b52c`。
-- 核对:待编排器核对(实施阶段第一个提交按续派单的 `Phase:` 行填写)。
+- 核对:Phase: IMPLEMENT — plan `7694dc2aa0` · orchestrator / Claude Fable 5.2 · 通过(L1、L2 在引擎判定点、L3)。裁决:ADR-047「精确接管面」两行按 I-05 先例追加,获准,`.claude/rules` 下不改别处;三个 ext 证明测试、`KNOWN_RED` 10 → 74、登记册与闸门行按计划,增补名单的提交要逐文件写明为何变红、并说明怎样核对过没有夹带别的原因的红;E7 前提不成立,七个用例不改,记入偏离;`config.test.ts` 的 5 条只列名、不加判官;`sample.ts:212` 不动,记入偏离;ext 自读会话行与 wellknown 刷新两项交设计方,本片不碰 `packages/ext` 生产代码。
 
 PLAN 阶段只提交本文件。下面的命令与结论分两类:「实测」是本阶段在临时克隆(`cp -cR` 克隆本工作树、只改克隆里的两个文件)里跑出来的,原始输出在 `IMP/` = `~/.cache/alpha-orch/2026-11-19/impl-fence-slice1/exp/out/`;其余是实施安排,还没有在本分支上运行。
 
@@ -57,7 +57,7 @@ L2 只在判定处生效:`permission.ts` 的 `configured()`(`:217-222`)。不在
 | --- | --- |
 | `packages/core/src/permission.ts` | **L1**:删掉 `saved` 绑定(`:180`)和 `savedRules`(`:207-215`),`evaluateInput` 的 `all`(`:235`)不再并入已存批准,原位留一个 `codepuppy(I-13 L1)` 标注块(一句理由,指向设计 §4.6);行尾标注改为 `codepuppy(I-05, I-13 L1)`。`PermissionSaved` 的 import 与 `node` 的依赖不动:服务与路由照旧,接管文件里少动一行。**L2**:`configured()`(`:221`)里的 `session.permissions` 只取 `effect === "deny"` 的条目,用 `codepuppy(I-13 L2)` 标注。两处都按既有标注块的形状写 |
 | `packages/core/src/config.ts` | **L3**:load 链(`:353-367`)不再调 `loadWellknown`,`gate.finish` 列表删掉 `...wellknownDocuments.flat()`(`:372`),原位留一个 `codepuppy(I-13 L3)` 标注块。core 开了 `noUnusedLocals`(`packages/core/tsconfig.json`),所以同时删掉只服务于它的 `loadWellknownEntry`(`:178-213`)和 `loadWellknown`(`:215-228`),原位留一行标注指向 load 链。`WellKnown` 服务、wellknown 插件、`Credential.Event.Switched` / `WellKnown.Event.Updated` 订阅、10 分钟刷新都不动 |
-| `packages/core/test/codepuppy-engine-db-records.test.ts`(新) | 在引擎真实服务上判 L1–L3,共 3 条。每条带一个对照,证明植入的那条记录如果被采用就会放宽或装载:**L1** 往 `permission` 表插 `shell / *`,判定仍是 `ask`;已存批准照样能列出(冻结的服务不变);对照是用引擎自己的 `Permission.evaluate`、按上游的并入方式算同一条记录,得到 `allow`。**L2** 会话行 `allow shell *` ⇒ 仍是 `ask`;agent `deny edit *` 加会话行 `ask edit *` / `allow edit *` ⇒ 仍是 `deny`;agent `allow *` 加会话行 `deny subagent *` ⇒ `deny`(自动化解析会话的写法照常生效);对照同样用 `Permission.evaluate`。**L3** 真 `WellKnown` 服务 + 持久 KV 里放来源、缓存清单与带本地 MCP 的缓存配置文档 ⇒ `Config.entries()` 里没有这个 MCP;对照是把同一份文档作为集成文档交给 `Config.integration` ⇒ 有。环境搭法照抄上游 `test/permission.test.ts` 与 `test/config/config.test.ts`(持久 KV + `AppNodeBuilder`) |
+| `packages/core/test/codepuppy-engine-db-records.test.ts`(新) | 在引擎真实服务上判 L1–L3,共 3 条。每条带一个对照,证明植入的那条记录如果被采用就会放宽或装载:**L1** 往 `permission` 表插 `shell / *`,判定仍是 `ask`;已存批准照样能列出(冻结的服务不变);对照是用引擎自己的 `Permission.evaluate`、按上游的并入方式算同一条记录,得到 `allow`。**L2** 会话行 `allow shell *` ⇒ 仍是 `ask`;agent `deny edit *` 加会话行 `ask edit *` / `allow edit *` ⇒ 仍是 `deny`;agent `allow *` 加会话行 `deny subagent *` ⇒ `deny`(自动化解析会话的写法照常生效);对照同样用 `Permission.evaluate`。**L3** 真 `WellKnown` 服务 + 持久 KV 里放来源、缓存清单与带本地 MCP 的缓存配置文档 ⇒ `Config.entries()` 里没有这个 MCP;对照是把同一份文档作为内联文档(`Config.configured({ content })`,即 Code Puppy 注入用的那一层)交给配置 ⇒ 有。环境搭法照抄上游 `test/permission.test.ts` 与 `test/config/config.test.ts`(持久 KV + `AppNodeBuilder`) |
 | `packages/ui-mac/src/main/engine-db-records.engine.cases.ts` + `engine-db-records.engine.test.ts`(新) | AC-03 的真引擎用例:整个子进程装生产渲染的围栏 profile 与真 `.node`,外加真引擎、真 ext 和模型桩,形状同 `fence-write-denied.engine.{cases,test}.ts`,只在 darwin 上跑。全部植入都由引擎自己的 shell 工具在「全部批准」档执行(这就是被围栏的 shell):`sqlite3 <库> < <测试写好的 .sql>`。3 条用例:**已存批准**(项目 id 取自 `GET /api/session/:id`)、**会话行 allow**(植入后 `GET /api/session/:id` 能读到这条规则)、**wellknown 三件套**(来源指向关着的本机端口,清单与配置文档同 M1)。前两条接着在「请求审批」档(`codepuppy-ask`)让模型调一次 shell,断言出现了 `shell` 询问,而且命令没有执行;第三条重启引擎(在同一个库上 `close` 再 `start`,即「重新装载配置」),断言 `/api/mcp` 里没有它、标记文件不存在。每条先从测试进程只读打开库,确认记录真的写进去了,保证用例不是空跑。宿主钉住 3 pass / 0 fail |
 | `packages/ext/src/policy/session-grant.test.ts` | 两条 known-bad arm 写的正是 L2 取代的旧行为。改成断言新行为并改名:`… the same allow written as a session rule does not override it either (I-13 L2)`(期望 `deny`);`… a child inherits a session-rule allow, which allows nothing (I-13 L2)`(先断言子会话的会话行就是那条 allow,再期望 `ask`)。条数不变 |
 | `packages/ext/src/policy/session-grant-restart.test.ts` | 对照改用会话行上的 `deny read a.env`:重启前、重启后都是 `deny`,同样证明用的是同一个库。用例名不变,头注释同步 |
@@ -107,7 +107,7 @@ L2 只在判定处生效:`permission.ts` 的 `configured()`(`:217-222`)。不在
 
 ### 偏离记录
 
-暂无。
+- 2026-11-20 · core 测试 L3 的对照由「集成文档」改为「内联文档」 · 集成文档会丢掉本地服务器(`packages/core/src/config/integration.ts:115-120`),拿它作对照永远看不到连接器,对照就不成立 · 提交 A。
 
 ### 可选(不做)
 

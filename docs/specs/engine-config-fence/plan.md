@@ -108,6 +108,10 @@ L2 只在判定处生效:`permission.ts` 的 `configured()`(`:217-222`)。不在
 ### 偏离记录
 
 - 2026-11-20 · core 测试 L3 的对照由「集成文档」改为「内联文档」 · 集成文档会丢掉本地服务器(`packages/core/src/config/integration.ts:115-120`),拿它作对照永远看不到连接器,对照就不成立 · 提交 A。
+- 2026-11-20 · L1 另删掉 `permission.ts:177` 的 `const location = yield* Location.Service` · 它只服务于被删的 `savedRules`,不删就过不了 core 的 `noUnusedLocals`;`Location` / `PermissionSaved` 的 import 与 `node` 依赖照旧不动 · 提交 B。
+- 2026-11-20 · 设计 §6 E7 的前提不成立(编排器裁决 3):M2 七个在会话行上写 `allow *` 的真引擎用例(package-effect、created-plugin、install-from-source、package-mcp-oauth、plugin-entrypoints、endpoint-route 与 `test-component/official-connectors.cases.ts:1044`)在 L1–L3 之后照样全绿,本片不改它们;提交 B 之后在本分支上复跑确认。设计 E7 那句「改成在 agent 层给放行」请设计方更正 · 提交 B。
+- 2026-11-20 · `test-fixtures/engine-adapter-sampler/sample.ts:212` 在会话行上写 `ask *`,L2 之后不再强制询问;它是录样本的脚本,不是测试,按裁决 5 不动,以后重录样本时注意 · 提交 B。
+- 2026-11-20 · `config.test.ts` 的 5 条已知红(名单见 M4)按裁决 4 只列名、不加判官;同一份名单写进登记册 `engine-db-records-not-honoured` 的 `note` 和 ADR-047 config.ts 那一行 · 提交 B。
 
 ### 可选(不做)
 

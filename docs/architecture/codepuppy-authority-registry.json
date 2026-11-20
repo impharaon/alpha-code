@@ -910,11 +910,11 @@
         },
         {
           "file": "packages/ext/src/policy/session-grant.test.ts",
-          "name": "a configured deny outranks the grant; the same allow written as a session rule overrides it (known-bad arm)"
+          "name": "a configured deny outranks the grant; the same allow written as a session rule does not override it either (I-13 L2)"
         },
         {
           "file": "packages/ext/src/policy/session-grant.test.ts",
-          "name": "another session and a child session created after the grant still ask; a session rule is inherited by that child (known-bad arm)"
+          "name": "another session and a child session created after the grant still ask; a child inherits a session-rule allow, which allows nothing (I-13 L2)"
         },
         {
           "file": "packages/ext/src/policy/session-grant.test.ts",
@@ -934,10 +934,60 @@
         },
         {
           "file": "packages/ext/src/policy/session-grant-upstream-reds.test.ts",
-          "name": "exactly the ten pinned upstream cases fail in those three files; every other case passes"
+          "name": "exactly the pinned upstream cases fail in those three files; every other case passes"
         }
       ],
-      "note": "Known red by design (orchestrator ruling 2026-11-12, option 甲: not taken over). Upstream tests asserting that an always reply writes a project-level saved approval: packages/core/test/permission.test.ts \"stores and removes saved resources for a project\" and the seven \"<fixture>: always allow covers repeat execution and narrows prefix scope\" cases (numeric npm script prefix, numeric AWS option prefix, substitution prefix, redirect prefix, assignment redirect prefix, PowerShell method prefix, PowerShell tab prefix); packages/core/test/tool-shell.test.ts \"declarations reuse approvals while substitutions retain reject/once/always behavior\"; packages/server/test/permission-saved.test.ts \"edits saved permissions through PATCH\". Reproduce: cd packages/core && bun test test/permission.test.ts test/tool-shell.test.ts; cd packages/server && bun test test/permission-saved.test.ts. session-grant-upstream-reds.test.ts requires exactly these to fail (tool-shell's two pre-existing \"conditional substitutions respect once|always\" reds tolerated). Rollback: never revert permission.ts alone while the adapter sends always as it is — \"allow for this session\" would become a permanent project-level approval; revert the I-05 slice as one commit."
+      "note": "Known red by design (orchestrator ruling 2026-11-12, option 甲: not taken over). Upstream tests asserting that an always reply writes a project-level saved approval: packages/core/test/permission.test.ts \"stores and removes saved resources for a project\" and the seven \"<fixture>: always allow covers repeat execution and narrows prefix scope\" cases (numeric npm script prefix, numeric AWS option prefix, substitution prefix, redirect prefix, assignment redirect prefix, PowerShell method prefix, PowerShell tab prefix); packages/core/test/tool-shell.test.ts \"declarations reuse approvals while substitutions retain reject/once/always behavior\"; packages/server/test/permission-saved.test.ts \"edits saved permissions through PATCH\". Reproduce: cd packages/core && bun test test/permission.test.ts test/tool-shell.test.ts; cd packages/server && bun test test/permission-saved.test.ts. session-grant-upstream-reds.test.ts requires exactly these to fail (tool-shell's two pre-existing \"conditional substitutions respect once|always\" reds tolerated). Rollback: never revert permission.ts alone while the adapter sends always as it is — \"allow for this session\" would become a permanent project-level approval; revert the I-05 slice as one commit. Since I-13 L1 (entry engine-db-records-not-honoured) the same pinned list also carries 64 upstream cases that seed a saved approval and expect it to allow; the two session-grant.test.ts cases that used a session-rule allow as their known-bad arm now assert that such an allow decides nothing (I-13 L2), and session-grant-restart.test.ts's control is a session-rule deny."
+    },
+    {
+      "id": "engine-db-records-not-honoured",
+      "decision": "引擎判定权限时不采用引擎库里的项目级已存批准;会话行上的规则只有「拒绝」生效;引擎不装载 wellknown 缓存的配置文档(SPEC-engine-config-fence BR-02)。被围栏的进程能写引擎库,这三类记录因此不能让放行或配置活过本回合。",
+      "adr": [
+        "ADR-047",
+        "ADR-048"
+      ],
+      "lane": "INT-safety I-13 (SPEC-engine-config-fence slice ①)",
+      "takeovers": [
+        "packages/core/src/permission.ts",
+        "packages/core/src/config.ts"
+      ],
+      "approval": {
+        "quote": "两份都批准",
+        "date": "2026-11-20",
+        "by": "owner",
+        "reason": "SPEC-engine-config-fence v1 BR-02 (with I-13 approved 2026-11-14, U-10「全部按你的推荐。」); DESIGN-engine-config-fence §4.6 places the three rules in these two already re-taken files."
+      },
+      "mechanism": {
+        "file": "packages/core/src/permission.ts",
+        "ladder": "L3 (re-taken files, annotated blocks: codepuppy(I-13 L1) — evaluateInput no longer merges the project's saved approvals; codepuppy(I-13 L2) — configured() keeps only the deny entries of the session row, so neither the decision nor a child session's inherited row can allow or soften to ask; codepuppy(I-13 L3) in packages/core/src/config.ts — load() no longer calls loadWellknown, so no wellknown document is loaded. The PermissionSaved service and its routes, the session setPermissions route and the WellKnown service stay as they are.)"
+      },
+      "tests": [
+        {
+          "file": "packages/core/test/codepuppy-engine-db-records.test.ts",
+          "name": "L1: a saved approval planted in the engine database allows nothing; the request still asks"
+        },
+        {
+          "file": "packages/core/test/codepuppy-engine-db-records.test.ts",
+          "name": "L2: a session-row allow or ask takes no part in the decision; a session-row deny still denies"
+        },
+        {
+          "file": "packages/core/test/codepuppy-engine-db-records.test.ts",
+          "name": "L3: a planted wellknown source, cached manifest and cached document load no configuration; the same document as the inline document does"
+        },
+        {
+          "file": "packages/ui-mac/src/main/engine-db-records.engine.test.ts",
+          "name": "引擎库里植入的已存批准、会话行 allow、wellknown 缓存文档都不生效"
+        },
+        {
+          "file": "packages/ext/src/policy/session-grant.test.ts",
+          "name": "a configured deny outranks the grant; the same allow written as a session rule does not override it either (I-13 L2)"
+        },
+        {
+          "file": "packages/ext/src/policy/session-grant.test.ts",
+          "name": "another session and a child session created after the grant still ask; a child inherits a session-rule allow, which allows nothing (I-13 L2)"
+        }
+      ],
+      "note": "Known red by design, not taken over (the disposition of orchestrator ruling 甲 for I-05, applied to I-13 by the orchestrator 2026-11-20). L1: 64 upstream cases that seed a saved approval (saved.add / saved.update) and expect it to allow — 44 in packages/core/test/permission.test.ts, 20 in packages/core/test/tool-shell.test.ts — pinned by name in packages/ext/src/policy/session-grant-upstream-reds.test.ts. L3: five upstream cases in packages/core/test/config/config.test.ts that expect a wellknown document to load; the gate does not run that file: \"layers integration documents below remote and user config and reloads when they change\", \"keeps only the policies of documents from integrations managed policy denies\", \"tolerates unavailable authenticated wellknown config and reloads it later\", \"keeps the last resolved wellknown config across failures and restarts until its source is removed\", \"logs redacted source-aware diagnostics for every config source\". Reproduce: cd packages/core && bun test test/permission.test.ts test/tool-shell.test.ts test/config/config.test.ts. Rollback: revert the I-13 slice as one commit (permission.ts L1/L2 and config.ts L3 with their tests)."
     },
     {
       "id": "adr041-collision-rejection",

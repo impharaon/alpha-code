@@ -174,10 +174,8 @@ const layer = Layer.effect(
   Service,
   Effect.gen(function* () {
     const bus = yield* Bus.Service
-    const location = yield* Location.Service
     const agents = yield* Agent.Service
     const sessions = yield* SessionStore.Service
-    const saved = yield* PermissionSaved.Service
     const hooks = yield* PluginHooks.Service
     const pending = new Map<ID, Pending>()
     // codepuppy(#1128 §4.4, I-05) ── "allow for this session" as in 0.1.26: an always reply grants (action, each save
@@ -204,21 +202,21 @@ const layer = Layer.effect(
     }).pipe(Effect.uninterruptible)
     yield* Effect.addFinalizer(() => close)
 
-    const savedRules = Effect.fnUntraced(function* () {
-      return (yield* saved.list({ projectID: location.project.id })).map(
-        (item): Permission.Rule => ({
-          action: item.action,
-          resource: item.resource,
-          effect: "allow",
-        }),
-      )
-    })
+    // codepuppy(I-13 L1) ── the project's saved approvals take no part in a decision (upstream merged them after the
+    // configured rules as allow). A fenced process can write the engine database, and Code Puppy never writes them: "allow
+    // for this session" is the in-memory grant above. The PermissionSaved service and its routes are unchanged.
+    // DESIGN-engine-config-fence §4.6, D8.
+    // codepuppy ── end
 
     const configured = Effect.fnUntraced(function* (sessionID: SessionSchema.ID, agentID?: Agent.ID) {
       const session = yield* sessions.get(sessionID)
       if (!session) return yield* new SessionErrors.NotFoundError({ sessionID })
       const agent = yield* agents.resolve(agentID ?? session.agent)
-      return merge(agent?.permissions ?? missingAgentPermissions, session.permissions ?? [])
+      // codepuppy(I-13 L2) ── only deny entries of the session row take part. The row lives in the engine database, which a
+      // fenced process can write; Code Puppy writes only deny there. ask is dropped too: it sorts after the agent's rules and
+      // would soften a tier's static deny into a question. DESIGN-engine-config-fence §4.6, D9.
+      return merge(agent?.permissions ?? missingAgentPermissions, (session.permissions ?? []).filter((rule) => rule.effect === "deny"))
+      // codepuppy ── end
     })
 
     function denied(input: Pick<Request, "action" | "resources">, rules: Permission.Ruleset) {
@@ -232,7 +230,7 @@ const layer = Layer.effect(
     const evaluateInput = Effect.fnUntraced(function* (input: AssertInput) {
       const rules = yield* configured(input.sessionID, input.agent)
       if (denied(input, rules)) return { effect: "deny" as const, rules }
-      const all = [...rules, ...(yield* savedRules()), ...(sessionGrants.get(input.sessionID) ?? [])] // codepuppy(I-05)
+      const all = [...rules, ...(sessionGrants.get(input.sessionID) ?? [])] // codepuppy(I-05, I-13 L1)
       const effects = input.resources.map((resource) => evaluate(input.action, resource, all).effect)
       const effect: Permission.Effect = effects.includes("ask") ? "ask" : "allow"
       const event = yield* hooks.trigger("permission", "evaluate", {

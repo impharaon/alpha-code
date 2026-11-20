@@ -1,5 +1,5 @@
 // DESIGN-stored-credentials-fence §4.2:主进程 ↔ sidecar 凭据消息的合同、sidecar 侧请求方与 main 侧应答。值都是一眼可辨的假值。
-import { describe, expect, test } from "bun:test"
+import { describe, expect, test, vi } from "bun:test"
 import {
   CREDENTIALS_PULL_TIMEOUT_MS,
   answerCredentialsMessage,
@@ -93,6 +93,28 @@ describe("sidecar 侧请求方", () => {
     expect(Date.now() - started).toBeGreaterThanOrEqual(CREDENTIALS_PULL_TIMEOUT_MS - 50)
     expect(posted).toEqual([{ type: "credentials.request", id: 1 }, { type: "credentials.unavailable", id: 1 }])
   }, CREDENTIALS_PULL_TIMEOUT_MS + 5_000)
+})
+
+// ② 审查第 8 条(核实):sidecar 主线程被阻塞超过 10 秒后,Node 的事件循环先跑到期的计时器、再处理已经排在端口上的消息(本机实测:node 先计时器、
+// bun 先消息)。计时器先让一次路(setImmediate)再判超时,已到的回复就先被处理,不会误发 credentials.unavailable、误触发重启。
+test("超时的计时器先跑、已排在端口上的回复紧随其后 ⇒ 回复照常收下,不发 credentials.unavailable", async () => {
+  vi.useFakeTimers()
+  try {
+    const posted: Array<{ type: string; id: number }> = []
+    let deliver: () => void = () => {}
+    const requester = createCredentialRequester((message) => {
+      posted.push(message)
+      if (message.type === "credentials.request") deliver = () => requester.receive({ type: "credentials", id: message.id, credentials: TABLE })
+    }, () => {})
+    const pulling = requester.pull()
+    vi.advanceTimersByTime(CREDENTIALS_PULL_TIMEOUT_MS) // Node's order after a long block: the due timer runs first …
+    deliver() // … then the reply that was already queued on the port
+    vi.runAllTimers()
+    expect(await pulling).toEqual(TABLE)
+    expect(posted).toEqual([{ type: "credentials.request", id: 1 }])
+  } finally {
+    vi.useRealTimers()
+  }
 })
 
 describe("main 侧应答", () => {

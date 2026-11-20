@@ -1,15 +1,15 @@
 {
- "_source": "Sampled by `bun packages/ui-mac/test-fixtures/engine-adapter-sampler/sample.ts` (alpha-code#1668 L6) at bc85af83a2: a real OpenCode 2 engine from this repo's packages/cli `serve`, isolated HOME/XDG, one git project, and the scripted OpenAI-compatible mock model next to the sampler. The build agent's `read *.env` ask fired on a mock `read .env`. `frame` is the raw permission.asked frame; `list` is GET /api/permission/request right after it. No ext runs here, so metadata is empty; tests add the four I7a keys.",
+ "_source": "Sampled by `bun packages/ui-mac/test-fixtures/engine-adapter-sampler/sample.ts` (alpha-code#1668 L6) at bbb4fe99a6: a real OpenCode 2 engine from this repo's packages/cli `serve`, isolated HOME/XDG, one git project, and the scripted OpenAI-compatible mock model next to the sampler. The build agent's `read *.env` ask fired on a mock `read .env`. `frame` is the raw permission.asked frame; `list` is GET /api/permission/request right after it. No ext runs here, so metadata is empty; tests add the four I7a keys.",
  "frame": {
-  "id": "evt_1f3f42ab90024QvlKL22SofuFO",
-  "created": 1795094227641,
+  "id": "evt_1f7625f270013NavxxiL7XSw08",
+  "created": 1795151781671,
   "type": "permission.asked",
   "location": {
-   "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-KHfZjs/proj"
+   "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-jxjtvu/proj"
   },
   "data": {
-   "id": "per_1f3f42ab9001uYG38KqVXsIUl2",
-   "sessionID": "ses_e0c0bd62bffe6xYRnO9rrh2aof",
+   "id": "per_1f7625f2600190wgbU7VG09PRU",
+   "sessionID": "ses_e089da208ffeBkQVHzd2Dnxs62",
    "action": "read",
    "resources": [
     ".env"
@@ -19,19 +19,19 @@
    ],
    "source": {
     "type": "tool",
-    "messageID": "msg_1f3f429ef001iE9vqwUB1tUnug",
-    "id": "call_mock_env_wqiie"
+    "messageID": "msg_1f7625e10001u2bZEg7akYA4IV",
+    "id": "call_mock_env_a9j3w"
    }
   }
  },
  "list": {
   "location": {
-   "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-KHfZjs/proj"
+   "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-jxjtvu/proj"
   },
   "data": [
    {
-    "id": "per_1f3f42ab9001uYG38KqVXsIUl2",
-    "sessionID": "ses_e0c0bd62bffe6xYRnO9rrh2aof",
+    "id": "per_1f7625f2600190wgbU7VG09PRU",
+    "sessionID": "ses_e089da208ffeBkQVHzd2Dnxs62",
     "action": "read",
     "resources": [
      ".env"
@@ -41,8 +41,8 @@
     ],
     "source": {
      "type": "tool",
-     "messageID": "msg_1f3f429ef001iE9vqwUB1tUnug",
-     "id": "call_mock_env_wqiie"
+     "messageID": "msg_1f7625e10001u2bZEg7akYA4IV",
+     "id": "call_mock_env_a9j3w"
     }
    }
   ]
@@ -54,7 +54,7 @@
    "packages/cli": "544883d154af3d90d64f2638bef467852fe252aa",
    "packages/client": "3d3c95581389d702c46e0fe7ccdadbcce295872b",
    "packages/codemode": "eb7ca2279c0d93a2e967709e18346f3aa31a8e23",
-   "packages/core": "39bb60e82a22a0d289c7fffe62414c4bfcbc2134",
+   "packages/core": "01c91dddf71fab004c738aa56b6afd5ae279533b",
    "packages/latex": "abcd38e17eb09d996d975964f46be0a2e758fdf4",
    "packages/merman": "3feaef89d940956096deb30e2b9f85f3fabdfe15",
    "packages/plugin": "d82062f713a03e48755e632f13d25a38707077a5",

@@ -730,6 +730,19 @@ describe("spawnLocalServer", () => {
     delete process.env.CODEPUPPY_API_KEY
   })
 
+  // ② 审查第 1 条 (b):一次卡住会发两次 unavailable(一次装载拉两份文档、几个 Location 同时装载)⇒ 每一代只请求一次重启
+  test("I-20:同一代里 credentials.unavailable 来几次都只请求一次 credential-change", async () => {
+    const child = new CredentialChild()
+    const respawns: string[] = []
+    const result = await spawnWith(child, respawns)
+    await result.health.wait
+    child.emit("message", { type: "credentials.unavailable", id: 1 })
+    child.emit("message", { type: "credentials.unavailable", id: 2 })
+    child.emit("message", { type: "credentials.unavailable", id: 3 })
+    expect(respawns).toEqual(["credential-change"])
+    await result.listener.stop()
+  })
+
   // 实现期修订 1(编排器裁决 2026-11-20,② 审查区外观察):存放点里单项读不出或目录列不出 ⇒ 按该项不在表里处理并记名字,不拒 fork、不回错误
   test("I-20 修订 1:存放点里一项读不出(mode 000)、一个目录列不出(mode 000)⇒ start 照常带其余整表;拉取照常回复(不回 error、不请求重启);日志点名路径与 errno、不含值", async () => {
     process.env.CODEPUPPY_API_KEY = "FAKE-platform-readable"

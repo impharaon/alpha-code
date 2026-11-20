@@ -9,7 +9,7 @@ spec_version: 1
 review:
   rounds: 2           # R1 审 4875af11e2 全文;R2 审 4875af11e2..6e372bc83f 修订范围(同一 Claude Opus 审查员,只读,非作者)
   reviewed_sha: "6e372bc83f"
-  verdict: "R2 FIX-THEN-MERGE;三处更正已落到本版(§10 R2 行);D13 owner 2026-11-20 定为计划目录移到引擎数据目录;规格 v1 经 owner 2026-11-20 批准后由编排器冻结"
+  verdict: "R2 FIX-THEN-MERGE;三处更正已落到本版(§10 R2 行);D13 owner 2026-11-20 定为计划目录移到引擎数据目录;规格 v1 经 owner 2026-11-20 批准后由编排器冻结;冻结后落入实现期修订 1(会话行三处只取 deny 并接管 session/context.ts 一行、资格判定专属原因 protected-config、片 ② 计划核对的契约事实、片 ⓪ 的 oh-my-zsh 例外),依据 owner 2026-11-20「两件都同意」"
 owners: [owner]
 last_reviewed: 2026-11-20
 ---
@@ -44,7 +44,7 @@ last_reviewed: 2026-11-20
 
 保证外的残留逐条列在 §6 安全面,每条带前提与处置(关闭或接受)。
 
-**对话侧会遇到的拒绝(用户自己的流程不变)。** 对话里的工具与命令写 CF 位置会得到 EPERM,例如让助手直接改 `~/.config/opencode/`、`~/.opencode/`(整个,含旧计划目录)或 `codepuppy.jsonc`。依据是 I-13 的 owner 批准原话「这些位置从围栏可写范围里拿掉或改为只读,必要的写入改由主进程代办」,它点名了合成的引擎配置、`codepuppy-shell-env.json`、引擎全局配置目录与 `~/.opencode`。CF 里另外几项(界面设置存储、端点钉选、连接记录、工具策略文档、`codepuppy.env`、主目录级 `opencode.json`、Code Puppy 状态根)是同一结果「改不了策略输入」的输入,今天只由主进程或用户在应用外写,用户经设置页、定制中心或应用外编辑的路径都不变。这几项不另取 owner 原话(§10 D3 编排器裁决);对话侧的拒绝写进规格「用户会碰到的限制」。把这些位置**里面**的文件夹当项目打开时,写入状态显示既有的只读提示「主目录和 Code Puppy 自己的数据目录不能整个作为项目写入，请打开里面的具体文件夹。」(§4.3;`i18n/zh.ts:1931`);包含这些位置的文件夹照常可写,只有里面那一处不可写。
+**对话侧会遇到的拒绝(用户自己的流程不变)。** 对话里的工具与命令写 CF 位置会得到 EPERM,例如让助手直接改 `~/.config/opencode/`、`~/.opencode/`(整个,含旧计划目录)或 `codepuppy.jsonc`。依据是 I-13 的 owner 批准原话「这些位置从围栏可写范围里拿掉或改为只读,必要的写入改由主进程代办」,它点名了合成的引擎配置、`codepuppy-shell-env.json`、引擎全局配置目录与 `~/.opencode`。CF 里另外几项(界面设置存储、端点钉选、连接记录、工具策略文档、`codepuppy.env`、主目录级 `opencode.json`、Code Puppy 状态根)是同一结果「改不了策略输入」的输入,今天只由主进程或用户在应用外写,用户经设置页、定制中心或应用外编辑的路径都不变。这几项不另取 owner 原话(§10 D3 编排器裁决);对话侧的拒绝写进规格「用户会碰到的限制」。把受保护位置本身或其**里面**的文件夹当项目打开时,写入状态显示专属的一句「这个文件夹是 Code Puppy 或引擎存放配置的位置，对话里不能写入。」(§4.3;状态根里的文件夹仍显示既有那句);包含这些位置的文件夹照常可写,只有里面那一处不可写。
 
 **计划文件的位置(给规格的用户可见变化;owner 2026-11-20 选定,D13)。** 计划文件改存到 `~/.local/share/opencode/plan/`;`~/.opencode/plan/` 里已有的文件不搬,对话里仍能读、不能再改;「清除数据」勾选引擎数据时计划文件一并删除(`data-clear.ts:189-196`)。
 
@@ -99,6 +99,10 @@ class 级 `enabled` 记录不需要绑定摘要(`packages/schema/src/codepuppy-t
 - wellknown:来源表、清单、配置文档都在 KV(`wellknown.ts:105-139`、`:209-212`),拉不到就用缓存装载成配置文档,policy 排在托管之后、高于所有用户层(`config.ts:183-205`、`:353-372`)。Code Puppy 没有登记 wellknown 来源的入口:登记路由 `POST /api/experimental/integration/wellknown`(`packages/protocol/src/groups/integration.ts:46` → `packages/server/src/handlers/integration.ts:89-95`)不在引擎适配器的路由表里,`packages/ui-mac/src` 与 `packages/codepuppy-app/src` 里 grep `wellknown` 为零;唯一的历史来源 —— 独立 OpenCode 的 `auth.json` 导入迁移 —— 主进程在 fork 前拒绝(`server.ts:509-513`)。
 - 会话所用的 agent:每一步重新装载上下文时从库里读会话行的 agent(`session/context.ts:133`、`session/runner/llm.ts:242`),重启后续跑也读它(`packages/server/src/process.ts:250-251`);界面每发一条消息先 `switchAgent` 到该档位(`engine-adapter/opencode2/routes.ts:126-135`)。
 - 测:A4 / A4b 在 change 臂照样成功(`K-change.json`)—— 围栏关不住引擎库,必须在引擎读取处处理。
+- 会话行还有两处读者(读 + 测,`887748b52c`;实现期返还):
+  - **ext**:`packages/ext/src/policy/index.ts:123-132` 的 `ruleset()` 把「agent 规则 + 会话行规则」交给闸门,闸门用它算身份轴的最后一条(`gate.ts:49-50`、`:55-61` 的 `hardDeny`)与「规则要问」(`:163`、`:226`)。交互分支读 `session.data.permissions`,而插件的 `session.get` 返回会话本身(`plugin/host.ts:586`),这个读法拿不到东西;无人值守分支读 `session.permissions`,拿得到。实测(`CFD/r3/SESSION-ROW.out`):交互会话里会话行的 deny 由引擎拒绝、会话行的 allow 盖不过 agent 规则里的身份 deny;**无人值守会话里,会话行的 allow 盖过 agent 规则里的身份 deny,工具照常执行**(`ran writes=1`;无人值守的放行不再调引擎判定,`gate.ts:171`、`:329`)。
+  - **引擎会话上下文**:`packages/core/src/session/context.ts:136` 直接把会话行并在 agent 规则之后,决定本次请求里有哪些工具(含 Code Mode 目录,`tool.ts:251-259`、`:381-384` 的 `whollyDisabled`)、技能与连接器说明,不经过 `Permission.configured`。实测(`CFD/r3/SNAPSHOT-ROW.out`):agent 规则拒了某个插件工具的权限动作,会话行写一条 allow 之后,这个工具出现在请求里并执行成功;没有会话行时它不可用。插件工具自己不调引擎判定,整工具拒绝只靠这一处。
+  - `schedule/check.ts:301` 属于实验开关 schedules,注入配置固定为关(ADR-047 决策 3);子会话建时复制父会话的规则(`session.ts:314`),之后经同样的读取。
 
 **P-07 程序本体所在的缓存。**(读)引擎装非内置 provider / 插件包到 `<XDG_CACHE_HOME>/opencode/npm`(`packages/util/src/npm.ts:139`);`rg` 等先按 PATH 找、找不到才用 `<cache>/opencode/bin`(`packages/core/src/util/which.ts:5-14`、`ripgrep/binary.ts:69`);官方数据库连接器是 `npx -y @bytebase/dbhub@1.5.0`(`official-connector-recipes.ts:79`),npm 缓存 `~/.npm` = W7;uvx 缓存 `<userData>/uv-cache`(`server.ts:468`)。Code Puppy 注入的 provider 包(`aisdk:@ai-sdk/*`)映射到随引擎打包的模块,不经缓存(`provider.ts:183-206`、`aisdk-native.ts:69-79`)。
 
@@ -121,7 +125,7 @@ class 级 `enabled` 记录不需要绑定摘要(`packages/schema/src/codepuppy-t
 
 **P-11 运行期放行今天见到拒写块就整代停掉。**(读 + 测,`887748b52c`)放行判定先把本代 profile 解析成可写规则(`server.ts:621-627` 调 `processFenceWriteRules`),「已覆盖」的目录不签发(`:631-632` 的 `generationWrites` → `processFenceRulesCover`,`process-fence-profile.ts:236-241`)。解析器对放行块之后出现的任何 `(deny file-write*` 直接抛(`process-fence-profile.ts:207-233`,判据 `process-fence-profile.test.ts:193-195`),`server.ts` 接住后记一行、本代停掉全部运行期放行。实测:0.2.6 的解析器对 0.2.6 生产 profile 解析出 22 条;加上 CF 两块即抛;加上 C1 的上级目录块同样抛;而 C1 的 `(deny file-read* file-write*` 块它**不抛也不解析**,静默放过(`CFD/r1/run/PARSER.out`)。资格判定 `checkWorkspaceDirectory`(`process-fence-profile.ts:413-487`)今天只拦 HOME / 祖先 / 根与应用状态根(同一、在内、包含),原因写 `home-or-app-state`。
 
-**P-12 W10、W19 是两个不依赖引擎配置的出口。**(读 + 测;假 HOME,`CFD/r1/run/Z.out`)`/etc/zshrc` 在 `TERM_PROGRAM` 有值时载入 `/etc/zshrc_$TERM_PROGRAM`(`/etc/zshrc:74`);Apple Terminal 那份在交互式 zsh 启动时执行 `~/.zsh_sessions/$TERM_SESSION_ID.session` 再删掉它(`/etc/zshrc_Apple_Terminal` 的 Resume 段)。今天的生产 profile 下,围栏内写 `~/.zsh_sessions/x.session` 与 `~/.zcompdump` 都成功,之后**围栏外**的 `zsh -i`(`TERM_PROGRAM=Apple_Terminal TERM_SESSION_ID=x`)执行了植入的标记;rc 里有 `compinit -C -d ~/.zcompdump` 时同样执行。删掉两行后两次写入 EPERM,标记都没有执行。应用自己的终端是 `zsh -l`、环境取 sidecar 的(`packages/core/src/pty.ts:166-184`),而 sidecar 白名单不含 `TERM_PROGRAM` / `TERM_SESSION_ID`(`sidecar-env.ts:30-62`);按这个形状在 PTY 里起围栏内的 `zsh -l`,rc 分别为空、`compinit`、`compinit -C -d ~/.zcompdump`,删行前后输出逐字相同;两种情况下都没有出现 `.zcompdump`(实测);不写会话文件是由系统 rc 推出的(sidecar 环境里没有 `TERM_PROGRAM`,Apple Terminal 那份 rc 不被载入),没有单独计数;历史照常写进 `~/.zsh_history`(W8)。
+**P-12 W10、W19 是两个不依赖引擎配置的出口。**(读 + 测;假 HOME,`CFD/r1/run/Z.out`)`/etc/zshrc` 在 `TERM_PROGRAM` 有值时载入 `/etc/zshrc_$TERM_PROGRAM`(`/etc/zshrc:74`);Apple Terminal 那份在交互式 zsh 启动时执行 `~/.zsh_sessions/$TERM_SESSION_ID.session` 再删掉它(`/etc/zshrc_Apple_Terminal` 的 Resume 段)。今天的生产 profile 下,围栏内写 `~/.zsh_sessions/x.session` 与 `~/.zcompdump` 都成功,之后**围栏外**的 `zsh -i`(`TERM_PROGRAM=Apple_Terminal TERM_SESSION_ID=x`)执行了植入的标记;rc 里有 `compinit -C -d ~/.zcompdump` 时同样执行。删掉两行后两次写入 EPERM,标记都没有执行。应用自己的终端是 `zsh -l`、环境取 sidecar 的(`packages/core/src/pty.ts:166-184`),而 sidecar 白名单不含 `TERM_PROGRAM` / `TERM_SESSION_ID`(`sidecar-env.ts:30-62`);按这个形状在 PTY 里起围栏内的 `zsh -l`,rc 分别为空、`compinit`、`compinit -C -d ~/.zcompdump`,删行前后输出逐字相同;两种情况下都没有出现 `.zcompdump`(实测);不写会话文件是由系统 rc 推出的(sidecar 环境里没有 `TERM_PROGRAM`,Apple Terminal 那份 rc 不被载入),没有单独计数;历史照常写进 `~/.zsh_history`(W8)。实现期复核(片 ⓪,分支 `fix/fence-drop-zsh-rows` 提交 `18c897b7d7`,宿主测试 `process-fence-zsh-startup.test.ts`,5 个内层用例):上面三种 rc 形状按构造就不会有差别 —— `compdump` 在转储所在目录不可写时提前返回,而 `$HOME` 本身从来不在可写集里;另加的第四种、仿 oh-my-zsh 的形状(**重建**这段顺序:比对转储里的 `#omz revision` / `#omz fpath`,不一致就 `command rm -f "$ZSH_COMPDUMP"`,再 `compinit -i -d`,再追加那两行;种子是一份真实的 compinit 转储加不一致的元数据)在生产 profile 下 shell 启动时恰好多出一行 `rm: <home>/.zcompdump-x-5.9: Operation not permitted`,别无其他;元数据一直不一致时每次启动都会出现这一行(推;只测了一次启动)。owner 2026-11-20「两件都同意」:保留这项修复,在规格里写明这个例外。
 
 **P-13 计划助手什么时候写 `~/.opencode`。**(读,`887748b52c`)用户在输入框选「计划」(chip、Shift+Tab 或装配弹窗的计划行)时引擎以计划助手运行;「请求审批」「只读」两档强制自己的助手,计划 chip 置灰(`composer-state.ts:46-61`),所以只在「全部批准」档可选;2.x 引擎没有让模型自己进计划模式的工具(`grep -rn plan_enter packages/core/src` 零命中)。计划助手只在用户明确要求时写计划文件,且只许写 `~/.opencode/plan/`(提示词 `plugin/plan.ts:14-20`,放行规则 `:40`);插件启动时只算路径、不建目录(`:30`)。写文件工具自动创建缺失的上级目录(`tool/plugin/write.ts:51`),任何写失败都结算成 `Unable to write <路径>`(`:65`)—— 这不是权限拒绝,所以 `plan.ts:44-53` 那句改写不生效。不改计划目录时,若围栏不许创建 `~/.opencode`,用户在时间线上看到一张失败的写文件工具卡,原文 `Unable to write ~/.opencode/plan/<文件>` 带 EPERM,计划正文仍在对话里(推:由代码读出,未在真引擎上跑)。ADR-019 的 owner 裁决(2026-07-07)「alpha 在任何层级不再创建任何 `.opencode`」;owner 的机器上 `~/.opencode` 不存在(编排器 2026-11-20 核对)。
 
@@ -215,7 +219,7 @@ export function processFenceRulesCover(rules: ProcessFenceWriteRules, directory:
 export type PlanProcessFenceInput = { /* 既有字段 */ engineConfigDirectory: string } // = server.ts 交给启动文档的同一个值(engineGlobalConfigDirectory(exported.env, exported.home))
 ```
 
-- CF 位置清单由一个纯函数给出(住在 `process-fence-profile.ts`,输入:userData、appStateRoot、codepuppyGlobalRoot、两个引擎配置目录、home、dataHome;名字取 `USER_DATA_LAYOUT` 与 store 常量),计划器把每个位置写成「真实上级目录 + 名字」;位置已存在且解析到别处(软链)时,再加真实目标(同一种规则)—— 与 C1 的 F2 同一条规则(P-08 软链一项)。真实路径用既有 `deps.realpath`;求不出 ⇒ 拒绝 fork(既有计划失败路径)。
+- CF 位置清单由一个纯函数给出(住在 `process-fence-profile.ts`,输入:userData、appStateRoot、codepuppyGlobalRoot、两个引擎配置目录、home、dataHome;名字取 `USER_DATA_LAYOUT` 与 store 常量;`opencode.updater` 的存储名只有一个权威常量 `UPDATER_STORE`,store 与本清单都取它),计划器把每个位置写成「真实上级目录 + 名字」;位置已存在且解析到别处(软链)时,再加真实目标(同一种规则)—— 与 C1 的 F2 同一条规则(P-08 软链一项)。真实路径用既有 `deps.realpath`;求不出 ⇒ 拒绝 fork(既有计划失败路径)。
 - 「父目录预建」循环(`887748b52c`:`process-fence-plan.ts:93-101`)增加:CF 里的每个目录位置(CF-1 的两个根、CF-2、CF-6、CF-8 两个、CF-11)。**谁都不新建、不预建 `~/.opencode` 或其下任何东西**(ADR-019;计划目录在引擎数据目录下,这一循环本来就预建数据目录,`plan` 由写文件工具懒建,D13)。这一步同时让 CF ancestors 冻结的每个节点都已存在,引擎与子进程只会对它们得到 EEXIST(P-05、P-08)。预建失败 ⇒ 抛 ⇒ 拒绝 fork(既有)。
 - 资格判定(R1 第 1 项):CF 的目录位置并入 `checkWorkspaceDirectory`(`887748b52c`:`process-fence-profile.ts:413-487`)的受保护关系,只拦「同一对象或在其内」:
 
@@ -225,20 +229,22 @@ configFenceRoots: () => readonly string[] // 最近一次计划算出的 CF 目�
                                           // 本运行尚未计划时由同一纯函数按主进程环境现算;非 darwin 为空
 ```
 
-  - directory 与某个根是同一对象,或沿 directory 的祖先链遇到该根(dev + ino,与 app 状态根「在内」同一判法)⇒ `{ eligible: false, reason: "home-or-app-state", detail: "inside the protected engine configuration location <root>" }`。根不在盘上 ⇒ 里面不可能有东西,跳过。
+  - directory 与某个根是同一对象,或沿 directory 的祖先链遇到该根(dev + ino,与 app 状态根「在内」同一判法)⇒ `{ eligible: false, reason: "protected-config", detail: "inside the protected engine configuration location <root>" }`。这一判定排在既有 HOME / 状态根判定**之后**,所以状态根里的文件夹仍得到 `home-or-app-state` 与既有那句。根不在盘上 ⇒ 里面不可能有东西,跳过。
+  - 新原因值 `protected-config` 进入原因联合类型的每一个消费者(片 ② 计划所列):`process-fence-profile.ts` 里的定义;`process-fence-workspaces.ts` 里跟踪器的资格类型与它的三处映射;`workspace-write-probe.ts` 里的两个结果类型;`workspace-writable.ts` 的 `workspaceReadonlyMessage`;zh / en 两份文案;测试运行时的类型。界面句子取规格原文:「这个文件夹是 Code Puppy 或引擎存放配置的位置，对话里不能写入。」
   - 包含某个根 ⇒ 不拦,照常签发;CF 渲染在 X1 之后,里面那一处照旧不可写(`CFD/r1/run/ATT-KF2-X1-config.out`:X1 放行 `~/.config` 后,其中 `other-app/x` 落盘,对 CF 位置与其上级目录的 11 项攻击全部被拒)。
-  - 签发前的资格检查(`process-fence-workspaces.ts:369`、`:377`)、W1 选择与开项目登记都走这一个函数,所以在 CF 位置之内的文件夹永不签发,用户看到 §1 那句既有只读提示。
+  - 签发前的资格检查(`process-fence-workspaces.ts:369`、`:377`)、W1 选择与开项目登记都走这一个函数,所以在 CF 位置之内的文件夹永不签发,用户看到 §1 那句专属提示。
 
 ### 4.4 主进程在 fork 前写引擎配置文件,并跑显式文件监听
 
 ```ts
 // packages/ui-mac/src/main/engine-explicit-config.ts(只在主进程执行)
-export type EngineConfigFiles = { explicitConfig: string; models?: string } // = explicitConfigPath(userDataPath) / engineModelsPath(userDataPath)
+export type EngineConfigFiles = { explicitConfig: string; models?: string; userError?: string } // 前两项 = explicitConfigPath(userDataPath) / engineModelsPath(userDataPath);
+                                                                                                  // userError:用户的 codepuppy.jsonc 解析不了时带上,主进程照旧记既有那一行「… is not valid …」
 export function engineModelsPath(userDataPath: string): string // 新导出,与既有 explicitConfigPath(:32)同模块;两端共用
 /** fork 前调用:合成并原子写显式文件;写或删模型底表;codepuppy.jsonc 缺席且未置逃生阀时先写种子 `{ $schema }`。
  *  layer 与今天注入那一次计算同源(codepuppy-config-injection.ts:330-367):policies = engineModelConfig(buildCodePuppyModelConfig(userData, 平台输入)).policies,
  *  commands = 出厂命令(promptRebrandDisabled 时空),skills = 出厂技能目录 ∪ 已启用技能当前代 ∪ PROJECT_SKILLS_ENTRY;平台输入取启动文档用的同一组值。
- *  任何 IO 错误抛出(消息含路径与 errno,不含内容)。 */
+ *  `governedModelsBase`、`explicitSkillDirs`、`PROJECT_SKILLS_ENTRY` 原样搬进本模块。任何 IO 错误抛出(消息含路径与 errno,不含内容)。 */
 export function writeEngineConfigFiles(input: {
   userDataPath: string
   root: string                 // codepuppyGlobalRoot
@@ -248,7 +254,7 @@ export function writeEngineConfigFiles(input: {
 }): EngineConfigFiles
 ```
 
-- 调用点:`spawnLocalServer` 里 `pinAppliedCatalog` 之后、计划围栏之前(`887748b52c`:`server.ts:466` 之后)。抛出 ⇒ 记一行 `[I-13] engine config files could not be written — refusing to fork: <message>` 并拒绝 fork(与 `codepuppy-secrets sync` / `applied model catalog pin` 同一条路径)。
+- 调用点:`spawnLocalServer` 里 `pinAppliedCatalog` 之后、计划围栏之前(`887748b52c`:`server.ts:466` 之后)。启动文档挪到计划围栏之前构建(内容不变),配置写入在计划之前就用上它的值。抛出 ⇒ 记一行 `[I-13] engine config files could not be written — refusing to fork: <message>` 并拒绝 fork(与 `codepuppy-secrets sync` / `applied model catalog pin` 同一条路径)。
 - 启动文档**不加字段**(R1 第 10 项):sidecar 已持有 `userDataPath`,用同一对路径函数得到 `config.file = explicitConfigPath(userDataPath)`,`models.file = existsSync(engineModelsPath(userDataPath)) ? 该路径 : 缺席`(今天这两处在 sidecar 里就是这样算的,`887748b52c`:`codepuppy-config-injection.ts:669-671`、`:783-795`)。主进程每次 fork 前:`models` 在 ⇒ 写;`models` 缺席(含运维逃生阀 `CODEPUPPY_MODELS_DISABLE`,`codepuppy-models.ts:137`)或底表为空 ⇒ **删除** `models.json`;删除失败与写失败同一路径,响亮拒绝 fork。今天 sidecar 在 `models` 缺席时既不删旧文件也不传路径(`codepuppy-config-injection.ts:669`、`:677`),改成按「文件在」判之后,只有主进程这一步删除能保证逃生阀不被上一代留下的文件架空;CF-2 让围栏内建不出它,所以「文件在」就等于「本代有模型底表」。sidecar 注入**不再写** CF-1 / CF-2 里的任何文件;注入失败时显式槽照旧给用户的 `codepuppy.jsonc`。
 - 监听:主进程在写完显式文件后用同一个 `watchExplicitSources`(输入照旧:文件、根、用户文件、本代 layer、skills 现算)起监听,本代子进程退出时停掉,下一代 fork 时以新 layer 重起。sidecar 不再起监听(`887748b52c`:`sidecar.ts:171` 删除)。监听写失败沿用既有日志 `[alpha-code#1667] could not rewrite …` 并保留上一份(引擎继续用上一份好的配置)。
 
@@ -281,10 +287,10 @@ export interface ToolPolicyStoreOptions { /* 既有字段 */ readonly write?: To
 | 编号 | 位置 | 规则 | 依据 |
 | --- | --- | --- | --- |
 | L1 | `packages/core/src/permission.ts:207-214`、`:235` | 判定不再并入 `permission` 表的已存批准(`savedRules` 不参与) | Code Puppy 从不写它(P-06);写它只来自直接改库 |
-| L2 | `packages/core/src/permission.ts:217-222` | 会话行上的规则只取 `effect === "deny"` 的条目参与 `configured()` | Code Puppy 只写 `deny`(P-06);`ask` 也去掉,因为它排在 agent 规则之后能把只读档的静态拒绝放松成询问 |
+| L2 | `packages/core/src/permission.ts:217-222`;`packages/core/src/session/context.ts:136`;`packages/ext/src/policy/index.ts:123-132`(`ruleset()` 的返回) | 会话行上的规则只取 `effect === "deny"` 的条目 —— 同一条规则落在会话行的三处读取:引擎判定(`configured()`)、本次请求里有哪些工具 / 技能 / 连接器说明(会话上下文)、ext 闸门(交互与无人值守两个分支同一个返回点) | Code Puppy 只写 `deny`(P-06,`automation-llm.ts:54`);`ask` 也去掉,因为它排在 agent 规则之后能把只读档的静态拒绝放松成询问;三处只改一处,另两处仍让会话行的 allow 生效(P-06 实测) |
 | L3 | `packages/core/src/config.ts:353-372` | 不装载 wellknown 文档(不调 `loadWellknown`,该层为空) | Code Puppy 无登记入口,历史导入被主进程拒绝(P-06) |
 
-`PermissionSaved` 服务与它的 list / update 路由、会话 `setPermissions` 路由原样保留,只是不再使判定放宽。三条都不依赖围栏,非 darwin 同样生效。北极星:两文件均已登记接管(`scripts/north-star-guard.sh:135`、`:175`),新增标注块按既有形状。
+`PermissionSaved` 服务与它的 list / update 路由、会话 `setPermissions` 路由原样保留,只是不再使判定放宽。三条都不依赖围栏,非 darwin 同样生效。北极星:`permission.ts` 与 `config.ts` 已登记接管(`scripts/north-star-guard.sh:135`、`:175`),新增标注块按既有形状。`packages/core/src/session/context.ts` 是新的上游接管,只改 `:136` 这一行(`codepuppy(I-13 L2)` 标注);owner 2026-11-20「两件都同意」即这次接管的同意。实现片按 ADR-029 §3 / ADR-047「精确接管面」加一行(为什么挂不了钩子:这次合并在会话上下文内部完成,插件钩子在它之后才拿到工具表,改不了合并顺序)、`UPSTREAM_EXCLUDES` 加一条、ADR-048 登记册加一项带反向臂(换回上游原文件 ⇒ E4 的快照臂红)。ext 那一处是 Code Puppy 自有代码,不涉及接管。
 
 ### 4.7 写盘登记簿
 
@@ -320,7 +326,7 @@ const directory = path.join(global.data, "plan") // = <XDG_DATA_HOME>/opencode/p
 | 工具策略写入:端口关闭(这一代在结束) | 同上;用户重试落在下一代 | 一行 |
 | 对话里的工具或命令写 CF | 该工具调用得到 EPERM,如同写任何不可写路径;配置不变 | 工具输出里的错误;内核沙箱日志 |
 | 本代 profile 里出现解析器不认识的文件写法 | 本代不签发运行期放行(既有路径);渲染与解析同模块、有往返测试,正常不会发生 | 既有 `process fence: cannot read this generation's write rules — runtime grants are disabled for it` |
-| 要设为可写的文件夹在 CF 位置之内 | 不签发,显示既有只读提示(§1、§4.3) | 既有资格判定日志,detail 带受保护位置 |
+| 要设为可写的文件夹是 CF 位置或在其之内 | 不签发,显示「这个文件夹是 Code Puppy 或引擎存放配置的位置，对话里不能写入。」(§1、§4.3) | 既有资格判定日志,detail 带受保护位置 |
 | 改动之前已存在的硬链别名、仍在运行的旧代进程 | 见残留 R6 | — |
 
 主进程写 CF 不受围栏影响(主进程不在围栏里),所以 R-2 的保存路径没有新的失败形态。
@@ -330,12 +336,13 @@ const directory = path.join(global.data, "plan") // = <XDG_DATA_HOME>/opencode/p
 | 新增/改动的代码 | 落在哪个模块 | 依赖谁 | 复用的已有权威 |
 | --- | --- | --- | --- |
 | CF 渲染、位置清单、W 行调整 | `packages/ui-mac/src/main/process-fence-profile.ts` | `user-data-layout.ts`、store 常量 | 唯一渲染点(`887748b52c`:`:143`);`regexLiteral`、`assertSeatbeltSafePath` |
-| 放行解析认得拒写块、覆盖判定扣掉拒写、资格判定拦 CF 之内 | `process-fence-profile.ts`、`server.ts`、`process-fence-workspaces.ts` 的 eligibility 输入、`index.ts:979` | 同上 | 既有 `processFenceWriteRules` / `processFenceRulesCover` / `checkWorkspaceDirectory`(唯一身份与资格规则),不另立判定 |
+| 放行解析认得拒写块、覆盖判定扣掉拒写、资格判定拦 CF 之内(原因 `protected-config`) | `process-fence-profile.ts`、`server.ts`、`process-fence-workspaces.ts` 的 eligibility 输入与三处映射、`index.ts:979`、`workspace-write-probe.ts`、`renderer/codepuppy-ui/workspace-writable.ts`、zh / en 文案 | 同上 | 既有 `processFenceWriteRules` / `processFenceRulesCover` / `checkWorkspaceDirectory`(唯一身份与资格规则),不另立判定 |
 | 真实路径 / 软链目标、预建目录、引擎配置目录输入 | `process-fence-plan.ts`、`server.ts` | 同上 | `deps.realpath`(`.native`)、父目录预建循环、`engineGlobalConfigDirectory` |
 | fork 前写显式文件 / 模型底表 / 种子;主进程监听 | `engine-explicit-config.ts`、`server.ts` | `codepuppy-models.ts`、`ext/src/factory-paths`、`ext/src/codepuppy-prompts`、`ext/src/gen-skill-paths` | `writeExplicitConfig`、`watchExplicitSources`、`composeExplicitDocument`、`governedModelsBase` 原样复用 |
 | sidecar 注入不写盘、不起监听 | `codepuppy-config-injection.ts`、`sidecar.ts` | `engine-explicit-config.ts` 的两个路径函数 | `explicitConfigPath`;启动文档不变 |
 | 工具策略写消息与 `mutate` 串行 | `codepuppy-sidecar-messages.ts`、主进程 `codepuppySidecar` 接收链、`packages/ext/src/policy/{resolver,index}.ts` | `packages/ext/src/policy/store.ts` | 既有 sidecar→main 按 id 回复的先例(`codepuppy.hub.view.request`) |
 | L1、L2 | `packages/core/src/permission.ts`(已接管) | — | 既有 `codepuppy(I-05)` 块 |
+| L2 的另两处读取 | `packages/core/src/session/context.ts:136`(新接管一行)、`packages/ext/src/policy/index.ts` 的 `ruleset()` | — | 同一条「只取 deny」规则 |
 | L3 | `packages/core/src/config.ts`(已接管) | — | 既有 `codepuppy(ADR-049)` 块形状 |
 | 计划目录 | `packages/core/src/plugin/plan.ts:31`(新接管)与随源的上游测试 | — | `global.data`(引擎自己存工作文件的目录) |
 
@@ -351,13 +358,13 @@ const directory = path.join(global.data, "plan") // = <XDG_DATA_HOME>/opencode/p
   - 签名或摘要校验配置文件:新子系统。
   - 启动时把链接数大于 1 的受保护文件重写成新 inode:见 §10 留档。
   - 放行解析遇到拒写块就跳过(R1 第 1 项):CF 位置之内的文件夹会被判「已覆盖」、界面显示可写而写不进去;读成 deny 才如实。
-  - 给 CF 之内的文件夹另起一个资格原因与提示文案:要新文案与界面改动;复用既有原因只改判定一处(提示文案后半句不贴切,见返还的观察)。
+  - 复用既有原因 `home-or-app-state`:那句提示的后半句「请打开里面的具体文件夹」对受保护位置之内的文件夹不成立;规格 v1 要求专属一句,改用 `protected-config`(§4.3)。
 - 安全面:
   - **威胁边界。** 被围栏的引擎进程树里的任何进程 —— 包括引擎自己代模型执行的写文件工具、shell 命令、工具与连接器的子进程及其后代(含脱离父进程者)—— 用任何文件操作(写、建、覆盖改名、交换、删、硬链、克隆、软链、`chmod`、改名上级目录、另一种路径写法)或直接改引擎库,去改变 R-1 的三类决定。可信计算基:主进程;引擎进程本身及它从受保护配置装载的代码(用户自己装的插件在引擎进程内运行,能做引擎能做的一切)。
   - **必须守住的不变量。**
     - **I1** CF 的每个位置及其真实目标在围栏内不可写;它们的每一级上级目录节点不可写;CF 是 profile 里最后的文件规则之一,之后没有任何放行文件写入的规则。
     - **I2** sidecar 进程不写 CF 的任何位置(它对账本的读取带 `sideEffectFree: true`,不落证据文件);CF 的写者只在主进程。
-    - **I3** 引擎判定权限时不并入已存批准,会话行规则只取 `deny`;引擎不装载 wellknown 文档。
+    - **I3** 引擎判定权限时不并入已存批准;会话行上的规则在每一处读取都只取 `deny` —— 引擎的 `configured()`、会话上下文(本次请求里有哪些工具、技能与连接器说明)、ext 的 `ruleset()`;引擎不装载 wellknown 文档。
     - **I4** 引擎与子进程需要在其中新建条目的每个被冻结目录节点,在 fork 前已存在。`~/.opencode` 不预建:计划目录移走之后,围栏里没有任何写者需要在其中新建条目(D13)。
     - **I5** 运行期放行与 CF 共存:解析器把 CF(与 C1)的拒写块读成 deny,覆盖判定扣掉它们;CF 位置之内的文件夹永不签发,包含它们的文件夹照常签发。
   - **残留(每条带前提与处置)。**
@@ -369,17 +376,18 @@ const directory = path.join(global.data, "plan") // = <XDG_DATA_HOME>/opencode/p
     - **R6 改动生效之前留下的东西。** 0.2.4 下对话写进这些位置的内容原样保留(本设计不审计、不修复,无迁移);那时做出的硬链别名仍能写进受保护文件(P-08);那时启动、至今仍在运行的脱离进程保持旧 profile。前提:改动之前的会话。处置:按 §10 D11 接受;旧代脱离进程在重启机器后结束。
     - **R7 非 darwin 没有围栏**(既有声明);L1–L3 与主进程写者照样生效。
     - **R8 受保护目录里用户自己放的软链。** 保证 (a) 的软链一句只管 CF 位置**本身**。用户在受保护目录里面放了指向围栏可写处的软链(例:`~/.config/opencode/plugin` → 作为项目打开的 dotfiles 仓库里的目录),对话经链目标写进去的内容,引擎照样当作全局配置读(`CFD/r1/run/NESTED.out`:改前改后都落盘)。链目标归它所在位置的规则管。前提:用户自己建了这样的链,且链目标在围栏可写范围内。owner 机器上 `~/.config/opencode` 是空的真实目录、`~/.opencode` 不存在(编排器核对)。处置:接受;关闭需要每次 fork 遍历用户管理的目录树找链 —— 作为意图候选交编排器(用户级原则 6;「不要设计的过于复杂。」)。
+    - **R9 登记过的 wellknown 来源仍会被请求。** 引擎库里登记的 wellknown 来源,在启动、凭据切换(`config.ts:432-442`)与每 10 分钟(`config.ts:450-466`)仍会收到不带凭据的 manifest 请求(`wellknown.ts:65-72`、`:153-166`),照常经过出网闸。响应里的 `auth.command` 会被登记成该集成的「命令登录」方式(`wellknown/plugin.ts:14-29`),只在有人调用 `connect/command` 时执行(`integration.ts:615-675`)—— Code Puppy 的接法界面只提供密钥与 OAuth(`dialog-connect-provider.tsx:430`),引擎适配路由表里没有这条路由(`engine-adapter/contract/routes.ts:119-123`),所以不会执行。带凭据与 `{env:}` 替换的 `remote_config` 请求只在装载 wellknown 文档时发出(`config.ts:178-186`),L3 之后不再发生。前提:有人往引擎库写了来源。处置:接受 —— 请求本身不带凭据、不改变 R-1 三类决定;以后若有界面接入命令登录,这一条就变成「运行什么程序」,届时重开。
   - **实现须出示的证据**(每条都要能失败,入口是真的):
     - **E1** 生产渲染的 profile(含 CF)+ 生产 addon:CF 每个位置 × {追加、截断、同目录写新再改名覆盖、工作区文件改名覆盖、`RENAME_SWAP`、改名移走、往目录硬链 / 克隆 / 软链、`chmod`、删除、建同目录兄弟 / 子目录} 全部 EPERM,事后围栏外读盘原样;经软链写法、大小写变体、firmlink 写法、改名任一上级目录全部失败;某个位置是软链时其真实目标同样被拒。已知的坏(各自必须红):去掉 CF(`P0.out` 全通过);CF 放在放行块之前(`ATT-Kearly.out`);去掉 ancestors 块(`ATT-KnoAnc.out`);X1 渲染在 CF 之后(`ATT-KXwrong-*.out`);软链位置只写链路径(`LINK-target.out`)。另有三组写法(R1 第 5、6 项,设计期已跑,`CFD/r1/run/VOLCASE.out`):经 `/.vol/<dev>/<inode>` 追加、经 `/.vol/<dev>/<目录 inode>/<名字>` 改名覆盖与新建(subpath / literal / regex 各一行);`*.DAT` / `*.Dat` 新建、改名覆盖成 `DEFAULT.DAT`、经大写名追加与新建 literal 位置 —— change 臂全部 EPERM,P0 臂全部成功。**保证外对照**(不算失败,R8):受保护目录里用户自建的嵌套软链,经链写入照常落到链目标(`NESTED.out`)。
     - **E2** 同一 profile 下这些写入照常:引擎 state、库及 `-wal`、日志、引擎缓存、`~/.npm`、`uv-cache`、计划目录 `<XDG_DATA_HOME>/opencode/plan`(懒建)、工作区、userData 里其余文件的新建 / 改名 / 删除;`mkdir -p` / 递归 `mkdirSync` 已存在的受保护目录。全新机器形状(没有 `~/.local/share/opencode`、没有 `~/.opencode`)下引擎正常起来;已知的坏:不预建 ⇒ 引擎在 Global mkdir 处 EPERM 退出(`change-noprecreate.log`)。
     - **E3** 真引擎(sidecar 形状:生产注入、真 ext、真 addon、生产 profile):A1a、A1b、A2(显式文件与全局目录两处)、A3 在 change 臂全部失败,同时模型调用、连接器调用、经主进程的安装 / 停用 / 启用、经主进程的工具策略修改、引擎重启全部正常;运行窗口内内核沙箱日志里来自引擎进程的保护集拒绝为零。已知的坏:control 臂四项全部成功(`K-control.json`)。
-    - **E4** L1–L3 经真实入口:被围栏的 shell 用 `sqlite3` 插已存批准、改会话行为 `allow`、写入 wellknown 来源 / 清单 / 缓存文档(文档里带一个本地 MCP 服务器)之后,「请求审批」档 shell 仍问、该 MCP 服务器不出现。已知的坏:去掉 L1 / L2 ⇒ 不问(`K-change.json` 的 A4 / A4b);去掉 L3 ⇒ 服务器出现。
+    - **E4** L1–L3 经真实入口:被围栏的 shell 用 `sqlite3` 插已存批准、改会话行为 `allow`、写入 wellknown 来源 / 清单 / 缓存文档(文档里带一个本地 MCP 服务器)之后,「请求审批」档 shell 仍问、该 MCP 服务器不出现。已知的坏:去掉 L1 / L2 ⇒ 不问(`K-change.json` 的 A4 / A4b);去掉 L3 ⇒ 服务器出现。另加两臂,会话行同样由 `sqlite3` 写入:(i)自动化会话(无人值守标准档),agent 规则拒了某个连接器工具的身份,会话行写一条同身份的 allow ⇒ 仍被拒(`cap-hard-deny`)、零副作用;已知的坏:ext 不过滤会话行 ⇒ 工具执行(`CFD/r3/SESSION-ROW.out`,`ran writes=1`)。(ii)「全部批准」档,agent 规则拒了某个插件工具的权限动作,会话行写一条 allow ⇒ 这个工具不在本次请求的工具表里、调用不可用;已知的坏:会话上下文不过滤 ⇒ 出现并执行成功(`CFD/r3/SNAPSHOT-ROW.out`)。
     - **E5** sidecar 启动全程不写 CF:生产形状的 sidecar 启动时内核沙箱日志零 CF 拒绝(含一份带坏条目的账本:sidecar 侧读取不落证据文件);引擎拿到的 `config.file` / `models.file` 等于主进程写的那两个路径,模型底表被主进程删掉的一代 `models.file` 缺席;逃生阀臂:盘上留着上一代的 `models.json`、置 `CODEPUPPY_MODELS_DISABLE` 启动 ⇒ fork 前文件已删、`models.file` 缺席(已知的坏:主进程只在底表为空时删 ⇒ 旧文件留下、`models.file` 指向它);已知的坏:保留 sidecar 里的 `writeExplicitConfig` ⇒ 出现 EPERM 拒绝且注入失败。
     - **E6** 工具策略:设置页的 setRecord / removeRecord / reset 经消息由主进程写入并在下一次判定生效;令主进程对该目录写失败 ⇒ RPC `writeFailed`、盘上旧文档不变;已知的坏:ext 在 sidecar 里直接写 ⇒ EPERM。并发臂:不等前一个回复连发两次 setRecord(两个不同工具)⇒ 两条记录都在盘上;已知的坏:去掉串行 ⇒ 后回的那次覆盖掉前一条。
-    - **E7** 主进程监听:用户手改 `codepuppy.jsonc`、主进程装一个技能 ⇒ 显式文件由主进程重写、引擎不重启即生效(既有 `package-effect.engine.cases.ts`、`created-plugin.engine.cases.ts` 改为主进程起监听后照样绿)。plan.md 注意(R1 第 9 项,只改测试):这两个用例以及 install-from-source、package-mcp-oauth、plugin-entrypoints、endpoint-route 几个引擎用例建会话时在会话行上写 `allow *`;L2 之后会话行只取 `deny`,它们要改成在 agent 层给放行,否则会停在审批上。
+    - **E7** 主进程监听:用户手改 `codepuppy.jsonc`、主进程装一个技能 ⇒ 显式文件由主进程重写、引擎不重启即生效(既有 `package-effect.engine.cases.ts`、`created-plugin.engine.cases.ts` 改为主进程起监听后照样绿)。plan.md 注意(R1 第 9 项,实测更正):E7 点名的六个引擎用例与 `official-connectors.cases.ts:1044` 在 L1–L3 下照样通过,不用改。受影响的是:ext 的两个证明用例 `session-grant.test.ts`、`session-grant-restart.test.ts`(它们的已知坏臂依赖会话行的 allow 生效,改为断言只有 deny 生效);钉住上游已知红的清单 `session-grant-upstream-reds.test.ts` 从 10 条变为 74 条;core `config.test.ts` 里 5 条没有闸门的上游 wellknown 用例(L3)。
     - **E8** 带着 0.2.4 形状的 userData、状态根、全局 opencode 配置、`~/.opencode`、工具策略文档冷启动:连接器、模型、设置、工具策略与升级前相同。
     - **E9** profile 形状:CF 两块在 N4 之后、在 X1 之后,路径为真实路径,含软链位置的目标与全部上级目录;`trimUntilCompiles` 丢工作区时 CF 原样。运行期放行与 CF 共存(R1 第 1 项):生产 profile(含 CF)+ 真引擎,本运行新打开一个项目 ⇒ 它拿到放行、对话写进去的文件落盘;在 CF 位置之内的文件夹 ⇒ 资格判定拒绝、零签发;包含 CF 位置的文件夹 ⇒ 签发,里面那一处仍 EPERM;解析器对 CF 两块与 C1 两块的往返逐条相等。已知的坏:解析器不改 ⇒ 本代放行被停、新项目写入失败(设计期已证前半:0.2.6 解析器对含 CF 的 profile 抛,对 C1 上级目录块抛,`CFD/r1/run/PARSER.out`)。
-    - **E10** W10 / W19(D15,D12 ⓪,设计期已跑,`CFD/r1/run/Z.out`,假 HOME):今天的生产 profile 下,围栏内写 `~/.zsh_sessions/x.session` 与 `~/.zcompdump` 成功,之后围栏外 `zsh -i`(`TERM_PROGRAM=Apple_Terminal TERM_SESSION_ID=x`;rc 带 `compinit -C -d ~/.zcompdump`)执行了植入内容 —— 这是已知的坏;删两行后两次写入 EPERM、植入内容不执行;应用终端形状(围栏内 PTY 里的 `zsh -l`,sidecar 形状环境,rc 为空 / `compinit` / `compinit -C`)删行前后输出逐字相同(`Z-pty-*.norm`;不出现 `.zcompdump` 是实测,不写会话文件由系统 rc 推出)。实现期在生产 addon 上重跑同一组。plan.md 注意:片 ⓪ 要改的测试 —— `packages/ui-mac/src/main/process-fence-profile.test.ts:80-81`、`:172-173`;`process-fence-write-sites.test.ts:105`;`custom-provider-truth.test.ts:81`。
+    - **E10** W10 / W19(D15,D12 ⓪,设计期已跑,`CFD/r1/run/Z.out`,假 HOME):今天的生产 profile 下,围栏内写 `~/.zsh_sessions/x.session` 与 `~/.zcompdump` 成功,之后围栏外 `zsh -i`(`TERM_PROGRAM=Apple_Terminal TERM_SESSION_ID=x`;rc 带 `compinit -C -d ~/.zcompdump`)执行了植入内容 —— 这是已知的坏;删两行后两次写入 EPERM、植入内容不执行;应用终端形状(围栏内 PTY 里的 `zsh -l`,sidecar 形状环境,rc 为空 / `compinit` / `compinit -C`)删行前后输出逐字相同(`Z-pty-*.norm`;不出现 `.zcompdump` 是实测,不写会话文件由系统 rc 推出;三种形状按构造无差别,见 P-12)。实现期在生产 addon 上重跑同一组,另加仿 oh-my-zsh 的第四臂:生产 profile 下启动只多出一行 `rm: <home>/.zcompdump-x-5.9: Operation not permitted`(`18c897b7d7` 的 `process-fence-zsh-startup.test.ts`)—— 这是规格写明的例外(owner 2026-11-20「两件都同意」),不是失败。plan.md 注意:片 ⓪ 要改的测试 —— `packages/ui-mac/src/main/process-fence-profile.test.ts:80-81`、`:172-173`;`process-fence-write-sites.test.ts:105`;`custom-provider-truth.test.ts:81`。
     - **E11** 计划目录与 CF-9(D13,片 ④):KF3 臂(`CFD/r1/run/DOT3.out`,设计期已跑)—— `~/.opencode` 不存在时 mkdir、递归 mkdir、软链、普通文件、改名搬入(f)、克隆(g)、硬链(g2)全部 EPERM,事后仍不存在;存在时其下写、建、追加、改名移走、chmod、往里搬全部 EPERM,读照常(d5);新位置懒建并写入落盘(p1、p2);P0 臂全部成功(已知的坏)。真引擎臂(实现须出示,**待证**,今天由代码推出):「全部批准」档选「计划」并要求写计划文件 ⇒ 文件落在 `<XDG_DATA_HOME>/opencode/plan/`,写文件工具卡显示该路径;已知的坏:不接管 `plan.ts` ⇒ 写 `~/.opencode/plan/…` 失败。登记册反向臂见 §4.8。
 
 ## 8. 拆分决定
@@ -405,10 +413,11 @@ const directory = path.join(global.data, "plan") // = <XDG_DATA_HOME>/opencode/p
 | D9 L2 只保留 `deny`(不保留 `ask`) | P-06;`ask` 排在 agent 规则之后会放松只读档的拒绝 |
 | D10 缓存里的程序本体不在保证内(R2) | P-07;关闭需要主进程代下载 = 新子系统 |
 | D11 改动之前留下的内容、硬链别名与仍在运行的旧代脱离进程不在保证内;不做 inode 重建、不审计旧内容 | P-08 `HL-KF.out`;同一窗口里对话本可直接写入任意内容,只关别名不能让那段时间留下的状态变可信;无迁移(用户级原则 6)。与 sibling D9 同向。**编排器确认(2026-11-20)**:接受,不做 inode 重建、不审计旧内容 |
-| D12 体量 L;五片,各自留下可用产品:⓪ 删 W10、W19 两行(独立,先落,D15);① L1–L3(只改引擎两个已接管文件);② CF(暂不含 CF-9、CF-11)+ W2 / W6 删行 + 放行解析器认得拒写块、覆盖判定扣掉拒写、资格判定拦 CF 之内 + 计划器预建 + 主进程写 / 删显式文件、模型底表、种子与监听 + 登记簿 —— 必须一次合入,否则 sidecar 的写入会被拒、本代运行期放行会被停;③ 工具策略写消息 + `mutate` 串行 + 把 CF-11 加进 CF;④(在 ② 之后)`plan.ts` 接管与其登记(§4.8)+ CF-9 为整个 `~/.opencode` + 删 W16 —— 三者同一片,已有 `~/.opencode/plan` 的机器在旧路径不可写的同一刻拿到新路径;单独成片是为了让 ② 不夹带上游接管、保持原子 | 依赖关系见 §4;P-11、P-12、P-14 |
+| D12 体量 L;五片,各自留下可用产品:⓪ 删 W10、W19 两行(独立,先落,D15);① L1–L3(引擎两个已接管文件 + 新接管 `session/context.ts:136` 一行 + `packages/ext/src/policy/index.ts` 的 `ruleset()` 返回点过滤);② CF(暂不含 CF-9、CF-11)+ W2 / W6 删行 + 放行解析器认得拒写块、覆盖判定扣掉拒写、资格判定拦 CF 之内 + 计划器预建 + 主进程写 / 删显式文件、模型底表、种子与监听 + 登记簿 —— 必须一次合入,否则 sidecar 的写入会被拒、本代运行期放行会被停;③ 工具策略写消息 + `mutate` 串行 + 把 CF-11 加进 CF;④(在 ② 之后)`plan.ts` 接管与其登记(§4.8)+ CF-9 为整个 `~/.opencode` + 删 W16 —— 三者同一片,已有 `~/.opencode/plan` 的机器在旧路径不可写的同一刻拿到新路径;单独成片是为了让 ② 不夹带上游接管、保持原子 | 依赖关系见 §4;P-11、P-12、P-14 |
 | D13 **owner 定(2026-11-20)**:计划目录移到引擎数据目录 `<XDG_DATA_HOME>/opencode/plan`(`path.join(global.data, "plan")`),接管 `packages/core/src/plugin/plan.ts` 的这一个路径值(§4.8);CF-9 为整个 `~/.opencode`,删 W16,谁都不建 `~/.opencode`(ADR-019 对计划助手也成立)。owner 原话(回复编排器的三选一,A = 改存到引擎数据目录):「我建议 A：改存到引擎数据目录」—— 同时是这次新增上游接管的同意。落选:允许围栏内只以目录形式建出 `~/.opencode` —— 预备好的目录树可改名或克隆进来(`DOT.out` f、g);主进程预建 `~/.opencode/plan` —— 与 ADR-019 owner 裁决冲突;不许建也不搬 —— 在没有 `~/.opencode` 的机器上拿掉计划文件这项能力 | P-08 `vnode-type` 一项、P-13、P-14;`DOT.out`、`DOT3.out`;ADR-019(2026-07-07);R1 第 4 项 |
-| D14 运行期放行与 CF 共存:解析器只认渲染点写出的两种拒写表头与三种条目、按括号配平定块尾,读成 deny;已覆盖 = 在某条 allow 下且不在任何 deny 下;CF 的目录位置并入 `checkWorkspaceDirectory` 的受保护关系,只拦同一或在内,复用既有原因 `home-or-app-state` | P-11;`PARSER.out`、`ATT-KF2-X1-*.out`;R1 第 1 项 |
-| D15 删 W10、W19:二者的内容会被围栏外的 zsh 执行,删行后围栏内写入 EPERM、应用终端输出不变;W8(历史,只读进历史列表)保留 | P-12;`CFD/r1/run/Z.out`、`Z-pty-*.norm`;R1 第 3 项 |
+| D14 运行期放行与 CF 共存:解析器只认渲染点写出的两种拒写表头与三种条目、按括号配平定块尾,读成 deny;已覆盖 = 在某条 allow 下且不在任何 deny 下;CF 的目录位置并入 `checkWorkspaceDirectory` 的受保护关系,只拦同一或在内,原因取专属值 `protected-config`(排在既有 HOME / 状态根判定之后),界面一句「这个文件夹是 Code Puppy 或引擎存放配置的位置，对话里不能写入。」(规格 v1) | P-11;`PARSER.out`、`ATT-KF2-X1-*.out`;R1 第 1 项 |
+| D15 删 W10、W19:二者的内容会被围栏外的 zsh 执行,删行后围栏内写入 EPERM;应用终端输出不变,唯一例外是 oh-my-zsh 形状的启动多一行 `rm: … Operation not permitted`(owner 2026-11-20「两件都同意」:保留修复,规格写明例外);W8(历史,只读进历史列表)保留 | P-12;`CFD/r1/run/Z.out`、`Z-pty-*.norm`;`18c897b7d7` `process-fence-zsh-startup.test.ts`;R1 第 3 项 |
+| D16 会话行「只取 deny」落在会话行的每一处读取:引擎 `configured()`(既有 L2)、会话上下文 `session/context.ts:136`(新接管一行,owner 2026-11-20「两件都同意」即同意)、ext `ruleset()`(返回点过滤,交互与无人值守同一处);`schedule/check.ts:301` 在固定关闭的实验开关后面,不改。当时的退路(只在 ext 里补,Code Mode 目录里仍可能列出被拒的工具)不再需要 | P-06(实现期追加三条);`CFD/r3/SESSION-ROW.out`、`SNAPSHOT-ROW.out`;实现期返还 2026-11-20 |
 
 | 轮/审查版本与范围 | 审计方 | finding 及处置 | 改了什么/验证证据 | 没改的及去向 |
 | --- | --- | --- | --- | --- |
@@ -428,6 +437,9 @@ const directory = path.join(global.data, "plan") // = <XDG_DATA_HOME>/opencode/p
 | R2 · 6e372bc83f · 修订范围 | Claude Opus 审查员(只读,非作者) | 2 Minor:D13 未定却有多处默认了某个选项 → **采纳;随后 owner 2026-11-20 定 D13(计划目录移到引擎数据目录),按定下的形状统一改写,不再逐处标「随 D13」** | front-matter summary;§1 (a)、对话侧拒绝一句、新增「计划文件的位置」一行(给规格);P-14;§4.1 CF-9;§4.2 渲染类型与草图去掉留口形状、删 W16;§4.3 不预建;新增 §4.8(接管 `plan.ts:31` 与登记义务);§6 架构表、I4、E2、E11;§10 D2、D4(撤回)、D6、D12(片 ④:`plan.ts` 接管 + CF-9 整个 + 删 W16 同片,② 保持原子)、D13(已定,落选项各留一句)。证据 `CFD/r1/run/DOT3.out`(KF3 全部按要求、P0 全部成功) | 真引擎臂(计划文件落在新位置、工具卡显示该路径)待实现出示 |
 | R2 · 6e372bc83f · 修订范围 | Claude Opus 审查员(只读,非作者) | 3 Minor:「文件在 = 本代有模型底表」会让 `CODEPUPPY_MODELS_DISABLE` 失效(今天缺席时不删旧文件,`codepuppy-config-injection.ts:669`、`:677`;`codepuppy-models.ts:137`) → **采纳** | §4.4:`models` 缺席或底表为空时主进程 fork 前删除 `models.json`,删除失败响亮拒绝 fork;§5 失败表同一行;E5 加逃生阀臂(旧文件留下即红) | 无 |
 | R2 · 6e372bc83f · 修订范围 | Claude Opus 审查员(只读,非作者) | 精确性备注:Z 实验(iii)「不写会话文件」是推断,「不出现 `.zcompdump`」是实测;片 ⓪ 要改的测试 → **采纳** | P-12、E10 改措辞;E10 加 plan.md 注意:`process-fence-profile.test.ts:80-81`、`:172-173`,`process-fence-write-sites.test.ts:105`,`custom-provider-truth.test.ts:81` | 无 |
+| 实现期返还 · 片 ① 计划 · §4.6 与保证 (b) | 实现方(片 ① 计划,实验在临时副本) | (a) ext 自己读会话行,无人值守分支不调引擎判定 → **采纳并扩大**:另查出引擎会话上下文也直接读会话行;(b) wellknown 来源仍收到 manifest 请求 → **保证外,记残留** | P-06 追加;§4.6 L2 改为三处读取并接管 `session/context.ts:136`(owner 2026-11-20「两件都同意」);I3;E4 加两臂;E7 更正;R9;D16;D12 ①。证据 `CFD/r3/SESSION-ROW.out`(7 臂)、`SNAPSHOT-ROW.out`(2 臂) | 无 |
+| 实现期返还 · 片 ② 计划核对 · 契约文字 | 实现方(片 ② 计划) | 规格 v1 要求受保护位置之内的文件夹有专属一句 → **采纳**:原因值 `protected-config`;`writeEngineConfigFiles` 结果带 `userError`;三项原样搬进 `engine-explicit-config.ts`;`UPDATER_STORE` 唯一权威;启动文档先于计划围栏构建;坏掉的软链 → **留档** | §1;§4.3(资格判定与消费者清单、`UPDATER_STORE`);§4.4;§5;§6 被否决的替代;D14;留档删「交给规格」一行、加坏软链一行 | 无 |
+| 实现期返还 · 片 ⓪ 实测 · P-12 / E10 / D15 | 实现方(片 ⓪,`fix/fence-drop-zsh-rows` `18c897b7d7`) | 三种 rc 形状按构造无差别;仿 oh-my-zsh 形状多一行 `rm` 报错 → **owner 选定保留修复、规格写明例外**(owner 2026-11-20「两件都同意」) | P-12、E10、D15;留档加 `ZSH_COMPDUMP` 一行(意图候选) | 无 |
 
 **留档**
 
@@ -437,4 +449,5 @@ const directory = path.join(global.data, "plan") // = <XDG_DATA_HOME>/opencode/p
 | 凭据替换:对话往引擎凭据表写自己的 key / OAuth 令牌,让用户对已配置 provider 或远程 MCP 的请求改用攻击者账户 | 读码所得(`model-resolver.ts:283-304` 凭据优先于配置的 apiKey),未实测;不改变用户凭据的去向,不在 R-1 内 | 不在授权结果内 | 作为意图候选交编排器 |
 | 目录缓存的撤销清单是否签名 | `readRevokedTargets` 未核实;只影响会话级授权包的判定 | 与 R-1 无直接关系 | 有人改动 `ext-curation-policy.ts` 时 |
 | 对话可删除引擎库或在数据目录放 `auth.json` 让下一次 fork 被拒 | 可用性 / 数据丢失,不是配置改道 | 不在授权结果内 | — |
-| CF 位置之内的文件夹复用既有只读提示,其后半句「请打开里面的具体文件夹」对这种文件夹不贴切(里面同样不可写) | `i18n/zh.ts:1931`、`en.ts:1957` 的 `codepuppy.workspace.readonlyHome`;判定只改 `checkWorkspaceDirectory` 一处(§4.3) | 文案属于规格的用户可见内容 —— **交给规格**,措辞由编排器在规格里定 | 规格定稿时 |
+| 应用终端的环境设置 `ZSH_COMPDUMP`,指向应用私有、围栏可写的路径(oh-my-zsh 尊重预设值),消掉 oh-my-zsh 启动时那一行 `rm` 报错 | 未实测;只影响 oh-my-zsh 用户在应用终端里看到的那一行 | owner 选择保留修复、规格写明例外(D15);不建机制 | 作为意图候选交编排器 |
+| 受保护位置本身是**坏掉的**软链:`realpath` 当它不存在,只保护链本身,之后出现的目标不受保护 | 片 ② 计划核对时读出;围栏内的代码建不出这样的链 | 与 R6 / R8 同类(围栏之外、用户自己留下的状态),不加机制 | — |

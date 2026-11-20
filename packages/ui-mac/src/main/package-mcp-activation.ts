@@ -163,7 +163,7 @@ export function packageAppliesAt(graph: Pick<PackageGraphV1, "effect"> | undefin
   return identity.ok && identity.scope.projectPath === graph.effect.projectPath && identity.scope.projectPathHash === graph.effect.projectPathHash
 }
 
-type ConnectorCredentials = Omit<Parameters<typeof resolveConnectorLeaf>[0], "server" | "leaf">
+export type ConnectorCredentials = Omit<Parameters<typeof resolveConnectorLeaf>[0], "server" | "leaf">
 
 /**
  * DESIGN-stored-credentials-fence §4.3 / (d): the table of Code Puppy's credential stores, read now, and the store-target test built from
@@ -171,7 +171,7 @@ type ConnectorCredentials = Omit<Parameters<typeof resolveConnectorLeaf>[0], "se
  * its exact spelling; every other reference into a store becomes an empty string and its file is never opened (resolveConnectorLeaf).
  * The only leaf is main's registered, validated one; never a renderer/sidecar-supplied file path.
  */
-function connectorCredentials(deps: ManagedMcpConvergenceDeps): ConnectorCredentials {
+export function connectorCredentials(deps: Pick<ManagedMcpConvergenceDeps, "root" | "userDataPath" | "log">): ConnectorCredentials {
   let runtimeParent: string | undefined
   try {
     runtimeParent = officialRuntimeParent(deps.root())

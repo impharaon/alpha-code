@@ -13,7 +13,7 @@
 // 与 `actionAllowed(auth, "cloud.dispatch")`),而云 MCP 的 `vision` 也只是把同一个 Authorization 原样转发
 // 到同一条路由(`cloud-mcp.ts` mount)。所以这里用的**就是**引擎经 MCP 访问云端的那份凭据,不另铸、不回退。
 // 路由的主机:平台节点地址(启动文档 platform.modelProxyBaseURL,main 由 `codepuppy-auth.ts` 落定,= `<platform>/v1`,platform 即 gateway 主机)的 origin。
-// 凭据在每次调用时现读文件(令牌续期会重写文件;比引擎装配置时解析一次更新)。
+// 凭据在每次调用时从进程内凭据表现读(令牌续期后主进程整表推来;比引擎装配置时解析一次更新;SPEC-stored-credentials-fence,不读文件)。
 //
 // ── 「云端是否可用」(与 alpha-code#1411 同轴)──────────────────────────────────────
 // `#1411` / `#1442` 的判据是 `platformPays = 文档里有云 MCP && CODEPUPPY_MCP_TOKEN 密钥文件在场`,桌面侧
@@ -33,7 +33,7 @@
 
 import { codepuppyBootstrap, routePlatformUrl, type CodePuppyBootstrap } from "../../util/src/codepuppy-bootstrap"
 import { createHash } from "node:crypto"
-import { readFileSync } from "node:fs"
+import { readCodePuppyCredential } from "../../util/src/codepuppy-credentials"
 import path from "node:path"
 import { mcpEngineToolId, resolveFileRefs } from "./cloud-websearch-kill"
 import { cloudMcpAuthorization } from "./cloud-access"
@@ -89,7 +89,7 @@ export type CloudVisionAccess =
  */
 export function cloudVisionAccess(
   bootstrap: CodePuppyBootstrap = codepuppyBootstrap(),
-  readFile: (p: string) => string = (p) => readFileSync(p, "utf8"),
+  readFile: (p: string) => string = readCodePuppyCredential, // DESIGN-stored-credentials-fence §4.4 C-d:进程内凭据表
 ): CloudVisionAccess {
   const endpoint = cloudVisionEndpoint(bootstrap)
   const header = cloudMcpAuthorization(bootstrap)

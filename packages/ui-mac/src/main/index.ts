@@ -63,6 +63,7 @@ import { createMenu } from "./menu"
 import {
   currentConfigFenceRoots,
   forkedSecretNames,
+  pushCredentialsToSidecar,
   getDefaultServerUrl,
   preferAppEnv,
   setDefaultServerUrl,
@@ -798,7 +799,8 @@ const main = Effect.gen(function* () {
     },
     // REQ-236 §2.1(`#1562`):同身份续期把新凭据原子写进引擎现读的文件,不重启引擎;在场性变了或写失败
     // ⇒ needs-structural,codepuppy-auth 自己请求 credential-change 重启并等它确认。
-    applyCredentials: () => applyPlatformCredentialsHot(app.getPath("userData"), process.env, forkedSecretNames()),
+    // DESIGN-stored-credentials-fence §4.3 T2:写盘与回读摘要都通过之后把整表推给当前 sidecar(引擎进程只从这张表读凭据)。
+    applyCredentials: () => applyPlatformCredentialsHot(app.getPath("userData"), process.env, forkedSecretNames(), pushCredentialsToSidecar),
     onChanged: () => {
       authScheduler?.rearm("auth-change")
       // `#1387`:违规词表只在启动同步一次 + 每 15 分钟一次,而冷启动那一次常常跑在令牌换好
@@ -1453,6 +1455,8 @@ const main = Effect.gen(function* () {
         generation: spawnGen,
         codepuppySidecar,
         fenceRun: fenceWorkspaces, // INT-safety R3: this run's writable history carries into the next generation
+        // DESIGN-stored-credentials-fence §4.2:引擎拉取凭据表超时 / 主进程读不出表 ⇒ 既有的 credential-change 重启
+        requestRespawn: (trigger) => void requestSidecarRespawn?.(trigger),
       })
       void spawning.then(
         () =>
@@ -1607,6 +1611,8 @@ const main = Effect.gen(function* () {
         generation: spawnGen,
         codepuppySidecar,
         fenceRun: fenceWorkspaces, // INT-safety R3: this run's writable history carries into the next generation
+        // DESIGN-stored-credentials-fence §4.2:引擎拉取凭据表超时 / 主进程读不出表 ⇒ 既有的 credential-change 重启
+        requestRespawn: (trigger) => void requestSidecarRespawn?.(trigger),
       })
       void spawning.then(
         () =>

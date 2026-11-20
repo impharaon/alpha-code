@@ -24,7 +24,9 @@ import { buildCodePuppyBootstrap, usableExportedPaths } from "./codepuppy-bootst
 import { exportedFlag } from "@opencode/util/codepuppy-bootstrap"
 import { factorySkillDirsForFork } from "./factory-skills"
 import { resourcesRoot } from "./ext-fs-installer"
-import { syncSecretFiles } from "./codepuppy-secret-files"
+import { credentialStores, readCredentialTable, syncSecretFiles } from "./codepuppy-secret-files"
+import { officialRuntimeParent } from "./official-connector-recipes"
+import { answerCredentialsMessage, type CredentialsMessage } from "./sidecar-credentials"
 import { customProviderSecretValues } from "./codepuppy-byok-keys"
 import { ignoredConfigProviderBlocks, ignoredConfigRemoteMcpEntries } from "./ext-config"
 import { readCustomProviderRecords } from "./custom-provider-records"
@@ -151,6 +153,35 @@ type SpawnLocalServerOptions = {
     receive(message: unknown, post: (message: CodePuppySidecarOutbound) => void): boolean
     attach(post: (message: CodePuppySidecarOutbound) => void): (reason: string) => void
   }
+  /**
+   * DESIGN-stored-credentials-fence §4.2:引擎拉取凭据表超时(`credentials.unavailable`)或主进程读不出表时,请求既有的 `credential-change` 重启
+   * (index.ts 接到 requestSidecarRespawn:既有队列与自愈阶梯,有界)。
+   */
+  requestRespawn?: (trigger: "credential-change") => void
+}
+
+/**
+ * DESIGN-stored-credentials-fence §4.3:Code Puppy 凭据存放点的整表,主进程现读。官方连接器运行期目录算不出(那里本来就没有官方运行期)⇒
+ * 不给该项。T1(start)、回复拉取(P)与续期推送(T2)都用它;不记录任何值,软链条目只记名字。
+ */
+function credentialTable(userDataPath: string) {
+  let runtimeParent: string | undefined
+  if (tryGetCodePuppyEnvironment()) {
+    try {
+      runtimeParent = officialRuntimeParent(codepuppyGlobalRoot())
+    } catch {
+      runtimeParent = undefined
+    }
+  }
+  return readCredentialTable(credentialStores({ userDataPath, ...(runtimeParent ? { officialRuntimeParent: runtimeParent } : {}) }), (line) => getLogger()?.warn(line))
+}
+
+// T2:当前这一代 sidecar 的推送口(start 发出之后才有;子进程退出即撤)。
+let pushCredentialTable: (() => void) | undefined
+
+/** DESIGN-stored-credentials-fence §4.3 T2:续期写盘之后把整表推给当前子进程。没有子进程 ⇒ 跳过;发送抛 ⇒ 抛(调用方按 needs-structural)。 */
+export function pushCredentialsToSidecar(): void {
+  pushCredentialTable?.()
 }
 
 // ── REQ-137:策略代理单例(main 进程内,围栏外)──────────────────────────────────────────
@@ -751,14 +782,24 @@ export async function spawnLocalServer(
   }
   // REQ-234 `#1529`:`codepuppy.*` 分发与探针应答并列;不是本族的消息原样交还(返回 false)。
   const postCodePuppy = (message: CodePuppySidecarOutbound) => child.postMessage(message)
+  // DESIGN-stored-credentials-fence §4.2:引擎装载配置之前的拉取 —— 同步建表并回复(收到与回复之间没有 await)。
+  const credentialReplies = {
+    table: () => credentialTable(options.userDataPath),
+    post: (message: CredentialsMessage) => child.postMessage(message),
+    respawn: () => options.requestRespawn?.("credential-change"),
+    log: (line: string) => getLogger()?.warn(line),
+  }
   child.on("message", (message: unknown) => {
     if (projectConfigViews.receive(message)) return
     if (writeProbes.receive(message)) return
     if (writeGrants.receive(message)) return
+    if (answerCredentialsMessage(message, credentialReplies)) return
     options.codepuppySidecar?.receive(message, postCodePuppy)
   })
   let detachCodePuppy: ((reason: string) => void) | undefined
+  const pushThisGeneration = () => child.postMessage({ type: "credentials", credentials: credentialTable(options.userDataPath) } satisfies CredentialsMessage)
   child.once("exit", (code) => {
+    if (pushCredentialTable === pushThisGeneration) pushCredentialTable = undefined
     clearOfficialConnectorRuntimeOnExit(runtimeGeneration)
     stopExplicitConfigWatch()
     if (explicitConfigWatch === stopExplicitConfigWatch) explicitConfigWatch = undefined
@@ -832,15 +873,26 @@ export async function spawnLocalServer(
     child.on("message", onMessage)
     child.on("exit", onExit)
     refreshTimeout()
+    // DESIGN-stored-credentials-fence §4.3 T1:fork 之后同步建表、随 start 交过去(官方连接器运行期已在上面恢复)。建表抛 ⇒ 本代失败。
+    let credentials: ReturnType<typeof credentialTable>
+    try {
+      credentials = credentialTable(options.userDataPath)
+    } catch (error) {
+      getLogger()?.error("Code Puppy credential table could not be read — refusing this generation (fail closed)", error)
+      fail(new Error(`Code Puppy credential table could not be read — sidecar start refused: ${serializeError(error).message}`))
+      return
+    }
     child.postMessage({
       type: "start",
       hostname,
       port,
       password,
       bootstrap,
+      credentials,
       // REQ-159:profile 全文 + 模块路径。sidecar 在 import 引擎之前 apply;缺席(darwin)即拒绝启动。
       ...(fence ? { fence: { profile: fence.profile, addonPath: fence.addonPath } } : {}),
     })
+    if (!exited) pushCredentialTable = pushThisGeneration
   }).catch((error) => {
     if (!exited) child.kill()
     throw error

@@ -165,12 +165,14 @@ export type HotApplyOutcome = "applied" | "needs-structural"
  * `applied`,下一次 fork 的 syncSecretFiles 自然带上 env 里的新值。两份热凭据的在场集合与 fork 时不同
  * (凭据出现或消失)⇒ `needs-structural`:平台 provider 与云 MCP 条目是否存在是 fork 时定的,热写改不了。
  * 任一写入或回读摘要不一致 ⇒ `needs-structural`(热写失败,由结构性重启的 syncSecretFiles 再写一次)。
- * 只返回结论,不记录任何值。
+ * DESIGN-stored-credentials-fence §4.3 T2:写入与回读摘要都通过之后 `push()` 把整表推给当前 sidecar(引擎进程只从那张表读凭据;没有子进程时
+ * push 什么都不做);push 抛 ⇒ `needs-structural`。只返回结论,不记录任何值。
  */
 export function applyPlatformCredentialsHot(
   userDataPath: string,
   env: NodeJS.ProcessEnv,
   forked: ReadonlySet<string> | undefined,
+  push: () => void,
 ): HotApplyOutcome {
   if (!forked) return "applied"
   const present = HOT_CREDENTIALS.filter((name) => env[name])
@@ -183,6 +185,7 @@ export function applyPlatformCredentialsHot(
       writeSecretFileAtomic(dir, name, value)
       if (digest(fs.readFileSync(path.join(dir, name), "utf8")) !== digest(value)) return "needs-structural"
     }
+    push()
   } catch {
     return "needs-structural"
   }

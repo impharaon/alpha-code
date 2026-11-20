@@ -14,16 +14,20 @@ import { assertExtPluginActive } from "../../src/main/sidecar-ext-ready"
 import { acceptCodePuppyBootstrap, assertEngineReadsBootstrap } from "../../src/main/sidecar-bootstrap-gate"
 import type { EngineFetch } from "../../src/main/in-process-engine"
 import { engineProjectTrust } from "../../src/main/engine-project-trust"
+import { parseCodePuppyCredentials, publishCodePuppyCredentials } from "@opencode/util/codepuppy-credentials"
 
 export type DriverInput = {
   engine: string
   password: string
   /** start 消息里的启动文档(测试用 main 的生产构建器构建)。 */
   bootstrap: unknown
+  /** start 消息里的凭据整表(SPEC-stored-credentials-fence T1;测试用 main 的生产读法建)。本驱动不接主进程,没有装载前拉取。 */
+  credentials?: unknown
 }
 
 const input = JSON.parse(process.argv[2]!) as DriverInput
 const bootstrap = acceptCodePuppyBootstrap(input.bootstrap)
+publishCodePuppyCredentials(parseCodePuppyCredentials(input.credentials ?? {}))
 const injection = injectCodePuppyConfig(bootstrap.paths.userData, bootstrap.paths.extPlugin, bootstrap.registryChannel, bootstrap.paths.userConfig ?? null)
 const content = JSON.parse(injection.config.content) as { providers: Record<string, { models?: Record<string, unknown> }> }
 // 沙箱里没有已应用的平台目录,平台节点的模型表是空的(`#1556`);补一个模型只为能发出请求(同 test-component/codepuppy-engine.ts)

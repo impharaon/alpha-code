@@ -22,9 +22,10 @@ import { CODEPUPPY_AGENT_TEXT } from "./codepuppy-agents"
 import { CODEPUPPY_BEHAVIOR_MD } from "./codepuppy-behavior"
 import { buildCodePuppyCapabilities, buildCodePuppyIdentity } from "./codepuppy-identity"
 import { buildCodePuppyModelConfig, engineModelConfig } from "./codepuppy-models"
-// `hasSecretFile` 是 ADR-009 的「平台代付」判据(见下方 `platformPays`,`#1195` 起换轴到 `CODEPUPPY_MCP_TOKEN` 文件 ——
-// 凭证在场性与代付判据从此是同一件事)。云 MCP 定义里的 `{file:…CODEPUPPY_MCP_TOKEN}` 引用由 main 写进启动文档(`#1698` R8)。
-import { hasSecretFile } from "./codepuppy-secret-files"
+// `CODEPUPPY_MCP_TOKEN` 的在场是 ADR-009 的「平台代付」判据(见下方 `platformPays`,`#1195` 起 —— 凭证在场性与代付判据从此是同一件事);
+// SPEC-stored-credentials-fence 起它问进程内凭据表,不问盘上的文件。云 MCP 定义里的 `{file:…CODEPUPPY_MCP_TOKEN}` 引用由 main 写进启动文档(`#1698` R8)。
+import { codepuppyCredential } from "@opencode/util/codepuppy-credentials"
+import { secretFilePath } from "./codepuppy-secret-files"
 import {
   applyWebSearchDenies,
   CLOUD_WEB_SEARCH_TOOL_ID,
@@ -204,7 +205,8 @@ export function injectCodePuppyConfig(
     // `CODEPUPPY_CLOUD_TOKEN`(错受众的 platform_access,只当在场性证据)换轴到
     // `CODEPUPPY_MCP_TOKEN`(登录铸 mcp_access)—— 它同时就是云 MCP 定义要引用的那份凭证,
     // 「代付成立」与「凭证可用」从此结构上不可能分叉。main 侧同一判据在
-    const platformPays = Boolean(cloudMcp && hasSecretFile(userDataPath, "CODEPUPPY_MCP_TOKEN"))
+    // DESIGN-stored-credentials-fence §4.4 C-f:本函数只在 sidecar 里跑,在场性只问主进程交来的进程内凭据表(T1),不读盘。
+    const platformPays = Boolean(cloudMcp && codepuppyCredential(secretFilePath(userDataPath, "CODEPUPPY_MCP_TOKEN")) !== undefined)
     // ADR-009 B2 的能力总闸:main 判一次写进启动文档(webSearch.killSwitch),ext 的最终闸读的是同一个值。
     const killSwitch = bootstrap.webSearch.killSwitch
     // 云 MCP server 这一 fork 会不会以 `enabled:true` 注册。判据与下方真正写 `config.mcp` 的那个
@@ -291,6 +293,7 @@ export function injectCodePuppyConfig(
       baseURL: bootstrap.platform.modelProxyBaseURL,
       defaultModel: bootstrap.platform.defaultModelOverride,
       disabled: switches.modelsDisabled,
+      credential: codepuppyCredential, // C-f:sidecar 里只问表
     })
     if (models) {
       // `#1667`:同一份投影,写成 2.x 的 `providers` / `policies`(`provider.use`)/ `model`(codepuppy-models.ts engineModelConfig)。

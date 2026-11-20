@@ -20,6 +20,7 @@ import { ConfigWatch } from "./config/watch.js"
 import { ConfigIntegration } from "./config/integration.js"
 import { ConfigManaged } from "./config/managed.js"
 import { CodePuppyProjectGate } from "./config/codepuppy-project-gate.js" // codepuppy(ADR-049)
+import { refreshCodePuppyCredentials, resolveCodePuppyCredentialRefs } from "@opencode/util/codepuppy-credentials" // codepuppy(I-20)
 import { ManagedPolicy } from "./managed-policy.js"
 import { Connection } from "@opencode/schema/connection"
 import { WellKnown } from "./wellknown.js"
@@ -166,9 +167,21 @@ export const layer = (options?: Options) =>
         })
       })
 
-      const loadFile = Effect.fnUntraced(function* (filepath: string, gate?: CodePuppyProjectGate.Filter) { // codepuppy(ADR-049)
-        const text = yield* fs.readFileStringSafe(filepath)
-        if (text === undefined) return
+      // codepuppy(I-20) ── DESIGN-stored-credentials-fence §4.4: Code Puppy's two documents (the explicit file and the inline content) take
+      // credential values from the in-process table only. Before each load of one of them that has a {file:} reference, pull the table from
+      // the main process (one request per load, never merged); then substitute only at the closed list of credential positions. A failed pull
+      // substitutes nothing — the references stay for the engine's own read below, never an older table. No other document is touched.
+      const codepuppyCredentialText = Effect.fnUntraced(function* (text: string, document: "inline" | "explicit") {
+        if (!text.includes("{file:")) return text
+        const pulled = yield* Effect.promise(() => refreshCodePuppyCredentials().then(() => true, () => false))
+        return pulled ? resolveCodePuppyCredentialRefs(text, document) : text
+      })
+      // codepuppy ── end
+
+      const loadFile = Effect.fnUntraced(function* (filepath: string, gate?: CodePuppyProjectGate.Filter, codepuppyDocument?: "explicit") { // codepuppy(ADR-049, I-20)
+        const read = yield* fs.readFileStringSafe(filepath)
+        if (read === undefined) return
+        const text = codepuppyDocument ? yield* codepuppyCredentialText(read, codepuppyDocument) : read // codepuppy(I-20)
         const substituted = yield* ConfigVariable.substitute({ type: "path", path: filepath, text })
         const info = yield* parseInfo(gate ? gate.raw(substituted, filepath) : substituted, filepath) // codepuppy(ADR-049)
         if (!info) return
@@ -234,19 +247,15 @@ export const layer = (options?: Options) =>
         )
 
         const explicit = sources.explicit
-          ? yield* loadFile(sources.explicit).pipe(
+          ? yield* loadFile(sources.explicit, undefined, "explicit").pipe( // codepuppy(I-20)
               Effect.map((config) => (config ? [config] : [])),
               Effect.orDie,
             )
           : []
         const content =
           options?.content !== undefined
-            ? yield* ConfigVariable.substitute({
-                type: "virtual",
-                source: "OPENCODE_CONFIG_CONTENT",
-                dir: location.directory,
-                text: options.content,
-              }).pipe(
+            ? yield* codepuppyCredentialText(options.content, "inline").pipe( // codepuppy(I-20)
+                Effect.flatMap((text) => ConfigVariable.substitute({ type: "virtual", source: "OPENCODE_CONFIG_CONTENT", dir: location.directory, text })), // codepuppy(I-20)
                 Effect.flatMap((text) => parseInfo(text, "OPENCODE_CONFIG_CONTENT")),
                 Effect.map((info) => (info ? [new Document({ type: "document", info })] : [])),
                 Effect.orDie,

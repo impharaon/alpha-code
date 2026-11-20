@@ -375,6 +375,7 @@ status.
 | `DESIGN-child-process-write-fence` | [specs/child-process-write-fence/design.md](specs/child-process-write-fence/design.md) | 用户亲手打开的项目当场可写、不重启引擎:围栏只认私有扩展类且围栏内五种方式都签不出;用户打开动作登记「本机引擎 + 目录」并冻结,主进程签发只能由当前引擎进程消费的令牌;真源只收已登记目录;「只读」与「重新启动」退出常规路径 | approved |
 | `SPEC-child-process-write-fence` | [specs/child-process-write-fence/spec.md](specs/child-process-write-fence/spec.md) | 连接器与语言服务的子进程也受写入范围约束，保留历史条款、有效裁决和交付证据边界。 | approved |
 | `SPEC-engine-config-fence` | [specs/engine-config-fence/spec.md](specs/engine-config-fence/spec.md) | 被围栏的进程树写不进决定「运行什么程序、哪些工具不问就放行、凭据交给谁」的配置位置；引擎不采用引擎库里三类跨回合的放行记录；写者改在主进程；计划文件改存引擎数据目录。 | approved |
+| `SPEC-stored-credentials-fence` | [specs/stored-credentials-fence/spec.md](specs/stored-credentials-fence/spec.md) | 被围栏的进程树读不到、拷不走、挪不走、改不了 Code Puppy 存在本机的凭据文件；引擎只从主进程交来的内存表取值；改写配置把凭据引到别处由 SPEC-engine-config-fence 关闭。 | approved |
 | `SPEC-cloud-job-desktop-notifications` | [specs/cloud-job-desktop-notifications/spec.md](specs/cloud-job-desktop-notifications/spec.md) | 用户能收到任务结果并在桌面设置里关闭通知。 | approved |
 | `PLAN-cloud-job-form-preflight` | [specs/cloud-job-form-preflight/plan.md](specs/cloud-job-form-preflight/plan.md) | alpha-code#1686 一段:拷入 AccountStatusV1、主进程只读预检 IPC、组件库卡片与名称 — 值列表(账户弹层改用)、两种发送框的预检区与按钮行右移 | active |
 | `SPEC-connector-workspace-following` | [specs/connector-workspace-following/spec.md](specs/connector-workspace-following/spec.md) | 连接器跟随当前会话所在项目目录，保留历史条款、有效裁决和交付证据边界。 | approved |

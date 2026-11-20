@@ -177,3 +177,6 @@ last_reviewed: 2026-11-20
   6a. 配置路径节点「同一对象」按 device + inode(`lstat`,计划器依赖里新增可选的 `lstat`,生产默认 `lstatSync` bigint),不再按小写字符串;红 `evidence/final6a-red.log` → 绿(本提交)。
   5 / 6b / 6c. 写入矩阵:已放行的 `~/.config` 本身改名(生产拒、X1 在后的已知坏通过);每次攻击的结果集合与矩阵逐条相等;去掉受保护集的已知坏臂里文件 / 目录 / 新建各一个位置与两种 firmlink 写法的每种手法都 OK(`a9e8de01ba`)。
   7. 措辞:真引擎宿主的对照臂经 W12 落地(沙箱在系统临时目录下),不是补回的 W2 / W6;写入矩阵覆盖的写法按位置写明;`custom-provider-truth.test.ts` 的固定 id 数改成 13。`gate-files.tsv`:`process-fence-plan` 22 → 26,`process-fence-config-fence` 内层 11 → 13。
+- 2026-11-20 · 确认审查 R2(`3af6988000..611815ad0e`,RECOMMEND MERGE)处置,新提交:
+  1. env 文件是指到 `/dev` 下的软链时只丢 `/dev` 下那条,链节点 literal 与路径节点照留(上一轮钉住的「链本身也不冻结」改正);红 `evidence/r2-1-red-*.log`(删链、换成普通文件都成功)→ 绿(本提交;经链写入照样到 `/dev/null`,删链 / 改名覆盖 EPERM)。
+  3. 计划器用例在假路径上一律注入假 `lstat`(`5847dc202a`)。

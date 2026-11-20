@@ -3,13 +3,13 @@ id: DESIGN-engine-config-fence
 title: 对话改不了决定程序、放行与凭据去向的引擎配置 技术设计
 summary: 围栏 profile 最末加一块只拒写的 CF(一张封闭清单:Code Puppy 状态根、合成的引擎配置目录、登录 shell 环境快照与密钥环境文件、端点钉选、连接记录、界面设置存储、引擎全局配置目录、整个 ~/.opencode、主目录级 opencode.json、工具策略文档),连同各自真实目标与每一级上级目录节点;运行期放行的解析器认得 CF,放行判定扣掉拒写位置;W2/W6/W10/W16/W19 行删掉;计划助手的计划目录改到引擎数据目录(接管上游 plan.ts 的路径一行,owner 2026-11-20 选定),谁都不再建 ~/.opencode;原来在围栏里写这些位置的写者(合成显式文件与模型底表、种子 codepuppy.jsonc、显式文件监听、ext 的工具策略写入)改在主进程,工具策略写入复用既有 codepuppy.* 窄消息;引擎库里三类会让授权或配置活过本回合的记录(已存批准、会话行上的放行规则、wellknown 缓存文档)在引擎装载时不再生效;用户无感
 kind: tech-design
-status: draft
+status: approved
 spec: SPEC-engine-config-fence
-spec_version: 0
+spec_version: 1
 review:
   rounds: 2           # R1 审 4875af11e2 全文;R2 审 4875af11e2..6e372bc83f 修订范围(同一 Claude Opus 审查员,只读,非作者)
   reviewed_sha: "6e372bc83f"
-  verdict: "R2 FIX-THEN-MERGE;三处更正已落到本版(§10 R2 行);D13 owner 2026-11-20 定为计划目录移到引擎数据目录"
+  verdict: "R2 FIX-THEN-MERGE;三处更正已落到本版(§10 R2 行);D13 owner 2026-11-20 定为计划目录移到引擎数据目录;规格 v1 经 owner 2026-11-20 批准后由编排器冻结"
 owners: [owner]
 last_reviewed: 2026-11-20
 ---
@@ -20,7 +20,7 @@ last_reviewed: 2026-11-20
 
 ## 1. 基线
 
-- Spec:**没有**。现有规格都不承载本结果的 AC(见「返还缺口」G1);`spec` 字段先占 `SPEC-engine-config-fence` v0。本设计不写规格。
+- Spec:[SPEC-engine-config-fence](spec.md) v1(owner 2026-11-20 批准:「两份都批准」),由编排器按本设计的保证 (a)–(c) 与 §6 残留写成(返还缺口 G1 由此关闭)。本设计不写规格。
 - 授权:INT-safety I-13(owner 2026-11-14 以 [U-10](https://github.com/impharaon/alpha-work/blob/2ead902/docs/intents/originals/INT-safety.chat.md#u-10) 批准),原文「智能体获批的一次写文件就能改掉插件放行策略的输入」,方向「这些位置从围栏可写范围里拿掉或改为只读,必要的写入改由主进程代办」。旧票 alpha-code#1530 与旧计划 #1542 已于 2026-11-15 退役,本设计只继承结果、不继承旧机制。owner 对这一族工作的硬约束(2026-11-19,逐字):「不要设计的过于复杂。」
 - 结果(spec 落地前的工作编号):
   - **R-1** 被围栏的进程树里的任何进程(模型调用的工具、shell 命令、连接器子进程及其后代)改不了决定「运行什么程序、哪些工具不问就放行、凭据交给谁」的引擎配置。

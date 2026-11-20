@@ -218,55 +218,61 @@ async function machine(arm: Arm) {
     toMain = main.port
   }
 
-  fs.mkdirSync(ROOT, { recursive: true })
-  const run = fs.realpathSync(fs.mkdtempSync(path.join(ROOT, `${arm}-`)))
-  const resources = path.join(run, "resources")
-  buildFenceAddon({ out: path.join(resources, "codepuppy-fence", "codepuppy_fence.node"), buildId: `cf-engine-${arm}-${Date.now()}` })
-  const protectedDirectories = new Set(
-    configFenceLocations({ userDataPath: userData, appStateRoot: stateRoot, codepuppyGlobalRoot: globalRoot, engineConfigDirectory: configDir, configHome: roots.configHome, home, dataHome: roots.dataHome })
-      .filter((location) => location.kind === "subpath")
-      .map((location) => location.path),
-  )
-  const log: string[] = []
-  const plan = planProcessFence(
-    {
-      userDataPath: userData,
-      sidecarEnv: process.env,
-      addon: { packaged: true, resourcesPath: resources, moduleDir: "/unused", exists: fs.existsSync },
-      egressProxyPort: Number(new URL(model.baseURL).port),
-      carriedWorkspaces: [],
-      engineConfigDirectory: configDir,
-    },
-    {
-      homeDir: () => home,
-      codepuppyGlobalRoot: () => globalRoot,
-      appStateRoot: () => stateRoot,
-      realpath: (p) => fs.realpathSync.native(p),
-      defaultWorkspace: () => ws,
-      readWorkspaces: () => [],
-      isDirectory: (p) => fs.statSync(p).isDirectory(),
-      // known bad (noprecreate): the protected directories are not created before the fence
-      mkdirp: (p) => (arm === "noprecreate" && protectedDirectories.has(p) ? undefined : void fs.mkdirSync(p, { recursive: true })),
-      compile: trialCompileProfile,
-      log: (line) => void log.push(line),
-    },
-  )
-  let profile = plan.profile
-  if (arm === "control") {
-    const blocks = profile.indexOf("(deny file-write*\n", profile.indexOf("(allow network-outbound"))
-    expect(blocks).toBeGreaterThan(0)
-    profile = profile.slice(0, blocks).replace(/^(.*; W3)$/m, `$1\n  (subpath "${globalRoot}")   ; W2\n  (subpath "${path.join(roots.configHome, "opencode")}")   ; W6`)
+  // a failure from here on must not orphan the unfenced "main": it holds this process's stderr, and the host would wait on it forever
+  try {
+    fs.mkdirSync(ROOT, { recursive: true })
+    const run = fs.realpathSync(fs.mkdtempSync(path.join(ROOT, `${arm}-`)))
+    const resources = path.join(run, "resources")
+    buildFenceAddon({ out: path.join(resources, "codepuppy-fence", "codepuppy_fence.node"), buildId: `cf-engine-${arm}-${Date.now()}` })
+    const protectedDirectories = new Set(
+      configFenceLocations({ userDataPath: userData, appStateRoot: stateRoot, codepuppyGlobalRoot: globalRoot, engineConfigDirectory: configDir, configHome: roots.configHome, home, dataHome: roots.dataHome })
+        .filter((location) => location.kind === "subpath")
+        .map((location) => location.path),
+    )
+    const log: string[] = []
+    const plan = planProcessFence(
+      {
+        userDataPath: userData,
+        sidecarEnv: process.env,
+        addon: { packaged: true, resourcesPath: resources, moduleDir: "/unused", exists: fs.existsSync },
+        egressProxyPort: Number(new URL(model.baseURL).port),
+        carriedWorkspaces: [],
+        engineConfigDirectory: configDir,
+      },
+      {
+        homeDir: () => home,
+        codepuppyGlobalRoot: () => globalRoot,
+        appStateRoot: () => stateRoot,
+        realpath: (p) => fs.realpathSync.native(p),
+        defaultWorkspace: () => ws,
+        readWorkspaces: () => [],
+        isDirectory: (p) => fs.statSync(p).isDirectory(),
+        // known bad (noprecreate): the protected directories are not created before the fence
+        mkdirp: (p) => (arm === "noprecreate" && protectedDirectories.has(p) ? undefined : void fs.mkdirSync(p, { recursive: true })),
+        compile: trialCompileProfile,
+        log: (line) => void log.push(line),
+      },
+    )
+    let profile = plan.profile
+    if (arm === "control") {
+      const blocks = profile.indexOf("(deny file-write*\n", profile.indexOf("(allow network-outbound"))
+      expect(blocks).toBeGreaterThan(0)
+      profile = profile.slice(0, blocks).replace(/^(.*; W3)$/m, `$1\n  (subpath "${globalRoot}")   ; W2\n  (subpath "${path.join(roots.configHome, "opencode")}")   ; W6`)
+    }
+    const rules = processFenceWriteRules(profile)
+    // the layout is honest: the engine sandbox is writable before the protected blocks (W12), the protected files are not after them
+    expect(processFenceRulesCover({ allow: rules.allow, deny: [] }, sandbox.root), sandbox.root).toBe(true)
+    if (arm !== "control")
+      for (const file of [explicitConfigPath(userData), jsonc, path.join(configDir, "opencode.json"), policyFilePath(defaultPolicyBaseDir(path.join(roots.dataHome, "opencode")), { account: "a", workspace: "w" })])
+        expect(processFenceRulesCover(rules, file), file).toBe(false)
+    fs.writeFileSync(path.join(run, "profile.sb"), profile)
+    applyProcessFence({ addonPath: plan.addonPath, profile }, { insideDir: ws, outsideDir: run })
+    console.log(`CF-ENGINE ${JSON.stringify({ arm, pid: process.pid, deny: rules.deny, sandboxRoot: sandbox.root })}`)
+    return { host, main, ws, jsonc, configDir, globalRoot, userData, roots, home, callLog, policyTarget, bootstrap, plan: { ...plan, profile }, log }
+  } catch (error) {
+    await main?.stop()
+    throw error
   }
-  const rules = processFenceWriteRules(profile)
-  // the layout is honest: the engine sandbox is writable before the protected blocks (W12), the protected files are not after them
-  expect(processFenceRulesCover({ allow: rules.allow, deny: [] }, sandbox.root), sandbox.root).toBe(true)
-  if (arm !== "control")
-    for (const file of [explicitConfigPath(userData), jsonc, path.join(configDir, "opencode.json"), policyFilePath(defaultPolicyBaseDir(path.join(roots.dataHome, "opencode")), { account: "a", workspace: "w" })])
-      expect(processFenceRulesCover(rules, file), file).toBe(false)
-  fs.writeFileSync(path.join(run, "profile.sb"), profile)
-  applyProcessFence({ addonPath: plan.addonPath, profile }, { insideDir: ws, outsideDir: run })
-  console.log(`CF-ENGINE ${JSON.stringify({ arm, pid: process.pid, deny: rules.deny, sandboxRoot: sandbox.root })}`)
-  return { host, main, ws, jsonc, configDir, globalRoot, userData, roots, home, callLog, policyTarget, bootstrap, plan: { ...plan, profile }, log }
 }
 
 /** Engine conversation helpers bound to the running engine. */

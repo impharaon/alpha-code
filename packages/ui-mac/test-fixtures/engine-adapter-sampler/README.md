@@ -48,7 +48,7 @@
     项目改名,PTY 建 / 改名 / 进程自己退出 / 删,切 git 分支,连上同目录的 `mock-mcp.ts`(本机假 MCP,不走 OAuth)后让它推三种
     list_changed 再断开,项目里加参考目录并重载目录,取消一张提问表单;外加最后读一次各会话(`sessions`)与订阅的第一帧
     (`serverConnected`)。`src/engine-adapter/contract-cases.test.ts` 的事件部分回放它;
-11. `approval-actions.json`(`#1697` 放回 r4):用真引擎的公开创建/读取审批 API,在一个临时会话的 ask 规则下采 shell / subagent
+11. `approval-actions.json`(`#1697` 放回 r4):用真引擎的公开创建/读取审批 API,在最先建的那个会话里、以一个只给采样器用、规则全是 ask 的 agent(`approval-ask`,其余剧本都采完之后才写进全局配置,目录类夹具里的 agent 清单因此不变;I-13 L2 起会话行上的 ask 不再起作用)采 shell / subagent
     无 policy 请求与一条带冻结 I7a policy metadata 的 shell 请求(同 permission-reply 剧本的取法,不运行 ext、不调用工具)。
     `projection-parity.test.ts` 据此核对有意的能力换名与身份动作不换名,其他字段仍与冻结函数比较;
 12. 停掉引擎与假模型。

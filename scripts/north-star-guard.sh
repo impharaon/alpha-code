@@ -132,6 +132,9 @@ UPSTREAM_EXCLUDES=(
   # ADR-038(#668;#1662 裁决第 2 项):审批请求的应答期限。2.x 的 `Permission.assert` 对回复无限期等待,
   # 插件只能改判定(`permission.hook.evaluate`)改不了等多久;插件侧看门狗回 reject 会级联整个会话 ——
   # ADR-038 否决过的形状。接管面只有 `Deferred.await` 那一处的有界等待与具名失败(`codepuppy(ADR-038)` 标注块)。
+  # INT-safety I-13(SPEC-engine-config-fence BR-02,owner 2026-11-20「两份都批准」):引擎库被围栏的进程写得进,判定不再并入项目级
+  # 已存批准(`codepuppy(I-13 L1)`)、会话行只取 deny(`codepuppy(I-13 L2)`);判据 packages/core/test/codepuppy-engine-db-records.test.ts
+  # 与真引擎 packages/ui-mac/src/main/engine-db-records.engine.test.ts。
   ':(exclude)packages/core/src/permission.ts'
   # #1563 / #1565 / #1572 / ADR-041(#1662 裁决第 5 项):MCP 运行时没有插件挂点 —— 启动、重连、并发、连接前的随包声明、
   # 失败归因都在 core 内部。v1 接管的是 packages/opencode/src/mcp/index.ts,这是同一权威换接法。规则本体在 Code Puppy
@@ -172,10 +175,17 @@ UPSTREAM_EXCLUDES=(
   # 拿项目配置的唯一汇合点,上游只有全局开关 project、插件接口没有配置编辑器、托管策略忽略不了单个键;接管面只在 load() 一条链上的
   # `codepuppy(ADR-049)` 标注(读一次信任、项目文档校验前过滤与解码后再拿一次、托管策略之后插闸门文档),规则本体在 Code Puppy 自有的
   # config/codepuppy-project-gate.ts。范围与逐文件复核见 ADR-049;判据 packages/core/test/codepuppy-project-gate{,-upgrade}.test.ts 与真引擎两臂。
+  # INT-safety I-13 L3(SPEC-engine-config-fence BR-02):load() 不再装载 wellknown 文档(`codepuppy(I-13 L3)`;只为它服务的
+  # loadWellknownEntry / loadWellknown 一并删掉,上游同步时这一段要人工移植);判据同上一条 I-13。
   ':(exclude)packages/core/src/config.ts'
   # #1713 / ADR-049:md 读取点只调用同一闸门;判据与复核清单同上。
   ':(exclude)packages/core/src/config/plugin/skill.ts'
   ':(exclude)packages/core/src/config/plugin/agent.ts'
+  # INT-safety I-13 L2 / DESIGN-engine-config-fence D16(owner 2026-11-20 经编排器转达:「两件都同意」):会话行上的规则只有 deny 参与。
+  # 会话上下文在 select 内部把会话行并进决定本次请求有哪些工具、技能与连接器说明的规则,插件钩子在那之后才拿到工具表,改不了这次合并;
+  # 接管面只有 :136 那一行的 `codepuppy(I-13 L2)` 行尾标注。判据 packages/ext/src/policy/session-row-rules.test.ts 的会话上下文三条
+  # (上游原文件 ⇒ E4 第二臂红)。
+  ':(exclude)packages/core/src/session/context.ts'
 )
 
 # ── UPSTREAM_PATHS 里住着的 Code Puppy 自有文件:结构性谓词,不是逐文件清单(`#1085` / ADR-043)──

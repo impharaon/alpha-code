@@ -96,20 +96,20 @@ describe("[packages/core/src/permission.ts codepuppy(I-05)] allow for this sessi
     }),
   )
 
-  it.live("a configured deny outranks the grant; the same allow written as a session rule overrides it (known-bad arm)", () =>
+  it.live("a configured deny outranks the grant; the same allow written as a session rule does not override it either (I-13 L2)", () =>
     Effect.gen(function* () {
       const { a, b, sessions, effect, grant } = yield* engine([...READ_ASKS, { action: "read", resource: "secret/*", effect: "deny" }])
       yield* grant(a, "read", "notes.md", ["*"])
       expect(yield* effect(a, "read", "other.md")).toBe("allow")
       expect(yield* effect(a, "read", "secret/key")).toBe("deny")
-      // Known bad (the engine-branch adapter's shape, design F-02): session rules merge after the agent's, so the
-      // same allow kept there beats the configured deny.
+      // The engine-branch adapter's shape (design F-02) kept the grant as a session rule, which merged after the agent's and
+      // beat the configured deny. Since I-13 L2 only a session rule's deny entries take part, so that allow decides nothing.
       yield* sessions.setPermissions({ sessionID: b, permissions: [{ action: "read", resource: "*", effect: "allow" }] } as never)
-      expect(yield* effect(b, "read", "secret/key")).toBe("allow")
+      expect(yield* effect(b, "read", "secret/key")).toBe("deny")
     }),
   )
 
-  it.live("another session and a child session created after the grant still ask; a session rule is inherited by that child (known-bad arm)", () =>
+  it.live("another session and a child session created after the grant still ask; a child inherits a session-rule allow, which allows nothing (I-13 L2)", () =>
     Effect.gen(function* () {
       const { a, b, sessions, effect, grant } = yield* engine(READ_ASKS)
       yield* grant(a, "read", "notes.md", ["*"])
@@ -117,10 +117,13 @@ describe("[packages/core/src/permission.ts codepuppy(I-05)] allow for this sessi
       expect(yield* effect(b, "read", "notes.md")).toBe("ask")
       const child = (yield* sessions.create({ parentID: a, agent: "build" } as never)).id as string
       expect(yield* effect(child, "read", "notes.md")).toBe("ask")
-      // Known bad: a grant kept as a session rule is copied into every child created afterwards (core session.ts create).
-      yield* sessions.setPermissions({ sessionID: b, permissions: [{ action: "read", resource: "*", effect: "allow" }] } as never)
+      // A grant kept as a session rule is copied into every child created afterwards (core session.ts create); since I-13 L2
+      // the copied allow takes no part in the child's decision either.
+      const rule = { action: "read", resource: "*", effect: "allow" }
+      yield* sessions.setPermissions({ sessionID: b, permissions: [rule] } as never)
       const inheriting = (yield* sessions.create({ parentID: b, agent: "build" } as never)).id as string
-      expect(yield* effect(inheriting, "read", "notes.md")).toBe("allow")
+      expect((yield* sessions.get(inheriting)).permissions).toEqual([rule])
+      expect(yield* effect(inheriting, "read", "notes.md")).toBe("ask")
     }),
   )
 

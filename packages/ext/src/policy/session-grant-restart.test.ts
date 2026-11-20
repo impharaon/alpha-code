@@ -3,7 +3,8 @@
 // embedded engine — Code Puppy's production embedding (packages/ui-mac/engine/engine-embed.ts `startEngine`, options
 // from engine-server-options.ts, the password wrapper from engine-authorization.ts) — is stopped and started again on
 // the same database file. Control: a session rule written to the same database survives the same restart, so the
-// "asks again" half is not an artefact of a fresh database.
+// "asks again" half is not an artefact of a fresh database. The control rule is a deny: since I-13 L2 only a session
+// rule's deny entries take part in a decision.
 //
 // Isolation: the ext test preload (scripts/test-isolation/preload.ts) points HOME / XDG_* / TMPDIR / OPENCODE_DB at a
 // fresh temp root; the engine refuses to boot unless its own directories are inside it (`assertEngineSandboxed`).
@@ -95,8 +96,8 @@ describe("[packages/core/src/permission.ts codepuppy(I-05)] allow for this sessi
       expect((await first.call("POST", `/api/session/${granted}/permission/${request.id}/reply`, { decision: "always" })).status).toBe(204)
       expect((await first.ask(granted, "a.env")).effect).toBe("allow")
 
-      expect((await first.call("PATCH", `/api/session/${ruled}`, { permissions: [{ action: "read", resource: "a.env", effect: "allow" }] })).status).toBe(204)
-      expect((await first.ask(ruled, "a.env")).effect).toBe("allow")
+      expect((await first.call("PATCH", `/api/session/${ruled}`, { permissions: [{ action: "read", resource: "a.env", effect: "deny" }] })).status).toBe(204)
+      expect((await first.ask(ruled, "a.env")).effect).toBe("deny")
     } finally {
       await first.close()
     }
@@ -104,7 +105,7 @@ describe("[packages/core/src/permission.ts codepuppy(I-05)] allow for this sessi
     const second = await boot(root, project)
     try {
       expect((await second.ask(granted, "a.env")).effect).toBe("ask")
-      expect((await second.ask(ruled, "a.env")).effect).toBe("allow")
+      expect((await second.ask(ruled, "a.env")).effect).toBe("deny")
     } finally {
       await second.close()
     }

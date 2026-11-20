@@ -29,6 +29,7 @@ const ledgerPath = resolve(repoRoot, "scripts", "process-fence-write-sites.tsv")
 const MAIN_ONLY_SITES = [
   ["codepuppy-environment.ts", "mkdirSync", "directory"],
   ["codepuppy-environment.ts", "rmdirSync", "directory"],
+  ["codepuppy-secret-files.ts", "openSync", "file"],
   ["codepuppy-installs.ts", "mkdirSync", "root"],
   ["codepuppy-installs.ts", "renameSync", "file"],
   ["engine-explicit-config.ts", "chmodSync", "engineConfigDirectory"],
@@ -75,6 +76,21 @@ function valueImports(rel: string, module: RegExp): { names: string[]; source: t
 // 用扫描器算出的同一个 sidecar 闭包。
 describe("I2:main-only 写者在 sidecar 闭包里没有调用方", () => {
   const closure = sidecarSourceFiles(repoRoot)
+  test("闭包里没有文件拿到 readCredentialTable / readRegularFileNoFollow(凭据存放点只由 main 读,SPEC-stored-credentials-fence I3;后者的 openSync 是只读打开)", () => {
+    const readers = new Set(["readCredentialTable", "readRegularFileNoFollow", "*", "default"])
+    const importers: string[] = []
+    const offenders: string[] = []
+    for (const rel of closure) {
+      if (rel.endsWith("/codepuppy-secret-files.ts")) continue
+      const { names } = valueImports(rel, /(^|\/)codepuppy-secret-files(\.ts)?$/)
+      if (names.length) importers.push(rel)
+      for (const name of names) if (readers.has(name)) offenders.push(`${rel}: ${name}`)
+    }
+    expect(offenders).toEqual([])
+    // 手段是活的:模型投影确实从那里拿凭据路径函数(拿到的只有路径与在场判断)
+    expect(importers).toContain("packages/ui-mac/src/main/codepuppy-models.ts")
+  })
+
   test("闭包里除 engine-explicit-config.ts 自己,没有文件拿到 writeExplicitConfig / watchExplicitSources / writeEngineConfigFiles / writeEngineConfigForFork / materializeGovernedModelsBase(也不整块 import 那个模块)", () => {
     const writers = new Set(["writeExplicitConfig", "watchExplicitSources", "writeEngineConfigFiles", "writeEngineConfigForFork", "materializeGovernedModelsBase", "*", "default"])
     const importers: string[] = []

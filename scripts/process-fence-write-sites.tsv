@@ -24,6 +24,8 @@ packages/ui-mac/src/main/codepuppy-live-allowlist.ts	mkdirSync	userDataPath	W3
 packages/ui-mac/src/main/codepuppy-secret-files.ts	chmodSync	dir	W3
 packages/ui-mac/src/main/codepuppy-secret-files.ts	chmodSync	temp	W3
 packages/ui-mac/src/main/codepuppy-secret-files.ts	mkdirSync	dir	W3
+# SPEC-stored-credentials-fence(片 ① 审查 R1 第 1 条):readRegularFileNoFollow 以 O_RDONLY | O_NOFOLLOW 打开(只读,扫描器按 API 名记作写盘点);只有 main 的 readCredentialTable 与连接器读法调用它,sidecar 闭包里没有文件拿到这两个函数(process-fence-write-sites.test.ts I2)。
+packages/ui-mac/src/main/codepuppy-secret-files.ts	openSync	file	main-only
 packages/ui-mac/src/main/codepuppy-secret-files.ts	openSync	temp	W3
 packages/ui-mac/src/main/codepuppy-secret-files.ts	renameSync	temp	W3
 packages/ui-mac/src/main/codepuppy-secret-files.ts	rmSync	file	W3

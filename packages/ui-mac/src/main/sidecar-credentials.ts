@@ -63,7 +63,9 @@ export function createCredentialRequester(post: (message: CredentialsRequest | C
       if (closed !== undefined) return Promise.reject(new Error(`Code Puppy credentials: channel closed (${closed})`))
       const id = ++next
       return new Promise<CodePuppyCredentials>((resolve, reject) => {
-        const timer = setTimeout(() => {
+        // After a long block of this thread Node runs the due timer before a reply already queued on the port: yield once (setImmediate runs
+        // after the queued message) and only then decide (review item 8).
+        const timer = setTimeout(() => setImmediate(() => {
           if (!settle(id)) return
           log(`Code Puppy credentials: pull ${id} had no reply within ${CREDENTIALS_PULL_TIMEOUT_MS} ms — this load uses no credential table`)
           reject(new Error("Code Puppy credentials: no reply from the main process"))
@@ -72,7 +74,7 @@ export function createCredentialRequester(post: (message: CredentialsRequest | C
           } catch {
             // the channel is gone; this generation is ending anyway
           }
-        }, CREDENTIALS_PULL_TIMEOUT_MS)
+        }), CREDENTIALS_PULL_TIMEOUT_MS)
         pending.set(id, { resolve, reject, timer })
         try {
           post({ type: "credentials.request", id })

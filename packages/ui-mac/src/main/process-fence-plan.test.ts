@@ -199,8 +199,10 @@ describeDarwin("planProcessFence", () => {
     expect(plan.configFenceRoots).toContain(TARGET)
     // 不在盘上的 literal 只写「真实上级目录 + 名字」(literal 对尚不存在的文件同样挡住新建)
     expect(deny).toContainEqual({ kind: "literal", value: `${REAL_UD}/codepuppy.env` })
-    // 经软链的 userData:规则里只有真实路径,没有链路径的写法
-    expect(deny.filter((rule) => rule.value.includes(USER_DATA))).toEqual([])
+    // 经软链的 userData:规则里只有真实路径;链路径只以节点出现在上级目录块里 —— 链节点本身与它上面配置路径上的目录(修订 2 B)
+    expect(deny.filter((rule) => rule.kind !== "literal" && rule.value.includes(USER_DATA))).toEqual([])
+    expect(deny.filter((rule) => rule.kind === "literal" && rule.value.includes(USER_DATA))).toEqual([{ kind: "literal", value: USER_DATA }])
+    for (const node of [`${HOME}/Library/Application Support`, `${HOME}/Library`]) expect(deny).toContainEqual({ kind: "literal", value: node })
     expect(deny).toContainEqual({ kind: "regex", value: "^/Volumes/data/userdata/[^/]+\\.[dD][aA][tT]$" })
     // 别的 realpath 错误 ⇒ 抛(既有「计划失败 ⇒ 拒 fork」路径)
     const denied = harness({ realpath: (p) => { if (p === `${HOME}/opencode.json`) throw Object.assign(new Error("EACCES"), { code: "EACCES" }); return p } })
@@ -296,6 +298,65 @@ describeDarwin("planProcessFence", () => {
         if (value === undefined) delete process.env[name]
         else process.env[name] = value
       rmSync(cwd, { recursive: true, force: true })
+    }
+  })
+
+  // 实现期修订 2 B:上级目录节点沿真实路径与配置路径(未解析)各算一遍 —— 配置路径上住在项目里的软链节点与它上面的项目文件夹也冻结
+  test("修订 2 B:XDG_CONFIG_HOME 是项目里的软链 ⇒ 链节点本身与它上面的项目文件夹进上级目录块;规则只有真实路径;项目本身照常可写,只是走签发路径", () => {
+    const link = `${HOME}/proj-a/cfglink`
+    const realpath = (p: string) => (p === link || p.startsWith(`${link}/`) ? `${HOME}/real-cfg${p.slice(link.length)}` : p)
+    const h = harness({ realpath })
+    h.input.sidecarEnv = { HOME, XDG_CONFIG_HOME: link }
+    h.input.engineConfigDirectory = `${link}/opencode`
+    const plan = planProcessFence(h.input, h.deps)
+    const rules = processFenceWriteRules(plan.profile)
+    expect(rules.deny).toContainEqual({ kind: "subpath", value: `${HOME}/real-cfg/opencode` })
+    expect(rules.deny).toContainEqual({ kind: "literal", value: link })
+    expect(rules.deny).toContainEqual({ kind: "literal", value: `${HOME}/proj-a` })
+    expect(rules.deny.filter((rule) => rule.kind !== "literal" && rule.value.includes("cfglink"))).toEqual([])
+    // 链下面的节点按身份就是真实路径上的那一个,不另列
+    expect(rules.deny.filter((rule) => rule.value.startsWith(`${link}/`))).toEqual([])
+    expect(new Set(rules.deny.map((rule) => `${rule.kind}:${rule.value}`)).size).toBe(rules.deny.length)
+    expect(plan.workspaces).toContain(`${HOME}/proj-a`)
+    expect(processFenceRulesCover(rules, `${HOME}/proj-a`)).toBe(false)
+    expect(processFenceRulesCover(rules, `${HOME}/proj-a/src`)).toBe(true)
+    expect(plan.configFenceRoots).toContain(`${HOME}/real-cfg/opencode`)
+  })
+
+  test("修订 2 B:两种写法指同一个节点按身份去重(大小写变体 ⇒ 只列真实写法);配置路径与真实路径相同 ⇒ 规则与上级目录块不变", () => {
+    const upper = `${HOME}/PROJ-A`
+    const realpath = (p: string) => {
+      if (p === `${upper}/cfglink` || p.startsWith(`${upper}/cfglink/`)) return `${HOME}/real-cfg${p.slice(`${upper}/cfglink`.length)}`
+      return p === upper || p.startsWith(`${upper}/`) ? `${HOME}/proj-a${p.slice(upper.length)}` : p
+    }
+    const h = harness({ realpath })
+    h.input.sidecarEnv = { HOME, XDG_CONFIG_HOME: `${upper}/cfglink` }
+    h.input.engineConfigDirectory = `${upper}/cfglink/opencode`
+    const deny = processFenceWriteRules(planProcessFence(h.input, h.deps).profile).deny
+    expect(deny).toContainEqual({ kind: "literal", value: `${HOME}/proj-a/cfglink` })
+    expect(deny).toContainEqual({ kind: "literal", value: `${HOME}/proj-a` })
+    expect(deny.filter((rule) => rule.value.includes("PROJ-A"))).toEqual([])
+    const plain = harness()
+    const plan = planProcessFence(plain.input, plain.deps)
+    const cf = planConfigFence({ userDataPath: USER_DATA, appStateRoot: STATE_ROOT, codepuppyGlobalRoot: GLOBAL, engineConfigDirectory: `${HOME}/.config/opencode`, roots: plan.roots }, { realpath: (p) => p, mkdirp: () => {} })
+    expect(cf.configFence.some((rule) => "via" in rule)).toBe(false)
+  })
+
+  test("修订 2 C:预建的目录位置本身是坏掉的软链 ⇒ 预建抛错、计划失败(拒 fork,预期失败);不跳过预建", () => {
+    const base = realpathSync(mkdtempSync(join(tmpdir(), "cf-dangling-")))
+    try {
+      const home = join(base, "home")
+      mkdirSync(join(home, ".config"), { recursive: true })
+      require("node:fs").symlinkSync(join(base, "gone"), join(home, ".config", "opencode"))
+      expect(() =>
+        planConfigFence(
+          { userDataPath: join(base, "ud"), appStateRoot: join(base, "state"), codepuppyGlobalRoot: join(base, "state", "env", "dev"), engineConfigDirectory: join(home, ".config", "opencode"), roots: { home, dataHome: join(home, ".local", "share"), cacheHome: join(home, ".cache"), configHome: join(home, ".config") } },
+          { realpath: (p) => realpathSync.native(p), mkdirp: (p) => void mkdirSync(p, { recursive: true }) },
+        ),
+      // 生产的 Electron Node 报 ENOENT(设计证据 r4/C-mkdir.out);bun 的递归 mkdir 对同一个坏软链报 EEXIST。两者都抛 ⇒ 计划失败
+      ).toThrow(/ENOENT|EEXIST/)
+    } finally {
+      rmSync(base, { recursive: true, force: true })
     }
   })
 

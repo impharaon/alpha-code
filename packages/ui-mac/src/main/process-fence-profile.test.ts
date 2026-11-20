@@ -144,6 +144,22 @@ describe("renderProcessFenceProfile —— 勘破 §8.2 的行(W10/W19 已删,D1
     expect(() => renderProcessFenceProfile({ ...base, configFence: [{ kind: "dat-files", dir: "relative" }] })).toThrow(/configFence\[0\]/)
   })
 
+  test("修订 2 B:规则带配置路径上的节点(via)⇒ 上级目录块在它自己的真实路径节点之后再列这些节点,去重;往返原样读回;节点里的引号拒绝渲染", () => {
+    const configFence = [
+      { kind: "subpath" as const, path: "/r/cfg/opencode", via: ["/w/proj/link", "/w/proj"] },
+      { kind: "literal" as const, path: "/w/other/x", via: ["/w/proj"] },
+    ]
+    const profile = renderProcessFenceProfile({ ...base, configFence })
+    const ancestors = profile.split("\n").find((line) => line.includes("; CF 上级目录节点"))!
+    expect(ancestors).toBe('(deny file-write* (literal "/r/cfg") (literal "/r") (literal "/w/proj/link") (literal "/w/proj") (literal "/w/other") (literal "/w"))      ; CF 上级目录节点')
+    expect(processFenceWriteRules(profile).deny).toEqual([
+      { kind: "subpath", value: "/r/cfg/opencode" },
+      { kind: "literal", value: "/w/other/x" },
+      ...["/r/cfg", "/r", "/w/proj/link", "/w/proj", "/w/other", "/w"].map((value) => ({ kind: "literal" as const, value })),
+    ])
+    expect(() => renderProcessFenceProfile({ ...base, configFence: [{ kind: "subpath", path: "/r/x", via: ['/w/"x'] }] })).toThrow(/configFence\[0\]/)
+  })
+
   test("位置清单:CF-1–8、CF-10(名字取 USER_DATA_LAYOUT 与 store 常量);两个引擎配置目录相同只列一份,用户导出 OPENCODE_CONFIG_DIR 时两份都列;不含 ~/.opencode 与工具策略目录(片 ④ / ③)", () => {
     const list = (engineConfigDirectory: string) =>
       configFenceLocations({ userDataPath: USER_DATA, appStateRoot: STATE_ROOT, codepuppyGlobalRoot: GLOBAL, engineConfigDirectory, configHome: roots.configHome, home: HOME })

@@ -40,6 +40,8 @@ import { STAGED_ATTACHMENT_PART_NAME, stagedAttachmentPart } from "./staged-atta
 import { canonicalToolIdentity } from "../../schema/src/tool-identity"
 import { policyWorkspace } from "./policy/index"
 import { createToolPolicyStore, defaultPolicyBaseDir } from "./policy/resolver"
+import { receiveToolPolicyWrite } from "./policy/store"
+import { Rpc } from "../../core/src/rpc.ts"
 import { Message } from "../../ai/src/schema/messages.ts"
 import { ToolFailure } from "../../ai/src/schema/errors.ts"
 import { projectTrustIdentity } from "../../ui-mac/src/main/project-trust-truth"
@@ -525,12 +527,17 @@ const hubHost = (options: { manifest: boolean }) =>
     const savedState = holder[PROCESS_STATE_KEY]
     const listeners: Array<(event: { data: unknown }) => void> = []
     const installs: unknown[] = []
+    // SPEC-engine-config-fence BR-03:main 收到的工具策略写请求(由 main 的生产接收函数写进 ext 读的那个数据目录)
+    const toolPolicyWrites: unknown[] = []
     const row = { id: "mcp:github", scope: null, name: "github", kind: "mcp", displayName: "GitHub", description: "repos", installed: false, enabled: false, state: "not-installed", authorization: "none" }
     const candidate = { id: "mcp:github", source: "catalog", name: "github", displayName: "GitHub", description: "repos", kind: "mcp", upstream: {} } as const
     const port = {
       postMessage: (message: { type: string; id: number; directory?: string; query?: string }) =>
         queueMicrotask(() => {
           if (message.type === "codepuppy.hub.install.request") installs.push(message)
+          if (message.type === "codepuppy.tool-policy.write.request") toolPolicyWrites.push(message)
+          const toPort = (data: unknown) => listeners.forEach((listener) => listener({ data }))
+          if (receiveToolPolicyWrite(message, { baseDir: defaultPolicyBaseDir(join(process.env.XDG_DATA_HOME!, "opencode")), post: toPort, log: () => {} })) return
           const reply =
             message.type === "codepuppy.sources.search.request"
               ? buildSourcesSearchReply(message.id, { result: { searchId: "search_github", query: message.query ?? "", sources: [{ source: "catalog", status: "ok", matched: 1, skipped: 0 }], candidates: [candidate, { id: "cand_ctx7", source: "claude-marketplace", name: "context7", displayName: "Context7", description: "docs", kind: "plugin", upstream: {} }] } })
@@ -569,8 +576,29 @@ const hubHost = (options: { manifest: boolean }) =>
         })
       },
     })
-    return { installs }
+    return { installs, toolPolicyWrites }
   })
+
+itWithPermission.live("I-13(SPEC-engine-config-fence BR-03):有 parentPort 时，ext 的工具策略改写交给 main —— 经 RPC 的 setRecord 在 port 上发一条写请求,main 的生产接收函数写盘,ext 下一次读到", () =>
+  Effect.gen(function* () {
+    const account = `acct:${createHash("sha256").update(String(Math.random())).digest("hex")}`
+    env({}, { policyAccount: account })
+    const { toolPolicyWrites } = yield* hubHost({ manifest: false })
+    yield* activate(CodePuppyExt)
+    const record = { selector: { level: "class", class: "plugin" }, state: "ask" }
+    const rpc = yield* Rpc.Service
+    const exit = yield* rpc.call("codepuppy.tool-policy", "setRecord", record).pipe(Effect.exit)
+    expect(Exit.isSuccess(exit), JSON.stringify(exit)).toBe(true)
+    expect(toolPolicyWrites).toEqual([expect.objectContaining({ type: "codepuppy.tool-policy.write.request", op: "save", records: [record] })])
+    const location = yield* Location.Service
+    const store = createToolPolicyStore({
+      baseDir: defaultPolicyBaseDir(join(process.env.XDG_DATA_HOME!, "opencode")),
+      account: () => account,
+      workspace: () => policyWorkspace(location as never),
+    })
+    expect((yield* Effect.promise(() => store.snapshot())).user).toEqual({ status: "ok", records: [record] })
+  }),
+)
 
 /**
  * 一次 `codepuppy_hub_install` 调用里用户看到的审批:每出现一条待批请求就记下并按 `answer` 回复,直到调用结束。

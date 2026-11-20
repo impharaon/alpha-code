@@ -445,6 +445,7 @@ PLAN 阶段按派单写在临时文件里，没有提交；本节由实施阶段
 ### 偏离记录
 
 - 2026-11-20 · 编排器核对后分两轮(本提交):单元 A = C0–C2;单元 B = C3–C5,在主线合入片 ④ 之后开始(片 ④ 的复审修正把计划器的预建跳过绑在 CF-9 那一条位置上，不再按路径字符串，单元 B 开工前重读那段循环)。写盘登记簿 `store.ts` 四行改 `main-only`、`MAIN_ONLY_SITES` 与结构判据,从 C1 / C2 挪到 C3 / C4:单元 A 里 CF-11 还没进受保护集,W4 照样罩着工具策略目录，这四行今天的根仍然如实，而且 `receiveToolPolicyWrite` 不新增任何写盘调用点，登记簿判据不受影响。`server.test.ts` 预建根表的 `XDG_DATA_HOME` 两行同样归单元 B。
+- 2026-11-20 · 单元 A 多一条测试(计划的测试表里没有):`ext/plugin-host.test.ts` 在 OpenCode 2 真插件宿主里装生产默认导出、带一个假 parentPort,经 RPC 的 `setRecord` ⇒ port 上恰一条工具策略写请求，由 main 的生产接收函数写盘，下一次读到。理由：计划里「`plugin.ts` 把桥的写者交给 `registerPolicy`」这一接线(变异 M2)只有单元 B 的真引擎臂能抓到；这一条让单元 A 自己就有判据。gate-files `plugin-host` 51 → 52。
 - 2026-11-20 · §4.7 的结构断言措辞(编排器已接受，单元 B 落地):设计写「sidecar 闭包里没有任何文件 import 这些写者」,但 §4.5 冻结的缺省写者(CLI 与单测用)就在 `resolver.ts` 里直接调 `savePolicyDocument` / `resetPolicyDocument`,而 `resolver.ts` 在闭包里;所以判据写成「闭包里拿到这两个写者的只有 `resolver.ts`,没有文件拿到 `receiveToolPolicyWrite`」。
 
 ### 可选(不做)

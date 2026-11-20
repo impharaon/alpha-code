@@ -127,7 +127,13 @@ last_reviewed: 2026-11-20
 | AC-05 | 同一宿主：delayed 臂(E11)—— 两个 Location 装载，第一个的拉取回复被扣住，其间提交新连接器版本，第二个拿到新值，迟到回复不被发布；timeout 臂(E12)—— 让 main 方超过 10 秒不回复 ⇒ 这次装载里凭据位置为空(不是旧值)，`credentials.unavailable` 到达 main 方的生产应答函数并请求 `credential-change`，宿主按生产意图重启引擎后连接器拿到盘上当前值；端口关闭臂同样不出现旧值。`server.test.ts`：假 fork 子进程发 `credentials.unavailable` / 建表失败 ⇒ `requestRespawn("credential-change")` 恰一次 | 合并在途拉取 ⇒ delayed 臂第二个拿到旧值；超时后用已发布的表 ⇒ timeout 臂留下旧值；不接重启 ⇒ 恢复后仍为空 |
 
 ### 偏离记录
-暂无。
+- 2026-11-20 · O1 撤回:片 ② 第一次实现提交按 O1 在 `packages/util/package.json` 声明了 `jsonc-parser`,`scripts/north-star-guard.sh` 把它判为上游文件改动(那等于一项设计没点名的新接管)。两份文档都是主进程用 `JSON.stringify` 写出的严格 JSON,`resolveCodePuppyCredentialRefs` 改用 `JSON.parse` 定位清单位置、代入处随机哨兵占位后整份重新序列化,解析不了照旧原样返回;`package.json` 与 `bun.lock` 回到主线原样,util 新文件只 import `node:path`、`node:os` · 提交 `8e90e143e3`。本会话为声明它跑过两次不带 `HUSKY=0` 的 `bun install`(会改共享的 `core.hooksPath`,编排器已复原)。
+- 2026-11-20 · 实现细节(不改合同):表与拉取函数各一个 `globalThis` 槽,另有仅测试用的 `__resetCodePuppyCredentialsForTests`(先例 `__resetCodePuppyBootstrapForTests`);装载前拉取以「文本含 `{file:`」为条件(清单位置的超集);10 秒上限与 `credentials.unavailable` 由 sidecar 侧请求方承担(拉取函数签名不带 id),`refresh` 只做「拉、成功才发布」;请求方另按设计 §4.2「迟到的回复不发布」把「比它新的请求的回复已先到」的旧回复也当迟到(那次拉取以错误结束,表不倒退);C-f 是 `ModelConfigInputs.credential` 查询(sidecar 的注入传表,主进程调用方不传 ⇒ 读盘);T2 落在 `applyPlatformCredentialsHot` 的必填 `push` 形参;`SpawnLocalServerOptions.requestRespawn`(O3) · 提交 `1cb3749549`。
+- 2026-11-20 · 计划外文件:`test-component/credential-table.ts`(测试里扮演 main 的 T1 / P / T2,共享宿主与各注入用例共用)、`test-component/mcp-env-dump.fixture.ts`(连接器启动时记下拿到的 TOKEN 与所在 Location);共享宿主之外自己起引擎或注入的用例按 sidecar 同序交表:`bootstrap-launch-parity.engine.cases.ts`(决定记录未重采即逐项相同)、`codepuppy-config-injection-engine.cases.ts`、`engine-plugin-policy.engine.cases.ts`、`engine-adapter/turn-failure.engine.cases.ts`(「删文件」一步改为 main 删文件并推表)、`test-fixtures/net-failure/engine-driver.ts`;写盘登记簿 `scripts/process-fence-write-sites.tsv` 与 `process-fence-write-sites.test.ts`(只读打开登记为 main-only 并加 I3 结构判据;这两个文件与工具策略那一路共用)· 提交 `5346d030c7`、`9c34e2a640`。
+- 2026-11-20 · 证明的形状:AC-02 的「引擎进程没有从磁盘读任何凭据文件」与「只加规则不换读法」对照臂在片 ③(要 C1);片 ② 用「表与盘不同 ⇒ 用表里的」分歧臂判读者只认表。E11 / E12 在片 ② 用「main 交出的表与盘不同 / 盘上新值、表里旧值」区分「经自己那次拉取」与「拉取失败后引擎自己读盘」(过渡态);合并在途拉取的变异起初漏过 E11(过渡态的盘读给出了新值),改成表与盘不同的值后红 · 提交 `5346d030c7`。
+- 2026-11-20 · 事实文档:`docs/` 里没有写着「引擎每次读凭据文件」的现行事实句(只有日期型决策记录与 v1 注入分类的合同句,都仍成立);事实变动落在 ADR-047 两行、权威保持表与登记册三项 · 提交 `62823783f4`。ADR-047「已握住 58 项」本来就与登记册不符(主线 63 项),本片没改这个数。
+- 2026-11-20 · O5:片 ② 没有 C1,自关围栏的既有宿主都不需要围栏外的拉取应答(各宿主照常绿,见证据表)。
+- 2026-11-20 · 证据:红 `97cff40c0e`(`evidence/s2-red-*.log`:新导出、新模块不存在;续期推送一次都没被调用);绿 `1cb3749549` 及其后。变异(都已 `git restore`,`evidence/mutations/M2-*.log`):去掉装载前拉取 ⇒ core 2 条、真引擎宿主红;拉取失败仍用已发布的表 ⇒ core 1 条、真引擎 E12 红;合并在途拉取 ⇒ util 1 条、真引擎 E11 红;平台凭据头仍读盘 ⇒ ext 2 条红;引擎配置照旧全部读盘 ⇒ 真引擎分歧臂红;去掉续期推送 ⇒ 单测 1 条、token-hot-apply 宿主红;去掉接收方绑定 ⇒ util 2 条、core 1 条红;代入范围放宽为全文 ⇒ util 4 条、core 1 条红。
 
 ## 片 ③:围栏 profile 末尾加 C1
 

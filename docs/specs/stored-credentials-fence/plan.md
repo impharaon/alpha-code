@@ -62,7 +62,13 @@ last_reviewed: 2026-11-20
 | AC-04(单元) | `packages/util/test/codepuppy-credentials.test.ts`、`process-fence-plan.test.ts` 新用例 | 同上三个变异各自让对应单元用例红 |
 
 ### 偏离记录
-暂无。
+- 2026-11-20 · 测试位置:util 的单测按该包惯例放在 `packages/util/src/codepuppy-credentials.test.ts`(计划写的是 `packages/util/test/`);计划器两个新导出的单测放进新文件 `packages/ui-mac/src/main/process-fence-credential-stores.test.ts`,不加进 `process-fence-plan.test.ts`(后者在闸门登记簿里钉精确条数 27,又与工具策略那一路共用)· 提交 `49b47fd063`。
+- 2026-11-20 · 签名:`resolveConnectorLeaf` 的输入与 `readCredentialTable` 各多一个可选 `log`(只收连接器名与字段位置 / 相对路径,不含值)—— 设计 §5 的「记名字」需要一个出口,设计 §4.1 / §4.3 其余形参不变;`ManagedMcpConvergenceDeps` 除 O4 的必填 `userDataPath` 外也多一个可选 `log`,`ext-ipc.ts` 接到主进程日志 · 提交 `d514173de1`。
+- 2026-11-20 · 构造点是 10 处不是 7 处:`ext-ipc.ts` 1 处 + 测试 9 处(`official-connectors.cases.ts` 有 5 处)。其中两处带真引擎的官方连接器用例先建出 `userData`(主进程的 userData 总在;这两个用例原先没建,真实目标清单求不出它的真实路径)· 提交 `d514173de1`。
+- 2026-11-20 · 计划外文件 `packages/ui-mac/src/main/logging.ts`:崩溃转储目录名收成 `codepuppy-secret-files.ts` 的 `CRASH_DUMPS_DIR`,存放点清单与 crashReporter 用同一个名字(不进 `USER_DATA_LAYOUT`:升级迁移逐项枚举那张表)· 提交 `d514173de1`。
+- 2026-11-20 · 实现细节:直接应用路径每次收敛只在某个 Location 真要应用启用的定义时才读一次表(停用不打开任何存放点);相对路径写法一律按别名给空串(引用必须已是 path.resolve 之后的绝对路径才可能等于表里的键)· 提交 `d514173de1`。
+- 2026-11-20 · 新宿主与真盘身份用例只在 darwin 跑(firmlink 写法与大小写不敏感的卷是 macOS 的事实),登记簿行带 `[平台:darwin]`,非 darwin 自报 skip · 提交:紧随 `d514173de1` 的登记提交。
+- 2026-11-20 · 证据:红 `49b47fd063`(`evidence/s1-red-*.log`:新导出不存在;旧读法把四种别名、别的连接器、平台凭据、BYOK 密钥的假值都交给了引擎);绿 `d514173de1`。变异(都已 `git restore`):M1 恢复无条件读文件 ⇒ 真引擎用例七个字段读到假值、util 4 条红;M2 按路径前缀判存放点 ⇒ 软链、大小写、firmlink 三个字段读到假值、身份用例红;M3 只认 `client_secret` ⇒ 远程 `client_secret` 变空、util 1 条红(`evidence/mutations/M1–M3-*.log`)。
 
 ## 片 ②:引擎与 ext 只从主进程交来的内存表取凭据
 

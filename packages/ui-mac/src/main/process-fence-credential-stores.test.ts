@@ -49,7 +49,8 @@ describe("planCredentialStores", () => {
 })
 
 describe("credentialStoreTarget", () => {
-  test("by identity: the canonical path, a workspace symlink, a relative path, a case variant, the firmlink spelling and a hard link all point into a store; an unrelated file does not; an unresolvable path counts as a store", () => {
+  // firmlink 写法与大小写不敏感的 APFS 是 macOS 的事实
+  test.skipIf(process.platform !== "darwin")("by identity: the canonical path, a workspace symlink, a relative path, a case variant, the firmlink spelling and a hard link all point into a store; an unrelated file does not; an unresolvable path counts as a store", () => {
     const token = path.join(userData, "codepuppy-mcp-secrets", "alpha", "v-0000aaaa", "TOKEN")
     const workspace = path.join(base, "workspace")
     fs.mkdirSync(workspace)

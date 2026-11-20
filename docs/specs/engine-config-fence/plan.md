@@ -14,7 +14,7 @@ last_reviewed: 2026-11-20
 
 ## 片 ①:引擎不认三类库内记录(L1–L3)
 
-- 依据:SPEC-engine-config-fence v1(owner 2026-11-20 批准)BR-02、AC-03,以及 BR-04 中本片可能碰坏的部分;DESIGN-engine-config-fence §2 P-06、§4.6、§6 I3 / E4 / E7、§10 D8、D9、D12 ①(两份文件 @ `3f36883278`,在 `docs/credential-and-config-fence` 工作树,另行合入主线,所以这里不写链接);INT-safety I-13;派单没有给 Issue 编号。读码基线 `origin/alpha` @ `887748b52c`。
+- 依据:SPEC-engine-config-fence v1(owner 2026-11-20 批准)BR-02、AC-03,以及 BR-04 中本片可能碰坏的部分;DESIGN-engine-config-fence §2 P-06、§4.6、§6 I3 / E4 / E7、§10 D8、D9、D12 ①(两份文件 @ `3f36883278`,在 `docs/credential-and-config-fence` 工作树,另行合入主线,所以这里不写链接);INT-safety I-13;派单没有给 Issue 编号。实施期设计返还 D16(设计方修订片段 `~/.cache/alpha-orch/2026-11-19/config-fence-design/r3/design-delta.md` §1–8,证据 `r3/SESSION-ROW.out`、`r3/SNAPSHOT-ROW.out`):会话行「只取 deny」落在会话行的每一处读取 —— 引擎 `configured()`、ext `ruleset()` 的返回点、引擎会话上下文 `session/context.ts:136`;编排器 2026-11-20 把前两处放进本片,第三处待 owner 同意新接管。读码基线 `origin/alpha` @ `887748b52c`。
 - 核对:Phase: IMPLEMENT — plan `7694dc2aa0` · orchestrator / Claude Fable 5.2 · 通过(L1、L2 在引擎判定点、L3)。裁决:ADR-047「精确接管面」两行按 I-05 先例追加,获准,`.claude/rules` 下不改别处;三个 ext 证明测试、`KNOWN_RED` 10 → 74、登记册与闸门行按计划,增补名单的提交要逐文件写明为何变红、并说明怎样核对过没有夹带别的原因的红;E7 前提不成立,七个用例不改,记入偏离;`config.test.ts` 的 5 条只列名、不加判官;`sample.ts:212` 不动,记入偏离;ext 自读会话行与 wellknown 刷新两项交设计方,本片不碰 `packages/ext` 生产代码。
 
 PLAN 阶段只提交本文件。下面的命令与结论分两类:「实测」是本阶段在临时克隆(`cp -cR` 克隆本工作树、只改克隆里的两个文件)里跑出来的,原始输出在 `IMP/` = `~/.cache/alpha-orch/2026-11-19/impl-fence-slice1/exp/out/`;其余是实施安排,还没有在本分支上运行。
@@ -40,16 +40,21 @@ PLAN 阶段只提交本文件。下面的命令与结论分两类:「实测」�
 - wellknown:`packages/ui-mac/src`、`packages/codepuppy-app/src`、`packages/ext/src` 里没有任何登记或读取它的代码,只有 `engine-explicit-config.ts:3` 一行讲装载顺序的注释;适配器不服务登记路由;唯一的历史来源 `auth.json` 导入,主进程在 fork 前就拒绝了(`server.ts:517`、`:534`)。
 - 0.2.6 的「助手查找与查状态不再弹审批」用的是档位的 agent 级 allow,不是会话行或已存批准。
 
-### L2 的落点(审查 R1 第 9 项)
+### L2 的落点(审查 R1 第 9 项;D16 修订)
 
-L2 只在判定处生效:`permission.ts` 的 `configured()`(`:217-222`)。不在两处共同读取的地方(`SessionStore` / `session/info.ts:49` 或 `session/context.ts:136`)。理由:
+计划阶段的结论(下面的 D16 修订已把 ext 读取处并进来):L2 在引擎判定处生效:`permission.ts` 的 `configured()`(`:217-222`)。不在两处共同读取的地方(`SessionStore` / `session/info.ts:49` 或 `session/context.ts:136`)。理由:
 
 1. 共同读取处都是没有接管的上游文件,改它们要另立 ADR(ADR-029 §3),超出派单两个文件的范围;在 store 层过滤,还会改变冻结路由返回的内容和子会话继承到的内容。
 2. 可见性只按「整个工具被拒」筛(`tool.ts:381-384` 的 `whollyDisabled`)。被植入的 allow / ask 最多让一个 agent 拒掉的工具出现在模型面前;真正执行时,引擎内置工具与 MCP 工具在自己的执行体里调 `Permission.assert`(如 `tool/plugin/shell.ts:127`、`tool/mcp.ts:74`),交互档里 ext 的 `confirm` 对每次调用都以 canonical 身份调一次 `assert`(`ext/src/policy/gate.ts:186`)。`assert` 走 `configured()`,只认 `deny`,所以 agent 的拒绝照旧成立。
 3. 只读档:植入的 `ask edit *` / `allow edit *` 能让编辑工具出现,但调用时只读档的静态 `deny` 照样拒绝(core 用例 L2 断言 `deny`)。
 4. 子助手:子会话继承父会话的会话行(`session.ts:314`),判定时经同一个 `configured()`,所以继承来的 allow 不放行。改过的 `session-grant.test.ts` 第二条在真内核上断言这一点(子会话照问,同时断言会话行确实复制过去了)。
 
-有一处不归本片(记作观察,不写代码):ext 的规则轴自己读会话行(`ext/src/policy/index.ts:123-132`)。无人值守路径里,判定为 allow 就直接返回,不再调引擎的 `assert`(`gate.ts:171`、`:329`)。所以在无人值守运行中,对只由 ext 把关、自身不调 `assert` 的插件工具,植入的会话行 allow 仍可能去掉规则轴的 deny。派单冻结了 `packages/ext` 的策略代码,不在本片改。
+**D16 修订(2026-11-20)。** 上面第 1–4 条只说到引擎判定处。设计方查实会话行还有两处读者,改为三处都只取 deny:
+
+- **ext `ruleset()`**(`packages/ext/src/policy/index.ts:123-136`,返回在 `:135`,本片):在返回点过滤一次,交互与无人值守两个分支共用这一处。交互分支读 `session.data.permissions`,插件的 `session.get` 返回会话本身(`plugin/host.ts:586`),今天就读不到东西,这里不改它的读法。无人值守分支读得到会话行;闸门判定放行后直接返回,不再调引擎判定(`gate.ts:171`、`:329`)。所以今天被植入的会话行 allow 能盖过 agent 规则里的身份 deny,工具照常执行(`SESSION-ROW.out` 的 `ran writes=1`)。
+- **引擎会话上下文**(`packages/core/src/session/context.ts:136`,**不在本片**):它决定本次请求里有哪些工具、技能和连接器说明,不经过 `configured()`;插件工具自己不调引擎判定,整工具拒绝只靠这一处(`SNAPSHOT-ROW.out`)。这是新的上游接管,要 owner 同意,编排器正在请示。获准后单独补一对提交:先提交 E4 第二臂(「全部批准」档,agent 拒掉的插件工具在会话行写 allow 之后出现并执行)让它红,再提交那一行的 `codepuppy(I-13 L2)` 标注与登记义务(ADR-047 加行、`UPSTREAM_EXCLUDES` 加一条、登记册反向臂)。本片已有的提交不用返工。owner 如果不同意,D16 的替代方案另行下发,本片不预先做。
+- `schedule/check.ts:301` 在固定关闭的实验开关后面,不改(D16)。
+- wellknown 来源仍会收到不带凭据的 manifest 请求:设计方记为残留 R9,接受,L3 不变。
 
 ### 改动
 
@@ -59,6 +64,9 @@ L2 只在判定处生效:`permission.ts` 的 `configured()`(`:217-222`)。不在
 | `packages/core/src/config.ts` | **L3**:load 链(`:353-367`)不再调 `loadWellknown`,`gate.finish` 列表删掉 `...wellknownDocuments.flat()`(`:372`),原位留一个 `codepuppy(I-13 L3)` 标注块。core 开了 `noUnusedLocals`(`packages/core/tsconfig.json`),所以同时删掉只服务于它的 `loadWellknownEntry`(`:178-213`)和 `loadWellknown`(`:215-228`),原位留一行标注指向 load 链。`WellKnown` 服务、wellknown 插件、`Credential.Event.Switched` / `WellKnown.Event.Updated` 订阅、10 分钟刷新都不动 |
 | `packages/core/test/codepuppy-engine-db-records.test.ts`(新) | 在引擎真实服务上判 L1–L3,共 3 条。每条带一个对照,证明植入的那条记录如果被采用就会放宽或装载:**L1** 往 `permission` 表插 `shell / *`,判定仍是 `ask`;已存批准照样能列出(冻结的服务不变);对照是用引擎自己的 `Permission.evaluate`、按上游的并入方式算同一条记录,得到 `allow`。**L2** 会话行 `allow shell *` ⇒ 仍是 `ask`;agent `deny edit *` 加会话行 `ask edit *` / `allow edit *` ⇒ 仍是 `deny`;agent `allow *` 加会话行 `deny subagent *` ⇒ `deny`(自动化解析会话的写法照常生效);对照同样用 `Permission.evaluate`。**L3** 真 `WellKnown` 服务 + 持久 KV 里放来源、缓存清单与带本地 MCP 的缓存配置文档 ⇒ `Config.entries()` 里没有这个 MCP;对照是把同一份文档作为内联文档(`Config.configured({ content })`,即 Code Puppy 注入用的那一层)交给配置 ⇒ 有。环境搭法照抄上游 `test/permission.test.ts` 与 `test/config/config.test.ts`(持久 KV + `AppNodeBuilder`) |
 | `packages/ui-mac/src/main/engine-db-records.engine.cases.ts` + `engine-db-records.engine.test.ts`(新) | AC-03 的真引擎用例:整个子进程装生产渲染的围栏 profile 与真 `.node`,外加真引擎、真 ext 和模型桩,形状同 `fence-write-denied.engine.{cases,test}.ts`,只在 darwin 上跑。全部植入都由引擎自己的 shell 工具在「全部批准」档执行(这就是被围栏的 shell):`sqlite3 <库> < <测试写好的 .sql>`。3 条用例:**已存批准**(项目 id 取自 `GET /api/session/:id`)、**会话行 allow**(植入后 `GET /api/session/:id` 能读到这条规则)、**wellknown 三件套**(来源指向关着的本机端口,清单与配置文档同 M1)。前两条接着在「请求审批」档(`codepuppy-ask`)让模型调一次 shell,断言出现了 `shell` 询问,而且命令没有执行;第三条重启引擎(在同一个库上 `close` 再 `start`,即「重新装载配置」),断言 `/api/mcp` 里没有它、标记文件不存在。每条先从测试进程只读打开库,确认记录真的写进去了,保证用例不是空跑。宿主钉住 3 pass / 0 fail |
+| `packages/ext/src/policy/index.ts`(D16 加入) | `ruleset()` 的返回点只把会话行里 `effect === "deny"` 的条目并到 agent 规则之后,交互与无人值守两个分支共用这一处;读法不变 |
+| `packages/ext/src/policy/session-row-rules.test.ts`(新,D16) | ext 读取处的 L2,共 4 条,环境同 `unattended-policy.test.ts`(生产权限服务 + Promise 适配器 + 执行链;工具带 MCP 身份、执行体不调引擎判定):对照,无人值守标准档里没有规则拒绝时工具照常执行;**E4 第一臂**,agent 规则拒了工具身份,植入会话行同身份 allow ⇒ 仍被拒(`cap-hard-deny`)、零副作用;会话行 deny(自动化解析会话自己写的那种)在交互档(引擎 `Permission denied`)与无人值守档(`cap-hard-deny`)都照样拒绝。会话行经会话存储写入 —— 与 `sqlite3` 改的是同一列;无人值守会话只在自动化运行当中存在,真引擎宿主里插不进去 |
+| `packages/ext/src/policy/unattended-policy.test.ts`(D16 带出) | 「`standard {"sessionAsk":true}` 立即具名拒绝」把规则轴上的 ask 写在会话行上;ext 过滤之后会话行的 ask 不参与,这条就不再拒绝。改为把同一条 ask 写在 agent 规则里(选项改名 `agentAsk`),规则轴 ask 在标准档立即拒绝这项保证不变;无人值守分支确实读当前会话行,由 `session-row-rules.test.ts` 的无人值守 deny 那条证明。条数不变 |
 | `packages/ext/src/policy/session-grant.test.ts` | 两条 known-bad arm 写的正是 L2 取代的旧行为。改成断言新行为并改名:`… the same allow written as a session rule does not override it either (I-13 L2)`(期望 `deny`);`… a child inherits a session-rule allow, which allows nothing (I-13 L2)`(先断言子会话的会话行就是那条 allow,再期望 `ask`)。条数不变 |
 | `packages/ext/src/policy/session-grant-restart.test.ts` | 对照改用会话行上的 `deny read a.env`:重启前、重启后都是 `deny`,同样证明用的是同一个库。用例名不变,头注释同步 |
 | `packages/ext/src/policy/session-grant-upstream-reds.test.ts` | `KNOWN_RED` 增加一组「I-13 L1」:M3 实测的 64 条名字,按文件列。用例名与头注释里的「ten」改为不带数字的说法,并写明两组来源(I-05 裁决甲、I-13 L1)。容忍组不变 |
@@ -77,6 +85,10 @@ L2 只在判定处生效:`permission.ts` 的 `configured()`(`:217-222`)。不在
    红色输出摘要写进提交说明。
 2. **修复(提交 B,不改提交 A 的测试)**:`permission.ts` 的 L1 / L2、`config.ts` 的 L3,以及同一事实要同步的全部内容:三个 ext 测试、`KNOWN_RED`、登记册、`gate-files.tsv` 的保证文字、守卫注释、ADR-047 两行(经同意时)。登记册里的测试名与测试文件必须同一个提交改,否则 `authority-registry.test.ts` 红。跑下面的相关检查,全绿。
 3. **每条规则各自的反向臂(不提交)**:每次只撤掉一条规则(临时改,再用 `git restore` 恢复那一个文件),跑 core 测试和 AC-03 宿主:撤 L1 ⇒ L1 两条红;撤 L2 ⇒ L2 两条红;撤 L3 ⇒ L3 两条红;其余保持绿。结果写进回执。
+
+4. **D16 · ext 读取处,测试先红(提交 C)**:`session-row-rules.test.ts` 与它的闸门行(精确条数 4)。在没有过滤的 ext 上运行,E4 第一臂红(工具执行了,`writes` 为 1),其余三条绿。
+5. **D16 · ext 过滤(提交 D,不改提交 C 的测试)**:`index.ts` 的返回点过滤、登记册 `engine-db-records-not-honoured` 补上机制与证明、本节的 D16 修订。跑 `session-row-rules.test.ts`、`unattended-policy.test.ts`、`register-policy.test.ts`、`authority-registry.test.ts` 与 ext 类型检查。撤掉这一处过滤 ⇒ E4 第一臂红。
+6. **待定 · 会话上下文(提交 E / F,要等 owner 同意 `session/context.ts` 接管)**:E 先提交 E4 第二臂(红),F 再提交 `:136` 一行加登记义务。
 
 相关检查(只跑这些,不跑整包、不跑门;机器上有门在跑时 bun 加 `--max-concurrency 2`):
 
@@ -102,6 +114,7 @@ L2 只在判定处生效:`permission.ts` 的 `configured()`(`:217-222`)。不在
 | AC-03 / BR-02 已存批准(L1) | `codepuppy-engine-db-records.test.ts` 的 L1 条;AC-03 宿主「已存批准」条 | 没有 L1:判定并入已存批准,`shell` 不再询问(设计实测 `K-change.json` A4;提交 A 的红输出;步骤 3 撤 L1 那一臂) |
 | AC-03 / BR-02 会话行(L2) | core L2 条(allow 不放宽、ask 不放松只读档的 deny、deny 照常生效);AC-03 宿主「会话行 allow」条;`session-grant.test.ts` 改名后的两条 | 没有 L2:会话行的 allow 排在 agent 规则之后获胜,`shell` 不询问(A4b);`ask` 把 `deny` 放松成询问;子会话继承的 allow 放行(步骤 3 撤 L2 那一臂) |
 | AC-03 / BR-02 wellknown(L3) | core L3 条;AC-03 宿主「wellknown」条 | 没有 L3:重启后 `planted` 出现在 `/api/mcp`,命令真的执行了(M1 `IMP/l3-base.log`;步骤 3 撤 L3 那一臂) |
+| AC-03 / BR-02 会话行(L2,ext 读取处,D16) | `session-row-rules.test.ts` 的 E4 第一臂;同文件两条会话行 deny | 没有 ext 过滤:无人值守标准档里植入的会话行 allow 盖过 agent 的身份 deny,工具执行(`SESSION-ROW.out`;提交 C 的红输出);过滤如果连 deny 也滤掉,无人值守那条 deny 就不再拒绝 |
 | BR-02 冻结的面 | core L1 条断言已存批准照样能列出;AC-03 宿主断言 `GET /api/session/:id` 照样返回会话行规则 | 改动如果误伤了服务或路由,列出或读取就会失败 |
 | BR-04(本片能碰坏的部分) | core L2 条断言会话行 `deny` 照样拒绝;`session-grant*.test.ts` 断言「始终允许」的会话内放行照常;M2 七个宿主复跑全绿 | L2 如果把 `deny` 也滤掉,自动化解析会话的 `deny subagent` 就失效,core 断言红;会话内放行一旦受影响,`session-grant` 的前几条就红 |
 
@@ -112,6 +125,9 @@ L2 只在判定处生效:`permission.ts` 的 `configured()`(`:217-222`)。不在
 - 2026-11-20 · 设计 §6 E7 的前提不成立(编排器裁决 3):M2 七个在会话行上写 `allow *` 的真引擎用例(package-effect、created-plugin、install-from-source、package-mcp-oauth、plugin-entrypoints、endpoint-route 与 `test-component/official-connectors.cases.ts:1044`)在 L1–L3 之后照样全绿,本片不改它们;提交 B 之后在本分支上复跑确认。设计 E7 那句「改成在 agent 层给放行」请设计方更正 · 提交 B。
 - 2026-11-20 · `test-fixtures/engine-adapter-sampler/sample.ts:212` 在会话行上写 `ask *`,L2 之后不再强制询问;它是录样本的脚本,不是测试,按裁决 5 不动,以后重录样本时注意 · 提交 B。
 - 2026-11-20 · `config.test.ts` 的 5 条已知红(名单见 M4)按裁决 4 只列名、不加判官;同一份名单写进登记册 `engine-db-records-not-honoured` 的 `note` 和 ADR-047 config.ts 那一行 · 提交 B。
+
+- 2026-11-20 · 设计返还 D16(编排器批准扩大范围):`packages/ext/src/policy/index.ts` 与新测试 `session-row-rules.test.ts` 加入本片;`session/context.ts:136` 待 owner 同意,本片不碰 `packages/core/src/session/` · 提交 C、D。
+- 2026-11-20 · D16 带出 `unattended-policy.test.ts` 一条:它用会话行上的 ask 证明标准档的规则轴 ask 立即拒绝,写的正是被取代的行为(没有任何产品写者会在会话行上写 ask)。改为写在 agent 规则里,保证不变,用例名里的选项随之改名;该用例名不在登记册与闸门登记簿里 · 提交 D。
 
 ### 可选(不做)
 

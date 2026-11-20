@@ -129,7 +129,10 @@ export async function registerPolicy(context: Plugin.Context, unattended: Unatte
     const permissions = selected === undefined
       ? (session as { data?: { permissions?: PermissionRule[] } } | undefined)?.data?.permissions
       : session?.permissions
-    return [...configured, ...(permissions ?? [])]
+    // I-13 L2 (SPEC-engine-config-fence BR-02; DESIGN-engine-config-fence §4.6, D16): only the session row's deny entries
+    // take part, on both branches. The row lives in the engine database, which a fenced process can write, and an unattended
+    // call the gate allows never reaches the engine's own decision. Code Puppy writes only deny there.
+    return [...configured, ...(permissions ?? []).filter((rule) => rule.effect === "deny")]
   }
 
   const deps: GateDeps = {

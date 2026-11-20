@@ -941,7 +941,7 @@
     },
     {
       "id": "engine-db-records-not-honoured",
-      "decision": "引擎判定权限时不采用引擎库里的项目级已存批准;会话行上的规则只有「拒绝」生效;引擎不装载 wellknown 缓存的配置文档(SPEC-engine-config-fence BR-02)。被围栏的进程能写引擎库,这三类记录因此不能让放行或配置活过本回合。",
+      "decision": "引擎判定权限时不采用引擎库里的项目级已存批准;会话行上的规则只有「拒绝」生效(引擎判定与 ext 闸门两处读取都是);引擎不装载 wellknown 缓存的配置文档(SPEC-engine-config-fence BR-02)。被围栏的进程能写引擎库,这三类记录因此不能让放行或配置活过本回合。",
       "adr": [
         "ADR-047",
         "ADR-048"
@@ -959,7 +959,7 @@
       },
       "mechanism": {
         "file": "packages/core/src/permission.ts",
-        "ladder": "L3 (re-taken files, annotated blocks: codepuppy(I-13 L1) — evaluateInput no longer merges the project's saved approvals; codepuppy(I-13 L2) — configured() keeps only the deny entries of the session row, so neither the decision nor a child session's inherited row can allow or soften to ask; codepuppy(I-13 L3) in packages/core/src/config.ts — load() no longer calls loadWellknown, so no wellknown document is loaded. The PermissionSaved service and its routes, the session setPermissions route and the WellKnown service stay as they are.)"
+        "ladder": "L3 (re-taken files, annotated blocks: codepuppy(I-13 L1) — evaluateInput no longer merges the project's saved approvals; codepuppy(I-13 L2) — configured() keeps only the deny entries of the session row, so neither the decision nor a child session's inherited row can allow or soften to ask; the extension's ruleset() return point (packages/ext/src/policy/index.ts, L0 Code Puppy code, design return D16) keeps only the deny entries of the session row as well, for the interactive and the unattended branch alike; codepuppy(I-13 L3) in packages/core/src/config.ts — load() no longer calls loadWellknown, so no wellknown document is loaded. The PermissionSaved service and its routes, the session setPermissions route and the WellKnown service stay as they are. The third read of the session row, packages/core/src/session/context.ts:136 (which tools, skills and connector descriptions a request gets), awaits the owner's consent to a new takeover (D16).)"
       },
       "tests": [
         {
@@ -985,6 +985,14 @@
         {
           "file": "packages/ext/src/policy/session-grant.test.ts",
           "name": "another session and a child session created after the grant still ask; a child inherits a session-rule allow, which allows nothing (I-13 L2)"
+        },
+        {
+          "file": "packages/ext/src/policy/session-row-rules.test.ts",
+          "name": "unattended standard tier: a planted session-row allow does not lift the agent's identity deny; nothing runs"
+        },
+        {
+          "file": "packages/ext/src/policy/session-row-rules.test.ts",
+          "name": "a session-row deny, the automation parser session's own write, still refuses the tool"
         }
       ],
       "note": "Known red by design, not taken over (the disposition of orchestrator ruling 甲 for I-05, applied to I-13 by the orchestrator 2026-11-20). L1: 64 upstream cases that seed a saved approval (saved.add / saved.update) and expect it to allow — 44 in packages/core/test/permission.test.ts, 20 in packages/core/test/tool-shell.test.ts — pinned by name in packages/ext/src/policy/session-grant-upstream-reds.test.ts. L3: five upstream cases in packages/core/test/config/config.test.ts that expect a wellknown document to load; the gate does not run that file: \"layers integration documents below remote and user config and reloads when they change\", \"keeps only the policies of documents from integrations managed policy denies\", \"tolerates unavailable authenticated wellknown config and reloads it later\", \"keeps the last resolved wellknown config across failures and restarts until its source is removed\", \"logs redacted source-aware diagnostics for every config source\". Reproduce: cd packages/core && bun test test/permission.test.ts test/tool-shell.test.ts test/config/config.test.ts. Rollback: revert the I-13 slice as one commit (permission.ts L1/L2 and config.ts L3 with their tests)."

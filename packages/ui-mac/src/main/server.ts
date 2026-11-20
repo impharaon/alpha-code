@@ -214,8 +214,9 @@ function ensureEgressPolicyProxy(): Promise<EgressProxyHandle> {
 // fork 之前:前者决定哪些 BYOK 节点存在,后者是这一代的起点。
 //
 // **输入只有这一个,配置文件刻意不读**(`#1380` R1 Blocker):provider 块住的那三条路径
-// (codepuppy.jsonc / `<XDG_CONFIG_HOME>/opencode` / `~/.opencode`)全在 seatbelt 的可写集里
-// (process-fence-profile.ts W2 / W6 / W16),也就是**被围栏的引擎树自己写得了**的地方。读它等于让引擎
+// (codepuppy.jsonc / `<XDG_CONFIG_HOME>/opencode` / `~/.opencode`)当初全在 seatbelt 的可写集里(W2 / W6 / W16),
+// 是**被围栏的引擎树自己写得了**的地方;三行现已删,三处都是受保护配置位置(SPEC-engine-config-fence CF-1 / CF-8 / CF-9,
+// process-fence-profile.ts),围栏内写不进。不读的理由照旧:读它等于让引擎
 // 写一行 baseURL 就给自己铸一条出网通道(confused deputy)。而注入面里这三条路径只贡献 `enabled_providers`
 // 与 `options.apiKey`(codepuppy-models.ts 第 (3) 段),**从不贡献 baseURL** —— 判据在
 // network-egress-derived.test.ts 的 B1 那条(带对照臂)。

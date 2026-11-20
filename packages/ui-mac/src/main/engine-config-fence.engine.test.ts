@@ -1,4 +1,4 @@
-// SPEC-engine-config-fence AC-04 (without tool policy) / AC-06; DESIGN E3 / E5 / E8. Host for engine-config-fence.engine.cases.ts: the fence is
+// SPEC-engine-config-fence AC-04 (without tool policy) / AC-06 / AC-08 ③; DESIGN E3 / E5 / E8 / E11. Host for engine-config-fence.engine.cases.ts: the fence is
 // process-lifetime, so each arm is its own `bun test` child (production, fresh, control, noprecreate). After the production arm this host —
 // outside every fence — reads the system sandbox log for the run window: the engine process (the cases process: the engine is embedded in
 // it) must have zero write denials on protected locations, while the attack commands (its fenced children) must have some — that is the
@@ -9,7 +9,7 @@ import { mkdirSync, realpathSync, rmSync, writeFileSync } from "node:fs"
 import { join, resolve } from "node:path"
 
 type Deny = { kind: "subpath" | "literal" | "regex"; value: string }
-const ARMS = { production: 4, fresh: 1, control: 1, noprecreate: 1 } as const
+const ARMS = { production: 4, fresh: 2, control: 1, noprecreate: 1 } as const
 
 /** `log show --start/--end` with an explicit offset (bun test runs with TZ=UTC, the log tool reads wall-clock time in its own zone). */
 const stamp = (date: Date) => {
@@ -20,7 +20,7 @@ const stamp = (date: Date) => {
 const inProtected = (deny: readonly Deny[], path: string) =>
   deny.some((rule) => (rule.kind === "subpath" ? path === rule.value || path.startsWith(`${rule.value}/`) : rule.kind === "literal" ? path === rule.value : new RegExp(rule.value).test(path)))
 
-test.skipIf(process.platform !== "darwin")("AC-04 / AC-06 real engine inside the production fence: attacks refused, ordinary work and restart fine, cold start on 0.2.6 data and a fresh machine; known-bad arms flip; no protected-location denial from the engine process", async () => {
+test.skipIf(process.platform !== "darwin")("AC-04 / AC-06 / AC-08 real engine inside the production fence: attacks refused, ordinary work and restart fine, cold start on 0.2.6 data and a fresh machine, the plan file under the engine data directory with ~/.opencode never created; known-bad arms flip; no protected-location denial from the engine process", async () => {
   const base = resolve(import.meta.dir, "../../../../node_modules/.cache/engine-config-fence")
   rmSync(base, { recursive: true, force: true })
   mkdirSync(join(base, "results"), { recursive: true })

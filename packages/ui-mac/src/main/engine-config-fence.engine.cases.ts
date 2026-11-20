@@ -16,7 +16,10 @@
 //                connector calls work; install / disable / enable through main, a hand edit and a skill install apply without restart;
 //                restart works. The host reads the system sandbox log for this run (no protected-location denial from this pid).
 //   fresh        fresh-machine shape (no <XDG_DATA_HOME>/opencode, no ~/.opencode, no codepuppy.jsonc): the planner pre-creates, main
-//                seeds, the engine starts and answers; ~/.opencode still absent.
+//                seeds, the engine starts and answers; ~/.opencode still absent. AC-08 (BR-07): in the 全部批准 tier with the plan agent
+//                chosen (request built by the composer, sent through the production adapter), the plan reminder names
+//                <XDG_DATA_HOME>/opencode/plan, the plan file lands there and the write card shows that path; ~/.opencode still absent.
+//                The sandbox is under the system temp root (W12), so here ~/.opencode is kept out by CF-9 alone.
 //   control      known bad: the production plan with the protected set removed (W2 / W6 put back as in 0.2.6) — the three attacks land.
 //                Note: here they land through W12, because the engine sandbox lives under the system temp root (/private/var/folders);
 //                the arm proves that without the blocks after the allow block nothing stops them, not that W2 / W6 are the row used.
@@ -45,6 +48,10 @@ import { policyFilePath } from "../../../ext/src/policy/store"
 import { defaultPolicyBaseDir } from "../../../ext/src/policy/resolver"
 import { policyWorkspace } from "../../../ext/src/policy/index"
 import { publishProviderAllowList, providerAllowList } from "../../../ext/src/provider-allow"
+import { createOpencodeClient } from "@opencode-ai/sdk/v2/client"
+import { createEngineFetch } from "../engine-adapter/index"
+import { buildPromptRequest, permLocksAgent, v1PromptModelFields } from "../renderer/codepuppy-ui/composer-state"
+import { toolCardHeadOf } from "../renderer/codepuppy-ui/session-timeline/cards/tool-card-model"
 
 type Arm = "production" | "fresh" | "control" | "noprecreate"
 const ARM = process.env.CODEPUPPY_CF_ENGINE_ARM as Arm
@@ -272,6 +279,15 @@ function engineTurns(m: Machine, running: () => Running) {
   return { send, turn, shell, mcpStatus, askedForEcho }
 }
 
+/** lstat, not exists: a dangling symlink at the path counts as present. */
+const onDisk = (file: string) => {
+  try {
+    fs.lstatSync(file)
+    return true
+  } catch {
+    return false
+  }
+}
 const read = (file: string) => {
   try {
     return fs.readFileSync(file, "utf8")
@@ -465,22 +481,87 @@ describe.if(ARM === "production")("production: 0.2.6-shaped data, the production
 })
 
 describe.if(ARM === "fresh")("fresh machine: no engine data directory, no ~/.opencode, no codepuppy.jsonc", () => {
+  let m: Machine
+  let running: Running
+  beforeAll(async () => {
+    m = await machine("fresh")
+    running = await m.host.start()
+  }, 240_000)
+  afterAll(async () => {
+    await running?.close().catch(() => undefined)
+    model.stop()
+  })
+
   test("AC-06 ③: the planner pre-creates, main seeds, the engine starts inside the fence and answers; ~/.opencode is still absent", async () => {
-    const m = await machine("fresh")
-    const running = await m.host.start()
-    try {
-      const turns = engineTurns(m, () => running)
-      const answer = await turns.shell("echo cf13-fresh-ok")
-      expect(answer.tool).toContain("cf13-fresh-ok")
-      expect(fs.existsSync(path.join(m.roots.dataHome, "opencode"))).toBe(true)
-      expect(fs.existsSync(path.join(m.roots.configHome, "opencode"))).toBe(true)
-      expect(JSON.parse(fs.readFileSync(m.jsonc, "utf8"))).toEqual({ $schema: "https://opencode.ai/config.json" })
-      expect(fs.statSync(path.join(m.userData, "codepuppy-engine-config")).mode & 0o777).toBe(0o700)
-      expect(fs.existsSync(path.join(m.home, ".opencode"))).toBe(false)
-    } finally {
-      await running.close().catch(() => undefined)
-      model.stop()
+    const turns = engineTurns(m, () => running)
+    const answer = await turns.shell("echo cf13-fresh-ok")
+    expect(answer.tool).toContain("cf13-fresh-ok")
+    expect(fs.existsSync(path.join(m.roots.dataHome, "opencode"))).toBe(true)
+    expect(fs.existsSync(path.join(m.roots.configHome, "opencode"))).toBe(true)
+    expect(JSON.parse(fs.readFileSync(m.jsonc, "utf8"))).toEqual({ $schema: "https://opencode.ai/config.json" })
+    expect(fs.statSync(path.join(m.userData, "codepuppy-engine-config")).mode & 0o777).toBe(0o700)
+    expect(onDisk(path.join(m.home, ".opencode"))).toBe(false)
+  }, 240_000)
+
+  test("AC-08 ③ (BR-07): 全部批准 tier, plan agent chosen — the plan reminder names <XDG_DATA_HOME>/opencode/plan, the plan file lands there, the write card shows that path; ~/.opencode is still absent", async () => {
+    const planDir = path.join(m.roots.dataHome, "opencode", "plan")
+    const file = path.join(planDir, "cf-plan.md")
+    // the plan chip is selectable in this tier (the other two force their own agent)
+    expect(permLocksAgent("allow")).toBe(false)
+    // the renderer's client over the production adapter, dispatched in-process (the fenced process may only reach the egress proxy port)
+    const ORIGIN = "http://codepuppy-sidecar.invalid"
+    const adapter = createEngineFetch({
+      isEngineOrigin: (origin) => origin === ORIGIN,
+      fetch: ((input: RequestInfo | URL, init?: RequestInit) => running.fetch(new Request(input, init))) as typeof fetch,
+    }) as typeof fetch
+    const client = createOpencodeClient({ baseUrl: ORIGIN, fetch: adapter })
+    const created = (await client.session.create({ directory: m.ws } as never)) as { data?: { id: string }; error?: unknown }
+    expect(created.error).toBeUndefined()
+    const sessionID = created.data!.id
+    const platformModel = Object.keys((m.host.content.providers.codepuppy?.models ?? {}) as Record<string, unknown>)[0] ?? "m"
+    const asked: string[] = []
+    /** One composer send in the 全部批准 tier with the plan agent chosen; waits for the turn to settle, refusing (and recording) any approval. */
+    const send = async (text: string) => {
+      const req = buildPromptRequest({ text, model: null, effort: null, perm: "allow", agent: "plan" })
+      expect(req.agent).toBe("plan")
+      const before = model.requests.length
+      const sent = (await client.session.promptAsync({ sessionID, directory: m.ws, parts: req.parts, agent: req.agent, ...v1PromptModelFields({ providerID: "codepuppy", id: platformModel }) } as never)) as { error?: unknown }
+      expect(sent.error).toBeUndefined()
+      const settled = running.send("POST", `/api/experimental/session/${sessionID}/wait`)
+      for (let i = 0; i < 400; i++) {
+        if (await Promise.race([settled.then(() => true), Bun.sleep(40).then(() => false)])) break
+        for (const request of ((await running.send("GET", `/api/session/${sessionID}/permission`)).json?.data ?? []) as Array<{ id: string; action: string }>) {
+          asked.push(request.action)
+          await running.send("POST", `/api/session/${sessionID}/permission/${request.id}/reply`, { decision: "reject" })
+        }
+      }
+      await settled
+      return model.requests.slice(before)
     }
+
+    // the user asks for a plan file; the model reads where Plan mode lets it write from the reminder the engine sent
+    const first = await send("Please write the plan to a plan file.")
+    const reminder = first.flatMap((request) => request.messages.filter((message) => message.role === "user").map((message) => textOf(message.content))).find((text) => text.includes("You are in Plan mode"))
+    expect(reminder, JSON.stringify(first.map((request) => request.messages))).toBeDefined()
+    const named = /write them only in:\n(.+)\n/.exec(reminder!)?.[1]
+    expect(named).toBe(planDir)
+    expect(reminder).not.toContain(".opencode")
+
+    // the model writes there (the stub follows the reminder, as a model would)
+    await send(`CP-CALL ${JSON.stringify({ name: "write", args: { path: path.join(named!, "cf-plan.md"), content: "# cf13 plan\n" } })}`)
+    expect(asked).toEqual([])
+    expect(fs.readFileSync(file, "utf8")).toBe("# cf13 plan\n")
+
+    // the card: the v1 timeline page through the adapter, then the production card model
+    const page = (await (await adapter(`${ORIGIN}/session/${sessionID}/message?limit=50`, { headers: { "x-opencode-directory": encodeURIComponent(m.ws) } })).json()) as Array<{ parts: any[] }>
+    const write = page.flatMap((message) => message.parts).find((part) => part.type === "tool" && part.tool === "write")
+    expect(write, JSON.stringify(page)).toBeDefined()
+    expect(write.state.status).toBe("completed")
+    expect(write.state.input.filePath).toBe(file)
+    // on a real home the card's path redaction writes /Users/<name> as ~, i.e. ~/.local/share/opencode/plan/
+    expect(toolCardHeadOf(write)).toMatchObject({ kind: "write", status: "success", target: "cf-plan.md", detail: `${planDir}/` })
+
+    expect(onDisk(path.join(m.home, ".opencode"))).toBe(false)
   }, 240_000)
 })
 

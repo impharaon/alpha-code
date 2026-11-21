@@ -679,3 +679,95 @@ test("R14 A10 install preparation reuses one catalog lookup inside its request w
  expect(await sources.catalogComparisons("github","r14_install_two")).toEqual([])
  expect(reads).toBe(2)
 })
+
+// DESIGN-domestic-cloud-connectivity §4.7(切片二)、§8 E-5:Claude、Codex 两份市场清单先经香港 GitHub 转发入口(§4.5 白名单最后两行),
+// 转发那一次最多 10 s,任何失败都改取原 raw 地址;两次都失败才报该来源失败,SourceStatusV1 形状不变。转发入口的字节就是同一份清单,
+// 所以桩把转发地址映射回录制好的 raw 字节;时间只经假时钟推进。
+const RELAY_CLAUDE = "https://alpha-github-hk.tidelabs.click/raw/anthropics/claude-plugins-official/main/.claude-plugin/marketplace.json"
+const RELAY_CODEX = "https://alpha-github-hk.tidelabs.click/raw/openai/plugins/main/.agents/plugins/marketplace.json"
+const RAW_CLAUDE = "https://raw.githubusercontent.com/anthropics/claude-plugins-official/main/.claude-plugin/marketplace.json"
+const RAW_CODEX = "https://raw.githubusercontent.com/openai/plugins/main/.agents/plugins/marketplace.json"
+const relayToRaw = (address: string) => address === RELAY_CLAUDE ? RAW_CLAUDE : address === RELAY_CODEX ? RAW_CODEX : undefined
+const flush = async (n = 40) => { for (let i = 0; i < n; i++) await Promise.resolve() }
+
+test("§4.7 E-5 转发入口答清单:两个来源经转发成功,不请求原 raw 地址;五个来源都成功", async () => {
+  const requested: string[] = []
+  const sources = (await sourcesModule()).createPluginSources({ catalog: async () => catalogCandidates(), fetch: async (url) => {
+    const address = String(url)
+    requested.push(address)
+    if (address.startsWith("https://raw.githubusercontent.com/")) throw new Error("original address must not be needed")
+    const raw = relayToRaw(address)
+    return fixtureFetch(raw ?? address)
+  } })
+  const result = await sources.searchSources("context7")
+  expect(result.sources.find((source) => source.source === "claude-marketplace")).toMatchObject({ status: "ok", matched: 1 })
+  expect(result.sources.find((source) => source.source === "codex-marketplace")).toMatchObject({ status: "ok" })
+  expect((await sourcesModule()).allPluginSourcesSucceeded(result.sources)).toBe(true)
+  expect(requested.filter((address) => address.startsWith("https://alpha-github-hk.tidelabs.click/")).sort()).toEqual([RELAY_CLAUDE, RELAY_CODEX])
+  expect(requested.some((address) => address.startsWith("https://raw.githubusercontent.com/"))).toBe(false)
+})
+
+test("§4.7 E-5 转发入口不通(挂住):第 10 s 中止转发、改取原地址,来源成功", async () => {
+  const { jest } = await import("bun:test")
+  const requested: string[] = []
+  const relaySignals: AbortSignal[] = []
+  const sources = (await sourcesModule()).createPluginSources({ catalog: async () => [], fetch: (url, init?: RequestInit) => {
+    const address = String(url)
+    requested.push(address)
+    if (relayToRaw(address)) {
+      const signal = init!.signal!
+      relaySignals.push(signal)
+      return new Promise<Response>((_, reject) => signal.addEventListener("abort", () => reject(new Error("relay aborted")), { once: true }))
+    }
+    return fixtureFetch(address)
+  } })
+  jest.useFakeTimers()
+  try {
+    const pending = sources.searchSources("context7")
+    await flush()
+    expect(requested.filter((address) => relayToRaw(address)).sort()).toEqual([RELAY_CLAUDE, RELAY_CODEX])
+    jest.advanceTimersByTime(9_999)
+    await flush()
+    expect(requested.filter((address) => address.startsWith("https://raw.githubusercontent.com/"))).toEqual([])
+    jest.advanceTimersByTime(1)
+    await flush()
+    expect(relaySignals.every((signal) => signal.aborted)).toBe(true)
+    expect(requested.filter((address) => address.startsWith("https://raw.githubusercontent.com/")).sort()).toEqual([RAW_CLAUDE, RAW_CODEX])
+    const result = await pending
+    expect(result.sources.find((source) => source.source === "claude-marketplace")).toMatchObject({ status: "ok", matched: 1 })
+    expect(result.sources.find((source) => source.source === "codex-marketplace")).toMatchObject({ status: "ok" })
+  } finally {
+    jest.useRealTimers()
+  }
+})
+
+test("§4.7 E-5 转发回非 2xx、回读不出的内容、拒连:都立刻改取原地址,来源成功", async () => {
+  const sources = (await sourcesModule()).createPluginSources({ catalog: async () => [], fetch: async (url) => {
+    const address = String(url)
+    if (address === RELAY_CLAUDE) return new Response("<html>bad gateway</html>", { status: 502 })
+    if (address === RELAY_CODEX) return new Response("not a marketplace")
+    return fixtureFetch(address)
+  } })
+  const result = await sources.searchSources("context7")
+  expect(result.sources.find((source) => source.source === "claude-marketplace")).toMatchObject({ status: "ok", matched: 1 })
+  expect(result.sources.find((source) => source.source === "codex-marketplace")).toMatchObject({ status: "ok" })
+  const refused = (await sourcesModule()).createPluginSources({ catalog: async () => [], fetch: async (url) => {
+    if (relayToRaw(String(url))) throw new TypeError("fetch failed: ECONNREFUSED")
+    return fixtureFetch(url)
+  } })
+  const second = await refused.searchSources("context7")
+  expect(second.sources.find((source) => source.source === "claude-marketplace")).toMatchObject({ status: "ok", matched: 1 })
+  expect(second.sources.find((source) => source.source === "codex-marketplace")).toMatchObject({ status: "ok" })
+})
+
+test("§4.7 转发与原地址都失败:报该来源失败,原因取原地址那次(形状不变)", async () => {
+  const sources = (await sourcesModule()).createPluginSources({ catalog: async () => [], fetch: async (url) => {
+    const address = String(url)
+    if (relayToRaw(address)) return new Response("bad gateway", { status: 502 })
+    if (address === RAW_CLAUDE || address === RAW_CODEX) return new Response("unavailable", { status: 503 })
+    return fixtureFetch(address)
+  } })
+  const result = await sources.searchSources("context7")
+  expect(result.sources.find((source) => source.source === "claude-marketplace")).toEqual({ source: "claude-marketplace", status: "failed", reason: "http", detail: "Source returned HTTP 503" })
+  expect(result.sources.find((source) => source.source === "codex-marketplace")).toEqual({ source: "codex-marketplace", status: "failed", reason: "http", detail: "Source returned HTTP 503" })
+})

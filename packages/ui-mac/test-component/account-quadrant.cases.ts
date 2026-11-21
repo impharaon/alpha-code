@@ -422,6 +422,11 @@ describe("alpha-code#1739 the account summary is refetched without a login event
     window.dispatchEvent(new Event("focus"))
     await flush()
   }
+  const deferred = () => {
+    let resolve!: (value: unknown) => void
+    const promise = new Promise<unknown>((r) => (resolve = r))
+    return { promise, resolve }
+  }
   const unsubscribed = CASES[2]!.summary // 未订阅、有余额、用量非零
   const subscribed = CASES[0]!.summary // 已订阅 Pro 月卡
   const counted = (reply: () => unknown) => {
@@ -500,6 +505,37 @@ describe("alpha-code#1739 the account summary is refetched without a login event
     expect(chip?.hasAttribute("data-pro")).toBe(true)
     expect(readRows(pop())["5 小时额度"]).toBe("1,234 / 9,000")
     expect(authReads).toBe(authBefore) // 没有任何登录状态的读取或事件
+  })
+
+  test("a reply that was sent earlier but arrives later never overwrites the newer value", async () => {
+    const older = CASES[0]!.summary // ¥998.65
+    const newer = CASES[1]!.summary // ¥0.00
+    at(0)
+    counted(() => older)
+    await mount()
+    click(document.querySelector(".codepuppy-sidebar-account")!)
+    await flush()
+    const pop = () => document.querySelector(".codepuppy-acct-pop")!
+    expect(readRows(pop())["可用余额"]).toBe("¥998.65")
+
+    const first = deferred() // 窗口回来那次(先发出)
+    const second = deferred() // 面板再打开那次(后发出)
+    const queue = [first.promise, second.promise]
+    summaryImpl = () => queue.shift()!
+    at(31)
+    await refocus()
+    const trigger = document.querySelector(".codepuppy-sidebar-account")!
+    click(trigger) // 关
+    click(trigger) // 开 → 第二次取值
+    await flush()
+    expect(queue.length).toBe(0)
+
+    second.resolve(newer)
+    await flush()
+    expect(readRows(pop())["可用余额"]).toBe("¥0.00")
+    first.resolve(older) // 先发出的回复后到:不得盖掉后发出的那份
+    await flush()
+    expect(readRows(pop())["可用余额"]).toBe("¥0.00")
   })
 
   test("a refetch that fails keeps the values already shown", async () => {

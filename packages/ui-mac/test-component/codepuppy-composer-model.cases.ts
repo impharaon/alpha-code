@@ -5017,3 +5017,87 @@ describe("#1588 AC3 回合错误卡「换模型」打开输入框的模型选择
     card.dispose()
   })
 })
+
+// alpha-code#1739:付款(或一轮对话消耗)之后,输入框「能否使用平台模型」的判断不重新登录就跟上账户服务的现值。
+// 取值时刻之一:回到应用窗口且距上次取值超过 30 秒。时间用 setSystemTime 注入,不断言真实耗时。
+describe("alpha-code#1739 composer and picker follow the account summary without a login event", () => {
+  const T0 = Date.parse("2026-11-21T00:00:00Z")
+  const at = (seconds: number) => setSystemTime(new Date(T0 + seconds * 1000))
+  const refocus = async () => {
+    window.dispatchEvent(new Event("focus"))
+    await flush()
+  }
+  const unsubscribed = (): AccountSummary => ({
+    ...summary,
+    balanceFen: 0,
+    plan: { ...summary.plan!, status: "expired" },
+  })
+
+  afterEach(() => setSystemTime())
+
+  test("④ the send gate opens once the refetch returns a subscription, with no login event", async () => {
+    at(0)
+    let current: AccountSummary = unsubscribed()
+    let reads = 0
+    let authReads = 0
+    installApi({
+      account: async () => {
+        reads++
+        return current
+      },
+      auth: async () => {
+        authReads++
+        return loggedIn
+      },
+    })
+    const mounted = mount(() =>
+      createComponent(CodePuppyComposerRuntime, {
+        mode: "home",
+        projects,
+        directory: () => "/workspace",
+        command,
+        // 引擎清单只有平台模型 ⇒ 无选择时发送门要求 platformPermission 已 ready(与上面「账户仍在重试」用例同一探针)。
+        modelContract: { list: async () => platformModels, current: async () => undefined, switch: async () => {} },
+        initialText: "hello",
+      }),
+    )
+    const send = mounted.host.querySelector<HTMLButtonElement>('button[aria-label="发送"]')!
+    await waitFor(() => expect(reads).toBeGreaterThan(0))
+    for (let attempt = 0; attempt < 20; attempt++) await flush()
+    expect(send.disabled).toBe(true) // 未订阅、没余额:账户服务说不能用平台模型
+
+    current = summary
+    const readsBefore = reads
+    const authBefore = authReads
+    at(31)
+    await refocus()
+    await waitFor(() => expect(send.disabled).toBe(false))
+    expect(reads).toBe(readsBefore + 1)
+    expect(authReads).toBe(authBefore) // 没有任何登录状态的读取
+    mounted.dispose()
+  })
+
+  test("the open picker's account rows follow the same refetch", async () => {
+    at(0)
+    let current: AccountSummary = unsubscribed()
+    installApi({ account: async () => current })
+    resetComposerModelProjection()
+    const mounted = mount(() =>
+      createComponent(ModelPickPop, {
+        contract: { list: async () => platformModels, current: async () => undefined, switch: async () => {} },
+        directory: () => "/workspace",
+        selected: () => null,
+        onSelect: async () => {},
+        onPicked: () => {},
+      }),
+    )
+    const platformRow = () => document.body.querySelector<HTMLButtonElement>('.a-mpp-row[data-group="platform"]')
+    await waitFor(() => expect(platformRow()?.textContent).toContain(zh["codepuppy.model.needsCredit"]))
+
+    current = summary
+    at(31)
+    await refocus()
+    await waitFor(() => expect(platformRow()?.textContent).not.toContain(zh["codepuppy.model.needsCredit"]))
+    mounted.dispose()
+  })
+})

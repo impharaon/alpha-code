@@ -67,6 +67,13 @@ export function macNativePackages(arch: TargetArch): string[] {
  */
 export const OFFICE_RUNTIME_BUILD_DIR = path.join("native", "office-runtime", "build")
 
+/**
+ * DESIGN-domestic-cloud-connectivity §4.8:随包 ripgrep 的构建产物根,相对 packages/ui-mac,下面每个目标架构一份
+ * (`<这里>/<arch>/rg` + 许可文件)。build-ripgrep.ts 写它,electron-builder 的 extraResources 把 `<这里>/<arch>/` 装成
+ * `<Resources>/ripgrep/`,afterPack 用 checkBundledRipgrep 核对包里的那一份。
+ */
+export const RIPGREP_BUILD_DIR = path.join("native", "ripgrep", "build")
+
 // ── Mach-O 头解析(不依赖 `file` / `lipo`,linux 上的单测也能跑)────────────────────────────
 
 const CPU_TYPE: Record<number, TargetArch> = { 0x01000007: "x64", 0x0100000c: "arm64" }
@@ -254,10 +261,27 @@ export function checkPackagedEngineAssets(resourcesDir: string, arch: TargetArch
   return problems
 }
 
-/** electron-builder afterPack 调用(签名之前):checkPackagedEngineAssets 不过即抛,拒绝出包。 */
+/**
+ * §4.8:打好的包里随包 ripgrep(`<Resources>/ripgrep/rg`)是必需的可执行文件 —— 在、带执行位、含目标架构片。
+ * 缺了它应用照样能跑(引擎退回自己的下载路径),所以打包时就拦,而不是等国内用户第一次搜索失败。返回问题清单(空 = 通过)。
+ */
+export function checkBundledRipgrep(resourcesDir: string, arch: TargetArch): string[] {
+  const file = path.join(resourcesDir, "ripgrep", "rg")
+  if (!fs.existsSync(file)) return ["ripgrep/rg 不存在(搜索工具随包的 ripgrep)"]
+  if ((fs.statSync(file).mode & 0o111) === 0) return ["ripgrep/rg 没有执行位"]
+  const archs = machOArchs(readHead(file))
+  if (archs === null) return ["ripgrep/rg 不是 Mach-O 文件"]
+  if (!archs.includes(arch)) return [`ripgrep/rg 只含 [${archs.join(", ")}],缺 ${arch}`]
+  return []
+}
+
+/** electron-builder afterPack 调用(签名之前):checkPackagedEngineAssets 与 checkBundledRipgrep 不过即抛,拒绝出包。 */
 export function assertPackagedEngineAssets(input: { resourcesDir: string; packingArch: string }): void {
   const problems = (SUPPORTED as readonly string[]).includes(input.packingArch)
-    ? checkPackagedEngineAssets(input.resourcesDir, input.packingArch as TargetArch)
+    ? [
+        ...checkPackagedEngineAssets(input.resourcesDir, input.packingArch as TargetArch),
+        ...checkBundledRipgrep(input.resourcesDir, input.packingArch as TargetArch),
+      ]
     : [`不支持的架构 ${input.packingArch}`]
   if (problems.length)
     throw new Error(`[engine-assets] 拒绝出 mac-${input.packingArch} 包,引擎原生资源不在加载点找的位置:\n  - ${problems.join("\n  - ")}`)

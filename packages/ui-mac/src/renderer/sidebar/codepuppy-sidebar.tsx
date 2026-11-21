@@ -24,6 +24,7 @@ import { CODEPUPPY_PATHS } from "../../shared/codepuppy-config"
 import { buildMarker, formatBuildIdentity, type BuildIdentity } from "../../shared/build-identity"
 import { useCodePuppyEndpoints } from "../use-codepuppy-endpoints"
 import { subscribeAuthState } from "../auth-recovery"
+import { accountSummary, clearAccountSummary, readAccountSummary, refreshAccountSummary } from "../account-summary"
 import { markStartupTimeline } from "../startup-timeline"
 import { homeHref, projectLabel } from "./route"
 import { hrefFor, parseRoute } from "../../shared/route-manifest"
@@ -45,7 +46,7 @@ import { type CodePuppyProject, type CodePuppySession, type CodePuppyProjectsApi
 import { updaterSurfaceFor } from "./updater-state-surface"
 import type { UpdaterState } from "@opencode-ai/app/updater"
 import { projectSidebarGroups } from "./project-display"
-import type { AuthState, AccountSummary } from "../../preload/types"
+import type { AuthState } from "../../preload/types"
 import { extHubOpen, setExtHubOpen, toggleExtHub } from "../extensions/ext-hub-state"
 import { rememberRoute, restoredRoute } from "../reload-place-store"
 import { automationOpen, setAutomationOpen, toggleAutomation } from "../automations/automation-state"
@@ -296,10 +297,13 @@ export function CodePuppySidebar(props: {
   const rechargeUrl = () => `${endpoints().web}${CODEPUPPY_PATHS.wallet}?tab=recharge`
   const subscribeUrl = () => `${endpoints().web}${CODEPUPPY_PATHS.wallet}?tab=subscription`
 
-  // Account summary (balance / membership / token usage) from alpha-platform B, fetched on login.
+  // Account summary (balance / membership / token usage) from alpha-platform B. The one shared copy lives in
+  // ../account-summary (#1739): this sidebar fetches on every login-state delivery, and the same value is refetched
+  // when the window regains focus (>30 s since the last fetch, watched by that module), when this panel opens and after
+  // a turn ends (use-projects), so a subscription paid on the web shows up without logging in again.
   // Contract: alpha-platform docs/contracts/account-billing.md. usageSeries powers the 14-day
   // sparkline. 401 → main's auth is stale; the footer already reflects logged-out on the next push.
-  const [summary, setSummary] = createSignal<AccountSummary | null>(null)
+  const summary = accountSummary
   const [summaryState, setSummaryState] = createSignal<"idle" | "loading" | "error">("idle")
   // #1686:换了一个登录(登录代变,含不先退出直接换号)就先清空,不让上一个账号的数留在卡片上;
   // 只采用最新一次请求的回复,较早发出、较晚回来的回复(可能属于上一个账号)直接丢弃。
@@ -310,28 +314,25 @@ export function CodePuppySidebar(props: {
     const mine = ++summaryRequest
     if (state.status !== "logged-in") {
       summaryEpoch = undefined
-      setSummary(null)
+      clearAccountSummary()
       setSummaryState("idle")
       return
     }
-    if (state.identityEpoch !== summaryEpoch) setSummary(null)
+    if (state.identityEpoch !== summaryEpoch) clearAccountSummary()
     summaryEpoch = state.identityEpoch
     setSummaryState("loading")
-    window.api.account
-      .summary()
+    readAccountSummary()
       .then((r) => {
         if (mine !== summaryRequest) return
-        if (r && "error" in r) {
-          setSummary(null)
-          setSummaryState("error")
-        } else {
-          setSummary(r as AccountSummary)
-          setSummaryState("idle")
-        }
+        setSummaryState(r && "error" in r ? "error" : "idle")
       })
       .catch(() => {
         if (mine === summaryRequest) setSummaryState("error")
       })
+  })
+  // 打开账户面板就取一次当前值(关闭不取)。
+  createEffect(() => {
+    if (menuOpen()) refreshAccountSummary()
   })
   const activePlan = () => {
     const s = summary()

@@ -226,6 +226,7 @@ function apiNode(path: string[]): unknown {
 
 const runtime = await import("../src/renderer/sidebar/overlay-close-test-runtime")
 const { hrefFor } = await import("../src/shared/route-manifest")
+const { resetAccountSummaryForTests } = await import("../src/renderer/account-summary")
 
 const DIR = "/Users/tester/proj-a"
 
@@ -266,12 +267,13 @@ beforeEach(() => {
   document.body.append(root)
 })
 
-afterEach(() =>
+afterEach(() => {
   disposers
     .splice(0)
     .reverse()
-    .forEach((dispose) => dispose()),
-)
+    .forEach((dispose) => dispose())
+  resetAccountSummaryForTests() // #1739:共享的账户状态与取值时刻是模块级,不跨用例
+})
 
 afterAll(() => GlobalRegistrator.unregister())
 

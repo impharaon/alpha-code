@@ -17,6 +17,7 @@ import {
   createSignal,
   For,
   Match,
+  on,
   onCleanup,
   onMount,
   Show,
@@ -110,6 +111,7 @@ import { t } from "../i18n"
 import { markStartupTimeline } from "../startup-timeline"
 import { subscribeRuntimeRecovery, subscribeSseReconnected } from "../runtime-recovery"
 import { reconcileAuthSnapshot, subscribeAuthState } from "../auth-recovery"
+import { accountSummary, readAccountSummary } from "../account-summary"
 import { catalogFailureReason, createCatalogRefreshHealth, retryCatalogRefresh } from "./catalog-refresh-health"
 import "./codepuppy-composer.css"
 
@@ -1205,6 +1207,9 @@ export function CodePuppyComposerRuntime(props: CodePuppyComposerRuntimeProps) {
       }),
   })
   const accountRetryWakeup = createRetryWakeup()
+  // #1739:账户状态在链外被取新(回到窗口 / 打开账户面板 / 一轮对话结束)时,把「能否用平台模型」的结论跟上。
+  // 链上账户已验证(ready / failed)才有值;链重起时清掉。
+  let reresolveAccount: ((usable: boolean) => void) | undefined
   // #1686:带登录代(identityEpoch),不先退出就换号时模型链按新身份重跑(同 auth-recovery 的不变量 G)。
   const authSignature = (state: AuthState) =>
     `${state.status}\u0000${state.mode}\u0000${state.platformStatus ?? "ready"}\u0000${state.account?.email ?? ""}\u0000${state.identityEpoch ?? ""}`
@@ -1307,6 +1312,7 @@ export function CodePuppyComposerRuntime(props: CodePuppyComposerRuntimeProps) {
     setPlatformId(null)
     setHasConfiguredByok(false)
     setPlatformPermission("recovering")
+    reresolveAccount = undefined
     setEngineModelRefs([])
     if (sessionID) invalidateComposerModelProjection(sessionID)
     else resetComposerModelProjection()
@@ -1432,7 +1438,7 @@ export function CodePuppyComposerRuntime(props: CodePuppyComposerRuntimeProps) {
           const classify = (summary: Awaited<ReturnType<typeof readSummary>>) =>
             summary.status === "error" ? ("recovering" as const) : accountResultState(summary.data)
           function readSummary() {
-            return readState(window.api.account.summary())
+            return readState(readAccountSummary())
           }
           const resolved = await resolveAccountWithRetry({
             read: async (attempt) => {
@@ -1571,8 +1577,25 @@ export function CodePuppyComposerRuntime(props: CodePuppyComposerRuntimeProps) {
     void accountResolution?.then(async (resolution) => {
       if (chainDisposed || seq !== chainSeq || resolution.status !== "ready") return
       await resolveSelection(resolution.usable, true)
+      reresolveAccount = (usable) => {
+        if (chainDisposed || seq !== chainSeq) return
+        const next = usable ? "ready" : "failed"
+        if (platformPermission() === next || (platformPermission() !== "ready" && platformPermission() !== "failed")) return
+        setPlatformPermission(next)
+        void resolveSelection(usable, true)
+      }
     })
   }
+
+  createEffect(
+    on(
+      accountSummary,
+      (next) => {
+        if (next) reresolveAccount?.(summaryUsable(next))
+      },
+      { defer: true },
+    ),
+  )
 
   createEffect(() => {
     authEpoch()

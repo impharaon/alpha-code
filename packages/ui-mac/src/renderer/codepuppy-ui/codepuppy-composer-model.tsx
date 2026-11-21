@@ -1,7 +1,7 @@
 // ModelPickPop — canonical Code Puppy composer model picker. It owns the visible IA and talks only to the
 // generated SDK v2 model contract; no upstream picker DOM is mounted, hidden, observed, or clicked.
 
-import { createEffect, createMemo, createSignal, For, onCleanup, onMount, Show, untrack } from "solid-js"
+import { createEffect, createMemo, createSignal, For, on, onCleanup, onMount, Show, untrack } from "solid-js"
 import type { AccountSummary, AuthState } from "../../preload/types"
 import type { EffectiveCatalog, ProviderKeyStatus } from "../../shared/codepuppy-model-types"
 import { CODEPUPPY_PATHS } from "../../shared/codepuppy-config"
@@ -28,6 +28,7 @@ import { t } from "../i18n"
 import { markStartupTimeline } from "../startup-timeline"
 import { replayRuntimeRecoveryState, subscribeRuntimeRecovery, subscribeSseReconnected } from "../runtime-recovery"
 import { reconcileAuthSnapshot, subscribeAuthState } from "../auth-recovery"
+import { accountSummary, readAccountSummary } from "../account-summary"
 import { catalogFailureReason, catalogSyncedAt, createCatalogRefreshHealth, retryCatalogRefresh } from "./catalog-refresh-health"
 
 const fmtYuan = (fen: number) => `¥${(fen / 100).toFixed(2)}`
@@ -127,8 +128,7 @@ export function ModelPickPop(props: {
       if (isCurrent(seq, epoch)) setSummary({ status: "recovering" })
       return
     }
-    void window.api.account
-      .summary()
+    void readAccountSummary()
       .then((result) => {
         if (!isCurrent(seq, epoch) || request !== summarySeq) return
         const resultState = accountResultState(result)
@@ -286,6 +286,18 @@ export function ModelPickPop(props: {
     composerModelProjection().sessionID
     untrack(() => loadAll())
   })
+
+  // #1739:共享的账户状态被别处取新了(回到窗口 / 打开账户面板 / 一轮对话结束)⇒ 已就绪的这份跟着变,
+  // 不等下一次登录事件。未就绪的(加载中 / 恢复中)仍由自己的 loadSummary 与退避循环负责。
+  createEffect(
+    on(
+      accountSummary,
+      (next) => {
+        if (next && summary().status === "ready") setSummary({ status: "ready", data: next })
+      },
+      { defer: true },
+    ),
+  )
 
   onMount(() => {
     const unsubscribe = subscribeAuthState((state) => {

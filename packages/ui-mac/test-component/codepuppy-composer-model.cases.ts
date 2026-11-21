@@ -112,6 +112,7 @@ const { createModelContract } = await import("../src/renderer/codepuppy-ui/model
 const { byokEngineId } = await import("../src/shared/codepuppy-model-types")
 const { brandIconId } = await import("../src/renderer/codepuppy-ui/model-picker-core")
 const { resetAuthRecoveryForTests } = await import("../src/renderer/auth-recovery")
+const { resetAccountSummaryForTests } = await import("../src/renderer/account-summary")
 const { setLocale } = await import("../src/renderer/i18n")
 
 // `#1556`:已应用目录(上游 V3 producer 快照 + 随包 BYOK 首启引导)经生产投影装配,见 effective-catalog.fixture.ts。
@@ -284,6 +285,7 @@ afterEach(() => {
   setLocale("zh")
   activeDisposals.splice(0).forEach((dispose) => dispose())
   resetAuthRecoveryForTests()
+  resetAccountSummaryForTests() // #1739:共享的账户状态与取值时刻是模块级,不跨用例
   setProviderLifecycleDeps()
   clearByokKeys()
   tempDirs.splice(0).forEach((dir) => rmSync(dir, { recursive: true, force: true }))

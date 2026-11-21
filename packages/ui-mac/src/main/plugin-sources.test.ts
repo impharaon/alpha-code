@@ -91,19 +91,32 @@ test("successful index and pinned archive bytes are reused within the applicatio
   const one = await sources.captureCandidate(id)
   const two = await sources.captureCandidate(id)
   expect(one.ok && two.ok && one.capture === two.capture).toBe(true)
-  expect(requests).toHaveLength(5)
+  // §4.7:每份清单先请求一次转发入口(本夹具不答)再取原地址;两次搜索之间索引与归档都复用,所以原地址仍是 5 次、转发各 1 次。
+  expect(requests.filter((url) => !url.startsWith("https://alpha-github-hk.tidelabs.click/"))).toHaveLength(5)
+  expect(requests.filter((url) => url.startsWith("https://alpha-github-hk.tidelabs.click/")).sort()).toEqual([RELAY_CLAUDE, RELAY_CODEX])
   expect(requests.every((url) => !url.includes("api.github.com"))).toBe(true)
 })
 
 test("failed sources are truthful and not cached as no results", async () => {
-  let calls = 0
-  const sources = (await sourcesModule()).createPluginSources({ catalog: async () => [], fetch: async (url) => ++calls === 1 ? new Response("unavailable", { status: 503 }) : fixtureFetch(url) })
+  // §4.7:清单经转发与原地址两次都失败才算该来源失败,所以第一次搜索让 Claude 清单的两个地址都回 503。
+  const claudeRequests: string[] = []
+  let codexRequests = 0
+  let available = false
+  const sources = (await sourcesModule()).createPluginSources({ catalog: async () => [], fetch: async (url) => {
+    if (url.includes("openai/plugins/main/")) codexRequests++
+    if (!url.includes("claude-plugins-official/main/")) return fixtureFetch(url)
+    claudeRequests.push(url)
+    return available ? fixtureFetch(url) : new Response("unavailable", { status: 503 })
+  } })
   const failed = await sources.searchSources("playwright")
   expect(failed.sources.slice(0, 2)).toMatchObject([{ status: "ok" }, { source: "claude-marketplace", status: "failed", reason: "http" }])
   expect(failed.candidates).toEqual([])
+  available = true
   const retried = await sources.searchSources("playwright")
   expect(retried.candidates).toHaveLength(1)
-  expect(calls).toBe(5)
+  // 失败没有被缓存成「无结果」:第二次搜索重新请求 Claude 清单(转发 → 原地址);成功的 Codex 清单不再请求。
+  expect(claudeRequests).toEqual([RELAY_CLAUDE, RAW_CLAUDE, RELAY_CLAUDE, RAW_CLAUDE])
+  expect(codexRequests).toBe(2)
 })
 
 test("invalid index is a format failure and unknown candidate cannot start a download", async () => {
@@ -163,7 +176,8 @@ test("Codex local entry captures only its pinned subtree and rechecks marketplac
 test("Codex failures retry per source while successful Claude results survive", async () => {
   let attempts = 0
   const sources = (await sourcesModule()).createPluginSources({ catalog: async () => [], fetch: async (url) => {
-    if (!url.includes("openai/plugins/main/")) return fixtureFetch(url)
+    // §4.7:转发地址由夹具回 404;这里只数原地址的请求。
+    if (!url.includes("raw.githubusercontent.com/openai/plugins/main/")) return fixtureFetch(url)
     attempts++
     return attempts === 1 ? new Response("unavailable", { status: 503 }) : fixtureFetch(url)
   } })
@@ -495,8 +509,8 @@ test("R12 A1 B5 a stalled fetch aborts only its source and leaves catalog and ot
  let result:Awaited<ReturnType<typeof sources.searchSources>>|undefined
  const pending=sources.searchSources("__no_entry__").then(value=>{result=value;return value})
  try {
-  await Promise.all(completed)
-  for(let i=0;i<20;i++)await Promise.resolve()
+  // §4.7:清单先问转发入口(夹具回 404)再取原地址 —— 等到没有新请求为止。
+  for(let seen=-1;seen!==completed.length;){seen=completed.length;await Promise.all(completed);for(let i=0;i<20;i++)await Promise.resolve()}
   jest.advanceTimersByTime(600_001)
   for(let i=0;i<40;i++)await Promise.resolve()
   expect(result).toBeDefined()
@@ -517,8 +531,8 @@ test("R12 B5 a whole source deadline also bounds a hung catalog callback", async
  let result:Awaited<ReturnType<typeof sources.searchSources>>|undefined
  const pending=sources.searchSources("__no_entry__").then(value=>{result=value;return value})
  try{
-  await Promise.all(completed)
-  for(let i=0;i<20;i++)await Promise.resolve()
+  // §4.7:清单先问转发入口(夹具回 404)再取原地址 —— 第二批请求在第一批落定后才发出,所以等到没有新请求为止。
+  for(let seen=-1;seen!==completed.length;){seen=completed.length;await Promise.all(completed);for(let i=0;i<20;i++)await Promise.resolve()}
   jest.advanceTimersByTime(900_001)
   for(let i=0;i<40;i++)await Promise.resolve()
   expect(result?.sources.find(source=>source.source==="catalog")).toMatchObject({status:"failed",reason:"network"})
@@ -627,8 +641,8 @@ test("R14 search publishes responsive sources before a hung index and finishes w
  jest.useFakeTimers()
  const pending=sources.searchSources("context7",partial=>progress.push(structuredClone(partial))).then(value=>{answer=value})
  try{
-  await Promise.all(requested)
-  for(let n=0;n<60;n++)await Promise.resolve()
+  // §4.7:清单先问转发入口(夹具回 404)再取原地址 —— 等到没有新请求为止。
+  for(let seen=-1;seen!==requested.length;){seen=requested.length;await Promise.all(requested);for(let n=0;n<60;n++)await Promise.resolve()}
   expect(progress.some(result=>result.candidates.some(candidate=>candidate.name==="context7"))).toBe(true)
   expect(answer).toBeUndefined()
   jest.advanceTimersByTime(30_000)

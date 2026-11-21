@@ -9,6 +9,7 @@ import type { PackageGraphAnnotationsV1 } from "../shared/plugin-install"
 import type { PackageAcceptedFactsV1 } from "./package-installability"
 import { SKILL_MD_PATH } from "../shared/host-extension-package-contract/decoder"
 import { PLUGIN_SOURCE_REQUEST_TIMEOUT_MS, PLUGIN_SOURCE_DEADLINE_MS } from "../shared/plugin-source-timing"
+import { CODEPUPPY_GITHUB_RELAY_HOST } from "../shared/codepuppy-config"
 
 export type PluginSourceIdV1 = "catalog" | "claude-marketplace" | "codex-marketplace" | "opencode-npm" | "mcp-registry"
 export type SourceStatusV1 =
@@ -33,6 +34,8 @@ const MARKETPLACES = [
   { source: "codex-marketplace", ecosystem: "codex", repository: "https://github.com/openai/plugins", manifest: ".agents/plugins/marketplace.json" },
 ] as const
 const MCP_REGISTRY = "https://registry.modelcontextprotocol.io/v0.1/servers"
+// DESIGN-domestic-cloud-connectivity §4.7:市场清单经香港转发入口的那一次最多等这么久,之后改取原地址。
+const MARKETPLACE_RELAY_TIMEOUT_MS = 10_000
 const NPM_REGISTRY = "https://registry.npmjs.org"
 // Largest recorded marketplace download is 25.8MB; leave ample room for real bundles.
 const SOURCE_DOWNLOAD_MAX_BYTES = 128 * 1024 * 1024
@@ -122,9 +125,24 @@ export function createPluginSources(deps: { catalog: () => Promise<readonly Cand
   const loadIndex = (market: typeof MARKETPLACES[number], signal?: AbortSignal) => {
     const known = indexes.get(market.source)
     if (known) return known
-    const pending = get(market.repository.replace("https://github.com/", "https://raw.githubusercontent.com/") + "/main/" + market.manifest, signal).then((bytes) => {
+    const original = market.repository.replace("https://github.com/", "https://raw.githubusercontent.com/") + "/main/" + market.manifest
+    const read = async (url: string, budget?: AbortSignal) => {
+      const bytes = await get(url, budget)
       try { return readMarketplace(bytes, market.ecosystem) } catch { throw new SourceError("format", "Marketplace is not readable") }
-    }).catch((error: unknown) => { indexes.delete(market.source); throw error })
+    }
+    // §4.7:先取香港转发入口(§4.5 白名单 `/raw/<原路径>`),最多 10 s;它的任何失败都改取原地址,用该来源剩下的搜索时限。
+    const pending = (async () => {
+      const relay = new AbortController()
+      const timer = setTimeout(() => relay.abort(), MARKETPLACE_RELAY_TIMEOUT_MS)
+      try {
+        return await read(`https://${CODEPUPPY_GITHUB_RELAY_HOST}/raw${new URL(original).pathname}`, signal ? AbortSignal.any([signal, relay.signal]) : relay.signal)
+      } catch {
+        // 原地址那一次的结果(成功或失败原因)才是该来源的结论。
+      } finally {
+        clearTimeout(timer)
+      }
+      return read(original, signal)
+    })().catch((error: unknown) => { indexes.delete(market.source); throw error })
     indexes.set(market.source, pending)
     return pending
   }

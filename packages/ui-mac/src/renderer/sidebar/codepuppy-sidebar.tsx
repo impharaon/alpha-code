@@ -24,7 +24,7 @@ import { CODEPUPPY_PATHS } from "../../shared/codepuppy-config"
 import { buildMarker, formatBuildIdentity, type BuildIdentity } from "../../shared/build-identity"
 import { useCodePuppyEndpoints } from "../use-codepuppy-endpoints"
 import { subscribeAuthState } from "../auth-recovery"
-import { accountSummary, clearAccountSummary, readAccountSummary, refreshAccountSummary } from "../account-summary"
+import { accountSummary, clearAccountSummary, markAccountSummaryStale, readAccountSummary, refreshAccountSummary } from "../account-summary"
 import { markStartupTimeline } from "../startup-timeline"
 import { homeHref, projectLabel } from "./route"
 import { hrefFor, parseRoute } from "../../shared/route-manifest"
@@ -296,6 +296,11 @@ export function CodePuppySidebar(props: {
   const endpoints = useCodePuppyEndpoints()
   const rechargeUrl = () => `${endpoints().web}${CODEPUPPY_PATHS.wallet}?tab=recharge`
   const subscribeUrl = () => `${endpoints().web}${CODEPUPPY_PATHS.wallet}?tab=subscription`
+  // #1739:付款可能不到 30 秒就回来 —— 从这里打开订阅 / 充值页之后,下一次回到窗口一定重取。
+  const openWalletPage = (url: string) => {
+    markAccountSummaryStale()
+    window.api.openLink(url)
+  }
 
   // Account summary (balance / membership / token usage) from alpha-platform B. The one shared copy lives in
   // ../account-summary (#1739): this sidebar fetches on every login-state delivery, and the same value is refetched
@@ -1218,15 +1223,15 @@ export function CodePuppySidebar(props: {
           </div>
           <div class="codepuppy-acct-cta">
             <Show when={!acctIsPro()}>
-              <button class="codepuppy-acct-btn primary" onClick={() => window.api.openLink(subscribeUrl())}>
+              <button class="codepuppy-acct-btn primary" onClick={() => openWalletPage(subscribeUrl())}>
                 {t("codepuppy.sidebar.upgrade")}
               </button>
             </Show>
-            <button class="codepuppy-acct-btn" onClick={() => window.api.openLink(rechargeUrl())}>
+            <button class="codepuppy-acct-btn" onClick={() => openWalletPage(rechargeUrl())}>
               {t("codepuppy.sidebar.recharge")}
             </button>
             <Show when={acctIsPro()}>
-              <button class="codepuppy-acct-btn" onClick={() => window.api.openLink(subscribeUrl())}>
+              <button class="codepuppy-acct-btn" onClick={() => openWalletPage(subscribeUrl())}>
                 {t("codepuppy.sidebar.manageSubscription")}
               </button>
             </Show>

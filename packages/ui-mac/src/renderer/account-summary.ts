@@ -27,6 +27,12 @@ let requestedAt: number | undefined
 const isSummary = (result: unknown): result is AccountSummary =>
   !!result && typeof result === "object" && !("error" in result)
 
+/** 从应用打开了订阅 / 充值页面:付款可能不到 30 秒就回来,下一次回到窗口一定取。 */
+let walletPageOpened = false
+export function markAccountSummaryStale() {
+  walletPageOpened = true
+}
+
 let watchingFocus = false
 
 /** 渲染层里唯一调 `window.api.account.summary()` 的地方。原样返回回复;成功的回复同时成为共享现值。 */
@@ -59,6 +65,7 @@ export function readAccountSummary() {
 /** 登出或换号:丢掉上一个账号的数,并让仍在途的取值不再写进共享现值。 */
 export function clearAccountSummary() {
   generation++
+  walletPageOpened = false
   published = sent
   requestedAt = undefined
   setShared(null)
@@ -69,9 +76,10 @@ export function refreshAccountSummary() {
   void readAccountSummary().catch(() => {})
 }
 
-/** 回到应用窗口:距上次取值超过 30 秒才取。 */
+/** 回到应用窗口:距上次取值超过 30 秒才取;从应用打开过订阅 / 充值页面之后的那一次不受 30 秒限制。 */
 export function refreshAccountSummaryIfStale() {
-  if (requestedAt !== undefined && Date.now() - requestedAt <= ACCOUNT_SUMMARY_STALE_MS) return
+  if (!walletPageOpened && requestedAt !== undefined && Date.now() - requestedAt <= ACCOUNT_SUMMARY_STALE_MS) return
+  walletPageOpened = false
   refreshAccountSummary()
 }
 

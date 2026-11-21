@@ -28,7 +28,7 @@ import { t } from "../i18n"
 import { markStartupTimeline } from "../startup-timeline"
 import { replayRuntimeRecoveryState, subscribeRuntimeRecovery, subscribeSseReconnected } from "../runtime-recovery"
 import { reconcileAuthSnapshot, subscribeAuthState } from "../auth-recovery"
-import { accountSummary, readAccountSummary } from "../account-summary"
+import { accountSummary, markAccountSummaryStale, readAccountSummary } from "../account-summary"
 import { catalogFailureReason, catalogSyncedAt, createCatalogRefreshHealth, retryCatalogRefresh } from "./catalog-refresh-health"
 
 const fmtYuan = (fen: number) => `¥${(fen / 100).toFixed(2)}`
@@ -477,6 +477,7 @@ export function ModelPickPop(props: {
       return
     }
     if (row.availability === "needs-credit") {
+      markAccountSummaryStale() // #1739:充值回来可能不到 30 秒
       window.api.openLink(`${endpoints().web}${CODEPUPPY_PATHS.wallet}?tab=recharge`)
       return
     }

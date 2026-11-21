@@ -14,6 +14,7 @@ import { routeArtifact } from "../../artifact-workbench/renderers/registry"
 import { RENDERER_COMPONENTS } from "../../artifact-workbench/renderers/renderer-views"
 import { formatTurnElapsed, cloudImageViewOf, type CloudImageView, type TimelineRow } from "../timeline-model"
 import { useTimelineIntents } from "./timeline-intents"
+import { markAccountSummaryStale } from "../../../account-summary"
 
 type CloudImageRow = Extract<TimelineRow, { kind: "cloudImage" }>
 type LocalImage = { entry: ManifestArtifactEntry }
@@ -418,7 +419,10 @@ export function CloudImageCard(props: { row: CloudImageRow }) {
             class="a-ig-btn"
             data-variant="primary"
             data-cloud-image-billing
-            onClick={() => void window.api.cloud.openBillingPage("recharge")}
+            onClick={() => {
+              markAccountSummaryStale() // #1739
+              void window.api.cloud.openBillingPage("recharge")
+            }}
           >
             {t("codepuppy.timeline.image.billing")}
           </button>

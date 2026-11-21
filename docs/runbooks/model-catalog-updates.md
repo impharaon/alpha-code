@@ -32,7 +32,7 @@ review_after: 2027-01-30
 ## A. 代理节点加/换模型
 
 **这一节不是只改一个配置文件。** 每条 route 的价格、窗口、输出上限都要带出处和指纹,直连腿的取值要 owner 签;换代还会
-碰到写着模型 id 的代码和测试。2026-11-20 准备换代时逐项对过 alpha-platform 的代码,下面按那次读到的写(那次没有真的换代)。
+碰到写着模型 id 的代码和测试。2026-11-20 准备换代时逐项对过网关仓的代码,下面按那次读到的写(那次没有真的换代)。
 
 前置判断(缺一不可,否则上架即死路由):
 
@@ -42,7 +42,7 @@ review_after: 2027-01-30
 2. **真实定价**:`routes[].pricing`(USD/Mtok)直接驱动 ledger 计价,必须与
    上游实价一致,不许估。上游改价后这里不会自己变,定期对一次官方价目页。
 
-步骤(第 9 步在 alpha-code,其余在 alpha-platform;命令在 `packages/gateway` 下跑):
+步骤(第 9 步在本仓,其余全在 alpha-platform,命令在 `packages/gateway` 下跑):
 
 1. `src/models.config.json` → `models` 加条目:`minPlan`(free/member)、`enabled`、`display`(见第 8 步)、`routes[]`
    (顺序即优先级:原生在前、OpenRouter 兜底)。每条 route 必填 `provider`、`upstreamModel`、`baseURL`、`wire`、
@@ -82,11 +82,11 @@ review_after: 2027-01-30
    过一张本地档位表,它对本地没收录的线上模型一律显示成最便宜的一档
    (claude-fable-5 真实 输入 71.4× / 输出 178.6×,当时显示「标准 ×1」)。
    `src/shared/platform-pricing-authority-ratchet.test.ts` 会拦住它回来。
-9. (可选,**在 alpha-code、要发 App**)要换 picker 的**平台默认模型**,改 `codepuppy-models.json` 顶层
+9. (可选,**在本仓、要发 App**)要换 picker 的**平台默认模型**,改 `codepuppy-models.json` 顶层
    `defaultPlatformModel`(裸 model id)。它是唯一的旋钮:声明缺席或该 id 不在
    生效目录中,app 就不自动默认任何平台模型 —— 不会替你挑一个便宜的。
    这个文件随安装包发,改它不属于「不发版」的范围。
-10. 部署:按 alpha-platform `docs/runbooks/deploy.md`,`npm run deploy:worker -- --config wrangler.jsonc --message "git:$sha"`。
+10. 部署:按网关仓的 `docs/runbooks/deploy.md`,`npm run deploy:worker -- --config wrangler.jsonc --message "git:$sha"`。
     不要直接 `wrangler deploy`:前置闸(含价格交叉核验)不会跑。
 11. 验证:部署后等一个刷新点(或重启 app)→ 引擎下次启动后,picker 代理节点组出现新模型、名称与档位是 `display`
    里写的 → 行尾显示的是**两个真倍数**(平台段写「平台模型清单尚未获取」说明这台机器还没拿到有效的 V3 目录)→ 真发
@@ -131,7 +131,7 @@ review_after: 2027-01-30
      **实测覆盖记录**:`deepseek-flash`(直连)2026-10-31 实测:`POST https://api.deepseek.com/v1/chat/completions`,
      `model: deepseek-flash`,带 32×32 PNG data URI 的图片请求 ⇒ 200,回答 "Red",223 入 / 23 出 ⇒ 目录改为能看图
      (alpha-platform#565,`catalog_version` 2)。智谱直连 2026-11-20 实测:`glm-5.3-flash` 带 32×32 PNG ⇒ 200「红色」;
-     `glm-5.3` 带图 ⇒ 400「messages.content.type 参数非法,取值范围 ['text']」(alpha-platform#598,`catalog_version` 3)。OpenRouter 上的 `deepseek/deepseek-v4-flash` 仍只收文字(2026-09-24 实测),两者不是同一个入口。
+     `glm-5.3` 带图 ⇒ 400「messages.content.type 参数非法,取值范围 ['text']」(网关仓 PR 598,`catalog_version` 3)。OpenRouter 上的 `deepseek/deepseek-v4-flash` 仍只收文字(2026-09-24 实测),两者不是同一个入口。
 2. 新模型 id 上游认不认:有该家 key 时跑 `bun packages/ui-mac/scripts/verify-byok-catalog.ts`(#1281;它查的是
    安装包里的首启引导与适配器表的端点 —— 要验刚加的 id,临时把它加进本机 `codepuppy-models.json` 的 `byokCatalog` 再跑,
    别提交);没 key 时它会把 id 列进「本次未验证」,不会假装绿。它读的是桌面端落在本机的 Key 文件或同名环境变量,
@@ -140,7 +140,7 @@ review_after: 2027-01-30
    `contracts/v1/fixtures/producer/byok-catalog.json`(测试要求它与清单逐字相等,不重新生成即红)。本仓测试用 vitest,
    不是 `bun test`:`npx vitest run test/byok-catalog.test.ts test/producer-fixtures-v1.test.ts`(schema、无凭据可读、
    不读 edition、夹具相等)。只改清单与夹具的推送走轻量检查(`.gate-light` + `bin/check-light`,约 3 秒),不跑全量门。
-   合并后按 alpha-platform `docs/runbooks/deploy.md` 部署:
+   合并后按网关仓的 `docs/runbooks/deploy.md` 部署:
    `npm run deploy:worker -- --config wrangler.jsonc --message "git:$sha"`(清单只由 gateway 这一个 Worker 提供)。
 4. 验证:`curl -sS https://<gateway>/v1/byok-catalog` 不带凭据返回新版本 → 等一个刷新点(或重启 app)→ 引擎下次启动后
    BYOK 组出现新模型(该 provider 已配 key 即亮)→ 选中发一条消息。BYOK 不经网关、不产生平台计费;模型能不能用取决于

@@ -6,8 +6,8 @@ kind: runbook
 status: active
 owners:
   - Code Puppy maintainers
-last_reviewed: 2026-11-04
-review_after: 2026-11-16
+last_reviewed: 2026-11-21
+review_after: 2026-12-21
 ---
 
 # 发版 runbook — Code Puppy Mac(签名 · 公证 · 自动更新)
@@ -40,8 +40,16 @@ grep -cE '(^|[^A-Za-z0-9_])ALPHA_|\.alpha-code-signing' ~/.codepuppy-signing/sig
 **打包配置**(`packages/ui-mac/electron-builder.config.ts` + `scripts/*`,零改上游):
 - prod/beta productName `Code Puppy`、appId `com.tide.codepuppy`(dev/beta 加后缀)、Electron 应用名 `Code Puppy` / `Code Puppy Beta` / `Code Puppy Dev`(决定钥匙串条目名)、登录 URL scheme `codepuppy`、artifact `codepuppy-*`。
 - 更新源 = 自有 public repo `jinjunnn/alpha-code`(prod=`latest` 渠道,beta=`beta`),**不是** `anomalyco/opencode`。
+  每次检查先经香港 GitHub 转发入口 `alpha-github-hk.tidelabs.click`(只转发本仓发行物与插件助手的两份市场清单,
+  [DESIGN-domestic-cloud-connectivity §4.5–§4.7](https://github.com/impharaon/alpha-work/blob/afcfa35e08688bc7cf28c1e8e21caf7a172cd3aa/docs/specs/domestic-cloud-connectivity/design.md)),
+  转发不通时同一次检查改走 github.com;经转发下载失败时同一轮改走 github.com 重查一次、版本相同才再下载(主进程日志 `updater feed reroute`)。
+  常量在 `packages/ui-mac/src/main/codepuppy-environment.ts` 的 `UPDATE_FEED_HOSTS` 与 `src/shared/codepuppy-config.ts` 的 `CODEPUPPY_GITHUB_RELAY_HOST`;发布步骤不变。
 - `CODEPUPPY_SIGN=1` → Developer ID 签名 + 公证;否则 ad-hoc(仅本机双击)。
 - `notarize` 是 boolean(electron-builder 26.x);team/凭证走 env。
+- 搜索工具随包带 ripgrep:prebuild 的 `scripts/build-ripgrep.ts` 按引擎 `packages/core/src/ripgrep/binary.ts` 钉住的版本与 sha256
+  取目标架构那一份(不符即红;下载缓存 `~/Library/Caches/codepuppy/ripgrep/`),装进 `<Resources>/ripgrep/`(rg + COPYING / LICENSE-MIT / UNLICENSE),
+  随应用签名;afterPack 核对 `ripgrep/rg` 在、可执行、含目标片。运行时 `server.ts` 把 `<Resources>/ripgrep` 追加到引擎 `PATH` **末尾**:
+  用户自己的 `rg` 照旧优先;它因此也出现在用户 shell 命令与 MCP 子进程的 `PATH` 末尾。随包文件缺失或不可执行时,引擎退回它原有的下载路径。
 - prebuild 会 `patch-server-version.ts` 把内嵌 server 的 `InstallationVersion` 从 `local` 改成真实版本(A4:否则 `@opencode-ai/plugin@local` 装不上,带 `.opencode` 插件的项目首个请求卡住)。
 
 围栏相关改动发版前，在 `packages/ui-mac` 显式运行 `CODEPUPPY_TEST_SIGNED_FENCE=1 bun test src/main/process-fence-extension-packaged.test.ts`（本地签名、`--publish never`、关闭公证）；普通 gate 只核对未启用时宿主自报 0 条，不构建或签名；临时 app/目录会清理，小结果保留在 worktree 的 `node_modules/.cache/project-writable/results/`。

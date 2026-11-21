@@ -216,4 +216,8 @@ r3 交接：依据 `4d40cd3455` 的独立审查接收项及 checked plan `654ffc
 
 ### 偏离记录
 
-暂无
+- 2026-11-21 · 单元四暂缓:alpha-platform `main@a52955dbe` 的 `packages/gateway/src/models.config.json` 仍只列 `deepseek-v4-flash`(#599 只合了第一段 #600),本仓 vendored `packages/codepuppy-contracts-consumer/vendor/alpha-platform-model-catalog/contracts/v3/fixtures/producer/model-catalog.json` 同样;把随包 `defaultPlatformModel` 改成 `deepseek-flash` 后,`codepuppy-composer-model.component.test.ts` 的 5 条默认用例按这份真实网关样本变红(默认解析得到 undefined),用户在网关改名上线前也拿不到平台自动默认。红测试提交 `6eec537cd1` 已由 `8c1a81b6e9` 撤回;JSON 改动与红测试另存编排缓存 `logs-D/unit4-{json,test}.patch`,待网关改名合入并重新 vendor 目录后一起落。
+- 2026-11-21 · 市场清单:共享夹具 `test-fixtures/plugin-helper/source-fetch.ts` 对转发地址回 404(只录了原地址字节),既有用例因此走「转发不可用 ⇒ 原地址」一臂;`plugin-sources.test.ts` 里编码旧单次请求的 2 处计数断言、1 处「第一个请求失败」写法、3 处按微任务步数等待的假时钟用例改为按两段请求判定,判据未放宽。
+- 2026-11-21 · 随包 ripgrep:构建戳记放在 `native/ripgrep/build/<arch>.stamp`(目录旁,不进包);`.gitignore` 另忽略 `resources/ripgrep/`(`server.test.ts` 的 §4.8 用例在非打包资源根短暂放桩 rg)。只做 darwin(与随包 Office 运行时同一范围),Windows 包不带 rg,见交付报告。
+- 2026-11-21 · 事实文档只改 `docs/runbooks/distribution.md`;`docs/architecture/2026-08-25-network-egress-seam.md` 是 2026-09 的勘破快照,不改。
+- 2026-11-21 · E-6 打包证据:本机 ad-hoc `dir` 包(`CODEPUPPY_TARGET_ARCH=arm64 OPENCODE_CHANNEL=prod`,无签名材料)上核对 `codesign --verify`、`rg --version`,并用引擎自己的 `RipgrepBinary`(PATH 无 rg、引擎 bin 为空、fetch 被拦)解析到包内 `Resources/ripgrep/rg` 且 0 次下载;对照组(PATH 不含随包目录)去下载 GitHub。签名形态(Developer ID)的 E-6 留给 Q6 前的签名测试构建。

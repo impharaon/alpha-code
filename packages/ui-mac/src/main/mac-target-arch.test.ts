@@ -20,8 +20,10 @@ import { Arch } from "electron-builder"
 import {
   ENGINE_ASSETS_DIR,
   OFFICE_RUNTIME_BUILD_DIR,
+  RIPGREP_BUILD_DIR,
   TARGET_ARCH_ENV,
   assertMacTargetArch,
+  checkBundledRipgrep,
   checkPackagedEngineAssets,
   engineNativeAssets,
   machOArchs,
@@ -422,7 +424,7 @@ describe("assertMacTargetArch(beforePack 的核对)", () => {
 // asar writer 产出(同上方 manifest 用例),原生文件是 Mach-O 头夹具,另带一个非原生资源。
 
 /** 一个打好的 `.app/Contents/Resources`:引擎资源目录 = engineNativeAssets 的每一项 + 一个音频文件。 */
-async function packagedResources(opts: { arch: TargetArch; unpack: boolean; mode?: Record<string, number>; bytes?: Record<string, Buffer> }) {
+async function packagedResources(opts: { arch: TargetArch; unpack: boolean; mode?: Record<string, number>; bytes?: Record<string, Buffer>; ripgrep?: false | { bytes: Buffer; mode: number } }) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "codepuppy-engine-assets-"))
   tmpDirs.push(dir)
   const assets = path.join(dir, "source", ENGINE_ASSETS_DIR)
@@ -437,6 +439,11 @@ async function packagedResources(opts: { arch: TargetArch; unpack: boolean; mode
   fs.mkdirSync(resources, { recursive: true })
   const { createPackageWithOptions } = await import(createRequire(require.resolve("electron-builder")).resolve("@electron/asar"))
   await createPackageWithOptions(path.join(dir, "source"), path.join(resources, "app.asar"), opts.unpack ? { unpackDir: ENGINE_ASSETS_DIR } : {})
+  // DESIGN-domestic-cloud-connectivity §4.8:随包 ripgrep 落 <Resources>/ripgrep/rg(extraResources,不进 asar)。
+  if (opts.ripgrep !== false) {
+    fs.mkdirSync(path.join(resources, "ripgrep"), { recursive: true })
+    fs.writeFileSync(path.join(resources, "ripgrep", "rg"), opts.ripgrep?.bytes ?? thin(opts.arch), { mode: opts.ripgrep?.mode ?? 0o755 })
+  }
   return { resources, appOutDir: path.join(dir, "app") }
 }
 
@@ -492,6 +499,41 @@ describe("#1669 checkPackagedEngineAssets(afterPack 的核对)", () => {
     const unpacked = await packagedResources({ arch: "arm64", unpack: true })
     await expect(afterPack(context(unpacked.appOutDir))).resolves.toBeUndefined()
     await expect(afterPack({ ...context(packed.appOutDir), electronPlatformName: "win32" })).resolves.toBeUndefined()
+  })
+})
+
+// DESIGN-domestic-cloud-connectivity §4.8:搜索工具随包带 ripgrep。构建产物 native/ripgrep/build/<arch>/ 经 darwin 的 extraResources
+// 装成 <Resources>/ripgrep/;afterPack 把 <Resources>/ripgrep/rg 当作必需的可执行文件核对(在、带执行位、含目标架构片)。
+describe("§4.8 随包 ripgrep", () => {
+  test("darwin extraResources:目标架构那一份 → <Resources>/ripgrep/;别的平台不带", async () => {
+    const { getConfig } = await import("../../electron-builder.config")
+    const entries = (getConfig("prod").extraResources ?? []) as Array<{ from: string; to: string }>
+    expect(entries.filter((entry) => entry.to === "ripgrep/")).toEqual(
+      process.platform === "darwin" ? [{ from: `${RIPGREP_BUILD_DIR}/${resolveTargetArch()}/`, to: "ripgrep/" }] : [],
+    )
+  })
+
+  test("checkBundledRipgrep:在、带执行位、含目标片 ⇒ 放行;缺席、没执行位、只含另一架构片、不是 Mach-O ⇒ 各自点名", async () => {
+    const good = await packagedResources({ arch: "arm64", unpack: true })
+    expect(checkBundledRipgrep(good.resources, "arm64")).toEqual([])
+    const missing = await packagedResources({ arch: "arm64", unpack: true, ripgrep: false })
+    expect(checkBundledRipgrep(missing.resources, "arm64")).toEqual(["ripgrep/rg 不存在(搜索工具随包的 ripgrep)"])
+    const plain = await packagedResources({ arch: "arm64", unpack: true, ripgrep: { bytes: thin("arm64"), mode: 0o644 } })
+    expect(checkBundledRipgrep(plain.resources, "arm64")).toEqual(["ripgrep/rg 没有执行位"])
+    const wrong = await packagedResources({ arch: "arm64", unpack: true, ripgrep: { bytes: thin("x64"), mode: 0o755 } })
+    expect(checkBundledRipgrep(wrong.resources, "arm64")).toEqual(["ripgrep/rg 只含 [x64],缺 arm64"])
+    const script = await packagedResources({ arch: "arm64", unpack: true, ripgrep: { bytes: Buffer.from("#!/bin/sh\n"), mode: 0o755 } })
+    expect(checkBundledRipgrep(script.resources, "arm64")).toEqual(["ripgrep/rg 不是 Mach-O 文件"])
+  })
+
+  test("生产 afterPack:包里缺 ripgrep/rg ⇒ 拒绝出包;带上 ⇒ 放行", async () => {
+    const { getConfig } = await import("../../electron-builder.config")
+    const afterPack = getConfig("prod").afterPack as (ctx: unknown) => Promise<void>
+    const context = (appOutDir: string) => ({ electronPlatformName: "darwin", appOutDir, arch: Arch.arm64, packager: { appInfo: { productFilename: "Code Puppy" } } })
+    const missing = await packagedResources({ arch: "arm64", unpack: true, ripgrep: false })
+    await expect(afterPack(context(missing.appOutDir))).rejects.toThrow(/拒绝出 mac-arm64 包[\s\S]*ripgrep\/rg 不存在/)
+    const present = await packagedResources({ arch: "arm64", unpack: true })
+    await expect(afterPack(context(present.appOutDir))).resolves.toBeUndefined()
   })
 })
 

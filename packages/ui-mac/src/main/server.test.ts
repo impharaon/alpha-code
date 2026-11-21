@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, mock, test, vi } from "bun:test"
 import { EventEmitter } from "node:events"
-import { chmodSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, renameSync, rmSync, writeFileSync } from "node:fs"
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, renameSync, rmSync, writeFileSync } from "node:fs"
 import { homedir, tmpdir } from "node:os"
 import { join, parse, resolve } from "node:path"
 import { writeCustomProviderTruth } from "./custom-provider-truth-write"
@@ -1265,6 +1265,44 @@ describe("I-13 tool policy writes from the sidecar go through main", () => {
     } finally {
       await result.listener.stop()
       rmSync(baseDir, { recursive: true, force: true })
+    }
+  })
+})
+
+// DESIGN-domestic-cloud-connectivity §4.8、§8 E-6 的自动化部分:引擎环境的 PATH 末尾追加 <资源根>/ripgrep(与 UV_CACHE_DIR 同处);
+// 用户自己的路径排在前面。再用**引擎自己的** `which`(packages/core/src/util/which.ts,RipgrepBinary 查 rg 用的就是它)对这一代 fork
+// 出去的 PATH 解析,引擎 bin 目录清空:随包 rg 在 ⇒ 解析到资源根之下(不走下载);用户 PATH 里有 rg ⇒ 用户的优先;随包 rg 没有执行位 ⇒
+// 解析不到(RipgrepBinary 退回它现有的下载路径,引擎代码不改)。资源根在非打包态是本包的 resources/,桩 rg 只在这条用例里存在。
+describe("§4.8 随包 ripgrep 进引擎 PATH", () => {
+  test("fork 的 PATH = 用户 PATH + <resourcesRoot()>/ripgrep;引擎的 which 在清空的引擎 bin 下解析到资源根里的 rg", async () => {
+    const { resourcesRoot } = await import("./ext-fs-installer")
+    const { which } = await import("../../../core/src/util/which")
+    const bundled = join(resourcesRoot(), "ripgrep")
+    const rg = join(bundled, "rg")
+    const created = !existsSync(bundled)
+    const userBin = mkdtempSync(join(tmpdir(), "user-bin-"))
+    const engineBin = mkdtempSync(join(tmpdir(), "engine-bin-"))
+    try {
+      mkdirSync(bundled, { recursive: true })
+      writeFileSync(rg, "#!/bin/sh\necho bundled\n", { mode: 0o755 })
+      process.env.PATH = "/usr/bin:/bin"
+      const env = await forkSidecar()
+      expect(env.PATH).toBe(`/usr/bin:/bin:${bundled}`)
+      expect(which("rg", { PATH: env.PATH }, engineBin)).toBe(rg)
+      expect(which("rg", { PATH: env.PATH }, engineBin)!.startsWith(resourcesRoot() + "/")).toBe(true)
+
+      writeFileSync(join(userBin, "rg"), "#!/bin/sh\necho user\n", { mode: 0o755 })
+      process.env.PATH = `${userBin}:/usr/bin:/bin`
+      const withUser = await forkSidecar()
+      expect(withUser.PATH).toBe(`${userBin}:/usr/bin:/bin:${bundled}`)
+      expect(which("rg", { PATH: withUser.PATH }, engineBin)).toBe(join(userBin, "rg"))
+
+      chmodSync(rg, 0o644)
+      expect(which("rg", { PATH: env.PATH }, engineBin)).toBeNull()
+    } finally {
+      rmSync(created ? bundled : rg, { recursive: true, force: true })
+      rmSync(userBin, { recursive: true, force: true })
+      rmSync(engineBin, { recursive: true, force: true })
     }
   })
 })

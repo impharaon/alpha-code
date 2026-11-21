@@ -6,7 +6,7 @@ kind: runbook
 status: active
 owners:
   - Code Puppy maintainers
-last_reviewed: 2026-10-30
+last_reviewed: 2026-11-20
 review_after: 2027-01-30
 ---
 
@@ -31,27 +31,49 @@ review_after: 2027-01-30
 
 ## A. 代理节点加/换模型
 
+**这一节不是只改一个配置文件。** 每条 route 的价格、窗口、输出上限都要带出处和指纹,直连腿的取值要 owner 签;换代还会
+碰到写着模型 id 的代码和测试。2026-11-20 准备换代时逐项对过网关仓的代码,下面按那次读到的写(那次没有真的换代)。
+
 前置判断(缺一不可,否则上架即死路由):
 
 1. **至少一条可路由的 route**:平台持有该家原生 key,或 OpenRouter 已上架该
    模型(千问系截至 2026-07-23 无原生 key、纯 OpenRouter 兜底 ——
    qwen3.8-max 因 OpenRouter 未上架同名条目而无法上代理节点,就是这个卡点)。
 2. **真实定价**:`routes[].pricing`(USD/Mtok)直接驱动 ledger 计价,必须与
-   上游实价一致,不许估。
+   上游实价一致,不许估。上游改价后这里不会自己变,定期对一次官方价目页。
 
-步骤(全在 alpha-platform):
+步骤(第 9 步在本仓,其余全在 alpha-platform,命令在 `packages/gateway` 下跑):
 
-1. `packages/gateway/src/models.config.json` → `models` 加条目:
-   `minPlan`(free/member)、`enabled`、`routes[]`(顺序即优先级:原生在前、
-   OpenRouter 兜底;每条含 provider/upstreamModel/baseURL/wire/pricing)。
+1. `src/models.config.json` → `models` 加条目:`minPlan`(free/member)、`enabled`、`display`(见第 8 步)、`routes[]`
+   (顺序即优先级:原生在前、OpenRouter 兜底)。每条 route 必填 `provider`、`upstreamModel`、`baseURL`、`wire`、
+   `pricing`(`inUsdPerMtok` / `outUsdPerMtok`,可选 `cacheReadUsdPerMtok`;`cacheWriteUsdPerMtok` 只有非 openai wire 可写)、
+   `maxOutputTokens`(取该 route 上游允许的最大值)、`contextWindowTokens`、`capabilityProvenance`
+   (`source` / `asOf` / `reviewAfter` / `verifiedBy` / `tupleFingerprint` / `outputCapReading`)。缺一项网关装载即失败
+   (`src/models-config-loader.ts`)。Claude 腿的 `allowedBetaFeatures` 必须是 `VERIFIED_BETA_FEATURES` 的子集。
    换代时旧 id 进 `aliases`(存量默认模型/结算不炸;`/v1/models` 只列当代)。
    策展政策:每家只保留最新一代(2026-07-05 拍板)。
-2. edition 白名单**双落点同步**(cn 版要可见就都要加):
-   - `packages/gateway/src/registry.ts` `DEFAULT_EDITION_CONFIG.editions.cn.models`(代码兜底);
-   - `packages/gateway/wrangler.jsonc` `vars.EDITION_CONFIG`(运行时权威)。
-3. 测试:gateway 包 `bun test`(models-config/edition 套件校验配置形状)。
-4. 部署:gateway worker `wrangler deploy`。
-5. 同一个条目里写 `display`(必填):`name`、`brand`(`anthropic | openai | deepseek | zhipu | qwen | moonshot | minimax`,
+2. **签核**。`tupleFingerprint` 钉住 provider、upstreamModel、wire、beta 集、窗口、输出上限和四个价,改其中任何一个旧签即作废。
+   - OpenRouter 腿:`bin/verify-openrouter-capability` 拿 OpenRouter 模型目录核对窗口与输出上限,并把直连腿价格与
+     OpenRouter 现价并排比;有未裁决的分歧退出 1。
+   - 直连腿:由 owner 签。`verifiedBy` 含「待 owner 复签」时整份配置拒绝装载;owner 过目后跑
+     `bin/countersign-capabilities --by "<签核人>"`。仓库代码不得代签。
+   - 价格分歧的豁免登记在 `AUTHORIZED_ADJUDICATIONS`(`src/models-config-loader.ts`),按(模型, provider, 字段)逐条;
+     换代后旧 id 的条目要清掉,新 id 有分歧要 owner 重新裁决。
+3. **可达性台账**:`route-leg-reachability.json` 每条 route 一条带日期的观测记录(`bin/verify-route-legs`)。加 route 同时
+   加记录,摘 route 同时摘记录,否则红。
+4. **输出上限闸**:`bin/verify-output-caps` 要求 `maxOutputTokens` 等于 `capabilityProvenance.outputCapReading.value`。
+5. **写着模型 id 的代码**。换代前先 `grep -rn "<旧 id>" packages contracts`。2026-11-20 的命中:`src/lib/openai-wire.ts`
+   (逐模型的推理参数对照表,新模型要重新实打)、`src/pipelines.ts` / `src/lib/pipeline-registry.ts` /
+   `src/lib/tier-router.ts` / `src/egress-relay-do.ts`(`claude-sonnet-5`)、`src/worker.ts` / `src/sandbox.ts` /
+   `src/agent-runner.mjs` / `src/harness/coding-claudecode.ts`(`claude-opus-4-8`)、`src/lib/failover.ts` /
+   `src/lib/egress.ts`,以及约 60 个测试文件。
+6. edition 白名单**双落点同步**(cn 版要可见就都要加):
+   - `src/registry.ts` `DEFAULT_EDITION_CONFIG.editions.cn.models`(代码兜底);
+   - `wrangler.jsonc` `vars.EDITION_CONFIG`(运行时权威)。
+7. 测试:本仓用 vitest,不是 `bun test`。相关用例
+   `npx vitest run test/models-config.test.ts test/registry.test.ts test/edition.test.ts test/model-catalog-v3.test.ts`;
+   全量门是仓库根的 `bin/check`(改 `models.config.json` 走全量门)。
+8. 同一个条目里写 `display`(必填):`name`、`brand`(`anthropic | openai | deepseek | zhipu | qwen | moonshot | minimax`,
    是**品牌**不是路由腿 —— qwen 经 OpenRouter 路由,brand 仍是 `qwen`)、可选 `reasoning` / `web` / `variants`
    (推理档位,REQ-029/055;选项键只允许 `reasoningEffort | reasoning | thinking`,loader 校验)。它随
    `GET /v1/models` 下发,桌面端**不需要**任何改动或发版。
@@ -60,10 +82,13 @@ review_after: 2027-01-30
    过一张本地档位表,它对本地没收录的线上模型一律显示成最便宜的一档
    (claude-fable-5 真实 输入 71.4× / 输出 178.6×,当时显示「标准 ×1」)。
    `src/shared/platform-pricing-authority-ratchet.test.ts` 会拦住它回来。
-6. (可选)要换 picker 的**平台默认模型**,改 `codepuppy-models.json` 顶层
+9. (可选,**在本仓、要发 App**)要换 picker 的**平台默认模型**,改 `codepuppy-models.json` 顶层
    `defaultPlatformModel`(裸 model id)。它是唯一的旋钮:声明缺席或该 id 不在
    生效目录中,app 就不自动默认任何平台模型 —— 不会替你挑一个便宜的。
-7. 验证:部署后等一个刷新点(或重启 app)→ 引擎下次启动后,picker 代理节点组出现新模型、名称与档位是 `display`
+   这个文件随安装包发,改它不属于「不发版」的范围。
+10. 部署:按网关仓的 `docs/runbooks/deploy.md`,`npm run deploy:worker -- --config wrangler.jsonc --message "git:$sha"`。
+    不要直接 `wrangler deploy`:前置闸(含价格交叉核验)不会跑。
+11. 验证:部署后等一个刷新点(或重启 app)→ 引擎下次启动后,picker 代理节点组出现新模型、名称与档位是 `display`
    里写的 → 行尾显示的是**两个真倍数**(平台段写「平台模型清单尚未获取」说明这台机器还没拿到有效的 V3 目录)→ 真发
    一条消息(走通 invoke→ledger 全链),盘一眼 ledger 计价 route 是否命中预期。
 
@@ -87,22 +112,36 @@ review_after: 2027-01-30
        [`model-variant-reachability`](../architecture/2026-09-06-model-variant-reachability.md) §5)。
        上游 `transform.options()` 对 `zhipuai*` 直连**无条件**写 `thinking: enabled`,所以智谱
        直连的每个模型要么标徽标并给「关」档,要么接受它总在思考。
+       **给「关」档之前先实打**:`glm-5.3` / `glm-5.3-flash` 始终思考,`thinking:{type:"disabled"}` 回 400
+       「该模型始终思考,不支持关闭思考;请使用 low、high 或 max」(2026-11-20 实打);给它们「关」档 = 用户一选就报错。
+       它们的档位是 `reasoningEffort` 的 low / high / max,且「低」排第一(辅助调用取第一档)。
    - **能不能看图**(REQ-228 #1420):每个模型的 `image_input` 必填 `true` / `false`(schema 判,缺一个整份拒绝),
      值抄自 models.dev 同名模型的 `modalities.input` 是否含 `image`;查的是与该 provider 适配器 `baseURL` 同一端点的
      models.dev provider(`api.moonshot.cn` ⇒ `moonshotai-cn`、`dashscope.aliyuncs.com` ⇒ `alibaba-cn`、
      `api.minimaxi.com` ⇒ `minimax-cn`、`api.deepseek.com` ⇒ `deepseek`、`open.bigmodel.cn` ⇒ `zhipuai`)。查法:
      `curl -s https://models.dev/api.json | jq '."<provider>".models."<id>".modalities.input'`。
-     models.dev 里查不到 ⇒ 写 `false`(看不了图,图片交给云端识图),不要按名字猜。引擎侧的最终值由
+     models.dev 里查不到 ⇒ 写 `false`(看不了图,图片交给云端识图),不要按名字猜。
+     两个例外情形(2026-11-20):① models.dev 收录有延迟(`qwen4-max` 发布 4 天后 `alibaba-cn` 仍未收录),厂商官方
+     模型页写明能看图时以官方页为准并在 PR 里写出处;② models.dev 的 `minimax-cn` 现在登记的端点是
+     `api.minimax.cn/anthropic/v1`,与适配器的 `api.minimaxi.com/v1` 不是同一个,MiniMax 的值没有同端点出处,
+     有 Key 时实打一次。引擎侧的最终值由
      `image-input-capability.test.ts` 起真引擎判。
      平台代理模型不读这个字段,一律看不了图(网关聊天入口拒收图片)。
      自定义节点没有上游出处,只认用户在真源记录里显式声明的 `imageInput`(见 `custom-provider-truth.ts`)。
      **实测覆盖记录**:`deepseek-flash`(直连)2026-10-31 实测:`POST https://api.deepseek.com/v1/chat/completions`,
      `model: deepseek-flash`,带 32×32 PNG data URI 的图片请求 ⇒ 200,回答 "Red",223 入 / 23 出 ⇒ 目录改为能看图
-     (alpha-platform#565,`catalog_version` 2)。OpenRouter 上的 `deepseek/deepseek-v4-flash` 仍只收文字(2026-09-24 实测),两者不是同一个入口。
+     (alpha-platform#565,`catalog_version` 2)。智谱直连 2026-11-20 实测:`glm-5.3-flash` 带 32×32 PNG ⇒ 200「红色」;
+     `glm-5.3` 带图 ⇒ 400「messages.content.type 参数非法,取值范围 ['text']」(网关仓 PR 598,`catalog_version` 3)。OpenRouter 上的 `deepseek/deepseek-v4-flash` 仍只收文字(2026-09-24 实测),两者不是同一个入口。
 2. 新模型 id 上游认不认:有该家 key 时跑 `bun packages/ui-mac/scripts/verify-byok-catalog.ts`(#1281;它查的是
    安装包里的首启引导与适配器表的端点 —— 要验刚加的 id,临时把它加进本机 `codepuppy-models.json` 的 `byokCatalog` 再跑,
-   别提交);没 key 时它会把 id 列进「本次未验证」,不会假装绿。
-3. alpha-platform 网关 `bun test`(`byok-catalog.test.ts` 校验 schema、无凭据可读、不读 edition)→ 部署 gateway。
+   别提交);没 key 时它会把 id 列进「本次未验证」,不会假装绿。它读的是桌面端落在本机的 Key 文件或同名环境变量,
+   本机没存 Key 的供应商一律未验证(2026-11-20:本机只有 DeepSeek、智谱的 Key)。
+3. 在 alpha-platform `packages/gateway` 下跑 `npm run contracts:generate`,重新生成 producer 夹具
+   `contracts/v1/fixtures/producer/byok-catalog.json`(测试要求它与清单逐字相等,不重新生成即红)。本仓测试用 vitest,
+   不是 `bun test`:`npx vitest run test/byok-catalog.test.ts test/producer-fixtures-v1.test.ts`(schema、无凭据可读、
+   不读 edition、夹具相等)。只改清单与夹具的推送走轻量检查(`.gate-light` + `bin/check-light`,约 3 秒),不跑全量门。
+   合并后按网关仓的 `docs/runbooks/deploy.md` 部署:
+   `npm run deploy:worker -- --config wrangler.jsonc --message "git:$sha"`(清单只由 gateway 这一个 Worker 提供)。
 4. 验证:`curl -sS https://<gateway>/v1/byok-catalog` 不带凭据返回新版本 → 等一个刷新点(或重启 app)→ 引擎下次启动后
    BYOK 组出现新模型(该 provider 已配 key 即亮)→ 选中发一条消息。BYOK 不经网关、不产生平台计费;模型能不能用取决于
    用户自己的 key 权限(preview 类模型可能需要上游侧开通,如阿里 Token Plan)。
@@ -125,6 +164,9 @@ review_after: 2027-01-30
 
 ## 常见坑
 
+- **查厂商文档走国际站**:本机网络下阿里、Moonshot、MiniMax 的国内文档站连不上(TLS 握手被断,2026-11-20),国际站可读:
+  `www.alibabacloud.com/help/en/model-studio/models`、`platform.moonshot.ai/docs/pricing/chat`、
+  `platform.minimax.io/docs/guides/models-intro`。国际站写的是国际端点,id 通常相同但不保证,以带 Key 的 `/models` 为准。
 - **模型 id 用 registry 当代真实 id**;换代走 `aliases`,不要留旧 id 在清单里。
 - **edition 白名单是双落点**(registry.ts 兜底 + wrangler.jsonc 运行时),改一半
   = 本地测试与线上行为分叉。

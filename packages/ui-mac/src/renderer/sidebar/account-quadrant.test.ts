@@ -2,7 +2,7 @@
 // packages/ui-mac/test-component/account-quadrant.cases.ts —— 生产 CodePuppySidebar + 真路由 +
 // 真点击,断言 chip 三态(免费版/按量付费/计划名)、未订阅时两行显示 summary.usage 真实
 // 用量、未订阅且无余额时面板不新增提示行。
-// alpha-code#1739 追加 5 例:回到窗口超过 30 秒重取 / 打开面板重取 / 取到已订阅面板改变且无登录事件 / 重取失败保留原值 / 先发出后到的回复不盖新值。
+// alpha-code#1739 追加 8 例:回到窗口超过 30 秒重取 / 打开面板重取 / 取到已订阅面板改变且无登录事件 / 重取失败保留原值 / 先发出后到的回复不盖新值 / 打开订阅或充值页后 30 秒内回到窗口也取(2 例)/ 平常切换仍守 30 秒。
 // 起子进程同 overlay-close.test.ts:cases 里的 mock.module 会污染同进程其它测试文件。
 
 import { expect, test } from "bun:test"
@@ -19,7 +19,7 @@ test(
     const output = `${result.stdout.toString()}${result.stderr.toString()}`
     if (result.exitCode !== 0) throw new Error(output)
     expect(output.match(/(\d+) fail\b/)?.[1], output).toBe("0")
-    expect(output.match(/(\d+) pass\b/)?.[1], output).toBe("12")
+    expect(output.match(/(\d+) pass\b/)?.[1], output).toBe("15")
   },
   120_000,
 )

@@ -5148,6 +5148,40 @@ describe("alpha-code#1739 composer and picker follow the account summary without
     mounted.dispose()
   })
 
+  test("after the picker's recharge row opens the wallet page, a refocus within 30 seconds still fetches", async () => {
+    at(0)
+    let reads = 0
+    const opened: string[] = []
+    installApi({
+      account: async () => {
+        reads++
+        return unsubscribed()
+      },
+      extras: { openLink: (url: string) => void opened.push(url) },
+    })
+    resetComposerModelProjection()
+    const mounted = mount(() =>
+      createComponent(ModelPickPop, {
+        contract: { list: async () => platformModels, current: async () => undefined, switch: async () => {} },
+        directory: () => "/workspace",
+        selected: () => null,
+        onSelect: async () => {},
+        onPicked: () => {},
+      }),
+    )
+    const platformRow = () => document.body.querySelector<HTMLButtonElement>('.a-mpp-row[data-group="platform"]')
+    await waitFor(() => expect(platformRow()?.textContent).toContain(zh["codepuppy.model.needsCredit"]))
+    const base = reads
+
+    at(2)
+    click(platformRow())
+    await waitFor(() => expect(opened.length).toBe(1))
+    at(10)
+    await refocus()
+    expect(reads).toBe(base + 1)
+    mounted.dispose()
+  })
+
   test("the open picker's account rows follow the same refetch", async () => {
     at(0)
     let current: AccountSummary = unsubscribed()

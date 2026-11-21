@@ -538,6 +538,46 @@ describe("alpha-code#1739 the account summary is refetched without a login event
     expect(readRows(pop())["可用余额"]).toBe("¥0.00")
   })
 
+  // 付款回来可能不到 30 秒:从应用打开订阅 / 充值页之后,下一次回到窗口一定取;平常的切换仍守 30 秒。
+  for (const cta of ["升级会员", "充值"]) {
+    test(`after "${cta}" opens the web page, a refocus within 30 seconds still fetches`, async () => {
+      at(0)
+      const seen = counted(() => unsubscribed)
+      await mount()
+      click(document.querySelector(".codepuppy-sidebar-account")!) // 打开面板那次取值,t0
+      await flush()
+      const buttons = [...document.querySelectorAll<HTMLElement>(".codepuppy-acct-pop .codepuppy-acct-btn")]
+      const button = buttons.find((b) => b.textContent?.trim() === cta)
+      expect(button).toBeDefined()
+      const base = seen.calls
+
+      at(2)
+      click(button!)
+      await flush()
+      expect(seen.calls).toBe(base)
+
+      at(10) // 距上次取值只有 10 秒
+      await refocus()
+      expect(seen.calls).toBe(base + 1)
+
+      at(15) // 链接那一次已用掉;之后的平常切换回到 30 秒规则
+      await refocus()
+      expect(seen.calls).toBe(base + 1)
+    })
+  }
+
+  test("an ordinary refocus within 30 seconds, with no wallet page opened, does not fetch", async () => {
+    at(0)
+    const seen = counted(() => unsubscribed)
+    await mount()
+    click(document.querySelector(".codepuppy-sidebar-account")!)
+    await flush()
+    const base = seen.calls
+    at(10)
+    await refocus()
+    expect(seen.calls).toBe(base)
+  })
+
   test("a refetch that fails keeps the values already shown", async () => {
     at(0)
     let reply: unknown = subscribed

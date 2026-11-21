@@ -208,8 +208,8 @@ test("R14 chat search receives failed hung-source status within thirty seconds, 
  if(request.type!=="codepuppy.sources.search.request")throw Error("wrong chat transport")
  const responding=sources.searchSources(request.query).then(result=>wire.deliver(buildSourcesSearchReply(request.id,{result})))
  try{
-  await Promise.all(fetching)
-  for(let n=0;n<60;n++)await Promise.resolve()
+  // alpha-work#159 §4.7:清单先问香港转发入口(夹具回 404)再取原地址 —— 第二批请求在第一批落定后才发出,等到没有新请求为止。
+  for(let seen=-1;seen!==fetching.length;){seen=fetching.length;await Promise.all(fetching);for(let n=0;n<60;n++)await Promise.resolve()}
   jest.advanceTimersByTime(30_000)
   for(let n=0;n<80;n++)await Promise.resolve()
   expect(output).toBeDefined()

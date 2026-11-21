@@ -1575,8 +1575,10 @@ export function CodePuppyComposerRuntime(props: CodePuppyComposerRuntimeProps) {
     if (chainDisposed || seq !== chainSeq) return
 
     void accountResolution?.then(async (resolution) => {
-      if (chainDisposed || seq !== chainSeq || resolution.status !== "ready") return
-      await resolveSelection(resolution.usable, true)
+      if (chainDisposed || seq !== chainSeq || resolution.status === "superseded") return
+      // 账户链判 failed(4xx / 契约不兼容)时不解析选择,但同样要能被之后取到的现值纠正。
+      if (resolution.status === "ready") await resolveSelection(resolution.usable, true)
+      if (chainDisposed || seq !== chainSeq) return
       reresolveAccount = (usable) => {
         if (chainDisposed || seq !== chainSeq) return
         const next = usable ? "ready" : "failed"
@@ -1584,6 +1586,9 @@ export function CodePuppyComposerRuntime(props: CodePuppyComposerRuntimeProps) {
         setPlatformPermission(next)
         void resolveSelection(usable, true)
       }
+      // 清单还没回来时账户状态就已被取新的:链走完这一刻补上一次。
+      const latest = accountSummary()
+      if (latest) reresolveAccount(summaryUsable(latest))
     })
   }
 

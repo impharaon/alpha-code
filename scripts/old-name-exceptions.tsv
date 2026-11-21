@@ -11,7 +11,11 @@
 packages/ui-mac/src/main/fixtures/relay-route/health-cloud.json	alpha-cloud	1	external-anchor	#159: byte-identical captured /health service identifier; fixture provenance is recorded beside it.
 packages/ui-mac/src/main/fixtures/relay-route/provenance.json	impharaon/alpha-platform	2	external-anchor	#159: actual source repository identity for the captured health response.
 packages/ui-mac/src/main/fixtures/relay-route/provenance.json	relay-ops/p4/post-alpha-gateway-hk.json	1	external-anchor	#159: exact authorized operations capture filename for the gateway health fixture.
-scripts/gate-files.tsv	alpha-work	9	external-anchor	#159: cross-repository issue identity for the relay behavior and exact-count gate entries.
+scripts/gate-files.tsv	alpha-work	10	external-anchor	#159: cross-repository issue identity for the relay behavior and exact-count gate entries.
+packages/ui-mac/src/shared/codepuppy-config.ts	alpha-github-hk.tidelabs.click	1	external-anchor	alpha-work#159 slice 2: DNS name of the Hong Kong GitHub relay (Cloudflare zone record, design §4.5); not a Code Puppy brand name.
+packages/ui-mac/test-fixtures/plugin-helper/source-fetch.ts	https://alpha-github-hk.tidelabs.click/	1	external-anchor	alpha-work#159 slice 2: the fixture answers the relay host (design §4.5 DNS name) with 404 so recorded-raw cases take the fallback arm.
+docs/runbooks/distribution.md	alpha-github-hk.tidelabs.click	1	external-anchor	alpha-work#159 slice 2: DNS name of the Hong Kong GitHub relay that the updater tries first (design §4.5).
+docs/runbooks/distribution.md	https://github.com/impharaon/alpha-work/blob/afcfa35e08688bc7cf28c1e8e21caf7a172cd3aa/docs/specs/domestic-cloud-connectivity/design.md	1	external-anchor	alpha-work#159 slice 2: pinned link to the coordination repository design that owns the relay decisions.
 #   命中词元:这一行里每处旧名向两侧扩展到 [A-Za-z0-9_.-@/:] 的最大连续段,去重后按出现顺序以空格连接
 #             (packages/ui-mac/src/main/old-name-scan.ts 的 hitTokens);文件名本身的命中写「文件名」。
 #   处数:    这个文件里命中词元恰好相同的行有几行。按内容定位、不记行号 —— 文件里增删不相干的行,本表不用动;

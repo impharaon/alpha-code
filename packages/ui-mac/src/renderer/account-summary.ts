@@ -18,6 +18,9 @@ const [shared, setShared] = createSignal<AccountSummary | null>(null)
 export const accountSummary = shared
 
 let generation = 0
+/** 取值的发出序号与已写入共享现值的最大序号:同一个登录里,先发出、后到的回复不得盖掉后发出的(较新的)现值。 */
+let sent = 0
+let published = 0
 /** 上次发出取值的时刻;失败的取值不算数(下次回到窗口照样取)。 */
 let requestedAt: number | undefined
 
@@ -34,11 +37,15 @@ export function readAccountSummary() {
     window.addEventListener("focus", refreshAccountSummaryIfStale)
   }
   const mine = generation
+  const seq = ++sent
   requestedAt = Date.now()
   return window.api.account.summary().then(
     (result) => {
       if (isSummary(result)) {
-        if (mine === generation) setShared(result)
+        if (mine === generation && seq > published) {
+          published = seq
+          setShared(result)
+        }
       } else if (mine === generation) requestedAt = undefined
       return result
     },
@@ -52,6 +59,7 @@ export function readAccountSummary() {
 /** 登出或换号:丢掉上一个账号的数,并让仍在途的取值不再写进共享现值。 */
 export function clearAccountSummary() {
   generation++
+  published = sent
   requestedAt = undefined
   setShared(null)
 }

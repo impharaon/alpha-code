@@ -305,8 +305,9 @@ export function CodePuppySidebar(props: {
   // sparkline. 401 → main's auth is stale; the footer already reflects logged-out on the next push.
   const summary = accountSummary
   const [summaryState, setSummaryState] = createSignal<"idle" | "loading" | "error">("idle")
-  // #1686:换了一个登录(登录代变,含不先退出直接换号)就先清空,不让上一个账号的数留在卡片上;
-  // 只采用最新一次请求的回复,较早发出、较晚回来的回复(可能属于上一个账号)直接丢弃。
+  // #1686:换了一个登录(登录代变,含不先退出直接换号)就先清空,不让上一个账号的数留在卡片上。
+  // 这里的 summaryRequest 只管 loading / error 状态(只认本效果最新一次请求);数据本身由 account-summary 把关:
+  // 较早发出、较晚回来的回复(上一个账号的,或同一登录里更旧的)不写进共享现值。
   let summaryRequest = 0
   let summaryEpoch: number | undefined
   createEffect(() => {

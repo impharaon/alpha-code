@@ -152,3 +152,68 @@ last_reviewed: 2026-11-19
 **r3 同进程核验。** 不设外部 TMPDIR（`env -u TMPDIR`），从 `packages/ui-mac` 单次执行 `bun test --timeout 120000 --max-concurrency 2 --reporter=junit --reporter-outfile=<本 lane 缓存>/r3-combined.xml`，只过滤本切片新增/修改的九个 `.test.ts`：`codepuppy-auth`、`codepuppy-cloud-jobs`、`codepuppy-bootstrap-build`、`codepuppy-endpoints`、`endpoint-route`、`relay-wiring`、`cloud-events-route`、`endpoint-route-fence.engine`、`endpoint-route.engine`（均在 `src/main/`）。沿用 gate 的 Bun 原生文件发现/执行顺序、同进程 preload 和 120000 ms 默认期限，没有拆成逐文件调用或重排来绕过状态。exit 0：38 pass / 0 fail、9 files、203.41 s；完整命令/输出在 `r3-combined.log`，JUnit 文件保留实际文件顺序。authority/wiring/继承值案例继续用原有宿主隔离模块和首次环境捕获；无需额外生产 reset/test option。此合跑也包含默认 TMPDIR 的 F1 和 E1～E6（本轮 E1 20 ms 切 direct、57651 ms 恢复，E4 cloud-only 周期 59374 ms；停滞仍 preferred），未重开已接收设计或上轮证据。
 
 r3 交接：依据 `4d40cd3455` 的独立审查接收项及 checked plan `654ffc4d39` / 冻结设计 `2ead902`；Codex（GPT-6）已核上述实施与相关测试。提交 `8947d2fe9b` 留红、`413cf2bae2` 修空导出及 F1，后续本记录提交只收机械采样来源登记与验证记录。四项 finding、两项便宜证据、index 接线登记及九文件合跑均完成；gate 宿主精确数未变（authority 子项 6→7、继承矩阵 3→8，wiring 3、F1 1），只改既有三行说明/子项 pin，不重排。无计划外生产文件、围栏实现或接口改动；没有生产请求、全 gate、推送或发布。遗留去向：无新增观察；住宅线路/真实云端验收与审查后的集成仍由编排器/owner 承接。
+
+## 切片二（桌面部分）：更新与两份市场清单先经香港入口、随包 ripgrep、默认平台模型 id
+
+- 依据：[alpha-work#159](https://github.com/impharaon/alpha-work/issues/159) 切片二 part D；[规格 v2 @ afcfa35](https://github.com/impharaon/alpha-work/blob/afcfa35e08688bc7cf28c1e8e21caf7a172cd3aa/docs/specs/domestic-cloud-connectivity/spec.md) BR-03/AC-03、BR-05/AC-05、BR-06/AC-06；[设计 v2 @ afcfa35](https://github.com/impharaon/alpha-work/blob/afcfa35e08688bc7cf28c1e8e21caf7a172cd3aa/docs/specs/domestic-cloud-connectivity/design.md) §2.5、§4.5–§4.8、§5「切片二」、§6「切片二」、§8「切片二」E-4～E-6、§10 O-2（全部经香港转发）。单元四依据编排派单（网关 alpha-platform#599 把 `deepseek-v4-flash` 改名 `deepseek-flash`，旧 id 留作别名）。实现起点 `alpha-code@827b97046a`（`origin/alpha`）。
+- 核对：IMPLEMENT 派单要求计划提交后直接实施，未经单独计划核对；本节由实施会话（Claude Opus 5.5）自写。
+
+本节只安排本仓的实施与证明；接口、失败边界、主机名与白名单路径以所链设计为准。不改 `packages/core`、端点发现文档、发布清单契约与切片一的路线机制；不做界面改动、生产步骤（Q1–Q6）与转发配置。
+
+### 改动
+
+| 文件 | 改什么 |
+| --- | --- |
+| `packages/ui-mac/src/shared/codepuppy-config.ts` | 新增 `CODEPUPPY_GITHUB_RELAY_HOST`（§4.6 给定的唯一落点）。 |
+| `packages/ui-mac/src/main/codepuppy-environment.ts` | 新增 `UPDATE_FEED_HOSTS`（与 `UPDATE_FEED_OWNER/REPO` 同处）；`verifyUpdaterFeed` 不变。 |
+| `packages/ui-mac/src/main/updater-controller.ts` | 新增无 electron 依赖的主机改道后端包装（按 `UPDATE_FEED_HOSTS` 逐个 `setFeedURL`+检查；经转发下载失败时同轮改直连重查、版本相同才再下一次）；`createUpdaterController` 状态机不变。放在这里而不是 `updater.ts`：后者顶层 import electron，bun 下不能直接加载；`updater.ts` 只负责把 `autoUpdater` 交给它。 |
+| `packages/ui-mac/src/main/updater.ts` | 用上面的包装构造交给控制器的 `checkForUpdates`/`downloadUpdate`；channel、prerelease、降级、自动下载设置原样。 |
+| `packages/ui-mac/src/main/updater-feed-hosts.test.ts`（新） | E-4 的自动化部分：真控制器 + 包装 + 按主机响应的本地桩更新器（不联网，不读真实时间）。 |
+| `packages/ui-mac/src/main/plugin-sources.ts` | `loadIndex` 先取转发地址（10 s 中止）再取原地址；`SourceStatusV1` 不变。 |
+| `packages/ui-mac/src/main/plugin-sources.test.ts`、`test-fixtures/plugin-helper/source-fetch.ts`（仅如既有用例因先访问转发而需要） | 新增 E-5 用例（假时钟推进 10 s）；既有用例只在其断言编码了「只请求 raw 地址」时同步。 |
+| `packages/ui-mac/scripts/build-ripgrep.ts`（新）、`scripts/prebuild.ts` | 构建期从 `packages/core/src/ripgrep/binary.ts` 读版本与目标架构 sha256（不另抄），下载（本机缓存）、校验、解出 `rg` 与许可文件到 `native/ripgrep/build/<arch>/`；sha256 不符即失败。只在 darwin 构建。 |
+| `packages/ui-mac/scripts/target-arch.ts` | 新增随包 ripgrep 目录常量与打包后核对（`<Resources>/ripgrep/rg` 存在、可执行、含目标架构片），并入 afterPack 已有的核对。 |
+| `packages/ui-mac/electron-builder.config.ts` | darwin 的 `extraResources` 增 `ripgrep/`（与 office-runtime 同法，随应用深签）。 |
+| `packages/ui-mac/.gitignore` | 忽略 `native/ripgrep/build/`。 |
+| `packages/ui-mac/resources/NOTICE.txt` | 追加 ripgrep 的 MIT/Unlicense 声明。 |
+| `packages/ui-mac/src/main/server.ts` | `UV_CACHE_DIR` 旁给引擎环境 `PATH` 末尾追加 `<resourcesRoot()>/ripgrep`。 |
+| `packages/ui-mac/src/main/server.test.ts`、`src/main/mac-target-arch.test.ts` | E-6 的自动化部分：fork 出的 `PATH` 顺序；用引擎自己的 `which` 在清空的引擎 bin 下解析到资源根；打包后核对拒绝缺失/无执行位/错架构的 `rg`。 |
+| `packages/ui-mac/src/main/codepuppy-models.json` | 单元四：`defaultPlatformModel` → `deepseek-flash`。 |
+| `packages/ui-mac/src/main/codepuppy-models.test.ts` 或 `model-default-core.test.ts` | 单元四的红绿：随包默认值经真实默认解析在只列当代 id 的网关目录里选中平台默认。 |
+| `docs/runbooks/distribution.md`、`docs/architecture/2026-08-25-network-egress-seam.md` | 事实：更新源先香港入口后 GitHub；市场清单先转发；包内 `ripgrep/` 与它出现在用户 shell 命令与 MCP 子进程 `PATH` 末尾。 |
+| `scripts/gate-files.tsv` | 只同步受影响登记文件的精确条数（实测重算）。 |
+
+### 顺序
+
+1. 本节计划提交（只含本文件）。
+2. 单元一：先提交 `updater-feed-hosts.test.ts`（对旧 `updater.ts` 后端形状为红：无改道、无日志），再提交常量 + 包装 + `updater.ts` 接线；跑新测试、`updater-restore.test.ts`、`codepuppy-environment.test.ts`、ui-mac typecheck。
+3. 单元二：先加 E-5 用例（红），再改 `loadIndex`；跑 `plugin-sources.test.ts`、`install-from-source.test.ts` 及其它以 `source-fetch` 为夹具的相关测试。
+4. 单元三：先加 server/target-arch 用例（红），再落 `server.ts`、构建脚本、打包配置、NOTICE、gitignore；跑 `server.test.ts`、`mac-target-arch.test.ts`、`release-source.test.ts`、typecheck；本机打一个未签名（ad-hoc）`dir` 包取打包证据。
+5. 单元四：先加默认模型红测试，再改 JSON；跑 `codepuppy-models.test.ts`、`model-default-core.test.ts`、`platform-pricing-authority-ratchet.test.ts`。
+6. 事实文档与 gate 登记条数；最后按派单逐步跑一次门（`GATE_ALLOW_FULL="pre-ship pass of relay slice 2 desktop part"`）。
+
+### 风险
+
+1. **经转发下载失败后的重查可能换版本。** 包装记下本轮经转发答出的版本，直连重查不同即抛错结束本轮（控制器进 `error`），不触发第二次下载；用例覆盖相同/不同两臂与「直连检查也失败」。
+2. **改道不能成环或重复下载。** 包装每轮最多：两次检查（转发、直连）+ 下载两次（仅当首次经转发且失败）；用例数下载调用次数。
+3. **市场清单既有用例的时序依赖。** 若干用例按微任务步数推进假时钟；先访问转发会改变步数。只同步编码了旧访问顺序的断言，不放宽判据。
+4. **ripgrep 构建要联网下载。** 用 curl 与本机缓存（同 office-runtime 的做法），sha256 由 `binary.ts` 给出；缓存命中仍校验。
+5. **默认模型 id 与网关部署的先后。** 网关 `/v1/models` 只列当代 id（`models.config.json` 的 aliases 注释）；本提交的桌面若早于网关改名上线发布，平台默认会落空（降级到第 ③/④ 级）。属发版顺序，交编排器。
+
+### 证明
+
+| AC | 测试/证据 | 缺少行为为什么会失败 |
+| --- | --- | --- |
+| AC-03 · E-4 转发可达 | `updater-feed-hosts.test.ts`：转发主机答新版并下载成功 ⇒ `ready`，`setFeedURL` 只用过转发主机与固定 owner/repo | 不先设转发主机，记录的 feed 选项不含 `host: alpha-github-hk…` |
+| AC-03 · E-4 转发不可达 | 同文件：转发检查抛错 ⇒ 同轮改 `github.com` 检查与下载 ⇒ `ready`，一行改道日志 | 无改道 ⇒ 控制器 `error`；无日志断言失败 |
+| AC-03 · E-4 只坏安装包 | 同文件：转发答检查、下载失败 ⇒ 直连重查同版本并下载 ⇒ `ready`，下载调用恰 2 次，一行日志 | 无下载改道 ⇒ `error` |
+| AC-03 · E-4 版本不同 | 同文件：直连答出另一版本 ⇒ `error`，不进 `ready`，第二次下载不发生 | 不比版本 ⇒ 进入 `ready` 或多一次下载 |
+| AC-03 · 下一轮重回转发 | 同文件：一轮改道后再检查，第一次 `setFeedURL` 仍是转发主机 | 记住直连会使第二轮首个 host 为 github.com |
+| AC-05 · E-5 | `plugin-sources.test.ts`：转发答清单 ⇒ 两来源 ok 且只请求转发地址；转发挂起 ⇒ 假时钟推进 10 s 后改取原地址并成功；转发非 2xx/坏 JSON ⇒ 改取原地址；两来源成功时 `allPluginSourcesSucceeded` 为真 | 不走转发 ⇒ 转发地址无请求；无 10 s 中止 ⇒ 来源要等 30 s 截止后失败 |
+| AC-06 · E-6（自动） | `server.test.ts`：fork 的 `PATH` = 用户 PATH + `<resourcesRoot()>/ripgrep`；`mac-target-arch.test.ts`：打包后核对拒绝缺失、无执行位、错架构的 `rg` | 不追加 ⇒ PATH 断言失败；不核对 ⇒ 坏包断言不抛 |
+| AC-06 · E-6（打包产物） | 本机 ad-hoc `dir` 包：`codesign --verify` 包内 `rg`；`rg --version` = `binary.ts` 的 15.1.0；用引擎 `which` 在 PATH 无 rg、引擎 bin 清空时解析到包内资源根 | 包内缺 `rg` 或版本/签名不符即可见 |
+| 单元四 | 随包 `defaultPlatformModel` 经 `resolveDefaultModel` 在只列 `deepseek-flash` 的目录中选中它 | 旧 id 不在当代目录 ⇒ `none` |
+
+### 偏离记录
+
+暂无

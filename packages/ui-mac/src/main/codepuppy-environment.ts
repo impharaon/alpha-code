@@ -16,6 +16,7 @@
 // electron-free:isPackaged/channel/appData 由 index.ts 注入,单测零 mock。
 
 import { tryCodePuppyBootstrap } from "@opencode/util/codepuppy-bootstrap"
+import { CODEPUPPY_GITHUB_RELAY_HOST } from "../shared/codepuppy-config"
 import { lstatSync, mkdirSync, readdirSync, realpathSync, rmdirSync, statSync } from "node:fs"
 import { homedir } from "node:os"
 import { basename, dirname, isAbsolute, join, normalize, relative, resolve } from "node:path"
@@ -42,6 +43,8 @@ export type CodePuppyEnvironmentInfo = {
 // updater feed 只允许指向自有发布仓(B9:错 owner = 会把上游 OpenCode 当更新装回来)。
 export const UPDATE_FEED_OWNER = "jinjunnn"
 export const UPDATE_FEED_REPO = "alpha-code"
+/** 每次检查依次尝试的主机:先香港转发入口,再 GitHub 直连(DESIGN-domestic-cloud-connectivity §4.6)。 */
+export const UPDATE_FEED_HOSTS = [CODEPUPPY_GITHUB_RELAY_HOST, "github.com"] as const
 
 /** 环境判定:打包 + 渠道 → 环境;未打包一律 dev(开发运行)。 */
 export function resolveAppEnvironment(input: { isPackaged: boolean; channel: BuildChannel }): AppEnvironment {

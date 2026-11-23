@@ -203,9 +203,9 @@ echo "▶ [5/14] contract lock + unit tests (contracts-consumer + ext + ui-mac +
 # 并行(owner 2026-11-23:门控不许单核;实测 2026-11-23,bun 1.3.14,10 核):`bun test --parallel[=N]` = worker 进程、
 # 隐含 --isolate,汇总行/junit/条数判据与串行同形(bun-test-floor.sh 原样适用)。
 #   · contracts-consumer:--parallel(默认核数),65 条不变,7s → 4s。
-#   · ui-mac:--parallel=5。ui-mac 有一批真引擎宿主用例(起内嵌引擎、15s 级等待),10 个 worker 时
-#     它们互相抢 CPU,多出 7 行红(同一批用例串行与 5 worker 下都是同样的 68 红/6917 过);
-#     5 worker 下与串行逐条一致,2145s → 503s。
+#   · ui-mac:scripts/bun-test-ui-mac.sh 分两组 —— 非引擎文件 `--parallel`、真引擎宿主文件串行(各自过
+#     bun-test-floor.sh 的下界与已知红棘轮)。真引擎用例(起内嵌引擎、15s 级等待)与别的 worker 抢
+#     CPU 会超时变红(实测:10 worker 多出 7 行红;5 worker 在负载 ~14 的整门里仍红 4 个真引擎文件)。
 #   · ext **保持串行**:src/policy 下 14 个测试文件共享 policy-host.cases.ts(顶层 await 加载引擎、
 #     设计上跨文件共享同一模块实例),在 --isolate 下导入方先于它初始化完成,报
 #     `Cannot access 'E' before initialization`(单文件 `bun test --isolate` 同样复现)。
@@ -214,7 +214,7 @@ echo "▶ [5/14] contract lock + unit tests (contracts-consumer + ext + ui-mac +
 if bun run --cwd packages/codepuppy-contracts-consumer check:vendor \
   && bash scripts/bun-test-floor.sh 15 packages/codepuppy-contracts-consumer --parallel \
   && bash scripts/bun-test-floor.sh 100 packages/ext \
-  && CODEPUPPY_KNOWN_FAILS_FILE=scripts/known-fails.tsv bash scripts/bun-test-floor.sh 3000 packages/ui-mac src --parallel=5 \
+  && bash scripts/bun-test-ui-mac.sh \
   && bash scripts/bun-test-app.sh; then
   echo "    ✓ tests"
 else

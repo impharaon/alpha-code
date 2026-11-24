@@ -1,14 +1,8 @@
-// REQ-128 #705 — 单装 planning builders 的 before/after parity 闸。
-//
-// 本票是纯重构:把 skill / agent / MCP 的 tx item 构造从 package-admission 的执行体里抽成
-// ext-package-tx-builders 的三个 builder,并把 probe 组合收敛成 extensionHealthProbeRouter。
-// **行为零变化是唯一验收轴**,所以这里冻结的是「事务引擎真正拿到的东西」:计划、账本模板、
-// hook 面、populate 的产物、precondition 的判决、以及该计划能呈给引擎的**每一种 item 形状**
-// 上的 probe 判决。字面量取自 origin/alpha@59211fe8 的实测捕获(抽取前),不是照实现回抄。
-//
-// 唯一一处刻意的差异也钉在这里:MCP 计划从「无 probe」变成「有 probe(恒 healthy)」。
-// 它是不是 no-op 不靠推理 —— 最后一个用例直接对**真引擎**证明 config-only 计划的 probe
-// 调用数为 0(engine 只对 generation 与 file item 调 probe)。
+// 单装 planning builders(ext-package-tx-builders)与 extensionHealthProbeRouter 的判据:MCP 计划的密钥引用、prepared
+// 资源与 precondition(计划与账本模板不带密钥明文),以及每种 item 形状 × 相位 × 内容状态上的 probe 判决 —— 后者是
+// agent / seed 插件 / 技能 / 密钥文件探针 fail-closed 分支唯一的执行者。字面量取自 REQ-128 #705 抽取前的实测捕获。
+// 那次纯重构的另三条「before/after 不变」快照(skill / agent 计划、config-only 计划零 probe)是一次性证据,已删
+// (ADR-0014;删前后这些模块的覆盖行不变)。
 
 import { createHash } from "node:crypto"
 import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs"
@@ -17,9 +11,8 @@ import { join } from "node:path"
 import { afterEach, beforeEach, describe, expect, test } from "bun:test"
 import { agentFileProbe } from "./ext-agent-install"
 import { extensionHealthProbeRouter, seedPluginFileProbe } from "./ext-health-probe-router"
-import { computeInstalledGraphDigest, type PackageGraphV1 } from "./ext-package-ledger-v3"
 import { skillGenerationProbe } from "./ext-skill-generations"
-import { runExtensionTransaction, type HealthProbe, type TxPlanItem } from "./ext-transaction"
+import type { HealthProbe, TxPlanItem } from "./ext-transaction"
 import { createPackageAdmissionCoordinator } from "./package-admission"
 
 const SKILL_MD = "---\nname: parity-skill\ndescription: parity fixture\n---\nbody\n"
@@ -181,117 +174,10 @@ async function captureBuild(kind: "skill" | "agent" | "mcp") {
   return captured
 }
 
-describe("REQ-128 #705 single-install builder parity", () => {
-  test("skill: plan, receipt, hook surface, populate and precondition are unchanged", async () => {
-    const { root: txRoot, plan, hooks } = await captureBuild("skill")
-    expect(txRoot).toBe(root)
-    expect(Object.keys(hooks).sort()).toEqual(["commitReceipt", "populate", "precondition", "probe"])
-    expect(plan.items).toEqual([
-      {
-        key: "skill--demo",
-        files: [{ path: "SKILL.md", sha256: sha(SKILL_MD), size: 60 }],
-        manifestDigest: plan.items[0]!.manifestDigest,
-        capabilities: [],
-        receipt: {
-          id: "skill:demo",
-          name: "demo",
-          kind: "skill",
-          environment: "dev",
-          scope: { kind: "global" },
-          version: "1.0.0",
-          manifestDigest: plan.items[0]!.manifestDigest,
-          payloadDigest: (plan.items[0]!.receipt as { payloadDigest: string }).payloadDigest,
-          grantDigest: "sha256:e63ffda29c91acbee6af26541abd8752aafed9091e115c03dd563e14695d6fa9",
-          desiredState: "disabled",
-          origin: "catalog",
-          installedAt: "2026-07-31T00:00:00.000Z",
-        },
-        // REQ-128 `#706`:root item 多带一份 V3 mutation 静态半场。这是 `#705` parity 之后
-        // **唯一**的计划面增量,所以在这里逐字钉死 —— 形状漂了就红。
-        packageMutation: {
-          operation: "install",
-          graphBeforeDigest: null,
-          // `#764`:这里**没有** package 级记录。它曾经是 `graphAfter` 的逐字抄本(packageId /
-          // envelopeDigest / installedGraphDigest)加上一份与组件 record 相同的 `version` —— 从未落过盘,
-          // 也没有任何消费方。逐字钉死这份计划面就是为了让它再长回来时红。
-          graphAfter: {
-            packageId: "package:parity-skill",
-            envelopeDigest: (plan.items[0]!.packageMutation as { graphAfter: { envelopeDigest: string } }).graphAfter.envelopeDigest,
-            installedGraphDigest: (plan.items[0]!.packageMutation as { graphAfter: { installedGraphDigest: string } }).graphAfter.installedGraphDigest,
-            root: {
-              componentId: "skill:demo",
-              kind: "skill",
-              name: "demo",
-              required: true,
-              manifestDigest: plan.items[0]!.manifestDigest,
-            },
-            children: [],
-          },
-          claimMutations: [
-            { op: "acquire", kind: "skill", name: "demo", owner: `bundle:package:parity-skill@${plan.items[0]!.manifestDigest}` },
-          ],
-          // REQ-128 `#698`:child 删除半场随 envelope 进 journal(commit records 里没有「被删掉的
-          // 那个」可派生)。首装恒空 —— 但它必须**在场**:缺席时崩溃前滚会算出一份「只加不减」的
-          // mutation,update 删掉的 child 会在前滚后复活成一条没人认领的 record。
-          childRemovals: [],
-        },
-      },
-    ])
-    // 图/记录的 digest 不是自由字符串:重算一遍必须逐字相同(篡改任一节点 → 解码期就红)。
-    const mutation = plan.items[0]!.packageMutation as { graphAfter: PackageGraphV1 }
-    expect(computeInstalledGraphDigest(mutation.graphAfter)).toBe(mutation.graphAfter.installedGraphDigest)
-    expect(plan.authorization).toEqual({ confirmed: { "skill--demo": [] }, decidedAt: "2026-07-31T00:00:00.000Z" })
-    const staging = join(tmp, "staging")
-    mkdirSync(staging, { recursive: true })
-    hooks.populate!(plan.items[0], staging)
-    expect(readdirSync(staging)).toEqual(["SKILL.md"])
-    expect(readFileSync(join(staging, "SKILL.md"), "utf8")).toBe(SKILL_MD)
-    expect(hooks.precondition!()).toEqual({ ok: true })
-  })
+describe("single-install builders: MCP secret handling and probe verdicts", () => {
 
-  test("agent: file + config double item, receipt files/configKey, requireAbsent are unchanged", async () => {
-    const { plan, hooks } = await captureBuild("agent")
-    expect(Object.keys(hooks).sort()).toEqual(["commitReceipt", "populate", "precondition", "probe"])
-    expect(plan.items).toHaveLength(2)
-    const file = plan.items[0]!
-    expect(file.key).toBe("agent--demo")
-    expect(file.action).toBe("file")
-    expect(file.file!.relTarget).toBe("agents/demo.md")
-    expect(file.file!.requireAbsent).toBe(true)
-    expect(sha(file.file!.next)).toBe(sha(AGENT_MD))
-    expect(file.capabilities).toEqual([])
-    expect(file.receipt).toMatchObject({
-      id: "agent:demo",
-      kind: "agent",
-      desiredState: "disabled",
-      files: [join(root, "agents/demo.md")],
-      configKey: "agent.demo",
-      installedAt: "2026-07-31T00:00:00.000Z",
-    })
-    const config = plan.items[1]!
-    expect(config.key).toBe("agent--demo--config")
-    expect(config.action).toBe("config")
-    expect(config.capabilities).toBeUndefined()
-    expect(config.receipt).toBeUndefined()
-    expect(config.config).toEqual({
-      target: join(root, "codepuppy.jsonc"),
-      edits: [
-        {
-          keyPath: ["agent", "demo"],
-          // desiredState=disabled ⇒ 引擎原生 disable:true 投影(#395)。
-          value: { description: "parity fixture", mode: "subagent", prompt: "prompt body", disable: true },
-        },
-      ],
-    })
-    // agent 不经 populate(file 适配器自己落 staging)。
-    const staging = join(tmp, "staging-agent")
-    mkdirSync(staging, { recursive: true })
-    for (const item of plan.items) hooks.populate!(item, staging)
-    expect(readdirSync(staging)).toEqual([])
-    expect(hooks.precondition!()).toEqual({ ok: true })
-  })
 
-  test("mcp: config item, secret refs, prepared resource and precondition are unchanged", async () => {
+  test("mcp: config item, secret refs, prepared resource and precondition", async () => {
     const { plan, hooks } = await captureBuild("mcp")
     // #712 是这份 parity 冻结面上**唯一**一处有意的偏离:hook 面多出 releasePrepared,plan 多出
     // 类型化 prepared descriptor(见下)。#705 冻结的其余各项(item 形状/账本模板/populate 产物/
@@ -342,7 +228,7 @@ describe("REQ-128 #705 single-install builder parity", () => {
   })
 
   // 每个计划能呈给引擎的 item 形状 × 相位 × 内容状态 —— 判决逐条冻结(抽取前实测)。
-  test("probe verdicts for every item shape each plan can present are unchanged", async () => {
+  test("probe verdicts for every item shape a plan can present", async () => {
     const fixtures = join(tmp, "fixtures")
     const genGood = join(fixtures, "gen-good")
     const genBad = join(fixtures, "gen-bad")
@@ -428,32 +314,6 @@ describe("REQ-128 #705 single-install builder parity", () => {
       expect(await mcp({ ...base, key: "mcp--demo", action: "config", phase })).toEqual({ healthy: true })
   })
 
-  // #705 之前 MCP 计划根本没有 probe hook。现在有了 —— 证明它是 no-op 的方式不是「读代码觉得」,
-  // 而是让**真引擎**跑一个 config-only 计划并数调用次数。数字必须是 0。
-  test("the engine never probes a config-only plan — the MCP path's added probe is provably inert", async () => {
-    let probeCalls = 0
-    const probe: HealthProbe = (input) => {
-      probeCalls++
-      return { healthy: false, reason: `probe must not be called for ${input.action} item "${input.key}"` }
-    }
-    const result = await runExtensionTransaction(
-      root,
-      {
-        items: [
-          {
-            key: "mcp--inert",
-            action: "config",
-            config: { target: join(root, "codepuppy.jsonc"), edits: [{ keyPath: ["mcp", "inert"], value: { type: "local", command: ["demo"] } }] },
-            capabilities: [],
-          },
-        ],
-        authorization: { confirmed: { "mcp--inert": [] }, decidedAt: "2026-07-31T00:00:00.000Z" },
-      },
-      { populate: () => {}, probe, log: () => {} },
-    )
-    expect(result.ok).toBe(true)
-    expect(probeCalls).toBe(0)
-  })
 
   // router 与 #705 之前那份手写组合(ext-ipc 恢复接线)在全部 item 形状上判决相同。
   test("extensionHealthProbeRouter is verdict-identical to the pre-#705 hand-written composition", async () => {

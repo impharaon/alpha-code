@@ -202,7 +202,7 @@
           "name": "a document-axis ask on an MCP tool registered after the first prompt asks before it runs; reject keeps it at 0"
         },
         {
-          "file": "packages/ui-mac/src/main/composer-tier-matrix.engine.test.ts",
+          "file": "packages/ui-mac/src/main/composer-tier-matrix.engine.scenario.test.ts",
           "name": "三档 × R1–R12、三条委派入口与审批请求的整条路径与助手发起的安装(composer-tier-matrix.engine.cases.ts,30 条)"
         }
       ],
@@ -356,7 +356,7 @@
       },
       "tests": [
         {
-          "file": "packages/ui-mac/src/main/composer-tier-matrix.engine.test.ts",
+          "file": "packages/ui-mac/src/main/composer-tier-matrix.engine.scenario.test.ts",
           "name": "三档 × R1–R12、三条委派入口与审批请求的整条路径与助手发起的安装(composer-tier-matrix.engine.cases.ts,30 条)"
         }
       ],
@@ -933,11 +933,11 @@
           "name": "an always reply to a read leaves the pending /review policy ask pending: no replied event and no child session"
         },
         {
-          "file": "packages/ext/src/policy/session-grant-upstream-reds.test.ts",
+          "file": "packages/ext/src/policy/session-grant-upstream-reds.scenario.test.ts",
           "name": "exactly the pinned upstream cases fail in those three files; every other case passes"
         }
       ],
-      "note": "Known red by design (orchestrator ruling 2026-11-12, option 甲: not taken over). Upstream tests asserting that an always reply writes a project-level saved approval: packages/core/test/permission.test.ts \"stores and removes saved resources for a project\" and the seven \"<fixture>: always allow covers repeat execution and narrows prefix scope\" cases (numeric npm script prefix, numeric AWS option prefix, substitution prefix, redirect prefix, assignment redirect prefix, PowerShell method prefix, PowerShell tab prefix); packages/core/test/tool-shell.test.ts \"declarations reuse approvals while substitutions retain reject/once/always behavior\"; packages/server/test/permission-saved.test.ts \"edits saved permissions through PATCH\". Reproduce: cd packages/core && bun test test/permission.test.ts test/tool-shell.test.ts; cd packages/server && bun test test/permission-saved.test.ts. session-grant-upstream-reds.test.ts requires exactly these to fail (tool-shell's two pre-existing \"conditional substitutions respect once|always\" reds tolerated). Rollback: never revert permission.ts alone while the adapter sends always as it is — \"allow for this session\" would become a permanent project-level approval; revert the I-05 slice as one commit. Since I-13 L1 (entry engine-db-records-not-honoured) the same pinned list also carries 64 upstream cases that seed a saved approval and expect it to allow; the two session-grant.test.ts cases that used a session-rule allow as their known-bad arm now assert that such an allow decides nothing (I-13 L2), and session-grant-restart.test.ts's control is a session-rule deny."
+      "note": "Known red by design (orchestrator ruling 2026-11-12, option 甲: not taken over). Upstream tests asserting that an always reply writes a project-level saved approval: packages/core/test/permission.test.ts \"stores and removes saved resources for a project\" and the seven \"<fixture>: always allow covers repeat execution and narrows prefix scope\" cases (numeric npm script prefix, numeric AWS option prefix, substitution prefix, redirect prefix, assignment redirect prefix, PowerShell method prefix, PowerShell tab prefix); packages/core/test/tool-shell.test.ts \"declarations reuse approvals while substitutions retain reject/once/always behavior\"; packages/server/test/permission-saved.test.ts \"edits saved permissions through PATCH\". Reproduce: cd packages/core && bun test test/permission.test.ts test/tool-shell.test.ts; cd packages/server && bun test test/permission-saved.test.ts. session-grant-upstream-reds.scenario.test.ts requires exactly these to fail (tool-shell's two pre-existing \"conditional substitutions respect once|always\" reds tolerated). Rollback: never revert permission.ts alone while the adapter sends always as it is — \"allow for this session\" would become a permanent project-level approval; revert the I-05 slice as one commit. Since I-13 L1 (entry engine-db-records-not-honoured) the same pinned list also carries 64 upstream cases that seed a saved approval and expect it to allow; the two session-grant.test.ts cases that used a session-rule allow as their known-bad arm now assert that such an allow decides nothing (I-13 L2), and session-grant-restart.test.ts's control is a session-rule deny."
     },
     {
       "id": "engine-db-records-not-honoured",
@@ -1004,7 +1004,7 @@
           "name": "a session-row deny on a plugin tool's permission action, the product's own kind of row write, still takes it out of the request"
         }
       ],
-      "note": "Known red by design, not taken over (the disposition of orchestrator ruling 甲 for I-05, applied to I-13 by the orchestrator 2026-11-20). L1: 64 upstream cases that seed a saved approval (saved.add / saved.update) and expect it to allow — 44 in packages/core/test/permission.test.ts, 20 in packages/core/test/tool-shell.test.ts — pinned by name in packages/ext/src/policy/session-grant-upstream-reds.test.ts. L3: five upstream cases in packages/core/test/config/config.test.ts that expect a wellknown document to load; the gate does not run that file: \"layers integration documents below remote and user config and reloads when they change\", \"keeps only the policies of documents from integrations managed policy denies\", \"tolerates unavailable authenticated wellknown config and reloads it later\", \"keeps the last resolved wellknown config across failures and restarts until its source is removed\", \"logs redacted source-aware diagnostics for every config source\". Reproduce: cd packages/core && bun test test/permission.test.ts test/tool-shell.test.ts test/config/config.test.ts. Rollback: revert the I-13 slice as one commit (permission.ts L1/L2 and config.ts L3 with their tests)."
+      "note": "Known red by design, not taken over (the disposition of orchestrator ruling 甲 for I-05, applied to I-13 by the orchestrator 2026-11-20). L1: 64 upstream cases that seed a saved approval (saved.add / saved.update) and expect it to allow — 44 in packages/core/test/permission.test.ts, 20 in packages/core/test/tool-shell.test.ts — pinned by name in packages/ext/src/policy/session-grant-upstream-reds.scenario.test.ts. L3: five upstream cases in packages/core/test/config/config.test.ts that expect a wellknown document to load; the gate does not run that file: \"layers integration documents below remote and user config and reloads when they change\", \"keeps only the policies of documents from integrations managed policy denies\", \"tolerates unavailable authenticated wellknown config and reloads it later\", \"keeps the last resolved wellknown config across failures and restarts until its source is removed\", \"logs redacted source-aware diagnostics for every config source\". Reproduce: cd packages/core && bun test test/permission.test.ts test/tool-shell.test.ts test/config/config.test.ts. Rollback: revert the I-13 slice as one commit (permission.ts L1/L2 and config.ts L3 with their tests)."
     },
     {
       "id": "plan-directory-in-engine-data",
@@ -2070,7 +2070,7 @@
           "name": "字段分类:上游 v1 / v2"
         },
         {
-          "file": "packages/ui-mac/src/main/project-config-commands.engine.test.ts",
+          "file": "packages/ui-mac/src/main/project-config-commands.engine.scenario.test.ts",
           "name": "I-12 / #1713 未允许与允许两臂"
         },
         {
@@ -2078,7 +2078,7 @@
           "name": "项目插件按生产信任放行"
         },
         {
-          "file": "packages/ui-mac/src/main/project-config-view.engine.test.ts",
+          "file": "packages/ui-mac/src/main/project-config-view.engine.scenario.test.ts",
           "name": "项目配置视图:九类"
         },
         {

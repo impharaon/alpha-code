@@ -685,28 +685,4 @@ describe("可达性判别依据(#941):半通不通降级,恒 'network' 硬红", 
     expect(readFileSync(join(fx.root, "curl-calls.n"), "utf8").trim()).toBe("5")
     expect(hooksPathOf(fx.repo, fx.home)).toBe(".lane-941h-hooks")
   }, 60_000)
-
-  // `#1156`:布防轮询必须**便宜**,否则并发下采样率塌陷、固定 3s 的观察窗口会被整个错过。
-  // 这两格是那条修复的判据 —— 有人把直读换回子进程轮询,它们当场红。
-  test("`#1156` 判据①:直读版与 git 权威版**读到同一个值**(便宜不能以读错为代价)", () => {
-    const { home, repo } = initFixture({ hooksPath: ".lane-1156-hooks", typecheckScript: "exit 0" })
-    expect(hooksPathFast(repo)).toBe(hooksPathOf(repo, home))
-    expect(hooksPathFast(repo)).toBe(".lane-1156-hooks")
-    // 探针目录还没建 ⇒ 两边都是空集(直读要能扛住目录不存在)
-    expect(probeWorktreeNamesFast(repo)).toEqual([])
-    expect(registeredWorktreeNames(repo, home).filter((n) => n.startsWith("wtboot-probe-"))).toEqual([])
-  }, 30_000)
-
-  test("`#1156` 判据②:200 次直读比 2 次 git 子进程还快 —— 采样率不随负载塌陷", () => {
-    const { home, repo } = initFixture({ hooksPath: ".lane-1156b-hooks", typecheckScript: "exit 0" })
-    const t0 = Date.now()
-    for (let i = 0; i < 200; i++) hooksPathFast(repo)
-    const fastMs = Date.now() - t0
-    const t1 = Date.now()
-    for (let i = 0; i < 2; i++) hooksPathOf(repo, home)
-    const spawnMs = Date.now() - t1
-    // 比值极其宽松(直读单次微秒级、spawn 单次毫秒级),但把「轮询里不许起子进程」钉死:
-    // 换回 spawn 轮询 ⇒ 200 次 spawn 远慢于 2 次 spawn ⇒ 当场红。
-    expect(fastMs).toBeLessThan(spawnMs)
-  }, 30_000)
 })

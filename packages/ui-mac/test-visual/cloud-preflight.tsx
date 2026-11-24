@@ -1,6 +1,6 @@
 // #1686 几何 harness:挂**生产**的两种云发送框与组件库卡片 + 生产 CSS,只桩 IPC 与数据。
 // 场景经 `?box=form|legacy|code-review&state=ok|wallet|loading|not-ready` 或 `?scene=popover&state=value|pending` 选择,
-// `?theme=dark` 切深色。由 src/renderer/extensions/cloud-preflight.browser.test.ts 驱动、量几何。
+// `?theme=dark` 切深色。由 src/renderer/extensions/cloud-preflight.browser.scenario.test.ts 驱动、量几何。
 import { render } from "solid-js/web"
 import type { AccountStatusV1 } from "@codepuppy/contracts-consumer"
 import { setLocale } from "../src/renderer/i18n"

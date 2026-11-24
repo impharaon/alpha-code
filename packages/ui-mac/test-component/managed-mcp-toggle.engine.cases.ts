@@ -3,7 +3,7 @@
 // (test-component/codepuppy-engine.ts)。本机 MCP 是 core 的真 stdio 夹具(codepuppy-mcp-startup-stdio.ts,每次 tools/call
 // 记一行);远程 MCP 是 core 的 `echoMcpHandler` 挂在本机一个真监听上。开关只走生产的持久写(setInstallStateByKey)与
 // main 的唯一运行时入口 convergeManagedMcp;引擎状态一律经引擎自己的路由读回。
-// 本文件由 src/main/managed-mcp-toggle.engine.test.ts 起独立子进程跑。
+// 本文件由 src/main/managed-mcp-toggle.engine.scenario.test.ts 起独立子进程跑。
 import { afterAll, beforeAll, expect, test } from "bun:test"
 import fs from "node:fs"
 import path from "node:path"

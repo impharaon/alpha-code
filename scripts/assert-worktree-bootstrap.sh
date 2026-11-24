@@ -382,7 +382,7 @@ if ! git -C "$MAIN" worktree add --detach -q "$MAIN/.worktrees/$NEG" "$BASE_SHA"
   echo "    ✗ 建不出反向探针 worktree —— **本次测量作废**,不要把它读成绿" >&2
   exit 1
 fi
-printf '%s\n' '{"extends":"./tsconfig.json","files":["src/main/worktree-probe-sweep.test.ts"],"include":[],"exclude":[]}' > "$MAIN/.worktrees/$NEG/packages/ui-mac/tsconfig.probe.json"
+printf '%s\n' '{"extends":"./tsconfig.json","files":["src/main/worktree-probe-sweep.scenario.test.ts"],"include":[],"exclude":[]}' > "$MAIN/.worktrees/$NEG/packages/ui-mac/tsconfig.probe.json"
 neg_out="$(cd "$MAIN/.worktrees/$NEG/packages/ui-mac" && "$NEG_TSGO" -p tsconfig.probe.json 2>&1)"; neg_rc=$?
 neg_missing="$(missing_module_lines "$neg_out")"
 if [ "$neg_rc" -eq 0 ]; then

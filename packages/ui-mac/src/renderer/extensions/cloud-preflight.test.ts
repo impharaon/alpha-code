@@ -496,7 +496,7 @@ describe.each(BOXES)("alpha-code#1686 preflight in the %s send box", (box) => {
   })
 
   test("keyboard order (R1 m5): the primary comes first in the DOM, then the secondary, then status and cancel", async () => {
-    // 视觉上主按钮最右由 CSS order 实现,浏览器几何检查(cloud-preflight.browser.test.ts)证明;这里钉 DOM = Tab 顺序。
+    // 视觉上主按钮最右由 CSS order 实现,浏览器几何检查(cloud-preflight.browser.scenario.test.ts)证明;这里钉 DOM = Tab 顺序。
     mount(box)
     await flush()
     const order = () => Array.from(row().children)

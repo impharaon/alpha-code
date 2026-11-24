@@ -228,21 +228,23 @@ layer_tests() { # <step> <工作目录> <层> <integration 层下界> [bun test 
   [ "$layer" = integration ] || floor=1
   CODEPUPPY_JUNIT_FILE="$GATE_REPORT_DIR/$step.$layer.xml" bash scripts/bun-test-floor.sh "$floor" "$w" "$@" "${files[@]}"
 }
+# 一处红不跳过后面的包:[6/14] 要从完整的报告里判每个登记文件(此前它自己逐个重跑,前一步红也照样判全)。
 unit_tests() {
-  bash scripts/test-layers.sh check || return 1
-  bun run --cwd packages/codepuppy-contracts-consumer check:vendor || return 1
-  local layer w
+  local rc=0 layer w
+  bash scripts/test-layers.sh check || rc=1
+  bun run --cwd packages/codepuppy-contracts-consumer check:vendor || rc=1
   for layer in "${test_layers[@]}"; do
     echo "── 层:$layer"
-    layer_tests codepuppy-contracts-consumer packages/codepuppy-contracts-consumer "$layer" 15 --parallel || return 1
-    layer_tests ext packages/ext "$layer" 100 || return 1
-    bash scripts/bun-test-ui-mac.sh "$layer" || return 1
+    layer_tests codepuppy-contracts-consumer packages/codepuppy-contracts-consumer "$layer" 15 --parallel || rc=1
+    layer_tests ext packages/ext "$layer" 100 || rc=1
+    bash scripts/bun-test-ui-mac.sh "$layer" || rc=1
     # 上游包(packages/core 等)里 Code Puppy 自有的登记文件:只经登记簿进套件,在这里跑一次,[6/14] 从报告判条数。
     for w in $(bash -c 'source scripts/test-layers.sh && test_layer_register_workdirs'); do
-      layer_tests "${w##*/}+gate-files" "$w" "$layer" 1 --parallel || return 1
+      layer_tests "${w##*/}+gate-files" "$w" "$layer" 1 --parallel || rc=1
     done
   done
-  bash scripts/bun-test-app.sh
+  bash scripts/bun-test-app.sh || rc=1
+  return $rc
 }
 # 每次 bun 调用的 junit 都写进 $GATE_REPORT_DIR;gate 没设(本地手跑)就用一个临时目录 —— [6/14] 登记簿从这些报告
 # 读逐文件条数,所以每个测试文件每次门只跑一次(此前登记簿把 ~400 个登记文件逐个重跑一遍,真引擎文件也跑两次)。

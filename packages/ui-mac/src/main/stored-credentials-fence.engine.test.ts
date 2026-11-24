@@ -1,19 +1,18 @@
 // SPEC-stored-credentials-fence AC-01 / AC-02 / AC-03(DESIGN §4.5 C1;E1 / E2 / E5 / E9 / E10)。宿主:stored-credentials-fence.engine.cases.ts 的每个臂
-// 各是一个 `bun test` 子进程(围栏是进程级的)。production 臂之后,本宿主(在一切围栏之外):① 核对存放点里每个假凭据文件逐字节原样;② 读这个运行窗口
+// 各是一个 `bun test` 子进程(围栏是进程级的)。production 臂之后,本宿主(在一切围栏之外):① 核对存放点里每个假凭据文件逐字节原样;② 判这个运行窗口
 // 的系统沙箱日志 —— 引擎进程(用例进程:引擎嵌在里面)在存放点上的读写拒绝为零,攻击子进程的拒绝作校准(没有即红,日志没读到不算「零」)。
+// 日志在 production 与 tools 两个被判的臂运行期间用 `log stream` 现场收(test-component/sandbox-denial-stream.ts:标记拒绝证明已接上、已排空,
+// 缺一即红),不再事后从存盘日志读 —— 存盘有保留期限,2026-11-24 本机 logd 一条内核消息都没存。
 // 运行期状态放在工作树的 node_modules/.cache 下。
 import { expect, test } from "bun:test"
 import { spawnSync } from "node:child_process"
 import { createHash } from "node:crypto"
 import { mkdirSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs"
 import { join, resolve } from "node:path"
+import { startSandboxDenialStream, type StreamedLogEvent } from "../../test-component/sandbox-denial-stream"
 
 type Rule = { kind: "subpath" | "literal" | "regex"; value: string }
 const ARMS = { production: 3, tools: 1, control: 2, widen: 1, notable: 1 } as const
-const stamp = (date: Date) => {
-  const pad = (n: number) => String(n).padStart(2, "0")
-  return `${date.getUTCFullYear()}-${pad(date.getUTCMonth() + 1)}-${pad(date.getUTCDate())} ${pad(date.getUTCHours())}:${pad(date.getUTCMinutes())}:${pad(date.getUTCSeconds())}+0000`
-}
 const inStore = (rules: readonly Rule[], path: string) =>
   rules.some((rule) => (rule.kind === "subpath" ? path === rule.value || path.startsWith(`${rule.value}/`) : rule.kind === "literal" ? path === rule.value : false))
 
@@ -26,8 +25,13 @@ test.skipIf(process.platform !== "darwin")("C1 真引擎:三档里 shell 与读�
   for (const entry of readdirSync(systemTemp)) if (/^scf-T-\w+$/.test(entry)) rmSync(join(systemTemp, entry), { recursive: true, force: true })
   const outputs: Record<string, string> = {}
   const windows: Record<string, { from: Date; to: Date }> = {}
+  // E2 / E5: the judged arms' sandbox refusals, captured live (attached before the arm starts, drained before anything is judged)
+  const judged = new Set(["production", "tools"])
+  const streamed: Record<string, StreamedLogEvent[]> = {}
+  let stream: Awaited<ReturnType<typeof startSandboxDenialStream>> | undefined
   try {
     for (const [arm, expected] of Object.entries(ARMS)) {
+      if (judged.has(arm)) stream = await startSandboxDenialStream({ predicate: 'eventMessage CONTAINS "deny(1) file-"', markerRoot: join(base, "stream-markers") })
       const from = new Date(Date.now() - 1_000)
       const child = Bun.spawn({
         cmd: [process.execPath, "test", "--timeout", "300000", ...(arm === "widen" ? ["--preload", join(import.meta.dir, "../../test-component/widen-credential-refs.preload.ts")] : []), join(import.meta.dir, "stored-credentials-fence.engine.cases.ts")],
@@ -37,6 +41,10 @@ test.skipIf(process.platform !== "darwin")("C1 真引擎:三档里 shell 与读�
         stderr: "pipe",
       })
       const [stdout, stderr, code] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
+      if (judged.has(arm)) {
+        streamed[arm] = await stream!.stop()
+        stream = undefined
+      }
       const output = `${stdout}${stderr}`
       outputs[arm] = output
       writeFileSync(join(base, "results", `${arm}.log`), output.slice(-300_000))
@@ -54,37 +62,31 @@ test.skipIf(process.platform !== "darwin")("C1 真引擎:三档里 shell 与读�
       }
     }
 
-    // E2 / E5: the system sandbox log, per arm window — denials on a C1 path, split by the engine process (the case process) and its children
-    const denialsOf = async (arm: "production" | "tools", calibrated: (split: { engine: number; children: number }) => boolean) => {
+    // E2 / E5: the system sandbox log (streamed), per arm window — denials on a C1 path, split by the engine process (the case process) and its children
+    const denialsOf = (arm: "production" | "tools") => {
       const meta = JSON.parse(outputs[arm]!.match(/^SCF-ENGINE (\{.*\})$/m)![1]!) as { pid: number; c1: Rule[] }
       const window = windows[arm]!
-      let split = { engine: [] as string[], children: [] as string[] }
-      for (let attempt = 0; attempt < 10; attempt++) {
-        await Bun.sleep(3_000)
-        const shown = spawnSync("log", ["show", "--start", stamp(window.from), "--end", stamp(window.to), "--style", "compact", "--predicate", 'eventMessage CONTAINS "deny(1) file-"'], { encoding: "utf8", maxBuffer: 256 * 1024 * 1024 })
-        expect(shown.status, shown.stderr).toBe(0)
-        writeFileSync(join(base, "results", `log-show-${arm}.txt`), `${stamp(window.from)} → ${stamp(window.to)}\n${shown.stdout}`)
-        const denials = shown.stdout
-          .split("\n")
-          .flatMap((line) => {
-            const match = /Sandbox: \S+\((\d+)\) deny\(1\) (file-[\w-]+) (\/.*)$/.exec(line)
-            return match ? [{ pid: Number(match[1]), line: `${match[2]} ${match[3]!.trim()}`, path: match[3]!.trim() }] : []
-          })
-          .filter((denial) => inStore(meta.c1, denial.path))
-        split = { engine: denials.filter((denial) => denial.pid === meta.pid).map((denial) => denial.line), children: denials.filter((denial) => denial.pid !== meta.pid).map((denial) => denial.line) }
-        if (calibrated({ engine: split.engine.length, children: split.children.length })) break
-      }
+      writeFileSync(join(base, "results", `log-stream-${arm}.json`), JSON.stringify(streamed[arm], null, 1))
+      const denials = streamed[arm]!
+        .filter((event) => event.timestamp >= window.from.getTime() && event.timestamp <= window.to.getTime())
+        .flatMap((event) => {
+          const match = /Sandbox: \S+\((\d+)\) deny\(1\) (file-[\w-]+) (\/.*)$/.exec(event.message)
+          return match ? [{ pid: Number(match[1]), line: `${match[2]} ${match[3]!.trim()}`, path: match[3]!.trim() }] : []
+        })
+        .filter((denial) => inStore(meta.c1, denial.path))
+      const split = { engine: denials.filter((denial) => denial.pid === meta.pid).map((denial) => denial.line), children: denials.filter((denial) => denial.pid !== meta.pid).map((denial) => denial.line) }
       writeFileSync(join(base, "results", `sandbox-denials-${arm}.json`), JSON.stringify({ window, enginePid: meta.pid, ...split }, null, 1))
       console.log(`[E2/E5 ${arm}] engine pid ${meta.pid}: ${split.engine.length} denials on credential stores; its fenced children: ${split.children.length}`)
       return split
     }
     // calibration of the criterion itself: in the tools arm the engine's own read tool (in-process) is refused on a store — those denials carry the engine pid
-    const tools = await denialsOf("tools", (split) => split.engine > 0)
+    const tools = denialsOf("tools")
     expect(tools.engine.length, "calibration: an in-process read of a store under C1 must show up as an engine-pid denial").toBeGreaterThan(0)
-    const production = await denialsOf("production", (split) => split.children > 0)
+    const production = denialsOf("production")
     expect(production.children.length, "calibration: the attack commands' denials must be in the log, or the log was not read").toBeGreaterThan(0)
     expect(production.engine).toEqual([])
   } finally {
+    stream?.kill()
     rmSync(join(base, "run"), { recursive: true, force: true })
     // each arm's stand-in system temp directory (a store can only be removed from outside the fence); a known-bad arm may have moved it into the sandbox
     for (const output of Object.values(outputs))

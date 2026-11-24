@@ -73,15 +73,16 @@ test(`#840 engine read on OpenCode 2: the package command is ${EXPECT}`, async (
     return { status: response.status, json: raw ? JSON.parse(raw) : undefined }
   }
 
-  // 插件装完之前清单可能是半套:轮询到两次相同且非空再判。
+  // 插件装完之前清单可能是半套:轮询到两次相同且非空再判。判「在」还要等到它出现(有上限):引擎自带的 /init、/review、/goal 先于读显式文件的
+  // 配置插件出现(实测 [] → [init, review, goal] → 再加上 pkg-probe),机器忙时中间那一态撑得过两次轮询,两次相同不等于装完。
   let listed: Array<{ name: string; description?: string }> = []
   let previous = ""
-  for (let i = 0; i < 40; i++) {
+  for (let i = 0; i < 300; i++) {
     const response = await send("GET", "/api/command")
     expect(response.status).toBe(200)
     listed = response.json.data
     const ids = JSON.stringify(listed.map((item) => item.name).sort())
-    if (ids === previous && listed.length > 0) break
+    if (ids === previous && listed.length > 0 && (EXPECT === "absent" || listed.some((item) => item.name === NAME))) break
     previous = ids
     await Bun.sleep(100)
   }

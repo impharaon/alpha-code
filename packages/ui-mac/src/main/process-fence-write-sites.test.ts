@@ -112,8 +112,8 @@ describe("I2:main-only 写者在 sidecar 闭包里没有调用方", () => {
     expect(importers).toContain("packages/ui-mac/src/main/codepuppy-models.ts")
   })
 
-  test("闭包里除 engine-explicit-config.ts 自己,没有文件拿到 writeExplicitConfig / watchExplicitSources / writeEngineConfigFiles / writeEngineConfigForFork / materializeGovernedModelsBase(也不整块 import 那个模块)", () => {
-    const writers = new Set(["writeExplicitConfig", "watchExplicitSources", "writeEngineConfigFiles", "writeEngineConfigForFork", "materializeGovernedModelsBase", "*", "default"])
+  test("闭包里除 engine-explicit-config.ts 自己,没有文件拿到 writeExplicitConfig / watchExplicitSources / syncExplicitConfig / writeEngineConfigFiles / writeEngineConfigForFork / materializeGovernedModelsBase(也不整块 import 那个模块)", () => {
+    const writers = new Set(["writeExplicitConfig", "watchExplicitSources", "syncExplicitConfig", "writeEngineConfigFiles", "writeEngineConfigForFork", "materializeGovernedModelsBase", "*", "default"])
     const importers: string[] = []
     const offenders: string[] = []
     for (const rel of closure) {

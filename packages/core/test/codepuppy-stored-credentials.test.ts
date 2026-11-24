@@ -2,7 +2,7 @@
 // documents — the explicit file and the inline content — take credential values from the in-process table only, pulled from the main
 // process before each load, and only at the closed list of credential positions. Every other position is left to the engine's own
 // {file:} read (in the fenced process that read is refused). A failed pull substitutes nothing, never an older table.
-// Real-engine evidence: packages/ui-mac/src/main/engine-cases.test.ts (stored-credentials.engine.cases.ts). Values are visibly fake.
+// Real-engine evidence: packages/ui-mac/src/main/stored-credentials.engine.test.ts. Values are visibly fake.
 import path from "path"
 import fs from "fs/promises"
 import { afterEach, describe, expect } from "bun:test"

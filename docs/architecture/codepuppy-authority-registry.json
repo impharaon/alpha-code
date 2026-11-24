@@ -23,7 +23,7 @@
           "name": "Code Mode 子调用的第一条拒绝补在外层成功终态上"
         },
         {
-          "file": "packages/ui-mac/src/main/unattended-run.engine.test.ts",
+          "file": "packages/ui-mac/src/main/engine-cases.test.ts",
           "name": "无人值守运行的真实入口证据(unattended-run.engine.cases.ts)"
         },
         {

@@ -10,7 +10,7 @@
 // 把 TimelineAttachments 的 onReadAgain 按钮去掉 ⇒ 第三条转红。
 //
 // 独立进程运行(`mock.module("solid-js", …)` 会污染同进程其它测试文件)。宿主:
-// src/renderer/codepuppy-ui/attachment-cards.component.test.ts。
+// src/renderer/subprocess-cases.test.ts。
 import { afterEach, describe, expect, mock, test } from "bun:test"
 import { transformAsync } from "@babel/core"
 import presetTypescript from "@babel/preset-typescript"

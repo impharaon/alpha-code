@@ -111,7 +111,7 @@ describe("REQ-125 C7:ComposerTakeover 删除后零引用(棘轮)", () => {
 
   test("#652 单一代次棘轮:会话发送与续钮都不得再碰 v2 durable 端点", () => {
     // 这一条是**源码棘轮**,只防「悄悄改回去」。THE PRIMARY JUDGEMENT IS NOT IN THIS FILE:
-    // 行为判据由 session-workspace/session-second-send.test.ts 执行(连发三条,生产 composer +
+    // 行为判据由 src/renderer/subprocess-cases.test.ts 的 session-second-send 一行执行(连发三条,生产 composer +
     // timeline 真挂载,断言**渲染出来的回复**),它登记在 scripts/gate-files.tsv 的 delegates_to。
     const composer = read(path.join(CODEPUPPY_UI, "codepuppy-composer.tsx"))
     expect(composer).toContain("c.session.promptAsync({")

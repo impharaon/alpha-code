@@ -211,7 +211,10 @@ echo "▶ [5/14] contract lock + unit tests (contracts-consumer + ext + ui-mac +
 #     `Cannot access 'E' before initialization`(单文件 `bun test --isolate` 同样复现)。
 #   · app 滚动 pin(bun-test-app.sh):整包 2s,没有并行的收益,保持串行。
 #   CI 的同名步骤(codepuppy-ci.yml,已停用)仍是串行命令,故这些步骤的档位不变(MIRRORED = 同一脚本、同一下界、同一已知红清单)。
-if bun run --cwd packages/codepuppy-contracts-consumer check:vendor \
+# 测试分层(ADR-0014):套件里每个测试文件按文件名恰好落在 fast / integration / scenario 一层;规则与判据在
+# scripts/test-layers.sh(唯一真源),无层或多层的文件逐个点名、本步红。
+if bash scripts/test-layers.sh check \
+  && bun run --cwd packages/codepuppy-contracts-consumer check:vendor \
   && bash scripts/bun-test-floor.sh 15 packages/codepuppy-contracts-consumer --parallel \
   && bash scripts/bun-test-floor.sh 100 packages/ext \
   && bash scripts/bun-test-ui-mac.sh \

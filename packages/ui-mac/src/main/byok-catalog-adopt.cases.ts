@@ -1,6 +1,6 @@
 // REQ-237 `#1556` —— BYOK 预置目录采纳规则的判据(方案 §2.3 规则 1–5,AC2;带 baseURL 被拒,AC3)。
 //
-// 子进程运行(byok-catalog-adopt.test.ts spawn):adoptByokCatalog 住在 catalog-refresher.ts,模块求值即拖入
+// 子进程运行(subprocess-cases.test.ts spawn):adoptByokCatalog 住在 catalog-refresher.ts,模块求值即拖入
 // electron / logging,这里只 mock 到能 import 为止,被测的是纯函数本身与 codepuppy-live-allowlist 的「已下载 = LKG 与
 // 随包首启引导取高者」。文档一律取上游 producer fixture 的 `value` 再改一处(不手写替身)。
 

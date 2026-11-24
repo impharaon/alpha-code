@@ -180,7 +180,7 @@ export const DOWNGRADED_ANCHORS: Record<string, SourceTextEntry> = {
     lines: 1,
   },
   "packages/ui-mac/src/main/sidecar-lifecycle.test.ts": {
-    why: "锚 index.ts 的 doRespawnSidecar:时间线 fork.start 写具名 trigger、捕获代 → kill → 健康终态 → markTokenGenerationApplied 的先后与唯一性,以及没健康 / fork 前失败两条路都接 planUnhealthyForkRetry。两个不会让它变红的变异:①在 healthy 判定前把 forkTokenGeneration 改写成 getTokenGeneration() 的新值;②给 markStartupTimeline 传一个被别处覆盖过的 trigger 变量(那一行文本逐字未变)。index.ts 结构上进不了 bun;行为判据在 credential-hot-apply.test.ts。 第二条锚(SPEC-stored-credentials-fence ② 审查第 1 条):两代 spawnLocalServer 都把 requestRespawn 交给 credentialRespawn.request、队列赋值之后立刻 credentialRespawn.attach(respawnSidecar);行为判据是同文件 createDeferredRespawn 的单元用例与 server.test.ts 的「同一代只请求一次」。两个不会让它变红的变异:①把 attach 的函数体改成只记下队列、不补发;②把 index.ts 里 attach 那一行包进一个恒假的条件(文本仍在、下标仍在赋值之后)。读 index.ts 只一行(模块级)。",
+    why: "锚 index.ts 的 doRespawnSidecar:时间线 fork.start 写具名 trigger、捕获代 → kill → 健康终态 → markTokenGenerationApplied 的先后与唯一性,以及没健康 / fork 前失败两条路都接 planUnhealthyForkRetry。两个不会让它变红的变异:①在 healthy 判定前把 forkTokenGeneration 改写成 getTokenGeneration() 的新值;②给 markStartupTimeline 传一个被别处覆盖过的 trigger 变量(那一行文本逐字未变)。index.ts 结构上进不了 bun;行为判据在 subprocess-cases.test.ts。 第二条锚(SPEC-stored-credentials-fence ② 审查第 1 条):两代 spawnLocalServer 都把 requestRespawn 交给 credentialRespawn.request、队列赋值之后立刻 credentialRespawn.attach(respawnSidecar);行为判据是同文件 createDeferredRespawn 的单元用例与 server.test.ts 的「同一代只请求一次」。两个不会让它变红的变异:①把 attach 的函数体改成只记下队列、不补发;②把 index.ts 里 attach 那一行包进一个恒假的条件(文本仍在、下标仍在赋值之后)。读 index.ts 只一行(模块级)。",
     evidence: "#1562",
     lines: 1,
   },

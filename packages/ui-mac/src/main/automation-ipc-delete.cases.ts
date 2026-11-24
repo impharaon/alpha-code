@@ -26,7 +26,7 @@
 //   ⑧ 本地档保存、本机校验不过 ⇒ `automations-save` 返回本地结构码;
 //   ⑨ 云端注册成功但本机保存失败 ⇒ 同样返回本地结构码,补偿删除照发。
 //
-// mock.module 会污染同进程其它测试文件 ⇒ 真断言放这里,由 automation-ipc-delete.test.ts
+// mock.module 会污染同进程其它测试文件 ⇒ 真断言放这里,由 subprocess-cases.test.ts
 // 在隔离子进程里跑(codepuppy-cloud-schedules.cases.ts 同款)。
 import { expect, mock, test } from "bun:test"
 import * as fs from "node:fs"

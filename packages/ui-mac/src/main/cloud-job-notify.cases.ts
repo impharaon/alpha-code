@@ -7,7 +7,7 @@
 //     只桩掉网络(getCloudJobStatus / listCloudArtifacts),看状态查询回 completed / failed 时通不通知。
 // 摘掉 cloud-ipc.ts 里任一处接线,对应那组当场红(本文件先于接线写成,红过)。
 //
-// 子进程运行(cloud-job-notify.test.ts spawn):mock.module("electron") 是进程级的,同进程会漏进
+// 子进程运行(subprocess-cases.test.ts spawn):mock.module("electron") 是进程级的,同进程会漏进
 // `bun test src` 里别的文件。顺序纪律:`await import("./cloud-ipc")` 必须排在全部 mock.module 之后。
 
 import { afterAll, beforeEach, describe, expect, mock, test } from "bun:test"

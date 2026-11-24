@@ -239,7 +239,7 @@ describe("buildCodePuppyModelConfig — BYOK direct nodes (only when the key FIL
   })
 
   // `#1556` AC3:端点 / Key 名 / 协议适配器只来自 App 内置适配器表。远程文档带这些字段时在采纳那一步就整份拒绝
-  // (byok-catalog-adopt.test.ts);这里判注入层自己:哪怕已应用目录里混进了 baseURL / keyEnv / compat,或者一个
+  // (subprocess-cases.test.ts);这里判注入层自己:哪怕已应用目录里混进了 baseURL / keyEnv / compat,或者一个
   // 适配器表里没有的 provider,注入出来的端点、密钥引用、npm 仍逐字是适配器表的,陌生 provider 一个都不注入。
   test("`#1556` AC3:BYOK 的 baseURL / Key 名 / npm 只来自适配器表 —— 已应用目录里的同名字段与陌生 provider 都不起作用", () => {
     for (const adapter of BYOK_ADAPTERS) plantSecret(adapter.keyEnv, `sk-${adapter.id}`)
@@ -1142,7 +1142,7 @@ describe("REQ-153 #1237:档位形状逐腿取自实打表;未实打的模型钉�
 })
 
 // REQ-228 #1420:「能不能看图」落成引擎 config 的 `modalities.input`(→ `capabilities.input.image`,真引擎那一格在
-// image-input-capability.test.ts)。这里判三件只在注入面能判的事:出货目录对每个直连模型都显式给了值;缺值按看不了图;
+// engine-cases.test.ts)。这里判三件只在注入面能判的事:出货目录对每个直连模型都显式给了值;缺值按看不了图;
 // 自定义节点的用户声明从 providers.add 一路落到真源与注入,声明一个不在清单里的 id 当场拒。
 describe("REQ-228 #1420:直连 / 平台 / 自定义三段的图片输入能力", () => {
   const keyEverything = () => {

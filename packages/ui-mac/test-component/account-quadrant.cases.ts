@@ -12,7 +12,7 @@
 //
 // 挂载走生产组合体(OverlayCloseHarness:真 CodePuppySidebar + 真 @solidjs/router),打开浮层走
 // 真实点击。替身面与 overlay-close.cases.ts 同因同法:上游 ui 装饰件 / SDK 传输层 / preload
-// 桥,不含被测语义。子进程运行(src/renderer/sidebar/account-quadrant.test.ts spawn):
+// 桥,不含被测语义。子进程运行(src/renderer/subprocess-cases.test.ts spawn):
 // mock.module 会污染同进程。
 import { transformAsync } from "@babel/core"
 import presetTypescript from "@babel/preset-typescript"

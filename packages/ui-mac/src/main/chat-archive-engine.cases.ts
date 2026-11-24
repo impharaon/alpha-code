@@ -5,7 +5,7 @@
 //     由注入的 fetch 截下(引擎那一端走真 fetch);
 //   · 反向臂(旧名字):同一个引擎的不过滤事件流里,这一轮结束时只有 `session.execution.*`,`session.idle` / `session.status`
 //     一条都没有;按旧名字过滤的订阅引擎照收(200),可这一轮跑完它一条事件都没送 —— 按 v1 名字订阅的人永远等不到。
-// 本文件由 chat-archive-engine.test.ts 宿主起独立 `bun test` 子进程跑。HOME / XDG 全在临时沙箱里,绝不碰 owner 的数据目录。
+// 本文件由 engine-cases.test.ts 宿主起独立 `bun test` 子进程跑。HOME / XDG 全在临时沙箱里,绝不碰 owner 的数据目录。
 import { afterAll, beforeAll, describe, expect, test } from "bun:test"
 import { mkdtempSync } from "node:fs"
 import { join } from "node:path"

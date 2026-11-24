@@ -1,4 +1,4 @@
-// provider-ipc wiring (REQ-226 `#1343`, R1 audit finding 1 + R2 blocker) — run by src/main/provider-ipc.wiring.test.ts
+// provider-ipc wiring (REQ-226 `#1343`, R1 audit finding 1 + R2 blocker) — run by src/main/subprocess-cases.test.ts
 // in a SUBPROCESS, because `mock.module("electron")` is process-global (same reason as app-version-ipc.wiring).
 // It lives in test-component/ (like codepuppy-composer-model.cases.ts) because it sets CODEPUPPY_GLOBAL_DIR to a temp
 // root and codepuppy-environment.test.ts forbids that assignment in any non-test file under src/main.

@@ -141,7 +141,7 @@ UPSTREAM_EXCLUDES=(
   # 自有的 codepuppy-startup.ts / codepuppy-first-party-mcp.ts;三个上游文件只在 `codepuppy(...)` 标注处调用它们。
   # 判据 packages/core/test/codepuppy-mcp-runtime.test.ts。
   # INT-safety I-20(SPEC-stored-credentials-fence,owner 2026-11-20「两份都批准」):client.ts 的 codepuppy(#1562, I-20) 块里,治理云连接器每个
-  # 请求的凭据改读进程内凭据表(readCodePuppyCredential),不读文件;判据 packages/ui-mac/src/main/cloud-credential-hot.engine.test.ts。
+  # 请求的凭据改读进程内凭据表(readCodePuppyCredential),不读文件;判据 packages/ui-mac/src/main/engine-cases.test.ts。
   ':(exclude)packages/core/src/mcp/client.ts'
   ':(exclude)packages/core/src/mcp/connection.ts'
   ':(exclude)packages/core/src/mcp/index.ts'
@@ -181,7 +181,7 @@ UPSTREAM_EXCLUDES=(
   # loadWellknownEntry / loadWellknown 一并删掉,上游同步时这一段要人工移植);判据同上一条 I-13。
   # INT-safety I-20(SPEC-stored-credentials-fence BR-02 / BR-03):显式文件与内联内容在 substitute 之前先向主进程拉凭据表、只在封闭清单位置代入
   # (`codepuppy(I-20)` 标注块与 loadFile 的文档种类参数);其它文档不动。判据 packages/core/test/codepuppy-stored-credentials.test.ts 与真引擎
-  # packages/ui-mac/src/main/stored-credentials.engine.test.ts。
+  # packages/ui-mac/src/main/engine-cases.test.ts。
   ':(exclude)packages/core/src/config.ts'
   # #1713 / ADR-049:md 读取点只调用同一闸门;判据与复核清单同上。
   ':(exclude)packages/core/src/config/plugin/skill.ts'

@@ -8,7 +8,7 @@
 //     不带目录的请求(bootstrapGlobal:GET /path、GET /provider、GET /project)。
 // 反向臂:同一台引擎、适配器不认这两个目录 ⇒ 清单里出现 engine-scratch-cwd 与 code-puppy(打包回归看到的那两行)。
 //
-// 本文件由 internal-projects.engine.test.ts 起独立 `bun test` 子进程来跑(沙箱改的环境变量与 chdir 不出那个进程)。
+// 本文件由 engine-cases.test.ts 起独立 `bun test` 子进程来跑(沙箱改的环境变量与 chdir 不出那个进程)。
 import { afterAll, beforeAll, describe, expect, test } from "bun:test"
 import { mkdirSync } from "node:fs"
 import { join } from "node:path"

@@ -575,7 +575,7 @@ describe("REQ-160 #1324 —— 不阻断对话 / 事件接线", () => {
   })
 
   // `#1667`:OpenCode 2 不发 v1 的 `session.idle` / `session.status`;一轮结束是 `session.execution.succeeded|failed|interrupted`。
-  // 真引擎上的同一件事(真执行事件唤醒、旧名字一条都不出现)在 chat-archive-engine.test.ts。
+  // 真引擎上的同一件事(真执行事件唤醒、旧名字一条都不出现)在 engine-cases.test.ts。
   test("事件流上只有一轮结束的执行事件才触发上报;连接帧、开始事件、v1 的 session.idle 都不触发", async () => {
     const dir = tempDir()
     const archiveCalls: Call[] = []

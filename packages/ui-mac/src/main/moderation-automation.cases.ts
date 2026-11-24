@@ -8,7 +8,7 @@
 // (由一个假 fetch 喂一条真响应);假的只有引擎客户端与落盘。判据是「引擎那一侧一次都没被调用」
 // 而不是某个标志位 —— 后者在把检查接到 `session.create` **之后**时照样绿,而那会留下一串空会话。
 //
-// mock.module 是进程级的,会污染同进程其它测试文件 ⇒ 由 moderation-automation.test.ts 起子进程跑。
+// mock.module 是进程级的,会污染同进程其它测试文件 ⇒ 由 subprocess-cases.test.ts 起子进程跑。
 
 import { expect, mock, test } from "bun:test"
 import * as fs from "node:fs"

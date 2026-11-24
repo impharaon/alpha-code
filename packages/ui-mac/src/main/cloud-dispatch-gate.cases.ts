@@ -16,7 +16,7 @@
 // 真的拒得动已知的坏形状(历史上那份缺省注入),再拿它判现在的好。
 //
 // mock.module 会污染同进程其它测试文件 ⇒ 真断言放这里,由 cloud-dispatch-gate.test.ts
-// 在隔离子进程里跑(codepuppy-cloud-jobs.cases.ts / cloud-ipc.test.ts 同款)。
+// 在隔离子进程里跑(codepuppy-cloud-jobs.cases.ts / subprocess-cases.test.ts 同款)。
 
 import { expect, mock, test } from "bun:test"
 import type { CloudJobEnvelope } from "../preload/types"

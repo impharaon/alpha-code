@@ -158,7 +158,7 @@ describe("engine runaway guard", () => {
   })
 })
 
-// AC4「每次 spawn 前轮转」的判据**不在本文件**,在 `req053-spawn-rotation.test.ts`
+// AC4「每次 spawn 前轮转」的判据**不在本文件**,在 `engine-cases.test.ts`
 // (它起子进程跑生产 `spawnLocalServer`,由注入的 fork 桩在被调用的那一刻观察真实文件系统)。
 //
 // 这里原先有一条 `serverSource.indexOf("rotateServerLogs()") < indexOf("utilityProcess.fork")`

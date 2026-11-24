@@ -393,7 +393,7 @@ describe("config target safety and writes", () => {
 // 注意边界:下面这条用例**手工拼装** executeClear + withConfigWriteLock + sweep 的等价链 ——
 // 它证明的是「这三步合起来能得到正确结果」,**不是**「生产真的这么接线了」。把
 // `data-clear-boot.ts` 里那次 sweep 调用整段删掉,它仍然全绿(本仓假闸形态⑧)。
-// 生产接线的判据在 `req053-clear-wiring.test.ts`。
+// 生产接线的判据在 `subprocess-cases.test.ts`。
 test("credential-level clear leaves codepuppy.jsonc with no guarded dangling refs and preserves the mcp leaf", () => {
   const plugin = join(roots.userData, "codepuppy-secrets", "plugin.js")
   const secret = join(roots.userData, "codepuppy-mcp-secrets", "demo", "TOKEN")
@@ -496,5 +496,5 @@ test("ANCHOR (not a gate): boot/respawn sweep source order in index.ts", () => {
 // 这里原先有一条 `clear wiring sweeps after deletion and before logout/exit under the config lock`,
 // 读 `data-clear-boot.ts` 源码比下标。`#966` 把它删了(不是留着当双保险):把 sweep 的返回值丢掉、
 // 把 data 级那次 sweep 挪到 `app.exit(0)` 之后、把对话框文案只改在注释里 —— 它都不会红。
-// 生产接线的判据现在在 `req053-clear-wiring.test.ts`(子进程跑真
+// 生产接线的判据现在在 `subprocess-cases.test.ts`(子进程跑真
 // `createDataClearAction().clearData()`,在 `logout()` 与 `app.exit(0)` **被调用的那一刻**取快照)。

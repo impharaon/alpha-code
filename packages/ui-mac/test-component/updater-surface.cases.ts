@@ -9,7 +9,7 @@
 // 挂载走生产组合体(OverlayCloseHarness:真 CodePuppySidebar + 真 @solidjs/router),交互走真实
 // 点击。替身面与 account-version.cases.ts 同因同法:上游 ui 装饰件 / SDK 传输层 / preload 桥,
 // 不含被测语义 —— updater 的桥替身只做「捕获订阅回调 + 计数 check/install」,状态推送本身
-// 就是被测通路的输入端。子进程运行(src/renderer/sidebar/updater-surface.test.ts spawn):
+// 就是被测通路的输入端。子进程运行(src/renderer/subprocess-cases.test.ts spawn):
 // mock.module 会污染同进程其它测试文件。
 
 import { transformAsync } from "@babel/core"

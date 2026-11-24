@@ -16,7 +16,7 @@
 // 的东西(覆盖率由注册表派生,映射本身由人声明)。
 //
 // 「各自路由到不同的具名 builder」的**行为半场**不在本文件:它在
-// `package-plugin.wiring.test.ts`(一次真安装的计划里同时出现四个 builder 的特征 item)。
+// `subprocess-cases.test.ts`(一次真安装的计划里同时出现四个 builder 的特征 item)。
 // 本文件只钉表本身。
 
 import { describe, expect, test } from "bun:test"

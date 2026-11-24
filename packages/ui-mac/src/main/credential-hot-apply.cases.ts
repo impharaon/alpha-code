@@ -3,7 +3,7 @@
 // sidecar-lifecycle(createSidecarRespawnQueue、armRespawnGenerationTerminal)。index.ts 结构上进不了 bun,
 // doRespawnSidecar 里「先捕获代 → fork → 健康终态后才 markTokenGenerationApplied(捕获代)」那一行 glue 在下面照抄,
 // 形状由 sidecar-lifecycle.test.ts 的 ANCHOR 钉住。终态上界用生产同一个数(index.ts 的 20000)。
-// 子进程宿主:credential-hot-apply.test.ts(本文件要 mock electron,同进程会污染别的测试文件)。
+// 子进程宿主:subprocess-cases.test.ts(本文件要 mock electron,同进程会污染别的测试文件)。
 
 import { afterEach, beforeEach, describe, expect, mock, test, vi } from "bun:test"
 import * as fs from "node:fs"

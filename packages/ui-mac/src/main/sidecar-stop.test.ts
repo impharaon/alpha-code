@@ -11,7 +11,7 @@
 
 import { afterEach, beforeEach, describe, expect, mock, test, vi } from "bun:test"
 import { EventEmitter } from "node:events"
-import { mkdtempSync, readFileSync, rmSync } from "node:fs"
+import { mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
@@ -174,18 +174,6 @@ describe("#858 停止合同:关掉引擎", () => {
       expect(parseSidecarStopCommand(value)).toBeUndefined()
   })
 
-  // 分类与「这处锚守不住什么」登记在 ./source-text-anchors.ts(`#968` 第 ⑤ 层机械校验)。
-  test("ANCHOR (not a gate): sidecar.ts 的 stop 走共享执行器,不再打 v1 的 /global/dispose", () => {
-    // sidecar.ts 顶层的 registerHooks / getParentPort() 让它无法被 import,所以这一跳只能锚源码。
-    // 上面三条才是行为判据 —— 这一条只保证生产真的接在那上面。
-    const source = readFileSync(join(import.meta.dir, "sidecar.ts"), "utf8")
-    expect(source).toContain("await stopSidecarEngine(engine)")
-    expect(source).toContain("return parseSidecarStopCommand(value)")
-    // 本地再决定一次 = 合同有两个真源,迟早漂移;v1 的释放路由在 2.x 是 404(OOR-2)。
-    expect(source).not.toMatch(/listener\??\.stop\(/)
-    expect(source).not.toContain("/global/dispose")
-    expect(readFileSync(join(import.meta.dir, "sidecar-stop.ts"), "utf8")).not.toContain("/global/dispose")
-  })
 })
 
 test("#1647 AC2 a hung engine close stays inside the five-second stop budget", async () => {

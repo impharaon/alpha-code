@@ -1,6 +1,4 @@
 import { expect, test } from "bun:test"
-import { readFileSync } from "node:fs"
-import { join } from "node:path"
 import { Deferred, Effect } from "effect"
 import {
   armBootGenerationTerminal,
@@ -241,22 +239,4 @@ test("#1322 boot 终态:健康失败 ⇒ failed 不带 fence(没有引擎就没�
   })
   expect(published).toEqual([{ status: "failed", generation: 8, reason: "boot" }])
   expect("fence" in published[0]!).toBe(false)
-})
-
-test("ANCHOR (not a gate): #577 终态生产者必须在 spawn promise 交回 fiber 之前 detached 武装", () => {
-  const source = readFileSync(join(import.meta.dir, "index.ts"), "utf8")
-
-  expect(source.split("void armBootGenerationTerminal(").length - 1).toBe(1)
-  expect(source).not.toMatch(/yield\*\s*armBootGenerationTerminal/)
-  expect(source).not.toMatch(/settleBootHealth\s*\(/)
-
-  // boot 路的 spawn(respawn 路另有一处,indexOf 从 0 起自然取到 boot 这一处)
-  const spawn = source.indexOf("const spawning = spawnLocalServer(")
-  const arm = source.indexOf("\n      void armBootGenerationTerminal(", spawn)
-  const handoff = source.indexOf("\n      return spawning", spawn)
-
-  expect(spawn).toBeGreaterThan(-1)
-  expect(arm).toBeGreaterThan(spawn)
-  expect(handoff).toBeGreaterThan(arm)
-  expect(source.slice(arm, handoff)).toContain("spawning,")
 })

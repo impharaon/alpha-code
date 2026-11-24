@@ -9,7 +9,6 @@
 //
 // 宿主:真判据在 sidecar-engine-host.cases.ts(独立的 `bun test` 子进程 —— 引擎沙箱改的环境变量不出那个进程)。
 import { expect, test } from "bun:test"
-import { readFileSync } from "node:fs"
 import { join } from "node:path"
 
 test("I1:真引擎上的进程内 fetch 交接、口令包装、配置通道、库路径与关闭;`#1698` 引擎入口读启动文档(sidecar-engine-host.cases.ts,8 条;含 #1713 信任钩子必填)", () => {
@@ -23,11 +22,3 @@ test("I1:真引擎上的进程内 fetch 交接、口令包装、配置通道、�
   expect(output.match(/(\d+) fail\b/)?.[1], output).toBe("0")
   expect(output.match(/(\d+) pass\b/)?.[1], output).toBe("8")
 }, 300_000)
-
-// 分类与「这处锚守不住什么」登记在 ./source-text-anchors.ts。
-test("ANCHOR (not a gate): engine-embed.ts 调 start() 时 lifecycle 位传 undefined,Transform 里同步交出 dispatch(裁决书 N1、I1 第 3 条)", () => {
-  const source = readFileSync(join(import.meta.dir, "..", "..", "engine", "engine-embed.ts"), "utf8")
-  expect(source).toContain("start(options, undefined, (app) => {")
-  expect(source).toMatch(/dispatch = HttpEffect\.toWebHandler\(app\)\s+hooks\.onDispatch\?\.\(dispatch\)/)
-  expect(source).not.toMatch(/import[^\n]*ServerFetch|ServerFetch\.make\(/)
-})

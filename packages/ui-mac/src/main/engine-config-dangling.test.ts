@@ -465,34 +465,6 @@ test("credential-level clear leaves codepuppy.jsonc with no guarded dangling ref
   }).edits).toEqual([])
 })
 
-// ⚠️ ANCHOR,不是闸门。`#966` 保留它是因为这处接线今天**没有别的东西守着**,但必须写清它守不住什么:
-//
-//   它只比较 `index.ts` 源码里几个字符串的下标。下面**三个变异**会让接线彻底失效,而它照绿:
-//     ① 把 `recordDanglingSweep("boot", danglingBoot.outcome)` 换成丢弃返回值;
-//     ② 把 `if (danglingBoot.enforcementGap.length > 0)` 整块删掉(fail-closed 拒启没了);
-//     ③ 把两处 `armEngineRunawayMeter(spawnGen)` 注释掉(断路器从不起表)。
-//
-//   `#1031` 把「TEST_ONBOARDING 下仍跑 boot sweep」拆成可执行闸:
-//     · `boot-dangling-sweep.test.ts` —— 删掉 `runBootDanglingSweep` 内的 sweep 调用即红;
-//     · `boot-dangling-onboarding-wiring.test.ts` —— 把调用塞回 `if (!TEST_ONBOARDING)` 即红。
-//   本条仍只守 boot/respawn 相对 spawn 的文本顺序。
-//
-//   为什么 index.ts 本身进不了 bun:静态 import `node:tls#setDefaultCACertificates` 在 bun 1.3.14
-//   链接期失败。整类处置见 `alpha-code#968`。
-test("ANCHOR (not a gate): boot/respawn sweep source order in index.ts", () => {
-  const source = readFileSync(join(import.meta.dir, "index.ts"), "utf8")
-  const reconcile = source.indexOf("reconcileEngineConfigTruth(logger")
-  const bootSweep = source.indexOf("runBootDanglingSweep(")
-  const firstFork = source.indexOf("spawnLocalServer(hostname, port, password")
-  const respawnSweep = source.indexOf('phase: "respawn"')
-  const secondFork = source.indexOf("spawnLocalServer(hostname, port, password", firstFork + 1)
-  expect(reconcile).toBeGreaterThan(-1)
-  expect(bootSweep).toBeGreaterThan(reconcile)
-  expect(firstFork).toBeGreaterThan(bootSweep)
-  expect(respawnSweep).toBeGreaterThan(firstFork)
-  expect(secondFork).toBeGreaterThan(respawnSweep)
-})
-
 // 这里原先有一条 `clear wiring sweeps after deletion and before logout/exit under the config lock`,
 // 读 `data-clear-boot.ts` 源码比下标。`#966` 把它删了(不是留着当双保险):把 sweep 的返回值丢掉、
 // 把 data 级那次 sweep 挪到 `app.exit(0)` 之后、把对话框文案只改在注释里 —— 它都不会红。

@@ -578,34 +578,6 @@ describe("injectCodePuppyConfig —— 注入组合体的执行级闸门(#607)",
     expect("explicit" in after).toBe(false)
   })
 
-  // #613 接线锚(R1 后收窄):sidecar.ts 无法被 bun import(首个 import 即 registerHooks,
-  // 顶层 getParentPort 必抛)。R1 实证纯文本锚锁不住值上车 —— 「失败字段真的在 ready 消息上」
-  // 已迁入真执行的 buildReadyMessage(sidecar-ready-message.test.ts)。留给源码锚的只剩
-  // bun 无法运行时验证的接线事实,按 rev2c ③″3-2 锁位置/顺序与唯一通路:
-  // 分类与「这处锚守不住什么」登记在 ./source-text-anchors.ts(`#968` 第 ⑤ 层机械校验)。
-  test("ANCHOR (not a gate): #613 sidecar.ts 的 ready 上报必须走 buildReadyMessage(injection),别无通路", () => {
-    const source = fs.readFileSync(path.join(import.meta.dir, "sidecar.ts"), "utf8")
-
-    // ① start() 捕获注入结果,ready 发送在捕获之后、以捕获值**整体**入参 —— 精确到字符:
-    //    `buildReadyMessage(injection && …)` / `(injection ?? …)` 等义改写都无法命中该子串。
-    //    #881:第二个入参是 prewarm 的结局(同样整体入参,同样精确到字符)。
-    const capture = source.indexOf("const injection = prepareSidecarEnv(")
-    const ready = source.indexOf("parentPort.postMessage(buildReadyMessage(injection, prewarmResult))")
-    expect(capture).toBeGreaterThan(-1)
-    expect(ready).toBeGreaterThan(capture)
-    // ② 被调用的必须是 sidecar-ready-message 导出的那一个(换源 import = 红),
-    //    且本文件不得 shadow 重定义同名函数(重定义 = 红)。
-    expect(source).toMatch(/import \{ buildReadyMessage[^}]*\} from "\.\/sidecar-ready-message"/)
-    expect(source).not.toMatch(/(?:function|const|let|var)\s+buildReadyMessage/)
-    // ③ 唯一通路:本文件不得再出现字面量构造的 ready 消息 —— R1 的绕过手法
-    //    (另发 {type:"ready"} 裸消息、把旧表达式留在注释里)从此撞红。
-    expect(source).not.toMatch(/postMessage\(\s*\{\s*type:\s*"ready"/)
-    // ④ 中间环节不得吞:prepareSidecarEnv 以 injectCodePuppyConfig 的结果作为函数**最后一条语句**
-    //    整体返回(锁到行尾 + 函数闭括号:`return injectCodePuppyConfig(...), {ok:true}` 逗号改写、
-    //    换行续写表达式,都无处容身)。
-    //    `#1698`:四个入参都来自已发布的启动文档。
-    expect(source).toMatch(/return injectCodePuppyConfig\(bootstrap\.paths\.userData, bootstrap\.paths\.extPlugin, bootstrap\.registryChannel, bootstrap\.paths\.userConfig \?\? null\)\n\}/)
-  })
 })
 
 describe("web search 主权在 2.x 权限规则里仍成立(#223)", () => {

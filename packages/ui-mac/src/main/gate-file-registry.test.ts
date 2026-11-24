@@ -653,8 +653,8 @@ describe("闸门文件登记簿完备性 (#647)", () => {
     // 过度命中由 KEPT 表吸收 —— 谓词保持愚蠢 + 默认拒,判断留在人读的表里。
     //
     // 真实枚举达到下界:谓词或 git 枚举退化成空集时,上面四条闸会**空对空全绿**(`0 fail` 恒成立)。
-    // 23 就是今天的实测值,不留余量 —— 删掉任何一个命中方都当场红。
-    expect(SOURCE_TEXT_HITS.size).toBeGreaterThanOrEqual(23)
+    // 14 就是今天的实测值(ADR-0014 删掉 41 条 ANCHOR 锚之后),不留余量 —— 删掉任何一个命中方都当场红。
+    expect(SOURCE_TEXT_HITS.size).toBeGreaterThanOrEqual(14)
     expect(SOURCE_TEXT_IN_SCOPE.length).toBeGreaterThanOrEqual(200)
     // 自指:本文件正文里必然写着谓词的正例夹具,不排除自己就把自己算成命中方。
     expect([...SOURCE_TEXT_HITS.keys()]).not.toContain(SELF)

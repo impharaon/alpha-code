@@ -87,7 +87,7 @@ thing the fence refuses is the engine connecting to a loopback OAuth server
 
 ## Pinned by
 
-- `packages/ui-mac/src/main/package-mcp-oauth.engine.test.ts`: a real OpenCode 2
+- `packages/ui-mac/src/main/package-mcp-oauth.engine.cases.ts` (a row of `engine-cases.test.ts`): a real OpenCode 2
   engine in a sandbox. Before sign-in the probe reports `needs_auth`. After the
   engine's own integration sign-in, the same name and URL report `connected`
   and a renamed server reports `needs_auth`. An engine that refuses the request

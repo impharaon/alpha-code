@@ -125,7 +125,7 @@ review_after: 2027-01-30
      模型页写明能看图时以官方页为准并在 PR 里写出处;② models.dev 的 `minimax-cn` 现在登记的端点是
      `api.minimax.cn/anthropic/v1`,与适配器的 `api.minimaxi.com/v1` 不是同一个,MiniMax 的值没有同端点出处,
      有 Key 时实打一次。引擎侧的最终值由
-     `image-input-capability.test.ts` 起真引擎判。
+     `packages/ui-mac/src/main/engine-cases.test.ts` 里 `image-input-capability.engine.cases.ts` 那一行起真引擎判。
      平台代理模型不读这个字段,一律看不了图(网关聊天入口拒收图片)。
      自定义节点没有上游出处,只认用户在真源记录里显式声明的 `imageInput`(见 `custom-provider-truth.ts`)。
      **实测覆盖记录**:`deepseek-flash`(直连)2026-10-31 实测:`POST https://api.deepseek.com/v1/chat/completions`,

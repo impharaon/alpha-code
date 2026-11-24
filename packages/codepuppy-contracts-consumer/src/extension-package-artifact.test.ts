@@ -148,10 +148,7 @@ describe("alpha-web extension package producer artifact pin", () => {
     })
   })
 
-  // 标题保持原样:这个字符串是
-  // `docs/verification/2026-07-31-req128-capability-matrix/matrix.tsv:7` 的 evidence key,
-  // 由 `packages/ui-mac/src/main/req128-capability-matrix.test.ts` 反查。改名会去动一份
-  // 已归档的 Phase 1 验证证据 —— 那不在本票边界内(`#811`/`#830` 同此处置)。
+  // 标题是已归档的 Phase 1 验证证据 `docs/verification/2026-07-31-req128-capability-matrix/matrix.tsv:7` 的 evidence key。
   test("v2 profile/capability closure covers OAuth and Alpha Connection and still excludes cloud", async () => {
     const registry = await json("host-extension-package.registry.v1.json")
     const profiles = await json("generic-profiles.v1.json")

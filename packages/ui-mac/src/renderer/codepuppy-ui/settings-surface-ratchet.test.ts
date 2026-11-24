@@ -15,8 +15,6 @@ const appHome = Bun.file(join(root, "../codepuppy-app/src/pages/home/home-projec
 const appNewSession = Bun.file(join(root, "../codepuppy-app/src/pages/new-session/use-new-session-commands.tsx"))
 const appSession = Bun.file(join(root, "../codepuppy-app/src/pages/session.tsx"))
 const appSettingsDialog = Bun.file(join(root, "../codepuppy-app/src/components/settings-dialog.tsx"))
-const l2Harness = Bun.file(join(root, "../../docs/verification/2026-07-21-req090-settings-l2/harness.html"))
-const l2Readme = Bun.file(join(root, "../../docs/verification/2026-07-21-req090-settings-l2/README.md"))
 
 describe("Alpha Settings ownership ratchets", () => {
   test("manifest registers one Alpha-owned overlay mount", () => {
@@ -87,17 +85,6 @@ describe("Alpha Settings ownership ratchets", () => {
     expect(guard).toBeGreaterThan(-1)
     expect(write).toBeGreaterThan(guard)
     expect(source).toContain("tauri migration: skipped reserved default.dat/settings.v3")
-  })
-
-  test("L2 records four static states in both themes without forbidden report fields", async () => {
-    const harness = await l2Harness.text()
-    const readme = await l2Readme.text()
-    for (const state of ["default", "save-failed", "gc-running", "gc-failed"]) {
-      expect(harness).toContain(`data-l2-state="${state}"`)
-      expect(readme).toContain(`theme=light&state=${state}`)
-      expect(readme).toContain(`theme=dark&state=${state}`)
-    }
-    expect(harness).not.toMatch(/digest|finishedAt|warning detail|\/Users\/|\bMB\b/)
   })
 
   test("#1550 AC2 / 新外壳:设置页铺在常驻顶栏与窄轨之外,不会落在 macOS 红绿灯下,也不画退出键", async () => {

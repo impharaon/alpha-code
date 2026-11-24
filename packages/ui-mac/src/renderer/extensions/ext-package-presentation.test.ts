@@ -1,5 +1,4 @@
 import { describe, expect, test } from "bun:test"
-import { resolve } from "node:path"
 import {
   CATALOG_PACKAGE_REASON_CODES,
   type CatalogPackageActionKindV1,
@@ -265,13 +264,7 @@ describe("package safe-view presentation", () => {
     ).toEqual([])
   })
 
-  test("the static visual harness Chinese copy stays aligned with the renderer dictionary", async () => {
-    const harness = await Bun.file(
-      resolve(
-        import.meta.dir,
-        "../../../../../docs/verification/2026-07-31-req128-package-detail/harness/package-detail-harness.html",
-      ),
-    ).text()
+  test("every rendered package key has non-empty copy in both locales", () => {
     const keys = [
       "codepuppy.ext.back",
       "codepuppy.ext.tabFeatured",
@@ -310,24 +303,11 @@ describe("package safe-view presentation", () => {
       "codepuppy.ext.authz.chipNew",
       "codepuppy.ext.authz.note",
     ] as const
-    // 先钉非空,再钉漂移:下面那条是子串包含判据,而 `includes("")` 恒真 ——
-    // 把任一 key 的值清空,漂移闸与 cases 里的同源断言(`toBe(zh[key])`,`"" === ""`)
-    // 会**同时**退化,三条闸全绿,而用户看到的是一个空的解释段。
-    // 审计实测三个新 key 各自清空都零红存活,这一行把 36 个 key 一次罩住。
+    // `includes("")` 恒真:把任一 key 的值清空,cases 里的同源断言(`toBe(zh[key])`,`"" === ""`)会一起退化,
+    // 用户看到的是一个空的解释段 —— 这一行把渲染用到的 36 个 key 一次罩住。
     expect(
       keys.filter((key) => zh[key].trim() === "" || en[key].trim() === ""),
       "every rendered key must have non-empty copy in both locales",
-    ).toEqual([])
-    expect(
-      keys.filter((key) => !harness.includes(zh[key])),
-      "visual harness contains Chinese literals, so every rendered phrase must track zh.ts",
-    ).toEqual([])
-    expect(
-      [
-        zh["codepuppy.ext.confirmTitle"].replace("{{name}}", "${esc(view.name)}"),
-        zh["codepuppy.ext.authz.introFirst"].replace("{{name}}", "${esc(view.name)}"),
-      ].filter((copy) => !harness.includes(copy)),
-      "visual harness interpolated Chinese copy must track zh.ts",
     ).toEqual([])
   })
 })

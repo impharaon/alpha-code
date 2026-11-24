@@ -8,8 +8,6 @@
 #     2026-09-24-1445-exa-mcp-response-shapes/results/*.json、2026-09-26-1445-exa-vendor-source-and-live-shapes/results/*
 #       (packages/core、packages/opencode 的 websearch nokey-outcomes 测试)
 #     2026-07-27-e7-packaged-live/results/latest-logged-in.json (cloud-web-search.test.ts)
-#     2026-07-21-req090-{recovery,permission,settings}-l2/harness.html (recovery-wiring / permission-mount-ratchet / settings-surface-ratchet)
-#     2026-07-31-req128-package-detail/harness/package-detail-harness.html (ext-package-presentation.test.ts)
 #   这类路径照常走全量门。
 
 docs/architecture/**

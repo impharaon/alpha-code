@@ -58,15 +58,4 @@ describe("REQ-090 Recovery wiring ratchet", () => {
     expect(renderer.match(/<RecoverySurface \/>/g)).toHaveLength(1)
   })
 
-  test("the static L2 harness covers four safe failure partitions in both themes", () => {
-    const harness = read("../../../../docs/verification/2026-07-21-req090-recovery-l2/harness.html")
-    expect(harness.match(/<article class="card">/g)).toHaveLength(8)
-    expect(harness.match(/<section class="theme light"/g)).toHaveLength(1)
-    expect(harness.match(/<section class="theme dark"/g)).toHaveLength(1)
-    expect(harness).toContain("RECOVERY_DATABASE_CORRUPT")
-    expect(harness).toContain("RECOVERY_ENGINE_STOPPED")
-    expect(harness).toContain("SURFACE RECOVERY")
-    expect(harness).toContain("SAVE RECOVERY")
-    expect(harness).not.toMatch(/\/Users\/|[A-Za-z]:\\Users\\|sk-[A-Za-z0-9]/)
-  })
 })

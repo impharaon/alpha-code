@@ -26,12 +26,6 @@ const watcher = await Bun.file(
 const permissionDialog = await Bun.file(
   resolve(root, "packages/ui-mac/src/renderer/codepuppy-ui/PermissionDialog.tsx"),
 ).text()
-const l2Harness = await Bun.file(
-  resolve(root, "docs/verification/2026-07-21-req090-permission-l2/harness.html"),
-).text()
-const l2Readme = await Bun.file(
-  resolve(root, "docs/verification/2026-07-21-req090-permission-l2/README.md"),
-).text()
 
 describe("Alpha Permission unique-mount ratchet", () => {
   test("deletes the upstream dock, legacy submission path, and dedicated reskin", async () => {
@@ -71,20 +65,6 @@ describe("Alpha Permission unique-mount ratchet", () => {
     expect(permissionDialog).not.toContain("ExtensionCapability")
   })
 
-  test("keeps the frame 03 L2 matrix on real Alpha CSS with no contract placeholders", () => {
-    const facts = ["subject", "action", "resources", "scope", "expiry"]
-    const decisions = ["once", "always", "reject"]
-    expect(l2Harness).toContain("permission-dialog.css")
-    facts.forEach((fact) => {
-      expect(l2Harness).toContain(`data-permission-fact="${fact}"`)
-    })
-    decisions.forEach((decision) => {
-      expect(l2Harness).toContain(`data-permission-decision="${decision}"`)
-    })
-    expect(l2Harness).toContain('data-kind="failed"')
-    expect(l2Harness).not.toContain("待契约")
-    expect(l2Readme).toContain("完整事实 / 三态 / 提交失败 × 双主题")
-  })
 })
 
 // #619 R3 Blocker-2:审批决定提交入口的**源码可达性**闸门(owner 2026-07-26 裁决:

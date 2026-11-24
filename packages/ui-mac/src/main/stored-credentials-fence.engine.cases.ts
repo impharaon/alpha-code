@@ -1,5 +1,5 @@
 // SPEC-stored-credentials-fence AC-01 / AC-02 / AC-03(DESIGN-stored-credentials-fence §4.5 C1,E1 / E2 / E5 / E9 / E10)的真引擎证明。只经
-// stored-credentials-fence.engine.test.ts 跑:围栏是进程级的,每个臂各是一个 `bun test` 子进程(CODEPUPPY_SCF_ARM)。
+// stored-credentials-fence.engine.scenario.test.ts 跑:围栏是进程级的,每个臂各是一个 `bun test` 子进程(CODEPUPPY_SCF_ARM)。
 //
 // 真嵌入式引擎 + 真 ext + 生产注入(test-component/codepuppy-engine.ts);本进程用生产计划器(planProcessFence:受保护集 + C1,真实路径)与生产
 // .node 把自己关进围栏,引擎就在本进程里(pid = 本进程)。「main」是围栏外的辅助进程(test-component/credential-main-helper.ts,装围栏之前起):

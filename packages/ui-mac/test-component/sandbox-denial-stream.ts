@@ -1,4 +1,4 @@
-// The fence hosts' sandbox refusals (engine-config-fence.engine.test.ts E5, stored-credentials-fence.engine.test.ts E2 / E5), read live with
+// The fence hosts' sandbox refusals (engine-config-fence.engine.scenario.test.ts E5, stored-credentials-fence.engine.scenario.test.ts E2 / E5), read live with
 // `log stream` while the judged arm runs instead of from the saved log afterwards: the saved log has retention limits, and a machine whose logd
 // has stopped keeping kernel messages returns an empty window (measured 2026-11-24: kernel lines visible for about a minute, then gone).
 //

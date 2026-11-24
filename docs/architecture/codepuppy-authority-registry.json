@@ -1042,11 +1042,11 @@
           "name": "rewrites blocked mutation failures with the Plan directory"
         },
         {
-          "file": "packages/ui-mac/src/main/engine-config-fence.engine.test.ts",
+          "file": "packages/ui-mac/src/main/engine-config-fence.engine.scenario.test.ts",
           "name": "AC-04 / AC-06 / AC-08 real engine inside the production fence: attacks refused, ordinary work and restart fine, cold start on 0.2.6 data and a fresh machine, the plan file under the engine data directory with ~/.opencode never created; known-bad arms flip; no protected-location denial from the engine process"
         }
       ],
-      "note": "Reverse arm (ADR-048): with the upstream plan.ts restored (git show 33f94fce96:packages/core/src/plugin/plan.ts) the three plan.test.ts cases turn red (the reminder, the edit allowance and the refusal text name ~/.opencode/plan), and the real-engine host turns red in its fresh arm: the Plan-mode reminder names <HOME>/.opencode/plan, the model's write there is refused by CF-9 and no plan file appears under the engine data directory. Reproduce: cd packages/core && bun test test/plugin/plan.test.ts; cd packages/ui-mac && bun test src/main/engine-config-fence.engine.test.ts."
+      "note": "Reverse arm (ADR-048): with the upstream plan.ts restored (git show 33f94fce96:packages/core/src/plugin/plan.ts) the three plan.test.ts cases turn red (the reminder, the edit allowance and the refusal text name ~/.opencode/plan), and the real-engine host turns red in its fresh arm: the Plan-mode reminder names <HOME>/.opencode/plan, the model's write there is refused by CF-9 and no plan file appears under the engine data directory. Reproduce: cd packages/core && bun test test/plugin/plan.test.ts; cd packages/ui-mac && bun test src/main/engine-config-fence.engine.scenario.test.ts."
     },
     {
       "id": "stored-credentials-in-memory",
@@ -1083,7 +1083,7 @@
           "name": "凭据经装载前拉取从内存表来;运行中新增 / 删除 / 表与盘不同都按表;扣住的回复不让另一 Location 用旧值;超时与端口关闭不用旧表并请求 credential-change;存放点里一项读不出不挡引擎(stored-credentials.engine.cases.ts,4 条)"
         },
         {
-          "file": "packages/ui-mac/src/main/stored-credentials-fence.engine.test.ts",
+          "file": "packages/ui-mac/src/main/stored-credentials-fence.engine.scenario.test.ts",
           "name": "C1 真引擎:三档里 shell 与读文件工具读、拷、挪、改凭据文件全部失败且假值不进模型请求;引擎只从主进程交来的表取凭据"
         }
       ]

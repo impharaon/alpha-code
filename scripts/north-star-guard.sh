@@ -195,7 +195,7 @@ UPSTREAM_EXCLUDES=(
   # 计划助手的计划文件放在引擎数据目录(global.data/plan),~/.opencode 整个受保护、谁都不建。目录在插件内部算出,同一个值写进存档的提醒、编辑放行
   # 与拒绝文案;插件能另加一条放行,改不了告诉模型往哪写的那句提醒。接管面只有 plan.ts:31 那一个值(`codepuppy(I-13 D13)` 行尾标注);上游
   # plan.test.ts 钉的正是这个目录,随源文件成对接管,只改 :27 的期望目录。判据:该测试的提醒 / 编辑放行 / 拒绝文案三条与真引擎
-  # packages/ui-mac/src/main/engine-config-fence.engine.test.ts 的 fresh 臂(上游原文件 ⇒ 都红)。
+  # packages/ui-mac/src/main/engine-config-fence.engine.scenario.test.ts 的 fresh 臂(上游原文件 ⇒ 都红)。
   ':(exclude)packages/core/src/plugin/plan.ts'
   ':(exclude)packages/core/test/plugin/plan.test.ts'
 )

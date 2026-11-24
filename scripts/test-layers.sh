@@ -92,7 +92,14 @@ ui_mac_is_engine() { # <相对 packages/ui-mac 的文件>
   return 1
 }
 
-# 门的每一次 bun 调用:<组名>\t<工作目录>\t<跑法 parallel|serial|app>\t<文件>。组名 = JUnit 报告名 `<step>.<layer>`。
+# 只经闸门登记簿进套件的工作目录(packages/core 等上游包里 Code Puppy 自有的登记文件)。
+test_layer_register_workdirs() {
+  awk -F'\t' '!/^#/ && NF >= 3 && $2 != "packages/codepuppy-contracts-consumer" && $2 != "packages/ext" && $2 != "packages/ui-mac" { print $2 }' \
+    scripts/gate-files.tsv | LC_ALL=C sort -u
+}
+
+# 门的每一次 bun 调用:<组名>\t<工作目录>\t<跑法 parallel|serial|app>\t<文件>。组名 = junit 报告名 `<step>.<layer>`,
+# step = `<包名>` 或 `<包名>+<组>`,包名是 packages/ 下的目录名(scripts/junit-file-counts.py 据此认工作目录)。
 test_layer_groups() {
   local layer f
   for layer in "${TEST_LAYERS[@]}"; do
@@ -105,9 +112,11 @@ test_layer_groups() {
     done < <(test_layer_list packages/ui-mac "$layer")
   done
   printf 'codepuppy-app.integration\t%s\tapp\tsrc\n' "$TEST_LAYER_APP_WORKDIR"
-  awk -F'\t' '!/^#/ && NF >= 3 && $2 != "packages/codepuppy-contracts-consumer" && $2 != "packages/ext" && $2 != "packages/ui-mac" { print $2 "\t" $3 }' \
-    scripts/gate-files.tsv | LC_ALL=C sort -u | while IFS=$'\t' read -r w f; do
-    printf 'gate-files+%s.%s\t%s\tparallel\t%s\n' "${w##*/}" "$(test_layer "$f")" "$w" "$f"
+  local w
+  for w in $(test_layer_register_workdirs); do
+    for layer in "${TEST_LAYERS[@]}"; do
+      test_layer_list "$w" "$layer" | sed "s|^|${w##*/}+gate-files.$layer	$w	parallel	|"
+    done
   done
 }
 

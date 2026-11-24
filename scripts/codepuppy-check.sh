@@ -20,16 +20,20 @@
 set -uo pipefail
 cd "$(git rev-parse --show-toplevel)"
 
-# 范围(owner 2026-11-23):`bin/check` = PR 门控,`bin/check --full` = 夜间全量。bun 没有「受影响测试」
-# 的机械选择(无依赖图),所以两档目前都跑全部测试 —— 差别只在上报给 gate 的那一行如实写明。
+# 范围(owner 2026-11-23):`bin/check` = PR 门控,`bin/check --full` = 夜间全量。测试分三层(ADR-0014,规则在
+# scripts/test-layers.sh):PR 门跑 fast + integration,`--full` 再加 scenario;scenario 从不进 PR 门。bun 没有「受影响
+# 测试」的机械选择(无依赖图),所以 PR 门跑这两层的全部文件 —— 上报给 gate 的那一行如实写明。
 # gate 设了 GATE_SCOPE_FILE 时写一行「本次测试跑了什么」;没设就什么都不写。
-scope="all tests (no selection)"
+test_layers=(fast integration)
+scope="fast + integration tests (no affected selection)"
 for arg in "$@"; do
   case "$arg" in
-    --full) scope="all tests (--full)" ;;
+    --full) test_layers=(fast integration scenario); scope="all tests (--full: fast + integration + scenario)" ;;
     *) echo "usage: bin/check [--full]" >&2; exit 2 ;;
   esac
 done
+# 闸门登记簿([6/14])只判本次范围里那几层的文件。
+export CODEPUPPY_TEST_LAYERS="${test_layers[*]}"
 if [ -n "${GATE_SCOPE_FILE:-}" ]; then printf '%s\n' "$scope" > "$GATE_SCOPE_FILE"; fi
 
 # 每行:<codepuppy-ci job>|<codepuppy-ci step name>|<本地档位>
@@ -212,25 +216,55 @@ echo "▶ [5/14] contract lock + unit tests (contracts-consumer + ext + ui-mac +
 #   · app 滚动 pin(bun-test-app.sh):整包 2s,没有并行的收益,保持串行。
 #   CI 的同名步骤(codepuppy-ci.yml,已停用)仍是串行命令,故这些步骤的档位不变(MIRRORED = 同一脚本、同一下界、同一已知红清单)。
 # 测试分层(ADR-0014):套件里每个测试文件按文件名恰好落在 fast / integration / scenario 一层;规则与判据在
-# scripts/test-layers.sh(唯一真源),无层或多层的文件逐个点名、本步红。
-if bash scripts/test-layers.sh check \
-  && bun run --cwd packages/codepuppy-contracts-consumer check:vendor \
-  && bash scripts/bun-test-floor.sh 15 packages/codepuppy-contracts-consumer --parallel \
-  && bash scripts/bun-test-floor.sh 100 packages/ext \
-  && bash scripts/bun-test-ui-mac.sh \
-  && bash scripts/bun-test-app.sh; then
+# scripts/test-layers.sh(唯一真源),无层或多层的文件逐个点名、本步红。下面每个包逐层跑本次范围的层
+# (PR 门 fast + integration,--full 加 scenario);$GATE_REPORT_DIR 置位时每次 bun 调用写一份
+# `<step>.<layer>.xml`(gate 读它报每层条数、耗时、最慢与超预算的用例)。下界:integration 层沿用整包地板
+# (15 / 100),fast / scenario 层只判「有文件就真跑了」(≥1);逐文件精确条数由 [6/14] 登记簿判。
+layer_tests() { # <step> <工作目录> <层> <integration 层下界> [bun test 参数...]
+  local step="$1" w="$2" layer="$3" floor="$4" f files=()
+  shift 4
+  while IFS= read -r f; do files+=("./$f"); done < <(bash scripts/test-layers.sh list "$w" "$layer")
+  [ "${#files[@]}" -gt 0 ] || return 0
+  [ "$layer" = integration ] || floor=1
+  CODEPUPPY_JUNIT_FILE="$GATE_REPORT_DIR/$step.$layer.xml" bash scripts/bun-test-floor.sh "$floor" "$w" "$@" "${files[@]}"
+}
+unit_tests() {
+  bash scripts/test-layers.sh check || return 1
+  bun run --cwd packages/codepuppy-contracts-consumer check:vendor || return 1
+  local layer w
+  for layer in "${test_layers[@]}"; do
+    echo "── 层:$layer"
+    layer_tests codepuppy-contracts-consumer packages/codepuppy-contracts-consumer "$layer" 15 --parallel || return 1
+    layer_tests ext packages/ext "$layer" 100 || return 1
+    bash scripts/bun-test-ui-mac.sh "$layer" || return 1
+    # 上游包(packages/core 等)里 Code Puppy 自有的登记文件:只经登记簿进套件,在这里跑一次,[6/14] 从报告判条数。
+    for w in $(bash -c 'source scripts/test-layers.sh && test_layer_register_workdirs'); do
+      layer_tests "${w##*/}+gate-files" "$w" "$layer" 1 --parallel || return 1
+    done
+  done
+  bash scripts/bun-test-app.sh
+}
+# 每次 bun 调用的 junit 都写进 $GATE_REPORT_DIR;gate 没设(本地手跑)就用一个临时目录 —— [6/14] 登记簿从这些报告
+# 读逐文件条数,所以每个测试文件每次门只跑一次(此前登记簿把 ~400 个登记文件逐个重跑一遍,真引擎文件也跑两次)。
+if [ -z "${GATE_REPORT_DIR:-}" ]; then
+  GATE_REPORT_DIR="$(mktemp -d)"
+  trap 'rm -rf "$GATE_REPORT_DIR"' EXIT
+fi
+export GATE_REPORT_DIR
+if unit_tests; then
   echo "    ✓ tests"
 else
   echo "    ✗ tests failed"; fail=1
 fi
 
 # `#777`:下面三步此前**本地完全没有**,而 CI 有。缺 [6/14] 尤其贵 —— 登记闸门里
-# llm / core / opencode 那几个只在这一步执行,别的步骤一条都不覆盖它们。
+# llm / core / opencode 那几个只在这一步执行,别的步骤一条都不覆盖它们。(ADR-0014 起它们在 [5/14] 跑一次。)
 echo "▶ [6/14] assert gate files (逐个点名;整包地板抓不到单个闸门文件消失)"
 # `#1153`:三档结局(与 [2/14]/[9/14]/[10/14] 同形):0 全部适用行已验证 / 1 真失守拦住 /
 # 2 门绿但有条件行的保证本次未验证:平台不适用或签名发布宿主未显式启用时,
 # 自报 0 条,登记簿验证与条件相符。darwin 未开签名开关也会到第 2 档。
-bash scripts/assert-gate-files.sh
+# 判定读 [5/14] 的 junit 报告(--from-reports),不再逐个重跑;本次层范围外(PR 门的 scenario 层)的登记文件不判。
+bash scripts/assert-gate-files.sh --from-reports "$GATE_REPORT_DIR"
 gate_files_rc=$?
 case "$gate_files_rc" in
 0) echo "    ✓ gate files" ;;

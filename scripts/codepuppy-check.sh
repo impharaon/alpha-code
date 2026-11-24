@@ -216,32 +216,46 @@ echo "▶ [5/14] contract lock + unit tests (contracts-consumer + ext + ui-mac +
 #   · app 滚动 pin(bun-test-app.sh):整包 2s,没有并行的收益,保持串行。
 #   CI 的同名步骤(codepuppy-ci.yml,已停用)仍是串行命令,故这些步骤的档位不变(MIRRORED = 同一脚本、同一下界、同一已知红清单)。
 # 测试分层(ADR-0014):套件里每个测试文件按文件名恰好落在 fast / integration / scenario 一层;规则与判据在
-# scripts/test-layers.sh(唯一真源),无层或多层的文件逐个点名、本步红。下面每个包逐层跑本次范围的层
-# (PR 门 fast + integration,--full 加 scenario);$GATE_REPORT_DIR 置位时每次 bun 调用写一份
-# `<step>.<layer>.xml`(gate 读它报每层条数、耗时、最慢与超预算的用例)。下界:integration 层沿用整包地板
-# (15 / 100),fast / scenario 层只判「有文件就真跑了」(≥1);逐文件精确条数由 [6/14] 登记簿判。
-layer_tests() { # <step> <工作目录> <层> <integration 层下界> [bun test 参数...]
-  local step="$1" w="$2" layer="$3" floor="$4" f files=()
-  shift 4
-  while IFS= read -r f; do files+=("./$f"); done < <(bash scripts/test-layers.sh list "$w" "$layer")
-  [ "${#files[@]}" -gt 0 ] || return 0
-  [ "$layer" = integration ] || floor=1
-  CODEPUPPY_JUNIT_FILE="$GATE_REPORT_DIR/$step.$layer.xml" bash scripts/bun-test-floor.sh "$floor" "$w" "$@" "${files[@]}"
+# scripts/test-layers.sh(唯一真源),无层或多层的文件逐个点名、本步红。每个工作目录把本次范围的几层(PR 门 fast +
+# integration,--full 加 scenario)放进**一次** bun 调用 —— 分层逐个串着调用会丢并行 —— 跑完按层把 junit 拆成
+# `<step>.<layer>.xml` 写进 $GATE_REPORT_DIR(gate 读它报每层条数、耗时、最慢与超预算的用例;[6/14] 登记簿读它判逐文件条数)。
+# 下界沿用整包地板(contracts-consumer 15 / ext 100),上游包的登记文件只判「真跑了」(≥1)。
+group_tests() { # <step> <工作目录> <下界> [bun test 参数...]
+  local step="$1" w="$2" floor="$3" f layer rc=0 files=() map
+  shift 3
+  map="$(mktemp)"
+  bash scripts/test-layers.sh map "$w" "${test_layers[@]}" > "$map"
+  while IFS=$'\t' read -r f layer; do files+=("./$f"); done < "$map"
+  if [ "${#files[@]}" -gt 0 ]; then
+    CODEPUPPY_JUNIT_FILE="$map.xml" bash scripts/bun-test-floor.sh "$floor" "$w" "$@" "${files[@]}" || rc=1
+    python3 scripts/junit-split-layers.py "$map.xml" "$map" "$GATE_REPORT_DIR" "$step" || rc=1
+  fi
+  rm -f "$map" "$map.xml"
+  return $rc
+}
+# ext 不给文件表、让 bun 自己发现(范围外的层按层标记排除):它的测试文件共享 policy-host 的模块级状态与环境,
+# 只在 bun 的发现顺序下互不干扰 —— 按排好序的文件表跑,test-preload / project-config 各红一条(2026-11-24 实测)。
+ext_tests() {
+  local rc=0 map ignore=()
+  map="$(mktemp)"
+  bash scripts/test-layers.sh map packages/ext "${test_layers[@]}" > "$map"
+  while IFS= read -r arg; do ignore+=("$arg"); done < <(bash scripts/test-layers.sh ignore "${test_layers[@]}")
+  CODEPUPPY_JUNIT_FILE="$map.xml" bash scripts/bun-test-floor.sh 100 packages/ext ${ignore[@]+"${ignore[@]}"} || rc=1
+  python3 scripts/junit-split-layers.py "$map.xml" "$map" "$GATE_REPORT_DIR" ext || rc=1
+  rm -f "$map" "$map.xml"
+  return $rc
 }
 # 一处红不跳过后面的包:[6/14] 要从完整的报告里判每个登记文件(此前它自己逐个重跑,前一步红也照样判全)。
 unit_tests() {
-  local rc=0 layer w
+  local rc=0 w
   bash scripts/test-layers.sh check || rc=1
   bun run --cwd packages/codepuppy-contracts-consumer check:vendor || rc=1
-  for layer in "${test_layers[@]}"; do
-    echo "── 层:$layer"
-    layer_tests codepuppy-contracts-consumer packages/codepuppy-contracts-consumer "$layer" 15 --parallel || rc=1
-    layer_tests ext packages/ext "$layer" 100 || rc=1
-    bash scripts/bun-test-ui-mac.sh "$layer" || rc=1
-    # 上游包(packages/core 等)里 Code Puppy 自有的登记文件:只经登记簿进套件,在这里跑一次,[6/14] 从报告判条数。
-    for w in $(bash -c 'source scripts/test-layers.sh && test_layer_register_workdirs'); do
-      layer_tests "${w##*/}+gate-files" "$w" "$layer" 1 --parallel || rc=1
-    done
+  group_tests codepuppy-contracts-consumer packages/codepuppy-contracts-consumer 15 --parallel || rc=1
+  ext_tests || rc=1
+  bash scripts/bun-test-ui-mac.sh "${test_layers[@]}" || rc=1
+  # 上游包(packages/core 等)里 Code Puppy 自有的登记文件:只经登记簿进套件,在这里跑一次,[6/14] 从报告判条数。
+  for w in $(bash -c 'source scripts/test-layers.sh && test_layer_register_workdirs'); do
+    group_tests "${w##*/}+gate-files" "$w" 1 --parallel || rc=1
   done
   bash scripts/bun-test-app.sh || rc=1
   return $rc

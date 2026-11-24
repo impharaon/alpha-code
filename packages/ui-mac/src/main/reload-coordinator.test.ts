@@ -1,6 +1,10 @@
 // REQ-234 `#1529`(基线 §2.6):main 是重载的请求方与记录方 —— generation 记录、sidecar ready 时重发、报告决定「待重载」原因。
 import { describe, expect, test } from "bun:test"
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
 import type { ReloadRequestMessage } from "./codepuppy-sidecar-messages"
+import { watchExplicitSources, writeExplicitConfig } from "./engine-explicit-config"
 import { createReloadCoordinator } from "./reload-coordinator"
 
 function setup() {
@@ -97,6 +101,34 @@ describe("reload-coordinator", () => {
     coordinator.receiveReport({ type: "codepuppy.reload.report", generation: 99, scope: "global", outcome: "reloaded", directories: [] })
     expect(coordinator.pendingFor("/p")).toEqual({ code: "reload-waiting", detail: "queued" })
     expect(logs.some((line) => line.includes("unknown generation 99"))).toBe(true)
+  })
+
+  // SPEC-engine-config-fence BR-04:main 刚提交的安装(这里是用户文件里多了一条命令)要在引擎这次重载里生效。显式文件由 main 的监听在
+  // 去抖之后重写;重载若先发出,引擎按上一份显式文件重建 Location,之后那次 config.updated 赶上 Location 还在装载就丢了(实测
+  // plugin-entrypoints.engine:已装技能 15 s 都不出现)。所以重载请求发出那一刻,显式文件必须已经是盘上输入的合成结果。
+  test("发出重载请求时,显式文件已按盘上的输入重写(不等监听的去抖)", () => {
+    const dir = mkdtempSync(join(tmpdir(), "reload-explicit-"))
+    const root = join(dir, "env", "dev")
+    mkdirSync(root, { recursive: true })
+    const userConfig = join(root, "codepuppy.jsonc")
+    writeFileSync(userConfig, "{}\n")
+    const file = join(dir, "engine-config", "codepuppy-explicit.json")
+    const layer = { policies: [], commands: {}, skills: [] }
+    writeExplicitConfig(file, userConfig, layer, root)
+    const stop = watchExplicitSources({ file, root, userConfig, layer, skills: () => [], log: () => {} })
+    try {
+      const { coordinator } = setup()
+      const atPost: string[] = []
+      coordinator.attach(() => void atPost.push(readFileSync(file, "utf8")))
+      // 同一拍里提交并请求重载:监听的回调还没有机会跑
+      writeFileSync(userConfig, JSON.stringify({ command: { probe: { template: "probe body" } } }))
+      coordinator.request({ scope: "global", items: [{ id: "command:probe", scope: "global" }], reason: "installed command probe" })
+      expect(atPost).toHaveLength(1)
+      expect(JSON.parse(atPost[0]!).command).toEqual({ probe: { template: "probe body" } })
+    } finally {
+      stop()
+      rmSync(dir, { recursive: true, force: true })
+    }
   })
 })
 

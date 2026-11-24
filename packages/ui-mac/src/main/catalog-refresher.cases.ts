@@ -2,7 +2,7 @@
 // `#1556` 起刷新器管两份文档:平台目录 V3(下文 `requests`)与 BYOK 预置目录 v1(下文 `byokRequests`);
 // 文末两组是 `#1556` AC4(BYOK 拉取不带凭据、失败不减条目)与 AC6(codepuppy-catalog-health 按文档分别保存)。
 //
-// 子进程运行(catalog-refresher.scenario.test.ts spawn):刷新器经 codepuppy-auth / codepuppy-catalog-health / logging 拖入 electron,
+// 子进程运行(subprocess-cases.scenario.test.ts spawn):刷新器经 codepuppy-auth / codepuppy-catalog-health / logging 拖入 electron,
 // mock.module 在同一进程内会泄漏到别的测试文件。刷新器有模块级状态(在途轮次、身份基线、30 分钟定时器),
 // 所以每条用例结束前都让在途那一轮落定,下一条从空闲开始。
 //

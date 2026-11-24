@@ -16,7 +16,7 @@
 //      相等 —— 含「合法但空的响应」与「从来没有缓存」两种退化态。此前两侧各写一份「什么算有效缓存」,
 //      空缓存时一边 0 行、一边静态 9 行。
 //
-// 子进程运行(models-catalog-v2.wiring.scenario.test.ts spawn):本链经 codepuppy-auth / codepuppy-contract-health /
+// 子进程运行(subprocess-cases.scenario.test.ts spawn):本链经 codepuppy-auth / codepuppy-contract-health /
 // logging 拖入 electron,mock.module 在同一进程内会泄漏到别的测试文件。
 
 import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test"

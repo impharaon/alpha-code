@@ -202,7 +202,7 @@
           "name": "a document-axis ask on an MCP tool registered after the first prompt asks before it runs; reject keeps it at 0"
         },
         {
-          "file": "packages/ui-mac/src/main/composer-tier-matrix.engine.scenario.test.ts",
+          "file": "packages/ui-mac/src/main/engine-cases.scenario.test.ts",
           "name": "三档 × R1–R12、三条委派入口与审批请求的整条路径与助手发起的安装(composer-tier-matrix.engine.cases.ts,30 条)"
         }
       ],
@@ -356,7 +356,7 @@
       },
       "tests": [
         {
-          "file": "packages/ui-mac/src/main/composer-tier-matrix.engine.scenario.test.ts",
+          "file": "packages/ui-mac/src/main/engine-cases.scenario.test.ts",
           "name": "三档 × R1–R12、三条委派入口与审批请求的整条路径与助手发起的安装(composer-tier-matrix.engine.cases.ts,30 条)"
         }
       ],
@@ -1250,7 +1250,7 @@
           "name": "续期热应用:令牌 A ⇒ A、热应用 B ⇒ B、删文件 ⇒ 具名失败零请求、令牌不进日志与响应;不装 ext ⇒ 占位值被拒;平台地址的写法变体都带令牌、像而不是的地址收不到(token-hot-apply.engine.cases.ts,3 条)"
         },
         {
-          "file": "packages/ui-mac/src/main/platform-credential-error.engine.test.ts",
+          "file": "packages/ui-mac/src/main/engine-cases.test.ts",
           "name": "平台凭据出错:读不到 ⇒ 零请求具名失败;401 / 403 ⇒ 一次 provider.auth;503 对照 ⇒ 看得见重试(platform-credential-error.engine.cases.ts,5 条)"
         }
       ]
@@ -2070,7 +2070,7 @@
           "name": "字段分类:上游 v1 / v2"
         },
         {
-          "file": "packages/ui-mac/src/main/project-config-commands.engine.scenario.test.ts",
+          "file": "packages/ui-mac/src/main/engine-cases.scenario.test.ts",
           "name": "I-12 / #1713 未允许与允许两臂"
         },
         {
@@ -2078,7 +2078,7 @@
           "name": "项目插件按生产信任放行"
         },
         {
-          "file": "packages/ui-mac/src/main/project-config-view.engine.scenario.test.ts",
+          "file": "packages/ui-mac/src/main/engine-cases.scenario.test.ts",
           "name": "项目配置视图:九类"
         },
         {

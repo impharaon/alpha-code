@@ -410,6 +410,7 @@ if [ "$(uname -s)" = Darwin ] && [ -f "$SELF_ROOT/packages/ui-mac/scripts/build-
         red "缺 Electron/addon 时 $f 竟然通过 —— 围栏反向探针不成立"
       elif ! grep -aqE 'path.txt|electron binary missing|codepuppy_fence.node' <<<"$neg_fence_out"; then
         red "$f 的红不来自缺 Electron/addon —— 本次反向测量无效"
+        { echo "    ↳ $f 的 bun test 输出末 40 行(rc=$neg_fence_rc,没带三个标记之一;下面是证据):"; tail -n 40 <<<"$neg_fence_out" | sed 's/^/      | /'; } >&2
       else
         echo "    ✓ 缺 Electron/addon:$f rc=$neg_fence_rc(先证明会红)"
       fi

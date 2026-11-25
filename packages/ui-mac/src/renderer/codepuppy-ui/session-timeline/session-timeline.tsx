@@ -33,6 +33,7 @@ import {
   type TimelineRow,
   type TimelineTurnWait,
 } from "./timeline-model"
+import { markAccountSummaryStale } from "../../account-summary"
 
 export interface CodePuppySessionTimelineProps {
   /** C4 右栏联动 api(#568 接线);缺席 = pill/媒体/产物行降级纯展示。 */
@@ -235,7 +236,10 @@ export function CodePuppySessionTimeline(props: CodePuppySessionTimelineProps = 
       return props.onReadAttachment
     },
     // `#1588` AC3:回合错误卡的出路,各接一个既有入口(生图卡同一个充值页 / 登录 / 设置 / 侧栏新对话命令)。
-    recharge: () => void window.api.cloud.openBillingPage("recharge"),
+    recharge: () => {
+      markAccountSummaryStale() // #1739
+      void window.api.cloud.openBillingPage("recharge")
+    },
     signIn: () => void window.api.auth.start(),
     openSettings: () => setSettingsOpen(true),
     get newSession() {

@@ -31,7 +31,10 @@ gate run
 > worktree、在里面跑真的 typecheck,断言它**自己**就能给出可信结论。CI 的每个 job 都是一次
 > 全新 `actions/checkout` + `bun install`,**结构上不存在 worktree**,所以这条能力只能在本地判。
 > 它守的是多 lane 并行:worktree 里拿不到真 typecheck ⇒ 每条 lane 都得去动**共享**主 checkout
-> ⇒ 谁先跑谁量到别人的树。本机实测约 50s。
+> ⇒ 谁先跑谁量到别人的树。本机实测约 50s;2026-11-25 满载的 PR 门里 282s。所以 PR 门只在本分支碰到它的输入时跑:
+> bootstrap 与判据脚本、依赖清单(只改 `"version"` 行的发版不算)与 `bun.lock`、`tsconfig*.json` / `bunfig.toml` / `.npmrc` /
+> `patches/`、husky、围栏 addon 的 C 源与构建脚本、它当探针跑的三个围栏测试与 `process-fence-apply.ts`(清单在
+> `scripts/codepuppy-check.sh` 的 `WORKTREE_BOOTSTRAP_INPUTS`);`--full`(夜间)总跑,registry、bun 版本这类环境漂移归夜间抓。
 > 这一步也有**三档**结局(与 `[10/14]` 同形):已验证 / **真失守**(红,拦住)/ **未验证**
 > —— `bun install` 依赖网络,registry 不可达时它什么都证明不了,这时**不拦 push**但也**不报绿**。
 >
@@ -71,7 +74,7 @@ gate run
 | **闸门文件点名** | `[6/14]` `scripts/assert-gate-files.sh`(全量见 `scripts/gate-files.tsv`) | 同上 job | 某个闸门文件被删/被清空/条数偏离登记 —— 整包地板抓不到。`#844` 起逐条判**精确条数**(少=删了用例,多=新增未登记);改动闸门文件后跑 `bash scripts/assert-gate-files.sh --update` 从实测写回登记簿(all-or-nothing、幂等,写回后打印 diff),例外语法与理由要求见 TSV 抬头或脚本 `--help`。**测试文件已删的行**:先在登记簿里写一条同时含「退役」与 `<工作目录>/<路径>` 的注释(替代测试或理由),`--update` 才会在写回时删掉那一行;缺注释的行一次列全后中止。检查模式不受影响,文件消失照样红(I-09)。**平台条件闸**(`#1153`):guarantee 列逐字 `[平台:darwin]`/`[平台:linux]` = 该行只在那个平台适用 —— 适用平台照常精确条数;不适用平台**仍真跑该文件**并要求它自报 0 条(标注不是免检牌:该跑的文件被误标 ⇒ >0 条当场红,文件被删也当场红)。**三档结局**(与 `[2/14]`/`[9/14]`/`[10/14]` 同形):全部适用行已验证 / 真失守(红,拦住)/ **存在「本平台不适用」行**(exit 2 —— 门绿但那几行的保证本次未被验证;本地 `[6/14]` 与 CI 的 assert gate files 步都记「未验证」不拦,恒红只会训练人把 darwin-only 判据摘出登记簿) |
 | **seed assets** | `[7/14]` `scripts/assert-seed-assets.sh` | `seed assets present` | 打包资源被静默删除(B7/B15) |
 | **docs gate** | `[8/14]` `scripts/check-doc-links.py <改动的 md>` | `docs gate` | Markdown 相对链接断了 |
-| **worktree bootstrap 能力**(`#916`) | `[9/14]` `scripts/assert-worktree-bootstrap.sh` | **无 —— CI 结构上没有 worktree**(每个 job 都是全新 checkout + `bun install`) | 新建的 worktree 里跑不出可信 typecheck ⇒ 每条 lane 为了下结论都得去动**共享**主 checkout ⇒ 并行时互相污染彼此的门测量(2026-08-02 把一道真闸门误诊成「1/5 间歇性 flaky」是同一形态)。判据是**能力**不是产物:真建 worktree、真跑 typecheck,并且**先证明没 bootstrap 的树确实会红**,再判 bootstrap 过的树绿。**三档结局**:已验证 / 真失守(红,拦住)/ **未验证**(registry 不可达 ⇒ `bun install` 装不上 ⇒ 本跑什么都没证明;不拦 push,但不报绿)|
+| **worktree bootstrap 能力**(`#916`) | `[9/14]` `scripts/assert-worktree-bootstrap.sh` | **无 —— CI 结构上没有 worktree**(每个 job 都是全新 checkout + `bun install`) | 新建的 worktree 里跑不出可信 typecheck ⇒ 每条 lane 为了下结论都得去动**共享**主 checkout ⇒ 并行时互相污染彼此的门测量(2026-08-02 把一道真闸门误诊成「1/5 间歇性 flaky」是同一形态)。判据是**能力**不是产物:真建 worktree、真跑 typecheck,并且**先证明没 bootstrap 的树确实会红**,再判 bootstrap 过的树绿。PR 门只在本分支碰到它的输入时跑(`WORKTREE_BOOTSTRAP_INPUTS`,跳过时 gate 记录的范围行写明),`--full` 总跑。**三档结局**:已验证 / 真失守(红,拦住)/ **未验证**(registry 不可达 ⇒ `bun install` 装不上 ⇒ 本跑什么都没证明;不拦 push,但不报绿)|
 | **Code Puppy 注入模型上下文的库存**(`#1284` / `#1296` / `#1299`) | `[12/14]` `bun packages/ext/scripts/context-injection-inventory.ts --check`:打印每段 alpha 注入(ext 四处 + ui-mac 两份 instruction 文件(identity 每种能力形状一行)+ ui-mac 三个 agent 的 prompt / description)的 id / 落点 / 实测字节 / 上限,并与 [`packages/ext/src/context-injection-inventory.snapshot.txt`](../../packages/ext/src/context-injection-inventory.snapshot.txt) 逐字节比对 | **无独立步** —— 判据在 `bun test (ext)`(登记簿咽喉 + 快照测试)与 `bun test (ui-mac)`(instructions 咽喉 + agent 咽喉,都跑真 injectCodePuppyConfig)里跑;本地这一步是 AC3「随本地闸打印」 | ① 某段注入超过声明上限(登记簿 import 即抛,ext 整个装不上);② 改了片段 / 上限没重生快照(`--write` 重生,让评审读快照 diff)。勘破与派生链见 [`../architecture/2026-09-08-context-injection-registry.md`](../architecture/2026-09-08-context-injection-registry.md) |
 | **required contexts 对真源**(`#890`) | `[10/14]` `scripts/assert-required-contexts.sh` | **无 —— CI 结构上跑不了**(读分支保护要令牌,fork PR 拿不到 secrets) | 仓内 [`.github/required-contexts.txt`](../../.github/required-contexts.txt) 与 GitHub 分支保护里那份真的对不上:漏一条 ⇒ 那道检查其实不必需(红着也能合),而仓内测试全绿。三档结局:一致 / 漂移(红,点名差在哪条,含「分支保护被整个关掉」)/ **未比对**(没 `gh`、没登录、网络不通 —— 不拦 push,但总结行不再说「全绿」) |
 | **north-star 漂移度量**(`#1288`) | `[13/14]` `scripts/north-star-drift-metrics.sh`:每次本地闸打印三个量 —— **收编面**(守卫 `UPSTREAM_EXCLUDES` 的条目数)/ **上游漂移**(`merge-base(origin/dev, HEAD)` → `HEAD`,辖区内被改/删的上游文件数与行数,`--diff-filter=DMR --no-renames`,**收编白名单里的文件照样计入**)/ **merge-base 年龄**(天)。辖区与白名单长度由 `north-star-guard.sh --print-jurisdiction` 给出,本步一个字都不解释(抄一份就是 `#637` 那个形状) | **无 —— 它不判任何东西**,不该占一个 required context | 第 `[1/14]` 步的守卫基准是 `origin/alpha`,只回答「**这个 PR 自己**有没有新增偏离」;白名单里的每一条它都按设计放行,`origin/dev` 的日期它连问都没问过。于是偏离一点一点长大而没有任何一次 push 提示过 —— 账在某一次 sync 时一次性付(2026-08 那次积到四周 / 375 个提交 ⇒ `#1248`)。**只量不拦**(先量后闸,`#1288` out of scope 明写不新设阈值闸)。三档:0 三个量都量到 / **2 未测量**(取不到 `origin/dev` —— 明说「未测量」并**拒绝打印 0**,给 0 会被读成「零漂移」)/ 1 脚本自己坏了。行为闸 = `packages/ui-mac/src/main/north-star-drift-metrics.test.ts` |
@@ -386,7 +389,7 @@ bash scripts/worktree-bootstrap.sh 916-worktree-bootstrap -b feat/916-worktree-b
 ### 装不上依赖的时候:三档,不是两档(`#916` R2,owner 裁决)
 
 `bun install` **依赖网络**。实测(2026-08-11):把 registry 指向不可达地址,**连已经装好的树**
-也会 `failed to resolve` / exit 1(3s)。而 `[9/14]` 每次 push 都跑 ⇒ 若把「装不上」一律判红,
+也会 `failed to resolve` / exit 1(3s)。而 `[9/14]` 在每次碰到它输入的 push 上都跑 ⇒ 若把「装不上」一律判红,
 **网络一抖就拦住 push**,理由与本次改动无关 ⇒ 人会 `--no-verify` ⇒ **十道门一起关掉**。
 这正是 `#890` 那条 lane 推理过并特意避开的形态,所以两处取同一个形状:
 

@@ -26,14 +26,42 @@ cd "$(git rev-parse --show-toplevel)"
 # gate 设了 GATE_SCOPE_FILE 时写一行「本次测试跑了什么」;没设就什么都不写。
 test_layers=(fast integration)
 scope="fast + integration tests (no affected selection)"
+full=0
 for arg in "$@"; do
   case "$arg" in
-    --full) test_layers=(fast integration scenario); scope="all tests (--full: fast + integration + scenario)" ;;
+    --full) full=1; test_layers=(fast integration scenario); scope="all tests (--full: fast + integration + scenario)" ;;
     *) echo "usage: bin/check [--full]" >&2; exit 2 ;;
   esac
 done
 # 闸门登记簿([6/14])只判本次范围里那几层的文件。
 export CODEPUPPY_TEST_LAYERS="${test_layers[*]}"
+
+# [9/14] 的输入(I-06):「新建的 worktree 能不能跑出可信 typecheck」只随这几样变 —— bootstrap 与它的判据脚本、依赖清单与锁、
+# 模块解析配置(任何深度的 tsconfig*.json / bunfig.toml / .npmrc、patches/)、husky,以及判据拿来当探针的东西:围栏 addon 的
+# 两个 C 源与构建脚本、它跑的三个围栏测试与发出缺 addon 那句话的 process-fence-apply.ts、反向 typecheck 的那个测试文件。
+# PR 门只在本分支碰到其中之一时跑它(约 4~5 分钟);`--full`(夜间)总跑 —— registry、bun 版本这类环境漂移不随分支变,归夜间抓。
+# package.json / bun.lock 只改了自身 "version" 行(发版)不算:装出来的依赖图不变。改动集与 docs gate 同口径:相对 origin/alpha
+# 分叉点的提交与未提交改动 ∪ 未跟踪文件,`--no-renames`(rename 的源路径也算);量不出分叉点 ⇒ 当作碰到了,照跑。
+WORKTREE_BOOTSTRAP_INPUTS='^(scripts/(assert-worktree-bootstrap|worktree-bootstrap|worktree-probe-sweep|native-prepare)\.sh|(.+/)?(bunfig\.toml|\.npmrc|tsconfig[^/]*\.json)|patches/.+|\.husky/.+|packages/ui-mac/(native/codepuppy-fence/[^/]+\.c|scripts/build-fence-addon\.ts|src/main/(network-egress-fence\.test|process-fence-apply\.test|process-fence-wiring\.test|process-fence-apply|worktree-probe-sweep\.scenario\.test)\.ts))$'
+WORKTREE_BOOTSTRAP_MANIFESTS='^(bun\.lock|(.+/)?package\.json)$'
+worktree_bootstrap_inputs_changed() {
+  local base names manifests diff
+  base="$(git merge-base origin/alpha HEAD 2>/dev/null)" || return 0
+  names="$(git diff --name-only --no-renames "$base" 2>/dev/null)" || return 0
+  names="$(printf '%s\n%s\n' "$names" "$(git ls-files --others --exclude-standard 2>/dev/null)")"
+  grep -qE "$WORKTREE_BOOTSTRAP_INPUTS" <<<"$names" && return 0
+  manifests="$(grep -E "$WORKTREE_BOOTSTRAP_MANIFESTS" <<<"$names")" || return 1
+  # shellcheck disable=SC2086
+  [ -z "$(git ls-files --others --exclude-standard -- $manifests 2>/dev/null)" ] || return 0
+  # shellcheck disable=SC2086
+  diff="$(git diff -U0 --no-renames "$base" -- $manifests 2>/dev/null)" || return 0
+  awk '/^(\+\+\+|---) /{next} /^[+-]/ && !/^[+-][[:space:]]*"version":/{found=1} END{exit !found}' <<<"$diff"
+}
+bootstrap_probe=1
+if [ "$full" -eq 0 ] && ! worktree_bootstrap_inputs_changed; then
+  bootstrap_probe=0
+  scope="$scope; worktree bootstrap probe not run (no bootstrap input changed; nightly runs it)"
+fi
 if [ -n "${GATE_SCOPE_FILE:-}" ]; then printf '%s\n' "$scope" > "$GATE_SCOPE_FILE"; fi
 
 # 每行:<codepuppy-ci job>|<codepuppy-ci step name>|<本地档位>
@@ -301,22 +329,28 @@ echo "▶ [9/14] worktree bootstrap 能力(新建 worktree 自己就能跑出可
 # 判据本体在 scripts/assert-worktree-bootstrap.sh —— 它**不**断言「脚本在」「软链在」
 # 「文件里写着 bun install」(按本仓定义那是假闸门),而是真建 worktree、真跑 typecheck,
 # 并且**先证明没 bootstrap 的树确实会红**,再用同一个探针判 bootstrap 过的树绿。
-# 代价:本机实测约 40s(3 棵探针树 + 一次 `bun install` 9.5s + 三次 ui-mac typecheck)。
+# 代价:本机实测约 40s(3 棵探针树 + 一次 `bun install` 9.5s + 三次 ui-mac typecheck);2026-11-25 满载的 PR 门里 282s,所以 PR 门只在
+# 本分支碰到它的输入时跑(I-06)。
 # 退出码三档(与第 [10/14] 步同形):0 已验证 / 1 真失守拦住 / 2 本次未验证不拦。
 # 第 2 档的理由(owner 裁决,`#916` R2):`bun install` **依赖网络**(实测:已装好的树指向
-# 不可达 registry 也会 `failed to resolve` / exit 1),而这一步每次 push 都跑 ⇒ 不给豁免的话
+# 不可达 registry 也会 `failed to resolve` / exit 1),而这一步在每次碰到它输入的 push 上都跑 ⇒ 不给豁免的话
 # 网络一抖就拦住 push,理由与本次改动无关 ⇒ 人会 `--no-verify` ⇒ **十道门一起关掉**。
 # 豁免不许变成万能挡箭牌:判别依据是**独立探一次 registry 可达性**(不解析 bun 的报错措辞),
 # 拿不准一律倒向「拦住」;而且脚本自己有两条判据钉着它 —— 非网络失败必须仍判 real(`[5/6]`)、
 # 判别依据必须双向可分且网络档不报绿(`[6/6]`)。
-bash scripts/assert-worktree-bootstrap.sh
-worktree_bootstrap_rc=$?
-case "$worktree_bootstrap_rc" in
-0) echo "    ✓ worktree bootstrap" ;;
-2) unverified=1 ;;  # 脚本自己打了「未验证」;不拦 push,但下面的总结行不许再说「全绿」
-*) echo "    ✗ worktree bootstrap 失守 —— 新建 worktree 仍然只能去共享主 checkout 才能跑真 typecheck"; fail=1 ;;
-esac
-unset worktree_bootstrap_rc
+# PR 门只在本分支碰到它的输入时跑(I-06,输入表与理由见脚本开头的 WORKTREE_BOOTSTRAP_INPUTS);`--full` 总跑。
+if [ "$bootstrap_probe" -eq 0 ]; then
+  echo "    · PR 门:本分支没碰 bootstrap 的输入(依赖清单的非版本号改动、锁、模块解析配置、bootstrap 与判据脚本、围栏 addon 探针)—— 本步由 --full(夜间)跑"
+else
+  bash scripts/assert-worktree-bootstrap.sh
+  worktree_bootstrap_rc=$?
+  case "$worktree_bootstrap_rc" in
+  0) echo "    ✓ worktree bootstrap" ;;
+  2) unverified=1 ;;  # 脚本自己打了「未验证」;不拦 push,但下面的总结行不许再说「全绿」
+  *) echo "    ✗ worktree bootstrap 失守 —— 新建 worktree 仍然只能去共享主 checkout 才能跑真 typecheck"; fail=1 ;;
+  esac
+  unset worktree_bootstrap_rc
+fi
 
 echo "▶ [10/14] required contexts vs GitHub 分支保护真源 (#890)"
 # 这一步在 codepuppy-ci 里**没有对应**,所以它不进 CI_STEPS(那张表是 CI 步骤的对照表)。

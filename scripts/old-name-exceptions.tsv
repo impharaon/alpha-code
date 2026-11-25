@@ -11,7 +11,7 @@
 packages/ui-mac/src/main/fixtures/relay-route/health-cloud.json	alpha-cloud	1	external-anchor	#159: byte-identical captured /health service identifier; fixture provenance is recorded beside it.
 packages/ui-mac/src/main/fixtures/relay-route/provenance.json	impharaon/alpha-platform	2	external-anchor	#159: actual source repository identity for the captured health response.
 packages/ui-mac/src/main/fixtures/relay-route/provenance.json	relay-ops/p4/post-alpha-gateway-hk.json	1	external-anchor	#159: exact authorized operations capture filename for the gateway health fixture.
-scripts/gate-files.tsv	alpha-work	10	external-anchor	#159: cross-repository issue identity for the relay behavior and exact-count gate entries.
+scripts/gate-files.tsv	alpha-work	11	external-anchor	#159: cross-repository issue identity for the relay behavior and exact-count gate entries.
 packages/ui-mac/src/shared/codepuppy-config.ts	alpha-github-hk.tidelabs.click	1	external-anchor	alpha-work#159 slice 2: DNS name of the Hong Kong GitHub relay (Cloudflare zone record, design §4.5); not a Code Puppy brand name.
 packages/ui-mac/test-fixtures/plugin-helper/source-fetch.ts	https://alpha-github-hk.tidelabs.click/	1	external-anchor	alpha-work#159 slice 2: the fixture answers the relay host (design §4.5 DNS name) with 404 so recorded-raw cases take the fallback arm.
 docs/runbooks/distribution.md	alpha-github-hk.tidelabs.click	1	external-anchor	alpha-work#159 slice 2: DNS name of the Hong Kong GitHub relay that the updater tries first (design §4.5).

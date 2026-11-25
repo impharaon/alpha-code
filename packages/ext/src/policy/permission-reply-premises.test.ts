@@ -7,10 +7,10 @@
 //         cascades stay in the replying session: reject upstream, always through Code Puppy's kernel block (I-05 contract A,
 //         design upgrade-fewer-takeovers §4 — the grant is the session's, and the cascade loop filters by session);
 //   (iii) a second reply to the same id is NotFound (the kernel keeps no reply history).
-import { beforeAll, describe, expect } from "bun:test"
+import { describe, expect } from "bun:test"
 import { Bus, E, isolate, it, Location, Permission, Plugin, promisePlugin, seedProject, Session } from "./policy-host.cases"
 
-beforeAll(isolate)
+isolate()
 const { Effect, Exit, Cause, Fiber } = E
 
 type Rule = { action: string; resource: string; effect: "allow" | "deny" | "ask" }

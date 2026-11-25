@@ -1,6 +1,6 @@
 // #1699:真实权限服务、Promise 适配器与执行链;逻辑时钟不前进,Asked 事件与结局竞争。
 import { canonicalJsonDigest } from "./store"
-import { beforeAll, expect } from "bun:test"
+import { expect } from "bun:test"
 import path from "node:path"
 import type { Context } from "@opencode/plugin/promise/plugin"
 import {
@@ -31,7 +31,7 @@ import {
 } from "./policy-host.cases"
 
 const { Effect, Exit, Cause, Deferred, Fiber } = E
-beforeAll(isolate)
+isolate()
 const allow = { action: "*", resource: "*", effect: "allow" as const }
 
 const setup = (

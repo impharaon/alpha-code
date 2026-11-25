@@ -18,7 +18,6 @@
 #   bash scripts/test-layers.sh check                  逐个文件判层;无层 / 多层逐个点名,exit 1
 #   bash scripts/test-layers.sh list <工作目录> <层>    该工作目录这一层的测试文件(相对工作目录)
 #   bash scripts/test-layers.sh map <工作目录> <层...>   该工作目录落在这几层的文件:<文件>\t<层>
-#   bash scripts/test-layers.sh ignore <层...>          让 bun 自己发现文件时排除范围外各层的参数
 #   bash scripts/test-layers.sh groups                 <组名>\t<工作目录>\t<跑法>\t<文件>\t<层>:`--full` 的每一次 bun 调用(测量用)
 
 TEST_LAYERS=(fast integration scenario)
@@ -94,16 +93,6 @@ test_layer_map() {
   return 0
 }
 
-# <本次范围里的层...> → 让 bun 自己发现文件时排除范围外那几层的 `--path-ignore-patterns`(规则与 test_layer 同一份:层标记)。
-# integration 是缺省层,写不成 glob;它恒在范围里。
-test_layer_ignore_args() {
-  local scope=" $* "
-  case "$scope" in *" scenario "*) ;; *) printf '%s\n' '--path-ignore-patterns=**/*.scenario.*' ;; esac
-  case "$scope" in *" fast "*) ;; *) printf '%s\n' '--path-ignore-patterns=**/*.fast.*' ;; esac
-  case "$scope" in *" integration "*) ;; *) echo "test-layers: integration 层不能排除(它是缺省层)" >&2; return 1 ;; esac
-  return 0
-}
-
 # ui-mac 里起真引擎的文件(integration 与 scenario 两层)串行跑(与别的 worker 抢 CPU 会超时变红,#1740 实测),其余并行 ——
 # 不起引擎的 scenario 文件(子进程套件、计时)照旧并行,串起来只会让夜间变慢;真浏览器文件见 ui_mac_run_group。
 # 判据是**启发式**(文件名含 engine,或文件 / 它引用的 *.cases.ts 里出现引擎沙箱 / 内嵌引擎等字样):
@@ -141,12 +130,11 @@ test_layer_register_workdirs() {
 # 门的每一次 bun 调用(`--full` 范围,三层):<组名>\t<工作目录>\t<跑法>\t<文件>\t<层>。一个工作目录的一组文件不论分几层都在
 # **一次** bun 调用里跑(分层逐个串着跑会丢并行),跑完按层把 junit 拆成 `<组名>.<层>.xml`;组名 = `<包名>` 或 `<包名>+<组>`,
 # 包名是 packages/ 下的目录名(scripts/junit-file-counts.py 据此认工作目录)。跑法:parallel = `--parallel`;one = `--parallel=1`(一个隔离 worker 逐个跑);serial = 一个进程按
-# 文件表顺序;discover = 一个进程、不给文件表、让 bun 自己发现(ext:它的文件共享模块级状态,只在 bun 的发现顺序下互不干扰),
-# 范围外的层用 test_layer_ignore_args 排除;app = bun-test-app.sh 的整包跑法。
+# 文件表顺序(ext 与 ui-mac 的真引擎组);app = bun-test-app.sh 的整包跑法。
 test_layer_groups() {
   local f layer w
   test_layer_map packages/codepuppy-contracts-consumer "${TEST_LAYERS[@]}" | sed "s|^|codepuppy-contracts-consumer	packages/codepuppy-contracts-consumer	parallel	|"
-  test_layer_map packages/ext "${TEST_LAYERS[@]}" | sed "s|^|ext	packages/ext	discover	|"
+  test_layer_map packages/ext "${TEST_LAYERS[@]}" | sed "s|^|ext	packages/ext	serial	|"
   while IFS=$'\t' read -r f layer; do
     case "$(ui_mac_run_group "$f" "$layer")" in
       serial) printf 'ui-mac+serial\tpackages/ui-mac\tserial\t%s\t%s\n' "$f" "$layer" ;;
@@ -168,8 +156,7 @@ if [ "${BASH_SOURCE[0]}" = "$0" ]; then
     check) test_layer_check ;;
     list) [ "$#" -eq 3 ] || { echo "usage: $0 list <工作目录> <层>" >&2; exit 2; }; test_layer_list "$2" "$3" ;;
     map) [ "$#" -ge 3 ] || { echo "usage: $0 map <工作目录> <层...>" >&2; exit 2; }; shift; test_layer_map "$@" ;;
-    ignore) shift; test_layer_ignore_args "$@" ;;
     groups) test_layer_groups ;;
-    *) echo "usage: $0 check | list <工作目录> <层> | map <工作目录> <层...> | ignore <层...> | groups" >&2; exit 2 ;;
+    *) echo "usage: $0 check | list <工作目录> <层> | map <工作目录> <层...> | groups" >&2; exit 2 ;;
   esac
 fi

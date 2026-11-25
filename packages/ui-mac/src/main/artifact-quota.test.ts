@@ -1,7 +1,7 @@
 // REQ-093/#279 —— run/project artifact quota 预约准入。真实 temp project + 真实
 // `.part → fsync → reservation scan/decision → final rename`:末余额多进程、崩溃预约与脱敏错误面。
 
-import { afterEach, beforeEach, describe, expect, test } from "bun:test"
+import { afterEach, beforeEach, describe, expect, spyOn, test } from "bun:test"
 import {
   appendFileSync,
   existsSync,
@@ -792,6 +792,12 @@ describe("finalizeArtifactWithQuota", () => {
     })
     let deleteEntered = false
     let clock: ReturnType<typeof freezeClock> | undefined
+    let expire: (() => void) | undefined
+    // 清理期限是一个真 setTimeout,在调读钩子之前同步武装(resolveArtifactQuotaBeforeDeadline:武装 → 调 work → 读钩子)。
+    // 冻住时钟管不到它:到删除钩子之前还有一次真的异步重读(open / stat / readFile / lstat / close),满载时超过 10ms,
+    // 计时器先到期,删除钩子还没被触到(PR 门满载时红过一次)。所以在读钩子里把它扣下 —— 清掉真计时器、留着它的回调 ——
+    // 删除钩子一进来就触发它:期限恰好在删除悬着的时候到,与机器闲忙无关。
+    const timers = spyOn(globalThis, "setTimeout")
     let result: Awaited<ReturnType<typeof write>>
     try {
       result = await write("bounded-delete.bin", "x", {
@@ -801,18 +807,23 @@ describe("finalizeArtifactWithQuota", () => {
         testHooks: {
           waitPolicy: { deadlineMs: 10, maxRounds: 250, intervalMs: 1 },
           returnPolicy: { reservationDeadlineMs: 10, stagedCloseDeadlineMs: 10 },
-          // 清理段一进来就冻住时钟(计时器已在此前武装):重读与删除之间那一次到期复核不会先于删除钩子。
-          // 等待段仍走真时钟 —— 它是前置,满载只会让它更早到期。
+          // 等待段仍走真时钟 —— 它是前置,满载只会让它更早到期。清理段一进来冻住时钟:重读与删除之间的到期复核不会先于删除钩子。
           beforeReservationCleanupRead() {
             clock = freezeClock()
+            const last = timers.mock.calls.length - 1
+            clearTimeout(timers.mock.results[last]!.value as ReturnType<typeof setTimeout>)
+            expire = timers.mock.calls[last]![0] as () => void
+            timers.mockRestore()
           },
-          // 删除永不返回 ⇒ 由 10ms 的清理期限计时器收尾。
+          // 删除永不返回 ⇒ 只能由清理期限收尾。
           beforeReservationCleanupDelete: hang(() => {
             deleteEntered = true
+            expire?.()
           }),
         },
       })
     } finally {
+      timers.mockRestore()
       clock?.restore()
     }
 

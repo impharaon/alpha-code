@@ -1,18 +1,25 @@
 # 文档类路径 —— 一次 push 只改这些(外加 *.md,隐含)时,`gate` 跑 bin/check-light 而不是全量 bin/check。
-# 只收文档类:不含 scripts/** .github/** packages/** frontend/** 与根配置(它们能改产品行为或闸门)。
-# 唯一的例外是 scripts/old-name-exceptions.tsv(旧名登记表):它跟着文档编辑走,只被 old-name-scan 与 naming-migration-wiring 两个测试读,
-# 这两个都在 scripts/docs-gates.sh 的 DOCS_ANCHOR_TESTS 里,轻量门照跑。
-# 语法:每行一个 glob,`*`/`?` 不跨目录,`**` 跨目录;`#` 注释。
+# 收录规则:一个非 .md 文件只有在**读它的每个测试 / 脚本 / 门步骤都在 bin/check-light 里**时才收(轻量门对它的改动覆盖得和全量门一样);
+# 只被便宜的文档锚定测试读的,把文件收进来、把那几个测试加进 scripts/docs-gates.sh 的 DOCS_ANCHOR_TESTS。
+# 控制门本身、产品行为或发版信任的文件留在全量门:闸门登记簿 scripts/gate-files.tsv(全量门拿它对真跑的条数)、模块体积棘轮、
+# 注入库存快照、锁文件、package.json、发版清单。不含 scripts/** .github/** packages/** frontend/** 与根配置。
+# 唯一的 scripts 例外是 scripts/old-name-exceptions.tsv(旧名登记表):它跟着文档编辑走,只被 old-name-scan 与 naming-migration-wiring
+# 两个测试读,这两个都在 DOCS_ANCHOR_TESTS 里,轻量门照跑。
+# 语法:每行一个 glob,`*`/`?` 不跨目录,`**` 跨目录;`#` 注释;没有排除语法。
 #
-# 刻意**不**收的 docs 路径(都有门里的测试在运行时读它们,改了会改变全量门的结果):
+# 刻意**不**收的 docs 路径(都有门里的测试或门步骤在运行时读它们,改了会改变全量门的结果):
+#   docs/architecture/codepuppy-authority-registry.json —— 接管面权威登记,被 ext 的 authority-registry.test.ts、ui-mac 的
+#     sync-upstream-takeover-isolation.test.ts 与 scripts/assert-authority-proofs.sh 读;所以 docs/architecture 只收 diagrams/
 #   docs/contracts/** 的非 .md 文件 —— desktop-release-manifest.trust.json 由 release-manifest.test.ts 严格校验(发版信任钥)
 #   docs/verification/ 里除 *.png / *.log / *.jsonl 之外的非 .md 文件 —— 被测试按名字读取:
 #     2026-09-24-1445-exa-mcp-response-shapes/results/*.json、2026-09-26-1445-exa-vendor-source-and-live-shapes/results/*
 #       (packages/core、packages/opencode 的 websearch nokey-outcomes 测试)
 #     2026-07-27-e7-packaged-live/results/latest-logged-in.json (cloud-web-search.test.ts)
 #   这类路径照常走全量门。
+# 已知缺口(没有排除语法,切不出来):docs/design/2026-11-15-plugin-package-install-and-card/frame.html 被 PR 门的
+#   plugin-search-layout.browser.test.ts 读,却落在 docs/design/** 里 —— 只改它的 push 走轻量门,不跑那个浏览器测试。
 
-docs/architecture/**
+docs/architecture/diagrams/**
 docs/archive/**
 docs/audits/**
 docs/design/**

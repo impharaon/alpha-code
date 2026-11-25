@@ -3,6 +3,8 @@
 // 里会泄漏到后续文件,所以不能直接放进整包运行。每行断言:退出 0、恰好 `pass` 条通过、0 条失败、恰好跑了 1 个文件
 // (子进程一条用例都没跑却 exit 0 时 `0 fail` 恒成立,只看失败数会放行);到 `timeout` 还没结束就杀掉子进程判红。
 // 每行的条数是这张表的判据,整张表的行数登记在 scripts/gate-files.tsv。
+// 各行同时跑(test.concurrent):各自的子进程、各自 mkdtemp 的目录与 0 号端口,互不共享状态;大半时间在等真定时器,
+// 所以本文件的时长是最慢那一行,不是各行之和(2026-11-25 实测 147s → 87s)。
 import { expect, test } from "bun:test"
 import { join } from "node:path"
 
@@ -15,7 +17,7 @@ const HOSTS: Host[] = [
   { title: "production IPC refreshes through the V2 fetch decoder and returns the persisted projection", cases: "src/main/models-catalog-v2.wiring.cases.ts", pass: 21, timeout: 180_000 },
 ]
 
-test.each(HOSTS)(
+test.concurrent.each(HOSTS)(
   "$title",
   async ({ cases, pass, args = [], cwd = ".", timeout }) => {
     const child = Bun.spawn([process.execPath, "test", ...args, join(UI_MAC, cases)], {

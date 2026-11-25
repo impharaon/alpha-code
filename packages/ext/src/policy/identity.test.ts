@@ -3,7 +3,7 @@
 // a v1 takeover used to supply. Replaces packages/opencode/test/tool/codepuppy-tool-identity.test.ts and
 // packages/core/test/codepuppy-tool-identity.test.ts (#1662 L4). Expected identities are hand-written literals.
 import { testCloudMcp } from "../../../ui-mac/test-component/codepuppy-bootstrap-fixture"
-import { beforeAll, describe, expect, test } from "bun:test"
+import { describe, expect, test } from "bun:test"
 import { createHash } from "node:crypto"
 import fs from "node:fs"
 import os from "node:os"
@@ -23,7 +23,7 @@ import { displaySnapshot } from "./display"
 import { canonicalJsonDigest } from "./store"
 import { canonicalToolIdentity } from "../../../schema/src/tool-identity"
 
-beforeAll(isolate)
+isolate()
 const core = path.resolve(import.meta.dir, "../../../core")
 const runtime = await import(path.join(core, "src/tool/runtime.ts"))
 const { Permission } = await import(path.join(core, "src/permission.ts"))

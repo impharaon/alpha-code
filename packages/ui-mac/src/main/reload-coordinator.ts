@@ -21,6 +21,7 @@ import {
   type ReloadRequestMessage,
   type ReloadScope,
 } from "./codepuppy-sidecar-messages"
+import { syncExplicitConfig } from "./engine-explicit-config"
 
 export type ReloadRequestInput = { scope: ReloadScope; items: ReloadItem[]; reason: string; force?: boolean; connectorChange?: boolean }
 
@@ -79,6 +80,12 @@ export function createReloadCoordinator(deps: {
 
   const send = (record: GenerationRecord) => {
     if (!post || record.applying) return
+    // 这次重载要读到 main 刚提交的东西:先把显式文件按盘上的输入写好(engine-explicit-config.ts)。写不成照旧发,监听会再追。
+    try {
+      syncExplicitConfig()
+    } catch (error) {
+      deps.log(`reload: generation ${record.generation}: the engine config file could not be brought up to date first: ${String(error)}`)
+    }
     try {
       post(
         buildReloadRequest({

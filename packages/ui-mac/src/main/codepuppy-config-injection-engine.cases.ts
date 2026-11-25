@@ -196,17 +196,21 @@ const skillFile = (dir: string, name: string) => {
   fs.writeFileSync(path.join(dir, "SKILL.md"), `---\nname: ${name}\ndescription: ${name} probe\n---\n\n${name}\n`)
 }
 
-/** 插件装完之前 `/api/skill` 也可能是半套:轮询到清单稳定(两次相同)再判。 */
+/**
+ * 插件装完之前 `/api/skill` 也可能是半套:轮询到清单稳定(两次相同)再判。`ready`:判「在」的用例等的条件(有上限)—— 引擎自带的技能先于
+ * 读配置与技能目录的插件出现,机器忙时半套撑得过两次轮询,两次相同不等于装完。
+ */
 async function settledIds(
   get: (route: string) => Promise<{ data: Array<{ id: string; name?: string }> }>,
   route: string,
   key: "id" | "name" = "id",
+  ready: (ids: string[]) => boolean = () => true,
 ) {
   let previous = ""
-  for (let i = 0; i < 40; i++) {
+  for (let i = 0; i < 300; i++) {
     const body = await get(route)
     const ids = JSON.stringify(body.data.map((item) => String(item[key])).sort())
-    if (ids === previous && body.data.length > 0) return JSON.parse(ids) as string[]
+    if (ids === previous && body.data.length > 0 && ready(JSON.parse(ids) as string[])) return JSON.parse(ids) as string[]
     previous = ids
     await new Promise((resolve) => setTimeout(resolve, 100))
   }
@@ -235,7 +239,7 @@ describe("S6 外部技能不继承:唯一机制是注入的移除指令(裁决�
     const injection = inject()
     const engine = await engineWith("s6-inherit", injection.config)
     plant(engine.slot.projectDirectory)
-    const ids = await settledIds(engine.get, "/api/skill", "name")
+    const ids = await settledIds(engine.get, "/api/skill", "name", (listed) => probes.every((probe) => listed.includes(probe)))
     for (const probe of probes) expect(ids).toContain(probe)
   }, 60_000)
 })

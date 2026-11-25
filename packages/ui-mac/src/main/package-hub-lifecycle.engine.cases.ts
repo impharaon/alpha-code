@@ -30,6 +30,9 @@ for (const method of ["log", "warn", "error"] as const)
     consoleLines.push(args)
   }
 let stopWatching: (() => void) | undefined
+// The sidecar link to main's reload coordinator. Production (server.ts) detaches it when a sidecar exits and attaches it again
+// when the next one is ready, which re-sends every reload generation still in flight.
+let detachSidecar: ((reason: string) => void) | undefined
 let running: Running | undefined
 let model: Awaited<ReturnType<(typeof import("../../test-component/codepuppy-engine"))["scriptedModel"]>>
 let host: Awaited<ReturnType<(typeof import("../../test-component/codepuppy-engine"))["codepuppyEngine"]>>
@@ -203,9 +206,16 @@ beforeAll(async () => {
     return running!.fetch(request)
   })
   const { registerExtIpcHandlers } = await import("./ext-ipc")
+  const postToSidecar = (message: Parameters<Parameters<typeof main.codepuppySidecar.attach>[0]>[0]) => {
+    if (message.type === "codepuppy.reload.request") reloadRequests.push(message)
+    for (const listener of listeners) listener({ data: message })
+  }
   // The sidecar's connector refresh: a fresh engine with a freshly injected launch config.
   refreshEngine = async () => {
     try {
+      // As in production: the old sidecar's link goes away with it, so a reload posted while the engine is being replaced is
+      // re-sent to the new one instead of failing against the closing engine and waiting for a session event that never comes.
+      detachSidecar?.("connector refresh")
       await running?.close()
       // 与生产换代同序(SPEC-engine-config-fence BR-03):main 先按同一份启动文档写显式文件与模型底表,sidecar 再注入
       const { writeEngineConfigForFork } = await import("./engine-explicit-config")
@@ -223,6 +233,7 @@ beforeAll(async () => {
       for (const key of Object.keys(host.content)) Reflect.deleteProperty(host.content, key)
       Object.assign(host.content, next)
       running = await host.start()
+      detachSidecar = main.codepuppySidecar.attach(postToSidecar)
       refreshes++
       return true
     } catch (error) {
@@ -243,10 +254,7 @@ beforeAll(async () => {
     },
     async () => undefined,
   )
-  main.codepuppySidecar.attach((message) => {
-    if (message.type === "codepuppy.reload.request") reloadRequests.push(message)
-    for (const listener of listeners) listener({ data: message })
-  })
+  detachSidecar = main.codepuppySidecar.attach(postToSidecar)
   await main.ledgerReady
   // main (server.ts) starts this watcher right after writing the explicit file, before the fork. The old connector refresh
   // happened to re-inject paths; runtime MCP activation must exercise the real in-process path too.

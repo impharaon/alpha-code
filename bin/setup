@@ -18,8 +18,9 @@ COMMON_DIR="$(git rev-parse --path-format=absolute --git-common-dir)" || exit 1
 MAIN="${COMMON_DIR%/.git}"
 export HUSKY=0
 
-echo "▶ bun install"
-bun install || { echo "✗ bin/setup 失败:bun install(依赖没装上 —— 别在这棵树上跑 typecheck/测试,那是成千上万条假红)" >&2; exit 1; }
+echo "▶ bun install --frozen-lockfile"
+# --frozen-lockfile:不改写受控的 bun.lock(否则本机 bun 重写 libc 字段会弄脏树，gate 拒跑;owner 2026-11-23 夜检在干净克隆上跑)。
+bun install --frozen-lockfile || { echo "✗ bin/setup 失败:bun install(依赖没装上 —— 别在这棵树上跑 typecheck/测试,那是成千上万条假红)" >&2; exit 1; }
 
 echo "▶ Electron + codepuppy-fence addon"
 bash scripts/native-prepare.sh "$TARGET" "$MAIN" || { echo "✗ bin/setup 失败:Electron 二进制 / codepuppy-fence addon(原因见上一行 ✗)" >&2; exit 1; }

@@ -132,6 +132,9 @@ function isExplicitInput(name: string, userConfig: string | undefined, root: str
   return relative === "skills-enabled.json" || /^ext-store\/[^/]+\/current\.json$/.test(relative)
 }
 
+/** 本进程里在跑的显式文件监听(main:每代引擎一份)。 */
+const runningWatches = new Set<() => void>()
+
 /**
  * 运行中:输入一变就重写显式文件(去抖 100ms)。输入 = 用户的 `codepuppy.jsonc`(main 装东西、用户手改),以及决定 `skills` 的
  * 技能允许集 `skills-enabled.json` 与各技能键的 `current.json`(翻代 / 新装 / 停用,`#1667` 编排器裁决 r3 第 1 条)—— 都在当前
@@ -194,11 +197,26 @@ export function watchExplicitSources(input: {
   // Atomic disable/enable writes can be coalesced by the recursive directory watcher. Observe the
   // allow-list file's state too, so a missed enable event cannot leave the explicit skills withdrawn.
   fs.watchFile(allowSet, { interval: 100 }, refreshAllowSet)
+  const sync = () => {
+    clearTimeout(timer)
+    refresh()
+  }
+  runningWatches.add(sync)
   return () => {
+    runningWatches.delete(sync)
     clearTimeout(timer)
     watcher?.close()
     fs.unwatchFile(allowSet, refreshAllowSet)
   }
+}
+
+/**
+ * 请引擎重载之前(reload-coordinator 发出每一个重载请求的那一刻):在跑的监听立刻按盘上的输入重写显式文件,不等去抖。
+ * 重载的 Location 读的就是这一份;要是重载先于去抖后的重写,引擎按上一份重建 Location,随后那次 config.updated 赶上它还在装载就丢了
+ * —— main 刚装上 / 启用 / 停用的东西在引擎里迟迟不生效(SPEC-engine-config-fence BR-04)。没有在跑的监听 ⇒ 什么都不做。
+ */
+export function syncExplicitConfig(): void {
+  for (const sync of runningWatches) sync()
 }
 
 /** Package state is owned by the ledger root; runtime projections consume the same graph membership. */

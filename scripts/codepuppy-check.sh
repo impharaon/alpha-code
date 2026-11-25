@@ -20,6 +20,18 @@
 set -uo pipefail
 cd "$(git rev-parse --show-toplevel)"
 
+# 范围(owner 2026-11-23):`bin/check` = PR 门控,`bin/check --full` = 夜间全量。bun 没有「受影响测试」
+# 的机械选择(无依赖图),所以两档目前都跑全部测试 —— 差别只在上报给 gate 的那一行如实写明。
+# gate 设了 GATE_SCOPE_FILE 时写一行「本次测试跑了什么」;没设就什么都不写。
+scope="all tests (no selection)"
+for arg in "$@"; do
+  case "$arg" in
+    --full) scope="all tests (--full)" ;;
+    *) echo "usage: bin/check [--full]" >&2; exit 2 ;;
+  esac
+done
+if [ -n "${GATE_SCOPE_FILE:-}" ]; then printf '%s\n' "$scope" > "$GATE_SCOPE_FILE"; fi
+
 # 每行:<codepuppy-ci job>|<codepuppy-ci step name>|<本地档位>
 # 档位只有三种:MIRRORED(跑同一条命令)、SUPERSET(本地还多验了东西)、
 # DEGRADED:<理由>(跑不了/跑的是降级档 —— 必须写清降级了什么)。没有第四种。
@@ -188,10 +200,21 @@ echo "▶ [5/14] contract lock + unit tests (contracts-consumer + ext + ui-mac +
 # 此前这里对「基线既有红」一票否决 ⇒ 每条 lane 只能手工重导基线,不导的默认动作是
 # `--no-verify`(一次关掉全部十道门,#754 演过)。与 CI 的 `bun test (ui-mac)` 同一条命令、
 # 同一份清单。注意清单只罩这一条全量;[6/14] 登记簿的逐文件精确点名**不**吸收已知红。
+# 并行(owner 2026-11-23:门控不许单核;实测 2026-11-23,bun 1.3.14,10 核):`bun test --parallel[=N]` = worker 进程、
+# 隐含 --isolate,汇总行/junit/条数判据与串行同形(bun-test-floor.sh 原样适用)。
+#   · contracts-consumer:--parallel(默认核数),65 条不变,7s → 4s。
+#   · ui-mac:scripts/bun-test-ui-mac.sh 分两组 —— 非引擎文件 `--parallel`、真引擎宿主文件串行(各自过
+#     bun-test-floor.sh 的下界与已知红棘轮)。真引擎用例(起内嵌引擎、15s 级等待)与别的 worker 抢
+#     CPU 会超时变红(实测:10 worker 多出 7 行红;5 worker 在负载 ~14 的整门里仍红 4 个真引擎文件)。
+#   · ext **保持串行**:src/policy 下 14 个测试文件共享 policy-host.cases.ts(顶层 await 加载引擎、
+#     设计上跨文件共享同一模块实例),在 --isolate 下导入方先于它初始化完成,报
+#     `Cannot access 'E' before initialization`(单文件 `bun test --isolate` 同样复现)。
+#   · app 滚动 pin(bun-test-app.sh):整包 2s,没有并行的收益,保持串行。
+#   CI 的同名步骤(codepuppy-ci.yml,已停用)仍是串行命令,故这些步骤的档位不变(MIRRORED = 同一脚本、同一下界、同一已知红清单)。
 if bun run --cwd packages/codepuppy-contracts-consumer check:vendor \
-  && bash scripts/bun-test-floor.sh 15 packages/codepuppy-contracts-consumer \
+  && bash scripts/bun-test-floor.sh 15 packages/codepuppy-contracts-consumer --parallel \
   && bash scripts/bun-test-floor.sh 100 packages/ext \
-  && CODEPUPPY_KNOWN_FAILS_FILE=scripts/known-fails.tsv bash scripts/bun-test-floor.sh 3000 packages/ui-mac src \
+  && bash scripts/bun-test-ui-mac.sh \
   && bash scripts/bun-test-app.sh; then
   echo "    ✓ tests"
 else

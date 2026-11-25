@@ -105,7 +105,7 @@ test_layer_ignore_args() {
 }
 
 # ui-mac 里起真引擎的文件(integration 与 scenario 两层)串行跑(与别的 worker 抢 CPU 会超时变红,#1740 实测),其余并行 ——
-# 不起引擎的 scenario 文件(真浏览器、子进程套件、计时)照旧并行,串起来只会让夜间变慢。
+# 不起引擎的 scenario 文件(子进程套件、计时)照旧并行,串起来只会让夜间变慢;真浏览器文件见 ui_mac_run_group。
 # 判据是**启发式**(文件名含 engine,或文件 / 它引用的 *.cases.ts 里出现引擎沙箱 / 内嵌引擎等字样):
 # 漏判 = 该文件留在并行组(最坏是回到间歇红,不丢覆盖),多判 = 多一个串行文件(只慢不红)。
 UI_MAC_ENGINE_PAT='engine-sandbox|engine-embed|in-process-engine|spawnLocalServer|startEngine|embedded engine|real engine|真引擎'
@@ -120,9 +120,16 @@ ui_mac_is_engine() { # <相对 packages/ui-mac 的文件>
   return 1
 }
 
-# <相对 packages/ui-mac 的文件> <层> → 0 = 进串行组。ui-mac 的分组只在这里定(门与测量都读它)。
-ui_mac_runs_serial() {
-  [ "$2" != fast ] && ui_mac_is_engine "$1"
+# <相对 packages/ui-mac 的文件> <层> → 它进哪一组:parallel / serial / browser。ui-mac 的分组只在这里定(门与测量都读它)。
+#   serial  = 起真引擎的 integration / scenario 文件,一个进程按文件表顺序跑(#1740);
+#   browser = 真浏览器文件(*.browser.*):每个起一台 vite 开发服务器 + 真 Chrome。两台同时跑会共用 vite 的依赖缓存、互相触发整页
+#             重载(aa455979a3 上 composer-popover-gap 两次红在 `Execution context was destroyed ... navigation`);放进不隔离的串行
+#             进程又会被前一个文件留下的全局打坏(tooltip 读不了 vite 配置)。所以单独一组:`--parallel=1`,一个隔离 worker 逐个跑;
+#   parallel = 其余。
+ui_mac_run_group() {
+  if [ "$2" = fast ]; then echo parallel; return 0; fi
+  case "${1##*/}" in *.browser.*) echo browser; return 0 ;; esac
+  if ui_mac_is_engine "$1"; then echo serial; else echo parallel; fi
 }
 
 # 只经闸门登记簿进套件的工作目录(packages/core 等上游包里 Code Puppy 自有的登记文件)。
@@ -133,7 +140,7 @@ test_layer_register_workdirs() {
 
 # 门的每一次 bun 调用(`--full` 范围,三层):<组名>\t<工作目录>\t<跑法>\t<文件>\t<层>。一个工作目录的一组文件不论分几层都在
 # **一次** bun 调用里跑(分层逐个串着跑会丢并行),跑完按层把 junit 拆成 `<组名>.<层>.xml`;组名 = `<包名>` 或 `<包名>+<组>`,
-# 包名是 packages/ 下的目录名(scripts/junit-file-counts.py 据此认工作目录)。跑法:parallel = `--parallel`;serial = 一个进程按
+# 包名是 packages/ 下的目录名(scripts/junit-file-counts.py 据此认工作目录)。跑法:parallel = `--parallel`;one = `--parallel=1`(一个隔离 worker 逐个跑);serial = 一个进程按
 # 文件表顺序;discover = 一个进程、不给文件表、让 bun 自己发现(ext:它的文件共享模块级状态,只在 bun 的发现顺序下互不干扰),
 # 范围外的层用 test_layer_ignore_args 排除;app = bun-test-app.sh 的整包跑法。
 test_layer_groups() {
@@ -141,11 +148,11 @@ test_layer_groups() {
   test_layer_map packages/codepuppy-contracts-consumer "${TEST_LAYERS[@]}" | sed "s|^|codepuppy-contracts-consumer	packages/codepuppy-contracts-consumer	parallel	|"
   test_layer_map packages/ext "${TEST_LAYERS[@]}" | sed "s|^|ext	packages/ext	discover	|"
   while IFS=$'\t' read -r f layer; do
-    if ui_mac_runs_serial "$f" "$layer"; then
-      printf 'ui-mac+serial\tpackages/ui-mac\tserial\t%s\t%s\n' "$f" "$layer"
-    else
-      printf 'ui-mac\tpackages/ui-mac\tparallel\t%s\t%s\n' "$f" "$layer"
-    fi
+    case "$(ui_mac_run_group "$f" "$layer")" in
+      serial) printf 'ui-mac+serial\tpackages/ui-mac\tserial\t%s\t%s\n' "$f" "$layer" ;;
+      browser) printf 'ui-mac+browser\tpackages/ui-mac\tone\t%s\t%s\n' "$f" "$layer" ;;
+      *) printf 'ui-mac\tpackages/ui-mac\tparallel\t%s\t%s\n' "$f" "$layer" ;;
+    esac
   done < <(test_layer_map packages/ui-mac "${TEST_LAYERS[@]}")
   printf 'codepuppy-app\t%s\tapp\tsrc\tintegration\n' "$TEST_LAYER_APP_WORKDIR"
   for w in $(test_layer_register_workdirs); do

@@ -6,178 +6,148 @@ kind: runbook
 status: active
 owners:
   - Code Puppy maintainers
-last_reviewed: 2026-11-20
-review_after: 2027-01-30
+last_reviewed: 2026-11-25
+review_after: 2027-02-23
 ---
 
-# 模型清单更新 runbook(代理节点 / BYOK)
+# 模型清单更新 runbook(平台代理 + BYOK)
 
-两份清单都由 alpha-platform 网关发布,桌面端后台拉取、校验、采纳;**加模型、改名称 / 能力 / 档位都不需要发 app 版本**
-(仍要发版的情形见下文「仍需要发 App」)。方案:alpha-code `docs/design/req236-catalog-and-model.md` §2.1–2.4、§2.9。
+**每次更新模型,平台代理(A)与自带 Key(B)两半一起做。** 两半都是 alpha-platform `packages/gateway` 下的**配置改动**:
+不改源码(`test/model-names-single-source.integration.test.ts` 会拦住源码里的模型名)、不发 App
+(例外见末尾「仍需要发 App」)。桌面端在启动、登录身份变化、每 30 分钟、手动重试时从网关拉两份清单
+(`packages/ui-mac/src/main/catalog-refresher.ts`),所以配置部署后桌面端自己跟上。
+方案:`docs/design/req236-catalog-and-model.md` §2.1–2.4、§2.9。
 
-- **代理节点(经 ALPHA 代理)**:真源 = alpha-platform 网关 registry
-  (`packages/gateway/src/models.config.json`)+ edition 白名单。桌面端经 `GET /v1/models`(ModelCatalogV3)拿到
-  edition 内的模型清单、计价倍数,以及每个模型的名称 / 品牌 / 能力 / 档位(`display`)。桌面端**不再**按 id 维护第二份
-  展示数据;没有拿到过有效清单时,选择器的平台段为空并写「平台模型清单尚未获取」。
-- **BYOK(自带 KEY 直连)**:模型清单与元数据的真源 = alpha-platform 网关的 BYOK 预置目录
-  (`packages/gateway/src/byok-catalog.json`,经 `GET /v1/byok-catalog` 发布,ByokCatalogV1)。**从不按账户 / edition 收窄**,
-  拉取不带凭据。决定 Key 发去哪的三样东西 —— 端点 `baseURL`、Key 名 `keyEnv`、协议适配器 `compat` —— **只在安装包里**
-  (`packages/ui-mac/src/main/byok-adapters.ts`),远程目录带这些字段会被整份拒绝;远程目录里 App 不认识的 provider 会被跳过。
-  安装包里的 `packages/ui-mac/src/main/codepuppy-models.json` 只留一份同形的**首启引导**(`byokCatalog`)。
+## 每次更新的两半清单
 
-**刷新与生效**(`catalog-refresher.ts`):刷新点 = 启动、登录身份变化(只拉平台那份)、每 30 分钟、手动重试;
-失败保留上次拿到的版本,两份清单的失败分别提示。**已下载 ≠ 已应用**:新清单下载好以后,要等引擎下一次启动
-(任何原因的换代,含重启 App)才会被选择器和引擎同时用上;这段时间选择器底部会写「模型清单已更新,将在引擎下次启动后生效」。
+| 半 | 改哪个文件(alpha-platform `packages/gateway`) | 桌面端读的接口 | 部署后验证 |
+| --- | --- | --- | --- |
+| A 平台代理 | `src/models.config.json`(模型、`routes`、`aliases`、`roles`、`editionModels`、`display`、档位)+ 台账 `route-leg-reachability.json`、`src/price-adjudications.json` + 生成夹具 | `GET /v1/models`(ModelCatalogV3,有登录态带 bearer) | 探针 1–5 |
+| B BYOK | `src/byok-catalog.json`(`catalog_version` 加一)+ 生成夹具 | `GET /v1/byok-catalog`(ByokCatalogV1,不带凭据) | 探针 6 |
 
-## A. 代理节点加/换模型
+- [ ] A:新模型、换代的旧 id 进 `aliases`、`roles` / `editionModels` 引用的 id 都已更新
+- [ ] A:价格、窗口、输出上限、出处、台账都对过
+- [ ] B:同一批模型在 `byok-catalog.json` 里也加 / 改 / 撤,`catalog_version` 加一
+- [ ] 两半在同一次部署里上线
 
-**这一节不是只改一个配置文件。** 每条 route 的价格、窗口、输出上限都要带出处和指纹,直连腿的取值要 owner 签;换代还会
-碰到写着模型 id 的代码和测试。2026-11-20 准备换代时逐项对过网关仓的代码,下面按那次读到的写(那次没有真的换代)。
+## A. 平台代理
 
-前置判断(缺一不可,否则上架即死路由):
+前置(缺一不可,否则上架即死路由):
 
-1. **至少一条可路由的 route**:平台持有该家原生 key,或 OpenRouter 已上架该
-   模型(千问系截至 2026-07-23 无原生 key、纯 OpenRouter 兜底 ——
-   qwen3.8-max 因 OpenRouter 未上架同名条目而无法上代理节点,就是这个卡点)。
-2. **真实定价**:`routes[].pricing`(USD/Mtok)直接驱动 ledger 计价,必须与
-   上游实价一致,不许估。上游改价后这里不会自己变,定期对一次官方价目页。
+1. 至少一条可路由的 route:平台持有该家原生 key,或 OpenRouter 已上架同名模型。
+2. 价格是上游实价,不估。
 
-步骤(第 9 步在本仓,其余全在 alpha-platform,命令在 `packages/gateway` 下跑):
+步骤(命令在 `packages/gateway` 下跑,`bin/…` 在 alpha-platform 仓根):
 
-1. `src/models.config.json` → `models` 加条目:`minPlan`(free/member)、`enabled`、`display`(见第 8 步)、`routes[]`
-   (顺序即优先级:原生在前、OpenRouter 兜底)。每条 route 必填 `provider`、`upstreamModel`、`baseURL`、`wire`、
-   `pricing`(`inUsdPerMtok` / `outUsdPerMtok`,可选 `cacheReadUsdPerMtok`;`cacheWriteUsdPerMtok` 只有非 openai wire 可写)、
-   `maxOutputTokens`(取该 route 上游允许的最大值)、`contextWindowTokens`、`capabilityProvenance`
-   (`source` / `asOf` / `reviewAfter` / `verifiedBy` / `tupleFingerprint` / `outputCapReading`)。缺一项网关装载即失败
-   (`src/models-config-loader.ts`)。Claude 腿的 `allowedBetaFeatures` 必须是 `VERIFIED_BETA_FEATURES` 的子集。
-   换代时旧 id 进 `aliases`(存量默认模型/结算不炸;`/v1/models` 只列当代)。
-   策展政策:每家只保留最新一代(2026-07-05 拍板)。
-2. **签核**。`tupleFingerprint` 钉住 provider、upstreamModel、wire、beta 集、窗口、输出上限和四个价,改其中任何一个旧签即作废。
-   - OpenRouter 腿:`bin/verify-openrouter-capability` 拿 OpenRouter 模型目录核对窗口与输出上限,并把直连腿价格与
-     OpenRouter 现价并排比;有未裁决的分歧退出 1。
-   - 直连腿:由 owner 签。`verifiedBy` 含「待 owner 复签」时整份配置拒绝装载;owner 过目后跑
-     `bin/countersign-capabilities --by "<签核人>"`。仓库代码不得代签。
-   - 价格分歧的豁免登记在 `AUTHORIZED_ADJUDICATIONS`(`src/models-config-loader.ts`),按(模型, provider, 字段)逐条;
-     换代后旧 id 的条目要清掉,新 id 有分歧要 owner 重新裁决。
-3. **可达性台账**:`route-leg-reachability.json` 每条 route 一条带日期的观测记录(`bin/verify-route-legs`)。加 route 同时
-   加记录,摘 route 同时摘记录,否则红。
-4. **输出上限闸**:`bin/verify-output-caps` 要求 `maxOutputTokens` 等于 `capabilityProvenance.outputCapReading.value`。
-5. **写着模型 id 的代码**。换代前先 `grep -rn "<旧 id>" packages contracts`。2026-11-20 的命中:`src/lib/openai-wire.ts`
-   (逐模型的推理参数对照表,新模型要重新实打)、`src/pipelines.ts` / `src/lib/pipeline-registry.ts` /
-   `src/lib/tier-router.ts` / `src/egress-relay-do.ts`(`claude-sonnet-5`)、`src/worker.ts` / `src/sandbox.ts` /
-   `src/agent-runner.mjs` / `src/harness/coding-claudecode.ts`(`claude-opus-4-8`)、`src/lib/failover.ts` /
-   `src/lib/egress.ts`,以及约 60 个测试文件。
-6. edition 白名单**双落点同步**(cn 版要可见就都要加):
-   - `src/registry.ts` `DEFAULT_EDITION_CONFIG.editions.cn.models`(代码兜底);
-   - `wrangler.jsonc` `vars.EDITION_CONFIG`(运行时权威)。
-7. 测试:本仓用 vitest,不是 `bun test`。相关用例
-   `npx vitest run test/models-config.test.ts test/registry.test.ts test/edition.test.ts test/model-catalog-v3.test.ts`;
-   全量门是仓库根的 `bin/check`(改 `models.config.json` 走全量门)。
-8. 同一个条目里写 `display`(必填):`name`、`brand`(`anthropic | openai | deepseek | zhipu | qwen | moonshot | minimax`,
-   是**品牌**不是路由腿 —— qwen 经 OpenRouter 路由,brand 仍是 `qwen`)、可选 `reasoning` / `web` / `variants`
-   (推理档位,REQ-029/055;选项键只允许 `reasoningEffort | reasoning | thinking`,loader 校验)。它随
-   `GET /v1/models` 下发,桌面端**不需要**任何改动或发版。
-   ⚠️ 桌面端**不配任何价格**。计价倍数随 `GET /v1/models` 的 `pricing_multiplier`
-   下发(REQ-127 #679 / ADR-039),Code Puppy 侧一个价格字段都不许有 —— 曾经有
-   过一张本地档位表,它对本地没收录的线上模型一律显示成最便宜的一档
-   (claude-fable-5 真实 输入 71.4× / 输出 178.6×,当时显示「标准 ×1」)。
-   `src/shared/platform-pricing-authority-ratchet.test.ts` 会拦住它回来。
-9. (可选,**在本仓、要发 App**)要换 picker 的**平台默认模型**,改 `codepuppy-models.json` 顶层
-   `defaultPlatformModel`(裸 model id)。它是唯一的旋钮:声明缺席或该 id 不在
-   生效目录中,app 就不自动默认任何平台模型 —— 不会替你挑一个便宜的。
-   这个文件随安装包发,改它不属于「不发版」的范围。
-10. 部署:按网关仓的 `docs/runbooks/deploy.md`,`npm run deploy:worker -- --config wrangler.jsonc --message "git:$sha"`。
-    不要直接 `wrangler deploy`:前置闸(含价格交叉核验)不会跑。
-11. 验证:部署后等一个刷新点(或重启 app)→ 引擎下次启动后,picker 代理节点组出现新模型、名称与档位是 `display`
-   里写的 → 行尾显示的是**两个真倍数**(平台段写「平台模型清单尚未获取」说明这台机器还没拿到有效的 V3 目录)→ 真发
-   一条消息(走通 invoke→ledger 全链),盘一眼 ledger 计价 route 是否命中预期。
+1. **改 `src/models.config.json`**(模型名只在这里和两份台账里出现):
+   - `models.<id>`:`minPlan`(`free` / `member`)、`enabled`、`display`(`name`、`brand`、可选 `reasoning` / `web` / `variants`)、
+     `routes[]`(顺序即优先级:原生在前、OpenRouter 兜底)。
+   - 每条 route:`provider`、`upstreamModel`、`baseURL`、`wire`、`pricing`(`inUsdPerMtok` / `outUsdPerMtok`,可选
+     `cacheReadUsdPerMtok`)、`maxOutputTokens`、`contextWindowTokens`、`capabilityProvenance`(`source`、`asOf`、`reviewAfter`、
+     `verifiedBy`、`tupleFingerprint`、`outputCapReading`)、`reasoningWire` 与 `reasoningWireUnverified` 二选一。
+     缺一项网关装载即失败(`src/models-config-loader.ts`)。
+   - 换代:旧 id 写进 `aliases`;`/v1/models` 只列当代。每家只保留最新一代。
+   - `roles`(`pricingBasis`、`pipelineCheap`、`pipelineSmart`、`agentChat`、`cloudCoding`)与 `editionModels`(cn 版可见名单)引用的 id 同批改;
+     引用到未启用模型,装载即失败。
+2. **台账**:`route-leg-reachability.json` 每条 route 一条带日期的观测记录,加 route 加记录、摘 route 摘记录。
+3. **指纹与签核**:`tupleFingerprint` 钉住 provider、upstreamModel、wire、beta 集、窗口、输出上限和四个价,改任一项旧签作废。
+   - OpenRouter 腿:`bin/verify-openrouter-capability`(核窗口、输出上限,并把直连价与 OpenRouter 现价并排比;有未裁决分歧退出 1)。
+   - 直连腿:`verifiedBy` 含「待 owner 复签」时整份配置拒绝装载;owner 过目后跑 `bin/countersign-capabilities --by "<签核人>"`。仓库代码不得代签。
+   - 直连价与 OpenRouter 价不一致:要 owner 的原话,记进 `src/price-adjudications.json`(按 模型 / provider / 字段 / keep 逐条);**没有原话就不写**。
+4. **重新生成夹具**:`npm run contracts:generate`(写 `contracts/v3/fixtures/producer/model-catalog.json`);
+   价格的第二道锚 `test/fixtures/live-config-expectations.json` 手改成新的单价 / 窗口 / 输出上限。
+5. **跑检查**:`npm run verify:output-caps`(`maxOutputTokens` 必须等于 `outputCapReading.value`)、`npm run verify:route-legs`、
+   `bin/verify-openrouter-capability`。相关用例:
+   `npx vitest run test/models-config.integration.test.ts test/registry.fast.test.ts test/model-catalog-v3.fast.test.ts test/model-names-single-source.integration.test.ts`
+   (网关仓用 vitest,不是 `bun test`)。
+6. **部署前核对**(三件都要写进给 owner 的汇报):
+   - **预留下限**:任何请求都按「模型整个上下文窗口 × 输入价」预留。新模型的预留下限与各套餐额度对一遍,告诉 owner 没有钱包余额的订阅用户会遇到什么。
+     预留规则正在 alpha-platform#606 里改;只描述现状,不描述未来设计。
+   - **复核日期**:`jq -r '.models[].routes[].capabilityProvenance.reviewAfter' src/models.config.json | sort -u`。过了日期的 route 请求期回 503;
+     60 天内到期的,同一次更新里一起续(按第 3 步的同一套核验)。
+   - **价格漂移**:部署闸会拿 OpenRouter 实时目录交叉核验。测价到部署之间价格会动:漂的 OpenRouter 行按第 3 步重新核;直连腿的分歧要 owner 原话。
+7. **推送**:只改 `.gate-light` 圈定的文件(上面的配置、两份台账、生成夹具、`docs/verification/**`、`*.md`)时 `gate` 跑 `bin/check-light`,
+   不跑全量门;它对配置改动会跑全量门的每一步外加「零未裁决分歧」。
+8. **部署**:顺序与命令按 alpha-platform `docs/runbooks/deploy.md`(账户服务先,再网关,再其他 Worker),
+   用 `npm run deploy:worker -- --config <wrangler 配置> --message "git:$sha"`,**不要**直接 `wrangler deploy`(前置闸不会跑)。
+   `roles` 会被打进非网关 Worker,所以角色变了就要把这些 Worker 都按序重部署。
+9. **探针**(每个都要;测试租户见 alpha-platform `docs/runbooks/production-test-account.md`,要另行授权):
+   1. 不带凭据 `GET /v1/models`:列表是新当代,旧 id 不在列。
+   2. 每个新 / 改动的模型各发一条最小消息:上游与台账那行一致,预留快照里的单价与配置一致。
+   3. 一次流式调用。
+   4. 旧 id 经 `aliases` 由新 id 接住。
+   5. 至少一个**只走 OpenRouter 的模型**:所有 OpenRouter 腿都经网关的告警中继发出(内联调用被上游拒收),无需配置,但探针必须覆盖;
+      国际版专属 id 要用**国际版租户**验证(新建的生产测试租户落在大陆版,看不到它们),并核对大陆版租户请求它被拒。
+   6. 见 B 节。
 
-## B. BYOK 加模型 / 改元数据
+## B. BYOK 预置目录
 
-在**已有 provider**(App 适配器表里有的那几家)上增删模型、改名称 / 徽标 / 档位 / 能不能看图,全在 alpha-platform:
+在**已有 provider**(`byok-adapters.ts` 适配器表里有的)上增删模型、改名称 / 徽标 / 档位 / 能不能看图,全在 `src/byok-catalog.json`:
 
-1. `packages/gateway/src/byok-catalog.json`(ByokCatalogV1):
-   - 已有 provider 加模型:`providers[].models` 加 `{ id, name, reasoning?, variants?, image_input }`,id 用上游真实
-     model id(如 alibaba 加 `qwen3.8-max`)。**每个模型自带完整元数据** —— 桌面端不再从平台同名条目借名称 / 徽标 / 档位
-     (同一模型经直连与经 OpenRouter 形状不同,不得跨腿套用)。
+1. **改清单**(ByokCatalogV1):
+   - `providers[].models` 加 `{ id, name, reasoning?, variants?, image_input }`;`id` 用上游真实 model id。每个模型自带完整元数据,
+     不从平台同名条目借(同一模型经直连与经 OpenRouter 形状不同)。
    - provider 级可改 `name`、`brand`、`preset`(是否出现在「添加节点」快捷卡)与顺序。
-   - **把 `catalog_version` 加一**(单调递增整数)。桌面端只采纳比本机已有版本(上次采纳的、或安装包首启引导的,取高者)
-     更高的文档;要撤一次坏发布,就再发一个更高的版本,不要回退版本号。
-   - **不要**写 `baseURL` / `keyEnv` / `compat` / `npm`:schema 不允许,网关装载失败;即使发出去,桌面端也会整份拒绝。
-   - 档位表的 wire 形状按 `@ai-sdk/openai-compatible` 写,直连节点能原样复用的前提是每个
-     BYOK 适配器都是 `compat: "openai"`(codepuppy-models 套件钉着)。**显式关闭档**写
-       `{ "thinking": { "type": "disabled" } }`,值必须逐字 `disabled`:智谱 2026-09-06 实打,
-       `type` 写错(如 `bogus`)会被上游**静默忽略并继续思考,HTTP 仍 200** —— 所以「上游返回 200」
-       不是受理证据,`reasoning_content` 有没有才是(勘破记录见
-       [`model-variant-reachability`](../architecture/2026-09-06-model-variant-reachability.md) §5)。
-       上游 `transform.options()` 对 `zhipuai*` 直连**无条件**写 `thinking: enabled`,所以智谱
-       直连的每个模型要么标徽标并给「关」档,要么接受它总在思考。
-       **给「关」档之前先实打**:`glm-5.3` / `glm-5.3-flash` 始终思考,`thinking:{type:"disabled"}` 回 400
-       「该模型始终思考,不支持关闭思考;请使用 low、high 或 max」(2026-11-20 实打);给它们「关」档 = 用户一选就报错。
-       它们的档位是 `reasoningEffort` 的 low / high / max,且「低」排第一(辅助调用取第一档)。
-   - **能不能看图**(REQ-228 #1420):每个模型的 `image_input` 必填 `true` / `false`(schema 判,缺一个整份拒绝),
-     值抄自 models.dev 同名模型的 `modalities.input` 是否含 `image`;查的是与该 provider 适配器 `baseURL` 同一端点的
-     models.dev provider(`api.moonshot.cn` ⇒ `moonshotai-cn`、`dashscope.aliyuncs.com` ⇒ `alibaba-cn`、
-     `api.minimaxi.com` ⇒ `minimax-cn`、`api.deepseek.com` ⇒ `deepseek`、`open.bigmodel.cn` ⇒ `zhipuai`)。查法:
-     `curl -s https://models.dev/api.json | jq '."<provider>".models."<id>".modalities.input'`。
-     models.dev 里查不到 ⇒ 写 `false`(看不了图,图片交给云端识图),不要按名字猜。
-     两个例外情形(2026-11-20):① models.dev 收录有延迟(`qwen4-max` 发布 4 天后 `alibaba-cn` 仍未收录),厂商官方
-     模型页写明能看图时以官方页为准并在 PR 里写出处;② models.dev 的 `minimax-cn` 现在登记的端点是
-     `api.minimax.cn/anthropic/v1`,与适配器的 `api.minimaxi.com/v1` 不是同一个,MiniMax 的值没有同端点出处,
-     有 Key 时实打一次。引擎侧的最终值由
-     `packages/ui-mac/src/main/engine-cases.test.ts` 里 `image-input-capability.engine.cases.ts` 那一行起真引擎判。
-     平台代理模型不读这个字段,一律看不了图(网关聊天入口拒收图片)。
-     自定义节点没有上游出处,只认用户在真源记录里显式声明的 `imageInput`(见 `custom-provider-truth.ts`)。
-     **实测覆盖记录**:`deepseek-flash`(直连)2026-10-31 实测:`POST https://api.deepseek.com/v1/chat/completions`,
-     `model: deepseek-flash`,带 32×32 PNG data URI 的图片请求 ⇒ 200,回答 "Red",223 入 / 23 出 ⇒ 目录改为能看图
-     (alpha-platform#565,`catalog_version` 2)。智谱直连 2026-11-20 实测:`glm-5.3-flash` 带 32×32 PNG ⇒ 200「红色」;
-     `glm-5.3` 带图 ⇒ 400「messages.content.type 参数非法,取值范围 ['text']」(网关仓 PR 598,`catalog_version` 3)。OpenRouter 上的 `deepseek/deepseek-v4-flash` 仍只收文字(2026-09-24 实测),两者不是同一个入口。
-2. 新模型 id 上游认不认:有该家 key 时跑 `bun packages/ui-mac/scripts/verify-byok-catalog.ts`(#1281;它查的是
-   安装包里的首启引导与适配器表的端点 —— 要验刚加的 id,临时把它加进本机 `codepuppy-models.json` 的 `byokCatalog` 再跑,
-   别提交);没 key 时它会把 id 列进「本次未验证」,不会假装绿。它读的是桌面端落在本机的 Key 文件或同名环境变量,
-   本机没存 Key 的供应商一律未验证(2026-11-20:本机只有 DeepSeek、智谱的 Key)。
-3. 在 alpha-platform `packages/gateway` 下跑 `npm run contracts:generate`,重新生成 producer 夹具
-   `contracts/v1/fixtures/producer/byok-catalog.json`(测试要求它与清单逐字相等,不重新生成即红)。本仓测试用 vitest,
-   不是 `bun test`:`npx vitest run test/byok-catalog.test.ts test/producer-fixtures-v1.test.ts`(schema、无凭据可读、
-   不读 edition、夹具相等)。只改清单与夹具的推送走轻量检查(`.gate-light` + `bin/check-light`,约 3 秒),不跑全量门。
-   合并后按网关仓的 `docs/runbooks/deploy.md` 部署:
-   `npm run deploy:worker -- --config wrangler.jsonc --message "git:$sha"`(清单只由 gateway 这一个 Worker 提供)。
-4. 验证:`curl -sS https://<gateway>/v1/byok-catalog` 不带凭据返回新版本 → 等一个刷新点(或重启 app)→ 引擎下次启动后
-   BYOK 组出现新模型(该 provider 已配 key 即亮)→ 选中发一条消息。BYOK 不经网关、不产生平台计费;模型能不能用取决于
-   用户自己的 key 权限(preview 类模型可能需要上游侧开通,如阿里 Token Plan)。
-5. 下次发 App 时可以把安装包首启引导(`codepuppy-models.json` 的 `byokCatalog`)更新成当时线上那份(同内容、同版本):
-   新装用户第一次启动、还没拉到远程目录前看到的就是它。版本**高于**本机已采纳的远程版本时首启引导胜出。
+   - **`catalog_version` 加一**(单调递增整数)。桌面端只采纳更高版本;撤一次坏发布 = 再发更高的版本,不回退版本号。
+   - 不写 `baseURL` / `keyEnv` / `compat` / `npm`:schema 不允许,网关装载失败;发出去桌面端也整份拒绝。
+2. **`image_input`(每个模型必填 `true` / `false`)**:抄 models.dev 同名模型 `modalities.input` 是否含 `image`,查与该 provider
+   适配器 `baseURL` 同端点的 models.dev provider(`api.moonshot.cn` ⇒ `moonshotai-cn`、`dashscope.aliyuncs.com` ⇒ `alibaba-cn`、
+   `api.minimaxi.com` ⇒ `minimax-cn`、`api.deepseek.com` ⇒ `deepseek`、`open.bigmodel.cn` ⇒ `zhipuai`):
+   `curl -s https://models.dev/api.json | jq '."<provider>".models."<id>".modalities.input'`。
+   查不到写 `false`,不按名字猜。厂商官方页写明能看图而 models.dev 尚未收录时以官方页为准,并在提交说明里写出处。
+   MiniMax 的 models.dev 端点与适配器端点不是同一个(2026-11-20),没有同端点出处,有 Key 时实打一次。
+3. **档位**(`variants`)按 `@ai-sdk/openai-compatible` 的 wire 形状写。
+   显式关闭档写 `{ "thinking": { "type": "disabled" } }`,值逐字 `disabled`:写错(如 `bogus`)上游**静默忽略并继续思考,HTTP 仍 200**,
+   所以 200 不是受理证据,看 `reasoning_content` 有没有(见 [`model-variant-reachability`](../architecture/2026-09-06-model-variant-reachability.md) §5)。
+   给「关」档之前先实打:`glm-5.3` / `glm-5.3-flash` 始终思考,`disabled` 回 400(2026-11-20 实打),它们的档位是 `reasoningEffort` 的 low / high / max,「低」排第一(辅助调用取第一档)。
+4. **上游认不认这个 id**:有该家 key 时 `bun packages/ui-mac/scripts/verify-byok-catalog.ts`(本仓;查的是安装包首启引导与适配器表端点,
+   要验刚加的 id,临时加进本机 `codepuppy-models.json` 的 `byokCatalog` 再跑,不提交)。没 key 的供应商列进「本次未验证」,不假装绿;
+   它读桌面端落在本机的 Key 文件或同名环境变量。
+5. **重新生成夹具并跑检查**(`packages/gateway`):`npm run contracts:generate`(重写 `contracts/v1/fixtures/producer/byok-catalog.json`,测试要求它与清单逐字相等),
+   `npx vitest run test/byok-catalog.integration.test.ts test/producer-fixtures-v1.fast.test.ts`。
+6. **推送与部署**:只改清单与夹具走 `bin/check-light`(约 3 秒);部署与 A 同一次(清单只由 gateway 这一个 Worker 提供)。
+7. **探针 6**:不带凭据 `curl -sS https://<gateway>/v1/byok-catalog` 返回新 `catalog_version` → 等一个刷新点(或重启 App)→ 引擎下次启动后,
+   已配该家 key 的 BYOK 组出现新模型 → 选中发一条消息。BYOK 不经网关、不产生平台计费;能不能用取决于用户自己的 key 权限(preview 类可能要上游侧开通)。
+   带图探针的图片要**至少 64×64**。
+
+下次发 App 时,可把安装包首启引导(`codepuppy-models.json` 的 `byokCatalog`)更新成当时线上那份(同内容、同版本);
+版本高于本机已采纳的远程版本时首启引导胜出。
+
+## 生效时机
+
+刷新点 = 启动、登录身份变化(只拉平台那份)、每 30 分钟、手动重试。**已下载 ≠ 已应用**:新清单下载好后,要等引擎下一次启动(任何原因的换代,含重启 App)
+选择器和引擎才同时用上;这段时间选择器底部写「模型清单已更新,将在引擎下次启动后生效」。
 
 ## 仍需要发 App(`ship:mac`)的情形
 
-只有这些(方案 §2.9),其余都走上面两节:
+只有这些(方案 §2.9),其余都走 A / B:
 
-1. 新 BYOK 供应商:新端点 / Key 名 / 协议适配器 —— 加进 `packages/ui-mac/src/main/byok-adapters.ts`
-   (`{ id, compat, baseURL, keyEnv, pico }`),同时在 alpha-platform 的 BYOK 目录里发布它的模型。只发目录不发 App,
-   旧 App 会跳过这个 provider。
+1. 新 BYOK 供应商(新端点 / Key 名 / 协议适配器):加进 `packages/ui-mac/src/main/byok-adapters.ts`(`{ id, compat, baseURL, keyEnv, pico }`),
+   同时在 B 发布它的模型。只发目录不发 App,旧 App 会跳过这个 provider。
 2. 新的推理选项键或新的请求协议(超出 `reasoningEffort | reasoning | thinking`、`openai | anthropic` 适配器)。
 3. 新品牌要显示专属图标(数据可先发,图标回落为通用图形)。
 4. 目录 schema 主版本变化(V3→V4、byok v1→v2)。
 5. 平台模型需要客户端新能力(例如看图要开平台聊天入口的图片通道)。
+6. 换 picker 的**平台默认模型**:`packages/ui-mac/src/main/codepuppy-models.json` 顶层 `defaultPlatformModel`(现为 `deepseek-v4-flash`,裸 model id)。
+   桌面端拿它去**已发布的目录**里找:id 不在目录中,就不自动默认任何平台模型(不会替你挑一个便宜的)。
+   所以已发出的 App 用作默认的那个 id,**不要从 A 的目录里改名或下架**;要换默认模型就发 App。
 
-发版本身:`bun test src` → `ship:mac` 重建安装(install-local 会用稳定 Developer ID 签名,不再触发钥匙串重弹)。
+发版本身:`bun test src` → `ship:mac` 重建安装。
 
 ## 常见坑
 
-- **查厂商文档走国际站**:本机网络下阿里、Moonshot、MiniMax 的国内文档站连不上(TLS 握手被断,2026-11-20),国际站可读:
-  `www.alibabacloud.com/help/en/model-studio/models`、`platform.moonshot.ai/docs/pricing/chat`、
-  `platform.minimax.io/docs/guides/models-intro`。国际站写的是国际端点,id 通常相同但不保证,以带 Key 的 `/models` 为准。
-- **模型 id 用 registry 当代真实 id**;换代走 `aliases`,不要留旧 id 在清单里。
-- **edition 白名单是双落点**(registry.ts 兜底 + wrangler.jsonc 运行时),改一半
-  = 本地测试与线上行为分叉。
-- **pricing 不准 = ledger 记错账**,上架前对一次上游价目页。
-- 引擎侧 v1/v2 双配置通道由 sidecar 自动双投影
-  (见 [engine-config-channels](../contracts/engine-config-channels.md)),
-  本 runbook 的改动**不需要**碰引擎配置。
-- preview/实验模型在展示名里带 "Preview" 字样,避免用户当正式版依赖。
-- **同步失败有出口**(#1084,`#1556` 起按清单分开):`GET /v1/models` 或 `GET /v1/byok-catalog` 拉不下来、
-  或文档校验不过时,窗口顶部会出现一条 warning 横幅,说明是哪一份清单,带分类码(`rate_limited` / `unauthorized` /
-  `http-503` / `contract-incompatible` …)。排障时先看它。一份清单成功只收掉它自己那一条,另一份的失败仍然显示。
-- **改了没生效?先分清已下载还是已应用。** 选择器底部写着「模型清单已更新,将在引擎下次启动后生效」= 新清单已下载、
-  这一代引擎还在用旧的;重启 App(或等下一次引擎换代)即生效。平台段写「平台模型清单尚未获取」= 这台机器还没拿到过
-  有效的平台清单(网络 / 登录 / 网关未部署 V3)。
+- **桌面端不配任何价格**:计价倍数随 `GET /v1/models` 的 `pricing_multiplier` 下发(ADR-039);`src/shared/platform-pricing-authority-ratchet.test.ts` 拦着本地价格字段。
+- **`roles.cloudCoding` 必须是沙箱里钉住的客户端能受理的模型**,换这个角色前先在沙箱实打。
+- **模型 id 用当代真实 id**;换代走 `aliases`,不要留旧 id 在清单里。
+- **价格不准 = ledger 记错账**,上架前对上游价目页。
+- **查厂商文档走国际站**(本机网络下阿里、Moonshot、MiniMax 国内文档站连不上,2026-11-20):
+  `www.alibabacloud.com/help/en/model-studio/models`、`platform.moonshot.ai/docs/pricing/chat`、`platform.minimax.io/docs/guides/models-intro`。
+  国际站写的是国际端点,id 通常相同但不保证,以带 Key 的 `/models` 为准。
+- **平台代理模型的看图**:网关聊天入口拒收图片,平台模型一律看不了图;BYOK 的 `image_input` 不适用于它。自定义节点只认用户在真源记录里显式声明的 `imageInput`(`custom-provider-truth.ts`)。
+- **实测覆盖记录**:`deepseek-flash`(直连)2026-10-31 带 32×32 PNG ⇒ 200 回答 "Red",目录改为能看图(alpha-platform#565,`catalog_version` 2);
+  智谱直连 2026-11-20:`glm-5.3-flash` 带图 ⇒ 200,`glm-5.3` 带图 ⇒ 400(`catalog_version` 3);OpenRouter 上的 `deepseek/deepseek-v4-flash` 仍只收文字(2026-09-24),两者不是同一个入口。
+- 引擎侧 v1/v2 双配置通道由 sidecar 自动双投影(见 [engine-config-channels](../contracts/engine-config-channels.md)),本 runbook 的改动不需要碰引擎配置。
+- preview / 实验模型在展示名里带 "Preview",避免用户当正式版依赖。
+- **同步失败有出口**:`GET /v1/models` 或 `GET /v1/byok-catalog` 拉不下来或校验不过时,窗口顶部出现 warning 横幅,说明是哪一份并带分类码
+  (`rate_limited` / `unauthorized` / `http-503` / `contract-incompatible` …),排障先看它;一份成功只收掉它自己那条。
+- **改了没生效?** 先分清已下载还是已应用(见「生效时机」)。平台段写「平台模型清单尚未获取」= 这台机器还没拿到过有效的平台清单(网络 / 登录 / 网关未部署 V3)。

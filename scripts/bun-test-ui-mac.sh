@@ -2,8 +2,9 @@
 # ui-mac 本次范围里的那几层测试(`bash scripts/bun-test-ui-mac.sh <层...>`,PR 门 `fast integration`,`--full` 再加 `scenario`),
 # 每组都走 scripts/bun-test-floor.sh(条数下界 + 已知红棘轮,#1086)。层由文件名决定,规则在 scripts/test-layers.sh(唯一真源)。
 #
-#   并行组:`bun test --parallel`(worker 进程,隐含 --isolate,默认核数)。fast 层全部、integration 层的非引擎文件 —— 一次调用。
-#   串行组:integration 层里起真引擎的文件(test-layers.sh 的 ui_mac_is_engine 启发式)与 scenario 层全部 —— 一次调用。真引擎用例
+#   并行组:`bun test --parallel`(worker 进程,隐含 --isolate,默认核数)。fast 层全部、integration 与 scenario 层里不起引擎的文件
+#           —— 一次调用。
+#   串行组:integration 与 scenario 层里起真引擎的文件(test-layers.sh 的 ui_mac_runs_serial)—— 一次调用。真引擎用例
 #           (内嵌引擎 / 子进程里的真引擎,15s~90s 级的等待)与别的 worker 抢 CPU 会超时变红(2026-11-23 实测:10 worker
 #           多出 7 行红,`--parallel=5` 在负载 ~14 的整门里仍有 4 个真引擎文件红);串行组把它们从抢占里拿出来。
 # 不按层分开跑:分层逐个串着调用会丢并行。每组跑完按层把 junit 拆成 `ui-mac.<层>.xml` / `ui-mac+serial.<层>.xml`
@@ -29,7 +30,7 @@ floor_serial=0
 : > "$work/parallel.map"
 : > "$work/serial.map"
 while IFS=$'\t' read -r f layer; do
-  if [ "$layer" = scenario ] || { [ "$layer" = integration ] && ui_mac_is_engine "$f"; }; then
+  if ui_mac_runs_serial "$f" "$layer"; then
     serial_files+=("./$f"); printf '%s\t%s\n' "$f" "$layer" >> "$work/serial.map"
   else
     parallel_files+=("./$f"); printf '%s\t%s\n' "$f" "$layer" >> "$work/parallel.map"
@@ -39,7 +40,7 @@ for layer in "$@"; do
   case "$layer" in
     fast) floor_parallel=$((floor_parallel + 100)) ;;
     integration) floor_parallel=$((floor_parallel + 1500)); floor_serial=$((floor_serial + 300)) ;;
-    scenario) floor_serial=$((floor_serial + 10)) ;;
+    scenario) floor_serial=$((floor_serial + 5)) ;;
   esac
 done
 

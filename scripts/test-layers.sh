@@ -104,7 +104,8 @@ test_layer_ignore_args() {
   return 0
 }
 
-# ui-mac integration 层里起真引擎的文件串行跑(与别的 worker 抢 CPU 会超时变红,#1740 实测),其余并行。
+# ui-mac 里起真引擎的文件(integration 与 scenario 两层)串行跑(与别的 worker 抢 CPU 会超时变红,#1740 实测),其余并行 ——
+# 不起引擎的 scenario 文件(真浏览器、子进程套件、计时)照旧并行,串起来只会让夜间变慢。
 # 判据是**启发式**(文件名含 engine,或文件 / 它引用的 *.cases.ts 里出现引擎沙箱 / 内嵌引擎等字样):
 # 漏判 = 该文件留在并行组(最坏是回到间歇红,不丢覆盖),多判 = 多一个串行文件(只慢不红)。
 UI_MAC_ENGINE_PAT='engine-sandbox|engine-embed|in-process-engine|spawnLocalServer|startEngine|embedded engine|real engine|真引擎'
@@ -117,6 +118,11 @@ ui_mac_is_engine() { # <相对 packages/ui-mac 的文件>
     if [ -f "$cf" ] && grep -qE "$UI_MAC_ENGINE_PAT" "$cf"; then return 0; fi
   done
   return 1
+}
+
+# <相对 packages/ui-mac 的文件> <层> → 0 = 进串行组。ui-mac 的分组只在这里定(门与测量都读它)。
+ui_mac_runs_serial() {
+  [ "$2" != fast ] && ui_mac_is_engine "$1"
 }
 
 # 只经闸门登记簿进套件的工作目录(packages/core 等上游包里 Code Puppy 自有的登记文件)。
@@ -135,7 +141,7 @@ test_layer_groups() {
   test_layer_map packages/codepuppy-contracts-consumer "${TEST_LAYERS[@]}" | sed "s|^|codepuppy-contracts-consumer	packages/codepuppy-contracts-consumer	parallel	|"
   test_layer_map packages/ext "${TEST_LAYERS[@]}" | sed "s|^|ext	packages/ext	discover	|"
   while IFS=$'\t' read -r f layer; do
-    if [ "$layer" = scenario ] || { [ "$layer" = integration ] && ui_mac_is_engine "$f"; }; then
+    if ui_mac_runs_serial "$f" "$layer"; then
       printf 'ui-mac+serial\tpackages/ui-mac\tserial\t%s\t%s\n' "$f" "$layer"
     else
       printf 'ui-mac\tpackages/ui-mac\tparallel\t%s\t%s\n' "$f" "$layer"

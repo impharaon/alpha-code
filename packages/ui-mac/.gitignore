@@ -26,3 +26,8 @@ native/codepuppy-fence/build/
 # 每个目标架构一份,经 extraResources 进包)。下载缓存在 ~/Library/Caches/codepuppy/office-runtime/,不在仓里。
 native/office-runtime/build/
 dist-engine/
+
+# 构建产物:随包 ripgrep(scripts/build-ripgrep.ts 按引擎 binary.ts 的钉住值产出,每个目标架构一份 + 旁边的 .stamp,经 extraResources 进包)。
+# 下载缓存在 ~/Library/Caches/codepuppy/ripgrep/,不在仓里。resources/ripgrep/ 只在 server.test.ts 的 §4.8 用例里短暂出现(桩 rg),不入库。
+native/ripgrep/build/
+resources/ripgrep/

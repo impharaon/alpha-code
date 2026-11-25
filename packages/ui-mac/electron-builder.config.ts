@@ -8,6 +8,7 @@ import { Arch, type Configuration, type MacOsTargetName } from "electron-builder
 import {
   ENGINE_ASSETS_DIR,
   OFFICE_RUNTIME_BUILD_DIR,
+  RIPGREP_BUILD_DIR,
   assertMacTargetArch,
   assertPackagedEngineAssets,
   resolveMacTargetArch,
@@ -192,6 +193,13 @@ const getBase = (appId: string): Configuration => ({
           {
             from: `${OFFICE_RUNTIME_BUILD_DIR}/${macTargetArch}/`,
             to: "office-runtime/",
+          },
+          // DESIGN-domestic-cloud-connectivity §4.8:搜索工具随包的 ripgrep(prebuild 里 scripts/build-ripgrep.ts 按引擎 binary.ts
+          // 钉住的版本与 sha256 取目标架构那一份)。落点 <resources>/ripgrep/rg,server.ts 把这个目录追加到引擎 PATH 末尾;
+          // 深签时与其它内嵌二进制同 Team 签名;afterPack 的 checkBundledRipgrep 核对它在、可执行、含目标片。
+          {
+            from: `${RIPGREP_BUILD_DIR}/${macTargetArch}/`,
+            to: "ripgrep/",
           },
         ]
       : []),

@@ -23,6 +23,10 @@ await $`bun ./scripts/build-fence-addon.ts`
 // 的 lock 以哈希校验安装,并在构建期验证四种格式真能读写;打印本架构实际体积。extraResources 把它带进包(office-runtime/)。
 await $`bun ./scripts/build-office-runtime.ts`
 
+// DESIGN-domestic-cloud-connectivity §4.8:搜索工具随包的 ripgrep —— 版本与 sha256 读自引擎 packages/core/src/ripgrep/binary.ts,
+// 不符即红;目标架构一份,extraResources 把它带进包(ripgrep/)。
+await $`bun ./scripts/build-ripgrep.ts`
+
 // Bundle @codepuppy/ext to self-contained ESM so the embedded Node server can load it
 // without resolving raw TS at runtime (see .claude/rules/DECISIONS.md ADR-006).
 await $`cd ../ext && bun run build`

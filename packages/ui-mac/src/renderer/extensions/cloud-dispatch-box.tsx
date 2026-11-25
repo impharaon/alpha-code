@@ -16,6 +16,7 @@ import { UploadConsentDialog } from "./upload-consent-dialog"
 import { failureCopy } from "./cloud-failure-copy"
 import { createCloudJobLifecycle, dispatchError, type CloudJobState } from "./cloud-job-lifecycle"
 import { CloudPreflightArea, createCloudPreflight } from "./cloud-preflight"
+import { markAccountSummaryStale } from "../account-summary"
 
 type ConsentState = { requestId: string; preview: UploadPreview }
 
@@ -293,6 +294,7 @@ export function CloudDispatchBox(props: { entryId?: string; spec: CloudPipelineS
                 void window.api.auth.start()
                 return
               }
+              markAccountSummaryStale() // #1739
               void window.api.cloud.openBillingPage(target)
             }}>
               {t(action() === "login" ? "codepuppy.ext.cloudGoLogin" : action() === "recharge" ? "codepuppy.ext.cloudGoRecharge" : "codepuppy.ext.cloudOpenOverflow")}

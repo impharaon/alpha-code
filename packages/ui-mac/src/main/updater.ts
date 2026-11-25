@@ -4,7 +4,7 @@ import { app, dialog } from "electron"
 import pkg from "electron-updater"
 import { UPDATER_ENABLED } from "./constants"
 import { getCodePuppyEnvironment, parseAppUpdateYml, verifyUpdaterFeed, type PackagedFeed } from "./codepuppy-environment"
-import { createUpdaterController, type UpdaterReadyRecord } from "./updater-controller"
+import { createUpdaterController, feedHostBackend, type UpdaterReadyRecord } from "./updater-controller"
 import { getLogger } from "./logging"
 import { getStore } from "./store"
 import { UPDATER_STORE } from "./store-keys"
@@ -71,12 +71,21 @@ export function setupAutoUpdater(stop: () => Promise<void>) {
   })
 
   const store = getStore(UPDATER_STORE)
+  // DESIGN-domestic-cloud-connectivity §4.6:每次检查先经香港转发入口、再 github.com;经转发下载失败时同一轮改走直连一次。
+  const feeds = feedHostBackend({
+    updater: {
+      setFeedURL: (options) => autoUpdater.setFeedURL(options),
+      checkForUpdates: () => autoUpdater.checkForUpdates(),
+      downloadUpdate: () => autoUpdater.downloadUpdate(),
+    },
+    log: (message, data) => logger.log(message, data),
+  })
   return createUpdaterController({
     enabled,
     currentVersion: app.getVersion(),
     backend: {
-      checkForUpdates: () => autoUpdater.checkForUpdates(),
-      downloadUpdate: () => autoUpdater.downloadUpdate(),
+      checkForUpdates: feeds.checkForUpdates,
+      downloadUpdate: feeds.downloadUpdate,
       quitAndInstall: () => autoUpdater.quitAndInstall(),
       // [ac#1559] 用更新器自己的 currentVersion(SemVer)判新旧 —— 与它判「有无可用更新」同一把尺子。
       isNewer: (version) => autoUpdater.currentVersion.compare(version) < 0,

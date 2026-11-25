@@ -75,7 +75,8 @@ export function createPluginSources(deps: { catalog: () => Promise<readonly Cand
   const npmQueries = new Map<string, Promise<{ name: string; version: string; description: string }[]>>()
   // Keep deadline/resource failure provenance private; the source failure wire shape remains unchanged.
   const boundedFailures = new WeakMap<SourceFailure, "network" | "format">()
-  const get = async (url: string, signal?: AbortSignal) => {
+  // `waitOutRateLimit: false`(§4.7 的转发那一次):429 就是这一次的失败,交给调用方改取原地址,不在转发上等。
+  const get = async (url: string, signal?: AbortSignal, waitOutRateLimit = true) => {
     if (signal?.aborted) throw new SourceError("network", "Source deadline exceeded")
     const controller = new AbortController()
     try {
@@ -86,7 +87,7 @@ export function createPluginSources(deps: { catalog: () => Promise<readonly Cand
         // out and the same page asked again until the request deadline; it is not the source being unavailable.
         for (let attempt = 1; ; attempt++) {
           response = await (deps.fetch ?? fetch)(url, { signal: live }).catch(() => { throw new SourceError("network", "Source request failed") })
-          if (response.status !== 429) break
+          if (response.status !== 429 || !waitOutRateLimit) break
           void response.body?.cancel().catch(() => undefined)
           await rateLimitPause(Number(response.headers.get("retry-after")) * 1000, attempt, live)
         }
@@ -126,8 +127,8 @@ export function createPluginSources(deps: { catalog: () => Promise<readonly Cand
     const known = indexes.get(market.source)
     if (known) return known
     const original = market.repository.replace("https://github.com/", "https://raw.githubusercontent.com/") + "/main/" + market.manifest
-    const read = async (url: string, budget?: AbortSignal) => {
-      const bytes = await get(url, budget)
+    const read = async (url: string, budget?: AbortSignal, waitOutRateLimit?: boolean) => {
+      const bytes = await get(url, budget, waitOutRateLimit)
       try { return readMarketplace(bytes, market.ecosystem) } catch { throw new SourceError("format", "Marketplace is not readable") }
     }
     // §4.7:先取香港转发入口(§4.5 白名单 `/raw/<原路径>`),最多 10 s;它的任何失败都改取原地址,用该来源剩下的搜索时限。
@@ -135,7 +136,7 @@ export function createPluginSources(deps: { catalog: () => Promise<readonly Cand
       const relay = new AbortController()
       const timer = setTimeout(() => relay.abort(), MARKETPLACE_RELAY_TIMEOUT_MS)
       try {
-        return await read(`https://${CODEPUPPY_GITHUB_RELAY_HOST}/raw${new URL(original).pathname}`, signal ? AbortSignal.any([signal, relay.signal]) : relay.signal)
+        return await read(`https://${CODEPUPPY_GITHUB_RELAY_HOST}/raw${new URL(original).pathname}`, signal ? AbortSignal.any([signal, relay.signal]) : relay.signal, false)
       } catch {
         // 原地址那一次的结果(成功或失败原因)才是该来源的结论。
       } finally {

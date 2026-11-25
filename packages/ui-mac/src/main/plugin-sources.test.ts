@@ -785,3 +785,27 @@ test("§4.7 转发与原地址都失败:报该来源失败,原因取原地址那
   expect(result.sources.find((source) => source.source === "claude-marketplace")).toEqual({ source: "claude-marketplace", status: "failed", reason: "http", detail: "Source returned HTTP 503" })
   expect(result.sources.find((source) => source.source === "codex-marketplace")).toEqual({ source: "codex-marketplace", status: "failed", reason: "http", detail: "Source returned HTTP 503" })
 })
+
+test("§4.7 转发入口回 429(GitHub 限流转发机)⇒ 不等 Retry-After,立刻改取原地址", async () => {
+  const { jest } = await import("bun:test")
+  const requested: string[] = []
+  const sources = (await sourcesModule()).createPluginSources({ catalog: async () => [], fetch: async (url) => {
+    const address = String(url)
+    requested.push(address)
+    if (relayToRaw(address)) return new Response("rate limited", { status: 429, headers: { "retry-after": "5" } })
+    return fixtureFetch(address)
+  } })
+  jest.useFakeTimers()
+  try {
+    const pending = sources.searchSources("context7")
+    await flush(200)
+    // 假时钟一刻未动:原地址已经请求,转发地址各只问过一次(没有按 Retry-After 再问)。
+    expect(requested.filter((address) => address.startsWith("https://raw.githubusercontent.com/")).sort()).toEqual([RAW_CLAUDE, RAW_CODEX])
+    expect(requested.filter((address) => relayToRaw(address)).sort()).toEqual([RELAY_CLAUDE, RELAY_CODEX])
+    const result = await pending
+    expect(result.sources.find((source) => source.source === "claude-marketplace")).toMatchObject({ status: "ok", matched: 1 })
+    expect(result.sources.find((source) => source.source === "codex-marketplace")).toMatchObject({ status: "ok" })
+  } finally {
+    jest.useRealTimers()
+  }
+})

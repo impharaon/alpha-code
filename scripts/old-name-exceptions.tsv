@@ -515,8 +515,6 @@ docs/runbooks/distribution.md	.alpha-code-signing	1	migration-source	一次性�
 docs/runbooks/distribution.md	RUNBOOK-alpha-code-distribution	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 docs/runbooks/extension-tx-journal.md	RUNBOOK-alpha-code-extension-tx-journal	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 docs/runbooks/model-catalog-updates.md	alpha-platform	7	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/runbooks/model-catalog-updates.md	:alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-docs/runbooks/model-catalog-updates.md	alpha-platform:	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 docs/runbooks/model-catalog-updates.md	RUNBOOK-alpha-code-model-catalog-updates	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 docs/runbooks/naming-migration.md	Support/alpha-code-state/	1	historical	0.1.24 及更早版本写下的旧名:升级迁移 runbook 点名迁移源与手工回退的目标(#1569)
 docs/runbooks/naming-migration.md	alpha-live-models.json alpha-byok-catalog.json	1	historical	0.1.24 及更早版本写下的旧名:升级迁移 runbook 点名迁移源与手工回退的目标(#1569)

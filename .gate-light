@@ -5,7 +5,7 @@
 # 注入库存快照、锁文件、package.json、发版清单。不含 scripts/** .github/** packages/** frontend/** 与根配置。
 # 唯一的 scripts 例外是 scripts/old-name-exceptions.tsv(旧名登记表):它跟着文档编辑走,只被 old-name-scan 与 naming-migration-wiring
 # 两个测试读,这两个都在 DOCS_ANCHOR_TESTS 里,轻量门照跑。
-# 语法:每行一个 glob,`*`/`?` 不跨目录,`**` 跨目录;`#` 注释;没有排除语法。
+# 语法:每行一个 glob,`*`/`?` 不跨目录,`**` 跨目录;`#` 注释;`!glob` 行把匹配的文件(含 .md)留在全量门。
 #
 # 刻意**不**收的 docs 路径(都有门里的测试或门步骤在运行时读它们,改了会改变全量门的结果):
 #   docs/architecture/codepuppy-authority-registry.json —— 接管面权威登记,被 ext 的 authority-registry.test.ts、ui-mac 的
@@ -16,8 +16,8 @@
 #       (packages/core、packages/opencode 的 websearch nokey-outcomes 测试)
 #     2026-07-27-e7-packaged-live/results/latest-logged-in.json (cloud-web-search.test.ts)
 #   这类路径照常走全量门。
-# 已知缺口(没有排除语法,切不出来):docs/design/2026-11-15-plugin-package-install-and-card/frame.html 被 PR 门的
-#   plugin-search-layout.browser.test.ts 读,却落在 docs/design/** 里 —— 只改它的 push 走轻量门,不跑那个浏览器测试。
+# 排除:docs/design/2026-11-15-plugin-package-install-and-card/frame.html 被 PR 门的 plugin-search-layout.browser.test.ts 读,
+#   虽在 docs/design/** 里,用下面的 `!` 行留在全量门。
 
 docs/architecture/diagrams/**
 docs/archive/**
@@ -32,3 +32,4 @@ docs/verification/**/*.log
 docs/verification/**/*.jsonl
 .claude/rules/**
 scripts/old-name-exceptions.tsv
+!docs/design/2026-11-15-plugin-package-install-and-card/frame.html

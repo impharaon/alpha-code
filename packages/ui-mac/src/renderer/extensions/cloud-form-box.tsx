@@ -13,6 +13,7 @@ import type { CloudBehaviorV1, CloudFieldV1 } from "../../shared/host-extension-
 import { failureCopy } from "./cloud-failure-copy"
 import { createCloudJobLifecycle, dispatchError, type CloudJobState } from "./cloud-job-lifecycle"
 import { CloudPreflightArea, createCloudPreflight } from "./cloud-preflight"
+import { markAccountSummaryStale } from "../account-summary"
 
 export function CloudFormBox(props: { cloud: CloudBehaviorV1; ready: boolean; recovering?: boolean }) {
   const [state, setState] = createStore<CloudJobState & { values: Record<string, string> }>({
@@ -216,6 +217,7 @@ export function CloudFormBox(props: { cloud: CloudBehaviorV1; ready: boolean; re
                 void window.api.auth.start()
                 return
               }
+              markAccountSummaryStale() // #1739
               void window.api.cloud.openBillingPage(target)
             }}>
               {t(action() === "login" ? "codepuppy.ext.cloudGoLogin" : action() === "recharge" ? "codepuppy.ext.cloudGoRecharge" : "codepuppy.ext.cloudOpenOverflow")}

@@ -17,7 +17,7 @@
 import { transformAsync } from "@babel/core"
 import presetTypescript from "@babel/preset-typescript"
 import { GlobalRegistrator } from "@happy-dom/global-registrator"
-import { afterAll, afterEach, beforeEach, describe, expect, mock, test } from "bun:test"
+import { afterAll, afterEach, beforeEach, describe, expect, mock, setSystemTime, test } from "bun:test"
 import presetSolid from "babel-preset-solid"
 import type { CodePuppyProject, CodePuppyProjectsApi } from "../src/renderer/sidebar/use-projects"
 import type { AccountSummary } from "../src/preload/types"
@@ -193,10 +193,15 @@ const DEFAULT_AUTH = {
 let currentAuth: Record<string, unknown> = DEFAULT_AUTH
 let pushAuth: ((state: unknown) => void) | undefined
 let summaryImpl: (() => Promise<unknown>) | undefined
+// alpha-code#1739:「期间登录状态事件为零」要能数 —— main 的登录现值被读了几次。
+let authReads = 0
 
 const EXPLICIT: Record<string, (...args: unknown[]) => unknown> = {
   appVersion: async () => "0.0.0-quadrant",
-  "auth.getState": async () => currentAuth,
+  "auth.getState": async () => {
+    authReads++
+    return currentAuth
+  },
   "auth.subscribe": (callback: unknown) => {
     pushAuth = callback as (state: unknown) => void
     return () => {}
@@ -221,6 +226,7 @@ function apiNode(path: string[]): unknown {
 
 const runtime = await import("../src/renderer/sidebar/overlay-close-test-runtime")
 const { hrefFor } = await import("../src/shared/route-manifest")
+const { resetAccountSummaryForTests } = await import("../src/renderer/account-summary")
 
 const DIR = "/Users/tester/proj-a"
 
@@ -261,12 +267,13 @@ beforeEach(() => {
   document.body.append(root)
 })
 
-afterEach(() =>
+afterEach(() => {
   disposers
     .splice(0)
     .reverse()
-    .forEach((dispose) => dispose()),
-)
+    .forEach((dispose) => dispose())
+  resetAccountSummaryForTests() // #1739:共享的账户状态与取值时刻是模块级,不跨用例
+})
 
 afterAll(() => GlobalRegistrator.unregister())
 
@@ -403,5 +410,188 @@ describe("alpha-code#1686 the balance card follows an account switch without log
     lateA.resolve(summaryA)
     await flush()
     expect(balance()).toBe("¥0.00")
+  })
+})
+
+// alpha-code#1739:付款(或一轮对话消耗)之后,账户面板不重新登录也要拿到当前值。取值时刻:回到应用窗口(距上次取值
+// 超过 30 秒)、打开账户面板。时间用 setSystemTime 注入(同 cloud-preflight 的 30 秒用例),不断言真实耗时。
+describe("alpha-code#1739 the account summary is refetched without a login event", () => {
+  const T0 = Date.parse("2026-11-21T00:00:00Z")
+  const at = (seconds: number) => setSystemTime(new Date(T0 + seconds * 1000))
+  const refocus = async () => {
+    window.dispatchEvent(new Event("focus"))
+    await flush()
+  }
+  const deferred = () => {
+    let resolve!: (value: unknown) => void
+    const promise = new Promise<unknown>((r) => (resolve = r))
+    return { promise, resolve }
+  }
+  const unsubscribed = CASES[2]!.summary // 未订阅、有余额、用量非零
+  const subscribed = CASES[0]!.summary // 已订阅 Pro 月卡
+  const counted = (reply: () => unknown) => {
+    const seen = { calls: 0 }
+    summaryImpl = async () => {
+      seen.calls++
+      return reply()
+    }
+    return seen
+  }
+
+  afterEach(() => {
+    setSystemTime()
+    summaryImpl = undefined
+    currentAuth = DEFAULT_AUTH
+  })
+
+  test("① a window refocus refetches only when the last fetch is older than 30 seconds", async () => {
+    at(0)
+    const seen = counted(() => unsubscribed)
+    await mount()
+    const mounted = seen.calls // 登录现值每送达一次侧栏就取一次;挂载时的次数不是本条的被测量
+
+    at(20)
+    await refocus()
+    expect(seen.calls).toBe(mounted)
+
+    at(31)
+    await refocus()
+    expect(seen.calls).toBe(mounted + 1)
+
+    at(40) // 距 31 秒那次只有 9 秒
+    await refocus()
+    expect(seen.calls).toBe(mounted + 1)
+  })
+
+  test("② opening the account panel fetches the current values each time it opens", async () => {
+    at(0)
+    const seen = counted(() => unsubscribed)
+    await mount()
+    const mounted = seen.calls
+
+    const trigger = document.querySelector(".codepuppy-sidebar-account")!
+    click(trigger)
+    await flush()
+    expect(seen.calls).toBe(mounted + 1)
+
+    click(trigger) // 关闭不取
+    await flush()
+    expect(seen.calls).toBe(mounted + 1)
+
+    click(trigger)
+    await flush()
+    expect(seen.calls).toBe(mounted + 2)
+  })
+
+  test("④ after the fetch returns a subscription the panel shows it, with no login event", async () => {
+    at(0)
+    let reply: unknown = unsubscribed
+    const seen = counted(() => reply)
+    await mount()
+    click(document.querySelector(".codepuppy-sidebar-account")!)
+    await flush()
+    const pop = () => document.querySelector(".codepuppy-acct-pop")!
+    expect(pop().querySelector(".codepuppy-acct-plan")?.textContent?.trim()).toBe("按量付费")
+    expect(readRows(pop())["5 小时额度"]).toBeUndefined()
+
+    reply = subscribed
+    const callsBefore = seen.calls
+    const authBefore = authReads
+    at(31)
+    await refocus()
+    expect(seen.calls).toBe(callsBefore + 1)
+    const chip = pop().querySelector(".codepuppy-acct-plan")
+    expect(chip?.textContent?.trim()).toBe("PRO 月卡")
+    expect(chip?.hasAttribute("data-pro")).toBe(true)
+    expect(readRows(pop())["5 小时额度"]).toBe("1,234 / 9,000")
+    expect(authReads).toBe(authBefore) // 没有任何登录状态的读取或事件
+  })
+
+  test("a reply that was sent earlier but arrives later never overwrites the newer value", async () => {
+    const older = CASES[0]!.summary // ¥998.65
+    const newer = CASES[1]!.summary // ¥0.00
+    at(0)
+    counted(() => older)
+    await mount()
+    click(document.querySelector(".codepuppy-sidebar-account")!)
+    await flush()
+    const pop = () => document.querySelector(".codepuppy-acct-pop")!
+    expect(readRows(pop())["可用余额"]).toBe("¥998.65")
+
+    const first = deferred() // 窗口回来那次(先发出)
+    const second = deferred() // 面板再打开那次(后发出)
+    const queue = [first.promise, second.promise]
+    summaryImpl = () => queue.shift()!
+    at(31)
+    await refocus()
+    const trigger = document.querySelector(".codepuppy-sidebar-account")!
+    click(trigger) // 关
+    click(trigger) // 开 → 第二次取值
+    await flush()
+    expect(queue.length).toBe(0)
+
+    second.resolve(newer)
+    await flush()
+    expect(readRows(pop())["可用余额"]).toBe("¥0.00")
+    first.resolve(older) // 先发出的回复后到:不得盖掉后发出的那份
+    await flush()
+    expect(readRows(pop())["可用余额"]).toBe("¥0.00")
+  })
+
+  // 付款回来可能不到 30 秒:从应用打开订阅 / 充值页之后,下一次回到窗口一定取;平常的切换仍守 30 秒。
+  for (const cta of ["升级会员", "充值"]) {
+    test(`after "${cta}" opens the web page, a refocus within 30 seconds still fetches`, async () => {
+      at(0)
+      const seen = counted(() => unsubscribed)
+      await mount()
+      click(document.querySelector(".codepuppy-sidebar-account")!) // 打开面板那次取值,t0
+      await flush()
+      const buttons = [...document.querySelectorAll<HTMLElement>(".codepuppy-acct-pop .codepuppy-acct-btn")]
+      const button = buttons.find((b) => b.textContent?.trim() === cta)
+      expect(button).toBeDefined()
+      const base = seen.calls
+
+      at(2)
+      click(button!)
+      await flush()
+      expect(seen.calls).toBe(base)
+
+      at(10) // 距上次取值只有 10 秒
+      await refocus()
+      expect(seen.calls).toBe(base + 1)
+
+      at(15) // 链接那一次已用掉;之后的平常切换回到 30 秒规则
+      await refocus()
+      expect(seen.calls).toBe(base + 1)
+    })
+  }
+
+  test("an ordinary refocus within 30 seconds, with no wallet page opened, does not fetch", async () => {
+    at(0)
+    const seen = counted(() => unsubscribed)
+    await mount()
+    click(document.querySelector(".codepuppy-sidebar-account")!)
+    await flush()
+    const base = seen.calls
+    at(10)
+    await refocus()
+    expect(seen.calls).toBe(base)
+  })
+
+  test("a refetch that fails keeps the values already shown", async () => {
+    at(0)
+    let reply: unknown = subscribed
+    counted(() => reply)
+    await mount()
+    click(document.querySelector(".codepuppy-sidebar-account")!)
+    await flush()
+    const pop = () => document.querySelector(".codepuppy-acct-pop")!
+    expect(readRows(pop())["可用余额"]).toBe("¥998.65")
+
+    reply = { error: "network" }
+    at(31)
+    await refocus()
+    expect(readRows(pop())["可用余额"]).toBe("¥998.65")
+    expect(pop().querySelector(".codepuppy-acct-plan")?.textContent?.trim()).toBe("PRO 月卡")
   })
 })

@@ -11,7 +11,7 @@ const UI_MAC = join(import.meta.dir, "../..")
 type Host = { title: string; cases: string; pass: number; args?: string[]; cwd?: string; timeout: number }
 
 const HOSTS: Host[] = [
-  { title: "账户浮层按「订阅×余额」四象限如实呈现(chip 三态 + 用量两行 + 无余额格静默)", cases: "test-component/account-quadrant.cases.ts", pass: 7, timeout: 120_000 },
+  { title: "账户浮层按「订阅×余额」四象限如实呈现(chip 三态 + 用量两行 + 无余额格静默)", cases: "test-component/account-quadrant.cases.ts", pass: 15, timeout: 120_000 },
   { title: "账户浮层显示当前版本号与构建身份(版本来自 window.api.appVersion、登录/登出两分支;#237 复制一行 + 三种包的标记 + 提交未知)", cases: "test-component/account-version.cases.ts", pass: 7, timeout: 120_000 },
   { title: "#1553 附件卡:读取路径标签随引擎能力与登录状态变化、发送前拒绝、读取结果与重新读取(真组件用例)", cases: "test-component/attachment-cards.cases.ts", pass: 15, timeout: 60_000 },
   { title: "#1557 模型目录刷新失败不在全局层(真组件用例)", cases: "test-component/catalog-failure-banner.cases.ts", pass: 3, timeout: 60_000 },
@@ -28,7 +28,7 @@ const HOSTS: Host[] = [
   { title: "the production ExtensionDetail header states the recorded artifact digest, or says it is not recorded; a document tool's runtime section reads the bundled runtime (#1564)", cases: "test-component/receipt-artifact-display.cases.ts", pass: 6, timeout: 60_000 },
   { title: "#652 会话内连发三条:第 2、3 条真发出去并渲染出回复", cases: "test-component/session-second-send.cases.ts", pass: 11, timeout: 60_000 },
   { title: "footer 更新条:AC1 五状态呈现互不相同 / AC2 ready 回放即见安装入口 / up-to-date 不常亮", cases: "test-component/updater-surface.cases.ts", pass: 3, timeout: 120_000 },
-  { title: "use-projects 恢复语义(8 例)+ REQ-126 供给回报(2 例)+ #692 非 Git 侧栏(1 例)+ #882 catalog.updated 接线(1 例)+ REQ-236 首页斜杠命令档位(1 例)+ #1560 首发显式模型(1 例)", cases: "test-component/use-projects.cases.ts", pass: 16, timeout: 120_000 },
+  { title: "use-projects 恢复语义(8 例)+ REQ-126 供给回报(2 例)+ #692 非 Git 侧栏(1 例)+ #882 catalog.updated 接线(1 例)+ REQ-236 首页斜杠命令档位(1 例)+ #1560 首发显式模型(1 例)+ #1739 session.idle 取账户现值(1 例)", cases: "test-component/use-projects.cases.ts", pass: 17, timeout: 120_000 },
 ]
 
 test.each(HOSTS)(

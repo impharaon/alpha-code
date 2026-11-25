@@ -111,9 +111,16 @@ let defaultDirReply: unknown = DEFAULT_WORKSPACE_DIR
 // `sidecarGeneration` 刻意只在这里注入 —— runtime-recovery.ts:29 用
 // `Boolean(window.api?.sidecarGeneration)` 判「有没有恢复能力」,把它塞进共享桩会改掉
 // 另外三个文件的分支。
+// alpha-code#1739:一轮对话结束(session.idle)必须取一次账户现值 —— 用例数这条 IPC 被调了几次。
+let accountReads = 0
 installPreloadStub(
   { catalog, account: summary, providerKeys: keys, auth: loggedIn },
-  {},
+  {
+    accountSummary: async () => {
+      accountReads++
+      return summary
+    },
+  },
   {
     workspaceDefaultDir: async () => {
       if (defaultDirReply instanceof Error) throw defaultDirReply
@@ -786,6 +793,24 @@ test("#882 global 事件流把 catalog.updated 按 directory 派发给就绪屏�
   // 判据:第二次探针是**事件**推动的 —— 它发生时一个兜底 tick 都还没烧掉。
   expect(ticksAtProbe[1]).toBe(0)
   expect(await listing).toHaveLength(1)
+})
+
+test("#1739 ③ global 事件流上一轮对话结束(session.idle)取一次账户现值,别的事件不取", async () => {
+  sidebarScenario = true
+  const { api } = mountHook(60_000)
+  await waitFor(() => expect(api.sdk()).toBeDefined())
+  await waitFor(() => expect(globalEventController).toBeDefined())
+  const emit = (frame: Record<string, unknown>) =>
+    globalEventController!.enqueue(encoder.encode(`data: ${JSON.stringify(frame)}\n\n`))
+
+  // 控制组:同一条流上的别的事件不取(否则这条只是「流是通的」)。
+  const before = accountReads
+  emit({ directory: "/repos/alpha-code", project: "git-alpha", payload: { type: "server.heartbeat", properties: {} } })
+  await tick(20)
+  expect(accountReads).toBe(before)
+
+  emit({ directory: "/repos/alpha-code", project: "git-alpha", payload: { type: "session.idle", properties: { sessionID: "ses-1" } } })
+  await waitFor(() => expect(accountReads).toBe(before + 1))
 })
 
 test("#1560 首发:显式选择的模型随首条消息与斜杠命令发出(含档位),未显式时两条都不带", async () => {

@@ -19,6 +19,7 @@ import { subscribeAuthState } from "../auth-recovery"
 import type { CloudAccountStatus } from "../../preload/types"
 import { failureCopy, preflightRefusalCopy } from "./cloud-failure-copy"
 import { dispatchError } from "./cloud-job-lifecycle"
+import { markAccountSummaryStale } from "../account-summary"
 
 /** 焦点刷新的新鲜度门槛(设计 §4.4「取数时机」;表单内常量,不是配置)。 */
 export const PREFLIGHT_STALE_MS = 30_000
@@ -196,6 +197,7 @@ function holdSentence(body: CloudAccountStatus) {
 
 function runAction(action: "login" | "recharge" | "overflow") {
   if (action === "login") return void window.api.auth.start()
+  markAccountSummaryStale() // #1739:付款回来可能不到 30 秒
   void window.api.cloud.openBillingPage(action)
 }
 

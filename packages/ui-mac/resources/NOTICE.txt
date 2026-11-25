@@ -39,6 +39,15 @@ Copyright Anthropic, licensed under the Apache License 2.0. Its full license
 text ships alongside it (resources/skills/skill-creator/LICENSE.txt). Source:
 Anthropic's official Claude plugins/skills.
 
+--------------------------------------------------------------------------------
+Bundled ripgrep (search tools)
+--------------------------------------------------------------------------------
+The "rg" executable bundled under ripgrep/ is ripgrep by Andrew Gallant
+(https://github.com/BurntSushi/ripgrep), Copyright (c) 2015 Andrew Gallant,
+dual-licensed under the MIT License and the Unlicense; you may use it under the
+terms of either. Its license texts (COPYING, LICENSE-MIT, UNLICENSE) ship
+alongside it in ripgrep/.
+
 Third-party components
 --------------------------------------------------------------------------------
 Other bundled components (Electron, SolidJS, and the dependencies declared in the

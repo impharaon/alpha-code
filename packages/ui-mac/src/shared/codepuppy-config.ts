@@ -38,6 +38,10 @@ export const CODEPUPPY_ENDPOINTS = {
   cloud: "https://alpha-cloud.tidelabs.click",
 } as const
 
+/** forge-hk 上的 GitHub 内容转发入口(DESIGN-domestic-cloud-connectivity §4.5)。只承载本仓发行物与插件助手的两份市场清单;
+ *  桌面每次先走它、再回 GitHub 直连(main/codepuppy-environment.ts 的 UPDATE_FEED_HOSTS、main/plugin-sources.ts 的 loadIndex)。 */
+export const CODEPUPPY_GITHUB_RELAY_HOST = "alpha-github-hk.tidelabs.click"
+
 // Path segments appended to the hosts above — the full alpha↔backend URL contract in one place.
 // Change a route here (e.g. /v1 → /openai/v1) instead of editing inline template strings.
 export const CODEPUPPY_PATHS = {

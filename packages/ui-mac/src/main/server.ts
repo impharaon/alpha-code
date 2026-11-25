@@ -1,7 +1,7 @@
 import { clearOfficialConnectorRuntime, clearOfficialConnectorRuntimeOnExit, officialAvailabilityPublished, restoreCommittedOfficialConnectors } from "./official-connector-resources"
 import { createHash } from "node:crypto"
 import { existsSync } from "node:fs"
-import { dirname, join } from "node:path"
+import { delimiter, dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
 // `#1423`:**命名空间导入,不是具名导入** —— 这一行曾是仓内唯一的
 // `import { app, utilityProcess } from "electron"`,而它让 server.ts 在 `bun test src` 全量里**链接期**就抛
@@ -562,6 +562,9 @@ export async function spawnLocalServer(
   const sidecarEnv = createSidecarEnv()
   // uv's default ~/.cache/uv is outside the fence; keep Office dependencies under the existing W3 root.
   sidecarEnv.UV_CACHE_DIR = join(options.userDataPath, "uv-cache")
+  // DESIGN-domestic-cloud-connectivity §4.8:随包 ripgrep 的目录追加在 PATH 末尾 —— 用户自己装的 rg 照旧优先;没有时引擎的 which
+  // 找到随包这一份,不再从 GitHub 下载。它因此也在用户 shell 命令与 MCP 子进程的 PATH 末尾(只在用户没有 rg 时被用到)。
+  sidecarEnv.PATH = [sidecarEnv.PATH, join(resourcesRoot(), "ripgrep")].filter(Boolean).join(delimiter)
   // REQ-236 `#1575`(方案 §2.4 第 4 条):工具策略按登录账户分区。ext 读启动文档的 policy.account 选分区,缺席 = anonymous(未登录)。
   // 值是「本安装随机标识 + 账户标记」的哈希,不是凭据:混入安装标识后同一账户在另一台安装上是另一个值,不能据它跨安装关联。只由这里按
   // 当刻登录态算 —— shell 导出的同名变量选不了分区;账户或安装标识取不到都不给。登录、登出、换号都会重新 fork(codepuppy-auth 的

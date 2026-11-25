@@ -25,6 +25,7 @@ import {
   subscribeRuntimeRecovery,
 } from "../runtime-recovery"
 import { markStartupTimeline } from "../startup-timeline"
+import { refreshAccountSummary } from "../account-summary"
 import { nextEngineRetryDelay } from "../codepuppy-ui/model-picker-logic"
 import { tierAgent, v1CommandModelFields, v1PromptModelFields, type PermMode } from "../codepuppy-ui/composer-state"
 
@@ -620,6 +621,8 @@ export function useCodePuppyProjects(
               break
             case "session.idle":
               void reloadForSession(projectID, directory)
+              // #1739:一轮对话结束,余额与 5 小时 / 7 日用量已变 —— 取一次账户现值。
+              refreshAccountSummary()
               break
             case "project.updated":
             case "project.directories.updated":

@@ -70,7 +70,8 @@ export function buildRipgrep(options: { arch?: TargetArch } = {}): { dir: string
   const dir = join(packageDir, RIPGREP_BUILD_DIR, arch)
   // 戳记放在目录旁边(不进包):记着装进去的是哪个 sha256 的发行包,钉住值变了就重装。
   const stamp = `${dir}.stamp`
-  const reused = readText(stamp) === pin.sha256 && existsSync(join(dir, "rg"))
+  // 复用要求 rg 与三份许可文件都在 —— NOTICE.txt 说许可文本随 rg 一起进包,缺一份就重装。
+  const reused = readText(stamp) === pin.sha256 && ["rg", ...RIPGREP_LICENSE_FILES].every((name) => existsSync(join(dir, name)))
   if (!reused) {
     installRipgrep({ archive: download(pin), pin, dir })
     writeFileSync(stamp, pin.sha256)

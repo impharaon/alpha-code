@@ -5,10 +5,10 @@
 // project's saved approvals; and the reply's cascade releases only pending requests of the same session.
 // Production permission engine, sessions, agents and plugin hooks in the isolated host (policy-host.cases.ts). The
 // restart half of invariant 4 is session-grant-restart.test.ts; invariant 6 is register-policy.test.ts E6.
-import { beforeAll, describe, expect } from "bun:test"
+import { describe, expect } from "bun:test"
 import { Bus, E, isolate, it, Location, Permission, PermissionSaved, Plugin, promisePlugin, seedProject, Session } from "./policy-host.cases"
 
-beforeAll(isolate)
+isolate()
 const { Effect, Fiber } = E
 
 type Rule = { action: string; resource: string; effect: "allow" | "deny" | "ask" }

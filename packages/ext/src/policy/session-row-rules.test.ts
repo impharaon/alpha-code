@@ -9,7 +9,7 @@
 // Harness: the production permission service, Promise adapter and execution chain (policy-host.cases.ts), as
 // unattended-policy.test.ts uses it. The tool is plugin-registered with the MCP layer's mark (the ext gives it an MCP
 // identity) and its executor makes no engine permission call, so the outcome is the extension's decision.
-import { beforeAll, expect } from "bun:test"
+import { expect } from "bun:test"
 import type { Context } from "@opencode/plugin/promise/plugin"
 import { AUTOMATION_PROFILES, type UnattendedProfile } from "../../../schema/src/codepuppy-unattended"
 import { buildUnattendedLive } from "../../../ui-mac/src/main/codepuppy-sidecar-messages"
@@ -18,7 +18,7 @@ import { createUnattendedState } from "./unattended"
 import { E, isolate, it, Location, Plugin, PluginHooks, promisePlugin, publishPolicyAccount, seedProject, Session, SessionContext, Tool, mcpToolMark } from "./policy-host.cases"
 
 const { Effect, Exit, Cause } = E
-beforeAll(isolate)
+isolate()
 
 type Rule = { action: string; resource: string; effect: "allow" | "deny" | "ask" }
 const IDENTITY = "mcp:unattended:write"

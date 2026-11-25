@@ -7,7 +7,7 @@ import { createUnattendedState } from "./unattended"
 // passes the evaluate hook", pinned on the engine source and on the `ask` path.
 import { readFileSync } from "node:fs"
 import path from "node:path"
-import { beforeAll, describe, expect, test } from "bun:test"
+import { describe, expect, test } from "bun:test"
 import {
   classifyPermissionRequest,
   readRiskClassification,
@@ -20,7 +20,7 @@ import { E, it, Location, Permission, Plugin, promisePlugin, isolate, seedProjec
 import { registerPolicy } from "./index"
 
 const { Effect, Exit, Cause, Fiber } = E
-beforeAll(isolate)
+isolate()
 
 const REPO_ROOT = path.resolve(import.meta.dir, "../../../..")
 const CLASSIFIER_SOURCE = "packages/ext/src/policy/risk.ts"

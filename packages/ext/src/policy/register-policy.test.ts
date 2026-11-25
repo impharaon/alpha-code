@@ -5,7 +5,7 @@ import { createUnattendedState } from "./unattended"
 // what the model request is built from; the snapshot's `execute` is what the session runner calls), expected
 // identities are hand-written literals, and side effects are real counters inside the tools.
 import { publishTestBootstrap, testCloudMcp } from "../../../ui-mac/test-component/codepuppy-bootstrap-fixture"
-import { beforeAll, describe, expect } from "bun:test"
+import { describe, expect } from "bun:test"
 import fs from "node:fs"
 import path from "node:path"
 import { createServer, type AddressInfo } from "node:net"
@@ -51,7 +51,7 @@ import { createToolPolicyStore, defaultPolicyBaseDir } from "./resolver"
 import { canonicalJsonDigest, savePolicyDocument } from "./store"
 
 const { Effect, Exit, Cause } = E
-beforeAll(isolate)
+isolate()
 
 // Hand-written expectations (never derived from production helpers).
 const ID_BUILTIN_WRITE = "builtin::probe_write"

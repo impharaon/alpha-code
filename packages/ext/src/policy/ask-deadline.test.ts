@@ -3,11 +3,11 @@
 // card is retracted with a replied event, and the call fails by name — it is never allowed. Runs the production
 // permission engine in the isolated host (policy-host.cases.ts). `#1698` G3: in Code Puppy's sidecar the deadline comes from the
 // published bootstrap document (`permission.askTimeoutMs`); the variable is read only by a host without a document.
-import { beforeAll, describe, expect, test } from "bun:test"
+import { describe, expect, test } from "bun:test"
 import { Bus, E, isolate, it, Location, Permission, Plugin, promisePlugin, publishAskTimeout, seedProject, Session } from "./policy-host.cases"
 import { __resetCodePuppyBootstrapForTests, ASK_TIMEOUT_MS_DEFAULT, codepuppyEngineSettings, publishCodePuppyBootstrap, tryCodePuppyBootstrap } from "../../../util/src/codepuppy-bootstrap"
 
-beforeAll(isolate)
+isolate()
 const { Effect, Exit, Cause, Fiber } = E
 const QuestionTool = (await import(`${import.meta.dir}/../../../core/src/tool/plugin/question.ts`)).QuestionTool
 

@@ -3,7 +3,7 @@ import { createUnattendedState } from "./unattended"
 // `buildInventory`). Replaces packages/opencode/test/permission/codepuppy-tool-inventory.test.ts (#1662 L4); the
 // v1 cases I1–I5 keep their meaning, I2 runs against the real host so "the badge tells the truth" is the same
 // resolver the executor uses, not a re-derivation.
-import { beforeAll, describe, expect, test } from "bun:test"
+import { describe, expect, test } from "bun:test"
 import path from "node:path"
 import { buildInventory } from "./rpc"
 import { toolFacts, type IdentityInput } from "./identity"
@@ -12,7 +12,7 @@ import { E, isolate, it, Location, mcpToolMark, Plugin, promisePlugin, publishPo
 import { registerPolicy } from "./index"
 import { createToolPolicyStore, defaultPolicyBaseDir } from "./resolver"
 
-beforeAll(isolate)
+isolate()
 const { Effect, Exit, Cause } = E
 
 const POLICY_URL = "https://mcp.example.test/policy"

@@ -2,7 +2,7 @@ import { createUnattendedState } from "./unattended"
 // #1662 L4 — lane seams I5: the tool policy API over the OpenCode 2 plugin RPC, called through the engine's RPC
 // registry (`Rpc.Service.call`, what `POST /api/rpc/:rpcID/:method` runs after its activation wait;
 // packages/server/src/handlers/rpc.ts maps a returned error to HTTP 400 `RpcError { type }`).
-import { beforeAll, describe, expect } from "bun:test"
+import { describe, expect } from "bun:test"
 import fs from "node:fs"
 import path from "node:path"
 import { E, it, Location, Plugin, promisePlugin, isolate, publishPolicyAccount, ROOT, Rpc } from "./policy-host.cases"
@@ -13,7 +13,7 @@ import { policyFilePath } from "./store"
 import { parseToolPolicyInventory } from "../../../schema/src/codepuppy-tool-inventory"
 
 const { Effect, Exit, Cause } = E
-beforeAll(isolate)
+isolate()
 
 const ID = "codepuppy.tool-policy"
 

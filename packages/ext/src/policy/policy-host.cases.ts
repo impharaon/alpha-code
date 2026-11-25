@@ -7,11 +7,12 @@
 // (packages/util/src/global-roots.ts). Network: core's test runner refuses non-loopback fetches.
 //
 // `.cases.ts`: a helper, not a test file — no `bun test` entry, no typecheck surface (packages/ext/tsconfig.json).
+import { afterAll, beforeAll } from "bun:test"
 import { createHash } from "node:crypto"
 import fs from "node:fs"
 import os from "node:os"
 import path from "node:path"
-import { publishTestBootstrap } from "../../../ui-mac/test-component/codepuppy-bootstrap-fixture"
+import { publishTestBootstrap, unpublishTestBootstrap } from "../../../ui-mac/test-component/codepuppy-bootstrap-fixture"
 import { tryCodePuppyBootstrap } from "../../../util/src/codepuppy-bootstrap"
 
 export const ROOT = fs.mkdtempSync(path.join(os.tmpdir(), "codepuppy-policy-host-"))
@@ -24,13 +25,10 @@ const ISOLATED: Record<string, string> = {
   XDG_STATE_HOME: path.join(ROOT, "state"),
   OPENCODE_DB: ":memory:",
 }
-/**
- * Re-applies the isolated environment. Call it from `beforeAll` in every file that uses this host: bun runs test
- * files in one process and caches this module, so a file that changed HOME / XDG after import would otherwise leave
- * the next file's engine and policy reading the owner's real directories (the policy reads its data root at call
- * time, as production does). The environment is never restored for the same reason.
- */
-export function isolate() {
+// The process's own values of those keys (the shared test-isolation preload's) from before this host first changed them.
+const OUTSIDE = Object.fromEntries(Object.keys(ISOLATED).map((key) => [key, process.env[key]]))
+
+function apply() {
   for (const [key, value] of Object.entries(ISOLATED)) {
     fs.mkdirSync(value === ":memory:" ? ROOT : value, { recursive: true })
     process.env[key] = value
@@ -39,6 +37,27 @@ export function isolate() {
   // `#1698`:registerPolicy 从 sidecar 发布的启动文档读随包清单与 Office 清单的路径;这里发布一份(都不在场 = 不给声明)
   publishTestBootstrap({ globalRoot: path.join(ROOT, "state") })
 }
+
+function restore() {
+  for (const [key, value] of Object.entries(OUTSIDE)) {
+    if (value === undefined) delete process.env[key]
+    else process.env[key] = value
+  }
+  unpublishTestBootstrap()
+}
+
+/**
+ * Call once at the top of every file that uses this host. bun runs a package's test files in one process and caches
+ * this module, so the host's environment is applied before the file's tests (another file may have changed HOME / XDG
+ * since import, and the policy reads its data root at call time, as production does) and taken back after them: the
+ * keys return to the process's own values and the bootstrap document is unpublished, so a later file never runs with
+ * this host's HOME or global root.
+ */
+export function isolate() {
+  beforeAll(apply)
+  afterAll(restore)
+}
+apply()
 
 /**
  * `#1698` G2:工具策略的账户分区来自启动文档的 policy.account(main 算的 `acct:<sha256>`);用例换账户 = 重新发布一份,
@@ -69,7 +88,6 @@ export function publishAskTimeout(askTimeoutMs: number | undefined): void {
     ...(askTimeoutMs === undefined ? {} : { askTimeoutMs }),
   })
 }
-isolate()
 
 const core = path.resolve(import.meta.dir, "../../../core")
 const load = (relative: string) => import(path.join(core, relative))

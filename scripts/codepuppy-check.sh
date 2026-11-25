@@ -210,9 +210,10 @@ echo "▶ [5/14] contract lock + unit tests (contracts-consumer + ext + ui-mac +
 #   · ui-mac:scripts/bun-test-ui-mac.sh 分两组 —— 非引擎文件 `--parallel`、真引擎宿主文件串行(各自过
 #     bun-test-floor.sh 的下界与已知红棘轮)。真引擎用例(起内嵌引擎、15s 级等待)与别的 worker 抢
 #     CPU 会超时变红(实测:10 worker 多出 7 行红;5 worker 在负载 ~14 的整门里仍红 4 个真引擎文件)。
-#   · ext **保持串行**:src/policy 下 14 个测试文件共享 policy-host.cases.ts(顶层 await 加载引擎、
+#   · ext **保持串行**:src/policy 下 10 个测试文件共享 policy-host.cases.ts(顶层 await 加载引擎、
 #     设计上跨文件共享同一模块实例),在 --isolate 下导入方先于它初始化完成,报
-#     `Cannot access 'E' before initialization`(单文件 `bun test --isolate` 同样复现)。
+#     `Cannot access 'E' before initialization`(单文件 `bun test --isolate` 同样复现)。共享的是模块,不是环境:
+#     每个用它的文件在自己的用例前装上宿主的 HOME / XDG 与启动文档、用例后还原,所以按任何文件顺序都互不干扰。
 #   · app 滚动 pin(bun-test-app.sh):整包 2s,没有并行的收益,保持串行。
 #   CI 的同名步骤(codepuppy-ci.yml,已停用)仍是串行命令,故这些步骤的档位不变(MIRRORED = 同一脚本、同一下界、同一已知红清单)。
 # 测试分层(ADR-0014):套件里每个测试文件按文件名恰好落在 fast / integration / scenario 一层;规则与判据在
@@ -233,25 +234,13 @@ group_tests() { # <step> <工作目录> <下界> [bun test 参数...]
   rm -f "$map" "$map.xml"
   return $rc
 }
-# ext 不给文件表、让 bun 自己发现(范围外的层按层标记排除):它的测试文件共享 policy-host 的模块级状态与环境,
-# 只在 bun 的发现顺序下互不干扰 —— 按排好序的文件表跑,test-preload / project-config 各红一条(2026-11-24 实测)。
-ext_tests() {
-  local rc=0 map ignore=()
-  map="$(mktemp)"
-  bash scripts/test-layers.sh map packages/ext "${test_layers[@]}" > "$map"
-  while IFS= read -r arg; do ignore+=("$arg"); done < <(bash scripts/test-layers.sh ignore "${test_layers[@]}")
-  CODEPUPPY_JUNIT_FILE="$map.xml" bash scripts/bun-test-floor.sh 100 packages/ext ${ignore[@]+"${ignore[@]}"} || rc=1
-  python3 scripts/junit-split-layers.py "$map.xml" "$map" "$GATE_REPORT_DIR" ext || rc=1
-  rm -f "$map" "$map.xml"
-  return $rc
-}
 # 一处红不跳过后面的包:[6/14] 要从完整的报告里判每个登记文件(此前它自己逐个重跑,前一步红也照样判全)。
 unit_tests() {
   local rc=0 w
   bash scripts/test-layers.sh check || rc=1
   bun run --cwd packages/codepuppy-contracts-consumer check:vendor || rc=1
   group_tests codepuppy-contracts-consumer packages/codepuppy-contracts-consumer 15 --parallel || rc=1
-  ext_tests || rc=1
+  group_tests ext packages/ext 100 || rc=1
   bash scripts/bun-test-ui-mac.sh "${test_layers[@]}" || rc=1
   # 上游包(packages/core 等)里 Code Puppy 自有的登记文件:只经登记簿进套件,在这里跑一次,[6/14] 从报告判条数。
   for w in $(bash -c 'source scripts/test-layers.sh && test_layer_register_workdirs'); do

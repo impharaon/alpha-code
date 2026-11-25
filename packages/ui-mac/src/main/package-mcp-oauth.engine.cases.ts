@@ -5,7 +5,7 @@
 //   · 同名同 URL ⇒ connected;同一个 URL 换个名字 ⇒ needs_auth(凭证按「名 + URL」绑定);登录前同名同 URL ⇒ needs_auth;
 //   · 引擎拒绝请求(口令不对)⇒ { ok: false },admission 据此 fail-closed;
 //   · 反向臂:v1 的 `POST /mcp` 在 2.x 引擎上拿不到这台服务的状态(旧接缝在 2.x 上恒判 engine-unavailable)。
-// 本文件由 package-mcp-oauth.engine.test.ts 宿主起独立 `bun test` 子进程跑。HOME / XDG 全在临时沙箱里,默认 Location
+// 本文件由 engine-cases.test.ts 宿主起独立 `bun test` 子进程跑。HOME / XDG 全在临时沙箱里,默认 Location
 // (进程 cwd)也切到沙箱里的空项目目录,绝不碰 owner 的数据目录、浏览器或钥匙串。围栏不在这里测(设计 §10 R-2 已在生产围栏下实测)。
 import { afterAll, beforeAll, describe, expect, test } from "bun:test"
 import { createHash, randomBytes } from "node:crypto"

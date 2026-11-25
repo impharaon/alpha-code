@@ -72,6 +72,11 @@ if [ -n "$known_fails" ] && [ ! -f "$known_fails" ]; then
   exit 2
 fi
 
+# 测试报告(ADR-0014):CODEPUPPY_JUNIT_FILE 置位 ⇒ 本次运行的 junit 写到那个路径并留下(门把它放进
+# $GATE_REPORT_DIR,名字 `<step>.<layer>.xml`;闸门登记簿也从它读逐文件条数)。同款纪律:读入后立刻 unset。
+report="${CODEPUPPY_JUNIT_FILE:-}"
+unset CODEPUPPY_JUNIT_FILE
+
 # ── 每条用例的默认超时(`#777` 的环境咽喉)──────────────────────────────────────
 # bun 默认 5000ms。本仓有 31 条 host 用例在子进程里跑**一整套** `.cases.ts`,5 秒对它们
 # 不是超时,是**机器速度在替断言下判决**:2026-08-02 起 alpha 主线 `unit tests (alpha packages)`
@@ -94,11 +99,16 @@ fi
 CODEPUPPY_TEST_TIMEOUT_MS="${CODEPUPPY_TEST_TIMEOUT_MS:-120000}"
 
 log="$(mktemp)"
-junit="$(mktemp)"
-trap 'rm -f "$log" "$junit"' EXIT
+if [ -n "$report" ]; then
+  junit="$report"
+  trap 'rm -f "$log"' EXIT
+else
+  junit="$(mktemp)"
+  trap 'rm -f "$log" "$junit"' EXIT
+fi
 
 set +e
-if [ -n "$known_fails" ]; then
+if [ -n "$known_fails" ] || [ -n "$report" ]; then
   # `#1086`:失败名的权威来源是外层进程写的 junit 报告,不是 console 文本 —— host 测试会把
   # 子进程 bun run 的 `(fail)` 行与 summary 原样回显进外层日志,裸 grep console 会把子进程的
   # 红当外层新红。junit 只由外层写(bun 1.3.14 实测:console 输出不受影响、退出码不变)。

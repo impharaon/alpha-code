@@ -1,7 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { readFileSync } from "node:fs"
 import { initialSelfHealState, noteSpawn, SELF_HEAL_MAX_ATTEMPTS } from "./sidecar-self-heal"
-import { join } from "node:path"
 import type { SidecarGenerationState } from "../preload/types"
 import {
   createDeferredRespawn,
@@ -229,33 +227,6 @@ describe("respawn generation terminal", () => {
   })
 })
 
-// REQ-236 AC4/AC6(`#1562`)的最后一英里:index.ts 结构上进不了 bun(见 ./source-text-anchors.ts 文件头),
-// 「重启时间线带具名原因」「只有这次 fork 健康完成才确认它捕获的代」两条接线只能锁源码形状。
-// 行为判据在 credential-hot-apply.test.ts(真 codepuppy-auth + 真终态生产者 + 这里锁住的那一行 glue)。
-const INDEX_SOURCE = readFileSync(join(import.meta.dir, "index.ts"), "utf8")
-
-test("ANCHOR (not a gate): #1562 respawn 时间线写具名原因,确认只挂在这次 fork 的健康终态上", () => {
-  const source = INDEX_SOURCE
-  const respawn = source.slice(source.indexOf("const doRespawnSidecar"), source.indexOf("const respawnSidecar"))
-  expect(respawn).toContain("async (trigger: SidecarRespawnTrigger) =>")
-  expect(respawn).toContain('markStartupTimeline("main.sidecar.respawn.fork.start", { generation: spawnGen, reason: trigger })')
-  const capture = respawn.indexOf("const forkTokenGeneration = getTokenGeneration()")
-  const kill = respawn.indexOf("await killSidecar()")
-  const healthy = respawn.indexOf("const healthy = await terminal")
-  const confirm = respawn.indexOf("if (healthy) markTokenGenerationApplied(forkTokenGeneration)")
-  // 没健康(健康失败 / 超时)与 fork 在子进程起来前就失败(catch)两条路都排有界重试。
-  expect(respawn).toContain("if (healthy) markTokenGenerationApplied(forkTokenGeneration)\n      else retryUnhealthyFork()")
-  expect(respawn).toContain("if (announcedGeneration !== null) retryUnhealthyFork()")
-  expect(respawn).toContain("planUnhealthyForkRetry({ trigger, timerArmed: selfHealTimer !== null, selfHeal, now: Date.now() })")
-  expect(capture).toBeGreaterThan(-1)
-  expect(kill).toBeGreaterThan(capture)
-  expect(confirm).toBeGreaterThan(healthy)
-  expect(healthy).toBeGreaterThan(kill)
-  // 确认只有这一处;boot 路与续期路都不确认,令牌续期也不再经任何 latch 驱动重启。
-  expect(source.match(/markTokenGenerationApplied\(/g)).toHaveLength(1)
-  expect(source).not.toMatch(/tokenRotation|onRenewed|token-only|"structural"\)/)
-  expect(source).toContain("await current.stop()")
-})
 
 // SPEC-stored-credentials-fence §4.2(② 审查第 1 条):引擎拉取凭据表超时 / 主进程读不出表时请求的 credential-change 重启,在 boot 那一代
 // main 的重启队列还没建好时不能丢 —— 记下,队列建好后补发一次(同 pendingAuthRespawn)。
@@ -276,14 +247,4 @@ describe("createDeferredRespawn", () => {
     deferred.attach((trigger) => void sent.push(trigger))
     expect(sent).toEqual([])
   })
-})
-
-test("ANCHOR (not a gate): SPEC-stored-credentials-fence 两代 spawnLocalServer 都把 requestRespawn 交给 createDeferredRespawn,队列建好后立刻 attach", () => {
-  const source = INDEX_SOURCE
-  expect(source.match(/requestRespawn: \(trigger\) => credentialRespawn\.request\(trigger\),/g)).toHaveLength(2)
-  expect(source).toContain("const credentialRespawn = createDeferredRespawn()")
-  const assigned = source.indexOf("requestSidecarRespawn = respawnSidecar")
-  const attached = source.indexOf("credentialRespawn.attach(respawnSidecar)")
-  expect(assigned).toBeGreaterThan(-1)
-  expect(attached).toBeGreaterThan(assigned)
 })

@@ -63,7 +63,10 @@ summarize() {
 
 # ── [a] 整包 ──────────────────────────────────────────────────────────────────
 set +e
-run_bun_test src
+# ADR-0014:$GATE_REPORT_DIR 置位时整包这一跑写 junit(codepuppy-app 的文件都在 integration 层,见 scripts/test-layers.sh)。
+app_report=()
+[ -n "${GATE_REPORT_DIR:-}" ] && app_report=(--reporter=junit "--reporter-outfile=$GATE_REPORT_DIR/codepuppy-app.integration.xml")
+run_bun_test ${app_report[@]+"${app_report[@]}"} src
 status=$?
 set -e
 summarize

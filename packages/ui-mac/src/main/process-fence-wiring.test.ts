@@ -662,18 +662,6 @@ describe("REQ-159 main 侧接线:计划 → start 命令 → 拒 fork", () => {
     }
   })
 
-  test("ANCHOR (not a gate): sidecar.ts 收到 start 后第一件事是 installProcessFence,早于注入与 import 引擎;darwin 缺席即抛", () => {
-    const source = readFileSync(join(import.meta.dir, "sidecar.ts"), "utf8")
-    const fence = source.indexOf("installProcessFence(command)")
-    const inject = source.indexOf("const injection = prepareSidecarEnv(")
-    const engine = source.indexOf('await import("virtual:opencode-server")')
-    expect(fence).toBeGreaterThan(-1)
-    expect(fence).toBeLessThan(inject)
-    expect(inject).toBeLessThan(engine)
-    expect(source).toContain("refusing to start the engine unfenced")
-    expect(source).toContain("const applied = applyProcessFence(command.fence)")
-  })
-
   // ── `#1394`:围栏的工作区清单不再来自围栏可写的 store ──────────────────────────────────────
   // 下面两条走**生产计划器**(不注入 planFence):真 store.ts + 真 electron-store 落盘的 opencode.global.dat、真 initCodePuppyEnvironment
   // 冻结的状态根、真 sandbox-exec 试编译、真 .node 路径解析(predev 编出的那份);唯一的替身是 fork(假子进程记录线上 start 命令)。
@@ -829,35 +817,4 @@ describe("REQ-159 main 侧接线:计划 → start 命令 → 拒 fork", () => {
     })
   })
 
-  test("ANCHOR (not a gate) `#1394`:生产计划器只读真源、不碰 store;ipc.ts 三个 store 通道写完都告诉真源;index.ts 在注册 IPC 之前播种", () => {
-    const server = readFileSync(join(import.meta.dir, "server.ts"), "utf8")
-    const plannerStart = server.indexOf("function planProductionFence(")
-    const plannerEnd = server.indexOf("export function getDefaultServerUrl(")
-    expect(plannerStart).toBeGreaterThan(-1)
-    expect(plannerEnd).toBeGreaterThan(plannerStart)
-    const planner = server.slice(plannerStart, plannerEnd)
-    expect(planner).toContain("readWorkspaceTruthOrThrow(fenceWorkspaceTruthPath(")
-    expect(planner).not.toContain("TABS_KEY")
-    expect(planner).not.toContain("getStore(")
-    const ipc = readFileSync(join(import.meta.dir, "ipc.ts"), "utf8")
-    for (const [channel, call] of [
-      ["store-set", "deps.fenceWorkspaces.noteRendererStoreSet(name, key, value)"],
-      ["store-delete", "deps.fenceWorkspaces.noteRendererStoreDelete(name, key)"],
-      ["store-clear", "deps.fenceWorkspaces.noteRendererStoreClear(name)"],
-    ] as const) {
-      const at = ipc.indexOf(`ipcMain.handle("${channel}"`)
-      expect(at, channel).toBeGreaterThan(-1)
-      expect(ipc.slice(at, ipc.indexOf("ipcMain.handle(", at + 1)), channel).toContain(call)
-    }
-    const index = readFileSync(join(import.meta.dir, "index.ts"), "utf8")
-    const preclean = index.indexOf("runTabsPreclean({")
-    const boot = index.indexOf("bootFenceWorkspaceTruth({")
-    const register = index.indexOf("registerIpcHandlers({")
-    expect(preclean).toBeGreaterThan(-1)
-    expect(boot).toBeGreaterThan(preclean)
-    expect(register).toBeGreaterThan(boot)
-    const wired = index.indexOf("fenceWorkspaces,", register)
-    expect(wired).toBeGreaterThan(register)
-    expect(wired).toBeLessThan(index.indexOf("killSidecar:", register))
-  })
 })

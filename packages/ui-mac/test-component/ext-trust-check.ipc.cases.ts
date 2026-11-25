@@ -5,7 +5,7 @@
 //   · 没有可执行扩展不弹;「允许」没勾知情框不落盘;拒绝也记、之后不弹;
 //   · 项目目录身份一变(删掉后在原路径重建)就再问;确认框开着期间目录被换掉 ⇒ 这次决定不落到新目录上;
 //   · 确认框的外观与文案:除了删掉「存于本项目 .codepuppy/prefs.json」那个括号,一个字都不变。
-// 由 src/main/ext-trust-check.test.ts 起独立子进程跑(要先 mock 掉 electron 再 import 真的 ext-ipc)。
+// 由 src/main/subprocess-cases.test.ts 起独立子进程跑(要先 mock 掉 electron 再 import 真的 ext-ipc)。
 
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"

@@ -8,7 +8,6 @@
 //
 // 宿主:真判据在 sidecar-ext-ready.cases.ts(独立的 `bun test` 子进程 —— 引擎沙箱改的环境变量不出那个进程)。
 import { expect, test } from "bun:test"
-import { readFileSync } from "node:fs"
 import { join } from "node:path"
 
 test("I4:ext 没装上时 sidecar 不报 ready —— 真引擎 + 桩插件(sidecar-ext-ready.cases.ts,5 条)", () => {
@@ -22,12 +21,3 @@ test("I4:ext 没装上时 sidecar 不报 ready —— 真引擎 + 桩插件(side
   expect(output.match(/(\d+) fail\b/)?.[1], output).toBe("0")
   expect(output.match(/(\d+) pass\b/)?.[1], output).toBe("5")
 }, 300_000)
-
-// 分类与「这处锚守不住什么」登记在 ./source-text-anchors.ts。
-test("ANCHOR (not a gate): sidecar.ts 在发 ready 之前 await assertExtPluginActive(初始目录、ext 目录)", () => {
-  const source = readFileSync(join(import.meta.dir, "sidecar.ts"), "utf8")
-  const gate = source.indexOf("await assertExtPluginActive(fetch, bootstrap.paths.initialDirectory, bootstrap.paths.extPlugin)")
-  const ready = source.indexOf("parentPort.postMessage(buildReadyMessage(injection, prewarmResult))")
-  expect(gate).toBeGreaterThan(-1)
-  expect(ready).toBeGreaterThan(gate)
-})

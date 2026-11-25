@@ -13,7 +13,7 @@
 // 恢复 `CatalogFailureBanner` 导出 ⇒ 第三条转红。
 //
 // 独立进程运行:`mock.module("solid-js", …)` 会污染同进程其它测试文件。宿主见
-// src/renderer/codepuppy-ui/catalog-failure-banner.component.test.ts。
+// src/renderer/subprocess-cases.test.ts。
 import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test"
 import { transformAsync } from "@babel/core"
 import presetTypescript from "@babel/preset-typescript"

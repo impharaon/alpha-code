@@ -5,7 +5,7 @@
 //   · `.codepuppy/plugins/marker.js`:setup 时往沙箱里的标记文件追加一个 `+`(经 ext 的项目插件扇出才会跑);
 //   · `codepuppy.jsonc` 的 `mcp.proj`:真 stdio MCP 夹具(MCP_FIXTURE),进程一起来就往启动日志写 `+`。
 // 项目里还有旧写法的 `.codepuppy/prefs.json`(0.1.x 的 main 写的就是这个形状)。
-// 本文件由 project-consent-store.engine.test.ts 起独立 `bun test` 子进程跑;HOME / XDG 全在临时沙箱里。
+// 本文件由 engine-cases.scenario.test.ts 起独立 `bun test` 子进程跑;HOME / XDG 全在临时沙箱里。
 import { afterAll, beforeAll, describe, expect, test } from "bun:test"
 import fs from "node:fs"
 import path from "node:path"

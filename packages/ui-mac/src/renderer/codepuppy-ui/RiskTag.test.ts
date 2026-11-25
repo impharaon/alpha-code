@@ -1,5 +1,5 @@
 // `#1314` 风险标签:组件逐档(AC-01)与两个能力授权框消费方。批准面板消费方在 PermissionDialog.test.ts,
-// 真浏览器的几何 / 对比度 / 与已批稿逐项比较在 risk-tag.browser.test.ts。
+// 真浏览器的几何 / 对比度 / 与已批稿逐项比较在 risk-tag.browser.scenario.test.ts。
 // 用生产 Solid 编译链渲染(同 Dialog.test.ts):bun 自带的 TSX 变换是 React 形,会悄悄丢掉 Solid 的响应式。
 import { GlobalRegistrator } from "@happy-dom/global-registrator"
 import { afterAll, afterEach, beforeEach, describe, expect, test } from "bun:test"

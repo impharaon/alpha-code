@@ -1,6 +1,6 @@
 // #1113(REQ-092 AC1 桌面消费侧)—— status/artifact-list 开放 `result` 清洗接线闸的子进程宿主。
 // 真断言在 cloud-result-scrub.cases.ts(须 mock electron ⇒ mock.module 会污染同进程的其它
-// 测试文件,子进程跑,cloud-ipc.test.ts 同款)。
+// 测试文件,子进程跑,subprocess-cases.test.ts 同款)。
 //
 // ── `#1294`:满载跑全量 ui-mac 套件时本宿主间歇红,根因**不是**派生失败 ─────────────────
 // 当时的判断是「4800 条大套件的负载下派生子进程失败」。那是猜的;把那一次 pre-push 的完整

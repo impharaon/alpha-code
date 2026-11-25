@@ -23,7 +23,7 @@
           "name": "Code Mode 子调用的第一条拒绝补在外层成功终态上"
         },
         {
-          "file": "packages/ui-mac/src/main/unattended-run.engine.test.ts",
+          "file": "packages/ui-mac/src/main/engine-cases.test.ts",
           "name": "无人值守运行的真实入口证据(unattended-run.engine.cases.ts)"
         },
         {
@@ -202,7 +202,7 @@
           "name": "a document-axis ask on an MCP tool registered after the first prompt asks before it runs; reject keeps it at 0"
         },
         {
-          "file": "packages/ui-mac/src/main/composer-tier-matrix.engine.test.ts",
+          "file": "packages/ui-mac/src/main/engine-cases.scenario.test.ts",
           "name": "三档 × R1–R12、三条委派入口与审批请求的整条路径与助手发起的安装(composer-tier-matrix.engine.cases.ts,30 条)"
         }
       ],
@@ -356,7 +356,7 @@
       },
       "tests": [
         {
-          "file": "packages/ui-mac/src/main/composer-tier-matrix.engine.test.ts",
+          "file": "packages/ui-mac/src/main/engine-cases.scenario.test.ts",
           "name": "三档 × R1–R12、三条委派入口与审批请求的整条路径与助手发起的安装(composer-tier-matrix.engine.cases.ts,30 条)"
         }
       ],
@@ -876,7 +876,7 @@
           "name": "the default is 300 s and every invalid override falls back to it, never to no deadline"
         },
         {
-          "file": "packages/ui-mac/src/main/permission-ask-timeout.engine.test.ts",
+          "file": "packages/ui-mac/src/main/engine-cases.test.ts",
           "name": "审批超时:到期的工具部件经桌面适配器被卡片分类为审批超时,模型读到同一句(permission-ask-timeout.engine.cases.ts,1 条)"
         },
         {
@@ -933,11 +933,11 @@
           "name": "an always reply to a read leaves the pending /review policy ask pending: no replied event and no child session"
         },
         {
-          "file": "packages/ext/src/policy/session-grant-upstream-reds.test.ts",
-          "name": "exactly the pinned upstream cases fail in those three files; every other case passes"
+          "file": "packages/ext/src/policy/session-grant-upstream-reds.scenario.test.ts",
+          "name": "the pinned upstream cases in those three files are present and red"
         }
       ],
-      "note": "Known red by design (orchestrator ruling 2026-11-12, option 甲: not taken over). Upstream tests asserting that an always reply writes a project-level saved approval: packages/core/test/permission.test.ts \"stores and removes saved resources for a project\" and the seven \"<fixture>: always allow covers repeat execution and narrows prefix scope\" cases (numeric npm script prefix, numeric AWS option prefix, substitution prefix, redirect prefix, assignment redirect prefix, PowerShell method prefix, PowerShell tab prefix); packages/core/test/tool-shell.test.ts \"declarations reuse approvals while substitutions retain reject/once/always behavior\"; packages/server/test/permission-saved.test.ts \"edits saved permissions through PATCH\". Reproduce: cd packages/core && bun test test/permission.test.ts test/tool-shell.test.ts; cd packages/server && bun test test/permission-saved.test.ts. session-grant-upstream-reds.test.ts requires exactly these to fail (tool-shell's two pre-existing \"conditional substitutions respect once|always\" reds tolerated). Rollback: never revert permission.ts alone while the adapter sends always as it is — \"allow for this session\" would become a permanent project-level approval; revert the I-05 slice as one commit. Since I-13 L1 (entry engine-db-records-not-honoured) the same pinned list also carries 64 upstream cases that seed a saved approval and expect it to allow; the two session-grant.test.ts cases that used a session-rule allow as their known-bad arm now assert that such an allow decides nothing (I-13 L2), and session-grant-restart.test.ts's control is a session-rule deny."
+      "note": "Known red by design (orchestrator ruling 2026-11-12, option 甲: not taken over). Upstream tests asserting that an always reply writes a project-level saved approval: packages/core/test/permission.test.ts \"stores and removes saved resources for a project\" and the seven \"<fixture>: always allow covers repeat execution and narrows prefix scope\" cases (numeric npm script prefix, numeric AWS option prefix, substitution prefix, redirect prefix, assignment redirect prefix, PowerShell method prefix, PowerShell tab prefix); packages/core/test/tool-shell.test.ts \"declarations reuse approvals while substitutions retain reject/once/always behavior\"; packages/server/test/permission-saved.test.ts \"edits saved permissions through PATCH\". Reproduce: cd packages/core && bun test test/permission.test.ts test/tool-shell.test.ts; cd packages/server && bun test test/permission-saved.test.ts. session-grant-upstream-reds.scenario.test.ts requires exactly these to fail (tool-shell's two pre-existing \"conditional substitutions respect once|always\" reds tolerated). Rollback: never revert permission.ts alone while the adapter sends always as it is — \"allow for this session\" would become a permanent project-level approval; revert the I-05 slice as one commit. Since I-13 L1 (entry engine-db-records-not-honoured) the same pinned list also carries 64 upstream cases that seed a saved approval and expect it to allow; the two session-grant.test.ts cases that used a session-rule allow as their known-bad arm now assert that such an allow decides nothing (I-13 L2), and session-grant-restart.test.ts's control is a session-rule deny."
     },
     {
       "id": "engine-db-records-not-honoured",
@@ -1004,7 +1004,7 @@
           "name": "a session-row deny on a plugin tool's permission action, the product's own kind of row write, still takes it out of the request"
         }
       ],
-      "note": "Known red by design, not taken over (the disposition of orchestrator ruling 甲 for I-05, applied to I-13 by the orchestrator 2026-11-20). L1: 64 upstream cases that seed a saved approval (saved.add / saved.update) and expect it to allow — 44 in packages/core/test/permission.test.ts, 20 in packages/core/test/tool-shell.test.ts — pinned by name in packages/ext/src/policy/session-grant-upstream-reds.test.ts. L3: five upstream cases in packages/core/test/config/config.test.ts that expect a wellknown document to load; the gate does not run that file: \"layers integration documents below remote and user config and reloads when they change\", \"keeps only the policies of documents from integrations managed policy denies\", \"tolerates unavailable authenticated wellknown config and reloads it later\", \"keeps the last resolved wellknown config across failures and restarts until its source is removed\", \"logs redacted source-aware diagnostics for every config source\". Reproduce: cd packages/core && bun test test/permission.test.ts test/tool-shell.test.ts test/config/config.test.ts. Rollback: revert the I-13 slice as one commit (permission.ts L1/L2 and config.ts L3 with their tests)."
+      "note": "Known red by design, not taken over (the disposition of orchestrator ruling 甲 for I-05, applied to I-13 by the orchestrator 2026-11-20). L1: 64 upstream cases that seed a saved approval (saved.add / saved.update) and expect it to allow — 44 in packages/core/test/permission.test.ts, 20 in packages/core/test/tool-shell.test.ts — pinned by name in packages/ext/src/policy/session-grant-upstream-reds.scenario.test.ts. L3: five upstream cases in packages/core/test/config/config.test.ts that expect a wellknown document to load; the gate does not run that file: \"layers integration documents below remote and user config and reloads when they change\", \"keeps only the policies of documents from integrations managed policy denies\", \"tolerates unavailable authenticated wellknown config and reloads it later\", \"keeps the last resolved wellknown config across failures and restarts until its source is removed\", \"logs redacted source-aware diagnostics for every config source\". Reproduce: cd packages/core && bun test test/permission.test.ts test/tool-shell.test.ts test/config/config.test.ts. Rollback: revert the I-13 slice as one commit (permission.ts L1/L2 and config.ts L3 with their tests)."
     },
     {
       "id": "plan-directory-in-engine-data",
@@ -1042,11 +1042,11 @@
           "name": "rewrites blocked mutation failures with the Plan directory"
         },
         {
-          "file": "packages/ui-mac/src/main/engine-config-fence.engine.test.ts",
+          "file": "packages/ui-mac/src/main/engine-config-fence.engine.scenario.test.ts",
           "name": "AC-04 / AC-06 / AC-08 real engine inside the production fence: attacks refused, ordinary work and restart fine, cold start on 0.2.6 data and a fresh machine, the plan file under the engine data directory with ~/.opencode never created; known-bad arms flip; no protected-location denial from the engine process"
         }
       ],
-      "note": "Reverse arm (ADR-048): with the upstream plan.ts restored (git show 33f94fce96:packages/core/src/plugin/plan.ts) the three plan.test.ts cases turn red (the reminder, the edit allowance and the refusal text name ~/.opencode/plan), and the real-engine host turns red in its fresh arm: the Plan-mode reminder names <HOME>/.opencode/plan, the model's write there is refused by CF-9 and no plan file appears under the engine data directory. Reproduce: cd packages/core && bun test test/plugin/plan.test.ts; cd packages/ui-mac && bun test src/main/engine-config-fence.engine.test.ts."
+      "note": "Reverse arm (ADR-048): with the upstream plan.ts restored (git show 33f94fce96:packages/core/src/plugin/plan.ts) the three plan.test.ts cases turn red (the reminder, the edit allowance and the refusal text name ~/.opencode/plan), and the real-engine host turns red in its fresh arm: the Plan-mode reminder names <HOME>/.opencode/plan, the model's write there is refused by CF-9 and no plan file appears under the engine data directory. Reproduce: cd packages/core && bun test test/plugin/plan.test.ts; cd packages/ui-mac && bun test src/main/engine-config-fence.engine.scenario.test.ts."
     },
     {
       "id": "stored-credentials-in-memory",
@@ -1079,11 +1079,11 @@
           "name": "a failed pull substitutes nothing — never the table published before — and the next load pulls again"
         },
         {
-          "file": "packages/ui-mac/src/main/stored-credentials.engine.test.ts",
+          "file": "packages/ui-mac/src/main/engine-cases.test.ts",
           "name": "凭据经装载前拉取从内存表来;运行中新增 / 删除 / 表与盘不同都按表;扣住的回复不让另一 Location 用旧值;超时与端口关闭不用旧表并请求 credential-change;存放点里一项读不出不挡引擎(stored-credentials.engine.cases.ts,4 条)"
         },
         {
-          "file": "packages/ui-mac/src/main/stored-credentials-fence.engine.test.ts",
+          "file": "packages/ui-mac/src/main/stored-credentials-fence.engine.scenario.test.ts",
           "name": "C1 真引擎:三档里 shell 与读文件工具读、拷、挪、改凭据文件全部失败且假值不进模型请求;引擎只从主进程交来的表取凭据"
         }
       ]
@@ -1204,7 +1204,7 @@
           "name": "kill-switch 下 cloud_web_search 到不了传输(评估恒 allow 也一样);兄弟云工具照常执行"
         },
         {
-          "file": "packages/ui-mac/src/main/websearch-honest.engine.test.ts",
+          "file": "packages/ui-mac/src/main/engine-cases.test.ts",
           "name": "Exa 结局诚实:出错 ⇒ 具名失败、D ⇒ 原文、零命中 ⇒ 没搜到、429 ⇒ 具名失败,两两不同;不装 ext ⇒ 塌成没搜到(websearch-honest.engine.cases.ts,7 条)"
         },
         {
@@ -1216,7 +1216,7 @@
           "name": "网 B:写着供应商端点的生产文件,恰好是五份上游供应商、ext 的 exa 供应商与登记过的纯说明"
         },
         {
-          "file": "packages/ui-mac/src/main/websearch-account-tool-table.engine.test.ts",
+          "file": "packages/ui-mac/src/main/engine-cases.test.ts",
           "name": "账户态工具表:代付两条都在、登出只剩本地、kill-switch 两条都不在;去掉注入的 deny 即回来(websearch-account-tool-table.engine.cases.ts,4 条)"
         },
         {
@@ -1246,11 +1246,11 @@
           "name": "P6 / S5:平台凭据头只对平台节点、每次现读;别的节点不带;反向臂:不装 ext ⇒ 不带"
         },
         {
-          "file": "packages/ui-mac/src/main/token-hot-apply.engine.test.ts",
-          "name": "续期热应用:令牌 A ⇒ A、热应用 B ⇒ B、删文件 ⇒ 具名失败零请求、令牌不进日志与响应;不装 ext ⇒ 占位值被拒;平台地址的写法变体都带令牌、像而不是的地址收不到(token-hot-apply.engine.cases.ts,3 条)"
+          "file": "packages/ui-mac/src/main/engine-cases.test.ts",
+          "name": "续期热应用:令牌 A ⇒ A、热应用 B ⇒ B、删文件 ⇒ 具名失败零请求、令牌不进日志与响应;不装 ext ⇒ 占位值被拒(token-hot-apply.engine.cases.ts,2 条)"
         },
         {
-          "file": "packages/ui-mac/src/main/platform-credential-error.engine.test.ts",
+          "file": "packages/ui-mac/src/main/engine-cases.test.ts",
           "name": "平台凭据出错:读不到 ⇒ 零请求具名失败;401 / 403 ⇒ 一次 provider.auth;503 对照 ⇒ 看得见重试(platform-credential-error.engine.cases.ts,5 条)"
         }
       ]
@@ -1271,7 +1271,7 @@
       },
       "tests": [
         {
-          "file": "packages/ui-mac/src/main/cloud-credential-hot.engine.test.ts",
+          "file": "packages/ui-mac/src/main/engine-cases.test.ts",
           "name": "云连接器:同一条连接上令牌 A ⇒ A、热应用 B ⇒ 下一个 POST 与重连的 GET 流带 B、会话过期 ⇒ 重新 initialize 带 C、删文件 ⇒ 不出网(cloud-credential-hot.engine.cases.ts,5 条)"
         }
       ]
@@ -1385,7 +1385,7 @@
           "name": "#1569 会话库改名先于 v1 → 2.x 转换:生产顺序 ⇒ 新名;转换先跑 ⇒ 旧名留在 2.x(naming-before-v1-conversion.cases.ts,2 条)"
         },
         {
-          "file": "packages/ui-mac/src/main/naming-resume.engine.test.ts",
+          "file": "packages/ui-mac/src/main/engine-cases.test.ts",
           "name": "#1569 AC4:迁移后继续生成、压缩后续写、溢出后续写都能完成;反向顺序具名失败(naming-resume.engine.cases.ts,2 条)"
         }
       ]
@@ -1884,7 +1884,7 @@
           "name": "#1647 AC2 a hung engine close stays inside the five-second stop budget"
         },
         {
-          "file": "packages/ui-mac/src/main/sidecar-stop-pending-approval.engine.test.ts",
+          "file": "packages/ui-mac/src/main/engine-cases.test.ts",
           "name": "#1647 AC1:等审批时停引擎 ⇒ 这一轮被释放、工具零执行(sidecar-stop-pending-approval.engine.cases.ts,3 条)"
         }
       ]
@@ -2070,15 +2070,15 @@
           "name": "字段分类:上游 v1 / v2"
         },
         {
-          "file": "packages/ui-mac/src/main/project-config-commands.engine.test.ts",
+          "file": "packages/ui-mac/src/main/engine-cases.scenario.test.ts",
           "name": "I-12 / #1713 未允许与允许两臂"
         },
         {
-          "file": "packages/ui-mac/src/main/engine-plugin-policy.engine.test.ts",
+          "file": "packages/ui-mac/src/main/engine-cases.test.ts",
           "name": "项目插件按生产信任放行"
         },
         {
-          "file": "packages/ui-mac/src/main/project-config-view.engine.test.ts",
+          "file": "packages/ui-mac/src/main/engine-cases.scenario.test.ts",
           "name": "项目配置视图:九类"
         },
         {
@@ -2086,11 +2086,11 @@
           "name": "消息合同:build / parse 往返"
         },
         {
-          "file": "packages/ui-mac/src/main/ext-trust-check.test.ts",
+          "file": "packages/ui-mac/src/main/subprocess-cases.test.ts",
           "name": "项目扩展信任确认:"
         },
         {
-          "file": "packages/ui-mac/src/renderer/codepuppy-ui/ext-trust-watcher.component.test.ts",
+          "file": "packages/ui-mac/src/renderer/subprocess-cases.test.ts",
           "name": "项目信任组件:不完整下次再查"
         }
       ]
@@ -2105,7 +2105,7 @@
       },
       "tests": [
         {
-          "file": "packages/ui-mac/src/main/package-hub-lifecycle.engine.test.ts",
+          "file": "packages/ui-mac/src/main/engine-cases.test.ts",
           "name": "desktop package lifecycle uses main IPC, the real ext scheduler and sandbox engine"
         },
         {

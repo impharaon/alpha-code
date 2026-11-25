@@ -11,23 +11,18 @@
 //   生产 applyPlatformCredentialsHot 的 push 形参;宿主的 main 那一侧是 test-component/credential-table.ts);
 //   ④ 反向臂:同一份配置不装 ext ⇒ 网关收到的是占位值、被拒 —— 证明 ①② 的令牌确实来自 ext,不是配置里藏着凭据;
 //   哨兵臂:两个令牌一次都不出现在引擎的日志输出与 HTTP 响应体里。
-//   ⑤ 平台节点地址的写法变体(`#1662` parity r6 Codex R1 Major 1):平台节点地址写成大写主机 / 显式默认端口 / 末尾斜杠 /
-//      主机末尾一个点,引擎发出的请求地址是规范化之后的(小写、去默认端口)⇒ 每种写法网关收到的都是令牌;像而不是的地址
-//      (`gw.example.evil`、`gw.example@evil`、兄弟路径 `/v1x`)上的自定义节点一次令牌都收不到。这些主机都不存在:进程的 `fetch` 在起引擎之前
-//      换成桩,这几个主机由本文件当网关答,回环照常,其它任何主机直接抛错 —— 一个真实请求都发不出去。
-//      已知的坏(实测,改之前):逐字比较 ⇒ 大写主机与显式默认端口两种写法上线的是占位值。
+//   平台节点地址的写法变体(大写主机 / 显式默认端口 / 末尾斜杠 / 主机末尾一个点)与像而不是的地址,在 ext 的
+//   platform-credential-header.test.ts 里逐个判(那是 `#1662` r6 那个 bug 的回归用例);这里不再每种写法各起一台引擎。
 // 合成令牌只在本进程里;用例输出只有布尔值与计数。
 //
 // 本文件由同名 `.test.ts` 宿主起独立 `bun test` 子进程跑。HOME / XDG 全在临时沙箱里,绝不碰 owner 的数据目录。
 import { afterAll, beforeAll, describe, expect, test } from "bun:test"
 import fs from "node:fs"
-import path from "node:path"
 import { assertEngineSandboxed, engineSandbox } from "../../test-component/engine-sandbox"
 import { codepuppyEngine, type Running } from "../../test-component/codepuppy-engine"
 import { handOverCredentials } from "../../test-component/credential-table"
 import { PLATFORM_API_KEY_PLACEHOLDER } from "./codepuppy-models"
-import { applyPlatformCredentialsHot, customProviderSecretName, secretFilePath, syncSecretFiles } from "./codepuppy-secret-files"
-import { writeCustomProviderTruth } from "./custom-provider-truth-write"
+import { applyPlatformCredentialsHot, secretFilePath, syncSecretFiles } from "./codepuppy-secret-files"
 
 const sandbox = engineSandbox()
 const TOKEN_A = `SENTINEL-HOT-APPLY-A-${crypto.randomUUID()}`
@@ -166,60 +161,4 @@ describe("REQ-236 #1562 续期热应用:同一个引擎实例里换凭据文件"
       await engine.close()
     }
   }, 120_000)
-
-  test("⑤ 平台节点地址的写法变体都带令牌;像而不是的地址上的自定义节点一次都收不到", async () => {
-    const wireTurn = async (engine: Running, directory: string, providerID: string) => {
-      const before = wire.length
-      const sessionID = (await engine.send("POST", "/api/session", { location: { directory }, model: { id: "m", providerID } })).json.data.id as string
-      await engine.send("POST", `/api/session/${sessionID}/prompt`, { text: "hi" })
-      await engine.send("POST", `/api/experimental/session/${sessionID}/wait`)
-      return wire.slice(before)
-    }
-    // 写法变体:每种起一台引擎(注入与 ext 都按这一刻启动文档里的平台节点地址)
-    const variants = { upper: "https://GW.example/v1", port: "https://gw.example:443/v1", slash: "https://gw.example/v1/", dot: "https://gw.example./v1" }
-    const seen: Record<string, string[]> = {}
-    for (const [label, base] of Object.entries(variants)) {
-      const host = codepuppyEngine({ sandbox, name: `hot-variant-${label}`, modelBaseURL: base })
-      syncSecretFiles(host.userData, { CODEPUPPY_API_KEY: TOKEN_A })
-      const engine = await host.start()
-      try {
-        seen[label] = [...new Set((await wireTurn(engine, host.projectDirectory, "codepuppy")).map((item) => item.hit))]
-      } finally {
-        await engine.close()
-      }
-    }
-    expect(seen).toEqual({ upper: ["A"], port: ["A"], slash: ["A"], dot: ["A"] })
-
-    // 像而不是:平台节点是 https://gw.example/v1;三条自定义节点(经生产的自定义节点真源与凭据文件写入)各指一个看着像的地址,各带自己的 key
-    const lookalikes = { "look-evil-suffix": "https://gw.example.evil/v1", "look-userinfo": "https://gw.example@evil/v1", "look-sibling": "https://gw.example/v1x" }
-    const userData = path.join(sandbox.root, "hot-lookalike-userdata")
-    writeCustomProviderTruth(
-      path.join(sandbox.root, "hot-lookalike-state", "codepuppy-state", "custom-providers", "dev.json"),
-      Object.entries(lookalikes).map(([id, baseURL]) => ({ id, name: id, compat: "openai", baseURL, models: ["m"] })),
-      { mkdirSync: fs.mkdirSync, writeFileSync: fs.writeFileSync, renameSync: fs.renameSync, rmSync: fs.rmSync },
-    )
-    for (const id of Object.keys(lookalikes)) {
-      fs.mkdirSync(path.dirname(secretFilePath(userData, customProviderSecretName(id))), { recursive: true })
-      fs.writeFileSync(secretFilePath(userData, customProviderSecretName(id)), `sk-${id}`, { mode: 0o600 })
-    }
-    const host = codepuppyEngine({ sandbox, name: "hot-lookalike", modelBaseURL: "https://gw.example/v1" })
-    syncSecretFiles(host.userData, { CODEPUPPY_API_KEY: TOKEN_A })
-    expect(Object.keys(lookalikes).every((id) => id in host.content.providers)).toBe(true)
-    const engine = await host.start()
-    try {
-      // 判官自检:同一台引擎上平台节点本身照常带令牌
-      expect([...new Set((await wireTurn(engine, host.projectDirectory, "codepuppy")).map((item) => item.hit))]).toEqual(["A"])
-      const got: Record<string, { requests: number; token: boolean }> = {}
-      for (const id of Object.keys(lookalikes)) {
-        const requests = await wireTurn(engine, host.projectDirectory, id)
-        got[id] = { requests: requests.length, token: requests.some((item) => item.hit === "A") }
-      }
-      // 三条的请求都确实到了桩(不是空对空;userinfo 写法发往的主机是 evil),一条令牌都没有
-      for (const id of Object.keys(lookalikes)) expect([id, got[id]!.requests > 0]).toEqual([id, true])
-      expect(Object.fromEntries(Object.entries(got).map(([id, value]) => [id, value.token]))).toEqual({ "look-evil-suffix": false, "look-userinfo": false, "look-sibling": false })
-      console.log(`[lookalike] requests ${JSON.stringify(Object.fromEntries(Object.entries(got).map(([id, value]) => [id, value.requests])))}`)
-    } finally {
-      await engine.close()
-    }
-  }, 240_000)
 })

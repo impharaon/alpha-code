@@ -11,7 +11,7 @@
 packages/ui-mac/src/main/fixtures/relay-route/health-cloud.json	alpha-cloud	1	external-anchor	#159: byte-identical captured /health service identifier; fixture provenance is recorded beside it.
 packages/ui-mac/src/main/fixtures/relay-route/provenance.json	impharaon/alpha-platform	2	external-anchor	#159: actual source repository identity for the captured health response.
 packages/ui-mac/src/main/fixtures/relay-route/provenance.json	relay-ops/p4/post-alpha-gateway-hk.json	1	external-anchor	#159: exact authorized operations capture filename for the gateway health fixture.
-scripts/gate-files.tsv	alpha-work	11	external-anchor	#159: cross-repository issue identity for the relay behavior and exact-count gate entries.
+scripts/gate-files.tsv	alpha-work	6	external-anchor	#159: cross-repository issue identity for the relay behavior and exact-count gate entries.
 packages/ui-mac/src/shared/codepuppy-config.ts	alpha-github-hk.tidelabs.click	1	external-anchor	alpha-work#159 slice 2: DNS name of the Hong Kong GitHub relay (Cloudflare zone record, design §4.5); not a Code Puppy brand name.
 packages/ui-mac/test-fixtures/plugin-helper/source-fetch.ts	https://alpha-github-hk.tidelabs.click/	1	external-anchor	alpha-work#159 slice 2: the fixture answers the relay host (design §4.5 DNS name) with 404 so recorded-raw cases take the fallback arm.
 docs/runbooks/distribution.md	alpha-github-hk.tidelabs.click	1	external-anchor	alpha-work#159 slice 2: DNS name of the Hong Kong GitHub relay that the updater tries first (design §4.5).
@@ -1022,7 +1022,6 @@ packages/ui-mac/src/main/release-manifest.ts	alpha-work	1	external-anchor	GitHub
 packages/ui-mac/src/main/remote-catalog.ts	alpha-web	2	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/ui-mac/src/main/server.ts	alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/ui-mac/src/main/server.ts	/code-puppy	1	user-content	用户默认工作目录 ~/code-puppy:owner 现有工作区与绑定它的会话(派发书判断点 1)
-packages/ui-mac/src/main/source-text-anchors.ts	/code-puppy	1	user-content	用户默认工作目录 ~/code-puppy:owner 现有工作区与绑定它的会话(派发书判断点 1)
 packages/ui-mac/src/main/source-text-anchors.ts	alpha-code	1	historical	说明品牌守卫要拦的旧应用名 alpha-code(应用名本身由 #1571 改)
 packages/ui-mac/src/main/windows.ts	alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 packages/ui-mac/src/main/workspace-file-service.ts	alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
@@ -1143,10 +1142,10 @@ scripts/assert-required-contexts.sh	repos/impharaon/alpha-code/branches/alpha	1	
 scripts/assert-seed-assets.sh	alpha-web	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 scripts/codepuppy-check.sh	alpha-web	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 scripts/disable-upstream-workflows.sh	impharaon/alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-scripts/gate-files.tsv	alpha-platform	4	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+scripts/gate-files.tsv	alpha-platform	3	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 scripts/gate-files.tsv	../alpha-web	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 scripts/gate-files.tsv	cloud_cloud_vision	1	historical	#1568 已改掉的旧模型可见名 / 注册常量,这里是描述旧名的历史说明
-scripts/gate-files.tsv	alpha-web	5	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+scripts/gate-files.tsv	alpha-web	3	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 scripts/gate-files.tsv	alpha-code	6	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 scripts/gate-files.tsv	alpha-platform alpha-bundled	1	historical	#1568 已改掉的旧模型可见名 / 注册常量,这里是描述旧名的历史说明
 scripts/gate-files.tsv	alpha-web	1	historical	#1568 已改掉的旧模型可见名 / 注册常量,这里是描述旧名的历史说明

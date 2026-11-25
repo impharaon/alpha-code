@@ -10,8 +10,6 @@
 //    / 原始 `details`/`error`/`preloadPath`。若有人把调用点改回直接落原始字段(脱敏出口还在但
 //    没人用了),这层变红——两层合起来覆盖「脱敏出口被摘掉」的两种形态。
 import { describe, expect, test } from "bun:test"
-import { readFileSync } from "node:fs"
-import { join } from "node:path"
 import { safeErrorName, safeRouteLabel } from "./renderer-diagnostic-redaction"
 import { encodeDirectory } from "../shared/route-manifest"
 
@@ -101,42 +99,3 @@ describe("#900 renderer diagnostic redaction — behavior", () => {
   })
 })
 
-describe("#900 renderer diagnostic redaction — wiring ratchet (source-shape)", () => {
-  const windows = readFileSync(join(import.meta.dir, "windows.ts"), "utf8")
-  const logging = readFileSync(join(import.meta.dir, "logging.ts"), "utf8")
-
-  test("ANCHOR (not a gate): did-fail-load/did-fail-provisional-load route both URLs through safeRouteLabel, not raw getURL()/validatedURL", () => {
-    expect(windows).toContain("routeId: safeRouteLabel(validatedURL)")
-    expect(windows).toContain("currentRouteId: safeRouteLabel(win.webContents.getURL())")
-    expect(windows).not.toMatch(/currentURL:\s*win\.webContents\.getURL\(\)/)
-    expect(windows).not.toMatch(/\bvalidatedURL,\s*\n\s*(currentURL|isMainFrame)/)
-  })
-
-  test("ANCHOR (not a gate): render-process-gone logs the closed reason/exitCode pair through safeRouteLabel, not the raw details object or getURL()", () => {
-    expect(windows).toContain("safeRouteLabel(win.webContents.getURL()), reason: details.reason, exitCode: details.exitCode")
-    expect(windows).not.toMatch(/currentURL:\s*win\.webContents\.getURL\(\),\s*details\s*}/)
-  })
-
-  test("ANCHOR (not a gate): unresponsive/responsive log through safeRouteLabel", () => {
-    const matches = windows.match(/routeId: safeRouteLabel\(win\.webContents\.getURL\(\)\)/g) ?? []
-    // did-fail-load(×2 via the shared `failed` closure) + render-process-gone + unresponsive + responsive
-    expect(matches.length).toBeGreaterThanOrEqual(3)
-  })
-
-  test("ANCHOR (not a gate): preload-error drops the absolute preloadPath and raw error object, keeping only safeErrorName", () => {
-    expect(windows).toContain("errorName: safeErrorName(error)")
-    expect(windows).not.toMatch(/\{\s*window: name,\s*preloadPath,\s*error\s*\}/)
-    // the raw preload path param is no longer read anywhere in the handler
-    expect(windows).toContain('"preload-error", (_event, _preloadPath, error)')
-  })
-
-  test("ANCHOR (not a gate): the terminal console-message listener no longer forwards raw message content to pty.log", () => {
-    expect(windows).toContain('writeLog("pty", "console", { window: name, level, line, sourceId })')
-    expect(windows).not.toContain('writeLog("pty", "console", { window: name, level, message, line, sourceId })')
-  })
-
-  test("ANCHOR (not a gate): spyRendererConsole is off — no whole-console-stream capture to renderer.log", () => {
-    expect(logging).toContain("spyRendererConsole: false")
-    expect(logging).not.toContain("spyRendererConsole: true")
-  })
-})

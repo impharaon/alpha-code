@@ -34,6 +34,14 @@ usage() {
            条数少了 = 有用例被删/清空/skip;多了 = 新增用例未登记(未登记 = 可被静默
            删除)。两个方向都当场红。
 
+--from-reports <目录>
+           不再逐个重跑:从 bin/check 第 [5/14] 步写下的 junit 报告(`<step>.<layer>.xml`,见
+           scripts/test-layers.sh)读每个登记文件的条数,判定与逐个重跑相同 —— 文件不在报告里 = 没跑到 = 红;
+           pass 条数与登记精确相等;条件行要求自报 0 条。门用这一档,于是每个测试文件每次门只跑一次。
+
+层范围:环境变量 CODEPUPPY_TEST_LAYERS(空格分隔,缺省三层全判)之外那几层的登记文件本次不判,逐行写明
+           (PR 门只跑 fast + integration,scenario 层的登记文件由 `bin/check --full` 判)。
+
 --update   从实测**自动写回**登记簿:逐条跑,全部绿之后把每行的登记条数改成实测值
            (all-or-nothing:任何一条测试失败就一条都不写回)。幂等 —— 登记与实测
            一致时零改动。给闸门文件加/删用例后跑这一条即可,让评审读 TSV 的 diff。
@@ -62,13 +70,22 @@ EOF
 }
 
 MODE=check
+REPORTS=""
 case "${1:-}" in
   --help|-h) usage; exit 0 ;;
   --update) MODE=update; shift ;;
+  --from-reports)
+    [ -n "${2:-}" ] && [ -d "$2" ] || { echo "::error::--from-reports 要一个存在的报告目录:${2:-<缺>}" >&2; exit 2; }
+    REPORTS="$2"; shift 2 ;;
   '') ;;
   *) echo "::error::未知参数:$1" >&2; usage >&2; exit 2 ;;
 esac
 [ "$#" -eq 0 ] || { echo "::error::多余参数:$*" >&2; usage >&2; exit 2; }
+
+# shellcheck source=scripts/test-layers.sh
+source "$ROOT/scripts/test-layers.sh"
+SCOPE_LAYERS=" ${CODEPUPPY_TEST_LAYERS:-${TEST_LAYERS[*]}} "
+out_of_scope=0
 
 [ -f "$MANIFEST" ] || { echo "::error::闸门登记簿缺失:$MANIFEST"; exit 1; }
 
@@ -78,7 +95,30 @@ updates="$(mktemp)"
 countfile="$(mktemp)"
 seenfile="$(mktemp)"
 retired="$(mktemp)"
-trap 'rm -f "$updates" "$countfile" "$seenfile" "$retired"' EXIT
+reported="$(mktemp)"
+trap 'rm -f "$updates" "$countfile" "$seenfile" "$retired" "$reported"' EXIT
+if [ -n "$REPORTS" ]; then
+  python3 "$ROOT/scripts/junit-file-counts.py" "$REPORTS" > "$reported" || { echo "::error::读不了测试报告目录 $REPORTS"; exit 1; }
+fi
+
+# --from-reports:<workdir> <path> <期望 =N|N|=0> → 报告里该文件的 pass 条数与期望相符则 0;不符 / 没跑到 / 跑了两次 ⇒ 1。
+report_check() {
+  local w="$1" p="$2" spec="$3" rows pass fail
+  rows="$(awk -F'\t' -v w="$w" -v p="$p" '$1 == w && $2 == p' "$reported")"
+  if [ -z "$rows" ]; then
+    echo "::error::$w/$p 不在本次测试报告里 —— 文件被删 / 改名 / 没被 [5/14] 跑到"; return 1
+  fi
+  if [ "$(printf '%s\n' "$rows" | wc -l | tr -d ' ')" -ne 1 ]; then
+    echo "::error::$w/$p 在报告里出现了不止一次 —— 同一文件被两组跑了"; return 1
+  fi
+  pass="$(printf '%s' "$rows" | cut -f3)"; fail="$(printf '%s' "$rows" | cut -f4)"
+  echo "── 报告:pass $pass · fail $fail · 期望 $spec"
+  [ "$fail" -eq 0 ] || { echo "::error::$w/$p 有 $fail 条失败"; return 1; }
+  case "$spec" in
+    =*) [ "$pass" -eq "${spec#=}" ] || { echo "::error::$w/$p 实际 $pass 条 ≠ 登记 ${spec#=} 条。刻意增删用例后跑 bash scripts/assert-gate-files.sh --update 写回。"; return 1; } ;;
+    *) [ "$pass" -ge "$spec" ] || { echo "::error::$w/$p 实际 $pass 条 < 下界 $spec 条"; return 1; } ;;
+  esac
+}
 
 # I-09:--update 遇到已删的测试文件不再在第一条就中止 —— 先把它们一次找全。理由不由工具代写:
 # 每一行都要求人已经在登记簿里写了退役注释(「退役」+ `<工作目录>/<路径>`,同一行),有注释的行
@@ -196,6 +236,15 @@ while IFS=$'\t' read -r floor workdir path delegates guarantee || [ -n "${floor:
       ;;
   esac
 
+  row_layer="$(test_layer "$path" 2>&1)" || { echo "::error::$workdir/$path:$row_layer"; failed=1; continue; }
+  case "$SCOPE_LAYERS" in
+    *" $row_layer "*) ;;
+    *)
+      echo "── 本次范围外:$workdir/$path($row_layer 层;范围 =${SCOPE_LAYERS% }),由 bin/check --full 判"
+      out_of_scope=$((out_of_scope + 1))
+      continue ;;
+  esac
+
   checked=$((checked + 1))
 
   # 平台或显式发布条件未满足。标注不是免检牌 —— 真跑该文件,要求它**自报 0 条**
@@ -203,7 +252,7 @@ while IFS=$'\t' read -r floor workdir path delegates guarantee || [ -n "${floor:
   # 两个方向都抓:该跑的文件被误标 ⇒ 本平台 >0 条 ⇒ 红;文件被删 ⇒ 匹配 0 个文件 ⇒ 红。
   if { [ -n "$platform" ] && [ "$platform" != "$RUNTIME_PLATFORM" ]; } || { [ -n "$manual" ] && [ "${CODEPUPPY_TEST_SIGNED_FENCE:-}" != "1" ]; }; then
     echo "── [$checked] $workdir/$path (登记 $floor,[平台:$platform],本平台 $RUNTIME_PLATFORM,显式条件 ${manual:-无})"
-    if bash "$ROOT/scripts/bun-test-floor.sh" "=0" "$workdir" "$path"; then
+    if { [ -n "$REPORTS" ] && report_check "$workdir" "$path" "=0"; } || { [ -z "$REPORTS" ] && bash "$ROOT/scripts/bun-test-floor.sh" "=0" "$workdir" "$path"; }; then
       echo "   ⊘ 本次未验证:文件在位且自报 0 条,与 [平台:$platform] / ${manual:-无额外条件} 相符 —— 该行的保证本次未被验证"
       na_count=$((na_count + 1))
       na_names="${na_names:+$na_names, }$workdir/$path"
@@ -246,6 +295,10 @@ while IFS=$'\t' read -r floor workdir path delegates guarantee || [ -n "${floor:
   call_spec="=$spec"
   [ "$kind" = range ] && call_spec="$spec"
   echo "── [$checked] $workdir/$path (登记 $floor, 委派 ${delegates}) — ${guarantee:-}"
+  if [ -n "$REPORTS" ]; then
+    report_check "$workdir" "$path" "$call_spec" || { echo "::error::闸门文件失守:$workdir/$path — ${guarantee:-}"; failed=1; }
+    continue
+  fi
   if ! bash "$ROOT/scripts/bun-test-floor.sh" "$call_spec" "$workdir" "$path"; then
     echo "::error::闸门文件失守:$workdir/$path — ${guarantee:-}"
     failed=1
@@ -253,6 +306,9 @@ while IFS=$'\t' read -r floor workdir path delegates guarantee || [ -n "${floor:
 done < "$MANIFEST"
 
 # 空登记簿 / 解析全挂 = 本脚本自己变成空闸门。显式判红。
+if [ "$out_of_scope" -gt 0 ]; then
+  echo "── $out_of_scope 个登记文件在本次层范围之外(见上),本次不判"
+fi
 if [ "$checked" -lt 25 ]; then
   echo "::error::只检查了 $checked 个闸门文件(至少应有 25 个)——登记簿被清空或解析失败"
   exit 1

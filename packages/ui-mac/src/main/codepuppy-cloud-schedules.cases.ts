@@ -23,7 +23,7 @@
 // [#969] 另加两条:注册/删除的拒绝都必须带**结构槽** `code`(呈现层据它选文案,不解析
 // `reason` 的中文前缀),以及桌面自己的早返(云档发不出的周期)也要带一个自铸的本地码。
 //
-// mock.module 会污染同进程其它测试文件 ⇒ 真断言放这里,由 codepuppy-cloud-schedules.test.ts
+// mock.module 会污染同进程其它测试文件 ⇒ 真断言放这里,由 subprocess-cases.test.ts
 // 在隔离子进程里跑(codepuppy-cloud-jobs.cases.ts 同款)。
 import { expect, mock, test } from "bun:test"
 import type { AutomationTask } from "../shared/automation-types"

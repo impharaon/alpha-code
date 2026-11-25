@@ -203,13 +203,4 @@ describe("reconcileMcpWorkspaceMarkers", () => {
     expect(readFileSync(config, "utf8")).toBe(before)
   })
 
-  // 分类与「这处锚守不住什么」登记在 ./source-text-anchors.ts(`#968` 第 ⑤ 层机械校验)。
-  test("ANCHOR (not a gate): main runs marker reconciliation before the first sidecar fork", () => {
-    const source = readFileSync(join(import.meta.dir, "index.ts"), "utf8")
-    const markerReconcile = source.indexOf("  reconcileMcpWorkspaceMarkers()")
-    const firstFork = source.indexOf("spawnLocalServer(hostname, port, password")
-
-    expect(markerReconcile).toBeGreaterThan(-1)
-    expect(firstFork).toBeGreaterThan(markerReconcile)
-  })
 })

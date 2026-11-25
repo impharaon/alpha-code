@@ -308,7 +308,7 @@ describe("闸门文件登记簿完备性 (#647)", () => {
     const fixture = mkdtempSync(join(base, "gate-release-"))
     try {
       mkdirSync(join(fixture, "scripts"))
-      cpSync(join(REPO_ROOT, "scripts/assert-gate-files.sh"), join(fixture, "scripts/assert-gate-files.sh"))
+      for (const script of ["assert-gate-files.sh", "test-layers.sh"]) cpSync(join(REPO_ROOT, "scripts", script), join(fixture, "scripts", script))
       const rows = readFileSync(join(REPO_ROOT, "scripts/gate-files.tsv"), "utf8").split("\n").filter((line) => line && !line.startsWith("#"))
       const release = rows.find((line) => line.includes("\tsrc/main/process-fence-extension-packaged.test.ts\t"))!
       // Real registry rows; only the platform is removed to test the environment rule on every host OS.
@@ -317,7 +317,7 @@ describe("闸门文件登记簿完备性 (#647)", () => {
       for (const [enabled, bad, exit, expected] of [["", "", 2, "=0"], ["1", "", 0, "=1"], ["", "1", 1, "=0"]] as const) {
         const calls = join(fixture, "calls")
         writeFileSync(calls, "")
-        const result = Bun.spawnSync(["bash", join(fixture, "scripts/assert-gate-files.sh")], { env: { ...process.env, CALLS: calls, CODEPUPPY_TEST_SIGNED_FENCE: enabled, BAD_SELF_SKIP: bad } })
+        const result = Bun.spawnSync(["bash", join(fixture, "scripts/assert-gate-files.sh")], { env: { ...process.env, CALLS: calls, CODEPUPPY_TEST_SIGNED_FENCE: enabled, BAD_SELF_SKIP: bad, CODEPUPPY_TEST_LAYERS: "" } })
         expect(result.exitCode, result.stderr.toString() + result.stdout.toString()).toBe(exit)
         expect(readFileSync(calls, "utf8").trim().split("\n").at(-1)).toBe(`${expected}\tsrc/main/process-fence-extension-packaged.test.ts`)
       }
@@ -653,8 +653,8 @@ describe("闸门文件登记簿完备性 (#647)", () => {
     // 过度命中由 KEPT 表吸收 —— 谓词保持愚蠢 + 默认拒,判断留在人读的表里。
     //
     // 真实枚举达到下界:谓词或 git 枚举退化成空集时,上面四条闸会**空对空全绿**(`0 fail` 恒成立)。
-    // 23 就是今天的实测值,不留余量 —— 删掉任何一个命中方都当场红。
-    expect(SOURCE_TEXT_HITS.size).toBeGreaterThanOrEqual(23)
+    // 14 就是今天的实测值(ADR-0014 删掉 41 条 ANCHOR 锚之后),不留余量 —— 删掉任何一个命中方都当场红。
+    expect(SOURCE_TEXT_HITS.size).toBeGreaterThanOrEqual(14)
     expect(SOURCE_TEXT_IN_SCOPE.length).toBeGreaterThanOrEqual(200)
     // 自指:本文件正文里必然写着谓词的正例夹具,不排除自己就把自己算成命中方。
     expect([...SOURCE_TEXT_HITS.keys()]).not.toContain(SELF)
@@ -674,7 +674,7 @@ describe("--update 处理已删的闸门文件 (I-09)", () => {
     const root = mkdtempSync(join(tmpdir(), "i09-gate-update-"))
     mkdirSync(join(root, "scripts"))
     mkdirSync(join(root, "pkg"))
-    for (const script of ["assert-gate-files.sh", "bun-test-floor.sh"])
+    for (const script of ["assert-gate-files.sh", "bun-test-floor.sh", "test-layers.sh", "junit-file-counts.py"])
       cpSync(join(REPO_ROOT, "scripts", script), join(root, "scripts", script))
     const rows: string[] = []
     for (let i = 1; i <= ROWS_N; i++) {
@@ -719,6 +719,70 @@ describe("--update 处理已删的闸门文件 (I-09)", () => {
       const checked = run()
       expect(checked.code, checked.out).toBe(1)
       expect(checked.out).toContain(name(3))
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  }, 120_000)
+})
+
+// ADR-0014:门的 [6/14] 不再逐个重跑,而是从 [5/14] 的 junit 报告读条数(`--from-reports`)。判定必须与逐个重跑同样
+// 拒得住:条数偏离、文件没跑到、文件有失败都红并点名;PR 门的层范围之外(scenario)不判但写明。
+describe("--from-reports:从测试报告判条数 (ADR-0014)", () => {
+  const ROWS_N = 26
+  const name = (i: number) => (i === ROWS_N ? "gate-report-probe-nightly.scenario.test.ts" : `gate-report-probe-${String(i).padStart(2, "0")}.test.ts`)
+  const testBody = (n: number, failing = false) =>
+    `import { expect, test } from "bun:test"\n${Array.from({ length: n }, (_, i) => `test("t${i}", () => { expect(${failing && i === 0 ? 1 : 0}).toBe(0) })`).join("\n")}\n`
+
+  test("条数一致 ⇒ 0;少一条 / 不在报告里 / 有失败 ⇒ 1 并点名;范围外的层写明不判", () => {
+    const root = mkdtempSync(join(tmpdir(), "gate-from-reports-"))
+    try {
+      mkdirSync(join(root, "scripts"))
+      mkdirSync(join(root, "packages", "pkg"), { recursive: true })
+      for (const script of ["assert-gate-files.sh", "bun-test-floor.sh", "test-layers.sh", "junit-file-counts.py"])
+        cpSync(join(REPO_ROOT, "scripts", script), join(root, "scripts", script))
+      const rows: string[] = []
+      for (let i = 1; i <= ROWS_N; i++) {
+        writeFileSync(join(root, "packages", "pkg", name(i)), testBody(1))
+        rows.push(["1", "packages/pkg", name(i), "-", `probe ${i}`].join("\t"))
+      }
+      writeFileSync(join(root, "scripts", "gate-files.tsv"), `# probe registry\n${rows.join("\n")}\n`)
+      const env = { ...process.env }
+      for (const key of Object.keys(env)) if (key.startsWith("CODEPUPPY_") || key === "GATE_REPORT_DIR") delete env[key]
+      const report = (files: string[]) => {
+        const dir = mkdtempSync(join(root, "reports-"))
+        Bun.spawnSync([process.execPath, "test", "--reporter=junit", `--reporter-outfile=${join(dir, "pkg.integration.xml")}`, ...files.map((f) => `./${f}`)], {
+          cwd: join(root, "packages", "pkg"),
+          env,
+        })
+        return dir
+      }
+      const run = (dir: string) => {
+        const r = Bun.spawnSync(["bash", join(root, "scripts", "assert-gate-files.sh"), "--from-reports", dir], {
+          cwd: root,
+          env: { ...env, CODEPUPPY_TEST_LAYERS: "fast integration" },
+        })
+        return { code: r.exitCode, out: `${r.stdout.toString()}${r.stderr.toString()}` }
+      }
+      const inScope = Array.from({ length: ROWS_N - 1 }, (_, i) => name(i + 1))
+
+      const green = run(report(inScope))
+      expect(green.code, green.out).toBe(0)
+      expect(green.out).toContain(`本次范围外:packages/pkg/${name(ROWS_N)}(scenario 层`)
+
+      writeFileSync(join(root, "packages", "pkg", name(2)), testBody(2))
+      const more = run(report(inScope))
+      expect(more.code, more.out).toBe(1)
+      expect(more.out).toContain(`packages/pkg/${name(2)} 实际 2 条 ≠ 登记 1 条`)
+      writeFileSync(join(root, "packages", "pkg", name(2)), testBody(1))
+
+      const missing = run(report(inScope.filter((f) => f !== name(3))))
+      expect(missing.code, missing.out).toBe(1)
+      expect(missing.out).toContain(`packages/pkg/${name(3)} 不在本次测试报告里`)
+
+      writeFileSync(join(root, "packages", "pkg", name(4)), testBody(1, true))
+      const red = run(report(inScope))
+      expect(red.code, red.out).toBe(1)
+      expect(red.out).toContain(`packages/pkg/${name(4)} 有 1 条失败`)
     } finally {
       rmSync(root, { recursive: true, force: true })
     }

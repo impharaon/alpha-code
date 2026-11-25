@@ -233,7 +233,7 @@ const CHECKS: Record<string, (r: Replayed) => void> = {
 const EXISTING: Record<string, { file: string; test: string }> = {
   "GET /global/event": { file: "event-projection.test.ts", test: "v1 SDK 订阅的 /global/event 是 2.x /api/event 的投影:SSE 帧为 {directory, payload},订阅方中止即退订" },
   "POST /session/:sessionID/command": { file: "command-reply.test.ts", test: "v1 响应的 info.id = 这条命令那个回合的助手消息,命令来源 chip 对得上回合" },
-  "GET /session/:sessionID/message": { file: "turn-failure.engine.test.ts", test: "模型不可用 / BYOK 401 / 平台 401 / 402 两种 / 429 / 平台凭据读不到(开头 / 两步之间)/ 拒连,两条入口的回合错误行(turn-failure.engine.cases.ts,9 条)" },
+  "GET /session/:sessionID/message": { file: "engine-cases.test.ts", test: "模型不可用 / BYOK 401 / 平台 401 / 402 两种 / 429 / 平台凭据读不到(开头 / 两步之间)/ 拒连,两条入口的回合错误行(turn-failure.engine.cases.ts,9 条)" },
   "GET /session/:sessionID/todo": { file: "todo-route.test.ts", test: "AC-01 2000+ 条消息、写过多次清单:只读最近一段(≤ 两页),结果 = 最后一次写入" },
   "GET /provider": { file: "projection-parity.test.ts", test: "provider 经真入口:createEngineFetch 的 GET /provider 回的就是这份转换(deprecated 模型在 HTTP 输出里)" },
   "POST /mcp/:name/auth/authenticate": { file: "mcp-auth.test.ts", test: "complete ⇒ 回 connected;紧接着的 /mcp 也是 connected(定制中心判成功)" },
@@ -395,8 +395,8 @@ const EVENT_CHECKS: Partial<Record<ContractEventType, () => Promise<void>>> = {
 
 /** 已有测试证明的事件(记录或现场采集的真引擎帧,交冻结 app 的归约 / 冻结消费方判)。 */
 const EXISTING_EVENTS: Partial<Record<ContractEventType, { file: string; test: string }>> = {
-  "message.updated": { file: "queued-prompt.engine.test.ts", test: "#1669 审批等待中追加一句:回答前两个窗口与重新加载都有这条用户消息、反向臂(去掉 session.inbox.enqueued)没有、允许一次后一条气泡 = 引擎 = 重新加载、停止后留在收件箱气泡留着(queued-prompt.engine.cases.ts,4 条)" },
-  "message.removed": { file: "revert-removal.engine.test.ts", test: "#1669 长对话编辑重发:暂存不删、重发后两个窗口 = 引擎 = 重新加载、暂存期间落下的消息一并删、反向臂(去掉 message.removed)旧问答残留(revert-removal.engine.cases.ts,5 条)" },
+  "message.updated": { file: "engine-cases.test.ts", test: "#1669 审批等待中追加一句:回答前两个窗口与重新加载都有这条用户消息、反向臂(去掉 session.inbox.enqueued)没有、允许一次后一条气泡 = 引擎 = 重新加载、停止后留在收件箱气泡留着(queued-prompt.engine.cases.ts,4 条)" },
+  "message.removed": { file: "engine-cases.test.ts", test: "#1669 长对话编辑重发:暂存不删、重发后两个窗口 = 引擎 = 重新加载、暂存期间落下的消息一并删、反向臂(去掉 message.removed)旧问答残留(revert-removal.engine.cases.ts,5 条)" },
   "message.part.updated": { file: "event-projection.test.ts", test: "读文件回合:事件流归约出的消息与 part,与重新加载这个会话的投影逐字相同" },
   "message.part.delta": { file: "event-projection.test.ts", test: "流式增量:正文先以 message.part.delta 一段段到达,part id 与最终快照同一个号" },
   "session.status": { file: "event-projection.test.ts", test: "会话状态:execution.started ⇒ busy,succeeded ⇒ idle + session.idle" },
@@ -406,7 +406,7 @@ const EXISTING_EVENTS: Partial<Record<ContractEventType, { file: string; test: s
   "question.asked": { file: "event-projection.test.ts", test: "提问:2.x 表单 ⇒ question.asked(v1 形状),回答后 question.replied 把它从待答里拿掉" },
   "question.replied": { file: "event-projection.test.ts", test: "提问:2.x 表单 ⇒ question.asked(v1 形状),回答后 question.replied 把它从待答里拿掉" },
   "file.watcher.updated": { file: "file-watcher.test.ts", test: "filesystem.changed(不带 sessionID)→ 那个目录频道上的 file.watcher.updated,面板照原样收下" },
-  "permission.asked": { file: "command-approval.engine.test.ts", test: "命令卡标题与记忆范围、patch 改文件卡(command-approval.engine.cases.ts,2 条)" },
+  "permission.asked": { file: "engine-cases.test.ts", test: "命令卡标题与记忆范围、patch 改文件卡(command-approval.engine.cases.ts,2 条)" },
   "permission.replied": { file: "permission-reply.test.ts", test: "v1 通道:连带的 replied 帧经投影器成为 v1 permission.replied,冻结 feed 逐条收卡" },
 }
 

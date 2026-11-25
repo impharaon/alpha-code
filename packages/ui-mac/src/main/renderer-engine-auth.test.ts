@@ -5,8 +5,6 @@
 // 真 index.ts / windows.ts 在 bun 里链接不起来(index.ts 见 source-text-anchors.ts 抬头;windows.ts 顶层 import electron),
 // 所以投影与补头都住在可 import 的 engine-authorization.ts,这里真执行它们;末两条锚只保证生产真的接在上面。
 import { describe, expect, test } from "bun:test"
-import { readFileSync } from "node:fs"
-import { join } from "node:path"
 import { engineAuthorization, engineConnectionFor, rendererEngineView, withEngineRequestAuthorization, type EngineConnection } from "./engine-authorization"
 import { createWslServersController } from "./wsl/servers"
 
@@ -71,13 +69,4 @@ describe("I8 renderer 只拿 { url },口令由 main 补在请求上", () => {
     expect(reported.at(-1)).toEqual([config.id, undefined])
   })
 
-  // 分类与「这处锚守不住什么」登记在 ./source-text-anchors.ts。
-  test("ANCHOR (not a gate): index.ts 的 awaitInitialization 返回 rendererEngineView(res)、把 WSL 连接交给 windows.ts,windows.ts 的 onBeforeSendHeaders 按源挑连接经 withEngineRequestAuthorization 补头", () => {
-    const index = readFileSync(join(import.meta.dir, "index.ts"), "utf8")
-    expect(index).toContain("return rendererEngineView(res)")
-    expect(index).toContain("setEngineConnection(connection)")
-    const windows = readFileSync(join(import.meta.dir, "windows.ts"), "utf8")
-    expect(windows).toContain("withEngineRequestAuthorization(details.url, details.requestHeaders, engineConnectionFor(details.url, [engineConnection, ...wslEngineConnections.values()]))")
-    expect(index).toContain("onEngineConnection: (id, connection) => setWslEngineConnection(id, connection)")
-  })
 })

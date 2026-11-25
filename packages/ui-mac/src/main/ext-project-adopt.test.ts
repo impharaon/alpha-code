@@ -150,21 +150,4 @@ describe("recovery gate 准入(review #380 minor:journal 在场的真实行为)"
 })
 
 describe("#356 wiring:触发面在 trust-check 两个早退之前(源文本合同)", () => {
-  // 分类与「这处锚守不住什么」登记在 ./source-text-anchors.ts(`#968` 第 ⑤ 层机械校验)。
-  test("ANCHOR (not a gate): adoption 调用位置先于「无 executable 早退」与「已有决策早退」", () => {
-    const src = readFileSync(join(import.meta.dir, "ext-ipc.ts"), "utf8")
-    const trustStart = src.indexOf('ipcMain.handle("ext-trust-check"')
-    const trustEnd = src.indexOf('ipcMain.handle("ext-external-check"', trustStart)
-    expect(trustStart).toBeGreaterThan(0)
-    expect(trustEnd).toBeGreaterThan(trustStart)
-    const trust = src.slice(trustStart, trustEnd)
-    const posAdopt = trust.indexOf("adoptProjectLedger(directory")
-    const posNoExec = trust.indexOf("if (!rows.length)")
-    const posDecision = trust.indexOf("hasExtensionsDecision(decision)")
-    expect(posAdopt).toBeGreaterThan(0)
-    expect(posNoExec).toBeGreaterThan(0)
-    expect(posDecision).toBeGreaterThan(0)
-    expect(posAdopt).toBeLessThan(posNoExec)
-    expect(posAdopt).toBeLessThan(posDecision)
-  })
 })

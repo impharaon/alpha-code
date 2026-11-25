@@ -1,50 +1,83 @@
 #!/usr/bin/env bash
-# ui-mac 全量(`bun test src`)分两组跑,两组都走 scripts/bun-test-floor.sh(条数下界 + 已知红棘轮,#1086)。
+# ui-mac 本次范围里的那几层测试(`bash scripts/bun-test-ui-mac.sh <层...>`,PR 门 `fast integration`,`--full` 再加 `scenario`),
+# 每组都走 scripts/bun-test-floor.sh(条数下界 + 已知红棘轮,#1086)。层由文件名决定,规则在 scripts/test-layers.sh(唯一真源);
+# 文件进哪一组由 test-layers.sh 的 ui_mac_run_group 定(门与测量读同一份):
 #
-#   A 组:非引擎测试文件 —— `bun test --parallel`(worker 进程,隐含 --isolate,默认核数)。
-#   B 组:真引擎宿主测试文件 —— 串行。它们要起内嵌引擎 / 子进程里的真引擎(15s~90s 级的等待),
-#         与别的 worker 抢 CPU 时会超时变红(2026-11-23 实测:10 worker 多出 7 行红,
-#         `--parallel=5` 在负载 ~14 的整门里仍有 4 个真引擎文件红);串行组把它们从抢占里拿出来,
-#         结果与机器负载无关,也不必往 known-fails.tsv 里加任何一行。
+#   并行组:`bun test --parallel`(worker 进程,隐含 --isolate,默认核数)—— fast 层全部、其余层里不起引擎也不起浏览器的文件。
+#   串行组:起真引擎的 integration / scenario 文件,一个进程按文件表顺序跑。真引擎用例(内嵌引擎 / 子进程里的真引擎,15s~90s
+#           级的等待)与别的 worker 抢 CPU 会超时变红(2026-11-23 实测:10 worker 多出 7 行红,`--parallel=5` 在负载 ~14 的
+#           整门里仍有 4 个真引擎文件红)。
+#   浏览器组:真浏览器文件(*.browser.*),`--parallel=1`:一个隔离 worker 逐个跑(理由见 ui_mac_run_group)。
+# 每组一次调用,不按层分开跑(分层逐个串着调用会丢并行);跑完按层把 junit 拆成 `ui-mac.<层>.xml` /
+# `ui-mac+serial.<层>.xml` / `ui-mac+browser.<层>.xml` 写进 $GATE_REPORT_DIR(scripts/junit-split-layers.py)。
 #
-# 覆盖与全量相同:A ∪ B == bun 默认发现的全部测试文件(find 的文件名模式即 bun 文档里的那五种),
-# 两组互不相交;任一组为空即报错(分类器退化 = 一组吞掉另一组)。
-# 「真引擎」判据(文件名含 engine,或文件 / 它旁边引用的 *.cases.ts 里出现引擎沙箱 / 内嵌引擎 /
-# spawnLocalServer 等字样)是**启发式**:漏判 = 该文件留在并行组(最坏是回到旧的间歇红,不丢覆盖),
-# 多判 = 多一个串行文件(只慢不红)。
+# 下界是灾难闸(加载失败、成片删除、runner 配错):按组内各层的下界相加;逐文件精确条数由闸门登记簿(scripts/assert-gate-files.sh)判。
 set -uo pipefail
 cd "$(git rev-parse --show-toplevel)"
+# shellcheck source=scripts/test-layers.sh
+source scripts/test-layers.sh
 WORKDIR=packages/ui-mac
-ENGINE_PAT='engine-sandbox|engine-embed|in-process-engine|spawnLocalServer|startEngine|embedded engine|real engine|真引擎'
-# 两个下界各自留大余量的灾难闸(整套 ≈ 6900 条,原整套下界 3000):A + B = 3000。
-FLOOR_PARALLEL="${UI_MAC_FLOOR_PARALLEL:-2000}"
-FLOOR_ENGINE="${UI_MAC_FLOOR_ENGINE:-1000}"
+[ "$#" -gt 0 ] || { echo "usage: $0 <fast|integration|scenario>..." >&2; exit 2; }
+for layer in "$@"; do
+  case "$layer" in fast|integration|scenario) ;; *) echo "usage: $0 <fast|integration|scenario>..." >&2; exit 2 ;; esac
+done
 
+work="$(mktemp -d)"
+trap 'rm -rf "$work"' EXIT
 parallel_files=()
-engine_files=()
-while IFS= read -r f; do
-  hit=0
-  case "$f" in *engine*) hit=1 ;; esac
-  if [ "$hit" -eq 0 ] && grep -qE "$ENGINE_PAT" "$WORKDIR/$f"; then hit=1; fi
-  if [ "$hit" -eq 0 ]; then
-    for c in $(grep -oE '[A-Za-z0-9._-]+\.(cases|live-cases)\.ts' "$WORKDIR/$f" | sort -u); do
-      cf="$WORKDIR/$(dirname "$f")/$c"
-      if [ -f "$cf" ] && grep -qE "$ENGINE_PAT" "$cf"; then hit=1; break; fi
-    done
-  fi
-  if [ "$hit" -eq 1 ]; then engine_files+=("./$f"); else parallel_files+=("./$f"); fi
-done < <(cd "$WORKDIR" && find src -type f \( -name '*.test.*' -o -name '*_test.*' -o -name '*.spec.*' -o -name '*_spec.*' \) \
-  | grep -E '\.(js|jsx|ts|tsx|mjs|cjs|mts|cts)$' | LC_ALL=C sort)
+serial_files=()
+browser_files=()
+: > "$work/parallel.map"
+: > "$work/serial.map"
+: > "$work/browser.map"
+while IFS=$'\t' read -r f layer; do
+  group="$(ui_mac_run_group "$f" "$layer")"
+  case "$group" in
+    serial) serial_files+=("./$f") ;;
+    browser) browser_files+=("./$f") ;;
+    *) parallel_files+=("./$f") ;;
+  esac
+  printf '%s\t%s\n' "$f" "$layer" >> "$work/$group.map"
+done < <(test_layer_map "$WORKDIR" "$@")
+floor_parallel=0
+floor_serial=0
+for layer in "$@"; do
+  case "$layer" in
+    fast) floor_parallel=$((floor_parallel + 100)) ;;
+    integration) floor_parallel=$((floor_parallel + 1500)); floor_serial=$((floor_serial + 300)) ;;
+    scenario) floor_serial=$((floor_serial + 5)) ;;
+  esac
+done
 
-if [ "${#parallel_files[@]}" -eq 0 ] || [ "${#engine_files[@]}" -eq 0 ]; then
-  echo "::error::ui-mac 测试分组退化:并行组 ${#parallel_files[@]} 个、真引擎串行组 ${#engine_files[@]} 个文件(两组都应非空)" >&2
+echo "── ui-mac($*):并行 ${#parallel_files[@]} + 串行 ${#serial_files[@]} + 浏览器 ${#browser_files[@]} 个文件"
+if [ $((${#parallel_files[@]} + ${#serial_files[@]} + ${#browser_files[@]})) -eq 0 ]; then
+  echo "::error::ui-mac 本次范围($*)一个测试文件都没有 —— 分层枚举退化" >&2
   exit 1
 fi
-echo "── ui-mac 分组:并行 ${#parallel_files[@]} 个文件 + 真引擎串行 ${#engine_files[@]} 个文件"
+
+# <组名> <map> <下界> [bun test 参数...]
+run_group() {
+  local step="$1" map="$2" floor="$3" rc=0
+  shift 3
+  CODEPUPPY_JUNIT_FILE="$work/$step.xml" CODEPUPPY_KNOWN_FAILS_FILE=scripts/known-fails.tsv \
+    bash scripts/bun-test-floor.sh "$floor" "$WORKDIR" "$@" || rc=1
+  if [ -n "${GATE_REPORT_DIR:-}" ]; then
+    python3 scripts/junit-split-layers.py "$work/$step.xml" "$map" "$GATE_REPORT_DIR" "$step" || rc=1
+  fi
+  return $rc
+}
 
 rc=0
-echo "── [A] 并行组"
-CODEPUPPY_KNOWN_FAILS_FILE=scripts/known-fails.tsv bash scripts/bun-test-floor.sh "$FLOOR_PARALLEL" "$WORKDIR" --parallel "${parallel_files[@]}" || rc=1
-echo "── [B] 真引擎串行组"
-CODEPUPPY_KNOWN_FAILS_FILE=scripts/known-fails.tsv bash scripts/bun-test-floor.sh "$FLOOR_ENGINE" "$WORKDIR" "${engine_files[@]}" || rc=1
+if [ "${#parallel_files[@]}" -gt 0 ]; then
+  echo "── [ui-mac] 并行组"
+  run_group ui-mac "$work/parallel.map" "$floor_parallel" --parallel "${parallel_files[@]}" || rc=1
+fi
+if [ "${#serial_files[@]}" -gt 0 ]; then
+  echo "── [ui-mac] 串行组(真引擎)"
+  run_group ui-mac+serial "$work/serial.map" "$floor_serial" "${serial_files[@]}" || rc=1
+fi
+if [ "${#browser_files[@]}" -gt 0 ]; then
+  echo "── [ui-mac] 浏览器组(--parallel=1)"
+  run_group ui-mac+browser "$work/browser.map" 1 --parallel=1 "${browser_files[@]}" || rc=1
+fi
 exit $rc

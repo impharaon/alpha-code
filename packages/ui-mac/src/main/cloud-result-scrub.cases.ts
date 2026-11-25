@@ -19,7 +19,7 @@
 // **不设防** —— 对抗载荷因此只用防线规格内的形态;裸 base64 形态只用于标定扫描器能力
 // (证明「零发现」不是扫描器瞎)。结构性关死 `result` 属于跨仓契约变更(alpha-platform#51)。
 //
-// mock.module 会污染同进程其它测试文件 ⇒ 子进程跑(cloud-ipc.test.ts 同款),
+// mock.module 会污染同进程其它测试文件 ⇒ 子进程跑(subprocess-cases.test.ts 同款),
 // 宿主 = cloud-result-scrub.test.ts。
 import { afterAll, expect, mock, test } from "bun:test"
 

@@ -8,7 +8,7 @@
 //   4. live 清单不含某 BYOK 供应商(或平台不可达)→ 该供应商仍在目录中;
 //   5. 平台目录 contract-incompatible → 本地 BYOK 仍正常返回(契约错误只上报,不阻断)。
 //
-// 子进程运行(codepuppy-platform-catalog.test.ts spawn):本模块经 codepuppy-auth / codepuppy-contract-health /
+// 子进程运行(subprocess-cases.test.ts spawn):本模块经 codepuppy-auth / codepuppy-contract-health /
 // logging 拖入 electron,mock.module 在同一进程内会泄漏到别的测试文件,故整体隔离。
 
 import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test"

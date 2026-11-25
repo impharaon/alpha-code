@@ -1,5 +1,5 @@
 // SPEC-engine-config-fence AC-04, AC-05 (tool policy), AC-06, AC-08 ③; DESIGN-engine-config-fence E3, E5, E6, E8, E11. Run only through
-// engine-config-fence.engine.test.ts: the fence is process-lifetime, so every arm is its own `bun test` child (CODEPUPPY_CF_ENGINE_ARM).
+// engine-config-fence.engine.scenario.test.ts: the fence is process-lifetime, so every arm is its own `bun test` child (CODEPUPPY_CF_ENGINE_ARM).
 //
 // Real embedded engine + real ext + production injection (test-component/codepuppy-engine.ts, which writes the engine config the way
 // main does before fork: writeEngineConfigForFork). This process then fences itself with the production planner (planProcessFence: real

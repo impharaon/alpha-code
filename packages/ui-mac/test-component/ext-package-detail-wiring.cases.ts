@@ -113,7 +113,7 @@ const extensions = {
    *  同样**照生产那条链走**(`extIpc` 而不是 `window.api.ext`),理由与上面那条逐字相同;
    *  `scope` 由数据层钉死 global —— 生产实现就是这么做的,替身不许自己另发明一个。
    *  「装完必须让引擎重扫」的判据不在本文件(这里的 `refreshEngine` 是常量桩),
-   *  它在 `package-install-engine-reload.test.ts`。 */
+   *  它在 `src/renderer/engine-cases.test.ts`。 */
   installCatalogIntent: async (intent: { catalogId: string }) =>
     extIpcRef!.installCatalog({ ...intent, scope: { scope: "global" } }),
 }

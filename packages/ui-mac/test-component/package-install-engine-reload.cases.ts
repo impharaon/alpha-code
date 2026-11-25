@@ -4,8 +4,8 @@
 // Exact data-layer/IPC ID counts catch bypasses and duplicate writes. The existing scheduler,
 // pending-state, connector permission and attachment checks below keep their original behavior.
 // Only process/HTTP boundaries are substituted; admission, ledger, transactions and planners are real.
-// Real MCP availability/read-back is additionally guarded by package-hub-lifecycle.engine.test.ts
-// and install-from-source.engine.test.ts; this host exercises actual renderer actions.
+// Real MCP availability/read-back is additionally guarded by engine-cases.test.ts
+// and engine-cases.test.ts; this host exercises actual renderer actions.
 //
 // ⚠️ 本仓踩过的三条本机纪律,本文件逐条遵守:
 //   · `mock.module` 会**就地改写**已捕获的模块命名空间对象 ⇒ 函数值必须先存进独立 const;

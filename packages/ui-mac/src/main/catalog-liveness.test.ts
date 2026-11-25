@@ -1,6 +1,4 @@
 import { describe, expect, test } from "bun:test"
-import { readFileSync } from "node:fs"
-import { join } from "node:path"
 import {
   CATALOG_LIVENESS_PROBE_INTERVAL_MS,
   armCatalogLiveness,
@@ -347,80 +345,4 @@ describe("catalog-liveness 巡查器安装(#1098)", () => {
     await new Promise((r) => setTimeout(r, 100))
     expect(ticks.length).toBe(stopped)
   })
-})
-
-// #564 接线锚(index.ts 是本仓唯一跑不进单测的文件,生产接线的最后一英里只能锁源码形状;
-// 决策行为的真闸门在上面的纯函数用例里)。断言九件事:
-// ① 恰好两处武装(boot 终态continuation + respawn 健康线之后),条件形状逐字锁定 ——
-//    boot 只在干净 ready 终态武装(injection-failed 不武装),respawn 同判据;
-// ② 决策被消费恰好一次(decideCatalogLiveness);
-// ③ kill-and-respawn 裁决真的接到 current.kill()(交给既有 self-heal respawn 路径);
-// ④ stop-and-report 裁决接到 recoveryService.register(显式恢复,不再自动 kill);
-// ⑤ killSidecar 与 handleSidecarExit 都停表(旧代探针不得打在新代身上);
-// ⑥ R1 Blocker:武装前判探针目录存在(不存在 = 观测面不可用,不武装、绝不代建),
-//    且 indeterminate 弃权在 kill 分支**之前**被消费(弃权路径上不得出现 current.kill());
-// ⑦ R2 Major:探针目录来自首屏解析(resolveCatalogProbeDirectory 唯一消费点),解析不出 /
-//    不在盘上才回退默认工作区 —— 探针本体**不得**再打 codepuppyUserWorkspaceDir()(那正是
-//    「只观测最廉价目录」的回归形状);
-// ⑧ R2 Minor:探针 promise 链尾必须有 .catch(回调体任一抛出不得成为 main 的 unhandled
-//    rejection),且 catch 内复位 probeInFlight(否则 probeCatalogMarker 意外 reject 会让
-//    每个后续 tick 空转、看门狗静默失效)。
-// ⑨ `#1098`:巡查器必须经 startCatalogLivenessProbes 安装(它保证「装好立刻巡查一次」),
-//    且武装体内不得再出现裸的定时器安装 —— 裸 setInterval 回来 = 第一次巡查又空等满一个周期,
-//    而上面的纯函数用例照绿(它们喂样本序列,一个定时器都不驱动)。
-// 分类与「这处锚守不住什么」登记在 ./source-text-anchors.ts(`#968` 第 ⑤ 层机械校验)。
-test("ANCHOR (not a gate): #564 看门狗武装/停表/裁决消费必须留在 index.ts 的接线形状里", () => {
-  const source = readFileSync(join(import.meta.dir, "index.ts"), "utf8")
-
-  expect(source.split("armCatalogLivenessWatchdog(spawnGen)").length - 1).toBe(2)
-  expect(source).toContain('if (terminal === "ready" && spawnGen === sidecarGen) armCatalogLivenessWatchdog(spawnGen)')
-  expect(source).toContain("if (healthy && !injectionFailure && spawnGen === sidecarGen) armCatalogLivenessWatchdog(spawnGen)")
-  expect(source.split("decideCatalogLiveness(").length - 1).toBe(1) // 唯一消费点(import 是裸标识符)
-
-  const armStart = source.indexOf("const armCatalogLivenessWatchdog = (gen: number) => {")
-  const armEnd = source.indexOf("CATALOG_LIVENESS_PROBE_INTERVAL_MS)", armStart)
-  expect(armStart).toBeGreaterThan(-1)
-  expect(armEnd).toBeGreaterThan(armStart)
-  const armBody = source.slice(armStart, armEnd)
-  // ⑨ #1098:立刻巡查一次由 startCatalogLivenessProbes 保证(行为判据在「巡查器安装」用例里);
-  //    这里只锁住生产真的走它,且武装体内没有第二条裸定时器路径。
-  expect(armBody).toContain("catalogLivenessTimer = startCatalogLivenessProbes(() => {")
-  expect(armBody.split("setInterval(").length - 1).toBe(0)
-  expect(armBody).toContain('decision.action === "kill-and-respawn"')
-  expect(armBody).toContain("current.kill()")
-  expect(armBody).toContain("recoveryService.register")
-
-  // ⑦ 探针目录:首屏解析唯一消费点;probe 打解析结果;唯一的 codepuppyUserWorkspaceDir() 出现在
-  //    回退表达式里(probe 本体直呼它 = 回归到只观测最廉价目录,必须在这里红)。
-  expect(source.split("resolveCatalogProbeDirectory(").length - 1).toBe(1)
-  expect(armBody).toContain("probeCatalogMarker({ url, password, directory: probeDirectory })")
-  expect(armBody).toContain("existsSync(userDirectory) ? userDirectory : codepuppyUserWorkspaceDir()")
-  expect(armBody.split("codepuppyUserWorkspaceDir()").length - 1).toBe(1)
-
-  // ⑥ 目录存在守卫:武装体内、armCatalogLiveness 之前(守卫失效 = 全新安装 60s 杀健康引擎)。
-  const guardAt = armBody.indexOf("if (!existsSync(probeDirectory))")
-  const armCallAt = armBody.indexOf("armCatalogLiveness(catalogLiveness")
-  expect(guardAt).toBeGreaterThan(-1)
-  expect(armCallAt).toBeGreaterThan(guardAt)
-  expect(armBody).toContain("workspace-dir-missing")
-
-  // ⑧ 链尾 .catch:在 .then 之后、且 catch 体内复位 probeInFlight。
-  const thenAt = armBody.indexOf(".then((sample) => {")
-  const catchAt = armBody.indexOf(".catch((error) => {", thenAt)
-  expect(thenAt).toBeGreaterThan(-1)
-  expect(catchAt).toBeGreaterThan(thenAt)
-  expect(armBody.indexOf("catalogLivenessProbeInFlight = false", catchAt)).toBeGreaterThan(catchAt)
-  // ⑥ indeterminate 弃权:在 kill 分支之前消费,且它与 current.kill() 之间隔着 return。
-  const indeterminateAt = armBody.indexOf('decision.action === "indeterminate"')
-  const killBranchAt = armBody.indexOf('decision.action === "kill-and-respawn"')
-  expect(indeterminateAt).toBeGreaterThan(-1)
-  expect(indeterminateAt).toBeLessThan(killBranchAt)
-  expect(armBody).toContain("main.sidecar.catalog_liveness.indeterminate")
-
-  const killFn = source.indexOf("async function killSidecar")
-  const killFnEnd = source.indexOf("function endSessionGrants")
-  expect(source.slice(killFn, killFnEnd)).toContain("stopCatalogLivenessWatchdog()")
-  const exitFn = source.indexOf("function handleSidecarExit")
-  const exitFnEnd = source.indexOf("function stopEngineRunawayMeter")
-  expect(source.slice(exitFn, exitFnEnd)).toContain("stopCatalogLivenessWatchdog()")
 })

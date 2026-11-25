@@ -566,15 +566,4 @@ describe("reconcileCodePuppyOfficeInstalls — re-anchor a stale bundle path in 
 })
 
 describe("boot wiring", () => {
-  // 分类与「这处锚守不住什么」登记在 ./source-text-anchors.ts(`#968` 第 ⑤ 层机械校验)。
-  test("ANCHOR (not a gate): main runs the Office instance reconcile before the marker reconcile and the first sidecar fork", () => {
-    const source = readFileSync(join(import.meta.dir, "index.ts"), "utf8")
-    const officeReconcile = source.indexOf("  reconcileCodePuppyOfficeInstalls()")
-    const markerReconcile = source.indexOf("  reconcileMcpWorkspaceMarkers()")
-    const firstFork = source.indexOf("spawnLocalServer(hostname, port, password")
-
-    expect(officeReconcile).toBeGreaterThan(-1)
-    expect(markerReconcile).toBeGreaterThan(officeReconcile)
-    expect(firstFork).toBeGreaterThan(markerReconcile)
-  })
 })

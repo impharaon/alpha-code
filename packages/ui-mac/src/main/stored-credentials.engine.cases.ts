@@ -5,7 +5,7 @@
 // 本机连接器 alpha 的令牌在 Code Puppy 的连接器存放点里(生产 writeMcpSecretVersioned 写),codepuppy.jsonc 经显式文件引用它;连接器每次启动把
 // 拿到的 TOKEN 与所在 Location 目录记一行(test-component/mcp-env-dump.fixture.ts)。每一步都开一个新 Location(新目录 ⇒ 一次新的配置装载)。
 // 片 ② 还没有围栏规则 C1:拉取失败时引用留给引擎自己从盘上读(设计接受的过渡态),所以「不用旧表」用「盘上是新值、旧表里是旧值」来判。
-// 假值一眼可辨;本文件由 stored-credentials.engine.test.ts 起独立子进程跑。
+// 假值一眼可辨;本文件由 engine-cases.test.ts 起独立子进程跑。
 import { afterAll, beforeAll, expect, test } from "bun:test"
 import fs from "node:fs"
 import path from "node:path"

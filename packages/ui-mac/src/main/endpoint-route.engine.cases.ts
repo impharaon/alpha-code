@@ -55,7 +55,7 @@ mock.module("./network-egress-proxy", () => ({ startEgressPolicyProxy: async (de
   return proxy
 } }))
 const { initCodePuppyEnvironment } = await import("./codepuppy-environment")
-const { initEndpoints, currentRoute, relayConfigured } = await import("./codepuppy-endpoints")
+const { initEndpoints, currentRoute, relayConfigured, noteRelayFailureSignal } = await import("./codepuppy-endpoints")
 const { spawnLocalServer } = await import("./server")
 const { creditDanglingSweepForSpawn } = await import("./dangling-sweep-latch")
 const { syncSecretFiles } = await import("./codepuppy-secret-files")
@@ -269,15 +269,18 @@ test("E1 refused engine CONNECT triggers an immediate route change and periodic 
     await send
     expect(f.wire.some((item) => item.target === "model-direct" && item.credential === "model")).toBe(true)
     await f.open("model-relay", port)
+    // The 60 s periodic timer that would find the reopened entry is R4 in endpoint-route.cases.ts (fake timers);
+    // here the same probe runs through main's immediate trigger (re-armed each poll, so a probe already in flight
+    // from before the reopen cannot leave a stale result), and the running engine must follow the new route.
     const recovered = Date.now()
-    await until(() => currentRoute() === "preferred", 65_000)
+    await until(() => (noteRelayFailureSignal(), currentRoute() === "preferred"), 10_000)
     const recoveryMs = Date.now() - recovered
     const next = f.wire.length
     await f.turn(id, "recovered entry")
     expect(f.wire.slice(next).some((item) => item.target === "model-relay" && item.credential === "model")).toBe(true)
-    console.log(`RELAY_EVIDENCE E1 direct_ms=${directMs} direct_bound_ms=6000 recovery_ms=${recoveryMs} recovery_bound_ms=65000 engine_restarts=0`)
+    console.log(`RELAY_EVIDENCE E1 direct_ms=${directMs} direct_bound_ms=6000 recovery_ms=${recoveryMs} engine_restarts=0`)
   } finally { await f.close() }
-}, 100_000)
+}, 40_000)
 
 for (const fault of ["headers", "body"] as const) test(`${fault === "headers" ? "E2" : "E3"} healthy TLS entry stalls ${fault}; real timeout and retry keep preferred`, async () => {
   const f = await startFixture(fault === "headers" ? "E2" : "E3")
@@ -296,7 +299,7 @@ for (const fault of ["headers", "body"] as const) test(`${fault === "headers" ? 
   } finally { await f.close() }
 }, 30_000)
 
-test("E4 cloud-only health fault switches both entries periodically and preserves cloud authority/key", async () => {
+test("E4 cloud-only health fault switches both entries on the next probe and preserves cloud authority/key", async () => {
   const f = await startFixture("E4")
   try {
     const id = await f.session()
@@ -309,8 +312,9 @@ test("E4 cloud-only health fault switches both entries periodically and preserve
     expect(f.wire.some((item) => item.path === "/mcp" && item.target === "cloud-relay" && item.credential === "cloud")).toBe(true)
     f.setCloudFault(true)
     const failureRecords = proxyRecords.filter((record) => record.event === "egress.connect" && record.reason === "dial-failed").length
+    // The probe is the periodic one's (R4 covers the timer); triggering it directly keeps the case off the 60 s cycle.
     const started = Date.now()
-    await until(() => currentRoute() === "direct", 65_000)
+    await until(() => (noteRelayFailureSignal(), currentRoute() === "direct"), 10_000)
     const periodicMs = Date.now() - started
     expect(proxyRecords.filter((record) => record.event === "egress.connect" && record.reason === "dial-failed")).toHaveLength(failureRecords)
     const before = f.wire.length
@@ -328,7 +332,7 @@ test("E4 cloud-only health fault switches both entries periodically and preserve
     expect(keys.length).toBeGreaterThan(1)
     expect(new Set(keys)).toEqual(new Set([args.idempotency_key]))
     f.setCloudFault(false)
-    await until(() => currentRoute() === "preferred", 65_000)
+    await until(() => (noteRelayFailureSignal(), currentRoute() === "preferred"), 10_000)
     const recovery = f.wire.length
     await f.turn(id, prompt)
     const recovered = (await f.toolParts(id)).filter((part) => part.tool === "codepuppy_dispatch").at(-1)?.display?.authority
@@ -339,9 +343,9 @@ test("E4 cloud-only health fault switches both entries periodically and preserve
     expect(f.wire.slice(recovery).some((item) => item.target === "model-relay" && item.credential === "model")).toBe(true)
     expect(f.wire.slice(recovery).some((item) => item.path === "/v1/tools/vision" && item.target === "model-relay" && item.credential === "cloud")).toBe(true)
     expect(f.wire.slice(recovery).some((item) => item.path === "/mcp" && item.target === "cloud-relay" && item.credential === "cloud")).toBe(true)
-    console.log(`RELAY_EVIDENCE E4 idle_periodic_direct_ms=${periodicMs} periodic_bound_ms=65000 authority_unchanged=true idempotency_unchanged=true`)
+    console.log(`RELAY_EVIDENCE E4 probe_direct_ms=${periodicMs} authority_unchanged=true idempotency_unchanged=true`)
   } finally { await f.close() }
-}, 150_000)
+}, 60_000)
 
 test("E5 running engine confines credentials to the intended host and path on both routes", async () => {
   const f = await startFixture("E5", { lookalikes: true })

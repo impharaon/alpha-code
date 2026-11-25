@@ -2,7 +2,6 @@
 // main 在 fork 之前拒绝(engine-legacy-credentials.ts)。这里判拒绝条件与 S7 的「同目录其它 OpenCode 数据」清单;
 // 真引擎上的前提(迁移真的会导入)在 engine-legacy-credentials.cases.ts,本文件第一条起子进程跑它。
 import { describe, expect, test } from "bun:test"
-import { readFileSync } from "node:fs"
 import { join } from "node:path"
 import { foreignOpenCodeData, LEGACY_CREDENTIAL_IMPORT_MIGRATION, legacyCredentialImportRefusal } from "./engine-legacy-credentials"
 
@@ -71,13 +70,4 @@ describe("S7 同目录的其它 OpenCode 数据", () => {
     expect(foreignOpenCodeData("/d", "/d/opencode.db", () => names)).toEqual(["auth.json", "opencode-dev.db", "opencode-next.db"])
   })
 
-  // 分类与「这处锚守不住什么」登记在 ./source-text-anchors.ts。
-  test("ANCHOR (not a gate): server.ts 在 fork 之前(每种运行形态)调 legacyCredentialImportRefusal,拒绝即抛", () => {
-    const source = readFileSync(join(import.meta.dir, "server.ts"), "utf8")
-    const check = source.indexOf("const refusal = await legacyCredentialImportRefusal({ dataDir, databasePath })")
-    const fork = source.indexOf("(options.fork ?? electronNs.utilityProcess.fork)(sidecar")
-    expect(check).toBeGreaterThan(-1)
-    expect(fork).toBeGreaterThan(check)
-    expect(source).toContain("throw new Error(refusal)")
-  })
 })

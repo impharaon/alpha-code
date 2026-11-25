@@ -7,8 +7,8 @@
 // 下面的假服务端施行的正是同一条规则,断言落在**可观察结果**上(拿到列表 / 吃 403),
 // 不是落在源码里出现过哪个字符串。
 //
-// mock.module 会污染同进程其它测试文件 ⇒ 真断言放这里,由 codepuppy-cloud-jobs.test.ts
-// 在隔离子进程里跑(cloud-ipc.test.ts 同款)。
+// mock.module 会污染同进程其它测试文件 ⇒ 真断言放这里,由 subprocess-cases.test.ts
+// 在隔离子进程里跑(subprocess-cases.test.ts 同款)。
 
 import { describe, expect, mock, test } from "bun:test"
 import type { RoutePurpose } from "@codepuppy/contracts-consumer"

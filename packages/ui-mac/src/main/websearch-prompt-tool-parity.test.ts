@@ -14,7 +14,7 @@
 //     `start()` 的选项)里的 `permissions` 规则表(顶层与各 agent;2.x `Permission.evaluate` 取 findLast,
 //     末条 deny 即把工具从模型工具表里摘掉)与 `mcp.servers.<云>` 在不在、有没有 `disabled:true`。
 // 两边来自**不同的代码路径**,所以「它们相等」不是自指等价链。
-// 真引擎上的工具表本身(真 fork env → 模型第一次请求)由 websearch-account-tool-table.engine.test.ts 判;本文件判的是提示那一行与它相符。
+// 真引擎上的工具表本身(真 fork env → 模型第一次请求)由 engine-cases.test.ts 判;本文件判的是提示那一行与它相符。
 //
 // 四格 = 登出/BYOK · 登录有额度 · 登录无额度 · kill-switch。
 // **「有额度 / 无额度」在桌面侧是同一组输入**,这不是取巧:基线 §二选定的形状就是

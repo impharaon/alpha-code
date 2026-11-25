@@ -4,7 +4,7 @@
 // 在两次 invoke 之间换掉 getVersion 的返回值,IPC 返回必须跟着变。任何把版本写成
 // 字面量的实现(不管抄的是当时的真版本还是别的)在其中至少一格上当场红。
 //
-// 子进程运行(app-version-ipc.wiring.test.ts spawn):mock.module("electron") 在同进程会
+// 子进程运行(subprocess-cases.test.ts spawn):mock.module("electron") 在同进程会
 // 泄漏进 `bun test src` 里其它文件 —— 同仓 models-catalog-v2.wiring.* 同因同法。
 
 import { expect, mock, test } from "bun:test"

@@ -80,8 +80,11 @@ export async function startSandboxDenialStream(input: { predicate: string; marke
         ` (log stream ${child.exitCode === null ? "still running" : `exited ${child.exitCode}`}; stderr: ${(await Promise.race([stderr, Bun.sleep(1_000).then(() => "")])).trim().slice(0, 500)})`,
     )
   }
+  const received = () => events.filter((event) => !event.message.includes(markers))
   await awaitMarker("attach", input.attachTimeoutMs ?? 30_000)
   return {
+    /** The arm's refusals that have come through so far (markers excluded), while it runs; judging waits for stop(). */
+    received,
     /** End marker through ⇒ stop the stream and read the rest of its output; the arm's refusals (markers excluded). */
     async stop(): Promise<StreamedLogEvent[]> {
       await awaitMarker("end", input.drainTimeoutMs ?? 60_000)
@@ -90,7 +93,7 @@ export async function startSandboxDenialStream(input: { predicate: string; marke
       await drained
       if (losses.length)
         throw new Error(`log stream reported ${losses.length} line(s) that are not log events — messages may have been dropped, the capture is incomplete: ${losses[0]!.slice(0, 300)}`)
-      return events.filter((event) => !event.message.includes(markers))
+      return received()
     },
     /** Idempotent: for the error paths that never reach stop(). */
     kill,

@@ -70,12 +70,14 @@ docs_gate_links() {
 
 # 仅轻量门用:输入全在文档类里的那几个测试(全量门里它们本来就在 ui-mac 全量套件 [5/14] 里跑)。
 #   old-name-scan            旧名登记表 ↔ 第一方文档命中(文档编辑最常弄坏它)
+#   naming-migration-wiring  R8 读旧名登记表里「保留旧值」的行(`.gate-light` 收了登记表,只改它的 push 靠这一条把关)
 #   local-gate-parity        读 docs/runbooks/ci.md 里「并签 `check`」的锚点
 #   network-egress-disclosure  读 docs/architecture 里的披露文档
 #   gate-file-registry       登记簿的 evidence 路径必须真的存在于 docs/ 下
-# 下界 50 = 这 4 个文件今天合计 59 条用例,留余量抓「整批没加载」而不抓少几条(同 bun-test-floor 的整包地板口径)。
+# 下界 50 = 这 5 个文件今天合计 68 条用例,留余量抓「整批没加载」而不抓少几条(同 bun-test-floor 的整包地板口径)。
 DOCS_ANCHOR_TESTS=(
   src/main/old-name-scan.test.ts
+  src/main/naming-migration-wiring.test.ts
   src/main/local-gate-parity.test.ts
   src/main/network-egress-disclosure.test.ts
   src/main/gate-file-registry.test.ts

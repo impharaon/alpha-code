@@ -22,7 +22,7 @@ run_step() {
 
 run_step "no literal NUL bytes (codepuppy-check [3/14])" docs_gate_nul
 run_step "docs gate: relative links in changed Markdown (codepuppy-check [8/14])" docs_gate_links
-run_step "docs-anchored tests (old-name registry, ci.md anchor, egress disclosure, gate-file registry)" docs_gate_anchor_tests
+run_step "docs-anchored tests (old-name registry + its R8 reader, ci.md anchor, egress disclosure, gate-file registry)" docs_gate_anchor_tests
 
 took=$((SECONDS - started))
 if [ "${#failed[@]}" -gt 0 ]; then

@@ -20,7 +20,8 @@
 //                rewrites of the document are refused. The host reads the system sandbox log for this run up to the window end the
 //                last test prints (no protected-location denial from this pid); after it, the conversation's write tool — running in
 //                the engine, so in this pid — is refused, and the host checks that this pid's denial on the tool policy directory is
-//                in the log (the reading sees engine-pid denials at all).
+//                in the log (the reading sees engine-pid denials at all). The kernel can lose one such report under load, so the write
+//                tool attacks again, each time a new name beside the document, until the host acknowledges one (bounded).
 //   fresh        fresh-machine shape (no <XDG_DATA_HOME>/opencode, no ~/.opencode, no codepuppy.jsonc): the planner pre-creates, main
 //                seeds, the engine starts and answers; ~/.opencode still absent. AC-08 (BR-07): in the 全部批准 tier with the plan agent
 //                chosen (request built by the composer, sent through the production adapter), the plan reminder names
@@ -66,6 +67,8 @@ import { toolCardHeadOf } from "../renderer/codepuppy-ui/session-timeline/cards/
 type Arm = "production" | "fresh" | "control" | "noprecreate"
 const ARM = process.env.CODEPUPPY_CF_ENGINE_ARM as Arm
 const ROOT = process.env.CODEPUPPY_CF_ENGINE_ROOT!
+/** Written by the host (outside the fence) once this pid's write-tool refusal has come through its live log stream. */
+const A3_SEEN = process.env.CODEPUPPY_CF_ENGINE_A3_SEEN!
 const NAME = "cfeng"
 const TOKEN = "FAKE-CONNECTOR-TOKEN-cf13"
 const BYOK = "FAKE-BYOK-KEY-cf13"
@@ -343,7 +346,7 @@ const read = (file: string) => {
     return undefined
   }
 }
-/** Poll for a file that the control arm's attack should produce. */
+/** Poll for a file that the control arm's attack should produce, or for the host's acknowledgement. */
 async function appears(file: string, ms: number) {
   for (const until = Date.now() + ms; Date.now() < until; await Bun.sleep(100)) if (fs.existsSync(file)) return true
   return false
@@ -424,8 +427,8 @@ async function shellPolicyAttacks(m: Machine, turns: ReturnType<typeof engineTur
 }
 
 /** A3 through the engine's write tool (it runs inside the engine process); the user approves the write when asked. */
-async function writeToolPolicyAttack(m: Machine, turns: ReturnType<typeof engineTurns>) {
-  const result = await turns.turn("build", "write", { path: m.policyTarget.file, content: allowDocument(m) }, undefined, "once")
+async function writeToolPolicyAttack(m: Machine, turns: ReturnType<typeof engineTurns>, target = m.policyTarget.file) {
+  const result = await turns.turn("build", "write", { path: target, content: allowDocument(m) }, undefined, "once")
   console.log(`[A3 write tool ${ARM}] asked=${JSON.stringify(result.asked)} ${result.tool.slice(0, 400)}`)
   return result
 }
@@ -610,6 +613,17 @@ describe.if(ARM === "production")("production: 0.2.6-shaped data, the production
     const written = await writeToolPolicyAttack(m, turns)
     expect(written.tool).toMatch(/operation not permitted|EPERM/i)
     expect(fs.readFileSync(file)).toEqual(baseline)
+    // the host's calibration needs this pid's refusal in its live log stream, and under load the kernel can lose one report (nightly
+    // 2026-11-25): until the host acknowledges one, the write tool attacks again about once a second, each time a new name beside the
+    // document, for at most 30 s — every attempt refused; none through ⇒ the host's calibration is red
+    const attempts = [file]
+    for (const deadline = Date.now() + 30_000; !(await appears(A3_SEEN, 1_000)) && Date.now() < deadline; ) {
+      const target = path.join(path.dirname(file), `cf-a3-write-${attempts.length}.json`)
+      attempts.push(target)
+      expect((await writeToolPolicyAttack(m, turns, target)).tool).toMatch(/operation not permitted|EPERM/i)
+      expect(onDisk(target)).toBe(false)
+    }
+    console.log(`[A3 write tool ${ARM}] ${attempts.length} attempt(s); host acknowledged: ${fs.existsSync(A3_SEEN)}`)
     expect(await turns.askedForEcho("after-write-tool")).toEqual(["mcp:probe:echo"])
   }, 240_000)
 })

@@ -2,6 +2,7 @@ import { withVideoProgress } from "./codepuppy-video-progress.js" // codepuppy(#
 import type { VideoProgress } from "@opencode/schema/codepuppy-video-progress"
 import {
   connectorLaunchHost,
+  isConnectorLaunchFailure,
   type ManagedFirstPartyBinding,
   type DeclaredFirstParty,
   type PinnedFilesCallPreparation,
@@ -127,6 +128,7 @@ export class ConnectError extends Schema.TaggedError<ConnectError>()("MCP.Connec
   // codepuppy(#1563): the named cause (codepuppy-startup.ts) and whether a background reconnect may change it.
   code: Schema.optional(Schema.declare(isCodepuppyFailureCode)),
   reconnect: Schema.optional(Schema.Boolean),
+  failure: Schema.optional(Schema.declare(isConnectorLaunchFailure)),
 }) {}
 
 /** A legacy Streamable HTTP server no longer recognizes this connection's session; the lifecycle reconnects. */
@@ -663,13 +665,13 @@ export const connect = Effect.fnUntraced(function* (options: ConnectOptions) {
     server,
     message: safeExplain(error), // codepuppy(#1645): body-free, it becomes the failed status
     answered: !repeats(error),
-    ...startFailure(error, options.config), // codepuppy(#1563)
+    ...startFailure(error, config.type === "local" && options.prepared ? { ...config, command: options.prepared.command } : config), // codepuppy(#1563)
   })
 })
 
 // codepuppy(#1563, #1645) ── the SDK-specific facts the Code Puppy classifier cannot see on its own. Also names a failed
 // listing (connection.ts), whose SDK error arrives as the cause of the client's own Error.
-export function startFailure(error: unknown, config: { readonly type: string; readonly url?: string }) {
+export function startFailure(error: unknown, config: { readonly type: string; readonly url?: string; readonly command?: readonly string[] }) {
   const listed = !(error instanceof SdkError) && error instanceof Error && (error.cause instanceof SdkError || error.cause instanceof SdkHttpError) ? error.cause : error
   const cause = listed instanceof SdkError && listed.code === SdkErrorCode.EraNegotiationFailed && listed.cause !== undefined ? listed.cause : listed
   return classifyStartFailure(cause, config, {

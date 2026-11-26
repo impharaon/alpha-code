@@ -1,7 +1,9 @@
 import { afterEach, expect, test } from "bun:test"
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, readdirSync, rmSync } from "node:fs"
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, readdirSync, rmSync, copyFileSync, symlinkSync } from "node:fs"
 import { tmpdir } from "node:os"
 import path from "node:path"
+import { createRequire } from "node:module"
+import { readNpmLaunchDeclaration } from "@opencode/core/mcp/codepuppy-npm-launch"
 import { Deferred, Effect, Fiber, Layer, Logger, Option, PlatformError, References, Stream } from "effect"
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
 import type {
@@ -841,6 +843,7 @@ test("connector cancellation during preparation prevents a late result from spaw
         expect(snapshots).toHaveLength(length)
         expect(snapshots.at(-1)?.state.phase).toBe("disabled")
         expect(snapshots.some((row) => row.state.phase === "failed")).toBe(false)
+    expect(current.failures).toEqual([])
       }),
     ).pipe(Effect.provide(hostEnvironmentLayer)),
   )
@@ -962,5 +965,70 @@ test("connector missing workspace is reported before package preparation or serv
     yield* current.connection.start
     expect(spawns).toHaveLength(0)
     expect(snapshots.at(-1)?.state).toMatchObject({ phase: "failed", failure: { kind: "workspace", reason: "missing" } })
+  })).pipe(Effect.provide(hostEnvironmentLayer)))
+})
+
+
+// Integration layer, affected PR/nightly. These THREE sources + LICENSE are unmodified
+// npm 11.20.0 files from the verified Node 26.13.1 archive (plan.md r2/r5); definitions,
+// config and npa are the repository's existing util dependencies (10.8.1 / 13.0.2).
+// The pinned 10.13.0/npm 11.20.0 combination is additionally verified by the real probe.
+// No fake npm grammar or external-format fixture is written here.
+function npmDeclarationFixture() {
+  const root = connectionRoot()
+  const npm = path.join(root, "npm")
+  for (const dir of ["bin", "lib/utils", "node_modules/@npmcli"]) mkdirSync(path.join(npm, dir), { recursive: true })
+  copyFileSync(new URL("./fixture/npm-launch/npx-cli.js", import.meta.url), path.join(npm, "bin/npx-cli.js"))
+  copyFileSync(new URL("./fixture/npm-launch/npm-cli.js", import.meta.url), path.join(npm, "bin/npm-cli.js"))
+  copyFileSync(new URL("./fixture/npm-launch/cmd-list.js", import.meta.url), path.join(npm, "lib/utils/cmd-list.js"))
+  const util = createRequire(new URL("../../util/package.json", import.meta.url))
+  const config = util.resolve("@npmcli/config/package.json")
+  symlinkSync(path.dirname(config), path.join(npm, "node_modules/@npmcli/config"), "dir")
+  symlinkSync(path.dirname(util.resolve("npm-package-arg/package.json")), path.join(npm, "node_modules/npm-package-arg"), "dir")
+  symlinkSync(path.dirname(createRequire(config).resolve("abbrev/package.json")), path.join(npm, "node_modules/abbrev"), "dir")
+  copyFileSync(new URL("../../util/package.json", import.meta.url), path.join(root, "package.json"))
+  mkdirSync(path.join(root, "home"))
+  return {
+    root,
+    launchers: { ...launcherEnvironment(root), node: process.execPath, npmCli: path.join(npm, "bin/npm-cli.js"), npxCli: path.join(npm, "bin/npx-cli.js") },
+    environment: { HOME: path.join(root, "home"), PATH: process.env.PATH! },
+  }
+}
+test("official npx boolean switches preserve the service argument boundary and repeated package specs", async () => {
+  const input = npmDeclarationFixture()
+  const parse = (args: string[]) => Effect.runPromise(Effect.scoped(readNpmLaunchDeclaration({ ...input, cwd: input.root, syntax: "npx", arguments: args })).pipe(Effect.provide(hostEnvironmentLayer)))
+  const implicit = await parse(["--yes", "one@1.2.3", "--package=business-argument"])
+  expect(implicit.arguments).toEqual(["one@1.2.3", "--package=business-argument"])
+  expect(implicit.packages).toEqual([])
+  const explicit = await parse(["--yes", "-p", "@scope/one@1.2.3", "--package=two@npm:three@^4", "--", "my-bin", "--package=service-flag"])
+  expect(explicit.arguments).toEqual(["my-bin", "--package=service-flag"])
+  expect(explicit.packages).toEqual([{ specification: "@scope/one@1.2.3", name: "@scope/one", type: "version" }, { specification: "two@npm:three@^4", name: "two", type: "alias" }])
+})
+
+test("official npm exec aliases and call syntax are parsed without executing the service", async () => {
+  const input = npmDeclarationFixture()
+  const marker = path.join(input.root, "must-not-execute")
+  writeFileSync(path.join(input.root, ".npmrc"), "@private:registry=https://registry.example.invalid/\n//registry.example.invalid/:_authToken=own-fixture-secret\n")
+  const parse = (args: string[]) => Effect.runPromise(Effect.scoped(readNpmLaunchDeclaration({ ...input, cwd: input.root, syntax: "npm-exec", arguments: args })).pipe(Effect.provide(hostEnvironmentLayer)))
+  const call = await parse(["exec", "--package=one@1.2.3", "--call", `printf ran > ${marker}`])
+  expect(call.call).toBe(`printf ran > ${marker}`)
+  expect(call.arguments).toEqual([])
+  expect(call.options["@private:registry"]).toBe("https://registry.example.invalid/")
+  expect(call.options["//registry.example.invalid/:_authToken"]).toBe("own-fixture-secret")
+  const alias = await parse(["x", "--package=one@1.2.3", "--", "my-bin", "-p", "business-value"])
+  expect(alias.arguments).toEqual(["my-bin", "-p", "business-value"])
+  expect(existsSync(marker)).toBe(false)
+})
+
+test("connector native spawn failure publishes the actual missing executable as its dependency fact", async () => {
+  const root = connectionRoot()
+  const snapshots: LaunchSnapshot[] = []
+  const spawns: ChildProcess.Command[] = []
+  const program = path.join(root, "missing-program")
+  await Effect.runPromise(Effect.scoped(Effect.gen(function* () {
+    const current = yield* launchConnection({ root, snapshots, spawns, command: [program] })
+    yield* current.connection.start
+    expect(snapshots.at(-1)?.state).toMatchObject({ phase: "failed", failure: { kind: "dependency", program } })
+    expect(yield* current.connection.diagnostic(snapshots[0].identity)).toMatchObject({ exitCode: null, effectiveCommand: [program] })
   })).pipe(Effect.provide(hostEnvironmentLayer)))
 })

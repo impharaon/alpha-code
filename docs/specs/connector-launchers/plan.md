@@ -460,3 +460,15 @@ McpClient 的宿主私有 prepared 参数直接绑定本次 command/cwd/environm
 证据：新增真 stdio 的 prepared 例在旧 client 为 0 PASS / 1 FAIL（must-not-run-npx 的 dependency_missing，`/tmp/connector-r5-prepared-red.log`），实现后 1 PASS / 4 assertions。新 4 个连接用例 4 PASS / 34 assertions；Node 资产两例 2 PASS / 9 assertions；cwd 缺失 1 PASS / 2 assertions。命令均在 core：`bun test test/codepuppy-connector-launch.test.ts -t '<对应完整名称或上文日志中的选择>'`，记录 `/tmp/connector-r5-connection.log`、`connector-r5-node-wait.log`、`connector-r5-workspace.log`。许可证明只在一个准备事件上立即试取既有许可、无等待/计时/容量运行；取消用 Deferred/Promise 屏障，晚到结果不 spawn。23 例中间整文件 23 PASS / 140 assertions（`/tmp/connector-r5-step-connection.log`）；新增 cwd 后最终整文件见本轮最终收据。
 
 #1759 只读复核仍为 `ef8a1ce8b4441aeeb12cc3a5cc0843ad43c1682f`，此前 R1/R2 接口表和签名未变。接线仍消费同一次 planPackageManagerCaches 的 env/cacheEnv/rules/locations/excluded、resolvePackageManagerLocations 的候选，不在本票复制缓存键表；最终 spawn 由其 project/refresh 权威覆盖。当前本票 localLaunch 没有装到 index/controller/root，故这些证明不能当应用启动或真围栏验收。
+
+### r5 官方 npm 语法阶段与原生失败事实
+
+新增 `core/src/mcp/codepuppy-npm-launch.ts`：readNpmLaunchDeclaration 在调用者 Location spawner 内以随包 Node 运行，原 argv 经 npm 自己的 npx-cli.js 改写、@npmcli/config 加载、npm-package-arg 解析、官方 cmd-list.deref 处理 npm exec/x；拦住的只是 npx 最后的 CLI dispatch，不执行包或服务。原 argv/凭据经 stdin 交该应用自有程序，native 环境不改。返回的 options 是实际生效的**临时解析配置**，含认证，明确不是 key/收据，不落盘、不日志输出；后续仍须提取只影响解析的非秘密内容，不能 hash 这整个对象。现有 util/NpmConfig.load 为引擎依赖管理使用宿主 Bun/当前 process.env/该缓存的 prefix；不把它错当 Location 内随包 npm 的解释器，也未修改该单一职责或引入第二份下载 authority。
+
+真实一次性验证：`gate slot -- bun /tmp/connector-r5-npm-proof/parse.ts` exit 0（`/tmp/connector-r5-npm-proof.log`），pinned Node 26.13.1 + npm 11.20.0/config 10.13.0，6 组：Boolean 开关后业务参数分界、重复 --package、scope/version/alias、--call 不执行、npm exec/x、file: 真实 npm 目录。项目 .npmrc registry 和占位认证确实进入临时 options；没有打印整份 options。最初项目配置断言失败是探针缺 package.json 而父目录已有 node_modules，npm 按原规则选了父 prefix；用真实 npm package.json 作为探针输入后通过，未改 npm 的项目根语义。
+
+Boolean case 曾在 VM 新 realm 下使官方 definitions 的 Boolean 与 CLI 的 Boolean 不同，真实红例 exit 1（`/tmp/connector-r5-npm-boolean-red.log`）；现用当前 realm compileFunction 执行未修改的已钉 npx 源码，保留构造器身份。常驻两个集成例复用仓内 util 已有 config 10.8.1/npa 13.0.2 和来自该官方归档的三个原样源码夹具（fixture/npm-launch/{npx-cli.js,npm-cli.js,cmd-list.js}，带原 LICENSE），2 PASS / 10 assertions；没有新增依赖，也不把这个轻夹具版本称为随包版本实证。新夹具均以字面 URL 读取，跟随原 test 文件进入 affected 选集。
+
+另补同链 `core/src/mcp/codepuppy-startup.ts`：实际 spawn 的 PlatformError.NotFound 在既有 classifier 产出 typed workspace/dependency 事实；ConnectError 仅增加内部 failure，带到同一 producer，不改 Mcp.Status/HTTP。程序名取实际 command[0]（prepared 时取 prepared.command），不解析 spawner 的 pathOrDescriptor：真实样本是拼接命令并带尾空格，并非程序名。真 native 缺程序的旧链为 0 PASS / 1 FAIL（`/tmp/connector-r5-native-red.log`），接通事实后 1 PASS / 2 assertions（`connector-r5-native-green.log`）。错误 code/reconnect 仍同一个 authority，不再由旁路猜一套。
+
+边界：这一阶段还没有 npm 默认/显式 bin 选择、uv 全语法适配、非秘密 key、包安装/持久入口与完整 prepareConnectorLaunch，不能称 AC-04 或 AC-10 全部通过。Node boot 重锚、mandatory bootstrap.launchers、Host/controller/index/root/窄消息与真实 installed runtimeDep/secret/egress producer 的 production composition 仍按 #1759 接口表等待；本轮准备好的 localLaunch 接口消除了连接层重复装配工作，但不会自动完成这些缺口。

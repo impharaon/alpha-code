@@ -52,7 +52,7 @@ const RECONNECT_CODES = new Set([
  */
 export function classifyStartFailure(
   error: unknown,
-  config: { readonly type: string; readonly url?: string },
+  config: { readonly type: string; readonly url?: string; readonly command?: readonly string[] },
   hints: { readonly timedOut?: boolean; readonly httpStatus?: number; readonly download?: PinnedFileDelivery } = {},
   env: Record<string, string | undefined> = process.env,
   egressProxy: string | undefined = tryCodePuppyBootstrap()?.network.egressProxy,
@@ -67,8 +67,15 @@ export function classifyStartFailure(
   if (!remote) {
     if (PlatformError.isPlatformError(error) && error.reason._tag === "NotFound") {
       // The spawner checks the working directory (FileSystem.access) before it spawns the command.
-      if (error.reason.module === "FileSystem") return { code: "workspace_missing", reconnect: false }
-      if (error.reason.module === "ChildProcess") return { code: "dependency_missing", reconnect: false }
+      if (error.reason.module === "FileSystem")
+        return { code: "workspace_missing", reconnect: false, failure: { kind: "workspace", reason: "missing" } }
+      if (error.reason.module === "ChildProcess")
+        return {
+          code: "dependency_missing", reconnect: false,
+          ...(config.command?.[0] !== undefined
+            ? { failure: { kind: "dependency", program: config.command[0] } as const }
+            : {}),
+        }
     }
     return { code: "spawn_failed", reconnect: false }
   }

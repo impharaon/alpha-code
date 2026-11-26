@@ -326,9 +326,27 @@ export function make(input: Input): Connection {
       yield* Scope.close(scope, Exit.void)
       state.scope = undefined
       const error = Cause.squash(result.cause)
+      // Preserve the facts named at the actual spawn/transport boundary. Public status
+      // keeps its existing short code; the attempt's row consumes this same detailed cause.
+      const cause: StartFailure = isConnectorLaunchFailure(error)
+        ? {
+            code:
+              error.kind === "dependency"
+                ? "dependency_missing"
+                : error.kind === "workspace" && error.reason === "missing"
+                  ? "workspace_missing"
+                  : "spawn_failed",
+            reconnect: false,
+            failure: error,
+          }
+        : error instanceof McpClient.NeedsAuthError
+          ? { code: "auth", reconnect: false, failure: { kind: "auth", service: input.name } }
+          : error instanceof McpClient.ConnectError && error.code !== undefined
+            ? { code: error.code, reconnect: error.reconnect === true, failure: error.failure }
+            : McpClient.startFailure(error, config)
       const failure = isConnectorLaunchFailure(error)
         ? error
-        : { kind: "unknown" as const, detail: McpClient.safeDescription(error) }
+        : (cause.failure ?? { kind: "unknown" as const, detail: McpClient.safeDescription(error) })
       yield* attempt?.failed(failure) ?? Effect.void
       yield* input.events.failed(
         error instanceof McpClient.NeedsAuthError
@@ -339,17 +357,7 @@ export function make(input: Input): Connection {
             }, // codepuppy(#1645): no remote body
         error instanceof McpClient.ConnectError && error.answered === true,
         // codepuppy(#1563): connect failures arrive named by the client; a tools/list failure is named here.
-        isConnectorLaunchFailure(error)
-          ? {
-              code: error.kind === "dependency" ? "dependency_missing" : "spawn_failed",
-              reconnect: false,
-              failure: error,
-            }
-          : error instanceof McpClient.NeedsAuthError
-            ? { code: "auth", reconnect: false }
-            : error instanceof McpClient.ConnectError && error.code !== undefined
-              ? { code: error.code, reconnect: error.reconnect === true }
-              : McpClient.startFailure(error, config), // codepuppy(#1645): with the SDK's HTTP status
+        cause,
       )
     }).pipe(
       Effect.ensuring(input.events.settled),

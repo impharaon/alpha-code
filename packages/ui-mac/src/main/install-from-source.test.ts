@@ -821,3 +821,29 @@ test("plugin MCP runtime binds saved options and DATA while content retains refe
   expect(await savePackageSecretsV1({ packageId: installed.packageId, options: { grafana_service_account_token: "replacement-token" } }, deps)).toMatchObject({ ok: true })
   expect(refs.every(ref => existsSync(ref.slice(6, -1)))).toBe(false)
 }))
+
+test("connector version selection preserves the source argv when pinned or cleared", () => installerHarness(async h => {
+  const { readPackageAuthorizationV1, savePackageSecretsV1 } = await import("./package-admission")
+  const { installedPluginDescription } = await import("./plugin-package-config")
+  const { bindPluginMcp } = await import("../shared/plugin-mcp-config")
+  const { readInstalledPluginSettings } = await import("../shared/installed-plugin-settings")
+  const capture = await captureStandardFixture("codex:build-ios-apps")
+  const converted = await convertPluginTree(capture)
+  h.sources.convertCandidate = async () => ({ ok: true, ...converted, capture, runtimeIdentity: undefined })
+  const installed = await h.install(h.request("build-ios-apps", "version_selection"))
+  if (!installed.ok) throw Error(installed.detail)
+  const deps = { root: () => h.root, userDataPath: h.temporary, casBaseRoot: () => h.temporary, environment: () => "dev" as const, loadVerifiedCatalog: async () => { throw Error("no catalog") } }
+  const authorization = await readPackageAuthorizationV1(installed.packageId, deps)
+  expect(authorization.ok && authorization.items.some(item => item.kind === "mcp-version")).toBe(true)
+  const state = readPackageLedgerStateV1(h.root)
+  if (!state.ok) throw Error(state.reason)
+  const graph = state.packageGraphs[0]!
+  const metadata = installedPluginDescription(h.root, graph)!
+  const entry = metadata.description.entries.find(entry => entry.kind === "mcp")!
+  if (entry.kind !== "mcp") throw Error("build-ios-apps has its real XcodeBuildMCP definition")
+  for (const version of ["2.0.0", ""]) {
+    expect(await savePackageSecretsV1({ packageId: installed.packageId, mcpVersions: { [entry.id]: version } }, deps)).toMatchObject({ ok: true })
+    const bound = bindPluginMcp({ description: metadata.description, entry, settings: readInstalledPluginSettings(h.root, graph.pluginTree!.storeKey)!, pluginRoot: metadata.pluginRoot, projectDir: h.temporary, resolveEnvironment: () => undefined, resolveSecret: () => undefined, resolveOptionSecret: () => undefined })
+    expect(bound).toMatchObject({ type: "local", command: ["npx", "-y", version ? "xcodebuildmcp@2.0.0" : "xcodebuildmcp@latest", "mcp"] })
+  }
+}))

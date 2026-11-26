@@ -454,3 +454,5 @@ r2 HTTP 接入步骤：S-09 的 L0 main 代理扩展与既有 L3 Fetch 组合点
 HTTP 新具名两例 2 pass，覆盖无凭据/跨路径/跨 CONNECT 目标的拒绝、真实流与撤销、认证头不外泄；main controller 保留定义与换代/关闭/sidecar exit 撤销 1 pass。proxy/controller 两个行为文件全量一次 26 pass / 0 fail（日志 `/tmp/plugin-standard-r2-step-proxy.log`）。core 仅具名 `plugin local MCP uses its private proxy for HTTP sessions and keeps proxy auth off the server`，真实原 Mcp.Service＋SDK＋main proxy，POST/GET/DELETE 与工具调用均通过，1 pass / 0 fail；不运行该文件中既有重试计时/容量用例。首次草稿未等待异步连接，读到工具表尚为空，已按文件原 connected helper 修正探测时机；未将其当缺陷红测。ui-mac typecheck exit 0；core typecheck 首次指出本测试 fixture digest 的模板类型断言缺席，已修正，待最终再核。
 
 r2 HTTP 静态收口：core `bun typecheck` exit 0（2,053 files / 2 projects），ui-mac `bun typecheck` exit 0，ext `authority-registry.test.ts` 5 pass / 0 fail。非 darwin 也启动同一个私有 MCP 代理，但不更改其普通代理环境；darwin 的 NO_PROXY/围栏端口沿原值。
+
+r2 AC-04 补红：`connector version selection preserves the source argv when pinned or cleared` 从 standard 的真实 Codex build-ios-apps 取 XcodeBuildMCP，具名命令 exit 1，0 pass / 1 fail（版本字段缺席），日志 `/tmp/plugin-standard-r2-version-red.log`；后续只补实现，不改此正确断言。

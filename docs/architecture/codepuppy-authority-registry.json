@@ -2314,7 +2314,7 @@
       "takeovers": [],
       "mechanism": {
         "file": "packages/ext/src/plugin-package-hooks.ts",
-        "ladder": "L0: existing event.subscribe, awaited session prompt/context/experimental.idle, tool.execute.before between policy head/tail, same-session synthetic and AppProcess; no engine takeover."
+        "ladder": "L0: existing event.subscribe, awaited session prompt/context/experimental.idle, tool.execute.before between policy head/tail, same-session synthetic and AppProcess; no engine takeover. S-03/S-07 private main parentPort SessionEnd receiver awaits the actual Session Location runner and the MCP owner before replying; Cleanup awaits active lifetimes. Main navigation senders remain separate pending S-03 wiring."
       },
       "tests": [
         {
@@ -2372,6 +2372,10 @@
         {
           "file": "packages/ext/src/plugin-host.test.ts",
           "name": "the original Claude Security guard receives the source agent identity before a shell call"
+        },
+        {
+          "file": "packages/ext/src/hub-bridge.test.ts",
+          "name": "private package SessionEnd awaits the owning Location and replies only after cleanup"
         }
       ]
     },
@@ -2580,6 +2584,18 @@
         {
           "file": "packages/core/test/codepuppy-mcp-runtime.test.ts",
           "name": "withdrawing the matching package handlers releases only owned remote transports on reload"
+        },
+        {
+          "file": "packages/ext/src/plugin-host.test.ts",
+          "name": "real SessionEnd runs the package hook and closes its remote transport before the parentPort reply"
+        },
+        {
+          "file": "packages/ext/src/plugin-host.test.ts",
+          "name": "an unattended real session keeps native elicitation cancellation without package auto-answer"
+        },
+        {
+          "file": "packages/plugin/test/codepuppy-package-runtime.test.ts",
+          "name": "session MCP release shares a Location across bundles and preserves a replacement generation"
         }
       ]
     }

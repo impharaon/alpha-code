@@ -7,6 +7,7 @@ export function pluginEntryRuntimeAvailable(entry: Entry): boolean {
     ((entry.hook.type === "command" &&
       [
         "SessionStart",
+        "SessionEnd",
         "UserPromptSubmit",
         "Stop",
         "PreToolUse",

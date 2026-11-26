@@ -4,7 +4,7 @@ import type { GateCall } from "./policy/gate"
 import type { Plugin } from "@opencode/plugin"
 import type { ElicitationAnswer } from "@opencode/plugin/codepuppy-package-runtime"
 import { Schema } from "effect"
-import { registerPackageRuntime } from "@opencode/plugin/codepuppy-package-runtime"
+import { releasePackageSessionMcp, registerPackageRuntime } from "@opencode/plugin/codepuppy-package-runtime"
 import type { HookEvent } from "../../ui-mac/src/shared/host-extension-package-contract/plugin-package"
 import { pluginToolRules } from "../../ui-mac/src/shared/host-extension-package-contract/plugin-conversion.mjs"
 import { match } from "../../core/src/util/wildcard"
@@ -58,6 +58,7 @@ export async function registerPackageHooks(
   let preparePrompt: ((event: import("@opencode/plugin/promise/session").SessionPrompt) => Promise<void>) | undefined
   const directory = mkdtempSync(join(tmpdir(), "codepuppy-plugin-session-"))
   const created = new Set<string>()
+  const endings = new Map<string, Promise<void>>()
   const continued = new Set<string>()
   const continuing = new Set<string>()
   const starts = new Map<string, Promise<void>>()
@@ -216,7 +217,7 @@ export async function registerPackageHooks(
       if (result.block) return [{ action: "decline" as const }]
       const specific = result.output?.hookSpecificOutput
       if (!record(specific) || specific.action === undefined) return []
-      if (!["accept", "decline", "cancel"].includes(String(specific.action))) {
+      if (typeof specific.action !== "string" || !["accept", "decline", "cancel"].includes(specific.action)) {
         input.log("runtime-failed: invalid elicitation hook action")
         return []
       }
@@ -553,6 +554,21 @@ export async function registerPackageHooks(
         output: "output" in result ? result.output : undefined,
       }))
   }
+  const endSession = (sessionID: string, reason: string) => {
+    const pending = endings.get(sessionID)
+    if (pending) return pending
+    const ending = (async () => {
+      try {
+        if (sessionEpoch.has(sessionID)) await run("SessionEnd", sessionID, { reason })
+      } finally {
+        try { await releasePackageSessionMcp(context.location, sessionID) }
+        finally { close(sessionID) }
+      }
+    })()
+    endings.set(sessionID, ending)
+    void ending.finally(() => { if (endings.get(sessionID) === ending) endings.delete(sessionID) }).catch(() => {})
+    return ending
+  }
   const startMonitors = (sessionID: string, invocation?: InstructionScope) => {
     const lifetime = sessionEpoch.get(sessionID)
     if (!lifetime) return
@@ -713,7 +729,9 @@ export async function registerPackageHooks(
               failures.set(event.data.sessionID, [...(failures.get(event.data.sessionID) ?? []), ...contexts])
           })
           .catch((error) => input.log("runtime-failed: package failure hook: " + String(error)))
-      } else close(event.data.sessionID)
+      } else {
+        void endSession(event.data.sessionID, "other").catch(error => input.log("runtime-failed: package SessionEnd: " + String(error)))
+      }
     }
   })().catch((error) => {
     if (!events.signal.aborted) input.log("runtime-failed: package event subscription: " + String(error))
@@ -869,6 +887,13 @@ export async function registerPackageHooks(
     })
   })
   return {
+    async receiveSession(message: import("../../ui-mac/src/main/codepuppy-sidecar-messages").PackageSessionMessage) {
+      if (message.action !== "leave") return false
+      const session = await context.session.get({ sessionID: message.sessionId }).catch(() => undefined)
+      if (!session || session.location.directory !== context.location.directory) return false
+      await endSession(message.sessionId, message.reason)
+      return true
+    },
     continuesTask(sessionID: string) {
       return continuing.has(sessionID)
     },
@@ -919,6 +944,7 @@ export async function registerPackageHooks(
         .join("\n")
     },
     dispose: async () => {
+      await Promise.all([...sessionEpoch.keys()].map(sessionID => endSession(sessionID, "other").catch(error => input.log("runtime-failed: package SessionEnd cleanup: " + String(error)))))
       disposed = true
       runtime.dispose()
       configResults.clear()

@@ -57,3 +57,24 @@ test("package runtime handlers share the native Location slot and release only t
     expect(runtime.packageRuntime(location)).toBeUndefined()
   } finally { first.dispose(); await rm(root, { recursive: true, force: true }) }
 })
+
+test("session MCP release shares a Location across bundles and preserves a replacement generation", async () => {
+  const runtime = await import("../src/codepuppy-package-runtime")
+  const root = await mkdtemp(join(tmpdir(), "package-mcp-owner-"))
+  const location = { directory: root }
+  const calls: string[] = []
+  const first = runtime.registerPackageMcpRuntime(location, { releaseSession: async id => { calls.push("old:" + id) } })
+  try {
+    const built = await Bun.build({ entrypoints: [join(import.meta.dir, "../src/codepuppy-package-runtime.ts")], outdir: root, target: "bun" })
+    expect(built.success).toBe(true)
+    const other: typeof runtime = await import(join(root, "codepuppy-package-runtime.js"))
+    await other.releasePackageSessionMcp(location, "ses_first")
+    await other.releasePackageSessionMcp({ ...location, workspaceID: "other" }, "ses_not_here")
+    const current = other.registerPackageMcpRuntime(location, { releaseSession: async id => { calls.push("current:" + id) } })
+    first.dispose()
+    await runtime.releasePackageSessionMcp(location, "ses_current")
+    current.dispose()
+    await other.releasePackageSessionMcp(location, "ses_closed")
+    expect(calls).toEqual(["old:ses_first", "current:ses_current"])
+  } finally { first.dispose(); await rm(root, { recursive: true, force: true }) }
+})

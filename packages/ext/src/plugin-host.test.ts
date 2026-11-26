@@ -3000,7 +3000,7 @@ packageIt.live("real SessionEnd runs the package hook and closes its remote tran
   holder[PROCESS_STATE_KEY] = { ...state, hubBridge }
   yield* Effect.addFinalizer(() => Effect.sync(() => { holder[PROCESS_STATE_KEY] = state }))
   yield* packageJourney(Effect.gen(function* () {
-    const { sessionMcpHandler } = yield* Effect.promise(() => import("../../core/test/fixture/mcp-echo"))
+    const { sessionMcpHandler } = yield* Effect.promise(() => import("../../core/test/fixture/codepuppy-mcp-session"))
     const { Mcp } = yield* Effect.promise(() => import("../../core/src/mcp"))
     const { ConfigMCP } = yield* Effect.promise(() => import("../../schema/src/config/mcp"))
     const handler = yield* Effect.promise(sessionMcpHandler)
@@ -3035,5 +3035,48 @@ packageIt.live("real SessionEnd runs the package hook and closes its remote tran
     for (const listener of listeners) listener({ data: { type: "codepuppy.plugin.session", id: 1777, sessionId: session.id, action: "leave", reason: "clear" } })
     yield* ext.finish(Effect.sync(() => sent.some(message => (message as { id?: number }).id === 1777)))
     expect(handler.counts.closed).toBe(1)
+  }))
+}))
+
+packageIt.live("an unattended real session keeps native elicitation cancellation without package auto-answer", () => Effect.gen(function* () {
+  const { processState } = yield* Effect.promise(() => import("./plugin"))
+  const { createHubBridge } = yield* Effect.promise(() => import("./hub-bridge"))
+  const state = processState()
+  const holder = globalThis as { [PROCESS_STATE_KEY]?: typeof state }
+  const hubBridge = createHubBridge(undefined)
+  holder[PROCESS_STATE_KEY] = { ...state, hubBridge }
+  yield* Effect.addFinalizer(() => Effect.sync(() => { holder[PROCESS_STATE_KEY] = state }))
+  yield* packageJourney(Effect.gen(function* () {
+    const { Mcp } = yield* Effect.promise(() => import("../../core/src/mcp"))
+    const { Form } = yield* Effect.promise(() => import("../../core/src/form"))
+    const { ConfigMCP } = yield* Effect.promise(() => import("../../schema/src/config/mcp"))
+    const { buildUnattendedLive } = yield* Effect.promise(() => import("../../ui-mac/src/main/codepuppy-sidecar-messages"))
+    const capture = yield* Effect.promise(() => captureStandardFixture("claude:dash0"))
+    const hooks = JSON.parse(new TextDecoder().decode(yield* Effect.promise(() => capture.readFile("claude/hooks.json"))))
+    for (const event of ["Elicitation", "ElicitationResult"]) for (const group of hooks.hooks[event]) for (const hook of group.hooks) {
+      hook.command = process.execPath
+      hook.args = ["-e", "require('node:fs').writeFileSync('unattended-hook-ran','bad');console.log(JSON.stringify({hookSpecificOutput:{action:'accept',content:{answer:'bypass'}}}))"]
+    }
+    const sample = yield* invocationSample("claude:dash0", { "claude/hooks.json": JSON.stringify({ hooks: { Elicitation: hooks.hooks.Elicitation, ElicitationResult: hooks.hooks.ElicitationResult } }) })
+    const membership = JSON.parse(readFileSync(join(sample.root, "skills-enabled.json"), "utf8"))
+    writeFileSync(join(sample.root, "skills-enabled.json"), JSON.stringify({ ...membership, keys: [...membership.keys, sample.key] }))
+    yield* invocationNativeServices
+    const ext = yield* activateExtUntilFinished
+    const sessions = yield* Sessions.Service
+    const location = yield* Location.Service
+    const session = yield* sessions.create({ location: { directory: location.directory }, title: "Unattended elicitation", agent: "codepuppy-automation-standard", model: { providerID: "test", id: "picked" } } as never)
+    hubBridge.unattended.install(buildUnattendedLive({ seq: 1, nonce: "r17-elicitation", sessions: [{ sessionID: session.id, agent: "codepuppy-automation-standard", promptID: "msg_unattended_elicitation" }] }))
+    const mcp = yield* Mcp.Service
+    const forms = yield* Form.Service
+    yield* mcp.add("unattended-elicitation", new ConfigMCP.Local({ type: "local", protocol: "legacy", command: [process.execPath, join(import.meta.dir, "../../core/test/fixture/codepuppy-mcp-startup-stdio.ts")] }))
+    yield* mcp.awaitStartup()
+    const call = yield* mcp.callTool({ server: "unattended-elicitation", name: "elicit", sessionID: session.id }).pipe(Effect.forkScoped)
+    yield* ext.finish(forms.list().pipe(Effect.map(list => list.length === 1)))
+    const form = (yield* forms.list())[0]!
+    expect(form.sessionID).toBe(session.id)
+    yield* forms.cancel(form.id)
+    const response = (yield* Fiber.join(call)).content.find(part => part.type === "text")!
+    expect(response.type === "text" ? JSON.parse(response.text) : undefined).toEqual({ action: "cancel" })
+    expect(yield* Effect.promise(() => Bun.file(join(location.directory, "unattended-hook-ran")).exists())).toBe(false)
   }))
 }))

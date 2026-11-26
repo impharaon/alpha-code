@@ -1,3 +1,4 @@
+import { parsePackageSessionMessage, type PackageSessionMessage } from "../../ui-mac/src/main/codepuppy-sidecar-messages"
 import { createNetworkEgress } from "./network-egress"
 import { parseNetworkOutbound } from "../../ui-mac/src/shared/network-egress-wire"
 import type { PackageAuthorizationResultV1 } from "../../ui-mac/src/shared/package-admission"
@@ -58,6 +59,7 @@ export type HubInstallSubject = { readonly name: string; readonly source: Plugin
 export type HubBridge = {
   readonly network: ReturnType<typeof createNetworkEgress>
   readonly unattended: ReturnType<typeof createUnattendedState>
+  onPackageSession(handler: (message: PackageSessionMessage) => Promise<boolean>): () => void
   readonly available: boolean
   view(input: { directory: string; sessionID?: string; agent?: string; query?: string }): Promise<{ ok: true; view: HubView } | BridgeFailure>
   search(input: { directory: string; query: string }): Promise<{ ok: true; result: SourceSearchResultV1 } | BridgeFailure>
@@ -88,6 +90,7 @@ export function createHubBridge(
   const log = options.log ?? ((line: string) => console.error(line))
   const pending = new Map<number, { settle: (message: unknown) => void; timer: ReturnType<typeof setTimeout> }>()
   const early: ReloadRequestMessage[] = []
+  const packageSessions = new Set<(message: PackageSessionMessage) => Promise<boolean>>()
   let reloadHandler: ((message: ReloadRequestMessage) => void) | undefined
   let seq = 0
   const unattended = createUnattendedState()
@@ -107,6 +110,18 @@ export function createHubBridge(
     const message = event?.data
     if (!isCodePuppySidecarMessage(message)) return
     const type = (message as { type: string }).type
+    if (type === "codepuppy.plugin.session") {
+      const parsed = parsePackageSessionMessage(message)
+      if (!parsed) return log("runtime-failed: malformed package session message")
+      void (async () => {
+        for (const receive of packageSessions) if (await receive(parsed)) return
+        throw Error("runtime-failed: package session has no active Location")
+      })().then(() => port?.postMessage({ id: parsed.id, ok: true }), error => {
+        log("runtime-failed: package session delivery: " + String(error))
+        port?.postMessage({ id: parsed.id, ok: false, error: "runtime-failed: package session delivery failed" })
+      })
+      return
+    }
     if (type.startsWith("codepuppy.network.")) {
       const parsed = parseNetworkOutbound(message)
       if (!parsed) return log("network egress: malformed runtime message")
@@ -192,6 +207,10 @@ export function createHubBridge(
   return {
     network,
     unattended,
+    onPackageSession: handler => {
+      packageSessions.add(handler)
+      return () => { packageSessions.delete(handler) }
+    },
     available: !!port,
     ...(port
       ? {

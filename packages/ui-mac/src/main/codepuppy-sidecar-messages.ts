@@ -732,3 +732,17 @@ export function parseToolPolicyWriteReply(value: unknown): ToolPolicyWriteReply 
   if (value.backup !== undefined && !isText(value.backup)) return
   return buildToolPolicyWriteReply(value.id, { ok: true, ...(typeof value.backup === "string" ? { backup: value.backup } : {}) })
 }
+
+/** DESIGN-local-plugin-install v3.1 S-03: trusted main actions, private parentPort only. */
+export type PackageSessionMessage = { type: "codepuppy.plugin.session"; id: number; sessionId: string } & (
+  | { action: "leave"; reason: "clear" | "resume" | "logout" | "prompt_input_exit" | "other" }
+  | { action: "notification"; notification: { message: string; title?: string; notificationType: string; occurrenceId: string } }
+)
+export function parsePackageSessionMessage(value: unknown): PackageSessionMessage | undefined {
+  if (!isRecord(value) || value.type !== "codepuppy.plugin.session" || !Number.isSafeInteger(value.id) || !isText(value.sessionId)) return
+  if (value.action === "leave" && typeof value.reason === "string" && ["clear", "resume", "logout", "prompt_input_exit", "other"].includes(value.reason)) return value as PackageSessionMessage
+  if (value.action !== "notification" || !isRecord(value.notification)) return
+  const notification = value.notification
+  if (typeof notification.message !== "string" || (notification.title !== undefined && typeof notification.title !== "string") || typeof notification.notificationType !== "string" || !isText(notification.occurrenceId)) return
+  return value as PackageSessionMessage
+}

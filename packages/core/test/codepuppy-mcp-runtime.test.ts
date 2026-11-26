@@ -878,7 +878,7 @@ testEffect(Layer.empty).live("stdio native form keeps its request owner through 
 }))
 
 testEffect(Layer.empty).live("withdrawing the matching package handlers releases only owned remote transports on reload", () => Effect.gen(function* () {
-  const { sessionMcpHandler } = yield* Effect.promise(() => import("./fixture/mcp-echo"))
+  const { sessionMcpHandler } = yield* Effect.promise(() => import("./fixture/codepuppy-mcp-session"))
   const runtime = yield* Effect.promise(() => import("@opencode/plugin/codepuppy-package-runtime"))
   const { Session } = yield* Effect.promise(() => import("@opencode/schema/session"))
   const handler = yield* Effect.promise(sessionMcpHandler)

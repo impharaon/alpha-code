@@ -41,7 +41,7 @@ last_reviewed: 2026-11-26
 | `main/network-egress-approval.ts`（新） | main 单一审批请求簿及串行决定点；实现 N3 调用所需的 list、决定、设置、撤销和失效发布，连接站点 store、活动快照与 N6 notice。 |
 | `main/network-egress-proxy.ts`、`shared/egress-denial.ts` | 在真实 CONNECT 入口连接上述服务，传递设计 §5 的原因与连接存活事实；保留本片现有拨号/隧道实现，并在建隧道前复核可变授权。 |
 | `main/network-egress-sites.ts`（新）、`main/egress-grant-truth.ts`、`main/egress-grant-truth-write.ts`、`main/egress-grant-records.ts` | main 唯一站点计算，替换旧精确记录的读写绑定为 N4 文档与环境路径；复用原子写形态，不读旧记录、不做转换。写端仍不进入 sidecar 闭包。 |
-| `packages/ui-mac/package.json`、`bun.lock` | 只加入设计 §4.4 已决定的直接依赖 `tldts@7.6.0`；核对 PRIVATE/通配/例外/IDNA 的实际运行结果。 |
+| `packages/ui-mac/package.json`、`bun.lock` | 只加入设计 §4.4 已决定的直接依赖 `tldts@7.5.5`；核对 PRIVATE/通配/例外/IDNA 的实际运行结果。 |
 | `main/network-egress-ipc.ts`（新）、`main/index.ts`、`preload/index.ts`、`preload/types.ts` | 公开 N3，落实产品窗口/main frame、当前代及输入校验，挂接 main 服务；preload 只转发公开 wire 与失效通知。 |
 | `main/server.ts`、`main/hub-view.ts`、`main/codepuppy-sidecar-messages.ts` | 生产代理、当前 child 的 attach/receive/detach 和 N2/N6 桥接线；去掉旧 native approval 绑定。保持现有单代理及代际所有权。 |
 | `main/egress-approval-dialog.ts` | 随生产接线替换删除已无消费者的旧联网 native dialog 实现；不改其它系统对话框。 |
@@ -110,6 +110,10 @@ U/E 各运行 `bun typecheck`，仅处理本片造成的问题；若包已有适
 2026-11-26 r1：步骤 1 在依赖安装处阻塞，尚未产生实施代码。12:17 +0800 开始，先在 `packages/ui-mac` 运行 `bun test src/renderer/codepuppy-ui/composer-state.test.ts src/main/codepuppy-config-injection.test.ts`，退出 0，45 pass / 0 fail。随后同目录执行 `bun add --exact tldts@7.6.0`，退出 1：`No version matching "7.6.0" found for specifier "tldts" (blocked by minimum-release-age: 259200 seconds)`。仓库 `bunfig.toml:4` 为 `minimumReleaseAge = 259200`，`:5` 的既有豁免列表不含 tldts；安装失败后 `git status --short` 为空，manifest/lock 未改动。
 
 本次只补入编排器核对原文和上述阻塞证据，步骤 1 未完成。需要编排器明确允许为已批准的固定依赖进行本次安装的发布年龄豁免，或由设计阶段提供符合现有安装规则的冻结依赖版本；实施者不降低筛选值、不改仓库安装规则、不自行换版。N4 是卡片实际记住范围及站点真源的前置，不能用手写 PSL 或无效按钮绕过。其余步骤与一次性 scenario/对照均未运行，保留其运行授权。
+
+2026-11-26 r2：tldts 7.5.5 instead of 7.6.0: repo minimumReleaseAge; orchestrator ruling 2026-11-26。依赖精确安装成功，未添加豁免；设计 §4.4 仅改版本并于 §10 留一行裁决。步骤 1 的实际库样本结果由同名站点测试核对。
+
+步骤 1 验据（2026-11-26 r2）：在 `packages/ui-mac` 执行 `bun test src/shared/network-egress-wire.test.ts src/main/network-egress-sites.test.ts src/renderer/codepuppy-ui/composer-state.test.ts src/main/codepuppy-config-injection.test.ts src/main/old-name-scan.test.ts`，退出 0，57 pass / 0 fail。PRIVATE、PSL 通配/例外、IDNA 全部通过；7.5.5 的直接运行结果符合设计 §2，r1 安装阻塞解除。
 
 ## 切片二：全部批准通放与系统代理
 

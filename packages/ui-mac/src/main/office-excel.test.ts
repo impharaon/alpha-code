@@ -146,3 +146,15 @@ assert expression(${JSON.stringify(source)}) == expression(${JSON.stringify(calc
 assert expression('="MiXeD"') != expression('="mixed"')
 assert expression('=A1+1') != expression('=A1+2')
 `))
+
+
+test("vendoring refuses a missing adaptation anchor instead of silently dropping the save guard", () => run(`
+import runpy
+module=runpy.run_path(${JSON.stringify(join(import.meta.dir, "../../scripts/vendor-office-excel.py"))})
+replace=module['replace_source']
+source='temp_path.replace(path)'
+assert replace(source,source,'guarded_save()')=='guarded_save()'
+try:replace(source,'missing anchor','unguarded_save()')
+except AssertionError as error:assert 'adaptation anchor' in str(error)
+else:raise AssertionError('missing source adaptation was silently ignored')
+`))

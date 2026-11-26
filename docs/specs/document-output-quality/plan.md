@@ -640,3 +640,5 @@ B4 green：同一 register/tool 反例不改，document-tool 文件 3 PASS（B4-
 B5 red：原公式报告用例追加同一实际工作簿的合法绝对路径别名（含 ./），保留原错误列表拒绝断言；当前仅字符串比较而拒绝，target exit 1（B5-red.log）。下一提交两边 realpath，与 ext 的同一文件语义一致。
 
 B5 green：两侧 realpath 后，原公式错误/摘要负对照保留，document-check 文件 4 PASS（B5-green.log）。
+
+B6 red：一次真实 generator 入口探针克隆固定 2.3.2 wheel，仅将 workspace 的 temp_path.replace 调用作受控 source drift；在 /tmp 脚本副本内覆盖该变体 hash 以单测适配层，生产 hash 守卫未动。当前生成器仍输出 161 文件、静默漏 save guard，独立断言 exit 1（B6-entry-red.log）。新增原 Excel 文件的最小 patch-guard 用例，下一提交每个 text.replace 都验证唯一 anchor，并在 sources.json 明记 scan.py 的局部 xmlns 适配。

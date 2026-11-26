@@ -1,7 +1,7 @@
 ---
 id: PLAN-document-output-quality
 title: 文档产出质量实施计划
-summary: 列出文档制作、渲染、自检与验收的八个交付切片，首片细化固定技能快照与许可资产。
+summary: 列出文档制作、渲染、自检与验收的八个交付切片，细化技能许可资产及制作环境、中文字体与模板两片。
 kind: plan
 status: active
 spec: SPEC-document-output-quality
@@ -101,3 +101,79 @@ PLAN 起草轮只做文档合同、链接和 diff 检查，并按当轮“commit
 ### 偏离记录
 
 2026-11-26 · 步骤 1/2 的材料与适配合为首个资产提交，再提交发现/分发验证；避免把原名冲突、安装假设或悬空 helper 引用的原稿暴露给嵌套发现。新增同目录 `WORKFLOW.md` 集中七技能的共用执行指引；保留脚本仅为适配后的 `pptx/scripts/apply_theme.cjs`，其余按实际未使用路径逐文件记录排除。无冻结契约变更。资产提交 `91aabeab39`。
+
+## 切片二：随包制作环境、中文字体与模板
+
+- 依据：[spec v1](spec.md) @ `31cd182e09710b603721c6f44d471b01289dd951`，AC-01..04、08、09、12、14、15 的资源/制作基础；[design](design.md) @ `7d1c4fdb55cc388af1fc7069249ec3d449641a60` §4.1/4.2、§6 R2/R6、§8/§10；[connector-launchers frozen design](../connector-launchers/design.md) @ `f7424aa45225a6d02d1958f4b4f72d247f99acc4` 的 v2 §4.1 / DOC-NODE-v2。切片一 `91aabeab39`、`7c739dc021` 已由 Claude Opus 5.5（orchestrator）接受；继承其来源、许可与发现结论。
+- 核对：待调度方核对本切片 PLAN 提交；下次 IMPLEMENT 的首个提交按恢复 brief 的 `Phase:` 行填写提交号、核对者/模型与结论。
+
+本片交付可供制作使用的资源树、构建来源与资源路径解析，不接通默认生成/自检流程。实际依据为当前 `build-office-runtime.ts` 的 mac-only 安装/验证、`office-runtime.lock` 的 CPython 3.11.15 与两份 mac 架构锁、`electron-builder.config.ts` 的 darwin-only Office 复制规则。沿用这些构建与打包拥有者补 Windows，不新建 Office Python 或 Node 的平行环境。既有普通读工具在本片仍可使用，旧 writer 删除及其烟测转换仍在片 7 同步完成。
+
+### 改动
+
+所有路径相对仓库根。新构建资源归 ui-mac 随包资产；新增路径解析文件归已有 main 资源责任，不让 util/ext 反向依赖 main。
+
+| 文件 | 改什么 |
+| --- | --- |
+| `packages/ui-mac/resources/office-runtime/requirements.in`、`office-runtime.lock`、`requirements-arm64.lock`；新增 `requirements-win32-x64.lock` | 在原有 Python 锁中补设计指定的 PDFium、Pydantic 及真实依赖闭包；Office CPython 仍为 3.11.15，补 win32-x64 官方发行身份。依赖边按对应目标的实际 METADATA/marker 生成，不能把 mac 的图当 Windows 的图 |
+| `packages/ui-mac/resources/office-runtime/requirements-x64.lock` | 移除不再属于发行范围的 Intel Mac 锁及 Office 构建中的引用；不改其它功能使用的通用 x64 架构解析 |
+| `packages/ui-mac/scripts/build-office-runtime.ts` | 扩充现有构建入口的目标选择、归档布局、解释器/stdlib/site-packages 定位、安装/裁剪/校验及 Windows `.pyd` 导入；保留原锁闭包、版本、哈希、实际导入与四格式读回证据。制作阶段新增能力的烟测不依赖未实现的 OfficeExcel，不提前删旧 writer |
+| `packages/ui-mac/resources/document-assets/package.json`、`package-lock.json`（新增） | 仅 docx 9.16.0、pptxgenjs 4.0.1 及其实际 npm 闭包的构建锁；由真实 npm 元数据生成 integrity，不改根工作区依赖或引入在线执行链 |
+| `packages/ui-mac/resources/document-assets/fonts.lock.json`、`build-requirements.lock`（新增） | 官方 noto-cjk 源提交/两套变量 TTF 的路径、原字节摘要与 OFL/版权对应；记录 400/700 实例、FontTools 构建版本/哈希、生成字体摘要及命名说明。值从实际来源和构建取得，不复制设计里的示例值作锁 |
+| `packages/ui-mac/scripts/build-document-assets.ts`（新增） | 构建文档 npm 闭包、静态中文字体和模板，核对分发许可并生成实际资产清单。复用现有构建获取/校验能力和包管理器，新增代码不另实现下载、续传或回退器。产物进入忽略的 `native/document-assets/build/`；锁与生成来源入库，node_modules、字体二进制及构建缓存不入库 |
+| `packages/ui-mac/scripts/build-document-templates.py`（新增） | 用随包 Office 库生成应用原创的中文报告 docx、分析 xlsx、汇报 pptx；分别写实际样式/页设置、数字格式/冻结/打印设置、主题/母版/布局及自定义来源/版本属性。生成后解析原生容器核实，模板不是固定业务内容的最终样例 |
+| `packages/ui-mac/src/main/document-resources.ts`、`document-resources.test.ts`（新增） | 一个资源解析入口从 resourcesRoot、目标和实际资产清单给出 Office Python、nodeModules、skills、fonts、templates 的真实路径/身份；dev 与 packaged 共用。测试真实资源复制、解析和缺文件/摘要错误，不建立第二份 Node 资产表或假 DocumentHost |
+| `packages/ui-mac/scripts/target-arch.ts`、`prebuild.ts`、`packages/ui-mac/electron-builder.config.ts`、`packages/ui-mac/.gitignore` | 在已有构建/包装链中接入文档资产，Office 复制扩到 win32-x64，验证解释器/PDFium 等原生文件的对应目标；保持 Node 签名与归档形态归 #1760。只增本片产物忽略路径，不改 gate |
+| `packages/ui-mac/src/main/office-runtime-lock.test.ts`、`mac-target-arch.test.ts`、`factory-skills.test.ts` | 更新已被新事实替换的五个顶层包/两份 mac 锁/mac-only 复制断言；新增当前模块的闭包、目标和真实资源复制验证。第一片摘要锁仍只拥有技能来源，不把字体/npm 的另一个锁塞进去 |
+| `packages/ui-mac/resources/NOTICE.txt` 与构建产物的许可目录/来源清单 | 保留实际分发的 npm、Python、PDFium 依赖及 OFL 原文/版权和字体修改说明；署名位置沿既有随包清单，不新增页面。LO 许可材料仍随片 3 的发行资产交付 |
+| `docs/specs/document-output-quality/plan.md` | 填核对回执、实施证据与必要偏离；不改冻结 spec/design 或受保护 ADR-014 |
+
+资源解析入口供片 4 的 DocumentHost.environment 消费；Windows 连接器命令/安全校验等现有消费者在片 7 接线时使用这同一结果，不在它们旁边新增第五份 `python.exe` 路径拼接，也不在本片重构全部命令历史逻辑。构建烟测在本片仍走原 reader 读回；片 7 删除 writer 时，沿 §4.8 改用制作库/OfficeExcel 生成再 stdio reader 读回。
+
+### 顺序
+
+1. **Python 两平台锁与构建提交**：先从官方发行/真实 wheels 取得 Windows CPython、PDFium 及新增依赖的锁实值，记录命令和来源；扩充原 builder 与其锁测试，再更新 Office 的目标校验/复制输入。当前 Mac 执行 darwin-arm64 构建和真实导入、四格式烟测；Windows 先核真实归档/wheel 的身份、布局和元数据，执行证据明确 pending。不能把 Mac 上读取 PE 文件或交叉求锁记成 Windows 启动成功。
+2. **npm、字体与中文模板提交**：用真实 lock 构建随包 npm 目录，实例化两家族 regular/bold 字体并保留 OFL/修改记录，生成三份中文模板和资产清单。用固定库实际生成/读回 Office/PDF；核对模板 OOXML 样式、主题/母版、自定义属性及 TTF 的 sfnt/cmap/字轴。先在临时目录完成缺包、坏 integrity/哈希、缺字体、缺模板等失败臂，再验证真实 assets 复制规则。构建工具只以绝对入口执行，不启动应用或窗口。
+3. **资源解析与打包消费提交**：接入 dev/packaged 的统一解析和 prebuild/extraResources，更新直接受影响的原断言与许可投影。用实际锁和暂存产物作测试输入；字体/模板不使用手写的二进制格式替身，新增 Windows 二进制夹具从锁定原文件提取所需字节并记来源。删除解释器、删传递依赖、拿错目标二进制、移除字体/模板复制各应让对应真实入口失败。
+4. **一次收尾**：每步只迭代本步用例名，再把本步改变的测试文件全跑一次；返回前再跑较宽相关集合一次。记录实际构建体积、原生目标、许可文件和模板/npm/font 摘要；保留 Windows/#1760/渲染验收的 pending 分类，不用跳过后的绿色结果冒称完成。
+
+相关检查从 `packages/ui-mac` 执行；新增用例分别命名为 `document runtime locks`、`document resources`，迭代以 `-t` 选择：
+
+```sh
+bun test src/main/office-runtime-lock.test.ts -t 'document runtime locks'
+bun test src/main/document-resources.test.ts -t 'document resources'
+CODEPUPPY_TARGET_ARCH=arm64 bun ./scripts/build-office-runtime.ts
+bun ./scripts/build-document-assets.ts
+bun test src/main/office-runtime-lock.test.ts src/main/document-resources.test.ts
+bun test src/main/mac-target-arch.test.ts src/main/factory-skills.test.ts
+bun typecheck
+```
+
+最后两组文件级命令按实际步骤分配，各文件只在其改变行为后收尾一次。真实完整构建/字体生成与格式读回是本片一次性实施证据，不变成每个资源用例反复安装依赖的常驻测试；常驻测试复用构建产物或读取真实锁/容器所需的小样本。`build-document-assets` 的 npm 执行烟测若尚无 #1760 的实际 Node 资产，可在临时目录用其冻结官方归档做一次库探针并标明来源；该临时工具不打进产品，不作为 DOC-NODE-v2 已接通的证据。Windows 执行与完整图像检查不在上述 Mac 绿色计数中。
+
+较宽相关集合由本片实际改动的 exports/磁盘资源消费者确定。当前已确认 `office-mcp.test.ts`、`attachment-read-roundtrip.test.ts`、`process-fence-wiring.test.ts` 直接 import 原 `buildOfficeRuntime`：前两个文件在已有构建产物上各跑一次；围栏文件只跑 `bun test src/main/process-fence-wiring.test.ts -t "the four bundled-runtime commands"`，它覆盖同一随包解释器在生产围栏内的制作/读回。该文件中另有空缓存联网安装与其它旅程，不在本片运行，也不为每个文件重装环境。`mac-target-arch.test.ts` 覆盖现有包装校验，`factory-skills.test.ts` 覆盖打包复制；已在步末覆盖者不重复跑。其余 consumers 若因实际接口变化需纳入，先用 `rg` 找出并记于本节，不扩成整个包测试。禁止执行完整 prebuild 链、app/窗口、包级测试、bin/check 或 gate；不因没有 #1760 而新建下载/安装路径。
+
+### 风险
+
+- **#1760 未开始实施**：消费 DOC-NODE-v2 的冻结签名与读取权限；Node 资产 ready 必须来自 `ConnectorLaunchHost.resolveAssets()` 的真实返回，而非 bootstrap 的目标路径。当前不修改 `CodePuppyBootstrap.launchers` 的生产者/解析器、不自建其接口或伪造 ready。`resolveAssets → DocumentHost.environment.node`、归档退路展开/签名、sidecar/ext 读取同代资产的真实集成断言标为 **pending（#1760 交付后，片 4 接线、片 8 真包验）**；这不是本片设计 blocker。
+- **Windows 不能由当前 Mac 的结果代证**：两平台的解释器布局、wheel marker、PDFium DLL 和导入方式分别验证；Windows 的 isolated import、实际模板生成/读回与最终包执行标为 **pending（Windows 执行机及后续发布验证）**。不回落到系统 Python、不请求用户安装或关闭保护，也不恢复 Intel Mac 产物。
+- **字体能打开不等于中文排版通过**：构建检查真实 TTF outlines/cmap、regular/bold 身份、OFL/RFN、ReportLab 可嵌入与中文 ToUnicode；整段替代、LO profile/fontconfig/Windows 私有字体发现和 PDF 内实际字体清单须片 3/4 才能证明。AC-08 的三字体对照臂标为 **pending（真实 LO 渲染）**，不以 fontTools 检查替代。
+- **模板来源与成品沿用不同**：本片核模板实际样式和来源属性；用户 PPT 模板的母版/配色保留、默认模型是否确实选择模板，仍须片 7/8 走实际任务验证。不得把“模板文件存在”记成 AC-12 全过。
+- **原构建闭包/许可证被裁剪失真**：继续核 installed METADATA、pip check、版本与哈希；npm 按 lock integrity 安装，PDFium 的 dependency licences 与字体原文均随产物检查。去掉构建工具/缓存前后验证实际导入和字体生成，不能只 import 一个顶层模块就宣布所有依赖就绪；不新增运行时包安装器。
+
+### 证明
+
+| AC / 本片范围 | 测试/证据 | 缺少行为为什么会失败 |
+| --- | --- | --- |
+| AC-01、02：Word/PPT 制作库与中文模板基础 | `document-resources.test.ts` 验实际打包复制和来源摘要；一次性用随包 Python、临时/已交付的固定 Node 与 docx/PptxGenJS 生成原生文件，再解析目录/页眉页脚页码、图片/表格、主题/母版、图表数据和备注等所生成要素 | npm 传递包缺失、模板遗漏、错误模块定位或空壳容器会让实际 require/制作/读回失败；此证据不代替每种三次默认模型质量分数 |
+| AC-03：Excel 制作/模板基础 | 原 Office builder 的实际 openpyxl 生成/stdio reader 读回；一次性解析模板数字格式、冻结、打印范围/页眉页脚与来源属性 | 只有文件名或 import 成功、未带库/模板设置时，原生读回与属性核对失败。LO 重算、独立汇总值和对象保真属于片 5/8，当前 pending |
+| AC-04：PDF 中文制作基础 | 随包解释器 + 静态 TTF 用 ReportLab 生成中文正文、图片、页眉页脚；pypdf 抽取原文、核字体/ToUnicode 与图片对象 | OTF/CFF 冒充 TTF、字体没进包、缺中文文本映射或只画了一张正文图片时失败；HTML/海报完整导出和断网截图仍归片 4/8 |
+| AC-08：中文字体资源与替代输入 | `document-resources.test.ts` 检查实际四字体复制/摘要；一次性 fontTools/ReportLab 核字形覆盖与嵌入，删除任一家族/字重或改源摘要的反例变红 | 字体资源缺席、拿错实例/家族或 cmap 缺本例汉字会失败；LO 整段一致性、三指定字体与去配置对照仍 pending |
+| AC-09：用户无须安装制作依赖 | `office-runtime-lock.test.ts` 的两平台完整闭包反例；在临时 cwd/收敛 PATH、固定绝对解释器下的实际四格式 smoke 和打包资源解析 | 删 CPython/原生库/传递包、遗漏复制或偷偷依赖系统包会在实际启动/import/制作失败。Node 宿主 ready 与国内 LO 下载/续传、整体离线流程分别依赖 #1760、片 3/8 |
+| AC-12：模板实物与来源 | 用真实库读三份生成模板的 styles/sections、slideMaster/theme/关系、工作簿格式与 custom properties；`document-resources.test.ts` 删除模板或篡改摘要后失败 | 空模板、错样式或只有硬编码路径时失败；实际任务选择 bundled/user 并保留用户母版的证据在片 7/8 pending |
+| AC-14：本片新增组件分发许可 | 真实 extraResources 复制后逐文件检查锁中 npm/Python/PDFium/OFL 许可、版权、字体修改记录及实际 hash；删除许可文件或只留占位清单后失败 | 漏带任一已分发依赖许可/字体来源时，清单与实际树不一致；沿用第一片的标准文件排除边界，LO 源码/许可义务留片 3 |
+| AC-15：Windows 资源与执行边界 | 两目标锁/资源投影、真实 Windows 归档与 wheel 元数据、实际 PE 文件目标检查；在 Windows 主机运行同一构建/isolated import/四格式读回后补执行记录 | 错把 mac python 路径/原生库放进 Windows 时，布局/目标检查或实际启动失败。当前 Mac 不可完成的执行和 Windows 包上的 AC-01/02/03/08/09 均 pending，不计为本片已通过 |
+
+### 偏离记录
+
+暂无。

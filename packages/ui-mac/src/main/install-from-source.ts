@@ -1,6 +1,5 @@
-import { buildPluginPackageTxItems, pluginHostName, pluginComponentId, pluginMcpConfig } from "./plugin-package-install"
+import { buildPluginPackageTxItems, pluginHostName, pluginComponentId, pluginMcpConfig, needsPluginFiles } from "./plugin-package-install"
 import { convertCreatedPlugin } from "./created-plugin"
-import { posix } from "node:path"
 import { renderInstalledSkill } from "../shared/host-extension-package-contract/plugin-conversion.mjs"
 import type { Capture, Entry, Text } from "../shared/host-extension-package-contract/plugin-conversion"
 import {
@@ -471,32 +470,6 @@ function outcomeOf(graph: PackageGraphV1, alreadyInstalled?: true): InstallOutco
     ...(alreadyInstalled ? { alreadyInstalled } : {}),
   }
 }
-function needsPluginFiles(entry: Extract<Entry, { kind: "mcp" | "skill" }>, paths: string[]): boolean {
-  const binding = (text: Text) =>
-    text.some((part) => typeof part !== "string" && "binding" in part && part.binding !== "projectDir")
-  if (entry.kind === "mcp")
-    return entry.transport === "stdio"
-      ? entry.command.some(binding) ||
-          Object.values(entry.environment).some(binding) ||
-          (!!entry.cwd && binding(entry.cwd)) ||
-          entry.command.some(
-            (text) => typeof text[0] === "string" && text[0].startsWith("./") && paths.includes(text[0].slice(2)),
-          )
-      : binding(entry.url) || Object.values(entry.headers).some(binding)
-  return (
-    binding(entry.instruction) ||
-    entry.instruction.some(
-      (part) =>
-        typeof part === "string" &&
-        [...part.matchAll(/\]\(([^)]+)\)/g)].some((match) => {
-          const target = posix.normalize(posix.join(entry.directory, match[1]!))
-          return paths.includes(target) && !target.startsWith(entry.directory + "/")
-        }),
-    )
-  )
-}
-
-
 /** The entry's catalog arm: global storage and one graph admission, including native catalog items. */
 export async function installCatalogFromSource(
   catalogId: string,

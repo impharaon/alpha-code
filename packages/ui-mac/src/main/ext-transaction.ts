@@ -961,12 +961,21 @@ function removeDirGuarded(root: string, dir: string, warnings: string[]): boolea
     return false
   }
   try {
+    makeDirectoriesRemovable(dir)
     fs.rmSync(dir, { recursive: true, force: true })
     return true
   } catch (error) {
     warnings.push(`removal failed for ${dir}: ${error instanceof Error ? error.message : String(error)}`)
     return false
   }
+}
+
+/** Restore traversal/write access only while deleting an owned tree; never follow its links. */
+function makeDirectoriesRemovable(dir: string): void {
+  const stat = fs.lstatSync(dir)
+  if (!stat.isDirectory()) return
+  fs.chmodSync(dir, stat.mode | 0o700)
+  for (const entry of fs.readdirSync(dir)) makeDirectoriesRemovable(path.join(dir, entry))
 }
 
 // ── GC(有界保留 + 双守卫) ──────────────────────────────────────────────────────────────────

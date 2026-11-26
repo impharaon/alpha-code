@@ -1,7 +1,7 @@
-import { buildPluginPackageTxItems, pluginHostName, pluginComponentId, pluginMcpConfig } from "./plugin-package-install"
+import { buildPluginPackageTxItems, pluginHostName, pluginComponentId, pluginMcpConfig, needsPluginFiles } from "./plugin-package-install"
 import { FACTORY_SKILL_IDS } from "./factory-skills"
 import type { PluginPackage, Entry } from "../shared/host-extension-package-contract/plugin-package"
-import type { PackageEffectV1 } from "../shared/plugin-install"
+import type { PackageEffectV1, PackageNotRunningV1 } from "../shared/plugin-install"
 import { createPackageDeclarationResolver } from "./package-declarations"
 import { isOfficialConnector } from "./official-connector-recipes"
 import { collectOldOfficialConnectorVersions, officialConnectorPaths, projectOfficialConnector, releaseOfficialConnectorResources, restoreCommittedOfficialConnectors } from "./official-connector-resources"
@@ -234,7 +234,7 @@ type PreparedComponent = {
   agentEntry?: Record<string, unknown>
   /** `#840` command:payload 字段 + template asset 字节合成的引擎叶(builder 只落 config)。 */
   commandEntry?: Record<string, unknown>
-  pluginPackage?: { description: PluginPackage; build: PackageTxBuildV1; names: Map<string, string>; nodes: import("./ext-package-ledger-v3").PackageGraphNodeV1[]; skills: UpsertInput[]; mcps: Extract<Entry, { kind: "mcp" }>[] }
+  pluginPackage?: { notRunning: PackageNotRunningV1[]; description: PluginPackage; build: PackageTxBuildV1; names: Map<string, string>; nodes: import("./ext-package-ledger-v3").PackageGraphNodeV1[]; skills: UpsertInput[]; mcps: Extract<Entry, { kind: "mcp" }>[] }
   itemDigest: string
 }
 
@@ -1025,20 +1025,27 @@ async function resolvePreparedPackage(
       const before = state.packageGraphs.find(graph => graph.packageId === packageId)
       const occupied = new Set(state.records.filter(record => !before || ![before.root, ...before.children].some(node => node.kind === record.kind && node.name === record.name)).map(record => record.kind + ":" + record.name))
       for (const name of FACTORY_SKILL_IDS) occupied.add("skill:" + name)
-      const names = new Map(payload.description.entries.filter(entry => entry.kind === "skill" || entry.kind === "mcp").map(entry => [entry.id, pluginHostName(entry, packageId, occupied, () => true)]))
+      const notRunning: PackageNotRunningV1[] = []
+      const paths = payload.description.tree.map(node => node.path)
+      const runnable = payload.description.entries.filter((entry): entry is Extract<Entry, { kind: "skill" | "mcp" }> => {
+        if (entry.kind === "skill" || entry.kind === "mcp" && !needsPluginFiles(entry, paths)) return true
+        notRunning.push({ kind: entry.kind, sourceName: entry.sourceName, reason: entry.kind === "mcp" ? "needs-plugin-files" : "kind-not-supported-yet" })
+        return false
+      })
+      const names = new Map(runnable.map(entry => [entry.id, pluginHostName(entry, packageId, occupied, () => true)]))
       const blobs = new Map<string, Buffer>()
       for (const ref of payload.blobs) {
         const bytes = await fetchVerified(ref)
         if (!bytes) return { ok: false, reason: "package admission: plugin blob integrity failed", package: view }
         blobs.set(ref.sha256, bytes)
       }
-      const mcps = payload.description.entries.filter((entry): entry is Extract<Entry, { kind: "mcp" }> => entry.kind === "mcp")
-      const nodes = payload.description.entries.filter(entry => entry.kind === "skill" || entry.kind === "mcp").map(entry => ({ componentId: pluginComponentId(packageId, entry), kind: entry.kind, name: names.get(entry.id)!, required: true, manifestDigest: "sha256:" + component.payloadRef.sha256 }))
+      const mcps = runnable.filter((entry): entry is Extract<Entry, { kind: "mcp" }> => entry.kind === "mcp")
+      const nodes = runnable.map(entry => ({ componentId: pluginComponentId(packageId, entry), kind: entry.kind, name: names.get(entry.id)!, required: true, manifestDigest: "sha256:" + component.payloadRef.sha256 }))
       const base = { environment: deps.environment(), scope: { kind: "global" as const }, origin: "catalog" as const, version: facts.envelope.prelude.version, desiredState: "disabled" as const, installedAt: new Date().toISOString(), payloadDigest: "sha256:" + component.payloadRef.sha256 }
       const skills = nodes.filter(node => node.kind === "skill").map(node => ({ ...base, id: node.componentId, kind: node.kind, name: node.name }))
       const built = await buildPluginPackageTxItems({ root: deps.root(), casBaseRoot: deps.casBaseRoot(), key, receipt: { ...base, id: "bundle:" + name, kind: "bundle", name }, description: payload.description, hostNames: names, skillReceipts: skills, readFile: async path => { const node = payload.description.tree.find(node => node.path === path); if (node?.kind !== "file") throw Error("Missing plugin file"); return node.bytes === 0 ? new Uint8Array() : blobs.get(node.digest.slice(7))! } })
       if (!built.ok) return { ok: false, reason: built.reason, package: view }
-      pluginPackage = { description: built.description, build: built.build, names, nodes, skills, mcps }
+      pluginPackage = { notRunning, description: built.description, build: built.build, names, nodes, skills, mcps }
     }
 
     components.push({
@@ -1540,7 +1547,7 @@ function packageGraphOf(prepared: PreparedPackage, rootManifestDigest: string, e
     envelopeDigest: `sha256:${prepared.binding.envelopeDigest}`,
     root: { ...graphNodeOf(prepared.root), required: true, manifestDigest: rootManifestDigest },
     children: [...prepared.components.slice(1).map(graphNodeOf), ...(prepared.root.pluginPackage?.nodes ?? [])],
-    ...(prepared.root.pluginPackage ? { pluginTree: { storeKey: prepared.root.key, treeDigest: prepared.root.pluginPackage.description.treeDigest }, source: { kind: "catalog" as const }, notRunning: prepared.root.pluginPackage.description.entries.filter(entry => entry.kind !== "skill" && entry.kind !== "mcp").map(entry => ({ kind: entry.kind, sourceName: entry.sourceName, reason: "kind-not-supported-yet" as const })) } : {}),
+    ...(prepared.root.pluginPackage ? { pluginTree: { storeKey: prepared.root.key, treeDigest: prepared.root.pluginPackage.description.treeDigest }, source: { kind: "catalog" as const }, notRunning: prepared.root.pluginPackage.notRunning } : {}),
   }
   return { ...withoutDigest, installedGraphDigest: computeInstalledGraphDigest(withoutDigest) }
 }

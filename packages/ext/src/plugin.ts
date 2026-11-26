@@ -502,7 +502,9 @@ export const CodePuppyExt: Plugin.Plugin = {
           }
           for (const skill of allInstalledPluginSkills(bootstrap.paths.globalRoot)) {
             if (!skillAllowed(skill)) continue
-            editor.add({ id: Skill.ID.make(skill.name), name: Skill.Name.make(skill.name), path: AbsolutePath.make(skill.path),
+            // Native directory ids may also occupy the managed key; keep their registrations intact.
+            const id = editor.get(skill.key) ? skill.key + "/" + skill.entry.id : skill.key
+            editor.add({ id: Skill.ID.make(id), name: Skill.Name.make(skill.name), path: AbsolutePath.make(skill.path),
               ...(typeof skill.entry.display.description === "string" ? { description: skill.entry.display.description } : {}),
               autoinvoke: skill.entry.invocation.implicitInvocation,
               content: renderPluginText(skill.entry.instruction, { pluginRoot: skill.pluginRoot, skillDir: skill.directory, projectDir: directory }),

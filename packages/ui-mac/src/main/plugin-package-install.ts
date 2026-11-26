@@ -1,6 +1,6 @@
 import { INSTALLED_PLUGIN_PACKAGE_FILE, PLUGIN_TREE_DIRECTORY, type InstalledPluginPackageV1 } from "../shared/installed-plugin-package"
 import { createHash } from "node:crypto"
-import { dirname, isAbsolute, relative, resolve } from "node:path"
+import { dirname, isAbsolute, posix, relative, resolve } from "node:path"
 import { renderInstalledSkill } from "../shared/host-extension-package-contract/plugin-conversion.mjs"
 import {
   canonicalPluginJson,
@@ -200,4 +200,29 @@ export function pluginMcpConfig(entry: Extract<Entry, { kind: "mcp" }>): McpConf
               }
             : {}),
       }
+}
+
+export function needsPluginFiles(entry: Extract<Entry, { kind: "mcp" | "skill" }>, paths: string[]): boolean {
+  const binding = (text: Text) =>
+    text.some((part) => typeof part !== "string" && "binding" in part && part.binding !== "projectDir")
+  if (entry.kind === "mcp")
+    return entry.transport === "stdio"
+      ? entry.command.some(binding) ||
+          Object.values(entry.environment).some(binding) ||
+          (!!entry.cwd && binding(entry.cwd)) ||
+          entry.command.some(
+            (text) => typeof text[0] === "string" && text[0].startsWith("./") && paths.includes(text[0].slice(2)),
+          )
+      : binding(entry.url) || Object.values(entry.headers).some(binding)
+  return (
+    binding(entry.instruction) ||
+    entry.instruction.some(
+      (part) =>
+        typeof part === "string" &&
+        [...part.matchAll(/\]\(([^)]+)\)/g)].some((match) => {
+          const target = posix.normalize(posix.join(entry.directory, match[1]!))
+          return paths.includes(target) && !target.startsWith(entry.directory + "/")
+        }),
+    )
+  )
 }

@@ -650,3 +650,16 @@ test("main settles every actually viewed Session before stopping without inventi
   notePluginSessionViewed(1778, undefined)
   requester.close()
 })
+
+test("unified plugin notifications retain the original occurrence identity across duplicate producers", async () => {
+  const { createPluginSessionRequester } = await import("./plugin-session-lifecycle")
+  const sent: Array<{ id: number }> = []
+  const requester = createPluginSessionRequester(message => { sent.push(message) })
+  const action = { sessionId: "ses_notification", action: "notification" as const, notification: { message: "Native permission", notificationType: "permission_prompt", occurrenceId: "evt_original_notification" } }
+  const first = requester.request(action)
+  const duplicate = requester.request(action)
+  expect(sent).toHaveLength(1)
+  requester.receive({ id: sent[0]!.id, ok: true })
+  await Promise.all([first, duplicate])
+  requester.close()
+})

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test"
 import { createHash } from "node:crypto"
-import { copyFileSync, cpSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs"
+import { copyFileSync, cpSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, existsSync, realpathSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import type { Location } from "../../../schema/src/location"
@@ -146,4 +146,25 @@ test("a failed preparation retries only through the explicit action, never in re
   expect(attempts).toBe(2)
   runtime.retry()
   expect(attempts).toBe(2)
+})
+
+
+test.each(["extract-failure", "verification-failure", "cancel"])("unpublished candidates are removed after %s and stale candidates are cleared at preparation", async (fault) => {
+  const f = fixture()
+  const root = join(f.input.userData, "document-runtime")
+  mkdirSync(join(root, "libreoffice-candidate-stale"), { recursive: true })
+  const runtime = createDocumentRuntime({ ...f.input, ...(fault === "extract-failure" ? { extract: async () => { throw Error("fixture extraction failed") } } : {}) })
+  runtimes.push(runtime)
+  let began!: () => void
+  const started = new Promise<void>((resolve) => { began = resolve })
+  runtime.subscribeRuntimeVerify(f.location, async (task, signal) => {
+    began()
+    if (fault === "cancel") { await new Promise<void>((resolve) => signal.addEventListener("abort", () => resolve(), { once: true })); return { ...task, status: "cancelled", reason: "sidecar-stopped" } }
+    return { ...task, status: "failed", reason: "conversion", detail: "fixture", exitCode: 1, stderr: "fixture" }
+  })
+  const failed = until(runtime, (state) => state.phase === "failed")
+  runtime.query(f.location)
+  if (fault === "cancel") { await started; await runtime.dispose() }
+  else { await failed; await runtime.dispose() }
+  expect(readdirSync(root).filter((name) => name.startsWith("libreoffice-candidate-"))).toEqual([])
 })

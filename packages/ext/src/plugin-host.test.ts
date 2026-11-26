@@ -3080,3 +3080,50 @@ packageIt.live("an unattended real session keeps native elicitation cancellation
     expect(yield* Effect.promise(() => Bun.file(join(location.directory, "unattended-hook-ran")).exists())).toBe(false)
   }))
 }))
+
+packageIt.live("main forwards real permission and completion notifications to the package once per native occurrence", () => Effect.gen(function* () {
+  const { processState } = yield* Effect.promise(() => import("./plugin"))
+  const { createHubBridge } = yield* Effect.promise(() => import("./hub-bridge"))
+  const { createPluginSessionRequester, watchPluginSessionNotifications } = yield* Effect.promise(() => import("../../ui-mac/src/main/plugin-session-lifecycle"))
+  const state = processState()
+  const holder = globalThis as { [PROCESS_STATE_KEY]?: typeof state }
+  const listeners: Array<(event: { data: unknown }) => void> = []
+  const requester = createPluginSessionRequester(message => { for (const listener of listeners) listener({ data: message }) })
+  const hubBridge = createHubBridge({ postMessage: message => { requester.receive(message) }, on: (_, listener) => { listeners.push(listener) } })
+  holder[PROCESS_STATE_KEY] = { ...state, hubBridge }
+  yield* Effect.addFinalizer(() => Effect.sync(() => { holder[PROCESS_STATE_KEY] = state; requester.close() }))
+  let producer!: Plugin.Context
+  yield* packageJourney(Effect.gen(function* () {
+    const capture = yield* Effect.promise(() => captureStandardFixture("claude:dash0"))
+    const hooks = JSON.parse(new TextDecoder().decode(yield* Effect.promise(() => capture.readFile("claude/hooks.json"))))
+    for (const group of hooks.hooks.Notification) for (const hook of group.hooks) {
+      hook.command = process.execPath
+      hook.args = ["-e", "const fs=require('node:fs');const input=await Bun.stdin.json();fs.appendFileSync('native-notifications.jsonl',JSON.stringify(input)+'\\n');console.log(JSON.stringify({continue:false,systemMessage:'notification cannot stop execution'}))"]
+    }
+    const sample = yield* invocationSample("claude:dash0", { "claude/hooks.json": JSON.stringify({ hooks: { Notification: hooks.hooks.Notification } }) })
+    const membership = JSON.parse(readFileSync(join(sample.root, "skills-enabled.json"), "utf8"))
+    writeFileSync(join(sample.root, "skills-enabled.json"), JSON.stringify({ ...membership, keys: [...membership.keys, sample.key] }))
+    yield* invocationNativeServices
+    const ext = yield* activateExtUntilFinished
+    const watcher = watchPluginSessionNotifications(producer)
+    yield* Effect.addFinalizer(() => Effect.promise(watcher.stop))
+    const sessions = yield* Sessions.Service
+    const location = yield* Location.Service
+    const session = yield* sessions.create({ location: { directory: location.directory }, title: "Native notification", agent: "build", model: { providerID: "test", id: "picked" } } as never)
+    yield* sessions.prompt({ sessionID: session.id, text: "Complete this native task" })
+    yield* sessions.wait(session.id)
+    const log = join(location.directory, "native-notifications.jsonl")
+    yield* ext.finish(Effect.promise(() => Bun.file(log).exists()))
+    const permissions = yield* Permission.Service
+    const ask = yield* permissions.ask({ sessionID: session.id, action: "shell", resources: ["native notification permission"] }).pipe(Effect.forkScoped)
+    yield* ext.finish(Effect.sync(() => readFileSync(log, "utf8").includes("permission_prompt")))
+    const pending = (yield* permissions.list())[0]!
+    yield* permissions.reply({ requestID: pending.id, reply: "once" })
+    yield* Fiber.join(ask)
+    const rows = readFileSync(log, "utf8").trim().split("\n").map(line => JSON.parse(line))
+    expect(rows.filter(row => row.notification_type === "idle_prompt")).toHaveLength(1)
+    expect(rows.filter(row => row.notification_type === "permission_prompt")).toHaveLength(1)
+    expect(rows.every(row => row.session_id === session.id && typeof row.message === "string")).toBe(true)
+    expect(JSON.stringify(yield* sessions.context(session.id))).not.toContain("notification cannot stop execution")
+  }), { id: "actual-notification-producer", setup: async context => { producer = context } })
+}))

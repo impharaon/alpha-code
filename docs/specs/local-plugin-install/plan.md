@@ -483,3 +483,45 @@ AC-25 目录正反证据补足：实际包 DATA 为 0700，定义更新后原文
 r2 一次最终较宽相关集：ui-mac 的原八文件加 `mcp-server-truth.test.ts mcp-server-derivation.test.ts ext-write-channels.test.ts package-mcp-activation.test.ts plugin-package-accounts.test.ts` 共 13 文件，271 pass / 1 fail，日志 `/tmp/plugin-standard-r2-related-ui.log`。唯一父失败来自 IPC 子宿主缺少 server boot 发布的临时 DATA 快照，整树准备提前失败，runtime barrier 用例等不到 entered；与新同链的测试 harness 初始化有关，已在既有 `test-component/ext-install-catalog-result.cases.ts` 同步生产启动条件，只发布临时 DATA/Home（额外文件的必要原因）。受影响七例定向 7 pass / 0 fail；生产 DATA 根仍由 server 实际 fence roots 发布，不在 IPC 重推导，也未改 gate。前一次子宿主超时/四条提前失败均保留，不报基线或 flaky。其余 12 文件的 257 项已通过，不重复跑较宽集合。
 
 写通道行为文件最终完整一次 `bun test --max-concurrency 2 src/main/ext-write-channels.test.ts` exit 0，15 pass / 0 fail（含原 IPC 子宿主 26 pass），日志 `/tmp/plugin-standard-r2-writer-final.log`；合并此次已完成相关集合为 272 pass / 0 fail，非再次运行 13 文件。
+
+
+r2 实样收据（内容整包，不等同真实服务完整可用）：`bun /tmp/plugin-standard-r2-real.ts` exit 0，报告固定的 15 包均经过实际 captureFolder → prepareCapture → converter → SourceInstaller → 账本/generation 树回读，113/113 条本片 skill/MCP 记录；reload/activation 边界不执行第三方程序。结果 `/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/plugin-standard-r2-real-mCn3Ey/results.json`，日志 `/tmp/plugin-standard-r2-real.log`。版本、treeNodes 与暂不运行原因逐项在结果中。
+
+| 报告样本 | 整树提交 | skill/MCP 实装/预期 | 后续边界 |
+| --- | --- | --- | --- |
+| `codex:supabase` | PASS | 3/3 | hosted app 属规格排除 |
+| `codex:build-ios-apps` | PASS | 10/10 | 真实服务/工具链运行未验 |
+| `claude:plugin-dev` | PASS | 7/7 | 助手交片 3；命令交片 3 |
+| `claude:supabase` | PASS | 3/3 | 真实服务/工具链运行未验 |
+| `claude:cloudinary` | PASS | 8/8 | 真实服务/工具链运行未验 |
+| `claude:catalyst-by-zoho` | PASS | 17/17 | 命令交片 3；hook 交片 5 |
+| `claude:codspeed` | PASS | 3/3 | 真实服务/工具链运行未验 |
+| `claude:mintlify` | PASS | 3/3 | 真实服务/工具链运行未验 |
+| `claude:logfire` | PASS | 7/7 | 命令交片 3 |
+| `claude:project-artifact` | PASS | 1/1 | 真实服务/工具链运行未验 |
+| `claude:grafana-mcp` | PASS | 2/2 | 真实服务/工具链运行未验 |
+| `claude:langfuse-observability` | PASS | 0/0 | hook 交片 5；SessionEnd 定义诊断交片 5 |
+| `claude:rill` | PASS | 11/11 | 真实服务/工具链运行未验 |
+| `claude:cockroachdb` | PASS | 37/37 | 助手交片 3；hook 交片 5 |
+| `claude:sap-hana-cli` | PASS | 1/1 | 真实服务/工具链运行未验 |
+
+Langfuse 保留完整 root bundle、配置/脚本/hook 文件，0/0 不是空包拒收，也不声称 hook 已运行；其 `hooks/hooks.json` SessionEnd 的 invalid-definition 是已观察的后续 hook 兼容项，交片 5，不在本片修复。Rill、CockroachDB、SAP 的本机/程序依赖没有成为内容准入条件；没有启动真实 Rill/Docker/Xcode/JBang/PHP 或第三方云授权。
+
+AC-05 一次性源密钥证据：`bun /tmp/plugin-standard-r2-secrets.ts` exit 0，在完整真实 SAP env 与 Cloudinary Authorization header 的临时副本中只填无效 canary；实际事务、CAS/树/配置/DTO 扫描与现有 credential guard 解引用。结果 `/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/plugin-source-secrets-BK2U9W/result.json`：两包 installedWhole/stored/runtimeMatches/originalRetained=true，persistentOutsideSecretStore=0，declarationLeaks=false；日志 `/tmp/plugin-standard-r2-secrets.log`。不输出或使用用户真实凭据。
+
+r2 删除反臂：提交干净基线后 `python3 /tmp/plugin-standard-r2-removal-arms.py` 顺序临时删除以下行为，每臂各运行具名一次，每次用 literal path 的 `git restore` 恢复，全部 exit 1（0 pass / 1 fail）；最终工作区没有 mutation。
+
+| 删除行为 / AC | 从包目录运行的具名命令 | 日志 |
+| --- | --- | --- |
+| 保存私有设置（AC-19/20） | ui-mac `bun test --max-concurrency 2 src/main/install-from-source.test.ts -t 'plugin service settings save typed values'` | `/tmp/plugin-standard-r2-arm-settings.log` |
+| 创建 DATA（AC-25） | ui-mac 同文件 `-t 'whole plugin removal deletes'` | `/tmp/plugin-standard-r2-arm-data.log` |
+| floatingVersion token 覆盖（AC-04） | ui-mac 同文件 `-t 'connector version selection preserves'` | `/tmp/plugin-standard-r2-arm-version.log` |
+| 认证本机 HTTP 转发（AC-27/03） | ui-mac `bun test --max-concurrency 2 src/main/network-egress-proxy.test.ts -t 'plugin loopback HTTP requires'` | `/tmp/plugin-standard-r2-arm-http.log` |
+| 连接实例私有 Fetch（AC-27/03） | core `bun test --max-concurrency 2 test/codepuppy-mcp-runtime.test.ts -t 'plugin local MCP uses its private proxy'` | `/tmp/plugin-standard-r2-arm-fetch.log` |
+| 别名到原权限 identity 的映射（§4.8） | ext `bun test --max-concurrency 2 src/plugin-host.test.ts -t 'long plugin MCP names'`；此前恢复无映射版本的真实反臂已执行，不重复 | `/tmp/plugin-standard-r2-alias-policy-red.log` |
+
+测试落点偏离：原计划新建 config/data 测试模块，本轮按最低真实层把这些用例放入既有 `install-from-source.test.ts`，DOM 放既有 account-dialog cases，主机身份/原 executor 放既有 plugin-host，不增加一次性回放到日常 suite。core 的 HTTP runtime 证据只跑本次具名 case，没有运行该文件已有容量/重试计时用例。最终消息 DTO 文件 `bun test --max-concurrency 2 src/main/codepuppy-sidecar-messages.test.ts` 15 pass / 0 fail；不重跑已命名原因的 server 基线红例。
+
+r2 静态收口：三个包各 `bun typecheck` exit 0；两 generator `--check` exit 0；36 个实际改动非生成生产模块＋两个手写合同模块 scoped oxlint 均 0 warnings / 0 errors。host artifact aggregate=`9094c2712f8ec5901bf5976ee914ab5a4a6874fa4932317a7881b2c553eb188f`（19 文件摘要见同提交的 artifact JSON），交 alpha-web 消费/重 pin，未声明 W 已消费或公开发布。Alpha 单仓临时 profile 的 `check-docs-contract --changed-since ddb1fc34d3 --format json` 仍 exit 1，71 errors / 251 warnings，plan 的两条旧 unknown-id 保持；`python3 scripts/check-doc-links.py docs/specs/local-plugin-install/plan.md` 8 links PASS；`git diff --check` PASS，hooksPath=`.githooks`。本片累计 38 个手写生产/合同文件，942 行新增/233 行删除（相对 accepted plan commit，不含测试/生成物）；r2 14:31–15:51 约 80 分钟，未超原估算。
+
+交接：依据 spec v5/design v3、accepted plan `ddb1fc34d3` 与 r1 S4-A/B/r2 续派；Codex / GPT-6 已核内容、配置、DATA、别名及 HTTP 独立部分，结论 **PARTIAL**。显式 SSE 等 designer v3.1；AC-13/14 内容完成/初始运行投影接缝交编排器定点续派；真实云/本机工具链验收交集成；SessionEnd/命令/助手交片 5/3；server 旧断言及 docs 基线交编排器，当前不修。已定的 provider、唯一 builder/身份/秘密/出网权威不重开；无额外 OPTIONAL、迁移、依赖或 gate 变更。所有命令前台收完，仅 commit，未推送/PR/merge/启动应用。

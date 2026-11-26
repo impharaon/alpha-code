@@ -43,6 +43,10 @@ type Whisper = {
   }>
 }
 
+export function chunkLanguage(speech: readonly {start:number;end:number}[], start:number,end:number, identify:()=>string): string | undefined {
+  return identify()
+}
+
 async function recognize() {
   const input = workerData as {
     sourceId: string
@@ -155,7 +159,7 @@ async function recognize() {
       block.set(samples.subarray(start, end))
       const stream = lid.createStream()
       stream.acceptWaveform({ samples: block, sampleRate: SAMPLE_RATE })
-      const language = (() => {
+      const language = chunkLanguage(speech,start,end,() => {
         try {
           const code = new Intl.Locale(lid.compute(stream).replaceAll("_", "-")).baseName
           if (code !== "und") return code
@@ -171,7 +175,7 @@ async function recognize() {
         const code = new Intl.Locale(lid.compute(retry).replaceAll("_", "-")).baseName
         if (code === "und") throw new Error(`Local language identification failed (SenseVoice language: ${detected})`)
         return code
-      })()
+      })
       const offset = Math.round((start / SAMPLE_RATE) * 1000) + input.audio.offsetMs
       const tail = Math.round((end / SAMPLE_RATE) * 1000) + input.audio.offsetMs
       if (["zh", "en", "ja", "ko", "yue"].includes(language.split("-")[0]!)) {

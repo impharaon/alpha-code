@@ -4,13 +4,17 @@ title: 连接器启动器与失败处理 技术设计
 summary: 统一连接器启动器与固定文件准备；v2 接纳两平台文档 Node 读取及受管第一方 MCP 的运行期按 ID 准备，核验声明身份与逐调用进度归属。
 kind: tech-design
 status: frozen
-version: "2.1"
+version: "2.2"
 spec: SPEC-connector-launchers
 spec_version: 1
 review:
   rounds: 0
   reviewed_sha: ""
-  verdict: "pending; v2.1 trusted Node command-template increment awaits independent review"
+  verdict: "not-required; v2.2 reuses v2.1 host-only command-slot expansion per orchestrator r6"
+  v2_1: # 基线原字段归档；最终独立 R1 裁决保留于 v2.1 §10
+    rounds: 0
+    reviewed_sha: ""
+    verdict: "pending; v2.1 trusted Node command-template increment awaits independent review"
   v2:
     rounds: 1
     reviewed_sha: 4d2b78d16b
@@ -25,7 +29,7 @@ last_reviewed: 2026-11-26
 
 # DESIGN-connector-launchers｜连接器启动器与失败处理 技术设计
 
-版本适用：以下 v1 正文与 R1 收据保持冻结，基线为 #1766 合入提交 `173122a8e955f97d830fe53fccd3400d079d9488`；文末 v2 增量仅替代其明确点名的条款，状态为 **frozen**，已按本增量 R1 与 owner 平台澄清修正，收据见文末 §10。 v2 已合入 `f7424aa45225a6d02d1958f4b4f72d247f99acc4`；文末 v2.1 仅补充可信 Node 命令槽及启动前准备，状态 **frozen**，v1/v2 正文和审查收据保留为各自版本的冻结基线。
+版本适用：以下 v1 正文与 R1 收据保持冻结，基线为 #1766 合入提交 `173122a8e955f97d830fe53fccd3400d079d9488`；文末 v2 增量仅替代其明确点名的条款，状态为 **frozen**，已按本增量 R1 与 owner 平台澄清修正，收据见文末 §10。 v2 已合入 `f7424aa45225a6d02d1958f4b4f72d247f99acc4`；文末 v2.1 仅补充可信 Node 命令槽及启动前准备，状态 **frozen**，v1/v2 正文和审查收据保留为各自版本的冻结基线。 v2.1 最终 R1 裁决见其 §10；文末 v2.2 仅补第一方持久缓存根的同一命令槽投影，状态 **frozen**，历史正文与裁决继续保留。
 
 本文按编排器对独立审查 R1 的「ALL ACCEPTED；修正后冻结」指令完成修正并冻结。规格的体验约定直接消费，不增加页面或设计稿；文件改动、实施顺序和具体用例归后续 plan.md。
 
@@ -763,3 +767,92 @@ K1/K2 不变：Node 路径、签名和准备由 launcher authority 持有；模�
 **本轮验证回执**：v1/v2 正文逐字保留核对通过（版本适用说明除外），当前增量状态及历史审查收据核对通过；ui-mac 的 `bun test src/main/old-name-scan.test.ts` exit 0（10 pass / 0 fail，2347 assertions），`git diff --check` exit 0。官方文档检查函数对本文 0 finding，仓级另有 69 errors / 253 warnings，均在本轮未改范围，不顺修；依本轮只提交 design.md 的指令未改索引或任何实现。新槽及真实启动行为仍未实施验证。
 
 **v2.1 审查与编排器裁决（2026-11-26）**：独立审查 R1（Claude Opus 5.5，只读）结论 MERGE，1 Minor。处置：已写入配置的首方条目，其 command 首项（Node 路径）由开机对账用同一 `expandFirstPartyCommand` 重锚到本代 `launchers.node`，沿用 Office 的既有先例（`codepuppy-office-instance.ts:117-124` reanchorOfficeCommand；`ext-mcp-policy.ts:47-50`「Boot reconciliation owns migrating already-installed entries」）。这是应用自身条目随版本保持可用，不是旧版本兼容。实施注意：`ext/src/policy/identity.ts:136` 的 evidenceDigest 散列已展开的 command，Node pin 变化会使它变化，实施时确认没有按它持久化的状态因此失效。v2.1 状态：frozen。
+
+# v2.2 增量｜第一方持久缓存根
+
+## 1. v2.2 基线与边界
+
+继承原 §1 的批准规格及 v2.1 冻结契约（合入 `a586b16fca`，含末尾 R1 裁决）；本轮代码/文档基线 `46f8580c95a47e4a03ea128d99b405edd3424e6e`。输入为 #1775 D3 的 `a3a6f2bd11f4f1c1f72e456e7781a9478c8784bc`、`docs/specs/video-understanding/plan.md:215-240`；只决定独立进程如何取得宿主派生的持久 cacheRoot，不改变 L1、缓存内容协议、环境规则、平台或原 AC。文档影响为同一设计的契约增量，仅提交本文。
+
+## 2. v2.2 地面真相
+
+- 消费端 `packages/ui-mac/src/shared/video-service.ts:1` 的命令只有 Node/server.js/workspace；`resources/video-mcp/server.ts:38-39` 直接连接 stdio，`runtime.ts:5-15` 需要 cacheRoot。父进程 bootstrap 的内存槽不能自动进入该进程；v2 的文件方法只返回 `{id,path}`，不能据此反推应用路径。依据为上述固定 #1775 提交。
+- 视频设计 `docs/specs/video-understanding/design.md:350-354`（协调仓 `58772f7d87e59a4d865476c3825f0cc5eb40b3a5`）要求 launcher/userData 派生、跨项目/会话持久的本机缓存；内容/配方键与原子发布归视频服务，不是本增量的新机制。
+- Mac profile 的 W3 是 `(subpath userDataPath)`（`process-fence-profile.ts:59,238`）；末尾配置拒写集由 `configFenceLocations:122-157` 提供。`<userData>/connector-runtime/first-party-cache/…` 在 W3 内，且不落受保护配置/凭据位置，无须新增可写行。v1 的 Windows `fenced=false` 边界保持，不把原生文件权限等同于 Mac 围栏。
+
+**本轮小探针**：临时目录内 Bun 脚本调用真实 renderProcessFenceProfile、configFenceLocations、processFenceWriteRules、processFenceRulesCover（`:215,122,364,403`），路径入参复用现有 `process-fence-profile.test.ts:40-48`；核对候选目录、受保护配置及将其 W3 指向别处的对照，输出 `{"cacheCovered":true,"protectedConfigCovered":false,"cacheCoveredWithoutItsW3":false}`，exit 0。只在临时目录写脚本，没有在样例路径写文件；这是生产 profile 的静态规则证据，尚非内核围栏下的实际进程写入证明。
+
+## 4. v2.2 接口契约
+
+### 4.1 位置与生命周期
+
+**选择同一命令展开器的专用参数槽 `{codepuppyCacheRoot}`。** main 在已有 LauncherEnvironment 增补 `firstPartyCacheRoots: Readonly<Record<string, string>>`，仍由本代 bootstrap.launchers 结构化克隆交 core/ext。map 的 key 是**受保护 Manifest.formats 的稳定条目 ID**，不是用户可改的 MCP 配置键、server 自报名称、项目或会话 ID；仅为声明含此槽的条目投影。目录为：
+
+```text
+<LauncherEnvironment.runtimeRoot>/first-party-cache/<declarationId>/
+= <userData>/connector-runtime/first-party-cache/<declarationId>/
+```
+
+本增量在 v1 §4.3 的 runtimeRoot 收纳范围中加入这个持久子树。main 用既有 userData/launcher 位置 authority 派生真实绝对路径，目录段常量归既有 USER_DATA_LAYOUT；受保护条目 ID 必须是单一路径段，目标须留在该缓存父根内。此为随包 producer 的校验，不增加用户字段。core/ext 只消费 map 中的成品路径，不另拼 HOME/XDG、资源路径或 assets 布局；map 不从 MCP params、entry、renderer 或 workspace 文件接收。main 重验始终读取自己的同代 map。
+
+该根不含 app 版本、pinSet、声明/配方摘要或运行代号，稳定条目 ID 跨升级保持，应用重启、更新和会话/项目切换均复用；停用或停止进程不删除它。清除应用数据时随 userData 一并移除；内容失效键继续归视频设计 §5，不增加 TTL、容量帽或自动淘汰政策。缓存不放进 pin 资产更新/准备临时目录的清理范围。
+
+### 4.2 同一展开、精确身份与进程入口
+
+在 v2.1 的同一 expander/matcher 末尾增补必填 `declarationId: string`，该值由调用方选择的受保护条目提供；声明者遍历 Manifest.formats 时取当前候选的 key，不使用 `_name` 或配置键选缓存根：
+
+```ts
+declare function expandFirstPartyCommand(
+  template: readonly string[], resources: string,
+  launchers: LauncherEnvironment, declarationId: string,
+): string[]
+declare function commandMatchesTemplate(
+  template: readonly string[], command: readonly unknown[], resources: string,
+  launchers: LauncherEnvironment, declarationId: string,
+): boolean
+// 视频条目向实际独立进程传参，workspace 仍为原来的服务参数：
+// ["{codepuppyNode}", "{codepuppyResources}/video-mcp/server.js", "{workspace}",
+//  "--cache-root", "{codepuppyCacheRoot}"]
+```
+
+新槽只可独占一个**非首项 argv 参数**，精确展开为 `launchers.firstPartyCacheRoots[declarationId]`；不支持拼接/路径后缀，不成为可执行文件、environment/cwd 的语法或 workspace 通配。main 的配置投影、应用自有条目的开机重锚、core/ext 的身份判定及 main 的 binding 重验均调用同一展开器，主进程与 sidecar 用各自受信的同代 map；声明者既有参数/输出不再增加另一份上下文。
+
+matcher 对展开后的缓存参数逐字比较，type、其余 command、environment 键和值及 cwd 仍按 v2 R1 精确核验。调用者增改缓存路径或其它配置不得借此获得首方声明/handler，仍按普通服务器运行；不得先把任意调用者的路径改成宿主根再认首方。缺 map/key 或非法受保护槽是内部接线/清单错误，交既有 unknown 诊断，不猜一个默认路径。声明摘要仍散列含槽的原始模板，recipe 摘要及 L1 的 `{ids}` / `{id,path}` 不变；不额外授予文件访问权。
+
+独立视频入口从 argv 的 `--cache-root` 原值绑定 VideoRuntime.cacheRoot；它不 import 父进程 bootstrap、不再解析槽、不反推或接受工具调用提供的根。目录尚未创建不影响首方声明；进程在既有 Environment.spawner 继承的围栏下按需递归创建该目录，写临时件与最终缓存都留在其内。创建/写入失败沿消费者既有磁盘错误归因，准备取消及发布规则保持原样，不借 main 绕过围栏写媒体结果。Node 自身的 preparing/resolveAssets 仍沿 v2.1，不为缓存另加下载或握手阶段。
+
+## 5. v2.2 数据与失败
+
+只有路径描述与 argv 交付，无迁移、兼容分支、新用户配置或新 RPC。缓存数据、并发写入与内容 ready 的唯一写者仍是视频本机服务；D5 的云派发记录仍由其原 authority 持有，不迁入本根。磁盘/取消失败不能伪造成功结果；目录生命周期不随一次调用结束。
+
+## 6. v2.2 架构与接缝映射
+
+| 能力 | 既有 authority / 本次明确 raise |
+| --- | --- |
+| 宿主派生与发布缓存路径 | v1 的 LauncherEnvironment/runtimeRoot、USER_DATA_LAYOUT（main `user-data-layout.ts:4`）、publishCodePuppyBootstrap/codepuppyBootstrap；**V22-R1** 增补上述 map、同一 bootstrap 校验与 main 投影，不新建路径服务 |
+| 参数展开与首方重验 | v2.1 V21-R1 的 expandFirstPartyCommand/commandMatchesTemplate，v2 V2-R4 声明者/identity 与 main binding 重验；**V22-R2** 加 declarationId 和本槽，消费受保护条目，不复制展开/匹配逻辑 |
+| 独立进程实际读取和写入 | #1775 的 VIDEO_SERVICE_COMMAND、server.ts stdio 入口与 VideoRuntime.cacheRoot；**消费者 D3** 接上述 argv 并按需 mkdir；沿现有 Environment.spawner 和 W3，无新增围栏放行或 main 代写 |
+
+K1/K2 不变；未新增包、下载器、包管理器、运行上下文 RPC 或身份权威。
+
+## 8. v2.2 所有权与交接
+
+#1760 提供 V22-R1/R2；#1775 D3 提供受保护条目的参数、真实入口读取及持久结果使用，引用下述回执更新其计划。D1/D3 不自行派生应用路径或扩 L1。#1761 的文档环境继续沿原只读面取 Node，不因本槽改其缓存或环境；其它能力不重开。本轮只提交本文。
+
+## 9. v2.2 回滚
+
+不适用。无不可逆数据改变；应用数据清除自然删除该根，不引入旧记录迁移。
+
+## 10. v2.2 裁决与接收回执
+
+| 接收回执 | 决定 | 依据 / 状态 |
+| --- | --- | --- |
+| **FIRST-PARTY-CACHE-v2.2** | **接受** #1775 D3：用 `{codepuppyCacheRoot}` 经同一宿主 expander 交付按受保护服务条目隔离的持久根；argv 精确身份匹配，跨升级/会话复用，清应用数据时移除 | v2.2 §4/§6 V22-R1/R2；与 FIRST-PARTY-NODE-v2.1、VIDEO-L1-v2 一并引用。**frozen**；依据本轮编排器指令，复用 v2.1 槽机制，review 为 not-required，无新增独立审查轮次 |
+
+**裁决理由**：选择已有同代 bootstrap → 展开器 → 精确 matcher → argv 的机制，不新增“只读视频运行上下文”RPC。参数槽保留显式 environment/cwd 的严格规则；不借 workspace 通配或退役路径变量，也不改变固定文件方法。新增目录复用现有 W3，无须新权限决定。v2.1 历史 frontmatter 字段原样归档于 review.v2_1，其最终 R1/编排器裁决仍以 v2.1 §10 的追加回执为准。
+
+**传播核对**：#1775 固定 `a3a6f2bd11` 的计划执行 `rg -n 'cacheRoot|codepuppyCache|VIDEO_SERVICE_COMMAND'`，命中 `:226,228,233,302`，缺口与此回执一一对应；消费者的 command/server/runtime 接本槽，旧“无载体”的假设由此替代。协调仓视频设计 `58772f7d87` 的 `rg -n 'cacheRoot|缓存根'` 命中 `:195,350`，根的 host 派生与跨项目持久要求保持；当前基线文档设计 `docs/specs/document-output-quality/design.md` 的 `rg -n 'codepuppyCacheRoot|firstPartyCacheRoots|cacheRoot'` 为 0 hits，没有此根的依赖，不改其原 DOC-NODE-v2 契约。
+
+**作者回执**：Codex / GPT-6；依据为本轮输入、v2.1 已审槽机制、W3/拒写行与可失败的规则探针。没有待 owner 决策。真实 MCP 进程取得参数、跨升级重用、Mac 内核围栏下写入和 Windows 产物尚未验证，留作实施集成证据；不能把规则覆盖探针当作这些断言已通过。
+
+**本轮验证回执**：v1/v2/v2.1 正文逐字保留（版本适用说明除外），历史审查字段和 v2.2 frozen/not-required 核对通过。ui-mac 的 `bun test src/main/old-name-scan.test.ts` exit 0（10 pass / 0 fail，2347 assertions），`git diff --check` exit 0；官方文档检查函数对本文 0 finding，仓级另有 69 errors / 253 warnings，均在本轮未改范围，未顺修。按指令仅改 design.md，未改索引、实现或消费者产物。

@@ -950,7 +950,7 @@ A1 启动投影：真实 engine 红测（`gate slot -- bun test --max-concurrenc
 main 的启动注入只对 pluginTree 所属 MCP 放原中和条目；ext 保留这种关闭，同时保留 main 后续 bound override 的 enabled 状态，不挡原连接器重连。ready 与成功重载继续用原 convergence，运行配置绑定不写回磁盘模板。此修正未增加 engine takeover/公开 DTO。必要同链 `engine-cases.test.ts` 的宿主精确条数 7→8、modules 当前运行边界同提交更新；engine case 的字面路径由原宿主选择，未扩大每 PR 全局声明。下一步完整 engine 文件经同一 gate slot 收口。
 
 
-A1 完整 engine 文件初次为 6 pass / 2 fail（`/tmp/plugin-standard-r10-A1-engine-green.log`）：新冷启动回归通过，两个原非插件包换代用例在 ready 的全包重收敛下失败。ready 的授权对象是 pluginTree，故现有 callback 增加私有 phase 域（engine-ready/reload），前者只选 pluginTree、后者仍按原 items/全包语义；不改变状态 writer 或公开协议。该同链 `ext-ipc.ts` 的选图条件是必要消费者，未给非插件包新增冷启动动作。
+A1 完整 engine 文件初次为 6 pass / 2 fail（`/tmp/plugin-standard-r10-A1-engine-green.log`）：新冷启动回归通过，两个原非插件包换代用例失败（随后 r9 基线复验也复现，不能归因于本轮 ready 动作）。ready 的授权对象是 pluginTree，故现有 callback 增加私有 phase 域（engine-ready/reload），前者只选 pluginTree、后者仍按原 items/全包语义；不改变状态 writer 或公开协议。该同链 `ext-ipc.ts` 的选图条件是必要消费者，未给非插件包新增冷启动动作。
 
 
 A2：4defc86a9f 的原位回归先红 0 pass / 1 fail（`bun test --max-concurrency 2 src/shared/host-extension-package-contract/plugin-conversion.test.ts -t "real skill bodies retain"`，`/tmp/plugin-standard-r10-A2-red.log`）。固定 build-ios-apps 的原 ios-ettrace-performance / ios-memgraph-leaks SKILL.md 逐字比对，仅包路径可绑定；`${RUN_DIR:-}`、`${TMPDIR:-/tmp}` 与普通环境引用保留源文字，环境已设置也不注入正文。现有 pluginText 增加 process/instruction 的域参数，所有指令正文与 prompt handler 选择后者，进程字段的环境算法不改；同一 parser/renderer 仍唯一。完整 converter 文件 41 pass / 0 fail（`/tmp/plugin-standard-r10-A2-green.log`），fast、原位 imports 可追踪；条数表旧 31 同步实际 41。CONTRACT 与生成 converter/artifact 同提交；没有新运行选项、公开模型字段、依赖或 engine takeover。
@@ -961,3 +961,33 @@ A3：9f4c0cdbed 的真实私有代理＋MCP SDK 回归先红（0 pass / 1 fail�
 A3 迭代纠正：未提交的 util→schema 导入试改违反实际包依赖，已完全恢复 util 文件，解析留在已有 core client；没有加依赖或相对路径绕过。e4f1576a55 仅将测试类型 guard 从错误的缩写 tag 改为真实 exported ConnectError 类，原行为断言不改。该试改期间排队的 A1 完整回归进入槽而被 import 失败中断（`/tmp/plugin-standard-r10-A1-engine-green-final.log`），不计为产品/基线失败；提交后重跑，不再边排队边改其生产依赖。
 
 A3 最终相关私有代理三例（`bun test --max-concurrency 2 src/main/network-egress-proxy.test.ts -t "plugin loopback|plugin CONNECT"`）3 pass / 0 fail，`/tmp/plugin-standard-r10-A3-green-complete.log`；原 schema 文件 21 pass / 0 fail，`/tmp/plugin-standard-r10-A3-prefix-green.log`。代理文件既有容量/计时场景不在本轮授权，不运行；新增用例位于原文件，imports 可追踪，有限本地 SDK integration。必要同链文件是 schema 的唯一原因解释、core client/既有 startup helper、renderer 现有原因函数和三个调用点以及双语文案；client takeover 增量与具名证据在原 plugin-mcp-transport registry 同提交登记，未新增 takeover 文件。gate-files 旧 24 同步实际 27。
+
+
+### r10 部分交付收口
+
+截至产品提交 `11e8383c82`，A1/A2/A3 已修正，未开始 A4–A9、B3/B4/B6/B7/B8 或片 5 剩余运行接线；本轮按执行预算返回 **PARTIAL**，没有新增待裁决设计问题。起于 20:47，收口约 21:35 UTC+08:00（约 48 分钟）。后续继续 r10 指定顺序，不将 r9 基础 hook/monitor 层当完整运行验收。
+
+A1 的具名 engine 正向与移除验证均实际经过同一共享槽：`gate slot -- python3 /tmp/plugin-standard-r10-removal.py` exit 0，其中包内 `bun test --max-concurrency 2 --timeout 180000 ./src/main/package-hub-lifecycle.engine.cases.ts -t "cold engine generations"` **1 pass / 0 fail**（`/tmp/plugin-standard-r10-A1-named-green.log`）。8 个移除反臂各 **0 pass / 1 fail**：ready 绑定、main 启动中和、ext 保持关闭、正文不展开环境、代理 dial prefix、schema prefix、网络层优先级、本机服务文案。日志 `/tmp/plugin-standard-r10-removal.log`、结构化清单 `/tmp/plugin-standard-r10-removal-results.json`；每臂只改具名生产行为，scoped git restore 后字节与提交一致，未以生成物 drift 代替业务失败。
+
+完整 engine 文件当前 **6 pass / 2 fail**（`/tmp/plugin-standard-r10-A1-engine-complete.log`）。按 delivery-ship Gate failure 规则做唯一一次 r9 基线复验：把本轮自己改变的文件临时置回 `1a6c7e1ac4` 原字节，在 gate slot 跑原文件，**5 pass / 同 2 fail**，最后恢复并验证当前全部字节一致（`/tmp/plugin-standard-r10-A1-r9-baseline.log`，`/tmp/plugin-standard-r10-A1-baseline.py`）。这证明两项早于 r10，**不声称 origin/alpha 也失败，不声称 flaky**：
+
+- `packages/ui-mac/src/main/package-hub-lifecycle.engine.cases.ts:481` — `removing a package whose remote connector is in the engine launch config leaves no live connector`，`removal reload reported` 未到达；r9 基线对应 :479。
+- `packages/ui-mac/src/main/package-hub-lifecycle.engine.cases.ts:498` — `cloud-only package switch withdraws and restores real engine tools`，`enabled cloud package connected` 未到达；r9 基线对应 :496。
+
+上述两个观察转本 #1776 片 5 运行链继续处理（fix now），没有改断言、等待期限或全仓调查。A1 新回归在两次完整当前运行及独立具名运行均通过，正向与三条必要移除臂已闭合；先前把两项失败与全包 ready 动作关联的假设已被基线证据否定。phase 仍只表达本轮授权的 pluginTree ready 域，普通 reload 保留原语义。
+
+最终当前相关集合共 **380 pass / 2 个上述 r9 基线 fail**（17 个测试文件，重复运行不累加）：
+
+- 较宽集合 **307 pass**：`/tmp/plugin-standard-r10-related-results.json` 中逐项命令；UI 的 injection 28、reload 12、activation 2、wiring 4、server-derivation 6、FakeChild server 52、artifact 11、envelope 106；Ext host 66、registry 5；Core `test/mcp.test.ts -t "query fallback|codemode"` 11、原 runtime 文件四个缺依赖/401/503/本地 stderr 原因与脱敏用例 4。没有运行 runtime 文件的容量、重试测量或计时场景。
+- Converter 41（A2）、Schema 原网络原因文件 21、私有代理相关三例 3（A3）、i18n 的键集合/缺值 fallback 两例 2（`/tmp/plugin-standard-r10-locales.log`），加 engine 当前 6；A1 单独 1 pass 与 ready 初次 12 pass 不重复计入。
+- 较宽 wiring 初次在 Electron 包的路径解析触发 binary 下载而未进入任何 case，有界结束本车道的 Bun（exit -15，`/tmp/plugin-standard-r10-related-ui-3.log`）。`bin/setup` exit 0，frozen-lockfile 检查 2173 installs/no changes，二进制与 addon 就绪；只复验同一文件 **4 pass / 0 fail**（`/tmp/plugin-standard-r10-wiring-prepared.log`）。只解析/安装二进制路径，实际 fork 全由 RecordingChild 替代；未启动应用或 Electron。hooksPath 仍 `.githooks`，无依赖/锁文件变更。
+
+本轮改变测试文件恰为 6 个：`packages/schema/test/codepuppy-net-failure.test.ts`；`packages/ui-mac/src/main/{engine-cases.test.ts,network-egress-proxy.test.ts,package-hub-lifecycle.engine.cases.ts,reload-coordinator.test.ts}`；`packages/ui-mac/src/shared/host-extension-package-contract/plugin-conversion.test.ts`。engine-cases 只同步所改内部文件的宿主计数 7→8，没有运行全部宿主/engine 层；测试仍由已有 imports、宿主字面路径和 `.gate-tests` 选择。
+
+类型检查：core、schema、ui-mac、ext 包内 `bun typecheck` 均 exit 0；日志 `/tmp/plugin-standard-r10-A3-{core,schema,ui}-types.log`、`/tmp/plugin-standard-r10-A1-ext-types.log`（core 2,059 files）。converter --check 与 artifact --check（20 files）均 exit 0。单仓 docs-contract **71 errors / 250 warnings**，保持既有基线与两项已接受 plan unknown-id（`/tmp/plugin-standard-r10-docs.json`）；没有削弱检查。`affected-tests --list` exit 0：**all tests: scripts/gate-files.tsv changed (gate or declared global input)**，列 **678 个 PR 文件**（`/tmp/plugin-standard-r10-affected{,-scope}.txt`）；没有依清单运行全套，没有改选择器或全局输入。旧三条 command-subagent 断言未改/未复跑，其文件仍不在清单。
+
+实样边界：继承 accepted 15/15 整树安装；本轮新增的 Grafana 原 userConfig/env 声明仅把 Docker 换为临时树 echo，真实主进程 IPC、选项秘密存储、冷启动 ROOT/DATA 绑定通过，不冒称 Grafana SaaS/Docker 验收。build-ios-apps 的原 ios-ettrace-performance 与 ios-memgraph-leaks 两份 SKILL.md 渲染逐字通过。Rill 身份仅用于本机代理拒连和权限边界测试，未声称启动真实 Rill；其余 SaaS/工具链及片 5 七包的运行验收未补。
+
+Host artifact aggregate 再变为 **38d198d344f7c858959ec9a5ff7dbdfe768eea940cd4cc8aa934347f0934761f**。本轮相对 r9 只改变 artifact 成员 `CONTRACT.md`、`plugin-package.ts`、`plugin-conversion.mjs`，以及 `host-extension-package-artifact.v1.json` 清单（共同前缀同 r9）；`plugin-conversion.ts` 为生成源。相对 `1db6a3bbf5` 的累计成员仍为 r9 收口列出的恰 9 项，没有新增成员，精确清单另见 `/tmp/plugin-standard-r10-host-artifact.json`。consumer pin/vendor 未动，checkpoint 交编排器。
+
+遗留去向：A4–A9、B3/B4/B6/B7/B8、片 5 剩余运行行为与上述两条 r9 失败继续本车道 fix now；跨仓 checkpoint 交编排器；docs 与三条旧模型断言沿原归属。后续 A5 应注意本分支 `plugin-source-timing.ts` 的 REQUEST 实值为 10 分钟，不能把替换 30 秒误报为缩短；r9 已允许的非阻塞分支尚未实现。本轮无新迁移、新依赖、公开 DTO、ARCH 或 OPTIONAL。已核 Codex（GPT-6），A1–A3 具名证据通过，整体 PARTIAL；已定的单一绑定/allow-set/SSE 合同不重开。

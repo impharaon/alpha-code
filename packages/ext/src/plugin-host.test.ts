@@ -2440,3 +2440,42 @@ packageIt.live("a real Ralph Stop continuation retains invocation permissions un
   yield* snapshot.execute({ sessionID: parent.id, agent: "build" as never, messageID: "msg_ralph_after" as never, call: { type: "tool-call", name: "write", id: "call_ralph_after", input: { path: "ralph-scope.txt", content: "after task" } } })
   expect(readFileSync(join(location.directory, "ralph-scope.txt"), "utf8")).toBe("after task")
 })))
+
+
+packageIt.live("dash0 failure hooks receive actual tool and execution failures without a Stop recovery", () => packageJourney(Effect.gen(function* () {
+  const capture = yield* Effect.promise(() => captureStandardFixture("claude:dash0"))
+  const hooks = JSON.parse(new TextDecoder().decode(yield* Effect.promise(() => capture.readFile("claude/hooks.json"))))
+  for (const groups of Object.values(hooks.hooks) as { hooks: { command: string; args?: string[] }[] }[][]) for (const group of groups) for (const handler of group.hooks) {
+    handler.command = process.execPath
+    handler.args = ["-e", "const fs=require('node:fs');const input=await Bun.stdin.json();fs.appendFileSync('failure-hook-events.jsonl',JSON.stringify(input)+'\\n')"]
+  }
+  const sample = yield* invocationSample("claude:dash0", { "claude/hooks.json": JSON.stringify(hooks) })
+  const membership = JSON.parse(readFileSync(join(sample.root, "skills-enabled.json"), "utf8"))
+  writeFileSync(join(sample.root, "skills-enabled.json"), JSON.stringify({ ...membership, keys: [...membership.keys, sample.key] }))
+  yield* invocationNativeServices
+  yield* activateExtUntilFinished
+  const sessions = yield* Sessions.Service
+  const location = yield* Location.Service
+  const parent = yield* sessions.create({ location: { directory: location.directory }, title: "Tool failure", agent: "build", model: { providerID: "test", id: "picked" } } as never)
+  const llm = yield* TestLLM.Test
+  yield* llm.push(TestLLM.toolCall("call_failed_write", "write", { path: "failed.ts" }), TestLLM.text("Tool failure received", "failure-feedback"))
+  yield* sessions.prompt({ sessionID: parent.id, text: "Attempt an invalid write" })
+  yield* sessions.wait(parent.id)
+  const events = () => readFileSync(join(location.directory, "failure-hook-events.jsonl"), "utf8").trim().split("\n").map(line => JSON.parse(line))
+  const tools = events().filter(event => event.hook_event_name === "PostToolUseFailure")
+  expect(tools).toHaveLength(1)
+  expect(tools[0]).toMatchObject({ tool_name: "Write", tool_use_id: "call_failed_write", is_interrupt: false })
+  expect(tools[0].error).toContain("content")
+  const broken = yield* sessions.create({ location: { directory: location.directory }, title: "Provider failure", agent: "build", model: { providerID: "test", id: "picked" } } as never)
+  const { AIError, InvalidRequestError } = yield* Effect.promise(() => import("../../ai/src/schema/errors"))
+  yield* llm.push(TestLLM.failAfter(new AIError({ reason: new InvalidRequestError({ message: "fixture provider rejection" }) })))
+  yield* sessions.prompt({ sessionID: broken.id, text: "Produce a provider rejection" })
+  yield* sessions.wait(broken.id).pipe(Effect.exit)
+  for (let waited = 0; waited < 3000 && !events().some(event => event.hook_event_name === "StopFailure"); waited += 10) yield* Effect.sleep("10 millis")
+  const failed = events().filter(event => event.hook_event_name === "StopFailure")
+  expect(failed).toHaveLength(1)
+  expect(failed[0]).toMatchObject({ session_id: broken.id, error_details: "fixture provider rejection" })
+  expect(typeof failed[0].error).toBe("string")
+  expect(events().filter(event => event.session_id === broken.id && event.hook_event_name === "Stop")).toHaveLength(0)
+  expect(yield* llm.requests()).toHaveLength(3)
+})))

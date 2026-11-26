@@ -32,6 +32,8 @@ export function createSecretFiles(roots: ProtectedFiles.ProtectedRoots) {
   const files = new Map<string, string>()
   const retained = new Map<string, Uint8Array>()
   let pending: Promise<void> | undefined
+  let requested = 0
+  let completed = 0
   let disposed = false
   const remember = (values: readonly Uint8Array[]) => {
     if (disposed) return
@@ -128,11 +130,14 @@ export function createSecretFiles(roots: ProtectedFiles.ProtectedRoots) {
     values: () => [...retained.values()],
     refresh: async () => {
       if (disposed) throw new Error("Secret files released")
-      if (!pending)
-        pending = scan().finally(() => {
-          pending = undefined
-        })
-      await pending
+      const generation = ++requested
+      while (completed < generation) {
+        if (!pending) {
+          const capturing = requested
+          pending = scan().then(() => { completed = capturing }).finally(() => { pending = undefined })
+        }
+        await pending
+      }
       if (disposed) throw new Error("Secret files released")
     },
     dispose: () => {

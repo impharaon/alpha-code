@@ -492,3 +492,52 @@ r8 开始于 2026-11-26 10:41:43 UTC。直达 `.cases.ts` 命令增加 `./`（�
 1 MiB fixture 原先紧接 `ESC ]` 打印随机 UUID，UUID 的数字/CSI-final 开头可被现成 `stripAnsi` 当作有效 ANSI 前缀消费，因此即使完整原值已不存在也不一定出现 `[REDACTED]`。一次只读正常化探针输出 `bareUuidSurvives=false, invalidPrefixPreservesUuid=true`，确认是新 fixture 的输入前提不稳定；改为现有 `secret-stream.test.ts` 已使用的 `ESC ]xxx` 后再接 UUID。保护、输出及当前 flush 断言完全保留，未改生产 normalizer/matcher。按计划的新版本重例规则，只重验这一改变输入的 1 MiB 行；没有重跑代码未变、已经 PASS 的正常一分钟，也没有再次跑整宿主。最终用完整宿主 47 行证据 + 修正后具名行补齐，明确保留整宿主首跑 exit 1。
 
 修正后 1 MiB：`gate slot -- bun test --max-concurrency 2 --timeout 90000 ./src/main/composer-tier-matrix.engine.cases.ts -t 'protected files invalid escape publishes streamed residue'`，exit 0，**1 pass / 0 fail / 18 expect**，5.76s；日志 `/tmp/secrets-r8-escape-green.log`。结合未改变的其它 47 行，48 个不同用例已通过；保留“整宿主首次检查不是 green”的验证限制。
+
+### ⑤最终验收收据（r8，darwin-arm64）
+
+已核：Codex / GPT-6 作者核对；没有新的设计决定、生产代码修正或文件范围扩张。第一个实现提交 `6e3ec00c81` 已填核对；fixture 修正 `d837106565`。本轮最终 diff 只有计划列出的三个文件；Core 基线对照及移除臂使用的临时源码改动全部恢复。
+
+命令缩写（均从 ui-mac 运行）：
+
+- **H**：`gate slot -- bun test --max-concurrency 2 src/main/engine-cases.scenario.test.ts -t '三档 × R1'`。exit 1；48 个子用例中 47 PASS、唯一无效 escape fixture 红；逐行事实如下。所有其它行没有改动；不以总命令 exit 1 否认其中已具名通过的行为，也不写成整宿主 green。
+- **F**：`gate slot -- bun test --max-concurrency 2 --timeout 90000 ./src/main/composer-tier-matrix.engine.cases.ts -t 'protected files invalid escape publishes streamed residue'`。修正输入后 exit 0，1 PASS。H 的其它 47 行 + F 的这一行 = **48 个不同用例 PASS，其中新增 18 行**。正常一分钟只跑 H 一次。
+- 额外低成本相关文件：`bun test --max-concurrency 2 src/main/gate-file-registry.test.ts` exit 0 / **25 PASS**；Core HEAD 整文件 **41 PASS**（同基线 23 红，见前节），不把 base 的 36 PASS 重复计入。
+
+| AC / 新增行 | 命名证据（均前缀 `protected files`） | 命令 / 实际结果 |
+| --- | --- | --- |
+| AC-01 / 3 | `read build`、`read ask`、`read readonly`；两次真实分页、变量名/端口、模型/记录/卡片、Asked=0 | H（整体 exit 1，三行均 PASS）；原值可见反臂 exit 1 |
+| AC-02 / 1 | `shell model records and card`；真 cat、最终 capture 文件/模型/记录/卡片 | H 该行 PASS；独立迭代同名行 PASS；原值可见反臂 exit 1 |
+| AC-03 / 1 | `restored env reaches local receiver`；原 write/edit/patch、重复键两个原 RHS、loopback HTTP 收到真实值/原文件 | H 该行 PASS；独立同名命令 exit 0 / 1 PASS（writers-green.log） |
+| AC-04 / 1 | `private key authenticates over SSH`；read/cat 不可见；实际临时 sshd 接受公钥，sftp 成功且 exit=0 | H 该行 PASS；独立迭代同名行 PASS；去 SSH 规则反臂原值可见 / exit 1。无机器前置项缺失，不碰 owner identity/config/agent |
+| AC-05 / 3 | `ordinary outside read build/ask/readonly`；分别 allow / Asked=1 后拒绝 / 原拒绝 | H 三行 PASS；旧 `/goal` 第一轮路径同步为 build allow，ask/readonly 限制仍有具名检查 |
+| AC-06 / 1 | `one rule reaches three consumers`；read 变量视图、工具普通结果、审批 risk `credential-path` | H 该行 PASS；临时只加 `vault.custom` 的联合正向臂 exit 0 / 1 PASS；分别移除 read/result/risk 的三臂均 exit 1 |
+| AC-07 / 0 | 继承① `protected paths follow platform semantics` 及 Windows-case 移除臂（schema 当时 exit 0 / 6 PASS，移除臂 exit 1） | 本轮不重跑已接受的基础行；win32-x64 真机 AC-01/02/04 在 Windows 包发布时 pending，darwin 不代签 Windows IO |
+| AC-08 / 4 | `capture failure start/chunk/end/io`；注入命中、进程副作用/exit=7、终态仅固定说明且 IO 无旧引用 | H 四行 PASS；独立该组 exit 0（连 Code Mode 共 5 PASS）；移除隐藏+原文 fallback 后原值可见 / exit 1 |
+| AC-09 / 1 | `minute live output`；命令结束前卡片 pending、磁盘 capture 与 Shell.output 都已有安全输出；结束后记录/模型安全 | H 该行 PASS，正常 60 秒一次；延迟 publish 到 end 的变异版在 `live minute card` 前置观察失败 / exit 1，finally 中断，不再跑满一分钟 |
+| AC-10 / 1 | `cloud fields keep ordinary values`；真实 AWS fixture 格式与 package.json；凭据遮盖而 `output = json`、region、数字、开关保留 | H 该行 PASS；整个 cloud 文件作为秘密的变异在 `output = json` 断言失败 / exit 1 |
+| SC-02 / 1 | `Code Mode results errors and cancelled progress` | H 该行 PASS；独立 closure 组 exit 0；原 r5 SC-02 低层移除臂继承，不重跑不相关集 |
+| v3.3 / 1 | `invalid escape publishes streamed residue`；1 MiB 未决段仅密文、无效序列在当前 flush 发布到实际文件/卡片 | H 原 fixture 红；F 修正为已有无效前缀后 exit 0 / 1 PASS，全部原断言保留 |
+
+### ⑤一次性移除臂
+
+脚本命令（repo 根）：`gate slot -- python3 /tmp/secrets-r8-arms.py` 与 `gate slot -- python3 /tmp/secrets-r8-arms-rest.py`。每一臂实际在 ui-mac 新进程运行 `bun test --max-concurrency 2 --timeout 90000 ./src/main/composer-tier-matrix.engine.cases.ts -t '<具名行>'`；记录包含命令、退出码、补丁及 SHA256、仅 boolean 的原值可见观察。没有产品开关/常驻变异框架。
+
+- 首批材料 `/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/secrets-r8-arms-amvphkzm`。驱动 exit 1：前七臂符合预期，AC-08 第一种变异只回落了碰巧只有普通前缀的第一个 chunk，虽因缺说明变红，却没有出现原值，**不计作原文可见反证**。
+- 修正的仅是一次性坏臂（故障后所有 chunk 走 raw fallback），后三臂材料 `/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/secrets-r8-arms-jigly7xe`，驱动 exit 0。未重跑此前已有效的七臂。两驱动 finally 都执行 scoped `git restore --worktree -- <这次修改的已提交源码>`，并逐字节比对 `RESTORED True`；首批真实失败、失败原因与 rawVisible=false 全部保留，不把无效对照隐去。
+
+| 臂 | 具名行（前缀同上） | exit / PASS/FAIL | 反证事实 |
+| --- | --- | --- | --- |
+| ac01-no-env | read build | 1 / 0 / 1 | model 原值可见；控制输入显式 allow read，排除“只是未获批准” |
+| ac02-no-mask | shell model records and card | 1 / 0 / 1 | 关 live 和通用结果遮盖后 model 原值可见 |
+| ac04-no-ssh-rule | private key authenticates over SSH | 1 / 0 / 1 | model 测试私钥行可见 |
+| ac06-new-name | one rule reaches three consumers | 0 / 1 / 0 | 只向发布家族加 vault.custom，read/result/risk 三处联合通过 |
+| ac06-no-read | one rule reaches three consumers | 1 / 0 / 1 | 安全 read 视图说明不再出现；保留其它消费者 |
+| ac06-no-result | one rule reaches three consumers | 1 / 0 / 1 | 普通工具回显的 model 原值可见 |
+| ac06-no-risk | one rule reaches three consumers | 1 / 0 / 1 | credential-path 风险事实丢失 |
+| ac08-raw-fallback（修正臂） | capture failure chunk | 1 / 0 / 1 | 故障确实命中、程序完成后 model 原值可见 |
+| ac09-end-only | minute live output | 1 / 0 / 1 | 结束前 live minute card 观察超时，正向已先通过；不同变异代码一次 |
+| ac10-whole-cloud | cloud fields keep ordinary values | 1 / 0 / 1 | output = json 普通值消失 |
+
+有效结论：**9 个坏臂各 0 PASS / 1 FAIL（exit 1），新增文件名正向臂 1 PASS（exit 0）**。Core base/HEAD 比较没有 HEAD-only 红，故 r8 无生产修复提交。未跑 gate run/bin/check/其它宿主/包级全套，无 push/PR/merge，无依赖安装。遗留去向：既有 Core 23 红及 19 匿名超时由编排器按原上游条目处置；`.gate-tests` 缺失的 selector 输入仍由编排器治理；Windows 真机行归 win32-x64 发布验收；整宿主首跑非 green 的事实与组合验收证据交编排器评判。OPTIONAL：无新增项。
+
+最终静态复核：scoped oxlint exit 0 / 0 warnings / 0 errors；ui-mac `bun typecheck` exit 0；`git diff --check` exit 0；以 `5511eceef3` 为 changed-since 的 Alpha 文档检查，plan.md 0 finding（其余 322 既有 finding 不属本轮）。实际宿主 7 行；与 `d837106565` 比较，所有临时修改的生产文件字节一致；没有残留本轮 node/sshd 进程。结束于 2026-11-26 11:17:34 UTC，本轮墙钟 35.9 分钟（含本机 slot 排队）；实际改动限三个计划文件。

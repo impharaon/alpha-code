@@ -488,3 +488,38 @@ SEAM-CHANGE-NEEDED：首方 Node boot re-anchor / 持久 tool-service binding �
 `gate slot -- python3 /tmp/connector-r5-uv-proof/settings.py` exit 0；固定 uv 0.13.10 在 HOME/UV/TMP/XDG 全部隔离的临时目录，以 `--no-config --offline --show-settings tool run --from codepuppy-probe-nonexistent-package==0 --with packaging==24.0 probe-command --business <temp workspace>` 返回 4824 bytes stdout、0 stderr，未执行服务或解析不存在包。原样输出 `/tmp/connector-r5-uv-proof/case-z2opj_os/stdout` 有 ToolRunSettings 的 command/from/with/constraints 与有效 resolver 设置；同时含 refresh/SystemTime，因此不能把整份调试输出当 key。没有读取用户 .env/config，没有把这个调试格式或半套语法解析器加入产品；完整 uv 适配、配置内容指纹与安装/bin 捕获仍未完成。
 
 移除臂首次发现许可用例的断言在内部 Effect 中先失败，主纤维还等 preparing 屏障，只得到 timeout；这不是合格反例。用例改为把「当时能否立即取得许可」经 Deferred 交父纤维断言，不改产品许可/预算，也不加墙钟断言。重做此一臂，最终结果见下文收据；其余臂无需重跑。
+
+### r5 #1759 合入后的装配落点（尚未实施）
+
+- `main/server.ts`：消费 #1759 同一次完成绑定的 R1 结果，传其 env 给 createLauncherAssetAuthority.packageManagerEnv；不在 server 重新算候选目录或把候选当已绑定。环境描述与同代 authority 共用，保留资源形态/平台/固定 pin 与 Manifest.formats 稳定 ID。
+- `main/codepuppy-bootstrap-build.ts` + `util/codepuppy-bootstrap.ts`：一次性增加 mandatory、严格校验的 bootstrap.launchers，再更新真实 builder/测试 bootstrap producer；取消当前 Reflect 过渡读法。视频仍由 codepuppyVideoDefinition/同一 expander 在宿主投影，Node boot 的策略后果先按上节裁定，不新增另一份配置写者。
+- `main/server.ts` 的 child message/lifetime：createPinnedFileMainBridge 原始文件口绑定 authority.ensureFile(pinnedFileAuthority(userData), …)，entryFor 绑定同一 authority.ensureEntry；changed 只投 createConnectorLaunchState，诊断按当前 generation/identity 回 core 查询并校验派生 transcript 路径。停用/换代/退出关闭 requester/bridge，晚到包不回写新代。
+- `main/sidecar.ts`：保持 installProcessFence 最先；accept bootstrap 后安装 #1759 的 installPackageManagerEnvironment 及 createPackageManagerEnvironmentRequester，再在 prepareSidecarEnv/import 引擎之前 publishConnectorLaunchHost；最终真实 spawner 仍只由 #1759 refresh/project 最终投影缓存键。端口函数不进 structured clone 文档。
+- `core/mcp/index.ts` 的现有 entry/Slot：按当前已安装声明、严格 declaredFirstPartyTools 和受信 descriptor 构造本轮 localLaunch；runtimeDependencies 取 main 的当前安装版本事实，不列另一份 git/密钥名单；只有两类运行器绑定完整 prepareConnectorLaunch，原生首方仅等待同一 resolveAssets。还须把按 directory/server 定位当前 entry 的私有诊断/重试查询接到 sidecar controller；本轮新增的是 connection.diagnostic，尚没有该 controller 注册/查询组装。
+- 文档：DocumentHost.environment 仍等同一 resolveAssets，LibreOffice 仍走同一文件 authority；当前 attempt 的实际 DocumentRuntime 绑定 createConnectorLaunchState.bindDocumentRuntime 后，现有 retry action 才能触达真实 runtime.retry()。本轮没有动 Office 构建或另开下载器。
+
+上述装配只列消费关系；R1/R2 的完整 names/signatures 沿本计划前表，分支复核提交仍是 ef8a1ce8b4441aeeb12cc3a5cc0843ad43c1682f。它们合入不自动补完 uv/npm 的规范化 key、真实安装、bin 捕获、自动恢复与完整 prepareConnectorLaunch。
+
+### r5 最终收据
+
+依据：SPEC v1、冻结 DESIGN v2.2、r5 IMPLEMENT；已核：Codex / GPT-6。结论 PARTIAL。已定勿重开：r4 uv 的无 CLT install-name 裁定、唯一 pinned authority、#1759 R1/R2 所有权、严格当前 Node/cache-root 匹配。本轮没有修改其它规格/权限规则、process-fence、gate 或其它仓；没有应用/窗口/正式包实测、计时/容量运行、push/PR/merge。
+
+- AC-02/06/07/08/10 子链：许可前准备、字节进度、依赖/cwd 检查、取消晚到不 spawn/不报失败、prepared 当前 argv/cwd/环境直接执行、首方 Node 同代路径再核对、连接后崩溃的完整遮密 stderr/真实 exit 和当前 identity 诊断查询，均有本轮真 Location/SDK/stdio 的命名用例；不是完整 AC-02 围栏、AC-06 限速或 AC-10 离线应用重启证据。R3 的呈现/助手/runtime.retry 单模块证据继承，production root 未装。
+- AC-04 语法子链：官方 npm 语法/配置只读阶段的两例与真实 pinned Node/npm 六组探针通过；不称已装好第三方本机模块。uv 语法、非秘密内容 key、npm/uv 实际安装与默认/显式 bin、持久入口组合/自动重试仍未完成，且这些仍是 #1760 独立余项。
+- v2：connection 自己构造 binding 的真实 stdio 请求/调用进度子链通过；main 下载/配方 authority 的已接受 r2/r4 证明继承，不把自有 Host fixture 当真实下载/整应用证明。
+- Node boot：上节真实策略后果及 SEAM-CHANGE-NEEDED 交编排器/设计 §10；没有在本轮放宽 identity 或改写持久策略。正式 AC-01/02/03/04/05/09/10、AC-06/07/08 应用整链仍未验收。
+
+最终相关命令（均在 packages/core；以下共 75 PASS / 377 assertions，未运行被过滤的 timing/engine/scale 例）：
+1. `bun test test/codepuppy-connector-launch.test.ts test/codepuppy-mcp-tool-collision.test.ts test/codepuppy-mcp-tool-generation.test.ts test/mcp-attach.test.ts test/mcp-instructions.test.ts --max-concurrency=2` → 52 PASS / 223 assertions（`/tmp/connector-r5-core-related.log`）。
+2. `bun test test/codepuppy-mcp-runtime.test.ts -t 'a missing working directory, a missing command|the failed status the desktop reads|the command main writes|Office declarations bind|bundled slots bind|bundled declarations reject|launcher download classification|managed pinned|refuted managed|production MCP connection registers pinned|ordinary MCP client|video progress follows each real SDK request|a local server that writes a secret to stderr and exits' --max-concurrency=2` → 15 PASS / 112 assertions，20 filtered（`/tmp/connector-r5-runtime-related.log`）。
+3. `bun test test/mcp.test.ts -t 'MCP tool names match V1 sanitization|passes session IDs as MCP request metadata|spawns local MCP servers through the location environment|reports a local MCP server as failed when the location has no execution plane|exposes every connection operation|keys connections on everything that changes them' --max-concurrency=2` → 7 PASS / 39 assertions（`/tmp/connector-r5-mcp-related.log`）。
+4. `bun test test/mcp-oauth.test.ts -t 'reports needs_auth for an unauthorized server without registering a client' --max-concurrency=2` → 1 PASS / 3 assertions（`/tmp/connector-r5-oauth-related.log`）。
+5. `bun typecheck` → exit 0，2064 files / 2 projects（`/tmp/connector-r5-core-typecheck.log`）；包无独立 lint 命令，git diff --check 通过。
+
+七个最终移除臂：环境隔离、连接后诊断、Node descriptor 一致性、真实缺程序事实、npm Boolean realm、managed binding、许可位置；各选择对应命名例都 exit 1 且因断言失败（许可臂最终在父纤维断言立即失败，不计初次 timeout 臂）。日志 `/tmp/connector-r5-removal-{environment,diagnosis,node_descriptor,native_fact,npm_boolean,managed_binding,permit}.log`；逐项 scoped git restore 后，上述 wider-related 恢复绿。npx/CLI/cmd-list/LICENSE 夹具分别为 2921/54/3039/9742 bytes；Python read_bytes 逐字对比归档原文件并计算 sha256，四项均 upstream-identical。
+
+`affected-tests --list` exit 0：**affected tests: 380 of 742 test files**（`/tmp/connector-r5-affected-final.scope` / `.list`），无全量 fallback；新输入以直接 import/字面 fixture URL 可追溯，无 global gate 输入或全局必跑层扩展。官方 docs check_repo 函数在解析到 alpha-work/governance/delivery-profile.yml 后检查本 worktree：本 plan 0 findings；仓级 56 errors / 251 warnings（`/tmp/connector-r5-docs.json`），其中 docs/README.md 的既有 index.stale 未顺修，不声称仓级文档检查全绿。
+
+遗留去向：Node 重锚的策略绑定语义 → 编排器/设计 §10；完整官方 uv/key/安装/bin/prepare → #1760 续接；#1759 → 合入后按本表装配；Office compileall → documents（已路由，本轮未碰）；docs/README.md index.stale 等 → 文档治理。OPTIONAL：无。无迁移。
+
+本轮时间核对：2026-11-26T19:02:34Z；自 18:08:43Z 起约 53 分钟（原预期约 90 分钟）。本轮只报告已完成子链；未完成项与冻结接缝已逐项列明。

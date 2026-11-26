@@ -147,7 +147,13 @@ export type HubInstallReply =
 export type PackageAuthorizationQuery = { type: "codepuppy.package.authorization.request"; id: number; packageId: string }
 export type PackageAuthorizationReply = { type: "codepuppy.package.authorization.reply"; id: number; result: PackageAuthorizationResultV1 }
 
+export type PackageLocationReadyMessage = { type: "codepuppy.package.location.ready"; directory: string }
+export function buildPackageLocationReady(directory: string): PackageLocationReadyMessage {
+  return { type: "codepuppy.package.location.ready", directory }
+}
+
 export type CodePuppySidecarInbound =
+  | PackageLocationReadyMessage
   | HubViewRequestMessage
   | PackageAuthorizationQuery
   | HubRequestQueryMessage
@@ -204,6 +210,8 @@ function parseReloadItems(value: unknown): ReloadItem[] | undefined {
 /** main 侧:ext → main 的封闭消息族。别的一律 undefined(含 main → ext 的方向)。 */
 export function parseCodePuppySidecarInbound(value: unknown): CodePuppySidecarInbound | undefined {
   if (!isRecord(value)) return
+  if (value.type === "codepuppy.package.location.ready")
+    return isText(value.directory) && Object.keys(value).every(key => ["type", "directory"].includes(key)) ? buildPackageLocationReady(value.directory) : undefined
   if (value.type === "codepuppy.package.authorization.request")
     return isId(value.id) && isText(value.packageId) && Object.keys(value).every(key => ["type", "id", "packageId"].includes(key))
       ? buildPackageAuthorizationQuery(value.id, value.packageId) : undefined

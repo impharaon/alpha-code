@@ -558,6 +558,7 @@ export const CodePuppyExt: Plugin.Plugin = {
     }
 
     await policy.seal()
+    hubBridge.locationReady(directory)
     return cleanup
   },
 }

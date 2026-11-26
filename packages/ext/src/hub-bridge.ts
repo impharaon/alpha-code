@@ -34,6 +34,7 @@ import {
   buildHubRequestQuery,
   buildHubViewRequest,
   buildReloadReport,
+  buildPackageLocationReady,
   isCodePuppySidecarMessage,
   parseHubRequestReply,
   parseHubViewReply,
@@ -68,6 +69,7 @@ export type HubBridge = {
   packageAuthorization(packageId: string): Promise<PackageAuthorizationResultV1 | BridgeFailure>
   /** 本进程里 main 搜索答过的候选(目录条目与 main 铸的编号)的名称与来源;没答过 ⇒ undefined。 */
   installSubject(id: string): HubInstallSubject | undefined
+  locationReady(directory: string): void
   report(input: { generation: number; scope: ReloadScope; outcome: ReloadOutcome; directories: string[]; error?: string }): void
   /** main → ext 的重载请求交给谁。只能挂一个(调度器);挂上之前到达的请求按序缓存,挂上时补交。 */
   onReloadRequest(handler: (message: ReloadRequestMessage) => void): void
@@ -246,6 +248,10 @@ export function createHubBridge(
       ),
     packageAuthorization: (packageId) => ask((id) => buildPackageAuthorizationQuery(id, packageId), (message) => parsePackageAuthorizationReply(message)?.result),
     installSubject: (id) => subjects.get(id),
+    locationReady(directory) {
+      try { port?.postMessage(buildPackageLocationReady(directory)) }
+      catch { log("[@codepuppy/ext] hub bridge: Location readiness could not be posted") }
+    },
     report(input) {
       if (!port) return
       try {

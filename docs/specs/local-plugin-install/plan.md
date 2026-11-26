@@ -1426,3 +1426,19 @@ Host artifact：`bun src/shared/host-extension-package-contract/generate-artifac
 本轮已核 Codex（GPT-6），结论 **DONE：片 5 收口，片 3/4 accepted 继承，不开始片 7**。core/ext/plugin/ui-mac 包内 bun typecheck exit 0（core 2,053 files / 0 errors）；五生产文件 scoped oxlint 0 warning/0 error，附件清理收口后 ext typecheck 与单文件 lint 同样通过。north-star exit 0，无新接管或白名单放宽。下一步/遗留去向：片 5 审查、design §10 镜像与 host checkpoint 交编排器；上述真实 SaaS/toolchain/原包 source guard 为验收边界。docs 基线与三条旧断言沿原已接受处置，无新增 BLOCKED/SEAM 或 OPTIONAL。实际 03:41–04:00 UTC+08:00 约 19 分钟，相关检查最终 scope 与 docs 结果见收口行；无 push/PR/merge/rebase、应用/窗口或全量 gate。
 
 收口核对：`affected-tests --list` 的原 scope line 为 **all tests: scripts/gate-files.tsv changed (gate or declared global input)**，678 个 PR test files，仅列举（`/tmp/plugin-standard-r19-affected{,-scope}.log`）。gate-files 仅原行 core 13→14、host 110→111；没有新 global/runner/selector 输入。`check-docs-contract --profile /tmp/plugin-standard-r11-docs-profile.yml --changed-since 1db6a3bbf5 --format json` 维持已接受基线 **71 errors / 250 warnings**（`r19-docs.json`）；不修其他文档。`git diff --check` exit 0、hooksPath=.githooks，所有前台命令已结束。主实现与 registry/ADR/本段证据同提交，代码红测保持 81180ab648 的原断言。
+
+### r20｜片 5 两部分审查修复
+
+核对：IMPLEMENT — r20 accepted findings，审查区间 94b7c81d1f..de4dc535d9 / de4dc535d9..dcb7ab90bc，两位 Claude Opus 5.5 / round 1/1；spec v5 / design v3.1 + rulings 不变。不开始片 7，每个缺陷独立红测与修复提交；相关文件/engine slot，不运行全层或 gate。
+
+输入核对：A1–A5 与 `/Users/pharaon/.cache/alpha-orch/2026-11-26/briefs/impl-1776-fix-s5-B.md` 的 B1–B9 全部纳入本轮。B4/B5 的原官方文档可在兼容报告本地快照 `evidence/docs/4-hooks.md` 读取，index.json 标记 URL 为 https://code.claude.com/docs/en/hooks.md、retrievedAt 2026-11-26；按 [matcher patterns](https://code.claude.com/docs/en/hooks#matcher-patterns) 与 [exit-code-0](https://code.claude.com/docs/en/hooks#exit-code-0) 核对，不用二手说明代替。正常上下文 plaintext 的本版已批准事件是 SessionStart/UserPromptSubmit/UserPromptExpansion；官方另有本片未实现的 PostModelSwitch，PreCompact stdout 则属于 summary instructions 而非普通上下文。匹配字段以官方逐事件表核对，FileChanged 的实际字面 watch 集仍沿 frozen 合同。
+
+文案漂移记录（交编排器 §10 镜像，未改设计）：design §4.9:367 仍将整个 ARGUMENTS 视为一个值，与已接受 r9 B2 的逐 parseArguments 参数语义不同；代码继续按 r9 B2，不回退也不重开裁决。
+
+A1：`bdaf037dfb` 为独立 engine 红测。late Location 具名行为在 `A1-engine-red3.log` 中因 `late Location plugin MCP bound` 未到达而红；skills-only reload 在 `A1-reload-red.log` 中因 `unrelated plugin MCP restored after skills reload` 未到达而红。初始两次仅 fixture 缺 publishPluginDataHome，及一次未包含的 remotion fixture，都不计缺陷红；在提交前沿已有 cold case 初始化 DATA、使用已固定 Temporal 样本修正装配，业务断言未变。最初路径归因未获证据，已纠正，不将其当产品问题。
+
+A1 实现：Location 的 ext setup 完成 seal 后，经既有 HubBridge/parentPort 发实际 directory 的 package Location readiness；同一个 main parser/host/reload coordinator 触发原 engine-ready 的 managed 收敛，debug Location cache keys 已包含构建中的新 Location，main RPC 等其完成后应用，发布端不等待，避免循环等待。所有 pluginTree MCP 图在 engine-ready/Location-ready/reload 都入选；非 pluginTree 图保留原 items 筛选。没有第二执行器、配置/允许集权威或 engine L3；registry plugin-local-mcp 同提交登记。两个具名 engine 例 **2 pass**；完整原文件通过 `gate slot -- bun test --max-concurrency 2 --timeout 180000 ./src/main/package-hub-lifecycle.engine.cases.ts` **10 pass / 0 fail**（`/tmp/plugin-standard-r20-A1-engine-file.log`）。必要消费文件：HubBridge/私部 message/parser/HubView/reload coordinator 与 ext setup；engine-cases 原宿主 count 8→10 为同链机械同步，不改 gate。
+
+A1 相关 main coordinator/view/message 三文件 **49 pass**，ext bridge **14 pass**（`A1-main-files.log` / `A1-bridge.log`）。ui-mac 初次类型检查指出 ReloadCoordinator 的声明缺新方法，已同步同一个私部接口；原 wire/session/install DTO 未变。其余最终检查与后续 finding 的证据接本段，不以 A1 通过代表全审查完成。
+
+A1 收口：最终 ext host **111 pass**，ui-mac/ext typecheck exit 0（`A1-host-file.log`、`A1-ui-types-green.log`、`A1-ext-types.log`）。A1 的原 engine 文件已完整一次，不在后续无改动时重跑；engine-cases 宿主只同步固定 pass count，没有运行整层 wrapper。

@@ -153,9 +153,8 @@ export function registerExtIpcHandlers(
       const state = readPackageLedgerStateV1(codepuppyGlobalRoot(), { sideEffectFree: true })
       if (!state.ok) return
       await convergeManagedMcp(state.packageGraphs.filter(graph => {
-        if (phase === "engine-ready" && !graph.pluginTree) return false
         const nodes = [graph.root, ...graph.children]
-        return nodes.some(node => node.kind === "mcp") && (!items.length || items.some(item => item.id === graph.packageId || nodes.some(node => node.componentId === item.id)))
+        return nodes.some(node => node.kind === "mcp") && (graph.pluginTree || (phase === "reload" && (!items.length || items.some(item => item.id === graph.packageId || nodes.some(node => node.componentId === item.id)))))
       }).flatMap(graph => [graph.root, ...graph.children].filter(node => node.kind === "mcp").map(node => node.name)))
     },
     log: (line) => getLogger()?.log(line),

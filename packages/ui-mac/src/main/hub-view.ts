@@ -556,6 +556,10 @@ export function createCodePuppySidecarHost(deps: {
         unattendedRuns.acknowledge(inbound)
         return true
       }
+      if (inbound.type === "codepuppy.package.location.ready") {
+        deps.reloads.locationReady(inbound.directory)
+        return true
+      }
       deps.reloads.receiveReport(inbound)
       return true
     },

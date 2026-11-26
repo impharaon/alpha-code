@@ -44,6 +44,7 @@ export type ReloadCoordinator = {
   request(input: ReloadRequestInput): { generation: number }
   /** ext 的报告。未知 generation ⇒ 记一行、忽略。 */
   receiveReport(report: ReloadReportMessage): void
+  locationReady(directory: string): void
   /** sidecar ready:接上发送口,重发全部在途 generation。返回**这一次**连接的断开函数(sidecar 退出时调):
    *  在途的保留(下一次 attach 重发),它们已收到的 waiting/failed 作废;晚到的旧连接断开不影响新连接。 */
   attach(post: (message: ReloadRequestMessage) => void): (reason: string) => void
@@ -173,6 +174,10 @@ export function createReloadCoordinator(deps: {
           if (other.generation <= record.generation && coversScope(record.scope, other.scope)) inFlight.delete(other.generation)
       }
       deps.onChange()
+    },
+
+    locationReady(directory: string) {
+      void deps.applyPackageMcp?.([], "engine-ready").catch(() => deps.log(`reload: package connectors could not be bound for Location ${directory}`))
     },
 
     attach(next) {

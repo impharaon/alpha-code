@@ -1,7 +1,7 @@
 import { useConnectorLaunchSnapshots } from "./connector-launch-client"
 import { connectorLaunchPresentation } from "./connector-launch-presentation"
 import { runConnectorLaunchAction } from "./connector-launch-actions"
-import { createDefaultWorkspaceDir } from "../codepuppy-ui/default-workspace"
+import { loadDefaultWorkspaceDir } from "../codepuppy-ui/default-workspace"
 // The Extension Hub (定制中心) — a full PAGE (not a modal) covering the content area, rendered as a
 // sibling of <CodePuppySidebar> inside AppInterface (renderer/index.tsx) via a dedicated Portal host on
 // #root. Only mounted while open, so it can never intercept background clicks. Browsable items come
@@ -163,8 +163,8 @@ export function ExtensionHub(props: {
       return active?.sessionID === id ? active.directory : undefined
     })
   })
-  const defaultDirectory = createDefaultWorkspaceDir()
-  const connectorLaunch = useConnectorLaunchSnapshots(() => projectDir() ?? defaultDirectory(), props.server)
+  const [defaultDirectory] = createResource(() => props.open(), loadDefaultWorkspaceDir)
+  const connectorLaunch = useConnectorLaunchSnapshots(() => props.open() ? projectDir() ?? defaultDirectory() : undefined, props.server)
   const ext = useExtensions(props.server, props.open, projectDir, props.directories)
   const section = hubSection
   // REQ-103(#195):governance 只读视图(逐扩展五维所有权 + availability/activation/health 三态)。
@@ -1884,7 +1884,7 @@ export function ExtensionHub(props: {
           name: row.name,
           currentlyOn: desiredOn(),
           liveUnreceipted: row.receipt.installedAt === "",
-          mcpConnected: !!row.mcp?.connected,
+          mcpConnected: row.receipt.installedAt === "" ? isOn() : !!row.mcp?.connected,
         })
       } finally {
         stateBusy[1](false)
@@ -1926,10 +1926,23 @@ export function ExtensionHub(props: {
       (row.type === "mcp" || row.type === "agent" || row.type === "plugin" || row.type === "skill") &&
       row.receipt.scope !== "project" &&
       !rowSessionGrant()
-    const isOn = () => (row.type === "mcp" && row.receipt.installedAt === "" ? !!row.mcp?.connected : desiredOn())
+    const isOn = () => (row.type === "mcp" && row.receipt.installedAt === "" ? (launch() ? launch()!.state.phase !== "disabled" : !!row.mcp?.connected) : desiredOn())
 
-    const launch = () => row.type === "mcp" ? connectorLaunch(row.name) : undefined
+    const launch = () => row.type === "mcp" && (row.receipt.scope === "project" || nameOnlyLiveMcpIsUnambiguousGlobal(row.name, ext.store.projectReceipts))
+      ? connectorLaunch().find((snapshot) => snapshot.identity.server === row.name)
+      : undefined
     const launchPresentation = () => { const snapshot = launch(); return snapshot && connectorLaunchPresentation(snapshot.state) }
+    const [launchDetails, setLaunchDetails] = createSignal<string>()
+    createEffect(() => { launch()?.identity.attempt; setLaunchDetails(undefined) })
+    const readLaunchDetails = async () => {
+      const snapshot = launch()
+      if (!snapshot) return
+      const result = await window.api.connectorLaunch.diagnostic(snapshot.identity)
+      const current = launch()
+      if (!current || current.identity.directory !== snapshot.identity.directory || current.identity.server !== snapshot.identity.server || current.identity.attempt !== snapshot.identity.attempt || current.sidecarGeneration !== snapshot.sidecarGeneration) return
+      if (!result.ok) { setLaunchDetails(t("codepuppy.connectorLaunch.detailsUnavailable")); return }
+      setLaunchDetails(JSON.stringify(result.value, null, 2))
+    }
     const launchAction = async () => {
       const snapshot = launch()
       const action = launchPresentation()?.action
@@ -1965,7 +1978,7 @@ export function ExtensionHub(props: {
       return { text: hs ? t(hs.textKey) : activationText(), hub: hs?.state }
     }
     const attention = (): "auth" | "session" | "enable" | "reload" | "update" | undefined => {
-      if (row.type === "mcp" && row.mcp?.needsAuth) return "auth"
+      if (!launch() && row.type === "mcp" && row.mcp?.needsAuth) return "auth"
       if (row.type === "mcp" && row.receipt.scope !== "project" && rowSessionGrant()) return "session"
       if (hubState()?.reloadNow) return "reload"
       if (hasToggle() && !isOn()) return "enable"
@@ -1999,7 +2012,7 @@ export function ExtensionHub(props: {
           </div>
           {/* REQ-136:项目行的状态只消费 main 给的项目范围判定(name-only 的全局实时状态不许串进来)。 */}
           <Show
-            when={projectMcpView()}
+            when={!launchPresentation() && projectMcpView()}
             fallback={
               <div class="codepuppy-ext-kit-desc" data-err={line().err ? "" : undefined} data-hub-state={line().hub} title={row.type === "cloud" ? undefined : line().detail}>
                 {line().text}
@@ -2011,6 +2024,12 @@ export function ExtensionHub(props: {
                 {t(project().textKey)}
               </div>
             )}
+          </Show>
+          <Show when={launch()?.state.phase === "failed"}>
+            <details class="codepuppy-ext-dprompt" onClick={(event) => event.stopPropagation()} onToggle={(event) => { if (event.currentTarget.open) void readLaunchDetails().catch(() => setLaunchDetails(t("codepuppy.connectorLaunch.detailsUnavailable"))) }}>
+              <summary>{t("codepuppy.timeline.devDetails")}</summary>
+              <pre>{launchDetails() ?? launchPresentation()?.detail}</pre>
+            </details>
           </Show>
           <Show when={row.type === "cloud" && hubState()?.detail}>
             {(detail) => (
@@ -2049,7 +2068,7 @@ export function ExtensionHub(props: {
         <Show when={launchPresentation()?.action}>
           {(action) => <button class="codepuppy-ext-updbtn" onClick={(event) => { event.stopPropagation(); void launchAction() }}>{action().label}</button>}
         </Show>
-        <Show when={!launchPresentation() && attention()}>
+        <Show when={!launchPresentation()?.action && attention()}>
           {(kind) => (
             <>
               {/* `#733`:MCP 走 OAuth 且当前没令牌 ⇒ 一颗能点的「去授权」,与状态「需要重新登录」是同一个事实的两半。 */}

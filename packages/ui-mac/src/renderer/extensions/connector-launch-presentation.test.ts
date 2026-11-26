@@ -1,4 +1,4 @@
-import { expect, test } from "bun:test"
+import { afterEach, beforeEach, expect, test } from "bun:test"
 import { connectorLaunchPresentation } from "./connector-launch-presentation"
 import { connectorDiagnosticPrompt, createConnectorAssistantHandoff } from "./connector-launch-assistant"
 import type {
@@ -6,9 +6,11 @@ import type {
   ConnectorLaunchFailure,
   ConnectorLaunchState,
 } from "../../../../util/src/codepuppy-connector-launch"
-import { setLocale } from "../i18n"
+import { currentLocale, setLocale } from "../i18n"
 
-setLocale("zh")
+const originalLocale = currentLocale()
+beforeEach(() => setLocale("zh"))
+afterEach(() => setLocale(originalLocale))
 // Integration layer: actual crash bytes/exit status below; all presentation inputs use our shared DTO.
 test("preparing shows observed progress with no problem or action and never invents a percentage", () => {
   expect(
@@ -47,8 +49,6 @@ test("connector rows and problems receive one reason and one action for each aut
   for (const [failure, reason, action] of cases) {
     const state: ConnectorLaunchState = { phase: "failed", failure, diagnostic: "attempt" }
     const row = connectorLaunchPresentation(state)
-    const problem = connectorLaunchPresentation(state)
-    expect(row).toEqual(problem)
     expect(row.reason).toBe(reason)
     expect(row.action?.kind).toBe(action)
     expect(row.problem).toBe(true)

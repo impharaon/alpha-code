@@ -17,6 +17,8 @@ export function ConnectorAssistantHost(props: {
     startChat: async (directory, text, parts, options) => {
       const serverKey = props.serverKey()
       if (!serverKey) throw Error("connector assistant server unavailable")
+      if (options?.existingSessionID && servers.get(options.existingSessionID) !== serverKey)
+        throw Error("connector assistant server changed")
       const id = await props.projects.startChat(directory, text, parts, {
         ...options,
         onSessionCreated: (sessionID) => {

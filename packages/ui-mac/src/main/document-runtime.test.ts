@@ -263,6 +263,7 @@ test("connector retry action restarts the current real document preparation", as
   expect(await state.api.retry({ ...identity, attempt: "old" })).toEqual({ ok: false, error: "not-current" })
   const ready = until(runtime, (value) => value.phase === "ready")
   expect(await state.api.retry(identity)).toEqual({ ok: true })
+  expect(runtime.query(f.location).phase).not.toBe("failed")
   await ready
   expect(f.counts).toEqual({ acquire: 1, extract: 1, verify: 1 })
   expect((await state.api.list(identity.directory))[0]?.state.phase).toBe("connected")

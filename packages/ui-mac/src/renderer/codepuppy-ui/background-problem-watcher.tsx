@@ -1,7 +1,7 @@
 import { useConnectorLaunchSnapshots } from "../extensions/connector-launch-client"
 import { connectorLaunchPresentation } from "../extensions/connector-launch-presentation"
 import { runConnectorLaunchAction } from "../extensions/connector-launch-actions"
-import { createDefaultWorkspaceDir } from "./default-workspace"
+import { loadDefaultWorkspaceDir } from "./default-workspace"
 import { activeSessionIdentity } from "./active-session-directory"
 import { pushToast } from "./Toast"
 // 工具服务(连接器)连不上 → 「未恢复问题」入口(SPEC-error-message-lifetime v2 AC-01/05/06,`#1687`;
@@ -15,7 +15,7 @@ import { pushToast } from "./Toast"
 // 只用入口那一半的公开入口:失败 = `putProblem({ attention: false })`,恢复 = `resolveProblem`。
 // 需要重新登录(`needs_auth`)是要用户动手的项:条目上的操作就是去授权,做了即离开入口(R2),
 // 授权后若仍要登录,下一次读状态会把它放回来。
-import { createEffect, createSignal, onCleanup, type Accessor } from "solid-js"
+import { createEffect, createResource, createSignal, onCleanup, type Accessor } from "solid-js"
 // CLIENT subpath only — the v2 barrel pulls Node-only deps that break the renderer (see ADR-008).
 import { createOpencodeClient } from "../../engine-adapter/contract/v1"
 import type { ServerInfo } from "../sidebar/use-projects"
@@ -55,9 +55,10 @@ function viewConnector(name: string) {
 }
 
 export function BackgroundProblemWatcher(props: { server: Accessor<ServerInfo | undefined> }) {
-  const defaultDirectory = createDefaultWorkspaceDir()
-  const launch = useConnectorLaunchSnapshots(() => activeSessionIdentity()?.directory ?? defaultDirectory(), props.server)
-  const [status, setStatus] = createSignal<{ data: Record<string, unknown>; skipCloud: boolean }>()
+  const [status, setStatus] = createSignal<{ data: Record<string, unknown>; skipCloud: boolean }>({ data: {}, skipCloud: false })
+  const [watching, setWatching] = createSignal(false)
+  const [defaultDirectory] = createResource(watching, loadDefaultWorkspaceDir)
+  const launch = useConnectorLaunchSnapshots(() => watching() ? activeSessionIdentity()?.directory ?? defaultDirectory() : undefined, props.server)
   let disposed = false
   let generation = 0
   let client: Client | undefined
@@ -85,17 +86,20 @@ export function BackgroundProblemWatcher(props: { server: Accessor<ServerInfo | 
   createEffect(() => {
     const current = status()
     const c = client
-    if (!current || !c || disposed) return
+    if (!watching() || !c || disposed) return
     const next = new Set<string>()
-    for (const [name, info] of Object.entries(current.data)) {
-      const snapshot = launch(name)
+    const snapshots = launch()
+    const names = new Set([...Object.keys(current.data), ...snapshots.map((snapshot) => snapshot.identity.server)])
+    for (const name of names) {
+      const info = current.data[name]
+      const snapshot = snapshots.find((value) => value.identity.server === name)
       if (snapshot) {
         const presentation = connectorLaunchPresentation(snapshot.state)
         if (!presentation.problem) continue
         const key = `connector\0${JSON.stringify([snapshot.identity.directory, snapshot.identity.server, snapshot.sidecarGeneration, snapshot.identity.attempt])}`
         next.add(key)
         putProblem({ key, title: `${displayName(name)} · ${presentation.reason}`, detail: presentation.detail, attention: false,
-          ...(presentation.action ? { action: { label: presentation.action.label, run: () => { void runConnectorLaunchAction(snapshot, presentation.action!.kind, (server) => c.mcp.auth.authenticate({ name: server })).catch((error) => pushToast({ kind: "error", title: error instanceof Error ? error.message : String(error) })) } } } : {}),
+          ...(presentation.action ? { action: { label: presentation.action.label, run: () => { void runConnectorLaunchAction(snapshot, presentation.action!.kind, (server) => c.mcp.auth.authenticate({ name: server, directory: snapshot.identity.directory })).catch((error) => pushToast({ kind: "error", title: error instanceof Error ? error.message : String(error) })) } } } : {}),
         })
         continue
       }
@@ -158,11 +162,18 @@ export function BackgroundProblemWatcher(props: { server: Accessor<ServerInfo | 
     const abort = new AbortController()
     onCleanup(() => {
       abort.abort()
-      if (gen === generation) client = undefined
+      if (gen === generation) {
+        client = undefined
+        setWatching(false)
+        setStatus({ data: {}, skipCloud: false })
+        for (const key of listed) resolveProblem(key)
+        listed = new Set()
+      }
     })
     void startupQuietEnded().then(() => {
       if (disposed || gen !== generation) return
       client = createOpencodeClient({ baseUrl: info.baseUrl, ...(info.fetch ? { fetch: info.fetch } : {}) })
+      setWatching(true)
       void readStatus()
       void follow(client, abort.signal, gen)
     })

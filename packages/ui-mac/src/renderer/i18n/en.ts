@@ -1,4 +1,5 @@
 export const dict = {
+  "codepuppy.connectorLaunch.detailsUnavailable": "Details are temporarily unavailable",
   "codepuppy.connectorLaunch.preparing": "Preparing (the first run downloads the runtime)",
   "codepuppy.connectorLaunch.bytes": "bytes",
   "codepuppy.connectorLaunch.packages": "packages",

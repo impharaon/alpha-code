@@ -1,5 +1,5 @@
 import type { LaunchIdentity, LaunchSnapshot } from "../../../../util/src/codepuppy-connector-launch"
-import { installedRowKey, openExtHubAt } from "./ext-hub-state"
+import { installedRowKey, openExtHubAt, openPackageManagement } from "./ext-hub-state"
 import type { ConnectorLaunchAction } from "./connector-launch-presentation"
 
 let assistant: ((identity: LaunchIdentity) => Promise<void>) | undefined
@@ -16,6 +16,11 @@ export async function runConnectorLaunchAction(
 ) {
   const identity = snapshot.identity
   if (kind === "secret") {
+    const failure = snapshot.state.phase === "failed" ? snapshot.state.failure : undefined
+    if (failure?.kind === "secret" && failure.packageId) {
+      openPackageManagement(failure.packageId)
+      return
+    }
     openExtHubAt("connectors", installedRowKey("mcp", identity.server))
     return
   }

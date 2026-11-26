@@ -1,4 +1,5 @@
 export const dict = {
+  "codepuppy.connectorLaunch.detailsUnavailable": "暂时无法读取详情",
   "codepuppy.connectorLaunch.preparing": "正在准备（首次需要下载运行环境）",
   "codepuppy.connectorLaunch.bytes": "字节",
   "codepuppy.connectorLaunch.packages": "个包",

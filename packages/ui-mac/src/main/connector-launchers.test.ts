@@ -1,3 +1,5 @@
+import { testBootstrap } from "../../test-component/codepuppy-bootstrap-fixture"
+import { codepuppyVideoDefinition } from "./codepuppy-video"
 import { afterEach, expect, test } from "bun:test"
 import { access, mkdtemp, readFile, realpath, rm, symlink, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
@@ -40,6 +42,20 @@ test("one descriptor owns Node/uv/npm and stable per-declaration cache roots bef
   expect(archive.firstPartyCacheRoots).toEqual(value.firstPartyCacheRoots)
   expect(() => describeLauncherEnvironment({ ...f.input, declarations: { "../outside": f.input.declarations.video } })).toThrow("declaration ID")
   expect(() => describeLauncherEnvironment({ ...f.input, bundle: { ...f.bundle, pinSet: "0".repeat(64) } })).toThrow("differs")
+})
+
+test("video host projection uses this bundle's Node and stable cache root even before archive expansion", async () => {
+  const f = await fixture()
+  const base = testBootstrap({ globalRoot: f.root, officeMcpManifest: join(f.resources, "office-mcp/tools.json") })
+  expect(codepuppyVideoDefinition(base)).toBeUndefined()
+  for (const form of ["expanded", "archives"] as const) {
+    const launchers = describeLauncherEnvironment({ ...f.input, bundle: { ...f.bundle, form } })
+    const bootstrap = { ...base, launchers }
+    const definition = codepuppyVideoDefinition(bootstrap)
+    expect(definition?.command).toEqual([launchers.node, join(f.resources, "video-mcp/server.js"), "{workspace}", "--cache-root", join(f.root, "connector-runtime/first-party-cache/video")])
+    expect(definition?.environment).toEqual({})
+    if (form === "archives") await expect(access(launchers.node)).rejects.toThrow()
+  }
 })
 
 test("resolver verifies both targets, catches changed bytes and preserves valid internal links", async () => {

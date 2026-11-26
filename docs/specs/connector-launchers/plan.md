@@ -217,7 +217,7 @@ last_reviewed: 2026-11-26
 ## 四：单一呈现、诊断交接与文档重试（r3）
 
 - 依据：DESIGN v1 §4.5/4.6/4.7/R4..R9，规格体验约定 AC-06/07/08，r3 明确授权文档动作接 runtime.retry()。
-- 核对：r3 同轮计划并实施；Codex / GPT-6 作者核对。复用现有行、问题动作与 startChat，不新增视觉稿。
+- 核对：Phase: IMPLEMENT（r3；计划 `2e75ba3f76`，首个实现 `8b38125c18`）；Codex / GPT-6 作者核对。复用现有行、问题动作与 startChat，不新增视觉稿。
 
 ### 改动
 | 文件 | 改什么 |
@@ -293,3 +293,26 @@ UI：`connector-launch-presentation.ts` 为行和 BackgroundProblemWatcher 的�
 当前实现 `background-problem-watcher.tsx` 仍从 SDK 默认目录表枚举名称，导致仅在当前 Location 的宿主快照出现的连接器不进入问题入口，违反本片目录身份要求。扩展原组件用例，让 SDK 表为空、宿主当前目录快照失败：`bun test src/renderer/codepuppy-ui/background-problem-watcher.test.ts -t "launcher snapshots suppress"` exit 1 / 0 PASS / 1 FAIL，入口为 null（日志 `/tmp/connector-r3-location-red.log`）。本次先单独提交该红例，随后只修同一 watcher/client 投影；不改断言。
 
 包内连接器的密钥目标红例：冻结 failure.secret.packageId 已有归属，但新动作只定位独立 MCP 行，没有打开真实包管理页。相同组件用例补入已安装包身份并点击「去填写」，期望现有管理目标 `owned-package`，实际 undefined；`bun test ...background-problem-watcher.test.ts -t "launcher snapshots suppress"` exit 1 / 1 FAIL，日志 `/tmp/connector-r3-package-key-red.log`。测试 harness 仅转出已有管理目标读取器，不新增产品端口；先提交测试，再修动作分派。
+
+### r3 当前 Location 修正与最终检查
+
+红例提交 `3bd9b35ef3` 与 `8675fff688` 的原断言未改：watcher 现在同时枚举本目录宿主快照与 SDK 表，富状态在 SDK 表为空时仍能进入同一问题入口；包内密钥按已核 failure.packageId 打开现有 openPackageManagement。源切换清除旧目录条目，认证携带同一目录，详情回包按完整 identity/代核对。定制中心关闭时不取默认目录/详情，观察器的新增读口也等启动静默后启动；失败详情展开走同一 diagnostic 查询。行保留现有启停、更新与管理操作，仅由富失败动作接管主错误动作；项目行优先显示本目录详情，全局行不借用同名项目收据的状态。
+
+补充身份链证据：既有 connector-launchers 文件新增用例，真正调用 describeLauncherEnvironment → codepuppyVideoDefinition → 同一 expander；展开形态和归档尚不存在形态都返回本代 Node 与固定 cache-root。该用例 1 PASS / 6 assertions，不是 Node 已 ready 的声明。已有 policy subjectBindingDigest 对 bundled 继续使用 bindingDigest，只有 cloud 使用 evidenceDigest（resolver.ts:56-58）；新声明 evidenceDigest 变化没有新增以它为键的持久化写端。
+
+最终相关集（一次，未跑全包/全层/场景/计时）：
+- ui-mac：`bun test src/main/connector-launchers.test.ts src/main/connector-launch-state.test.ts src/main/document-runtime.test.ts src/main/codepuppy-sidecar-wiring.test.ts src/main/codepuppy-bootstrap-build.test.ts src/main/sidecar-bootstrap-gate.test.ts src/main/video-service.test.ts src/main/ipc-channel-binding-census.test.ts src/renderer/extensions/connector-launch-presentation.test.ts src/renderer/i18n/locale-regression.test.ts src/renderer/i18n/zh-punctuation.fast.test.ts` → **91 PASS / 493 assertions**（日志 `/tmp/connector-r3-wider-ui.log`）。
+- watcher：`bun test src/renderer/codepuppy-ui/background-problem-watcher.test.ts -t 'needs_auth|off on purpose|kill switch on|kill switch released|production wiring|launcher snapshots'` → **6 PASS / 29 assertions**；4 个原计时/窗口用例未跑，日志 `/tmp/connector-r3-final-watcher.log`。
+- ext：identity/resolver/register-policy/tool-policy-rpc/unattended-policy 五文件 → **152 PASS / 508 assertions**；plugin-host 只选 unavailable document projection → **1 PASS**。日志 `/tmp/connector-r3-wider-ext.log`、`/tmp/connector-r3-plugin-host.log`。这些是摘要/身份的既有持久化和调用方相关集，不跑其余插件宿主用例。
+- core：`bun test test/codepuppy-mcp-runtime.test.ts -t 'the command main writes|Office declarations bind|bundled slots bind|bundled declarations reject|launcher download classification'` → **5 PASS / 67 assertions**；其余引擎/时序用例未跑（`/tmp/connector-r3-final-core.log`）。
+- `bun typecheck`：util **114 files**；core **2056 files / 2 projects**；ext 与 ui-mac 均 exit 0；ext `bun run build` exit 0，当前 dist 已重建。
+
+移除臂均 exit 1 后 scoped git restore：Node/cache 精确比较（`connector-r3-node-removal.log`）；environment/cwd 比较（`connector-r3-identity-removal.log`）；preparing 不入问题（`connector-r3-preparing-removal.log`，真组件）；runtime.retry 实际调用（`connector-r3-document-removal.log`，立刻仍为 failed）；首条诊断事实（`connector-r3-assistant-removal.log`，真实子进程 exit 23/stderr）。日志均在 `/tmp/`；还原后相关用例为绿。
+
+依赖定位核对至 #1759 分支 `ade930e31c1eb7e00d670951c663c582891262b5`：R1 绑定返回 env/cacheEnv/rules/locations 已在上表展开；R2 的 install 返回 void，refresh 返回 Promise<void>，project 返回合并缓存键后的对象。未复制这些模块或其缓存键表。
+
+文档检查：官方 check-docs-contract 的 check_repo 对本 worktree/alpha profile 检查，plan.md **0 finding**；仓级仍 **58 errors / 249 warnings**，首个为 docs/README.md 的既有 index.stale，与 r2 收据相同，不顺修。完整结果 `/tmp/connector-r3-own-docs-contract.json`。
+
+未完成的本票工作（不是全归 #1759）：core PackageRunner 全语法适配、持久准备收据/无解析离线入口；Location spawner 诊断 tee/遮密与落盘、runtimeDep/egress 事实及动作；v2 受管请求 entryFor/配方展开/活跃调用 handler；Node boot 重锚与 prepare-before-permit；生产 controller/DocumentRuntime/Host 发布装配。原生无槽声明在未有 launcher 描述时可核验，Node/cache 槽不行；根装配时把临时 Reflect/可缺 context 读取收敛到冻结的必填 bootstrap.launchers。AC-01/02/03/04/05/09/10 整包实测与 AC-06/07/08 真引擎半条链仍未验收，未运行应用/Electron/窗口或无网计时。
+
+遗留去向：Office Python prerequisite builder 的 compileall exit 1 及完整 snapshot 两条缺失前置失败 → 编排器处理本机/产物前置；docs 索引等旧问题 → 既有文档治理，非本票；本票余项 → 按上面下一片继续。无迁移、无其它仓修改、无推送/PR/合并；OPTIONAL：无。

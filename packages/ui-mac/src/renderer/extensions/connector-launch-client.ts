@@ -8,31 +8,30 @@ export function useConnectorLaunchSnapshots(
   server: Accessor<ServerInfo | undefined>,
 ) {
   const [rows, setRows] = createSignal<LaunchSnapshot[]>([])
-  const [local, setLocal] = createSignal<string>()
   const api = window.api?.connectorLaunch
+  let local: Promise<string> | undefined
   let revision = 0
   let disposed = false
   const refresh = async () => {
     const current = ++revision
     const dir = directory()
-    if (!api || !dir || !local() || server()?.baseUrl !== local()) {
-      setRows([])
-      return
-    }
+    if (!api || !dir) return
     try {
+      local ??= window.api.awaitInitialization().then((value) => value.url)
+      const url = await local
+      if (disposed || current !== revision || server()?.baseUrl !== url) return
       const result = await api.list(dir)
       if (!disposed && revision === current) setRows(result)
     } catch {
-      if (!disposed && revision === current) setRows([])
+      /* Keep the last current projection if this read is temporarily unavailable. */
     }
   }
-  if (api) {
-    void window.api
-      .awaitInitialization()
-      .then((value) => {
-        if (!disposed) setLocal(value.url)
-      })
-      .catch(() => {})
+  createEffect(() => {
+    const dir = directory()
+    const info = server()
+    revision++
+    setRows([])
+    if (!api || !dir || !info) return
     onCleanup(
       api.subscribe(() => {
         void refresh()
@@ -40,21 +39,16 @@ export function useConnectorLaunchSnapshots(
     )
     onCleanup(
       window.api.sidecarGeneration.subscribe(() => {
+        local = undefined
         setRows([])
         void refresh()
       }),
     )
-  }
-  createEffect(() => {
-    directory()
-    server()
-    local()
-    setRows([])
     void refresh()
   })
   onCleanup(() => {
     disposed = true
     revision++
   })
-  return (name: string) => rows().find((row) => row.identity.directory === directory() && row.identity.server === name)
+  return () => rows().filter((row) => row.identity.directory === directory())
 }

@@ -26,7 +26,7 @@ last_reviewed: 2026-11-26
 ## 切片一：对话决定、记住与撤销
 
 - 依据：[规格 v2 / AC-07、AC-09 至 AC-12](spec.md) @ `adba35744395860dcb736642d9263b5d29d1e1de`；[冻结设计 §4.1–§4.6、§4.8、§5、§6、§10](design.md) @ `4948d952f353d69764b370f91f595f24d36ee270`（#1763）；#1757 的本次 PLAN brief。继承 §10 的全部 R1 处置，不重开 ARCH-8 或无活动对话时的投递范围。读码基线同该冻结提交。
-- 核对：待编排器核对本 PLAN 提交；第一笔实施提交从续接 brief 的 `Phase:` 原文填写，不由计划作者自签通过。
+- 核对：Phase: IMPLEMENT — 25b6edee4e · Claude Opus 5.5 (orchestrator) · plan accepted for slice one: AC-07, AC-09, AC-10, AC-11, AC-12 each have a named test and a removal/known-bad control that turns red at the real entry point; files stay within the design's N1–N4/N6 surfaces plus the named same-call-chain registrars (main/index.ts, settings.tsx); no frozen decision restated or changed; slice two (AC-08, AC-13) stays a separate plan section.
 
 以下是待实施安排，不是已取得的行为证据。路径缩写 `main/`、`shared/`、`preload/`、`renderer/` 相对于 `packages/ui-mac/src/`，`ui/` 表示 `renderer/codepuppy-ui/`。新文件名是本片的落点安排，其私有辅助函数不升为冻结合同。
 
@@ -107,7 +107,9 @@ U/E 各运行 `bun typecheck`，仅处理本片造成的问题；若包已有适
 
 ### 偏离记录
 
-暂无。本次按 PLAN brief 的拆分授权提出两片，第二片尚未细化；首片核对后实施中的偏离在对应提交同步本节。
+2026-11-26 r1：步骤 1 在依赖安装处阻塞，尚未产生实施代码。12:17 +0800 开始，先在 `packages/ui-mac` 运行 `bun test src/renderer/codepuppy-ui/composer-state.test.ts src/main/codepuppy-config-injection.test.ts`，退出 0，45 pass / 0 fail。随后同目录执行 `bun add --exact tldts@7.6.0`，退出 1：`No version matching "7.6.0" found for specifier "tldts" (blocked by minimum-release-age: 259200 seconds)`。仓库 `bunfig.toml:4` 为 `minimumReleaseAge = 259200`，`:5` 的既有豁免列表不含 tldts；安装失败后 `git status --short` 为空，manifest/lock 未改动。
+
+本次只补入编排器核对原文和上述阻塞证据，步骤 1 未完成。需要编排器明确允许为已批准的固定依赖进行本次安装的发布年龄豁免，或由设计阶段提供符合现有安装规则的冻结依赖版本；实施者不降低筛选值、不改仓库安装规则、不自行换版。N4 是卡片实际记住范围及站点真源的前置，不能用手写 PSL 或无效按钮绕过。其余步骤与一次性 scenario/对照均未运行，保留其运行授权。
 
 ## 切片二：全部批准通放与系统代理
 

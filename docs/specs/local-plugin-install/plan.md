@@ -951,3 +951,6 @@ main 的启动注入只对 pluginTree 所属 MCP 放原中和条目；ext 保留
 
 
 A1 完整 engine 文件初次为 6 pass / 2 fail（`/tmp/plugin-standard-r10-A1-engine-green.log`）：新冷启动回归通过，两个原非插件包换代用例在 ready 的全包重收敛下失败。ready 的授权对象是 pluginTree，故现有 callback 增加私有 phase 域（engine-ready/reload），前者只选 pluginTree、后者仍按原 items/全包语义；不改变状态 writer 或公开协议。该同链 `ext-ipc.ts` 的选图条件是必要消费者，未给非插件包新增冷启动动作。
+
+
+A2：4defc86a9f 的原位回归先红 0 pass / 1 fail（`bun test --max-concurrency 2 src/shared/host-extension-package-contract/plugin-conversion.test.ts -t "real skill bodies retain"`，`/tmp/plugin-standard-r10-A2-red.log`）。固定 build-ios-apps 的原 ios-ettrace-performance / ios-memgraph-leaks SKILL.md 逐字比对，仅包路径可绑定；`${RUN_DIR:-}`、`${TMPDIR:-/tmp}` 与普通环境引用保留源文字，环境已设置也不注入正文。现有 pluginText 增加 process/instruction 的域参数，所有指令正文与 prompt handler 选择后者，进程字段的环境算法不改；同一 parser/renderer 仍唯一。完整 converter 文件 41 pass / 0 fail（`/tmp/plugin-standard-r10-A2-green.log`），fast、原位 imports 可追踪；条数表旧 31 同步实际 41。CONTRACT 与生成 converter/artifact 同提交；没有新运行选项、公开模型字段、依赖或 engine takeover。

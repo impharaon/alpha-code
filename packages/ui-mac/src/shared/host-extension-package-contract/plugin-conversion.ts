@@ -134,7 +134,7 @@ export async function convertPluginTree(input: Capture): Promise<{ package: Plug
       display[target] = source.startsWith("icon_") ? value.replace(/^\.\//, "") : value
     }
     if (data.hooks !== undefined) scopedHooks.push({ path, value: data.hooks, scope: { kind: "skill", entryId: "skill:" + path } })
-    entries.push({ kind: "skill", id: "skill:" + path, sourcePath: path, sourceName: name, directory, instruction: pluginText(instruction), invocation: invocation({ ...data, allow_implicit_invocation: data.allow_implicit_invocation === false || policy.allow_implicit_invocation === false ? false : true }, opencode ? "opencode" : codex ? "literal" : "claude", path, diagnostics), display, dependencies, mcpDependencies: [...new Set([...dependencies.map(item => item.value), ...(object(data.dependencies) ? strings(data.dependencies.mcp) : [])])] })
+    entries.push({ kind: "skill", id: "skill:" + path, sourcePath: path, sourceName: name, directory, instruction: pluginText(instruction, "instruction"), invocation: invocation({ ...data, allow_implicit_invocation: data.allow_implicit_invocation === false || policy.allow_implicit_invocation === false ? false : true }, opencode ? "opencode" : codex ? "literal" : "claude", path, diagnostics), display, dependencies, mcpDependencies: [...new Set([...dependencies.map(item => item.value), ...(object(data.dependencies) ? strings(data.dependencies.mcp) : [])])] })
   }
   const definitions: { name: string; path: string; pointer: string; value: unknown }[] = []
   const addServers = (path: string, map: Record<string, unknown>, pointer: string) => {
@@ -177,7 +177,7 @@ export async function convertPluginTree(input: Capture): Promise<{ package: Plug
     if (!parsed) { diagnostics.push({ path, code: "invalid-definition", message: "Markdown definition is invalid" }); continue }
     const kind = match[1]!.startsWith("agent") ? "agent" : "command"
     if (kind === "agent" && parsed.data.hooks !== undefined) scopedHooks.push({ path, value: parsed.data.hooks, scope: { kind, entryId: kind + ":" + path } })
-    entries.push({ kind, id: kind + ":" + path, sourcePath: path, sourceName: match[2]!, instruction: pluginText(instruction), invocation: invocation(parsed.data, opencode ? "opencode" : codex ? "codex" : "claude", path, diagnostics) })
+    entries.push({ kind, id: kind + ":" + path, sourcePath: path, sourceName: match[2]!, instruction: pluginText(instruction, "instruction"), invocation: invocation(parsed.data, opencode ? "opencode" : codex ? "codex" : "claude", path, diagnostics) })
   }
   const hookFiles = new Set<string>()
   let hookOrder = 0
@@ -214,7 +214,7 @@ export async function convertPluginTree(input: Capture): Promise<{ package: Plug
           if (handler.type === "prompt") {
             if (!["PreToolUse", "PermissionRequest", "PostToolUse", "PostToolUseFailure", "PostToolBatch", "UserPromptSubmit", "UserPromptExpansion", "Stop", "SubagentStop", "PermissionDenied", "TaskCreated", "TaskCompleted", "TeammateIdle"].includes(event)) { diagnostics.push({ path, sourceName: name, code: "unsupported-host-capability", message: "Prompt hooks have no source protocol for this event" }); continue }
             if (typeof handler.prompt !== "string") { invalid("Hook prompt is missing"); continue }
-            entries.push({ kind: "hook", id, sourcePath: path, sourceName: event, hook: { ...base, type: "prompt", prompt: pluginText(handler.prompt), ...(sourceModel(handler.model) ? { model: sourceModel(handler.model) } : {}), continueOnBlock: handler.continueOnBlock === true } })
+            entries.push({ kind: "hook", id, sourcePath: path, sourceName: event, hook: { ...base, type: "prompt", prompt: pluginText(handler.prompt, "instruction"), ...(sourceModel(handler.model) ? { model: sourceModel(handler.model) } : {}), continueOnBlock: handler.continueOnBlock === true } })
           }
           if (Object.hasOwn(UNAVAILABLE_PLUGIN_HOOKS, event)) diagnostics.push({ path, sourceName: name, code: "unavailable-trigger", message: UNAVAILABLE_PLUGIN_HOOKS[event as keyof typeof UNAVAILABLE_PLUGIN_HOOKS] })
         }

@@ -1,11 +1,11 @@
 {
   "artifactPath": "packages/ui-mac/src/shared/host-extension-package-contract",
-  "artifactSha256": "62fa9200debfe9248898c880aeb6e9f71f7ed12fab72e41a0e85504c45c5f79f",
+  "artifactSha256": "38d198d344f7c858959ec9a5ff7dbdfe768eea940cd4cc8aa934347f0934761f",
   "files": [
     {
-      "bytes": 23470,
+      "bytes": 23655,
       "path": "CONTRACT.md",
-      "sha256": "e5014dc4a9f2da9cdcd1459aa880cff26b37874fbac11c1b20e1c75c903e922d"
+      "sha256": "8699396f8c7ca04f21d890e37e0b213e90aec9cce410257a3cdc712af2ec50f3"
     },
     {
       "bytes": 7251,
@@ -18,9 +18,9 @@
       "sha256": "2e50222a6af86ce4e415f63019067d452aa2d5e2cf61c5013f021a3d0ed2a11e"
     },
     {
-      "bytes": 24559,
+      "bytes": 24703,
       "path": "plugin-package.ts",
-      "sha256": "a653a8e8ec5dd5809fca61ea3d08260b6e4b915263e839aa0ff675c66a251ede"
+      "sha256": "4d2c6808d52c7c6c990a55b76eacaae2c70cfd1a710f51298029a040b1e28db6"
     },
     {
       "bytes": 884,
@@ -28,9 +28,9 @@
       "sha256": "48a0219dd28692f659d85471a8457491ec602efc56501181ee825944479c44dc"
     },
     {
-      "bytes": 94011,
+      "bytes": 94134,
       "path": "plugin-conversion.mjs",
-      "sha256": "1667ca46f5aa5edc73b9566f3aecdc44fa8a703cfa7875379f27a9b7bdfe1454"
+      "sha256": "761c12eca26f0d88784f3e35a0ec9d6a6ffdebfe7b6f5a6ea2627aee0f159ae0"
     },
     {
       "bytes": 2062,

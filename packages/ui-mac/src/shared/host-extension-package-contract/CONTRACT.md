@@ -434,3 +434,5 @@ capability projection connects package command hooks at the awaited SessionStart
 and UserPromptSubmit phases; other hook scopes/events and monitor declarations
 retain their entry-specific not-running annotation. Installing content does not
 execute these hooks.
+
+指令正文（skill/command/agent 与 prompt handler）保留普通 shell 环境表达式，仅识别包路径/userConfig 绑定；进程字段继续按 Text 的环境节点求值。

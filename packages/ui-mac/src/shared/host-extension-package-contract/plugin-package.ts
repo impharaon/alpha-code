@@ -500,14 +500,15 @@ function object(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === "object" && !Array.isArray(value)
 }
 
-export function pluginText(value: string): Text {
+export function pluginText(value: string, target: "process" | "instruction" = "process"): Text {
   const parts: Text[number][] = []
   let offset = 0
   for (const match of value.matchAll(/\$\{(user_config\.[^}]+|[A-Za-z_][\w]*(?::-[^}]*)?)\}/g)) {
-    if (match.index! > offset) parts.push(value.slice(offset, match.index))
     const expression = match[1]!
     const binding = pluginPathBinding(expression)
+    if (target === "instruction" && !binding && !expression.startsWith("user_config.")) continue
     const split = expression.indexOf(":-")
+    if (match.index! > offset) parts.push(value.slice(offset, match.index))
     parts.push(binding ? { binding } : expression.startsWith("user_config.") ? { option: expression.slice(12) } : { environment: { name: split < 0 ? expression : expression.slice(0, split), ...(split < 0 ? {} : { default: pluginText(expression.slice(split + 2)) }) } })
     offset = match.index! + match[0].length
   }

@@ -307,4 +307,6 @@ S-04 依据 DESIGN-local-plugin-install v3.1 §6/§10 与 orchestrator ruling 20
 
 S-06 依据同一冻结设计的 §10：精确新 L3 仅 `packages/core/src/session/compaction.ts`，在实际 compact 采用（含 held summary）前 await PreCompact，在 publish 成功持久化后 await PostCompact；后台预计算不触发。现有模型钩子不覆盖采用预计算结果，不能在 ext 事后还原这个决定点；L1/L2 仍改同一生命周期并另添源码/产物同步入口，故沿设计选择直接 L3。注册 `plugin-hook-compaction`，native summary/预算/重试算法不改，opaque native window 无可读 summary 时不造字段。north-star 精确单文件清单随该登记同步；没有扩大到 runner/step.ts。原模块 finite integration 与真实 host 用例覆盖手动/自动/溢出、持久化后通知及预计算采用，移除回调即红。
 
+S-05 的 r16 orchestrator ruling 2026-11-27 接受 `core/src/instruction-discovery.ts` 中 File/schema/codec 的可选来源字段增量（packageId/sourcePath/scope），原调用者无需改变。L0 transform 的额外字段会被原 constructor/codec 丢弃，另建来源表会复制权威；L1/L2 仍须补同一值边界并维护源码/产物同步，故登记此精确 L3 与原模块 proof `core/test/instruction-discovery.test.ts`，对应 `plugin-hook-instructions`。元数据只保留 producer 的事实，不从渲染后系统文字反推。
+
 S-12 配套登记（#1776 r15）：`packages/schema/test/mcp.test.ts` 的 transport round-trip 反例和 `packages/client/src/promise/generated/types.ts` 两处由 schema 生成的可选 transport 字段随同原 S-12 权威登记。基线 1db6a3bbf5 不含这两处，提交 513e35a7c6 / 27595818cb 属本车道；r15 修正登记遗漏，不更改生成物、断言、协议值或守卫算法。它们是已批准 RemoteConfig 的配套 artifact/proof，不增加 runtime 接管点。

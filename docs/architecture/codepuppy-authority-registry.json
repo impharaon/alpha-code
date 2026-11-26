@@ -2404,6 +2404,26 @@
       ]
     },
     {
+      "id": "plugin-hook-instructions",
+      "decision": "DESIGN-local-plugin-install v3.1 §6/10 S-05 plus orchestrator ruling 2026-11-27 r16: optional instruction source provenance (package ID, source path and memory scope) survives the native File constructor, editor and admission codec. Existing files without provenance keep their native behavior.",
+      "adr": ["ADR-029", "ADR-047"],
+      "lane": "#1776 slice 5, r16",
+      "takeovers": [
+        "packages/core/src/instruction-discovery.ts",
+        "packages/core/test/instruction-discovery.test.ts"
+      ],
+      "mechanism": {
+        "file": "packages/core/src/instruction-discovery.ts",
+        "ladder": "Exact L3 S-05 increment accepted in r16: L0 transforms cannot preserve source fields dropped by the native constructor/schema codec. L1/L2 would patch the same native value boundary through an additional source/build synchronization path. One additive optional field in the existing File schema; no shadow provenance registry."
+      },
+      "tests": [
+        {
+          "file": "packages/core/test/instruction-discovery.test.ts",
+          "name": "preserves instruction source provenance through editing and admission encoding"
+        }
+      ]
+    },
+    {
       "id": "plugin-hook-tool-batch",
       "decision": "DESIGN-local-plugin-install v3.1 §4.12/6 S-08: aggregate terminal native tool calls by actual assistant message ID, including validation failures, in model order. Drain once at the awaited context boundary before a request, or at native idle; use the same processed/pending state and existing synthetic continuation. Seed registration with actual history, never replay prior batches or emit an empty batch.",
       "adr": [

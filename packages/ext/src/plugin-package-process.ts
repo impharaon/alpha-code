@@ -21,10 +21,11 @@ export function createPackageProcesses(location: RuntimeLocation) {
   const environment = async (input: Pick<PackageProcessInput, "source" | "environment" | "environmentFile" | "signal">, timeout?: number): Promise<Record<string, string | undefined>> => {
     if (!input.environmentFile || Bun.file(input.environmentFile).size === 0) return {}
     const config = pluginProcessConfig(input.source)
+    const owned = config.environment()
     const result = await runtime.runPromise(Effect.gen(function* () {
       const processes = yield* AppProcess.Service
       return yield* processes.run(ChildProcess.make("bash", ["-c", '"$(command -p -v env)" -0; printf "\\0"; . "$1" >/dev/null; "$(command -p -v env)" -0', "package-session-environment", input.environmentFile!], {
-        cwd: input.source.projectDir, extendEnv: true, env: { ...config.environment(), ...input.environment },
+        cwd: input.source.projectDir, extendEnv: true, env: { ...owned, ...input.environment },
       }), { signal: input.signal, timeout })
     }))
     if (result.exitCode !== 0) throw Error("runtime-failed: session environment shell exited " + result.exitCode)
@@ -37,7 +38,7 @@ export function createPackageProcesses(location: RuntimeLocation) {
     const before = variables(split[0]!)
     const after = variables(split[1]!)
     return Object.fromEntries([...new Set([...before.keys(), ...after.keys()])]
-      .filter(key => key !== "CLAUDE_ENV_FILE" && before.get(key) !== after.get(key))
+      .filter(key => key !== "CLAUDE_ENV_FILE" && !Object.hasOwn(owned, key) && before.get(key) !== after.get(key))
       .map(key => [key, after.get(key)]))
   }
   const prepare = async (input: PackageProcessInput, timeout?: number) => {
@@ -66,6 +67,7 @@ export function createPackageProcesses(location: RuntimeLocation) {
     return { command, redact }
   }
   return {
+    environment,
     command: async (input: PackageProcessInput & { stdin: Record<string, unknown>; timeoutSeconds: number }) => {
       const deadline = performance.now() + input.timeoutSeconds * 1000
       const prepared = await prepare(input, input.timeoutSeconds * 1000)

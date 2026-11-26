@@ -9,6 +9,7 @@ export type PreparedInstruction = {
   rawArguments: string
   arguments: readonly string[]
   cwd: string
+  environment?: Record<string, string | undefined>
 }
 export type PreparedShellCommand = Pick<PreparedInstruction, "parts">
 export type BoundShellCommand = { executable: string; argv: readonly string[]; env: Record<string, string> }

@@ -301,6 +301,8 @@ OpenCode 共用服务、库与凭证。
 
 依据 DESIGN-local-plugin-install v3 §6/§10、r5 的 IMPLEMENT 派发及 orchestrator ruling 2026-11-27（Claude Opus 5.5）：只在已接管 `core/src/config/plugin/command.ts` 增加来源语法与 source/value 边界，原生和整包指令复用同一 shell/process 原语。自有 `@opencode/plugin/codepuppy-package-runtime` 是 Location 生命周期内的反向调用端口；PreparedInstruction.arguments 原样携带参数名顺序，未声明为 []，仍由 core 解析。源码识别在绑定值之前，绑定值/调用参数不成为新 shell 节点。唯一主权登记为 `plugin-invocation-semantics`，原 command-model-priority/项目信任决定保持；没有增加其他上游文件接管。
 
+S-01 r19（orchestrator ruling 2026-11-27 / Claude Opus 5.5）：PreparedInstruction 增可选 environment，携真实 Invocation Session 的 ENV_FILE export delta；既有 command.ts 合成 env 时以原绑定槽为优先，仍先编译 source 再插入值，不增 renderer、进程原语或上游接管文件。ext 在实际首个展开前 await 同一 SessionStart promise，native 附加 skills 先登记全部作用域，再展开；同一个 AppProcess source 保持变量归属、unset 与会话隔离。核心 inline-env 例、真实 command/attached-skill 首次/更新例为具名 proof；登记仍归 plugin-invocation-semantics，设计 §10 镜像由编排器持有。
+
 ### #1776 S-04 / S-06 配置与压缩窄边界
 
 S-04 依据 DESIGN-local-plugin-install v3.1 §6/§10 与 orchestrator ruling 2026-11-27（r14）：既有 config.ts / config/plugin/skill.ts 的读取、watcher 与 rescan 在原生发布链调用同一个 beforeConfigChange；raw revision 仍经当前项目 trust/parser，拒绝不改用户文件，托管策略不可阻止。登记 `plugin-hook-config-change` 与原 `project-opencode-config-trust`，无额外接管文件或 DTO。

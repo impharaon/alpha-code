@@ -2207,18 +2207,18 @@
     },
     {
       "id": "plugin-invocation-semantics",
-      "decision": "DESIGN-local-plugin-install v3 S-01: one Location-owned command renderer compiles original source nodes before binding arguments and Text values; package calls use the same renderer as native commands. PreparedInstruction.arguments is the verbatim Invocation name order ([] if undeclared), per orchestrator ruling 2026-11-27. Orchestrator ruling 2026-11-27 r9: S-01 also binds shell commands without executing, returning the selected executable, argv and invocation env for the existing AppProcess consumer. Review r9 B5: runtime values enter per-invocation environment slots, never escaped command text; source quote/substitution/heredoc context only chooses the reference. Orchestrator review ruling r9 B2 (2026-11-27): shell ARGUMENTS and native trailing rest expand as parsed argv; text retains raw arguments. Review r9 B1: inline and fenced shell source share the same recognizer for execution and project trust; bound values never introduce shell nodes. PackageAllowSetV3 includes bundle roots in the existing keys/scoped projection per orchestrator ruling 2026-11-27 (r8); roots remain absent from component rows.",
+      "decision": "DESIGN-local-plugin-install v3 S-01: one Location-owned command renderer compiles original source nodes before binding arguments and Text values; package calls use the same renderer as native commands. PreparedInstruction.arguments is the verbatim Invocation name order ([] if undeclared), per orchestrator ruling 2026-11-27. Orchestrator ruling 2026-11-27 r9: S-01 also binds shell commands without executing, returning the selected executable, argv and invocation env for the existing AppProcess consumer. Review r9 B5: runtime values enter per-invocation environment slots, never escaped command text; source quote/substitution/heredoc context only chooses the reference. Orchestrator review ruling r9 B2 (2026-11-27): shell ARGUMENTS and native trailing rest expand as parsed argv; text retains raw arguments. Review r9 B1: inline and fenced shell source share the same recognizer for execution and project trust; bound values never introduce shell nodes. PackageAllowSetV3 includes bundle roots in the existing keys/scoped projection per orchestrator ruling 2026-11-27 (r8); roots remain absent from component rows. Orchestrator ruling 2026-11-27 r19: additive S-01 PreparedInstruction.environment optionally carries this Invocation Session ENV_FILE export delta. Core merges it below its generated binding env; only the existing renderer executes shell nodes. The ext source is the existing AppProcess shell export authority, with managed package variables retained by that same owner. The first expansion awaits the same once-per-lifetime SessionStart; all native skill attachments register their scopes before that boundary.",
       "adr": [
         "ADR-029",
         "ADR-047"
       ],
-      "lane": "#1776 slice 3, explicit implement dispatch r5/r6",
+      "lane": "#1776 slices 3/5, r19",
       "takeovers": [
         "packages/core/src/config/plugin/command.ts"
       ],
       "mechanism": {
         "file": "packages/core/src/config/plugin/command.ts",
-        "ladder": "Existing L3 increment only: private renderer exposed through self-owned @opencode/plugin/codepuppy-package-runtime, scoped disposal; ext does not import core or run a second shell renderer. L0 extension hooks wrap the existing skill/subagent executors and consume the r6 command/agent allow-set projection; actual model/tool registries own identity, effort, discovery and execution. Shell tool-rule matching consumes the existing pure ShellScan leaf, never executes or reparses a shell template."
+        "ladder": "Existing L3 increment only: private renderer exposed through self-owned @opencode/plugin/codepuppy-package-runtime, scoped disposal; ext does not import core or run a second shell renderer. L0 extension hooks wrap the existing skill/subagent executors and consume the r6 command/agent allow-set projection; actual model/tool registries own identity, effort, discovery and execution. Shell tool-rule matching consumes the existing pure ShellScan leaf, never executes or reparses a shell template. S-01 r19 is a narrow increment of the same owned command.ts env composition; no additional upstream file or renderer."
       },
       "tests": [
         {
@@ -2300,6 +2300,14 @@
         {
           "file": "packages/ext/src/package-scope.test.ts",
           "name": "bundle root membership decodes without enabling its same-named instructions"
+        },
+        {
+          "file": "packages/core/test/codepuppy-command-model-priority.test.ts",
+          "name": "package inline shells receive the invocation environment without reinterpreting its values"
+        },
+        {
+          "file": "packages/ext/src/plugin-host.test.ts",
+          "name": "first command and attached skill shells wait for SessionStart and read their own live session exports"
         }
       ]
     },
@@ -2310,11 +2318,11 @@
         "ADR-029",
         "ADR-047"
       ],
-      "lane": "#1776 slice 5, r18",
+      "lane": "#1776 slice 5, r19",
       "takeovers": [],
       "mechanism": {
         "file": "packages/ext/src/plugin-package-hooks.ts",
-        "ladder": "L0: existing event.subscribe, awaited session prompt/context/experimental.idle, tool.execute.before between policy head/tail, same-session synthetic and AppProcess; no engine takeover. S-03/S-07 private main parentPort SessionEnd receiver awaits the actual Session Location runner and the MCP owner before replying; Cleanup awaits active lifetimes. Main router/navigation/delete and logout send the fixed private message; main stop waits for known viewed Sessions before its existing stop budget, and before-quit awaits stopSidecars. The view map owns only renderer view facts, not Session epochs or process lifetimes. Main consumes original native permission/completion/MCP-form event IDs through the same private notification action, independent of OS notification settings; requester deduplicates occurrences per engine generation. Declared literal file watchers share the runner and active ownership, with handler-owned replacement watchPaths and native add/change/unlink facts. SessionStart/FileChanged alone receive a session-owned ENV_FILE; existing AppProcess sources its exported delta for later hooks/monitors, without mutating process.env. PreparedInstruction has no environment field: inline instruction shell propagation is pending a frozen S-01 increment, not implemented here."
+        "ladder": "L0: existing event.subscribe, awaited session prompt/context/experimental.idle, tool.execute.before between policy head/tail, same-session synthetic and AppProcess; no engine takeover. S-03/S-07 private main parentPort SessionEnd receiver awaits the actual Session Location runner and the MCP owner before replying; Cleanup awaits active lifetimes. Main router/navigation/delete and logout send the fixed private message; main stop waits for known viewed Sessions before its existing stop budget, and before-quit awaits stopSidecars. The view map owns only renderer view facts, not Session epochs or process lifetimes. Main consumes original native permission/completion/MCP-form event IDs through the same private notification action, independent of OS notification settings; requester deduplicates occurrences per engine generation. Declared literal file watchers share the runner and active ownership, with handler-owned replacement watchPaths and native add/change/unlink facts. SessionStart/FileChanged alone receive a session-owned ENV_FILE; existing AppProcess sources its exported delta for later hooks/monitors, without mutating process.env. Per accepted r19 S-01, the same Session ENV_FILE source now supplies instruction rendering too; first expansion and native prompts await the same SessionStart promise, while export values remain per Invocation and generated binding variables win."
       },
       "tests": [
         {

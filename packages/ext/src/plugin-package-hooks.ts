@@ -117,7 +117,7 @@ export async function registerPackageHooks(
       watchFile(pointer, { interval: 100, persistent: false }, revoke)
     }
   }
-  const processSource = (installed: Installed, scope?: InstructionScope): Parameters<typeof pluginProcessConfig>[0] => {
+  const processSource = (installed: Installed, scope?: Pick<InstructionScope, "item">): Parameters<typeof pluginProcessConfig>[0] => {
     if (!installed.settings) throw Error("dependency-missing: package settings")
     return {
       description: installed.description, settings: installed.settings, pluginRoot: installed.pluginRoot,
@@ -623,6 +623,18 @@ export async function registerPackageHooks(
       catch (error) { input.log("runtime-failed: package file watch: " + String(error)) }
     }
   }
+  const startSession = async (sessionID: string, messageID?: string) => {
+    if (!sessionEpoch.has(sessionID)) sessionEpoch.set(sessionID, {})
+    if (!starts.has(sessionID)) starts.set(sessionID,
+      run("SessionStart", sessionID, {
+        source: created.delete(sessionID) ? "startup" : "resume",
+        ...(messageID ? { prompt_id: messageID } : {}),
+      }).then(contexts => {
+        sessionContexts.set(sessionID, [...(sessionContexts.get(sessionID) ?? []), ...contexts])
+      }),
+    )
+    await starts.get(sessionID)
+  }
   const endSession = (sessionID: string, reason: Extract<PackageSessionMessage, { action: "leave" }>["reason"]) => {
     const pending = endings.get(sessionID)
     if (pending) return pending
@@ -874,17 +886,7 @@ export async function registerPackageHooks(
     if (pending?.length)
       promptContexts.set(event.sessionID, [...(promptContexts.get(event.sessionID) ?? []), ...pending])
     reconcileFileWatches(event.sessionID)
-    if (!starts.has(event.sessionID))
-      starts.set(
-        event.sessionID,
-        run("SessionStart", event.sessionID, {
-          source: created.delete(event.sessionID) ? "startup" : "resume",
-          prompt_id: event.messageID,
-        }).then((contexts) => {
-          sessionContexts.set(event.sessionID, [...(sessionContexts.get(event.sessionID) ?? []), ...contexts])
-        }),
-      )
-    await starts.get(event.sessionID)
+    await startSession(event.sessionID, event.messageID)
     startMonitors(event.sessionID)
     const contexts = await run("UserPromptSubmit", event.sessionID, {
       prompt: event.prompt.text ?? "",
@@ -957,6 +959,24 @@ export async function registerPackageHooks(
     })
   })
   return {
+    async instructionEnvironment(sessionID: string, item: Instruction, allowed: () => boolean) {
+      const starting = startSession(sessionID)
+      const lifetime = sessionEpoch.get(sessionID)!
+      const valid = () => allowed() && sessionEpoch.get(sessionID) === lifetime
+      await starting
+      if (!valid()) throw Error("runtime-failed: package invocation ended before instruction rendering")
+      const file = environmentFile(sessionID, lifetime, false)
+      if (!file) return {}
+      const controller = new AbortController()
+      running.set(controller, { sessionID, valid })
+      try {
+        const variables = await processes.environment({ source: processSource(item.installed, { item }), environment: { CLAUDE_ENV_FILE: undefined }, environmentFile: file, signal: controller.signal })
+        if (!valid()) throw Error("runtime-failed: package invocation ended before instruction rendering")
+        return variables
+      } finally {
+        running.delete(controller)
+      }
+    },
     async receiveSession(message: PackageSessionMessage) {
       const session = await context.session.get({ sessionID: message.sessionId }).catch(() => undefined)
       if (!session || session.location.directory !== context.location.directory) return false
@@ -996,6 +1016,7 @@ export async function registerPackageHooks(
       messageID: string | undefined,
       allowed: () => boolean,
     ) {
+      await startSession(sessionID, messageID)
       const results = await run(
         "UserPromptExpansion",
         sessionID,

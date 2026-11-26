@@ -129,6 +129,7 @@ export async function registerPackageInvocations(
   const prepared = async (
     item: Instruction,
     rawArguments: string,
+    sessionID: string,
     ancestors: ReadonlySet<string> = new Set(),
   ): Promise<string> => {
     const key = item.installed.key + ":" + item.entry.id
@@ -154,6 +155,7 @@ export async function registerPackageInvocations(
       arguments: item.entry.invocation.arguments,
       rawArguments,
       cwd: context.location.directory,
+      environment: await input.hooks.instructionEnvironment(sessionID, item, () => allowed(item)),
     })
     requireActive(item)
     const preload: string[] = []
@@ -167,7 +169,7 @@ export async function registerPackageInvocations(
       if (skill) {
         if (!skill.entry.invocation.implicitInvocation)
           throw new Error("dependency_missing: preload skill is manual-only: " + source)
-        preload.push(await prepared(skill, "", visited))
+        preload.push(await prepared(skill, "", sessionID, visited))
         continue
       }
       const managed = (await context.skill.list()).data.find((skill) => skill.id === source || skill.name === source)
@@ -272,7 +274,7 @@ export async function registerPackageInvocations(
       (typeof incoming.background === "boolean"
         ? incoming.background
         : item.installed.description.provider === "claude-code" && (!parent.parentID || item.entry.kind === "skill"))
-    const text = [expansion, await prepared(item, rawArguments)].filter(Boolean).join("\n\n")
+    const text = [expansion, await prepared(item, rawArguments, toolContext.sessionID)].filter(Boolean).join("\n\n")
     const forwarded: Record<string, unknown> = {
       ...incoming,
       agent: target,
@@ -362,7 +364,7 @@ export async function registerPackageInvocations(
             await input.hooks.beforeExpansion(invocation.sessionID, item, invocation.prompt.text, messageID, () =>
               allowed(item),
             )
-            text = await prepared(item, invocation.prompt.text)
+            text = await prepared(item, invocation.prompt.text, invocation.sessionID)
             scope.text = text
           } catch (error) {
             scope.dispose()
@@ -445,7 +447,7 @@ export async function registerPackageInvocations(
           const loaded = await original({ ...data, id: selected?.id ?? "skill--" + item.name }, frame)
           if (item.entry.invocation.fork || item.entry.invocation.agent)
             return delegate(item, rawArguments, "", frame, "tool")
-          const text = await prepared(item, rawArguments)
+          const text = await prepared(item, rawArguments, frame.sessionID)
           bind(frame.sessionID, item, text, "tool")
           const body = selected?.content.trim()
           const replace = (content: string) => (body ? content.replace(body, () => text) : text)
@@ -470,6 +472,7 @@ export async function registerPackageInvocations(
         scopes.get(event.sessionID)?.delete(scope.item.installed.key + ":" + scope.item.entry.id)
       }
     }
+    const attached: { id: string; scope: Scope }[] = []
     for (const attachment of event.prompt.skills ?? []) {
       const listed = (await context.skill.list()).data.find((skill) => skill.id === attachment.id)
       const item = instructions().find(
@@ -478,16 +481,23 @@ export async function registerPackageInvocations(
           listed?.path === join(candidate.installed.pluginRoot, candidate.entry.sourcePath),
       )
       if (!item) continue
-      const scope = bind(event.sessionID, item, "", "attachment")
+      attached.push({ id: attachment.id, scope: bind(event.sessionID, item, "", "attachment") })
+    }
+    for (const current of attached) {
+      const scope = current.scope
+      const item = scope.item
       try {
         await input.hooks.beforeExpansion(event.sessionID, item, "", event.messageID, () => allowed(item))
-        scope.text = await prepared(item, "")
+        scope.text = await prepared(item, "", event.sessionID)
       } catch (error) {
-        scope.dispose()
-        scopes.get(event.sessionID)?.delete(item.installed.key + ":" + item.entry.id)
+        for (const pending of attached.slice(attached.indexOf(current))) {
+          pending.scope.dispose()
+          const key = pending.scope.item.installed.key + ":" + pending.scope.item.entry.id
+          if (scopes.get(event.sessionID)?.get(key) === pending.scope) scopes.get(event.sessionID)?.delete(key)
+        }
         throw error
       }
-      event.prompt.skills = event.prompt.skills?.filter((skill) => skill.id !== attachment.id)
+      event.prompt.skills = event.prompt.skills?.filter((skill) => skill.id !== current.id)
     }
   })
   await context.session.hook("context", async (event) => {
@@ -565,7 +575,7 @@ export async function registerPackageInvocations(
       if (!item.entry.invocation.paths.some((pattern) => Glob.match(pattern, file))) continue
       const current = scopes.get(event.sessionID)?.get(item.installed.key + ":" + item.entry.id)
       if (current && allowed(current.item)) continue
-      const text = await prepared(item, "")
+      const text = await prepared(item, "", event.sessionID)
       bind(event.sessionID, item, text, "path")
     }
   })

@@ -808,7 +808,7 @@ A5 原私有整轨入口在不跑真实模型/容量的约束内没有先行 2 G
 ## D6 AV1 本机解码
 
 - 依据：规格 v1 AC-06/12/16/17/18；`impharaon/alpha-work:docs/specs/video-understanding/design.md` §4.2、§6、§10 V-d @ `e1a5106f6802600cf802f09fda7181f2a86c8081`（alpha-work#254）；alpha-code#1775 r13。沿既有 source/info/frames/clip 路径消费新组件。
-- 核对：r13 明确授权本节 PLAN 后同轮 IMPLEMENT，无额外设计选择；首个实现提交填入本节计划提交。未有独立计划审查收据，不代写通过记录。
+- 核对：计划提交 `c293e80bcb`；r13 的 Phase: PLAN then IMPLEMENT 同轮授权，无额外设计选择。未有独立计划审查收据，不代写通过记录。
 
 ### 改动
 
@@ -848,4 +848,6 @@ A5 原私有整轨入口在不跑真实模型/容量的约束内没有先行 2 G
 
 ### 偏离记录
 
-暂无。真实构建/AV1 解码证据和资产发布清单在完成时补入本节；发布由编排器执行。
+r13 执行：新 worktree 无随包 native/runtime 目录，原声明生成器需要真实 runtime 材料；复用既有固定源缓存调用原 Mac runtime producer，纳入完整 dav1d 许可并核验实际 native 闭包，不改 ASR 源码、版本或编译选项。生成声明因此也同步真实 runtime/build-lock/licences 和该 producer 的 native 摘要。两平台 codec/source 资产仍单独生产，不下载模型。
+
+同链必要修正：Windows 的既有 SOURCE.json 中 OpenH264 PREFIX 字段原来固定为 Mac codec-prefix，实际 Windows 构建和 BUILD.sh 使用 codec-win-prefix；本片发布的新源材料改为消费同一个 prefixName，确保元数据与真实命令相同。无冻结决定变化。最终实物摘要、证明和发布清单在本节续记；发布由编排器执行。

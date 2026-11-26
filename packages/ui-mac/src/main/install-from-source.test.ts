@@ -74,6 +74,30 @@ test("whole plugin skills retain sibling directories and root resources", () => 
   expect(readFileSync(join(live, "tree/skills/skill-development/../hook-development/SKILL.md"), "utf8")).toBe(new TextDecoder().decode(await capture.readFile("skills/hook-development/SKILL.md")).replace("name: hook-development", "name: " + graph.children.find(node => node.name.startsWith("hook-development-"))!.name))
 }))
 
+test("plugin-dev installs commands and agents from the same live bundle", () => installerHarness(async h => {
+  const capture = await captureStandardFixture("claude:plugin-dev")
+  const converted = await convertPluginTree(capture)
+  h.sources.convertCandidate = async () => ({ ok: true, ...converted, capture, runtimeIdentity: undefined })
+  const outcome = await h.install(h.request("real_plugin_dev_invocation"))
+  expect(outcome.ok).toBe(true)
+  if (!outcome.ok) throw new Error(outcome.detail)
+  expect(outcome.installed.filter(entry => entry.kind === "command")).toHaveLength(1)
+  expect(outcome.installed.filter(entry => entry.kind === "agent")).toHaveLength(3)
+  expect(outcome.notRunning.filter(entry => entry.kind === "command" || entry.kind === "agent")).toEqual([])
+  const state = readPackageLedgerStateV1(h.root)
+  if (!state.ok) throw new Error(state.reason)
+  const graph = state.packageGraphs.find(graph => graph.packageId === outcome.packageId)!
+  const live = resolveLiveGenerationDir(h.root, graph.pluginTree!.storeKey)!
+  for (const entry of converted.package.entries.filter(entry => entry.kind === "command" || entry.kind === "agent")) {
+    expect(readFileSync(join(live, "tree", entry.sourcePath), "utf8")).toBe(new TextDecoder().decode(await capture.readFile(entry.sourcePath)))
+    expect(graph.declarations).toContainEqual(expect.objectContaining({ kind: entry.kind, sourceName: entry.sourceName }))
+  }
+  const keys = () => JSON.parse(readFileSync(join(h.root, "skills-enabled.json"), "utf8")).keys as string[]
+  expect(keys().filter(key => key.startsWith("command--") || key.startsWith("agent--"))).toHaveLength(4)
+  expect((await setPackageStateV1({ packageId: outcome.packageId, state: "disabled" }, { globalRoot: () => h.root, advisoryGate: () => ({ allowed: true }), resolvePackage: async () => { throw Error("direct source") } })).ok).toBe(true)
+  expect(keys().filter(key => key.startsWith("command--") || key.startsWith("agent--"))).toEqual([])
+}))
+
 test("whole plugin remotion enables real cross-skill references", () => installerHarness(async h => {
   const capture = await captureWholeFixture("remotion", path => path === ".codex-plugin/plugin.json" || ["remotion-create", "remotion-best-practices"].some(name => path === "skills/" + name + "/SKILL.md"))
   const converted = await convertPluginTree(capture)

@@ -1,0 +1,66 @@
+{
+  "speech-en.wav": {
+    "source": "https://huggingface.co/datasets/google/fleurs",
+    "split": "en_us/dev",
+    "original": "16053666868203857398.wav",
+    "sha256": "71e8878c98c2a4622e9cd6fdaf0d131095f290ab01ea1fb6a901f33b16d9bc29",
+    "license": "CC-BY-4.0",
+    "operation": "unmodified original WAV, copied from the existing 2026-11-25 pilot sample set",
+    "tsv_row": "1626\t16053666868203857398.wav\tThe Olympic gold medalist was due to swim in the 100m and 200m freestyle and in three relays at the Commonwealth Games, but due to his complaints his fitness has been in doubt.\tthe olympic gold medalist was due to swim in the 100m and 200m freestyle and in three relays at the commonwealth games but due to his complaints his fitness has been in doubt\tt h e | o l y m p i c | g o l d | m e d a l i s t | w a s | d u e | t o | s w i m | i n | t h e | 1 0 0 m | a n d | 2 0 0 m | f r e e s t y l e | a n d | i n | t h r e e | r e l a y s | a t | t h e | c o m m o n w e a l t h | g a m e s | b u t | d u e | t o | h i s | c o m p l a i n t s | h i s | f i t n e s s | h a s | b e e n | i n | d o u b t |\t162240\tFEMALE"
+  },
+  "frame-control.json": {
+    "source": "derived from platform-sample.mp4 in the same fixture directory",
+    "codec_pin": "ffmpeg/darwin-arm64/9.1-openh264-2.7.0",
+    "operations": [
+      "ffmpeg -v error -stream_loop 4 -i platform-sample.mp4 -c:v libopenh264 frame-source.mp4",
+      "ffmpeg -nostdin -copyts -ss 0.079 -noaccurate_seek -i frame-source.mp4 -vf trim=end=0.08,select=lte(t\\,0.079),scale=iw*sar:ih,setsar=1,showinfo -fps_mode passthrough -update 1 -f image2 frame-sample.jpg",
+      "ffprobe -v error -select_streams v:0 -show_entries stream=width,height -of json frame-sample.jpg",
+      "bundled helpers/vision frame-sample.jpg"
+    ],
+    "capture": "ffmpeg stderr retains only original pts_time lines; ffprobe and OCR stdout are unchanged",
+    "sha256": {
+      "frame-source.mp4": "d89a4d97c877aaf0965ceccdf1b1a409af56a864838a928b575adcea96a7d9b6",
+      "frame-sample.jpg": "f7f9de98fa8e4f23424a2aae1065711593afeb8fa7b4647d9a56c0a5409f9ab5",
+      "frame-control.json": "08bb02a50b03f6804df5fbd01f571962d2177a41afa296c7797f715e62ea967d"
+    },
+    "scene_operations": [
+      [
+        "-nostdin",
+        "-copyts",
+        "-progress",
+        "pipe:2",
+        "-nostats",
+        "-v",
+        "info",
+        "-i",
+        "packages/ui-mac/src/main/fixtures/video/frame-source.mp4",
+        "-vf",
+        "select='gt(scene,0.3)',showinfo",
+        "-an",
+        "-f",
+        "null",
+        "-"
+      ],
+      [
+        "-nostdin",
+        "-copyts",
+        "-progress",
+        "pipe:2",
+        "-nostats",
+        "-v",
+        "info",
+        "-i",
+        "packages/ui-mac/src/main/fixtures/video/frame-source.mp4",
+        "-filter_complex",
+        "[0:v]split[scenes][timeline];[scenes]select='gt(scene,0.3)',showinfo,nullsink;[timeline]null[progress]",
+        "-map",
+        "[progress]",
+        "-an",
+        "-f",
+        "null",
+        "-"
+      ]
+    ],
+    "scene_capture": "Unchanged progress frame= lines; copyts/null out_time_us remains zero, so processing progress uses the actual unfiltered frame count."
+  }
+}

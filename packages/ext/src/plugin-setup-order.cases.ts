@@ -15,6 +15,7 @@ mock.module("./policy/index", () => ({
   registerPolicy: async () => {
     order.push("registerPolicy")
     return {
+      videoToolFacts: async () => () => ({ kind: "builtin" }),
       seal: async () => {
         order.push("seal")
       },

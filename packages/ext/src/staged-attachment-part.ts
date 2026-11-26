@@ -14,13 +14,22 @@
 
 /** 暂存附件部件的固定文件名(I11')。 */
 export const STAGED_ATTACHMENT_PART_NAME = "codepuppy-attachment.json"
+export const MEDIA_ATTACHMENT_PART_NAME = "codepuppy-media.json"
 /** 暂存附件部件的 MIME(I11';自定义 MIME 会被引擎按字节嗅探改写,实测)。 */
 export const STAGED_ATTACHMENT_PART_MIME = "text/plain"
 
 /** 一个暂存附件 → prompt 的 `files` 条目(`data:` URI 只装它的 StagedAttachmentMeta JSON,UTF-8 → base64)。 */
 export function stagedAttachmentPart(meta: unknown): { uri: string; name: string } {
+  return attachmentPart(meta, STAGED_ATTACHMENT_PART_NAME)
+}
+
+export function mediaAttachmentPart(meta: unknown): { uri: string; name: string } {
+  return attachmentPart(meta, MEDIA_ATTACHMENT_PART_NAME)
+}
+
+function attachmentPart(meta: unknown, name: string) {
   const bytes = new TextEncoder().encode(JSON.stringify(meta))
   let binary = ""
   for (const byte of bytes) binary += String.fromCharCode(byte)
-  return { uri: `data:${STAGED_ATTACHMENT_PART_MIME};base64,${btoa(binary)}`, name: STAGED_ATTACHMENT_PART_NAME }
+  return { uri: `data:${STAGED_ATTACHMENT_PART_MIME};base64,${btoa(binary)}`, name }
 }

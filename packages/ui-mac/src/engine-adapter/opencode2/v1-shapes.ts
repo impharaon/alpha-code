@@ -33,7 +33,8 @@ import type {
   QuestionRequest,
 } from "../contract/v1"
 import { isNetFailureLayer, parseFailureCode } from "@opencode/schema/codepuppy-net-failure"
-import { STAGED_ATTACHMENT_PART_NAME, stagedAttachmentPart } from "../../../../ext/src/staged-attachment-part"
+import { MEDIA_ATTACHMENT_PART_NAME, mediaAttachmentPart, STAGED_ATTACHMENT_PART_NAME, stagedAttachmentPart } from "../../../../ext/src/staged-attachment-part"
+import { MEDIA_METADATA_KEY, mediaAttachmentOf } from "../../shared/media-attachment"
 import { ATTACHMENT_METADATA_KEY, type StagedAttachmentMeta } from "../../shared/attachment-path"
 import { TITLE_VARIANT_ALIAS } from "../../shared/codepuppy-model-types"
 import { projectSessionMessages } from "./messages"
@@ -122,6 +123,8 @@ export function toPrompt(parts: readonly V1PartInput[]) {
     .join("\n")
   type PromptFile = { uri: string; name?: string; mention?: { start: number; end: number; text: string } }
   const files = parts.flatMap((part): PromptFile[] => {
+    const media = part.type === "text" && part.synthetic ? mediaAttachmentOf(part.metadata) : undefined
+    if (media) return [mediaAttachmentPart(media)]
     if (isStagedAttachmentPart(part)) return [stagedAttachmentPart(part.metadata[ATTACHMENT_METADATA_KEY]!)]
     if (part.type !== "file" || !part.url) return []
     const mention = part.source?.text
@@ -349,6 +352,17 @@ function semanticKey(messageID: string, part: Part) {
 
 function restoreStagedAttachment(part: Part): Part {
   if (part.type !== "file") return part
+  if (part.filename === MEDIA_ATTACHMENT_PART_NAME) {
+    const data = part.url.match(/^data:[^,]*;base64,(.*)$/)?.[1]
+    if (!data) return part
+    try {
+      const media = mediaAttachmentOf({ [MEDIA_METADATA_KEY]: JSON.parse(utf8FromBase64(data)) })
+      if (!media) return part
+      return { id: part.id, sessionID: part.sessionID, messageID: part.messageID, type: "text", text: "", synthetic: true, metadata: { [MEDIA_METADATA_KEY]: media } } as Part
+    } catch {
+      return part
+    }
+  }
   const meta = stagedAttachmentOf({ filename: part.filename, url: part.url })
   if (!meta) return part
   return {

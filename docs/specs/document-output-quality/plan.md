@@ -811,3 +811,16 @@ all bun (packages/codepuppy-contracts-consumer) tests: bun.lock changed (manifes
 ```
 
 已核 Codex / GPT-6：r14 全部具名缺陷已修正；冻结 spec/design/§10 不变，ship 归编排器。遗留去向：既有 #1760/发布/relay/Windows/真实 LO 集成沿原归属；docs contract 全仓输出 69 errors/251 warnings，本 plan findings=0，不扩修其它文档。16 个相对链接通过、diff 检查通过、hooksPath=.githooks。无新 OPTIONAL。本机日志统一 /tmp/alpha-1761-r14；前台命令完成后才交回。
+
+
+## r15：视频合入后的集成
+
+2026-11-26 13:25:35 UTC 开始，预计 75 分钟（slot 排队另记）。按 r15 显式授权 fetch 后 merge origin/alpha `2142240b16b1a5516ba841d75e751fdf93f54607`，不 rebase；原 HEAD 4e74d7830f。只组合冲突与直接消费者，不改变两份冻结设计。
+
+语义组合：core MCP 同时消费 documentPythonEnvironmentFor 与 VideoProgress；cloud-vision-hooks 保留视频 isVideoFrames 权威、frame/OCR 注册/按需 vision executor/带问题的缓存键，也保留 documentPageView、Read 路径和既有 vision 成败回执（普通图片缓存键仍为原 hash）。plugin 同时接入两个能力，视频 transform 与文档 lifecycle 均在原链中。工具卡按可信身份继续分派，两类标题走同一 toolTitleKeyOf；两侧原测试一并保留。electron-builder 的 extraResources 保留两类资产，beforePack/afterPack 对两类资源都执行各自权威检查，视频 child-sign/inventory/afterSign 保留，Windows 不在文档检查后提前 return；Linux 仍不受影响。NOTICE 是手工随包署名，没有生成器：合并两个完整段落，不删任何许可。NUL 沿原机制同时保留 Office 后缀/解释器头与 WAV/视频 native-header 豁免，地板不变。
+
+冲突测试：mac-target-arch 保留 Windows x64 拒绝、Linux 不受影响与视频签名判据；Office snapshot 的真实 Excel schema 变异保留，同时传入视频构建产物；release-source 保留 Linux 放行预检查和正式 darwin dirty-source 拒绝。context injection 由原生成器重生，Office tools 与引擎 fixture 将由原生成器重生，不手合 JSON。
+
+登记表三方逐 key 比较只有 core MCP runtime 被双方同时修改（共同基线 24，双方各 25）；实际合并用例为 26（trusted-Python 与 video progress 各新增一条），slot 真实测量通过后只同步其 count=26。collision 3→4 是 origin 单边改动，保留 4，并在同一相关运行中实际通过。双方其它登记/理由保留。旧名登记中的实际采样命中在最终 sampler 完成后按同一 hitTokens 核对，不保留失效的采样路径。
+
+bun.lock 改变，bun install --frozen-lockfile exit 0（5 packages installed），husky 后已恢复并核对 .githooks。初次相关运行 ext / packaging / core 均 exit 0，逐文件实际 JUnit 与类型检查日志在 /tmp/alpha-1761-r15。采样器拒绝未提交的引擎闭包，所以先提交已解决的合并树，再在此真实提交上运行 sampler，生成结果另一次提交；中间保留有来源的原 JSON 仅为采样前置，绝不视为最终一致性证据。

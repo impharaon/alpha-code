@@ -12,6 +12,8 @@
 // 正向闸门锁 model/enabled_providers/provider/三个 alpha agent/{file:} ref,反向闸门锁 catch 的
 // 真实爆炸半径 + 失败必须出声)。
 
+import { codepuppyVideoDefinition } from "./codepuppy-video"
+import { VIDEO_MCP_NAME } from "../shared/media-attachment"
 import { codepuppyBootstrap } from "@opencode/util/codepuppy-bootstrap"
 import { ASK_AGENT, READONLY_AGENT } from "../shared/permission-tier"
 import { AUTOMATION_DEFAULTS } from "../shared/automation-types"
@@ -556,6 +558,12 @@ export function injectCodePuppyConfig(
         console.error(
           `[alpha-code#223] web search kill switch is set — the cloud MCP server definition is WITHHELD from the engine config (a neutralised ${WITHHELD_CLOUD_MCP.url} entry overrides any inherited one); only a confirmed @codepuppy/ext load installs the real one from the bootstrap document${extPluginPath ? "" : ", and no ext bundle path was resolved this fork so it will stay dark"}`,
         )
+    }
+
+    const video = codepuppyVideoDefinition(bootstrap)
+    if (video) {
+      config.mcp = { ...config.mcp, servers: { ...config.mcp?.servers, [VIDEO_MCP_NAME]: video } }
+      injectedMcpNames.add(VIDEO_MCP_NAME)
     }
 
     // Remote MCP config only toggles whole servers, but the engine's global permission layer filters

@@ -1349,3 +1349,29 @@ test("document workflow stages reuse tool steps only for persisted builtin, clou
     expect(toolCardHeadOf(forged).titleKey).toBeUndefined()
   }
 })
+
+test("verified video progress shows actual coverage and bytes, never a percentage or a third-party claim", () => {
+  const display: ToolDisplaySnapshotV1 = { identity: { source: "mcp", origin: "codepuppy-video", name: "transcript" }, technicalId: "video", authority: { kind: "codepuppy-bundled", bindingId: "video", evidenceDigest: "sha256:abc" } }
+  const make = (progress: unknown) => part("arbitrary-alias", { status: "running", metadata: { "codepuppy.video.progress": progress } }, display)
+  const known = toolStepLineOf(make({ phase: "transcribing", completed: 60000, total: 3600000, unit: "ms" }))
+  expect(known).toMatchObject({ verbKey: "codepuppy.timeline.video.phase.transcribing", object: "1:00 / 60:00" })
+  const unknown = make({ phase: "decoding", completed: 12000, unit: "ms" })
+  expect(toolStepLineOf(unknown).object).toBe("0:12")
+  expect(toolStepLineOf(part("same-name", unknown.state, { ...display, authority: { kind: "not-asserted" } })).object).not.toBe("0:12")
+  expect(toolStepLineOf(make({ phase: "transcribing", completed: -1, unit: "ms" })).object).not.toBe("-1")
+  expect(toolStepLineOf(part("video", { status: "running", metadata: { preparation: { phase: "download", sequence: 3, id: "model", receivedBytes: 2048 } } }, display))).toMatchObject({ verbKey: "codepuppy.timeline.video.phase.preparing", object: "2048 B" })
+  const finished = part("video", { status: "completed", metadata: { "codepuppy.video.progress": { phase: "transcribing", completed: 60000, unit: "ms" } } }, display)
+  expect(toolStepLineOf(finished).object).not.toBe("1:00")
+  const cloud: ToolDisplaySnapshotV1 = { identity: { source: "mcp", origin: "codepuppy", name: "vision" }, technicalId: "vision", authority: { kind: "codepuppy-cloud", bindingId: "cloud", evidenceDigest: "sha256:abc" } }
+  expect(toolStepLineOf(part("vision", { status: "running", metadata: { "codepuppy.video.frame": { sourceId: "source", frameId: "frame", actualMs: 121000 } } }, cloud))).toMatchObject({ verbKey: "codepuppy.timeline.video.frameUpload", object: "2:01" })
+
+})
+
+
+test("completed and cached video understanding cards retain the uploaded file range and bytes",()=>{
+ const display:ToolDisplaySnapshotV1={identity:{source:"mcp",origin:"codepuppy-video",name:"understand"},technicalId:"video",authority:{kind:"codepuppy-bundled",bindingId:"video",evidenceDigest:"sha256:abc"}}
+ for(const cached of [false,true]){
+  const value=part("video",{status:"completed",metadata:{"codepuppy.video.upload":{file:"speech.mp4",sourceRange:{start_ms:60000,end_ms:90000},bytes:1019},cached}},display)
+  expect(toolStepLineOf(value)).toMatchObject({verbKey:"codepuppy.timeline.video.understand",object:"speech.mp4 · 1:00–1:30 · 1019 B"})
+ }
+})

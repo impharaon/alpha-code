@@ -1,3 +1,7 @@
+import { Error } from "@opencode/plugin/promise/tool"
+import { VIDEO_FRAME_KEY, type VideoFrameReference } from "../../schema/src/codepuppy-video-progress"
+import type { ToolEditor } from "@opencode/plugin/promise/tool"
+import { outputs } from "../../ui-mac/resources/video-mcp/contracts"
 // cloud-vision-hooks — 看不了图的模型:贴图与 Read 读到的图自动送云端识图,模型可按编号 / 路径追问
 // (`#1419`,REQ-228 基线 §2-B;`#1447` R1 修订)。`#1665` 起接在 OpenCode 2 的两个钩子上(清点表 P2 / P4 / P7)。
 //
@@ -32,11 +36,15 @@ import {
   dataUrlBase64,
   looksLikeBase64Image,
   transcribeEntry,
+  describeEntry,
+  visionCacheKey,
+  visionFailureBlock,
   VisionSession,
+  safeDelimiters,
   visionToolRefusedText,
   type VisionImageEntry,
 } from "./cloud-vision"
-import { contextText, renderTemplate, VISION_SYSTEM_NOTE_ID, VISION_SYSTEM_NOTE_OFFLINE_ID } from "./context-injection"
+import { contextText, renderTemplate, renderWrapper, VIDEO_OCR_ID, VIDEO_FRAME_NOTE_ID, VIDEO_FRAME_OFFLINE_ID, VISION_SYSTEM_NOTE_ID, VISION_SYSTEM_NOTE_OFFLINE_ID } from "./context-injection"
 import { compressForVision, VISION_MCP_IMAGE_MAX_BYTES } from "./vision-image"
 
 export type ModelRef = { readonly providerID: string; readonly id: string }
@@ -54,6 +62,8 @@ export type CloudVisionHookDeps = {
     view: { path: string; sha256: string; inspected: boolean; reason?: string },
   ) => void
   readonly directory: string
+  /** Existing policy authority verifies the bundled video frames producer. */
+  readonly isVideoFrames: (tool: string) => Promise<boolean>
   /** 该模型能不能看图;查不到 = undefined(按看不了处理)。 */
   readonly seesImages: (model: ModelRef) => Promise<boolean | undefined>
   /** 插件存储(跨重启的转写缓存);缺席 = 只在本进程缓存。 */
@@ -121,6 +131,7 @@ export function createCloudVisionHooks(deps: CloudVisionHookDeps) {
   const sessions = new Map<string, VisionSession>()
   const documentReads = new Map<string, Map<string, string>>()
   const questions = new Map<string, { sessionID: string; entry: VisionImageEntry }>()
+  const wrapped = Symbol("video-frame-vision")
   const sessionFor = (sessionID: string): VisionSession => {
     let s = sessions.get(sessionID)
     if (!s) sessions.set(sessionID, (s = new VisionSession()))
@@ -128,24 +139,22 @@ export function createCloudVisionHooks(deps: CloudVisionHookDeps) {
   }
 
   /** 跨重启的转写缓存:先看登记簿,再看插件存储。 */
-  async function warmTranscript(session: VisionSession, entry: VisionImageEntry) {
-    if (!deps.storage || session.transcripts.has(entry.hash)) return
+  async function warmTranscript(session: VisionSession, entry: VisionImageEntry, question?: string) {
+    const key = visionCacheKey(entry, question)
+    if (!deps.storage || session.transcripts.has(key)) return
     try {
-      const stored = await deps.storage.get(STORAGE_PREFIX + entry.hash)
-      if (typeof stored === "string" && stored !== "") session.transcripts.set(entry.hash, stored)
+      const stored = await deps.storage.get(STORAGE_PREFIX + key)
+      if (typeof stored === "string" && stored !== "") session.transcripts.set(key, stored)
     } catch (error) {
-      deps.error?.(
-        `[@codepuppy/ext] cloud vision: transcript cache unavailable (${error instanceof Error ? error.message : String(error)})`,
-      )
+      deps.error?.(`[@codepuppy/ext] cloud vision: transcript cache unavailable (${error instanceof globalThis.Error ? error.message : String(error)})`)
     }
   }
-  async function persistTranscript(session: VisionSession, entry: VisionImageEntry) {
-    const text = session.transcripts.get(entry.hash)
+  async function persistTranscript(session: VisionSession, entry: VisionImageEntry, question?: string) {
+    const key = visionCacheKey(entry, question)
+    const text = session.transcripts.get(key)
     if (!deps.storage || text === undefined) return
-    await deps.storage.set(STORAGE_PREFIX + entry.hash, text).catch((error: unknown) => {
-      deps.error?.(
-        `[@codepuppy/ext] cloud vision: transcript not cached (${error instanceof Error ? error.message : String(error)})`,
-      )
+    await deps.storage.set(STORAGE_PREFIX + key, text).catch((error: unknown) => {
+      deps.error?.(`[@codepuppy/ext] cloud vision: transcript not cached (${error instanceof globalThis.Error ? error.message : String(error)})`)
     })
   }
 
@@ -156,18 +165,19 @@ export function createCloudVisionHooks(deps: CloudVisionHookDeps) {
         const session = sessionFor(event.sessionID)
         const visionTool = cloudVisionToolId(bootstrap())
         const readPaths = new Map<string, string>()
-        type Slot = {
-          message: number
-          part: number
-          item?: number
-          entry: VisionImageEntry
-          name?: string
-          path?: string
-        }
+        type Slot = { message: number; part: number; item?: number; entry: VisionImageEntry; name?: string; path?: string; frame?: { reference: VideoFrameReference; text: string } }
         const slots: Slot[] = []
         const replaced = new Map<number, unknown[]>()
-        const contentOf = (index: number) =>
-          replaced.get(index) ?? ((event.messages[index] as MessageLike).content as unknown[])
+        const contentOf = (index: number) => replaced.get(index) ?? ((event.messages[index] as MessageLike).content as unknown[])
+        const videoTools = new Set<string>()
+        for (const raw of event.messages) {
+          const content = (raw as MessageLike).content
+          if (!Array.isArray(content)) continue
+          for (const value of content) {
+            const part = value as Part
+            if (part.type === "tool-result" && !videoTools.has(toolName(part)) && await deps.isVideoFrames(toolName(part))) videoTools.add(toolName(part))
+          }
+        }
         event.messages.forEach((raw, m) => {
           const message = raw as MessageLike
           if (!Array.isArray(message.content)) return
@@ -199,6 +209,23 @@ export function createCloudVisionHooks(deps: CloudVisionHookDeps) {
               replaced.set(m, next)
               return
             }
+            if (videoTools.has(toolName(part)) && result.type === "content" && Array.isArray(result.value)) {
+              const items = result.value
+              const text = items.find((item) => item && typeof item === "object" && item.type === "text" && typeof item.text === "string")?.text
+              const json = typeof text === "string" ? (() => { try { return JSON.parse(text) } catch { return undefined } })() : undefined
+              const parsed = outputs.frames.safeParse(json)
+              const images = result.value.filter(imageFileItem)
+              if (!parsed?.success || images.length !== parsed.data.frames.length) return
+              parsed.data.frames.forEach((frame, index) => {
+                const image = images[index]!
+                const base64 = dataUrlBase64(image.uri)
+                if (!base64 || image.mime !== frame.mime) return
+                const reference = { sourceId: parsed.data.sourceId, frameId: frame.id, actualMs: frame.actualMs }
+                const entry = session.registerFrame({ base64, label: frame.id, path: frame.path }, reference)
+                slots.push({ message: m, part: p, item: items.indexOf(image), entry, frame: { reference, text: frame.ocr.text } })
+              })
+              return
+            }
             if (toolName(part) !== "read" || result.type !== "content" || !Array.isArray(result.value)) return
             result.value.forEach((item: unknown, i: number) => {
               if (!imageFileItem(item)) return
@@ -210,15 +237,12 @@ export function createCloudVisionHooks(deps: CloudVisionHookDeps) {
         })
         const sees = (await deps.seesImages(event.model)) === true
         if (!sees && slots.length > 0) {
-          const td = {
-            access: cloudVisionAccess(bootstrap(), readFile),
-            fetch: deps.fetch,
-            timeoutMs: deps.timeoutMs,
-            log: deps.error,
-          }
-          for (const slot of slots) await warmTranscript(session, slot.entry)
-          const blocks = await Promise.all(slots.map((slot) => transcribeEntry(session, slot.entry, td, slot.name)))
-          await Promise.all(slots.map((slot) => persistTranscript(session, slot.entry)))
+          const td = { access: cloudVisionAccess(bootstrap(), readFile), fetch: deps.fetch, timeoutMs: deps.timeoutMs, log: deps.error }
+          for (const slot of slots) if (!slot.frame) await warmTranscript(session, slot.entry)
+          const blocks = await Promise.all(slots.map((slot) => slot.frame
+            ? renderWrapper(VIDEO_OCR_ID, { label: safeDelimiters(`${slot.frame.reference.frameId} · ${slot.frame.reference.actualMs} ms · source ${slot.frame.reference.sourceId}`), body: safeDelimiters(slot.frame.text) })
+            : transcribeEntry(session, slot.entry, td, slot.name)))
+          await Promise.all(slots.filter((slot) => !slot.frame).map((slot) => persistTranscript(session, slot.entry)))
           slots.forEach((slot, index) => {
             const next = [...contentOf(slot.message)]
             const text = blocks[index]!
@@ -252,6 +276,7 @@ export function createCloudVisionHooks(deps: CloudVisionHookDeps) {
         if (sees) return
         const toolId = cloudVisionToolId(bootstrap())
         const access = cloudVisionAccess(bootstrap(), readFile)
+        if (slots.some((slot) => slot.frame)) event.system.push({ type: "text", text: toolId && access.ok ? renderTemplate(VIDEO_FRAME_NOTE_ID, { name: toolId }) : contextText(VIDEO_FRAME_OFFLINE_ID) })
         event.system.push({
           type: "text",
           text:
@@ -260,28 +285,19 @@ export function createCloudVisionHooks(deps: CloudVisionHookDeps) {
               : contextText(VISION_SYSTEM_NOTE_OFFLINE_ID),
         })
       } catch (error) {
-        deps.error?.(
-          `[@codepuppy/ext] cloud vision (context) failed: ${error instanceof Error ? error.message : String(error)}`,
-        )
+        deps.error?.(`[@codepuppy/ext] cloud vision (context) failed: ${error instanceof globalThis.Error ? error.message : String(error)}`)
       }
     },
 
     /** P7:模型调 `codepuppy_vision` ⇒ 引用换成压缩后的 base64。抛出 = 模型看到的工具错误(与 web search 闸同一机制)。 */
-    async toolBefore(event: {
-      readonly tool: string
-      readonly sessionID: string
-      readonly id?: string
-      input: unknown
-    }): Promise<void> {
+    async toolBefore(event: { readonly tool: string; readonly sessionID: string; readonly id: string; input: unknown }): Promise<void> {
       const toolId = cloudVisionToolId(bootstrap())
       if (!toolId || event.tool !== toolId) return
       const args = event.input as Record<string, unknown> | null
       if (!args || typeof args !== "object") return
       const ref = args.image
       if (typeof ref !== "string" || ref.trim() === "")
-        throw new Error(
-          `${toolId}: "image" is required — pass an attachment number, a file name, or a path already read with the Read tool`,
-        )
+        throw new globalThis.Error(`${toolId}: "image" is required — pass an attachment number, a file name, or a path already read with the Read tool`)
       let image: { base64: string; mime: string }
       if (looksLikeBase64Image(ref))
         image = await compressForVision(Buffer.from(ref, "base64"), { maxBytes: VISION_MCP_IMAGE_MAX_BYTES })
@@ -293,13 +309,18 @@ export function createCloudVisionHooks(deps: CloudVisionHookDeps) {
             .list()
             .map((e) => `${e.number} = ${e.label}${e.path ? ` [${e.path}]` : ""} (sha256 ${e.hash.slice(0, 12)}…)`)
             .join("; ")
-          throw new Error(
+          throw new globalThis.Error(
             `${toolId}: no image in this session matches "${ref}". ` +
               (known ? `Known images: ${known}. ` : "No images have been seen in this session yet. ") +
               "Pass an attachment number, a file name, or a path that was already read with the Read tool; for a file that has not been read yet, call Read on that path first — reading it registers the image here.",
           )
         }
         // 这条路走 MCP,上限是整包 262144(`#1447` R1 B1):按追问预算压。
+        const frame = session.frameReference(ref, deps.directory)
+        if (frame) {
+          event.input = { ...args, model: CLOUD_VISION_MODEL, fallback_on_refusal: CLOUD_VISION_FALLBACK_ON_REFUSAL }
+          return
+        }
         image = await entry.compressed(VISION_MCP_IMAGE_MAX_BYTES)
         if (event.id) questions.set(event.id, { sessionID: event.sessionID, entry })
       }
@@ -325,6 +346,35 @@ export function createCloudVisionHooks(deps: CloudVisionHookDeps) {
             inspected: event.status === "completed",
             ...(event.status !== "completed" ? { reason: "The existing vision question failed." } : {}),
           })
+    },
+
+    /** The existing vision executor still owns upload, cache, billing and errors. */
+    transform(editor: ToolEditor) {
+      const id = cloudVisionToolId(bootstrap())
+      if (!id) return
+      editor.update(id, (tool) => {
+        if (Object.getOwnPropertySymbols(tool.execute).includes(wrapped)) return
+        const execute = tool.execute
+        const next: typeof execute = async (input, context) => {
+          const session = sessionFor(context.sessionID)
+          const args = input as Record<string, unknown>
+          const ref = typeof args?.image === "string" ? args.image : ""
+          const frame = ref && !looksLikeBase64Image(ref) ? session.frameReference(ref, deps.directory) : undefined
+          if (!frame) return await execute(input, context)
+          context.signal.throwIfAborted()
+          await context.progress({ [VIDEO_FRAME_KEY]: frame })
+          const entry = session.lookup(frame.frameId, deps.directory)!
+          const question = typeof args.question === "string" ? args.question : undefined
+          await warmTranscript(session, entry, question)
+          const outcome = await describeEntry(session, entry, { access: cloudVisionAccess(bootstrap(), readFile), signal: context.signal, fetch: deps.fetch, timeoutMs: deps.timeoutMs, log: deps.error }, question)
+          context.signal.throwIfAborted()
+          if (!outcome.ok) throw new Error({ message: visionFailureBlock(frame.frameId, outcome.kind), metadata: { [VIDEO_FRAME_KEY]: frame } })
+          await persistTranscript(session, entry, question)
+          return { output: { text: outcome.text, model: CLOUD_VISION_MODEL, fallback_used: CLOUD_VISION_FALLBACK_ON_REFUSAL }, metadata: { [VIDEO_FRAME_KEY]: frame } }
+        }
+        Object.defineProperty(next, wrapped, { value: true })
+        tool.execute = next
+      })
     },
 
     /** 测试与诊断用:本 Location 里某会话的登记簿。 */

@@ -4982,3 +4982,22 @@ test("BC4 production timeline intent reaches the existing SDK OAuth adapter and 
   expect(requests.every(request=>new URL(request.url).searchParams.get("location[directory]")==="/tmp/workspace")).toBe(true)
  }finally{Object.assign(window,{api:previous});bindingAccountClient=undefined}
 },15000)
+
+
+test("video progress updates the existing card with actual coverage and unknown-total bytes", async () => {
+  const host = mount()
+  const [state, setState] = solidStore.createStore<Record<string, unknown>>({ status: "running", input: {}, time: { start: 1 }, metadata: { "codepuppy.video.progress": { phase: "transcribing", completed: 60000, total: 3600000, unit: "ms" } } })
+  const display = { identity: { source: "mcp", origin: "codepuppy-video", name: "transcript" }, technicalId: "video", authority: { kind: "codepuppy-bundled", bindingId: "video", evidenceDigest: "sha256:abc" } }
+  runtime.setTimelineRows(assistantFixture([toolPartFixture("prt_video", "video_transcript", state, display)], "busy"))
+  await flush()
+  // Open the same step detail used by other local tools.
+  const card = host.querySelector("[data-codepuppy-tool-card]")!
+  await openStep(card)
+  await flush()
+  expect(host.textContent).toContain("1:00 / 60:00")
+  setState("metadata", { "codepuppy.video.progress": { phase: "preparing", completed: 2048, unit: "bytes" } })
+  await flush()
+  expect(host.textContent).toContain("2048 B")
+  expect(host.textContent).not.toContain("1:00 / 60:00")
+  expect(host.textContent).not.toContain("%")
+})

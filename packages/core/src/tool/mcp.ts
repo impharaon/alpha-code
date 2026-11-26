@@ -1,3 +1,4 @@
+import { VIDEO_PROGRESS_KEY } from "@opencode/schema/codepuppy-video-progress" // codepuppy(#1775)
 export * as McpTool from "./mcp.js"
 
 import { ToolFailure } from "@opencode/ai/effect"
@@ -88,13 +89,14 @@ export const layer = Layer.effect(
                         message: `MCP tool "${tool.name}" on server "${tool.server}" changed after this request was prepared; it was not run. Use the tool as the server now lists it.`,
                       })
                     // codepuppy ── end
+                    const callContext = yield* Effect.context() // codepuppy(#1775): capture this invocation
                     const result = yield* mcp
                       .callTool({
                         server: tool.server,
                         name: tool.name,
                         args: (input ?? {}) as Record<string, unknown>,
                         sessionID: context.sessionID,
-                      })
+                      }, (update) => Effect.runPromiseWith(callContext)(context.progress({ [VIDEO_PROGRESS_KEY]: update }))) // codepuppy(#1775): keep the callback outside request data
                       .pipe(
                         Effect.catchTags({
                           "MCP.NotFoundError": (error) =>

@@ -1,3 +1,4 @@
+import { parseVideoBridgeReply, type VideoBridgeRequest, type VideoBridgeReply } from "../../ui-mac/src/shared/video-understanding"
 import { createNetworkEgress } from "./network-egress"
 import { parseNetworkOutbound } from "../../ui-mac/src/shared/network-egress-wire"
 import type { PackageAuthorizationResultV1 } from "../../ui-mac/src/shared/package-admission"
@@ -58,7 +59,10 @@ export type BridgeFailure = { ok: false; reason: "unavailable" | "timeout" | "er
 /** BR-10:审批卡上「要装什么」—— main 在搜索结果里给出的名称与真实来源(自制插件为 `created`)。 */
 export type HubInstallSubject = { readonly name: string; readonly source: PluginSourceIdV1 | "created" }
 
+type VideoAction = VideoBridgeRequest extends infer Request ? Request extends VideoBridgeRequest ? Omit<Request,"type"|"id"> : never : never
+
 export type HubBridge = {
+  video(input: VideoAction): Promise<VideoBridgeReply | BridgeFailure>
   readonly network: ReturnType<typeof createNetworkEgress>
   readonly unattended: ReturnType<typeof createUnattendedState>
   readonly available: boolean
@@ -227,6 +231,7 @@ export function createHubBridge(
   }
 
   return {
+    video: (input) => ask((id)=>({type:"codepuppy.video.understand",id,...input}),parseVideoBridgeReply),
     network,
     unattended,
     available: !!port,

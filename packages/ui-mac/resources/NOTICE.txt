@@ -85,3 +85,21 @@ licensed under SIL Open Font License 1.1. Full licences, copyrights, fixed sourc
 and Code Puppy static-font modification details ship in document-assets/licenses/.
 Chinese Office templates are application-authored; their source/version are
 recorded in each template's custom properties.
+--------------------------------------------------------------------------------
+Local video and audio components
+--------------------------------------------------------------------------------
+SenseVoiceSmall (FunASR / Alibaba) model and its complete Model License 1.1
+are included at video-mcp/licenses/SenseVoiceSmall.txt. The original model
+archive carries a link to this text; that link is not a replacement for it.
+
+Full licenses, attribution and ONNX Runtime third-party notices for sherpa-onnx,
+Whisper / OpenAI, whisper.cpp, whisper.node, Silero VAD, pyannote segmentation,
+3D-Speaker, FFmpeg (LGPL 2.1), OpenH264, Tesseract, tessdata_fast, Leptonica,
+libjpeg-turbo / IJG, yt-dlp and its EJS helper ship in video-mcp/licenses/.
+video-mcp/licenses.json records each original source and the full text digest.
+
+FFmpeg is built without GPL/nonfree libraries and uses OpenH264 for H.264.
+The downloaded ffmpeg component includes its licenses and SOURCE.json. The
+matching source release asset named there includes both original source
+archives, the build configuration and BUILD.sh. Sources accompany each
+platform's binary asset on the same public release.

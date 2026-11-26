@@ -7,7 +7,7 @@ import {
   type StagedAttachmentMeta,
 } from "../../ui-mac/src/shared/attachment-path"
 import { attachmentReadOf } from "../../ui-mac/src/renderer/codepuppy-ui/session-timeline/timeline-attachments"
-import { attachmentInstruction } from "./attachment-reader-hooks"
+import { createAttachmentReaderHooks, mediaAttachmentOfText, mediaInstruction, attachmentInstruction } from "./attachment-reader-hooks"
 import { mcpEngineToolId } from "./cloud-websearch-kill"
 import { explainAttachmentBlock } from "./context-injection"
 
@@ -121,4 +121,30 @@ describe("I11' 暂存附件部件", () => {
     expect(stagedAttachmentOfText("Attached file: codepuppy-attachment.json")).toBeUndefined()
     expect(stagedAttachmentOfText("hello")).toBeUndefined()
   })
+})
+
+
+test("media metadata becomes a registered local instruction with the original path and no installation step", async () => {
+  const media = { kind: "audio" as const, name: "会议.mp3", path: "/outside/project/会议.mp3", bytes: 2_000_000_000, durationMs: null }
+  const text = `\n\nAttached file: codepuppy-media.json\n\n${JSON.stringify(media)}`
+  expect(mediaAttachmentOfText(text)).toEqual(media)
+  expect(mediaAttachmentOfText(text.replace("codepuppy-media.json", "other.json"))).toBeUndefined()
+  const instruction = mediaInstruction(media, { "codepuppy-video": { status: "connected" } })
+  expect(explainAttachmentBlock(instruction)).toEqual({ ok: true, id: "media.read", kind: "wrapper" })
+  expect(instruction).toContain("codepuppy-video_info")
+  expect(instruction).toContain("codepuppy-video_transcript")
+  expect(instruction).toContain(JSON.stringify({ kind: "path", path: media.path }))
+  expect(instruction).not.toContain(".code-puppy")
+  expect(explainAttachmentBlock(mediaInstruction(media, {}))).toMatchObject({ id: "media.unavailable" })
+  expect(mediaInstruction(media, {})).toContain("do not invent content or ask them to install")
+  class UserMessage {
+    role = "user"
+    content: unknown[]
+    constructor(fields: Record<string, unknown>) { this.content = fields.content as unknown[] }
+  }
+  const original = new UserMessage({ content: [{ type: "text", text }] })
+  const event = { messages: [original] }
+  await createAttachmentReaderHooks({ directory: "/different/project", mcpStatus: async () => ({ "codepuppy-video": { status: "connected" } }) }).context(event)
+  expect(event.messages[0]!.content).toEqual([{ type: "text", text: instruction }])
+  expect(original.content).toEqual([{ type: "text", text }])
 })

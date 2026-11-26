@@ -1,3 +1,4 @@
+import { parseVideoBridgeRequest, type VideoBridgeRequest, type VideoBridgeReply } from "../shared/video-understanding"
 import type { NetworkOutbound } from "../shared/network-egress-wire"
 import type { PackageAuthorizationResultV1 } from "../shared/package-admission"
 import { isInstallOutcomeV1, type InstallOutcomeV1, type CreatedPluginDraftV1 } from "../shared/plugin-install"
@@ -163,6 +164,7 @@ export type PackageAuthorizationQuery = { type: "codepuppy.package.authorization
 export type PackageAuthorizationReply = { type: "codepuppy.package.authorization.reply"; id: number; result: PackageAuthorizationResultV1 }
 
 export type CodePuppySidecarInbound =
+  | VideoBridgeRequest
   | HubViewRequestMessage
   | PackageAuthorizationQuery
   | HubRequestQueryMessage
@@ -171,6 +173,7 @@ export type CodePuppySidecarInbound =
   | SourcesSearchRequest
   | HubInstallRequest
 export type CodePuppySidecarOutbound =
+  | VideoBridgeReply
   | NetworkOutbound
   | ReloadRequestMessage
   | PackageAuthorizationReply
@@ -218,6 +221,8 @@ function parseReloadItems(value: unknown): ReloadItem[] | undefined {
 
 /** main 侧:ext → main 的封闭消息族。别的一律 undefined(含 main → ext 的方向)。 */
 export function parseCodePuppySidecarInbound(value: unknown): CodePuppySidecarInbound | undefined {
+  const video=parseVideoBridgeRequest(value)
+  if(video)return video
   if (!isRecord(value)) return
   if (value.type === "codepuppy.package.authorization.request")
     return isId(value.id) && isText(value.packageId) && Object.keys(value).every(key => ["type", "id", "packageId"].includes(key))

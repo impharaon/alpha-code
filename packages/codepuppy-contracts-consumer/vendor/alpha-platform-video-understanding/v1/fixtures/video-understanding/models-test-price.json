@@ -1,0 +1,38 @@
+{
+  "kind": "schema",
+  "contract": "VideoModelsV1",
+  "expect": "valid",
+  "source": "packages/gateway/scripts/generate-wire-contracts.ts: buildVideoModelsV1; isolated test rate, not the deployed price table",
+  "value": {
+    "schema_version": 1,
+    "default_model": "gemini",
+    "models": [
+      {
+        "key": "gemini",
+        "label": "Gemini 3.5 Flash-Lite",
+        "revision": "a1d9bb3c1e8bbe73bc0454fd7e4016d4e8c5124e5d8b26b3ca7b2e3196b84b89",
+        "mimes": [
+          "video/mp4",
+          "video/mpeg",
+          "video/mov",
+          "video/avi",
+          "video/x-flv",
+          "video/mpg",
+          "video/webm",
+          "video/wmv",
+          "video/3gpp"
+        ],
+        "inline_media_bytes_exclusive": 100000000,
+        "upload_request_bytes_limit": 100000000,
+        "upload_media_bytes_exclusive": 99737336,
+        "upstream_request_bytes_limit": 104857600,
+        "context_tokens": 1048576,
+        "output_tokens": 65536,
+        "price": {
+          "input_fen_per_million": "12.345",
+          "output_fen_per_million": "67.89"
+        }
+      }
+    ]
+  }
+}

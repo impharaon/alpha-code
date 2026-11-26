@@ -111,4 +111,4 @@ export const BUNDLED_PLUGIN_TOOL_NAMES: ReadonlyArray<readonly [string, string]>
 export const VISION_MARKER_KEY: readonly [string, string] = ["alpha_vision", "codepuppy_vision"]
 
 /** 项目隐藏目录(`PROJECT_HIDDEN_DIR` 的旧值)。 */
-export const LEGACY_PROJECT_HIDDEN_DIR = ".code-puppy"
+export { LEGACY_PROJECT_HIDDEN_DIR } from "../shared/project-hidden-dir"

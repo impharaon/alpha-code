@@ -758,3 +758,33 @@ b 的依据是 design §4.1 的明确接口变更：classifyPermissionRequest �
 观察与去向：对旧 first-parent 的 staged diff --check 会报 alpha 自带的 `resources/video-runtime/licenses/leptonica.txt:26`、`src/shared/project-artifact-path.ts:104` 两处 EOF 空行；一次与 origin/alpha 的逐文件 diff 为空，未改这些源资产，供编排器按 alpha 既有事项处置。安装的 trust 提示保留原日志，不擅改策略。本轮无新 ARCH/OPTIONAL，未解冲突为零。
 
 证据统一前缀 `/tmp/secrets-r13-`：sample、ext-tests、fixture-identity、fixture-consumers、write-sites、permission-dialog、permission-risk、protected-files、ext-typecheck、ui-typecheck、schema-typecheck、install、inventory、build、lint、affected.log；聚合标识与计数 `receipt.json`。偏离仅为本次明确授权的合并解决、原生成器重采与事实/登记校验；没有新设计、依赖选择、检测规则/阈值或产品行为改动。未 push/开 PR/merge PR，发布仍由编排器负责。
+
+## r14 旧名双向登记与两处精确条数同步
+
+依据：r14 指定 gate4.log，起始树 `dd9a6d99bf`；spec v4、design v3.3 不变。已核 Codex / GPT-6。开始 2026-11-26 13:40:59 UTC，验证完成约 13:59 UTC，约 18 分钟，主要等待本机两项 ship 的 slot。登记修正提交 **`59433425af`**；没有改生产代码、测试代码、生成夹具或检测规则。
+
+| 指定失败项 | 归类 | 实测事实与纠正 |
+| --- | --- | --- |
+| old-name 方向 A | c | 原 shared OLD_NAME/hitTokens 实测 events.json 中当前 secrets worktree 的 CLI 路径 21 行；按原登记约定记为 **user-content**，理由说明是真实原采样器事件路径、非产品品牌，保留生成 JSON |
+| old-name 方向 B | c | 旧 video worktree CLI 路径登记 21、实际 0；删除其失效键，由当前实测键替代。只换一行，没有扩大范围豁免 |
+| policy/risk 精确数 23≠22 | c | 用例 **protected path risk consumes the location roots** 是本分支 **793fdff5db** 有意新增（共享名单/Location 根、排除与 Windows 显式凭据路径，AC-06/07、design §4.1）；同步 22→23，并更新该行当前说明 |
+| config-injection 精确数 29≠28 | c | 用例 **interactive env read rules preserve automation denies** 是本分支 **a58ad3042e** 有意新增（交互安全读取与自动化拒绝同时保留，AC-01、design §4.4）；同步 28→29，登记用例名称、来源和理由 |
+
+来源确认使用两文件相对 origin/alpha 的 diff、`git log -S '<原用例名>' -- <file>` 与该提交的实际改动；两来源提交均不在 origin/alpha 祖先链，两个新增用例也只在本分支 diff 中，非 alpha 带入的重复计数。没有为过门删除用例、改断言或使用下界。
+
+逐文件先复现、更新后各完整复核一次，均从对应 package 执行 `gate slot -- bun test --max-concurrency 2 --timeout 90000 <file>`（附 JUnit reporter，仅记录结果）：
+
+| 文件 | 修正前 exit / PASS / FAIL | 最终 exit / PASS / FAIL |
+| --- | --- | --- |
+| ui-mac `src/main/old-name-scan.test.ts` | 1 / 8 / 2（方向 A/B） | **0 / 10 / 0**，原自检、双向与反例全部保留 |
+| ext `src/policy/risk.test.ts` | 0 / 23 / 0，实际数超旧登记 | **0 / 23 / 0** |
+| ui-mac `src/main/codepuppy-config-injection.test.ts` | 0 / 29 / 0，实际数超旧登记 | **0 / 29 / 0** |
+| ui-mac `src/main/gate-file-registry.test.ts`（唯一额外直接消费者） | 不重复做前置测量 | **0 / 25 / 0** |
+
+本轮最终 **87 个不同用例 PASS**。同一原 gate-files 检查入口亦有红→绿证据：`CODEPUPPY_TEST_FILES=/tmp/secrets-r14-selected-tests bash scripts/assert-gate-files.sh --from-reports <报告目录>`，红时明确报 29≠28、23≠22（exit 1），最终四行严格等号全部通过（exit 0）：29=29、97=97、23=23、8=8。范围是本次两行加本分支已有两条改动登记行；没有运行全表 --update（该模式会逐条跑整个登记簿）。
+
+报告诚实性：本轮 risk/config 均有新产生的原始 JUnit；原 gate 入口还要求校验已有改行 register-policy/display，复用 **r13 原始完整 Ext JUnit**，其源码从 10abacd95b 至本轮未变（git diff 校验）。报告不改写、不伪造，当前两文件复测数也与之相同；97/8 的复用结果不计入本轮 87。最终计数入口采用该真实 Ext 报告与本轮 config 报告，读取计数，不再执行额外测试。
+
+只读 `affected-tests --list` exit 0：**`affected tests: 157 of 736 test files`**。两份 TSV 数据以实际 guard 检验，没有适用的生产 TS typecheck/lint 变化；没有重复 r13 已通过的包级检查。git diff --check 与本次 plan.md 文档合同通过，hooksPath 仍 `.githooks`。
+
+证据：原日志 `~/.cache/alpha-orch/2026-11-26/review/1758-gate4.log`；本轮 `/tmp/secrets-r14-{old-name,risk,config}-{red,green}.log`、`name-counts.json`、`gate-counts-{red,green,final}.log`、`registry-consumer.log`、`affected.log`、`receipt.json` 与 `reports-{red,green}/`。偏离仅为按限定范围使用原检查入口代替全表 --update；没有新选项、判据副本、豁免类型、known-fails 或门槛改动，无 fetch/merge/rebase/push/PR。指定四个失败项已消除，遗留去向 none；无新增 ARCH/OPTIONAL。

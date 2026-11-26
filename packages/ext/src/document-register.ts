@@ -36,6 +36,7 @@ export async function registerDocumentTools(
       documentRuntimeRoot: string
       verify: string
       render: string
+    recalculate: string
     }
   },
 ) {
@@ -45,6 +46,7 @@ export async function registerDocumentTools(
     assets: input.resources.assets,
     documentRuntimeRoot: input.resources.documentRuntimeRoot,
     renderScript: input.resources.render,
+    recalculateScript: input.resources.recalculate,
   })
   const registration = { render }
   const cleanup = input.host.subscribeRuntimeVerify(

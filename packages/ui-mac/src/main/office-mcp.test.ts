@@ -316,15 +316,8 @@ describe.skipIf(!darwin)("REQ-133 Alpha first-party Office MCP resources", () =>
         call(3, "read_xlsx", { path }),
       ])
       expect(payload(messages, 2).sheetsUpdated).toEqual(["Data"])
-      expect(payload(messages, 3).sheets).toEqual([
-        {
-          name: "Data",
-          rows: [
-            ["Item", "Value"],
-            ["Alpha", 133],
-          ],
-        },
-      ])
+      const sheets = payload(messages, 3).sheets as Array<{ name: string; cells: Array<{ address: string; value: unknown }> }>
+      expect(sheets.map((sheet) => [sheet.name, sheet.cells.map((cell) => cell.value)])).toEqual([["Data", ["Item", "Value", "Alpha", 133]]])
     },
     180_000,
   )
@@ -404,10 +397,27 @@ describe.skipIf(!darwin)("REQ-133 Alpha first-party Office MCP resources", () =>
     expect(response?.result?.content?.[0]?.text).toContain("path is outside the granted workspace")
   })
 
+  testFormat("excel")("Excel stdio reads calculated values/error locations and delegates typed objects without a required describe step", async () => {
+    const path = join(workspace, "calculated.xlsx")
+    const messages = await exchange(commandFor("excel"), [initialize(),
+      call(2, "write_xlsx", { path, sheets: [{ name: "Data", cells: { A1: "Region", B1: "Amount", A2: "East", B2: "=2*6", A3: "West", B3: 4, C2: "=#REF!" } }, { name: "Summary", cells: {} }] }),
+      call(3, "read_xlsx", { path, sheet: "Data", range: "B2:C2", mode: "both" }),
+      call(4, "excel_objects", { action: "apply", operation: "create_pivot_table", path, inputJson: JSON.stringify({ sheet: "Summary", at: "A1", source: "Data!A1:B3", row_fields: ["Region"], value_fields: [{ field: "Amount" }] }) }),
+      call(5, "excel_edit", { path, action: "replace", query: "East", replacement: "North" }),
+      call(6, "excel_inspect", { path, action: "range", sheet: "Summary", range: "A2:B2" }),
+      call(7, "excel_objects", { action: "describe", operation: "add_slicer" }),
+    ])
+    expect(payload(messages, 3).cells).toMatchObject([{ address: "B2", value: 12, formula: "=2*6" }, { address: "C2", value: "#REF!" }])
+    expect(payload(messages, 3).errors).toEqual([{ sheet: "Data", cell: "C2", formula: "=#REF!", error: "#REF!" }])
+    expect(payload(messages, 4).diagnostics).toEqual([])
+    expect(payload(messages, 6).cells).toMatchObject([{ value: "North" }, { value: 12 }])
+    expect(payload(messages, 7).inputSchema).toHaveProperty("properties.target")
+  }, 180_000)
+
   test("four stdio entry modes expose only their format-specific read/write tools", async () => {
     const expected = {
       word: ["read_docx", "write_docx"],
-      excel: ["read_xlsx", "write_xlsx"],
+      excel: ["read_xlsx", "excel_inspect", "excel_edit", "excel_objects", "excel_recalculate", "write_xlsx"],
       powerpoint: ["read_pptx", "write_pptx"],
       pdf: ["read_pdf", "write_pdf"],
     } as const

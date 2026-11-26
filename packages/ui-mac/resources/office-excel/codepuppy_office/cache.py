@@ -1,6 +1,8 @@
 """Merge computed caches into the original OOXML package, never the LO rewrite."""
 from copy import deepcopy
 import hashlib
+import datetime as dt
+from openpyxl.utils.datetime import to_excel
 import io
 from pathlib import Path
 import re
@@ -32,6 +34,9 @@ def sheets(archive):
 def expression(value):
     text = value.text if hasattr(value,'text') else value
     if not isinstance(text,str):raise ValueError('calculation incomplete: unsupported formula object')
+    # LO serializes error literals in lower case; quoted string contents remain case-sensitive.
+    parts=re.split(r'("(?:""|[^"])*")',text)
+    text=''.join(part if index%2 else re.sub(r'#(?:REF!|DIV/0!|VALUE!|NAME\?|N/A|NUM!|NULL!|SPILL!|CALC!)',lambda match:match[0].upper(),part,flags=re.IGNORECASE) for index,part in enumerate(parts))
     tokens=Tokenizer(text if text.startswith('=') else '='+text).items
     return ''.join(re.sub(r'^(?:_xlfn\.|_xlws\.)+','',t.value) if t.type=='FUNC' else t.value for t in tokens)
 
@@ -94,12 +99,15 @@ def merge_caches(original, calculated):
                 formula=cell.find(tag('f'))
                 cell.insert(list(cell).index(formula)+1 if formula is not None else 0,value)
                 values[(title,address)]=(kind,text)
-                if kind=='e':errors.append({'sheet':title,'cell':address,'formula':str(workbook[title][address].value),'error':text})
+                if kind=='e':errors.append({'sheet':title,'cell':address,'formula':getattr(workbook[title][address].value,'text',str(workbook[title][address].value)),'error':text})
             if targets:changes[part]=ET.tostring(document,encoding='utf-8',xml_declaration=True)
         # A chart's objects/relationships stay in the original part; only its data caches change.
         for part in source.namelist():
-            if not re.fullmatch(r'xl/charts/chart\d+\.xml',part):continue
+            if not part.startswith('xl/charts/') or not part.endswith('.xml') or '/_rels/' in part:continue
             chart=xml(source.read(part));changed=False
+            if chart.tag!='{'+C+'}chartSpace':
+                if chart.findall('.//{*}f'):raise ValueError('calculation incomplete: unrecognized chart formula/cache structure '+part)
+                continue
             for reference in chart.findall('.//c:numRef',NS)+chart.findall('.//c:strRef',NS):
                 f=reference.find('c:f',NS)
                 if f is None or not f.text:continue
@@ -123,6 +131,8 @@ def merge_caches(original, calculated):
                     value=item[1] if item else workbook[title][address].value
                     if value is None:continue
                     if numeric:
+                        if isinstance(value,(dt.datetime,dt.date,dt.time,dt.timedelta)):value=to_excel(value,workbook.epoch)
+                        if isinstance(value,bool):value=int(value)
                         try:float(value)
                         except (ValueError,TypeError):continue
                     point=ET.SubElement(cache,'{'+C+'}pt',idx=str(index));ET.SubElement(point,'{'+C+'}v').text=str(value)

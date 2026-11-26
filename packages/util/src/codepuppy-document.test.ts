@@ -45,3 +45,28 @@ describe("document render receipts", () => {
     expect(() => publishDocumentHost(host)).toThrow("already published")
   })
 })
+
+test("Python environment lookup is Location-bound and derived environment matching is exact", async () => {
+  const { documentPythonEnvironmentFor, publishDocumentPythonEnvironment, matchesDocumentPythonEnvironment } = await import("./codepuppy-document.js")
+  const location = { directory: "/workspace" } as never
+  const environment = { CODEPUPPY_DOCUMENT_HOST: "/private/python-host/8/registration/host.json" }
+  const clear = publishDocumentPythonEnvironment(location, environment)
+  try {
+    expect(documentPythonEnvironmentFor(location)).toEqual(environment)
+    expect(documentPythonEnvironmentFor({ directory: "/workspace", workspaceID: "other" } as never)).toBeUndefined()
+    expect(matchesDocumentPythonEnvironment(environment, environment)).toBe(true)
+    expect(matchesDocumentPythonEnvironment({ CODEPUPPY_DOCUMENT_HOST: "/foreign/host.json" }, environment)).toBe(false)
+    expect(matchesDocumentPythonEnvironment(undefined, environment)).toBe(false)
+    expect(matchesDocumentPythonEnvironment(environment)).toBe(false)
+  } finally { clear() }
+  expect(documentPythonEnvironmentFor(location)).toBeUndefined()
+})
+
+test("calculation receipts require actual source/result hashes and typed error locations", async () => {
+  const { isExcelRecalculateResult } = await import("./codepuppy-document.js")
+  const receipt = { status: "recalculated", id: "calculation", path: "/workspace/book.xlsx", sourceSha256: "a".repeat(64), resultSha256: "b".repeat(64), formulaCount: 1, errors: [{ sheet: "Data", cell: "B2", formula: "=#REF!", error: "#REF!" }], diagnostics: [] }
+  expect(isExcelRecalculateResult(receipt)).toBe(true)
+  expect(isExcelRecalculateResult({ ...receipt, resultSha256: "not-a-hash" })).toBe(false)
+  expect(isExcelRecalculateResult({ ...receipt, errors: [{ cell: "B2" }] })).toBe(false)
+  expect(isExcelRecalculateResult({ status: "pending", checkId: "calculation", runtime: { phase: "preparing", stage: "download" } })).toBe(true)
+})

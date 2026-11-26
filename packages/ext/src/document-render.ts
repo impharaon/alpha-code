@@ -6,6 +6,7 @@ import { SessionMessage } from "../../schema/src/session-message"
 import {
   DOCUMENT_WORK_DIR,
   documentRecord,
+  isExcelRecalculateResult,
   isRenderRequest,
   type DocumentCaller,
   type DocumentHost,
@@ -30,6 +31,7 @@ export function createDocumentRenderer(input: {
   assets: string
   documentRuntimeRoot: string
   renderScript: string
+  recalculateScript: string
   execute?: (
     jobRoot: string,
     python: string,
@@ -151,6 +153,23 @@ export function createDocumentRenderer(input: {
           })
           return { status: "pending", checkId: id, artifact: record, runtime: environment.renderState }
         }
+        const diagnostics: string[] = []
+        const recalculation = request.kind === "xlsx" ? await runDocumentPython({ operation: "recalculate", python: environment.python, script: input.recalculateScript, directory: caller.location.directory, path: source.file.abs, environment: environment.pythonEnvironment }, combined) : undefined
+        const calculated: unknown = recalculation ? JSON.parse(recalculation.stdout) : undefined
+        if (request.kind === "xlsx" && (!recalculation || recalculation.exitCode !== 0 || !isExcelRecalculateResult(calculated))) return failed("conversion", "Excel calculation did not produce a receipt")
+        if (isExcelRecalculateResult(calculated) && calculated.status !== "recalculated") {
+          if (calculated.status === "pending") {
+            const artifact = await resolveDocumentArtifact(caller.location.directory, { checkId: id, kind: request.kind, sourcePath: source.file.abs, artifactPath: source.file.abs })
+            if (!artifact || artifact.sourceSha256 !== digest) return failed("source-changed", "Excel source changed while waiting for runtime")
+            await input.host.defer({ id, location: caller.location, sessionID: caller.sessionID, notificationID: SessionMessage.ID.create(), request, sourceSha256: digest, artifact, revision, state: "waiting-runtime" })
+            return { status: "pending", checkId: id, artifact, runtime: calculated.runtime }
+          }
+          return failed(calculated.code === "source-changed" ? "source-changed" : "conversion", String(calculated.detail))
+        }
+        if (isExcelRecalculateResult(calculated) && calculated.status === "recalculated" && ((await realpath(calculated.path)) !== (await realpath(source.file.abs)) || calculated.sourceSha256 !== digest || typeof calculated.resultSha256 !== "string")) return failed("source-changed", "Excel source changed before calculation")
+        const renderedDigest = documentRecord(calculated) ? String(calculated.resultSha256) : digest
+        if (documentRecord(calculated)) diagnostics.push(JSON.stringify({ recalculationId: calculated.id, errors: calculated.errors, diagnostics: calculated.diagnostics }))
+        if (artifact) artifact = { ...artifact, sourceSha256: renderedDigest, artifactSha256: renderedDigest }
         await mkdir(job, { recursive: true })
         const profileRoot = join(input.documentRuntimeRoot, "jobs", renderId)
         if (request.kind !== "pdf")
@@ -169,7 +188,7 @@ export function createDocumentRenderer(input: {
           JSON.stringify({
             kind: request.kind,
             source: source.file.abs,
-            sourceSha256: digest,
+            sourceSha256: renderedDigest,
             dpi: request.dpi ?? 144,
             profileRoot,
             ...(environment.renderState.phase === "ready"
@@ -241,7 +260,7 @@ export function createDocumentRenderer(input: {
         if (
           createHash("sha256")
             .update(await readFile(source.file.abs))
-            .digest("hex") !== digest
+            .digest("hex") !== renderedDigest
         )
           return failed("source-changed", "source changed during rendering")
         const assets = readDocumentAssets(input.assets)
@@ -259,6 +278,7 @@ export function createDocumentRenderer(input: {
             ? { source: "bundled" as const, path: join(input.assets, template.path), sha256: template.sha256 }
             : null,
           diagnostics: [
+            ...diagnostics,
             ...(Array.isArray(result.diagnostics)
               ? result.diagnostics.filter((v): v is string => typeof v === "string")
               : []),

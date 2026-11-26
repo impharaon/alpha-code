@@ -1,3 +1,4 @@
+import { publishDocumentPythonEnvironment } from "../../util/src/codepuppy-document"
 // `#1665`:ext 在 OpenCode 2 真插件宿主里(plugin-host.harness.ts)—— 每条用例装的是生产的默认导出 `CodePuppyExt`,
 // 经上游真的钩子链 / 工具注册表 / transform 服务判结果。「权威保持」类用例都带反向臂:同一个输入在**不装 ext** 的宿主里
 // 走上游默认,结论必须相反 —— 去掉我们的钩子 ⇒ 这条用例红。
@@ -1552,4 +1553,17 @@ itWithPermission.live("D3/I-10 installing the user's own plugin asks once in eve
   expect(automation.asks).toEqual([])
   expect(Exit.isFailure(automation.exit)).toBe(true)
   expect(JSON.stringify(automation.exit)).toContain("Permission denied: codepuppy_hub_create")
+}))
+
+it.effect("shell uses only its Location's document projection and removes inherited host keys", () => Effect.gen(function* () {
+  env({})
+  yield* activate(CodePuppyExt)
+  const location = yield* Location.Service
+  const hooks = yield* PluginHooks.Service
+  const event = { command: "python -I script.py", cwd: location.directory, timeout: 1000, shell: "/bin/sh", env: { CODEPUPPY_DOCUMENT_HOST: "/old/host.json" } as Record<string, string | undefined> }
+  yield* hooks.trigger("shell", "create.before", event)
+  expect(event.env.CODEPUPPY_DOCUMENT_HOST).toBeUndefined()
+  const clear = publishDocumentPythonEnvironment(location, { CODEPUPPY_DOCUMENT_HOST: "/current/host.json" })
+  yield* hooks.trigger("shell", "create.before", event).pipe(Effect.ensuring(Effect.sync(clear)))
+  expect(event.env.CODEPUPPY_DOCUMENT_HOST).toBe("/current/host.json")
 }))

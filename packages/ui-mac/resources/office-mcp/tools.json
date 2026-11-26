@@ -1,5 +1,5 @@
 {
-  "serverSha256": "ccb2448351f5b16993744b1c3372e357afa9d717c2fa54119e22ac7cf3b38b34",
+  "serverSha256": "63391a335a078d7f5873d52447bf3e49062b7184a0dcf2a5cdd788d58081009f",
   "formats": {
     "word": {
       "command": [
@@ -217,13 +217,454 @@
       "tools": [
         {
           "name": "read_xlsx",
-          "description": "Read cell values from every worksheet in an Excel workbook",
+          "description": "Read calculated values, formulas and error locations with explicit cache sources and cursors",
           "inputSchema": {
             "type": "object",
             "properties": {
               "path": {
                 "type": "string",
                 "description": "Absolute path inside the granted workspace"
+              },
+              "sheet": {
+                "type": "string"
+              },
+              "range": {
+                "type": "string"
+              },
+              "mode": {
+                "type": "string",
+                "enum": [
+                  "values",
+                  "formulas",
+                  "both"
+                ]
+              },
+              "rows": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "cursor": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "path"
+            ],
+            "additionalProperties": false
+          }
+        },
+        {
+          "name": "excel_inspect",
+          "description": "Inspect workbook structure, read ranges or find literal text with formula values and source-bound cursors",
+          "inputSchema": {
+            "type": "object",
+            "$defs": {
+              "FindInspect": {
+                "additionalProperties": false,
+                "properties": {
+                  "path": {
+                    "title": "Path",
+                    "type": "string"
+                  },
+                  "action": {
+                    "const": "find",
+                    "title": "Action",
+                    "type": "string"
+                  },
+                  "query": {
+                    "title": "Query",
+                    "type": "string"
+                  },
+                  "sheet": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "default": null,
+                    "title": "Sheet"
+                  },
+                  "exact": {
+                    "default": false,
+                    "title": "Exact",
+                    "type": "boolean"
+                  },
+                  "caseSensitive": {
+                    "default": false,
+                    "title": "Casesensitive",
+                    "type": "boolean"
+                  },
+                  "mode": {
+                    "default": "values",
+                    "enum": [
+                      "values",
+                      "formulas"
+                    ],
+                    "title": "Mode",
+                    "type": "string"
+                  },
+                  "cursor": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "default": null,
+                    "title": "Cursor"
+                  }
+                },
+                "required": [
+                  "path",
+                  "action",
+                  "query"
+                ],
+                "title": "FindInspect",
+                "type": "object"
+              },
+              "RangeInspect": {
+                "additionalProperties": false,
+                "properties": {
+                  "path": {
+                    "title": "Path",
+                    "type": "string"
+                  },
+                  "action": {
+                    "const": "range",
+                    "title": "Action",
+                    "type": "string"
+                  },
+                  "sheet": {
+                    "title": "Sheet",
+                    "type": "string"
+                  },
+                  "range": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "default": null,
+                    "title": "Range"
+                  },
+                  "mode": {
+                    "default": "values",
+                    "enum": [
+                      "values",
+                      "formulas",
+                      "both"
+                    ],
+                    "title": "Mode",
+                    "type": "string"
+                  },
+                  "rows": {
+                    "anyOf": [
+                      {
+                        "exclusiveMinimum": 0,
+                        "type": "integer"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "default": null,
+                    "title": "Rows"
+                  },
+                  "cursor": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "default": null,
+                    "title": "Cursor"
+                  }
+                },
+                "required": [
+                  "path",
+                  "action",
+                  "sheet"
+                ],
+                "title": "RangeInspect",
+                "type": "object"
+              },
+              "SheetInspect": {
+                "additionalProperties": false,
+                "properties": {
+                  "path": {
+                    "title": "Path",
+                    "type": "string"
+                  },
+                  "action": {
+                    "const": "sheet",
+                    "title": "Action",
+                    "type": "string"
+                  },
+                  "sheet": {
+                    "title": "Sheet",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "path",
+                  "action",
+                  "sheet"
+                ],
+                "title": "SheetInspect",
+                "type": "object"
+              },
+              "WorkbookInspect": {
+                "additionalProperties": false,
+                "properties": {
+                  "path": {
+                    "title": "Path",
+                    "type": "string"
+                  },
+                  "action": {
+                    "const": "workbook",
+                    "title": "Action",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "path",
+                  "action"
+                ],
+                "title": "WorkbookInspect",
+                "type": "object"
+              }
+            },
+            "discriminator": {
+              "mapping": {
+                "find": "#/$defs/FindInspect",
+                "range": "#/$defs/RangeInspect",
+                "sheet": "#/$defs/SheetInspect",
+                "workbook": "#/$defs/WorkbookInspect"
+              },
+              "propertyName": "action"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/$defs/WorkbookInspect"
+              },
+              {
+                "$ref": "#/$defs/SheetInspect"
+              },
+              {
+                "$ref": "#/$defs/RangeInspect"
+              },
+              {
+                "$ref": "#/$defs/FindInspect"
+              }
+            ]
+          }
+        },
+        {
+          "name": "excel_edit",
+          "description": "Sort a range or replace literal text through the shared preserving save and pivot-refresh path",
+          "inputSchema": {
+            "type": "object",
+            "$defs": {
+              "ReplaceEdit": {
+                "additionalProperties": false,
+                "properties": {
+                  "path": {
+                    "title": "Path",
+                    "type": "string"
+                  },
+                  "action": {
+                    "const": "replace",
+                    "title": "Action",
+                    "type": "string"
+                  },
+                  "query": {
+                    "title": "Query",
+                    "type": "string"
+                  },
+                  "replacement": {
+                    "title": "Replacement",
+                    "type": "string"
+                  },
+                  "sheet": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "default": null,
+                    "title": "Sheet"
+                  },
+                  "exact": {
+                    "default": false,
+                    "title": "Exact",
+                    "type": "boolean"
+                  },
+                  "caseSensitive": {
+                    "default": false,
+                    "title": "Casesensitive",
+                    "type": "boolean"
+                  },
+                  "inFormulas": {
+                    "default": false,
+                    "title": "Informulas",
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "path",
+                  "action",
+                  "query",
+                  "replacement"
+                ],
+                "title": "ReplaceEdit",
+                "type": "object"
+              },
+              "SortEdit": {
+                "additionalProperties": false,
+                "properties": {
+                  "path": {
+                    "title": "Path",
+                    "type": "string"
+                  },
+                  "action": {
+                    "const": "sort",
+                    "title": "Action",
+                    "type": "string"
+                  },
+                  "sheet": {
+                    "title": "Sheet",
+                    "type": "string"
+                  },
+                  "range": {
+                    "title": "Range",
+                    "type": "string"
+                  },
+                  "sortBy": {
+                    "items": {
+                      "$ref": "#/$defs/SortKey"
+                    },
+                    "minItems": 1,
+                    "title": "Sortby",
+                    "type": "array"
+                  },
+                  "hasHeader": {
+                    "default": true,
+                    "title": "Hasheader",
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "path",
+                  "action",
+                  "sheet",
+                  "range",
+                  "sortBy"
+                ],
+                "title": "SortEdit",
+                "type": "object"
+              },
+              "SortKey": {
+                "additionalProperties": false,
+                "properties": {
+                  "column": {
+                    "description": "Header text (if has_header) or column letter.",
+                    "title": "Column",
+                    "type": "string"
+                  },
+                  "order": {
+                    "default": "ascending",
+                    "enum": [
+                      "ascending",
+                      "descending"
+                    ],
+                    "title": "Order",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "column"
+                ],
+                "title": "SortKey",
+                "type": "object"
+              }
+            },
+            "discriminator": {
+              "mapping": {
+                "replace": "#/$defs/ReplaceEdit",
+                "sort": "#/$defs/SortEdit"
+              },
+              "propertyName": "action"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/$defs/SortEdit"
+              },
+              {
+                "$ref": "#/$defs/ReplaceEdit"
+              }
+            ]
+          }
+        },
+        {
+          "name": "excel_objects",
+          "description": "Describe or apply a typed pivot, slicer or sparkline operation",
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": [
+                  "describe",
+                  "apply"
+                ]
+              },
+              "operation": {
+                "type": "string",
+                "enum": [
+                  "create_pivot_table",
+                  "delete_pivot_table",
+                  "add_slicer",
+                  "delete_slicer",
+                  "add_sparklines",
+                  "delete_sparklines"
+                ]
+              },
+              "path": {
+                "type": "string"
+              },
+              "inputJson": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "action",
+              "operation"
+            ],
+            "additionalProperties": false
+          }
+        },
+        {
+          "name": "excel_recalculate",
+          "description": "Recalculate a copy with verified LibreOffice, merge caches into the original package and report formula errors",
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "path": {
+                "type": "string"
               }
             },
             "required": [

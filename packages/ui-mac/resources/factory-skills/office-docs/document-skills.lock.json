@@ -1205,8 +1205,8 @@
       "sourcePath": "skills/xlsx/SKILL.md",
       "sourceSha256": "f32b1c2b5d5d31e02964df110d6489613d9345f86830c118cfe24159d8448ce6",
       "path": "xlsx/SKILL.md",
-      "sha256": "e48cfcc960642a92d0c48d3e010e17e98122f511a1dde0fefc2dcf893dc77e47",
-      "changes": "Adapted runtime/workflow, Chinese typography, local delivery, template priority and bounded visual review; retained format/design knowledge."
+      "sha256": "1bae7018ab5204de95d7bee79e1e2756562af12288c05eba230e73fe1801c2c6",
+      "changes": "Adapted runtime/workflow, Chinese typography, local delivery, template priority and bounded visual review; retained format/design knowledge. Slice 5: shared edit opens a copied template; host projection is injected by the existing environment/shell entry."
     },
     {
       "sourcePath": "skills/xlsx/scripts/office/helpers/__init__.py",

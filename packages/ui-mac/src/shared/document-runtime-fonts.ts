@@ -16,9 +16,8 @@ const xml = (value: string) =>
   value.replaceAll("&", "&amp;").replaceAll('"', "&quot;").replaceAll("<", "&lt;").replaceAll(">", "&gt;")
 
 /** Creates a private job profile. Does not touch system/user LO configuration or install fonts. */
-export function prepareDocumentFonts(input: {
+export function prepareDocumentProfile(input: {
   assets: string
-  runtimeRoot: string
   jobRoot: string
   platform: "darwin" | "win32"
   home: string
@@ -50,10 +49,6 @@ export function prepareDocumentFonts(input: {
     `<?xml version="1.0" encoding="UTF-8"?><oor:items xmlns:oor="http://openoffice.org/2001/registry" xmlns:xs="http://www.w3.org/2001/XMLSchema">${registry}</oor:items>`,
   )
   if (input.platform === "win32") {
-    const destination = join(input.runtimeRoot, "share", "fonts", "truetype")
-    mkdirSync(destination, { recursive: true })
-    for (const font of manifest.fonts)
-      copyFileSync(join(assets, font.path), join(destination, font.path.split("/").at(-1)!))
     return { profileUri: pathToFileURL(profile).href, environment: {} as Record<string, string> }
   }
   const cache = join(input.jobRoot, "font-cache")
@@ -71,4 +66,14 @@ export function prepareDocumentFonts(input: {
     `<?xml version="1.0"?><!DOCTYPE fontconfig SYSTEM "urn:fontconfig:fonts.dtd"><fontconfig>${directories.map((dir) => `<dir>${xml(dir)}</dir>`).join("")}<cachedir>${xml(cache)}</cachedir>${replacements.map(([from, to]) => `<alias binding="strong"><family>${xml(from)}</family><prefer><family>${xml(to)}</family></prefer></alias>`).join("")}</fontconfig>`,
   )
   return { profileUri: pathToFileURL(profile).href, environment: { FONTCONFIG_FILE: file } }
+}
+
+export function prepareDocumentFonts(input: { assets: string; runtimeRoot: string; jobRoot: string; platform: "darwin" | "win32"; home: string }) {
+  const result = prepareDocumentProfile(input)
+  if (input.platform === "win32") {
+    const destination = join(input.runtimeRoot, "share", "fonts", "truetype")
+    mkdirSync(destination, { recursive: true })
+    for (const font of readDocumentAssets(input.assets).fonts) copyFileSync(join(input.assets, font.path), join(destination, font.path.split("/").at(-1)!))
+  }
+  return result
 }

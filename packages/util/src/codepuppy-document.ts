@@ -59,7 +59,7 @@ export const DOCUMENT_WORK_DIR = ".document-output"
 
 // Pure render contract shared by ext, main and artifact discovery.
 export type DocumentKind = "docx" | "xlsx" | "pptx" | "pdf" | "html" | "design"
-export type DocumentEnvironment = { python: string; node: string; nodeModules: string; skills: string; templates: string; fonts: string; workRoot: string; renderState: DocumentRuntimeState }
+export type DocumentEnvironment = { python: string; node: string; nodeModules: string; skills: string; templates: string; fonts: string; workRoot: string; renderState: DocumentRuntimeState; pythonEnvironment: DocumentPythonEnvironment }
 export type RenderRequest = { kind: DocumentKind; path: string; outputPath?: string; dpi?: number; viewport?: { width: number; height: number } }
 export type RenderPage = { number: number; path: string; sha256: string; width: number; height: number }
 export type DocumentArtifactRecord = { checkId: string; kind: DocumentKind; sourcePath: string; sourceSha256: string; artifactPath: string; artifactSha256: string }
@@ -75,7 +75,33 @@ export type DocumentCheckReport = { checkId: string; renderId: string; revision:
 export type DeferredDocumentCheck = { id: string; location: Location.Ref; sessionID: import("../../schema/src/session.js").Session.ID; notificationID: import("../../schema/src/session-message.js").SessionMessage.ID; request: RenderRequest; sourceSha256: string; artifact: DocumentArtifactRecord; revision: 0 | 1; state: "waiting-runtime" | "admitting" | "admitted" | "complete"; report?: DocumentCheckReport }
 export type DocumentCaller = { location: Location.Ref; sessionID: import("../../schema/src/session.js").Session.ID }
 export type DocumentCheckAdmission = { status: "admitted"; checkId: string; notificationID: import("../../schema/src/session-message.js").SessionMessage.ID } | { status: "session-missing" | "conflict"; checkId: string }
+export const DOCUMENT_PYTHON_HOST = "CODEPUPPY_DOCUMENT_HOST"
+export type DocumentPythonEnvironment = { CODEPUPPY_DOCUMENT_HOST: string }
+export type DocumentPythonProjection = { schemaVersion: 1; sequence: number; sidecarGeneration: number; registrationId: string; location: Location.Ref } & (
+  | { status: "invalidated"; reason: "location-disposed" | "sidecar-stopped" }
+  | { status: "active"; pinId: PinnedFileId; pinSha256: string; runtime: DocumentRuntimeState; jobs: { root: string; profileSeed: string; fontconfigTemplate: string | null; configurationSha256: string; timeoutMs: 180000 } }
+)
+const pythonKey = Symbol.for("codepuppy.document.python-environments")
+const pythonEnvironments = () => {
+  const target = globalThis as { [pythonKey]?: Map<string, DocumentPythonEnvironment> }
+  return target[pythonKey] ??= new Map()
+}
+const pythonLocationKey = (location: Location.Ref) => JSON.stringify([location.directory, location.workspaceID ?? null])
+export function publishDocumentPythonEnvironment(location: Location.Ref, value: DocumentPythonEnvironment) {
+  pythonEnvironments().set(pythonLocationKey(location), value)
+  return () => { if (pythonEnvironments().get(pythonLocationKey(location)) === value) pythonEnvironments().delete(pythonLocationKey(location)) }
+}
+export function documentPythonEnvironmentFor(location: Location.Ref) { return pythonEnvironments().get(pythonLocationKey(location)) }
+export function isDocumentPythonEnvironment(value: unknown): value is DocumentPythonEnvironment {
+  return documentRecord(value) && Object.keys(value).length === 1 && absolute(value.CODEPUPPY_DOCUMENT_HOST)
+}
+export function matchesDocumentPythonEnvironment(environment: unknown, expected?: DocumentPythonEnvironment) {
+  if (environment !== undefined && !documentRecord(environment)) return false
+  const actual = documentRecord(environment) ? environment[DOCUMENT_PYTHON_HOST] : undefined
+  return expected ? actual === expected.CODEPUPPY_DOCUMENT_HOST : actual === undefined
+}
 export type DocumentHost = {
+  pythonEnvironment(location: Location.Ref): Promise<DocumentPythonEnvironment>
   environment(caller: DocumentCaller): Promise<DocumentEnvironment>
   chromiumRender(input: { caller: DocumentCaller; checkId: string; revision: 0 | 1; request: RenderRequest; sourceSha256: string }): Promise<RenderResult>
   defer(input: DeferredDocumentCheck): Promise<void>
@@ -112,7 +138,7 @@ export function documentMetadata(result: RenderResult): DocumentToolMetadata | u
 }
 
 export function isDocumentEnvironment(value: unknown): value is DocumentEnvironment {
-  return documentRecord(value) && ["python", "node", "nodeModules", "skills", "templates", "fonts", "workRoot"].every((key) => absolute(value[key])) && isDocumentRuntimeState(value.renderState)
+  return documentRecord(value) && ["python", "node", "nodeModules", "skills", "templates", "fonts", "workRoot"].every((key) => absolute(value[key])) && isDocumentRuntimeState(value.renderState) && isDocumentPythonEnvironment(value.pythonEnvironment)
 }
 export function isRenderResult(value: unknown): value is RenderResult {
   if (!documentRecord(value)) return false
@@ -126,6 +152,7 @@ export function isDocumentCaller(value: unknown): value is DocumentCaller & Reco
   return documentRecord(value) && text(value.sessionID) && documentRecord(value.location) && absolute(value.location.directory) && (value.location.workspaceID === undefined || text(value.location.workspaceID))
 }
 export type DocumentHostRequest =
+  | { operation: "python-environment"; location: Location.Ref }
   | { operation: "environment"; caller: DocumentCaller }
   | { operation: "chromiumRender"; input: Parameters<DocumentHost["chromiumRender"]>[0] }
   | { operation: "defer"; input: DeferredDocumentCheck }
@@ -148,7 +175,7 @@ export function parseDocumentHostRequest(value: unknown): DocumentHostRequestMes
     : request.operation === "chromiumRender" ? documentRecord(request.input) && isDocumentCaller(request.input.caller) && text(request.input.checkId) && (request.input.revision === 0 || request.input.revision === 1) && isRenderRequest(request.input.request) && documentDigest(request.input.sourceSha256)
     : request.operation === "defer" ? isDeferredDocumentCheck(request.input)
     : request.operation === "recordCheck" ? documentRecord(request.input) && isDocumentCaller(request.input.caller) && text(request.input.checkId) && isDocumentCheckReport(request.input.report)
-    : ["verify-register", "verify-unregister", "ready-register", "ready-unregister"].includes(String(request.operation)) && (!["verify-register", "verify-unregister"].includes(String(request.operation)) || text(request.registrationId)) && documentRecord(request.location) && absolute(request.location.directory) && (request.location.workspaceID === undefined || text(request.location.workspaceID))
+    : ["python-environment", "verify-register", "verify-unregister", "ready-register", "ready-unregister"].includes(String(request.operation)) && (!["verify-register", "verify-unregister"].includes(String(request.operation)) || text(request.registrationId)) && documentRecord(request.location) && absolute(request.location.directory) && (request.location.workspaceID === undefined || text(request.location.workspaceID))
   return valid ? value as unknown as DocumentHostRequestMessage : undefined
 }
 export function parseDocumentHostReply(value: unknown): DocumentHostReplyMessage | undefined {
@@ -170,4 +197,16 @@ export const DocumentToolInputSchema = Schema.Union([
 
 export function isDocumentCheckAdmission(value: unknown): value is DocumentCheckAdmission {
   return documentRecord(value) && text(value.checkId) && (["session-missing", "conflict"].includes(String(value.status)) || (value.status === "admitted" && text(value.notificationID)))
+}
+
+export type ExcelDiagnostic = { kind: "pivot-not-rebuilt"; sheet: string; pivot: string; source: string; detail: string }
+export type ExcelRecalculateResult =
+  | { status: "recalculated"; id: string; path: string; sourceSha256: string; resultSha256: string; formulaCount: number; errors: FormulaError[]; diagnostics: ExcelDiagnostic[] }
+  | { status: "pending"; checkId: string; runtime: DocumentRuntimeState }
+  | { status: "failed"; code: "source-changed" | "runtime" | "calculation" | "disk" | "timeout"; detail: string }
+export function isExcelRecalculateResult(value: unknown): value is ExcelRecalculateResult {
+  if (!documentRecord(value)) return false
+  if (value.status === "pending") return text(value.checkId) && isDocumentRuntimeState(value.runtime)
+  if (value.status === "failed") return ["source-changed", "runtime", "calculation", "disk", "timeout"].includes(String(value.code)) && typeof value.detail === "string"
+  return value.status === "recalculated" && text(value.id) && absolute(value.path) && documentDigest(value.sourceSha256) && documentDigest(value.resultSha256) && count(value.formulaCount) && Array.isArray(value.errors) && value.errors.every((error) => documentRecord(error) && text(error.sheet) && text(error.cell) && typeof error.formula === "string" && text(error.error)) && Array.isArray(value.diagnostics) && value.diagnostics.every((item) => documentRecord(item) && item.kind === "pivot-not-rebuilt" && text(item.sheet) && text(item.pivot) && typeof item.source === "string" && text(item.detail))
 }

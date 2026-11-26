@@ -94,6 +94,7 @@ def recalculate(path):
         snapshot=job/'source.xlsx';shutil.copyfile(source,snapshot)
         environment=os.environ.copy()
         if sys.platform=='darwin':
+            if not isinstance(jobs['fontconfigTemplate'],str):raise RuntimeError('missing mac fontconfig template')
             template=Path(jobs['fontconfigTemplate']).read_text(encoding='utf-8')
             if '{{JOB_FONT_CACHE}}' not in template:raise RuntimeError('fontconfig template has no job cache marker')
             cache=job/'font-cache';cache.mkdir()

@@ -1,4 +1,6 @@
 #!/usr/bin/env bun
+import { officePythonPath } from "../src/shared/document-resources"
+import { officeRuntimeDir } from "./build-office-runtime"
 // gen-office-mcp-tools — #1565(REQ-236 §2.3):四个随包文档工具的「声明定义」清单 resources/office-mcp/tools.json。
 //
 // 引擎在文档工具连上之前就要把它们的用法告诉模型(连上要几秒;那几秒里模型会以为没有文档工具)。用法只有一个来源:
@@ -35,7 +37,7 @@ print(json.dumps({name: server.tools_for(name) for name in formats}))
 /** 由 `server` 的 tools_for() 渲染清单全文(不写盘)。 */
 export function renderOfficeMcpTools(server: string = OFFICE_MCP_SERVER): string {
   const formats = CODEPUPPY_OFFICE_CONNECTORS.map((connector) => connector.format)
-  const python = Bun.which("python3")
+  const python = officePythonPath(officeRuntimeDir(process.arch === "arm64" ? "arm64" : "x64"), process.platform)
   if (!python) throw new Error("gen-office-mcp-tools: python3 is not on PATH (needed to load server.py's tools_for)")
   const run = Bun.spawnSync([python, "-I", "-B", "-c", EXPORT_TOOLS, server, ...formats], { stderr: "pipe" })
   if (run.exitCode !== 0) throw new Error(`gen-office-mcp-tools: ${python} exited ${run.exitCode}: ${run.stderr.toString()}`)

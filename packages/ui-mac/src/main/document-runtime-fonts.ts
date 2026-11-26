@@ -1,1 +1,1 @@
-export { prepareDocumentFonts } from "../shared/document-runtime-fonts"
+export { prepareDocumentFonts, prepareDocumentProfile } from "../shared/document-runtime-fonts"

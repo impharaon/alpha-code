@@ -15,12 +15,12 @@ import type { createDocumentRuntime } from "./document-runtime"
 /** Attached to the existing sidecar receive/attach lane, with its real generation. */
 export function createDocumentMainBridge(
   host: DocumentHost,
-  runtime: Pick<ReturnType<typeof createDocumentRuntime>, "subscribe" | "subscribeRuntimeVerify">,
+  runtime: Pick<ReturnType<typeof createDocumentRuntime>, "subscribe" | "subscribeRuntimeVerify" | "invalidatePythonEnvironment">,
   sidecarGeneration: number,
   cancelChromium: (request: Parameters<DocumentHost["chromiumRender"]>[0]) => void,
 ) {
   const renders = new Map<number, Parameters<DocumentHost["chromiumRender"]>[0]>()
-  const registrations = new Map<string, { id: string; cleanup: () => Promise<void> }>()
+  const registrations = new Map<string, { id: string; location: Parameters<DocumentHost["pythonEnvironment"]>[0]; cleanup: () => Promise<void> }>()
   const ready = new Map<string, () => void>()
   const attempts = new Map<
     string,
@@ -96,6 +96,7 @@ export function createDocumentMainBridge(
       post = sender
       const operation = async () => {
         const request = message.request
+        if (request.operation === "python-environment") return host.pythonEnvironment(request.location)
         if (request.operation === "environment") return host.environment(request.caller)
         if (request.operation === "chromiumRender") {
           renders.set(message.id, request.input)
@@ -117,6 +118,7 @@ export function createDocumentMainBridge(
           }
           registrations.set(identity, {
             id: request.registrationId,
+            location: request.location,
             cleanup: runtime.subscribeRuntimeVerify(
               request.location,
               (task, signal) =>
@@ -190,6 +192,7 @@ export function createDocumentMainBridge(
       return true
     },
     async dispose() {
+      for (const entry of registrations.values()) runtime.invalidatePythonEnvironment(entry.location, entry.id, "sidecar-stopped")
       stopped = true
       unsubscribe()
       post = undefined

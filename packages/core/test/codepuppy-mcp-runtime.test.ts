@@ -629,6 +629,15 @@ describe("#1565: the shipped Office manifest and server", () => {
     }),
   )
 
+  testEffect(Layer.empty).effect("Office declarations bind the exact trusted Python environment", () => Effect.sync(() => {
+    const expected = { CODEPUPPY_DOCUMENT_HOST: "/private/python-host/7/registration/host.json" }
+    const entry = { type: "local", command: afterExtension, environment: expected }
+    expect(declaredListedTools("codepuppy-word", entry, manifest, fs.readFileSync, expected)?.length).toBeGreaterThan(0)
+    expect(declaredListedTools("codepuppy-word", entry, manifest, fs.readFileSync)).toBeUndefined()
+    expect(declaredListedTools("codepuppy-word", { ...entry, environment: { CODEPUPPY_DOCUMENT_HOST: "/foreign/host.json" } }, manifest, fs.readFileSync, expected)).toBeUndefined()
+    expect(declaredListedTools("codepuppy-word", { type: "local", command: afterExtension }, manifest, fs.readFileSync, expected)).toBeUndefined()
+  }))
+
   let previous: string | undefined
   beforeAll(() => {
     previous = tryCodePuppyBootstrap()?.paths.officeMcpManifest

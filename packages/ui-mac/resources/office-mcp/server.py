@@ -20,7 +20,7 @@ from typing import Any, Callable
 
 
 PROTOCOL_VERSION = "2025-06-18"
-SERVER_VERSION = "1.1.0"
+SERVER_VERSION = "2.0.0"
 FORMATS = {"word", "excel", "powerpoint", "pdf"}
 EXTENSIONS = {"word": ".docx", "excel": ".xlsx", "powerpoint": ".pptx", "pdf": ".pdf"}
 
@@ -212,7 +212,8 @@ def tools_for(format_name: str) -> list[dict[str, Any]]:
         ]
     if format_name == "excel":
         return [
-            tool("read_xlsx", "Read cell values from every worksheet in an Excel workbook", path_property, ["path"]),
+            tool("read_xlsx", "Read calculated values, formulas and error locations with explicit cache sources and cursors", {**path_property, "sheet": {"type":"string"}, "range":{"type":"string"}, "mode":{"type":"string","enum":["values","formulas","both"]}, "rows":{"type":"integer","minimum":1}, "cursor":{"type":"string"}}, ["path"]),
+            *excel_operation_tools(),
             tool(
                 "write_xlsx",
                 "Create a workbook or update addressed cells in an existing workbook",
@@ -274,6 +275,16 @@ def tools_for(format_name: str) -> list[dict[str, Any]]:
     ]
 
 
+def excel_operation_tools():
+    from codepuppy_office.excel import INSPECT, EDIT, operation_models, workspace
+    return [
+        {"name":"excel_inspect","description":"Inspect workbook structure, read ranges or find literal text with formula values and source-bound cursors","inputSchema":{"type":"object",**INSPECT.json_schema()}},
+        {"name":"excel_edit","description":"Sort a range or replace literal text through the shared preserving save and pivot-refresh path","inputSchema":{"type":"object",**EDIT.json_schema()}},
+        tool("excel_objects","Describe or apply a typed pivot, slicer or sparkline operation",{"action":{"type":"string","enum":["describe","apply"]},"operation":{"type":"string","enum":list(operation_models(workspace()))},"path":{"type":"string"},"inputJson":{"type":"string"}},["action","operation"]),
+        tool("excel_recalculate","Recalculate a copy with verified LibreOffice, merge caches into the original package and report formula errors",{"path":{"type":"string"}},["path"]),
+    ]
+
+
 def tool(name: str, description: str, properties: dict[str, Any], required: list[str]) -> dict[str, Any]:
     return {
         "name": name,
@@ -294,6 +305,21 @@ def call_tool(format_name: str, workspace: Path, name: str, arguments: dict[str,
         "powerpoint": {"read_pptx": read_pptx, "write_pptx": write_pptx},
         "pdf": {"read_pdf": read_pdf, "write_pdf": write_pdf},
     }
+    if format_name == "excel" and name in {"excel_inspect","excel_edit","excel_objects","excel_recalculate"}:
+        from codepuppy_office import OfficeExcel
+        if name == "excel_objects" and arguments.get("action") == "describe":
+            reject_unknown_keys(arguments,{"action","operation"},name)
+            return OfficeExcel.object_schema(arguments.get("operation"))
+        path = require_workspace_path(workspace,arguments.get("path"),EXTENSIONS[format_name])
+        request = {**arguments,"path":str(path)}
+        if name == "excel_inspect": return OfficeExcel.inspect(json.dumps(request))
+        if name == "excel_edit": return OfficeExcel.apply_edit(json.dumps(request))
+        if name == "excel_recalculate":
+            reject_unknown_keys(arguments,{"path"},name)
+            return OfficeExcel.recalculate(str(path))
+        reject_unknown_keys(arguments,{"path","action","operation","inputJson"},name)
+        if request.get("action") != "apply" or not isinstance(request.get("inputJson"),str):raise ValueError("invalid-input: excel_objects apply requires inputJson")
+        return OfficeExcel.objects(str(path),request.get("operation"),request["inputJson"])
     handler = handlers[format_name].get(name)
     if handler is None:
         raise ValueError(f"unknown {format_name} tool: {name}")
@@ -597,18 +623,13 @@ def require_string(value: Any, name: str) -> str:
     return value
 
 
-def read_xlsx(path: Path, _: dict[str, Any]) -> dict[str, Any]:
+def read_xlsx(path: Path, arguments: dict[str, Any]) -> dict[str, Any]:
     require_existing(path)
-    from openpyxl import load_workbook
-
-    workbook = load_workbook(path, data_only=False)
-    return {
-        "path": str(path),
-        "sheets": [
-            {"name": sheet.title, "rows": [list(row) for row in sheet.iter_rows(values_only=True)]}
-            for sheet in workbook.worksheets
-        ],
-    }
+    from codepuppy_office import OfficeExcel
+    if arguments.get('sheet'):
+        return OfficeExcel.inspect(json.dumps({**arguments,'path':str(path),'action':'range'}))
+    structure=OfficeExcel.inspect(json.dumps({'path':str(path),'action':'workbook'}))
+    return {'path':str(path),'sheets':[{'name':sheet['name'],**OfficeExcel.inspect(json.dumps({**arguments,'path':str(path),'sheet':sheet['name'],'action':'range'}))} for sheet in structure['sheets']]}
 
 
 def write_xlsx(path: Path, arguments: dict[str, Any]) -> dict[str, Any]:

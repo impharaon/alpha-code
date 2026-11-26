@@ -13,7 +13,7 @@ import type { documentChromium } from "./document-chromium"
 /** Composition consumes launcher-resolved resources. It never guesses a Node entry or acquires a second copy. */
 export function createDocumentHost(input: {
   authorize: (caller: DocumentCaller) => Promise<void> | void
-  resources: () => Promise<Omit<DocumentEnvironment, "renderState" | "workRoot">>
+  resources: () => Promise<Omit<DocumentEnvironment, "renderState" | "workRoot" | "pythonEnvironment">>
   chromium: typeof documentChromium
   runtime: ReturnType<typeof createDocumentRuntime>
   defer: DocumentHost["defer"]
@@ -26,6 +26,7 @@ export function createDocumentHost(input: {
   const key = (caller: DocumentCaller) =>
     JSON.stringify([caller.location.directory, caller.location.workspaceID ?? null, caller.sessionID])
   const host: DocumentHost = {
+    async pythonEnvironment(location) { return input.runtime.pythonEnvironment(location) },
     async environment(caller) {
       await input.authorize(caller)
       const directory = await realpath(caller.location.directory)
@@ -35,7 +36,7 @@ export function createDocumentHost(input: {
       await writeFile(join(workRoot, ".gitignore"), "*\n")
       callers.add(key(caller))
       const renderState = input.runtime.query(caller.location)
-      return { ...(await input.resources()), workRoot, renderState }
+      return { ...(await input.resources()), workRoot, renderState, pythonEnvironment: await host.pythonEnvironment(caller.location) }
     },
     async chromiumRender(request) {
       await input.authorize(request.caller)

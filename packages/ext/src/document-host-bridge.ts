@@ -1,6 +1,8 @@
 import { randomUUID } from "node:crypto"
 import {
   isDocumentEnvironment,
+  isDocumentPythonEnvironment,
+  publishDocumentPythonEnvironment,
   isRenderResult,
   type DocumentHost,
   type DocumentHostRequest,
@@ -11,6 +13,8 @@ import { bindDocumentRuntimeVerification } from "./document-runtime-bridge"
 
 /** Function adapters stay process-local; parentPort carries only the validated data contracts. */
 export function createDocumentHostBridge(bridge: HubBridge, sidecarGeneration: number) {
+  const projections = new Map<string, () => void>()
+  const registrations = new Map<string, Promise<{ ok: true } | { ok: false; error: unknown }>>()
   let latest: { sequence: number; state: DocumentRuntimeState } | undefined
   bridge.onDocumentRuntimeMessage((message) => {
     if (message.type !== "codepuppy.document.runtime.changed") return false
@@ -29,9 +33,24 @@ export function createDocumentHostBridge(bridge: HubBridge, sidecarGeneration: n
     return value
   }
   const host: DocumentHost = {
+    async pythonEnvironment(location) {
+      const registered = await registrations.get(JSON.stringify(location))
+      if (registered && !registered.ok) throw registered.error
+      const value = await call({ operation: "python-environment", location })
+      if (!isDocumentPythonEnvironment(value)) throw Error("invalid document Python environment reply")
+      const key = JSON.stringify(location)
+      projections.get(key)?.()
+      projections.set(key, publishDocumentPythonEnvironment(location, value))
+      return value
+    },
     async environment(caller) {
+      const registered = await registrations.get(JSON.stringify(caller.location))
+      if (registered && !registered.ok) throw registered.error
       const value = await call({ operation: "environment", caller })
       if (!isDocumentEnvironment(value)) throw Error("invalid document environment reply")
+      const key = JSON.stringify(caller.location)
+      projections.get(key)?.()
+      projections.set(key, publishDocumentPythonEnvironment(caller.location, value.pythonEnvironment))
       return { ...value, renderState: latest?.state ?? value.renderState }
     },
     chromiumRender: (input) => chromium(input),
@@ -48,12 +67,21 @@ export function createDocumentHostBridge(bridge: HubBridge, sidecarGeneration: n
         () => ({ ok: true as const }),
         (error: unknown) => ({ ok: false as const, error }),
       )
+      registrations.set(JSON.stringify(location), registered)
       return async () => {
-        await cleanup()
-        const result = await registered
-        if (!result.ok) throw result.error
-        await call({ operation: "verify-unregister", location, registrationId })
+        try {
+          const result = await registered
+          if (!result.ok) throw result.error
+          // Main invalidates the projection before cancelling the still-listening Location executor.
+          await call({ operation: "verify-unregister", location, registrationId })
+        } finally {
+          await cleanup()
+          projections.get(JSON.stringify(location))?.()
+          projections.delete(JSON.stringify(location))
+          if (registrations.get(JSON.stringify(location)) === registered) registrations.delete(JSON.stringify(location))
+        }
       }
+
     },
     subscribeReady(location, listener) {
       const cleanup = bridge.onDocumentReady((check, generation) => {

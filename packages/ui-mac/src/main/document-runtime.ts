@@ -10,6 +10,7 @@ import type { PinnedFiles, PinnedFileId } from "../../../util/src/codepuppy-pinn
 import { isDocumentRuntimeVerifyReceipt, sameDocumentVerifyRef, type DocumentRuntimeState, type DocumentRuntimeVerifyTask, type DocumentRuntimeVerifyReceipt } from "../../../util/src/codepuppy-document"
 import { prepareDocumentFonts } from "./document-runtime-fonts"
 import { readDocumentAssets } from "./document-resources"
+import { createDocumentPythonProjections } from "./document-python"
 import { USER_DATA_LAYOUT } from "./user-data-layout"
 
 const execute = promisify(execFile)
@@ -27,6 +28,7 @@ export function createDocumentRuntime(input: {
   if (!pin) throw new Error(`no published LibreOffice pin for ${input.platform}`)
   const selected = pin
   const root = join(input.userData, USER_DATA_LAYOUT.documentRuntime)
+  const projections = createDocumentPythonProjections({ root, generation: input.sidecarGeneration, pin: selected, assets: input.assets, resources: input.resources, platform: input.platform === "darwin-arm64" ? "darwin" : "win32" })
   const destination = join(root, "libreoffice", input.platform, selected.version)
   const registrations = new Map<string, { id: string; location: Location.Ref; run: (task: DocumentRuntimeVerifyTask, signal: AbortSignal) => Promise<DocumentRuntimeVerifyReceipt> }>()
   const requests = new Set<string>()
@@ -40,6 +42,7 @@ export function createDocumentRuntime(input: {
   let disposed = false
   const publish = (next: DocumentRuntimeState) => {
     if (disposed) return
+    projections.publish(next)
     state = next
     sequence++
     for (const listener of listeners) listener(state, sequence)
@@ -124,6 +127,14 @@ export function createDocumentRuntime(input: {
     } catch (error) { if (!disposed) fail(error) }
   }
   return {
+    invalidatePythonEnvironment(location: Location.Ref, registrationId: string, reason: "location-disposed" | "sidecar-stopped") { projections.invalidate(location, registrationId, reason) },
+    pythonEnvironment(location: Location.Ref) {
+      const registration = registrations.get(key(location))
+      if (!registration || disposed) throw Error("document Python environment requires a live Location registration")
+      const environment = projections.environment(location, registration.id, state)
+      this.query(location)
+      return environment
+    },
     query(location: Location.Ref) {
       requests.add(key(location))
       if (!preparation && !disposed) preparation = prepare()
@@ -137,6 +148,7 @@ export function createDocumentRuntime(input: {
       registrations.set(identity, { id: registrationId, location, run })
       dispatch()
       return async () => {
+        projections.invalidate(location, registrationId, "location-disposed")
         registrations.delete(identity); requests.delete(identity)
         if (active?.task.registrationId && key(active.task.location) === identity) {
           const attempt = active
@@ -147,6 +159,7 @@ export function createDocumentRuntime(input: {
       }
     },
     async dispose() {
+      projections.dispose()
       disposed = true; controller.abort()
       registrations.clear(); requests.clear(); listeners.clear()
       if (active) { active.cancelled = true; active.abort.abort(); await active.settled }

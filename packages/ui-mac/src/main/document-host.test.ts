@@ -32,6 +32,7 @@ function fixture() {
   const runtime = {
     query: () => ({ phase: "preparing", stage: "download" }),
     subscribeRuntimeVerify: () => async () => {},
+    pythonEnvironment: async () => ({ CODEPUPPY_DOCUMENT_HOST: join(root, "host.json") }),
   } as never
   return { root, caller, resources, runtime }
 }
@@ -77,9 +78,10 @@ describe("document host", () => {
     })
     const pending = new Map<unknown, (value: RenderResult) => void>()
     const mainHost: DocumentHost = {
+      pythonEnvironment: async () => ({ CODEPUPPY_DOCUMENT_HOST: join(f.root, "host.json") }),
       environment: async () => ({
         ...f.resources,
-        workRoot: f.root,
+        workRoot: f.root, pythonEnvironment: { CODEPUPPY_DOCUMENT_HOST: join(f.root, "host.json") },
         renderState: { phase: "preparing", stage: "verify" },
       }),
       chromiumRender: async (request) => {
@@ -93,7 +95,7 @@ describe("document host", () => {
     }
     const main = createDocumentMainBridge(
       mainHost,
-      { subscribe: () => () => {}, subscribeRuntimeVerify: mainHost.subscribeRuntimeVerify },
+      { subscribe: () => () => {}, subscribeRuntimeVerify: mainHost.subscribeRuntimeVerify, invalidatePythonEnvironment() {} },
       7,
       (request) => {
         cancelled++

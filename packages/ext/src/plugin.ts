@@ -1,5 +1,8 @@
+import { DOCUMENT_PYTHON_HOST, documentHost, documentPythonEnvironmentFor } from "../../util/src/codepuppy-document"
+import { declaredFirstPartyTools } from "../../core/src/mcp/codepuppy-first-party-mcp"
+import { checkCodePuppyOfficeMcpSafety } from "../../ui-mac/src/shared/office-advisories"
 import { existsSync, readFileSync, readdirSync } from "node:fs"
-import { join } from "node:path"
+import { dirname, join } from "node:path"
 import { pathToFileURL } from "node:url"
 import type { Plugin } from "@opencode/plugin"
 import { codepuppyBootstrap, routePlatformUrl } from "../../util/src/codepuppy-bootstrap"
@@ -133,6 +136,9 @@ export const CodePuppyExt: Plugin.Plugin = {
       requireCodePuppyGlobalRoot(bootstrap.paths.globalRoot)
       // `#1698` R33:随包内容需要的工具 shell 输出只在这里逐项列出;每次建子进程时从文档派生,不写本进程环境。
       await context.shell.hook("create.before", (event) => {
+        const document = documentPythonEnvironmentFor(context.location)
+        if (document) event.env[DOCUMENT_PYTHON_HOST] = document.CODEPUPPY_DOCUMENT_HOST
+        else delete event.env[DOCUMENT_PYTHON_HOST]
         event.env.CODEPUPPY_GLOBAL_DIR = codepuppyBootstrap().paths.globalRoot
       })
       const projectRootFor = (target: string): ProjectRoot | null => {
@@ -339,7 +345,7 @@ export const CodePuppyExt: Plugin.Plugin = {
         return cfg
       }
 
-      await context.mcp.transform((editor) => {
+      await context.mcp.transform(async (editor) => {
         // #223 R5 / M3:云 MCP 的完整定义只由 ext 在这里装 —— 本句能执行 = 本 Location 的 ext 已装上、上面的执行闸已注册。
         try {
           // Main omits the effective server when its owning package is off. Rearm only an injected entry.
@@ -361,6 +367,15 @@ export const CodePuppyExt: Plugin.Plugin = {
             editor.update(name, (config) => {
               config.disabled = disabled
             })
+          }
+          for (const [name, config] of editor.list()) {
+            if (config.type !== "local" || config.disabled === true || !bootstrap.paths.officeMcpManifest) continue
+            const previous = config.environment?.[DOCUMENT_PYTHON_HOST] ? documentPythonEnvironmentFor(context.location) : undefined
+            if (!declaredFirstPartyTools(name, config, bootstrap.paths.officeMcpManifest, readFileSync, previous)) continue
+            const resources = dirname(dirname(bootstrap.paths.officeMcpManifest))
+            if (!checkCodePuppyOfficeMcpSafety(name, config as unknown as Record<string, unknown>, context.location.directory, resources, previous).ok) continue
+            const environment = await documentHost().pythonEnvironment(context.location)
+            editor.update(name, (entry) => { if (entry.type === "local") entry.environment = { ...entry.environment, ...environment } })
           }
         } catch (cause) {
           merged = false

@@ -97,6 +97,7 @@ export function documentRuntimeResources(resourcesRoot: string) {
   return {
     verify: realpathSync(join(resourcesRoot, "document-runtime", "verify_runtime.py")),
     extractMsi: realpathSync(join(resourcesRoot, "document-runtime", "extract_msi.py")),
+    recalculate: realpathSync(join(resourcesRoot, "document-runtime", "recalculate_document.py")),
     render: realpathSync(join(resourcesRoot, "document-runtime", "render_document.py")),
     updateFields: realpathSync(join(resourcesRoot, "document-runtime", "update_fields.xba")),
   }

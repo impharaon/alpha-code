@@ -31,6 +31,7 @@ function fixture() {
   const deferred: DeferredDocumentCheck[] = []
   let queried = 0
   const host: DocumentHost = {
+    pythonEnvironment: async () => ({ CODEPUPPY_DOCUMENT_HOST: join(root, "host.json") }),
     environment: async () => {
       queried++
       return {
@@ -40,7 +41,7 @@ function fixture() {
         skills: assets,
         templates: join(assets, "templates"),
         fonts: join(assets, "fonts"),
-        workRoot: join(root, ".document-output"),
+        workRoot: join(root, ".document-output"), pythonEnvironment: { CODEPUPPY_DOCUMENT_HOST: join(root, "host.json") },
         renderState: { phase: "preparing", stage: "download", received: 1, total: 100 },
       }
     },
@@ -82,6 +83,7 @@ function fixture() {
     assets,
     documentRuntimeRoot: join(root, "runtime"),
     renderScript: join(root, "fixed-render.py"),
+    recalculateScript: join(root, "fixed-recalculate.py"),
     chromium: host.chromiumRender,
     execute,
   }

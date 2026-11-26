@@ -87,6 +87,24 @@ export async function registerPackageHooks(
     const source = allInstalledPluginInstructions(input.root).find(item => item.entry.kind === "agent" && item.name === agent)
     return source ? sourceInstructionName(source) : agent
   }
+  const matchesHook = (event: HookEvent, matcher: string | undefined, fields: Record<string, unknown>) => {
+    if (!matcher || matcher === "*") return true
+    const field: Partial<Record<HookEvent, string>> = {
+      PreToolUse: "tool_name", PostToolUse: "tool_name", PostToolUseFailure: "tool_name",
+      PermissionRequest: "tool_name", PermissionDenied: "tool_name", SessionStart: "source",
+      SessionEnd: "reason", Notification: "notification_type", SubagentStart: "agent_type",
+      SubagentStop: "agent_type", PreCompact: "trigger", PostCompact: "trigger",
+      ConfigChange: "source", StopFailure: "error", InstructionsLoaded: "load_reason",
+      UserPromptExpansion: "command_name", Elicitation: "mcp_server_name", ElicitationResult: "mcp_server_name",
+    }
+    const name = field[event]
+    if (!name) return true
+    const value = String(fields[name] ?? "")
+    if ((event === "StopFailure" ? /^[\w|]+$/ : /^[\w ,|\-]+$/).test(matcher))
+      return matcher.split(event === "StopFailure" ? "|" : /[|,]/).some(item => item.trim() === value)
+    try { return new RegExp(matcher).test(value) }
+    catch { input.log("runtime-failed: package hook matcher " + event + ": invalid regular expression"); return false }
+  }
   let disposed = false
   const active = (installed: Installed) => {
     if (disposed) return false
@@ -364,22 +382,7 @@ export async function registerPackageHooks(
                 return
             }
             if (event === "FileChanged" && !filePaths(sessionID, handler).includes(String(eventFields.file_path))) return
-            if (
-              event !== "FileChanged" && handler.hook.matcher &&
-              !new RegExp(handler.hook.matcher).test(
-                String(
-                  eventFields.tool_name ??
-                    eventFields.command_name ??
-                    eventFields.mcp_server_name ??
-                    eventFields.memory_type ??
-                    eventFields.notification_type ??
-                    eventFields.source ??
-                    eventFields.agent_type ??
-                    "",
-                ),
-              )
-            )
-              return
+            if (event !== "FileChanged" && !matchesHook(event, handler.hook.matcher, eventFields)) return
             const sourceConfig = processSource(handler.installed, handler.scope)
             if (handler.hook.type === "prompt") {
               const config = pluginProcessConfig(sourceConfig)
@@ -766,7 +769,7 @@ export async function registerPackageHooks(
       installed.description.entries.some(entry => entry.kind === "hook" && pluginEntryRuntimeAvailable(entry) &&
         ["Elicitation", "ElicitationResult"].includes(entry.hook.event) &&
         (entry.hook.scope.kind === "package" || [...instructions.values()].some(scopes => entry.hook.scope.kind !== "package" && scopes.get(installed.key + ":" + entry.hook.scope.entryId)?.active())) &&
-        (!entry.hook.matcher || new RegExp(entry.hook.matcher).test(sourceServer(installed, server)))),
+        matchesHook(entry.hook.event, entry.hook.matcher, { mcp_server_name: sourceServer(installed, server) })),
     ),
     async beforeConfigChange(change) {
       const results = (await Promise.all([...sessionEpoch.keys()].map(sessionID => run("ConfigChange", sessionID, {

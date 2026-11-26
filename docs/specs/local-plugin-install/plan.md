@@ -1476,3 +1476,7 @@ Host 检查：`bun src/shared/host-extension-package-contract/generate-artifact.
 B3：观察修正独立提交 `e6cc55cdcf`；未修实现上真实 child Start/Submit 仍触发，**0 pass / 1 fail**（`/tmp/plugin-standard-r21-B3-red.log`）。应用已保全候选后同例 **1 pass / 18 expects**（`B3-green.log`），验证完成/父 leave 两条真实 Session-owned HTTP transport 的关闭路径、无 child always monitor、SubagentStart/Stop 保留且四次真实模型请求不增。移除 child SessionStart guard 的 child-only loader 臂 **0 pass / 1 fail**，标记 REMOVAL_ARM_APPLIED（`B3-removal.log`），纠正后的断言能检测生产行为缺失；未改磁盘源码。原完整 host 文件结果见本步收口；原 lifecycle registry 同提交登记 L0 child 归属，无新端口。
 
 B3 完整原 host **113 pass / 0 fail**（`/tmp/plugin-standard-r21-B3-host-file.log`）。沿 r20 已验证的测试进程 `env -u CLAUDE_CODE_SESSION_ID` 隔离外部 Claude host ID；保留其他进程环境，不改旧断言或生产环境绑定。当前 B3 红测已收绿。
+
+B4：`151f7b6913` 红测在固定 hookify `*` group、真实 stdio Elicitation 与原 dash0 group 上 **0 pass / 3 fail**（`/tmp/plugin-standard-r21-B4-red.log`）。单一 matchesHook 同时供 handler 运行与 hasElicitationHandlers 消费：`*`/空/缺省 all-match，按官方字符集区分 exact list/regexp，按事件取 trigger/reason/load_reason/tool_name 等，不再按字段存在顺序猜；FileChanged 仍按 frozen 字面 watch 集。坏 regexp 只记具名错误，不能抛穿每个 MCP 调用。官方依据是兼容报告保存的 [Claude hooks matcher patterns](https://code.claude.com/docs/en/hooks#matcher-patterns)，本地 2026-11-26 原文已核对（含 StopFailure 较窄字符集）。三个具名例 **3 pass / 13 expects**（`B4-green.log`），原完整 host 结果见收口；registry 同提交，gate count 113→116，不增测试层/依赖或接口。
+
+B4 完整原 host **116 pass / 0 fail**（`/tmp/plugin-standard-r21-B4-host-file.log`）；原 subagent 和 InstructionsLoaded 行为仍通过。

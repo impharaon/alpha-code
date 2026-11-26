@@ -20,6 +20,17 @@ import {
   type ComposerAttachment,
 } from "./composer-attachments-core"
 
+test("media has no document limit and sends original-path metadata without bytes", () => {
+  for (const [name, kind] of [["large.mp4", "video"], ["recording.mp3", "audio"]] as const) {
+    expect(classifyAttachment({ name, type: "", size: 2_000_000_000 })).toEqual({ ok: true, kind })
+    const media = { kind, name, path: `/outside/${name}`, bytes: 2_000_000_000, durationMs: null }
+    const attachment = { ...media, id: "media", size: media.bytes }
+    expect(buildAttachmentParts([attachment])).toEqual([{ type: "text", text: "", synthetic: true, metadata: { "codepuppy.media": media } }])
+    expect(revalidateStagedDirectory([attachment], "/another-project")).toEqual([attachment])
+  }
+  expect(classifyAttachment({ name: "code.ts", type: "video/mp2t", size: 5 })).toEqual({ ok: true, kind: "text" })
+})
+
 const img = (over: Partial<Extract<ComposerAttachment, { kind: "image" }>> = {}): ComposerAttachment => ({
   id: "att-1",
   name: "a.png",

@@ -13,7 +13,7 @@ type Host = { title: string; cases: string; pass: number; args?: string[]; cwd?:
 const HOSTS: Host[] = [
   { title: "账户浮层按「订阅×余额」四象限如实呈现(chip 三态 + 用量两行 + 无余额格静默)", cases: "test-component/account-quadrant.cases.ts", pass: 15, timeout: 120_000 },
   { title: "账户浮层显示当前版本号与构建身份(版本来自 window.api.appVersion、登录/登出两分支;#237 复制一行 + 三种包的标记 + 提交未知)", cases: "test-component/account-version.cases.ts", pass: 7, timeout: 120_000 },
-  { title: "#1553 附件卡:读取路径标签随引擎能力与登录状态变化、发送前拒绝、读取结果与重新读取(真组件用例)", cases: "test-component/attachment-cards.cases.ts", pass: 15, timeout: 60_000 },
+  { title: "#1553 附件卡:读取路径标签随引擎能力与登录状态变化、发送前拒绝、读取结果与重新读取(真组件用例)", cases: "test-component/attachment-cards.cases.ts", pass: 16, timeout: 60_000 },
   { title: "#1557 模型目录刷新失败不在全局层(真组件用例)", cases: "test-component/catalog-failure-banner.cases.ts", pass: 3, timeout: 60_000 },
   { title: "#903 /new-session 非法 draft 与水合中的真组件用例", cases: "test-component/draft-route-gate.cases.ts", pass: 5, timeout: 60_000 },
   { title: "package safe view and admission traverse the production ExtensionHub card and ExtensionDetail paths", cases: "test-component/ext-package-detail-wiring.cases.ts", pass: 15, timeout: 60_000 },

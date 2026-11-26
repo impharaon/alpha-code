@@ -1,3 +1,4 @@
+import { timelineAttachmentsOf } from "./timeline-attachments"
 import { describe, expect, test } from "bun:test"
 import type {
   AssistantMessage,
@@ -1829,4 +1830,14 @@ describe("脚注词元数按界面语言写(AC-07:不再硬写英文「24k」)",
     expect(formatTokenCount(24_000, "zht")).toBe(formatTokenCount(24_000, "zh-Hant"))
     expect(formatTokenCount(24_000, "zh")).not.toMatch(/k$/i)
   })
+})
+
+
+test("original-path media cards survive reload without claiming that an attachment was already read", () => {
+  const media = { kind: "video", path: "/outside/talk.mp4", name: "talk.mp4", bytes: 2_000_000_000, durationMs: null }
+  const part = textPart("media", "user", "", { synthetic: true, metadata: { "codepuppy.media": media } })
+  const cards = timelineAttachmentsOf([part], () => ({ tools: [], turnActive: false, directory: "/another-project" }))
+  expect(cards).toHaveLength(1)
+  expect(cards[0]).toMatchObject({ name: "talk.mp4", size: media.bytes, localMedia: media })
+  expect(cards[0]!.read).toBeUndefined()
 })

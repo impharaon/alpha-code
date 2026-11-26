@@ -16,6 +16,7 @@ import os from "node:os"
 import path from "node:path"
 
 import { Arch } from "electron-builder"
+import { writeVideoRuntimeFixture } from "./fixtures/video/runtime"
 
 import {
   ENGINE_ASSETS_DIR,
@@ -284,8 +285,8 @@ describe("生产 electron-builder.config.ts 的 beforePack", () => {
       await expect(beforePack({ electronPlatformName: "darwin", arch: Arch[crossArch] })).rejects.toThrow(
         new RegExp(`拒绝打 mac-${crossArch} 包[\\s\\S]*正在打 ${crossArch} 包`),
       )
-      // 非 mac 平台不受影响(win/linux 打包照旧)。
-      await expect(beforePack({ electronPlatformName: "win32", arch: Arch.x64 })).resolves.toBeUndefined()
+      // 视频只发布 Windows x64，不能让其它架构跳过闭包检查。
+      await expect(beforePack({ electronPlatformName: "win32", arch: Arch.arm64 })).rejects.toThrow("Unsupported video runtime target")
     } finally {
       if (saved === undefined) delete process.env[TARGET_ARCH_ENV]
       else process.env[TARGET_ARCH_ENV] = saved
@@ -444,6 +445,8 @@ async function packagedResources(opts: { arch: TargetArch; unpack: boolean; mode
     fs.mkdirSync(path.join(resources, "ripgrep"), { recursive: true })
     fs.writeFileSync(path.join(resources, "ripgrep", "rg"), opts.ripgrep?.bytes ?? thin(opts.arch), { mode: opts.ripgrep?.mode ?? 0o755 })
   }
+  await writeVideoRuntimeFixture(path.join(resources, "video-mcp"), "darwin-arm64")
+  await writeVideoRuntimeFixture(path.join(dir, "app/resources/video-mcp"), "win32-x64")
   return { resources, appOutDir: path.join(dir, "app") }
 }
 
@@ -486,7 +489,7 @@ describe("#1669 checkPackagedEngineAssets(afterPack 的核对)", () => {
     ])
   })
 
-  test("生产 electron-builder.config.ts:asarUnpack 解包引擎资源目录;afterPack 对今天的形状拒绝出包、对解包的形状放行,非 mac 平台不受影响", async () => {
+  test("生产 electron-builder.config.ts:asarUnpack 解包引擎资源目录;afterPack 对今天的形状拒绝出包、对解包的形状放行,Windows 核对自己的视频资源", async () => {
     const { getConfig } = await import("../../electron-builder.config")
     const config = getConfig("prod")
     expect(config.asarUnpack).toEqual([`${ENGINE_ASSETS_DIR}/**`])
@@ -537,10 +540,8 @@ describe("§4.8 随包 ripgrep", () => {
   })
 })
 
-// I-14:没有签名材料时打出的本机包,electron-builder 不签(identity null 是「跳过签名」,不是 ad-hoc);而 fuses 改写了
-// Electron 可执行文件,原签名随之失效,macOS 启动即杀。所以本机包的 ad-hoc 签名由 fuses 翻转之后紧接着补
-// (@electron/fuses 的 resetAdHocDarwinSignature:`codesign --sign - --force --deep`,不查钥匙串身份);有签名材料的
-// 正式包配置逐字不变。去掉这一项 ⇒ 未签名一臂红;把它也加到正式包 ⇒ 签名一臂红。真打包启动的证据见交付记录。
+// 本机与正式包沿同一个 signer：子文件签名后刷新视频摘要，再签父 app。
+// 不能让 fuse 深签在摘要封装以后再次改写原生文件。实际签名探针是一次性证据。
 describe("I-14 本机包的本机签名", () => {
   const configOf = (sign: string | undefined) => {
     const env: Record<string, string | undefined> = { ...process.env, [TARGET_ARCH_ENV]: "arm64", GITHUB_ACTIONS: "false" }
@@ -554,10 +555,10 @@ describe("I-14 本机包的本机签名", () => {
   }
   const releaseFuses = { runAsNode: false, enableNodeOptionsEnvironmentVariable: false, enableNodeCliInspectArguments: false, enableEmbeddedAsarIntegrityValidation: true, onlyLoadAppFromAsar: true, enableCookieEncryption: true }
 
-  test("没有签名材料:不按钥匙串找身份,fuses 翻转后补 ad-hoc 签名;正式签名包的 fuse 配置与身份来源不变", () => {
+  test("没有签名材料:同一 signer 使用 ad-hoc 身份;正式签名包仍自动找身份且不重复 fuse 深签", () => {
     const local = configOf(undefined)
-    expect(local.identity).toBe("skip")
-    expect(local.fuses).toEqual({ ...releaseFuses, resetAdHocDarwinSignature: true })
+    expect(local.identity).toBe("-")
+    expect(local.fuses).toEqual(releaseFuses)
     const release = configOf("1")
     expect(release.identity).toBe("auto")
     expect(release.fuses).toEqual(releaseFuses)

@@ -1,3 +1,4 @@
+import type { VideoFrameReference } from "../../schema/src/codepuppy-video-progress"
 // cloud-vision — 看不了图的模型,把图送云端识图(`#1419`,REQ-228 基线 §2-B;云端半场 alpha-platform#484 已上线)。
 //
 // 两条路径,最终落到**同一个**识图接口 `POST <gateway>/v1/tools/vision`(基线 §2-0:能力只在 gateway 那条路由上):
@@ -46,7 +47,7 @@ import {
   VISION_TOOL_REFUSED_ID,
   VISION_TRANSCRIPT_ID,
 } from "./context-injection"
-import { compressForVision, sniffImageMime, VISION_IMAGE_MAX_BYTES, VisionImageDecodeError, VisionImageTooLargeError, type CompressedImage } from "./vision-image"
+import { compressForVision, sniffImageMime, VISION_IMAGE_MAX_BYTES, type CompressedImage } from "./vision-image"
 
 /** 云 worker 自己 advertise 的远端工具名(alpha-platform `cloud-mcp.ts` mount);引擎 id 是 `<server>_vision`(`codepuppy_vision`)。 */
 export const CLOUD_VISION_REMOTE_TOOL = "vision"
@@ -122,6 +123,7 @@ export type DescribeImageInput = {
   readonly access: { readonly endpoint: string; readonly authorization: string }
   readonly image: CompressedImage
   readonly question?: string
+  readonly signal?: AbortSignal
   readonly fetch?: typeof fetch
   readonly timeoutMs?: number
 }
@@ -146,7 +148,7 @@ export async function describeImage(input: DescribeImageInput): Promise<VisionOu
       method: "POST",
       headers: { authorization: input.access.authorization, "content-type": "application/json" },
       body: JSON.stringify(visionRequestBody(input.image, input.question)),
-      signal: AbortSignal.timeout(input.timeoutMs ?? CLOUD_VISION_TIMEOUT_MS),
+      signal: input.signal ? AbortSignal.any([input.signal, AbortSignal.timeout(input.timeoutMs ?? CLOUD_VISION_TIMEOUT_MS)]) : AbortSignal.timeout(input.timeoutMs ?? CLOUD_VISION_TIMEOUT_MS),
     })
   } catch (error) {
     return { ok: false, kind: "network", detail: error instanceof Error ? error.message : String(error) }
@@ -233,12 +235,15 @@ export type RegisterImageInput = {
 }
 
 const sha256 = (bytes: Uint8Array) => createHash("sha256").update(bytes).digest("hex")
+export const visionCacheKey = (entry: VisionImageEntry, question?: string) => question ? sha256(Buffer.from(JSON.stringify([entry.hash, question]))) : entry.hash
 
 export class VisionSession {
   /** hash → 云端认出来的正文(只记成功;失败不记,下次仍会重试)。 */
   readonly transcripts = new Map<string, string>()
   private readonly inflight = new Map<string, Promise<VisionOutcome>>()
   private readonly entries: VisionImageEntry[] = []
+  private readonly frames = new Map<string, { entry: VisionImageEntry; reference: VideoFrameReference }>()
+  private readonly frameHashes = new Set<string>()
   private readonly hashByPart = new Map<string, string>()
   /** 因超过 VISION_SESSION_MAX_IMAGES 被挤出去的哈希:再遇到不重新编号(编号一旦漂移,模型手里的引用就全错了)。 */
   private readonly evicted = new Set<string>()
@@ -259,6 +264,23 @@ export class VisionSession {
       return existing
     }
     return this.createEntry({ number: this.nextNumber++, label: input.label, hash, path: input.path, base64: input.base64, bytes })
+  }
+
+  /** Video references retain each source time even when the JPEG bytes dedupe. */
+  registerFrame(input: RegisterImageInput, reference: VideoFrameReference): VisionImageEntry {
+    const hash = sha256(Buffer.from(input.base64, "base64"))
+    this.frameHashes.add(hash)
+    this.evicted.delete(hash)
+    const entry = this.register(input)!
+    this.frames.set(reference.frameId, { entry, reference })
+    return entry
+  }
+
+  frameReference(ref: string, directory: string): VideoFrameReference | undefined {
+    const exact = this.frames.get(ref.trim())
+    if (exact) return exact.reference
+    const entry = this.lookup(ref, directory)
+    return [...this.frames.values()].find((frame) => frame.entry === entry)?.reference
   }
 
   /**
@@ -302,9 +324,13 @@ export class VisionSession {
       },
     }
     this.entries.push(entry)
-    while (this.entries.length > VISION_SESSION_MAX_IMAGES) {
-      const dropped = this.entries.shift()
-      if (dropped) this.evicted.add(dropped.hash)
+    if (!this.frameHashes.has(input.hash)) {
+      const ordinary = this.entries.filter((image) => !this.frameHashes.has(image.hash))
+      if (ordinary.length > VISION_SESSION_MAX_IMAGES) {
+        const dropped = ordinary[0]!
+        this.entries.splice(this.entries.indexOf(dropped), 1)
+        this.evicted.add(dropped.hash)
+      }
     }
     return entry
   }
@@ -321,6 +347,8 @@ export class VisionSession {
   lookup(ref: string, directory: string): VisionImageEntry | undefined {
     const trimmed = ref.trim()
     if (!trimmed) return undefined
+    const frame = this.frames.get(trimmed)
+    if (frame) return frame.entry
     const numbered = /^#?\s*(?:图片|附件|image|attachment)?\s*#?\s*(\d+)\s*$/i.exec(trimmed)
     if (numbered) {
       const n = Number(numbered[1])
@@ -339,23 +367,25 @@ export class VisionSession {
   }
 
   /** 同一张图在途的调用只发一次;成功即记入 transcripts。 */
-  describeOnce(entry: VisionImageEntry, run: () => Promise<VisionOutcome>): Promise<VisionOutcome> {
-    const cached = this.transcripts.get(entry.hash)
+  describeOnce(entry: VisionImageEntry, run: () => Promise<VisionOutcome>, question?: string): Promise<VisionOutcome> {
+    const key = visionCacheKey(entry, question)
+    const cached = this.transcripts.get(key)
     if (cached !== undefined) return Promise.resolve({ ok: true, text: cached, model: "", fallbackUsed: false })
-    const pending = this.inflight.get(entry.hash)
+    const pending = this.inflight.get(key)
     if (pending) return pending
     const promise = run()
       .then((outcome) => {
-        if (outcome.ok) this.transcripts.set(entry.hash, outcome.text)
+        if (outcome.ok) this.transcripts.set(key, outcome.text)
         return outcome
       })
-      .finally(() => this.inflight.delete(entry.hash))
-    this.inflight.set(entry.hash, promise)
+      .finally(() => this.inflight.delete(key))
+    this.inflight.set(key, promise)
     return promise
   }
 }
 
 export type TranscribeDeps = {
+  readonly signal?: AbortSignal
   readonly access: CloudVisionAccess
   readonly fetch?: typeof fetch
   readonly timeoutMs?: number
@@ -367,28 +397,28 @@ export type TranscribeDeps = {
  * 云端不可用 ⇒ 不压缩、不出网,直接给原因;同一内容只出网一次(会话内哈希去重)。
  * `name` 是这一次出现时的名字(同一张图换名再贴,块里写的是这次的名字),缺省用登记时的;块里的标签恒为 `#<编号> <名字>`。
  */
+/** Same cached compression/HTTP authority for automatic pictures and requested video frames. */
+export async function describeEntry(session: VisionSession, entry: VisionImageEntry, deps: TranscribeDeps, question?: string): Promise<VisionOutcome> {
+  const key = visionCacheKey(entry, question)
+  const cached = session.transcripts.get(key)
+  if (cached !== undefined) return { ok: true, text: cached, model: CLOUD_VISION_MODEL, fallbackUsed: false }
+  if (!deps.access.ok) return { ok: false, kind: deps.access.reason === "credential-unreadable" ? "credential" : "not-logged-in", detail: deps.access.reason }
+  let image: CompressedImage
+  try { image = await entry.compressed() }
+  catch (error) {
+    deps.log?.(`[@codepuppy/ext] cloud vision: compressor unavailable for ${entry.label} — ${error instanceof Error ? error.message : String(error)}`)
+    return { ok: false, kind: "unsupported-format", detail: "Local image compression failed" }
+  }
+  const access = deps.access
+  const outcome = await session.describeOnce(entry, () => describeImage({ access, image, question, signal: deps.signal, fetch: deps.fetch, timeoutMs: deps.timeoutMs }), question)
+  if (!outcome.ok) deps.log?.(`[@codepuppy/ext] cloud vision: ${entry.label} failed (${outcome.kind}): ${outcome.detail}`)
+  return outcome
+}
+
 export async function transcribeEntry(session: VisionSession, entry: VisionImageEntry, deps: TranscribeDeps, name?: string): Promise<string> {
   const label = visionLabel(entry, name)
-  const cached = session.transcripts.get(entry.hash)
-  if (cached !== undefined) return visionTranscriptBlock(label, cached)
-  if (!deps.access.ok) return visionFailureBlock(label, deps.access.reason === "credential-unreadable" ? "credential" : "not-logged-in")
-  const access = deps.access
-  let image: CompressedImage
-  try {
-    image = await entry.compressed()
-  } catch (error) {
-    if (error instanceof VisionImageDecodeError || error instanceof VisionImageTooLargeError) {
-      deps.log?.(`[@codepuppy/ext] cloud vision: ${label} not sent — ${error.message}`)
-      return visionFailureBlock(label, "unsupported-format")
-    }
-    // 装不上 photon(wasm 缺席之类)也落在这一格:本机压不了 ⇒ 不发原图去撞 413。
-    deps.log?.(`[@codepuppy/ext] cloud vision: compressor unavailable for ${label} — ${error instanceof Error ? error.message : String(error)}`)
-    return visionFailureBlock(label, "unsupported-format")
-  }
-  const outcome = await session.describeOnce(entry, () => describeImage({ access, image, fetch: deps.fetch, timeoutMs: deps.timeoutMs }))
-  if (outcome.ok) return visionTranscriptBlock(label, outcome.text)
-  deps.log?.(`[@codepuppy/ext] cloud vision: ${label} failed (${outcome.kind}): ${outcome.detail}`)
-  return visionFailureBlock(label, outcome.kind)
+  const outcome = await describeEntry(session, entry, deps)
+  return outcome.ok ? visionTranscriptBlock(label, outcome.text) : visionFailureBlock(label, outcome.kind)
 }
 
 // ── 图片数据的形状判定 ─────────────────────────────────────────────────────────────

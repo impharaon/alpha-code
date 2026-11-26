@@ -395,3 +395,13 @@ describe("published byte limits", () => {
     )
   })
 })
+
+test("video producer fixtures decode through the pinned schema", async () => {
+  for (const name of ["input", "result", "job-inline", "job-artifact", "models-test-price", "input-unknown-model", "input-unknown-field", "result-negative-usage", "models-missing-price"]) {
+    const file = await Bun.file(resolve(root, "vendor/alpha-platform-video-understanding/v1/fixtures/video-understanding", `${name}.json`)).json()
+    const decode = () => decodeContract(file.contract, file.value, "cloud-http")
+    if (file.expect === "valid") expect(decode(), name).toEqual(file.value)
+    else expect(decode, name).toThrow(ContractIncompatibleError)
+  }
+  expect(() => decodeContract("VideoUnderstandingInputV1", { schema_version: 1, question: "question", source_range: {start_ms: 1, end_ms: 1} }, "cloud-http")).toThrow(ContractIncompatibleError)
+})

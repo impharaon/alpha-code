@@ -43,6 +43,8 @@ import type { ProtectedFiles } from "../../../schema/src/codepuppy-protected-fil
 
 export interface PolicyRegistration {
   readonly dispose: () => void
+  readonly videoToolFacts: () => Promise<(tool: RegisteredTool) => ToolFacts>
+  readonly factsFor: (name: string) => Promise<ToolFacts | undefined>
   /** Last statement of the extension's `setup`: registers the parts that must see every earlier registration. */
   readonly seal: () => Promise<void>
   /**
@@ -260,6 +262,22 @@ export async function registerPolicy(context: Plugin.Context, unattended: Unatte
 
   return {
     dispose: () => { terminalEvents.abort(); externalRead.dispose(); secrets.dispose() },
+    videoToolFacts: async () => {
+      // Transform callbacks are synchronous: capture the existing plugin-order fact before registering one.
+      const ambiguous = await earlyAmbiguous()
+      return (tool) =>
+        toolFacts(tool, {
+          early,
+          earlyAmbiguous: ambiguous,
+          mcp,
+          bundled,
+          extOrigin,
+          cloudMcp: bootstrap.cloudMcp,
+          officeMcpManifest: bootstrap.paths.officeMcpManifest,
+        })
+    },
+
+    factsFor,
     askInstall: async (call) => {
       const key = installCallKey(call)
       const prepared = installAsks.get(key)

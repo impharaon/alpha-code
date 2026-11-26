@@ -19,6 +19,6 @@
   },
   "references": [{ "path": "../codepuppy-app" }],
   "files": ["src/renderer/env.d.ts"],
-  "include": ["src", "benchmarks", "package.json"],
+  "include": ["resources/video-mcp/**/*.ts", "src", "benchmarks", "package.json"],
   "exclude": ["src/**/*.test.ts", "src/**/*.cases.ts", "benchmarks/**/dist"]
 }

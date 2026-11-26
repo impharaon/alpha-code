@@ -988,6 +988,13 @@ export function CodePuppyComposerRuntime(props: CodePuppyComposerRuntimeProps) {
           accepted.push({ id, name, mime: f.type, kind: "image", size: f.size, url: await readAsDataUrl(f) })
           continue
         }
+        if (c.kind === "video" || c.kind === "audio") {
+          const result = await window.api.attachments.media(f)
+          accepted.push(result.ok
+            ? { ...result.media, id, size: result.media.bytes }
+            : { id, name, size: f.size, kind: "failed", reason: result.reason, file: f })
+          continue
+        }
         const bytes = await f.arrayBuffer()
         if (c.kind === "text") {
           const url = textAttachmentUrl(new Uint8Array(bytes))

@@ -1,4 +1,4 @@
-import { contextBridge, ipcRenderer } from "electron"
+import { contextBridge, ipcRenderer, webUtils } from "electron"
 import {
   type AuthErrorCode,
   type AuthState,
@@ -129,6 +129,7 @@ const api: ElectronAPI = {
   },
   // REQ-236 `#1553` AC2:PDF / Office 附件存一份到会话实例目录的隐藏目录(main/composer-attachment-stage.ts)。
   attachments: {
+    media: (file) => ipcRenderer.invoke("composer-media-register", webUtils.getPathForFile(file), file.name, file.size, file.type),
     stage: (directory, name, reader, bytes) => ipcRenderer.invoke("composer-attachment-stage", directory, name, reader, bytes),
   },
   getDefaultServerUrl: () => ipcRenderer.invoke("get-default-server-url"),
@@ -329,6 +330,7 @@ const api: ElectronAPI = {
     openBillingPage: (page) => ipcRenderer.invoke("cloud-open-billing-page", page),
     dispatch: (envelope) => ipcRenderer.invoke("cloud-dispatch", envelope),
     upload: (intent) => ipcRenderer.invoke("cloud-upload", intent),
+    videoUploads: (identity) => ipcRenderer.invoke("cloud-video-upload-state",identity),
     confirmUpload: (requestId) => ipcRenderer.invoke("cloud-upload-confirm", requestId),
     cancelUpload: (requestId) => ipcRenderer.invoke("cloud-upload-cancel", requestId),
     status: (jobId) => ipcRenderer.invoke("cloud-status", jobId),

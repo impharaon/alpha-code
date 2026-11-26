@@ -16,6 +16,7 @@ mock.module("./policy/index", () => ({
     order.push("registerPolicy")
     return {
       dispose: () => { order.push("disposePolicy") },
+      videoToolFacts: async () => () => ({ kind: "builtin" }),
       seal: async () => {
         order.push("seal")
       },

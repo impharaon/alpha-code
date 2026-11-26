@@ -665,3 +665,45 @@ test("unified plugin notifications retain the original occurrence identity acros
   await Promise.all([first, duplicate])
   requester.close()
 })
+
+test("plugin quit does not intercept when no viewed Sessions need settlement", async () => {
+  const { createPluginSessionRequester, createPluginSessionQuitHandler, notePluginSessionViewed } = await import("./plugin-session-lifecycle")
+  const requester = createPluginSessionRequester(() => {})
+  let prevented = 0
+  let stopped = 0
+  let quit = 0
+  const beforeQuit = createPluginSessionQuitHandler(async () => { stopped++ }, () => { quit++ })
+  try {
+    beforeQuit({ preventDefault: () => { prevented++ } })
+    expect(prevented).toBe(0)
+    expect(stopped).toBe(0)
+    expect(quit).toBe(0)
+    requester.close()
+    notePluginSessionViewed(2128, "ses_no_live_generation")
+    beforeQuit({ preventDefault: () => { prevented++ } })
+    expect(prevented).toBe(0)
+    expect(stopped).toBe(0)
+  } finally { requester.close(); notePluginSessionViewed(2128, undefined) }
+})
+
+test("plugin quit waits for actual viewed Session receipts and then quits once", async () => {
+  const { createPluginSessionRequester, createPluginSessionQuitHandler, notePluginSessionViewed, endViewedPluginSessions } = await import("./plugin-session-lifecycle")
+  const sent: Array<{ id: number }> = []
+  const requester = createPluginSessionRequester(message => { sent.push(message) })
+  let prevented = 0
+  let quit = 0
+  const beforeQuit = createPluginSessionQuitHandler(async () => { await endViewedPluginSessions("other") }, () => { quit++ })
+  notePluginSessionViewed(2128, "ses_real_quit")
+  try {
+    beforeQuit({ preventDefault: () => { prevented++ } })
+    expect(prevented).toBe(1)
+    expect(sent).toHaveLength(1)
+    expect(quit).toBe(0)
+    requester.receive({ id: sent[0]!.id, ok: true })
+    await Bun.sleep(0)
+    expect(quit).toBe(1)
+    beforeQuit({ preventDefault: () => { prevented++ } })
+    expect(prevented).toBe(1)
+    expect(quit).toBe(1)
+  } finally { requester.close(); notePluginSessionViewed(2128, undefined) }
+})

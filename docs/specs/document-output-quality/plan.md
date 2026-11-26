@@ -767,3 +767,6 @@ r14 schema 边界实现：document-render 改用 `@opencode/schema/session-messa
 
 
 r14 无人值守 target green：保留原敏感读取/只读工具拒绝断言，两个原失败用例 **2 PASS / 0 FAIL**（unattended-target-green.log，21 expect）；不是修改预期。真实 sampler 经 shared slot 完整执行，17 份 fixture 由当前引擎生成（sampler.log 最终 fixtures written）；身份与真实帧一起重采，不手写 tree 戳记。JSON 中动态 ID/时间随真实采样变化，属派生证据而非扩大产品范围。最终十二个失败文件将每个单独 Bun 进程按原 flags 复验，共用一个 gate slot 租约以免反复排队；真实 JUnit 交原 scoped gate-files checker 消费，登记行自身变化仍由原脚本强制核验，不绕过地板/登记阈值。
+
+
+r14 重采后的直接登记同步（c）：最终 old-name 文件先报 8 PASS/2 FAIL，指出新模型目录增加第三方模型原名、原 CLI 工作目录变成此次真实采样路径；按原 hitTokens 导出实际逐行数量，仅同步上述五个精确登记，不更改 fixture 原文/扫描规则。该 inventory 同步属于真实重采的直接结果，不是第二次尝试产品修正。其它十一失败文件本轮最终独立复验均已通过。

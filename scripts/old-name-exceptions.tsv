@@ -1161,7 +1161,7 @@ scripts/gate-files.tsv	alpha-cloud alpha-bundled	1	historical	#1568 已改掉的
 scripts/known-fails-compare.py	alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 scripts/module-size-ratchet.tsv	alpha-web alpha-ask alpha-code	1	historical	#1568 已改掉的旧模型可见名 / 注册常量,这里是描述旧名的历史说明
 scripts/worktree-link-deps.sh	@alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-packages/ui-mac/src/engine-adapter/fixtures/events.json	/Users/pharaon/app/wt/alpha-code-feat-stored-credentials-table/packages/cli	21	external-anchor	#1697 放回单元 3:真引擎采样的 CLI 工作目录,词元含仓库名;保留实际事件原文,不是产品旧品牌。处数由 old-name-scan.ts 的 hitTokens 逐行计算。
+packages/ui-mac/src/engine-adapter/fixtures/events.json	/Users/pharaon/app/wt/alpha-code-feat-1761-document-output/packages/cli	21	external-anchor	#1761 / e7dc2837e4 重采:真实引擎事件的 CLI 工作目录;保留实际事件原文,不是产品旧品牌。处数由 old-name-scan.ts 的 hitTokens 逐行计算。
 packages/ui-mac/src/engine-adapter/fixtures/approval-actions.json	alpha-code	1	external-anchor	#1697 放回 r4:采样出处中的真实仓库名,不是产品旧品牌。
 packages/ui-mac/test-component/hub-package.fixture.json	impharaon/alpha-web	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含由仓库名派生的 producer 夹具来源),保留真实样本外部锚点
 packages/ui-mac/test-fixtures/plugin-helper/catalog-scope/provenance.json	https://github.com/impharaon/alpha-code	1	external-anchor	真实目录来源的 GitHub 仓库地址；用于定位 pinned commit 与摘要，不是产品名称
@@ -1171,8 +1171,10 @@ packages/ui-mac/test-fixtures/plugin-helper/catalog/catalog.json	alpha-work alph
 packages/ui-mac/test-fixtures/plugin-helper/catalog/catalog.json	alpha-work alpha-code :Alpha alpha-web Alpha alpha-code@e77cb02f3	1	historical	正式目录办公连接器的历史 intake 与字节来源记录；保留原始样本及其已记录摘要
 packages/ui-mac/test-fixtures/plugin-helper/catalog/catalog.json	alpha-web alpha-work	1	historical	正式目录套件的 REQ-105/REQ-135 历史来源说明；保留原始样本及其已记录摘要
 packages/ui-mac/src/engine-adapter/fixtures/catalog.json	tidepool-alpha-free	2	third-party	#1668 / 9d919e6096 重采:真实引擎 GET /api/model 返回的第三方模型原名,来源见同文件 _source;保留样本字节,处数由 old-name-scan.ts 的 hitTokens 实测。
-packages/ui-mac/src/engine-adapter/fixtures/catalog.json	Alpha	1	third-party	#1668 / 9d919e6096 重采:真实引擎 GET /api/model 返回的第三方模型原名,来源见同文件 _source;保留样本字节,处数由 old-name-scan.ts 的 hitTokens 实测。
+packages/ui-mac/src/engine-adapter/fixtures/catalog.json	Alpha	2	third-party	#1761 / e7dc2837e4 重采:真实引擎模型目录的第三方模型名称,来源见 fixture _source;保留样本,处数由 old-name-scan.ts 的 hitTokens 实测。
 packages/ui-mac/src/engine-adapter/fixtures/routes.json	tidepool-alpha-free	2	third-party	#1668 / 9d919e6096 重采:真实引擎 GET /api/model 返回的第三方模型原名,来源见同文件 _source;保留样本字节,处数由 old-name-scan.ts 的 hitTokens 实测。
-packages/ui-mac/src/engine-adapter/fixtures/routes.json	Alpha	1	third-party	#1668 / 9d919e6096 重采:真实引擎 GET /api/model 返回的第三方模型原名,来源见同文件 _source;保留样本字节,处数由 old-name-scan.ts 的 hitTokens 实测。
+packages/ui-mac/src/engine-adapter/fixtures/routes.json	Alpha	2	third-party	#1761 / e7dc2837e4 重采:真实引擎模型目录的第三方模型名称,来源见 fixture _source;保留样本,处数由 old-name-scan.ts 的 hitTokens 实测。
 packages/ui-mac/icons/source/make-icons.py	Image.alpha_composite	1	third-party	#1784: Pillow module API; not a product name.
 packages/ui-mac/icons/source/make-icons.py	flat.alpha_composite	1	third-party	#1784: Pillow image API; not a product name.
+packages/ui-mac/src/engine-adapter/fixtures/catalog.json	seaglass-alpha-free	2	third-party	#1761 / e7dc2837e4 重采:真实引擎模型目录的第三方模型 ID,来源见 fixture _source;保留样本,处数由 old-name-scan.ts 的 hitTokens 实测。
+packages/ui-mac/src/engine-adapter/fixtures/routes.json	seaglass-alpha-free	2	third-party	#1761 / e7dc2837e4 重采:真实引擎模型目录的第三方模型 ID,来源见 fixture _source;保留样本,处数由 old-name-scan.ts 的 hitTokens 实测。

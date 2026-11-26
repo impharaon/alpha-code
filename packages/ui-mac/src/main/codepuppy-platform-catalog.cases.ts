@@ -223,7 +223,7 @@ describe("#681:fetch → LKG → 投影 全程只认 ModelCatalogV3", () => {
     const onDisk = JSON.parse(readFileSync(liveAllowlistPath(userData), "utf8"))
     expect(onDisk.pricingBasisModelId).toBe("deepseek-v4-flash")
     const diskById = new Map<string, unknown>(onDisk.models.map((m: any) => [m.id, m.pricing]))
-    expect(diskById.get("claude-fable-5")).toEqual({ input: 71.4, output: 178.6 })
+    expect(diskById.get("claude-fable-5.2")).toEqual({ input: 26.7, output: 33.3 })
     expect(diskById.get("brand-new-model")).toEqual({ input: 2.5, output: 7.5 })
 
     pinAppliedCatalog(userData, 1) // `#1555`:picker 读 fork 前钉住的已应用目录;这里模拟那次 fork
@@ -231,13 +231,13 @@ describe("#681:fetch → LKG → 投影 全程只认 ModelCatalogV3", () => {
     expect(effective.pricingBasisModelId).toBe("deepseek-v4-flash")
     const rows = new Map(effective.platformModels.map((model) => [model.id, model]))
     // 每个字段都来自快照:名称 / 品牌 / 档位来自 display,pricing 来自目录行,逐字段全等(`#1556` AC1)。
-    const opusWire = wire.data.find((m: any) => m.id === "claude-opus-4.8")
-    expect(rows.get("claude-opus-4.8")!.name).toBe(opusWire.display.name)
-    expect(rows.get("claude-opus-4.8")!.brand).toBe("anthropic")
-    expect(rows.get("claude-opus-4.8")!.variants).toEqual(opusWire.display.variants)
-    expect(rows.get("claude-opus-4.8")!.pricing).toEqual({ input: 35.7, output: 89.3 })
+    const opusWire = wire.data.find((m: any) => m.id === "claude-opus-5.5")
+    expect(rows.get("claude-opus-5.5")!.name).toBe(opusWire.display.name)
+    expect(rows.get("claude-opus-5.5")!.brand).toBe("anthropic")
+    expect(rows.get("claude-opus-5.5")!.variants).toEqual(opusWire.display.variants)
+    expect(rows.get("claude-opus-5.5")!.pricing).toEqual({ input: 13.3, output: 16.7 })
     // 品牌是 display.brand,不是路由腿 provider(qwen 经 openrouter)。
-    expect(rows.get("qwen3.7-max")!.brand).toBe("qwen")
+    expect(rows.get("qwen4-max")!.brand).toBe("qwen")
     expect(rows.get("brand-new-model")).toEqual({ id: "brand-new-model", name: "Brand New Model", brand: "qwen", pricing: { input: 2.5, output: 7.5 } })
     expect(effective.liveSync.status).toBe("live")
   })
@@ -251,7 +251,7 @@ describe("#681:fetch → LKG → 投影 全程只认 ModelCatalogV3", () => {
     expect(row!.pricing).toEqual({ input: 9.9, output: 9.9 })
   })
 
-  test("12 行里 1 行 input:0 → 整份拒绝、LKG 不写、平台段为空且没有任何 pricing", async () => {
+  test("整份目录里 1 行 input:0 → 整份拒绝、LKG 不写、平台段为空且没有任何 pricing", async () => {
     const wire = catalogV3()
     wire.data[3].pricing_multiplier.input = 0
     stubFetch(wire)
@@ -288,9 +288,9 @@ describe("#681:fetch → LKG → 投影 全程只认 ModelCatalogV3", () => {
 
     pinAppliedCatalog(userData, 1) // `#1555`:picker 读 fork 前钉住的已应用目录;这里模拟那次 fork
     const effective = getEffectiveCatalog(userData)
-    expect(effective.platformModels.find((m) => m.id === "claude-fable-5")!.pricing).toEqual({
-      input: 71.4,
-      output: 178.6,
+    expect(effective.platformModels.find((m) => m.id === "claude-fable-5.2")!.pricing).toEqual({
+      input: 26.7,
+      output: 33.3,
     })
     expect(effective.byokProviders.map((provider) => provider.id)).toEqual(localByokIds)
   })
@@ -307,7 +307,7 @@ describe("#681:fetch → LKG → 投影 全程只认 ModelCatalogV3", () => {
 
     expect(readFileSync(liveAllowlistPath(userData)).equals(before)).toBe(true)
     pinAppliedCatalog(userData, 1) // `#1555`:picker 读 fork 前钉住的已应用目录;这里模拟那次 fork
-    expect(getEffectiveCatalog(userData).platformModels.length).toBe(12)
+    expect(getEffectiveCatalog(userData).platformModels.length).toBe(17)
   })
 })
 // ── ac#962:gateway 嵌套信封的分类码要穿过**生产接线**,不只是纯函数 ───────────────────────
@@ -358,7 +358,7 @@ describe("`#1555` AC5:picker 与引擎读同一份已应用目录", () => {
 
     pinAppliedCatalog(userData, 2) // 下一次引擎换代
     const after = getEffectiveCatalog(userData)
-    expect(after.platformModels).toHaveLength(12)
+    expect(after.platformModels).toHaveLength(17)
     expect(after.applied).toEqual(after.downloaded)
   })
 })

@@ -73,15 +73,9 @@
               },
               "brand": {
                 "type": "string",
-                "enum": [
-                  "anthropic",
-                  "openai",
-                  "deepseek",
-                  "zhipu",
-                  "qwen",
-                  "moonshot",
-                  "minimax"
-                ]
+                "minLength": 1,
+                "maxLength": 64,
+                "pattern": "^[a-z0-9][a-z0-9-]*$"
               },
               "reasoning": {
                 "type": "boolean"

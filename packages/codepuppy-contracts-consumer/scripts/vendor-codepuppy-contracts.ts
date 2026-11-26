@@ -90,8 +90,13 @@ const UPSTREAMS = [
     // `#1556` / platform#559(REQ-237):目录升 V3(每行必填 `display`,删 `byok_providers`)并新增 BYOK 预置目录
     // `ByokCatalogV1`(`GET /v1/byok-catalog`)。两份同一个发布者、同一个消费者(catalog-refresher),所以 BYOK
     // schema 骑这一条 pin,不动 V1 bundle。源:alpha-platform PR #562(分支 feat/559-catalog-v3)的 a154d1f。
+    //
+    // #1754 / platform#615:前移到平台主线的 6f04c6d(PR #616),两份 schema 的 `brand` 由七家枚举改为
+    // 开放字符串(1–64 个字符,`^[a-z0-9][a-z0-9-]*$`)。a154d1f..6f04c6d 之间已钉的五个文件里,除两份 schema
+    // 的这一处外只有两份 producer fixture 换了现役清单内容(平台 17 个模型、BYOK 预设 catalog_version 4);
+    // 桌面解码的形状没有别的变化。
     repo: "jinjunnn/alpha-platform",
-    commit: "a154d1f4f45fc614798a16c1535f73a1b67483f9",
+    commit: "6f04c6ded4abd9ca9a4ac316b04e85a6f72baf06",
     lock: "alpha-platform-model-catalog.lock.json",
     vendor: "vendor/alpha-platform-model-catalog",
     sourceEnv: "CODEPUPPY_PLATFORM_MODEL_CATALOG_SOURCE",

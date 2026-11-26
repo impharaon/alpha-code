@@ -191,6 +191,42 @@ describe("变异一律整份拒绝(不逐行降级)", () => {
   })
 })
 
+describe("厂商(brand)是开放字符串:1–64 个字符,`^[a-z0-9][a-z0-9-]*$`", () => {
+  // 样本取上游 producer 字节,只改一行的 brand;平台目录与 BYOK 目录各走自己的真入口。
+  const platformWith = async (brand: string) => {
+    const value = await producerValue()
+    value.data[0].display.brand = brand
+    return wire(value)
+  }
+  const byokWith = async (brand: string) => {
+    const value = await byokValue()
+    value.providers[0].brand = brand
+    return wire(value)
+  }
+
+  test("`google` 与表外新厂商的目录整份解得开,行原样保留", async () => {
+    for (const brand of ["google", "some-new-vendor", "a", "x".repeat(64)]) {
+      const catalog = decodeJsonContract("ModelCatalogV3", await platformWith(brand), "model-catalog")
+      expect(catalog.data[0].display.brand, brand).toBe(brand)
+      const byok = decodeJsonContract("ByokCatalogV1", await byokWith(brand), "byok-catalog")
+      expect(byok.providers[0].brand, brand).toBe(brand)
+    }
+  })
+
+  test("空串 / 含大写 / 65 个字符 / 首字符是连字符 / 含下划线的厂商,整份目录拒绝", async () => {
+    for (const brand of ["", "Google", "x".repeat(65), "-google", "goo_gle"]) {
+      const platform = await platformWith(brand)
+      expect(() => decodeJsonContract("ModelCatalogV3", platform, "model-catalog"), `platform ${brand}`).toThrow(
+        ContractIncompatibleError,
+      )
+      const byok = await byokWith(brand)
+      expect(() => decodeJsonContract("ByokCatalogV1", byok, "byok-catalog"), `byok ${brand}`).toThrow(
+        ContractIncompatibleError,
+      )
+    }
+  })
+})
+
 describe("#681 / `#1556` consumer pin", () => {
   test("consumer pin 经出货 decoder 解出真实 12 模型与真实倍数", async () => {
     const pin = await authored(CONSUMER_PIN)

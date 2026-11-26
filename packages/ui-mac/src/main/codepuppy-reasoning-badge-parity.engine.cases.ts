@@ -351,7 +351,7 @@ describe("REQ-153 #1266/#1267:手段自证(嵌入式 OpenCode 2 · 本机桩)", 
   test("手段自证:注入丢了推理转发 ⇒ 判据逐档点名红(整张档位表不进引擎 / 档位在、内容丢了)", async () => {
     const dropped = await machine("badge-dropped", (model) => {
       // 形状一:模型的 variants 与 capabilities.reasoning 都没写进引擎配置(engineModel 不转发)
-      for (const [providerID, id] of [["codepuppy", "qwen3.7-max"], ["zhipuai-byok", "glm-4.5-air"]] as const) {
+      for (const [providerID, id] of [["codepuppy", "qwen4-max"], ["zhipuai-byok", "glm-4.5-air"]] as const) {
         const injected = model(providerID, id)
         delete injected.variants
         delete injected.capabilities?.reasoning
@@ -362,10 +362,10 @@ describe("REQ-153 #1266/#1267:手段自证(嵌入式 OpenCode 2 · 本机桩)", 
         delete variant.body
       }
     })
-    const rows = ["codepuppy:qwen3.7-max", "zhipuai-byok:glm-4.5-air", "deepseek-byok:deepseek-v4-pro"].map((key) => findRow(dropped, key))
+    const rows = ["codepuppy:qwen4-max", "zhipuai-byok:glm-4.5-air", "deepseek-byok:deepseek-v4-pro"].map((key) => findRow(dropped, key))
     // picker 侧没动:三行仍亮徽标、chip 照旧 —— 只有引擎那一头丢了
     expect(rows.map((row) => ({ key: rowKey(row), badge: row.reasoning, chip: row.model.variants }))).toEqual([
-      { key: "codepuppy:qwen3.7-max", badge: true, chip: ["关", "开"] },
+      { key: "codepuppy:qwen4-max", badge: true, chip: ["关", "开"] },
       { key: "zhipuai-byok:glm-4.5-air", badge: true, chip: ["关", "开"] },
       { key: "deepseek-byok:deepseek-v4-pro", badge: true, chip: ["低", "中", "高", "最高"] },
     ])
@@ -407,7 +407,7 @@ describe("REQ-153 #1266/#1267:手段自证(嵌入式 OpenCode 2 · 本机桩)", 
   test("手段自证(#1237 标题调用):注入里有 `none` 那一档 ⇒ 两类参数的标题都取第一档;去掉它(2.x 原样)⇒ 标题跟着所选的档走,逐格点名红", async () => {
     // 生产注入:选「开」时标题请求是第一档「关」—— reasoning_effort 一类与请求体 thinking 一类都成立
     const target = await real()
-    const qwenOn = await target.send(findRow(target, "codepuppy:qwen3.7-max"), "开")
+    const qwenOn = await target.send(findRow(target, "codepuppy:qwen4-max"), "开")
     const airOn = await target.send(findRow(target, "zhipuai-byok:glm-4.5-air"), "开")
     expect({ main: qwenOn.main?.reasoning_effort, title: qwenOn.title?.reasoning_effort }).toEqual({ main: "medium", title: "none" })
     expect({ main: airOn.main?.thinking, title: airOn.title?.thinking, controls: reasoningControls(airOn.title ?? {}) }).toEqual({
@@ -428,7 +428,7 @@ describe("REQ-153 #1266/#1267:手段自证(嵌入式 OpenCode 2 · 本机桩)", 
     })
     // 生产注入里每个有档位的模型都带着它(否则这条反向臂是空对空)
     expect(removed).toBe(bare.rows.filter((row) => row.model.variants.length > 0).length)
-    const rows = ["codepuppy:qwen3.7-max", "zhipuai-byok:glm-4.5-air", "codepuppy:claude-opus-4.8"].map((key) => findRow(bare, key))
+    const rows = ["codepuppy:qwen4-max", "zhipuai-byok:glm-4.5-air", "codepuppy:claude-opus-5.5"].map((key) => findRow(bare, key))
     const result = await matrix(bare, rows)
     expect(result.harness).toEqual([])
     expect(result.failures).toEqual(NO_ALIAS_FAILURES)
@@ -437,20 +437,20 @@ describe("REQ-153 #1266/#1267:手段自证(嵌入式 OpenCode 2 · 本机桩)", 
 
 /** 「去掉 `none`」的期望(实测,2.x 原样的标题选档):标题跟着所选的档走 —— 选第一档那一格碰巧对,其余每一格(含没选档)都点名。 */
 const NO_ALIAS_FAILURES = [
-  'codepuppy:qwen3.7-max(默认)(标题辅助调用): 应同第一档 关 {"controls":{"reasoning_effort":"none"},"thinking":null},标题请求 {"controls":{},"thinking":null}',
-  'codepuppy:qwen3.7-max@开(标题辅助调用): 应同第一档 关 {"controls":{"reasoning_effort":"none"},"thinking":null},标题请求 {"controls":{"reasoning_effort":"medium"},"thinking":null}',
+  'codepuppy:qwen4-max(默认)(标题辅助调用): 应同第一档 关 {"controls":{"reasoning_effort":"none"},"thinking":null},标题请求 {"controls":{},"thinking":null}',
+  'codepuppy:qwen4-max@开(标题辅助调用): 应同第一档 关 {"controls":{"reasoning_effort":"none"},"thinking":null},标题请求 {"controls":{"reasoning_effort":"medium"},"thinking":null}',
   'zhipuai-byok:glm-4.5-air(默认)(标题辅助调用): 应同第一档 关 {"controls":{},"thinking":{"type":"disabled"}},标题请求 {"controls":{},"thinking":null}',
   'zhipuai-byok:glm-4.5-air@开(标题辅助调用): 应同第一档 关 {"controls":{},"thinking":{"type":"disabled"}},标题请求 {"controls":{"thinking":{"type":"enabled"}},"thinking":{"type":"enabled"}}',
-  'codepuppy:claude-opus-4.8(默认)(标题辅助调用): 应同第一档 低 {"controls":{"reasoning":{"effort":"low"}},"thinking":null},标题请求 {"controls":{},"thinking":null}',
-  'codepuppy:claude-opus-4.8@中(标题辅助调用): 应同第一档 低 {"controls":{"reasoning":{"effort":"low"}},"thinking":null},标题请求 {"controls":{"reasoning":{"effort":"medium"}},"thinking":null}',
-  'codepuppy:claude-opus-4.8@高(标题辅助调用): 应同第一档 低 {"controls":{"reasoning":{"effort":"low"}},"thinking":null},标题请求 {"controls":{"reasoning":{"effort":"high"}},"thinking":null}',
+  'codepuppy:claude-opus-5.5(默认)(标题辅助调用): 应同第一档 低 {"controls":{"reasoning":{"effort":"low"}},"thinking":null},标题请求 {"controls":{},"thinking":null}',
+  'codepuppy:claude-opus-5.5@中(标题辅助调用): 应同第一档 低 {"controls":{"reasoning":{"effort":"low"}},"thinking":null},标题请求 {"controls":{"reasoning":{"effort":"medium"}},"thinking":null}',
+  'codepuppy:claude-opus-5.5@高(标题辅助调用): 应同第一档 低 {"controls":{"reasoning":{"effort":"low"}},"thinking":null},标题请求 {"controls":{"reasoning":{"effort":"high"}},"thinking":null}',
 ]
 
 /** 「注入丢了推理转发」的期望(实测):默认那格判据只看 chip(chip 没动 ⇒ 不红)。形状一的每一档引擎拒绝(时间线上是一条
  *  provider.no-route 错误);形状二的每一档发得出去,但主请求体零推理参数。 */
 const DROPPED_FAILURES = [
-  "codepuppy:qwen3.7-max@关: 引擎拒绝了这次发送(provider.no-route: Variant unavailable for codepuppy/qwen3.7-max: 关)",
-  "codepuppy:qwen3.7-max@开: 引擎拒绝了这次发送(provider.no-route: Variant unavailable for codepuppy/qwen3.7-max: 开)",
+  "codepuppy:qwen4-max@关: 引擎拒绝了这次发送(provider.no-route: Variant unavailable for codepuppy/qwen4-max: 关)",
+  "codepuppy:qwen4-max@开: 引擎拒绝了这次发送(provider.no-route: Variant unavailable for codepuppy/qwen4-max: 开)",
   "zhipuai-byok:glm-4.5-air@关: 引擎拒绝了这次发送(provider.no-route: Variant unavailable for zhipuai-byok/glm-4.5-air: 关)",
   "zhipuai-byok:glm-4.5-air@开: 引擎拒绝了这次发送(provider.no-route: Variant unavailable for zhipuai-byok/glm-4.5-air: 开)",
   ...[

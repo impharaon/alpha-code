@@ -4,8 +4,8 @@
   "expect": "valid",
   "value": {
     "schema_version": 1,
-    "catalog_version": 1,
-    "published_at": "2026-10-30T00:00:00Z",
+    "catalog_version": 4,
+    "published_at": "2026-11-20T00:00:00Z",
     "providers": [
       {
         "id": "deepseek",
@@ -16,7 +16,7 @@
           {
             "id": "deepseek-flash",
             "name": "deepseek-flash",
-            "image_input": false
+            "image_input": true
           },
           {
             "id": "deepseek-v4-pro",
@@ -47,10 +47,13 @@
         "preset": true,
         "models": [
           {
-            "id": "glm-5.2",
-            "name": "GLM-5.2",
+            "id": "glm-5.3",
+            "name": "GLM-5.3",
             "reasoning": true,
             "variants": {
+              "低": {
+                "reasoningEffort": "low"
+              },
               "高": {
                 "reasoningEffort": "high"
               },
@@ -61,22 +64,21 @@
             "image_input": false
           },
           {
-            "id": "glm-4.5-air",
-            "name": "GLM-4.5-Air",
+            "id": "glm-5.3-flash",
+            "name": "GLM-5.3-Flash",
             "reasoning": true,
             "variants": {
-              "关": {
-                "thinking": {
-                  "type": "disabled"
-                }
+              "低": {
+                "reasoningEffort": "low"
               },
-              "开": {
-                "thinking": {
-                  "type": "enabled"
-                }
+              "高": {
+                "reasoningEffort": "high"
+              },
+              "最高": {
+                "reasoningEffort": "max"
               }
             },
-            "image_input": false
+            "image_input": true
           }
         ]
       },
@@ -87,9 +89,14 @@
         "preset": false,
         "models": [
           {
-            "id": "MiniMax-M2",
-            "name": "MiniMax-M2",
-            "image_input": false
+            "id": "MiniMax-M3.1-Flash",
+            "name": "MiniMax-M3.1-Flash",
+            "image_input": true
+          },
+          {
+            "id": "MiniMax-M3",
+            "name": "MiniMax-M3",
+            "image_input": true
           }
         ]
       },
@@ -100,19 +107,19 @@
         "preset": true,
         "models": [
           {
-            "id": "qwen3.8-max",
-            "name": "qwen3.8-max",
+            "id": "qwen4-max",
+            "name": "qwen4-max",
             "image_input": true
           },
           {
-            "id": "qwen-plus",
-            "name": "qwen-plus",
-            "image_input": false
+            "id": "qwen3.7-plus",
+            "name": "qwen3.7-plus",
+            "image_input": true
           },
           {
-            "id": "qwen3-coder-plus",
-            "name": "qwen3-coder-plus",
-            "image_input": false
+            "id": "qwen3.8-flash",
+            "name": "qwen3.8-flash",
+            "image_input": true
           }
         ]
       },
@@ -123,13 +130,8 @@
         "preset": true,
         "models": [
           {
-            "id": "kimi-k3",
-            "name": "kimi-k3",
-            "image_input": true
-          },
-          {
-            "id": "kimi-k2.6",
-            "name": "kimi-k2.6",
+            "id": "kimi-k3.1-pro",
+            "name": "kimi-k3.1-pro",
             "image_input": true
           }
         ]

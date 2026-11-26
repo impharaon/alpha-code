@@ -1175,3 +1175,5 @@ packages/ui-mac/src/engine-adapter/fixtures/catalog.json	tidepool-alpha-free	2	t
 packages/ui-mac/src/engine-adapter/fixtures/catalog.json	Alpha	1	third-party	#1668 / 9d919e6096 重采:真实引擎 GET /api/model 返回的第三方模型原名,来源见同文件 _source;保留样本字节,处数由 old-name-scan.ts 的 hitTokens 实测。
 packages/ui-mac/src/engine-adapter/fixtures/routes.json	tidepool-alpha-free	2	third-party	#1668 / 9d919e6096 重采:真实引擎 GET /api/model 返回的第三方模型原名,来源见同文件 _source;保留样本字节,处数由 old-name-scan.ts 的 hitTokens 实测。
 packages/ui-mac/src/engine-adapter/fixtures/routes.json	Alpha	1	third-party	#1668 / 9d919e6096 重采:真实引擎 GET /api/model 返回的第三方模型原名,来源见同文件 _source;保留样本字节,处数由 old-name-scan.ts 的 hitTokens 实测。
+packages/ui-mac/icons/source/make-icons.py	Image.alpha_composite	1	third-party	#1784: Pillow module API; not a product name.
+packages/ui-mac/icons/source/make-icons.py	flat.alpha_composite	1	third-party	#1784: Pillow image API; not a product name.

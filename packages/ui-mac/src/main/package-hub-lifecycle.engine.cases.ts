@@ -624,7 +624,7 @@ test("cold engine generations bind plugin MCP ROOT options secrets and DATA only
   } finally { beforeReady = undefined }
 }, 120_000)
 
-async function installLocationPluginFixture(requestId: string) {
+async function installLocationPluginFixture(requestId: string, environment: Record<string, string> = {}) {
   const { publishPluginDataHome } = await import("./plugin-package-data")
   publishPluginDataHome(sandbox.data)
   const { captureStandardFixture } = await import("../../test-fixtures/plugin-helper/fixture")
@@ -636,7 +636,7 @@ async function installLocationPluginFixture(requestId: string) {
   const definition = JSON.parse(new TextDecoder().decode(await original.readFile(".mcp.json")))
   const { pathToFileURL } = await import("node:url")
   const capture = await captureStandardFixture("claude:grafana-mcp", {
-    ".mcp.json": JSON.stringify({ ...definition, mcpServers: { grafana: { ...definition.mcpServers.grafana, command: process.execPath, args: ["${CLAUDE_PLUGIN_ROOT}/echo.mjs"] } } }),
+    ".mcp.json": JSON.stringify({ ...definition, mcpServers: { grafana: { ...definition.mcpServers.grafana, env: { ...definition.mcpServers.grafana.env, ...environment }, command: process.execPath, args: ["${CLAUDE_PLUGIN_ROOT}/echo.mjs"] } } }),
     "echo.mjs": `await import(${JSON.stringify(pathToFileURL(MCP_FIXTURE).href)});`,
   })
   const converted = await convertPluginTree(capture)
@@ -691,6 +691,28 @@ test("plugin MCP remains connected after a skills-only package reload", async ()
     await until(async () => await mcpStatus(plugin.name) === "connected", "unrelated plugin MCP restored after skills reload")
   } finally {
     if (skills) expect(await invoke("ext-uninstall-package", skills)).toMatchObject({ ok: true })
+    expect(await invoke("ext-uninstall-package", plugin.packageId)).toMatchObject({ ok: true })
+  }
+}, 120_000)
+
+test("plugin MCP missing environment dependency appears in the hub row detail", async () => {
+  const { publishPluginEnvironment } = await import("./plugin-package-data")
+  publishPluginEnvironment({ R20_MISSING_RUNTIME: "fixture-initial-value" })
+  const plugin = await installLocationPluginFixture("missing_dependency_plugin", { R20_BINDING: "${R20_MISSING_RUNTIME}" })
+  try {
+    publishPluginEnvironment({})
+    expect(await invoke("ext-save-package-secrets", { packageId: plugin.packageId, options: { grafana_url: "https://changed.example.invalid", grafana_service_account_token: TOKEN } })).toMatchObject({ ok: true })
+    const view = await invoke("ext-hub-view", host.projectDirectory) as import("./codepuppy-sidecar-messages").HubView
+    const row = view.rows.find(row => row.kind === "mcp" && row.name === plugin.name)
+    expect(row?.installed).toBe(true)
+    expect(row?.stateReason?.detail).toContain("R20_MISSING_RUNTIME")
+    publishPluginEnvironment({ R20_MISSING_RUNTIME: "fixture-restored-value" })
+    expect(await invoke("ext-save-package-secrets", { packageId: plugin.packageId, options: { grafana_url: "https://restored.example.invalid", grafana_service_account_token: TOKEN } })).toMatchObject({ ok: true })
+    await until(async () => await mcpStatus(plugin.name) === "connected", "dependency restored")
+    const restored = await invoke("ext-hub-view", host.projectDirectory) as import("./codepuppy-sidecar-messages").HubView
+    expect(restored.rows.find(row => row.kind === "mcp" && row.name === plugin.name)?.stateReason?.detail).toBeUndefined()
+  } finally {
+    publishPluginEnvironment({})
     expect(await invoke("ext-uninstall-package", plugin.packageId)).toMatchObject({ ok: true })
   }
 }, 120_000)

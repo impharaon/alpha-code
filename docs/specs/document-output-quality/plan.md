@@ -331,3 +331,7 @@ bun typecheck
 暂无。依据冻结 R4/R5/R12 及 §4.9 选实现细节，没有新产品或跨模块设计取舍，按 r6 继续实施。
 
 2026-11-26 · 切片四的真实 Word 字段反例（修正前证据）：片 2 的 `build-document-templates.py` 用空 `w:fldSimple instr="TOC ..."`；实际 LO 26.8.3.1 的固定刷新/转换仍只在 PDF 正文出现一次“正文”，没有目录条目。`.../office-runtime/build/arm64/bin/python3 -I -B` 的独立 PdfReader 核对在 `/tmp/alpha-1761-r6/word-fields-inspection.json` 记 `tocRendered=false`，断言 exit 1；固定脚本本身 exit 0 不作为目录已更新的证明。对照为锁定 docx 9.16.0 的 `TableOfContents` 实际产物 `/tmp/alpha-1761-r6/native-toc.docx`：原生 SDT/复杂域、书签和 PAGEREF，不能用空简单域替代。属同调用链模板缺陷，下一提交修正生成器/真实模板并重核实际 PDF；不因此变更设计或引入用户刷新步骤。这是一条一次性真实产物验证，不加入依赖 LO 的常规测试。
+
+2026-11-26 · 原生目录修正的必要同调用链偏离：`build-document-assets.ts` 用已锁 docx 9.16.0 构建真实 TOC/heading 样本，`build-document-templates.py` 把原生 SDT/复杂域及配对书签纳入应用模板，其余样式/页眉页脚保留；Word 模板版本升为 2，fixture 只复制实际新字节并更新摘要/来源，不手造外部 XML 样本。实际 `bun scripts/build-document-assets.ts` exit 0，593 文件/四字体/三模板核验通过。固定 `update_fields.xba` 只在 app 私有 profile 执行字段/目录刷新，输入只有渲染副本；LO 自己创建原生 Basic catalogue，不开放模型宏/脚本。固定脚本仍输出原文件的空 TOC/PAGEREF 缓存诊断，不能用副本刷新掩盖原成品需在同一轮修正内补齐的缓存。
+
+修正后 `bun /tmp/alpha-1761-r6/word-fields-probe.ts` exit 0，回执 `/tmp/alpha-1761-r6/word-native-receipt.json`；独立 PdfReader 的同一断言 exit 0，实际 PDF 出现“正文……1”目录条目及正文标题，`word-native-inspection.json` 的 `tocRendered=true`。原模板反例与新原生结构的真实渲染构成 red→green，不把单纯 XML 存在计作版面通过。该目录修正属于本片必要模板消费者，未改冻结设计或其它规格。

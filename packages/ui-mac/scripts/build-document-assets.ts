@@ -36,7 +36,10 @@ export async function buildDocumentAssets() {
     const configuration = { ...fonts, sources: fonts.sources.map((entry) => ({ ...entry, local: downloadOfficeBuildFile(entry) })) }
     const config = join(tools, "fonts.json")
     writeFileSync(config, JSON.stringify(configuration))
-    run(python, ["-I", "-B", "-c", "import sys,runpy; sys.path.insert(0,sys.argv.pop(1)); script=sys.argv.pop(1); runpy.run_path(script,run_name='__main__')", join(tools, "site"), join(import.meta.dir, "build-document-templates.py"), staging, config])
+    // Generate the native TOC/heading relationship through the locked Word library, not a hand-written empty field.
+    const toc = join(tools, "native-toc.docx")
+    run(process.execPath, ["-e", 'const d = require(process.argv[1]); const doc = new d.Document({sections:[{children:[new d.TableOfContents("目录",{headingStyleRange:"1-3",hyperlink:true}),new d.Paragraph({heading:d.HeadingLevel.HEADING_1,text:"正文"})]}]}); await Bun.write(process.argv[2], await d.Packer.toBuffer(doc))', join(staging, "node_modules", "docx"), toc])
+    run(python, ["-I", "-B", "-c", "import sys,runpy; sys.path.insert(0,sys.argv.pop(1)); script=sys.argv.pop(1); runpy.run_path(script,run_name='__main__')", join(tools, "site"), join(import.meta.dir, "build-document-templates.py"), staging, config, toc])
     const instances = JSON.parse(readFileSync(join(staging, "instances.json"), "utf8")) as DocumentAssets["fonts"]
     if (fonts.instances.length !== 4 || JSON.stringify(instances) !== JSON.stringify(fonts.instances)) throw new Error("generated fonts disagree with the pinned instances")
     rmSync(join(staging, "instances.json"))
@@ -46,7 +49,7 @@ export async function buildDocumentAssets() {
     cpSync(join(source, "fonts.lock.json"), join(staging, "licenses", "font-sources.json"))
     writeFileSync(join(staging, "licenses", "FONT-MODIFICATIONS.txt"), `Code Puppy, 2026-11-26. Noto source ${fonts.commit}. FontTools ${fonts.fontTools}; wght=400/700, static TrueType, explicit regular/bold style names. Original OFL and copyrights retained. No Reserved Font Name declared in these source licences.\n`)
     const files = [...new Bun.Glob("**/*").scanSync({ cwd: staging, onlyFiles: true, dot: true })].sort().map((path) => ({ path, sha256: digest(join(staging, path)) }))
-    const templates = Object.fromEntries(([['docx', 'chinese-report.docx'], ['xlsx', 'chinese-analysis.xlsx'], ['pptx', 'chinese-presentation.pptx']] as const).map(([kind, name]) => [kind, { path: `templates/${name}`, version: "1", sha256: digest(join(staging, "templates", name)) }]))
+    const templates = Object.fromEntries(([['docx', 'chinese-report.docx'], ['xlsx', 'chinese-analysis.xlsx'], ['pptx', 'chinese-presentation.pptx']] as const).map(([kind, name]) => [kind, { path: `templates/${name}`, version: kind === "docx" ? "2" : "1", sha256: digest(join(staging, "templates", name)) }]))
     writeFileSync(join(staging, "assets.json"), JSON.stringify({ schemaVersion: 1, files, fonts: instances, templates }, null, 2) + "\n")
     readDocumentAssets(staging)
     writeFileSync(join(staging, ".stamp"), stamp)

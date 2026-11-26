@@ -31,5 +31,11 @@
   "templateGeneratorSha256": "8b6764d0bf1387e471c62286b33a79128606157ba2349161dd3f82ca77876df4",
   "npmLockSha256": "a71a683cf53c9b91ee466dd74315a61334bc1c1a5f269ae7a82d13405d0c769c",
   "windowsHeader": "First 4096 bytes of python/python.exe from CPython 3.11.15 PBS 20260310 win32-x64 SHA256 9302cfe055216e60309bb99961d8a093189183af8dd27a3bd7c40d5e6252090b; header inspection only, not executable evidence.",
-  "darwinHeader": "First 4096 bytes of bundled bin/python3 from CPython 3.11.15 PBS 20260310 darwin-arm64 pin 96842b1451580427d724500306f39466941f9cba2fc03a1de6f27016d899a764; header/path tests only."
+  "darwinHeader": "First 4096 bytes of bundled bin/python3 from CPython 3.11.15 PBS 20260310 darwin-arm64 pin 96842b1451580427d724500306f39466941f9cba2fc03a1de6f27016d899a764; header/path tests only.",
+  "wordTemplate": {
+    "source": "Actual build-document-assets.ts output after replacing empty simple TOC with locked docx 9.16.0 native TableOfContents and its heading bookmark",
+    "version": "2",
+    "generatorSha256": "34b32c582150d257e76a102f3856147ba557ead94ee920bd22127851451e2d33",
+    "sha256": "718a7ef5d44174df336b95c9bc7f7a6fc0bf69837ef0a14d8aa8306e8fd7628a"
+  }
 }

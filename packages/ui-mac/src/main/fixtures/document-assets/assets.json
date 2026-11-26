@@ -63,7 +63,7 @@
     },
     {
       "path": "templates/chinese-report.docx",
-      "sha256": "b781c29513a915f31f08dfc6c8b804e13d8f0e2642e182edc57993578a6f5eb8"
+      "sha256": "718a7ef5d44174df336b95c9bc7f7a6fc0bf69837ef0a14d8aa8306e8fd7628a"
     }
   ],
   "fonts": [
@@ -95,8 +95,8 @@
   "templates": {
     "docx": {
       "path": "templates/chinese-report.docx",
-      "version": "1",
-      "sha256": "b781c29513a915f31f08dfc6c8b804e13d8f0e2642e182edc57993578a6f5eb8"
+      "version": "2",
+      "sha256": "718a7ef5d44174df336b95c9bc7f7a6fc0bf69837ef0a14d8aa8306e8fd7628a"
     },
     "xlsx": {
       "path": "templates/chinese-analysis.xlsx",

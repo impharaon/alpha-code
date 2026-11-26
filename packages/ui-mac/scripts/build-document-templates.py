@@ -4,11 +4,11 @@ import hashlib,json,sys,zipfile
 from lxml import etree
 
 
-def custom_properties(path, source):
+def custom_properties(path, source, version):
     ns='http://schemas.openxmlformats.org/officeDocument/2006/custom-properties'
     vt='http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes'
     root=etree.Element('{%s}Properties'%ns,nsmap={None:ns,'vt':vt})
-    for index,(name,value) in enumerate([('CodePuppyTemplateSource',source),('CodePuppyTemplateVersion','1')],2):
+    for index,(name,value) in enumerate([('CodePuppyTemplateSource',source),('CodePuppyTemplateVersion',version)],2):
         prop=etree.SubElement(root,'{%s}property'%ns,fmtid='{D5CDD505-2E9C-101B-9397-08002B2CF9AE}',pid=str(index),name=name)
         etree.SubElement(prop,'{%s}lpwstr'%vt).text=value
     with zipfile.ZipFile(path) as archive:parts={x:archive.read(x) for x in archive.namelist() if not x.endswith('/')}
@@ -30,7 +30,7 @@ def custom_properties(path, source):
             info=zipfile.ZipInfo(name,(2026,11,26,0,0,0));info.compress_type=zipfile.ZIP_DEFLATED;archive.writestr(info,data)
 
 
-def templates(root):
+def templates(root, toc_path):
     from docx import Document
     from docx.shared import Mm,Pt
     from docx.oxml import OxmlElement
@@ -54,10 +54,14 @@ def templates(root):
     footer=section.footer.paragraphs[0];footer.text='第 '
     field=OxmlElement('w:fldSimple');field.set(qn('w:instr'),'PAGE');footer._p.append(field);footer.add_run(' 页')
     doc.add_heading('报告标题',0);doc.add_paragraph('摘要与结论')
-    doc.add_heading('目录',1);toc=OxmlElement('w:fldSimple');toc.set(qn('w:instr'),'TOC \\o "1-3" \\h \\z \\u');doc.add_paragraph()._p.append(toc)
-    doc.add_heading('正文',1);doc.add_paragraph('从这里开始撰写报告。')
+    # The actual docx 9.16.0 output supplies the SDT/complex TOC and its heading bookmark.
+    with zipfile.ZipFile(toc_path) as native:
+        body=etree.fromstring(native.read('word/document.xml')).find(qn('w:body'))
+        doc._element.body.insert(len(doc._element.body)-1,body.find(qn('w:sdt')))
+        doc._element.body.insert(len(doc._element.body)-1,body.find(qn('w:p')))
+    doc.add_paragraph('从这里开始撰写报告。')
     table=doc.add_table(rows=2,cols=2);table.style='Light Shading Accent 1';table.cell(0,0).text='项目';table.cell(0,1).text='说明'
-    path=root/'chinese-report.docx';doc.save(path);custom_properties(path,'bundled:chinese-report')
+    path=root/'chinese-report.docx';doc.save(path);custom_properties(path,'bundled:chinese-report','2')
     workbook=Workbook();workbook._fonts[0]=Font(name='Noto Sans SC');sheet=workbook.active;sheet.title='数据';sheet.append(['项目','数值','日期','比例'])
     sheet.freeze_panes='A2';sheet.column_dimensions['A'].width=24;sheet.column_dimensions['B'].width=18;sheet.column_dimensions['C'].width=20;sheet.column_dimensions['D'].width=18
     for cell in sheet[1]:cell.font=Font(name='Noto Sans SC',bold=True,color='FFFFFF');cell.fill=PatternFill('solid',fgColor='24445C');cell.alignment=Alignment(vertical='center')
@@ -66,7 +70,7 @@ def templates(root):
     sheet['B2'].number_format='#,##0.00';sheet['C2'].number_format='yyyy-mm-dd';sheet['D2'].number_format='0.0%'
     sheet.print_title_rows='1:1';sheet.print_area='A1:D2';sheet.page_setup.orientation='landscape';sheet.page_setup.paperSize=sheet.PAPERSIZE_A4
     sheet.oddHeader.center.text='数据分析';sheet.oddFooter.center.text='第 &P 页 / 共 &N 页'
-    path=root/'chinese-analysis.xlsx';workbook.save(path);custom_properties(path,'bundled:chinese-analysis')
+    path=root/'chinese-analysis.xlsx';workbook.save(path);custom_properties(path,'bundled:chinese-analysis','1')
     presentation=Presentation();presentation.slide_width=Inches(13.333);presentation.slide_height=Inches(7.5)
     slide=presentation.slides.add_slide(presentation.slide_layouts[0]);slide.shapes.title.text='汇报标题';slide.placeholders[1].text='主题与结论'
     slide.notes_slide.notes_text_frame.text='在这里填写讲者备注。'
@@ -83,7 +87,7 @@ def templates(root):
         parts[name]=etree.tostring(theme,encoding='UTF-8',xml_declaration=True)
     with zipfile.ZipFile(path,'w',zipfile.ZIP_DEFLATED) as archive:
         for name,data in parts.items():archive.writestr(name,data)
-    custom_properties(path,'bundled:chinese-presentation')
+    custom_properties(path,'bundled:chinese-presentation','1')
     # Validate the generated containers, not a second hand-written representation.
     assert Document(root/'chinese-report.docx').styles['Normal'].font.name=='Noto Serif SC'
     from openpyxl import load_workbook
@@ -125,5 +129,5 @@ def fonts(config,root):
 
 if __name__=='__main__':
     output=Path(sys.argv[1]);config=json.loads(Path(sys.argv[2]).read_text())
-    instances=fonts(config,output/'fonts');templates(output/'templates')
+    instances=fonts(config,output/'fonts');templates(output/'templates',Path(sys.argv[3]))
     (output/'instances.json').write_text(json.dumps(instances,ensure_ascii=False,indent=2)+'\n')

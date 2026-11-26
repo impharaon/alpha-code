@@ -383,6 +383,8 @@ test("desktop SQLite package without a DSN keeps an engine-visible definition ac
     expect(normalized.type === "normalized" && JSON.stringify(normalized.encoded).includes("dbhub-readonly")).toBe(true)
   }
   expect(await installDesktopPackageV1("package:dbhub-readonly", deps)).toMatchObject({ ok: true })
+  const { setPackageStateV1 } = await import("../src/main/ext-install-planner")
+  expect(await setPackageStateV1({ packageId: "package:dbhub-readonly", state: "enabled" }, deps)).toMatchObject({ ok: true })
   for (const _restart of [1, 2]) {
     clearOfficialConnectorRuntime()
     restoreCommittedOfficialConnectors()

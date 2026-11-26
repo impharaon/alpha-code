@@ -49,7 +49,12 @@ async function sourceHarness(temporary: string) {
   })
   const candidate = async (query: string, source = "claude-marketplace") => (await sources.searchSources(query)).candidates.find((row) => row.source === source)!.id
   const request = (candidateId: string, requestId = "request_a2_01") => ({ requestId, source: { kind: "candidate" as const, candidateId }, effect: { kind: "all-projects" as const }, via: "chat" as const })
-  return { install, installContent: install, sources, root, temporary, activation, reloads, candidate, request, fetched }
+  const installAndApply = async (request: Parameters<typeof install>[0]) => {
+    const result = await install(request)
+    await new Promise<void>(resolve => setImmediate(resolve))
+    return result
+  }
+  return { install: installAndApply, installContent: install, sources, root, temporary, activation, reloads, candidate, request, fetched }
 }
 
 test("whole plugin skills retain sibling directories and root resources", () => installerHarness(async h => {
@@ -126,7 +131,7 @@ test("A2 marketplace context7 commits one real enabled package and durable decla
   expect(state.ok && state.packageGraphs[0]?.declarations?.[0]?.mcp).toMatchObject({ type: "remote", url: "https://mcp.context7.com/mcp?client=claude-code-plugin" })
   expect(readMcpLeafStrict("context7-de6dee1ccd")).toMatchObject({ ok: true, value: { url: "https://mcp.context7.com/mcp?client=claude-code-plugin" } })
   expect(h.activation).toEqual(["claude:context7"])
-  expect(h.reloads).toEqual([])
+  expect(h.reloads).toEqual(["claude:context7"])
   expect(await h.install(input)).toEqual(outcome)
   expect(await h.install(h.request(input.source.candidateId, "request_a2_02"))).toMatchObject({ ok: true, packageId: "claude:context7", alreadyInstalled: true })
   const after = readPackageLedgerStateV1(h.root)
@@ -505,7 +510,7 @@ test("BC2a pinned marketplace prepares opaque choices and only the selected real
   expect(state.ok && state.packageGraphs.map(graph => graph.packageId)).toEqual(["claude:context7"])
   expect(state.ok && state.records.map(record => record.name)).toEqual([state.ok && state.packageGraphs[0]!.root.name, "context7-de6dee1ccd"])
   expect(h.activation).toEqual(["claude:context7"])
-  expect(h.reloads).toEqual([])
+  expect(h.reloads).toEqual(["claude:context7"])
 }))
 
 test("BC2a captured local bytes remain usable after the original directory moves and source bytes stay unchanged", () => installerHarness(async h => {
@@ -585,8 +590,12 @@ for(const kind of ["agent","command"] as const)test("R14 A7 catalog "+kind+" sch
  const planner={globalRoot:()=>h.root,resolveEntry:async()=>null,advisoryGate:()=>({allowed:true}),resolvePackage:async(id:string,version:string)=>resolveVerifiedPackageV1(catalog,id,version)}
  const admission={root:()=>h.root,userDataPath:h.temporary,casBaseRoot:()=>h.temporary,environment:()=>"dev" as const,loadVerifiedCatalog:async()=>({source:"remote" as const,catalog,snapshotDigest:sha256Hex(JSON.stringify(catalog))}),installability:{fetchPayload:fetchBytes},fetchAsset:fetchBytes}
  const reloads:string[]=[]
- const result=await installCatalogFromSource(envelope.prelude.packageId,{requestId:"r14_reload_"+kind,source:{kind:"catalog",catalogId:envelope.prelude.packageId},effect:{kind:"all-projects"},via:"chat"},{planner:planner as never,admission,activateMcp:async()=>[],reloadSkills:id=>{reloads.push(id)},removeDeparting:()=>{}})
+ const {createSourceInstaller}=await import("./install-from-source")
+ const installer=createSourceInstaller({globalRoot:()=>h.root,casBaseRoot:()=>h.temporary,environment:()=>"dev",userDataPath:h.temporary,sources:h.sources,advisoryGate:planner.advisoryGate,resolvePackage:planner.resolvePackage as never,activateMcp:async()=>[],reloadSkills:id=>{reloads.push(id)},removeDeparting:()=>{},catalogInstall:(id,request)=>installCatalogFromSource(id,request,{planner:planner as never,admission,activateMcp:async()=>[],reloadSkills:()=>{},removeDeparting:()=>{}})})
+ const result=await installer({requestId:"r14_reload_"+kind,source:{kind:"catalog",catalogId:envelope.prelude.packageId},effect:{kind:"all-projects"},via:"chat"})
  expect(result).toMatchObject({ok:true})
+ expect(reloads).toEqual([])
+ await new Promise<void>(resolve=>setImmediate(resolve))
  expect(reloads).toEqual([envelope.prelude.packageId])
 }))
 
@@ -676,7 +685,7 @@ test("review AC11 local marketplace folder installs only the selected real plugi
   expect(state.records.filter(record => record.kind !== "bundle").map(record => record.name)).toEqual(result.installed.map(entry => entry.hostName))
   expect(result.source).toEqual({ kind: "local-folder" })
   expect(h.activation).toEqual([result.packageId])
-  expect(h.reloads).toEqual([])
+  expect(h.reloads).toEqual([result.packageId])
   expect(state.records.some(record => ["github", "playwright", "frontend-design"].includes(record.name))).toBe(false)
 }))
 

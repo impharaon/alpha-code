@@ -2182,6 +2182,10 @@
         {
           "file": "packages/core/test/codepuppy-mcp-runtime.test.ts",
           "name": "explicit SSE opens the declared GET URL and never probes HTTP codemode"
+        },
+        {
+          "file": "packages/core/test/codepuppy-mcp-runtime.test.ts",
+          "name": "absent and explicit HTTP retain the same streamable HTTP request"
         }
       ]
     }

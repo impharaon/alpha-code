@@ -51,6 +51,7 @@ async function installPackage(directory: string, multiple: boolean, projectOnly:
   const installed = await install({ requestId: "account_install_01", source: { kind: "candidate", candidateId: candidate.id }, effect: projectOnly ? { kind: "project", directory: project } : { kind: "all-projects" }, via: "chat" })
   expect(installed.ok, JSON.stringify(installed)).toBe(true)
   if (!installed.ok) throw Error(installed.detail)
+  await new Promise<void>(resolve => setImmediate(resolve))
   const before = readPackageLedgerStateV1(root())
   if (!before.ok) throw Error(before.reason)
   const graph = before.packageGraphs.find(graph => graph.packageId === installed.packageId)!

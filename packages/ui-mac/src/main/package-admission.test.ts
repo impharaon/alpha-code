@@ -79,6 +79,8 @@ test("whole plugin profile installs its signed tree and registered skills throug
   expect(existsSync(pluginDataDirectory(deps.dataHome(), sample.envelope.prelude.packageId))).toBe(true)
   const live = resolveLiveGenerationDir(root, state.packageGraphs[0]!.pluginTree!.storeKey)!
   expect(readFileSync(join(live, "tree/skills/using-superpowers/SKILL.md"), "utf8")).toContain("superpowers")
+  expect(JSON.parse(readFileSync(skillsEnabledPath(root), "utf8")).keys).not.toContain("skill--using-superpowers-63fb5846cb")
+  expect(await setPackageStateV1({ packageId: sample.envelope.prelude.packageId, state: "enabled" }, deps)).toMatchObject({ ok: true })
   expect(JSON.parse(readFileSync(skillsEnabledPath(root), "utf8")).keys).toContain("skill--using-superpowers-63fb5846cb")
   expect(await setPackageStateV1({ packageId: sample.envelope.prelude.packageId, state: "disabled" }, deps)).toMatchObject({ ok: true })
   expect(JSON.parse(readFileSync(skillsEnabledPath(root), "utf8")).keys).not.toContain("skill--using-superpowers-63fb5846cb")
@@ -140,6 +142,8 @@ test("project-only catalog admission commits effect with the graph and keeps per
   const identity = projectScopeIdentity(project)
   if (!identity.ok) throw Error(identity.reason)
   expect(await installDesktopPackageV1("package:supabase", { ...deps, effect: identity.scope })).toMatchObject({ ok: true })
+  const { setPackageStateV1 } = await import("./ext-install-planner")
+  expect(await setPackageStateV1({ packageId: "package:supabase", state: "enabled" }, deps)).toMatchObject({ ok: true })
   const state = readPackageLedgerStateV1(root)
   expect(state.ok && state.packageGraphs[0]?.effect).toEqual(identity.scope)
   expect(state.ok && state.records.every((record) => record.scope.kind === "global" && record.desiredState === "enabled")).toBe(true)
@@ -181,6 +185,10 @@ test("desktop plus commits content before automatic package enable without login
   })
   expect(result.ok).toBe(true)
   expect(commits).toEqual([["disabled", "disabled", "disabled"]])
+  const content = readPackageLedgerStateV1(root)
+  expect(content.ok && content.records.map(record => record.desiredState)).toEqual(["disabled", "disabled", "disabled"])
+  const { setPackageStateV1 } = await import("./ext-install-planner")
+  expect(await setPackageStateV1({ packageId: "package:supabase", state: "enabled" }, deps)).toMatchObject({ ok: true })
   const state = readPackageLedgerStateV1(root)
   expect(state.ok).toBe(true)
   if (!state.ok) return
@@ -293,6 +301,8 @@ test("package activation and switch work when main-owned remote definitions requ
   try {
     expect((await installDesktopPackageV1("package:supabase", deps)).ok).toBe(true)
     expect(readMcpServerRecords(() => {}).map((record) => record.name)).toContain("supabase")
+    const { setPackageStateV1 } = await import("./ext-install-planner")
+    expect(await setPackageStateV1({ packageId: "package:supabase", state: "enabled" }, deps)).toMatchObject({ ok: true })
     const installed = readPackageLedgerStateV1(root)
     expect(installed.ok && installed.records.map((record) => record.desiredState)).toEqual(["enabled", "enabled", "enabled"])
     const config = readFileSync(join(root, "codepuppy.jsonc"), "utf8")

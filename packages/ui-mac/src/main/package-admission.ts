@@ -15,7 +15,7 @@ import { agentMdToEntry } from "./agent-md-entry"
 import { evaluateBundleAuthorization, evaluateCapabilityDiff, isSafeCapability, type CapabilityDiff } from "./ext-capability-grants"
 import { recoveryReceiptInputs } from "./ext-agent-install"
 import { nextDesiredState } from "./ext-install-policy"
-import { promotePayloadToCas, setPackageStateV1, type PlannerDeps } from "./ext-install-planner"
+import { promotePayloadToCas, type PlannerDeps } from "./ext-install-planner"
 import { persistMcp, readMcpLeafStrict, releasePreparedMcpSecretVersion, withConfigWriteLock } from "./ext-config"
 import { canonicalJson, sha256Hex } from "./ext-manifest-v2"
 import { buildAgentTxItems, buildCloudTxItems, buildCommandTxItems, buildDepartingChildConfigItemsV1, buildMcpTxItems, buildSkillTxItems } from "./ext-package-tx-builders"
@@ -447,10 +447,7 @@ export async function installDesktopPackageV1(
       confirmed: Object.fromEntries(prepared.components.map((component) => [component.key, packageAuthorizationCapabilitiesV1(component.accepted.component)])),
     },
   }, deps, connection, { ok: true, unavailable: false }, lifecycle.plan, "automatic")
-  if (!result.ok) return result
-  const enabled = await setPackageStateV1({ packageId: catalogId, state: "enabled" }, { ...deps, globalRoot: deps.root })
-  const warnings = [result.warning, enabled.ok ? enabled.warning : enabled.reason].filter(Boolean)
-  return { ...result, ...(enabled.ok ? { installedDisabled: undefined } : {}), ...(warnings.length ? { warning: warnings.join("; ") } : {}) }
+  return result
 }
 
 /** Re-read the installed identity and signed declarations; this path never materializes assets. */

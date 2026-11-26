@@ -87,6 +87,7 @@ export function PackageAccountDialog(props: {
             <Show when={item.kind === "option"}><small>{item.kind === "option" ? item.description : ""}</small></Show>
             <Show when={item.kind === "option" && item.type === "boolean"} fallback={
               <input class="codepuppy-ext-input" type={item.kind === "mcp-version" ? "text" : item.kind === "option" && !item.sensitive ? item.type === "number" ? "number" : "text" : "password"} autocomplete="off"
+                placeholder={item.kind === "secret" ? t("codepuppy.ext.packageTokenPlaceholder") : undefined}
                 value={String(values()[item.prerequisiteId] ?? (item.kind === "option" || item.kind === "mcp-version" ? item.value ?? "" : ""))}
                 onInput={event => setValues(current => ({ ...current, [item.prerequisiteId]: event.currentTarget.value }))} />
             }>

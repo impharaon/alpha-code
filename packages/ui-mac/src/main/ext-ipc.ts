@@ -1120,11 +1120,11 @@ export function registerExtIpcHandlers(
     if (!removed.ok) getLogger().warn("Package departing content cleanup is pending")
     await convergeManagedMcp(children.filter((child) => child.kind === "mcp").map((child) => child.name)).catch(() => undefined)
   }
-  // Runtime work is completed below, after the recovery mutex has released.
+  // The installer schedules the existing state writer/runtime after its content result has returned.
   const sourceInstaller = createSourceInstaller({
     globalRoot: codepuppyGlobalRoot, casBaseRoot: () => getCodePuppyEnvironment().casBaseRoot, environment: () => getCodePuppyEnvironment().environment, userDataPath, sources: pluginSources,
-    advisoryGate: (input) => plannerDeps().advisoryGate(input), resolvePackage: (id, version) => plannerDeps().resolvePackage(id, version),
-    activateMcp: async () => [], reloadSkills: () => {}, removeDeparting: removeDepartingPackageComponents,
+    advisoryGate: (input) => plannerDeps().advisoryGate(input), resolvePackage: (id, version) => plannerDeps().resolvePackage(id, version), resolveEntry: (id) => plannerDeps().resolveEntry(id),
+    activateMcp: activatePackageMcp, reloadSkills: reloadPackageSkills, removeDeparting: removeDepartingPackageComponents,
     catalogInstall: (catalogId, request) => installCatalogFromSource(catalogId, request, {
       planner: plannerDeps(), admission: packageAdmissionDeps, activateMcp: async () => [],
       reloadSkills: () => {}, removeDeparting: removeDepartingPackageComponents,
@@ -1272,6 +1272,7 @@ export function registerExtIpcHandlers(
         const result = await setPackageStateV1(intent, plannerDeps())
         if (!result.ok) return result
         const packageId = (intent as { packageId: string }).packageId
+        sourceInstaller.cancelActivation(packageId)
         const state = readPackageLedgerStateV1(codepuppyGlobalRoot(), { sideEffectFree: true })
         const graph = state.ok && state.packageGraphs.find((entry) => entry.packageId === packageId)
         return graph && [graph.root, ...graph.children].some((node) => node.kind !== "mcp") ? { ...result, ...reloads.request({ scope: "global", items: packageReloadItems(packageId), reason: `set package state ${packageId}`, force: true, connectorChange: packageNeedsStartupRefresh(packageId) }) } : result
@@ -1435,12 +1436,6 @@ export function registerExtIpcHandlers(
         return { ok: false as const, code: "transaction-failed" as const, detail: "Project identity changed during source capture" }
     }
     const result = await gatedWrite.installFromSource(request)
-    if (isInstallOutcomeV1(result) && result.ok) {
-      await activatePackageMcp(result.packageId)
-      const state = readPackageLedgerStateV1(codepuppyGlobalRoot(), { sideEffectFree: true })
-      const graph = state.ok && state.packageGraphs.find(graph => graph.packageId === result.packageId)
-      if (graph && [graph.root, ...graph.children].some(node => node.kind !== "mcp")) reloadPackageSkills(result.packageId)
-    }
     return result
   }
   ipcMain.handle(GATED_WRITE_CHANNELS.installFromSource, (_event: IpcMainInvokeEvent, request: InstallRequestV1) => {

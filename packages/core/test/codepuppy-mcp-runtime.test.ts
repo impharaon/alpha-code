@@ -750,3 +750,19 @@ testEffect(Layer.empty).live("explicit SSE opens the declared GET URL and never 
   expect(Exit.isFailure(result)).toBe(true)
   expect(seen).toEqual([{ method: "GET", path: "/events?source=plugin", authorization: "Bearer invalid-sse-test" }])
 }))
+
+
+testEffect(Layer.empty).live("absent and explicit HTTP retain the same streamable HTTP request", () => Effect.gen(function* () {
+  const seen: Array<{ method: string; search: string }> = []
+  const endpoint = Bun.serve({ port: 0, hostname: "127.0.0.1", fetch(request) {
+    seen.push({ method: request.method, search: new URL(request.url).search })
+    return new Response(null, { status: 403 })
+  } })
+  yield* Effect.addFinalizer(() => Effect.promise(() => endpoint.stop(true)))
+  for (const transport of [undefined, "http"] as const) {
+    const config = new ConfigMCP.Remote({ type: "remote", url: `http://127.0.0.1:${endpoint.port}/mcp?source=plugin`, ...(transport ? { transport } : {}), oauth: false })
+    const result = yield* McpClient.connect({ server: "http", config, directory: ROOT }).pipe(Effect.provide(hostEnvironmentLayer), Effect.scoped, Effect.exit)
+    expect(Exit.isFailure(result)).toBe(true)
+  }
+  expect(seen).toEqual([{ method: "POST", search: "?source=plugin" }, { method: "POST", search: "?source=plugin" }])
+}))

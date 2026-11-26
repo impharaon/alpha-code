@@ -48,7 +48,7 @@ import { allPluginSourcesSucceeded, installedPackageIdentity, packageDeclaration
 type Dependencies = Pick<
   PlannerDeps,
   "globalRoot" | "casBaseRoot" | "environment" | "advisoryGate" | "resolvePackage"
-> & {
+> & Partial<Pick<PlannerDeps, "resolveEntry">> & {
   userDataPath: string
   dataHome?: () => string
   sources: Pick<ReturnType<typeof createPluginSources>, "convertCandidate" | "catalogComparisons" | "searchedSources" | "release">
@@ -61,7 +61,13 @@ type Dependencies = Pick<
 /** Main owns one instance; the registered write channel supplies the shared recovery gate and ledger barrier. */
 export function createSourceInstaller(deps: Dependencies) {
   const requests = new Map<string, { input: string; result: Promise<InstallOutcomeV1> }>()
-  return async function installFromSource(request: InstallRequestV1): Promise<InstallOutcomeV1> {
+  const activations = new Map<string, ReturnType<typeof setImmediate>>()
+  const cancelActivation = (packageId: string) => {
+    const pending = activations.get(packageId)
+    if (pending) clearImmediate(pending)
+    activations.delete(packageId)
+  }
+  const installFromSource = async function installFromSource(request: InstallRequestV1): Promise<InstallOutcomeV1> {
     if (!request || !isHubRequestId(request.requestId) || (request.via !== "chat" && request.via !== "hub"))
       return { ok: false, code: "unknown-id", detail: "Invalid installation request" }
     const encoded = canonicalJson(request)
@@ -398,9 +404,6 @@ export function createSourceInstaller(deps: Dependencies) {
         }
       }
       if (departing.length) await deps.removeDeparting(departing.filter(child => !sameSource?.pluginTree || child.kind !== "skill"))
-      const enabled = await setPackageStateV1({ packageId, state: "enabled" }, deps)
-      if (enabled.ok) await deps.activateMcp(packageId).catch(() => undefined)
-      if (mapped.some((item) => item.entry.kind === "skill")) deps.reloadSkills(packageId)
       return outcomeOf(graph)
     })().catch(
       (): InstallOutcomeV1 => ({
@@ -410,10 +413,31 @@ export function createSourceInstaller(deps: Dependencies) {
       }),
     )
     requests.set(request.requestId, { input: encoded, result: pending })
+    void pending.then(result => {
+      if (!result.ok) return
+      // Publish the enabled image only after the entire promise/IPC return chain has completed.
+      cancelActivation(result.packageId)
+      activations.set(result.packageId, setImmediate(() => {
+        activations.delete(result.packageId)
+        void (async () => {
+          const state = readPackageLedgerStateV1(deps.globalRoot(), { sideEffectFree: true })
+          const graph = state.ok && state.packageGraphs.find(graph => graph.packageId === result.packageId)
+          if (!state.ok || !graph) return
+          const nodes = [graph.root, ...graph.children]
+          const enabled = result.alreadyInstalled
+            ? { ok: true as const }
+            : await setPackageStateV1({ packageId: result.packageId, state: "enabled" }, deps)
+          if (!enabled.ok) console.warn("[plugin-install] Package activation failed", { packageId: result.packageId })
+          await deps.activateMcp(result.packageId)
+          if (nodes.some(node => node.kind !== "mcp" && node.kind !== "cloud")) deps.reloadSkills(result.packageId)
+        })().catch(() => console.warn("[plugin-install] Package runtime could not be applied", { packageId: result.packageId }))
+      }))
+    })
     const source = request.source
     if (source.kind === "candidate") void pending.then(() => deps.sources.release(source.candidateId))
     return pending
   }
+  return Object.assign(installFromSource, { cancelActivation })
 }
 
 function renderText(text: Text): string {
@@ -497,10 +521,7 @@ export async function installCatalogFromSource(
   if (!state.ok) return { ok: false, code: "transaction-failed", detail: "Installed catalog entry could not be read" }
   const graph = state.packageGraphs.find((graph) => graph.packageId === catalogId)
   if (!graph) return { ok: false, code: "nothing-runnable", detail: "No catalog content could be installed", notRunning: [] }
-  if (legacy) await setPackageStateV1({ packageId: catalogId, state: "enabled" }, planner)
   if (before) await deps.removeDeparting([before.root, ...before.children].filter((node) => !state.records.some((record) => record.kind === node.kind && record.name === node.name)))
-  await deps.activateMcp(catalogId)
   const nodes = [graph.root, ...graph.children]
-  if (nodes.some((node) => node.kind !== "mcp" && node.kind !== "cloud")) deps.reloadSkills(catalogId)
   return { ok: true, packageId: catalogId, displayName: graph.displayName ?? legacy?.entry.displayName ?? catalogId, source: { kind: "catalog" }, installed: nodes.flatMap((node) => node.kind === "skill" || node.kind === "mcp" ? [{ kind: node.kind, hostName: node.name, sourceName: node.name }] : []), notRunning: graph.notRunning ?? [] }
 }

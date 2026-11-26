@@ -1,4 +1,4 @@
-import { afterAll, expect, mock, spyOn, test } from "bun:test"
+import { afterAll, afterEach, expect, mock, spyOn, test } from "bun:test"
 import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
@@ -134,11 +134,16 @@ const createRuntime = activationModule.createManagedMcpConvergence
 const managedMcpNamesOf = activationModule.managedMcpNamesOf
 const packageAppliesAt = activationModule.packageAppliesAt
 const credentialActivations: string[][] = []
+const runtimeTasks: Promise<unknown>[] = []
 let heldRuntime: { entered(): void; release: Promise<void> } | undefined
 mock.module("../src/main/package-mcp-activation", () => ({
   createManagedMcpConvergence: (deps: Parameters<typeof createRuntime>[0]) => {
     const converge = createRuntime(deps)
-    return async (names: readonly string[]) => { credentialActivations.push([...names]); if(heldRuntime){heldRuntime.entered();await heldRuntime.release} return converge(names) }
+    return (names: readonly string[]) => {
+      const task = (async () => { credentialActivations.push([...names]); if(heldRuntime&&names.length){heldRuntime.entered();await heldRuntime.release} return converge(names) })()
+      runtimeTasks.push(task)
+      return task
+    }
   },
   managedMcpNamesOf,
   packageAppliesAt,
@@ -173,7 +178,15 @@ const { codepuppySidecar, pluginSources } = registerExtIpcHandlers(
 )
 // `#1529`:像 server.ts 在 sidecar ready 时那样接上发送口 —— 装完之后发往 ext 的东西都落在这里。
 const toSidecar: Array<Record<string, unknown>> = []
-codepuppySidecar.attach((message) => void toSidecar.push(message as Record<string, unknown>))
+let observeReload: ((message: Record<string, unknown>) => void) | undefined
+codepuppySidecar.attach(message => { toSidecar.push(message as Record<string, unknown>); observeReload?.(message as Record<string, unknown>) })
+
+async function settlePackageRuntime() {
+  await new Promise<void>(resolve => setImmediate(resolve))
+  await Promise.allSettled(runtimeTasks.splice(0))
+  await new Promise<void>(resolve => setImmediate(resolve))
+}
+afterEach(settlePackageRuntime)
 
 afterAll(() => {
   rmSync(root, { recursive: true, force: true })
@@ -589,6 +602,7 @@ test("BC3 production account save re-applies the same standalone MCP package and
   const result=await handlers.get("ext-install-from-source")!({sender:{id:1}},{requestId:"bc3_registry_account_install",source:{kind:"candidate",candidateId:candidate.id},effect:{kind:"all-projects"},via:"hub"}) as import("../src/shared/plugin-install").InstallOutcomeV1
   expect(result.ok,JSON.stringify(result)).toBe(true)
   if(!result.ok)throw Error(result.detail)
+  await settlePackageRuntime()
   const read=()=>handlers.get("ext-package-authorization")!({sender:{id:1}},result.packageId) as Promise<import("../src/shared/package-admission").PackageAuthorizationResultV1>
   const pending=await read()
   expect(pending).toMatchObject({ok:true,items:[{kind:"secret",saved:false}]})
@@ -682,13 +696,16 @@ test("R14 B6 all previously allowed Git forges prepare a whole real MCP package 
 
 test("R14 A7 main source entry reloads a real bundled agent without force", async () => {
  catalogOverride=currentCatalog
+ const reloaded=Promise.withResolvers<void>()
+ observeReload=message=>{if(message.type==="codepuppy.reload.request" && Array.isArray(message.items) && message.items.some(item=>item.id==="agent:code-reviewer"))reloaded.resolve()}
  try{
   const before=toSidecar.filter(message=>message.type==="codepuppy.reload.request").length
   expect(await handlers.get("ext-install-from-source")!({sender:{id:1}},{requestId:"r14_native_agent_reload",source:{kind:"catalog",catalogId:"agent:code-reviewer"},effect:{kind:"all-projects"},via:"chat"})).toMatchObject({ok:true,packageId:"agent:code-reviewer"})
+  await reloaded.promise
   const requests=toSidecar.filter(message=>message.type==="codepuppy.reload.request").slice(before)
   expect(requests).toContainEqual(expect.objectContaining({scope:"global",items:expect.arrayContaining([expect.objectContaining({id:"agent:code-reviewer"})])}))
   expect(requests.every(request=>!request.force)).toBe(true)
- }finally{catalogOverride=undefined}
+ }finally{catalogOverride=undefined;observeReload=undefined}
 })
 
 for(const source of ["created","project"] as const)test("R14 A9 renderer cannot submit "+source+" writes", async () => {
@@ -709,7 +726,7 @@ for(const source of ["created","project"] as const)test("R14 A9 renderer cannot 
  }finally{fetchSpy.mockRestore()}
 })
 
-for(const kind of ["catalog","candidate"] as const)test("R14 B8 submitted "+kind+" stage has its main-owned display name before runtime settles",async()=>{
+for(const kind of ["catalog","candidate"] as const)test("R14 B8 submitted "+kind+" content completion keeps its main-owned display name before runtime settles",async()=>{
  const {fixtureFetch}=await import("../test-fixtures/plugin-helper/source-fetch")
  const fetchSpy=spyOn(globalThis,"fetch").mockImplementation(fixtureFetch)
  const candidate=(await pluginSources.searchSources("context7")).candidates.find(candidate=>candidate.source==="claude-marketplace")!
@@ -722,7 +739,7 @@ for(const kind of ["catalog","candidate"] as const)test("R14 B8 submitted "+kind
  try{
   codepuppySidecar.receive({type:"codepuppy.hub.install.request",id:901,requestId,directory:join(root,"workspace"),sessionID:"ses_name",agent:"build",ref:{kind:"id",id},scope:"all-projects"},()=>{})
   await entered.promise
-  expect(handlers.get("ext-hub-request")!({sender:{id:1}},requestId)).toMatchObject({stage:"submitted",displayName:name})
+  expect(handlers.get("ext-hub-request")!({sender:{id:1}},requestId)).toMatchObject({stage:"committed",displayName:name})
  }finally{
   release.resolve();heldRuntime=undefined
   for(let n=0;n<100;n++){

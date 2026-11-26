@@ -726,3 +726,11 @@ r13 明确授权 merge（不 rebase）。2026-11-26 11:58 UTC 开始，预计 20
 - gate-files.tsv：保留双方新增/修改及 origin 已声明的退役/拆分记录，332 个活跃登记行；所有单边修改计数取该修改方。唯一双方修改的 plugin-host（共同基线 52、本分支 55、origin 53）单独实测为 56，非取较大值或盲目相加；其它行不重复测量。
 
 bun.lock 随 origin 改变，`bun install --frozen-lockfile` exit 0（2 packages installed），husky 后已恢复并核对 core.hooksPath=.githooks；无额外锁文件变动。相关测试 `cd packages/ext && gate slot -- bun test src/hub-bridge.test.ts src/hub-tools.test.ts src/policy/tool-policy-rpc.test.ts src/network-egress.test.ts src/context-injection.test.ts src/plugin-host.test.ts` 为 **151 PASS / 0 FAIL**。Bun 合并输出无逐文件数量，故为解决唯一仍待测的 count 行，使用 `CODEPUPPY_TEST_COUNT_FILE=/tmp/alpha-1761-r13/plugin-host.count gate slot -- bash scripts/bun-test-floor.sh 0 packages/ext src/plugin-host.test.ts` 单独测得 **56 PASS / 0 FAIL**；该 56 是前述 151 的子集，不重复累计。两包目录各自 bun typecheck（ext / ui-mac）均 exit 0。所有日志在 /tmp/alpha-1761-r13；只运行这些具名消费者，未跑全层/全套、gate run 或 bin/check，没有发布/push/PR/merge 到远端。已核 Codex / GPT-6。
+
+## r14：ship gate 失败修正
+
+2026-11-26 12:21:41 UTC 开始，预估 90 分钟（共享 slot 排队另记），仅按 r14 的失败文件/检查逐项定位；不跑全套、gate run 或 bin/check。调度方已提供 origin/alpha b0a9d0298d 的逐文件绿色基线，不重新扩大基线调查。每文件通过 `gate slot -- bun test --max-concurrency 2 --timeout 90000 <file>` 独立复现，日志 /tmp/alpha-1761-r14/red-*.log / red-results.json。
+
+已复现：fixture-identity 4 PASS/1 FAIL（core/util tree 身份已改变，需真实重采，分类 c）；engine-cases 25 PASS/1 FAIL（无人值守子文件两种拒绝错误未投影，分类 a，正在核对）；ext-security 7 PASS/1 FAIL（document Chromium 窗口漏 webviewTag:false，分类 a，窗口清单新增点属 c）。OfficeExcel 15 PASS 与 schema snapshot 2 PASS 单独均绿，而 full gate 的 Python import 缺 text_budget.py / circular import，加上 installOfficeExcel 每次先删安装目录，表明必须修正共享环境的并行安装（分类 a），不能称 flaky。old-name 扫描 9 PASS/1 FAIL，唯一 stale 行为旧 office-docs 的 /code-puppy 计数（分类 c）。
+
+静态入口复现：`bash -c 'source scripts/docs-gates.sh; docs_gate_nul'` exit 1，实际 Office/解释器二进制 fixture 未在既有 binary 机制登记（分类 c）；`bash scripts/assert-seed-assets.sh` exit 1，默认制作入口重写后漏掉原社区 Excel 明确退役事实（分类 b，片 7 / §4.1/4.8 并未复活社区连接器，将恢复该事实而不放宽 guard）。后续修正均保留原守卫规则、阈值和地板。

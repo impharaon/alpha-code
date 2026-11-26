@@ -59,6 +59,11 @@ const PICKED = { providerID: "picked", id: "user-choice" }
 const COMMAND_MODEL = { providerID: "cmd", model: "command-choice" }
 const AGENT_MODEL = { providerID: "agent", id: "agent-choice" }
 
+it.live("native argument suffix stays on the native syntax axis", () => Effect.gen(function* () {
+  const result = yield* runCommand({ template: "$ARGUMENTS[0]" }, {})
+  expect(result.prompts).toEqual(["go[0]"])
+}))
+
 it.live("package instruction renders source nodes before bound values and arguments", () => Effect.gen(function* () {
   yield* runCommand({ template: "Initialize native command services" }, {})
   const location = yield* Location.Service

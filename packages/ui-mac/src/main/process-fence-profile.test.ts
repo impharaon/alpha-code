@@ -84,6 +84,21 @@ const locationInput = {
 }
 
 describe("package manager locations", () => {
+  test("Bun global locations follow the trusted user root before application XDG defaults", () => {
+    for (const [xdgCacheHome, bunInstall, root] of [
+      [null, null, `${locationInput.home}/.bun`],
+      ["/user/cache", null, "/user/cache/.bun"],
+      ["/user/cache", "/user/bun", "/user/bun"],
+    ] as const) {
+      const result = resolvePackageManagerLocations({ ...locationInput, xdgCacheHome, bunInstall })
+      expect(result.writable.filter((entry) => entry.manager === "bun" && entry.purpose === "global-install").map((entry) => entry.rule)).toEqual([
+        { kind: "subpath", value: `${root}/install/global` }, { kind: "subpath", value: `${root}/bin` },
+      ])
+      expect(result.env.BUN_INSTALL).toBe(bunInstall === null ? root : undefined)
+      expect(result.env.BUN_INSTALL_CACHE_DIR).toBe(`${locationInput.userDataPath}/package-managers/bun/install-cache`)
+    }
+  })
+
   test("homebrew installation nodes stay protected while ordinary global bins remain writable", () => {
     const root = realpathSync(mkdtempSync(join(import.meta.dir, "../../node_modules/.cache/homebrew-identity-")))
     try {

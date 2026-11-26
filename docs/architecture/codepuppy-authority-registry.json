@@ -2321,11 +2321,11 @@
         },
         {
           "file": "packages/ext/src/plugin-host.test.ts",
-          "name": "the real PayPal prompt hook approves without skipping native approval and ignores Read"
+          "name": "the real PayPal prompt hook"
         },
         {
           "file": "packages/ext/src/plugin-host.test.ts",
-          "name": "a rejecting PayPal prompt hook ends the current native task"
+          "name": "a rejecting PayPal prompt hook"
         },
         {
           "file": "packages/ext/src/plugin-host.test.ts",

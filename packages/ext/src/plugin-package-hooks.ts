@@ -542,6 +542,19 @@ export async function registerPackageHooks(
         })
   })
   await context.session.hook("experimental.idle", async (event) => {
+    if (
+      !allInstalledPluginPackages(input.root)
+        .filter(active)
+        .some((installed) =>
+          installed.description.entries.some(
+            (entry) =>
+              entry.kind === "hook" &&
+              pluginEntryRuntimeAvailable(entry) &&
+              ["Stop", "SubagentStop"].includes(entry.hook.event),
+          ),
+        )
+    )
+      return
     const session = await context.session.get({ sessionID: event.sessionID })
     const results = await run(session.parentID ? "SubagentStop" : "Stop", event.sessionID, {
       background_tasks: event.background,

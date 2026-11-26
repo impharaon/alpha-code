@@ -1090,3 +1090,8 @@ D4 决定边界补核：caa4b35fab 在原 register-policy integration 文件增�
 
 
 PostToolUse 步骤（D4 / AC-11）：4fdba9a7b3 隔离固定 hookify 原 PostToolUse handler（仅从临时 manifest 撤 PreToolUse，防止前阶段假满足），运行原 posttooluse.py 与原敏感文件 warn 规则；真实模型工具 write 已完成，再一轮模型请求应带警告。具名先 0 pass / 1 fail，后 1 pass / 0 fail（`/tmp/plugin-standard-r12-post-{red,green}.log`）。现在从真正 tool.execute.after completed 取原输入和实际 output/content，源名/字段转换仍在原 identity；handler 错误留在同一个 runner 的 onFailure，未启用的包不会额外解析工具身份。警告只在写后出现且文件已写，不冒充前阶段 deny 或工具回滚。完整 host 原文件 **79 pass / 0 fail**（`/tmp/plugin-standard-r12-post-complete.log`），ext/ui-mac 包内 typecheck 均 exit 0（`/tmp/plugin-standard-r12-{ext,ui}-types.log`）。本步骤仅 command PostToolUse connected，未新增 engine 接管，L0 原登记、gate-files 79 同步。
+
+
+较宽相关集核对发现并直接处理两项本轮引入的配套问题：原 context-injection `package idle cleanup preserves the context-bearing event unchanged` 在没有 Stop handler 时被新增的无条件 Session.get 拒绝（`/tmp/plugin-standard-r12-ext-related.log`）；idle 现在先看当前包的 Stop/SubagentStop 消费者，无消费者便不读会话、不改 context-bearing event。registry 的两条动态 PayPal 标题此前写成运行时展开的全名，原静态验证按源码 includes 找不到；只把登记名同步为原源码中稳定的测试前缀，不改验证器或测试断言。修后 context-injection / authority-registry / host 三个完整原文件 **129 pass / 0 fail**（`/tmp/plugin-standard-r12-idle-complete.log`），host 79 不另累加。
+
+移除核对发现真实 hookify 的规则在 tool_name 不匹配时仍加载全部规则，因此只删源别名映射的臂仍绿；没有称它为有效反臂。在 identity 原 fast 文件补最小源/运行字段往返及验证 MCP 源身份，取现有 toolFacts/mint 的本仓注册事实，外部拼写来自已固定 hookify/Convex；完整 **20 pass / 0 fail**（`/tmp/plugin-standard-r12-identity-complete.log`）。该纯映射在原同名文件、无进程/网络/真实 runtime，imports 可追踪，为 affected PR fast。随后用这一最低层证据替代弱的别名移除观察；字段和权限的真实宿主回归仍保留。

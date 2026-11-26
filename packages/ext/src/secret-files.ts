@@ -166,10 +166,12 @@ function pathGlob(value: string, pattern: string, platform: ProtectedFiles.PathP
 }
 
 function canDescend(relative: string, pattern: string, platform: ProtectedFiles.PathPlatform) {
-  if (pattern.split("/").includes("**")) return true
   const segments = relative.split("/")
   const parts = pattern.split("/")
-  return segments.length < parts.length && segments.every((segment, index) => pathGlob(segment, parts[index], platform))
+  const recursive = parts.indexOf("**")
+  const prefix = recursive === -1 ? parts.slice(0, -1) : parts.slice(0, recursive)
+  if (recursive === -1 && segments.length >= parts.length) return false
+  return segments.every((segment, index) => index >= prefix.length || pathGlob(segment, prefix[index], platform))
 }
 
 async function sqliteValues(file: ProtectedFiles.ProtectedFile) {

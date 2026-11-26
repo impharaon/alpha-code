@@ -541,3 +541,10 @@ r8 开始于 2026-11-26 10:41:43 UTC。直达 `.cases.ts` 命令增加 `./`（�
 有效结论：**9 个坏臂各 0 PASS / 1 FAIL（exit 1），新增文件名正向臂 1 PASS（exit 0）**。Core base/HEAD 比较没有 HEAD-only 红，故 r8 无生产修复提交。未跑 gate run/bin/check/其它宿主/包级全套，无 push/PR/merge，无依赖安装。遗留去向：既有 Core 23 红及 19 匿名超时由编排器按原上游条目处置；`.gate-tests` 缺失的 selector 输入仍由编排器治理；Windows 真机行归 win32-x64 发布验收；整宿主首跑非 green 的事实与组合验收证据交编排器评判。OPTIONAL：无新增项。
 
 最终静态复核：scoped oxlint exit 0 / 0 warnings / 0 errors；ui-mac `bun typecheck` exit 0；`git diff --check` exit 0；以 `5511eceef3` 为 changed-since 的 Alpha 文档检查，plan.md 0 finding（其余 322 既有 finding 不属本轮）。实际宿主 7 行；与 `d837106565` 比较，所有临时修改的生产文件字节一致；没有残留本轮 node/sshd 进程。结束于 2026-11-26 11:17:34 UTC，本轮墙钟 35.9 分钟（含本机 slot 排队）；实际改动限三个计划文件。
+
+## r9 R1 修复收据
+
+依据：r9 IMPLEMENT(review fixes) 接受的发现 1–10；spec v4 / design v3.3 / SC-01、SC-02 不变。已核 Codex / GPT-6；开始 2026-11-26 11:45 UTC。每个缺陷先单独提交具名红例，再提交修复；所有新单元/文件系统/Node collector 例在原模块测试，属于原 fast/integration 选择路径；不新增全局 setup 或 gate。
+
+- 1：`1864e5340d` 红：现实 HOME（无关深目录、Library/Keychains、真实 AWS/docker/kube writer 样本）在真实 Node collector 中记录 21 次不应发生的 stat/readdir（预期 0）。修复按首个 `**` 之前的路径前缀下降，keychain 来源锚定 Library/Keychains；`bun test --max-concurrency 2 src/secret-files.test.ts` exit 0 / 6 PASS，日志 `/tmp/secrets-r9-01-{red,green}.log`。
+- 3（推断只确认一次）：真实宿主只读探针输出 `{"chromeOpen":true,"databaseExists":false,"readOnlySelect":"not-run"}`。指定 Default/Network/Cookies 不存在，无法确认 BUSY/LOCKED；按 r9 条件授权跳过 snapshot 恢复实现，不搜索其它 profile/读取 cookie 值，不启动 Chrome。编排器 snapshot 裁定只有确认该前提后才适用，Location fail-closed 不变。

@@ -425,8 +425,8 @@ function locatedRules(roots: ProtectedRoots): LocatedRule[] {
             ]),
           ),
         ]
-      : at(roots.home, [
-          rule("keychain", ["Library/Keychains/**", "**/*.keychain", "**/*.keychain-db"], "opaque", "encrypted-store"),
+      : at(api.join(roots.home, "Library", "Keychains"), [
+          rule("keychain", ["**"], "opaque", "encrypted-store"),
         ])),
     ...(roots.platform === "win32"
       ? [

@@ -483,3 +483,8 @@ r9 裁定续接：调度方 Claude Opus 5.5 明确授权只修实际缓存测试
 ### 偏离记录
 
 暂无。开始核对 2026-11-26 10:27:51 UTC，包含 r9 单断言处置；本片局部执行预计约一小时（不含共享 slot/外部集成等待），如实际规模倍增按 brief 返回。所有新增测试 import 模块、fixture 使用字面路径，选取无需改 gate；当前基线缺 `.gate-tests` 的已知限制仅如实报告。
+
+
+r9 首个实施提交核对：本节消费 `74e2a0aec2` 与恢复 brief `Phase: IMPLEMENT` 的同轮授权，已核 Codex / GPT-6；冻结版本仍为 `7ef8b89b30`，未重新设计。工作区 check 归档成为 main/ext 同一内部权威，pending 原子落盘与真实 ID 桥重放已实现，主 host 直接组合其持久存储；#1760 的生产 bootstrap 调用者仍未交付。必要文件增量：`util/codepuppy-document.ts` 的三种阶段纯数据；既有 `cloud-vision.test.ts` 消费真实 Read.toModelContent/Message/PNG fixture；UI 的既有 tool-card-model/tests 与 zh/en 词条将同一 metadata 投影到原步骤行，不新增 DOM/样式/稿件；原生/云/首方 authority 复用现有持久身份。工具说明库存由既有生成器重生，条目仍 98，实际字节 29833→30180；此前 wider 唯一红为这项机械快照同步，未改阈值。
+
+本提交组件证据：ext 改变的四文件 33 PASS，ui 相关六文件 143 PASS；ext wider 初次 143 PASS/1 个已说明快照差异（日志 `/tmp/alpha-1761-r9/{ext-changed,ui-related-final,ext-related-final}.log`）。两包 typecheck exit 0（`ext-types-final.log`、`ui-types-final.log`）。新增独立真实插件 API 探针已得到正常 durable admission 和相同 ID 精确重试，但 Session 删除后实际抛 `Session.NotFoundError`，与 HTTP 客户端的 `SessionNotFoundError` 不同；下一提交单独保留该正确断言 red，然后只改本功能错误分类。中间两次探针 setup 错误为漏 Location 和把 core remove 的 ID 参数写成对象，均已据实际接口纠正；不归咎于引擎、不改引擎。当前仅保存本片可恢复实现，不声称全部验收完成。

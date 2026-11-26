@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test"
+import { createDocumentInspection } from "./document-check"
 import { createDocumentTool } from "./document-tool"
 import type { DocumentCaller, DocumentHost, RenderResult } from "../../util/src/codepuppy-document"
 
@@ -10,7 +11,7 @@ describe("document tool", () => {
       executed++
       return { status: "failed", code: "source-missing", detail: "not found" }
     }
-    const tool = createDocumentTool({ host: () => ({}) as DocumentHost, location, render })
+    const tool = createDocumentTool({ check: createDocumentInspection().check, host: () => ({}) as DocumentHost, location, render })
     for (const input of [
       {
         action: "render",

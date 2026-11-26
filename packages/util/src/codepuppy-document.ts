@@ -58,6 +58,10 @@ export function sameDocumentVerifyRef(a: DocumentRuntimeVerifyRef, b: DocumentRu
 export const DOCUMENT_WORK_DIR = ".document-output"
 
 // Pure render contract shared by ext, main and artifact discovery.
+export type DocumentStage = "generate" | "render" | "inspect"
+export function documentStage(value: unknown): DocumentStage | undefined {
+  return value === "generate" || value === "render" || value === "inspect" ? value : undefined
+}
 export type DocumentKind = "docx" | "xlsx" | "pptx" | "pdf" | "html" | "design"
 export type DocumentEnvironment = { python: string; node: string; nodeModules: string; skills: string; templates: string; fonts: string; workRoot: string; renderState: DocumentRuntimeState; pythonEnvironment: DocumentPythonEnvironment }
 export type RenderRequest = { kind: DocumentKind; path: string; outputPath?: string; dpi?: number; viewport?: { width: number; height: number } }

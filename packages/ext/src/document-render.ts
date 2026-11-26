@@ -2,6 +2,12 @@ import { createHash, randomUUID } from "node:crypto"
 import { mkdir, readFile, realpath, writeFile } from "node:fs/promises"
 import { basename, isAbsolute, join, relative, sep } from "node:path"
 import { homedir } from "node:os"
+import {
+  documentCheckRoot,
+  readDocumentCheck,
+  writeDocumentRecord,
+  type DocumentCheckIdentity,
+} from "../../ui-mac/src/shared/document-check-records"
 import { SessionMessage } from "../../schema/src/session-message"
 import {
   DOCUMENT_WORK_DIR,
@@ -38,7 +44,6 @@ export function createDocumentRenderer(input: {
     signal: AbortSignal,
   ) => Promise<{ stdout: string; stderr: string; exitCode: number }>
 }) {
-  const checks = new Map<string, { caller: DocumentCaller; kind: string; path: string }>()
   return async (
     caller: DocumentCaller,
     request: RenderRequest,
@@ -55,21 +60,24 @@ export function createDocumentRenderer(input: {
       return { status: "failed", code: "invalid-input", detail: "invalid document render parameters" }
     if (revision === 1 && !checkId)
       return { status: "failed", code: "invalid-input", detail: "revision 1 requires its original checkId" }
-    const previous = checkId ? checks.get(checkId) : undefined
-    if (
-      checkId &&
-      (!previous ||
-        previous.caller.sessionID !== caller.sessionID ||
-        previous.caller.location.directory !== caller.location.directory ||
-        previous.caller.location.workspaceID !== caller.location.workspaceID ||
-        previous.kind !== request.kind ||
-        previous.path !== request.path)
-    )
-      return {
-        status: "failed",
-        code: "invalid-input",
-        detail: "checkId does not belong to this session, Location and artifact",
+    let previous: DocumentCheckIdentity | undefined
+    if (checkId) {
+      try {
+        previous = await readDocumentCheck(caller, checkId)
+      } catch {
+        return {
+          status: "failed",
+          code: "invalid-input",
+          detail: "checkId does not belong to this session, Location and artifact",
+        }
       }
+      if (
+        previous.request.path !== request.path ||
+        previous.request.kind !== request.kind ||
+        previous.request.outputPath !== request.outputPath
+      )
+        return { status: "failed", code: "invalid-input", detail: "document artifact identity changed" }
+    }
     let artifact: DocumentArtifactRecord | undefined
     const failed = async (
       code: Extract<RenderResult, { status: "failed" }>["code"],
@@ -117,12 +125,29 @@ export function createDocumentRenderer(input: {
             artifactPath: source.file.abs,
             artifactSha256: digest,
           }
-        checks.set(id, { caller, kind: request.kind, path: request.path })
         const environment = await input.host.environment(caller)
         if (combined.aborted) throw Error("document rendering timeout")
         const work = join(caller.location.directory, DOCUMENT_WORK_DIR)
         if ((await realpath(environment.workRoot)) !== (await realpath(work)))
           throw Error("document work root does not match the Location")
+        if (
+          (previous?.correctionSha256 && (revision !== 1 || previous.correctionSha256 !== digest)) ||
+          (revision === 0 && previous?.originalSha256 && previous.originalSha256 !== digest)
+        )
+          return failed("source-changed", "the single correction round requires revision 1 and cannot be repeated")
+        const identity = {
+          ...previous,
+          caller: {
+            location: {
+              directory: caller.location.directory,
+              ...(caller.location.workspaceID ? { workspaceID: caller.location.workspaceID } : {}),
+            },
+            sessionID: caller.sessionID,
+          },
+          request,
+        }
+        const archive = await documentCheckRoot(caller, id)
+        await writeDocumentRecord(join(archive, "identity.json"), identity)
         const renderId = randomUUID()
         const job = join(work, id, String(revision), renderId)
         if (request.kind === "html" || request.kind === "design") {
@@ -130,6 +155,13 @@ export function createDocumentRenderer(input: {
             { caller, checkId: id, revision, request, sourceSha256: digest },
             combined,
           )
+          if (result.status === "rendered")
+            await writeDocumentRecord(join(archive, "identity.json"), {
+              ...identity,
+              ...(revision === 0
+                ? { originalSha256: result.receipt.sourceSha256 }
+                : { correctionSha256: result.receipt.sourceSha256 }),
+            })
           return result
         }
         if (
@@ -154,21 +186,71 @@ export function createDocumentRenderer(input: {
           return { status: "pending", checkId: id, artifact: record, runtime: environment.renderState }
         }
         const diagnostics: string[] = []
-        const recalculation = request.kind === "xlsx" ? await runDocumentPython({ operation: "recalculate", python: environment.python, script: input.recalculateScript, directory: caller.location.directory, path: source.file.abs, environment: environment.pythonEnvironment }, combined) : undefined
+        const recalculation =
+          request.kind === "xlsx"
+            ? await runDocumentPython(
+                {
+                  operation: "recalculate",
+                  python: environment.python,
+                  script: input.recalculateScript,
+                  directory: caller.location.directory,
+                  path: source.file.abs,
+                  environment: environment.pythonEnvironment,
+                },
+                combined,
+              )
+            : undefined
         const calculated: unknown = recalculation ? JSON.parse(recalculation.stdout) : undefined
-        if (request.kind === "xlsx" && (!recalculation || recalculation.exitCode !== 0 || !isExcelRecalculateResult(calculated))) return failed("conversion", "Excel calculation did not produce a receipt")
+        if (
+          request.kind === "xlsx" &&
+          (!recalculation || recalculation.exitCode !== 0 || !isExcelRecalculateResult(calculated))
+        )
+          return failed("conversion", "Excel calculation did not produce a receipt")
         if (isExcelRecalculateResult(calculated) && calculated.status !== "recalculated") {
           if (calculated.status === "pending") {
-            const artifact = await resolveDocumentArtifact(caller.location.directory, { checkId: id, kind: request.kind, sourcePath: source.file.abs, artifactPath: source.file.abs })
-            if (!artifact || artifact.sourceSha256 !== digest) return failed("source-changed", "Excel source changed while waiting for runtime")
-            await input.host.defer({ id, location: caller.location, sessionID: caller.sessionID, notificationID: SessionMessage.ID.create(), request, sourceSha256: digest, artifact, revision, state: "waiting-runtime" })
+            const artifact = await resolveDocumentArtifact(caller.location.directory, {
+              checkId: id,
+              kind: request.kind,
+              sourcePath: source.file.abs,
+              artifactPath: source.file.abs,
+            })
+            if (!artifact || artifact.sourceSha256 !== digest)
+              return failed("source-changed", "Excel source changed while waiting for runtime")
+            await input.host.defer({
+              id,
+              location: caller.location,
+              sessionID: caller.sessionID,
+              notificationID: SessionMessage.ID.create(),
+              request,
+              sourceSha256: digest,
+              artifact,
+              revision,
+              state: "waiting-runtime",
+            })
             return { status: "pending", checkId: id, artifact, runtime: calculated.runtime }
           }
-          return failed(calculated.code === "source-changed" ? "source-changed" : "conversion", String(calculated.detail))
+          return failed(
+            calculated.code === "source-changed" ? "source-changed" : "conversion",
+            String(calculated.detail),
+          )
         }
-        if (isExcelRecalculateResult(calculated) && calculated.status === "recalculated" && ((await realpath(calculated.path)) !== (await realpath(source.file.abs)) || calculated.sourceSha256 !== digest || typeof calculated.resultSha256 !== "string")) return failed("source-changed", "Excel source changed before calculation")
+        if (
+          isExcelRecalculateResult(calculated) &&
+          calculated.status === "recalculated" &&
+          ((await realpath(calculated.path)) !== (await realpath(source.file.abs)) ||
+            calculated.sourceSha256 !== digest ||
+            typeof calculated.resultSha256 !== "string")
+        )
+          return failed("source-changed", "Excel source changed before calculation")
         const renderedDigest = documentRecord(calculated) ? String(calculated.resultSha256) : digest
-        if (documentRecord(calculated)) diagnostics.push(JSON.stringify({ recalculationId: calculated.id, errors: calculated.errors, diagnostics: calculated.diagnostics }))
+        if (documentRecord(calculated))
+          diagnostics.push(
+            JSON.stringify({
+              recalculationId: calculated.id,
+              errors: calculated.errors,
+              diagnostics: calculated.diagnostics,
+            }),
+          )
         if (artifact) artifact = { ...artifact, sourceSha256: renderedDigest, artifactSha256: renderedDigest }
         await mkdir(job, { recursive: true })
         const profileRoot = join(input.documentRuntimeRoot, "jobs", renderId)
@@ -285,7 +367,11 @@ export function createDocumentRenderer(input: {
             ...(output.stderr ? [output.stderr] : []),
           ],
         }
-        await writeFile(join(job, "receipt.json"), JSON.stringify(receipt))
+        await writeDocumentRecord(join(job, "receipt.json"), receipt)
+        await writeDocumentRecord(join(archive, "identity.json"), {
+          ...identity,
+          ...(revision === 0 ? { originalSha256: renderedDigest } : { correctionSha256: renderedDigest }),
+        })
         return { status: "rendered", receipt }
       } catch (error) {
         return failed(

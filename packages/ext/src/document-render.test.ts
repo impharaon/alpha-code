@@ -13,6 +13,7 @@ import {
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { createDocumentRenderer } from "./document-render"
+import { createDocumentInspection } from "./document-check"
 import { createDocumentTool } from "./document-tool"
 import type { DocumentHost, DocumentCaller, DeferredDocumentCheck } from "../../util/src/codepuppy-document"
 const roots: string[] = []
@@ -132,7 +133,7 @@ describe("document render", () => {
     const f = fixture()
     const source = join(f.root, "report.docx")
     copyFileSync(join(f.input.assets, "templates/chinese-report.docx"), source)
-    const tool = createDocumentTool({
+    const tool = createDocumentTool({ check: createDocumentInspection().check,
       host: () => f.input.host,
       location: f.caller.location,
       render: createDocumentRenderer(f.input),

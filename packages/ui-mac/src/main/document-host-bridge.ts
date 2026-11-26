@@ -15,13 +15,19 @@ import type { createDocumentRuntime } from "./document-runtime"
 /** Attached to the existing sidecar receive/attach lane, with its real generation. */
 export function createDocumentMainBridge(
   host: DocumentHost,
-  runtime: Pick<ReturnType<typeof createDocumentRuntime>, "subscribe" | "subscribeRuntimeVerify" | "invalidatePythonEnvironment">,
+  runtime: Pick<
+    ReturnType<typeof createDocumentRuntime>,
+    "subscribe" | "subscribeRuntimeVerify" | "invalidatePythonEnvironment"
+  >,
   sidecarGeneration: number,
   cancelChromium: (request: Parameters<DocumentHost["chromiumRender"]>[0]) => void,
 ) {
   const renders = new Map<number, Parameters<DocumentHost["chromiumRender"]>[0]>()
-  const registrations = new Map<string, { id: string; location: Parameters<DocumentHost["pythonEnvironment"]>[0]; cleanup: () => Promise<void> }>()
-  const ready = new Map<string, () => void>()
+  const registrations = new Map<
+    string,
+    { id: string; location: Parameters<DocumentHost["pythonEnvironment"]>[0]; cleanup: () => Promise<void> }
+  >()
+  const ready = new Map<string, { location: Parameters<DocumentHost["subscribeReady"]>[0]; cleanup: () => void }>()
   const attempts = new Map<
     string,
     { task: DocumentRuntimeVerifyTask; settle: (receipt: DocumentRuntimeVerifyReceipt) => void }
@@ -34,6 +40,20 @@ export function createDocumentMainBridge(
   let post: ((value: unknown) => void) | undefined
   const key = (location: { directory: string; workspaceID?: string }) =>
     JSON.stringify([location.directory, location.workspaceID ?? null])
+  const subscribeReady = (location: Parameters<DocumentHost["subscribeReady"]>[0]) =>
+    host.subscribeReady(
+      location,
+      (check) =>
+        new Promise((settle) => {
+          admissions.set(key(location) + check.id, { check, settle })
+          if (post) send(post, { type: "codepuppy.document.check-ready", sidecarGeneration, check })
+        }),
+    )
+  const pauseReady = () => {
+    for (const entry of ready.values()) entry.cleanup()
+    for (const pending of admissions.values()) pending.settle({ status: "conflict", checkId: pending.check.id })
+    admissions.clear()
+  }
   let latest: unknown
   const send = (sender: (value: unknown) => void, value: unknown) => {
     try {
@@ -48,9 +68,13 @@ export function createDocumentMainBridge(
   })
   return {
     attach(sender: (value: unknown) => void) {
+      pauseReady()
       post = sender
+      for (const entry of ready.values()) entry.cleanup = subscribeReady(entry.location)
       if (latest) send(sender, latest)
       return () => {
+        if (post !== sender) return
+        pauseReady()
         post = undefined
       }
     },
@@ -148,22 +172,17 @@ export function createDocumentMainBridge(
         }
         if (request.operation === "ready-register") {
           if (!ready.has(identity))
-            ready.set(
-              identity,
-              host.subscribeReady(
-                request.location,
-                (check) =>
-                  new Promise((settle) => {
-                    admissions.set(identity + check.id, { check, settle })
-                    send(sender, { type: "codepuppy.document.check-ready", sidecarGeneration, check })
-                  }),
-              ),
-            )
+            ready.set(identity, { location: request.location, cleanup: subscribeReady(request.location) })
           return null
         }
         if (request.operation === "ready-unregister") {
-          ready.get(identity)?.()
+          ready.get(identity)?.cleanup()
           ready.delete(identity)
+          for (const [id, pending] of admissions)
+            if (key(pending.check.location) === identity) {
+              admissions.delete(id)
+              pending.settle({ status: "conflict", checkId: pending.check.id })
+            }
           return null
         }
       }
@@ -192,7 +211,8 @@ export function createDocumentMainBridge(
       return true
     },
     async dispose() {
-      for (const entry of registrations.values()) runtime.invalidatePythonEnvironment(entry.location, entry.id, "sidecar-stopped")
+      for (const entry of registrations.values())
+        runtime.invalidatePythonEnvironment(entry.location, entry.id, "sidecar-stopped")
       stopped = true
       unsubscribe()
       post = undefined
@@ -205,7 +225,7 @@ export function createDocumentMainBridge(
       admissions.clear()
       await Promise.all([...registrations.values()].map((entry) => entry.cleanup()))
       registrations.clear()
-      for (const cleanup of ready.values()) cleanup()
+      for (const entry of ready.values()) entry.cleanup()
       ready.clear()
     },
   }

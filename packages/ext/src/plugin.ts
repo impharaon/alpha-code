@@ -48,6 +48,8 @@ import type { SkillEditor } from "@opencode/plugin/promise/skill"
 import { readPackageAllowSet } from "./gen-skill-paths"
 import { managedMcpAllowedHere, managedSkillAllowedHere, managedSkillIdentity } from "./package-scope"
 import { modelFacts } from "./model-facts"
+import { documentSessionActive, recordDocumentPageView } from "./document-register"
+import { cloudVisionToolId } from "./cloud-vision"
 import { createCloudVisionHooks } from "./cloud-vision-hooks"
 import { createAttachmentReaderHooks } from "./attachment-reader-hooks"
 import { createAgentMentionHooks } from "./agent-mention-hooks"
@@ -167,12 +169,27 @@ export const CodePuppyExt: Plugin.Plugin = {
         for (const tool of createCodePuppyTools({ context, reloads, projectRootFor, readConsent: readProjectExtensionsConsent }))
           editor.add(tool)
         for (const tool of createHubTools(hubBridge, context, policy.askInstall)) editor.add(tool)
+        for (const tool of editor.list()) {
+          const stage = tool.id === "shell" ? "generate" : tool.id === "read" || tool.id === cloudVisionToolId(bootstrap) ? "inspect" : undefined
+          if (!stage) continue
+          editor.update(tool.id, (entry) => {
+            const execute = entry.execute
+            entry.execute = async (value, toolContext) => {
+              if (!documentSessionActive(context.location, toolContext.sessionID)) return execute(value, toolContext)
+              const title = stage === "generate" ? "生成" : "检查"
+              await toolContext.progress({ title, codepuppyDocumentStage: stage })
+              const result = await execute(value, { ...toolContext, progress: (update) => toolContext.progress({ ...update, title, codepuppyDocumentStage: stage }) })
+              return { ...result, metadata: { ...result.metadata, title, codepuppyDocumentStage: stage } }
+            }
+          })
+        }
       })
 
       // `#1419`(REQ-228):看不了图的模型 —— 图片送云端识图,模型可按编号 / 路径追问。登记簿按本 Location 建
       // (#223 R7 的纪律);能力真源是引擎目录里的模型(modelFacts);转写正文跨重启缓存在插件存储里。
       const vision = createCloudVisionHooks({
         directory,
+        documentPageView: (sessionID, view) => recordDocumentPageView(context.location, sessionID, view),
         // 目录查不到(或查询失败)⇒ undefined ⇒ 按看不了图处理(基线 §2-B 第 6 条)。
         seesImages: (model) =>
           modelFacts(context, model).then(
@@ -214,6 +231,7 @@ export const CodePuppyExt: Plugin.Plugin = {
       })
       await context.tool.hook("execute.after", (event) => {
         if (event.status === "error") {
+          vision.toolAfter(event)
           // `#1449` / `#1445`(#1662 parity):Code Puppy 的 exa 供应商(exa-websearch.ts)抛出的具名结局,被 2.x 的 websearch 工具包成了
           // 通用的「Unable to search the web for …」;这里换回 0.1.26 的那句话(或供应商原文)。只认那个类型,不看文案。
           // 429 时供应商抛的是引擎认得出的 HttpClientError(random 才会换同伴),具名结局在它的 cause 里 —— 沿 cause 链找。
@@ -233,7 +251,10 @@ export const CodePuppyExt: Plugin.Plugin = {
         } catch (cause) {
           error(`[@codepuppy/ext] cloud tool ${event.tool} result refused: ${describe(cause)}`)
           event.result = { content: renderTemplate(CLOUD_CONTRACT_REFUSED_ID, { name: event.tool }), metadata: { codepuppy: { contractRefused: true } } }
+          vision.toolAfter({ ...event, status: "error" })
+          return
         }
+        vision.toolAfter(event)
       })
 
       // ── 请求组装(P3 / P4 / P5 / P6)─────────────────────────────────────────────────────────

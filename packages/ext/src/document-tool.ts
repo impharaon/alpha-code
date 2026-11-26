@@ -15,6 +15,7 @@ import { TOOL_TEXT } from "./context-injection"
 export function createDocumentTool(input: {
   host: () => DocumentHost
   location: DocumentCaller["location"]
+  check: (caller: DocumentCaller, report: DocumentCheckReport, host: DocumentHost) => Promise<DocumentCheckReport>
   render: (
     caller: DocumentCaller,
     request: RenderRequest,
@@ -40,14 +41,14 @@ export function createDocumentTool(input: {
       const caller = { location: input.location, sessionID: context.sessionID }
       if (args.action === "environment") return { content: JSON.stringify(await input.host().environment(caller)) }
       if (args.action === "check") {
-        await input
-          .host()
-          .recordCheck({ caller, checkId: args.report.checkId, report: args.report as DocumentCheckReport })
+        await context.progress({ title: "检查", codepuppyDocumentStage: "inspect" })
+        const report = await input.check(caller, args.report as DocumentCheckReport, input.host())
         return {
+          metadata: { title: "检查", codepuppyDocumentStage: "inspect" },
           content: JSON.stringify({
             status: "recorded",
             checkId: args.report.checkId,
-            coverage: args.report.uninspected.length ? "partial" : "complete",
+            coverage: report.uninspected.length ? "partial" : "complete",
           }),
         }
       }
@@ -55,9 +56,12 @@ export function createDocumentTool(input: {
         return {
           content: JSON.stringify({ status: "failed", code: "invalid-input", detail: "invalid render request" }),
         }
-      await context.progress({ title: "渲染" })
+      await context.progress({ title: "渲染", codepuppyDocumentStage: "render" })
       const result = await input.render(caller, args.request, args.checkId, args.revision, context.signal)
-      return { content: JSON.stringify(result), metadata: documentMetadata(result) }
+      return {
+        content: JSON.stringify(result),
+        metadata: { ...documentMetadata(result), title: "渲染", codepuppyDocumentStage: "render" },
+      }
     },
   }
 }

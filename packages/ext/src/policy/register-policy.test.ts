@@ -1841,6 +1841,16 @@ describe("env write-back", () => {
 })
 
 describe("secret result boundaries", () => {
+  it.live("verified shell exit stays numeric when it equals a protected value", () => Effect.gen(function* () {
+    const location = yield* Location.Service
+    fs.writeFileSync(path.join(location.directory, ".env"), "PASSWORD=7\n")
+    const { session } = yield* setup({ internal: [ShellTool.Plugin], records: NEUTRAL })
+    const result = yield* callRaw(session.id, "shell", { command: "cat .env; exit 7" })
+    expect(Exit.isSuccess(result)).toBe(true)
+    const completed = (result as { value: { output: unknown; metadata?: unknown } }).value
+    expect(completed.output).toMatchObject({ exit: 7, output: "PASSWORD=[REDACTED]\n" })
+    expect(completed.metadata).toMatchObject({ exit: 7 })
+  }))
   it.live("registered shell capture masks live files and preserves program use", () => Effect.gen(function* () {
     const location = yield* Location.Service
     const value = randomUUID()

@@ -66,6 +66,7 @@ import { ConfigCommandPlugin } from "../../core/src/config/plugin/command"
 import { SubagentTool } from "../../core/src/tool/plugin/subagent"
 import { SkillTool } from "../../core/src/tool/plugin/skill"
 import { ReadTool } from "../../core/src/tool/plugin/read"
+import { ShellTool } from "../../core/src/tool/plugin/shell"
 import { TestLLM } from "../../ai/src/testing"
 import { dirname } from "node:path"
 
@@ -2923,3 +2924,25 @@ packageIt.live("a normal session with a parent does not fabricate subagent lifec
   yield* sessions.wait(child.id)
   expect(yield* Effect.promise(() => Bun.file(join(location.directory, "subagent-hook-events.jsonl")).exists())).toBe(false)
 })))
+
+packageIt.live("the original Claude Security guard receives the source agent identity before a shell call", () => {
+  const observed = { executions: 0 }
+  return packageJourney(Effect.gen(function* () {
+    const sample = yield* invocationSample("claude:claude-security")
+    const membership = JSON.parse(readFileSync(join(sample.root, "skills-enabled.json"), "utf8"))
+    writeFileSync(join(sample.root, "skills-enabled.json"), JSON.stringify({ ...membership, keys: [...membership.keys, sample.key] }))
+    yield* invocationNativeServices
+    const ext = yield* activateExtUntilFinished
+    const target = sample.hostNames["agent:agents/scan-verifier.md"]!
+    yield* ext.finish((yield* Agent.Service).get(target as never).pipe(Effect.map(Boolean)))
+    const location = yield* Location.Service
+    const sessions = yield* Sessions.Service
+    const session = yield* sessions.create({ location: { directory: location.directory }, title: "Original guard", agent: target, model: { providerID: "test", id: "picked" } } as never)
+    const result = yield* (yield* Tool.Service).snapshot().pipe(Effect.flatMap(snapshot => snapshot.execute({ sessionID: session.id, agent: target as never, messageID: "msg_security_source_guard" as never, call: { type: "tool-call", name: "shell", id: "security_source_guard", input: { command: "python3 -c 'print(7)'" } } })), Effect.exit)
+    expect(Exit.isFailure(result)).toBe(true)
+    expect(Exit.isFailure(result) ? Cause.pretty(result.cause) : "").toContain("interpreter")
+    expect(observed.executions).toBe(0)
+  }), { id: "source-guard-shell-probe", setup: async context => {
+    await context.tool.transform(editor => editor.add({ name: "shell", description: "Native shell execution boundary probe", input: ShellTool.Input, execute: async () => { observed.executions++; return { content: "shell reached" } } }))
+  } })
+})

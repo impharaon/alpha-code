@@ -660,14 +660,17 @@ export async function spawnLocalServer(
   explicitConfigWatch?.()
   const stopExplicitConfigWatch = watchExplicitSources({ ...engineConfig.watch, log: (line) => getLogger()?.warn(line) })
   explicitConfigWatch = stopExplicitConfigWatch
-  const child = (() => {
+  const spawned = (() => {
     try {
-      return (options.fork ?? electronNs.utilityProcess.fork)(sidecar, [], {
-        cwd: ensureEngineScratchCwd(options.userDataPath),
+      const cwd = ensureEngineScratchCwd(options.userDataPath)
+      const files = pinnedFileAuthority(options.userDataPath)
+      const child = (options.fork ?? electronNs.utilityProcess.fork)(sidecar, [], {
+        cwd,
         env: sidecarEnv,
         serviceName: SIDECAR_SERVICE_NAME,
         stdio: "pipe",
       })
+      return { child, files }
     } catch (error) {
       clearOfficialConnectorRuntime(runtimeGeneration)
       stopExplicitConfigWatch()
@@ -675,6 +678,7 @@ export async function spawnLocalServer(
       throw error
     }
   })()
+  const child = spawned.child
   let exited = false
   // #613:ready IPC 带回的注入失败。在此立即 error(main 侧无条件可观测,不依赖后续健康结果),
   // 并随返回值交给终态生产者(armBoot/armRespawnGenerationTerminal)发布 "injection-failed"。
@@ -762,7 +766,7 @@ export async function spawnLocalServer(
   }
   // REQ-234 `#1529`:`codepuppy.*` 分发与探针应答并列;不是本族的消息原样交还(返回 false)。
   const postCodePuppy = (message: CodePuppySidecarOutbound) => child.postMessage(message)
-  const pinnedFiles = createPinnedFileMainBridge({ ensureFile: (id, signal, progress) => pinnedFileAuthority(options.userDataPath).ensureFile(id, signal, progress) }, String(options.generation ?? 0), (message) => child.postMessage(message))
+  const pinnedFiles = createPinnedFileMainBridge(spawned.files, String(options.generation ?? 0), (message) => child.postMessage(message))
   // DESIGN-stored-credentials-fence §4.2:引擎装载配置之前的拉取 —— 同步建表并回复(收到与回复之间没有 await)。
   let credentialRespawnRequested = false
   const credentialReplies = {

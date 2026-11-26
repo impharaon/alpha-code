@@ -97,7 +97,7 @@ test("alpha.* 进 codepuppySidecar、应答回同一子进程;ready 之后才 at
   }
   creditDanglingSweepForSpawn()
   const result = await spawnLocalServer("127.0.0.1", 4391, "password", {
-    userDataPath,
+    userDataPath: join(userDataPath, "first-launch"),
     healthCheck: async () => true,
     fork: (() => child) as unknown as typeof import("electron").utilityProcess.fork,
     egressProxy: async () => ({ port: 4433 }),
@@ -114,6 +114,12 @@ test("alpha.* 进 codepuppySidecar、应答回同一子进程;ready 之后才 at
 
   expect((await result.listener.probeWrite("/ws")).outcome).toBe("writable")
   expect(await result.listener.projectConfigView("/ws")).toMatchObject({ directory: "/ws", complete: true })
+  expect(received).toHaveLength(1)
+
+  // The launcher namespace is consumed before the generic hub dispatch, with an ID-only terminal reply.
+  child.emit("message", { type: "codepuppy.pinned-file.ensure", id: 99, sidecarGeneration: "0", fileId: "python/any/not-in-manifest" })
+  await new Promise<void>((resolve) => setImmediate(resolve))
+  expect(child.wire.at(-1)).toMatchObject({ type: "codepuppy.pinned-file.result", id: 99, sidecarGeneration: "0", delivery: { result: { ok: false, error: "unknown-file" } } })
   expect(received).toHaveLength(1)
 
   await result.listener.stop()

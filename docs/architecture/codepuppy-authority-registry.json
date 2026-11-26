@@ -2303,7 +2303,7 @@
     },
     {
       "id": "plugin-hook-lifecycle",
-      "decision": "DESIGN-local-plugin-install v3.1 §4.4/4.12 S-03: the ext runner consumes actual session lifecycle and existing idle/synthetic primitives. Package command SessionStart/UserPromptSubmit, Stop and PreToolUse are active; Stop block/reason continues the same Session via its native idle drain, never a second inference loop. PreToolUse runs between policy deny and confirm/pin; the existing identity owner converts source tool fields. Final input, live generation and service digest bind a same-call decision in the existing policy authority; ask wins over allow and native hard deny remains authoritative. Other lifecycle domains are registered only as their consumers land.",
+      "decision": "DESIGN-local-plugin-install v3.1 §4.4/4.12 S-03: the ext runner consumes actual session lifecycle and existing idle/synthetic primitives. Package command SessionStart/UserPromptSubmit, Stop and PreToolUse, plus prompt PreToolUse, are active; Stop block/reason continues the same Session via its native idle drain, never a second inference loop. PreToolUse runs between policy deny and confirm/pin; the existing identity owner converts source tool fields. Final input, live generation and service digest bind a same-call decision in the existing policy authority; ask wins over allow and native hard deny remains authoritative. Prompt handlers use the existing stateless generate.text without tools and preserve native approval for ok=true. A rejected tool records its native error before the awaited context barrier ends the turn when continueOnBlock=false. Other lifecycle domains are registered only as their consumers land.",
       "adr": [
         "ADR-029",
         "ADR-047"
@@ -2315,6 +2315,14 @@
         "ladder": "L0: existing event.subscribe, awaited session prompt/context/experimental.idle, tool.execute.before between policy head/tail, same-session synthetic and AppProcess; no engine takeover."
       },
       "tests": [
+        {
+          "file": "packages/ext/src/plugin-host.test.ts",
+          "name": "the real PayPal prompt hook approves without skipping native approval and ignores Read"
+        },
+        {
+          "file": "packages/ext/src/plugin-host.test.ts",
+          "name": "a rejecting PayPal prompt hook ends the current native task"
+        },
         {
           "file": "packages/ext/src/plugin-host.test.ts",
           "name": "real hookify PreToolUse blocks the matching native write using source tool fields"

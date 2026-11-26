@@ -11,6 +11,8 @@ import { allInstalledPluginPackages, installedPluginPackage } from "./plugin-pac
 import { readPackageAllowSet } from "./gen-skill-paths"
 import { managedPackageEntryAllowedHere } from "./package-scope"
 import { createPackageProcesses } from "./plugin-package-process"
+import { pluginProcessConfig } from "../../ui-mac/src/shared/plugin-mcp-config"
+import { resolvePackageModel } from "./model-facts"
 import { ASK_AGENT, READONLY_AGENT } from "../../ui-mac/src/shared/permission-tier"
 import { PACKAGE_HOOK_CONTEXT_ID, renderWrapper } from "./context-injection"
 import { mkdtempSync, writeFileSync, chmodSync, rmSync, watchFile, unwatchFile } from "node:fs"
@@ -19,7 +21,16 @@ import { join } from "node:path"
 import { createHash } from "node:crypto"
 
 type Installed = ReturnType<typeof allInstalledPluginPackages>[number]
-type Contribution = { installed: Installed; text: string; order: number; sessionID: string; lifetime: object; block?: boolean; output?: Record<string, unknown> }
+type Contribution = {
+  installed: Installed
+  text: string
+  order: number
+  sessionID: string
+  lifetime: object
+  block?: boolean
+  stopTurn?: boolean
+  output?: Record<string, unknown>
+}
 const record = (value: unknown): value is Record<string, unknown> =>
   !!value && typeof value === "object" && !Array.isArray(value)
 
@@ -34,6 +45,7 @@ export async function registerPackageHooks(
   const starts = new Map<string, Promise<void>>()
   const sessionContexts = new Map<string, Contribution[]>()
   const promptContexts = new Map<string, Contribution[]>()
+  const stopTurns = new Map<string, Contribution>()
   const running = new Map<AbortController, { installed: Installed; sessionID: string }>()
   const observed = new Set<string>()
   const promptEpoch = new Map<string, number>()
@@ -68,6 +80,7 @@ export async function registerPackageHooks(
   const close = (sessionID: string) => {
     sessionEpoch.delete(sessionID)
     promptEpoch.delete(sessionID)
+    stopTurns.delete(sessionID)
     for (const [controller, owner] of running) if (owner.sessionID === sessionID) controller.abort()
     continued.delete(sessionID)
     starts.delete(sessionID)
@@ -95,10 +108,7 @@ export async function registerPackageHooks(
     const installed = allInstalledPluginPackages(input.root).filter(active)
     const handlers = installed.flatMap((installed) =>
       installed.description.entries.flatMap((entry) =>
-        entry.kind === "hook" &&
-        pluginEntryRuntimeAvailable(entry) &&
-        entry.hook.event === event &&
-        entry.hook.type === "command"
+        entry.kind === "hook" && pluginEntryRuntimeAvailable(entry) && entry.hook.event === event
           ? [{ installed, entry, hook: entry.hook }]
           : [],
       ),
@@ -106,7 +116,8 @@ export async function registerPackageHooks(
     if (!handlers.length) return []
     const lifetime = sessionEpoch.get(sessionID) ?? {}
     sessionEpoch.set(sessionID, lifetime)
-    let session = await context.session.get({ sessionID })
+    const currentSession = await context.session.get({ sessionID })
+    let session = currentSession
     while (session.parentID) session = await context.session.get({ sessionID: session.parentID })
     const transcript = join(directory, createHash("sha256").update(sessionID).digest("hex") + ".jsonl")
     const history = await context.session.context({ sessionID })
@@ -178,7 +189,12 @@ export async function registerPackageHooks(
         session.agent === READONLY_AGENT ? "plan" : session.agent === ASK_AGENT ? "default" : "bypassPermissions",
       hook_event_name: event,
       stop_hook_active: continued.has(sessionID),
-      last_assistant_message: history.filter(message => message.type === "assistant").at(-1)?.content.flatMap(part => part.type === "text" ? [part.text] : []).join("\n") ?? "",
+      last_assistant_message:
+        history
+          .filter((message) => message.type === "assistant")
+          .at(-1)
+          ?.content.flatMap((part) => (part.type === "text" ? [part.text] : []))
+          .join("\n") ?? "",
       ...fields,
     }
     const epoch = promptEpoch.get(sessionID)
@@ -197,8 +213,21 @@ export async function registerPackageHooks(
           }
           try {
             if (!active(handler.installed)) return
-            const source = call && await input.policy.packageToolCall(call.tool, call.input, Object.fromEntries(handler.installed.description.entries.flatMap(entry => entry.kind === "mcp" ? [["mcp::" + entry.sourceName, handler.installed.hostNames[entry.id]!]] : [])), "claude")
-            const eventFields = source ? { ...fields, tool_name: source.name, tool_input: source.input, tool_use_id: call!.id } : fields
+            const source =
+              call &&
+              (await input.policy.packageToolCall(
+                call.tool,
+                call.input,
+                Object.fromEntries(
+                  handler.installed.description.entries.flatMap((entry) =>
+                    entry.kind === "mcp" ? [["mcp::" + entry.sourceName, handler.installed.hostNames[entry.id]!]] : [],
+                  ),
+                ),
+                "claude",
+              ))
+            const eventFields = source
+              ? { ...fields, tool_name: source.name, tool_input: source.input, tool_use_id: call!.id }
+              : fields
             if (handler.hook.if) {
               const rules = pluginToolRules(handler.hook.if, () => {
                 throw Error("hook condition has invalid tool rule syntax")
@@ -214,21 +243,108 @@ export async function registerPackageHooks(
               )
                 return
             }
-            if (handler.hook.matcher && !new RegExp(handler.hook.matcher).test(String(eventFields.tool_name ?? eventFields.command_name ?? eventFields.agent_type ?? eventFields.source ?? ""))) return
+            if (
+              handler.hook.matcher &&
+              !new RegExp(handler.hook.matcher).test(
+                String(
+                  eventFields.tool_name ??
+                    eventFields.command_name ??
+                    eventFields.agent_type ??
+                    eventFields.source ??
+                    "",
+                ),
+              )
+            )
+              return
             if (!handler.installed.settings) throw Error("dependency-missing: package settings")
-            const result = await processes.command({
-              source: {
-                description: handler.installed.description,
-                settings: handler.installed.settings,
-                pluginRoot: handler.installed.pluginRoot,
-                projectDir: context.location.directory,
-                resolveEnvironment: (name) => process.env[name],
-                resolveOptionSecret: (ref) => codepuppyCredential(ref.slice(6, -1)),
-                resolveSecret: (id) => {
-                  const ref = handler.installed.settings?.secretRefs[id]
-                  return ref ? codepuppyCredential(ref.slice(6, -1)) : undefined
-                },
+            const processSource: Parameters<typeof pluginProcessConfig>[0] = {
+              description: handler.installed.description,
+              settings: handler.installed.settings,
+              pluginRoot: handler.installed.pluginRoot,
+              projectDir: context.location.directory,
+              resolveEnvironment: (name) => process.env[name],
+              resolveOptionSecret: (ref) => codepuppyCredential(ref.slice(6, -1)),
+              resolveSecret: (id) => {
+                const ref = handler.installed.settings?.secretRefs[id]
+                return ref ? codepuppyCredential(ref.slice(6, -1)) : undefined
               },
+            }
+            if (handler.hook.type === "prompt") {
+              const config = pluginProcessConfig(processSource)
+              redact = (text) =>
+                [...config.secretValues]
+                  .toSorted((left, right) => right.length - left.length)
+                  .reduce((text, secret) => text.replaceAll(secret, "[redacted]"), text)
+              const eventJSON = JSON.stringify({ ...payload, ...eventFields })
+              const hasArguments = handler.hook.prompt.some(
+                (part) => typeof part === "string" && part.includes("$ARGUMENTS"),
+              )
+              const prompt =
+                handler.hook.prompt
+                  .map((part) =>
+                    typeof part === "string" ? part.replaceAll("$ARGUMENTS", () => eventJSON) : config.render([part]),
+                  )
+                  .join("") + (hasArguments ? "" : "\n\n" + eventJSON)
+              const hint = await resolvePackageModel(context, handler.hook.model, input.log)
+              const separator = hint?.indexOf("/") ?? -1
+              const selected =
+                currentSession.model ??
+                (hint && separator >= 0
+                  ? { providerID: hint.slice(0, separator), id: hint.slice(separator + 1) }
+                  : (await context.model.default()).data)
+              let timeout: ReturnType<typeof setTimeout> | undefined
+              let abort: (() => void) | undefined
+              const response = await Promise.race([
+                context.experimental.generate.text({
+                  prompt:
+                    prompt +
+                    '\n\nReturn only JSON: {"ok":boolean,"reason"?:string,"impossible"?:boolean}. Use ok=true for approve; ok=false requires a reason. This judgment cannot execute tools.',
+                  ...(selected ? { model: selected } : {}),
+                }),
+                new Promise<never>((_, reject) => {
+                  abort = () =>
+                    reject(
+                      Error(
+                        controller.signal.reason instanceof Error ? controller.signal.reason.message : "hook cancelled",
+                      ),
+                    )
+                  controller.signal.addEventListener("abort", abort, { once: true })
+                  timeout = setTimeout(() => reject(Error("prompt hook timed out")), handler.hook.timeoutSeconds * 1000)
+                }),
+              ]).finally(() => {
+                if (timeout) clearTimeout(timeout)
+                if (abort) controller.signal.removeEventListener("abort", abort)
+              })
+              const judgment: unknown = JSON.parse(response.text)
+              if (
+                !record(judgment) ||
+                typeof judgment.ok !== "boolean" ||
+                (judgment.reason !== undefined && typeof judgment.reason !== "string") ||
+                (judgment.impossible !== undefined && typeof judgment.impossible !== "boolean") ||
+                (!judgment.ok && (typeof judgment.reason !== "string" || !judgment.reason.trim()))
+              )
+                throw Error("prompt hook returned an invalid judgment")
+              if (!active(handler.installed) || controller.signal.aborted || sessionEpoch.get(sessionID) !== lifetime)
+                return
+              const stopping = ["Stop", "SubagentStop"].includes(event)
+              return {
+                installed: handler.installed,
+                block: !judgment.ok && (!stopping || judgment.impossible !== true),
+                stopTurn: !judgment.ok && !stopping && !handler.hook.continueOnBlock,
+                exitCode: 0,
+                order,
+                text: config.secretValues.size
+                  ? [...config.secretValues].reduce(
+                      (text, secret) => text.replaceAll(secret, "[redacted]"),
+                      String(judgment.reason ?? ""),
+                    )
+                  : String(judgment.reason ?? ""),
+                sessionID,
+                lifetime,
+              }
+            }
+            const result = await processes.command({
+              source: processSource,
               command: handler.hook.command,
               ...(handler.hook.args === undefined ? {} : { args: handler.hook.args }),
               environment: {},
@@ -250,17 +366,31 @@ export async function registerPackageHooks(
                 lifetime,
               }
             if (result.exitCode !== 0) throw Error("hook exited " + result.exitCode)
-            const output: unknown = result.stdout.trim() ? /^[\s]*[\[{]/.test(result.stdout) ? JSON.parse(result.stdout) : { systemMessage: result.stdout } : {}
+            const output: unknown = result.stdout.trim()
+              ? /^[\s]*[\[{]/.test(result.stdout)
+                ? JSON.parse(result.stdout)
+                : { systemMessage: result.stdout }
+              : {}
             if (!record(output)) throw Error("hook output must be an object")
             const specific = record(output.hookSpecificOutput) ? output.hookSpecificOutput : undefined
             return {
               installed: handler.installed,
-              block: output.continue === false || ["Stop", "SubagentStop", "PreToolUse"].includes(event) && output.decision === "block" || event === "PreToolUse" && specific?.permissionDecision === "deny",
+              block:
+                output.continue === false ||
+                (["Stop", "SubagentStop", "PreToolUse"].includes(event) && output.decision === "block") ||
+                (event === "PreToolUse" && specific?.permissionDecision === "deny"),
               output,
               exitCode: 0,
               order,
               text: redact(
-                [specific?.additionalContext, output.systemMessage, output.stopReason, ["Stop", "SubagentStop", "PreToolUse"].includes(event) ? specific?.permissionDecisionReason ?? output.reason : undefined]
+                [
+                  specific?.additionalContext,
+                  output.systemMessage,
+                  output.stopReason,
+                  ["Stop", "SubagentStop", "PreToolUse"].includes(event)
+                    ? (specific?.permissionDecisionReason ?? output.reason)
+                    : undefined,
+                ]
                   .filter((value) => typeof value === "string")
                   .join("\n"),
               ),
@@ -288,7 +418,7 @@ export async function registerPackageHooks(
             running.delete(controller)
           }
         }
-        if (!handler.hook.async && !handler.hook.asyncRewake) return execute()
+        if (handler.hook.type !== "command" || (!handler.hook.async && !handler.hook.asyncRewake)) return execute()
         void execute()
           .then(async (result) => {
             if (
@@ -300,7 +430,7 @@ export async function registerPackageHooks(
             if (sessionEpoch.get(sessionID) !== lifetime) return
             const contexts = event === "SessionStart" ? sessionContexts : promptContexts
             if (result.text) contexts.set(sessionID, [...(contexts.get(sessionID) ?? []), result])
-            if (handler.hook.asyncRewake && result.exitCode === 2)
+            if (handler.hook.type === "command" && handler.hook.asyncRewake && result.exitCode === 2)
               await context.session.synthetic({ sessionID, text: result.text, resume: true })
           })
           .catch((error) => input.log("runtime-failed: asynchronous package hook: " + String(error)))
@@ -308,34 +438,52 @@ export async function registerPackageHooks(
       }),
     )
     if (sessionEpoch.get(sessionID) !== lifetime) return []
-    const contributions = results.filter((result): result is NonNullable<typeof result> => !!result && active(result.installed))
+    const contributions = results.filter(
+      (result): result is NonNullable<typeof result> => !!result && active(result.installed),
+    )
     const blocked = contributions.find((result) => result.block)
+    if (blocked?.stopTurn) stopTurns.set(sessionID, blocked)
     if (blocked && !["Stop", "SubagentStop"].includes(event))
       throw Error("runtime-failed: package hook blocked " + event + (blocked.text ? ": " + blocked.text : ""))
     return contributions
       .filter((result) => result.text || event === "PreToolUse" || event === "PermissionRequest")
-      .map((result) => ({ installed: result.installed, text: result.text, order: result.order, sessionID, lifetime, block: result.block, output: "output" in result ? result.output : undefined }))
+      .map((result) => ({
+        installed: result.installed,
+        text: result.text,
+        order: result.order,
+        sessionID,
+        lifetime,
+        block: result.block,
+        output: "output" in result ? result.output : undefined,
+      }))
   }
-  await context.tool.hook("execute.before", async event => {
+  await context.tool.hook("execute.before", async (event) => {
     const results = await run("PreToolUse", event.sessionID, {}, event)
     for (const result of results) {
-      const specific = result.output && record(result.output.hookSpecificOutput) ? result.output.hookSpecificOutput : undefined
+      const specific =
+        result.output && record(result.output.hookSpecificOutput) ? result.output.hookSpecificOutput : undefined
       if (!record(specific?.updatedInput)) continue
       const source = await input.policy.packageToolCall(event.tool, specific.updatedInput, {}, "runtime")
       event.input = source.input
     }
-    const decisions = results.flatMap(result => {
-      const specific = result.output && record(result.output.hookSpecificOutput) ? result.output.hookSpecificOutput : undefined
+    const decisions = results.flatMap((result) => {
+      const specific =
+        result.output && record(result.output.hookSpecificOutput) ? result.output.hookSpecificOutput : undefined
       const decision = specific?.permissionDecision ?? result.output?.decision
       return decision === "allow" || decision === "ask" ? [{ result, decision }] : []
     })
-    const decision = decisions.some(item => item.decision === "ask") ? "ask" : decisions.length ? "allow" : undefined
-    if (decision) await input.policy.bindPackageHook(event, decision, () => decisions.every(item => active(item.result.installed)))
-    const contexts = results.filter(result => result.text)
-    if (contexts.length) promptContexts.set(event.sessionID, [...(promptContexts.get(event.sessionID) ?? []), ...contexts])
+    const decision = decisions.some((item) => item.decision === "ask") ? "ask" : decisions.length ? "allow" : undefined
+    if (decision)
+      await input.policy.bindPackageHook(event, decision, () =>
+        decisions.every((item) => active(item.result.installed)),
+      )
+    const contexts = results.filter((result) => result.text)
+    if (contexts.length)
+      promptContexts.set(event.sessionID, [...(promptContexts.get(event.sessionID) ?? []), ...contexts])
   })
   await context.session.hook("prompt", async (event) => {
     continued.delete(event.sessionID)
+    stopTurns.delete(event.sessionID)
     promptEpoch.set(event.sessionID, (promptEpoch.get(event.sessionID) ?? 0) + 1)
     promptContexts.delete(event.sessionID)
     if (!starts.has(event.sessionID))
@@ -353,6 +501,10 @@ export async function registerPackageHooks(
   })
   await context.session.hook("context", (event) => {
     revoke()
+    const stopped = stopTurns.get(event.sessionID)
+    stopTurns.delete(event.sessionID)
+    if (stopped && active(stopped.installed) && stopped.lifetime === sessionEpoch.get(event.sessionID))
+      throw Error("runtime-failed: package hook blocked this turn: " + stopped.text)
     for (const contribution of [
       sessionContexts.get(event.sessionID) ?? [],
       promptContexts.get(event.sessionID) ?? [],
@@ -366,13 +518,20 @@ export async function registerPackageHooks(
           }),
         })
   })
-  await context.session.hook("experimental.idle", async event => {
+  await context.session.hook("experimental.idle", async (event) => {
     const session = await context.session.get({ sessionID: event.sessionID })
-    const results = await run(session.parentID ? "SubagentStop" : "Stop", event.sessionID, { background_tasks: event.background, session_crons: [] })
-    const blocking = results.filter(result => result.block)
+    const results = await run(session.parentID ? "SubagentStop" : "Stop", event.sessionID, {
+      background_tasks: event.background,
+      session_crons: [],
+    })
+    const blocking = results.filter((result) => result.block)
     if (!blocking.length) return
     continued.add(event.sessionID)
-    await context.session.synthetic({ sessionID: event.sessionID, text: blocking.map(result => result.text).join("\n"), resume: true })
+    await context.session.synthetic({
+      sessionID: event.sessionID,
+      text: blocking.map((result) => result.text).join("\n"),
+      resume: true,
+    })
   })
   return async () => {
     disposed = true

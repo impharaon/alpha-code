@@ -359,7 +359,7 @@ bun typecheck
 ## 切片五：Excel 操作、保真重算与透视刷新
 
 - 依据：spec v1 @ `31cd182e09`，AC-03、07、11；冻结设计 @ `46f8580c95` §4.6/4.7、§6 R9/R10/R11、§10 R1-4/R1-10；继承已验收片 2/3/4，不重开决定。r7 授权本片计划后同轮实施，但计划若揭示未决设计问题则停止。
-- 核对：r7 同轮计划自核为 Codex / GPT-6；下面的 Python 运行环境交接尚缺冻结定义，未进入实施，不冒称调度方已接受新增接缝。补齐后首个实施提交填写实际 Phase 核对版本。
+- 核对：r8 IMPLEMENT — 按 brief 继续 `d3c2190fc8` 计划；Python 交接缺口由冻结设计增量 `7ef8b89b30` §4.10/R13 关闭，维持一参 API。调度方授权继续本片、随后计划/实施片 6；本轮已核 Codex / GPT-6，不另称独立审查。
 
 ### 改动
 
@@ -405,3 +405,7 @@ bun typecheck
 所需最小补齐由设计拥有者定义：在保留一参 OfficeExcel API 与不新增引擎 API 的前提下，明确默认脚本及 stdio 连接器共用的、绑定已授权 Location/本代的运行环境读取契约（状态、LO 入口、应用生成 profile/字体/工作目录和失效/缺投影行为），并给出生产者/消费者归属；若选择另一签名则显式修订原权威。实施者不自行选环境变量、工作区 JSON、用户数据路径约定或另开 RPC，不给测试专用 configure 成功替身。r7 明确允许计划暴露未决问题即停；本轮只提交本节，等待该具体契约后恢复同轮实施工作。没有运行行为测试/移除臂或提交实现，AC-03/07/11 不计通过；没有把共享执行槽等待取消，本轮尚未派发 LO 命令。
 
 本轮文档证据：`python3 scripts/check-doc-links.py docs/specs/document-output-quality/plan.md` 12 links PASS；`git diff --check` exit 0。`affected-tests --list` exit 2，缺 `.gate-tests`、没有 scope line，与已记录基线相同（`/tmp/alpha-1761-r7-affected.scope`），未更改 gate 或运行全量。文档契约本文件 findings 为 0；输出 `/tmp/alpha-1761-r7-docs-contract.json`。已核 Codex / GPT-6：计划文件/顺序/证据已列，唯一需先回设计的事项为上述 Python 环境交接；其它冻结决定沿用。
+
+2026-11-26 r8 · 09:25:29 UTC 开始。本片原接缝由 `7ef8b89b30` 的 §4.10/R13 解除，读取远端设计，未 merge/rebase。实际 2.3.2 wheel SHA-256 `d0201d55d64d52a4cb1f0be25565631ab803e55dfc2eff286b1bc40a4a0e256c` 提取 160 个 Python 文件及一个实际 JSON 数据文件；MIT、源/产出摘要与改编说明均进入同一资源目录。没有装完整 MCP 发行包或新增 pip 依赖。应用模块经同一个 Office builder 安装到真实 site-packages，`-I` import 与 inspect/edit/schema/排序字面替换、并发源保护/游标版本、缺投影失败的 5 个模块集成用例通过。源码选择器首次遗漏运行期 JSON，已按实际依赖补齐；一次写文件命令工作目录错误，未写入，修正后继续。
+
+必要同链问题已定位：实际 openpyxl+lxml 生成的 workbook 在 sheet 局部声明关系前缀；2.3.2 的 `package.scan.rel_id` 只看根声明，首次添加 slicer 进入 package.apply 时 KeyError。该真实输入的 regression 将先单独提交 red，再补最小局部 namespace 消费修正，不改保存权威、不降为裸 openpyxl.save。当前提交仅为共用模块/来源和已绿子集，R13 投影、LO 实物、对象完整保真仍在本片后续，不宣称整条 AC 通过。

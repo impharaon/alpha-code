@@ -1,0 +1,817 @@
+{
+  "version": "2.3.2",
+  "wheelSha256": "d0201d55d64d52a4cb1f0be25565631ab803e55dfc2eff286b1bc40a4a0e256c",
+  "upstream": "https://github.com/haris-musa/excel-mcp-server",
+  "adaptations": [
+    "Selected operation/schema and static dependency closure; no MCP/HTTP/CSV/VBA entrypoints",
+    "Removed non-format file/cell/text/pivot-field quotas rather than increasing caps",
+    "Current-edit formula results and save hook supplied by OfficeExcel; source-hash guard before atomic save"
+  ],
+  "files": [
+    {
+      "path": "excel_mcp/__init__.py",
+      "sourceSha256": "4759e98bd9c9a01bea044c0b126dc6dbd3fb93583befa64bc2573b3bb6fb75c6",
+      "sha256": "cef578cd9d75c9201eb1d7de75ef9d7b46aafad1b6259d2c60ebc1f71731f03d"
+    },
+    {
+      "path": "excel_mcp/calc/bessel.py",
+      "sourceSha256": "7f632960bbf1b2e9b29bed42ed92c4116b466e2490ce6d87be339ee07ac15a8c",
+      "sha256": "9321f87ec60d2672cf962f42c8129ff722ac421792ed8dbef8a94966ec74943d"
+    },
+    {
+      "path": "excel_mcp/calc/cells.py",
+      "sourceSha256": "b899633fbb3348cf84888ead5040cbe0575e4863cec7a642d2093c6596a62b99",
+      "sha256": "44cf7495240221a64dde22fc1c20ce41211953d39dc9f92b26934664f4183177"
+    },
+    {
+      "path": "excel_mcp/calc/criteria.py",
+      "sourceSha256": "200767dd20f8f3d9f77f6e3fc03986000b2d2c72caf260230408b03fc4af19c0",
+      "sha256": "54423061f3caec04a636a79e3804c344c1aabb869d20844e2ef6e2b624efcf7b"
+    },
+    {
+      "path": "excel_mcp/calc/dateparts.py",
+      "sourceSha256": "2630f2b8c4a15aeb151682031b0fefd36f06a6b8afecdde61d3eb694a0cabe9a",
+      "sha256": "2d668191493231079bd9204a6f9b92cb6a548e80e3e5dbcaa45a81ce08ed3428"
+    },
+    {
+      "path": "excel_mcp/calc/dynamic.py",
+      "sourceSha256": "71331e9c8517718ea4c753517516226044b34ca7aed60c7d65e04a26038fbee7",
+      "sha256": "83ab77edbeb88f8fce16d4920015d6417cae9bbadbd010592c7f89050a637e58"
+    },
+    {
+      "path": "excel_mcp/calc/engine.py",
+      "sourceSha256": "fb44b5a9c368c9f580e106c2e940d4c243615270a71f9df401f214bf3196ad9f",
+      "sha256": "ad6a3b807e2000032af38c99441156b0015dcd93138cf39ddf614882f6650554"
+    },
+    {
+      "path": "excel_mcp/calc/functions/__init__.py",
+      "sourceSha256": "2a32f52bdf41c5637784dce4f54960cbe324bed7048fb77834ada56552343fea",
+      "sha256": "c5ec0ece1c1d0d8c9ed5d9d1dcfcf57db069004c6ef75a968370ea3cf4063759"
+    },
+    {
+      "path": "excel_mcp/calc/functions/accrual.py",
+      "sourceSha256": "c7b0001c8501fb315e8b52743d6182a447b9fb2df2b262c5aff0ad5b00c3aa81",
+      "sha256": "e9f860f205113fb107c5cb7604de83b4d1d2d643bd0bb284a7b3f6d2422a15bb"
+    },
+    {
+      "path": "excel_mcp/calc/functions/arrays.py",
+      "sourceSha256": "b00cf6b0070bd779e29dedf80ea39d303c4d71c4f8f42bed865708f763632eae",
+      "sha256": "c11858871217a90a1abcc6c87dedec9985a07b912b3d2d180af7230388251963"
+    },
+    {
+      "path": "excel_mcp/calc/functions/bessels.py",
+      "sourceSha256": "00b506d884508fef10803c815ae7fc307288bf137e02bf1f6d86a122e19b7480",
+      "sha256": "ed0296be494b0599784e0862dad0556ee97570ff8ae1c26d924c2232d2058286"
+    },
+    {
+      "path": "excel_mcp/calc/functions/complexnum.py",
+      "sourceSha256": "269a9d815bc943a0e5eb9292561c1562e842238910f6d05e7bcf35e1e7b3c6c3",
+      "sha256": "a95d86c2ee898615f3d7a9cb95b53a8f776209123d06e16d9c777b31f9f469a3"
+    },
+    {
+      "path": "excel_mcp/calc/functions/conditional.py",
+      "sourceSha256": "603ca412f32edaedd422f690b8c84615f7b055ebe5d1ecba59213c924178ac6f",
+      "sha256": "433d2c49162631454063ac00d2c124d730ab5937152fe2f7f13c25d360169647"
+    },
+    {
+      "path": "excel_mcp/calc/functions/continuous.py",
+      "sourceSha256": "34ec21772d5e5208ee14cd75f66ebba9cc499010fe50f4c428689483b47e023c",
+      "sha256": "c3e540aba3e39dba2914248be48df3bda9ae5dc7d4f1ad650399b192913002a4"
+    },
+    {
+      "path": "excel_mcp/calc/functions/convert.py",
+      "sourceSha256": "59c56611d902c5b9ba49e3634c52d049e0ba215fa7af858c9c99e0480c3427b2",
+      "sha256": "580e7ac33bd6f9892b7c15074b888189dd1958161130254ecb97fc793644140e"
+    },
+    {
+      "path": "excel_mcp/calc/functions/database.py",
+      "sourceSha256": "19b01e074559232eaf2c967620a2f3fc32ea6d3b3464314ee262015daf20d4ef",
+      "sha256": "2429cc6e7d7c244c761c98792c8d8d5a577bb83574eb3b09249e06d88281c2d2"
+    },
+    {
+      "path": "excel_mcp/calc/functions/datetime.py",
+      "sourceSha256": "2712b92db808c80e95f33f1a9c5108f7f94d4ae6b5e8dbc16b755569c755f448",
+      "sha256": "63e5606e2130e0f3c1caaa5799fd47af86347a47222717e3b491089360c6f95d"
+    },
+    {
+      "path": "excel_mcp/calc/functions/depreciation.py",
+      "sourceSha256": "f6dcbecea12ab93693e3d991c51dd7de127c3917325190ef84bec75d294c3e61",
+      "sha256": "7e4172a055cf5e13caf1b53edfd92fdf27c907410e128ea0387389d51ff98c8a"
+    },
+    {
+      "path": "excel_mcp/calc/functions/discrete.py",
+      "sourceSha256": "9870395b719be32b470e0713e82ab142f3cae82bdbb4cd05fa84e22d426986ed",
+      "sha256": "fae41bd0eb054a1e6e0bdf133c2dc3b1842db702c22ac3242f66e58719e0f56b"
+    },
+    {
+      "path": "excel_mcp/calc/functions/distributions.py",
+      "sourceSha256": "09006421a2478c08c71ac02ee44e73ed25ffda8ab9bc985095f1d941675e7c66",
+      "sha256": "c571d22faac5e3c5b6dfb594ede50c3af48d59151105c6fed7fbb74ec42f93fa"
+    },
+    {
+      "path": "excel_mcp/calc/functions/financial.py",
+      "sourceSha256": "e46573a27ab0f9bb39ec5cb8f21ecb308c9faa1a98f6efb4f5ff72df0301c313",
+      "sha256": "0a0d6ee93dff5ead34263f41e72a630883be9b169292d33b4dfec79f15b369a0"
+    },
+    {
+      "path": "excel_mcp/calc/functions/helpers.py",
+      "sourceSha256": "81a1085198ade69bf9bff77447bf86ea0c276568f58e3621061835b284d20c1e",
+      "sha256": "2e0eff91f8ec7b15476cf8277f6817c9549b508748b19ad9271a8b31b3710252"
+    },
+    {
+      "path": "excel_mcp/calc/functions/indirect.py",
+      "sourceSha256": "f7d3e76002744bc92dc6edf8d33b265f06a1402683e1437e65d89145bac836e1",
+      "sha256": "e160c9914600635e6510f214f969d20982c92958efcbbd557adf0c351d065854"
+    },
+    {
+      "path": "excel_mcp/calc/functions/information.py",
+      "sourceSha256": "375c2743f5955c0d57f8d704b32e93c5abf41972a93adaf696f006c32d25ed1d",
+      "sha256": "d32dd3c251116be73a14aab83f83d1fa3380b0a952620ea724004728d4e5857b"
+    },
+    {
+      "path": "excel_mcp/calc/functions/lambdas.py",
+      "sourceSha256": "bc863d7e521abf326fe9cbee0e063013b3a40bf4ebebf3f567587f2ddff59aa0",
+      "sha256": "b4fd1c6c9da1375dada2f364aed72ec96c29db64ce9f076a44dc659fc3c2f063"
+    },
+    {
+      "path": "excel_mcp/calc/functions/legacy.py",
+      "sourceSha256": "27c0c5e0c3704635f3e1531240d2ab69abf88a9165308d4b01ab04aa62e598b5",
+      "sha256": "a788de46e10889842699699ded9f9c6b1d1e325dab4f790ea98aa5936d63c941"
+    },
+    {
+      "path": "excel_mcp/calc/functions/linest.py",
+      "sourceSha256": "1471bd3276c4ac6cb3cd6c21029a983bd847bda15b2ae67103fa8bfe74072189",
+      "sha256": "f9f99c3c8ca2c1e261f35f621e69a8039b35fd1ced43a8ce954a1648e183fc24"
+    },
+    {
+      "path": "excel_mcp/calc/functions/logical.py",
+      "sourceSha256": "5fdd5b7979b86968f94e1ea55cf1a0b153b9adcc8b7288d339a67f18f4ee5721",
+      "sha256": "c9c7e2e710655bdadb1a3154ae5822cd58cfd72434f6ce3a50b28ecc2ca45cb0"
+    },
+    {
+      "path": "excel_mcp/calc/functions/lookup.py",
+      "sourceSha256": "734b3dfb7d3e8597a196e4dbfe8e399e61573e1b546ca293ab61825c8436c57e",
+      "sha256": "f3758d685412aabaac2f4fcadb71e1599a52eb131d7fdd0312a14e4c7ca42df7"
+    },
+    {
+      "path": "excel_mcp/calc/functions/math.py",
+      "sourceSha256": "4640256f7d6d9bc9021437953f1a84416d5fae555f60a5d00ffb69299126d3aa",
+      "sha256": "4c65401ec973efecaa807709e41fae69b33102c583c7d323917c1faf6fa19ddb"
+    },
+    {
+      "path": "excel_mcp/calc/functions/mathextra.py",
+      "sourceSha256": "ed2b34de58f3e788baab9bfe69d4b287209716abab2bd722534110e554971ded",
+      "sha256": "c64d4109411e867b98d148bd54a0f8518d26d43c341b261e6d93b14b94c7655c"
+    },
+    {
+      "path": "excel_mcp/calc/functions/matrices.py",
+      "sourceSha256": "40e40bd6fe5c47c3d621f2ed3422a06d580eaa83a3234a447b5af2b4bc0604e9",
+      "sha256": "d5d6ccea163f7c602ae931c43c8ba7eb895c1d8fa4094b1b7d940024f5e2f7e4"
+    },
+    {
+      "path": "excel_mcp/calc/functions/numbersystems.py",
+      "sourceSha256": "6bbeb569298e762fdf06e451f7024954722591d0c247227d33da2461c37f720a",
+      "sha256": "81505665963ee77a0860a6463ba258bf2ac42ea6e595f7675f943d845ff7f097"
+    },
+    {
+      "path": "excel_mcp/calc/functions/oddcoupon.py",
+      "sourceSha256": "40a95a8e93fbab801bbd5d6d3a8505d7ff7ab86d62a3c4bdd2753711228ddd1a",
+      "sha256": "6198985196ebb119416cb6d180d81f690db5f62935fea34657965b32cf430543"
+    },
+    {
+      "path": "excel_mcp/calc/functions/references.py",
+      "sourceSha256": "35dca649f0322e83858fa6ed1cdfb960725fcd78a9921c95e4f34542aeb62592",
+      "sha256": "f48c95de2c4d8bb2534b214a0bb033646efc766d35be6d031d20788dec5beb9f"
+    },
+    {
+      "path": "excel_mcp/calc/functions/regression.py",
+      "sourceSha256": "2dc029178e7a4e51cfe9814cd4d7747c28d0faac638033fac6868345e0e2bd6d",
+      "sha256": "ee2b3bb10daa4e0c599fc5a2bd56828636bfb4415fb010acff44eace8f46e101"
+    },
+    {
+      "path": "excel_mcp/calc/functions/reshape.py",
+      "sourceSha256": "18fa434646694e4ad77348833463ee1505fd5c8eebb3b8fd8cafabeebff8cd2c",
+      "sha256": "c6529266716c53390d9b1cb82b31b8a4aca6a7179fa4dd7228ffa1e5f97fde15"
+    },
+    {
+      "path": "excel_mcp/calc/functions/search.py",
+      "sourceSha256": "36217e9c2702ec5e0fa5be689da6faebd71a7084348985a5ab470bfe9b0df4e5",
+      "sha256": "4d74150e71d49cc58d0814a66c25f0313391e653552bc9cba61dd58924e4ff08"
+    },
+    {
+      "path": "excel_mcp/calc/functions/securities.py",
+      "sourceSha256": "ee4021e6cf4e8748ad4b260c39cbcee58d09d1e9e92df64493375b7f0272723b",
+      "sha256": "847f89f0ec108fd3276c67360453c3a93b62ea287f41267d258ff80e6a98bb52"
+    },
+    {
+      "path": "excel_mcp/calc/functions/statextra.py",
+      "sourceSha256": "b7a8d81e185c4e5423c8aed5d3ae504edc70bb8ced3d3f33ed0a6a51b07fdbda",
+      "sha256": "aa06f53c1894403d93c19272fa5ec7baeded7aec97ef3fe019eeb7342539eb5c"
+    },
+    {
+      "path": "excel_mcp/calc/functions/statistical.py",
+      "sourceSha256": "b195b7df9bf51472025075451d7a972b33b7252962958325b8288a992c17e39b",
+      "sha256": "55cbd08095eefedc83a7c6c9a7cae5a4b8d0f2cafb5d5810490bee99c5954a09"
+    },
+    {
+      "path": "excel_mcp/calc/functions/subtotals.py",
+      "sourceSha256": "de7ffb5678e071579084c00947f2515a7d6770d6e49bb773e719e7e1de7513b6",
+      "sha256": "fa2857fdc4d05364c4a08835911b906c672171119f9d12ab0ab53f72180054cb"
+    },
+    {
+      "path": "excel_mcp/calc/functions/testdist.py",
+      "sourceSha256": "bd769e83edbe07e8fd9b380f450b24bcf54a9462a4c646dab6757e634fbbfccd",
+      "sha256": "6154550b7ea4cf07ccc8a530a7a8e81359ec1db9ce4c8f037cf537a619e15e15"
+    },
+    {
+      "path": "excel_mcp/calc/functions/text.py",
+      "sourceSha256": "8bb838379b150a1a8ee1b82274a094fc75772028b80052238a839bdb45ba8fa9",
+      "sha256": "d4b7fe48b7c6f1fec1db7f8efc3dc6a04ff38e7e9f19c9cc34bd161adf06e2f7"
+    },
+    {
+      "path": "excel_mcp/calc/functions/textsplit.py",
+      "sourceSha256": "0e65ce2592b7cf2692581a615b8135ab9b7c8859d251eaa31f032665bcca292f",
+      "sha256": "68bdcff56b1200627ec84fa01139b569d9d4f20b719b544f65b9d8d0f1ebaaa3"
+    },
+    {
+      "path": "excel_mcp/calc/leastsquares.py",
+      "sourceSha256": "efb80adb8e6608abdfc70709a09715a4779052a51e82833ce18eacf048fce55d",
+      "sha256": "0309a89fc1db749c9498210f7ee9b6199e00b448a773586b3391d7722672a285"
+    },
+    {
+      "path": "excel_mcp/calc/numberformat.py",
+      "sourceSha256": "06f3d448fb5cb08e0c6657b49220ab8f2f658f2b64d96b98322d2ce82759d851",
+      "sha256": "391a7d46c0acf8ef5730cd37d22f66c3026c75bfa98e9145d31b253d88127cd8"
+    },
+    {
+      "path": "excel_mcp/calc/operators.py",
+      "sourceSha256": "249cfd47d7cc5df9f48ff097d590a9ac96c86693be1231be299f3c0623e82a0d",
+      "sha256": "07a1ce9d8d344cac0bfa6e1a89bae23c8cc80e14ef953794a18f8f0933673848"
+    },
+    {
+      "path": "excel_mcp/calc/parser.py",
+      "sourceSha256": "43c70c440fb64622e49709822dacaad51f8175d451e6c64ed30c6422a8f7af63",
+      "sha256": "5d2513f5c605b608bdc3b64b1d28deddf8692da31be972e27a66f00db4bb86a8"
+    },
+    {
+      "path": "excel_mcp/calc/r1c1.py",
+      "sourceSha256": "7792bee401dbfaf289ee77e5334bab7dc124799bc082486012b61af997082753",
+      "sha256": "cc239d63cbc6ef6c7b2ef9f59939dce15e22093a8a73970343feec3a3136484f"
+    },
+    {
+      "path": "excel_mcp/calc/registry.py",
+      "sourceSha256": "b5208b2b0e0f4b104f4c6fa5a9a7d71ac627fbc7614172e97293908f07c7238c",
+      "sha256": "4e703a8698066b4939f2f83166baf700980f30ffb499b5bf3e0e25c24ecacb7c"
+    },
+    {
+      "path": "excel_mcp/calc/scheduler.py",
+      "sourceSha256": "860280701aaed46ede2dcb461d73d0bae7123eaecf23e2ac3b32d89fc5d370bb",
+      "sha256": "cdd64353e83d12e1cf2e799125703b1a607761c600f75b73c34608f4638a17ea"
+    },
+    {
+      "path": "excel_mcp/calc/specfun.py",
+      "sourceSha256": "0af0f4b95e6a2bc586949fd63de756523fa82ca42e26095ff9a0bddda6709613",
+      "sha256": "1fd3890fe77d0048515aa44c2c0724d31961b25ea3b41a9901f2068b8d575fa9"
+    },
+    {
+      "path": "excel_mcp/calc/tablerefs.py",
+      "sourceSha256": "0a3a380f71e86919a4c2dc88e5d6c77d02324eff1466962d8752f17a6e155cb6",
+      "sha256": "0b3c171bcfd3ba8e0bdc7c9cba0c81e48f3ce56334dfcbbd8993fea0fabf051f"
+    },
+    {
+      "path": "excel_mcp/calc/textformat.py",
+      "sourceSha256": "ef6d4947530b8b9bfa8306a775823f645502c3629cd403ae3a2e09baa65d0a01",
+      "sha256": "adb212bcc6f6e7ab3732861131dbc8da79d9533b60cca492fe1ab2207b6ea7fe"
+    },
+    {
+      "path": "excel_mcp/calc/values.py",
+      "sourceSha256": "e79f0fcfc6bbfc29c5272ddfb4aff64cd6e96d46456efb0086cc37c1c53d84de",
+      "sha256": "3d8695519ae5e9bedb6af79322d1be3de631a43fd3b3218af01707a28f2223a5"
+    },
+    {
+      "path": "excel_mcp/calc/wildcard.py",
+      "sourceSha256": "017f4985a16283837ea0dd53f5544e5b773de4b520e6d899b8b6979dd73976cb",
+      "sha256": "0ff880ea6078197a564ca8adc0d6553a69baf9c995f591012cef7cd1db71b244"
+    },
+    {
+      "path": "excel_mcp/cell_budget.py",
+      "sourceSha256": "6697eca5ea6a221ebcee48527244a756575a620c193a8a539903697628f06207",
+      "sha256": "38cd0b6547291c9b619d44246243e742b7c96c43b252ae785c2602deab77af75"
+    },
+    {
+      "path": "excel_mcp/chart_roundtrip.py",
+      "sourceSha256": "04f0f60f3c21ccf0ecea73f4ef8bd1954246197b97cf4bd799fb370632b5826a",
+      "sha256": "ec2d9401036d4d5cd6bab10ed5ade353f675bb039c36668a2c7a8a5d4d719dc6"
+    },
+    {
+      "path": "excel_mcp/config.py",
+      "sourceSha256": "5536e42980d594172f1055e3f80be3a11814efb2746c9984ad559501e731b829",
+      "sha256": "d44ac9c294a8729c62b9f266c4a4e171d5f43ea6683ebeb61b5f24b656e5d98b"
+    },
+    {
+      "path": "excel_mcp/digits.py",
+      "sourceSha256": "286da1a7fbe6576e0b02e2f5175c18f489226a596f9cf6f4070e517dfa2acdfb",
+      "sha256": "f70d8bced458714e189060bc323c32b43d8a7a3fab8931323b80e70367d88998"
+    },
+    {
+      "path": "excel_mcp/errors.py",
+      "sourceSha256": "5dccc5a956f55504cd2586b19b8a919beb3bb16998a09ba517d5286a2140a4e9",
+      "sha256": "8a5d4433048e783a1d5b9e64b7c6ce050b5710d9838aaa975b620a1687867b01"
+    },
+    {
+      "path": "excel_mcp/formula_syntax.py",
+      "sourceSha256": "812c09c3eedf6db0193b23ae698c567d61f9b62534c1e4b9326812714035715e",
+      "sha256": "2f7d107ae7f8ba13cefc22611cd176192cb4c31f8e73dbd811a56af8d8d600b6"
+    },
+    {
+      "path": "excel_mcp/formulas.py",
+      "sourceSha256": "aaaf998279daa1e6df8f366d8dfe4ff88b813bc05dc1eb9c4433b1b1060fc034",
+      "sha256": "260580276ac205f127bb67423fe5c83ac76393e47b31dab9aebe0e8d93b70bfe"
+    },
+    {
+      "path": "excel_mcp/function_arguments.json",
+      "sourceSha256": "2524a70683bd1a03072766188c43d06903685ee88100447a070ce7a9fb2065c5",
+      "sha256": "2524a70683bd1a03072766188c43d06903685ee88100447a070ce7a9fb2065c5"
+    },
+    {
+      "path": "excel_mcp/inputs.py",
+      "sourceSha256": "af476af2b82cc52b7761b00f309a5bae2d962154db2f59ba954dbd60c4564d6d",
+      "sha256": "442593dff7366a8415c2514cbc94fe5500dc6b1a4392b9c93b7a7412a66f9279"
+    },
+    {
+      "path": "excel_mcp/lazy_edit.py",
+      "sourceSha256": "b5b7bac8d5e333d5a5bdb9f4ad1f48b1666391d0d7a7d0faa7e8143535209272",
+      "sha256": "10bc50c7067865cc533a2c21d8aa093769d50afd6c14e170fb2a8e9a3903cac2"
+    },
+    {
+      "path": "excel_mcp/lazy_find.py",
+      "sourceSha256": "496e6b321a099e1c7b31853f73ed7ecd665d0ff4b1540f0e649a9721f8d8b4a6",
+      "sha256": "64485a5c8a082a33d4dcdfe001a9c2229a55e24c703b66f8a42272a9e7c22491"
+    },
+    {
+      "path": "excel_mcp/lazy_rows.py",
+      "sourceSha256": "ef4c0a373cf5e41ae7a3e414c654fd09a2d337dc8baa73b7ba08c36b56a1eb69",
+      "sha256": "d766717e4015b0204c22fc5fd2619d7666317edc91f2a75e48fe6f62366004b8"
+    },
+    {
+      "path": "excel_mcp/lazy_shared.py",
+      "sourceSha256": "cd7eb05ee187efe7618e95f1ff54949d3bc98a876e90fa7602936c0da41b1ce4",
+      "sha256": "32f14bb8113feac14ad163de670200b0e5f9c032f381f352a55a5e85ba9953b0"
+    },
+    {
+      "path": "excel_mcp/lazy_source.py",
+      "sourceSha256": "9250cec8f0fe79a54a08dc9c1f8f4d41ba10b7eed7ee47c4b4f713faac4822c8",
+      "sha256": "adb7977e922cf3da330ddbb20fe177c98750f1f53d32d593fc3d84982cfcdde0"
+    },
+    {
+      "path": "excel_mcp/lazy_workbook.py",
+      "sourceSha256": "aacf349a02a5151f59ae589af05e2b48d55d14c0a2e35fb11108ecf2612830f5",
+      "sha256": "ec799991b24a34fb046190480e09b5db5128358c7bc86643fa3195ddea1d1e4e"
+    },
+    {
+      "path": "excel_mcp/links.py",
+      "sourceSha256": "d61d10241f9fdf4ea82152baf9ec5c0335139dc6b9d95f5945971f826d09f504",
+      "sha256": "2062b02428bf72e7e8cdaeb5ebda51feecb2d9abf333f86747d3b290b379ce9b"
+    },
+    {
+      "path": "excel_mcp/operations/__init__.py",
+      "sourceSha256": "b00ae58929471f6136307f381e1014284cd51d1d2d01c3d62a390b750502169c",
+      "sha256": "6c0b027aabd482631a771cdfff6f6a178a6c4a53bf667c752e00d7615193f126"
+    },
+    {
+      "path": "excel_mcp/operations/cells.py",
+      "sourceSha256": "5129062c4dfeaa392132a1e52e7a472f44fe4be9a871d508521b9d527119b3de",
+      "sha256": "5c158c403e0cef69edf04b15c0ebec0d95454270e0bb144c17a1096250788d79"
+    },
+    {
+      "path": "excel_mcp/operations/charts_data.py",
+      "sourceSha256": "c0191366749ad6bdcf15c5cf361aeaf73155bf0f59f5ed82effd09a530273644",
+      "sha256": "0bec62d34bc788b5021540846f23dc848f499c4d72692c0541125a29cd6f481c"
+    },
+    {
+      "path": "excel_mcp/operations/charts_options.py",
+      "sourceSha256": "781e4883069fc6a2b466aa576e8b030353f6b5a052ceb665b7ccf6f6073dd0b6",
+      "sha256": "b255196a20eeabe804efb479a0f8a0fc893446de38621d6cd7a2e82694679baa"
+    },
+    {
+      "path": "excel_mcp/operations/columns.py",
+      "sourceSha256": "cd5e92fab2f5977b11fc8c9222e65e6ae596f13e21049cfe8e61da0e197ca40c",
+      "sha256": "9ecf3ccdb0cd61f0675c039d9638c356325475cec0d5b1129d72777fc88b8ee6"
+    },
+    {
+      "path": "excel_mcp/operations/comparison.py",
+      "sourceSha256": "b882025790af54b4e31880afd6a68914338008d9b6a0239aef8496311c473987",
+      "sha256": "b3c4c10242e66ba490a8864559b6240ce6656c09edce911568ad6d19f8798cc5"
+    },
+    {
+      "path": "excel_mcp/operations/date_width.py",
+      "sourceSha256": "f9a3834c2c48f89dc78350ce84be5748664ea119eaf816c58603a395a79435b6",
+      "sha256": "b94b9867523c3e1fdc1ee721e0be1ed71f34cdbb8a484d247fdd9216bff81119"
+    },
+    {
+      "path": "excel_mcp/operations/drawings.py",
+      "sourceSha256": "29732226197bfeafd9b5db6c279c2dabbb68d2d46646266e188f429cd2111bd4",
+      "sha256": "7d15af73645132bef64b1d08358a39e9e631dc4e0ea63160e0987217212aa216"
+    },
+    {
+      "path": "excel_mcp/operations/filter_criteria.py",
+      "sourceSha256": "8863c30e383b657f7cc6498562c3f69d551703648c9333c55efca3d3f6aed925",
+      "sha256": "b216667778ec42f9c58a0c2f180819ffcb29d57dc11f99d4255799efe4ab52ea"
+    },
+    {
+      "path": "excel_mcp/operations/filters.py",
+      "sourceSha256": "08740506d223d8689ce85433517d7cdb7a81b46f2452bc739b845adaa365e3df",
+      "sha256": "92498ad2d7afee9617feff7971f0bcd7a18fe33c2ea77ebefac9ab3e93559a84"
+    },
+    {
+      "path": "excel_mcp/operations/formatting.py",
+      "sourceSha256": "9df89e47e2b878be0b488680396da58ada2f12d00af09735620516317e832caa",
+      "sha256": "d22731f109309d4b52de4da7a1d2fbdd984be5032a1c0cc8edb8197b537f6f5e"
+    },
+    {
+      "path": "excel_mcp/operations/hyperlinks.py",
+      "sourceSha256": "64650b21e04142906908e97cb0a1eb8dba2548b04a277df3013842c35ff47a4b",
+      "sha256": "d9a1d321e401648a46ac310cae80ba44996654764165ff1b4e16a49f6c333edd"
+    },
+    {
+      "path": "excel_mcp/operations/pivot.py",
+      "sourceSha256": "7df54e68551ef95e2e9885b172289f2f1528353f49809c8aee27038dde41869a",
+      "sha256": "8a2ff73cc9ec76c6e21dab078c1843944bfa7df3248ca333391fd0a6c78929f6"
+    },
+    {
+      "path": "excel_mcp/operations/pivot_axis.py",
+      "sourceSha256": "9d58fae0fba17b737e8b7299be88aff34e89084f52b4e0ca01014bfe4b331261",
+      "sha256": "32880df680c023b98793553e0279e556dc2a2fc0d2dcda2de1be15c8d501571c"
+    },
+    {
+      "path": "excel_mcp/operations/pivot_cache.py",
+      "sourceSha256": "377c3ff882d825a0ea65a132e1afe5ebc4d6e724b711320b115b8967f5d1082e",
+      "sha256": "d40680030e453c68ba4cabfc6611fb3c3c21e67695776c56172786e07fd8d4f4"
+    },
+    {
+      "path": "excel_mcp/operations/pivot_calc.py",
+      "sourceSha256": "63edbe087537edc7891535f93b640a0cdaced5438bf9bcd39d06ffc5f14724d0",
+      "sha256": "b63437b4636ffa9bfa1793a19d1566f11699d535a39dfc748487abd925ec81dd"
+    },
+    {
+      "path": "excel_mcp/operations/pivot_definition.py",
+      "sourceSha256": "117cae7bb3f575f7a0a69f9f711fa1f9e3a20e7f211004e4e806161a7f331aec",
+      "sha256": "df3ceff8c34c413a9931888f61c98c0ef8a134f998f46ad2447bfa20a96a8774"
+    },
+    {
+      "path": "excel_mcp/operations/pivot_fields.py",
+      "sourceSha256": "1f5ee613bb7dec8fcd769a31dfa6132853afcc187306c19aa4a6f23787838aeb",
+      "sha256": "4d8a90af1b5b2e94abaff03d75311c6a6f37ccf27556600ce2c5bc27880cb512"
+    },
+    {
+      "path": "excel_mcp/operations/pivot_groups.py",
+      "sourceSha256": "7317abcda2301bfd9b3076447f92c1240bb27927f1b7d093a2be2c0ad0d3750c",
+      "sha256": "5c2fed4688c5077f3cfebfd64f97a64de860174281d0ba1a10bd154dd1b6717b"
+    },
+    {
+      "path": "excel_mcp/operations/pivot_index.py",
+      "sourceSha256": "b7a967548510d57a0cf1440a93148395676ab12f8c1320125e441bdf6ef726ad",
+      "sha256": "00b3feebe515adb841b497c83162cab1a859d7d940a12237c2425a0f3a462b48"
+    },
+    {
+      "path": "excel_mcp/operations/pivot_options.py",
+      "sourceSha256": "f6a2dac1aecd522403d7a821a79a5d497bad3661dec5e12f7f152acc5a56e81b",
+      "sha256": "4ad54e6cdf5a690eef280c01c31b8730ce320e85764fc3b52cb6725c7c5be996"
+    },
+    {
+      "path": "excel_mcp/operations/pivot_rebuild.py",
+      "sourceSha256": "004089a66f67ffbb796d3d7df10eedab04c6fcd7d6baa428e648ac4826f0ad0f",
+      "sha256": "ffc7ea3f3c94f1d6dcbdb9d78cde6c35035d141116fca4f2d82fde29b681c1ba"
+    },
+    {
+      "path": "excel_mcp/operations/pivot_records.py",
+      "sourceSha256": "2204579ed2fadf40c9a2a3c333d893deec79035c4c81a653c05078038f033a39",
+      "sha256": "0b9f1e651499f9e47aa86df3a494d8820c7546e73897a7b69543e90e3364eea5"
+    },
+    {
+      "path": "excel_mcp/operations/pivot_render.py",
+      "sourceSha256": "8d243649b07290e7730d9dc8a98ca4c04cb6f057e43fa4e93799082a24c79df7",
+      "sha256": "90e982c2d2c2473899e0a77f8bad717b831ecb5b68b0be3b4d26cd8b9fe51832"
+    },
+    {
+      "path": "excel_mcp/operations/pivot_showas.py",
+      "sourceSha256": "c2a3b1723014e9a869206064cd8d47b52aeb49aa5f89697ddd955dbf087720cf",
+      "sha256": "16518759ce723aa124937f1ac23f4dbd65c3252e6f57fd958f506113dc7e949c"
+    },
+    {
+      "path": "excel_mcp/operations/pivot_source.py",
+      "sourceSha256": "9f06c0e5a627465a11a1be17e6d9eb44b87f66419d9a503ac4adad84f1e67442",
+      "sha256": "866ae371c08bcb2bb0095711c46fec1a6ecf13acf2cd4d4afe9bf910afee42dd"
+    },
+    {
+      "path": "excel_mcp/operations/pivot_specs.py",
+      "sourceSha256": "9a23dc03101a07aa9e7a07c4b665b033d418284fe2cab15ae2c695b8e64b19ea",
+      "sha256": "94a4ef3a7d7b1535f40cbb6caa680c91bd3b6e3885869096a554ec508645cb36"
+    },
+    {
+      "path": "excel_mcp/operations/pivot_values.py",
+      "sourceSha256": "6b4030af84fb86c6d202e6f9a30c6d4f0ac52f8ed82e71b0b49a1232bf926486",
+      "sha256": "f65c8ad7962eb548b103cd911e28fab24856bdf826a608b3251ef1b659a996bd"
+    },
+    {
+      "path": "excel_mcp/operations/replace.py",
+      "sourceSha256": "5948045a0edebe581a14846efb4d30502c7fc4d65f82b8e7015bd4952d20906d",
+      "sha256": "450e50ba01a874cf308964e90c393e928f4d8a30f6bde30facc8efdca2d6a0cb"
+    },
+    {
+      "path": "excel_mcp/operations/slicer_index.py",
+      "sourceSha256": "7dd84bd1e95708c6732a586231a41221a4623d7a479336b1997dda90a097b20b",
+      "sha256": "e4779d482c320980f44b4319f23fb12a98c53977e0bb57507f71dcf3504d5e40"
+    },
+    {
+      "path": "excel_mcp/operations/slicer_manage.py",
+      "sourceSha256": "4642b267d10d253873f8b7e4bf65b579d1c0207ad3eb95b428d22eec6ac0b75b",
+      "sha256": "ac1b36a01b7a8b85fee47432aa1f6bf4bdf92953b62edf2083efd5e222b4810d"
+    },
+    {
+      "path": "excel_mcp/operations/slicer_pivot.py",
+      "sourceSha256": "5623977b342bf636f26b3e827818032b5ab7b523a4674fcb63c346d1e66ac93f",
+      "sha256": "3f8491117ed0e511a6679b6ba1529dadabba459b700708dbf22fce6fb9f6a14e"
+    },
+    {
+      "path": "excel_mcp/operations/slicer_place.py",
+      "sourceSha256": "553fd1057130768019ecf3b943d6445d54ee5171944ff165baf285720d7376f9",
+      "sha256": "1ff26e15febb300345d4e9c21941a8e006a4ee28888d8b44bfcfd14940bcd603"
+    },
+    {
+      "path": "excel_mcp/operations/slicer_table.py",
+      "sourceSha256": "eeb25603af5f0bd9f92ec70a35ac1191f969297dea5866781622fdd28f0e2d1e",
+      "sha256": "1686b3e18645043cd566e2e430444625331546ef968ee35fa7e4f6bd59783076"
+    },
+    {
+      "path": "excel_mcp/operations/slicer_xml.py",
+      "sourceSha256": "d3aed785e85a441a1ece6b775e6d4814aafdca5f052d1d299724603ea4738d1c",
+      "sha256": "0925e771ec49d71bb0778747e3f680ba045cc9f2eff82a798d3bed9807511911"
+    },
+    {
+      "path": "excel_mcp/operations/slicers.py",
+      "sourceSha256": "f09795885fd0b78e6f1a58e878c9939b6308bc9f3432d5d78e86ce32ff3ea111",
+      "sha256": "785896cc569c236c2456eb3a4558abc90e570e513c370668f330bbe4e6e5a90d"
+    },
+    {
+      "path": "excel_mcp/operations/sorting.py",
+      "sourceSha256": "7ef2d77c18a27db5fcc323afc700912585108ccce32bde7610f04110ec241f64",
+      "sha256": "2b57616b630bfd2c9714a856584b93bcce73aa0947b6bc97a9b0cfcb305386ca"
+    },
+    {
+      "path": "excel_mcp/operations/sparkline_style.py",
+      "sourceSha256": "32e782499f876431aaae0fdb3ce6b907bea69a9b08c734fd9bd9eabaaf6ceb60",
+      "sha256": "8a670ae331953a13f064c04a98a5930070e16f6380b8cf19bc06eff137080815"
+    },
+    {
+      "path": "excel_mcp/operations/sparkline_xml.py",
+      "sourceSha256": "9caf97f3ca11c1321b1f9758055d928386b16e4c41369b020146dea01ba0aa28",
+      "sha256": "b31d10f529c9bf74af271787a5a7c696ce6d9f60e8ceb645608d785a038d77c0"
+    },
+    {
+      "path": "excel_mcp/operations/sparklines.py",
+      "sourceSha256": "1daea204196f74f104faf3a0128f622afaa360952cb809eb9a634b3263b0255a",
+      "sha256": "1d23d8301bae7e573226b1124978498aba3859c36de43f0756cd5b30dd6ed6e4"
+    },
+    {
+      "path": "excel_mcp/operations/spill.py",
+      "sourceSha256": "e8e93be5fd12e2db2b38042be1f6135991b10a06fb4193de4b48eeb9306f5739",
+      "sha256": "7da685c4049b9cc3eacf00b28de1f853c4dc7d5776c49106a8d38902515d1798"
+    },
+    {
+      "path": "excel_mcp/operations/used_range.py",
+      "sourceSha256": "e7314a6625f6b36925ab4d9a6353feb0548f01151df174c0684854146e426b00",
+      "sha256": "e999dfaf0d98bc9aa4551cbb30ef85f17548230dfbf24bc7d476473420fc02f7"
+    },
+    {
+      "path": "excel_mcp/operations/x14_xml.py",
+      "sourceSha256": "2060dff515160ee59f45bafaf6c69153dc1151e596770e6d5dbd9bada3966558",
+      "sha256": "a3b70b546a62a43d54eb07a19588f9a17e936fcad51844ea1fc3a95f1a7356e9"
+    },
+    {
+      "path": "excel_mcp/package/__init__.py",
+      "sourceSha256": "f2865f0b56dfe56818cbca3cf6761a0673945278fae34124cfad7c83547e90d2",
+      "sha256": "ac467739262a34669d48bfc02c555d1c04e7c781a206d6c744c3efabd653a72f"
+    },
+    {
+      "path": "excel_mcp/package/anchors.py",
+      "sourceSha256": "4e9ffec3d2694eb50a73026394f3ac51d1651c33b584c6acd3f2c46ffcfee640",
+      "sha256": "b4f1bfd47bb252d191367053689dc57f2563eb771abc99324873db27a625895f"
+    },
+    {
+      "path": "excel_mcp/package/arrays.py",
+      "sourceSha256": "23a8bb2ba38f0ff01d5e8d49dbc53ad044c303c8b086df794789c77b32db8c8a",
+      "sha256": "e7701fe649783cb1ee0eb51564b20cf10b58cc25ec46be625908bdb22fc43a52"
+    },
+    {
+      "path": "excel_mcp/package/capture.py",
+      "sourceSha256": "ad9d8f424762052091139540c92af22fba483ab475e155aa9fe1cfd2c18a3411",
+      "sha256": "17da918a80908c8e95f9675971a43411cd72f9bb8260b177a2a0054f69be06d9"
+    },
+    {
+      "path": "excel_mcp/package/capture_sheet.py",
+      "sourceSha256": "307a58442f30861c30d8f820029d34e352fd19661357c5fdba368c84fbe0ddfe",
+      "sha256": "a52b3fc62e003207d8d8810aa045591ac3a1ccbc43b720946c0f64c9dd7ebdcd"
+    },
+    {
+      "path": "excel_mcp/package/consistency.py",
+      "sourceSha256": "d5df5f869b1f9ab60dcc1cf540d60cef9785a8b90d284b1e0aa32489b0f89159",
+      "sha256": "c50eaa620b91d9116e2957dd5a577887a97f80b4cc62970175ad36f9b22731cf"
+    },
+    {
+      "path": "excel_mcp/package/extensions.py",
+      "sourceSha256": "14455d4a263a5788e5179480d24cf30355c487962aceeb5f80f851a0fbd5c83a",
+      "sha256": "d46d3f117ce69bc77369edd383e20bdb1f46005719619bf770653443fbeaf3b0"
+    },
+    {
+      "path": "excel_mcp/package/guards.py",
+      "sourceSha256": "dbaf86b035a58c3329d3c0fb69611b22863fc9192239bed888fec11784925c3b",
+      "sha256": "0ae9428162ff944663feb3a45c1eba59fedcaf1682d54efb62ef09ec39fe3a61"
+    },
+    {
+      "path": "excel_mcp/package/lazy_records.py",
+      "sourceSha256": "aeeee9d22c4079bfe716d6cbcea0bed5b1755b4ae7126c6783a7e7b99ba3a789",
+      "sha256": "2d09229f641857ef1e253955b6c3e877d9de6ce9754b56d5471f08ab2c4feae9"
+    },
+    {
+      "path": "excel_mcp/package/lines.py",
+      "sourceSha256": "2873b58e2ea4f159adef811ceccbddd8a50900718c1285247bd7c16c43ffb39e",
+      "sha256": "550c0728b4204198bc2c0c40d6e4e75a6099987f6db10c9a03e3e062169db73c"
+    },
+    {
+      "path": "excel_mcp/package/metadata.py",
+      "sourceSha256": "dbd0b5bd0c9927ef4d3883af1937bd7ae70e1191914fa650ea82a9fb9233e266",
+      "sha256": "f1f219733803b59cb7381034ec322185bd7dc54379062bb73060613428d75007"
+    },
+    {
+      "path": "excel_mcp/package/model.py",
+      "sourceSha256": "4398c2b7d4341207602f4616341c3393c9e629fe3a385f879cc01bd0d0599d00",
+      "sha256": "cdc7d9bef5656e730a07d463e1872d598f8948231e6bca83f94f610049f91655"
+    },
+    {
+      "path": "excel_mcp/package/opc.py",
+      "sourceSha256": "bc56702193a62522c014e3b880f894b05f0ab6596399be9f675ae628d4452d1d",
+      "sha256": "cc2aeba64195990a2efaa7dc34126360df88672073ebc8e480cc1d38c9b2bfbd"
+    },
+    {
+      "path": "excel_mcp/package/patch.py",
+      "sourceSha256": "6416c43136cec1722290737686a7d2e479168c1f650aa77ccabd0ab1e5ad22f8",
+      "sha256": "47a3deee91376af52c509f8f8464efd5cb912d8a89cba54c4a02d96685e5948e"
+    },
+    {
+      "path": "excel_mcp/package/pivot_records.py",
+      "sourceSha256": "c3e6b12999c0de1dfc1db416fd3ecb41220a3698cb5e39b540e97bbe73f17e80",
+      "sha256": "67f923f32884732f316196fc04764ca31fbf696636d957fd5c9b83ee2ab01b74"
+    },
+    {
+      "path": "excel_mcp/package/pivots.py",
+      "sourceSha256": "a1aa4da30856893509780a0a8a855d8f85b2a581c74d129c55a2601f171cb02d",
+      "sha256": "da2ad8d60ee07a43513c11abde95578aa92019bee72c7276893fc72eeccf61ed"
+    },
+    {
+      "path": "excel_mcp/package/properties.py",
+      "sourceSha256": "855c628e113dfe9c7f729596412cc3b5c807c9d79d4c082435d7b8c5b2212506",
+      "sha256": "97294e2d9a8db55c72169592af1969a9bcd263f642f765ad1879eaf54355f460"
+    },
+    {
+      "path": "excel_mcp/package/query_tables.py",
+      "sourceSha256": "31c40758d362021c78425d1650901a9d947b5d18926fc31b84aff91310149101",
+      "sha256": "fb1af76b5f712b3d0ddf4502e91ad63e3d3ca15e919458cc057166fc457e8f3c"
+    },
+    {
+      "path": "excel_mcp/package/reader.py",
+      "sourceSha256": "eba8065d4e0ccd67a99ceeaf2a0fc48f379fc791e4f6d91fc5b71dba6f7f9a29",
+      "sha256": "3ea3eb21d60d0b34b8b7be71c7a1789c9f6d71133179805587bfa4c41098ee9a"
+    },
+    {
+      "path": "excel_mcp/package/restore.py",
+      "sourceSha256": "5a657976ea7af344f7636928c3340ed0e1334fa6cbef45422f15af1edf3b110a",
+      "sha256": "e56ac13ce8db32e34a9f598217971db3f5ffd557cb4ab5f7d9f84199920e6b52"
+    },
+    {
+      "path": "excel_mcp/package/restore_sheet.py",
+      "sourceSha256": "ebf0c4ecd0f135dd87c43e1de5f7b576fb66f8692c5e1c1bdbd13a579df3400d",
+      "sha256": "bf14c296ac3d6a3346a41cc08f9c1e8306f318f60e847675d666506497ae9917"
+    },
+    {
+      "path": "excel_mcp/package/scan.py",
+      "sourceSha256": "19799dc8e39a7007c8063977fd0e79d4dc4998c47b3678980fcce1c9d90854a5",
+      "sha256": "6de0e6f5cbeb5618deed484ee03ed0555b8a79ec5f240e95903ea2f4a424c43c"
+    },
+    {
+      "path": "excel_mcp/package/shape_names.py",
+      "sourceSha256": "740ab4f4c3305d6dae2efe1cf57c3db700cdcc5150deae40fc6a840e6ba1aa91",
+      "sha256": "a526cfc75b3b626979855c4d16bcaacecba52f137e09fa19b6d31a7a6babf4f9"
+    },
+    {
+      "path": "excel_mcp/package/vml.py",
+      "sourceSha256": "1e4ca363a8a87975948fdbef93e12b82f8040d2507653ef67684cbec55d88b8f",
+      "sha256": "4080ec4835b6baa7171ac649549f349d26239c096ba56b882516ed51ca5afb41"
+    },
+    {
+      "path": "excel_mcp/paths.py",
+      "sourceSha256": "ae53e7d1e0bf7303ef84361ad476a7c83dd1b5f33fae8937618a18934e68c4c2",
+      "sha256": "be269ca2cb631e75089096b22b8d25ea547922d71c83302fc78c6332d8885936"
+    },
+    {
+      "path": "excel_mcp/plain_refs.py",
+      "sourceSha256": "b26316bb117d7d0b6278b47b1cbeabbd95d7ac0dac2c026fb16f498db8ddacea",
+      "sha256": "3c46673df25442da773124edc82595038a1e1d161d29323e021473627d988a10"
+    },
+    {
+      "path": "excel_mcp/refs.py",
+      "sourceSha256": "27b287a17ee8684f9b125671794731e7a0cd290fac014e6f20acb8f302434009",
+      "sha256": "0543cf3f7a9119925e533e329764f6021dca208c5b746882c76e0276521c392a"
+    },
+    {
+      "path": "excel_mcp/server/__init__.py",
+      "sourceSha256": "0ff25681b282c9c620079ad418eff652c390c6ac514636388992d4a6fde50ada",
+      "sha256": "54979bc12d4e8eccfb3c506f4ecee85f07449b69cb9b4305b40b7bd6bf9b3adb"
+    },
+    {
+      "path": "excel_mcp/server/object_tools.py",
+      "sourceSha256": "43d8b405b5fc5e264a555df9e02093daedac848dff1ef7303d6cb4b0d9d0025c",
+      "sha256": "93f31d8aec6a75d94f2d29189b294b7f13d393bfe48e1263749bdc38f39d6126"
+    },
+    {
+      "path": "excel_mcp/server/params.py",
+      "sourceSha256": "d64229d5aecedee006ff5a71be41ce30ffbc3c38bea7e76cc49f288f5dfbb66e",
+      "sha256": "d23a6c7f4f2d252122d31338e4936f973b6fbc744f9bb7d2ecfb00d7246265fe"
+    },
+    {
+      "path": "excel_mcp/server/pivot_tools.py",
+      "sourceSha256": "eedd875c9108ebd68d10f26ed074004c7f4ad3de813cfe8defa5978f905f9e0b",
+      "sha256": "f990ae20da67d596f1face245e14fdc2ff73cbe7bb21f566f498db12eaff1036"
+    },
+    {
+      "path": "excel_mcp/server/results.py",
+      "sourceSha256": "7c07f545b82c6d4eb3e0fc0dc02c26ffb1fba1a08a39623800d3b687134c54d7",
+      "sha256": "0bdbae664d483420861349780524c17f671444bd4e2b4a751a10f44db08ceaae"
+    },
+    {
+      "path": "excel_mcp/server/slicer_tools.py",
+      "sourceSha256": "c263341e665de1029b2ef4645709161e3704c2cc94b3d214e88acb0585f57f57",
+      "sha256": "16d18160aa55fd39b8f9559341ddef6c6eecf70662dbd29c98ae82243d71fe9a"
+    },
+    {
+      "path": "excel_mcp/shared_text.py",
+      "sourceSha256": "b081e8d8608c304a252a0aa7eec19ca66cc098816cb033d37f71dff1f8a4a7c7",
+      "sha256": "939ec96332573881aef9dbc374db01c34ad62bec8a6a6295d4d79edca66b4b7b"
+    },
+    {
+      "path": "excel_mcp/shared_translator.py",
+      "sourceSha256": "a353b854f4e6adf986da6bd8646364c7c742be79ec5b6e2e0109a6f284730a26",
+      "sha256": "fc09424878543ebd8c38a1df8147e34df4c94539005c1448462bdb5d36411d65"
+    },
+    {
+      "path": "excel_mcp/spill.py",
+      "sourceSha256": "6283f9bcda0e6563908e9e2bf02fc67357c7f529ab0172b8adf0f24a9e4351c8",
+      "sha256": "fb1a595d0dcc623ed69984178a25a212a78b3ef375fa88223e116a00c21b5fc6"
+    },
+    {
+      "path": "excel_mcp/structured.py",
+      "sourceSha256": "503041f2f99557f884a07c67776944cdf14a767ff3a6ea71ac62d6fabdd933c0",
+      "sha256": "fa7ad990e7d195bd9163505f6cceb061d1851c2d216c8fcbe577b3764a626d14"
+    },
+    {
+      "path": "excel_mcp/text.py",
+      "sourceSha256": "67b6fced1531d68e0d6693dcd5009b0adb9e8023d079c0962d5d4cf3a84c37e7",
+      "sha256": "fc4e1b1b7caaea035da97f83e7e950fc8716ef6d93abaac5ffe5870f1fbc706a"
+    },
+    {
+      "path": "excel_mcp/text_budget.py",
+      "sourceSha256": "813aa69cbf7f49c8cee1ed449d5698076087f90b310db52ef848a8e1137be03b",
+      "sha256": "c493a45dcce03f1eab673e181ce0f90444d90ffd7814876ee3271a1e7f33b0d0"
+    },
+    {
+      "path": "excel_mcp/values.py",
+      "sourceSha256": "776738deae717359336a313aa7521a379141997e213f41606eedc7a36db10fee",
+      "sha256": "a5c9199f7b77629e551248a178531462b73432de827e7c5a7055f929aa81abf1"
+    },
+    {
+      "path": "excel_mcp/workspace.py",
+      "sourceSha256": "547ba0ffeebc15cb710507e21d6b7ca986daf4272ca46d72999c6166f04f1001",
+      "sha256": "46766ef9b1affba7a5925c629e3575953ad3e0dd371dfa07b12393aeedc6f159"
+    },
+    {
+      "path": "excel_mcp/xlfn.py",
+      "sourceSha256": "8debdca437500e61ca357977fbc1fbce8616c9123eec7a6df9ce1520b21be119",
+      "sha256": "d976c32f50d97edda801e16056548ab17d1d8bd7d38035a41556c89cfea5ddeb"
+    },
+    {
+      "path": "excel_mcp/xlm.py",
+      "sourceSha256": "4103df2acedda738ae6ee9e477ef773cf75ea919ef8e0eaee2e49d210a460dbf",
+      "sha256": "2e30f6816ed20c397dcb1d89609c23260f9528266d65bcd3df2553dcf7581980"
+    },
+    {
+      "path": "excel_mcp/xml_text.py",
+      "sourceSha256": "2bf1b64a9f664741827769e06a201177461173fc0720a7ad417ca1b05b796588",
+      "sha256": "b721ab590dc576567988155249a9c8385db14b64c0faf122445550988429f7a6"
+    },
+    {
+      "path": "excel_mcp/zip_limits.py",
+      "sourceSha256": "eadd94a6dcba6d2f08823d0369d8564a6dcc7f8e28ff3559210d6f35af3de1b9",
+      "sha256": "c41600352d7804599bf7e1becdc27f5d4fe4b0b0231c1f13013bdd466bb93cc6"
+    }
+  ]
+}

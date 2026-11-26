@@ -23,7 +23,7 @@
 // Build on the target host: darwin-arm64 or win32-x64. Node is owned by the launcher; this builder only ships Office Python.
 import { spawnSync } from "node:child_process"
 import { createHash } from "node:crypto"
-import { existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, renameSync, rmSync, writeFileSync } from "node:fs"
+import { cpSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, renameSync, rmSync, writeFileSync } from "node:fs"
 import { homedir, tmpdir } from "node:os"
 import { dirname, join, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
@@ -124,12 +124,34 @@ export function buildOfficeRuntime(options: { arch?: TargetArch } = {}): OfficeR
     .digest("hex")
   const reused = readText(join(dir, STAMP)) === stamp
   if (!reused) install({ arch, dir, lock, requirementsPath, locked, stamp })
+  installOfficeExcel(dir)
   const modules = verify(dir, arch, locked)
   const size = measure(dir)
   console.log(
     `[alpha:office-runtime] ${arch}: ${(size.bytes / 1024 / 1024).toFixed(1)} MB (${size.files} files, ${size.machO} Mach-O, ${modules.length} top-level modules imported, 4 formats round-tripped)${reused ? " [reused]" : ""} at ${dir}`,
   )
   return { dir, arch, reused, ...size, modules }
+}
+
+/** App modules share the Office interpreter; the community MCP distribution is never installed. */
+export function installOfficeExcel(dir: string) {
+  const source = join(packageDir, "resources/office-excel")
+  const files = [...new Bun.Glob("**/*").scanSync({ cwd: source, onlyFiles: true })].filter((file) => !file.includes("__pycache__/")).sort()
+  const manifest = JSON.parse(readFileSync(join(source, "sources.json"), "utf8")) as { files: { path: string; sha256: string }[] }
+  for (const file of manifest.files)
+    if (createHash("sha256").update(readFileSync(join(source, file.path))).digest("hex") !== file.sha256) throw Error(`Excel source digest mismatch: ${file.path}`)
+  const site = run(officePythonPath(dir, process.platform), ["-I", "-B", "-c", "import sysconfig;print(sysconfig.get_path('purelib'))"]).trim()
+  for (const name of ["excel_mcp", "codepuppy_office"]) {
+    const destination = join(site, name)
+    if (existsSync(destination)) rmSync(destination, { recursive: true, force: true })
+    cpSync(join(source, name), destination, { recursive: true })
+  }
+  const license = join(site, "codepuppy_office", "licenses")
+  mkdirSync(license, { recursive: true })
+  cpSync(join(source, "LICENSE"), join(license, "excel-mcp-server-LICENSE"))
+  cpSync(join(source, "sources.json"), join(license, "excel-mcp-server-sources.json"))
+  writeFileSync(join(dir, ".office-excel-stamp"), createHash("sha256").update(files.map((file) => `${file}:${createHash("sha256").update(readFileSync(join(source, file))).digest("hex")}`).join("\n")).digest("hex"))
+  run(officePythonPath(dir, process.platform), ["-I", "-B", "-c", "from codepuppy_office import OfficeExcel; assert OfficeExcel.object_schema('create_pivot_table')['inputSchema']['required']"])
 }
 
 function install(input: {

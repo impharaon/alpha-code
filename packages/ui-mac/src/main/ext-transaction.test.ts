@@ -1142,3 +1142,20 @@ describe("recoveryClean — 迁移等敏感动作的收敛判定", () => {
     expect(recoveryClean({ ok: true, reports: [rep("uninstalled", "none"), rep("committed", "cleaned")] })).toBe(true)
   })
 })
+
+test("plugin tree transaction verifies real modes and links before switching", async () => {
+  const { captureWholeFixture } = await import("../../test-fixtures/plugin-helper/fixture")
+  const { materializePluginTreeFromCas, putCasBlobFromBuffer } = await import("./ext-cas")
+  const capture = await captureWholeFixture("superpowers", file => file === "skills/executing-plans/scripts/task-start" || file === "tests/hermes/__init__.py")
+  const tree = [...capture.nodes, { kind: "symlink" as const, path: "task-start-link", target: "skills/executing-plans/scripts/task-start" }]
+  for (const node of tree) if (node.kind === "file" && node.bytes) expect(putCasBlobFromBuffer(root, Buffer.from(await capture.readFile(node.path)), node.digest.slice(7)).ok).toBe(true)
+  const files = tree.flatMap(node => node.kind === "file" ? [{ path: node.path, sha256: node.digest.slice(7), size: node.bytes, mode: node.mode }] : [])
+  const item = { key: "bundle--real-script", files, tree }
+  const hooks = { populate: (_item: unknown, dir: string) => materializePluginTreeFromCas(root, tree, dir) }
+  expect(await runExtensionTransaction(root, { items: [item] }, hooks)).toMatchObject({ ok: true })
+  const live = resolveLiveGenerationDir(root, item.key)!
+  expect(fs.readlinkSync(path.join(live, "task-start-link"))).toBe("skills/executing-plans/scripts/task-start")
+  const before = readCurrentGeneration(root, item.key)
+  expect(await runExtensionTransaction(root, { items: [item] }, { populate: (_item, dir) => { hooks.populate(_item, dir); fs.chmodSync(path.join(dir, "skills/executing-plans/scripts/task-start"), 0o644) } })).toMatchObject({ ok: false, stage: "verify" })
+  expect(readCurrentGeneration(root, item.key)).toEqual(before)
+})

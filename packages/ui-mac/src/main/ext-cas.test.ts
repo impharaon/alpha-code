@@ -11,6 +11,8 @@ import {
   casPaths,
   hasCasBlob,
   materializeFilesFromCas,
+  materializePluginTreeFromCas,
+  verifyPluginTreeOnDisk,
   pinCasBlob,
   populateFromCas,
   putCasBlobFromBuffer,
@@ -41,6 +43,19 @@ test("plugin tree file materialization preserves the real script execute mode", 
   const file = { path: node.path, sha256: node.digest.slice(7), size: node.bytes, mode: node.mode }
   materializeFilesFromCas(base, [file], path.join(base, "installed"))
   expect(fs.statSync(path.join(base, "installed", node.path)).mode & 0o7777).toBe(node.mode)
+})
+
+test("plugin tree preserves modes and links without following link destinations", async () => {
+  const capture = await captureWholeFixture("superpowers", file => file === "tests/hermes/__init__.py" || file === "skills/executing-plans/scripts/task-start" || file === ".github/ISSUE_TEMPLATE")
+  const tree = [...capture.nodes, { kind: "symlink" as const, path: "task-start-link", target: "skills/executing-plans/scripts/task-start" }]
+  for (const node of tree) if (node.kind === "file" && node.bytes) expect(putCasBlobFromBuffer(base, Buffer.from(await capture.readFile(node.path)), node.digest.slice(7)).ok).toBe(true)
+  const dest = path.join(base, "tree")
+  materializePluginTreeFromCas(base, tree, dest)
+  expect(verifyPluginTreeOnDisk(tree, dest)).toEqual({ ok: true })
+  expect(fs.readlinkSync(path.join(dest, "task-start-link"))).toBe("skills/executing-plans/scripts/task-start")
+  fs.chmodSync(path.join(dest, "skills/executing-plans/scripts/task-start"), 0o644)
+  expect(verifyPluginTreeOnDisk(tree, dest).ok).toBe(false)
+  expect(() => materializePluginTreeFromCas(base, [...tree, { kind: "file", path: "task-start-link/escape", mode: 0o644, bytes: 0, digest: `sha256:${sha("")}` }], path.join(base, "bad"))).toThrow("Invalid plugin tree")
 })
 
 describe("casBlobPath", () => {

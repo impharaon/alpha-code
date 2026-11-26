@@ -1,3 +1,4 @@
+import { pluginRelativePath } from "./plugin-package"
 import { createHash } from "node:crypto"
 import { parse, type ParseError } from "jsonc-parser/lib/esm/main.js"
 import { ConfigMarkdown } from "@opencode/core/config/markdown"
@@ -85,7 +86,7 @@ export async function convertPluginTree(input: Capture): Promise<{ package: Plug
   const files = new Map<string, Uint8Array>()
   const seen = new Set<string>()
   for (const node of input.nodes) {
-    if (!validPath(node.path)) throw new CaptureError("invalid-path", node.path)
+    if (!pluginRelativePath(node.path)) throw new CaptureError("invalid-path", node.path)
     if (seen.has(node.path)) throw new CaptureError("duplicate-path", node.path)
     seen.add(node.path)
     if (node.kind !== "symlink" && (!Number.isInteger(node.mode) || node.mode < 0 || node.mode > 0o7777)) throw new CaptureError("invalid-node", node.path)
@@ -157,7 +158,7 @@ export async function convertPluginTree(input: Capture): Promise<{ package: Plug
     for (const entry of declared) {
       if (typeof entry !== "string") continue
       const path = entry.replace(/^\.\//, "")
-      if (!validPath(path)) { diagnostics.push({ path: "package.json", code: "invalid-definition", message: "Native module entry is not a relative tree path" }); continue }
+      if (!pluginRelativePath(path)) { diagnostics.push({ path: "package.json", code: "invalid-definition", message: "Native module entry is not a relative tree path" }); continue }
       if (!files.has(path)) { diagnostics.push({ path, code: "missing-entry", message: "Native module entry is missing" }); continue }
       modules.set(path, string(manifest?.name) ?? path.split("/").at(-1)!.replace(/\.[^.]+$/, ""))
     }
@@ -291,11 +292,11 @@ export function convertMcpServerDefinition(server: Json, source: Source): { pack
 function marketplaceSource(value: unknown): MarketplaceEntry["source"] {
   if (typeof value === "string") {
     const path = value.replace(/^\.\//, "").replace(/\/$/, "")
-    return validPath(path) ? { kind: "path", path } : { kind: "unsupported", detail: "Invalid marketplace path" }
+    return pluginRelativePath(path) ? { kind: "path", path } : { kind: "unsupported", detail: "Invalid marketplace path" }
   }
   if (!object(value) || (value.source !== "url" && value.source !== "git-subdir") || typeof value.url !== "string") return { kind: "unsupported", detail: "Source is not a Git repository or local path" }
   const path = typeof value.path === "string" ? value.path.replace(/^\.\//, "").replace(/\/$/, "") : undefined
-  if (path !== undefined && !validPath(path)) return { kind: "unsupported", detail: "Invalid Git subdirectory" }
+  if (path !== undefined && !pluginRelativePath(path)) return { kind: "unsupported", detail: "Invalid Git subdirectory" }
   return { kind: "git", url: value.url, ...(typeof value.sha === "string" ? { commit: value.sha } : {}), ...(typeof value.ref === "string" ? { ref: value.ref } : {}), ...(path === undefined ? {} : { path }) }
 }
 
@@ -303,7 +304,7 @@ function declaredPaths(value: unknown, path: string, field: string, diagnostics:
   if (value === undefined || (allowObject && object(value))) return []
   return (typeof value === "string" ? [value] : Array.isArray(value) ? value : [value]).flatMap((value): string[] => {
     const normalized = typeof value === "string" ? value.replace(/^\.\//, "").replace(/\/$/, "") : ""
-    if (validPath(normalized)) return [normalized]
+    if (pluginRelativePath(normalized)) return [normalized]
     diagnostics.push({ path, field, code: "invalid-definition", message: "Declared path is not a relative tree path" })
     return []
   })
@@ -414,7 +415,6 @@ function bindings(value: string): Text {
   return parts.length ? parts : [value]
 }
 function bindingName(value: string): "pluginRoot" | "skillDir" | "projectDir" | undefined { return value === "CLAUDE_PLUGIN_ROOT" ? "pluginRoot" : value === "CLAUDE_SKILL_DIR" ? "skillDir" : value === "CLAUDE_PROJECT_DIR" ? "projectDir" : undefined }
-function validPath(value: string): boolean { return !!value && !value.includes("\0") && !value.includes("\\") && !value.startsWith("/") && !/^[A-Za-z]:/.test(value) && value.split("/").every((part) => !!part && part !== "." && part !== "..") }
 function object(value: unknown): value is Record<string, unknown> { return typeof value === "object" && value !== null && !Array.isArray(value) }
 function string(value: unknown): string | undefined { return typeof value === "string" ? value : undefined }
 function stringMap(value: unknown): value is Record<string, string> { return object(value) && Object.values(value).every((part) => typeof part === "string") }

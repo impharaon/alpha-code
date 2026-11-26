@@ -218,7 +218,7 @@ M1–M3 本次整包的具名记录（去向：编排器的机器条件处置，
 ## 片 2 · #1762：市场插件整树安装与技能路径
 
 - 依据：#1762；local-plugin-install 规格 v4 @ `9f5ee3c`（内容批准于 v2/v3），AC-09、AC-02 的技能与资源部分；同名设计 v2 @ `9f5ee3c` §4.1、§4.2、§4.3 的技能语义、§8 第 2 片的桌面部分。并消费 plugin-helper-and-hub 设计 v9 @ `8721a7667f817503dc4ad6eaa4f942c881b398e6` §4.1、§4.3、§4.4 对当前入口、转换产物放置、宿主命名与范围的修订。权威链接沿用本文片 1 及[来源扩展计划](../plugin-helper-and-hub/plan.md)中的协调仓链接；不重述设计决定。
-- 核对：待编排器核对本片计划；首个实施提交逐字填入续派 `Phase:` 的计划提交、核对者/模型与结论。
+- 核对：IMPLEMENT — fea5b56acc · Claude Opus 5.5 (orchestrator) · plan accepted: every AC has a failing-without-behaviour proof from pinned real samples, files stay inside the allowed scope (the packages/ext files are justified same-call-chain), no frozen decision restated or changed.
 - 本片只接市场 Claude/Codex 包的整树内容与技能运行路径。命令、助手、hooks 的文件随树保存，运行与相应诊断沿切片 3/5；不认领 AC-02 全项。renderer、folder/Git 取源入口、原生文件引用、市场列表、其他仓库和 gate 不在改动面。不处理已安装记录迁移；需要验证新装时用干净临时根。
 - 基线：`HEAD = origin/alpha = 9f08c506d9842d319616c7e45c33d3b9c3279e48`，Bun 1.4.4。计划阶段起于 2026-11-26 10:59（UTC+08:00）；预计 45 分钟。实施预计 L，约 24–30 个手写生产/合同文件（按需项不一定同时改）及对应既有测试、压缩夹具，约 1,000–1,600 行手写改动，生成物另计；预计 4–6 小时。每完成下方一组 AC 证据核对规模与用时，达到预估上界两倍即返回具体原因。
 
@@ -291,4 +291,6 @@ M1–M3 本次整包的具名记录（去向：编排器的机器条件处置，
 
 ### 偏离记录
 
-暂无。
+- 2026-11-26 · 步骤 1 红测提交 `8843cebac2`（0 pass / 3 fail）；本次只提交步骤 2 中独立可验证的 CAS/事务树能力，尚未完成任何完整 AC。计划核对漏掉了 `src/shared/package-admission.ts:133` 的冻结 `PackageAdmissionPlanItemV1.kind` 枚举：它不含 `bundle`，而 `src/main/package-admission.ts:758–766` 把 profile 路由的 kind 原样写入该 renderer DTO。已定 root 必须为 bundle，不能伪装成 skill，也不能在本片擅自放宽被冻结的 DTO。返回 `SEAM-CHANGE-NEEDED`：最小所需变更是允许该枚举表达既有 `bundle` kind（外层字段不变），并同步其既有解码/枚举验证；在续派明确该接缝后恢复步骤 2 的 profile 部分及步骤 3–5。宿主已发布 envelope/registry/manifest 与 aggregate 均未改，不需消费方此时重 pin。未完成 profile/schema/corpus 草稿及修改前 diff 已保存在临时实验目录的 `implementation-before-seam.patch`、`plugin-package-draft.ts` 与两个 JSON 中，不作为权威或已交付代码。
+
+- 2026-11-26 · 局部验证：`bun test src/main/ext-cas.test.ts src/main/ext-transaction.test.ts` 96 pass / 0 fail；最终树案例 `-t "plugin tree"` 3 pass / 0 fail；`bun test src/shared/host-extension-package-contract/plugin-conversion.test.ts` 31 pass / 0 fail（路径文法复用本次纯 helper，避免第二份权威）。返回前较宽相关集一次：`ext-cas-gc.test.ts`、`ext-transaction-config.test.ts`、`ext-transaction-file.test.ts`、`ext-transaction-prepared.test.ts`、`package-child-kind.fast.test.ts`、`package-update.test.ts`、`package-admission.parity.test.ts`、`engine-explicit-config.test.ts`，125 pass / 0 fail，日志 `partial-wider-tests.log` 留在上述临时目录。`bun typecheck` exit 0，两个 generator `--check` exit 0，旧名扫描 10 pass，文档合同仍为既有 71 errors / 250 warnings。`install-from-source.test.ts -t "whole plugin"` 仍 0 pass / 2 fail，正是尚未实施的安装回归。S1 7/7、S3 装后移走来源运行、S4 12/12 与双变量绑定都未证明；不能据本次底层测试认领 AC-09 或 AC-02 完成。宿主 artifact aggregate 仍为 `0af4d2fbf62755e3510c7dba1ddca381d1b436e2903d47c5261a21ed91873437`，无合同版本变化。

@@ -427,3 +427,34 @@ test("a start receipt lost before the first query never subscribes or prevents a
  expect(h.cancelled).toContain("job_video_1")
  ready.resolve(await normal("job_video_1") as CloudJobStatus)
 })
+
+test("cancel intent remains durable when full-body progress persistence is still in flight",async()=>{
+ const {spyOn}=await import("bun:test")
+ const cache=await import("../../resources/video-mcp/cache")
+ const write=cache.writeJson,blocked=Promise.withResolvers<void>(),release=Promise.withResolvers<void>(),persisted=Promise.withResolvers<void>(),response=Promise.withResolvers<void>()
+ let held=false
+ const spy=spyOn(cache,"writeJson").mockImplementation(async(file,value)=>{
+  const state=value as {cancelled?:boolean;attempts?:{bodyFullySent?:boolean}[]}
+  if(!held && file.includes(`${path.sep}cloud${path.sep}`) && state.attempts?.[0]?.bodyFullySent && !state.cancelled){
+   held=true;const snapshot=structuredClone(value);blocked.resolve();await release.promise;await write(file,snapshot);persisted.resolve();return
+  }
+  await write(file,value)
+ })
+ const h=await harness(),service=createMainVideoService(h.deps)
+ h.deps.dispatch=async input=>{h.requests.push(input);await input.progress(input.clip.bytes);await response.promise;return {error:"cancelled"}}
+ const started=await service.start(call,await h.prepared(),h.referencePath)
+ await service.query(started.requestId,call)
+ try{
+  await blocked.promise
+  const cancelling=service.cancel(started.requestId,call)
+  await Promise.race([cancelling,Bun.sleep(20)])
+  release.resolve();await persisted.promise;await cancelling
+  const file=path.join(root,"cloud",(await readdir(path.join(root,"cloud")))[0]!)
+  expect(JSON.parse(await readFile(file,"utf8")).cancelled).toBe(true)
+ }finally{
+  release.resolve();response.resolve()
+  const file=path.join(root,"cloud",(await readdir(path.join(root,"cloud")))[0]!)
+  for(let i=0;i<100;i++){if(JSON.parse(await readFile(file,"utf8")).attempts[0].state === "cancelled")break;await Bun.sleep(1)}
+  spy.mockRestore()
+ }
+})

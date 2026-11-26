@@ -21,6 +21,8 @@ describe("document resources", () => {
     cpSync(join(import.meta.dir, "../..", entry.from), join(root, entry.to), { recursive: true })
     const result = documentRuntimeResources(root)
     expect(readFileSync(result.verify, "utf8")).toContain("pypdfium2.PdfDocument")
+    expect(readFileSync(result.render, "utf8")).toEqual(readFileSync(join(import.meta.dir, "../../resources/document-runtime/render_document.py"), "utf8"))
+    expect(readFileSync(result.updateFields, "utf8")).toContain("getDocumentIndexes()")
     rmSync(result.verify)
     expect(() => documentRuntimeResources(root)).toThrow()
   })

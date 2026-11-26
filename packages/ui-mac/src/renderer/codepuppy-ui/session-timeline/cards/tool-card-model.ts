@@ -269,6 +269,12 @@ export function hubToolActionOf(part: ToolPart): "search" | "install" | undefine
 }
 
 // ── #1576 来源三类 × 执行位置(只从持久化快照派生) ─────────────────────────
+/** Only the verified app plugin can publish document receipts, including pending/failed inspections. */
+export function isDocumentTool(part: ToolPart): boolean {
+  const snapshot = displaySnapshotOf(part)
+  return snapshot?.identity.source === "plugin" && snapshot.authority.kind === "codepuppy-bundled" && snapshot.identity.name === "codepuppy_document" && snapshot.readable === "codepuppy:document"
+}
+
 /** 用户层来源三类:内置(builtin / host / 当次持久化 authority = codepuppy-bundled)、云(codepuppy-cloud)、其余一律第三方(含无快照)。 */
 export type ToolProvenanceSource = "builtin" | "codepuppy-cloud" | "third-party"
 

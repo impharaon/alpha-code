@@ -3,7 +3,7 @@ import { sameDocumentVerifyRef, type DocumentRuntimeVerifyTask, type DocumentRun
 import type { HubBridge } from "./hub-bridge"
 
 /** One Location registration on the existing parentPort listener; never uses hub query timeouts. */
-export function bindDocumentRuntimeVerification(bridge: HubBridge, location: Location.Ref, sidecarGeneration: number, run: (task: DocumentRuntimeVerifyTask, signal: AbortSignal) => Promise<DocumentRuntimeVerifyReceipt>) {
+export function bindDocumentRuntimeVerification(bridge: HubBridge, location: Location.Ref, sidecarGeneration: number, registrationId: string, run: (task: DocumentRuntimeVerifyTask, signal: AbortSignal) => Promise<DocumentRuntimeVerifyReceipt>) {
   const attempts = new Map<string, { task: DocumentRuntimeVerifyTask; abort: AbortController; result: Promise<DocumentRuntimeVerifyReceipt>; cancelled: boolean; reason: "requested" | "location-disposed" }>()
   const unsubscribe = bridge.onDocumentRuntimeMessage((message) => {
     if (message.type === "codepuppy.document.runtime.verify.cancel") {
@@ -14,6 +14,7 @@ export function bindDocumentRuntimeVerification(bridge: HubBridge, location: Loc
     if (message.type !== "codepuppy.document.runtime.verify") return false
     const task = message.task
     if (task.sidecarGeneration !== sidecarGeneration || task.location.directory !== location.directory || task.location.workspaceID !== location.workspaceID) return false
+    if (task.registrationId !== registrationId) return true
     const existing = attempts.get(task.taskId)
     if (existing) {
       if (sameDocumentVerifyRef(existing.task, task)) void existing.result.then((receipt) => bridge.documentRuntimeReceipt({ type: "codepuppy.document.runtime.verify.receipt", receipt }))

@@ -35,7 +35,7 @@
   "wordTemplate": {
     "source": "Actual build-document-assets.ts output after replacing empty simple TOC with locked docx 9.16.0 native TableOfContents and its heading bookmark",
     "version": "2",
-    "generatorSha256": "34b32c582150d257e76a102f3856147ba557ead94ee920bd22127851451e2d33",
-    "sha256": "718a7ef5d44174df336b95c9bc7f7a6fc0bf69837ef0a14d8aa8306e8fd7628a"
+    "generatorSha256": "643fe2ea5b24a879f33045025e504270f8044698f11e1ec3170905d836b1ec26",
+    "sha256": "3fe0b8e1d5042b17ca1147b746346b8b198c52c95d3dd62c6a8ede8a31fae128"
   }
 }

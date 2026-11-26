@@ -45,7 +45,7 @@ def templates(root, toc_path):
     section.top_margin=section.bottom_margin=Mm(22);section.left_margin=section.right_margin=Mm(24)
     for style in doc.styles:
         if style.type!=1:continue
-        family='Noto Sans SC' if style.name.startswith(('Heading','Title')) else 'Noto Serif SC'
+        family='Noto Sans SC' if style.name.startswith(('Heading','Title','TOC')) else 'Noto Serif SC'
         style.font.name=family;style.font.size=Pt(11 if family=='Noto Serif SC' else 16)
         style.element.get_or_add_rPr().get_or_add_rFonts().set(qn('w:eastAsia'),family)
         style.paragraph_format.space_after=Pt(8)
@@ -54,6 +54,7 @@ def templates(root, toc_path):
     footer=section.footer.paragraphs[0];footer.text='第 '
     field=OxmlElement('w:fldSimple');field.set(qn('w:instr'),'PAGE');footer._p.append(field);footer.add_run(' 页')
     doc.add_heading('报告标题',0);doc.add_paragraph('摘要与结论')
+    doc.add_paragraph('目录',style='TOC Heading')
     # The actual docx 9.16.0 output supplies the SDT/complex TOC and its heading bookmark.
     with zipfile.ZipFile(toc_path) as native:
         body=etree.fromstring(native.read('word/document.xml')).find(qn('w:body'))

@@ -1,11 +1,7 @@
 import { createHash } from "node:crypto"
 import { readFile, realpath } from "node:fs/promises"
 import { isAbsolute, join, relative, sep } from "node:path"
-import { Effect, Stream } from "effect"
-import { ChildProcess } from "effect/process"
-import { ChildProcessSpawner } from "effect/process/ChildProcessSpawner"
-import { CrossSpawnSpawner } from "../../util/src/cross-spawn-spawner"
-import { LayerNode } from "../../util/src/effect/layer-node"
+import { runDocumentPython } from "./document-process"
 import type { Location } from "../../schema/src/location"
 import type { PinnedFiles } from "../../util/src/codepuppy-pinned-files"
 import { isDocumentRuntimeVerifyTask, isDocumentRuntimeVerifyReceipt, sameDocumentVerifyRef, type DocumentRuntimeVerifyTask, type DocumentRuntimeVerifyReceipt } from "../../util/src/codepuppy-document"
@@ -34,20 +30,11 @@ export function createDocumentRuntimeVerifier(input: {
         if (descriptor.version !== pin.version) throw new Error("verification version does not match the pin")
         await inside(input.templates, descriptor.template)
         if (createHash("sha256").update(await readFile(descriptor.template)).digest("hex") !== descriptor.templateSha256) throw new Error("verification template changed")
-        const process = Effect.scoped(Effect.gen(function* () {
-          const spawner = yield* ChildProcessSpawner
-          const handle = yield* spawner.spawn(ChildProcess.make(input.python, ["-I", "-B", input.script, task.runtimeRoot, task.jobRoot], { cwd: input.location.directory, forceKillAfter: "2 seconds" }))
-          return yield* Effect.all([
-            Stream.runFold(Stream.decodeText(handle.stdout), () => "", (a, b) => a + b),
-            Stream.runFold(Stream.decodeText(handle.stderr).pipe(Stream.tap((chunk) => Effect.sync(() => { stderr += chunk }))), () => "", (a, b) => a + b),
-            handle.exitCode,
-          ], { concurrency: "unbounded" })
-        })).pipe(Effect.provide(LayerNode.compile(CrossSpawnSpawner.node)))
-        const output = await Effect.runPromise(process, { signal: AbortSignal.any([signal, controller.signal]) })
-        stderr = output[1]; exitCode = Number(output[2])
+        const output = await runDocumentPython({ operation: "verify", python: input.python, script: input.script, directory: input.location.directory, runtimeRoot: task.runtimeRoot, jobRoot: task.jobRoot }, AbortSignal.any([signal, controller.signal]))
+        stderr = output.stderr; exitCode = output.exitCode
         if (signal.aborted) return { ...task, status: "cancelled", reason: "requested" }
         if (exitCode !== 0) return { ...task, status: "failed", reason: "conversion", detail: "fixed LibreOffice verification exited unsuccessfully", exitCode, stderr }
-        const value = JSON.parse(output[0]) as Record<string, unknown>
+        const value = JSON.parse(output.stdout) as Record<string, unknown>
         const receipt = { ...task, status: "completed", version: value.version, pdfPath: value.pdfPath, pdfSha256: value.pdfSha256, pageCount: value.pageCount }
         if (!isDocumentRuntimeVerifyReceipt(receipt) || receipt.status !== "completed" || receipt.version !== pin.version) throw new Error("invalid fixed verification output")
         await inside(task.jobRoot, receipt.pdfPath)

@@ -106,14 +106,6 @@ export const CODEPUPPY_OFFICE_CONNECTORS = [
   extension: string
 }>
 
-/** 第一方 Office 服务的写工具名(resources/office-mcp/server.py tools_for 的写入口)。 */
-export const OFFICE_WRITE_TOOL: Readonly<Record<CodePuppyOfficeFormat, string>> = Object.freeze({
-  word: "write_docx",
-  excel: "write_xlsx",
-  powerpoint: "write_pptx",
-  pdf: "write_pdf",
-})
-
 /** #1564: the app-bundled interpreter and the shared server, as `{codepuppyResources}`-relative slots. */
 export const CODEPUPPY_OFFICE_PYTHON_SLOT = "{codepuppyResources}/office-runtime/bin/python3"
 export const CODEPUPPY_OFFICE_SERVER_SLOT = "{codepuppyResources}/office-mcp/server.py"

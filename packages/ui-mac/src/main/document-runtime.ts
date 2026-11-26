@@ -131,10 +131,10 @@ export function createDocumentRuntime(input: {
       return state
     },
     subscribe(listener: (state: DocumentRuntimeState, sequence: number) => void) { listeners.add(listener); listener(state, sequence); return () => { listeners.delete(listener) } },
-    subscribeRuntimeVerify(location: Location.Ref, run: (task: DocumentRuntimeVerifyTask, signal: AbortSignal) => Promise<DocumentRuntimeVerifyReceipt>) {
+    subscribeRuntimeVerify(location: Location.Ref, run: (task: DocumentRuntimeVerifyTask, signal: AbortSignal) => Promise<DocumentRuntimeVerifyReceipt>, registrationId: string = randomUUID()) {
       const identity = key(location)
       if (registrations.has(identity)) throw new Error("duplicate document verification registration")
-      registrations.set(identity, { id: randomUUID(), location, run })
+      registrations.set(identity, { id: registrationId, location, run })
       dispatch()
       return async () => {
         registrations.delete(identity); requests.delete(identity)
@@ -143,6 +143,7 @@ export function createDocumentRuntime(input: {
           attempt.cancelled = true; attempt.abort.abort()
           await attempt.settled
         }
+        dispatch()
       }
     },
     async dispose() {

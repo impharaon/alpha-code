@@ -31,14 +31,14 @@ def verify(runtime_root, job_root):
         fonts.relative_to(job)
         environment['FONTCONFIG_FILE'] = str(fonts)
     command = [str(executable), '-env:UserInstallation=' + profile.as_uri(), '--headless', '--nologo', '--nodefault', '--nofirststartwizard', '--norestore']
-    version = subprocess.run(command + ['--version'], env=environment, capture_output=True, text=True, check=True)
+    version = subprocess.run(command + ['--version'], env=environment, capture_output=True, text=True, encoding='utf-8', errors='replace', check=True)
     if not re.match(r'^LibreOffice\s+' + re.escape(config['version']) + r'(?:\.[0-9]+)?(?:\s|$)', version.stdout):
         raise ValueError('LibreOffice version mismatch: ' + version.stdout.strip())
     output = job / 'verify-output'
     output.mkdir()  # Exclusive fresh output; never accept an earlier probe's PDF.
     source = job / 'control.docx'
     shutil.copyfile(template, source)
-    converted = subprocess.run(command + ['--convert-to', 'pdf:writer_pdf_Export', '--outdir', str(output), str(source)], env=environment, capture_output=True, text=True)
+    converted = subprocess.run(command + ['--convert-to', 'pdf:writer_pdf_Export', '--outdir', str(output), str(source)], env=environment, capture_output=True, text=True, encoding='utf-8', errors='replace')
     if converted.returncode:
         sys.stderr.write(converted.stderr)
         raise subprocess.CalledProcessError(converted.returncode, command)
@@ -66,6 +66,8 @@ def verify(runtime_root, job_root):
 
 
 if __name__ == '__main__':
+    sys.stdout.reconfigure(encoding='utf-8')
+    sys.stderr.reconfigure(encoding='utf-8')
     try:
         if len(sys.argv) != 3:
             raise ValueError('expected candidate root and private task root')

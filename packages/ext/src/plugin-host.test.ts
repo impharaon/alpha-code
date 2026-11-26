@@ -2662,3 +2662,28 @@ packageIt.live("a first-input Convex skill invocation arms only its matching mon
   for (let waited = 0; waited < 1000 && !(yield* Effect.promise(() => Bun.file(join(location.directory, "first-input-monitors")).exists())); waited += 10) yield* Effect.sleep("10 millis")
   expect(readFileSync(join(location.directory, "first-input-monitors"), "utf8").trim().split("\n").sort()).toEqual(["convex-occ-insights", "convex-runtime-errors"])
 })))
+
+packageIt.live("an always monitor waits for a real prompt and does not restart on later prompts", () => packageJourney(Effect.gen(function* () {
+  const capture = yield* Effect.promise(() => captureStandardFixture("claude:convex"))
+  const monitors = JSON.parse(new TextDecoder().decode(yield* Effect.promise(() => capture.readFile("monitors/monitors.json")))) as { name: string; command: string; when?: string }[]
+  const monitor = monitors[0]!
+  delete monitor.when
+  monitor.command = 'printf "started\\n" >> "${CLAUDE_PROJECT_DIR}/always-monitor-started"; printf "ALWAYS_MONITOR_NOTICE\\n"'
+  const sample = yield* invocationSample("claude:convex", { "monitors/monitors.json": JSON.stringify([monitor]), "hooks/hooks.json": null })
+  const membership = JSON.parse(readFileSync(join(sample.root, "skills-enabled.json"), "utf8"))
+  writeFileSync(join(sample.root, "skills-enabled.json"), JSON.stringify({ ...membership, keys: [...membership.keys, sample.key] }))
+  yield* invocationNativeServices
+  yield* activateExtUntilFinished
+  const location = yield* Location.Service
+  const sessions = yield* Sessions.Service
+  const session = yield* sessions.create({ location: { directory: location.directory }, title: "Always monitor lifecycle", agent: "build", model: { providerID: "test", id: "picked" } } as never)
+  expect(yield* Effect.promise(() => Bun.file(join(location.directory, "always-monitor-started")).exists())).toBe(false)
+  yield* (yield* TestLLM.Test).always(TestLLM.text("Always monitor task", "always-monitor-task"))
+  yield* sessions.prompt({ sessionID: session.id, text: "Start a real task" })
+  yield* sessions.wait(session.id)
+  for (let waited = 0; waited < 1000 && !JSON.stringify(yield* sessions.context(session.id)).includes("ALWAYS_MONITOR_NOTICE"); waited += 10) yield* Effect.sleep("10 millis")
+  expect(JSON.stringify(yield* sessions.context(session.id))).toContain("ALWAYS_MONITOR_NOTICE")
+  yield* sessions.prompt({ sessionID: session.id, text: "Next ordinary prompt" })
+  yield* sessions.wait(session.id)
+  expect(readFileSync(join(location.directory, "always-monitor-started"), "utf8").trim().split("\n")).toEqual(["started"])
+})))

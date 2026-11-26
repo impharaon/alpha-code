@@ -2456,6 +2456,38 @@
           "name": "package compact hooks block before a summary and observe the actual committed summary"
         }
       ]
+    },
+    {
+      "id": "plugin-session-monitors",
+      "decision": "DESIGN-local-plugin-install v3.1 §4.15: an enabled package registers always monitors only on a real session prompt, and skill monitors only when their actual named skill is invoked, including a first-input command. One process per package/entry/session generation; output lines enter that same session through native synthetic/inbox. Package off/update/removal, session close and Location disposal invalidate queued lines and cancel the owned process tree. Task scope release does not turn a session monitor into a short-lived hook. No crash restart loop.",
+      "adr": [
+        "ADR-029",
+        "ADR-047"
+      ],
+      "lane": "#1776 slice 5, r14",
+      "takeovers": [],
+      "mechanism": {
+        "file": "packages/ext/src/plugin-package-hooks.ts",
+        "ladder": "L0: same active package projection, Invocation activation, session lifecycle/resource table and AppProcess streaming helper. Hook and monitor source configuration share one package process binding owner; no new engine seam, source registry, timer-based inference loop or global environment mutation."
+      },
+      "tests": [
+        {
+          "file": "packages/ext/src/plugin-host.test.ts",
+          "name": "Convex skill monitors start once per session and stop without late delivery when the bundle closes"
+        },
+        {
+          "file": "packages/ext/src/plugin-host.test.ts",
+          "name": "a first-input Convex skill invocation arms only its matching monitors"
+        },
+        {
+          "file": "packages/ext/src/plugin-host.test.ts",
+          "name": "an always monitor waits for a real prompt and does not restart on later prompts"
+        },
+        {
+          "file": "packages/ext/src/plugin-package-process.test.ts",
+          "name": "monitor output flushes its final line and cancellation releases its child"
+        }
+      ]
     }
   ]
 }

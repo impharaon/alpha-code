@@ -59,6 +59,7 @@ export async function registerPackageHooks(
   const promptContexts = new Map<string, Contribution[]>()
   const stopTurns = new Map<string, Contribution>()
   const running = new Map<AbortController, { valid(): boolean; sessionID: string }>()
+  const monitors = new Map<string, { controller: AbortController; sessionID: string; valid(): boolean }>()
   const observed = new Set<string>()
   const promptEpoch = new Map<string, number>()
   const sessionEpoch = new Map<string, object>()
@@ -88,6 +89,25 @@ export async function registerPackageHooks(
           values.filter((value) => value.valid() && value.lifetime === sessionEpoch.get(value.sessionID)),
         )
   }
+  const watchPackage = (installed: Installed) => {
+    for (const file of ["current.json", INSTALLED_PLUGIN_SETTINGS_FILE]) {
+      const pointer = join(input.root, "ext-store", installed.key, file)
+      if (observed.has(pointer)) continue
+      observed.add(pointer)
+      watchFile(pointer, { interval: 100, persistent: false }, revoke)
+    }
+  }
+  const processSource = (installed: Installed, scope?: InstructionScope): Parameters<typeof pluginProcessConfig>[0] => {
+    if (!installed.settings) throw Error("dependency-missing: package settings")
+    return {
+      description: installed.description, settings: installed.settings, pluginRoot: installed.pluginRoot,
+      projectDir: context.location.directory,
+      ...(scope ? { skillDir: scope.item.entry.kind === "skill" ? join(installed.pluginRoot, scope.item.entry.directory) : dirname(join(installed.pluginRoot, scope.item.entry.sourcePath)) } : {}),
+      resolveEnvironment: name => process.env[name],
+      resolveOptionSecret: ref => codepuppyCredential(ref.slice(6, -1)),
+      resolveSecret: id => { const ref = installed.settings?.secretRefs[id]; return ref ? codepuppyCredential(ref.slice(6, -1)) : undefined },
+    }
+  }
   const membership = join(input.root, "skills-enabled.json")
   watchFile(membership, { interval: 100, persistent: false }, revoke)
   const events = new AbortController()
@@ -97,6 +117,7 @@ export async function registerPackageHooks(
     sessionEpoch.delete(sessionID)
     configResults.delete(sessionID)
     batches.delete(sessionID)
+    for (const [key, monitor] of monitors) if (monitor.sessionID === sessionID) monitors.delete(key)
     promptEpoch.delete(sessionID)
     stopTurns.delete(sessionID)
     for (const [controller, owner] of running) if (owner.sessionID === sessionID) controller.abort()
@@ -231,13 +252,7 @@ export async function registerPackageHooks(
           const controller = new AbortController()
           let redact = (text: string) => text
           running.set(controller, { valid: handler.valid, sessionID })
-          for (const file of ["current.json", INSTALLED_PLUGIN_SETTINGS_FILE]) {
-            const pointer = join(input.root, "ext-store", handler.installed.key, file)
-            if (!observed.has(pointer)) {
-              observed.add(pointer)
-              watchFile(pointer, { interval: 100, persistent: false }, revoke)
-            }
-          }
+          watchPackage(handler.installed)
           try {
             if (!handler.valid()) return
             const bindings = Object.fromEntries(handler.installed.description.entries.flatMap(entry =>
@@ -284,29 +299,9 @@ export async function registerPackageHooks(
               )
             )
               return
-            if (!handler.installed.settings) throw Error("dependency-missing: package settings")
-            const processSource: Parameters<typeof pluginProcessConfig>[0] = {
-              description: handler.installed.description,
-              settings: handler.installed.settings,
-              pluginRoot: handler.installed.pluginRoot,
-              projectDir: context.location.directory,
-              ...(handler.scope
-                ? {
-                    skillDir:
-                      handler.scope.item.entry.kind === "skill"
-                        ? join(handler.installed.pluginRoot, handler.scope.item.entry.directory)
-                        : dirname(join(handler.installed.pluginRoot, handler.scope.item.entry.sourcePath)),
-                  }
-                : {}),
-              resolveEnvironment: (name) => process.env[name],
-              resolveOptionSecret: (ref) => codepuppyCredential(ref.slice(6, -1)),
-              resolveSecret: (id) => {
-                const ref = handler.installed.settings?.secretRefs[id]
-                return ref ? codepuppyCredential(ref.slice(6, -1)) : undefined
-              },
-            }
+            const sourceConfig = processSource(handler.installed, handler.scope)
             if (handler.hook.type === "prompt") {
-              const config = pluginProcessConfig(processSource)
+              const config = pluginProcessConfig(sourceConfig)
               redact = (text) =>
                 [...config.secretValues]
                   .toSorted((left, right) => right.length - left.length)
@@ -385,7 +380,7 @@ export async function registerPackageHooks(
               }
             }
             const result = await processes.command({
-              source: processSource,
+              source: sourceConfig,
               command: handler.hook.command,
               ...(handler.hook.args === undefined ? {} : { args: handler.hook.args }),
               environment: {},
@@ -512,6 +507,42 @@ export async function registerPackageHooks(
         block: result.block,
         output: "output" in result ? result.output : undefined,
       }))
+  }
+  const startMonitors = (sessionID: string, invocation?: InstructionScope) => {
+    const lifetime = sessionEpoch.get(sessionID)
+    if (!lifetime) return
+    for (const installed of allInstalledPluginPackages(input.root).filter(active)) {
+      for (const entry of installed.description.entries) {
+        if (entry.kind !== "monitor" || !pluginEntryRuntimeAvailable(entry)) continue
+        if (entry.when.kind === "skill" && (!invocation || invocation.item.installed.key !== installed.key || invocation.item.entry.kind !== "skill" || invocation.item.entry.sourceName !== entry.when.sourceName)) continue
+        if (entry.when.kind === "always" && invocation) continue
+        const key = JSON.stringify([installed.settings?.packageId, entry.id, sessionID])
+        const previous = monitors.get(key)
+        if (previous?.valid()) continue
+        previous?.controller.abort()
+        const controller = new AbortController()
+        const valid = () => !controller.signal.aborted && active(installed) && sessionEpoch.get(sessionID) === lifetime
+        monitors.set(key, { controller, sessionID, valid })
+        running.set(controller, { sessionID, valid })
+        watchPackage(installed)
+        void Promise.resolve()
+          .then(() => {
+            if (!valid()) return
+            return processes.monitor({
+              source: processSource(installed, invocation), command: entry.command, environment: {}, signal: controller.signal,
+            }, async line => {
+              if (!valid()) return
+              await context.session.synthetic({
+                sessionID, text: renderWrapper(PACKAGE_HOOK_CONTEXT_ID, { label: entry.sourceName, body: line }), resume: true,
+              })
+            })
+          })
+          .catch(error => {
+            if (valid()) input.log("runtime-failed: monitor " + entry.sourceName + ": " + String(error))
+          })
+          .finally(() => running.delete(controller))
+      }
+    }
   }
   // The initial snapshot is the recovery watermark; old terminal calls are never replayed.
   const rememberBatches = async (sessionID: string) => {
@@ -671,6 +702,7 @@ export async function registerPackageHooks(
         }),
       )
     await starts.get(event.sessionID)
+    startMonitors(event.sessionID)
     const contexts = await run("UserPromptSubmit", event.sessionID, {
       prompt: event.prompt.text ?? "",
       prompt_id: event.messageID,
@@ -750,11 +782,13 @@ export async function registerPackageHooks(
       }
     },
     activateInstruction(sessionID: string, item: Instruction, allowed: () => boolean) {
+      if (!sessionEpoch.has(sessionID)) sessionEpoch.set(sessionID, {})
       const scopes = instructions.get(sessionID) ?? new Map<string, InstructionScope>()
       const id = item.installed.key + ":" + item.entry.id
       const scope = { item, active: allowed }
       scopes.set(id, scope)
       instructions.set(sessionID, scopes)
+      if (allowed()) startMonitors(sessionID, scope)
       return () => {
         if (scopes.get(id) === scope) scopes.delete(id)
         revoke()
@@ -795,6 +829,7 @@ export async function registerPackageHooks(
       runtime.dispose()
       configResults.clear()
       batches.clear()
+      monitors.clear()
       releasePermissionRequest()
       events.abort()
       unwatchFile(membership, revoke)

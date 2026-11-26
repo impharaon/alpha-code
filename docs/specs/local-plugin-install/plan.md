@@ -1209,3 +1209,15 @@ PackageRuntime 只查当前真实 Session.location，无新增服务依赖/DTO�
 **Langfuse 实际一次性边界**：同一临时 runner `-t 'one-time original Langfuse'` **1 pass**（`/tmp/plugin-standard-r14-original-runtime.log` 中另一个 telemetry fixture 先失败，不把整次命令标全绿）。原 Stop shell 与 langfuse_hook.py 正文未改，以明确的 `/usr/bin:/bin` PATH 验证源 Python fallback、清空 auth env、state 指向本包 DATA。真实日志说明缺少 langfuse SDK/uv PATH（原 fail-open 路径）；未安装外部 Python SDK、未用真实 Langfuse key 或发 SaaS trace，不将这个受控 fallback 称为默认 app PATH 的全链验收。SessionEnd 仍待 S-03。
 
 相关回查：项目 trust 原两文件 **20 pass**，takeover/同步/本地 parity 五个原文件 **95 pass**。独立 north-star guard exit 1，现只剩本轮未改的 `packages/client/src/promise/generated/types.ts`、`packages/schema/test/mcp.test.ts`；`git diff 4e31bc4a3b -- <这两文件>` 为空，未扩大调查/修复它们，去向为编排器已有分支登记。core/ext/ui-mac/plugin 类型检查均 exit 0；conversion/artifact --check exit 0（20 文件）。Host artifact aggregate 仍 9eaf52305a08ccdf6cbba6131c6573228f304e6316671f510b952fc48c3668b7，成员/清单相对 r13 无变化。
+
+### r14｜会话 monitors 与 Convex 原命令
+
+AC-11/13/14/20/24/25：2c2d5677ff 的 Convex 声明变体先红（未启动任何 monitor），c641c79fcb 的首条输入直接 invoke 变体也先红（尚无 prompt epoch）。现在真实 prompt 才登记 always；真实 Invocation（包括第一条输入）建立会话活跃期并只启动指定 skill 的 monitor。以 packageId/entryId/sessionID 管一实例，换代/配置更换另查活跃所有权；同一会话普通后续 prompt 不重复启动，skill 的本轮 scope 结束后 monitor 继续归会话。hook 与 monitor 复用同一个 processSource/ROOT/DATA/OPTION/秘密表、原 core binding 和 AppProcess，不增加 parser/进程后门。
+
+stdout 的 CRLF/LF、最后残行经已有流执行器进入原 synthetic/inbox，同名输出沿源 monitor 名展示并唤醒同一任务；stderr 不变成正常通知。包关闭/换代/移除、会话原 close 和 Location disposal 取消同一资源表的进程，异步启动前/排队行投递前再查代与会话有效性；非零退出用原脱敏诊断，不无限重启。新 registry `plugin-session-monitors` 为 L0。Notification hook 的宿主统一出口仍属未完成 S-03，不把 monitor 的原生 synthetic 通知等同该完整事件已接通。
+
+完整 host **89 pass / 0 fail**（`/tmp/plugin-standard-r14-monitors-complete.log`）；installer **50 pass**（`monitors-install.log`）；ext/ui-mac typecheck exit 0。新增三个有限原 integration 用例分别证明 design 的两个进程/无 quickstart/真实流与残行/关包杀树和迟到丢弃、首条 skill 输入、always 不随安装与 session.create 启动且后续 prompt 不重启。来源为固定 Convex monitors.json，仅替换命令作有限观察程序或令一个原声明缺省 when；没有把 hand-written 外部协议当真实格式。gate-files 86→89 精确计数，仍在原 host 文件，不改 selector。
+
+六个移除臂全红：monitor-ready、monitor-invocation、monitor-skill-filter、monitor-once、monitor-notification、monitor-cancel；`python3 /tmp/plugin-standard-r14-monitor-removal.py`，结果 `/tmp/plugin-standard-r14-monitor-removal-results.json`，每臂确认实际注入，源盘未改。加前述 S-04 五臂、S-08 四臂、S-06 六臂，本轮 **21 个移除臂全红**。
+
+**Convex 原命令一次性验收**：ext 包内 `bun test --max-concurrency 2 /tmp/plugin-standard-r14-runtime/plugin-runtime.test.ts -t 'one-time original Convex'` **1 pass / 0 fail**（`/tmp/plugin-standard-r14-convex-original.log`）。原五条 monitor 命令正文保留，仅前置 temp PID 观察；首条 design Invocation 实际启动 runtime-errors / occ-insights 两条原 shell 循环，其余 quickstart 三条不运行。项目无 .env.local，实际走源自保护，无 npx/凭据/云请求；关包后两条原进程树退出，模型请求仍只有真实任务的一次。真实已关联部署的 npx 日志/insights、云权限与业务数据为外部验收边界；主动吐行的受控命令变体另证明宿主通知，不冒称静默原 guard 产生过 SaaS 错误行。

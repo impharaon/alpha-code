@@ -3,20 +3,20 @@ id: DESIGN-document-output-quality
 title: 助手文档与设计成品质量 技术设计
 summary: 固定引入 Anthropic 技能并适配随包运行环境，以 LibreOffice、PDFium 和内置 Chromium 生成自检图；复用固定文件下载与云端识图，归并 Excel 操作，保留中文模板和离线成品。
 kind: tech-design
-status: draft
+status: frozen
 spec: SPEC-document-output-quality
 spec_version: 1
 review:
-  rounds: 0
-  reviewed_sha: ""
-  verdict: ""
+  rounds: 1
+  reviewed_sha: d07c5aa8a8
+  verdict: "fix-then-freeze; R1 4 Major 4 Minor accepted and corrected"
 owners: [owner]
 last_reviewed: 2026-11-26
 ---
 
 # DESIGN-document-output-quality｜助手文档与设计成品质量 技术设计
 
-本文是 #1761 的送审设计。只决定契约、责任和取舍；不包含改动文件清单、实施步骤或测试清单。消费规格中的既有工具卡片与文件预览，不新增页面或绘制体验稿。
+本文按本次指令采纳独立审查 R1，修正后冻结；仅依赖 darwin-x64 启动器的条款按 §10 标为 pending-seam，其余不受阻。只决定契约、责任和取舍；不包含改动文件清单、实施步骤或测试清单。消费规格中的既有工具卡片与文件预览，不新增页面或绘制体验稿。
 
 ## 1. 基线
 
@@ -24,7 +24,7 @@ last_reviewed: 2026-11-26
 - 代码基线：`9f08c506d9842d319616c7e45c33d3b9c3279e48`。本文以下 main 路径简写相对 `packages/ui-mac/src/main/`，资源路径相对 `packages/ui-mac/resources/`。
 - 背景：协调仓 `docs/intents/discussions/INT-office.md`，读取版本 `86a58c7bbdaad8b7c689d1c9c2845e3ce16db2a9`，重点为 P-01、P-03、P-05、2026-11-25 三次试验及 U-12。本机原始证据根简称 `pilot/`：`~/.cache/alpha-orch/2026-11-25/office-pilot/`；它只定位证据，不是产品默认路径。
 - 固定下载机制：直接消费协调仓 `docs/specs/domestic-cloud-connectivity/design.md`「切片四」§4.11、§10 冻结回执，读取版本同上；继承 R1 `6b0e4c0` 的处置，不另定清单、镜像、续传或回退规则。
-- 启动器输入：#1760 的 `docs/specs/connector-launchers/design.md`，固定提交 `ceeee7d4df92c7549f69f505ba173af4c7dd47e5`，仍为送审草稿。本文消费其 §4.1..4.3、§4.5、§4.7；必要交接请求见 §8，不把草稿端口当成现有实现。
+- 启动器输入：#1760 的 `docs/specs/connector-launchers/design.md`，固定合入提交 `173122a8e955f97d830fe53fccd3400d079d9488`（#1766），status=frozen，继承其 R1 处置。本文按要求执行 `git fetch -q origin && git show origin/alpha:docs/specs/connector-launchers/design.md`（exit 0），未合并 origin/alpha；消费其 §4.1..4.3、§4.5、§4.7。该版本 `:104` 的 platform 仍只有 darwin-arm64 / win32-x64，darwin-x64 请求留在 §8/§10；冻结是决定的状态，不是实现完成证明。
 - AC-01..AC-03 的分数仍归规格及已授权的默认模型实测。本文不改变分数、不进行付费调用，也不以强模型试验成绩证明默认模型能力。
 - 文档影响为 feature decision；唯一落点是本文与必要的生成索引行。ADR-014 第 5 条的后续修订属于实现批准后的同项决定传播，本文不修改受保护规则资产。
 
@@ -47,7 +47,11 @@ last_reviewed: 2026-11-26
 | F-11 | `pilot/F-excel/logs/x3_tools.json` 是社区 server 2.3.2 实际 tools/list，共 46 个工具。已安装 METADATA 标 MIT；`excel_mcp/operations/calculated.py:27-47` 先读缓存，仅缺缓存时尝试自带公式计算。`workspace.py:315-338` 用 `package.prepare/apply` 保存扩展。 | 计算结果不能因有缓存就冒称新鲜重算；选用操作层与保真保存层，不运行它的 MCP/HTTP 服务。 |
 | F-12 | 本次临时探针复制真实 `F-excel/X3-community/work/sales_x3.xlsx`；调用 2.3.2 的 `Workspace.edit`、`operations.sparklines.add_sparklines` 后再次 edit/save，迷你图 part 数为 1→1；同一文件改用普通 openpyxl load/save 为 1→0，且真实报“不支持 Sparkline Group”。命令 exit 0；回执 `/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/document-design-probe-kyey3nss/receipt.json`。 | 保存保真是实际边界，不能让模型在创建这些对象后随手整本 openpyxl 回存。探针只证明迷你图，没有冒称证明全部对象。 |
 | F-13 | `factory-skills.ts:20-56,109-117` 与 `reconcileFactorySkills` 是出厂技能来源/嵌套发现权威；`packages/ext/src/plugin.ts:160-176` 通过 tool.transform 注册自有工具；工具文案归 `context-injection.ts`。 | 用既有出厂渠道和工具注册，不引入 Claude 插件运行器或另一份技能发现机制。 |
-| F-14 | `packages/plugin/src/promise/session.ts:199-220` 向插件公开 session.synthetic；`packages/core/src/session.ts:244-246,528` 是全局 Session.Service.synthetic；协议 `groups/session.ts:398-415` 已支持 id、delivery、resume，精确冲突报错。`LocationServiceMap.Service.get`（core `location-service-map.ts:9-16`）已有 Location 执行面。 | 就绪后的补查有合法的持久合成输入口；需要的是本票的宿主桥和待查记录，不是改现有发送通道或另造会话队列。 |
+| F-14 | `packages/plugin/src/promise/session.ts:201-214` 向所属 Location 的插件公开 session.synthetic，`promise/adapter.ts:637` 已适配 host.session.synthetic；现有协议支持 id、delivery、resume 和精确 ID 重试。 | ext 可直接入队补查，不需要新增 server 适配器或 Location 路由，也不改现有发送通道。 |
+| F-15 | `renderer/codepuppy-ui/session-rail/artifacts/local-artifacts.ts:58-85` 只识别 OFFICE_WRITE_TOOL、write、patch 新建；映射在 `shared/office-advisories.ts:110-115`。`scripts/build-office-runtime.ts:271-274` 的构建烟测也调用四个 writer。 | 移除 writer 必须同时改变这两个消费者；shell/Chromium 成品以文档工具持久回执进入原面板，不能只改工具清单。 |
+| F-16 | `renderer/extensions/codepuppy-catalog.json:75-84,162-176,336-346` 仍有旧 writer/描述，Excel default-disabled，artifactDigest 及重 intake 规则在 `:142,172`；`codepuppy-catalog.snapshot.json:8` 明确快照由目录发布仓 catalog-src 生成，不许手编。 | 目录源生产者与桌面快照消费者是跨仓契约；默认制作路径不能依赖启用 Excel MCP。 |
+| F-17 | 社区 2.3.2 的 sorting.py/replace.py/cells.py 无 pivot rebuild 调用；`operations/pivot_rebuild.py:56-92` 提供 can_rebuild/rebuild，后者只重建本实现创建且未被 Excel 重刷的透视表；现有调用来自 `slicer_pivot.py:23` 的导入及其切片器路径。 | 原稿“排序后自动更新透视”没有接缝，改为保存前显式调用，并对不可重建者如实诊断。 |
+| F-18 | `factory-skills.ts:124-133` 直接收嵌套 SKILL.md；目录 `codepuppy-catalog.json:999-1013` 已有 canvas-design。`packages/core/src/filesystem/codepuppy-project-watch.ts:16-47,62-64` 是 ADR-047 的项目 watcher 忽略表拥有者，尚无 .document-output。 | 适配技能采用独立 frontmatter name；工作目录写本地 gitignore 并消费同一个 watcher 忽略权威。 |
 
 外部包元数据补核：PyPI `pypdfium2/5.0.0/json`（本次 urllib 读取，exit 0）列出 mac arm64/x64、win_amd64 wheel；许可证为 BSD-3-Clause、Apache-2.0 及 dependency licenses。[Python API](https://pypdfium2.readthedocs.io/en/stable/python_api.html) 提供 PdfDocument、逐页 render。其实际随包加载尚未验证。所有本次探针只运行 Python/读元数据，没有启动桌面应用、Electron 或 LibreOffice。
 
@@ -56,6 +60,8 @@ last_reviewed: 2026-11-26
 ### 4.1 技能、运行环境与许可
 
 **决定：固定快照、适配后随包、出厂加载。** 引入 F-03 的七个技能；`office-docs` 保留为六种成品的路由与自检总入口，对应技能通过既有 factory nested discovery 按需加载。只注入短路由，不把七份正文和 Excel 操作 schema 每次全部塞入上下文。模型称呼统一为“助手”；去掉 Claude 专属路径、上传交付、预装包/apt/brew、失败后 npm/pip install 及 Linux 专属命令。没有用户新增的确认步骤。
+
+七个适配技能的 frontmatter name 分别固定为 `codepuppy-document-docx`、`codepuppy-document-xlsx`、`codepuppy-document-pptx`、`codepuppy-document-pdf`、`codepuppy-document-frontend-design`、`codepuppy-document-canvas-design`、`codepuppy-document-theme-factory`；路由与技能内引用使用这些名字，不占用目录可安装的 canvas-design 等原名，也不靠顶层 FACTORY_SKILL_IDS 的避让覆盖嵌套技能。
 
 制作路线保留上游知识：新 Word 用 docx 9.16.0；PPT 用 pptxgenjs 4.0.1 的原生图表/表格/备注；Excel 用 openpyxl 和 §4.6 操作；PDF 用 reportlab/pypdf；网页与海报用 frontend-design、canvas-design、theme-factory 的构图与主题指导，以本地 HTML/CSS/JS 为可编辑源，Chromium 导出成品。用户模板走上游“编辑现有容器”的方式，不能为了使用新建库而丢掉母版。无需引入 web-artifacts-builder 的 Claude artifacts 发布脚本、React 工程或在线安装链来完成当前 AC。
 
@@ -77,7 +83,11 @@ type DocumentEnvironment = {
 
 模型通过现有 shell 工具运行本地脚本，使用 environment 返回的入口；npm 库从绝对 nodeModules 路径加载，不依赖 ESM 对 NODE_PATH 的支持。Python 文档库由原 Office runtime 的构建锁继续负责，补 Windows 的 CPython 3.11.15/同版文档库闭包；不共用 #1760 的第三方连接器 Python 环境。PDF 栅格化增加 pypdfium2 5.0.0，Excel 操作需要的 pydantic 及其闭包均在构建期锁版本/哈希和随包，运行时不安装。Node 只消费 #1760 的入口与签名方案，不再带第二份 Node。文档 npm 包也在构建期按 F-05 精确版本和 lock integrity 备好，不通过 npx 启动。
 
+消费 #1760 冻结版时只读取其 Node 资产入口/签名与公开宿主面；不把该设计仅供 uv-tool/npm-exec 的 PATH、UV_PYTHON、XDG 等启动器覆盖套到原生文档脚本。包管理器共用位置仍归它引用的 #1759 权威，本文不重算这些环境键。
+
 最终成品仍写用户指定的项目位置。模型要读取的 PNG/局部图统一写 `workRoot/<checkId>/<revision>/<renderId>/`，在同一已授权工作区内，避免为了自检再触发外部目录读许可；LO profile、临时展开和待查日志仍在 userData，二者不混淆。main 的 Chromium 输出也必须绑定当前工作区授权与源/目标真实路径，不能借宿主桥扩大写权限；不改 HOME 或新增清理到期策略。
+
+初始化该应用工作目录时写入 `.document-output/.gitignore`，内容为 `*\n`，使渲染与制作中间物不进入项目版本控制；项目文件 watcher 在既有 `projectWatchIgnore` 的 FOLDERS 中忽略 `.document-output`，不为每张检查图发项目变化事件。最终成品仍在用户项目正常位置，由原 watcher 与产物面板照常处理；不在 renderer 再维护一份 watcher 排除表。
 
 分发边界如下（是许可证决定，不是实施文件清单）：
 
@@ -118,7 +128,7 @@ HTML 默认产物是单文件 HTML：脚本、样式、图片和 OFL 字体子�
 
 F-07 的读取命令用 urllib 读取三份 `provenanceUrl + ".mirrorlist"`，提取 Size 和 SHA-256；是官方元数据，不是本次下载验真的摘要。发布者核对副本 bytes/hash 后才提交可消费 entry。香港优先、失败后原地址从 byte 0 重取、同来源有效 part 的续传、取消、完整性/磁盘错误、缓存重验，全部沿用冻结机制。这里的“原地址”是自有 GitHub release 副本，不临时回 TDF。
 
-存储统一派生自 USER_DATA_LAYOUT：下载缓存 `<userData>/pinned-files/<sha256>/<filename>`；展开 runtime `<userData>/document-runtime/libreoffice/<target>/<version>/`；job profile、font cache、临时文件与检查记录在同一 document-runtime 下的独立子目录。安装资源只读。mac 下载约 300/310 MB，展开实测约 806 MB；Windows 下载约 376 MB、展开体积尚未测量，磁盘错误如实报告，不以约 800 MB 做人为容量闸。
+存储统一派生自 USER_DATA_LAYOUT：下载缓存沿 #1760 冻结契约为 `<userData>/pinned-files/<id>/<filename>`，同一宿主按 id 合并在途获取，不另改为按摘要合并；展开 runtime `<userData>/document-runtime/libreoffice/<target>/<version>/`；job profile、font cache、临时文件与检查记录在同一 document-runtime 下的独立子目录。安装资源只读。mac 下载约 300/310 MB，展开实测约 806 MB；Windows 下载约 376 MB、展开体积尚未测量，磁盘错误如实报告，不以约 800 MB 做人为容量闸。
 
 mac 用系统 hdiutil `attach -readonly -nobrowse -noautoopen -mountpoint <私有临时挂载点>`，复制原 LibreOffice.app 到临时展开根后卸载；不运行安装器、不写 /Applications、不改上游签名或去 quarantine。Windows 用随包 Python ctypes 调 `MsiOpenDatabaseW(MSIDBOPEN_READONLY)`、查询 Directory/Component/File/Media/_Streams、`MsiRecordReadStream` 取 CAB，再用 Cabinet API `FDICopy` 按 MSI 目录表还原到临时根；不执行安装序列、自定义 action、msiexec 或系统注册。Windows 的这个解包适配是明确新增端口，依据是 [Windows Installer 只读数据库](https://learn.microsoft.com/en-us/windows/win32/api/msiquery/nf-msiquery-msiopendatabasea)、[CAB 文件键](https://learn.microsoft.com/en-us/windows/win32/msi/cabinet-files)、[FDICopy](https://learn.microsoft.com/en-us/windows/win32/api/fdi/nf-fdi-fdicopy)；尚未在该 MSI 实物/Windows 上运行。二进制原字节保留，解包路径不越界；不得以需要管理员权限为解决办法。
 
@@ -128,11 +138,11 @@ mac 用系统 hdiutil `attach -readonly -nobrowse -noautoopen -mountpoint <私�
 type DocumentRuntimeState =
   | { phase: "preparing"; stage: "download" | "extract" | "verify";
       received?: number; total?: number }
-  | { phase: "ready"; version: "26.8.3"; executable: string }
+  | { phase: "ready"; version: string; executable: string }
   | { phase: "failed"; failure: ConnectorLaunchFailure }
 ```
 
-这是本票文档 runtime 的状态，不伪造“连接器尚未连接”。失败直接复用 #1760 的 ConnectorLaunchFailure 和已有呈现/助手交接：固定文件失败映射 download；磁盘/解包/启动异常带完整诊断归 unknown；不要求用户安装 LibreOffice。复用 progress 单位和失败动作，不给 #1760 的 ConnectorLaunchState 私加一个 stage。环境查询第一次触发后台准备并立即返回；准备过程没有整包总时限。普通文档库和读工具启动不等待 LO，工具卡片通过同一状态流显示真实下载字节与阶段。
+这是本票文档 runtime 的状态，不伪造“连接器尚未连接”。ready.version 从选中的 pinned list entry 读取，当前值为 26.8.3，不在类型层锁死。失败直接复用 #1760 的 ConnectorLaunchFailure、PinnedFileDelivery 原始失败事实与已有呈现/助手交接：connect/timeout/HTTP 5xx/429 才映射 download；404、完整性/磁盘/解包/启动异常及无法确认的粗 network 码带完整诊断归 unknown，不要求用户安装 LibreOffice。复用 progress 单位和失败动作，不给 #1760 的 ConnectorLaunchState 私加一个 stage。环境查询第一次触发后台准备并立即返回；下载准备没有整包总时限，verify 中实际启动 LO 则受 §4.4 的自检执行期限。普通文档库和读工具启动不等待 LO，工具卡片通过同一状态流显示真实下载字节与阶段。
 
 ### 4.4 模型可调用的制作与渲染契约
 
@@ -154,10 +164,13 @@ type RenderPage = {
   number: number                   // 1起，按PDF页序或HTML纵向片段排序
   path: string; sha256: string; width: number; height: number
 }
-type RenderReceipt = {
-  id: string; checkId: string; revision: 0 | 1
+type DocumentArtifactRecord = {
+  checkId: string
   kind: DocumentKind; sourcePath: string; sourceSha256: string
   artifactPath: string; artifactSha256: string
+}
+type RenderReceipt = DocumentArtifactRecord & {
+  id: string; revision: 0 | 1
   renderer: "libreoffice-pdfium" | "pdfium" | "chromium"
   rendererVersion: string; pages: RenderPage[]; pageCount: number
   template: { source: "bundled" | "user"; path: string; sha256: string } | null
@@ -165,14 +178,21 @@ type RenderReceipt = {
 }
 type RenderResult =
   | { status: "rendered"; receipt: RenderReceipt }
-  | { status: "pending"; checkId: string; runtime: DocumentRuntimeState }
+  | { status: "pending"; checkId: string; artifact: DocumentArtifactRecord;
+      runtime: DocumentRuntimeState }
   | { status: "failed"; code: "invalid-input" | "source-missing" | "runtime" |
-      "conversion" | "raster" | "disk" | "source-changed"; detail: string }
+      "conversion" | "raster" | "disk" | "source-changed" | "timeout";
+      detail: string; artifact?: DocumentArtifactRecord }
+type DocumentToolMetadata = {
+  codepuppyDocument: { schemaVersion: 1; artifact: DocumentArtifactRecord }
+}
 ```
 
 所有字段经 schema 验证；格式须与文件/容器一致，非法参数不执行 I/O；路径沿现有工作区授权与真实路径校验，不带入预览器的文件/页数上限。dpi、viewport 只定义本请求所需精度/画布，不新增产品选项。HTML 未给 viewport 时默认 1440×900 CSS px；design 未给时从源声明的画布尺寸取，源也未声明则助手按任务选择尺寸。Office/PDF 每页按 144 dpi 全量栅格化；网页按完整 scrollHeight 分段出图（片段高为 viewport.height），不能只截首屏。图片不因工具上下文容量而被省略；页多时模型逐批 Read。设计导出 PNG 是完整画布成品，另可分片检查，不能只交第一片。
 
 首次 render 省略 checkId、revision 默认 0，工具分配并返回 checkId；修正后的 render 带同一 checkId、revision=1，必须属于当前会话/Location 的同一成品。renderId 每次新分配，工具不把重渲染当成新一次修正；原始检查、修正、复核的身份由此闭合。环境查询不是生成完成回执，template 字段取实际选中模板的来源记录和哈希，未知时为 null，不能凭模型口头声称填入 bundled。
+
+DocumentArtifactRecord 只指向已核实存在、位于授权工作区的文件，不把请求中的目标路径当作已生成。Office 的 sourcePath/artifactPath 是同一成品，design 则分别是可编辑源与已导出的 PNG。rendered 回执、LO pending 记录以及失败但成品仍存在的结果都把该 record 投影到工具返回的 DocumentToolMetadata；工具 part 仍正常完成，内部 status 说明检查失败，不能把“检查未完成”变成“文件未生成”。元数据随现有工具 part 持久化，具体面板消费者见 §4.8；检查图不登记为用户成品。
 
 | 格式 | 唯一自检渲染路径与关键语义 |
 | --- | --- |
@@ -180,9 +200,11 @@ type RenderResult =
 | Excel | §4.7 先重算 → 成品快照 → `pdf:calc_pdf_Export` → 同一 PDFium。尊重各 sheet 的打印范围、分页、重复表头、方向与缩放；输出全部可打印页，不强行缩成一页或拿网格预览代替打印版面。 |
 | PPT | 成品快照 → `pdf:impress_pdf_Export` → 同一 PDFium；每张普通幻灯片对应一页，讲者备注仍保存在 PPT，不用备注页冒充幻灯片数。 |
 | PDF | 直接 PDFium 解码每页，不经 LO/重排/截图浏览器工具栏；pageCount 来自真实 PDF，记录每页尺寸。 |
-| HTML / design | main 的离屏 Chromium 载体消费文件快照；复用既有隔离 session/protocol/零外网规则，等待 fonts.ready、图片 decode、应用脚本稳定后通过 `webContents.capturePage` 分片。固定画布直接导出 PNG，必要 PDF 导出用内置 `printToPDF`；无外置 Chrome/Playwright 浏览器下载。 |
+| HTML / design | main 的离屏 Chromium 载体消费文件快照；复用既有隔离 session/protocol/零外网规则，在 load 完成、`document.fonts.ready`、当前图片 decode 全部 settle 后，再连续等待两个 requestAnimationFrame，随后通过 `webContents.capturePage` 分片。图片解码失败记 diagnostics 后继续，不另等“应用脚本稳定”或 network idle；载体关闭后台节流，长期动画不阻止上述截取时点。固定画布直接导出 PNG，必要 PDF 导出用内置 `printToPDF`；无外置 Chrome/Playwright 浏览器下载。 |
 
 LO 进程每 job 独立 UserInstallation，不和用户开的 LibreOffice 争用 profile，也不借用户的安装路径。转换进程退出 0 仍需确认新 PDF 存在、非空、可解码；stderr、页数与 renderer 版本保留。生成输出不因渲染失败被删除。PDFium 使用同版跨平台 wheel，与现有 pypdf 分别承担“画出来”和“读结构”，不增加 Poppler 系统命令依赖。
+
+**自检执行的固定期限为 180,000 ms**，从本次实际 render / excel_recalculate 开始计时（render 内的 Excel 重算共享这一期限，不层层叠加），覆盖 LO、PDFium、Chromium 的 load/fonts/decode/帧等待和截图；LO 准备 verify 的启动转换也用此期限，后台下载不计入。178,000 ms 时取消并请求终止；到 180,000 ms 强制结束本 job 进程句柄或销毁 WebContents，由调用端期限保证不再等待卡死的 worker/宿主回包，过期回包和未发布临时结果不再生效。返回 code=timeout、保留可交付文件和已完成页，助手明确“本次版面检查未完成”，不自动重跑整轮；这只界定检查是否完成，不限制文档交付、文件大小或页数，不增加用户动作。
 
 Chromium 载体的创建/截图是**本票新增**，不直接调用只能显示用户预览的 openRailPreview，也不复制其隔离实现。将现有 hardenSession/hardenWebContents 的公共不变量收敛成同一内部权威，预览与导出消费它；文档导出只允许当前 job 的固定资源映射，HTML 源可执行所需本地 JS，但没有 preload、Node、Electron API、其它工作区文件或出网能力。这里不会改变用户现有预览组件与交互。
 
@@ -206,7 +228,7 @@ type DocumentCheckReport = {
 type DeferredDocumentCheck = {
   id: string; location: Location.Ref; sessionID: Session.ID
   notificationID: SessionMessage.ID
-  request: RenderRequest; sourceSha256: string
+  request: RenderRequest; sourceSha256: string; artifact: DocumentArtifactRecord
   revision: 0 | 1
   state: "waiting-runtime" | "admitting" | "admitted" | "complete"
   report?: DocumentCheckReport
@@ -221,9 +243,9 @@ Location/Session/SessionMessage 类型直接消费现有 schema，不另发明 I
 
 **LO 尚未 ready 时立即走 BR-08。** Word/Excel/PPT 生成不等待环境准备，render 返回 pending，同时宿主原子落 DeferredDocumentCheck；助手先交文件，并明说“版面尚未检查”；Excel 同时写明重算若未完成，不能谎称无公式错误。PDF、HTML、海报仍可当次检查。
 
-下载/解包就绪后，宿主按 pending 记录请求 sidecar 的窄桥 `resumeDocumentCheck(checkId)`，桥在 server 自有接线层调用现有 Session.Service.synthetic：`id=notificationID`、`delivery="queue"`、`resume=true`，text 为应用固定的补查指令与本地成品引用、metadata 为 checkId/源摘要；不会冒充用户新要求。插件在原 Location 执行同一 render→Read/vision→check，至多一轮修正，回复原会话。新任务晚到时 queue 只在其可用边界处理，不打断正在进行的用户工作。
+下载/解包就绪后，main 经现有 main↔sidecar↔ext 桥通知记录所属 Location 的 ext；该 ext 直接调用自己已有的 `ctx.session.synthetic({sessionID,id:notificationID,text,metadata,delivery:"queue",resume:true})`。text 为应用固定的补查指令与本地成品引用、metadata 为 checkId/源摘要；不会冒充用户新要求。插件在原 Location 执行同一 render→Read/vision→check，至多一轮修正，回复原会话。新任务晚到时 queue 只在其可用边界处理，不打断正在进行的用户工作。
 
-该桥是明确新增能力，`Session.Service.synthetic` 已有持久 admission 与精确 ID 重试。main 不导入 core；server 适配消息，按真实 Location 路由到现有执行面。记录在收到 admission 回执后才从 admitting 变 admitted，断线重发同一 notificationID，不新增会话队列/重试引擎。应用重启后读取 waiting/admitting 继续这一项已授权补查；admitted 不再新建合成消息。这个过程只新增本功能输入，**不把现有 composer、配置、permission 或其它生产路径从一代引擎切到另一代**。
+只新增该功能的通知/回执，复用插件 API 的持久 admission 与精确 ID 重试；不增加 packages/server 适配器，不直接调用 core Session.Service，不另建 Location 路由。ext 在现有 Location setup 中订阅本 Location 的待查通知，cleanup 时解绑；main 在 ready 或原有桥重新挂接时重放尚未交接的记录，暂未挂接只保留记录，不产生 Location 不可用错误，也不要求用户重新发起检查。记录在收到 ext 的 admission 回执后才从 admitting 变 admitted，断线重发同一 notificationID，不新增会话队列/重试引擎。应用重启后读取 waiting/admitting 继续这一项已授权补查；admitted 不再新建合成消息。这个过程只新增本功能输入，**不把现有 composer、配置、permission 或其它生产路径从一代引擎切到另一代**。
 
 补查前重新读取当前文件：未改动就查原稿；用户改动过则检查当前版本并明确所查版本，修正前还要比较摘要，不能覆盖用户同时改的内容。原文件被删除/移走时在原会话报告找不到，留下实际原因；会话已删除则终结该 pending、保留本地检查记录，不重建会话。应用退出期间不声称能继续工作；下次启动接着做，无到期时间或用户新增操作。
 
@@ -261,6 +283,12 @@ type ExcelEdit = { path: string } & (
   | { action: "replace"; query: string; replacement: string; sheet?: string;
       exact?: boolean; caseSensitive?: boolean; inFormulas?: boolean }
 )
+type ExcelDiagnostic = {
+  kind: "pivot-not-rebuilt"; sheet: string; pivot: string; source: string; detail: string
+}
+type ExcelMutationResult = {
+  path: string; sourceSha256: string; resultSha256: string; diagnostics: ExcelDiagnostic[]
+}
 type ExcelObjectOperation = "create_pivot_table" | "delete_pivot_table" |
   "add_slicer" | "delete_slicer" | "add_sparklines" | "delete_sparklines"
 type ExcelObjects =
@@ -282,7 +310,9 @@ read 默认 values；range 省略指 used range；rows 省略按输出预算分�
 
 所有修改复用 `Workspace.edit → package.prepare/apply → 原子保存` 的同一保真权威。模型脚本也通过这一随包适配入口打开/保存含扩展的工作簿；不要在它之后裸 openpyxl save。新增的脚本 API 为 `OfficeExcel.edit(path)` 上下文管理器，yield 已加载的 openpyxl Workbook，退出时沿同一保真保存/源摘要校验；工具与技能没有第二套保存实现。值读取注明 stored 未必新鲜；missing 返回 null 和明确未计算原因，不能用 null 冒充公式结果或把 evaluator 不支持报告成 Excel 公式错误。
 
-脚本侧 `OfficeExcel` 是 `from codepuppy_office import OfficeExcel` 的随包模块（装在 Office Python 自身 site-packages，`-I` 也可 import）；导出 `edit(path: str) -> ContextManager[openpyxl.Workbook]`、`recalculate(path: str) -> ExcelRecalculateResult`。结果可序列化为 §4.7 的同一 JSON 联合，MCP/文档工具与脚本都消费它；不让实施者另选一个未定义的导入入口。
+脚本侧 `OfficeExcel` 是 `from codepuppy_office import OfficeExcel` 的随包模块（装在 Office Python 自身 site-packages，`-I` 也可 import）。除 `edit(path: str) -> ContextManager[openpyxl.Workbook]`、`recalculate(path: str) -> ExcelRecalculateResult`，还导出 `inspect(input_json: str)`、`apply_edit(input_json: str) -> ExcelMutationResult`、`object_schema(operation: ExcelObjectOperation)`、`objects(path: str, operation: ExcelObjectOperation, input_json: str) -> ExcelMutationResult`：input_json 分别使用上面的 ExcelInspect/ExcelEdit 与 objects.describe 所产出的同一 Pydantic schema，inspect/object_schema 的返回与对应工具完全相同。MCP 工具只调用这些模块入口，不重复逻辑。edit 的保存结果及诊断以同一结构化 JSON 写到脚本 stderr，shell 能直接交给助手，其它调用直接返回结构化结果。
+
+出厂技能默认经此模块完成透视表、切片器、迷你图、排序和查替；不需要启用任何 MCP。Excel 连接器可继续 default-disabled，用户主动使用连接器时只是多一个同模块的调用入口，不新增启用步骤、第二份运行环境或第二个 Excel 条目。默认用户的 AC-11 能力由随包模块提供，不以目录条目已启用为前提。
 
 ### 4.7 Excel 重算、公式缓存与对象保真
 
@@ -290,9 +320,10 @@ read 默认 values；range 省略指 used range；rows 省略按输出预算分�
 type ExcelRecalculateInput = { path: string }
 type ExcelRecalculateResult =
   | { status: "recalculated"; id: string; path: string; sourceSha256: string;
-      resultSha256: string; formulaCount: number; errors: FormulaError[] }
+      resultSha256: string; formulaCount: number; errors: FormulaError[];
+      diagnostics: ExcelDiagnostic[] }
   | { status: "pending"; checkId: string; runtime: DocumentRuntimeState }
-  | { status: "failed"; code: "source-changed" | "runtime" | "calculation" | "disk";
+  | { status: "failed"; code: "source-changed" | "runtime" | "calculation" | "disk" | "timeout";
       detail: string }
 ```
 
@@ -302,11 +333,24 @@ type ExcelRecalculateResult =
 
 该缓存合并器是本票明确新增能力 `OfficeExcel.recalculate(path)` 的一部分，不是现有 openpyxl/LibreOffice 自动保证；返回 FormulaError 包括 #REF!/#DIV/0! 等实际错误的 sheet、cell、formula。0 错误与汇总值核对使用重算后的值。LibreOffice 回存的整本文件只作计算/渲染中间物，绝不能替换最终工作簿；切片器在 LibreOffice 中的交互支持程度也不能靠截图宣布与 Excel 相同。
 
-排序/替换或修改原始数据后，先更新依赖的透视缓存/显示结果（消费上游 pivot/slicer 操作维护能力），再重算并刷新图表缓存、渲染；不能保住了 slicer XML 却把统计结果留在旧版。重算前后的源摘要一致才原子合并；并发变化返回 source-changed 并重新读取当前文件，不能覆盖用户修改。整个过程只有“重算值与缓存同步”这一存储权威，不在 reader 里另写计算器。公式错误是检查结果，不阻止文件交付，助手在同一轮修正中处理并报告余项。
+**保存前显式刷新受影响的透视表。** excel_edit 与 OfficeExcel.edit 在同一保真保存入口、`package.prepare/apply` 之前确定实际 changed ranges：工具操作返回精确受影响坐标，脚本上下文比较进入/退出时各透视源区域的值、公式和引用，不能依赖模型声明自己改了哪里。枚举透视表的 worksheetSource/命名源，若源与 changed ranges 相交，先调 2.3.2 的 `pivot_rebuild.can_rebuild(pivot)`；可重建者调用 `pivot_rebuild.rebuild(workbook,sheet,pivot,lambda request: request,limits,results)`，保留布局、筛选选择、名称和已有关系，由既有 package 保存层收纳重建后的对象。
+
+results 回调使用本次编辑后的数据；源含公式时用已有 `calc.engine.Engine.calculate` 并把旧公式缓存标 stale，不调用只读旧存盘缓存的 formula_values 冒充当前结果；最终数值仍由 §4.7 的 LO 重算复核。该回调适配及 changed-range 相交判定归 R10 的保存接线，不另造透视计算器。Excel 创建或被 Excel 重刷、can_rebuild=false 的透视表，以及本次无法求值/解析源者，保留对象并记录 ExcelDiagnostic（sheet/pivot/source/具体原因），继续保存用户修改，助手把“该透视表尚未刷新”列入 remaining；不强制用户打开 Excel，不把它误报为已刷新，也不让一次不能重建取消其它成品能力。
+
+随后重算、刷新图表缓存并渲染；重算前后的源摘要一致才原子合并，并发变化返回 source-changed 并重新读取当前文件，不能覆盖用户修改。整个过程只有“重算值与缓存同步”这一存储权威，不在 reader 里另写计算器。公式错误与透视诊断都是检查结果，不阻止文件交付，助手在同一轮修正中处理并报告余项。
 
 ### 4.8 宿主边界与现有工具去向
 
 四个 `write_docx/write_xlsx/write_pptx/write_pdf` 从本版 advertised tools、dispatch、清单/权限元数据中移除，不改造成另一套宽 JSON 写入器，不保留旧调用别名。`read_docx/read_pptx/read_pdf` 保持既有内容读取；`read_xlsx` 依 §4.6 增强。四个首方连接器 ID 与现有定制中心条目保留，Excel 不出现社区第二项。生成脚本仍过现有 shell/文件权限；不能借“出厂技能”绕过权限，亦不另问一次本地执行确认。
+
+移除 writer 的消费者契约同步如下，不能只删工具定义：
+
+| 消费者 | 改为消费的权威与行为 |
+| --- | --- |
+| “本次对话产物”的 `scanLocalArtifacts/candidatesOf`（`renderer/codepuppy-ui/session-rail/artifacts/local-artifacts.ts:58-85`） | 优先解析首方 codepuppy_document 已完成工具 part 的 `metadata.codepuppyDocument`，与 §4.4 的 rendered receipt / pending record 使用同一个 DocumentArtifactRecord schema；以 sourcePath/artifactPath 取得候选，去重，排除 workRoot 内的中间物，再走现有会话目录、文档类型、stat/预览规则。相同文件只留最近一次，保留已有 write/patch 来源及子会话归属；不解析 shell 命令或模型正文猜路径。pending 已有 Office 文件马上入面板，主进程导出的 PNG 在文件核实后入面板，检查失败但文件存在也不抹掉它。 |
+| `shared/office-advisories.ts:110-115` 的 OFFICE_WRITE_TOOL | 删除旧 writer 映射及上述消费者依赖；不建“旧 writer 或新回执”的兼容分支。DocumentArtifactRecord 的纯数据 schema 放既有 util 共享契约面，ext/main/renderer 使用同一版本，不各手编解析格式。 |
+| `scripts/build-office-runtime.ts:271-274` 的构建烟测消费者 | 制作侧改调用随包制作库/OfficeExcel 模块，再经真实 stdio reader 读回；不再调用已删除 writer，也不降为只 import/握手而失去产物读回证明。 |
+| 四条连接器的工具说明、Excel intake/digest 与桌面目录快照 | §8 的目录源生产者按本设计更新并发布；桌面只消费生成/校验后的字节快照与快照锁，不手编 codepuppy-catalog.json，不保留与真实工具不同的写入承诺。 |
 
 跨 bundle 的新增 **DocumentHost** 由 ui-mac main/sidecar 的既有 ID 请求应答桥承载，util 只持有纯数据与发布端口；不让 ext/core import main。下面的签名是本票决定 raise，不声称存在：
 
@@ -319,17 +363,17 @@ type DocumentHost = {
   defer(input: DeferredDocumentCheck): Promise<void>
   recordCheck(input: { caller: { location: Location.Ref; sessionID: Session.ID };
     checkId: string; report: DocumentCheckReport }): Promise<void>
+  subscribeReady(location: Location.Ref,
+    listener: (check: DeferredDocumentCheck) => Promise<DocumentCheckAdmission>): () => void
 }
 declare function publishDocumentHost(host: DocumentHost): void
 declare function documentHost(): DocumentHost
-// server 适配器；checkId只能引用宿主登记的待查记录。
-declare function resumeDocumentCheck(checkId: string): Promise<
-  { ok: true; notificationID: SessionMessage.ID } |
-  { ok: false; reason: "session-missing" | "location-unavailable" | "conflict" }
->
+type DocumentCheckAdmission =
+  | { status: "admitted"; checkId: string; notificationID: SessionMessage.ID }
+  | { status: "session-missing" | "conflict"; checkId: string }
 ```
 
-bootstrap 只新增 DocumentEnvironment 的资源路径/资产锁投影，不序列化函数；publish 在引擎启动前每代一次。caller 由 ext 当前 Tool.Context/Location 绑定，经 server 桥核对，不是模型输入；main 据此派生 workRoot 并核对 checkId 的归属。复用 #1760 的 pinned-file 请求、LauncherEnvironment 与诊断/失败动作；本票只增加 document.environment/render/defer/record-check/resume 的窄消息和 runtime.changed 通知。消息带 request id、sidecar generation，进度带递增 sequence；停止/退出终结本代请求，旧回包不覆盖新状态。main 只获取固定 LO 文件和拥有 Chromium 渲染；Python 制作、重算、PDFium 与 Excel 操作在现有 Location 执行面内运行，不把任意模型脚本或任意 URL 交给主进程执行。
+bootstrap 只新增 DocumentEnvironment 的资源路径/资产锁投影，不序列化函数；publish 在引擎启动前每代一次。caller 由 ext 当前 Tool.Context/Location 绑定，经既有 sidecar↔ext 桥核对，不是模型输入；main 据此派生 workRoot 并核对 checkId 的归属。复用 #1760 的 pinned-file 请求、LauncherEnvironment 与诊断/失败动作；本票只增加 document.environment/render/defer/record-check 的窄请求、document.check-ready 通知/DocumentCheckAdmission 回执与 runtime.changed 通知。subscribeReady 只登记该 ext 的真实 Location 并消费其已登记 check，不能指定另一个项目的会话或任意文本；清除订阅不删除待查记录。消息带 request id、sidecar generation，进度带递增 sequence；停止/退出终结本代请求，旧回包不覆盖新状态。main 只获取固定 LO 文件和拥有 Chromium 渲染；Python 制作、重算、PDFium 与 Excel 操作在现有 Location 执行面内运行，不把任意模型脚本或任意 URL 交给主进程执行。
 
 ## 5. 数据与失败
 
@@ -338,19 +382,21 @@ bootstrap 只新增 DocumentEnvironment 的资源路径/资产锁投影，不序
 - **BR-08 窗口**：先持久化待查记录再返回 pending；ready/admission 之间崩溃可用相同 notificationID 重发；已 admission 未答复不再新建输入。后续执行失败沿现有 Session 错误与 pending 记录可恢复，不虚构成功。没有自动反复进行第二轮、第三轮修正；新的用户要求是新的任务。
 - **下载失败**：沿 #1760 的失败类型/动作及固定文件错误处理，已生成文件保留，原会话获知尚未查。网络恢复/用户现有重试动作继续同一准备流程，不要求手工安装、清缓存或改系统保护。mac 正式签名/Gatekeeper 或 Windows 解包实物失败须作为平台实现缺口处理，不能改成让用户关闭保护。
 - **视觉失败**：按实际已读页、已识图页报告覆盖范围；云识图额度/鉴权/拒绝归原服务，不在文档功能制造新批准或配额。原稿、渲染图和剩余问题都在本地；只有 F-10 这条不能看图时的识图路径上传图片。
+- **自检卡死**：§4.4 的 180 s 是执行与返回的统一期限，下载准备不计入；超时终结本 job，不发布不完整的 PNG/PDF 或 Excel 回存。工具保留已有成品回执供产物面板读取，报告尚未查的页；没有自动无限重试或等待用户确认的分支。
 - **离线及不可信内容**：生成/转换无更新检查，无运行期 npm/pip/字体下载；Office 外部关系、HTML URL 与文档中的指令都是输入数据，不提升到 system 指令。LO 禁外部更新和文档宏，Chromium 禁外网；不会为了画出一个远端图片而替用户联网。
 
 ## 6. 架构落点
 
-按[现有模块图](../../architecture/modules.md)落在既有 ui-mac、ext、util/schema、core/server 责任内；不新增顶层包或业务框架。资源子树仍属 ui-mac 的随包资产，执行逻辑仍属其既有宿主/扩展责任。
+按[现有模块图](../../architecture/modules.md)落在既有 ui-mac、ext、util/schema 与 core 自有 watcher 配置责任内；不新增顶层包或业务框架，不改变 packages/server。资源子树仍属 ui-mac 的随包资产，执行逻辑仍属其既有宿主/扩展责任。
 
 | 责任 | 模块与依赖 | 现有权威及约束结论 |
 | --- | --- | --- |
 | 技能、Office Python/npm/字体/模板构建与许可 | ui-mac 资源/打包；消费 #1760 Node 与现有 Office lock | `factorySkillSources/reconcileFactorySkills`、`build-office-runtime`；不再造环境版本表。Windows 路径统一由资源解析投影，已知 Office command 展开重复只在本票必需路径上消费同一结果，不全仓重构。 |
 | 固定 LO 获取、展开、待查记录、离屏 Chromium | ui-mac main；消费 util 的纯契约及 OS/Electron | `resourcesRoot`、USER_DATA_LAYOUT、ensurePinnedFile、现有预览隔离；没有连接器直接下载或主进程执行模型代码。 |
 | 制作路由、文档工具、自检与视觉 | ext + 现有 Location 工具执行面 | `createCodePuppyTools` 模式、shell/read/skill、createCloudVisionHooks；不引入第二个视觉上传口或模型能力表。 |
+| 成品回执、对话产物与中间物可见性 | util 的纯 DocumentArtifactRecord schema，ext/main 生产，ui-mac renderer 消费；core 自有 watcher 配置 | `scanLocalArtifacts` 的已持久工具 part 与 `projectWatchIgnore` 单一忽略表；保留最终成品的既有预览，隐藏检查中间物，不靠 shell 文本推断。 |
 | Excel 保真操作、公式缓存、PDF 栅格化 | 现有随包 office-mcp/Office Python 责任 | server 的 workspace path 校验与原子替换，选中 MIT 操作层及 package 保存层；图像入口统一 PDFium。 |
-| 就绪补查的持久合成输入 | server 自有 sidecar 接线，消费 core Session.Service；契约在 util/schema | `Session.Service.synthetic` 已有入队/唤醒；不从 ext 反向依赖 core，不从 main import server，不改已有代际路径。 |
+| 就绪补查的持久合成输入 | main 经现有 sidecar↔ext 桥通知拥有者；契约在 util，调用在 Location 的 ext | `ctx.session.synthetic` 是现成的插件 API；不从 ext 反向依赖 core、不从 main import server，不新增 server 路由或触碰 ADR-044 的守卫面。 |
 
 ### 能力接缝总表
 
@@ -358,18 +404,18 @@ R 表示**已决定新增**的端口，范围及签名以 §4 为准；不是尚
 
 | 依赖能力 / 对应 AC | 已有可调用符号或决定的 raise |
 | --- | --- |
-| 出厂技能按需发现、六种制作 / AC-01..04、12 | `factorySkillSources`、`reconcileFactorySkills`（main factory-skills `:36,148`）、`SkillTool.Plugin`（core `tool/plugin/skill.ts:32`）、`ShellTool.Plugin`（`:101`）；**R1**：§4.1 的 vendoring/适配/模板与环境投影。所有正文制作能力由随包 docx/PptxGenJS/openpyxl/reportlab API 实现，不再依赖四个 writer。 |
+| 出厂技能按需发现、六种制作 / AC-01..04、12 | `factorySkillSources`、`reconcileFactorySkills`（main factory-skills `:36,148`）、`SkillTool.Plugin`（core `tool/plugin/skill.ts:32`）、`ShellTool.Plugin`（`:101`）；**R1**：§4.1 的 vendoring/独立技能名/模板与环境投影。所有正文制作能力由随包 docx/PptxGenJS/openpyxl/reportlab API 实现，不再依赖四个 writer。 |
 | 跨平台资源入口 / AC-09、15 | `resourcesRoot`（ext-fs-installer `:260`）、USER_DATA_LAYOUT（`:4`）、#1760 LauncherEnvironment；**R2**：§4.1 DocumentEnvironment，Office Python 的 win32-x64 构建/解析与文档 npm 闭包。 |
 | LO 下载与准备 / AC-06、09、10、13 | 冻结 ensurePinnedFile（协调设计 §4.11.4，由 #1760 实现）；**R3**：§4.3 的本平台 pin 选择、hdiutil/Windows MSI-CAB 只读解包、ready 发布及 runtime.changed。源、副本与许可材料由 §8 发布责任交付。 |
 | Office/PDF 逐页栅格化 / AC-04、06、08 | 上游 soffice headless CLI、PDFium `PdfDocument/page.render`；**R4**：§4.4 的 document.render 和 receipt，借 Location Environment 执行，144 dpi 全页，路径/页摘要/版本真实记录。 |
-| HTML 离线和海报 / AC-04、13 | `resolveWorkspaceFile`（workspace-file-service `:59`）、Electron `webContents.capturePage/printToPDF`；**R5**：§4.4 的离屏载体及预览隔离权威共用、整页分片/完整 PNG 导出。现有 openRailPreview 不是这个端口。 |
+| HTML 离线和海报 / AC-04、13 | `resolveWorkspaceFile`（workspace-file-service `:59`）、Electron `webContents.capturePage/printToPDF`；**R5**：§4.4 的离屏载体及预览隔离权威共用、load/fonts/decode/两帧时点、180 s 期限及整页分片/完整 PNG 导出。现有 openRailPreview 不是这个端口。 |
 | 字体与模板 / AC-08、12、14 | F-06 fontconfig、F-08 Windows 私有字体发现、reportlab TTFont；**R6**：§4.2 同一字体资产/映射与模板来源记录、§4.1 许可/排除清单。 |
 | 模型实际看图、至多一轮 / AC-05、06、13 | `ReadTool.toModelContent`（core `tool/plugin/read.ts:258`）、`createCloudVisionHooks`（ext `cloud-vision-hooks.ts:104`）、`cloudVisionToolId`（cloud-vision）；**R7**：§4.5 check 记录、读取关联和渲染/检查卡片投影。 |
-| BR-08 晚到补查 / AC-10 | `Session.Service.synthetic`（core session `:244,528`）、`LocationServiceMap.Service.get`（`:13`）；**R8**：§4.5 待查记录、§4.8 DocumentHost/resumeDocumentCheck 窄桥和回执；不隐含另一个后台助手服务。 |
+| BR-08 晚到补查 / AC-10 | 插件 `SessionDomain.synthetic`（`packages/plugin/src/promise/session.ts:201-214`）→ `adapter.ts:637`；**R8**：§4.5 待查记录、§4.8 DocumentHost.subscribeReady 通知/回执，由所属 ext 调同一 API；没有 server 适配器、额外 Location 路由或另一个后台助手服务。 |
 | Excel 区域、结构、排序查替 / AC-07、11 | 社区 2.3.2 `operations.calculated.read_calculated:27`、`cells.read_range:183/find_cells:296`、`sorting.sort_range:57`、`replace.replace_cells:23`；结构来自 server/workbook_tools `:44`、sheet_tools `:22`；**R9**：§4.6 的首方 inspect/edit/read 合约、分页和缓存来源标记。 |
-| 透视/切片器/迷你图及保真 / AC-03、11 | 2.3.2 `operations.pivot.create_pivot:70`、`slicers.add_slicer:70`、`slicer_manage.delete_slicer:124`、`sparklines.add_sparklines:28/delete_sparklines:53`、`Workspace.edit:185`、`save_atomically:315`；**R10**：§4.6 的 objects 按需类型适配与共用 `OfficeExcel.edit`，保留 package 权威，去除非格式配额。 |
+| 透视/切片器/迷你图及保真 / AC-03、11 | 2.3.2 `operations.pivot.create_pivot:70`、`slicers.add_slicer:70`、`slicer_manage.delete_slicer:124`、`sparklines.add_sparklines:28/delete_sparklines:53`、`Workspace.edit:185`、`save_atomically:315`、`pivot_rebuild.can_rebuild/rebuild:56-92`、`calc.engine.Engine.calculate:105`；**R10**：§4.6 的 objects/inspect/apply_edit 脚本导出与共用 edit，§4.7 的 changed-range 相交、保存前 rebuild/诊断接线；保留 package 权威、去除非格式配额。 |
 | Excel 新鲜算值与错误位置 / AC-03、07 | 上游 xlsx recalc 固定宏做法、pypdf/openpyxl 的只读解析；**R11**：§4.7 `OfficeExcel.recalculate`/excel_recalculate，LO 副本计算、原 ZIP 缓存合并、错误定位及图表/透视缓存同步。不可宣称这些已由 LO 自动保真。 |
-| 工具注册、权限与清单 / AC-05、11、14 | ext tool.transform（plugin `:160-163`）、`tools_for/call_tool`（office-mcp server `:127,290`）、现有工具 provenance/permission 清单；**R12**：§4.8 移除 writer、增强 Excel、增加文档工具与真实 runtime 进度，同步既有清单权威，不维护影子工具表。 |
+| 工具注册、产物面板与清单 / AC-05、11、14 | ext tool.transform（plugin `:160-163`）、`tools_for/call_tool`（office-mcp server `:127,290`）、`scanLocalArtifacts`（local-artifacts `:89`）、`projectWatchIgnore`（core filesystem 自有配置）、目录 `scripts/sync-catalog-snapshot.mjs`；**R12**：§4.8 移除 OFFICE_WRITE_TOOL/旧 writer 消费、接入 DocumentArtifactRecord、调整构建烟测依赖、工作根 gitignore/watcher 忽略、消费 §8 的目录源与 intake 更新；不维护影子工具表。 |
 
 K1：权限档位权威不变。K2：下载、环境、技能发现、视觉、Excel 保存和预览隔离各一个拥有者；新增消费不复制。`constraints.md:31` 已记 Office 命令展开的既有重复，Windows 入口本次必须走同一资源投影，不能再加第五份；其余既有偏离不在本票清理。依赖保持 Schema→Core/Protocol→Server，Client 不依赖 Core/Server。无必要架构例外。
 
@@ -381,11 +427,14 @@ K1：权限档位权威不变。K2：下载、环境、技能发现、视觉、E
 
 | 产出方 / 负责 | 产出与 AC / 小节 | 消费契约 | 开工依赖 | 集成/验收依赖 |
 | --- | --- | --- | --- | --- |
-| #1760 的桌面启动器拥有者 | 随包 Node/npm、LauncherEnvironment、固定文件公共口与失败呈现；AC-09/15、§4.1/3/8 | 其固定设计；国内固定文件机制 | 已批准规格；本文不修改它的环境权威 | 该设计批准并实现。本设计请求把文档消费者纳入其合法 bootstrap 读取面；现有 mac x64 包也需其 Node/platform 投影支持 darwin-x64，不能由本票带第二份 Node。这个 target 扩展须回该设计处置；Windows Office Python归本票，不让其第三方环境代替。 |
-| 本票的发行资产生产者 | TDF 三份原字节副本、精确 pin 与源码/许可材料；AC-09/14、§4.3 | 冻结 PinnedFiles 与 §4.3 身份 | 本设计批准、实际发行资产可取得 | 先附加到已公开自有 release 且可取，再提交完整 originUrl；对应清单提交供入口消费。本文没有生产发布授权。 |
+| #1760 的桌面启动器拥有者 | 随包 Node/npm、LauncherEnvironment、固定文件公共口与失败呈现；AC-09/15、§4.1/3/8 | #1766 合入 `173122a8e955f97d830fe53fccd3400d079d9488` 的冻结设计；国内固定文件机制 | 既有冻结输入；本文不修改它的环境权威 | darwin-arm64/win32-x64 消费其决定的 Node/公共端口，实际实现仍须交付。本设计请求把文档消费者纳入合法 bootstrap 读取面；mac x64 的 Node/platform 投影扩展由编排器回 #1760 设计处置，本文不带第二份 Node。仅此目标依赖标 pending-seam；Windows Office Python 归本票。 |
+| 目录发布仓（alpha-web）的 catalog-src 生产者；桌面目录快照消费者 | 四条首方 Office 条目的 tools/描述；Excel 新版本 re-intake、artifactDigest 与对应独立锚点；§4.6/§4.8，AC-09/11/14 | Word/PPT/PDF tools 分别只有 read_docx/read_pptx/read_pdf；Excel 为 read_xlsx、excel_inspect、excel_edit、excel_objects、excel_recalculate。codepuppy_document 属 ext，不伪列为连接器工具；四条描述区分技能制作与连接器实际读/操作能力，去掉旧 writer 及其新建/改写承诺。Excel ID 唯一且 default-disabled 不变 | 本冻结契约即可并行准备目录源；实际 digest/intake 依赖本票新的 server.py 和选中源码/许可材料 | 生产者用实际新字节重新 intake，artifactDigest 沿既有 `bundledOfficeServerDigest` / aggregateFilesDigest 域计算，不能沿用旧摘要或虚构值；同步目录 guard 锚点后发布。桌面运行既有 sync-catalog-snapshot 生成字节快照与锁，不手编快照；同一消费版本的工具/说明/digest 与打包字节一致才完成集成。 |
+| 本票的发行资产生产者 | TDF 三份原字节副本、精确 pin 与源码/许可材料；AC-09/14、§4.3 | 冻结 PinnedFiles 与 §4.3 身份 | 本冻结设计、实际发行资产可取得；darwin-x64 的共享启动器集成仍待 seam | 先附加到已公开自有 release 且可取，再提交完整 originUrl；对应清单提交供入口消费。本文没有生产发布授权。 |
 | 国内固定文件入口拥有者 | 从桌面固定清单提交投影白名单；AC-09、§4.3 | 冻结切片四的清单快照/锁/relay 规则 | 已冻结共享设计与真实清单 | 香港入口部署匹配该快照；应用真实改道/续传/国内下载证据，不以读取 TDF 元数据代替。 |
 
 不向 #1760 请求文档专属下载器、另一套 preparing 或新包管理器。darwin-x64 是明确的共享输入请求，批准前不能把该目标写成已 ready；已具备的 mac arm64/Windows 设计不因等待这个接缝重开。
+
+目录工具/描述契约已冻结；新的 intake 摘要、目录发布、快照再生成是既有生产者的交付依赖，不是待决的产品取舍，也不把启用 Excel MCP 变成默认用户的前置步骤。本次仅提交设计，不代该仓写源、发布目录或修改桌面字节快照。
 
 ## 9. 回滚
 
@@ -402,23 +451,54 @@ K1：权限档位权威不变。K2：下载、环境、技能发现、视觉、E
 | 逐页检查、至多一轮修正，复核当前文件；不能看图的模型沿 Read+现有识图 | F-10；BR-03/13；不宣称默认模型质量数值已过 |
 | Excel 选中 12 个社区操作归三类工具，另加 LO 重算；原 ZIP 缓存合并，不让整本回存破坏对象 | F-11/12；BR-05/09；新增 R9..R11 是实现责任，不伪称现成功能 |
 | 原四 writer 从工具面移除，reader 保留，模板和源文件可直接继续编辑 | F-01、BR-01/10；无兼容分支、无新增用户限制 |
-| 所有能力都有合法符号或 R1..R12 的明确 raise，L 设计仍为 draft | §6；尚无独立审查或 owner 对本设计的批准 |
+| 所有能力都有合法符号或 R1..R12 的明确 raise；R1 修正后冻结，darwin-x64 启动器依赖除外 | §6 与本次“apply design review R1, then freeze”指令；pending-seam 精确范围见下文，不把未实现断言写成已证明 |
 
 | 轮 / 审查版本与范围 | 审计方 | finding 及处置 | 改了什么 / 验证证据 | 没改的及去向 |
 | --- | --- | --- | --- | --- |
-| 作者自查；代码 `9f08c506`、规格 v1、本文全部 | Codex / GPT-6 | 作者自查，不计独立审查轮次；draft 待调度方的 L 设计审查与 owner 批准 | 固定源码/许可边界、三平台 LO 元数据、实际 LO 配置键及 Excel 迷你图保真反例的探针 exit 0；ui-mac 的 `bun test src/main/old-name-scan.test.ts` exit 0（10 pass）；`python3 scripts/check-doc-links.py docs/specs/document-output-quality/design.md docs/README.md` exit 0（426 links）；`git diff --check` exit 0。官方文档合同检查对本文无 finding，整体基线缺口见下表 | 运行期与正式包断言见下表；本次不实现、不发布、不付费跑模型 |
+| 首稿作者自查；代码 `9f08c506`、规格 v1、设计 `d07c5aa8a8` | Codex / GPT-6 | 作者自查，不计独立审查轮次；由以下 R1 处置与冻结收据接续 | 继承首稿的固定源码/许可、LO 元数据/配置键、迷你图保真反例、旧名扫描 10 pass、426 个相对链接与 diff 检查的 exit 0 回执；不因恢复会话重跑这些旧探针 | 运行期与正式包断言仍归实施；本次不实现、不发布、不付费跑模型 |
 
-**待 owner 定**：没有新增产品取舍或用户限制提案；本 L 技术设计本身尚待批准。ADR-014 第 5 条受保护资产的准确修订与该设计批准一并交调度方，本文未越权改写。#1760 的 mac x64 接缝请求是技术输入处置，不要求用户新增操作。
+### R1 独立审查、处置与冻结
+
+审查对象为设计 `d07c5aa8a8`，审查员 **Claude Opus 5.5**（只读、非作者），结论 **FIX-THEN-MERGE**，无 Blocker，4 Major、4 Minor。本次指令明确八项全部采纳，另执行第 9 项健壮性与第 10 项默认用户能力要求，修正后冻结。以下为逐项处置；Codex / GPT-6 只核对采纳与引用传播，不记作第二轮独立审查。
+
+| finding / 级别 | 处置与最小修正 | 核对证据 / 遗留 |
+| --- | --- | --- |
+| R1-1 Major：删 writer 后成品面板失去来源 | **采纳并修正**。§4.4 的 rendered/pending/有成品的失败结果统一携带 DocumentArtifactRecord，投影到已持久工具 part；§4.8 的 scanLocalArtifacts 消费 sourcePath/artifactPath，保留原面板/预览；移除 OFFICE_WRITE_TOOL，并明确构建烟测消费者转用随包制作库再 reader 读回 | F-15 与 §6 R12；没有保留旧 writer 兼容，也没有新增产物登记页面。实际 panel/烟测改动属实施 |
+| R1-2 Major：目录源/Excel intake/digest 未交接 | **采纳并修正**。§8 增加 alpha-web catalog-src 生产者与桌面快照消费者，冻结四条 tools/描述和 Excel 新字节 re-intake/digest 义务；§4.8 只消费生成的字节快照 | F-16；catalog/snapshot/provenance 规则已读。本文未改目录字节，实际源发布/快照/digest 由相应生产者交付 |
+| R1-3 Major：补查不需要 server 适配器 | **采纳并简化**。§4.5/4.8 与 §6 R8 删除原 server resume 适配、额外 Location 路由及其 location-unavailable 错误；main 经既有桥通知拥有者 ext，直接 ctx.session.synthetic，沿现有 ID admission/queue/唤醒 | F-14、plugin promise adapter `:637`；DocumentHost.subscribeReady 与 admission 回执闭合。packages/server 零改动决定，ADR-044 面不扩大 |
+| R1-4 Major：排序/替换没有透视刷新入口 | **采纳并修正**。§4.7 在 excel_edit/OfficeExcel.edit 的同一保存入口，按实际 changed ranges 与透视源相交判定，先 can_rebuild，再以恒等 request 调 rebuild；非本实现或不能重建者保留对象并给诊断和 remaining | F-17、pivot_rebuild `:56-92`；results 从当前编辑数据取，旧缓存不冒充新值；实际重建与保真结果归实施证明 |
+| R1-5 Minor：嵌套技能与目录同名冲突 | **采纳并修正**。§4.1 明确七个 codepuppy-document-* frontmatter name，内部路由引用一并改名；保留现有嵌套发现渠道 | F-18；不依赖只处理顶层的 FACTORY_SKILL_IDS，也不改/删除用户已装技能 |
+| R1-6 Minor：工作根污染版本控制与 watcher | **采纳并修正**。§4.1 创建工作根时写内容为 * 加换行的 .gitignore；§4.8/§6 R12 使用既有 projectWatchIgnore 排除 .document-output | F-18；只有中间物被排除，正常位置的最终成品仍在原面板可见；没有清理期限或用户操作 |
+| R1-7 Minor：运行态类型硬编码 LO 版本 | **采纳并修正**。§4.3 ready.version 改为 string，实际值只取 pinned list entry | 当前 pin 仍为26.8.3；不复制版本权威，也不增加运行期更新 |
+| R1-8 Minor：截图“脚本稳定”不可判定 | **采纳并修正**。§4.4 明确 load→fonts.ready→图片 decode settle→连续两帧→capture，不等待 network idle 或任意脚本终态 | 序列可直接实现且受同一执行期限；图片失败保留诊断，长动画不挡住截取 |
+| R1-9 健壮性指令 | **采纳并修正**。§4.4/4.7/§5 定义180 s统一自检执行期限、提前2 s取消与到期强制终止；返回timeout且保留已生成文件/产物回执，报告未查 | 下载准备不计入，不引入文件/页数限制、额外确认或无限重试；实际卡死终结证据归实施 |
+| R1-10 默认用户能力指令 | **采纳并修正**。§4.6 从同一 OfficeExcel 模块导出 inspect/apply_edit/object_schema/objects，出厂技能直接调用；连接器只是同模块另一入口 | F-16 的 default-disabled 不变；默认用户可制作 pivot/slicer/sparkline、排序查替，无需启用 MCP；§6 R9/R10 同步 |
+| R1-OPTIONAL：OOXMLRecalcMode + convert-to 代替固定宏 | **本轮不采纳**。未在临时目录完成同一真实工作簿的重算/保真对照，不满足“已验证且更简单”的采用条件；§4.7 保留固定 RecalculateAndSave 宏 | 不为可选替代扩展调查，不宣称已证明替代可行；msiexec /a 仍不采用，因为会运行安装序列 |
+
+**冻结范围**：按本次明确指令，`status=frozen`；`review.rounds=1`、`reviewed_sha=d07c5aa8a8`、verdict 为 `fix-then-freeze; R1 4 Major 4 Minor accepted and corrected`。冻结的是本次修正后的契约，不是运行实现或正式包已经通过。没有新增 owner-only 产品决定，也没有等待沉默批准。
+
+| 范围 | 状态与影响 | 所属交接 |
+| --- | --- | --- |
+| 除下一行外的 §1/§2、§4、§5、§6、§8、§9 及本文审查处置 | **frozen**。darwin-arm64/win32-x64 的决定可直接消费；darwin-x64 的 LO pin、字体/PDF/Chromium 等不依赖新 Node 入口的决定也不重开 | 实施者据此编写 plan.md；实际签名/Windows/目录发布/测量证据仍按本节留存 |
+| §4.1 的 darwin-x64 LauncherEnvironment.node 投影及依赖它的制作路径；§6 R1/R2 在该目标的部分；§8 启动器生产者行的 darwin-x64 端到端集成 | **pending-seam**。冻结版 #1760 仍未提供该 platform；只暂停这些依赖条款的实施交接，不能冒称 Intel 目标已 ready，不阻挡其它条款 | 编排器将既有请求回 #1760 设计处置，消费其明确新增 target/Node 资产入口后仅更新受影响条款；本票不带第二份 Node、不新增用户步骤 |
+
+引用传播已在本文做一次接缝扫查：旧草稿启动器 SHA、按 sha256 派生的固定文件缓存、固定版本 ready 类型、脚本稳定等待、server 适配与 Location 路由决定均移除；对应当前形状在 §1/§4/§6/§8 一致。OFFICE_WRITE_TOOL 与旧 writer 只保留在“删除义务/事实证据”中，不再是有效消费端口。目录源新增的生产者依赖已落在 §8，未另创平行契约。
+
+传播取证范围只有本消费设计：Python 字面搜索旧启动器 SHA、原 server resume 函数名、原 Location 路由类名、固定版本 ready 类型及旧摘要缓存路径，五项各为 0；旧不可用错误名仅 1 处且在 R1-3 历史删除处置中。review 字段、R1-1..R1-10 覆盖及无新旧名词元断言均 exit 0；未修改其它生产者设计，必要输入已按 §8 交接。
+
+**R1 修正文档验证回执**：Codex / GPT-6 核对 review 字段、十项处置和 pending-seam 范围；`git fetch -q origin && git show origin/alpha:docs/specs/connector-launchers/design.md` exit 0，读取到 #1766 的冻结输入，未 merge/rebase。ui-mac 的 `bun test src/main/old-name-scan.test.ts` exit 0（10 pass / 0 fail），两份改动文档的 `check-doc-links.py` exit 0（426 links），`git diff --check` exit 0。官方 `check_repo(..., changed_since="origin/alpha")` 对本设计 0 finding，仓级仍为既有 71 errors / 250 warnings（索引/跨仓引用等），未顺带修整。仅更新生成器产出的本设计索引行状态为 frozen，不收其它索引漂移。未启动应用/窗口程序，未跑可选重算替代或付费实测。
+
+**待 owner 定**：无新增产品取舍或限制提案。ADR-014 第 5 条的准确修订仍按原保护资产流程交实施/调度方，本文未越权修改；darwin-x64 是明确的技术接缝请求，归上表，不能转成用户手装依赖。
 
 **仍为推断或未验证的断言**
 
 | 断言 / 观察 | 已有证据与边界 | 遗留去向 |
 | --- | --- | --- |
 | Windows MSI-CAB 无安装解包、私有字体发现、LO/Office Python 的正式包可执行性 | Win32/LO 固定源码支持所选路径，但本机未运行 Windows MSI、无 Windows 真机；mac 正式签名/Gatekeeper 也未由 pilot 证明 | 本票平台实现与规格 AC-15，失败不能改为用户手装依赖 |
-| 公式缓存合并保住全部 Excel 对象，排序/数据修改后透视和图表均新鲜 | 小探针只证明上游迷你图保存边界；缓存合并器、图表缓存同步、LO对各公式行为尚未实现 | 本票 R10/R11，不能把这部分写成已验证事实 |
+| 公式缓存合并保真、受影响且可重建透视表的刷新，以及图表新鲜度 | 小探针只证明上游迷你图保存边界；缓存合并器、保存前 rebuild 接线、图表缓存同步、LO 对各公式行为尚未实现；Excel 创建/重刷的不可重建透视表明确进入 diagnostics/remaining，不承诺已刷新 | 本票 R10/R11，不能把这部分写成已验证事实 |
 | 平台默认模型完成质量、自检实际发现问题与中文字体单段一致 | 原强模型 pilot 与配置可行性不等于默认模型和正式包；字体实值锁/四份产物尚待构建 | 已授权的小额模型测量决定 AC-01..03 是否修订；本票按原 AC 实施验证，不在设计任务执行 |
 | 固定文件的自有 release/HK 上线、真实国内续传 | 本次只读官方元数据，没有发布或实网下载 LO | §8 既有生产者；消费契约已冻结，不重开机制 |
 | ADR-014 决策 5 与新规格冲突 | `.claude/rules/adrs/ADR-014-extension-hub.md:22` 仍写旧的禁止再分发和重量理由 | 精确修订受保护条款须随批准输入交实施；无相邻规则清理 |
 | 文档索引与既有引用不是全绿 | 修改索引前官方 `check_repo(..., changed_since="origin/alpha")` 为 69 errors/252 warnings；新设计无 finding。`docs/README.md:105` 所在生成块原已 stale；只加入生成器产生的本设计一行后为 71/250，其中 `:391`、`:448` 等两类既有跨仓意图引用因索引成为 changed file 从 warning 升为 error，仍非本设计新增引用 | 告知调度方的基线观察，不调查或修复其它文档；本次范围只含本文及必要索引行 |
 
-交接收据：依据为 §1 的固定输入；作者 Codex / GPT-6 已核设计边界与上列可失败证据，结论为**送审稿完成，未冻结**；已定勿重开为技能主路、LO 渲染、不带 OfficeCLI、共享下载/启动器/视觉权威；下一步为调度方审查本文并处理 §8 的共享输入请求；遗留仅为本节明确的未验证实施断言与默认模型测量，无产品范围扩张。
+交接收据：依据为规格 v1、设计 `d07c5aa8a8` 的独立 R1 与 §1 的冻结输入更新；Codex / GPT-6 已核八项 finding 和两项附加指令均有对应契约、接缝及消费者，结论为**修正后冻结，唯上表为 pending-seam**。已定勿重开：技能主路、LO 渲染、不带 OfficeCLI、共享下载/启动器/视觉权威及本轮十项修正。下一步由实施者消费 frozen 条款写 plan.md，编排器处理 #1760 的 darwin-x64 接缝；遗留只有明确的实现/发布证据、默认模型测量与该接缝，无产品范围扩张。

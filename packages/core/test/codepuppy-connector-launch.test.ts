@@ -21,6 +21,7 @@ import {
   readUvLaunchDeclaration,
   uvToolInstallArguments,
   parseUvResolvedValue,
+  readUvLaunchEnvironment,
 } from "@opencode/core/mcp/codepuppy-uv-launch"
 import { UV_TOOL_SETTINGS, UV_SERVICE_COMMAND } from "./fixture/uv-tool-settings"
 import { readNpmLaunchDeclaration, normalizeNpmLaunchDeclaration, installNpmConnector } from "@opencode/core/mcp/codepuppy-npm-launch"
@@ -1631,6 +1632,27 @@ test("uv resolved settings retain nested resolver semantics without treating dis
   } })
   expect(parseUvResolvedValue(declaration.fields.command!)).toEqual({ kind: "tuple", name: "Some", items: [UV_SERVICE_COMMAND] })
   expect(() => parseUvResolvedValue(declaration.fields.options!.slice(0, -1))).toThrow()
+})
+
+// Integration layer: own metadata protocol at the uv process boundary. The flag meanings
+// are verified against pinned uv0.13.10 `tool run --help` (-C is config-setting).
+test("uv execution environment keeps build config settings out of directory options", async () => {
+  const root = connectionRoot()
+  const commands: ChildProcess.Command[] = []
+  const layer = Layer.effect(Environment.Service, Effect.gen(function* () {
+    const current = yield* Environment.Service
+    return Environment.Service.of({ ...current, spawner: ChildProcessSpawner.make(command => {
+      commands.push(command)
+      return current.spawner.spawn(ChildProcess.make(process.execPath, ["-e", "process.stdout.write(JSON.stringify({cwd:process.cwd(),environment:process.env}))"], command._tag === "StandardCommand" ? command.options : {}))
+    }) })
+  })).pipe(Layer.provide(hostEnvironmentLayer))
+  const declaration = parseUvToolSettings(UV_TOOL_SETTINGS)
+  const value = await Effect.runPromise(Effect.scoped(readUvLaunchEnvironment({
+    syntax: "uvx", arguments: ["-C", "key=value", "--directory", root, "--from", declaration.from!, ...declaration.command],
+    declaration, launchers: launcherEnvironment(root), cwd: root, environment: { OWN_CURRENT: "current" },
+  })).pipe(Effect.provide(layer)))
+  expect(commands[0]).toMatchObject({ args: ["--directory", root, "run", "--offline", "--no-config", "--no-project", "--no-env-file", "--", launcherEnvironment(root).node, "--input-type=commonjs", "-e", expect.any(String)] })
+  expect(value).toMatchObject({ cwd: root, environment: { OWN_CURRENT: "current" } })
 })
 
 // Integration layer: our SDK stdio fixture is imported by the ready package entry.

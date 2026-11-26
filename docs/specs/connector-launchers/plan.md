@@ -698,3 +698,5 @@ core `bun typecheck` →exit0、2069 files/2 projects（`/tmp/connector-r7-core-
 - 风险/证明：相同内容跨项目和凭据变化 key 相同，源/约束/有效解析设置改变则失效；editable 当前源与并行 Location 不相互覆盖，原服务 argv/env 不持久化。真实 uv/Python probe 在临时目录通过 gate slot；轻量测试验证事务只在 miss 安装/发布、hit 不解析 registry/下载 Python、失败与取消不留下 ready、准确进度/egress 归属。每项移除应使命名证据失败。
 - 验证：迭代仅命名例；每步完整行为文件一次；返回前实际 export/mock/枚举消费者一次、core bun typecheck、affected-tests --list、文档和 diff 检查。继承其它模块未变证据，不跑全层/全套/时序/容量。
 - #1759：沿 r7 的冻结接口与生产组装表，只读复核分支；不复制 R1/R2 或把候选位置当绑定结果。未决设计分叉才返回 PLAN-READY，其余本轮直接实现。
+
+r8 执行目录红例：真实 pinned `uv tool run --help` 的 `-C, --config-setting`，现有 readUvLaunchEnvironment 把它复制为根目录选项。新增既有文件的 CLI 边界组件例（应用自有元数据协议，不伪造 uv 输出），`bun test test/codepuppy-connector-launch.test.ts -t 'uv execution environment keeps' --max-concurrency=2` →exit1，0 PASS/1 FAIL（`/tmp/connector-r8-uv-directory-red.log`）。先提交该例，再修复，只允许真实 --directory 进入该元数据读取命令。

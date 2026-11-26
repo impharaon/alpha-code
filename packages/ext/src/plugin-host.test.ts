@@ -1827,7 +1827,7 @@ packageIt.live("package invocation applies preload memory effort and native turn
   const snapshot = yield* (yield* Tool.Service).snapshot()
   const result = yield* snapshot.execute({ sessionID: parent.id, agent: "build" as never, messageID: "msg_controls" as never, call: { type: "tool-call", name: "subagent", id: "call_controls", input: { agent: target, description: "Review", prompt: "review" } } })
   const requests = yield* llm.requests()
-  expect(JSON.stringify(requests)).toContain("REVIEW_MEMORY_FROM_EXISTING_FILE")
+  expect(JSON.stringify(requests[0]?.system)).toContain("REVIEW_MEMORY_FROM_EXISTING_FILE")
   expect(JSON.stringify(requests)).toContain("Plugin Structure for Claude Code")
   expect(JSON.stringify(requests)).toContain("MAXIMUM STEPS REACHED")
   expect(JSON.stringify(result)).toContain('"partial":true')

@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from "node:crypto"
 import { constants } from "node:fs"
 import { lstat, open, realpath } from "node:fs/promises"
-import { isAbsolute, relative, resolve, sep } from "node:path"
+import { basename, isAbsolute, relative, resolve, sep } from "node:path"
 import {
   CONTROL_ENVELOPE_MAX_BYTES,
   decodeContract,
@@ -250,8 +250,8 @@ export async function createVideoUploadSnapshot(
   tenantId: string,
   manifestJson?: string,
 ): Promise<VideoUploadSnapshot> {
-  const relative=path.relative(input.directory,input.originalPath)
-  const name=(path.isAbsolute(relative) || relative.split(path.sep).includes("..") ? path.basename(input.originalPath) : relative).split(path.sep).join("/")
+  const nameRelative=relative(input.directory,input.originalPath)
+  const name=(isAbsolute(nameRelative) || nameRelative.split(sep).includes("..") ? basename(input.originalPath) : nameRelative).split(sep).join("/")
   const sensitivity=classifyUploadContent({path:input.originalPath,content:""})
   const manifest = manifestJson
     ? decodeContract("UploadManifestV1", JSON.parse(manifestJson), "cloud-http")

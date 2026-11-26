@@ -94,10 +94,11 @@ export function createDocumentRuntime(input: {
         await stat(executable(canonical, input.platform))
         if (attempt.cancelled || disposed) return
         if (canonical !== destination) {
+          await writeFile(join(canonical, "document-runtime.json"), JSON.stringify({ pinId: selected.id, pinSha256: selected.sha256, fonts: manifest.fonts, version: receipt.version }))
+          if (attempt.cancelled || disposed) return
           await mkdir(join(destination, ".."), { recursive: true })
           await rename(canonical, destination)
         }
-        await writeFile(join(destination, "document-runtime.json"), JSON.stringify({ pinId: selected.id, pinSha256: selected.sha256, fonts: manifest.fonts, version: receipt.version }))
         candidate = destination
         if (attempt.cancelled || disposed || !registrations.has(key(registration.location))) return
         publish({ phase: "ready", version: receipt.version, executable: executable(destination, input.platform) })

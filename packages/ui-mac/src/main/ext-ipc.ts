@@ -1521,8 +1521,8 @@ export function registerExtIpcHandlers(
   ipcMain.handle(HUB_READ_CHANNELS.hubRequest, (_event: IpcMainInvokeEvent, requestId: unknown) => isHubRequestId(requestId) ? hubRequests.get(requestId) : null)
   const codepuppySidecarHost: CodePuppySidecarHost = createCodePuppySidecarHost({
     video: async request=>{
-      if(request.action === "start" || request.action === "prepare")await verifyVideoCall(request,engineClient(await awaitServer()),videoCacheRoot())
-      return handleVideoCloudRequest(request)
+      const referencePath=request.action === "start" || request.action === "prepare" ? await verifyVideoCall(request,engineClient(await awaitServer()),videoCacheRoot()) : undefined
+      return handleVideoCloudRequest(request,referencePath)
     },
     view: hubView,
     requests: hubRequests,

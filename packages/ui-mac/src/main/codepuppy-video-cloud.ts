@@ -40,6 +40,7 @@ type Attempt = {
   cancelOutcome?: unknown
 }
 type RecordValue = {
+  referencePath:string
   sourceId: string
   input: VideoCloudRequest["input"]
   tenant: string
@@ -178,8 +179,7 @@ export function createMainVideoService(deps: {
     if (
       !source ||
       source.sourceId !== request.sourceId ||
-      !source.path ||
-      source.path !== completed.data.sensitivity.originalPath
+      !source.path
     )
       throw new Error("video_request_invalid")
     return { target, source }
@@ -370,7 +370,7 @@ export function createMainVideoService(deps: {
             if (!checked && !attempt?.jobId) continue
             if (!attempt) {
               const snapshot = await createVideoUploadSnapshot(
-                { directory: call.directory, path: checked!.target, originalPath: checked!.source.path, ...clip },
+                { directory: call.directory, path: checked!.target, originalPath: record.referencePath, ...clip },
                 record.tenant,
               )
               const guarded = guardCloudEnvelope({
@@ -395,7 +395,7 @@ export function createMainVideoService(deps: {
             const active = attempt
             if (!active.jobId) {
               const snapshot = await createVideoUploadSnapshot(
-                { directory: call.directory, path: checked!.target, originalPath: checked!.source.path, ...clip },
+                { directory: call.directory, path: checked!.target, originalPath: record.referencePath, ...clip },
                 record.tenant,
                 active.manifestJson,
               )
@@ -564,7 +564,8 @@ export function createMainVideoService(deps: {
     return current
   }
   return {
-    async start(call: VideoCall, request: VideoCloudRequest) {
+    async start(call: VideoCall, request: VideoCloudRequest, referencePath:string) {
+      if(!path.isAbsolute(referencePath))throw new Error("video_request_invalid")
       const root = rootOf(),
         identity = deps.identity()
       if (!identity) throw new Error("not-authenticated")
@@ -589,6 +590,7 @@ export function createMainVideoService(deps: {
           if (await readJson(fileOf(root, key))) return
           await checkedClip(root, { ...request, input })
           await writeJson(fileOf(root, key), {
+            referencePath,
             sourceId: request.sourceId,
             input,
             tenant: identity.tenantId,

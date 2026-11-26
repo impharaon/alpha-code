@@ -49,7 +49,13 @@ export async function verifyVideoCall(
   )
     throw new Error("video_request_invalid")
   const source = input.source as { kind?: unknown; id?: unknown; path?: unknown } | undefined
-  if (source?.kind === "id" && source.id === request.request.sourceId) return
+  if (source?.kind === "id" && source.id === request.request.sourceId) {
+    const file=cachePath({cacheRoot:await realpath(root)},"sources",`${source.id}.json`)
+    if(await realpath(file) !== file)throw new Error("upload-path-invalid")
+    const record=await readJson<{path:string}>(file)
+    if(!record || !path.isAbsolute(record.path))throw new Error("video_request_invalid")
+    return record.path
+  }
   if (source?.kind !== "path" || typeof source.path !== "string") throw new Error("video_request_invalid")
   // sourceOf's existing path index proves which content the admitted original path resolved to.
   // Main never opens the original media file on instructions from the connector.
@@ -61,4 +67,5 @@ export async function verifyVideoCall(
   if ((await realpath(index)) !== index) throw new Error("upload-path-invalid")
   const resolved = await readJson<{ sourceId: string }>(index)
   if (resolved?.sourceId !== request.request.sourceId) throw new Error("video_request_invalid")
+  return path.resolve(call.directory,source.path)
 }

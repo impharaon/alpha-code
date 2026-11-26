@@ -228,11 +228,12 @@ export const videoCloudService = createMainVideoService({
     return JSON.parse(await fs.promises.readFile(path.join(saved.dir, file), "utf8"))
   },
 })
-export async function handleVideoCloudRequest(request: VideoBridgeRequest): Promise<VideoBridgeReply> {
+export async function handleVideoCloudRequest(request: VideoBridgeRequest, referencePath?:string): Promise<VideoBridgeReply> {
   try {
+    if(request.action === "start" && !referencePath)throw new Error("video_request_invalid")
     const result =
       request.action === "start"
-        ? await videoCloudService.start(request.call, request.request)
+        ? await videoCloudService.start(request.call, request.request, referencePath!)
         : request.action === "prepare"
           ? await videoCloudService.prepare(request.requestId, request.call, request.request)
           : request.action === "cancel"

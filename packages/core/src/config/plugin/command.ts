@@ -289,62 +289,98 @@ function evaluateTemplate(
 function bindTemplateNode(node: TemplateNode, syntax: PreparedInstruction["syntax"], parameter: (token: string, kind: TemplateNode["kind"]) => string | string[] | undefined) {
   const env: Record<string, string> = {}
   const prefix = "CODEPUPPY_PACKAGE_" + randomUUID().replaceAll("-", "") + "_"
+  const pieces: ({ source: string } | { values: readonly string[] })[] = []
+  for (const part of node.parts) {
+    if ("boundValue" in part) { pieces.push({ values: [part.boundValue] }); continue }
+    const pattern = syntax === "claude" ? /\$(?:ARGUMENTS(?:\[\d+\])?|\d+|[A-Za-z_][A-Za-z_0-9]*)/g : /\$(?:ARGUMENTS|[1-9]\d*)/g
+    let end = 0
+    for (const match of part.source.matchAll(pattern)) {
+      pieces.push({ source: part.source.slice(end, match.index) })
+      const argument = parameter(match[0], node.kind)
+      pieces.push(argument === undefined ? { source: match[0] } : { values: Array.isArray(argument) ? argument : [argument] })
+      end = match.index + match[0].length
+    }
+    pieces.push({ source: part.source.slice(end) })
+  }
+  const payload = pieces.flatMap(piece => "source" in piece ? [piece.source] : piece.values).join("")
+  let wireDelimiter = prefix + "HEREDOC"
+  while (payload.includes(wireDelimiter)) wireDelimiter += "_"
   const quotes = [""]
-  const pending: { delimiter: string; tabs: boolean }[] = []
-  let heredoc: { delimiter: string; tabs: boolean } | undefined
+  const pending: { delimiter: string; tabs: boolean; quoted: boolean }[] = []
+  let heredoc: typeof pending[number] | undefined
   let line = ""
+  let lineHasValue = false
   let escaped = false
-  const source = (text: string) => {
-    if (node.kind !== "shell") return text
-    for (let index = 0; index < text.length; index++) {
-      const character = text[index]!
+  let comment = false
+  let wordStart = true
+  let text = ""
+  const endHeredocLine = () => {
+    if (heredoc && !lineHasValue && (heredoc.tabs ? line.replace(/^\t+/, "") : line) === heredoc.delimiter) {
+      if (heredoc.quoted) text = text.slice(0, text.length - line.length) + (heredoc.tabs ? line.match(/^\t*/)?.[0] ?? "" : "") + wireDelimiter
+      heredoc = pending.shift()
+    }
+    line = ""
+    lineHasValue = false
+  }
+  const source = (input: string) => {
+    if (node.kind !== "shell") { text += input; return }
+    for (let index = 0; index < input.length; index++) {
+      const character = input[index]!
       if (heredoc) {
-        if (character !== "\n") { line += character; continue }
-        if ((heredoc.tabs ? line.replace(/^\t+/, "") : line) === heredoc.delimiter) heredoc = pending.shift()
-        line = ""
+        if (character !== "\n") { line += character; text += character; continue }
+        endHeredocLine()
+        text += character
+        wordStart = true
+        continue
+      }
+      if (comment) {
+        text += character
+        if (character === "\n") { comment = false; wordStart = true; heredoc = pending.shift() }
         continue
       }
       const quote = quotes.at(-1)!
-      if (escaped) { escaped = false; continue }
-      if (character === "\\" && quote !== "'") { escaped = true; continue }
-      if (quote !== "'" && text.slice(index, index + 2) === "$(") { quotes.push(""); index++; continue }
-      if (quote) { if (character === quote) quotes[quotes.length - 1] = ""; continue }
-      if (character === "'") { quotes[quotes.length - 1] = character; continue }
-      if (character === '"') { quotes[quotes.length - 1] = character; continue }
-      if (character === "(") { quotes.push(""); continue }
-      if (character === ")" && quotes.length > 1) { quotes.pop(); continue }
-      const redirect = text.slice(index).match(/^<<(-?)(?!<)[ \t]*(?:'([^']+)'|"([^"]+)"|([^\s;&|<>]+))/)
+      if (escaped) { text += character; escaped = false; wordStart = false; continue }
+      if (character === "\\" && quote !== "'") { text += character; escaped = true; wordStart = false; continue }
+      if (quote !== "'" && input.slice(index, index + 2) === "$(") { text += "$("; quotes.push(""); index++; wordStart = true; continue }
+      if (quote) { text += character; if (character === quote) quotes[quotes.length - 1] = ""; wordStart = false; continue }
+      if (character === "#" && wordStart) { comment = true; text += character; continue }
+      const redirect = input.slice(index).match(/^<<(-?)(?!<)[ \t]*(?:'([^']+)'|"([^"]+)"|([^\s;&|<>]+))/)
       if (redirect) {
-        pending.push({ delimiter: redirect[2] ?? redirect[3] ?? redirect[4]!, tabs: redirect[1] === "-" })
+        const delimiter = redirect[2] ?? redirect[3] ?? redirect[4]!
+        const quoted = redirect[2] !== undefined || redirect[3] !== undefined
+        pending.push({ delimiter, tabs: redirect[1] === "-", quoted })
+        text += quoted ? redirect[0].slice(0, -delimiter.length - 2) + "'" + wireDelimiter + "'" : redirect[0]
         index += redirect[0].length - 1
+        wordStart = false
         continue
       }
+      text += character
+      if (character === "'" || character === '"') quotes[quotes.length - 1] = character
+      if (character === "(") quotes.push("")
+      if (character === ")" && quotes.length > 1) quotes.pop()
+      wordStart = /[\s;&|()<>]/.test(character)
       if (character === "\n" && pending.length) heredoc = pending.shift()
     }
-    return text
   }
-  const value = (text: string) => {
-    if (node.kind !== "shell") return text
+  const value = (input: string) => {
+    if (node.kind !== "shell") return input
+    if (heredoc) {
+      lineHasValue = true
+      if (heredoc.quoted) return input
+    }
     const name = prefix + Object.keys(env).length
-    env[name] = text
+    env[name] = input
     const reference = "${" + name + "}"
     if (heredoc || quotes.at(-1) === '"') return reference
     return quotes.at(-1) === "'" ? "'\"" + reference + "\"'" : '"' + reference + '"'
   }
-  const text = node.parts.map(part => {
-    if ("boundValue" in part) return value(part.boundValue)
-    const pattern = syntax === "claude" ? /\$(?:ARGUMENTS(?:\[\d+\])?|\d+|[A-Za-z_][A-Za-z_0-9]*)/g : /\$(?:ARGUMENTS|[1-9]\d*)/g
-    let end = 0
-    let rendered = ""
-    for (const match of part.source.matchAll(pattern)) {
-      rendered += source(part.source.slice(end, match.index))
-      const argument = parameter(match[0], node.kind)
-      const quote = quotes.at(-1)!
-      rendered += argument === undefined ? source(match[0]) : Array.isArray(argument) ? argument.map(value).join(heredoc || !quote ? " " : quote + " " + quote) : value(argument)
-      end = match.index + match[0].length
-    }
-    return rendered + source(part.source.slice(end))
-  }).join("")
+  for (const piece of pieces) {
+    if ("source" in piece) { source(piece.source); continue }
+    const quote = quotes.at(-1)!
+    text += piece.values.map(value).join(heredoc || !quote ? " " : quote + " " + quote)
+    if (piece.values.length && !heredoc && !comment) wordStart = false
+  }
+  endHeredocLine()
   return { text, env }
 }
 

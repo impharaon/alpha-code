@@ -1,15 +1,15 @@
 ---
 id: DESIGN-child-process-write-fence
 title: 子进程写入围栏技术设计
-summary: 保留旧版裁决；v4 的缓存、非 Homebrew 全局安装、本人批准文件夹与用户配置契约已冻结待独立审查；Homebrew 单列待 owner 定，不阻塞其余决定。
+summary: 保留旧版裁决；v4 经 R1 修订固定位置身份真源、真实路径审批、目标文件判定、版本管理器全局位置与受围栏的环境探测后冻结；Homebrew 仍待 owner 定。
 kind: tech-design
-status: frozen-pending-review
+status: frozen
 spec: SPEC-child-process-write-fence
 spec_version: 4
 review:
-  rounds: 0
-  reviewed_sha: ""
-  verdict: "pending-review"
+  rounds: 1
+  reviewed_sha: "b49fa26f93"
+  verdict: "fix-then-merge; R1 1 Blocker 4 Major 3 Minor and one premise conflict, all corrected"
 owners: [owner]
 last_reviewed: 2026-11-26
 ---
@@ -369,7 +369,7 @@ renderer tracker 收到后丢掉该 `(引擎代, server, directory)` 的缓存;�
 
 # v4 增量｜缓存、全局安装、批准文件夹与用户配置（#1759）
 
-本增量状态为 **frozen-pending-review**：除明确标注「待 owner 定（B1）」的 Homebrew 行外，其余决定、R1–R6 接缝与证明义务冻结，等待编排者安排独立审查；尚未宣称审查通过。前文 v2/v3 的决定与 R1–R3 收据保留；其当时 frontmatter 收据为 `spec_version: 3`、`status: approved`、`review.rounds: 3`、`reviewed_sha: 8370b2fa23`、verdict「R1/R2/R3 findings all dispositioned and corrected, frozen by orchestrator 2026-11-19」。以下只替代明确点名的旧结论。**Homebrew 的行及其执行接缝单独待 owner 定（B1），不进入本次冻结域；其余决定不依赖 B1 的选择。**
+本增量状态为 **frozen**：除「待 owner 定（B1）」的 Homebrew 行外，其余决定、R1–R8 接缝与证明义务冻结。独立审查 R1（Claude Opus 5.5，审查版本 `b49fa26f93`）原结论 FIX-THEN-MERGE；本次按编排者逐项处置完成设计修订，收据与原 verdict 见 frontmatter 和本增量 §10，不把设计修订当成实现已通过。前文 v2/v3 的决定与 R1–R3 收据保留；其当时 frontmatter 收据为 `spec_version: 3`、`status: approved`、`review.rounds: 3`、`reviewed_sha: 8370b2fa23`、verdict「R1/R2/R3 findings all dispositioned and corrected, frozen by orchestrator 2026-11-19」。以下只替代明确点名的旧结论。**Homebrew 的行及其执行接缝单独待 owner 定（B1），不进入本次冻结域；其余决定不依赖 B1 的选择。**
 
 ## 1. 基线
 
@@ -395,6 +395,12 @@ renderer tracker 收到后丢掉该 `(引擎代, server, directory)` 的缓存;�
 | V4-P09（测+读） | 最小命令 `/usr/bin/sandbox-exec -p '(version 1)(allow default)(deny file-write* (subpath "<T>/home"))' /usr/bin/sandbox-exec -p '(version 1)(allow default)' /usr/bin/true`：退出 71，`sandbox-exec: sandbox_apply: Operation not permitted`。本机 Homebrew commit `3e47189a707c739ee1278a28a3b845f5834574e6` 的 `formula_installer.rb:1233,1466-1468,1538` 对 build、linkage、postinstall 再调 Sandbox；`sandbox.rb:111-130` 的 `HOMEBREW_AVOID_NESTED_SANDBOXING` 在默认 prefix 或 admin/staff 等组拒绝，`:178-192` 的 inherited 检查要求 Homebrew 专用 FD | 只放开 Homebrew 写目录不足以完成 BR-09。最小探针已证明内核前提失败；真实 brew 安装失败的完整链仍是读码推断，本次未安装或修改 Homebrew |
 | V4-P10（续接，测） | 临时 canonical 根 `fence1759-resume-bcqple0j`，空 HOME。`BUN_INSTALL_CACHE_DIR=<C>/bun/install-cache bun pm cache`、`npm_config_cache=<C>/npm/cache npm config get cache`、pnpm store/cache 键、pip/uv cache 及 `UV_PYTHON_INSTALL_DIR=<C>/uv/python uv python dir` 均返回指定路径、退出 0。Yarn Classic 1.22.22 的 `YARN_CACHE_FOLDER=<C>/yarn/cache node bin/yarn.js cache dir` 返回 `<C>/yarn/cache/v6`；Yarn 4.9.2 同时设置两键后 `config get globalFolder` 返回 `<C>/yarn/berry`，`config get cacheFolder` 返回 `<C>/yarn/berry/cache`。`BUN_RUNTIME_TRANSPILER_CACHE_PATH=<C>/bun/transpiler-cache bun <真实 Yarn Classic 的 bin/yarn.js> --version` 返回 1.22.22、退出 0，并生成两个缓存文件 | U1：本机变量读取已证；现代 Yarn 默认 global cache 优先的具体落点闭合，不能声称它落在 Classic 那一份目录；最终生产环境接线/lifecycle scripts 尚待实施证明 |
 | V4-P11（续接，测+读） | pnpm 10.32.1，以公开 semver 7.7.3 的原始 tarball 执行 `pnpm add -g <semver.tgz> --offline --ignore-scripts`：退出 0，安装树 `<PNPM_HOME>/global/5`，根层 regular shim `<PNPM_HOME>/semver`；直接调用 shim 返回 1.2.3、退出 0。临时 HOME 内 deny file-write*，仅给 `subpath(PNPM_HOME/global)` 与 `regex("^<escaped-PNPM_HOME>/[^/]+$")` 放行，同命令退出 0；撤根层 regex 后退出 1，`The CLI has no write access to the pnpm home directory`，无 shim；往 `PNPM_HOME/store/negative` 写入退出 1、0 落盘。实际包的 bin 字段来自 registry tarball，未手写包格式。已安装 pnpm 的 `dist/pnpm.cjs:16757-16761,18810-18825` 也显示 globalDirRoot 为 PNPM_HOME/global、bin 取 global-bin-dir 或 PNPM_HOME | U3：固定的是安装位置的一级节点模式与 global 子树，不需要动态 bin 名单；递归 store 仍不在集合中。该探针不是生产 profile 或 Windows 的通过结论 |
+
+| V4-P12（R1，读+测） | 当前 `ShellTool.prepare`（`packages/core/src/tool/plugin/shell.ts:115-125`）只解析 cwd/cd 的外部目录；`pty.ts:169` 在 spawn 后加 -l。`shell-env.ts:51-57,92,102` 与 `shell-env-cache.ts:93-103` 都直接 spawn 用户 shell；`server.ts:438-462` 合回环境，`shell-env-cache.ts:25-37` 未排除 XDG 根。pnpm 的 `switchCliVersion`（本机 `pnpm.cjs:201127-201143`）安装到工具根 `PNPM_HOME/.tools`（`:180533`）。临时 HOME 中，pnpm 10.32.1 对 `pnpm_config_store_dir` / `pnpm_config_cache_dir` 的查询回到原 store / undefined；换为 npm 前缀即报告指定 C；npm 11.20.0 的 `config get cache` 对三键各报一条 Unknown env config，退出 0 | R1-F4..F8/P0 的实际入口前提；不能声称任意 -g prefix 自动问目录、PTY rc 仍受 spawn 前变量约束、或 npm 安装配置路径无噪声。官方 [pnpm 配置](https://github.com/pnpm/pnpm/blob/main/pnpm/docs/configuring.md#environment-variables) 的专用前缀与宿主实测差异明确记录 |
+| V4-P13（R1，测） | 临时 HOME 中 `bun <T>/identity.ts` 直接 import 本仓 `checkWorkspaceDirectory`；正常 `~/.bun/bin` 返回 eligible:true，改成指向测试 HOME 的软链后返回 eligible:false / home-or-app-state，两臂进程退出 0。另用真实 `stat`：原本指向 chosen-A 的合法目录软链可解析；显示后改指 chosen-B，跟随链接的 dev+ino 对比为不同 | 既有排除可合法复用；目录软链本身不等于不合法，点击时必须核对所显示身份。未声称 R7 真源或 R4 IPC 已实现 |
+| V4-P14（R1，测） | 临时 HOME 的 `.zshrc` 尝试写入一个测试围栏外目录，并 export XDG_CONFIG_HOME 指向假工作区。`/bin/zsh -il -c 'printf ... "$XDG_CONFIG_HOME"'` 在 open 臂落盘；以 `/usr/bin/sandbox-exec -p <小型测试 profile>` 先围栏再 exec 时，写入 EPERM、0 落盘，但仍输出假 XDG 值；两臂 shell 退出均为 0 | 只看 rc/探针退出 0 不足以证明安全；同一生产写围栏与可信根消费固定必须同时接线。小 profile 不替代 R8 正式入口证明 |
+
+R1 的上述探针只用本机工具与临时根 `/private/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/fence1759-r1-g6wb_kqb/`，不运行用户真实 rc、不读出或记录秘密，不下载包、不运行应用；版本管理器布局仅查其官方文档/源码。P13/P14 的文件与 shell 输入就是本机实际目录、软链和命令，不是另一系统格式的手写替身。
 
 续接探针只下载三个公开 npm 小包：`semver@7.7.3`（28,442 bytes）、`yarn@1.22.22`（1,238,429 bytes）、`@yarnpkg/cli-dist@4.9.2`（1,066,119 bytes），元数据来自 `https://registry.npmjs.org/<包>/<版本>`，归档用其中 dist.tarball、原样解包后调用其真实 CLI；没有执行它们的安装脚本。semver tarball SHA-256 为 `b49572086d1e04c9a014cafc232685cc74570320d4e7091c2e30a7138c8522bd`。原始 `results.json`、`fenced-results.json`、`bun-runtime.json` 和逐命令 logs 留在本机 `/private/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/fence1759-resume-bcqple0j/`，非仓内交付物。Go/Cargo/rustup/Yarn 不在本机 PATH；已知 Cargo/Rustup 与此前 probe 的工具缓存也未找到 Go/Cargo。Yarn 已用上述小包完成本次所需探针；Go/Cargo 不下载整套工具链，U1/U2 的真实工具验证按续接 brief 记为实施阶段义务。P09 沿用，不重复调查或运行 Homebrew。
 
@@ -435,7 +441,7 @@ function resolvePackageManagerLocations(input: PackageManagerLocationInput): Pac
 | 工具 | 缓存/辅助数据：固定注入的键和值 | 全局安装决定 |
 | --- | --- | --- |
 | bun | `BUN_INSTALL_CACHE_DIR=C/bun/install-cache`；`BUN_RUNTIME_TRANSPILER_CACHE_PATH=C/bun/transpiler-cache` | 允许真实 `~/.bun/install/global` 和 `~/.bun/bin`；不以 `BUN_INSTALL` 重定向整个 Bun 安装 |
-| pnpm | `npm_config_store_dir=C/pnpm/store`、`npm_config_cache_dir=C/pnpm/cache`、`npm_config_state_dir=C/pnpm/state` | 用真实平台 PNPM_HOME（下表）；global packages 与 bin 在它之下。仅设置固定 `PNPM_HOME`，不把 store 顺带留在 PNPM_HOME |
+| pnpm | store/cache/state 三键各同时投影 `pnpm_config_<name>_dir` 与 `npm_config_<name>_dir`，值同为 `C/pnpm/<name>`；命名噪声见下文 | 用真实平台 PNPM_HOME（下表）；global packages 与 bin 在它之下。仅设置固定 `PNPM_HOME`，不把 store 顺带留在 PNPM_HOME |
 | yarn | `YARN_CACHE_FOLDER=C/yarn/cache`；现代版另设 `YARN_GLOBAL_FOLDER=C/yarn/berry`，默认 enableGlobalCache 下实际 cacheFolder 为 `C/yarn/berry/cache`，其 metadata/mirror 也留在 C（P10 实测） | Classic 的 global packages 在平台全局目录，bin 在固定 prefix/bin。现代 Yarn 没有 Classic `global add`；不虚构一个命令，BR-09 的该命令用 Classic 语义 |
 | npm / npx | `npm_config_cache=C/npm/cache`（包括 `_npx`、logs） | 真实 prefix 的 `lib/node_modules`、`bin`（Windows 为 prefix 下 `node_modules` 和 shim）；不重定向用户全局安装到 C |
 | pip | `PIP_CACHE_DIR=C/pip/cache` | 虚拟环境仍在项目；`--user` 写 Python 实际用户安装目录，缓存与其分开 |
@@ -444,7 +450,9 @@ function resolvePackageManagerLocations(input: PackageManagerLocationInput): Pac
 | cargo | `CARGO_HOME=C/cargo/home`（registry/git 索引、crate cache 和安装临时数据）；project `target` 不改 | `CARGO_INSTALL_ROOT=~/.cargo`，实际写入只含 `bin`、`.crates.toml`、`.crates2.json`；RUSTUP_HOME 不重定向、不把整棵 `~/.rustup` 加入写集合 |
 | Homebrew | **待 owner 定（B1）**；本次不确定其环境或执行方式 | **待 owner 定（B1）**；不产出 allow 清单，不影响其余行 |
 
-这些值是应用进程树的默认环境，不是命令黑名单；用户明确命令参数或项目配置仍按工具自身优先级解释，最终落盘受同一写集合约束。cache 重定向必须同时到达 shell、PTY、MCP 和 LSP 的真实 spawn；终端登录 rc 或连接器环境若覆盖这些默认值，缓存约定在最终 spawn 环境合成时重新投影。**已决定的新端口 R2**：环境合成消费 R1 的相同 `env`，只覆盖表内缓存键；不会清空用户 PATH、代理、registry 或凭据。不得通过修改机器上的 rc/npmrc 来安装这套环境。
+这些值是应用进程树的默认环境，不是命令黑名单；用户明确命令参数或项目配置仍按工具自身优先级解释，最终落盘受同一写集合约束。**已决定的新端口 R2**：shell、PTY、MCP、LSP 的 spawn 环境合成消费 R1 的相同 `env`，在该次 spawn 前只覆盖表内缓存键；不会清空用户 PATH、代理、registry 或凭据，不修改机器上的 rc/npmrc。**残留事实（R1-F6）**：PTY 在 spawn 后以 `-l` 运行用户 rc（`packages/core/src/pty.ts:169`），rc 后续 `export CARGO_HOME=...` 等仍能覆盖它；R2 不能在 exec 之前约束之后执行的 shell 代码，不宣称这种路径满足“缓存始终在 C”。不改 rc、不拦命令、不要求用户多做一步；真实入口证据分别报告默认路径与 rc 覆盖路径的结果。
+
+**pnpm 通道（R1-F7）**：现行官方配置文档使用 `pnpm_config_*`；本机 pnpm 10.32.1 的实际同名查询忽略该前缀，而读取 `npm_config_*`（P12）。因此三对固定同值键由 R1 同时产生，无版本探测、切换或配置选项。npm 对 pnpm 专用前缀没有该噪声，但 npm 11.20.0 在实际读取配置时会对另三键逐项输出 `Unknown env config`，三条警告明确接受并保留，不称作无噪声；不把“--version 没有警告”当成安装路径的证据。真实入口必须核对缓存落点与这些警告，不通过压 stderr 隐藏。
 
 缓存迁入 C 后撤掉真实 HOME 的 W7、W17、W18 放行（保留历史编号，不复用）；W8 历史文件不在本次改变内。旧缓存不拷贝、不删除、不热身下载。C 已在 W3 下；无须把整个应用状态根放开。
 
@@ -457,16 +465,30 @@ Cargo 改 CARGO_HOME 会改变用户全局 config 的查找位置。决定由主
 | 工具 | macOS / POSIX 固定路径模板（默认 subpath；点名文件为 literal；pnpm 根层使用下文固定 regex） | Windows 等价位置（仅环境/权限语义，不渲染 seatbelt） |
 | --- | --- | --- |
 | bun | `~/.bun/install/global`、`~/.bun/bin` | `%USERPROFILE%/.bun/install/global`、`.bun/bin` |
-| pnpm | macOS `~/Library/pnpm/global`、`~/Library/pnpm/bin` 与 PNPM_HOME 根层节点固定模式；Linux `~/.local/share/pnpm` 同形；缓存仍由显式键到 C（P11） | `%LOCALAPPDATA%/pnpm/global`、PNPM_HOME 的 shim/bin |
-| yarn Classic | `~/.config/yarn/global`（macOS/Linux）；`~/.yarn/bin`；prefix/bin 采用下面 npm 的固定 prefix 族 | `%LOCALAPPDATA%/Yarn/config/global`、`%LOCALAPPDATA%/Yarn/bin` |
-| npm | prefix 族 `/opt/homebrew`、`/usr/local`、`~/.npm-global`、`~/.local` 各自的 `lib/node_modules`、`bin`，另含 node_modules 中工具自身的 install 元数据；prefix 自身不放行 | `%APPDATA%/npm`（node_modules 和 `.cmd`/`.ps1`/无后缀 shim） |
+| pnpm | macOS `~/Library/pnpm/global`、`~/Library/pnpm/bin`、`~/Library/pnpm/.tools` 与 PNPM_HOME 根层节点固定模式；Linux `~/.local/share/pnpm` 同形；`.tools` 供 switchCliVersion 安装项目钉住的 pnpm，缓存仍由显式键到 C（P11/P12） | `%LOCALAPPDATA%/pnpm/global`、`pnpm/.tools`、PNPM_HOME 的 shim/bin |
+| yarn Classic | `~/.config/yarn/global`（macOS/Linux）；`~/.yarn/bin`；prefix/bin 采用 npm 的固定 prefix 族及下文版本管理器模板 | `%LOCALAPPDATA%/Yarn/config/global`、`%LOCALAPPDATA%/Yarn/bin` |
+| npm | prefix 族 `/opt/homebrew`、`/usr/local`、`~/.npm-global`、`~/.local` 各自的 `lib/node_modules`、`bin`，以及下文版本管理器的固定模板；另含安装元数据，prefix 自身不整体放行 | `%APPDATA%/npm`（node_modules 和 `.cmd`/`.ps1`/无后缀 shim） |
 | pip --user | `~/Library/Python`（macOS framework）；`~/.local/lib/python*` 的 Python 用户安装树及 `~/.local/bin`（POSIX non-framework）；不得放开整个 `~/.local/lib` | `%APPDATA%/Python/Python<version>/site-packages` 与 `Scripts` |
 | uv tool | `~/.local/share/uv/tools`、`~/.local/bin`；受管 Python 在 C/uv/python | `%APPDATA%/uv/tools`、用户 executable 目录；由 R1 用官方平台路径规则落成，不按盘符猜 |
 | go | `~/go/bin`；用户指定且本来已可写的 GOBIN 不额外扩权 | `%USERPROFILE%/go/bin` |
 | cargo | `~/.cargo/bin`；`~/.cargo/.crates.toml`、`~/.cargo/.crates2.json` 及 cargo 实际使用的同名原子写入伴随文件 | `%USERPROFILE%/.cargo` 下同样的 bin/安装元数据；缓存 C/cargo/home |
 | Homebrew | **待 owner 定（B1）**；全局位置及执行方式均不由本次决定 | Homebrew 无 Windows 原生对应；不引入另一种系统包管理器 |
 
-已有/显式自定义 prefix 在表外且尚未获准时，仍可走 BR-08 的原有文件夹批准；没有新增“禁止自定义 prefix”的规则。固定表不改变操作系统所有权/ACL，也不赋予管理员权限。U3 已由 P11 收敛：pnpm 的固定安装位置是 `subpath(PNPM_HOME/global)`、`subpath(PNPM_HOME/bin)`，以及 `regex("^" + escapedCanonicalPnpmHome + "/[^/]+$")` 的根层节点模式（含 shim 与其临时替换节点）；不枚举包名或扫描安装结果来扩权。主进程预建 PNPM_HOME；此 regex 只匹配一级节点，不匹配 `store/cache/state` 之下任何内容，原缓存树没有 subpath allow。模式的转义复用 profile 的既有规则，加入实际渲染字节并由现有 `processFenceWriteRules` 读取。P11 的 PNPM_HOME/store 写文件负臂已拒绝；P11 只证明本机 pnpm 10.32.1，Windows 与其他版本的真入口语料为实施证明义务。`/opt/homebrew` 在 npm prefix 族里仅表示现有 Node 安装布局；使用该 npm 不需要运行 brew，不依赖 B1。
+固定表以模板覆盖版本管理器的同类全局位置，供 npm 与 Yarn Classic 共用：`H` 为可信 HOME，`V=[^/]+` 为一个版本目录分段（不设版本/条数上限）；模板中的根先由 R7 按具体目录绑定，之后才渲染锚定根的 regex，不能把未经验证的 realpath 接进模板。
+
+| 管理器 / 官方布局 | 固定模板（POSIX；regex 展开后以 `^` 锚定，安装子树以 `(/.*)?$` 收尾） |
+| --- | --- |
+| nvm | `H/.nvm/versions/node/V/{lib/node_modules,bin}`；XDG 默认根 `<configHome>/nvm/versions/node/V` 同形；不放开 nvm 整根 |
+| fnm | `H/Library/Application Support/fnm`（macOS）、`H/.local/share/fnm`、`H/.fnm` 下的 `node-versions/V/installation/{lib/node_modules,bin}`；不把 multishell 软链当新 prefix 授权 |
+| volta | `H/.volta/tools/image/node/V/{lib/node_modules,bin}`；Volta 接管包安装还使用 `tools/image/packages`、`tools/user/packages`、`tools/user/bins`、`tools/shared`、`bin`、`tmp`、`log` 的安装树/元数据/暂存位置（均在 `H/.volta` 下，分别列规则，不开放整根与 cache） |
+| asdf | `H/.asdf/installs/nodejs/V/{lib/node_modules,bin}`；`H/.asdf/shims` 是全局可执行入口 |
+| mise | `H/.local/share/mise/installs/node/V/{lib/node_modules,bin}`、对应 `shims`；目录别名先通过 R7 绑定真实安装目标，不泛放 installs 根 |
+
+布局依据：[nvm 的 NVM_DIR/NVM_BIN](https://github.com/nvm-sh/nvm#environment-variables)、[fnm 目录选择](https://github.com/Schniz/fnm/blob/master/src/directories.rs)、[fnm installations_dir](https://github.com/Schniz/fnm/blob/master/src/config.rs)、[Volta v4 位置权威](https://github.com/volta-cli/volta/blob/main/crates/volta-layout/src/v4.rs)、[Volta 包安装](https://github.com/volta-cli/volta/blob/main/crates/volta-core/src/tool/package/install.rs)、[asdf 数据根](https://asdf-vm.com/manage/configuration.html)、[asdf shims](https://asdf-vm.com/manage/versions.html#shims)、[mise 目录](https://mise.jdx.dev/directories.html)。这是读取官方布局后的决定，尚未实跑这些管理器；Windows 仍只作原生布局/权限语义验收，不把 POSIX regex 搬到盘符路径。
+
+**更正 R1-F5**：不再声称“任意未列出的全局 prefix 会触发文件夹批准卡片”。`ShellTool.prepare`（`packages/core/src/tool/plugin/shell.ts:115-125`）只为 cwd/cd 解析到的目录调用 `authorizeExternal`，没有分析 `npm -g` 的实际写目标。表外路径保持既有围栏结果；已打开/已批准范围照常有效，本设计不新增 shell 的 prefix 识别机制、不新增询问或禁止自定义 prefix 的规则。上述固定模板覆盖已知默认布局；其真实调用仍须证明。
+
+pnpm 的固定位置还包括 `subpath(PNPM_HOME/.tools)`（R1-F4；实际 `switchCliVersion` → `installPnpmToTools`，`pnpm.cjs:201127-201143`，工具根 `:180533`）。根层 shim 保留 P11 的一级节点 regex；递归 store/cache/state 没有相应 allow。主进程预建 PNPM_HOME，R7 绑定每个安装目录，不能用 `PNPM_HOME/**` 替代。`/opt/homebrew` 在 npm prefix 族里只是现有 Node 布局，不依赖 B1。
 
 ### 4.3 用户配置固定表与拒绝优先级
 
@@ -482,21 +504,62 @@ Cargo 改 CARGO_HOME 会改变用户全局 config 的查找位置。决定由主
 
 CF/C1 的权威仍为 `configFenceLocations`（`process-fence-profile.ts:122`）、`planConfigFence`（`process-fence-plan.ts:83`）、`planCredentialStores`（`process-fence-plan.ts:314`）和现有 credential stores 生产者；任何 cache/global/user-config allow 与 X1 之后，保留 `renderConfigFence`/`renderCredentialFence` 的原拒绝、真实目标与祖先节点规则。应用/引擎配置不进 R3；`~/.opencode`、`~/.zsh_sessions`、`~/.zcompdump*` 继续受既有保护。凭据保护指 Code Puppy 保存的凭据，不把整份用户 `.npmrc` 擅自列成不可写；向模型输出秘密的问题归对应规格。
 
+### 4.3.1 固定位置的身份真源（R1-F1，新增端口 R7）
+
+R1/R3 只定义候选；**main 每次规划先过 R7，再把已核验目标交给 profile**，不直接 realpath 后放行。R7 属现有围栏 planner/真源所有者，复用 `checkWorkspaceDirectory`（`process-fence-profile.ts:589`）排除目录真实目标为 HOME/祖先、应用状态根及其相关目录、受保护配置目录。literal 用户文件不把其父目录授予写权限：`~/.zshrc` 可以是 literal，不能因其父级是 HOME 而误拒正常文件编辑。
+
+```ts
+type WritableLocationTruth = {
+  v: 1
+  entries: readonly {
+    sourcePath: string // R1/R3 固定候选的绝对写法，含具体版本目录；不可由 renderer 提供
+    targetPath: string // main 第一次规划记录的 canonical 目标；后续不重指
+    kind: "directory" | "file"
+  }[]
+}
+function planWritableLocations(input: {
+  candidates: readonly { sourcePath: string; kind: "directory" | "file" }[]
+  truthPath: string
+  eligibility: WorkspaceDirectoryInput
+}): { locations: WritableLocationTruth["entries"]; excluded: readonly string[] }
+```
+
+该函数是**已决定 raise**，内部文件 I/O 仍在 main 的现有 planner/真源端口，不引入 renderer/sidecar 写面。真源为 `<casBaseRoot>/fence-workspaces/<env>-write-locations.json`，与现有 `<env>.json` 同级，整个目录在 CF-1 之下；复用 `fenceWorkspaceTruthPath` 的根（`process-fence-workspaces.ts:50`）与 `writeWorkspaceTruth`（`:113`）的 main 独占、临时文件+rename 写法，数据格式用上面的独立 schema，不改变 workspace 真源。字段必填，路径为绝对路径，按 sourcePath+kind 唯一；只收本轮固定候选，目录须通过上述既有排除，文件保留 CF/C1 最终拒绝优先级。真源不放用户数据/秘密、不靠 electron store；运行期消息不能增删记录。
+
+首次规划在任何 v4 围栏树/探针开始之前：这些新放行的真实全局目录及用户配置此前不在可写表，main 把首次合法 realpath 目标写入真源后才能使用。缺失的目录由 main 在已核验父级下预建；缺失文件只记录“canonical 父级+文件名”的计划目标，不预写用户文件，不能等工具先建出软链再采信。后续规划无论来自重启、背景刷新或引擎换代，只接受当前解析仍等于首次 targetPath 的条目；后改的软链目标既不跟随，也不覆盖真源记录，仍保留合法的首次软链位置能力。文件正常原子替换不要求沿用旧 inode：固定真源绑定的是目标路径，不是把用户文件钉死在同一个 inode。
+
+C 及 C 下每个实际发出的写规则同样经过 R7；由于 W3 本来可写，不能对 C 使用“此前不可写”的信任推断：main 固定其 app-data 锚、先核验 C/父级与目标仍在该锚下，再预建并记录，不能从已可写 W3 下的软链追到锚外。所有 regex 先按固定模板列出/准备具体安装根并绑定其真实目标，再在绑定根下展开后缀；不把任意新 realpath（如 HOME）变成 regex 根。真源写失败不使用尚未记录的新放行，读坏/读失败不从当前可写磁盘重建首次身份，走既有规划失败/日志路径；没有弹窗、确认、迁移或兼容分支。P13 已验证既有目录排除能挡 HOME；R7 持久化及重启接线仍由实施在真实 planner 证明。
+
 ### 4.4 本人批准目录：同一个登记与签发所有者
 
 v4 替代前文「外部目录卡片批准永远不能登记」以及 S4 的“六个记录点”穷举；**新增一个明确的人类动作来源**，不把导航、SSE、命令或普通 permission reply 变成授权来源。X1 私有类及绑定当前引擎的签发、原生消费、运行内历史不变。
 
-**已决定的新端口 R4**：现有审批卡的具体点击处理经 preload 调主进程；不放进工具 RPC 或 sidecar→main 协议。其语义是“将这次本人看到并批准的具体目录加入现有目录授权”，名字按域定义：
+**已决定的新端口 R4**：现有审批卡在呈现时经 preload 只读请求 main 解析目录，显示**实际将授予的 real path**，可同时标明原始写法；点击继续使用同一个按钮，不因目标是合法软链而拒绝。
 
 ```ts
+type DirectoryAccessTarget = {
+  absolute: string // FileAccess.Target.absolute，文件或目录本身
+  directory: string // FileAccess.externalDirectory.directory
+}
+type DirectoryAccessDescription = {
+  snapshotID: string
+  targets: readonly {
+    absolute: string
+    realTarget: string
+    directory: string
+    realDirectory: string
+    dev: string // stat 跟随链接后的十进制 BigInt 字符串
+    ino: string
+  }[]
+}
+function describeDirectoryAccess(input: {
+  server: string; sessionID: string; requestID: string; requestFingerprint: string
+  targets: readonly DirectoryAccessTarget[]
+}): Promise<DirectoryAccessDescription>
 type DirectoryWriteApproval = {
-  server: string
-  sessionID: string
-  requestID: string
-  requestFingerprint: string
-  decisionID: string
-  decision: "once" | "always"  // reject 直接走原审批入口，不调用本端口
-  directories: readonly string[] // 快照里逐项显示的具体绝对目录，不是 glob/save
+  server: string; sessionID: string; requestID: string; requestFingerprint: string
+  decisionID: string; decision: "once" | "always"
+  snapshotID: string // main 发给正在呈现的卡片，身份事实由 main 留在内存
 }
 type DirectoryWriteApprovalResult =
   | { outcome: "granted" | "no-fence" }
@@ -505,15 +568,73 @@ type DirectoryWriteApprovalResult =
 function approveDirectoryWrite(input: DirectoryWriteApproval): Promise<DirectoryWriteApprovalResult>
 ```
 
-所有字段必填，目录数量不加上限。request/decision ID 复用已有审批身份；目录列表从同一已核验且正呈现的快照冻结，调用方不能补一个未显示的目标。`external_directory` 的生产请求新增 **R5**：`metadata.directoryAccess: { access: "read" | "write"; directories: readonly string[] }`，必填字段、无缺省、无数量上限；内容直接消费 `FileAccess.resolve` 的 `externalDirectory.directory`，与 resources 一一对应；不取 `save` 的较宽 root，不从 shell 文本猜路径。没有具体路径的第三方请求不能凭自述制造主进程授权；已有卡片须实际呈现具体目录才有可批准对象。
+所有字段必填，数量无上限。description 只读，不 mkdir、登记或签发；main 对正在呈现的已核验请求保存原路径、realDirectory 的 dev+ino 与 renderer/代际绑定，renderer 不能自行补一个未显示的目标。对缺失目录，main 只读记录最深存在祖先的 realpath/dev+ino 及待创建后缀，显示预计真实目标；批准时先核对同一个祖先，再准备准确目标，不能授予更宽祖先。snapshotID 复用请求生命期、不新增有效时限。
 
-R4 的入口只允许现有应用 renderer 的 preload sender；精确点击处理是唯一生产调用点，不按最近一次用户输入/激活时限取资格。账本的 `current`/fingerprint 冲突与过期检查先完成，批准路径绑定该份快照、该 renderer 和当前本机引擎代际。**先记录资格、等现有 tracker.grantWrite 收到消费成功，再由原 ApprovalEngine.decide 发 permission reply**；因此原工具这一次即可继续落盘，不能依赖下一条命令重试。主进程的批准簿按 decisionID 幂等，相同决定重复消费同一结果，冲突/过期不登记、不签发。R4 返回 no-fence 时不伪造 grant。
+点击时 main 重解析原路径，realDirectory 的 dev+ino（缺失目录为该存在祖先的身份）与显示快照不一致 ⇒ `conflict`，不登记、不 mkdir、不签发，沿既有冲突刷新卡片；合法软链目标未变则照常批准（R1-F2，P13）。`current`/fingerprint 的既有冲突/过期检查同样先于任何写动作；idempotency 仍用 decisionID。**先比对显示身份，再登记资格，等 tracker.grantWrite 消费成功，最后才由原 ApprovalEngine.decide 回复 allow**。reject 不调用 R4，no-fence 不伪造 grant。主进程批准结果绑定当时本机引擎代际，sender 只允许现有应用 renderer 的 preload；具体点击是唯一登记来源，不靠近期输入时间或 sidecar 声称的已批准。
+
+**R5（R1-F3 修订）**：`FileAccess.authorizeExternal` 的 metadata 形状冻结为：
+
+```ts
+type DirectoryAccessMetadata = {
+  directoryAccess: {
+    access: "read" | "write"
+    targets: readonly DirectoryAccessTarget[]
+  }
+}
+```
+
+`absolute` 直接来自 `Target.absolute`，`directory` 来自同一个 Target 的 externalDirectory（内部目标取其实际所属目录）；与该次 resources 逐项对应，access 来自真实读写调用。不能仅传 directory，也不能从 save 的宽项目根、glob 或 shell 文本猜文件。卡片从 main 的 description 显示真实路径；无实际目标的第三方自述不会制造主进程授权。
 
 批准源调用同一 `checkWorkspaceDirectory`、目录身份判定、`userOpened.register` 与 tracker `grantWrite`；其语义名称虽保留 `userOpened`，成员扩为“本人打开或本人批准”，不另造 registry。批准不创建项目 tab；运行内授权仍进入 `carriedWorkspaces`，后续同代/换代引擎可继续使用；不增加批准有效期或重启后的持久记忆。文件夹不存在时不得把其更宽祖先当作获准目标；主进程仅准备批准的具体目录，沿现有 canonical/保护判定校验其实际落点，再签发。此准备能力是 R4 的组成部分，不是引擎可任意调用的 mkdir 服务。
 
-**已决定的新端口 R6**：ext 的现有 permission evaluate hook 消费主进程对具体目标给出的“已在集合中 / 需本人目录批准 / 受保护”结果。只读/既有 deny 优先。表内 global/user-config 不再因 `external_directory` 多问一次，命令/改文件审批仍按既有档位；未获准的表外写目标在全部批准档也保持 BR-08 的目录卡片。读操作不因本增量新增写授权要求；R5 的 `directoryAccess.access`，取自 FileAccess 的实际调用种类，不能从工具名猜。R6 是只读询问/投影，不允许 sidecar 用它登记目录或申请令牌。既有 session always 不能跳过尚未获得的 OS 目录授权。
+**R6（R1-F3/F8 修订）**：ext 的既有 evaluate hook 按 **target.absolute 的实际文件**查询 main 的有效写范围；例如 `~/.zshrc`、`~/.config/git/config`、`~/.cargo/config.toml` 命中 R3 的精确文件即可，不要求它们的 HOME/父目录可写，不为编辑这些文件批准 HOME。只读/既有 deny 与 CF/C1 优先；固定 global/user-config 文件不额外问 external_directory，命令/改文件工具仍按原权限档审批；表外写目标的目录批准保留 BR-08 行为，读操作不因本增量新增写授权。session always 不代替尚未得到的目录 OS 授权。
+
+运行内已批准目录的查询明确走现有 `codepuppy.*` sidecar→main dispatch（`server.ts:779-802` → `CodePuppySidecarHost.receive`，`hub-view.ts:496,519`），ext 复用 `createHubBridge` 的 parentPort、请求 id 和超时机制（`ext/src/hub-bridge.ts:80`）；增加以下只读消息，不建立新通信通路：
+
+```ts
+type WriteScopeRequest = {
+  type: "codepuppy.write-scope.request"
+  id: number
+  access: "read" | "write"
+  targets: readonly DirectoryAccessTarget[]
+}
+type WriteScopeReply = {
+  type: "codepuppy.write-scope.reply"
+  id: number
+  result: {
+    revision: number
+    targets: readonly {
+      absolute: string
+      outcome: "writable" | "needs-approval" | "protected" | "no-fence"
+    }[]
+  } | { error: "unavailable" }
+}
+```
+
+id 为现有桥的非负整数，请求字段必填、路径绝对、结果与输入同序，无数量上限。main 的新 `readWriteScope` 消费 R1/R3 经 R7 验证的规则、CF/C1、实际代际 profile 及 tracker 的本运行目录授权；只投影每个目标的状态与授权/代际变化 revision，不更新任何状态。main/桥的消费方法统一为 `readWriteScope(request: Pick<WriteScopeRequest, "access" | "targets">): Promise<WriteScopeReply["result"]>`；消息不能含登记/签发请求或令牌；bad shape 被现有 parser 拒绝，不可用沿现有失败路径，不把失败解释为已获准。main parser/build、CodePuppySidecarInbound/Outbound 与 HubBridge 的只读调用是同一 R6 raise 的两端；query 只能读，批准仍只来自 R4。对应 wire 形状属于 `codepuppy-sidecar-messages.ts` 现有权威，不另写 ext 镜像。
 
 用户拒绝时没有任何 grant；失败沿现有审批失败/重试呈现，不把卡片装成“批准成功”，不发允许回复。Home/状态/受保护位置沿已有一句说明，不能把失败变成让用户重启。远端审批不签发本机目录扩展。缓存/global/user-config 是静态集合，不伪装为本人批准记录。
+
+### 4.4.1 环境探针也在围栏内（R1-P0，新增端口 R8）
+
+原先“shell rc 只在用户下次打开外部终端时才绕过围栏”的前提不成立：`preferAppEnv` 每次启动都会在 main 派生 `-il`/`-l` shell，未装围栏，且结果可改 XDG 根。决定只作内部接线修正，保持规格限制行，不新增用户步骤，也不把该事实送回 owner 重新批准。
+
+```ts
+type ShellProbeFenceContext = {
+  profile: string // 与引擎同一 planner/renderer 产生、已试编译的实际策略字节
+  env: Readonly<Record<string, string>> // minimalProbeEnv + 固定根 + R1 缓存 + 同一代理 env
+  roots: EngineRoots & { stateHome: string; engineConfigDirectory: string }
+}
+function prepareShellProbeFence(): Promise<ShellProbeFenceContext>
+```
+
+这是 main 启动协调层的已决定 raise：在任何 rc/缓存结果能合并之前，取系统 HOME、启动进程的显式路径环境与已初始化的 canonical 应用根作为唯一可信根快照，复用 `usableExportedPaths`、`resolveEngineRoots`、`engineGlobalConfigDirectory` 和 state 默认规则。先完成已有必须同步的主进程初始化，再用既有 `ensureEgressPolicyProxy` 得到真端口与 `sidecarEgressProxyEnv`，通过同一 `planProcessFence`、R7 真源、CF/C1 和工作区真源/运行内 carry 生成 probe 策略；没有端口/真源/有效 profile 就不运行未围栏探针。`initCodePuppyEnvironment` 及探针所需根准备必须在 `preferAppEnv` 之前完成（当前 `index.ts:627` 在 `:655` 前，需倒正这条依赖）；root 解析不再依赖探针，避免“先执行可写 rc 才能建立围栏”的环。
+
+`loadShellEnv`/`probeShellEnvAsync` 都接收该 context，在 darwin 以 `/usr/bin/sandbox-exec -p profile <shell> -il/-l -c 'env -0'` 启动：**先装策略再执行 shell 的第一条 rc**，不用嵌套 sidecar，不加第二套 HOME allow，main 自身不进入围栏。缓存命中后的后台刷新也走相同入口；当前目录和最小 env 仍使用 main 已知的路径，超时与缓存命中语义沿用现有实现。正式签名产物上的该入口仍须实证，不假称本地小 profile 已证明出货形态。
+
+缓存读取、异步 fresh 与同步 probe 的所有合并出口，只消费其非根环境；主进程的 `HOME`、`XDG_CONFIG_HOME`、`XDG_DATA_HOME`、`XDG_STATE_HOME`、`XDG_CACHE_HOME`、`OPENCODE_CONFIG_DIR`/`OPENCODE_CONFIG` 及数据位置 `OPENCODE_DB` 都不能被 probe/cache 改写，未设值也按可信快照的既有默认保留，不能重新从已污染的 `process.env` 解析。main 配置/工具策略写者、bootstrap、planner 和 sidecar 所见的 CF-8/CF-11/data/state 根必须是同一份快照，即使 probe 的 `env -0` 回吐指向工作区的 XDG 值也不消费；不以扩大写 allow 修复这种重定向。PATH 等工具发现照常消费；没有 root 新开关、旧缓存迁移或额外批准。非 darwin 保留无 Seatbelt 的原平台边界，但根来源仍一致。
+
+R8 的 schema/入口、两类探针的 context 参数与根合并位置一并冻结；当前源码尚无该 context，实施不能把已有 `minimalProbeEnv` 当成围栏。P14 证明在 exec 前装 Seatbelt 能挡 rc 的越界写，但挡不住 rc 输出 XDG 字符串，因此根快照消费约束必须同时存在。
 
 ### 4.5 能力 seam map（现有端口 / 已决定 raise / 待 owner 定）
 
@@ -521,20 +642,22 @@ R4 的入口只允许现有应用 renderer 的 preload sender；精确点击处�
 | --- | --- | --- |
 | 路径/环境单一权威，#1760 复用 | R1 `resolvePackageManagerLocations`；R2 最终 spawn 环境合成；既有 `createSidecarEnv`（`sidecar-env.ts:221`）、`spawnLocalServer`（`server.ts:487`） | 已决定 raise；目前只有 uv 单点赋值 |
 | 静态清单落到真策略 | `planProcessFence`（`process-fence-plan.ts:229`）、`renderProcessFenceProfile`（`process-fence-profile.ts:215`）、R1/R3 输出；原 planner deps.mkdirp/realpath/compile | 现有端口 + 已决定输入扩展；不增加第二个 renderer |
-| 用户配置与固定安装位置权限投影 | R3 `userConfigurationLocations`、R6 只读 writable 判定；`registerPolicy`（`ext/src/policy/index.ts:75`）的 evaluate hook | 已决定 raise；权限档仍用现有 gate/catalog |
-| 具体批准目标与读写语义 | R5 在 `FileAccess.authorizeExternal`（`core/src/file-access.ts:120`）携带 `directoryAccess`（directories/access）；卡片沿现有请求事实核验 | 已决定 raise；不把目前没有的 metadata 说成可用 |
-| 本人点击到 main、授权先于允许回复 | R4 `approveDirectoryWrite`；`PermissionDialog` 点击（`:84-129`）、`ReceiptLedger.decide`（`contract/receipts.ts:102`）增加 pre-reply await 接缝 | 已决定 raise；不得在代际翻译器里做权限决定，不切换 session API 代际 |
+| 用户配置与固定安装位置权限投影 | R3；R6 `readWriteScope` 经 `server.ts:779-802` → `createCodePuppySidecarHost`（`hub-view.ts:501`）及 `createHubBridge`（`ext/src/hub-bridge.ts:80`）；wire 见 §4.4；`registerPolicy` evaluate hook | 已决定只读消息/两端 raise；按目标文件判定，权限档仍用原 gate/catalog |
+| 具体批准目标与读写语义 | R5 在 `FileAccess.authorizeExternal`（`core/src/file-access.ts:120`）携带 `directoryAccess`（targets.absolute/directory、access）；卡片沿现有请求事实核验 | 已决定 raise；不把目前没有的 metadata 说成可用 |
+| 本人点击到 main、授权先于允许回复 | R4 `describeDirectoryAccess` / `approveDirectoryWrite`（显示 real path、点击核对 dev+ino）；`PermissionDialog` 点击（`:84-129`）、`ReceiptLedger.decide`（`contract/receipts.ts:102`）增加 pre-reply await 接缝 | 已决定 raise；不得在代际翻译器里做权限决定，不切换 session API 代际 |
 | 资格/身份/历史 | `UserOpenedRegistry.register`（`process-fence-workspaces.ts:321`）、`checkWorkspaceDirectory`（`process-fence-profile.ts:589`）、`FenceWorkspaceTracker.grantWrite`（`:401`）及 carriedWorkspaces | 复用，R4 是唯一新增登记来源；保留现有竞争防护 |
 | 活进程树放行 | `SidecarListener.grantWrite`（`server.ts:732`）、`FenceAddon.issueFileExtensionToProcess`（`process-fence-apply.ts:35`）、sidecar `grant-write`（`:157`） | 复用，不加原生签发方式 |
 | 真实入口装载及保护优先 | `applyProcessFence`（`process-fence-apply.ts:86`）、CF/C1 既有 planner/renderer | 复用；目录合并后再走同一个生产入口 |
+| 固定写位置的首次目标与重启防重指 | R7 `planWritableLocations`；`checkWorkspaceDirectory`（`process-fence-profile.ts:589`）、`fenceWorkspaceTruthPath`（`process-fence-workspaces.ts:50`）/原子真源写法（`:113`）；§4.3.1 冻结独立 schema | 已决定 main-only 真源 raise；R1/R3/C 均消费 |
+| 登录 shell 的受围栏探测与可信根 | R8 `prepareShellProbeFence`；`loadShellEnv`（`shell-env.ts:86`）/`probeShellEnvAsync`（`shell-env-cache.ts:93`）接 context；`planProcessFence`、`ensureEgressPolicyProxy`（`server.ts:181`）、`minimalProbeEnv`（`shell-env.ts:42`） | 已决定启动依赖/context raise，原探针无围栏，不能冒充已实现 |
 | Homebrew 执行方式 | **待 owner 定（B1）**；P09 接受为事实，不在本次选择执行入口 | **待 owner 定（B1）**；不属于其余已冻结接缝的依赖 |
 | Windows | R1/R3 平台投影、既有权限 gate 和 no-fence 分支 | 不增 Windows 围栏；真机尚未验证 |
 
 ## 5. 数据与失败
 
-包缓存和安装仍由包管理器写盘；不新建应用数据库、迁移历史缓存或复制用户凭据。主进程只准备清单目录与已本人批准的具体目录，资格仍属现有运行内所有者。前文运行内已可写历史、送出但答复不明的令牌、跨代引擎孤儿风险继续适用；新静态 global 根也必须被 `generationWrites` 从**实际 apply 的 profile**读到，不能手抄一份“已覆盖”判定。
+包缓存和安装仍由包管理器写盘；不新建应用数据库、迁移历史缓存或复制用户凭据；新增的 R7 小型路径身份真源由 main 独占，格式与原子写边界见 §4.3.1。主进程只准备清单目录与已本人批准的具体目录，资格仍属现有运行内所有者。前文运行内已可写历史、送出但答复不明的令牌、跨代引擎孤儿风险继续适用；新静态 global 根也必须被 `generationWrites` 从**实际 apply 的 profile**读到，不能手抄一份“已覆盖”判定。
 
-目录授权与 permission reply 没有跨进程事务。关键窗口在授权成功后、HTTP reply 之前：用户已经批准该目录，它可以保持可写；原请求继续挂起，按相同 decisionID 重试回复即可，不能假称撤回已消费的扩展。原生消费失败不发 allow；过期/指纹冲突先于登记；只收到引擎 replied、甚至引擎自行移除 pending，都不能补登记。R4 成功结果绑定当时引擎代际；代际变化按 tracker 的运行内历史重新确认当前代，不拿旧消费确认解锁新请求。
+目录授权与 permission reply 没有跨进程事务。关键窗口在授权成功后、HTTP reply 之前：用户已经批准该目录，它可以保持可写；原请求继续挂起，按相同 decisionID 重试回复即可，不能假称撤回已消费的扩展。原生消费失败不发 allow；过期/指纹冲突与显示目录的 dev+ino 冲突都先于登记；只收到引擎 replied、甚至引擎自行移除 pending，都不能补登记。R4 成功结果绑定当时引擎代际；代际变化按 tracker 的运行内历史重新确认当前代，不拿旧消费确认解锁新请求。
 
 CF/C1 优先于任何 allow，包括配置文件软链、安装脚本改名祖先和审批祖先目录。POSIX 权限不足、网络/registry 错误仍由原工具报错；不可把它们标成写围栏成功。Homebrew 的失败/执行契约单独待 owner 定（B1）；本节其余管理器及目录授权的失败处理不依赖该选择。
 
@@ -542,17 +665,17 @@ CF/C1 优先于任何 allow，包括配置文件软链、安装脚本改名祖�
 
 沿 `docs/architecture/modules.md:51` 的桌面宿主与 `:41` 的 Schema 边界：位置/固定值留 main 的 profile 权威，preload 只暴露本机批准动作及只读结果，renderer 不 import main；core/protocol 不依赖桌面，R5 只携带 FileAccess 已有域数据，ext 从宿主桥消费投影。R1 纯函数不要求 engine import main；#1760 的 main 侧消费者取得结果后将环境交给连接器。共享消息类型走既有 shared/schema 边界，不让 core 反向依赖 Server。没有新顶层模块目录。
 
-K1：不另建权限档名单。K2：缓存、全局清单、用户配置位置都由同一 profile 所有者提供；授权复用 tracker、X1、CF/C1，不复制判断。R4 的 preload sender、具体点击调用点与旧记录点采用同一个信任面；目录扩大不能由工具 RPC、sidecar 回信或普通 HTTP 触发。未引入新的结构例外。
+K1：不另建权限档名单。K2：缓存、全局清单、用户配置位置都由同一 profile 所有者提供；授权复用 tracker、X1、CF/C1，R7 是固定位置身份的单一真源，R8 的根快照也由该宿主协调，不能在 ext 复制判断。R4 的 preload sender、具体点击调用点与旧记录点采用同一个信任面；目录扩大不能由工具 RPC、sidecar 回信或普通 HTTP 触发。未引入新的结构例外。
 
-证据必须经过 `spawnLocalServer → planProcessFence → sidecar.start/applyProcessFence → 实际命令/PTY/MCP`，含最终环境；只测纯 resolver、只用讨论里的 HOME mimic 或只见退出 0，不能声称 AC-09..12 成立。以真实包管理器生成的项目/安装输入留来源，围栏外核对项目依赖、全局命令可调用、用户配置真实内容和原 HOME 缓存无变更。撤掉缓存 env 的 bun/go/cargo 对照必须失败；撤掉 global/config 清单的对应操作必须失败；Git 撤锁路径须失败。外部批准须在原请求上写成功、已有子进程和之后的子进程均可写、PID 不变；移除 R4 时同一写入失败且无落盘；拒绝、自回复、伪造/重放、深链接与 sidecar 消息不产生目录授权。加入新 allow 之后，CF/C1 与两处 shell 缓存负例仍须保持拒绝。上述是设计成立的可证伪标准，具体用例、命令编排和文件归 plan.md。
+证据必须经过 `spawnLocalServer → planProcessFence → sidecar.start/applyProcessFence → 实际命令/PTY/MCP`，含最终环境；只测纯 resolver、只用讨论里的 HOME mimic 或只见退出 0，不能声称 AC-09..12 成立。以真实包管理器生成的项目/安装输入留来源，围栏外核对项目依赖、全局命令可调用、用户配置真实内容和原 HOME 缓存无变更。撤掉缓存 env 的 bun/go/cargo 对照必须失败；撤掉 global/config 清单的对应操作必须失败；Git 撤锁路径须失败。外部批准须在原请求上写成功、已有子进程和之后的子进程均可写、PID 不变；移除 R4 时同一写入失败且无落盘；拒绝、自回复、伪造/重放、深链接与 sidecar 消息不产生目录授权。加入新 allow 之后，CF/C1 与两处 shell 缓存负例仍须保持拒绝；重启前把固定安装目录/用户文件/C 子项换成软链后，planner 不得放行 HOME 或新目标；真实卡片显示 real path，显示后换目录再批准必须 conflict，原合法软链批准仍成功。pnpm 项目钉版必须实际走 `.tools`，npm/Yarn Classic 的版本管理器全局前缀与 pnpm 环境键噪声也纳入真实入口。启动探针的缓存命中刷新和无缓存路径都须证明 rc 越界写失败、PATH 仍能发现工具、恶意 XDG 输出不能移动 CF-8/CF-11；反向撤围栏/根固定分别必须暴露越界写/根漂移。上述是设计成立的可证伪标准，具体用例、命令编排和文件归 plan.md。
 
-Windows 不运行 Seatbelt，也不宣称 CF/C1 有 OS 围栏保证；沿规格原有平台边界。相同命令与文件操作仍消费权限档：“全部批准”直接执行，“请求审批”先问，拒绝后无该次写入；真实目录来源必须使用 Windows 路径权威和大小写规则。Windows 实机、带签名生产进程树、本次各管理器全量安装均未执行，留给真实入口证明；不以 macOS 的临时目录探针代替。
+Windows 不运行 Seatbelt，也不宣称 CF/C1 有 OS 围栏保证；沿规格原有平台边界。相同命令与文件操作仍消费权限档：“全部批准”直接执行，“请求审批”先问，拒绝后无该次写入；真实目录来源必须使用 Windows 路径权威和大小写规则。Windows 实机、带签名生产进程树（包括 R8 探针）、本次各管理器全量安装均未执行，留给真实入口证明；不以 macOS 的临时目录探针代替。
 
 被否决：放开真实 HOME 缓存（违反 AC-09）；把 HOME/XDG 整体指到 C（改变项目/配置查找）；在每个 connector 或 shell wrapper 复制路径表（违反 K2）；先回复后授权（原请求会竞态失败）；看到 permission.replied 自动登记（模型可制造）。Homebrew 的两种产品取舍只在 §10 提问，本次不选择、设计或否决其中任何一种。
 
 ## 8. 拆分决定
 
-同仓的所有权接缝只有 #1760：#1759 的 profile 所有者产 R1 的缓存位置、环境键与目录预建语义；#1760 的 launcher 所有者消费该结果，负责它自己的 Node/uv 启动器与 Python 版本、下载和准备状态。#1760 可以按 R1 开始设计，其真实围栏验收依赖同一实现与生产环境接线。两边不各持有 `uv-cache` 或 npm cache 常量；连接器单条环境不能把缓存改回 HOME。launcher 的运行时布局由其设计负责，不能通过本设计扩大到 HOME。不存在跨仓技术拆分。缓存、非 Homebrew 全局位置、用户配置、目录批准、Windows 权限语义及 #1760 的 R1 消费均已独立冻结；B1 只挂在 Homebrew 的行和 seam 上，不作为这些部分的开工、审查或集成依赖。
+同仓的所有权接缝只有 #1760：#1759 的 profile 所有者产 R1 的缓存位置、环境键与目录预建语义（均先经 R7 身份验证，使用 R8 的可信根）；#1760 的 launcher 所有者消费该结果，负责它自己的 Node/uv 启动器与 Python 版本、下载和准备状态。#1760 可以按 R1 开始设计，其真实围栏验收依赖同一实现与生产环境接线。两边不各持有 `uv-cache` 或 npm cache 常量；连接器单条环境不能把缓存改回 HOME。launcher 的运行时布局由其设计负责，不能通过本设计扩大到 HOME。共享接缝传播核对：`rg --files docs/specs | rg 'connector-launchers/(design|spec)\.md$'` 在本 checkout 只返回 spec.md，没有可修订的 #1760 design.md；并行设计的交接输入须消费本版 R1/R7/R8（不再复制未验证 C 根或未围栏 probe），不声称已修改另一 worktree。不存在跨仓技术拆分。缓存、非 Homebrew 全局位置、用户配置、目录批准、Windows 权限语义及 #1760 的 R1 消费均已独立冻结；B1 只挂在 Homebrew 的行和 seam 上，不作为这些部分的开工、审查或集成依赖。
 
 ## 9. 回滚
 
@@ -566,13 +689,34 @@ Windows 不运行 Seatbelt，也不宣称 CF/C1 有 OS 围栏保证；沿规格�
 | 本人目录批准先 grant 后 permission reply，复用既有 X1/registry | v4 BR-05/08、AC-10，P03..P06；新增来源取代旧 S4 穷举，未放宽“模型不能登记” |
 | 用户配置按文件/必要伴随名放行，CF/C1 最后拒绝 | AC-12，P08；既有保护规格仍是权威 |
 | Windows 复用环境/权限，无 OS 围栏承诺 | spec v4 Windows 段与 AC-04；未实机验证 |
-| B1：Homebrew **待 owner 定（B1）**，其余增量 frozen-pending-review | P09 的嵌套失败为已接受事实；编排者 Claude Opus 5.5 在本次续接 brief 裁决将其作为产品取舍交 owner，其余决定不依赖 B1，不继续调查 Homebrew 或选择路线 |
+| B1：Homebrew **待 owner 定（B1）**，其余增量 frozen | P09 的嵌套失败为已接受事实；编排者 Claude Opus 5.5 在本次续接 brief 裁决将其作为产品取舍交 owner，其余决定不依赖 B1，不继续调查 Homebrew 或选择路线 |
 
-**B1 提请 owner 的问题（本次续接 brief 要求原样带回）：** Homebrew 在现有写入围栏里会再次启动自己的沙箱，已实测这种嵌套会失败。您选择哪一种：A，在「全部批准」档由应用替助手在围栏外运行 `brew`，保留对话中的安装能力，但 formula 安装脚本也会在围栏外运行，现有写入范围及凭据、联网围栏不能约束这些脚本；还是 B，对话里不提供 `brew install`，保留这部分围栏边界，但用户必须在应用外安装 Homebrew 软件，这会减少已批准的对话能力，需要您明确同意？本次不选择或设计 A/B；等待只影响 Homebrew，其余 v4 决定照常进入独立审查。
+**B1 提请 owner 的问题（本次续接 brief 要求原样带回）：** Homebrew 在现有写入围栏里会再次启动自己的沙箱，已实测这种嵌套会失败。您选择哪一种：A，在「全部批准」档由应用替助手在围栏外运行 `brew`，保留对话中的安装能力，但 formula 安装脚本也会在围栏外运行，现有写入范围及凭据、联网围栏不能约束这些脚本；还是 B，对话里不提供 `brew install`，保留这部分围栏边界，但用户必须在应用外安装 Homebrew 软件，这会减少已批准的对话能力，需要您明确同意？本次不选择或设计 A/B；等待只影响 Homebrew，其余 v4 决定按 R1 处置冻结。
 
-**U1–U3 的闭合与实施证明义务：** U1 的变量读取已由 P07/P10 的本机真实 CLI 查询闭合，Bun runtime cache 已实际生成；Yarn 两种语义明确区分。Go/Cargo 未在本机找到可执行文件，需要整套工具链下载，超出本次少量小包预算，因此按续接 brief 归实施阶段：用实际工具验证 GOMODCACHE/GOCACHE/CARGO_HOME 及 install root、缓存无 HOME 改动；生产 shell rc、MCP 环境覆盖和 lifecycle scripts 的最终 env 经 R2 真实 spawn 证明，不以 CLI 查询替代。U2 的“配置和凭据都随 CARGO_HOME 读取”由官方定义闭合，同一原文件读取桥的义务已明确；真实 Cargo config 合并/相对路径、credential provider、rustup shim 与私有 registry 用隔离样本在实施时证明，禁止使用/输出真实秘密。U3 的名字变化已由固定根层模式与 P11 正反臂解决，不留动态名单或 PNPM_HOME 整树放行的设计分叉；跨版本/Windows 仍属真实入口证据。Windows、生产签名进程树及全量安装尚未执行；这些是验证既定决定的义务，不是等待 Homebrew 的设计分叉，也不增加用户步骤或限制。Homebrew P09 的内核失败已实测，完整 brew 安装链仍是读码推断；本轮不重跑。
+**U1–U3 的闭合与实施证明义务：** U1 的变量读取已由 P07/P10 的本机真实 CLI 查询闭合，Bun runtime cache 已实际生成；Yarn 两种语义明确区分。Go/Cargo 未在本机找到可执行文件，需要整套工具链下载，超出本次少量小包预算，因此按续接 brief 归实施阶段：用实际工具验证 GOMODCACHE/GOCACHE/CARGO_HOME 及 install root、缓存无 HOME 改动；MCP 环境覆盖和 lifecycle scripts 的 spawn env 经 R2 真实入口证明，不以 CLI 查询替代；PTY 的 rc 在 spawn 后重新 export 的路径保留 R1-F6 残留说明，不把它写成已覆盖。U2 的“配置和凭据都随 CARGO_HOME 读取”由官方定义闭合，同一原文件读取桥的义务已明确；真实 Cargo config 合并/相对路径、重定向 CARGO_HOME 导致项目/全局同一 config 被双读的情形（U2）、credential provider、rustup shim 与私有 registry 用隔离样本在实施时证明，禁止使用/输出真实秘密。U3 的名字变化已由固定根层模式与 P11 正反臂解决，不留动态名单或 PNPM_HOME 整树放行的设计分叉；跨版本/Windows 仍属真实入口证据。Windows、生产签名进程树及全量安装尚未执行；另含 `packages/util/src/npm-config.ts:33` 失败返回空配置后回落 `~/.npm` 的负例；这些是验证既定决定的义务，不是等待 Homebrew 的设计分叉，也不增加用户步骤或限制。Homebrew P09 的内核失败已实测，完整 brew 安装链仍是读码推断；本轮不重跑。
 
 | 轮/版本与范围 | 检查方 | 结论与证据 | 遗留去向 |
 | --- | --- | --- | --- |
 | 首轮作者交接（历史收据，当前结论见下一行）/ 代码 `9f08c506d9842d319616c7e45c33d3b9c3279e48`，spec v4 pinned SHA | Codex（GPT-6，designer；无独立审查，无子代理） | 已读批准输入、沿用旧有效收据；P07/P08/P09 小探针；旧名称扫描 10 pass/0 fail；文档契约当前与 HEAD 基线均 72 个 error、无新增 finding（只更新本设计索引行，其余既有断链/索引问题未修）；`git diff --check` 通过；R1–R6 明确为新接缝；B1 无合法端口，送审草案，不标 approved | B1 回 #1759 调度方；U1–U3 在本节诚实保留，不宣称可直接实施 |
 | 续接冻结 / 输入设计 `403bfc16b7`；本增量非 Homebrew 部分与 R1–R6 | Codex（GPT-6，designer；独立审查由编排者另行安排） | 采纳续接 brief 的 B1 分离裁决；P10/P11 最小探针；U1/U2/U3 按上段闭合或转实施证明义务；`status: frozen-pending-review`，review rounds 仍为 0，未声明 pass | B1 为唯一 owner 选择；其余决定不依赖该选择 |
+
+
+### R1 独立审查及编排者处置（适用本增量）
+
+审查方：Claude Opus 5.5，只读；审查版本 `b49fa26f93`，原 verdict **FIX-THEN-MERGE**（1 Blocker、4 Major、3 Minor，另 1 个前提冲突）。编排者在本次 brief 逐项采纳，要求无新增用户步骤的最小修正；下面的“已修”均指设计修订，非产品实现/验收已完成。frontmatter 的 rounds=1、reviewed_sha、指定 verdict 据此记录；没有自行新增复审轮次，B1 不重开。
+
+| finding / 处置 | 设计修正与依据 | 留下的证明 / 去向 |
+| --- | --- | --- |
+| R1-F1 Blocker，fix | §4.3.1 R7 main-only 身份真源；首次目标绑定、目录复用既有排除、后续不跟随重指，C 锚另核验；P13 | planner 真源持久化、软链替换后重启的真实入口证明 |
+| R1-F2 Major，fix | §4.4 main 只读 description；卡片显示 real path，点击比对 dev+ino，变化返回 conflict，合法软链可批准；P13 | 真卡片及同一请求写入证明 |
+| R1-F3 Major，fix | R5 带 Target.absolute 与 directory，R6 以文件命中 R3；编辑 shell/Git/Cargo 配置不授予 HOME | AC-12 三档真实编辑工具证明 |
+| R1-F4 Major，fix | §4.2 增 PNPM_HOME/.tools，来源 switchCliVersion/安装工具根；P12 | 项目钉版触发真实 `.tools` 写入 |
+| R1-F5 Major，fix | §4.2 统一补 nvm/fnm/volta/asdf/mise 固定模板和官方依据；删除任意 prefix 自动问目录的错误承诺；P12 | 已安装版本管理器的 npm/Yarn Classic 全局安装；没有新增 prefix 解析器 |
+| R1-F6 Minor，record corrected claim | R2 和 §10 如实保留 PTY 登录 rc 的事后覆盖，不宣称 spawn 前注入可约束它 | 真实入口分别报告默认与 rc 覆盖；不改用户 rc |
+| R1-F7 Minor，fix / accepted noise | P12 比较专用前缀与宿主实际消费；R1 发同值键，明确 npm 11 三条警告，不隐藏输出 | 缓存落点与噪声一起进入真实入口证据 |
+| R1-F8 Minor，fix | R6 的只读 request/reply 已冻结，复用既有 `codepuppy.*` dispatch + HubBridge；无登记/签发字段 | 两端 parser、代际绑定、无副作用证明 |
+| R1-P0 premise conflict，fix | §4.4.1 R8：先装同一生产写围栏再执行探针 rc；所有探针/缓存结果不能改可信 engine config/data/state 根；P12/P14 | 生产签名探针与 CF-8/CF-11 根不漂移证明；规格限制行保持原文，不向 owner 新提问 |
+
+**仅留档，不修：** `server.ts:460-462` 无缓存同步探测目前跳过 `sanitizeCachedShellEnv`；本次只在 R8 的根消费边界解决根漂移，不顺带统一其它 session-control 键净化。**ARCH：** PNPM_HOME 一级 regex 在 `processFenceRulesCover`（`process-fence-profile.ts:400-407`）的保守祖先覆盖算法中会扩大“不签发”的判断；本轮只记该现有影响，不改算法、不把它当成按文件授权的正向判据。Optional 的 Cargo config 双读、npm-config load 失败负例已归 U2/真实入口证明义务，不加新 AC 或用户限制。
+
+**本次交接核对：** 依据 spec v4 与审查输入 `b49fa26f93`；Codex（GPT-6，designer）按上述九项处置核对定义/所有者/已有调用点与 P12–P14 小探针，本轮旧名称扫描 10 pass/0 fail、`git diff --check` 通过；文档契约当前与输入 HEAD 均 72 个 error，无新增 finding，未修与本票无关的基线问题。结论为设计已修并 frozen。下一步由编排者按既有流程消费冻结设计；剩余产品选择只有 B1，实施证明义务留本节，不把本地探针当成生产实现已通过。

@@ -683,3 +683,7 @@ r3 最终静态检查：schema `bun typecheck` 142 files、core 2,053 files / 2 
 交接：依据 spec v5 / design v3.1 / r5 arguments 裁决；已核 Codex（GPT-6），结论 SEAM-CHANGE-NEEDED，不是整片通过。已定勿重开为片 4 accepted 与 S-01.arguments；下一步编排器授权上述 PackageAllowSetV3 两文件增量后继续本片第 4/5 步。遗留去向：冻结补口 fix now；三条 baseline command-subagent 断言、缺 selector manifest、docs 基线交编排器；真实 SaaS/工具链仍 integration acceptance。OPTIONAL：无。
 
 最终修正提交前再次 `git diff --check` exit 0、plan 相对链接 8 pass，hooksPath=.githooks；所有本车道前台测试/类型/生成器/文档命令均已结束。机器上其他 worktree 的 gate 不由本车道启动/处置；本车道 Bun 测试未启用并行文件。实际非生成生产变更约 7 文件/300 余行，尚未达到计划后续工作，停点由冻结合同触发，非规模/时间超限。
+
+2026-11-27 · orchestrator ruling 2026-11-27（Claude Opus 5.5，r6）：授权扩展片 2 PackageAllowSetV3 的既有 keys/scoped kind 投影为 command/agent，仍沿原 root/effect/claim 算法。仅 package-scope.ts 与 ext-receipt-v2.ts 的该域轴增量，不增 DTO 字段/状态文件。r5 停点关闭，继续 IMPLEMENT 片 3；另按 r6 在临时 detached origin/alpha 实跑三条 command-subagent 断言，并在结束后移除该 worktree。
+
+片 3 r6 基线核对：临时 detached `/tmp/alpha-code-1776-r6-alpha` 固定 origin/alpha `5c896630ab0ca03f2c364f88e281007c31f8d202`，bin/setup exit 0。包内 `bun test --max-concurrency 2 test/config/command-subagent.test.ts -t "runs native JSON|runs subagent mode|subagent: false"` 为 0 pass / 同名 3 fail（`/tmp/plugin-standard-r6-origin-alpha.log`），确认为 origin/alpha 已存在；未改断言/产品，临时 worktree 已移除。允许集新红测各 0 pass / 1 fail（b71376a3ce）；域轴扩展后 ext scope 文件 39 pass，生产者新 case 1 pass。旧“非投影记录”测试使用 agent，因本次 agent 进入投影而不再成立，同提交改用不贡献调用入口的 bundle，保留其 publish lag 断言。

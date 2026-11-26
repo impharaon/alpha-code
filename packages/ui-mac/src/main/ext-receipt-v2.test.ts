@@ -780,18 +780,18 @@ describe("#336 skills projection final-publish lag — 判别式如实上报", (
     expect(derivationKeys()).not.toContain("skill--shrink")
   })
 
-  test("派生无变化(非 skill / MCP 写)不触发 publish:seam 失败不误报 projectionLag", () => {
-    // I-11 起 v3 也投影 global MCP 的开启状态,所以「派生不变的写」取 agent 记录。
-    const w = upsertRecordV2(root, upsertInput({ id: "agent:plain", name: "plain", kind: "agent", configKey: "agent.plain" }), failingPublish)
+  test("派生无变化(非调用组件写)不触发 publish:seam 失败不误报 projectionLag", () => {
+    // command/agent 现在也是投影成员；用不贡献调用入口的 bundle 记录验无变化分支。
+    const w = upsertRecordV2(root, upsertInput({ id: "bundle:plain", name: "plain", kind: "bundle", configKey: undefined }), failingPublish)
     expect(w.ok).toBe(true)
     if (!w.ok) throw new Error("unreachable")
     // 首写时派生缺席→absent 也会做首建发布;先真建一次再验"无变化跳过"
-    const again = upsertRecordV2(root, upsertInput({ id: "agent:plain2", name: "plain2", kind: "agent", configKey: "agent.plain2" }))
+    const again = upsertRecordV2(root, upsertInput({ id: "bundle:plain2", name: "plain2", kind: "bundle", configKey: undefined }))
     expect(again.ok).toBe(true)
-    const third = upsertRecordV2(root, upsertInput({ id: "agent:plain3", name: "plain3", kind: "agent", configKey: "agent.plain3" }), failingPublish)
+    const third = upsertRecordV2(root, upsertInput({ id: "bundle:plain3", name: "plain3", kind: "bundle", configKey: undefined }), failingPublish)
     expect(third.ok).toBe(true)
     if (!third.ok) throw new Error("unreachable")
-    expect(third.projectionLag).toBeUndefined() // 投影无变化(全 agent)→ alreadyFinal 跳过 publish
+    expect(third.projectionLag).toBeUndefined() // 投影无变化(全 bundle)→ alreadyFinal 跳过 publish
   })
 })
 

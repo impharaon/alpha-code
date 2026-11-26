@@ -636,6 +636,50 @@ D2 prepare 的完成记录原只用 clip SHA 命名，相同字节不同源范�
 
 本轮检查：canonical `check_docs_contract.check_repo(worktree, "impharaon/alpha-code", coordination_repo, project.url, "HEAD")` 为既有 **69 errors / 253 warnings**，本 plan **0 finding**；`git diff --check` exit 0。`affected-tests --list` exit 2，仍因本 worktree 缺 `.gate-tests` 未产出 scope line，遗留交 orchestrator/gate owner，不改 gate。只有本 plan 变更，没有测试/类型检查/业务改动，故没有新增 PASS 或删除臂可报。
 
+### r8 D5 实施收据（本节更新覆盖上文 r7 历史 pending）
+
+状态：D5 桌面代码 DONE；未执行收费调用、真实平台端到端、应用窗口或完整 gate。已核 Codex / GPT-6，按 `fc44a45f6f` 与 r8 裁决实施。实现提交 `23ff1a499b`（固定契约/核对行）、`54cebb1912`（接线与持久执行）、`ed5a08b1c2`（取消断言等候终态）、`5582afd891`（销毁窗口竞态先红）和 `6e6942ad27`（修正、宿主确认卡及机械同步）；本收据另提交。开始 2026-11-26 09:39:07 UTC，收据时 10:32:24 UTC（53 分钟）；未约定估时，不以本轮约一小时的单元/本机集成耗时代替模型或产品耗时。
+
+**固定产物**：平台 #621 已合并，经 #623 的 `2626e2f5f8183a78da438db4654572928862f126` 固定 `v1/video-understanding.schema.json`，SHA-256 `f7e20441ea3c07e681bf3003abee3655ba840cbf8f6ce76a5f29cbd88a2d6d66`。同 lock 固定 9 份 producer fixture；`CODEPUPPY_PLATFORM_VIDEO_CONTRACT_SOURCE=/tmp/video-d5-platform.git bun run check:vendor`（contracts-consumer）exit 0，**10 artifacts verified against staged upstream bytes**。其它旧 pin 因没有其 checkout 只验证 lock/bytes，工具已明确输出 provenance not verified，不扩大声称。
+
+**结果**：understand 内层经实际 MCP 准备完成片段，ext 仅包住既有 policy 核验的 bundled 工具；main 读取 engine 已铸 running call 再核 session/message/agent/源/问题/指定范围。原 parentPort 关联请求异步查询同一 main 记录，二进制流与原控制字节走同一上传/同意 authority；renderer 复用既有确认卡、会话身份和工具卡。main 持久化 attempt/control bytes 后才上传，持久化真实 ID 后才查询，未知回执原键恢复，已知 job 不重新上传。范围拆分保留全部原时间偏移和实际 jobIds/usage；已注册 artifact 沿原保存/配额/下载链解码完整答案，同租户/模型 revision 复用成功结果。取消原 signal 并保存取消 intent 与原 cancelOutcome，迟到答案不写成功缓存。
+
+#### 相关证明与实际输出
+
+| AC / 行为 | 实际命令与输出 | 边界 |
+| --- | --- | --- |
+| AC-13 schema/实际 producer 数据 | contracts-consumer：`bun test src/contracts.test.ts scripts/vendor-lock-degradation.test.ts scripts/git-cross-repo.test.ts --max-concurrency 2` → **43 PASS / 0 FAIL** | 包含 video 的 9 份生产向量与源码/锁同步；不是平台付费执行 |
+| AC-13 可信 wrapper、原桥、错误指令登记、既有 vision/policy 不回归 | ext：`bun test src/video-understanding.test.ts src/hub-bridge.test.ts src/plugin-host.test.ts src/plugin-setup-order.test.ts src/plugin-fanout.test.ts src/project-config.test.ts src/cloud-vision.test.ts src/vision-image.test.ts src/context-injection.test.ts src/policy/register-policy.test.ts src/policy/identity.test.ts src/policy/bundled-plugin.test.ts src/policy/inventory.test.ts --max-concurrency 2 --timeout 30000` → **281 PASS / 0 FAIL** | 有实际信号取消回执、未核同名工具不变、只有最终答案进入模型；不跑 scenario |
+| AC-09/13、AC-16 桌面错误，既有卡片/入口/隐私 | ui-mac：`bun test src/main/codepuppy-video-cloud.test.ts src/main/codepuppy-video-call.test.ts src/main/codepuppy-video-transport.test.ts src/main/codepuppy-upload.test.ts src/main/codepuppy-upload-manifest.test.ts src/main/codepuppy-sidecar-messages.test.ts src/main/hub-view.test.ts src/main/video-service.test.ts src/main/video-tools.test.ts src/main/office-mcp-tools-snapshot.test.ts src/main/codepuppy-config-injection.test.ts src/main/cloud-result-scrub.test.ts src/main/upload-boundaries.fast.test.ts src/main/codepuppy-web-upload-consent.fast.test.ts src/main/process-fence-write-sites.test.ts src/renderer/extensions/upload-consent-dialog.test.ts src/renderer/codepuppy-ui/session-timeline/cards/tool-card-model.test.ts src/renderer/codepuppy-ui/session-timeline/cards/tool-card-provenance-gates.test.ts src/renderer/codepuppy-ui/session-timeline/cards/cards-contract.test.ts src/renderer/codepuppy-ui/session-timeline/process-fold.test.ts src/renderer/codepuppy-ui/session-timeline/session-timeline.test.ts src/main/old-name-scan.test.ts --max-concurrency 2 --timeout 30000` → **303 PASS / 0 FAIL** | 本机 HTTP/真实媒体流/实际 SDK/真实文件锁与新实例；artifact 超过控制体帽仍完整。旧名检查先红七处外部锚点，机械登记后本次全绿 |
+| AC-13 既有 HTTP 入口与鉴权读方 | ui-mac：`bun test src/main/subprocess-cases.test.ts -t 'cloud-ipc broadcast\|job action-selection\|终态 → 系统通知\|automation IPC cloud-leg\|cloud schedule error-surfacing' --max-concurrency 2 --timeout 120000` → **5 PASS / 0 FAIL**，隔离子体分别 **13 / 21 / 8 / 9 / 7 PASS** | 新模型预算 getter 的 `cloud.read` 与 platform origin 由实际 getter 用例验证；普通云派发重试重新选路的原断言保持 |
+| AC-13 发送者销毁时撤销仍在签发的同意 | `5582afd891` 的 `codepuppy-upload.test.ts -t 'video uses'` 在修正前 **1 FAIL**（应 cancelled，实际 sent）；`6e6942ad27` 后 ui-mac：`bun test src/main/codepuppy-video-cloud.test.ts src/main/codepuppy-upload.test.ts src/main/codepuppy-upload-manifest.test.ts --max-concurrency 2` → **22 PASS / 0 FAIL** | 销毁把同一 pending 项置 cancelled；没有第二份同意状态。这是同一调用链收尾，新行为文件有新增断言后按必要集合验证 |
+| 包与资源检查 | contracts-consumer / ext / ui-mac 各 `bun typecheck` → exit 0；ui-mac `bun scripts/build-video-mcp.ts`、`bun scripts/gen-office-mcp-tools.ts` → exit 0；`bash scripts/north-star-guard.sh` → zero upstream package edits；`git diff --check` → exit 0 | 无 Electron/应用启动、收费或生产接触 |
+
+以上各永久用例是 fast/integration，新增模块有同名测试，DOM 宿主用例留在原 upload-consent-dialog 文件/原 runtime 转口；测试依赖由静态 import/字面路径可追踪。未加 nightly-only 用例，也未扩大 gate 的 global 面。
+
+#### 删除对照（全部恢复）
+
+| 移除臂 | 实际具名命令 | 输出 |
+| --- | --- | --- |
+| 去掉 verified understand 外层 | `cd packages/ext && bun test src/video-understanding.test.ts -t 'verified understand' --max-concurrency 2 --timeout 10000` | exit 1；具名 expect 红，恢复 |
+| 去掉 HTTP 前 attempt 持久化 | `cd packages/ui-mac && bun test src/main/codepuppy-video-cloud.test.ts -t 'resumes persisted unknown' --max-concurrency 2 --timeout 10000` | exit 1；具名 expect 红，恢复 |
+| 忽略 running job 的重接 | `cd packages/ui-mac && bun test src/main/codepuppy-video-cloud.test.ts -t 'resumes persisted unknown' --max-concurrency 2 --timeout 10000` | exit 1；具名 expect 红，恢复 |
+| 从成功 key 移除 tenant | `cd packages/ui-mac && bun test src/main/codepuppy-video-cloud.test.ts -t 'success cache' --max-concurrency 2 --timeout 10000` | exit 1；具名 expect 红，恢复 |
+| exclusive 改为 inclusive | `cd packages/ui-mac && bun test src/main/codepuppy-video-transport.test.ts -t 'video binary transport' --max-concurrency 2 --timeout 10000` | exit 1；具名 expect 红，恢复 |
+| 用 clip 路径替代原敏感来源 | `cd packages/ui-mac && bun test src/main/codepuppy-upload.test.ts -t 'video uses' --max-concurrency 2 --timeout 10000` | exit 1；具名 expect 红，恢复 |
+| 用合法但截短文本替代完整 artifact | `cd packages/ui-mac && bun test src/main/codepuppy-video-cloud.test.ts -t 'full result follows' --max-concurrency 2 --timeout 10000` | exit 1；具名 expect 红，恢复 |
+| 分片第二段起点加 1 ms | `cd packages/ui-mac && bun test src/main/codepuppy-video-cloud.test.ts -t 'size and timeout recovery' --max-concurrency 2 --timeout 10000` | exit 1；具名 expect 红，恢复 |
+| 去掉实际取消 signal | `cd packages/ui-mac && bun test src/main/codepuppy-video-cloud.test.ts -t 'cancellation leaves' --max-concurrency 2 --timeout 10000` | exit 1；具名 expect 红，恢复 |
+| 去掉 engine 铸定的首方 authority 校验 | `cd packages/ui-mac && bun test src/main/codepuppy-video-call.test.ts -t 'main verifies' --max-concurrency 2 --timeout 10000` | exit 1；具名 expect 红，恢复 |
+
+十臂均是断言失败，不计编译失败、超时或 module import 错误。artifact 臂用符合 schema 的截短答案替代完整读取，`toContain(full.text)` 红；取消臂等待持久 attempt 终态再断言，实际 completed 对 expected cancelled 红。恢复后按上列相关集运行；移除臂只操作本次已提交文件，逐个 `git restore -- <file>`，没有更改测试阈值。
+
+#### 实际偏离与遗留去向
+
+必要额外文件：`context-injection.ts`/inventory snapshot 登记两个新工具失败指令，复用单一上下文 authority；`upload-consent-test-runtime.ts` 转口实际新宿主与原会话 identity，只供原 DOM 测试；`plugin-setup-order.cases.ts`、两处 cloud IPC cases 同步既有导出的 mock；`subprocess-cases.test.ts` 仅把已增加一例的 jobs 子体条数 20→21；`vendor-lock-degradation.test.ts` 同步新增 capability 的 checkout env/锁文件清单；`scripts/old-name-exceptions.tsv` 仅七个新外部锚点登记，不改守卫或扫描逻辑。现有 `modules.md` 一行登记 main 云状态与同意 authority。实现中的 retry 入口捕获回归由既有用例定位，已恢复原每次重试选路，没有放松断言。DOM harness 起初查局部 host，而批准的对话框使用 Portal，已用 document.body 验证实际卡片。
+
+遗留（不阻塞本轮代码交付）：#1760 尚未实现的真实 expander/firstPartyCacheRoots/冷准备/身份链 → 原依赖集成验收；应用打包、Windows 实机、三按钮真模型/未登录/余额不足/平台失败收费端到端 → orchestrator 后续授权验收，当前未声称 AC-13 整体通过。既有 sidecar wiring/bootstrap 测试会触及 Electron 安装入口的机器问题沿 D3 收据保留，不以本轮导入启动代替验证。`affected-tests --list` exit 2：缺 `.gate-tests`，**无 scope line** → gate owner，gate 冻结未修。canonical docs-contract 为既有 **69 errors / 253 warnings**，plan **0 finding**，modules **13 个既有失效路径** → docs owner，未顺修。无新增设计分叉、ARCH 或 OPTIONAL 产品项。
+
 ### r3 D2 第一步实施记录
 
 2026-11-26 · 新增严格工具 schema、Node 组件进程执行、源内容/路径索引与原子持久缓存；实际音频夹具为 FLEURS en_us/dev 的原始 WAV，来源与 TSV 行/摘要在 fixtures/video/provenance.json。路径命名与只读身份按计划提取，同一实现由旧 owner 和服务消费。相关四文件 50 pass / 0 fail；ext project-config 28 pass / 0 fail。没有运行未钉住的 ffmpeg 或模型；实际媒体探测与新进程/组件集成断言仍按样本和 D3 就绪情况补齐。

@@ -2073,3 +2073,21 @@ packageIt.live("unmatched package model hints use the existing default for comma
   expect(JSON.stringify(result)).toContain("Default child model")
   expect((yield* llm.requests())).toHaveLength(2)
 })))
+
+packageIt.live("hookify writing-rules keeps literal dollar replacement patterns in loaded skill content", () => packageJourney(Effect.gen(function* () {
+  const captured = yield* Effect.promise(() => captureStandardFixture("claude:hookify"))
+  const source = new TextDecoder().decode(yield* Effect.promise(() => captured.readFile("skills/writing-rules/SKILL.md")))
+  const sample = yield* invocationSample("claude:hookify")
+  yield* invocationNativeServices
+  const ext = yield* activateExtUntilFinished
+  const skills = yield* Skill.Service
+  const name = sample.hostNames["skill:skills/writing-rules/SKILL.md"]!
+  yield* ext.finish(skills.list().pipe(Effect.map(list => list.some(item => item.name === name))))
+  const skill = (yield* skills.list()).find(item => item.name === name)!
+  const location = yield* Location.Service
+  const parent = yield* (yield* Sessions.Service).create({ location: { directory: location.directory }, title: "Writing rules", agent: "build", model: { providerID: "test", id: "picked" } } as never)
+  const snapshot = yield* (yield* Tool.Service).snapshot()
+  const loaded = yield* snapshot.execute({ sessionID: parent.id, agent: "build" as never, messageID: "msg_writing_rules" as never, call: { type: "tool-call", name: "skill", id: "call_writing_rules", input: { id: skill.id } } })
+  const expected = source.slice(source.indexOf("\n---\n") + 5).trim().replaceAll("${CLAUDE_PLUGIN_ROOT}", join(sample.live, "tree"))
+  expect(loaded.content.filter(part => part.type === "text").map(part => part.text).join("\n")).toContain(expected)
+})))

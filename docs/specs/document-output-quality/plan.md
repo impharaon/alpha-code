@@ -634,3 +634,5 @@ B3 red：真实插件宿主里成功合并 cloud + 合法项目 Office 声明，
 B3 green：provider 获取仅单独 log，MCP merge/ownership 不再全局降级；同一真宿主断言未改，plugin-host 文件 55 PASS（B3-green.log）。首方文档仍须真实绑定，未添加伪成功 provider。
 
 B4 red：原 document-tool 文件经真实 Location register→renderer→tool 入口，先证明渲染期间 active=true，再分别返回 conversion/timeout；两项结束后仍 active，target 2 FAIL（B4-red.log）。下一提交只清理失败/超时的活动会话标记，后续工具标题恢复原分类。
+
+B4 green：同一 register/tool 反例不改，document-tool 文件 3 PASS（B4-green.log）；pending、failed/timeout 或抛错都释放活动标记，rendered 继续等最终检查。

@@ -44,9 +44,14 @@ export function documentToolForLocation(location: DocumentCaller["location"]) {
     render: async (...args) => {
       const registered = locations.get(key(location))
       if (!registered) throw Error("document Location resources were not registered before execution")
-      const result = await registered.render(...args)
-      if (result.status === "pending") registered.active.delete(args[0].sessionID)
-      return result
+      try {
+        const result = await registered.render(...args)
+        if (result.status !== "rendered") registered.active.delete(args[0].sessionID)
+        return result
+      } catch (error) {
+        registered.active.delete(args[0].sessionID)
+        throw error
+      }
     },
   })
 }

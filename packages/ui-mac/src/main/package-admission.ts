@@ -1,3 +1,4 @@
+import { pluginInstructionDefinition } from "../shared/host-extension-package-contract/plugin-conversion.mjs"
 import { pluginOptionAuthorization, pluginVersionAuthorization, savePluginOptions, preparePluginSettings, installedPluginDescription } from "./plugin-package-config"
 import { buildPluginPackageTxItems, pluginHostName, pluginComponentId, pluginMcpConfig } from "./plugin-package-install"
 import { FACTORY_SKILL_IDS } from "./factory-skills"
@@ -18,7 +19,7 @@ import { nextDesiredState } from "./ext-install-policy"
 import { promotePayloadToCas, type PlannerDeps } from "./ext-install-planner"
 import { persistMcp, readMcpLeafStrict, releasePreparedMcpSecretVersion, withConfigWriteLock } from "./ext-config"
 import { canonicalJson, sha256Hex } from "./ext-manifest-v2"
-import { buildAgentTxItems, buildCloudTxItems, buildCommandTxItems, buildDepartingChildConfigItemsV1, buildMcpTxItems, buildSkillTxItems } from "./ext-package-tx-builders"
+import { buildAgentTxItems, buildCloudTxItems, buildCommandTxItems, buildPackageInstructionTxItems, buildDepartingChildConfigItemsV1, buildMcpTxItems, buildSkillTxItems } from "./ext-package-tx-builders"
 import { computeGrantDigest, readPackageLedgerStateV1, type UpsertInput } from "./ext-receipt-v2"
 import { commitTransactionLedger } from "./ext-package-ledger-commit"
 import {
@@ -237,7 +238,7 @@ type PreparedComponent = {
   agentEntry?: Record<string, unknown>
   /** `#840` command:payload 字段 + template asset 字节合成的引擎叶(builder 只落 config)。 */
   commandEntry?: Record<string, unknown>
-  pluginPackage?: { notRunning: PackageNotRunningV1[]; description: PluginPackage; build: PackageTxBuildV1; names: Map<string, string>; nodes: import("./ext-package-ledger-v3").PackageGraphNodeV1[]; skills: UpsertInput[]; mcps: Extract<Entry, { kind: "mcp" }>[] }
+  pluginPackage?: { notRunning: PackageNotRunningV1[]; description: PluginPackage; build: PackageTxBuildV1; names: Map<string, string>; nodes: import("./ext-package-ledger-v3").PackageGraphNodeV1[]; records: UpsertInput[]; mcps: Extract<Entry, { kind: "mcp" }>[] }
   itemDigest: string
 }
 
@@ -1032,8 +1033,8 @@ async function resolvePreparedPackage(
       const occupied = new Set(state.records.filter(record => !before || ![before.root, ...before.children].some(node => node.kind === record.kind && node.name === record.name)).map(record => record.kind + ":" + record.name))
       for (const name of FACTORY_SKILL_IDS) occupied.add("skill:" + name)
       const notRunning: PackageNotRunningV1[] = []
-      const runnable = payload.description.entries.filter((entry): entry is Extract<Entry, { kind: "skill" | "mcp" }> => {
-        if (entry.kind === "skill" || entry.kind === "mcp") return true
+      const runnable = payload.description.entries.filter((entry): entry is Extract<Entry, { kind: "skill" | "mcp" | "command" | "agent" }> => {
+        if (entry.kind === "skill" || entry.kind === "mcp" || entry.kind === "command" || entry.kind === "agent") return true
         notRunning.push({ kind: entry.kind, sourceName: entry.sourceName, reason: "kind-not-supported-yet" })
         return false
       })
@@ -1054,7 +1055,16 @@ async function resolvePreparedPackage(
       const skills = nodes.filter(node => node.kind === "skill").map(node => ({ ...base, id: node.componentId, kind: node.kind, name: node.name }))
       const built = await buildPluginPackageTxItems({ root: deps.root(), casBaseRoot: deps.casBaseRoot(), key, receipt: { ...base, id: "bundle:" + name, kind: "bundle", name }, description: payload.description, hostNames: names, skillReceipts: skills, readFile: async path => { const node = payload.description.tree.find(node => node.path === path); if (node?.kind !== "file") throw Error("Missing plugin file"); return node.bytes === 0 ? new Uint8Array() : blobs.get(node.digest.slice(7))! } })
       if (!built.ok) return { ok: false, reason: built.reason, package: view }
-      pluginPackage = { notRunning, description: built.description, build: built.build, names, nodes, skills, mcps }
+      const records = [...skills]
+      for (const entry of runnable) {
+        if (entry.kind !== "command" && entry.kind !== "agent") continue
+        const hostName = names.get(entry.id)!
+        const receipt = { ...base, id: pluginComponentId(packageId, entry, hostName, "catalog"), kind: entry.kind, name: hostName }
+        const instruction = buildPackageInstructionTxItems({ root: deps.root(), key: entry.kind + "--" + hostName, name: hostName, kind: entry.kind, receipt, capabilities: [], manifestDigest: "sha256:" + component.payloadRef.sha256, description: pluginInstructionDefinition(entry.instruction).description })
+        built.build.items.push(...instruction.items)
+        records.push(receipt)
+      }
+      pluginPackage = { notRunning, description: built.description, build: built.build, names, nodes, records, mcps }
     }
 
     components.push({
@@ -1233,7 +1243,7 @@ async function executePreparedPackage(
       Object.assign(plugin.build.receipt, receipt)
       for (const item of plugin.build.items) item.manifestDigest = manifestDigest
       plugin.build.items[0]!.capabilities = common.capabilities
-      for (const skill of plugin.skills) Object.assign(skill, { desiredState: receipt.desiredState, manifestDigest: receipt.manifestDigest, grantDigest: receipt.grantDigest, installedAt: now })
+      for (const skill of plugin.records) Object.assign(skill, { desiredState: receipt.desiredState, manifestDigest: receipt.manifestDigest, grantDigest: receipt.grantDigest, installedAt: now })
       for (const entry of plugin.mcps) {
         const hostName = plugin.names.get(entry.id)!
         const needs = plugin.description.secrets.filter(need => need.componentId === entry.id && JSON.stringify(entry).includes('"secret":"' + need.id + '"'))

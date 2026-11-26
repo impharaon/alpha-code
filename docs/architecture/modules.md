@@ -83,3 +83,5 @@ review_after: 2027-05-09
 `packages/schema/src/mcp.ts` 单独持有 remote MCP 的可选传输轴（缺席/HTTP 与显式 SSE）；main 包投影和真源、ext 的唯一投影将其交给既有 `core/src/mcp/client.ts` 的 SDK 选择，不建立第二连接器客户端。S-12 的精确接管见 registry `plugin-mcp-transport`。内容入口 `createSourceInstaller` 在提交结果返回后的事件轮次调用原 state writer，再收敛 MCP/重载；同一入口取消被显式包状态动作取代的待激活任务，state writer 的校验、写盘和锁顺序不变。
 
 S-01 的 `@opencode/plugin/codepuppy-package-runtime` 只持有同进程、按 Location 分区的反向 renderer 槽。`core/src/config/plugin/command.ts` 随 Location 注册/释放，原生和包指令共用源码先编译、后绑定值的 shell/process 原语；参数名顺序由 Invocation 传入，语法轴由 converter 合同生成，ext 不导入 core 执行器。
+
+整包 command/agent 与 skill/MCP 进入同一 PackageGraph/declarations。`ext-package-tx-builders.ts` 的包指令 builder 只生成 receipt 及 agent 启停 config 项，正文仍由 live 树的统一指令描述持有；共享 converter 的 `pluginInstructionDefinition` 负责 metadata/body 分离，不在运行端重写 YAML。

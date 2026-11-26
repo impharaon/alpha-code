@@ -2,7 +2,7 @@ import { preparePluginSettings } from "./plugin-package-config"
 import { buildPluginPackageTxItems, pluginHostName, pluginComponentId, pluginMcpConfig, needsPluginFiles } from "./plugin-package-install"
 import { convertCreatedPlugin } from "./created-plugin"
 import { renderPluginText } from "../shared/host-extension-package-contract/plugin-package"
-import { renderInstalledSkill } from "../shared/host-extension-package-contract/plugin-conversion.mjs"
+import { renderInstalledSkill, pluginInstructionDefinition } from "../shared/host-extension-package-contract/plugin-conversion.mjs"
 import type { Capture, Entry, Text } from "../shared/host-extension-package-contract/plugin-conversion"
 import {
   diagnosticNotRunning,
@@ -34,6 +34,7 @@ import {
   buildDepartingChildConfigItemsV1,
   buildMcpTxItems,
   buildSkillTxItems,
+  buildPackageInstructionTxItems,
   type PackageTxBuildV1,
 } from "./ext-package-tx-builders"
 import { projectScopeIdentity, readPackageLedgerStateV1, type UpsertInput } from "./ext-receipt-v2"
@@ -160,12 +161,12 @@ export function createSourceInstaller(deps: Dependencies) {
       const mapped = converted.package.entries
         .toSorted((left, right) => (left.kind + left.sourcePath).localeCompare(right.kind + right.sourcePath))
         .flatMap((entry) => {
-          if (entry.kind !== "mcp" && entry.kind !== "skill") {
+          if (entry.kind !== "mcp" && entry.kind !== "skill" && !(wholePackage && (entry.kind === "command" || entry.kind === "agent"))) {
             notRunning.push({ kind: entry.kind, sourceName: entry.sourceName, reason: "kind-not-supported-yet" })
             return []
           }
           if (
-            !wholePackage && needsPluginFiles(
+            !wholePackage && (entry.kind === "skill" || entry.kind === "mcp") && needsPluginFiles(
               entry,
               converted.package.tree.map((node) => node.path),
             )
@@ -215,6 +216,7 @@ export function createSourceInstaller(deps: Dependencies) {
           sourceName: item.entry.sourceName,
           secretNeeds: [],
         }
+        if (item.entry.kind === "command" || item.entry.kind === "agent") builds.push(buildPackageInstructionTxItems({ ...common, kind: item.entry.kind, description: pluginInstructionDefinition(item.entry.instruction).description }))
         if (item.entry.kind === "skill" && wholePackage) skillReceipts.push(receipt)
         if (item.entry.kind === "skill" && !wholePackage) {
           const prefix = item.entry.directory ? item.entry.directory + "/" : ""

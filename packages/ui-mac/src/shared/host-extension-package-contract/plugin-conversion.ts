@@ -12,6 +12,21 @@ export class CaptureError extends Error {
   }
 }
 
+/** Read Markdown metadata while retaining the original Text nodes for invocation-time binding. */
+export function pluginInstructionDefinition(instruction: Text): { body: Text; description?: string } {
+  const source = instruction.map(part => typeof part === "string" ? part : "").join("")
+  const parsed = ConfigMarkdown.parseOption(source)
+  let header = parsed ? source.length - parsed.content.length : 0
+  const body = instruction.flatMap(part => {
+    if (!header) return [part]
+    if (typeof part !== "string") return []
+    const rest = part.slice(header)
+    header = Math.max(0, header - part.length)
+    return rest ? [rest] : []
+  })
+  return { body, ...(typeof parsed?.data.description === "string" ? { description: parsed.data.description } : {}) }
+}
+
 export function readMarketplace(bytes: Uint8Array, ecosystem: "claude" | "codex"): { name: string; entries: MarketplaceEntry[]; diagnostics: Diagnostic[] } {
   const document: unknown = JSON.parse(decode(bytes))
   if (!object(document) || !Array.isArray(document.plugins)) throw new Error("invalid marketplace definition")

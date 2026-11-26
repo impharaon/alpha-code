@@ -575,8 +575,8 @@ test("R12 A4 identical package bytes update the same identity when the requested
  expect(readdirSync(a)).toEqual([]);expect(readdirSync(b)).toEqual([])
 }))
 
-test("R12 A5 unsupported real command agent and hook entries retain whole package content and explain runtime status", () => installerHarness(async h => {
-  for (const [name, kinds] of [["explanatory-output-style", ["hook"]], ["pr-review-toolkit", ["command", "agent", "agent", "agent", "agent", "agent", "agent"]]] as const) {
+test("R12 A5 command and agent entries run while pending hooks retain whole package content", () => installerHarness(async h => {
+  for (const [name, kinds] of [["explanatory-output-style", ["hook"]], ["pr-review-toolkit", []]] as const) {
     const result = await h.install(h.request(await h.candidate(name), "r12_unsupported_" + name))
     expect(result).toMatchObject({ ok: true })
     if (!result.ok) throw Error("expected content installation")
@@ -585,7 +585,9 @@ test("R12 A5 unsupported real command agent and hook entries retain whole packag
   }
   const state = readPackageLedgerStateV1(h.root)
   expect(state.ok && state.packageGraphs).toHaveLength(2)
-  expect(state.ok && state.records.every(record => record.kind === "bundle")).toBe(true)
+  expect(state.ok && state.records.filter(record => record.kind === "bundle")).toHaveLength(2)
+  expect(state.ok && state.records.filter(record => record.kind === "command")).toHaveLength(1)
+  expect(state.ok && state.records.filter(record => record.kind === "agent")).toHaveLength(6)
 }))
 
 test("R14 A6 an unresolved environment URL preserves installed content until runtime binding", () => installerHarness(async h => {

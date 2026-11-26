@@ -36,6 +36,8 @@ Produce the requested file locally using the bundled environment and the matchin
 
 ## Reading and spreadsheet operations
 
+The separate community Excel connector is retired and is not an install option.
+
 The optional first-party stdio connectors retain `read_docx`, `read_pptx`, `read_pdf`, and `read_xlsx`; they are readers, not the production path. Excel additionally offers `excel_inspect`, `excel_edit`, `excel_objects` and `excel_recalculate`. Their default-disabled state does not limit script authoring: the same `OfficeExcel.inspect`, `apply_edit`, `object_schema`, `objects`, `edit` and `recalculate(path)` functions are available to skills. Use the typed operation schemas; pivot/slicer/sparkline operations, sorting and literal replacement share the preserving save layer, which refreshes rebuildable pivots after source edits and reports objects it cannot rebuild. Report actual recalculation errors with sheet/cell/formula/value and bind formulaCheck to its real recalculation receipt.
 
 For file extraction, an already available matching reader can be used; if a connector is absent, use the bundled libraries. Do not ask the user to enable a connector just to create a file, recommend a retired community Office server, upload private documents for formatting, or claim unperformed validation. Preserve the bundled source licences and exclusions.

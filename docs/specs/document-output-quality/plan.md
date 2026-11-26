@@ -736,3 +736,5 @@ bun.lock 随 origin 改变，`bun install --frozen-lockfile` exit 0（2 packages
 静态入口复现：`bash -c 'source scripts/docs-gates.sh; docs_gate_nul'` exit 1，实际 Office/解释器二进制 fixture 未在既有 binary 机制登记（分类 c）；`bash scripts/assert-seed-assets.sh` exit 1，默认制作入口重写后漏掉原社区 Excel 明确退役事实（分类 b，片 7 / §4.1/4.8 并未复活社区连接器，将恢复该事实而不放宽 guard）。后续修正均保留原守卫规则、阈值和地板。
 
 r14 NUL green（c）：沿原 BINARY_SUFFIXES 登记实际 docx/pptx/xlsx/pdf 格式，沿 EXCLUDED_PREFIXES 仅登记两份真实 Mach-O/PE 头文件（非整个目录或源文本）。同一 docs_gate_nul 入口 exit 0：5969 个受检文件零 NUL，1333 个已登记二进制、4 个非文本条目及 11260 个原样上游条目跳过；4000 地板未变。首轮漏列 control.pdf/头文件名字不准确已逐项核对后补齐，不把失败轮计为通过。
+
+r14 seed green（b）：片 7 默认技能恢复原独立社区 Excel connector 的明确退役/不可安装事实，保留新首方 Excel 与脚本制作能力；assert-seed-assets 原入口 exit 0，未修改 seed guard 的条件。

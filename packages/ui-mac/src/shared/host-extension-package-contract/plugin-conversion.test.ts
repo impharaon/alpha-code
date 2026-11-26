@@ -45,7 +45,7 @@ test("invocation fields preserve source controls and provider argument syntax", 
   const source = new TextDecoder().decode(await original.readFile("agents/code-reviewer.md"))
   const variant = source.replace("---\n", '---\narguments: [target, mode]\neffort: high\npaths: ["src/**"]\nskills: [review]\nmemory: project\nmaxTurns: 7\nbackground: false\n')
   const converted = (await (await converter()).convertPluginTree(await captureStandardFixture("claude:feature-dev", { "agents/code-reviewer.md": variant }))).package
-  expect(converted.entries.find(entry => entry.id === "agent:agents/code-reviewer.md")).toMatchObject({ invocation: { arguments: ["target", "mode"], argumentSyntax: "claude", effort: "high", paths: ["src/**"], preloadSkills: ["review"], memory: "project", maxTurns: 7, background: false, model: { alias: "sonnet" }, availableTools: expect.arrayContaining([{ tool: "Read" }]) } })
+  expect(converted.entries.find(entry => entry.id === "agent:agents/code-reviewer.md")).toMatchObject({ invocation: { arguments: ["target", "mode"], argumentSyntax: "literal", effort: "high", paths: ["src/**"], preloadSkills: ["review"], memory: "project", maxTurns: 7, background: false, model: { alias: "sonnet" }, availableTools: expect.arrayContaining([{ tool: "Read" }]) } })
   const vercel = (await (await converter()).convertPluginTree(await captureStandardFixture("codex:vercel"))).package
   expect(vercel.entries.filter(entry => entry.kind === "command")).toHaveLength(6)
   expect(vercel.entries.find(entry => entry.kind === "command")).toMatchObject({ invocation: { argumentSyntax: "codex" } })

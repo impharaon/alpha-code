@@ -408,7 +408,8 @@ or its blobs. The envelope header and network timeout checks still apply. Packag
 
 The root maps to the existing `bundle` ledger kind and owns one tree generation;
 skills refer to their real directories in that tree. Commands and agents carry
-Invocation metadata for the host runtime; content retention alone does not
+Invocation metadata for the host runtime; agent entries use literal instruction
+syntax, preserving dollar amounts and shell examples. Content retention alone does not
 establish that a runtime entry is active.
 
 Standard plugin definitions use the frozen plugin installation design v3

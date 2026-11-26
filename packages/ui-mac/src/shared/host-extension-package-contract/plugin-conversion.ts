@@ -177,7 +177,7 @@ export async function convertPluginTree(input: Capture): Promise<{ package: Plug
     if (!parsed) { diagnostics.push({ path, code: "invalid-definition", message: "Markdown definition is invalid" }); continue }
     const kind = match[1]!.startsWith("agent") ? "agent" : "command"
     if (kind === "agent" && parsed.data.hooks !== undefined) scopedHooks.push({ path, value: parsed.data.hooks, scope: { kind, entryId: kind + ":" + path } })
-    entries.push({ kind, id: kind + ":" + path, sourcePath: path, sourceName: match[2]!, instruction: pluginText(instruction, "instruction"), invocation: invocation(parsed.data, opencode ? "opencode" : codex ? "codex" : "claude", path, diagnostics) })
+    entries.push({ kind, id: kind + ":" + path, sourcePath: path, sourceName: match[2]!, instruction: pluginText(instruction, "instruction"), invocation: invocation(parsed.data, kind === "agent" ? "literal" : opencode ? "opencode" : codex ? "codex" : "claude", path, diagnostics) })
   }
   const hookFiles = new Set<string>()
   let hookOrder = 0

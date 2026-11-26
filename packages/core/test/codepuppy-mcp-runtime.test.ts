@@ -837,3 +837,42 @@ testEffect(PluginTestLayer).live("a real session owns matching remote MCP transp
     expect(transports.size).toBe(0)
   }).pipe(Effect.provide(mcpLayer({ remote: new ConfigMCP.Remote({ type: "remote", url: `http://127.0.0.1:${http.port}/mcp`, oauth: false }), local: local({ CODEPUPPY_MCP_STARTUP_LOG: starts }, { protocol: "legacy" }) }, Layer.succeed(Bus.Service, bus))))
 }))
+
+testEffect(Layer.empty).live("unmatched remote MCP connectors keep the Location transport when other package handlers exist", () => Effect.gen(function* () {
+  const runtime = yield* Effect.promise(() => import("@opencode/plugin/codepuppy-package-runtime"))
+  const { Session } = yield* Effect.promise(() => import("@opencode/schema/session"))
+  const server = httpServer()
+  yield* Effect.addFinalizer(() => Effect.sync(() => { server.stop() }))
+  const registration = runtime.registerPackageRuntime({ directory: ROOT }, { ...packageElicitationHandlers({ beforeElicitation: async () => ({ handled: false }), afterElicitationResult: async input => input.answer }), hasElicitationHandlers: name => name === "another-server" })
+  yield* Effect.addFinalizer(() => Effect.sync(() => registration.dispose()))
+  yield* Effect.gen(function* () {
+    const mcp = yield* Mcp.Service
+    yield* connected("remote")
+    yield* mcp.callTool({ server: "remote", name: "probe", sessionID: Session.ID.make("ses_remote_without_matching_handler") })
+    expect(server.state.lists).toBe(1)
+    expect(server.state.calls).toBe(1)
+  }).pipe(Effect.provide(mcpLayer({ remote: new ConfigMCP.Remote({ type: "remote", url: server.url, oauth: false }) })))
+}))
+
+testEffect(Layer.empty).live("stdio native form keeps its request owner through ElicitationResult", () => Effect.gen(function* () {
+  const runtime = yield* Effect.promise(() => import("@opencode/plugin/codepuppy-package-runtime"))
+  const { Session } = yield* Effect.promise(() => import("@opencode/schema/session"))
+  const sessionID = Session.ID.make("ses_stdio_form_result")
+  const seen: string[] = []
+  const registration = runtime.registerPackageRuntime({ directory: ROOT }, packageElicitationHandlers({
+    beforeElicitation: async input => { seen.push("before:" + input.sessionID); return { handled: false } },
+    afterElicitationResult: async input => { seen.push("after:" + input.sessionID); return { action: "accept", content: { answer: "modified " + (input.answer.content as { answer: string }).answer } } },
+  }))
+  yield* Effect.addFinalizer(() => Effect.sync(() => registration.dispose()))
+  yield* Effect.gen(function* () {
+    const mcp = yield* Mcp.Service
+    const forms = yield* Form.Service
+    yield* connected("local")
+    const call = yield* mcp.callTool({ server: "local", name: "elicit", sessionID }).pipe(Effect.forkScoped)
+    const pending = yield* until(forms.list().pipe(Effect.map(list => list.length ? list[0] : undefined)), "owned native form")
+    expect(pending.sessionID).toBe(sessionID)
+    yield* forms.reply({ id: pending.id, answer: { answer: "user response" } })
+    expect(JSON.stringify(yield* Fiber.join(call))).toContain("modified user response")
+    expect(seen).toEqual(["before:" + sessionID, "after:" + sessionID])
+  }).pipe(Effect.provide(mcpLayer({ local: local({}, { protocol: "legacy" }) })))
+}))

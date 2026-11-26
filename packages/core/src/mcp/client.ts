@@ -148,12 +148,14 @@ export interface CallToolResult {
 export type ElicitationFormParams = ElicitRequestFormParams
 export type ElicitationParams = ElicitRequestParams
 export type ElicitationResult = ElicitResult
+export type ElicitationOwner = { readonly sessionID: Session.ID } | { readonly ambiguous: true }
 
 export interface ElicitationHandler {
   readonly create: (input: {
     readonly server: string
     readonly params: ElicitationParams
     readonly signal: AbortSignal
+    readonly owner?: ElicitationOwner
   }) => Effect.Effect<ElicitationResult, Error>
   /**
    * Legacy era only: the server announces that a URL-mode elicitation finished out of band. Removed in
@@ -163,11 +165,13 @@ export interface ElicitationHandler {
   readonly complete: (input: {
     readonly server: string
     readonly elicitationID: ElicitRequestURLParams["elicitationId"]
+    readonly owner?: ElicitationOwner
   }) => Effect.Effect<void>
 }
 
 /** For a request that can come back asking for input: tool calls, prompts and resource reads. */
 export interface PerRequest {
+  readonly sessionID?: Session.ID
   /**
    * Answers the elicitations this request causes instead of the connection's handler, for a connection
    * that serves several callers. 2026-07-28 only.
@@ -254,9 +258,11 @@ export const connect = Effect.fnUntraced(function* (options: ConnectOptions) {
   })
 
   // Requests that bring their own elicitation handler, keyed by the signal each passes to the SDK.
-  const callers = new WeakMap<AbortSignal, ElicitationHandler["create"]>()
+  const callers = new WeakMap<AbortSignal, PerRequest>()
+  const inFlight = new Set<PerRequest>()
+  const urlOwners = new Map<string, ElicitationOwner | undefined>()
   const claim = (signal: AbortSignal, input: PerRequest) => {
-    if (input.elicitation) callers.set(signal, input.elicitation)
+    callers.set(signal, input)
     return signal
   }
 
@@ -321,11 +327,22 @@ export const connect = Effect.fnUntraced(function* (options: ConnectOptions) {
       client.setRequestHandler("elicitation/create", (request, ctx) => {
         const origin = (ctx.mcpReq as { readonly origin?: { readonly options?: { readonly signal?: AbortSignal } } })
           .origin?.options?.signal
-        const create = (origin && callers.get(origin)) ?? elicitation.create
-        return runPromise(create({ server, params: request.params, signal: ctx.mcpReq.signal }))
+        const caller = origin ? callers.get(origin) : undefined
+        const sessions = new Set([...inFlight].map(call => call.sessionID))
+        const owner: ElicitationOwner | undefined = caller?.sessionID
+          ? { sessionID: caller.sessionID }
+          : sessions.size > 1 && !sessions.has(undefined)
+            ? { ambiguous: true }
+            : sessions.size === 1 && !sessions.has(undefined) ? { sessionID: [...sessions][0]! } : undefined
+        const id = request.params.mode === "url" ? request.params.elicitationId : undefined
+        if (id !== undefined) urlOwners.set(id, owner)
+        const create = caller?.elicitation ?? elicitation.create
+        return runPromise(create({ server, params: request.params, signal: ctx.mcpReq.signal, owner }).pipe(
+          Effect.ensuring(Effect.sync(() => { if (id !== undefined) urlOwners.delete(id) })),
+        ))
       })
       client.setNotificationHandler("notifications/elicitation/complete", (notification) =>
-        runPromise(elicitation.complete({ server, elicitationID: notification.params.elicitationId })),
+        runPromise(elicitation.complete({ server, elicitationID: notification.params.elicitationId, owner: urlOwners.get(notification.params.elicitationId) })),
       )
     }
 
@@ -579,14 +596,18 @@ export const connect = Effect.fnUntraced(function* (options: ConnectOptions) {
         })
         // A modern server rejects headers mirrored from a stale definition before running the tool,
         // so relist and retry once with the fresh definition.
-        return call.pipe(
-          Effect.catchIf(
-            (error) => connection.modern && error instanceof ProtocolError && error.code === HEADER_MISMATCH,
-            () => connection.tools().pipe(Effect.andThen(call)),
+        return Effect.acquireUseRelease(
+          Effect.sync(() => { const request = { ...input }; inFlight.add(request); return request }),
+          () => call.pipe(
+            Effect.catchIf(
+              (error) => connection.modern && error instanceof ProtocolError && error.code === HEADER_MISMATCH,
+              () => connection.tools().pipe(Effect.andThen(call)),
+            ),
+            Effect.mapError(failure),
+            Effect.tapError((error) => Effect.logWarning("failed to call MCP tool", { server, error: safeDescription(error) })), // codepuppy(#1645)
+            Effect.map(toCallToolResult),
           ),
-          Effect.mapError(failure),
-          Effect.tapError((error) => Effect.logWarning("failed to call MCP tool", { server, error: safeDescription(error) })), // codepuppy(#1645)
-          Effect.map(toCallToolResult),
+          request => Effect.sync(() => { inFlight.delete(request) }),
         )
       },
       onClose: (callback) => {

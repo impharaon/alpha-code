@@ -2375,7 +2375,6 @@
         }
       ]
     },
-
     {
       "id": "plugin-hook-config-change",
       "decision": "DESIGN-local-plugin-install v3.1 §4.12/6 S-04 plus orchestrator ruling 2026-11-27: await the same Location runtime before publishing changed settings or skill revisions, including the skill watcher and config.updated rescan. Rejection keeps the previous effective view without rewriting disk; policy_settings cannot be blocked. Rejected revisions reuse one occurrence and active handler result; disabling its package releases the rejection.",
@@ -2460,7 +2459,6 @@
         }
       ]
     },
-
     {
       "id": "plugin-hook-tool-batch",
       "decision": "DESIGN-local-plugin-install v3.1 §4.12/6 S-08: aggregate terminal native tool calls by actual assistant message ID, including validation failures, in model order. Drain once at the awaited context boundary before a request, or at native idle; use the same processed/pending state and existing synthetic continuation. Seed registration with actual history, never replay prior batches or emit an empty batch.",
@@ -2546,6 +2544,38 @@
         {
           "file": "packages/ext/src/plugin-package-process.test.ts",
           "name": "monitor output flushes its final line and cancellation releases its child"
+        }
+      ]
+    },
+    {
+      "id": "plugin-hook-elicitation",
+      "decision": "DESIGN-local-plugin-install v3.1 §6 S-07 and orchestrator ruling r17: matching HTTP/SSE transports belong to the actual Session; stdio remains Location-owned. Freeze actual request ownership through ElicitationResult. Ambiguous cross-session stdio requests retain native forms and a named diagnostic. SessionEnd, native removal/archive and Location disposal release owned remote transports through the same MCP connection lifecycle.",
+      "adr": [
+        "ADR-029",
+        "ADR-047"
+      ],
+      "lane": "#1776 slice 5, r17",
+      "takeovers": [
+        "packages/core/src/mcp/index.ts",
+        "packages/core/src/mcp/client.ts",
+        "packages/core/test/codepuppy-mcp-runtime.test.ts"
+      ],
+      "mechanism": {
+        "file": "packages/core/src/mcp/index.ts",
+        "ladder": "Existing L3 increment only: MCP index selects session-owned remote connections through existing McpConnection.make/stop/auth/fetch; client tracks real in-flight call ownership. L0 has no inbound elicitation or connection-lifetime hook; L1/L2 patch the same points and add synchronization. The Code Puppy Location reverse port carries callbacks only, not a second transport registry."
+      },
+      "tests": [
+        {
+          "file": "packages/core/test/codepuppy-mcp-runtime.test.ts",
+          "name": "a real session owns matching remote MCP transports until SessionEnd and removal while stdio stays open"
+        },
+        {
+          "file": "packages/core/test/codepuppy-mcp-runtime.test.ts",
+          "name": "stdio cross-session elicitation only diagnoses ambiguous ownership and retains native forms"
+        },
+        {
+          "file": "packages/core/test/codepuppy-mcp-runtime.test.ts",
+          "name": "stdio native form keeps its request owner through ElicitationResult"
         }
       ]
     }

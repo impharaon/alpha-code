@@ -72,3 +72,19 @@ export function registerPackageRuntime(location: RuntimeLocation, handler: Packa
 export function packageRuntime(location: RuntimeLocation): PackageRuntimeHandlers | undefined {
   return handlers.get(key(location))
 }
+
+// S-07: this is only the reverse call into the MCP owner's existing connection lifecycle.
+const mcpSlot = Symbol.for("codepuppy.package.mcp-session-runtime.v1")
+type McpRuntime = { releaseSession(sessionID: string): Promise<void> }
+const mcpScope = globalThis as typeof globalThis & { [mcpSlot]?: Map<string, McpRuntime> }
+const mcpRuntimes = mcpScope[mcpSlot] ??= new Map<string, McpRuntime>()
+
+export function registerPackageMcpRuntime(location: RuntimeLocation, runtime: McpRuntime): { dispose(): void } {
+  const id = key(location)
+  mcpRuntimes.set(id, runtime)
+  return { dispose() { if (mcpRuntimes.get(id) === runtime) mcpRuntimes.delete(id) } }
+}
+
+export async function releasePackageSessionMcp(location: RuntimeLocation, sessionID: string): Promise<void> {
+  await mcpRuntimes.get(key(location))?.releaseSession(sessionID)
+}

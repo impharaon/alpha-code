@@ -1307,3 +1307,11 @@ core/ext/ui-mac 类型检查均 exit 0，八个 touched production modules 的 s
 **精确未完成状态**：r16 S-07 裁决指向“core 现有 session MCP release port”，但当前树 `core/src/mcp/index.ts:168` Interface 只有 server connect/disconnect/remove，`plugin/src/codepuppy-package-runtime.ts:53` 固定阶段槽亦无 Session 释放口，core/plugin 定点搜索未见该符号。本轮已异步请求给出文件/符号，或明确在原 MCP authority/同一 Location 槽将真实 SessionEnd 接到现有 connection.stop 的最小调用；未收到答复，不新造独立释放机制。S-07 的 HTTP/SSE 会话连接、stdio in-flight elicitation/Result 尚未实施。S-03 仍缺 main 真实 leave/SessionEnd 与释放前 await、archive/delete/shutdown 结算、统一 Notification、FileChanged watcher/watchPaths 与 CLAUDE_ENV_FILE；没有把普通审批拒绝冒充正式无时机的 PermissionDenied。Claude Security metrics/tip 与上述生命周期对应的原脚本验收仍待完成；未开始片 7。
 
 已核 Codex（GPT-6），spec v5 / design v3.1 + r16 rulings；结论 **PARTIAL**。本轮完成观察点修正、S-05 与子助手/公共 agent 输入的所述证据，未宣称片 5 全部闭合。约 01:11–01:55（UTC+08）44 分钟；每个引擎增量同提交登记，唯一新增可选字段为已裁决的 File.source，无新依赖/迁移/仓外写。遗留去向：S-07 入口指代回编排器；S-03 其余行/未完原脚本 fix now 续本车道；dash0 的源快照执行位缺陷交编排器决定输入处置；docs 基线与旧 command-subagent 断言沿既有归属。无新增 OPTIONAL。
+
+### r17｜S-07 裁决纠正与片 5 续作
+
+核对：IMPLEMENT — r17 / orchestrator Claude Opus 5.5；spec v5 / design v3.1 及既有 rulings 不变。偏离记录：orchestrator ruling r17 明确不存在旧 session MCP release port，S-07 自身引入匹配 HTTP/SSE 的 Session 连接及其释放；stdio 仍复用 Location。最小同进程反向口只将真实 SessionEnd 的释放转交 core MCP authority，不另造 transport owner。
+
+核心回归先红：`4625d8ff0d` 恢复真实 SDK stdio 探针，单调用/同会话并发/跨会话歧义 **0 pass / 3 fail**（`/tmp/plugin-standard-r17-stdio-red.log`）；`1bbb32a1a0` 用真实 native Session 与 SDK HTTP transport 的实际 open/close 观察 **0 pass / 1 fail**，期望按 Session 创建第二连接而实际仅 Location 一个（`remote-red.log`）。现有 McpConnection.make/stop 复用认证/fetch/锁/scope；核心同一 Session Map 持有连接，native archive/delete 按 Session ID 收尾。跨 Location 删除事件在原 Bus 上携带调用方 Location，订阅仅去掉该过滤、仍只处理本 owner 已持有的 Session，不重发或伪造事件。精确登记 plugin-hook-elicitation，既有 index/client/test 接管增量；connection.ts 直接复用而无新字节改动。无公网/DTO/依赖变化。
+
+该步六条具名 MCP case **6 pass / 0 fail**（`/tmp/plugin-standard-r17-mcp-step-green.log`），包括未匹配 handler 不加连接及真实 Form→Result 保留 owner；core typecheck **2,052 files / 0 errors**，registry **5 pass**。gate-files 原 MCP 数字 24→32 机械同步当前实际 32 例（含此前两条 SSE case），不改 selector。真实 ext SessionEnd 及包 handler 的接线仍待后续，直接反向释放调用不冒称完整离开事件。

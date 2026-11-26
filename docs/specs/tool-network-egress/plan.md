@@ -167,6 +167,25 @@ U/E 各运行 `bun typecheck`，仅处理本片造成的问题；若包已有适
 
 一次较宽相关集：U `bun test --max-concurrency 2 src/main/network-egress-ipc.test.ts src/main/network-egress-proxy.test.ts src/renderer/codepuppy-ui/settings-tools.test.ts` 退出 0，39 pass / 0 fail。三个发送入口分别执行 `bun test --max-concurrency 2 ./test-component/use-projects.cases.ts -t '首页斜杠命令的 session.command'`（1 pass）、`./test-component/session-second-send.cases.ts -t '会话内 /review'`（1 pass）、`./test-component/session-timeline.cases.ts -t '全部批准下停止后切到'`（4 pass），均退出 0。`bun typecheck` 从 U 执行通过；提交前 `bun test --max-concurrency 2 src/main/old-name-scan.test.ts` 退出 0，10 pass；链接 4 条通过、`git diff --check` 通过。文档检查仍为 70 errors / 252 warnings，与 r2 检查无新增语义问题；报告对设计既有未登记意图的说明改为设计第 23 行定位，避免计划重复引用同一未知 ID。没有重跑 scenario/实际 45 s/对照臂，没有全包、bin/check 或 gate。
 
+
+### r4：ship gate 三项新红的处置证据
+
+输入为编排器提供的 `1757-gate-fail.log`（2026-11-26 review 缓存）。保留 ship 已生成的 merge `2339b9daf3`，没有 rebase 或 push。仅修本轮两处产品边界及具名包用例的同步点，不改 gate/known-fails 或任何断言和阈值。
+
+基线：`git worktree add --detach /tmp/egress-r4-alpha-20261126 origin/alpha`，实际 HEAD `a586b16fcac32702d2d14cda898c5a32bb71d02c`；独立 `bun install --frozen-lockfile --ignore-scripts` 安装成功，未借用支线 workspace 模块。基线 U `bun test --max-concurrency 2 src/main/engine-cases.test.ts -t 'desktop package lifecycle|无人值守运行的真实入口证据'` 退出 0，2 pass / 0 fail（内部包 7、无人值守 16）。完成后已执行 `git worktree remove /tmp/egress-r4-alpha-20261126`，目录与登记均移除。基线日志 `/tmp/egress-r4-alpha-engines.log`。
+
+| 失败 | 原因与修正 | 红/绿证据 |
+| --- | --- | --- |
+| preload 装载路径 | 产品代码错误：新增直接 shared 类型 import 越过 preload 的既有 import 白名单。事件类型改用既有的 `Parameters<typeof listener>[0]` 模式，经 ElectronAPI 类型推导；单一 exposeInMainWorld 和 N3 IPC 转发保持原状。测试未改。 | 原 gate 在 ext-security-boundaries:134 判红；U `bun test --max-concurrency 2 src/main/ext-security-boundaries.test.ts` 退出 0，8 pass。 |
+| 无人值守 metadata | 产品代码错误：ext 的新增运行时相对导入 `schema/src/tool` 被本地插件源码热加载器递归加入重载图，invalidate 了宿主共享 schema，使 Tool.Error 的类身份分裂，SDK 转换后丢掉拒绝 metadata。改为宿主提供的 `@opencode/plugin/promise/tool` Error 构造器；相对 schema 引用只保留 type，原生 Error 显式使用 globalThis.Error。没有改无人值守规则、N6 文案或断言。 | 支线修复前同基线命令为 1 pass / 1 fail：无人值守内部 13 pass / 3 fail，正是 AC-04、U-3、投影夹具；关掉 wrapper/非围栏网络绑定的有界诊断均未消除错误，已恢复这些诊断改动。仅修共享构造器后，`bun test --max-concurrency 2 ./src/main/unattended-run.engine.cases.ts` 退出 0，16 pass / 0 fail。红日志 `/tmp/egress-r4-branch-red.log`，绿日志 `/tmp/egress-r4-unattended-green.log`。 |
+| 包生命周期 | 夹具同步缺口：原 action 在 main 安装返回后立即断言 wire 已 post；前一项连接器 refresh 可已 detach。既有 reload-coordinator 的合同允许此时入队，在 attach 时重发。仅在该已有断言前用现有 until 等待同一个 request 送达，保留原 global/非 force 断言、15 秒上界、重载报告与真实 connector 移除检查。没有给产品路径增加等待，也未将业务断言改成另一种行为。 | 原 gate 为内部 6 pass / 1 fail（line 77）；本地基线和支线修复前包宿主均曾通过，故不声称原 gate 当时已捕获 detach。隔离临时用例明确 detach 后，安装成功但 `posted:[]`，同一断言红（0 pass / 1 fail）；重新 attach 后实际发出 generation 1 的 global request，同断言及 connector 移除通过（1 pass）。延后 attach 到下一 microtask 的临时扩展臂通过了原送达断言，但其后 removal reload reported 未收齐（0 pass / 1 fail），不计为完整绿证据；没有据此扩大修复范围。实际包宿主修正后 1 pass（内部 7），日志 `/tmp/egress-r4-package-green.log`；临时机制证据 `/tmp/egress-r4-wire-control.log`、`/tmp/egress-r4-wire-reattach.log`、`/tmp/egress-r4-wire-await.log`。 |
+
+完整具名宿主文件：U `bun test --max-concurrency 2 src/main/engine-cases.test.ts` 退出 0，26 pass / 0 fail（69.27 s）；后续只有包夹具同步改动，按受影响文件重跑包行（完整内部 7 条），其它 25 行没有再次运行。没有修改宿主表或计数。日志 `/tmp/egress-r4-engine-all.log`。
+
+相关集：E `bun test --max-concurrency 2 src/network-egress.test.ts src/policy/display.test.ts src/hub-bridge.test.ts src/context-injection.test.ts src/plugin-host.test.ts src/plugin-process-singleton.test.ts src/plugin-reload-wiring.test.ts` 退出 0，123 pass / 0 fail。U 执行 activity、approval、sites、IPC、proxy、derived、registry、disclosure、write-sites、gate-file-registry、renderer network feed/card、settings-tools、surface-seam/settings-ratchet、locale、old-name 共 17 个具名文件：159 pass / 1 fail，唯一失败是 network-egress-card.test.ts:15 与 locale-regression.test.ts:227 在同一进程重复注册 happy-dom（合并了此前分开的测试组）。仅把该 locale 文件单独进程验证，`bun test --max-concurrency 2 src/renderer/i18n/locale-regression.test.ts` 为 10 pass / 0 fail；未改夹具或断言。记录为命令分组问题，不归因产品，不作为第三项根因。日志 `/tmp/egress-r4-ui-related.log`、`/tmp/egress-r4-locale-alone.log`。
+
+两包 `bun typecheck` 退出 0；三个发送入口依 r3 同名命令分别 1、1、4 pass，提交前旧名扫描 10 pass，链接 4 条和 diff 检查通过。文档检查仍为 70 errors / 252 warnings，与 r3 逐条比较新增 0、消失 0。临时端口对照最初的 import/mock 路径问题均在 /tmp 内修正，未计为行为红证据；所有产品诊断输出均已撤掉。没有执行 gate、bin/check、整包套件或重复 45 s scenario。
+
 ## 切片二：全部批准通放与系统代理
 
 本轮仅保留交付边界，后续 PLAN 再展开。AC-08 的真引擎/真围栏三条及去档位判断对照、AC-13 的系统代理证明仍为整票必需证据。AC-13 按设计 §4.7、§10：日常从 `resolveEgressRoutes` 注入路由并走真实上游握手；另由编排器安排**一次**真实机器已设本地测试系统代理的真引擎/真围栏验收，连接仅经它可达的目标，保留测试代理连接记录，并对照无系统代理。日常注入不计作系统配置读取已验证。本片不启动 Electron、不改本机系统代理；缺少那次实机记录时，最终 AC-13 不能记为通过。

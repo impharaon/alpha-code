@@ -73,8 +73,11 @@ async function action(channel: string, ...args: unknown[]) {
   const before = refreshes
   const requested = reloadRequests.length
   expect(await invoke(channel, ...args)).toMatchObject({ ok: true })
-  if (channel === "ext-install-package" && args[0] === "package:supabase")
+  if (channel === "ext-install-package" && args[0] === "package:supabase") {
+    // A preceding connector refresh can have detached the wire; main queues and replays on attach.
+    await until(() => reloadRequests.slice(requested).some(request => request.scope === "global" && request.force !== true), "installed package reload delivered")
     expect(reloadRequests.slice(requested).some(request => request.scope === "global" && request.force !== true)).toBe(true)
+  }
   const pending = reloadRequests.slice(requested)
   if (pending.length)
     await until(() => pending.every(request => reloadReports.some(report => report.generation === request.generation && report.outcome === "reloaded")), channel)

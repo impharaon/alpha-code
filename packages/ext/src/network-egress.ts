@@ -1,5 +1,7 @@
 import { randomUUID } from "node:crypto"
-import { Tool } from "../../schema/src/tool"
+// Use the host constructor: local plugin reloads must not invalidate the shared tool schema.
+import { Error } from "@opencode/plugin/promise/tool"
+import type { Tool } from "../../schema/src/tool"
 import { NETWORK_EGRESS_NOTE } from "./context-injection"
 import type { Plugin } from "@opencode/plugin"
 import { activitySession, networkActivityKey, parseNetworkActivity, sessionRefKey, type EgressNotice, type SessionRef, type NetworkActivity, type NetworkActivityReply, type NetworkInbound, type NetworkOutbound } from "../../ui-mac/src/shared/network-egress-wire"
@@ -62,11 +64,11 @@ export function createNetworkEgress(deps: {
       .filter((notice) => notice.activities.some((item) => networkActivityKey(item) === networkActivityKey(wireActivity(activity))))
       .map((notice) => notice.requestID)
     if (!requests.length) return value
-    const result = failed ? value instanceof Tool.Error ? value : new Tool.Error({ message: value instanceof Error ? value.message : String(value), error: value }) : value
+    const result = failed ? value instanceof Error ? value : new Error({ message: value instanceof globalThis.Error ? value.message : String(value), error: value }) : value
     if (!result || typeof result !== "object") return result
     const original = "metadata" in result ? result.metadata as Record<string, unknown> | undefined : undefined
     const marker = { session, requests, hadMetadata: original !== undefined }
-    if (result instanceof Tool.Error) { failures.set(result, marker); return result }
+    if (result instanceof Error) { failures.set(result, marker); return result }
     const metadata = { ...original, [RESULT_NOTICE]: marker }
     return { ...result, metadata }
   }
@@ -114,7 +116,7 @@ export function createNetworkEgress(deps: {
       }
       const requests = marker.requests.filter((id) => notices.get(sessionRefKey(marker.session))?.has(id))
       if (!requests.length) return false
-      if (event.status === "error") event.error = new Tool.Error({ message: `${event.error.message}\n\n${NETWORK_EGRESS_NOTE}`, ...(event.error.error === undefined ? {} : { error: event.error.error }), ...(event.error.metadata === undefined ? {} : { metadata: event.error.metadata }) })
+      if (event.status === "error") event.error = new Error({ message: `${event.error.message}\n\n${NETWORK_EGRESS_NOTE}`, ...(event.error.error === undefined ? {} : { error: event.error.error }), ...(event.error.metadata === undefined ? {} : { metadata: event.error.metadata }) })
       if (event.status === "completed") {
         const content = event.result.content
         event.result = { ...event.result, content: Array.isArray(content) ? [...content, { type: "text", text: NETWORK_EGRESS_NOTE }] : typeof content === "string" ? `${content}\n\n${NETWORK_EGRESS_NOTE}` : [{ type: "text", text: NETWORK_EGRESS_NOTE }] }

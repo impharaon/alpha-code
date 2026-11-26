@@ -1,4 +1,3 @@
-import type { EgressChange } from "../shared/network-egress-wire"
 import { contextBridge, ipcRenderer } from "electron"
 import {
   type AuthErrorCode,
@@ -38,7 +37,7 @@ const api: ElectronAPI = {
     settings: () => ipcRenderer.invoke("network-egress-settings"),
     revoke: (input) => ipcRenderer.invoke("network-egress-revoke", input),
     subscribe: (listener) => {
-      const handler = (_event: unknown, event: EgressChange) => listener(event)
+      const handler = (_event: unknown, event: Parameters<typeof listener>[0]) => listener(event)
       ipcRenderer.on("network-egress-change", handler)
       return () => ipcRenderer.removeListener("network-egress-change", handler)
     },

@@ -91,6 +91,8 @@ review_after: 2027-05-09
 `packages/ext/src/plugin-package-invocation.ts` 将已安装包的 command/agent/skill 接到原 command、skill 与 subagent 执行器，沿唯一 PackageAllowSetV3 检查分项和项目范围。调用期工具规则由既有 policy 绑定，下一用户输入/idle 清除；paths 用实际文件工具完成事件，preload 与 memory 在子会话上下文绑定，模型建议/effort 从原模型目录解析。指令模板只经 S-01 的 core renderer，源 shell 规则匹配复用纯 ShellScan，未新增执行循环或模板解释器。
 
 
+S-06 只在原生 compaction 的实际采用前和成功发布后 await 同一 Location runtime；后台预计算不触发。手动拒绝/自动跳过/溢出失败由原生结果渠道呈现；通知在窗口持久化后运行，原生 opaque window 不伪造可读摘要。
+
 S-08 由 ext 既有 awaited context/idle 屏障按实际 assistant message ID 收集终态工具批次，成功与校验失败都从原消息读取并交同一源身份投影。初始化历史作为水位，处理中与完成集合共用；空批次不发，附加上下文在下一请求前送达，idle 继续仍走原 synthetic。
 
 S-04 在 core 配置读取及技能 watcher/重扫的发布链选取文件修订；被拒的旧字节继续经过原解析和当前项目信任，不回写用户文件，托管策略不可阻止。ext 同一 hook runner 按 occurrence/会话/处理器复用结果，当前包停用或更换即不再维持其拒绝。初次加载不冒充文件变更。

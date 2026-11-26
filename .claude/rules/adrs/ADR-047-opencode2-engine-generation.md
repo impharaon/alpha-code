@@ -300,3 +300,9 @@ OpenCode 共用服务、库与凭证。
 ### #1776 S-01 调用 renderer 窄增量
 
 依据 DESIGN-local-plugin-install v3 §6/§10、r5 的 IMPLEMENT 派发及 orchestrator ruling 2026-11-27（Claude Opus 5.5）：只在已接管 `core/src/config/plugin/command.ts` 增加来源语法与 source/value 边界，原生和整包指令复用同一 shell/process 原语。自有 `@opencode/plugin/codepuppy-package-runtime` 是 Location 生命周期内的反向调用端口；PreparedInstruction.arguments 原样携带参数名顺序，未声明为 []，仍由 core 解析。源码识别在绑定值之前，绑定值/调用参数不成为新 shell 节点。唯一主权登记为 `plugin-invocation-semantics`，原 command-model-priority/项目信任决定保持；没有增加其他上游文件接管。
+
+### #1776 S-04 / S-06 配置与压缩窄边界
+
+S-04 依据 DESIGN-local-plugin-install v3.1 §6/§10 与 orchestrator ruling 2026-11-27（r14）：既有 config.ts / config/plugin/skill.ts 的读取、watcher 与 rescan 在原生发布链调用同一个 beforeConfigChange；raw revision 仍经当前项目 trust/parser，拒绝不改用户文件，托管策略不可阻止。登记 `plugin-hook-config-change` 与原 `project-opencode-config-trust`，无额外接管文件或 DTO。
+
+S-06 依据同一冻结设计的 §10：精确新 L3 仅 `packages/core/src/session/compaction.ts`，在实际 compact 采用（含 held summary）前 await PreCompact，在 publish 成功持久化后 await PostCompact；后台预计算不触发。现有模型钩子不覆盖采用预计算结果，不能在 ext 事后还原这个决定点；L1/L2 仍改同一生命周期并另添源码/产物同步入口，故沿设计选择直接 L3。注册 `plugin-hook-compaction`，native summary/预算/重试算法不改，opaque native window 无可读 summary 时不造字段。north-star 精确单文件清单随该登记同步；没有扩大到 runner/step.ts。原模块 finite integration 与真实 host 用例覆盖手动/自动/溢出、持久化后通知及预计算采用，移除回调即红。

@@ -434,9 +434,10 @@ it.live("package compaction hooks veto before provider work and observe only com
   const runtime = yield* Effect.promise(() => import("@opencode/plugin/codepuppy-package-runtime"))
   const seen: { phase: string; occurrenceId: string; summary?: string }[] = []
   let allow = false
+  const committedWindows: boolean[] = []
   const registration = runtime.registerPackageRuntime({ directory: "/project" }, packageCompactionHandlers({
     beforeCompaction: async input => { seen.push({ phase: "before", occurrenceId: input.occurrenceId }); expect(input).toMatchObject({ sessionID: fixture.sessionID, trigger: "manual", customInstructions: null }); return { proceed: allow, reason: "fixture retains full history" } },
-    afterCompaction: async input => { seen.push({ phase: "after", occurrenceId: input.occurrenceId, ...(input.summary === undefined ? {} : { summary: input.summary }) }); expect((await Effect.runPromise(fixture.load)).messages.some(message => message.type === "compaction" && message.status === "completed")).toBe(true) },
+    afterCompaction: async input => { seen.push({ phase: "after", occurrenceId: input.occurrenceId, ...(input.summary === undefined ? {} : { summary: input.summary }) }); committedWindows.push((await Effect.runPromise(fixture.load)).messages.some(message => message.type === "compaction" && message.status === "completed")); expect(committedWindows.at(-1)).toBe(true) },
   }))
   yield* Effect.addFinalizer(() => Effect.sync(() => registration.dispose()))
   expect(yield* fixture.compact).toMatchObject({ status: "failed", error: { message: expect.stringContaining("fixture retains full history") } })
@@ -449,6 +450,7 @@ it.live("package compaction hooks veto before provider work and observe only com
   expect(seen[1]!.occurrenceId).toBe(seen[2]!.occurrenceId)
   expect(seen[0]!.occurrenceId).not.toBe(seen[1]!.occurrenceId)
   expect(seen[2]).not.toHaveProperty("summary")
+  expect(committedWindows).toEqual([true])
 }))
 
 it.live("package compaction rejection skips automatic work and names an overflow failure", () => Effect.gen(function* () {

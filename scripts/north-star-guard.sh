@@ -193,6 +193,12 @@ UPSTREAM_EXCLUDES=(
   # 接管面只有 :136 那一行的 `codepuppy(I-13 L2)` 行尾标注。判据 packages/ext/src/policy/session-row-rules.test.ts 的会话上下文三条
   # (上游原文件 ⇒ E4 第二臂红)。
   ':(exclude)packages/core/src/session/context.ts'
+  # #1776 S-06, DESIGN-local-plugin-install v3.1 §10: awaited before-commit / after-publication hooks only.
+  ':(exclude)packages/core/src/session/compaction.ts'
+  # Paired existing-module S-04/S-06 regression tests (same approved lifecycle authority).
+  ':(exclude)packages/core/test/config/reload.test.ts'
+  ':(exclude)packages/core/test/session-compaction.test.ts'
+  ':(exclude)packages/core/test/session-native-compaction.test.ts'
   # INT-safety I-13 D13 / SPEC-engine-config-fence BR-07(owner 2026-11-20 在编排器给的三个选项里选 A,原话:「我建议 A：改存到引擎数据目录」):
   # 计划助手的计划文件放在引擎数据目录(global.data/plan),~/.opencode 整个受保护、谁都不建。目录在插件内部算出,同一个值写进存档的提醒、编辑放行
   # 与拒绝文案;插件能另加一条放行,改不了告诉模型往哪写的那句提醒。接管面只有 plan.ts:31 那一个值(`codepuppy(I-13 D13)` 行尾标注);上游

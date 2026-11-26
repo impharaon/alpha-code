@@ -2371,7 +2371,8 @@
       "lane": "#1776 slice 5, r14",
       "takeovers": [
         "packages/core/src/config.ts",
-        "packages/core/src/config/plugin/skill.ts"
+        "packages/core/src/config/plugin/skill.ts",
+        "packages/core/test/config/reload.test.ts"
       ],
       "mechanism": {
         "file": "packages/core/src/config/codepuppy-plugin-config-change.ts",
@@ -2380,7 +2381,15 @@
       "tests": [
         {
           "file": "packages/core/test/config/reload.test.ts",
-          "name": "configuration hooks retain rejected file revisions across unrelated native rescans; skill configuration hooks retain rejected bytes through config rescans then release them; managed configuration changes are observed but package hooks cannot reject policy settings"
+          "name": "configuration hooks retain rejected file revisions across unrelated native rescans"
+        },
+        {
+          "file": "packages/core/test/config/reload.test.ts",
+          "name": "skill configuration hooks retain rejected bytes through config rescans then release them"
+        },
+        {
+          "file": "packages/core/test/config/reload.test.ts",
+          "name": "managed configuration changes are observed but package hooks cannot reject policy settings"
         },
         {
           "file": "packages/ext/src/plugin-host.test.ts",
@@ -2409,6 +2418,42 @@
         {
           "file": "packages/ext/src/plugin-host.test.ts",
           "name": "PostToolBatch groups native terminal calls before the next request and never replays old batches"
+        }
+      ]
+    },
+    {
+      "id": "plugin-hook-compaction",
+      "decision": "DESIGN-local-plugin-install v3.1 §4.12/6 S-06: await PreCompact before provider work or precomputed-summary adoption; manual veto is a named failure, automatic veto skips, overflow veto is a named failure. AfterCompaction observes only a committed window, once with the same occurrence; unreadable native replacement windows do not invent a summary. No callback during background precomputation.",
+      "adr": [
+        "ADR-029",
+        "ADR-047"
+      ],
+      "lane": "#1776 slice 5, r14",
+      "takeovers": [
+        "packages/core/src/session/compaction.ts",
+        "packages/core/test/session-compaction.test.ts",
+        "packages/core/test/session-native-compaction.test.ts"
+      ],
+      "mechanism": {
+        "file": "packages/core/src/session/compaction.ts",
+        "ladder": "New exact L3: the existing compaction model hook excludes adoption of a held summary and is too late for the common before-commit decision. L1/L2 still patch those same lifecycle points and add synchronization authority. Only compact() admission and publish() success call the frozen Location reverse port; summary, native compaction, budget, retry and precompute algorithms remain native."
+      },
+      "tests": [
+        {
+          "file": "packages/core/test/session-native-compaction.test.ts",
+          "name": "package compaction hooks veto before provider work and observe only committed windows"
+        },
+        {
+          "file": "packages/core/test/session-native-compaction.test.ts",
+          "name": "package compaction rejection skips automatic work and names an overflow failure"
+        },
+        {
+          "file": "packages/core/test/session-compaction.test.ts",
+          "name": "package compaction events only surround adoption of a precomputed summary"
+        },
+        {
+          "file": "packages/ext/src/plugin-host.test.ts",
+          "name": "package compact hooks block before a summary and observe the actual committed summary"
         }
       ]
     }

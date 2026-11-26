@@ -399,7 +399,7 @@ export async function registerPackageHooks(
               return {
                 installed: handler.installed,
                 valid: handler.valid,
-                block: ["UserPromptSubmit", "PreToolUse", "Stop", "SubagentStop", "ConfigChange", "PostToolBatch"].includes(event),
+                block: ["UserPromptSubmit", "PreToolUse", "Stop", "SubagentStop", "ConfigChange", "PostToolBatch", "PreCompact"].includes(event),
                 exitCode: 2,
                 order,
                 text: result.stderr,
@@ -419,7 +419,7 @@ export async function registerPackageHooks(
               valid: handler.valid,
               block:
                 output.continue === false ||
-                (["Stop", "SubagentStop", "PreToolUse", "ConfigChange"].includes(event) && output.decision === "block") ||
+                (["Stop", "SubagentStop", "PreToolUse", "ConfigChange", "PreCompact"].includes(event) && output.decision === "block") ||
                 (event === "PreToolUse" && specific?.permissionDecision === "deny") ||
                 (event === "PermissionRequest" && record(specific?.decision) && specific.decision.behavior === "deny"),
               output,
@@ -431,7 +431,7 @@ export async function registerPackageHooks(
                   output.systemMessage,
                   output.stopReason,
                   event === "PermissionRequest" && record(specific?.decision) ? specific.decision.message : undefined,
-                  ["Stop", "SubagentStop", "PreToolUse", "ConfigChange"].includes(event)
+                  ["Stop", "SubagentStop", "PreToolUse", "ConfigChange", "PreCompact"].includes(event)
                     ? (specific?.permissionDecisionReason ?? output.reason)
                     : undefined,
                 ]
@@ -498,10 +498,10 @@ export async function registerPackageHooks(
     const contributions = results.filter((result): result is NonNullable<typeof result> => !!result && result.valid())
     const blocked = contributions.find((result) => result.block)
     if (blocked?.stopTurn && event !== "StopFailure") stopTurns.set(sessionID, blocked)
-    if (blocked && !["Stop", "SubagentStop", "PostToolUseFailure", "StopFailure", "ConfigChange", "PostToolBatch"].includes(event))
+    if (blocked && !["Stop", "SubagentStop", "PostToolUseFailure", "StopFailure", "ConfigChange", "PostToolBatch", "PreCompact", "PostCompact"].includes(event))
       throw Error("runtime-failed: package hook blocked " + event + (blocked.text ? ": " + blocked.text : ""))
     return contributions
-      .filter((result) => result.text || event === "PreToolUse" || event === "PermissionRequest" || event === "ConfigChange" || event === "PostToolBatch")
+      .filter((result) => result.text || event === "PreToolUse" || event === "PermissionRequest" || event === "ConfigChange" || event === "PostToolBatch" || event === "PreCompact")
       .map((result) => ({
         installed: result.installed,
         valid: result.valid,
@@ -560,8 +560,14 @@ export async function registerPackageHooks(
       return { apply: change.source === "policy_settings" || !blocked, ...(blocked?.text ? { reason: blocked.text } : {}) }
     },
     instructionsLoaded: async () => {},
-    beforeCompaction: async () => ({ proceed: true }),
-    afterCompaction: async () => {},
+    async beforeCompaction(input) {
+      const results = await run("PreCompact", input.sessionID, { trigger: input.trigger, custom_instructions: input.customInstructions })
+      const blocked = results.find(result => result.block && result.valid())
+      return { proceed: !blocked, ...(blocked?.text ? { reason: blocked.text } : {}) }
+    },
+    async afterCompaction(input) {
+      await run("PostCompact", input.sessionID, { trigger: input.trigger, ...(input.summary === undefined ? {} : { compact_summary: input.summary }) })
+    },
     beforeElicitation: async () => ({ handled: false }),
     afterElicitationResult: async input => input.answer,
   })

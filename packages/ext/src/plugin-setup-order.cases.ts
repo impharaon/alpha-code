@@ -45,7 +45,7 @@ function recordingContext(directory: string, label: () => string) {
             })
           return async () => {
             order.push(`${label()}:${name}.${method}`)
-            return { dispose: async () => {} }
+            return name === "session" && method === "list" ? { data: [], cursor: {} } : { dispose: async () => {} }
           }
         },
       },

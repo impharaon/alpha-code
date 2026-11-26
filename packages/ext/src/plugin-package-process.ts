@@ -10,15 +10,40 @@ type PackageProcessInput = {
   source: Parameters<typeof pluginProcessConfig>[0]
   command: Text
   args?: Text[]
-  environment: Record<string, string>
+  environment: Record<string, string | undefined>
+  environmentFile?: string
   signal: AbortSignal
 }
 
 /** Source/value binding stays in core; AppProcess owns the only spawn, stdin and cancellation path. */
 export function createPackageProcesses(location: RuntimeLocation) {
   const runtime = ManagedRuntime.make(LayerNode.compile(AppProcess.node))
-  const prepare = async (input: PackageProcessInput) => {
+  const environment = async (input: Pick<PackageProcessInput, "source" | "environment" | "environmentFile" | "signal">, timeout?: number): Promise<Record<string, string | undefined>> => {
+    if (!input.environmentFile || Bun.file(input.environmentFile).size === 0) return {}
     const config = pluginProcessConfig(input.source)
+    const result = await runtime.runPromise(Effect.gen(function* () {
+      const processes = yield* AppProcess.Service
+      return yield* processes.run(ChildProcess.make("bash", ["-c", '"$(command -p -v env)" -0; printf "\\0"; . "$1" >/dev/null; "$(command -p -v env)" -0', "package-session-environment", input.environmentFile!], {
+        cwd: input.source.projectDir, extendEnv: true, env: { ...config.environment(), ...input.environment },
+      }), { signal: input.signal, timeout })
+    }))
+    if (result.exitCode !== 0) throw Error("runtime-failed: session environment shell exited " + result.exitCode)
+    const split = result.stdout.toString("utf8").split("\0\0")
+    if (split.length !== 2) throw Error("runtime-failed: session environment export failed")
+    const variables = (text: string) => new Map(text.split("\0").filter(Boolean).map(entry => {
+      const separator = entry.indexOf("=")
+      return [entry.slice(0, separator), entry.slice(separator + 1)] as const
+    }))
+    const before = variables(split[0]!)
+    const after = variables(split[1]!)
+    return Object.fromEntries([...new Set([...before.keys(), ...after.keys()])]
+      .filter(key => key !== "CLAUDE_ENV_FILE" && before.get(key) !== after.get(key))
+      .map(key => [key, after.get(key)]))
+  }
+  const prepare = async (input: PackageProcessInput, timeout?: number) => {
+    const inherited = await environment(input, timeout)
+    const owned = pluginProcessConfig(input.source).environment()
+    const config = pluginProcessConfig({ ...input.source, resolveEnvironment: name => Object.hasOwn(owned, name) ? owned[name] : Object.hasOwn(inherited, name) ? inherited[name] : input.environment[name] ?? input.source.resolveEnvironment(name) })
     const bound =
       input.args === undefined
         ? await bindPackageShellCommand(location, {
@@ -32,7 +57,7 @@ export function createPackageProcesses(location: RuntimeLocation) {
       bound.argv.map((value) =>
         [...config.secretValues].some((secret) => value.includes(secret)) ? Redacted.make(value) : value,
       ),
-      { cwd: input.source.projectDir, extendEnv: true, env: { ...config.environment(), ...input.environment, ...bound.env } },
+      { cwd: input.source.projectDir, extendEnv: true, env: { ...input.environment, ...inherited, ...config.environment(), ...bound.env } },
     )
     const redact = (text: string) =>
       [...config.secretValues]
@@ -42,7 +67,8 @@ export function createPackageProcesses(location: RuntimeLocation) {
   }
   return {
     command: async (input: PackageProcessInput & { stdin: Record<string, unknown>; timeoutSeconds: number }) => {
-      const prepared = await prepare(input)
+      const deadline = performance.now() + input.timeoutSeconds * 1000
+      const prepared = await prepare(input, input.timeoutSeconds * 1000)
       const result = await runtime
         .runPromise(
           Effect.gen(function* () {
@@ -50,7 +76,7 @@ export function createPackageProcesses(location: RuntimeLocation) {
             return yield* processes.run(prepared.command, {
               stdin: JSON.stringify(input.stdin),
               signal: input.signal,
-              timeout: input.timeoutSeconds * 1000,
+              timeout: Math.max(0, deadline - performance.now()),
             })
           }),
         )

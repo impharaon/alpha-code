@@ -20,10 +20,10 @@ import { pluginProcessConfig } from "../../ui-mac/src/shared/plugin-mcp-config"
 import { resolvePackageModel } from "./model-facts"
 import { ASK_AGENT, READONLY_AGENT } from "../../ui-mac/src/shared/permission-tier"
 import { PACKAGE_HOOK_CONTEXT_ID, renderWrapper } from "./context-injection"
-import { mkdtempSync, writeFileSync, chmodSync, rmSync, watchFile, unwatchFile } from "node:fs"
+import { mkdtempSync, writeFileSync, chmodSync, rmSync, watchFile, unwatchFile, type Stats } from "node:fs"
 import { tmpdir } from "node:os"
-import { dirname, join } from "node:path"
-import { createHash } from "node:crypto"
+import { dirname, join, resolve, isAbsolute } from "node:path"
+import { createHash, randomUUID } from "node:crypto"
 
 type Installed = ReturnType<typeof allInstalledPluginPackages>[number]
 type Instruction = ReturnType<typeof import("./plugin-package-skills").allInstalledPluginInstructions>[number]
@@ -71,6 +71,9 @@ export async function registerPackageHooks(
   const observed = new Set<string>()
   const promptEpoch = new Map<string, number>()
   const sessionEpoch = new Map<string, object>()
+  const environmentFiles = new Map<string, { lifetime: object; file: string }>()
+  const fileWatches = new Map<string, { lifetime: object; paths: Map<string, (current: Stats, previous: Stats) => void>; pending: Promise<void> }>()
+  const dynamicWatches = new Map<string, Map<string, { paths: string[]; valid(): boolean }>>()
   const configResults = new Map<string, Map<string, { valid(): boolean; result: Promise<HookResult | undefined> }>>()
   const batches = new Map<string, { complete: Set<string>; pending: Map<string, Promise<Contribution[]>> }>()
   const children = new Map<string, { parentID: string; agentType: string }>()
@@ -97,6 +100,7 @@ export async function registerPackageHooks(
     )
   }
   const revoke = () => {
+    for (const sessionID of sessionEpoch.keys()) reconcileFileWatches(sessionID)
     for (const [controller, owner] of running) if (!owner.valid()) controller.abort()
     for (const contexts of [sessionContexts, promptContexts])
       for (const [sessionID, values] of contexts)
@@ -128,6 +132,11 @@ export async function registerPackageHooks(
   watchFile(membership, { interval: 100, persistent: false }, revoke)
   const events = new AbortController()
   const close = (sessionID: string) => {
+    closeFileWatches(sessionID)
+    dynamicWatches.delete(sessionID)
+    const environment = environmentFiles.get(sessionID)
+    if (environment) rmSync(environment.file, { force: true })
+    environmentFiles.delete(sessionID)
     children.delete(sessionID)
     instructions.delete(sessionID)
     failures.delete(sessionID)
@@ -228,17 +237,18 @@ export async function registerPackageHooks(
     })
     return answers.find(answer => answer.action === "decline") ?? answers[0]
   }
-  const run = async (
-    event: HookEvent,
-    sessionID: Parameters<Plugin.Context["session"]["get"]>[0]["sessionID"],
-    fields: Record<string, unknown>,
-    call?: GateCall,
-    invocation?: InstructionScope,
-    occurrenceId?: string,
-    batch?: readonly BatchCall[],
-  ) => {
+  const environmentFile = (sessionID: string, lifetime: object, create: boolean) => {
+    const current = environmentFiles.get(sessionID)
+    if (current?.lifetime === lifetime) return current.file
+    if (!create) return
+    const file = join(directory, createHash("sha256").update(sessionID).digest("hex") + "-" + randomUUID() + ".sh")
+    writeFileSync(file, "", { flag: "wx", mode: 0o600 })
+    environmentFiles.set(sessionID, { lifetime, file })
+    return file
+  }
+  const handlersFor = (event: HookEvent, sessionID: string, invocation?: InstructionScope) => {
     const installed = allInstalledPluginPackages(input.root).filter(active)
-    const handlers = installed.flatMap((installed) =>
+    return installed.flatMap((installed) =>
       installed.description.entries.flatMap((entry) => {
         if (entry.kind !== "hook" || !pluginEntryRuntimeAvailable(entry) || entry.hook.event !== event) return []
         const scope =
@@ -258,6 +268,20 @@ export async function registerPackageHooks(
         return valid() ? [{ installed, entry, hook: entry.hook, scope, valid }] : []
       }),
     )
+  }
+  const filePaths = (sessionID: string, handler: ReturnType<typeof handlersFor>[number]) =>
+    dynamicWatches.get(sessionID)?.get(handler.installed.key + ":" + handler.entry.id)?.paths ??
+    (handler.hook.matcher?.split("|") ?? []).filter(Boolean).map(name => resolve(context.location.directory, name))
+  const run = async (
+    event: HookEvent,
+    sessionID: Parameters<Plugin.Context["session"]["get"]>[0]["sessionID"],
+    fields: Record<string, unknown>,
+    call?: GateCall,
+    invocation?: InstructionScope,
+    occurrenceId?: string,
+    batch?: readonly BatchCall[],
+  ) => {
+    const handlers = handlersFor(event, sessionID, invocation)
     if (!handlers.length) return []
     const lifetime = sessionEpoch.get(sessionID) ?? {}
     sessionEpoch.set(sessionID, lifetime)
@@ -333,8 +357,9 @@ export async function registerPackageHooks(
               )
                 return
             }
+            if (event === "FileChanged" && !filePaths(sessionID, handler).includes(String(eventFields.file_path))) return
             if (
-              handler.hook.matcher &&
+              event !== "FileChanged" && handler.hook.matcher &&
               !new RegExp(handler.hook.matcher).test(
                 String(
                   eventFields.tool_name ??
@@ -424,11 +449,13 @@ export async function registerPackageHooks(
                 lifetime,
               }
             }
+            const file = environmentFile(sessionID, lifetime, ["SessionStart", "FileChanged"].includes(event))
             const result = await processes.command({
               source: sourceConfig,
               command: handler.hook.command,
               ...(handler.hook.args === undefined ? {} : { args: handler.hook.args }),
-              environment: {},
+              environment: { CLAUDE_ENV_FILE: ["SessionStart", "FileChanged"].includes(event) ? file : undefined },
+              ...(file ? { environmentFile: file } : {}),
               signal: controller.signal,
               stdin: { ...payload, ...eventFields },
               timeoutSeconds: handler.hook.timeoutSeconds,
@@ -454,11 +481,19 @@ export async function registerPackageHooks(
               : {}
             if (!record(output)) throw Error("hook output must be an object")
             const specific = record(output.hookSpecificOutput) ? output.hookSpecificOutput : undefined
+            if (event === "FileChanged" && output.watchPaths !== undefined) {
+              if (!Array.isArray(output.watchPaths) || !output.watchPaths.every(value => typeof value === "string" && isAbsolute(value) && !value.includes("\0")))
+                throw Error("hook watchPaths must contain absolute file paths")
+              const watches = dynamicWatches.get(sessionID) ?? new Map<string, { paths: string[]; valid(): boolean }>()
+              watches.set(handler.installed.key + ":" + handler.entry.id, { paths: output.watchPaths, valid: handler.valid })
+              dynamicWatches.set(sessionID, watches)
+              reconcileFileWatches(sessionID)
+            }
             return {
               installed: handler.installed,
               valid: handler.valid,
               block:
-                (!["Elicitation", "ElicitationResult"].includes(event) && output.continue === false) ||
+                (!["Elicitation", "ElicitationResult", "Notification", "FileChanged"].includes(event) && output.continue === false) ||
                 (["Stop", "SubagentStop", "PreToolUse", "ConfigChange", "PreCompact", "Elicitation", "ElicitationResult"].includes(event) && output.decision === "block") ||
                 (event === "PreToolUse" && specific?.permissionDecision === "deny") ||
                 (event === "PermissionRequest" && record(specific?.decision) && specific.decision.behavior === "deny"),
@@ -539,7 +574,7 @@ export async function registerPackageHooks(
     const contributions = results.filter((result): result is NonNullable<typeof result> => !!result && result.valid())
     const blocked = contributions.find((result) => result.block)
     if (blocked?.stopTurn && event !== "StopFailure") stopTurns.set(sessionID, blocked)
-    if (blocked && !["Stop", "SubagentStop", "PostToolUse", "PostToolUseFailure", "StopFailure", "ConfigChange", "PostToolBatch", "PreCompact", "PostCompact", "Elicitation", "ElicitationResult"].includes(event))
+    if (blocked && !["Stop", "SubagentStop", "PostToolUse", "PostToolUseFailure", "StopFailure", "ConfigChange", "PostToolBatch", "PreCompact", "PostCompact", "Elicitation", "ElicitationResult", "Notification", "FileChanged"].includes(event))
       throw Error("runtime-failed: package hook blocked " + event + (blocked.text ? ": " + blocked.text : ""))
     return contributions
       .filter((result) => result.text || event === "PreToolUse" || event === "PermissionRequest" || event === "ConfigChange" || event === "PostToolBatch" || event === "PreCompact" || event === "Elicitation" || event === "ElicitationResult")
@@ -554,6 +589,39 @@ export async function registerPackageHooks(
         stopTurn: result.stopTurn,
         output: "output" in result ? result.output : undefined,
       }))
+  }
+  const closeFileWatches = (sessionID: string) => {
+    const state = fileWatches.get(sessionID)
+    if (!state) return
+    fileWatches.delete(sessionID)
+    for (const [file, listener] of state.paths) unwatchFile(file, listener)
+    state.paths.clear()
+  }
+  const reconcileFileWatches = (sessionID: string) => {
+    const lifetime = sessionEpoch.get(sessionID)
+    const handlers = handlersFor("FileChanged", sessionID)
+    if (!lifetime || !handlers.length) { closeFileWatches(sessionID); return }
+    const state = fileWatches.get(sessionID) ?? { lifetime, paths: new Map<string, (current: Stats, previous: Stats) => void>(), pending: Promise.resolve() }
+    fileWatches.set(sessionID, state)
+    const dynamic = dynamicWatches.get(sessionID)
+    if (dynamic) for (const [id, entry] of dynamic) if (!entry.valid()) dynamic.delete(id)
+    const wanted = new Set(handlers.flatMap(handler => filePaths(sessionID, handler)))
+    for (const [file, listener] of state.paths) if (!wanted.has(file)) { unwatchFile(file, listener); state.paths.delete(file) }
+    for (const file of wanted) {
+      if (state.paths.has(file)) continue
+      const listener = (current: Stats, previous: Stats) => {
+        const event = !current.isFile() ? previous.isFile() ? "unlink" : undefined
+          : !previous.isFile() ? "add"
+          : current.mtimeMs !== previous.mtimeMs || current.size !== previous.size || current.ino !== previous.ino ? "change" : undefined
+        if (!event) return
+        state.pending = state.pending.then(async () => {
+          if (fileWatches.get(sessionID) !== state || !state.paths.has(file) || sessionEpoch.get(sessionID) !== lifetime) return
+          await run("FileChanged", sessionID, { file_path: file, event })
+        }).catch(error => input.log("runtime-failed: package FileChanged: " + String(error)))
+      }
+      try { watchFile(file, { interval: 100, persistent: false }, listener); state.paths.set(file, listener) }
+      catch (error) { input.log("runtime-failed: package file watch: " + String(error)) }
+    }
   }
   const endSession = (sessionID: string, reason: Extract<PackageSessionMessage, { action: "leave" }>["reason"]) => {
     const pending = endings.get(sessionID)
@@ -591,7 +659,7 @@ export async function registerPackageHooks(
           .then(() => {
             if (!valid()) return
             return processes.monitor({
-              source: processSource(installed, invocation), command: entry.command, environment: {}, signal: controller.signal,
+              source: processSource(installed, invocation), command: entry.command, environment: { CLAUDE_ENV_FILE: undefined }, environmentFile: environmentFile(sessionID, lifetime, false), signal: controller.signal,
             }, async line => {
               if (!valid()) return
               await context.session.synthetic({
@@ -805,6 +873,7 @@ export async function registerPackageHooks(
     expansions.delete(event.messageID)
     if (pending?.length)
       promptContexts.set(event.sessionID, [...(promptContexts.get(event.sessionID) ?? []), ...pending])
+    reconcileFileWatches(event.sessionID)
     if (!starts.has(event.sessionID))
       starts.set(
         event.sessionID,
@@ -889,10 +958,13 @@ export async function registerPackageHooks(
   })
   return {
     async receiveSession(message: PackageSessionMessage) {
-      if (message.action !== "leave") return false
       const session = await context.session.get({ sessionID: message.sessionId }).catch(() => undefined)
       if (!session || session.location.directory !== context.location.directory) return false
-      await endSession(message.sessionId, message.reason)
+      if (message.action === "leave") await endSession(message.sessionId, message.reason)
+      if (message.action === "notification") await run("Notification", message.sessionId, {
+        message: message.notification.message, notification_type: message.notification.notificationType,
+        ...(message.notification.title === undefined ? {} : { title: message.notification.title }),
+      })
       return true
     },
     continuesTask(sessionID: string) {
@@ -911,7 +983,7 @@ export async function registerPackageHooks(
       const scope = { item, active: allowed }
       scopes.set(id, scope)
       instructions.set(sessionID, scopes)
-      if (allowed()) startMonitors(sessionID, scope)
+      if (allowed()) { reconcileFileWatches(sessionID); startMonitors(sessionID, scope) }
       return () => {
         if (scopes.get(id) === scope) scopes.delete(id)
         revoke()
@@ -952,6 +1024,8 @@ export async function registerPackageHooks(
       batches.clear()
       children.clear()
       monitors.clear()
+      for (const sessionID of fileWatches.keys()) closeFileWatches(sessionID)
+      dynamicWatches.clear()
       releasePermissionRequest()
       events.abort()
       unwatchFile(membership, revoke)

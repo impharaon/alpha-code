@@ -1,5 +1,5 @@
 import { requestSidecarStop } from "./sidecar-stop"
-import { createPluginSessionRequester } from "./plugin-session-lifecycle"
+import { createPluginSessionRequester, watchPluginSessionNotifications } from "./plugin-session-lifecycle"
 import type { CodePuppySidecarHost } from "./hub-view"
 import { engineClient } from "./engine-client"
 import { configurePluginMcpProxy, attachPluginMcpProxyPublisher, pluginMcpProxySnapshot } from "./plugin-mcp-proxy"
@@ -766,6 +766,7 @@ export async function spawnLocalServer(
     return grant
   }
   // REQ-234 `#1529`:`codepuppy.*` 分发与探针应答并列;不是本族的消息原样交还(返回 false)。
+  let pluginNotifications: ReturnType<typeof watchPluginSessionNotifications> | undefined
   const packageSessions = createPluginSessionRequester(message => child.postMessage(message))
   const postCodePuppy = (message: CodePuppySidecarOutbound) => child.postMessage(message)
   // DESIGN-stored-credentials-fence §4.2:引擎装载配置之前的拉取 —— 同步建表并回复(收到与回复之间没有 await)。
@@ -824,6 +825,7 @@ export async function spawnLocalServer(
     if (explicitConfigWatch === stopExplicitConfigWatch) explicitConfigWatch = undefined
     exited = true
     electronNs.app.off("child-process-gone", onProcessGone)
+    void pluginNotifications?.stop()
     packageSessions.close()
     projectConfigViews.close()
     writeProbes.close(`sidecar exited with code ${code}`)
@@ -914,6 +916,7 @@ export async function spawnLocalServer(
   // REQ-234 `#1529`:ready 之后接上重载请求的发送口(重发 main 记录里仍在途的 generation)。
   if (!exited) {
     const client = engineClient({ url: `http://${hostname}:${port}`, username: null, password })
+    pluginNotifications = watchPluginSessionNotifications(client)
     detachCodePuppy = options.codepuppySidecar?.attach(postCodePuppy, options.generation, {
       session: async (ref) => {
         const info = await client.session.get({ sessionID: ref.sessionID })

@@ -8,6 +8,8 @@ export function pluginEntryRuntimeAvailable(entry: Entry): boolean {
       [
         "SessionStart",
         "SessionEnd",
+        "Notification",
+        "FileChanged",
         "UserPromptSubmit",
         "Stop",
         "PreToolUse",

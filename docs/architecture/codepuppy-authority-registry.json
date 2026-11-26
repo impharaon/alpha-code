@@ -2314,7 +2314,7 @@
       "takeovers": [],
       "mechanism": {
         "file": "packages/ext/src/plugin-package-hooks.ts",
-        "ladder": "L0: existing event.subscribe, awaited session prompt/context/experimental.idle, tool.execute.before between policy head/tail, same-session synthetic and AppProcess; no engine takeover. S-03/S-07 private main parentPort SessionEnd receiver awaits the actual Session Location runner and the MCP owner before replying; Cleanup awaits active lifetimes. Main router/navigation/delete and logout send the fixed private message; main stop waits for known viewed Sessions before its existing stop budget, and before-quit awaits stopSidecars. The view map owns only renderer view facts, not Session epochs or process lifetimes."
+        "ladder": "L0: existing event.subscribe, awaited session prompt/context/experimental.idle, tool.execute.before between policy head/tail, same-session synthetic and AppProcess; no engine takeover. S-03/S-07 private main parentPort SessionEnd receiver awaits the actual Session Location runner and the MCP owner before replying; Cleanup awaits active lifetimes. Main router/navigation/delete and logout send the fixed private message; main stop waits for known viewed Sessions before its existing stop budget, and before-quit awaits stopSidecars. The view map owns only renderer view facts, not Session epochs or process lifetimes. Main consumes original native permission/completion/MCP-form event IDs through the same private notification action, independent of OS notification settings; requester deduplicates occurrences per engine generation. Declared literal file watchers share the runner and active ownership, with handler-owned replacement watchPaths and native add/change/unlink facts. SessionStart/FileChanged alone receive a session-owned ENV_FILE; existing AppProcess sources its exported delta for later hooks/monitors, without mutating process.env. PreparedInstruction has no environment field: inline instruction shell propagation is pending a frozen S-01 increment, not implemented here."
       },
       "tests": [
         {
@@ -2392,6 +2392,22 @@
         {
           "file": "packages/ui-mac/src/main/sidecar-stop.test.ts",
           "name": "without a viewed Session main posts stop immediately and waits for the real child exit"
+        },
+        {
+          "file": "packages/ext/src/plugin-host.test.ts",
+          "name": "main forwards real permission and completion notifications to the package once per native occurrence"
+        },
+        {
+          "file": "packages/ext/src/plugin-host.test.ts",
+          "name": "SessionStart and FileChanged shell environments reach later package processes only in that real Session"
+        },
+        {
+          "file": "packages/ui-mac/src/main/hub-view.test.ts",
+          "name": "unified plugin notifications retain the original occurrence identity across duplicate producers"
+        },
+        {
+          "file": "packages/ext/src/plugin-package-process.test.ts",
+          "name": "session environment uses actual shell exports before bindings without changing the host or accumulating PATH"
         }
       ]
     },

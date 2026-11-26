@@ -163,6 +163,15 @@ test("processing recipes ignore unrelated bundled bytes and post-signing digests
  }
  const first=await inventory("before-signing"),second=await inventory("after-signing")
  expect(second.recipe).toEqual(first.recipe)
+ const pins=(await import("../../resources/pinned-files.json")).default
+ const downloader=pins.files.find(pin=>pin.family === "ffmpeg" && pin.target === `${process.platform}-${process.arch}`)!
+ const original=downloader.sha256
+ try{
+  downloader.sha256="f".repeat(64)
+  const changed=await inventory("after-signing")
+  expect(changed.recipe.speech).toBe(second.recipe.speech)
+  expect(changed.recipe.frames).not.toBe(second.recipe.frames)
+ }finally{downloader.sha256=original}
  const speech=await inventory("after-signing","new-speech-build")
  expect(speech.recipe.speech).not.toEqual(second.recipe.speech)
  expect(speech.recipe.frames).toBe(second.recipe.frames)

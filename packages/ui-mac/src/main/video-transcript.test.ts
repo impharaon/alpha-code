@@ -41,5 +41,9 @@ test("worker reads the complete PCM cache across bounded file reads",async()=>{
  const samples=Float32Array.from({length:17000},(_,index)=>index/17000)
  const file=path.join(root,"cache.f32")
  await writeFile(file,new Uint8Array(samples.buffer))
- expect(await readAudioSamples(file,samples.length)).toEqual(samples)
+ const {spyOn}=await import("bun:test")
+ const fs=await import("node:fs/promises")
+ // Exercise the same whole-Buffer API refusal without a capacity run or a multi-GiB allocation.
+ const whole=spyOn(fs,"readFile").mockRejectedValue(Object.assign(new RangeError("File size is greater than 2 GiB"),{code:"ERR_FS_FILE_TOO_LARGE"}))
+ try{expect(await readAudioSamples(file,samples.length)).toEqual(samples)}finally{whole.mockRestore()}
 })

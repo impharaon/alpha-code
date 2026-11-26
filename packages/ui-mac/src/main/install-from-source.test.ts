@@ -1011,7 +1011,7 @@ test("a custom MCP record never inherits plugin validation from a colliding grap
   if (!state.ok) throw Error(state.reason)
   const record = state.records.find(record => record.kind === "mcp" && record.name === name)!
   expect(persistMcp(name, { type: "local", command: ["/tmp/plugin-entry", "--source-argv"] })).toMatchObject({ ok: true })
-  expect(upsertRecordV2(h.root, { ...record, origin: "created" })).toMatchObject({ ok: true })
+  expect(upsertRecordV2(h.root, { ...record, origin: "created", transaction: undefined })).toMatchObject({ ok: true })
   expect(persistMcp(name, { type: "local", command: ["/tmp/custom-entry", "--source-argv"] })).toMatchObject({ ok: false, reason: "command not allowed: /tmp/custom-entry" })
   expect(persistMcp(name, { type: "remote", url: "http://localhost:9876/mcp" })).toMatchObject({ ok: false })
 }))

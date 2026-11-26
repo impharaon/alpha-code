@@ -1448,7 +1448,11 @@ it.live("installed plugin skill bindings stay package-local in the real SkillEdi
     const projection = join(root, "skills-enabled.json")
     writeFileSync(projection, JSON.stringify({ v: 3, keys: ["skill--security-two"], scoped: [{ kind: "skill", name: "security-one", projectPath: directory }], mcp: [] }))
     yield* activate({ id: "test.native-skill", async setup(context) {
-      await context.skill.transform(editor => editor.add({ id: "claude-security" as never, name: "native-security" as never, path: join(fixtureRoot, "whole/claude/plugins/claude-security/skills/claude-security/SKILL.md") as never, content: "native skill" }))
+      await context.skill.transform(editor => {
+        for (const [id, name] of [["claude-security", "native-security"], ["security-one", "native-host-name"], ["skill--security-two", "native-managed-key"]]) {
+          editor.add({ id: id as never, name: name as never, path: join(fixtureRoot, "whole/claude/plugins/claude-security/skills/claude-security/SKILL.md") as never, content: "native skill" })
+        }
+      })
     } })
     const ext = yield* activateExtUntilFinished
     const plugins = yield* Plugins.Service
@@ -1460,6 +1464,8 @@ it.live("installed plugin skill bindings stay package-local in the real SkillEdi
     const registered = (yield* skills.list()).filter(skill => skill.name.startsWith("security-"))
     expect(registered).toHaveLength(2)
     expect((yield* skills.list()).find(skill => skill.id === "claude-security")?.name).toBe("native-security")
+    expect((yield* skills.list()).find(skill => skill.id === "security-one")?.name).toBe("native-host-name")
+    expect((yield* skills.list()).find(skill => skill.id === "skill--security-two")?.name).toBe("native-managed-key")
     for (const skill of registered) {
       const installed = allInstalledPluginSkills(root).find(item => item.name === skill.name)!
       expect(skill.path).toBe(installed.path)

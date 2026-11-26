@@ -39,21 +39,23 @@ export async function stopSidecarEngine(engine: StoppableEngine | undefined) {
   }
 }
 
-/** Main's existing six-second fallback starts only after the awaited SessionEnd barrier. */
+/** The existing stop deadline stays live while SessionEnd waits for its receiver. */
 export async function requestSidecarStop(
   child: { postMessage(command: SidecarStopCommand): void; kill(): unknown },
   exit: Promise<unknown>,
 ) {
   let exited = false
+  let expired = false
   let timer: ReturnType<typeof setTimeout> | undefined
   const closed = exit.then(() => { exited = true })
-  const ending = endViewedPluginSessions("other")
-  if (ending) await ending
-  if (exited) return
-  child.postMessage(SIDECAR_STOP_COMMAND)
+  const deadline = new Promise<void>(resolve => {
+    timer = setTimeout(() => { expired = true; if (!exited) child.kill(); resolve() }, SIDECAR_DRAIN_TIMEOUT_MS + 1000)
+  })
   try {
-    await Promise.race([closed, new Promise<void>(resolve => {
-      timer = setTimeout(() => { if (!exited) child.kill(); resolve() }, SIDECAR_DRAIN_TIMEOUT_MS + 1000)
-    })])
+    const ending = endViewedPluginSessions("other")
+    if (ending) await Promise.race([ending, closed, deadline])
+    if (exited || expired) return
+    child.postMessage(SIDECAR_STOP_COMMAND)
+    await Promise.race([closed, deadline])
   } finally { clearTimeout(timer) }
 }

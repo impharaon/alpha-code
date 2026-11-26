@@ -442,3 +442,22 @@ test("ambiguous exported option names preserve each source key and report the en
   expect(converted.package.options?.cc_langfuse_debug?.default).toBe(false)
   expect(converted.package.diagnostics).toContainEqual(expect.objectContaining({ field: "/userConfig", message: "Plugin option environment name is ambiguous: CLAUDE_PLUGIN_OPTION_CC_LANGFUSE_DEBUG" }))
 })
+
+test("standard hook sources retain command prompt scopes events and monitor triggers", async () => {
+  const convert = (await converter()).convertPluginTree
+  const learning = (await convert(await captureStandardFixture("claude:learning-output-style"))).package
+  expect(learning.entries.filter(entry => entry.kind === "hook")).toMatchObject([{ hook: { type: "command", event: "SessionStart", scope: { kind: "package" } } }])
+  const langfuse = (await convert(await captureStandardFixture("claude:langfuse-observability"))).package
+  expect(langfuse.entries.filter(entry => entry.kind === "hook").length).toBeGreaterThan(0)
+  const dash = (await convert(await captureStandardFixture("claude:dash0"))).package
+  expect(dash.entries.filter(entry => entry.kind === "hook")).toHaveLength(24)
+  expect(dash.diagnostics.filter(item => item.code === "unavailable-trigger").map(item => item.sourceName).sort()).toEqual(["CwdChanged", "PermissionDenied", "TaskCompleted", "TaskCreated", "TeammateIdle"])
+  const stripe = (await convert(await captureStandardFixture("claude:stripe"))).package
+  expect(stripe.entries.find(entry => entry.kind === "hook" && entry.hook.event === "PostToolBatch")).toMatchObject({ hook: { type: "command", command: ["node"], args: [expect.any(Array)] } })
+  const paypal = (await convert(await captureStandardFixture("claude:paypal"))).package
+  expect(paypal.entries.find(entry => entry.kind === "hook")).toMatchObject({ hook: { type: "prompt", event: "PreToolUse", matcher: "Write|Edit", continueOnBlock: false } })
+  const convex = (await convert(await captureStandardFixture("claude:convex"))).package
+  expect(convex.entries.filter(entry => entry.kind === "monitor")).toHaveLength(5)
+  expect(convex.entries.filter(entry => entry.kind === "monitor" && entry.when.kind === "skill" && entry.when.sourceName === "design")).toHaveLength(2)
+  expect(convex.entries.filter(entry => entry.kind === "monitor" && entry.when.kind === "skill" && entry.when.sourceName === "quickstart")).toHaveLength(3)
+})

@@ -1,7 +1,7 @@
 {
   "archive": {
     "path": "selection.tar.gz",
-    "sha256": "447244563d6602a164375a55c8ed5ef8c1b4666e08358103b4b402bb9e90e92f"
+    "sha256": "48b8e757268b2c88cb14492d9562c4b0dcd3ea0073d562af2b675bc21d2b59b0"
   },
   "samples": [
     {
@@ -6067,6 +6067,4013 @@
           "mode": 420,
           "bytes": 34818,
           "sha256": "ede72f73fbcb0f7f896afcd42d7fe17a9c67b2f680e815bb8c6f35181d1c751d"
+        }
+      ]
+    },
+    {
+      "name": "claude:code-modernization",
+      "root": "claude-code-modernization",
+      "repository": "https://github.com/anthropics/claude-plugins-official",
+      "commit": "0fbfda5a91f4adc311daca25acc99132f40f0b6e",
+      "pluginPath": "plugins/code-modernization",
+      "ecosystem": "claude",
+      "files": [
+        {
+          "path": ".claude-plugin/plugin.json",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 2830,
+          "sha256": "7f57026f2c30996f36b119cf00d867c831651e6b105e2cbd913f42c29af7a454"
+        },
+        {
+          "path": "CHANGELOG.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 2496,
+          "sha256": "b1d444c7e42ba61ecc9efe0fa13c1f26ad6bf3f2ba1b09a92ce31d087cf79db2"
+        },
+        {
+          "path": "LICENSE",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 11358,
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+        },
+        {
+          "path": "README.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 31473,
+          "sha256": "df7b81e5ac2b3c1a3fc6f5b3352657b87a9b541560743d0944413727e240b986"
+        },
+        {
+          "path": "agents/architecture-critic.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 3426,
+          "sha256": "c7cc2f35a4effc903a0a112b2f5523bb748d90f8c75ab83c9055339220620c7c"
+        },
+        {
+          "path": "agents/business-rules-extractor.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 3781,
+          "sha256": "77edbaced0c0c66a836c5313d1709ad993424fdc98f2c005be836607a07ff32f"
+        },
+        {
+          "path": "agents/legacy-analyst.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 3707,
+          "sha256": "b31ec09dfeb1ba12514979d982d26eff6adcd86e86ea3605eee33efc749acc4a"
+        },
+        {
+          "path": "agents/scaffolder.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 2282,
+          "sha256": "03ea117d753f6123508de838502dc67d52ce7c09d58818dfd0a1d5679caff9f6"
+        },
+        {
+          "path": "agents/security-auditor.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 4916,
+          "sha256": "0910739fa2df087ff5566ea1f34271f5fdd7569c16621ca14e01c1cca2c379d6"
+        },
+        {
+          "path": "agents/test-engineer.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 4691,
+          "sha256": "71e5fa3918ac2738836016e48d553828b5bd4f04b142e3a1d7e9bf277779b2cc"
+        },
+        {
+          "path": "agents/uplift-migrator.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 4889,
+          "sha256": "2d197f3dc8aa0fece5f1d15ee683b3db73c9b25cca9b2dcfb68877a084168011"
+        },
+        {
+          "path": "agents/version-delta-analyst.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 7823,
+          "sha256": "43ba0b04de9256aaf687d3854fb70c689a06018dfb316f40c29bfcd71f397334"
+        },
+        {
+          "path": "assets/media/pane-fleet.png",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 142422,
+          "sha256": "6fc91ab55c13af5bed4c312864b630d78dfd91bf9b021ae8049d4579a6a11f0e"
+        },
+        {
+          "path": "assets/media/pane-hidden-bar.png",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 10715,
+          "sha256": "710ae299969e70765222f81ee8fbf5f91c83341bd3b8a70981f254950af30bfb"
+        },
+        {
+          "path": "assets/media/pane-live.gif",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1404969,
+          "sha256": "9144a8f2930a1271af33c60339233e18f17d8ef000102313637cc1317ec3bfa4"
+        },
+        {
+          "path": "assets/media/pane-review-deck.png",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 133583,
+          "sha256": "2167258f7fc10a47085ac5d194ce74148744a0f98055050250cecb064be13eed"
+        },
+        {
+          "path": "assets/media/pane-rewrite-light.png",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 117894,
+          "sha256": "81ed1c3d4a7c9c189f7b2d8f2a033452c50d80a0cc364f176b97ac08cba1819c"
+        },
+        {
+          "path": "assets/media/pane-rewrite.png",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 124643,
+          "sha256": "1d8e642b296e156c7aaca9afcff6e68a0f2d7e41a5f94e2fbcb17dea2cf81aac"
+        },
+        {
+          "path": "assets/media/pane-sign.png",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 81833,
+          "sha256": "be519ebf34752fad8af8508df5e6f080490731951a3792e7521fbac562616b44"
+        },
+        {
+          "path": "assets/media/pane-uplift-light.png",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 269367,
+          "sha256": "61b486b94346d195162e0724f345630d5064afd2c3f88fdeff0c517d00e61f06"
+        },
+        {
+          "path": "assets/media/pane-uplift.png",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 289076,
+          "sha256": "3d0416795fcc671ba1279a7fc120f04c3195c3424e4882a5291c7b4e3b6d21b6"
+        },
+        {
+          "path": "assets/media/pane-xray.png",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 139746,
+          "sha256": "2d66476c5b569875bdd58e4db0ef45cc6aa41a397c69b8783e5559ca8a395194"
+        },
+        {
+          "path": "assets/media/report-caught.jpg",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 58194,
+          "sha256": "851935e81f1b2ada2b17aa2e7fb5bf3fa49aba4ed067d739fb4e935bbc98a750"
+        },
+        {
+          "path": "assets/media/report-glance.jpg",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 90208,
+          "sha256": "dcbb0350bfe406c09c66acb447039cb66890b735596b26f1e331e9c5e6c31adf"
+        },
+        {
+          "path": "assets/media/report-proof.jpg",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 140940,
+          "sha256": "e4e9c2251f1c3e29f3367765b7584675a2ddc5fccab0f635464ab919e86af102"
+        },
+        {
+          "path": "assets/report-template.html",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 50074,
+          "sha256": "6d19e82a969abffb1c74f7572da6db918aa4bdc94a3ec94c7bf2a70e9b5e2ced"
+        },
+        {
+          "path": "assets/topology-viewer-screenshot.jpg",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 228387,
+          "sha256": "2d08b465ccb3caa1366bd52fa7e4929cd3f88e7e173fc9df64d759d3598df028"
+        },
+        {
+          "path": "assets/topology-viewer.html",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 81400,
+          "sha256": "c6a49fca21e0a9c67471394bd5d3bebf7a1b4923d42342fc71da33f0b9064b98"
+        },
+        {
+          "path": "assets/vendor/LICENSE-mermaid.txt",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1746,
+          "sha256": "bcf76ea9df2a058c039327334d60778caca59da0d5aba6beb345dfd0afe370a6"
+        },
+        {
+          "path": "assets/vendor/mermaid.min.js",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 3572661,
+          "sha256": "581ed7d74bd9048d0e3a91363927d72ef22942d7722546b27f7cc29e35390eb8"
+        },
+        {
+          "path": "commands/modernize-assess.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 9021,
+          "sha256": "2366cb9f89bd4d62340a0eb29b988efb861d50d81021994c9b7b63b95662e559"
+        },
+        {
+          "path": "commands/modernize-brief.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 9191,
+          "sha256": "180a839596f9be714819de73d292764c76a687e8fa51f5b24af5135f713a148b"
+        },
+        {
+          "path": "commands/modernize-extract-rules.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 9419,
+          "sha256": "dfd10caadf2eeb70d2e5a15db657fe2505445aa91e6d8f54dc81b1c5bdeb3c09"
+        },
+        {
+          "path": "commands/modernize-harden.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 9007,
+          "sha256": "c295a7dee264f3780b22f9736f3164e8844670b15f1dc3005e19d8bbbc02ac2c"
+        },
+        {
+          "path": "commands/modernize-map.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 10860,
+          "sha256": "f5c3225ac22896037bdb9f432fd913b0153a01fd1dc79e966850e25c883964db"
+        },
+        {
+          "path": "commands/modernize-preflight.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 13286,
+          "sha256": "ee7a2759aa0c926d7c9c3ba5e99a32c4dabb0da7c75f6095e40f2fb1abe85f19"
+        },
+        {
+          "path": "commands/modernize-reimagine.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 8120,
+          "sha256": "4392ddefd8cef3d5de568eb7a55184e9bb32e15e2742c15bf28b00f3c04c9924"
+        },
+        {
+          "path": "commands/modernize-review.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 3534,
+          "sha256": "d3937ae491750b709b2b5a95cfbeb74597095471f5b9641aa35eb740e9837b1b"
+        },
+        {
+          "path": "commands/modernize-status.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 4159,
+          "sha256": "a02e8c834e2050b45339668c9810505b3a6252463c9dc352b0ef3c665e98c480"
+        },
+        {
+          "path": "commands/modernize-transform.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 9126,
+          "sha256": "883512f95312264a36f0e8641101a2b4b67cf3319f08a2a26a28d9d48f3bea02"
+        },
+        {
+          "path": "commands/modernize-uplift.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 20607,
+          "sha256": "ca7ad8dcc25e1e4804124ce4739a692cec6f4e42cebf229fd53d1cb6c310a2e6"
+        },
+        {
+          "path": "commands/modernize-verify.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 13944,
+          "sha256": "b2c5f4701ed91cc6ca0477400435232e5362636f7d8712ca26f4dd14cafa61ae"
+        },
+        {
+          "path": "commands/modernize.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 4738,
+          "sha256": "d43e2e1600ddd91a5f1fc6b9d81689c1ba152ac7e7392b5e900792c61e48b3e0"
+        },
+        {
+          "path": "hooks/README.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 15546,
+          "sha256": "2cf39eec32a2284a38f6f9ee7ad7c2b2d1ee3d89651d7f83ac15965f22cb5091"
+        },
+        {
+          "path": "hooks/fleet/fleet.ts",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 11222,
+          "sha256": "8ef46bbd24fd8e5ce691a306625b72d58f7c6d1ba7b6a302768d8068279e73fd"
+        },
+        {
+          "path": "hooks/hooks.json",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1801,
+          "sha256": "3d7344c1c0a8a3f54001cf5d48dd9158d5b6a77c00f2d2f3f9d9a402c0fa2a21"
+        },
+        {
+          "path": "hooks/host.ts",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1570,
+          "sha256": "0e09a2002e8f7916c79507f42c057972f0c696ea8c6d8f6de2ba61bc4e0aef42"
+        },
+        {
+          "path": "hooks/map/estate.ts",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 9204,
+          "sha256": "3974f2825d405c1a9ff880748f538ff8de6541489e01e57fe5b4cfaf325102f1"
+        },
+        {
+          "path": "hooks/map/raster.ts",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 3211,
+          "sha256": "cc46052d8c203d3f2eb910547922468cfbce70c0c453713b33319d784e312506"
+        },
+        {
+          "path": "hooks/map/treemap.ts",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 4808,
+          "sha256": "3cf3e3f4130464af66edeac5b0e5afbf8f62c7b232e42d31e5b7a62d7e00c978"
+        },
+        {
+          "path": "hooks/paths.ts",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 2586,
+          "sha256": "ff62837865ed2d242d6a59272c07872accb26e6bcd70156f2416ae8435c42e08"
+        },
+        {
+          "path": "hooks/reader/brief.ts",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 6632,
+          "sha256": "fd61df3c19f91c6026cddc8b4987cb79b7f654aec793ec48f6ca21f059f99196"
+        },
+        {
+          "path": "hooks/reader/discover.ts",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 11057,
+          "sha256": "f7f83831b56dc0cb89ffd7aee47b351344e39d1ce7c944f08e8ae10231444dce"
+        },
+        {
+          "path": "hooks/reader/estate-model.ts",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 8508,
+          "sha256": "7bb0ecf41b926b517dd75757a47320e151be5347dddf0fa749584462ddd5d182"
+        },
+        {
+          "path": "hooks/reader/fs.ts",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 2409,
+          "sha256": "909e69768ed80c67f1f60b6873f62f695ec7252815690271bebc826e2f707ac1"
+        },
+        {
+          "path": "hooks/reader/modernized.ts",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 12974,
+          "sha256": "fa8e68f0ab05a58559e467d5300d0a64943787acef7310ef5015797812784f57"
+        },
+        {
+          "path": "hooks/reader/progress.ts",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 36077,
+          "sha256": "27c209ec2be75a65f9dbee0ea4f4bdfb426c17b5fb97831580d36e9305e57235"
+        },
+        {
+          "path": "hooks/reader/rules.ts",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 13147,
+          "sha256": "06982413681c05ff87fc997919a2a15b01969edfdeee9ae1f3d6d1b82101b064"
+        },
+        {
+          "path": "hooks/reader/topology.ts",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 5935,
+          "sha256": "4ea90c6191a45b1f1044a112e388de34856630084467f7351191c04687e42bb2"
+        },
+        {
+          "path": "hooks/reader/tracks.ts",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 2865,
+          "sha256": "28951287bd22498c720c57a30feb7f5e0b5e027eafcc4238fc22f980d4f0aad7"
+        },
+        {
+          "path": "hooks/reader/uplift.ts",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 9486,
+          "sha256": "ec2f5c34ac29906283490fcf346222caa87551a6e95c778fb494e7662b497354"
+        },
+        {
+          "path": "hooks/reader/verification.ts",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 6477,
+          "sha256": "b5c1c676c53145c14bc1acf0f795c0bda174d4d703e2bf2512092cd5c760af77"
+        },
+        {
+          "path": "hooks/register.ts",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 42850,
+          "sha256": "af7734710b221936f29ac5144a3d6ea8bb510886d430a1baeb711b930711d42f"
+        },
+        {
+          "path": "hooks/review/deck.ts",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 5073,
+          "sha256": "5f4bf36f5e0cd4dc19dc0abbc52cd0e680961ff4a1777b3078b909ea581764bb"
+        },
+        {
+          "path": "hooks/review/ledger.ts",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 2973,
+          "sha256": "92eb785e5447eef1c4ac2de4bd3039f5f4c8d09436f0376582d2f0ce4d534fef"
+        },
+        {
+          "path": "hooks/sign.ts",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 2490,
+          "sha256": "6ebae5215d894ccbf62c6a185c2a1dbba5b6bc6744d40cd95c20ceeff7f25bbf"
+        },
+        {
+          "path": "hooks/state.ts",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 5423,
+          "sha256": "ad35d8e9a1a1f355ca40898fda8b31400433bf3e13fbaec7d7fe12d5c4843c3d"
+        },
+        {
+          "path": "hooks/tests-run.ts",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 3703,
+          "sha256": "bc220e03b6db9727dc53df55fd6508d0457767ec83eb523f15ec8b95e5248027"
+        },
+        {
+          "path": "hooks/text.ts",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 2121,
+          "sha256": "675bcb3d7b14b959cd9a12872fddc5ed49b42f91134ca28586506da6f50d754f"
+        },
+        {
+          "path": "hooks/views/deck.tsx",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 11738,
+          "sha256": "093d68f013bc7634aeae516bafbb2043f39b514b6de77a34196ebb01702afd56"
+        },
+        {
+          "path": "hooks/views/palette.ts",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 551,
+          "sha256": "f1dedffe84d7fd654d10e5fa7981e3760e8d5d945b14e79ebe92396523efe93b"
+        },
+        {
+          "path": "hooks/views/pane.tsx",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 26900,
+          "sha256": "bb94d81a1e9d5fde72d57e27311156bca4e68680d708d65268fac68879893cc1"
+        },
+        {
+          "path": "hooks/xray/xray.ts",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 10431,
+          "sha256": "db93bfef36f981782eec156475bc9f3c4fc8c93d9afa58b01c8cd53bd9e43804"
+        },
+        {
+          "path": "references/target-versions.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 3244,
+          "sha256": "d71ff94c6a0fb17dd5038108344b49e69e5996b300482f1e2cc4771343652ba8"
+        },
+        {
+          "path": "scripts/baseline_diff.py",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 44527,
+          "sha256": "2d6da7d273b635ddafa1e06bfc936c1e539a565fc013bf3e6693176e94477352"
+        },
+        {
+          "path": "scripts/build_report.py",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 45739,
+          "sha256": "769bbaccf3fc324bcc83c7d355de151978dba1dd59955eebead033e7726a8fd6"
+        },
+        {
+          "path": "scripts/compare.py",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 23095,
+          "sha256": "42da2625792868cc2f22df05bd6d26f05c7f6144159556ea41f5e2f41f1584fb"
+        },
+        {
+          "path": "scripts/make_shards.py",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 12468,
+          "sha256": "1462f990eab2e3f27f3ad7eb153392a8fa0669ec3a3fab74d28c6c4c3a842f2b"
+        },
+        {
+          "path": "scripts/proof_pack.py",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 73244,
+          "sha256": "c9657da61aad8c26407ef0ac6d3a31d4a7c3bdd831de4e1b784b5273d2c9c9b4"
+        },
+        {
+          "path": "scripts/render_rules.py",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 10121,
+          "sha256": "795dbe4e0ee891e5036c0253c963cd226fc61df9655373defd3dbd2aaf34d4c2"
+        },
+        {
+          "path": "scripts/telemetry.py",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 36866,
+          "sha256": "98db7a1ae057aaa21470ce2d494cb900c3ec98da298b070606036a1e979b2d10"
+        },
+        {
+          "path": "scripts/telemetry.sh",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 6031,
+          "sha256": "59c98c30658bafd2e4701f5851566daa8fcfd951d0189de7c7a88fcdc1ed1b6c"
+        },
+        {
+          "path": "scripts/tests/test_compare_tolerance.py",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 9072,
+          "sha256": "4e1c222c35b4614e1025cb0048e11e3125f08b62c8bd4f10a050d2f1a1f91bf9"
+        },
+        {
+          "path": "scripts/tests/test_proof_rules_run.py",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 35902,
+          "sha256": "998531dfd33ac03e871544f3c3c9abe3ea462d8ef553c507df631efa9f0d9bd8"
+        },
+        {
+          "path": "scripts/tests/test_proof_tools.py",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 135116,
+          "sha256": "a59ba5c872a9eb599f214a0bec3e84e604835e962d84c5d40f905d5cbb3f7aa0"
+        },
+        {
+          "path": "scripts/tests/test_report_next.py",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1982,
+          "sha256": "8b1b1e99ee1eaa9d6ec415cd2aa82bff88b326bb94c1a1bc6807f3372019b0d6"
+        },
+        {
+          "path": "scripts/tests/test_report_tools.py",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 45754,
+          "sha256": "54a93ac5a9d532c8f7de85cf48aafde396897eaa17a75605efb6b20727970823"
+        },
+        {
+          "path": "scripts/tests/test_rules_tools.py",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 12227,
+          "sha256": "9abf8bf17571a12fdd57df689f15b17e70253b4f73d1c1cdbd6bd6bc5932e015"
+        },
+        {
+          "path": "scripts/tests/test_telemetry.py",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 48629,
+          "sha256": "b32eba22bcf8ab81a0ef67d3847809f056d72f00d765a731661221e8c8d55bc1"
+        },
+        {
+          "path": "scripts/trace_rules.py",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 28638,
+          "sha256": "b2f81564351f3701855f367dc70a1299621bf516efefdef4f4b41d085ac3904b"
+        },
+        {
+          "path": "scripts/uplift_checks.py",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 19104,
+          "sha256": "9ce3103bc8040afc5e25e55cccc925c74959131cfcde02eeaa34f114193f7171"
+        },
+        {
+          "path": "tests/fixtures/inputs.ts",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1538,
+          "sha256": "14fd5d8aef9030d8b6893bdef25ce2967616ac0cf969ad386ea80198188c2fb6"
+        },
+        {
+          "path": "tests/fixtures/stacks.ts",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 9128,
+          "sha256": "78bb08913c7c193265f7d911b15d40f28b2ab76d2f5e005e4fb5197f0232711f"
+        },
+        {
+          "path": "tests/fixtures/workspace.ts",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 9627,
+          "sha256": "3c05e33a053e392e7720fc71eb5eeedeac8e6bd392e4b71ed57b9ecfbbb1838c"
+        },
+        {
+          "path": "tests/fixtures/world.ts",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 7909,
+          "sha256": "0a4ab1d131285208023ed2cafa1c569c2cca3a9f2942ff7fc43a9c6fb2ad080d"
+        },
+        {
+          "path": "tests/hostile.test.ts",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 3717,
+          "sha256": "f49fe5a330e6e670bacf3c4483b4ab5095ec6d7367d96d5703153cdc4b032c21"
+        },
+        {
+          "path": "tests/logic.test.ts",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 35000,
+          "sha256": "75ae5d8ccd10176fcdf28779d87f09ef73de9ee8a35a97e371c76a4d893c910f"
+        },
+        {
+          "path": "tests/mount.test.ts",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 3868,
+          "sha256": "c1c5fef9e951a624242d4141645def863837f0980d6acbdae2e20e60c5681999"
+        },
+        {
+          "path": "tests/register.test.ts",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 27343,
+          "sha256": "3059c5ec55a4775251a8691b621979bdb07840b9bce3dbc49cebcc78c4b9fc1f"
+        },
+        {
+          "path": "tests/stacks.test.ts",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 28042,
+          "sha256": "0c49b8d713fc3d23528e7e42aa9b9f06414164edb33b224f7c8a3c714023db8c"
+        },
+        {
+          "path": "tests/verification.test.ts",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 20489,
+          "sha256": "75beaa9ffe19ce9fd0a14e04a517fd8ebd0711867b78811448de92118bbaed63"
+        },
+        {
+          "path": "tsconfig.json",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 360,
+          "sha256": "59e257d023b0b587744190a5e4744fc203451e092cd49f4e03c8b4dc80bbcab5"
+        },
+        {
+          "path": "workflows/extract-rules.js",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 48621,
+          "sha256": "408951e41ff645c5ee272d089455f37d15b52cb8f6d94bb370e86d7ad5cf6ca2"
+        },
+        {
+          "path": "workflows/harden-scan.js",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 14786,
+          "sha256": "9cc9ee7ee760b413375304fd65142c274c78396bda9fefa93175bfde2e57aa4b"
+        },
+        {
+          "path": "workflows/portfolio-assess.js",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 6516,
+          "sha256": "a44263224ca1097fd4950b015ccacf645a041d4ab5cea1e7348db248e7cca646"
+        },
+        {
+          "path": "workflows/reimagine-scaffold.js",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 5565,
+          "sha256": "4c7383eac7ab4bf602e59cd099ff743f6944748296f1556d5eb6464e164714c1"
+        },
+        {
+          "path": "workflows/uplift-deltas.js",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 15111,
+          "sha256": "723adcd10f17c1ba936deba4cd859ef18a574224e4d652a305167132367be8b5"
+        },
+        {
+          "path": "workflows/uplift-migrate.js",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 22618,
+          "sha256": "b6bcd4e9bc56a6deb633c1004c35761a39293cbc290066f11e52992249394a22"
+        }
+      ]
+    },
+    {
+      "name": "claude:convex",
+      "root": "claude-convex",
+      "repository": "https://github.com/get-convex/convex-backend-skill",
+      "commit": "6ca54f6e2e7582812187b8a5a4783fb4dff52692",
+      "pluginPath": "",
+      "ecosystem": "claude",
+      "files": [
+        {
+          "path": ".claude-plugin/marketplace.json",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1201,
+          "sha256": "27f6a377b6bb205093c933d7b049cf2ee9538b41db4b4786dc3aec08a328d0ee"
+        },
+        {
+          "path": ".claude-plugin/plugin.json",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1405,
+          "sha256": "c946d958a8a0322f25284daeb7fae8320ed8e2f98de9fb5deb298aaacc685fd3"
+        },
+        {
+          "path": ".github/workflows/validate.yml",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1184,
+          "sha256": "e475e335302e7b7bb34b1479b97149305576a42c99dcf75e5109d968f9c880ae"
+        },
+        {
+          "path": ".mcp.json",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 126,
+          "sha256": "ec96ee98acca29c3258649c420e581759191839e2e8b2929f3c9e35c768c3ac2"
+        },
+        {
+          "path": "README.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 9136,
+          "sha256": "fc0621a17005d21bc5b48dcdb95b91b0219b2013664d59b2670cafc0cedd37d0"
+        },
+        {
+          "path": "agents/convex-expert.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 34388,
+          "sha256": "2252802afee88db8c82f76e3bcac911f1b3ce52694c8db01b1db78f88da67318"
+        },
+        {
+          "path": "agents/convex-reviewer.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 6387,
+          "sha256": "f3fa5672d51e297962a4aae4e65e155d73ba5ee260cc90da6661d241e3076bed"
+        },
+        {
+          "path": "commands/quickstart.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1081,
+          "sha256": "35ef4cd352988a913a4af39956fe71e21ca78a413fb69bfcdbce0fd8080ba21b"
+        },
+        {
+          "path": "hooks/analytics.mjs",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 6961,
+          "sha256": "b19a4a30291909dd43dd3ae64d7d5f242be51a3b499db58d29780ec95d9395f3"
+        },
+        {
+          "path": "hooks/convex-freshness.mjs",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 4365,
+          "sha256": "095123d53d7a8ab34a643b4e411731bd0f436995e28734e26a98b73e68321ee9"
+        },
+        {
+          "path": "hooks/convex-lint.mjs",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 65182,
+          "sha256": "b1d8ea04c2565290d2d25903c42700e728ef452fc651a76870367b77d512bcb6"
+        },
+        {
+          "path": "hooks/convex-lint.test.mjs",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 47095,
+          "sha256": "3be4537cac483306be7fd6ad3ebbed3136ca5a4db266dcd500030c10d86b9e9c"
+        },
+        {
+          "path": "hooks/convex-typecheck.mjs",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 10202,
+          "sha256": "a6e6ffeceab6fba622a0cb30d7713bc700363b06af96db52dcb3c7f253d752c3"
+        },
+        {
+          "path": "hooks/convex-typecheck.test.mjs",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 13697,
+          "sha256": "254228b0eb4a28b0b0e44bfee144638325a25f29a36bc76e0a770d8236485205"
+        },
+        {
+          "path": "hooks/hooks.json",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 875,
+          "sha256": "c99e2d9a8b52620b1513ef36949d1c63c0a734d498fb6c93a4cc3ec190fb893b"
+        },
+        {
+          "path": "hooks/session-start.mjs",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1967,
+          "sha256": "34b23eca7303a4119d6999cc63d35dc7e2655c86de26d621f38da744124b876e"
+        },
+        {
+          "path": "hooks/session-start.test.mjs",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 7578,
+          "sha256": "0e98b3a6256fada3cd3eafa09415542d6689214bb162b57bbb6130c7640f3cd6"
+        },
+        {
+          "path": "monitors/monitors.json",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 11161,
+          "sha256": "4d8486ddac0815c3c8c184ebdccce9a02fd72df8b2e24bdbf7f0f1c9b5b013bd"
+        },
+        {
+          "path": "skills/add/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 3848,
+          "sha256": "029a0d39e09be7f4550996fecaaae19f48b20227cf62e92b1542d1e8e83faa91"
+        },
+        {
+          "path": "skills/agent/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1834,
+          "sha256": "3efa7c2cc62d19c56fa4350ddf7c2590836aa608235f7fe16d29edb460cfc02c"
+        },
+        {
+          "path": "skills/auth/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 3057,
+          "sha256": "0086a9d6f4e2fbd1eab22413d9b99463b22f93fbf1b236b917d1effc410184b4"
+        },
+        {
+          "path": "skills/billing/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 4046,
+          "sha256": "dd100b610b077a8595e2c64ff14d3136f45d67a39555b7ba5cc54aaa28e8f7ba"
+        },
+        {
+          "path": "skills/convex-authz/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 9155,
+          "sha256": "ec017427739a958b7577bfde7b97e33b8e99a64f441f0f7ba7f2079b9e007a3f"
+        },
+        {
+          "path": "skills/crons/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 833,
+          "sha256": "d152a0e5e2d9e96f4298f6eb08551309d1f577261e556ed4026ae0d08164a954"
+        },
+        {
+          "path": "skills/design/LICENSE.txt",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 11343,
+          "sha256": "79aaec53ef1333544088fe80ecb8ec70f2b84f60c0c4157240df0911cf9696c7"
+        },
+        {
+          "path": "skills/design/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 52895,
+          "sha256": "7b287be123aa10096f4449b63b473b9c10a7b23b593117cb72d36698c5e68c62"
+        },
+        {
+          "path": "skills/domains/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1737,
+          "sha256": "18b053c9069e79d287c9a4a58df993351cfd561ef8efe34765a2ca4913a8ce27"
+        },
+        {
+          "path": "skills/env/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 844,
+          "sha256": "9480271a69aab3bbe330e38af0a3bafd7f0e1f6825163d2bacb3910c76cee980"
+        },
+        {
+          "path": "skills/improve-convex-plugin/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 3686,
+          "sha256": "ccbc1ccbc1988ce7ca0592ed6cb288aef6fc95bd761c65cee913080ab1f5114c"
+        },
+        {
+          "path": "skills/labs-quickstart/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 18081,
+          "sha256": "23332ce7c6d3462ee487eb5c2796374d0a4aeb7cb4c61a0c9444baf4fa7433f3"
+        },
+        {
+          "path": "skills/migrate/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1062,
+          "sha256": "fe502b63e902be29b565be568b7577f23de6035a4a9e51158b2cfe7bb7696753"
+        },
+        {
+          "path": "skills/quickstart/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 13072,
+          "sha256": "ffdf43071a8a1c47ce1d8aa990567782713e52a1aa14d44b6de21af6ee60ea3c"
+        },
+        {
+          "path": "skills/seed/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 819,
+          "sha256": "21f690bbc22b7ee0d511cec73552362cb44209d0bb5720641a58c6f25b79bd8a"
+        },
+        {
+          "path": "skills/suggest/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 2663,
+          "sha256": "3c7dffe23fb8ba140f69bd03e3b8e97ed1912813a9cbbe08a2a5f43cf9b4336e"
+        },
+        {
+          "path": "skills/test/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 843,
+          "sha256": "82ac0dd31c3d82822f28f4932edfe226a9044488415383702871893e947279c0"
+        },
+        {
+          "path": "skills/workflow/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 3888,
+          "sha256": "0bb64f6934a4b072635135ba7763f4e095624e6816386176eb9c74e0715f9206"
+        }
+      ]
+    },
+    {
+      "name": "claude:dash0",
+      "root": "claude-dash0",
+      "repository": "https://github.com/dash0hq/dash0-agent-plugin",
+      "commit": "72a84179e6c64871ad5b6fceb09e00f502de415a",
+      "pluginPath": "",
+      "ecosystem": "claude",
+      "files": [
+        {
+          "path": ".agents/plugins/marketplace.json",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 312,
+          "sha256": "663476b2720381d3776ba4e11e37d0dc6a0a13cadd2ef5d9894934bf793b63e0"
+        },
+        {
+          "path": ".agents/resume",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 159,
+          "sha256": "9631817bf520cf0bc12c022a75daa5d4d1131342b9871aef6895cfd958d872e4"
+        },
+        {
+          "path": ".agents/setup",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 6333,
+          "sha256": "db7bd7467516cfc74d9c6b7d00b6d994e9046762b36a076ae33b8f7869dcdefb"
+        },
+        {
+          "path": ".aikido",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 255,
+          "sha256": "5279249531c29752e1eff7923044578348b95717091f49436ed134131277d04d"
+        },
+        {
+          "path": ".claude/skills/copilot-local-dev/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 4086,
+          "sha256": "1996e487c7e3dd035ba75878890214985777f33eb4276510ec8cc313d588f83e"
+        },
+        {
+          "path": ".claude/skills/copilot-local-dev/setup.sh",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 6874,
+          "sha256": "3b5acbfb0495e010847a497e451e67734c0e226f3266e951f6986a825c7361a7"
+        },
+        {
+          "path": ".claude/skills/copilot-local-dev/teardown.sh",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1094,
+          "sha256": "ba351e3163744ce1195a1c89fe775a924fa9c61b875c122cbc84c5929c820c68"
+        },
+        {
+          "path": ".claude-plugin/README.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 22535,
+          "sha256": "f6419651cb412b38c9ce38fa3dc536538ef59b67d3e27d7d5cb6c633dffa29ca"
+        },
+        {
+          "path": ".claude-plugin/plugin.json",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 3286,
+          "sha256": "a6841af834bafcf206e135588aeaf851e9776e3a67d3f3a0e0f45ab9f3074688"
+        },
+        {
+          "path": ".codex-plugin/README.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 11802,
+          "sha256": "afb0cbd7706c60ac6ef7e79a77618801d98239987ed9bbe13d162a4ba52afea2"
+        },
+        {
+          "path": ".codex-plugin/plugin.json",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1174,
+          "sha256": "651fc6a74ec2b625b3c62f9d43753747c9ebf0aff548c79a85be4ae43edaaf2d"
+        },
+        {
+          "path": ".cursor-plugin/README.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 11982,
+          "sha256": "18c0d137a1030cb1b58697d1751fe039bfa0a1f5645cb2ad7533ba001ebcc0ce"
+        },
+        {
+          "path": ".cursor-plugin/plugin.json",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 500,
+          "sha256": "d8533bbb97a9d1b5d12f4b8d224cc8a281d0d2cb7e20955f0017ba3975cb0d2d"
+        },
+        {
+          "path": ".dockerignore",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 451,
+          "sha256": "2bfccd1982122d68fc14d2c08d88552881a2e31818d05bd5bb7f422f8f55eb16"
+        },
+        {
+          "path": ".editorconfig",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 260,
+          "sha256": "ae0017a6b22123cebed4cd598ca91ff95cc9baa5577006e201ffe3784528396a"
+        },
+        {
+          "path": ".gitattributes",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 806,
+          "sha256": "0137ef03a311f33d5f45aa83f2bbe83a78ffb6718bc4b3f6c05687158b43dd97"
+        },
+        {
+          "path": ".github/dependabot.yml",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 433,
+          "sha256": "191c9e69a3c0c0942f8d46565f5d8f22849c37b070c5af9f5917366d591cc660"
+        },
+        {
+          "path": ".github/plugin/README.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 10597,
+          "sha256": "7ce5c516ab14d8e444712274d9b033bf20eea7315ee03db68fc9160306783ac8"
+        },
+        {
+          "path": ".github/plugin/marketplace.json",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 505,
+          "sha256": "dba419734c69c725618aa29b3ee2da1ef50042be2111d01def596c8cea9c306d"
+        },
+        {
+          "path": ".github/workflows/ci.yml",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 22872,
+          "sha256": "f1373fd6565a3fb66e6110adc3a2d72e3da9052f44b31b496f5ac5a22dc5b98c"
+        },
+        {
+          "path": ".github/workflows/cla.yml",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 550,
+          "sha256": "c50d4be5e8eadb6d51808dc7cff1bb78acc7ef29cb38dbbc99ac69f0097d363e"
+        },
+        {
+          "path": ".github/workflows/release.yml",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 22224,
+          "sha256": "bc3eb8b3e6d67196d621154651896bacf63fa8f35c88864a06ff2a89c05cb22f"
+        },
+        {
+          "path": ".gitignore",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 224,
+          "sha256": "df3f1f9d9efb443bc931707f450a8ef28f729eec2a32546050c43d53142e428a"
+        },
+        {
+          "path": ".golangci.yml",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 723,
+          "sha256": "b98a63a71a015de5065355998f58c8ee2b74be8f4d8caa84050cb0044c30b43c"
+        },
+        {
+          "path": ".goreleaser.yaml",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 3484,
+          "sha256": "3680ad371b8c40b39a36ec0893c2e6729a3dad417840eb3de6ba57cc0e4fc240"
+        },
+        {
+          "path": "CODEOWNERS",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 38,
+          "sha256": "bdabf9b6cc4ded3129910d1e89a3b48b84ac6241bdd6baf7c07317d983517b27"
+        },
+        {
+          "path": "DEVELOPMENT.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 30761,
+          "sha256": "577e4287d1f1ba5e0e622c58ea61ffe43d22db29349b062ca9169cb959051153"
+        },
+        {
+          "path": "FEATURE_MATRIX.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 14562,
+          "sha256": "cee1de9df4909d9754ed9dc656f6764bcdedc04a853efb052b03c1bc3c4e02b6"
+        },
+        {
+          "path": "LICENSE",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 11358,
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+        },
+        {
+          "path": "Makefile",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 4347,
+          "sha256": "b4c88511abe8b7952aaf01784ef2f046b211e912859259eb558fb5ac0a4acaaa"
+        },
+        {
+          "path": "README.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 3412,
+          "sha256": "4861aa9aacf24fcfa64253e4a2d72383781a352409420c51f193a302bd1f127d"
+        },
+        {
+          "path": "SECURITY.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1514,
+          "sha256": "e9317e53a47fff8d75a6d12d09532d25843fc1a056e03a8790531f4d971b856a"
+        },
+        {
+          "path": "claude/README.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 3330,
+          "sha256": "dacaad95ce3a5cff2404150900d92f943f90e55d506e4f4401feedd96da8cb44"
+        },
+        {
+          "path": "claude/claude-on-event.sh",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 8725,
+          "sha256": "805bbd9a73317eef00dfc5cadd759f5c9634ecc2c979c2fa4403ba9213537efb"
+        },
+        {
+          "path": "claude/commands/audit-usage.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1740,
+          "sha256": "ec55df80b6d927859826d017ea26a9b8bf9a21b70aa7229b24f960d995e9df2f"
+        },
+        {
+          "path": "claude/commands/open-session.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 626,
+          "sha256": "6cb4a0c0bfbdf199e0a50f9f0c6751e7608228be570f4fd597a6344966218b00"
+        },
+        {
+          "path": "claude/hooks.json",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 4878,
+          "sha256": "99b8e7fc08520093377283e9d45f9c23c62c2d8d7670a9ef1fd3892d0af56b8b"
+        },
+        {
+          "path": "claude/skills/dash0-configure/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 8047,
+          "sha256": "68cd68de446d6dd76d23f4b1ea0500bde2a1fa3594050cc4f66c289db177defc"
+        },
+        {
+          "path": "claude/tools/claude-code-usage-audit.py",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 16199,
+          "sha256": "6d7511d78961bb140dd6287163c648ef5c116398f0c34c272589e4b6e133b49f"
+        },
+        {
+          "path": "claude/tools/claude_code_usage_audit_test.py",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 7881,
+          "sha256": "be4e0e5818f56ac8a72559c4329bde286fc14580773683cffec2c4308ff1f4e1"
+        },
+        {
+          "path": "cmd/claude-on-event/integration_test.go",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 13410,
+          "sha256": "e7abd8886316461f48df7e62fc987045efc440ca35e8d65d47fd0513489bfd74"
+        },
+        {
+          "path": "cmd/claude-on-event/main.go",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 5722,
+          "sha256": "ebb595c07444fc6c9c0dec4bf5e6139d43da968628a97db62ab0951c173f2b82"
+        },
+        {
+          "path": "cmd/claude-on-event/main_test.go",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 52787,
+          "sha256": "2f1a66f4ba83b7828befd9418fdb6f85ac5fc3e27011854ce91b6fb0e13f9fc8"
+        },
+        {
+          "path": "cmd/codex-on-event/main.go",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 4971,
+          "sha256": "dced1baf3214f2912cf9060d3d37c740a46c0fee85b5424d150997e64a2a4fbc"
+        },
+        {
+          "path": "cmd/copilot-on-event/main.go",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 14233,
+          "sha256": "054d8476e08a8ffc36a9ca23261ddd3b8142375f547e35da591c14e00592f8e8"
+        },
+        {
+          "path": "cmd/cursor-on-event/main.go",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 2725,
+          "sha256": "2465744b51e98d19410c9d38b626b7700a9f637fa0f508b7d56e522ed40825c9"
+        },
+        {
+          "path": "cmd/demo/lambda.go",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 2716,
+          "sha256": "1858679a03e961952d90c14da33ffda93783442716d3bd8d7afe6b5f0a91fcae"
+        },
+        {
+          "path": "cmd/demo/main.go",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 2392,
+          "sha256": "ee182638d1093133d56f9d2a849cf7227ca1f3621bd48b3cda8e5b126a4a7f29"
+        },
+        {
+          "path": "codex/README.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 2998,
+          "sha256": "1f43134e7a5d9135e506e3ba5f4101c1bc078dcdea411b2f13f3481a3d978367"
+        },
+        {
+          "path": "codex/codex-on-event.ps1",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 8421,
+          "sha256": "4099cedaaa65059ddeae62e667eb7f494f9fba6cd09e10ce55a6216f2c136420"
+        },
+        {
+          "path": "codex/codex-on-event.sh",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 7190,
+          "sha256": "51ea3b0cd6117d968da4ffbe4fbcee589db08c41afba3ff89b1f2ef43e70d4d8"
+        },
+        {
+          "path": "codex/hooks.json",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 3428,
+          "sha256": "401eac4f0cfe8b4b7963c159d70a71d9ce40fc940f38413d6c15e9c1f07b97ee"
+        },
+        {
+          "path": "copilot/README.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 8961,
+          "sha256": "d2e5ebd6ebb8029f32115c7cea65dda4496a4411c82342d3ace23b090d25a930"
+        },
+        {
+          "path": "copilot/copilot-on-event.ps1",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 8436,
+          "sha256": "76f1e3ea9d05dccc7445993dd446035b2c2904a771b316a976218a0a1f39b3b6"
+        },
+        {
+          "path": "copilot/copilot-on-event.sh",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 7213,
+          "sha256": "16348abec3717934e2f2df2a7f1522ddb16e27c31239897f2c9f5cc77474686c"
+        },
+        {
+          "path": "copilot/hooks.json",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 930,
+          "sha256": "e0ac3cf153f2f92839c08b7ffab483f193b652305e531a81b3d71a5927875d9b"
+        },
+        {
+          "path": "copilot/plugin.json",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 603,
+          "sha256": "43fe266e3cceab0cfd84e11a8dfe2d16926ae16595ce02dbade758391a17f416"
+        },
+        {
+          "path": "copilot/skills/dash0-configure/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 14352,
+          "sha256": "8423a1b95fd3d5b8878e9d655f46788b3a7346ec2fbf2258a4c3c88ab67d51ec"
+        },
+        {
+          "path": "cursor/README.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 7034,
+          "sha256": "a26a78caaec6020a684afb1e124703d3547e741885e3972ac5bfee17d73bd0d9"
+        },
+        {
+          "path": "cursor/cursor-on-event.ps1",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 8282,
+          "sha256": "5e02675eeb43454728f3183aae530927f78e020e068ab4704f32833a1c397440"
+        },
+        {
+          "path": "cursor/cursor-on-event.sh",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 6877,
+          "sha256": "b5fd54a5eadc403902d5bf4fddac2732071b76109b1827466c03b0f583d7dbb9"
+        },
+        {
+          "path": "cursor/hooks.json",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 684,
+          "sha256": "dc0c045c8cc3a65db439f7a1bc112db932319d25878ca0cac086d204b3e709b0"
+        },
+        {
+          "path": "cursor/skills/dash0-configure/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 6628,
+          "sha256": "5eccf3bcff5d6a2aa13990ac61958e24af43441d86f1dead4c6ba2e1b6719219"
+        },
+        {
+          "path": "go.mod",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 178,
+          "sha256": "3f2ca977fad55e8c5b52347a14cd25542c8acbfa8c13f5f6913aeaa7aee18a4f"
+        },
+        {
+          "path": "go.sum",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 690,
+          "sha256": "4746839b446db9056ddae0b2c697b6881ef4f90392e5be28cafc31fba0187c0e"
+        },
+        {
+          "path": "install-codex.ps1",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 26230,
+          "sha256": "b779f247823014b0cf8ed7d65fe3e91472e397c0bca7d0c5fa3e8f182bde59a3"
+        },
+        {
+          "path": "install-codex.sh",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 14240,
+          "sha256": "df31b2288b7e56454486757c330526397cb0d85e3416248785686c03b320b941"
+        },
+        {
+          "path": "install-cursor.ps1",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 23774,
+          "sha256": "a9e0b778ab41235b887e9bd474efbd48b21eee7acc32463f537074f7445f5cdd"
+        },
+        {
+          "path": "install-cursor.sh",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 18589,
+          "sha256": "cb23a32d94588120e7e0b83850df9cf359f27fd3e188fe0c85dbdf1b11a75aed"
+        },
+        {
+          "path": "internal/config/config.go",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 3613,
+          "sha256": "e0f7f9abc9472feedf7bf3f3551deb0767332f4a7d4a8dbf8a31c4bbd486d691"
+        },
+        {
+          "path": "internal/config/config_test.go",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 4026,
+          "sha256": "40f0b84948ddbb5f10ee329590359cc5735eb53f6aa66fd5f78ba89d07d86694"
+        },
+        {
+          "path": "internal/demo/README.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 2890,
+          "sha256": "cf5a1f4b9db37b32df6a0961cca3c3714c340b2a4188bd15ff400600690c03d6"
+        },
+        {
+          "path": "internal/demo/data.go",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 14770,
+          "sha256": "59cf20a48cc0c7ca14624016de9709c540bf0254e87bc7d0d8d41a5db2cdf388"
+        },
+        {
+          "path": "internal/demo/deploy/README.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 4623,
+          "sha256": "ff659163ba30f9a35d32253371cc365013baf5bb5d76e6c5f74b9bbdcab3cca3"
+        },
+        {
+          "path": "internal/demo/deploy/deploy.sh",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 5925,
+          "sha256": "6ce58ea4d516dcd504ca24990f269948eaa15dfafd9ffb1153a92a4939a0da9e"
+        },
+        {
+          "path": "internal/demo/deploy/teardown.sh",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1271,
+          "sha256": "ad37e45b77e3ec3768282ced39d2230ad2bc6476601e24fe32fa3f13559dc200"
+        },
+        {
+          "path": "internal/demo/generator.go",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 10811,
+          "sha256": "a5d4a6da533898cabf1baf166cca330afd0fb08701deb5871d6e5531c855f4d9"
+        },
+        {
+          "path": "internal/demo/generator_test.go",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 6393,
+          "sha256": "4daccf4cf13b123fe606174ed728d92e6ad68fc7d3703b488c17fffc8f48041b"
+        },
+        {
+          "path": "internal/demo/handler.go",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1526,
+          "sha256": "7092a79482c13b647d3bbb7947bf477c6ccbba3badc1c5a48f35346ed0fa4122"
+        },
+        {
+          "path": "internal/demo/spans/chat.json",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 7839,
+          "sha256": "5c92328e6f995f9a43902e7f333660338a64fc3647b196311ae9c6d45856f821"
+        },
+        {
+          "path": "internal/demo/spans/mcp_server.json",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 6469,
+          "sha256": "98117617143e561a9724280c2d5a69df77d2c956401533e2b7206e356ac0aa09"
+        },
+        {
+          "path": "internal/demo/spans/skill.json",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 6382,
+          "sha256": "d1acc246e97ca8592c61e0c5b2ba75c92fbe8a496a90388fb18384c90e459c60"
+        },
+        {
+          "path": "internal/demo/spans/tool.json",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 7810,
+          "sha256": "e3d96a04a78f75ad30dae62e4535a8a24b8284c8fed8771487010a82a0c2fc0b"
+        },
+        {
+          "path": "internal/demo/vcs_metrics.go",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 8130,
+          "sha256": "855063461580a7cf35fe24a06f765bc32f5d144ab6018db3ab58ce643cf3a38d"
+        },
+        {
+          "path": "internal/demo/vcs_metrics_test.go",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 2847,
+          "sha256": "f52fd3e2f7d173731671bbf5558b2edc931fd4deed7daf59cbf733b5539e93bf"
+        },
+        {
+          "path": "internal/dotenv/dotenv.go",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1077,
+          "sha256": "aabcaa8a5836070cc3f61dce89ff99c429c14890ed22b9dca313683aae263220"
+        },
+        {
+          "path": "internal/dotenv/dotenv_test.go",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 2451,
+          "sha256": "e6aa4d6a7e3f22e05c3a54c2c4fc4abebe4ccdf2f5467784334b71374856392d"
+        },
+        {
+          "path": "internal/filelog/filelog.go",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1797,
+          "sha256": "d6c3c8f53169e22f48e569f7f6be2278c37f4014ab015e10b46143ea61053f75"
+        },
+        {
+          "path": "internal/filelog/filelog_test.go",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 4523,
+          "sha256": "e04c967b7618aa1463eebd18b89dd6a5eb57c697042284ef2dbd1afbd58ab80d"
+        },
+        {
+          "path": "internal/harness/harness.go",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 11455,
+          "sha256": "60cad1aa185b10287291e964f14687453e11b57f5c2f3c712ca85a429ad54f15"
+        },
+        {
+          "path": "internal/harness/harness_test.go",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 21434,
+          "sha256": "6cd59cce91b955e75909ee128064997bf1956222a629c99f77b49f8a342726a0"
+        },
+        {
+          "path": "internal/harness/keychain_darwin.go",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1044,
+          "sha256": "f14932f7f39f126053afe5624e31a19c0790fcb03087fb50066f3688d62a8818"
+        },
+        {
+          "path": "internal/harness/keychain_darwin_test.go",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 4828,
+          "sha256": "4a37d47d3b3ed63e7b01b9eae14664a2775fbb88b42f506b8877ffb83610c45c"
+        },
+        {
+          "path": "internal/harness/keychain_other.go",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 562,
+          "sha256": "90c512b44249c41d488adf3cf6189c958508c937fb0820ebe737ee9da25845f3"
+        },
+        {
+          "path": "internal/identity/identity.go",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 3854,
+          "sha256": "b23b9e39f70d2ff25b8a19071ea2d6f3a97d17d9c344c3cc6c8104558809184b"
+        },
+        {
+          "path": "internal/identity/identity_test.go",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 6126,
+          "sha256": "0f83656429478e52fb4e7309b6a944225999449d856c3494ca8fed958bfd3480"
+        },
+        {
+          "path": "internal/otlp/genai.go",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 2482,
+          "sha256": "51313269968852b47d0a5d851be80df4ddfd5a9066f7f899541079234c9353d1"
+        },
+        {
+          "path": "internal/otlp/genai_test.go",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1844,
+          "sha256": "e54d98013e9c473ff1f93494b91f7d156a29430d92f4791a007321a9a3633666"
+        },
+        {
+          "path": "internal/otlp/identity_test.go",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 7215,
+          "sha256": "46971e6d14dd77775d76b2d9c4b6a26e6c29aa5fb41633320596e749a94bae6b"
+        },
+        {
+          "path": "internal/otlp/otlp.go",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 26453,
+          "sha256": "2fe5e8c1607831d2425061707c11b7f45a94a7f970d7ee615ca806839a126155"
+        },
+        {
+          "path": "internal/otlp/otlp_test.go",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 26585,
+          "sha256": "8193ac53093374d28fece4a0057bb9dd7badb15f686b13d481fcb547e3b6b39a"
+        },
+        {
+          "path": "internal/otlp/trace.go",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 9042,
+          "sha256": "0a1530033ac69596a5dc9ffa9e0e172bfdb45fd510d1aed9c189b529a98e6083"
+        },
+        {
+          "path": "internal/otlp/trace_test.go",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 22431,
+          "sha256": "d40bc5784bfcfd1b56ed6e7f94957118730275214b234143b07e385e976e3c78"
+        },
+        {
+          "path": "internal/otlp/tracecontext.go",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 8477,
+          "sha256": "7a4d2a4850c5bc8dc0a4e921983cae89c954a4a8daf39a890233bc07c6bd0f0d"
+        },
+        {
+          "path": "internal/otlp/tracecontext_test.go",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 5295,
+          "sha256": "f984bf1e85642c5d842120757a9103c723930e54b92e896b62320d415d5ea504"
+        },
+        {
+          "path": "internal/pipeline/agent_reuse_test.go",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 5947,
+          "sha256": "e03a348ac4b38b7bb93bed60058c7558a2d436558efbdee785f04c06cf56a384"
+        },
+        {
+          "path": "internal/pipeline/extractors_test.go",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 10616,
+          "sha256": "24fbb7e99c7f2737b429b05e6636e0877e0a027bb272af5434ff5b5d930e0e15"
+        },
+        {
+          "path": "internal/pipeline/pipeline.go",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 37477,
+          "sha256": "5a0d611f69cab44b40f7ee2d7cb600bb1c13a24c061ac1a594b4e4203cf28324"
+        },
+        {
+          "path": "internal/pipeline/pipeline_test.go",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 79410,
+          "sha256": "66c56469565ec09a0d619f84c49f7efd5cb57f24db282fcd6aa6cffb76c0377c"
+        },
+        {
+          "path": "internal/pipeline/setupnudge.go",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1730,
+          "sha256": "f60918534025423d87d43ffe104041a003027baafb53d34d5158519df04daa67"
+        },
+        {
+          "path": "internal/pipeline/turn_continuation_test.go",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 3245,
+          "sha256": "c786f67823e389bd2735f38f24584cb3e3edebd696d94726b9670f65f854fe67"
+        },
+        {
+          "path": "internal/sessionurl/sessionurl.go",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 2579,
+          "sha256": "bf40d69a5dc5734583ecf1f8eeb3eb2b8005e3100fed17c4bbe1d5b7dea0bca6"
+        },
+        {
+          "path": "internal/sessionurl/sessionurl_test.go",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 3315,
+          "sha256": "58ed54af340377ab8ef1f45258446f8529800768eb56722852a910f6f94fac4b"
+        },
+        {
+          "path": "internal/source/claude/billing.go",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 16107,
+          "sha256": "b1aa31f884d1743cd2b1eda9b34824f0f00d76009d4ec98cf6ab3ea97c39f5e2"
+        },
+        {
+          "path": "internal/source/claude/billing_test.go",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 22571,
+          "sha256": "312043a5fd98b8eeef2cbf9179fcc40d03ef74e910dd606a785f329b0dc9f8c5"
+        },
+        {
+          "path": "internal/source/codex/codex.go",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 12270,
+          "sha256": "59669f0c8a56edbe536f80a5bab36bfde61b3e0b8bb8f60a1f1ab9b8c0402089"
+        },
+        {
+          "path": "internal/source/codex/codex_test.go",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 26471,
+          "sha256": "3ad9e46ea432d9c3b1fec49945536551bd73bffa0d9d5d3fc9e466443382a7af"
+        },
+        {
+          "path": "internal/source/codex/golden_test.go",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 10292,
+          "sha256": "86ad95c667618a7bee3979eb1c96140299994367bb7f80a230b756aed0e4e09f"
+        },
+        {
+          "path": "internal/source/codex/rollout.go",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 20103,
+          "sha256": "6e1281e3d9b2e8c97c248b475b83133678253f608b75ea5b3882e64958b092e5"
+        },
+        {
+          "path": "internal/source/codex/rollout_test.go",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 24390,
+          "sha256": "a986aac9a94ea453884269dea6c1bf5c6f0ff95ab4afd69e47f8c6167111fe57"
+        },
+        {
+          "path": "internal/source/codex/testdata/captured_events.jsonl",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 40891,
+          "sha256": "88af396fd6b91ab92c206a1d2e442efa3fbd81e3547f25b82ca13cc038844adc"
+        },
+        {
+          "path": "internal/source/codex/testdata/golden_spans.json",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 28019,
+          "sha256": "142dc5a91df353336a26cbe0b8510b6eec05799101d2a9d83afe10dd4629a388"
+        },
+        {
+          "path": "internal/source/codex/testdata/rollouts/rollout-2026-07-07T12-28-09-019f3be8-053a-78c3-9096-e9ab264c13a0.jsonl",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 2238,
+          "sha256": "fd823e6ea956a9a6baa9f2b8945c0f8921a8e0f1ad15a1413f2892dd8ada1caa"
+        },
+        {
+          "path": "internal/source/codex/testdata/rollouts/rollout-2026-07-07T12-37-33-019f3bf0-9fe5-7821-b583-cd99b1eb0738.jsonl",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 2238,
+          "sha256": "d4ca7f077919b49e3b33fdb418016bb317492b28b51205d15a75d0450815b0c8"
+        },
+        {
+          "path": "internal/source/codex/testdata/rollouts/rollout-2026-07-07T12-40-19-019f3bf3-29e5-7320-a40b-883e09c7601a.jsonl",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 5606,
+          "sha256": "85239ac9bf222cd00c2ae0f9e75461912ae59eb0e78b55df871763934bce18fd"
+        },
+        {
+          "path": "internal/source/codex/testdata/rollouts/rollout-2026-07-07T12-40-33-019f3bf3-5f80-7ca3-81a0-298149d46129.jsonl",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 2239,
+          "sha256": "22cb84ca12d8ea1b85000e6a2af2e3f210aaa6cfa48a77a989b98d788b48cf54"
+        },
+        {
+          "path": "internal/source/codex/testdata/rollouts/rollout-2026-07-07T12-40-33-019f3bf3-605d-7393-ac4f-63f8dcc20260.jsonl",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 2239,
+          "sha256": "f0797ed4d53a81c3a452d8f85280307e59154257339fbf99c0c41ffb656ba79e"
+        },
+        {
+          "path": "internal/source/codex/testdata/rollouts/rollout-2026-07-07T12-40-33-019f3bf3-60f7-7db2-8a74-7cf0618742e6.jsonl",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1571,
+          "sha256": "596ba8afc008edd6bb2af0b0ccae79bdbe9da04886533a5207e708449036f287"
+        },
+        {
+          "path": "internal/source/codex/trust.go",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 10139,
+          "sha256": "70588f3912b0a1787c4ac022b38eb05a3027005442c661d8754cb767b8823a17"
+        },
+        {
+          "path": "internal/source/codex/trust_test.go",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 9447,
+          "sha256": "75d7334db706559546f9bdda5a43e9d21078cdb97b53240057b730689e13532c"
+        },
+        {
+          "path": "internal/source/copilot/copilot.go",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 5420,
+          "sha256": "2fd57384f717d33b30f5730f8cffbb436505b626cbd369a30ce6ee7476d9fbb5"
+        },
+        {
+          "path": "internal/source/copilot/copilot_test.go",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 27080,
+          "sha256": "1eba81deabd43ebfb1f0502358b12f4d87b6875aa3da4b33d441e562459a736d"
+        },
+        {
+          "path": "internal/source/copilot/otelfile.go",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 21894,
+          "sha256": "9ae4de31714ef5f4238d4196b1dac1d9e7bb71547edd9e81b433908c2219449a"
+        },
+        {
+          "path": "internal/source/copilot/session.go",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 9119,
+          "sha256": "0c08f2d9637378f7baa31a45a7ba263b640b3d5697091abbfb5d5aa02fcfcdad"
+        },
+        {
+          "path": "internal/source/copilot/session_test.go",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 9080,
+          "sha256": "8b89312088359cd7d047390ff1c5b1d0d03f024dc18296dfa4c0764ef71ace29"
+        },
+        {
+          "path": "internal/source/cursor/cursor.go",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 5102,
+          "sha256": "1c7fcba67d9eea4259f772e9074a71055ecde06b7ac9c4eb3c2f3debce88e767"
+        },
+        {
+          "path": "internal/source/cursor/cursor_test.go",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 9476,
+          "sha256": "b03ce54dca819141c4aa01bcff252e0f5d5208c96348f877046d25fc2419342d"
+        },
+        {
+          "path": "internal/transcript/transcript.go",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 23079,
+          "sha256": "05ad47c529852823ca94412926cb6cd3c3a74cd82e6b29b9a31cf3ef253d1ab2"
+        },
+        {
+          "path": "internal/transcript/transcript_test.go",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 55157,
+          "sha256": "e3bd23d46446f28bda3819c66d66c9b2c16ba34765eb8452fec68d2caa52c09d"
+        },
+        {
+          "path": "internal/vcs/vcs.go",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 5558,
+          "sha256": "75360f1683f6f914b40fa7b8cee3a05b2594eb2cef3eb5f20821477963c834bb"
+        },
+        {
+          "path": "internal/vcs/vcs_test.go",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 6822,
+          "sha256": "2e01573c47cb7bebb6a0c70ef1367bf427dcf77760e973acb82345aeec01bf7a"
+        },
+        {
+          "path": "internal/version/version.go",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 189,
+          "sha256": "df441a325d6c4583f6a8a2cf1b1bef47e8291a4f6a936a67659f792630796f85"
+        },
+        {
+          "path": "qa/CLAUDE.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 2270,
+          "sha256": "f2ab97e712116aae6694c9c53f0e4b9c51404b9583ac3ec28dd4d8c96c6cb8ca"
+        },
+        {
+          "path": "qa/config.local.json.example",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 245,
+          "sha256": "cc0f0a68a4126878aa577d2923babc71854381fe92d61abe15d34248b5df289d"
+        },
+        {
+          "path": "qa/findings/cursor-subagent-work-produces-no-span.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 4179,
+          "sha256": "5ec0f794865b16f61a90d7645c7985406e48556e512e84d4a9d32f0553937d43"
+        },
+        {
+          "path": "qa/learnings/README.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 6679,
+          "sha256": "053bbbaffbe3474f1fd61ecacdb8688f9d0171e2ee933a0713046c90df37e477"
+        },
+        {
+          "path": "qa/learnings/binary-a-run-tests-the-installed-release-unless-swapped.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1180,
+          "sha256": "6d8440c373b203fcce811a884d4b2cb5ca8bb07269edc5477cb05591215a8ae8"
+        },
+        {
+          "path": "qa/learnings/config-managed-options-cannot-be-overridden.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1641,
+          "sha256": "125a0fb530805429d506fe2e101b5fe7a68ebfd1e85b5ebe1d424dc22a058616"
+        },
+        {
+          "path": "qa/learnings/config-project-file-leaks-into-every-registration.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1436,
+          "sha256": "680339d329a3f38629a77bd9ecd4b8fb8b0d7874b49ba960fb936810bb613080"
+        },
+        {
+          "path": "qa/learnings/copilot-hooks-carry-no-numbers.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1648,
+          "sha256": "bf7d5512587202b02cb48ae484a98f2e4bdc1e6309c2a0c6621ac1c4194c5479"
+        },
+        {
+          "path": "qa/learnings/copilot-non-zero-shell-exit-is-not-a-failed-tool.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1179,
+          "sha256": "3c2f5de54360f591608dc1acd6e821b5174d9dd10b99b1aba539b1a2bff34b3e"
+        },
+        {
+          "path": "qa/learnings/copilot-otel-rollup-differs-on-a-delegating-turn.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1401,
+          "sha256": "b071dee5bc121367ec95a18fe53d92d519508c67dd3a755d06db4ab459311161"
+        },
+        {
+          "path": "qa/learnings/copilot-skill-name-lands-on-the-tool-span-only.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1298,
+          "sha256": "a8b808eeeefe3ee47e10edfec38c76989c4bd803532b63630a661e892b838189"
+        },
+        {
+          "path": "qa/learnings/copilot-subagent-sessions-are-dropped-on-purpose.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 2573,
+          "sha256": "24692448385a42ca37bf229f69c65abd73a204053c8e2d9b0026e5bfcdc0b84d"
+        },
+        {
+          "path": "qa/learnings/cost-is-reproducible-from-the-transcript-and-a-price-table.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 2026,
+          "sha256": "cba9d118dec019814077d64d4420eb3f28a36427d7ac8376a1abb864d2930aff"
+        },
+        {
+          "path": "qa/learnings/cursor-print-mode-fires-no-turn-hooks.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 2125,
+          "sha256": "b574d80e2592b36db2dfa15d51a1cdbd23d4eba5d03c9def8f17c04a57a3242d"
+        },
+        {
+          "path": "qa/learnings/cursor-stale-wrapper-overwrites-the-qa-token.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 2121,
+          "sha256": "0cae3dfbeda31df8a43ce9414fc5baa1cb6394d556118d9337870985307b0fc6"
+        },
+        {
+          "path": "qa/learnings/cursor-subagent-session-looks-like-a-real-one.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 2150,
+          "sha256": "47e0fb5386b01b178052c16456be7cad8aef066be157f413d65eb754e2723d7e"
+        },
+        {
+          "path": "qa/learnings/cursor-transcript-carries-no-usage-and-counts-tools-differently.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 2263,
+          "sha256": "1c9003a845d9b496f0225e9d6871dc48b300c35ddb9a5309363e21e5fed095f5"
+        },
+        {
+          "path": "qa/learnings/cursor-turn-ended-is-per-loop-not-per-turn.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1205,
+          "sha256": "b97c10ea6242d7bad75e1866f08bddef5230335ce89291422843d0c99ae2d30e"
+        },
+        {
+          "path": "qa/learnings/deadend-a-throwaway-home-loses-claude-code-auth.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1056,
+          "sha256": "9a02d48ce1a3f73b097ec083c67b077aeef456ff9788f7b9bf031c0efb21a4c2"
+        },
+        {
+          "path": "qa/learnings/deadend-codex-does-not-delegate-without-multi-agent-mode.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1509,
+          "sha256": "334ca9c55befc30dac5b3ba3b1e605cd80e9be982736b239bad9bfbd878cd999"
+        },
+        {
+          "path": "qa/learnings/hooks-a-codex-subagent-is-reusable-a-claude-one-is-not.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 2402,
+          "sha256": "4b9eec94aa398e34d1df29a769d90388a92e278c800783825e33f6b49488e0db"
+        },
+        {
+          "path": "qa/learnings/hooks-session-state-is-deleted-at-sessionend.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1112,
+          "sha256": "44979745821d0221fa42add3575d96479467cf28891a54659866013091241dce"
+        },
+        {
+          "path": "qa/learnings/hooks-some-slash-commands-fire-no-hooks-at-all.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1353,
+          "sha256": "9073f9299c938089482ab9beb83a251d19dc39b2063cb3eb38c563da6d7a326d"
+        },
+        {
+          "path": "qa/learnings/hooks-the-task-tool-returns-before-its-sub-agent-runs.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 2040,
+          "sha256": "a245cd6f51e1d7e42b869178c9ba49e98cab10aa0f271ad113c382aa69cda7c5"
+        },
+        {
+          "path": "qa/learnings/hooks-transcript-does-not-exist-at-session-start.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1224,
+          "sha256": "d5d0d7f24c281638a8542ec36df491cdcf8c422f9d1c377f25e57947ddb7a3de"
+        },
+        {
+          "path": "qa/learnings/model-dash0-normalizes-the-model-name-at-ingest.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1464,
+          "sha256": "629e43ee7c887148618ed311edacb5667cfd9abde83841119f5930d5e37c50ee"
+        },
+        {
+          "path": "qa/learnings/oracle-the-hook-mapping-is-blind-to-work-that-fires-no-tool-hook.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 2531,
+          "sha256": "13a9f347337f3f7c306038b7ed998a229e8875271f70fedde34147a44b5d9674"
+        },
+        {
+          "path": "qa/learnings/query-403-cannot-distinguish-restriction-from-absence.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1124,
+          "sha256": "7a5f6361ef94ffe7597fbd8de930cecd63e980fa19790a652ca72d40192c5e69"
+        },
+        {
+          "path": "qa/learnings/query-json-output-caps-at-100-records.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1006,
+          "sha256": "398ed77fb484bab2a63e5c386e7d72a607b2c485071e82ecec91e4682defa7ff"
+        },
+        {
+          "path": "qa/learnings/query-pass-endpoint-token-and-dataset-explicitly.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1127,
+          "sha256": "70631c207338436c7d49d5714942d93f9e40c4fa6de7de740305383598d7f0fe"
+        },
+        {
+          "path": "qa/learnings/query-precision-disabled-is-mandatory.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 819,
+          "sha256": "e3731a811b9b39b745c69ed936d52c0aa71bd0d6a24c005c6efb9b299a3c3cb9"
+        },
+        {
+          "path": "qa/learnings/usage-claude-result-json-omits-subagent-usage.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1501,
+          "sha256": "dda85993d44d15f434f37a4f87bee008bf10d3c6f5efad7c45ce1bf006078c69"
+        },
+        {
+          "path": "qa/mcp-fixture/main.go",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 6671,
+          "sha256": "6bfc196327998579b71d618736faaa8e2cde96dafed1e1c1dcb403ed8a0a8f70"
+        },
+        {
+          "path": "qa/mcp-fixture/main_test.go",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 3312,
+          "sha256": "478c90e2d9e255a6218e45c39f867eb45bbf5ef086a66fe9d36edfd834d9ac42"
+        },
+        {
+          "path": "qa/recorder/main.go",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 7616,
+          "sha256": "fbc8babd33e3ed4c5a8e0d84a53d4ea93a94f3597c8d001573ec10a4f58282fa"
+        },
+        {
+          "path": "qa/setup.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 112026,
+          "sha256": "e92b314774d301b08a0e106b66ad030bbb2f5b5fec16c7b61c918b4485cc8560"
+        },
+        {
+          "path": "qa/skill-fixture/fixture_test.go",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1853,
+          "sha256": "19d26e90c98917cb3508ae8e6c4ac903328286bd2c819f70f6f65f1adac99a0b"
+        },
+        {
+          "path": "qa/skill-fixture/qa-echo/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 566,
+          "sha256": "420db64b6d0fb3ab50fb151b13118d6e4363e6a458b0dcf9d5becf9b2fd2c937"
+        },
+        {
+          "path": "qa/specs/claude/README.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1509,
+          "sha256": "c2c31d9584fc451453ed6a20d28a0e4ee87c7afef3110f21d7d0a28356640f1c"
+        },
+        {
+          "path": "qa/specs/claude/mcp/README.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 4161,
+          "sha256": "418171f899fdeb447cdca330c02a4ab0672e0c456ece6fe66a4b41f87c4220f5"
+        },
+        {
+          "path": "qa/specs/claude/mcp/mcp-call-names-the-server-and-strips-the-prefix.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 7211,
+          "sha256": "03cb8679e496cf11cb64ade898b5b88d51373433e36ec89d39f40e01fd1d6e17"
+        },
+        {
+          "path": "qa/specs/claude/mcp/mcp-tool-failure-sets-the-span-status.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 6656,
+          "sha256": "5ddae0cc5341370a95e1202dc4edfb7e03814c318b440382bf2f5a18049723f1"
+        },
+        {
+          "path": "qa/specs/claude/mcp/two-mcp-servers-in-one-session-are-not-conflated.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 4719,
+          "sha256": "9a9c42079f383fe95d382ec70865837c060ccee4742bb88d070f22c9b46674e0"
+        },
+        {
+          "path": "qa/specs/claude/session/README.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 3687,
+          "sha256": "c37aafb0d000dcfd2484e3bc2f2083a7f129f57f461445f33c8d05965572e0cb"
+        },
+        {
+          "path": "qa/specs/claude/session/claude-span-carries-no-undeclared-attribute.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 8474,
+          "sha256": "7709e71cb6b15df80c224f455a4b7aa3dcb781656a531dd0986c546352ffd85d"
+        },
+        {
+          "path": "qa/specs/claude/session/single-turn-no-tool-session.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 7960,
+          "sha256": "3d34d6ddc4eef4083b6942f12c3f1f65d6fadfd5c5f2be35d7ed68de2e65ccf9"
+        },
+        {
+          "path": "qa/specs/claude/session/sub-agent-tool-call-produces-a-span.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 6438,
+          "sha256": "ef4d20e7d0d67efedde370c719db6011e224ed33bb1900c7c9bf0ed190364366"
+        },
+        {
+          "path": "qa/specs/claude/session/sub-agent-usage-is-counted-once.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 6401,
+          "sha256": "6b61cc3303a23cded706a3a8c18bfc11b766880e40363377bf3d120840f03336"
+        },
+        {
+          "path": "qa/specs/claude/session/tool-call-produces-one-span-per-post-tool-use.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 5827,
+          "sha256": "1d797bc37eeb22d9cb6206dc3a94fa625ecf05f9c2f3c72c16a8aa292eb13b2c"
+        },
+        {
+          "path": "qa/specs/claude/skills/README.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1746,
+          "sha256": "f4d98f10f17ac71c939653b917cb63054c3e7ac693e261b2d42ada5943fa0e6b"
+        },
+        {
+          "path": "qa/specs/claude/skills/skill-invocation-is-counted-by-either-route.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 7036,
+          "sha256": "98f7e4cfa8ccf1c1ca48ce6244eb72b0a4eb7dcceb521c2c66bc7a8a9e7cf2f4"
+        },
+        {
+          "path": "qa/specs/codex/README.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1488,
+          "sha256": "802af06298d7d825fd7a1bf0cbb0f3e22e4aa8bcd2b44e6afe7d5d71b64d179a"
+        },
+        {
+          "path": "qa/specs/codex/session/README.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 3548,
+          "sha256": "49f5ab1a3711d8028c58cac0f197a0a44148482bd9211edcb5f539c9482f1b12"
+        },
+        {
+          "path": "qa/specs/codex/session/billing-and-allowance-come-from-the-rollout.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 5700,
+          "sha256": "5ce1b8137522fff5c689d96ad018a1526ff8bc30586ccd06fc5f8384784b4678"
+        },
+        {
+          "path": "qa/specs/codex/session/codex-span-carries-no-undeclared-attribute.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 4550,
+          "sha256": "5e0b6e70841d296f8ef04828ad133d59343203f7350180dafb5350238a56c303"
+        },
+        {
+          "path": "qa/specs/codex/session/tool-span-duration-is-reconstructed.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 5593,
+          "sha256": "2e4b322e8cd1fb52141b3c149c734d74ecf3338f22d19ba635a998229fd1c4dd"
+        },
+        {
+          "path": "qa/specs/codex/session/turn-usage-is-scoped-to-its-own-turn.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 5818,
+          "sha256": "2d0184fae4ad3e65b347a703ca0fce9ef6f4264ab62d3114c734a8321cdb8794"
+        },
+        {
+          "path": "qa/specs/codex/skills/README.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 2600,
+          "sha256": "b7dbb30c8bc31e11a75fa3bdc3654794bbcb8beed6d0fc713c1706879c4f484d"
+        },
+        {
+          "path": "qa/specs/codex/skills/skill-invocation-is-attributed-by-either-route.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 6456,
+          "sha256": "744e632f94870a542aff6c073bb650a778c7446127161363752568db4cbb8904"
+        },
+        {
+          "path": "qa/specs/codex/subagents/README.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 4127,
+          "sha256": "5820d5c009d1c81bc0eea927e149ae6c136652c367099e07cfa6f4b61a2d8fca"
+        },
+        {
+          "path": "qa/specs/codex/subagents/a-reused-agent-keeps-producing-spans.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 5901,
+          "sha256": "bf0511e40d784e577e8469f1ef75e353455c8a8c5122a045968353e35509cbea"
+        },
+        {
+          "path": "qa/specs/codex/subagents/subagent-usage-is-counted-once.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 5635,
+          "sha256": "8b4baf6dcb7b47cb9c19a785253a22be79da846fb42891186ead79de6667b405"
+        },
+        {
+          "path": "qa/specs/codex/subagents/subagent-work-is-anchored-under-its-spawn-call.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 5623,
+          "sha256": "7506e3fd950b456fa931e0c4caf7124028ca07380036a14624fb81977159abee"
+        },
+        {
+          "path": "qa/specs/copilot/README.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 3249,
+          "sha256": "630f262de0cb9a3df46fd000c130237b237dfd968921fba6a90602bda7c1c07c"
+        },
+        {
+          "path": "qa/specs/copilot/session/README.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 3818,
+          "sha256": "e92f9ff26a001dfe7d993b04da7068d86397e812ee200a1a4c2e3c17556cdf06"
+        },
+        {
+          "path": "qa/specs/copilot/session/copilot-span-carries-no-undeclared-attribute.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 6436,
+          "sha256": "6127bbc1e1107f81c5cea443f20054ea9e44eabbd6afa6c6a26afec9514a0413"
+        },
+        {
+          "path": "qa/specs/copilot/session/tool-spans-come-from-the-otel-file.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 6074,
+          "sha256": "dda9866c1042c6c2537c969bfbaf6b6d619547b1119287a03f489ef09d07499d"
+        },
+        {
+          "path": "qa/specs/copilot/session/turn-usage-comes-from-the-native-otel-file.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 7276,
+          "sha256": "77c24865a963514dac583b28d38f039d7a503003570ed0fb75661fc7e1361c86"
+        },
+        {
+          "path": "qa/specs/copilot/skills/README.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 2929,
+          "sha256": "74f20c6f840f2989e0fe91d7e0241aa4f55fb3b79764a798e8af19bce2b7bb6d"
+        },
+        {
+          "path": "qa/specs/copilot/skills/skill-invocation-is-named-on-the-tool-span.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 4862,
+          "sha256": "4fa62dbdf20cbf0c82a49fde6d082a036dd2cb8371ef4ee81548132b14b2907d"
+        },
+        {
+          "path": "qa/specs/copilot/subagents/README.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 4465,
+          "sha256": "884a6576f524af749616614a454f7de927df179bc6f26d24d5e38a5be2e3b019"
+        },
+        {
+          "path": "qa/specs/copilot/subagents/subagent-gets-its-own-invoke-agent-span.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 7623,
+          "sha256": "bdcace7bf0bb062d4feb6c0f4d9cd3af10d27adfa8453850ff54bbf1e3d33cf5"
+        },
+        {
+          "path": "qa/specs/copilot/turns/README.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 2414,
+          "sha256": "e974981c9160fd7c5786c8acac3667af18bb87048c3b59b61c0685d7646a16ee"
+        },
+        {
+          "path": "qa/specs/copilot/turns/resumed-turn-is-scoped-to-itself.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 6489,
+          "sha256": "5d50999a0b7bc3f87368a574f2176095530b7ab85209c2fed98a18f617296b89"
+        },
+        {
+          "path": "qa/specs/cursor/README.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 4250,
+          "sha256": "d08d01fef851491b9c1061756e7991826fb8cdaf704e794183065896a06c0ce3"
+        },
+        {
+          "path": "qa/specs/cursor/mcp/README.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 2191,
+          "sha256": "6b1da0a70759dbdafeff3264073ec8fc77c2d59b450b9767343904df44933f58"
+        },
+        {
+          "path": "qa/specs/cursor/mcp/mcp-call-strips-the-prefix-and-tags-a-placeholder-server.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 5526,
+          "sha256": "a69dfb3f609d47265cc810bdba86e8b07d0118f9f23cda2dfb3bb012405e37f0"
+        },
+        {
+          "path": "qa/specs/cursor/session/README.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 2607,
+          "sha256": "c2d5d84a8daec2b848c6ebd8a581fef5e9793863f90bce8ed9e1434af86bacd0"
+        },
+        {
+          "path": "qa/specs/cursor/session/cursor-span-carries-no-undeclared-attribute.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 5446,
+          "sha256": "79a7273b24881365265594d1f41c9b7e4c7e9752ebbece048c354ff8114893b9"
+        },
+        {
+          "path": "qa/specs/cursor/session/single-turn-agrees-with-the-hooks-that-fed-it.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 6718,
+          "sha256": "150d4c47e71acc7c30c28e7b6b119a4134264af40dd122fd48bec8b7ea2730ca"
+        },
+        {
+          "path": "qa/specs/cursor/session/tool-failure-sets-the-span-status.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 5040,
+          "sha256": "cf7a290ac8cf9a1eaccc3c9d60fb863ea4ea535e5c3523be0a642621c840fea9"
+        },
+        {
+          "path": "qa/specs/cursor/subagents/README.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 3787,
+          "sha256": "fa594cfeac4c6e2c73e8fcfd9e36ffc8efac21a783957dfdba0339f2169a77b3"
+        },
+        {
+          "path": "qa/specs/cursor/subagents/subagent-work-reaches-no-span.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 5964,
+          "sha256": "c1f928eb2b83096ad0becc2d0293e7473e2cbbb5ecc8a00a1f40b5682325912d"
+        },
+        {
+          "path": "qa/specs/cursor/turns/README.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 2181,
+          "sha256": "586ebd8b6b9fbd8245a65048c43861d5ca4a35361a84a79f65965584230cb720"
+        },
+        {
+          "path": "qa/specs/cursor/turns/resumed-turn-is-scoped-to-itself.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 6041,
+          "sha256": "f0f896210fa2bb5be8cb0bd0bf3372dac931f4d4857f52fde16e4fca1748262d"
+        },
+        {
+          "path": "qa/tools/qa-attrs.py",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 11241,
+          "sha256": "7324707e6f774456d73f72780946974aa85f431d8ae5b4e7dc2ffcb3ce896ff9"
+        },
+        {
+          "path": "qa/tools/qa-codex-hooks/main.go",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 5732,
+          "sha256": "0f62fe93134141d71e26ba7760f03ae4587d935a1e22a52b0e562cd41c903b0e"
+        },
+        {
+          "path": "qa/tools/qa-compare.py",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 57651,
+          "sha256": "3eabc6279828fe3fc76aed5369156ee73a1fd92c67569ccb59e576d03c66b074"
+        },
+        {
+          "path": "qa/tools/qa-cost.py",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 9328,
+          "sha256": "190fc81d358f3a5b31f8eca6896feab2203895608d642837b9d04546509cb672"
+        },
+        {
+          "path": "qa/tools/qa-cursor-drive.py",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 9528,
+          "sha256": "cac20075f129e12545cd1e3dc221012b65d687d91e5286f84aa8e42c631d213c"
+        },
+        {
+          "path": "qa/tools/qa-otel.py",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 14382,
+          "sha256": "f902320a86ab93222c38ebf15e02a6ba163fb55a3e61d121efe97c570191c54d"
+        },
+        {
+          "path": "qa/tools/qa-rollout.py",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 7813,
+          "sha256": "43653bed25da7dcf43f94d948ff73cc1f95e30188a336dc1fdd22f554a04948f"
+        },
+        {
+          "path": "qa/tools/qa-session-codex.sh",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 22737,
+          "sha256": "82029467f69f48899143755f9b5767989c684c84dd7351bbdb6f71a2aacb20ff"
+        },
+        {
+          "path": "qa/tools/qa-session-copilot.sh",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 22713,
+          "sha256": "f94130ac9ee57bb9bc77b5bf5a675aa6c26ec5be781439134df7e79db1667f53"
+        },
+        {
+          "path": "qa/tools/qa-session-cursor.sh",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 25584,
+          "sha256": "84f86e0580ec0a2384b59c60868e8be693ff4e15654cbf4415d62f92e671a6e1"
+        },
+        {
+          "path": "qa/tools/qa-session.sh",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 9060,
+          "sha256": "be8ea15a708b58ede02700cbbe64b8630274c1c0a3cc2aaac8764b25a29e06fa"
+        },
+        {
+          "path": "qa/tools/qa-transcript-cursor.py",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 7130,
+          "sha256": "4afa4aeb50e0d4f56b03e4f6e2720e8822937d5d2dca2dc24879d9a24c06bf6d"
+        },
+        {
+          "path": "scripts/docker/Dockerfile",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 3424,
+          "sha256": "a8c50a6f0c5e31ab3a0f54101c693bcb6a92222135890475541dc3f20ab2bbd2"
+        },
+        {
+          "path": "scripts/docker/README.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 2073,
+          "sha256": "20f0a993d7f2957542ccdcf0428e3e62dd64e9953f9ed9e3be0cdbca1c62a74e"
+        },
+        {
+          "path": "scripts/docker/entrypoint.sh",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 545,
+          "sha256": "616df62e2f5d91d16a6dbf9421d1353abad4a38676ce86982f12154f4d041033"
+        },
+        {
+          "path": "scripts/docker/marketplace.json",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 241,
+          "sha256": "79c0a80066f792d9b665b398c0906a2b56036d503a2865104f0ac76d9c4b2ad3"
+        },
+        {
+          "path": "scripts/expected-artifacts.sh",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1527,
+          "sha256": "50be928f75b90bc0f1aa52fffca8856e36f6020707b1b312f4f45ec28859576c"
+        },
+        {
+          "path": "scripts/go-version-check.sh",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1298,
+          "sha256": "848f256c3f44bc75d6d360aeb7458c309c29000057fbc61a0edb928c95a9c999"
+        },
+        {
+          "path": "scripts/release-plan.sh",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 6209,
+          "sha256": "055498da9770ff4e44f3a262c8fb48dc96903fb102b498ede9ecf7ff0a7b8ac8"
+        },
+        {
+          "path": "scripts/verify-release-assets.sh",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 8872,
+          "sha256": "a0c526b63810633915042835128a32186494943dce0a0a7e20258e53cf107362"
+        },
+        {
+          "path": "scripts/version.sh",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 8064,
+          "sha256": "a681c1bfbe26d9725e97f331be5a9ae58da5c81614ff04d04e7a23521a71e947"
+        },
+        {
+          "path": "test/capture/copilot/README.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 3981,
+          "sha256": "efa1b691e039497b11464f525d74593594e666e88b6746103f84d42f57d18219"
+        },
+        {
+          "path": "test/capture/copilot/capture.sh",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1450,
+          "sha256": "d18fa85f849772622f28dfe7eedc56b5014e27c87c21bd11da11c4123a617c28"
+        },
+        {
+          "path": "test/capture/copilot/hooks-camelcase.json",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1375,
+          "sha256": "33c851a6a285e968d5be7916fb6ad75d25201d015f514e858dda30679ccc30bf"
+        },
+        {
+          "path": "test/capture/copilot/hooks-pascalcase.json",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1388,
+          "sha256": "1acff0b5e9c4af142a58c94b09d64996f3691ca5d34b9f44f6f1d74707aadf72"
+        },
+        {
+          "path": "test/capture/cursor/README.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 2940,
+          "sha256": "b478021e068a7ec8ecb66b97b216adc8b94b2c02d5daa67fbe421f5c9e32a7ed"
+        },
+        {
+          "path": "test/capture/cursor/capture.sh",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1104,
+          "sha256": "f4eebe0e93dea9355965597c6ab2d11e9c0e39e5803f718201fa376c1b427337"
+        },
+        {
+          "path": "test/capture/cursor/hooks.json",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1238,
+          "sha256": "682378eb88682859a96eb4dad4081b1deb309138ee5f57848ccfed000733d33c"
+        },
+        {
+          "path": "test/consistency/bootstrap_test.go",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 14884,
+          "sha256": "13e9edc996d1277a6daaca08358bac177fbaea26b6a2d2a7d5b1bf88671d804b"
+        },
+        {
+          "path": "test/consistency/codex_test.go",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 2714,
+          "sha256": "1b8a641ebd82724aa424e811758256feb88cd9a24071511b23614b3421d731a1"
+        },
+        {
+          "path": "test/consistency/copilot_test.go",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 7042,
+          "sha256": "11278acaa1fc1940d1e84062c85071700aed217e6826e5432bbbb0b9a62686b4"
+        },
+        {
+          "path": "test/consistency/skills_test.go",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 3586,
+          "sha256": "3615258106136d8d52d57c55ad258ef50f074cffeb803400365464f540224da1"
+        },
+        {
+          "path": "test/contracts/README.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 2827,
+          "sha256": "9288153f7162d2f186e5700f26dbc13d927b51e3c0f21460fd33667bf312dc9f"
+        },
+        {
+          "path": "test/contracts/bootstrap.sh",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 14976,
+          "sha256": "934346274619fa1978671049be9f3aca49b326653d5c82371ff82b6032ae11b4"
+        },
+        {
+          "path": "test/contracts/claude.sh",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 5270,
+          "sha256": "ec743a9f681bcf7676c327150fb12b8ad577470481b1ea045b3f7d3ea0bfa4d9"
+        },
+        {
+          "path": "test/contracts/codex.sh",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 6408,
+          "sha256": "b51e7fdf85278fd141f6ba851f9dc1bf303f6f86289404667a817e6b377795fe"
+        },
+        {
+          "path": "test/contracts/cursor.sh",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 6992,
+          "sha256": "ff053dfe2fcd0f7e90e9e0132b23d8d0507e15c2275430d0afe43f89898a9a5f"
+        },
+        {
+          "path": "test/contracts/lib.sh",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1770,
+          "sha256": "bb79f596d2b92cdb95e94156d108a96564a757f6b89a7513292e64255fb7aa16"
+        },
+        {
+          "path": "test/contracts/release.sh",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 11871,
+          "sha256": "e280a411554e76f9530609669f5044ddb0c9fd337af1d1858c5c90c451d37b4c"
+        },
+        {
+          "path": "test/contracts/run.sh",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 512,
+          "sha256": "a6e903f81cd4093f344171e1a3428988c112d72fa8ef88469c12f460ec660c42"
+        },
+        {
+          "path": "test/e2e/cache_ttl_e2e_test.go",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 4372,
+          "sha256": "7618ede53a1a60765bbc2e6d166c4e0c894a6b04f376649a711f2f3481b73984"
+        },
+        {
+          "path": "test/e2e/codex_e2e_test.go",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 18787,
+          "sha256": "56ef0ca0ffedf201ade790cc234f3d8089177d12626a920cc6443f88162b8644"
+        },
+        {
+          "path": "test/e2e/copilot_e2e_test.go",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 62136,
+          "sha256": "ff029fa8dd487e4305690f85bd7bdd2bc546ff6268f396fe5872e9e377eb7bb4"
+        },
+        {
+          "path": "test/e2e/e2e_test.go",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 12199,
+          "sha256": "a1ea36df4f0277162e5316c98ea1d9290c798248610cf0fb5ec775b2d4faa961"
+        },
+        {
+          "path": "test/e2e/mock-otlp-server/main.go",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1264,
+          "sha256": "5d65e22fdfed05c13e795c004df2d2324c96a655eb7d01d3569178fc1adf138a"
+        },
+        {
+          "path": "test/e2e/observability_gaps_e2e_test.go",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 8645,
+          "sha256": "f6de12b43ed3df5e191dfb31643c8d81f6aafb546e5d1abb37bcd529ddbcef37"
+        },
+        {
+          "path": "test/e2e/sysprocattr_unix.go",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 441,
+          "sha256": "721e53a9af47e7f2bba240902fa15220e66615ee220156627da1fb754ea6dd1f"
+        },
+        {
+          "path": "test/e2e/sysprocattr_windows.go",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 678,
+          "sha256": "edbcd6fffa862164f66b02e82b0635c62999015f4762c5d58a3636b002b7c433"
+        },
+        {
+          "path": "uninstall-codex.ps1",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 7706,
+          "sha256": "d205d8f001d27674ef9843f0db745d3e99e66f3bc24b9b3856851664e80936d7"
+        },
+        {
+          "path": "uninstall-codex.sh",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 3750,
+          "sha256": "4fb95a4168d3e061366713c210b4db314f9e1c28f3bc0620e08fd0efd0680ed3"
+        },
+        {
+          "path": "uninstall-cursor.ps1",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 8349,
+          "sha256": "f9e556784fdb8b81cda0b25c9c4410a46d5038f2708d24c3e203a98ef3bd1fcf"
+        },
+        {
+          "path": "uninstall-cursor.sh",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 7039,
+          "sha256": "f8b613d71c0c01ca63020483b7a558706479a2dd15e26df14f66b78f997452fb"
+        }
+      ]
+    },
+    {
+      "name": "claude:hookify",
+      "root": "claude-hookify",
+      "repository": "https://github.com/anthropics/claude-plugins-official",
+      "commit": "0fbfda5a91f4adc311daca25acc99132f40f0b6e",
+      "pluginPath": "plugins/hookify",
+      "ecosystem": "claude",
+      "files": [
+        {
+          "path": ".claude-plugin/plugin.json",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 232,
+          "sha256": "550683ed7c6b70d4aa83f4ecb64ec7baffcadb3a0bb2d78925aeed6d509b789a"
+        },
+        {
+          "path": ".gitignore",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 291,
+          "sha256": "9c4f1216608d920b999f9caee6dd91169b5ea0c12eeb2e2d803cb1be7e922a16"
+        },
+        {
+          "path": "LICENSE",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 11358,
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+        },
+        {
+          "path": "README.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 7710,
+          "sha256": "976542a7e018465e44855bed6f53fae12aea7ca59b6e1db40f8880b72b09e38c"
+        },
+        {
+          "path": "agents/conversation-analyzer.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 5625,
+          "sha256": "96267342d2d0788763b392b26a322ca44d1b62ee4d65be31c0aaa8031ad85db7"
+        },
+        {
+          "path": "commands/configure.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 2863,
+          "sha256": "1cb84c1055f6069f2b16ee5b8691f776640267d98b65c09fb81c7569b3197c5f"
+        },
+        {
+          "path": "commands/help.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 4624,
+          "sha256": "39529a6e6473c45d08efbcf7053369a17e04cd3fda0bdf6f186eb20c94135d33"
+        },
+        {
+          "path": "commands/hookify.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 7667,
+          "sha256": "7560e58edc6cbb899c0b171292f63654fd1a0bd77354e7f89e2457acd0241e30"
+        },
+        {
+          "path": "commands/list.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 2020,
+          "sha256": "6128e44611d981e911c0e956d619b02924f46407a00bbb9deff2e4f3465b9368"
+        },
+        {
+          "path": "core/__init__.py",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "path": "core/config_loader.py",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 9690,
+          "sha256": "9f1d083cc43883323ddf00747e7696a4fd9d478ddd63f5b43038657da8516e56"
+        },
+        {
+          "path": "core/rule_engine.py",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 10711,
+          "sha256": "6c70424f7eafdea4e803c7bcb93305e1e75bfd8c405834ebfcdf34bb79f66fb4"
+        },
+        {
+          "path": "examples/console-log-warning.local.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 315,
+          "sha256": "240788cba25f5a403f13682c703eb2bed5ef3245aa9e82faaca628288a08e53b"
+        },
+        {
+          "path": "examples/dangerous-rm.local.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 278,
+          "sha256": "fad5e3e0d5dc1f60901d2d4d948a609eeeb69d0e91f49fcb02d81e4e01489acf"
+        },
+        {
+          "path": "examples/require-tests-stop.local.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 500,
+          "sha256": "f5d950883a4c20f1660af1ef589805f73ffe409167eb6b8db9a60b6ad05f7cfb"
+        },
+        {
+          "path": "examples/sensitive-files-warning.local.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 421,
+          "sha256": "f81037232ae3d37bc71f74b49adb16b568fa0bfa1318638c2e019d089480749b"
+        },
+        {
+          "path": "hooks/__init__.py",
+          "kind": "file",
+          "mode": 493,
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "path": "hooks/hooks.json",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1036,
+          "sha256": "d60651c94a42751d75db2f930faf083302acb45db9a7d8f4a5f6878f71537298"
+        },
+        {
+          "path": "hooks/posttooluse.py",
+          "kind": "file",
+          "mode": 493,
+          "bytes": 1622,
+          "sha256": "52f3b71247cc376fb4226ab44258e89b02f997840cadbfd0e1ebd06009b76f32"
+        },
+        {
+          "path": "hooks/pretooluse.py",
+          "kind": "file",
+          "mode": 493,
+          "bytes": 1852,
+          "sha256": "5d28948f576f93caefcb4089959db2066147334c61be3139a1c113593255a8c7"
+        },
+        {
+          "path": "hooks/stop.py",
+          "kind": "file",
+          "mode": 493,
+          "bytes": 1403,
+          "sha256": "6ebc614e48dd994a4fe2aa1a3f2b5ab413ffd2b3c22f81c66cacd23f9c92919e"
+        },
+        {
+          "path": "hooks/userpromptsubmit.py",
+          "kind": "file",
+          "mode": 493,
+          "bytes": 1389,
+          "sha256": "577824bc91e4510eb6f299b3485f35892eaf710108213e01f4c86eb350a813cb"
+        },
+        {
+          "path": "matchers/__init__.py",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "path": "skills/writing-rules/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 8423,
+          "sha256": "2994b5d3152243b1a1cbf8358e9d7c18f290f31a23920647f31053c3efdf990d"
+        },
+        {
+          "path": "utils/__init__.py",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ]
+    },
+    {
+      "name": "claude:learning-output-style",
+      "root": "claude-learning-output-style",
+      "repository": "https://github.com/anthropics/claude-plugins-official",
+      "commit": "0fbfda5a91f4adc311daca25acc99132f40f0b6e",
+      "pluginPath": "plugins/learning-output-style",
+      "ecosystem": "claude",
+      "files": [
+        {
+          "path": ".claude-plugin/plugin.json",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 295,
+          "sha256": "4bba7c0b3584635927762a6887cf6ad44ba2599b257e4afcea78384aff56274b"
+        },
+        {
+          "path": "LICENSE",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 11358,
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+        },
+        {
+          "path": "README.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 4687,
+          "sha256": "3148b3552ce12e2e8fa73e00d914882ae60557b29ded502d22da633685e5bdbd"
+        },
+        {
+          "path": "hooks/hooks.json",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 320,
+          "sha256": "2f5725548acfcae80ae997996a5037aad0754c13498cd81b87df35893f283db8"
+        },
+        {
+          "path": "hooks-handlers/session-start.sh",
+          "kind": "file",
+          "mode": 493,
+          "bytes": 3564,
+          "sha256": "2b2ef02fffeb9df6d587a3180ab3bb06e1364a75f70e2f534045b599b953731e"
+        }
+      ]
+    },
+    {
+      "name": "claude:paypal",
+      "root": "claude-paypal",
+      "repository": "https://github.com/paypal/AI-Toolkit",
+      "commit": "5dce83d8243f87eb37ac7cbd6711bc090fe042f8",
+      "pluginPath": "",
+      "ecosystem": "claude",
+      "files": [
+        {
+          "path": ".agents/plugins/marketplace.json",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 357,
+          "sha256": "416406a8c1011aebdb0ba81e278d5e88cbb6222a15f188fe9ed19629572e59d7"
+        },
+        {
+          "path": ".claude-plugin/marketplace.json",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1199,
+          "sha256": "89acd785a2bed9c11b9b19a5d06a97a9bc6e0debfd5accc20fad4c9c98a60b11"
+        },
+        {
+          "path": ".claude-plugin/plugin.json",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 533,
+          "sha256": "d8787ed36989c912406b7f9acde041a91efe0df745a07a4d1fd84e1ec12f4a4b"
+        },
+        {
+          "path": ".codex-plugin/plugin.json",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1294,
+          "sha256": "855e39d81c386c53150baa0f7ef83254e48f354566166ddb00e52bab029c5c0d"
+        },
+        {
+          "path": ".cursor-plugin/marketplace.json",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 879,
+          "sha256": "d356f02ef39d12f2bdb814e5d60ef5b3250540f309c59d30b87cec4d0775fb1f"
+        },
+        {
+          "path": ".cursor-plugin/plugin.json",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 979,
+          "sha256": "65befa1858552e7abf18fd606aceb47336bc523ce0b1658e723250cd3cd99bb6"
+        },
+        {
+          "path": ".github/ISSUE_TEMPLATE/bug.yml",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1551,
+          "sha256": "acadb0ea6619c6702cdf0fea2568a8eacba1903121d8096e45268598eb0e8921"
+        },
+        {
+          "path": ".github/ISSUE_TEMPLATE/config.yml",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 170,
+          "sha256": "2d534d0f0f45b0b449d7cfe9595ec61f095d7d06d661472c0a24367b8af85152"
+        },
+        {
+          "path": ".github/ISSUE_TEMPLATE/feature_requests.yml",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1946,
+          "sha256": "f3d4681b1b5e2af4e65dae04a00b08400dc6f160830ce6d2efe857215cdba156"
+        },
+        {
+          "path": ".github/PULL_REQUEST_TEMPLATE.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1179,
+          "sha256": "7adfb4aeb139e57efcf1eea495513becc4fdfb029db531cdb805340a3ee50704"
+        },
+        {
+          "path": ".gitignore",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 42,
+          "sha256": "50cf92260db2455ba8815842a3b121150f50a2ffb431c10e8ded2fa32d375f66"
+        },
+        {
+          "path": ".husky/pre-commit",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 16,
+          "sha256": "e2b7c9733375d7182af2033bda9a7d2a05d0db5eef5be53d26eb7b5f3df8fbc3"
+        },
+        {
+          "path": ".markdownlint.json",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 202,
+          "sha256": "4bf4a21053c168581c6e67daf0f8b4f430ae0cf102cf8633e2b5479756f431e5"
+        },
+        {
+          "path": ".mcp.json",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 220,
+          "sha256": "c87c55c72e4b01fc1bd0f796189581e7eb74f8185fe478436f5a8b1325dab4ed"
+        },
+        {
+          "path": ".prettierrc.json",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 51,
+          "sha256": "9bcafb5c3ee63dfe8d2e0e05405d66c0b8e7f0d821506a5f3c87dd5ccd2fe864"
+        },
+        {
+          "path": "CONTRIBUTING.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 2505,
+          "sha256": "2341af4b41dfa954ed7c26f79eab9e0fc179cdae6ed9062dc7dbd3a215a822c8"
+        },
+        {
+          "path": "LICENSE",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 11341,
+          "sha256": "9df6ee2168d9fbcc3199fa71a341ea9f76e06df954f2e9769e47806d80037c15"
+        },
+        {
+          "path": "README.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 9596,
+          "sha256": "d4cef36a581e8285b18551646e5b052b9a99adee4dcd0dd6ec3b3ab57dd721dc"
+        },
+        {
+          "path": "SECURITY.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1006,
+          "sha256": "ebfafe64aa349595cecac97e9dd69efb3eb635d175375f6eb654cef290b60385"
+        },
+        {
+          "path": "assets/Avatars-Square-PayPal-RGB.svg",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1494,
+          "sha256": "d1446cb495c57b528ec652faed428227b88f55346a51de0aae8648440d769e75"
+        },
+        {
+          "path": "commands/doctor.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 25108,
+          "sha256": "9dd89b6d6a360b58258105f5805693df31343482d863a6beaaf9c068cea9d5eb"
+        },
+        {
+          "path": "commands/explain-error.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 3031,
+          "sha256": "d35183b3f68a8df5d924011f783a9b7754c309b8b70f69ab66f1d43b72e226cb"
+        },
+        {
+          "path": "commands/sandbox.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 2639,
+          "sha256": "6eb2a8b6dccfc30136658e4b8a8bb84b9f0479f033c855f297785445d0642dbd"
+        },
+        {
+          "path": "commands/setup.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 12427,
+          "sha256": "9ceec2ce3d42db5c5e28505363e9ed65f60097d480955b5b60fb8a6fcb953603"
+        },
+        {
+          "path": "commands/test-accounts.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 3933,
+          "sha256": "c42357e562812d2025b307b8f11a473ab643e9574b3533f90731d556fc1958b3"
+        },
+        {
+          "path": "hooks/hooks.json",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1090,
+          "sha256": "6756605a79c07f604a24034fab4b77c4374d79f00725913201423efa21c2aee9"
+        },
+        {
+          "path": "package-lock.json",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 60552,
+          "sha256": "0eb8251afe530e33a3faea45c5a30d3d573e5923e44c1c9500577afa24d4fcaa"
+        },
+        {
+          "path": "package.json",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1062,
+          "sha256": "bd9ef939ce9f37e5d0389699afc6405253f1a099b138e97db350db27bd1a9291"
+        },
+        {
+          "path": "skills/paypal-best-practices/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 8135,
+          "sha256": "87419665a9d3ec20bef5dbff3272ee4d1c412c210b662811447c5df0d3d61112"
+        },
+        {
+          "path": "skills/paypal-best-practices/references/3d-secure.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 2204,
+          "sha256": "8717be582ee0acfcf7be047297f00a10f747ca9a74afe5ff6d7e3f05db04db4f"
+        },
+        {
+          "path": "skills/paypal-best-practices/references/agentic-commerce.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1811,
+          "sha256": "9438daa201c445198d5cbcf9d20415bc27f8b75591dcdb522feac517a259e5ae"
+        },
+        {
+          "path": "skills/paypal-best-practices/references/authentication.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1991,
+          "sha256": "2a604ece4c5258d16a6a8c1ed48f3eaf10730eed47fc85fea491aa27ee02ba86"
+        },
+        {
+          "path": "skills/paypal-best-practices/references/bnpl.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 2586,
+          "sha256": "1538e1a9c27db99f2987c6504420403a0c848c54d132d05b82dc327bd9a06252"
+        },
+        {
+          "path": "skills/paypal-best-practices/references/checkout.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 4522,
+          "sha256": "6b88084c6e6e7430fd2e51c726211f9d75f706bce64ea3c64dbf7d9b482645f7"
+        },
+        {
+          "path": "skills/paypal-best-practices/references/disputes-refunds.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 2193,
+          "sha256": "834b6ca1c5634cf2ed35e8068c9b3273153494c0da6b5491dd9193f32ee61375"
+        },
+        {
+          "path": "skills/paypal-best-practices/references/expanded-checkout.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 3242,
+          "sha256": "065706972391ead351ccfeacfc934b563d54cf885403e5208947ad439b73041e"
+        },
+        {
+          "path": "skills/paypal-best-practices/references/fastlane-braintree.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 20828,
+          "sha256": "9382141d6b2490203f9ef23b52c77f181f58b1eb3d5e8d1e1a20f3dbe0a4e44f"
+        },
+        {
+          "path": "skills/paypal-best-practices/references/fastlane.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 17657,
+          "sha256": "62207f577448879700010ae7971f0e8313189c8b7cf7dd11c1a01b55a869092e"
+        },
+        {
+          "path": "skills/paypal-best-practices/references/invoicing.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1488,
+          "sha256": "541b7baed82a136b8f6bb1e1372657083cb65a90d063851f174124b6ffab505f"
+        },
+        {
+          "path": "skills/paypal-best-practices/references/js-sdk-v6.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 29666,
+          "sha256": "4b2c9b8936d1788fd808d03eeb2c0e4747c69e64e4faaf003931525b5b90c3b4"
+        },
+        {
+          "path": "skills/paypal-best-practices/references/mcp-tools.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1678,
+          "sha256": "5f0d0dc27b59cfd8f15a2d0f2f1a64797dedaf4ffa4833d538d7eb261e2c0983"
+        },
+        {
+          "path": "skills/paypal-best-practices/references/payouts.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1744,
+          "sha256": "7d485119ca194a742fe4fbbdf5ed2d6e6b3bad38a9d38c7c7f2ee166da3b7b9d"
+        },
+        {
+          "path": "skills/paypal-best-practices/references/subscriptions.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 2082,
+          "sha256": "370890c28d76b81b942cc70f3272659b0f28e5a7903553ebc2047d328d8f726d"
+        },
+        {
+          "path": "skills/paypal-best-practices/references/venmo.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1920,
+          "sha256": "2bc8a539b752ea8af86db6f299414c538d1bb2fcfceca8422d80756a41648fb4"
+        },
+        {
+          "path": "skills/paypal-best-practices/references/webhooks.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 2010,
+          "sha256": "96f6b6bd2fb019de01622f29cfe7ab964c6744d722d31027ee538c8891087b1c"
+        },
+        {
+          "path": "skills/paypal-routing/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 13097,
+          "sha256": "75ef7ea2bd11c6ea6138f038bf61d3bb5c5e8021bc27803eda6424fce7573682"
+        }
+      ]
+    },
+    {
+      "name": "claude:ralph-loop",
+      "root": "claude-ralph-loop",
+      "repository": "https://github.com/anthropics/claude-plugins-official",
+      "commit": "0fbfda5a91f4adc311daca25acc99132f40f0b6e",
+      "pluginPath": "plugins/ralph-loop",
+      "ecosystem": "claude",
+      "files": [
+        {
+          "path": ".claude-plugin/plugin.json",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 343,
+          "sha256": "57d66d7f01fd65debae05d75733d8e6bf75d77a349224f340db27e40581cc4b7"
+        },
+        {
+          "path": "LICENSE",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 11358,
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+        },
+        {
+          "path": "README.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 6054,
+          "sha256": "ac7160078edef11c94d3611e89a4f50e3be18eed570999a4586218188a1da975"
+        },
+        {
+          "path": "commands/cancel-ralph.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 738,
+          "sha256": "7f3fd4218c50f66dbff586f1df1ae00255925b8d60809f99ccfae4a3ca9c923b"
+        },
+        {
+          "path": "commands/help.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 3227,
+          "sha256": "51bbd57d6edf8f50fb1273ed006da29e5322338d537f4153fbd66430b6e118c3"
+        },
+        {
+          "path": "commands/ralph-loop.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 916,
+          "sha256": "e15d5d0afe3097f6fcb54b6e4dbc686e2702efebbd7e6b38bee0c0d398ffba8f"
+        },
+        {
+          "path": "hooks/hooks.json",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 291,
+          "sha256": "cd60eabe587794c00c873c6f36d340f970c4b57ab9c5664d80c5a22915e74302"
+        },
+        {
+          "path": "hooks/stop-hook.sh",
+          "kind": "file",
+          "mode": 493,
+          "bytes": 7533,
+          "sha256": "13c547e77956e44f6af41d1be140f55da0e1ee3c55a540b530f48ee7c7ba9a11"
+        },
+        {
+          "path": "scripts/setup-ralph-loop.sh",
+          "kind": "file",
+          "mode": 493,
+          "bytes": 7044,
+          "sha256": "042341b82911d25992888de4d229b0b5cebf1d8c68783996d322916197aafcff"
+        }
+      ]
+    },
+    {
+      "name": "claude:stripe",
+      "root": "claude-stripe",
+      "repository": "https://github.com/stripe/ai",
+      "commit": "deae744bc0cbf6034b4b6f22f51c690b71a4e779",
+      "pluginPath": "providers/claude/plugin",
+      "ecosystem": "claude",
+      "files": [
+        {
+          "path": ".claude-plugin/plugin.json",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 379,
+          "sha256": "17837a5b7ddb627ffa6eba65cd013f3cb6175d7604b7fa89e3c6acfaef4eba10"
+        },
+        {
+          "path": ".mcp.json",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 108,
+          "sha256": "c8425624d85f6f4ed5e93465d5d423bf18ee8e0d1d3fe444e8fb22ed52614475"
+        },
+        {
+          "path": "agents/company-researcher.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 8131,
+          "sha256": "c7a14f4fb6c9e4ee1c51248eeca47e1e05d94e89b6230829a72857ab4aa7d9c1"
+        },
+        {
+          "path": "commands/explain-error.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 823,
+          "sha256": "4d1e56c4de18cf164ff9e227e15bb529b2d9bfc07d4e96d90d5e465a17774d6f"
+        },
+        {
+          "path": "commands/test-cards.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1015,
+          "sha256": "4e2496258654baac2ab3837a3c5d273f7acb1c45e46a58293d11a1e3df23104b"
+        },
+        {
+          "path": "hooks/hooks.json",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 2327,
+          "sha256": "8d083a4776e3de8d1d372ea7b991788daacc3c62edec1386ee4ede2cda7b97cb"
+        },
+        {
+          "path": "scripts/cli.mjs",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 2996,
+          "sha256": "36c1122931a5762ea9f810e45a4e0159ad11813edb08cbad6f8293e2d74f055c"
+        },
+        {
+          "path": "scripts/constants.mjs",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 202,
+          "sha256": "cf1517ae3ff78e77e3f7069ba5954fef3d928a1b3ec78b6861fc6f274931a51c"
+        },
+        {
+          "path": "scripts/feedback.mjs",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 5272,
+          "sha256": "8644c2e24998b62deace3094afac23286c4d0ee686651eb6b1cccc0c2deb3b87"
+        },
+        {
+          "path": "scripts/hookHelpers.mjs",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1363,
+          "sha256": "e0d9bdb79cd17214e75f84ddf860935883d74432a85b018a9ef8b4f7e24ee417"
+        },
+        {
+          "path": "scripts/lifecycle/postToolBatch.mjs",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 587,
+          "sha256": "e4f11394c8fe0072e2a60f76c7b4caf39ca58eefe75872cf6f163d8ff3bd60a3"
+        },
+        {
+          "path": "scripts/lifecycle/postToolUse.mjs",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 790,
+          "sha256": "570095f8996ade512dcccb02eb08fcb212f588d38e07221972e8b4faa4e101fd"
+        },
+        {
+          "path": "scripts/lifecycle/postToolUseFailure.mjs",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 396,
+          "sha256": "e439741b386f7c5b9341f0c9a60630e8b639ee9b6e2598ad98546fcab38d3f13"
+        },
+        {
+          "path": "scripts/lifecycle/sessionStart.mjs",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 391,
+          "sha256": "ece3275120f8cefdd69d633d9f3cf0a415b2ea1aa835fdd1c92b969ad2fc676c"
+        },
+        {
+          "path": "scripts/lifecycle/userPromptSubmit.mjs",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 514,
+          "sha256": "f0e18b68bf39afe91b689a5dbd797ed249048f8032281d9f31ffc6702b1e27a9"
+        },
+        {
+          "path": "scripts/transcriptHelpers.mjs",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 3861,
+          "sha256": "078ecbb85a597443ef8dd5730fe958f2c52946dbe55c9b1463676385dea14f9c"
+        },
+        {
+          "path": "skills/.gitkeep",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "path": "skills/connect-recommend/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 24329,
+          "sha256": "a98c07369a6b248f1bce16a41c53c6b98db4ce0c81c196b6d716bdf67ccd405e"
+        },
+        {
+          "path": "skills/connect-recommend/references/account-types.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 18981,
+          "sha256": "c248536f673c702284397b84ab3ebcdc401d333a8d6d2df6c92b8a8d38bed781"
+        },
+        {
+          "path": "skills/connect-recommend/references/charge-patterns.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 12280,
+          "sha256": "d947db1f26e3608d6f3a512a1d43bbee3961c174ff7ea8e9847e0edb1ab348f3"
+        },
+        {
+          "path": "skills/connect-recommend/references/company-researcher.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 7833,
+          "sha256": "fa423887f0290be0788cb36746f2f403ca6ec1bbf5a7ce5b599908fa2b7412ec"
+        },
+        {
+          "path": "skills/connect-recommend/references/compatibility-matrix.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 17903,
+          "sha256": "ecd211bc35556fc08740a2ccbb0777b31f86ae6c10a28596dd53294db095b039"
+        },
+        {
+          "path": "skills/connect-recommend/references/decision-matrix.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 38464,
+          "sha256": "cf2a491c1d43eaf3f3a032cb1fb40e88514c5b58a78879b520a577828d17a69e"
+        },
+        {
+          "path": "skills/connect-recommend/references/discovery-questions.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 20152,
+          "sha256": "832d8d2050f1201d07ec3026efaaa9a6bb4908ce4684ae9edfe954a6107a6edc"
+        },
+        {
+          "path": "skills/connect-recommend/references/recommendation-template.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 17707,
+          "sha256": "388f7baa3346bf778fb83a7981c2cdd73edb6a01a1394ef5291cf8094f044931"
+        },
+        {
+          "path": "skills/connect-recommend/references/terminology-rules.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 9109,
+          "sha256": "dc89a0370ac4dc2f3803ec0eb2501e41075e06f45bb6be5b54e320cf6427816c"
+        },
+        {
+          "path": "skills/connect-required-verification-information/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 28226,
+          "sha256": "a9c30050a332f34096905103990c6ee7decd4039809f9db10a5cbc26d9e3ea88"
+        },
+        {
+          "path": "skills/metronome/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 12986,
+          "sha256": "49be038cfe1d7b596233e7398e0cf25046a96b6e4729daaa7380802a858a1054"
+        },
+        {
+          "path": "skills/stripe-apps/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 7365,
+          "sha256": "da49a9a5c86187f3edc13ba3620a6a3c781fbdd1e8956dd0adbc2764679df322"
+        },
+        {
+          "path": "skills/stripe-apps/references/authentication.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 4746,
+          "sha256": "518017baf7302a769bbe2ddd853cf18079428db20591286f1f664b4845275373"
+        },
+        {
+          "path": "skills/stripe-apps/references/backend.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 4458,
+          "sha256": "d7b2348478bae5ed71dc1a117619269c74859a12bae170d0225901825ec04eab"
+        },
+        {
+          "path": "skills/stripe-apps/references/canonical-docs.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 4477,
+          "sha256": "855d0feb1bd77ad056089f8a7e5c59f72838494e484950c2538097dc235cd834"
+        },
+        {
+          "path": "skills/stripe-apps/references/discovery.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 9445,
+          "sha256": "1552d10191f5c0502686c3033d19e2ca1f23a59375b9a632c0e7d73fdb96036a"
+        },
+        {
+          "path": "skills/stripe-apps/references/extension-types.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 5245,
+          "sha256": "1f51c4ef3ca60bde4f226d1456e10a09806dbd7c0d2724ff972bfd0eda457f4a"
+        },
+        {
+          "path": "skills/stripe-apps/references/feedback.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1977,
+          "sha256": "590c74e49dc00150f3315df1b34636d75b733039f0d76bce582e8564928157dc"
+        },
+        {
+          "path": "skills/stripe-apps/references/onboarding-ux.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 2732,
+          "sha256": "837617d1ff7b13e6d01afdf1ab001e667e255e4fa5a9d512109dd5836c7aeca9"
+        },
+        {
+          "path": "skills/stripe-apps/references/publishing.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 5867,
+          "sha256": "73bc9173ecaf2109d67c08383da33fcef71a28812f1665073225c195b8d8cd05"
+        },
+        {
+          "path": "skills/stripe-apps/references/script-extensions.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 7512,
+          "sha256": "26ebf9b160c89450cb3b5cb3f8111cdc0d3d688cfb03b9531390d290f8240054"
+        },
+        {
+          "path": "skills/stripe-apps/references/ui-extensions.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 21177,
+          "sha256": "1129209f6e1bb8a926d9af4ddcea29c91dcc878d53491026ed28ca82e5082dd8"
+        },
+        {
+          "path": "skills/stripe-apps/references/webhooks.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 3436,
+          "sha256": "d96cd5c0088b6b41b61297a172834381ca5e95c3c697f139ee231c6a9005a752"
+        },
+        {
+          "path": "skills/stripe-apps/references/workflow.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 8648,
+          "sha256": "1c6009479ec71831c702ed7c417e8ca4306bf1dfee27990c3d3eb475389fb3cf"
+        },
+        {
+          "path": "skills/stripe-best-practices/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 6246,
+          "sha256": "2a85f02dbed48bb1e1863b80836151028512aa72f079467647a48833107acacc"
+        },
+        {
+          "path": "skills/stripe-best-practices/references/billing.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 10029,
+          "sha256": "85cf38ea5ca0b43da54d96a2b285abb467679f8e103595b524b801ebc00b7c5d"
+        },
+        {
+          "path": "skills/stripe-best-practices/references/connect.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 11016,
+          "sha256": "5da76cb728ab738f52b0838d5e5d4143a3aa91d73d842f69153e2a1f0ca9471f"
+        },
+        {
+          "path": "skills/stripe-best-practices/references/payments.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 9065,
+          "sha256": "f7edac576b72da7b5c11a4d532240bd11dab1f4c8dfe1d4040d16d5a6ec0fee0"
+        },
+        {
+          "path": "skills/stripe-best-practices/references/security.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 10047,
+          "sha256": "9d2b1f3a6e72d5907e0418291523c61aa27bb7ad2db3a7b94fe4f356519651d7"
+        },
+        {
+          "path": "skills/stripe-best-practices/references/tax.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 22897,
+          "sha256": "a0699c4f70892d09eab427636343f569b29aed1036e3d1292348fa28e0e3cf3c"
+        },
+        {
+          "path": "skills/stripe-best-practices/references/treasury.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 793,
+          "sha256": "ccd38ef29a654b2c59bde4d56e5537af6a89f10a7297ed0b87c3b9e9f2bb8ffa"
+        },
+        {
+          "path": "skills/stripe-directory/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 7856,
+          "sha256": "0805bce6792026e5963dc58f2844d6f18b626053b806c9bdf2220206c41206a6"
+        },
+        {
+          "path": "skills/stripe-docs/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1356,
+          "sha256": "af38e784edcdb2f1b273825705c749c1fb3a2614a25875d0705abde02eaa603f"
+        },
+        {
+          "path": "skills/stripe-pay/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 4452,
+          "sha256": "3577d363c3505a514c3f61a9cdc67d5b1df47bca4521cc2509043388f6bff623"
+        },
+        {
+          "path": "skills/stripe-projects/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 7002,
+          "sha256": "26e54941597899591447308388dd1c25bf8eb92dc7aa46c02a5ff3156eb14d50"
+        },
+        {
+          "path": "skills/upgrade-stripe/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 9357,
+          "sha256": "dc7186bcb0f731ddbcfe9e3518cd97c13e3b1e920cb19dac13cf346769622d88"
         }
       ]
     }

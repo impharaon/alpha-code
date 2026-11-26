@@ -20,7 +20,7 @@ test("main verifies the engine minted running video call and original admitted s
         directory: root,
         cacheRoot: root,
         signal: new AbortController().signal,
-        recipe: "test",
+        recipe: {speech:"test",frames:"test",media:"test"},
         progress: () => {},
         platform: "darwin-arm64",
         component: async () => {

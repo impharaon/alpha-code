@@ -33,7 +33,7 @@ test("another process reopens published results without process-local state", as
 })
 
 test("cancelling a lock waiter leaves the writer's published result usable", async () => {
-  const runtime: VideoRuntime = { cacheRoot: root, directory: root, recipe: "test", platform: "darwin-arm64", signal: new AbortController().signal, progress: () => {}, component: async () => { throw new Error("not used") } }
+  const runtime: VideoRuntime = { cacheRoot: root, directory: root, recipe: {speech:"test",frames:"test",media:"test"}, platform: "darwin-arm64", signal: new AbortController().signal, progress: () => {}, component: async () => { throw new Error("not used") } }
   let enter: () => void = () => {}
   let release: () => void = () => {}
   const entered = new Promise<void>((resolve) => { enter = resolve })

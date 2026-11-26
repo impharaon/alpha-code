@@ -61,11 +61,14 @@ test("signature finalization binds changed native bytes before the parent resour
   for (const file of ["server.js", "speech-worker.js"]) await writeFile(path.join(directory, file), "export {}\n")
   // Change bytes at our hash boundary; the actual signer is checked once on a
   // copied bundle. This fixture does not pretend to contain a code signature.
+  const before=await checkVideoRuntime(directory,"darwin-arm64")
   const native = path.join(directory, "node-whisper.node")
   await writeFile(native, Buffer.concat([await readFile(native), Buffer.from("signature-test-boundary")]))
   await expect(checkVideoRuntime(directory, "darwin-arm64")).rejects.toThrow("content mismatch")
   finalizeVideoSignatures(resources)
   const manifest = await checkVideoRuntime(directory, "darwin-arm64")
+  expect(manifest.buildIdentities).toEqual(before.buildIdentities)
+  expect(manifest.files["node-whisper.node"]).not.toBe(before.files["node-whisper.node"])
   const declaration = JSON.parse(await readFile(path.join(resources, "office-mcp/tools.json"), "utf8"))
   expect(declaration.formats.video.codeSha256["video-mcp/node-whisper.node"]).toBe(manifest.files["node-whisper.node"])
   expect(declaration.formats.video.codeSha256["video-mcp/runtime.json"]).toBeDefined()

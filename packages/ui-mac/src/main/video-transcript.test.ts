@@ -9,7 +9,7 @@ import { fail, type VideoRuntime } from "../../resources/video-mcp/runtime"
 
 const root = await mkdtemp(path.join(tmpdir(), "video-transcript-"))
 afterAll(() => rm(root, { recursive: true, force: true }))
-const runtime: VideoRuntime = { directory: root, cacheRoot: root, recipe: "verified-assets-recipe", signal: new AbortController().signal, platform: "darwin-arm64", progress: () => {}, component: async () => fail("component_download_failed", "No models in cache projection test") }
+const runtime: VideoRuntime = { directory: root, cacheRoot: root, recipe: {speech:"verified-assets-recipe",frames:"verified-assets-recipe",media:"verified-assets-recipe"}, signal: new AbortController().signal, platform: "darwin-arm64", progress: () => {}, component: async () => fail("component_download_failed", "No models in cache projection test") }
 
 test("cached complete transcript is projected by overlap without recognizing again or requiring the moved source", async () => {
   const source = await sourceOf({ kind: "path", path: path.join(import.meta.dir, "fixtures/video/speech-en.wav") }, runtime)
@@ -20,7 +20,7 @@ test("cached complete transcript is projected by overlap without recognizing aga
   source.aliases = []
   expect(await transcriptOf(source, { startMs: 1800, endMs: 2500 }, runtime)).toEqual({ sourceId: source.sourceId, range: { startMs: 1800, endMs: 2500 }, segments: [segments[0]], cached: true })
   expect((await transcriptOf(source, undefined, runtime)).segments).toEqual(segments)
-  await expect(transcriptOf(source, undefined, { ...runtime, recipe: "changed-assets-recipe" })).rejects.toThrow("no longer available")
+  await expect(transcriptOf(source, undefined, { ...runtime, recipe: {speech:"changed-assets-recipe",frames:"changed-assets-recipe",media:"changed-assets-recipe"} })).rejects.toThrow("no longer available")
 })
 
 test("worker routes speechless covered chunks through SenseVoice without calling LID",async()=>{

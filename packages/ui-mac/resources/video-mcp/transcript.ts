@@ -7,7 +7,7 @@ import type { VideoRuntime } from "./runtime"
 
 export type Transcript = { sourceId: string; range: TimeRange; segments: TranscriptSegment[]; cached: boolean }
 export const overlaps = (segment: TimeRange, range: TimeRange) => segment.endMs > range.startMs && segment.startMs < range.endMs
-export const transcriptRecipe = (info: MediaInfo, runtime: VideoRuntime) => digest(`${runtime.recipe}:audio-0:${info.audioStartMs}`)
+export const transcriptRecipe = (info: MediaInfo, runtime: VideoRuntime) => digest(`${runtime.recipe.speech}:audio-0:${info.audioStartMs}`)
 
 export async function transcriptOf(source: Source, range: TimeRange | undefined, runtime: VideoRuntime): Promise<Transcript> {
   const info = await mediaInfo(source, runtime)

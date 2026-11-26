@@ -21,6 +21,7 @@ export type BundledVideoRuntime = {
   platform: VideoRuntime["platform"]
   files: Record<string, string>
   components: Record<string, string>
+  buildIdentities: {speech:Record<string,string>;frames:Record<string,string>}
 }
 
 export function videoInvocation(args: readonly string[], bundleDirectory: string): VideoInvocation | undefined {
@@ -65,15 +66,7 @@ export async function createVideoRuntime(
     if ((await fileDigest(absolute)) !== expected)
       fail("component_download_failed", "A bundled video dependency failed its content check.")
   }
-  const recipe = digest(
-    JSON.stringify({
-      algorithm: "video-local-v1",
-      pins: pins.files
-        .filter((pin) => pin.target === "any" || pin.target === platform)
-        .map((pin) => [pin.id, pin.sha256]),
-      bundled: bundled.files,
-    }),
-  )
+  const recipe = Object.fromEntries((["speech","frames","media"] as const).map(kind=>[kind,digest(JSON.stringify({algorithm:"video-local-v1",pins:pins.files.filter(pin=>(pin.target === "any" || pin.target === platform) && (kind === "speech" ? pin.family === "speech-model" : pin.family === "ffmpeg" || kind === "frames" && platform === "win32-x64" && pin.family === "ocr-model")).map(pin=>[pin.id,pin.sha256]),native:kind === "media" ? {} : bundled.buildIdentities[kind]}))])) as VideoRuntime["recipe"]
   const runtime: VideoRuntime = {
     directory: input.directory,
     cacheRoot: input.cacheRoot,

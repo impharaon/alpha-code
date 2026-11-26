@@ -16,7 +16,7 @@ export async function clipMedia(
   requireRange(range, info)
   const video = info.streams.some((stream) => stream.kind === "video")
   if (output.kind === "gif" && !video) fail("no_video_stream", "This source has no video stream for a GIF.")
-  const key = digest(`${runtime.recipe}:${JSON.stringify(range)}:${JSON.stringify(output)}`)
+  const key = digest(`${runtime.recipe.media}:${JSON.stringify(range)}:${JSON.stringify(output)}`)
   const directory = cachePath(runtime, "clips", source.sourceId, key)
   const manifest = `${directory}/complete.json`
   const previous = await readPublished<{ path: string; mime: string; durationMs: number }>(manifest)

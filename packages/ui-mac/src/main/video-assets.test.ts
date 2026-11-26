@@ -11,7 +11,7 @@ afterAll(() => rm(root, { recursive: true, force: true }))
 // This is our bundle-inventory schema, not a forged model/codec response.
 await writeFile(
   path.join(root, "runtime.json"),
-  JSON.stringify({ platform: `${process.platform}-${process.arch}`, files: {}, components: {} }),
+  JSON.stringify({ platform: `${process.platform}-${process.arch}`, files: {}, components: {}, buildIdentities:{speech:{},frames:{}} }),
 )
 const invocation = { directory: root, cacheRoot: path.join(root, "persistent-cache"), bundleDirectory: root + path.sep }
 
@@ -164,5 +164,7 @@ test("processing recipes ignore unrelated bundled bytes and post-signing digests
  const first=await inventory("before-signing"),second=await inventory("after-signing")
  expect(second.recipe).toEqual(first.recipe)
  const speech=await inventory("after-signing","new-speech-build")
- expect(speech.recipe).not.toEqual(second.recipe)
+ expect(speech.recipe.speech).not.toEqual(second.recipe.speech)
+ expect(speech.recipe.frames).toBe(second.recipe.frames)
+ expect(speech.recipe.media).toBe(second.recipe.media)
 })

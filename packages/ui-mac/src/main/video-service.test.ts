@@ -70,7 +70,7 @@ test("local video progress carries full processing facts over the actual SDK bef
   const received: unknown[] = []
   const directory = await mkdtemp(path.join(tmpdir(), "video-progress-"))
   const runtime: import("../../resources/video-mcp/runtime").VideoRuntime = {
-    directory, cacheRoot: directory, recipe: "wire-only", platform: "darwin-arm64", signal: new AbortController().signal, progress: () => {},
+    directory, cacheRoot: directory, recipe: {speech:"wire-only",frames:"wire-only",media:"wire-only"}, platform: "darwin-arm64", signal: new AbortController().signal, progress: () => {},
     async component() {
       await this.progress({ phase: "decoding", completed: 1500, total: 9000, unit: "ms" })
       await observed.promise

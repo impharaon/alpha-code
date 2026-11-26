@@ -50,7 +50,7 @@ export async function framesOf(source: Source, selection: FrameSelection, runtim
     if (selection.timesMs.some((time) => time >= info.durationMs))
       fail("range_invalid", "The requested frame lies outside the source duration.")
   } else requireRange(selection.range, info)
-  const key = digest(`${runtime.recipe}:${JSON.stringify(selection)}`)
+  const key = digest(`${runtime.recipe.frames}:${JSON.stringify(selection)}`)
   const manifest = cachePath(runtime, "frames", source.sourceId, `${key}.json`)
   const found = await readPublished<Frame[]>(manifest)
   if (found) return { sourceId: source.sourceId, frames: found.map((item) => frame.parse(item)), cached: true }
@@ -113,7 +113,7 @@ export async function framesOf(source: Source, selection: FrameSelection, runtim
     const created: string[] = []
     try {
       for (const entry of selected) {
-        const id = digest(`${source.sourceId}:${entry.actualMs}:${runtime.recipe}`)
+        const id = digest(`${source.sourceId}:${entry.actualMs}:${runtime.recipe.frames}`)
         const existing = frames.find((item) => item.id === id)
         if (existing) {
           frames.push({ ...existing, ...entry })

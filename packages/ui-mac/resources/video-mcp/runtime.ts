@@ -8,7 +8,7 @@ export type VideoRuntime = {
   cacheRoot: string
   // Fingerprint of the algorithm plus the actual pinned asset digests for this
   // platform (including lazy language/OCR assets). The preparer owns that list.
-  recipe: string
+  recipe: {speech:string;frames:string;media:string}
   component: (name: ComponentName) => Promise<PreparedComponent>
   signal: AbortSignal
   progress: (update: VideoProgress) => void | Promise<void>

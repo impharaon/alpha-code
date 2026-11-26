@@ -32,6 +32,7 @@ export async function checkVideoRuntime(directory: string, target: VideoTarget) 
     files: Record<string, string>
     components: Record<string, string>
     buildFingerprint: string
+    buildIdentities: {speech:Record<string,string>;frames:Record<string,string>}
   }
   if (manifest.platform !== target) throw new Error("Video runtime target mismatch")
   const binaries = Object.keys(manifest.files).filter(
@@ -84,9 +85,11 @@ export async function writeVideoRuntimeInventory(
     }
   }
   await visit(directory)
+  const native=Object.entries(files).filter(([file])=>/\.(node|dylib|dll|so|metallib)$/.test(file) || file === components.ocr)
+  const buildIdentities={speech:Object.fromEntries(native.filter(([file])=>!file.startsWith("helpers/"))),frames:Object.fromEntries(native.filter(([file])=>file.startsWith("helpers/")))}
   await writeFile(
     path.join(directory, "runtime.json"),
-    `${JSON.stringify({ platform: target, components, files: Object.fromEntries(Object.entries(files).sort(([left], [right]) => left.localeCompare(right))), buildFingerprint }, null, 2)}\n`,
+    `${JSON.stringify({ platform: target, components, buildIdentities, files: Object.fromEntries(Object.entries(files).sort(([left], [right]) => left.localeCompare(right))), buildFingerprint }, null, 2)}\n`,
   )
   return checkVideoRuntime(directory, target)
 }

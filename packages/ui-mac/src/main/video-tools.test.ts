@@ -16,7 +16,7 @@ afterAll(() => rm(root, { recursive: true, force: true }))
 const runtime: VideoRuntime = {
   directory: root,
   cacheRoot: root,
-  recipe: "test",
+  recipe: {speech:"test",frames:"test",media:"test"},
   signal: new AbortController().signal,
   platform: "darwin-arm64",
   progress: () => {},
@@ -107,7 +107,7 @@ test("understand's real MCP executor publishes its local prepared clip without a
   source.info={durationMs:40,startMs:0,audioStartMs:0,videoStartMs:0,streams:[{kind:"video",codec:"mpeg4"}]}
   await writeJson(cachePath(runtime,"sources",`${source.sourceId}.json`),source)
   const range={startMs:0,endMs:40}
-  const key=digest(`${runtime.recipe}:${JSON.stringify(range)}:${JSON.stringify({kind:"clip"})}`)
+  const key=digest(`${runtime.recipe.media}:${JSON.stringify(range)}:${JSON.stringify({kind:"clip"})}`)
   const directory=cachePath(runtime,"clips",source.sourceId,key)
   await mkdir(directory,{recursive:true})
   const target=path.join(directory,"cached.mp4")

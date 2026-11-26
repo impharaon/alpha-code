@@ -11,7 +11,7 @@ afterAll(() => rm(root, { recursive: true, force: true }))
 const runtime: VideoRuntime = {
   directory: root,
   cacheRoot: path.join(root, "cache"),
-  recipe: "test",
+  recipe: {speech:"test",frames:"test",media:"test"},
   signal: new AbortController().signal,
   platform: "darwin-arm64",
   progress: () => {},

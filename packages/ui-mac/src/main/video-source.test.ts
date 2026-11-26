@@ -7,7 +7,7 @@ import { fail, mediaFailure, type VideoRuntime } from "../../resources/video-mcp
 
 const root = await mkdtemp(path.join(tmpdir(), "video-source-"))
 afterAll(() => rm(root, { recursive: true, force: true }))
-const runtime: VideoRuntime = { directory: root, cacheRoot: path.join(root, "cache"), recipe: "test", platform: "darwin-arm64", signal: new AbortController().signal, progress: () => {}, component: async () => fail("component_download_failed", "No components are prepared in this filesystem-only test") }
+const runtime: VideoRuntime = { directory: root, cacheRoot: path.join(root, "cache"), recipe: {speech:"test",frames:"test",media:"test"}, platform: "darwin-arm64", signal: new AbortController().signal, progress: () => {}, component: async () => fail("component_download_failed", "No components are prepared in this filesystem-only test") }
 
 test("source identity hashes real media once, reconciles paths and detects a changed file", async () => {
   const first = path.join(root, "one.wav")

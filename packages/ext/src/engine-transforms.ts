@@ -64,7 +64,12 @@ export function projectServerConfig(entry: unknown): Mcp.ServerConfig | undefine
     ...(base.type === "local" && typeof entry.cwd === "string" ? { cwd: entry.cwd } : {}),
     ...(base.type === "remote" ? oauthOf(entry.oauth) : {}),
     ...(entry.enabled === true ? { disabled: false } : {}),
-    ...(typeof entry.timeout === "number" ? { timeout: { startup: entry.timeout, catalog: entry.timeout, execution: entry.timeout } } : {}),
+    ...(typeof entry.timeout === "number" || isObj(entry.timeouts) ? { timeout: {
+      ...(typeof entry.timeout === "number" ? { startup: entry.timeout, catalog: entry.timeout, execution: entry.timeout } : {}),
+      ...(isObj(entry.timeouts) && typeof entry.timeouts.startupMs === "number" ? { startup: entry.timeouts.startupMs } : {}),
+      ...(isObj(entry.timeouts) && typeof entry.timeouts.catalogMs === "number" ? { catalog: entry.timeouts.catalogMs } : {}),
+      ...(isObj(entry.timeouts) && typeof entry.timeouts.executionMs === "number" ? { execution: entry.timeouts.executionMs } : {}),
+    } } : {}),
   } as Mcp.ServerConfig
 }
 

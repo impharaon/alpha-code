@@ -67,3 +67,9 @@ review_after: 2027-05-09
 新引擎以 Schema 为底层，Core 和 Protocol 在其上，Server 位于入口层。Client
 消费 Schema 和 Protocol，SDK 组合由 sdk-next 持有。Code Puppy 桌面宿主通过已声明的
 接缝使用引擎和 UI；渲染进程通过公开 IPC 访问宿主能力。上游包的工作状态不属于本组合的交付状态。
+
+## 标准插件的配置与数据
+
+`packages/ui-mac/src/main/plugin-package-config.ts` 是包选项的唯一写入方：设置沿现有文件事务提交，敏感值复用版本化 MCP secret resource，公开授权状态只含普通值和秘密是否已设置。`src/shared/installed-plugin-settings.ts` 持有私有设置形状、DATA 路径派生及模型可见普通选项读取；设置与 immutable generation/CAS 分开。
+
+`plugin-package-data.ts` 消费 server 从实际 sidecar 围栏快照发布的 dataHome，创建和清理各包 DATA；更新/关闭保留，整包卸载不跟随目录内符号链接。`src/shared/plugin-mcp-config.ts` 在运行边界绑定规范化 MCP 的 Text/argv、选项和环境，随后消费 ext 的唯一 `projectServerConfig`。`packages/ext/src/plugin-package-tools.ts` 在 awaited context hook 改长 MCP 函数的模型别名，保留定义对象和原执行身份。

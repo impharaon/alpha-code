@@ -49,7 +49,7 @@ export type McpServerTruthReadDeps = {
 
 export type McpServerTruthRead = { ok: true; absent: boolean; servers: McpServerRecord[] } | { ok: false; reason: string }
 
-const RECORD_KEYS: readonly string[] = ["name", "url", "headers", "timeout", "oauth"]
+const RECORD_KEYS: readonly string[] = ["name", "url", "headers", "timeout", "timeouts", "oauth"]
 const TOP_KEYS: readonly string[] = ["v", "servers"]
 
 function isRecord(v: unknown): v is Record<string, unknown> {
@@ -79,7 +79,7 @@ export function invalidMcpServerRecord(entry: unknown, label: string): string | 
   const unexpected = Object.keys(entry).filter((k) => !RECORD_KEYS.includes(k))
   if (unexpected.length) return `${label} has unexpected key(s): ${unexpected.join(", ")}`
   if (typeof entry.name !== "string" || !isExtensionName(entry.name)) return `${label}.name is not an extension name: ${JSON.stringify(entry.name)}`
-  if (typeof entry.url !== "string" || !parsesAsUrl(entry.url)) return `${label}.url is not a URL: ${JSON.stringify(entry.url)}`
+  if (typeof entry.url !== "string" || !parsesAsUrl(entry.url) && !/\$\{[^}]+\}/.test(entry.url)) return `${label}.url is not a URL: ${JSON.stringify(entry.url)}`
   if (entry.headers !== undefined) {
     if (!isRecord(entry.headers)) return `${label}.headers is not an object`
     for (const [k, v] of Object.entries(entry.headers)) if (typeof v !== "string") return `${label}.headers[${JSON.stringify(k)}] is not a string`

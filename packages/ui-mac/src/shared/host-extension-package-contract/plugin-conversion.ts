@@ -70,9 +70,9 @@ export async function convertPluginTree(input: Capture): Promise<{ package: Plug
     if (!object(value) || !["string", "number", "boolean"].includes(String(value.type)) || value.default !== undefined && (typeof value.default !== value.type || typeof value.default === "number" && !Number.isFinite(value.default))) {
       diagnostics.push({ path: source.path, field: "/userConfig/" + escapePointer(key), code: "invalid-definition", message: "Invalid plugin option type or default" }); continue
     }
-    const secret = value.sensitive === true && value.default !== undefined ? credentialNeed(key, { componentId: "$package", file: source.path, pointer: "/userConfig/" + escapePointer(key) + "/default", sensitive: true, needs: optionNeeds, credentials: optionCredentials, replace: () => {} }, String(value.default)) : undefined
+    const secret = value.sensitive === true ? credentialNeed(key, { componentId: "$package", file: source.path, pointer: "/userConfig/" + escapePointer(key) + "/default", sensitive: true, needs: optionNeeds, credentials: optionCredentials, replace: () => {} }, value.default === undefined ? undefined : String(value.default)) : undefined
     options[key] = { type: value.type as "string" | "number" | "boolean", title: string(value.title) ?? key, description: string(value.description) ?? "", required: value.required === true, sensitive: value.sensitive === true, ...(value.default === undefined ? {} : { default: secret ? { secret } : value.default as string | number | boolean }) }
-    if (secret) { replacePointer(documents.get(source.path)!, "/userConfig/" + escapePointer(key) + "/default", "{secret:" + secret + "}"); optionChanged.add(source.path) }
+    if (secret && value.default !== undefined) { replacePointer(documents.get(source.path)!, "/userConfig/" + escapePointer(key) + "/default", "{secret:" + secret + "}"); optionChanged.add(source.path) }
   }
   if (codex && files.has(".app.json")) {
     const apps = json(".app.json")
@@ -170,6 +170,17 @@ export async function convertPluginTree(input: Capture): Promise<{ package: Plug
     const entry = mcpEntry(definition, id, text)
     if (!entry) { diagnostics.push({ path: definition.path, field: definition.pointer, code: "invalid-definition", message: "MCP definition has invalid connection fields" }); continue }
     if (winner === definition) entries.push(entry)
+  }
+  for (const [file, document] of documents) {
+    const visit = (value: unknown, pointer: string) => {
+      if (typeof value === "string") for (const part of pluginText(value)) {
+        if (typeof part === "string" || !("option" in part) || !options[part.option]?.sensitive) continue
+        credentialNeed(part.option, { componentId: "$package", file, pointer, sensitive: true, needs, credentials, replace: () => {} })
+      }
+      if (Array.isArray(value)) value.forEach((child, index) => visit(child, pointer + "/" + index))
+      else if (object(value)) for (const [key, child] of Object.entries(value)) visit(child, pointer + "/" + escapePointer(key))
+    }
+    visit(document, "")
   }
   const replacements = new Map<string, Uint8Array>([...changed].map((path) => [path, new TextEncoder().encode(JSON.stringify(documents.get(path), null, 2) + "\n")]))
   const tree = input.nodes.map((node): TreeNode => {

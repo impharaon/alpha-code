@@ -121,12 +121,12 @@ export function InstalledPackageDetail(props: {
       setBusy(false)
     }
   }
-  const tokenAccount = () => { const entry = account(); return entry?.kind === "secret" ? entry : undefined }
+  const tokenAccount = () => { const entry = account(); return entry?.kind === "secret" || entry?.kind === "option" ? entry : undefined }
   // 名称旁的一个词:取第一件没做完的账户事。
   const pending = () => {
-    const item = items().find((entry) => (entry.kind === "secret" ? !entry.saved : entry.kind === "mcp-oauth" ? !entry.authenticated : false))
+    const item = items().find((entry) => (entry.kind === "option" ? entry.required && !entry.configured : entry.kind === "secret" ? !entry.saved : entry.kind === "mcp-oauth" ? !entry.authenticated : false))
     if (!item) return undefined
-    return item.kind === "secret"
+    return item.kind === "option" ? t("codepuppy.ext.packagePendingConfig") : item.kind === "secret"
       ? t(item.prerequisiteId === "mcp:dbhub-readonly#DSN" ? "codepuppy.ext.packagePendingSqliteAddress" : "codepuppy.ext.packagePendingToken")
       : t("codepuppy.ext.packagePendingLogin")
   }
@@ -161,12 +161,12 @@ export function InstalledPackageDetail(props: {
             {(item) => (
               <div class="codepuppy-ext-kv-row">
                 <span class="k">
-                  {t(item.kind === "secret" ? (item.prerequisiteId === "mcp:dbhub-readonly#DSN" ? "codepuppy.ext.packageSqliteAddress" : "codepuppy.ext.packageToken") : "codepuppy.ext.packageAccount", {
+                  {item.kind === "option" ? item.label : t(item.kind === "secret" ? (item.prerequisiteId === "mcp:dbhub-readonly#DSN" ? "codepuppy.ext.packageSqliteAddress" : "codepuppy.ext.packageToken") : "codepuppy.ext.packageAccount", {
                     name: props.label,
                   })}
                 </span>
                 <span class="v">
-                  {item.kind === "secret"
+                  {item.kind === "option" ? item.configured ? String(item.value ?? "••••") : "—" : item.kind === "secret"
                     ? t(item.saved ? "codepuppy.ext.packageTokenSaved" : item.prerequisiteId === "mcp:dbhub-readonly#DSN" ? "codepuppy.ext.packagePendingSqliteAddress" : "codepuppy.ext.packagePendingToken")
                     : item.kind === "mcp-oauth"
                       ? t(item.authenticated ? "codepuppy.ext.packageAccountReady" : "codepuppy.ext.packagePendingLogin")
@@ -188,7 +188,7 @@ export function InstalledPackageDetail(props: {
                         if (item.kind === "mcp-oauth") void submit()
                       }}
                     >
-                      {item.kind === "secret"
+                      {item.kind === "option" ? t("codepuppy.ext.packageConfigure") : item.kind === "secret"
                         ? t(item.saved ? "codepuppy.ext.packageChangeToken" : item.prerequisiteId === "mcp:dbhub-readonly#DSN" ? "codepuppy.ext.packageFillSqliteAddress" : "codepuppy.ext.packageFillToken")
                         : t(
                             item.kind === "mcp-oauth" && item.authenticated

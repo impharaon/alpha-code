@@ -1,6 +1,7 @@
+import { pluginDataDirectory } from "../shared/installed-plugin-settings"
 import { sha256Hex } from "./ext-manifest-v2"
 import { expect, spyOn, test } from "bun:test"
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync, statSync, symlinkSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { captureFixture, captureWholeFixture, captureStandardFixture, fixtureRoot } from "../../test-fixtures/plugin-helper/fixture"
@@ -88,6 +89,15 @@ test("whole plugin removal deletes its owned tree without treating member skills
   if (!before.ok) throw Error(before.reason)
   const graph = before.packageGraphs[0]!
   const store = join(h.root, "ext-store", graph.pluginTree!.storeKey)
+  const data = pluginDataDirectory(join(h.temporary, "data"), installed.packageId)
+  expect(statSync(data).mode & 0o777).toBe(0o700)
+  writeFileSync(join(data, "state"), "persistent")
+  const outside = join(h.temporary, "outside")
+  mkdirSync(outside)
+  writeFileSync(join(outside, "retained"), "unrelated")
+  symlinkSync(outside, join(data, "link"))
+  expect((await setPackageStateV1({ packageId: installed.packageId, state: "disabled" }, { globalRoot: () => h.root, environment: () => "dev", advisoryGate: () => ({ allowed: true }), resolvePackage: async () => { throw Error("not catalog") } })).ok).toBe(true)
+  expect(readFileSync(join(data, "state"), "utf8")).toBe("persistent")
   const flat = join(h.root, "skills/using-superpowers/SKILL.md")
   mkdirSync(join(h.root, "skills/using-superpowers"), { recursive: true })
   const bytes = Buffer.from(await capture.readFile("skills/using-superpowers/SKILL.md"))
@@ -95,6 +105,8 @@ test("whole plugin removal deletes its owned tree without treating member skills
   const unused = () => { throw Error("No independent component files may be removed") }
   expect(uninstallPackageV1(installed.packageId, { globalRoot: () => h.root, installers: { removeFsInstall: unused, removeMcpConfig: unused, removeCommandConfig: unused, removeMcpSecretsStrict: unused, releaseCodePuppyConnectionBindings: unused, removePluginPath: unused, removeInstallGrants } })).toMatchObject({ ok: true })
   expect(existsSync(store)).toBe(false)
+  expect(existsSync(data)).toBe(false)
+  expect(readFileSync(join(outside, "retained"), "utf8")).toBe("unrelated")
   expect(readFileSync(flat)).toEqual(bytes)
   const after = readPackageLedgerStateV1(h.root)
   expect(after.ok && after.records).toEqual([])
@@ -530,25 +542,30 @@ test("R12 A4 identical package bytes update the same identity when the requested
  expect(readdirSync(a)).toEqual([]);expect(readdirSync(b)).toEqual([])
 }))
 
-test("R12 A5 unsupported real command agent and hook entries explain nothing-runnable without ledger writes", () => installerHarness(async h => {
+test("R12 A5 unsupported real command agent and hook entries retain whole package content and explain runtime status", () => installerHarness(async h => {
   for (const [name, kinds] of [["explanatory-output-style", ["hook"]], ["pr-review-toolkit", ["command", "agent", "agent", "agent", "agent", "agent", "agent"]]] as const) {
     const result = await h.install(h.request(await h.candidate(name), "r12_unsupported_" + name))
-    expect(result).toMatchObject({ ok: false, code: "nothing-runnable" })
-    if (result.ok || result.code !== "nothing-runnable") throw Error("expected unsupported components")
+    expect(result).toMatchObject({ ok: true })
+    if (!result.ok) throw Error("expected content installation")
     expect(result.notRunning.map(entry => entry.kind).sort()).toEqual([...kinds].sort())
     expect(result.notRunning.every(entry => entry.reason === "kind-not-supported-yet" && !!entry.sourceName)).toBe(true)
   }
-  expect(readPackageLedgerStateV1(h.root)).toMatchObject({ ok: true, records: [], packageGraphs: [] })
+  const state = readPackageLedgerStateV1(h.root)
+  expect(state.ok && state.packageGraphs).toHaveLength(2)
+  expect(state.ok && state.records.every(record => record.kind === "bundle")).toBe(true)
 }))
 
-test("R14 A6 an unpublishable substituted remote leaf leaves no committed package", () => installerHarness(async h => {
+test("R14 A6 an unresolved environment URL preserves installed content until runtime binding", () => installerHarness(async h => {
  const capture=await captureFixture("external_plugins/context7")
  const definition=JSON.parse(new TextDecoder().decode(await capture.readFile(".mcp.json")))
  const prepared=await h.sources.prepareCapture(await captureFixture("external_plugins/context7",{".mcp.json":JSON.stringify({...definition,mcpServers:{...definition.mcpServers,context7:{...definition.mcpServers.context7,url:"${WHOLE_URL}",oauth:false}}})}))
  if(prepared.kind!=="package")throw Error("expected a real package variant")
- expect(await h.install(h.request(prepared.candidateId,"r14_remote_publish"))).toMatchObject({ok:false,code:"transaction-failed"})
- expect(readPackageLedgerStateV1(h.root)).toMatchObject({ok:true,records:[],packageGraphs:[]})
- expect(readMcpLeafStrict("context7")).toMatchObject({ok:true,value:undefined})
+ const installed=await h.install(h.request(prepared.candidateId,"r14_remote_publish"))
+ expect(installed).toMatchObject({ok:true})
+ const state=readPackageLedgerStateV1(h.root)
+ expect(state.ok&&state.packageGraphs).toHaveLength(1)
+ if(!installed.ok)throw Error(installed.detail)
+ expect(readMcpLeafStrict(installed.installed[0]!.hostName)).toMatchObject({ok:true,value:{url:"${WHOLE_URL}"}})
 }))
 
 for(const kind of ["agent","command"] as const)test("R14 A7 catalog "+kind+" schedules a non-force content reload",()=>installerHarness(async h=>{
@@ -591,7 +608,7 @@ test("review C5 one real multi-component transaction rolls back a mid-populate f
   try {
     expect(await h.install(h.request(id, "c5_failed"))).toMatchObject({ ok: false, code: "transaction-failed" })
     expect(populated).toBe(1)
-    expect(probe.mock.calls[0]![1].items.map(item => item.action)).toEqual([undefined, "receipt", "config"])
+    expect(probe.mock.calls[0]![1].items.map(item => item.action)).toEqual([undefined, "receipt", "file", "config"])
     expect(probe).toHaveBeenCalledTimes(1)
     const failed = readPackageLedgerStateV1(h.root)
     expect(failed.ok && failed.records).toEqual([])
@@ -762,4 +779,45 @@ test("plugin service settings save typed values and keep sensitive values out of
     }
     expect(readFileSync(join(h.root, "installs.json"), "utf8")).not.toContain("fixture-secret-do-not-publish")
   }
+}))
+
+test("plugin MCP runtime binds saved options and DATA while content retains references", () => installerHarness(async h => {
+  const { savePackageSecretsV1 } = await import("./package-admission")
+  const { installedPluginDescription } = await import("./plugin-package-config")
+  const { bindPluginMcp } = await import("../shared/plugin-mcp-config")
+  const { readInstalledPluginSettings } = await import("../shared/installed-plugin-settings")
+  const { connectorCredentials } = await import("./package-mcp-activation")
+  const { resolveConnectorLeaf } = await import("@opencode/util/codepuppy-credentials")
+  const capture = await captureStandardFixture("claude:grafana-mcp")
+  const converted = await convertPluginTree(capture)
+  h.sources.convertCandidate = async () => ({ ok: true, ...converted, capture, runtimeIdentity: undefined })
+  const installed = await h.install(h.request("grafana", "grafana_bind"))
+  if (!installed.ok) throw Error(installed.detail)
+  const state = readPackageLedgerStateV1(h.root)
+  if (!state.ok) throw Error(state.reason)
+  const graph = state.packageGraphs[0]!
+  const metadata = installedPluginDescription(h.root, graph)!
+  const entry = metadata.description.entries.find(entry => entry.kind === "mcp")!
+  if (entry.kind !== "mcp") throw Error("Real Grafana sample has MCP")
+  const deps = { root: () => h.root, userDataPath: h.temporary, casBaseRoot: () => h.temporary, environment: () => "dev" as const, loadVerifiedCatalog: async () => { throw Error("no catalog") } }
+  const bind = () => bindPluginMcp({ description: metadata.description, entry, settings: readInstalledPluginSettings(h.root, graph.pluginTree!.storeKey)!, pluginRoot: metadata.pluginRoot, projectDir: h.temporary,
+    resolveEnvironment: () => undefined, resolveSecret: () => undefined,
+    resolveOptionSecret: reference => {
+      const value = resolveConnectorLeaf({ server: graph.root.name, leaf: { environment: { value: reference } }, ...connectorCredentials({ root: deps.root, userDataPath: () => h.temporary }) }) as { environment: { value: string } }
+      return value.environment.value
+    },
+  })
+  expect(bind).toThrow(/missing-config: grafana_(url|service_account_token)/)
+  expect(await savePackageSecretsV1({ packageId: installed.packageId, options: { grafana_url: "http://localhost:3000", grafana_service_account_token: "runtime-only-fixture-token" } }, deps)).toMatchObject({ ok: true })
+  const bound = bind()
+  expect(bound).toMatchObject({ type: "local", command: ["docker", "run", "--rm", "-i", "-e", "GRAFANA_URL", "-e", "GRAFANA_SERVICE_ACCOUNT_TOKEN", "grafana/mcp-grafana", "-t", "stdio"], environment: { GRAFANA_URL: "http://localhost:3000", GRAFANA_SERVICE_ACCOUNT_TOKEN: "runtime-only-fixture-token", CLAUDE_PLUGIN_DATA: pluginDataDirectory(join(h.temporary, "data"), installed.packageId) } })
+  expect(JSON.stringify(graph)).not.toContain("runtime-only-fixture-token")
+  const settingsFile = join(h.root, "ext-store", graph.pluginTree!.storeKey, "package-settings.json")
+  const previous = readFileSync(settingsFile)
+  const refs = Object.values(readInstalledPluginSettings(h.root, graph.pluginTree!.storeKey)!.secretRefs)
+  expect(await savePackageSecretsV1({ packageId: installed.packageId, options: { grafana_service_account_token: "replacement-token" } }, { ...deps, transaction: (root, plan, hooks) => runExtensionTransaction(root, plan, { ...hooks, probePrepared: () => ({ healthy: false, reason: "injected option resource failure" }) }) })).toMatchObject({ ok: false })
+  expect(readFileSync(settingsFile)).toEqual(previous)
+  expect(refs.every(ref => existsSync(ref.slice(6, -1)))).toBe(true)
+  expect(await savePackageSecretsV1({ packageId: installed.packageId, options: { grafana_service_account_token: "replacement-token" } }, deps)).toMatchObject({ ok: true })
+  expect(refs.every(ref => existsSync(ref.slice(6, -1)))).toBe(false)
 }))

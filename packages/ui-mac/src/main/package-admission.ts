@@ -1,3 +1,4 @@
+import { pluginOptionAuthorization, savePluginOptions } from "./plugin-package-config"
 import { buildPluginPackageTxItems, pluginHostName, pluginComponentId, pluginMcpConfig, needsPluginFiles } from "./plugin-package-install"
 import { FACTORY_SKILL_IDS } from "./factory-skills"
 import type { PluginPackage, Entry } from "../shared/host-extension-package-contract/plugin-package"
@@ -472,7 +473,7 @@ async function resolveInstalledPackage(packageId: unknown, deps: PackageAdmissio
 export async function readPackageAuthorizationV1(packageId: unknown, deps: PackageAdmissionDeps): Promise<PackageAuthorizationResultV1> {
   const resolved = await resolveInstalledPackage(packageId, deps)
   if (!resolved.ok) return { ok: false, reason: resolved.reason }
-  const items: PackageAuthorizationItemV1[] = []
+  const items: PackageAuthorizationItemV1[] = pluginOptionAuthorization(deps.root(), resolved.graph)
   if (!resolved.facts) {
     for (const entry of resolved.declarations) {
       const leaf = entry.kind === "mcp" ? readMcpLeafStrict(entry.hostName) : undefined
@@ -523,7 +524,12 @@ export async function readPackageAuthorizationV1(packageId: unknown, deps: Packa
 export async function savePackageSecretsV1(input: unknown, deps: PackageAdmissionDeps): Promise<PackageActionResultV1> {
   if (!input || typeof input !== "object" || Array.isArray(input)) return { ok: false, reason: "invalid package credential action" }
   const raw = input as Record<string, unknown>
-  if (Object.keys(raw).some((key) => key !== "packageId" && key !== "secrets")) return { ok: false, reason: "invalid package credential action" }
+  if (Object.keys(raw).some((key) => key !== "packageId" && key !== "secrets" && key !== "options")) return { ok: false, reason: "invalid package credential action" }
+  if (raw.options !== undefined) {
+    if (raw.secrets !== undefined && (!decodeStringMap(raw.secrets) || Object.keys(raw.secrets as object).length)) return { ok: false, reason: "invalid plugin settings action" }
+    const resolved = await resolveInstalledPackage(raw.packageId, deps)
+    return resolved.ok ? savePluginOptions(resolved.graph, raw.options, deps) : { ok: false, reason: resolved.reason }
+  }
   const secrets = decodeStringMap(raw.secrets)
   if (!secrets || Object.values(secrets).some((value) => !value.length)) return { ok: false, reason: "invalid package credentials" }
   const resolved = await resolveInstalledPackage(raw.packageId, deps)
@@ -556,6 +562,7 @@ export async function savePackageSecretsV1(input: unknown, deps: PackageAdmissio
     const built = buildMcpTxItems({
       effect: resolved.graph.effect,
       root: deps.root(), key: packageChildTxKeyV1("mcp", record.name), name: record.name,
+      source: resolved.graph.pluginTree ? "plugin" : "connector",
       ...component.definition, manifestDigest: record.manifestDigest!, receipt: { ...record },
       userDataPath: deps.userDataPath,
       secretValues: secrets, newSecretVersionId: deps.secretVersionId ?? newMcpSecretVersionId,
@@ -1219,7 +1226,7 @@ async function executePreparedPackage(
       for (const skill of plugin.skills) Object.assign(skill, { desiredState: receipt.desiredState, manifestDigest: receipt.manifestDigest, grantDigest: receipt.grantDigest, installedAt: now })
       for (const entry of plugin.mcps) {
         const hostName = plugin.names.get(entry.id)!
-        const needs = plugin.description.secrets.filter(need => need.componentId === entry.id)
+        const needs = plugin.description.secrets.filter(need => need.componentId === entry.id && JSON.stringify(entry).includes('"secret":"' + need.id + '"'))
         const leaf = pluginMcpConfig(entry)
         const mcp = buildMcpTxItems({ root, key: "mcp--" + hostName, name: hostName, receipt: { ...receipt, id: pluginComponentId(prepared.facts.envelope.prelude.packageId, entry, hostName, "catalog"), name: hostName, kind: "mcp" }, capabilities: [], manifestDigest, userDataPath: deps.userDataPath, effect: lifecycle.graph.effect, newSecretVersionId: deps.secretVersionId ?? newMcpSecretVersionId, leaf, secretNeeds: needs.map(need => ({ needId: need.id })), secretValues: Object.fromEntries(needs.map(need => [need.id, intent.grants?.secrets?.[component.accepted.component.id + "#" + need.id] ?? ""])) })
         if (!mcp.ok) return { ok: false, reason: mcp.reason }

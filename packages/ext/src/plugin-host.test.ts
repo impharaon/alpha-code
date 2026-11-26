@@ -1615,3 +1615,33 @@ itWithPermission.live("D3/I-10 installing the user's own plugin asks once in eve
   expect(Exit.isFailure(automation.exit)).toBe(true)
   expect(JSON.stringify(automation.exit)).toContain("Permission denied: codepuppy_hub_create")
 }))
+
+it.live("long plugin MCP names are aliased by the awaited context hook without copying definitions", () => Effect.gen(function* () {
+  env({})
+  const { captureStandardFixture } = yield* Effect.promise(() => import("../../ui-mac/test-fixtures/plugin-helper/fixture"))
+  const { mcpToolMark } = yield* Effect.promise(() => import("../../core/src/tool/codepuppy-mcp-tool-mint"))
+  const converted = yield* Effect.promise(() => captureStandardFixture("claude:cloudinary").then(convertPluginTree))
+  const root = join(scratch, "codepuppy-state/env/dev")
+  const key = "bundle--long-mcp-alias"
+  const live = join(root, "ext-store", key, "generations/gen-000001-abcdef")
+  mkdirSync(live, { recursive: true })
+  const hostNames = Object.fromEntries(converted.package.entries.map((entry, index) => [entry.id, "service-" + index]))
+  const source = converted.package.entries.find(entry => entry.kind === "mcp")!
+  const server = hostNames[source.id]!
+  writeFileSync(join(live, "plugin-package.json"), JSON.stringify({ description: converted.package, hostNames }))
+  writeFileSync(join(root, "ext-store", key, "current.json"), JSON.stringify({ generation: "gen-000001-abcdef" }))
+  writeFileSync(join(root, "ext-store", key, "package-settings.json"), JSON.stringify({ packageId: "claude:cloudinary", dataHome: join(scratch, "data"), values: {}, secretRefs: {}, versions: {} }))
+  const name = "get_asset_" + "details_".repeat(8)
+  const effective = server + "_" + name
+  yield* activate({ id: "mcp-alias-registered-tool" as never, async setup(context) {
+    await context.tool.transform(editor => editor.add({ name, options: { namespace: server, codemode: false }, ...mcpToolMark(server, name), description: "asset details", input: { type: "object" }, execute: async () => ({ content: "original tool" }) }))
+  } })
+  const definition = { description: "asset details", input: { type: "object" } }
+  yield* activate(CodePuppyExt)
+  const hooks = yield* PluginHooks.Service
+  const shaped = yield* hooks.trigger("session", "context", { ...contextEvent([]), tools: { [effective]: definition } })
+  expect(Object.keys(shaped.tools)).toHaveLength(1)
+  expect(Object.keys(shaped.tools)[0]!.length).toBe(64)
+  expect(shaped.tools[effective]).toBeUndefined()
+  expect(Object.values(shaped.tools)[0]).toBe(definition)
+}))

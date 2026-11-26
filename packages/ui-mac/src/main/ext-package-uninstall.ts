@@ -1,3 +1,5 @@
+import { readInstalledPluginSettings, INSTALLED_PLUGIN_SETTINGS_FILE } from "../shared/installed-plugin-settings"
+import { removePluginData } from "./plugin-package-data"
 // ext-package-uninstall — REQ-128 `#698`:整包卸载,以及 update 时**离场 child** 的实物清除。
 //
 // 为什么必须有这个入口:`#706` 之后,一个属于 Bundle 的 child 被直接卸载会被响亮拒绝
@@ -112,6 +114,17 @@ export function removePackageChildArtifactsV1(
   const warnings: string[] = []
   for (const child of children) {
     if (child.kind === "bundle") {
+      const settings = readInstalledPluginSettings(root, packageChildTxKeyV1("bundle", child.name))
+      if (settings) {
+        try { removePluginData(settings.dataHome, settings.packageId) }
+        catch { return { ok: false, reason: "Plugin data could not be removed", removed, warnings } }
+        if (Object.keys(settings.secretRefs).length) {
+          const secrets = installers.removeMcpSecretsStrict(child.name)
+          if (!secrets.ok) return { ok: false, reason: secrets.reason, removed, warnings }
+        }
+        try { fs.rmSync(path.join(root, "ext-store", packageChildTxKeyV1("bundle", child.name), INSTALLED_PLUGIN_SETTINGS_FILE), { force: true }) }
+        catch { return { ok: false, reason: "Plugin settings could not be removed", removed, warnings } }
+      }
       const store = removeOwnedGenerationStoreInLock(root, packageChildTxKeyV1("bundle", child.name))
       removed.push(...store.removed)
       warnings.push(...store.warnings)

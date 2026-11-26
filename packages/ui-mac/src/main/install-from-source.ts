@@ -1,3 +1,6 @@
+import { pluginDataHome, preparePluginData, discardPreparedPluginData } from "./plugin-package-data"
+import { pluginSettingsItem, preparePluginOptionSecrets } from "./plugin-package-config"
+import { readInstalledPluginSettings } from "../shared/installed-plugin-settings"
 import { buildPluginPackageTxItems, pluginHostName, pluginComponentId, pluginMcpConfig, needsPluginFiles } from "./plugin-package-install"
 import { convertCreatedPlugin } from "./created-plugin"
 import { renderPluginText } from "../shared/host-extension-package-contract/plugin-package"
@@ -49,6 +52,7 @@ type Dependencies = Pick<
   "globalRoot" | "casBaseRoot" | "environment" | "advisoryGate" | "resolvePackage"
 > & {
   userDataPath: string
+  dataHome?: () => string
   sources: Pick<ReturnType<typeof createPluginSources>, "convertCandidate" | "catalogComparisons" | "searchedSources" | "release">
   catalogInstall(catalogId: string, request: InstallRequestV1): Promise<InstallOutcomeV1>
   activateMcp(packageId: string): Promise<unknown>
@@ -157,7 +161,7 @@ export function createSourceInstaller(deps: Dependencies) {
             return []
           }
           if (
-            (!wholePackage || entry.kind === "mcp") && needsPluginFiles(
+            !wholePackage && needsPluginFiles(
               entry,
               converted.package.tree.map((node) => node.path),
             )
@@ -168,12 +172,23 @@ export function createSourceInstaller(deps: Dependencies) {
           const hostName = sameSource?.declarations?.find(item => item.kind === entry.kind && item.sourceName === entry.sourceName)?.hostName ?? pluginHostName(entry, packageId, names, name => entry.kind !== "skill" || !!sameSource || uncuratedSkillFreshGate(deps.globalRoot(), name).ok)
           return [{ entry, hostName }]
         })
-      if (!mapped.length)
+      if (!mapped.length && !wholePackage)
         return { ok: false, code: "nothing-runnable", detail: "No runnable components in this source", notRunning }
       const builds: PackageTxBuildV1[] = []
       const skillReceipts: UpsertInput[] = []
       const rootName = "plugin-" + sha256Hex(packageId).slice(0, 24)
       const rootKey = "bundle--" + rootName
+      const existingSettings = readInstalledPluginSettings(deps.globalRoot(), rootKey)
+      const settings = wholePackage ? structuredClone(existingSettings ?? { packageId, dataHome: (deps.dataHome ?? pluginDataHome)(), values: {}, secretRefs: {}, versions: {} }) : undefined
+      const optionDefaults = Object.fromEntries(Object.entries(converted.package.options ?? {}).flatMap(([key, option]) => {
+        if (!settings || typeof option.default !== "object" || settings.secretRefs[option.default.secret]) return []
+        const bytes = converted.privateCredentials.get(option.default.secret)
+        if (!bytes) return []
+        const value = new TextDecoder().decode(bytes)
+        return [[key, option.type === "string" ? value : JSON.parse(value) as number | boolean]]
+      }))
+      const optionPrepared = settings ? preparePluginOptionSecrets({ description: converted.package, settings, server: rootName, userDataPath: deps.userDataPath, values: optionDefaults }) : undefined
+      let preparedData: ReturnType<typeof preparePluginData> | undefined
       const installedNames = new Map(mapped.map(item => [item.entry.id, item.hostName]))
       const declarations: PackageDeclarationV1[] = []
       const nodes: PackageGraphNodeV1[] = []
@@ -248,7 +263,7 @@ export function createSourceInstaller(deps: Dependencies) {
           const leaf = pluginMcpConfig(entry)
           declaration.mcp = leaf
           declaration.secretNeeds = converted.package.secrets
-            .filter((need) => need.componentId === entry.id)
+            .filter((need) => need.componentId === entry.id && JSON.stringify(entry).includes('"secret":"' + need.id + '"'))
             .map((need) => ({ needId: need.id, label: need.label }))
           if (entry.transport !== "stdio" && entry.oauth !== false && !declaration.secretNeeds.length)
             declaration.login = { serverUrl: renderText(entry.url) }
@@ -260,6 +275,7 @@ export function createSourceInstaller(deps: Dependencies) {
           }
           const build = buildMcpTxItems({
             ...common,
+            source: wholePackage ? "plugin" : "connector",
             userDataPath: deps.userDataPath,
             newSecretVersionId: newMcpSecretVersionId,
             leaf,
@@ -288,6 +304,7 @@ export function createSourceInstaller(deps: Dependencies) {
       }) : undefined
       if (rootBuild && !rootBuild.ok) return { ok: false, code: "transaction-failed", detail: rootBuild.reason }
       if (rootBuild?.ok) builds.unshift(rootBuild.build)
+      if (settings && rootBuild?.ok) rootBuild.build.items.push(pluginSettingsItem(rootKey, settings))
       const graph: PackageGraphV1 = {
         packageId,
         envelopeDigest: converted.package.treeDigest,
@@ -334,7 +351,7 @@ export function createSourceInstaller(deps: Dependencies) {
         claimMutations: planPackageClaimTransferV1(diff.diff),
         childRemovals: departing.map((node) => ({ kind: node.kind, name: node.name })),
       }
-      const prepared = builds.flatMap((build) => (build.prepared ? [build.prepared] : []))
+      const prepared = [...builds.flatMap((build) => (build.prepared ? [build.prepared] : [])), ...(optionPrepared ? [optionPrepared] : [])]
       const result = await runExtensionTransaction(
         deps.globalRoot(),
         { items, ...(prepared.length ? { prepared: prepared.map((resource) => resource.descriptor) } : {}) },
@@ -342,6 +359,7 @@ export function createSourceInstaller(deps: Dependencies) {
           populate: (item, directory) => {
             const build = builds.find((build) => build.items.some((candidate) => candidate.key === item.key))
             build?.populate(item, directory)
+            if (settings && !preparedData) preparedData = preparePluginData(settings.dataHome, packageId)
           },
           probe: builds[0]!.probe,
           precondition: () => {
@@ -378,8 +396,10 @@ export function createSourceInstaller(deps: Dependencies) {
           commitReceipt: (records) => commitTransactionLedger(deps.globalRoot(), records),
         },
       )
-      if (!result.ok)
+      if (!result.ok) {
+        if (preparedData?.created) discardPreparedPluginData(preparedData.directory)
         return { ok: false, code: "transaction-failed", detail: "Package transaction failed at " + result.stage }
+      }
       for (const build of builds.filter((build) => build.receipt.kind === "mcp")) {
         const leaf = build.items[0]!.config!.edits[0]!.value as Record<string, unknown>
         if (leaf.type === "remote") {

@@ -5,13 +5,12 @@ import { renderInstalledSkill } from "../shared/host-extension-package-contract/
 import {
   canonicalPluginJson,
   pluginTreeDigest,
-  renderPluginText, validPluginPackage,
+  validPluginPackage,
   type Entry,
   type Text,
   type PluginPackage,
   type TreeNode,
 } from "../shared/host-extension-package-contract/plugin-package"
-import type { McpConfigLeafV1 } from "../shared/plugin-install"
 import { materializePluginTreeFromCas, putCasBlobFromBuffer } from "./ext-cas"
 import { extensionHealthProbeRouter } from "./ext-health-probe-router"
 import { probeLedgerForWrite, type UpsertInput } from "./ext-receipt-v2"
@@ -163,35 +162,7 @@ export function pluginComponentId(packageId: string, entry: { kind: string; sour
   return "user:" + (hostName ?? pluginHostName({ ...entry, sourcePath: "" }, packageId, new Set(), () => true))
 }
 
-/** Existing v1 MCP leaf projection for the converter's normalized entries. */
-export function pluginMcpConfig(entry: Extract<Entry, { kind: "mcp" }>): McpConfigLeafV1 {
-  const render = (text: Text) => renderPluginText(text, { pluginRoot: "${CLAUDE_PLUGIN_ROOT}", projectDir: "${CLAUDE_PROJECT_DIR}" })
-  return entry.transport === "stdio"
-    ? {
-        type: "local",
-        command: entry.command.map(render),
-        environment: Object.fromEntries(Object.entries(entry.environment).map(([key, value]) => [key, render(value)])),
-        ...(entry.cwd ? { cwd: render(entry.cwd) } : {}),
-        ...(entry.timeoutMs === undefined ? {} : { timeout: entry.timeoutMs }),
-      }
-    : {
-        type: "remote",
-        url: render(entry.url),
-        headers: Object.fromEntries(Object.entries(entry.headers).map(([key, value]) => [key, render(value)])),
-        ...(entry.timeoutMs === undefined ? {} : { timeout: entry.timeoutMs }),
-        ...(entry.oauth === false
-          ? { oauth: false }
-          : entry.oauth?.oauth
-            ? {
-                oauth: {
-                  ...(entry.oauth.oauth.clientId ? { clientId: entry.oauth.oauth.clientId } : {}),
-                  ...(entry.oauth.oauth.clientSecret ? { clientSecret: render(entry.oauth.oauth.clientSecret) } : {}),
-                  ...(entry.oauth.oauth.scopes ? { scope: entry.oauth.oauth.scopes.join(" ") } : {}),
-                },
-              }
-            : {}),
-      }
-}
+export { pluginMcpConfig } from "../shared/plugin-mcp-config"
 
 export function needsPluginFiles(entry: Extract<Entry, { kind: "mcp" | "skill" }>, paths: string[]): boolean {
   const binding = (text: Text) =>

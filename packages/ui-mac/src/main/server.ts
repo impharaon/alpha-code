@@ -1,5 +1,6 @@
 import type { CodePuppySidecarHost } from "./hub-view"
 import { engineClient } from "./engine-client"
+import { publishPluginDataHome, publishPluginEnvironment } from "./plugin-package-data"
 import { clearOfficialConnectorRuntime, clearOfficialConnectorRuntimeOnExit, officialAvailabilityPublished, restoreCommittedOfficialConnectors } from "./official-connector-resources"
 import { createHash } from "node:crypto"
 import { existsSync } from "node:fs"
@@ -287,7 +288,7 @@ function refreshConfiguredEgressDestinations(userDataPath: string): void {
  * The plan's own W1 list (the authority that rendered the profile) travels with it; required when fenceRun is set.
  * `configFenceRoots`: the protected configuration directories that same plan rendered (eligibility reads them, below).
  */
-type PlannedFence = ProcessFenceStartInput & { workspaces?: readonly string[]; configFenceRoots?: readonly string[] }
+type PlannedFence = ProcessFenceStartInput & { workspaces?: readonly string[]; configFenceRoots?: readonly string[]; roots?: ProcessFencePlan["roots"] }
 
 type ProductionFenceInput = {
   userDataPath: string
@@ -696,6 +697,8 @@ export async function spawnLocalServer(
   // literal deny keeps it uncovered), which can be issued once more; a second extension for the same directory is
   // harmless (DESIGN-engine-config-fence D14). A definite consume failure, or a failure before any token existed, may retry.
   const possiblyConsumed = new Set<string>()
+  publishPluginDataHome((fence?.roots ?? resolveEngineRoots(sidecarEnv, sidecarEnv.HOME!)).dataHome)
+    publishPluginEnvironment(sidecarEnv)
   // The one source of this generation's write roots: the exact profile bytes it applies, parsed by the renderer's
   // module (its allow rules and, after them, the protected deny blocks). An unrecognised form leaves this undefined, and
   // every directory then counts as covered (no issue).

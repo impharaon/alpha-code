@@ -37,7 +37,11 @@ export type NotRunningReasonV1 =
 export type PackageNotRunningV1 = { kind: string; sourceName: string; reason: NotRunningReasonV1 }
 
 /** Installed package account view: declarations and presence/status only, never secret references. */
+export type PackageOptionValuesV1 = Record<string, string | number | boolean>
+export type PackageSettingsIntentV1 = { packageId: string; secrets?: Record<string, string>; options?: PackageOptionValuesV1 }
+
 export type PackageAuthorizationItemV1 =
+  | { kind: "option"; componentId: string; prerequisiteId: string; serviceName: string; label: string; key: string; type: "string" | "number" | "boolean"; description: string; required: boolean; sensitive: boolean; configured: boolean; value?: string | number | boolean }
   | { kind: "secret"; componentId: string; prerequisiteId: string; serviceName: string; label: string; saved: boolean }
   | { kind: "mcp-oauth"; componentId: string; prerequisiteId: string; serviceName: string; label: string; authenticated: boolean; status: string }
   | { kind: "connection"; componentId: string; prerequisiteId: string; serviceName: string; label: string; ready: boolean }

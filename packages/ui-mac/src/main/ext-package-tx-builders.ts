@@ -148,6 +148,7 @@ export type AgentTxBuildInputV1 = CommonInput & { asset?: Buffer; agentEntry?: R
  *  `{template, description?, agent?, model?, subtask?}`。本层不解释其内容,只落 config。 */
 export type CommandTxBuildInputV1 = CommonInput & { commandEntry?: Record<string, unknown> }
 export type McpTxBuildInputV1 = CommonInput & {
+  source?: "plugin" | "connector"
   effect?: PackageEffectV1
   userDataPath: string
   /** 用户本次提交的密钥明文(只在 populate 闭包内用,不进描述符、不进 receipt)。 */
@@ -401,7 +402,7 @@ export function buildMcpTxItems(input: McpTxBuildInputV1): PackageTxBuildResultV
         : undefined
   )
   if (!config) return { ok: false, reason: "profile cannot build an MCP transaction" }
-  const valid = validateServer(config)
+  const valid = validateServer(config, input.source ?? "connector")
   if (!valid.ok) return { ok: false, reason: valid.reason }
   receipt.configKey = `mcp.${input.name}`
   const items: TxPlanItem[] = [

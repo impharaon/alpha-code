@@ -200,3 +200,22 @@ describe("authority minting (ADR-041 §5)", () => {
     })
   })
 })
+
+// MCP entries use the real engine issuer, including the otherwise unforgeable registration mark.
+test("long plugin MCP aliases retain the original definition and case-sensitive tool identity", async () => {
+  const { aliasPluginMcpTools } = await import("../plugin-package-tools")
+  const server = { hostName: "cloudinary-a123456789", sourceName: "Cloudinary", packageId: "claude:cloudinary" }
+  const names = ["get_asset_" + "details_".repeat(8), "Get_asset_" + "details_".repeat(8), "short"]
+  const registered = names.map(name => ({ id: mcpEffectiveName(server.hostName, name), name, options: { namespace: server.hostName }, ...mcpToolMark(server.hostName, name) }))
+  const definitions = names.map(() => ({ description: "MCP tool", input: { type: "object" } }))
+  const tools = Object.fromEntries(registered.map((tool, index) => [tool.id, definitions[index]!]))
+  aliasPluginMcpTools(tools, registered, [server])
+  expect(Object.keys(tools)).toHaveLength(3)
+  expect(Object.keys(tools).every(name => name.length <= 64)).toBe(true)
+  expect(tools[registered[0]!.id]).toBeUndefined()
+  expect(tools[registered[1]!.id]).toBeUndefined()
+  expect(Object.values(tools).filter(value => value === definitions[0])).toHaveLength(1)
+  expect(Object.values(tools).filter(value => value === definitions[1])).toHaveLength(1)
+  expect(tools[registered[2]!.id]).toBe(definitions[2])
+  expect(Object.keys(tools).filter(name => name.length === 64).every(name => /_[a-f0-9]{10}$/.test(name))).toBe(true)
+})

@@ -1,3 +1,4 @@
+import { aliasPluginMcpTools } from "./plugin-package-tools"
 import { existsSync, readFileSync, readdirSync } from "node:fs"
 import { join } from "node:path"
 import { pathToFileURL } from "node:url"
@@ -42,7 +43,7 @@ import { agentSampling, applyAgents, applyProjectMcp, commandDefinitions, remove
 import { postActivationTail } from "./post-activation-tail"
 import type { AgentEditor } from "@opencode/plugin/promise/agent"
 import type { SkillEditor } from "@opencode/plugin/promise/skill"
-import { allInstalledPluginSkills, installedPluginSkill } from "./plugin-package-skills"
+import { allInstalledPluginSkills, allInstalledPluginPackages, installedPluginSkill } from "./plugin-package-skills"
 import { renderPluginText } from "../../ui-mac/src/shared/host-extension-package-contract/plugin-package"
 import { Skill } from "../../schema/src/skill"
 import { AbsolutePath } from "../../schema/src/schema"
@@ -296,6 +297,13 @@ export const CodePuppyExt: Plugin.Plugin = {
         if (bootstrap.network.egressProxy) processState().hubBridge.network.context(context.location.directory, event)
       })
       for (const name of ["context", "compaction", "generate", "title"] as const) await context.session.hook(name, assembleRequest)
+      await context.session.hook("context", async event => {
+        const servers = allInstalledPluginPackages(bootstrap.paths.globalRoot).flatMap(installed => installed.description.entries.flatMap(entry => {
+          const hostName = installed.hostNames[entry.id]
+          return entry.kind === "mcp" && hostName && installed.settings ? [{ hostName, sourceName: entry.sourceName, packageId: installed.settings.packageId }] : []
+        }))
+        aliasPluginMcpTools(event.tools, await context.tool.list(), servers)
+      })
       // REQ-236 `#1562`:平台代理节点的凭据每次请求现读,续期热应用不必重启引擎;读不到就抛,请求不发出。
       // 写在 http.request:2.x 的路由层在 model.request 之后才按 apiKey 写 Authorization(packages/ai/src/route/auth.ts),
       // 那里加的头会被注入的占位 apiKey 盖掉;http.request 拿到的是鉴权之后、即将发出的请求(#1662 parity B4)。
@@ -510,7 +518,7 @@ export const CodePuppyExt: Plugin.Plugin = {
             editor.add({ id: Skill.ID.make(id), name: Skill.Name.make(skill.name), path: AbsolutePath.make(skill.path),
               ...(typeof skill.entry.display.description === "string" ? { description: skill.entry.display.description } : {}),
               autoinvoke: skill.entry.invocation.implicitInvocation,
-              content: renderPluginText(skill.entry.instruction, { pluginRoot: skill.pluginRoot, skillDir: skill.directory, projectDir: directory }),
+              content: renderPluginText(skill.entry.instruction, { pluginRoot: skill.pluginRoot, skillDir: skill.directory, projectDir: directory, pluginData: skill.pluginData, resolveOption: skill.resolveOption }),
             })
           }
         },

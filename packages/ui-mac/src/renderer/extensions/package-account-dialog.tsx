@@ -32,11 +32,11 @@ export function PackageAccountDialog(props: {
   const items = () => {
     if (authorization.error) return []
     const value = authorization()
-    return value?.ok ? value.items.filter(item => item.kind === "secret") : []
+    return value?.ok ? value.items.filter(item => item.kind === "secret" || item.kind === "option") : []
   }
   const selected = () => items().find(item => item.prerequisiteId === props.needId)
   const fields = () => items().filter(item => selected() && item.componentId === selected()!.componentId && item.serviceName === selected()!.serviceName)
-  const [values, setValues] = createSignal<Record<string, string>>({})
+  const [values, setValues] = createSignal<Record<string, string | number | boolean>>({})
   createEffect(on(() => [props.packageId, props.needId], () => setValues({})))
   const [busy, setBusy] = createSignal(false)
   const [error, setError] = createSignal("")
@@ -47,8 +47,17 @@ export function PackageAccountDialog(props: {
     setBusy(true)
     setError("")
     try {
-      const secrets = Object.fromEntries(Object.entries(values()).filter(([, value]) => value.length > 0))
-      const result = await props.save({ packageId: props.packageId, secrets })
+      const options = Object.fromEntries(fields().flatMap(item => {
+        const value = values()[item.prerequisiteId]
+        if (item.kind !== "option" || value === undefined) return []
+        if (item.type === "number" && (String(value).trim() === "" || !Number.isFinite(Number(value)))) throw Error("Invalid number")
+        return [[item.key, item.type === "number" ? Number(value) : value]]
+      }))
+      const secrets = Object.fromEntries(fields().flatMap(item => {
+        const value = values()[item.prerequisiteId]
+        return item.kind === "secret" && typeof value === "string" && value.length ? [[item.prerequisiteId, value]] : []
+      }))
+      const result = await props.save({ packageId: props.packageId, ...(selected()?.kind === "option" ? { options } : { secrets }) })
       if (!result.ok) {
         setError(extensionError(result.reason, "codepuppy.ext.packageCredentialSaveFailed"))
         return
@@ -63,20 +72,25 @@ export function PackageAccountDialog(props: {
     }
   }
   return (
-    <Dialog open onClose={close} size="sm" title={t("codepuppy.ext.packageTokenTitle", { name: props.label })}
+    <Dialog open onClose={close} size="sm" title={t(selected()?.kind === "option" ? "codepuppy.ext.packageSettingsTitle" : "codepuppy.ext.packageTokenTitle", { name: props.label })}
       footer={<Button variant="primary" loading={busy()} onClick={() => void submit()}>{t("codepuppy.ext.packageSaveToken")}</Button>}>
-      <p>{t(props.needId === "mcp:dbhub-readonly#DSN" ? "codepuppy.ext.packageSqlitePurpose" : "codepuppy.ext.packageTokenPurpose", { name: props.label })}</p>
+      <p>{t(selected()?.kind === "option" ? "codepuppy.ext.packageSettingsPurpose" : props.needId === "mcp:dbhub-readonly#DSN" ? "codepuppy.ext.packageSqlitePurpose" : "codepuppy.ext.packageTokenPurpose", { name: props.label })}</p>
       <Show when={tokenUrl(props.packageId, props.source)}>
         {url => <button class="codepuppy-ext-link" onClick={() => void window.api.openLink(url())}>{t("codepuppy.ext.packageGithubTokenLink")}</button>}
       </Show>
       <For each={fields()}>
         {item => (
           <label class="codepuppy-ext-flabel">
-            {item.prerequisiteId === "mcp:github-official#GITHUB_PERSONAL_ACCESS_TOKEN" ? t("codepuppy.ext.officialGithubPat") : item.prerequisiteId === "mcp:dbhub-readonly#DSN" ? t("codepuppy.ext.officialSqliteDsn") : fields().length > 1 ? item.label : t("codepuppy.ext.packageToken", { name: props.label })}
-            <input class="codepuppy-ext-input" type="password" autocomplete="off"
-              placeholder={t(item.prerequisiteId === "mcp:github-official#GITHUB_PERSONAL_ACCESS_TOKEN" ? "codepuppy.ext.officialGithubPat" : item.prerequisiteId === "mcp:dbhub-readonly#DSN" ? "codepuppy.ext.officialSqliteDsn" : "codepuppy.ext.packageTokenPlaceholder")}
-              value={values()[item.prerequisiteId] ?? ""}
-              onInput={event => setValues(current => ({ ...current, [item.prerequisiteId]: event.currentTarget.value }))} />
+            {item.kind === "option" ? item.label : item.prerequisiteId === "mcp:github-official#GITHUB_PERSONAL_ACCESS_TOKEN" ? t("codepuppy.ext.officialGithubPat") : item.prerequisiteId === "mcp:dbhub-readonly#DSN" ? t("codepuppy.ext.officialSqliteDsn") : fields().length > 1 ? item.label : t("codepuppy.ext.packageToken", { name: props.label })}
+            <Show when={item.kind === "option"}><small>{item.kind === "option" ? item.description : ""}</small></Show>
+            <Show when={item.kind === "option" && item.type === "boolean"} fallback={
+              <input class="codepuppy-ext-input" type={item.kind === "option" && !item.sensitive ? item.type === "number" ? "number" : "text" : "password"} autocomplete="off"
+                value={String(values()[item.prerequisiteId] ?? (item.kind === "option" ? item.value ?? "" : ""))}
+                onInput={event => setValues(current => ({ ...current, [item.prerequisiteId]: event.currentTarget.value }))} />
+            }>
+              <input type="checkbox" checked={(values()[item.prerequisiteId] ?? (item.kind === "option" ? item.value : false)) === true}
+                onChange={event => setValues(current => ({ ...current, [item.prerequisiteId]: event.currentTarget.checked }))} />
+            </Show>
           </label>
         )}
       </For>

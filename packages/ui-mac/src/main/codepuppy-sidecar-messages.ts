@@ -656,7 +656,7 @@ export function buildPackageAuthorizationReply(id: number, result: PackageAuthor
   return { type: "codepuppy.package.authorization.reply", id, result: result.ok ? {
     ok: true, packageId: result.packageId, items: result.items.map(item => ({
       kind: item.kind, componentId: item.componentId, prerequisiteId: item.prerequisiteId, serviceName: item.serviceName, label: item.label,
-      ...(item.kind === "secret" ? { saved: item.saved } : item.kind === "mcp-oauth" ? { authenticated: item.authenticated, status: item.status } : { ready: item.ready }),
+      ...(item.kind === "option" ? { key: item.key, type: item.type, description: item.description, required: item.required, sensitive: item.sensitive, configured: item.configured, ...(!item.sensitive && item.value !== undefined ? { value: item.value } : {}) } : item.kind === "secret" ? { saved: item.saved } : item.kind === "mcp-oauth" ? { authenticated: item.authenticated, status: item.status } : { ready: item.ready }),
     })) as Extract<PackageAuthorizationResultV1, { ok: true }>["items"],
   } : { ok: false, reason: result.reason } }
 }
@@ -670,7 +670,8 @@ export function parsePackageAuthorizationReply(value: unknown): PackageAuthoriza
   if (result.ok !== true || !isText(result.packageId) || !Array.isArray(result.items) || Object.keys(result).some(key => !["ok", "packageId", "items"].includes(key))) return
   for (const item of result.items) {
     if (!isRecord(item) || !["componentId", "prerequisiteId", "serviceName", "label"].every(key => typeof item[key] === "string")) return
-    const fields = item.kind === "secret" && typeof item.saved === "boolean" ? ["saved"]
+    const fields = item.kind === "option" && typeof item.key === "string" && ["string", "number", "boolean"].includes(String(item.type)) && typeof item.description === "string" && typeof item.required === "boolean" && typeof item.sensitive === "boolean" && typeof item.configured === "boolean" && (item.value === undefined || !item.sensitive && typeof item.value === item.type && (typeof item.value !== "number" || Number.isFinite(item.value))) ? ["key", "type", "description", "required", "sensitive", "configured", "value"]
+      : item.kind === "secret" && typeof item.saved === "boolean" ? ["saved"]
       : item.kind === "mcp-oauth" && typeof item.authenticated === "boolean" && typeof item.status === "string" ? ["authenticated", "status"]
       : item.kind === "connection" && typeof item.ready === "boolean" ? ["ready"] : undefined
     if (!fields || Object.keys(item).some(key => !["kind", "componentId", "prerequisiteId", "serviceName", "label", ...fields].includes(key))) return

@@ -167,6 +167,10 @@ export const CodePuppyExt: Plugin.Plugin = {
       // (#223 R7 的纪律);能力真源是引擎目录里的模型(modelFacts);转写正文跨重启缓存在插件存储里。
       const vision = createCloudVisionHooks({
         directory,
+        isVideoFrames: async (tool) => {
+          const facts = await policy.factsFor(tool)
+          return facts?.identity.source === "mcp" && facts.authority.kind === "codepuppy-bundled" && facts.identity.origin === "codepuppy-video" && facts.identity.name === "frames"
+        },
         // 目录查不到(或查询失败)⇒ undefined ⇒ 按看不了图处理(基线 §2-B 第 6 条)。
         seesImages: (model) =>
           modelFacts(context, model).then(
@@ -176,6 +180,8 @@ export const CodePuppyExt: Plugin.Plugin = {
         storage: { get: (key) => context.storage.get(key), set: (key, value) => context.storage.set(key, value) },
         error,
       })
+
+      await context.tool.transform((editor) => vision.transform(editor))
 
       // `#1553`(REQ-236 §2.6)/ I11':暂存附件 ⇒ 本次请求里换成读取指令;逐服务状态取本 Location 的 MCP 列表。
       const attachments = createAttachmentReaderHooks({

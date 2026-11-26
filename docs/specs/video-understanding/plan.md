@@ -451,7 +451,7 @@ D3 代码/实物提交：`9929af424c`、`6bc8ccbf0a`；本收据提交继续包�
 ## D4 处理进度与帧的模型投影
 
 - 依据：impharaon/alpha-work:SPEC-video-understanding v1 @ `25afeda6285b66b3de9d83531fa2e5a6cafa468f` 的 AC-04/07/14/16；冻结视频设计 §4.3、§5「卡片进度」、§6 D4、§10 @ `870002ed698f1a83efa9d6ecb359ea5a0d0d41af`；#1775 r6 续派。D3 的 pins、原调用/SDK 取消与真实组件证明继承 `9929af424c`、`6bc8ccbf0a`、`07d05e8291`，不重跑模型/构建/签名测量。
-- 核对：本节提交后由 r6 的「append D4's plan section and implement it in the same round unless it reveals an undecided design question」授权接续；第一实施提交填写计划提交及续派依据，不自称独立审查通过。
+- 核对：计划 `0c5739736e`；#1775 r6「Now D4 … Append D4's plan section and implement it in the same round unless it reveals an undecided design question」授权同轮实施。Codex / GPT-6 自检冻结输入与实际路径；未发现需改变冻结设计的分叉，不自称独立审查通过。
 
 ### 改动
 
@@ -496,7 +496,13 @@ D3 代码/实物提交：`9929af424c`、`6bc8ccbf0a`；本收据提交继续包�
 
 ### 偏离记录
 
-暂无。r6 允许同轮计划后实施；本节不重作冻结技术决定，不新增界面稿。D3 接缝/发布/真模型/Windows 实测仍 pending；D5 不在本轮。
+- 原计划 Tool.Context 归属证明落在既有 `core/test/codepuppy-mcp-tool-collision.test.ts` 的真实 McpTool/Tool registry harness；SDK 并发通知仍在 runtime 既有文件。新增自有 helper 的 fast 文件随模块命名，不按票命名。
+- 必要同链 `ui-mac/src/main/codepuppy-video.ts` 使用已有 `codemode:false` 让本机视频工具直接调用；`core/src/codemode/tool.ts:150-156` 明确将内部 progress 置空，且外层只保留 execute 输出/文件、丢帧所属工具身份。没有改 Code Mode、增加选项或另接状态机。声明断言在既有 video-service 测试；#1760 冷身份/自动注入仍 pending。
+- 同一 `cloud-vision.ts` 内提取 `describeEntry` 供原自动图片转写与主动帧追问共用压缩/HTTP/错误/缓存；问题参与原缓存键，避免相同帧的另一问题拿旧答案。没有新增视觉客户端。新 frame 引用/时间共用 schema 的窄 metadata，普通图片行为不变。
+- 视觉投影用仓内原始 `packages/ai/test/fixtures/images/edit-source.jpg`（128×128 JFIF、Lavc60.31.102）不改字节，配 D2 output schema 与实际 Message/ToolResultPart 类；仅证明投影/路由，不称它是 OCR/ffmpeg 实测样本。没有新增虚构媒体格式。
+- 服务 JS 字节变化由 D3 原 producer 重生同一清单；组件/native/pin 不重建。组件集合初次外层命令触发 Bun 默认 5 秒超时（75 PASS、1 timeout）；具名原因是嵌套集合的外层时限，按既有 runner 单独执行 cases 完成 125 PASS / 6.07 秒，最终用命令行 `--timeout 30000` 检查受影响集合，不改断言或生产限制。
+
+r6 允许同轮计划后实施；本节不重作冻结技术决定，不新增界面稿。D3 接缝/发布/真模型/Windows 实测仍 pending；D5 不在本轮。
 
 ## D5 平台视频理解桌面接线
 

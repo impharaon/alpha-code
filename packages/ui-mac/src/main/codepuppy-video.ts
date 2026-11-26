@@ -16,5 +16,6 @@ export function codepuppyVideoDefinition(bootstrap: CodePuppyBootstrap) {
 }
 
 export function videoServerDefinition(expand: (template: readonly string[]) => string[]) {
-  return { type: "local" as const, command: expand(VIDEO_SERVICE_COMMAND), environment: {}, enabled: true }
+  // Keep processing notifications and frame results on the existing direct MCP path.
+  return { type: "local" as const, command: expand(VIDEO_SERVICE_COMMAND), environment: {}, enabled: true, codemode: false }
 }

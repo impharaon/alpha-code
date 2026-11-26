@@ -11,7 +11,7 @@
 import { describe, expect } from "bun:test"
 import os from "node:os"
 import fs from "node:fs"
-import { Deferred, Effect, Layer, Schema, Stream } from "effect"
+import { Context, Option, Deferred, Effect, Layer, Schema, Stream } from "effect"
 import { AppNodeBuilder } from "@opencode/core/effect/app-node-builder"
 import { LayerNode } from "@opencode/util/effect/layer-node"
 import { Bus } from "@opencode/core/bus"
@@ -28,7 +28,7 @@ import { testEffect } from "./lib/effect"
 
 const mcpTool = (server: string, name: string) =>
   ({ server: Mcp.ServerName.make(server), name, description: name, codemode: true, inputSchema: { type: "object", properties: {} } }) satisfies Mcp.Tool
-const CATALOG = [mcpTool("opencode", "session_rename"), mcpTool("opencode", "session_renamed"), mcpTool("experimental", "image_generate")]
+const CATALOG = [mcpTool("video", "progress"), mcpTool("opencode", "session_rename"), mcpTool("opencode", "session_renamed"), mcpTool("experimental", "image_generate")]
 
 let gate = Deferred.makeUnsafe<void>()
 // The catalog is held until the test opens the gate, so the test decides whether the builtins register first.
@@ -37,6 +37,10 @@ const mcp = Layer.succeed(
   Mcp.Service.of({
     ...emptyMcp,
     tools: () => Deferred.await(gate).pipe(Effect.as(CATALOG)),
+    callTool: (input) => Effect.promise(async () => {
+      await input.videoProgress?.({ phase: "transcribing", completed: 1000, total: 2000, unit: "ms" })
+      return { isError: false, content: [{ type: "text" as const, text: "answer" }] }
+    }),
   }),
 )
 const it = testEffect(
@@ -112,3 +116,22 @@ describe("test isolation", () => {
     }),
   )
 })
+
+
+class ProgressContext extends Context.Service<ProgressContext, { location: string }>()("test/video-progress-context") {}
+it.live("video progress binds the whole current invocation context instead of the registry's initialization context", () =>
+  Effect.gen(function* () {
+    const registry = yield* Tool.Service
+    yield* Deferred.succeed(gate, undefined)
+    const mcpTools = yield* McpTool.Service
+    yield* mcpTools.flush
+    const tool = (yield* registry.list()).find((tool) => tool.id === "video_progress")!
+    const received: unknown[] = []
+    for (const location of ["first", "second"]) yield* tool.execute({}, {
+      id: "call" as never, sessionID: "session" as never, messageID: "message" as never, agent: "build" as never,
+      progress: (update) => Effect.gen(function* () { received.push({ location: Option.getOrThrow(yield* Effect.serviceOption(ProgressContext)).location, update }) }),
+    }).pipe(Effect.provideService(ProgressContext, { location }))
+    expect(received).toEqual(["first", "second"].map((location) => ({ location, update: { "codepuppy.video.progress": { phase: "transcribing", completed: 1000, total: 2000, unit: "ms" } } })))
+    gate = Deferred.makeUnsafe<void>()
+  }),
+)

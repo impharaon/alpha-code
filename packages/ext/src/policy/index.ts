@@ -39,6 +39,7 @@ import type { HubBridge, HubInstallSubject } from "../hub-bridge"
 import { denyHubMutationForAutomation, hubInstallAsk } from "../hub-tools"
 
 export interface PolicyRegistration {
+  readonly factsFor: (name: string) => Promise<ToolFacts | undefined>
   /** Last statement of the extension's `setup`: registers the parts that must see every earlier registration. */
   readonly seal: () => Promise<void>
   /**
@@ -230,6 +231,7 @@ export async function registerPolicy(context: Plugin.Context, unattended: Unatte
   }) as never)
 
   return {
+    factsFor,
     askInstall: async (call) => {
       const key = installCallKey(call)
       const prepared = installAsks.get(key)

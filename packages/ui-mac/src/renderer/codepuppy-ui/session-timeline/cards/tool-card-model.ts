@@ -1,3 +1,4 @@
+import { VIDEO_PROGRESS_KEY, VIDEO_FRAME_KEY, videoProgress, videoFrameReference } from "@opencode/schema/codepuppy-video-progress"
 // REQ-125 C6 / #879 — 工具卡纯模型(零 DOM、零 solid、零上游组件)。
 //
 // 职责:把 SDK typed 通道进来的 ToolPart 投影成卡片可渲染的结构。#879 起:
@@ -90,6 +91,7 @@ export type ToolCardKind =
   | "task"
   | "question"
   | "cloud"
+  | "video"
   | "unknown"
 
 /**
@@ -141,6 +143,8 @@ export interface CodePuppyCloudRule {
   /** 完成态展开体:目前仅 web_search 有链接体,其余无 body。 */
   links?: boolean
 }
+
+const VIDEO_CARD_TOOLS = new Map(["info", "transcript", "frames", "search", "export", "clip", "gif", "download"].map((name) => [name, `codepuppy.timeline.video.tool.${name}`]))
 
 const CODEPUPPY_CLOUD_RULES = new Map<string, CodePuppyCloudRule>([
   ["web_search", { titleKey: "codepuppy.timeline.cloud.webSearch", targetInput: "query", links: true }],
@@ -383,6 +387,8 @@ function dispatchOfSnapshot(snapshot: DisplaySnapshot, metadata: () => Record<st
       return { kind: effective, category, metadataOnly: false, name: sanitizedName(identity.name) }
     }
   }
+  if (identity.source === "mcp" && authority.kind === "codepuppy-bundled" && identity.origin === "codepuppy-video" && VIDEO_CARD_TOOLS.has(identity.name))
+    return { kind: "video", category, metadataOnly: false, name: identity.name }
   // #587 Code Puppy Cloud 专用卡:资格闸是 category(= 当次持久化 authority 铸出的
   // "codepuppy-cloud"),不是 origin / 别名字符串 —— authority 缺席时同名工具落到下面的
   // 第三方 MCP 降级卡(fail-closed)。
@@ -532,6 +538,7 @@ const TITLE_KEYS: Partial<Record<ToolCardKind, string>> = {
  */
 export function toolTitleKeyOf(dispatch: ToolCardDispatch): string | undefined {
   if (dispatch.metadataOnly) return undefined
+  if (dispatch.kind === "video") return VIDEO_CARD_TOOLS.get(dispatch.name)
   if (dispatch.kind === "cloud") return dispatch.cloudRule?.titleKey
   if (dispatch.kind === "bash") return "codepuppy.timeline.step.bash"
   return TITLE_KEYS[dispatch.kind]
@@ -582,7 +589,7 @@ export function toolCardHeadOf(part: ToolPart): ToolCardHead {
   if (permissionAskTimedOut(part.state)) head.askTimedOut = true
   // AC2:降级卡不读 input / metadata —— 到此为止。
   if (dispatch.metadataOnly) return head
-  head.titleKey = TITLE_KEYS[dispatch.kind]
+  head.titleKey = toolTitleKeyOf(dispatch)
 
   const input = inputOf(part)
   const metadata = metadataOf(part)
@@ -1507,6 +1514,29 @@ function stepEndOf(part: ToolPart, dispatch: ToolCardDispatch, head: ToolCardHea
  * 一次工具调用的步骤行(单项)。合并行的动作名见 toolGroupVerbOf。
  * 输入只有 identity 分派 + 已脱敏的头部投影(toolCardHeadOf)+ 本模块既有的有界读取器。
  */
+/** Numeric facts only; no server prose/filename enters the progress line. */
+export function videoProgressLineOf(part: ToolPart): { key: string; amount: string } | undefined {
+  const dispatch = toolCardDispatchOf(part)
+  if (dispatch.kind !== "video" && !(dispatch.kind === "cloud" && dispatch.name === "vision")) return
+  const facts = metadataOf(part)
+  const update = dispatch.kind === "video" && part.state.status === "running" ? videoProgress(facts[VIDEO_PROGRESS_KEY]) : undefined
+  const clock = (ms: number) => `${Math.floor(ms / 60000)}:${String(Math.floor(ms / 1000) % 60).padStart(2, "0")}`
+  if (update) {
+    const count = (value: number) => update.unit === "ms" ? clock(value) : `${value}${update.unit === "bytes" ? " B" : ""}`
+    return { key: `codepuppy.timeline.video.phase.${update.phase}`, amount: count(update.completed) + (update.total === undefined ? "" : ` / ${count(update.total)}`) }
+  }
+  // VIDEO-L1-v2 owns this existing preparation field and its sequence/lifetime.
+  const preparation = facts.preparation as { phase?: unknown; receivedBytes?: unknown; totalBytes?: unknown } | undefined
+  if (dispatch.kind === "video" && part.state.status === "running" && preparation && ["download", "unpack", "verify"].includes(String(preparation.phase))) {
+    const bytes = preparation.receivedBytes
+    const total = preparation.totalBytes
+    const known = typeof bytes === "number" && Number.isSafeInteger(bytes) && bytes >= 0
+    return { key: "codepuppy.timeline.video.phase.preparing", amount: known ? `${bytes} B` + (typeof total === "number" && Number.isSafeInteger(total) && total >= bytes ? ` / ${total} B` : "") : "" }
+  }
+  const frame = dispatch.kind === "cloud" && dispatch.name === "vision" ? videoFrameReference(facts[VIDEO_FRAME_KEY]) : undefined
+  if (frame) return { key: "codepuppy.timeline.video.frameUpload", amount: clock(frame.actualMs) }
+}
+
 export function toolStepLineOf(part: ToolPart): ToolStepLine {
   const dispatch = toolCardDispatchOf(part)
   const head = toolCardHeadOf(part)
@@ -1516,6 +1546,13 @@ export function toolStepLineOf(part: ToolPart): ToolStepLine {
     // AC5:非我方 = 来源标记 + 工具名;没有动作名、没有参数、没有输出。
     line.source = source
     line.object = dispatch.name
+    return line
+  }
+  const video = videoProgressLineOf(part)
+  if (video) {
+    line.verbKey = video.key
+    line.object = video.amount
+    line.objectMono = false
     return line
   }
   if (dispatch.metadataOnly) {

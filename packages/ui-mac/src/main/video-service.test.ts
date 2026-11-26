@@ -19,6 +19,8 @@ test("video declaration delegates the Node slot to the host expander without der
   expect(seen).toEqual([VIDEO_SERVICE_COMMAND])
   expect(definition.command[0]).toBe("/host-verified/node")
   expect(definition.environment).toEqual({})
+  // Code Mode suppresses nested progress; video uses the existing direct MCP path.
+  expect(definition.codemode).toBe(false)
 })
 
 test("built service exchanges actual stdio discovery and a typed cold call without native modules", async () => {
@@ -59,4 +61,30 @@ test("bundled video discovers its actual definitions without preparing models an
     await client.close()
     await server.close()
   }
+})
+
+test("local video progress carries full processing facts over the actual SDK before the original call completes", async () => {
+  const { VIDEO_PROGRESS_KEY } = await import("../../../schema/src/codepuppy-video-progress")
+  const { fail } = await import("../../resources/video-mcp/runtime")
+  const observed = Promise.withResolvers<void>()
+  const received: unknown[] = []
+  const directory = await mkdtemp(path.join(tmpdir(), "video-progress-"))
+  const runtime: import("../../resources/video-mcp/runtime").VideoRuntime = {
+    directory, cacheRoot: directory, recipe: "wire-only", platform: "darwin-arm64", signal: new AbortController().signal, progress: () => {},
+    async component() {
+      await this.progress({ phase: "decoding", completed: 1500, total: 9000, unit: "ms" })
+      await observed.promise
+      return fail("component_download_failed", "No native components used by this SDK wiring test")
+    },
+  }
+  const server = createVideoServer(runtime)
+  const client = new Client({ name: "video-progress", version: "1" })
+  const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair()
+  await server.connect(serverTransport)
+  await client.connect(clientTransport)
+  try {
+    const result = await client.callTool({ name: "info", arguments: { source: { kind: "path", path: path.join(import.meta.dir, "fixtures/video/speech-en.wav") } } }, { onprogress: (update) => { received.push(update._meta?.[VIDEO_PROGRESS_KEY]); observed.resolve() } })
+    expect(result.isError).toBe(true)
+    expect(received).toEqual([{ phase: "decoding", completed: 1500, total: 9000, unit: "ms" }])
+  } finally { observed.resolve(); await client.close(); await server.close(); await rm(directory, {recursive:true,force:true}) }
 })

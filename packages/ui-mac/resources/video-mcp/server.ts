@@ -1,3 +1,4 @@
+import { VIDEO_PROGRESS_KEY } from "@opencode/schema/codepuppy-video-progress"
 import { Server } from "@modelcontextprotocol/server"
 import { StdioServerTransport } from "@modelcontextprotocol/server/stdio"
 import { pathToFileURL, fileURLToPath } from "node:url"
@@ -11,6 +12,7 @@ export function createVideoServer(input?: VideoRuntime | VideoInvocation) {
   const server = new Server({ name: "codepuppy-video", version: "1.0.0" }, { capabilities: { tools: {} } })
   server.setRequestHandler("tools/list", async () => ({ tools: videoToolDefinitions() }) as never)
   server.setRequestHandler("tools/call", async (request, context) => {
+    let sequence = 0
     try {
       const runtime =
         input &&
@@ -33,6 +35,7 @@ export function createVideoServer(input?: VideoRuntime | VideoInvocation) {
           ...runtime,
           signal: AbortSignal.any([runtime.signal, context.mcpReq.signal]),
           progress: async (update) => {
+            if (context.mcpReq.signal.aborted) return
             await runtime.progress(update)
             const token = context.mcpReq._meta?.progressToken
             if (typeof token === "string" || typeof token === "number")
@@ -40,8 +43,8 @@ export function createVideoServer(input?: VideoRuntime | VideoInvocation) {
                 method: "notifications/progress",
                 params: {
                   progressToken: token,
-                  progress: update.completed,
-                  ...(update.total === undefined ? {} : { total: update.total }),
+                  progress: ++sequence,
+                  _meta: { [VIDEO_PROGRESS_KEY]: update },
                   message: update.phase,
                 },
               })

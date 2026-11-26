@@ -1,3 +1,4 @@
+import type { VideoProgress } from "@opencode/schema/codepuppy-video-progress"
 export * as Mcp from "./index.js"
 
 import { Mcp } from "@opencode/schema/mcp"
@@ -187,6 +188,7 @@ export interface Interface extends State.Transformable<Editor> {
     readonly name: string
     readonly args?: Record<string, unknown>
     readonly sessionID?: Session.ID
+    readonly videoProgress?: (update: VideoProgress) => Promise<void> // codepuppy(#1775)
   }) => Effect.Effect<ToolResult, NotFoundError | ToolCallError>
   readonly instructions: () => Effect.Effect<ServerInstructions[]>
   readonly prompts: () => Effect.Effect<Prompt[]>
@@ -889,7 +891,7 @@ export const layer = (options?: Options) =>
         callTool: Effect.fn("MCP.callTool")(function* (input) {
           const server = ServerName.make(input.server)
           const call = (connection: McpClient.Connection) =>
-            connection.callTool({ name: input.name, args: input.args, sessionID: input.sessionID })
+            connection.callTool({ name: input.name, args: input.args, sessionID: input.sessionID, videoProgress: input.videoProgress }) // codepuppy(#1775)
           const failed = (owner: string) =>
             Effect.mapError(
               (error: Error) =>

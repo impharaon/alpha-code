@@ -1,3 +1,4 @@
+import type { VideoProgress } from "@opencode/schema/codepuppy-video-progress"
 import type { MediaFailure } from "./contracts"
 
 export type ComponentName = "ffmpeg" | "ffprobe" | "sensevoice" | "sensevoice-tokens" | "vad" | "lid-encoder" | "lid-decoder" | "diarization-segmentation" | "speaker-embedding" | "whisper" | "ocr" | "ocr-model" | "python" | "yt-dlp" | "yt-dlp-ejs" | "node" | { kind: "ocr-model"; script: string }
@@ -10,7 +11,7 @@ export type VideoRuntime = {
   recipe: string
   component: (name: ComponentName) => Promise<PreparedComponent>
   signal: AbortSignal
-  progress: (update: { phase: "decoding" | "transcribing" | "diarizing" | "frames" | "exporting"; completed: number; total?: number; unit: "bytes" | "ms" | "items" }) => void | Promise<void>
+  progress: (update: VideoProgress) => void | Promise<void>
   platform: "darwin-arm64" | "win32-x64"
   egressProxy?: string
 }

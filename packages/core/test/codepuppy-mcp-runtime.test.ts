@@ -702,3 +702,22 @@ describe("#1645: a failure's remote text stays out of logs and the failed status
       }),
   )
 })
+
+
+describe("video progress", () => {
+  const definitions = toolsFile([{ name: "video_progress", description: "progress wire fixture", inputSchema: { type: "object", properties: { completed: { type: "number" } } } }])
+  testEffect(mcpLayer({ progress: local({ CODEPUPPY_MCP_TOOLS_FILE: definitions }) })).live("video progress follows each real SDK request instead of the connection's last caller", () =>
+    Effect.gen(function* () {
+      yield* connected("progress")
+      const mcp = yield* Mcp.Service
+      const first: unknown[] = []
+      const second: unknown[] = []
+      yield* Effect.all([
+        mcp.callTool({ server: "progress", name: "video_progress", args: { completed: 1000 }, videoProgress: async (update) => { first.push(update) } }),
+        mcp.callTool({ server: "progress", name: "video_progress", args: { completed: 2000 }, videoProgress: async (update) => { second.push(update) } }),
+      ], { concurrency: 2 })
+      expect(first).toEqual([{ phase: "decoding", completed: 1000, total: 10000, unit: "ms" }, { phase: "transcribing", completed: 1000, total: 10000, unit: "ms" }])
+      expect(second).toEqual([{ phase: "decoding", completed: 2000, total: 10000, unit: "ms" }, { phase: "transcribing", completed: 2000, total: 10000, unit: "ms" }])
+    }),
+  )
+})

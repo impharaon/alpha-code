@@ -50,6 +50,7 @@ tool.codepuppy_reload.args.reason                         text      tool-arg-des
 tool.codepuppy_reload.description                         text      tool-description         373    1024   36%
 vision.system-note-offline                                text      system                   251    1024   25%
 vision.tool.refused                                       text      vision-block              24    1024    2%
+vision.video-frame-offline                                text      system                   161    1024   16%
 agent-mention.delegate                                    template  agent-mention            100    1024   10%
 attachment.unavailable.failed                             template  attachment-block         227    1024   22%
 attachment.unavailable.missing                            template  attachment-block         289    1024   28%
@@ -82,6 +83,7 @@ vision.failure.rate-limited                               template  vision-block
 vision.failure.refused                                    template  vision-block              44    1024    4%
 vision.failure.unsupported-format                         template  vision-block             117    1024   11%
 vision.system-note                                        template  system                   460    1024   45%
+vision.video-frame-note                                   template  system                   255    1024   25%
 attachment.read                                           wrapper   attachment-block         242    1024   24%
 media.read                                                wrapper   attachment-block         322    1024   31%
 media.unavailable                                         wrapper   attachment-block         197    1024   19%
@@ -92,6 +94,7 @@ tool-failure.websearch.unauthorized                       wrapper   tool-failure
 tool-failure.websearch.unexpected_status                  wrapper   tool-failure              58    1024    6%
 tool-failure.websearch.upstream                           wrapper   tool-failure              52    1024    5%
 vision.transcript                                         wrapper   vision-block             119    1024   12%
+vision.video-ocr                                          wrapper   vision-block              88    1024    9%
 rebrand.identity-default                                  rebrand   system                    66     512   13%
 rebrand.identity-gpt                                      rebrand   system                    66     512   13%
 rebrand.identity-gpt-astra                                rebrand   system                    66     512   13%
@@ -99,7 +102,7 @@ rebrand.identity-kimi                                     rebrand   system      
 rebrand.identity-meta                                     rebrand   system                    84     512   16%
 rebrand.identity-trinity                                  rebrand   system                    97     512   19%
 rebrand.tool-use-meta                                     rebrand   system                    33     512    6%
-fragments: 99; injected bytes: 29996; declared limits total: 162304
+fragments: 102; injected bytes: 30500; declared limits total: 165376
 references (paths / verbs / definitions supplied by others — carry no Code Puppy text, not counted):
   ref.mcp                /mcp               云 MCP server 定义(type / url / oauth / headers.Authorization = {file:} 引用):ext 经 mcp.transform 装(cloud-websearch-kill.ts),项目 MCP 经同一 transform 补缺;ui-mac 主进程直写配置(codepuppy-config-injection.ts / cloud-sidecar-config.ts / mcp-default-deny.ts / ext-disabled-injection.ts);工具表是远端 server 的字
   ref.schema             /$schema           ui-mac 无继承 config 时种下的 JSON Schema URL(codepuppy-config-injection.ts:91)

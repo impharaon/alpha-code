@@ -1521,3 +1521,26 @@ it.effect("a background summary waits for a response whose prompt is still cache
     expect(yield* summarizedAfterBreak("ses_precompute_hour", "1h")).not.toContain("Third question")
   }),
 )
+
+it.effect("package compaction events only surround adoption of a precomputed summary", () => Effect.gen(function* () {
+  requests = []
+  const compaction = yield* enablePrecompute
+  const session = yield* insertSession(Session.ID.make("ses_package_precompute"))
+  const history = precomputeHistory()
+  yield* storeMessages(session.id, history.due)
+  const runtime = yield* Effect.promise(() => import("@opencode/plugin/codepuppy-package-runtime"))
+  const seen: { phase: string; occurrenceId: string; summary?: string }[] = []
+  const registration = runtime.registerPackageRuntime({ directory: "/project" }, {
+    hasElicitationHandlers: () => false, beforeConfigChange: async () => ({ apply: true }), instructionsLoaded: async () => {}, beforeElicitation: async () => ({ handled: false }), afterElicitationResult: async input => input.answer,
+    beforeCompaction: async input => { seen.push({ phase: "before", occurrenceId: input.occurrenceId }); return { proceed: true } },
+    afterCompaction: async input => { seen.push({ phase: "after", occurrenceId: input.occurrenceId, summary: input.summary }) },
+  })
+  yield* Effect.addFinalizer(() => Effect.sync(() => registration.dispose()))
+  yield* compaction.precompute(Effect.succeed(loaded(session, history.near)))
+  expect(seen).toHaveLength(0)
+  expect(yield* compaction.compact({ reason: "auto", context: loaded(session, history.due) })).toEqual({ status: "completed" })
+  expect(requests).toHaveLength(1)
+  expect(seen.map(event => event.phase)).toEqual(["before", "after"])
+  expect(seen[0]!.occurrenceId).toBe(seen[1]!.occurrenceId)
+  expect(seen[1]!.summary).toBe("## Objective\n- manual summary")
+}))

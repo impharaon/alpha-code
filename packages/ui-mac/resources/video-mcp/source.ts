@@ -14,10 +14,12 @@ const identity = (value: Awaited<ReturnType<typeof sourceStat>>) => [value.dev, 
 const sourceStat = (file: string) => stat(file, { bigint: true })
 
 export async function updateSource(sourceId:string,runtime:VideoRuntime,change:(current:Source|undefined)=>Promise<Source>){
+  return withMediaLock(runtime,`source:${sourceId}`,async()=>{
   const current=await readJson<Source>(cachePath(runtime,"sources",`${sourceId}.json`))
   const updated=await change(current)
   await writeJson(cachePath(runtime,"sources",`${sourceId}.json`),updated)
   return updated
+  })
 }
 
 export async function sourceOf(ref: MediaRef, runtime: VideoRuntime): Promise<Source> {
@@ -48,7 +50,7 @@ export async function sourceOf(ref: MediaRef, runtime: VideoRuntime): Promise<So
     const after = await handle.stat({ bigint: true })
     const current = await sourceStat(canonical)
     if (identity(before) !== identity(after) || identity(after) !== identity(current)) fail("source_changed", "The source changed while it was being opened.")
-    return withMediaLock(runtime, `source:${sourceId}`, async () => {
+    {
       const source=await updateSource(sourceId,runtime,async existing=>{
       const source: Source = { ...existing, sourceId, path: canonical, name: path.basename(requested), bytes: Number(after.size), aliases: [...(existing?.aliases ?? []).filter((entry) => entry.path !== canonical), { path: canonical, identity: identity(after) }] }
       return source
@@ -56,7 +58,7 @@ export async function sourceOf(ref: MediaRef, runtime: VideoRuntime): Promise<So
       })
       await writeJson(indexPath, { identity: identity(after), sourceId })
       return source
-    })
+    }
   } finally { await handle.close() }
 }
 
@@ -83,7 +85,7 @@ export function probeInfo(raw: unknown): MediaInfo {
 
 export async function mediaInfo(source: Source, runtime: VideoRuntime) {
   if (source.info) return source.info
-  return withMediaLock(runtime, `probe:${source.sourceId}`, async () => {
+  {
     const completed=await updateSource(source.sourceId,runtime,async saved=>{
     if (saved?.info) return saved
     const probe = await runtime.component("ffprobe")
@@ -106,7 +108,7 @@ export async function mediaInfo(source: Source, runtime: VideoRuntime) {
     return {...(saved ?? source),info}
     })
     return completed.info!
-  })
+  }
 }
 
 export async function verifySourceFile(source: Source, file: string) {

@@ -612,3 +612,5 @@ A6 green：仅同步 union 到当前权威，无新下载/校验实现；util ty
 A10 red：资源配置目标轴的现有 resources 文件新增 Windows/Mac FileSet 断言，target exit 1（A10-red.log）：当前 Win 没有专属入口且全局按 host 选源。原“一份 runtime”断言同提交消费 global+mac 最终合成配置，不保留生产旧布局兼容。下一提交将两平台入口放到 electron-builder 的平台层，并在 Windows workflow 复用仓库已有 setup-uv 固定 action SHA（不触发 workflow/发布）。
 
 A10 green：target FileSets 与 afterPack/copier 在 resources 文件 14 PASS（A10-green.log），不再根据 mac host 把 arm64 Python 拷入 Windows 包；uv 仅增加固定 action 安装步骤。没有运行/发布 Windows workflow，Win 实机包仍按既有计划待验。
+
+A9 Windows font rewrite red：既有 ext renderer 文件用实际模板/页图和原 profile 生成器，正常 Office render 调用了会修改 runtime 字体的 installer，target 1 FAIL（A9-fonts-red.log，实际 1 次）。下一提交渲染仅建私有 profile；Windows 四字体仍由 main 准备/验证负责，不在并发 render 中重写。

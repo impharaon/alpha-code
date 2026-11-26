@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, test } from "bun:test"
+import { afterEach, describe, expect, test, spyOn } from "bun:test"
 import { createHash } from "node:crypto"
 import {
   copyFileSync,
@@ -164,4 +164,20 @@ describe("document render", () => {
     const result = await render(f.caller, { kind: "pdf", path: f.source })
     expect(result).toMatchObject({ status: "failed", code: "raster", artifact: { artifactPath: f.source } })
   })
+})
+
+
+test("rendering uses a private profile without reinstalling the prepared runtime fonts", async () => {
+  const f = fixture()
+  const source = join(f.root, "report.docx")
+  copyFileSync(join(f.input.assets, "templates/chinese-report.docx"), source)
+  const environment = f.input.host.environment
+  f.input.host.environment = async (caller) => ({ ...await environment(caller), renderState: { phase: "ready", version: "fixture", executable: "/runtime/LibreOffice.app/Contents/MacOS/soffice" } })
+  const fonts = await import("../../ui-mac/src/shared/document-runtime-fonts")
+  const installer = spyOn(fonts, "prepareDocumentFonts")
+  try {
+    const render = createDocumentRenderer({ ...f.input, execute: async (job) => { const output = await f.input.execute(job); const result = JSON.parse(output.stdout); return { ...output, stdout: JSON.stringify({ ...result, renderer: "libreoffice-pdfium" }) } } })
+    expect((await render(f.caller, { kind: "docx", path: source })).status).toBe("rendered")
+    expect(installer.mock.calls).toHaveLength(0)
+  } finally { installer.mockRestore() }
 })

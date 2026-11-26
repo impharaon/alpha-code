@@ -3,14 +3,18 @@ id: DESIGN-connector-launchers
 title: 连接器启动器与失败处理 技术设计
 summary: 统一连接器启动器与固定文件准备；v2 接纳两平台文档 Node 读取及受管第一方 MCP 的运行期按 ID 准备，核验声明身份与逐调用进度归属。
 kind: tech-design
-status: frozen
-version: 2
+status: frozen-pending-review
+version: "2.1"
 spec: SPEC-connector-launchers
 spec_version: 1
 review:
-  rounds: 1
-  reviewed_sha: 4d2b78d16b
-  verdict: "fix-then-freeze; R1 1 Major 1 Minor + identity hardening accepted"
+  rounds: 0
+  reviewed_sha: ""
+  verdict: "pending; v2.1 trusted Node command-template increment awaits independent review"
+  v2:
+    rounds: 1
+    reviewed_sha: 4d2b78d16b
+    verdict: "fix-then-freeze; R1 1 Major 1 Minor + identity hardening accepted"
   v1:
     rounds: 1
     reviewed_sha: ceeee7d4df
@@ -21,7 +25,7 @@ last_reviewed: 2026-11-26
 
 # DESIGN-connector-launchers｜连接器启动器与失败处理 技术设计
 
-版本适用：以下 v1 正文与 R1 收据保持冻结，基线为 #1766 合入提交 `173122a8e955f97d830fe53fccd3400d079d9488`；文末 v2 增量仅替代其明确点名的条款，状态为 **frozen**，已按本增量 R1 与 owner 平台澄清修正，收据见文末 §10。
+版本适用：以下 v1 正文与 R1 收据保持冻结，基线为 #1766 合入提交 `173122a8e955f97d830fe53fccd3400d079d9488`；文末 v2 增量仅替代其明确点名的条款，状态为 **frozen**，已按本增量 R1 与 owner 平台澄清修正，收据见文末 §10。 v2 已合入 `f7424aa45225a6d02d1958f4b4f72d247f99acc4`；文末 v2.1 仅补充可信 Node 命令槽及启动前准备，状态 **frozen-pending-review**，v1/v2 正文和审查收据保留为各自版本的冻结基线。
 
 本文按编排器对独立审查 R1 的「ALL ACCEPTED；修正后冻结」指令完成修正并冻结。规格的体验约定直接消费，不增加页面或设计稿；文件改动、实施顺序和具体用例归后续 plan.md。
 
@@ -676,3 +680,84 @@ V2-R1 已撤回；V2-R2..R5 是设计决定 raise，不假称当前代码已经�
 **文档验证回执**：本轮脚本核对 v1 正文（除版本适用说明）与 review.v1 逐字不变、v2 无额外平台资产行及旧待审状态、两项接收回执与 R1 receipt 一致。ui-mac 的 `bun test src/main/old-name-scan.test.ts` exit 0（10 pass / 0 fail，2347 assertions），`git diff --check` exit 0；官方文档检查函数对本文 0 finding，仓级 71 errors / 251 warnings 与前轮相同，为范围外既有结果，未顺修。只同步本设计的生成索引行；本轮没有运行应用或把新接口当成已实现。
 
 **待 owner 定**：无。实际 Windows tar 格式、原始 archive 分支、公证、受管 MCP 的声明摘要/环境身份与跨 Location metadata、真实模型冷下载/取消仍未验证；这些是实施/集成证据，不能由本次冻结回执冒充通过。
+
+# v2.1 增量｜第一方命令引用可信 Node
+
+## 1. v2.1 基线与边界
+
+继承 SPEC-connector-launchers v1（原 §1）及 v2 合入 `f7424aa45225a6d02d1958f4b4f72d247f99acc4` 的全部冻结决定；仅补 v2 §4.3/V2-R4 的 Node 命令模板约定和其启动依赖，支撑原 BR-01/03/06/11 与相关 AC，不改 AC、平台或环境作用域。输入是 #1775 D1 的 `31d4cacaf0`、`docs/specs/video-understanding/plan.md:111-113` 的 BLOCKED: design；本文是唯一新增技术决定，未实施。状态 **frozen-pending-review**，独立审查尚未发生。
+
+## 2. v2.1 地面真相
+
+调查限于模板匹配与已定的两种 Node 形态。当前 `core/mcp/codepuppy-first-party-mcp.ts:27-38` 的 commandMatchesTemplate 只替换 resources，workspace 槽匹配任意无 `..` 的绝对路径；v1 §4.1 已允许资源树内 Node 或 userData 下的随包归档展开入口。v2 §4.1 的 resolveAssets 已决定统一展开/核验，但 §4.3 的声明者没有可引用该入口的槽，消费者不能自行补约定。
+
+**本轮小探针**：临时目录内生成仅调用当前真实 commandMatchesTemplate 的 Bun 脚本，以 #1775 上述探针的同形入参分别比较资源树路径、归档路径、workspace 槽的 `/tmp/untrusted-node`；在 packages/core 执行 `bun <临时目录>/probe.ts`，输出 `{"direct":true,"archive":false,"workspaceSlotAlsoMatchesAnyAbsoluteExecutable":true}`，exit 0，临时目录随后自动清除。没有执行这些路径的程序、读写运行时或访问网络；结果仅证实现有匹配缺口，不是新契约实现通过。
+
+## 4. v2.1 接口契约
+
+### 4.1 保留槽与唯一展开器
+
+受保护随包 Manifest.formats 中，引用启动器 Node 的 command 必须以完整 argv 首项 **`{codepuppyNode}`** 表示，例如 `["{codepuppyNode}", "{codepuppyResources}/video-mcp/server.js"]`；它不是用户 MCP 配置的新语法。该槽仅可独占 command[0]，不接受拼接、后缀、其它参数位置或以 workspace 槽充当可执行文件；这是随包声明 producer 的形状约定，普通用户命令仍按原路径运行。resources 槽和作为服务参数的 workspace 槽保留已有含义；environment/cwd 不解释此槽。
+
+**明确 raise V21-R1**：在同一 core 自有 codepuppy-first-party-mcp 模块导出唯一纯展开函数，main 生成第一方显式配置和 matcher 核验均调用它，不各写替换逻辑：
+
+```ts
+declare function expandFirstPartyCommand(
+  template: readonly string[],
+  resources: string,
+  launchers: LauncherEnvironment,
+): string[]
+declare function commandMatchesTemplate(
+  template: readonly string[],
+  command: readonly unknown[],
+  resources: string,
+  launchers: LauncherEnvironment,
+): boolean
+```
+
+expandFirstPartyCommand 将首项的保留槽替换为 `launchers.node`，resources 按现有规则展开，workspace 参数槽留给现有 Location 接线；不做 I/O、PATH 查找或 shell 拼接。非法随包槽形状是清单/接线错误，交已有 unknown 诊断，不尝试另一个解释器。matcher 使用同一展开结果，对首项及其它非 workspace 项逐项、逐字比较；workspace 规则只用于参数，不能成为 Node 的后备匹配。v2 §4.3 的 declaredFirstPartyTools、declaredListedTools 各在现有参数末尾新增必填 `launchers: LauncherEnvironment`，内部传给同一 matcher；返回形状不变。
+
+这里的 launchers **只能由宿主 composition root 绑定**：main 用自己构建并校验的本代 bootstrap.launchers，core/ext 用同一已发布 `codepuppyBootstrap().launchers`；不从 entry.environment、MCP params、workspace 文件或 binding.entry 读取 Node/launchers，也不新增可让调用者选择路径的平台参数。自动登记的 entry.command 是上述函数生成的绝对 argv，不把 `{codepuppyNode}` 原样交 spawn。资源树或归档哪一条路径合法由本构建产物清单与 pinSet/platform 唯一决定：只匹配该代 `LauncherEnvironment.node`，不以“位于 resources/userData 之下”放行另一条路径，不把两种形态同时当路径白名单。
+
+### 4.2 身份、尚未 ready 与实际启动
+
+v2 R1 的 type、command、environment 键和值、cwd 精确核验继续成立；不匹配仍是普通服务器，不清掉额外配置后冒认首方。main 在 entryFor 重验时从自己的同代 launchers 调用同一声明者；core 不能把自报 node/path 塞入 binding 来替换它。codeSha256 仍验证 resources 内的服务代码/依赖；Node 自身的 pin、签名与可执行完整性由唯一 launcher authority 的 resolveAssets 核验，不在每个服务清单复制 Node 摘要或要求 Node 位于 codeSha256 的 resources 树内。声明摘要仍散列原始模板（含槽），不加入展开绝对路径或 ready 状态；recipe 摘要规则不变。
+
+bootstrap 的 node 是主进程按包内清单推导的确定绝对路径，归档尚未展开时也可供逐字比较，**不能以 exists/realpath 失败抹掉首方声明**。受保护服务代码、显式配置和摘要核验成功就保留 declaredFirstParty/首方 authority；其文件 handler 仍遵守 v2 的真实 tools/list 与活跃调用关联值约束，不因 Node 未就绪提前下载模型。
+
+**明确 raise V21-R2**：McpConnection.make 在取得 DeclaredFirstParty 后，以已核验的 `entry.command[0] === 本代 launchers.node` 决定这项启动依赖，无需从声明输出猜原模板或让服务自报角色；在实际 spawn、获取 startPermits 和握手 startup 计时前，等待既有 `ConnectorLaunchHost.resolveAssets()`。需要准备的等待期间，core 经既有 changed/LaunchSnapshot 发布 `preparing`、`stage:"launcher"` 和活动进度，成功后进入原 connecting。返回的 node 必须与本代可信描述及已核验 argv 首项一致，再按 v1 的签名/完整性要求启动；不能悄悄改成 PATH 中的 node。尚未 ready 只触发同一随包资产展开/核验，不下载第二份 Node、不运行 npm，也不调用两类包运行器的 prepareConnectorLaunch 或把 PATH/UV_PYTHON/XDG 覆盖施于这个原生命令。取消/停用/越代按原 attempt 取消等待与状态，不能在晚到准备完成后 spawn；共享资产准备不因一个等待者取消破坏其它等待者。
+
+## 5. v2.1 数据与失败
+
+没有迁移或新用户配置。合法声明的身份与资产 ready 分开：准备失败保留其首方声明，启动按已有 ConnectorLaunchFailure/诊断和单一动作呈现；取消不报失败。已 ready 时同一 resolveAssets 复用本地已验资产、不发网络请求；准备不占握手时限，也不刷新原工具调用时限。DocumentHost.environment 继续走同一 resolveAssets 取得 Node，不新增文档专用准备路径。
+
+## 6. v2.1 架构与接缝映射
+
+| 本次能力 | 既有 authority / 本次明确 raise |
+| --- | --- |
+| 命令展开、身份及 main 复核 | commandMatchesTemplate/declaredFirstPartyTools/declaredListedTools（core `codepuppy-first-party-mcp.ts:27,46,84`）、ext `policy/identity.ts:130`；**V21-R1** 在同一模块增加展开器、可信 launchers 参数并接 main/core/ext；main 消费纯函数，不让 core import main |
+| 原生首方启动前资产准备 | v2 V2-R2 的 ConnectorLaunchHost.resolveAssets、v1 的 McpConnection.make 与 changed/LaunchSnapshot；**V21-R2** 接首方 Node 的准备等待、状态及同代路径再核对，不改变两类包运行器作用域 |
+
+K1/K2 不变：Node 路径、签名和准备由 launcher authority 持有；模板展开/身份仍是同一个首方声明器，没有额外路径表、下载器或包管理器。这两项是新增接线决定，当前代码和前述缺陷探针不证明其已实现。
+
+## 8. v2.1 所有权与交接
+
+#1760 提供本槽、同一声明器与正常资产准备接线；#1775 D1 仅向既定 Manifest 提供以该槽为首项的视频条目/代码，引用下述接收回执更新原阻塞，不自行扩 matcher。#1761 文档继续消费 DocumentEnvironment.node/原 DOC-NODE-v2；若构造受管第一方 Node 命令也引用本槽，不新增另一套路径派生。两消费者引用本次提交与接收回执；本轮不编辑其它设计或实现，发布/集成证明仍按 v1/v2。
+
+## 9. v2.1 回滚
+
+不适用。没有迁移或不可逆数据改变。
+
+## 10. v2.1 裁决与接收回执
+
+| 接收回执 | 决定与适用范围 | 依据 / 状态 |
+| --- | --- | --- |
+| **FIRST-PARTY-NODE-v2.1** | **接受** #1775 返回的 Node 模板接缝：保留槽 `{codepuppyNode}` 由本代宿主 launchers 唯一展开，精确匹配两种合法包形态中该代选定的 Node；冷资产保持首方身份并经正常 preparing 等待，随后才 spawn | v2.1 §4、§6 V21-R1/R2；与 VIDEO-L1-v2 / DOC-NODE-v2 一并引用。状态 frozen-pending-review，尚无本增量独立审查；不声称运行集成已通过 |
+
+**否决的替代**：以 workspace 槽借位会接受任意绝对可执行路径，已被真实 matcher 探针证伪；只把 Node 写成 resources 路径不能覆盖已批准归档形态；把准备前的缺文件当普通服务器会丢掉正确首方声明。三者均由本槽和单一准备 authority 取代，无新增用户步骤。
+
+**传播核对**：固定 `31d4cacaf0` 的 `docs/specs/video-understanding/plan.md` 执行 `rg -n 'VIDEO-L1-v2|commandMatchesTemplate|SEAM-CHANGE-NEEDED'`，命中 `:19,30,75,111-113,137`，受影响的 D1 模板/身份假设由本回执补齐；协调仓视频设计 `9f438a7bc8` 的 `rg -n 'declaredFirstPartyTools|L1 的具体接纳|pending-seam: L1'` 命中 `:61,68,152,393,464,476`，其首方声明约定引用本文。当前基线文档设计 `docs/specs/document-output-quality/design.md` 的 `rg -n 'LauncherEnvironment.node|DOC-NODE-v2'` 命中 `:27,76,429,434,447,481,487,489,497,510`，保留同源 Node/准备读取，若引用模板则用本槽；不改文档自己的环境 authority。消费者拥有者更新固定输入，本次只改本文。
+
+**作者回执**：Codex / GPT-6；依据为 v2 合入基线、#1775 固定阻塞证据与本轮真实匹配探针。新增能力全部映射至 V21-R1/R2；v1/v2 的独立审查收据分别保留于 review.v1/review.v2，本增量 review.rounds=0。待 owner 定：无。两平台真实归档展开、签名/公证、首方声明冷启动和准备取消仍未验证，归实施集成证明，不能从纯函数旧行为探针推断通过。
+
+**本轮验证回执**：v1/v2 正文逐字保留核对通过（版本适用说明除外），当前增量状态及历史审查收据核对通过；ui-mac 的 `bun test src/main/old-name-scan.test.ts` exit 0（10 pass / 0 fail，2347 assertions），`git diff --check` exit 0。官方文档检查函数对本文 0 finding，仓级另有 69 errors / 253 warnings，均在本轮未改范围，不顺修；依本轮只提交 design.md 的指令未改索引或任何实现。新槽及真实启动行为仍未实施验证。

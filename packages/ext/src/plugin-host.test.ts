@@ -2222,3 +2222,36 @@ packageIt.live("real hookify PreToolUse blocks the matching native write using s
   const { existsSync } = yield* Effect.promise(() => import("node:fs"))
   expect(existsSync(join(location.directory, "credentials.txt"))).toBe(false)
 })))
+
+packageIt.live("the real Convex hook allow is scoped to one call and never overrides a native deny", () => packageJourney(Effect.gen(function* () {
+  const sample = yield* invocationSample("claude:convex")
+  const membership = JSON.parse(readFileSync(join(sample.root, "skills-enabled.json"), "utf8"))
+  writeFileSync(join(sample.root, "skills-enabled.json"), JSON.stringify({ ...membership, keys: [...membership.keys, sample.key] }))
+  yield* invocationNativeServices
+  yield* activateExtUntilFinished
+  const sessions = yield* Sessions.Service
+  const location = yield* Location.Service
+  const parent = yield* sessions.create({ location: { directory: location.directory }, title: "Hook allow once", agent: "build", model: { providerID: "test", id: "picked" } } as never)
+  const snapshot = yield* (yield* Tool.Service).snapshot()
+  const permission = yield* Permission.Service
+  const write = (id: string, sessionID = parent.id) => Effect.gen(function* () {
+    const call = yield* snapshot.execute({ sessionID, agent: "build" as never, messageID: ("msg_" + id) as never, call: { type: "tool-call", name: "write", id: id as never, input: { path: "convex/" + id + ".ts", content: "export const example = query({ handler: async () => [] });" } } }).pipe(Effect.exit, Effect.forkChild)
+    let asks = 0
+    for (let waited = 0; waited < 3000 && !call.pollUnsafe(); waited += 10) {
+      for (const request of yield* permission.forSession(sessionID)) { asks++; yield* permission.reply({ requestID: request.id, reply: "once" }) }
+      yield* Effect.sleep("10 millis")
+    }
+    return { asks, exit: yield* Fiber.join(call) }
+  })
+  const allowed = yield* write("allowed")
+  expect(Exit.isSuccess(allowed.exit)).toBe(true)
+  expect(allowed.asks).toBe(0)
+  const deniedSession = yield* sessions.create({ location: { directory: location.directory }, title: "Native deny", agent: "build", model: { providerID: "test", id: "picked" }, permissions: [{ action: "edit", resource: "*", effect: "deny" }] } as never)
+  expect(Exit.isFailure((yield* write("denied", deniedSession.id)).exit)).toBe(true)
+  writeFileSync(join(sample.root, "skills-enabled.json"), JSON.stringify({ v: 3, keys: [], scoped: [], mcp: [] }))
+  const ordinary = yield* write("ordinary")
+  expect(Exit.isSuccess(ordinary.exit)).toBe(true)
+  expect(ordinary.asks).toBeGreaterThan(0)
+}), { id: "package-test-hook-ask", setup: async context => {
+  await context.agent.transform(editor => editor.update("build", agent => agent.permissions.push({ action: "edit", resource: "*", effect: "ask" })))
+} }))

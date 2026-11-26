@@ -260,7 +260,10 @@ test("video uses the same sender and tenant bound consent state and retains the 
   const file=join(import.meta.dir,"fixtures/video/platform-sample.mp4")
   const snapshot=await createVideoUploadSnapshot({directory:"/project",path:file,originalPath:"/project/.ssh/recording.mp4",bytes:await Bun.file(file).size,sha256:await fileDigest(file),mime:"video/mp4"},"tenant-a")
   let tenant="tenant-a",sent=0
-  const service=createMainUploadService({identity:()=>({tenantId:tenant,accessToken:"test"}),issue:async()=>jwt({schema_version:1,iss:"codepuppy-web",aud:"codepuppy-platform-upload",sub:"tenant-a",token_use:"upload_consent",purpose:"artifact.upload",scope:["artifact.upload"],iat:1,exp:4000000000,jti:"test",manifest_id:snapshot.manifest.manifest_id,manifest_sha256:snapshot.manifestSha256,egress:snapshot.manifest.egress}),dispatch:async()=>{throw new Error("not the text path")},log:()=>{}})
+  const issuance = Promise.withResolvers<void>()
+  let holdIssuance=false
+  const issueStarted = Promise.withResolvers<void>()
+  const service=createMainUploadService({identity:()=>({tenantId:tenant,accessToken:"test"}),issue:async()=>{if(holdIssuance){issueStarted.resolve();await issuance.promise};return jwt({schema_version:1,iss:"codepuppy-web",aud:"codepuppy-platform-upload",sub:"tenant-a",token_use:"upload_consent",purpose:"artifact.upload",scope:["artifact.upload"],iat:1,exp:4000000000,jti:"test",manifest_id:snapshot.manifest.manifest_id,manifest_sha256:snapshot.manifestSha256,egress:snapshot.manifest.egress})},dispatch:async()=>{throw new Error("not the text path")},log:()=>{}})
   const send=async()=>{sent++;return accepted}
   const result=await service.prepareVideo(42,snapshot,send)
   expect(result.status).toBe("consent-required");expect(sent).toBe(0)
@@ -273,4 +276,13 @@ test("video uses the same sender and tenant bound consent state and retains the 
   const changed=await service.prepareVideo(42,snapshot,send)
   if(changed.status !== "consent-required")throw new Error("expected privacy card")
   tenant="tenant-b";expect(await service.confirm(42,changed.requestId)).toMatchObject({status:"failed",error:"not-authenticated"});expect(sent).toBe(1)
+  tenant="tenant-a";holdIssuance=true
+  const closing=await service.prepareVideo(42,snapshot,send)
+  if(closing.status !== "consent-required")throw new Error("expected privacy card")
+  const confirming=service.confirm(42,closing.requestId)
+  await issueStarted.promise
+  service.clear(42)
+  issuance.resolve()
+  expect(await confirming).toEqual({status:"cancelled"})
+  expect(sent).toBe(1)
 })

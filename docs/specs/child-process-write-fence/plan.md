@@ -658,36 +658,50 @@ PLAN 阶段只提交本文件。下表和命令均为实施安排，不代表已
 
 - r8 收口：较宽相关六文件 `bun test --max-concurrency 2 src/main/naming-migration-wiring.test.ts src/main/keychain-boot-order.test.ts src/main/process-fence-wiring.test.ts src/main/shell-env.test.ts src/main/custom-provider-truth.test.ts src/main/package-manager-environment.test.ts` **51 pass / 0 fail / 483 expect**。这次误将 wiring 文件内既有 Office 冷/暖真实下载用例一并带出 slot 运行；这些隔离缓存行已结束且通过，不重跑、不计为 #1759 新证明；本轮测试选择的偏离在此明示。ui-mac 类型 exit 0，north-star exit 0，旧名 **10 pass**。`affected-tests --list` exit 2：基线缺根 `.gate-tests`，没有 scope 行，不改 gate。
 
-## 交付切片五｜Homebrew 围栏外执行的接缝核实
+## 交付切片五｜Homebrew 围栏外执行
 
-- 依据：#1759；spec v6 AC-11 的 brew；design v4.2 的 v5 §4.1–4.4、§6 与 §10 R1-F2 @ `6a292250bc`；r8 允许同轮继续，遇未定设计问题返回。
-- 核对：实施前核实发现 H4 接缝不足，尚未形成可执行的完整文件/提交计划，不将本段报为 PLAN-READY。Bun 的两个提交不依赖此接缝。
+- 依据：#1759；spec v6 BR-09/AC-11（brew）；design v4.4 §4.1–4.4、§5、§6 ①–⑦与 §10 @ `e3a15f2432`。H2 私有输入见 :800–844，H4 claim/交付见 :869–907，重定向次序与比较见 :896–897，证明义务见 :939；历史 r8 接缝已由该版关闭。Bun 沿 r8 已完成结果。
+- 核对：r9 · Claude Opus 5.5（编排者）明确授权本轮更新计划后实施；首实现提交填本计划提交号，作者自核不冒充独立审查。
 
 ### 改动
 
 | 文件 | 改什么 |
 | --- | --- |
-| 本计划 | 留下 H4 新接缝的可复现事实、未证明边界和需要设计所有者补充的条件。 |
-| 场景根 `r8/h4/{probe.m,nonbrew.py,production.sb,result.json,scanner.json,inspection.json}`（临时、未入库） | 最小原生 Mach/audit/签名/真实围栏证据；不写生产 H2/H4，不冒充已经接通的产品入口。 |
+| `packages/plugin/src/codepuppy-package-manager.ts`（新增） | 冻结 H2 类型的单一所有者，无运行时服务或新依赖。 |
+| `packages/ui-mac/engine/package-manager-scan-transform.ts`、`package-manager-plan.ts`（新增）及模块测试 | 在同一 ShellScan 的 build seam 补源 span/命令与重定向事实；main 的确定 argv/cwd/赋值规划和私有输入前导/叶重写；不复制 parser/前置词表。 |
+| `packages/ui-mac/engine/package-manager-shell-transform.ts`（新增）及模块测试；`scripts/build-engine.ts`、`electron.vite.config.ts`、必要的 `env.d.ts` | H2 窄口 build adapter：原 prepare 后实际 Shell.ID、Tool.Context、私有 input fd、真实 PID 绑定与原生命周期清理；main 与 engine 构建消费相同 scanner，保持上游文件不改。 |
+| `packages/ext/src/hub-bridge.ts`、`plugin.ts` 及既有测试；`packages/ui-mac/src/main/codepuppy-sidecar-messages.ts`、`hub-view.ts` 及既有测试 | H2 控制请求经真实 sidecar 宿主连接；类型/线协议只有一个解析所有者；凭据不落盘/日志。 |
+| `packages/ui-mac/src/main/homebrew-installation.ts`、`server.ts` 及既有测试；`package-manager-execution.ts`（新增）及模块测试 | 保存本代安装/普通环境/覆盖前代理快照，规划与复核身份；main 节点簿、一次 claim/比较、仅自有参数 spawn、流与 PGID 取消。 |
+| `packages/ui-mac/src/main/network-egress-proxy.ts`、`index.ts` 及既有测试 | 同一个策略代理的精确非 CONNECT 数据路由，原 CONNECT 不变；正常退出先结束 main 在途孩子。 |
+| `packages/ui-mac/native/codepuppy-fence/package_manager.c`、`package_manager_ipc.h`、`package_manager_helper.m`（新增）、`codepuppy_fence.c`；main 的 `package-manager-helper.ts`（新增） | 内核 audit/signature/进程身份与绑定检查；私有 Mach claim；严格签名原生 helper 的 proof fd 读取、匿名 loopback 字节流与原叶 fenced exec。 |
+| `packages/ui-mac/scripts/build-fence-addon.ts`、`build-package-manager-helper.ts`（新增）、`electron-builder.config.ts` 与相关既有测试 | 两架构构建、只读资源、严格 helper 签名复用现有打包签名身份；不启动应用/窗口、不触碰真实证书或安装。 |
+| `scripts/gate-files.tsv`、本计划 | 必要枚举机械同步、实际命令/结果/偏离；不改 gate。 |
 
 ### 顺序
 
-1. 先核 H4 能区分真实到达的 helper 叶和普通叶再次 exec 同一 helper；这决定 H2/native 的接线能否满足冻结不变量。
-2. 以下探针证实当前 H4 输入不能区分两者，按 frozen seam 不足返回；待设计所有者补足可信的逐节点执行来源，再写 H1→H2→H3/H4→真实 formula 的完整实施段。不实现一个已知违反 §4.1/§4.4 的放行口。
+1. H1：在同一 scanner 加确定规划入口与 source facts，复用既有 ShellSelect 方言/前置词；补路径/分支/变量/opaque/重定向用例与三个真实解释器的前导/叶交付测试。运行变动模块文件一次并提交。
+2. H2：Core/Plugin 构建适配、真实 Tool.Context 到 ext/main 的桥；保留原 Info/权限/Job，对私有 fd、prepare 次序与绑定/清理做最低层证据。运行各变动文件、适用类型检查后提交。
+3. H3/H4：main 节点簿和路由、helper/addon、打包与退出清理一起落地；节点格式/比较、错误证明仍 pending、一次消费、错误 HTTP 零 spawn、流/身份重核/取消；签名/Mach 前提只用临时 CLI。运行相关文件、类型后提交。
+4. 经 `gate slot` 一次性真实生产 main → sidecar → Shell 工具 → broker/helper → 真实 Homebrew formula，隔离 HOME/prefix/cache；只补失败行、不重复成功安装。逐项 §6 ①–⑦和撤分流 exit 71、保护撤除、凭据比较/交付/重定向次序移除臂；记录工具/来源/digest/输出/磁盘。最后一次较宽直接相关集合、类型、旧名、north-star、文档契约、affected-tests 与 diff 收口并提交证据。
 
 ### 风险
 
-- H4 的 executable/CDHash/签名/防注入与真实 Shell 祖先检查能确认进程映像和归属，不能确认该进程由源中的哪个语法叶到达。另一个普通叶 exec 同一签名 helper 后也满足检查；不需要篡改程序、伪造 audit token 或获得 bearer。
+- scanner 原本服务权限，不含 H1 全部事实；build seam 必须精确锚定并在漂移时构建失败，原扫描结果不变，main 不拉 Core 服务层。循环/不可确定值沿冻结 opaque 语义保留原围栏执行。
+- 私有输入、用户 redirections 和已有 fd 的次序必须由同一个原 shell 求值，不能由 main 模拟其副作用；先用真正 bash/zsh/posix 钉住 :896，再接完整安装，避免重安装迭代。
+- helper 已就绪但 root PID 尚未绑定的竞态须等真实 bind/cancel；错误凭据不得消耗 pending；异步断流/正常退出只有一个终态，main 自己持有孩子句柄。
+- 签名/Mach CLI 可以无窗口验证；本机证据只用 adhoc hardened helper，不弹证书授权或启动 Electron。生产 Team/打包形态若不能在禁窗口条件下证明，明确记录边界，不伪称实跑。
 
 ### 证明
 
 | AC | 测试/证据 | 层与运行时机 | 缺少行为为什么会失败 |
 | --- | --- | --- | --- |
-| AC-11 brew；H4/复合命令保真 | `r8/h4/result.json`、`inspection.json`；scratch CLI 编译/adhoc runtime+restrict+kill 签名后，两条真实 Mach request/reply；两条 root Shell 均由真实 `sandbox-exec -f production.sb` 启动，额外 literal resource subtree 拒写保护 probe helper。原 scanner 对 `/usr/bin/python3 …/nonbrew.py && false && brew --prefix` 返回 scanned。 | 一次性新接缝前提探针，约半秒；无包安装、窗口、生产协议修改。不是产品已接通的 scenario。 | 正常叶命中 pinned 映像/签名、真实 audit peer、root PID/pidversion/祖先与 pending node；反臂中普通叶仅从自己父 Shell 的 `kern.procargs2` 读公开 service/IDs 后 exec 同一 helper，也命中全部条件并获 grant，外层随后因 false exit 1，原计划 helper 叶从未到达。断言“反臂不获 grant”真实 **exit 1**。 |
+| AC-11/H1 | `engine/package-manager-plan.test.ts`：真实 scanner 产物、PATH 覆盖/quote/path/precommand、export 与 cd 的分支、opaque、原 redirection spans；main 身份/HB 既有测试 | fast/integration，affected PR/nightly，直接 import 与 literal 源码路径 | 复制/错用 PATH 或盲用未执行 export 会选错 launcher/cwd；漏 span 会改非 brew 叶；移除 HB 则 launcher/Library 可写。 |
+| §6 ③④⑥ | 上述模块的临时解释器输入/输出测试：三方言、allexport/xtrace、3–9 全闭、2>&9、9>out、文件/pipe/关闭 stdin、失败重定向 | integration，affected PR/nightly；不装包、不跑计时 | 内部 fd 先绑再套用户重定向时拿不到 proof；错序则建文件/用户 stderr/stdin/失败状态不同；导出/trace 会泄露已知测试凭据。 |
+| AC-11/H2 | shell-transform 与 hub-bridge/messages/host 既有文件的准备/上下文/私有字节/真实绑定/清理回归 | fast/integration，affected PR/nightly | 提前委派会绕审批；metadata 来自模型或漏 PID 绑定不能建立真实执行；把 privateInput 放 Info/环境会直接被检查捕获。 |
+| H3/H4、§6 ⑦ | `main/package-manager-execution.test.ts`：坏格式不进比较、wrong proof 保持 pending 后正确 claim、重放/额外参数零 spawn；实际 HTTP stream/stdin/exit/cancel；native peer 模块测试 | fast/integration，affected PR/nightly；签名内核组合留一次 scenario | 撤 timingSafeEqual 会使错误 proof 领取；先终结 wrong-proof 节点使随后真实叶失败；重复/改参数会多 spawn 或用到 caller 值；断流不清理会留下句柄。 |
+| AC-11、§6 ①②⑤ | 临时真实助手 Shell → 原 gate/prepare → H2/main → helper/Mach → 真实 formula：all/ask/deny/readonly、cd/&&/\|\|、r8 attacker、解释器内残留与启动文件抢读 | 一次 scenario/nightly 层，经 gate slot，命令/来源/digest 存原场景根 `r9/`，不加入每 PR 矩阵 | 撤分流真实 Homebrew 内部 sandbox exit 71；撤 proof 比较恢复 r8 grant；正确 proof 仍须安装/CLI 成功；启动抢读须 126/错误码，不能静默放行。 |
+| §6 ③、⑥、取消/退出 | 同一次真实入口核并发兄弟/后台 argv/env/fd、非 brew/postinstall 零凭据、无多余 helper/brew fd、真实重定向矩阵；stdout/stderr/exit/signal、背景/大输出、abort/timeout/disconnect/normal quit | 一次 scenario，经 gate slot，无时长阈值/种子扫掠 | 凭据走 argv/env 可被兄弟读到；用户 3–9 关闭必须仍分流；错误流终态/取消会与实际退出/磁盘/子进程状态不符。 |
 
 ### 偏离记录
 
-- **SEAM-CHANGE-NEEDED: H4 `claimPackageManagerNode` 的逐节点执行来源。** frozen `design.md:789` 保留原 shell 的 `&&/||`，`:836` 不得提前破坏控制流，`:875` 又仅以同一 helper 映像与绑定 Shell 自身/后代来核 peer，并声称其它叶/孩子不获能力。上述真实探针的两个 peer 都通过全部核验：相同 CDHash/identifier、动态签名有效、hardened runtime、无 entitlements、规范化 executable、内核 PID/pidversion、活 root 身份与后代、同 node 未 claim；普通叶仍能冒领尚未到达的节点。最小所需补充是 main 可核的“本次已批准语法叶实际执行”绑定，而非仅 Shell 后代；不能通过换 ID、放宽 peer、缩窄 brew 子命令、新卡或放弃控制流不变量绕过。此处只返还受影响 H2/H4，不重开 Bun/R1 或其它已接受切片。
-- 探针采用 adhoc 签名的严格 hardened CLI，不声称实测生产 Team 签名；相同二进制被普通叶再次 exec，其签名/映像事实仍相同。reply 只记录 grant 事件，不运行 brew 或发真实 HTTP 能力；生产 helper、流式取消/退出及触发 Homebrew 内部 Sandbox 的 formula 尚未实施/证明。初版 `/tmp` 与 kernel `/private/tmp` 的别名比较、Foundation 路径归一均使正臂误拒；改 POSIX realpath 后才计证据。`/bin/ps` 在真实 profile 不能 exec，观察改为只读自己父进程的 sysctl，不修改围栏。所有初版结果也保留。
-- 本轮约 40 分钟：Bun 两个提交约 11 分钟，其余约 30 分钟用于切片五接线阅读、轻量接缝核实与收口。曾把轻量 Mach 前提探针排入 gate slot；见需等待其它 ship 约一小时，取消自己的排队任务后按轻量原生探针直接运行。没有执行重安装场景、改 gate、launch app、push/PR/merge。按 r8 的未定接缝规则返回，未展开完整切片五文件列表或代码。
-- 文档契约用原工作树单仓 profile 收口 **exit 1 / 70 error / 252 warning**，finding 与 r7 已接受基线逐项相同；最初误用 portfolio 全仓 profile 的查询不作为此工作树结果。完整本轮清单、命令、计数、偏离和证据边界写入原场景根 `r8/summary.json`，总索引 `record.json` 保留 r7 并指向 r8；代码只提交 Bun 的既定文件，切片五只有本计划证据。
+- r8 的 adhoc Mach 前提反例与所有原始/修正记录保留在原场景根 `r8/h4/`，不改写为产品证明；r9 v4.4 以 §4.4 :890–901 / §6 :939 取代此前仅 peer/祖先核验。此计划不再把旧 :789/:836/:875 视为当前 H4 合同。旧文档契约 **70 error/252 warning** 与缺 `.gate-tests` 的基线收据沿 r8，结束时只核相关增量。

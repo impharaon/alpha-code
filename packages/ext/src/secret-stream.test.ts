@@ -51,3 +51,13 @@ test("invalidated escape residues publish in the current flush and leave no plai
   await transform.finish()
   expect(await readdir(root)).toEqual([])
 })
+
+test("complete escapes publish without touching spool storage", async () => {
+  const root = await mkdtemp(path.join(tmpdir(), "secret-stream-")); owned.push(root)
+  const output: string[] = []
+  const transform = createSecretStream(path.join(root, "absent", "sh_fixture.out"), "fixture", () => [Buffer.from("known")], async (bytes) => { output.push(Buffer.from(bytes).toString()) })
+  await transform.push(Buffer.from("\x1b[31mknown\x1b[0m ordinary"))
+  await transform.finish()
+  expect(output.join("")).toBe("[REDACTED] ordinary")
+  expect(await readdir(root)).toEqual([])
+})

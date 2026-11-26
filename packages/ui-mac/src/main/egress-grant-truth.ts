@@ -6,6 +6,10 @@ import { isEgressHostShape } from "./network-egress-registry"
 
 export const EGRESS_GRANTS_DIRNAME = "egress-grants"
 export const EGRESS_GRANT_TRUTH_VERSION = 1
+export function isEgressTimestamp(value: unknown): value is string {
+  return typeof value === "string" && /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d{1,3})?Z$/.test(value)
+    && Number.isFinite(Date.parse(value)) && new Date(value).toISOString().slice(0, 19) === value.slice(0, 19)
+}
 export type EgressGrantRecord = RememberedSite
 export type EgressGrantTruthRead = { ok: true; absent: boolean; sites: RememberedSite[] } | { ok: false; reason: string }
 
@@ -20,8 +24,7 @@ export function invalidEgressGrantList(entries: unknown): string | undefined {
     if (!hasEgressKeys(entry, ["site", "at"])) return `sites[${index}] has invalid fields`
     const site = parseSiteKey(entry.site)
     if (!site || !isEgressHostShape(site.value)) return `sites[${index}].site is invalid`
-    if (typeof entry.at !== "string" || !/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d{1,3})?Z$/.test(entry.at)
-      || !Number.isFinite(Date.parse(entry.at)) || new Date(entry.at).toISOString().slice(0, 19) !== entry.at.slice(0, 19)) return `sites[${index}].at is not a UTC timestamp`
+    if (!isEgressTimestamp(entry.at)) return `sites[${index}].at is not a UTC timestamp`
     const key = JSON.stringify(site)
     if (seen.has(key)) return `sites[${index}] duplicates an earlier site`
     seen.add(key)

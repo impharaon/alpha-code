@@ -258,3 +258,8 @@ U/E 各运行 `bun typecheck`，仅处理本片造成的问题；若包已有适
 切片二步骤 1（2026-11-26）：N7 已接到真实代理，测试夹具同步异步就绪合同；新增 `test-component/egress-upstream-fixture.ts` 是初始清单之外的同调用链测试文件，为九个已有 TCP peer 复用 connect-event → Promise 就绪适配，只供测试，不参与 allow-all 判据。N7 的协议测试使用真实生产请求，HTTP/HTTPS 由 Node server 解析；SOCKS peer 按 RFC 1928 与 SOCKS4 回复；HTTPS 证书由本次 openssl 生成、仅子进程加入 CA；Electron system Session 在隔离子进程验证 API 接线，没有启动 Electron。
 
 U `bun test --max-concurrency 2 src/main/network-egress-grants.test.ts src/main/network-egress-upstream.test.ts src/main/network-egress-proxy.test.ts`：38 pass / 0 fail（`/tmp/egress-s2-step1.log`）；其中原代理 24 条先单独通过，新增两条路由撤销/迟到/循环边界窄跑 2 pass。U `bun typecheck` 退出 0。旧名扫描最初误从根目录执行被根守卫拒绝，从 U 重跑为 10 pass；不计错误命令为通过。文档检查基线 69 errors / 253 warnings，沿用既有问题，不扩修。
+
+
+切片二步骤 2：完整非空活动快照的档位解析按 activity revision 核对，待批窗口恢复到全 allow 时继续；通放不写用户授权集合。N5 复用现有环境状态根追加逐次 JSONL，设置按唯一 ID 投影；实际 readonly 文件导致的 append 失败只影响记录状态，真实 CONNECT 仍成功。新增改动范围为 `egress-grant-truth.ts` 的 UTC 判据提取（N4/N5 共用同一时间合同，避免复制校验）；其余均在初始列表。三条旧代理夹具把 loopback 伪装成可批准目标，按设计 §4.2 改为公开形状的测试名映射到本地 TCP peer，原拒绝/批准/迟到断言保持；连接 ID 按 N5 改为运行 UUID + 序号，旧计数断言同步 string。
+
+U `bun test --max-concurrency 2 src/main/network-egress-approval.test.ts src/main/network-egress-passes.test.ts src/main/network-egress-proxy.test.ts`：37 pass / 0 fail（`/tmp/egress-s2-step2.log`）；`bun typecheck` 退出 0。初次新 passes 夹具遗漏父目录创建，2 fail，补齐夹具后窄跑 4 pass；这是夹具错误，不记作产品移除臂。新增 N7/passes 测试均为 integration：依赖通过静态 import 可追踪，普通受影响 PR 可选中；真引擎增量仍放已有 scenario 宿主，只由夜间运行，本轮验收按具名用例单次执行。返回前将执行 `affected-tests --list` 报告 scope。

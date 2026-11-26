@@ -35,8 +35,13 @@ export async function resolveEgressRoutes(target: Destination, signal: AbortSign
     await upstream.setProxy({ mode: "system" })
     return upstream
   })()
-  const upstream = await abortable(systemSession, signal)
-  return parseEgressRoutes(await abortable(upstream.resolveProxy(`https://${authority(target)}/`), signal))
+  try {
+    const upstream = await abortable(systemSession, signal)
+    return parseEgressRoutes(await abortable(upstream.resolveProxy(`https://${authority(target)}/`), signal))
+  } catch {
+    signal.throwIfAborted()
+    throw failure("EPROXYCONFIG")
+  }
 }
 
 export async function dialEgressUpstream(target: Destination, routes: UpstreamRoute[], policy: EgressDialPolicy, signal: AbortSignal): Promise<UpstreamTunnel> {
@@ -92,7 +97,7 @@ function connectSocket(target: Destination, signal: AbortSignal): Promise<Socket
 function httpTunnel(target: Destination, route: Exclude<UpstreamRoute, { kind: "direct" }>, signal: AbortSignal): Promise<Socket> {
   signal.throwIfAborted()
   return new Promise((resolve, reject) => {
-    const request = (route.kind === "https" ? https : http).request({ method: "CONNECT", host: route.host, port: route.port, path: authority(target), signal })
+    const request = (route.kind === "https" ? https : http).request({ method: "CONNECT", host: route.host, port: route.port, path: authority(target), headers: { Host: authority(target) }, signal })
     request.once("error", (error: NodeJS.ErrnoException) => reject(error.code === "ETIMEDOUT" ? error : failure("EPROXYCONNECT")))
     request.once("connect", (response, socket, head) => {
       socket.on("error", () => {})

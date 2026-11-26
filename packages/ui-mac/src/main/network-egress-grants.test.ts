@@ -40,7 +40,7 @@ test("授权并集消费 main 服务，没有通路时不可自行批准", async
   expect(await requestUserEgressGrant("a.example.com", 443)).toBe("not-asked")
   expect(isUserGrantedEgressDestination("a.example.com", 443)).toBe(false)
   const seen: string[] = []
-  configureEgressGrantApproval({
+  configureEgressGrantApproval({ pass: async () => undefined, recordPass: () => {}, denyPass: () => {},
     authorized: (host, port) => host === "a.example.com" && port === 443,
     request: async (host, port) => { seen.push(`${host}:${port}`); return "user-denied" },
   })

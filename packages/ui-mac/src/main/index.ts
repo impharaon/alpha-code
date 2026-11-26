@@ -1,5 +1,5 @@
 import { createNetworkEgressApproval } from "./network-egress-approval"
-import { createEgressSiteStore } from "./egress-grant-records"
+import { createEgressSiteStore, createEgressPassStore } from "./egress-grant-records"
 import { networkEgressActivity } from "./network-egress-activity"
 import { configureEgressGrantApproval } from "./network-egress-grants"
 import { registerNetworkEgressIpcHandlers } from "./network-egress-ipc"
@@ -1008,6 +1008,7 @@ const main = Effect.gen(function* () {
   const networkEgress = process.platform === "darwin" ? createNetworkEgressApproval({
     available: true, activity: networkEgressActivity,
     store: createEgressSiteStore((line) => logger.warn(line)), log: (line) => logger.warn(line),
+    passes: createEgressPassStore((line) => logger.warn(line)),
   }) : undefined
   if (networkEgress) configureEgressGrantApproval(networkEgress)
   registerNetworkEgressIpcHandlers({ ipc: ipcMain, windows: productWindows, service: networkEgress })

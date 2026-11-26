@@ -1,7 +1,7 @@
 // Address admission stays shared by remembered and temporary user grants. Approval ownership lives in main's conversation service.
 import { BlockList, isIP } from "node:net"
 import { isEgressHostShape, isLoopbackHost } from "./network-egress-registry"
-import type { Destination } from "../shared/network-egress-wire"
+import type { Destination, EgressPass } from "../shared/network-egress-wire"
 import type { EgressDenialDetail } from "../shared/egress-denial"
 
 export type UserEgressGrant = Destination
@@ -73,7 +73,15 @@ export function admitUserEgressGrant(host: unknown, port: unknown): UserEgressGr
 let authority: {
   authorized(host: string, port: number): boolean
   request(host: string, port: number, signal?: AbortSignal): Promise<EgressGrantOutcome>
+  pass(): Promise<EgressPassBasis | undefined>
+  recordPass(pass: EgressPass): void
+  denyPass(id: string, destination: Destination, basis: EgressPassBasis): void
 } | undefined
+
+export type EgressPassBasis = Pick<EgressPass, "sessions" | "tierRevision">
+export const currentEgressPass = () => authority?.pass() ?? Promise.resolve(undefined)
+export const recordEgressPass = (pass: EgressPass) => authority?.recordPass(pass)
+export const denyEgressPass = (id: string, destination: Destination, basis: EgressPassBasis) => authority?.denyPass(id, destination, basis)
 
 export function configureEgressGrantApproval(deps: NonNullable<typeof authority>): void {
   authority = deps

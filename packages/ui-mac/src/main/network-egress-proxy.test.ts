@@ -539,14 +539,14 @@ describe("`#1412` 未登记目的地的出口:问用户", () => {
       authorize: () => false,
       dial: testEgressDial((h, p) => {
         dialed.push(`${h}:${p}`)
-        return net.connect(p, h)
+        return net.connect(p, "127.0.0.1")
       }),
       requestGrant: async (h, p) => {
         asked.push(`${h}:${p}`)
         return "user-denied"
       },
     })
-    const authority = `127.0.0.1:${target.port}`
+    const authority = `grant.example.test:${target.port}`
     const res = await rawRequest(proxy.port, `CONNECT ${authority} HTTP/1.1\r\nHost: ${authority}\r\n\r\n`)
     await tick()
     expect(res.status).toBe(403)
@@ -555,7 +555,7 @@ describe("`#1412` 未登记目的地的出口:问用户", () => {
     expect(dialed).toEqual([])
     expect(target.connections).toBe(0)
     expect(logs.filter((r) => r.event === "egress.grant")).toEqual([
-      { event: "egress.grant", id: 1, at: expect.any(String), host: "127.0.0.1", port: target.port, decision: "refused" } as never,
+      { event: "egress.grant", id: expect.any(String), at: expect.any(String), host: "grant.example.test", port: target.port, decision: "refused" } as never,
     ])
     expect(logs.some((r) => r.event === "egress.connect" && r.verdict === "deny" && r.reason === "unregistered")).toBe(true)
   })
@@ -563,8 +563,8 @@ describe("`#1412` 未登记目的地的出口:问用户", () => {
   test("用户批准 ⇒ 200 隧道,字节双向到达,grant 记录排在 connect allow 之前", async () => {
     const target = await withTarget()
     let approved = false
-    const { proxy, logs } = await startProxy({ authorize: () => approved, requestGrant: async () => { approved = true; return "granted" } })
-    const authority = `127.0.0.1:${target.port}`
+    const { proxy, logs } = await startProxy({ dial: testEgressDial((_host, port) => net.connect(port, "127.0.0.1")), authorize: () => approved, requestGrant: async () => { approved = true; return "granted" } })
+    const authority = `grant.example.test:${target.port}`
     const { status, socket } = await connectThrough(proxy.port, authority)
     expect(status).toBe(200)
     const echoed = await new Promise<string>((resolve) => {
@@ -586,10 +586,10 @@ describe("`#1412` 未登记目的地的出口:问用户", () => {
     let asks = 0
     let approved = false
     const { proxy } = await startProxy({
-      authorize: (h, p) => approved && `${h}:${p}` === `127.0.0.1:${target.port}`,
+      authorize: (h, p) => approved && `${h}:${p}` === `grant.example.test:${target.port}`,
       dial: testEgressDial((h, p) => {
         dialed.push(`${h}:${p}`)
-        return net.connect(p, h)
+        return net.connect(p, "127.0.0.1")
       }),
       requestGrant: () =>
         new Promise((resolve) => {
@@ -600,7 +600,7 @@ describe("`#1412` 未登记目的地的出口:问用户", () => {
           }
         }),
     })
-    const authority = `127.0.0.1:${target.port}`
+    const authority = `grant.example.test:${target.port}`
     // 客户端等不到答复就走了(`webfetch` 30 s 超时短于人类反应时间)
     const impatient = net.connect(proxy.port, "127.0.0.1", () => impatient.write(`CONNECT ${authority} HTTP/1.1\r\nHost: ${authority}\r\n\r\n`))
     impatient.on("error", () => {})

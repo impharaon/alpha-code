@@ -3,6 +3,31 @@ import { createNetworkEgressActivity } from "./network-egress-activity"
 import { createNetworkEgressApproval } from "./network-egress-approval"
 import type { EgressApproval, NetworkActivity, NetworkOutbound, RememberedSite, SessionRef } from "../shared/network-egress-wire"
 
+test("通放只取非空完整的全 allow 快照，等待窗口恢复后无用户点击也能继续", async () => {
+  const f = await approvalFixture()
+  try {
+    expect(await f.service.pass()).toBeUndefined()
+    await f.setActivities([])
+    const waiting = f.service.request("recover.example.com", 443)
+    await f.service.api.setTier({ session: f.session(), tier: "allow" })
+    expect(await f.service.pass()).toBeUndefined()
+    await f.setActivities(["ses_a"])
+    expect(await waiting).toBe("granted")
+    expect(await f.cards()).toEqual([])
+    expect(f.service.authorized("recover.example.com", 443)).toBe(false)
+    await f.setActivities(["ses_a", "ses_b"])
+    expect(await f.service.pass()).toBeUndefined()
+    for (const tier of ["ask", "readonly"] as const) {
+      await f.service.api.setTier({ session: f.session("ses_b"), tier })
+      expect(await f.service.pass()).toBeUndefined()
+    }
+    await f.service.api.setTier({ session: f.session("ses_b"), tier: "allow" })
+    expect((await f.service.pass())?.sessions).toHaveLength(2)
+    f.activity.attach(2, () => {}, { session: async () => ({}), shell: async () => true })
+    expect(await f.service.pass()).toBeUndefined()
+  } finally { f.service.close() }
+})
+
 async function approvalFixture(options: { timeoutMs?: number; unreadable?: boolean } = {}) {
   const activity = createNetworkEgressActivity()
   const messages: NetworkOutbound[] = []

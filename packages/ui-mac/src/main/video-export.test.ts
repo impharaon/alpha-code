@@ -1,10 +1,10 @@
-import { afterAll, expect, test } from "bun:test"
+import { afterAll, expect, test, spyOn } from "bun:test"
 import { copyFile, mkdtemp, readFile, readdir, rm, symlink } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import path from "node:path"
 import { subtitleText, transcriptText, writeProjectOutput } from "../../resources/video-mcp/export"
 import { sourceOf } from "../../resources/video-mcp/source"
-import { fail, type VideoRuntime } from "../../resources/video-mcp/runtime"
+import { fail, mediaFailure, type VideoRuntime } from "../../resources/video-mcp/runtime"
 
 const root = await mkdtemp(path.join(tmpdir(), "video-export-"))
 afterAll(() => rm(root, { recursive: true, force: true }))
@@ -81,4 +81,20 @@ test("project exports retain original media, disambiguate existing names and rej
     await rm(outside, { recursive: true, force: true })
   }
   expect((await readdir(root)).some((file) => file.endsWith(".part"))).toBe(false)
+})
+
+
+test("project export supports filesystems without hard links and identifies invalid targets",async()=>{
+ const original=path.join(root,"fat-source.wav")
+ await copyFile(path.join(import.meta.dir,"fixtures/video/speech-en.wav"),original)
+ const source=await sourceOf({kind:"path",path:original},runtime)
+ const fs=await import("node:fs/promises")
+ const link=spyOn(fs,"link").mockRejectedValue(Object.assign(new Error("filesystem does not support hard links"),{code:"ENOTSUP"}))
+ try{
+  const output=await writeProjectOutput(source,"fat.txt","fat.txt",{text:"complete export"},runtime).catch(error=>({error:mediaFailure(error)}))
+  expect(output).toHaveProperty("path")
+  if("path" in output)expect(await readFile(output.path,"utf8")).toBe("complete export")
+ }finally{link.mockRestore()}
+ const error=await writeProjectOutput(source,"../escape.txt","result.txt",{text:"no"},runtime).catch(error=>error)
+ expect(mediaFailure(error)).toMatchObject({code:"export_target_invalid",action:expect.stringContaining("project")})
 })

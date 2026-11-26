@@ -811,17 +811,35 @@ test("§4.7 转发入口回 429(GitHub 限流转发机)⇒ 不等 Retry-After,�
 })
 
 
-test("a plugin root with its own marketplace remains a plugin candidate", async () => {
+test("a real mixed plugin root exposes its marketplace without duplicating its listed root", async () => {
   const sources = (await sourcesModule()).createPluginSources({ catalog: async () => [] })
   const capture = await captureStandardFixture("claude:codspeed")
   expect(capture.nodes.some(node => node.path.endsWith("marketplace.json"))).toBe(true)
   const prepared = await sources.prepareCapture({ ...capture, source: { ...capture.source, kind: "folder" } })
-  expect(prepared.kind).toBe("package")
-  if (prepared.kind !== "package") throw Error("Real plugin root was mistaken for a market")
-  const converted = await sources.convertCandidate(prepared.candidateId)
+  expect(prepared.kind).toBe("marketplace")
+  if (prepared.kind !== "marketplace") throw Error("Mixed root must expose the real market")
+  expect(prepared.entries.map(entry => entry.displayName)).toEqual(["codspeed"])
+  const converted = await sources.convertCandidate(prepared.entries[0]!.id)
   expect(converted.ok && converted.package.entries.some(entry => entry.kind === "mcp" && entry.sourceName === "CodSpeed")).toBe(true)
 })
 
+test("a mixed marketplace also exposes its unlisted root alongside selectable nested real plugins", async () => {
+  const { captureFixture } = await import("../../test-fixtures/plugin-helper/fixture")
+  const sources = (await sourcesModule()).createPluginSources({ catalog: async () => [] })
+  const root = await captureStandardFixture("claude:codspeed")
+  const marketplace = JSON.parse(new TextDecoder().decode(await root.readFile(".claude-plugin/marketplace.json")))
+  const nested = await captureFixture("plugins/frontend-design")
+  // Controlled addition of the pinned real frontend-design tree to the real CodSpeed mixed repo shape.
+  const files = Object.fromEntries(await Promise.all(nested.nodes.flatMap(node => node.kind === "file" ? [nested.readFile(node.path).then(bytes => ["nested/" + node.path, new TextDecoder().decode(bytes)])] : [])))
+  const capture = await captureStandardFixture("claude:codspeed", { ...files, ".claude-plugin/marketplace.json": JSON.stringify({ ...marketplace, plugins: [{ ...marketplace.plugins[0], name: "frontend-design", source: "./nested" }] }) })
+  const prepared = await sources.prepareCapture({ ...capture, source: { ...capture.source, kind: "folder" } })
+  expect(prepared.kind).toBe("marketplace")
+  if (prepared.kind !== "marketplace") throw Error("Mixed root must expose both choices")
+  expect(prepared.entries.map(entry => entry.displayName)).toEqual(["frontend-design", "codspeed"])
+  const converted = await Promise.all(prepared.entries.map(entry => sources.convertCandidate(entry.id)))
+  expect(converted[0]!.ok && converted[0]!.package.entries.some(entry => entry.kind === "skill" && entry.sourceName === "frontend-design")).toBe(true)
+  expect(converted[1]!.ok && converted[1]!.package.entries.some(entry => entry.kind === "mcp" && entry.sourceName === "CodSpeed")).toBe(true)
+})
 
 test("a connector version suggestion uses the real npm metadata and remains optional", async () => {
   const { suggestPluginVersion } = await import("./plugin-sources")

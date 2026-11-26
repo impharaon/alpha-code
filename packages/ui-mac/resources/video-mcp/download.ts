@@ -70,6 +70,8 @@ export function videoDownloadArgs(url:string,paths:{ytdlp:string;ejs:string;node
         "--ffmpeg-location",
         paths.ffmpeg,
         "--no-playlist",
+        "-S",
+        "vcodec:h264",
         "--no-progress",
         "-o",
         `${paths.directory}/media.%(ext)s`,

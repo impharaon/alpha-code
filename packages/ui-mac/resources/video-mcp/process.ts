@@ -34,6 +34,7 @@ export async function runComponent(executable: string, args: readonly string[], 
     await copied.catch(() => {})
     if (output && created) await rm(output, { force: true })
     if (runtime.signal.aborted) fail("cancelled", "Media processing was cancelled.")
+    if(error instanceof Error && /unsupported codec|decoder .*not found|no decoder found|unknown decoder|not implemented|doesn.t support.*decoding/i.test(error.message))fail("format_unsupported","The prepared decoder does not support this media codec.")
     if (error && typeof error === "object" && "code" in error && error.code === "ENOENT") fail("component_download_failed", "The prepared component executable is missing.")
     throw error
   }

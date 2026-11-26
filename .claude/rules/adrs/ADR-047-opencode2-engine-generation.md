@@ -306,3 +306,5 @@ OpenCode 共用服务、库与凭证。
 S-04 依据 DESIGN-local-plugin-install v3.1 §6/§10 与 orchestrator ruling 2026-11-27（r14）：既有 config.ts / config/plugin/skill.ts 的读取、watcher 与 rescan 在原生发布链调用同一个 beforeConfigChange；raw revision 仍经当前项目 trust/parser，拒绝不改用户文件，托管策略不可阻止。登记 `plugin-hook-config-change` 与原 `project-opencode-config-trust`，无额外接管文件或 DTO。
 
 S-06 依据同一冻结设计的 §10：精确新 L3 仅 `packages/core/src/session/compaction.ts`，在实际 compact 采用（含 held summary）前 await PreCompact，在 publish 成功持久化后 await PostCompact；后台预计算不触发。现有模型钩子不覆盖采用预计算结果，不能在 ext 事后还原这个决定点；L1/L2 仍改同一生命周期并另添源码/产物同步入口，故沿设计选择直接 L3。注册 `plugin-hook-compaction`，native summary/预算/重试算法不改，opaque native window 无可读 summary 时不造字段。north-star 精确单文件清单随该登记同步；没有扩大到 runner/step.ts。原模块 finite integration 与真实 host 用例覆盖手动/自动/溢出、持久化后通知及预计算采用，移除回调即红。
+
+S-12 配套登记（#1776 r15）：`packages/schema/test/mcp.test.ts` 的 transport round-trip 反例和 `packages/client/src/promise/generated/types.ts` 两处由 schema 生成的可选 transport 字段随同原 S-12 权威登记。基线 1db6a3bbf5 不含这两处，提交 513e35a7c6 / 27595818cb 属本车道；r15 修正登记遗漏，不更改生成物、断言、协议值或守卫算法。它们是已批准 RemoteConfig 的配套 artifact/proof，不增加 runtime 接管点。

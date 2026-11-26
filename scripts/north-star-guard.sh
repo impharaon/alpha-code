@@ -144,6 +144,9 @@ UPSTREAM_EXCLUDES=(
   # 请求的凭据改读进程内凭据表(readCodePuppyCredential),不读文件;判据 packages/ui-mac/src/main/engine-cases.test.ts。
   # #1776 S-12 / ADR-047: one optional RemoteConfig transport field; SDK selection stays in the existing client.
   ':(exclude)packages/schema/src/mcp.ts'
+  # #1776 S-12 companion schema regression and generated public API projection; same approved transport field.
+  ':(exclude)packages/schema/test/mcp.test.ts'
+  ':(exclude)packages/client/src/promise/generated/types.ts'
   ':(exclude)packages/core/src/mcp/client.ts'
   ':(exclude)packages/core/src/mcp/connection.ts'
   ':(exclude)packages/core/src/mcp/index.ts'

@@ -1241,3 +1241,11 @@ stdout 的 CRLF/LF、最后残行经已有流执行器进入原 synthetic/inbox�
 **下一轮精确状态**：S-04 已按 r14 ruling 完成；S-06 与 S-08 完成，monitors 原进程/会话 wiring 与本轮范围证据完成。片 5 仍有 **S-03** 的真实 leave/SessionEnd（含 main 在释放前 await）、统一 Notification、FileChanged/CLAUDE_ENV_FILE、完整 SubagentStart/Stop 来源字段；**S-05 InstructionsLoaded** 的真实 source/admission；**S-07 Elicitation/Result** 的 HTTP/SSE 会话与 stdio in-flight 归属；其余获准 prompt 事件与上表剩余原脚本验收。未开始片 7。无新设计裁决/公开合同问题被擅定；所有实现仅消费原 v3.1 与已接受 ruling。
 
 已核 Codex（GPT-6）。本轮 2026-11-26 23:53 至 2026-11-27 00:42（UTC+08）约 49 分钟；截至本收口前 19 文件、868 additions / 84 deletions（含红测、原测试、registry/ADR/docs）。必要表外私部 helper 与 mock 同步原因已逐步记录；无新依赖/迁移/仓外写。遗留去向：剩余片 5 fix now 续本车道；两个旧 north-star 登记缺口与 host checkpoint 交编排器；docs 基线/三条旧 command-subagent 断言仍归原处置。无新增 OPTIONAL；本轮状态 **PARTIAL**，不将片 3/4 的 accepted 或本轮局部证明标作片 5 全部完成。
+
+### r15｜继续片 5 与 S-12 配套登记
+
+核对：IMPLEMENT — r15 / orchestrator Claude Opus 5.5，accepted r14 PARTIAL；片 5 原计划继续，spec v5 / design v3.1 + 已接受 rulings 不变。
+
+派发要求的一次基线核查：相对 1db6a3bbf5，generated Promise types 有两处 transport 可选字段，schema mcp.test 有原 round-trip/非法值用例；分别由本车道 513e35a7c6 / 27595818cb 引入，确属本车道登记遗漏。原 guard 红输出 `/tmp/plugin-standard-r15-north-star-red.log`。在原 plugin-mcp-transport / ADR-047 与精确 allowlist 补登记这两个配套 artifact/proof；不改它们的字节/断言，不把配套文件误作新的 runtime L3，也不改 gate 算法。这修正 r14 将其移交编排器的处置，既有 SSE 决策未变。
+
+S-12 登记修后：schema 原文件 3 pass、registry 原文件 5 pass，独立 north-star exit 0（`/tmp/plugin-standard-r15-{schema-proof,registry-proof,north-star-green}.log`）；没有重跑 SSE/engine 套件。S-05 定点只读事实：InstructionDiscovery.File schema 只有 path/content，editor.add 重建 File 且 load 用 Files codec；原生 constructor+codec 探针输出只有这两字段（没有元数据）。现阶段不在 ext/进程 Map 另造来源权威；保留该接缝核对，先完成独立行。

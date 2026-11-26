@@ -623,3 +623,74 @@ test("cold engine generations bind plugin MCP ROOT options secrets and DATA only
     expect(await invoke("ext-uninstall-package", graph.packageId)).toMatchObject({ ok: true })
   } finally { beforeReady = undefined }
 }, 120_000)
+
+async function installLocationPluginFixture(requestId: string) {
+  const { publishPluginDataHome } = await import("./plugin-package-data")
+  publishPluginDataHome(sandbox.data)
+  const { captureStandardFixture } = await import("../../test-fixtures/plugin-helper/fixture")
+  const { convertPluginTree } = await import("../shared/host-extension-package-contract/plugin-conversion.mjs")
+  const { pluginRuntimeIdentity } = await import("./plugin-sources")
+  const { readPackageLedgerStateV1 } = await import("./ext-receipt-v2")
+  const { MCP_FIXTURE } = await import("../../test-component/codepuppy-engine")
+  const original = await captureStandardFixture("claude:grafana-mcp")
+  const definition = JSON.parse(new TextDecoder().decode(await original.readFile(".mcp.json")))
+  const { pathToFileURL } = await import("node:url")
+  const capture = await captureStandardFixture("claude:grafana-mcp", {
+    ".mcp.json": JSON.stringify({ ...definition, mcpServers: { grafana: { ...definition.mcpServers.grafana, command: process.execPath, args: ["${CLAUDE_PLUGIN_ROOT}/echo.mjs"] } } }),
+    "echo.mjs": `await import(${JSON.stringify(pathToFileURL(MCP_FIXTURE).href)});`,
+  })
+  const converted = await convertPluginTree(capture)
+  main.pluginSources.convertCandidate = async () => ({ ok: true, ...converted, capture, runtimeIdentity: pluginRuntimeIdentity(converted.package) })
+  const installed = await main.installFromSource({ requestId, source: { kind: "candidate", candidateId: requestId }, effect: { kind: "all-projects" }, via: "chat" })
+  expect(installed).toMatchObject({ ok: true })
+  if (!installed.ok || !("packageId" in installed)) throw Error("Plugin fixture not installed")
+  const state = readPackageLedgerStateV1(root)
+  if (!state.ok) throw Error(state.reason)
+  const graph = state.packageGraphs.find(graph => graph.packageId === installed.packageId)!
+  const name = graph.children.find(node => node.kind === "mcp")!.name
+  await until(() => { const current = readPackageLedgerStateV1(root); return current.ok && current.records.some(record => record.name === name && record.desiredState === "enabled") }, "plugin fixture enabled")
+  expect(await invoke("ext-save-package-secrets", { packageId: graph.packageId, options: { grafana_url: "https://grafana.example.invalid", grafana_service_account_token: TOKEN } })).toMatchObject({ ok: true })
+  await until(async () => await mcpStatus(name) === "connected", "plugin fixture connected")
+  return { packageId: graph.packageId, name }
+}
+
+test("plugin MCP connects in a Location created after engine ready", async () => {
+  const plugin = await installLocationPluginFixture("late_location_plugin")
+  try {
+    const { mkdirSync } = await import("node:fs")
+    const { engineClient } = await import("./engine-client")
+    const directory = join(sandbox.root, "late-plugin-location")
+    mkdirSync(directory, { recursive: true })
+    const client = engineClient({ url: running!.url, username: "opencode", password: "cp-hub-lifecycle" })
+    await client.session.create({ location: { directory }, model: { id: "m", providerID: "codepuppy" } })
+    await until(async () => (await client.mcp.list({ location: { directory } })).data.some(entry => entry.name === plugin.name && entry.status.status === "connected"), "late Location plugin MCP bound")
+  } finally {
+    expect(await invoke("ext-uninstall-package", plugin.packageId)).toMatchObject({ ok: true })
+  }
+}, 120_000)
+
+test("plugin MCP remains connected after a skills-only package reload", async () => {
+  const plugin = await installLocationPluginFixture("skills_reload_plugin")
+  let skills: string | undefined
+  try {
+    const { captureStandardFixture } = await import("../../test-fixtures/plugin-helper/fixture")
+    const { convertPluginTree } = await import("../shared/host-extension-package-contract/plugin-conversion.mjs")
+    const { pluginRuntimeIdentity } = await import("./plugin-sources")
+    const capture = await captureStandardFixture("codex:temporal")
+    const converted = await convertPluginTree(capture)
+    expect(converted.package.entries.some(entry => entry.kind === "mcp")).toBe(false)
+    main.pluginSources.convertCandidate = async () => ({ ok: true, ...converted, capture, runtimeIdentity: pluginRuntimeIdentity(converted.package) })
+    const before = reloadRequests.length
+    const installed = await main.installFromSource({ requestId: "skills_only_reload", source: { kind: "candidate", candidateId: "skills_only_reload" }, effect: { kind: "all-projects" }, via: "chat" })
+    expect(installed).toMatchObject({ ok: true })
+    if (!installed.ok || !("packageId" in installed)) throw Error("Skills fixture not installed")
+    skills = installed.packageId
+    await until(() => reloadRequests.length > before, "skills package reload requested")
+    const pending = reloadRequests.slice(before)
+    await until(() => pending.every(request => reloadReports.some(report => report.generation === request.generation && report.outcome === "reloaded")), "skills package reload finished")
+    await until(async () => await mcpStatus(plugin.name) === "connected", "unrelated plugin MCP restored after skills reload")
+  } finally {
+    if (skills) expect(await invoke("ext-uninstall-package", skills)).toMatchObject({ ok: true })
+    expect(await invoke("ext-uninstall-package", plugin.packageId)).toMatchObject({ ok: true })
+  }
+}, 120_000)

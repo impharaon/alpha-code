@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test, spyOn } from "bun:test"
 import { createHash } from "node:crypto"
-import { copyFileSync, cpSync, mkdirSync, mkdtempSync, readFileSync, promises, readdirSync, existsSync, realpathSync, rmSync, writeFileSync } from "node:fs"
+import { copyFileSync, cpSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, existsSync, realpathSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import type { Location } from "../../../schema/src/location"
@@ -173,8 +173,9 @@ test.each(["extract-failure", "verification-failure", "cancel"])("unpublished ca
 test("runtime marker is complete inside the candidate before the real publication rename", async () => {
   const f = fixture()
   let marker: unknown = null
-  const rename = promises.rename
-  const observed = spyOn(promises, "rename").mockImplementation(async (from, to) => {
+  const fs = await import("node:fs/promises")
+  const rename = fs.rename
+  const observed = spyOn(fs, "rename").mockImplementation(async (from, to) => {
     if (String(from).includes("libreoffice-candidate-") && String(to).endsWith(pin.version)) marker = existsSync(join(String(from), "document-runtime.json")) ? JSON.parse(readFileSync(join(String(from), "document-runtime.json"), "utf8")) : null
     return rename(from, to)
   })
@@ -183,6 +184,7 @@ test("runtime marker is complete inside the candidate before the real publicatio
     runtime.subscribeRuntimeVerify(f.location, f.completed)
     const ready = until(runtime, (state) => state.phase === "ready")
     runtime.query(f.location); await ready
+    expect(observed.mock.calls.length).toBeGreaterThan(0)
     expect(marker).toMatchObject({ pinId: pin.id, pinSha256: pin.sha256, version: pin.version })
   } finally { observed.mockRestore() }
 })

@@ -158,7 +158,6 @@ export function createDocumentRuntime(input: {
       const registration = registrations.get(key(location))
       if (!registration || disposed || !projections) throw Error("document Python environment requires a live Location registration")
       const environment = projections.environment(location, registration.id, state)
-      this.query(location)
       return environment
     },
     query(location: Location.Ref) {

@@ -1,8 +1,9 @@
+import { z } from "zod"
 import { afterAll, expect, test } from "bun:test"
 import { mkdtemp, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import path from "node:path"
-import { createVideoRuntime, videoInvocation } from "../../resources/video-mcp/assets"
+import { createVideoRuntime, preparedFilesResult, videoInvocation } from "../../resources/video-mcp/assets"
 import { mediaFailure } from "../../resources/video-mcp/runtime"
 
 const root = await mkdtemp(path.join(tmpdir(), "video-assets-"))
@@ -82,4 +83,62 @@ test("preparation failures retain disk, cancellation and unavailable categories 
     "component_download_failed",
   )
   expect(called).toBe(false)
+})
+
+test("SDK nested preparation stays associated with the original call and propagates cancellation", async () => {
+  const { Client, InMemoryTransport } = await import("@modelcontextprotocol/client")
+  const { createVideoServer } = await import("../../resources/video-mcp/server")
+  const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair()
+  const server = createVideoServer(invocation)
+  const client = new Client({ name: "video-asset-host", version: "1" })
+  const requests: Record<string, unknown>[] = []
+  const seen = Promise.withResolvers<void>()
+  const cancelled = Promise.withResolvers<void>()
+  client.setRequestHandler(
+    "codepuppy/pinned-files.ensure",
+    {
+      params: z.object({ ids: z.array(z.string()), _meta: z.record(z.string(), z.unknown()) }),
+      result: preparedFilesResult,
+    },
+    async (params, context) => {
+      requests.push(params)
+      if (requests.length === 1) return { ok: false, error: "disk" }
+      context.mcpReq.signal.addEventListener("abort", () => cancelled.resolve(), { once: true })
+      seen.resolve()
+      await cancelled.promise
+      return { ok: false, error: "cancelled" }
+    },
+  )
+  await server.connect(serverTransport)
+  await client.connect(clientTransport)
+  const params = {
+    name: "info",
+    arguments: { source: { kind: "path", path: path.join(import.meta.dir, "fixtures/video/speech-en.wav") } },
+    _meta: {
+      "codepuppy/pinned-files.call": "original-host-call",
+      "codepuppy/pinned-files.deadline": Date.now() + 120000,
+    },
+  }
+  try {
+    await client.listTools()
+    expect(requests).toEqual([])
+    const result = await client.callTool(params)
+    expect(result.isError).toBe(true)
+    if (result.content[0]?.type === "text") expect(JSON.parse(result.content[0].text).code).toBe("disk_full")
+    expect(requests[0]).toEqual({
+      ids: ["ffmpeg/" + `${process.platform}-${process.arch}` + "/9.1-openh264-2.7.0"],
+      _meta: params._meta,
+    })
+    const controller = new AbortController()
+    const pending = client.callTool(params, { signal: controller.signal }).catch((error: unknown) => error)
+    await seen.promise
+    controller.abort()
+    await pending
+    await cancelled.promise
+    expect(requests).toHaveLength(2)
+  } finally {
+    cancelled.resolve()
+    await client.close()
+    await server.close()
+  }
 })

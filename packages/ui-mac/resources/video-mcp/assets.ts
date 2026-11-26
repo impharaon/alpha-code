@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto"
 import path from "node:path"
 import { z } from "zod"
 import pins from "../pinned-files.json"
-import { modelRoles } from "./asset-recipes"
+import { defaultOcrLanguages, defaultOcrPins, modelRoles, videoRecipes } from "./asset-recipes"
 import { cachePath, digest, fileDigest, publish, readPublished, withMediaLock } from "./cache"
 import { fail, type ComponentName, type VideoRuntime } from "./runtime"
 
@@ -124,7 +124,9 @@ export async function createVideoRuntime(
     if (name === "ocr-model" || typeof name === "object")
       return ocrModels(typeof name === "object" ? name.script : undefined)
     if (name === "ffmpeg" || name === "ffprobe") {
-      const id = `ffmpeg/${platform}/9.1-openh264-2.7.0`
+      const id =
+        videoRecipes.find((recipe) => recipe.id.startsWith(`ffmpeg/${platform}/`))?.id ??
+        fail("component_download_failed", "The codec recipe is missing.")
       const pin =
         pins.files.find((pin) => pin.id === id) ??
         fail("component_download_failed", "The pinned video codec archive is absent from this build.")
@@ -135,11 +137,13 @@ export async function createVideoRuntime(
       }
     }
     if (name === "python") {
-      const id = `python/${platform}/3.12.16-20261124`
-      const files = await ensure([id])
+      const id =
+        videoRecipes.find((recipe) => recipe.id.startsWith(`python/${platform}/`))?.id ??
+        fail("component_download_failed", "The launcher Python recipe is missing.")
       const pin =
         pins.files.find((pin) => pin.id === id) ??
         fail("component_download_failed", "The launcher's pinned Python entry is absent from this build.")
+      const files = await ensure([id])
       return { path: files[0]!.path, digest: pin.sha256 }
     }
     const role = modelRoles[name as keyof typeof modelRoles]
@@ -159,7 +163,7 @@ export async function createVideoRuntime(
       ? pins.files
           .filter((pin) => pin.family === "ocr-model" && pin.id.endsWith(`/script-${script}`))
           .map((pin) => pin.id)
-      : ["chi_sim", "chi_tra", "eng", "osd"].map((language) => `ocr-model/win32-x64/${language}-4.1.0`)
+      : defaultOcrPins().map((pin) => pin.id)
     if (!ids.length) fail("component_download_failed", "No pinned OCR model matches the detected script.")
     const key = digest(JSON.stringify(ids.map((id) => [id, pins.files.find((pin) => pin.id === id)?.sha256])))
     const root = cachePath(runtime, "ocr-models", key)
@@ -173,7 +177,7 @@ export async function createVideoRuntime(
       for (const [index, entry] of entries.entries()) {
         const filename = script
           ? path.join("script", `${script}.traineddata`)
-          : `${["chi_sim", "chi_tra", "eng", "osd"][index]}.traineddata`
+          : `${defaultOcrLanguages[index]}.traineddata`
         const target = path.join(root, filename)
         await mkdir(path.dirname(target), { recursive: true })
         const pending = `${target}.${randomUUID()}.part`

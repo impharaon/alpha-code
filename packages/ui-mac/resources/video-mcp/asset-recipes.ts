@@ -1,3 +1,5 @@
+import pins from "../pinned-files.json"
+
 export const videoRecipes = [
   {
     id: "speech-model/any/sensevoice-2024-07-17-int8",
@@ -50,6 +52,18 @@ export const videoRecipes = [
       "ffmpeg/licenses/OpenH264.txt",
     ],
   })),
+  ...["darwin-arm64", "win32-x64"].map((target) => ({
+    id: `python/${target}/3.12.16-20261124`,
+    archive: "tar.gz",
+    entry: target === "darwin-arm64" ? "python/bin/python3" : "python/python.exe",
+    required: [target === "darwin-arm64" ? "python/bin/python3" : "python/python.exe"],
+  })),
+  ...pins.files
+    .filter((pin) => pin.family === "ocr-model")
+    .map((pin) => {
+      const entry = `${pin.id.split("/").at(-1)}.traineddata`
+      return { id: pin.id, archive: "file", entry, required: [entry] }
+    }),
 ] as const
 
 export const modelRoles = {
@@ -62,3 +76,33 @@ export const modelRoles = {
   "speaker-embedding": { id: videoRecipes[4].id, member: "" },
   whisper: { id: videoRecipes[5].id, member: "" },
 } as const
+
+export const defaultOcrLanguages = ["chi_sim", "chi_tra", "eng", "osd"] as const
+
+export function defaultOcrPins() {
+  return defaultOcrLanguages.map((language) => {
+    const pin = pins.files.find(
+      (pin) => pin.family === "ocr-model" && pin.id.split("/").at(-1)?.startsWith(`${language}-`),
+    )
+    if (!pin) throw new Error(`Missing default OCR pin: ${language}`)
+    return pin
+  })
+}
+
+/** Unique compressed deliveries for the complete zh/en local transcript path. */
+export function firstVideoPins(target: "darwin-arm64" | "win32-x64") {
+  const ids = new Set(
+    Object.entries(modelRoles)
+      .filter(([name]) => name !== "whisper")
+      .map(([, role]) => role.id as string),
+  )
+  const codec = videoRecipes.find((recipe) => recipe.id.startsWith(`ffmpeg/${target}/`))
+  if (!codec) throw new Error(`Missing codec recipe: ${target}`)
+  ids.add(codec.id)
+  if (target === "win32-x64") for (const pin of defaultOcrPins()) ids.add(pin.id)
+  return [...ids].map((id) => {
+    const pin = pins.files.find((pin) => pin.id === id)
+    if (!pin) throw new Error(`Missing first-use video pin: ${id}`)
+    return pin
+  })
+}

@@ -74,6 +74,9 @@ export const OFFICE_RUNTIME_BUILD_DIR = path.join("native", "office-runtime", "b
  */
 export const RIPGREP_BUILD_DIR = path.join("native", "ripgrep", "build")
 
+/** First-party media native/helper closure, selected by electron-builder os/arch macros. */
+export const VIDEO_RUNTIME_BUILD_DIR = path.join("native", "video-runtime", "build")
+
 // ── Mach-O 头解析(不依赖 `file` / `lipo`,linux 上的单测也能跑)────────────────────────────
 
 const CPU_TYPE: Record<number, TargetArch> = { 0x01000007: "x64", 0x0100000c: "arm64" }

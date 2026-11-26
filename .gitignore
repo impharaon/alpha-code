@@ -50,3 +50,5 @@ legal-drafts-private/
 
 # Bundled video service build output
 /packages/ui-mac/dist-video/
+
+/packages/ui-mac/native/video-runtime/build/

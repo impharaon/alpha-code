@@ -16,6 +16,7 @@ import { join } from "node:path"
 
 import { videoToolDefinitions } from "../resources/video-mcp/contracts"
 import { videoRecipes } from "../resources/video-mcp/asset-recipes"
+import { VIDEO_RUNTIME_BUILD_DIR } from "./target-arch"
 import { VIDEO_DECLARATION_ID, VIDEO_SERVICE_COMMAND } from "../src/shared/video-service"
 import { CODEPUPPY_OFFICE_CONNECTORS, codepuppyOfficeInstallCommand } from "../src/shared/office-advisories"
 
@@ -39,6 +40,12 @@ print(json.dumps({name: server.tools_for(name) for name in formats}))
 export function renderOfficeMcpTools(
   server: string = OFFICE_MCP_SERVER,
   videoRoot = join(OFFICE_MCP_DIR, "../../dist-video"),
+  runtimeRoot = join(
+    OFFICE_MCP_DIR,
+    "../..",
+    VIDEO_RUNTIME_BUILD_DIR,
+    process.platform === "darwin" ? "mac-arm64" : "win-x64",
+  ),
 ): string {
   const formats = CODEPUPPY_OFFICE_CONNECTORS.map((connector) => connector.format)
   const python = Bun.which("python3")
@@ -57,14 +64,23 @@ export function renderOfficeMcpTools(
           command: VIDEO_SERVICE_COMMAND,
           environment: {},
           cwd: null,
-          codeSha256: Object.fromEntries(
-            ["server.js", "speech-worker.js"].map((name) => [
+          codeSha256: Object.fromEntries([
+            ...["server.js", "speech-worker.js"].map((name) => [
               `video-mcp/${name}`,
               createHash("sha256")
                 .update(readFileSync(join(videoRoot, name)))
                 .digest("hex"),
             ]),
-          ),
+            ...[
+              "runtime.json",
+              ...Object.keys(JSON.parse(readFileSync(join(runtimeRoot, "runtime.json"), "utf8")).files),
+            ].map((name) => [
+              `video-mcp/${name}`,
+              createHash("sha256")
+                .update(readFileSync(join(runtimeRoot, name)))
+                .digest("hex"),
+            ]),
+          ]),
           tools: videoToolDefinitions(),
           recipe: videoRecipes,
         },

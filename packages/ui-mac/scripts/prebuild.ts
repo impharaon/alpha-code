@@ -4,6 +4,7 @@ import { $ } from "bun"
 import { resolveChannel } from "./utils"
 
 const channel = resolveChannel()
+await $`bun ./scripts/build-video-runtime.ts`
 await $`bun ./scripts/build-video-mcp.ts`
 await $`bun ./scripts/gen-office-mcp-tools.ts`
 await $`bun ./scripts/copy-icons.ts ${channel}`
@@ -15,7 +16,6 @@ await $`bun ./scripts/gen-db-expected.ts`
 // #1229:Office 版式预览宿主页(跑在隔离 WebContentsView 里,与主渲染世界零共享)。
 // 单独打包的理由见该脚本文件头;产物落 out/office-preview/,由 rail-preview-host 按固定资产表服务。
 await $`bun ./scripts/build-office-preview.ts`
-
 
 // REQ-159(`#1321`):引擎进程围栏的原生模块 —— fat(arm64 + x86_64)N-API .node,darwin-only;
 // 缺片 / 空壳片脚本自己红。extraResources 把它带进包(codepuppy-fence/),sidecar 在 import 引擎前 dlopen。

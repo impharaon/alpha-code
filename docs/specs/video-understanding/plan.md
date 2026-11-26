@@ -321,6 +321,102 @@ Node/uv、Python 的 pin 仍归 #1760；两平台 native/helper 与 yt-dlp 2026.
 
 实际 SenseVoice 归档的 LICENSE 只有 71 B 的原厂链接，不能当成许可全文。已沿模型卡明确的 FunASR MODEL_LICENSE 取得全文，署名保留 FunASR/Alibaba，原文入 resources/video-runtime/licenses/SenseVoiceSmall.txt；pyannote LICENSE 直接取本次原厂归档。其余许可闭包、构建产物、完整 pin 与结果核对随下个实施单元补齐。
 
+
+### r5 完整 pin、构建与打包实物
+
+本轮完成 D3 consumer/build producer。唯一运行期 pin 表是 `packages/ui-mac/resources/pinned-files.json`：49 项（6 speech、2 ffmpeg、41 OCR）；Python 仍由 #1760 贡献，视频 recipe 引用其固定 ID，不复制其记录。下表是本轮实际字节证据，不宣称尚未上传的自有 release URL 可用。原厂五项可沿原 URL 获取；turbo、41 OCR 原件和两平台 ffmpeg 共 44 项的自有 release 副本，以及两份对应源码资产，须由 orchestrator 发布后再部署 relay 快照/probe；本会话没有上传或部署。
+
+| ID | bytes | SHA-256 |
+| --- | ---: | --- |
+| `speech-model/any/whisper-tiny-lid` | 116204861 | `c46116994e539aa165266d96b325252728429c12535eb9d8b6a2b10f129e66b1` |
+| `speech-model/any/silero-vad` | 643854 | `9e2449e1087496d8d4caba907f23e0bd3f78d91fa552479bb9c23ac09cbb1fd6` |
+| `speech-model/any/sensevoice-2024-07-17-int8` | 163002883 | `7d1efa2138a65b0b488df37f8b89e3d91a60676e416f515b952358d83dfd347e` |
+| `speech-model/any/pyannote-segmentation-3-0` | 6958444 | `24615ee884c897d9d2ba09bb4d30da6bb1b15e685065962db5b02e76e4996488` |
+| `speech-model/any/3dspeaker-eres2net-base` | 39593762 | `f1ee61be04000b50392a63442e5dd9feaea7e81dddd494d3647cf1c3d88a1498` |
+| `speech-model/any/whisper-turbo-q5` | 574041195 | `394221709cd5ad1f40c46e6031ca61bce88931e6e088c188294c6d5a55ffa7e2` |
+| `ocr-model/win32-x64/chi_sim-4.1.0` | 2469156 | `a5fcb6f0db1e1d6d8522f39db4e848f05984669172e584e8d76b6b3141e1f730` |
+| `ocr-model/win32-x64/chi_tra-4.1.0` | 2366642 | `529c5b5797d64b126065cd55f2bb4c7fd7b15790798091b1ff259941a829330b` |
+| `ocr-model/win32-x64/eng-4.1.0` | 4113088 | `7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2` |
+| `ocr-model/win32-x64/osd-4.1.0` | 10562727 | `9cf5d576fcc47564f11265841e5ca839001e7e6f38ff7f7aacf46d15a96b00ff` |
+| `ocr-model/win32-x64/script-Arabic` | 9311038 | `47c262ac4e843c024df87ffa1363b77a821a843c069c71ef7650f4d2ecfea1e8` |
+| `ocr-model/win32-x64/script-Armenian` | 7879909 | `e94e3cfcb79dc6bc24b819ce01340b690f2aabe4c5ac295545ae1bca5d7472f4` |
+| `ocr-model/win32-x64/script-Bengali` | 5712242 | `d04c2064bd0ffcd18488c4048d40d88ab056185f3462c2337b52f9e6c51158e5` |
+| `ocr-model/win32-x64/script-Canadian_Aboriginal` | 7180795 | `ec11e31e65541a2040982ee8a08514278f850127908df71553f0958cd02609f8` |
+| `ocr-model/win32-x64/script-Cherokee` | 4231619 | `76df30145426bde13c7ab07a2cb9a27b415a7d703472424801b35c3c3da3aab7` |
+| `ocr-model/win32-x64/script-Cyrillic` | 29252466 | `a80325ebb1c7aa2dca5002ec05b15052a51dcb2e9e65373c264a3df7ac284358` |
+| `ocr-model/win32-x64/script-Devanagari` | 17943870 | `3bbb87c1de2a6a2ef0a97dc041e6eea2723a1c22d638f5e38157a5cd441c12b7` |
+| `ocr-model/win32-x64/script-Ethiopic` | 9074416 | `4856c53285f9dd28dd130228316cdd506a5172505c99f367d63d84e6467c15f4` |
+| `ocr-model/win32-x64/script-Fraktur` | 10915632 | `ac985c3020e42986f8a19e07f1c1b501d47ed7d8e96de69f685bb907aa8db55c` |
+| `ocr-model/win32-x64/script-Georgian` | 6949865 | `8da5cc7e2af2c8da04d126ab1f2604904305e548bc3fc20d3c0bae6d519ca013` |
+| `ocr-model/win32-x64/script-Greek` | 3041556 | `52e201e4a22336d89ee202b579aca04f15ffd6e5e6af1fe164498f2c7de898e6` |
+| `ocr-model/win32-x64/script-Gujarati` | 5017100 | `94643022c1dc06a6b1a96f7dbc3bcc77f455b38e6843cc115a4c9c460b0b32aa` |
+| `ocr-model/win32-x64/script-Gurmukhi` | 4213597 | `34c36da0fc59198f009ebbe8646708255fa3ca2553e62645a7b584cbceca8b24` |
+| `ocr-model/win32-x64/script-HanS` | 5972903 | `d03c250faaa48015bfde2213f3d7d5bda82bcee93422fceac5906a32073d9152` |
+| `ocr-model/win32-x64/script-HanS_vert` | 5429738 | `b555a9a60c88e5e27ddd34541d055200c05492d1f184732518a721faf1db979b` |
+| `ocr-model/win32-x64/script-HanT` | 5448070 | `29588327f0d830b5c112209045d826b9be014138266b20f2b08843aac2730fbb` |
+| `ocr-model/win32-x64/script-HanT_vert` | 5448267 | `ec4e31daec478e61216b1d9f34e0441fc1fcefacfe4fb28f1ea8bcfcc97ba302` |
+| `ocr-model/win32-x64/script-Hangul` | 4845849 | `cae2d12b8cdac6b62643b65915bec347e80970adc55228ca42ac1ec8909b198a` |
+| `ocr-model/win32-x64/script-Hangul_vert` | 4725034 | `8fbbd6366654e043038bbcf78b2b8e031c64c2b65f133593d097edee6c7e2ea8` |
+| `ocr-model/win32-x64/script-Hebrew` | 4866337 | `4f4f3405404a61e21e5c16316ed5c3052ddb3572a75e0b3dc3fe118b12dea76e` |
+| `ocr-model/win32-x64/script-Japanese` | 5877645 | `c176cdca0c17e9be97bda854ac91baea90b92e2813b45749ad05e409477ba8b2` |
+| `ocr-model/win32-x64/script-Japanese_vert` | 6445356 | `1d463a4811f3ae174e11b3f87773e07130c1c6aca042f31f7a90c41d939f1538` |
+| `ocr-model/win32-x64/script-Kannada` | 6777791 | `1252172cbbe99d27e5e52009a0e79444d555329b82e0b88d6e1f2a601a1b7d86` |
+| `ocr-model/win32-x64/script-Khmer` | 4476365 | `330366535d1155974af0f99630df3060c9a98c657b1e4b29f458125f1d10e44a` |
+| `ocr-model/win32-x64/script-Lao` | 10103937 | `6bdca344c3ed9ecf405e2f8b5eb0af9832c1de7d92af2f4891867549c1d1fb63` |
+| `ocr-model/win32-x64/script-Latin` | 89384811 | `6dbdaf8ecc6c40f025c2648bf3b3f3fbffe073e1fd2df2047fde2e2b2f020d53` |
+| `ocr-model/win32-x64/script-Malayalam` | 9007302 | `822ad7ed9fb2eba0b0da5c788ed8710eba651d91777fc659ce0d700cfb99be06` |
+| `ocr-model/win32-x64/script-Myanmar` | 7840489 | `78f95e6033824b7c197a099e9fdef55e0742146619d822c9b8d81f933f2b27df` |
+| `ocr-model/win32-x64/script-Oriya` | 5744929 | `39fc17f9e30eee261ac08b2d9d3c82bf28e69cff7c38d0a3aea19f1023410ade` |
+| `ocr-model/win32-x64/script-Sinhala` | 4782577 | `ce202bfbdc65e677abd76f5349f4765296b3d2b01c87608f49154ad7fa12ec4a` |
+| `ocr-model/win32-x64/script-Syriac` | 5803220 | `a89964433928a74de707e6fb61df1e933660de19c969f5301e8195e0219ea9bc` |
+| `ocr-model/win32-x64/script-Tamil` | 7089032 | `6857e222c6977986915bd073f669c2cde33039dedde26603ed6be87b0a8d62bb` |
+| `ocr-model/win32-x64/script-Telugu` | 6485174 | `615dd18355098058d77a45ee3bacc5d36aca574880c1b6099011f2aca09f2d1c` |
+| `ocr-model/win32-x64/script-Thaana` | 6048323 | `aae14e808cc783e00fe37af8afa67ff09c8d01b454065b7633e014eb2b5b6e2d` |
+| `ocr-model/win32-x64/script-Thai` | 4249016 | `d9e34be94556ddb65fd7e04892ff606e1a5b696d0eb422b5a7efc6859943702d` |
+| `ocr-model/win32-x64/script-Tibetan` | 5699531 | `0c869d52597d5b03eb6f52c5d0c217514e883259ead05765c0329e5a536538ae` |
+| `ocr-model/win32-x64/script-Vietnamese` | 1667794 | `30546eea618459e79761f962391e6879778b026ad7b4459a11664a1b654758bd` |
+| `ffmpeg/darwin-arm64/9.1-openh264-2.7.0` | 21408316 | `fa3bb967e71c7bb934924822799d2f633197e6b972430961cbbf8a651bdaf98f` |
+| `ffmpeg/win32-x64/9.1-openh264-2.7.0` | 22408571 | `5b42585b521c1e4dd708ec01b2c1f02812c3f254d8cc658ff9989bd314aebffe` |
+
+首次完整中文/英文处理按压缩交付物去重：Mac = 326403804 + 21408316 = **347812120 B**（6 项）；Windows 再计默认 OCR 19511613 B，总计 **368323988 B**（10 项）。两者均小于 400000000 B；不取 turbo 或其它 script。`firstVideoPins()` 同时用于精确集合/体积核对，缺任一角色/pin 即失败。这不是北京/owner 网络速度或首次回答实测。
+
+构建锁 `resources/video-runtime/build.lock.json` 只登记随包构建输入，运行期不读取它下载模型/codec：Whisper wrapper 来自 npm 1.1.3 的 gitHead `3e05649a6aab6c52bb566ef731231ba5296b7885`，完整源码仓为 mybigday/whisper.node；cpp submodule `978113305b2ead22249b881deafa131dc8884911`。Mac 实际自建 Metal/CPU N-API 6、min macOS 12.0；Windows 实际 LLVM-MinGW x64 CPU 自建，关闭 host-native 与 AVX/AVX2/FMA/F16C 的编译基线依赖。sherpa 2.0.3 的 JS/native 原包按现有 bun.lock SHA-512 获取；网站闭包为 yt-dlp 2026.11.23 + 它要求的 EJS 0.8.0 wheel，无安装时编译/postinstall/系统程序退路。
+
+Windows OCR 已从真实 Tesseract 5.5.2 / Leptonica 1.85.0 / libjpeg-turbo 3.1.2 静态构建，内部帧为 JPEG，保留 OSD 所需 legacy engine。交叉构建显式使用已关闭 TIFF 的返回事实，启用 `_USE_MATH_DEFINES`，不是改写上游输出格式。Mac Vision helper 实际编译为 arm64/min12；没有引入新用户选项。FFmpeg 9.1 + OpenH264 2.7.0 两平台实际编译、归档，仅交付程序与许可证/来源；构建明确 `--disable-gpl --disable-nonfree --disable-autodetect --enable-libopenh264 --disable-network`。原始源码与可重放 `BUILD.sh` 分开同 release 分发，不计入首次下载量。归档关闭 AppleDouble 元数据。
+
+| 对应源码实物 | bytes | SHA-256 |
+| --- | ---: | --- |
+| `video-ffmpeg-9.1-openh264-2.7.0-darwin-arm64-source.tar.gz` | 72899604 | `e7038a3f43b9222b2443b3f54015ff69abeca4b0d993061aba3658dca8d44c2a` |
+| `video-ffmpeg-9.1-openh264-2.7.0-win32-x64-source.tar.gz` | 72899721 | `b08d6c4f3b9300d46879e20bcc9cec90aaae8961e774f8d5c337da7de06d1012` |
+
+构建命令（ui-mac；临时根保存在 `/tmp/video-d3-r5-root.txt`，产物未发布）：`bun scripts/build-video-runtime.ts darwin-arm64 <temporary-root>` 与 `win32-x64` 均成功，实际目标产物分别落 ignored `native/video-runtime/build/mac-arm64` / `win-x64`；`bun scripts/build-video-components.ts <target> <temporary-root> <temporary-root>/release` 两平台成功。最后只按同一 tar 命令排除 AppleDouble 重打包，表中摘要对应最终实物。发布者从临时根的 `release/`、`sources/ggml-large-v3-turbo-q5_0.bin`、`ocr-models/` 取实际字节；原始 OCR 路径/对应摘要见该根 `ocr-evidence.json`。
+
+实际只读产物检查：`otool -l` 的五个 Mac native/helper 最低版本为 11.0/12.0，没有 macOS 15 addon；`otool -L` 只有同目录两个 sherpa dylib与系统库/框架。Node 26.13.1 / N-API 10 实际加载完整 sherpa JS 与自建 whisper JS/native，`OfflineRecognizer` 和 `initWhisper` 均为 function；这是 ABI/闭包加载，不是模型准确率或转写速度证据。`llvm-objdump -p` 核 Windows 6 个 native/helper：两个应用内 DLL 关系闭合，其余为 Windows 系统/UCRT DLL；没有缺失 VC runtime 依赖。Windows 本机加载/实际播放和安装包验收仍 pending。`ffmpeg -version/-L/-encoders` 确认 9.1、LGPL、libopenh264/GIF encoder；没有执行未由 pinned preparation 提供的媒体推理。
+
+许可 `licenses.json` 对 20 份真实全文记录来源/摘要，包含 SenseVoice 的 5306 B Model License（FunASR/Alibaba）与 ONNX Runtime 1.28.2 的 MIT/325054 B ThirdPartyNotices。后者来自 sherpa 2.0.3 自己 CMake 指定的 csukuangfj/onnxruntime-libs 1.28.2 归档，完整归档 SHA `d9e5c0c79929e201f5b8eb095e6809a91ce78be9866a1bca0dfab7e20b40ae40`，不使用不存在的同号 npm 包/上游 tag 冒充来源。许可随 native/helper 一起进入 `video-mcp/`，NOTICE 沿既有读取面指向完整材料。
+
+必要同链补充：`scripts/video-runtime-artifacts.ts` 统一持有产物/平台/全文检查及签名后摘要封装；新测试在该模块独立文件，real header 夹具由这次两平台真实 Whisper addon 截取并记录完整产物/片段摘要，没有发明 PE/Mach-O。`prebuild` 先产 native 闭包再生成同一 tools.json 的 codeSha256。额外修改 `.gitignore` 是隔离目标构建目录；`scripts/old-name-exceptions.tsv` 仅登记本轮固定 release 外部 URL 的机械新命中。
+
+签名会改写 native 字节；因此 Mac 沿 electron-builder 已有 signer/entitlements/identity，在子文件签名之后、父 app seal 之前刷新 inventory 与同一 video 声明摘要。未配证书时改用该 signer 的 `identity: "-"`，取代 fuse 深签的独立 ad-hoc 步骤，避免摘要更新后再被深签改写；没有改变签名身份或围栏权限。Windows 在 afterSign 刷新。临时复制真实 Electron.app（ditto 保留相对 symlink），加实际 native/服务资源后调用配置里的 signer，`codesign --verify --deep --strict` 与 `checkVideoRuntime()` 都通过；没有启动应用/访问生产。初次 Node cp 把框架 symlink 改为绝对路径，探针失败后改用 ditto，通过的是第二份临时副本；不把第一次失败当成应用缺陷。完整 Code Puppy 包/Developer ID/Windows 签名仍待发布侧。
+
+### r5 测试与接收边界
+
+新增 fast 为纯配方/集合/压缩字节算术；integration 为真实 SDK 嵌套请求/取消、文件摘要/真实目标 header/许可全文及签名封装边界。测试静态 import 被测模块，读取的 pin/许可/fixture 路径为 literal，按受影响 PR 跑；不把真实构建、签名、模型质量/性能/国内网络测量加入 PR 永久套件。Office snapshot 保留 Office 全声明、video 源码/schema/配方的一致性，并验证实际 inventory 中所有文件均进入 codeSha256；native 字节由 producer/包前包后校验，不在每次轻测重新构建。
+
+步骤核对：`bun test src/main/video-assets.fast.test.ts src/main/video-assets.test.ts src/main/video-runtime-artifacts.test.ts src/main/office-mcp-tools-snapshot.test.ts` **11 PASS / 0 FAIL**；service/tools/snapshot 相关步骤 **7 PASS / 0 FAIL**；旧名登记补齐后 `bun test src/main/old-name-scan.test.ts` **10 PASS / 0 FAIL**。`bun typecheck` exit 0。初次 SDK 探针修正为已安装 2.3.1 的 custom-schema handler 和第二参数 request options 后通过；没有改 SDK/放松断言。
+
+`affected-tests --list` 已执行但此分支不存在 `.gate-tests`，输出 `affected-tests: [Errno 2] No such file or directory: '<worktree>/.gate-tests'`，没有生成 scope line；按本票 gate frozen 交编排器/门控维护者，不在本票添加配置或跑全量。新测试不修改 global setup、runner 或 dependencies。最终相关集合和删除对照在下一收据追加，不用上述步骤计数冒充最终结果。
+
+| AC / D3 边界 | 本轮已核 / 待接收 |
+| --- | --- |
+| AC-01/04/15 | lazy/原 call 关联、原 deadline/signal、真实 SDK 取消和失败分类已核；#1760 expander/declarer/handler、正常准备进度/继续原问题的真实调用 pending |
+| AC-09/14 | cacheRoot argv 原值、持久配方含实际 pin/native 摘要已核；跨重启无二次转写/断网包/出网记录为真实集成 pending |
+| AC-15 | 两平台精确首次集合/字节已核；44 个副本+2 源码资产未发布，HK/原址/续传与两地实测 pending，归 orchestrator/#1760 |
+| AC-16 | disk/cancelled/network/integrity 分类与同一 call 的返回已核；D4 界面/真实损坏样本的包体验收接续 |
+| AC-17 | 两平台真实构建、Mac ABI/最低版本、Windows PE/DLL 核对已核；Windows 本机执行和完整安装包 pending |
+| AC-18 | 完整许可及应用资源投影、下载 ffmpeg 归档中的许可/对应源码已核；最终安装包清单仍须发布侧验收 |
+
+
 ## D4 处理进度与帧的模型投影
 
 待本片 PLAN 展开；范围、AC 和依赖见总览，实施依据为视频设计 §4.3/§5 卡片进度/§6 D4。

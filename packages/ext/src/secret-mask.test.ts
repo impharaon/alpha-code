@@ -267,3 +267,15 @@ test("permission rejection preserves the engine tool error prototype", async () 
   const safe = await mask.error({ call, tool: "read", error: original })
   expect(Object.getPrototypeOf(safe) === Object.getPrototypeOf(original)).toBe(true)
 })
+
+test("line-wise output masks each multiline credential fragment", async () => {
+  // Quoted multiline assignment syntax from the official Node dotenv fixture.
+  const lines = ["fixture-first-multiline-token", "fixture-second-multiline-token"]
+  const { mask } = await setup([lines.join("\n")])
+  for (const line of lines) {
+    await mask.begin({ call, kind: "tool" })
+    const result = await mask.result({ facts: undefined, call, tool: "shell", result: { content: line + "\n", output: { output: line } } })
+    expect(JSON.stringify(result).includes(line)).toBe(false)
+    expect(JSON.stringify(result).includes(ProtectedFiles.REDACTED)).toBe(true)
+  }
+})

@@ -1263,3 +1263,9 @@ S-03 本轮只读核对实际 main leave/notification、native subagent progress
 收口检查：ext / ui-mac 的 `bun typecheck` 均 exit 0（`/tmp/plugin-standard-r15-{ext,ui}-typecheck.log`）；`generate-artifact.ts --check` exit 0，20 members 均通过，aggregate 仍为 `9eaf52305a08ccdf6cbba6131c6573228f304e6316671f510b952fc48c3668b7`，本轮改变的 artifact members 为 **无**。docs contract 保持原 **71 errors / 250 warnings**（`/tmp/plugin-standard-r15-docs.json`），不清理基线；`git diff --check` exit 0。`affected-tests --list` exit 0，scope 原文 `all tests: scripts/gate-files.tsv changed (gate or declared global input)`，列出 **678** 个 PR 文件（`/tmp/plugin-standard-r15-affected-tests.log`），仅列举，未运行全套。当前唯一测试通过数 **103**＝host 95＋schema 3＋registry 5，另有上列 4 fail；窄测不重复累加。本轮 removal arms **0**，r14 已接受的 21 不冒作新证据。
 
 已核 Codex（GPT-6），依据版本不变，结论 **BLOCKED**：新回归的三个观察点需编排器明确处置；S-05/S-07 的最小接缝增量回编排裁决，S-03 与剩余实样仍属片 5 后续，未扩大到其他片。当前 prompt 生产增量保留为可恢复的部分实现，不作为全绿交付。必要表外文件只有派发明确授权的两个 S-12 登记缺口及 gate-files 数字同步；无新依赖、迁移、公开合同更改或仓外写。00:44 至 01:10 UTC+08 约 26 分钟，因明确规则停止，未达到原片 5 工时两倍。遗留去向：上述三项 fix now/编排裁决；docs 基线与三条旧 command-subagent 断言沿既有处置；host checkpoint 仍由编排器协调。无新增 OPTIONAL。
+
+### r16｜片 5 裁决续作
+
+核对：IMPLEMENT — r16 / orchestrator Claude Opus 5.5（2026-11-27）；spec v5 / design v3.1 + 已接受 rulings 不变。偏离记录：**orchestrator ruling 2026-11-27** 允许修正 10b72352ac 新增测试的三个观察点，逐例移除证明；允许 S-05 的 InstructionDiscovery.File/schema/codec additive 来源元数据增量；S-07 仍由既有 MCP 权威持有生命周期，不新增平行释放机制。设计 §10 镜像由编排器负责。
+
+观察断言修正单独提交：Stop 从真实 user text 读取事件 JSON，PostToolUse 继续分支从下一轮 system context 观察反馈，Submit 用 Cause.pretty 读取原生失败原因。拒绝/继续、模型请求数、零工具及已完成写入断言保持。原十例 **10 pass**，完整 host 文件 **99 pass / 0 fail**（`/tmp/plugin-standard-r16-{prompts-green,prompt-host-complete}.log`）。四个受修正用例逐一有移除臂：prompt-stop-continue、prompt-stop-impossible、prompt-post-feedback、prompt-submit-entry，均 **0 pass / 1 fail** 且 child-only loader 命中生产边界（`python3 /tmp/plugin-standard-r16-prompt-removal.py` / `prompt-removal-results.json`）；未改生产代码来迎合错误断言。新增用例数量/层级保持，仍为既有 PR integration 文件。

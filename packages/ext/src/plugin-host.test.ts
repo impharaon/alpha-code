@@ -2716,7 +2716,7 @@ for (const impossible of [false, true]) packageIt.live(`package prompt Stop ${im
   const requests = yield* llm.requests()
   expect(requests).toHaveLength(impossible ? 2 : 4)
   expect(requests[1]!.tools).toHaveLength(0)
-  expect(JSON.stringify(requests[1])).toContain('"hook_event_name":"Stop"')
+  expect(requests[1]!.messages.filter(message => message.role === "user").flatMap(message => message.content).filter(part => part.type === "text").map(part => part.text).join("\n")).toContain('"hook_event_name":"Stop"')
   if (!impossible) expect(JSON.stringify(yield* sessions.context(session.id))).toContain("fixture Stop judgment")
 })))
 
@@ -2738,7 +2738,7 @@ for (const continueOnBlock of [false, true]) packageIt.live(`package prompt Post
   const requests = yield* llm.requests()
   expect(requests).toHaveLength(continueOnBlock ? 3 : 2)
   expect(requests[1]!.tools).toHaveLength(0)
-  expect(JSON.stringify(history)).toContain("fixture post judgment")
+  expect(JSON.stringify(continueOnBlock ? requests[2]!.system : history)).toContain("fixture post judgment")
 })))
 
 packageIt.live("package prompt PostToolUseFailure feeds back even when continueOnBlock is false", () => packageJourney(Effect.gen(function* () {
@@ -2772,7 +2772,7 @@ for (const event of ["UserPromptSubmit", "UserPromptExpansion"] as const) packag
   if (event === "UserPromptExpansion") yield* ext.finish(commands.list().pipe(Effect.map(items => items.some(item => item.name === command))))
   const exit = yield* (event === "UserPromptSubmit" ? sessions.prompt({ sessionID: session.id, text: "Reject this input" }) : commands.execute({ name: command!, invocation: { sessionID: session.id, prompt: { text: "Reject this expansion" }, delivery: "queue" } })).pipe(Effect.exit)
   expect(Exit.isFailure(exit)).toBe(true)
-  expect(JSON.stringify(exit)).toContain("fixture prompt entry rejection")
+  expect(Exit.isFailure(exit) ? Cause.pretty(exit.cause) : "").toContain("fixture prompt entry rejection")
   const requests = yield* llm.requests()
   expect(requests).toHaveLength(1)
   expect(requests[0]!.tools).toHaveLength(0)

@@ -479,3 +479,7 @@ r2 设置/身份最终接线：直接来源与已存在的签名 profile admissi
 r2 最终代码核对：别名 executor 用例移入现有 ext `plugin-host.test.ts`，继续调用真实 core ModelRequest/Session/Tool registry；从 core 测试中撤出跨包宿主 helper 的导入，避免把 renderer 项目带入 core 检查。清理转换器同链失效的四个 type import，未修改未触及模块的检查规则。core、ext、ui-mac 各自 `bun typecheck` 均 exit 0；core 为 2,053 files / 2 projects。转换器＋artifact 行为文件最终 45 pass / 0 fail，直接安装文件最终 42 pass / 0 fail。
 
 AC-25 目录正反证据补足：实际包 DATA 为 0700，定义更新后原文件保留，关闭后设置及 DATA 保留；移除只清理本包目录/设置/secret 版本，兄弟包目录和外部 symlink 指向均保留。以上断言在同一个既有 install 文件，不新建场景/票号测试。Ext 最终相关组 `bun test --max-concurrency 2 src/plugin-host.test.ts src/plugin-setup-order.test.ts src/package-scope.test.ts src/policy/register-policy.test.ts src/policy/tool-policy-rpc.test.ts src/policy/unattended-policy.test.ts` exit 0，191 pass / 0 fail。
+
+r2 一次最终较宽相关集：ui-mac 的原八文件加 `mcp-server-truth.test.ts mcp-server-derivation.test.ts ext-write-channels.test.ts package-mcp-activation.test.ts plugin-package-accounts.test.ts` 共 13 文件，271 pass / 1 fail，日志 `/tmp/plugin-standard-r2-related-ui.log`。唯一父失败来自 IPC 子宿主缺少 server boot 发布的临时 DATA 快照，整树准备提前失败，runtime barrier 用例等不到 entered；与新同链的测试 harness 初始化有关，已在既有 `test-component/ext-install-catalog-result.cases.ts` 同步生产启动条件，只发布临时 DATA/Home（额外文件的必要原因）。受影响七例定向 7 pass / 0 fail；生产 DATA 根仍由 server 实际 fence roots 发布，不在 IPC 重推导，也未改 gate。前一次子宿主超时/四条提前失败均保留，不报基线或 flaky。其余 12 文件的 257 项已通过，不重复跑较宽集合。
+
+写通道行为文件最终完整一次 `bun test --max-concurrency 2 src/main/ext-write-channels.test.ts` exit 0，15 pass / 0 fail（含原 IPC 子宿主 26 pass），日志 `/tmp/plugin-standard-r2-writer-final.log`；合并此次已完成相关集合为 272 pass / 0 fail，非再次运行 13 文件。

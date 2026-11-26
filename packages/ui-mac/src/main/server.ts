@@ -704,7 +704,7 @@ export async function spawnLocalServer(
   // harmless (DESIGN-engine-config-fence D14). A definite consume failure, or a failure before any token existed, may retry.
   const possiblyConsumed = new Set<string>()
   publishPluginDataHome((fence?.roots ?? resolveEngineRoots(sidecarEnv, sidecarEnv.HOME!)).dataHome)
-    publishPluginEnvironment(sidecarEnv)
+  publishPluginEnvironment(sidecarEnv)
   // The one source of this generation's write roots: the exact profile bytes it applies, parsed by the renderer's
   // module (its allow rules and, after them, the protected deny blocks). An unrecognised form leaves this undefined, and
   // every directory then counts as covered (no issue).

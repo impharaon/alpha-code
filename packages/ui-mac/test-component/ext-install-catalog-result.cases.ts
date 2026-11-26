@@ -146,6 +146,7 @@ mock.module("../src/main/package-mcp-activation", () => ({
 
 const { initCodePuppyEnvironment } = await import("../src/main/codepuppy-environment")
 const { registerExtIpcHandlers } = await import("../src/main/ext-ipc")
+const { publishPluginDataHome, publishPluginEnvironment } = await import("../src/main/plugin-package-data")
 const { codepuppyGlobalRoot } = await import("../src/main/codepuppy-installs")
 
 delete process.env.CODEPUPPY_GLOBAL_DIR
@@ -156,6 +157,9 @@ initCodePuppyEnvironment({
   baseRoot: join(root, "codepuppy-state"),
   homeDir: join(root, "home"),
 })
+// The server boot publishes its actual roots/environment before IPC source writes. This harness owns only temporary roots.
+publishPluginDataHome(join(root, "runtime-data"))
+publishPluginEnvironment({ HOME: join(root, "home") })
 const { codepuppySidecar, pluginSources } = registerExtIpcHandlers(
   join(root, "user-data"),
   "dev",

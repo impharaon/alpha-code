@@ -22,3 +22,14 @@ test("cached complete transcript is projected by overlap without recognizing aga
   expect((await transcriptOf(source, undefined, runtime)).segments).toEqual(segments)
   await expect(transcriptOf(source, undefined, { ...runtime, recipe: "changed-assets-recipe" })).rejects.toThrow("no longer available")
 })
+
+test("worker routes speechless covered chunks through SenseVoice without calling LID",async()=>{
+ const {chunkLanguage}=await import("../../resources/video-mcp/speech-worker")
+ let calls=0
+ const identify=()=>{calls++;return "fr"}
+ expect(chunkLanguage([],0,16000,identify)).toBeUndefined()
+ expect(chunkLanguage([{start:16000,end:17000}],0,16000,identify)).toBeUndefined()
+ expect(calls).toBe(0)
+ expect(chunkLanguage([{start:15999,end:17000}],0,16000,identify)).toBe("fr")
+ expect(calls).toBe(1)
+})

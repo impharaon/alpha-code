@@ -306,13 +306,19 @@ test("launcher snapshots suppress preparing problems and use the row projection 
   await settle()
   expect(retries).toBe(1)
   expect(entryLabel()).toBe(countLabel(1))
-  for (const [failure, reason, label] of [[{ kind: "secret", fields: ["API_KEY"] }, "需要填写密钥", "去填写"], [{ kind: "workspace", reason: "not-git" }, "这个文件夹不是 Git 仓库", "换文件夹"]] as const) {
+  for (const [failure, reason, label] of [[{ kind: "secret", fields: ["API_KEY"], packageId: "owned-package" }, "需要填写密钥", "去填写"], [{ kind: "workspace", reason: "not-git" }, "这个文件夹不是 Git 仓库", "换文件夹"]] as const) {
     snapshot = { ...snapshot, sequence: snapshot.sequence + 1, state: { phase: "failed", failure: failure.kind === "secret" ? { ...failure, fields: [...failure.fields] } : failure, diagnostic: "one" } }
     changed?.(snapshot)
     await settle()
     if (items().length === 0) await openList()
     expect(items()[0]?.textContent).toContain(reason)
     expect(items()[0]?.querySelector(".codepuppy-problems-act")?.textContent).toBe(label)
+    if (failure.kind === "secret") {
+      items()[0]!.querySelector<HTMLButtonElement>(".codepuppy-problems-act")!.click()
+      await settle()
+      expect(runtime.takePackageManagementTarget()).toBe(failure.packageId)
+      runtime.setExtHubOpen(false)
+    }
   }
   snapshot = { ...snapshot, sequence: snapshot.sequence + 1, state: { phase: "connected" } }
   changed?.(snapshot)

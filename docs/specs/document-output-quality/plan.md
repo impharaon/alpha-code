@@ -770,3 +770,44 @@ r14 无人值守 target green：保留原敏感读取/只读工具拒绝断言�
 
 
 r14 重采后的直接登记同步（c）：最终 old-name 文件先报 8 PASS/2 FAIL，指出新模型目录增加第三方模型原名、原 CLI 工作目录变成此次真实采样路径；按原 hitTokens 导出实际逐行数量，仅同步上述五个精确登记，不更改 fixture 原文/扫描规则。该 inventory 同步属于真实重采的直接结果，不是第二次尝试产品修正。其它十一失败文件本轮最终独立复验均已通过。
+
+
+r14 最终逐项收据（a=行为缺陷，b=已批行为更替的消费者，c=登记/快照同步；红列为 PASS/FAIL，最终 FAIL 均为 0）：
+
+| 指定项 | 分类 | 原复现 | 最终 PASS | 提交 | 依据/保留不变量 |
+| --- | --- | --- | --- | --- | --- |
+| fixture-identity | c | 4/1 | 5 | e7dc2837e4 | 真实重采 17 份 JSON,不手写身份 |
+| engine-cases | a | 25/1 | 26 | 6ebda952f1 → 3500cf146a | Schema 包身份,保留原拒绝断言 |
+| ext-security-boundaries | a+c | 7/1 | 8 | 1109f500b3 | 显式 webviewTag:false 与创建点登记 |
+| office-excel | a | 15/0（整门 import 红） | 16 | bfcb0c5bb2 → 27b5afba0e | 实际 inode 回归先红,不删并行读者的模块 |
+| office-mcp-tools-snapshot | a | 2/0（整门 import 红） | 2 | 27b5afba0e | 同一并行安装原因,保留真实 schema 变异 |
+| old-name-scan | c | 9/1；重采后 8/2 | 10 | b197ff885e / b1b5abf471 | 真实模型/采样路径按 hitTokens 登记 |
+| process-fence-wiring | b | 11/4 | 15 | d4ad79357f | 片 7 / §4.1/4.8 制作与 reader;缓存/围栏不变 |
+| process-fence-write-sites | c | 15/1 | 16 | 1678b5fa61 | 原生成器登记两处 W1+X1,保留理由 |
+| websearch-copies | b | 7/1 | 8 | 022cfd1dc4 | §4.10/R13 async 锚,安装顺序不变 |
+| ooxml-chokepoint | a | 3/2 | 5 | fc0688d30f | 原实现回唯一解压权威,守卫不变 |
+| artifact-html-preview | b | 5/1 | 6 | 9edcbcfc3a | §4.4/R4 blocked 回调,仅 origin 且拒绝原 URL |
+| attachment-path | c | 9/1 | 10 | 40393b5aed | 常量样本保留实际 advisories 依赖 |
+
+十二文件最终 **127 PASS / 0 FAIL**；每文件独立 Bun 进程，flags 均为 `--max-concurrency 2 --timeout 90000`，均在 gate slot 内。除重采直接带来的旧名登记失败在 b1b5abf471 后具名复验外，不重复已绿文件。最终日志 green-0..11.log（旧名以 old-name-final.log 为准），真实 JUnit 在 reports/；原 red-0..11.log 与新增 inode red 保留。
+
+| 静态/装配项 | 分类 | 红→绿证据 | 提交/原因 |
+| --- | --- | --- | --- |
+| literal NUL | c | docs_gate_nul exit 1→0；5969 text / 1333 binary | c5d05e0a42；原 binary 机制,4000 地板不变 |
+| seed assets | a | assert-seed-assets exit 1→0 | 2455ebbdce；恢复社区 connector 退役事实 |
+| bootstrap 三条汇总 | b | assert-worktree-bootstrap 六阶段 exit 0 | d4ad79357f；原红为已替换 writer 消费者,未改 bootstrap 守卫 |
+| gate files | c | scoped checker exit 1→0；15 条精确一致/317 范围外 | 最终真实 JUnit,未改 TSV 数字/阈值 |
+
+第一次 scoped gate-files 仅因重采旧名报告 8/2 而红，其余登记行全部精确一致；同步实际样本登记后重跑同一命名 checker 才取得 exit 0，原脚本强制核验的五行仍按原入口执行，无跳过或伪造 JUnit。最终计数 Office stdio 12 / hygiene 19 / factory-skills 26 / ext plugin-host 56 / core MCP 25；这些登记核验与独立复验不重复累加为独立用例。
+
+直接相关 wider set 一次：实际重采 JSON 的 14 个直接 consumer，加 workspace-file-service/artifact-external-open/artifact-quick-look/renderer registry 共 **18 文件、249 PASS/0 FAIL**（related-green.log）；三个 Office runtime 消费者显式 --parallel 有限复验 **30 PASS/0 FAIL**（office-parallel.log，含前述已测文件，不重复累计）。ext bundle build、ext/ui-mac 各自 bun typecheck 均 exit 0。两次 bootstrap 是不同安装输入（d4ad79357f 与补登记 Schema workspace edge 的 3500cf146a），最终 bootstrap-final.log 六阶段完整 PASS，含新树自己 typecheck、幂等后真实围栏、错误隔离、网络未验证不报绿；未修改 bootstrap 判据。
+
+偏离/文件理由：ext manifest 与 bun.lock 补既有 Schema 消费边是修复共享类身份所需的机械登记，无新第三方库。17 份真实采样 JSON 的 ID/时间/实际帧造成该提交 7737 增/7675 删（含三行证据），由直接 consumers 校验。新增 office-excel 回归落原文件；其它断言仅随表中 b 类已批准更替更新，无删用例/放宽地板。预计 90 分钟，实际约 62 分钟，未翻倍；无 LO 复跑、收费模型、窗口、上传/部署、push、PR、rebase 或 merge。
+
+PR scope（只 --list，没有执行该全量范围）：
+
+```text
+all bun (packages/codepuppy-contracts-consumer) tests: bun.lock changed (manifest or lockfile); all bun (packages/ext) tests: bun.lock changed (manifest or lockfile); all bun (packages/ui-mac/src) tests: bun.lock changed (manifest or lockfile); all bun (packages/codepuppy-app/src) tests: bun.lock changed (manifest or lockfile); all bun (packages/codepuppy-app/test-browser/[p]rompt-attachments.test.ts) tests: bun.lock changed (manifest or lockfile); all bun (packages/ai/test/codepuppy-*.test.ts) tests: bun.lock changed (manifest or lockfile); all bun (packages/core/test/codepuppy-*.test.ts) tests: bun.lock changed (manifest or lockfile); all bun (packages/schema/test/codepuppy-*.test.ts) tests: bun.lock changed (manifest or lockfile); all bun (packages/plugin/test/codepuppy-*.test.ts) tests: bun.lock changed (manifest or lockfile); all bun (packages/util/src/codepuppy-*.test.ts) tests: bun.lock changed (manifest or lockfile); all bun (packages/core/test/plugin/[p]lan.test.ts) tests: bun.lock changed (manifest or lockfile); all bun (packages/core/test/[m]cp.test.ts) tests: bun.lock changed (manifest or lockfile); all bun (packages/core/test/[o]auth-page.test.ts) tests: bun.lock changed (manifest or lockfile)
+```
+
+已核 Codex / GPT-6：r14 全部具名缺陷已修正；冻结 spec/design/§10 不变，ship 归编排器。遗留去向：既有 #1760/发布/relay/Windows/真实 LO 集成沿原归属；docs contract 全仓输出 69 errors/251 warnings，本 plan findings=0，不扩修其它文档。16 个相对链接通过、diff 检查通过、hooksPath=.githooks。无新 OPTIONAL。本机日志统一 /tmp/alpha-1761-r14；前台命令完成后才交回。

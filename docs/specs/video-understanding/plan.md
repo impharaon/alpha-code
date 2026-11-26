@@ -210,7 +210,7 @@ last_reviewed: 2026-11-26
 
 ### 偏离记录
 
-暂无。本轮仅展开 D2 计划；没有改 D1 已接受代码、冻结设计或其它仓。样本许可/外部数据说明链接是取证来源，最终夹具须固定实物版本和摘要；本轮不宣称已取得新说话人/六页/法语长片样本，也不把所需测量列为已经通过。
+PLAN 阶段暂无；r3 实施的必要文件接线、测试层级调整和待组件实测边界见下方实施记录。样本许可/外部数据说明链接是取证来源，最终夹具须固定实物版本和摘要；未取得的新说话人/六页/法语长片样本及测量不列为已经通过。
 
 ## D3 按需组件、固定文件与分发
 
@@ -260,3 +260,30 @@ last_reviewed: 2026-11-26
 | AC-11/14/16/17 | 网站 argv/代理与 typed 失败、取消/空间 errno、缓存及源变化边界已落地；真实 yt-dlp 本机站点/公开 URL、坏媒体/不支持格式的实际 probe、隔离空间不足、断网/出网与 Windows 包仍 pending；已有 WAV 为唯一新增媒体夹具，不声称其它夹具已取得 |
 
 以上是已接受「没有已准备组件时只验证独立模块、实物断言 pending」的实施边界，未更改冻结设计/AC。真正的安装包、质量与平台答案不由源码存在推断通过。
+
+### r3 返回前核对收据
+
+已核：Codex / GPT-6，实现自检，依据 spec v1、冻结设计 `870002ed69`、已核 D2 plan `129df72433` 与 r3 FIRST-PARTY-NODE-v2.1 续派。实现提交 `54ce411e2a`（D1 消费端）、`c234e76753`（来源/缓存/共用 owner）、`d5f73f4ab4`（音轨/转写/搜索）、`768649a187`（画面/输出/工具）。未 push、未 merge/rebase、未启动应用或付费调用。
+
+返回前按 import/工具枚举/旧名登记的相关集只扩展运行一次：ui-mac **270 pass / 0 fail，21 文件，3143 assertions**；ext **39 pass / 0 fail，2 文件，109 assertions**。ui-mac 与 ext 分别 `bun typecheck`，exit 0。命令分别在对应包目录执行：
+
+```bash
+bun test src/main/video-contracts.fast.test.ts src/main/video-source.test.ts src/main/video-cache.test.ts src/main/video-process.test.ts src/main/video-audio.fast.test.ts src/main/video-transcript.test.ts src/main/video-search.fast.test.ts src/main/video-frames.test.ts src/main/video-export.test.ts src/main/video-tools.test.ts src/main/video-service.test.ts src/main/office-mcp-tools-snapshot.test.ts src/main/codepuppy-config-injection.test.ts src/main/codepuppy-workdir.test.ts src/main/artifact-manifest.test.ts src/main/codepuppy-artifact-download.test.ts src/main/artifact-service.test.ts src/main/cloud-artifact-guard.fast.test.ts src/main/codepuppy-root-retirement.test.ts src/main/visible-brand-copy.test.ts src/main/old-name-scan.test.ts
+bun test src/project-config.test.ts src/register.test.ts
+```
+
+以下删除对照各只改一处生产行为、`bun test <文件> -t '<case 前缀>'`，每个 exit 1 且为具名断言红；逐个 `git restore -- <自身文件>` 恢复，六个相关文件合跑 **12 pass / 0 fail，53 assertions**，再进入上述相关扩展集。临时日志在 `/tmp/video-r3-removal-<arm>.log`，不作为仓库内验收实物。
+
+| arm / 去掉什么 | 文件与 case 前缀 | 实际失败含义 |
+| --- | --- | --- |
+| coverage / 最短尾覆盖 | video-audio.fast.test.ts / audio coverage retains | 单样本域未被识别窗覆盖 |
+| token-time / 使用实际 token 起点 | video-audio.fast.test.ts / visible text retains | 600/2400 ms 句起点变成 0 |
+| file-digest / 验引用文件内容摘要 | video-cache.test.ts / published media results require | 同长度变更的文件仍被当成完成项 |
+| source-change / 原路径 identity 核对 | video-source.test.ts / source identity hashes | 已改变的原文件仍可被打开作旧内容 |
+| frame-pts / 使用实际呈现帧 | video-frames.test.ts / frame selection preserves | 把请求 79 ms 冒充实际 40 ms |
+| search-range / 时间交集 | video-search.fast.test.ts / transcript search intersects | 区间外唯一词仍被返回 |
+| subtitle-ms / 保留毫秒余数 | video-export.test.ts / subtitle exports parse | 独立解析的时间不再与源 segment 一致 |
+
+文档影响落在同一 plan 与 modules map。调用 canonical `check_frontmatter/check_id_references/check_local_links` 检查这两文件：frontmatter/ID 与 plan 链接无问题；modules 的链接检查为红，13 个失效目标全部在 `129df72433:docs/architecture/modules.md` 原样存在（一次基线确认）。`docs/architecture/modules.md:24`（以及 25/28/29/30/31/37/38/43/47/49/56/60）— 旧包/目录链接已不存在 — 建议去向：编排器后续 docs governance，当前只记录，不在本票修复。此前全仓文档检查的既有错误不据此清理。`git diff --check` exit 0。
+
+已定勿重开：本地/平台分工、实际库/许可证路线、VIDEO-L1-v2、FIRST-PARTY-NODE-v2.1 和唯一 pinned-file authority。下一步由编排器安排 D3 PLAN；#1760 接入后补真实身份/冷 Node/自动注入，D3 后补上表实际组件/样本证据，D4/D5 分别负责进度投影/平台答案。无新增设计分叉或 OPTIONAL 产品项。

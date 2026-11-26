@@ -4,7 +4,7 @@ import type { IncomingMessage, ServerResponse } from "node:http"
 import { planPackageManagerExecution, packageManagerExecutionSource, type PackageManagerCommand } from "../../engine/package-manager-plan"
 import type { PackageManagerExecutionLease, PreparedShellExecution } from "@opencode/plugin/codepuppy-package-manager"
 import { resolveHomebrewExecutable, type HomebrewInstallation } from "./homebrew-installation"
-import { loadPackageManagerNative, packageManagerHelperPath, type PackageManagerNative, type NativeHelperPeer, type PackageManagerNodeClaim, type PackageManagerNodeGrant } from "./package-manager-helper"
+import { loadPackageManagerNative, packageManagerHelperPath, type BoundShellProcess, type PackageManagerNative, type NativeHelperPeer, type PackageManagerNodeClaim, type PackageManagerNodeGrant } from "./package-manager-helper"
 import type { PackageManagerCancelReason, PackageManagerControlHandler } from "./codepuppy-sidecar-messages"
 
 type Node = {
@@ -18,7 +18,7 @@ type Execution = {
   generation: Generation
   nodes: Map<string, Node>
   env: Readonly<Record<string, string>>
-  root?: { pid: number; pidversion: number }
+  root?: BoundShellProcess
   bound: Promise<void>
   resolveBound(): void
 }
@@ -98,7 +98,7 @@ async function claimPackageManagerNode(claim: PackageManagerNodeClaim, peer: Nat
   await execution.bound
   if (executions.get(claim.executionID) !== execution || !generation.active) return { kind: "error", error: "inactive-execution" }
   if (node.state !== "pending") return { kind: "error", error: "node-consumed" }
-  if (!execution.root || !generation.native.packageManagerBoundDescendant(peer.pid, peer.pidversion, execution.root.pid, execution.root.pidversion)) return { kind: "error", error: "unauthorized" }
+  if (!execution.root || !generation.native.packageManagerBoundDescendant(peer.pid, peer.pidversion, execution.root)) return { kind: "error", error: "unauthorized" }
   node.proof.fill(0); node.proof = undefined
   if (!resolveHomebrewExecutable({ ...node.plan, env: nodeEnvironment(execution.env, node.plan), installations: generation.installations })) { terminal(node); return { kind: "fenced" } }
   const authorization = randomBytes(32).toString("hex")

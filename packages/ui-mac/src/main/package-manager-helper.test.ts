@@ -56,7 +56,7 @@ server.listen(0,"127.0.0.1"); await once(server,"listening")
 const root=native.packageManagerProcessIdentity(process.pid)
 const serviceName="app.codepuppy.helper.test."+process.pid
 const service=native.startPackageManagerService(serviceName,helper,(input,peer,reply)=>{
- claims.push({proofMatches:input.nodeProof===proof,pid:peer.pid,pidversion:peer.pidversion,descendant:native.packageManagerBoundDescendant(peer.pid,peer.pidversion,root.pid,root.pidversion),wrongVersion:native.packageManagerBoundDescendant(peer.pid,peer.pidversion+1,root.pid,root.pidversion)})
+ claims.push({proofMatches:input.nodeProof===proof,pid:peer.pid,pidversion:peer.pidversion,descendant:native.packageManagerBoundDescendant(peer.pid,peer.pidversion,root),wrongVersion:native.packageManagerBoundDescendant(peer.pid,peer.pidversion+1,root),wrongBirth:native.packageManagerBoundDescendant(peer.pid,peer.pidversion,{...root,startTime:{...root.startTime,microseconds:(root.startTime.microseconds+1)%1000000}})})
  reply(mode==="reject"?{kind:"error",error:"unauthorized"}:{kind:"delegated",brokerPort:server.address().port,authorization})
 })
 const rows=[]
@@ -81,7 +81,7 @@ console.log(JSON.stringify({rows,frames}))
     for (const row of record.rows) {
       expect(row.argvContainsCredential).toBe(false)
       if (row.mode === "rogue") { expect(row.claims).toEqual([]); expect(row.requests).toBe(0); continue }
-      expect(row.claims).toEqual([{ proofMatches: true, pid: row.pid, pidversion: expect.any(Number), descendant: true, wrongVersion: false }])
+      expect(row.claims).toEqual([{ proofMatches: true, pid: row.pid, pidversion: expect.any(Number), descendant: true, wrongVersion: false, wrongBirth: false }])
     }
     expect(record.rows[0].stderr).toContain("unauthorized")
     expect(record.rows[0].requests).toBe(0)

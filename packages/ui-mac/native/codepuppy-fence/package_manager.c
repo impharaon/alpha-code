@@ -224,21 +224,35 @@ static int pid_argument(napi_env env,napi_value value,pid_t *pid) {
   *pid=(pid_t)number; return 1;
 }
 static napi_value process_identity(napi_env env,napi_callback_info info) {
-  size_t argc=1; napi_value argv[1],result; pid_t pid; audit_token_t audit;
+  size_t argc=1; napi_value argv[1],result,start; pid_t pid; struct proc_bsdinfo process;
   napi_get_cb_info(env,info,&argc,argv,NULL,NULL);
-  if(argc!=1 || !pid_argument(env,argv[0],&pid) || !process_audit(pid,&audit)) return fail(env,"package-manager process identity unavailable");
-  napi_create_object(env,&result); set_number(env,result,"pid",audit.val[5]); set_number(env,result,"pidversion",audit.val[7]); return result;
+  if(argc!=1 || !pid_argument(env,argv[0],&pid)) return fail(env,"package-manager process identity requires a PID");
+  if(proc_pidinfo(pid,PROC_PIDTBSDINFO,0,&process,sizeof process)!=sizeof process) { napi_get_undefined(env,&result); return result; }
+  napi_create_object(env,&result); set_number(env,result,"pid",pid);
+  napi_create_object(env,&start);
+  napi_value seconds,microseconds; napi_create_double(env,(double)process.pbi_start_tvsec,&seconds); napi_create_double(env,(double)process.pbi_start_tvusec,&microseconds);
+  napi_set_named_property(env,start,"seconds",seconds); napi_set_named_property(env,start,"microseconds",microseconds); napi_set_named_property(env,result,"startTime",start); return result;
 }
 static napi_value bound_descendant(napi_env env,napi_callback_info info) {
-  size_t argc=4; napi_value argv[4],result; pid_t peer,root; uint32_t peer_version=0,root_version=0; audit_token_t audit;
+  size_t argc=3; napi_value argv[3],result,value,start; pid_t peer,root; uint32_t peer_version=0; audit_token_t audit; double seconds=0,microseconds=0;
   napi_get_cb_info(env,info,&argc,argv,NULL,NULL);
-  int valid=argc==4 && pid_argument(env,argv[0],&peer) && pid_argument(env,argv[2],&root) && napi_get_value_uint32(env,argv[1],&peer_version)==napi_ok && napi_get_value_uint32(env,argv[3],&root_version)==napi_ok;
-  valid=valid && process_audit(peer,&audit) && audit.val[7]==peer_version && process_audit(root,&audit) && audit.val[7]==root_version;
+  int valid=argc==3 && pid_argument(env,argv[0],&peer) && napi_get_value_uint32(env,argv[1],&peer_version)==napi_ok &&
+    napi_get_named_property(env,argv[2],"pid",&value)==napi_ok && pid_argument(env,value,&root) &&
+    napi_get_named_property(env,argv[2],"startTime",&start)==napi_ok &&
+    napi_get_named_property(env,start,"seconds",&value)==napi_ok && napi_get_value_double(env,value,&seconds)==napi_ok && isfinite(seconds) && seconds>=0 && seconds<=9007199254740991.0 && floor(seconds)==seconds &&
+    napi_get_named_property(env,start,"microseconds",&value)==napi_ok && napi_get_value_double(env,value,&microseconds)==napi_ok && isfinite(microseconds) && microseconds>=0 && microseconds<1000000 && floor(microseconds)==microseconds;
+  valid=valid && process_audit(peer,&audit) && audit.val[7]==peer_version;
+  struct proc_bsdinfo process;
+  valid=valid && proc_pidinfo(peer,PROC_PIDTBSDINFO,0,&process,sizeof process)==sizeof process;
+  // A process birth survives exec. The message audit version still pins the helper's current image.
   while(valid && peer!=root) {
-    struct proc_bsdinfo process;
-    if(peer<=1 || proc_pidinfo(peer,PROC_PIDTBSDINFO,0,&process,sizeof process)!=sizeof process || process.pbi_ppid==(uint32_t)peer) { valid=0; break; }
+    struct proc_bsdinfo parent;
+    if(process.pbi_ppid<=1 || proc_pidinfo((pid_t)process.pbi_ppid,PROC_PIDTBSDINFO,0,&parent,sizeof parent)!=sizeof parent ||
+      parent.pbi_start_tvsec>process.pbi_start_tvsec || (parent.pbi_start_tvsec==process.pbi_start_tvsec && parent.pbi_start_tvusec>process.pbi_start_tvusec)) { valid=0; break; }
     peer=(pid_t)process.pbi_ppid;
+    process=parent;
   }
+  valid=valid && process.pbi_start_tvsec==(uint64_t)seconds && process.pbi_start_tvusec==(uint64_t)microseconds;
   napi_get_boolean(env,valid,&result); return result;
 }
 napi_value register_package_manager_exports(napi_env env,napi_value exports) {

@@ -661,7 +661,7 @@ PLAN 阶段只提交本文件。下表和命令均为实施安排，不代表已
 ## 交付切片五｜Homebrew 围栏外执行
 
 - 依据：#1759；spec v6 BR-09/AC-11（brew）；design v4.4 §4.1–4.4、§5、§6 ①–⑦与 §10 @ `e3a15f2432`。H2 私有输入见 :800–844，H4 claim/交付见 :869–907，重定向次序与比较见 :896–897，证明义务见 :939；历史 r8 接缝已由该版关闭。Bun 沿 r8 已完成结果。
-- 核对：`e75bbb6508` · r10 Claude Opus 5.5（编排者）接受切片五计划与 post-start invalid-frame ruling，授权继续实施；Codex（GPT-6）实施自核，不冒充独立审查。
+- 核对：r11 `Phase: IMPLEMENT` · Claude Opus 5.5（编排者）按 `e154ccd365` 的 v4.5 授权关闭 root exec 接缝并继续切片五；Codex（GPT-6）实施自核，不冒充独立审查。
 
 ### 改动
 
@@ -740,3 +740,6 @@ PLAN 阶段只提交本文件。下表和命令均为实施安排，不代表已
 - **r10 接缝待裁决：H2/H4 根进程跨 exec 的身份连续性。** 冻结 `design.md @ e3a15f2432:836,890` 要求一次绑定本代 root PID/pidversion、接受真实 Shell 的 exec 形态/后代。实际原生实现 `native/codepuppy-fence/package_manager.c:237` 对当前 root audit pidversion 作相等检查。真实 POSIX 入口 `posix-peer-results.json` 中 root PID **48986** 不变，bind 的 pidversion **11944774**，claim 时 **11944775**；正确 proof 已经过比较，真实 helper PID **48990**，ancestry 返回 false，helper **126/unauthorized**、0 main spawn；同一真实入口的针对性复核 **0 pass / 1 fail**。最小需要：冻结 root 跨 exec 仍可验证同一内核进程实例的判据，并保留 peer 当前 audit pidversion/签名/节点 proof 校验；不自行放松当前 root 校验或改 H2/公开协议。未闭合 POSIX/exec 行，故切片五本轮不是 DONE。
 - 未证明边界：compound install + npm/postinstall 全链、完整并发/后台 fd 矩阵、解释器残留/启动文件抢读、完整入口 HB 负向身份矩阵、P09 nested exit71、生产 Team/打包 Electron 身份与真实 GUI quit。adhoc hardened helper、真实 Mach audit/kernel 和真实 Node 引擎证据不冒充这些边界。AC-09/10/12 与非 brew AC-11 沿此前已验收材料，未重跑成功工具行。
 - 最后较宽直接相关集合：`bun test --max-concurrency 2 src/main/network-egress-proxy.test.ts src/main/window-close.test.ts src/main/keychain-boot-order.test.ts src/main/keychain-rename-native.test.ts src/main/naming-migration-wiring.test.ts` **60 pass / 249 expect**。ui-mac/ext 类型 exit0、旧名 **10 pass / 2347 expect**、north-star/diff exit0，hooksPath 为 `.githooks`。文档契约 **70 error / 252 warning**，finding 与 r9 逐项相同；`affected-tests --list` **exit2**（基线缺 `.gate-tests`，没有 scope 行）。未跑 gate run/bin/check/全包或计时用例；未启动应用/窗口、签名授权弹框或外部写操作。细节只保存在本计划和忽略的场景产物。
+
+- r11 输入：按编排者明确授权读取设计 worktree 的 `e154ccd365` v4.5（独立审查并行，不 merge/rebase）；r10 root 身份接缝由该输入关闭。红回归在原节点簿测试里令真实根 bash 绑定后 exec 到 sh，再到严格 helper，旧实现 **1 fail**（126 ≠ 17，`/tmp/fence1759-r11-root-red.log`），独立提交 `089305a611`。本步改原生根启动时间读取/祖先先后，TS 消费 `BoundShellProcess`；原 peer audit pidversion/签名检查保留。场景与对照结果在本节后续补入。
+- r11 本步验证：`gate slot -- bun test --max-concurrency 2 src/main/package-manager-execution.test.ts src/main/package-manager-helper.test.ts` **2 pass / 23 expect**；原红回归未改。helper 既有用例同时断言 peer 错 pidversion 和根错微秒启动时间均为 false；两包中的本次代码只改 ui-mac，`bun typecheck` exit0。无新增永久用例条数，原 gate 文件计数不变。

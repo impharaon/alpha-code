@@ -4,6 +4,7 @@ import { loadFenceAddon } from "./process-fence-apply"
 export const PACKAGE_MANAGER_HELPER = "codepuppy-package-manager"
 export function packageManagerHelperPath(addonPath: string) { return join(dirname(addonPath), PACKAGE_MANAGER_HELPER) }
 export type NativeHelperPeer = { pid: number; pidversion: number; executable: string; signingIdentity: string }
+export type BoundShellProcess = { pid: number; startTime: { seconds: number; microseconds: number } }
 export type PackageManagerNodeClaim = { executionID: string; nodeID: string; nodeProof: string }
 export type PackageManagerNodeGrant =
   | { kind: "delegated"; brokerPort: number; authorization: string }
@@ -12,8 +13,8 @@ export type PackageManagerNodeGrant =
 export type PackageManagerNative = {
   startPackageManagerService(name: string, helper: string, claim: (input: PackageManagerNodeClaim, peer: NativeHelperPeer, reply: (grant: PackageManagerNodeGrant) => void) => void): unknown
   closePackageManagerService(service: unknown): void
-  packageManagerProcessIdentity(pid: number): { pid: number; pidversion: number }
-  packageManagerBoundDescendant(pid: number, pidversion: number, root: number, rootVersion: number): boolean
+  packageManagerProcessIdentity(pid: number): BoundShellProcess | undefined
+  packageManagerBoundDescendant(pid: number, pidversion: number, root: BoundShellProcess): boolean
 }
 export function loadPackageManagerNative(addon: string): PackageManagerNative {
   const native = loadFenceAddon(addon) as unknown as PackageManagerNative

@@ -3633,7 +3633,7 @@ packageIt.live("first command and attached skill shells wait for SessionStart an
 
 
 // Fixed feature-dev/Temporal inputs and dash0 SessionStart group; the temporary helper holds a real export source.
-for (const entry of ["command", "attached skill"] as const) packageIt.live(`cancelling a ${entry} call closes its SessionStart-written ENV_FILE source`, () => packageJourney(Effect.gen(function* () {
+for (const entry of ["command", "attached skill", "command expansion hook"] as const) packageIt.live(`cancelling a ${entry} call closes its SessionStart-written ENV_FILE source`, () => packageJourney(Effect.gen(function* () {
   const tree = yield* Effect.promise(() => captureStandardFixture("claude:dash0"))
   const source = JSON.parse(new TextDecoder().decode(yield* Effect.promise(() => tree.readFile("claude/hooks.json"))))
   const skillTree = yield* Effect.promise(() => captureStandardFixture("codex:temporal"))
@@ -3643,8 +3643,12 @@ for (const entry of ["command", "attached skill"] as const) packageIt.live(`canc
     hook.command = process.execPath
     hook.args = ["-e", "const fs=require('node:fs');await Bun.stdin.json();fs.appendFileSync(process.env.CLAUDE_ENV_FILE," + JSON.stringify(line) + ")"]
   }
+  if (entry === "command expansion hook") for (const group of source.hooks.UserPromptSubmit) for (const hook of group.hooks) {
+    hook.command = process.execPath
+    hook.args = ["-e", "await Bun.stdin.json()"]
+  }
   const sample = yield* invocationSample("claude:feature-dev", {
-    "hooks/hooks.json": JSON.stringify({ hooks: { SessionStart: source.hooks.SessionStart } }),
+    "hooks/hooks.json": JSON.stringify({ hooks: { SessionStart: source.hooks.SessionStart, ...(entry === "command expansion hook" ? { UserPromptExpansion: source.hooks.UserPromptSubmit } : {}) } }),
     "skills/temporal-developer/SKILL.md": skill,
     "source-blocker.mjs": "import fs from 'node:fs';fs.writeFileSync('source-reader.pid',String(process.pid));while(!fs.existsSync('release-source'))await Bun.sleep(10);console.log('export completed')",
   })
@@ -3662,7 +3666,7 @@ for (const entry of ["command", "attached skill"] as const) packageIt.live(`canc
   const location = yield* Location.Service
   const sessions = yield* Sessions.Service
   const session = yield* sessions.create({ location: { directory: location.directory }, title: "Source cancellation", agent: "build", model: { providerID: "test", id: "picked" } } as never)
-  const call = yield* (entry === "command"
+  const call = yield* (entry !== "attached skill"
     ? commands.execute({ name: command, invocation: { sessionID: session.id, prompt: { text: "Use the session exports" }, delivery: "queue" } })
     : sessions.prompt({ sessionID: session.id, text: "Use the session exports", skills: [{ id: attached.id }] })).pipe(Effect.forkScoped)
   yield* Effect.gen(function* () {

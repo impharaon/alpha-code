@@ -411,3 +411,5 @@ bun typecheck
 必要同链问题已定位：实际 openpyxl+lxml 生成的 workbook 在 sheet 局部声明关系前缀；2.3.2 的 `package.scan.rel_id` 只看根声明，首次添加 slicer 进入 package.apply 时 KeyError。该真实输入的 regression 将先单独提交 red，再补最小局部 namespace 消费修正，不改保存权威、不降为裸 openpyxl.save。当前提交仅为共用模块/来源和已绿子集，R13 投影、LO 实物、对象完整保真仍在本片后续，不宣称整条 AC 通过。
 
 保存回归 red：`cd packages/ui-mac && bun test src/main/office-excel.test.ts -t "saving edited pivot"` exit 1，`package.restore.sheet_parts → scan.rel_id` 返回空关系 ID，KeyError；日志 `/tmp/alpha-1761-r8/preservation-red.log`。fixture 为测试中实际 openpyxl 生成的工作簿，经真实 2.3.2 操作创建 pivot/slicer，Source 使用实际上游模型的 sheet/name；不是手写 OOXML。此提交只加入该回归和证据，下一提交修正解析。
+
+保存回归 green：相同测试断言未改，namespace 修正消费 tag 上实际 xmlns 声明；同时移除 reader 的配额记账减法（非扩大数值），当前公式 results 对齐上游真实 `dict[address,value]` 契约。`bun test src/main/office-excel.test.ts` 6 PASS/0 FAIL，日志 `/tmp/alpha-1761-r8/operations-green.log`；实际 pivot 汇总随 `=10+2 → =20+2` 变为 22，二次保存仍有 slicer/sparkline parts。两次中间失败分别为 None 配额记账和本次 results key 适配错误，均为同调用链修正，未降阈值或改红测断言。

@@ -156,7 +156,8 @@ def tags(document: Scan, name: str) -> list[dict[str, str]]:
 
 def rel_id(values: dict[str, str], document: Scan) -> str:
     """The relationship id (``r:id``) among the attributes of a tag of ``document``."""
-    prefix = next((p for p, uri in document.namespaces.items() if uri == REL_NS), None)
+    scope = {**document.namespaces, **{key[6:]: value for key, value in values.items() if key.startswith('xmlns:')}}
+    prefix = next((p for p, uri in scope.items() if uri == REL_NS), None)
     return values.get(f'{prefix}:id', '') if prefix else ''
 _ROOT_TAG = re.compile('<[A-Za-z_][^\\s>/]*[^>]*?(/?)>')
 _IGNORABLE = re.compile('(\\b[\\w.-]+:Ignorable=")([^"]*)(")')

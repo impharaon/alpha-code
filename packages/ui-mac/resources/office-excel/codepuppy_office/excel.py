@@ -37,7 +37,7 @@ def formula_values(_workspace, _path, owner, area):
     workbook = owner.parent
     engine = Engine(workbook, workbook)
     engine.stale.update((sheet.title, cell.row, cell.column) for sheet in workbook.worksheets for cell in sheet._cells.values() if cell.data_type == 'f')
-    return {(row, column): engine.calculate(owner, row, column) for row in range(area.min_row, area.max_row + 1) for column in range(area.min_col, area.max_col + 1) if owner.cell(row, column).data_type == 'f'}
+    return {owner.cell(row,column).coordinate: engine.calculate(owner, row, column) for row in range(area.min_row, area.max_row + 1) for column in range(area.min_col, area.max_col + 1) if owner.cell(row, column).data_type == 'f'}
 
 
 def pivot_source_range(workbook, pivot):
@@ -60,7 +60,7 @@ def source_snapshot(workbook, pivot):
     sheet, reference = pivot_source_range(workbook, pivot)
     area = parse_range(reference)
     calculated = formula_values(None, None, sheet, area)
-    return (sheet.title, reference, tuple((row, col, copy(sheet.cell(row,col).value), calculated.get((row,col))) for row in range(area.min_row,area.max_row+1) for col in range(area.min_col,area.max_col+1)))
+    return (sheet.title, reference, tuple((row, col, copy(sheet.cell(row,col).value), calculated.get(sheet.cell(row,col).coordinate)) for row in range(area.min_row,area.max_row+1) for col in range(area.min_col,area.max_col+1)))
 
 
 def begin_edit(workbook, path, original):

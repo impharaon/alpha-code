@@ -58,6 +58,10 @@ class Adapt(ast.NodeTransformer):
             node.value = ast.Constant(None)
         return self.generic_visit(node)
 
+    def visit_AugAssign(self, node):
+        if self.path.endswith('package/reader.py') and isinstance(node.target, ast.Attribute) and node.target.attr == 'budget': return None
+        return self.generic_visit(node)
+
     def visit_ImportFrom(self, node):
         if node.module == 'excel_mcp' and self.path.endswith('workspace.py'):
             node.names = [a for a in node.names if a.name != 'macros']
@@ -133,6 +137,8 @@ def main(wheel):
                 text = text.replace('write_atomically(path, content)', 'from codepuppy_office.excel import finish_edit\n    finish_edit(workbook, path, content)\n    write_atomically(path, content, workbook._codepuppy_edit["sourceSha256"])')
                 text = text.replace('def write_atomically(path: Path, content: bytes)', 'def write_atomically(path: Path, content: bytes, source_sha256: str)')
                 text = text.replace('temp_path.replace(path)', 'from codepuppy_office.excel import file_digest\n        if file_digest(path) != source_sha256: raise WorkbookError("source-changed: workbook changed before atomic save")\n        temp_path.replace(path)')
+            if path == 'excel_mcp/package/scan.py':
+                text = text.replace("prefix = next((p for p, uri in document.namespaces.items() if uri == REL_NS), None)", "scope = {**document.namespaces, **{key[6:]: value for key, value in values.items() if key.startswith('xmlns:')}}\n    prefix = next((p for p, uri in scope.items() if uri == REL_NS), None)")
             ast.parse(text)
             adapted = (HEADER + text + '\n').encode()
             target = output / path

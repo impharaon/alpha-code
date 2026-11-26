@@ -681,7 +681,7 @@
     {
       "path": "excel_mcp/package/reader.py",
       "sourceSha256": "eba8065d4e0ccd67a99ceeaf2a0fc48f379fc791e4f6d91fc5b71dba6f7f9a29",
-      "sha256": "3ea3eb21d60d0b34b8b7be71c7a1789c9f6d71133179805587bfa4c41098ee9a"
+      "sha256": "b1ad7ddc561cca30df1a91c727993bab8f3ab50ade0f7da79bc9b47d3fbd8e46"
     },
     {
       "path": "excel_mcp/package/restore.py",
@@ -696,7 +696,7 @@
     {
       "path": "excel_mcp/package/scan.py",
       "sourceSha256": "19799dc8e39a7007c8063977fd0e79d4dc4998c47b3678980fcce1c9d90854a5",
-      "sha256": "6de0e6f5cbeb5618deed484ee03ed0555b8a79ec5f240e95903ea2f4a424c43c"
+      "sha256": "9993b12e761dbfb8cb30b887301f6a5b03d81681a02bab01fd584562a5ffee3d"
     },
     {
       "path": "excel_mcp/package/shape_names.py",

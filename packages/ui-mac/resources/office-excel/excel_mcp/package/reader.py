@@ -18,7 +18,6 @@ class Reader:
 
     def read(self, name: str) -> bytes:
         size = self.archive.getinfo(name).file_size
-        self.budget -= size
         return self.archive.read(name)
 
     def rels(self, source: str) -> list[Rel]:

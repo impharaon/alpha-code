@@ -1,3 +1,4 @@
+import { Flock } from "@opencode/util/flock"
 import { preparedVideoPath } from "../../resources/video-mcp/prepare"
 import { afterEach, beforeEach, expect, test } from "bun:test"
 import { mkdtemp, mkdir, copyFile, realpath, rm, readFile, readdir, symlink } from "node:fs/promises"
@@ -263,36 +264,51 @@ test("video full result follows the registered artifact reference without a cont
 test("video cancellation leaves another subscriber running and cancels the last in-flight job before a late result", async () => {
   const h = await harness(),
     status = Promise.withResolvers<CloudJobStatus>(),
-    normal = h.deps.status
-  h.deps.status = async () => status.promise
+    polling = Promise.withResolvers<void>(),
+    cancelled = Promise.withResolvers<void>(),
+    normalStatus = h.deps.status,
+    normalCancel = h.deps.cancel
+  h.deps.status = async () => {
+    polling.resolve()
+    return status.promise
+  }
+  h.deps.cancel = async (id) => {
+    await normalCancel(id)
+    cancelled.resolve()
+  }
   const service = createMainVideoService(h.deps),
     request = await h.prepared(),
     first = await service.start(call, request, h.referencePath),
     other = { ...call, callID: "second" },
     second = await service.start(other, request, h.referencePath)
-  await state(service, first.requestId, call, (s) => s.progress?.phase === "understanding")
-  await service.query(second.requestId,other)
-  await service.cancel(first.requestId, call)
-  expect(h.cancelled).toEqual([])
-  expect((await service.query(first.requestId, call)).state.error).toBe("cancelled")
-  const cancelling = service.cancel(second.requestId, other)
-  for (let i = 0; !h.cancelled.length && i < 100; i++) await Bun.sleep(1)
-  expect(h.cancelled).toEqual(["job_video_1"])
-  status.resolve((await normal("job_video_1")) as CloudJobStatus)
-  await cancelling
-  for (let i = 0; i < 100; i++) {
-    const r = JSON.parse(
-      await readFile(path.join(root, "cloud", (await readdir(path.join(root, "cloud")))[0]!), "utf8"),
-    )
-    if (r.result || r.attempts[0]?.state === "cancelled") break
-    await Bun.sleep(1)
+  await service.query(first.requestId, call)
+  await service.query(second.requestId, other)
+  await polling.promise
+  const lateResult = (await normalStatus("job_video_1")) as CloudJobStatus
+  try {
+    await service.cancel(first.requestId, call)
+    expect(h.cancelled).toEqual([])
+    expect((await service.query(first.requestId, call)).state.error).toBe("cancelled")
+    expect((await service.query(second.requestId, other)).state.progress?.phase).toBe("understanding")
+    const cancelling = service.cancel(second.requestId, other)
+    await cancelled.promise
+    expect(h.cancelled).toEqual(["job_video_1"])
+    status.resolve(lateResult)
+    await cancelling
+    expect((await service.query(second.requestId, other)).state.error).toBe("cancelled")
+    const pointer = JSON.parse(
+      await readFile(path.join(root, "cloud-requests", `${second.requestId}.json`), "utf8"),
+    ) as { key: string }
+    // Read the published record only after the real worker releases its processing lock.
+    // Directory enumeration can instead pick an atomic writer's transient .part file.
+    await Flock.withLock(`video-run:${pointer.key}`, async () => {
+      const record = JSON.parse(await readFile(path.join(root, "cloud", `${pointer.key}.json`), "utf8"))
+      expect(record.attempts[0].state).toBe("cancelled")
+      expect(record.result).toBeUndefined()
+    }, { dir: path.join(root, "cloud-locks"), timeoutMs: Infinity })
+  } finally {
+    status.resolve(lateResult)
   }
-  expect((await service.query(second.requestId, other)).state.error).toBe("cancelled")
-  const record = JSON.parse(
-    await readFile(path.join(root, "cloud", (await readdir(path.join(root, "cloud")))[0]!), "utf8"),
-  )
-  expect(record.attempts[0].state).toBe("cancelled")
-  expect(record.result).toBeUndefined()
 })
 test("video main admission rejects changed media and escaping symlinks before upload", async () => {
   const h = await harness(),

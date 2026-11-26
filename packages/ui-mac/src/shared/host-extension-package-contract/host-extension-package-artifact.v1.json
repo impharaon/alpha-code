@@ -1,6 +1,6 @@
 {
   "artifactPath": "packages/ui-mac/src/shared/host-extension-package-contract",
-  "artifactSha256": "9094c2712f8ec5901bf5976ee914ab5a4a6874fa4932317a7881b2c553eb188f",
+  "artifactSha256": "774caf717da28ecee4aad3f313129915e9ffc2ecfdde50bdf847c3ea27eda929",
   "files": [
     {
       "bytes": 22668,
@@ -18,19 +18,19 @@
       "sha256": "2e50222a6af86ce4e415f63019067d452aa2d5e2cf61c5013f021a3d0ed2a11e"
     },
     {
-      "bytes": 21514,
+      "bytes": 23567,
       "path": "plugin-package.ts",
-      "sha256": "05c04895d22e65d2a1974fc413f27a733c28ddedf8e2e12a9443a402393f560b"
+      "sha256": "0fec55978d085b5134a644d6d591187c3769ecf59aa70b7ee6151c7075d4755d"
     },
     {
-      "bytes": 86527,
+      "bytes": 89337,
       "path": "plugin-conversion.mjs",
-      "sha256": "19ca4f037ca2c101dfb25efb78aa9aed75c07d074d6e252d2719fe88f0dfb93f"
+      "sha256": "c260aaf61efc0cf5ae33dbf61ca7b065b876927c738dac7115c50ef55c7e17ba"
     },
     {
-      "bytes": 1689,
+      "bytes": 1738,
       "path": "plugin-conversion.d.mts",
-      "sha256": "886a4720175e53a058b42bec5ccb9a4c9edd4038538bc613e32f40745a544c79"
+      "sha256": "7a1ec0f7d230d59103eedb48f05d911813cc50e004fac1ab60cfae6a6e0b2feb"
     },
     {
       "bytes": 21158,
@@ -68,9 +68,9 @@
       "sha256": "4f78b77c5fd575a64cd3ffd5ac0422c47f38b84c15a3a6942b3b30a1d6be9d81"
     },
     {
-      "bytes": 39737,
+      "bytes": 47152,
       "path": "profiles/plugin-package.v1.schema.json",
-      "sha256": "505c9c6c3e49321bd821bcf5b04c4ded80f0a2769a5c317d1e538bf8ec68b6de"
+      "sha256": "637d269e97d203eebcffe7c2e800ff15f5a532f5f34fd50ef0980c197ef256d8"
     },
     {
       "bytes": 1550,
@@ -88,14 +88,14 @@
       "sha256": "8a316b97066b180fcb3b286e67936137ad3bd5fd0327340f625804383d4c1db0"
     },
     {
-      "bytes": 5138,
+      "bytes": 5069,
       "path": "testvectors/plugin-package-description.v1.json",
-      "sha256": "d8e54449fd6b886e380d7730a82790a1124b9bb6bd4d29b7e3391bafb89fc4d2"
+      "sha256": "55e1434b1a319a8fe8f74c7b975adc868318b13b45dbf7be17c59aaecec9dd3d"
     },
     {
-      "bytes": 47677,
+      "bytes": 47614,
       "path": "testvectors/decoder-corpus.v1.json",
-      "sha256": "45d2296584cc84a127ff4c4427bd8a2def96c61c0649f755d473a4d73e257604"
+      "sha256": "9103a131ec4e3d7a2f4bc6a52936eb9eb624f8d5750b71c2b861a10095467fb2"
     }
   ],
   "schema": "codepuppy.host-extension-package.artifact.v1"

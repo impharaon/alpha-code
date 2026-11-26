@@ -570,7 +570,7 @@ r3 最终静态检查：schema `bun typecheck` 142 files、core 2,053 files / 2 
 ## 片 3 · #1776：命令、子助手与调用语义
 
 - 依据：[Story #1776](https://github.com/impharaon/alpha-code/issues/1776)；[spec v5 @ 7278c10](https://github.com/impharaon/alpha-work/blob/7278c10/docs/specs/local-plugin-install/spec.md) 的完整 AC-06/10、与片 2 合闭的 AC-02 命令/助手/预览、AC-13/14 命令/助手分项；[design v3.1 @ 3a0352e4e3](https://github.com/impharaon/alpha-work/blob/3a0352e4e3306c0410e2bb680a07f6312d8bcf57/docs/specs/local-plugin-install/design.md) §4.1/4.3/4.8/4.9/§5/§6 S-01/§8/§10（其中片 3 合同沿冻结 v3）。
-- 核对：r4 派发允许同轮 PLAN→IMPLEMENT；本节处于 PLAN，S-01-Q1 需要设计裁决，未记录实施通过。片 4 的 15 实样、SSE 选择/真实连接、AC-14 延后与关闭取消、删除反臂按 r4 的 Claude Opus 5.5 验收收据继承，不重开其历史问题。
+- 核对：IMPLEMENT slice 3 per plan（r5 Phase）；Claude Opus 5.5（orchestrator）的 orchestrator ruling 2026-11-27 已定点补齐 S-01.arguments，Q1 关闭。片 4 的 15 实样、SSE 选择/真实连接、AC-14 延后与关闭取消、删除反臂按 r4 验收收据继承，不重开其历史问题。
 - 起于 2026-11-26 16:36（UTC+08:00），基线 `88d40cb6df`、工作区干净、hooksPath=`.githooks`。实施预计 6–10 小时、20–28 个手写生产/合同文件、约 2,000–3,500 行（测试/生成物/真实夹具另计）；每组 AC 后核对实际规模/用时，达到上界两倍返回，不静默扩大。
 - 集成顺序保持 4→3→5→7→8→9→6；片 5/7/8/9/6 的 AC 归属继承前节表。本片的调用身份/规则、实际 agent/command 与 Invocation 值成为片 5 的输入；alpha-web 的 converter 消费/重 pin 仍由外仓集成，不在此实现。
 
@@ -645,5 +645,7 @@ r3 最终静态检查：schema `bun typecheck` 142 files、core 2,053 files / 2 
 2026-11-26 · 本轮按 r4 的“发现未裁决设计问题则停在 PLAN-READY”执行：只追加本节，没有实现代码、测试或 engine 登记改动。S-01-Q1 是冻结跨模块输入缺失，不能由本车道增字段/改责任来绕过；建议最小输入字段已列于风险，待编排器/设计裁决后进入第 2 步。片 4 accepted 及其他已定合同继续继承。
 
 2026-11-27 · orchestrator ruling 2026-11-27（Claude Opus 5.5，r5）：S-01 的 PreparedInstruction 增加 `arguments: readonly string[]`，原样传 Invocation.arguments，未声明为 []；仍由 core 唯一 renderer 解析。Q1 已裁决，按 IMPLEMENT 继续，不在 ext 预展开参数。S-01 增量随 engine 实现同提交登记。
+
+转换步骤证据：`9beb41bae1` 为三个具名红测（0 pass / 3 fail），真实六样本原件同提交固定。实现后 `bun test src/shared/host-extension-package-contract/{plugin-conversion,host-extension-package-artifact,package-envelope-v1}.test.ts`（ui-mac）154 pass / 0 fail，包内 `bun typecheck` exit 0。实际转换与严格模型/schema 同步，生成物/corpus 由原 generator 更新。一次类型检查误从根目录启动，触发范围外 turbo 检查并已结束（codepuppy-ui exit 2），不计作相关验证，也未调查/修复范围外错误；其后包内命令明确 workdir。
 
 本轮 PLAN 收口（2026-11-26 16:47，Codex / GPT-6）：只读核对固定设计/真实样本/既有入口，约 11 分钟。`python3 scripts/check-doc-links.py docs/specs/local-plugin-install/plan.md` exit 0，8 条相对链接；`git diff --check` exit 0。单仓 docs profile 的 `check-docs-contract --changed-since 88d40cb6df --format json` exit 1，71 errors / 251 warnings，与已接受基线一致（`/tmp/plugin-standard-r4-plan-docs.json`）；按派发不修两条旧 unknown-id。`affected-tests --list` exit 2，缺 `.gate-tests`，无 scope line（`/tmp/plugin-standard-r4-plan-affected.log`）。未运行测试/应用/全量门，hooksPath=`.githooks`。已核依据 spec v5/design v3.1 与 r4；结论 PLAN-READY / Q1 待裁决。下一步由编排器/设计定点补 renderer 参数名输入；其余遗留维持原去向，无额外 OPTIONAL。

@@ -208,7 +208,8 @@
                   "instruction",
                   "invocation",
                   "display",
-                  "mcpDependencies"
+                  "mcpDependencies",
+                  "dependencies"
                 ],
                 "properties": {
                   "id": {
@@ -239,7 +240,11 @@
                       "userInvocable",
                       "implicitInvocation",
                       "allowedTools",
-                      "deniedTools"
+                      "deniedTools",
+                      "arguments",
+                      "argumentSyntax",
+                      "paths",
+                      "preloadSkills"
                     ],
                     "properties": {
                       "argumentHint": {
@@ -342,16 +347,119 @@
                             }
                           }
                         }
+                      },
+                      "arguments": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "argumentSyntax": {
+                        "enum": [
+                          "claude",
+                          "codex",
+                          "opencode",
+                          "literal"
+                        ]
+                      },
+                      "effort": {
+                        "enum": [
+                          "low",
+                          "medium",
+                          "high",
+                          "xhigh",
+                          "max"
+                        ]
+                      },
+                      "paths": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "preloadSkills": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "memory": {
+                        "enum": [
+                          "user",
+                          "project",
+                          "local"
+                        ]
+                      },
+                      "maxTurns": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 9007199254740991
+                      },
+                      "background": {
+                        "type": "boolean"
                       }
                     }
                   },
                   "display": {
-                    "type": "object"
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "displayName": {
+                        "type": "string"
+                      },
+                      "shortDescription": {
+                        "type": "string"
+                      },
+                      "iconSmall": {
+                        "type": "string"
+                      },
+                      "iconLarge": {
+                        "type": "string"
+                      },
+                      "brandColor": {
+                        "type": "string"
+                      },
+                      "defaultPrompt": {
+                        "type": "string"
+                      }
+                    }
                   },
                   "mcpDependencies": {
                     "type": "array",
                     "items": {
                       "type": "string"
+                    }
+                  },
+                  "dependencies": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "type",
+                        "value"
+                      ],
+                      "properties": {
+                        "type": {
+                          "const": "mcp"
+                        },
+                        "value": {
+                          "type": "string"
+                        },
+                        "description": {
+                          "type": "string"
+                        },
+                        "transport": {
+                          "enum": [
+                            "stdio",
+                            "http",
+                            "sse"
+                          ]
+                        },
+                        "url": {
+                          "$ref": "#/$defs/Text"
+                        }
+                      }
                     }
                   }
                 }
@@ -393,7 +501,11 @@
                       "userInvocable",
                       "implicitInvocation",
                       "allowedTools",
-                      "deniedTools"
+                      "deniedTools",
+                      "arguments",
+                      "argumentSyntax",
+                      "paths",
+                      "preloadSkills"
                     ],
                     "properties": {
                       "argumentHint": {
@@ -496,6 +608,56 @@
                             }
                           }
                         }
+                      },
+                      "arguments": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "argumentSyntax": {
+                        "enum": [
+                          "claude",
+                          "codex",
+                          "opencode",
+                          "literal"
+                        ]
+                      },
+                      "effort": {
+                        "enum": [
+                          "low",
+                          "medium",
+                          "high",
+                          "xhigh",
+                          "max"
+                        ]
+                      },
+                      "paths": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "preloadSkills": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "memory": {
+                        "enum": [
+                          "user",
+                          "project",
+                          "local"
+                        ]
+                      },
+                      "maxTurns": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 9007199254740991
+                      },
+                      "background": {
+                        "type": "boolean"
                       }
                     }
                   }
@@ -538,7 +700,11 @@
                       "userInvocable",
                       "implicitInvocation",
                       "allowedTools",
-                      "deniedTools"
+                      "deniedTools",
+                      "arguments",
+                      "argumentSyntax",
+                      "paths",
+                      "preloadSkills"
                     ],
                     "properties": {
                       "argumentHint": {
@@ -641,6 +807,56 @@
                             }
                           }
                         }
+                      },
+                      "arguments": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "argumentSyntax": {
+                        "enum": [
+                          "claude",
+                          "codex",
+                          "opencode",
+                          "literal"
+                        ]
+                      },
+                      "effort": {
+                        "enum": [
+                          "low",
+                          "medium",
+                          "high",
+                          "xhigh",
+                          "max"
+                        ]
+                      },
+                      "paths": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "preloadSkills": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "memory": {
+                        "enum": [
+                          "user",
+                          "project",
+                          "local"
+                        ]
+                      },
+                      "maxTurns": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 9007199254740991
+                      },
+                      "background": {
+                        "type": "boolean"
                       }
                     }
                   }

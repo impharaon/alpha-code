@@ -1,4 +1,4 @@
-export type { Sha256, RelPath, Json, Source, Provider, TreeNode, Capture, Text, ToolRule, ModelHint, Invocation, SecretNeed, LoginNeed, HookEvent, Hook, Entry, Diagnostic, PluginPackage, MarketplaceEntry } from "./plugin-package";
+export type { Sha256, RelPath, Json, Source, Provider, TreeNode, Capture, Text, ToolRule, ModelHint, ArgumentSyntax, SkillDisplay, McpToolDependency, Invocation, SecretNeed, LoginNeed, HookEvent, Hook, Entry, Diagnostic, PluginPackage, MarketplaceEntry } from "./plugin-package";
 import type { RelPath, Json, Source, Capture, Entry, Diagnostic, PluginPackage, MarketplaceEntry } from "./plugin-package";
 export declare class CaptureError extends Error {
     readonly code: "invalid-path" | "duplicate-path" | "invalid-node" | "read-failed" | "digest-mismatch";

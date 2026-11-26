@@ -3,8 +3,8 @@ import { createHash } from "node:crypto"
 import { parse, type ParseError } from "jsonc-parser/lib/esm/main.js"
 import { ConfigMarkdown } from "@opencode/core/config/markdown"
 
-export type { Sha256, RelPath, Json, Source, Provider, TreeNode, Capture, Text, ToolRule, ModelHint, Invocation, SecretNeed, LoginNeed, HookEvent, Hook, Entry, Diagnostic, PluginPackage, MarketplaceEntry } from "./plugin-package"
-import type { Sha256, RelPath, Json, Source, TreeNode, Capture, Text, ToolRule, Invocation, SecretNeed, LoginNeed, HookEvent, Entry, Diagnostic, PluginPackage, MarketplaceEntry } from "./plugin-package"
+export type { Sha256, RelPath, Json, Source, Provider, TreeNode, Capture, Text, ToolRule, ModelHint, ArgumentSyntax, SkillDisplay, McpToolDependency, Invocation, SecretNeed, LoginNeed, HookEvent, Hook, Entry, Diagnostic, PluginPackage, MarketplaceEntry } from "./plugin-package"
+import type { Sha256, RelPath, Json, Source, TreeNode, Capture, Text, ToolRule, Invocation, McpToolDependency, SkillDisplay, ArgumentSyntax, SecretNeed, LoginNeed, HookEvent, Entry, Diagnostic, PluginPackage, MarketplaceEntry } from "./plugin-package"
 
 export class CaptureError extends Error {
   constructor(readonly code: "invalid-path" | "duplicate-path" | "invalid-node" | "read-failed" | "digest-mismatch", readonly path: string) {
@@ -87,6 +87,7 @@ export async function convertPluginTree(input: Capture): Promise<{ package: Plug
     }
   }
   const entries: Entry[] = []
+  const dependencyDefinitions: { name: string; path: string; pointer: string; value: unknown }[] = []
   const roots = opencode ? ["skills", "skill", ".opencode/skills", ".opencode/skill"] : ["skills", ...manifests.flatMap(item => declaredPaths(item.value?.skills, item.path, "skills", diagnostics))]
   const loose = !manifest && !opencode ? [...files.keys()].filter(path => /^[^/]+\/SKILL\.md$/.test(path)) : []
   const skillFiles = [...files.keys()].filter((path) => path === "SKILL.md" || (loose.length === 1 && path === loose[0]) || roots.some((root) => path.startsWith(root + "/") && path.endsWith("/SKILL.md")))
@@ -97,7 +98,25 @@ export async function convertPluginTree(input: Capture): Promise<{ package: Plug
     const data: Record<string, unknown> = parsed.data
     const directory = path === "SKILL.md" ? "" : path.slice(0, -"/SKILL.md".length)
     const name = string(data.name) ?? directory.split("/").at(-1) ?? input.source.entryName ?? "skill"
-    entries.push({ kind: "skill", id: "skill:" + path, sourcePath: path, sourceName: name, directory, instruction: pluginText(instruction), invocation: invocation(data), display: jsonRecord(data), mcpDependencies: object(data.dependencies) ? strings(data.dependencies.mcp) : [] })
+    const sidecarPath = (directory ? directory + "/" : "") + "agents/openai.yaml"
+    const sidecar = codex && files.has(sidecarPath) ? ConfigMarkdown.parseOption("---\n" + decode(files.get(sidecarPath)!) + "\n---") : undefined
+    if (codex && files.has(sidecarPath) && !sidecar) diagnostics.push({ path: sidecarPath, code: "invalid-definition", message: "Skill YAML could not be parsed" })
+    const yaml: Record<string, unknown> = sidecar?.data ?? {}
+    const policy = object(yaml.policy) ? yaml.policy : {}
+    const dependencies: McpToolDependency[] = object(yaml.dependencies) && Array.isArray(yaml.dependencies.tools) ? yaml.dependencies.tools.flatMap((value): McpToolDependency[] => {
+      if (!object(value) || value.type !== "mcp" || typeof value.value !== "string") return []
+      const transport = value.transport === "sse" ? "sse" : value.transport === "stdio" ? "stdio" : ["http", "streamable_http", "streamable-http"].includes(String(value.transport)) ? "http" : undefined
+      if (typeof value.url === "string" && transport !== "stdio") dependencyDefinitions.push({ name: value.value, path: sidecarPath, pointer: "/dependencies/tools", value: { type: transport ?? "http", url: value.url } })
+      return [{ type: "mcp", value: value.value, ...(typeof value.description === "string" ? { description: value.description } : {}), ...(transport ? { transport } : {}), ...(typeof value.url === "string" ? { url: pluginText(value.url) } : {}) }]
+    }) : []
+    const display: SkillDisplay = {}
+    if (object(yaml.interface)) for (const [source, target] of [["display_name", "displayName"], ["short_description", "shortDescription"], ["icon_small", "iconSmall"], ["icon_large", "iconLarge"], ["brand_color", "brandColor"], ["default_prompt", "defaultPrompt"]] as const) {
+      const value = yaml.interface[source]
+      if (typeof value !== "string") continue
+      if (source.startsWith("icon_") && !pluginRelativePath(value.replace(/^\.\//, ""))) { diagnostics.push({ path: sidecarPath, field: "interface/" + source, code: "invalid-definition", message: "Skill icon must be relative to its skill directory" }); continue }
+      display[target] = source.startsWith("icon_") ? value.replace(/^\.\//, "") : value
+    }
+    entries.push({ kind: "skill", id: "skill:" + path, sourcePath: path, sourceName: name, directory, instruction: pluginText(instruction), invocation: invocation({ ...data, allow_implicit_invocation: data.allow_implicit_invocation === false || policy.allow_implicit_invocation === false ? false : true }, opencode ? "opencode" : codex ? "literal" : "claude", path, diagnostics), display, dependencies, mcpDependencies: [...new Set([...dependencies.map(item => item.value), ...(object(data.dependencies) ? strings(data.dependencies.mcp) : [])])] })
   }
   const definitions: { name: string; path: string; pointer: string; value: unknown }[] = []
   const addServers = (path: string, map: Record<string, unknown>, pointer: string) => {
@@ -139,7 +158,7 @@ export async function convertPluginTree(input: Capture): Promise<{ package: Plug
     const parsed = ConfigMarkdown.parseOption(instruction)
     if (!parsed) { diagnostics.push({ path, code: "invalid-definition", message: "Markdown definition is invalid" }); continue }
     const kind = match[1]!.startsWith("agent") ? "agent" : "command"
-    entries.push({ kind, id: kind + ":" + path, sourcePath: path, sourceName: match[2]!, instruction: pluginText(instruction), invocation: invocation(parsed.data) })
+    entries.push({ kind, id: kind + ":" + path, sourcePath: path, sourceName: match[2]!, instruction: pluginText(instruction), invocation: invocation(parsed.data, opencode ? "opencode" : codex ? "codex" : "claude", path, diagnostics) })
   }
   if (!opencode && files.has("hooks/hooks.json")) {
     const path = "hooks/hooks.json"
@@ -161,6 +180,7 @@ export async function convertPluginTree(input: Capture): Promise<{ package: Plug
       }
     }
   }
+  definitions.push(...dependencyDefinitions.filter(item => !definitions.some(existing => existing.name === item.name)))
   const unique = [...new Map(definitions.map((definition) => [definition.path + "#" + definition.pointer, definition])).values()]
   const winners = new Map(unique.map((definition) => [definition.name, definition]))
   const needs = optionNeeds
@@ -379,22 +399,58 @@ function credentialText(value: string, context: CredentialContext): Text {
   return [...(prefix ? [prefix] : []), { secret: id }]
 }
 
-function invocation(data: Record<string, unknown>): Invocation {
+function invocation(data: Record<string, unknown>, syntax: ArgumentSyntax, path: string, diagnostics: Diagnostic[]): Invocation {
+  const rules = (field: string) => toolRules(data[field], () => diagnostics.push({ path, field, code: "invalid-definition", message: "Tool rule has unbalanced syntax" }))
+  const effort = ["low", "medium", "high", "xhigh", "max"].find(value => data.effort === value) as Invocation["effort"]
+  const memory = ["user", "project", "local"].find(value => data.memory === value) as Invocation["memory"]
   return {
     fork: data.context === "fork", userInvocable: data["user-invocable"] !== false, implicitInvocation: data["disable-model-invocation"] !== true && data.allow_implicit_invocation !== false,
-    allowedTools: toolRules(data["allowed-tools"]), deniedTools: toolRules(data["disallowed-tools"]),
-    ...(data.tools === undefined ? {} : { availableTools: toolRules(data.tools) }),
-    ...(typeof data.model === "string" ? { model: { alias: data.model } } : {}),
+    allowedTools: rules("allowed-tools"), deniedTools: rules("disallowed-tools"),
+    ...(data.tools === undefined ? {} : { availableTools: rules("tools") }),
+    ...(typeof data.model === "string" && data.model !== "inherit" ? { model: data.model.includes("/") ? { providerID: data.model.slice(0, data.model.indexOf("/")), modelID: data.model.slice(data.model.indexOf("/") + 1) } : { alias: data.model } } : {}),
     ...(typeof data.agent === "string" ? { agent: data.agent } : {}),
     ...(typeof data["argument-hint"] === "string" ? { argumentHint: data["argument-hint"] } : {}),
+    arguments: strings(data.arguments), argumentSyntax: syntax, paths: strings(data.paths), preloadSkills: strings(data.skills),
+    ...(effort ? { effort } : {}), ...(memory ? { memory } : {}),
+    ...(Number.isSafeInteger(data.maxTurns) && Number(data.maxTurns) > 0 ? { maxTurns: Number(data.maxTurns) } : {}),
+    ...(typeof data.background === "boolean" ? { background: data.background } : {}),
   }
 }
 
-function toolRules(value: unknown): ToolRule[] {
-  return strings(value).map((value) => {
-    const match = value.match(/^([^()]+)\((.*)\)$/)
-    return match ? { tool: match[1]!, pattern: match[2]! } : { tool: value }
-  })
+function toolRules(value: unknown, invalid: () => void): ToolRule[] {
+  const result: ToolRule[] = []
+  for (const source of typeof value === "string" ? [value] : Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : []) {
+    let start = 0
+    while (start < source.length) {
+      if (/[\s,]/.test(source[start]!)) { start++; continue }
+      let depth = 0
+      let quote = ""
+      let escaped = false
+      let end = start
+      for (; end < source.length; end++) {
+        const character = source[end]!
+        if (escaped) { escaped = false; continue }
+        if (character === "\\") { escaped = true; continue }
+        if (quote) { if (character === quote) quote = ""; continue }
+        if (character === "'" || character === '"') { quote = character; continue }
+        if (character === "(") depth++
+        if (character === ")") depth--
+        if (depth === 0 && /[\s,]/.test(character)) break
+        if (depth < 0) break
+      }
+      if (depth !== 0 || quote || escaped) {
+        invalid()
+        const next = source.indexOf(",", start)
+        start = next < 0 ? source.length : next + 1
+        continue
+      }
+      const rule = source.slice(start, end).match(/^([^()\s]+)(?:\(([\s\S]*)\))?$/)
+      if (rule) result.push({ tool: rule[1]!, ...(rule[2] === undefined ? {} : { pattern: rule[2] }) })
+      else invalid()
+      start = end + 1
+    }
+  }
+  return result
 }
 function strings(value: unknown): string[] { return typeof value === "string" ? value.split(/,\s*|\s+/).filter(Boolean) : Array.isArray(value) ? value.filter((part): part is string => typeof part === "string") : [] }
 function object(value: unknown): value is Record<string, unknown> { return typeof value === "object" && value !== null && !Array.isArray(value) }

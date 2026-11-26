@@ -30,6 +30,9 @@ export type McpTimeouts = { startupMs?: number; catalogMs?: number; executionMs?
 export type PackageTextBindings = { pluginRoot: string; skillDir?: string; projectDir: string; pluginData: string; resolveOption(key: string): string | number | boolean | undefined; resolveEnvironment(name: string): string | undefined; resolveSecret(id: string): string | undefined }
 export type ToolRule = { tool: string; pattern?: string }
 export type ModelHint = { alias: string } | { providerID: string; modelID: string }
+export type ArgumentSyntax = "claude" | "codex" | "opencode" | "literal"
+export type SkillDisplay = { displayName?: string; shortDescription?: string; iconSmall?: RelPath; iconLarge?: RelPath; brandColor?: string; defaultPrompt?: string }
+export type McpToolDependency = { type: "mcp"; value: string; description?: string; transport?: "stdio" | "http" | "sse"; url?: Text }
 export type Invocation = {
   argumentHint?: string
   model?: ModelHint
@@ -40,6 +43,14 @@ export type Invocation = {
   allowedTools: ToolRule[]
   deniedTools: ToolRule[]
   availableTools?: ToolRule[]
+  arguments: string[]
+  argumentSyntax: ArgumentSyntax
+  effort?: "low" | "medium" | "high" | "xhigh" | "max"
+  paths: string[]
+  preloadSkills: string[]
+  memory?: "user" | "project" | "local"
+  maxTurns?: number
+  background?: boolean
 }
 export type SecretNeed = {
   id: string
@@ -92,7 +103,8 @@ export type Entry = EntryBase &
         directory: RelPath
         instruction: Text
         invocation: Invocation
-        display: Record<string, Json>
+        display: SkillDisplay
+        dependencies: McpToolDependency[]
         mcpDependencies: string[]
       }
     | { kind: "command" | "agent"; instruction: Text; invocation: Invocation }
@@ -354,10 +366,12 @@ function validEntry(value: unknown): value is Entry {
     if (!text(value.instruction) || !invocation(value.invocation)) return false
     if (value.kind !== "skill") return keys(value, [...base, "instruction", "invocation"])
     return (
-      keys(value, [...base, "directory", "instruction", "invocation", "display", "mcpDependencies"]) &&
+      keys(value, [...base, "directory", "instruction", "invocation", "display", "dependencies", "mcpDependencies"]) &&
       (value.directory === "" || pluginRelativePath(value.directory)) &&
       value.sourcePath === (value.directory ? value.directory + "/" : "") + "SKILL.md" &&
-      object(value.display) &&
+      object(value.display) && keys(value.display, ["displayName", "shortDescription", "iconSmall", "iconLarge", "brandColor", "defaultPrompt"]) && Object.values(value.display).every(item => typeof item === "string") &&
+      [value.display.iconSmall, value.display.iconLarge].every(item => item === undefined || pluginRelativePath(item)) &&
+      Array.isArray(value.dependencies) && value.dependencies.every(item => object(item) && keys(item, ["type", "value", "description", "transport", "url"]) && item.type === "mcp" && typeof item.value === "string" && optionalString(item.description) && (item.transport === undefined || ["stdio", "http", "sse"].includes(String(item.transport))) && (item.url === undefined || text(item.url))) &&
       strings(value.mcpDependencies)
     )
   }
@@ -462,6 +476,7 @@ function invocation(value: unknown): boolean {
       "allowedTools",
       "deniedTools",
       "availableTools",
+      "arguments", "argumentSyntax", "effort", "paths", "preloadSkills", "memory", "maxTurns", "background",
     ])
   )
     return false
@@ -488,6 +503,12 @@ function invocation(value: unknown): boolean {
     typeof value.implicitInvocation === "boolean" &&
     rules(value.allowedTools) &&
     rules(value.deniedTools) &&
+    strings(value.arguments) && ["claude", "codex", "opencode", "literal"].includes(String(value.argumentSyntax)) &&
+    strings(value.paths) && strings(value.preloadSkills) &&
+    (value.effort === undefined || ["low", "medium", "high", "xhigh", "max"].includes(String(value.effort))) &&
+    (value.memory === undefined || ["user", "project", "local"].includes(String(value.memory))) &&
+    (value.maxTurns === undefined || Number.isSafeInteger(value.maxTurns) && Number(value.maxTurns) > 0) &&
+    (value.background === undefined || typeof value.background === "boolean") &&
     (value.availableTools === undefined || rules(value.availableTools))
   )
 }

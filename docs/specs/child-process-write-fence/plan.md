@@ -661,7 +661,7 @@ PLAN 阶段只提交本文件。下表和命令均为实施安排，不代表已
 ## 交付切片五｜Homebrew 围栏外执行
 
 - 依据：#1759；spec v6 BR-09/AC-11（brew）；design v4.4 §4.1–4.4、§5、§6 ①–⑦与 §10 @ `e3a15f2432`。H2 私有输入见 :800–844，H4 claim/交付见 :869–907，重定向次序与比较见 :896–897，证明义务见 :939；历史 r8 接缝已由该版关闭。Bun 沿 r8 已完成结果。
-- 核对：`cd811619a9` · r9 Claude Opus 5.5（编排者）明确授权本轮更新计划后实施；Codex（GPT-6）实施自核，不冒充独立审查。
+- 核对：`e75bbb6508` · r10 Claude Opus 5.5（编排者）接受切片五计划与 post-start invalid-frame ruling，授权继续实施；Codex（GPT-6）实施自核，不冒充独立审查。
 
 ### 改动
 
@@ -722,3 +722,21 @@ PLAN 阶段只提交本文件。下表和命令均为实施安排，不代表已
 - 新 Node 集成首次发现多代 dlopen 重复注册同一 N-API cleanup hook 导致 Node abort（r10-book.log）；改为每个 Mach service 自有 cleanup hook，关闭/GC 幂等，真实重复代用例通过。该修正属于 r9 新底座的实际接线缺陷。H1 补未到达静态节点仍规划凭据（跳过的 export 不传播）、未知 export 的值不沿用旧快照、time/coproc 前置语义；不新增 parser 或识别白名单。模块与节点簿 **5 pass / 158 expect**，server/profile **101 pass / 619 expect**，打包相关 **40 pass / 99 expect**；真实 formula/完整 §6 场景尚未计通过。
 - r10 实际构建回归：electron-vite 的配置 bundler 把 scanner 的 import.meta.dirname 留在临时配置文件上下文，main 首次构建找错 Core 目录而 ENOENT。最低层使用生产 electron-vite.loadConfigFromFile 加载真实配置并调用同一 scanner 插件，修正前 **1 fail**（Vite 自己的 loader 不复现，未冒充红证据）；红测试独立提交后，路径改由 fileURLToPath(import.meta.url) 取原文件目录，原断言不改，完整 H1 **5 pass / 157 expect**。不改上游或新增构建开关。
 - r10 完整入口发现 zsh 外围关闭 stdin 时，原 `if true 2>/dev/null 8<&0` 的复制失败诊断仍落到用户 stderr。最低层原三方言文件补“不出现 bad file descriptor”断言，独立红提交 `506076b033`（0 pass / 1 fail）；将 stderr 重定向放到外围探测组后，原断言不改，完整 H1 通过。仅修正 R1-F1 构造的可见输出，不改真实叶的重定向次序、失败码或 stdin。
+- r10 场景根为原根下的 `r10/`：`packages/ui-mac/node_modules/.cache/package-manager-scenario-vf8vnnjs/r10/summary.json` 保存命令、PASS/expect 数、来源/digest、磁盘记录、控制臂及未证明边界；仅作为一次 scenario 层材料，不加入每 PR 测试。Homebrew 为只读本机源码 clone（commit `3e47189a707c739ee1278a28a3b845f5834574e6`，7.0.15）；临时 tap 的真实 formula 安装官方 jq 1.8.1 原始 arm64 CLI（SHA-256 `a9fe3ea2f86dfc72f6728417521ec9067b343277152b114f4e98d8cb0e263603`），不冒称为 homebrew/core 的编译配方。真实 Homebrew 的 install.rb/Sandbox 路径未替换，formula/资源/宿主边界见 `sources.json`。
+- 场景隔离偏离：首轮登录探针把 PATH 改成系统 brew，导致安装命令尝试真实 prefix 的目录创建，围栏拒绝、未完成安装；随后在源码中明确隔离 PATH，先要求 `brew --prefix` 精确等于临时 prefix 且观测到对应 main spawn，才允许安装。临时 Portable Ruby 的 `current` 软链曾被复制展开，恢复真实软链；Homebrew 7 的本地 tap trust 用原生 `brew trust` 在隔离 HOME/XDG_CONFIG_HOME 预置。没有执行真实位置的成功安装。一次较宽测试误从仓库根调用，被根 guard 在发现测试前拒绝；改在包目录运行。以上不是产品新增开关或用户步骤。
+
+| r10 命令（包目录按路径所属包） | 结果与实际产物 |
+| --- | --- |
+| `bun test --max-concurrency 2 engine/package-manager-plan.test.ts` | **5 pass / 163 expect**；生产 config bundling、同源 scanner、真实三方言私有输入/重定向；新增两项缺陷各有独立红提交后修正。 |
+| `bun test --max-concurrency 2 src/main/package-manager-execution.test.ts` | **1 pass / 3 expect**（内部真实 Node assert 四行）；坏格式/错误 proof 保持 pending、正确 claim/一次消费、字节流/exit17、启动前 400/0 spawn、200 后坏帧 helper 非零/原因 stderr/整个 PGID 消失、main 正常退出清组。常数比较为两段 32 字节 Buffer 的 `timingSafeEqual`，未跑计时测试。 |
+| `bun test --max-concurrency 2 src/main/process-fence-profile.test.ts src/main/server.test.ts`；`src/main/mac-target-arch.test.ts` | 分别 **101 pass / 619 expect**、**40 pass / 99 expect**；真实磁盘 launcher/PATH shadow/身份刷新，helper 资源与签名打包接线。 |
+| ext：`bun test --max-concurrency 2 src/hub-bridge.test.ts` | **15 pass / 59 expect**；原通道授权、绑定、清理与私有字节投影。 |
+| `gate slot -- bun ./node_modules/.cache/package-manager-scenario-vf8vnnjs/r10/run.ts` | **1 pass / 31 expect**；真实 prepare/prefer → main/受围栏 Node sidecar → 原助手 Shell → H2/Mach/helper → main HTTP broker → 真实 formula。`cd p && brew install jq` 成功，cwd 为 p；围栏外 jq 输出 `jq-1.8.1`；`false || brew --prefix && echo ok` 成功。all 0 卡、ask 一张原命令卡，deny/readonly 0 main spawn。磁盘 `formula-results.json`。成功安装不重跑。 |
+| `gate slot -- …/r10/bun-main-host test …/r10/security.test.ts` | **2 pass / 17 expect**；真实普通 Python 叶 re-exec 严格 helper，坏格式与错误 proof 均 126/unauthorized，外层 false 为 exit1、0 main spawn、finish；另一行同节点随后真实叶成功。测试主机提供同用户 PID 快照，围栏内 reader 对 argv/env 的 64-hex 候选立即 hash，自身 fd3–9 为空；没有保存原始环境或凭据。此快照不冒充全部并发/后台矩阵。 |
+| `gate slot -- …/r10/bun-main-host test …/r10/redirections.test.ts` | **0 pass / 1 fail**；实际磁盘 bash/zsh 各 9 行已通过（close3–9、stderr→9、9>out、文件/pipe/两种 EOF、missing 0 claim、allexport/xtrace 无凭据），POSIX 合法叶因下述 root 身份问题被拒，不标三方言全通过。缺失重定向行的 finish 已观测。 |
+| `gate slot -- bun …/r10/lifecycle-run.ts` | 四个独立进程各 **1 pass**，共 **4 pass / 16 expect**；真实 Shell 工具 cancel/timeout、sidecar 断开、调用生产 main 退出清理；TERM 不退出的孩子和 brew PGID 均在测试宿主收尾之前消失。app-quitting 调生产 `stopPackageManagerExecutions`，没有启动 Electron 的 before-quit 事件；该事件接线沿现有 window-close 测试核对。 |
+
+- r10 已知坏臂：只在场景的同一 main 构建中去掉 proof 的 `timingSafeEqual`，未改生产源码，普通叶第二次 wrong-proof claim 得到 delegated、1 main spawn，原断言 **1 fail**；正常版此前 **2 pass**，产物分别 `comparison-removal-results.json`、`security-results.json`。撤 H2 分流的真实 formula 臂 **1 fail**，但实际先失败于 prefix 写权限预检，**未到嵌套 sandbox exit71，不计为所需 P09 证明**。r9 的 fd 次序和 additionalFds 移除红臂继续保留，不把它们替代完整入口。
+- **r10 接缝待裁决：H2/H4 根进程跨 exec 的身份连续性。** 冻结 `design.md @ e3a15f2432:836,890` 要求一次绑定本代 root PID/pidversion、接受真实 Shell 的 exec 形态/后代。实际原生实现 `native/codepuppy-fence/package_manager.c:237` 对当前 root audit pidversion 作相等检查。真实 POSIX 入口 `posix-peer-results.json` 中 root PID **48986** 不变，bind 的 pidversion **11944774**，claim 时 **11944775**；正确 proof 已经过比较，真实 helper PID **48990**，ancestry 返回 false，helper **126/unauthorized**、0 main spawn；同一真实入口的针对性复核 **0 pass / 1 fail**。最小需要：冻结 root 跨 exec 仍可验证同一内核进程实例的判据，并保留 peer 当前 audit pidversion/签名/节点 proof 校验；不自行放松当前 root 校验或改 H2/公开协议。未闭合 POSIX/exec 行，故切片五本轮不是 DONE。
+- 未证明边界：compound install + npm/postinstall 全链、完整并发/后台 fd 矩阵、解释器残留/启动文件抢读、完整入口 HB 负向身份矩阵、P09 nested exit71、生产 Team/打包 Electron 身份与真实 GUI quit。adhoc hardened helper、真实 Mach audit/kernel 和真实 Node 引擎证据不冒充这些边界。AC-09/10/12 与非 brew AC-11 沿此前已验收材料，未重跑成功工具行。
+- 最后较宽直接相关集合：`bun test --max-concurrency 2 src/main/network-egress-proxy.test.ts src/main/window-close.test.ts src/main/keychain-boot-order.test.ts src/main/keychain-rename-native.test.ts src/main/naming-migration-wiring.test.ts` **60 pass / 249 expect**。ui-mac/ext 类型 exit0、旧名 **10 pass / 2347 expect**、north-star/diff exit0，hooksPath 为 `.githooks`。文档契约 **70 error / 252 warning**，finding 与 r9 逐项相同；`affected-tests --list` **exit2**（基线缺 `.gate-tests`，没有 scope 行）。未跑 gate run/bin/check/全包或计时用例；未启动应用/窗口、签名授权弹框或外部写操作。细节只保存在本计划和忽略的场景产物。

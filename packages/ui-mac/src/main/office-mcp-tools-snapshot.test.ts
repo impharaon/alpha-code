@@ -52,14 +52,14 @@ test("regeneration preserves Office definitions and video source declaration wit
 
 test("AC1: changing one schema field in server.py changes the exported tool definitions", () => {
   const source = readFileSync(OFFICE_MCP_SERVER, "utf8")
-  // write_docx 表格块的 `header` 默认值(Word 段里唯一一处)。
-  const field = `"header": {"type": "boolean", "default": True}`
+  // The preserved Excel reader's rows schema; changing it must affect the real generated definition.
+  const field = `"rows":{"type":"integer","minimum":1}`
   expect(source.split(field)).toHaveLength(2)
   const edited = join(scratch, "server.py")
-  writeFileSync(edited, source.replace(field, `"header": {"type": "boolean", "default": False}`))
+  writeFileSync(edited, source.replace(field, `"rows":{"type":"integer","minimum":2}`))
   type Manifest = { formats: Record<string, { tools: unknown[] }> }
   const committed = JSON.parse(readFileSync(OFFICE_MCP_MANIFEST, "utf8")) as Manifest
   const regenerated = JSON.parse(renderOfficeMcpTools(edited, videoRoot, runtimeRoot)) as Manifest
-  expect(regenerated.formats.word!.tools).not.toEqual(committed.formats.word!.tools)
-  expect(regenerated.formats.excel!.tools).toEqual(committed.formats.excel!.tools)
+  expect(regenerated.formats.excel!.tools).not.toEqual(committed.formats.excel!.tools)
+  expect(regenerated.formats.word!.tools).toEqual(committed.formats.word!.tools)
 })

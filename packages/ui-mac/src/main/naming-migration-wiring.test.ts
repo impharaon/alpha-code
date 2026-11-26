@@ -182,7 +182,8 @@ const right = (pairs: ReadonlyArray<readonly [string, string]>) => pairs.map((pa
 
 describe("§12 —— 迁移映射的新名逐项等于各自的权威", () => {
   test("userData、全局根、环境配置、设置键、项目隐藏目录", () => {
-    expect(Object.keys(LEGACY_USER_DATA).sort()).toEqual(Object.keys(USER_DATA_LAYOUT).sort())
+    expect(Object.keys(LEGACY_USER_DATA).every((key) => key in USER_DATA_LAYOUT)).toBe(true)
+    expect("documentRuntime" in LEGACY_USER_DATA).toBe(false)
     for (const [item, legacy] of Object.entries(LEGACY_USER_DATA))
       expect(legacy.replace(/^alpha/, "codepuppy"), item).toBe(USER_DATA_LAYOUT[item as keyof typeof USER_DATA_LAYOUT])
     expect([LEGACY_BASE_DIR, basename(defaultCodePuppyBaseRoot("/a"))]).toEqual(["alpha-code-state", "codepuppy-state"])

@@ -103,6 +103,15 @@ describe("REQ-133 Alpha Office connector registry and stdio safety", () => {
       ])
   })
 
+  test("derived Office environment must equal the trusted Location projection; durable and forged keys fail", () => {
+    const projection = { CODEPUPPY_DOCUMENT_HOST: "/private/document-runtime/python-host/7/registration/host.json" }
+    const server = { ...config("excel"), environment: projection }
+    expect(checkCodePuppyOfficeMcpSafety("codepuppy-excel", server, workspace, resources).ok).toBe(false)
+    expect(checkCodePuppyOfficeMcpSafety("codepuppy-excel", server, workspace, resources, projection).ok).toBe(true)
+    expect(checkCodePuppyOfficeMcpSafety("codepuppy-excel", { ...server, environment: { CODEPUPPY_DOCUMENT_HOST: "/foreign/host.json" } }, workspace, resources, projection).ok).toBe(false)
+    expect(checkCodePuppyOfficeMcpSafety("codepuppy-excel", config("excel"), workspace, resources, projection).ok).toBe(false)
+  })
+
   test("all four exact local commands pass and share the workspace-policy registry", () => {
     for (const connector of CODEPUPPY_OFFICE_CONNECTORS) {
       const server = config(connector.format)

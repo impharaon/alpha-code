@@ -4,6 +4,21 @@ import type { PackageAuthorizationResultV1 } from "../shared/package-admission"
 import { isInstallOutcomeV1, type InstallOutcomeV1, type CreatedPluginDraftV1 } from "../shared/plugin-install"
 import type { SourceSearchResultV1, CandidateV1, SourceStatusV1 } from "./plugin-sources"
 import type { ToolPolicyPartition, ToolPolicyRecord } from "../../../schema/src/codepuppy-tool-policy"
+import { documentRecord, isDocumentRuntimeState, isDocumentRuntimeVerifyRef, isDocumentRuntimeVerifyTask, isDocumentRuntimeVerifyReceipt, type DocumentRuntimeState, type DocumentRuntimeVerifyRef, type DocumentRuntimeVerifyTask, type DocumentRuntimeVerifyReceipt } from "../../../util/src/codepuppy-document"
+
+export type DocumentRuntimeMessage =
+  | { type: "codepuppy.document.runtime.verify"; task: DocumentRuntimeVerifyTask }
+  | { type: "codepuppy.document.runtime.verify.cancel"; ref: DocumentRuntimeVerifyRef }
+  | { type: "codepuppy.document.runtime.verify.receipt"; receipt: DocumentRuntimeVerifyReceipt }
+  | { type: "codepuppy.document.runtime.changed"; sidecarGeneration: number; sequence: number; state: DocumentRuntimeState }
+
+export function parseDocumentRuntimeMessage(value: unknown): DocumentRuntimeMessage | undefined {
+  if (!documentRecord(value)) return
+  if (value.type === "codepuppy.document.runtime.verify" && isDocumentRuntimeVerifyTask(value.task)) return { type: value.type, task: value.task }
+  if (value.type === "codepuppy.document.runtime.verify.cancel" && isDocumentRuntimeVerifyRef(value.ref)) return { type: value.type, ref: value.ref }
+  if (value.type === "codepuppy.document.runtime.verify.receipt" && isDocumentRuntimeVerifyReceipt(value.receipt)) return { type: value.type, receipt: value.receipt }
+  if (value.type === "codepuppy.document.runtime.changed" && Number.isSafeInteger(value.sidecarGeneration) && Number(value.sidecarGeneration) >= 0 && Number.isSafeInteger(value.sequence) && Number(value.sequence) >= 0 && isDocumentRuntimeState(value.state)) return { type: value.type, sidecarGeneration: Number(value.sidecarGeneration), sequence: Number(value.sequence), state: value.state }
+}
 
 // Main ↔ sidecar contract: source lookup, ID-only installation, main-owned progress and reload messages.
 // Shared by ext and ui-mac; no filesystem or Electron dependencies. Build/parse pairs reject malformed payloads.

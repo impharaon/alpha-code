@@ -440,6 +440,33 @@ describe("请求体与登记簿(纯函数)", () => {
   })
 })
 
+// Component evidence uses the real Read converter, Message classes, vision compression/cache and hook.
+// The page fixture was rendered by the document runtime; no invented image or tool-result wire format.
+test("document page evidence comes from native Read images or successful existing vision, per path even for identical pages", async () => {
+  const { createCloudVisionHooks } = await import("./cloud-vision-hooks")
+  const { ReadTool } = await import("../../core/src/tool/plugin/read")
+  const png = await Bun.file(join(import.meta.dir, "../../ui-mac/src/main/fixtures/document-runtime/canvas-2-3.png")).bytes()
+  const paths = ["/workspace/page-1.png", "/workspace/page-2.png"]
+  const views: Array<{ path: string; sha256: string; inspected: boolean }> = []
+  let calls = 0
+  const messages = () => paths.flatMap((path, index) => [
+    Message.assistant([ToolCallPart.make({ id: "read-" + index, name: "read", input: { path } })]),
+    Message.tool(ToolResultPart.make({ id: "read-" + index, name: "read", result: { type: "content", value: ReadTool.toModelContent(path, undefined, { type: "file", mime: "image/png", encoding: "base64", content: Buffer.from(png).toString("base64") }) as never } })),
+  ])
+  const native = createCloudVisionHooks({ directory: "/workspace", isVideoFrames: async () => false, seesImages: async () => true, fetch: async () => { calls++; throw Error("native vision must not connect") }, documentPageView: (_session, view) => views.push(view) })
+  await native.context({ sessionID: "ses_document", model: KIMI, system: [], messages: messages() })
+  expect(views.map((view) => [view.path, view.inspected])).toEqual(paths.map((path) => [path, true]))
+  expect(views.map((view) => view.sha256)).toEqual(paths.map(() => createHash("sha256").update(png).digest("hex")))
+  expect(calls).toBe(0)
+  const cloud = createCloudVisionHooks({ directory: "/workspace", isVideoFrames: async () => false, seesImages: async () => false, bootstrap: publishDoc(), documentPageView: (_session, view) => views.push(view), fetch: async () => { calls++; return Response.json({ text: "The page fits the canvas.", model: "qwen", fallback_used: false }) } })
+  await cloud.context({ sessionID: "ses_cloud_document", model: GLM, system: [], messages: messages() })
+  await cloud.context({ sessionID: "ses_cloud_document", model: GLM, system: [], messages: messages() })
+  expect(calls).toBe(1)
+  expect(views.slice(2).every((view) => view.inspected)).toBe(true)
+  const refused = createCloudVisionHooks({ directory: "/workspace", isVideoFrames: async () => false, seesImages: async () => false, bootstrap: publishTestBootstrap({ globalRoot: join(root, "isolated"), platform: {} }), documentPageView: (_session, view) => views.push(view) })
+  await refused.context({ sessionID: "ses_document", model: GLM, system: [], messages: messages() })
+  expect(views.slice(-2).map((view) => view.inspected)).toEqual([false, false])
+})
 
 describe("video frame projection", () => {
   // Existing upstream JPEG (128x128, Lavc60.31.102), used unchanged. The frame

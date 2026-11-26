@@ -1,0 +1,163 @@
+# Adapted for Code Puppy, 2026-11-26, from excel-mcp-server 2.3.2 (MIT).
+"""Putting what openpyxl dropped back into the file it wrote."""
+import re
+from openpyxl import Workbook
+from openpyxl.worksheet.worksheet import Worksheet
+from excel_mcp.package import consistency, metadata, properties, query_tables
+from excel_mcp.package.extensions import in_excel_order
+from excel_mcp.package.model import Link, PackageState, Part, Sheet, state_of, workbook_sheets
+from excel_mcp.package.opc import Package, Rel, free_ids
+from excel_mcp.package.patch import WORKBOOK_ORDER, append_to_root, insertions, splice
+from excel_mcp.package.restore_sheet import restore_sheet
+from excel_mcp.package.scan import attributes, rel_id, remap_relationship_ids, scan, tags
+from excel_mcp.refs import CellRange
+MAIN = 'xl/workbook.xml'
+_TAB_ID = re.compile('(<(?:[\\w.-]+:)?pivotTable\\b[^>]*?\\btabId=")(\\d+)(")')
+_TABLE_ID = re.compile('(<(?:[\\w.-]+:)?tableSlicerCache\\b[^>]*?\\btableId=")(\\d+)(")')
+
+def sheet_parts(package: Package) -> dict[str, str]:
+    """The part that holds each sheet of the workbook, by sheet name."""
+    document = scan(package.read(MAIN))
+    targets = {rel.id: rel.target for rel in package.rels(MAIN)}
+    return {values['name']: targets[rel_id(values, document)] for values in tags(document, 'sheet')}
+
+def apply(workbook: Workbook, written: bytes) -> bytes:
+    """``written``, the file openpyxl saved for ``workbook``, with what it dropped put back."""
+    state = state_of(workbook)
+    if state.is_empty():
+        return written
+    return Restorer(workbook, state, written).run()
+
+class Restorer:
+    """Merges the preserved content of a `PackageState` into a package that openpyxl wrote."""
+
+    def __init__(self, workbook: Workbook, state: PackageState, written: bytes) -> None:
+        self.workbook = workbook
+        self.state = state
+        self.package = Package(written)
+        self.placed: dict[Part, str] = {}
+        numbers = {sheet: number for number, sheet in enumerate(workbook_sheets(workbook), 1)}
+        self.sheet_ids = {old: numbers[s] for s, old in state.sheet_ids.items() if s in numbers}
+        self.table_ids = {old: table.id for table, old in state.table_ids.items()}
+        self.pivots = consistency.pivots_that_remain(workbook)
+        self.orphans = consistency.orphaned_caches(workbook, state)
+        self.gone = {name for sheet, name in state.sheet_names.items() if sheet not in numbers}
+        self.dynamic_array = 0
+        self.query_areas: dict[tuple[int, str], CellRange] = {}
+
+    def run(self) -> bytes:
+        links = list(self.state.workbook.links)
+        links += self._metadata(links)
+        parts = self.sheet_parts()
+        for sheet, package in self.state.sheets.items():
+            if sheet in parts and isinstance(sheet, Worksheet):
+                restore_sheet(self, sheet, package, parts[sheet])
+        self._workbook(links)
+        self._company(self.state.workbook.company)
+        return self.package.to_bytes()
+
+    def sheet_index(self, sheet: Sheet) -> int:
+        """The position of ``sheet``, by which sheet-level names refer to it."""
+        return workbook_sheets(self.workbook).index(sheet)
+
+    def sheet_parts(self) -> dict[Sheet, str]:
+        return {self.workbook[name]: part for name, part in sheet_parts(self.package).items()}
+
+    def place(self, part: Part) -> str:
+        """Add a part, and the parts it refers to, to the package; its name may change."""
+        if part in self.placed:
+            return self.placed[part]
+        data = self._with_current_ids(part)
+        same = not part.unique and self.package.exists(part.name) and (self.package.read(part.name) == data)
+        name = part.name if same else self.package.unique_name(part.name)
+        self.placed[part] = name
+        if not same:
+            self.package.write(name, data)
+            self.package.content_types.declare(name, part.content_type, part.by_default)
+            self.package.rels(name).extend(self._rels(part.links))
+        return name
+
+    def _rels(self, links: list[Link]) -> list[Rel]:
+        return [Rel(link.id, link.type, self.target(link), isinstance(link.target, str)) for link in links]
+
+    def target(self, link: Link) -> str:
+        return link.target if isinstance(link.target, str) else self.place(link.target)
+
+    def attach(self, owner: str, links: list[Link], texts: list[str], scope: dict[str, str]) -> list[str]:
+        """Add relationships to a part that is being merged into, and renumber the XML to match."""
+        rels = self.package.rels(owner)
+        free_id = free_ids(rels)
+        known: dict[tuple[str, str], Rel] = {}
+        for rel in rels:
+            known.setdefault((rel.type, rel.target), rel)
+        mapping: dict[str, str] = {}
+        for link in links:
+            rel = Rel(link.id, link.type, self.target(link), isinstance(link.target, str))
+            existing = known.get((rel.type, rel.target))
+            if existing is None:
+                rel.id = free_id(link.id)
+                rels.append(rel)
+                known[rel.type, rel.target] = rel
+            mapping[link.id] = (existing or rel).id
+        return [remap_relationship_ids(text, mapping, scope) for text in texts]
+
+    def _with_current_ids(self, part: Part) -> bytes:
+        """Slicer and timeline caches name sheets and tables by number, which openpyxl renumbers."""
+        if part.content_type not in (consistency.SLICER_CACHE, consistency.TIMELINE_CACHE):
+            return part.data
+        text = part.data.decode('utf-8')
+        text = _TAB_ID.sub(lambda m: m[1] + str(self.sheet_ids.get(int(m[2]), m[2])) + m[3], text)
+        text = _TABLE_ID.sub(lambda m: m[1] + str(self.table_ids.get(int(m[2]), m[2])) + m[3], text)
+        return consistency.without_missing_pivots(text, self.pivots).encode('utf-8')
+
+    def _metadata(self, links: list[Link]) -> list[Link]:
+        """Add dynamic array metadata if a cell asks for it; returns the link if the part is new."""
+        if not any((mark.dynamic for sheet in self.state.sheets.values() for mark in sheet.marks)):
+            return []
+        existing = next((link for link in links if link.type == metadata.RELATIONSHIP), None)
+        part = existing.target if existing else Part(metadata.PART, metadata.CONTENT_TYPE, b'')
+        if isinstance(part, str):
+            return []
+        document = metadata.Metadata(part.data.decode('utf-8') if part.data else None)
+        self.dynamic_array = document.dynamic_array_index()
+        part.data = document.xml.encode('utf-8')
+        return [] if existing else [Link('rIdMetadata', metadata.RELATIONSHIP, part)]
+
+    def _workbook(self, links: list[Link]) -> None:
+        package = self.state.workbook
+        names = [name for name, _ in package.elements]
+        ordered = in_excel_order(package.extensions)
+        links, texts = consistency.without_caches(links, [xml for _, xml in package.elements] + list(ordered.values()), self.orphans)
+        extensions = consistency.empty_cache_lists(dict(zip(ordered, texts[len(names):], strict=True)))
+        remapped = self.attach(MAIN, links, texts[:len(names)] + list(extensions.values()), package.namespaces)
+        new = list(zip(names, remapped[:len(names)], strict=True))
+        if extensions:
+            new.append(('extLst', f"<extLst>{''.join(remapped[len(names):])}</extLst>"))
+        self._cache_extensions(package.cache_extensions)
+        data = self.package.read(MAIN)
+        data = splice(data, insertions(scan(data), new, WORKBOOK_ORDER))
+        if self.query_areas:
+            data = query_tables.with_areas(data.decode('utf-8'), self.query_areas).encode('utf-8')
+        self.package.write(MAIN, data)
+        self.attach('', package.root_links, [], {})
+
+    def _cache_extensions(self, extensions: dict[str, str]) -> None:
+        if not extensions:
+            return
+        document = scan(self.package.read(MAIN))
+        targets = {rel.id: rel.target for rel in self.package.rels(MAIN)}
+        for values in tags(document, 'pivotCache'):
+            extension = extensions.get(values['cacheId'])
+            if extension:
+                target = targets[rel_id(values, document)]
+                self.package.write(target, append_to_root(self.package.read(target), extension))
+
+    def _company(self, company: str) -> None:
+        if company:
+            app = self.package.read(properties.APP_PART)
+            self.package.write(properties.APP_PART, properties.named(app, company))
+
+    def pivot_name(self, part: str) -> str:
+        data = self.package.read(part)
+        document = scan(data)
+        return attributes(data[document.root_tag[0]:document.root_tag[1]].decode())['name']

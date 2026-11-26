@@ -264,3 +264,39 @@ describe("hub-bridge — tool policy writer (I-13)", () => {
     expect(await viewing).toEqual({ ok: true, view })
   })
 })
+
+import { bindDocumentRuntimeVerification } from "./document-runtime-bridge"
+import type { Location } from "../../schema/src/location"
+import type { DocumentRuntimeVerifyTask } from "../../util/src/codepuppy-document"
+
+describe("document runtime bridge", () => {
+  test("early tasks remain for their owning Location, deduplicate execution and terminate cancellation", async () => {
+    const wire = fakePort()
+    const bridge = createHubBridge(wire.port, { timeoutMs: 1, log: () => {} })
+    const location = { directory: "/work/owner" as Location.Ref["directory"] }
+    const task: DocumentRuntimeVerifyTask = { kind: "libreoffice", taskId: "task-1", registrationId: "registration-1", sidecarGeneration: 7, location, pinId: "libreoffice/darwin-arm64/test", pinSha256: "a".repeat(64), runtimeRoot: "/state/candidate", jobRoot: "/state/jobs/task-1" }
+    wire.deliver({ type: "codepuppy.document.runtime.verify", task })
+    let spawned = 0
+    const other = bindDocumentRuntimeVerification(bridge, { directory: "/work/other" as Location.Ref["directory"] }, 7, "other-registration", async () => { throw Error("wrong Location") })
+    const cleanup = bindDocumentRuntimeVerification(bridge, location, 7, "registration-1", async (task, signal) => {
+      spawned++
+      await new Promise<void>((resolve) => signal.addEventListener("abort", () => resolve(), { once: true }))
+      return { ...task, status: "completed", version: "test", pdfPath: "/state/jobs/task-1/probe.pdf", pdfSha256: "b".repeat(64), pageCount: 1 }
+    })
+    wire.deliver({ type: "codepuppy.document.runtime.verify", task })
+    expect(spawned).toBe(1)
+    wire.deliver({ type: "codepuppy.document.runtime.verify.cancel", ref: task })
+    await cleanup(); await other()
+    expect(wire.sent).toHaveLength(2) // replay has the same terminal result, never another spawn
+    expect(wire.sent.every((message) => (message as { receipt: { status: string } }).receipt.status === "cancelled")).toBe(true)
+  })
+})
+
+test("document verification ignores an old registration in the same Location and generation", async () => {
+  const wire = fakePort(); const bridge = createHubBridge(wire.port, { log: () => {} })
+  const location = { directory: "/work/owner" as Location.Ref["directory"] }
+  let ran = 0
+  const cleanup = bindDocumentRuntimeVerification(bridge, location, 7, "new-registration", async (task) => { ran++; return { ...task, status: "cancelled", reason: "requested" } })
+  wire.deliver({ type: "codepuppy.document.runtime.verify", task: { kind: "libreoffice", taskId: "old-task", registrationId: "old-registration", sidecarGeneration: 7, location, pinId: "libreoffice/darwin-arm64/test", pinSha256: "a".repeat(64), runtimeRoot: "/state/candidate", jobRoot: "/state/jobs/old" } })
+  await cleanup(); expect(ran).toBe(0); expect(wire.sent).toHaveLength(0)
+})

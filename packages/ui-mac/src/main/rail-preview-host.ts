@@ -1,3 +1,4 @@
+import { hardenPreviewSession, hardenPreviewContents } from "./preview-isolation"
 // REQ-108(alpha-code#244)—— 右栏文件查看器的 html/pdf 叠放载体(WebContentsView)。
 //
 // 与 html-preview-host(REQ-096)的关系:**同一套隔离,不同的画布**。
@@ -349,41 +350,19 @@ function serveRequest(record: RailPreviewRecord, request: Request): Response {
 // ---- session / webContents 硬化(逐条对齐 html-preview-host,AC3)----
 
 function hardenSession(ses: Session, record: RailPreviewRecord) {
-  ses.setPermissionRequestHandler((_wc, _permission, callback) => callback(false))
-  ses.setPermissionCheckHandler(() => false)
-  if (typeof ses.setDevicePermissionHandler === "function") ses.setDevicePermissionHandler(() => false)
-  // pdf 工具栏已整条移除;这里是「任何形式的下载都异常」的 fail-closed 兜底。
-  ses.on("will-download", (event) => {
-    event.preventDefault()
+  hardenPreviewSession(ses, { scheme: HTML_PREVIEW_SCHEME, packaged: electronRef.app.isPackaged, kind: record.kind === "pdf" ? "pdf" : "html", download: () => {
     recordBlocked(record, "download")
     writeLog("rail-preview", "blocked download", { previewId: record.previewId }, "warn")
-  })
-  ses.webRequest.onBeforeRequest((details, callback) => {
-    const allowed =
-      details.url.startsWith(`${HTML_PREVIEW_SCHEME}://`) ||
-      (!electronRef.app.isPackaged && details.url.startsWith("devtools://")) ||
-      // Chromium PDF viewer 自身以 chrome-extension:// 装载(mhjfbmdgcfjbbpaeojofohoefgiehjai),
-      // 它的界面又整个由 chrome://resources/ 下的 Lit / mojo / cr_elements 拼出来
-      // (#1227 实测被拦的五条:text_defaults_md.css、lit.rollup.js、load_time_data.js、
-      // mojo/public/js/bindings.js、cr_a11y_announcer.css)。两者都是编译进 Chromium 的静态
-      // 资源,不是文档能发起的外网面;拦掉任一条 = PDF 载体整个不工作(黑屏,且不报错)。
-      (record.kind === "pdf" &&
-        (details.url.startsWith("chrome-extension://") || details.url.startsWith("chrome://resources/")))
-    if (!allowed) {
-      recordBlocked(record, safeOrigin(details.url))
-      writeLog("rail-preview", "blocked request", { previewId: record.previewId, target: safeOrigin(details.url) }, "warn")
-    }
-    callback({ cancel: !allowed })
-  })
+  }, blocked: (url) => {
+    recordBlocked(record, safeOrigin(url))
+    writeLog("rail-preview", "blocked request", { previewId: record.previewId, target: safeOrigin(url) }, "warn")
+  } })
   ses.protocol.handle(HTML_PREVIEW_SCHEME, (request) => serveRequest(record, request))
 }
 
 function hardenViewContents(record: RailPreviewRecord) {
   const wc = record.view.webContents
-  wc.setWindowOpenHandler(() => ({ action: "deny" as const }))
-  wc.on("will-navigate", (event: ElectronEvent) => event.preventDefault())
-  wc.on("will-redirect", (event: ElectronEvent) => event.preventDefault())
-  wc.on("will-attach-webview", (event: ElectronEvent) => event.preventDefault())
+  hardenPreviewContents(wc, "rail-preview")
   // 拦 Cmd/Ctrl+P(打印)与 Cmd/Ctrl+S(保存)—— owner 裁决:viewer 的下载/打印通路全关。
   wc.on("before-input-event", (event: ElectronEvent, input: Input) => {
     if (!input.meta && !input.control) return

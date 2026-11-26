@@ -1,3 +1,4 @@
+import { documentPythonEnvironmentFor } from "@opencode/util/codepuppy-document"
 import type { VideoProgress } from "@opencode/schema/codepuppy-video-progress"
 export * as Mcp from "./index.js"
 
@@ -451,7 +452,7 @@ export const layer = (options?: Options) =>
           })
         const entry: ServerEntry = {
           config,
-          declared: declaredListedTools(name, config, tryCodePuppyBootstrap()?.paths.officeMcpManifest, readFileSync), // codepuppy(#1565)
+          declared: declaredListedTools(name, config, tryCodePuppyBootstrap()?.paths.officeMcpManifest, readFileSync, documentPythonEnvironmentFor(location)), // codepuppy(#1565)
           status: { status: "pending" },
           startup: Latch.makeUnsafe(),
           attempt: { started, settled: Latch.makeUnsafe() },

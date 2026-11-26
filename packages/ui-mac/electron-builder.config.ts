@@ -12,9 +12,11 @@ import {
   RIPGREP_BUILD_DIR,
   VIDEO_RUNTIME_BUILD_DIR,
   assertMacTargetArch,
+  checkOfficeRuntime,
   assertPackagedEngineAssets,
   resolveMacTargetArch,
 } from "./scripts/target-arch"
+import { DOCUMENT_ASSET_BUILD_DIR, readDocumentAssets } from "./src/main/document-resources"
 import { assertReleaseSource } from "./scripts/release-source"
 import { isReleaseBuild } from "./scripts/build-identity"
 
@@ -115,6 +117,10 @@ const getBase = (appId: string): Configuration => ({
   // afterPack 核对包里的落点(下方,scripts/target-arch.ts 的 checkPackagedEngineAssets)。
   asarUnpack: [`${ENGINE_ASSETS_DIR}/**`],
   extraResources: [
+    ...(process.platform === "darwin" || process.platform === "win32" ? [
+      { from: `${DOCUMENT_ASSET_BUILD_DIR}/`, to: "document-assets/" },
+      { from: `${DOCUMENT_ASSET_BUILD_DIR}/node_modules/`, to: "document-assets/node_modules/" },
+    ] : []),
     // (REQ-076 T1 清理)原有指向 native/ 的条目为上游 desktop 遗留死配置:alpha 无 native/ 目录
     // (mac_window.node/swift-build 未克隆),打包时恒为空 no-op,已删。
     {
@@ -147,6 +153,7 @@ const getBase = (appId: string): Configuration => ({
       from: "resources/office-mcp/",
       to: "office-mcp/",
     },
+    { from: "resources/document-runtime/", to: "document-runtime/" },
     {
       // REQ-023 T2:官方 agent md 资产(#361 起由 collectBuiltinAgentPayload 收集 → CAS →
       // 事务安装落 ~/.alpha/agents)。
@@ -200,14 +207,6 @@ const getBase = (appId: string): Configuration => ({
             to: "codepuppy-fence/",
             filter: ["codepuppy_fence.node"],
           },
-          // #1564:Word/Excel/PowerPoint/PDF 四个文档工具的随包运行时(prebuild 里 scripts/build-office-runtime.ts
-          // 按 resources/office-runtime/ 的两架构 lock 产出,只装目标架构那一份)。落点 <resources>/office-runtime/,
-          // main 模板的命令头就是 <resources>/office-runtime/bin/python3;beforePack 核对它每个 Mach-O 含目标片,
-          // 深签时与其它内嵌二进制同 Team 签名。
-          {
-            from: `${OFFICE_RUNTIME_BUILD_DIR}/${macTargetArch}/`,
-            to: "office-runtime/",
-          },
           // DESIGN-domestic-cloud-connectivity §4.8:搜索工具随包的 ripgrep(prebuild 里 scripts/build-ripgrep.ts 按引擎 binary.ts
           // 钉住的版本与 sha256 取目标架构那一份)。落点 <resources>/ripgrep/rg,server.ts 把这个目录追加到引擎 PATH 末尾;
           // 深签时与其它内嵌二进制同 Team 签名;afterPack 的 checkBundledRipgrep 核对它在、可执行、含目标片。
@@ -232,6 +231,7 @@ const getBase = (appId: string): Configuration => ({
     // seals their updated inventory before the parent app, including ad-hoc builds.
   },
   mac: {
+    extraResources: [{ from: `${OFFICE_RUNTIME_BUILD_DIR}/${macTargetArch ?? "arm64"}/`, to: "office-runtime/" }],
     artifactName: "codepuppy-${os}-${arch}.${ext}",
     category: "public.app-category.developer-tools",
     icon: `resources/icons/icon.icns`,
@@ -268,41 +268,36 @@ const getBase = (appId: string): Configuration => ({
   // #1564:随包 Office 运行时同样在、且每个 Mach-O 都含这一片。
   // 任一不过即抛,宁可不出包,也不出一个终端打不开的包。
   beforePack: async (context) => {
+    if (context.electronPlatformName === "win32") {
+      if (Arch[context.arch] !== "x64") throw new Error("Office Windows packages target win32-x64; Unsupported video runtime target")
+      const problems = checkOfficeRuntime(path.join(packageDir, OFFICE_RUNTIME_BUILD_DIR, "win32-x64"), "x64", "win32")
+      if (problems.length) throw new Error(problems.join("\n"))
+    }
     if (context.electronPlatformName === "darwin") {
       if (isReleaseBuild(channel, process.env)) assertReleaseSource(packageDir)
       assertMacTargetArch({ packingArch: Arch[context.arch], packageDir })
     }
-    if (context.electronPlatformName === "darwin" || context.electronPlatformName === "win32") {
-      const target = context.electronPlatformName === "darwin" ? "darwin-arm64" : "win32-x64"
-      if (Arch[context.arch] !== (target === "darwin-arm64" ? "arm64" : "x64"))
-        throw new Error("Unsupported video runtime target")
-      const { checkVideoRuntime } = await import("./scripts/video-runtime-artifacts")
-      await checkVideoRuntime(
-        path.join(packageDir, VIDEO_RUNTIME_BUILD_DIR, target === "darwin-arm64" ? "mac-arm64" : "win-x64"),
-        target,
-      )
-    }
+    if (context.electronPlatformName !== "darwin" && context.electronPlatformName !== "win32") return
+    readDocumentAssets(path.join(packageDir, DOCUMENT_ASSET_BUILD_DIR))
+    const target = context.electronPlatformName === "darwin" ? "darwin-arm64" : "win32-x64"
+    if (Arch[context.arch] !== (target === "darwin-arm64" ? "arm64" : "x64"))
+      throw new Error("Unsupported video runtime target")
+    const { checkVideoRuntime } = await import("./scripts/video-runtime-artifacts")
+    await checkVideoRuntime(
+      path.join(packageDir, VIDEO_RUNTIME_BUILD_DIR, target === "darwin-arm64" ? "mac-arm64" : "win-x64"),
+      target,
+    )
   },
-  // `#1669`:装包后、签名前核对引擎原生资源在包里的落点 —— 每个都解包、加载点的目标在解包目录里、可执行的带执行位、
-  // Mach-O 含目标片。不过即抛:宁可不出包,也不出一个终端打不开的包。
   afterPack: async (context) => {
-    if (context.electronPlatformName === "darwin")
-      assertPackagedEngineAssets({
-        resourcesDir: path.join(
-          context.appOutDir,
-          `${context.packager.appInfo.productFilename}.app`,
-          "Contents/Resources",
-        ),
-        packingArch: Arch[context.arch],
-      })
-    if (context.electronPlatformName === "darwin" || context.electronPlatformName === "win32") {
-      const mac = context.electronPlatformName === "darwin"
-      const resources = mac
-        ? path.join(context.appOutDir, `${context.packager.appInfo.productFilename}.app`, "Contents/Resources")
-        : path.join(context.appOutDir, "resources")
-      const { checkVideoRuntime } = await import("./scripts/video-runtime-artifacts")
-      await checkVideoRuntime(path.join(resources, "video-mcp"), mac ? "darwin-arm64" : "win32-x64")
-    }
+    if (context.electronPlatformName !== "darwin" && context.electronPlatformName !== "win32") return
+    const mac = context.electronPlatformName === "darwin"
+    const resourcesDir = mac
+      ? path.join(context.appOutDir, `${context.packager.appInfo.productFilename}.app`, "Contents", "Resources")
+      : path.join(context.appOutDir, "resources")
+    readDocumentAssets(path.join(resourcesDir, "document-assets"))
+    if (mac) assertPackagedEngineAssets({ resourcesDir, packingArch: Arch[context.arch] })
+    const { checkVideoRuntime } = await import("./scripts/video-runtime-artifacts")
+    await checkVideoRuntime(path.join(resourcesDir, "video-mcp"), mac ? "darwin-arm64" : "win32-x64")
   },
   afterSign: async (context) => {
     const mac = context.electronPlatformName === "darwin"
@@ -322,6 +317,7 @@ const getBase = (appId: string): Configuration => ({
     schemes: [...DEEP_LINK_SCHEMES],
   },
   win: {
+    extraResources: [{ from: `${OFFICE_RUNTIME_BUILD_DIR}/win32-x64/`, to: "office-runtime/" }],
     icon: `resources/icons/icon.ico`,
     signtoolOptions: {
       sign: signWindows,

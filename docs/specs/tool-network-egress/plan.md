@@ -317,3 +317,5 @@ r7 收尾：源代码仍为 `cc604a9bcb`，本轮只更新本节证据。三个�
 依据 r8 的 R1 处置，只修复六项接受项，不重开设计。新增回归均放原 integration 文件，依赖由静态 import 可追踪；不扩大 scenario 或 PR 选测层。每项缺陷先单独提交红测试，再提交产品修复，原红断言不改。
 
 R1-2：活动 revision 在档位查询中变化时重读至稳定，沿用拨号 signal 限定等待。必要同调用链文件 `network-egress-grants.ts` 仅把已有 signal 传入 main 的 pass 查询，未改 wire 合同。`83ba2c44b2` 的两条回归在旧实现为 0 pass / 2 fail（`/tmp/egress-r8-2-red.log`）；U `bun test --max-concurrency 2 src/main/network-egress-approval.test.ts` 修复后为 10 pass / 0 fail（`/tmp/egress-r8-2-green.log`）。
+
+R1-1：CONNECT 共用同一卡片路径和一次结束状态；路由重查丢失通放依据后重新询问，用户等待暂停拨号剩余预算，不重置预算。只有真实用户授权存在时才写 granted。`c8fa1937a1` 的回归为 0 pass / 2 fail（`/tmp/egress-r8-1-red.log`，缺卡片与 504 后第二条 403）；修复后 proxy 完整文件 28 pass / 0 fail（`/tmp/egress-r8-1-green.log`），登记数量同步为 28。

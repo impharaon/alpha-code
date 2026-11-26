@@ -1,17 +1,17 @@
 ---
 id: DESIGN-child-process-write-fence
 title: 子进程写入围栏技术设计
-summary: 保留 v4 冻结裁决；v5 经 R1 修正受保护的 Homebrew 安装身份、helper 单次叶授权与 main 自有执行计划后冻结，保留围栏外执行的已知残留。
+summary: 保留既有围栏与 Homebrew 裁决；v4.1 按规格 v6 让 Cargo 原生读取配置与凭据，只放行真实 Cargo Home 的缓存、锁和数据库，安装与配置编辑另循既有规则。
 kind: tech-design
 status: frozen
 spec: SPEC-child-process-write-fence
-spec_version: 5
+spec_version: 6
 review:
-  rounds: 1
-  reviewed_sha: "176ba25a68"
-  verdict: "fix-then-freeze; R1 2 Blocker 2 Minor accepted and corrected"
+  rounds: 0
+  reviewed_sha: ""
+  verdict: "frozen-per-r7; no independent review claimed for v4.1"
 owners: [owner]
-last_reviewed: 2026-11-26
+last_reviewed: 2026-11-27
 ---
 
 # DESIGN-child-process-write-fence｜用户亲手打开的项目当场可写 技术设计
@@ -447,16 +447,16 @@ function resolvePackageManagerLocations(input: PackageManagerLocationInput): Pac
 | pip | `PIP_CACHE_DIR=C/pip/cache` | 虚拟环境仍在项目；`--user` 写 Python 实际用户安装目录，缓存与其分开 |
 | uv | `UV_CACHE_DIR=C/uv/cache`；`UV_PYTHON_INSTALL_DIR=C/uv/python` | `uv tool` 的真实用户 tools/bin（下表）；连接器专用安装由 #1760 消费本端口派生的 C/uv，不另放一份 HOME 缓存 |
 | go | 保留 GOPATH 的开发工作区语义（默认 `~/go`）；显式 `GOMODCACHE=C/go/mod`、`GOCACHE=C/go/build`，下载工具链也在 module cache | 默认 GOBIN 为 `~/go/bin`；只放行 bin，不放行整个 GOPATH。显式 GOPATH/GOBIN 如已在项目/批准范围内照常使用，不因缓存修复把该根整体放开 |
-| cargo | `CARGO_HOME=C/cargo/home`（registry/git 索引、crate cache 和安装临时数据）；project `target` 不改 | `CARGO_INSTALL_ROOT=~/.cargo`，实际写入只含 `bin`、`.crates.toml`、`.crates2.json`；RUSTUP_HOME 不重定向、不把整棵 `~/.rustup` 加入写集合 |
+| cargo | **v4.1 / spec v6 取代旧决定**：R1/R2 不再注入 CARGO_HOME，Cargo 原生使用真实 `~/.cargo`；仅放行下文 v4.1 的缓存/锁精确表。project `target` 及配置中的路径不改 | `CARGO_INSTALL_ROOT=~/.cargo`，实际写入只含 `bin`、`.crates.toml`、`.crates2.json`；RUSTUP_HOME 不重定向、不把整棵 `~/.rustup` 加入写集合 |
 | Homebrew | **待 owner 定（B1）**；本次不确定其环境或执行方式 | **待 owner 定（B1）**；不产出 allow 清单，不影响其余行 |
 
-这些值是应用进程树的默认环境，不是命令黑名单；用户明确命令参数或项目配置仍按工具自身优先级解释，最终落盘受同一写集合约束。**已决定的新端口 R2**：shell、PTY、MCP、LSP 的 spawn 环境合成消费 R1 的相同 `env`，在该次 spawn 前只覆盖表内缓存键；不会清空用户 PATH、代理、registry 或凭据，不修改机器上的 rc/npmrc。**残留事实（R1-F6）**：PTY 在 spawn 后以 `-l` 运行用户 rc（`packages/core/src/pty.ts:169`），rc 后续 `export CARGO_HOME=...` 等仍能覆盖它；R2 不能在 exec 之前约束之后执行的 shell 代码，不宣称这种路径满足“缓存始终在 C”。不改 rc、不拦命令、不要求用户多做一步；真实入口证据分别报告默认路径与 rc 覆盖路径的结果。
+这些值是应用进程树的默认环境，不是命令黑名单；用户明确命令参数或项目配置仍按工具自身优先级解释，最终落盘受同一写集合约束。**已决定的新端口 R2**：shell、PTY、MCP、LSP 的 spawn 环境合成消费 R1 的相同 `env`，在该次 spawn 前只覆盖表内缓存键；不会清空用户 PATH、代理、registry 或凭据，不修改机器上的 rc/npmrc。**残留事实（R1-F6）**：PTY 在 spawn 后以 `-l` 运行用户 rc（`packages/core/src/pty.ts:169`），rc 后续 `export GOMODCACHE=...` 等仍能覆盖默认缓存键；Cargo 不再承诺迁入 C，见 v4.1；R2 不能在 exec 之前约束之后执行的 shell 代码，不宣称这种路径满足“缓存始终在 C”。不改 rc、不拦命令、不要求用户多做一步；真实入口证据分别报告默认路径与 rc 覆盖路径的结果。
 
 **pnpm 通道（R1-F7）**：现行官方配置文档使用 `pnpm_config_*`；本机 pnpm 10.32.1 的实际同名查询忽略该前缀，而读取 `npm_config_*`（P12）。因此三对固定同值键由 R1 同时产生，无版本探测、切换或配置选项。npm 对 pnpm 专用前缀没有该噪声，但 npm 11.20.0 在实际读取配置时会对另三键逐项输出 `Unknown env config`，三条警告明确接受并保留，不称作无噪声；不把“--version 没有警告”当成安装路径的证据。真实入口必须核对缓存落点与这些警告，不通过压 stderr 隐藏。
 
 缓存迁入 C 后撤掉真实 HOME 的 W7、W17、W18 放行（保留历史编号，不复用）；W8 历史文件不在本次改变内。旧缓存不拷贝、不删除、不热身下载。C 已在 W3 下；无须把整个应用状态根放开。
 
-Cargo 改 CARGO_HOME 会改变用户全局 config 的查找位置。决定由主进程为 C/cargo/home 的 `config`/`config.toml` 建立指向原用户配置的只读读取链接，文件内容不复制、不记录；原配置的写入由 §4.3 精确清单承担。此读取桥不是旧数据迁移，也不为 cache 建链接。原 Cargo credentials 不搬入 C、不复制值、不转成环境变量；同一读取桥也为原来已存在的 `credentials`/`credentials.toml` 建立指向原文件的读取链接，保留 Cargo 自己的文件选择与 credential-provider 解析，不能只链接 config 却使私有 registry 的原凭据失联。该桥不新增原凭据文件写 allow；CF/C1 真实目标保护照旧。官方 [Cargo 配置/凭据位置](https://doc.rust-lang.org/cargo/reference/config.html) 明确两类文件均随 CARGO_HOME 查找；本机无 Cargo，实际 config 合并、相对路径与 credential-provider 行为为 U2 的实施阶段证明义务，不能把普通文件链接可读等同于 Cargo 已通过。
+**v4.1 撤销 Cargo 读取桥决定。** 真实 Cargo 证明配置软链改变相对路径基准；include/按项目生成副本也不能覆盖已运行 shell 的跨目录行为。依据 SPEC v6 BR-07/AC-09 与 U-40，不重定向 CARGO_HOME，不为 config/config.toml 或 credentials/credentials.toml 建桥、复制、include 或翻译；让 Cargo 在原位置自行选择、合并并读取。配置写入仍归 §4.3，凭据不因缓存例外增加写 allow，CF/C1 与真实目标保护照旧。取代范围、精确缓存表及 U2 证据见文末 **v4.1 增量**。
 
 ### 4.2 全局安装固定表
 
@@ -471,7 +471,7 @@ Cargo 改 CARGO_HOME 会改变用户全局 config 的查找位置。决定由主
 | pip --user | `~/Library/Python`（macOS framework）；`~/.local/lib/python*` 的 Python 用户安装树及 `~/.local/bin`（POSIX non-framework）；不得放开整个 `~/.local/lib` | `%APPDATA%/Python/Python<version>/site-packages` 与 `Scripts` |
 | uv tool | `~/.local/share/uv/tools`、`~/.local/bin`；受管 Python 在 C/uv/python | `%APPDATA%/uv/tools`、用户 executable 目录；由 R1 用官方平台路径规则落成，不按盘符猜 |
 | go | `~/go/bin`；用户指定且本来已可写的 GOBIN 不额外扩权 | `%USERPROFILE%/go/bin` |
-| cargo | `~/.cargo/bin`；`~/.cargo/.crates.toml`、`~/.cargo/.crates2.json` 及 cargo 实际使用的同名原子写入伴随文件 | `%USERPROFILE%/.cargo` 下同样的 bin/安装元数据；缓存 C/cargo/home |
+| cargo | `~/.cargo/bin`；`~/.cargo/.crates.toml`、`~/.cargo/.crates2.json` 及 cargo 实际使用的同名原子写入伴随文件 | `%USERPROFILE%/.cargo` 下同样的 bin/安装元数据；缓存按 v4.1 使用真实 Cargo Home |
 | Homebrew | **待 owner 定（B1）**；全局位置及执行方式均不由本次决定 | Homebrew 无 Windows 原生对应；不引入另一种系统包管理器 |
 
 固定表以模板覆盖版本管理器的同类全局位置，供 npm 与 Yarn Classic 共用：`H` 为可信 HOME，`V=[^/]+` 为一个版本目录分段（不设版本/条数上限）；模板中的根先由 R7 按具体目录绑定，之后才渲染锚定根的 regex，不能把未经验证的 realpath 接进模板。
@@ -667,7 +667,7 @@ CF/C1 优先于任何 allow，包括配置文件软链、安装脚本改名祖�
 
 K1：不另建权限档名单。K2：缓存、全局清单、用户配置位置都由同一 profile 所有者提供；授权复用 tracker、X1、CF/C1，R7 是固定位置身份的单一真源，R8 的根快照也由该宿主协调，不能在 ext 复制判断。R4 的 preload sender、具体点击调用点与旧记录点采用同一个信任面；目录扩大不能由工具 RPC、sidecar 回信或普通 HTTP 触发。未引入新的结构例外。
 
-证据必须经过 `spawnLocalServer → planProcessFence → sidecar.start/applyProcessFence → 实际命令/PTY/MCP`，含最终环境；只测纯 resolver、只用讨论里的 HOME mimic 或只见退出 0，不能声称 AC-09..12 成立。以真实包管理器生成的项目/安装输入留来源，围栏外核对项目依赖、全局命令可调用、用户配置真实内容和原 HOME 缓存无变更。撤掉缓存 env 的 bun/go/cargo 对照必须失败；撤掉 global/config 清单的对应操作必须失败；Git 撤锁路径须失败。外部批准须在原请求上写成功、已有子进程和之后的子进程均可写、PID 不变；移除 R4 时同一写入失败且无落盘；拒绝、自回复、伪造/重放、深链接与 sidecar 消息不产生目录授权。加入新 allow 之后，CF/C1 与两处 shell 缓存负例仍须保持拒绝；重启前把固定安装目录/用户文件/C 子项换成软链后，planner 不得放行 HOME 或新目标；真实卡片显示 real path，显示后换目录再批准必须 conflict，原合法软链批准仍成功。pnpm 项目钉版必须实际走 `.tools`，npm/Yarn Classic 的版本管理器全局前缀与 pnpm 环境键噪声也纳入真实入口。启动探针的缓存命中刷新和无缓存路径都须证明 rc 越界写失败、PATH 仍能发现工具、恶意 XDG 输出不能移动 CF-8/CF-11；反向撤围栏/根固定分别必须暴露越界写/根漂移。上述是设计成立的可证伪标准，具体用例、命令编排和文件归 plan.md。
+证据必须经过 `spawnLocalServer → planProcessFence → sidecar.start/applyProcessFence → 实际命令/PTY/MCP`，含最终环境；只测纯 resolver、只用讨论里的 HOME mimic 或只见退出 0，不能声称 AC-09..12 成立。以真实包管理器生成的项目/安装输入留来源，围栏外核对项目依赖、全局命令可调用、用户配置真实内容和原 HOME 缓存无变更（Cargo 按 v4.1 / spec v6 例外）。撤掉缓存 env 的 bun/go 对照必须失败；Cargo 按 v4.1 撤掉真实缓存/锁规则作对照；撤掉 global/config 清单的对应操作必须失败；Git 撤锁路径须失败。外部批准须在原请求上写成功、已有子进程和之后的子进程均可写、PID 不变；移除 R4 时同一写入失败且无落盘；拒绝、自回复、伪造/重放、深链接与 sidecar 消息不产生目录授权。加入新 allow 之后，CF/C1 与两处 shell 缓存负例仍须保持拒绝；重启前把固定安装目录/用户文件/C 子项换成软链后，planner 不得放行 HOME 或新目标；真实卡片显示 real path，显示后换目录再批准必须 conflict，原合法软链批准仍成功。pnpm 项目钉版必须实际走 `.tools`，npm/Yarn Classic 的版本管理器全局前缀与 pnpm 环境键噪声也纳入真实入口。启动探针的缓存命中刷新和无缓存路径都须证明 rc 越界写失败、PATH 仍能发现工具、恶意 XDG 输出不能移动 CF-8/CF-11；反向撤围栏/根固定分别必须暴露越界写/根漂移。上述是设计成立的可证伪标准，具体用例、命令编排和文件归 plan.md。
 
 Windows 不运行 Seatbelt，也不宣称 CF/C1 有 OS 围栏保证；沿规格原有平台边界。相同命令与文件操作仍消费权限档：“全部批准”直接执行，“请求审批”先问，拒绝后无该次写入；真实目录来源必须使用 Windows 路径权威和大小写规则。Windows 实机、带签名生产进程树（包括 R8 探针）、本次各管理器全量安装均未执行，留给真实入口证明；不以 macOS 的临时目录探针代替。
 
@@ -685,7 +685,7 @@ Windows 不运行 Seatbelt，也不宣称 CF/C1 有 OS 围栏保证；沿规格�
 
 | 裁决 | 适用范围与依据 |
 | --- | --- |
-| 缓存统一进 C，真实全局位置分开，清单只有一个 owner | v4 AC-09/11，P01/P02/P07；R1/R2；不拷贝旧缓存 |
+| 其它七种缓存进 C；Cargo 由文末 v4.1 / spec v6 取代；真实全局位置分开，清单只有一个 owner | v4 AC-09/11 与 v6 Cargo 例外；P01/P02/P07、R1/R2；不拷贝缓存 |
 | 本人目录批准先 grant 后 permission reply，复用既有 X1/registry | v4 BR-05/08、AC-10，P03..P06；新增来源取代旧 S4 穷举，未放宽“模型不能登记” |
 | 用户配置按文件/必要伴随名放行，CF/C1 最后拒绝 | AC-12，P08；既有保护规格仍是权威 |
 | Windows 复用环境/权限，无 OS 围栏承诺 | spec v4 Windows 段与 AC-04；未实机验证 |
@@ -693,7 +693,7 @@ Windows 不运行 Seatbelt，也不宣称 CF/C1 有 OS 围栏保证；沿规格�
 
 **B1 提请 owner 的问题（本次续接 brief 要求原样带回）：** Homebrew 在现有写入围栏里会再次启动自己的沙箱，已实测这种嵌套会失败。您选择哪一种：A，在「全部批准」档由应用替助手在围栏外运行 `brew`，保留对话中的安装能力，但 formula 安装脚本也会在围栏外运行，现有写入范围及凭据、联网围栏不能约束这些脚本；还是 B，对话里不提供 `brew install`，保留这部分围栏边界，但用户必须在应用外安装 Homebrew 软件，这会减少已批准的对话能力，需要您明确同意？本次不选择或设计 A/B；等待只影响 Homebrew，其余 v4 决定按 R1 处置冻结。
 
-**U1–U3 的闭合与实施证明义务：** U1 的变量读取已由 P07/P10 的本机真实 CLI 查询闭合，Bun runtime cache 已实际生成；Yarn 两种语义明确区分。Go/Cargo 未在本机找到可执行文件，需要整套工具链下载，超出本次少量小包预算，因此按续接 brief 归实施阶段：用实际工具验证 GOMODCACHE/GOCACHE/CARGO_HOME 及 install root、缓存无 HOME 改动；MCP 环境覆盖和 lifecycle scripts 的 spawn env 经 R2 真实入口证明，不以 CLI 查询替代；PTY 的 rc 在 spawn 后重新 export 的路径保留 R1-F6 残留说明，不把它写成已覆盖。U2 的“配置和凭据都随 CARGO_HOME 读取”由官方定义闭合，同一原文件读取桥的义务已明确；真实 Cargo config 合并/相对路径、重定向 CARGO_HOME 导致项目/全局同一 config 被双读的情形（U2）、credential provider、rustup shim 与私有 registry 用隔离样本在实施时证明，禁止使用/输出真实秘密。U3 的名字变化已由固定根层模式与 P11 正反臂解决，不留动态名单或 PNPM_HOME 整树放行的设计分叉；跨版本/Windows 仍属真实入口证据。Windows、生产签名进程树及全量安装尚未执行；另含 `packages/util/src/npm-config.ts:33` 失败返回空配置后回落 `~/.npm` 的负例；这些是验证既定决定的义务，不是等待 Homebrew 的设计分叉，也不增加用户步骤或限制。Homebrew P09 的内核失败已实测，完整 brew 安装链仍是读码推断；本轮不重跑。
+**U1–U3 的闭合与实施证明义务：** U1 的变量读取已由 P07/P10 的本机真实 CLI 查询闭合，Bun runtime cache 已实际生成；Yarn 两种语义明确区分。当时未找到 Go/Cargo；Go 的 GOMODCACHE/GOCACHE 与 install root、原 HOME 缓存无改动仍归实施证明。Cargo 后续真实验证及存储规则由文末 v4.1 / spec v6 取代；MCP 环境覆盖和 lifecycle scripts 的 spawn env 经 R2 真实入口证明，不以 CLI 查询替代；PTY 的 rc 在 spawn 后重新 export 的路径保留 R1-F6 残留说明，不把它写成已覆盖。U2 的原文件读取桥已由 v4.1 撤销；后续使用 Cargo 原生 Home 的真实入口证明配置/凭据选择、相对路径、镜像/认证、credential provider 与 rustup shim，不复制或输出真实秘密；已完成的小探针与仍未验证部分分列 v4.1。U3 的名字变化已由固定根层模式与 P11 正反臂解决，不留动态名单或 PNPM_HOME 整树放行的设计分叉；跨版本/Windows 仍属真实入口证据。Windows、生产签名进程树及全量安装尚未执行；另含 `packages/util/src/npm-config.ts:33` 失败返回空配置后回落 `~/.npm` 的负例；这些是验证既定决定的义务，不是等待 Homebrew 的设计分叉，也不增加用户步骤或限制。Homebrew P09 的内核失败已实测，完整 brew 安装链仍是读码推断；本轮不重跑。
 
 | 轮/版本与范围 | 检查方 | 结论与证据 | 遗留去向 |
 | --- | --- | --- | --- |
@@ -944,3 +944,93 @@ R1 的反向材料必须进入同一真实入口证明：改写/删除 launcher�
 **留档：** “只让安装类子命令围栏外运行”尚无 owner 批准，本次不实施、不形成限制/新 gate，也不将它记成 owner 决定。它不阻止按现有 SPEC v5 与本轮技术修正冻结；后续如 owner 改规格，再只重开受影响部分。
 
 **交接收据：** 输入 SPEC v5 `834e269da9`、v4 `efc8ba3abd`、v5 送审版 `176ba25a68` 与本轮 R1/编排者处置。Codex（GPT-6，designer）核对上述符号与全部受影响 H1–H4 接缝，v1–v4 正文未改；V5-P09 的 canonical marker 正反探针通过（非 canonical 规则的失败观察也留档）；旧名称扫描 10 pass/0 fail，`git diff --check` 通过；文档契约相对输入 HEAD 仍为 72 error/249 warning、无新增 finding。生产实现/签名/真实安装和负向证明尚未执行，留 §6。结论为 v5 已修并 frozen，无本次交付需要等待的 owner 决定。未 merge/rebase、实现、push、PR 或变动 v4 裁决。
+
+
+# v4.1 增量｜Cargo 使用真实 Home 的缓存与锁（SPEC v6）
+
+**状态：frozen，按 r7 明确冻结。** 只取代 v4 的 Cargo CARGO_HOME/读取桥/缓存落点及其证明义务；bun、pnpm、yarn、npm、pip、uv、go 的缓存规则和 v5 Homebrew 决定不变。当前 frontmatter 声明本增量，未声称独立审查已运行；v5 原审查收据仍为 rounds=1、reviewed_sha=`176ba25a68`、verdict=`fix-then-freeze; R1 2 Blocker 2 Minor accepted and corrected`，v5 段落中“frontmatter 只属 v5”是当时记录。
+
+## 1. 基线
+
+- 批准输入：[SPEC-child-process-write-fence v6](https://github.com/impharaon/alpha%2Dcode/blob/7966eb280a7ed3c5341dbc98a1c5c690e6c20c5a/docs/specs/child-process-write-fence/spec.md)，提交 `7966eb280a`，覆盖 BR-07 / AC-09 的 Cargo 例外及 U2。已执行 `git fetch -q origin`、`git show origin/alpha:docs/specs/child-process-write-fence/spec.md` 并核对固定提交；未 merge，也未修改本分支 spec.md。
+- owner 2026-11-27，INT-safety U-40 原话：「Cargo 选 1，第二处引擎改动允许，Supabase 报告批准」。本增量只消费“Cargo 选 1”：命令可写平常 `~/.cargo` 的缓存与锁，配置/镜像/凭据保持原含义；其余两项不进入本设计范围。cache 例外不改 BR-09/10 的全局安装与配置编辑审批。
+
+## 2. 地面真相与停止边界
+
+只验证真实 Cargo 写入所需的 Home 子项、原生配置含义和缓存/安装边界；明确固定集合并取得正反臂即停止。以下都不是应用真实入口通过的声明。
+
+| 证据 | 已观察事实与决定影响 |
+| --- | --- |
+| C41-P01（实施方，已接受） | slice 2 `4897732d21..e013855a79` 的相对路径记录中，原 config 构建 0，生产软链桥构建 101；配置 SHA-256 未变。结果在该工作树 `packages/ui-mac/node_modules/.cache/package-manager-scenario-vf8vnnjs/cargo-relative/result.json`。桥改变的是定义位置，故撤销该桥，而非替用户修配置字节 |
+| C41-P02（本会话 r5/r6） | Cargo 1.100.0 的 include 修复固定目录相对路径，却重复合并 HOME 内项目的数组；按项目分流并翻译路径的六个固定 cwd 样本成功、原 `.cargo` 未改，但同一 shell `cd` 跨 HOME 边界分别导致缺配置/重复合并。root 为 `fence1759-cargo41-6o12wedw` 与 `fence1759-cargo-r6-1umrorvv`；故不采用副本、include 或逐项目切换 Cargo Home |
+| C41-P03（本轮测） | `cargo 1.100.0 (3acc79c0c 2026-11-05)`，不设 CARGO_HOME，临时 HOME 中经真实 Seatbelt 构建公开 `itoa=1.0.17` 和本地 Git crate；成功写 registry index/cache/src、git db/checkouts、`.package-cache`、`.package-cache-mutate`、`.global-cache`，镜像认证成功。分别撤掉 registry、git 或全部缓存规则，均 101 |
+| C41-P04（本轮测） | 只允许 `.global-cache` 而漏掉 `.global-cache-journal`：Cargo 退出 0，但警告 `failed to auto-clean cache data`，数据库为 0 bytes / 0 tables；加入 journal 后无该警告，数据库 57,344 bytes，包含 registry/git 跟踪表。不需要放行 `-wal/-shm` 就完成本轮实际工作负载；不能把 exit 0 当作缓存完整成功 |
+| C41-P05（本轮测） | HOME 内项目、同一 shell 双向 cd 均成功、relative env 读取正确，rustflags 标志只出现一次；config.toml/credentials.toml 哈希未变。cache-only 规则拒写 config、credentials、env、任意 Home 文件；bin 已存在时写入仍 EPERM。仅 cache 时 `cargo install --path` 为 101，加既有 bin/`.crates*` 安装规则后为 0，安装命令可调用 |
+
+C41-P03–P05 命令为 `/usr/bin/sandbox-exec -f <profile.sb> <真实 cargo> run -vv` / `install --offline --debug --path <Cargo 生成的项目>`；原始 profiles、逐命令结果与摘要位于本机临时根 `fence1759-cargo-r7-5zvn2wj1/{result.json,summary.json}`，探针源码在 `/tmp/fence1759-cargo-r7-probe.py`。输入来自 r6 留存的真实公开 sparse-index 元数据与 SHA-256 校验通过的 itoa 归档；Git crate/manifest/凭据样本分别由真实 `cargo new/add`、`git init/commit`、`cargo login` 生成。认证只用本地隔离 registry/临时随机探针凭据，值未输出或复制进配置；未读真实账号/Keychain，未启动窗口或应用。
+
+## 4. 接口契约
+
+### 4.1 原生环境与精确写集合
+
+`H = <真实 HOME>/.cargo`（Windows 为 `<USERPROFILE>/.cargo`）；这是目录路径，不是整根写 allow。**R1 的 env 不再产出 CARGO_HOME，R2 的 cacheEnv 不再覆盖它**，也不设置/更换 HOME；默认根及 config/config.toml、credentials/credentials.toml 的选择和路径解释交给 Cargo 本身。已明确传给命令的 CARGO_HOME 仍按 Cargo 语义使用，不由本增量重写或自动放行其它根。`CARGO_INSTALL_ROOT=H` 的既有默认与 BR-09 安装规则不变。项目 target 及用户配置的 target-dir/build-dir、registry/provider/镜像值不重写。
+
+R1 的既有 `PackageManagerLocations` 返回形状不变，下表项都为 `manager: "cargo", purpose: "cache"`；由 `process-fence-profile` 的同一固定集合权威产生，R7/main 规划后送既有 renderer：
+
+| rule | H 下精确位置 | 含义 |
+| --- | --- | --- |
+| subpath | `registry` | index、archive cache、解包 src 和该缓存树内部元数据 |
+| subpath | `git` | db、checkouts 和该缓存树内部元数据 |
+| literal | `.package-cache` | Cargo 原生共享缓存锁 |
+| literal | `.package-cache-mutate` | Cargo 原生缓存变更锁 |
+| literal | `.global-cache` | 原生访问/清理跟踪数据库 |
+| literal | `.global-cache-journal` | C41-P04 实证所需的 SQLite rollback journal |
+
+不使用 `H` 整根 subpath、`H/*`、`.global-cache*` 等兜底模式；本次不增加 `-wal/-shm` 或未观察到的任意根层文件。锁/数据库由 Cargo 初始化/更新，main 不打开、截断或重写内容。main 只预建必需目录，缺失的 literal 文件按既有 nearest-existing-ancestor 路径规划，不预写 SQLite 文件。
+
+**缓存边界与其它既有授权：** config/config.toml 仍按 BR-10 / R3 的精确用户配置规则与 R6 判定编辑；credentials/credentials.toml 不新增写授权，不复制、不建立任何读取桥或环境 token；CF/C1 对受保护真实目标仍优先。`bin`、`.crates.toml`、`.crates2.json` 及既有安装元数据伴随文件只归 BR-09 / global-install 表，不归 cache。既有权限档行为继续：全部批准直接执行，请求审批仍在原命令批准后执行，只读档不能运行命令；不因这个例外新增卡片或档位名单。`env`、rustup 文件、其它 H 子项与 HOME 其它位置没有新增 cache allow。
+
+### 4.2 main 规划与身份
+
+**明确修订的接缝：** `planPackageManagerCaches` 不再假定 `purpose: cache` 全部位于应用数据根内，也不再把所有候选当目录。按既有 manager/rule 域区分：其它七种工具继续执行 C 下的 anchor 检查；Cargo 表项走 H 下的固定目录/文件候选，subpath 对应 directory、literal 对应 file，复用同一个 `planWritableLocations` / R7 身份真源与排除规则，不建立第二个表或新配置开关。R1/R2 的返回 env/cacheEnv 均移除重定向 CARGO_HOME，保留其它键原值。`prepareCargoConfigurationBridge` 及其调用撤销；没有替代加载器、生成配置或 cwd 切换协议。
+
+Cargo 的 cache 候选不能经 symlink 变成 H 本身/祖先、bin、`.crates.toml`/`.crates2.json` 及既有安装元数据伴随文件、config/credentials 或 CF/C1 等受保护目标的可写授权。由 main 将真实 H 及这些保留位置的词法/真实路径作为 **cache 投影的排除条件**，目录不得覆盖它们、literal 不得命中它们；合法的外置 registry/git 缓存链接仍走 R7 的初次真实目标绑定和之后不跟随重指的规则。该排除只约束 cache 规则生成，不撤销 BR-03/08、BR-09 或 R3 已有授权。不把缺失/被重指的固定项扩大为 H 或 HOME allow；失败继续走现有 planner/fence 错误路径，不新增用户步骤。
+
+## 5. 数据与失败
+
+不搬配置、凭据或缓存，不复制 secret，不生成配置副本，不新增持久化模型。原生锁保留 Cargo 与应用外 Cargo 并用时的原语义；应用不替换锁、加配额/独立等待策略或“清理”共享缓存。Cargo 的实际报错/警告照原命令返回，不以退出 0 或隐藏 stderr 掩盖数据库写失败。配置中的其它写目标仍由既有项目/批准目录与围栏判定，不因保留路径语义而自动扩大。
+
+## 6. 架构与 seam map
+
+K1 的权限档权威、K2 的单一位置/身份权威均不变；沿 `modules.md` 的 main profile/planner、Core/Plugin/ext spawn 环境接缝消费，不新增模块目录、框架或依赖。下面 slice 2 符号坐标取 `e013855a79` 实施面；本设计 worktree 只修改设计，不合入实现。
+
+| 能力 | 已有 callable / 决定的修订 | 所有者 |
+| --- | --- | --- |
+| 固定 env/写位置 | `resolvePackageManagerLocations`（`process-fence-profile.ts:227`）；修改 Cargo 返回项，不改 `PackageManagerLocations` 形状 | R1/profile |
+| 两类 cache 规划 | `planPackageManagerCaches`（`process-fence-plan.ts:45-64`）；按 manager 分 anchor、按 rule 分目录/文件、剔除 bridge 调用是明确 raise | main planner |
+| 真实目标与缺失文件 | `planWritableLocations`（`:88`）、`plannedWritableTarget`（`:135`）；加入 Cargo 保留位置的 cache 排除，复用既有真源 | R7/main |
+| 围栏/运行环境消费 | `renderProcessFenceProfile`（`process-fence-profile.ts:328`）与已冻结 R2 的 shell/PTY/MCP/LSP 环境端口；原 grant/gate/CF/C1 不变 | main 与既有消费方 |
+| 桥撤销 | `prepareCargoConfigurationBridge`（`process-fence-plan.ts:66`）及 `:62` 调用不再存在；无需新端口 | main |
+
+实施证明仍须经过 `spawnLocalServer → planProcessFence → sidecar.start/applyProcessFence → 真实命令/PTY`，检查最终环境不再重定向 Cargo。HOME 内外、同一 shell cd、配置更新、相对 paths/env/target/source、镜像认证及原生凭据读取须保持含义；原配置/凭据内容不变，只有缓存/锁和已批准安装位置按用途改变。Windows、真实 rustup shim、外部 credential provider/OS Keychain、产品签名进程树本轮未验证，须在既有 CF/C1 保护下留真实入口证据，不能把临时 cargo:token 样本视作它们全部通过。
+
+反向证明不能只跑无依赖项目：真实 registry/Git 依赖撤相应规则须失败；撤 journal 即使 exit 0，也须暴露清理警告/空数据库。仅 cache 的进程写 config/credentials/bin/其它 HOME 位置仍失败，R3/global-install 的独立授权再按原权限档验证；去掉安装规则后同一安装失败。改写 cache 项为指向 H、bin/安装元数据、配置、凭据或 CF/C1 的链接不得产出额外 cache 规则；其它七种工具的缓存环境、CF/C1 和既有目录批准行为保持原样。这里定义可证伪标准，具体文件/步骤归实施方 plan.md。
+
+## 8. 拆分决定
+
+无新增跨仓/所有权拆分。#1760 的 uv/npm 缓存继续消费同一 R1。传播核对 `rg -l 'CARGO_HOME|Cargo.*读取桥' docs/specs --glob design.md` 只有本设计命中；已修 §4.1 Cargo 行/读取桥、§4.2 Windows 缓存说明及 §6/§10 的 Cargo 证明义务，其余历史调查/审查记录保留，不是仍生效的读取桥决定。
+
+## 9. 回滚
+
+不适用；没有迁移或旧版本行为路径。
+
+## 10. owner 决定与裁决（v4.1）
+
+| 裁决 | 依据与适用范围 |
+| --- | --- |
+| 采纳选项 1，Cargo 原生 Home 缓存/锁可写；不再等待产品选择 | U-40 逐字原话与 SPEC v6 `7966eb280a`；只改变 Cargo，其他七种缓存仍隔离 |
+| 撤销 config/credentials 读取桥、include 与翻译副本路线 | C41-P01/P02 已证语义漂移/跨 cwd 缺口；原生 Home 的 C41-P03/P05 正臂保留路径/认证/单次合并 |
+| 精确 cache 表含 journal，不含整个 H、bin、配置或凭据 | C41-P03–P05 的实际落盘与消融；安装/配置编辑仍由 BR-09/10 决定 |
+| v4.1 frozen；既有 v4/v5 审查结论只在其原范围继续有效 | 本次 r7 的明确冻结指令；本增量 rounds=0、未运行独立审查，不将 owner 规格批准或本地探针冒充独立审查通过 |
+
+**交接收据：** 依据 SPEC v6 与 r7/owner U-40，Codex（GPT-6，designer）完成 C41-P03–P05 的真实 Cargo 1.100 临时 Seatbelt 正反探针；保留 P01/P02 的失败证据。旧名称扫描 10 pass/0 fail，`git diff --check` 通过；文档契约检查与输入 HEAD 同为 70 error/252 warning，无新增 finding，未修无关基线问题。本增量已冻结，无 owner 待决；产品真实入口、Windows、shim/外部 provider 及生产签名证明留 §6。只提交 design.md，不 merge、实现或发布；文档索引按本次“仅 design.md”范围不修改。

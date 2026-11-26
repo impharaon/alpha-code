@@ -181,3 +181,87 @@ last_reviewed: 2026-11-26
 
 - main 接收端最后核对：固定清单 authority 在 fork 前、既有 scratch cwd 建立后完成初始化；未知 ID 不在接收过程中读清单/派生目标。`codepuppy-sidecar-wiring.test.ts` 增加真实 spawnLocalServer 的 first-launch 数据根和未知 ID 终结回复（子进程为既有记录器、无 Electron 进程）；全文件 4 PASS，其他命名空间仍交原 hub。该既有测试是同调用链必要补充。
 - r2 准确剩余：生产 bootstrap 的 launchers 字段/校验及 core Host 注册、包运行器准备/持久入口、runtimeDep/egress/诊断与单一呈现、文档 runtime 主装配及 retry 动作、第一方命令槽/严格声明身份/重锚/受管调用均待继续；未把纯资产与消息桥回归写成 AC 完成。接入 #1759 的已审 R1/R2 提交后继续，不需要重开已冻结设计。当前 Issue 的 Design/Plan 版本引用仍待编排器同步，本执行者未改 Issue。
+
+## 五：可信命令槽与精确声明身份（r3）
+
+- 依据：DESIGN v2 §4.3/V2-R4、v2.1 §4/V21-R1、v2.2 §4/V22-R2；SPEC v1 AC-01/04/05/10 的身份子链；r3 授权先做不依赖 R1/R2 的部分。
+- 核对：r3 同轮计划并实施；Codex / GPT-6 作者核对。测试传宿主生成的真实形状描述；原生资源命令无须编造运行器位置，含 Node/cache 槽的声明缺可信描述即不获声明。生产 bootstrap/资产 ready 等待仍依赖后续装配。
+
+### 改动
+| 文件 | 改什么 |
+| --- | --- |
+| `packages/core/src/mcp/codepuppy-first-party-mcp.ts`、`packages/core/test/codepuppy-mcp-runtime.test.ts` | 同一展开器、精确 matcher、v2 单一清单解析/代码摘要、显式 environment/cwd、声明/配方摘要；既有文件的非引擎用例验证，真实引擎/计时用例不跑 |
+| `packages/util/src/codepuppy-hash.ts`（新）、`packages/ext/src/policy/store.ts` | 原样移动 canonicalJson/canonicalJsonDigest 的纯实现到 util 自有命名域，store 原导出消费/转出；避免修改未收编的上游 util/hash.ts，不新增第二实现 |
+| `packages/util/src/codepuppy-connector-launch.ts` | 冻结声明/配方/状态数据与可信描述读取的纯校验，供 main/core/ext 共享 |
+| `packages/ext/src/policy/identity.ts`、`packages/ext/src/plugin.ts`、`packages/core/src/mcp/index.ts` | 消费新声明 `.tools` 与绑定摘要；保留 Office 的已核宿主 Python 投影，额外环境/cwd 仍严格拒绝首方身份 |
+| `packages/ui-mac/scripts/gen-office-mcp-tools.ts`、`resources/office-mcp/tools.json` 及既有 snapshot/wiring 测试 | Office 改为同一 v2 codeSha256/environment/cwd 形状，不保留旧 schema 分支；视频继续由原 producer 贡献条目 |
+| `packages/ui-mac/src/main/codepuppy-video.ts` 及既有测试 | 消费同一展开器；不从 PATH、workspace 或 entry.environment 读取可信 Node/cache 根 |
+
+### 顺序
+1. 提交本段与后续独立工作计划；起始 `2026-11-26T15:24:31Z`，本轮预计约 90 分钟。
+2. 先跑既有声明的命名纯用例；实现展开/核验并补资源/归档 Node、假路径、额外环境/cwd、原文模板摘要的回归，再更新各消费者及实际生成清单。
+3. 完成后只跑受影响文件的非引擎、非计时用例；必要生成产物按原 producer 命令准备，不启动 Electron/GUI。
+
+### 风险
+不得把未 ready 当身份不匹配；codeSha256 只查资源内受保护代码，不对 userData Node 另抄摘要。Office 后续宿主 Python 投影必须逐键等于已核投影，不能借“清掉环境”认可额外用户配置。摘要移动是同一实现的归属变更，旧 policy 摘要必须不变。
+
+### 证明
+| AC | 测试/证据 | 层与运行时机 | 缺少行为为什么会失败 |
+| --- | --- | --- | --- |
+| AC-01/04/05/10 身份子链 | 原 module 纯声明用例：两种合法 Node 路径、稳定 cache 根、缺目录仍声明、假 Node/cache/环境/cwd 拒绝 | fast/integration 中最低可用层；受影响 PR/nightly；只选不启动引擎的命名用例 | 任意绝对 Node、workspace 首项通配或环境注入会错误获首方声明 |
+| 数据契约 | 原 policy store/identity 用例及实际 gen-office 清单核对 | integration 受影响 PR/nightly；外部格式从真实随包文件取 | 摘要改变/漏代码字段/producer 与 parser 不同形会失败 |
+
+### 偏离记录
+暂无。
+
+## 四：单一呈现、诊断交接与文档重试（r3）
+
+- 依据：DESIGN v1 §4.5/4.6/4.7/R4..R9，规格体验约定 AC-06/07/08，r3 明确授权文档动作接 runtime.retry()。
+- 核对：r3 同轮计划并实施；Codex / GPT-6 作者核对。复用现有行、问题动作与 startChat，不新增视觉稿。
+
+### 改动
+| 文件 | 改什么 |
+| --- | --- |
+| `packages/util/src/codepuppy-connector-launch.ts`、core 既有 startup 模块 | 共享状态/诊断/动作数据、由原始事实做失败归因；不从粗 network 猜 404 可重试 |
+| `packages/ui-mac/src/renderer/extensions/connector-launch-presentation.ts`（新）及既有行/watcher/action 文件 | 一个原因/详情/动作投影，行与问题入口共同消费； preparing 不进入问题，崩溃构造含命令/退出/stderr 的 startChat 输入 |
+| `packages/ui-mac/src/main/document-host.ts`、`document-host-bridge.ts`、util document 契约、ext document bridge、既有测试 | 通过既有身份/代通道把 retry 动作接到当前 runtime.retry()，保留缓存和原验证任务路径 |
+| `packages/ui-mac/src/preload` 与既有 IPC/renderer 装配点（按现有接口落置） | 注册本片动作的窄调用，不接受任意命令/URL；生产 runtime 根装配后直接绑定已实现动作 |
+
+### 顺序
+1. 从现有行/watcher/文档工具卡入口取现成状态与动作端口，先实现同一投影及失败事实/诊断首条内容。
+2. 接文档重试的现有桥/动作，并用实际 createDocumentRuntime 的失败→点击动作→重新准备证明，不用独立计数器替代 runtime。
+3. 按变更文件运行命名用例、文件末次相关集；一次移除臂、包目录类型检查与 scope 回执。
+
+### 风险
+完整状态 producer/进程诊断 tee 的生产装配仍由启动链完成，本片不伪造 connected 或报错。界面动作执行不是恢复证据，最终状态清除旧问题。不会新开多个空对话或带其他连接器日志/密钥。
+
+### 证明
+| AC | 测试/证据 | 层与运行时机 | 缺少行为为什么会失败 |
+| --- | --- | --- | --- |
+| AC-06/07 | 行/watcher 的同一投影用例；文档真 runtime 经 action 重试 | 最低可用 fast/integration，受影响 PR/nightly | 准备误报问题、两处原因/动作分歧、点击不触发实际准备即失败 |
+| AC-08 | 首条消息保留命令/exit/stderr，既有 startChat 回执/导航；遮密用例 | fast/integration，受影响 PR/nightly | 去掉内容或生成多个会话时断言失败 |
+
+### 偏离记录
+暂无。
+
+## 三：离线入口及 #1759 机械接入清单（r3）
+
+- 依据：DESIGN v1 §4.3/4.4/4.7；#1759 冻结设计 §4.1 R1/R2；r3 不复制位置 authority。准备收据/入口绑定先做可独立验证部分，真实围栏/应用重启仍属六。
+- 核对：Codex / GPT-6 按 r3 只读核对设计与 #1759 分支；下列为消费清单，不新增签名或写入规则。
+
+| 接口（原位置） | 原签名 / 本票消费点 |
+| --- | --- |
+| `process-fence-profile.ts` R1 | `resolvePackageManagerLocations(input: PackageManagerLocationInput): PackageManagerLocations`；input 原字段为 platform/home/userDataPath/configHome/appData/localAppData/goInstallBin/xdgCacheHome/bunInstall，全必填；`PackageManagerLocations.env: Readonly<Record<string,string>>`、writable 原样消费。main 在白名单过滤后的同次位置计算拿 env，填 LauncherEnvironment.packageManagerEnv，不再算 UV/npm 根 |
+| `process-fence-plan.ts` 绑定 | `planPackageManagerCaches(input: PackageManagerLocationInput & { truthPath: string; eligibility: WorkspaceDirectoryInput })`；消费该分支实际绑定后的环境/位置，候选路径不能绕过已有身份绑定。生产 fence 与 bootstrap 用同一份结果 |
+| `src/shared/package-manager-environment.ts` R2 | `installPackageManagerEnvironment(value: unknown, pull?: () => Promise<PackageManagerEnvironment>)`；sidecar 在 import engine 前使用 #1759 的安装路径，不另 publish 一份缓存表 |
+| 同模块最终投影 | `projectPackageManagerEnvironment<T>(source: Readonly<Record<string,T>> | undefined)`，以及 `packageManagerEnvironment(): PackageManagerEnvironment` / `refreshPackageManagerEnvironment()`；最终实际 spawner 由该分支投影，launcher 的业务/专用覆盖先合成，不在 core 重写 R1 缓存键 |
+| `engine/package-manager-spawner.ts` | 消费其现有 spawner adapter 在最终 spawn 时调用 refresh/project 的接线；MCP 的 prepare/已准备入口都走同一个 Location Environment，不能由 main 安装任意包 |
+
+### 改动 / 顺序
+先实现 core 自有持久准备/收据读取与当前执行参数重绑（文件/用例随实现记录）；待依赖合入后，main bootstrap builder→sidecar Host 发布→McpConnection.make prepare（许可/握手计时前）→McpClient prepared 是机械接线顺序。此处不引入不存在的本地模块或空 R1 结果。
+
+### 风险 / 证明
+AC-10 独立证据必须观察重启后未调用解析器/下载器，key 不含 cwd/密钥/服务参数；真正应用重启、10 秒时钟、旧默认运行器对照不能由组件回归冒充。本轮不跑计时/规模用例；准备语法必须消费官方解析器/真实发布格式，不手写第三方协议夹具。
+
+### 偏离记录
+暂无。

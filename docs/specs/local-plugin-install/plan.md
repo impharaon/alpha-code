@@ -644,4 +644,6 @@ r3 最终静态检查：schema `bun typecheck` 142 files、core 2,053 files / 2 
 
 2026-11-26 · 本轮按 r4 的“发现未裁决设计问题则停在 PLAN-READY”执行：只追加本节，没有实现代码、测试或 engine 登记改动。S-01-Q1 是冻结跨模块输入缺失，不能由本车道增字段/改责任来绕过；建议最小输入字段已列于风险，待编排器/设计裁决后进入第 2 步。片 4 accepted 及其他已定合同继续继承。
 
+2026-11-27 · orchestrator ruling 2026-11-27（Claude Opus 5.5，r5）：S-01 的 PreparedInstruction 增加 `arguments: readonly string[]`，原样传 Invocation.arguments，未声明为 []；仍由 core 唯一 renderer 解析。Q1 已裁决，按 IMPLEMENT 继续，不在 ext 预展开参数。S-01 增量随 engine 实现同提交登记。
+
 本轮 PLAN 收口（2026-11-26 16:47，Codex / GPT-6）：只读核对固定设计/真实样本/既有入口，约 11 分钟。`python3 scripts/check-doc-links.py docs/specs/local-plugin-install/plan.md` exit 0，8 条相对链接；`git diff --check` exit 0。单仓 docs profile 的 `check-docs-contract --changed-since 88d40cb6df --format json` exit 1，71 errors / 251 warnings，与已接受基线一致（`/tmp/plugin-standard-r4-plan-docs.json`）；按派发不修两条旧 unknown-id。`affected-tests --list` exit 2，缺 `.gate-tests`，无 scope line（`/tmp/plugin-standard-r4-plan-affected.log`）。未运行测试/应用/全量门，hooksPath=`.githooks`。已核依据 spec v5/design v3.1 与 r4；结论 PLAN-READY / Q1 待裁决。下一步由编排器/设计定点补 renderer 参数名输入；其余遗留维持原去向，无额外 OPTIONAL。

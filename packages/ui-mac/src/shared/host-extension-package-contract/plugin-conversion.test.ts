@@ -14,6 +14,43 @@ const converter = () => import("./plugin-conversion")
 const registryServer = async (file: string) => (await Bun.file(join(fixtureRoot, "registry", file)).json()).server as { [key: string]: Json }
 const registrySource: Source = { kind: "mcp-registry", locator: "https://registry.modelcontextprotocol.io", serverName: "io.github.github/github-mcp-server", version: "2.1.0" }
 
+test("source tool rules retain quoted nested patterns and recover the next rule", async () => {
+  const original = await captureStandardFixture("claude:plugin-dev")
+  const source = new TextDecoder().decode(await original.readFile("commands/create-plugin.md"))
+  // Pinned plugin-dev declaration, with a controlled rule-list variant exercising its source grammar.
+  const variant = source.replace(/allowed-tools:[\s\S]*?\n---/, 'allowed-tools: \'Bash(clay *), Bash(echo "a,b" $(date)), Write, Broken(, AskUserQuestion\'\n---')
+  const result = (await (await converter()).convertPluginTree(await captureStandardFixture("claude:plugin-dev", { "commands/create-plugin.md": variant }))).package
+  const command = result.entries.find(entry => entry.kind === "command")!
+  expect(command).toMatchObject({ invocation: { allowedTools: [
+    { tool: "Bash", pattern: "clay *" }, { tool: "Bash", pattern: 'echo "a,b" $(date)' }, { tool: "Write" }, { tool: "AskUserQuestion" },
+  ] } })
+  expect(result.diagnostics).toContainEqual(expect.objectContaining({ path: "commands/create-plugin.md", field: "allowed-tools", code: "invalid-definition" }))
+})
+
+test("skill sidecars preserve manual policy and resolve declared MCP dependencies", async () => {
+  const convert = (await converter()).convertPluginTree
+  const temporal = await captureStandardFixture("codex:temporal")
+  const source = new TextDecoder().decode(await temporal.readFile("skills/temporal-cloud-setup/SKILL.md"))
+  // Remove the redundant frontmatter false so the real YAML must supply the manual policy.
+  const manual = (await convert(await captureStandardFixture("codex:temporal", { "skills/temporal-cloud-setup/SKILL.md": source.replace(/^allow_implicit_invocation: false\r?\n/m, "") }))).package
+  expect(manual.entries.find(entry => entry.sourceName === "temporal-cloud-setup")).toMatchObject({ invocation: { implicitInvocation: false, userInvocable: true, argumentSyntax: "literal", arguments: [], paths: [], preloadSkills: [] }, display: { displayName: "Temporal Cloud Setup", shortDescription: "Set up Temporal Cloud and run a sample Workflow" } })
+  const apps = (await convert(await captureStandardFixture("codex:openai-developers"))).package
+  expect(apps.entries.find(entry => entry.sourceName === "build-chatgpt-app")).toMatchObject({ dependencies: [{ type: "mcp", value: "openaiDeveloperDocs", transport: "http", url: ["https://developers.openai.com/mcp"] }], display: { displayName: "Build ChatGPT App", defaultPrompt: expect.stringContaining("$build-chatgpt-app") } })
+  expect(apps.entries.filter(entry => entry.kind === "agent")).toHaveLength(0)
+  expect(apps.entries).toContainEqual(expect.objectContaining({ kind: "mcp", sourceName: "openaiDeveloperDocs", transport: "http" }))
+})
+
+test("invocation fields preserve source controls and provider argument syntax", async () => {
+  const original = await captureStandardFixture("claude:feature-dev")
+  const source = new TextDecoder().decode(await original.readFile("agents/code-reviewer.md"))
+  const variant = source.replace("---\n", '---\narguments: [target, mode]\neffort: high\npaths: ["src/**"]\nskills: [review]\nmemory: project\nmaxTurns: 7\nbackground: false\n')
+  const converted = (await (await converter()).convertPluginTree(await captureStandardFixture("claude:feature-dev", { "agents/code-reviewer.md": variant }))).package
+  expect(converted.entries.find(entry => entry.id === "agent:agents/code-reviewer.md")).toMatchObject({ invocation: { arguments: ["target", "mode"], argumentSyntax: "claude", effort: "high", paths: ["src/**"], preloadSkills: ["review"], memory: "project", maxTurns: 7, background: false, model: { alias: "sonnet" }, availableTools: expect.arrayContaining([{ tool: "Read" }]) } })
+  const vercel = (await (await converter()).convertPluginTree(await captureStandardFixture("codex:vercel"))).package
+  expect(vercel.entries.filter(entry => entry.kind === "command")).toHaveLength(6)
+  expect(vercel.entries.find(entry => entry.kind === "command")).toMatchObject({ invocation: { argumentSyntax: "codex" } })
+})
+
 test("real third-party sample trees are archive-only and unpacked into temporary storage", async () => {
   const storedRoot = join(import.meta.dir, "../../../test-fixtures/plugin-helper")
   expect(fixtureRoot).not.toBe(storedRoot)

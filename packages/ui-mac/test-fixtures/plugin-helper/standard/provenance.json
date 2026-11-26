@@ -1,7 +1,7 @@
 {
   "archive": {
     "path": "selection.tar.gz",
-    "sha256": "e586191eb843ed2c1c90a309ea863d413bb9b1b9c7316c932f9fd51c03b47c3b"
+    "sha256": "447244563d6602a164375a55c8ed5ef8c1b4666e08358103b4b402bb9e90e92f"
   },
   "samples": [
     {
@@ -1079,6 +1079,4994 @@
           "mode": 420,
           "bytes": 20425,
           "sha256": "34e13249dba8a066f33c5f723dbb7b9cb6174b80cc490dd866fbfd1736f0577f"
+        }
+      ]
+    },
+    {
+      "name": "claude:claude-security",
+      "root": "claude-claude-security",
+      "repository": "https://github.com/anthropics/claude-plugins-official",
+      "commit": "0fbfda5a91f4adc311daca25acc99132f40f0b6e",
+      "pluginPath": "plugins/claude-security",
+      "ecosystem": "claude",
+      "files": [
+        {
+          "path": ".claude-plugin/plugin.json",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1134,
+          "sha256": "70bab346027eedfccd77af09c9890c14cec7c54474c47fd2723f45676b646cb4"
+        },
+        {
+          "path": ".gitattributes",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 178,
+          "sha256": "6165c3453b390e9e0718ddeeb212cd9652559d7dff94a622aca6819279d5f133"
+        },
+        {
+          "path": "ATTACK-SURFACE.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 3703,
+          "sha256": "9b3f99653d590be87d640800d4a71909f509500719edefca2758eadb552b6db7"
+        },
+        {
+          "path": "CI.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 36560,
+          "sha256": "8ca88b380c72f81e0a97612b0ca18b537704f0abb689200322d92c9a5426ff11"
+        },
+        {
+          "path": "LICENSE",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1500,
+          "sha256": "15d46b21bd3c8ead21dd4fe0f4b82a8d934b698cf6367b09c06211058fc4332d"
+        },
+        {
+          "path": "NOTICE.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1037,
+          "sha256": "de9f06a5e0b160f563704ef53f03336f17b65685285b0b077a574ff3f3d28d8f"
+        },
+        {
+          "path": "README.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 23522,
+          "sha256": "5c0928a99c5075a6fc313a451462ad22fd34185a218517e8ae4030caa995a2fc"
+        },
+        {
+          "path": "SECURITY.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 7140,
+          "sha256": "a707cca877e503dcb6f1b1fe1c9b669082da711a47df785f879f944b964b6660"
+        },
+        {
+          "path": "TUI.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 5773,
+          "sha256": "da2d747e5e82f02afdd40762603c1fdaa4813f583147b5dbe122b2cb7781ca29"
+        },
+        {
+          "path": "action.yml",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 61210,
+          "sha256": "f3821aba8400657ca048de737945d38c5880ec78dca24da2e508676fcd6d03a9"
+        },
+        {
+          "path": "agents/attack-surface-redactor.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 3301,
+          "sha256": "9aea8c1a48b0102678cebb09379c669c46f543dc7868eade2ed89d7ca898b987"
+        },
+        {
+          "path": "agents/attack-surface-stage.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 3244,
+          "sha256": "d29dc0dce0c1d6a3fa3ffc3905c981597fbc4903f7ec5b010cba1eb66a500cdc"
+        },
+        {
+          "path": "agents/attack-surface-verifier.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1547,
+          "sha256": "ceba3becc7ae9047360de8dea6bd1bee59fef51ebc91a71b51c8e8873fbdecc0"
+        },
+        {
+          "path": "agents/claude-security.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 4603,
+          "sha256": "158b8aded79d2e0775b375c29950361a882a9cbafdd69619671601ff93e50ac0"
+        },
+        {
+          "path": "agents/explore.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 2810,
+          "sha256": "96c6298056990ca23bb6ac7fc820e3bd91c6ed0c147a3e774ac3c16be7128621"
+        },
+        {
+          "path": "agents/finding-explainer.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 8109,
+          "sha256": "27e2596ef374d142d5ac6b0c2430841fd3be6f0b2e8caa903573e209481c8187"
+        },
+        {
+          "path": "agents/patch-generator.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 7895,
+          "sha256": "3ff1eeee6a8a4b513572cebc34bba663dcb5b39da27f2e564bbdb7f8d23ce7f4"
+        },
+        {
+          "path": "agents/patch-verifier.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 13242,
+          "sha256": "36a1904aad2acfe5986edb0dcd9e18af68dd8dbd1d70122f003945ba269ce801"
+        },
+        {
+          "path": "agents/scan-component-researcher.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 8816,
+          "sha256": "4cffa87bfc5da910944dd2e09b0723bcf7ec2b002b1ab1e2bf757a055be2d212"
+        },
+        {
+          "path": "agents/scan-context.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1216,
+          "sha256": "cad908117e7e6ddfa86a035447342f1cca0f513b559036b94cb7a99bbb462e5d"
+        },
+        {
+          "path": "agents/scan-inventory.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 5189,
+          "sha256": "3beb20f6d63cf4d7688c6ea66595f45cdd8cd149d55b5c122b3f7f0f73dd952e"
+        },
+        {
+          "path": "agents/scan-loader.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 625,
+          "sha256": "25749b14b85c68258e320d7ba7cc7bf3d289ce7458b804b76f1cad3af5933375"
+        },
+        {
+          "path": "agents/scan-path-checker.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1131,
+          "sha256": "67a08b0346cea2f7c26dbd4a0a6265b028fd968c9752ea5c1b41490402244ea6"
+        },
+        {
+          "path": "agents/scan-redactor.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 3252,
+          "sha256": "0391e5fc1718d20319d3ff8997c09cdb354281fd85d0509ac63c900eb0ca2ff8"
+        },
+        {
+          "path": "agents/scan-researcher.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 9690,
+          "sha256": "b1958f195f1ed2b8e26ec4673669991e62b740f7b435c091a5d1a519353facec"
+        },
+        {
+          "path": "agents/scan-sheet-researcher.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 7617,
+          "sha256": "b29070ae011eb722463a13df15e73bd7e7fb4386dd1221e6b73b9cb66197b38d"
+        },
+        {
+          "path": "agents/scan-verifier.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 16488,
+          "sha256": "3cf1c6463bd7a653cd3862554e04f116f5b7b802715069d9632784a4cb0a2983"
+        },
+        {
+          "path": "claude-security",
+          "kind": "file",
+          "mode": 493,
+          "bytes": 468,
+          "sha256": "8ef19f825d5e5331e3f3db9c14f42b78a1104c74ede2fb3ed461ec6accc12e84"
+        },
+        {
+          "path": "hooks/hooks.json",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 3913,
+          "sha256": "a2813e2a0ffcf9aad8f86cf44943f3795a14558f9b215ec8bfc7686cc755dcbb"
+        },
+        {
+          "path": "hooks/hooks.py",
+          "kind": "file",
+          "mode": 493,
+          "bytes": 55323,
+          "sha256": "21339d90f102db5f3274b85c86624f80ba83e2da94f916208c8ff42d2dfa1cf2"
+        },
+        {
+          "path": "hooks/hooks.sh",
+          "kind": "file",
+          "mode": 493,
+          "bytes": 6347,
+          "sha256": "4450d576c5bc81411071727623dd2231e002e1d90b213bc983596fbe1cbda02a"
+        },
+        {
+          "path": "hooks/live/atlas.js",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 4977,
+          "sha256": "34f5bf9bf937882c46533cc9661a26f432f7b13558b09d50017291747da6b4b5"
+        },
+        {
+          "path": "hooks/live/canvas.js",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1394,
+          "sha256": "33aa226247cd0951ced4ff3004ea7240ca71324e59fe626796d82dbba815b9ff"
+        },
+        {
+          "path": "hooks/live/chart.js",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 15921,
+          "sha256": "0fefdc3e919c82d3976ab87ebcd43e32930d8f85985c437ed245b0fa83f9571c"
+        },
+        {
+          "path": "hooks/live/listener.js",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 16569,
+          "sha256": "c5a4a4906962eb2522b83ce9a0e0013f582289772449ff27808022dd62f989d7"
+        },
+        {
+          "path": "hooks/live/map.js",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 10561,
+          "sha256": "d79bc70bb7ed5c17b7daa1975e8ff9cee5025001a65c033b7a1168c7e53fe1d0"
+        },
+        {
+          "path": "hooks/live/marks.js",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 6605,
+          "sha256": "70201c52334d2dd969b4255d0c7985577ff0ff206be6282eb5cbe7bf2c06c361"
+        },
+        {
+          "path": "hooks/live/palette.js",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 2194,
+          "sha256": "7d068ea7fdb2e714cb1e370cfad7b0b33330cd6eed2d2b461b4dee82a8906d07"
+        },
+        {
+          "path": "hooks/live/plan.js",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 8606,
+          "sha256": "7a4d9109462306c383c3570d0823f87d277978b6de76c9fde91a31b8d19f1c26"
+        },
+        {
+          "path": "hooks/live/register.js",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 15129,
+          "sha256": "d3d30217026604d75d3f54a1ae9a1ff8bb9bc7196565714220b7fe620ec09c64"
+        },
+        {
+          "path": "hooks/live/scan.js",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 7613,
+          "sha256": "b2f42651ae6e70927cd90ea59c23e063aefeb6f1184c9f40e12692e2737b1cda"
+        },
+        {
+          "path": "hooks/live/view.js",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 18324,
+          "sha256": "8588429e08a56b354a1cb562b8aeedf458904812b39c14d3de0f25c4dd2b22d5"
+        },
+        {
+          "path": "hooks/live/words.js",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 3473,
+          "sha256": "ef2882d6adf474c0f91521a7d01ff469c3ad55fa32c1aa5ea0712db31b252b14"
+        },
+        {
+          "path": "hooks/python_check.py",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 732,
+          "sha256": "63035ccff722a4de7a8cc3460a0848dd377acb3f9c8ce2f6744ae082d753c36b"
+        },
+        {
+          "path": "scripts/attack_surface_report.py",
+          "kind": "file",
+          "mode": 493,
+          "bytes": 96534,
+          "sha256": "0989464bc147db90f1b79c0b2c3b1ea606f1ddc2bb3a7e009c8891e08d4ac1dc"
+        },
+        {
+          "path": "scripts/cli.py",
+          "kind": "file",
+          "mode": 493,
+          "bytes": 21284,
+          "sha256": "a2fdc2a2bdd821fc0177ba3e4ad0c6eaeb0132219c239567df28fdce4efadd0f"
+        },
+        {
+          "path": "scripts/cloud_token.py",
+          "kind": "file",
+          "mode": 493,
+          "bytes": 13723,
+          "sha256": "381aec172ec526625a354423be0e05be3f414090bb3ef51bfa6ffe151761f8a6"
+        },
+        {
+          "path": "scripts/keep-waiting.sh",
+          "kind": "file",
+          "mode": 493,
+          "bytes": 3011,
+          "sha256": "4ba4744585934a93290dbe00f01f40b3e125b67df077a802a78cb5070e26cd86"
+        },
+        {
+          "path": "scripts/lib/__init__.py",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 58,
+          "sha256": "4673bbd8db2c97c8dd7f387345693a7b55f9ac8ce9d6a13f7ce0c4b6a4757981"
+        },
+        {
+          "path": "scripts/lib/absolute.py",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1264,
+          "sha256": "df09c23241a792d3be9e9b89adf0f8a5970048e484fdcd03cc4475f5c97e71c5"
+        },
+        {
+          "path": "scripts/lib/actions.py",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 18626,
+          "sha256": "8f8a943ff2f7d4403673416fc03f31ed467a55aa6140945949cb1d2713e52656"
+        },
+        {
+          "path": "scripts/lib/agent_calls.py",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 968,
+          "sha256": "802731597f5689f888404300c6f38110b4e7aa02dedc36dacbaee5da178c62e1"
+        },
+        {
+          "path": "scripts/lib/atomic.py",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1812,
+          "sha256": "a083cba21ad704d20466ae6ccc6cbb8c4c42d4a68f0b033fe6c362817e62e383"
+        },
+        {
+          "path": "scripts/lib/candidates.py",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 2314,
+          "sha256": "1ff89a0d88ad9f06bd77fa9da3ab49c7fb31fbdf4af456f562192c213e3b7b5f"
+        },
+        {
+          "path": "scripts/lib/chain.py",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 2126,
+          "sha256": "9ffe1168e340719d85cced9d3ec71e7d6e43588b0bad3efe771ad93315490025"
+        },
+        {
+          "path": "scripts/lib/change_base.py",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 5279,
+          "sha256": "81a0350ef95482ae46aed1d29e3880c398e667922789685c8d3d7142c370e8af"
+        },
+        {
+          "path": "scripts/lib/console.py",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1641,
+          "sha256": "376e5f494f3508ab6733132f9661757231984dd1de04e16c6831e9ab5a1c9319"
+        },
+        {
+          "path": "scripts/lib/cwe-categories.json",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 30049,
+          "sha256": "ebc4b1eff4fb1dfba2e1783f53c61371d1a66c6935a76098ed47c10e6d97dcc0"
+        },
+        {
+          "path": "scripts/lib/cwe.py",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 2725,
+          "sha256": "ab9a246425ce6ce2e6bc488ac2fe72a481a8acd2c05f8401b4c72e0e26e1a63a"
+        },
+        {
+          "path": "scripts/lib/display.py",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 994,
+          "sha256": "2571b31f82990ee67ad48c3feea6257f1bb537987576b419e3f9f327a2036413"
+        },
+        {
+          "path": "scripts/lib/duration.py",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 633,
+          "sha256": "e54d526293f177d14c327afb32aea1a4990513694ae729b5a86aa4a52fe3a2dd"
+        },
+        {
+          "path": "scripts/lib/effort.py",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1057,
+          "sha256": "214beda1b07463d62647cc20d8593e28895a3bfa77bb1a4f725ebaea8874bdc6"
+        },
+        {
+          "path": "scripts/lib/exhaustiveness.py",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 316,
+          "sha256": "a0edd1a1ae50e96e8429de39fa5668f08df941bad95ba4bcee543ac6cc0cb53d"
+        },
+        {
+          "path": "scripts/lib/explanation.py",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 11498,
+          "sha256": "31693159a5824796397ec8c1912696e39fe4cfd40b61eb72642c8b3bcbe2ba88"
+        },
+        {
+          "path": "scripts/lib/finding.py",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 32269,
+          "sha256": "ab4829891563666e4112447f2b7be9dbbe42a920a63151573f36132953aded4b"
+        },
+        {
+          "path": "scripts/lib/gfm.py",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 6901,
+          "sha256": "bcf432414f9e68707c1620d311bb6917efde72af736e5311a6f276917bed850e"
+        },
+        {
+          "path": "scripts/lib/gh.py",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 4879,
+          "sha256": "a4679877dc203bb4a87db6bc04be69fc59d7fd63053eb7375dc9f7c716400bd2"
+        },
+        {
+          "path": "scripts/lib/git.py",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 8715,
+          "sha256": "4d3445307c5a91661e9311123aeb5c7653edd493906005d1e1f46dc6815afe7a"
+        },
+        {
+          "path": "scripts/lib/history.py",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 6386,
+          "sha256": "ed6d8add8e7811ee153744694c6246312892603d386168787f10c3e9b871e23a"
+        },
+        {
+          "path": "scripts/lib/last_report.py",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 7210,
+          "sha256": "7b428c86409bc8b61a5c043be4aaef53a5bf493e434275a45243362b103928d1"
+        },
+        {
+          "path": "scripts/lib/link.py",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 653,
+          "sha256": "312713d0d5555f5f4daed6bc470f00f1c252d67fcafc426a70f71ead632bb412"
+        },
+        {
+          "path": "scripts/lib/live/__init__.py",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 65,
+          "sha256": "0645b4cbdf511a429633782fa8192ebcce34f34a1c2e748389fb7111114cabf2"
+        },
+        {
+          "path": "scripts/lib/live/atlas.py",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 6959,
+          "sha256": "1f6b3a0321922603b873c256ca317cc7c74a04fa6e7a78b8ea461fb4ec7212b6"
+        },
+        {
+          "path": "scripts/lib/live/command.py",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 2509,
+          "sha256": "433146e3e4a874ea319c9d4e75df87bc38776aad60fef3b0a25417dc7d635916"
+        },
+        {
+          "path": "scripts/lib/live/login.py",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 4569,
+          "sha256": "eecfdbef2d547a4a2ea5bd615577e6f37f218c05b3d0a8bfbd8f1a2e42b8fb58"
+        },
+        {
+          "path": "scripts/lib/live/plain.py",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 7749,
+          "sha256": "b7d294504a896a58570c5dc66520093e36f4c93b87c1d5386531438d16d2102f"
+        },
+        {
+          "path": "scripts/lib/live/report.py",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 6973,
+          "sha256": "84961c2cc0f869fd1bd207a6002b78947e5e98ad967d369705246d88c927d8e8"
+        },
+        {
+          "path": "scripts/lib/live/sandbox.py",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 24929,
+          "sha256": "4e22706f7969767b4d6b550be6e2bf7650b69becc6ad2a98118c4b1bc8af1aee"
+        },
+        {
+          "path": "scripts/lib/live/scan.py",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 18919,
+          "sha256": "77ec7d8fb8bf341ce5f3b8883ce1c331df9f1c0dc003c838f9621ffc1f35ca8b"
+        },
+        {
+          "path": "scripts/lib/live/session.py",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 19226,
+          "sha256": "9e68b33664d065abd742a91a0d155d23151e1802d9f78cea07f9a74b066a1391"
+        },
+        {
+          "path": "scripts/lib/live/stream.py",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 28929,
+          "sha256": "9fe0301dfaec1c5bb935de9540cb3b60538c581847f8ac6c5894b905b4b73b39"
+        },
+        {
+          "path": "scripts/lib/live/terminal.py",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 3907,
+          "sha256": "7d93fbb5f6f747f14b9cab3a4ba87aa548e07869fc0c80dd7baf94f9bcc72648"
+        },
+        {
+          "path": "scripts/lib/live/words.py",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1237,
+          "sha256": "3d4edc8b3ce457b87ea2ae061557ace602fe2b72fbc7f6474a2c0b8daf24bbf2"
+        },
+        {
+          "path": "scripts/lib/markdown.py",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 6358,
+          "sha256": "805f2d5458bbd9fcd1af9440b93a07adee37676fbf40782203a0c7106fb397ec"
+        },
+        {
+          "path": "scripts/lib/marker.py",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 18388,
+          "sha256": "0e75d7913de9d3d8a64092666d3adfc9f82b26f55da0fb5cc70b0d4f34b031a0"
+        },
+        {
+          "path": "scripts/lib/packs.py",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 5310,
+          "sha256": "f56df1190824accf8d4ef612639ada7ec5e188ffc839b545ef23e185e9feedc7"
+        },
+        {
+          "path": "scripts/lib/place.py",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 4087,
+          "sha256": "2eedc6f8122f4916afedf0cb4419cddc82d27265271a3a2b6f242cb1caa0aca6"
+        },
+        {
+          "path": "scripts/lib/plain.py",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 3115,
+          "sha256": "094210cfa2246457c0c622e3513ed3446702e43568e75f7fe4ce8e479a1a5fa9"
+        },
+        {
+          "path": "scripts/lib/plugin.py",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 9107,
+          "sha256": "cb86c4f80e7952fa5748e37bc7f285363e591abbd1d1361bf224a58f8c706e39"
+        },
+        {
+          "path": "scripts/lib/products.py",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 38189,
+          "sha256": "1236b2e523d427f5d598b54ff9cb00ed4cc9ec4b5c99226bf94cf5c46387743d"
+        },
+        {
+          "path": "scripts/lib/receipt.py",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 6835,
+          "sha256": "274ea0c76a7b0544e6104ee0a6b74ad2ad5b143329eeb15ca2098aed6e9cc916"
+        },
+        {
+          "path": "scripts/lib/remote.py",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 5765,
+          "sha256": "267d43a4b8d6bda93fc01917640a7bfd5686b5dfbed889912c960e09b1f3a6ac"
+        },
+        {
+          "path": "scripts/lib/removal.py",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1919,
+          "sha256": "3fb8f52830fe9eb27429af41c69b674969001ba081cc852b5c75969d4319a326"
+        },
+        {
+          "path": "scripts/lib/report.py",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 18015,
+          "sha256": "a904b40ca8e9c6393fcb22e727d3f30da34102b342ddab15dfe87a16cfa4edc6"
+        },
+        {
+          "path": "scripts/lib/review.py",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 49074,
+          "sha256": "1082ce05f1aade84354250c118f13e65bf580ec9b89bc8b37cc5f466b772a82a"
+        },
+        {
+          "path": "scripts/lib/revision.py",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 3235,
+          "sha256": "90e95f28a680bf6106840aee6b1504c2766a2c602276abdd640d5f46b3ce82c2"
+        },
+        {
+          "path": "scripts/lib/sandbox/__init__.py",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 73,
+          "sha256": "670013b5d3d5463b2df9e6aa3592d7dfe9213ba82da33e3048708532f858af3a"
+        },
+        {
+          "path": "scripts/lib/sandbox/keeper.py",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 4904,
+          "sha256": "4653fb7f0b3eef75bb13809e85186aca8a4872caa237e24ad9154746f93aebbd"
+        },
+        {
+          "path": "scripts/lib/sandbox/kernel.py",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 6993,
+          "sha256": "4ec3a1dd8339600a24a5c834b0355895de44f3a8378490df2fa53bd9965efe8b"
+        },
+        {
+          "path": "scripts/lib/sandbox/landlock.py",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 2216,
+          "sha256": "bf7df1ec2f6ff8d9caa281c012591d4f292113617404c17919ae626ad63b0554"
+        },
+        {
+          "path": "scripts/lib/sandbox/machine.py",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 15041,
+          "sha256": "8f069172cf5ff204690c1cd834337a96ddda22dd0280a9c6ecaf1299cc54a695"
+        },
+        {
+          "path": "scripts/lib/sandbox/plan.py",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 5193,
+          "sha256": "9ba45d37fd8e3580f119ed5447fbed8720fa7de1ca57aff289fa36602c85ea37"
+        },
+        {
+          "path": "scripts/lib/sandbox/provider.py",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 19409,
+          "sha256": "6601c6b8f28d21b80f3e445c7f65b02155984c30a56ee553ad313f036229f017"
+        },
+        {
+          "path": "scripts/lib/sandbox/relay.py",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 15383,
+          "sha256": "1ea15190b151ebede8c3c83535c94e0dd19120288dedb3a3d5488ed184284b71"
+        },
+        {
+          "path": "scripts/lib/sandbox/request.py",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 6024,
+          "sha256": "003f056175606f91501c8cbf6905299c73caa8f320f1aeb22dabf266b6ae9663"
+        },
+        {
+          "path": "scripts/lib/sandbox/results.py",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 10385,
+          "sha256": "338b48a7af0e9f972960cfa35c4c0e3501d308099d9173d22edc444add3f1efd"
+        },
+        {
+          "path": "scripts/lib/sandbox/root.py",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 12423,
+          "sha256": "e4fe0589d84c72f069d2fd306f005b6f3ec8c56b88b62f1e4b33933de5ebff33"
+        },
+        {
+          "path": "scripts/lib/sandbox/seccomp.py",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 6722,
+          "sha256": "2d3573b9ab6eeb5c8807dbe9a7f7ba33c7768b270cbf2bc53496349ac116abdc"
+        },
+        {
+          "path": "scripts/lib/sandbox/sigv4.py",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1578,
+          "sha256": "38dd1cf4c0aab665e0795a224ac1e7bd85a73037413ca9c5e3fbb7988694e2d9"
+        },
+        {
+          "path": "scripts/lib/sandbox/streams.py",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 4084,
+          "sha256": "f5ebd2c01ab1de8bf092f2adc1b9297eb8821a8d34eead0b753af275fdec177c"
+        },
+        {
+          "path": "scripts/lib/sandbox/tunnel.py",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 5273,
+          "sha256": "cdd9117823bc25de4388995557e4d9c99b195b07ef796da34bd6286619906f08"
+        },
+        {
+          "path": "scripts/lib/sandbox_hosts.py",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 5384,
+          "sha256": "1faa7a882d09ae51fa66a8f64187d4e4968403689ad13e298c584a22ea630821"
+        },
+        {
+          "path": "scripts/lib/sarif.py",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 19162,
+          "sha256": "4c704f1b50c7121db1d1f424c973de6792ec921e4f782ebb8139b2d4320b21c9"
+        },
+        {
+          "path": "scripts/lib/secret.py",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 2352,
+          "sha256": "8a8c8e8f6ecf908afe21f4a32ab7370cfd2838f016577b7cd16e4f67e6b09822"
+        },
+        {
+          "path": "scripts/lib/source.py",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 3605,
+          "sha256": "75621d7dcff62a43cb871a6289a780f631f48cd27a89c04e2f05f8f2313ccc6d"
+        },
+        {
+          "path": "scripts/lib/strictjson.py",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 5431,
+          "sha256": "7b09e7feabbeb50d226e8abd25c1a6ebf48add880817a93b929b54cdbe16ed35"
+        },
+        {
+          "path": "scripts/lib/surface.py",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 15779,
+          "sha256": "7811eb0f6f0349f891593e009481b2354d005253469df889b4e7272babb0a60b"
+        },
+        {
+          "path": "scripts/lib/surface_dir.py",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 2865,
+          "sha256": "9c296f999b6f5a06803b239bd788c2414b498f2d7b88453808aaeff64ac3d07f"
+        },
+        {
+          "path": "scripts/lib/surface_patch.py",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 29728,
+          "sha256": "6066b50a9a9ac5ee3ab9bcfb82bf21b698e1fb0abdb2120fdbb061d86f147f7a"
+        },
+        {
+          "path": "scripts/lib/unidiff.py",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 6300,
+          "sha256": "a9cdcc9bbf2214ab32dbb2e295422c6cc986bcade469381b5c48041dc425c355"
+        },
+        {
+          "path": "scripts/lib/unreadable.py",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 3153,
+          "sha256": "0d195fbc9cb303e15fe7a05ae0a1dd1a03f7c04bc7a7092427c6eddac15fb24e"
+        },
+        {
+          "path": "scripts/lib/verdict.py",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 5066,
+          "sha256": "915dae7056ca76f2c492703176c49e79f9a0fb25d86208f7f60ce776ce738e21"
+        },
+        {
+          "path": "scripts/lib/views/__init__.py",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 35,
+          "sha256": "63ac3bce0b3046b754262e341e170b0777076f3698c0bb24bddcd169cb568bee"
+        },
+        {
+          "path": "scripts/lib/views/outline.py",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 686,
+          "sha256": "67af25a3a510f9b39450f448b0fff2781ddb4d1c2267244cde07b6442f549cfc"
+        },
+        {
+          "path": "scripts/lib/views/renderer.py",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 6033,
+          "sha256": "f54ac887e9a45740d550cb886f3bec15ac24cf23f68ab4ee0629c1aebf054f5f"
+        },
+        {
+          "path": "scripts/lib/views/screen.py",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 6229,
+          "sha256": "2b44f742de34d3e91e4f99046be2aa2cc393c1197ec4b0e5e90a1a2caa4b379b"
+        },
+        {
+          "path": "scripts/lib/views/show.py",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1708,
+          "sha256": "951bd63debc802233f0d477d77caee32917c41666daf4a08a0ed77f26e4486a4"
+        },
+        {
+          "path": "scripts/lib/views/tui.py",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 4605,
+          "sha256": "075a1f3ed1b8e9b5b5bd4e5812c7142d16c3e4beaf901d3c08bbfe4770fe258a"
+        },
+        {
+          "path": "scripts/lib/views/wire.py",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 2262,
+          "sha256": "01704cec2abd80acfa0b1c6859303c3694e8c9975f0bb11b2b9ec10b6fafa3ec"
+        },
+        {
+          "path": "scripts/list_remotes.py",
+          "kind": "file",
+          "mode": 493,
+          "bytes": 3839,
+          "sha256": "3fde7b2de39150ac9b06ad2fd4439a19e2a01c5007ded9317e3d919c8dc48e11"
+        },
+        {
+          "path": "scripts/patch_artifacts.py",
+          "kind": "file",
+          "mode": 493,
+          "bytes": 114892,
+          "sha256": "bd7cd47e852c18ed91d1ebf5deb679a788a9ee388f9fb1c0475147f4dc8b74a0"
+        },
+        {
+          "path": "scripts/post_review.py",
+          "kind": "file",
+          "mode": 493,
+          "bytes": 47103,
+          "sha256": "f8766714fc32d78ceb9d9455394f2afb3fec7a8ca3d62e817f798dba38c65f0d"
+        },
+        {
+          "path": "scripts/remove_work_dir.py",
+          "kind": "file",
+          "mode": 493,
+          "bytes": 3867,
+          "sha256": "2a286865d576a1a1db8fac6b16fb7c7007fa0e17e542936735d5f04e16aa52a4"
+        },
+        {
+          "path": "scripts/render_report.py",
+          "kind": "file",
+          "mode": 493,
+          "bytes": 70058,
+          "sha256": "a1bf90407cfbcf27d1e36b148ca9382f7c68131c4628132d33ea818e7164f276"
+        },
+        {
+          "path": "scripts/repeat_verdict.py",
+          "kind": "file",
+          "mode": 493,
+          "bytes": 18354,
+          "sha256": "009f5d3a14b3e356a02a54c1a1197f2447f7e5795711b3d4ec132200a1a574dd"
+        },
+        {
+          "path": "scripts/sandbox/sandboxed-claude.sh",
+          "kind": "file",
+          "mode": 493,
+          "bytes": 6583,
+          "sha256": "fde47a13791546b81e450d21a954c6206ed402f54aeb5ade8dd50aae93ea48dc"
+        },
+        {
+          "path": "scripts/sandbox.py",
+          "kind": "file",
+          "mode": 493,
+          "bytes": 48842,
+          "sha256": "e479c9b3b83055b29d007bbafdff7e27c3fbb9f254baa9c4514e7778cc9587c0"
+        },
+        {
+          "path": "scripts/sandbox_guest.py",
+          "kind": "file",
+          "mode": 493,
+          "bytes": 3620,
+          "sha256": "e43cf932828a2c93301bda1ba547ee93ddcb9e857f08288f626148f752122985"
+        },
+        {
+          "path": "scripts/sandbox_keeper.py",
+          "kind": "file",
+          "mode": 493,
+          "bytes": 16624,
+          "sha256": "ada4c9e94753d900074df9b6263d5b257d525e13c87d5663ab3550c6f5b0f43c"
+        },
+        {
+          "path": "scripts/sandbox_walls.py",
+          "kind": "file",
+          "mode": 493,
+          "bytes": 4840,
+          "sha256": "eb3a5418c2943922544650de455bc2834cda24c65cfb4e154a3c0d3e649e14c4"
+        },
+        {
+          "path": "scripts/save_result.py",
+          "kind": "file",
+          "mode": 493,
+          "bytes": 54474,
+          "sha256": "d66beba4e271cf7eae10e0f708cd3fa36672542780f1e1d9bec1367eeeddb308"
+        },
+        {
+          "path": "scripts/saved_credentials.py",
+          "kind": "file",
+          "mode": 493,
+          "bytes": 5594,
+          "sha256": "9f825e066c24e4563283e9ff3d62c02e34cbe20ea959cbeb4906ef326131884b"
+        },
+        {
+          "path": "scripts/scan_user.py",
+          "kind": "file",
+          "mode": 493,
+          "bytes": 22962,
+          "sha256": "15e00d95f08389f712b822dee559bc85d0b4b99b8088d29c2a8628a643b795ba"
+        },
+        {
+          "path": "scripts/session_status.py",
+          "kind": "file",
+          "mode": 493,
+          "bytes": 9733,
+          "sha256": "5c9a3a95ebeb06a07c4368ac047ae391377bec402231836fffbd27b59165fc6b"
+        },
+        {
+          "path": "scripts/shell/bash",
+          "kind": "file",
+          "mode": 493,
+          "bytes": 745,
+          "sha256": "cc3cfb3d227f909d684983a9ee458ed32a82d6e6bcca5746a726a904d49b00a4"
+        },
+        {
+          "path": "scripts/triage.py",
+          "kind": "file",
+          "mode": 493,
+          "bytes": 48823,
+          "sha256": "7d31cfb9ea21a0a96264f015226e87a58be8f82280520873c5c33fd9eb7d5e0e"
+        },
+        {
+          "path": "scripts/views/term/app.mjs",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 4866,
+          "sha256": "2d3be3f2806b710d7283ce1a323a10e28463312baea325e30b7a927bfc854ea3"
+        },
+        {
+          "path": "scripts/views/term/atlas.mjs",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 3119,
+          "sha256": "6285b31de0049f8f6c83421fbe917bad586281f93fff3650311a5bedc63aa3b1"
+        },
+        {
+          "path": "scripts/views/term/canvas.mjs",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 3987,
+          "sha256": "352f8e505621eee0028e41028805329647124a95a317de72cecafcf82bc8230c"
+        },
+        {
+          "path": "scripts/views/term/codemap.mjs",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 13333,
+          "sha256": "9ff6d529f5c550c0cc96a7060e343d337d41b234c59eafea48a1254495abae57"
+        },
+        {
+          "path": "scripts/views/term/keys.mjs",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1286,
+          "sha256": "347b2e25f0630f24c982458ca97a5dc36bdd4fc320b9310e41c4f8a053007bb8"
+        },
+        {
+          "path": "scripts/views/term/look.mjs",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 3097,
+          "sha256": "7ca4dedc3a7de794bc6698c0df064bd8c3b3805d5c79fd0a8e9ba3d93ba6eac1"
+        },
+        {
+          "path": "scripts/views/term/main.mjs",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 671,
+          "sha256": "f436b5116b061b6b0fb4d6e994ef92b870f3ec6cd0d423e9f57f526c697bae4b"
+        },
+        {
+          "path": "scripts/views/term/marks.mjs",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 9369,
+          "sha256": "6ce0502bbebadc17c625db3066a63aafc01d420df674305e5507561040893a64"
+        },
+        {
+          "path": "scripts/views/term/numbers.mjs",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 833,
+          "sha256": "01a394b5ddfe33a2230f5dd435ec36a7a04b540dce00025466f281fc2456ff54"
+        },
+        {
+          "path": "scripts/views/term/pace.mjs",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 4414,
+          "sha256": "bca41751867d7180fa57d730a31f5ac444ff90b43c5242c9c5e23abeb8b319d3"
+        },
+        {
+          "path": "scripts/views/term/paint.mjs",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 8810,
+          "sha256": "ded79cadda19b24f01382b283df3ac6c256211019854301a8f9319f6509522b9"
+        },
+        {
+          "path": "scripts/views/term/palette.mjs",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1217,
+          "sha256": "1a91b1df68968b6f155bdebf4b7e052209ac67265ccee3d13a78a7208dd1da3b"
+        },
+        {
+          "path": "scripts/views/term/panes.mjs",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 14157,
+          "sha256": "adb803cbe996a186caf6fc6d330b8066248bfeb1c04f97425bd52018862a928b"
+        },
+        {
+          "path": "scripts/views/term/raster.mjs",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 8151,
+          "sha256": "3747c3ea6416de80719fd69b8434a7d5a40ffda135306e468719f046ef852973"
+        },
+        {
+          "path": "scripts/views/term/scan.mjs",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 8230,
+          "sha256": "eb62479153a40f930b296fe412a2db54517a828d7b0805b36aa762d7707ff795"
+        },
+        {
+          "path": "scripts/views/term/strips.mjs",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 9348,
+          "sha256": "5e03cc0d1bad17f6391984e4ae9a942bc6a62357dd2bedb2daaecd68247a8851"
+        },
+        {
+          "path": "scripts/views/term/text.mjs",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 4430,
+          "sha256": "977b9abffac634b55813851530eae5e44bf6d8f39abad09844986063ac9ed047"
+        },
+        {
+          "path": "scripts/views/term/view.mjs",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 13820,
+          "sha256": "2d9442a5b423a6b33c3d8dc7883837448657284aae2ab7f159076bf582177170"
+        },
+        {
+          "path": "scripts/views/term/words.mjs",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1393,
+          "sha256": "03fef15004861c3455532edcf3fb58e39b28e21c6c4015830ec0c5c0a54df44f"
+        },
+        {
+          "path": "scripts/write_scan_meta.py",
+          "kind": "file",
+          "mode": 493,
+          "bytes": 42128,
+          "sha256": "5cb212a9a4dbd172d181d228efe1fb332f5c9d480ef298410db200f0b258236e"
+        },
+        {
+          "path": "skills/attack-surface-analysis/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 22342,
+          "sha256": "bda08bdfedd6383c11aa4fcf1a1fd5f9efc6a3f63728d50b1a9c88e020f49b9c"
+        },
+        {
+          "path": "skills/attack-surface-analysis/config-interaction-audit.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 16006,
+          "sha256": "fee82d208895d1d5dab5696638966adfac86a4baddff76adf8de60555cfc23c6"
+        },
+        {
+          "path": "skills/attack-surface-analysis/default-attack-surface-reduction.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 13162,
+          "sha256": "32378ee28abe2536ddd7d10ac50f7082e06484584a9b62f4a7331429381cfe71"
+        },
+        {
+          "path": "skills/attack-surface-analysis/early-reachability-audit.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 18775,
+          "sha256": "ec51fa75b6d4947d4e4e089a159c6e28a9d8e76e0f96f74834402ba6f23e971d"
+        },
+        {
+          "path": "skills/attack-surface-analysis/pipeline.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 17635,
+          "sha256": "dbd04af2bd5c85665df6826bcaf4b42a8e71c13b9a04555881c11fa1ea0ccf0a"
+        },
+        {
+          "path": "skills/ci-review/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 7843,
+          "sha256": "e6f9d9b5525a742849bc6a1d54ee24a895c3f44fe36f9169e030af8c0649a6d1"
+        },
+        {
+          "path": "skills/claude-security/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 6969,
+          "sha256": "15e3a09af48625f43bfa9d1a0a29e56667d945370ac6655967b38afbcd554a53"
+        },
+        {
+          "path": "skills/claude-security/jobs/continue-scan.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 4130,
+          "sha256": "05a6d730d4728b4f100ec5cdb0fe5eda0ef21987f58e65c8ca86d91268e31798"
+        },
+        {
+          "path": "skills/claude-security/jobs/scan-changes.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 32319,
+          "sha256": "3c009a51e5ea1735280add753cd1d4c1598f407e16fd174c836d9dbfb5ceb665"
+        },
+        {
+          "path": "skills/claude-security/jobs/scan-codebase.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 33810,
+          "sha256": "4aadc5a416f7ef17bf622b17808994d13eae71e45114341890455428bcb778eb"
+        },
+        {
+          "path": "skills/claude-security/jobs/suggest-patches.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 38232,
+          "sha256": "80e43c81544d9e4466e2750ccee43a8f01482574eb3e5a801c1523e237ed9c4f"
+        },
+        {
+          "path": "skills/claude-security/jobs/triage-findings.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 6378,
+          "sha256": "4e9768ad48c33e0d28f755363c8940d1b6aad20733925fc0d93879d9d3be8f55"
+        },
+        {
+          "path": "skills/claude-security/role.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 16187,
+          "sha256": "cbffb8a1cfc767969f23e70ada5cbdf8283d6eb3ba4b2e7d5d15830bf0302b9d"
+        },
+        {
+          "path": "skills/claude-security/specs/patch-review-brief.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1280,
+          "sha256": "99d6b68777eded60644eeae346fe411e43ef0935a07147601a9fafc40cdcde7e"
+        },
+        {
+          "path": "skills/claude-security/specs/patch-spec.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 11990,
+          "sha256": "a01fe9837b7eccfcf84325ab21fd57947a3ccfdfa743c9582e6ad60f512d11ef"
+        },
+        {
+          "path": "skills/claude-security/specs/report-spec.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 11474,
+          "sha256": "38c5d732a4647020ccbe540c46e92f1a5b8d0104a29d280c0a71ee7b5e8a7918"
+        },
+        {
+          "path": "skills/hosted/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 9320,
+          "sha256": "f0da8fabbcec5e2571ad9adaf22d5b5e9ea64b4ae1daa33e49695fcd5336f85a"
+        },
+        {
+          "path": "skills/install-cli/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 372,
+          "sha256": "9dbd4b0e8f0250a1907ee7a82aaba19130ab4eaf9da28a1eac8cfe5a8130e8b5"
+        },
+        {
+          "path": "skills/threat-model/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 19695,
+          "sha256": "6dd429cff4a684c6d78ae1a569a3831a9c0b3cc299f9f59823cf287d043a835e"
+        },
+        {
+          "path": "workflows/scan.js",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 197436,
+          "sha256": "344a05cad6104805ae17577f9d58dfd72f49d8c3f5dbb02b067a138963261c1d"
+        },
+        {
+          "path": "workflows/triage.js",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 10228,
+          "sha256": "46d95d7420e2765dddad8a9033c7d1a2015cea929487d7e58bce01483c091af5"
+        }
+      ]
+    },
+    {
+      "name": "claude:feature-dev",
+      "root": "claude-feature-dev",
+      "repository": "https://github.com/anthropics/claude-plugins-official",
+      "commit": "0fbfda5a91f4adc311daca25acc99132f40f0b6e",
+      "pluginPath": "plugins/feature-dev",
+      "ecosystem": "claude",
+      "files": [
+        {
+          "path": ".claude-plugin/plugin.json",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 284,
+          "sha256": "f89c71879d479ddcce5427f7ce4b462329b030d02c06d8d42d3b6002e1fd1b18"
+        },
+        {
+          "path": "LICENSE",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 11358,
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+        },
+        {
+          "path": "README.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 11697,
+          "sha256": "6c304db2b1052f14399f87ba1b042f8b74f431485a3100de61ec53307f115098"
+        },
+        {
+          "path": "agents/code-architect.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 2259,
+          "sha256": "c50fb08d59a4bbd19660860626a049e44cf1a2b0c1cf782e6c7a99ba7e71b0c3"
+        },
+        {
+          "path": "agents/code-explorer.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 2115,
+          "sha256": "3b277703de7458988ec3b8021c716f79f642e174950ed332629310f68322029a"
+        },
+        {
+          "path": "agents/code-reviewer.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 2994,
+          "sha256": "a7df173bf77a00da5584c6401a1061524fdbe477b6fef5dd496d4c7a9113c78c"
+        },
+        {
+          "path": "commands/feature-dev.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 5097,
+          "sha256": "652e5d6264fd253fcb70c2f84de986a88d77109a02410aacd90230a6ab4bf557"
+        }
+      ]
+    },
+    {
+      "name": "claude:plugin-dev",
+      "root": "claude-plugin-dev",
+      "repository": "https://github.com/anthropics/claude-plugins-official",
+      "commit": "0fbfda5a91f4adc311daca25acc99132f40f0b6e",
+      "pluginPath": "plugins/plugin-dev",
+      "ecosystem": "claude",
+      "files": [
+        {
+          "path": ".claude-plugin/plugin.json",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 289,
+          "sha256": "3c83209b8d3f7844f98d9982e520327bd97b888c0772c0e0f82fd4fd7d9f9eec"
+        },
+        {
+          "path": "LICENSE",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 11358,
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+        },
+        {
+          "path": "README.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 14676,
+          "sha256": "3b2c268c85f34e7bd8db62ce3e38b07ae210f6e4b9131ec2cf669479205378c7"
+        },
+        {
+          "path": "agents/agent-creator.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 7488,
+          "sha256": "99ca808b7577e5c4b816cd7e621a1dea4b0ba9104ba24629cd713170cfe9dbd3"
+        },
+        {
+          "path": "agents/plugin-validator.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 6678,
+          "sha256": "cd1cf892e9d4693a1b783ffd53965a25bad9c293db87a2122578c97fdb098b94"
+        },
+        {
+          "path": "agents/skill-reviewer.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 6132,
+          "sha256": "78ac55ddc31dd78227df90029d9c2333bdd97567296ddd4a9b23c090a94fc09a"
+        },
+        {
+          "path": "commands/create-plugin.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 15855,
+          "sha256": "f2c634dfc0b519dbb1795bd012f44f93a94cabfc2cbd08020ccd1816a435dab8"
+        },
+        {
+          "path": "skills/agent-development/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 11168,
+          "sha256": "6a2826571320828cc6f8f21ccd8e6eefd2bced62000c8c5e43a712c12e2d83a1"
+        },
+        {
+          "path": "skills/agent-development/examples/agent-creation-prompt.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 9838,
+          "sha256": "a299652c1bba7b43736cc72a14ada464baccc80c6431e5fa3a55bd13129ac54c"
+        },
+        {
+          "path": "skills/agent-development/examples/complete-agent-examples.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 13916,
+          "sha256": "8321e9933dd0033c46bf5ae831e7cf7dc79783c80fb9b5ea1b66c74f4ac2b337"
+        },
+        {
+          "path": "skills/agent-development/references/agent-creation-system-prompt.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 9749,
+          "sha256": "c56e7fafb84bcbeff69ecd61b1f68ca380e8ba4177dc57c6ceeecd3aa8a83d7b"
+        },
+        {
+          "path": "skills/agent-development/references/system-prompt-design.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 9998,
+          "sha256": "eaac53eaaf8326ac04428987280fb5041920b7571477ad41742517c5aac683fc"
+        },
+        {
+          "path": "skills/agent-development/references/triggering-examples.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 8868,
+          "sha256": "b8ff47692b007b19b36df81ebd0562476202a21d67db80eeca9c3ee05528cb10"
+        },
+        {
+          "path": "skills/agent-development/scripts/validate-agent.sh",
+          "kind": "file",
+          "mode": 493,
+          "bytes": 5796,
+          "sha256": "d22e1292f997169fb745793dc50ebe3e9c6631603e1d77f04c2e79bb1fc63cba"
+        },
+        {
+          "path": "skills/command-development/README.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 7651,
+          "sha256": "dd4ba7eded93d7ba698f05ec63d06d110a6b5543664af359b005dd976ce811b8"
+        },
+        {
+          "path": "skills/command-development/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 19233,
+          "sha256": "c55ad02cfe4cbb2a947eea3b1ed5fa1871e722d627c3c6792c3ed87c10c4d7a8"
+        },
+        {
+          "path": "skills/command-development/examples/plugin-commands.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 13989,
+          "sha256": "7d71d7b516020a6c171171399b40dd2cad02b842c9faa78b90e0983906c9ee94"
+        },
+        {
+          "path": "skills/command-development/examples/simple-commands.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 8675,
+          "sha256": "f2533ed834305166603bcb4dd870d695af4a33b9a49d330937a4c70ed964767c"
+        },
+        {
+          "path": "skills/command-development/references/advanced-workflows.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 13618,
+          "sha256": "eb258095b5a411b68377c96730effe597884a14b619cb0c1a7ab1c801d80a7d9"
+        },
+        {
+          "path": "skills/command-development/references/documentation-patterns.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 14971,
+          "sha256": "70c6c9b0a9b2d46a925ada6c45808a73498a457e1d641c82cc05de8a29a33b05"
+        },
+        {
+          "path": "skills/command-development/references/frontmatter-reference.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 9162,
+          "sha256": "db1ea175ca4b0bb7d11c75cb8a7d00b353ea7cf4df2027b4263e45ded4d39475"
+        },
+        {
+          "path": "skills/command-development/references/interactive-commands.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 20980,
+          "sha256": "09ab1f18bfa3ff5f7088e45d5810ac20eb25ffc97fc9e8bb79416d40e0b4516b"
+        },
+        {
+          "path": "skills/command-development/references/marketplace-considerations.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 16437,
+          "sha256": "ab30835431d06a8e65cd629ba0e73b3f1de5b043126c6fef7ea70163400e90f4"
+        },
+        {
+          "path": "skills/command-development/references/plugin-features-reference.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 14622,
+          "sha256": "57e11ae6a4bbc1a4a295d1f036202970911d6029d64f4ab058b63a4c5a899072"
+        },
+        {
+          "path": "skills/command-development/references/testing-strategies.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 14803,
+          "sha256": "e6ccf78d85c23bc58582dbc8b91731c4e412568705ed2c87ac699a1ded9adc67"
+        },
+        {
+          "path": "skills/hook-development/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 16246,
+          "sha256": "f47e2d42f6360294216a859ae0c30b93caafdd2b2e5ffc007489ba4ca447fa5c"
+        },
+        {
+          "path": "skills/hook-development/examples/load-context.sh",
+          "kind": "file",
+          "mode": 493,
+          "bytes": 1690,
+          "sha256": "0d614599e711c087b381a4ac7ee3c40758af1022669fc998649d199b9dfe15ed"
+        },
+        {
+          "path": "skills/hook-development/examples/validate-bash.sh",
+          "kind": "file",
+          "mode": 493,
+          "bytes": 1304,
+          "sha256": "348c58f4cf38a2e7080ea5272935a7658c7122d83dd6c52d0a1f2ef599c176ab"
+        },
+        {
+          "path": "skills/hook-development/examples/validate-write.sh",
+          "kind": "file",
+          "mode": 493,
+          "bytes": 1222,
+          "sha256": "89a8ef9bb7508e4819080e65834d6783afa5a5a614d458a3821b80a329eb32e5"
+        },
+        {
+          "path": "skills/hook-development/references/advanced.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 10148,
+          "sha256": "5b139ceeb6a3ef16555a6eef421e2642e6ca286b5527ee2b4e02c11ae5b75dd5"
+        },
+        {
+          "path": "skills/hook-development/references/migration.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 8299,
+          "sha256": "7f8e7a795829837f46a0c058c26c8f5c4aa8be5c9fb5316b828229d1802ded77"
+        },
+        {
+          "path": "skills/hook-development/references/patterns.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 7144,
+          "sha256": "cb607fca192bfa892fd198141b86dac9d0ca2c573a280b054b7beaa56fc9a8bf"
+        },
+        {
+          "path": "skills/hook-development/scripts/README.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 3677,
+          "sha256": "08a28b12ffa9fcb16f257ea685c70a920f4f835978b9ffbbac055137c6f6aca0"
+        },
+        {
+          "path": "skills/hook-development/scripts/hook-linter.sh",
+          "kind": "file",
+          "mode": 493,
+          "bytes": 4200,
+          "sha256": "85a7d55488f8f38f9b98350b5cb597fb306432d5e61eaa3444e7226ca9309e0b"
+        },
+        {
+          "path": "skills/hook-development/scripts/test-hook.sh",
+          "kind": "file",
+          "mode": 493,
+          "bytes": 5336,
+          "sha256": "ded642e811b4731f6a2c90c73b02e00c937511d9ee65236bb8cf9964f0069393"
+        },
+        {
+          "path": "skills/hook-development/scripts/validate-hook-schema.sh",
+          "kind": "file",
+          "mode": 493,
+          "bytes": 5081,
+          "sha256": "e7785d6c61d368f5ea5270c979753aea02f776f5b6aa220137ec4585abd720c2"
+        },
+        {
+          "path": "skills/mcp-integration/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 12530,
+          "sha256": "b9319d8e44c8f058c1c4f003168295ab2582567fd6329c8b933409116e938bc6"
+        },
+        {
+          "path": "skills/mcp-integration/examples/http-server.json",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 502,
+          "sha256": "7a11adaea5ac1bb76269bf473f5cf5cbd636a83c2ec0b7007f2b1cbf4a8a725f"
+        },
+        {
+          "path": "skills/mcp-integration/examples/sse-server.json",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 337,
+          "sha256": "2bb1c32911c5714158e368d4bb347306078f6d2097b653e9e5c9a02d2cc0510e"
+        },
+        {
+          "path": "skills/mcp-integration/examples/stdio-server.json",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 686,
+          "sha256": "46148a5dc7fc5e63c681c5fb975d3908d3f3052f51de7236725cdadda41e2b5d"
+        },
+        {
+          "path": "skills/mcp-integration/references/authentication.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 10159,
+          "sha256": "2f48cf8fd68d169e885ce96a62a7feaadd0fa293d74b451a51998947f41a8f86"
+        },
+        {
+          "path": "skills/mcp-integration/references/server-types.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 10824,
+          "sha256": "6ec320da9fdec2445d03f6b3ece875ecba383fa5e6fd9c2f5dd8fd7a6038a090"
+        },
+        {
+          "path": "skills/mcp-integration/references/tool-usage.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 11674,
+          "sha256": "8dd0005d7ba6cd2d24e72f9e6102c129b7445fc818e14656ad9ebaef6621a7a6"
+        },
+        {
+          "path": "skills/plugin-settings/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 12097,
+          "sha256": "028b955244b937ebc1a5c268a12776b8ceae4cbfb60928fbca927227f4c8851d"
+        },
+        {
+          "path": "skills/plugin-settings/examples/create-settings-command.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 2177,
+          "sha256": "abf0a36bb3f6425041046f2da1ebfac5505c5b37656fdd4772cfc4d8bd2fa655"
+        },
+        {
+          "path": "skills/plugin-settings/examples/example-settings.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 2930,
+          "sha256": "f07209b6e2fb62d443ae07d01bc1674c6c741c352a04549bfa978e1f34b9769e"
+        },
+        {
+          "path": "skills/plugin-settings/examples/read-settings-hook.sh",
+          "kind": "file",
+          "mode": 493,
+          "bytes": 2205,
+          "sha256": "627fce38d37d64c971401ecc85d548f060075670bcac52f65c92ca156e810c70"
+        },
+        {
+          "path": "skills/plugin-settings/references/parsing-techniques.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 11513,
+          "sha256": "bc90aa020aa5fcbb3483d7316754450dcc91d086ee96f9304fa655e878f7712e"
+        },
+        {
+          "path": "skills/plugin-settings/references/real-world-examples.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 9492,
+          "sha256": "35c8805ac43fccd9efeef932bc49afc424f8fd150b553197652996abf2d1327e"
+        },
+        {
+          "path": "skills/plugin-settings/scripts/parse-frontmatter.sh",
+          "kind": "file",
+          "mode": 493,
+          "bytes": 1269,
+          "sha256": "1ab8c42d5a19e0b404af3c573d0267fc19b5987e1d7885f522066ffd76e54553"
+        },
+        {
+          "path": "skills/plugin-settings/scripts/validate-settings.sh",
+          "kind": "file",
+          "mode": 493,
+          "bytes": 2712,
+          "sha256": "2f4975285cba7f16b82c764a95fe76d34ac488308ba6705c04561267da4f4f75"
+        },
+        {
+          "path": "skills/plugin-structure/README.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 3210,
+          "sha256": "c7cb4931d6d71198cba6b552e4733b41940be56a65552a2ff7c5656750b95184"
+        },
+        {
+          "path": "skills/plugin-structure/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 13796,
+          "sha256": "a2dbc1e5502aacb360d0ca74732cdd7be4f6a12a49edf4f2ade4134fbc026247"
+        },
+        {
+          "path": "skills/plugin-structure/examples/advanced-plugin.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 18746,
+          "sha256": "3d24f5856048a94cb99fe2b8207d99f2f5d69325771b361d63ec73024290759c"
+        },
+        {
+          "path": "skills/plugin-structure/examples/minimal-plugin.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1731,
+          "sha256": "c4f14fe56b153be3c532b7947bb10b453fc92e280dca5a7da752d2b1b5d17448"
+        },
+        {
+          "path": "skills/plugin-structure/examples/standard-plugin.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 13310,
+          "sha256": "b8cfba84bd4dbdc83365cebcde5dcc6391252372300df0c1ea7890441582d784"
+        },
+        {
+          "path": "skills/plugin-structure/references/component-patterns.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 12086,
+          "sha256": "38681792a6aba4f06d3c391b20b04060263f1fbaacc5880cc0cafe0543d37f91"
+        },
+        {
+          "path": "skills/plugin-structure/references/manifest-reference.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 12061,
+          "sha256": "d0ff8ffece4754df92c543266b8d0b689fb85473f51fbb57e215f2d235ee9782"
+        },
+        {
+          "path": "skills/skill-development/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 22825,
+          "sha256": "d51b4e20043b13e462aa86c47ea82d43e216eb292871538127f4b12a54e4944f"
+        },
+        {
+          "path": "skills/skill-development/references/skill-creator-original.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 11547,
+          "sha256": "8c0ce23bb87be91f5b0853c2e9815617c3858b63acdddfe5da47d2c2d3a60816"
+        }
+      ]
+    },
+    {
+      "name": "codex:vercel",
+      "root": "codex-vercel",
+      "repository": "https://github.com/openai/plugins",
+      "commit": "981b02c0c44058b595f3b4180002c3ae3c806d40",
+      "pluginPath": "plugins/vercel",
+      "ecosystem": "codex",
+      "files": [
+        {
+          "path": ".app.json",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 98,
+          "sha256": "b638b778280d0256dfc18ff64f830cf091d92e5f6ff098069ca1e6eba296f1cf"
+        },
+        {
+          "path": ".codex-plugin/plugin.json",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1647,
+          "sha256": "e6f470a8c5136d4e3a697882c5a81f0caddfac01e92b81ea37c084fc8d5d0353"
+        },
+        {
+          "path": ".mcp.json",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 108,
+          "sha256": "af4528af961ca15e912b4f88643242743269706bee92c5f65f3cf428981ebe19"
+        },
+        {
+          "path": "README.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 9452,
+          "sha256": "b623ef9e39a934cef8114a8f90a118b8bbe3493273796bb5acaa202452bc19c4"
+        },
+        {
+          "path": "agents/ai-architect.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 12595,
+          "sha256": "261a723d9223b7d000bfb40cc3400eac6ebecc528e5f048dfd8d6ed0fb743c26"
+        },
+        {
+          "path": "agents/ai-architect.md.tmpl",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 8570,
+          "sha256": "dcb76ef1193c2b8206fe9ccd08559a46beb7488452ae5af897d7a085de075a2e"
+        },
+        {
+          "path": "agents/deployment-expert.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 12307,
+          "sha256": "4fa012779dab0ebebb7f75646cc1a993d86d2970db053b19f15672cf48f90bf3"
+        },
+        {
+          "path": "agents/deployment-expert.md.tmpl",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 7658,
+          "sha256": "b94ffb38834d6591b480c57d208fa7ca4dc3f49a3e93fa230bb4a89656da1883"
+        },
+        {
+          "path": "agents/performance-optimizer.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 12462,
+          "sha256": "4ffb46d5c16c466ed6e19c5cccf04627e572beb1c721ac89a68495771d6c4747"
+        },
+        {
+          "path": "agents/performance-optimizer.md.tmpl",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 7659,
+          "sha256": "6283f44252482dd2f02c7d37f3a20b7ef039fb874d663de2d3a5722202c04634"
+        },
+        {
+          "path": "assets/app-icon.png",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 36958,
+          "sha256": "3bbcc360dadfbdd161591284f540b3c5d1d7d8083f2b4e6e5698be7dd4541de4"
+        },
+        {
+          "path": "assets/composer-icon.png",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 2254,
+          "sha256": "3e4a7d38560781583cbe7356c4e538f22fbf222fd490551cbc61c00ebdf4475c"
+        },
+        {
+          "path": "assets/logo-padded.png",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 2254,
+          "sha256": "3e4a7d38560781583cbe7356c4e538f22fbf222fd490551cbc61c00ebdf4475c"
+        },
+        {
+          "path": "assets/logo.png",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 2254,
+          "sha256": "3e4a7d38560781583cbe7356c4e538f22fbf222fd490551cbc61c00ebdf4475c"
+        },
+        {
+          "path": "commands/_conventions.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 2982,
+          "sha256": "cb10f630e3d615ef4a1c556c3b35ab4312b3c387770a988bb233335aa637908e"
+        },
+        {
+          "path": "commands/bootstrap.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 5807,
+          "sha256": "e26a1f7aa23a17b5af6db7d30f8470a537d72449907ae7dca9765b9d836c015a"
+        },
+        {
+          "path": "commands/bootstrap.md.tmpl",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 2331,
+          "sha256": "1e085e763487c26f55dae65c5b5bf542dd8f7930de64d1377b703b50d3c401f1"
+        },
+        {
+          "path": "commands/deploy.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 7981,
+          "sha256": "b45ce44b2db2025d425b4d3582a7eb9e11a05a87f9b5c27591ba8d60cbd2e696"
+        },
+        {
+          "path": "commands/deploy.md.tmpl",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 3977,
+          "sha256": "d7b915b1ba283b01659873c8bee05a1c585abcb4af83948ee451251a655c7f7d"
+        },
+        {
+          "path": "commands/env.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 8975,
+          "sha256": "cb1a0174593e1e1531974a19a352a3817fe673c524ee8a1871ed2feeb310b9ef"
+        },
+        {
+          "path": "commands/env.md.tmpl",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 6145,
+          "sha256": "47d5c29121b5e03677404569a15bb4ca8e9e97e6ef3dfa7f03a41f4a5c46a953"
+        },
+        {
+          "path": "commands/marketplace.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 13110,
+          "sha256": "e4d702ff3e161e6520b618aadf9396a71a88233e13eb45ac15b944240a4748ab"
+        },
+        {
+          "path": "commands/marketplace.md.tmpl",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 9068,
+          "sha256": "3d7d91391531b25c8c849085135fee852a0aa80b32b97468f55a7af19eb9cd93"
+        },
+        {
+          "path": "commands/status.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 10823,
+          "sha256": "ec6e7fc6e5c09fc120e0a98351e3261c4c12aff722f141681401b26ee9ba1d91"
+        },
+        {
+          "path": "commands/status.md.tmpl",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 7449,
+          "sha256": "2261c7914b47d6e1ef180291fcdcbfac64e9a1671a2d5a262fc6fa26e7ebe4db"
+        },
+        {
+          "path": "skills/_chain-audit.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 13075,
+          "sha256": "e645081528807ec3c50454b7367bd91278b9784a82f433e0a1803aba156f64ea"
+        },
+        {
+          "path": "skills/agent-browser/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 6616,
+          "sha256": "268feb796ace9927d54310ffda8f72bac63cd1c0d88a0506294beab6472a611b"
+        },
+        {
+          "path": "skills/agent-browser/agents/openai.yaml",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 103,
+          "sha256": "af04c1bbddc77978a371af47afdb87fe331bc08004620a5b6f15e4e19d02d483"
+        },
+        {
+          "path": "skills/agent-browser-verify/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 6563,
+          "sha256": "ddba077d6c07d6b5cce7aa8fb8b2c56e043cd561d70f20f096b7422dd44a1ee6"
+        },
+        {
+          "path": "skills/agent-browser-verify/agents/openai.yaml",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 120,
+          "sha256": "206437b938766d00eaab3b7abfbf6373d923e478707e6d790fd752ce2cf86964"
+        },
+        {
+          "path": "skills/ai-elements/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 21514,
+          "sha256": "47ae062a3ca7dc004f667591b39998d650a0cd0d909fe3a06ca6bb9a9f685567"
+        },
+        {
+          "path": "skills/ai-elements/agents/openai.yaml",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 171,
+          "sha256": "d0cc9adb39365dcf46bd490129558c8f8590fc1df9c0e11c329e2b3a620320da"
+        },
+        {
+          "path": "skills/ai-gateway/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 19134,
+          "sha256": "cdfc9062b39056d43b406a93ba081d38383473a62d5391b8c9561b89079c6647"
+        },
+        {
+          "path": "skills/ai-gateway/agents/openai.yaml",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 97,
+          "sha256": "a4d38268963f3d551df6d88296738bcade16fe7a58c94d7d422d23d36b6d6fce"
+        },
+        {
+          "path": "skills/ai-generation-persistence/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 7749,
+          "sha256": "275935c3e309762399764595e6bfa0f9408132f197e170bbe377a7194f4327ba"
+        },
+        {
+          "path": "skills/ai-generation-persistence/agents/openai.yaml",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 190,
+          "sha256": "c917e04777050941f07548325cc1fa2732a7c46512bc144388cb8b43ea5800b6"
+        },
+        {
+          "path": "skills/ai-sdk/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 6366,
+          "sha256": "787895e07e49c8686ad12b5017bc7f5160fa88863c2739a98976b540f709e2b5"
+        },
+        {
+          "path": "skills/ai-sdk/agents/openai.yaml",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 89,
+          "sha256": "fad9fabe45c1a4029565b188776575be0edabdfe930dc0db613fd603d64f58ce"
+        },
+        {
+          "path": "skills/ai-sdk/references/ai-gateway.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 2191,
+          "sha256": "f3c716c7f9ddad655044f19823ce5c2792985fba5589a0e99e8e3b1139fec90c"
+        },
+        {
+          "path": "skills/ai-sdk/references/common-errors.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 11034,
+          "sha256": "64949f0614a629733d1c47d6e5d5b953d90a696e71922695f69248a21290dcad"
+        },
+        {
+          "path": "skills/ai-sdk/references/devtools.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1199,
+          "sha256": "a07e778b4ce4279cb3a70321a6e5a6021614ed6188d29a5d59ea21e3e53e8d3d"
+        },
+        {
+          "path": "skills/ai-sdk/references/providers.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "path": "skills/ai-sdk/references/type-safe-agents.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 5323,
+          "sha256": "7501751dd0d505e9ee3c9fbf8298d758e8bdae0395554d8f5333e4e017202ae8"
+        },
+        {
+          "path": "skills/auth/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 9387,
+          "sha256": "22f46358aeb87caddde759176073aea63dab402930ada7250741068a67318e3f"
+        },
+        {
+          "path": "skills/auth/agents/openai.yaml",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 170,
+          "sha256": "42233e069b3f53f116e4fdd16ae5cab8559b69f3242abe309ce1cb128a432a51"
+        },
+        {
+          "path": "skills/bootstrap/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 6987,
+          "sha256": "509de0d4efe0611ef39bdbeb3514daaf42794898fc36c67466370d2b1cbd914c"
+        },
+        {
+          "path": "skills/bootstrap/agents/openai.yaml",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 173,
+          "sha256": "0db4223c0b0415fda845dc20421e06483a93db81a9e12b7373f44f368cfe9a92"
+        },
+        {
+          "path": "skills/cdn-caching/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 18904,
+          "sha256": "b4024155cacc4d2d385ee0ee7ad1b5e6c1079e1b2599885fc2b3d197ea433f64"
+        },
+        {
+          "path": "skills/cdn-caching/agents/openai.yaml",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 119,
+          "sha256": "dadb3b7be8e4126dad53db6f50b1c6afe7ec2ef16fd53bcb32a3311ecf9d5c3e"
+        },
+        {
+          "path": "skills/chat-sdk/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 11071,
+          "sha256": "4b57ca391f11d05ce5f9b43bd2d316ca1099947542a105162818122ba05fc5f7"
+        },
+        {
+          "path": "skills/chat-sdk/agents/openai.yaml",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 93,
+          "sha256": "92ff9733ae22f1745e25bc3d02c3797fd94457a5e1c892f8653cf1b4bee01c00"
+        },
+        {
+          "path": "skills/cms/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 10530,
+          "sha256": "d5f22976cb562714110ecd2e358b5123cd12baaffec6d7dc6af086e272b93ff5"
+        },
+        {
+          "path": "skills/cms/agents/openai.yaml",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 169,
+          "sha256": "efd0ad497b38c1190a0ea2b0895d2d9d31971f729136ea713c3c176cbe4dd528"
+        },
+        {
+          "path": "skills/cron-jobs/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 2093,
+          "sha256": "16b197f8fc40559cc16c4aa1d535466d3f595ac2aec0b297203f1db23d98f873"
+        },
+        {
+          "path": "skills/cron-jobs/agents/openai.yaml",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 112,
+          "sha256": "eaa6e7a73a48b2d683e180adea3835ec281d0d6195d2d69e05eb7be555abf46f"
+        },
+        {
+          "path": "skills/deployments-cicd/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 11164,
+          "sha256": "0eb60b7627053f47eebe13685fb06c2ecee1cc3ada6fee283b3775a2a3ae4e64"
+        },
+        {
+          "path": "skills/deployments-cicd/agents/openai.yaml",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 113,
+          "sha256": "31a4370535d00bf02dc5feab3cded49bbebb403044dc1eb3ba65c65ca3789760"
+        },
+        {
+          "path": "skills/email/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 10376,
+          "sha256": "bd601c2f88f5879ce01fc235efb902a8f50575eb0b24f445fe827ae0b909248c"
+        },
+        {
+          "path": "skills/email/agents/openai.yaml",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 159,
+          "sha256": "56715b13117eed0a385c2a60d3daf8a0a9a1a2dce54e6726c4fbe165579cbe36"
+        },
+        {
+          "path": "skills/env-vars/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 9161,
+          "sha256": "6390db2eaa8fece483672975cc23f308fe10286c08126b7db6566dda64ba31c4"
+        },
+        {
+          "path": "skills/env-vars/agents/openai.yaml",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 105,
+          "sha256": "90cb5070d3430ccd085402331449953241a1cd4afa73f2f74f336600d2a50370"
+        },
+        {
+          "path": "skills/eve/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 4654,
+          "sha256": "33139452b6dfec01a35b5f1d4089f7fa95075edfa593522855950c35e4bb492e"
+        },
+        {
+          "path": "skills/eve/agents/openai.yaml",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 97,
+          "sha256": "3225b236e8ec6478a4e67d9a72070e5625b2eff4e9a2f15b40491a0e4176bf74"
+        },
+        {
+          "path": "skills/geist/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 6896,
+          "sha256": "000d1515d168deabce0097b86ceaf7b5cc6c891e505e6a80c40b65b46b47b77e"
+        },
+        {
+          "path": "skills/geist/agents/openai.yaml",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 167,
+          "sha256": "01e309b9b8019fdd8115dfbd80ab91b4204ba7c13e51d5f5f9f9bb22defa6305"
+        },
+        {
+          "path": "skills/geistdocs/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 8264,
+          "sha256": "ebd9221a886c61a53e999382ca2bbcbd01e5100e7fe11a554da9bff1a4462284"
+        },
+        {
+          "path": "skills/geistdocs/agents/openai.yaml",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 176,
+          "sha256": "f8907a562bdad6992cec61a87eb589a1ace0a58fe9c275483f4c051e61a87adc"
+        },
+        {
+          "path": "skills/investigation-mode/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 9306,
+          "sha256": "7fb010f9716e7c8f814976263a6ac5b64f1e266a9b3d71b0559fce015d93a86a"
+        },
+        {
+          "path": "skills/investigation-mode/agents/openai.yaml",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 106,
+          "sha256": "c289daea569dc657edf38c9d836b7079356e9117692182411f07a3e357c748bb"
+        },
+        {
+          "path": "skills/json-render/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 10376,
+          "sha256": "89f5c6e94dcc53310c569f9dadede009be51bddec04af50efa3b6a2181b05a24"
+        },
+        {
+          "path": "skills/json-render/agents/openai.yaml",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 177,
+          "sha256": "8952fa2c1ce15afe4577c852343c497726dbfce33e598822081a717470c50bb2"
+        },
+        {
+          "path": "skills/knowledge-update/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 7126,
+          "sha256": "88e7a902e08fb6140cc637bd76e0836a67cf489054e9b3377f1972a37fc21da6"
+        },
+        {
+          "path": "skills/knowledge-update/agents/openai.yaml",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 127,
+          "sha256": "1a54b47b2fec910454f4deacbe482c30c4fbe2d0f74fb6743c2085145c747802"
+        },
+        {
+          "path": "skills/marketplace/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 6614,
+          "sha256": "57df1817f77785369753a2f8fbbfb21ed3859f7393a5d5e23376cd6ed47cf052"
+        },
+        {
+          "path": "skills/marketplace/agents/openai.yaml",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 177,
+          "sha256": "7ac1e667948d7dfa74a837eba22a33b561b661c26a82c006cc7a8d7fa0844f6d"
+        },
+        {
+          "path": "skills/micro/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 4001,
+          "sha256": "8d694a0b60a57bf3ab7e61bdf555545a2c941acb1a8d2938bf94a0d7cd624fe4"
+        },
+        {
+          "path": "skills/micro/agents/openai.yaml",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 140,
+          "sha256": "d18da37e0c0755891f76da8e06686d6dd74379bb1f2e472fbc22b88c33174aa7"
+        },
+        {
+          "path": "skills/microfrontends/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 4305,
+          "sha256": "aea264a84984cb809c1d8cc9bc9bde2cee8ec92d1101242d89ce743ac484807e"
+        },
+        {
+          "path": "skills/microfrontends/agents/openai.yaml",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 105,
+          "sha256": "b4f6c435216b2de4b1411f256e5c5e59845226cdf895e859a33128bfe95ac31c"
+        },
+        {
+          "path": "skills/microfrontends/references/configuration.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 7270,
+          "sha256": "4cf0bed8c766825f226ae7e1189277b87fb56ba3a81dd79a1d819c7aba12ccd2"
+        },
+        {
+          "path": "skills/microfrontends/references/local-development.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 5861,
+          "sha256": "a3eedaa76060afa7c0b8d8fb4904127582631d881e3366e122ed5257316aaf3c"
+        },
+        {
+          "path": "skills/microfrontends/references/managing-microfrontends.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 7608,
+          "sha256": "0523de85aa1765ce22dc344074fe3be50b75377a5d802704d3ac391da9016fc3"
+        },
+        {
+          "path": "skills/microfrontends/references/path-routing.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 6140,
+          "sha256": "f9b8f897e6ba0c24090012970de9aa6a638214caafddbeffc0fe91d0f27e643b"
+        },
+        {
+          "path": "skills/microfrontends/references/security.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 4189,
+          "sha256": "14947f8ba4487fd0478e7c0ad6802c060ffdc21171981d3e33d0b6e02c45986c"
+        },
+        {
+          "path": "skills/microfrontends/references/troubleshooting.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 8202,
+          "sha256": "88a972602f070a860e2017e067eef2220cd88cc57b14bc830bb0d18648895f17"
+        },
+        {
+          "path": "skills/ncc/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 4513,
+          "sha256": "e37c814ba40e85f0e280a50c78b266a5b4b808f69cfe6231a46d306446cf0dc2"
+        },
+        {
+          "path": "skills/ncc/agents/openai.yaml",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 169,
+          "sha256": "228aaadeb133dca59233ad83cb3b24b42f9e4f43b65baae2325658a133cb6825"
+        },
+        {
+          "path": "skills/next-cache-components/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 10324,
+          "sha256": "337a928c251c4500b9107152c2560a5b506707a22f763dd94902b8fc5b3b44bd"
+        },
+        {
+          "path": "skills/next-cache-components/agents/openai.yaml",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 129,
+          "sha256": "623459b7a70c8d997bd7f140007635c72c1dcb921b8559cfd89e1ba3b5bedda7"
+        },
+        {
+          "path": "skills/next-forge/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 7514,
+          "sha256": "1427a3c22669d365b26daf1dfa1d67e599155679a4b8fc13651017ab761288e0"
+        },
+        {
+          "path": "skills/next-forge/agents/openai.yaml",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 154,
+          "sha256": "3616db166468651589a8ac99bbc7341231a49449534258063d3c3aaa43df3379"
+        },
+        {
+          "path": "skills/next-forge/references/architecture.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 5361,
+          "sha256": "b9ea72e475e747797dda1413e89843e218e850f43d9e0c597712cd53cfe7aa05"
+        },
+        {
+          "path": "skills/next-forge/references/customization.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 6986,
+          "sha256": "cf45ac1c0f4fe30b37ededb4bab2f915851fe6d96c4dddd618619d64ad765844"
+        },
+        {
+          "path": "skills/next-forge/references/packages.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 8556,
+          "sha256": "fce84c439bf91b73f487887c5d36d4f1980109aac8ce1e3b585c79b4fd2cfe31"
+        },
+        {
+          "path": "skills/next-forge/references/setup.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 4317,
+          "sha256": "2625bc7da628a8a27c32b88863d1d0c20be3963bb7920c330cddaa7d5f000556"
+        },
+        {
+          "path": "skills/next-upgrade/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 2928,
+          "sha256": "24869b3c690618b485f009dbd5b93c44385000b322347e2d41d20fe908fa1041"
+        },
+        {
+          "path": "skills/next-upgrade/agents/openai.yaml",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 120,
+          "sha256": "93ae1649bc921e159ad306316c01a08d15491a8d75cdfc619da331dbb3fe98f3"
+        },
+        {
+          "path": "skills/nextjs/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 5328,
+          "sha256": "cdd014ce090e4a137abd81682238d994a41fcd73a626cd70a2af47e2451bbb0c"
+        },
+        {
+          "path": "skills/nextjs/agents/openai.yaml",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 95,
+          "sha256": "f3b76bb6fce9d078fb213868ea7d24ef253ba03655186b00f03ee512fc809015"
+        },
+        {
+          "path": "skills/nextjs/references/app-router-files.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 2610,
+          "sha256": "d11b45d535b41d047fbe22e062de5c72716d64b39b85e9c259cc8e1f5362a567"
+        },
+        {
+          "path": "skills/nextjs/references/async-patterns.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1664,
+          "sha256": "3a5e4a91d8399f0922c4a3b15b3490fbeb7396f976139a92311ea34cfa300584"
+        },
+        {
+          "path": "skills/nextjs/references/bundling.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 4456,
+          "sha256": "5496b337073985068c61527e0a89fbf7088faa47b9f92d2dd09a7d070cb48a7c"
+        },
+        {
+          "path": "skills/nextjs/references/data-patterns.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 6687,
+          "sha256": "538c8e24cd60eded9825a9461f2c644f5e6e5203d95aa4bf7c9486412bcc7aa1"
+        },
+        {
+          "path": "skills/nextjs/references/debug-tricks.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 2953,
+          "sha256": "62617a7cb131a2111f9f033617404fadb3458d56aeb0643f75aa5b2e43abf192"
+        },
+        {
+          "path": "skills/nextjs/references/directives.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1476,
+          "sha256": "60b82ee24a8d43631da59beeec11f46ab25ce83c8000578f2222ecb6b6cadf4d"
+        },
+        {
+          "path": "skills/nextjs/references/error-handling.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 4736,
+          "sha256": "30b4e825b625df01d4a7c441591ac46782aab4f913432e96f408153d5fa62098"
+        },
+        {
+          "path": "skills/nextjs/references/file-conventions.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 3464,
+          "sha256": "95eeb1c6e1c98571192662c8ba3cbf6a034f754596aba54a35077a50a5266de3"
+        },
+        {
+          "path": "skills/nextjs/references/font.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 5196,
+          "sha256": "cb1f8d43e8fbca39839056b4621724837858bdace13e73bf3faf69abca318a21"
+        },
+        {
+          "path": "skills/nextjs/references/functions.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 4388,
+          "sha256": "39a8a418af501d7132d289f4b5dd6cae59d1bfa6fda941d502fc29bb0204e079"
+        },
+        {
+          "path": "skills/nextjs/references/hydration-error.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1801,
+          "sha256": "d4baec07ab818045e284c45dd24422685ac934a38ea325139651f664a94eff57"
+        },
+        {
+          "path": "skills/nextjs/references/image.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 3882,
+          "sha256": "231a15ddea67fe0b965762cc89993ca5aaeb0c35c0e67767bd53ca138ec04c05"
+        },
+        {
+          "path": "skills/nextjs/references/metadata.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 7140,
+          "sha256": "19b00274877056f222f2284be5ade2479690e79e86af9a0466bc9d209506a95d"
+        },
+        {
+          "path": "skills/nextjs/references/parallel-routes.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 7171,
+          "sha256": "d8a1c2546d90af2b37e22a4a56a1978555af0d62a7683e349ce3e3287ab8a4af"
+        },
+        {
+          "path": "skills/nextjs/references/route-handlers.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 3244,
+          "sha256": "976a17de8024b3a65063350ae0fb6b9b617293f06358305800c858f58b015680"
+        },
+        {
+          "path": "skills/nextjs/references/rsc-boundaries.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 4309,
+          "sha256": "2b50b0310884609efc9f2620fbb81ef83a30a810544e449ff669c55935d5b920"
+        },
+        {
+          "path": "skills/nextjs/references/runtime-selection.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 985,
+          "sha256": "7abb95f9af0f4769e7e9e91aba94a5787ed16e2c4009a140c8577a3a49828060"
+        },
+        {
+          "path": "skills/nextjs/references/scripts.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 3326,
+          "sha256": "fff3bc7530d5af472e2825fde69a26218c9e58acba74d60913f403baab4628a3"
+        },
+        {
+          "path": "skills/nextjs/references/self-hosting.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 8334,
+          "sha256": "f59e9afa0ff4dcbe20374dff13517ccec3ac6a239ef6d02e0ee8863cf9fc7082"
+        },
+        {
+          "path": "skills/nextjs/references/suspense-boundaries.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1366,
+          "sha256": "63e2e7125b1a1a9d652dd301814ad7140f8ab3ad6726b2b53df76a89d9bc262a"
+        },
+        {
+          "path": "skills/observability/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 26510,
+          "sha256": "ec9869baf54d7aaa65e34685deab4c855c23b2e65a9ed987ba2e9ce2ee0d4c48"
+        },
+        {
+          "path": "skills/observability/agents/openai.yaml",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 179,
+          "sha256": "e31199b517bcec980195266d77ec6f3620bf932c7b6fd9aeaa3bf5f5e137bad7"
+        },
+        {
+          "path": "skills/payments/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 10589,
+          "sha256": "102127fccfef4a019e3944fd719f75dce1ad60237d0996ea0aa216636981cce4"
+        },
+        {
+          "path": "skills/payments/agents/openai.yaml",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 174,
+          "sha256": "347a65e498ecb19f14be76fd1d6129a4796c5fa5c4bbd7d1b5ddfe1f4c032831"
+        },
+        {
+          "path": "skills/react-best-practices/AGENTS.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 94347,
+          "sha256": "722aa11cb37a6fc3748414c095870e8547b95b370152371272ca2afb8db880f4"
+        },
+        {
+          "path": "skills/react-best-practices/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 6951,
+          "sha256": "64cbd5962d4a6005e55503138c29930053d55dacc6290e60bad22ebeebca5fca"
+        },
+        {
+          "path": "skills/react-best-practices/agents/openai.yaml",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 117,
+          "sha256": "7ec87ac3ce75263c3bec83846f4bbe21e5838a418d843dd8abc1224f1c97b8d3"
+        },
+        {
+          "path": "skills/react-best-practices/rules/_sections.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1538,
+          "sha256": "3f70f58057811d6b5602b5d37c4e0d6bf9be12f94875d2bf4653c9889bc51c9e"
+        },
+        {
+          "path": "skills/react-best-practices/rules/_template.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 631,
+          "sha256": "99df2a3ea088c6c22de2484ddc7e964d0e9923846f44c63380343ecc64455442"
+        },
+        {
+          "path": "skills/react-best-practices/rules/advanced-event-handler-refs.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1483,
+          "sha256": "a3097edeecfb2ff6851cd66ed8cdf0617c3c88180504bee824aa6e75a215bbbc"
+        },
+        {
+          "path": "skills/react-best-practices/rules/advanced-init-once.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 958,
+          "sha256": "3e4dc22173eb0e2b6dcf583e3babd862b8696328f8f59aee7c4d746c5bc05f6c"
+        },
+        {
+          "path": "skills/react-best-practices/rules/advanced-use-latest.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1072,
+          "sha256": "8a3f64dfe5a77d1564248faf17fe662ae75b55d497a243cb30b38eb07ccbbf9a"
+        },
+        {
+          "path": "skills/react-best-practices/rules/async-api-routes.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1125,
+          "sha256": "523338540d73427dc14c0cbb19f2741ebccdf8b105a7b2c1b33d2905cf237a42"
+        },
+        {
+          "path": "skills/react-best-practices/rules/async-defer-await.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 2008,
+          "sha256": "1f4acbcaeca37f7d65b8a8eec432af67302b7da88b4214762d1036596ee530c0"
+        },
+        {
+          "path": "skills/react-best-practices/rules/async-dependencies.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1293,
+          "sha256": "16ef469f877e30c6b8e1e1b4bc3e527312fa3c6318cb785a4eca186ea236131a"
+        },
+        {
+          "path": "skills/react-best-practices/rules/async-parallel.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 654,
+          "sha256": "6d2f841896279e976dfcdc1ac89e70771ac188baadfd43c096b5706cb838b961"
+        },
+        {
+          "path": "skills/react-best-practices/rules/async-suspense-boundaries.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 2506,
+          "sha256": "0e12cf5488e4f81fae9751bdfce782cfac2c1d15c6f9dfbfc2a65879c97d90f4"
+        },
+        {
+          "path": "skills/react-best-practices/rules/bundle-barrel-imports.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 2370,
+          "sha256": "9e61a5d579a8a7d55194c2e110414d7ee2d8da947ba187d444daa1e54d265f0f"
+        },
+        {
+          "path": "skills/react-best-practices/rules/bundle-conditional.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 949,
+          "sha256": "09c8259c3efb04fc0abb8e412ccbda217c222ae8118516283e571c995fe3a7d4"
+        },
+        {
+          "path": "skills/react-best-practices/rules/bundle-defer-third-party.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 920,
+          "sha256": "3719fb47b191e8db4fe22686ec88448ad5af9e6838585425abbe103d0b642e37"
+        },
+        {
+          "path": "skills/react-best-practices/rules/bundle-dynamic-imports.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 791,
+          "sha256": "401817a7369f315fc5a68a1095742ff7d53d0461906880dc9d64a41495ee1986"
+        },
+        {
+          "path": "skills/react-best-practices/rules/bundle-preload.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1149,
+          "sha256": "d1f7cc28da7cd5ab249acd287edc5b761afcfb194e9cb62cd44c5f3543db2de2"
+        },
+        {
+          "path": "skills/react-best-practices/rules/client-event-listeners.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1968,
+          "sha256": "ca176a1970eefae528a91dd10f9af87ac3c337111b34913e6e89fbf997f91a74"
+        },
+        {
+          "path": "skills/react-best-practices/rules/client-localstorage-schema.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1950,
+          "sha256": "0fb7cdf9dc93fdf22f87e3669f953fb9d4ac9b0be42eec4a29fe9a2560610b88"
+        },
+        {
+          "path": "skills/react-best-practices/rules/client-passive-event-listeners.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1636,
+          "sha256": "750f7bf0917f8116aa399ceed1314e3663648615de198fa7ae429cb3faf6cc52"
+        },
+        {
+          "path": "skills/react-best-practices/rules/client-swr-dedup.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1159,
+          "sha256": "644652c39c6cc00de8d1c77a7273612e868dc3f7edda30764164c12ec0f764a3"
+        },
+        {
+          "path": "skills/react-best-practices/rules/js-batch-dom-css.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 3256,
+          "sha256": "745df2ce9e42f772bc82964a1fdcc40304ef254697f050f8144207980a051d1b"
+        },
+        {
+          "path": "skills/react-best-practices/rules/js-cache-function-results.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1931,
+          "sha256": "08d12e0b734097e49cce5150a1f0dcf1f09447ea4e955fa18c166b511df8edcf"
+        },
+        {
+          "path": "skills/react-best-practices/rules/js-cache-property-access.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 532,
+          "sha256": "73e47431e74878a927061bf0ddc7cd91a7556cb35d2573f3421e82300d9ae311"
+        },
+        {
+          "path": "skills/react-best-practices/rules/js-cache-storage.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1651,
+          "sha256": "11b826b0433898c1ece2d3547010d8e77db9fb240185748c45db91493de9b6cc"
+        },
+        {
+          "path": "skills/react-best-practices/rules/js-combine-iterations.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 753,
+          "sha256": "71add08aeeb43091d4ff4c0b2842cce8b4bdef8ad3e732cc034bb5a84827e746"
+        },
+        {
+          "path": "skills/react-best-practices/rules/js-early-exit.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1129,
+          "sha256": "d701adb3a486ad67979e050ce4eada0c80cc69a78c116d845e305022af9b1ba0"
+        },
+        {
+          "path": "skills/react-best-practices/rules/js-flatmap-filter.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1411,
+          "sha256": "9e5b166a41914d975bef7635467f8fb32cd98b5c3126c0bc6f163490812fb5f0"
+        },
+        {
+          "path": "skills/react-best-practices/rules/js-hoist-regexp.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1028,
+          "sha256": "f9e9aef2f7c2307dd7310f283df85dcada45fc43e9bb941b0c3aa414dec21ec4"
+        },
+        {
+          "path": "skills/react-best-practices/rules/js-index-maps.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 837,
+          "sha256": "5df1bdc2cfabb2c98abd55d26762e5c18189535c2e686184f426082e62920391"
+        },
+        {
+          "path": "skills/react-best-practices/rules/js-length-check-first.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1747,
+          "sha256": "8b54a311c826b299272f29187fc58bc55772a04c4a72eeb29456ee96dc9fc624"
+        },
+        {
+          "path": "skills/react-best-practices/rules/js-min-max-loop.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 2278,
+          "sha256": "1f2b3f5ad0616932597ff78c635deb8cc032e5d9a7f3c7021aa9ba1b073b892a"
+        },
+        {
+          "path": "skills/react-best-practices/rules/js-set-map-lookups.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 532,
+          "sha256": "a7fd781a6ba9ad49065961b6f9a90ef486bf6b648390e1a08704025f98e1642b"
+        },
+        {
+          "path": "skills/react-best-practices/rules/js-tosorted-immutable.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1782,
+          "sha256": "d0a5e1b0fec48a0a81397957e2f068e224329f7c42cb5feeed8aae6fa64025e8"
+        },
+        {
+          "path": "skills/react-best-practices/rules/rendering-activity.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 564,
+          "sha256": "1e5e7eaf3555e61d6a2e900089c676527d26259501db5594f59544b6c664f85a"
+        },
+        {
+          "path": "skills/react-best-practices/rules/rendering-animate-svg-wrapper.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1179,
+          "sha256": "9736845b133e8ffcb3c5b6d34403819366af44bf34498ad94e8154c081f9da3e"
+        },
+        {
+          "path": "skills/react-best-practices/rules/rendering-conditional-render.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 980,
+          "sha256": "2ec2fa23c4148285144687050c52369adba3da2fbe3d486f8d3e0aad8f06f2bc"
+        },
+        {
+          "path": "skills/react-best-practices/rules/rendering-content-visibility.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 815,
+          "sha256": "64eee6d5b916fe74df33363994b27fc7f71bea3bcedc7ee04bda23107ca3e6e4"
+        },
+        {
+          "path": "skills/react-best-practices/rules/rendering-hoist-jsx.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1039,
+          "sha256": "93b229560fae92005ed9a2a829064607b39b2e984e92d221d05b2d41df2b7c0e"
+        },
+        {
+          "path": "skills/react-best-practices/rules/rendering-hydration-no-flicker.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 2302,
+          "sha256": "ad3e6edc56c3d253500713195e84b89b0dfff9efbe1726f7824f98eb9bf72259"
+        },
+        {
+          "path": "skills/react-best-practices/rules/rendering-hydration-suppress-warning.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 872,
+          "sha256": "915bacb934e2927d84b37a3f3d225a47b309ac8f9e494ed2bcb66ce07c5676a2"
+        },
+        {
+          "path": "skills/react-best-practices/rules/rendering-resource-hints.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 2549,
+          "sha256": "351b1095d641717b930f1b2253282b7120af3023bc74e06c17675168d4286864"
+        },
+        {
+          "path": "skills/react-best-practices/rules/rendering-script-defer-async.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1868,
+          "sha256": "4cea07b7875ba7fc2c7465ff23b63a2bb334f90aaf2d9293d38d67b05fdb32ab"
+        },
+        {
+          "path": "skills/react-best-practices/rules/rendering-svg-precision.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 588,
+          "sha256": "ed468533f6e95f622859c884b122cf21f9f593ed6bb3d500a54de4b9f9bcb9fb"
+        },
+        {
+          "path": "skills/react-best-practices/rules/rendering-usetransition-loading.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 2070,
+          "sha256": "4fddb807812b133b478d42bdbfd34d4e0389ca73f18f544d5f1fd419cffc2aa2"
+        },
+        {
+          "path": "skills/react-best-practices/rules/rerender-defer-reads.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 973,
+          "sha256": "234050a77faf50cb306be10a9e15bd4421134ab5907e75f13e6d78e2bd262dc9"
+        },
+        {
+          "path": "skills/react-best-practices/rules/rerender-dependencies.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 824,
+          "sha256": "17eb5830956fb56486fd3cfc7431f5849d39751730c05ad9e77dd4f0c27169c5"
+        },
+        {
+          "path": "skills/react-best-practices/rules/rerender-derived-state-no-effect.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1201,
+          "sha256": "cb11ec76f50aa7b6847269f02d79b120c889a30d9ecd2c1d578f75144419c77a"
+        },
+        {
+          "path": "skills/react-best-practices/rules/rerender-derived-state.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 728,
+          "sha256": "1c326bb67b01fb084eb00c8911b0a7cff54681c2315b629f88e49b64eaa6481d"
+        },
+        {
+          "path": "skills/react-best-practices/rules/rerender-functional-setstate.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 2956,
+          "sha256": "508191c734a5537fc83eba2a131621f6b66790ecd0de59c5a635e9283f618415"
+        },
+        {
+          "path": "skills/react-best-practices/rules/rerender-lazy-state-init.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 2008,
+          "sha256": "986490ede55bbe6c96e2c4df7433ff2c24949d078d168003ecf539dd332bc1f2"
+        },
+        {
+          "path": "skills/react-best-practices/rules/rerender-memo-with-default-value.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1173,
+          "sha256": "81c47476564ad8a79fc68fc442734255ca7d6829424359464503fda0a9f9a0dd"
+        },
+        {
+          "path": "skills/react-best-practices/rules/rerender-memo.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1148,
+          "sha256": "1f258990c2f27ff6256b3cc5c43300631bb3f0d81f749aed08d07fcdcc131dd1"
+        },
+        {
+          "path": "skills/react-best-practices/rules/rerender-move-effect-to-event.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1268,
+          "sha256": "abc2cbf167bee056743023351e96806a411d3398da8802093620aecf0721f029"
+        },
+        {
+          "path": "skills/react-best-practices/rules/rerender-no-inline-components.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 2135,
+          "sha256": "1cc32907a770272524ba682eef9e7efdd8ad4533b6f89b718a1fcd7d1d0eb6a3"
+        },
+        {
+          "path": "skills/react-best-practices/rules/rerender-simple-expression-in-memo.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1018,
+          "sha256": "5bdcf2d1558ba5204e643c887b7b4060f89630969425651eb68e96427d97f800"
+        },
+        {
+          "path": "skills/react-best-practices/rules/rerender-split-combined-hooks.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1844,
+          "sha256": "6f45d703343484ef9acef9388397f3642966ae6a5a258899a0cf1f9977cfbf6c"
+        },
+        {
+          "path": "skills/react-best-practices/rules/rerender-transitions.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1055,
+          "sha256": "60f4033909a62df5e5b8c601494f9e50a562e2f8c1c2d81eac24f38142265f1c"
+        },
+        {
+          "path": "skills/react-best-practices/rules/rerender-use-deferred-value.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1846,
+          "sha256": "8c3579576a61a949884167745dcfaf1d5426ba305cc61fd0a79602d70fda4909"
+        },
+        {
+          "path": "skills/react-best-practices/rules/rerender-use-ref-transient-values.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1742,
+          "sha256": "f1a649af9d1d0b5c762f6c9c4c1c70c90d7df82aa10296ee87aadb78c1b76c54"
+        },
+        {
+          "path": "skills/react-best-practices/rules/server-after-nonblocking.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 2000,
+          "sha256": "a9c523800c3fc0af700bddb49039ee06beb49a5939c1640534dc5c9f5e83975d"
+        },
+        {
+          "path": "skills/react-best-practices/rules/server-auth-actions.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 2635,
+          "sha256": "04e3cd723c4b3b21a2a9ab32661b1f262068ea94ab82fd70a644ad130d1df7da"
+        },
+        {
+          "path": "skills/react-best-practices/rules/server-cache-lru.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1353,
+          "sha256": "1924b64561841923b88a657085097a0aeba3e0ba2d5470b9f5c15cc10d6ae70f"
+        },
+        {
+          "path": "skills/react-best-practices/rules/server-cache-react.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 2228,
+          "sha256": "fddeea6c870bb3da4134b61d54b7d09b83d2603f929b7547cd3dc1dc269edd5c"
+        },
+        {
+          "path": "skills/react-best-practices/rules/server-dedup-props.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 2060,
+          "sha256": "c2747424cdac46be62f835f245a0aa887b0090b416d28e2ac8676702645eeb37"
+        },
+        {
+          "path": "skills/react-best-practices/rules/server-hoist-static-io.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 4387,
+          "sha256": "6cbf4b4d76197a3893d703a9d5840ad8e33a59acb5e5cd8b2e56f7ec02b27985"
+        },
+        {
+          "path": "skills/react-best-practices/rules/server-parallel-fetching.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1554,
+          "sha256": "569a2e9fc04f9606686cd75c5894ef8781b502786a7fffe241396846c7733472"
+        },
+        {
+          "path": "skills/react-best-practices/rules/server-serialization.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 996,
+          "sha256": "f4c7d68b29c82381baad059c4a7f09e868e71ec9c3115a26ad3ae7d24c0dfe1f"
+        },
+        {
+          "path": "skills/routing-middleware/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 9502,
+          "sha256": "0b9144b76ee253d169453505a7c9d8d42ceefe8ab835bc136b7c56402ae9877f"
+        },
+        {
+          "path": "skills/routing-middleware/agents/openai.yaml",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 182,
+          "sha256": "d99c2c0fc8dc6eac667f040121beab8a662e3e9dde030a74437996ff3189cbea"
+        },
+        {
+          "path": "skills/runtime-cache/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 7962,
+          "sha256": "d8c9263c079330012710b33de933c5568ce32a781478f0bfcb44d4187d0d846b"
+        },
+        {
+          "path": "skills/runtime-cache/agents/openai.yaml",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 169,
+          "sha256": "4b3b77a6bf3a5d2210bb14ab2fefb0701d3f9cc5f278e7d8c91682e1ebc7e5e6"
+        },
+        {
+          "path": "skills/satori/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 7321,
+          "sha256": "e18bc83ab691fa888301a3678b7d7d888f2d8989d9ee9344ec192dec3c75fddc"
+        },
+        {
+          "path": "skills/satori/agents/openai.yaml",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 171,
+          "sha256": "2d477e67a4e81ddf22a0d2343b7c9d0e19c3bb0fc4d4f04dedcb24e76f80fc08"
+        },
+        {
+          "path": "skills/shadcn/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 19533,
+          "sha256": "f624e06541dcf3c3c8cb3978fe924fa2fded979048f360ae4919f27edbb67fb2"
+        },
+        {
+          "path": "skills/shadcn/agents/openai.yaml",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 171,
+          "sha256": "43088258a439701d62146ea2527901671c3186ff299b1a59098886e0eea33527"
+        },
+        {
+          "path": "skills/sign-in-with-vercel/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 2317,
+          "sha256": "7e2484055684e96d6c2f3b968939b32cad8e75c224189110ae09e4de7cb1fadf"
+        },
+        {
+          "path": "skills/sign-in-with-vercel/agents/openai.yaml",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 182,
+          "sha256": "9da9b4e9ecf48d5ed455d4be7bafc0ea7d29fbdee5c0c7531816b317d00e2bbd"
+        },
+        {
+          "path": "skills/swr/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 5774,
+          "sha256": "3c88522d609da8c8bc981225f44471d436609b5acdf854fc40e8d29aae191d50"
+        },
+        {
+          "path": "skills/swr/agents/openai.yaml",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 90,
+          "sha256": "b3eb64d0040601f565dd5d4c2421e66c5a635e8bea1258783b19b1056ec77342"
+        },
+        {
+          "path": "skills/turbopack/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 9933,
+          "sha256": "92b7684d1900cdbb6e23529ff77c943d744fea6ddd5ffcc45468fa79654e8d77"
+        },
+        {
+          "path": "skills/turbopack/agents/openai.yaml",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 88,
+          "sha256": "7d1ff73a75d21c5640dc32008560762a10d36fc5e179724ad082f6d111a30fef"
+        },
+        {
+          "path": "skills/turborepo/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 16867,
+          "sha256": "3c4b0658cedf2f342b49919d5116371a6f3c03a03759d1d6ff29a52d22059704"
+        },
+        {
+          "path": "skills/turborepo/agents/openai.yaml",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 88,
+          "sha256": "8d303907226757445f546854953baee2db06e20250224c4c5ef7e388273406dd"
+        },
+        {
+          "path": "skills/v0-dev/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 14603,
+          "sha256": "3fc9dc2b71b9fd27f1e95ac2df97eee81cb27550b4c6463615a4d492f4f2d22d"
+        },
+        {
+          "path": "skills/v0-dev/agents/openai.yaml",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 88,
+          "sha256": "123346292718750a2c06b73323e99c77c46f4902e61aea52006c15d471f3f5ef"
+        },
+        {
+          "path": "skills/vercel-agent/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 2352,
+          "sha256": "4e1d77cd9405e40222a923f8a1bce4639ee24acf555f30a37c363a63c96d990f"
+        },
+        {
+          "path": "skills/vercel-agent/agents/openai.yaml",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 160,
+          "sha256": "8628040014bb44f6ac249f7a71a5c226d5f872b2e36ce7d0094caf85f4b2f75a"
+        },
+        {
+          "path": "skills/vercel-api/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 9815,
+          "sha256": "74bf57484948269645b28eb1b6ed2b6b6691bf02cb1bec7b9ceb3fb91d906dbf"
+        },
+        {
+          "path": "skills/vercel-api/agents/openai.yaml",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 103,
+          "sha256": "e2f91b01056c69fbb2be1c439aa75adf9c4a361887c6e268c48095f29bc9f12e"
+        },
+        {
+          "path": "skills/vercel-cli/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 5241,
+          "sha256": "0962de55d37c10eab8889dd8a90ca04d2747f2812102cd2f1e6aecefd7e533f7"
+        },
+        {
+          "path": "skills/vercel-cli/agents/openai.yaml",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 90,
+          "sha256": "a4ea7f0f14b9b611bcbb147979f9a75aeb4a2c88dd42081bdc2ce9089c072b3f"
+        },
+        {
+          "path": "skills/vercel-cli/references/advanced.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 882,
+          "sha256": "aa2ce5087d575aed94b9a36f599651f20c7eba44274027305b60929afcc7b576"
+        },
+        {
+          "path": "skills/vercel-cli/references/bun.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1195,
+          "sha256": "ad009b1eb8da4890f32f482330832e3eb3b33aac7c30ab05c3ce5a546fb0de9f"
+        },
+        {
+          "path": "skills/vercel-cli/references/ci-automation.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1537,
+          "sha256": "c93ac7152a0de55fc8dd000d6c655a71fc9f00c30ec31f98fbc143e1afa3973c"
+        },
+        {
+          "path": "skills/vercel-cli/references/deployment.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1747,
+          "sha256": "3522d20f663fdd6bcd83c5d1039d0a12d4e0e4a9e8c504e5a1b8330d1cc1e2c8"
+        },
+        {
+          "path": "skills/vercel-cli/references/domains-and-dns.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 896,
+          "sha256": "6f49e7d71f7e0912097826fe63ecf99c483023d03a4c02847abad2bd82e43ad8"
+        },
+        {
+          "path": "skills/vercel-cli/references/environment-variables.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1084,
+          "sha256": "e8836f9a0c987daa3053c3dd9c59626f2a25957ff86a55d4c62779f05253f757"
+        },
+        {
+          "path": "skills/vercel-cli/references/flags.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 3491,
+          "sha256": "87eecdc951f39d96b2ebbf9ecff610dc40304be75701acbfb7ef73b38645016a"
+        },
+        {
+          "path": "skills/vercel-cli/references/getting-started.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1371,
+          "sha256": "953104a802ad27d0be9caf1bf36d6881e98c899144702ac1fdddbba400dabd13"
+        },
+        {
+          "path": "skills/vercel-cli/references/global-options.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 703,
+          "sha256": "5eca7f2e37de30c698ce7c3a6b91bd742bdd95cfa741050fe1057625889ced14"
+        },
+        {
+          "path": "skills/vercel-cli/references/integrations.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 7564,
+          "sha256": "3d30f88e4d54cf52f7f128dfe7636a038cd6980fc58418f1c40dc105e281a3c5"
+        },
+        {
+          "path": "skills/vercel-cli/references/local-development.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 913,
+          "sha256": "1aabaa27355146ca037438b8a87183b6e751c4247976dbea6c563d5c57ccc8bf"
+        },
+        {
+          "path": "skills/vercel-cli/references/monitoring-and-debugging.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 2360,
+          "sha256": "7a4d8ef794e54691a9e17542364fc709de9771445f5070fb6afe5928b6ebd0ad"
+        },
+        {
+          "path": "skills/vercel-cli/references/monorepos.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 2995,
+          "sha256": "6474020ff37b8fab06f9a230e5b963f91d17f406d1e95920041d53af579e03fe"
+        },
+        {
+          "path": "skills/vercel-cli/references/node-backends.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 2719,
+          "sha256": "f28175cbd4ddc00473a3d1565819e5069a57fdc186ae4010f2535715c61769cb"
+        },
+        {
+          "path": "skills/vercel-cli/references/projects-and-teams.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1068,
+          "sha256": "f28a69e42f0a635138bffefcbbd90cc6a13ac6c9014e025bcdd4fcb5c250d4fe"
+        },
+        {
+          "path": "skills/vercel-cli/references/storage.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 821,
+          "sha256": "e64a2f0c74968d1b8f01c23bed0254a2699e409825b0fc7947d1abe13d827bc5"
+        },
+        {
+          "path": "skills/vercel-connect/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 17554,
+          "sha256": "65438f9a3500e5fa94825a762bf271be201e5de68689f64f6fb805ce8292d152"
+        },
+        {
+          "path": "skills/vercel-connect/agents/openai.yaml",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 128,
+          "sha256": "e2056e5a55ed8ead53396ff05a80d73da4636c7615ec32ac56434b2195a6158e"
+        },
+        {
+          "path": "skills/vercel-firewall/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 20060,
+          "sha256": "ff7654dc6b4dba878e34a69951deee3ffd2e0779b88b0e29d062a960539c1991"
+        },
+        {
+          "path": "skills/vercel-firewall/agents/openai.yaml",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 113,
+          "sha256": "8738cd4b8c6540980b722e9351b45118d4af33379971272797314024b8ac0e5f"
+        },
+        {
+          "path": "skills/vercel-flags/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 10354,
+          "sha256": "e668b1e4384bfbfbb0ac0df7c953183bb1a8956c5ba558d1f43836d09d9c5e46"
+        },
+        {
+          "path": "skills/vercel-flags/agents/openai.yaml",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 178,
+          "sha256": "36e71f93e0fbf29805c76e9990b2dd2cc4f5b4aeee6633e6babbe2ffd110d9ef"
+        },
+        {
+          "path": "skills/vercel-functions/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 14367,
+          "sha256": "f7a80c5159847c8c8d22e3d02c5157e10e85aeac8d501eaeda8d8c4355af95e8"
+        },
+        {
+          "path": "skills/vercel-functions/agents/openai.yaml",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 182,
+          "sha256": "fcfe330fd810ba6b9f3da8dc6f32ff7748be9b3a03f4e15a57f17e578f40aebb"
+        },
+        {
+          "path": "skills/vercel-queues/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 8356,
+          "sha256": "8e12371a880cd754359a765a63b5d3d54243c11cc700cae6513e8cc95822f54c"
+        },
+        {
+          "path": "skills/vercel-queues/agents/openai.yaml",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 179,
+          "sha256": "6f311ebb89fb61e72dd75e0143d34ecdb1633e50762ea58e4084755f5343710a"
+        },
+        {
+          "path": "skills/vercel-sandbox/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 10918,
+          "sha256": "d549ffa8793afdb2e4ba60eacef1d004de1c25e938db1bdb99702d4c4ead07aa"
+        },
+        {
+          "path": "skills/vercel-sandbox/agents/openai.yaml",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 160,
+          "sha256": "55589a752f8dedc36372f89c7a93d20b14fb273e1b754f5ff7be3fef73484450"
+        },
+        {
+          "path": "skills/vercel-services/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 7465,
+          "sha256": "1638be9f8ff41638bf4eba03d9880abd19ccc027b646ad25cddf429b61e07f45"
+        },
+        {
+          "path": "skills/vercel-services/agents/openai.yaml",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 144,
+          "sha256": "998a31eaa7560fd37f768938fa4c70174cff37b4b6fde2f56fac0b1202cd59c8"
+        },
+        {
+          "path": "skills/vercel-services/references/fastapi-vite/backend/pyproject.toml",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 165,
+          "sha256": "b5399daf75f1f20bf1182fb84861ca804f3c43a1a0c7d4db7c76a4d4e6d4ceeb"
+        },
+        {
+          "path": "skills/vercel-services/references/fastapi-vite/frontend/package.json",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 320,
+          "sha256": "2af93704192c13c84bd4a3d581417c7960f124d07ef7d223330df90ac7741c86"
+        },
+        {
+          "path": "skills/vercel-services/references/fastapi-vite/frontend/vite.config.ts",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 133,
+          "sha256": "6dc0ce25c4170ac9fbadb4dbd19ca5c2ceb57b9c5efc5090b82e2923f53dd679"
+        },
+        {
+          "path": "skills/vercel-services/references/fastapi-vite/vercel.json",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 208,
+          "sha256": "ca623af3e210bf2f57eff4de7ab4eb9aad045b06d9aa67297ba844b8b67158b2"
+        },
+        {
+          "path": "skills/vercel-storage/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 15334,
+          "sha256": "39790b7fe708b2ba845a08c7f5ee1eff6e0f2b799f09ebc898d00c0f8cd13866"
+        },
+        {
+          "path": "skills/vercel-storage/agents/openai.yaml",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 176,
+          "sha256": "2a100617a537e88bf0c125a6803e043a6bd09348bbba793ccdccda5e42f050b8"
+        },
+        {
+          "path": "skills/verification/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 7516,
+          "sha256": "8baf446b9cc0894c85d8d79484ef8c72d03e8a6cac6f6bd20f672da708c929c9"
+        },
+        {
+          "path": "skills/verification/agents/openai.yaml",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 178,
+          "sha256": "f4bca3cd7b039905cf72fcef8d30c452c5337b4c543d7c558657322fc1ed1454"
+        },
+        {
+          "path": "skills/workflow/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 27514,
+          "sha256": "b159cfcb9ef1d78f69cd13f4d0801c9bf058fb81a4b8598e914e20b34c545364"
+        },
+        {
+          "path": "skills/workflow/agents/openai.yaml",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 106,
+          "sha256": "76e1ad89caf77ffa5fb1ebe2745842cbd2676df0ce108b319b3ce320f2eaaaa4"
+        },
+        {
+          "path": "skills/workflow/references/durable-agent-patterns.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 2522,
+          "sha256": "086373231fc631f9089ab1ffc88c4f6595de3cacb2de6b7939b270cd8cadf8c8"
+        },
+        {
+          "path": "vercel.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 54345,
+          "sha256": "5b8f1adeba081ac5cc0340f3c270654140664dd26bce4baedbea373f4a33f2a1"
+        },
+        {
+          "path": "website/index.html",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 3835,
+          "sha256": "e2295af222629b7e7eeca9989db0c45d22276da656218f5ed5856557cbe4282f"
+        }
+      ]
+    },
+    {
+      "name": "codex:temporal",
+      "root": "codex-temporal",
+      "repository": "https://github.com/openai/plugins",
+      "commit": "981b02c0c44058b595f3b4180002c3ae3c806d40",
+      "pluginPath": "plugins/temporal",
+      "ecosystem": "codex",
+      "files": [
+        {
+          "path": ".codex-plugin/assets/composer-icon.svg",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1463,
+          "sha256": "3327f51e319e1f3071d953887cfa9b86b9369a519975cae357a56e0fcda72b58"
+        },
+        {
+          "path": ".codex-plugin/assets/logo.svg",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1463,
+          "sha256": "3327f51e319e1f3071d953887cfa9b86b9369a519975cae357a56e0fcda72b58"
+        },
+        {
+          "path": ".codex-plugin/plugin.json",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1592,
+          "sha256": "2669f52a67af435d5776fb8c4682dfdf463a003aa3bcf851f9f8845eccc1e962"
+        },
+        {
+          "path": "LICENSE",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1083,
+          "sha256": "9a7285d76bcfe865691b02e6a42deb9a6f86ce0a0d87a12b79fc6a996ba187a5"
+        },
+        {
+          "path": "assets/.gitkeep",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "path": "assets/temporal-logo.svg",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1463,
+          "sha256": "3327f51e319e1f3071d953887cfa9b86b9369a519975cae357a56e0fcda72b58"
+        },
+        {
+          "path": "skills/temporal-cloud-setup/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 70314,
+          "sha256": "084ace6d87df3794288701521106bf1af89ce847f3d241bc3cdbe03a795da21d"
+        },
+        {
+          "path": "skills/temporal-cloud-setup/agents/openai.yaml",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 165,
+          "sha256": "b1e753aba0ddd176f040444571b75caaa76ce4e652e27c95e0d73c06af7ca4e8"
+        },
+        {
+          "path": "skills/temporal-cloud-setup/references/failure-handling.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 12767,
+          "sha256": "e2adbfc5136e38014b3710fbcca6270101804fff2dacff84ccac9cfa404a5454"
+        },
+        {
+          "path": "skills/temporal-cloud-setup/references/sdk-cloud.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 8145,
+          "sha256": "83d041d4f2c5f3d1e33554320bbb91267cb55a390e7072dcb1cae00ce0fe7459"
+        },
+        {
+          "path": "skills/temporal-cloud-setup/references/unified-cli.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 15912,
+          "sha256": "25ed767edfc5c2cb3d3a46290a69c3d7b681c22c67ce3341984cd287f9d6fd01"
+        },
+        {
+          "path": "skills/temporal-cloud-setup/scripts/provision.sh",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 106280,
+          "sha256": "0ae7d2892766b42010d3a8d978299d0893d24f0ec458fbef11771e594d0e1199"
+        },
+        {
+          "path": "skills/temporal-developer/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 7618,
+          "sha256": "25baa82277144571782613812d7f350e91fa8e617143ec7f6786815796782a89"
+        },
+        {
+          "path": "skills/temporal-developer/references/core/ai-patterns.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 5679,
+          "sha256": "17031793f57425df51ebb7111e96932abd1294cc3042104865d1cc967fc6aaed"
+        },
+        {
+          "path": "skills/temporal-developer/references/core/cli-workflow-commands.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 10060,
+          "sha256": "b32f811c677915e21cc3bb9717036464f18508b4d4efa72f96845d7bceabacb6"
+        },
+        {
+          "path": "skills/temporal-developer/references/core/determinism.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 6522,
+          "sha256": "c2bfdb586836968a50c9151dce3f6e4562f9642f622c9d2ab0b7ec6300d893e0"
+        },
+        {
+          "path": "skills/temporal-developer/references/core/dev-management.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 4330,
+          "sha256": "0563581f09e5c47c6ad10586c1705a50b87487f898c23510ecdc34654a88c45f"
+        },
+        {
+          "path": "skills/temporal-developer/references/core/error-reference.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 3048,
+          "sha256": "43c2cba4b3a086b42a749a3fdb25d9b74efee3a0792de97c8153db6b01591e92"
+        },
+        {
+          "path": "skills/temporal-developer/references/core/gotchas.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 9491,
+          "sha256": "ce989241dbf911d165c77077c710f383cde1c669c806ee295b898889f079a62b"
+        },
+        {
+          "path": "skills/temporal-developer/references/core/install_cli.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1296,
+          "sha256": "76296b9fa1d37054926900f81b5c2e34dc620c6433ef4cbf22ba3d39e0f2a002"
+        },
+        {
+          "path": "skills/temporal-developer/references/core/interactive-workflows.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1379,
+          "sha256": "1f3045bceedbdadaa7f788ea3d3cf3d848ff87dc879020e7c1c15e7c1a9b0f8b"
+        },
+        {
+          "path": "skills/temporal-developer/references/core/patterns.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 15020,
+          "sha256": "394a1dab91ac55e068db7a8d8b1d0d2117a410d0bee26a45ed5612453bfa56a7"
+        },
+        {
+          "path": "skills/temporal-developer/references/core/priority-fairness.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 10442,
+          "sha256": "77c04fdf523bbab86b1a8a02280a1161908a8b67a5c077245b865bd35843a5a5"
+        },
+        {
+          "path": "skills/temporal-developer/references/core/standalone-activities.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 8326,
+          "sha256": "2946bba5c33c527ddbccfce7fd4a49e113a77068d1eca8423e95ee191b37d4a3"
+        },
+        {
+          "path": "skills/temporal-developer/references/core/troubleshooting.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 9471,
+          "sha256": "a7795771e70344cf100e238d9041dded8f2924a09a62714e82dfe0e84bd55894"
+        },
+        {
+          "path": "skills/temporal-developer/references/core/versioning.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 8985,
+          "sha256": "f8cf72d1d81c1f5da43c2844cdc384a98607aa7e09ec46b1079361b13656ff95"
+        },
+        {
+          "path": "skills/temporal-developer/references/dotnet/advanced-features.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 6771,
+          "sha256": "e10107b171410168c4357d0b3710dd03a295772841380fa3adbe2823245290e5"
+        },
+        {
+          "path": "skills/temporal-developer/references/dotnet/data-handling.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 5858,
+          "sha256": "d93c7451f838f1e749409fe8f6d66ecccb292ccc30d3a26cf5d3d841a001645f"
+        },
+        {
+          "path": "skills/temporal-developer/references/dotnet/determinism-protection.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 2733,
+          "sha256": "1d06fdf1e70ec125c85f78a724ce72987129d0610cc368b864e7926a8beb327e"
+        },
+        {
+          "path": "skills/temporal-developer/references/dotnet/determinism.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 2647,
+          "sha256": "f970ec51e84972523b60f0503938f2a3e6319bc299a7ddd87319ff2bb82da3d6"
+        },
+        {
+          "path": "skills/temporal-developer/references/dotnet/dotnet.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 8694,
+          "sha256": "a651db713df59b25bed6f08cc1a5b2b9068d927db0193b087a2eda596cf1c3ae"
+        },
+        {
+          "path": "skills/temporal-developer/references/dotnet/error-handling.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 4613,
+          "sha256": "360517ad5329768b819c448f57a7e649a7d4b1e86cea5a50ffe0c41bcb017d08"
+        },
+        {
+          "path": "skills/temporal-developer/references/dotnet/gotchas.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 7501,
+          "sha256": "47256a9c8ad6c06d62412f815d65555bc9043fc8e3851714f7ba4ba1a739f572"
+        },
+        {
+          "path": "skills/temporal-developer/references/dotnet/observability.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 3159,
+          "sha256": "16d47df13882cec2a2755492fc13179c5d949fffb9c13791408ff786862ff334"
+        },
+        {
+          "path": "skills/temporal-developer/references/dotnet/patterns.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 14241,
+          "sha256": "f0cdbf3728973fb0e1a3a21e8360b513c5eb11085f2d281b09e9775950c31197"
+        },
+        {
+          "path": "skills/temporal-developer/references/dotnet/standalone-activities.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 6119,
+          "sha256": "0a8402532604cb064f6c12c2817194d1be998e125f6c08e93e3a27cfee7d2b92"
+        },
+        {
+          "path": "skills/temporal-developer/references/dotnet/testing.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 5885,
+          "sha256": "6ef6eb6384e384fa98aab7d5c4203e66751b75d2ee46d0b85c7312cd3a47d47d"
+        },
+        {
+          "path": "skills/temporal-developer/references/dotnet/versioning.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 11749,
+          "sha256": "147443690205c6af5e56202395c4a500db97da860f45b92ab2fc46595755a70a"
+        },
+        {
+          "path": "skills/temporal-developer/references/go/advanced-features.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 6273,
+          "sha256": "25d2565ec2d14e54a83ff70c3c9509bcb5391baf4ef687099eb07df5d10feb54"
+        },
+        {
+          "path": "skills/temporal-developer/references/go/data-handling.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 7824,
+          "sha256": "213c11759608dd830e4f820fceb4d4aae2f78a1292fd189dae380b251e5d4b09"
+        },
+        {
+          "path": "skills/temporal-developer/references/go/determinism-protection.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 3386,
+          "sha256": "0616d4c89bbc6556a9eed7e40a09a0883434b7fde4ecc0070844f83f89853bf9"
+        },
+        {
+          "path": "skills/temporal-developer/references/go/determinism.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 3073,
+          "sha256": "ca96508a8d54444d281d6a3250b98ffb90ff4526c5bdeb2061059381f3ad0a56"
+        },
+        {
+          "path": "skills/temporal-developer/references/go/error-handling.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 5724,
+          "sha256": "1af48891f14bbab81bfa1b1c15b447bc3766275161343965f043395be89ee8ae"
+        },
+        {
+          "path": "skills/temporal-developer/references/go/go.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 7878,
+          "sha256": "d7e6fda905035217c4989332c204bc187934e32a2d5c79ebf5f89d447e827466"
+        },
+        {
+          "path": "skills/temporal-developer/references/go/gotchas.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 7624,
+          "sha256": "e47dfd4f94e4418a6c7a6d00ca583e8259e874023a16b57b4905f189966b8407"
+        },
+        {
+          "path": "skills/temporal-developer/references/go/observability.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 5529,
+          "sha256": "3a58e126b27cf10714b998a46d2286410f49f20707c122bd583a277930202728"
+        },
+        {
+          "path": "skills/temporal-developer/references/go/patterns.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 16081,
+          "sha256": "80a4a5b173ff4c728b36a0a4ab83b588271f16e8234ad00736ada349ef247504"
+        },
+        {
+          "path": "skills/temporal-developer/references/go/standalone-activities.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 6667,
+          "sha256": "a57c007dd7b8d1c4ae23fd15367735efed49c8d6147cda10ca25e76966d9ac46"
+        },
+        {
+          "path": "skills/temporal-developer/references/go/testing.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 6604,
+          "sha256": "7481ab059006139aae4c7d777c8510e82ea7d75b24be1f531577e85b11fff788"
+        },
+        {
+          "path": "skills/temporal-developer/references/go/versioning.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 9921,
+          "sha256": "881372b879bfdf9e98c0df1aa18dd37914eb261cdde172a4cc7586ca5d6f44c2"
+        },
+        {
+          "path": "skills/temporal-developer/references/integrations.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 5242,
+          "sha256": "4f5cf38b628f7b7b39307e611b7ea8717bbfc854445e657dce2f3a0594474174"
+        },
+        {
+          "path": "skills/temporal-developer/references/java/advanced-features.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 6693,
+          "sha256": "0501137bb2f263d0ec0452c4e10417b9fb9e250eed4ee8bef58cfb8aa30ee57d"
+        },
+        {
+          "path": "skills/temporal-developer/references/java/data-handling.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 9016,
+          "sha256": "fd1254c4d955215536203b231c13c0e53e48f4238e45d550282ae26d571cc0e4"
+        },
+        {
+          "path": "skills/temporal-developer/references/java/determinism-protection.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 3436,
+          "sha256": "c7c1e42b68d2382e3ac3d3e9f5bdec11995a1f3e71dda63a50ab26df0f8a7291"
+        },
+        {
+          "path": "skills/temporal-developer/references/java/determinism.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 3488,
+          "sha256": "21402641db1c8d6d2e7972afe7f2418eadd593ad233618410567cb52549e53a9"
+        },
+        {
+          "path": "skills/temporal-developer/references/java/error-handling.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 6286,
+          "sha256": "d317b7dad213bf90a93ab337d2f56ce76e1ccdf5f14684118d161457c55e9752"
+        },
+        {
+          "path": "skills/temporal-developer/references/java/gotchas.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 5580,
+          "sha256": "b3afd0410674162163af1c0291df76a1dee1010d8f7f5728bae98da1556ed8b6"
+        },
+        {
+          "path": "skills/temporal-developer/references/java/integrations/spring-ai.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 13048,
+          "sha256": "79f18e1e89f71a0f8f7fd7a61e073fcdf155d10c48ad7abf5743cec31703a302"
+        },
+        {
+          "path": "skills/temporal-developer/references/java/integrations/spring-boot.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 10213,
+          "sha256": "f2e5565b0d5d41804c57eae6bdd512b7099c6aa6bd7434c8aad52abeeaa27c30"
+        },
+        {
+          "path": "skills/temporal-developer/references/java/java.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 10239,
+          "sha256": "d5bc7923ef746fd34166d87eb4a915fc4f83d8857ec04feb7b974eab83139e4e"
+        },
+        {
+          "path": "skills/temporal-developer/references/java/observability.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 4197,
+          "sha256": "627657eb636e5b3bb0d2947c639c9c291e8c69c359d9fb911ea8db0f16e3577b"
+        },
+        {
+          "path": "skills/temporal-developer/references/java/patterns.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 15096,
+          "sha256": "ed5a2f090fd1b0d655c8b20efe2b1700d7c86f4e38d4715607c3e438b6e9d238"
+        },
+        {
+          "path": "skills/temporal-developer/references/java/standalone-activities.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 5470,
+          "sha256": "51481bc1027709246534b4303a8798738fa9d2581d7a473d5fce47ebda9803f4"
+        },
+        {
+          "path": "skills/temporal-developer/references/java/testing.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 7947,
+          "sha256": "7221ec40639ef58587fa7655fec6068720ad62cbda8621c9dd474b897a568f04"
+        },
+        {
+          "path": "skills/temporal-developer/references/java/versioning.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 11352,
+          "sha256": "deeb21f351a7e0665e102eecb00d5c81bbdda304013c9a179f37b6d674e2927c"
+        },
+        {
+          "path": "skills/temporal-developer/references/python/advanced-features.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 7165,
+          "sha256": "e78a8697b4b9ede141a355ac83514c524d0d7e2a0ebd57dbb5b0a4d21c710822"
+        },
+        {
+          "path": "skills/temporal-developer/references/python/ai-patterns.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 10518,
+          "sha256": "2753dd62db4e5dac70175240c6d5adfdeb24b15d14db2c5fe33497d845e2f60c"
+        },
+        {
+          "path": "skills/temporal-developer/references/python/data-handling.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 6312,
+          "sha256": "e009fae68c15c983eebb7876b2bcdc6b7b66afac0ae7c003e6bea367060a17fe"
+        },
+        {
+          "path": "skills/temporal-developer/references/python/determinism-protection.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 7056,
+          "sha256": "98c41dab94de390a5d71bdedf9c06a1ba1754a8918965e8d632a12417698d2fb"
+        },
+        {
+          "path": "skills/temporal-developer/references/python/determinism.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 2042,
+          "sha256": "6cc267bfa631d1514d803733219dff7ebd8d893c94e58d10a4793eb6ff21a3bd"
+        },
+        {
+          "path": "skills/temporal-developer/references/python/error-handling.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 4155,
+          "sha256": "cad683db77a5d9ce2554bff866b828a7c0e3b82cf622f16c322f1f7bc9780fc2"
+        },
+        {
+          "path": "skills/temporal-developer/references/python/gotchas.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 7526,
+          "sha256": "e1dab9cca28d20fcbb1d21b98a906c94c6643564efc095e7b0074861766298c2"
+        },
+        {
+          "path": "skills/temporal-developer/references/python/integrations/braintrust.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 7329,
+          "sha256": "dac13e0ce8c7a4e62c11257125244497bb18b2c68ebd0b070315cf8d0563fea8"
+        },
+        {
+          "path": "skills/temporal-developer/references/python/integrations/google-adk.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 10758,
+          "sha256": "b5fa927dcdf54fad3622dfa89980bfe6a766aa5089163da7f9143605aad799b4"
+        },
+        {
+          "path": "skills/temporal-developer/references/python/integrations/langgraph.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 8404,
+          "sha256": "a92e93ad87bc5490faa56d2769d56a34c68640c2ae732cbc3c7fc74e43d3a8e5"
+        },
+        {
+          "path": "skills/temporal-developer/references/python/integrations/langsmith.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 9472,
+          "sha256": "80d8560d73d485268dd9fe5e8d359f83ee05670fc154bd929f4ebf4d9d504657"
+        },
+        {
+          "path": "skills/temporal-developer/references/python/integrations/openai-agents-sdk.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 20630,
+          "sha256": "e783c29a73196b9ec5e56449b239b01afa5b9abbc4b3f01300b0d03c69a62945"
+        },
+        {
+          "path": "skills/temporal-developer/references/python/integrations/opentelemetry.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 2738,
+          "sha256": "052226266873b776a69d80876fa16afcd0b31e3dd3da41c40596c1085f1f42fe"
+        },
+        {
+          "path": "skills/temporal-developer/references/python/integrations/pydantic-ai.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 11535,
+          "sha256": "73fdc136246d098c6bf3732c74945a0c91c887f94a843d0dc5f0796aa8d9b0e8"
+        },
+        {
+          "path": "skills/temporal-developer/references/python/observability.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 3317,
+          "sha256": "cb4dc692f669c7d1086940398b769e660a2f363648c81725f6aed7b792eb1dcd"
+        },
+        {
+          "path": "skills/temporal-developer/references/python/patterns.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 12341,
+          "sha256": "5a5e3930ac490073122c2ccff5a1ad44364638fbb3196551ed6a42992ff2ab54"
+        },
+        {
+          "path": "skills/temporal-developer/references/python/python.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 8159,
+          "sha256": "0a4fa9d1857101b9cb1e65a2f0b9e7c6da9e280a4271e97f70c0e56205e73974"
+        },
+        {
+          "path": "skills/temporal-developer/references/python/standalone-activities.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 5891,
+          "sha256": "c4132387dd9359cbc2e8819cfeb8ac8a8ddfff900ffa387c60dca5e2a033d263"
+        },
+        {
+          "path": "skills/temporal-developer/references/python/sync-vs-async.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 7285,
+          "sha256": "0c7b9619bd8fb97f88c6d38309ebadbf3b961cd7ad678fd3dcee19e80380c13a"
+        },
+        {
+          "path": "skills/temporal-developer/references/python/testing.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 4996,
+          "sha256": "2bb9bff4217ad2a77da6509990121af5999e00e7fbc08f9a824a562326560997"
+        },
+        {
+          "path": "skills/temporal-developer/references/python/versioning.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 12933,
+          "sha256": "33af5c6ae2736414ca70138917ebe12d8a29532f1f760a149cd4448d785ea725"
+        },
+        {
+          "path": "skills/temporal-developer/references/python/workflow-streams.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 21933,
+          "sha256": "3dc3f49611b690dc83a1ba60f0024b7c93448c0ac4b78fd0c201c1e06755b0d7"
+        },
+        {
+          "path": "skills/temporal-developer/references/ruby/advanced-features.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 7983,
+          "sha256": "f0bf760459183795c485e2639420b027377d0d696487a30ec0552d36659318ac"
+        },
+        {
+          "path": "skills/temporal-developer/references/ruby/data-handling.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 3978,
+          "sha256": "4c4bc37a8ca83f7c702a16a3ac74496affa89d5a9bcebf443735cae368dbd117"
+        },
+        {
+          "path": "skills/temporal-developer/references/ruby/determinism-protection.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 5254,
+          "sha256": "8a4f15233f9d829171329d51dfc1ddeacd1021e5d8e577a3bd1faf771bf16fd9"
+        },
+        {
+          "path": "skills/temporal-developer/references/ruby/determinism.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 2987,
+          "sha256": "a81a7b47841f0b3a55dcdfc19d06c1c32fb7042283f921b06020033511bed61c"
+        },
+        {
+          "path": "skills/temporal-developer/references/ruby/error-handling.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 2714,
+          "sha256": "cb2257485116550e6a1ba0e28ec9176f5282f18e39a6d83038645d2c8f991c05"
+        },
+        {
+          "path": "skills/temporal-developer/references/ruby/gotchas.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 7091,
+          "sha256": "bf554370bb79bda8bdb8cd39bd5f431831d9f0f4cef785df350a93b56311620c"
+        },
+        {
+          "path": "skills/temporal-developer/references/ruby/observability.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 2301,
+          "sha256": "8dbe5216e8ab2b58dbfc45326b98ad190de40450d5dacfac8c2ba528509260b2"
+        },
+        {
+          "path": "skills/temporal-developer/references/ruby/patterns.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 10441,
+          "sha256": "746f358cb69372c15fe90cc329836cb33c5393509d53bd0d3a135a500ff677b1"
+        },
+        {
+          "path": "skills/temporal-developer/references/ruby/ruby.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 6198,
+          "sha256": "5072596725cedc496e855412a58b731ad8558e463bb4a29c19b1f704e6226ad4"
+        },
+        {
+          "path": "skills/temporal-developer/references/ruby/testing.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 6642,
+          "sha256": "8cba93dec57c5da81e54754424aeafcb4fca6e8d827cfe50c78e880b22713aca"
+        },
+        {
+          "path": "skills/temporal-developer/references/ruby/versioning.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 9047,
+          "sha256": "2fd1485b70bf8fbc2f3d5d5f74d88bc371fae29051bcf19e40961f07f328e3cc"
+        },
+        {
+          "path": "skills/temporal-developer/references/rust/rust.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 7007,
+          "sha256": "8007feae65d1bc4847c4dfc51c3e4b05f64d272a2ab388fc35b10577ec4b0661"
+        },
+        {
+          "path": "skills/temporal-developer/references/typescript/advanced-features.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 5730,
+          "sha256": "a4433dfcd6df2cd26f877ebe3f3b9deba5fe7e6931b5e995d7045843ec06b760"
+        },
+        {
+          "path": "skills/temporal-developer/references/typescript/data-handling.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 6074,
+          "sha256": "2604262698516c35dc63c9746f72fe147ea6fe570b7559cd9fce0677c3f9874b"
+        },
+        {
+          "path": "skills/temporal-developer/references/typescript/determinism-protection.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 2412,
+          "sha256": "cc58d49c9716f9b28c7bdd36b3192df20c2c4909f5c4acc6f3ce6f9e56ec1c16"
+        },
+        {
+          "path": "skills/temporal-developer/references/typescript/determinism.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 2135,
+          "sha256": "55391d93f4aa93f3eeb72c2d8cd1093cd9fcd5fd962848a245d077bfc12e8c2d"
+        },
+        {
+          "path": "skills/temporal-developer/references/typescript/error-handling.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 3359,
+          "sha256": "b40078a343f8d251162c320cd98c1e66ff41af60e2c6560df3c86862b6da840a"
+        },
+        {
+          "path": "skills/temporal-developer/references/typescript/gotchas.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 9302,
+          "sha256": "1443ec107a010374bbbb0293e6a864505f98ec61c8903ff170f26a28a8023968"
+        },
+        {
+          "path": "skills/temporal-developer/references/typescript/integrations/braintrust.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 3836,
+          "sha256": "d38800fa427f3f09b15ef63dbae0c38c7a8afeb1ef285b8f612222793e94c401"
+        },
+        {
+          "path": "skills/temporal-developer/references/typescript/integrations/mastra.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 7684,
+          "sha256": "6852a6198d862cf8dbec31a06c0e7f834cb20553796fa6439f774c32747d57db"
+        },
+        {
+          "path": "skills/temporal-developer/references/typescript/integrations/opentelemetry.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 3691,
+          "sha256": "714d23e1e03265d1852ab0045ffab21a737e784def4b1619614d244ffb949f15"
+        },
+        {
+          "path": "skills/temporal-developer/references/typescript/integrations/vercel-ai-sdk.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 8619,
+          "sha256": "1ca2be854423311ddf38ccdebe7416d886600d2520266ef479bde76673a96d5f"
+        },
+        {
+          "path": "skills/temporal-developer/references/typescript/observability.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 3821,
+          "sha256": "fb0fe28c5fcebb36222172a788ec7580fc6683307017f92328bf656e683013a7"
+        },
+        {
+          "path": "skills/temporal-developer/references/typescript/patterns.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 11716,
+          "sha256": "8bc84381f9d6432301f3011b60a64f0170bc2584fca170cff9e55469cb958613"
+        },
+        {
+          "path": "skills/temporal-developer/references/typescript/standalone-activities.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 5903,
+          "sha256": "3f6516929895aa336b9f708f7992dbacbaa7b6ea7afb72df07d50e73a5c0fa71"
+        },
+        {
+          "path": "skills/temporal-developer/references/typescript/testing.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 6262,
+          "sha256": "a0b378f3c54cde05a84145f229fc7a0006b1fb5c9957867e53c7918a1903deaf"
+        },
+        {
+          "path": "skills/temporal-developer/references/typescript/typescript.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 7575,
+          "sha256": "1f64da9b56932c562696848ac258cff8eefa40614b790b98ce708bd0ad36c457"
+        },
+        {
+          "path": "skills/temporal-developer/references/typescript/versioning.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 9452,
+          "sha256": "ee9190d230275026aadfdd27e04fe58188735d4d589d3a40ff58ac3063fd9f62"
+        },
+        {
+          "path": "skills/temporal-ops/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 34535,
+          "sha256": "62e8bae3efd2712ed8062088d0d547a19e7c77525f309ef60b95380cfba218b3"
+        },
+        {
+          "path": "skills/temporal-ops/agents/openai.yaml",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 177,
+          "sha256": "9aae24717bd6a9e545f123a50f8d4d4b6e4d7f309192716be576b61f4269da20"
+        },
+        {
+          "path": "skills/temporal-ops/references/ops/cli-conventions.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 10215,
+          "sha256": "148725e38e879f7d8388981f827df3b293d1e888b9c301c3488d34f96cd550b5"
+        },
+        {
+          "path": "skills/temporal-ops/references/ops/cloud-audit-logs.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 7893,
+          "sha256": "aa8c883992789da74106f4137e948b535f25535c39554b357c038fbba5dd9a95"
+        },
+        {
+          "path": "skills/temporal-ops/references/ops/cloud-billing.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 9953,
+          "sha256": "02092a258ca2be494cea53efbece82efdd909a40a171e76f43c61f57e0b04383"
+        },
+        {
+          "path": "skills/temporal-ops/references/ops/cloud-capacity.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 10364,
+          "sha256": "aa61d3de36d00341813839eff16fa0195f1ed05ba4fb3aa068c2e772482a618c"
+        },
+        {
+          "path": "skills/temporal-ops/references/ops/cloud-certs.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 11547,
+          "sha256": "0b40dbf365f3444d46d7a01c7be390294188cce6ff21fb00f6188940a1489cfe"
+        },
+        {
+          "path": "skills/temporal-ops/references/ops/cloud-connectivity.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 9209,
+          "sha256": "826830c7ad08803570bcf66ebe1740311fb017d27527c07c21ede070c762cb73"
+        },
+        {
+          "path": "skills/temporal-ops/references/ops/cloud-iam.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 15741,
+          "sha256": "cf45a6f60dc6f0d6164c5c2838afc4b7625c3aef23ad1436023b809021e4867e"
+        },
+        {
+          "path": "skills/temporal-ops/references/ops/cloud-migration.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 11247,
+          "sha256": "109a5bf2ce8757e78c229c777c3d49d6da4bee8d960a1b948610310d94cd44cb"
+        },
+        {
+          "path": "skills/temporal-ops/references/ops/cloud-namespace-admin.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 20997,
+          "sha256": "0b5f15ba9da04271856d4d67d86f1dea013ad43459cb31bb4f7b0ae637b58586"
+        },
+        {
+          "path": "skills/temporal-ops/references/ops/cloud-notifications.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 2404,
+          "sha256": "d2caa33d1ba2d621060465feea56368851f1a76bced3f7a3b370ad8a85e4453a"
+        },
+        {
+          "path": "skills/temporal-ops/references/ops/cloud-ops-api.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 4902,
+          "sha256": "e8370cb163d610ac5b054f7c413b36c6f99db9a34dfaaf6f6dbb775f8e43a88d"
+        },
+        {
+          "path": "skills/temporal-ops/references/ops/cloud-saml-scim.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 8771,
+          "sha256": "d54a07c08d6f2ab42c30d71ef9aba5706a2f50f633c1abc0632750146120216f"
+        },
+        {
+          "path": "skills/temporal-ops/references/ops/cloud-terraform.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 8421,
+          "sha256": "eeda54ffe1d411307b00f5afcedf19fea1e848fd0f5d466283c8030b2c86b92e"
+        },
+        {
+          "path": "skills/temporal-ops/references/ops/recipes.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 19521,
+          "sha256": "1b68a2a9e4cab9f42cc5b09806d7132c964345dc39978bd3bf9899d2f010b551"
+        },
+        {
+          "path": "skills/temporal-ops/references/ops/self-hosted-admin.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 14233,
+          "sha256": "e62738885dedec68755ebbd1196f17e940f348d03cfe0930adcdcd2ad36d8404"
+        },
+        {
+          "path": "skills/temporal-ops/references/ops/workflow-health.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 13086,
+          "sha256": "1c2aabd8e9c22a632f8aa50c089812a10d903e56330576430c80d9016b87ccc7"
+        },
+        {
+          "path": "skills/temporal-ops/references/triage/authentication.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 19747,
+          "sha256": "84839594ea130ead0fa183c3dd11a348ee2fedaa0eefb6a064ef5b8602f69bb2"
+        },
+        {
+          "path": "skills/temporal-ops/references/triage/blob-size-limits.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 6423,
+          "sha256": "f9d4abfcf4eb842de3a730de0eb1c46cf497b3d3053e4cb483db2de872bdfa30"
+        },
+        {
+          "path": "skills/temporal-ops/references/triage/certificates.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 33699,
+          "sha256": "0968540eed7a41a45c30539b2c19f5f671b1b0e7a89941c1eb63609f77873c62"
+        },
+        {
+          "path": "skills/temporal-ops/references/triage/connectivity.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 14367,
+          "sha256": "e9b88ad4c6e510117192692ab098f75843a686ddfb8c230a290df510d175e8c0"
+        },
+        {
+          "path": "skills/temporal-ops/references/triage/diagnostic-ladder.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 18942,
+          "sha256": "38792ba69fac6322345e87a8699f8ece4f855af031dbe1094d54fba9af62092f"
+        },
+        {
+          "path": "skills/temporal-ops/references/triage/ha-failover.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 18183,
+          "sha256": "19eec8bd8f597077c1cea159d51380e24ac768a74fb0f5b572f7fb46e441e343"
+        },
+        {
+          "path": "skills/temporal-ops/references/triage/non-determinism.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 21186,
+          "sha256": "c395c204bec8802528bdd4d9ad141efca85ca414f616c685cd3515271ec911c5"
+        },
+        {
+          "path": "skills/temporal-ops/references/triage/performance-bottlenecks.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 9096,
+          "sha256": "623a97a6d18c8db31ccffb0209af67b910357c8bae5b5b3662aacb00b405558e"
+        },
+        {
+          "path": "skills/temporal-ops/references/triage/rate-limits.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 17285,
+          "sha256": "cc569691926aba2b0652e3cd2027598333ac227ff1cb13bccab31470aa882afe"
+        },
+        {
+          "path": "skills/temporal-ops/references/triage/recipes.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 21635,
+          "sha256": "a3a45eab208455672eb5bf171d9c50386493f0e43aa8efeae2d47feacc71d960"
+        },
+        {
+          "path": "skills/temporal-ops/references/triage/replay.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 13809,
+          "sha256": "82f47f64fee30ee9e79a1cda7c0917a735b39541de7aff496e250b59c2ef70e1"
+        },
+        {
+          "path": "skills/temporal-ops/references/triage/runtime-errors.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 16990,
+          "sha256": "79ae6fd2a3f064c29c6cdca74a8bedac3f9ea00be53c419cb53078dd5e3f2796"
+        },
+        {
+          "path": "skills/temporal-ops/references/triage/schedule-missed.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 5893,
+          "sha256": "6b06aa80230f3f6f81694449208344f855b5d217389649923e10370f7fdea730"
+        },
+        {
+          "path": "skills/temporal-ops/references/triage/sdk-snippet-review.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 12156,
+          "sha256": "21ba82a552565a522b1cdaa24c75bdacd398126c83917a151cab0b1e7d8e192c"
+        },
+        {
+          "path": "skills/temporal-ops/references/triage/worker-health.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 22937,
+          "sha256": "a076e359a504fea217a5e8a16f3c503c31400b180ba6d6f7698d5ae4eb56eb1d"
+        },
+        {
+          "path": "skills/temporal-ops/references/triage/workflow-stuck.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 31485,
+          "sha256": "d7ff0949639c348fefd0573b875334063414eda7c99f3da21be161df9d76b2da"
+        },
+        {
+          "path": "skills/temporal-serverless/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 37330,
+          "sha256": "afbb674aa65465d7ae79c7128896da593f894875864c112370b129e8cd39a707"
+        },
+        {
+          "path": "skills/temporal-serverless/agents/openai.yaml",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 174,
+          "sha256": "3628e6683f659a177a60aac01e08194c80b14fcfb31b67ad9f74166f9fb50243"
+        },
+        {
+          "path": "skills/temporal-serverless/assets/temporal-cloud-serverless-worker-role.yaml",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 3251,
+          "sha256": "b23c87f081626d4c20e345b5f89c214504dff166bc09c02f7ab89e14e67391b7"
+        },
+        {
+          "path": "skills/temporal-serverless/assets/temporal-self-hosted-serverless-worker-role.yaml",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 2512,
+          "sha256": "fd4205488719a40f0ece10fc1a199adc70962f18d16fdf94a4849ab13e1e9895"
+        },
+        {
+          "path": "skills/temporal-serverless/references/aws-lambda/diagnostics.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 15842,
+          "sha256": "1d69da4b95c6d216661359b89e536f22bb04479b11138b945cddeb7b8c7137c5"
+        },
+        {
+          "path": "skills/temporal-serverless/references/aws-lambda/iam.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 20126,
+          "sha256": "1041ba554f402a1954d28103b4dfa46a3830a2fb541b5362e2e83d5d56baea1e"
+        },
+        {
+          "path": "skills/temporal-serverless/references/aws-lambda/observability.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 10310,
+          "sha256": "222ef47eef4fbef5b02b23aa0222c03be9ef7f5683d4ce3ea40971d407ee6eed"
+        },
+        {
+          "path": "skills/temporal-serverless/references/aws-lambda/self-hosted.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 3321,
+          "sha256": "8691795402df08e4e27126e35112f3e0072ba845d054d2ca83b5fa4f53ce2dd6"
+        },
+        {
+          "path": "skills/temporal-serverless/references/aws-lambda/setup.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 44892,
+          "sha256": "54f75f68ef29b3fb68c03e9ec5add3bb33caf373c70b10bc643f839b143e8167"
+        },
+        {
+          "path": "skills/temporal-serverless/references/aws-lambda/versioning.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 4647,
+          "sha256": "0f48d4d2880b3ac0f38362bce4af6e8ac44b838583ddcbca8b61943056ebd474"
+        },
+        {
+          "path": "skills/temporal-serverless/references/concepts.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 20019,
+          "sha256": "497eb3e7718c0453a5ec9480d4559fcdf5044b98042a7d957cc70b705d51a061"
+        },
+        {
+          "path": "skills/temporal-serverless/references/sdk-configuration.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 13354,
+          "sha256": "ead51db435af533c19ac18810f885a926f4339db6e644b138020d07ada07f1d9"
+        }
+      ]
+    },
+    {
+      "name": "codex:openai-developers",
+      "root": "codex-openai-developers",
+      "repository": "https://github.com/openai/plugins",
+      "commit": "981b02c0c44058b595f3b4180002c3ae3c806d40",
+      "pluginPath": "plugins/openai-developers",
+      "ecosystem": "codex",
+      "files": [
+        {
+          "path": ".app.json",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 108,
+          "sha256": "d3943fc37e3b7069842ee6a5d9d3061b75475c95c3da92417ec43c0000eb5151"
+        },
+        {
+          "path": ".codex-plugin/plugin.json",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1972,
+          "sha256": "547f6c8e73514cb921d6570ccc7d1114d397a88506bdc8ad1338709d6d435b8a"
+        },
+        {
+          "path": ".mcp.json",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 169,
+          "sha256": "4a1ddd40ac4e0a0b8ed0ee32e374e0f337cd0651fdf76ea34df31bfef18747f4"
+        },
+        {
+          "path": "README.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1635,
+          "sha256": "136f569ece96a1e0b260b06ef46e4693be22ffb574ee1aafc30ed5cab8c3331b"
+        },
+        {
+          "path": "assets/logo.png",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 2699,
+          "sha256": "776310bcb0f0f191c616f31a13fcb8de8cc94d920c77625c271b3a034199ac43"
+        },
+        {
+          "path": "assets/openai-platform.png",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 17940,
+          "sha256": "f2f8832878739a84d60fc6a6acf8dc5681fac3ed8318a70d37aa1f8fffacb537"
+        },
+        {
+          "path": "mcp/server.mjs",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 6602,
+          "sha256": "3f9c0d447ad9ae48eefd94c8b9ed52f6e0a45b8383e536f2768010c6a9a70377"
+        },
+        {
+          "path": "scripts/openai-platform-api-key.mjs",
+          "kind": "file",
+          "mode": 493,
+          "bytes": 13600,
+          "sha256": "7dd08001d0712226b443bdd00f45f99a90a58bdf10e25595da29850849a2fa23"
+        },
+        {
+          "path": "skills/agents-sdk/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 9961,
+          "sha256": "61830dccd552307bc714b961acae80b1c9c9c30b5d2faaa9e6043b6fb0414760"
+        },
+        {
+          "path": "skills/agents-sdk/agents/openai.yaml",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 103,
+          "sha256": "c60cd06ccfccd4da0a2dbfd6bf43bbdce6c3d41404ca24943d54bde9bfc4cbfa"
+        },
+        {
+          "path": "skills/build-chatgpt-app/LICENSE.txt",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 10774,
+          "sha256": "a7f55b2cb68997f729e6199720d4d3cae47633aba0254a84b2d36ab284be9d45"
+        },
+        {
+          "path": "skills/build-chatgpt-app/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 19656,
+          "sha256": "b4ba5e0847e9b56b327da4e7546f5f0bf3325f54d6d21fc119b320bc2c898a53"
+        },
+        {
+          "path": "skills/build-chatgpt-app/agents/openai.yaml",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 852,
+          "sha256": "b05fde0d0fa81bf1e3c76d662e6a8994d6c8363250e9488e2f3522fea1086bc3"
+        },
+        {
+          "path": "skills/build-chatgpt-app/references/app-archetypes.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 3514,
+          "sha256": "ae3bb232c201541303264653518eca8bc59832bc73e511835d66ebd0a3c04f87"
+        },
+        {
+          "path": "skills/build-chatgpt-app/references/apps-sdk-docs-workflow.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 8143,
+          "sha256": "41f0ec23b35c6a66de59de80c13b9be59002a371c8a36d23f96f20e19c656b49"
+        },
+        {
+          "path": "skills/build-chatgpt-app/references/interactive-state-sync-patterns.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 4281,
+          "sha256": "5ca632712be3d75f63a405292184a7867cfc0fa3803b53b2063a94318a8c1278"
+        },
+        {
+          "path": "skills/build-chatgpt-app/references/repo-contract-and-validation.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 2962,
+          "sha256": "28fb7093b67e29d05322e3fd38cb7ad182e92913aa45051d97dbddca8a627cd6"
+        },
+        {
+          "path": "skills/build-chatgpt-app/references/search-fetch-standard.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 2021,
+          "sha256": "32c706205035007d1b616bf3eeb6c6c9ce69f6c56493bf0ea942a20abe8b39e6"
+        },
+        {
+          "path": "skills/build-chatgpt-app/references/upstream-example-workflow.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 3443,
+          "sha256": "241f2fc58ff6c3b276325bef70254d8e1a18ec9e7633bd3bd03ef45ff478f727"
+        },
+        {
+          "path": "skills/build-chatgpt-app/references/window-openai-patterns.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 4707,
+          "sha256": "1718848c5c903368fb536ee4be405e54a0fe3a91ef13986f5780735b04ca3cb3"
+        },
+        {
+          "path": "skills/build-chatgpt-app/scripts/scaffold_node_ext_apps.mjs",
+          "kind": "file",
+          "mode": 493,
+          "bytes": 16371,
+          "sha256": "fb12086ca7e37ab7d1fb02418b11623f207b8726aabfcbfb3d5634539479807a"
+        },
+        {
+          "path": "skills/chatgpt-app-submission/LICENSE.txt",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 10774,
+          "sha256": "a7f55b2cb68997f729e6199720d4d3cae47633aba0254a84b2d36ab284be9d45"
+        },
+        {
+          "path": "skills/chatgpt-app-submission/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 11256,
+          "sha256": "c9b43ca8fe60189e541afa30ea32a86f1bd7ab58a353faac777192a282b796cf"
+        },
+        {
+          "path": "skills/openai-api-troubleshooting/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 3930,
+          "sha256": "9fb4e152430c2f0475d1d14ce61b413267d322af9c032f2affb64698ca562662"
+        },
+        {
+          "path": "skills/openai-api-troubleshooting/agents/openai.yaml",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 136,
+          "sha256": "8e58c04d41496c3c426db0f83802e5546414524dd38f560581e45f38eb7548af"
+        },
+        {
+          "path": "skills/openai-api-troubleshooting/references/evals.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 8193,
+          "sha256": "9921d77b49038df2ca7e3dba8d29b76fa8ba612f1b6f0a4eb63b966b4f09f1f3"
+        },
+        {
+          "path": "skills/openai-platform-api-key/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 13472,
+          "sha256": "dab4bb5fafe22d7a8ea0b1aa570acd6d970b3052d6d5e51c65f3192b02ca24d9"
+        },
+        {
+          "path": "skills/openai-platform-api-key/agents/openai.yaml",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 117,
+          "sha256": "fc27a29c74c453e85c2f79fb0ee729336f5df2376bf792b82598eacd0437d842"
+        },
+        {
+          "path": "skills/openai-platform-api-key/references/evals.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 12409,
+          "sha256": "98a8d2acc8e4352ae677ae9fa3dccc64f063a6327530685f8ccf2219c2a984e1"
+        },
+        {
+          "path": "tests/openai-platform-api-key.test.mjs",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 34818,
+          "sha256": "ede72f73fbcb0f7f896afcd42d7fe17a9c67b2f680e815bb8c6f35181d1c751d"
         }
       ]
     }

@@ -39,6 +39,9 @@ set -uo pipefail
 
 ROOT="$(git rev-parse --show-toplevel)"
 prefix="${PWD#"$ROOT/packages/codepuppy-app"}"; prefix="${prefix#/}"
+# Explicit file lists change load order; keep mock.module state within each file.
+flags=()
+if [ "${1:-}" = --isolate ]; then flags=(--isolate); shift; fi
 selected=()
 for f in "$@"; do selected+=("./${prefix:+$prefix/}${f#./}"); done
 cd "$ROOT"
@@ -62,7 +65,7 @@ run_bun_test() {
   # CI=1 的理由见抬头;--conditions=solid 与 --preload 与上游 package.json 的 test:unit 同款
   # (pin e11dbd020 起上游自己加了 --conditions=solid:少了它,solid-js/web 解析到 server 构建,
   # 十余个上游测试文件在加载期就死于 `Export named 'use' not found`)。
-  (cd "$WORKDIR" && CI=1 bun test --conditions=solid --timeout "$CODEPUPPY_TEST_TIMEOUT_MS" --preload ./happydom.ts "$@") >"$log" 2>&1
+  (cd "$WORKDIR" && CI=1 bun test ${flags[@]+"${flags[@]}"} --conditions=solid --timeout "$CODEPUPPY_TEST_TIMEOUT_MS" --preload ./happydom.ts "$@") >"$log" 2>&1
 }
 
 summarize() {

@@ -1,8 +1,8 @@
 {
   "repo": "jinjunnn/alpha-web",
-  "commit": "a7f79c667c71b03a4ae54350dd061a116a2c4080",
+  "commit": "b9979b8696414658b0ac3f60926a2eb78bc9c8f7",
   "artifactPath": "contracts/extension-package/artifact",
-  "artifactSha256": "bd082405e97b433f4148869bbf70b772e2d426767db723b53d738e2afadfdb87",
+  "artifactSha256": "b3b9bc150a93fa68a7c966d13f55cf81f4b58250c941db0e2d76d6eac0aa2a6c",
   "files": [
     {
       "path": "asset.generic-bundle-agent.md",
@@ -18,11 +18,15 @@
     },
     {
       "path": "claude-code.rules.v1.json",
-      "sha256": "3e3c9c4b2d2476c21d37a7057af8b292a7cb2a53fd9330da71087b5c5f631ae7"
+      "sha256": "fbb29317b797552e0b92c9ff05a8b8eec60fd92e57432555b4e0033b62aabe3f"
+    },
+    {
+      "path": "codex.rules.v1.json",
+      "sha256": "726d19ea97bd9af932471a9438aa9908c714a3e69b50e646fd1cb5449c063191"
     },
     {
       "path": "codepuppy-package-compatibility-report-v1.schema.json",
-      "sha256": "d5f963afe04960419b970d48a5a26e349da38ce7dd47773d25720dbdb886f195"
+      "sha256": "16d9fc9fc6792de845a2eaf8c873ee5f823cf6ad35fb4385512640e88a392b6f"
     },
     {
       "path": "codepuppy-package-declaration-v1.schema.json",
@@ -30,23 +34,23 @@
     },
     {
       "path": "expected.bundle.compiled.json",
-      "sha256": "6d04e1d0ad22b88b987385ffd0f7e2fdf64d22e52f891785f928fc17b0fbeaca"
+      "sha256": "4df62f6c309679ca88c1c0b86878a182fb0cb1a46b6f2bfa450c27babc43293f"
     },
     {
       "path": "expected.cloud.compiled.json",
-      "sha256": "d522ae5e19d657c43e6299252608bc2649f3058870a712db9bfbd61d9cdfda03"
+      "sha256": "d524d34dea57a357b43fa7cbece11b8f6664648771a70bcac49fcd5235dff61e"
     },
     {
       "path": "expected.mcp-remote.compiled.json",
-      "sha256": "3ec28325164647b9089eb38a449a8802b841143fe0e108c63e94a835d13eb07c"
+      "sha256": "0b134ce6f6d7671b96fbe3f7073babed1791c459221960c36c7f3a4247005f00"
     },
     {
       "path": "expected.remote-connection.compiled.json",
-      "sha256": "10ed83d1a05b0317d3518f0a08ab9f853427350ab330f0c662e7fa1a2b1abe1a"
+      "sha256": "ea1ea708218949c266ec9eb70aeb1c2ed0d6e535b979036e5732a37012071495"
     },
     {
       "path": "expected.remote-oauth.compiled.json",
-      "sha256": "3e9ca07973e9d662133df17f4d3f24924f8c403551d81ae18046ca0d1fad3e1e"
+      "sha256": "24240c620dec72a844380cf532180264b6333a870a112dcad5e10fa84a15b8e1"
     },
     {
       "path": "extension-package-error-v1.schema.json",
@@ -54,7 +58,7 @@
     },
     {
       "path": "extension-package-producer-artifact.v1.json",
-      "sha256": "75a5c5d7068c3137497bdf2b6e0540f558bbc9845030941121b0033b901bf91f"
+      "sha256": "77fe1b68d5cffbd200c40285a3319e6ecd976913c1148d3059324f6f59210113"
     },
     {
       "path": "generic-profiles.v1.json",
@@ -62,19 +66,19 @@
     },
     {
       "path": "generic-rules.v1.json",
-      "sha256": "b2a36bd8aa7a400a56f13f9b6e6a92db6c71181c6e46b5873c201bc8d9e45ba4"
+      "sha256": "8df5c24be9e78f7ad3ec740283e1f4256332246f9117f636c7123c81a518eefa"
     },
     {
       "path": "host-contract-pin.v1.json",
-      "sha256": "ec7af87a5d68658349ccf0cee7481888287072270c42b43b18ad442627153fe4"
+      "sha256": "5b6e1eab950b8daa318f831faaad84c3d4d9e19ea905277c2f92e249dd9fe5f3"
     },
     {
       "path": "host-extension-package-artifact.v1.json",
-      "sha256": "ef5eda81b5d3d5cf1f4089381cf9a64923d25c6bd35103411d9552ca7176c0ae"
+      "sha256": "2d3b783ece9c7d59c465b2108b80202aea78941aa1ec21f75e894a61ef218a97"
     },
     {
       "path": "host-extension-package.registry.v1.json",
-      "sha256": "d17f4cbbf0bae0fd7acd71e2f792c0b05a25b01f472d63d963ac5cb903493005"
+      "sha256": "309333f962bcc56c647f4af030f326346f39576d565923b1bc7e5290ee639e5b"
     },
     {
       "path": "input.author-capabilities.invalid.json",
@@ -158,15 +162,15 @@
     },
     {
       "path": "report.blocked.json",
-      "sha256": "d95c9b69a988b1be2670b3016278cea24556f287ed1e0812072ab8a71e85af2d"
+      "sha256": "4e426939f06a84f119cfbdb142cf21a95f3bcf049418d55b1deeb5bca3ce5826"
     },
     {
       "path": "report.compatible.json",
-      "sha256": "be871871d9d0d0392993647f36a000e726013ba08a8bed07b180fe0116a0ce6b"
+      "sha256": "fb0f17cbc7a5cac232ecee8b0acb00ab53f279ad9a230b7dbf12b0c35c7b4148"
     },
     {
       "path": "report.review-required.json",
-      "sha256": "a2f250fe87c8c0631ef74d42e7803f8bde40e75e8c12e3916c9987b4f40b1723"
+      "sha256": "1b104774a59b6b69a5897b6929f9a8a02af66c11d736cd824469feeb7bb1677e"
     },
     {
       "path": "vectors.v1.json",

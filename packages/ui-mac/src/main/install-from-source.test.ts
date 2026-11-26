@@ -1015,3 +1015,22 @@ test("a custom MCP record never inherits plugin validation from a colliding grap
   expect(persistMcp(name, { type: "local", command: ["/tmp/custom-entry", "--source-argv"] })).toMatchObject({ ok: false, reason: "command not allowed: /tmp/custom-entry" })
   expect(persistMcp(name, { type: "remote", url: "http://localhost:9876/mcp" })).toMatchObject({ ok: false })
 }))
+
+test("catalog cloud content requests its startup refresh after installation has returned", () => installerHarness(async h => {
+  const { createSourceInstaller, installCatalogFromSource } = await import("./install-from-source")
+  const { resolveVerifiedPackageV1 } = await import("./package-installability")
+  const { canonicalArtifactJsonBytesV1 } = await import("../shared/host-extension-package-contract/generate-artifact")
+  // Shipped cloud-v1 decoder corpus, the same input used by the real lifecycle engine case.
+  const corpus = await Bun.file(join(import.meta.dir, "../shared/host-extension-package-contract/testvectors/decoder-corpus.v1.json")).json() as { cases: Array<{ name: string; envelope: import("../shared/host-extension-package-contract/decoder").CodePuppyPackageEnvelopeV1; components: Array<{ payload: unknown }> }> }
+  const cloud = corpus.cases.find(entry => entry.name === "cloud-v1")!
+  const catalog = { version: "cloud-runtime", entries: [], packages: [cloud.envelope] }
+  const fetchBytes = async () => canonicalArtifactJsonBytesV1(cloud.components[0]!.payload)
+  const planner = { globalRoot: () => h.root, resolveEntry: async () => null, advisoryGate: () => ({ allowed: true }), resolvePackage: async (id: string, version: string) => resolveVerifiedPackageV1(catalog, id, version) }
+  const admission = { root: () => h.root, userDataPath: h.temporary, casBaseRoot: () => h.temporary, environment: () => "dev" as const, loadVerifiedCatalog: async () => ({ source: "remote" as const, catalog, snapshotDigest: sha256Hex(JSON.stringify(catalog)) }), installability: { fetchPayload: fetchBytes }, fetchAsset: fetchBytes }
+  const reloads: string[] = []
+  const installer = createSourceInstaller({ globalRoot: () => h.root, casBaseRoot: () => h.temporary, environment: () => "dev", userDataPath: h.temporary, sources: h.sources, advisoryGate: planner.advisoryGate, resolvePackage: planner.resolvePackage as never, activateMcp: async () => [], reloadSkills: id => { reloads.push(id) }, removeDeparting: () => {}, catalogInstall: (id, request) => installCatalogFromSource(id, request, { planner: planner as never, admission, activateMcp: async () => [], reloadSkills: () => {}, removeDeparting: () => {} }) })
+  expect(await installer({ requestId: "cloud_deferred_refresh", source: { kind: "catalog", catalogId: cloud.envelope.prelude.packageId }, effect: { kind: "all-projects" }, via: "hub" })).toMatchObject({ ok: true })
+  expect(reloads).toEqual([])
+  await new Promise<void>(resolve => setImmediate(resolve))
+  expect(reloads).toEqual([cloud.envelope.prelude.packageId])
+}))

@@ -26,7 +26,7 @@ function mount(items: PackageAuthorizationItemV1[], needId = "FIRST", result = {
   const reads: string[] = []
   const writes: unknown[] = []
   let closed = 0
-  Object.assign(window, { api: { ext: { packageAuthorization: async (id: string) => { reads.push(id); return { ok: true, packageId: id, items } } } } })
+  Object.assign(window, { api: { ext: { onHubViewChanged: () => () => {}, packageAuthorization: async (id: string) => { reads.push(id); return { ok: true, packageId: id, items } } } } })
   const host=document.createElement("div");document.body.append(host)
   disposers.push(web.render(()=>solid.createComponent(PackageAccountDialog,{packageId:"main-package",label:"Docs",needId,save:async(input:unknown)=>{writes.push(input);return result},onClose:()=>{closed++},onSaved:()=>{}}),host))
   return { reads, writes, closed:()=>closed }
@@ -66,7 +66,7 @@ test("BC4 account save failure stays in the shared dialog and never displays the
 test("BC4 changing the package target clears the previous input before a different package can save",async()=>{
  const [packageId,setPackageId]=solid.createSignal("first-package")
  const writes:unknown[]=[]
- Object.assign(window,{api:{ext:{packageAuthorization:async(id:string)=>({ok:true,packageId:id,items:[field("FIRST")]})}}})
+ Object.assign(window,{api:{ext:{onHubViewChanged:()=>()=>{},packageAuthorization:async(id:string)=>({ok:true,packageId:id,items:[field("FIRST")]})}}})
  const host=document.createElement("div");document.body.append(host)
  disposers.push(web.render(()=>solid.createComponent(PackageAccountDialog,{get packageId(){return packageId()},label:"Docs",needId:"FIRST",save:async(input:unknown)=>{writes.push(input);return {ok:true}},onClose:()=>{},onSaved:()=>{}}),host))
  await flush()
@@ -85,7 +85,7 @@ test("I-15 the official Registry GitHub server's token form links to where GitHu
  const opened: string[] = []
  const show = (packageId: string, source: unknown) => {
   document.body.innerHTML = ""
-  Object.assign(window, { api: { openLink: async (url: string) => { opened.push(url) }, ext: { packageAuthorization: async (id: string) => ({ ok: true, packageId: id, items: [field("TOKEN", "mcp_github")] }) } } })
+  Object.assign(window, { api: { openLink: async (url: string) => { opened.push(url) }, ext: { onHubViewChanged: () => () => {}, packageAuthorization: async (id: string) => ({ ok: true, packageId: id, items: [field("TOKEN", "mcp_github")] }) } } })
   const host = document.createElement("div"); document.body.append(host)
   disposers.push(web.render(() => solid.createComponent(PackageAccountDialog, { packageId, source, label: "GitHub", needId: "TOKEN", save: async () => ({ ok: true }), onClose: () => {}, onSaved: () => {} } as never), host))
  }
@@ -137,4 +137,27 @@ test("connector version suggestion is prefilled and clearing it submits the orig
   input.value = ""; input.dispatchEvent(new Event("input", { bubbles: true }))
   document.querySelector<HTMLButtonElement>('.a-dialog-footer button')!.click(); await flush()
   expect(h.writes).toEqual([{ packageId: "main-package", mcpVersions: { "mcp:xcodebuildmcp": "" } }])
+})
+
+test("connector suggestion refreshes an open dialog without replacing user input", async () => {
+  const item: PackageAuthorizationItemV1 = { kind: "mcp-version", componentId: "mcp:xcodebuildmcp", prerequisiteId: "version", serviceName: "xcodebuildmcp", label: "xcodebuildmcp", key: "mcp:xcodebuildmcp", token: "xcodebuildmcp@latest", value: "" }
+  let changed: (() => void) | undefined
+  let disposed = false
+  Object.assign(window, { api: { ext: {
+    onHubViewChanged: (listener: () => void) => { changed = listener; return () => { disposed = true } },
+    packageAuthorization: async (packageId: string) => ({ ok: true, packageId, items: [item] }),
+  } } })
+  const host = document.createElement("div"); document.body.append(host)
+  const dispose = web.render(() => solid.createComponent(PackageAccountDialog, { packageId: "build-ios-apps", label: "Xcode", needId: "version", save: async () => ({ ok: true }), onClose: () => {}, onSaved: () => {} } as never), host)
+  disposers.push(dispose)
+  await flush()
+  const input = () => document.querySelector<HTMLInputElement>('input[type="text"]')!
+  expect(input().value).toBe("")
+  Object.assign(item, { value: "2.0.0", suggestion: "2.0.0" }); changed?.(); await flush()
+  expect(input().value).toBe("2.0.0")
+  input().value = "my-version"; input().dispatchEvent(new Event("input", { bubbles: true }))
+  Object.assign(item, { value: "3.0.0", suggestion: "3.0.0" }); changed?.(); await flush()
+  expect(input().value).toBe("my-version")
+  dispose(); disposers.pop()
+  expect(disposed).toBe(true)
 })

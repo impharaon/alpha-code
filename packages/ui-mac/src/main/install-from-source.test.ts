@@ -927,3 +927,28 @@ test("source installation returns committed content before default enable and ru
   expect(after.ok && after.records.every(record => record.desiredState === "enabled")).toBe(true)
   expect(h.activation).toEqual([result.ok ? result.packageId : ""])
 }))
+
+// Real build-ios-apps fixture declares xcodebuildmcp@latest; metadata is held, not a timing fixture.
+test("connector version metadata never blocks authorization and is refreshed once available", () => installerHarness(async h => {
+  const { readPackageAuthorizationV1 } = await import("./package-admission")
+  const capture = await captureStandardFixture("codex:build-ios-apps")
+  const converted = await convertPluginTree(capture)
+  h.sources.convertCandidate = async () => ({ ok: true, ...converted, capture, runtimeIdentity: undefined })
+  const installed = await h.install(h.request("build-ios-apps", "version_hint_pending"))
+  if (!installed.ok) throw Error(installed.detail)
+  let release!: (version: string) => void
+  const metadata = new Promise<string>(resolve => { release = resolve })
+  let requests = 0
+  const deps = { versionSuggestion: async () => { requests++; return metadata }, root: () => h.root, userDataPath: h.temporary, casBaseRoot: () => h.temporary, environment: () => "dev" as const, loadVerifiedCatalog: async () => { throw Error("no catalog") } }
+  let first: Awaited<ReturnType<typeof readPackageAuthorizationV1>> | undefined
+  const pending = readPackageAuthorizationV1(installed.packageId, deps).then(result => { first = result })
+  try {
+    await new Promise<void>(resolve => setImmediate(resolve))
+    expect(first).toMatchObject({ ok: true })
+    expect(first?.ok && first.items.find(item => item.kind === "mcp-version")).toMatchObject({ value: "" })
+    if (first?.ok) expect(first.items.find(item => item.kind === "mcp-version")).not.toHaveProperty("suggestion")
+  } finally { release("2.0.0"); await metadata; await pending }
+  const refreshed = await readPackageAuthorizationV1(installed.packageId, deps)
+  expect(refreshed.ok && refreshed.items.find(item => item.kind === "mcp-version")).toMatchObject({ value: "2.0.0", suggestion: "2.0.0" })
+  expect(requests).toBe(1)
+}))

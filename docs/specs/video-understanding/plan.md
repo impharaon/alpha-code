@@ -214,7 +214,94 @@ PLAN 阶段暂无；r3 实施的必要文件接线、测试层级调整和待组
 
 ## D3 按需组件、固定文件与分发
 
-待本片 PLAN 展开；范围、AC 和依赖见总览，实施依据为视频设计 §4.2/§6 D3 与许可决定，以及启动器设计 VIDEO-L1-v2、固定文件设计 L2。
+- 依据：impharaon/alpha-work:SPEC-video-understanding v1 @ `25afeda6285b66b3de9d83531fa2e5a6cafa468f`，AC-15/18 及 AC-01/04/09/14/16/17 的组件与分发段；视频设计 §4.2/§5/§6 D3/§10 @ `870002ed698f1a83efa9d6ecb359ea5a0d0d41af`；本仓 launcher 设计 `VIDEO-L1-v2`、`FIRST-PARTY-NODE-v2.1` @ `a586b16fca`；固定文件设计 L2 @ impharaon/alpha-work `982e258` 的 `docs/specs/domestic-cloud-connectivity/design.md` §4.11/§10；#1775 r4 续派。
+- 核对：待确认下述缓存根的消费者接缝后实施。r4 已接受 D1+D2 `54ce411e2a..768649a187` 与收据 `b41df39997`（Claude Opus 5.5）；继承 270+39 PASS、七臂删除对照，不重复验收已接受范围。
+
+### 计划发现的输入缺口
+
+**问题仅为宿主路径如何合法送达独立视频进程，不是 #1760 handler 尚未实现。** 已冻结的 L1 方法可以直接编码为消费端并把集成留 pending；但是它没有提供持久媒体缓存根，当前也没有其它已决定的外部进程读取面：
+
+| 事实 / 固定依据 | 对 D3 的影响 |
+| --- | --- |
+| 视频设计 §5 要求缓存根由 launcher/userData authority 派生、跨项目/会话持久；`resources/video-mcp/runtime.ts:5–15` 的 D2 私有上下文因此必需 cacheRoot | 不能把项目目录或临时目录当持久根，也不能根据 HOME 自行猜应用 userData |
+| `src/shared/video-service.ts:1` 的已提交命令只有 Node、资源内 server.js、workspace；`resources/video-mcp/server.ts:38–39` 的独立入口尚未收到 runtime | D3 必须给实际 stdio 入口接可信 runtime，而不只是给测试注入上下文 |
+| `a586b16fca:docs/specs/connector-launchers/design.md` v2 §4.2 的 ManagedPinnedFilesResult 成功只有 `{id,path}`；v2 §4.3 的协议 metadata 只有 call/deadline，业务参数只收 ids | 不能给 ensure 方法私加 cacheRoot/环境字段，不能从 `<runtimeRoot>/assets/...` 的布局倒推根并复制 launcher 的路径 authority |
+| 同一设计 v1 §4.3 的 LauncherEnvironment.runtimeRoot 只经宿主 bootstrap 交 sidecar；`packages/util/src/codepuppy-bootstrap.ts:165–166` 是进程内 Symbol 槽，不随 spawn 传入外部 MCP | 在 server.ts import bootstrap 不能取得父进程已发布对象 |
+| 同一设计 v2 §4.3 要求显式 environment/cwd 逐字匹配声明，当前 video environment 是 `{}`；v2.1 §4.2 继续保持该规则且不把原生 Node 改作 npm/uv runner | 不能只往配置塞机器路径、借 workspace 槽承载缓存根，或套包运行器的 XDG 覆盖绕过身份核验 |
+| `src/main/sidecar-env.ts:58–76,221–246` 不再继承 Code Puppy 路径变量；#1759 R1 的固定包管理器键也没有视频缓存根 | 不能恢复退役的 CODEPUPPY_GLOBAL_DIR，或把普通 XDG/某包管理器缓存反推成 userData |
+
+**交回原设计的问题：给受管视频服务补哪一个只读的宿主运行上下文接缝，至少让 host-derived cacheRoot 在实际 spawn 后可达？**
+
+1. 推荐：在同代已核验首方启动链中投影只读视频运行上下文；根由现有 userData/launcher 路径 authority 产生，明确传输载体及覆盖次序，保持显式配置 environment/cwd 的严格身份规则。消费者不接收 URL/命令/任意目标，不改 L1 的固定文件语义。
+2. 或在同一命令展开/匹配 authority 接纳专用缓存根槽；原设计明确它的路径来源、展开签名与精确 matcher，D3 消费该槽，不借 workspace 通配。
+
+两者都不新增用户设置或操作。推荐第一项是为了让目录仍由原 authority 交付、避免增加位置推导。尚未验证的是实际宿主投影及进程围栏可达性；本轮不擅自选择载体或扩展冻结接口。按 r4 的例外，本轮完成本节并返回 PLAN-READY，确认前不写 D3 实现。
+
+### 改动
+
+下表是缺口确认后的执行文件范围；文件名为本片内部实现分工，最终接缝文件以原设计确认的 owner 为准。D3 不实现 #1760 的 downloader、expander、handler、解包、摘要算法或启动状态机，不修改其它仓/relay，不发布资产。
+
+| 文件（相对本仓） | 改什么 |
+| --- | --- |
+| `packages/ui-mac/resources/pinned-files.json`（新；若 #1760 先落地则合并其现有表） | 仅贡献实际视频模型、ffmpeg 与 OCR 条目，沿同一 PinnedFiles/ocr-model 域；准确 bytes/sha256/originUrl/provenanceUrl 来自真实发布元数据与实物，不覆盖其它 owner 条目，不手写另一套 schema/下载器 |
+| `packages/ui-mac/resources/video-mcp/asset-recipes.ts`（新）、`scripts/gen-office-mcp-tools.ts` | 唯一视频配方只存 PinnedFileId、archive、相对 entry/required；把同一配方投影到已存在的 video manifest 项。角色→归档内成员消费同一配方；版本/摘要/URL/下载量只从 pinned-files 读，不能在角色表复制 |
+| `packages/ui-mac/resources/video-mcp/assets.ts`（新）、`server.ts`、`runtime.ts` | 消费 L1 的实际 SDK 自定义请求与原调用 metadata/deadline/signal，按工具/实际语言按需取入口，准备完成在同一次 call 继续；取得已确认的可信缓存根后创建 D2 上下文，recipe 指纹包含实际 pin/随包依赖摘要。启动/initialize/list 不准备模型。无直连下载/系统程序回退 |
+| `packages/ui-mac/resources/video-runtime/`（新） | 原生依赖/自建源码与网站 wheel 的构建锁及许可证原件；它们是随包构建输入，不能在这里另登一份运行期模型/ffmpeg pin。锁住冻结选定版本、源码摘要、构建命令、对应源材料，不把预编译 macOS 15 Whisper addon 当最低目标构建 |
+| `packages/ui-mac/scripts/build-video-runtime.ts`、`build-video-components.ts`（新）、`build-video-mcp.ts`、`prebuild.ts` | 构建 darwin-arm64/win32-x64 原生闭包、Mac Vision/Windows Tesseract helper；制作 LGPL+OpenH264 ffmpeg/ffprobe 两平台归档及对应源代码/许可材料，输出供 orchestrator 发布的实物/摘要，不调用上传。生产安装不跑编译/postinstall；不生成 Intel Mac 行 |
+| `packages/ui-mac/electron-builder.config.ts`、`scripts/target-arch.ts` 及各自既有测试 | asar 外只装目标平台的 native/helper/依赖与完整许可；复用现有架构检查/签名链验证 Mach-O/PE、执行位、依赖落点。Mac 最低部署目标消费已有应用目标（本机 Electron Info.plist 为 12.0），不抬高要求；实际发布目标以同次构建的应用事实核对 |
+| `packages/ui-mac/resources/NOTICE.txt`、`resources/video-runtime/licenses/`（新）、现有许可证展示读取点（仅必要同链） | 注册 SenseVoice 名称、署名、模型许可全文，以及 sherpa/ONNX Runtime、Whisper、ffmpeg/OpenH264、OCR、网站闭包的各自许可；应用清单与可下载组件内都能核实际材料。沿已有 About/NOTICE 路径，不新增界面 |
+| `packages/ui-mac/src/main/video-assets.fast.test.ts`、`video-assets.test.ts`（新）、既有 video-service/tools/snapshot 与构建/架构测试 | 配方/按需集合纯算法用 fast；实际 SDK 嵌套请求/取消/原 call 继续、临时构建/实物清单用 integration；实际模型/包/两地下载测量仅一次性证据或 scenario，不进入轻量测试。外部 metadata/归档夹具必须从原发布捕获并记 provenance |
+| `docs/specs/video-understanding/plan.md`、`docs/verification/video-understanding-local.md`（实测才创建）、`docs/architecture/modules.md`（owner 变化时） | 本节记录实际 pins、构建/许可产物、差异与 pending 证据；真实测量才写 verification，不用代码存在宣称验收通过 |
+
+### 顺序
+
+1. **接缝与 pin 数据**：确认上述一个路径输入缺口；只读核对 #1760 已冻结类型/声明形状。用临时目录获取所选模型/源码/许可/构建实物，计算完整 bytes/SHA-256、列归档成员，填唯一 pinned-files 与只引用 ID 的配方。先贡献原厂已有文件；自建/转存件必须有实际字节和目标公开 release 位置，未发布不假称可下载。提交这一单元及同源纯配方断言。
+2. **两平台构建与许可**：按平台产出 native/helper、ffmpeg 归档和 source/license 材料，接入已有 prebuild/packaging/signing/架构检查。每个平台的下载总量按真实压缩交付字节求和；中文/英文不取 turbo，其它 script 按锁定 tessdata_fast 集合按需。Mac/Windows 的真实构建/加载分别留证，无机器或产物时明确 pending，不写假 PE/Mach-O 当外部格式夹具。
+3. **L1 与原调用接线**：server handler 在同一调用捕获 `_meta["codepuppy/pinned-files.call"]` 与原 deadline，严格只发送 ids；嵌套 request 使用剩余预算和同一取消。返回完整入口后继续 D2 操作。准备进度由 #1760 report authority 归原 call；失败映射 download/disk/cancelled，不改成握手失败/新调用/自动重发用户问题。
+4. **相关核对与发布交接**：每步仅跑本模块行为文件；返回前只扩展一次到配方/首方清单/构建目标/许可证枚举的实际消费者及包 typecheck。#1760 handler 未实施仍为集成依赖，不能代写其实现。发布次序沿 L2：orchestrator 先将自建/转存实物附加到已有公开正式 release，再部署快照、逐条 release probe，最后发布消费应用；本会话只交实物与 pin，不执行这些动作。
+
+### 取证后的 pin 表入口
+
+本轮因路径接缝待确认，**没有获取模型/ffmpeg 字节或生成实际 pin**；下表是采集范围，不是可发布清单，不能用待取证值填入运行期 JSON。准确 entry、bytes、sha256 与许可须共同绑定实际交付实物。
+
+| 资产 / 目标 | 选定来源与版本（只引用冻结设计） | pin/实物状态 |
+| --- | --- | --- |
+| SenseVoice int8 + tokens / any | sherpa asr-models，2024-07-17 | 未取证；设计 F-07 的 163002883 B 只是基线，不当本轮摘要证明 |
+| tiny multilingual LID encoder/decoder / any | 同一 asr-models 的已选 int8 tiny 归档 | 未取证；设计 F-07 的 116204861 B 同上 |
+| Silero VAD / any | 同一 asr-models 的已选文件 | 未取证；设计 F-07 的 643854 B 同上 |
+| pyannote segmentation int8、3dspeaker embedding / any | sherpa speaker-segmentation-models / speaker-recongition-models 的已选模型 | 未取证；真实许可、文件摘要/长度及成员待取得 |
+| Whisper turbo q5 / any | ggml-large-v3-turbo-q5_0.bin，原字节转存已有自有正式 release | 未取证/未发布；不能把 provenance 原址当运行期退路 |
+| ffmpeg/ffprobe / darwin-arm64、win32-x64 | 自建 9.1 LGPL + OpenH264 2.7.0，沿冻结构建许可边界 | 尚未构建，故没有归档摘要/长度或公开资产 URL |
+| 默认 zh/en/OSD 与已有 script 集合 / win32-x64 | tessdata_fast 固定 4.1.0，逐原件转存自有正式 release | 未取证/未发布；映射从该固定集合生成，不手写不完整语言白名单 |
+
+Node/uv、Python 的 pin 仍归 #1760；两平台 native/helper 与 yt-dlp 2026.11.23/配套 EJS 属第一方构建锁/产物闭包，不能混入一个虚构的运行期 family。
+
+### 风险
+
+- 真正的跨进程缓存根输入没有被冻结；先完成本节并交回这一点，不把已有 host 内存对象当成外部 Node 的可用端口，不以路径猜测制造 K2 偏离。
+- 原厂模型归档可能包含未用权重、缺随附许可或 release tag 后续被覆盖；只能按完整压缩交付物测量、实物摘要锁定并补齐许可。若所有首次必需归档超过 AC-15 的 400 MB，回报实际数值及受影响输入，不能漏算说话人/LID/ffmpeg 或新增用户等待政策。
+- Mac 低部署目标 Whisper 原生构建、Windows OCR/native 闭包和真正 LGPL+OpenH264 产物仍未证实；不能改用 pilot、GPL encoder 或抬高系统版本。失败只退回受影响设计条款，不代换已冻结选型。
+- #1760 尚无实现是已知集成依赖；本票测试真实 SDK 消费行为与产物，handler 归属/同代取消/换源续传须在其接入后验证，不能在服务里补第二个 downloader/解包器或状态机。
+- 当前没有发布权限：本轮可以计算真实 pin、交付归档与源码材料；没有公开副本就不能宣称香港/原址上线可达。发布者须按固定顺序取证。
+
+### 证明
+
+| AC / D3 分工 | 具名测试或一次性证据（命令从 ui-mac 执行） | 缺少行为为什么会失败 |
+| --- | --- | --- |
+| AC-01/15 按需且原调用继续 | `bun test src/main/video-assets.fast.test.ts src/main/video-assets.test.ts src/main/video-service.test.ts src/main/video-tools.test.ts`：真实 SDK 嵌套 ensure，初始化/list 零准备，tools/call 才请求正确 ID/原 meta；准备后同一 call 继续，失败/取消没有假成功 | 急切取 turbo/所有 OCR、丢 call 关联或重启新调用会使请求集合/往返断言失败。宿主实际归属与首次原问题回答仍待 #1760 集成/安装包 |
+| AC-09/14 已备离线复用 | 相同资产/配方在新进程由真实已发布入口读回；无准备 URL/系统程序回退；一次性断网包实测 | 用内存目录/临时根、组件未完整即 ready 或联网回退不能通过重启/出网证据。缓存根首先依赖上面的输入确认 |
+| AC-15 体积/国内/续传/切源 | 从实际 pinned-files 与配方求两平台中文/英文首次唯一归档集合和准确总字节；缺任何必需角色即失败。北京与 owner 各一次实际组件下载；断点/HK 不可用用例归共享 downloader 的真实入口 | 漏算 diarization/LID、把解压体积当下载量会与 pin 实物不符；源码表不证明国内到达。不得为本票再测伪 downloader；#1760/发布就绪前 pending |
+| AC-17 目标闭包 | 构建模块与 target-arch 既有测试补目标产物；实际 Mac Mach-O/deployment target、Windows PE/DLL 闭包及包内真实文件核对；两个平台分别执行 native/helper 加载 | 错平台、未解包 native、缺依赖/执行位、macOS 15 预编译冒充已有目标会失败。Windows 真运行不能由 Mac 字符串断言代替 |
+| AC-18 全文/署名 | 实际产物 license inventory 比对：SenseVoice 名称/署名/许可原文摘要，native/模型/编码器/OCR/网站各闭包许可；比对安装资源和已准备目录的真实文件 | 只有 NOTICE 一行、漏模型全文或下载归档无许可不会通过文件/摘要核对；不写断言文案/标题数量的文档测试 |
+| AC-04/16 准备进度/失败 | `video-assets.test.ts` 的原 signal/deadline、准备期间进度与 disk/network/integrity/cancelled 分类；安装包核实际原 call metadata | 固定 SDK 短默认超时、延长 deadline、取消后发布 ready 或丢 disk 类别会变红；D4 的界面呈现及真转写性能分开验收 |
+
+计划的删除对照：去掉 lazy 请求集合、去掉 call/deadline 透传、去掉取消传递、漏首次必需归档、装入错误平台 native、漏 SenseVoice 全文，各自须有具名断言红，再恢复转绿。只在实施有真实行为/产物后执行；本轮 PLAN 未执行，不能继承 D1/D2 的七臂作为 D3 证明。
+
+### 偏离记录
+
+2026-11-26 · r4 允许计划后同轮实施，也明确「计划发现冻结设计未定的决定则停止并返回 PLAN-READY」。本轮在真实 server 的 cacheRoot 注入处发现上述一个契约缺口，完成计划后停止；只修改本节，不改冻结设计/其它仓/应用实现，没有生成虚假 pin、构建或测量结果。推荐与替代的载体都交原设计确认，不在此冻结新契约。
+
+本轮收据：Codex / GPT-6，核对 D3 计划与上述固定输入、真实 stdio/spawn/bootstrap 读取面；结论为计划已备、路径交付接缝待原设计确认。通过原 alpha profile 调 canonical `check_docs_contract.check_repo(本 worktree, "impharaon/alpha-code", profile.coordination_repo, profile.project.url, "HEAD")`：本文件 0 finding；仓级 69 errors / 253 warnings，继承既有基线，不顺修。`git diff --check` exit 0。D3 行为测试 PASS 计数与删除对照均为未执行；本轮没有下载组件/新增实际 pin，没有把 D1/D2 证据计入 D3。遗留只交回原设计的缓存根消费面，其余计划待该输入确认后原顺序执行。
 
 ## D4 处理进度与帧的模型投影
 

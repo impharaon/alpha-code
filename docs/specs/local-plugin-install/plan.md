@@ -1468,3 +1468,7 @@ B3 的阻塞与保全：`422a3019cd` 已提交独立红测，固定 feature-dev 
 Host 检查：`bun src/shared/host-extension-package-contract/generate-artifact.ts --check` **exit 0 / 20 files**；aggregate **9eaf52305a08ccdf6cbba6131c6573228f304e6316671f510b952fc48c3668b7**，r20 artifact 成员变化 **0**。累计相对 1db6a3bbf5 的九个 manifest 成员仍为 CONTRACT.md、plugin-package.ts、plugin-hook-events.ts、plugin-conversion.mjs、plugin-conversion.d.mts、generate-artifact.ts、profiles/plugin-package.v1.schema.json、testvectors/plugin-package-description.v1.json、testvectors/decoder-corpus.v1.json；除此目录里的 generator source/测试和 manifest 自身不冒称 artifact 成员。consumer pin/vendor 未触碰。
 
 已核 Codex（GPT-6），04:17 开始，本轮约 52 分钟；完成 A1–A5、B1、B2 的独立红先行与修复，B3 新测阻塞的最小所需授权如上，其余 B4–B9 交下轮 fix now。design §4.9 ARGUMENTS 文案漂移交编排器 §10 镜像；外部 CLAUDE_CODE_SESSION_ID 测试环境事实见 B2，不在产品添加环境过滤。旧 docs/三断言沿既有处置，未新增 OPTIONAL。git diff --check exit 0、hooksPath=.githooks；未 push/PR/merge/rebase、启动应用/窗口或执行真实 SaaS，所有前台命令结束。最终收口提交只保留本段证据和已有 gate 行数量同步。
+
+### r21｜B3 观察修正与 B4–B9 收口
+
+核对：IMPLEMENT — r21，orchestrator / Claude Opus 5.5，2026-11-27；r20 A1–A5/B1/B2 与 67fbda8e16 accepted。本轮只续 B3–B9，不开始片 7。偏离记录（orchestrator ruling 2026-11-27）：B3 新测限定真实 child session ID，父 SessionStart 合法；本轮新增而非守旧回归的错误观察允许独立提交纠正、注明原因并用一个移除臂证明；既有回归断言仍按 BLOCKED 规则。该增量不修改设计/公共 DTO。B3 先单独纠正 422a3019cd 的观察谓词，其他断言不变；随后在未实现上验证红，再应用已保全候选补丁。

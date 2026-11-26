@@ -2969,7 +2969,7 @@ packageIt.live("real subagents skip main session phases and release transports o
       yield* mcp.callTool({ server: "child-remote", name: "echo", sessionID: child as never })
       expect(handler.counts).toEqual({ opened: leaveParent ? 3 : 2, closed: leaveParent ? 1 : 0 })
       const rows = readFileSync(join(location.directory, "child-phases.jsonl"), "utf8").trim().split("\n").map(line => JSON.parse(line))
-      expect(rows.filter(row => ["SessionStart", "UserPromptSubmit"].includes(row.hook_event_name))).toEqual([])
+      expect(rows.filter(row => row.session_id === child && ["SessionStart", "UserPromptSubmit"].includes(row.hook_event_name))).toEqual([])
       expect(yield* Effect.promise(() => Bun.file(join(location.directory, "child-always-monitor")).exists())).toBe(false)
       if (leaveParent) {
         for (const listener of listeners) listener({ data: { type: "codepuppy.plugin.session", id: 2023, sessionId: parent.id, action: "leave", reason: "clear" } })

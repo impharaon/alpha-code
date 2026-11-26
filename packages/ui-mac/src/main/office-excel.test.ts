@@ -117,7 +117,8 @@ path.write_bytes(content)
 actual=load_workbook(path,data_only=True)
 assert count==4 and actual['Summary']['H2'].value==20100
 assert actual['Summary']['I2'].value=='中文' and actual['Summary']['J2'].value is True
-assert errors==[{'sheet':'Summary','cell':'K2','formula':'=#REF!','error':'#REF!'}]
+# The fixture records pinned LibreOffice's computed value for an imported =#REF! literal.
+assert errors==[{'sheet':'Summary','cell':'K2','formula':'=#REF!','error':'#NAME?'}]
 assert load_workbook(path)['Summary']['K2'].value=='=#REF!'
 with zipfile.ZipFile(original) as before,zipfile.ZipFile(path) as after:
  for name in before.namelist():

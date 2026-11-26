@@ -856,6 +856,26 @@ describe("I-11 global MCP states in the v3 projection", () => {
 })
 
 describe("E2 package allow-set v3", () => {
+  test("command and agent projection follows the package root and project effect", () => {
+    const inputs = ["bundle", "command", "agent"].map(kind => upsertInput({ kind: kind as UpsertInput["kind"], id: kind + ":entry", name: kind + "-entry", configKey: undefined }))
+    const nodes = inputs.map(input => ({ componentId: input.id, kind: input.kind, name: input.name, required: true, manifestDigest: DIGEST_A }))
+    const graph: PackageGraphV1 = { packageId: "local:invocation", envelopeDigest: DIGEST_A, installedGraphDigest: "", root: nodes[0]!, children: nodes.slice(1), pluginTree: { treeDigest: DIGEST_A, storeKey: "bundle--bundle-entry" } }
+    graph.installedGraphDigest = computeInstalledGraphDigest(graph)
+    expect(applyPackageMutation(root, { operation: "install", transactionId: "invocation-seed", graphBeforeDigest: null, graphAfter: graph, claimMutations: nodes.map(node => ({ op: "acquire", kind: node.kind, name: node.name, owner: bundleOwner(graph.packageId, graph.root.manifestDigest) })), childRecordMutations: inputs.map(input => ({ op: "upsert", input })) }).ok).toBe(true)
+    const projection = () => JSON.parse(fs.readFileSync(skillsEnabledPath(root), "utf8"))
+    expect(projection().keys).toEqual(["agent--agent-entry", "command--command-entry"])
+    expect(setDesiredStateV2(root, "bundle", "bundle-entry", "disabled").ok).toBe(true)
+    expect(projection().keys).toEqual([])
+    const directory = path.join(root, "project")
+    fs.mkdirSync(directory)
+    const scope = projectScopeIdentity(directory)
+    if (!scope.ok) throw new Error(scope.reason)
+    const scoped = { ...graph, effect: scope.scope }
+    scoped.installedGraphDigest = computeInstalledGraphDigest(scoped)
+    expect(applyPackageMutation(root, { operation: "update", transactionId: "invocation-scope", graphBeforeDigest: graph.installedGraphDigest, graphAfter: scoped, claimMutations: [], childRecordMutations: [] }).ok).toBe(true)
+    expect(setDesiredStateV2(root, "bundle", "bundle-entry", "enabled").ok).toBe(true)
+    expect(projection()).toEqual({ v: 3, keys: [], scoped: [{ kind: "agent", name: "agent-entry", projectPath: scope.scope.projectPath }, { kind: "command", name: "command-entry", projectPath: scope.scope.projectPath }], mcp: [] })
+  })
   // These are our own ledger/graph inputs, not fabricated provider definitions.
   const scopeFor = (name: string) => {
     const directory = path.join(root, name)

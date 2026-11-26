@@ -45,7 +45,7 @@ describe("decodePackageAllowSet", () => {
     { v: 3, keys: [skill.key, 1], scoped: [], mcp: [] },
     { v: 3, keys: [], scoped: {}, mcp: [] },
     { v: 3, keys: [], scoped: [null], mcp: [] },
-    { v: 3, keys: [], scoped: [{ kind: "agent", name: skill.name, projectPath: alpha }], mcp: [] },
+    { v: 3, keys: [], scoped: [{ kind: "hook", name: skill.name, projectPath: alpha }], mcp: [] },
     { v: 3, keys: [], scoped: [{ kind: "skill", name: 1, projectPath: alpha }], mcp: [] },
     { v: 3, keys: [], scoped: [{ kind: "skill", name: skill.name, projectPath: 1 }], mcp: [] },
   ].map((input) => ({ input })))("unrecognized or malformed projection has no provable members: %j", (sample) => {
@@ -116,6 +116,16 @@ describe("managedSkillAllowedHere positive membership", () => {
 })
 
 describe("scopedPackageAllowedHere", () => {
+  test("command and agent membership keeps its kind and exact project", () => {
+    for (const kind of ["command", "agent"] as const) {
+      const decoded = decodePackageAllowSet({ v: 3, keys: [], scoped: [{ kind, name: "entry", projectPath: alpha }], mcp: [] })
+      expect(decoded).toBeDefined()
+      expect(scopedPackageAllowedHere(kind, "entry", decoded, alpha)).toBe(true)
+      expect(scopedPackageAllowedHere(kind, "entry", decoded, beta)).toBe(false)
+      expect(scopedPackageAllowedHere(kind === "agent" ? "command" : "agent", "entry", decoded, alpha)).toBe(false)
+      expect(scopedPackageAllowedHere(kind, "entry", decodePackageAllowSet({ v: 3, keys: [], scoped: [], mcp: [] }), alpha)).toBe(false)
+    }
+  })
   test("MCP matching uses the same positive project membership", () => {
     const input: PackageAllowSetV3 = { v: 3, keys: [], scoped: [{ kind: "mcp", name: "context7", projectPath: alpha }], mcp: [] }
     expect(scopedPackageAllowedHere("mcp", "context7", input, alpha)).toBe(true)

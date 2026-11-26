@@ -1,0 +1,5 @@
+{
+  "dependencies": {
+    "semver": "file:../../../../../../tmp/connector-r6-capture-8ngpSb/archives/semver-7.8.5.tgz"
+  }
+}

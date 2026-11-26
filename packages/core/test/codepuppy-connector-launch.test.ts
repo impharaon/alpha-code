@@ -1,8 +1,22 @@
 import { afterEach, expect, test } from "bun:test"
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, readdirSync, rmSync, copyFileSync, symlinkSync } from "node:fs"
+import {
+  mkdtempSync,
+  mkdirSync,
+  writeFileSync,
+  readFileSync,
+  existsSync,
+  readdirSync,
+  rmSync,
+  copyFileSync,
+  symlinkSync,
+  cpSync,
+} from "node:fs"
 import { tmpdir } from "node:os"
 import path from "node:path"
 import { createRequire } from "node:module"
+import { connectorPreparationKey } from "@opencode/core/mcp/codepuppy-connector-key"
+import { parseUvToolSettings, readUvLaunchDeclaration } from "@opencode/core/mcp/codepuppy-uv-launch"
+import { UV_TOOL_SETTINGS, UV_SERVICE_COMMAND } from "./fixture/uv-tool-settings"
 import { readNpmLaunchDeclaration } from "@opencode/core/mcp/codepuppy-npm-launch"
 import { Deferred, Effect, Fiber, Layer, Logger, Option, PlatformError, References, Stream } from "effect"
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
@@ -18,6 +32,8 @@ import {
   publishConnectorPreparation,
   readConnectorPreparation,
   connectorRunnerEnvironment,
+  captureNpmConnectorPreparation,
+  preparedNpmEntry,
 } from "@opencode/core/mcp/codepuppy-connector-launch"
 import { hostEnvironmentLayer, recordingEnvironmentLayer, transformEnvironmentFiles } from "./fixture/environment"
 import { observeConnectorLaunch } from "@opencode/core/mcp/codepuppy-connector-diagnostic"
@@ -305,18 +321,16 @@ function diagnosticLayer() {
       return Environment.Service.of({
         ...current,
         spawner: ChildProcessSpawner.make((command) =>
-          current.spawner
-            .spawn(command)
-            .pipe(
-              Effect.map((handle) =>
-                ChildProcessSpawner.makeHandle({
-                  ...handle,
-                  stderr: handle.stderr.pipe(
-                    Stream.flatMap((bytes) => Stream.fromIterable([...bytes].map((byte) => Uint8Array.of(byte)))),
-                  ),
-                }),
-              ),
+          current.spawner.spawn(command).pipe(
+            Effect.map((handle) =>
+              ChildProcessSpawner.makeHandle({
+                ...handle,
+                stderr: handle.stderr.pipe(
+                  Stream.flatMap((bytes) => Stream.fromIterable([...bytes].map((byte) => Uint8Array.of(byte)))),
+                ),
+              }),
             ),
+          ),
         ),
       })
     }),
@@ -510,27 +524,25 @@ test("connector diagnostics flush unterminated stderr on pipe failure without ex
       return Environment.Service.of({
         ...current,
         spawner: ChildProcessSpawner.make((command) =>
-          current.spawner
-            .spawn(command)
-            .pipe(
-              Effect.map((handle) =>
-                ChildProcessSpawner.makeHandle({
-                  ...handle,
-                  stderr: handle.stderr.pipe(
-                    Stream.concat(
-                      Stream.fail(
-                        PlatformError.systemError({
-                          _tag: "Unknown",
-                          module: "ChildProcess",
-                          method: "read",
-                          description: "own pipe failure known-secret",
-                        }),
-                      ),
+          current.spawner.spawn(command).pipe(
+            Effect.map((handle) =>
+              ChildProcessSpawner.makeHandle({
+                ...handle,
+                stderr: handle.stderr.pipe(
+                  Stream.concat(
+                    Stream.fail(
+                      PlatformError.systemError({
+                        _tag: "Unknown",
+                        module: "ChildProcess",
+                        method: "read",
+                        description: "own pipe failure known-secret",
+                      }),
                     ),
                   ),
-                }),
-              ),
+                ),
+              }),
             ),
+          ),
         ),
       })
     }),
@@ -593,15 +605,62 @@ test("connector diagnostics continue observing a real MCP process after connecti
 for (const runner of ["uv-tool", "npm-exec"] as const)
   test(`${runner} environment keeps bundled runtimes ahead of old PATH and binds current business inputs`, () => {
     const launchers = launcherEnvironment(path.resolve("owned-runtime"))
-    const input = { runner, launchers, key: "d".repeat(64), inherited: { PATH: "/old/bin:/shared/bin", HOME: "/own/home", NODE_OPTIONS: "--require old-host", PYTHONHOME: "/old/python", PYTHONPATH: "/old/modules", VIRTUAL_ENV: "/old/venv", UV_CACHE_DIR: "/r1/cache", XDG_CONFIG_HOME: "/user/config", NPM_CONFIG_IGNORE_SCRIPTS: "false" }, declared: { PATH: "/declared/bin:/shared/bin", PRIVATE_KEY: "current-secret", npm_config_registry: "https://registry.invalid", npm_config_ignore_scripts: "false", NODE_OPTIONS: "--require declared-module" }, packageBins: ["/prepared/bin"], python: "/pinned/python/bin/python3" }
+    const input = {
+      runner,
+      launchers,
+      key: "d".repeat(64),
+      inherited: {
+        PATH: "/old/bin:/shared/bin",
+        HOME: "/own/home",
+        NODE_OPTIONS: "--require old-host",
+        PYTHONHOME: "/old/python",
+        PYTHONPATH: "/old/modules",
+        VIRTUAL_ENV: "/old/venv",
+        UV_CACHE_DIR: "/r1/cache",
+        XDG_CONFIG_HOME: "/user/config",
+        NPM_CONFIG_IGNORE_SCRIPTS: "false",
+      },
+      declared: {
+        PATH: "/declared/bin:/shared/bin",
+        PRIVATE_KEY: "current-secret",
+        npm_config_registry: "https://registry.invalid",
+        npm_config_ignore_scripts: "false",
+        NODE_OPTIONS: "--require declared-module",
+      },
+      packageBins: ["/prepared/bin"],
+      python: "/pinned/python/bin/python3",
+    }
     const before = structuredClone(input)
     const env = connectorRunnerEnvironment(input)
-    expect(env.PATH?.split(":")).toEqual(["/prepared/bin", path.dirname(input.launchers.uv), "/pinned/python/bin", "/declared/bin", "/shared/bin", "/old/bin"])
-    expect(env).toMatchObject({ HOME: "/own/home", NODE_OPTIONS: "--require declared-module", PRIVATE_KEY: "current-secret", npm_config_registry: "https://registry.invalid", UV_CACHE_DIR: "/r1/cache", XDG_CONFIG_HOME: "/user/config", UV_PYTHON: "3.12.16" })
+    expect(env.PATH?.split(":")).toEqual([
+      "/prepared/bin",
+      path.dirname(input.launchers.uv),
+      "/pinned/python/bin",
+      "/declared/bin",
+      "/shared/bin",
+      "/old/bin",
+    ])
+    expect(env).toMatchObject({
+      HOME: "/own/home",
+      NODE_OPTIONS: "--require declared-module",
+      PRIVATE_KEY: "current-secret",
+      npm_config_registry: "https://registry.invalid",
+      UV_CACHE_DIR: "/r1/cache",
+      XDG_CONFIG_HOME: "/user/config",
+      UV_PYTHON: "3.12.16",
+    })
     for (const key of ["PYTHONHOME", "PYTHONPATH", "VIRTUAL_ENV"]) expect(env).not.toHaveProperty(key)
-    if (runner === "uv-tool") expect(env).toMatchObject({ UV_TOOL_DIR: path.join(input.launchers.runtimeRoot, "prepared", input.key, "uv/tools"), UV_TOOL_BIN_DIR: path.join(input.launchers.runtimeRoot, "prepared", input.key, "uv/bin") })
+    if (runner === "uv-tool")
+      expect(env).toMatchObject({
+        UV_TOOL_DIR: path.join(input.launchers.runtimeRoot, "prepared", input.key, "uv/tools"),
+        UV_TOOL_BIN_DIR: path.join(input.launchers.runtimeRoot, "prepared", input.key, "uv/bin"),
+      })
     if (runner === "npm-exec") {
-      expect(env).toMatchObject({ npm_config_prefer_offline: "true", npm_config_ignore_scripts: "true", npm_config_update_notifier: "false" })
+      expect(env).toMatchObject({
+        npm_config_prefer_offline: "true",
+        npm_config_ignore_scripts: "true",
+        npm_config_update_notifier: "false",
+      })
       expect(env).not.toHaveProperty("NPM_CONFIG_IGNORE_SCRIPTS")
       expect(env).not.toHaveProperty("UV_TOOL_DIR")
     }
@@ -612,9 +671,31 @@ for (const runner of ["uv-tool", "npm-exec"] as const)
   })
 
 test("Windows runner environment merges case-insensitive keys and PATH without retaining old runtime controls", () => {
-  const launchers = { ...launcherEnvironment(path.resolve("owned-runtime")), platform: "win32-x64" as const, runtimeRoot: "C:\\app-data\\connector-runtime", uv: "C:\\app-data\\uv\\uv.exe", node: "C:\\app-data\\node\\node.exe" }
-  const env = connectorRunnerEnvironment({ runner: "npm-exec", launchers, key: "e".repeat(64), inherited: { Path: "C:\\old;C:\\shared", Node_Options: "--require old", pythonpath: "C:\\old-modules", Home: "C:\\own-home", KEY: "old-secret" }, declared: { PATH: "c:\\shared;C:\\declared", key: "current-secret" }, packageBins: ["C:\\prepared\\bin"], python: "C:\\python\\python.exe" })
-  expect(env.PATH).toBe("C:\\prepared\\bin;C:\\app-data\\uv;C:\\app-data\\node;C:\\python;c:\\shared;C:\\declared;C:\\old")
+  const launchers = {
+    ...launcherEnvironment(path.resolve("owned-runtime")),
+    platform: "win32-x64" as const,
+    runtimeRoot: "C:\\app-data\\connector-runtime",
+    uv: "C:\\app-data\\uv\\uv.exe",
+    node: "C:\\app-data\\node\\node.exe",
+  }
+  const env = connectorRunnerEnvironment({
+    runner: "npm-exec",
+    launchers,
+    key: "e".repeat(64),
+    inherited: {
+      Path: "C:\\old;C:\\shared",
+      Node_Options: "--require old",
+      pythonpath: "C:\\old-modules",
+      Home: "C:\\own-home",
+      KEY: "old-secret",
+    },
+    declared: { PATH: "c:\\shared;C:\\declared", key: "current-secret" },
+    packageBins: ["C:\\prepared\\bin"],
+    python: "C:\\python\\python.exe",
+  })
+  expect(env.PATH).toBe(
+    "C:\\prepared\\bin;C:\\app-data\\uv;C:\\app-data\\node;C:\\python;c:\\shared;C:\\declared;C:\\old",
+  )
   expect(env).toMatchObject({ key: "current-secret", Home: "C:\\own-home" })
   for (const key of ["Path", "KEY", "Node_Options", "pythonpath"]) expect(env).not.toHaveProperty(key)
 })
@@ -727,7 +808,9 @@ test("connector preparation runs before permits and publishes progress before th
           prepare: ({ preparing: report, runtimeDep }) =>
             Effect.gen(function* () {
               expect(runtimeDep.missing).toEqual([])
-              const available = Option.isSome(yield* startPermits.withPermitsIfAvailable(START_CONCURRENCY)(Effect.void))
+              const available = Option.isSome(
+                yield* startPermits.withPermitsIfAvailable(START_CONCURRENCY)(Effect.void),
+              )
               report("python", { unit: "bytes", completed: 42, total: 100 })
               yield* Deferred.succeed(preparing, available)
               yield* Deferred.await(ready)
@@ -951,21 +1034,30 @@ test("first-party Node refuses an asset result from a different trusted descript
   )
 })
 
-
 test("connector missing workspace is reported before package preparation or service spawn", async () => {
   const root = connectionRoot()
   const snapshots: LaunchSnapshot[] = []
   const spawns: ChildProcess.Command[] = []
-  await Effect.runPromise(Effect.scoped(Effect.gen(function* () {
-    const current = yield* launchConnection({ root, snapshots, spawns, cwd: path.join(root, "missing"),
-      prepare: () => Effect.die("must not prepare without a workspace"),
-    })
-    yield* current.connection.start
-    expect(spawns).toHaveLength(0)
-    expect(snapshots.at(-1)?.state).toMatchObject({ phase: "failed", failure: { kind: "workspace", reason: "missing" } })
-  })).pipe(Effect.provide(hostEnvironmentLayer)))
+  await Effect.runPromise(
+    Effect.scoped(
+      Effect.gen(function* () {
+        const current = yield* launchConnection({
+          root,
+          snapshots,
+          spawns,
+          cwd: path.join(root, "missing"),
+          prepare: () => Effect.die("must not prepare without a workspace"),
+        })
+        yield* current.connection.start
+        expect(spawns).toHaveLength(0)
+        expect(snapshots.at(-1)?.state).toMatchObject({
+          phase: "failed",
+          failure: { kind: "workspace", reason: "missing" },
+        })
+      }),
+    ).pipe(Effect.provide(hostEnvironmentLayer)),
+  )
 })
-
 
 // Integration layer, affected PR/nightly. These THREE sources + LICENSE are unmodified
 // npm 11.20.0 files from the verified Node 26.13.1 archive (plan.md r2/r5); definitions,
@@ -982,32 +1074,69 @@ function npmDeclarationFixture() {
   const util = createRequire(new URL("../../util/package.json", import.meta.url))
   const config = util.resolve("@npmcli/config/package.json")
   symlinkSync(path.dirname(config), path.join(npm, "node_modules/@npmcli/config"), "dir")
-  symlinkSync(path.dirname(util.resolve("npm-package-arg/package.json")), path.join(npm, "node_modules/npm-package-arg"), "dir")
-  symlinkSync(path.dirname(createRequire(config).resolve("abbrev/package.json")), path.join(npm, "node_modules/abbrev"), "dir")
+  symlinkSync(
+    path.dirname(util.resolve("npm-package-arg/package.json")),
+    path.join(npm, "node_modules/npm-package-arg"),
+    "dir",
+  )
+  symlinkSync(
+    path.dirname(createRequire(config).resolve("abbrev/package.json")),
+    path.join(npm, "node_modules/abbrev"),
+    "dir",
+  )
   copyFileSync(new URL("../../util/package.json", import.meta.url), path.join(root, "package.json"))
   mkdirSync(path.join(root, "home"))
   return {
     root,
-    launchers: { ...launcherEnvironment(root), node: process.execPath, npmCli: path.join(npm, "bin/npm-cli.js"), npxCli: path.join(npm, "bin/npx-cli.js") },
+    launchers: {
+      ...launcherEnvironment(root),
+      node: process.execPath,
+      npmCli: path.join(npm, "bin/npm-cli.js"),
+      npxCli: path.join(npm, "bin/npx-cli.js"),
+    },
     environment: { HOME: path.join(root, "home"), PATH: process.env.PATH! },
   }
 }
 test("official npx boolean switches preserve the service argument boundary and repeated package specs", async () => {
   const input = npmDeclarationFixture()
-  const parse = (args: string[]) => Effect.runPromise(Effect.scoped(readNpmLaunchDeclaration({ ...input, cwd: input.root, syntax: "npx", arguments: args })).pipe(Effect.provide(hostEnvironmentLayer)))
+  const parse = (args: string[]) =>
+    Effect.runPromise(
+      Effect.scoped(readNpmLaunchDeclaration({ ...input, cwd: input.root, syntax: "npx", arguments: args })).pipe(
+        Effect.provide(hostEnvironmentLayer),
+      ),
+    )
   const implicit = await parse(["--yes", "one@1.2.3", "--package=business-argument"])
   expect(implicit.arguments).toEqual(["one@1.2.3", "--package=business-argument"])
   expect(implicit.packages).toEqual([])
-  const explicit = await parse(["--yes", "-p", "@scope/one@1.2.3", "--package=two@npm:three@^4", "--", "my-bin", "--package=service-flag"])
+  const explicit = await parse([
+    "--yes",
+    "-p",
+    "@scope/one@1.2.3",
+    "--package=two@npm:three@^4",
+    "--",
+    "my-bin",
+    "--package=service-flag",
+  ])
   expect(explicit.arguments).toEqual(["my-bin", "--package=service-flag"])
-  expect(explicit.packages).toEqual([{ specification: "@scope/one@1.2.3", name: "@scope/one", type: "version" }, { specification: "two@npm:three@^4", name: "two", type: "alias" }])
+  expect(explicit.packages).toEqual([
+    { specification: "@scope/one@1.2.3", name: "@scope/one", type: "version" },
+    { specification: "two@npm:three@^4", name: "two", type: "alias" },
+  ])
 })
 
 test("official npm exec aliases and call syntax are parsed without executing the service", async () => {
   const input = npmDeclarationFixture()
   const marker = path.join(input.root, "must-not-execute")
-  writeFileSync(path.join(input.root, ".npmrc"), "@private:registry=https://registry.example.invalid/\n//registry.example.invalid/:_authToken=own-fixture-secret\n")
-  const parse = (args: string[]) => Effect.runPromise(Effect.scoped(readNpmLaunchDeclaration({ ...input, cwd: input.root, syntax: "npm-exec", arguments: args })).pipe(Effect.provide(hostEnvironmentLayer)))
+  writeFileSync(
+    path.join(input.root, ".npmrc"),
+    "@private:registry=https://registry.example.invalid/\n//registry.example.invalid/:_authToken=own-fixture-secret\n",
+  )
+  const parse = (args: string[]) =>
+    Effect.runPromise(
+      Effect.scoped(readNpmLaunchDeclaration({ ...input, cwd: input.root, syntax: "npm-exec", arguments: args })).pipe(
+        Effect.provide(hostEnvironmentLayer),
+      ),
+    )
   const call = await parse(["exec", "--package=one@1.2.3", "--call", `printf ran > ${marker}`])
   expect(call.call).toBe(`printf ran > ${marker}`)
   expect(call.arguments).toEqual([])
@@ -1023,10 +1152,361 @@ test("connector native spawn failure publishes the actual missing executable as 
   const snapshots: LaunchSnapshot[] = []
   const spawns: ChildProcess.Command[] = []
   const program = path.join(root, "missing-program")
-  await Effect.runPromise(Effect.scoped(Effect.gen(function* () {
-    const current = yield* launchConnection({ root, snapshots, spawns, command: [program] })
-    yield* current.connection.start
-    expect(snapshots.at(-1)?.state).toMatchObject({ phase: "failed", failure: { kind: "dependency", program } })
-    expect(yield* current.connection.diagnostic(snapshots[0].identity)).toMatchObject({ exitCode: null, effectiveCommand: [program] })
-  })).pipe(Effect.provide(hostEnvironmentLayer)))
+  await Effect.runPromise(
+    Effect.scoped(
+      Effect.gen(function* () {
+        const current = yield* launchConnection({ root, snapshots, spawns, command: [program] })
+        yield* current.connection.start
+        expect(snapshots.at(-1)?.state).toMatchObject({ phase: "failed", failure: { kind: "dependency", program } })
+        expect(yield* current.connection.diagnostic(snapshots[0].identity)).toMatchObject({
+          exitCode: null,
+          effectiveCommand: [program],
+        })
+      }),
+    ).pipe(Effect.provide(hostEnvironmentLayer)),
+  )
+})
+
+// Pure layer: original captured uv 0.13.10 output + original service argv. No IO or clock.
+test("official uv settings preserve command escapes and every requirement input", () => {
+  const result = parseUvToolSettings(UV_TOOL_SETTINGS)
+  expect(result.command).toEqual(UV_SERVICE_COMMAND)
+  expect(result.from).toBe("foo-bar[read]==1.0")
+  expect(result.with).toEqual(["packaging==24.0"])
+  expect(result.fields.with_requirements).toContain("/requirements.txt")
+  expect(result.fields.constraints).toContain("/constraints.txt")
+  expect(result.fields.overrides).toContain("/overrides.txt")
+  expect(result.fields.build_constraints).toContain("/build-constraints.txt")
+  expect(result.withEditable).toEqual([expect.stringMatching(/\/editable$/)])
+  expect(result.noEnvironmentFiles).toBe(true)
+  expect(result.fields.settings).toContain('"value],}"')
+  expect(result.fields.settings).toContain("index_locations:")
+})
+
+test("uv settings reject incomplete metadata without echoing the credential-bearing input", () => {
+  expect(() => parseUvToolSettings("not uv metadata")).toThrow("Missing uv ToolRunSettings")
+  try {
+    parseUvToolSettings(UV_TOOL_SETTINGS.slice(0, -20))
+    throw Error("must reject incomplete settings")
+  } catch (error) {
+    expect(String(error)).not.toContain("fixture-token")
+    expect(String(error)).toContain("uv")
+  }
+})
+
+// Integration layer: only the binary boundary is substituted with a real process emitting the
+// captured output. The one-time pinned-binary probe independently proves the CLI/settings format.
+test("uv declaration parsing forwards original uv and uvx syntax on the Location execution plane", async () => {
+  const root = connectionRoot()
+  const commands: ChildProcess.Command[] = []
+  const layer = Layer.effect(
+    Environment.Service,
+    Effect.gen(function* () {
+      const current = yield* Environment.Service
+      return Environment.Service.of({
+        ...current,
+        spawner: ChildProcessSpawner.make((command) => {
+          commands.push(command)
+          return current.spawner.spawn(
+            ChildProcess.make(
+              process.execPath,
+              ["-e", "process.stdout.write(" + JSON.stringify(UV_TOOL_SETTINGS) + ")"],
+              command._tag === "StandardCommand" ? command.options : {},
+            ),
+          )
+        }),
+      })
+    }),
+  ).pipe(Layer.provide(hostEnvironmentLayer))
+  for (const syntax of ["uvx", "uv"] as const) {
+    const args =
+      syntax === "uvx"
+        ? ["--from", "foo-bar[read]==1.0", ...UV_SERVICE_COMMAND]
+        : ["--directory", root, "tool", "run", "--from", "foo-bar[read]==1.0", ...UV_SERVICE_COMMAND]
+    const result = await Effect.runPromise(
+      Effect.scoped(
+        readUvLaunchDeclaration({
+          syntax,
+          arguments: args,
+          cwd: root,
+          environment: { PATH: root },
+          launchers: launcherEnvironment(root),
+        }),
+      ).pipe(Effect.provide(layer)),
+    )
+    expect(result.command).toEqual(UV_SERVICE_COMMAND)
+    expect(commands.at(-1)).toMatchObject({
+      command: path.join(root, "bundled/uv"),
+      args: ["--show-settings", ...(syntax === "uvx" ? ["tool", "run"] : []), ...args],
+      options: { cwd: root, env: { PATH: root }, extendEnv: false },
+    })
+  }
+})
+
+// Pure layer: our normalized resolution-fact contract. Invocation context is deliberately
+// extra data here, proving it cannot accidentally become a key axis through object spreading.
+test("connector content keys exclude invocation state credentials and runtime locations", () => {
+  const first = {
+    runner: "npm-exec" as const,
+    launchers: launcherEnvironment("/first-runtime"),
+    requirements: [{ kind: "registry" as const, name: "own", version: "1.2.3", extras: ["b", "a"] }],
+    options: {
+      registry: "https://first:credential@packages.invalid/?channel=stable&%73ig=one",
+      cache: "/first-cache",
+      prefix: "/first-project",
+      _authToken: "first-token",
+    },
+    configuration: [
+      {
+        purpose: "constraints" as const,
+        value: {
+          requires: ["own==1.2.3"],
+          registry: "https://one:secret@packages.invalid/?token=first&channel=stable",
+          credentialRef: "first-ref",
+          nested: { apiKey: "first-key", enabled: true },
+        },
+      },
+    ],
+    cwd: "/first-project",
+    identity: { directory: "/first-project", server: "first", attempt: "one" },
+    command: ["own", "/first-project"],
+    environment: { KEY: "first-business-key" },
+  }
+  const second = {
+    ...first,
+    launchers: launcherEnvironment("/second-runtime"),
+    requirements: [{ ...first.requirements[0]!, extras: ["a", "b", "a"] }],
+    options: {
+      registry: "https://second:rotated@packages.invalid/?sig=two&channel=stable",
+      cache: "/second-cache",
+      prefix: "/second-project",
+      _authToken: "second-token",
+    },
+    configuration: [
+      {
+        purpose: "constraints" as const,
+        value: {
+          requires: ["own==1.2.3"],
+          registry: "https://two:rotated@packages.invalid/?channel=stable&token=second",
+          credentialRef: "second-ref",
+          nested: { apiKey: "second-key", enabled: true },
+        },
+      },
+    ],
+    cwd: "/second-project",
+    identity: { directory: "/second-project", server: "second", attempt: "two" },
+    command: ["own", "/second-project"],
+    environment: { KEY: "rotated-business-key" },
+  }
+  expect(connectorPreparationKey(first)).toBe(connectorPreparationKey(second))
+  expect(connectorPreparationKey(first)).toMatch(/^[a-f0-9]{64}$/)
+})
+
+test("connector content keys track resolution contents and platform pins", () => {
+  const input = {
+    runner: "uv-tool" as const,
+    launchers: launcherEnvironment("/runtime"),
+    requirements: [{ kind: "registry" as const, name: "own", version: "==1.2.3" }],
+    options: { index_strategy: "FirstIndex", refresh: "volatile time is not resolution content" },
+    configuration: [{ purpose: "constraints" as const, value: ["dependency==1.0"] }],
+  }
+  const key = connectorPreparationKey(input)
+  for (const changed of [
+    { ...input, requirements: [{ ...input.requirements[0]!, version: "==1.2.4" }] },
+    { ...input, options: { index_strategy: "UnsafeBestMatch" } },
+    { ...input, configuration: [{ purpose: "constraints" as const, value: ["dependency==2.0"] }] },
+    { ...input, launchers: { ...input.launchers, pinSet: "b".repeat(64) } },
+    { ...input, launchers: { ...input.launchers, platform: "win32-x64" as const } },
+  ])
+    expect(connectorPreparationKey(changed)).not.toBe(key)
+  expect(connectorPreparationKey({ ...input, options: { ...input.options, refresh: "another time" } })).toBe(key)
+})
+
+test("connector content keys canonicalize remote git and local content requirements", () => {
+  const input = {
+    runner: "npm-exec" as const,
+    launchers: launcherEnvironment("/runtime"),
+    options: {},
+    configuration: [],
+    requirements: [
+      { kind: "remote" as const, url: "https://one:private@own.invalid/package.tgz?key=one&content=v1" },
+      {
+        kind: "git" as const,
+        url: "git+https://one:private@git.invalid/repository?token=one",
+        revision: "commit-a",
+        subdirectory: "pkg",
+      },
+      { kind: "content" as const, sha256: "a".repeat(64), name: "own-local" },
+    ],
+  }
+  const key = connectorPreparationKey(input)
+  expect(
+    connectorPreparationKey({
+      ...input,
+      requirements: [
+        { kind: "content", sha256: "a".repeat(64), name: "own-local" },
+        {
+          kind: "git",
+          url: "git+https://two:rotated@git.invalid/repository?token=two",
+          revision: "commit-a",
+          subdirectory: "pkg",
+        },
+        { kind: "remote", url: "https://two:rotated@own.invalid/package.tgz?content=v1&key=two" },
+      ],
+    }),
+  ).toBe(key)
+  expect(
+    connectorPreparationKey({
+      ...input,
+      requirements: [{ kind: "content", sha256: "b".repeat(64), name: "own-local" }],
+    }),
+  ).not.toBe(key)
+})
+
+// Integration layer: effective options really come from the official npm config parser,
+// including each project's .npmrc and per-project runtime/config paths. No hand-written npm output.
+test("connector content key reuses identical effective npm resolution in another project after key rotation", async () => {
+  const keys: string[] = []
+  for (const token of ["first", "rotated"]) {
+    const input = npmDeclarationFixture()
+    writeFileSync(
+      path.join(input.root, ".npmrc"),
+      `registry=https://packages.invalid/\n@private:registry=https://private.invalid/\n//private.invalid/:_authToken=${token}\n`,
+    )
+    const parsed = await Effect.runPromise(
+      Effect.scoped(
+        readNpmLaunchDeclaration({
+          ...input,
+          cwd: input.root,
+          syntax: "npx",
+          arguments: ["--package=own@1.2.3", "--", "own-bin", input.root],
+        }),
+      ).pipe(Effect.provide(hostEnvironmentLayer)),
+    )
+    keys.push(
+      connectorPreparationKey({
+        runner: "npm-exec",
+        launchers: input.launchers,
+        requirements: [{ kind: "registry", name: "own", version: "1.2.3" }],
+        options: parsed.options,
+        configuration: [],
+      }),
+    )
+  }
+  expect(keys[0]).toBe(keys[1])
+})
+
+// Integration layer: prefix metadata and bin-selector sources are unmodified captures from
+// pinned npm 11.20.0 install --prefix (r6 actual semver tarball probe). Package code comes
+// from the already-installed repository dependency; no registry or extra dependency is used.
+function npmCaptureFixture() {
+  const f = npmDeclarationFixture()
+  const key = "c".repeat(64)
+  const prefix = path.join(f.launchers.runtimeRoot, "prepared", key)
+  mkdirSync(path.join(prefix, "node_modules/.bin"), { recursive: true })
+  copyFileSync(
+    new URL("./fixture/npm-launch/installed-package.json", import.meta.url),
+    path.join(prefix, "package.json"),
+  )
+  copyFileSync(
+    new URL("./fixture/npm-launch/installed-package-lock.json", import.meta.url),
+    path.join(prefix, "package-lock.json"),
+  )
+  const npm = path.dirname(path.dirname(f.launchers.npmCli))
+  mkdirSync(path.join(npm, "node_modules/libnpmexec/lib"), { recursive: true })
+  copyFileSync(
+    new URL("./fixture/npm-launch/libnpmexec-package.json", import.meta.url),
+    path.join(npm, "node_modules/libnpmexec/package.json"),
+  )
+  copyFileSync(
+    new URL("./fixture/npm-launch/get-bin-from-manifest.js", import.meta.url),
+    path.join(npm, "node_modules/libnpmexec/lib/get-bin-from-manifest.js"),
+  )
+  const util = createRequire(new URL("../../util/package.json", import.meta.url))
+  const installed = createRequire(util.resolve("@npmcli/config/package.json"))
+  symlinkSync(
+    path.dirname(installed.resolve("@npmcli/package-json/package.json")),
+    path.join(npm, "node_modules/@npmcli/package-json"),
+    "dir",
+  )
+  const semver = path.dirname(installed.resolve("semver/package.json"))
+  cpSync(semver, path.join(prefix, "node_modules/semver"), { recursive: true })
+  symlinkSync("../semver/bin/semver.js", path.join(prefix, "node_modules/.bin/semver"))
+  return {
+    ...f,
+    key,
+    prefix,
+    version: JSON.parse(readFileSync(path.join(semver, "package.json"), "utf8")).version as string,
+  }
+}
+
+test("npm capture records actual package bins and its receipt survives an offline reread", async () => {
+  const f = npmCaptureFixture()
+  const spawns: ChildProcess.Command[] = []
+  const preparation = await Effect.runPromise(
+    Effect.scoped(
+      Effect.gen(function* () {
+        const value = yield* captureNpmConnectorPreparation({ ...f, cwd: f.root })
+        yield* publishConnectorPreparation({ runtimeRoot: f.launchers.runtimeRoot, preparation: value })
+        expect(spawns).toHaveLength(1)
+        const cached = yield* readConnectorPreparation({
+          runtimeRoot: f.launchers.runtimeRoot,
+          key: f.key,
+          runner: "npm-exec",
+        })
+        expect(cached?.packages).toEqual({ semver: f.version })
+        expect(cached?.entries).toEqual(value.entries)
+        expect(spawns).toHaveLength(1)
+        return value
+      }),
+    ).pipe(Effect.provide(recordingEnvironmentLayer(spawns))),
+  )
+  const entry = path.join(f.prefix, "node_modules/semver/bin/semver.js")
+  expect(preparedNpmEntry(preparation, { kind: "package", name: "semver" })).toBe(entry)
+  expect(preparedNpmEntry(preparation, { kind: "bin", name: "semver" })).toBe(entry)
+  expect(preparation.required).toContain(path.join(f.prefix, "package-lock.json"))
+})
+
+test("npm capture uses the official package-name default among distinct bins", async () => {
+  const f = npmCaptureFixture()
+  const manifest = JSON.parse(readFileSync(new URL("./fixture/npm-launch/npm-package.json", import.meta.url), "utf8"))
+  // Counterfactual ordering of the actual npm manifest: first-key selection would choose npx.
+  manifest.bin = { npx: manifest.bin.npx, npm: manifest.bin.npm }
+  const root = JSON.parse(readFileSync(path.join(f.prefix, "package.json"), "utf8"))
+  root.dependencies = { npm: manifest.version }
+  writeFileSync(path.join(f.prefix, "package.json"), JSON.stringify(root))
+  mkdirSync(path.join(f.prefix, "node_modules/npm/bin"), { recursive: true })
+  writeFileSync(path.join(f.prefix, "node_modules/npm/package.json"), JSON.stringify(manifest))
+  for (const bin of ["npm", "npx"]) {
+    copyFileSync(
+      path.join(path.dirname(f.launchers.npmCli), `${bin}-cli.js`),
+      path.join(f.prefix, `node_modules/npm/bin/${bin}-cli.js`),
+    )
+    symlinkSync(`../npm/bin/${bin}-cli.js`, path.join(f.prefix, `node_modules/.bin/${bin}`))
+  }
+  const value = await Effect.runPromise(
+    Effect.scoped(captureNpmConnectorPreparation({ ...f, cwd: f.root })).pipe(Effect.provide(hostEnvironmentLayer)),
+  )
+  expect(preparedNpmEntry(value, { kind: "package", name: "npm" })).toBe(
+    path.join(f.prefix, "node_modules/npm/bin/npm-cli.js"),
+  )
+  expect(preparedNpmEntry(value, { kind: "bin", name: "npx" })).toBe(
+    path.join(f.prefix, "node_modules/npm/bin/npx-cli.js"),
+  )
+})
+
+test("npm capture rejects a bin link outside the prepared prefix", async () => {
+  const f = npmCaptureFixture()
+  const outside = path.join(f.root, "outside.js")
+  writeFileSync(outside, "/* owned outside entry */")
+  // Replace only our own generated link, retaining the actual package/bin metadata.
+  rmSync(path.join(f.prefix, "node_modules/.bin/semver"))
+  symlinkSync(outside, path.join(f.prefix, "node_modules/.bin/semver"))
+  const failure = await Effect.runPromise(
+    Effect.scoped(captureNpmConnectorPreparation({ ...f, cwd: f.root })).pipe(
+      Effect.flip,
+      Effect.provide(hostEnvironmentLayer),
+    ),
+  )
+  expect(failure).toMatchObject({ kind: "unknown", detail: expect.stringContaining("escaped its prefix") })
 })

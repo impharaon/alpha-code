@@ -10,7 +10,7 @@ import type {
 } from "@opencode/util/codepuppy-connector-launch"
 import { Environment } from "../environment/index.js"
 
-const Preparation = Schema.Struct({
+export const ConnectorPreparation = Schema.Struct({
   schema: Schema.Literal(1),
   ready: Schema.Literal(true),
   key: Schema.String,
@@ -20,7 +20,7 @@ const Preparation = Schema.Struct({
   required: Schema.Array(Schema.String),
 })
 
-export type ConnectorPreparation = Omit<typeof Preparation.Type, "schema" | "ready">
+export type ConnectorPreparation = Omit<typeof ConnectorPreparation.Type, "schema" | "ready">
 
 /** The original runner role survives preparation. Native commands never enter this projection. */
 export function connectorRunnerEnvironment(input: {
@@ -124,7 +124,7 @@ export function readConnectorPreparation(input: {
         Effect.catchTag("Environment.WrongKind", () => Effect.succeed(undefined)),
       )
     if (source === undefined) return
-    const decoded = Schema.decodeUnknownOption(Schema.fromJsonString(Preparation))(source)
+    const decoded = Schema.decodeUnknownOption(Schema.fromJsonString(ConnectorPreparation))(source)
     if (Option.isNone(decoded)) return
     const value = decoded.value
     if (value.key !== input.key || value.runner !== input.runner) return
@@ -227,3 +227,104 @@ export function installConnectorPython(input: {
     return { exitCode, stdout: new TextDecoder().decode(stdout), stderr: new TextDecoder().decode(stderr) }
   }).pipe(Effect.mapError(launchFailure))
 }
+
+const npmEntryPrefixes = { package: "package:", bin: "bin:" } as const
+
+/** Capture actual installed npm manifests and bin links, using the pinned npm's own bin selection. */
+export function captureNpmConnectorPreparation(input: {
+  launchers: LauncherEnvironment
+  key: string
+  cwd: string
+  environment: Record<string, string>
+}) {
+  return Effect.gen(function* () {
+    if (!/^[a-f0-9]{64}$/.test(input.key))
+      return yield* Effect.fail({ kind: "unknown", detail: "Invalid connector preparation key" } as const)
+    const environment = yield* Environment.Service
+    const handle = yield* environment.spawner.spawn(
+      ChildProcess.make(input.launchers.node, ["--input-type=commonjs", "-e", npmCaptureProgram], {
+        cwd: input.cwd,
+        env: input.environment,
+        extendEnv: false,
+        stdin: {
+          stream: Stream.succeed(
+            new TextEncoder().encode(
+              JSON.stringify({
+                npmCli: input.launchers.npmCli,
+                prefix: path.join(input.launchers.runtimeRoot, "prepared", input.key),
+                key: input.key,
+                prefixes: npmEntryPrefixes,
+              }),
+            ),
+          ),
+          endOnDone: true,
+        },
+      }),
+    )
+    const [code, stdout, stderr] = yield* Effect.all(
+      [handle.exitCode, Stream.mkUint8Array(handle.stdout), Stream.mkUint8Array(handle.stderr)],
+      { concurrency: "unbounded" },
+    )
+    if (code !== 0) return yield* Effect.fail({ kind: "unknown", detail: new TextDecoder().decode(stderr) } as const)
+    return yield* Schema.decodeUnknownEffect(Schema.fromJsonString(ConnectorPreparation))(
+      new TextDecoder().decode(stdout),
+    )
+  }).pipe(Effect.mapError(launchFailure))
+}
+
+export function preparedNpmEntry(preparation: ConnectorPreparation, input: { kind: "package" | "bin"; name: string }) {
+  return preparation.entries[npmEntryPrefixes[input.kind] + input.name]
+}
+
+const npmCaptureProgram = String.raw`
+const fs = require('node:fs')
+const path = require('node:path')
+const { createRequire } = require('node:module')
+;(async () => {
+  const input = JSON.parse(fs.readFileSync(0, 'utf8'))
+  const npmRequire = createRequire(input.npmCli)
+  const PackageJson = npmRequire('@npmcli/package-json')
+  const getBin = npmRequire(path.join(path.dirname(npmRequire.resolve('libnpmexec/package.json')), 'lib/get-bin-from-manifest.js'))
+  const canonical = fs.realpathSync(input.prefix)
+  const owned = (file) => {
+    const relative = path.relative(canonical, fs.realpathSync(file))
+    if (relative === '..' || relative.startsWith('..' + path.sep) || path.isAbsolute(relative)) throw new Error('Prepared npm file escaped its prefix')
+    return path.join(input.prefix, relative)
+  }
+  const root = JSON.parse(fs.readFileSync(path.join(input.prefix, 'package.json'), 'utf8'))
+  const packages = Object.create(null)
+  const entries = Object.create(null)
+  const defaults = Object.create(null)
+  const required = new Set([owned(path.join(input.prefix, 'package.json'))])
+  const lock = path.join(input.prefix, 'package-lock.json')
+  if (fs.existsSync(lock)) required.add(owned(lock))
+  const bins = new Set()
+  for (const name of Object.keys({ ...root.dependencies, ...root.devDependencies, ...root.optionalDependencies })) {
+    const target = path.join(input.prefix, 'node_modules', name)
+    if (!fs.existsSync(target)) continue
+    const directory = owned(target)
+    const manifest = (await PackageJson.normalize(directory)).content
+    packages[name] = typeof manifest.version === 'string' ? manifest.version : null
+    required.add(owned(path.join(directory, 'package.json')))
+    required.add(directory)
+    for (const bin of Object.keys(manifest.bin || {})) bins.add(bin)
+    try { defaults[name] = getBin(manifest) } catch { /* Explicit bins / --call need no default. */ }
+  }
+  for (const name of bins) {
+    const shim = path.join(input.prefix, 'node_modules', '.bin', name)
+    if (!fs.existsSync(process.platform === 'win32' ? shim + '.cmd' : shim)) continue
+    const target = process.platform === 'win32'
+      ? path.resolve(path.dirname(shim), await npmRequire('read-cmd-shim')(shim + '.cmd'))
+      : shim
+    const entry = owned(target)
+    if (!fs.statSync(entry).isFile()) continue
+    entries[input.prefixes.bin + name] = entry
+    required.add(entry)
+  }
+  for (const [name, bin] of Object.entries(defaults)) {
+    const entry = entries[input.prefixes.bin + bin]
+    if (entry) entries[input.prefixes.package + name] = entry
+  }
+  process.stdout.write(JSON.stringify({ schema: 1, ready: true, key: input.key, runner: 'npm-exec', packages, entries, required: [...required] }))
+})().catch((error) => { process.stderr.write(String(error.message) + '\n'); process.exitCode = 1 })
+`

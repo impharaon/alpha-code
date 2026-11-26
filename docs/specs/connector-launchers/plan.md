@@ -535,3 +535,16 @@ SEAM-CHANGE-NEEDED：首方 Node boot re-anchor / 持久 tool-service binding �
 r6 槽位绑定：红例提交 3ce60e164e（0 PASS / 2 FAIL，`/tmp/connector-r6-binding-red.log`），实现不改红例。core 的 declaredFirstPartyBinding 继续作为同一个严格匹配 owner；旧 declaredFirstPartyTools 委托并仅返回原冻结 DTO。只有声明实际含 host-only 槽时，返回将该两种 token 保留、其它实参不变的 binding facts；ext 的 toolFacts 在核验通过后用命令/声明环境/cwd 算独立 binding digest，authority.evidenceDigest 仍保留原核验事实。第三方与非此槽的现有摘要算法不改，没有记录迁移。
 
 命名红例转绿 2 PASS / 23 assertions，整文件 `packages/ext: bun test src/policy/identity.test.ts --max-concurrency=2` 为 21 PASS / 79 assertions（`/tmp/connector-r6-identity-step.log`）；`bun typecheck` exit 0。真磁盘覆盖 tool/service enabled 的 Node、cache 位置变化，以及声明 arg/env/cwd 与未声明环境/cwd/假 Node 的反向臂。没有使用路径相等启发式还原槽，没有绕过当前 Node 的精确身份核验。
+
+
+### r6 官方解析、非秘密 key 与 npm 真实入口捕获
+
+新增 `core/mcp/codepuppy-uv-launch.ts` 在 Location spawner 用随包 uv 的 `--show-settings` 读取真实 ToolRunSettings，不解析包或执行服务；uvx 转为 tool run，uv 原选项位置保留。平衡解析器保留全部字段，解码 command/from/with/editable/env-file 的 Rust 字符串，原 requirement-file 枚举及 resolver 嵌套内容暂保留原字段，不声称已完成安装参数适配。`core/test/fixture/uv-tool-settings.ts` 由真实 pinned uv 0.13.10 输出截取，含引号、反斜线、Unicode/控制字符；凭据均为自有虚构输入。一次性 `gate slot -- python3 /tmp/connector-r6-uv-probe.py` exit 0（`/tmp/connector-r6-uv-probe.log`），无服务执行。3 个命名例 3 PASS / 18 assertions。
+
+新增 `core/mcp/codepuppy-connector-key.ts` 是规范化 facts 的纯 key owner，显式投影平台/pins、需求与仅影响解析的 options/configuration，URL 认证与签名复用诊断的 query-name owner；本地源必须由调用者给内容 facts，不用路径作盐。去重排序，排除业务 argv/cwd/位置/身份/认证引用及缓存控制。4 例含真实 npm 官方配置读取、换项目与轮换自有凭据，4 PASS / 11 assertions（`/tmp/connector-r6-key-tests.log`）。**尚未完成官方 uv/npx 全部输出到这些 facts 的适配**，不能将整个原始配置或 Debug 文本传入 key。
+
+既有 connector-launch 模块导出同一 ConnectorPreparation schema，新增 captureNpmConnectorPreparation / preparedNpmEntry：随包 Node 内使用 npm 自己的 PackageJson.normalize、get-bin-from-manifest 与实际 .bin 链接；捕获实际版本、package/显式 bin 默认入口、锁/manifest/目录，拒绝逃出 prefix 的链接。无第二份 bin 选择规则。真实 npm 11.20.0 离线 pack/install 自带 semver 7.8.5 后，产品 capture→publish→read→随包 Node 入口运行输出 1.2.3（`gate slot -- bun /tmp/connector-r5-npm-proof/capture-r6.ts`，`/tmp/connector-r6-capture-proof.log`）；cacheHit=true。该 probe 的安装命令仍是一次性脚本，**产品 installer 尚未接入**。
+
+新增 npm-launch fixture 是该次实际 prefix metadata 与 pinned npm/libnpmexec 的原始源码/manifest/LICENSE；多 bin 例将真实 npm manifest 的 bin 顺序反向，证明官方选择而非首项猜测。3 例 3 PASS / 10 assertions（`/tmp/connector-r6-capture-tests.log`）。新例均放现有测试文件，静态 import/字面 fixture URL 可追溯，属于受影响 PR 的模块/组件层；不新增 nightly/scenario 或全局必跑输入。准备模块整文件 37 PASS / 194 assertions（`bun test test/codepuppy-connector-launch.test.ts --max-concurrency=2`，`/tmp/connector-r6-preparation-step.log`）；core `bun typecheck` exit 0，2068 files / 2 projects。
+
+文件偏离：新增两个 core helper 各持有语法边界与内容 key；diagnostic 仅共享现有秘密 query 名规则，避免第二份秘密规则；fixture 全是官方真实输出/源码。尚未完成：uv 持久安装/bin 捕获、uv/npm 全语法归一到 key、产品 installer、完整 prepareConnectorLaunch 组合；不能以本阶段当作 AC-04/10 已完成。#1759 接口表仍适用，其同一 env 的最终投影继续由 R2 拥有。

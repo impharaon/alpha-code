@@ -248,17 +248,22 @@ function commandArguments(command: ChildProcess.Command): string[] {
   return [...commandArguments(command.left), "|", ...commandArguments(command.right)]
 }
 
+const secretQueryParameter =
+  "(?:x-amz-(?:credential|security-token|signature)|x-goog-(?:credential|signature)|access_token|token|sig|signature|api[_-]?key|key|auth|authorization)"
+const secretQueryName = new RegExp(`^${secretQueryParameter}$`, "i")
+const secretQueryValue = new RegExp(`([?&]${secretQueryParameter}=)[^&#]*`, "gi")
+
+/** Shared credential-query classification for diagnostics and non-secret resolution identities. */
+export function isConnectorSecretQueryParameter(name: string) {
+  return secretQueryName.test(name)
+}
+
 function maskDiagnostic(text: string, secrets: readonly string[]) {
   const transport = text
     .replace(/((?:proxy-)?authorization\s*:\s*)[^\r\n]+/gi, "$1[redacted]")
     .replace(/\bbearer\s+[A-Za-z0-9._~+/=-]+/gi, "bearer [redacted]")
     .replace(/[a-z][a-z0-9+.-]*:\/\/[^\s<>"'`]+/gi, (url) =>
-      url
-        .replace(/^(\w[\w+.-]*:\/\/)[^/?#]*@/, "$1[redacted]@")
-        .replace(
-          /([?&](?:x-amz-(?:credential|security-token|signature)|x-goog-(?:credential|signature)|access_token|token|sig|signature|api[_-]?key|key|auth|authorization)=)[^&#]*/gi,
-          "$1[redacted]",
-        ),
+      url.replace(/^(\w[\w+.-]*:\/\/)[^/?#]*@/, "$1[redacted]@").replace(secretQueryValue, "$1[redacted]"),
     )
   return secrets.reduce((value, secret) => value.split(secret).join("[redacted]"), transport)
 }

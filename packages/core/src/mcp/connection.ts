@@ -174,7 +174,7 @@ export function make(input: Input): Connection {
         )
       const scope = yield* Scope.fork(input.scope)
       state.scope = scope
-      const fetch = input.config.type === "remote" ? pluginMcpFetch(input.name, input.config.url, input.fetch) : input.fetch
+      const fetch = input.config.type === "remote" ? pluginMcpFetch(input.name, input.config.url, input.fetch, input.config.transport ?? "http") : input.fetch
       const authProvider = yield* input.authProvider.pipe(Effect.provideService(FetchHttpClient.Fetch, fetch))
       const { McpClient } = yield* Effect.promise(() => import("./client.js"))
       // List tools as part of connect so a failure here marks the server failed rather than

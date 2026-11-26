@@ -991,3 +991,14 @@ A1 的具名 engine 正向与移除验证均实际经过同一共享槽：`gate 
 Host artifact aggregate 再变为 **38d198d344f7c858959ec9a5ff7dbdfe768eea940cd4cc8aa934347f0934761f**。本轮相对 r9 只改变 artifact 成员 `CONTRACT.md`、`plugin-package.ts`、`plugin-conversion.mjs`，以及 `host-extension-package-artifact.v1.json` 清单（共同前缀同 r9）；`plugin-conversion.ts` 为生成源。相对 `1db6a3bbf5` 的累计成员仍为 r9 收口列出的恰 9 项，没有新增成员，精确清单另见 `/tmp/plugin-standard-r10-host-artifact.json`。consumer pin/vendor 未动，checkpoint 交编排器。
 
 遗留去向：A4–A9、B3/B4/B6/B7/B8、片 5 剩余运行行为与上述两条 r9 失败继续本车道 fix now；跨仓 checkpoint 交编排器；docs 与三条旧模型断言沿原归属。后续 A5 应注意本分支 `plugin-source-timing.ts` 的 REQUEST 实值为 10 分钟，不能把替换 30 秒误报为缩短；r9 已允许的非阻塞分支尚未实现。本轮无新迁移、新依赖、公开 DTO、ARCH 或 OPTIONAL。已核 Codex（GPT-6），A1–A3 具名证据通过，整体 PARTIAL；已定的单一绑定/allow-set/SSE 合同不重开。
+
+
+## r11 · 从 A4 继续审查修正
+
+核对：IMPLEMENT，编排器 r11；spec v5 / design v3.1 @f313990 与 r9 的已定 S-12 裁决，保留 r10 收据。2026-11-26 21:40 UTC+08:00 开始，顺序 A4–A9 → B3/B4/B6/B7/B8 → 两条本分支 engine 失败 → 片 5 剩余运行验收。本文记录运行证据；pin/vendor、gate、已定单一绑定权威不变。
+
+A4：d607a2c829 的原位真实 SDK 回归先红（`bun test --max-concurrency 2 src/main/plugin-mcp-proxy.test.ts -t "explicit SSE registers"`，0 pass / 1 fail，实际 GET 有 proxy、/messages?sessionId POST 无 proxy；`/tmp/plugin-standard-r11-A4-red.log`）。fixture 只解析 core 已安装 Claude Agent SDK 的 peer 来加载 lockfile 钉住的 SDK SSE server，不运行 agent SDK、不加依赖、不硬编码机器路径/包缓存 hash、不手写 JSON-RPC。两次真实 SSE 会话均列工具/调用，实际 sessionId 不同；通过同一 bearer，私有认证/登记头不进服务，未登记同源路径 405，撤销关闭流且旧端点拒绝。
+
+落实 r9 已接受 S-12 补口：既有 main 代理 handle/绑定 helper 消费源 transport 轴，connection 把同一轴交给实例 fetch。SDK 的实际 JSON POST 通过该实例的私有 proxy headers 登记地址；main 先核对有效 capability、已声明 SSE 流、origin 与协议，再原子登记 exact URL 后 pipe 转发。登记随同一绑定/流生命周期清理，不使用同源通配授权，不解析第二份 SSE、不读 SDK 私部、不增加 RPC/公开 McpProxyBinding 字段。该局部登记复用原代理鉴权与代际，不新建网络/权限权威；普通 HTTP 与 auth fetch 继续原域。原 connection 接管增量及具名证据同提交登记于 plugin-local-mcp / plugin-mcp-transport。
+
+完整原 proxy lifecycle 文件 2 pass / 0 fail（`/tmp/plugin-standard-r11-A4-green.log`）。测试为有限本地 SDK integration，原文件 imports 可追踪，受影响 PR/nightly；该文件未登记精确条数，无新增全局集。后续补核心连接消费者及最终类型/相关集/移除验证，未把其余审计项或片 5 标完成。

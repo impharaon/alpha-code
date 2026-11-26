@@ -1,3 +1,5 @@
+export const PLUGIN_MCP_SSE_ENDPOINT_HEADER = "codepuppy-mcp-sse-endpoint"
+
 /** Main-issued capabilities cross only the controlled, in-memory sidecar channel. */
 export type McpProxyBinding = {
   packageId: string
@@ -30,21 +32,23 @@ export function pluginMcpEndpoint(binding: McpProxyBinding, url: URL): boolean {
 }
 
 /** A single connection captures a generation. Revocation cannot hand an old transport its successor's bearer. */
-export function pluginMcpFetch(name: string, serverUrl: string, base: typeof globalThis.fetch): typeof globalThis.fetch {
+export function pluginMcpFetch(name: string, serverUrl: string, base: typeof globalThis.fetch, transport: "http" | "sse" = "http"): typeof globalThis.fetch {
   const binding = current(name).find(binding => binding.serverUrl === serverUrl)
   if (!binding) return base
   const send: typeof globalThis.fetch = Object.assign(async (input: string | URL | Request, init?: RequestInit) => {
     if (!current(name).some(value => value.proxyAuthorization === binding.proxyAuthorization)) throw new DOMException("Plugin MCP binding was revoked", "AbortError")
     const url = new URL(input instanceof Request ? input.url : input)
-    if (!pluginMcpEndpoint(binding, url)) return base(input, init)
-    const response = await base(input, { ...init, redirect: "manual", proxy: { url: binding.proxyUrl, headers: { "Proxy-Authorization": binding.proxyAuthorization }, respectNoProxy: false } } as RequestInit)
+    const method = init?.method ?? (input instanceof Request ? input.method : "GET")
+    const headers = new Headers(init?.headers ?? (input instanceof Request ? input.headers : undefined))
+    // Only the declared SSE transport registers its protocol POST, after the SDK learns that endpoint.
+    const post = transport === "sse" && method === "POST" && headers.get("content-type")?.startsWith("application/json") && pluginMcpLoopback(url) && url.origin === new URL(binding.serverUrl).origin
+    if (!pluginMcpEndpoint(binding, url) && !post) return base(input, init)
+    const response = await base(input, { ...init, redirect: "manual", proxy: { url: binding.proxyUrl, headers: { "Proxy-Authorization": binding.proxyAuthorization, ...(post ? { [PLUGIN_MCP_SSE_ENDPOINT_HEADER]: binding.serverUrl } : {}) }, respectNoProxy: false } } as RequestInit)
     if (init?.redirect === "manual" || response.status < 300 || response.status > 399 || !response.headers.has("location")) return response
     if (init?.redirect === "error") throw TypeError("MCP request redirected")
     const next = new URL(response.headers.get("location")!, url)
     // The ordinary destination authority owns redirects; the private proxy bearer never follows them.
-    const headers = new Headers(init?.headers ?? (input instanceof Request ? input.headers : undefined))
     if (next.origin !== url.origin) { headers.delete("Authorization"); headers.delete("Cookie") }
-    const method = init?.method ?? (input instanceof Request ? input.method : "GET")
     const get = response.status === 303 && method !== "HEAD" || [301, 302].includes(response.status) && method === "POST"
     await response.body?.cancel()
     return base(next, { ...init, headers, ...(get ? { method: "GET", body: undefined } : {}) })

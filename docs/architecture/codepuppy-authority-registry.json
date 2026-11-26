@@ -2147,9 +2147,13 @@
         {
           "file": "packages/ui-mac/src/main/plugin-mcp-proxy.test.ts",
           "name": "package MCP capabilities retain a definition and revoke on replacement, off and sidecar exit"
+        },
+        {
+          "file": "packages/ui-mac/src/main/plugin-mcp-proxy.test.ts",
+          "name": "explicit SSE registers its real POST endpoint for the same proxy generation and revokes it with the stream"
         }
       ],
-      "note": "The existing connection input fetch is scoped before McpClient.connect. index.ts connectProvider and explicit authorization already override that service with the layer-captured fetch, so their exact composition points also consume the same private wrapper. oauth.ts, the public server schema, global fetch, NO_PROXY, seatbelt and the gate are unchanged."
+      "note": "The existing connection input fetch is scoped before McpClient.connect. index.ts connectProvider and explicit authorization already override that service with the layer-captured fetch, so their exact composition points also consume the same private wrapper. oauth.ts, the public server schema, global fetch, NO_PROXY, seatbelt and the gate are unchanged. #1776 r11 A4 (orchestrator r9 S-12 ruling): source transport reaches the existing connection fetch. Only the bound SSE transport issues endpoint registration through its private proxy headers; main checks the live declared SSE stream, origin and generation capability, registers the exact POST URL, and removes the control header. Same bearer and stream revocation; no second SSE parser, SDK private access, general same-origin grant or public binding fields."
     },
     {
       "id": "plugin-mcp-transport",
@@ -2191,9 +2195,13 @@
         {
           "file": "packages/ui-mac/src/main/network-egress-proxy.test.ts",
           "name": "plugin loopback refused upstream is a named TCP failure with local service copy"
+        },
+        {
+          "file": "packages/ui-mac/src/main/plugin-mcp-proxy.test.ts",
+          "name": "explicit SSE registers its real POST endpoint for the same proxy generation and revokes it with the stream"
         }
       ],
-      "note": " #1776 r10 A3: the existing client takeover decodes only the main proxy's named TCP refusal, retains that layer before HTTP fallback, and publishes a body-free local-service marker through the existing status prefix. No new failure code, transport, credential or permission authority."
+      "note": " #1776 r10 A3: the existing client takeover decodes only the main proxy's named TCP refusal, retains that layer before HTTP fallback, and publishes a body-free local-service marker through the existing status prefix. No new failure code, transport, credential or permission authority. #1776 r11 A4 (orchestrator r9 S-12 ruling): source transport reaches the existing connection fetch. Only the bound SSE transport issues endpoint registration through its private proxy headers; main checks the live declared SSE stream, origin and generation capability, registers the exact POST URL, and removes the control header. Same bearer and stream revocation; no second SSE parser, SDK private access, general same-origin grant or public binding fields."
     },
     {
       "id": "plugin-invocation-semantics",

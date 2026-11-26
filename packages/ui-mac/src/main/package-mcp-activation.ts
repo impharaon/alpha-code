@@ -144,7 +144,7 @@ async function applyAt(
         packageId: graph!.packageId, entryId: entry.id, generation: basename(dirname(installed.pluginRoot)),
         definitionDigest: ("sha256:" + sha256Hex(canonicalJson([entry, settings.values, settings.versions]))) as `sha256:${string}`,
         serverUrl: resolved && typeof resolved === "object" && "url" in resolved && typeof resolved.url === "string" ? resolved.url : bound.url,
-      })
+      }, entry.transport === "sse" ? "sse" : "http")
       const config = projectServerConfig(resolved)
       if (!config) return { directory: target, name, status: "failed", detail: "Installed connector definition is invalid" }
       const startup = launchedByPackageRunner(config) && !config.timeout ? { timeout: { startup: RUNNER_FIRST_FETCH_STARTUP_MS } } : {}

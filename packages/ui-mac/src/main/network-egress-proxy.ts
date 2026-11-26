@@ -1,5 +1,5 @@
 import { randomBytes } from "node:crypto"
-import { pluginMcpLoopback, pluginMcpEndpoint, type McpProxyBinding } from "@opencode/util/codepuppy-plugin-mcp"
+import { pluginMcpLoopback, pluginMcpEndpoint, PLUGIN_MCP_SSE_ENDPOINT_HEADER, type McpProxyBinding } from "@opencode/util/codepuppy-plugin-mcp"
 // REQ-137 (`#1336`) —— 本地 loopback CONNECT 策略代理:目的地闸门的**咽喉点**。
 //
 // 强制层(seatbelt `(deny network*)` + 只放行本代理端口,`#1337`)把 sidecar 那棵树的全部出网逼到这里;
@@ -138,7 +138,7 @@ export type EgressProxyHandle = {
   port: number
   /** 关掉监听并切断在途隧道;resolve 时端口已释放。 */
   close: () => Promise<void>
-  bindPluginMcp(input: Omit<McpProxyBinding, "proxyUrl" | "proxyAuthorization">): McpProxyBinding
+  bindPluginMcp(input: Omit<McpProxyBinding, "proxyUrl" | "proxyAuthorization">, transport?: "http" | "sse"): McpProxyBinding
   revokePluginMcp(binding: McpProxyBinding): void
 }
 
@@ -241,7 +241,7 @@ export async function startEgressPolicyProxy(deps: EgressProxyDeps): Promise<Egr
   const tlsSilentMs = deps.tlsSilentMs ?? 15_000
   const log = deps.log
   let seq = 0
-  const bindings = new Map<string, { binding: McpProxyBinding; streams: Set<{ destroy(): void }> }>()
+  const bindings = new Map<string, { binding: McpProxyBinding; transport: "http" | "sse"; streams: Set<{ destroy(): void }>; events: Set<http.ServerResponse>; posts: Set<string> }>()
   const bound = (authorization: string | string[] | undefined) => typeof authorization === "string" ? bindings.get(authorization) : undefined
   const bindStream = (capability: NonNullable<ReturnType<typeof bound>>, stream: { destroy(): void; once(event: "close", callback: () => void): unknown }) => {
     capability.streams.add(stream)
@@ -256,15 +256,22 @@ export async function startEgressPolicyProxy(deps: EgressProxyDeps): Promise<Egr
   const server = http.createServer((req, res) => {
     const capability = bound(req.headers["proxy-authorization"])
     const url = URL.canParse(req.url ?? "") ? new URL(req.url!) : undefined
-    if (capability && url?.protocol === "http:" && pluginMcpEndpoint(capability.binding, url)) {
+    if (capability && url && capability.transport === "sse" && capability.events.size && req.method === "POST" && req.headers[PLUGIN_MCP_SSE_ENDPOINT_HEADER] === capability.binding.serverUrl && pluginMcpLoopback(url) && url.origin === new URL(capability.binding.serverUrl).origin)
+      capability.posts.add(url.href)
+    if (capability && url?.protocol === "http:" && (pluginMcpEndpoint(capability.binding, url) || req.method === "POST" && capability.posts.has(url.href))) {
       const headers: http.OutgoingHttpHeaders = { ...req.headers, host: url.host }
       delete headers["proxy-authorization"]
       delete headers["proxy-connection"]
+      delete headers[PLUGIN_MCP_SSE_ENDPOINT_HEADER]
       // localhost resolves to loopback here; neither DNS nor a redirected peer may broaden the capability.
       const host = url.hostname === "[::1]" ? "::1" : url.hostname
       const upstream = http.request({ hostname: host, port: url.port || 80, path: url.pathname + url.search, method: req.method, headers, agent: false,
         ...(host === "localhost" ? { lookup: loopbackLookup, autoSelectFamily: true } : {}),
       }, response => {
+        if (capability.transport === "sse" && req.method === "GET" && response.headers["content-type"]?.startsWith("text/event-stream")) {
+          capability.events.add(res)
+          res.once("close", () => { capability.events.delete(res); if (!capability.events.size) capability.posts.clear() })
+        }
         res.writeHead(response.statusCode ?? 502, response.headers)
         response.pipe(res)
         res.once("close", () => response.destroy())
@@ -447,10 +454,10 @@ export async function startEgressPolicyProxy(deps: EgressProxyDeps): Promise<Egr
   return {
     host: "127.0.0.1",
     port: address.port,
-    bindPluginMcp: input => {
+    bindPluginMcp: (input, transport = "http") => {
       if (!pluginMcpLoopback(new URL(input.serverUrl))) throw Error("Plugin MCP binding requires its declared loopback endpoint")
       const binding = { ...input, proxyUrl: "http://127.0.0.1:" + address.port, proxyAuthorization: "Bearer " + randomBytes(32).toString("hex") }
-      bindings.set(binding.proxyAuthorization, { binding, streams: new Set() })
+      bindings.set(binding.proxyAuthorization, { binding, transport, streams: new Set(), events: new Set(), posts: new Set() })
       return binding
     },
     revokePluginMcp: binding => {

@@ -21,11 +21,11 @@ export function revokePluginMcpProxy(name: string) {
 }
 
 /** Called only with main's freshly bound, enabled installed definition, never with a sidecar-supplied URL. */
-export async function bindPluginMcpProxy(name: string, input: Omit<McpProxyBinding, "proxyUrl" | "proxyAuthorization">) {
+export async function bindPluginMcpProxy(name: string, input: Omit<McpProxyBinding, "proxyUrl" | "proxyAuthorization">, transport: "http" | "sse" = "http") {
   if (!pluginMcpLoopback(new URL(input.serverUrl))) { revokePluginMcpProxy(name); return }
   if (!proxy || !publish) throw Error("Plugin MCP proxy is unavailable")
   const previous = active.get(name) ?? []
   if (previous.some(binding => binding.generation !== input.generation || binding.definitionDigest !== input.definitionDigest)) revokePluginMcpProxy(name)
-  if (!(active.get(name) ?? []).some(binding => binding.serverUrl === input.serverUrl)) active.set(name, [...(active.get(name) ?? []), proxy.bindPluginMcp(input)])
+  if (!(active.get(name) ?? []).some(binding => binding.serverUrl === input.serverUrl)) active.set(name, [...(active.get(name) ?? []), proxy.bindPluginMcp(input, transport)])
   await publish(pluginMcpProxySnapshot())
 }

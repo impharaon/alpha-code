@@ -117,6 +117,8 @@ U/E 各运行 `bun typecheck`，仅处理本片造成的问题；若包已有适
 
 步骤 2 验据：U 执行 `bun test src/main/network-egress-activity.test.ts src/main/codepuppy-sidecar-messages.test.ts src/main/hub-view.test.ts src/main/old-name-scan.test.ts`，退出 0，45 pass / 0 fail；E 执行 `bun test src/network-egress.test.ts src/hub-bridge.test.ts src/policy/display.test.ts`，退出 0，22 pass / 0 fail。新增同调用链文件 `main/codepuppy-unattended.ts` 仅给既有 main 在册名单增加只读 `has(sessionID)`，供 N1 排除自动化，避免从工具 metadata 猜身份。
 
+步骤 3 验据：U 执行 `bun test src/main/egress-grant-truth.test.ts src/main/network-egress-grants.test.ts src/main/network-egress-approval.test.ts src/main/network-egress-ipc.test.ts src/main/network-egress-proxy.test.ts src/shared/egress-denial.test.ts src/main/old-name-scan.test.ts`，退出 0，58 pass / 0 fail。真实 CONNECT 经生产审批服务放行后收到回显字节；同一拨号前复核判据拒绝已撤销授权。旧上限/冷却和精确持久化断言已按新行为替换。生产服务由 `main/index.ts` 在 fork 前初始化，`server.ts` 只消费既有代理默认授权出口，避免在代理启动与 IPC 各建一份批准状态。
+
 ## 切片二：全部批准通放与系统代理
 
 本轮仅保留交付边界，后续 PLAN 再展开。AC-08 的真引擎/真围栏三条及去档位判断对照、AC-13 的系统代理证明仍为整票必需证据。AC-13 按设计 §4.7、§10：日常从 `resolveEgressRoutes` 注入路由并走真实上游握手；另由编排器安排**一次**真实机器已设本地测试系统代理的真引擎/真围栏验收，连接仅经它可达的目标，保留测试代理连接记录，并对照无系统代理。日常注入不计作系统配置读取已验证。本片不启动 Electron、不改本机系统代理；缺少那次实机记录时，最终 AC-13 不能记为通过。

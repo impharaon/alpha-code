@@ -115,7 +115,7 @@ export function createNetworkEgressActivity() {
     },
     publish(message: NetworkOutbound) {
       if (!connection) return
-      try { connection.post(message) } catch { connection.complete = false; changed() }
+      try { connection.post(message) } catch { if (connection.complete) { connection.complete = false; changed() } }
     },
   }
 }

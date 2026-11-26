@@ -1,3 +1,4 @@
+import type { EgressChange } from "../shared/network-egress-wire"
 import { contextBridge, ipcRenderer } from "electron"
 import {
   type AuthErrorCode,
@@ -30,6 +31,18 @@ const updaterHandler = (_: unknown, state: UpdaterState) => {
 }
 
 const api: ElectronAPI = {
+  networkEgress: {
+    setTier: (input) => ipcRenderer.invoke("network-egress-set-tier", input),
+    listApprovals: (input) => ipcRenderer.invoke("network-egress-list-approvals", input),
+    decide: (input) => ipcRenderer.invoke("network-egress-decide", input),
+    settings: () => ipcRenderer.invoke("network-egress-settings"),
+    revoke: (input) => ipcRenderer.invoke("network-egress-revoke", input),
+    subscribe: (listener) => {
+      const handler = (_event: unknown, event: EgressChange) => listener(event)
+      ipcRenderer.on("network-egress-change", handler)
+      return () => ipcRenderer.removeListener("network-egress-change", handler)
+    },
+  },
   killSidecar: () => ipcRenderer.invoke("kill-sidecar"),
   sidecarGeneration: {
     getState: () => ipcRenderer.invoke("sidecar-generation-state"),

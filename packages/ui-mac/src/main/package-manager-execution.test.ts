@@ -63,6 +63,15 @@ for(const proof of ["G".repeat(64)+"\n","1".repeat(64)+"\n"]){const result=await
 const streamed=await sibling(Buffer.from(lease.shellPrivateInput.data));assert.equal(streamed.exit,17);assert.equal(streamed.stdout,"binary input\n");assert.equal(streamed.stderr,"stderr");assert.equal(spawns().length,1);assert.equal(spawns()[0].bash_env,"");assert.equal(spawns()[0].proxy,"http://user.example:1234")
 const replay=await sibling(Buffer.from(lease.shellPrivateInput.data));assert.equal(replay.exit,126);assert.match(replay.stderr,/node-consumed/);assert.equal(spawns().length,1)
 await generation.control({op:"finish",executionID:lease.executionID});await generation.control({op:"finish",executionID:lease.executionID});rows.push("proof-format/wrong/pending/real/once/finish")
+// Bind the real shell before exec; its process instance survives the image change.
+const execLease=await authorize("brew stream")
+const execRoot=spawn("/bin/bash",["-c",'printf exec-ready; IFS= read -r go; exec /bin/sh -c "$1"',"root",execLease.executionSource],{cwd,env:{HOME:root,PATH:join(prefix,"bin")+":/usr/bin:/bin"},stdio:["pipe","pipe","pipe","pipe"]})
+const execDone=collect(execRoot)
+await once(execRoot.stdout,"data")
+await generation.control({op:"bind",executionID:execLease.executionID,pid:execRoot.pid})
+execRoot.stdio[3].end(Buffer.from(execLease.shellPrivateInput.data));execRoot.stdin.end("go\n")
+const execResult=await execDone;assert.equal(execResult.exit,17,execResult.stderr);assert.equal(execResult.stdout,"exec-ready");assert.equal(execResult.stderr,"stderr")
+await generation.control({op:"finish",executionID:execLease.executionID});rows.push("root-exec")
 for(const kind of ["early","late"]){
  mode=kind;const l=await authorize(kind==="early"?"brew stream":"brew wait"),before=spawns().length
  const c=spawn("/bin/bash",["-c",l.executionSource],{cwd,env:{HOME:root,PATH:join(prefix,"bin")+":/usr/bin:/bin"},stdio:["pipe","pipe","pipe","pipe"]});const done=collect(c);await generation.control({op:"bind",executionID:l.executionID,pid:c.pid});c.stdio[3].end(Buffer.from(l.shellPrivateInput.data));c.stdin.end();const result=await done
@@ -87,7 +96,7 @@ front.closeAllConnections();actual.closeAllConnections();front.close();actual.cl
     const result = spawnSync("node", [build.outputs[0].path], { encoding: "utf8", timeout: 30000 })
     expect(result.status, result.stderr + result.stdout).toBe(0)
     const evidence = JSON.parse(result.stdout.trim())
-    expect(evidence.rows).toEqual(["proof-format/wrong/pending/real/once/finish", "early-invalid", "late-invalid", "normal-app-exit-group"])
-    expect(evidence.spawns).toBe(3)
+    expect(evidence.rows).toEqual(["proof-format/wrong/pending/real/once/finish", "root-exec", "early-invalid", "late-invalid", "normal-app-exit-group"])
+    expect(evidence.spawns).toBe(4)
   } finally { rmSync(scratch, { recursive: true, force: true }) }
 }, 40000)

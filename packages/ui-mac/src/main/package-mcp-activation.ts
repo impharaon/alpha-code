@@ -1,3 +1,4 @@
+import { pluginMcpLoopback } from "@opencode/util/codepuppy-plugin-mcp"
 import { bindPluginMcpProxy, revokePluginMcpProxy } from "./plugin-mcp-proxy"
 import { canonicalJson, sha256Hex } from "./ext-manifest-v2"
 import { basename, dirname } from "node:path"
@@ -17,7 +18,7 @@ import { projectServerConfig } from "../../../ext/src/engine-transforms"
 import type { EngineConnection } from "./engine-authorization"
 import { engineClient } from "./engine-client"
 import { launchedByPackageRunner, RUNNER_FIRST_FETCH_STARTUP_MS } from "./engine-explicit-config"
-import { readMcpLeafStrict } from "./ext-config"
+import { readMcpLeafStrict, validateServer } from "./ext-config"
 import { projectScopeIdentity, readPackageLedgerStateV1 } from "./ext-receipt-v2"
 import type { PackageGraphV1 } from "./ext-package-ledger-v3"
 import { credentialStores, readCredentialTable, readRegularFileNoFollow } from "./codepuppy-secret-files"
@@ -140,6 +141,17 @@ async function applyAt(
         resolveSecret: id => refs.find(file => basename(file) === id) ? "{file:" + refs.find(file => basename(file) === id)! + "}" : undefined,
       }) : leaf.value
       const resolved = JSON.stringify(bound).includes("{file:") ? resolveConnectorLeaf({ server: name, leaf: bound, ...credentials() }) : bound
+      if (installed && bound.type === "remote") {
+        const config = projectServerConfig(resolved)
+        if (config?.type === "remote") {
+          const address = URL.canParse(config.url) && pluginMcpLoopback(new URL(config.url)) ? { ok: true as const } : validateServer({ type: "remote", url: config.url })
+          if (!address.ok) {
+            revokePluginMcpProxy(name)
+            await client.experimental.mcp.disconnect({ server: name, location }).catch(() => undefined)
+            return { directory: target, name, status: "failed", detail: address.reason }
+          }
+        }
+      }
       if (installed && settings && entry?.kind === "mcp" && bound.type === "remote" && typeof bound.url === "string") await bindPluginMcpProxy(name, {
         packageId: graph!.packageId, entryId: entry.id, generation: basename(dirname(installed.pluginRoot)),
         definitionDigest: ("sha256:" + sha256Hex(canonicalJson([entry, settings.values, settings.versions]))) as `sha256:${string}`,

@@ -303,7 +303,7 @@ export function validateServer(server: Record<string, unknown>, source: "plugin"
     // `#1381`(基线 I4):远程 MCP 的地址准入与出网准入**同一个函数**(network-egress-derived.ts classifyBaseUrl:https、
     // 非 loopback、DNS 名或 IPv4 字面量、端口在范围内)—— 出网派生收不进放行集合的地址,添加那一刻就拒。此前这里放行
     // loopback `http://`,而出网侧拒 ⇒「加得进、连不上」(与 `#1383` 自定义节点的症状同形)。拒绝带类别 `code`,renderer 据此说人话。
-    const portable = source === "plugin" && typeof url === "string" && (url.includes("${") || url.includes("{file:") || URL.canParse(url) && ["http:", "https:"].includes(new URL(url).protocol) && ["localhost", "127.0.0.1", "[::1]"].includes(new URL(url).hostname))
+    const portable = source === "plugin" && typeof url === "string" && (url.includes("${") || url.includes("{file:") || URL.canParse(url) && ["http:", "https:"].includes(new URL(url).protocol))
     const address = portable ? { ok: true as const } : classifyBaseUrl(url, "mcp")
     if (!address.ok) return { ok: false, reason: MCP_ADDRESS_REJECTION_REASON[address.code], code: address.code }
   }

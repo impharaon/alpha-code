@@ -299,6 +299,7 @@ export function createSecretMask(roots: ProtectedFiles.ProtectedRoots) {
           error: permissionCause(input.error, "mask"),
           metadata: metadata(await mutationProjection({ ...state?.last, ...input.error.metadata }, state) as Tool.Metadata),
         })
+        if (error.error) Object.setPrototypeOf(error, Object.getPrototypeOf(input.error))
         await finishProgress(state, false)
         return error
       } catch {
@@ -308,7 +309,9 @@ export function createSecretMask(roots: ProtectedFiles.ProtectedRoots) {
         } catch {
           /* Never recover the previous dynamic progress. */
         }
-        return new Tool.Error({ message: ProtectedFiles.MASKING_FAILED_TEXT, error: permissionCause(input.error, "hide"), metadata: hiddenMetadata(state) })
+        const error = new Tool.Error({ message: ProtectedFiles.MASKING_FAILED_TEXT, error: permissionCause(input.error, "hide"), metadata: hiddenMetadata(state) })
+        if (error.error) Object.setPrototypeOf(error, Object.getPrototypeOf(input.error))
+        return error
       } finally {
         if (state) calls.delete(toolCallKey(input.call))
       }

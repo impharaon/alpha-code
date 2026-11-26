@@ -1002,3 +1002,5 @@ A4：d607a2c829 的原位真实 SDK 回归先红（`bun test --max-concurrency 2
 落实 r9 已接受 S-12 补口：既有 main 代理 handle/绑定 helper 消费源 transport 轴，connection 把同一轴交给实例 fetch。SDK 的实际 JSON POST 通过该实例的私有 proxy headers 登记地址；main 先核对有效 capability、已声明 SSE 流、origin 与协议，再原子登记 exact URL 后 pipe 转发。登记随同一绑定/流生命周期清理，不使用同源通配授权，不解析第二份 SSE、不读 SDK 私部、不增加 RPC/公开 McpProxyBinding 字段。该局部登记复用原代理鉴权与代际，不新建网络/权限权威；普通 HTTP 与 auth fetch 继续原域。原 connection 接管增量及具名证据同提交登记于 plugin-local-mcp / plugin-mcp-transport。
 
 完整原 proxy lifecycle 文件 2 pass / 0 fail（`/tmp/plugin-standard-r11-A4-green.log`）。测试为有限本地 SDK integration，原文件 imports 可追踪，受影响 PR/nightly；该文件未登记精确条数，无新增全局集。后续补核心连接消费者及最终类型/相关集/移除验证，未把其余审计项或片 5 标完成。
+
+A4 证据加严：原用例改走实际 McpConnection.make（未预包装 fetch），保留原断言，完整原文件仍 2 pass / 0 fail（`/tmp/plugin-standard-r11-A4-connection-green.log`）；core、util、ui-mac 包内 `bun typecheck` 均 exit 0（`/tmp/plugin-standard-r11-A4-{core,util,ui}-types.log`）。该用例现在覆盖 transport 从 config 传入实例 fetch 的消费者；没有扩展产品合同。

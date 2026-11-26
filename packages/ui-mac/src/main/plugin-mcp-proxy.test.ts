@@ -35,10 +35,10 @@ test("explicit SSE registers its real POST endpoint for the same proxy generatio
   const peer = dirname(Bun.resolveSync("@anthropic-ai/claude-agent-sdk", resolve(import.meta.dir, "../../../core")))
   const sdk = await import(Bun.resolveSync("@modelcontextprotocol/sdk/server/mcp.js", peer))
   const sse = await import(Bun.resolveSync("@modelcontextprotocol/sdk/server/sse.js", peer))
-  const { McpClient } = await import("../../../core/src/mcp/client")
+  const { McpConnection } = await import("../../../core/src/mcp/connection")
+  const { Environment } = await import("../../../core/src/environment/index")
   const { hostEnvironmentLayer } = await import("../../../core/test/fixture/environment")
   const { Effect } = await import("effect")
-  const { FetchHttpClient } = await import("effect/http")
   const seen: Array<{ method: string; path: string; privateHeaders: unknown[] }> = []
   const streams: Promise<void>[] = []
   const closeServers: Array<() => Promise<void>> = []
@@ -75,9 +75,18 @@ test("explicit SSE registers its real POST endpoint for the same proxy generatio
   try {
     await bindPluginMcpProxy("sse", { packageId: "claude:sse", entryId: "mcp:sse", generation: "gen-000001-abcdef", definitionDigest: ("sha256:" + "e".repeat(64)) as `sha256:${string}`, serverUrl: url }, "sse")
     const binding = pluginMcpProxySnapshot().sse![0]!
-    const send = pluginMcpFetch("sse", url, base, "sse")
     for (const revoke of [false, true]) await Effect.runPromise(Effect.gen(function* () {
-      const client = yield* McpClient.connect({ server: "sse", config: { type: "remote", url, transport: "sse", oauth: false, headers: { Authorization: "Bearer invalid-local-sse-token" } }, directory: import.meta.dir })
+      const run = Effect.runForkWith(yield* Effect.context())
+      const connection = McpConnection.make({
+        name: "sse", config: { type: "remote", url, transport: "sse", oauth: false, headers: { Authorization: "Bearer invalid-local-sse-token" } }, directory: import.meta.dir,
+        environment: yield* Environment.Service, fetch: base, scope: yield* Effect.scope,
+        authProvider: Effect.succeed(undefined), elicitation: { create: () => Effect.die("unexpected elicitation"), complete: () => Effect.void },
+        lock: effect => effect, callbacks: effect => run(effect), fork: effect => run(effect),
+        events: { connecting: Effect.void, connected: Effect.void, settled: Effect.void, failed: failure => Effect.die(failure), closed: () => Effect.void, changed: () => Effect.void },
+      })
+      yield* connection.start
+      const client = connection.client
+      if (!client) throw Error("SSE connection did not retain its client")
       expect((yield* client.tools()).map(tool => tool.name)).toEqual(["probe"])
       expect((yield* client.callTool({ name: "probe", args: {} })).content).toEqual([{ type: "text", text: "sse-probed" }])
       if (!revoke) {
@@ -87,7 +96,7 @@ test("explicit SSE registers its real POST endpoint for the same proxy generatio
         expect(seen).toHaveLength(before)
       }
       if (revoke) { revokePluginMcpProxy("sse"); yield* Effect.promise(() => streams.at(-1)!) }
-    }).pipe(Effect.provide(hostEnvironmentLayer), Effect.provideService(FetchHttpClient.Fetch, send), Effect.scoped))
+    }).pipe(Effect.provide(hostEnvironmentLayer), Effect.scoped))
     expect(seen.filter(request => request.method === "GET")).toHaveLength(2)
     expect(new Set(seen.filter(request => request.method === "POST").map(request => request.path)).size).toBe(2)
     expect(requests.every(request => request.authorization === binding.proxyAuthorization)).toBe(true)

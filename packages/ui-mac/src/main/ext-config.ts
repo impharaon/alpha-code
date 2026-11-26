@@ -475,7 +475,8 @@ export function persistMcp(name: string, server: Record<string, unknown>, meta?:
     return { ok: false, reason: `server name "${name}" is reserved by an official connector recipe` }
   if (!server || typeof server !== "object") return { ok: false, reason: "invalid server config" }
   const state = readPackageLedgerStateV1(codepuppyGlobalRoot(), { sideEffectFree: true })
-  const source = state.ok && state.packageGraphs.some(graph => graph.pluginTree && graph.children.some(node => node.kind === "mcp" && node.name === name)) ? "plugin" : "connector"
+  const record = state.ok ? state.records.find(record => record.kind === "mcp" && record.name === name) : undefined
+  const source = record && record.origin !== "created" && state.ok && state.packageGraphs.some(graph => graph.pluginTree && graph.children.some(node => node.kind === "mcp" && node.name === record.name && node.componentId === record.id)) ? "plugin" : "connector"
   const valid = validateServer(server, source)
   if (!valid.ok) return valid
   // `#1381`(基线 I1):远程 MCP 的记录住在围栏写不到的真源里(mcp-server-truth.ts);配置文件里的 `mcp.*` 远程条目对注入面与

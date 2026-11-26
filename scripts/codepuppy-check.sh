@@ -244,6 +244,7 @@ echo "▶ [5/14] contract lock + unit tests (contracts-consumer + ext + ui-mac +
 # 选择与层校验只在共享工具;runner 保留包内分组与每层 JUnit 报告。
 unit_tests() {
   local rc=0
+  # 串行先验 vendor 的不可变来源,再跑依赖该快照的测试,使 provenance 失守先于其衍生红例显示。
   bun run --cwd packages/codepuppy-contracts-consumer check:vendor || rc=1
   if [ "$full" -eq 1 ]; then
     affected-tests run --full || rc=1
@@ -256,11 +257,32 @@ unit_tests() {
 }
 # 每次 bun 调用的 junit 都写进 $GATE_REPORT_DIR;gate 没设(本地手跑)就用一个临时目录 —— [6/14] 登记簿从这些报告
 # 读逐文件条数,所以每个测试文件每次门只跑一次(此前登记簿把 ~400 个登记文件逐个重跑一遍,真引擎文件也跑两次)。
+temporary_reports=0
 if [ -z "${GATE_REPORT_DIR:-}" ]; then
   GATE_REPORT_DIR="$(mktemp -d)"
-  trap 'rm -rf "$GATE_REPORT_DIR"' EXIT
+  temporary_reports=1
 fi
 export GATE_REPORT_DIR
+probe_pids=()
+terminate_probe() {
+  local pid="$1" child
+  # probe 函数 → bash 脚本 → bun 可以有多层;只沿本次探针的子进程树从叶子收起。
+  for child in $(pgrep -P "$pid" 2>/dev/null); do terminate_probe "$child"; done
+  pkill -TERM -P "$pid" 2>/dev/null || true
+  kill -TERM "$pid" 2>/dev/null || true
+}
+cleanup() {
+  # 非交互 bash 的后台作业忽略 SIGINT;父进程退出时显式终止每个探针及其直接子进程。
+  for pid in ${probe_pids[@]+"${probe_pids[@]}"}; do
+    terminate_probe "$pid"
+    wait "$pid" 2>/dev/null || true
+  done
+  if [ "$temporary_reports" -eq 1 ]; then
+    rm -f "$GATE_REPORT_DIR"/*
+    rmdir "$GATE_REPORT_DIR"
+  fi
+}
+trap cleanup EXIT
 # [9]/[10]/[11]/[13] 不读测试报告,在独立子进程中与 [5] 重叠;输出留到汇合处逐步整块打印。
 probe_9() {
   local fail=0 unverified=0
@@ -386,11 +408,12 @@ probe_13() {
 }
 
 probe_steps=(9 10 11 13)
-probe_pids=()
 for probe in "${probe_steps[@]}"; do
   "probe_$probe" > "$GATE_REPORT_DIR/probe-$probe.log" 2>&1 &
   probe_pids+=("$!")
 done
+# runner 可等这些探针结束;退出码仍由本进程的 wait 收取,不丢失失败/未验证状态。
+export CODEPUPPY_TEST_PROBE_PIDS="${probe_pids[*]}"
 
 if unit_tests; then
   echo "    ✓ tests"
@@ -405,7 +428,7 @@ echo "▶ [6/14] assert gate files (逐个点名;整包地板抓不到单个闸�
 # `#1153`:三档结局(与 [2/14]/[9/14]/[10/14] 同形):0 全部适用行已验证 / 1 真失守拦住 /
 # 2 门绿但有条件行的保证本次未验证:平台不适用或签名发布宿主未显式启用时,
 # 自报 0 条,登记簿验证与条件相符。darwin 未开签名开关也会到第 2 档。
-# 判定读 [5/14] 的 junit 报告(--from-reports);PR 只判选中文件,--full 判全部登记。
+# 判定读 [5/14] 的 junit 报告(--from-reports);PR 还逐个运行未选中但本分支登记行改动的文件,避免条数漂移等到夜间。
 CODEPUPPY_TEST_FILES="$test_files" bash scripts/assert-gate-files.sh --from-reports "$GATE_REPORT_DIR"
 gate_files_rc=$?
 case "$gate_files_rc" in
@@ -491,6 +514,7 @@ for i in "${!probe_steps[@]}"; do
     *) fail=1 ;;
   esac
 done
+probe_pids=()
 
 # ── 覆盖自陈(`#777`)──────────────────────────────────────────────────────────
 # 「和 CI 1:1」以前是散文。现在这张表由脚本自己打出来,并由

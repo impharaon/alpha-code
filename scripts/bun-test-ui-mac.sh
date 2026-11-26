@@ -60,6 +60,7 @@ if [ "$WORKDIR" != packages/ui-mac ]; then
     done
     rc=0
     # 普通 ext 文件串行:policy-host 的顶层 await 共享模块不能被 --isolate 打断初始化。
+    # 两组之间串行:普通组的真实 policy-host 引擎先结束,再让红例子进程并行加载 core/server,避免 CPU 竞争超时。
     [ "${#ext_files[@]}" -eq 0 ] || run_group "$step" "$floor" "${ext_files[@]}" || rc=1
     # 预期红例宿主不导入 policy-host;各自把上游文件放进子进程,可隔离并行。
     [ "${#upstream_red_files[@]}" -eq 0 ] || run_group "$step+upstream-reds" 0 --parallel=3 "${upstream_red_files[@]}" || rc=1
@@ -80,8 +81,14 @@ floor_parallel=0; floor_serial=0
 if [ "${CODEPUPPY_TEST_FULL:-0}" = 1 ]; then floor_parallel=1600; floor_serial=305; fi
 export CODEPUPPY_KNOWN_FAILS_FILE=scripts/known-fails.tsv
 rc=0
-# 组间串行:真引擎不能和其它测试组争 CPU;浏览器冷构建也不与普通组叠加,组内各自使用多个 worker。
+# 组间串行:浏览器冷构建不与普通组叠加;两者结束后才把测试组时段交给真引擎。
 [ "${#parallel_files[@]}" -eq 0 ] || run_group ui-mac "$floor_parallel" --parallel "${parallel_files[@]}" || rc=1
-[ "${#serial_files[@]}" -eq 0 ] || run_group ui-mac+serial "$floor_serial" --parallel=3 "${serial_files[@]}" || rc=1
 [ "${#browser_files[@]}" -eq 0 ] || run_group ui-mac+browser 1 --parallel=5 "${browser_files[@]}" || rc=1
+if [ "${#serial_files[@]}" -gt 0 ]; then
+  # bootstrap 探针会安装依赖、typecheck、跑围栏;只与非引擎组重叠,全部退出后引擎才独占 CPU。
+  for pid in ${CODEPUPPY_TEST_PROBE_PIDS:-}; do
+    while kill -0 "$pid" 2>/dev/null; do sleep 0.05; done
+  done
+  run_group ui-mac+serial "$floor_serial" --parallel=3 "${serial_files[@]}" || rc=1
+fi
 exit "$rc"

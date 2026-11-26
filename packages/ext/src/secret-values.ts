@@ -113,9 +113,10 @@ export function secretScalar(name: string, value: unknown): Uint8Array[] {
   return [Buffer.from(String(value))]
 }
 
-function leaves(value: unknown, prefix: readonly string[] = []): { path: readonly string[]; value: unknown }[] {
+function leaves(value: unknown, prefix: readonly string[] = [], ancestors = new Set<object>()): { path: readonly string[]; value: unknown }[] {
   if (typeof value !== "object" || value === null) return [{ path: prefix, value }]
-  return Object.entries(value).flatMap(([key, child]) => leaves(child, [...prefix, key]))
+  if (ancestors.has(value)) return []
+  return Object.entries(value).flatMap(([key, child]) => leaves(child, [...prefix, key], new Set([...ancestors, value])))
 }
 
 function selected(path: readonly string[], selector: readonly string[]): boolean {
@@ -137,7 +138,7 @@ function fieldMatch(name: string, pattern: string) {
   ).test(name)
 }
 
-function scalar(value: string): string | number | boolean | null {
+function scalar(value: string, anchors = new Map<string, unknown>()): unknown {
   const text = value.trim()
   if (text.startsWith('"')) return JSON.parse(text)
   if (text.startsWith("'")) {
@@ -147,19 +148,41 @@ function scalar(value: string): string | number | boolean | null {
   if (/^(?:true|false)$/i.test(text)) return text.toLowerCase() === "true"
   if (/^(?:null|~)$/i.test(text)) return null
   if (/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?$/i.test(text)) return Number(text)
-  if (/^[!&*]|^\{|^\[/.test(text)) {
-    if (/^[\[{]/.test(text)) return JSON.parse(text)
+  if (text.startsWith("*")) {
+    const name = text.slice(1).replace(/\s+#.*$/, "").trim()
+    if (!anchors.has(name)) throw new Error("Unknown protected document alias")
+    return anchors.get(name)
+  }
+  if (text.startsWith("[")) {
+    if (!text.endsWith("]")) throw new Error("Invalid protected sequence")
+    const items: string[] = []
+    let start = 1, depth = 0, quote = ""
+    for (let index = 1; index < text.length - 1; index++) {
+      const char = text[index]
+      if (quote) { if (char === quote && text[index - 1] !== "\\") quote = ""; continue }
+      if (char === '"' || char === "'") { quote = char; continue }
+      if (char === "[" || char === "{") depth++
+      if (char === "]" || char === "}") depth--
+      if (char === "," && depth === 0) { items.push(text.slice(start, index)); start = index + 1 }
+    }
+    if (quote || depth) throw new Error("Invalid protected sequence")
+    if (text.slice(start, -1).trim()) items.push(text.slice(start, -1))
+    return items.map((item) => scalar(item, anchors))
+  }
+  if (/^[!&]|^\{/.test(text)) {
+    if (text.startsWith("{")) return JSON.parse(text)
     throw new Error("Unsupported protected document syntax")
   }
   return text.replace(/\s+#.*$/, "")
 }
 
-// Static YAML/TOML mappings and sequences; no tags, shell, aliases or interpolation are evaluated.
+// Static YAML/TOML values; aliases share data, without executing tags, shell or interpolation.
 function staticDocument(text: string): unknown {
   if (/^\s*[\[{]/.test(text) && !/^\s*\[\[?[a-zA-Z_][\w.-]*\]\]?/.test(text)) return JSON.parse(text)
   const root: Record<string, unknown> = Object.create(null)
   const stack: { indent: number; path: string[]; sequence?: boolean }[] = [{ indent: -1, path: [] }]
   const arrays = new Map<string, number>()
+  const anchors = new Map<string, unknown>()
   const lines = text.split(/\r?\n/)
   for (let index = 0; index < lines.length; index++) {
     const line = lines[index]
@@ -191,15 +214,25 @@ function staticDocument(text: string): unknown {
       parent.push(String(position))
       stack.push({ indent, path: parent, sequence: true })
     }
-    const entry = line.slice(indent + (list ? 2 : 0)).match(/^([^:=]+?)(?::\s*|\s*=\s*)(.*)$/)
-    if (!entry) throw new Error("Invalid protected document")
-    const path = [...parent, String(scalar(entry[1]))]
-    if (!entry[2]) {
+    const body = line.slice(indent + (list ? 2 : 0))
+    const entry = body.match(/^([^:=]+?)(?::(?:\s+|$)|\s*=\s*)(.*)$/)
+    if (!entry && !list) throw new Error("Invalid protected document")
+    const path = entry ? [...parent, String(scalar(entry[1]))] : parent
+    const raw = entry ? entry[2] : body
+    const anchor = raw.match(/^&([\w-]+)(?:\s+(.*))?$/)
+    const source = anchor ? anchor[2] ?? "" : raw
+    if (!source) {
+      if (anchor) {
+        const value = Object.create(null)
+        const target = path.slice(0, -1).reduce<Record<string, unknown>>((node, key) => (node[key] ??= Object.create(null)) as Record<string, unknown>, root)
+        target[path.at(-1)!] = value
+        anchors.set(anchor[1], value)
+      }
       stack.push({ indent: indent + (list ? 1 : 0), path })
       continue
     }
-    let value: unknown = scalar(entry[2])
-    if (/^[|>][-+]?\s*$/.test(entry[2])) {
+    let value: unknown = scalar(source, anchors)
+    if (/^[|>][-+]?\s*$/.test(source)) {
       const parts: string[] = []
       while (
         index + 1 < lines.length &&
@@ -210,14 +243,23 @@ function staticDocument(text: string): unknown {
         .filter((part) => part.trim())
         .reduce((min, part) => Math.min(min, part.match(/^ */)![0].length), Infinity)
       value =
-        parts.map((part) => part.slice(padding)).join(entry[2][0] === ">" ? " " : "\n") +
-        (entry[2].includes("-") ? "" : "\n")
+        parts.map((part) => part.slice(padding)).join(source[0] === ">" ? " " : "\n") +
+        (source.includes("-") ? "" : "\n")
     }
     const target = path.slice(0, -1).reduce<Record<string, unknown>>((node, key) => {
       const child = (node[key] ??= Object.create(null))
       if (!child || typeof child !== "object" || Array.isArray(child)) throw new Error("Invalid protected document")
       return child as Record<string, unknown>
     }, root)
+    if (anchor) anchors.set(anchor[1], value)
+    if (path.at(-1) === "<<") {
+      for (const mapping of Array.isArray(value) ? value : [value]) {
+        if (!mapping || typeof mapping !== "object" || Array.isArray(mapping)) throw new Error("Invalid protected merge")
+        for (const [key, child] of Object.entries(mapping))
+          if (!Object.hasOwn(target, key)) Object.defineProperty(target, key, { value: child, enumerable: true, configurable: true, writable: true })
+      }
+      continue
+    }
     Object.defineProperty(target, path.at(-1)!, { value, enumerable: true, configurable: true, writable: true })
   }
   return root

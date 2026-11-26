@@ -417,6 +417,37 @@ Windows OCR 已从真实 Tesseract 5.5.2 / Leptonica 1.85.0 / libjpeg-turbo 3.1.
 | AC-18 | 完整许可及应用资源投影、下载 ffmpeg 归档中的许可/对应源码已核；最终安装包清单仍须发布侧验收 |
 
 
+
+### r5 最终核对收据
+
+D3 代码/实物提交：`9929af424c`、`6bc8ccbf0a`；本收据提交继续包含最终同链修正。最终相关范围由实际 import/清单读方确定：14 个 video 模块文件，office snapshot、mac-target-arch、release-source、config injection、bootstrap builder、old-name scan，共 20 文件；`bun test` 逐一显式列出这些文件（原命令/输出保存在 `/tmp/video-d3-related-final.log`）为 **142 PASS / 0 FAIL / 3278 assertions**。`packages/util` 下 `bun test src/codepuppy-bootstrap.test.ts` 为 **20 PASS / 0 FAIL / 118 assertions**。这些为最终集合计数，不与步骤计数累加。`packages/ui-mac` 下 `bun typecheck` exit 0；`git diff --check` exit 0。
+
+相关集合首次发现本票引入的 10 个红：before/afterPack 的新检查抢在既有发布/架构失败之前、旧包夹具缺视频资源，以及旧 ad-hoc 机制断言。修正为先守原发布/引擎架构检查，再加载 video validator；视频打包/签名 helper 为分支内 lazy import，配置拷贝夹具无需复制与自己失败面无关的构建模块。更新已被替换的 Windows no-op/签名断言，包夹具增加真实截取的两平台 header 和完整许可。`bun test src/main/mac-target-arch.test.ts src/main/release-source.test.ts src/main/video-runtime-artifacts.test.ts` 完整 **57 PASS / 0 FAIL**，继而最终集合全绿。新增必要同链文件 `src/main/fixtures/video/runtime.ts` 仅供两个模块复用自己的 inventory fixture；`release-source.test.ts` 删除 Windows 以前无操作的前置调用，使该测试继续只验证原有 Mac 发布先行规则。没有放松架构/完整性/许可阈值，没有修理全仓。
+
+删除对照均在已提交实现在单一具名用例中执行，每臂 exit 1 且恰为 1 FAIL，随后 `git restore` 该文件；最后上述集合为绿：
+
+| 删除臂 | 具名命令（ui-mac） | 红的事实 |
+| --- | --- | --- |
+| 提前准备 turbo | `bun test src/main/video-assets.test.ts -t "component preparation is lazy"` | 1 FAIL / exit 1 |
+| 丢 call/deadline metadata | `bun test src/main/video-assets.test.ts -t "component preparation is lazy"` | 1 FAIL / exit 1 |
+| 替换原取消 signal | `bun test src/main/video-assets.test.ts -t "component preparation is lazy"` | 1 FAIL / exit 1 |
+| 漏 speaker embedding 首次归档 | `bun test src/main/video-assets.fast.test.ts -t "first complete"` | 1 FAIL / exit 1 |
+| 跳过真实 native 平台检查 | `bun test src/main/video-runtime-artifacts.test.ts -t "wrong-platform"` | 1 FAIL / exit 1 |
+| 跳过全文许可校验 | `bun test src/main/video-runtime-artifacts.test.ts -t "full SenseVoice"` | 1 FAIL / exit 1 |
+| 签名封装不更新 native 摘要 | `bun test src/main/video-runtime-artifacts.test.ts -t "signature finalization"` | 1 FAIL / exit 1 |
+
+文档按 alpha-work/governance/delivery-profile.yml 调 canonical `check_docs_contract.check_repo(本 worktree, "impharaon/alpha-code", coordination_repo, project.url, "HEAD")`：69 errors / 253 warnings，与既有记录相同；本 plan 0 finding，modules.md 的 13 个已知失效包路径保持未改。没有把这些基线项目当成本票新缺陷。
+
+遗留去向（record and continue，不顺修）：
+
+- `packages/ui-mac/src/main/codepuppy-sidecar-wiring.test.ts:38` — 第一条最终联集在既有 Electron mock 的模块导入阶段触发依赖 `electron/index.js:8` 的 install.js 自动下载，已终止自己那条安装/测试进程，没有运行 Electron/app；该文件和同样直接导入 server 的 sidecar-bootstrap-gate 未计入最终 PASS。`docs/runbooks/ci.md` 指向 bin/setup/native-prepare，但本票不跑安装或修此依赖状态，交测试环境维护者。其余集合单独完成，不以重跑该红/挂起项赌结果。
+- `<worktree>/.gate-tests` — `affected-tests --list` 最后再次执行，仍报 No such file，未产出 scope line；交 orchestrator/gate owner，本票 gate frozen，不添加替代选择器或全量跑。
+- `docs/architecture/modules.md:24` 等 — 13 个既有目标失效，整体文档 checker 基线 69/253；交文档治理，不修。
+- `docs/runbooks/ci.md:15` — 仍写 pre-push 全量，与本次 owner「只跑相关/全量夜间」指令不符；只按本次明确指令执行，交文档维护者，不改运行规则。
+
+非阻塞待接收仍按上表：#1760 的真实 expander/declarer/ensure 及冷 Node、缓存 argv 身份、进度/断点/换源/原调用继续；orchestrator 发布 44 副本与两份源码、部署 relay/probe；真模型准确率/速度/说话人、北京与 owner 网络、断网/出网与完整安装包/Windows 真实运行。D4/D5 未实施。本轮没有 paid call、上传、生产联络、push/PR/merge 或 app/window 启动。OPTIONAL：无。已核：Codex / GPT-6；冻结设计与接缝未变。
+
+
 ## D4 处理进度与帧的模型投影
 
 待本片 PLAN 展开；范围、AC 和依赖见总览，实施依据为视频设计 §4.3/§5 卡片进度/§6 D4。

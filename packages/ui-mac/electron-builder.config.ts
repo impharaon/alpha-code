@@ -15,7 +15,6 @@ import {
   assertPackagedEngineAssets,
   resolveMacTargetArch,
 } from "./scripts/target-arch"
-import { checkVideoRuntime, finalizeVideoSignatures } from "./scripts/video-runtime-artifacts"
 import { assertReleaseSource } from "./scripts/release-source"
 import { isReleaseBuild } from "./scripts/build-identity"
 
@@ -243,6 +242,7 @@ const getBase = (appId: string): Configuration => ({
     entitlementsInherit: "resources/entitlements.plist",
     identity: shouldSign ? (process.env.CODEPUPPY_SIGN_IDENTITY ?? undefined) : "-",
     sign: async (options) => {
+      const { finalizeVideoSignatures } = await import("./scripts/video-runtime-artifacts")
       // Resolve through the declared electron-builder dependency; retain its
       // signer, identity, entitlements, retry policy and child-before-parent order.
       const require = createRequire(import.meta.url)
@@ -268,39 +268,41 @@ const getBase = (appId: string): Configuration => ({
   // #1564:随包 Office 运行时同样在、且每个 Mach-O 都含这一片。
   // 任一不过即抛,宁可不出包,也不出一个终端打不开的包。
   beforePack: async (context) => {
+    if (context.electronPlatformName === "darwin") {
+      if (isReleaseBuild(channel, process.env)) assertReleaseSource(packageDir)
+      assertMacTargetArch({ packingArch: Arch[context.arch], packageDir })
+    }
     if (context.electronPlatformName === "darwin" || context.electronPlatformName === "win32") {
       const target = context.electronPlatformName === "darwin" ? "darwin-arm64" : "win32-x64"
       if (Arch[context.arch] !== (target === "darwin-arm64" ? "arm64" : "x64"))
         throw new Error("Unsupported video runtime target")
+      const { checkVideoRuntime } = await import("./scripts/video-runtime-artifacts")
       await checkVideoRuntime(
         path.join(packageDir, VIDEO_RUNTIME_BUILD_DIR, target === "darwin-arm64" ? "mac-arm64" : "win-x64"),
         target,
       )
     }
-    if (context.electronPlatformName !== "darwin") return
-    if (isReleaseBuild(channel, process.env)) assertReleaseSource(packageDir)
-    assertMacTargetArch({ packingArch: Arch[context.arch], packageDir })
   },
   // `#1669`:装包后、签名前核对引擎原生资源在包里的落点 —— 每个都解包、加载点的目标在解包目录里、可执行的带执行位、
   // Mach-O 含目标片。不过即抛:宁可不出包,也不出一个终端打不开的包。
   afterPack: async (context) => {
+    if (context.electronPlatformName === "darwin")
+      assertPackagedEngineAssets({
+        resourcesDir: path.join(
+          context.appOutDir,
+          `${context.packager.appInfo.productFilename}.app`,
+          "Contents/Resources",
+        ),
+        packingArch: Arch[context.arch],
+      })
     if (context.electronPlatformName === "darwin" || context.electronPlatformName === "win32") {
       const mac = context.electronPlatformName === "darwin"
       const resources = mac
-        ? path.join(context.appOutDir, `${context.packager.appInfo.productFilename}.app`, "Contents", "Resources")
+        ? path.join(context.appOutDir, `${context.packager.appInfo.productFilename}.app`, "Contents/Resources")
         : path.join(context.appOutDir, "resources")
+      const { checkVideoRuntime } = await import("./scripts/video-runtime-artifacts")
       await checkVideoRuntime(path.join(resources, "video-mcp"), mac ? "darwin-arm64" : "win32-x64")
     }
-    if (context.electronPlatformName !== "darwin") return
-    assertPackagedEngineAssets({
-      resourcesDir: path.join(
-        context.appOutDir,
-        `${context.packager.appInfo.productFilename}.app`,
-        "Contents",
-        "Resources",
-      ),
-      packingArch: Arch[context.arch],
-    })
   },
   afterSign: async (context) => {
     const mac = context.electronPlatformName === "darwin"
@@ -308,6 +310,7 @@ const getBase = (appId: string): Configuration => ({
     const resources = mac
       ? path.join(context.appOutDir, `${context.packager.appInfo.productFilename}.app`, "Contents/Resources")
       : path.join(context.appOutDir, "resources")
+    const { finalizeVideoSignatures, checkVideoRuntime } = await import("./scripts/video-runtime-artifacts")
     if (!mac) finalizeVideoSignatures(resources)
     await checkVideoRuntime(path.join(resources, "video-mcp"), mac ? "darwin-arm64" : "win32-x64")
   },

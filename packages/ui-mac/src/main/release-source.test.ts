@@ -83,7 +83,6 @@ describe("#1631 真实 beforePack", () => {
           Object.defineProperty(process, "platform", { value: "darwin" })
           const { Arch } = await import("electron-builder")
           const config = (await import(${JSON.stringify(path.join(cwd, "electron-builder.config.ts"))})).default
-          await config.beforePack({ electronPlatformName: "win32", arch: Arch.x64 })
           await config.beforePack({ electronPlatformName: "darwin", arch: Arch.x64 })
         `], { cwd, encoding: "utf8", env: { ...process.env, OPENCODE_CHANNEL: channel, CODEPUPPY_SIGN: sign, GITHUB_ACTIONS: "false", CODEPUPPY_TARGET_ARCH: "arm64" } })
         expect(result.status).toBe(1)

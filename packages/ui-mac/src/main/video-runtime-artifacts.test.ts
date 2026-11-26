@@ -3,6 +3,7 @@ import { chmod, copyFile, cp, mkdir, mkdtemp, readFile, rm, writeFile } from "no
 import { tmpdir } from "node:os"
 import path from "node:path"
 import { checkVideoRuntime, videoBinaryTarget, writeVideoRuntimeInventory } from "../../scripts/video-runtime-artifacts"
+import { writeVideoRuntimeFixture } from "./fixtures/video/runtime"
 import licences from "../../resources/video-runtime/licenses.json"
 
 // Integration layer: filesystem inventory wiring. Real header clips from the
@@ -12,17 +13,7 @@ afterAll(() => rm(root, { recursive: true, force: true }))
 const fixtures = path.join(import.meta.dir, "fixtures/video/native-headers")
 
 async function bundle(target: "darwin-arm64" | "win32-x64") {
-  const directory = path.join(root, target)
-  await mkdir(path.join(directory, "helpers"), { recursive: true })
-  const header = path.join(fixtures, `${target}.bin`)
-  for (const file of ["sherpa.node", "node-whisper.node", "helpers/ocr"])
-    await copyFile(header, path.join(directory, file))
-  await chmod(path.join(directory, "helpers/ocr"), 0o755)
-  await cp(path.join(import.meta.dir, "../../resources/video-runtime/licenses"), path.join(directory, "licenses"), {
-    recursive: true,
-  })
-  await writeVideoRuntimeInventory(directory, target, { ocr: "helpers/ocr" }, "fixture")
-  return directory
+  return writeVideoRuntimeFixture(path.join(root, target), target)
 }
 
 test("native inventory rejects a real wrong-platform header even when the content digest is current", async () => {

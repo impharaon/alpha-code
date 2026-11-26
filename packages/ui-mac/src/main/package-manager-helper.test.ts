@@ -56,7 +56,7 @@ server.listen(0,"127.0.0.1"); await once(server,"listening")
 const root=native.packageManagerProcessIdentity(process.pid)
 const serviceName="app.codepuppy.helper.test."+process.pid
 const service=native.startPackageManagerService(serviceName,helper,(input,peer,reply)=>{
- claims.push({proofMatches:input.nodeProof===proof,pid:peer.pid,pidversion:peer.pidversion,descendant:native.packageManagerBoundDescendant(peer.pid,peer.pidversion,root),wrongVersion:native.packageManagerBoundDescendant(peer.pid,peer.pidversion+1,root),wrongBirth:native.packageManagerBoundDescendant(peer.pid,peer.pidversion,{...root,startTime:{...root.startTime,microseconds:(root.startTime.microseconds+1)%1000000}})})
+ claims.push({proofMatches:input.nodeProof===proof,pid:peer.pid,pidversion:peer.pidversion,descendant:native.packageManagerBoundDescendant(peer.pid,peer.pidversion,root),wrongVersion:native.packageManagerBoundDescendant(peer.pid,peer.pidversion+1,root),wrongBirth:native.packageManagerBoundDescendant(peer.pid,peer.pidversion,{...root,startAbstime:root.startAbstime+1n})})
  reply(mode==="reject"?{kind:"error",error:"unauthorized"}:{kind:"delegated",brokerPort:server.address().port,authorization})
 })
 const rows=[]

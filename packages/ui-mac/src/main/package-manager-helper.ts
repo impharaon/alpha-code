@@ -4,7 +4,8 @@ import { loadFenceAddon } from "./process-fence-apply"
 export const PACKAGE_MANAGER_HELPER = "codepuppy-package-manager"
 export function packageManagerHelperPath(addonPath: string) { return join(dirname(addonPath), PACKAGE_MANAGER_HELPER) }
 export type NativeHelperPeer = { pid: number; pidversion: number; executable: string; signingIdentity: string }
-export type BoundShellProcess = { pid: number; startTime: { seconds: number; microseconds: number } }
+/** Root Shell process instance; `startAbstime` is the kernel's monotonic birth (`ri_proc_start_abstime`), stable across exec. */
+export type BoundShellProcess = { pid: number; startAbstime: bigint }
 export type PackageManagerNodeClaim = { executionID: string; nodeID: string; nodeProof: string }
 export type PackageManagerNodeGrant =
   | { kind: "delegated"; brokerPort: number; authorization: string }

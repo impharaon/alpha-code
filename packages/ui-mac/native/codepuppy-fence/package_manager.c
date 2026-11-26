@@ -4,6 +4,7 @@
 #include <CoreFoundation/CoreFoundation.h>
 #include <libproc.h>
 #include <sys/proc_info.h>
+#include <sys/resource.h>
 #include <servers/bootstrap.h>
 #include <pthread.h>
 #include <stdatomic.h>
@@ -223,36 +224,36 @@ static int pid_argument(napi_env env,napi_value value,pid_t *pid) {
   if(napi_get_value_double(env,value,&number)!=napi_ok || !isfinite(number) || number<1 || number>INT_MAX || floor(number)!=number) return 0;
   *pid=(pid_t)number; return 1;
 }
+// Monotonic kernel birth of a process instance: written at creation, unchanged by exec or calendar changes.
+static int process_start(pid_t pid,uint64_t *start) {
+  struct rusage_info_v4 usage;
+  if(proc_pid_rusage(pid,RUSAGE_INFO_V4,(rusage_info_t *)&usage)!=0) return 0;
+  *start=usage.ri_proc_start_abstime; return 1;
+}
 static napi_value process_identity(napi_env env,napi_callback_info info) {
-  size_t argc=1; napi_value argv[1],result,start; pid_t pid; struct proc_bsdinfo process;
+  size_t argc=1; napi_value argv[1],result,start; pid_t pid; uint64_t birth=0;
   napi_get_cb_info(env,info,&argc,argv,NULL,NULL);
   if(argc!=1 || !pid_argument(env,argv[0],&pid)) return fail(env,"package-manager process identity requires a PID");
-  if(proc_pidinfo(pid,PROC_PIDTBSDINFO,0,&process,sizeof process)!=sizeof process) { napi_get_undefined(env,&result); return result; }
+  // An ended process has no identity, so its nodes can never be claimed.
+  if(!process_start(pid,&birth)) { napi_get_undefined(env,&result); return result; }
   napi_create_object(env,&result); set_number(env,result,"pid",pid);
-  napi_create_object(env,&start);
-  napi_value seconds,microseconds; napi_create_double(env,(double)process.pbi_start_tvsec,&seconds); napi_create_double(env,(double)process.pbi_start_tvusec,&microseconds);
-  napi_set_named_property(env,start,"seconds",seconds); napi_set_named_property(env,start,"microseconds",microseconds); napi_set_named_property(env,result,"startTime",start); return result;
+  napi_create_bigint_uint64(env,birth,&start); napi_set_named_property(env,result,"startAbstime",start); return result;
 }
 static napi_value bound_descendant(napi_env env,napi_callback_info info) {
-  size_t argc=3; napi_value argv[3],result,value,start; pid_t peer,root; uint32_t peer_version=0; audit_token_t audit; double seconds=0,microseconds=0;
+  size_t argc=3; napi_value argv[3],result,value; pid_t peer,root; uint32_t peer_version=0; uint64_t bound=0,birth=0; bool lossless=false; audit_token_t audit;
   napi_get_cb_info(env,info,&argc,argv,NULL,NULL);
   int valid=argc==3 && pid_argument(env,argv[0],&peer) && napi_get_value_uint32(env,argv[1],&peer_version)==napi_ok &&
     napi_get_named_property(env,argv[2],"pid",&value)==napi_ok && pid_argument(env,value,&root) &&
-    napi_get_named_property(env,argv[2],"startTime",&start)==napi_ok &&
-    napi_get_named_property(env,start,"seconds",&value)==napi_ok && napi_get_value_double(env,value,&seconds)==napi_ok && isfinite(seconds) && seconds>=0 && seconds<=9007199254740991.0 && floor(seconds)==seconds &&
-    napi_get_named_property(env,start,"microseconds",&value)==napi_ok && napi_get_value_double(env,value,&microseconds)==napi_ok && isfinite(microseconds) && microseconds>=0 && microseconds<1000000 && floor(microseconds)==microseconds;
+    napi_get_named_property(env,argv[2],"startAbstime",&value)==napi_ok && napi_get_value_bigint_uint64(env,value,&bound,&lossless)==napi_ok && lossless;
+  // The message audit version pins the helper's current image. The root is the bound process instance, whatever image it now runs.
   valid=valid && process_audit(peer,&audit) && audit.val[7]==peer_version;
-  struct proc_bsdinfo process;
-  valid=valid && proc_pidinfo(peer,PROC_PIDTBSDINFO,0,&process,sizeof process)==sizeof process;
-  // A process birth survives exec. The message audit version still pins the helper's current image.
+  // One live parent chain read at claim time; intermediate hops compare nothing, the root hop compares its monotonic birth.
   while(valid && peer!=root) {
-    struct proc_bsdinfo parent;
-    if(process.pbi_ppid<=1 || proc_pidinfo((pid_t)process.pbi_ppid,PROC_PIDTBSDINFO,0,&parent,sizeof parent)!=sizeof parent ||
-      parent.pbi_start_tvsec>process.pbi_start_tvsec || (parent.pbi_start_tvsec==process.pbi_start_tvsec && parent.pbi_start_tvusec>process.pbi_start_tvusec)) { valid=0; break; }
+    struct proc_bsdinfo process;
+    if(proc_pidinfo(peer,PROC_PIDTBSDINFO,0,&process,sizeof process)!=sizeof process || process.pbi_ppid<=1) { valid=0; break; }
     peer=(pid_t)process.pbi_ppid;
-    process=parent;
   }
-  valid=valid && process.pbi_start_tvsec==(uint64_t)seconds && process.pbi_start_tvusec==(uint64_t)microseconds;
+  valid=valid && process_start(root,&birth) && birth==bound;
   napi_get_boolean(env,valid,&result); return result;
 }
 napi_value register_package_manager_exports(napi_env env,napi_value exports) {

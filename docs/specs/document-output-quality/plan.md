@@ -750,3 +750,5 @@ r14 OOXML（a）：red-9.log 两条闸均点名 shared/workspace-file.ts。将�
 r14 写盘登记（c）：red-7.log 仅两处新签名。先运行原 --write 生成器，再保留原登记簿全部理由注释，将 document-render 的 mkdir(job)/writeFile(render.json) 归 W1+X1：job 在经宿主与 realpath 核验的所属 Location/.document-output 下。无新增可写根、无 TODO；不改变权限守卫。
 
 r14 HTML 预览消费者（b）：red-10.log 的旧 details.url 字面锚已由 §4.4/R4 复用 hardenPreviewSession 的 blocked(url) 回调替代。仍要求 safeOrigin 仅返回 origin，仍要求 recordBlocked 接收 safeOrigin(url)，额外明确拒绝直接记录 url；不改 UI 状态面或泄漏 path/query。
+
+r14 websearch 消费者（b）：red-8.log 的同步 transform 字面锚与 §4.10/R13 读取 Python projection 所需的 async transform 不符，只更新此锚；云定义安装先于项目合并/首个 return 的顺序断言全保留。

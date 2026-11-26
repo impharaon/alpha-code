@@ -197,7 +197,7 @@ describe("websearch 执行副本普查(#223 R3 · R4 起降为纵深)", () => {
   // 回执是这个 transform 的第一句,排在项目 MCP 合并(`applyProjectMcp`,会抛)之前。
   test("ext 装载回执是 mcp.transform 的第一句(排在项目 MCP 合并之前)", () => {
     const plugin = read("packages/ext/src/plugin.ts")
-    const transform = plugin.indexOf("context.mcp.transform((editor) => {")
+    const transform = plugin.indexOf("context.mcp.transform(async (editor) => {")
     expect(transform).toBeGreaterThanOrEqual(0)
     const install = plugin.indexOf("installCloudMcp(editor, bootstrap)", transform)
     const project = plugin.indexOf("applyProjectMcp(editor", transform)

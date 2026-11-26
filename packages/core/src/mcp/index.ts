@@ -1,3 +1,4 @@
+import { pluginMcpFetch } from "@opencode/util/codepuppy-plugin-mcp" // codepuppy(#1776): OAuth retains the same instance-private fetch boundary
 export * as Mcp from "./index.js"
 
 import { Mcp } from "@opencode/schema/mcp"
@@ -289,7 +290,7 @@ export const layer = (options?: Options) =>
                   const { McpOAuth } = yield* Effect.promise(() => import("./oauth.js"))
                   return yield* McpOAuth.authorize({ name, config: remote, integrationID, methodID }).pipe(
                     Effect.provideService(Credential.Service, credentials),
-                    Effect.provideService(FetchHttpClient.Fetch, fetch),
+                    Effect.provideService(FetchHttpClient.Fetch, pluginMcpFetch(name, remote.url, fetch)),
                   )
                 }),
             })
@@ -315,6 +316,7 @@ export const layer = (options?: Options) =>
           : Effect.succeed(undefined)
 
       const connectProvider = Effect.fnUntraced(function* (
+        name: ServerName,
         entry: ServerEntry,
         credential: Credential.Info | undefined,
       ) {
@@ -322,7 +324,7 @@ export const layer = (options?: Options) =>
         const { McpOAuth } = yield* Effect.promise(() => import("./oauth.js"))
         return yield* McpOAuth.connectProvider({ config: entry.config, credential }).pipe(
           Effect.provideService(Credential.Service, credentials),
-          Effect.provideService(FetchHttpClient.Fetch, fetch),
+          Effect.provideService(FetchHttpClient.Fetch, pluginMcpFetch(name, entry.config.url, fetch)),
         )
       })
 
@@ -437,7 +439,7 @@ export const layer = (options?: Options) =>
                 const credential = yield* selectCredential(entry)
                 return {
                   key: McpPool.key({ ...input, credential: credential?.id }),
-                  authProvider: connectProvider(entry, credential),
+                  authProvider: connectProvider(name, entry, credential),
                 }
               }
               // Resolved exactly as the spawn resolves it, `~` included, so the key matches where the server runs.
@@ -461,7 +463,7 @@ export const layer = (options?: Options) =>
             directory: location.directory,
             clientInfo: options?.clientInfo,
             authProvider: Effect.suspend(() =>
-              selectCredential(entry).pipe(Effect.flatMap((credential) => connectProvider(entry, credential))),
+              selectCredential(entry).pipe(Effect.flatMap((credential) => connectProvider(name, entry, credential))),
             ),
             elicitation,
             environment,

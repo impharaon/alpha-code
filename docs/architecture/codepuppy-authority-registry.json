@@ -2114,6 +2114,41 @@
         }
       ],
       "note": "Orchestrator r16 requires the original busy-disable assertions to remain; the real lifecycle case fails with the revoke call removed. This preserves the existing explicit package-off authority, with no new grant or owner decision."
+    },
+    {
+      "id": "plugin-local-mcp",
+      "decision": "Only the managed plugin MCP instance receives a main-issued, generation-bound loopback proxy capability; ordinary tools and child processes retain the existing destination authority.",
+      "adr": [
+        "ADR-029"
+      ],
+      "lane": "#1776 slice 4",
+      "takeovers": [
+        "packages/core/src/mcp/connection.ts",
+        "packages/core/src/mcp/index.ts"
+      ],
+      "mechanism": {
+        "file": "packages/util/src/codepuppy-plugin-mcp.ts",
+        "ladder": "L0 in the existing main egress proxy; L3 at the already-owned MCP connection and OAuth-provider FetchHttpClient.Fetch composition points (DESIGN-local-plugin-install v3 §10 S-09). mcp.transform cannot supply a private fetch. L1/L2 would wrap the same private scope; no additional transport or OAuth authority is created."
+      },
+      "tests": [
+        {
+          "file": "packages/core/test/codepuppy-mcp-runtime.test.ts",
+          "name": "plugin local MCP uses its private proxy for HTTP sessions and keeps proxy auth off the server"
+        },
+        {
+          "file": "packages/ui-mac/src/main/network-egress-proxy.test.ts",
+          "name": "plugin loopback HTTP requires its endpoint capability and revocation closes the stream"
+        },
+        {
+          "file": "packages/ui-mac/src/main/network-egress-proxy.test.ts",
+          "name": "plugin CONNECT capabilities never authorize a different target or ordinary CONNECT"
+        },
+        {
+          "file": "packages/ui-mac/src/main/plugin-mcp-proxy.test.ts",
+          "name": "package MCP capabilities retain a definition and revoke on replacement, off and sidecar exit"
+        }
+      ],
+      "note": "The existing connection input fetch is scoped before McpClient.connect. index.ts connectProvider and explicit authorization already override that service with the layer-captured fetch, so their exact composition points also consume the same private wrapper. oauth.ts, the public server schema, global fetch, NO_PROXY, seatbelt and the gate are unchanged."
     }
   ]
 }

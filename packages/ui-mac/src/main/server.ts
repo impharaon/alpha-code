@@ -1,5 +1,7 @@
 import type { CodePuppySidecarHost } from "./hub-view"
 import { engineClient } from "./engine-client"
+import { configurePluginMcpProxy, attachPluginMcpProxyPublisher, pluginMcpProxySnapshot } from "./plugin-mcp-proxy"
+import type { PluginMcpProxies } from "@opencode/util/codepuppy-plugin-mcp"
 import { publishPluginDataHome, publishPluginEnvironment } from "./plugin-package-data"
 import { clearOfficialConnectorRuntime, clearOfficialConnectorRuntimeOnExit, officialAvailabilityPublished, restoreCommittedOfficialConnectors } from "./official-connector-resources"
 import { createHash } from "node:crypto"
@@ -193,6 +195,7 @@ function ensureEgressPolicyProxy(): Promise<EgressProxyHandle> {
     // Conversation approval is registered by the main composition root before the sidecar starts.
     egressProxySingleton = startEgressPolicyProxy({ log }).then(
       (handle) => {
+        configurePluginMcpProxy(handle)
         getLogger()?.log(`network egress policy proxy listening on ${handle.host}:${handle.port} — the only way out of the engine tree (REQ-137); destinations = network-egress-registry.ts`)
         return handle
       },
@@ -567,6 +570,9 @@ export async function spawnLocalServer(
       throw new Error(`network egress policy proxy failed to start — sidecar fork refused: ${serializeError(error).message}`)
     }
     Object.assign(sidecarEnv, sidecarEgressProxyEnv(egressProxyPort))
+  } else {
+    // The instance-private MCP proxy is also used where the process-wide fence/proxy is absent.
+    await (options.egressProxy ?? ensureEgressPolicyProxy)()
   }
   // `#1667`(基线 S2 / S7):会话库与全局配置目录由 main 算(与 db-safety / mcp-default-deny 同一推导),显式进 `start()` 的选项。
   // 数据目录里的独立 OpenCode `auth.json` 会在 OpenCode 2 第一次跑导入迁移时进凭证表 ⇒ 拒 fork(fail-closed,原因可读)。
@@ -793,7 +799,23 @@ export async function spawnLocalServer(
     getLogger()?.warn(line)
   }
   const pushThisGeneration = () => child.postMessage({ type: "credentials", credentials: credentialTable(options.userDataPath, credentialLog) } satisfies CredentialsMessage)
+  let proxyRevision = 0
+  const pendingProxies = new Map<number, { resolve(): void; reject(error: Error): void }>()
+  const detachProxies = attachPluginMcpProxyPublisher((bindings: PluginMcpProxies) => new Promise<void>((resolve, reject) => {
+    const revision = ++proxyRevision
+    pendingProxies.set(revision, { resolve, reject })
+    try { child.postMessage({ type: "plugin-mcp-proxies", revision, bindings }) }
+    catch { pendingProxies.delete(revision); reject(Error("Plugin MCP proxy publication failed")) }
+  }))
+  child.on("message", (message: unknown) => {
+    if (!message || typeof message !== "object" || !("type" in message) || message.type !== "plugin-mcp-proxies-ready" || !("revision" in message) || typeof message.revision !== "number") return
+    pendingProxies.get(message.revision)?.resolve()
+    pendingProxies.delete(message.revision)
+  })
   child.once("exit", (code) => {
+    detachProxies()
+    for (const pending of pendingProxies.values()) pending.reject(Error("Sidecar exited before plugin MCP proxy publication"))
+    pendingProxies.clear()
     if (pushCredentialTable === pushThisGeneration) pushCredentialTable = undefined
     clearOfficialConnectorRuntimeOnExit(runtimeGeneration)
     stopExplicitConfigWatch()
@@ -877,6 +899,7 @@ export async function spawnLocalServer(
       password,
       bootstrap,
       credentials,
+      pluginMcpProxies: pluginMcpProxySnapshot(),
       // REQ-159:profile 全文 + 模块路径。sidecar 在 import 引擎之前 apply;缺席(darwin)即拒绝启动。
       ...(fence ? { fence: { profile: fence.profile, addonPath: fence.addonPath } } : {}),
     })

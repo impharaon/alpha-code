@@ -1,4 +1,6 @@
-import { basename } from "node:path"
+import { bindPluginMcpProxy, revokePluginMcpProxy } from "./plugin-mcp-proxy"
+import { canonicalJson, sha256Hex } from "./ext-manifest-v2"
+import { basename, dirname } from "node:path"
 import { bindPluginMcp } from "../shared/plugin-mcp-config"
 import { readInstalledPluginSettings } from "../shared/installed-plugin-settings"
 import { installedPluginDescription } from "./plugin-package-config"
@@ -81,6 +83,7 @@ async function converge(name: string, deps: ManagedMcpConvergenceDeps): Promise<
   if (!state.ok) return [{ directory, name, status: "unavailable", detail: "Package state could not be read" }]
   const record = state.records.find((entry) => entry.kind === "mcp" && entry.name === name && entry.scope.kind === "global")
   const graph = state.packageGraphs.find((entry) => [entry.root, ...entry.children].some((node) => node.kind === "mcp" && node.name === name))
+  if (!record || record.desiredState === "disabled") revokePluginMcpProxy(name)
   const official = record && isOfficialConnector(name) ? name : undefined
   // Official recipe: materialize before applying an enabled intent, and clear after disconnecting a disabled one.
   const materialized = official && record?.desiredState === "enabled" ? settleOfficialConnectorCredential(official, "enabled") : true
@@ -137,6 +140,11 @@ async function applyAt(
         resolveSecret: id => refs.find(file => basename(file) === id) ? "{file:" + refs.find(file => basename(file) === id)! + "}" : undefined,
       }) : leaf.value
       const resolved = JSON.stringify(bound).includes("{file:") ? resolveConnectorLeaf({ server: name, leaf: bound, ...credentials() }) : bound
+      if (installed && settings && entry?.kind === "mcp" && bound.type === "remote" && typeof bound.url === "string") await bindPluginMcpProxy(name, {
+        packageId: graph!.packageId, entryId: entry.id, generation: basename(dirname(installed.pluginRoot)),
+        definitionDigest: ("sha256:" + sha256Hex(canonicalJson([entry, settings.values, settings.versions]))) as `sha256:${string}`,
+        serverUrl: resolved && typeof resolved === "object" && "url" in resolved && typeof resolved.url === "string" ? resolved.url : bound.url,
+      })
       const config = projectServerConfig(resolved)
       if (!config) return { directory: target, name, status: "failed", detail: "Installed connector definition is invalid" }
       const startup = launchedByPackageRunner(config) && !config.timeout ? { timeout: { startup: RUNNER_FIRST_FETCH_STARTUP_MS } } : {}

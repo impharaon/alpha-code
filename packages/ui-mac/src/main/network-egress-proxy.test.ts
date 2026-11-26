@@ -655,3 +655,53 @@ test("真实 CONNECT 经 main 对话决定后收到靶站字节，拨号前授�
   const revoked = await startProxy({ authorize: () => false, requestGrant: async () => "granted", dial: () => { throw new Error("revoked destination must not dial") } })
   expect((await rawRequest(revoked.proxy.port, "CONNECT a.example.com:443 HTTP/1.1\r\nHost: a.example.com:443\r\n\r\n")).body).toContain("conversation approval is unavailable")
 })
+
+// Use real HTTP streams; protocol framing is covered by the MCP runtime's SDK transport case.
+test("plugin loopback HTTP requires its endpoint capability and revocation closes the stream", async () => {
+  const { publishPluginMcpProxies, pluginMcpFetch } = await import("@opencode/util/codepuppy-plugin-mcp")
+  const received: Array<{ method: string; authorization: string | null }> = []
+  let cancelled!: () => void
+  const cancellation = new Promise<void>(resolve => { cancelled = resolve })
+  const target = Bun.serve({ port: 0, hostname: "127.0.0.1", fetch: request => {
+    received.push({ method: request.method, authorization: request.headers.get("proxy-authorization") })
+    if (request.method === "GET") return new Response(new ReadableStream({ start(controller) { controller.enqueue(new TextEncoder().encode("data: connected\n\n")) }, cancel() { cancelled() } }), { headers: { "Content-Type": "text/event-stream" } })
+    return new Response("accepted")
+  } })
+  cleanups.push(async () => { publishPluginMcpProxies({}); await target.stop(true) })
+  const { proxy, logs } = await startProxy()
+  const url = "http://localhost:" + target.port + "/mcp"
+  const binding = proxy.bindPluginMcp({ packageId: "claude:rill", entryId: "mcp:rill-developer", generation: "gen-000001-abcdef", definitionDigest: "sha256:" + "a".repeat(64), serverUrl: url })
+  publishPluginMcpProxies({ rill: [binding] })
+  const send = pluginMcpFetch("rill", url, fetch)
+  expect((await fetch(url, { proxy: { url: binding.proxyUrl, respectNoProxy: false }, method: "POST" })).status).toBe(405)
+  expect(received).toEqual([])
+  const wrong = await fetch(url.replace("/mcp", "/other"), { proxy: { url: binding.proxyUrl, headers: { "Proxy-Authorization": binding.proxyAuthorization }, respectNoProxy: false }, method: "POST" })
+  expect(wrong.status).toBe(405)
+  expect(received).toEqual([])
+  expect(await (await send(url, { method: "POST", body: "request" })).text()).toBe("accepted")
+  const response = await send(url + "?codemode=false")
+  const reader = response.body!.getReader()
+  expect(new TextDecoder().decode((await reader.read()).value)).toBe("data: connected\n\n")
+  expect(received).toEqual([{ method: "POST", authorization: null }, { method: "GET", authorization: null }])
+  proxy.revokePluginMcp(binding)
+  await expect(reader.read()).rejects.toThrow()
+  await cancellation
+  publishPluginMcpProxies({})
+  await expect(send(url)).rejects.toThrow("revoked")
+  expect(JSON.stringify(logs)).not.toContain(binding.proxyAuthorization)
+})
+
+test("plugin CONNECT capabilities never authorize a different target or ordinary CONNECT", async () => {
+  const target = await startTarget()
+  cleanups.push(target.close)
+  const { proxy } = await startProxy()
+  const authority = "127.0.0.1:" + target.port
+  const binding = proxy.bindPluginMcp({ packageId: "claude:rill", entryId: "mcp:rill-developer", generation: "gen-000001-abcdef", definitionDigest: "sha256:" + "b".repeat(64), serverUrl: "https://" + authority + "/mcp" })
+  expect((await rawRequest(proxy.port, `CONNECT ${authority} HTTP/1.1\r\nHost: ${authority}\r\n\r\n`)).status).toBe(403)
+  expect((await rawRequest(proxy.port, `CONNECT 127.0.0.1:1 HTTP/1.1\r\nHost: 127.0.0.1:1\r\nProxy-Authorization: ${binding.proxyAuthorization}\r\n\r\n`)).status).toBe(403)
+  expect(target.connections).toBe(0)
+  expect((await rawRequest(proxy.port, `CONNECT ${authority} HTTP/1.1\r\nHost: ${authority}\r\nProxy-Authorization: ${binding.proxyAuthorization}\r\n\r\n`)).status).toBe(200)
+  expect(target.connections).toBe(1)
+  proxy.revokePluginMcp(binding)
+  expect((await rawRequest(proxy.port, `CONNECT ${authority} HTTP/1.1\r\nHost: ${authority}\r\nProxy-Authorization: ${binding.proxyAuthorization}\r\n\r\n`)).status).toBe(403)
+})

@@ -1,3 +1,5 @@
+import { randomBytes } from "node:crypto"
+import { pluginMcpLoopback, pluginMcpEndpoint, type McpProxyBinding } from "@opencode/util/codepuppy-plugin-mcp"
 // REQ-137 (`#1336`) —— 本地 loopback CONNECT 策略代理:目的地闸门的**咽喉点**。
 //
 // 强制层(seatbelt `(deny network*)` + 只放行本代理端口,`#1337`)把 sidecar 那棵树的全部出网逼到这里;
@@ -136,6 +138,8 @@ export type EgressProxyHandle = {
   port: number
   /** 关掉监听并切断在途隧道;resolve 时端口已释放。 */
   close: () => Promise<void>
+  bindPluginMcp(input: Omit<McpProxyBinding, "proxyUrl" | "proxyAuthorization">): McpProxyBinding
+  revokePluginMcp(binding: McpProxyBinding): void
 }
 
 const REGISTRY_PATH = "packages/ui-mac/src/main/network-egress-registry.ts"
@@ -170,6 +174,10 @@ export function parseConnectAuthority(authority: string | undefined): { host: st
   if (port < 1 || port > 65535) return undefined
   return { host: hostPart, port }
 }
+
+const loopbackLookup: net.LookupFunction = (_hostname, options, callback) => options.all
+  ? callback(null, [{ address: "::1", family: 6 }, { address: "127.0.0.1", family: 4 }])
+  : callback(null, options.family === 6 ? "::1" : "127.0.0.1", options.family === 6 ? 6 : 4)
 
 function defaultDial(host: string, port: number): net.Socket {
   // autoSelectFamily(Happy Eyeballs):`localhost` 在 macOS 上先解到 ::1;靶站只听 v4 时不能停在第一个地址。
@@ -233,6 +241,12 @@ export async function startEgressPolicyProxy(deps: EgressProxyDeps): Promise<Egr
   const tlsSilentMs = deps.tlsSilentMs ?? 15_000
   const log = deps.log
   let seq = 0
+  const bindings = new Map<string, { binding: McpProxyBinding; streams: Set<{ destroy(): void }> }>()
+  const bound = (authorization: string | string[] | undefined) => typeof authorization === "string" ? bindings.get(authorization) : undefined
+  const bindStream = (capability: NonNullable<ReturnType<typeof bound>>, stream: { destroy(): void; once(event: "close", callback: () => void): unknown }) => {
+    capability.streams.add(stream)
+    stream.once("close", () => capability.streams.delete(stream))
+  }
   const live = new Set<net.Socket>()
   const track = (s: net.Socket) => {
     live.add(s)
@@ -240,6 +254,29 @@ export async function startEgressPolicyProxy(deps: EgressProxyDeps): Promise<Egr
   }
 
   const server = http.createServer((req, res) => {
+    const capability = bound(req.headers["proxy-authorization"])
+    const url = URL.canParse(req.url ?? "") ? new URL(req.url!) : undefined
+    if (capability && url?.protocol === "http:" && pluginMcpEndpoint(capability.binding, url)) {
+      const headers: http.OutgoingHttpHeaders = { ...req.headers, host: url.host }
+      delete headers["proxy-authorization"]
+      delete headers["proxy-connection"]
+      // localhost resolves to loopback here; neither DNS nor a redirected peer may broaden the capability.
+      const host = url.hostname === "[::1]" ? "::1" : url.hostname
+      const upstream = http.request({ hostname: host, port: url.port || 80, path: url.pathname + url.search, method: req.method, headers, agent: false,
+        ...(host === "localhost" ? { lookup: loopbackLookup, autoSelectFamily: true } : {}),
+      }, response => {
+        res.writeHead(response.statusCode ?? 502, response.headers)
+        response.pipe(res)
+        res.once("close", () => response.destroy())
+      })
+      bindStream(capability, upstream)
+      bindStream(capability, res)
+      upstream.on("error", () => { if (!res.headersSent) res.writeHead(502); res.end("Plugin MCP service-unavailable") })
+      req.once("aborted", () => upstream.destroy())
+      res.once("close", () => upstream.destroy())
+      req.pipe(upstream)
+      return
+    }
     // 明文 HTTP 的绝对 URI 形式(`GET http://host/ …`)—— 本代理不做明文转发,fail-closed。
     log({ event: "egress.connect", id: ++seq, at: new Date().toISOString(), method: req.method ?? "", authority: req.url ?? "", verdict: "deny", reason: "method-not-connect", status: 405 })
     const body = denialBody("method-not-connect", `${req.method ?? ""} ${req.url ?? ""}`)
@@ -262,6 +299,10 @@ export async function startEgressPolicyProxy(deps: EgressProxyDeps): Promise<Egr
 
     const parsed = parseConnectAuthority(authority)
     if (!parsed) return deny(400, "bad-authority")
+    const capability = bound(req.headers["proxy-authorization"])
+    const endpoint = capability && new URL(capability.binding.serverUrl)
+    if (capability && endpoint?.protocol === "https:" && parsed.host === endpoint.hostname.replace(/^\[|\]$/g, "") && parsed.port === Number(endpoint.port || 443)) return openTunnel(parsed, capability)
+    if (req.headers["proxy-authorization"] !== undefined) return deny(403, "unregistered", parsed)
     if (authorize(parsed.host, parsed.port)) return openTunnel(parsed)
 
     // `#1412` —— 未登记 ⇒ 在拒绝之前走唯一的出口:问用户。答复到达之前**一次 DNS 都不发、
@@ -291,9 +332,10 @@ export async function startEgressPolicyProxy(deps: EgressProxyDeps): Promise<Egr
     )
     return
 
-    function openTunnel(parsed: { host: string; port: number }): void {
-      const upstream = dial(parsed.host, parsed.port)
+    function openTunnel(parsed: { host: string; port: number }, capability?: NonNullable<ReturnType<typeof bound>>): void {
+      const upstream = capability && parsed.host === "localhost" ? net.connect({ host: "localhost", port: parsed.port, autoSelectFamily: true, lookup: loopbackLookup }) : dial(parsed.host, parsed.port)
       track(upstream)
+      if (capability) { bindStream(capability, upstream); bindStream(capability, clientSocket) }
       let settled = false
       const timer = setTimeout(() => {
         if (!settled) upstream.destroy(Object.assign(new Error("dial timeout"), { code: "ETIMEDOUT" }))
@@ -398,8 +440,21 @@ export async function startEgressPolicyProxy(deps: EgressProxyDeps): Promise<Egr
   return {
     host: "127.0.0.1",
     port: address.port,
+    bindPluginMcp: input => {
+      if (!pluginMcpLoopback(new URL(input.serverUrl))) throw Error("Plugin MCP binding requires its declared loopback endpoint")
+      const binding = { ...input, proxyUrl: "http://127.0.0.1:" + address.port, proxyAuthorization: "Bearer " + randomBytes(32).toString("hex") }
+      bindings.set(binding.proxyAuthorization, { binding, streams: new Set() })
+      return binding
+    },
+    revokePluginMcp: binding => {
+      const capability = bindings.get(binding.proxyAuthorization)
+      bindings.delete(binding.proxyAuthorization)
+      for (const stream of capability?.streams ?? []) stream.destroy()
+    },
     close: () =>
       new Promise<void>((resolve) => {
+        for (const capability of bindings.values()) for (const stream of capability.streams) stream.destroy()
+        bindings.clear()
         for (const s of live) s.destroy()
         live.clear()
         server.close(() => resolve())

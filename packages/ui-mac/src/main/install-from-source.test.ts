@@ -42,7 +42,7 @@ async function sourceHarness(temporary: string) {
   const activation: string[] = []
   const reloads: string[] = []
   const install = createSourceInstaller({ sources, globalRoot: () => root, casBaseRoot: () => temporary, environment: () => "dev", userDataPath: temporary,
-    gate: makeRecoveryGate(() => ({})), advisoryGate: () => ({ allowed: true }), resolvePackage: async () => { throw Error("non-catalog must use graph declarations") },
+    dataHome: () => join(temporary, "data"), gate: makeRecoveryGate(() => ({})), advisoryGate: () => ({ allowed: true }), resolvePackage: async () => { throw Error("non-catalog must use graph declarations") },
     catalogInstall: async () => ({ ok: false, code: "unknown-id", detail: "no catalog entries in this controlled search" }),
     activateMcp: async (id) => { activation.push(id) }, reloadSkills: (id) => { reloads.push(id) }, removeDeparting: () => {},
   })
@@ -733,3 +733,33 @@ test("standard plugin content installs before configuration programs or local se
     expect(result.ok && result.installed.length).toBe(converted.package.entries.filter(entry => entry.kind === "skill" || entry.kind === "mcp").length)
   })
 })
+
+
+test("plugin service settings save typed values and keep sensitive values out of public state", () => installerHarness(async h => {
+  const { readPackageAuthorizationV1, savePackageSecretsV1 } = await import("./package-admission")
+  const deps = { root: () => h.root, userDataPath: h.temporary, casBaseRoot: () => h.temporary, environment: () => "dev" as const, loadVerifiedCatalog: async () => { throw Error("Direct package never loads catalog") } }
+  for (const name of ["claude:grafana-mcp", "claude:langfuse-observability"]) {
+    const capture = await captureStandardFixture(name)
+    const converted = await convertPluginTree(capture)
+    h.sources.convertCandidate = async () => ({ ok: true, ...converted, capture, runtimeIdentity: undefined })
+    const installed = await h.install(h.request(name, "settings_" + name.replace(/[^a-zA-Z0-9_]/g, "_")))
+    if (!installed.ok) throw Error(installed.detail)
+    const before = await readPackageAuthorizationV1(installed.packageId, deps)
+    expect(before.ok && before.items.some(item => item.kind === "option")).toBe(true)
+    const options = name.includes("grafana") ? { grafana_url: "http://localhost:3000", grafana_service_account_token: "fixture-secret-do-not-publish" } : { LANGFUSE_SECRET_KEY: "fixture-secret-do-not-publish", CC_LANGFUSE_DEBUG: false, CC_LANGFUSE_MAX_CHARS: 0, LANGFUSE_USER_ID: "" }
+    expect(await savePackageSecretsV1({ packageId: installed.packageId, options }, deps)).toMatchObject({ ok: true })
+    const after = await readPackageAuthorizationV1(installed.packageId, deps)
+    expect(JSON.stringify(after)).not.toContain("fixture-secret-do-not-publish")
+    expect(after.ok && after.items.filter(item => item.kind === "option" && item.sensitive).every(item => item.configured && !("value" in item))).toBe(true)
+    if (name.includes("langfuse")) {
+      expect(after).toMatchObject({ items: expect.arrayContaining([
+        expect.objectContaining({ kind: "option", key: "CC_LANGFUSE_DEBUG", value: false }),
+        expect.objectContaining({ kind: "option", key: "CC_LANGFUSE_MAX_CHARS", value: 0 }),
+        expect.objectContaining({ kind: "option", key: "LANGFUSE_USER_ID", value: "" }),
+        expect.objectContaining({ kind: "option", key: "LANGFUSE_BASE_URL", value: "https://cloud.langfuse.com" }),
+      ]) })
+      expect(await savePackageSecretsV1({ packageId: installed.packageId, options: { CC_LANGFUSE_DEBUG: "false" } }, deps)).toMatchObject({ ok: false })
+    }
+    expect(readFileSync(join(h.root, "installs.json"), "utf8")).not.toContain("fixture-secret-do-not-publish")
+  }
+}))

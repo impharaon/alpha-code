@@ -214,3 +214,81 @@ r6 ship 前置（2026-11-16，按 Claude Opus 5.5 对照干净 origin/alpha 的 
 - `bash scripts/assert-gate-files.sh` exit 0，352 个文件全部在位、通过且精确计数一致；新生命周期宿主 1、admission 22、presentation 6、mcp-auth 5。日志 `/tmp/hub-r6-gate-files.log`。同轮此步骤的 network-egress-proxy / net-failure-real-stack / schema codepuppy-net-failure 分别 23/5/20 pass，均 exit 0；这是后续逐文件实测，不冒充前述 ui-mac 整包 exit 0，也不重跑已授权一次的整包。
 
 M1–M3 本次整包的具名记录（去向：编排器的机器条件处置，本片不改 DNS 或共享主 checkout）：`其它失败形态各自可辨,且都不转发 > 登记了但解析不了(.invalid)⇒ 503 dial-failed ENOTFOUND:DNS 在代理进程里发生,失败也在这里可读`；`六个 webfetch 都经出网代理失败,并作为工具记录落库`；`持久化记录的 metadata.codepuppyNetFailure:policy / dns / tcp / tcp / tls-silent`。后两条父组为 `#1572 AC4 真栈:Electron 内嵌 node + 真出网代理 + 真 webfetch ⇒ 持久化的工具记录带层`。M4 本轮逐文件检查已绿。r6 偏离仅为授权的测试/登记同步与本段证据，无生产改动、依赖、接口、迁移或额外放宽；class B 全部闭合。已核 Codex / GPT-6。
+
+## 片 2 · #1762：市场插件整树安装与技能路径
+
+- 依据：#1762；local-plugin-install 规格 v4 @ `9f5ee3c`（内容批准于 v2/v3），AC-09、AC-02 的技能与资源部分；同名设计 v2 @ `9f5ee3c` §4.1、§4.2、§4.3 的技能语义、§8 第 2 片的桌面部分。并消费 plugin-helper-and-hub 设计 v9 @ `8721a7667f817503dc4ad6eaa4f942c881b398e6` §4.1、§4.3、§4.4 对当前入口、转换产物放置、宿主命名与范围的修订。权威链接沿用本文片 1 及[来源扩展计划](../plugin-helper-and-hub/plan.md)中的协调仓链接；不重述设计决定。
+- 核对：待编排器核对本片计划；首个实施提交逐字填入续派 `Phase:` 的计划提交、核对者/模型与结论。
+- 本片只接市场 Claude/Codex 包的整树内容与技能运行路径。命令、助手、hooks 的文件随树保存，运行与相应诊断沿切片 3/5；不认领 AC-02 全项。renderer、folder/Git 取源入口、原生文件引用、市场列表、其他仓库和 gate 不在改动面。不处理已安装记录迁移；需要验证新装时用干净临时根。
+- 基线：`HEAD = origin/alpha = 9f08c506d9842d319616c7e45c33d3b9c3279e48`，Bun 1.4.4。计划阶段起于 2026-11-26 10:59（UTC+08:00）；预计 45 分钟。实施预计 L，约 24–30 个手写生产/合同文件（按需项不一定同时改）及对应既有测试、压缩夹具，约 1,000–1,600 行手写改动，生成物另计；预计 4–6 小时。每完成下方一组 AC 证据核对规模与用时，达到预估上界两倍即返回具体原因。
+
+### 当前代码核对
+
+| 位置 | 本片依赖的事实与落点 |
+| --- | --- |
+| `packages/ui-mac/src/shared/host-extension-package-contract/plugin-conversion.ts:21–26,93–103` | 已有 `TreeNode`、`Capture`、`Text` 与 `convertPluginTree`，含目录 mode、文件 mode/digest、symlink target 和两种路径绑定；v9 G-04 是历史基线，不能据其零命中结论重写转换库。 |
+| `packages/ui-mac/src/main/plugin-sources.ts:654`（`readArchive`）、`:386`（`captureFolder`） | 现有取源保有 mode、目录和 symlink。市场取源已在；本片复用捕获结果，不另建 reader，也不扩取源入口。 |
+| `packages/ui-mac/src/main/install-from-source.ts:161–171,212–246,325–339,500–525` | 先按 `needsPluginFiles` 丢 entry，再逐技能只提升目录内普通文件；包图 root 是第一个组件。临时目录实际调用 `createSourceInstaller`：固定 remotion 共发现 12 技能，仅装 8，另 4 项为 `needs-plugin-files`；plugin-dev 7 技能仅装 3；claude-security 1 技能导致 `nothing-runnable`。不采用派工描述中的“8 个”作为固定总数，验收该提交的全部 12 个。 |
+| `packages/ui-mac/src/main/ext-cas.ts:267`、`ext-transaction.ts:78,100,715–733,772–811`、`ext-health-probe-router.ts:73` | 文件清单没有 mode/链接节点，物化只写文件；事务 verify 拒所有 symlink，generation probe 一律按独立技能探测。整树须接入这些既有事务点，单改拒收条件不能通过安装。派工列的 `claude-plugin-install.ts` 在本基线已不存在，其现行责任在 `install-from-source.ts`。 |
+| `packages/ui-mac/src/main/ext-package-ledger-v3.ts:72,291,304`、`ext-package-lifecycle.ts:35,55` | 账本已有 `bundle` kind，但尚无 `pluginTree`；profile→kind 的唯一表尚不含聚合 profile，必须同步其类型、解码、摘要和 builder 分派。 |
+| `packages/ext/src/gen-skill-paths.ts:15,68`、`package-scope.ts:53`、`plugin.ts:143,493` | 技能发现与受管身份仅识别独立 `skill--…` generation；只把路径换到 bundle 会漏发现并绕过既有范围判定。已有 `skill.transform` 和 `SkillEditor.update`，可消费树内真实路径并渲染调用内容，无需改引擎 API 或换引擎代际。 |
+
+上述是已批准整树能力的未实现点，没有发现冻结合同与当前调用面的事实矛盾。K1/K2（[架构约束](../../architecture/constraints.md)）要求继续复用唯一转换库、账本写器、健康探针路由和允许集判定；运行层不得重新发现 provider 清单或镜像账本 decoder。
+
+### 改动
+
+以下路径省略 `packages/ui-mac/` 前缀；明确写 `packages/ext/` 的行是必要的同调用链文件，理由是上表的技能发现、范围与调用绑定仍由它持有。
+
+| 文件 | 改什么 |
+| --- | --- |
+| `src/shared/host-extension-package-contract/plugin-conversion.ts` 及生成的 `.mjs` / `.d.mts` | 复用规范化树与绑定，补足本片实际发现的技能/资料解析；普通资源不按脚本、目录或引用类型过滤。保留既有宿主名称转换，只在安装副本处理名称，绝对运行路径不写进公开转换结果；需要的新纯 helper 按插件/技能概念命名。 |
+| 同目录 `registry.ts`、`host-extension-package.registry.v1.json`、`decoder.ts`、新 `profiles/plugin-package.v1.schema.json` | 实现设计 §4.2 已定聚合 profile 的接受边界；复用 `PluginPackage` 与 `PackagePayloadRefV1`，校验节点、树摘要、entry 与非空文件 blob 的对应，允许空文件/空目录。禁止另写一套 provider 格式。 |
+| 同目录 `CONTRACT.md`、`generate-artifact.ts`、`testvectors/decoder-corpus.v1.json`、`host-extension-package-artifact.v1.json` 及必要的 envelope schema 枚举 | 同步新增 profile 的合同说明、真实样本派生语料、文件列表和摘要。转换器继续由自己的 generator 产出；不把它顺带发布给尚未接入的消费方。 |
+| `src/main/ext-cas.ts`、`ext-transaction.ts`、`ext-health-probe-router.ts`；必要时 `ext-atomic-fs.ts` | 在现有 generation/journal 路径支持声明的完整树：内容寻址文件、目录、mode、链接；校验用 lstat/readlink，不跟链接写入或遍历，按已定链接语义重定位包内绝对目标。恢复使用同一树校验与 probe；不为整树复用技能 Markdown 资产上限或另加数量帽。 |
+| 新 `src/main/plugin-package-install.ts`、`ext-package-tx-builders.ts`、`install-from-source.ts` | 新模块只负责把已转换的一个插件树和宿主映射构造成既有包事务，供来源入口及 profile 安装复用。一次准备 bundle 树和组件记录；技能引用树内目录，不再各复制一份。替换本片技能的 `needs-plugin-files` 分支，继续给真实无效定义和未接运行的种类原有结构化结果；安装不执行包内代码。 |
+| `src/main/ext-package-ledger-v3.ts`、`ext-package-ledger-commit.ts`、`ext-package-lifecycle.ts`、`ext-receipt-v2.ts`、`ext-package-uninstall.ts`；`src/shared/plugin-install.ts`、`package-admission.ts` 的必要内部类型联动 | 接入已定 `pluginTree` 关联、bundle root、完整图摘要与 claims，root 状态驱动组件和原有允许集；树资源及规范化描述随同一 generation 提交/移除。装后返回仍只列可运行 skill/MCP，不把 bundle 当用户入口；不改 renderer DTO 形状，不另存包状态或新账本。 |
+| `src/main/package-installability.ts`、`package-admission.ts` 及 `ext-package-lifecycle.ts` 的 profile 路由 | 新 profile 解码后的资源提升、admission 绑定和 builder 分派进入同一整树实现；绑定覆盖树、语义与 entry，不能只覆盖外层 root。仅补宿主内容安装接线，不做发布、签名或商店条目。 |
+| `packages/ext/src/gen-skill-paths.ts`、`package-scope.ts`、`plugin.ts`；新 `packages/ext/src/plugin-package-skills.ts`（及所需纯共享绑定 helper） | 从已安装资源描述与 live 指针取得明确 skill entry 的真实目录；规范化描述和宿主映射跟同一树资源走，不在 ext 重读 manifest。包树路径进入现有受管技能正向判定；`skill.transform` 按每个包/技能渲染 instruction 的绑定，真实 `Skill.Info.path` 保持在对应树内。两包不得共享可变 ROOT/SKILL_DIR 环境；项目路径仍取当前 Location。新模块只收拢这段必要读取/绑定，不持第二份状态。 |
+| `test-fixtures/plugin-helper/` 的归档、provenance、`fixture.ts`、`source-fetch.ts`；各受影响模块既有 `.test.ts` | 补下表固定提交的真实文件，归档保存原始层级、mode 和摘要，外来 Markdown 仍只在临时目录解压；补最小相关常驻回归，完整样本验收另记一次性命令/结果。`captureFixture` 目前把所有文件 mode 固定为 0644，改为消费归档元数据，不用它证明执行位。 |
+
+**宿主 artifact 影响**：`plugin-package@1` 会改变本仓宿主 registry/decoder/schema/corpus 与 aggregate 摘要；后续消费仓必须单独升级 host pin 并验证其编译/发布路径，本片不改消费仓、不重签已发布内容。v9 §4.3 暂不把转换库加入发布 artifact 的安排继续适用；新增 profile 必需的类型依赖须在本仓 artifact 内自足，不能把 Electron、源码别名或协调仓路径带入产物。现有发布检查若要求合同版本递增，同步该版本与生成物，不修改检查。
+
+### 顺序
+
+1. **真实样本与红测**：按下表收录归档和 provenance；在 `plugin-conversion.test.ts`、`install-from-source.test.ts`、`ext-cas.test.ts` 的既有文件增加最小回归。先逐例运行并保存当前失败；回归测试独立提交，随后修复提交不改其正确断言。编码旧“拒绝带包内文件技能”的旧断言在替换行为时一并调整，不并存冲突语义。
+2. **整树合同与事务**：实现 profile/decoder、完整树物化与 journal/verify/probe，补 `package-envelope-v1.test.ts`、`host-extension-package-artifact.test.ts`、`ext-transaction.test.ts` 的对应案例。先跑新增 case，完成后各行为文件完整跑一次；检查链接节点未被当 blob 读取、mode 在文件完成后恢复、错误不触碰 live 树。
+3. **包安装与持久关联**：接入共用整树 builder、bundle root、图摘要/claims、admission、内容返回及既有开关/移除。跑本步改动的 `install-from-source.test.ts`、`ext-package-ledger-v3.test.ts`、`package-admission.test.ts`、`package-installability.test.ts`、`ext-package-ledger-uninstall.test.ts` 对应案例及文件；不扩展命令/助手/hooks 运行。
+4. **技能路径与调用绑定**：接通 ext 的发现、受管身份、`skill.transform`，覆盖两包隔离、同名宿主映射、全部项目/仅当前项目和包关闭。按模块在 `gen-skill-paths.test.ts`、`package-scope.test.ts`、`plugin-host.test.ts` 与新模块对应测试中验证；从实际注册的路径/content 读取资料，不仅检查 outcome 的 enabled 字样。实施第一笔填本片“核对”，每笔偏离同时更新本片。
+5. **一次性真实验收与收尾检查**：用完整固定样本从现有市场候选→安装入口完成下表验收，命令和输出交编排器，不把整个样本回放永久放进 PR 常驻测试。按实际改动导出查一次直接消费者（`rg -l 'createSourceInstaller|buildSkillTxItems|PackageProfilePayloadV1|packageChildKindV1|skillGenerationLiveDirs|managedSkillIdentity' src ../ext/src -g '*.test.ts'`，在 `packages/ui-mac`，按模块依赖确认并去重），返回前只跑一次较宽相关集，含 `package-child-kind.fast.test.ts`、`package-update.test.ts`、`package-admission.parity.test.ts`、`engine-explicit-config.test.ts` 和受改动影响的事务/GC 消费测试。各改动包执行 `bun typecheck`，两个 generator 执行 `--check`；运行 `bun test src/main/old-name-scan.test.ts`、文档合同检查及 `git diff --check`。不运行全包、全仓、gate 或 `bin/check`，不启动 App/Electron，不推送。
+
+### 风险
+
+- 完整树的隐蔽回归点是 staging/recovery 假定“全部常规文件”、typed probe 假定“generation 就是一个技能”，以及 CAS GC 对 journal 文件摘要的读取。以最小含空文件、目录、真实脚本和包内链接的样本测物化/校验/提交，恢复与正常提交消费同一声明；若 journal 表示联动，带上既有 `ext-cas-gc.test.ts` 的对应验证，不另开存储路径。
+- 资源保留不能等于全部入口已运行：plugin-dev 的 command/agent 文件应读到，但 `notRunning` 仍如实标记切片 3/5 未接的入口。规范化树先经现有秘密 replacements 再入 CAS，不能因“原样复制”留回原始秘密文件；沿既有密钥测试验证这条链，不扩大本片凭据产品范围。
+- 指到 bundle 后若没联动 ext 的受管身份，关闭/项目范围就会失效；因此路径注册与现有允许集判定同一步落地，不以临时放开受管识别作为过渡。只复用现有 `skill.transform`，不切换任何 `session.*`/`v2.session.*` 生产路径。
+- 不用空脚本或自造插件证明可用。Superpowers 的跨技能脚本采用其真实计划作输入，在临时 Git 项目运行；构建与 `.git` 资料分别来自真实构建命令与 Git 产生的目录，不手写伪格式。链接/执行位变更只施加在真实包副本并记录。耗时整包回放只作一次性验收。
+
+### 证明
+
+计划阶段已取到三份 upstream 归档并核对 PAX 提交；实现阶段夹具须保存相同 commit、所选成员逐文件摘要/原 mode、归档摘要与受控改动。下载得到的完整 tar.gz 摘要仅记录此次字节，不能假定 codeload 永久输出相同压缩字节。
+
+| 样本 | 固定来源与已核文件 |
+| --- | --- |
+| S1 | `anthropics/claude-plugins-official` @ `b5b01ac4f889fec0c4c6bb89f27ca7c8574473f6`，`plugins/plugin-dev`（7 skills、1 command、3 agents，87 节点）；`skills/skill-development/SKILL.md:609–614` 的六个兄弟目录，`skills/hook-development/scripts/` 的真实脚本与 references/examples。 |
+| S2 | 同一上游提交的 `plugins/claude-security`（56 节点），`skills/claude-security/SKILL.md:21–25,42–53,69` 同时含 ROOT/SKILL_DIR；其 jobs/specs/role 和根 scripts 是真实目标，不运行安全扫描、hooks 或模型。 |
+| S3 | `obra/superpowers` @ `22f0b463e7a5e579904dd6211a520321035526f7`，完整包含 `skills/executing-plans/scripts/task-start`、`skills/subagent-driven-development/scripts/task-brief`/`sdd-repo`/`sdd-workspace` 及 `docs/plans/2025-11-22-opencode-support-implementation.md`。真实 `task-start` 会调用兄弟技能中的工具，适合作为移走来源后的调用证据。 |
+| S4 | `openai/plugins` @ `981b02c0c44058b595f3b4180002c3ae3c806d40`，`.agents/plugins/marketplace.json` 与完整 `plugins/remotion`（399 节点、12 skills）；`remotion-create`、`remotion-docs`、`remotion-interactivity`、`remotion-markup` 的真实跨技能链接。无需 Node/视频生成，#1760 的运行环境不作为本片前置。 |
+
+| AC | 测试/证据（均从包原始文件派生） | 缺少行为为什么会失败 |
+| --- | --- | --- |
+| AC-09 · 树与元数据 | 常驻 integration：`ext-cas.test.ts` / `ext-transaction.test.ts` 的“plugin tree preserves modes and links”案例，取 S3 的真实脚本与资料组；在副本 chmod 可执行并加指向已存在文件的相对链接和包内绝对链接，比较 lstat.mode/readlink/字节摘要，空文件取 S3 的 `tests/hermes/__init__.py`，空目录取 Git 实际生成的目录；故意换目标或 mode 的反臂必须失败。迭代命令：`bun test src/main/ext-cas.test.ts src/main/ext-transaction.test.ts -t 'plugin tree'`。 | 旧物化丢 mode/空目录/链接，旧 verify 直接拒 symlink；只复制常规文件或把链接解引用均不能满足断言。 |
+| AC-09 · 移走来源与兄弟资料 | 常驻 integration 在 `install-from-source.test.ts` 增加“whole plugin skill paths survive source removal”，只取 S1/S3 的必要真实成员；真实安装后 rename 来源副本，按注册技能路径读 S1 的六个兄弟 `SKILL.md`，并直接执行 S3 `task-start`，输入上表真实计划的 Task 1，检查提取 brief 的真实内容和 Git base。完整 S3 一次性补实际构建输出（在 S3 根运行 `bun build .opencode/plugins/superpowers.js --target=node --outdir dist`）与 Git 在真实副本生成的 `.git`（记录 `git init`/fixture commit 的命令及成员摘要），装后比较保留内容与链接。迭代命令：`bun test src/main/install-from-source.test.ts -t 'whole plugin'`。 | 旧独立 skill generation 下兄弟目录/包根资料缺失；只存来源路径会在 rename 后读取或执行失败；脚本失执行位或跨技能脚本没装会直接失败。 |
+| AC-09 · 绑定且不串包 | `plugin-conversion.test.ts` 检查 S2 的两个 typed binding 原样保留；`packages/ext/src/plugin-host.test.ts` / 新模块测试“installed plugin skill bindings stay package-local”检查真正交给 SkillEditor 的 content/path，以 S2 与另一真实包副本同时注册，所有 ROOT 目标落本包 live 树、SKILL_DIR 目标落该技能目录，jobs/specs/role 可读；当前项目取另一个临时目录，仍保持其身份。涉及同名时仅改真实清单 name 字段并记录。分别从所属包运行 `bun test <该文件> -t 'plugin skill bindings'`。 | 旧逻辑整项拒装；统一 ROOT 或按来源目录绑定会分别命中他包/已移走来源，未展开变量时不能打开目标；仅检查转换 Text 而未接运行注册不能通过。 |
+| AC-02 · 技能/资源与具体结果 | `plugin-conversion.test.ts`、`package-envelope-v1.test.ts` 的最小常驻案例分别钉 S1 的技能发现和 profile→description/blob 解码（含摘要/引用不符反臂）；一次性将 S1 完整市场候选交 `createSourceInstaller`，验证 7 技能均返回 installed、记录和实际 SkillEditor 注册齐全，目录/脚本/references/examples/根资料完整；command/agent 原文件可读且未冒报运行，具体 `notRunning` 仍供现有界面消费。运行各文件对应 `-t`，完整样本另记入口命令、7/7 和文件摘要比较结果。 | 当前结果仅 3/7；仅去掉拒收但继续逐技能复制时，根文件与跨目录引用仍丢失；虚报完整可运行会与 command/agent 的原诊断断言冲突。 |
+| AC-09、AC-02 · remotion 真实回归 | S4 在 `plugin-conversion.test.ts` 保留最小跨技能成员常驻回归；完整包一次性从真实市场清单查询/捕获后走安装入口，核对该固定树全部 12 技能 installed/enabled、SkillEditor 注册路径都在同一树；移走来源后逐个读取真实包内链接目标，无 skill 的 `needs-plugin-files`。同一包关闭/仅当前项目仍用既有成员判定验证。命令沿 `install-from-source.test.ts` / ext 模块的 named case，完整 12/12 输出另交编排器。 | 计划阶段实际入口只有 8/12，四个相互引用技能被拒；只改返回状态或复制每技能局部文件会在实际注册/链接读取处失败。 |
+
+计划阶段已运行：在 `packages/ui-mac` 执行 `bun test src/main/install-from-source.test.ts src/main/ext-cas.test.ts src/shared/host-extension-package-contract/plugin-conversion.test.ts src/main/old-name-scan.test.ts`，exit 0，90 pass / 0 fail。临时 probe 实际调用转换库与 `createSourceInstaller`，exit 0，观察到上表 8/12、3/7 和 `nothing-runnable`；这是旧行为复现，不是实施通过证据。旧名扫描单独复跑 exit 0（10 pass）。当前 worktree 的文档合同检查 exit 1：71 errors / 250 warnings，其中本文件两项为片 1 既有的跨仓 ID 未限定引用（已用 `git show origin/alpha:docs/specs/local-plugin-install/plan.md` 确认），其他为未改文件的索引/链接/布局等现状；本片新增章节未引入这些项。按派工只写本片，不修旁项，交编排器处置。另在临时 Git 项目直接运行 S3 `task-start <上述真实计划> 1`，exit 0，实际产生 `brief:` 与 `base:`；`bun build <S3>/.opencode/plugins/superpowers.js --target=node --outdir <临时产物目录>` exit 0，得到 9.54 KB 的真实构建文件。它们只证明拟用样本/命令可行，尚未证明整包安装。`git diff --check` exit 0。实现与完整样本验收尚未开始。
+
+### 偏离记录
+
+暂无。

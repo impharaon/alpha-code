@@ -7,6 +7,19 @@ import { FetchHttpClient } from "effect/http"
 import { Environment } from "../environment/index.js"
 import { KeyedMutex } from "../effect/keyed-mutex.js"
 import type { McpClient } from "./client.js"
+import { createConnectorLaunchAttempt } from "./codepuppy-connector-diagnostic.js"
+import {
+  isConnectorLaunchFailure,
+  type ConnectorLaunchDiagnostic,
+  type ConnectorLaunchFailure,
+  type ConnectorLaunchHost,
+  type DeclaredFirstParty,
+  type LauncherEnvironment,
+  type LaunchIdentity,
+  type PreparedLaunch,
+  type RuntimeDependencyFacts,
+} from "@opencode/util/codepuppy-connector-launch"
+import { McpStdio } from "./stdio.js"
 import { startPermits, type StartFailure } from "./codepuppy-startup.js" // codepuppy(#1563)
 
 export type Failure = Extract<Mcp.Status, { readonly status: "failed" | "needs_auth" }>
@@ -69,6 +82,19 @@ export interface Input {
   /** Runs recovery that a background request triggered. */
   readonly fork: (effect: Effect.Effect<void>) => unknown
   readonly events: Events
+  /** Trusted Code Puppy context, constructed by the sidecar controller, never MCP config. */
+  readonly localLaunch?: {
+    readonly sidecarGeneration: string
+    readonly runtimeRoot: string
+    readonly secrets: readonly string[]
+    readonly host: ConnectorLaunchHost
+    readonly firstParty?: { launchers: LauncherEnvironment; declaration: DeclaredFirstParty }
+    readonly packagePreparation?: (input: {
+      identity: LaunchIdentity
+      runtimeDep: RuntimeDependencyFacts
+      preparing: Effect.Success<ReturnType<typeof createConnectorLaunchAttempt>>["preparing"]
+    }) => Effect.Effect<PreparedLaunch, ConnectorLaunchFailure, Environment.Service | Scope.Scope>
+  }
 }
 
 export interface Catalog {
@@ -85,6 +111,8 @@ export interface Connection {
   /** Connects and lists tools; a failure is reported through `failed`. */
   readonly start: Effect.Effect<void>
   readonly stop: Effect.Effect<void>
+  /** Only the current attempt can disclose its diagnostic; callers never supply a path. */
+  readonly diagnostic: (identity: LaunchIdentity) => Effect.Effect<ConnectorLaunchDiagnostic | undefined, Error>
   /**
    * Runs a request against `client` and, if that request observed a session expiry, reconnects and
    * runs it once more against the replacement. Any other failure passes through.
@@ -102,6 +130,7 @@ export function make(input: Input): Connection {
     client?: McpClient.Connection
     tools?: ReadonlyArray<McpClient.Tool>
     prompts?: ReadonlyArray<McpClient.Prompt>
+    attempt?: Effect.Success<ReturnType<typeof createConnectorLaunchAttempt>>
   } = {}
 
   // Runs a connection callback under the lock, dropping it if the connection is no longer the live
@@ -153,7 +182,13 @@ export function make(input: Input): Connection {
 
   const watch = (client: McpClient.Connection) => {
     const live = whenLive(client)
-    client.onClose((reason) => live(input.events.closed(reason)))
+    client.onClose((reason) =>
+      live(
+        (state.attempt?.failed({ kind: "unknown", detail: reason }) ?? Effect.void).pipe(
+          Effect.andThen(input.events.closed(reason)),
+        ),
+      ),
+    )
     // Background refreshes (list-changed) can observe the expiry too; they do not retry, so
     // reconnect here for them. Foreground calls reconnect through `recovering`.
     client.onSessionExpired(() => input.fork(recover(client)))
@@ -173,33 +208,104 @@ export function make(input: Input): Connection {
         )
       const scope = yield* Scope.fork(input.scope)
       state.scope = scope
+      const launch = input.config.type === "local" ? input.localLaunch : undefined
+      const attempt = launch
+        ? yield* createConnectorLaunchAttempt({
+            identity: { directory: input.directory, server: input.name, attempt: crypto.randomUUID() },
+            sidecarGeneration: launch.sidecarGeneration,
+            requestedCommand: input.config.type === "local" ? input.config.command : [],
+            cwd:
+              input.config.type === "local" ? McpStdio.resolveCwd(input.directory, input.config.cwd) : input.directory,
+            runtimeRoot: launch.runtimeRoot,
+            secrets: launch.secrets,
+            changed: launch.host.changed,
+          }).pipe(Effect.provideService(Environment.Service, input.environment))
+        : undefined
+      state.attempt = attempt
       const authProvider = yield* input.authProvider
       const { McpClient } = yield* Effect.promise(() => import("./client.js"))
       // List tools as part of connect so a failure here marks the server failed rather than
       // leaving it connected with a silently empty tool list and no path to recover. A shared connection
       // decides first: it can only be shared on 2026-07-28, so an older server is never asked to list.
       const config = input.config
-      const result = yield* McpClient.connect({
-        server: input.name,
-        config,
-        directory: input.directory,
-        authProvider,
-        elicitation: input.elicitation,
-        clientInfo: input.clientInfo,
-        roots: !input.shared,
+      const result = yield* Effect.gen(function* () {
+        const runtimeDep =
+          launch && attempt
+            ? yield* Effect.tryPromise({
+                try: () => launch.host.runtimeDependencies(attempt.identity),
+                catch: (error): ConnectorLaunchFailure => ({ kind: "unknown", detail: String(error) }),
+              })
+            : undefined
+        if (runtimeDep?.missing[0])
+          return yield* Effect.fail({ kind: "dependency", program: runtimeDep.missing[0] } as const)
+        if (launch && config.type === "local") {
+          const cwd = yield* Environment.typeFollowing(
+            input.environment.files,
+            McpStdio.resolveCwd(input.directory, config.cwd),
+          ).pipe(Effect.catchTag("Environment.NotFound", () => Effect.succeed(undefined)))
+          if (cwd !== "directory") return yield* Effect.fail({ kind: "workspace", reason: "missing" } as const)
+        }
+        const firstParty = launch?.firstParty
+        if (firstParty && config.type === "local" && config.command[0] === firstParty.launchers.node) {
+          attempt!.preparing("launcher", { unit: "activity", detail: "Verifying bundled Node" })
+          const assets = yield* Effect.tryPromise({
+            try: () => launch!.host.resolveAssets(),
+            catch: (error): ConnectorLaunchFailure => ({ kind: "unknown", detail: String(error) }),
+          })
+          if (assets.node !== firstParty.launchers.node)
+            return yield* Effect.fail({
+              kind: "unknown",
+              detail: "Bundled Node changed during connector preparation",
+            } as const)
+        }
+        if (launch?.packagePreparation)
+          attempt!.preparing("packages", { unit: "activity", detail: "Preparing connector packages" })
+        const prepared = launch?.packagePreparation
+          ? yield* launch.packagePreparation({
+              identity: attempt!.identity,
+              runtimeDep: runtimeDep!,
+              preparing: attempt!.preparing,
+            })
+          : undefined
+        yield* attempt?.connecting ?? Effect.void
+        return yield* McpClient.connect({
+          server: input.name,
+          config,
+          directory: input.directory,
+          authProvider,
+          elicitation: input.elicitation,
+          clientInfo: input.clientInfo,
+          roots: !input.shared,
+          prepared,
+          managedFirstParty:
+            firstParty && attempt && config.type === "local"
+              ? {
+                  declaration: firstParty.declaration,
+                  binding: {
+                    identity: attempt.identity,
+                    sidecarGeneration: launch!.sidecarGeneration,
+                    entry: { type: "local", command: config.command, environment: config.environment, cwd: config.cwd },
+                    declarationSha256: firstParty.declaration.declarationSha256,
+                    recipeSha256: firstParty.declaration.recipeSha256,
+                  },
+                }
+              : undefined,
+        }).pipe(
+          Effect.flatMap(
+            (client): Effect.Effect<{ client: McpClient.Connection; tools?: ReadonlyArray<McpClient.Tool> }, Error> =>
+              input.shared && !client.modern
+                ? Effect.succeed({ client })
+                : client.tools().pipe(Effect.map((tools) => ({ client, tools }))),
+          ),
+          // codepuppy(#1563 AC5): at most four starts (spawn or connect, handshake, tools/list) at once, process-wide.
+          startPermits.withPermit,
+          (effect) => (config.type === "remote" && !input.shared ? endpointLoads.withLock(config.url)(effect) : effect),
+        )
       }).pipe(
-        Effect.flatMap(
-          (client): Effect.Effect<{ client: McpClient.Connection; tools?: ReadonlyArray<McpClient.Tool> }, Error> =>
-            input.shared && !client.modern
-              ? Effect.succeed({ client })
-              : client.tools().pipe(Effect.map((tools) => ({ client, tools }))),
-        ),
-        Effect.provideService(Environment.Service, input.environment),
+        Effect.provideService(Environment.Service, attempt?.environment ?? input.environment),
         Effect.provideService(FetchHttpClient.Fetch, input.fetch),
         Scope.provide(scope),
-        // codepuppy(#1563 AC5): at most four starts (spawn or connect, handshake, tools/list) at once, process-wide.
-        startPermits.withPermit,
-        (effect) => (config.type === "remote" && !input.shared ? endpointLoads.withLock(config.url)(effect) : effect),
+        Effect.onInterrupt(() => attempt?.disabled ?? Effect.void),
         Effect.exit,
       )
       if (Exit.isSuccess(result) && !result.value.tools) {
@@ -212,6 +318,7 @@ export function make(input: Input): Connection {
         state.tools = result.value.tools
         state.prompts = []
         watch(result.value.client)
+        yield* attempt?.connected ?? Effect.void
         yield* input.events.connected
         whenLive(result.value.client)(refreshPrompts(result.value.client))
         return
@@ -219,17 +326,30 @@ export function make(input: Input): Connection {
       yield* Scope.close(scope, Exit.void)
       state.scope = undefined
       const error = Cause.squash(result.cause)
+      const failure = isConnectorLaunchFailure(error)
+        ? error
+        : { kind: "unknown" as const, detail: McpClient.safeDescription(error) }
+      yield* attempt?.failed(failure) ?? Effect.void
       yield* input.events.failed(
         error instanceof McpClient.NeedsAuthError
           ? { status: "needs_auth", error: error.message }
-          : { status: "failed", error: McpClient.safeDescription(error) }, // codepuppy(#1645): no remote body
+          : {
+              status: "failed",
+              error: isConnectorLaunchFailure(error) ? error.kind : McpClient.safeDescription(error),
+            }, // codepuppy(#1645): no remote body
         error instanceof McpClient.ConnectError && error.answered === true,
         // codepuppy(#1563): connect failures arrive named by the client; a tools/list failure is named here.
-        error instanceof McpClient.NeedsAuthError
-          ? { code: "auth", reconnect: false }
-          : error instanceof McpClient.ConnectError && error.code !== undefined
-            ? { code: error.code, reconnect: error.reconnect === true }
-            : McpClient.startFailure(error, config), // codepuppy(#1645): with the SDK's HTTP status
+        isConnectorLaunchFailure(error)
+          ? {
+              code: error.kind === "dependency" ? "dependency_missing" : "spawn_failed",
+              reconnect: false,
+              failure: error,
+            }
+          : error instanceof McpClient.NeedsAuthError
+            ? { code: "auth", reconnect: false }
+            : error instanceof McpClient.ConnectError && error.code !== undefined
+              ? { code: error.code, reconnect: error.reconnect === true }
+              : McpClient.startFailure(error, config), // codepuppy(#1645): with the SDK's HTTP status
       )
     }).pipe(
       Effect.ensuring(input.events.settled),
@@ -241,6 +361,7 @@ export function make(input: Input): Connection {
     const scope = state.scope
     if (!scope) return
     state.scope = undefined
+    yield* state.attempt?.disabled ?? Effect.void
     state.client = undefined
     state.tools = undefined
     state.prompts = undefined
@@ -262,6 +383,15 @@ export function make(input: Input): Connection {
     },
     start,
     stop,
+    diagnostic: (identity) =>
+      Effect.suspend(() =>
+        state.attempt &&
+        identity.directory === input.directory &&
+        identity.server === input.name &&
+        identity.attempt === state.attempt.identity.attempt
+          ? state.attempt.diagnostic
+          : Effect.succeed(undefined),
+      ),
     recovering,
     catalog: (client) =>
       recovering(client, (client) =>

@@ -16,6 +16,16 @@ import { Server } from "@modelcontextprotocol/server"
 import { StdioServerTransport } from "@modelcontextprotocol/server/stdio"
 
 const env = process.env
+if (env.CODEPUPPY_MCP_LAUNCH_FILE)
+  writeFileSync(
+    env.CODEPUPPY_MCP_LAUNCH_FILE,
+    JSON.stringify({
+      argv: process.argv.slice(2),
+      cwd: process.cwd(),
+      key: env.CONNECTOR_CURRENT_KEY,
+      homePresent: env.HOME !== undefined,
+    }),
+  )
 const mark = (value: string) => {
   if (env.CODEPUPPY_MCP_STARTUP_LOG) appendFileSync(env.CODEPUPPY_MCP_STARTUP_LOG, value)
 }
@@ -44,6 +54,10 @@ server.setRequestHandler("tools/list", async () => {
   return { tools: [{ name: "echo", description: "echo", inputSchema: { type: "object" as const, properties: { text: { type: "string" } } } }] }
 })
 server.setRequestHandler("tools/call", async (request, context) => {
+  if (request.params.name === "crash" && env.CODEPUPPY_MCP_CRASH_STDERR) {
+    process.stderr.write(env.CODEPUPPY_MCP_CRASH_STDERR + "\n")
+    process.exit(17)
+  }
   if (env.CODEPUPPY_MCP_CALL_LOG) appendFileSync(env.CODEPUPPY_MCP_CALL_LOG, `${request.params.name}\n`)
   const args = (request.params.arguments ?? {}) as Record<string, unknown>
   if (request.params.name === "video_progress") {

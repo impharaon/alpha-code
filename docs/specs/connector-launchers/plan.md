@@ -448,3 +448,15 @@ Office 前置失败明确交接（继承 r3 事实，不重跑）：在 packages
 
 ### 风险与偏离
 官方完整语法/解析配置的归一可能占主要时间；保持当前真实语义，不靠猜测过滤选项。若接缝不足，按事实返回；普通私有 helper 选择不转回设计。新文件与初始列表外的必要同链改动在实际提交补列。暂无其它偏离。
+
+### r5 已落：许可边界、直接执行与 attempt producer
+
+`McpConnection.Input.localLaunch` 是 sidecar controller 的私有受信上下文（不进入 ConfigMCP/HTTP）：同代 host、runtimeRoot、当前 secrets、已精确核验的 firstParty 声明/descriptor、包准备 Effect。每次 start 生成新 identity，先读 host.runtimeDependencies、检查真实 cwd，再进行包准备或首方 Node resolveAssets；返回 Node 与受信 descriptor 不同即拒绝。准备/资产等待在 startPermits 与 McpClient.initialize 的预算之外；包准备回调消费实际 identity/runtimeDep 并向同一个 producer 报进度。此回调是尚未完成的 prepareConnectorLaunch 的接入点，不宣称已实现官方完整解析/安装。
+
+McpClient 的宿主私有 prepared 参数直接绑定本次 command/cwd/environment。只在该 stdio 的 Environment.spawner 将 extendEnv 设为 false，避免继承重添已去掉的控制项；原生 Node/其它命令保留原环境语义，上游 stdio 不改。createConnectorLaunchAttempt 从 r4 真句柄观察器生产递增 sequence、阶段、进度、单次失败及不透明 attempt ID；停止/取消后丢弃晚到状态，连接后退出也收完整诊断。connection.diagnostic 仅接受本次完整 identity，不接受路径；root 仍须装上该查询与状态桥。失败后 stop 保留失败，不用 disabled 覆盖它。
+
+实际文件补项：`core/src/mcp/pool.ts` 仅转发新增私有 diagnostic 查询，满足既有 Connection 实现；`core/test/fixture/codepuppy-mcp-startup-stdio.ts` 增两个自有输入（报告本次 argv/cwd/是否继承 HOME、调用后 crash），复用真实 SDK stdio，非第三方格式替身。没有 process-fence 文件修改。顺序偏离：先完成许可/诊断，boot 重锚依赖 mandatory bootstrap.launchers 的生产投影尚未装配，现有 video 宿主每 fork 投影仍是唯一写者，不新增平行配置写者。
+
+证据：新增真 stdio 的 prepared 例在旧 client 为 0 PASS / 1 FAIL（must-not-run-npx 的 dependency_missing，`/tmp/connector-r5-prepared-red.log`），实现后 1 PASS / 4 assertions。新 4 个连接用例 4 PASS / 34 assertions；Node 资产两例 2 PASS / 9 assertions；cwd 缺失 1 PASS / 2 assertions。命令均在 core：`bun test test/codepuppy-connector-launch.test.ts -t '<对应完整名称或上文日志中的选择>'`，记录 `/tmp/connector-r5-connection.log`、`connector-r5-node-wait.log`、`connector-r5-workspace.log`。许可证明只在一个准备事件上立即试取既有许可、无等待/计时/容量运行；取消用 Deferred/Promise 屏障，晚到结果不 spawn。23 例中间整文件 23 PASS / 140 assertions（`/tmp/connector-r5-step-connection.log`）；新增 cwd 后最终整文件见本轮最终收据。
+
+#1759 只读复核仍为 `ef8a1ce8b4441aeeb12cc3a5cc0843ad43c1682f`，此前 R1/R2 接口表和签名未变。接线仍消费同一次 planPackageManagerCaches 的 env/cacheEnv/rules/locations/excluded、resolvePackageManagerLocations 的候选，不在本票复制缓存键表；最终 spawn 由其 project/refresh 权威覆盖。当前本票 localLaunch 没有装到 index/controller/root，故这些证明不能当应用启动或真围栏验收。

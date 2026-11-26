@@ -2,9 +2,14 @@ import { afterEach, expect, test } from "bun:test"
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, readdirSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import path from "node:path"
-import { Effect, Layer, Logger, PlatformError, References, Stream } from "effect"
+import { Deferred, Effect, Fiber, Layer, Logger, Option, PlatformError, References, Stream } from "effect"
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
-import type { LauncherEnvironment } from "@opencode/util/codepuppy-connector-launch"
+import type {
+  ConnectorLaunchHost,
+  LaunchSnapshot,
+  LauncherEnvironment,
+  PreparedLaunch,
+} from "@opencode/util/codepuppy-connector-launch"
 import { Environment } from "@opencode/core/environment/index"
 import {
   installConnectorPython,
@@ -15,7 +20,57 @@ import {
 import { hostEnvironmentLayer, recordingEnvironmentLayer, transformEnvironmentFiles } from "./fixture/environment"
 import { observeConnectorLaunch } from "@opencode/core/mcp/codepuppy-connector-diagnostic"
 import { McpClient } from "@opencode/core/mcp/client"
+import { McpConnection } from "@opencode/core/mcp/connection"
+import { START_CONCURRENCY, startPermits } from "@opencode/core/mcp/codepuppy-startup"
 import { ConfigMCP } from "@opencode/schema/config/mcp"
+
+// Integration layer: the real client/stdio/Location executes the prepared entry. The own
+// stdio fixture reports the current business inputs; no npm/uv resolver or registry is involved.
+test("prepared MCP launch directly executes the entry with current argv cwd and isolated environment", async () => {
+  const root = mkdtempSync(path.join(tmpdir(), "connector-prepared-client-"))
+  roots.push(root)
+  const launchFile = path.join(root, "launch.json")
+  const commands: ChildProcess.Command[] = []
+  const prepared: PreparedLaunch = {
+    runner: "npm-exec",
+    key: "a".repeat(64),
+    command: [
+      process.execPath,
+      new URL("./fixture/codepuppy-mcp-startup-stdio.ts", import.meta.url).pathname,
+      "--business",
+      root,
+    ],
+    cwd: root,
+    environment: { PATH: process.env.PATH!, CODEPUPPY_MCP_LAUNCH_FILE: launchFile, CONNECTOR_CURRENT_KEY: "rotated" },
+  }
+  const options = {
+    server: "prepared",
+    directory: tmpdir(),
+    prepared,
+    config: new ConfigMCP.Local({
+      type: "local",
+      protocol: "legacy",
+      command: ["must-not-run-npx"],
+      environment: { CODEPUPPY_MCP_EXIT_STDERR: "wrong environment" },
+    }),
+  }
+  await Effect.runPromise(
+    Effect.scoped(
+      Effect.gen(function* () {
+        const client = yield* McpClient.connect(options)
+        expect((yield* client.tools()).map((tool) => tool.name)).toEqual(["echo"])
+      }),
+    ).pipe(Effect.provide(recordingEnvironmentLayer(commands))),
+  )
+  expect(JSON.parse(readFileSync(launchFile, "utf8"))).toEqual({
+    argv: ["--business", root],
+    cwd: root,
+    key: "rotated",
+    homePresent: false,
+  })
+  expect(commands).toHaveLength(1)
+  expect(commands[0]).toMatchObject({ command: process.execPath, options: { extendEnv: false } })
+})
 
 // Integration layer, affected PR/nightly. Own process fixtures reproduce the actual uv 0.13.10
 // optional install_name_tool invocation captured in plan.md r3; no large uv/Python archive in the suite.
@@ -560,4 +615,352 @@ test("Windows runner environment merges case-insensitive keys and PATH without r
   expect(env.PATH).toBe("C:\\prepared\\bin;C:\\app-data\\uv;C:\\app-data\\node;C:\\python;c:\\shared;C:\\declared;C:\\old")
   expect(env).toMatchObject({ key: "current-secret", Home: "C:\\own-home" })
   for (const key of ["Path", "KEY", "Node_Options", "pythonpath"]) expect(env).not.toHaveProperty(key)
+})
+// Integration layer: a real McpConnection + SDK + stdio. The host is the frozen transport
+// boundary; its dependency/asset results stand in for the root assembly waiting on #1759.
+function launchConnection(input: {
+  root: string
+  snapshots: LaunchSnapshot[]
+  spawns: ChildProcess.Command[]
+  missing?: string[]
+  prepare?: NonNullable<McpConnection.Input["localLaunch"]>["packagePreparation"]
+  firstParty?: NonNullable<McpConnection.Input["localLaunch"]>["firstParty"]
+  assets?: () => Promise<LauncherEnvironment>
+  command?: string[]
+  cwd?: string
+  environment?: Record<string, string>
+}) {
+  return Effect.gen(function* () {
+    const environment = yield* Environment.Service
+    const scope = yield* Effect.scope
+    const closed = yield* Deferred.make<void>()
+    const failures: McpConnection.Failure[] = []
+    const unused = async (): Promise<never> => {
+      throw Error("unused host port")
+    }
+    const host: ConnectorLaunchHost = {
+      changed: (snapshot) => input.snapshots.push(structuredClone(snapshot)),
+      runtimeDependencies: async () => ({
+        runtimeDep: input.missing ?? [],
+        executables: {},
+        missing: input.missing ?? [],
+      }),
+      resolveAssets: input.assets ?? unused,
+      ensureFile: unused,
+      beginEgress: unused,
+      egressEvidence: unused,
+      endEgress() {},
+      prepareFiles: unused,
+    }
+    const connection = McpConnection.make({
+      name: "attempt-service",
+      directory: input.root,
+      config: new ConfigMCP.Local({
+        type: "local",
+        protocol: "legacy",
+        command: input.command ?? [
+          process.execPath,
+          new URL("./fixture/codepuppy-mcp-startup-stdio.ts", import.meta.url).pathname,
+        ],
+        environment: input.environment,
+        cwd: input.cwd,
+      }),
+      authProvider: Effect.succeed(undefined),
+      elicitation: { create: () => Effect.die("unused elicitation"), complete: () => Effect.void },
+      environment: {
+        ...environment,
+        spawner: ChildProcessSpawner.make((command) => {
+          input.spawns.push(command)
+          return environment.spawner.spawn(command)
+        }),
+      },
+      fetch: globalThis.fetch,
+      scope,
+      lock: (effect) => effect,
+      callbacks: (effect) => Effect.runFork(effect),
+      fork: (effect) => Effect.runFork(effect),
+      events: {
+        connecting: Effect.void,
+        connected: Effect.void,
+        settled: Effect.void,
+        changed: () => Effect.void,
+        failed: (failure) =>
+          Effect.sync(() => {
+            failures.push(failure)
+          }),
+        closed: () => connection.stop.pipe(Effect.andThen(Deferred.succeed(closed, undefined))),
+      },
+      localLaunch: {
+        sidecarGeneration: "generation-r5",
+        runtimeRoot: input.root,
+        secrets: ["current-secret"],
+        host,
+        packagePreparation: input.prepare,
+        firstParty: input.firstParty,
+      },
+    })
+    return { connection, closed, failures }
+  })
+}
+function connectionRoot() {
+  const root = mkdtempSync(path.join(tmpdir(), "connector-attempt-"))
+  roots.push(root)
+  return root
+}
+
+test("connector preparation runs before permits and publishes progress before the real handshake", async () => {
+  const root = connectionRoot()
+  const snapshots: LaunchSnapshot[] = []
+  const spawns: ChildProcess.Command[] = []
+  await Effect.runPromise(
+    Effect.scoped(
+      Effect.gen(function* () {
+        const ready = yield* Deferred.make<void>()
+        const preparing = yield* Deferred.make<void>()
+        const current = yield* launchConnection({
+          root,
+          snapshots,
+          spawns,
+          command: ["must-not-run-uvx"],
+          prepare: ({ preparing: report, runtimeDep }) =>
+            Effect.gen(function* () {
+              expect(runtimeDep.missing).toEqual([])
+              expect(Option.isSome(yield* startPermits.withPermitsIfAvailable(START_CONCURRENCY)(Effect.void))).toBe(
+                true,
+              )
+              report("python", { unit: "bytes", completed: 42, total: 100 })
+              yield* Deferred.succeed(preparing, undefined)
+              yield* Deferred.await(ready)
+              return {
+                runner: "uv-tool" as const,
+                key: "b".repeat(64),
+                cwd: root,
+                environment: { PATH: process.env.PATH! },
+                command: [
+                  process.execPath,
+                  new URL("./fixture/codepuppy-mcp-startup-stdio.ts", import.meta.url).pathname,
+                ] as [string, ...string[]],
+              }
+            }),
+        })
+        const fiber = yield* Effect.forkScoped(current.connection.start)
+        yield* Deferred.await(preparing)
+        expect(spawns).toHaveLength(0)
+        expect(snapshots.map((row) => row.state.phase)).toEqual(["preparing", "preparing"])
+        expect(snapshots[1].state).toEqual({
+          phase: "preparing",
+          stage: "python",
+          progress: { unit: "bytes", completed: 42, total: 100 },
+        })
+        yield* Deferred.succeed(ready, undefined)
+        yield* Fiber.join(fiber)
+        expect(current.failures).toEqual([])
+        expect(snapshots.map((row) => row.state.phase)).toEqual(["preparing", "preparing", "connecting", "connected"])
+        expect(snapshots.map((row) => row.sequence)).toEqual([1, 2, 3, 4])
+        expect(new Set(snapshots.map((row) => row.identity.attempt)).size).toBe(1)
+        expect(spawns).toHaveLength(1)
+        const identity = snapshots[0].identity
+        expect(yield* current.connection.diagnostic({ ...identity, directory: tmpdir() })).toBeUndefined()
+        expect(yield* current.connection.diagnostic(identity)).toMatchObject({
+          identity,
+          requestedCommand: ["must-not-run-uvx"],
+          effectiveCommand: [process.execPath, expect.any(String)],
+          stage: "running",
+        })
+        yield* current.connection.stop
+        expect(snapshots.at(-1)?.state.phase).toBe("disabled")
+      }),
+    ).pipe(Effect.provide(hostEnvironmentLayer)),
+  )
+})
+
+test("connector dependency and download failures do not spawn and preserve a single failure fact", async () => {
+  for (const failure of ["dependency", "download"] as const) {
+    const root = connectionRoot()
+    const snapshots: LaunchSnapshot[] = []
+    const spawns: ChildProcess.Command[] = []
+    let prepared = false
+    await Effect.runPromise(
+      Effect.scoped(
+        Effect.gen(function* () {
+          const current = yield* launchConnection({
+            root,
+            snapshots,
+            spawns,
+            missing: failure === "dependency" ? ["git"] : [],
+            prepare: () =>
+              Effect.suspend(() => {
+                prepared = true
+                return Effect.fail({ kind: "download", detail: "interrupted current-secret" } as const)
+              }),
+          })
+          yield* current.connection.start
+          expect(prepared).toBe(failure === "download")
+          expect(spawns).toHaveLength(0)
+          expect(current.failures).toHaveLength(1)
+          expect(snapshots.at(-1)?.state).toMatchObject({ phase: "failed", failure: { kind: failure } })
+          const diagnostic = yield* current.connection.diagnostic(snapshots[0].identity)
+          expect(diagnostic).toMatchObject({ exitCode: null, signal: null, effectiveCommand: [] })
+          expect(JSON.stringify(snapshots)).not.toContain("current-secret")
+        }),
+      ).pipe(Effect.provide(hostEnvironmentLayer)),
+    )
+  }
+})
+
+test("connector cancellation during preparation prevents a late result from spawning or publishing failure", async () => {
+  const root = connectionRoot()
+  const snapshots: LaunchSnapshot[] = []
+  const spawns: ChildProcess.Command[] = []
+  await Effect.runPromise(
+    Effect.scoped(
+      Effect.gen(function* () {
+        const preparing = yield* Deferred.make<void>()
+        const pending = Promise.withResolvers<PreparedLaunch>()
+        const current = yield* launchConnection({
+          root,
+          snapshots,
+          spawns,
+          prepare: () =>
+            Deferred.succeed(preparing, undefined).pipe(Effect.andThen(Effect.promise(() => pending.promise))),
+        })
+        const fiber = yield* Effect.forkScoped(current.connection.start)
+        yield* Deferred.await(preparing)
+        yield* Fiber.interrupt(fiber)
+        const length = snapshots.length
+        pending.resolve({
+          runner: "npm-exec",
+          key: "c".repeat(64),
+          command: ["must-not-run-late"],
+          cwd: root,
+          environment: {},
+        })
+        yield* Effect.promise(() => pending.promise)
+        yield* Effect.yieldNow
+        expect(spawns).toHaveLength(0)
+        expect(snapshots).toHaveLength(length)
+        expect(snapshots.at(-1)?.state.phase).toBe("disabled")
+        expect(snapshots.some((row) => row.state.phase === "failed")).toBe(false)
+      }),
+    ).pipe(Effect.provide(hostEnvironmentLayer)),
+  )
+})
+
+test("connector production attempt records a crash after connection with complete stderr and real exit", async () => {
+  const root = connectionRoot()
+  const snapshots: LaunchSnapshot[] = []
+  const spawns: ChildProcess.Command[] = []
+  const output = "actual-crash current-secret " + "x".repeat(7000)
+  await Effect.runPromise(
+    Effect.scoped(
+      Effect.gen(function* () {
+        const current = yield* launchConnection({
+          root,
+          snapshots,
+          spawns,
+          environment: { CODEPUPPY_MCP_CRASH_STDERR: output },
+        })
+        yield* current.connection.start
+        expect(current.connection.client).toBeDefined()
+        yield* current.connection.client!.callTool({ name: "crash", args: {} }).pipe(Effect.ignore)
+        yield* Deferred.await(current.closed)
+        expect(snapshots.map((row) => row.state.phase)).toEqual(["connecting", "connected", "failed"])
+        const diagnostic = yield* current.connection.diagnostic(snapshots[0].identity)
+        expect(diagnostic).toMatchObject({
+          exitCode: 17,
+          signal: null,
+          stage: "running",
+          stderr: output.replace("current-secret", "[redacted]") + "\n",
+        })
+        expect(diagnostic!.effectiveCommand[0]).toBe(process.execPath)
+        expect(readFileSync(diagnostic!.transcriptFile, "utf8")).not.toContain("current-secret")
+      }),
+    ).pipe(Effect.provide(hostEnvironmentLayer)),
+  )
+})
+
+test("first-party Node waits for the trusted assets without entering package preparation or a permit", async () => {
+  const root = connectionRoot()
+  const snapshots: LaunchSnapshot[] = []
+  const spawns: ChildProcess.Command[] = []
+  const launchers = { ...launcherEnvironment(root), node: process.execPath }
+  await Effect.runPromise(
+    Effect.scoped(
+      Effect.gen(function* () {
+        const resolving = yield* Deferred.make<void>()
+        const assets = Promise.withResolvers<LauncherEnvironment>()
+        const current = yield* launchConnection({
+          root,
+          snapshots,
+          spawns,
+          firstParty: {
+            launchers,
+            declaration: { tools: [], declarationSha256: "a".repeat(64), recipeSha256: "b".repeat(64) },
+          },
+          assets: () => {
+            Effect.runSync(Deferred.succeed(resolving, undefined))
+            return assets.promise
+          },
+        })
+        const fiber = yield* Effect.forkScoped(current.connection.start)
+        yield* Deferred.await(resolving)
+        expect(Option.isSome(yield* startPermits.withPermitsIfAvailable(START_CONCURRENCY)(Effect.void))).toBe(true)
+        expect(spawns).toHaveLength(0)
+        expect(snapshots.map((row) => row.state)).toEqual([
+          { phase: "preparing", stage: "launcher", progress: { unit: "activity", detail: "Verifying bundled Node" } },
+        ])
+        assets.resolve(launchers)
+        yield* Fiber.join(fiber)
+        expect(current.failures).toEqual([])
+        expect(snapshots.map((row) => row.state.phase)).toEqual(["preparing", "connecting", "connected"])
+        expect(spawns).toHaveLength(1)
+        expect(spawns[0]).toMatchObject({ command: process.execPath, options: { extendEnv: true, env: {} } })
+        yield* current.connection.stop
+      }),
+    ).pipe(Effect.provide(hostEnvironmentLayer)),
+  )
+})
+
+test("first-party Node refuses an asset result from a different trusted descriptor", async () => {
+  const root = connectionRoot()
+  const snapshots: LaunchSnapshot[] = []
+  const spawns: ChildProcess.Command[] = []
+  const launchers = { ...launcherEnvironment(root), node: process.execPath }
+  await Effect.runPromise(
+    Effect.scoped(
+      Effect.gen(function* () {
+        const current = yield* launchConnection({
+          root,
+          snapshots,
+          spawns,
+          firstParty: {
+            launchers,
+            declaration: { tools: [], declarationSha256: "a".repeat(64), recipeSha256: "b".repeat(64) },
+          },
+          assets: async () => ({ ...launchers, node: path.join(root, "different-node") }),
+        })
+        yield* current.connection.start
+        expect(spawns).toHaveLength(0)
+        expect(snapshots.at(-1)?.state).toMatchObject({
+          phase: "failed",
+          failure: { kind: "unknown", detail: "Bundled Node changed during connector preparation" },
+        })
+      }),
+    ).pipe(Effect.provide(hostEnvironmentLayer)),
+  )
+})
+
+
+test("connector missing workspace is reported before package preparation or service spawn", async () => {
+  const root = connectionRoot()
+  const snapshots: LaunchSnapshot[] = []
+  const spawns: ChildProcess.Command[] = []
+  await Effect.runPromise(Effect.scoped(Effect.gen(function* () {
+    const current = yield* launchConnection({ root, snapshots, spawns, cwd: path.join(root, "missing"),
+      prepare: () => Effect.die("must not prepare without a workspace"),
+    })
+    yield* current.connection.start
+    expect(spawns).toHaveLength(0)
+    expect(snapshots.at(-1)?.state).toMatchObject({ phase: "failed", failure: { kind: "workspace", reason: "missing" } })
+  })).pipe(Effect.provide(hostEnvironmentLayer)))
 })

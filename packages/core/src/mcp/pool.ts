@@ -333,6 +333,7 @@ export const layer = Layer.effect(
         get client() {
           return live().client
         },
+        diagnostic: (identity) => live().diagnostic(identity),
         get tools() {
           return live().tools
         },

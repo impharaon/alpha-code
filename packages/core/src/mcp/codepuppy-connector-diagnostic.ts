@@ -1,9 +1,83 @@
 import path from "node:path"
 import { Effect, Exit, PlatformError, References, Sink, Stream } from "effect"
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
-import type { ConnectorLaunchDiagnostic, LaunchIdentity } from "@opencode/util/codepuppy-connector-launch"
+import type {
+  ConnectorLaunchDiagnostic,
+  ConnectorLaunchFailure,
+  ConnectorLaunchHost,
+  ConnectorLaunchState,
+  LaunchIdentity,
+} from "@opencode/util/codepuppy-connector-launch"
 import { KilledBySignal } from "@opencode/util/cross-spawn-spawner"
 import { Environment } from "../environment/index.js"
+
+/** The connection owns one producer per attempt; root only transports its snapshots and queries. */
+export function createConnectorLaunchAttempt(
+  input: Parameters<typeof observeConnectorLaunch>[0] & {
+    sidecarGeneration: string
+    changed: ConnectorLaunchHost["changed"]
+  },
+) {
+  return Effect.gen(function* () {
+    const observed = yield* observeConnectorLaunch(input)
+    let sequence = 0
+    let active = true
+    let failed = false
+    const secrets = input.secrets.filter(Boolean).sort((a, b) => b.length - a.length)
+    const changed = (state: ConnectorLaunchState) => {
+      if (!active) return
+      input.changed({
+        identity: input.identity,
+        sidecarGeneration: input.sidecarGeneration,
+        sequence: ++sequence,
+        state,
+      })
+    }
+    return {
+      ...observed,
+      identity: input.identity,
+      preparing(
+        stage: Extract<ConnectorLaunchState, { phase: "preparing" }>["stage"],
+        progress: Extract<ConnectorLaunchState, { phase: "preparing" }>["progress"],
+      ) {
+        if (!active || failed) return
+        observed.stage(stage)
+        changed({ phase: "preparing", stage, progress })
+      },
+      connecting: Effect.sync(() => {
+        if (!active || failed) return
+        observed.stage("handshake")
+        changed({ phase: "connecting" })
+      }),
+      connected: Effect.sync(() => {
+        if (!active || failed) return
+        observed.stage("running")
+        changed({ phase: "connected" })
+      }),
+      failed: (failure: ConnectorLaunchFailure) =>
+        Effect.suspend(() => {
+          if (!active || failed) return Effect.void
+          failed = true
+          const safe = "detail" in failure ? { ...failure, detail: maskDiagnostic(failure.detail, secrets) } : failure
+          return observed.diagnostic.pipe(
+            Effect.tapError((error) =>
+              Effect.logWarning("connector diagnostic could not be written", {
+                error: maskDiagnostic(String(error), secrets),
+              }),
+            ),
+            Effect.ignore,
+            Effect.andThen(
+              Effect.sync(() => changed({ phase: "failed", failure: safe, diagnostic: input.identity.attempt })),
+            ),
+          )
+        }),
+      disabled: Effect.sync(() => {
+        if (!failed) changed({ phase: "disabled" })
+        active = false
+      }),
+    }
+  })
+}
 
 /** This attempt's Location spawner observes real handles; stdio receives the same masked stderr. */
 export function observeConnectorLaunch(input: {

@@ -1,6 +1,12 @@
 import { withVideoProgress } from "./codepuppy-video-progress.js" // codepuppy(#1775)
 import type { VideoProgress } from "@opencode/schema/codepuppy-video-progress"
-import { connectorLaunchHost, type ManagedFirstPartyBinding, type DeclaredFirstParty, type PinnedFilesCallPreparation } from "@opencode/util/codepuppy-connector-launch"
+import {
+  connectorLaunchHost,
+  type ManagedFirstPartyBinding,
+  type DeclaredFirstParty,
+  type PinnedFilesCallPreparation,
+  type PreparedLaunch,
+} from "@opencode/util/codepuppy-connector-launch"
 import { registerPinnedFilesHandler } from "./codepuppy-pinned-files.js"
 export * as McpClient from "./client.js"
 
@@ -32,6 +38,8 @@ import {
   type VersionNegotiationOptions,
 } from "@modelcontextprotocol/client"
 import { Cause, Clock, Duration, Effect, Exit, PlatformError, Schedule, Schema } from "effect"
+import { ChildProcess, ChildProcessSpawner } from "effect/process"
+import { Environment } from "../environment/index.js"
 import { ConfigMCP } from "@opencode/schema/config/mcp"
 import type { Session } from "@opencode/schema/session"
 import { isRecord } from "@opencode/util/record"
@@ -228,6 +236,8 @@ export interface ConnectOptions {
   readonly roots?: boolean
   /** Constructed from the protected declaration before inherited environment/cwd are applied. */
   readonly managedFirstParty?: { binding: ManagedFirstPartyBinding; declaration: DeclaredFirstParty }
+  /** Host-private result of package preparation, completed before connection startup begins. */
+  readonly prepared?: PreparedLaunch
 }
 
 /**
@@ -370,17 +380,37 @@ export const connect = Effect.fnUntraced(function* (options: ConnectOptions) {
   const exit = yield* Effect.gen(function* () {
     if (config.type === "attached") return yield* initialize(config.transport)
     if (config.type === "local") {
-      const [command, ...args] = config.command
+      const prepared = options.prepared
+      const [command, ...args] = prepared?.command ?? config.command
+      const environment = yield* Environment.Service
       const transport = yield* McpStdio.make({
         server,
         command,
         args,
-        cwd: McpStdio.resolveCwd(options.directory, config.cwd),
-        environment: {
+        cwd: prepared?.cwd ?? McpStdio.resolveCwd(options.directory, config.cwd),
+        environment: prepared?.environment ?? {
           ...(command === "opencode" ? { BUN_BE_BUN: "1" } : {}),
           ...config.environment,
         },
-      })
+      }).pipe(
+        // Stdio retains its upstream inherited-env behavior for native commands. A prepared
+        // runner already has its complete controlled environment; do not resurrect removed controls.
+        Effect.provideService(
+          Environment.Service,
+          prepared
+            ? Environment.Service.of({
+                ...environment,
+                spawner: ChildProcessSpawner.make((child) =>
+                  environment.spawner.spawn(
+                    child._tag === "StandardCommand"
+                      ? ChildProcess.make(child.command, child.args, { ...child.options, extendEnv: false })
+                      : child,
+                  ),
+                ),
+              })
+            : environment,
+        ),
+      )
       return yield* initialize(transport)
     }
     const { McpOAuth } = yield* Effect.promise(() => import("./oauth.js"))

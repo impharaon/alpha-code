@@ -1,15 +1,15 @@
 ---
 id: DESIGN-child-process-write-fence
 title: 子进程写入围栏技术设计
-summary: v4 冻结裁决原样保留；v5 按 owner 选 A 补充经原命令授权后由 main 在围栏外运行 Homebrew 的受控入口、流式结果与取消，增量冻结待独立审查。
+summary: 保留 v4 冻结裁决；v5 经 R1 修正受保护的 Homebrew 安装身份、helper 单次叶授权与 main 自有执行计划后冻结，保留围栏外执行的已知残留。
 kind: tech-design
-status: frozen-pending-review
+status: frozen
 spec: SPEC-child-process-write-fence
 spec_version: 5
 review:
-  rounds: 0
-  reviewed_sha: ""
-  verdict: "pending-review"
+  rounds: 1
+  reviewed_sha: "176ba25a68"
+  verdict: "fix-then-freeze; R1 2 Blocker 2 Minor accepted and corrected"
 owners: [owner]
 last_reviewed: 2026-11-26
 ---
@@ -724,7 +724,7 @@ Windows 不运行 Seatbelt，也不宣称 CF/C1 有 OS 围栏保证；沿规格�
 
 # v5 增量｜已获准的 Homebrew 命令由应用在围栏外执行（B1）
 
-**本增量：frozen-pending-review。** v4 在 `efc8ba3abd` 冻结的所有决定及 R1 处置逐字保留；其中“待 owner 定（B1）”和旧提问是当时记录，现在仅由本增量 §10 的 U-38 决定取代。v4 的审查收据仍为 rounds=1、reviewed_sha=`b49fa26f93`、verdict=`fix-then-merge; R1 1 Blocker 4 Major 3 Minor and one premise conflict, all corrected`；本文 frontmatter 从本次起只声明 v5 的独立审查状态。v4 的其它部分不重新送审或更换决定。
+**本增量：frozen（R1 修订后）。** v4 在 `efc8ba3abd` 冻结的所有决定及 R1 处置逐字保留；其中“待 owner 定（B1）”和旧提问是当时记录，现在仅由本增量 §10 的 U-38 决定取代。v4 的审查收据仍为 rounds=1、reviewed_sha=`b49fa26f93`、verdict=`fix-then-merge; R1 1 Blocker 4 Major 3 Minor and one premise conflict, all corrected`；本文 frontmatter 只声明 v5 的审查状态：R1 审查 `176ba25a68`，两项 Blocker、两项 Minor 按编排者裁决全部修正。v4 的其它部分不重新送审或更换决定。
 
 ## 1. 基线
 
@@ -735,7 +735,7 @@ Windows 不运行 Seatbelt，也不宣称 CF/C1 有 OS 围栏保证；沿规格�
 
 ## 2. 地面真相
 
-本次只查：审批之后的受控执行点、shell 结果/取消所有者、main 的消息与监听入口；找到可调用符号或决定所缺接缝即停止。P09 的嵌套 Seatbelt 退出 71 沿用，不重跑安装。
+本轮只复核 R1 改变的安装身份、profile 覆盖、叶授权与 main 计划来源；原审批/结果接缝复用送审版证据。找到已有符号或决定所缺接缝即停止。P09 的嵌套 Seatbelt 退出 71 沿用，不重跑安装。
 
 | 编号 | 已观察事实 | 决策影响 |
 | --- | --- | --- |
@@ -744,149 +744,174 @@ Windows 不运行 Seatbelt，也不宣称 CF/C1 有 OS 围栏保证；沿规格�
 | V5-P03（读） | `Shell.create` 捕获 handle.all 到现有 `.out`（`core/src/shell.ts:333-341`），等输出完成后发布退出（`:395-434`）；超时走 handle.kill，现有 forceKillAfter=3s（`:315-316,379-385`）；工具结果走 `ShellResult.output`（`tool/plugin/shell.ts:211-224`），中断调用 shell.remove | 保留原 Shell/Job/capture 体系，不能在 main 另造会话结果或成功通知 |
 | V5-P04（读） | main 的 `codepuppy.*` 接收在 `server.ts:779-802`，`createCodePuppySidecarHost`（`hub-view.ts:501`）与 `createHubBridge`（`ext/src/hub-bridge.ts:80`）已有请求/回复；`startEgressPolicyProxy`（`network-egress-proxy.ts:228-246`）在现有唯一许可 loopback 端口监听，目前非 CONNECT 全答 405；退出钩子 `index.ts:715-726` 调 stopSidecars | 授权登记/取消复用已有 sidecar→main 通道；流式 helper 入口与 main 任务清理目前不存在，需决定 raise；不宣称已有任意 HTTP/RPC 执行口 |
 | V5-P06（读） | `createSidecarEnv()` 在 `server.ts:562` 形成工具环境，`:588` 才覆盖 `sidecarEgressProxyEnv`；该函数（`sidecar-env.ts:266-282`）列出被应用替换的八个代理键 | H3 在覆盖前保存这一代的 PATH/代理快照是新增接线，复用现有环境权威，不从 main 的完整环境复制秘密 |
+| V5-P07（读，R1） | v4 §4.2 允许 `/opt/homebrew/bin`、`/usr/local/bin`、`~/.local/bin`、`~/.cargo/bin` 等；`renderProcessFenceProfile`（`process-fence-profile.ts:236-261`）在 allow 后渲染显式拒写；其 CF 节点保护（`:266-286`）已有 literal 上级/软链节点语义 | 仅有路径/布局相同不足以授权；H1 增受保护的主进程安装身份及同一 profile 的精确拒写，不撤掉 npm bin allow |
+| V5-P08（读） | ShellScan 的前置命令集合在 `core/src/shell/scan.ts:64-65`；该模块无服务层 import。Shell 的真实 PID 在 `core/src/shell.ts:323-326` 取自 spawn handle；原生 `IssueFileExtensionToProcess`（`native/codepuppy-fence/codepuppy_fence.c:97-123`）已取内核 audit token/pidversion，但没有 helper 专用交付口 | 复用单一 scanner；main 自己规划。PID 绑定和仅交给 helper 的能力交付是 H2/H4 新增接缝，不把旧原生扩展签发误当已有 helper RPC |
+| V5-P09（测，本轮） | 临时 HOME/仅含 marker 的文件树里，以 `/usr/bin/sandbox-exec -f <denied.sb> /usr/bin/python3 -c <文件写/删/改名探针>` 验证：canonical 路径的 launcher literal、repository root literal、Library subpath 使写/删 brew、写 Library、改名 root 均 EPERM，而同 bin 新建 npm-probe 成功；撤掉 deny 时全部成功 | literal root 不等于 prefix subtree 拒写。首轮误用 `/var/folders` 别名发规则时全部写成功；改用真实 `/private/var/folders` 后上述拒写才成立，HB 必须规范化并保护 alias 节点；这不是生产围栏/真实 brew 安装证据 |
 | V5-P05（测） | 临时 HOME/cache/logs/tmp 中，仅执行真实 `/opt/homebrew/bin/brew --version`，关闭自动更新/analytics，退出 0、stdout 为 `Homebrew 7.0.15`、stderr 空；本机探针使用的可执行路径为 `/opt/homebrew/bin/brew` | 只证明本机正常围栏外 CLI 可启动，不证明安装、代理、签名或取消已通过。没有运行应用、安装软件或读取用户真实 rc/秘密 |
 
-V5-P05 用 `python3 tempfile.mkdtemp/subprocess.run(timeout=15)`，原始输出在本机临时根 `fence1759-v5-r6_u3fj_/brew-version.json`；它不是产品证据。以下 H1–H4 是为 B1 决定的新增接缝，不是已实现功能。
+V5-P09 原始 profile/输出在临时根 `fence1759-r4-canonical-fc33jhuy/{denied.sb,control.sb,result.json}`；文件内容只是 probe marker，不是伪造的 Homebrew 脚本/包格式。V5-P05 用 `python3 tempfile.mkdtemp/subprocess.run(timeout=15)`，原始输出在本机临时根 `fence1759-v5-r6_u3fj_/brew-version.json`；它不是产品证据。以下 H1–H4 是为 B1 决定的新增接缝，不是已实现功能。
 
 ## 4. 接口契约
 
-### 4.1 H1：识别与复合命令边界
+### 4.1 H1：固定识别形态、安装身份与 main 计划
 
-受控入口是**本机助手 shell 工具通过原权限判断之后、实际启动 shell 之前**。ext 的工具策略与 `ShellTool.prepare` 继续判断原命令；权限卡和 `Shell.Info.command` 都保存原始来源，不把内部 helper 命令显示给用户。为现有 ShellScan 增加同源的叶命令 source span（shell 方言仍沿 ShellSelect），由单一 planner 产生执行重写计划；不另写正则 shell 解析器、不新增依赖。
+受控入口仍是**本机助手 shell 工具通过原权限判断之后、实际启动 shell 之前**。ext/`ShellTool.prepare` 判断原命令，卡片、`Shell.Info.command` 与输出记录保留原来源。main 自己消费原命令和自己的本代环境快照，调用同一 ShellScan 的纯规划入口；不采信 helper 给出的解析结果，不复制一个 shell 解析器。新增 source span、确定值规划及 helper 重写均是 H1 的决定 raise，方言沿 ShellSelect。
 
 ```ts
 type PackageManagerKind = "homebrew"
+type PackageManagerAssignment = {
+  name: string; value: string // main 从下面 source span 确定的值
+  origin: "prefix" | "export"
+  start: number; end: number
+}
 type PackageManagerCommand = {
   nodeID: string
-  start: number // 原可执行 word 的 UTF-16 code-unit 范围，与 String.slice 一致；end exclusive
-  end: number
-  program: string // bare brew 或其路径写法，不含 argv/shell 运算符
-  argv: readonly (
-    | { kind: "literal"; value: string }
-    | { kind: "expansion"; source: string }
-  )[] // 保留原 shell 的词/展开槽，不在 main 执行 source
+  start: number; end: number // 原可执行 word 的 UTF-16 code-unit 范围，end exclusive
+  program: string // bare brew 或路径写法
+  argv: readonly string[] // main 规划出的确定值，不留 caller expansion 槽
+  cwd: string // main 从已批准初始 cwd 与源码里的确定 cd 推导的绝对路径
+  assignments: readonly PackageManagerAssignment[]
 }
 function planPackageManagerExecution(input: {
   manager: PackageManagerKind; command: string; shell: string; cwd: string
+  env: Readonly<Record<string, string>> // main 保存的本代工具环境；不是请求 env
 }): readonly PackageManagerCommand[]
 ```
 
-只把**可执行位置**的 `brew` 识别为候选，包括带引号/绝对/相对路径的 brew，以及 `command`、`env` 这类前置语义下实际启动的 brew；`echo brew`、注释、文件内容、参数字符串都不是入口。H3 新增由 main 持有的 Homebrew 安装解析器：裸名按这一代保存的工具 PATH 查找，路径限定按该节点的实际 cwd 解析；两种写法使用同一真实安装身份校验。`/opt/homebrew/bin/brew`、`/usr/local/bin/brew` 是默认布局，不是穷尽前缀名单；合法的路径限定安装不要求其前缀也在 PATH，不要求用户多填路径。候选文件名叫 brew 本身不允许把任意项目脚本当 Homebrew；main 不接受 caller 自选的 shell/interpreter/其它 executable。缺失或不可执行按普通命令错误返回，不能启动安装向导或换一个程序代跑。
+**识别形态钉住（R1-F3）：** 可执行位置上的裸 `brew`、引号/绝对/相对路径的 brew；可剥离的前置命令只复用 ShellScan 在 `scan.ts:64-65` 的既有集合（Bash：`builtin/command/time/coproc/!`；Zsh 再含 `noglob/nocorrect/exec/-`），另认只有 `NAME=VALUE` 操作数的 `env` 前置形式，不把 `env` 的选项/其它执行包装器自行扩成新名单。普通前缀赋值沿原 shell 语法。`echo brew`、注释、参数字符串不是入口。裸名按**该节点实际 PATH** 查找：main 本代快照加源码中可追溯的前缀赋值、literal export；不能用启动时 PATH 忽略该节点的显式覆盖。
 
-复合命令**只替换其中已识别的 brew 叶命令**为随包只读的、无窗口的原生流转发 helper；该 helper 仍由原 shell 在围栏内启动，不需要用户安装 Node/Python。`cd p && brew install x && touch y` 的 cd/touch 和流程控制都在原围栏内，只有 brew 及其后代在 main 那侧运行；路径限定 brew 同样处理。`&&`、`||`、pipeline、子 shell、输入输出重定向仍由原 shell 执行，重定向文件也由原围栏检查；不得把整段源文本交给 main 的 `shell -c`。shell 自己完成 argv 展开和该节点的当前 cwd/env，helper 只转发对应节点的进程 I/O。普通 shell 解析无法证明是 brew 的内容保持原 shell 执行，不因出现字符串而升级为围栏外权限，不能以“整段可能含 brew”作兜底。
+argv、cwd、赋值都由 main 的同一计划决定；可从快照和 literal export 确定的变量引用由 main 解析，不在围栏外执行 shell source、`$()`、反引号或 caller 提交的展开值。赋值/cd 只有在到达该节点的控制流上值可确定时才入计划；不能盲目应用未执行分支里的 export。`cd p && brew install jq` 的 cwd 由 main 按该已批准源码中的确定 cd 推导；遇到动态 cd、不能确定的展开、会重复执行同一语法节点的循环或其它 opaque 形态，不作 helper 重写。每个静态 brew 节点至多分流一次，源码中多个 brew 节点各自独立；不把它改成用户配额。其它所有形态**仍在围栏内照常执行**，不拒绝原命令、不新增询问，也不以含有 brew 为由豁免整段命令。
 
-H1 的 source span、按 literal/expansion 槽绑定执行材料与 helper 重写均为已决定 raise：literal words 必须原值相同，展开槽只占原词在 shell 中允许展开的位置；不能用 `brew --version` 的授权申请 `brew install ...`，不能把展开后的字节再次作为 shell 源码解释。helper/主进程不重新执行 `$()`，也不从 argv 重新拼 shell 文本。opaque 不等于拒绝普通命令，但绝不产生整段豁免；真实入口证据必须包括复合和路径限定形式，而非只验证一个独立的 `brew install`。
+**安装身份钉住（R1-F1）：** main 在安装围栏之前、于围栏外只读解析本机既有 Homebrew 安装并保存其身份；不执行尚未验证的候选脚本来探测身份。身份包含 prefix、canonical launcher、Homebrew repository root、`Library/Homebrew`，以及 launcher/路径节点的 realpath 与 dev+ino。默认 `/opt/homebrew`、`/usr/local` 布局沿现有平台工具发现（`platform/darwin.ts:5`、`platform/index.ts:24-30`）；不是对任何 caller 所给、长得像 Homebrew 的目录做即时登记。安装仓库/Library 不得来自已打开/已批准项目或其它围栏可写树；身份只在 main 本代安装快照建立，不从命令参数、项目 clone 或 helper 请求添加。每次命令规划可从这些已受保护的安装锚点刷新 launcher 当前元数据，容纳围栏外 brew 自更新，不因它换了文件 inode 就永久失去身份；刷新不接纳新的 caller/项目安装根。节点按自己的 PATH/cwd 解析后，必须与该安装快照的 launcher 身份一致；`~/.local/bin/brew`、`~/.cargo/bin/brew` 的同名脚本或项目内 cloned Homebrew 不因此获得豁免。路径限定写法也执行相同检查，不因在 PATH 外就免检。身份不符则原命令保持围栏内执行。
 
-### 4.2 H2：复用已完成的权限决定
+为使该身份在围栏启动后保持成立，在 `renderProcessFenceProfile` 的所有写 allow/X1 后、既有受保护拒写区域加入以下 **HB 精确拒写**，由现有 profile/planner 唯一持有，不改 v4 固定表原文：各已登记 prefix 的 `bin/brew` 用 literal；launcher 的真实目标及软链路径节点用 literal；repository root 节点用 literal；`Library/Homebrew` 用 subpath（连同其真实路径），其祖先/软链节点复用 CF 的 literal 节点保护。`repository root` 只拒改节点本身，不拒整棵 prefix：Apple Silicon 仓库与 prefix 同为 `/opt/homebrew` 时，npm 的 `bin`/`lib/node_modules` 仍可写。HB 不增加任何 allow，不把仓库别处已有写 allow 偷偷当作 Library/launcher 的可写许可。HB 路径先以 realpath 规范化，再补必要 alias 节点（V5-P09）。`ProcessFenceProfileInput` 新增必填 `homebrewFence: readonly ConfigFenceRule[]`（只接受既有 literal/subpath 两种分支，无 dat-files；无安装为 `[]`），值只由 main 的安装快照导出，不是用户配置或 sidecar 可提交的规则。profile 的 `processFenceWriteRules` 继续读取这份 deny；protected CF/C1 的拒写/拒读含义不变。此处只保护真实 brew 入口与实现，不冻结整个 bin，也不保护其它工具链软链。
 
-在 `Shell.create` 成功执行 before/prepare 之后新增宿主执行委托口。现有 create.before 不移作授权后口；core 通过 Plugin 的 Shell 域传递已准备好的调用，ext 只把该本机助手 shell 调用交给 main，core 不 import Electron/main。该口服务于已有普通本机执行与 B1 的分流，不新增档位名单或通用执行注册表。
+复合命令只把符合 H1 的 brew 叶改成随包只读、无窗口的原生 helper。原 shell 继续在围栏内处理 cd、`&&/||`、pipeline、子 shell、重定向与非 brew 叶；main 不接收整段 `shell -c`。改写源仅含非秘密 execution/node ID、helper 地址与原叶的程序/参数材料，**不含授权能力**；这些原叶材料只供 helper 在必要时沿原围栏 exec，不是 main 的执行参数来源。节点在实际执行前身份复核不符时，H4 返回 fenced，helper 在原围栏内 exec 原叶；不能把身份失败变成围栏外的任意脚本执行。
+
+### 4.2 H2：授权后登记、一次节点与真实 Shell 绑定
+
+成功执行 before/prepare、分配真实 Shell.ID 后且 spawn 前新增 Plugin Shell 域的宿主委托口，ext 经既有 parentPort 桥连 main；原 create.before 不变成授权后口，Core 不 import Electron。所有者仍是原 Shell/Job。
 
 ```ts
 type PreparedShellExecution = {
   shellID: string; sessionID: string; messageID: string; callID: string
   command: string; cwd: string; shell: string
-  env: Readonly<Record<string, string | undefined>>
 }
 type PackageManagerExecutionLease = {
   executionID: string
-  nodes: readonly { nodeID: string; program: string }[] // 原 source 的程序写法，执行文件只由 main 决定
-  brokerPort: number // 已有策略代理实际监听端口
-  authorization: string // 每次执行的内存能力，不是模型/账户凭据
+  nodes: readonly { nodeID: string }[]
+  helperService: string // 非秘密的本代 native helper 交付地址
+  executionSource: string // main 按 H1 计划产生的内部源，不含能力
 }
 function authorizePackageManagerExecution(
   input: PreparedShellExecution,
 ): Promise<PackageManagerExecutionLease>
+function bindPackageManagerShell(input: { executionID: string; pid: number }): Promise<void>
 function finishPackageManagerExecution(input: { executionID: string }): Promise<void>
 function cancelPackageManagerExecution(input: {
   executionID: string
   reason: "cancelled" | "timeout" | "engine-disconnected" | "app-quitting"
 }): Promise<void>
-```
-
-H2 的合法注册口也明确为新端口（Promise 侧契约，Effect 侧按既有 Plugin adapter 转换）：
-
-```ts
 type PreparedShellDelegate = {
-  executionSource: string // 只给内部 spawn；Info.command/审批仍用原 command
-  env: Readonly<Record<string, string | undefined>>
+  executionSource: string // 只给内部 spawn；Info.command/卡片仍用原 command
+  bindProcess(input: { pid: number }): Promise<void>
   cancel(reason: "cancelled" | "timeout"): Promise<void>
   finish(): Promise<void>
 }
-// Plugin.ShellDomain 新增单一宿主口；在实际 before/prepare 成功之后调用
 function delegatePreparedShell(handler: (
   input: PreparedShellExecution,
 ) => Promise<PreparedShellDelegate | undefined>): Promise<void>
 ```
 
-ext 在这里调用 H1/H2 并返回 helper source、该 Shell 的临时 env 和清理回调；无 brew 则返回 undefined，继续现有本机 spawn。core 持有执行所有权、在自然结束/中断/超时时调用对应回调，不允许通用 create.before 冒充该阶段，不引入 provider 注册表、配置开关或供模型调用的新工具。
+Promise 侧契约按现有 Plugin adapter 转 Effect。ext 调 H2，main 用 H1 自己规划，返回由该计划产生的 helper source；没有合格节点则委托返回 undefined，继续原 spawn。`Shell.create` 取到真实 `handle.pid` 后经 bindProcess 绑定一次 main 的本代 PID/pidversion；它不是模型填写的 pid。H4 的叶交付须等此绑定，不在外层 Shell.env、全局 env 或 executionSource 安放 bearer。core 在自然结束/中断/超时时调用对应清理。
 
-字段必填，无调用/节点/参数数量上限。main 的 lease 簿绑定**当前 sidecar 代、Shell/Tool 调用身份、已经过原 gate/permission.assert 的原命令快照、H1 节点计划及 main 的 Homebrew 安装解析权威**。完整 source 身份来自真实 `Tool.Context`（callID 对应 context.id），由 ShellTool 的内部调用上下文传给 core，不能从模型传入的 tool input/metadata 猜测。登记只走现有 parentPort `codepuppy.*` 的宿主接线，由新的授权后口触发；公开 helper 入口、工具参数、模型回话、普通 permission.replied 事件或 caller 自带 `approved:true` 都不能登记 lease。main 对活代和原调用快照核对，后续只消费该 lease 已列明的 brew 节点及其词绑定；实际可执行文件在该节点到达时按当前 cwd 与 main 保存的 Homebrew 安装身份解析，`cd` 后的相对写法不能提前按工具最初 cwd 误解；不能靠 shellID/decisionID 字符串自行申请授权。此绑定是 H2 的组成部分，当前源码的 void prepare 还不提供它，实施必须补齐，不可降格为一个可由任意子进程调用的 execute RPC。
+main 将 lease 绑定当前 sidecar 代、真实 Tool.Context（callID=context.id）和 Shell/会话身份、已通过原 gate/permission.assert 的 source/cwd 快照及 main 自己的 H1 计划。完整调用身份由 ShellTool 内部上下文传给 core，不从模型 tool input/metadata 猜测。登记/绑定/取消只接受真实 sidecar 宿主连接；helper 的公开数据口、`permission.replied`、`approved:true` 或 ID 字符串都不能登记 lease。授权登记不接受 caller env；本代普通工具环境来自 main 已保存的 `createSidecarEnv` + v4 R1/R2 投影。
 
-「全部批准」沿原 gate 允许后直接登记；「请求审批」等待原卡片批准及 prepare 成功后登记；原有 deny、用户拒绝、只读档都不能登记/启动。main 不再问一次、不重做一份权限策略、不把 brew 变成定制中心的“安装助手”工具；一次复合命令继续是一张原命令卡和同一个 Shell/Job。lease 无独立有效期、没有跨运行持久化；自然随该 Shell 执行及对应 sidecar 生命期结束，不增加用户配额、超时或确认。
+**R1-F2：每个已批准 brew 节点只消费一次。** main 原子记录 pending → claimed（只交给一个 helper 进程身份）→ started → terminal；取消、身份失效或未到达节点可从未启动状态直接 terminal，不能再领能力；claim 后的能力只允许该节点的一次 spawn，不能换 invocationID 再领一次，也不因断连/错误恢复为 pending。不再有 caller 自定的无限实例 ID 或 expansion 槽。lease 容器随原 Shell/sidecar 生命期清理，尚未消费的节点不是可供其它叶任意构造执行材料的权限。
 
-### 4.3 H3：main 直接运行 brew，结果回到原 shell
+「全部批准」走原 gate 后直接登记；「请求审批」原卡批准及 prepare 成功后才登记；deny、拒绝和只读档不能登记/启动。没有新卡、工具、档位名单、独立有效期、持久重放或新运行超时；原命令仍是同一个 Shell/Job。
 
-main 是实际 brew 进程的父进程，使用原工具相同 OS 用户身份，以 Node `child_process.spawn(executable, argv, { shell: false, cwd, env, detached: true })` 运行并持有独立进程组；不在 sidecar 里再套一次 sandbox-exec，不修改系统 brew，不用 sudo，不把整个引擎移出围栏。executable 只取 main 依据 lease 节点作出的解析结果，HTTP/helper 不能另给可执行文件；安装缺失的结果也在该节点报告，不能提前破坏 `&&`/`||` 的控制流。
+### 4.3 H3：main 仅使用自有计划运行 brew
 
-环境以该 brew 节点的普通工具环境和原 shell 运行到该节点时的 cwd/env 为基准：包含正常 PATH、HOME、R1 的包管理器默认缓存以及命令自己的环境赋值；**不 spread main.process.env，不自动附加 provider/账户密钥或凭据内存表**；传给 brew 之前剥离 helper 的 lease 能力及 broker 控制变量，绝不把控制凭据当普通子进程环境传下去。撤掉宿主为强制联网围栏注入的代理值，并保留/恢复用户本来的代理选择；原命令显式指定的用户代理按原 shell 语义保留。main 在现有 `createSidecarEnv` 结果被 `sidecarEgressProxyEnv` 覆盖之前保存本代 PATH 和八个代理键的值/缺席状态（V5-P06）；H3 增加该快照与 lease 的接线。运行材料中仍等于本代应用注入值的代理键恢复此快照，显式不同的值保留；缺席则删除该键。不能把“围栏外 brew”仍强制送回应用的策略代理。Homebrew 自身的缓存、prefix、日志和脚本行为使用其正常位置/既有环境，不把 v4 原本未冻结的 Homebrew cache 候选误当有效清单，也不扩大 v4 的全局 allow。
+main 以原工具同一 OS 用户身份 `child_process.spawn(executable, argv, { shell: false, cwd, env, detached: true })`，持有独立进程组。executable 只取 H1 受保护安装；argv/cwd 只取 main 保存的对应节点计划，**helper 请求不携带、更不能替换 argv/cwd/env**。执行前再次核对 launcher/路径身份；身份失效返回 fenced，由 helper 在原围栏 exec 原叶。缺失的 brew/其它普通启动错误仍在原叶到达时返回，不提前破坏 `&&/||`，不启动安装向导。
 
-每个 brew 实例的 stdin/stdout/stderr、最终 exit/signal 由 H3 逐字节流回 helper；helper 保持原 shell 的文件描述符语义，将两路输出写回自己的 stdout/stderr，并以 brew 的真实退出状态/信号结束。原 `Shell.create` 的 capture、ShellResult、Job 通知与取消继续工作，因此无需 main 调用会话 API 写“成功”消息，也无需另造结果格式。没有新增输出截断、缓存大小或运行时长限制；背压/流结束复用通常的 pipe 语义，终态在输出 flush 后只发布一次。
+环境基线只用 main 为本代保存的普通工具快照（含 v4 R1/R2 缓存默认值），再应用 **H1 能用原 source span 追溯的前缀赋值与 literal export**；赋值值也由 main 从源码/快照确定，不从请求补键或补值。不可追溯的键忽略，不因此拒绝原命令。最后无条件剥离 `BASH_ENV`、`ENV`、所有 `BASH_FUNC_*`、`SHELLOPTS`、`BASHOPTS`、`PS4`，以及内部 helper 控制材料；即使这些键出现在快照或合法赋值中也不传给 brew。不是清空用户环境或新增命令禁令，而是避免 bash launcher 在执行已批准 argv 之前解释 caller 注入的启动代码。
+
+不 spread main.process.env，不自动附加 provider/账户密钥或凭据内存表。main 在 `createSidecarEnv` 被 `sidecarEgressProxyEnv` 覆盖前保存八个代理键的值/缺席（V5-P06），H3 使用该原始用户代理快照而非应用策略代理；仅源码可追溯的用户代理赋值可覆盖它。Homebrew 缓存/prefix/日志保持自身正常环境，不增加 v4 的 Homebrew write allow；brew 不继承 H4 的能力。
+
+stdin/stdout/stderr 与真实 exit/signal 流回原 helper；它将字节写回自己的标准流、以 brew 的真实退出状态/信号结束。原 Shell capture、ShellResult、Job、后台与取消机制继续工作；main 不写会话消息或合成成功。没有新增输出大小或时长限制，背压沿 pipe 语义，flush 后只发布一个终态。
 
 ```ts
-type PackageManagerProcessRequest = {
-  executionID: string; nodeID: string; invocationID: string
-  argv: readonly string[]; cwd: string
-  env: Readonly<Record<string, string>>
-}
+type PackageManagerProcessRequest = { executionID: string; nodeID: string }
 type PackageManagerProcessFrame =
   | { type: "stdout" | "stderr"; seq: number; dataBase64: string }
   | { type: "exit"; exitCode: number | null; signal: string | null }
+  | { type: "fenced" } // 尚未 spawn，身份失效；helper 改在原围栏 exec 原叶
   | { type: "stopped"; reason: "cancelled" | "timeout" | "engine-disconnected" | "app-quitting" }
 ```
 
-同一 invocationID 重复交付不得再 spawn；一次循环中多次 brew 是不同实例，不设次数上限。main 先核对活 lease、节点词绑定、有效 cwd/env，再 spawn；argv/cwd/env 是运行材料，不是可修改已批准源文本的通道。未持有 lease 的请求、伪造/重放或节点不匹配不启动任何进程，并经 helper 的普通非零命令错误报告。连接失效不自动重跑安装，以免重复外部副作用；新一次用户/助手命令仍按原规则执行。
+同一节点再次请求为 0 main spawn，不自动重放安装。伪造、过期代或节点不符为普通 helper 非零错误；不能通过新请求扩大节点、参数或环境。连接失效同样不重跑；新一次命令仍按原规则执行。
 
-### 4.4 H4：窄流式传输与取消接线
+### 4.4 H4：能力只交给 helper 叶、流式结果与取消
 
-授权登记、finish/cancel 在现有 `codepuppy-sidecar-messages` / `CodePuppySidecarHost.receive` / HubBridge 上增加对应类型，控制请求不等待 brew 跑完；现有桥的控制应答超时不是 brew 的运行超时。流式 helper 需要一个**新增且仅服务于活 lease 的内部入口**，复用已有 N4 允许的策略代理 loopback 监听端口，在 `startEgressPolicyProxy` 的非 CONNECT 分支之前只分派 `POST /codepuppy/package-manager/process`：
+授权登记/bind/finish/cancel 复用 `codepuppy-sidecar-messages` / `CodePuppySidecarHost.receive` / HubBridge，控制应答不等 brew 完成，也不成为安装超时。**替代送审版的 shell exported 控制环境**：新增 ui-mac native 的叶交付口，只有随包 helper 进程从 main 的私有 Mach request/reply 直接取得一次节点能力，使用内核消息 audit trailer 识别 peer，不接受消息自报 pid。该口只做下列交付，不提供执行任意程序、登记 lease 或改计划功能。
 
-- 请求的 `Authorization: Bearer <authorization>` 头携带 H2 的每次执行能力；URL/日志/命令 argv 不含能力。该值只经宿主→调用所有者→该 Shell 的临时控制环境交给 helper，不进全局 sidecar env、bootstrap、磁盘或会话输出；不是新增用户配置。
-- 请求/响应均为 UTF-8 `application/x-ndjson` 的 chunked 双向流，一行一个 JSON；请求首行为 PackageManagerProcessRequest，之后只能是 `{ type: "stdin", dataBase64: string }` 或 `{ type: "stdin-eof" }`；响应为上述 H3 的有序输出/终态帧。用现有 Node HTTP request/response 的双向流，不另起对外服务、不增加 loopback 端口或放开一个任意转发路径。随包原生 helper 仅实现该传输，不提供其它程序执行功能；打包/签名复用 ui-mac 既有原生资源链，不能依赖用户另装解释器。
-- 代理模块只做这一个 origin-form 路由分派，lease/节点/执行属于 main 的包管理器执行所有者；原 CONNECT 的目的地策略、未知路径/方法的拒绝行为保留。这里不是目的地联网批准，不新增联网卡。
+```ts
+type PackageManagerNodeClaim = { executionID: string; nodeID: string }
+type PackageManagerNodeGrant =
+  | { kind: "delegated"; brokerPort: number; authorization: string }
+  | { kind: "fenced" }
+  | { kind: "error"; error: "unauthorized" | "inactive-execution" | "node-consumed" }
+// 新 native 接缝；peer 来源是内核，不是可序列化的 caller 字段。
+function claimPackageManagerNode(
+  input: PackageManagerNodeClaim, peer: NativeHelperPeer,
+): PackageManagerNodeGrant
+type NativeHelperPeer = {
+  pid: number; pidversion: number
+  executable: string; signingIdentity: string
+}
+```
 
-HTTP 在启动进程之前完成首帧校验：接受后返回 200 并流送 H3 帧；400/`invalid-request` 表示帧或字段不合法，401/`unauthorized` 表示能力缺失或无效，403/`command-mismatch` 表示节点/词绑定不符，409/`inactive-execution` 或 `invocation-conflict` 表示 lease 已结束或实例 ID 已消费，均为 0 spawn。失败体固定为 `{ error: 上述字符串枚举 }`，不回显环境/能力；helper 把它转成原命令的 stderr/非零状态。连接失败/流中途断开同样不能报告成功，且不重放安装。普通 brew 的启动/运行失败在 200 流中返回真实 stderr/退出，不伪装成 HTTP 授权失败。
+main 核对 peer 为受保护的随包 helper、生产签名/代码完整性且不容许注入，进程身份是 H2 已绑定的真实 Shell 自身（exec 形态）或其后代、当前代/节点尚未 claim，然后原子 claim；未知/重复/伪造 peer 只返回上述 error（helper 以 stderr/非零结束），不给能力、不启动 brew。helperService 地址与 node ID 不是能力。`NativeHelperPeer` 的内核身份/映像验证和私有 Mach 交付是**明确新增的 H4 raise**（V5-P08 只有 audit token 先例，没有现成端口）；由 ui-mac 原生模块与 main 同一个节点簿消费，能力只留该 helper 内存、仅用于其下一次数据请求。不得改成叶前缀文本里插入秘密、共享临时文件、继承 FD 给整棵 shell 或 exported env；外层 shell、其它叶及其孩子都不获得能力。Mach 交付不增加 TCP 端口，不能变成 BR-05 的扩权入口。
 
-控制消息的身份取自承载它的真实 sidecar 连接，不能由 payload 换代。main 将每个进程组与 lease/Shell 绑定；shell.remove、工具 abort、原 shell timeout 或 helper 被 kill/流断开，都会通过 cancel/连接关闭终止对应 brew 及其普通后代。复用原命令的终止语义（现有 Shell 的 TERM/forceKillAfter=3s），不另设安装限时。取消对象是 main 保存的活 ChildProcess/进程组，不按 caller 自报 pid 杀进程。
+数据仍复用 N4 允许的唯一 loopback 端口：`startEgressPolicyProxy` 的非 CONNECT 分支只分派 `POST /codepuppy/package-manager/process`。请求头 `Authorization: Bearer <authorization>` 是该叶的一次能力，不进 URL、argv、环境、日志、bootstrap 或磁盘；成功启动时原子消费并从 helper 清除。请求/响应是 UTF-8 `application/x-ndjson` chunked 双向流，首行为仅含 ID 的 PackageManagerProcessRequest，之后只能 `{ type: "stdin", dataBase64: string }` / `{ type: "stdin-eof" }`，响应为 H3 帧。随包无窗口 helper 复用 native/resources 打包签名链，无需用户安装 Node/Python；main 不接收 caller 的 executable、argv、cwd、env 或展开值。原 CONNECT 策略、未知方法/路径的拒绝不变，无新联网卡。
+
+首帧接受返回 200；400/`invalid-request` 为字段/帧不合法，401/`unauthorized` 为能力缺失/无效，403/`node-mismatch` 为节点/peer 绑定不符，409/`inactive-execution` 或 `node-consumed` 为执行已结束/节点已消费，均为 0 spawn。错误体 `{ error: 上述字符串枚举 }` 不回显材料，由 helper 转 stderr/非零；普通 brew 启动/运行错误仍用 200 流的真实输出/退出。身份在启动前失效以 fenced 终态回到原围栏，不冒充成功。流断开不重试。
+
+main 按真实 ChildProcess/进程组绑定 lease，shell.remove、工具 abort、原 shell timeout、helper kill/流关闭均取消对应 brew 及其普通后代。沿原 TERM/forceKillAfter=3s 语义，不加安装限时，不按 caller 自报 pid 杀进程。正常应用退出清理见 §5；不对 main 崩溃/强退作同样保证。
 
 ### 4.5 seam map
 
 | 依赖能力 | 可调用符号 / 明确决定的 raise | 所有者与边界 |
 | --- | --- | --- |
-| 原权限与执行身份 | `ShellTool.prepare`（`tool/plugin/shell.ts:114`）、`Permission.assert`；H2 的 `delegatePreparedShell` 与授权后 lease 接缝新增，位置在 `Shell.create` 的 before 返回之后（`:285`） | Core/Plugin 只给准备事实，ext 接宿主；不是复用 create.before 或信任布尔值 |
-| brew 叶命令和保真重写 | 复用 ShellScan.scan（`shell/scan.ts:227`）与 ShellParse 权威；H1 新增 source span、词绑定与 helper execution source | 单一 shell 语法所有者；opaque 不提供豁免，不写整段 main shell |
-| 控制往返 | `createHubBridge`（`ext/src/hub-bridge.ts:80`）、`createCodePuppySidecarHost`（`hub-view.ts:501`）、`server.ts:779-802`；H2 三个方法对应新的 request/reply | 现有父进程通道；无 helper 登记 lease 的公开端点 |
-| Homebrew 解析与环境 | H3 新增 main 安装解析器与本代启动快照；复用 `createSidecarEnv`、`sidecarEgressProxyEnv`（V5-P06），按节点 cwd 解析真实安装 | 不是新 PATH/代理真源；不复制 main 全量环境 |
-| 原生 helper 与流式 brew 运行 | H3/H4 新增 main-run 生命周期及只读随包 helper；Node spawn/HTTP；当前代理 `network-egress-proxy.ts:242` 只有 405，需要 H4 的精确路由 raise | main 执行、helper 在围栏内；没有声称已有代理可用 |
-| 普通会话结果/取消 | `Shell.create` capture/exit（`core/src/shell.ts:333-434`）、`ShellResult.output`、`ShellTool` 的 interrupt → shell.remove（`:211-224`） | 仍是原 Shell/Job；H4 增 cancel 的跨边界接线 |
-| 应用/引擎关闭 | `index.ts:715-726` 的 before-quit/will-quit 与 sidecar 退出；H4 增 main 的 lease 进程组清理 | main 持有句柄，清理独立于 sidecar 是否还有能力收结果 |
+| 原权限与真实执行身份 | `ShellTool.prepare`（`tool/plugin/shell.ts:114`）、Permission.assert；H2 新增 `delegatePreparedShell` 于 before 返回并分配 ID 后（`core/src/shell.ts:285-287`），真实 handle.pid 在 `:323-326`，新增 bindProcess/`bindPackageManagerShell` | Core/Plugin 给准备事实，ext 接桥；不信任模型布尔值/PID |
+| main 自有计划与重写 | 同一 `ShellScan.scan`（`shell/scan.ts:227`）、纯模块/前置词表（V5-P08）；H1 新增确定 argv/cwd/赋值 source span 的规划入口；main 经该窄纯入口消费 | 不引服务层/复制 parser；不能确定就继续原围栏，不接收运行期展开 |
+| Homebrew 身份与 HB profile | H1 新增 main 安装快照/身份核对；`renderProcessFenceProfile`（`process-fence-profile.ts:236-261`）/CF literal 节点保护（`:266-286`）/`processFenceWriteRules`（`:304` 起）消费 HB deny | 与 v4 R1/R7 同一 planner/profile；只保护 brew，不冻结 npm bin |
+| 主进程环境 | `createSidecarEnv` / `sidecarEgressProxyEnv`（V5-P06）及 v4 R1/R2；H3 新增本代快照与源码赋值投影、固定剥离键 | main 是唯一值来源，helper 不供 env/cwd/argv |
+| 既有控制往返 | `createHubBridge`（`ext/src/hub-bridge.ts:80`）、`createCodePuppySidecarHost`（`hub-view.ts:501`）、`server.ts:779-802`；H2 新增对应 request/reply | 原宿主连接，公开数据口不登记 lease |
+| 仅叶能力交付 | H4 新增 `claimPackageManagerNode`、NativeHelperPeer 的内核 audit/映像签名核对和私有 Mach 交付；原生 audit token 先例（V5-P08）不是现成实现 | ui-mac native/main/helper；不把能力交给整个 Shell/任何非 brew 子进程 |
+| 一次节点/流式运行 | H3/H4 新增 main 节点状态机/HTTP 精确路由，当前 `network-egress-proxy.ts:242` 只有 405；随包 helper 同链打包签名 | 不再有任意 invocationID；每节点至多一次，不重放 |
+| 原结果/取消/退出 | `Shell.create`（`core/src/shell.ts:333-434`）、ShellResult.output、ShellTool interrupt → shell.remove（`:211-224`）、`index.ts:715-726`；H4 新增跨边界取消/正常退出清理 | 原 Shell/Job，main 持有句柄；崩溃残留如 §5 |
 
 ## 5. 数据与失败
 
-只有本次执行的 main 内存 lease/进程簿，不新增数据库、迁移、持久任务队列或自动恢复重跑。brew 不存在返回普通 command-not-found（127），不可执行返回通常的启动失败（126）；其他 spawn/I/O 错误保留 stderr 与非零结果，不吞掉、不装作安装成功。若外层 shell 使用 `||`/pipeline 处理该退出，最终命令结果照原 shell 语义计算。
+仅本次执行的 main 内存安装/计划/节点簿，没有数据库、迁移、持久任务队列或自动恢复重跑。身份/形态不合格沿原围栏运行，不改 gate 结果、不拒绝原命令；因此仍可能遇到旧的 Homebrew 嵌套沙箱失败。brew 缺失返回 command-not-found（127），不可执行返回通常的启动失败（126）；其它 spawn/I/O 错误保留 stderr/非零，不合成成功；外层 `||`/pipeline 仍按原 shell 语义计算。
 
-取消与退出竞态只产生一个终态；原命令超时由原 Shell/Job 控制，main 不另开始一段新的默认计时。main 正常退出时，before-quit 暂缓这次退出，先停止接新 lease、按原有终止语义结束所有在途 brew 进程组，再清理传输/sidecar并继续退出；重入只清理同一批句柄一次；will-quit 做幂等清理，不能依赖已经退出的 sidecar 替 main 杀进程。应用已经关闭时不可能再向对话交付结果，不写一个 exit 0；保留现有 Shell/Job 中断/未完成恢复含义，不在下次启动重跑安装。用户重新发命令仍走原批准规则。
+取消/退出竞态只发布一个终态，沿原命令超时。正常 before-quit 暂缓退出，停止新 lease，按原终止语义结束在途 brew 进程组，再清理传输/sidecar 后继续；重入/ will-quit 幂等，不依赖已退出的 sidecar 杀 main 的孩子。应用关闭后无法再给对话交付结果，不写 exit 0、不在下次启动重跑。**R1-F4 的诚实残留：** `detached: true` 的 brew 进程组在 main 崩溃或被 force-quit 时会继续运行；before-quit/will-quit 不能覆盖这种退出，不声称原取消钩子提供父进程死亡保证。本次不新增守护进程/崩溃回收机制。
 
-**残留只按已批准 v5 限制如实声明：** brew 命令及其安装脚本在围栏外运行；应用的写入范围、已保存密钥保护与联网范围约束不了它们。main 不承诺替它们过滤文件写入、遮住凭据文件或限制网络，也不虚称 Homebrew 自己的沙箱等于应用围栏。此豁免只属于已获准的 brew 进程树；复合命令的其它叶命令、普通引擎/MCP/LSP/终端、R8 的启动环境探针都不因此移出围栏。
+**残留按 SPEC v5 限制原意声明（含 R1-P0）：** brew 命令及安装脚本在围栏外运行；brew 自身还能执行任意代码，如 `brew ruby -e`、`brew sh`、读取仓库 Brewfile 或 `--file=-` 的 `brew bundle`、`brew install ./x.rb`，以及从 PATH 找到的外部 `brew-<name>` 子命令。它们都是 owner 允许的“这条 brew 命令”，本设计不筛成只有 install 类子命令。应用的写入范围、已保存密钥保护与联网范围约束不了它们；main 不承诺过滤其写入、遮住凭据文件或限制网络。v4 的可写 `/opt/homebrew/bin` 等还允许围栏内代码替换其它工具链软链，围栏外 brew 随后可能调用它们；HB 仅保护 brew 身份，不消除这个残留，本次不增机制。复合命令的非 brew 叶、普通引擎/MCP/LSP/终端和 R8 探针仍在原围栏。
 
 ## 6. 架构落点与证据边界
 
-沿 `modules.md` 的 Core/Plugin、ext、ui-mac 边界：Core 保有 Shell/Job/语法与权限，Plugin 只提供 H2 这个真实授权后接缝，ext 通过既有 bridge 消费；main 保有 executable 解析、lease 与进程句柄，原生 helper 归 ui-mac 的既有 native/resources 归属。Core/Protocol 不依赖 Electron，ext 不 import main 的私有模块，无新顶层模块目录。K1 不复制档位名单，K2 不在 main 重写权限引擎，也不另写 ShellScan。真实围栏派生通路的单一登记权威须将 H3 点名为 **SPEC v5 BR-09 的 Homebrew 已知豁免**，不能偷偷抹掉围栏断言。
+沿 `modules.md` 的 Core/Plugin、ext、ui-mac 边界：Core 保有 Shell/Job/语法与权限；main 消费 ShellScan 的窄纯入口并自行持有计划，不依赖 Core 服务层，不另造 parser；Plugin 的 H2 由 ext 经既有桥消费。main 的 profile/planner 持有安装身份、HB 拒写、环境和节点簿，ui-mac native/helper 持有内核 peer 交付与字节转发。没有新顶层模块目录或包依赖，Core/Protocol 不依赖 Electron、ext 不 import main 私有实现。K1 档位名单不变，K2 同一概念仍只有一个判定权威；H3 在真实围栏派生通路的单一权威中登记为 **SPEC v5 BR-09 的 Homebrew 已知豁免**，不抹掉围栏断言。
 
-实现证明必须从真实助手 shell 工具入口经过原 gate/prepare → H2 → main → 真实 brew；在打包签名形态上用一个来源可追溯、确实触发 Homebrew 内部 Sandbox 的真实 formula 安装，保留输出/退出及落盘事实。**已知坏对照**：同一命令撤掉 H2/H3 的围栏外分流，回到原 sidecar 派生路径，必须因嵌套沙箱失败（P09 已观察 exit 71），不能以 --version 成功、纯 resolver 或 mock 返回值代替。全批档 0 新卡、请求审批档只有原卡且批准后成功，拒绝/只读/伪造 lease/把已批准的 --version 换成 install 都必须 0 main spawn。
+实施证明仍从真实助手 shell 工具 → 原 gate/prepare → H2/main → 真实 brew；打包签名形态用来源可追溯且触发 Homebrew 内部 Sandbox 的真实 formula 安装，保留输出/退出/落盘。已知坏对照撤掉分流后，原围栏路径必须因嵌套沙箱失败（P09 exit 71）；--version、纯 resolver 或 mock 不替代。全批档无新卡、请求审批档只有原卡；拒绝/只读/伪造 lease 为 0 main spawn。
 
-同一真实入口还必须证明 `cd && 路径限定 brew && 非brew写入` 的 cwd/流程正确，非 brew 越界写仍被拒；pipeline、重定向与 stderr/exit/signal 回到原 capture，后台/大输出仍沿原结果机制；取消、超时、sidecar 断开与应用正常退出都结束 main 在途进程且不重复报告成功。节点词绑定、source span、授权后 port、原生 helper 的生产签名及 HTTP 背压/断连尚未实跑，均是实施证明义务，不冒充当前可调用事实；具体语料/文件/顺序归 plan.md。
+R1 的反向材料必须进入同一真实入口证明：改写/删除 launcher、重指 Intel 软链和替换 repository/Library 失败，同时普通 npm bin 安装仍成功；PATH 影子 brew、项目 clone 和不合格形态都实际在围栏内运行。`brew install jq && npm install` 的非 brew 叶及 postinstall 获得 0 能力；同 node 换任意 ID/重复请求仍只有一次 spawn，额外 env/cwd/argv/展开材料改变不了 main 计划。BASH_ENV/ENV/函数导出/选项/PS4 不进入 brew；可追溯 PATH/代理赋值与确定 cd 正确。仅对 helper 的 native 交付、签名/进程身份、防注入与 pidversion 绑定不能用 caller PID 字符串或共享 env 替代。其实现均尚未实跑，属于明确的 H1–H4 raise/实施证明义务。
 
-被否决：包含 brew 就把整段命令交 main shell（扩大豁免）；让 sidecar 自己禁用沙箱或剥掉 Homebrew 内部沙箱（不符合已选 A）；通用的“给任意 executable 运行”RPC（超出 B1）；再加一张 Homebrew 批准卡（无 owner 授权）。普通 OS 文件权限/工具错误维持原含义，不引入 root 权限或系统安装向导。
+复合/路径限定、pipeline/重定向、stdout/stderr/exit/signal、后台与大输出继续沿原结果机制；正常取消、超时、sidecar 断开/应用退出结束在途进程，force-quit 残留如 §5。具体语料/文件/顺序留 plan.md，不因证明义务添加新用户步骤。
+
+被否决：整段命令移出围栏、sidecar 禁用沙箱、任意 executable RPC、再次批准卡（均超出 B1）；共享 shell 环境交付能力、caller 自供执行材料、给任意 Homebrew clone 认身份（R1 已证不成立）。只放行 install 类子命令未采纳，见 §10 留档。
 
 ## 8. 拆分决定
 
@@ -900,9 +925,22 @@ HTTP 在启动进程之前完成首帧校验：接受后返回 200 并流送 H3 
 
 | 裁决 | 来源 / 适用范围 |
 | --- | --- |
-| B1 已由 owner 选择 A，不再待决；允许后由应用替助手在围栏外运行 brew | U-38（2026-11-26），对 brief 引用的「由应用替助手在围栏外运行 brew；代价是 Homebrew 软件包自带的脚本在围栏外运行」答「好的。」；已落 SPEC v5 BR-09 与新增限制行、版本 5 批准记录，提交 `834e269da9` |
-| main 仅执行对应已批准 brew 节点，复合命令不整体豁免 | §4 H1–H4；只把 B1 所需进程树移出围栏，不修改 v4 的其余规则 |
-| 复用原 gate/审批，不增加卡片；结果和取消仍属原 Shell/Job | V5-P01/P03；新接缝如实列明，不把现有 create.before 当成授权后口 |
-| v4 状态仍 frozen，所有 R1 处置不变；v5 为 frozen-pending-review | `efc8ba3abd` 的 v4 收据与正文逐字保留；本轮独立审查尚未运行，frontmatter rounds=0、verdict=pending-review 只属 v5 |
+| B1 已由 owner 选择 A；允许后由应用替助手在围栏外运行这条 brew | U-38（2026-11-26），对「由应用替助手在围栏外运行 brew；代价是 Homebrew 软件包自带的脚本在围栏外运行」答「好的。」；SPEC v5 BR-09/限制/批准记录，提交 `834e269da9` |
+| main 只消费原批准节点的一次自有计划；原卡/结果/取消不增加步骤 | H1–H4 经 R1 修订；参数/环境不由 helper 提交，不把复合命令整体豁免 |
+| v4 正文、所有 R1 处置仍 frozen；v5 经本轮 R1 修正后 frozen | v4 原文逐字保留；v5 收据 rounds=1、reviewed_sha=`176ba25a68`、verdict=`fix-then-freeze; R1 2 Blocker 2 Minor accepted and corrected`，依本次编排者明确处置，不声称修订稿又获独立复审 |
 
-**交接收据：** 依据 SPEC v5 `834e269da9`、设计 v4 `efc8ba3abd` 与本次 owner 决定 brief；Codex（GPT-6，designer）只核对本增量的实际入口与 H1–H4 seams，V5-P05 小探针退出 0；已核对 `# DESIGN-` 起的 v1–v4 正文仍以原提交内容逐字作前缀。旧名称扫描 `cd packages/ui-mac && bun test src/main/old-name-scan.test.ts` 为 10 pass/0 fail；文档契约检查与输入 HEAD 同为 72 个 error、249 个 warning，无新增 finding，既有问题未在本次修复。结论：B1 设计增量冻结待独立审查，无 owner 待决；实现/生产证据尚未执行，留本增量 §6。没有 merge origin/alpha、实现、推送或变动 v4 裁决。
+### R1 处置（审查 `176ba25a68` 的 v5 增量，原 :725-908）
+
+审计方 Claude Opus 5.5（read-only），结论 FIX-THEN-MERGE；本次 brief 裁决四项接受修正及 premise note 留档。只修 v5 和其 profile 接缝，不改 v4 历史决定。
+
+| finding / 处置 | 修订决定及原因 | 核对 / 尚待实施证明 |
+| --- | --- | --- |
+| R1-F1 Blocker，accepted / corrected | H1 以 main 预先解析且受 HB 拒写保护的 launcher/Library 身份为准；prefix/bin/brew、repository 节点精确 literal，Library subtree 拒写；不匹配走原围栏。消除可写 bin 脚本/影子命令/任意 clone 冒充 | V5-P07/P09 与 CF 既有节点语义；本轮 canonical marker 正反探针通过，真实入口仍须证明 launcher/仓库不可替换且 npm bin 可安装 |
+| R1-F2 Blocker，accepted / corrected | H2/H4 仅给已绑定 helper 叶一次能力，不进 shell exported env；节点单次原子消费；H3 只用 main 的 argv/cwd/环境快照和可追溯赋值，固定剥离六类 shell 注入键，不拒绝不可追溯环境键 | 删除 expansion/env/cwd/invocationID 请求字段；新增叶私有交付/真实 PID 绑定 seams。真实 postinstall、重放和注入负例须 0 额外 spawn |
+| R1-F3 Minor，accepted / corrected | H1 识别仅为 scanner 既有前置集合及只有 NAME=VALUE 的 env；节点自身 PATH 决定裸名候选，再过身份校验；其它形态照旧围栏内执行 | V5-P08；真实源码赋值/路径限定、影子和 opaque 对照 |
+| R1-F4 Minor，accepted / corrected | §5 明说 main crash/force-quit 后 detached brew 组继续运行；只保留正常退出清理承诺 | 没有声称 quit 钩子覆盖强退，也没有新增守护机制 |
+| R1-P0 premise note，record / 不收窄 | §5 点明 brew 自身子命令/本地 formula/Brewfile/stdin/外部命令可执行任意代码；仍属 owner 批准的“这条命令”。并记其它工具链软链可被 v4 bin allow 改写并供 brew 调用 | 不加 install 类过滤或保护其它工具链的新机制；收窄提议由编排者告知 owner、登记 pending intent，本次不是有效设计输入 |
+
+**留档：** “只让安装类子命令围栏外运行”尚无 owner 批准，本次不实施、不形成限制/新 gate，也不将它记成 owner 决定。它不阻止按现有 SPEC v5 与本轮技术修正冻结；后续如 owner 改规格，再只重开受影响部分。
+
+**交接收据：** 输入 SPEC v5 `834e269da9`、v4 `efc8ba3abd`、v5 送审版 `176ba25a68` 与本轮 R1/编排者处置。Codex（GPT-6，designer）核对上述符号与全部受影响 H1–H4 接缝，v1–v4 正文未改；V5-P09 的 canonical marker 正反探针通过（非 canonical 规则的失败观察也留档）；旧名称扫描 10 pass/0 fail，`git diff --check` 通过；文档契约相对输入 HEAD 仍为 72 error/249 warning、无新增 finding。生产实现/签名/真实安装和负向证明尚未执行，留 §6。结论为 v5 已修并 frozen，无本次交付需要等待的 owner 决定。未 merge/rebase、实现、push、PR 或变动 v4 裁决。

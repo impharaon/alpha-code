@@ -652,3 +652,15 @@ installNpmConnector 在同一 Location 的随包 Node 内加载官方原声明�
 真实 setuptools75.8.0 构建的 src-layout PEP660 editable 包，随包 uv0.13.10 / Python3.12.16 安装成功；来源文件整体从 source-a 改名为 source-b 后，产品内容 fingerprint 前后同为 dbeb9c65cc1d5020c605c63833232725fd07ec9779aa48065b8a5605d925b096，capture/publish/read 仍命中有效包入口收据，但实际 venv Python import 报 ModuleNotFoundError。原文件 __file__ 为 source-a，uv 生成的 editable 绑定保留了这个绝对路径。证据 `gate slot -- bun /tmp/connector-r5-npm-proof/editable-receipt-r7.ts`（`/tmp/connector-r7-editable-receipt.log`、`/tmp/connector-r7-editable-yo35envh/receipt-result.json`）。这是执行绑定必须覆盖的真实缺口，不能仅把当前 cwd/argv 改成 source-b 就当完成，也不能把项目路径塞回内容 key。绑定实现未完成前不声明完整 prepare 或 DONE-INDEPENDENT。
 
 文件偏离：新增 content 程序是 Node/npm/UV 两运行器共享的本地源责任，diagnostic 仅导出既有 URL 名称规则供这个隔离程序消费，key 的规范化函数可自包含序列化，避免另写秘密规则；未加生产依赖/选项/权限表。后续 UV resolved 值解析与环境绑定在既有 uv-launch 同链继续。
+
+### r7 已落：当前执行绑定与 uv resolved 值解析
+
+bindConnectorLaunch 将有效准备的入口与本次 argv/cwd/环境重新结合：npm 默认/显式 bin、当前包目录 .bin、Node shebang/JS、native、Windows cmd/bat 与 ps1 分支；--call 使用随包 npm 的 promise-spawn 处理平台 shell，不把业务值写入 ready。npm 生命周期环境复用实际 libnpmexec/run-script 与 @npmcli/run-script 的 make-spawn-args/package-envs，在调度边界只捕获应用自有元数据，不运行服务。env 包含真实 INIT_CWD、npm_lifecycle_*、当前项目配置；最终仍由 connectorRunnerEnvironment 投影角色缓存/PATH。shell 输入仅经该次子进程私有环境传递，启动子进程前删除，不进入 argv 或持久回执。
+
+uv 当前执行环境由随包 uv run --offline --no-config --no-project 的应用自有 Node 元数据探针读取，uv 自己处理 --directory 和 env-file 展开，不加手写 dotenv 解析。parseUvResolvedValue 解析真实钉住 Debug 的 nested tuple/map/record/Rust string，只是后续内容适配的值层；尚未把所有 requirements/source/解析配置变成 key facts。未提交一个不完整的配置投影占位函数，也未增加 prepareConnectorLaunch stub。
+
+新增3例在既有模块文件：真实 uv 样本的 nested config/escape；真实 npm 元数据→准备入口→SDK stdio 的本次 argv/cwd/业务环境；--call 保留 shell 语义且两次业务值不进 ready。组件/集成层均受影响 PR/nightly，依赖由静态 import 和既有字面 fixture URL 可追溯。源码 gzip 补入 pinned libnpmexec 的 run-script/no-tty/is-windows 原文件；其余依赖复用仓内已装版本，正式 pinned 实物另核。
+
+`bun test test/codepuppy-connector-launch.test.ts -t 'uv resolved settings retain|bound package entries use|npm call binding keeps' --max-concurrency=2` →3 PASS /16 assertions；本行为整文件 `bun test test/codepuppy-connector-launch.test.ts --max-concurrency=2` →45 PASS /249 assertions（`/tmp/connector-r7-binding-new.log`、`/tmp/connector-r7-binding-file.log`）。核心 `bun typecheck` 已通过2069 files/2 projects；最终检查与移除臂在本轮收据补记。
+
+**当前未完成边界**：完整 uv PEP508/requirements（Local/Remote/Stdin 与递归包含）、resolved config→content facts、editable 源路径重绑仍未完成；完整 prepareConnectorLaunch 的 Python 定位/准备事务/ready 快路径/失败取消进度组合仍未定义。npm 读侧与产品 installer、执行绑定 primitives 已完成，不将它们等同完整第三方启动或离线应用重启。生产 #1759 接线仍按前表。

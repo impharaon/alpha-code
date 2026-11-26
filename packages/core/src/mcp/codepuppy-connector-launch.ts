@@ -7,9 +7,12 @@ import type {
   LauncherEnvironment,
   ConnectorLaunchFailure,
   PackageRunner,
+  PreparedLaunch,
 } from "@opencode/util/codepuppy-connector-launch"
+import { isConnectorLaunchFailure } from "@opencode/util/codepuppy-connector-launch"
 import { Environment } from "../environment/index.js"
-import { connectorNpmDefaults } from "./codepuppy-npm-launch.js"
+import { connectorNpmDefaults, readNpmLaunchDeclaration, readNpmLaunchEnvironment } from "./codepuppy-npm-launch.js"
+import { parseUvToolSettings, readUvLaunchEnvironment } from "./codepuppy-uv-launch.js"
 
 export const ConnectorPreparation = Schema.Struct({
   schema: Schema.Literal(1),
@@ -167,8 +170,7 @@ function preparationExists(files: Environment.Files, runtimeRoot: string, value:
 }
 
 function launchFailure(error: unknown): ConnectorLaunchFailure {
-  if (typeof error === "object" && error !== null && "kind" in error && error.kind === "unknown" && "detail" in error)
-    return { kind: "unknown", detail: String(error.detail) }
+  if (isConnectorLaunchFailure(error)) return error
   return { kind: "unknown", detail: error instanceof Error ? error.message : String(error) }
 }
 
@@ -278,6 +280,103 @@ export function captureNpmConnectorPreparation(input: {
 export function preparedNpmEntry(preparation: ConnectorPreparation, input: { kind: "package" | "bin"; name: string }) {
   return preparation.entries[npmEntryPrefixes[input.kind] + input.name]
 }
+
+/** Current invocation data is bound after package readiness; none of it is written to ready.json. */
+export function bindConnectorLaunch(input: {
+  launchers: LauncherEnvironment
+  preparation: ConnectorPreparation
+  python: string
+  cwd: string
+  environment: Record<string, string>
+  source:
+    | { runner: "npm-exec"; syntax: "npx" | "npm-exec"; arguments: readonly string[]; declaration: Effect.Success<ReturnType<typeof readNpmLaunchDeclaration>> }
+    | { runner: "uv-tool"; syntax: "uvx" | "uv"; arguments: readonly string[]; declaration: ReturnType<typeof parseUvToolSettings> }
+}): Effect.Effect<PreparedLaunch, ConnectorLaunchFailure, Environment.Service | Scope.Scope> {
+  return Effect.gen(function* () {
+    const paths = input.launchers.platform === "win32-x64" ? path.win32 : path.posix
+    const packageBins = [...new Set([
+      ...(input.source.runner === "npm-exec" ? [paths.join(input.launchers.runtimeRoot, "prepared", input.preparation.key, "node_modules", ".bin")] : []),
+      ...Object.values(input.preparation.entries).map(file => paths.dirname(file)),
+      ...input.preparation.required.filter(file => paths.basename(file) === "pyvenv.cfg").map(file => paths.join(paths.dirname(file), input.launchers.platform === "win32-x64" ? "Scripts" : "bin")),
+    ])]
+    const source = input.source
+    const npmPackage = source.runner === "npm-exec" && source.declaration.selection === "package"
+      ? source.declaration.requests[0]?.alias ?? source.declaration.requests[0]?.name ?? Object.keys(input.preparation.packages)[0]
+      : undefined
+    const defaultEntry = npmPackage ? preparedNpmEntry(input.preparation, { kind: "package", name: npmPackage }) : undefined
+    const service = source.runner === "npm-exec"
+      ? source.declaration.selection === "package"
+        ? [Object.entries(input.preparation.entries).find(([name, entry]) => name.startsWith(npmEntryPrefixes.bin) && entry === defaultEntry)?.[0].slice(npmEntryPrefixes.bin.length) ?? "", ...source.declaration.arguments.slice(1)]
+        : [...source.declaration.arguments]
+      : source.declaration.command.map((argument, index) => index === 0 && source.declaration.from === null ? argument.replace(/@[^@]+$/, "") : argument)
+    if (source.runner === "npm-exec" && source.declaration.selection === "package" && !defaultEntry)
+      return yield* Effect.fail({ kind: "unknown", detail: "The prepared package has no default executable" } as const)
+    const execution = source.runner === "npm-exec"
+      ? yield* readNpmLaunchEnvironment({ ...input, ...source, serviceArguments: service, packageBins })
+      : yield* readUvLaunchEnvironment({ ...input, ...source })
+    const environment = connectorRunnerEnvironment({ runner: source.runner, launchers: input.launchers, key: input.preparation.key, inherited: {}, declared: execution.environment, packageBins, python: input.python })
+    const shell = source.runner === "npm-exec" && (source.declaration.selection === "call" || source.declaration.selection === "shell")
+    const head = shell ? source.declaration.call : service[0]
+    if (shell) {
+      const script = head || (input.launchers.platform === "win32-x64" ? "cmd" : "sh")
+      return {
+        runner: source.runner, key: input.preparation.key, cwd: execution.cwd,
+        command: [input.launchers.node, "--input-type=commonjs", "-e", connectorShellProgram],
+        environment: { ...environment, [connectorShellInput]: JSON.stringify({ npmCli: input.launchers.npmCli, command: script, arguments: [], shell: source.declaration.scriptShell || true }) },
+      } satisfies PreparedLaunch
+    }
+    if (!head) return yield* Effect.fail({ kind: "unknown", detail: "No connector executable was declared" } as const)
+    const selected = source.runner === "npm-exec"
+      ? defaultEntry ?? preparedNpmEntry(input.preparation, { kind: "bin", name: head })
+      : input.preparation.entries[head]
+    const entry = selected ?? (yield* resolveConnectorExecutable({ head, cwd: execution.cwd, environment, launchers: input.launchers }))
+    const args = service.slice(1)
+    if (input.launchers.platform === "win32-x64" && /\.(cmd|bat)$/i.test(entry))
+      return { runner: source.runner, key: input.preparation.key, cwd: execution.cwd,
+        command: [input.launchers.node, "--input-type=commonjs", "-e", connectorShellProgram],
+        environment: { ...environment, [connectorShellInput]: JSON.stringify({ npmCli: input.launchers.npmCli, command: entry, arguments: args, shell: true }) },
+      } satisfies PreparedLaunch
+    if (input.launchers.platform === "win32-x64" && /\.ps1$/i.test(entry)) {
+      const interpreter = yield* resolveConnectorExecutable({ head: "powershell.exe", cwd: execution.cwd, environment, launchers: input.launchers })
+      return { runner: source.runner, key: input.preparation.key, cwd: execution.cwd, environment, command: [interpreter, "-File", entry, ...args] } satisfies PreparedLaunch
+    }
+    const files = yield* Environment.Service
+    const prefix = yield* files.files.read(entry, { offset: 0, length: 256 })
+    const node = /\.[cm]?js$/i.test(entry) || /^#![^\r\n]*\bnode(?:\s|$)/.test(new TextDecoder().decode(prefix.bytes))
+    return { runner: source.runner, key: input.preparation.key, cwd: execution.cwd, environment, command: node ? [input.launchers.node, entry, ...args] : [entry, ...args] } satisfies PreparedLaunch
+  }).pipe(Effect.mapError(launchFailure))
+}
+
+function resolveConnectorExecutable(input: { head: string; cwd: string; environment: Record<string, string>; launchers: LauncherEnvironment }) {
+  return Effect.gen(function* () {
+    const environment = yield* Environment.Service
+    const windows = input.launchers.platform === "win32-x64"
+    const paths = windows ? path.win32 : path.posix
+    const lookup = (name: string) => Object.entries(input.environment).find(([key]) => windows ? key.toLowerCase() === name.toLowerCase() : key === name)?.[1]
+    const suffixes = windows && !paths.extname(input.head) ? ["", ...(lookup("PATHEXT") || ".COM;.EXE;.BAT;.CMD").split(";")] : [""]
+    const directories = paths.isAbsolute(input.head) || input.head.includes("/") || windows && input.head.includes("\\")
+      ? [input.cwd]
+      : (lookup("PATH") || "").split(windows ? ";" : ":")
+    for (const directory of directories) for (const suffix of suffixes) {
+      const candidate = paths.resolve(input.cwd, directory, input.head + suffix)
+      const kind = yield* Environment.typeFollowing(environment.files, candidate).pipe(Effect.catchTag("Environment.NotFound", () => Effect.succeed(undefined)))
+      if (kind === "file") return candidate
+    }
+    return yield* Effect.fail({ kind: "dependency", program: input.head } as const)
+  })
+}
+
+const connectorShellInput = "CODEPUPPY_MCP_SHELL_INPUT"
+const connectorShellProgram = String.raw`
+const input = JSON.parse(process.env.` + connectorShellInput + String.raw`)
+delete process.env.` + connectorShellInput + String.raw`
+const npmRequire = require('node:module').createRequire(input.npmCli)
+npmRequire('@npmcli/promise-spawn')(input.command, input.arguments, { shell: input.shell, cwd: process.cwd(), env: process.env, stdio: 'inherit' }).catch(error => {
+  if (error.signal) { process.kill(process.pid, error.signal); return }
+  if (error.message) process.stderr.write(String(error.message) + '\n')
+  process.exitCode = typeof error.code === 'number' ? error.code : 1
+})
+`
 
 /** Read uv's installed receipt and distribution metadata without importing connector code or .pth files. */
 export function captureUvConnectorPreparation(input: {

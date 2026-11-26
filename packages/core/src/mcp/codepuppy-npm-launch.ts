@@ -122,6 +122,20 @@ const { createRequire } = require('node:module')
       revision: parsed.gitCommittish || (parsed.gitRange ? 'semver:' + parsed.gitRange : ''), subdirectory: parsed.gitSubdir || null }
   })
   const declaration = { arguments: args, packages, call, scriptShell: config.get('script-shell'), options, resolutionOptions: { ...options, before }, requests, selection }
+  if (input.operation.kind === 'environment') {
+    const runFile = path.join(path.dirname(npmRequire.resolve('libnpmexec/package.json')), 'lib/run-script.js')
+    const runRequire = createRequire(runFile)
+    const scriptRoot = path.dirname(npmRequire.resolve('@npmcli/run-script/package.json'))
+    const makeArgs = npmRequire(path.join(scriptRoot, 'lib/make-spawn-args.js'))
+    const packageEnvs = npmRequire(path.join(scriptRoot, 'lib/package-envs.js'))
+    const capture = async value => ({ cwd: value.path, environment: makeArgs({ ...value, cmd: value.pkg.scripts[value.event], env: { ...value.env, ...packageEnvs(value.pkg) } })[2].env })
+    const intercept = Object.assign(id => id === '@npmcli/run-script' ? capture : runRequire(id), { resolve: runRequire.resolve })
+    const module = { exports: {} }
+    vm.compileFunction(fs.readFileSync(runFile, 'utf8'), ['require','module','exports'], { filename: runFile })(intercept, module, module.exports)
+    const result = await module.exports({ args: input.operation.arguments, call, flatOptions: options, path: config.localPrefix, runPath: process.cwd(), binPaths: input.operation.bins, scriptShell: config.get('script-shell') || undefined })
+    process.stdout.write(JSON.stringify(result))
+    return
+  }
   if (input.operation.kind === 'install') {
     const effective = Object.assign(Object.create(null), ...config.list.slice(0, -1).toReversed())
     delete effective.before
@@ -209,12 +223,21 @@ export function installNpmConnector(
   return runNpmLauncher(input, { kind: "install", key: input.key, specs: input.installSpecs })
 }
 
+export function readNpmLaunchEnvironment(input: Parameters<typeof readNpmLaunchDeclaration>[0] & { serviceArguments: readonly string[]; packageBins: readonly string[] }) {
+  return Effect.gen(function* () {
+    const result = yield* runNpmLauncher(input, { kind: "environment", arguments: input.serviceArguments, bins: input.packageBins })
+    if (result.exitCode !== 0) return yield* Effect.fail({ kind: "unknown", detail: result.stderr } as const)
+    return yield* Schema.decodeUnknownEffect(Schema.fromJsonString(Schema.Struct({ cwd: Schema.String, environment: Schema.Record(Schema.String, Schema.String) })))(result.stdout)
+  }).pipe(Effect.mapError(npmFailure))
+}
+
 function runNpmLauncher(
   input: Parameters<typeof readNpmLaunchDeclaration>[0],
   operation:
     | { kind: "declaration" }
     | { kind: "normalize"; content: ReturnType<typeof connectorContentRuntime> }
-    | { kind: "install"; key: string; specs: readonly string[] },
+    | { kind: "install"; key: string; specs: readonly string[] }
+    | { kind: "environment"; arguments: readonly string[]; bins: readonly string[] },
 ) {
   return Effect.gen(function* () {
     const environment = yield* Environment.Service

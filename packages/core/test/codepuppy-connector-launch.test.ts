@@ -20,6 +20,7 @@ import {
   parseUvToolSettings,
   readUvLaunchDeclaration,
   uvToolInstallArguments,
+  parseUvResolvedValue,
 } from "@opencode/core/mcp/codepuppy-uv-launch"
 import { UV_TOOL_SETTINGS, UV_SERVICE_COMMAND } from "./fixture/uv-tool-settings"
 import { readNpmLaunchDeclaration, normalizeNpmLaunchDeclaration, installNpmConnector } from "@opencode/core/mcp/codepuppy-npm-launch"
@@ -39,6 +40,7 @@ import {
   connectorRunnerEnvironment,
   captureNpmConnectorPreparation,
   preparedNpmEntry,
+  bindConnectorLaunch,
 } from "@opencode/core/mcp/codepuppy-connector-launch"
 import { hostEnvironmentLayer, recordingEnvironmentLayer, transformEnvironmentFiles } from "./fixture/environment"
 import { observeConnectorLaunch } from "@opencode/core/mcp/codepuppy-connector-diagnostic"
@@ -1538,9 +1540,14 @@ function npmSourceFixture() {
   const util = createRequire(new URL("../../util/package.json", import.meta.url))
   const arborist = createRequire(util.resolve("@npmcli/arborist/package.json"))
   const pacote = createRequire(arborist.resolve("pacote/package.json"))
+  const runScript = createRequire(arborist.resolve("@npmcli/run-script/package.json"))
+  const config = createRequire(util.resolve("@npmcli/config/package.json"))
   const modules = {
     "@npmcli/arborist": path.dirname(util.resolve("@npmcli/arborist/package.json")),
     "@npmcli/run-script": path.dirname(arborist.resolve("@npmcli/run-script/package.json")),
+    "@npmcli/promise-spawn": path.dirname(runScript.resolve("@npmcli/promise-spawn/package.json")),
+    "proc-log": path.dirname(arborist.resolve("proc-log/package.json")),
+    "ci-info": path.dirname(config.resolve("ci-info/package.json")),
     pacote: path.dirname(arborist.resolve("pacote/package.json")),
     "npm-packlist": path.dirname(pacote.resolve("npm-packlist/package.json")),
     tar: path.dirname(pacote.resolve("tar/package.json")),
@@ -1614,4 +1621,60 @@ test("npm product installer forwards resolved configuration and owned prefix wit
   expect(trace.arguments).not.toContain("--cache=" + path.join(input.root, "unbound-cache"))
   expect(trace.arguments.join(" ")).not.toContain("must-not-run")
   expect(trace.cache).toBe(cache)
+})
+
+// Module layer: actual uv0.13.10 Debug sample, including nested map keys and Rust escapes.
+test("uv resolved settings retain nested resolver semantics without treating display metadata as CLI syntax", () => {
+  const declaration = parseUvToolSettings(UV_TOOL_SETTINGS)
+  expect(parseUvResolvedValue(declaration.fields.options!)).toMatchObject({ kind: "record", name: "ResolverInstallerOptions", fields: {
+    config_settings: { kind: "tuple", name: "Some", items: [{ kind: "tuple", name: "ConfigSettings", items: [{ kind: "record", fields: { key: { kind: "tuple", name: "String", items: ["value],}"] } } }] }] },
+  } })
+  expect(parseUvResolvedValue(declaration.fields.command!)).toEqual({ kind: "tuple", name: "Some", items: [UV_SERVICE_COMMAND] })
+  expect(() => parseUvResolvedValue(declaration.fields.options!.slice(0, -1))).toThrow()
+})
+
+// Integration layer: our SDK stdio fixture is imported by the ready package entry.
+// npm's real run-script assembly supplies the environment; its dispatch is intercepted, never executed during binding.
+test("bound package entries use current argv cwd environment and real npm script metadata", async () => {
+  const input = npmSourceFixture()
+  const entry = path.join(input.prefix, "node_modules/semver/bin/semver.js")
+  writeFileSync(entry, `void import(${JSON.stringify(new URL("./fixture/codepuppy-mcp-startup-stdio.ts", import.meta.url).href)})\n`)
+  const preparation = await Effect.runPromise(Effect.scoped(captureNpmConnectorPreparation({ ...input, cwd: input.root })).pipe(Effect.provide(hostEnvironmentLayer)))
+  const other = path.join(input.root, "current-project")
+  mkdirSync(other)
+  const file = path.join(input.root, "current-launch.json")
+  const environment = { ...input.environment, CODEPUPPY_MCP_LAUNCH_FILE: file, CONNECTOR_CURRENT_KEY: "current-business-value" }
+  const declared = await Effect.runPromise(Effect.scoped(readNpmLaunchDeclaration({ ...input, environment, cwd: other, syntax: "npx", arguments: ["semver@7.8.5", "--current-argument", other] })).pipe(Effect.provide(hostEnvironmentLayer)))
+  const bound = await Effect.runPromise(Effect.scoped(bindConnectorLaunch({ ...input, environment, cwd: other, preparation, source: { runner: "npm-exec", syntax: "npx", arguments: ["semver@7.8.5", "--current-argument", other], declaration: declared } })).pipe(Effect.provide(hostEnvironmentLayer)))
+  expect(bound.command).toEqual([input.launchers.node, entry, "--current-argument", other])
+  expect(bound.cwd).toBe(other)
+  expect(bound.environment.INIT_CWD).toBe(other)
+  expect(bound.environment.npm_lifecycle_event).toBe("npx")
+  expect(bound.environment.npm_lifecycle_script).toBe("'semver'")
+  expect(bound.environment.CONNECTOR_CURRENT_KEY).toBe("current-business-value")
+  expect(bound.environment.PATH!.split(path.delimiter)[0]).toBe(path.join(input.prefix, "node_modules/.bin"))
+  await Effect.runPromise(Effect.scoped(Effect.gen(function* () {
+    const client = yield* McpClient.connect({ server: "current-input", config: new ConfigMCP.Local({ type: "local", protocol: "legacy", command: ["must-not-run-npx"] }), directory: other, prepared: bound })
+    expect((yield* client.tools()).map(tool => tool.name)).toEqual(["echo"])
+  })).pipe(Effect.provide(hostEnvironmentLayer)))
+  const observed = JSON.parse(readFileSync(file, "utf8"))
+  expect(observed).toMatchObject({ cwd: other, argv: ["--current-argument", other], key: "current-business-value" })
+})
+
+test("npm call binding keeps shell syntax and current business values out of the package receipt", async () => {
+  const input = npmSourceFixture()
+  const preparation = await Effect.runPromise(Effect.scoped(captureNpmConnectorPreparation({ ...input, cwd: input.root })).pipe(Effect.provide(hostEnvironmentLayer)))
+  await Effect.runPromise(publishConnectorPreparation({ runtimeRoot: input.launchers.runtimeRoot, preparation }).pipe(Effect.provide(hostEnvironmentLayer)))
+  const call = `'${input.launchers.node}' -e 'process.stdout.write(process.env.OWN_CALL_VALUE)'`
+  for (const current of ["first-business-value", "second-business-value"]) {
+    const environment = { ...input.environment, OWN_CALL_VALUE: current }
+    const declaration = await Effect.runPromise(Effect.scoped(readNpmLaunchDeclaration({ ...input, environment, cwd: input.root, syntax: "npx", arguments: ["--package=semver@7.8.5", "--call", call] })).pipe(Effect.provide(hostEnvironmentLayer)))
+    const bound = await Effect.runPromise(Effect.scoped(bindConnectorLaunch({ ...input, environment, cwd: input.root, preparation, source: { runner: "npm-exec", syntax: "npx", arguments: ["--package=semver@7.8.5", "--call", call], declaration } })).pipe(Effect.provide(hostEnvironmentLayer)))
+    const child = Bun.spawn(bound.command, { cwd: bound.cwd, env: bound.environment, stdout: "pipe", stderr: "pipe" })
+    const [code, stdout, stderr] = await Promise.all([child.exited, new Response(child.stdout).text(), new Response(child.stderr).text()])
+    expect({ code, stdout, stderr }).toEqual({ code: 0, stdout: current, stderr: "" })
+  }
+  const receipt = readFileSync(path.join(input.prefix, "ready.json"), "utf8")
+  expect(receipt).not.toContain("business-value")
+  expect(receipt).not.toContain("OWN_CALL_VALUE")
 })

@@ -18,10 +18,14 @@ export async function networkSessionRef(identity: { serverKey?: string; director
 }
 
 export async function setSessionNetworkTier(identity: { serverKey?: string; directory: string; sessionID: string }, tier: RuntimeTier): Promise<void> {
-  const session = await networkSessionRef(identity)
-  if (!session) return
-  const result = await window.api.networkEgress.setTier({ session, tier })
-  if (!result.ok) throw new Error(`network egress: ${result.code}`)
+  try {
+    const session = await networkSessionRef(identity)
+    if (!session) return
+    const result = await window.api.networkEgress.setTier({ session, tier })
+    if (!result.ok) console.warn(`network egress: tier report unavailable (${result.code}); continuing with approval cards`)
+  } catch {
+    console.warn("network egress: tier report failed; continuing with approval cards")
+  }
 }
 
 export function createNetworkEgressFeed(api: NetworkEgressApi, session: SessionRef) {

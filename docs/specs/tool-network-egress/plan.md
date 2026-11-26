@@ -146,7 +146,26 @@ U/E 各运行 `bun typecheck`，仅处理本片造成的问题；若包已有适
 返回前较宽相关集：U `bun test --max-concurrency 2 src/main/network-egress-derived.test.ts src/main/network-egress-registry.test.ts src/main/network-egress-disclosure.test.ts src/main/process-fence-write-sites.test.ts src/main/gate-file-registry.test.ts src/renderer/codepuppy-ui/surface-seam-contract.test.ts src/renderer/codepuppy-ui/settings-surface-ratchet.test.ts src/renderer/i18n/locale-regression.test.ts`，退出 0，95 pass / 0 fail；E `bun test --max-concurrency 2 src/plugin-host.test.ts src/plugin-process-singleton.test.ts src/plugin-reload-wiring.test.ts`，退出 0，54 pass / 0 fail。`hub-view.test.ts`、`codepuppy-sidecar-messages.test.ts` 已在步骤 2 全文件跑过且之后未改，不重复。两包 `bun typecheck` 均退出 0；没有适用的包级 lint 命令。scenario 表的 gate-files 下界随实际 7→8 行机械同步，没有改 gate 选测或逻辑。
 
 
-最终检查：U 提交前 `bun test --max-concurrency 2 src/main/old-name-scan.test.ts` 退出 0，10 pass / 0 fail；`python3 scripts/check-doc-links.py docs/specs/tool-network-egress/plan.md docs/specs/tool-network-egress/design.md` 与 `git diff --check`。所属 profile 的 `check-docs-contract --changed-since origin/alpha --format json` 退出 1，为 70 errors / 252 warnings（基线 69 / 253）；逐条比较仅设计文件既有的 `ref.unknown-id: INT-safety is neither a live id nor a retired id` 因本轮获准版本编辑而由 warning 升为 error，没有新增语义问题。既有 docs/README.md 索引、旧链接及 INT-safety 登记问题交编排器，不扩修。r2 从 12:21 至 13:25 +0800 约 64 分钟，覆盖既定六步；未执行全包、全套或 gate。
+最终检查：U 提交前 `bun test --max-concurrency 2 src/main/old-name-scan.test.ts` 退出 0，10 pass / 0 fail；`python3 scripts/check-doc-links.py docs/specs/tool-network-egress/plan.md docs/specs/tool-network-egress/design.md` 与 `git diff --check`。所属 profile 的 `check-docs-contract --changed-since origin/alpha --format json` 退出 1，为 70 errors / 252 warnings（基线 69 / 253）；逐条比较仅设计文件既有的 `ref.unknown-id`（设计第 23 行既有的未登记意图引用） 因本轮获准版本编辑而由 warning 升为 error，没有新增语义问题。既有 docs/README.md 索引、旧链接及该意图登记问题交编排器，不扩修。r2 从 12:21 至 13:25 +0800 约 64 分钟，覆盖既定六步；未执行全包、全套或 gate。
+
+
+### r3：代码审查 R1 修正证据
+
+2026-11-26，按编排器 r3 的四项 Minor 和已接受的 OPTIONAL 修正；代码审查来源为 Claude Opus 5.5（R1，MERGE）。沿用切片一范围，没有 rebase、没有展开切片二或增加审查轮次。文档影响仅为本节的修正实现与验证记录。
+
+| R1 项 | 最小修正及回归判据 |
+| --- | --- |
+| 1 已决卡片积累 | `listApprovals` 在既有串行队列里交付已决快照一次并释放对应请求/回执；退休前重复决定仍取原回执，退休后身份为 not-found。dock 只渲染 pending/connection-expired；保存失败提示移到同一 dock 的单个行内反馈，卡片消失后仍可见。主服务回归核对读取后清空、旧 ID 退休及新卡不带历史；真实 Solid 双会话回归核对两个副本都移除；原保存失败断言继续通过。 |
+| 2 上报失败挡住发送 | `setSessionNetworkTier` 对 unavailable 与异常只写 console.warn 后返回；调用方继续原发送路径。Vite 编译的真实 renderer 用例分别使 main 上报返回 unavailable、IPC reject，断言 helper 均完成、日志各一次且 main tier 仍为 unknown。已有首页、会话命令、继续入口同时核对正常绑定顺序。 |
+| 3 准入失败误发等待说明 | `admitUserEgressGrant` 拒绝时直接返回 not-asked，不产生 N6 notice；回环和私网用例在真实活动集合下断言卡片与 notice 均为空。代理/IPC 相关回归核对既有拒绝路径继续工作。 |
+| 4 平台根覆盖 PRIVATE 租户 | domain 匹配除域边界外，还要求目标的完整 PSL registrable domain 等于被记住的 site.value；host 精确匹配保持原样。用真实 tldts 7.5.5 核对 sts.amazonaws.com → amazonaws.com，但 victim.s3.amazonaws.com → victim.s3.amazonaws.com，后者不被前者授权。 |
+| OPTIONAL | `approvalFixture` 改为测试文件私有；没有引入其它可选工作。 |
+
+先红：提交 `8e102cd5b7` 仅含回归测试（含被替换的旧已决卡片断言），未改生产代码。U `bun test --max-concurrency 2 src/main/network-egress-approval.test.ts src/main/network-egress-sites.test.ts -t '已决结果读取|准入失败|记住平台根'` 退出 1：0 pass / 3 fail；`bun test --max-concurrency 2 src/renderer/codepuppy-ui/network-egress-card.test.ts -t '档位上报失败|真实 main 批准'` 退出 1：0 pass / 2 fail。分别命中未清空已决列表、准入拒绝仍有 notice、PRIVATE 租户被覆盖、双会话已决 DOM 未移除及档位失败仍抛错。日志为 `/tmp/egress-r3-red-main.log`、`/tmp/egress-r3-red-ui.log`；修复提交未修改这些测试。
+
+转绿及步骤末：U `bun test --max-concurrency 2 src/main/network-egress-approval.test.ts src/main/network-egress-sites.test.ts src/renderer/codepuppy-ui/network-egress-card.test.ts src/renderer/codepuppy-ui/network-egress.test.ts` 退出 0，14 pass / 0 fail；随后将请求退休也纳入既有串行队列，只复核受影响的 `network-egress-approval.test.ts`、`network-egress-card.test.ts`，退出 0，11 pass / 0 fail。日志 `/tmp/egress-r3-green.log`、`/tmp/egress-r3-retirement.log`。
+
+一次较宽相关集：U `bun test --max-concurrency 2 src/main/network-egress-ipc.test.ts src/main/network-egress-proxy.test.ts src/renderer/codepuppy-ui/settings-tools.test.ts` 退出 0，39 pass / 0 fail。三个发送入口分别执行 `bun test --max-concurrency 2 ./test-component/use-projects.cases.ts -t '首页斜杠命令的 session.command'`（1 pass）、`./test-component/session-second-send.cases.ts -t '会话内 /review'`（1 pass）、`./test-component/session-timeline.cases.ts -t '全部批准下停止后切到'`（4 pass），均退出 0。`bun typecheck` 从 U 执行通过；提交前 `bun test --max-concurrency 2 src/main/old-name-scan.test.ts` 退出 0，10 pass；链接 4 条通过、`git diff --check` 通过。文档检查仍为 70 errors / 252 warnings，与 r2 检查无新增语义问题；报告对设计既有未登记意图的说明改为设计第 23 行定位，避免计划重复引用同一未知 ID。没有重跑 scenario/实际 45 s/对照臂，没有全包、bin/check 或 gate。
 
 ## 切片二：全部批准通放与系统代理
 

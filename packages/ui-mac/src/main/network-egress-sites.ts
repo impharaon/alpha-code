@@ -12,7 +12,8 @@ export function siteForHost(host: string): SiteKey {
 
 export function siteContains(site: SiteKey, host: string): boolean {
   const value = asciiHost(host)
-  return value === site.value || (site.kind === "domain" && value.endsWith(`.${site.value}`))
+  if (site.kind === "host") return value === site.value
+  return (value === site.value || value.endsWith(`.${site.value}`)) && getDomain(value, { allowPrivateDomains: true }) === site.value
 }
 
 function asciiHost(host: string): string {

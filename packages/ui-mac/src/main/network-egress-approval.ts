@@ -93,7 +93,13 @@ export function createNetworkEgressApproval(deps: {
     },
     async listApprovals(input) {
       if (!deps.available || !await deps.activity.contains(input.session)) return { ok: false, code: "unavailable" }
-      return { ok: true, value: [...cards.values()].filter((group) => group.approval.recipients.some((session) => sessionRefKey(session) === sessionRefKey(input.session))).map((group) => structuredClone(group.approval)) }
+      return linearize(() => {
+        const visible = [...cards.values()].filter((group) => group.approval.recipients.some((session) => sessionRefKey(session) === sessionRefKey(input.session)))
+        const value = visible.map((group) => structuredClone(group.approval))
+        // A settled result is delivered once, then its request identity and receipt can retire.
+        visible.forEach((group) => { if (group.receipt) cards.delete(group.approval.requestID) })
+        return { ok: true as const, value }
+      })
     },
     decide(input) {
       return linearize(() => {
@@ -162,11 +168,7 @@ export function createNetworkEgressApproval(deps: {
     request(host: string, port: number, signal?: AbortSignal): Promise<EgressGrantOutcome> {
       if (!deps.available || signal?.aborted) return Promise.resolve("approval-unavailable")
       const target = admitUserEgressGrant(host, port)
-      if (!target) {
-        const activities = deps.activity.snapshot().activities
-        deps.activity.publish({ type: "codepuppy.network.notice", requestID: randomUUID(), destination: { host, port }, state: "denied", sessions: [...new Map(activities.map((activity) => { const session = activitySession(activity); return [sessionRefKey(session), session] })).values()], activities, attribution: "unknown" })
-        return Promise.resolve("not-asked")
-      }
+      if (!target) return Promise.resolve("not-asked")
       if (authorized(target.host, port)) return Promise.resolve("granted")
       const destinationKey = key(target.host, port)
       const deadline = now() + (deps.timeoutMs ?? EGRESS_GRANT_PROMPT_TIMEOUT_MS)

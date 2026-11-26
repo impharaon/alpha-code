@@ -24,17 +24,18 @@ export function SessionNetworkEgressCards(props: { identity: () => { serverKey: 
 
 export function NetworkEgressCards(props: { session: SessionRef; api: NetworkEgressApi }) {
   const feed = createNetworkEgressFeed(props.api, props.session)
+  const [rememberFailed, setRememberFailed] = createSignal(false)
   onCleanup(feed.dispose)
   return <div data-network-egress-cards>
     <Show when={feed.state.failed}><p role="alert">{t("codepuppy.network.readFailed")} <Button size="sm" onClick={() => void feed.load()}>{t("codepuppy.network.retry")}</Button></p></Show>
-    <For each={feed.state.cards}>{(request) => <NetworkEgressCard request={request} api={props.api} ready={feed.state.ready} />}</For>
+    <Show when={rememberFailed()}><p role="alert">{t("codepuppy.network.rememberFailed")}</p></Show>
+    <For each={feed.state.cards.filter((request) => request.state !== "resolved")}>{(request) => <NetworkEgressCard request={request} api={props.api} ready={feed.state.ready} onReceipt={(receipt) => setRememberFailed(receipt.persistenceError === "io")} />}</For>
   </div>
 }
 
-export function NetworkEgressCard(props: { request: EgressApproval; api: NetworkEgressApi; ready: boolean }) {
+export function NetworkEgressCard(props: { request: EgressApproval; api: NetworkEgressApi; ready: boolean; onReceipt(receipt: EgressDecisionReceipt): void }) {
   const [busy, setBusy] = createSignal<EgressDecision>()
   const [failed, setFailed] = createSignal(false)
-  const [receipt, setReceipt] = createSignal<EgressDecisionReceipt>()
   let disposed = false
   onCleanup(() => { disposed = true })
   const decide = async (decision: EgressDecision) => {
@@ -43,9 +44,9 @@ export function NetworkEgressCard(props: { request: EgressApproval; api: Network
     setFailed(false)
     try {
       const result = await props.api.decide({ requestID: props.request.requestID, decision })
+      if (result.ok) props.onReceipt(result.value)
       if (disposed) return
       if (!result.ok) { setFailed(true); return }
-      setReceipt(result.value)
     } catch { if (!disposed) setFailed(true) }
     finally { if (!disposed) setBusy(undefined) }
   }
@@ -56,8 +57,6 @@ export function NetworkEgressCard(props: { request: EgressApproval; api: Network
       <p>{t("codepuppy.network.unknown")}</p>
       <p>{t(props.request.site.kind === "domain" ? "codepuppy.network.scope" : "codepuppy.network.hostScope", { site: props.request.site.value })}</p>
       <Show when={props.request.state === "connection-expired"}><p role="status">{t("codepuppy.network.expired")}</p></Show>
-      <Show when={props.request.state === "resolved"}><p role="status">{props.request.decision === "deny" ? t("codepuppy.network.denied") : t("codepuppy.network.allowed")}</p></Show>
-      <Show when={receipt()?.persistenceError}><p role="alert">{t("codepuppy.network.rememberFailed")}</p></Show>
       <Show when={failed()}><p role="alert">{t("codepuppy.network.decideFailed")}</p></Show>
     </div>
     <Show when={props.request.state !== "resolved"}>

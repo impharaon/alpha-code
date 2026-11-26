@@ -183,3 +183,18 @@ test("locations and root failures stay independent", async () => {
     { type: "text", text: ProtectedFiles.MASKING_FAILED_TEXT },
   ])
 })
+
+test("masking failure drops previous and current dynamic key names", async () => {
+  const { mask, roots } = await setup()
+  const key = randomUUID()
+  await mask.begin({ call, kind: "tool" })
+  const live = await mask.progress({ call, update: { [key]: "live before the value is known" } })
+  expect(Object.hasOwn(live, key)).toBe(true)
+  await writeFile(path.join(roots.project, "credentials.json"), "{")
+  const failed = await mask.progress({ call, update: { [key]: "hidden" } })
+  expect(JSON.stringify(failed).includes(key)).toBe(false)
+  expect(failed.output).toBe(ProtectedFiles.MASKING_FAILED_TEXT)
+  const terminal = await mask.result({ call, tool: "fixture", result: { content: "ordinary prefix" } })
+  expect(JSON.stringify(terminal).includes(key)).toBe(false)
+  expect(terminal.content).toEqual([{ type: "text", text: ProtectedFiles.MASKING_FAILED_TEXT }])
+})

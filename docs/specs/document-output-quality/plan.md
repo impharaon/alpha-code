@@ -1,7 +1,7 @@
 ---
 id: PLAN-document-output-quality
 title: 文档产出质量实施计划
-summary: 列出文档制作、渲染、自检与验收的八个交付切片，细化技能许可资产及制作环境、中文字体与模板两片。
+summary: 列出八个交付切片，细化前三片的技能许可、制作环境与模板、LibreOffice 准备及固定文件接入。
 kind: plan
 status: active
 spec: SPEC-document-output-quality
@@ -188,3 +188,81 @@ npm 真实闭包中 `https@1.0.0` 只有 package.json，没有可执行入口；
 六个实际删除臂（字体、模板、OFL、docx 包、PDFium 原生库、解释器）均在同一暂存入口失败，随后恢复；另由 `guards.py` 移除生产摘要、OFL、npm 许可与 PE 目标校验，每项对应常驻测试均变红（exit 1），恢复后再做最终绿色检查。三类 pending 保持：#1760 resolveAssets/v2.1 token 的真实宿主接线与签名、Windows 实机执行、LO 整段字体及默认模型/完整质量验收。
 
 切片二最终相关检查：`bun test src/main/mac-target-arch.test.ts src/main/document-resources.test.ts` 50 PASS；`office-runtime-lock.test.ts` 6 PASS；`factory-skills.test.ts` 27 PASS；`office-mcp.test.ts` 与 `attachment-read-roundtrip.test.ts` 15 PASS；围栏定向用例 1 PASS；旧名扫描 10 PASS；`bun typecheck`、8 个相对链接、diff 检查均通过。文档合同对本文 0 finding，仓级仍为既有 69 errors / 253 warnings。未跑全量、未启动应用/窗口、未付费调用或发布。
+
+## 切片三：LibreOffice 准备与固定文件接入
+
+- 依据：[spec v1](spec.md) @ `31cd182e09710b603721c6f44d471b01289dd951`，AC-06、08、09、10、13、14、15 的组件准备部分；[design](design.md) @ `7d1c4fdb55cc388af1fc7069249ec3d449641a60` §4.2/4.3、§4.4 的准备 verify 期限、§5、§6 R3、§8/§10；协调仓 impharaon/alpha-work 国内连接性设计切片四 §4.11/§10 @ `86a58c7bbdaad8b7c689d1c9c2845e3ce16db2a9`；[启动器冻结契约](../connector-launchers/design.md) @ `f7424aa45225a6d02d1958f4b4f72d247f99acc4` 的固定文件、失败事实及生命周期端口。切片二 `78969e73d2`、`351d991411` 已由 Claude Opus 5.5（orchestrator）接受，继承其资源、字体身份和许可回执。
+- 核对：待调度方核对本切片 PLAN 提交；恢复 IMPLEMENT 后在首个实施提交填入其 `Phase:` 行的提交、核对者/模型和结论。
+
+本片实现准备器、解包与私有配置、ready 的真实验证条件，以及供后续 DocumentHost 使用的状态；对话卡片/产物回执在片 4、持久补查与 session.synthetic 在片 6 接通。`USER_DATA_LAYOUT` 当前尚无 document-runtime；#1760 的清单/下载/失败端口尚未实现。下面明确区分可独立完成的组件与待集成证据，不把下载缓存、已展开目录或未接通的端口当 ready。
+
+### 改动
+
+| 文件 | 改什么 |
+| --- | --- |
+| `packages/ui-mac/resources/pinned-files.json`（#1760 拥有的共享清单，条件性追加） | 仅在发行者交付可取的自有 release URL、精确字节/摘要和对应许可/源码材料后，贡献设计 §4.3 的两条 LO entry；通过共享 readPinnedFiles 校验。不建 LO 专用清单，不填占位 URL、latest、空表或临时 TDF 退路；未交付时本项保持集成 pending |
+| `packages/util/src/codepuppy-document.ts`、`codepuppy-document.test.ts`（新增） | 落地本票冻结的 DocumentRuntimeState 及必要的纯状态/通知数据校验；失败、固定文件 ID、delivery 和 LauncherPlatform 直接消费 #1760/共享契约的导出，不复制它们的类型或分类器。后续片在此继续落同一文档契约 |
+| `packages/ui-mac/src/main/document-runtime.ts`、`document-runtime.test.ts`（新增） | 消费本平台清单条目、共享获取结果和原始失败事实；协调一次展开、verify、原子 ready 发布与查询/订阅。首次查询启动准备并立即给实际状态，进度来自真实阶段；同 pin 合并准备，复用共享下载取消/缓存规则，不建重试/下载引擎 |
+| `packages/ui-mac/src/main/document-runtime-fonts.ts`、`document-runtime-fonts.test.ts`（新增） | 从片 2 的真实字体/摘要生成私有 fontconfig、LO profile 与字体替代配置，生成正确 file URI；mac 使用实际字体目录与私有缓存，Windows 使用 LO 私有字体目录。更新/扩展/宏/外链配置按实际 26.8.3 注册表键生成，解析 XML 验证，不写系统字体或用户 LO 设置 |
+| `packages/ui-mac/resources/document-runtime/extract_msi.py`（新增） | 固定的随包 Python ctypes 适配：只读查询真实 MSI 表/流并用 Cabinet API 还原原目录，校验目标路径和关系；不执行 msiexec、安装序列、自定义 action 或系统注册，不下载外部 CAB，不提供任意命令入口 |
+| `packages/ui-mac/resources/document-runtime/verify_runtime.py`（新增） | 固定的版本/最小转换验证任务及结果读回：使用独立 profile 和控制样本，检查新 PDF 非空、可解码、版本/页数真实；执行与终止接到现有 Location/权限面。只接受准备器派生的资源/工作路径，不接收模型脚本；不以 main 裸执行用户文档绕过执行权威 |
+| `packages/ui-mac/src/main/user-data-layout.ts` | 增加 documentRuntime 目录名；下级 runtime、profiles、字体缓存及临时根从此派生。共享 pinned-files 缓存和文件名仍由 #1760 派生，本片只消费返回路径 |
+| `packages/ui-mac/src/main/naming-migration-map.ts`、`naming-migration.ts`、`naming-migration-wiring.test.ts`、`naming-migration.test.ts` | 必要的同调用链登记同步：旧名表只约束/枚举真实存在的历史键，相关断言也只覆盖这些键。当前代码以 USER_DATA_LAYOUT 的全部键推导旧名，新增 documentRuntime 会产生 undefined；最小修正为从旧名表枚举。保留全部既有映射，不给新目录编造旧名、不添加迁移行为或兼容分支 |
+| `packages/ui-mac/src/main/codepuppy-sidecar-messages.ts`、`codepuppy-sidecar-messages.test.ts` | 按 §4.8 承载本功能 runtime.changed 的窄通知并消费同一状态 schema；核对实际 generation/sequence，隔离停止或旧代回包。完整 DocumentHost 环境请求和卡片接线在片 4，不在此扩展其它生产发送路径 |
+| `packages/ui-mac/src/main/document-resources.ts`、`document-resources.test.ts` | 复用既有四字体/模板身份、Office Python 与资源根供准备器使用；新增固定运行脚本/随包许可材料的实际路径验证。保留 Node 的显式输入接缝，不决定启动器 v2.1 token |
+| `packages/ui-mac/scripts/build-document-licenses.ts`（新增）、`prebuild.ts`、`packages/ui-mac/electron-builder.config.ts`、`resources/NOTICE.txt` | 从同一已验 pin 实物提取/核对 LO 原始许可和署名，带入下载前可读的随包目录；复制固定运行脚本、许可及来源记录。构建也不另造 LO 获取通道；没有真实材料时不能把许可清单记为完成，不代替发行者发布源码/资产 |
+| `packages/ui-mac/src/main/fixtures/document-runtime/**`（按需新增） | 仅从所选 DMG/MSI、真实 hdiutil/LO 输出、MSI 表/CAB 或现有真实控制文档提取小样本，记录来源 pin/摘要与提取方法；不提交整包，也不手写另一系统的表/文件格式。操作流程重放及完整平台测量保留一次性证据 |
+| `docs/specs/document-output-quality/plan.md` | 填核对、证据和偏离，不修改冻结设计/其它规格或受保护规则 |
+
+main 的生产装配、固定文件窄桥和执行面由 #1760 与片 4 的 DocumentHost 接线消费；本片不向 bootstrap 塞函数，不从 main import core/server，不新增 renderer 可传 URL/路径/命令的通道。材料准备与状态测试可先按冻结端口实现；端口尚无真实实现时，保持其导入/调用归原拥有者的集成依赖，不写同名临时实现或用构建期 downloader 代替。普通库与 reader 不 await LO。
+
+### 顺序
+
+1. **状态、路径与固定文件消费提交**：从冻结契约消费 pin 及失败类型，增加文档状态和目录布局；完成历史键枚举的必要同步。准备器只从共享清单选本平台 LO entry，版本/文件身份读取该 entry，不另放 URL/摘要常量。控制共享获取的等待与完成，证明查询不等待下载、并发只展开一次、下载字节与阶段真实、失败保留诊断。清单实值和真实 #1760 调用尚缺时，只记录对应集成 pending，不提交伪 entry 或生产 fallback。
+2. **解包、字体与验证提交**：mac 消费共享口已验证的 DMG，以只读/no-browse/no-autoopen 方式挂载，保留原 app 字节/签名复制到私有暂存根并在 finally 卸载；Windows 以同一随包 Python 处理 MSI/CAB。依据真实材料处理目录映射、文件名和流，拒绝路径越界；不能从外链补附件。生成实际 fontconfig/profile/私有字体，运行固定 headless 最小转换并检查新 PDF；全部成功才原子发布 ready。verify 的执行/强制终止沿设计 §4.4，不给下载加总时限，不把实际转换超时记成下载失败。
+3. **生命周期与随包材料提交**：完成取消、异常卸载/未发布目录、重启后重新确认有效 runtime、fonts/pin 身份变化时的私有配置重验，以及状态通知的代/序号。有效固定文件缓存由共享口重验；本片不设置 TTL、容量帽或清理用户目录。把实际 LO 许可/署名及源码取得说明带入包，核实际复制结果；ready 事件只供片 4/6 消费，不提前创建待查队列或额外助手服务。
+4. **一次相关收尾**：每步迭代本步用例名，步末运行改变行为的测试文件一次；返回前跑较宽相关集合一次。完整 DMG/MSI 解包、headless 转换、执行超时/中止、出网记录和三字体对照用一次性命令/产物留证，不让普通测试重复下载约 300/376 MB 实物或反复做重型旅程。没有实物/平台/外部发布时明确列 pending，不以模拟成功代证。
+
+新用例组采用 `document runtime` / `document runtime fonts`，从相应 package 目录执行：
+
+```sh
+# packages/util
+bun test src/codepuppy-document.test.ts -t 'document runtime'
+bun test src/codepuppy-document.test.ts
+bun typecheck
+
+# packages/ui-mac
+bun test src/main/document-runtime.test.ts -t 'document runtime'
+bun test src/main/document-runtime-fonts.test.ts -t 'document runtime fonts'
+bun test src/main/document-runtime.test.ts src/main/document-runtime-fonts.test.ts
+bun test src/main/document-resources.test.ts src/main/codepuppy-sidecar-messages.test.ts
+bun test src/main/naming-migration-wiring.test.ts src/main/naming-migration.test.ts
+bun typecheck
+```
+
+较宽相关集合至少包含 `codepuppy-sidecar-wiring.test.ts`（共享消息消费者）、`old-name-scan.test.ts`（布局/许可/文档）、片 2 的 `document-resources.test.ts`；已在步末跑过的文件不重复。新增状态导出/消息的真实 consumers 用 `rg` 搜索后补到本节。`naming-migration.test.ts` 只因必要历史键枚举修正纳入，不扩查或修复其它历史迁移问题。若实际验证需要修改既有进程生命周期拥有者，再列出直接文件及证据，不另造围栏/停止器；不跑整包、bin/check、gate，不启动 app/Electron/任何窗口。
+
+### 风险
+
+- **发行实物与清单不是代码可虚构的输入**：两份原字节副本的自有 release 发布、精确源档/许可材料和 relay 快照部署均归调度方/owner。没有可取 originUrl 就不新增可消费 entry；不得用 TDF provenanceUrl 下载、构建下载函数或另一白名单绕过。香港实网续传、改道、北京与 owner 下载核对为 **pending（资产及 relay 发布后，消费共享口实测）**。
+- **#1760 端口尚未落地**：共享 readPinnedFiles/ensurePinnedFile、ConnectorLaunchHost/PinnedFileDelivery、失败分类和代生命周期沿其冻结定义消费。真实清单解析/缓存重验/失败事实/进度与 DocumentHost 首次查询的连接为 **pending（#1760 交付、片 4 装配后）**；不把私有受控测试函数记成生产端口已接通。
+- **准备 verify 的执行归属**：实际 LO 进程必须沿当前 Location 的执行/权限面进入，不能为跑探针放宽围栏或绕过它；代码只准备固定 job 及检查真实结果，主进程不接收任意脚本。真实受限执行、178 s 取消/180 s 强制终结与无外网的联动证据在对应端口就绪后完成；接缝若实际不足，返回其具体事实与最小 seam 请求，不另开执行通道。
+- **平台边界**：Windows MSI/CAB API、私有字体发现和正式包执行不能在 Mac 上冒称通过；取不到所选 MSI 的真实表/流也不能手写等效输入。Win32 API/目录关系或正式签名验证与实物矛盾时返回证据，不改用系统安装器、管理员权限或用户关闭保护。Windows 真执行为 **pending（Windows 实机及实际 pin）**；Mac 正式签名/Gatekeeper 归真包验证。
+- **字体配置不等于成品证明**：XML/路径/四字体身份先用实际文件验证；三指定字体、无微软雅黑和去配置对照要求真实 LO PDF 的嵌入字体/逐段范围核对。不卸载 owner 字体以制造环境；条件不足转干净账户/机器验收。完整 Office 页图和模型 Read 覆盖在片 4/6/8，不能以控制文档一次转换替代 AC-06/08。
+- **状态不能吞掉文件交付**：准备失败/停止/旧代消息不得把已制作成品抹掉，也不阻塞普通库和 reader；恢复只沿共享口/已有动作，不增加轮询服务、重试引擎、有效期或用户确认。持久补查和用户收到结果的 AC-10 证据仍归片 6。
+
+### 证明
+
+| AC / 本片范围 | 测试/证据 | 缺少行为为什么会失败 |
+| --- | --- | --- |
+| AC-06：真正可用的 LO 才 ready | `document-runtime.test.ts` 验 pending→extract→verify→ready 及失败/取消；实际选中 pin 的版本/最小转换输出由随包 PDFium 解码、记录真实页数与渲染来源 | 只下载/展开就发布 ready、复用旧同名 PDF、忽略非零退出/空 PDF 时失败；删除 verify/原子发布保护的反例须使测试变红。三格式全页图与助手看到的页数留片 4/6 |
+| AC-08：私有字体配置与真实替代基础 | `document-runtime-fonts.test.ts` 解析生成 XML，核实际目录/缓存/file URI、四字体摘要及字体家族映射；真实 LO 三字体文档的 PDF 字体/字形与去配置对照 | 配置未指向随包字体、XML 特殊字符损坏、Windows 误用 fontconfig 或丢失整家族替代表时失败；成品单段一致必须由真实渲染证明，未取得则 pending |
+| AC-09：后台准备、共享获取与离线复用 | 组件用例核共享 ID-only 调用、真实进度传递、一次展开、缓存/失败事实消费；在共享口发布后以安装包记录断流续传、HK 失效→同一 origin、缓存重验及离线启动 | 传 URL/第二下载器、硬编码缓存、丢进度/错误分类、每次都重下或用户须安装时无法通过；国内两地与真实入口证据在外部依赖就绪后补，不用本地假延迟代证 |
+| AC-10：不等待下载且可通知 ready | 卡住获取完成的受控本功能用例：查询立即返回 preparing，现有制作资源/reader 可用；ready 状态通过同一消息 schema 只通知当前代、递增 sequence | 环境查询 await 整包、失败阻塞生成、旧代回包覆盖当前状态时失败；Word/Excel/PPT 先交付及原会话补查由片 4/6 真引擎验，当前不计整条通过 |
+| AC-13：准备后的转换没有更新/外链出网 | 解析真实 profile 的更新/宏/外链配置；共享下载阶段与完成后的固定转换分别记录出网，后者不应新增连接 | 只检查配置文本而实际仍检查更新不能通过出网证据；去禁网/配置的对照须在真实执行入口体现。首次 pin 下载不混入“准备后渲染无外网”的计数 |
+| AC-14：下载前可读许可及原包保留 | `build-document-licenses` 从实际 pin 解包树生成来源/许可材料；按真实 extraResources 复制后核 LICENSE/NOTICE/第三方署名与来源摘要，配套精确源码副本/说明由发行者交付 | 原包许可被裁剪、包里只有链接或占位清单、缺对应源档交接时不能记通过；删除已分发许可/摘要校验的反例变红，不上传或发布任何资产 |
+| AC-15：同一逻辑的 Windows 分支 | 真实所选 MSI 表/CAB/PE 输入的路径/目录映射检查；Windows 主机执行只读解包→私有字体→headless 控制转换→ready | 假 MSI、错目录/入口、安装动作或误用 mac 字体机制无法通过真实执行。Mac 上只做可证的纯逻辑/真实样本解析，Windows 全流程及最终包 AC 保持 pending |
+
+### 偏离记录
+
+暂无。

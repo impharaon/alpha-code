@@ -388,3 +388,9 @@ test("#1654 AC1 webfetch Request timed out is an overall timeout on either path"
     expect(classifyNetFailure(new Error("Request timed out elsewhere"), path)).toBeUndefined()
   }
 })
+
+
+test("governed network prefixes keep their layer through a transport error cause", () => {
+  const error = new Error("transport failed", { cause: new Error(withFailureCode("tcp", "private upstream unavailable")) })
+  expect(classifyNetFailure(error, OTHER)).toEqual({ layer: "tcp", code: "tcp" })
+})

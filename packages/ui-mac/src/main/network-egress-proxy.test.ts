@@ -705,3 +705,31 @@ test("plugin CONNECT capabilities never authorize a different target or ordinary
   proxy.revokePluginMcp(binding)
   expect((await rawRequest(proxy.port, `CONNECT ${authority} HTTP/1.1\r\nHost: ${authority}\r\nProxy-Authorization: ${binding.proxyAuthorization}\r\n\r\n`)).status).toBe(403)
 })
+
+// Real private proxy + production MCP SDK client; the allocated endpoint has no listener.
+test("plugin loopback refused upstream is a named TCP failure with local service copy", async () => {
+  const { publishPluginMcpProxies, pluginMcpFetch } = await import("@opencode/util/codepuppy-plugin-mcp")
+  const { McpClient } = await import("../../../core/src/mcp/client")
+  const { hostEnvironmentLayer } = await import("../../../core/test/fixture/environment")
+  const { Effect } = await import("effect")
+  const { FetchHttpClient } = await import("effect/http")
+  const { withFailureCode } = await import("@opencode/schema/codepuppy-net-failure")
+  const { mcpFailureReason } = await import("../renderer/extensions/ext-presentation")
+  const unused = await startTarget()
+  const url = `http://127.0.0.1:${unused.port}/mcp`
+  await unused.close()
+  const { proxy } = await startProxy()
+  const binding = proxy.bindPluginMcp({ packageId: "claude:rill", entryId: "mcp:rill-developer", generation: "gen-000001-abcdef", definitionDigest: ("sha256:" + "d".repeat(64)) as `sha256:${string}`, serverUrl: url })
+  publishPluginMcpProxies({ rill: [binding] })
+  cleanups.push(async () => { publishPluginMcpProxies({}) })
+  const error = await Effect.runPromise(McpClient.connect({ server: "rill", config: { type: "remote", url, oauth: false, codemode: false }, directory: import.meta.dir }).pipe(
+    Effect.provide(hostEnvironmentLayer),
+    Effect.provideService(FetchHttpClient.Fetch, pluginMcpFetch("rill", url, fetch)),
+    Effect.scoped,
+    Effect.flip,
+  ))
+  if (error._tag !== "ConnectError") throw error
+  expect(error).toMatchObject({ code: "tcp" })
+  expect(mcpFailureReason(error.code, withFailureCode(error.code!, error.message))).toBe("本机地址上没有服务在运行")
+  expect(mcpFailureReason("http", "HTTP 502")).not.toBe("本机地址上没有服务在运行")
+})

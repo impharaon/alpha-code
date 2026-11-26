@@ -675,10 +675,12 @@ test("系统路由等待后复核撤销；拨号期限覆盖查询，迟到结�
 })
 
 test("系统代理指回策略端口时不递归，也不擅自追加直连", async () => {
-  let handle: EgressProxyHandle
-  let dialed = 0
-  const f = await startProxy({ authorize: () => true, resolveEgressRoutes: async () => [{ kind: "http", host: "127.1", port: handle.port }], dial: testEgressDial(() => { dialed++; throw new Error("loop") }) })
-  handle = f.proxy
-  const response = await rawRequest(handle.port, "CONNECT example.com:443 HTTP/1.1\r\nHost: example.com:443\r\n\r\n")
-  expect(response.status).toBe(502); expect(response.body).toContain("EPROXYLOOP"); expect(dialed).toBe(0)
+  for (const host of ["127.1", "::1", "0:0:0:0:0:0:0:1", "::ffff:127.0.0.1"]) {
+    let handle: EgressProxyHandle
+    let dialed = 0
+    const f = await startProxy({ authorize: () => true, resolveEgressRoutes: async () => [{ kind: "http", host, port: handle.port }], dial: testEgressDial(() => { dialed++; throw new Error("loop") }) })
+    handle = f.proxy
+    const response = await rawRequest(handle.port, "CONNECT example.com:443 HTTP/1.1\r\nHost: example.com:443\r\n\r\n")
+    expect(response.status).toBe(502); expect(response.body, host).toContain("EPROXYLOOP"); expect(dialed).toBe(0)
+  }
 })

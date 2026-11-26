@@ -1274,3 +1274,19 @@ for (const mode of ["rewrite", "defect", "dispose"] as const)
     expect(observed).toEqual([{ output: mode === "rewrite" ? "safe" : ProtectedFiles.MASKING_FAILED_TEXT }])
     expect(result.content).toEqual([{ type: "text", text: mode === "rewrite" ? "done" : ProtectedFiles.MASKING_FAILED_TEXT }])
   }))
+
+it.effect("progress hook failure removes every prior dynamic key", () => Effect.gen(function* () {
+  const service = yield* Tool.Service
+  const hooks = yield* PluginHooks.Service
+  const updates: unknown[] = []
+  let calls = 0
+  yield* hooks.register("tool", "execute.progress", (event) => Effect.gen(function* () {
+    if (calls++ > 0) return yield* Effect.die("fixture defect")
+    event.metadata = { "previous-dynamic-key": "live" }
+  }))
+  yield* transform(service, { progress: { name: "progress", description: "fixture", input: Schema.Struct({ text: Schema.String }), execute: (_input, context) => Effect.gen(function* () { yield* context.progress({}); yield* context.progress({}); return { content: "done" } }) } }, { codemode: false })
+  const result = yield* (yield* service.snapshot()).execute({ ...call("progress"), progress: (update) => Effect.sync(() => { updates.push(update) }) })
+  expect(updates).toHaveLength(2)
+  expect(updates[1]).toEqual({ output: ProtectedFiles.MASKING_FAILED_TEXT })
+  expect(JSON.stringify(result).includes("previous-dynamic-key")).toBe(false)
+}))

@@ -2324,3 +2324,31 @@ for (const continueOnBlock of [false, true]) {
     expect(yield* Effect.promise(() => Bun.file(join(location.directory, "payment.ts")).exists())).toBe(false)
   })))
 }
+
+
+packageIt.live("the real hookify PostToolUse rule adds context after the native write", () => packageJourney(Effect.gen(function* () {
+  const capture = yield* Effect.promise(() => captureStandardFixture("claude:hookify"))
+  const hooks = JSON.parse(new TextDecoder().decode(yield* Effect.promise(() => capture.readFile("hooks/hooks.json"))))
+  // Isolate the original post handler so a pre-handler cannot satisfy the assertion.
+  delete hooks.hooks.PreToolUse
+  const rule = new TextDecoder().decode(yield* Effect.promise(() => capture.readFile("examples/sensitive-files-warning.local.md")))
+  const sample = yield* invocationSample("claude:hookify", { "hooks/hooks.json": JSON.stringify(hooks) })
+  const membership = JSON.parse(readFileSync(join(sample.root, "skills-enabled.json"), "utf8"))
+  writeFileSync(join(sample.root, "skills-enabled.json"), JSON.stringify({ ...membership, keys: [...membership.keys, sample.key] }))
+  yield* invocationNativeServices
+  yield* activateExtUntilFinished
+  const location = yield* Location.Service
+  mkdirSync(join(location.directory, ".claude"), { recursive: true })
+  writeFileSync(join(location.directory, ".claude/hookify.sensitive.local.md"), rule)
+  const sessions = yield* Sessions.Service
+  const parent = yield* sessions.create({ location: { directory: location.directory }, title: "Post hook context", agent: "build", model: { providerID: "test", id: "picked" } } as never)
+  const llm = yield* TestLLM.Test
+  yield* llm.push(TestLLM.toolCall("call_post_write", "write", { path: "credentials.txt", content: "not a real secret" }), TestLLM.text("Received the warning", "post-warning"))
+  yield* sessions.prompt({ sessionID: parent.id, text: "Write the fixture" })
+  yield* sessions.wait(parent.id)
+  const requests = yield* llm.requests()
+  expect(requests).toHaveLength(2)
+  expect(JSON.stringify(requests[0])).not.toContain("Sensitive file detected")
+  expect(JSON.stringify(requests[1])).toContain("Sensitive file detected")
+  expect(readFileSync(join(location.directory, "credentials.txt"), "utf8")).toBe("not a real secret")
+})))

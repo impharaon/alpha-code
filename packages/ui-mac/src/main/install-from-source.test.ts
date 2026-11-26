@@ -1001,3 +1001,17 @@ test("a nonlocal plain HTTP plugin connector fails by itself after the whole pac
     expect(readPackageLedgerStateV1(h.root)).toMatchObject({ ok: true, packageGraphs: [{ packageId: installed.packageId }] })
   } finally { await engine.stop(true) }
 }))
+
+test("a custom MCP record never inherits plugin validation from a colliding graph name", () => installerHarness(async h => {
+  const { upsertRecordV2 } = await import("./ext-receipt-v2")
+  const installed = await h.install(h.request(await h.candidate("context7"), "origin_not_name"))
+  if (!installed.ok) throw Error(installed.detail)
+  const name = installed.installed.find(entry => entry.kind === "mcp")!.hostName
+  const state = readPackageLedgerStateV1(h.root)
+  if (!state.ok) throw Error(state.reason)
+  const record = state.records.find(record => record.kind === "mcp" && record.name === name)!
+  expect(persistMcp(name, { type: "local", command: ["/tmp/plugin-entry", "--source-argv"] })).toMatchObject({ ok: true })
+  expect(upsertRecordV2(h.root, { ...record, origin: "created" })).toMatchObject({ ok: true })
+  expect(persistMcp(name, { type: "local", command: ["/tmp/custom-entry", "--source-argv"] })).toMatchObject({ ok: false, reason: "command not allowed: /tmp/custom-entry" })
+  expect(persistMcp(name, { type: "remote", url: "http://localhost:9876/mcp" })).toMatchObject({ ok: false })
+}))

@@ -36,6 +36,7 @@ test("a timestamp pick seeks and reads PTS from the same extraction without enum
  const runtime:import("../../resources/video-mcp/runtime").VideoRuntime={directory:root,cacheRoot:root,platform:"darwin-arm64",recipe:{speech:"test",frames:"test",media:"test"},signal:new AbortController().signal,progress:()=>{},component:async name=>({path:String(name),digest:"captured-pinned-engine"})}
  const source=await sourceOf({kind:"path",path:path.join(import.meta.dir,"fixtures/video/frame-source.mp4")},runtime)
  source.info={durationMs:200,startMs:0,audioStartMs:0,videoStartMs:0,streams:[{kind:"video",codec:"h264"}]}
+ let scanAtExtraction:unknown
  const argsSeen:string[][]=[]
  const updates:import("../../../schema/src/codepuppy-video-progress").VideoProgress[]=[]
  runtime.progress=update=>{updates.push(update)}
@@ -44,6 +45,7 @@ test("a timestamp pick seeks and reads PTS from the same extraction without enum
   argsSeen.push([...args])
   if(executable === "ffmpeg"){
    if(args.includes("null")){await onStderr?.(args.includes("-filter_complex") ? controls.sceneSplitStderr : controls.sceneFilteredStderr);return {stdout:"",stderr:""}}
+   scanAtExtraction=updates.at(-1)
    await copyFile(path.join(import.meta.dir,"fixtures/video/frame-sample.jpg"),output ?? args.at(-1)!)
    return {stdout:"",stderr:controls.ffmpegStderr}
   }
@@ -55,6 +57,6 @@ test("a timestamp pick seeks and reads PTS from the same extraction without enum
   expect(result.frames[0]).toMatchObject({requestedMs:79,actualMs:40})
   expect(argsSeen.some(args=>args.includes("-ss") && args.includes("-copyts"))).toBe(true)
   await framesOf(source,{kind:"scenes",threshold:0.3},runtime)
-  expect(updates.some(update=>update.unit === "ms" && update.completed > 0)).toBe(true)
+  expect(scanAtExtraction).toMatchObject({phase:"frames",unit:"items",completed:5})
  }finally{spy.mockRestore();await rm(root,{recursive:true,force:true})}
 })

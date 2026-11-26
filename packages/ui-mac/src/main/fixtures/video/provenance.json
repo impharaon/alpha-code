@@ -21,7 +21,7 @@
     "sha256": {
       "frame-source.mp4": "d89a4d97c877aaf0965ceccdf1b1a409af56a864838a928b575adcea96a7d9b6",
       "frame-sample.jpg": "f7f9de98fa8e4f23424a2aae1065711593afeb8fa7b4647d9a56c0a5409f9ab5",
-      "frame-control.json": "6f191884cd6bc4c1238ba830e4c165ed73fb31a91c40b4d2cd9330d91a9bddd6"
+      "frame-control.json": "08bb02a50b03f6804df5fbd01f571962d2177a41afa296c7797f715e62ea967d"
     },
     "scene_operations": [
       [
@@ -60,6 +60,7 @@
         "null",
         "-"
       ]
-    ]
+    ],
+    "scene_capture": "Unchanged progress frame= lines; copyts/null out_time_us remains zero, so processing progress uses the actual unfiltered frame count."
   }
 }

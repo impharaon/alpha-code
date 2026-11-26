@@ -604,3 +604,5 @@ A9 published-repair green：原两项 runtime 断言不变，文件 19 PASS（A9
 A7 原生材料确认及 red：一次 fontTools TTFont 读取四份随包实际 TTF 的 nameID 0（缓存中已有 FontTools，无安装/下载），Sans 两字重为“© 2014-2021 Adobe ... Reserved Font Name Source”，Serif 为“© 2017-2024 Adobe ...”；`font-copyright.txt` 保存输出。对 NOTICE 的 holder 一次性核对断言失败（缺 Adobe）；文档证据不新增正文措辞单元测试。下一提交用实际 copyright holder/年份替换 Noto Project Authors。
 
 A7 green：NOTICE 保留实际四个 nameID 0 的完整 copyright 文本（包含 Sans 的 RFN 原文），一次性 fontTools 对照 4/4 PASS（A7-green.log），OFL 文件不改。
+
+A6 authority 核对：alpha-work domestic-cloud-connectivity design §4.11.1:573-574 的当前联合有 ocr-model、无 darwin-x64。既有 util 文档文件添加类型层回归，`bun typecheck` 对 OCR ID 和 no-Intel 断言给两个错误（A6-red.log）；不是用手写数组当运行期校验器。下一提交只同步纯数据联合。

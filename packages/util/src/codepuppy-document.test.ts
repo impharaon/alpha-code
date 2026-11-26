@@ -70,3 +70,12 @@ test("calculation receipts require actual source/result hashes and typed error l
   expect(isExcelRecalculateResult({ ...receipt, errors: [{ cell: "B2" }] })).toBe(false)
   expect(isExcelRecalculateResult({ status: "pending", checkId: "calculation", runtime: { phase: "preparing", stage: "download" } })).toBe(true)
 })
+
+import type { PinnedFileId, PinnedTarget } from "./codepuppy-pinned-files.js"
+// Type-level contract: bun typecheck must reject a removed OCR family or restored Intel Mac target.
+const ocrPin: PinnedFileId = "ocr-model/any/contract-sample"
+const noIntelMac: Extract<PinnedTarget, "darwin-x64"> extends never ? true : false = true
+test("pinned file types follow the current family and target authority", () => {
+  expect(ocrPin).toBe("ocr-model/any/contract-sample")
+  expect(noIntelMac).toBe(true)
+})

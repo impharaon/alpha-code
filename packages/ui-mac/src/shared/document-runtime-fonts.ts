@@ -37,7 +37,7 @@ export function prepareDocumentProfile(input: {
     ),
     item("/org.openoffice.Office.Common/Security/Scripting", property("MacroSecurityLevel", "int", "3")),
     item("/org.openoffice.Office.Writer/Content/Update", property("Link", "int", "2")),
-    item("/org.openoffice.Office.Calc/Content/Update", property("Link", "int", "0")),
+    item("/org.openoffice.Office.Calc/Content/Update", property("Link", "int", "1")),
     item(
       "/org.openoffice.Office.Jobs/Jobs/UpdateCheck/Arguments",
       property("AutoCheckEnabled", "boolean", "false") + property("AutoDownloadEnabled", "boolean", "false"),

@@ -95,10 +95,15 @@ describe("package manager locations", () => {
       npm_config_cache: `${cache}/npm/cache`, PIP_CACHE_DIR: `${cache}/pip/cache`,
       UV_CACHE_DIR: `${cache}/uv/cache`, UV_PYTHON_INSTALL_DIR: `${cache}/uv/python`,
       GOMODCACHE: `${cache}/go/mod`, GOCACHE: `${cache}/go/build`,
-      CARGO_HOME: `${cache}/cargo/home`, CARGO_INSTALL_ROOT: "/Users/puppy/.cargo",
+      CARGO_INSTALL_ROOT: "/Users/puppy/.cargo",
     })
     expect([...new Set(result.writable.filter((entry) => entry.purpose === "cache").map((entry) => entry.manager))].sort()).toEqual(["bun", "cargo", "go", "npm", "pip", "pnpm", "uv", "yarn"])
-    expect(result.writable.filter((entry) => entry.purpose === "cache").every((entry) => entry.rule.kind === "subpath" && entry.rule.value.startsWith(`${cache}/`))).toBe(true)
+    expect(result.writable.filter((entry) => entry.purpose === "cache" && entry.manager !== "cargo").every((entry) => entry.rule.kind === "subpath" && entry.rule.value.startsWith(`${cache}/`))).toBe(true)
+    expect(result.writable.filter((entry) => entry.manager === "cargo" && entry.purpose === "cache").map((entry) => entry.rule)).toEqual([
+      ...["registry", "git"].map((name) => ({ kind: "subpath", value: `/Users/puppy/.cargo/${name}` })),
+      ...[".package-cache", ".package-cache-mutate", ".global-cache", ".global-cache-journal"].map((name) => ({ kind: "literal", value: `/Users/puppy/.cargo/${name}` })),
+    ])
+    expect(result.env.CARGO_HOME).toBeUndefined()
     expect(result.writable.some((entry) => entry.purpose === "global-install" && entry.rule.value.startsWith(cache))).toBe(false)
   })
 

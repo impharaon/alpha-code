@@ -241,7 +241,6 @@ export function resolvePackageManagerLocations(input: PackageManagerLocationInpu
     UV_PYTHON_INSTALL_DIR: path.join(cache, "uv", "python"),
     GOMODCACHE: path.join(cache, "go", "mod"),
     GOCACHE: path.join(cache, "go", "build"),
-    CARGO_HOME: path.join(cache, "cargo", "home"),
     CARGO_INSTALL_ROOT: path.join(input.home, ".cargo"),
   }
   const writable: PackageManagerLocations["writable"][number][] = []
@@ -255,7 +254,8 @@ export function resolvePackageManagerLocations(input: PackageManagerLocationInpu
   add("pip", "cache", "subpath", env.PIP_CACHE_DIR)
   add("uv", "cache", "subpath", env.UV_CACHE_DIR, env.UV_PYTHON_INSTALL_DIR)
   add("go", "cache", "subpath", env.GOMODCACHE, env.GOCACHE)
-  add("cargo", "cache", "subpath", env.CARGO_HOME)
+  add("cargo", "cache", "subpath", ...["registry", "git"].map((name) => path.join(input.home, ".cargo", name)))
+  add("cargo", "cache", "literal", ...[".package-cache", ".package-cache-mutate", ".global-cache", ".global-cache-journal"].map((name) => path.join(input.home, ".cargo", name)))
   add("bun", "global-install", "subpath", path.join(input.home, ".bun", "install", "global"), path.join(input.home, ".bun", "bin"))
   add("pnpm", "global-install", "subpath", ...["global", "bin", ".tools"].map((name) => path.join(pnpm, name)))
   // pnpm creates executable shims directly in PNPM_HOME; its recursive store is not an install root.

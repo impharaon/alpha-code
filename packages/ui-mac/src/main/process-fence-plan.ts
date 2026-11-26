@@ -20,7 +20,7 @@
 // **刻意不建** `~/.opencode`:它整个是受保护配置位置 CF-9,任何进程都不建它(BR-07;W16 已删,计划目录在引擎数据目录下,
 // 这里本来就预建数据目录,`plan` 由写文件工具懒建);W17/W18(dev-only)也不建。
 
-import { lstatSync, mkdirSync, readFileSync, readlinkSync, renameSync, rmSync, statSync, symlinkSync, unlinkSync, writeFileSync } from "node:fs"
+import { lstatSync, mkdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs"
 import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path"
 import { resolveFenceAddonPath, type FenceAddonResolveInput } from "./process-fence-apply"
 import {
@@ -29,6 +29,9 @@ import {
   checkWorkspaceDirectory,
   PACKAGE_MANAGERS_DIRNAME,
   resolvePackageManagerLocations,
+  userConfigurationLocations,
+  processFenceRulesCover,
+  type ProcessFenceWriteRule,
   resolveEngineRoots,
   selectWorkspaceUnion,
   trimUntilCompiles,
@@ -46,10 +49,28 @@ export function planPackageManagerCaches(input: PackageManagerLocationInput & { 
   const anchor = checkWorkspaceDirectory(input.eligibility, input.userDataPath)
   if (!anchor.eligible) throw new Error("package manager cache: invalid application data anchor")
   const resolved = resolvePackageManagerLocations(input)
-  const cachePaths = new Set(resolved.writable.filter((entry) => entry.purpose === "cache").map((entry) => entry.rule.value))
-  const candidates = [join(input.userDataPath, PACKAGE_MANAGERS_DIRNAME), ...cachePaths].map((sourcePath) => ({ sourcePath, kind: "directory" as const }))
+  const caches = resolved.writable.filter((entry) => entry.purpose === "cache")
+  const cachePaths = new Set(caches.map((entry) => entry.rule.value))
+  const cargoHome = join(input.home, ".cargo")
+  const cargoInstalls = resolved.writable.filter((entry) => entry.manager === "cargo" && entry.purpose === "global-install").map((entry) => entry.rule)
+  const reserved = [cargoHome, ...cargoInstalls.map((rule) => rule.value),
+    ...userConfigurationLocations(input).flatMap((rule) => rule.kind !== "dat-files" && dirname(rule.path) === cargoHome ? [rule.path] : []),
+    ...["credentials", "credentials.toml", "env"].map((name) => join(cargoHome, name)),
+  ].flatMap((path) => [path, plannedWritableTarget(path, input.eligibility.realpath).target])
+  const candidates = [{ sourcePath: join(input.userDataPath, PACKAGE_MANAGERS_DIRNAME), kind: "directory" as const },
+    ...caches.map((entry) => ({ sourcePath: entry.rule.value, kind: entry.rule.kind === "literal" ? "file" as const : "directory" as const })),
+  ]
   for (const candidate of candidates) {
     const target = plannedWritableTarget(candidate.sourcePath, input.eligibility.realpath).target
+    const cache = caches.find((entry) => entry.rule.value === candidate.sourcePath)
+    if (cache?.manager === "cargo") {
+      const rule = { ...cache.rule, value: target }
+      if (reserved.some((path) => processFenceRulesCover({ allow: [rule], deny: [] }, path)) ||
+        cargoInstalls.filter((entry) => entry.kind === "subpath").some((entry) =>
+          [entry.value, plannedWritableTarget(entry.value, input.eligibility.realpath).target].some((value) => processFenceRulesCover({ allow: [{ ...entry, value }], deny: [] }, target))))
+        throw new Error("package manager cache: Cargo target overlaps a reserved location")
+      continue
+    }
     const inside = relative(anchor.directory, target)
     if (inside === "" || inside === ".." || inside.startsWith(`..${process.platform === "win32" ? "\\" : "/"}`) || isAbsolute(inside))
       throw new Error("package manager cache: target is outside the application data anchor")
@@ -59,29 +80,8 @@ export function planPackageManagerCaches(input: PackageManagerLocationInput & { 
   const targets = new Map(plan.locations.map((entry) => [entry.sourcePath, entry.targetPath]))
   const env = Object.fromEntries(Object.entries(resolved.env).map(([key, value]) => [key, targets.get(value) ?? value]))
   const cacheEnv = Object.fromEntries(Object.entries(resolved.env).filter(([, value]) => cachePaths.has(value)).map(([key, value]) => [key, targets.get(value)!]))
-  prepareCargoConfigurationBridge(input.home, env.CARGO_HOME!)
-  return { env, cacheEnv, locations: plan.locations }
-}
-
-function prepareCargoConfigurationBridge(home: string, cargoHome: string) {
-  for (const name of ["config", "config.toml", "credentials", "credentials.toml"]) {
-    const source = join(home, ".cargo", name)
-    try {
-      lstatSync(source)
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException)?.code === "ENOENT") continue
-      throw error
-    }
-    const target = join(cargoHome, name)
-    try {
-      const node = lstatSync(target)
-      if (node.isSymbolicLink() && readlinkSync(target) === source) continue
-      unlinkSync(target)
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException)?.code !== "ENOENT") throw error
-    }
-    symlinkSync(source, target)
-  }
+  const rules: ProcessFenceWriteRule[] = caches.map((entry) => ({ ...entry.rule, value: targets.get(entry.rule.value)! }))
+  return { env, cacheEnv, rules, locations: plan.locations }
 }
 
 /** Main-only identity planning. New locations are usable only after the truth is committed. */

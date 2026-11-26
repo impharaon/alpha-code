@@ -2712,6 +2712,38 @@ packageIt.live("an always monitor waits for a real prompt and does not restart o
   expect(readFileSync(join(location.directory, "always-monitor-started"), "utf8").trim().split("\n")).toEqual(["started"])
 })))
 
+packageIt.live("only command prompt lifecycle plaintext enters model context", () => packageJourney(Effect.gen(function* () {
+  const tree = yield* Effect.promise(() => captureStandardFixture("claude:dash0"))
+  const source = JSON.parse(new TextDecoder().decode(yield* Effect.promise(() => tree.readFile("claude/hooks.json"))))
+  const hooks = Object.fromEntries(["SessionStart", "UserPromptSubmit", "UserPromptExpansion", "PreToolUse", "PostToolUse"].map(event => [event, source.hooks[event] ?? structuredClone(source.hooks.UserPromptSubmit)]))
+  for (const groups of Object.values(hooks) as { matcher?: string; hooks: { command: string; args: string[] }[] }[][]) for (const group of groups) {
+    delete group.matcher
+    for (const hook of group.hooks) {
+      hook.command = process.execPath
+      hook.args = ["-e", "const input=await Bun.stdin.json();console.log(input.hook_event_name+'_PLAIN_CONTEXT')"]
+    }
+  }
+  const sample = yield* invocationSample("claude:feature-dev", { "hooks/hooks.json": JSON.stringify({ hooks }) })
+  const membership = JSON.parse(readFileSync(join(sample.root, "skills-enabled.json"), "utf8"))
+  writeFileSync(join(sample.root, "skills-enabled.json"), JSON.stringify({ ...membership, keys: [...membership.keys, sample.key] }))
+  yield* invocationNativeServices
+  const ext = yield* activateExtUntilFinished
+  const command = sample.hostNames["command:commands/feature-dev.md"]!
+  const commands = yield* Command.Service
+  yield* ext.finish(commands.list().pipe(Effect.map(items => items.some(item => item.name === command))))
+  const sessions = yield* Sessions.Service
+  const location = yield* Location.Service
+  const session = yield* sessions.create({ location: { directory: location.directory }, title: "Plain stdout boundary", agent: "build", model: { providerID: "test", id: "picked" } } as never)
+  const llm = yield* TestLLM.Test
+  yield* llm.push(TestLLM.toolCall("plaintext_write", "write", { path: "plaintext.txt", content: "completed" }), TestLLM.text("Done", "plaintext-complete"))
+  yield* commands.execute({ name: command, invocation: { sessionID: session.id, prompt: { text: "Write the file" }, delivery: "queue" } })
+  yield* sessions.wait(session.id)
+  const requests = JSON.stringify(yield* llm.requests())
+  for (const event of ["SessionStart", "UserPromptSubmit", "UserPromptExpansion"]) expect(requests).toContain(event + "_PLAIN_CONTEXT")
+  for (const event of ["PreToolUse", "PostToolUse"]) expect(requests).not.toContain(event + "_PLAIN_CONTEXT")
+  expect(readFileSync(join(location.directory, "plaintext.txt"), "utf8")).toBe("completed")
+})))
+
 const runtimePromptSample = (event: "Stop" | "PostToolUse" | "PostToolUseFailure" | "UserPromptSubmit" | "UserPromptExpansion" | "PermissionRequest" | "PostToolBatch", continueOnBlock: boolean) => Effect.gen(function* () {
   const capture = yield* Effect.promise(() => captureStandardFixture("claude:paypal"))
   const source = JSON.parse(new TextDecoder().decode(yield* Effect.promise(() => capture.readFile("hooks/hooks.json"))))

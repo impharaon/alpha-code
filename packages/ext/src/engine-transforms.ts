@@ -44,7 +44,7 @@ export function toServerConfig(entry: unknown): Mcp.ServerConfig | undefined {
   if (entry.type === "remote" && typeof entry.url === "string") {
     const headers = stringRecord(entry.headers)
     const oauth = entry.oauth === false ? { oauth: false as const } : isObj(entry.oauth) ? { oauth: entry.oauth } : {}
-    return { type: "remote", url: entry.url, ...(headers ? { headers } : {}), ...oauth, ...codemode, ...disabled } as Mcp.ServerConfig
+    return { type: "remote", url: entry.url, ...(entry.transport === "http" || entry.transport === "sse" ? { transport: entry.transport } : {}), ...(headers ? { headers } : {}), ...oauth, ...codemode, ...disabled } as Mcp.ServerConfig
   }
   return undefined
 }

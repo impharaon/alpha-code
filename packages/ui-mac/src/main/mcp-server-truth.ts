@@ -49,7 +49,7 @@ export type McpServerTruthReadDeps = {
 
 export type McpServerTruthRead = { ok: true; absent: boolean; servers: McpServerRecord[] } | { ok: false; reason: string }
 
-const RECORD_KEYS: readonly string[] = ["name", "url", "headers", "timeout", "timeouts", "oauth"]
+const RECORD_KEYS: readonly string[] = ["name", "url", "headers", "timeout", "timeouts", "oauth", "transport"]
 const TOP_KEYS: readonly string[] = ["v", "servers"]
 
 function isRecord(v: unknown): v is Record<string, unknown> {
@@ -106,7 +106,7 @@ export function invalidMcpServerList(entries: unknown, label = "servers"): strin
 
 /** 固定键序 + headers 拷贝:读回的对象不带文件里的键序,写端用同一个函数得到确定的字节。没有 headers 就没有这个键。 */
 export function canonicalMcpServerRecord(r: McpServerRecord): McpServerRecord {
-  return { name: r.name, url: r.url, ...(r.headers ? { headers: { ...r.headers } } : {}), ...(r.timeout === undefined ? {} : { timeout: r.timeout }), ...(r.oauth === undefined ? {} : { oauth: r.oauth === false ? false : { ...r.oauth } }) }
+  return { name: r.name, url: r.url, ...(r.transport === undefined ? {} : { transport: r.transport }), ...(r.headers ? { headers: { ...r.headers } } : {}), ...(r.timeout === undefined ? {} : { timeout: r.timeout }), ...(r.oauth === undefined ? {} : { oauth: r.oauth === false ? false : { ...r.oauth } }) }
 }
 
 /** 严格读(见文件头)。缺失 ⇒ ok + absent + 空清单;其余任何不对 ⇒ ok:false + 一行日志。 */

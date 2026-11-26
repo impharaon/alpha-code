@@ -73,7 +73,7 @@ const SAFE_MCP_FIELDS = new Set([
   "enabled",
   "cwd",
   "timeout", "timeouts", "forwardEnvironment",
-  "oauth",
+  "oauth", "transport",
 ])
 // Command heads we allow for local (stdio) MCP servers. Absolute paths under the standard mac
 // package-manager bin dirs are also accepted (Homebrew / system). REQ-076 T2:win32 上 head 经

@@ -11,7 +11,7 @@ export function pluginMcpConfig(entry: Extract<Entry, { kind: "mcp" }>, bindings
   const render = (text: Text) => renderPluginText(text, bindings ?? { pluginRoot: "${CLAUDE_PLUGIN_ROOT}", projectDir: "${CLAUDE_PROJECT_DIR}" })
   const timing = { ...(entry.timeoutMs === undefined ? {} : { timeout: entry.timeoutMs }), ...(entry.timeouts ? { timeouts: entry.timeouts } : {}) }
   if (entry.transport !== "stdio") return {
-    type: "remote", url: render(entry.url), headers: Object.fromEntries(Object.entries(entry.headers).map(([key, value]) => [key, render(value)])), ...timing,
+    type: "remote", transport: entry.transport, url: render(entry.url), headers: Object.fromEntries(Object.entries(entry.headers).map(([key, value]) => [key, render(value)])), ...timing,
     ...(entry.oauth === false ? { oauth: false } : entry.oauth?.oauth ? { oauth: {
       ...(entry.oauth.oauth.clientId ? { clientId: entry.oauth.oauth.clientId } : {}),
       ...(entry.oauth.oauth.clientSecret ? { clientSecret: render(entry.oauth.oauth.clientSecret) } : {}),

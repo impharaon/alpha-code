@@ -9,6 +9,7 @@ import {
   SdkErrorCode,
   SdkHttpError,
   StreamableHTTPClientTransport,
+  SSEClientTransport, // codepuppy(#1776, S-12)
   UnauthorizedError,
   UnsupportedProtocolVersionError,
   type CallToolRequestOptions,
@@ -331,14 +332,14 @@ export const connect = Effect.fnUntraced(function* (options: ConnectOptions) {
   // it with 404, or with the 400 a freshly restarted single-session server emits, means it no longer
   // knows this connection. Modern connections never carry a session id, so a modern 404 for an unknown
   // method is not mistaken for expiry. Other 400s pass through untouched.
-  const session: { transport?: StreamableHTTPClientTransport; expired?: () => void; reported: boolean } = {
+  const session: { transport?: StreamableHTTPClientTransport | SSEClientTransport; expired?: () => void; reported: boolean } = {
     reported: false,
   }
   const failure = (error: unknown) => {
     // A tool call that relists first can fail with the list's already mapped expiry.
     if (error instanceof SessionExpiredError) return error
     // codepuppy(#1645): the SDK error stays the cause, so a failed listing is named with its HTTP status (startFailure).
-    if (!(error instanceof SdkHttpError) || session.transport?.sessionId === undefined) return new Error(explain(error), { cause: error })
+    if (!(error instanceof SdkHttpError) || !(session.transport instanceof StreamableHTTPClientTransport) || session.transport.sessionId === undefined) return new Error(explain(error), { cause: error })
     const expired =
       error.status === 404 ||
       (error.status === 400 &&
@@ -382,14 +383,12 @@ export const connect = Effect.fnUntraced(function* (options: ConnectOptions) {
     // Servers that bundle their own Code Mode (Cloudflare and others) expose raw tools when asked
     // with ?codemode=false, which is what our Code Mode wants. The configured URL stays the OAuth identity.
     const url = new URL(config.url)
-    const addedCodemode = config.codemode !== false && !url.searchParams.has("codemode") && !rejectsUnknownQuery(url)
+    const addedCodemode = config.transport !== "sse" && config.codemode !== false && !url.searchParams.has("codemode") && !rejectsUnknownQuery(url)
     if (addedCodemode) url.searchParams.set("codemode", "false")
     const open = Effect.fnUntraced(function* (url: URL) {
-      session.transport = new StreamableHTTPClientTransport(url, {
-        requestInit: config.headers ? { headers: config.headers } : undefined,
-        authProvider: options.authProvider,
-        fetch,
-      })
+      // codepuppy(#1776, S-12): both SDK transports retain this instance's auth and fetch boundary.
+      const transportOptions = { requestInit: config.headers ? { headers: config.headers } : undefined, authProvider: options.authProvider, fetch }
+      session.transport = config.transport === "sse" ? new SSEClientTransport(url, transportOptions) : new StreamableHTTPClientTransport(url, transportOptions)
       return yield* initialize(session.transport)
     })
 
@@ -417,7 +416,7 @@ export const connect = Effect.fnUntraced(function* (options: ConnectOptions) {
         const transport = session.transport
         // Termination failures are logged below; onerror would report them a second time.
         client.onerror = undefined
-        if (transport?.sessionId !== undefined && !session.reported)
+        if (transport instanceof StreamableHTTPClientTransport && transport.sessionId !== undefined && !session.reported)
           yield* Effect.tryPromise({ try: () => transport.terminateSession(), catch: toError }).pipe(
             Effect.timeoutOrElse({
               duration: TERMINATE_TIMEOUT,

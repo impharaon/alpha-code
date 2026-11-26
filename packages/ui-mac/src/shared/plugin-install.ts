@@ -7,7 +7,7 @@ export type NotRunningReasonV1 = "kind-not-supported-yet" | "needs-plugin-files"
 export type PackageNotRunningV1 = { kind: string; sourceName: string; reason: NotRunningReasonV1 }
 export type McpConfigLeafV1 =
   | { type: "local"; command: string[]; environment?: Record<string, string>; cwd?: string; timeout?: number; timeouts?: McpTimeouts; forwardEnvironment?: EnvironmentForward[] }
-  | { type: "remote"; url: string; headers?: Record<string, string>; timeout?: number; timeouts?: McpTimeouts; oauth?: false | { clientId?: string; clientSecret?: string; scope?: string; redirectUri?: string } }
+  | { type: "remote"; transport?: "http" | "sse"; url: string; headers?: Record<string, string>; timeout?: number; timeouts?: McpTimeouts; oauth?: false | { clientId?: string; clientSecret?: string; scope?: string; redirectUri?: string } }
 export type PackageSourceV1 =
   | { kind: "catalog" }
   | { kind: "marketplace"; ecosystem: "claude" | "codex"; repository: string; commit: string; path: string; entryName: string }
@@ -48,7 +48,7 @@ export function validMcpConfigLeaf(input: unknown): input is McpConfigLeafV1 {
   if (input.forwardEnvironment !== undefined && (!Array.isArray(input.forwardEnvironment) || !input.forwardEnvironment.every(value => exact(value, ["name", "source"]) && nonempty(value.name) && (value.source === "local" || value.source === "remote")))) return false
   if (input.type === "local")
     return exact(input, ["type", "command", "environment", "cwd", "timeout", "timeouts", "forwardEnvironment"]) && Array.isArray(input.command) && input.command.length > 0 && input.command.every((part: unknown) => typeof part === "string") && (input.environment === undefined || stringMap(input.environment)) && (input.cwd === undefined || typeof input.cwd === "string")
-  if (input.type !== "remote" || !exact(input, ["type", "url", "headers", "timeout", "timeouts", "oauth"]) || !nonempty(input.url) || (input.headers !== undefined && !stringMap(input.headers))) return false
+  if (input.type !== "remote" || !exact(input, ["type", "transport", "url", "headers", "timeout", "timeouts", "oauth"]) || !nonempty(input.url) || (input.transport !== undefined && input.transport !== "http" && input.transport !== "sse") || (input.headers !== undefined && !stringMap(input.headers))) return false
   return input.oauth === undefined || input.oauth === false || (exact(input.oauth, ["clientId", "clientSecret", "scope", "redirectUri"]) && Object.values(input.oauth).every((value) => typeof value === "string"))
 }
 

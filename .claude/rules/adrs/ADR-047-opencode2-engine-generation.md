@@ -288,3 +288,12 @@ OpenCode 共用服务、库与凭证。
 - ➖ 撤回一个带上游祖先的合并,要同时暂停每日同步,重新落地要 revert 那次 revert(基线 §6)。
 - ⚠️ Code Puppy 的库与数据目录仍与用户自装的 OpenCode 同路径;本 ADR 只保证不导入不属于 Code Puppy 的凭证;本票不搬目录(编排器已定,裁决书 R5),目录搬迁是一次独立的数据迁移,另行裁决。
 - 🔁 [[ADR-036]] 被本 ADR 取代(accepted 时把 ADR-036 的状态改为 superseded)。
+
+
+### #1776 S-12 增量：显式 MCP 传输（accepted，2026-11-26）
+
+依据 [DESIGN-local-plugin-install v3.1 §4.13/§10](https://github.com/impharaon/alpha-work/blob/3a0352e4e3306c0410e2bb680a07f6312d8bcf57/docs/specs/local-plugin-install/design.md) 与 #1776 r3 的实施续派，只登记该已冻结增量，不改变本 ADR 其余裁决。L0 transform 不能扩 schema 或替换私有 SDK transport；L1 现有文档转换不覆盖 schema 源码/解码/直接运行，L2 需另建这些入口的 apply/restore 管线，故沿 ADR-029 采用精确 L3。
+
+新接管只有 `packages/schema/src/mcp.ts` 的 `RemoteConfig.transport?: "http" | "sse"`；既有 `packages/core/src/mcp/client.ts` 只扩 SDK 选择、union 类型与 HTTP 专用收尾判别。不接管整个 schema 目录，不新增依赖/client/协议 fallback。维护归属为 MCP/runtime 车道，登记 id=`plugin-mcp-transport`；north-star 的 schema 单文件清单与现有打印/同步 parity 共用同一权威。
+
+缺席/显式 http 维持原 HTTP 行为，显式 sse 原 URL 经同一 authProvider/headers/受控 Fetch 打开 SSE，SSE 不做 HTTP codemode 探测或 sessionId/DELETE 收尾。判据在 schema mcp、ext engine-transforms、ui-mac install/truth 与 core codepuppy-mcp-runtime 既有测试；真实 SDK 流及代理证据随本片 plan 收据，不以配置复制代替。同步上游必须对该单文件与既有 client 做 takeover upgrade review。

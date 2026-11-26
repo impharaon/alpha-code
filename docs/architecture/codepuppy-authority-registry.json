@@ -2149,6 +2149,41 @@
         }
       ],
       "note": "The existing connection input fetch is scoped before McpClient.connect. index.ts connectProvider and explicit authorization already override that service with the layer-captured fetch, so their exact composition points also consume the same private wrapper. oauth.ts, the public server schema, global fetch, NO_PROXY, seatbelt and the gate are unchanged."
+    },
+    {
+      "id": "plugin-mcp-transport",
+      "decision": "Preserve the declared remote MCP transport: absent or http uses existing HTTP; explicit sse uses the existing SDK SSE transport, same auth/fetch and no HTTP session cleanup (DESIGN-local-plugin-install v3.1 S-12; #1776 r3).",
+      "adr": [
+        "ADR-029",
+        "ADR-047"
+      ],
+      "lane": "MCP/runtime (#1776 slice 4)",
+      "takeovers": [
+        "packages/schema/src/mcp.ts",
+        "packages/core/src/mcp/client.ts"
+      ],
+      "mechanism": {
+        "file": "packages/core/src/mcp/client.ts",
+        "ladder": "L3: RemoteConfig one-field schema raise plus narrow increment in the existing client. L0 cannot extend shared decoding or choose a private transport; L1/L2 would add a source/build apply/restore pipeline for the same two boundaries (design v3.1 §10 S-12)."
+      },
+      "tests": [
+        {
+          "file": "packages/schema/test/mcp.test.ts",
+          "name": "remote MCP transport preserves explicit HTTP or SSE and leaves the default absent"
+        },
+        {
+          "file": "packages/ext/src/engine-transforms.test.ts",
+          "name": "remote MCP projection preserves explicit transport without inventing a default"
+        },
+        {
+          "file": "packages/ui-mac/src/main/mcp-server-truth.test.ts",
+          "name": "remote MCP truth persists explicit transport without adding it to default records"
+        },
+        {
+          "file": "packages/core/test/codepuppy-mcp-runtime.test.ts",
+          "name": "explicit SSE opens the declared GET URL and never probes HTTP codemode"
+        }
+      ]
     }
   ]
 }

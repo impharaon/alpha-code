@@ -142,6 +142,8 @@ UPSTREAM_EXCLUDES=(
   # 判据 packages/core/test/codepuppy-mcp-runtime.test.ts。
   # INT-safety I-20(SPEC-stored-credentials-fence,owner 2026-11-20「两份都批准」):client.ts 的 codepuppy(#1562, I-20) 块里,治理云连接器每个
   # 请求的凭据改读进程内凭据表(readCodePuppyCredential),不读文件;判据 packages/ui-mac/src/main/engine-cases.test.ts。
+  # #1776 S-12 / ADR-047: one optional RemoteConfig transport field; SDK selection stays in the existing client.
+  ':(exclude)packages/schema/src/mcp.ts'
   ':(exclude)packages/core/src/mcp/client.ts'
   ':(exclude)packages/core/src/mcp/connection.ts'
   ':(exclude)packages/core/src/mcp/index.ts'

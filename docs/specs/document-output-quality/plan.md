@@ -354,3 +354,54 @@ bun typecheck
 较宽选择器基线缺陷：工作树根 `affected-tests --list` exit 2，stderr 为 `No such file or directory: .../.gate-tests`，未产生 scope line；实际 `.gate-tests` 不在树中。记录为 gate 配置/调度方去向，不扩大为全量、增写选择器配置或假报 affected scope。原命令输出 `/tmp/alpha-1761-r6/affected-tests.scope`。未运行 bin/check/gate run、未启动 app/Electron/窗口、未上传发布部署；foreground 排空，hooksPath 保持 `.githooks`。
 
 返回前文档核对：`python3 scripts/check-doc-links.py docs/specs/document-output-quality/plan.md` 为 12 links PASS；alpha profile 的文档契约检查本文件 findings=0（全仓既有 322 findings 不扩修），输出 `/tmp/alpha-1761-r6/docs-contract-final.json`；`git diff --check` exit 0。已核 Codex / GPT-6：上述本片组件证据成立，完整 AC 与正式生产集成仍按已列 pending 续交；没有变更冻结决定。
+
+
+## 切片五：Excel 操作、保真重算与透视刷新
+
+- 依据：spec v1 @ `31cd182e09`，AC-03、07、11；冻结设计 @ `46f8580c95` §4.6/4.7、§6 R9/R10/R11、§10 R1-4/R1-10；继承已验收片 2/3/4，不重开决定。r7 授权本片计划后同轮实施，但计划若揭示未决设计问题则停止。
+- 核对：r7 同轮计划自核为 Codex / GPT-6；下面的 Python 运行环境交接尚缺冻结定义，未进入实施，不冒称调度方已接受新增接缝。补齐后首个实施提交填写实际 Phase 核对版本。
+
+### 改动
+
+| 文件 | 改什么 |
+| --- | --- |
+| `packages/ui-mac/resources/office-excel/excel_mcp/**`、`LICENSE`、`sources.json`（新增） | 以试验实际 2.3.2 wheel 为输入，收纳选中 operation、calc、Workspace/package 及静态依赖最小闭包；逐文件记源/改编摘要及配额移除，不复制社区 MCP/HTTP/SSE/上传服务，不引入另一套解释器或目录项 |
+| `packages/ui-mac/scripts/vendor-office-excel.py`（新增） | 重现固定源码选择和改编、生成来源清单，验证实际 wheel 版本/摘要/MIT；六个对象操作的函数注解和对应 InputModel 是 schema 唯一源，排除其它工具。仅构建期读已取得的固定输入，不做运行期下载 |
+| `packages/ui-mac/resources/office-excel/codepuppy_office/__init__.py`、`excel.py`、`objects.py`（新增） | 导出同一 OfficeExcel；inspect/read/find/游标，sort/字面查替，共用 edit 保存；对象 schema/执行复用同一 Pydantic 模型。edit 计算实际变更源区域，在 package.prepare/apply 前重建可重建 pivot；当前 workbook 的 Engine 结果及 stale 标记进入同一 results 回调；不可重建者保留并返回具体诊断 |
+| `packages/ui-mac/resources/office-excel/codepuppy_office/recalculate.py`、`cache.py`、`recalculate.xba`（新增） | 固定副本/私有 profile/LO calculateAll/store、进程退出与期限；按 sheet 身份和坐标合并原 ZIP 的缓存/类型及 chart cache，保留公式、扩展与非目标 part，源摘要一致才原子提交；运行环境消费口须先由下述接缝裁定，不在此自选路径/变量 |
+| `packages/ui-mac/scripts/build-office-runtime.ts`、`src/main/office-runtime-lock.test.ts`、`document-resources.test.ts`（必要同链） | 将应用模块与选中源码/实际许可证装入两个目标的 Office Python site-packages，构建戳纳入实际源字节，`-I` 实际 import/能力读回并核许可；继续原锁闭包，不直接安装完整社区发行包，不增加未经设计允许的依赖。两平台目录消费现有路径权威 |
+| `packages/ui-mac/resources/office-mcp/server.py`、`src/main/office-mcp.test.ts` | read_xlsx 增强和三类操作/重算工具仅委托 OfficeExcel，保留 workspace 授权；旧 read_xlsx 的公式文本断言按新行为调整。writer 移除仍归片 7，当前不提前改 Word/PPT/PDF 或连接器发布版本/描述 |
+| `packages/ui-mac/src/main/office-excel.test.ts`（新增，模块此前无测试）、实际生成的 `fixtures/office-excel/**` | 最低层的同模块 API/ZIP/保真/桥接用例，fixture 来自真实 2.3.2、当前制作库及现有试验工作簿，注明来源；重算合并单元用例消费一次真实 LO 输出，不手写另一系统的 ZIP/对象结构 |
+| `packages/ext/src/document-render.ts/.test.ts`、`document-process.ts`、`document-register.ts`（仅必要同链） | XLSX 在渲染前调用同一重算入口、消费结果与新源摘要，再生成同版图片；失败/公式错误/透视诊断保留可交付文件，不用转换中间本替代原工作簿。跨进程环境交接未定前不加运行时参数/空成功回调 |
+| `packages/ui-mac/resources/factory-skills/office-docs/xlsx/SKILL.md` 及其来源清单 | 只随本片已实现入口同步 Excel 的共享保存/对象/读取/重算实际用法；全套技能流程接线仍归片 7，生成来源/改编摘要机械同步，不改上游锁版本 |
+| `docs/specs/document-output-quality/plan.md` | 本片计划、实际文件/偏离、命令与 pending 证据；不改冻结设计、其它规格、gate、目录源或另一仓 |
+
+### 顺序
+
+1. 先补齐 Python 消费宿主实时运行环境的冻结接缝；本轮已定位的具体证据在偏离记录。它决定 recalculate 的启动及 pending 行为，不可用 PATH、固定安装目录、伪 ready 或只在测试注入的回调替代。确认后按实际试验 wheel/源码提取最小闭包、MIT 与 schema，构建 Office Python 并验证 `-I` import；不先实现一份临时保存/计算器。
+2. 接 OfficeExcel 共用 edit 与 inspect/objects/apply_edit：先单个改变用例，步末跑模块文件；再用实际 pivot/slicer/sparkline 产物验证二次保存与修改源后 rebuild、不可重建诊断、当前公式数据回调，及游标版本绑定/字面替换/排序。schema 未知字段必须明确 invalid-input，不能只比 JSON 标题或上游工具数量。
+3. 固定 LO 副本重算→原 ZIP 缓存/图表合并→原子提交；先用真实计算副本的合并层用例，再进行一次实际 LO 重算/连接器读回。独立求和、公式错误位置、字符串/布尔/空结果及共享/数组映射与等价性按真实样本核对，失败不提交半份结果。重算后接 XLSX 渲染同版摘要。需要共享 `gate slot` 的命令前台排队，按 r7 **等待并重试，不因排队取消**；期间只做不冲突的轻量工作。
+4. 连接器只委托模块，相关 stdio 用例核真实返回及授权；步末跑对应文件。最后按 `rg` 实际 imports、工具枚举和资源引用选一次 wider，至少包含 office-mcp-tools-snapshot（若改动事实须与片 7/外仓发布边界核对，不能手编目录）、codepuppy-office-instance、Office 资源/锁及 ext renderer 消费者，四包中实际受影响包的 typecheck。运行 `affected-tests --list` 报真实 scope；既有缺 `.gate-tests` 不以全量兜底，不改 gate。
+
+### 风险
+
+- **Python 环境交接未决**：§4.1 的环境是 JS DocumentHost 的异步结果；§4.6 的 Python API 无环境/宿主参数，现有 stdio 命令只传 format/workspace。如何绑定当前 Location/代、取得实时 preparing/ready/failed、派生 profile/字体/job，以及重启后拒旧状态尚未定义。它不是 #1760 的共享下载实现尚缺，不能仅写 integration pending 来填一个空绑定。所需最小裁定见偏离记录；此问题未补齐，本片不进入实现。
+- **配额不能换成“大数字”**：2.3.2 有 CellBudget/ZIP/text/operation/schema 多处限制；逐实际调用链移除与格式无关的限制，保留 OOXML/引用/对象合法性。若最小闭包实际要求未批准的新依赖，先给出模块/导入证据，不安装完整社区 server 或另造同义实现。
+- **保真不由 openpyxl/LO 保证**：读取真实 extension、关系与 package 状态；原 ZIP 非目标 part 摘要及公式身份是证据。chart cache、共享/数组公式、命名源和不可重建 pivot 必须覆盖真实样本，未取得样本不手写替代、不冒称通过。Excel 创建/重刷来源的诊断不能只凭 can_rebuild mock 代证；单元边界可受控，Acceptance 留实际对象。
+- **分片归属**：完整 AC-03 的默认模型三次成品、Windows/正式包在片 8；外仓目录 re-intake/发布与片 7 的快照/工具清单联动不是本片可手编替代的工作。AC-11 的默认关闭连接器条件不变，模块入口本身必须可用。正式 #1760/发行资产与围栏集成的既有 pending 不重复声明成通过。
+
+### 证明
+
+| AC / 本片范围 | 命名证据 | 层与时机 | 移除行为的失败判据 |
+| --- | --- | --- | --- |
+| AC-03：新鲜重算/汇总/保真 | `office-excel.test.ts` 的缓存合并与 source-changed；真实 LO 计算副本、原 ZIP 扩展/关系/公式与 chart cache 核对，独立合计实际销售数据 | 快速 XML/数据逻辑及真实文件集成为 affected PR/nightly；真实 LO/试验对照一次性命令记录；默认模型三次旅程片 8/nightly | 缓存缺失/公式不等价仍成功、整本 LO 回存、丢 chart/扩展、覆盖并发编辑均使相应断言失败；未跑模型旅程不记整条通过 |
+| AC-07：读每个公式值与错误位置 | 既有 `office-mcp.test.ts` 的实际 stdio read_xlsx/excel_inspect；模块对 stored/community-evaluator/missing 的真实来源标记、分页/游标源变更 | 同一模块纯逻辑 fast、随包 Python/stdin/filesystem integration，affected PR/nightly；LO 输出真实样本一次性留证 | 只返回公式、把不支持当 Excel 错误、漏 #REF! 地址/跨版本翻页或静默截断会失败；删返回值/缓存来源/源摘要守卫的臂必须红 |
+| AC-11：对象/排序查替与保存前刷新 | `office-excel.test.ts` 模块与原 ZIP、`office-mcp.test.ts` 委托；真实 200 行工作簿做 pivot/slicer/sort/replace 后 LO 打开，检查只一个既有 Excel ID | 模块/文件/stdin 为 integration affected PR/nightly；200 行多步/LO 为一次性 Acceptance，未来完整旅程仅 scenario/nightly，不加重每个 PR | 去掉 package.apply 会丢实际扩展；去 rebuild/changed-range/当前公式回调则汇总仍旧；去诊断会误报 Excel-made pivot 已刷新；六个 operation 任一未执行、字面替换错成正则/排序不动都会失败 |
+
+### 偏离记录
+
+2026-11-26 r7 · 开始核对时间 08:43:42 UTC（16:43:42 +08）。本轮只读了当前契约/直接调用链与实际 2.3.2 wheel 的 Workspace/pivot/schema/Engine 实现，没有改生产代码或启动 LO。**SEAM-CHANGE-NEEDED: OfficeExcel.recalculate / Python DocumentEnvironment handoff**：`design.md:312` 冻结 `recalculate(path)`；§4.7 要据实时 LO 状态返回 pending，且独立 profile/字体/固定宏由应用配置。现有 `main/document-host.ts:29-38` 只给 JS 调用返回环境，落盘仅 `.gitignore`；`ext/document-host-bridge.ts:33-37` 只返回 JS 对象；`util/codepuppy-document.ts:86-95` 的发布槽为进程内 Symbol，不可由 Python `-I` 读取。stdio server 当前 `main()` 只接 format/workspace（`resources/office-mcp/server.py:49-74`），且 `shared/office-advisories.ts:149-151` 的既有连接器环境权限不提供文档环境通道。设计没有定义 Python 模块取得宿主投影的入口、身份/时效、私有资源路径及 pending 的归属；仅实现 #1760 的 ensureFile/Node 不会使这个 Python 入口自动成立。
+
+所需最小补齐由设计拥有者定义：在保留一参 OfficeExcel API 与不新增引擎 API 的前提下，明确默认脚本及 stdio 连接器共用的、绑定已授权 Location/本代的运行环境读取契约（状态、LO 入口、应用生成 profile/字体/工作目录和失效/缺投影行为），并给出生产者/消费者归属；若选择另一签名则显式修订原权威。实施者不自行选环境变量、工作区 JSON、用户数据路径约定或另开 RPC，不给测试专用 configure 成功替身。r7 明确允许计划暴露未决问题即停；本轮只提交本节，等待该具体契约后恢复同轮实施工作。没有运行行为测试/移除臂或提交实现，AC-03/07/11 不计通过；没有把共享执行槽等待取消，本轮尚未派发 LO 命令。
+
+本轮文档证据：`python3 scripts/check-doc-links.py docs/specs/document-output-quality/plan.md` 12 links PASS；`git diff --check` exit 0。`affected-tests --list` exit 2，缺 `.gate-tests`、没有 scope line，与已记录基线相同（`/tmp/alpha-1761-r7-affected.scope`），未更改 gate 或运行全量。文档契约本文件 findings 为 0；输出 `/tmp/alpha-1761-r7-docs-contract.json`。已核 Codex / GPT-6：计划文件/顺序/证据已列，唯一需先回设计的事项为上述 Python 环境交接；其它冻结决定沿用。

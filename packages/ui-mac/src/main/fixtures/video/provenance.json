@@ -1,0 +1,11 @@
+{
+  "speech-en.wav": {
+    "source": "https://huggingface.co/datasets/google/fleurs",
+    "split": "en_us/dev",
+    "original": "16053666868203857398.wav",
+    "sha256": "71e8878c98c2a4622e9cd6fdaf0d131095f290ab01ea1fb6a901f33b16d9bc29",
+    "license": "CC-BY-4.0",
+    "operation": "unmodified original WAV, copied from the existing 2026-11-25 pilot sample set",
+    "tsv_row": "1626\t16053666868203857398.wav\tThe Olympic gold medalist was due to swim in the 100m and 200m freestyle and in three relays at the Commonwealth Games, but due to his complaints his fitness has been in doubt.\tthe olympic gold medalist was due to swim in the 100m and 200m freestyle and in three relays at the commonwealth games but due to his complaints his fitness has been in doubt\tt h e | o l y m p i c | g o l d | m e d a l i s t | w a s | d u e | t o | s w i m | i n | t h e | 1 0 0 m | a n d | 2 0 0 m | f r e e s t y l e | a n d | i n | t h r e e | r e l a y s | a t | t h e | c o m m o n w e a l t h | g a m e s | b u t | d u e | t o | h i s | c o m p l a i n t s | h i s | f i t n e s s | h a s | b e e n | i n | d o u b t |\t162240\tFEMALE"
+  }
+}

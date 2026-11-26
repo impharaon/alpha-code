@@ -224,6 +224,10 @@ last_reviewed: 2026-11-26
 
 待本片 PLAN 展开；范围、AC 和依赖见总览，实施依据为视频设计 §4.4/§4.5/§5/§6 D5。平台契约只消费 producer 固定产物，不在桌面定义副本。
 
+### r3 D2 第一步实施记录
+
+2026-11-26 · 新增严格工具 schema、Node 组件进程执行、源内容/路径索引与原子持久缓存；实际音频夹具为 FLEURS en_us/dev 的原始 WAV，来源与 TSV 行/摘要在 fixtures/video/provenance.json。路径命名与只读身份按计划提取，同一实现由旧 owner 和服务消费。相关四文件 50 pass / 0 fail；ext project-config 28 pass / 0 fail。没有运行未钉住的 ffmpeg 或模型；实际媒体探测与新进程/组件集成断言仍按样本和 D3 就绪情况补齐。
+
 ### r3 D1 接缝续接记录
 
 2026-11-26 · 消费 FIRST-PARTY-NODE-v2.1 @ origin/alpha `a586b16fca`，已 fetch/read，未 merge/rebase。新增同一 manifest 的 video 条目、Node 服务源码/构建资源和自动注入消费点；首项仅 `{codepuppyNode}`，不实现展开、matcher、resolveAssets 或重锚。当前 producer 尚未提供 launchers/expandFirstPartyCommand，消费点保持未就绪、不回退解释器；#1760 集成后才核实际自动注入、冷 Node 身份/准备和已持久条目重锚，断言 pending。

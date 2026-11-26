@@ -291,7 +291,7 @@ bun typecheck
 | 文件 | 改什么 |
 | --- | --- |
 | `packages/util/src/codepuppy-document.ts/.test.ts` | 在同一共享面增加 RenderRequest、环境/成品/页/渲染回执/结果、DocumentHost 发布口及纯数据验证；只消费已有 Location/Session ID。check/defer 数据按冻结形状交所属后片处理，不用空成功替代检查 |
-| `packages/util/src/codepuppy-document-resources.ts`（新增）；main 的 `document-resources.ts`、`document-runtime-fonts.ts` 及现有测试 | 将本票已有资源身份/profile 函数移到 main/ext 都可合法消费的 Node 资源权威；原 main 入口消费同一实现。固定脚本/字体/模板来自发布投影，不让 ext import main，也不复制路径/字体/许可证逻辑 |
+| `packages/ui-mac/src/shared/document-resources.ts`、`document-runtime-fonts.ts`（新增）；main 的 `document-resources.ts`、`document-runtime-fonts.ts` 及现有测试 | 将本票已有资源身份/profile 函数移到 main/ext 都可合法消费的 Node 资源权威；原 main 入口消费同一实现。固定脚本/字体/模板来自发布投影，不让 ext import main，也不复制路径/字体/许可证逻辑 |
 | `packages/ui-mac/resources/document-runtime/render_document.py`（新增） | 固定 Office/PDF 快照、格式核对、PDFium 全页 PNG/版本/尺寸/摘要；Office 先 LO PDF，独立 profile，不改原文档，拒旧 PDF 和源变更。XLSX 最终缓存重算调用位在 ext，由片 5 接入，不自造计算器 |
 | `packages/ext/src/document-render.ts/.test.ts`、`document-tool.ts/.test.ts`（新增）、`document-runtime-verify.ts` | Location 绑定的固定执行与结果读回；校验业务参数先于 I/O、工作区真实路径、check/revision/源身份和实际文件，产生共享 metadata；复用公共进程实现/取消，不接任意程序、命令或 main URL。工具文案纳入现有登记簿 |
 | `packages/ext/src/context-injection.ts`、`plugin.ts`、`hub-bridge.ts/.test.ts`；main 的 `codepuppy-sidecar-messages.ts/.test.ts`、既有宿主/sidecar/bootstrap 装配文件（仅必要同链） | 承载 DocumentHost 的 ID 请求/应答、verify 注册及 generation/sequence/停止终结；发布同代只读资源投影，在真实 Location setup 注册和 cleanup。#1760 未交付则保持显式装配依赖，不添加 Node 路径、下载实现或成功替身 |
@@ -329,3 +329,5 @@ bun typecheck
 ### 偏离记录
 
 暂无。依据冻结 R4/R5/R12 及 §4.9 选实现细节，没有新产品或跨模块设计取舍，按 r6 继续实施。
+
+2026-11-26 · 切片四的真实 Word 字段反例（修正前证据）：片 2 的 `build-document-templates.py` 用空 `w:fldSimple instr="TOC ..."`；实际 LO 26.8.3.1 的固定刷新/转换仍只在 PDF 正文出现一次“正文”，没有目录条目。`.../office-runtime/build/arm64/bin/python3 -I -B` 的独立 PdfReader 核对在 `/tmp/alpha-1761-r6/word-fields-inspection.json` 记 `tocRendered=false`，断言 exit 1；固定脚本本身 exit 0 不作为目录已更新的证明。对照为锁定 docx 9.16.0 的 `TableOfContents` 实际产物 `/tmp/alpha-1761-r6/native-toc.docx`：原生 SDT/复杂域、书签和 PAGEREF，不能用空简单域替代。属同调用链模板缺陷，下一提交修正生成器/真实模板并重核实际 PDF；不因此变更设计或引入用户刷新步骤。这是一条一次性真实产物验证，不加入依赖 LO 的常规测试。

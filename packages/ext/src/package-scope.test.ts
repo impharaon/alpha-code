@@ -183,7 +183,7 @@ describe("managedMcpAllowedHere", () => {
 test("bundle root membership decodes without enabling its same-named instructions", () => {
   const decoded = decodePackageAllowSet({ v: 3, keys: [], scoped: [{ kind: "bundle", name: skill.name, projectPath: alpha }], mcp: [] })
   expect(decoded).toBeDefined()
-  expect(scopedPackageAllowedHere("bundle" as never, skill.name, decoded, alpha)).toBe(true)
-  expect(scopedPackageAllowedHere("bundle" as never, skill.name, decoded, beta)).toBe(false)
+  expect(scopedPackageAllowedHere("bundle", skill.name, decoded, alpha)).toBe(true)
+  expect(scopedPackageAllowedHere("bundle", skill.name, decoded, beta)).toBe(false)
   expect(managedSkillAllowedHere(skill, decoded, alpha)).toBe(false)
 })

@@ -5,7 +5,7 @@ import { isAbsolute, join, relative, sep } from "node:path"
 export type PackageAllowSetV3 = {
   v: 3
   keys: string[]
-  scoped: { kind: "skill" | "mcp" | "command" | "agent"; name: string; projectPath: string }[]
+  scoped: { kind: "skill" | "mcp" | "command" | "agent" | "bundle"; name: string; projectPath: string }[]
   /** 每条 global 范围 MCP 账本记录恰一项;按 name 升序,不重名(重名 = 读不到)。 */
   mcp: { name: string; enabled: boolean }[]
 }
@@ -14,7 +14,7 @@ export function decodePackageAllowSet(input: unknown): PackageAllowSetV3 | undef
   if (!object(input) || input.v !== 3 || !Array.isArray(input.keys) || !Array.isArray(input.scoped) || !Array.isArray(input.mcp)) return
   if (!input.keys.every((key: unknown): key is string => typeof key === "string")) return
   if (!input.scoped.every((entry: unknown): entry is PackageAllowSetV3["scoped"][number] =>
-    object(entry) && ["skill", "mcp", "command", "agent"].includes(String(entry.kind)) &&
+    object(entry) && ["skill", "mcp", "command", "agent", "bundle"].includes(String(entry.kind)) &&
     typeof entry.name === "string" && typeof entry.projectPath === "string",
   )) return
   if (!input.mcp.every((entry: unknown): entry is PackageAllowSetV3["mcp"][number] =>
@@ -25,7 +25,7 @@ export function decodePackageAllowSet(input: unknown): PackageAllowSetV3 | undef
 }
 
 export function scopedPackageAllowedHere(
-  kind: "skill" | "mcp" | "command" | "agent",
+  kind: "skill" | "mcp" | "command" | "agent" | "bundle",
   name: string,
   allowSet: PackageAllowSetV3 | undefined,
   projectRoot: string | undefined,
@@ -35,7 +35,7 @@ export function scopedPackageAllowedHere(
   return allowSet.scoped.some((entry) => entry.kind === kind && entry.name === name && entry.projectPath === projectRoot)
 }
 
-export function managedPackageEntryAllowedHere(kind: "command" | "agent", name: string, allowSet: PackageAllowSetV3 | undefined, projectRoot: string | undefined): boolean {
+export function managedPackageEntryAllowedHere(kind: "command" | "agent" | "bundle", name: string, allowSet: PackageAllowSetV3 | undefined, projectRoot: string | undefined): boolean {
   return !!allowSet && (allowSet.keys.includes(kind + "--" + name) || scopedPackageAllowedHere(kind, name, allowSet, projectRoot))
 }
 

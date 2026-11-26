@@ -721,7 +721,7 @@ AC-06 Ralph 原件一次性 `/tmp/plugin-standard-r6-ralph.log` **1 pass / 0 fai
 ## 片 5 · #1776：hooks、扩展事件与会话监视
 
 - 依据：[Story #1776](https://github.com/impharaon/alpha-code/issues/1776)；spec v5 @7278c10 的 AC-11/15、AC-03 hook 当次 allow、AC-13/14 其余运行入口、AC-20 hook OPTION、AC-22/23/24、AC-25 hook DATA 与生命周期、AC-30；[design v3.1 @8389b0f](https://github.com/impharaon/alpha-work/blob/8389b0f/docs/specs/local-plugin-install/design.md) §4.1/4.4/4.10/4.12/4.15、§5/6 S-03…S-08、§8/10。r5 arguments 与 r6 command/agent allow-set 的编排裁决继续有效，不因设计文字尚未镜像而撤回已接通行为。
-- 核对：r7 Phase: IMPLEMENT；Claude Opus 5.5（orchestrator）授权先 rebase，再计划并实施本片；若计划揭示未定合同则返回 PLAN-READY。片 4/3 通过 821be82013 的收据继承，以下只核对新基线的差异。当前本片停在下述 R5-ROOT 接缝，未写片 5 运行代码。
+- 核对：IMPLEMENT — 0192606eac · orchestrator / Claude Opus 5.5 · slice 5 plan accepted with the bundle allow-set seam（r8 Phase）。orchestrator ruling 2026-11-27 授权 keys/scoped 域和唯一生产者增加 bundle；无新字段、不显示为 UI component。R5-ROOT 已裁决，按本节计划继续实施；片 4/3 及 r7 rebase 收据继承。
 - r7 起于 2026-11-26 18:42（UTC+08:00）；本片实施预计 8–12 小时、约 30–40 个手写生产/合同文件、3,500–5,500 行（测试/生成物另计）。每组 AC 核对实际范围/耗时，达到两倍停止线返回，不扩大到其他仓或门。
 - 集成顺序仍为 4→3→5→7→8→9→6。本片不实现 LSP（片 7，AC-21）、style/default（片 8，AC-28/29）、source.command/link（片 9，AC-31）或原生引用/最终 UI（片 6，AC-02/08/09/13/15 的其余部分）；W 仅继承共享 converter/pin 的外仓依赖，不在此修改。
 
@@ -811,3 +811,6 @@ r7 仅完成获授权 rebase、片 4/3 相关复验与本节计划；机械 dial
 
 
 r7 收口静态证据（2026-11-26 18:56，约 14 分钟）：UI/Ext 包内 bun typecheck 均 exit 0（`/tmp/plugin-standard-r7-typecheck-{ui,ext}.log`）；plan 8 条相对链接通过，git diff --check exit 0。单仓 docs-contract（changed-since=origin/alpha）为 71 errors / 250 warnings，71 errors 仍属接受的基线，未修两条旧 unknown-id，也未拓展治理（`/tmp/plugin-standard-r7-docs.json`）。本片计划范围外只改已说明的精确计数一行；无 S5 生产代码、gate/selector 改动、push/PR/merge。hooksPath=.githooks，所有本车道前台命令均结束。
+
+
+r8 orchestrator ruling 2026-11-27（Claude Opus 5.5）：接受 R5-ROOT，bundle 与 r6 command/agent 同属允许集域扩展；同原 root/effect/claim 算法，无新字段、UI 行或事务合同。设计 §10 镜像由编排器处理。新红测先独立提交，global enabled/disabled/project-enabled 与 scoped 解码两文件各 0 pass / 1 fail；原有精确 keys/scoped 断言随新根成员同步，旧“非投影”样本改用 cloud，不放宽比较。

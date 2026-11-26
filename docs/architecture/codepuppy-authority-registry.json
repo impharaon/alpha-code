@@ -2192,7 +2192,7 @@
     },
     {
       "id": "plugin-invocation-semantics",
-      "decision": "DESIGN-local-plugin-install v3 S-01: one Location-owned command renderer compiles original source nodes before binding arguments and Text values; package calls use the same renderer as native commands. PreparedInstruction.arguments is the verbatim Invocation name order ([] if undeclared), per orchestrator ruling 2026-11-27.",
+      "decision": "DESIGN-local-plugin-install v3 S-01: one Location-owned command renderer compiles original source nodes before binding arguments and Text values; package calls use the same renderer as native commands. PreparedInstruction.arguments is the verbatim Invocation name order ([] if undeclared), per orchestrator ruling 2026-11-27. PackageAllowSetV3 includes bundle roots in the existing keys/scoped projection per orchestrator ruling 2026-11-27 (r8); roots remain absent from component rows.",
       "adr": [
         "ADR-029",
         "ADR-047"
@@ -2257,6 +2257,14 @@
         {
           "file": "packages/ext/src/policy/register-policy.test.ts",
           "name": "package Bash prefix grants cover every parsed command and preserve quoted executable paths"
+        },
+        {
+          "file": "packages/ui-mac/src/main/ext-receipt-v2.test.ts",
+          "name": "a bundle-only package projects enabled disabled and project-enabled root membership"
+        },
+        {
+          "file": "packages/ext/src/package-scope.test.ts",
+          "name": "bundle root membership decodes without enabling its same-named instructions"
         }
       ]
     }

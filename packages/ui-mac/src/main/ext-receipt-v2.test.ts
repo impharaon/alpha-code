@@ -781,14 +781,14 @@ describe("#336 skills projection final-publish lag — 判别式如实上报", (
   })
 
   test("派生无变化(非调用组件写)不触发 publish:seam 失败不误报 projectionLag", () => {
-    // command/agent 现在也是投影成员；用不贡献调用入口的 bundle 记录验无变化分支。
-    const w = upsertRecordV2(root, upsertInput({ id: "bundle:plain", name: "plain", kind: "bundle", configKey: undefined }), failingPublish)
+    // command/agent 现在也是投影成员；用不贡献该投影的 cloud 记录验无变化分支。
+    const w = upsertRecordV2(root, upsertInput({ id: "cloud:plain", name: "plain", kind: "cloud", configKey: undefined }), failingPublish)
     expect(w.ok).toBe(true)
     if (!w.ok) throw new Error("unreachable")
     // 首写时派生缺席→absent 也会做首建发布;先真建一次再验"无变化跳过"
-    const again = upsertRecordV2(root, upsertInput({ id: "bundle:plain2", name: "plain2", kind: "bundle", configKey: undefined }))
+    const again = upsertRecordV2(root, upsertInput({ id: "cloud:plain2", name: "plain2", kind: "cloud", configKey: undefined }))
     expect(again.ok).toBe(true)
-    const third = upsertRecordV2(root, upsertInput({ id: "bundle:plain3", name: "plain3", kind: "bundle", configKey: undefined }), failingPublish)
+    const third = upsertRecordV2(root, upsertInput({ id: "cloud:plain3", name: "plain3", kind: "cloud", configKey: undefined }), failingPublish)
     expect(third.ok).toBe(true)
     if (!third.ok) throw new Error("unreachable")
     expect(third.projectionLag).toBeUndefined() // 投影无变化(全 bundle)→ alreadyFinal 跳过 publish
@@ -863,7 +863,7 @@ describe("E2 package allow-set v3", () => {
     graph.installedGraphDigest = computeInstalledGraphDigest(graph)
     expect(applyPackageMutation(root, { operation: "install", transactionId: "invocation-seed", graphBeforeDigest: null, graphAfter: graph, claimMutations: nodes.map(node => ({ op: "acquire", kind: node.kind, name: node.name, owner: bundleOwner(graph.packageId, graph.root.manifestDigest) })), childRecordMutations: inputs.map(input => ({ op: "upsert", input })) }).ok).toBe(true)
     const projection = () => JSON.parse(fs.readFileSync(skillsEnabledPath(root), "utf8"))
-    expect(projection().keys).toEqual(["agent--agent-entry", "command--command-entry"])
+    expect(projection().keys).toEqual(["agent--agent-entry", "bundle--bundle-entry", "command--command-entry"])
     expect(setDesiredStateV2(root, "bundle", "bundle-entry", "disabled").ok).toBe(true)
     expect(projection().keys).toEqual([])
     const directory = path.join(root, "project")
@@ -874,7 +874,7 @@ describe("E2 package allow-set v3", () => {
     scoped.installedGraphDigest = computeInstalledGraphDigest(scoped)
     expect(applyPackageMutation(root, { operation: "update", transactionId: "invocation-scope", graphBeforeDigest: graph.installedGraphDigest, graphAfter: scoped, claimMutations: [], childRecordMutations: [] }).ok).toBe(true)
     expect(setDesiredStateV2(root, "bundle", "bundle-entry", "enabled").ok).toBe(true)
-    expect(projection()).toEqual({ v: 3, keys: [], scoped: [{ kind: "agent", name: "agent-entry", projectPath: scope.scope.projectPath }, { kind: "command", name: "command-entry", projectPath: scope.scope.projectPath }], mcp: [] })
+    expect(projection()).toEqual({ v: 3, keys: [], scoped: [{ kind: "agent", name: "agent-entry", projectPath: scope.scope.projectPath }, { kind: "bundle", name: "bundle-entry", projectPath: scope.scope.projectPath }, { kind: "command", name: "command-entry", projectPath: scope.scope.projectPath }], mcp: [] })
   })
   // These are our own ledger/graph inputs, not fabricated provider definitions.
   const scopeFor = (name: string) => {

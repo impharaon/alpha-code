@@ -140,6 +140,9 @@ export function installOfficeExcel(dir: string) {
   const manifest = JSON.parse(readFileSync(join(source, "sources.json"), "utf8")) as { files: { path: string; sha256: string }[] }
   for (const file of manifest.files)
     if (createHash("sha256").update(readFileSync(join(source, file.path))).digest("hex") !== file.sha256) throw Error(`Excel source digest mismatch: ${file.path}`)
+  const stampPath = join(dir, ".office-excel-stamp")
+  const stamp = createHash("sha256").update(files.map((file) => `${file}:${createHash("sha256").update(readFileSync(join(source, file))).digest("hex")}`).join("\n")).digest("hex")
+  if (readText(stampPath) === stamp) return
   const site = run(officePythonPath(dir, process.platform), ["-I", "-B", "-c", "import sysconfig;print(sysconfig.get_path('purelib'))"]).trim()
   for (const name of ["excel_mcp", "codepuppy_office"]) {
     const destination = join(site, name)
@@ -150,8 +153,8 @@ export function installOfficeExcel(dir: string) {
   mkdirSync(license, { recursive: true })
   cpSync(join(source, "LICENSE"), join(license, "excel-mcp-server-LICENSE"))
   cpSync(join(source, "sources.json"), join(license, "excel-mcp-server-sources.json"))
-  writeFileSync(join(dir, ".office-excel-stamp"), createHash("sha256").update(files.map((file) => `${file}:${createHash("sha256").update(readFileSync(join(source, file))).digest("hex")}`).join("\n")).digest("hex"))
   run(officePythonPath(dir, process.platform), ["-I", "-B", "-c", "from codepuppy_office import OfficeExcel; assert OfficeExcel.object_schema('create_pivot_table')['inputSchema']['required']"])
+  writeFileSync(stampPath, stamp)
 }
 
 function install(input: {

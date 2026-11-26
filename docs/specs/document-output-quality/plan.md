@@ -740,3 +740,5 @@ r14 NUL green（c）：沿原 BINARY_SUFFIXES 登记实际 docx/pptx/xlsx/pdf �
 r14 seed green（b）：片 7 默认技能恢复原独立社区 Excel connector 的明确退役/不可安装事实，保留新首方 Excel 与脚本制作能力；assert-seed-assets 原入口 exit 0，未修改 seed guard 的条件。
 
 r14 Python race red（a）：在既有 office-excel 文件加实际模块 inode 回归；相同已钉住 snapshot 再 install 后 `excel_mcp/text_budget.py` inode 118330632→118330811，1 FAIL（office-reinstall-red.log），证明重复准备会删除正在被并行 reader 导入的模块。下一实现沿已有 .office-excel-stamp 跳过相同已验证 snapshot，并将戳记放到 import 成功后；不新增下载/缓存路径或安装协议。
+
+r14 Python 安装 target green：相同 snapshot 不再删除模块，新增 inode 断言 1 PASS（office-reinstall-green.log）；源摘要校验仍先执行，只有导入验证成功才发布原戳记。最终会按 r14 独立复验两个原失败文件，并对这三个真实 runtime 消费者做有限并行接线，确认原 import 缺文件原因不再发生，不称 flaky。

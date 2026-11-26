@@ -448,3 +448,4 @@
 4	packages/ui-mac	engine/package-manager-plan.test.ts	-	#1759 H1/H4:同一真实 scanner 的 source span/分支规划与三方言真实私有输入、重定向及 xtrace/allexport;无包安装。精确条数=实测 4。
 2	packages/ui-mac	engine/package-manager-shell-transform.test.ts	-	#1759 H2:实际 Core/Plugin 构建适配与真实 Node spawner 的 Shell.create 私有描述符/准备次序/PID/终态;精确条数=实测 2。
 16	packages/ui-mac	src/main/codepuppy-sidecar-messages.test.ts	-	既有 sidecar 封闭消息解析与 #1759 H2 私有输入/真实调用身份;本轮变动文件据实登记，精确条数=实测 16。
+1	packages/ui-mac	src/main/package-manager-helper.test.ts	-	#1759 H4 native:真实双片 addon/strict adhoc helper、内核 audit 与 pidversion/映像、字节流和 fenced stdin;无 brew 安装或 Electron。精确条数=实测 1。

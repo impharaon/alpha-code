@@ -1,6 +1,5 @@
 import { afterAll, expect, test } from "bun:test"
 import { mkdtempSync, mkdirSync, rmSync } from "node:fs"
-import { tmpdir } from "node:os"
 import { join, resolve } from "node:path"
 import { spawnSync } from "node:child_process"
 import { packageManagerShellSource } from "./package-manager-shell-transform"

@@ -46,6 +46,7 @@ static void *sandbox_library;
 
 /* keychain_rename.c */
 napi_value register_keychain_exports(napi_env env, napi_value exports);
+napi_value register_package_manager_exports(napi_env env, napi_value exports);
 
 static napi_value throw_and_null(napi_env env, const char *message) {
   napi_throw_error(env, NULL, message);
@@ -214,5 +215,6 @@ NAPI_MODULE_INIT() {
   napi_set_named_property(env, exports, "buildId", build_id);
   napi_create_string_utf8(env, LIBSANDBOX, NAPI_AUTO_LENGTH, &lib_name);
   napi_set_named_property(env, exports, "libsandbox", lib_name);
+  register_package_manager_exports(env, exports);
   return register_keychain_exports(env, exports);
 }

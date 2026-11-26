@@ -315,6 +315,17 @@ function refreshConfiguredEgressDestinations(userDataPath: string): void {
  * The plan's own W1 list (the authority that rendered the profile) travels with it; required when fenceRun is set.
  * `configFenceRoots`: the protected configuration directories that same plan rendered (eligibility reads them, below).
  */
+// Main owns the user values before R8 fills absent roots. Keyed by the app data identity.
+const packageManagerUserEnvironments = new Map<string, { xdgCacheHome: string | null; bunInstall: string | null }>()
+function capturePackageManagerUserEnvironment(userDataPath: string, source: Record<string, string | undefined>) {
+  const known = packageManagerUserEnvironments.get(userDataPath)
+  if (known) return known
+  const exported = usableExportedPaths({ env: source, home: homedir(), log: (line) => getLogger()?.warn(line) })
+  const snapshot = Object.freeze({ xdgCacheHome: exported.env.XDG_CACHE_HOME || null, bunInstall: source.BUN_INSTALL || null })
+  packageManagerUserEnvironments.set(userDataPath, snapshot)
+  return snapshot
+}
+
 type PlannedFence = ProcessFenceStartInput & { workspaces?: readonly string[]; configFenceRoots?: readonly string[]; cacheEnv?: Readonly<Record<string, string>>; refreshGoEnvironment?: () => Promise<Readonly<Record<string, string>>>; cancelGoQuery?: () => void }
 
 type ProductionFenceInput = {
@@ -368,11 +379,14 @@ async function planProductionFence(input: ProductionFenceInput): Promise<Planned
   if (!info) throw new Error("package manager cache: application environment not initialized")
   const exported = usableExportedPaths({ env: input.sidecarEnv, home: homedir(), log: (line) => getLogger()?.warn(line) })
   const roots = resolveEngineRoots(exported.env, exported.home)
-  const locationInput = { platform: "darwin" as const, goInstallBin: null, home: roots.home, userDataPath: input.userDataPath, configHome: roots.configHome,
+  const userEnvironment = packageManagerUserEnvironments.get(input.userDataPath) ?? { xdgCacheHome: exported.env.XDG_CACHE_HOME || null, bunInstall: input.sidecarEnv.BUN_INSTALL || null }
+  const locationInput = { platform: "darwin" as const, goInstallBin: null, xdgCacheHome: userEnvironment.xdgCacheHome, bunInstall: userEnvironment.bunInstall, home: roots.home, userDataPath: input.userDataPath, configHome: roots.configHome,
     appData: electronNs.app.getPath("appData"), localAppData: join(roots.home, "Library", "Caches"), truthPath: writableLocationTruthPath(info.casBaseRoot, info.environment),
     eligibility: { homeDir: roots.home, appStateRoot: info.casBaseRoot, configFenceRoots: () => preplanConfigFenceRoots({ env: input.sidecarEnv, home: roots.home, userDataPath: input.userDataPath, appStateRoot: info.casBaseRoot, codepuppyGlobalRoot: codepuppyGlobalRoot() }), realpath: realpathSync.native, isDirectory: (path) => statSync(path).isDirectory() },
   } satisfies Parameters<typeof planPackageManagerCaches>[0]
   const prepareCaches = (goInstallBin: string | null) => planPackageManagerCaches({ ...locationInput, goInstallBin })
+  if (userEnvironment.bunInstall !== null) input.sidecarEnv.BUN_INSTALL = userEnvironment.bunInstall
+  else delete input.sidecarEnv.BUN_INSTALL
   const caches = prepareCaches(null)
   const originalEnv = { ...input.sidecarEnv }
   const makePlan = (homebrewFence: Parameters<typeof planProcessFence>[0]["homebrewFence"], userWritableLocations: Parameters<typeof planProcessFence>[0]["userWritableLocations"]) => planProcessFence(
@@ -486,6 +500,7 @@ export function resolveShellProbeRoots(input: { env: Record<string, string | und
     ...minimalProbeEnv(exported.env), HOME: roots.home,
     XDG_CONFIG_HOME: roots.configHome, XDG_DATA_HOME: roots.dataHome, XDG_CACHE_HOME: roots.cacheHome, XDG_STATE_HOME: stateHome,
     OPENCODE_CONFIG_DIR: engineConfigDirectory,
+    ...(exported.env.BUN_INSTALL ? { BUN_INSTALL: exported.env.BUN_INSTALL } : {}),
     ...Object.fromEntries(["OPENCODE_CONFIG", "OPENCODE_DB"].flatMap((key) => exported.env[key] === undefined ? [] : [[key, exported.env[key]!]])),
   } }
 }
@@ -496,6 +511,7 @@ export async function prepareShellProbeFence(): Promise<ShellProbeFenceContext> 
   if (!info) throw new Error("shell probe fence: application environment not initialized")
   // A probe may not take the engine planner's missing-truth fallback.
   readWorkspaceTruthOrThrow(fenceWorkspaceTruthPath(info.casBaseRoot, info.environment), { readFileSync })
+  capturePackageManagerUserEnvironment(userDataPath, process.env)
   const snapshot = resolveShellProbeRoots({ env: { ...process.env }, home: homedir(), userDataPath })
   const port = process.platform === "darwin" ? (await ensureEgressPolicyProxy()).port : undefined
   const env = { ...snapshot.env, ...(port === undefined ? {} : sidecarEgressProxyEnv(port)) }
@@ -504,7 +520,15 @@ export async function prepareShellProbeFence(): Promise<ShellProbeFenceContext> 
 }
 
 export function preferAppEnv(userDataPath: string, context: ShellProbeFenceContext) {
-  applyTrustedShellEnvironment(process.env, {}, context)
+  const userEnvironment = capturePackageManagerUserEnvironment(userDataPath, process.env)
+  const apply = (source: Record<string, string>) => {
+    // A default injected into the probe is not a user export when it comes back through env -0/cache.
+    const inherited = Object.fromEntries(Object.entries(source).filter(([key]) => key !== "BUN_INSTALL"))
+    applyTrustedShellEnvironment(process.env, inherited, context)
+    if (userEnvironment.bunInstall === null) delete process.env.BUN_INSTALL
+    else process.env.BUN_INSTALL = userEnvironment.bunInstall
+  }
+  apply({})
   const logger = getLogger()
   const logShellEnvCache = (message: string, extra?: Record<string, unknown>) => write("main", message, extra)
   const shell = process.platform === "win32" ? null : getUserShell()
@@ -515,7 +539,7 @@ export function preferAppEnv(userDataPath: string, context: ShellProbeFenceConte
   if (shell) {
     const cached = readShellEnvCache(userDataPath, shell, logShellEnvCache)
     if (cached) {
-      applyTrustedShellEnvironment(process.env, cached, context)
+      apply(cached)
       logger.log(`[server] Shell env from cache (${Object.keys(cached).length} vars) — refreshing in background`)
       void probeShellEnvAsync(shell, context)
         .then((fresh) => {
@@ -529,13 +553,13 @@ export function preferAppEnv(userDataPath: string, context: ShellProbeFenceConte
               `[server] [req301] stripped session-control keys from refreshed shell env: ${stripped.join(", ")}`,
             )
           writeShellEnvCache(userDataPath, shell, cleanFresh, logShellEnvCache)
-          applyTrustedShellEnvironment(process.env, cleanFresh, context)
+          apply(cleanFresh)
           logger.log(`[server] Shell env refreshed in background (${Object.keys(cleanFresh).length} vars)`)
         })
         .catch(() => {})
     } else {
       const probed = loadShellEnv(shell, logger, context)
-      applyTrustedShellEnvironment(process.env, probed ?? {}, context)
+      apply(probed ?? {})
       if (probed) writeShellEnvCache(userDataPath, shell, probed, logShellEnvCache)
     }
   }

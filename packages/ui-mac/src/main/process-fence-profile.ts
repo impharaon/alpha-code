@@ -220,6 +220,8 @@ export type PackageManagerLocationInput = {
   appData: string
   localAppData: string
   goInstallBin: string | null
+  xdgCacheHome: string | null
+  bunInstall: string | null
 }
 export type PackageManagerLocations = {
   env: Readonly<Record<string, string>>
@@ -230,8 +232,10 @@ export type PackageManagerLocations = {
 export function resolvePackageManagerLocations(input: PackageManagerLocationInput): PackageManagerLocations {
   const path = packageManagerPath(input)
   const cache = path.join(input.userDataPath, PACKAGE_MANAGERS_DIRNAME)
+  const bun = input.bunInstall ?? path.join(input.xdgCacheHome ?? input.home, ".bun")
   const pnpm = input.platform === "win32" ? path.join(input.localAppData, "pnpm") : input.platform === "darwin" ? path.join(input.home, "Library", "pnpm") : path.join(input.home, ".local", "share", "pnpm")
   const env = {
+    ...(input.bunInstall === null ? { BUN_INSTALL: bun } : {}),
     BUN_INSTALL_CACHE_DIR: path.join(cache, "bun", "install-cache"),
     BUN_RUNTIME_TRANSPILER_CACHE_PATH: path.join(cache, "bun", "transpiler-cache"),
     ...Object.fromEntries(["store", "cache", "state"].flatMap((name) => ["pnpm", "npm"].map((prefix) => [`${prefix}_config_${name}_dir`, path.join(cache, "pnpm", name)]))),
@@ -260,7 +264,7 @@ export function resolvePackageManagerLocations(input: PackageManagerLocationInpu
   add("go", "cache", "subpath", path.join(cache, "go", "gopath"), env.GOMODCACHE, env.GOCACHE)
   add("cargo", "cache", "subpath", ...["registry", "git"].map((name) => path.join(input.home, ".cargo", name)))
   add("cargo", "cache", "literal", ...[".package-cache", ".package-cache-mutate", ".global-cache", ".global-cache-journal"].map((name) => path.join(input.home, ".cargo", name)))
-  add("bun", "global-install", "subpath", path.join(input.home, ".bun", "install", "global"), path.join(input.home, ".bun", "bin"))
+  add("bun", "global-install", "subpath", path.join(bun, "install", "global"), path.join(bun, "bin"))
   add("pnpm", "global-install", "subpath", ...["global", "bin", ".tools"].map((name) => path.join(pnpm, name)))
   // pnpm creates executable shims directly in PNPM_HOME; its recursive store is not an install root.
   add("pnpm", "global-install", "regex", `^${regexLiteral(pnpm)}${input.platform === "win32" ? "\\\\[^\\\\]+" : "/[^/]+"}$`)
@@ -321,6 +325,8 @@ function packageManagerPath(input: PackageManagerLocationInput) {
   const path = input.platform === "win32" ? win32 : posix
   for (const key of ["home", "userDataPath", "configHome", "appData", "localAppData"] as const)
     if (typeof input[key] !== "string" || !path.isAbsolute(input[key])) throw new Error(`package manager locations: ${key} must be an absolute path`)
+  for (const key of ["xdgCacheHome", "bunInstall"] as const)
+    if (input[key] !== null && (typeof input[key] !== "string" || !path.isAbsolute(input[key]))) throw new Error(`package manager locations: ${key} must be an absolute path or null`)
   if (input.goInstallBin !== null && (typeof input.goInstallBin !== "string" || !path.isAbsolute(input.goInstallBin))) throw new Error("package manager locations: goInstallBin must be an absolute path or null")
   return path
 }

@@ -80,7 +80,7 @@ const locationInput = {
   configHome: "/Users/puppy/.config",
   appData: "/Users/puppy/Library/Application Support",
   localAppData: "/Users/puppy/Library/Caches",
-  goInstallBin: null,
+  goInstallBin: null, xdgCacheHome: null, bunInstall: null,
 }
 
 describe("package manager locations", () => {
@@ -133,6 +133,7 @@ describe("package manager locations", () => {
     const cache = `${locationInput.userDataPath}/package-managers`
     const result = resolvePackageManagerLocations(locationInput)
     expect(result.env).toEqual({
+      BUN_INSTALL: `${locationInput.home}/.bun`,
       BUN_INSTALL_CACHE_DIR: `${cache}/bun/install-cache`,
       BUN_RUNTIME_TRANSPILER_CACHE_PATH: `${cache}/bun/transpiler-cache`,
       pnpm_config_store_dir: `${cache}/pnpm/store`, npm_config_store_dir: `${cache}/pnpm/store`,

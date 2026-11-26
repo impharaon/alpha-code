@@ -212,7 +212,7 @@ describe.skipIf(!darwin)("#1504 Office cache under the unchanged process fence",
       healthCheck: async () => true,
       egressProxy: async () => proxy,
       planFence: (input) => {
-        const caches = planPackageManagerCaches({ platform: "darwin", goInstallBin: null, home: isolated.HOME, userDataPath: input.userDataPath,
+        const caches = planPackageManagerCaches({ platform: "darwin", goInstallBin: null, xdgCacheHome: null, bunInstall: null, home: isolated.HOME, userDataPath: input.userDataPath,
           configHome: isolated.XDG_CONFIG_HOME, appData: join(root, "appData"), localAppData: join(isolated.HOME, "Library/Caches"),
           truthPath: join(root, "state/fence-workspaces/dev-write-locations.json"),
           eligibility: { homeDir: isolated.HOME, appStateRoot: join(root, "state"), configFenceRoots: () => [], realpath: realpathSync.native,

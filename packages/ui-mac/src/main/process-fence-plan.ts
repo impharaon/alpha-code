@@ -118,7 +118,7 @@ export function planPackageManagerCaches(input: PackageManagerLocationInput & { 
   if (plan.excluded.length) throw new Error(`package manager cache: writable location truth refused ${plan.excluded.join(", ")}`)
   const targets = new Map(plan.locations.map((entry) => [entry.sourcePath, entry.targetPath]))
   const env = Object.fromEntries(Object.entries(resolved.env).map(([key, value]) => [key, targets.get(value) ?? value]))
-  const cacheEnv = Object.fromEntries(Object.entries(resolved.env).filter(([key, value]) => (cachePaths.has(value) || key === "GOBIN")).map(([key, value]) => [key, targets.get(value) ?? value]))
+  const cacheEnv = Object.fromEntries(Object.entries(resolved.env).filter(([key, value]) => (cachePaths.has(value) || key === "GOBIN" || key === "BUN_INSTALL")).map(([key, value]) => [key, targets.get(value) ?? value]))
   const rules: ProcessFenceWriteRule[] = caches.map((entry) => ({ ...entry.rule, value: targets.get(entry.rule.value)! }))
   return { env, cacheEnv, rules, locations: plan.locations }
 }

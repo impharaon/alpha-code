@@ -43,7 +43,7 @@ const ws = join(run, "ws")
 const dataHome = join(home, ".local", "share")
 const cacheHome = join(home, ".cache")
 const configHome = join(home, ".config")
-const packageCache = resolvePackageManagerLocations({ platform: "darwin", goInstallBin: null, home, userDataPath: userData, configHome, appData: appSupport, localAppData: join(home, "Library", "Caches") }).env
+const packageCache = resolvePackageManagerLocations({ platform: "darwin", goInstallBin: null, xdgCacheHome: null, bunInstall: null, home, userDataPath: userData, configHome, appData: appSupport, localAppData: join(home, "Library", "Caches") }).env
 const xdgConfig = join(configHome, "opencode")
 /** CF-11: the tool policy directory and one partition's document in it (the file name is a sha256, as policyFilePath writes it). */
 const policyDir = join(dataHome, "opencode", "codepuppy-tool-policy")

@@ -103,6 +103,7 @@ const keylessWebSearchFlags = [
   "OPENCODE_EXPERIMENTAL_PARALLEL",
 ] as const
 const managedEnv = [
+  "BUN_INSTALL",
   "PATH", // preferAppEnv applies the cached shell PATH; restore it before the next test file.
   "SHELL",
   "CODEPUPPY_GLOBAL_DIR",
@@ -460,6 +461,35 @@ describe("login-shell import vs the keyless flags (#223 Major 3)", () => {
     chmodSync(script, 0o755)
     return script
   }
+
+  test("Bun probe defaults stay child-only through cached, fresh and synchronous environment merges", async () => {
+    const original = process.env.BUN_INSTALL
+    try {
+      for (const mode of ["cached", "synchronous", "configured"] as const) {
+        const slot = join(userDataPath, mode)
+        mkdirSync(slot)
+        const root = join(process.env.HOME!, mode === "configured" ? "configured-bun" : ".bun")
+        if (mode === "configured") process.env.BUN_INSTALL = root
+        else delete process.env.BUN_INSTALL
+        const context = { profile: "(version 1)(allow default)(deny file-write*)", ...resolveShellProbeRoots({ env: { ...process.env }, home: process.env.HOME!, userDataPath: slot }) }
+        context.env.BUN_INSTALL = root
+        process.env.SHELL = fakeLoginShell(`bun-${mode}.sh`, { BUN_INSTALL: mode === "configured" ? "/wrong/probed-bun" : root, R8_PROBE_MARKER: "fresh", PATH: "/usr/bin:/bin" })
+        if (mode === "cached") writeShellEnvCache(slot, process.env.SHELL, { BUN_INSTALL: root, R8_PROBE_MARKER: "cached", PATH: "/usr/bin:/bin" })
+        preferAppEnv(slot, context)
+        expect(process.env.BUN_INSTALL).toBe(mode === "configured" ? root : undefined)
+        if (mode === "cached") {
+          const deadline = Date.now() + 2_000
+          while (process.env.R8_PROBE_MARKER !== "fresh" && Date.now() < deadline) await Bun.sleep(5)
+          expect(process.env.R8_PROBE_MARKER).toBe("fresh")
+          expect(process.env.BUN_INSTALL).toBeUndefined()
+        }
+      }
+    } finally {
+      if (original === undefined) delete process.env.BUN_INSTALL
+      else process.env.BUN_INSTALL = original
+      delete process.env.R8_PROBE_MARKER
+    }
+  })
 
   test("trusted probe roots survive cached input and the real asynchronous refresh", async () => {
     const context = { profile: "(version 1)(allow default)(deny file-write*)", ...resolveShellProbeRoots({ env: { ...process.env }, home: process.env.HOME!, userDataPath }) }

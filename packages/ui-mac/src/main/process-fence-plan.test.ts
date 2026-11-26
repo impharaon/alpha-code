@@ -46,7 +46,7 @@ describe("planWritableLocations", () => {
       // Existing real filesystem fixtures; system prefixes are excluded to keep this Mac untouched.
       const version = join(disk.home, ".nvm/versions/node/v24.0.0")
       mkdirSync(version, { recursive: true })
-      const input = { platform: "darwin" as const, home: disk.home, userDataPath: join(disk.root, "ud"), configHome: join(disk.home, ".config"), appData: join(disk.home, "Library/Application Support"), localAppData: join(disk.home, "Library/Caches"), goInstallBin: null, truthPath: disk.truthPath, eligibility: { ...disk.eligibility, configFenceRoots: () => [disk.protected, "/opt/homebrew", "/usr/local"] } }
+      const input = { platform: "darwin" as const, home: disk.home, userDataPath: join(disk.root, "ud"), configHome: join(disk.home, ".config"), appData: join(disk.home, "Library/Application Support"), localAppData: join(disk.home, "Library/Caches"), goInstallBin: null, xdgCacheHome: null, bunInstall: null, truthPath: disk.truthPath, eligibility: { ...disk.eligibility, configFenceRoots: () => [disk.protected, "/opt/homebrew", "/usr/local"] } }
       const first = planUserWritableLocations(input)
       const cover = (target: string) => processFenceRulesCover({ allow: first.rules, deny: [] }, target, "file")
       for (const target of [join(disk.home, ".bun/bin/cli"), join(version, "lib/node_modules/cli/package.json"), join(disk.home, ".gitconfig.lock"), join(disk.home, ".zshrc")]) expect(cover(target), target).toBe(true)
@@ -177,7 +177,7 @@ describe("planWritableLocations", () => {
 
 describe("package manager cache planning", () => {
   const inputFor = (disk: Parameters<Parameters<typeof withLocationDisk>[0]>[0]) => ({
-    platform: "darwin" as const, goInstallBin: null, home: disk.home, userDataPath: join(disk.root, "userData"), configHome: join(disk.home, ".config"),
+    platform: "darwin" as const, goInstallBin: null, xdgCacheHome: null, bunInstall: null, home: disk.home, userDataPath: join(disk.root, "userData"), configHome: join(disk.home, ".config"),
     appData: join(disk.home, "Library", "Application Support"), localAppData: join(disk.home, "Library", "Caches"),
     truthPath: disk.truthPath, eligibility: disk.eligibility,
   })
@@ -190,7 +190,8 @@ describe("package manager cache planning", () => {
       expect(plan.env.PNPM_HOME).toBe(join(disk.home, "Library", "pnpm"))
       expect(plan.cacheEnv.PNPM_HOME).toBeUndefined()
       expect(plan.cacheEnv.CARGO_INSTALL_ROOT).toBeUndefined()
-      expect(Object.keys(plan.cacheEnv)).toHaveLength(16)
+      expect(Object.keys(plan.cacheEnv)).toHaveLength(17)
+      expect(plan.cacheEnv.BUN_INSTALL).toBe(join(disk.home, ".bun"))
       expect(plan.locations.filter((entry) => entry.kind === "directory").every((entry) => statSync(entry.targetPath).isDirectory())).toBe(true)
       expect(plan.env.CARGO_HOME).toBeUndefined()
       expect(plan.cacheEnv.CARGO_HOME).toBeUndefined()

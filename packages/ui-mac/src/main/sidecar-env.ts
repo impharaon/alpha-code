@@ -33,6 +33,7 @@ const EXACT = new Set([
   "GOENV",
   "GOPATH",
   "GOBIN",
+  "BUN_INSTALL",
   "HOME",
   "USER",
   "LOGNAME",

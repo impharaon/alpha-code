@@ -1,3 +1,9 @@
+import { PACKAGE_TOOL_DEPENDENCY_ID, renderWrapper } from "../context-injection"
+import { packageToolRule } from "./identity"
+import type { Invocation } from "../../../ui-mac/src/shared/host-extension-package-contract/plugin-package"
+import { ShellScan } from "../../../core/src/shell/scan"
+import { match } from "../../../core/src/util/wildcard"
+import { canonicalToolIdentity } from "../../../schema/src/tool-identity"
 // Code Puppy tool policy inside the extension (lane seams I3): everything L4 hangs on the OpenCode 2 plugin Context
 // goes through `registerPolicy`. The extension's `setup` awaits it first and awaits `seal()` last (L3 owns the call
 // sites; `plugin-setup-order.test.ts`).
@@ -19,7 +25,7 @@ import path from "node:path"
 import type { Plugin } from "@opencode/plugin"
 import { createCatalog } from "./catalog"
 import { attachDirectoryDisplay, attachUnattendedDenial, attachNetFailure, attachTerminal, attachWriteDenied, displaySnapshot, wrapForDisplay } from "./display"
-import { confirm, decide, effectiveFor, gateWithoutToolCall, holdAsk, holdUnattendedDeny, isInstallAsk, pin, type GateCall, type GateDecision, type GateDeps } from "./gate"
+import { PACKAGE_INVOCATION_ALLOW, confirm, decide, effectiveFor, gateWithoutToolCall, holdAsk, holdUnattendedDeny, isInstallAsk, pin, type GateCall, type GateDecision, type GateDeps } from "./gate"
 import {
   codeModeFacts,
   CODE_MODE_TOOL,
@@ -39,6 +45,9 @@ import type { HubBridge, HubInstallSubject } from "../hub-bridge"
 import { denyHubMutationForAutomation, hubInstallAsk } from "../hub-tools"
 
 export interface PolicyRegistration {
+  bindPackageAgent(agent: string, invocation: Pick<Invocation, "availableTools" | "deniedTools">, bindings: Readonly<Record<string, string>>): void
+  bindPackageInvocation(sessionID: string, invocation: Pick<Invocation, "allowedTools" | "deniedTools" | "availableTools">, bindings: Readonly<Record<string, string>>, active: () => boolean): () => void
+  clearPackageInvocation(sessionID: string): void
   registerModelToolAliases(aliases: ReadonlyMap<string, string>): void
   /** Last statement of the extension's `setup`: registers the parts that must see every earlier registration. */
   readonly seal: () => Promise<void>
@@ -113,13 +122,50 @@ export async function registerPolicy(context: Plugin.Context, unattended: Unatte
     return tools.map((tool) => toolFacts(tool, input))
   }
 
+  const invocationScopes = new Map<string, Set<{ invocation: Pick<Invocation, "allowedTools" | "deniedTools" | "availableTools">; bindings: Readonly<Record<string, string>>; active: () => boolean }>>()
+  const invocationRules = (sessionID: string, facts: ToolFacts, input: unknown, resources?: readonly string[]): PermissionRule[] => {
+    const scopes = invocationScopes.get(sessionID)
+    if (!scopes) return []
+    const combined: PermissionRule[] = []
+    for (const scope of scopes) {
+    const canonical = canonicalToolIdentity(facts.identity)
+    const deny: PermissionRule[] = [{ action: canonical, resource: "*", effect: "deny" }]
+    if (!scope.active()) return deny
+    const resolve = (rule: import("../../../ui-mac/src/shared/host-extension-package-contract/plugin-package").ToolRule) => packageToolRule(rule, facts, scope.bindings)
+    if (scope.invocation.availableTools && !scope.invocation.availableTools.some(rule => resolve(rule))) return deny
+    const record = input && typeof input === "object" ? input as Record<string, unknown> : {}
+    const rawValues = resources ?? [record.command, record.filePath, record.file_path, record.path, record.agent, record.id, record.url].filter((value): value is string => typeof value === "string")
+    const shell = facts.identity.name === "shell"
+    const groups = rawValues.flatMap(value => {
+      if (shell) {
+        const parsed = ShellScan.scan(value, "posix")
+        return parsed.kind === "scanned" ? parsed.commands.map(command => [command.resource, command.words.join(" ")]) : [[]]
+      }
+      const host = scope.bindings[(facts.identity.name === "subagent" ? "agent" : facts.identity.name) + "::" + value]
+      return [[value, ...(host ? [host] : [])]]
+    })
+    const matches = (rule: import("../../../ui-mac/src/shared/host-extension-package-contract/plugin-package").ToolRule, values: readonly string[]) => {
+      const resolved = resolve(rule)
+      if (!resolved) return false
+      if (resolved.pattern === undefined || resolved.pattern === "*") return true
+      return values.some(value => match(value, resolved.pattern!) || !shell && match(path.relative(context.location.directory, value), resolved.pattern!) || resolved.pattern!.endsWith(":*") && (value === resolved.pattern!.slice(0, -2) || match(value, resolved.pattern!.slice(0, -2) + " *")))
+    }
+    const all = (rules: readonly import("../../../ui-mac/src/shared/host-extension-package-contract/plugin-package").ToolRule[]) => (groups.length ? groups : [[]]).every(values => rules.some(rule => matches(rule, values)))
+    if ((input !== undefined || resources !== undefined) && scope.invocation.availableTools && !all(scope.invocation.availableTools)) return deny
+    if (scope.invocation.deniedTools.some(rule => groups.length ? groups.some(values => matches(rule, values)) : matches(rule, []))) return deny
+    if (all(scope.invocation.allowedTools)) combined.push({ action: PACKAGE_INVOCATION_ALLOW, resource: canonical, effect: "allow" })
+    }
+    return combined
+  }
   const modelToolAliases = new Map<string, string>()
   const factsFor = async (name: string) => {
     if (name === CODE_MODE_TOOL) return codeModeFacts()
     return (await allFacts()).find((facts) => facts.technicalId === (modelToolAliases.get(name) ?? name))
   }
 
+  const packageAgents = new Map<string, import("./catalog").PackageAgentPolicy>()
   const catalog = createCatalog({
+    packageAgent: agent => packageAgents.get(agent),
     tools: allFacts,
     snapshot: () => store.snapshot(),
     transform: (callback) => context.agent.transform(callback as never),
@@ -127,7 +173,7 @@ export async function registerPolicy(context: Plugin.Context, unattended: Unatte
     log: (message) => console.info(`[codepuppy-policy] ${message}`),
   })
 
-  const ruleset = async (sessionID: string, agent: string, selected?: UnattendedProfile): Promise<readonly PermissionRule[]> => {
+  const ruleset = async (sessionID: string, agent: string, selected?: UnattendedProfile, call?: Pick<GateCall, "tool" | "input">): Promise<readonly PermissionRule[]> => {
     const configured =
       catalog.configured(agent) ??
       (await context.agent.get({ agentID: agent } as never)).data.permissions ?? []
@@ -139,7 +185,8 @@ export async function registerPolicy(context: Plugin.Context, unattended: Unatte
     // I-13 L2 (SPEC-engine-config-fence BR-02; DESIGN-engine-config-fence §4.6, D16): only the session row's deny entries
     // take part, on both branches. The row lives in the engine database, which a fenced process can write, and an unattended
     // call the gate allows never reaches the engine's own decision. Code Puppy writes only deny there.
-    return [...configured, ...(permissions ?? []).filter((rule) => rule.effect === "deny")]
+    const facts = call && await factsFor(call.tool)
+    return [...configured, ...(permissions ?? []).filter((rule) => rule.effect === "deny"), ...(facts ? invocationRules(sessionID, facts, call?.input) : [])]
   }
 
   const deps: GateDeps = {
@@ -184,9 +231,14 @@ export async function registerPolicy(context: Plugin.Context, unattended: Unatte
     await catalog.prune(event as never, async (name) => {
       const facts = await factsFor(name)
       if (!facts) return true
-      const [snapshot, rules] = await Promise.all([store.snapshot(), ruleset(event.sessionID, event.agent)])
+      const [snapshot, rules] = await Promise.all([store.snapshot(), ruleset(event.sessionID, event.agent, undefined, { tool: name, input: undefined })])
       return effectiveFor(facts, snapshot, rules).action === "deny"
     })
+    const current = invocationScopes.get(event.sessionID)
+    if (!current) return
+    const facts = await allFacts()
+    const missing = [...new Set([...current].flatMap(scope => [...scope.invocation.allowedTools, ...scope.invocation.deniedTools, ...(scope.invocation.availableTools ?? [])].filter(rule => !facts.some(fact => packageToolRule(rule, fact, scope.bindings))).map(rule => rule.tool)))]
+    if (missing.length) event.system.push({ type: "text", text: renderWrapper(PACKAGE_TOOL_DEPENDENCY_ID, { label: "package invocation", body: missing.join(", ") }) })
   })
 
   // Risk facts on every approval request (#1285): Code Puppy's classification overrides what a tool reports.
@@ -212,6 +264,12 @@ export async function registerPolicy(context: Plugin.Context, unattended: Unatte
       const facts = (await allFacts()).find((item) => item.permission === event.action)
       if (facts) await gateWithoutToolCall(deps, event as never, facts, "build")
     }
+    const sourceFacts = (await allFacts()).find(item => item.permission === event.action || canonicalToolIdentity(item.identity) === event.action)
+    if (sourceFacts) {
+      const rules = invocationRules(event.sessionID, sourceFacts, undefined, event.resources)
+      if (rules.some(rule => rule.effect === "deny")) event.effect = "deny"
+      else if (event.effect === "ask" && rules.some(rule => rule.action === PACKAGE_INVOCATION_ALLOW && rule.effect === "allow")) event.effect = "allow"
+    }
     if (event.effect !== "ask" || !event.metadata) return
     ;(event.metadata as Record<string, unknown>)[RISK_METADATA_KEY] = classifyPermissionRequest({
       permission: event.action,
@@ -232,6 +290,15 @@ export async function registerPolicy(context: Plugin.Context, unattended: Unatte
   }) as never)
 
   return {
+    bindPackageAgent: (agent, invocation, bindings) => { packageAgents.set(agent, { invocation, bindings }) },
+    bindPackageInvocation: (sessionID, invocation, bindings, active) => {
+      const entries = invocationScopes.get(sessionID) ?? new Set()
+      const scope = { invocation, bindings, active }
+      entries.add(scope)
+      invocationScopes.set(sessionID, entries)
+      return () => { entries.delete(scope) }
+    },
+    clearPackageInvocation: sessionID => { invocationScopes.delete(sessionID) },
     registerModelToolAliases: (aliases: ReadonlyMap<string, string>) => { for (const [alias, original] of aliases) modelToolAliases.set(alias, original) },
     askInstall: async (call) => {
       const key = installCallKey(call)

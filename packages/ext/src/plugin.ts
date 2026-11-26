@@ -1,3 +1,4 @@
+import { registerPackageInvocations } from "./plugin-package-invocation"
 import { aliasPluginMcpTools } from "./plugin-package-tools"
 import { existsSync, readFileSync, readdirSync } from "node:fs"
 import { join } from "node:path"
@@ -170,6 +171,8 @@ export const CodePuppyExt: Plugin.Plugin = {
 
       // `#1419`(REQ-228):看不了图的模型 —— 图片送云端识图,模型可按编号 / 路径追问。登记簿按本 Location 建
       // (#223 R7 的纪律);能力真源是引擎目录里的模型(modelFacts);转写正文跨重启缓存在插件存储里。
+      const packageInvocations = await registerPackageInvocations(context, { root: bootstrap.paths.globalRoot, projectRoot: () => projectRootFor(directory)?.directory, policy, log: error })
+      cleanups.push(() => packageInvocations.dispose())
       const vision = createCloudVisionHooks({
         directory,
         // 目录查不到(或查询失败)⇒ undefined ⇒ 按看不了图处理(基线 §2-B 第 6 条)。
@@ -496,9 +499,9 @@ export const CodePuppyExt: Plugin.Plugin = {
       cleanups.push(() => providerTail.abort())
       const activePlugins = async () => (((await context.plugin.list()) as { data?: Array<{ id?: string }> }).data ?? []).map((plugin) => String(plugin.id))
       // #1700(Codex R1/1 M1):项目停用的助手同样等这一批激活结束才移除 —— 早了会被 post 段的配置层按默认(全放行)重建。
-      const agentTail = postActivationTail<Pick<AgentEditor, "remove">>({
+      const agentTail = postActivationTail<AgentEditor>({
         transform: (callback) => context.agent.transform(callback),
-        apply: (editor) => removeAgents(editor, disabledAgents),
+        apply: (editor) => { removeAgents(editor, disabledAgents); packageInvocations.transformAgents(editor) },
         activePlugins,
         log,
         unplaced: "project agents with disable: true stay registered",
@@ -517,7 +520,7 @@ export const CodePuppyExt: Plugin.Plugin = {
             const id = editor.get(skill.key) ? skill.key + "/" + skill.entry.id : skill.key
             editor.add({ id: Skill.ID.make(id), name: Skill.Name.make(skill.name), path: AbsolutePath.make(skill.path),
               ...(typeof skill.entry.display.shortDescription === "string" ? { description: skill.entry.display.shortDescription } : {}),
-              autoinvoke: skill.entry.invocation.implicitInvocation,
+              autoinvoke: skill.entry.invocation.implicitInvocation && skill.entry.invocation.paths.length === 0,
               content: renderPluginText(skill.entry.instruction, { pluginRoot: skill.pluginRoot, skillDir: skill.directory, projectDir: directory, pluginData: skill.pluginData, resolveOption: skill.resolveOption }),
             })
           }

@@ -38,6 +38,12 @@ export function allInstalledPluginPackages(root: string) {
   try { return readdirSync(join(root, "ext-store")).flatMap(key => { const installed = installedPluginPackage(root, key); return installed ? [installed] : [] }) }
   catch { return [] }
 }
+export function allInstalledPluginInstructions(root: string) {
+  return allInstalledPluginPackages(root).flatMap(installed => installed.description.entries.flatMap(entry => {
+    const name = installed.hostNames[entry.id]
+    return name && (entry.kind === "skill" || entry.kind === "command" || entry.kind === "agent") ? [{ installed, entry, name }] : []
+  }))
+}
 export function installedPluginSkills(root: string, key: string) {
   const installed = installedPluginPackage(root, key)
   if (!installed) return []

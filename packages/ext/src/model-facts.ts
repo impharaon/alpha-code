@@ -7,6 +7,30 @@
 // 查不到 ⇒ 字段缺席(调用方据此不改请求,fail-closed 的那一支)。
 
 import type { Plugin } from "@opencode/plugin"
+import type { Invocation, ModelHint } from "../../ui-mac/src/shared/host-extension-package-contract/plugin-package"
+
+export async function resolvePackageModel(context: Pick<Plugin.Context, "model">, hint: ModelHint | undefined): Promise<string | undefined> {
+  if (!hint) return
+  const models = (await context.model.list()).data
+  const preferred = (await context.model.default()).data
+  const matching = models.filter(model => "alias" in hint
+    ? [model.family, model.id, model.name].some(value => value?.toLowerCase().includes(hint.alias.toLowerCase()))
+    : model.providerID === hint.providerID && model.id === hint.modelID)
+  const model = matching.find(model => model.providerID === preferred?.providerID) ?? matching[0]
+  if (!model) throw new Error("dependency_missing: model " + ("alias" in hint ? hint.alias : hint.providerID + "/" + hint.modelID))
+  return model.providerID + "/" + model.id
+}
+
+export async function packageEffortVariant(context: Pick<Plugin.Context, "model">, ref: { readonly providerID: string; readonly id: string }, effort: NonNullable<Invocation["effort"]>, log: (line: string) => void) {
+  const model = (await context.model.list()).data.find(model => model.providerID === ref.providerID && model.id === ref.id)
+  const exact = model?.variants.find(variant => variant.id === effort)
+  if (exact) return exact
+  const variants = model?.variants ?? []
+  const index = ["low", "medium", "high", "xhigh", "max"].indexOf(effort)
+  const variant = variants[Math.round(index * (variants.length - 1) / 4)]
+  log("Package reasoning effort " + effort + " maps to " + (variant?.id ?? "the model default") + " for " + ref.providerID + "/" + ref.id)
+  return variant
+}
 
 export type ModelFacts = {
   /** 线上模型名(2.x `Model.Info.modelID`)。 */

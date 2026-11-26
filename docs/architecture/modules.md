@@ -85,3 +85,5 @@ review_after: 2027-05-09
 S-01 的 `@opencode/plugin/codepuppy-package-runtime` 只持有同进程、按 Location 分区的反向 renderer 槽。`core/src/config/plugin/command.ts` 随 Location 注册/释放，原生和包指令共用源码先编译、后绑定值的 shell/process 原语；参数名顺序由 Invocation 传入，语法轴由 converter 合同生成，ext 不导入 core 执行器。
 
 整包 command/agent 与 skill/MCP 进入同一 PackageGraph/declarations。`ext-package-tx-builders.ts` 的包指令 builder 只生成 receipt 及 agent 启停 config 项，正文仍由 live 树的统一指令描述持有；共享 converter 的 `pluginInstructionDefinition` 负责 metadata/body 分离，不在运行端重写 YAML。
+
+`packages/ext/src/plugin-package-invocation.ts` 将已安装包的 command/agent/skill 接到原 command、skill 与 subagent 执行器，沿唯一 PackageAllowSetV3 检查分项和项目范围。调用期工具规则由既有 policy 绑定，下一用户输入/idle 清除；paths 用实际文件工具完成事件，preload 与 memory 在子会话上下文绑定，模型建议/effort 从原模型目录解析。指令模板只经 S-01 的 core renderer，源 shell 规则匹配复用纯 ShellScan，未新增执行循环或模板解释器。

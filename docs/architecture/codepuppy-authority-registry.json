@@ -2197,13 +2197,13 @@
         "ADR-029",
         "ADR-047"
       ],
-      "lane": "#1776 slice 3, explicit implement dispatch r5",
+      "lane": "#1776 slice 3, explicit implement dispatch r5/r6",
       "takeovers": [
         "packages/core/src/config/plugin/command.ts"
       ],
       "mechanism": {
         "file": "packages/core/src/config/plugin/command.ts",
-        "ladder": "Existing L3 increment only: private renderer exposed through self-owned @opencode/plugin/codepuppy-package-runtime, scoped disposal; ext does not import core or run a second shell renderer."
+        "ladder": "Existing L3 increment only: private renderer exposed through self-owned @opencode/plugin/codepuppy-package-runtime, scoped disposal; ext does not import core or run a second shell renderer. L0 extension hooks wrap the existing skill/subagent executors and consume the r6 command/agent allow-set projection; actual model/tool registries own identity, effort, discovery and execution. Shell tool-rule matching consumes the existing pure ShellScan leaf, never executes or reparses a shell template."
       },
       "tests": [
         {
@@ -2221,6 +2221,42 @@
         {
           "file": "packages/core/test/codepuppy-command-model-priority.test.ts",
           "name": "native argument suffix stays on the native syntax axis"
+        },
+        {
+          "file": "packages/ext/src/plugin-host.test.ts",
+          "name": "package agent delegates with its instructions and tool set"
+        },
+        {
+          "file": "packages/ext/src/plugin-host.test.ts",
+          "name": "package commands invoke the source renderer only after an explicit call"
+        },
+        {
+          "file": "packages/ext/src/plugin-host.test.ts",
+          "name": "package invocation applies preload memory effort and native turn limits"
+        },
+        {
+          "file": "packages/ext/src/plugin-host.test.ts",
+          "name": "package paths activate on real file access while Temporal manual skills stay explicit"
+        },
+        {
+          "file": "packages/ext/src/plugin-host.test.ts",
+          "name": "package YAML dependencies resolve to a real connected MCP tool"
+        },
+        {
+          "file": "packages/ext/src/plugin-host.test.ts",
+          "name": "package Claude background agents stop when their package is disabled"
+        },
+        {
+          "file": "packages/ext/src/plugin-host.test.ts",
+          "name": "package skill arguments and denies expire at the next user prompt"
+        },
+        {
+          "file": "packages/ext/src/plugin-host.test.ts",
+          "name": "package agent Edit remains available when source Write is denied"
+        },
+        {
+          "file": "packages/ext/src/policy/register-policy.test.ts",
+          "name": "package Bash prefix grants cover every parsed command and preserve quoted executable paths"
         }
       ]
     }

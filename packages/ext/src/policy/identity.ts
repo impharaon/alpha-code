@@ -33,6 +33,18 @@ import { bundledPluginTools, type BundledPluginTools } from "./bundled-plugin"
 import { canonicalJsonDigest } from "./store"
 import { mcpBindingDigest, type McpEntry } from "./resolver"
 import type { ToolTransportFact } from "./risk"
+import type { ToolRule } from "../../../ui-mac/src/shared/host-extension-package-contract/plugin-package"
+
+/** Source spellings resolve against verified runtime facts, including this package's MCP bindings. */
+export function packageToolRule(rule: ToolRule, facts: ToolFacts, bindings: Readonly<Record<string, string>>): ToolRule | undefined {
+  const aliases: Readonly<Record<string, string>> = { Bash: "shell", Read: "read", Write: "write", Edit: "edit", MultiEdit: "edit", Glob: "glob", Grep: "grep", LS: "list", NotebookRead: "read", NotebookEdit: "edit", WebFetch: "webfetch", WebSearch: "websearch", TodoWrite: "todo", AskUserQuestion: "question", Task: "subagent", Agent: "subagent", Skill: "skill", KillShell: "shell_cancel", BashOutput: "shell_read" }
+  const mcp = rule.tool.match(/^mcp__(.+?)__(.+)$/)
+  const matches = mcp
+    ? facts.identity.source === "mcp" && facts.identity.origin === (bindings["mcp::" + mcp[1]] ?? mcp[1]) && (mcp[2] === "*" || facts.identity.name === mcp[2])
+    : rule.tool === "*" || (aliases[rule.tool] ? facts.identity.source === "builtin" && facts.identity.name === aliases[rule.tool] : facts.technicalId === rule.tool || facts.identity.name === rule.tool)
+  if (!matches) return
+  return { tool: facts.technicalId, ...(rule.pattern === undefined ? {} : { pattern: bindings[(facts.identity.name === "subagent" ? "agent" : facts.identity.name) + "::" + rule.pattern] ?? rule.pattern }) }
+}
 
 /** Registry entry as the promise plugin API lists it. */
 export interface RegisteredTool {

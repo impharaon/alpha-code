@@ -6,10 +6,10 @@ import type { Plugin } from "@opencode/plugin"
 import type { ElicitationAnswer } from "@opencode/plugin/codepuppy-package-runtime"
 import { Schema } from "effect"
 import { releasePackageSessionMcp, registerPackageRuntime } from "@opencode/plugin/codepuppy-package-runtime"
-import type { HookEvent } from "../../ui-mac/src/shared/host-extension-package-contract/plugin-package"
+import { renderPluginText, type HookEvent } from "../../ui-mac/src/shared/host-extension-package-contract/plugin-package"
 import { pluginToolRules } from "../../ui-mac/src/shared/host-extension-package-contract/plugin-conversion.mjs"
 import { match } from "../../core/src/util/wildcard"
-import { INSTALLED_PLUGIN_SETTINGS_FILE } from "../../ui-mac/src/shared/installed-plugin-settings"
+import { INSTALLED_PLUGIN_SETTINGS_FILE, publicPluginOption } from "../../ui-mac/src/shared/installed-plugin-settings"
 import { pluginEntryRuntimeAvailable } from "../../ui-mac/src/shared/plugin-package-runtime"
 import { codepuppyCredential } from "../../util/src/codepuppy-credentials"
 import { allInstalledPluginPackages, allInstalledPluginInstructions, installedPluginPackage } from "./plugin-package-skills"
@@ -390,6 +390,11 @@ export async function registerPackageHooks(
                 [...config.secretValues]
                   .toSorted((left, right) => right.length - left.length)
                   .reduce((text, secret) => text.replaceAll(secret, "[redacted]"), text)
+              const promptBindings = {
+                pluginRoot: config.bindings.pluginRoot, projectDir: config.bindings.projectDir,
+                skillDir: config.bindings.skillDir, pluginData: config.bindings.pluginData,
+                resolveOption: (key: string) => publicPluginOption(handler.installed.description, handler.installed.settings, key),
+              }
               const eventJSON = JSON.stringify({ ...payload, ...eventFields })
               const hasArguments = handler.hook.prompt.some(
                 (part) => typeof part === "string" && part.includes("$ARGUMENTS"),
@@ -397,7 +402,7 @@ export async function registerPackageHooks(
               const prompt =
                 handler.hook.prompt
                   .map((part) =>
-                    typeof part === "string" ? part.replaceAll("$ARGUMENTS", () => eventJSON) : config.render([part]),
+                    typeof part === "string" ? part.replaceAll("$ARGUMENTS", () => eventJSON) : renderPluginText([part], promptBindings),
                   )
                   .join("") + (hasArguments ? "" : "\n\n" + eventJSON)
               const hint = await resolvePackageModel(context, handler.hook.model, input.log)

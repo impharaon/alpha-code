@@ -871,3 +871,15 @@ describe("控制组:判据能测出已知的坏", () => {
     expect(union.selected).not.toContain("/Users/alpha")
   })
 })
+
+
+test("file targets match literal and regex entries exactly while directory grant coverage stays conservative", () => {
+  for (const allow of [[{ kind: "literal" as const, value: "/parent" }], [{ kind: "regex" as const, value: "^/parent$" }]]) {
+    expect(processFenceRulesCover({ allow, deny: [] }, "/parent/child")).toBe(true)
+    expect(processFenceRulesCover({ allow, deny: [] }, "/parent/child", "file")).toBe(false)
+    expect(processFenceRulesCover({ allow, deny: [] }, "/parent", "file")).toBe(true)
+  }
+  const allow = [{ kind: "subpath" as const, value: "/parent" }]
+  expect(processFenceRulesCover({ allow, deny: [{ kind: "literal", value: "/parent" }] }, "/parent/child", "file")).toBe(true)
+  expect(processFenceRulesCover({ allow, deny: [{ kind: "literal", value: "/parent/child" }] }, "/parent/child", "file")).toBe(false)
+})

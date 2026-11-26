@@ -1,3 +1,4 @@
+import { createDirectoryWriteApproval } from "./directory-write-approval"
 import type { WorkspaceWritableChanged } from "./workspace-write-probe"
 import { clearOfficialConnectorRuntimeOnExit } from "./official-connector-resources"
 import { randomUUID } from "node:crypto"
@@ -1005,8 +1006,16 @@ const main = Effect.gen(function* () {
   }
   registerRendererProtocol()
   setDockIcon()
+  const directoryWrites = createDirectoryWriteApproval({
+    eligibility: { homeDir: homedir(), appStateRoot: codepuppyEnv.casBaseRoot, configFenceRoots: currentConfigFenceRoots, realpath: realpathSync.native, isDirectory: (directory) => statSync(directory).isDirectory() },
+    tracker: fenceWorkspaces,
+    sidecar: () => server,
+    current: (sessionID, requestID) => server?.permissionRequest(sessionID, requestID) ?? Promise.resolve(undefined),
+  })
   const updater = setupAutoUpdater(stopSidecars)
   registerIpcHandlers({
+    directoryWrites,
+    isAppRenderer: (id) => BrowserWindow.getAllWindows().some((window) => window.webContents.id === id),
     tabsPrecleanDone: tabsPreclean.done,
     fenceWorkspaces,
     killSidecar: () => killSidecar(),

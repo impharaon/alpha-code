@@ -1,3 +1,4 @@
+import { buildWriteScopeRequest, buildWriteScopeReply, parseWriteScopeReply } from "./codepuppy-sidecar-messages"
 // REQ-234 `#1529` I6:parentPort `codepuppy.*` 消息族封闭 —— 只认三种 ext → main 的形状,其余(含未知 alpha.* type、
 // main → ext 方向、形状不对)一律 undefined,由收方丢弃。
 import { describe, expect, test } from "bun:test"
@@ -280,4 +281,16 @@ test("I-13 tool policy write: requests (save / reset) and replies (ok / ok with 
     { type: "codepuppy.tool-policy.write.request", id: 4, ok: true },
   ])
     expect(messages.parseToolPolicyWriteReply(bad), JSON.stringify(bad)).toBeUndefined()
+})
+
+
+test("external write scope has one read-only contract and rejects malformed or granting messages", () => {
+  const targets = [{ absolute: "/outside/a", directory: "/outside" }]
+  const query = buildWriteScopeRequest(1, { access: "write", targets })
+  expect(parseCodePuppySidecarInbound(query)).toEqual(query)
+  const reply = buildWriteScopeReply(1, { revision: 3, targets: [{ absolute: targets[0]!.absolute, outcome: "needs-approval" }] })
+  expect(parseWriteScopeReply(reply)).toEqual(reply)
+  for (const bad of [{ ...query, register: true }, { ...query, targets: [{ absolute: "relative", directory: "/outside" }] }, { ...query, access: "execute" }, { ...query, id: -1 }]) expect(parseCodePuppySidecarInbound(bad)).toBeUndefined()
+  expect(parseWriteScopeReply({ ...reply, result: { revision: 3, targets: [{ absolute: "/outside/a", outcome: "granted" }] } })).toBeUndefined()
+  expect(parseCodePuppySidecarInbound(reply)).toBeUndefined()
 })

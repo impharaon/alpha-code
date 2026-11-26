@@ -1,3 +1,4 @@
+import { evaluateDirectoryWrite } from "./index"
 // ADR-041 on OpenCode 2 — tool identity, authority and location as the extension derives them (identity.ts), plus
 // pins on the upstream rules the derivation restates (name normalization, rule evaluation) and on upstream behaviour
 // a v1 takeover used to supply. Replaces packages/opencode/test/tool/codepuppy-tool-identity.test.ts and
@@ -199,4 +200,22 @@ describe("authority minting (ADR-041 §5)", () => {
       location: { kind: "local" },
     })
   })
+})
+
+
+test("external write scope preserves read and deny while asking for an unapproved write", async () => {
+  const targets = [{ absolute: "/outside/file", directory: "/outside" }]
+  for (const access of ["read", "write"] as const) for (const outcome of ["writable", "needs-approval", "protected", "no-fence"] as const) {
+    const event = { action: "external_directory", effect: "allow" as "allow" | "ask" | "deny", metadata: { directoryAccess: { access, targets } } }
+    await evaluateDirectoryWrite(event, async () => ({ revision: 1, targets: [{ absolute: targets[0]!.absolute, outcome }] }))
+    expect(event.effect).toBe(access === "read" ? "allow" : outcome === "protected" ? "deny" : outcome === "needs-approval" ? "ask" : "allow")
+    event.effect = "deny"
+    await evaluateDirectoryWrite(event, async () => ({ revision: 2, targets: [{ absolute: targets[0]!.absolute, outcome: "writable" }] }))
+    expect(event.effect).toBe("deny")
+  }
+  const event = { action: "external_directory", effect: "allow" as "allow" | "ask" | "deny", metadata: { directoryAccess: { access: "write", targets } } }
+  await evaluateDirectoryWrite(event, async () => ({ error: "unavailable" }))
+  expect(event.effect).toBe("ask")
+  await evaluateDirectoryWrite(event, async () => ({ revision: 3, targets: [{ absolute: targets[0]!.absolute, outcome: "no-fence" }] }))
+  expect(event.effect).toBe("ask")
 })

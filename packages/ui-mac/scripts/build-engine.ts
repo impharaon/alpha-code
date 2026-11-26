@@ -21,6 +21,7 @@ import { mainConfig } from "../../cli/vite.node.config"
 import { nodeTarget } from "../../cli/src/node/target"
 import { collectNodeAssets, hashNodeAssets } from "../../cli/script/node-assets"
 import { bundledModelsSnapshot } from "../../core/script/models-snapshot"
+import { projectDirectoryAccessSource } from "../engine/file-access-transform"
 import { transformV1MigrationSource } from "../engine/v1-migration-transform"
 
 const uiMac = path.resolve(import.meta.dirname, "..")
@@ -70,6 +71,8 @@ config.plugins = [
       if (id === "bun:sqlite") return bunSqliteShim
     },
     transform(code: string, id: string) {
+      const directoryAccess = projectDirectoryAccessSource(code, path.resolve(id))
+      if (directoryAccess !== undefined) return directoryAccess
       if (path.resolve(id) !== v1Migration) return
       return transformV1MigrationSource(code)
     },

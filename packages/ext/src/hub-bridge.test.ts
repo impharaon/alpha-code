@@ -1,3 +1,4 @@
+import { buildWriteScopeReply } from "../../ui-mac/src/main/codepuppy-sidecar-messages"
 // REQ-234 `#1531`:ext 侧 parentPort 请求簿记(hub-bridge.ts)。假 port 只替换 Electron 的 parentPort 那两样(postMessage / on),
 // 应答由 main 侧**生产**构造器(buildHubViewReply / buildHubRequestReply / buildReloadRequest)造 —— 合同只有一份。
 import { describe, expect, test } from "bun:test"
@@ -263,4 +264,16 @@ describe("hub-bridge — tool policy writer (I-13)", () => {
     expect(await saving).toBeUndefined()
     expect(await viewing).toEqual({ ok: true, view })
   })
+})
+
+
+test("external write scope uses the existing parent port and has no registration operation", async () => {
+  const wire = fakePort()
+  const bridge = createHubBridge(wire.port, { log: () => {} })
+  const input = { access: "write" as const, targets: [{ absolute: "/outside/file", directory: "/outside" }] }
+  const promise = bridge.readWriteScope(input)
+  expect(parseCodePuppySidecarInbound(wire.sent[0])).toEqual({ type: "codepuppy.write-scope.request", id: 1, ...input })
+  wire.deliver(buildWriteScopeReply(1, { revision: 1, targets: [{ absolute: "/outside/file", outcome: "writable" }] }))
+  expect(await promise).toEqual({ revision: 1, targets: [{ absolute: "/outside/file", outcome: "writable" }] })
+  expect(await createHubBridge(undefined, { log: () => {} }).readWriteScope(input)).toEqual({ error: "unavailable" })
 })

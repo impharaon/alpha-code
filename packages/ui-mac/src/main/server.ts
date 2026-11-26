@@ -1,3 +1,7 @@
+import type { CodePuppySidecarHost } from "./hub-view"
+import { engineAuthorization } from "./engine-authorization"
+import { toV1PermissionRequest } from "../engine-adapter/opencode2/v1-shapes"
+import type { WriteScopeRequest, WriteScopeReply } from "./codepuppy-sidecar-messages"
 import { parsePackageManagerEnvironmentRequest, type PackageManagerEnvironmentReply } from "../shared/package-manager-environment"
 import { clearOfficialConnectorRuntime, clearOfficialConnectorRuntimeOnExit, officialAvailabilityPublished, restoreCommittedOfficialConnectors } from "./official-connector-resources"
 import { createHash } from "node:crypto"
@@ -53,7 +57,7 @@ import type { CodePuppySidecarOutbound } from "./codepuppy-sidecar-messages"
 import { consumeDanglingSweepCredit } from "./dangling-sweep-latch"
 // REQ-159 `#1321`:进程围栏计划 —— fork 之前渲染 + 试编译可写集、解析原生模块路径,经 StartCommand 交给
 // sidecar 在 import 引擎之前 apply。计划做不出来 = 拒绝 fork(fail-closed,原因可读),不静默无围栏。
-import { planPackageManagerCaches, planProcessFence, type ProcessFencePlan } from "./process-fence-plan"
+import { plannedWritableTarget, planPackageManagerCaches, planProcessFence, type ProcessFencePlan } from "./process-fence-plan"
 import { trialCompileProfile } from "./process-fence-compile"
 import type { ProcessFenceStartInput } from "./process-fence-apply"
 // REQ-137 `#1337`:网络出网的强制半场接线。围栏(profile N1–N4)把 sidecar 那棵树的出网收成 loopback 上**一个**端口,
@@ -100,7 +104,11 @@ type SidecarMessage =
   | { type: "stopped" }
   | { type: "error"; error: { message: string; stack?: string } }
 
+let writeScopeRevision = 0
+
 export type SidecarListener = {
+  permissionRequest(sessionID: string, requestID: string): Promise<ReturnType<typeof toV1PermissionRequest> | undefined>
+  readWriteScope(request: Pick<WriteScopeRequest, "access" | "targets">): Promise<WriteScopeReply["result"]>
   projectConfigView: (directory: string) => Promise<ProjectConfigView | undefined>
   stop: () => Promise<void>
   kill: () => void
@@ -152,10 +160,7 @@ type SpawnLocalServerOptions = {
    * REQ-234 `#1529`:parentPort 上 `codepuppy.*` 窄消息的 main 侧接收者(hub-view.ts 的 createCodePuppySidecarHost)。
    * `receive` 与 writeProbes 并列挂在 `child.on("message")` 上;ready 之后 `attach`,子进程退出时调它返回的断开函数。
    */
-  codepuppySidecar?: {
-    receive(message: unknown, post: (message: CodePuppySidecarOutbound) => void): boolean
-    attach(post: (message: CodePuppySidecarOutbound) => void): (reason: string) => void
-  }
+  codepuppySidecar?: CodePuppySidecarHost
   /**
    * DESIGN-stored-credentials-fence §4.2:引擎拉取凭据表超时(`credentials.unavailable`)或主进程读不出表时,请求既有的 `credential-change` 重启
    * (index.ts 接到 requestSidecarRespawn:既有队列与自愈阶梯,有界)。
@@ -750,6 +755,7 @@ export async function spawnLocalServer(
     }
   })()
   let exited = false
+  ++writeScopeRevision
   // #613:ready IPC 带回的注入失败。在此立即 error(main 侧无条件可观测,不依赖后续健康结果),
   // 并随返回值交给终态生产者(armBoot/armRespawnGenerationTerminal)发布 "injection-failed"。
   let injectionFailure: { message: string; stack?: string } | undefined
@@ -817,6 +823,7 @@ export async function spawnLocalServer(
         const result = await writeGrants.request(issued.token)
         if (result.outcome === "granted" && !exited) {
           grantedDirectories.add(directory)
+          ++writeScopeRevision
           getLogger()?.log(`process fence: grant granted directory=${JSON.stringify(directory)} roundTripMs=${(performance.now() - started).toFixed(3)}`)
           return { outcome: "granted" }
         }
@@ -833,6 +840,15 @@ export async function spawnLocalServer(
     granting.set(directory, grant)
     void grant.finally(() => granting.delete(directory))
     return grant
+  }
+  const readWriteScope: SidecarListener["readWriteScope"] = async (request) => {
+    if (exited || (fence && !writeRules)) return { error: "unavailable" }
+    return { revision: writeScopeRevision, targets: request.targets.map((target) => {
+      if (!fence) return { absolute: target.absolute, outcome: "no-fence" as const }
+      const actual = plannedWritableTarget(target.absolute, realpathSync.native).target
+      const protectedTarget = processFenceRulesCover({ allow: writeRules!.deny, deny: [] }, actual, "file")
+      return { absolute: target.absolute, outcome: protectedTarget ? "protected" as const : processFenceRulesCover({ allow: [...writeRules!.allow, ...[...grantedDirectories].map((value) => ({ kind: "subpath" as const, value }))], deny: writeRules!.deny }, actual, "file") ? "writable" as const : "needs-approval" as const }
+    }) }
   }
   // REQ-234 `#1529`:`codepuppy.*` 分发与探针应答并列;不是本族的消息原样交还(返回 false)。
   const postCodePuppy = (message: CodePuppySidecarOutbound) => child.postMessage(message)
@@ -867,7 +883,7 @@ export async function spawnLocalServer(
       return
     }
     if (receiveToolPolicyWrite(message, { baseDir: toolPolicyBaseDir, post: (reply) => child.postMessage(reply), log: (line) => getLogger()?.warn(line) })) return
-    options.codepuppySidecar?.receive(message, postCodePuppy)
+    options.codepuppySidecar?.receive(message, postCodePuppy, readWriteScope)
   })
   let detachCodePuppy: ((reason: string) => void) | undefined
   // 实现期修订 1:读不出的条目、软链条目每代只记一次(拉取每次装载都来)
@@ -996,6 +1012,13 @@ export async function spawnLocalServer(
   let stopping: Promise<void> | undefined
 
   const listener: SidecarListener = {
+      permissionRequest: async (sessionID, requestID) => {
+        const response = await fetch(`http://${hostname}:${port}/api/session/${encodeURIComponent(sessionID)}/permission/${encodeURIComponent(requestID)}`, { headers: { authorization: engineAuthorization(password) } })
+        if (response.status === 404) return
+        if (!response.ok) throw new Error("permission request unavailable")
+        return toV1PermissionRequest((await response.json()).data)
+      },
+      readWriteScope,
       kill: () => {
         if (!exited) child.kill()
       },

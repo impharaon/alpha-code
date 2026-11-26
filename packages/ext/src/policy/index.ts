@@ -1,3 +1,4 @@
+import { directoryAccessMetadata } from "../../../ui-mac/src/shared/directory-write-approval"
 // Code Puppy tool policy inside the extension (lane seams I3): everything L4 hangs on the OpenCode 2 plugin Context
 // goes through `registerPolicy`. The extension's `setup` awaits it first and awaits `seal()` last (L3 owns the call
 // sites; `plugin-setup-order.test.ts`).
@@ -72,7 +73,7 @@ export function policyWorkspace(location: Plugin.Context["location"]): string {
  * `toolPolicy`: who writes the tool policy document (SPEC-engine-config-fence BR-03, DESIGN §4.5). The extension passes the hub bridge's
  * writer — main, over the parent port — whenever the process has one; absent (CLI, test hosts) the store writes directly.
  */
-export async function registerPolicy(context: Plugin.Context, unattended: UnattendedState, installSubject: HubBridge["installSubject"], toolPolicy?: ToolPolicyWriter): Promise<PolicyRegistration> {
+export async function registerPolicy(context: Plugin.Context, unattended: UnattendedState, installSubject: HubBridge["installSubject"], toolPolicy?: ToolPolicyWriter, readWriteScope?: HubBridge["readWriteScope"]): Promise<PolicyRegistration> {
   const env = process.env
   // `#1698`:随包清单与 Office 清单的路径、云 MCP 定义、账户分区来自 sidecar 发布的启动文档(冻结,一代不变)
   const bootstrap = codepuppyBootstrap()
@@ -199,6 +200,7 @@ export async function registerPolicy(context: Plugin.Context, unattended: Unatte
       }
       return holdUnattendedDeny(event, selected, event.action, (denial) => denied(event.source?.type === "tool" ? event.source.id : undefined, denial))
     }
+    await evaluateDirectoryWrite(event, readWriteScope)
     if (isCodePuppyPolicyRequest(event.metadata)) {
       // BR-10: an assistant-initiated install asks in every tier — no allow rule, saved approval or tier skips it.
       if (isInstallAsk(event.metadata) && event.effect !== "deny") event.effect = "ask"
@@ -288,3 +290,15 @@ export async function registerPolicy(context: Plugin.Context, unattended: Unatte
   }
 }
 
+
+
+export async function evaluateDirectoryWrite(event: { action: string; effect: "allow" | "ask" | "deny"; metadata?: unknown }, readWriteScope?: HubBridge["readWriteScope"]) {
+  if (event.action !== "external_directory" || event.effect === "deny") return
+  const request = directoryAccessMetadata(event.metadata)
+  if (!request || request.access !== "write") return
+  const result = await readWriteScope?.(request).catch(() => ({ error: "unavailable" as const }))
+  if (!result || "error" in result) { event.effect = "ask"; return }
+  if (result.targets.length !== request.targets.length || result.targets.some((target, index) => target.absolute !== request.targets[index]!.absolute)) { event.effect = "ask"; return }
+  if (result.targets.every((target) => target.outcome === "no-fence")) return
+  event.effect = result.targets.some((target) => target.outcome === "protected") ? "deny" : result.targets.some((target) => target.outcome === "needs-approval") ? "ask" : "allow"
+}

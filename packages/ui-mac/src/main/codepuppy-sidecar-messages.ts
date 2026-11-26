@@ -1,3 +1,4 @@
+import { parseDirectoryAccessTargets, type DirectoryAccessTarget } from "../shared/directory-write-approval"
 import type { PackageAuthorizationResultV1 } from "../shared/package-admission"
 import { isInstallOutcomeV1, type InstallOutcomeV1, type CreatedPluginDraftV1 } from "../shared/plugin-install"
 import type { SourceSearchResultV1, CandidateV1, SourceStatusV1 } from "./plugin-sources"
@@ -147,6 +148,7 @@ export type PackageAuthorizationQuery = { type: "codepuppy.package.authorization
 export type PackageAuthorizationReply = { type: "codepuppy.package.authorization.reply"; id: number; result: PackageAuthorizationResultV1 }
 
 export type CodePuppySidecarInbound =
+  | WriteScopeRequest
   | HubViewRequestMessage
   | PackageAuthorizationQuery
   | HubRequestQueryMessage
@@ -155,6 +157,7 @@ export type CodePuppySidecarInbound =
   | SourcesSearchRequest
   | HubInstallRequest
 export type CodePuppySidecarOutbound =
+  | WriteScopeReply
   | ReloadRequestMessage
   | PackageAuthorizationReply
   | HubViewReplyMessage
@@ -202,6 +205,7 @@ function parseReloadItems(value: unknown): ReloadItem[] | undefined {
 /** main 侧:ext → main 的封闭消息族。别的一律 undefined(含 main → ext 的方向)。 */
 export function parseCodePuppySidecarInbound(value: unknown): CodePuppySidecarInbound | undefined {
   if (!isRecord(value)) return
+  if (value.type === "codepuppy.write-scope.request") return parseWriteScopeRequest(value)
   if (value.type === "codepuppy.package.authorization.request")
     return isId(value.id) && isText(value.packageId) && Object.keys(value).every(key => ["type", "id", "packageId"].includes(key))
       ? buildPackageAuthorizationQuery(value.id, value.packageId) : undefined
@@ -727,4 +731,33 @@ export function parseToolPolicyWriteReply(value: unknown): ToolPolicyWriteReply 
   if (value.ok !== true || Object.keys(value).some((key) => !["type", "id", "ok", "backup"].includes(key))) return
   if (value.backup !== undefined && !isText(value.backup)) return
   return buildToolPolicyWriteReply(value.id, { ok: true, ...(typeof value.backup === "string" ? { backup: value.backup } : {}) })
+}
+
+
+export type WriteScopeRequest = { type: "codepuppy.write-scope.request"; id: number; access: "read" | "write"; targets: readonly DirectoryAccessTarget[] }
+export type WriteScopeReply = { type: "codepuppy.write-scope.reply"; id: number; result: { revision: number; targets: readonly { absolute: string; outcome: "writable" | "needs-approval" | "protected" | "no-fence" }[] } | { error: "unavailable" } }
+
+export function parseWriteScopeRequest(value: unknown): WriteScopeRequest | undefined {
+  if (!isRecord(value) || Object.keys(value).length !== 4 || value.type !== "codepuppy.write-scope.request" || !isId(value.id) || (value.access !== "read" && value.access !== "write")) return
+  const targets = parseDirectoryAccessTargets(value.targets)
+  return targets ? { type: value.type, id: value.id, access: value.access, targets } : undefined
+}
+export function buildWriteScopeRequest(id: number, input: Pick<WriteScopeRequest, "access" | "targets">): WriteScopeRequest {
+  const request = parseWriteScopeRequest({ type: "codepuppy.write-scope.request", id, ...input })
+  if (!request) throw new Error("invalid write scope query")
+  return request
+}
+export function parseWriteScopeReply(value: unknown): WriteScopeReply | undefined {
+  if (!isRecord(value) || Object.keys(value).length !== 3 || value.type !== "codepuppy.write-scope.reply" || !isId(value.id) || !isRecord(value.result)) return
+  const result = value.result
+  if (Object.keys(result).length === 1 && result.error === "unavailable") return { type: value.type, id: value.id, result: { error: "unavailable" } }
+  if (Object.keys(result).length !== 2 || !isId(result.revision) || !Array.isArray(result.targets)) return
+  const targets = result.targets
+  if (!targets.every((target) => isRecord(target) && Object.keys(target).length === 2 && parseDirectoryAccessTargets([{ absolute: target.absolute, directory: target.absolute }]) && ["writable", "needs-approval", "protected", "no-fence"].includes(target.outcome as string))) return
+  return { type: value.type, id: value.id, result: { revision: result.revision, targets } }
+}
+export function buildWriteScopeReply(id: number, result: WriteScopeReply["result"]): WriteScopeReply {
+  const reply = parseWriteScopeReply({ type: "codepuppy.write-scope.reply", id, result })
+  if (!reply) throw new Error("invalid write scope result")
+  return reply
 }

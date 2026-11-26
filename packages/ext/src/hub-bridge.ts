@@ -17,6 +17,10 @@ import { PLUGIN_SOURCE_SEARCH_REPLY_TIMEOUT_MS } from "../../ui-mac/src/shared/p
 import { createUnattendedState } from "./policy/unattended"
 import type { ToolPolicyWriter } from "./policy/resolver"
 import {
+  buildWriteScopeRequest,
+  parseWriteScopeReply,
+  type WriteScopeRequest,
+  type WriteScopeReply,
   buildToolPolicyWriteRequest,
   parseToolPolicyWriteReply,
   buildPackageAuthorizationQuery,
@@ -55,6 +59,7 @@ export type HubInstallSubject = { readonly name: string; readonly source: Plugin
 
 export type HubBridge = {
   readonly unattended: ReturnType<typeof createUnattendedState>
+  readWriteScope(request: Pick<WriteScopeRequest, "access" | "targets">): Promise<WriteScopeReply["result"]>
   readonly available: boolean
   view(input: { directory: string; sessionID?: string; agent?: string; query?: string }): Promise<{ ok: true; view: HubView } | BridgeFailure>
   search(input: { directory: string; query: string }): Promise<{ ok: true; result: SourceSearchResultV1 } | BridgeFailure>
@@ -172,6 +177,10 @@ export function createHubBridge(
 
   return {
     unattended,
+    readWriteScope: async (request) => {
+      const result = await ask((id) => buildWriteScopeRequest(id, request), (message) => parseWriteScopeReply(message)?.result)
+      return "ok" in result ? { error: "unavailable" } : result
+    },
     available: !!port,
     ...(port
       ? {

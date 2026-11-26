@@ -552,7 +552,7 @@ PLAN 阶段只提交本文件。下表和命令均为实施安排，不代表已
 ## 交付切片三｜本人批准项目外目录
 
 - 依据：#1759；spec v6 AC-10 / BR-08；冻结 design v4 §4.4 R4/R5/R6、§5/§6 与 §10 v4 R1 处置（`d4a849e524`；后续 v4.1/v4.2 不改变本片）。切片一、二提供位置/身份与实际围栏；切片四继续负责 AC-11/12，切片五负责 v5 brew。
-- 核对：r6 续接明确允许本轮追加计划后直接实施；本节由 Codex（GPT-6）核对冻结输入与真实调用链，不替编排者声称独立审查通过。
+- 核对：`ed37f9bf43` · Codex（GPT-6）· 按 r6 续接的“追加计划后直接实施”授权自核通过；未另收到编排者计划审查回执，不宣称独立审查通过。
 
 ### 改动
 
@@ -562,7 +562,7 @@ PLAN 阶段只提交本文件。下表和命令均为实施安排，不代表已
 | `packages/ui-mac/src/main/codepuppy-sidecar-messages.ts`、`hub-view.ts`、`ext-ipc.ts`；`packages/ext/src/hub-bridge.ts`、`plugin.ts`、`policy/index.ts` 及现有测试 | 接 R6 两端 parser/build/只读 request，evaluate 消费实际目标状态；不在 ext 维护路径/档位表。 |
 | `packages/ui-mac/src/shared/directory-write-approval.ts`（新增：R4 的纯 wire 类型/输入校验）；`src/main/directory-write-approval.ts` 及同模块测试（新增：主进程描述快照、本人批准协调） | 绑定请求事实、renderer、引擎代、显示时 dev/ino 与 decisionID；只读描述与批准写动作分离。复用原 tracker/register/grant 与既有身份规则。 |
 | `packages/ui-mac/src/main/process-fence-plan.ts`、`process-fence-workspaces.ts`、`server.ts`、`ipc.ts`、`index.ts` 及既有测试；`src/preload/index.ts`、`types.ts` | 复用已有 plannedWritableTarget/checkWritableTarget 预览缺失目标，避免另一套资格判定；主进程核实 pending 请求，暴露 R4、投影实际 profile/grants 的 R6 revision，组合至当前代。 |
-| `packages/ui-mac/src/engine-adapter/contract/receipts.ts`、`engine-adapter/index.ts`、`permission-reply.test.ts`；renderer 的 `PermissionDialog.tsx`、`permission-watcher.tsx`、`app.tsx` 及既有审批测试 | 在既有卡片显示真实目标，具体按钮登记 pre-reply 动作；账本先完成 current/fingerprint 校验，再 await 本人批准的 R4，成功后才沿原审批回复。拒绝、自动回复不登记动作。复用现有冲突/失败呈现。 |
+| `packages/ui-mac/src/engine-adapter/contract/receipts.ts`、`engine-adapter/index.ts`、`permission-reply.test.ts`；renderer 的 `PermissionDialog.tsx`、`permission-watcher.tsx`、renderer 的 `index.tsx` 及既有审批测试 | 在既有卡片显示真实目标，具体按钮登记 pre-reply 动作；账本先完成 current/fingerprint 校验，再 await 本人批准的 R4，成功后才沿原审批回复。拒绝、自动回复不登记动作。复用现有冲突/失败呈现。 |
 | `scripts/gate-files.tsv`、本计划 | 仅同步实际测试条数与一次性证据；不改 gate 的选择或规则。 |
 
 ### 顺序
@@ -590,4 +590,13 @@ PLAN 阶段只提交本文件。下表和命令均为实施安排，不代表已
 
 ### 偏离记录
 
-暂无。真实签名 utilityProcess/Electron 窗口禁止启动，沿前片证据边界报告；不以 Node transport 和 DOM harness 冒充产品签名/UI 全链实跑。
+- r6：步骤 1/2 的 main 组合入口合在首个实现提交，原因是同一个 SidecarListener/IPC 类型接缝及 index 的依赖组合；卡片/receipt 仍为下一提交。`server.permissionRequest` 只读原生 pending，并复用现有 v1 投影/指纹，不在翻译器做权限决定。描述还保留 main 自己算的完整快照指纹，兼容的是当前同时使用的 v1 指纹通道，并非旧版本迁移。
+- 计划中的 renderer `app.tsx` 实际组合落点为 `src/renderer/index.tsx`（原 PermissionWatcher 包装处）；只传当前本机 sidecar 的 server/origin 事实，不改 app 的公共 surface。额外 `test-component/preload-stub.ts` 仅为新 R4 preload 能力作现有类型枚举分类；只读回调由 `server.ts` 的每代 parentPort 接收口交给既有 Host.receive，绑定发送方实际代际，避免全局宿主误读新一代；原调用链的无关重场景不追加运行。
+- R5 原方法真实源码执行 **2 pass**；R6 消息 **15 pass**，ext bridge/identity **33 pass**；main/R4/hub/server **75 pass**（后新增精确文件投影 case 的结果续记）。主进程 R4 三条真盘聚合用例含普通/缺失/软链、重指/换 inode、拒绝位置与原生失败重试；卡片/receipt 当前 **101 pass**。类型 ui-mac/ext exit 0，写点与既有 sidecar dispatch **20 pass**。真实签名 utilityProcess/Electron 窗口禁止启动，沿前片证据边界报告；不以 Node transport 和 DOM harness 冒充产品签名/UI 全链实跑。
+
+- R6 精确文件接线的真实 renderer 用例先 **1 fail**：既有 `processFenceRulesCover` 用于“目录是否可被改名”的签发安全判定，literal 祖先按已覆盖处理，不能直接拿来判具体文件。按工程标准 §6 给同一个权威增加 `kind: "directory" | "file"` 域参数；原调用维持 directory，R6 实际目标使用 file 的 literal/regex 精确匹配，既有 deny 优先不变。没有另造匹配器。运行内只把已确认的 grant 投影为 writable，不把在途/可能消费的令牌当成功。
+- 本轮精确目标 authority 的域参数及其 source 接线完整四文件 **144 pass**；主进程 IPC 的新本人批准 case **1 pass**。撤 R4 显示身份核对使合法目录被重指后错误 granted，命名用例 **1 fail**；恢复后通过。撤 receipt 的 await，原先检查点早于错误回复的微任务，测试曾漏检；改为在 grant 仍挂起时让当前事件循环排空，移除臂 **1 fail**、恢复 **1 pass**。无耗时阈值或重复重场景。
+- Go 补跑 `gate slot -- bun test ./node_modules/.cache/package-manager-scenario-vf8vnnjs/r6/go.test.ts` **1 pass / 46 expect**：unset、GOENV 文件、GOBIN 环境、GOENV=off，及两入口 null 后发现 Go 的真实下载/运行/安装均成功；两个撤 GOPATH 臂失败，原 HOME/go/pkg 仍零变化。初轮默认 Shell 正臂已成功，损坏签名被实际拒绝（`note has no verifiable signatures`）；只因临时 runner 写死另一种报错措辞而停止，保留日志并复用已完成行，未重复成功安装。补跑排队命令一度缺 `./` 而未选中任何测试，修正后才执行，不记为通过。完整结果 `r6/go-results.json`；七个其它工具与 Cargo U2 沿 r4 已接受的真实结果，不重跑。
+- R4 在准备目录之前还消费本代 R6 的实际 CF/C1 结果，任何 protected 目标都先返回 protected-config；仅靠目录资格不替代精确文件保护。只读端口通过现有 Host.receive 的发送方回调传入，server 的参数类型复用该 Host 类型，撤旧镜像签名。当前无围栏结果保留原权限 gate，不把 no-fence 当作静态放行。
+- 新增 R4 preload 两口只在真实应用主 frame 接受；project-writable-ipc 既有宿主增加一条真实 handler/真实 tracker 用例，描述、子 frame、拒绝形状与 sidecar 消息均零签发。该 `.cases.ts` 定向执行首次也缺 `./`，未选中测试；补全路径后 **1 pass**。测试桩的 absent 分类与 gate 表只同步事实，ext hub-bridge 的原未登记文件按本轮实测 **14** 条补登记。
+- 首个实现提交收口：主进程 R4/hub/messages/server **91 pass**，ext 两文件 **33 pass**，类型 exit 0、旧名 **10 pass**。Go 原生默认 GOCACHE/GOMODCACHE 的事后查询与真实目录检查，在八臂均为 **0 文件**；隔离 HOME 初始为空，未重复包安装。首轮 AC-10 原生签发与工具写入已实际落盘，但临时 observer RPC 返回编码失败，未计完整场景通过；原日志/结果保留，修正测试自身的完成消息后续接剩余证明。

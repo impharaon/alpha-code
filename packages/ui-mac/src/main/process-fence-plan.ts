@@ -132,7 +132,7 @@ export function planWritableLocations(input: {
 }
 
 /** Resolve through the deepest existing parent; an unresolved symlink is not a missing directory. */
-function plannedWritableTarget(source: string, realpath: WorkspaceDirectoryInput["realpath"]): { target: string; missing: Set<string> } {
+export function plannedWritableTarget(source: string, realpath: WorkspaceDirectoryInput["realpath"]): { target: string; missing: Set<string> } {
   try {
     return { target: resolve(realpath(source)), missing: new Set() }
   } catch (error) {
@@ -150,7 +150,7 @@ function plannedWritableTarget(source: string, realpath: WorkspaceDirectoryInput
   }
 }
 
-function checkWritableTarget(input: WorkspaceDirectoryInput, planned: { target: string; missing: Set<string> }) {
+export function checkWritableTarget(input: WorkspaceDirectoryInput, planned: { target: string; missing: Set<string> }) {
   const stat = input.stat ?? ((path: string) => statSync(path, { bigint: true }))
   // Preview only the not-yet-created nodes through the existing identity predicate. Existing ancestors
   // keep their real device/inode; a file is checked as one node, without granting its parent directory.

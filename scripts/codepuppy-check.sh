@@ -20,21 +20,17 @@
 set -uo pipefail
 cd "$(git rev-parse --show-toplevel)"
 
-# 范围(owner 2026-11-23):`bin/check` = PR 门控,`bin/check --full` = 夜间全量。测试分三层(ADR-0014,规则在
-# scripts/test-layers.sh):PR 门跑 fast + integration,`--full` 再加 scenario;scenario 从不进 PR 门。bun 没有「受影响
-# 测试」的机械选择(无依赖图),所以 PR 门跑这两层的全部文件 —— 上报给 gate 的那一行如实写明。
-# gate 设了 GATE_SCOPE_FILE 时写一行「本次测试跑了什么」;没设就什么都不写。
-test_layers=(fast integration)
-scope="fast + integration tests (no affected selection)"
+# PR 门只跑共享 affected-tests 选中的 fast / integration;--full 包含 scenario。
 full=0
 for arg in "$@"; do
   case "$arg" in
-    --full) full=1; test_layers=(fast integration scenario); scope="all tests (--full: fast + integration + scenario)" ;;
+    --full) full=1 ;;
     *) echo "usage: bin/check [--full]" >&2; exit 2 ;;
   esac
 done
-# 闸门登记簿([6/14])只判本次范围里那几层的文件。
-export CODEPUPPY_TEST_LAYERS="${test_layers[*]}"
+export CODEPUPPY_TEST_FULL="$full"
+unset CODEPUPPY_TEST_FILES
+test_files=""
 
 # [9/14] 的输入(I-06):「新建的 worktree 能不能跑出可信 typecheck」只随这几样变 —— bootstrap 与它的判据脚本、依赖清单与锁、
 # 模块解析配置(任何深度的 tsconfig*.json / bunfig.toml / .npmrc、patches/)、husky,以及判据拿来当探针的东西:围栏 addon 的
@@ -60,9 +56,7 @@ worktree_bootstrap_inputs_changed() {
 bootstrap_probe=1
 if [ "$full" -eq 0 ] && ! worktree_bootstrap_inputs_changed; then
   bootstrap_probe=0
-  scope="$scope; worktree bootstrap probe not run (no bootstrap input changed; nightly runs it)"
 fi
-if [ -n "${GATE_SCOPE_FILE:-}" ]; then printf '%s\n' "$scope" > "$GATE_SCOPE_FILE"; fi
 
 # 每行:<codepuppy-ci job>|<codepuppy-ci step name>|<本地档位>
 # 档位只有三种:MIRRORED(跑同一条命令)、SUPERSET(本地还多验了东西)、
@@ -244,37 +238,17 @@ echo "▶ [5/14] contract lock + unit tests (contracts-consumer + ext + ui-mac +
 #     每个用它的文件在自己的用例前装上宿主的 HOME / XDG 与启动文档、用例后还原,所以按任何文件顺序都互不干扰。
 #   · app 滚动 pin(bun-test-app.sh):整包 2s,没有并行的收益,保持串行。
 #   CI 的同名步骤(codepuppy-ci.yml,已停用)仍是串行命令,故这些步骤的档位不变(MIRRORED = 同一脚本、同一下界、同一已知红清单)。
-# 测试分层(ADR-0014):套件里每个测试文件按文件名恰好落在 fast / integration / scenario 一层;规则与判据在
-# scripts/test-layers.sh(唯一真源),无层或多层的文件逐个点名、本步红。每个工作目录把本次范围的几层(PR 门 fast +
-# integration,--full 加 scenario)放进**一次** bun 调用 —— 分层逐个串着调用会丢并行 —— 跑完按层把 junit 拆成
-# `<step>.<layer>.xml` 写进 $GATE_REPORT_DIR(gate 读它报每层条数、耗时、最慢与超预算的用例;[6/14] 登记簿读它判逐文件条数)。
-# 下界沿用整包地板(contracts-consumer 15 / ext 100),上游包的登记文件只判「真跑了」(≥1)。
-group_tests() { # <step> <工作目录> <下界> [bun test 参数...]
-  local step="$1" w="$2" floor="$3" f layer rc=0 files=() map
-  shift 3
-  map="$(mktemp)"
-  bash scripts/test-layers.sh map "$w" "${test_layers[@]}" > "$map"
-  while IFS=$'\t' read -r f layer; do files+=("./$f"); done < "$map"
-  if [ "${#files[@]}" -gt 0 ]; then
-    CODEPUPPY_JUNIT_FILE="$map.xml" bash scripts/bun-test-floor.sh "$floor" "$w" "$@" "${files[@]}" || rc=1
-    python3 scripts/junit-split-layers.py "$map.xml" "$map" "$GATE_REPORT_DIR" "$step" || rc=1
-  fi
-  rm -f "$map" "$map.xml"
-  return $rc
-}
-# 一处红不跳过后面的包:[6/14] 要从完整的报告里判每个登记文件(此前它自己逐个重跑,前一步红也照样判全)。
+# 选择与层校验只在共享工具;runner 保留包内分组与每层 JUnit 报告。
 unit_tests() {
-  local rc=0 w
-  bash scripts/test-layers.sh check || rc=1
+  local rc=0
   bun run --cwd packages/codepuppy-contracts-consumer check:vendor || rc=1
-  group_tests codepuppy-contracts-consumer packages/codepuppy-contracts-consumer 15 --parallel || rc=1
-  group_tests ext packages/ext 100 || rc=1
-  bash scripts/bun-test-ui-mac.sh "${test_layers[@]}" || rc=1
-  # 上游包(packages/core 等)里 Code Puppy 自有的登记文件:只经登记簿进套件,在这里跑一次,[6/14] 从报告判条数。
-  for w in $(bash -c 'source scripts/test-layers.sh && test_layer_register_workdirs'); do
-    group_tests "${w##*/}+gate-files" "$w" 1 --parallel || rc=1
-  done
-  bash scripts/bun-test-app.sh || rc=1
+  if [ "$full" -eq 1 ]; then
+    affected-tests run --full || rc=1
+  else
+    test_files="$GATE_REPORT_DIR/selected-files.txt"
+    affected-tests --list > "$test_files" || return 1
+    affected-tests run || rc=1
+  fi
   return $rc
 }
 # 每次 bun 调用的 junit 都写进 $GATE_REPORT_DIR;gate 没设(本地手跑)就用一个临时目录 —— [6/14] 登记簿从这些报告
@@ -296,8 +270,8 @@ echo "▶ [6/14] assert gate files (逐个点名;整包地板抓不到单个闸�
 # `#1153`:三档结局(与 [2/14]/[9/14]/[10/14] 同形):0 全部适用行已验证 / 1 真失守拦住 /
 # 2 门绿但有条件行的保证本次未验证:平台不适用或签名发布宿主未显式启用时,
 # 自报 0 条,登记簿验证与条件相符。darwin 未开签名开关也会到第 2 档。
-# 判定读 [5/14] 的 junit 报告(--from-reports),不再逐个重跑;本次层范围外(PR 门的 scenario 层)的登记文件不判。
-bash scripts/assert-gate-files.sh --from-reports "$GATE_REPORT_DIR"
+# 判定读 [5/14] 的 junit 报告(--from-reports);PR 只判选中文件,--full 判全部登记。
+CODEPUPPY_TEST_FILES="$test_files" bash scripts/assert-gate-files.sh --from-reports "$GATE_REPORT_DIR"
 gate_files_rc=$?
 case "$gate_files_rc" in
 0) echo "    ✓ gate files" ;;

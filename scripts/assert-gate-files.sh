@@ -36,11 +36,11 @@ usage() {
 
 --from-reports <目录>
            不再逐个重跑:从 bin/check 第 [5/14] 步写下的 junit 报告(`<step>.<layer>.xml`,见
-           scripts/test-layers.sh)读每个登记文件的条数,判定与逐个重跑相同 —— 文件不在报告里 = 没跑到 = 红;
+           .gate-tests)读每个登记文件的条数,判定与逐个重跑相同 —— 文件不在报告里 = 没跑到 = 红;
            pass 条数与登记精确相等;条件行要求自报 0 条。门用这一档,于是每个测试文件每次门只跑一次。
 
-层范围:环境变量 CODEPUPPY_TEST_LAYERS(空格分隔,缺省三层全判)之外那几层的登记文件本次不判,逐行写明
-           (PR 门只跑 fast + integration,scenario 层的登记文件由 `bin/check --full` 判)。
+PR 范围:CODEPUPPY_TEST_FILES 指向共享工具写出的仓库相对路径清单;只判选中的登记文件。
+           未设置时(手动检查、--update、bin/check --full)判全部登记。
 
 --update   从实测**自动写回**登记簿:逐条跑,全部绿之后把每行的登记条数改成实测值
            (all-or-nothing:任何一条测试失败就一条都不写回)。幂等 —— 登记与实测
@@ -82,10 +82,12 @@ case "${1:-}" in
 esac
 [ "$#" -eq 0 ] || { echo "::error::多余参数:$*" >&2; usage >&2; exit 2; }
 
-# shellcheck source=scripts/test-layers.sh
-source "$ROOT/scripts/test-layers.sh"
-SCOPE_LAYERS=" ${CODEPUPPY_TEST_LAYERS:-${TEST_LAYERS[*]}} "
 out_of_scope=0
+registered=0
+if [ -n "${CODEPUPPY_TEST_FILES:-}" ] && [ ! -f "$CODEPUPPY_TEST_FILES" ]; then
+  echo "::error::selected test list missing:$CODEPUPPY_TEST_FILES" >&2
+  exit 1
+fi
 
 [ -f "$MANIFEST" ] || { echo "::error::闸门登记簿缺失:$MANIFEST"; exit 1; }
 
@@ -236,14 +238,12 @@ while IFS=$'\t' read -r floor workdir path delegates guarantee || [ -n "${floor:
       ;;
   esac
 
-  row_layer="$(test_layer "$path" 2>&1)" || { echo "::error::$workdir/$path:$row_layer"; failed=1; continue; }
-  case "$SCOPE_LAYERS" in
-    *" $row_layer "*) ;;
-    *)
-      echo "── 本次范围外:$workdir/$path($row_layer 层;范围 =${SCOPE_LAYERS% }),由 bin/check --full 判"
-      out_of_scope=$((out_of_scope + 1))
-      continue ;;
-  esac
+  registered=$((registered + 1))
+  if [ -n "${CODEPUPPY_TEST_FILES:-}" ] && ! grep -Fqx "$workdir/$path" "$CODEPUPPY_TEST_FILES"; then
+    echo "── 本次范围外:$workdir/$path(未被 affected-tests 选中)"
+    out_of_scope=$((out_of_scope + 1))
+    continue
+  fi
 
   checked=$((checked + 1))
 
@@ -307,10 +307,10 @@ done < "$MANIFEST"
 
 # 空登记簿 / 解析全挂 = 本脚本自己变成空闸门。显式判红。
 if [ "$out_of_scope" -gt 0 ]; then
-  echo "── $out_of_scope 个登记文件在本次层范围之外(见上),本次不判"
+  echo "── $out_of_scope 个登记文件在本次选择范围之外(见上),本次不判"
 fi
-if [ "$checked" -lt 25 ]; then
-  echo "::error::只检查了 $checked 个闸门文件(至少应有 25 个)——登记簿被清空或解析失败"
+if [ "$registered" -lt 25 ]; then
+  echo "::error::只登记了 $registered 个闸门文件(至少应有 25 个)——登记簿被清空或解析失败"
   exit 1
 fi
 

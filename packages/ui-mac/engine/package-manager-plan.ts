@@ -145,7 +145,7 @@ export function packageManagerExecutionSource(input: {
     // Attach the pipe to a shell group before copying it: zsh attaches a command's pipe after its redirects.
     const stdin = `${writer} | { ${helper} 9<&0 0<&8 8<&-; }`
     const closed = `${writer} | { ${helper} 9<&0 0<&- 8<&-; }`
-    const leaf = `${node.wrapper ? node.wrapper + " " : ""}{ if true 2>/dev/null 8<&0; then { ${stdin}; } 8<&0; else ${closed}; fi;${node.exec ? ' exit "$?";' : ""} } ${node.redirects.map((redir) => input.command.slice(redir.start, redir.end)).join(" ")}`
+    const leaf = `${node.wrapper ? node.wrapper + " " : ""}{ if { true 8<&0; } 2>/dev/null; then { ${stdin}; } 8<&0; else ${closed}; fi;${node.exec ? ' exit "$?";' : ""} } ${node.redirects.map((redir) => input.command.slice(redir.start, redir.end)).join(" ")}`
     return source.slice(0, node.leafStart) + leaf + source.slice(node.leafEnd)
   }, input.command)
   return prelude + source

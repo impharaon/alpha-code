@@ -158,3 +158,38 @@ try:replace(source,'missing anchor','unguarded_save()')
 except AssertionError as error:assert 'adaptation anchor' in str(error)
 else:raise AssertionError('missing source adaptation was silently ignored')
 `))
+
+for (const mode of ["permissions", "termination"] as const) test(`cache replacement preserves source permissions and cleans its temporary file on ${mode}`, () => run(`
+import os,subprocess,sys,textwrap
+from shutil import copyfile
+original=Path(${JSON.stringify(join(import.meta.dir, "fixtures/office-excel/cache-original.xlsx"))})
+calculated=Path(${JSON.stringify(join(import.meta.dir, "fixtures/office-excel/cache-calculated.xlsx"))})
+copyfile(original,path);path.chmod(0o640)
+# The LO execution boundary is controlled; the package and calculated caches are the real LO fixtures.
+code="""
+import importlib,os,signal,sys
+from pathlib import Path
+from shutil import copyfile
+module=importlib.import_module('codepuppy_office.recalculate')
+path=Path(sys.argv[1]);root=path.parent
+seed=root/'seed';(seed/'user/basic/Standard').mkdir(parents=True)
+(seed/'user/basic/Standard/Module1.xba').write_text('controlled execution boundary')
+projection={'runtime':{'phase':'ready','executable':'unused'},'jobs':{'root':str(root),'profileSeed':str(seed),'fontconfigTemplate':None,'timeoutMs':180000}}
+module.read_projection=lambda expected=None:(projection,())
+module.sys.platform='win32' # No fontconfig is needed by this controlled executor.
+module.run=lambda command,*args:copyfile(sys.argv[2],command[-1]) if command[-1]!='--terminate_after_init' else None
+if sys.argv[3]=='termination':
+ def interrupt(source,destination):os.kill(os.getpid(),signal.SIGTERM)
+ module.os.replace=interrupt
+result=module.recalculate(str(path))
+assert result['status']=='recalculated',result
+"""
+result=subprocess.run([sys.executable,'-I','-B','-c',textwrap.dedent(code),str(path),str(calculated),${JSON.stringify(mode)}],capture_output=True,text=True)
+assert not list(path.parent.glob('.~recalculate-*.tmp')),'cache temporary file survived termination'
+if ${JSON.stringify(mode)}=='permissions':
+ assert result.returncode==0,result.stderr
+ assert path.stat().st_mode & 0o777==0o640,oct(path.stat().st_mode)
+else:
+ assert result.returncode!=0
+ assert path.read_bytes()==original.read_bytes(),'termination replaced the source'
+`))

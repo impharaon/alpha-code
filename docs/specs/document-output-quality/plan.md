@@ -644,3 +644,5 @@ B5 green：两侧 realpath 后，原公式错误/摘要负对照保留，documen
 B6 red：一次真实 generator 入口探针克隆固定 2.3.2 wheel，仅将 workspace 的 temp_path.replace 调用作受控 source drift；在 /tmp 脚本副本内覆盖该变体 hash 以单测适配层，生产 hash 守卫未动。当前生成器仍输出 161 文件、静默漏 save guard，独立断言 exit 1（B6-entry-red.log）。新增原 Excel 文件的最小 patch-guard 用例，下一提交每个 text.replace 都验证唯一 anchor，并在 sources.json 明记 scan.py 的局部 xmlns 适配。
 
 B6 green：真实 generator 重生 161 份源，Python 结果字节未变，sources.json 补 scan xmlns 适配出处；缺锚点的真实入口拒绝，office-excel 文件 13 PASS（B6-green.log）。全部 save/digest 适配以唯一 anchor 为前提，不再静默省略。
+
+B7 cache red：原 office-excel 文件两个原生 Python 子进程用例，以真实原稿/LO 缓存 fixture、受控执行边界验证原子写入。修正子脚本缩进后真实 red 为权限 0640→0600 以及 SIGTERM 留下临时文件（B7-cache-red.log，2 FAIL），不是以子进程语法错误充当证据。下一提交只保护缓存 commit 的权限与终止清理。

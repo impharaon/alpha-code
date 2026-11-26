@@ -278,13 +278,14 @@ test("video cancellation leaves another subscriber running and cancels the last 
     const r = JSON.parse(
       await readFile(path.join(root, "cloud", (await readdir(path.join(root, "cloud")))[0]!), "utf8"),
     )
-    if (r.cancelled) break
+    if (r.result || r.attempts[0]?.state === "cancelled") break
     await Bun.sleep(1)
   }
   expect((await service.query(second.requestId, other)).state.error).toBe("cancelled")
   const record = JSON.parse(
     await readFile(path.join(root, "cloud", (await readdir(path.join(root, "cloud")))[0]!), "utf8"),
   )
+  expect(record.attempts[0].state).toBe("cancelled")
   expect(record.result).toBeUndefined()
 })
 test("video main admission rejects changed media and escaping symlinks before upload", async () => {
@@ -348,7 +349,8 @@ test("video disconnection continues the original admission and cancellation reso
   for (let i = 0; i < 100; i++) {
     const record = JSON.parse(await readFile(file, "utf8"))
     if (record.attempts[0].state === "cancelled") {
-      expect(record.result).toBeUndefined()
+      expect(record.attempts[0].state).toBe("cancelled")
+  expect(record.result).toBeUndefined()
       return
     }
     await Bun.sleep(1)

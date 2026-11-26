@@ -440,3 +440,46 @@ r8 已完成组件与必要偏离：按 §4.10 追加 `main/document-python.ts`�
 保存前新增直接接线回归：真实 `Plugin.Context.location` 是 `Location.Info`（`packages/plugin/src/promise/plugin.ts:29`、`packages/schema/src/location.ts:19-25`），含 project；文件契约是 Location.Ref。当前 writer 直接序列化 Info 会被 Python 的严格投影 schema 拒绝。既有 `Python projection...` 用例补真实形状及 Ref-only 断言，target 命令 exit 1，`location-ref-red.log`。先提交该正确断言，再仅在 main 写文件时投影 directory/workspaceID；不修改仍待处置的缓存错误断言。
 
 Location.Ref 回归 green：相同新断言未改，main 文件现在只写 directory/workspaceID；`bun test src/main/document-runtime.test.ts` 11 PASS，`bun typecheck` exit 0，日志 `location-ref-green.log`、`ui-types-location-ref.log`。该修正不影响其余用例计数，仍为 282 PASS/1 个待处置错误码断言 FAIL。
+
+r9 裁定续接：调度方 Claude Opus 5.5 明确授权只修实际缓存测试的错误值。`fd16895522` 将预期改为 fixture 实际的 #NAME? 并注明来源，其余断言不变。`cd packages/ui-mac && bun test src/main/office-excel.test.ts` 为 **9 PASS / 0 FAIL**（`/tmp/alpha-1761-r9/excel-green.log`）；移除 cache.merge 返回的 errors 为 [] 后，命名实物用例 exit 1（`assertion-removal.log`），源码恢复后整文件绿。故片 5 既有最终集合合计 **283 PASS / 0 FAIL**（仅本文件重跑，其余沿 r8 证据），不据此冒称尚未完成的真实完整 LO 原子提交旅程、Windows 或默认模型 AC 已通过。
+
+## 切片六：逐页自检、一轮修正与就绪补查
+
+- 依据：[spec v1](spec.md) @ `31cd182e09`，AC-05、06、09、10、13 的本片部分；[design](design.md) @ `7ef8b89b30` §4.5/4.8、R7/R8 及 §10；消费片 4/5 与既有 Read/云识图和 session.synthetic。文档影响为实施证据，仅更新本 canonical plan，不修改冻结设计、受保护规则或其它规格。
+- 核对：r9 `Phase: IMPLEMENT` 授权先追加本节并在无未决设计问题时同轮实施；Codex / GPT-6 自核现有 API 与冻结契约，不冒称调度方对本节另有审查。当前未见未决设计问题；#1760 生产 composition 仍为既有集成依赖。
+
+### 改动
+
+| 文件 | 改什么 |
+| --- | --- |
+| `packages/ui-mac/src/shared/document-check-records.ts`（新增） | 工作区已有 checkId 的归属、revision、receipt 与报告读写/原子落盘的内部权威；ext/main 共用，不新建公共协议或队列 |
+| `packages/ext/src/document-check.ts/.test.ts`（新增）及既有 `document-render.ts/.test.ts`、`document-tool.ts/.test.ts`、`document-register.ts` | 检查当前回执/源/页摘要、全页覆盖和实际视觉结果，诚实降为 partial；固化同任务 revision、恢复既有身份、限制第二轮改稿；Location 订阅 ready，用原 notificationID 调现有 synthetic |
+| `packages/ext/src/cloud-vision-hooks.ts`、`plugin.ts` 及既有 `plugin-host.test.ts` | 从现有 Read 图片登记和原生/云转写结局记录页面摘要事实，沿同一缓存/压缩/凭据/拒绝路径；检查卡片使用现有 metadata/title，不加视图 |
+| `packages/ui-mac/src/main/document-checks.ts`（新增）及既有 `document-host.ts/.test.ts`、`document-host-bridge.ts` | 原子保存 DeferredDocumentCheck、就绪/重新挂接重放 waiting/admitting、核 admission 身份、终结删除会话、存最终报告；不新增 Session 引擎或服务路由 |
+| `packages/ext/src/context-injection.ts` 及清点 snapshot（仅实际登记项改变时） | 同步工具已有说明中的逐页检查、一轮修正、pending 与补查指令；完整技能入口和 legacy writer 替换仍归片 7 |
+
+### 顺序
+
+1. 归档/检查组件及其既有渲染、工具文件用例：真实渲染 fixture 的页图/源/receipt 为输入；通过实际 Read `toModelContent` 形状验证 inspected 证据，缺图/过期摘要/视觉失败/页序不全不能完整盖章。检查与文件下载互不设闸。
+2. 主进程 deferred 原子存储、runtime ready 与桥重连重放；ext 直接委托本 Location 的 synthetic，验证 durable 回执的 ID/session/type/delivery/payload。逐个证明断线同 ID 重试、admitted 不再入队、Session 删除与文件变更/丢失。
+3. 完成 Location setup/cleanup 与现有工具标题接线；步末跑改变文件各一次。返回前按实际 imports、声明枚举/清点选 wider 一次，至少包括 document-render/tool、host/runtime/桥、plugin-host、util 文档契约、上下文清点；受影响包 `bun typecheck`。全流程只跑相关用例；容量/计时/默认模型旅程归片 8/nightly。
+
+### 风险
+
+- 看见图片的证据必须来自实际模型请求的 Read 图片/已成功转写；render、文本提取或仅路径登记均不够。记录哈希/路径并在报告时重核当前页，失败明确 partial；不另打视觉请求。
+- 内存登记不足以支持重启：归属/原稿/修后页图与 pending 均须落盘，再让同 ID 重放；旧桥未收到 admission 时不提前 admitted。新应用实例不声称退出期间在执行。
+- 用户修改文件和一轮修正的边界以源摘要核对；pending 恢复查当前文件并说明版本，不能用旧图覆盖盖章。文件/会话消失沿既有错误契约报告/终结，不自动重建会话。
+- #1760 的实际 main/ext composition、正式打包退出/围栏/网络、真模型发现/修正溢出、Windows 仍待其交付与片 8；组件模拟断线不替代这些实测。
+
+### 证明
+
+| AC | 测试/证据 | 层与运行时机 | 缺少行为为什么会失败 |
+| --- | --- | --- | --- |
+| AC-05 | document-check、document-render/tool：逐页成功/失败事实、过期图、原稿→唯一修正→复核、完整与 partial、报告 fixes/remaining 留存；真实溢出修复沿片 8 的真实需求 | 快速文件/钩子为 affected PR/nightly；实际模型旅程仅 scenario/nightly | 未读/失败仍 inspected、旧稿被盖章、允许第二轮改稿、丢修正/剩余问题会使断言失败；无模型实物不记整条 AC 绿 |
+| AC-06 | 既有实际 renderer receipt/页图由检查消费，检查对页序/摘要/源版本逐项核对 | 文件 integration affected PR/nightly；真实 LO 页数证明沿片 3/4/8 | 伪造页数、页摘要或旧源不能形成完整有效报告 |
+| AC-09、10 | document-host 及 ext check：pending 持久化、ready/重新注册 admission、重启同 ID、删除会话、文件更改/丢失、admitted 去重；现有桥传递 | 文件/桥 integration affected PR/nightly；干净安装/断网/退出正式包片 8 | 去原子持久化/同 ID/回执核对/重放/cleanup 任一使对应恢复或去重断言失败；文件 pending 仍可交付 |
+| AC-13 | 原生图片路径无额外网络、云视觉成功与失败沿原缓存，组件 fetch spy/既有视觉用例 | 现有钩子 integration affected PR/nightly；正式包出网记录片 8 | 原生路径偷发请求/重复绕缓存或把拒绝当成功会失败 |
+
+### 偏离记录
+
+暂无。开始核对 2026-11-26 10:27:51 UTC，包含 r9 单断言处置；本片局部执行预计约一小时（不含共享 slot/外部集成等待），如实际规模倍增按 brief 返回。所有新增测试 import 模块、fixture 使用字面路径，选取无需改 gate；当前基线缺 `.gate-tests` 的已知限制仅如实报告。

@@ -378,7 +378,7 @@ status.
 | `SPEC-stored-credentials-fence` | [specs/stored-credentials-fence/spec.md](specs/stored-credentials-fence/spec.md) | 被围栏的进程树读不到、拷不走、挪不走、改不了 Code Puppy 存在本机的凭据文件；引擎只从主进程交来的内存表取值；改写配置把凭据引到别处由 SPEC-engine-config-fence 关闭。 | approved |
 | `SPEC-cloud-job-desktop-notifications` | [specs/cloud-job-desktop-notifications/spec.md](specs/cloud-job-desktop-notifications/spec.md) | 用户能收到任务结果并在桌面设置里关闭通知。 | approved |
 | `PLAN-cloud-job-form-preflight` | [specs/cloud-job-form-preflight/plan.md](specs/cloud-job-form-preflight/plan.md) | alpha-code#1686 一段:拷入 AccountStatusV1、主进程只读预检 IPC、组件库卡片与名称 — 值列表(账户弹层改用)、两种发送框的预检区与按钮行右移 | active |
-| `DESIGN-connector-launchers` | [specs/connector-launchers/design.md](specs/connector-launchers/design.md) | 随包提供 uv 与官方 Node/npm，主进程校验固定文件，围栏内准备连接器环境；准备和握手分开计时，持久化可离线启动的入口，并统一失败原因与动作。 | frozen |
+| `DESIGN-connector-launchers` | [specs/connector-launchers/design.md](specs/connector-launchers/design.md) | 统一连接器启动器与固定文件准备；v2 接纳两平台文档 Node 读取及受管第一方 MCP 的运行期按 ID 准备，核验声明身份与逐调用进度归属。 | frozen |
 | `SPEC-connector-workspace-following` | [specs/connector-workspace-following/spec.md](specs/connector-workspace-following/spec.md) | 连接器跟随当前会话所在项目目录，保留历史条款、有效裁决和交付证据边界。 | approved |
 | `SPEC-context-injection-budgets` | [specs/context-injection-budgets/spec.md](specs/context-injection-budgets/spec.md) | 应用注入的对话内容有明确大小上限，保留历史条款、有效裁决和交付证据边界。 | approved |
 | `SPEC-conversation-overlays` | [specs/conversation-overlays/spec.md](specs/conversation-overlays/spec.md) | 统一对话浮层交互，并让用户批准工具时还能翻看时间线。 | approved |

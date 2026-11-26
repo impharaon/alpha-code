@@ -13,6 +13,13 @@ type FileIndex = { identity: string; sourceId: string }
 const identity = (value: Awaited<ReturnType<typeof sourceStat>>) => [value.dev, value.ino, value.size, value.mtimeNs, value.ctimeNs].join(":")
 const sourceStat = (file: string) => stat(file, { bigint: true })
 
+export async function updateSource(sourceId:string,runtime:VideoRuntime,change:(current:Source|undefined)=>Promise<Source>){
+  const current=await readJson<Source>(cachePath(runtime,"sources",`${sourceId}.json`))
+  const updated=await change(current)
+  await writeJson(cachePath(runtime,"sources",`${sourceId}.json`),updated)
+  return updated
+}
+
 export async function sourceOf(ref: MediaRef, runtime: VideoRuntime): Promise<Source> {
   if (ref.kind === "id") {
     if (!/^[a-f0-9]{64}$/.test(ref.id)) fail("source_missing", "This local media reference has not been opened.")
@@ -42,9 +49,11 @@ export async function sourceOf(ref: MediaRef, runtime: VideoRuntime): Promise<So
     const current = await sourceStat(canonical)
     if (identity(before) !== identity(after) || identity(after) !== identity(current)) fail("source_changed", "The source changed while it was being opened.")
     return withMediaLock(runtime, `source:${sourceId}`, async () => {
-      const existing = await readJson<Source>(cachePath(runtime, "sources", `${sourceId}.json`))
+      const source=await updateSource(sourceId,runtime,async existing=>{
       const source: Source = { ...existing, sourceId, path: canonical, name: path.basename(requested), bytes: Number(after.size), aliases: [...(existing?.aliases ?? []).filter((entry) => entry.path !== canonical), { path: canonical, identity: identity(after) }] }
-      await writeJson(cachePath(runtime, "sources", `${sourceId}.json`), source)
+      return source
+
+      })
       await writeJson(indexPath, { identity: identity(after), sourceId })
       return source
     })
@@ -75,8 +84,8 @@ export function probeInfo(raw: unknown): MediaInfo {
 export async function mediaInfo(source: Source, runtime: VideoRuntime) {
   if (source.info) return source.info
   return withMediaLock(runtime, `probe:${source.sourceId}`, async () => {
-    const saved = await readJson<Source>(cachePath(runtime, "sources", `${source.sourceId}.json`))
-    if (saved?.info) return saved.info
+    const completed=await updateSource(source.sourceId,runtime,async saved=>{
+    if (saved?.info) return saved
     const probe = await runtime.component("ffprobe")
     const file = await sourceFile(source)
     const result = await runComponent(probe.path, ["-v", "error", "-show_format", "-show_streams", "-of", "json", file], runtime).catch(async (error) => {
@@ -94,8 +103,9 @@ export async function mediaInfo(source: Source, runtime: VideoRuntime) {
     const info = probeInfo(JSON.parse(result.stdout))
     await verifySourceFile(source, file)
     source.info = info
-    await writeJson(cachePath(runtime, "sources", `${source.sourceId}.json`), { ...source, info })
-    return info
+    return {...(saved ?? source),info}
+    })
+    return completed.info!
   })
 }
 

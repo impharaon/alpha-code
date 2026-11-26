@@ -664,3 +664,5 @@ A1/A10 消费者同步：原 mac FileSet 用例消费 global+mac，真实 asar f
 最终 related 首轮 UI 272 PASS/6 FAIL，均为 release-source 旧临时包缺新配置直接依赖（Cannot find module src/main/document-resources）；本轮配置消费者同调用链，补列此既有测试文件。其六个 beforePack 原断言保留，只复制两份真实资源模块并把原“无条件放行的 win32”调用改为仍无关的 Linux；Windows 资产核对已有 A1/A10 的专用真实正反臂。其它 17 个文件已绿，不为它们重复全跑。
 
 计数工具范围缺口：依授权对四个实际变更条数的登记行创建临时 scoped view，执行原 bash scripts/assert-gate-files.sh --update；四个文件均绿（12/19/26/55），但脚本 :312 硬性要求至少 25 个文件，exit 1，all-or-nothing 未写回。finally 已恢复原登记簿全部字节。不扩跑 21 个无关文件，也不改冻结脚本/阈值；需要 gate 拥有者提供已有 scoped-update 入口或授权机械 count 同步。core 行另有禁止本轮跑的时序/容量用例（:265 等），新 trusted Python case 已具名通过，不假造全文件 25 PASS。
+
+release-source 消费者 green：保留六个 release/架构顺序断言，复制真实资源模块并用 Linux 代表不适用平台，原文件 14 PASS（release-consumer-green.log）；UI 其余 17 文件的 264 项此前均绿，当前 18 文件合计 278 项有独立通过证据，没有扩跑无关文件来凑 gate 最低数。UI typecheck 再次 exit 0（ui-mac-types-final.log）。

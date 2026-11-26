@@ -510,6 +510,26 @@
       "sha256": "96694b50dcfde13d56e40346ddaa552a9cd650290e9b933cecf83c1d82226960",
       "bytes": 22388338,
       "provenanceUrl": "https://github.com/astral-sh/python-build-standalone/releases/tag/20261124"
+    },
+    {
+      "id": "libreoffice/darwin-arm64/26.8.3",
+      "family": "libreoffice",
+      "target": "darwin-arm64",
+      "version": "26.8.3",
+      "originUrl": "https://github.com/impharaon/alpha-code/releases/download/v0.2.8/LibreOffice_26.8.3_MacOS_aarch64.dmg",
+      "bytes": 299927705,
+      "sha256": "de943203795e5057785f65515063e2db5eb60b0bb6d8e2534fec59e5cc5fb988",
+      "provenanceUrl": "https://download.documentfoundation.org/libreoffice/stable/26.8.3/mac/aarch64/LibreOffice_26.8.3_MacOS_aarch64.dmg"
+    },
+    {
+      "id": "libreoffice/win32-x64/26.8.3",
+      "family": "libreoffice",
+      "target": "win32-x64",
+      "version": "26.8.3",
+      "originUrl": "https://github.com/impharaon/alpha-code/releases/download/v0.2.8/LibreOffice_26.8.3_Win_x86-64.msi",
+      "bytes": 376311808,
+      "sha256": "0e6918c273eabbdbbd800ee0dacbbf130a14c13c2e4cec861b06dd59e015bf94",
+      "provenanceUrl": "https://download.documentfoundation.org/libreoffice/stable/26.8.3/win/x86_64/LibreOffice_26.8.3_Win_x86-64.msi"
     }
   ]
 }

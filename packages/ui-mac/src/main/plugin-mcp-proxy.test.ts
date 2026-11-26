@@ -111,3 +111,52 @@ test("explicit SSE registers its real POST endpoint for the same proxy generatio
     await new Promise<void>(resolve => endpoint.close(() => resolve()))
   }
 })
+
+// Moved from core's runtime file: the main proxy belongs in ui-mac's integration layer.
+test("plugin local MCP uses its private proxy for HTTP sessions and keeps proxy auth off the server", async () => {
+  const { resolve } = await import("node:path")
+  const sdk = await import(Bun.resolveSync("@modelcontextprotocol/server", resolve(import.meta.dir, "../../../core")))
+  const { McpConnection } = await import("../../../core/src/mcp/connection")
+  const { Environment } = await import("../../../core/src/environment/index")
+  const { hostEnvironmentLayer } = await import("../../../core/test/fixture/environment")
+  const { Effect } = await import("effect")
+  const server = new sdk.Server({ name: "codepuppy-remote", version: "1.0.0" }, { capabilities: { tools: {} } })
+  server.setRequestHandler("tools/list", async () => ({ tools: [{ name: "probe", inputSchema: { type: "object" as const, properties: {} } }] }) as never)
+  server.setRequestHandler("tools/call", async () => ({ content: [{ type: "text" as const, text: "probed" }] }))
+  const transport = new sdk.WebStandardStreamableHTTPServerTransport({ sessionIdGenerator: () => crypto.randomUUID(), enableJsonResponse: true })
+  await server.connect(transport)
+  const methods: string[] = []
+  const proxyHeaders: Array<string | null> = []
+  const endpoint = Bun.serve({ port: 0, hostname: "127.0.0.1", fetch(request) {
+    methods.push(request.method); proxyHeaders.push(request.headers.get("proxy-authorization"))
+    return transport.handleRequest(request)
+  } })
+  const url = `http://127.0.0.1:${endpoint.port}/mcp`
+  const proxy = await startEgressPolicyProxy({ log: () => {} })
+  const binding = proxy.bindPluginMcp({ packageId: "claude:rill", entryId: "mcp:rill-developer", generation: "gen-000001-abcdef", definitionDigest: ("sha256:" + "c".repeat(64)) as `sha256:${string}`, serverUrl: url })
+  publishPluginMcpProxies({ remote: [binding] })
+  const requests: unknown[] = []
+  const base: typeof fetch = Object.assign((input: Parameters<typeof fetch>[0], init?: Parameters<typeof fetch>[1]) => { requests.push(init); return fetch(input, init) }, fetch)
+  try {
+    await Effect.runPromise(Effect.gen(function* () {
+      const run = Effect.runForkWith(yield* Effect.context())
+      const connection = McpConnection.make({
+        name: "remote", config: { type: "remote", url, oauth: false }, directory: import.meta.dir,
+        environment: yield* Environment.Service, fetch: base, scope: yield* Effect.scope,
+        authProvider: Effect.succeed(undefined), elicitation: { create: () => Effect.die("unexpected elicitation"), complete: () => Effect.void },
+        lock: effect => effect, callbacks: effect => run(effect), fork: effect => run(effect),
+        events: { connecting: Effect.void, connected: Effect.void, settled: Effect.void, failed: failure => Effect.die(failure), closed: () => Effect.void, changed: () => Effect.void },
+      })
+      yield* connection.start
+      const client = connection.client
+      if (!client) throw Error("HTTP connection did not retain its client")
+      expect((yield* client.tools()).map(tool => tool.name)).toEqual(["probe"])
+      expect((yield* client.callTool({ name: "probe", args: {} })).content).toEqual([{ type: "text", text: "probed" }])
+      yield* connection.stop
+    }).pipe(Effect.provide(hostEnvironmentLayer), Effect.scoped))
+    expect(methods).toContain("POST"); expect(methods).toContain("GET"); expect(methods).toContain("DELETE")
+    expect(proxyHeaders.every(value => value === null)).toBe(true)
+    expect(requests.length).toBeGreaterThan(0)
+    expect(requests.every(request => (request as { proxy?: { headers: Record<string, string>; respectNoProxy: boolean } }).proxy?.headers["Proxy-Authorization"] === binding.proxyAuthorization && (request as { proxy: { respectNoProxy: boolean } }).proxy.respectNoProxy === false)).toBe(true)
+  } finally { publishPluginMcpProxies({}); await proxy.close(); await server.close(); await endpoint.stop(true) }
+})

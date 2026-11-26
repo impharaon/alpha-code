@@ -708,35 +708,6 @@ describe("#1645: a failure's remote text stays out of logs and the failed status
 })
 
 
-// The real SDK transport runs through main's real proxy. Removing the instance fetch binding loses
-// the per-request proxy options, even on a test host without a seatbelt fence.
-testEffect(Layer.empty).live("plugin local MCP uses its private proxy for HTTP sessions and keeps proxy auth off the server", () => Effect.gen(function* () {
-  const { startEgressPolicyProxy } = yield* Effect.promise(() => import("../../ui-mac/src/main/network-egress-proxy"))
-  const { publishPluginMcpProxies } = yield* Effect.promise(() => import("../../util/src/codepuppy-plugin-mcp"))
-  const { FetchHttpClient } = yield* Effect.promise(() => import("effect/http"))
-  const server = httpServer()
-  const proxy = yield* Effect.promise(() => startEgressPolicyProxy({ log: () => {} }))
-  yield* Effect.addFinalizer(() => Effect.promise(async () => { publishPluginMcpProxies({}); await proxy.close(); await server.stop() }))
-  const binding = proxy.bindPluginMcp({ packageId: "claude:rill", entryId: "mcp:rill-developer", generation: "gen-000001-abcdef", definitionDigest: ("sha256:" + "c".repeat(64)) as `sha256:${string}`, serverUrl: server.url })
-  publishPluginMcpProxies({ remote: [binding] })
-  const requests: unknown[] = []
-  const base: typeof fetch = Object.assign((input: Parameters<typeof fetch>[0], init?: Parameters<typeof fetch>[1]) => { requests.push(init); return fetch(input, init) }, fetch)
-  yield* Effect.gen(function* () {
-    const mcp = yield* Mcp.Service
-    yield* connected("remote")
-    expect((yield* mcp.tools()).map(tool => tool.name)).toEqual(["probe"])
-    expect((yield* mcp.callTool({ server: "remote", name: "probe", args: {} })).content).toEqual([{ type: "text", text: "probed" }])
-    yield* mcp.disconnect("remote")
-  }).pipe(Effect.provide(mcpLayer({ remote: new ConfigMCP.Remote({ type: "remote", url: server.url, oauth: false }) })), Effect.provideService(FetchHttpClient.Fetch, base))
-  expect(server.state.methods).toContain("POST")
-  expect(server.state.methods).toContain("GET")
-  expect(server.state.methods).toContain("DELETE")
-  expect(server.state.proxyHeaders.every(value => value === null)).toBe(true)
-  expect(requests.length).toBeGreaterThan(0)
-  expect(requests.every(request => (request as { proxy?: { headers: Record<string, string>; respectNoProxy: boolean } }).proxy?.headers["Proxy-Authorization"] === binding.proxyAuthorization && (request as { proxy: { respectNoProxy: boolean } }).proxy.respectNoProxy === false)).toBe(true)
-}))
-
-
 testEffect(Layer.empty).live("explicit SSE opens the declared GET URL and never probes HTTP codemode", () => Effect.gen(function* () {
   const { Schema } = yield* Effect.promise(() => import("effect"))
   const seen: Array<{ method: string; path: string; authorization: string | null }> = []

@@ -2122,3 +2122,25 @@ packageIt.live("package delegation asserts sourceless permission only for comman
     })
   } })
 })
+
+packageIt.live("package agent bodies keep dollar amounts and shell examples literal during delegation", () => packageJourney(Effect.gen(function* () {
+  const capture = yield* Effect.promise(() => captureStandardFixture("claude:feature-dev"))
+  const path = "agents/code-reviewer.md"
+  const source = new TextDecoder().decode(yield* Effect.promise(() => capture.readFile(path)))
+  const literal = "AGENT_PRICE=$1,250.00\nAGENT_SNIPPET=!`printf AGENT_SHOULD_REMAIN_SOURCE`"
+  const sample = yield* invocationSample("claude:feature-dev", { [path]: source + "\n" + literal + "\n" })
+  yield* invocationNativeServices
+  const ext = yield* activateExtUntilFinished
+  const agents = yield* Agent.Service
+  const name = sample.hostNames["agent:" + path]!
+  yield* ext.finish(agents.get(name as never).pipe(Effect.map(Boolean)))
+  const location = yield* Location.Service
+  const sessions = yield* Sessions.Service
+  const parent = yield* sessions.create({ location: { directory: location.directory }, title: "Literal agent", agent: "build", model: { providerID: "test", id: "picked" } } as never)
+  const llm = yield* TestLLM.Test
+  yield* llm.push(TestLLM.text("Reviewed source", "literal-agent"))
+  const snapshot = yield* (yield* Tool.Service).snapshot()
+  yield* snapshot.execute({ sessionID: parent.id, agent: "build" as never, messageID: "msg_agent_literal" as never, call: { type: "tool-call", name: "subagent", id: "call_agent_literal", input: { agent: name, description: "Review", prompt: "first second", background: false } } })
+  const requests = yield* llm.requests()
+  expect(JSON.stringify(requests)).toContain(JSON.stringify(literal).slice(1, -1))
+})))

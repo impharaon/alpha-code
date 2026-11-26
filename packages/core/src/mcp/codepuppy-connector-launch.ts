@@ -35,10 +35,12 @@ export function publishConnectorPreparation(input: { runtimeRoot: string; prepar
       entries: input.preparation.entries,
       required: input.preparation.required,
     }
-    yield* environment.files.write(temporary, new TextEncoder().encode(JSON.stringify(value))).pipe(
-      Effect.andThen(environment.files.move(temporary, file)),
-      Effect.ensuring(environment.files.remove(temporary).pipe(Effect.ignore)),
-    )
+    yield* environment.files
+      .write(temporary, new TextEncoder().encode(JSON.stringify(value)))
+      .pipe(
+        Effect.andThen(environment.files.move(temporary, file)),
+        Effect.ensuring(environment.files.remove(temporary).pipe(Effect.ignore)),
+      )
   }).pipe(Effect.mapError(launchFailure))
 }
 
@@ -51,18 +53,26 @@ export function readConnectorPreparation(input: {
   return Effect.gen(function* () {
     if (!path.isAbsolute(input.runtimeRoot) || !/^[a-f0-9]{64}$/.test(input.key)) return
     const environment = yield* Environment.Service
-    const source = yield* environment.files.read(path.join(input.runtimeRoot, "prepared", input.key, "ready.json")).pipe(
-      Effect.map((result) => new TextDecoder().decode(result.bytes)),
-      Effect.catchTag("Environment.NotFound", () => Effect.succeed(undefined)),
-      Effect.catchTag("Environment.WrongKind", () => Effect.succeed(undefined)),
-    )
+    const source = yield* environment.files
+      .read(path.join(input.runtimeRoot, "prepared", input.key, "ready.json"))
+      .pipe(
+        Effect.map((result) => new TextDecoder().decode(result.bytes)),
+        Effect.catchTag("Environment.NotFound", () => Effect.succeed(undefined)),
+        Effect.catchTag("Environment.WrongKind", () => Effect.succeed(undefined)),
+      )
     if (source === undefined) return
     const decoded = Schema.decodeUnknownOption(Schema.fromJsonString(Preparation))(source)
     if (Option.isNone(decoded)) return
     const value = decoded.value
     if (value.key !== input.key || value.runner !== input.runner) return
     if (!(yield* preparationExists(environment.files, input.runtimeRoot, value))) return
-    return { key: value.key, runner: value.runner, packages: value.packages, entries: value.entries, required: value.required }
+    return {
+      key: value.key,
+      runner: value.runner,
+      packages: value.packages,
+      entries: value.entries,
+      required: value.required,
+    }
   }).pipe(Effect.mapError(launchFailure))
 }
 
@@ -73,7 +83,12 @@ function preparationExists(files: Environment.Files, runtimeRoot: string, value:
     const required = [...new Set([...value.required, ...Object.values(value.entries)])]
     for (const file of required) {
       const relative = path.relative(prefix, file)
-      if (!path.isAbsolute(file) || relative === ".." || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative))
+      if (
+        !path.isAbsolute(file) ||
+        relative === ".." ||
+        relative.startsWith(`..${path.sep}`) ||
+        path.isAbsolute(relative)
+      )
         return false
       const kind = yield* Environment.typeFollowing(files, file).pipe(
         Effect.catchTag("Environment.NotFound", () => Effect.succeed(undefined)),
@@ -147,7 +162,5 @@ export function installConnectorPython(input: {
       { concurrency: "unbounded" },
     )
     return { exitCode, stdout: new TextDecoder().decode(stdout), stderr: new TextDecoder().decode(stderr) }
-  }).pipe(
-    Effect.mapError(launchFailure),
-  )
+  }).pipe(Effect.mapError(launchFailure))
 }

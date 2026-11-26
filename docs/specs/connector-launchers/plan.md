@@ -371,3 +371,9 @@ r4 v2 client 子链：新增 `packages/core/src/mcp/codepuppy-pinned-files.ts`�
 `bun test test/codepuppy-mcp-runtime.test.ts -t 'managed pinned|refuted managed|production MCP client registers pinned'` → 5 PASS / 27 assertions（`/tmp/connector-r4-pinned-client.log`）：实际双 SDK peers；完整组 ids 验完才调宿主、去重、当前 token/deadline、并发调用归属、撤销/原调用取消/晚到进度，以及生产 McpClient 的真实 handler 与 Host 端口；握手/列工具期间宿主调用为 0。core/util/ui-mac typecheck exit 0。该文件包含既有真引擎/时序用例，本轮只跑命名新增例和最终相关轻用例，不运行其整文件时序组（brief 禁止）。
 
 接线界限：managedFirstParty 构造上下文是已冻结 binding/declaration 的内部数据轴，并非用户选项；当前还没有从生产 attempt controller 给 McpConnection 传入，main prepareFiles/entryFor 重验与配方展开也未落，因此以上不能作为视频整链完成。#1759 R1/R2 清单仍沿 r3 表，不复制其位置/绑定。
+
+r4 诊断 producer：新增 `packages/core/src/mcp/codepuppy-connector-diagnostic.ts`，必要的独立域函数 observeConnectorLaunch 取得当前 Location 的 files/spawner，返回仅该 attempt 的执行面与阶段/诊断读取。真实句柄的 stdin/stdout/kill/unref/附加 fd 保留；后台观察真实 exit/signal，stderr 在跨块遮密后才同时进入完整诊断和 stdio，未用尾部/300 字符摘要。无工具启动时 exitCode=null；日志替换为遮密 argv，抑制底层同次 spawn 的原 argv 行，平台错误保持 tag/分类。诊断文件按 attempt 编码在 runtimeRoot/diagnostics 内派生，业务环境不落盘；root/controller 仍待接入。
+
+`bun test test/codepuppy-connector-launch.test.ts` → 13 PASS / 68 assertions（完整输出 `/tmp/connector-r4-launch-final.log`）；`bun typecheck` → exit 0，2060 files / 2 projects。真实进程逐字节拆 stderr，跨换行已知密钥、Authorization、URL 凭据/签名均遮蔽，6KB+ 原文不丢，stdout 未收集进诊断；exit 23、SIGTERM、未 spawn 的 null、管道错误下未换行片段均有证据。实际 McpClient→未修改 McpStdio→装饰后的 Location spawner 证明完整崩溃仍在、stdio 所读字节已遮蔽；连接成功后终止的真实 MCP 子进程仍取得 running/SIGTERM。
+
+测试修正事实：stdio.ts:101 的独立 Effect.runPromise 只携带 Scope，调用方 Logger 无法捕获其 debug 行，不能把空 capture 当“不泄漏”。两种 logger 注入均不改变此事实；未修改 stdio。最终在其实际句柄读取边界完整比对 masked bytes，并独立核验可捕获的 spawn/client 日志；不声称捕获了该独立执行体的全部 logger。此处是当前原始 stdio 的上下文限制，不作为本票去修改它的授权。

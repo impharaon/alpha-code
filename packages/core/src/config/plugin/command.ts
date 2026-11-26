@@ -6,6 +6,7 @@ import type { Entry } from "@opencode/schema/config"
 import { ConfigCommand } from "@opencode/schema/config/command"
 import { AppProcess } from "@opencode/util/process"
 import path from "path"
+import { randomUUID } from "node:crypto"
 import { Effect, FiberSet, Option, Schema } from "effect"
 import { ChildProcess } from "effect/process"
 import { Agent } from "../../agent.js"
@@ -264,39 +265,12 @@ function evaluateTemplate(
       hasArguments = true
       return args[named] ?? ""
     }
-    const renderNode = (node: TemplateNode) => {
-      let quote = ""
-      let escaped = false
-      const value = (text: string) => node.kind !== "shell" ? text : quote === "'" ? text.replaceAll("'", "'\\''") : quote === '"' ? text.replace(/[\\"$`]/g, character => "\\" + character) : "'" + text.replaceAll("'", "'\\''") + "'"
-      return node.parts.map(part => {
-        if ("boundValue" in part) return value(part.boundValue)
-        const pattern = input.syntax === "claude" ? /\$(?:ARGUMENTS(?:\[\d+\])?|\d+|[A-Za-z_][A-Za-z_0-9]*)/g : /\$(?:ARGUMENTS|[1-9]\d*)/g
-        let end = 0
-        let rendered = ""
-        const source = (text: string) => {
-          if (node.kind === "shell") for (const character of text) {
-            if (escaped) { escaped = false; continue }
-            if (character === "\\" && quote !== "'") { escaped = true; continue }
-            if (quote) { if (character === quote) quote = ""; continue }
-            if (character === "'" || character === '"') quote = character
-          }
-          return text
-        }
-        for (const match of part.source.matchAll(pattern)) {
-          rendered += source(part.source.slice(end, match.index))
-          const argument = parameter(match[0], node.kind)
-          rendered += argument === undefined ? source(match[0]) : Array.isArray(argument) ? argument.map(value).join(" ") : value(argument)
-          end = match.index + match[0].length
-        }
-        return rendered + source(part.source.slice(end))
-      }).join("")
-    }
-    const rendered = nodes.map(node => ({ kind: node.kind, delimiter: node.delimiter, text: renderNode(node) }))
+    const rendered = nodes.map(node => ({ kind: node.kind, delimiter: node.delimiter, ...bindTemplateNode(gated ? { ...node, kind: "text" } : node, input.syntax, parameter) }))
     const shell = rendered.some(node => node.kind === "shell") && !gated ? yield* services.shell.resolve({ priority: "config" }) : undefined
     const outputs = yield* Effect.forEach(rendered, node => {
       if (node.kind !== "shell") return Effect.succeed(node.text)
       if (!shell) return Effect.succeed(node.delimiter === "```" ? "```!" + node.text + "```" : "!`" + node.text + "`")
-      return services.processes.run(ChildProcess.make(shell, ShellSelect.args(shell, node.text), { cwd: input.cwd, stdin: "ignore" }), { combineOutput: true }).pipe(
+      return services.processes.run(ChildProcess.make(shell, ShellSelect.args(shell, node.text), { cwd: input.cwd, stdin: "ignore", env: node.env }), { combineOutput: true }).pipe(
         Effect.map(result => (result.output ?? Buffer.concat([result.stdout, result.stderr])).toString("utf8")),
         Effect.mapError(error => new Error("Shell interpolation failed: " + error.message)),
       )
@@ -305,6 +279,68 @@ function evaluateTemplate(
     if (hasArguments || !input.rawArguments.trim()) return text
     return text + "\n\n" + (input.syntax === "opencode" ? input.rawArguments : "ARGUMENTS: " + input.rawArguments)
   })
+}
+
+function bindTemplateNode(node: TemplateNode, syntax: PreparedInstruction["syntax"], parameter: (token: string, kind: TemplateNode["kind"]) => string | string[] | undefined) {
+  const env: Record<string, string> = {}
+  const prefix = "CODEPUPPY_PACKAGE_" + randomUUID().replaceAll("-", "") + "_"
+  const quotes = [""]
+  const pending: { delimiter: string; tabs: boolean }[] = []
+  let heredoc: { delimiter: string; tabs: boolean } | undefined
+  let line = ""
+  let escaped = false
+  const source = (text: string) => {
+    if (node.kind !== "shell") return text
+    for (let index = 0; index < text.length; index++) {
+      const character = text[index]!
+      if (heredoc) {
+        if (character !== "\n") { line += character; continue }
+        if ((heredoc.tabs ? line.replace(/^\t+/, "") : line) === heredoc.delimiter) heredoc = pending.shift()
+        line = ""
+        continue
+      }
+      const quote = quotes.at(-1)!
+      if (escaped) { escaped = false; continue }
+      if (character === "\\" && quote !== "'") { escaped = true; continue }
+      if (quote !== "'" && text.slice(index, index + 2) === "$(") { quotes.push(""); index++; continue }
+      if (quote) { if (character === quote) quotes[quotes.length - 1] = ""; continue }
+      if (character === "'") { quotes[quotes.length - 1] = character; continue }
+      if (character === '"') { quotes[quotes.length - 1] = character; continue }
+      if (character === "(") { quotes.push(""); continue }
+      if (character === ")" && quotes.length > 1) { quotes.pop(); continue }
+      const redirect = text.slice(index).match(/^<<(-?)(?!<)[ \t]*(?:'([^']+)'|"([^"]+)"|([^\s;&|<>]+))/)
+      if (redirect) {
+        pending.push({ delimiter: redirect[2] ?? redirect[3] ?? redirect[4]!, tabs: redirect[1] === "-" })
+        index += redirect[0].length - 1
+        continue
+      }
+      if (character === "\n" && pending.length) heredoc = pending.shift()
+    }
+    return text
+  }
+  const value = (text: string) => {
+    if (node.kind !== "shell") return text
+    const name = prefix + Object.keys(env).length
+    env[name] = text
+    const reference = "${" + name + "}"
+    if (heredoc || quotes.at(-1) === '"') return reference
+    return quotes.at(-1) === "'" ? "'\"" + reference + "\"'" : '"' + reference + '"'
+  }
+  const text = node.parts.map(part => {
+    if ("boundValue" in part) return value(part.boundValue)
+    const pattern = syntax === "claude" ? /\$(?:ARGUMENTS(?:\[\d+\])?|\d+|[A-Za-z_][A-Za-z_0-9]*)/g : /\$(?:ARGUMENTS|[1-9]\d*)/g
+    let end = 0
+    let rendered = ""
+    for (const match of part.source.matchAll(pattern)) {
+      rendered += source(part.source.slice(end, match.index))
+      const argument = parameter(match[0], node.kind)
+      const quote = quotes.at(-1)!
+      rendered += argument === undefined ? source(match[0]) : Array.isArray(argument) ? argument.map(value).join(heredoc || !quote ? " " : quote + " " + quote) : value(argument)
+      end = match.index + match[0].length
+    }
+    return rendered + source(part.source.slice(end))
+  }).join("")
+  return { text, env }
 }
 
 function parseArguments(input: string, syntax: PreparedInstruction["syntax"]) {

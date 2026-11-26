@@ -1067,3 +1067,24 @@ describe("#773 —— 坏账本:三条 V3 只读路径给出一致的、可观�
     expect(readPackageLedgerStateV1(root).ok).toBe(true)
   })
 })
+
+test("a bundle-only package projects enabled disabled and project-enabled root membership", () => {
+  const input = upsertInput({ kind: "bundle", id: "bundle:hooks", name: "hooks", configKey: undefined })
+  const node = { componentId: input.id, kind: input.kind, name: input.name, required: true, manifestDigest: DIGEST_A }
+  const graph: PackageGraphV1 = { packageId: "local:hooks", envelopeDigest: DIGEST_A, installedGraphDigest: "", root: node, children: [], pluginTree: { treeDigest: DIGEST_A, storeKey: "bundle--hooks" } }
+  graph.installedGraphDigest = computeInstalledGraphDigest(graph)
+  expect(applyPackageMutation(root, { operation: "install", transactionId: "hooks-seed", graphBeforeDigest: null, graphAfter: graph, claimMutations: [{ op: "acquire", kind: "bundle", name: "hooks", owner: bundleOwner(graph.packageId, DIGEST_A) }], childRecordMutations: [{ op: "upsert", input }] }).ok).toBe(true)
+  const projection = () => JSON.parse(fs.readFileSync(skillsEnabledPath(root), "utf8"))
+  expect(projection()).toEqual({ v: 3, keys: ["bundle--hooks"], scoped: [], mcp: [] })
+  expect(setDesiredStateV2(root, "bundle", "hooks", "disabled").ok).toBe(true)
+  expect(projection()).toEqual({ v: 3, keys: [], scoped: [], mcp: [] })
+  const directory = path.join(root, "hooks-project")
+  fs.mkdirSync(directory)
+  const scope = projectScopeIdentity(directory)
+  if (!scope.ok) throw Error(scope.reason)
+  const scoped = { ...graph, effect: scope.scope }
+  scoped.installedGraphDigest = computeInstalledGraphDigest(scoped)
+  expect(applyPackageMutation(root, { operation: "update", transactionId: "hooks-project", graphBeforeDigest: graph.installedGraphDigest, graphAfter: scoped, claimMutations: [], childRecordMutations: [] }).ok).toBe(true)
+  expect(setDesiredStateV2(root, "bundle", "hooks", "enabled").ok).toBe(true)
+  expect(projection()).toEqual({ v: 3, keys: [], scoped: [{ kind: "bundle", name: "hooks", projectPath: scope.scope.projectPath }], mcp: [] })
+})

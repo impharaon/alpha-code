@@ -92,7 +92,7 @@ users:
     extras:
     - --region
     - *region
-` 
+`
   const values = strings(credentialValues(file("kube", "assignments"), Buffer.from(document)))
   expect(values).toContain("fixture-aliased-token")
   expect(values).not.toContain("us-east-1")

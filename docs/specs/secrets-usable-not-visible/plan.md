@@ -559,3 +559,25 @@ r8 开始于 2026-11-26 10:41:43 UTC。直达 `.cases.ts` 命令增加 `./`（�
 - 10（retention）：红提交 `ce43591321`，替换 encrypted-store 后旧字节仍保留（1 FAIL）；按路径只保留最新不透明字节，替换/释放时旧数组置零，普通 env 凭据仍保留旧值；发布稳定的值快照供 matcher 缓存。完整 secret-files.test.ts exit 0 / 9 PASS，含相同快照引用、旧字节清零及 env retained union；日志 `/tmp/secrets-r9-10b-{red,green}.log`。
 - 10（stream）：红提交 `d36f984fe2`，单 flush 内完整 ANSI 序列仍尝试建 spool，存储父目录不存在时 ENOENT（1 FAIL）。修复仅在未决 escape 跨 flush 时落密文；同 flush 在当前缓冲处理，跨帧仍逐帧释放。原 stream 文件完整 exit 0 / 5 PASS / 63 expect。compiled patterns 按稳定快照身份缓存；一次性真实源码计数探针 `bun /tmp/secrets-r9-patterns.ts` exit 0：相同快照三次 push 编译 before=3 / after=1，新快照 after=2 且新 token 仍遮盖。探针只在临时源码副本中给真实 TextDecoder 加局部计数，无产品开关/计时/容量测量，材料 `/tmp/secrets-r9-patterns.log` 与日志所列临时目录。
 - 7 保留原能力的补充红提交 `9713c6f9b3`：紧凑的单行占位输入 replaceAll 漏掉真实多行值（1 FAIL）。匹配器按输入真实布局（line-slots / assignments，私有 typed domain 参数）选原样行槽或紧凑视图；不把完整视图作为写回新前置条件。完整 secret-mutations.test.ts exit 0 / 9 PASS；日志 `/tmp/secrets-r9-07b-{red,green}.log`。
+
+### r9 提交与最终检查
+
+| 发现 | 红例提交 → 修复提交 | 当前证据 |
+| --- | --- | --- |
+| 1 | 1864e5340d → 08d107f9d5 | 现实 Node HOME 21 次越界调用 → 0；collector 文件当前 9 PASS |
+| 2 | 2c662eddfc → 5f6463aaf3 | EKS/YAML 与现实 HOME 2 FAIL → 10 PASS（当步两个文件） |
+| 3 | 无代码提交 | Chrome open=true / 指定数据库不存在；前提未确认，条件修复跳过，不宣称浏览器无锁 |
+| 4 | 968e933753 → 6c40108655 | Node dot-directory captured=false → true；当步 7 PASS |
+| 5 | 83ba7fce31 → 70f0330dcd；893faae19c → 254349ed50 | 低层原因及原型红→绿；真实 unattended AC-04 始终 1 FAIL，仍为 PARTIAL |
+| 6 | b53da325de → 3baef53c9b | refresh generation 红→绿；当步 8 PASS |
+| 7 | c44708d4be → 001bec377c；9713c6f9b3 → fe63a79129 | 三 writer 行槽与紧凑 replaceAll 红→绿；当前 9 PASS |
+| 8 | 2f9fc32b7e → abc8df17d5 | 根目录 notice 红→绿；Schema 7 PASS |
+| 9 | 88f46840d3 → a467c695bb | 多行片段泄露红→绿；values/mask 15 PASS |
+| 10 | ce43591321 → f8d4aff072；d36f984fe2 → 362afb21b2 | encrypted 最新字节与单 flush 无 spool 红→绿；collector 9 / stream 5 PASS；编译计数 3→1 |
+
+- 一次 wider-related：按 literal import 搜索过滤掉无关的 `codepuppy-secret-files`（main 凭据写者）、只检查本轮真实消费者/枚举；`packages/ext` 执行 `bun test --max-concurrency 2 src/policy/register-policy.test.ts src/policy/risk.test.ts src/secret-read.test.ts src/secret-spool.test.ts src/plugin-host.test.ts`，exit 0 / **176 PASS**，日志 `/tmp/secrets-r9-related.log`。未跑重型 composer/minute/1 MiB、其它 scenario 或 Core 整文件。Schema/已改模块的最后一次完整文件收据合计 45 PASS，加此 176 = **221 个不同用例 PASS**；指定 unattended 行单独 FAIL，不混入通过数。
+- 已改测试文件：`secret-files.test.ts`、`secret-values.test.ts`、`secret-mask.test.ts`、`secret-mutations.test.ts`、`secret-stream.test.ts`、`plugin-host.test.ts` 与 Schema `codepuppy-protected-files.test.ts`，均沿用原文件。`scripts/gate-files.tsv` 中实际注册的 plugin-host 仍 52 条（只恢复断言），其它新增条数所在模块未在该表登记，故不增加/改写 count 行或门的选择策略。
+- `bun typecheck`：ext exit 0；schema exit 0 / 144 files；scoped oxlint 13 TS 文件 exit 0 / 0 warnings / 0 errors；ext `bun run build` exit 0。`git diff --check 1a13ddc9f9` 消除新测试的一处行尾空白后通过，不改断言。Alpha docs checker 仅本次 plan.md 0 finding。
+- `affected-tests --list` exit 2：`No such file or directory: '<worktree>/.gate-tests'`，本基线没有 scope line；被冻结的 gate/.gate-tests 未改。
+- 逐项落点以本节为唯一执行证据；额外文件仅第 2 项明确要求的真实格式样本 `fixtures/secret-files/kube-eks.yaml` 和既有 `provenance.json`。没有改 Core/SC 签名、依赖、生产配置、规则、其它仓库，未启动 app/Electron/窗口，无 push/PR/merge。
+- 遗留去向：**发现 5** 按两次修正失败规则交编排器，具体红点 `unattended-run.engine.cases.ts:286`（expected failed / actual ok，env 首格即失败），需要编排器处置真实 engine 错误分类链路的下一步范围；不声称已证实必须改冻结接口。第 3 项前提未确认供编排器知悉；selector 缺输入按既有归属处理。其余没有新 OPTIONAL/ARCH 扩项。

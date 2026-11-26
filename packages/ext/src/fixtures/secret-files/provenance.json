@@ -68,5 +68,10 @@
     "source": "Google Cloud SDK 594.0.1 lib/googlecloudsdk/core/credentials/creds.py AccessTokenCache._COLUMNS",
     "version": "source SHA-256 af6b60dd4e30c7438af090b0556812814881967a90f483a3c294db96da7bc878",
     "sha256": "96e1b8b992b6771d1a4c5beebf228db1701c1c49b6e50db311b70cd7e3f483dd"
+  },
+  "kube-eks.yaml": {
+    "source": "https://raw.githubusercontent.com/aws/aws-cli/develop/tests/functional/eks/testdata/output_single",
+    "version": "AWS CLI official update-kubeconfig golden output, downloaded 2026-11-26; unmodified",
+    "sha256": "f544c9afb682b6827ed98c03561a3ca27e1c455d3d78de6bde9491897cb46c01"
   }
 }

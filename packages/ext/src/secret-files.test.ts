@@ -161,6 +161,8 @@ test("realistic home collection never visits unrelated deep directories", async 
   await copyFile(fixture("aws-credentials.ini"), path.join(roots.home, ".aws", "credentials"))
   await copyFile(fixture("docker.json"), path.join(roots.home, ".docker", "config.json"))
   await copyFile(fixture("kube.yaml"), path.join(roots.home, ".kube", "config"))
+  await copyFile(fixture("kube-eks.yaml"), path.join(roots.home, ".kube", "eks"))
+  roots.pathVariables = { KUBECONFIG: [path.join(roots.home, ".kube", "config"), path.join(roots.home, ".kube", "eks")].join(path.delimiter) }
   await writeFile(path.join(roots.home, "Library/Keychains", "login.keychain-db"), "fixture-encrypted-keychain")
   await writeFile(path.join(root, "audit.mjs"), `
 import fs from 'node:fs/promises';export const visited=[];

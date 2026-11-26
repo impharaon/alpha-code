@@ -75,3 +75,26 @@ test("structured parse failures never become opaque values", async () => {
   const text = await fixture("gcp.json").text()
   expect(() => credentialValues(file("gcp-adc", "json"), Buffer.from(text.slice(0, -3)))).toThrow()
 })
+
+test("AWS EKS exec args and YAML aliases retain credential classification", async () => {
+  // Official aws eks update-kubeconfig golden output; provenance.json pins its original bytes.
+  expect(credentialValues(file("kube", "assignments"), await fixture("kube-eks.yaml").bytes())).toEqual([])
+  // YAML 1.2 anchors/aliases/flow sequence and YAML merge-key examples, with fixture-only values.
+  const document = `defaults: &default
+  token: fixture-aliased-token
+ordinary: &region us-east-1
+users:
+- name: fixture
+  user:
+    <<: *default
+    exec:
+      args: [--region, *region, eks]
+    extras:
+    - --region
+    - *region
+` 
+  const values = strings(credentialValues(file("kube", "assignments"), Buffer.from(document)))
+  expect(values).toContain("fixture-aliased-token")
+  expect(values).not.toContain("us-east-1")
+  expect(values).not.toContain("--region")
+})

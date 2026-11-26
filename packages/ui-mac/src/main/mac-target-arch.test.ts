@@ -17,6 +17,7 @@ import path from "node:path"
 
 import { Arch } from "electron-builder"
 import { writeVideoRuntimeFixture } from "./fixtures/video/runtime"
+import { writeLauncherFixture } from "../../test-component/connector-launcher-fixture"
 
 import {
   ENGINE_ASSETS_DIR,
@@ -441,6 +442,7 @@ async function packagedResources(opts: { arch: TargetArch; unpack: boolean; mode
   const resources = path.join(dir, "app", "Code Puppy.app", "Contents", "Resources")
   fs.mkdirSync(resources, { recursive: true })
   fs.cpSync(path.join(import.meta.dir, "fixtures/document-assets"), path.join(resources, "document-assets"), { recursive: true })
+  await writeLauncherFixture(resources, "darwin-arm64")
   const { createPackageWithOptions } = await import(createRequire(require.resolve("electron-builder")).resolve("@electron/asar"))
   await createPackageWithOptions(path.join(dir, "source"), path.join(resources, "app.asar"), opts.unpack ? { unpackDir: ENGINE_ASSETS_DIR } : {})
   // DESIGN-domestic-cloud-connectivity §4.8:随包 ripgrep 落 <Resources>/ripgrep/rg(extraResources,不进 asar)。

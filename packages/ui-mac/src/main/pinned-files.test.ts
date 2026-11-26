@@ -43,6 +43,9 @@ function authority(route: (url: string, init: RequestInit) => Response | Promise
 test("manifest validates the shipped pins and canonical GitHub asset identities", () => {
   expect(readPinnedFiles()).toEqual(pins)
   expect(parsePinnedFiles(pins)).toEqual(pins)
+  for (const target of ["darwin-arm64", "win32-x64"]) {
+    for (const family of ["python", "libreoffice"]) expect(pins.files.some((file) => file.family === family && file.target === target)).toBe(true)
+  }
   const invalid = [
     null, {}, { ...manifest, schemaVersion: true }, { ...manifest, files: [null] },
     ...[

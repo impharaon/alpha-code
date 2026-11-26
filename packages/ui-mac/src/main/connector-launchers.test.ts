@@ -1,15 +1,15 @@
 import { afterEach, expect, test } from "bun:test"
-import { access, chmod, cp, mkdir, mkdtemp, readFile, realpath, rename, rm, symlink, writeFile } from "node:fs/promises"
+import { access, mkdtemp, readFile, realpath, rm, symlink, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { dirname, join, resolve } from "node:path"
 import pins from "../../resources/pinned-files.json"
 import type { LauncherPlatform } from "../../../util/src/codepuppy-connector-launch"
 import type { PinnedFiles } from "../../../util/src/codepuppy-pinned-files"
-import { checkLauncherBundle, connectorNodeSigningOptions, createLauncherAssetAuthority, describeLauncherEnvironment, finalizeLauncherSignatures, launcherEntries, launcherFileDigest, launcherPinSet, writeLauncherInventory } from "./connector-launchers"
+import { checkLauncherBundle, connectorNodeSigningOptions, createLauncherAssetAuthority, describeLauncherEnvironment, finalizeLauncherSignatures, launcherFileDigest, launcherPinSet, writeLauncherInventory } from "./connector-launchers"
 import { buildConnectorLaunchers } from "../../scripts/build-connector-launchers"
+import { launcherFixtureSamples, launcherHeader, writeLauncherFixture } from "../../test-component/connector-launcher-fixture"
 
 // Actual original executable headers and npm files; provenance beside the fixtures.
-const samples = join(import.meta.dir, "fixtures/connector-launchers")
 const roots: string[] = []
 afterEach(async () => { await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true }))) })
 async function fixture(platform: LauncherPlatform = "darwin-arm64") {
@@ -18,28 +18,9 @@ async function fixture(platform: LauncherPlatform = "darwin-arm64") {
   // macOS tmpdir has a /var alias; the production authority uses the canonical userData.
   const canonical = await realpath(root)
   const resources = join(canonical, "resources")
-  const directory = join(resources, "connector-launchers")
-  const entries = launcherEntries(platform)
-  for (const binary of ["uv", "uvx", "node"] as const) {
-    const file = join(directory, entries[binary])
-    await mkdir(dirname(file), { recursive: true })
-    await writeFile(file, await header(platform, binary))
-    await chmod(file, 0o755)
-  }
-  const npm = join(directory, dirname(dirname(entries.npmCli)))
-  await cp(join(samples, "npm"), npm, { recursive: true })
-  await rename(join(npm, "package.sample"), join(npm, "package.json"))
-  await mkdir(join(directory, "licenses/uv"), { recursive: true })
-  await mkdir(join(directory, "licenses/node"), { recursive: true })
-  for (const file of ["LICENSE-MIT", "LICENSE-APACHE"]) await cp(join(samples, file), join(directory, "licenses/uv", file))
-  await cp(join(samples, "node-LICENSE-prefix"), join(directory, "licenses/node/LICENSE"))
-  const bundle = await writeLauncherInventory(directory, platform, "expanded")
+  const { directory, entries, bundle } = await writeLauncherFixture(resources, platform)
   const input = { resources, userData: canonical, platform, bundle, pins: pins as PinnedFiles, packageManagerEnv: { npm_config_cache: join(canonical, "r1-cache") }, declarations: { video: { command: ["{codepuppyNode}", "server.js", "--cache-root", "{codepuppyCacheRoot}"] } } }
   return { root: canonical, resources, directory, entries, bundle, input }
-}
-
-async function header(platform: LauncherPlatform, binary: "uv" | "uvx" | "node") {
-  return Buffer.from(await readFile(join(samples, `${platform}-${binary}.header.b64`), "utf8"), "base64")
 }
 
 test("one descriptor owns Node/uv/npm and stable per-declaration cache roots before readiness", async () => {
@@ -79,7 +60,7 @@ test("resolver verifies both targets, catches changed bytes and preserves valid 
 test("sealed prepared digests reject a mutable cache whose inventory was forged alongside the binary", async () => {
   const f = await fixture()
   const sealed = { ...f.bundle.files }
-  await writeFile(join(f.directory, f.entries.node), await header("darwin-arm64", "uv"))
+  await writeFile(join(f.directory, f.entries.node), await launcherHeader("darwin-arm64", "uv"))
   await writeLauncherInventory(f.directory, "darwin-arm64", "expanded")
   await expect(checkLauncherBundle(f.directory, "darwin-arm64", sealed)).rejects.toThrow("sealed inventory")
 })
@@ -88,7 +69,7 @@ test("target, npm closure, missing entries and symlink escapes never become read
   const f = await fixture()
   await expect(checkLauncherBundle(f.directory, "win32-x64")).rejects.toThrow("invalid launcher bundle")
   const saved = await readFile(join(f.directory, f.entries.node))
-  await writeFile(join(f.directory, f.entries.node), await header("win32-x64", "node"))
+  await writeFile(join(f.directory, f.entries.node), await launcherHeader("win32-x64", "node"))
   await expect(writeLauncherInventory(f.directory, "darwin-arm64", "expanded")).rejects.toThrow("target mismatch")
   await writeFile(join(f.directory, f.entries.node), saved)
   const npm = join(f.directory, dirname(dirname(f.entries.npmCli)), "package.json")
@@ -109,7 +90,7 @@ test("Node entitlements match only the precise packaged executable; inventory re
   expect(connectorNodeSigningOptions(node, app, "/bundle/node.plist")).toEqual({ entitlements: "/bundle/node.plist", hardenedRuntime: true })
   for (const file of [app, node + "-other", join(app, "Contents/Frameworks/Helper.app"), join(app, "Contents/Resources/office-runtime/bin/python3")]) expect(connectorNodeSigningOptions(file, app, "/bundle/node.plist")).toBeUndefined()
   const f = await fixture()
-  await writeFile(join(f.directory, f.entries.node), await header("darwin-arm64", "uv"))
+  await writeFile(join(f.directory, f.entries.node), await launcherHeader("darwin-arm64", "uv"))
   finalizeLauncherSignatures(f.resources)
   const result = await checkLauncherBundle(f.directory, "darwin-arm64")
   expect(result.files[f.entries.node]).toBe(await launcherFileDigest(join(f.directory, f.entries.node)))
@@ -118,6 +99,6 @@ test("Node entitlements match only the precise packaged executable; inventory re
 test("build rejects a source that differs from the lock before publishing a bundle", async () => {
   const f = await fixture()
   const destination = join(f.root, "unpublished")
-  await expect(buildConnectorLaunchers({ platform: "darwin-arm64", destination, form: "expanded", archives: { uv: join(f.directory, f.entries.uv), node: join(f.directory, f.entries.node) }, licenses: samples })).rejects.toThrow("archive integrity mismatch")
+  await expect(buildConnectorLaunchers({ platform: "darwin-arm64", destination, form: "expanded", archives: { uv: join(f.directory, f.entries.uv), node: join(f.directory, f.entries.node) }, licenses: launcherFixtureSamples })).rejects.toThrow("archive integrity mismatch")
   await expect(access(destination)).rejects.toThrow()
 })

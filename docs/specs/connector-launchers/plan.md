@@ -1,7 +1,7 @@
 ---
 id: PLAN-connector-launchers
 title: 连接器启动器实施计划
-summary: 固定文件、随包资产、持久准备、单一呈现、受管文件调用与平台验收的交付分片；本轮实施固定文件权威。
+summary: 固定文件下载、随包运行时、持久准备、连接器呈现和受管调用的分片计划与实施证据。
 kind: plan
 status: active
 spec: SPEC-connector-launchers
@@ -79,7 +79,7 @@ last_reviewed: 2026-11-26
 | AC-03 真实下载口（非北京/干净包验收） | `gate slot -- bun /tmp/connector-launchers-live-download.ts` → exit 0；临时空 userData 的同一 createPinnedFileAuthority/ensureFile 真下载 Darwin Python，`via=origin`、25270084 B、SHA `9d6d9d0d85feda3f9cb4eb3e048f0fed21ed280feda087927eaa4fbc7124826f`、最终进度 25270084；再请求 `via=cache`。本机此时未证明 relay 已放行 |
 | AC-01/09/10 的 pin 身份子证据 | 两个 originUrl 用 curl 实取到 `/tmp/connector-launchers-python-{darwin,windows}.tar.gz`，`shasum -a 256` / `wc -c`：Darwin 同上；Windows 22388338 B / `96694b50dcfde13d56e40346ddaa552a9cd650290e9b933cecf83c1d82226960`，均与清单一致。`tar -tf` 确认配方入口 python/bin/python3（含 3.12）及 python/python.exe；未执行连接器或 Windows 包 |
 | 共享 schema 同解 | `/tmp/connector-launchers-parser-probe.ts` 从真实 Python entry 生成 41 组输入；桌面 parsePinnedFiles 与公开转发 parser blob `2233d7b0c6e053fc8a5d630f62c6d3ce7386b9a9` 的 load 同解：41/41，13 accept。只读取该文件并在 /tmp 运行，没有修改/部署转发仓 |
-| 静态 / 文档 | ui-mac `bun typecheck` → exit 0；`git diff --check` → exit 0；`python3 scripts/check-doc-links.py docs/specs/connector-launchers/plan.md` → exit 0。官方 check_repo 对本计划 0 finding；仓级 58 errors / 249 warnings，包括既有索引漂移及 docs/README.md 的 INT-safety、INT-upstream-upgrade-readiness 未知 ID，未顺修 |
+| 静态 / 文档 | ui-mac `bun typecheck` → exit 0；`git diff --check` → exit 0；`python3 scripts/check-doc-links.py docs/specs/connector-launchers/plan.md` → exit 0。官方 check_repo 对本计划 0 finding；仓级 58 errors / 249 warnings，包括既有索引漂移及 docs/README.md:393、452–454 的既有未知意图 ID，未顺修 |
 | 选择范围 | 工作树 `affected-tests --list` → exit 0，`affected tests: 273 of 738 test files`。未改 selector/global setup/runner；这是列表，未执行 273 文件 |
 
 遗留去向：LibreOffice `libreoffice/{darwin-arm64,win32-x64}/26.8.3` 缺已公开自有副本及可验证 originUrl → 发布者按文档设计 §4.3/国内连接性 §4.11.2 发布原字节、许可/源码材料后回本片填 pin；本轮未上传或绕回 TDF。原厂两份 mirrorlist 的大小/SHA 与冻结值一致，但不把元数据当副本实物证明。#1760 当前 Issue body 的 Design/Plan 仍是「待补」→ 编排器同步本轮冻结 v2.2/计划与实现引用；本执行者只提交，不改 Issue。仓级文档 findings → 既有文档治理，非本票修复。端到端 AC、文档重试与受管视频调用 → 上表后续分片；OPTIONAL 无。
@@ -164,3 +164,17 @@ last_reviewed: 2026-11-26
 ### 偏离记录
 
 暂无。
+
+
+### r2 实施回执与后续接入点
+
+- 依据：首片已被 r2 接收；本轮新增 `37b1c2fd71`（LO pins）、`c86a4dc4d7`（资产计划）、`ee10e1607a`（资产实现）、`98e3d3a0ce`（桥计划）、`2d1966e981`（桥实现）。Codex / GPT-6 作者核对，未发生独立审查。
+- AC-01/04/05/09 的资产子链：uv/Node 四份原厂归档实际下载，完整 SHA 与 lock 一致。实测 bytes：uv darwin 14700626、uv Windows 15641577、Node darwin 30638176、Node Windows 41166246；uv 两份许可也按锁核对。`gate slot -- bun /tmp/connector-launchers-build-probe.ts` → exit 0，Darwin/Windows 展开清单分别 1750/1748 个文件，pinSet `98f61dba61d6d582a8d335d592e9becb78631c9e9107740e8f21fee51f5bf9fd`。Windows 是在 Mac 上核对原件/目标/布局，未执行 Windows 进程。
+- AC-02/10 的资产子链：`gate slot -- bun /tmp/connector-launchers-archive-probe.ts` → exit 0，两平台原始归档形态均首次展开、再次复用；同时篡改可写 Node 与其 runtime.json 后，受随包 preparedFiles 拒绝并从已验原始归档重建。Darwin 绝对入口实际输出 uv 0.13.10、Node v26.13.1、npm 11.20.0。没有网络重取 Node/uv；不是正式签名、公证或应用离线重启的替代证据。
+- AC-03/06/07 的消息子链：`bun test src/main/pinned-files.test.ts` → 12 PASS；ID-only 下载、进度、未知 ID/URL 覆盖拒绝、按请求取消、旧代消息及通道关闭均经两端桥和同一真实文件 authority。main server 的 message/kill/stop/exit 已接；core 的完整 ConnectorLaunchHost 尚未发布，未注册部分 host 或受管 handler。
+- 移除臂：临时移除 sealed preparedFiles 比较、Node 精确签名路径、requester generation 比较，分别跑 `connector-launchers -t 'sealed prepared'`、`-t 'Node entitlements'`、`pinned-files -t 'generation close'`，各 exit 1，均为预期行为断言失败；已恢复源文件。
+- 相关集合一次：connector-launchers、pinned-files、server、sidecar-stop、codepuppy-sidecar-wiring、video-runtime-artifacts、document-runtime、video-assets.fast、naming-migration、naming-migration-wiring、process-fence-write-sites、old-name-scan，共 12 文件 164 PASS / 2 FAIL。新增 LO URL 需按既有规范登记外部锚点，已在 scripts/old-name-exceptions.tsv 精确追加两行，未改 gate 代码/selector/阈值。另一失败在接受的首片 server.ts 源码上以同一单例重现：缺少 ext/dist/server.js 的警告含点号，误中 bad="." 的断言；`packages/ext` 的 `bun run build` 补本地生成前置产物后，该 server 单例 1 PASS，未改 server 测试断言/无关源码。
+- 包装夹具同步：新增 mandatory launcher 检查使现有 mac-target-arch 包夹具缺资产；提取真实采样的共用 `test-component/connector-launcher-fixture.ts` 给两个测试消费，未手写二进制格式。修正后 `bun test src/main/connector-launchers.test.ts src/main/mac-target-arch.test.ts` → 46 PASS；旧名检查 10 PASS。该 helper/mac-target-arch.test.ts 与精确 URL 登记是原文件表外的必要同调用链同步。
+- 执行偏离：上面的首次相关集合误含 sidecar-stop 的计时用例，本轮未授权该计时运行；已记录范围选择失误，不再重跑。未运行全套、gate run/bin/check，未启动应用或窗口。
+- 静态：ui-mac `bun typecheck` exit 0；util `bun typecheck` exit 0（113 files）；构建配置可由 Bun 加载。最终 docs/scope 结果在本段结尾补记。
+- 下一步需要的接入输入：当前分支没有 #1759 R1/R2。只读定位到 feat/1759-fence-global-writes 的 process-fence-profile.ts:226/232，已向编排器请求应接入的依赖提交；不合并/复制该分支、不另算包管理器路径。拿到依赖后完成生产 bootstrap/sidecar 的同代 LauncherEnvironment、prepare/离线入口、第一方 expander/matcher/开机重锚与 handler，再接文档 runtime/retry 和连接器行/问题的单一投影。当前只完成稳定 cache-root 描述，尚未完成 argv 槽/精确首方身份。完整 AC-02/06/07/08/10、Windows 实机、正式签名与 GUI 验收仍未完成；不存在新增设计取舍或 OPTIONAL 产品项。

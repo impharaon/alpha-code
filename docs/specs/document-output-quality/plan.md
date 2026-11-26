@@ -638,3 +638,5 @@ B4 red：原 document-tool 文件经真实 Location register→renderer→tool �
 B4 green：同一 register/tool 反例不改，document-tool 文件 3 PASS（B4-green.log）；pending、failed/timeout 或抛错都释放活动标记，rendered 继续等最终检查。
 
 B5 red：原公式报告用例追加同一实际工作簿的合法绝对路径别名（含 ./），保留原错误列表拒绝断言；当前仅字符串比较而拒绝，target exit 1（B5-red.log）。下一提交两边 realpath，与 ext 的同一文件语义一致。
+
+B5 green：两侧 realpath 后，原公式错误/摘要负对照保留，document-check 文件 4 PASS（B5-green.log）。

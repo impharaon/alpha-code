@@ -1,5 +1,5 @@
 import { mkdirSync, readdirSync, readFileSync, realpathSync } from "node:fs"
-import { readFile } from "node:fs/promises"
+import { readFile, realpath } from "node:fs/promises"
 import { join } from "node:path"
 import {
   isDeferredDocumentCheck,
@@ -163,7 +163,7 @@ export function createDocumentChecks(input: {
       if (
         !isExcelRecalculateResult(result) ||
         result.status !== "recalculated" ||
-        result.path !== receipt.sourcePath ||
+        (await realpath(result.path)) !== (await realpath(receipt.sourcePath)) ||
         result.resultSha256 !== receipt.sourceSha256 ||
         JSON.stringify(result.errors) !== JSON.stringify(report.formulaCheck.errors)
       )

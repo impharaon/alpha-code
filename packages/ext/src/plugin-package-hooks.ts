@@ -69,11 +69,12 @@ export async function registerPackageHooks(
   const configResults = new Map<string, Map<string, { valid(): boolean; result: Promise<HookResult | undefined> }>>()
   const batches = new Map<string, { complete: Set<string>; pending: Map<string, Promise<Contribution[]>> }>()
   const children = new Map<string, { parentID: string; agentType: string }>()
+  const sourceInstructionName = (item: Instruction) => item.installed.description.provider === "claude-code"
+    ? item.installed.description.name + ":" + item.entry.sourceName
+    : item.entry.sourceName
   const sourceAgentType = (agent: string | undefined) => {
     const source = allInstalledPluginInstructions(input.root).find(item => item.entry.kind === "agent" && item.name === agent)
-    return source
-      ? source.installed.description.provider === "claude-code" ? source.installed.description.name + ":" + source.entry.sourceName : source.entry.sourceName
-      : agent
+    return source ? sourceInstructionName(source) : agent
   }
   let disposed = false
   const active = (installed: Installed) => {
@@ -855,10 +856,7 @@ export async function registerPackageHooks(
         "UserPromptExpansion",
         sessionID,
         {
-          command_name:
-            item.installed.description.provider === "claude-code"
-              ? item.installed.description.name + ":" + item.entry.sourceName
-              : item.entry.sourceName,
+          command_name: sourceInstructionName(item),
           args,
           source: "plugin",
           expansion_type: item.entry.kind === "command" ? "command" : "skill",

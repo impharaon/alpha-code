@@ -85,3 +85,12 @@ for (const operation of ["write", "edit", "patch"] as const) test(`multiline rea
   expect(actual === source.replace("3000", "3001")).toBe(true)
   expect(actual.includes(ProtectedFiles.REDACTED)).toBe(false)
 })
+
+test("compact edits still replace every multiline assignment occurrence", async () => {
+  const { roots } = await setup()
+  const source = 'KEY="first\nline"\nFLAG=0\nKEY=second\nFLAG=0\n'
+  await writeFile(path.join(roots.directory, ".env"), source)
+  const { mutation } = await restoreEnvMutation({ operation: "edit", path: ".env", oldString: "KEY=[REDACTED]\nFLAG=0", newString: "KEY=[REDACTED]\nFLAG=1", replaceAll: true }, roots)
+  if (mutation.operation !== "edit") throw new Error("wrong operation")
+  expect(source.replace(mutation.oldString, mutation.newString) === source.replaceAll("FLAG=0", "FLAG=1")).toBe(true)
+})

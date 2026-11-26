@@ -594,3 +594,5 @@ A5 探针修正：Bun 的 fs.promises 对象 spy 没有截住 node:fs/promises �
 A5 green：正确模块导出探针实际命中 rename，marker 在候选内已完整，runtime 文件 16 PASS（A5-real-green.log）。生产实现没有为测试增加新端口。
 
 A8：新增原 runtime 文件的 ready→dispose→同 userData 新 runtime 实例用例，current 直接通过 extract=0/verify=1（A8-green.log）；这是原有行为的补证，无需为了制造 red 改坏代码。
+
+A9 runtime red：未发布 manifest 当前在构造器 throw；复用已发布目录验证失败当前直接 failed，target 0 PASS/2 FAIL（A9-runtime-red.log）。分两个生产提交修正，均不添加无限自动重试。A9 的共享 cache 要求与仍冻结的 §4.10/R13 明文“{{JOB_FONT_CACHE}} 替换为本 job 内缓存”相冲突；该部分需设计拥有者同步裁定，不能悄悄改 Python 投影契约。Windows 字体只在准备时写入则与 §4.2 已一致，将独立修。

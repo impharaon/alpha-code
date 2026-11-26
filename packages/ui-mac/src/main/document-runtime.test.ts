@@ -202,3 +202,27 @@ test("restart reuses the published runtime with zero extraction and one fresh ve
   expect(f.counts.extract).toBe(0)
   expect(f.counts.verify).toBe(1)
 })
+
+test("an unpublished manifest is a failed state instead of a constructor exception", () => {
+  const f = fixture()
+  const runtime = createDocumentRuntime({ ...f.input, manifest: { schemaVersion: 1, files: [] } }); runtimes.push(runtime)
+  expect(runtime.query(f.location)).toMatchObject({ phase: "failed", failure: { kind: "unknown" } })
+  expect(f.counts.acquire).toBe(0)
+})
+
+test("a published runtime that fails verification is re-extracted once and then verified fresh", async () => {
+  const f = fixture()
+  const first = createDocumentRuntime(f.input); runtimes.push(first)
+  first.subscribeRuntimeVerify(f.location, f.completed)
+  const initial = until(first, (state) => state.phase === "ready"); first.query(f.location); await initial; await first.dispose()
+  f.counts.extract = 0; f.counts.verify = 0
+  const next = createDocumentRuntime(f.input); runtimes.push(next)
+  next.subscribeRuntimeVerify(f.location, (task) => {
+    if (task.runtimeRoot.endsWith(pin.version)) { f.counts.verify++; return Promise.resolve({ ...task, status: "failed", reason: "conversion", detail: "fixture stale binary", exitCode: 1, stderr: "fixture" }) }
+    return f.completed(task)
+  })
+  const result = until(next, (state) => state.phase === "ready" || state.phase === "failed"); next.query(f.location)
+  expect((await result).phase).toBe("ready")
+  expect(f.counts.extract).toBe(1)
+  expect(f.counts.verify).toBe(2)
+})

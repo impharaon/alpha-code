@@ -936,3 +936,10 @@ B1/B2/B5 与 S-01 bind-only 已完成；片 5 尚需完成并给证据：调用/
 - testvectors/plugin-package-description.v1.json
 
 同目录 `host-extension-package-artifact.v1.json` 清单也改变；`plugin-conversion.ts` 是生成源而非 artifact 成员。精确清单及 aggregate 另见 `/tmp/plugin-standard-r9-host-artifact.json`。未修改 consumer pin 或 vendored copies。遗留去向：片 5 运行链及上述 A/B 修正继续本车道 fix now；alpha-web checkpoint 交编排器；旧断言/docs 基线维持原归属。已核 Codex（GPT-6），本轮 PARTIAL；已定 binding/allow-set/SSE 不重开，OPTIONAL 无。
+
+
+## r10 · 审查修正续作
+
+核对：IMPLEMENT，编排器 / Claude Opus 5.5 r10；spec v5 / design v3.1 @f313990 与 r9 已定裁决。2026-11-26 20:47 UTC+08:00 起，顺序 A1 → A2–A9 → B3/B4/B6/B7/B8 → 片 5 剩余运行验收；不重开已定 S-01/allow-set/SSE，不改 pin/vendor。本轮文档影响为运行证据，落同一 plan。
+
+A1 ready 调度：41790bff15 单独回归先红（包内 `bun test --max-concurrency 2 src/main/reload-coordinator.test.ts -t "each ready engine"`，0 pass / 1 fail，`/tmp/plugin-standard-r10-A1-ready-red.log`）。沿现有 applyPackageMcp 入口在每次 attach 请求最终账本投影的重新绑定，不创建 reload generation、不重载 Location、不增加另一绑定器；启动 projection 仍待指定 engine case 验证后修正。纯调度 fast case 在原文件、imports 可追踪，受影响 PR/nightly；原文件完整 12 pass / 0 fail（`/tmp/plugin-standard-r10-A1-ready-green.log`）；该文件不在 gate-files 精确条数表，未增加条数登记。A1 engine 用例已通过 `gate slot --` 排队，未绕过共享 engine 槽。

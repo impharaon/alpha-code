@@ -178,6 +178,8 @@ export function createReloadCoordinator(deps: {
     attach(next) {
       post = next
       detachedBecause = undefined
+      // Runtime bindings belong to this engine generation, even when main has no pending install/reload.
+      void deps.applyPackageMcp?.([]).catch(() => deps.log("reload: package connectors could not be bound after engine ready"))
       for (const record of [...inFlight.values()].sort((a, b) => a.generation - b.generation)) send(record)
       if (inFlight.size > 0) deps.log(`reload: engine ready — re-sent ${inFlight.size} pending generation(s)`)
       deps.onChange()

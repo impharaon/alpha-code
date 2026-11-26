@@ -109,9 +109,24 @@ last_reviewed: 2026-11-26
 - 一次相关扩展集：`cd packages/ui-mac && bun test src/engine-adapter/boundary.test.ts src/engine-adapter/event-projection.test.ts src/engine-adapter/projection-parity.test.ts src/shared/attachment-path.test.ts src/main/old-name-scan.test.ts` → 48 pass / 0 fail；`cd packages/ext && bun test src/plugin-host.test.ts` → 52 pass / 0 fail。通过 import/枚举搜索选取；真实引擎/Office roundtrip/scenario 不在本片运行。
 - 类型：`cd packages/ui-mac && bun typecheck`、`cd packages/ext && bun typecheck` 均 exit 0。首轮 ui-mac 发现媒体分类判别联合无法收窄，拆成 video/audio 两个判别项后通过。
 - **BLOCKED: design — VIDEO-L1-v2 v2 §4.3 的 Node 命令绑定不完整。** 启动器设计 `:67-73` 同时允许资源树内 Node 和 userData 下的已校验归档入口；`:566` 要求 command 沿用现有受信模板匹配。实际 `packages/core/src/mcp/codepuppy-first-party-mcp.ts:27-38` 仅替换 resources，或将 workspace 槽匹配任意绝对路径，没有 LauncherEnvironment.node 的受信槽/投影。不能把 workspace 当 Node 槽，否则任意绝对可执行路径也会匹配。此处是冻结约定的缺口，区别于已知的声明器/handler 尚未实现。
-+- 只读探针：在 `packages/core` 用 `bun -e` import 实际 `commandMatchesTemplate`，同一视频模板依次传资源树 Node、userData 归档 Node、workspace 充当 Node 且实参为 `/tmp/untrusted-node`，输出 `{"direct":true,"archive":false,"workspaceSlotAlsoMatchesAnyAbsoluteExecutable":true}`，exit 0；没有执行这些路径的任何程序。
-+- **SEAM-CHANGE-NEEDED**：请 #1760 原 authority 明确视频受保护清单如何引用/核验 `LauncherEnvironment.node`，覆盖资源树与归档两种已批准形态、darwin-arm64/win32-x64，并保持同一声明器/main 重验。D1 不新增占位符、解析器、运行时路径表或宽松可执行匹配。因此本轮停止服务清单/自动注入接线，未创建假可用服务或部署产物；这些以及可信身份/实际启动断言仍 pending，不能按 D1 完成验收。
-+- AC-01 完整内容回答、AC-02 真实 2 GB 界面计时、AC-13 平台结果、AC-17 安装包验收未执行；本片没有窗口、下载、付费调用、生产接触、全量门或 gate 修改。
+- 只读探针：在 `packages/core` 用 `bun -e` import 实际 `commandMatchesTemplate`，同一视频模板依次传资源树 Node、userData 归档 Node、workspace 充当 Node 且实参为 `/tmp/untrusted-node`，输出 `{"direct":true,"archive":false,"workspaceSlotAlsoMatchesAnyAbsoluteExecutable":true}`，exit 0；没有执行这些路径的任何程序。
+- **SEAM-CHANGE-NEEDED**：请 #1760 原 authority 明确视频受保护清单如何引用/核验 `LauncherEnvironment.node`，覆盖资源树与归档两种已批准形态、darwin-arm64/win32-x64，并保持同一声明器/main 重验。D1 不新增占位符、解析器、运行时路径表或宽松可执行匹配。因此本轮停止服务清单/自动注入接线，未创建假可用服务或部署产物；这些以及可信身份/实际启动断言仍 pending，不能按 D1 完成验收。
+- AC-01 完整内容回答、AC-02 真实 2 GB 界面计时、AC-13 平台结果、AC-17 安装包验收未执行；本片没有窗口、下载、付费调用、生产接触、全量门或 gate 修改。
+
+
+### 删除对照（一次性验证，未加入永久测试）
+
+在 `d059f0236e` 的已提交代码上，逐臂只改一个生产入口，执行下列指定 case；各臂结束立即 `git restore -- <该文件>`。每臂均是断言失败，不是编译/装载失败。全部恢复后再跑同一组 case，共 6 pass / 0 fail。完整输出在本机 `/tmp/video-d1-removal-<arm>.log`，汇总 `/tmp/video-d1-removal-arms.json`。
+
+| arm / 移除的行为 | 包目录内的命令 | 结果 |
+| --- | --- | --- |
+| media-classification：跳过媒体分类 | ui-mac `bun test src/renderer/codepuppy-ui/composer-attachments-core.test.ts -t 'media has no document limit'` | exit 1，1 fail |
+| media-wire-projection：不将媒体 metadata 投影为 prompt 附件 | ui-mac `bun test src/engine-adapter/staged-attachment.test.ts -t 'media metadata round-trips'` | exit 1，1 fail |
+| composer-original-path-branch：跳过真实 composer 的媒体分支，落到 File 正文读取 | ui-mac `bun test ./test-component/codepuppy-composer-model.cases.ts -t 'attaches large media'` | exit 1，2 fail（drop、picker） |
+| media-context-instruction：context hook 不识别媒体载体 | ext `bun test src/attachment-reader-hooks.test.ts -t 'media metadata becomes'` | exit 1，1 fail |
+| source-change-check：不核对登记时真实文件大小 | ui-mac `bun test src/main/composer-media-attachment.test.ts -t 'source validation'` | exit 1，1 fail |
+
+已核：Codex / GPT-6；依据本节固定输入及 checked plan `56ab1074db`，仅核对已完成的 D1 附件调用链，结论为部分代码已验证、D1 未完成。已定勿重开：视频设计 §10。下一步与遗留去向：Node 模板缺口 → #1760 原设计/编排器；服务实物、清单和自动注入须在该缺口关闭后续做，原 #1760 声明器/handler 的实际集成断言继续 pending；D2–D5 未动。没有新增 owner 决策或限制。
 
 ## D2 完整本机处理与持久结果
 

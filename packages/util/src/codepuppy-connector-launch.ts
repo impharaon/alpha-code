@@ -1,6 +1,7 @@
 // #1760 frozen connector-launchers §4.6 / DOC-NODE-v2 data definitions.
 // Shared authority only; launcher acquisition, classification and host publication remain #1760 integration.
 import type { EnsurePinnedFileResult, PinnedFileId } from "./codepuppy-pinned-files.js"
+import type { Tool } from "../../schema/src/tool.js"
 
 export type LauncherPlatform = "darwin-arm64" | "win32-x64"
 export type LauncherEnvironment = {
@@ -36,6 +37,62 @@ export type DeclaredFirstParty = {
   recipe?: readonly PinnedEntryRecipe[]
   declarationSha256: string
   recipeSha256: string
+}
+export type FirstPartyConfiguredEntry = {
+  type: "local"
+  command: readonly string[]
+  environment?: Readonly<Record<string, string>>
+  cwd?: string
+}
+export type ManagedFirstPartyBinding = {
+  identity: LaunchIdentity
+  sidecarGeneration: string
+  entry: FirstPartyConfiguredEntry
+  declarationSha256: string
+  recipeSha256: string
+}
+export type ManagedPinnedFilesResult =
+  | { ok: true; files: { id: PinnedFileId; path: string }[] }
+  | Extract<EnsurePinnedFileResult, { ok: false }>
+export type PinnedPreparationProgress = {
+  id: PinnedFileId
+  phase: "download" | "unpack" | "verify" | "ready" | "failed" | "cancelled"
+  sequence: number
+  receivedBytes?: number
+  totalBytes?: number
+  error?: Extract<EnsurePinnedFileResult, { ok: false }>["error"]
+  failure?: DownloadFailureEvidence
+}
+export type PinnedFilesCallPreparation = {
+  callID: Tool.CallID
+  report: (update: PinnedPreparationProgress) => Promise<void>
+}
+export type RuntimeDependencyFacts = {
+  runtimeDep: readonly string[]
+  executables: Readonly<Record<string, string>>
+  missing: readonly string[]
+}
+export type ConnectorEgressEvidence = { identity: LaunchIdentity; host: string; port: number; outcome: "refused" | "granted" | "not-asked" }
+export type ConnectorLaunchHost = {
+  ensureFile(id: PinnedFileId, signal: AbortSignal, progress: (received: number, total: number) => void): Promise<PinnedFileDelivery>
+  changed(snapshot: LaunchSnapshot): void
+  runtimeDependencies(identity: LaunchIdentity): Promise<RuntimeDependencyFacts>
+  beginEgress(identity: LaunchIdentity): Promise<{ proxyEnvironment: Record<string, string> }>
+  egressEvidence(identity: LaunchIdentity): Promise<ConnectorEgressEvidence[]>
+  endEgress(identity: LaunchIdentity): void
+  resolveAssets(): Promise<LauncherEnvironment>
+  prepareFiles(input: { binding: ManagedFirstPartyBinding; ids: readonly PinnedFileId[] }, signal: AbortSignal, progress: (update: PinnedPreparationProgress) => void): Promise<ManagedPinnedFilesResult>
+}
+const hostKey = Symbol.for("codepuppy.connector-launch.host")
+export function publishConnectorLaunchHost(host: ConnectorLaunchHost) {
+  const target = globalThis as { [hostKey]?: ConnectorLaunchHost }
+  if (target[hostKey]) throw new Error("connector launch host already published for this process")
+  target[hostKey] = host
+}
+export function connectorLaunchHost(): ConnectorLaunchHost {
+  const host = (globalThis as { [hostKey]?: ConnectorLaunchHost })[hostKey]
+  if (!host) throw new Error("connector launch host was not published before engine startup")
+  return host
 }
 
 export type DownloadFailureEvidence =

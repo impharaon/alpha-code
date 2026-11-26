@@ -1,5 +1,7 @@
 import { withVideoProgress } from "./codepuppy-video-progress.js" // codepuppy(#1775)
 import type { VideoProgress } from "@opencode/schema/codepuppy-video-progress"
+import { connectorLaunchHost, type ManagedFirstPartyBinding, type DeclaredFirstParty, type PinnedFilesCallPreparation } from "@opencode/util/codepuppy-connector-launch"
+import { registerPinnedFilesHandler } from "./codepuppy-pinned-files.js"
 export * as McpClient from "./client.js"
 
 import { readCodePuppyCredential } from "@opencode/util/codepuppy-credentials" // codepuppy(#1562, I-20)
@@ -161,6 +163,7 @@ export interface ElicitationHandler {
 
 /** For a request that can come back asking for input: tool calls, prompts and resource reads. */
 export interface PerRequest {
+  readonly preparation?: PinnedFilesCallPreparation
   /**
    * Answers the elicitations this request causes instead of the connection's handler, for a connection
    * that serves several callers. 2026-07-28 only.
@@ -223,6 +226,8 @@ export interface ConnectOptions {
   readonly clientInfo?: Implementation
   /** False declares no roots and leaves `roots/list` unanswered, for a connection no one directory owns. */
   readonly roots?: boolean
+  /** Constructed from the protected declaration before inherited environment/cwd are applied. */
+  readonly managedFirstParty?: { binding: ManagedFirstPartyBinding; declaration: DeclaredFirstParty }
 }
 
 /**
@@ -241,6 +246,7 @@ export const connect = Effect.fnUntraced(function* (options: ConnectOptions) {
   // Attached clients run ordinary SDK servers over the initialize handshake.
   const protocol = config.type === "attached" ? "legacy" : config.protocol
   const changed = { tools: () => {}, prompts: () => {}, resources: () => {} }
+  const pinnedClients = new WeakMap<Client, ReturnType<typeof registerPinnedFilesHandler>>()
   const listChanged = (key: keyof typeof changed) => ({
     autoRefresh: false,
     debounceMs: 0,
@@ -267,7 +273,7 @@ export const connect = Effect.fnUntraced(function* (options: ConnectOptions) {
       : safeDescription(error)
 
   // Two more attempts, 250 ms and 1 s later, while the failure is transient and the deadline has not passed.
-  const retrying = <A, E>(what: string, effect: Effect.Effect<A, E>, deadline = Infinity) =>
+  const retrying = <A, E, R>(what: string, effect: Effect.Effect<A, E, R>, deadline = Infinity) =>
     Effect.retry(
       effect,
       Schedule.max([Schedule.exponential("250 millis", 4), Schedule.recurs(2)]).pipe(
@@ -288,6 +294,7 @@ export const connect = Effect.fnUntraced(function* (options: ConnectOptions) {
     const runPromise = Effect.runPromiseWith(context)
     const client = new Client(options.clientInfo ?? { name: "opencode", version: "unknown" }, {
       capabilities: {
+        ...(options.managedFirstParty?.declaration.recipe?.length ? { experimental: { "codepuppy/pinned-files": {} } } : {}),
         ...(elicitation ? { elicitation: { form: {}, url: {} } } : {}),
         // Legacy era only: roots are deprecated as of 2026-07-28 and modern servers cannot request them.
         // Some legacy servers refuse to run without one (https://github.com/anomalyco/opencode/issues/2308).
@@ -300,6 +307,11 @@ export const connect = Effect.fnUntraced(function* (options: ConnectOptions) {
         resources: listChanged("resources"),
       },
     })
+    if (options.managedFirstParty?.declaration.recipe?.length) {
+      const pinned = registerPinnedFilesHandler(client, options.managedFirstParty, (input, signal, progress) => connectorLaunchHost().prepareFiles(input, signal, progress))
+      pinnedClients.set(client, pinned)
+      yield* Effect.addFinalizer(() => Effect.sync(() => pinned.close()))
+    }
     // Background work such as the standalone SSE stream reports failures only here; aborts come from close.
     client.onerror = (error) => {
       if (error.name === "AbortError") return
@@ -506,6 +518,7 @@ export const connect = Effect.fnUntraced(function* (options: ConnectOptions) {
                     },
                   ]
                 })
+                pinnedClients.get(client)?.listed(tools)
                 listed.clear()
                 for (const tool of tools) listed.set(tool.name, tool)
                 return Effect.forEach(
@@ -549,15 +562,15 @@ export const connect = Effect.fnUntraced(function* (options: ConnectOptions) {
         ),
       callTool: (input, videoProgress) => {
         const call = Effect.tryPromise({
-          try: (signal) =>
-            withVideoProgress(signal, videoProgress, (onprogress) => client.callTool(
+          try: (signal) => {
+            const run = (meta: Record<string, string | number>, callSignal: AbortSignal) => withVideoProgress(callSignal, videoProgress, (onprogress) => client.callTool(
               {
                 name: input.name,
                 arguments: input.args ?? {},
-                ...(input.sessionID === undefined ? {} : { _meta: { "ai.opencode/sessionID": input.sessionID } }),
+                _meta: { ...meta, ...(input.sessionID === undefined ? {} : { "ai.opencode/sessionID": input.sessionID }) },
               },
               {
-                signal: claim(signal, input),
+                signal: claim(callSignal, input),
                 timeout: execution,
                 // Only asks for a progress token: progress on the response stream can keep proxies from closing it.
                 // The SDK timeout does not reset on progress; execution is the hard wall.
@@ -570,7 +583,10 @@ export const connect = Effect.fnUntraced(function* (options: ConnectOptions) {
                   inputSchema: { type: "object" },
                 }) as CallToolRequestOptions["toolDefinition"],
               },
-            )),
+            ))
+            const pinned = pinnedClients.get(client)
+            return pinned ? pinned.withCall({ preparation: input.preparation, signal, deadline: Date.now() + execution, run }) : run({}, signal)
+          },
           catch: (error) => error,
         })
         // A modern server rejects headers mirrored from a stale definition before running the tool,

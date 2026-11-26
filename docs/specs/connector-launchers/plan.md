@@ -363,3 +363,11 @@ r4 guard green：原 absent/missing-directory 两个断言不改，生产步骤�
 r4 已完成子链：真实探针 `gate slot -- bun /tmp/connector-r4-runtime-proof/install-python.ts` exit 0（`/tmp/connector-r4-managed-python.log`）。当前 Python pin 经唯一 authority 再验为 cache，R1 从 #1759 原函数取得；测试 seam 仅替换 developer probe 为 exit 1。真实 uv 以仅 uv/Node 目录的 PATH 安装 3.12.16，system marker=false，额外代理连接=0；Python `--version` 为 `Python 3.12.16`。uv 明确警告 install-name patch 未做，安装 exit 0；wheels 不受影响是 r4 裁定，并非本探针独立证明。无应用/utilityProcess 真围栏，不能当 AC-02 或整包 AC-01 通过。
 
 r4 准备收据：同一 core 新模块的 publishConnectorPreparation/readConnectorPreparation 只持久化 schema/ready/key/runner/真实版本/入口/所需文件，以 Location.files 写 part 后 rename；载入只读文件，无包管理器、TTL、刷新或环境持久化。prefix 内入口缺失/损坏/跨 runner/半成品不算 ready；调用输入每次绑定。`bun test test/codepuppy-connector-launch.test.ts` → 8 PASS / 36 assertions；`bun typecheck` → exit 0，2058 files / 2 projects。开发中按本地 Effect 4 API 修正 catchTag 和 fromJsonString 后通过。尚未接 prepareConnectorLaunch 的完整语法归一及调用者，不把 helper 的无进程读取等同 AC-10 整包启动。
+
+r4 v2 client 子链：新增 `packages/core/src/mcp/codepuppy-pinned-files.ts`，从既有 client 的受管构造上下文注册三参数 SDK handler；util 同一模块补冻结 Host 发布/读取与 v2 DTO。`mcp/index.ts`、`tool/mcp.ts` 是冻结 V2-R5 点名的必要调用链：本次 Tool.Context 捕获 report，逐层传 preparation；client 真实 tools/list 匹配后才给 tools/call 关联值与原 execution 绝对 deadline，结束/取消/关闭撤销，按当前 call 递增进度，不用 initialize context。没有配方的 client 不注册方法或 capability。
+
+真实 SDK 2.3.1 的 custom schema 收到带 `_meta` 的完整 params（直接 additionalProperties:false 会误拒绝），因此 handler 边界先去协议字段再对唯一业务字段 ids 做严格 schema 校验；ctx.mcpReq 单独取协议关联。未改 SDK/protocol codec，不是设计分叉。
+
+`bun test test/codepuppy-mcp-runtime.test.ts -t 'managed pinned|refuted managed|production MCP client registers pinned'` → 5 PASS / 27 assertions（`/tmp/connector-r4-pinned-client.log`）：实际双 SDK peers；完整组 ids 验完才调宿主、去重、当前 token/deadline、并发调用归属、撤销/原调用取消/晚到进度，以及生产 McpClient 的真实 handler 与 Host 端口；握手/列工具期间宿主调用为 0。core/util/ui-mac typecheck exit 0。该文件包含既有真引擎/时序用例，本轮只跑命名新增例和最终相关轻用例，不运行其整文件时序组（brief 禁止）。
+
+接线界限：managedFirstParty 构造上下文是已冻结 binding/declaration 的内部数据轴，并非用户选项；当前还没有从生产 attempt controller 给 McpConnection 传入，main prepareFiles/entryFor 重验与配方展开也未落，因此以上不能作为视频整链完成。#1759 R1/R2 清单仍沿 r3 表，不复制其位置/绑定。

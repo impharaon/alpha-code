@@ -45,6 +45,7 @@ import { readFileSync } from "node:fs"
 import { withFailureCode } from "@opencode/schema/codepuppy-net-failure"
 import { tryCodePuppyBootstrap } from "@opencode/util/codepuppy-bootstrap"
 import { declaredListedTools, listsDeclaration, sameTool, type DeclaredTool } from "./codepuppy-first-party-mcp.js"
+import type { PinnedFilesCallPreparation } from "@opencode/util/codepuppy-connector-launch"
 import { reconnectDelay, type StartFailure } from "./codepuppy-startup.js"
 import { effectiveName, normalizedName } from "../tool/runtime.js"
 // codepuppy ── end
@@ -190,6 +191,7 @@ export interface Interface extends State.Transformable<Editor> {
     readonly name: string
     readonly args?: Record<string, unknown>
     readonly sessionID?: Session.ID
+    readonly preparation?: PinnedFilesCallPreparation
   }, videoProgress?: (update: VideoProgress) => Promise<void>) => Effect.Effect<ToolResult, NotFoundError | ToolCallError>
   readonly instructions: () => Effect.Effect<ServerInstructions[]>
   readonly prompts: () => Effect.Effect<Prompt[]>
@@ -892,7 +894,7 @@ export const layer = (options?: Options) =>
         callTool: Effect.fn("MCP.callTool")(function* (input, videoProgress) {
           const server = ServerName.make(input.server)
           const call = (connection: McpClient.Connection) =>
-            connection.callTool({ name: input.name, args: input.args, sessionID: input.sessionID }, videoProgress) // codepuppy(#1775)
+            connection.callTool({ name: input.name, args: input.args, sessionID: input.sessionID, preparation: input.preparation }, videoProgress) // codepuppy(#1775, #1760)
           const failed = (owner: string) =>
             Effect.mapError(
               (error: Error) =>

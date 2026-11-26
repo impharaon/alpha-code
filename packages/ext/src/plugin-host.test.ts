@@ -2744,6 +2744,41 @@ packageIt.live("only command prompt lifecycle plaintext enters model context", (
   expect(readFileSync(join(location.directory, "plaintext.txt"), "utf8")).toBe("completed")
 })))
 
+packageIt.live("prompt hooks keep sensitive options as safe references before model generation", () => packageJourney(Effect.gen(function* () {
+  const tree = yield* Effect.promise(() => captureStandardFixture("claude:paypal"))
+  const hooks = JSON.parse(new TextDecoder().decode(yield* Effect.promise(() => tree.readFile("hooks/hooks.json"))))
+  const group = hooks.hooks.PreToolUse[0]
+  group.matcher = "Write"
+  group.hooks[0].prompt = "R21_PROMPT_SECURITY secret=${user_config.LANGFUSE_SECRET_KEY} public=${user_config.LANGFUSE_PUBLIC_KEY} root=${CLAUDE_PLUGIN_ROOT} $ARGUMENTS"
+  const sample = yield* invocationSample("claude:langfuse-observability", { "hooks/hooks.json": JSON.stringify({ hooks: { PreToolUse: [group] } }) })
+  const credential = join(sample.root, "prompt-option-fixture.json")
+  const secret = "r21_fake_prompt_secret_for_test_only"
+  handOver(credential, JSON.stringify(secret))
+  const id = sample.description.secrets.find(need => need.label === "LANGFUSE_SECRET_KEY")!.id
+  const settingsFile = join(sample.root, "ext-store", sample.key, "package-settings.json")
+  const settings = JSON.parse(readFileSync(settingsFile, "utf8"))
+  writeFileSync(settingsFile, JSON.stringify({ ...settings, values: { LANGFUSE_SECRET_KEY: { secret: id }, LANGFUSE_PUBLIC_KEY: "r21-public-value" }, secretRefs: { [id]: "{file:" + credential + "}" } }))
+  const membership = JSON.parse(readFileSync(join(sample.root, "skills-enabled.json"), "utf8"))
+  writeFileSync(join(sample.root, "skills-enabled.json"), JSON.stringify({ ...membership, keys: [...membership.keys, sample.key] }))
+  yield* invocationNativeServices
+  yield* activateExtUntilFinished
+  const sessions = yield* Sessions.Service
+  const location = yield* Location.Service
+  const session = yield* sessions.create({ location: { directory: location.directory }, title: "Prompt option security", agent: "build", model: { providerID: "test", id: "picked" } } as never)
+  const llm = yield* TestLLM.Test
+  yield* llm.push(TestLLM.toolCall("prompt_option_write", "write", { path: "prompt-option.ts", content: "fixture" }), TestLLM.text('{"ok":true}', "prompt-option-judgment"), TestLLM.text("Done", "prompt-option-complete"))
+  yield* sessions.prompt({ sessionID: session.id, text: "Write the file" })
+  yield* sessions.wait(session.id)
+  const judgments = (yield* llm.requests()).filter(request => JSON.stringify(request).includes("R21_PROMPT_SECURITY"))
+  expect(judgments).toHaveLength(1)
+  const prompt = JSON.stringify(judgments[0])
+  expect(prompt.includes(secret)).toBe(false)
+  expect(prompt).toContain("${user_config.LANGFUSE_SECRET_KEY}")
+  expect(prompt).toContain("r21-public-value")
+  expect(prompt).toContain(join(sample.live, "tree"))
+  expect(readFileSync(join(location.directory, "prompt-option.ts"), "utf8")).toBe("fixture")
+})))
+
 const runtimePromptSample = (event: "Stop" | "PostToolUse" | "PostToolUseFailure" | "UserPromptSubmit" | "UserPromptExpansion" | "PermissionRequest" | "PostToolBatch", continueOnBlock: boolean) => Effect.gen(function* () {
   const capture = yield* Effect.promise(() => captureStandardFixture("claude:paypal"))
   const source = JSON.parse(new TextDecoder().decode(yield* Effect.promise(() => capture.readFile("hooks/hooks.json"))))

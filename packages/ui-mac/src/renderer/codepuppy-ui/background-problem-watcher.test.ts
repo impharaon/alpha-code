@@ -290,6 +290,10 @@ test("launcher snapshots suppress preparing problems and use the row projection 
   await settle()
   expect(entry()).toBeNull()
   expect(toasts()).toHaveLength(0)
+  // A Location-only connector need not appear in the SDK default-directory table.
+  source.set({})
+  source.emit()
+  await settle()
   snapshot = { ...snapshot, sequence: 1, state: { phase: "failed", failure: { kind: "download", detail: "connection interrupted" }, diagnostic: "one" } }
   changed?.(snapshot)
   await settle()

@@ -287,3 +287,7 @@ UI：`connector-launch-presentation.ts` 为行和 BackgroundProblemWatcher 的�
 偏离/必要同链文件：依据 documents plan:573/704 的明确已接受接缝，撤回本轮计划里拟增 DocumentHost/bridge 方法的路线；实际重试直接绑定当前 runtime 到已有 connector API，没有改 DocumentHost/引擎 API。新增 `connector-launch-client/actions/assistant` 与 `connector-assistant-host.tsx` 分别复用窄 preload、现有密钥/OAuth 入口和现有 router/startChat；index 只挂已有壳的动作宿主；en/zh 添加本片文案；test-component/preload-stub 机械登记新能力缺席，避免改变无此能力的旧组件夹具。`connector-launch-state` 为本片必要生产端文件，使用冻结 API，没有另造下载器/Session 队列。最终静态检查及移除臂见总收据。
 
 未闭环：生产 controller 安装、core changed/diagnostic 消息桥、DocumentRuntime 当前 attempt 绑定由待接启动链装配；Node boot 重锚、PackageRunner 持久准备/离线入口仍需后续实现。未将这些写成已依赖 #1759 自然完成：R1/R2 合入后只解决其位置/最终投影端口，本票仍拥有余下代码与整链验收。
+
+### r3 自验补出的 Location 专属行红例
+
+当前实现 `background-problem-watcher.tsx` 仍从 SDK 默认目录表枚举名称，导致仅在当前 Location 的宿主快照出现的连接器不进入问题入口，违反本片目录身份要求。扩展原组件用例，让 SDK 表为空、宿主当前目录快照失败：`bun test src/renderer/codepuppy-ui/background-problem-watcher.test.ts -t "launcher snapshots suppress"` exit 1 / 0 PASS / 1 FAIL，入口为 null（日志 `/tmp/connector-r3-location-red.log`）。本次先单独提交该红例，随后只修同一 watcher/client 投影；不改断言。

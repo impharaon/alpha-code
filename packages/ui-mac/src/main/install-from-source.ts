@@ -165,7 +165,7 @@ export function createSourceInstaller(deps: Dependencies) {
             notRunning.push({ kind: entry.kind, sourceName: entry.sourceName, reason: "needs-plugin-files" })
             return []
           }
-          const hostName = pluginHostName(entry, packageId, names, name => entry.kind !== "skill" || !!sameSource || uncuratedSkillFreshGate(deps.globalRoot(), name).ok)
+          const hostName = sameSource?.declarations?.find(item => item.kind === entry.kind && item.sourceName === entry.sourceName)?.hostName ?? pluginHostName(entry, packageId, names, name => entry.kind !== "skill" || !!sameSource || uncuratedSkillFreshGate(deps.globalRoot(), name).ok)
           return [{ entry, hostName }]
         })
       if (!mapped.length)

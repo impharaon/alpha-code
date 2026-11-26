@@ -351,7 +351,8 @@ export function createPluginSources(deps: { catalog: () => Promise<readonly Cand
         return id
       }
       const manifest = [".claude-plugin/marketplace.json", ".agents/plugins/marketplace.json"].find(path => capture.nodes.some(node => node.kind === "file" && node.path === path))
-      if (manifest) {
+      const plugin = ["plugin.json", ".claude-plugin/plugin.json", ".codex-plugin/plugin.json"].some(path => capture.nodes.some(node => node.kind === "file" && node.path === path))
+      if (manifest && !plugin) {
         const ecosystem = manifest.startsWith(".agents/") ? "codex" : "claude"
         const marketplace = readMarketplace(await capture.readFile(manifest), ecosystem)
         return { kind: "marketplace", entries: marketplace.entries.flatMap(entry => {

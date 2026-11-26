@@ -1,11 +1,11 @@
 {
   "artifactPath": "packages/ui-mac/src/shared/host-extension-package-contract",
-  "artifactSha256": "5ce5dbc5ff3fe262b4bdb69b6388e42ac1c583338b095544ca7ac8a4422e6cde",
+  "artifactSha256": "50bd6924443a901e15a3cabc780e0432531d296fe19c9320855b1d192a14a524",
   "files": [
     {
-      "bytes": 22669,
+      "bytes": 22668,
       "path": "CONTRACT.md",
-      "sha256": "ed7a89bc75ee88eef63015bc504a7bd14820066ea24da7a30c87c47f89f06567"
+      "sha256": "21c5abb71b7a4245a07a91709c01a44db698d0dd59dbf3263317ebff70cf370e"
     },
     {
       "bytes": 7251,

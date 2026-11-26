@@ -421,3 +421,22 @@ r1 步骤 2 / S4-A/B：四条已提交新回归均转绿（install 两例 2 pass
 r1 实样补红（AC-12）：直接捕获报告中的完整本地目录时，带自身市场清单的真实插件被 `prepareCapture` 当成市场且返回零候选。只补 CodSpeed 原市场文件入既有 standard 归档，保留原字节/provenance。ui-mac `bun test --max-concurrency 2 src/main/plugin-sources.test.ts -t 'a plugin root with its own marketplace'` exit 1，0 pass / 1 fail，Expected package / Received marketplace。此缺陷属本片来源识别，先提交正确红测后修复；早一轮草稿因漏动态 import 未到行为断言，已在提交前纠正，不把它作红证据。
 
 r1 身份映射补红：真实 context7 定义先与一个已存在的同宿主键连接器碰撞，分配 11 位 hash；移除碰撞者再更新源定义时，旧实现重新分配成 10 位并改了组件身份。ui-mac `bun test --max-concurrency 2 src/main/install-from-source.test.ts -t 'allocated plugin host names survive removal'` exit 1，0 pass / 1 fail（Expected context7-de6dee1ccd5 / Received context7-de6dee1ccd）。修正消费已保存 declaration 的映射，不另造身份表。
+
+
+r1 来源与身份收口：`prepareCapture` 在根插件清单存在时保留该插件候选，不因其自带市场清单而改走市场；真正市场根继续逐条指定。该具名红测转绿，`plugin-sources.test.ts` 全文件 46 pass / 0 fail。来源更新复用 declaration 中已分配的同逻辑组件 hostName；移除碰撞者后的更新红测转绿，未新增身份表。MCP 短前缀在长度截断后仍去尾部连字符。变更行为文件 `install-from-source.test.ts` 与 `package-admission.test.ts` 全文件 64 pass / 0 fail。
+
+一次较宽相关集：ui-mac 的 `package-admission.parity.test.ts package-update.test.ts ext-package-lifecycle.test.ts ext-package-ledger-uninstall.test.ts engine-explicit-config.test.ts ext-config.test.ts ext-mcp-policy.test.ts package-mcp-oauth.wiring.test.ts`（均在 src/main），`bun test --max-concurrency 2 <上述文件>` exit 0，221 pass / 0 fail；ext 的 `src/package-scope.test.ts src/plugin-host.test.ts src/engine-transforms.test.ts` 同命令 exit 0，108 pass / 0 fail。两包 `bun typecheck` exit 0；四个主要改动生产模块 scoped oxlint 0 warnings / 0 errors。
+
+删除行为反臂（临时改动、各一次、原字节已恢复）：恢复市场误判、撤回 folder/Git 整树分派、移除身份 hash 的 kind 维度，各自的具名回归均 exit 1 / 1 fail。日志为 `/tmp/plugin-standard-remove-market-root.log`、`/tmp/plugin-standard-remove-whole-source.log`、`/tmp/plugin-standard-remove-identity-kind.log`。它们分别验证来源入口、整树和跨 kind 身份的缺失会被检测。
+
+实样内容验收：ui-mac 运行 `bun /tmp/plugin-standard-r1-real.ts`，最终 exit 0，结果与隔离安装根留在 `/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/plugin-standard-real-dZONcH/results.json`。直接用报告 sample.json 的完整目录，经过真实 captureFolder→prepareCapture→convertCandidate→createSourceInstaller→账本/树探针；十个包整树提交、共 62 个 skill/MCP 组件：Codex Supabase 3/3、build-ios-apps 10/10；Claude plugin-dev 7/7、Supabase 3/3、Cloudinary 8/8（5 MCP）、Catalyst 17/17（1 MCP）、CodSpeed 3/3、Mintlify 3/3、Logfire 7/7、project-artifact 1/1。命令/助手/hooks 原件保留且继续如实 not-running；OpenAI app 编号仍诊断不足。此验收不启动连接器/技能脚本，activate/reload 只记边界，不能作为真实服务连通或 AC-14 正反进程验收。
+
+未完成实样如实保留：Grafana 仍被旧 docker 命令校验拒绝，SAP hana-cli 仍被旧 -p 校验拒绝，Langfuse 仅 hook/options 尚无内容入口；Rill 与 CockroachDB 仍被旧 loopback 校验拒绝。前两轮探测先暴露市场误判（首轮在第五包后结束，第二轮仅余项），修复来源识别后才做上述完整一轮，不把未完成探测写为通过。来源脚本与日志只在临时目录，不成为产品依赖。
+
+**BLOCKED: design — §4.13 / §6 S-09 / §10 — 缺少显式 SSE 的合法运行合同。** 当前 `packages/schema/src/mcp.ts:57–74` 的 RemoteConfig 没有传输选择字段；`packages/core/src/mcp/client.ts:334,387–409` 只持有/构造 StreamableHTTPClientTransport，没有 SSEClientTransport 分支；`packages/plugin/src/promise/mcp.ts:15–18` 公开域仅 list/transform/reload，编辑器只接受该 ServerConfig，内部 MCP.attach 不是这个域的 callable port。冻结 §4.13 又明确要求显式 SSE 必须进入 SSE transport。现有 §10 对 S-09 的 ADR-029 理由只覆盖私有 fetch 组合点，不覆盖 schema 的新选择字段/新接管。不能在未冻结字段/合法端口下扩公开类型、增加隐藏传输开关、假借 attached 或另建 MCP/OAuth 实现。
+
+最小所需输入：设计/编排器补齐显式 HTTP/SSE 选择的类型、传递至同一 McpClient 的端口与所需 ADR-029 精确登记范围（若采用 RemoteConfig 的 typed transport 字段，应同时包含 schema 与 client 及生成消费者），保留同一 OAuth/fetch 权威；只回这个合同缺口，不重开 D1–D17 或产品范围。S-09 的私有 fetch 与 transport 接入是同一运行链，待该合同后集成。AC-04/05/19、AC-20 值保存、AC-25 DATA 绑定、AC-26/27 运行、AC-03 出网及 AC-13/14 直接入口进程证据仍待完成；此轮只完成内容/转换/身份基础，不报 slice 4 DONE。
+
+恢复点：未完成的配置/DATA 私有资源草稿在 `/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/plugin-standard-r1-draft-1f_hita_/`，含 tracked.patch 与三个新文件；已从工作区撤回，没有提交半成品。该草稿尚未实现凭据/运行接线，且 typecheck 曾指出 server 的 PlannedFence 未公开 roots，不是可验收代码；后续从冻结合同与已提交代码继续，按需参考草稿。已核：Codex / GPT-6，输入 spec v5 @7278c10、design v3 @5ee9f55、实施核对 ddb1fc34d3；结论为上述具体设计阻塞。遗留去向：设计/编排器接收 SSE 运行合同；其余未完成 AC 留 #1776，真实账号/本机服务验收仍由编排器安排；两条文档合同基线错误保持原样。未启动 App/Electron/窗口，未改其他仓库/引擎/主权登记/gate，未推送。
+
+r1 最终静态检查：ui-mac 再次 `bun typecheck` exit 0；converter/host 两个 generator `--check` exit 0。当前 host artifact aggregate=`50bd6924443a901e15a3cabc780e0432531d296fe19c9320855b1d192a14a524`，不是 W 已消费/发布的声明。六个改动生产模块 scoped oxlint 0 warnings / 0 errors。Alpha 单仓 profile 的 `check-docs-contract --changed-since ddb1fc34d3` 仍 exit 1，71 errors / 251 warnings，与本轮已确认基线相同；未修那两条被提升的旧引用。链接检查 8 条、`git diff --check` 通过，hooks 保持 `.githooks`。S4-B 的长工具别名与完整运行绑定也仍待续作，未以短 server 名称测试冒称 ≤64 的最终模型工具名已经闭合。

@@ -148,7 +148,7 @@ export function pluginHostName(
   const prefix = entry.sourceName.toLowerCase().replace(/[^a-z0-9_-]+/g, "-").replace(/^[^a-z0-9]+|-+$/g, "") || entry.kind
   const budget = entry.kind === "mcp" ? 24 : 43
   for (let length = 10; length < budget; length++) {
-    const name = prefix.slice(0, budget - length - 1) + "-" + identity.slice(0, length)
+    const name = prefix.slice(0, budget - length - 1).replace(/-+$/, "") + "-" + identity.slice(0, length)
     if (occupied.has("identity:" + name + ":" + identity)) return name
     if (occupied.has(entry.kind + ":" + name) || !available(name)) continue
     occupied.add(entry.kind + ":" + name)

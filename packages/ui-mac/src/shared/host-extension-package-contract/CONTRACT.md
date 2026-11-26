@@ -410,7 +410,7 @@ The root maps to the existing `bundle` ledger kind and owns one tree generation;
 skills refer to their real directories in that tree. Commands, agents and hooks
 can be retained as package content without claiming their runtime is connected.
 
-Standard plugin definitions use the frozen DESIGN-local-plugin-install v3
+Standard plugin definitions use the frozen plugin installation design v3
 contracts (§4.8/4.10/4.13). Source provider selection precedes discovery; root
 portable and Claude declarations merge with the selected provider taking
 precedence. `Text` retains environment/default, option, secret and DATA bindings

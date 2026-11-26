@@ -6,6 +6,7 @@ import { readPinnedFiles } from "../src/main/pinned-files"
 
 readPinnedFiles()
 const channel = resolveChannel()
+await $`bun ./scripts/build-connector-launchers.ts`
 await $`bun ./scripts/build-video-runtime.ts`
 await $`bun ./scripts/build-video-mcp.ts`
 await $`bun ./scripts/gen-office-mcp-tools.ts`

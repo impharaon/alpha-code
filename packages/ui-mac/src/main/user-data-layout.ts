@@ -3,6 +3,9 @@
 // 零依赖:迁移模块的 import 闭包不得因为取一个文件名而拖进解密或钥匙串代码(AC8)。
 export const USER_DATA_LAYOUT = {
   pinnedFiles: "pinned-files",
+  connectorLaunchers: "connector-launchers",
+  connectorRuntime: "connector-runtime",
+  firstPartyCache: "first-party-cache",
   documentRuntime: "document-runtime",
   auth: "codepuppy-auth.json",
   pkce: "codepuppy-pkce.json",

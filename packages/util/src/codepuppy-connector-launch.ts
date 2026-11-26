@@ -1,8 +1,22 @@
 // #1760 frozen connector-launchers §4.6 / DOC-NODE-v2 data definitions.
 // Shared authority only; launcher acquisition, classification and host publication remain #1760 integration.
-import type { EnsurePinnedFileResult } from "./codepuppy-pinned-files.js"
+import type { EnsurePinnedFileResult, PinnedFileId } from "./codepuppy-pinned-files.js"
 
 export type LauncherPlatform = "darwin-arm64" | "win32-x64"
+export type LauncherEnvironment = {
+  platform: LauncherPlatform
+  pinSet: string
+  uv: string
+  uvx: string
+  node: string
+  npmCli: string
+  npxCli: string
+  runtimeRoot: string
+  pythonFileId: PinnedFileId
+  packageManagerEnv: Readonly<Record<string, string>>
+  environment: Record<string, string>
+  firstPartyCacheRoots: Readonly<Record<string, string>>
+}
 export type DownloadFailureEvidence =
   | { kind: "connect" | "timeout"; detail: string }
   | { kind: "http"; status: number; detail: string }

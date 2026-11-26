@@ -19,6 +19,7 @@ import {
 import { DOCUMENT_ASSET_BUILD_DIR, readDocumentAssets } from "./src/main/document-resources"
 import { assertReleaseSource } from "./scripts/release-source"
 import { isReleaseBuild } from "./scripts/build-identity"
+import { CONNECTOR_LAUNCHER_BUILD_DIR, checkLauncherBundle, connectorNodeSigningOptions, finalizeLauncherSignatures } from "./src/main/connector-launchers"
 
 // REQ-089 AC3: the OS protocol list has exactly one source. The installer metadata that makes a
 // cold-start deep link reach the app at all is derived from the same manifest the runtime
@@ -117,6 +118,7 @@ const getBase = (appId: string): Configuration => ({
   // afterPack 核对包里的落点(下方,scripts/target-arch.ts 的 checkPackagedEngineAssets)。
   asarUnpack: [`${ENGINE_ASSETS_DIR}/**`],
   extraResources: [
+    { from: CONNECTOR_LAUNCHER_BUILD_DIR + "/${os}-${arch}/", to: "connector-launchers/" },
     ...(process.platform === "darwin" || process.platform === "win32" ? [
       { from: `${DOCUMENT_ASSET_BUILD_DIR}/`, to: "document-assets/" },
       { from: `${DOCUMENT_ASSET_BUILD_DIR}/node_modules/`, to: "document-assets/node_modules/" },
@@ -251,8 +253,12 @@ const getBase = (appId: string): Configuration => ({
       await sign({
         ...options,
         optionsForFile: (file: string) => {
-          if (path.resolve(file) === path.resolve(options.app))
+          if (path.resolve(file) === path.resolve(options.app)) {
+            finalizeLauncherSignatures(path.join(options.app, "Contents/Resources"))
             finalizeVideoSignatures(path.join(options.app, "Contents/Resources"))
+          }
+          const node = connectorNodeSigningOptions(file, options.app, path.join(packageDir, "resources/connector-node-entitlements.plist"))
+          if (node) return { ...options.optionsForFile?.(file), ...node }
           return options.optionsForFile?.(file) ?? {}
         },
       })
@@ -280,6 +286,7 @@ const getBase = (appId: string): Configuration => ({
     if (context.electronPlatformName !== "darwin" && context.electronPlatformName !== "win32") return
     readDocumentAssets(path.join(packageDir, DOCUMENT_ASSET_BUILD_DIR))
     const target = context.electronPlatformName === "darwin" ? "darwin-arm64" : "win32-x64"
+    await checkLauncherBundle(path.join(packageDir, CONNECTOR_LAUNCHER_BUILD_DIR, target === "darwin-arm64" ? "mac-arm64" : "win-x64"), target)
     if (Arch[context.arch] !== (target === "darwin-arm64" ? "arm64" : "x64"))
       throw new Error("Unsupported video runtime target")
     const { checkVideoRuntime } = await import("./scripts/video-runtime-artifacts")
@@ -295,6 +302,7 @@ const getBase = (appId: string): Configuration => ({
       ? path.join(context.appOutDir, `${context.packager.appInfo.productFilename}.app`, "Contents", "Resources")
       : path.join(context.appOutDir, "resources")
     readDocumentAssets(path.join(resourcesDir, "document-assets"))
+    await checkLauncherBundle(path.join(resourcesDir, "connector-launchers"), mac ? "darwin-arm64" : "win32-x64")
     if (mac) assertPackagedEngineAssets({ resourcesDir, packingArch: Arch[context.arch] })
     const { checkVideoRuntime } = await import("./scripts/video-runtime-artifacts")
     await checkVideoRuntime(path.join(resourcesDir, "video-mcp"), mac ? "darwin-arm64" : "win32-x64")
@@ -306,7 +314,11 @@ const getBase = (appId: string): Configuration => ({
       ? path.join(context.appOutDir, `${context.packager.appInfo.productFilename}.app`, "Contents/Resources")
       : path.join(context.appOutDir, "resources")
     const { finalizeVideoSignatures, checkVideoRuntime } = await import("./scripts/video-runtime-artifacts")
-    if (!mac) finalizeVideoSignatures(resources)
+    if (!mac) {
+      finalizeLauncherSignatures(resources)
+      finalizeVideoSignatures(resources)
+    }
+    await checkLauncherBundle(path.join(resources, "connector-launchers"), mac ? "darwin-arm64" : "win32-x64")
     await checkVideoRuntime(path.join(resources, "video-mcp"), mac ? "darwin-arm64" : "win32-x64")
   },
   dmg: {

@@ -27,3 +27,78 @@ test("package MCP capabilities retain a definition and revoke on replacement, of
     expect(pluginMcpProxySnapshot()).toEqual({})
   } finally { detach(); publishPluginMcpProxies({}); await proxy.close(); await target.stop(true) }
 })
+
+// Real legacy SSE server from core's installed Claude Agent SDK peer (bun.lock); no hand-written JSON-RPC.
+test("explicit SSE registers its real POST endpoint for the same proxy generation and revokes it with the stream", async () => {
+  const { createServer } = await import("node:http")
+  const { dirname, resolve } = await import("node:path")
+  const peer = dirname(Bun.resolveSync("@anthropic-ai/claude-agent-sdk", resolve(import.meta.dir, "../../../core")))
+  const sdk = await import(Bun.resolveSync("@modelcontextprotocol/sdk/server/mcp.js", peer))
+  const sse = await import(Bun.resolveSync("@modelcontextprotocol/sdk/server/sse.js", peer))
+  const { McpClient } = await import("../../../core/src/mcp/client")
+  const { hostEnvironmentLayer } = await import("../../../core/test/fixture/environment")
+  const { Effect } = await import("effect")
+  const { FetchHttpClient } = await import("effect/http")
+  const seen: Array<{ method: string; path: string; privateHeaders: unknown[] }> = []
+  const streams: Promise<void>[] = []
+  const closeServers: Array<() => Promise<void>> = []
+  const transports = new Map<string, InstanceType<typeof sse.SSEServerTransport>>()
+  const endpoint = createServer(async (request, response) => {
+    seen.push({ method: request.method!, path: request.url!, privateHeaders: [request.headers["proxy-authorization"], request.headers["codepuppy-mcp-sse-endpoint"]] })
+    if (request.headers.authorization !== "Bearer invalid-local-sse-token") { response.writeHead(403); response.end(); return }
+    if (request.method === "GET" && request.url === "/events?source=plugin") {
+      const server = new sdk.McpServer({ name: "real-sdk-sse", version: "1.0.0" })
+      server.registerTool("probe", { inputSchema: {} }, async () => ({ content: [{ type: "text", text: "sse-probed" }] }))
+      const transport = new sse.SSEServerTransport("/messages", response)
+      transports.set(transport.sessionId, transport)
+      streams.push(new Promise<void>(resolve => response.once("close", resolve)))
+      closeServers.push(() => server.close())
+      await server.connect(transport)
+      return
+    }
+    const transport = transports.get(new URL(request.url!, "http://localhost").searchParams.get("sessionId") ?? "")
+    if (request.method === "POST" && transport) { await transport.handlePostMessage(request, response); return }
+    response.writeHead(404); response.end()
+  })
+  await new Promise<void>(resolve => endpoint.listen(0, "127.0.0.1", resolve))
+  const address = endpoint.address()
+  if (!address || typeof address === "string") throw Error("SSE fixture port missing")
+  const url = `http://127.0.0.1:${address.port}/events?source=plugin`
+  const proxy = await startEgressPolicyProxy({ log: () => {} })
+  configurePluginMcpProxy(proxy)
+  const detach = attachPluginMcpProxyPublisher(async bindings => publishPluginMcpProxies(bindings))
+  const requests: Array<{ url: string; authorization?: string }> = []
+  const base: typeof fetch = Object.assign((input: Parameters<typeof fetch>[0], init?: Parameters<typeof fetch>[1]) => {
+    requests.push({ url: String(input), authorization: (init as { proxy?: { headers: Record<string, string> } })?.proxy?.headers["Proxy-Authorization"] })
+    return fetch(input, init)
+  }, fetch)
+  try {
+    await bindPluginMcpProxy("sse", { packageId: "claude:sse", entryId: "mcp:sse", generation: "gen-000001-abcdef", definitionDigest: ("sha256:" + "e".repeat(64)) as `sha256:${string}`, serverUrl: url }, "sse")
+    const binding = pluginMcpProxySnapshot().sse![0]!
+    const send = pluginMcpFetch("sse", url, base, "sse")
+    for (const revoke of [false, true]) await Effect.runPromise(Effect.gen(function* () {
+      const client = yield* McpClient.connect({ server: "sse", config: { type: "remote", url, transport: "sse", oauth: false, headers: { Authorization: "Bearer invalid-local-sse-token" } }, directory: import.meta.dir })
+      expect((yield* client.tools()).map(tool => tool.name)).toEqual(["probe"])
+      expect((yield* client.callTool({ name: "probe", args: {} })).content).toEqual([{ type: "text", text: "sse-probed" }])
+      if (!revoke) {
+        const before = seen.length
+        const rejected = yield* Effect.promise(() => fetch(new URL("/unrelated", url), { method: "POST", proxy: { url: binding.proxyUrl, headers: { "Proxy-Authorization": binding.proxyAuthorization }, respectNoProxy: false } }))
+        expect(rejected.status).toBe(405)
+        expect(seen).toHaveLength(before)
+      }
+      if (revoke) { revokePluginMcpProxy("sse"); yield* Effect.promise(() => streams.at(-1)!) }
+    }).pipe(Effect.provide(hostEnvironmentLayer), Effect.provideService(FetchHttpClient.Fetch, send), Effect.scoped))
+    expect(seen.filter(request => request.method === "GET")).toHaveLength(2)
+    expect(new Set(seen.filter(request => request.method === "POST").map(request => request.path)).size).toBe(2)
+    expect(requests.every(request => request.authorization === binding.proxyAuthorization)).toBe(true)
+    expect(seen.every(request => request.privateHeaders.every(value => value === undefined))).toBe(true)
+    const before = seen.length
+    expect((await fetch(requests.find(request => request.url.includes("/messages?"))!.url, { method: "POST", proxy: { url: binding.proxyUrl, headers: { "Proxy-Authorization": binding.proxyAuthorization }, respectNoProxy: false } })).status).toBe(405)
+    expect(seen).toHaveLength(before)
+  } finally {
+    detach(); publishPluginMcpProxies({}); await proxy.close()
+    await Promise.all(closeServers.map(close => close()))
+    endpoint.closeAllConnections()
+    await new Promise<void>(resolve => endpoint.close(() => resolve()))
+  }
+})

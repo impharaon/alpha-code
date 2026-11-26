@@ -1,10 +1,12 @@
 import type { MediaFailure } from "./contracts"
 
-export type ComponentName = "ffmpeg" | "ffprobe" | "sensevoice" | "vad" | "lid" | "diarization-segmentation" | "speaker-embedding" | "whisper" | "ocr" | "ocr-model" | "python" | "yt-dlp" | "yt-dlp-ejs" | "node"
+export type ComponentName = "ffmpeg" | "ffprobe" | "sensevoice" | "sensevoice-tokens" | "vad" | "lid-encoder" | "lid-decoder" | "diarization-segmentation" | "speaker-embedding" | "whisper" | "ocr" | "ocr-model" | "python" | "yt-dlp" | "yt-dlp-ejs" | "node" | { kind: "ocr-model"; script: string }
 export type PreparedComponent = { path: string; digest: string }
 export type VideoRuntime = {
   directory: string
   cacheRoot: string
+  // Fingerprint of the algorithm plus the actual pinned asset digests for this
+  // platform (including lazy language/OCR assets). The preparer owns that list.
   recipe: string
   component: (name: ComponentName) => Promise<PreparedComponent>
   signal: AbortSignal

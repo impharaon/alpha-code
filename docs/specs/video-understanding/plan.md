@@ -235,3 +235,9 @@ last_reviewed: 2026-11-26
 构建复用仓内已锁定的 MCP SDK 2.3.1 与 zod，ui-mac 仅增加直接构建依赖声明，bun.lock 仅三条 workspace 声明变化；未引入新版本。新增 `.gitignore` 的 dist-video 规则与 `scripts/prebuild.ts` 构建接线为必要同一调用链文件。清单保留未改的现有 Office producer，#1760 的 v2 producer schema 转换仍归其拥有者，不在本票添加旧版本解析分支。
 
 `bun test src/main/codepuppy-config-injection.test.ts` 在组合运行中通过；服务/快照初测暴露 SDK 高层类无 setRequestHandler，改用其真实 Server 后，`bun test src/main/video-service.test.ts src/main/office-mcp-tools-snapshot.test.ts` 为 4 pass / 0 fail。实际 SDK InMemoryTransport 往返列出同一 schema，未准备工具不冒充执行成功。`bun typecheck` exit 0；服务源码将随 D2 纳入显式类型检查。
+
+### r3 D2 音轨与持久结果实施记录
+
+新增 `speech-worker.ts`：同一独立服务内的原生推理 worker，避免同步 diarization/ASR 阻塞 MCP 的取消；这是 audio.ts 的必要执行文件，不增加宿主执行入口。冻结的 sherpa 2.0.3 与 Whisper 1.1.3 以 `bun install --ignore-scripts` 锁定，未运行 postinstall/下载模型；原生库的随包构建仍归 D3。完整样本域切块、tiny LID 分路、实际 token/segment 时间、整轨说话人稳定标签、完成 chunk 的持久恢复和搜索已接入；重叠说话保留未知，不删除文字。私有 `runtime.recipe` 由准备者提供算法与该平台实际 pin/随包资产摘要的指纹，不能用版本标签代替。
+
+补充 source/probe 的前后 identity 复核、发布值/引用文件摘要、新进程读取、取消锁等待者与流式子进程失败清理。新增 `video-process.test.ts` 是字节传输/取消的真实子进程用例，不模拟编解码器；`video-transcript.test.ts` 因实际写缓存而使用文件系统层命名，代替计划中的 `.fast.test.ts`。命令 `bun test src/main/video-contracts.fast.test.ts src/main/video-source.test.ts src/main/video-cache.test.ts src/main/video-process.test.ts src/main/video-audio.fast.test.ts src/main/video-transcript.test.ts src/main/video-search.fast.test.ts`：13 pass / 0 fail，50 assertions。缓存投影数据为本机内部 schema，未冒充 sherpa/ffprobe 回执。真实模型的 AC-03/04/05 与对照评分、长片性能仍 pending；没有用 pilot 模型绕过 pin。

@@ -2,9 +2,9 @@ import { createHash } from "node:crypto"
 import { createReadStream } from "node:fs"
 import { open, realpath, stat } from "node:fs/promises"
 import path from "node:path"
-import { cachePath, digest, fileDigest, readJson, withMediaLock, writeJson } from "./cache"
+import { cachePath, digest, readJson, withMediaLock, writeJson } from "./cache"
 import type { MediaRef, TimeRange } from "./contracts"
-import { fail, type VideoRuntime } from "./runtime"
+import { fail, mediaFailure, type VideoRuntime } from "./runtime"
 import { runComponent } from "./process"
 
 export type MediaInfo = { durationMs: number; startMs: number; audioStartMs: number; videoStartMs: number; streams: { kind: "audio" | "video" | "subtitle"; codec: string; language?: string }[]; width?: number; height?: number; fps?: number }
@@ -27,7 +27,10 @@ export async function sourceOf(ref: MediaRef, runtime: VideoRuntime): Promise<So
   })
   if (!info && index) return sourceOf({ kind: "id", id: index.sourceId }, runtime)
   if (!info?.isFile()) fail("source_unreadable", "The source is not a readable media file.")
-  if (index?.identity === identity(info)) return sourceOf({ kind: "id", id: index.sourceId }, runtime)
+  if (index?.identity === identity(info)) {
+    const cached = await readJson<Source>(cachePath(runtime, "sources", `${index.sourceId}.json`))
+    if (cached) return cached
+  }
   const canonical = await realpath(requested)
   const handle = await open(canonical, "r")
   try {
@@ -38,11 +41,13 @@ export async function sourceOf(ref: MediaRef, runtime: VideoRuntime): Promise<So
     const after = await handle.stat({ bigint: true })
     const current = await sourceStat(canonical)
     if (identity(before) !== identity(after) || identity(after) !== identity(current)) fail("source_changed", "The source changed while it was being opened.")
-    const existing = await readJson<Source>(cachePath(runtime, "sources", `${sourceId}.json`))
-    const source: Source = { ...existing, sourceId, path: canonical, name: path.basename(requested), bytes: Number(after.size), aliases: [...(existing?.aliases ?? []).filter((entry) => entry.path !== canonical), { path: canonical, identity: identity(after) }] }
-    await writeJson(cachePath(runtime, "sources", `${sourceId}.json`), source)
-    await writeJson(indexPath, { identity: identity(after), sourceId })
-    return source
+    return withMediaLock(runtime, `source:${sourceId}`, async () => {
+      const existing = await readJson<Source>(cachePath(runtime, "sources", `${sourceId}.json`))
+      const source: Source = { ...existing, sourceId, path: canonical, name: path.basename(requested), bytes: Number(after.size), aliases: [...(existing?.aliases ?? []).filter((entry) => entry.path !== canonical), { path: canonical, identity: identity(after) }] }
+      await writeJson(cachePath(runtime, "sources", `${sourceId}.json`), source)
+      await writeJson(indexPath, { identity: identity(after), sourceId })
+      return source
+    })
   } finally { await handle.close() }
 }
 
@@ -60,6 +65,7 @@ export function probeInfo(raw: unknown): MediaInfo {
   const startMs = Math.round((Number(input.format?.start_time) || 0) * 1000)
   const audio = streams.find((stream) => stream.codec_type === "audio")
   const video = streams.find((stream) => stream.codec_type === "video")
+  if (!audio && !video) fail("format_unsupported", "This file has no supported audio or video stream.")
   const fps = video?.avg_frame_rate?.split("/").map(Number)
   return { durationMs: Math.round(duration * 1000), startMs, audioStartMs: Math.round((Number(audio?.start_time) || 0) * 1000) - startMs, videoStartMs: Math.round((Number(video?.start_time) || 0) * 1000) - startMs,
     streams: streams.flatMap((stream) => ["audio", "video", "subtitle"].includes(stream.codec_type) ? [{ kind: stream.codec_type as "audio" | "video" | "subtitle", codec: stream.codec_name ?? "unknown", ...(stream.tags?.language ? { language: stream.tags.language } : {}) }] : []),
@@ -72,8 +78,21 @@ export async function mediaInfo(source: Source, runtime: VideoRuntime) {
     const saved = await readJson<Source>(cachePath(runtime, "sources", `${source.sourceId}.json`))
     if (saved?.info) return saved.info
     const probe = await runtime.component("ffprobe")
-    const result = await runComponent(probe.path, ["-v", "error", "-show_format", "-show_streams", "-of", "json", await sourceFile(source)], runtime)
+    const file = await sourceFile(source)
+    const result = await runComponent(probe.path, ["-v", "error", "-show_format", "-show_streams", "-of", "json", file], runtime).catch(async (error) => {
+      if (mediaFailure(error).code !== "processing_failed") throw error
+      if (error instanceof Error && /not implemented|unsupported codec|decoder .*not found/i.test(error.message)) fail("format_unsupported", "The prepared decoder does not support this media format.")
+      const handle = await open(file, "r")
+      try {
+        const header = Buffer.alloc(64)
+        const read = await handle.read(header, 0, header.length, 0)
+        const prefix = header.subarray(0, read.bytesRead)
+        const known = /^(RIFF|RF64|OggS|fLaC|ID3)/.test(prefix.toString("ascii")) || prefix.subarray(4, 8).toString("ascii") === "ftyp" || prefix.subarray(0, 4).equals(Buffer.from([0x1a, 0x45, 0xdf, 0xa3])) || prefix[0] === 0xff && ((prefix[1] ?? 0) & 0xe0) === 0xe0
+        fail(known ? "media_corrupt" : "format_unsupported", known ? "The media container is damaged or incomplete." : "This file is not a supported audio or video format.")
+      } finally { await handle.close() }
+    })
     const info = probeInfo(JSON.parse(result.stdout))
+    await verifySourceFile(source, file)
     source.info = info
     await writeJson(cachePath(runtime, "sources", `${source.sourceId}.json`), { ...source, info })
     return info

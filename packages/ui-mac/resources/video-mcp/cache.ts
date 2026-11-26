@@ -40,11 +40,12 @@ export async function withMediaLock<T>(runtime: VideoRuntime, key: string, opera
   return Flock.withLock(key, operation, { dir: cachePath(runtime, "locks"), signal: runtime.signal, timeoutMs: Infinity })
 }
 
-export type Published<T> = { value: T; files: { path: string; bytes: number; sha256: string }[] }
+export type Published<T> = { value: T; sha256: string; files: { path: string; bytes: number; sha256: string }[] }
 
 export async function readPublished<T>(file: string) {
   const record = await readJson<Published<T>>(file)
-  if (!record) return undefined
+  if (!record || !Array.isArray(record.files) || !("value" in record) || record.files.some((entry) => !entry || typeof entry.path !== "string" || !Number.isSafeInteger(entry.bytes) || !/^[a-f0-9]{64}$/.test(entry.sha256))) return undefined
+  if (record.sha256 !== digest(JSON.stringify(record.value))) return undefined
   for (const item of record.files) {
     const info = await stat(item.path).catch((error: NodeJS.ErrnoException) => { if (error.code === "ENOENT") return undefined; throw error })
     if (!info?.isFile() || info.size !== item.bytes || await fileDigest(item.path) !== item.sha256) return undefined
@@ -54,5 +55,5 @@ export async function readPublished<T>(file: string) {
 
 export async function publish<T>(file: string, value: T, files: string[] = []) {
   const entries = await Promise.all(files.map(async (entry) => ({ path: entry, bytes: (await stat(entry)).size, sha256: await fileDigest(entry) })))
-  await writeJson(file, { value, files: entries } satisfies Published<T>)
+  await writeJson(file, { value, sha256: digest(JSON.stringify(value)), files: entries } satisfies Published<T>)
 }

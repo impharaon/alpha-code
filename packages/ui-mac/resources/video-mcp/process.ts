@@ -1,5 +1,6 @@
 import { spawn } from "node:child_process"
 import { createWriteStream } from "node:fs"
+import { rm } from "node:fs/promises"
 import { pipeline } from "node:stream/promises"
 import { fail, type VideoRuntime } from "./runtime"
 
@@ -11,7 +12,11 @@ export async function runComponent(executable: string, args: readonly string[], 
   const controls: Buffer[] = []
   child.stderr.on("data", (value: Buffer) => errors.push(value))
   if (!output) child.stdout.on("data", (value: Buffer) => controls.push(value))
-  const copied = output ? pipeline(child.stdout, createWriteStream(output, { flags: "wx" }), { signal: runtime.signal }) : Promise.resolve()
+  const destination = output ? createWriteStream(output, { flags: "wx" }) : undefined
+  let created = false
+  destination?.once("open", () => { created = true })
+  const copied = destination ? pipeline(child.stdout, destination, { signal: runtime.signal }) : Promise.resolve()
+  const closed = new Promise<void>((resolve) => child.once("close", () => resolve()))
   const ended = new Promise<void>((resolve, reject) => {
     child.once("error", reject)
     child.once("close", (code) => {
@@ -25,7 +30,11 @@ export async function runComponent(executable: string, args: readonly string[], 
     await Promise.all([copied, ended])
   } catch (error) {
     child.kill()
+    await closed
+    await copied.catch(() => {})
+    if (output && created) await rm(output, { force: true })
     if (runtime.signal.aborted) fail("cancelled", "Media processing was cancelled.")
+    if (error && typeof error === "object" && "code" in error && error.code === "ENOENT") fail("component_download_failed", "The prepared component executable is missing.")
     throw error
   }
   return { stdout: Buffer.concat(controls).toString("utf8"), stderr: Buffer.concat(errors).toString("utf8") }

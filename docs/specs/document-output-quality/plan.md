@@ -280,3 +280,52 @@ bun typecheck
 
 
 移除臂：`python3 /tmp/alpha-1761-r6/removal.py` 的 pin 摘要、字体替代表、验证身份、PDF 摘要、重复任务合并、打包入口六臂均 exit 1（断言失败）；逐臂原字节恢复，结果 `/tmp/alpha-1761-r6/removal-results.json` 及各 `arm-*.log`。最初两个等待失败状态的反例暴露测试不应只等某一终态，现改为等待 ready/failed 任一终态再严格断言 failed，反例直接变红；中止并排空了原反例进程，未记其超时为通过。返回前 wider：sidecar-wiring 4 PASS、old-name-scan 10 PASS（新增来源注释先触发旧名守卫，改为引用契约名/提交后通过）；本片唯一用例总数 107 PASS，不累加迭代重跑。正式受围栏固定任务、共享端口/原始包许可与 Windows 的 pending 不变。
+
+## 切片四：文档渲染、共享回执与产物面板
+
+- 依据：spec v1 @ `31cd182e09`，AC-04、05、06、08、10、13 的渲染/回执贡献；冻结设计 @ `46f8580c95a47e4a03ea128d99b405edd3424e6e` §4.1、4.4、4.8、4.9、§6 R4/R5/R12；继承片 2/3。#1760 实际资产/固定文件连接仍为集成依赖，Excel 最终缓存重算在片 5，Read/vision/check 及持久补查 admission 在片 6。
+- 核对：r6 brief 明确授权本片先写计划，未出现冻结设计未决问题即同轮实施；本轮 Codex / GPT-6 按既有契约自核文件与顺序，不冒称调度方另行审查或变更冻结决定。
+
+### 改动
+
+| 文件 | 改什么 |
+| --- | --- |
+| `packages/util/src/codepuppy-document.ts/.test.ts` | 在同一共享面增加 RenderRequest、环境/成品/页/渲染回执/结果、DocumentHost 发布口及纯数据验证；只消费已有 Location/Session ID。check/defer 数据按冻结形状交所属后片处理，不用空成功替代检查 |
+| `packages/util/src/codepuppy-document-resources.ts`（新增）；main 的 `document-resources.ts`、`document-runtime-fonts.ts` 及现有测试 | 将本票已有资源身份/profile 函数移到 main/ext 都可合法消费的 Node 资源权威；原 main 入口消费同一实现。固定脚本/字体/模板来自发布投影，不让 ext import main，也不复制路径/字体/许可证逻辑 |
+| `packages/ui-mac/resources/document-runtime/render_document.py`（新增） | 固定 Office/PDF 快照、格式核对、PDFium 全页 PNG/版本/尺寸/摘要；Office 先 LO PDF，独立 profile，不改原文档，拒旧 PDF 和源变更。XLSX 最终缓存重算调用位在 ext，由片 5 接入，不自造计算器 |
+| `packages/ext/src/document-render.ts/.test.ts`、`document-tool.ts/.test.ts`（新增）、`document-runtime-verify.ts` | Location 绑定的固定执行与结果读回；校验业务参数先于 I/O、工作区真实路径、check/revision/源身份和实际文件，产生共享 metadata；复用公共进程实现/取消，不接任意程序、命令或 main URL。工具文案纳入现有登记簿 |
+| `packages/ext/src/context-injection.ts`、`plugin.ts`、`hub-bridge.ts/.test.ts`；main 的 `codepuppy-sidecar-messages.ts/.test.ts`、既有宿主/sidecar/bootstrap 装配文件（仅必要同链） | 承载 DocumentHost 的 ID 请求/应答、verify 注册及 generation/sequence/停止终结；发布同代只读资源投影，在真实 Location setup 注册和 cleanup。#1760 未交付则保持显式装配依赖，不添加 Node 路径、下载实现或成功替身 |
+| `packages/ui-mac/src/main/document-host.ts/.test.ts`（新增） | 组合环境/准备/Chromium、归属和文件核对；工作根初始化/gitignore；把 pending 的真实 artifact 交冻结 defer 端口，后续 admission/check 归片 6；不从 main 启动用户 Python |
+| `packages/ui-mac/src/main/preview-isolation.ts/.test.ts`（新增）、`html-preview-host.ts`、`rail-preview-host.ts` 及已有测试 | 提取已有预览权限、请求和导航的共同不变量，三个载体消费同一份；保留原预览 UI/交互及 PDF 内置资源能力 |
+| `packages/ui-mac/src/main/document-chromium.ts/.test.ts`（新增） | 固定当前 job 资源映射、离屏载体、无外网、字体/图片/two-rAF 时点、完整网页分片与完整设计 PNG；真实存在/摘要与超时销毁后才发布回执；Electron 用已有测试方式替换，不启动应用或窗口 |
+| `packages/ui-mac/src/renderer/codepuppy-ui/session-rail/artifacts/local-artifacts.ts/.test.ts`、`shared/office-advisories.ts`、`engine-adapter/local-artifacts.engine.cases.ts` | 元数据为成品来源，保留 write/patch、子会话、目录/文档/stat 规则，排除工作根；删除旧 writer 映射/分支，替换编码旧行为的用例，真实引擎 scenario 只更新不在本轮运行 |
+| `packages/core/src/filesystem/codepuppy-project-watch.ts` 及其现有相关测试 | 在唯一 FOLDERS 表忽略工作根，不另加 renderer watcher 排除表 |
+| `docs/specs/document-output-quality/plan.md` | 本片实际文件、证据、偏离与 pending 续记；不改冻结设计、其它规格、ADR 或目录快照 |
+
+### 顺序
+
+1. 共享数据与 Node 资源/profile 权威；固定 Office/PDF renderer 和 Location 适配。先测参数/身份/格式/缺文件、所有真实 PDF 页和摘要，再用片 3 的实际 LO 控制样本做一次性三格式/直接 PDF 输出探针；不用 mock 成功声明真实渲染。运行 util 文档文件、ext 渲染文件和被移动资源的已有文件；必要 package typecheck。
+2. 共用预览隔离和 Chromium 导出。用现有 Electron fake 验三个载体的实际策略、load/fonts/decode/two-rAF、长页最后一片/设计完整画布、外链诊断、超时/失败及缺输出；不启动 app/Electron/窗口。正式离线截图比对保留片 8，不能以 fake 像素代证。
+3. 工具/宿主/桥/回执消费、工作根和 watcher。真实文件的 pending/失败回执不抹掉成品，修正身份不跨会话/Location；不存在的 PNG 不进 metadata。接入面板的同一 schema 并删除旧分支，更新旧行为断言。#1760 的真实 resolveAssets/清单/下载调用及正式 bootstrap 在其交付后核实际集成，不造宿主 fallback。
+4. 每步只跑改变的用例/文件；最后一次跑实际依赖搜索选出的较宽相关文件与包 typecheck。至少含资源/sidecar 消费者、两个预览器既有测试、local-artifacts/office-advisories 的消费者及 watcher 忽略测试。移除身份/页循环/metadata/隔离保护的对应臂必须变红。普通检查不加入完整 LO 旅程或模型测量；不运行整个包、scenario、bin/check 或 gate。
+
+### 风险
+
+- 片 3 的共享获取/许可/Windows 真执行及正式围栏仍 pending；工厂级装配测试不代证安装包，缺真实 pin 不生成假清单或另下 LO。
+- 实际源模板属性未知则 template=null；不据模型声称填 bundled。LO 域/目录内容问题在同一轮改稿与后续真引擎证明，不把转换成功当内容齐全。
+- HTML 允许本地 JS，但资源路径和网络必须受同一 workspace/job 守卫；不能照搬用户预览的体积/页数帽。只给校验过的业务参数，主进程不执行模型命令。
+- pending 持久 admission、实际逐页读图与 Excel 最终缓存是后片所有权；本片只调用既定端口、保留真实渲染事实，不报告“已检查/公式无错”。生产装配缺前片提供者的地方明确 pending，不用未注册端口回退执行。
+
+### 证明
+
+| AC / 本片贡献 | 命名证据 | 删除行为的失败判据 |
+| --- | --- | --- |
+| AC-04 PDF/HTML/design | 实际多页 PDFium、HTML 全 scrollHeight 分片和设计完整画布用例；一次性 LO/直接 PDF 输出与 PNG 尺寸/摘要检查 | 跳过末页、只截首屏、缺 PNG 或伪目标回执失败；离线版面/中文复制/海报溢出仍须真实成品验收 |
+| AC-05 渲染与修正身份 | `document render` / `document tool` 的 checkId、revision、源变更及 metadata 用例 | 错会话/Location/源或迟到结果获接受即失败；实际发现并修一轮留片 6/8 |
+| AC-06/08 来源/全页/字体 | 三 Office 固定转换→PDFium 的真实页数/来源、片 3 profile 共用及模板来源解析 | 替换成其它 Office 预览、丢页、无字体 profile 或口头模板回执失败；干净字体环境和 Windows 真包仍 pending |
+| AC-10 先交付 | pending/失败的实际 artifact 经工具 part→scanLocalArtifacts 的用例 | 环境阻塞文件、丢 metadata、虚构 PNG 或检查失败抹掉文件即失败；持久补查与原会话回复片 6 |
+| AC-13 无外网 | 共享预览隔离和 Chromium 固定资源映射/外链诊断用例 | 新载体未调用共用策略、外网未取消、导航/权限放行则变红；真实包出网记录片 8 |
+
+### 偏离记录
+
+暂无。依据冻结 R4/R5/R12 及 §4.9 选实现细节，没有新产品或跨模块设计取舍，按 r6 继续实施。

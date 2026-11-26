@@ -648,3 +648,5 @@ B6 green：真实 generator 重生 161 份源，Python 结果字节未变，sour
 B7 cache red：原 office-excel 文件两个原生 Python 子进程用例，以真实原稿/LO 缓存 fixture、受控执行边界验证原子写入。修正子脚本缩进后真实 red 为权限 0640→0600 以及 SIGTERM 留下临时文件（B7-cache-red.log，2 FAIL），不是以子进程语法错误充当证据。下一提交只保护缓存 commit 的权限与终止清理。
 
 B7 cache green：office-excel 文件 15 PASS（B7-cache-green.log）。同一原子替换前保留源权限，commit 临界区 SIGTERM 转为退出并执行 finally 删除临时文件，随后恢复原处理器；真实缓存与原稿保真断言保留。Windows ACL/实机验证仍归既有平台验收。
+
+B7 cursor red：原 stdio 模块新增以真实工具生成的 Data 游标续读、不再传 sheet 的用例，现工具把同一游标套给 Summary 而拒绝，target 1 FAIL（B7-cursor-red.log）。下一提交由 OfficeExcel 单一拥有者从它生成的不透明游标还原 sheet，再走原 source/binding 校验；stdio 仅委托，不另抄校验。

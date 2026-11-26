@@ -177,6 +177,16 @@ describe.skipIf(!darwin)("REQ-133 Alpha first-party Office MCP resources", () =>
     expect(payload(messages, 7).inputSchema).toHaveProperty("properties.target")
   }, 180_000)
 
+  testFormat("excel")("read_xlsx resumes the cursor sheet when the next request omits sheet", async () => {
+    createOfficeReaderSamples(python, workspace, ["excel"], bare)
+    const path = join(workspace, "sample.xlsx")
+    const first = payload(await exchange(commandFor("excel"), [initialize(), call(2, "read_xlsx", { path, sheet: "Data", rows: 1 })]), 2)
+    expect(first.nextCursor).toBeString()
+    const next = payload(await exchange(commandFor("excel"), [initialize(), call(2, "read_xlsx", { path, cursor: first.nextCursor, rows: 1 })]), 2)
+    expect(next.sheet).toBe("Data")
+    expect(next.cells).toMatchObject([{ address: "A2", value: "East" }, { address: "B2", value: 12 }, { address: "C2", value: "#REF!" }])
+  })
+
   test("four stdio entry modes expose only their format-specific readers and Excel operations", async () => {
     const expected = {
       word: ["read_docx"],

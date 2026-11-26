@@ -343,7 +343,8 @@ export async function registerPackageHooks(
     unwatchFile(membership, revoke)
     for (const pointer of observed) unwatchFile(pointer, revoke)
     for (const controller of running.keys()) controller.abort()
-    await subscription
+    // The host closes the Location stream scope after plugin cleanup; joining it here blocks that close.
+    void subscription
     await processes.dispose()
     rmSync(directory, { recursive: true, force: true })
   }

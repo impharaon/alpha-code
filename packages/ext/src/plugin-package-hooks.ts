@@ -8,7 +8,7 @@ import { match } from "../../core/src/util/wildcard"
 import { INSTALLED_PLUGIN_SETTINGS_FILE } from "../../ui-mac/src/shared/installed-plugin-settings"
 import { pluginEntryRuntimeAvailable } from "../../ui-mac/src/shared/plugin-package-runtime"
 import { codepuppyCredential } from "../../util/src/codepuppy-credentials"
-import { allInstalledPluginPackages, installedPluginPackage } from "./plugin-package-skills"
+import { allInstalledPluginPackages, allInstalledPluginInstructions, installedPluginPackage } from "./plugin-package-skills"
 import { readPackageAllowSet } from "./gen-skill-paths"
 import { managedPackageEntryAllowedHere } from "./package-scope"
 import { createPackageProcesses } from "./plugin-package-process"
@@ -68,6 +68,7 @@ export async function registerPackageHooks(
   const sessionEpoch = new Map<string, object>()
   const configResults = new Map<string, Map<string, { valid(): boolean; result: Promise<HookResult | undefined> }>>()
   const batches = new Map<string, { complete: Set<string>; pending: Map<string, Promise<Contribution[]>> }>()
+  const children = new Map<string, { parentID: string; agentType: string }>()
   let disposed = false
   const active = (installed: Installed) => {
     if (disposed) return false
@@ -115,6 +116,7 @@ export async function registerPackageHooks(
   watchFile(membership, { interval: 100, persistent: false }, revoke)
   const events = new AbortController()
   const close = (sessionID: string) => {
+    children.delete(sessionID)
     instructions.delete(sessionID)
     failures.delete(sessionID)
     sessionEpoch.delete(sessionID)
@@ -131,42 +133,7 @@ export async function registerPackageHooks(
     sessionContexts.delete(sessionID)
     promptContexts.delete(sessionID)
   }
-  const run = async (
-    event: HookEvent,
-    sessionID: Parameters<Plugin.Context["session"]["get"]>[0]["sessionID"],
-    fields: Record<string, unknown>,
-    call?: GateCall,
-    invocation?: InstructionScope,
-    occurrenceId?: string,
-    batch?: readonly BatchCall[],
-  ) => {
-    const installed = allInstalledPluginPackages(input.root).filter(active)
-    const handlers = installed.flatMap((installed) =>
-      installed.description.entries.flatMap((entry) => {
-        if (entry.kind !== "hook" || !pluginEntryRuntimeAvailable(entry) || entry.hook.event !== event) return []
-        const scope =
-          entry.hook.scope.kind === "package"
-            ? undefined
-            : (instructions.get(sessionID)?.get(installed.key + ":" + entry.hook.scope.entryId) ??
-              (invocation?.item.installed.key === installed.key && invocation.item.entry.id === entry.hook.scope.entryId
-                ? invocation
-                : undefined))
-        if (entry.hook.scope.kind !== "package" && !scope) return []
-        const valid = () =>
-          active(installed) &&
-          (!scope ||
-            (scope.active() &&
-              (invocation === scope ||
-                instructions.get(sessionID)?.get(installed.key + ":" + scope.item.entry.id) === scope)))
-        return valid() ? [{ installed, entry, hook: entry.hook, scope, valid }] : []
-      }),
-    )
-    if (!handlers.length) return []
-    const lifetime = sessionEpoch.get(sessionID) ?? {}
-    sessionEpoch.set(sessionID, lifetime)
-    const currentSession = await context.session.get({ sessionID })
-    let session = currentSession
-    while (session.parentID) session = await context.session.get({ sessionID: session.parentID })
+  const transcriptFor = async (sessionID: string) => {
     const transcript = join(directory, createHash("sha256").update(sessionID).digest("hex") + ".jsonl")
     const history = await context.session.context({ sessionID })
     let parent: string | null = null
@@ -229,9 +196,51 @@ export async function registerPackageHooks(
       mode: 0o600,
     })
     chmodSync(transcript, 0o600)
+    return { transcript, history }
+  }
+  const run = async (
+    event: HookEvent,
+    sessionID: Parameters<Plugin.Context["session"]["get"]>[0]["sessionID"],
+    fields: Record<string, unknown>,
+    call?: GateCall,
+    invocation?: InstructionScope,
+    occurrenceId?: string,
+    batch?: readonly BatchCall[],
+  ) => {
+    const installed = allInstalledPluginPackages(input.root).filter(active)
+    const handlers = installed.flatMap((installed) =>
+      installed.description.entries.flatMap((entry) => {
+        if (entry.kind !== "hook" || !pluginEntryRuntimeAvailable(entry) || entry.hook.event !== event) return []
+        const scope =
+          entry.hook.scope.kind === "package"
+            ? undefined
+            : (instructions.get(sessionID)?.get(installed.key + ":" + entry.hook.scope.entryId) ??
+              (invocation?.item.installed.key === installed.key && invocation.item.entry.id === entry.hook.scope.entryId
+                ? invocation
+                : undefined))
+        if (entry.hook.scope.kind !== "package" && !scope) return []
+        const valid = () =>
+          active(installed) &&
+          (!scope ||
+            (scope.active() &&
+              (invocation === scope ||
+                instructions.get(sessionID)?.get(installed.key + ":" + scope.item.entry.id) === scope)))
+        return valid() ? [{ installed, entry, hook: entry.hook, scope, valid }] : []
+      }),
+    )
+    if (!handlers.length) return []
+    const lifetime = sessionEpoch.get(sessionID) ?? {}
+    sessionEpoch.set(sessionID, lifetime)
+    const currentSession = await context.session.get({ sessionID })
+    let session = currentSession
+    while (session.parentID) session = await context.session.get({ sessionID: session.parentID })
+    const { transcript, history } = await transcriptFor(sessionID)
+    const subagent = ["SubagentStart", "SubagentStop"].includes(event) ? children.get(sessionID) : undefined
+    const subagentFields = subagent ? { agent_id: sessionID, agent_type: subagent.agentType } : {}
     const payload = {
-      session_id: sessionID,
-      transcript_path: transcript,
+      session_id: subagent?.parentID ?? sessionID,
+      transcript_path: subagent ? (await transcriptFor(subagent.parentID)).transcript : transcript,
+      ...(subagent ? { agent_transcript_path: transcript, ...subagentFields } : {}),
       cwd: context.location.directory,
       permission_mode:
         session.agent === READONLY_AGENT ? "plan" : session.agent === ASK_AGENT ? "default" : "bypassPermissions",
@@ -264,6 +273,7 @@ export async function registerPackageHooks(
             const source = call && await input.policy.packageToolCall(call.tool, call.input, bindings, "claude")
             const eventFields: Record<string, unknown> = {
               ...fields,
+              ...subagentFields,
               ...(source ? {
                 tool_name: source.name, tool_input: source.input, tool_use_id: call!.id,
                 ...("tool_response" in fields ? { tool_response: (await input.policy.packageToolCall(call!.tool, fields.tool_response, {}, "claude")).input } : {}),
@@ -581,6 +591,25 @@ export async function registerPackageHooks(
     }
     return contexts
   }
+  await context.tool.transform(editor => editor.update("subagent", tool => {
+    const execute = tool.execute
+    tool.execute = async (value, frame) => {
+      let started = false
+      return execute(value, {
+        ...frame,
+        progress: async update => {
+          await frame.progress(update)
+          if (started || typeof update.sessionID !== "string") return
+          started = true
+          const child = await context.session.get({ sessionID: update.sessionID })
+          const source = allInstalledPluginInstructions(input.root).find(item => item.entry.kind === "agent" && item.name === child.agent)
+          children.set(child.id, { parentID: frame.sessionID, agentType: source?.entry.sourceName ?? child.agent ?? "" })
+          const contexts = await run("SubagentStart", child.id, {})
+          sessionContexts.set(child.id, [...(sessionContexts.get(child.id) ?? []), ...contexts])
+        },
+      })
+    }
+  }))
   const runtime = registerPackageRuntime(context.location, {
     hasElicitationHandlers: () => false,
     async beforeConfigChange(change) {
@@ -770,7 +799,7 @@ export async function registerPackageHooks(
     )
       return
     const session = await context.session.get({ sessionID: event.sessionID })
-    const results = await run(session.parentID ? "SubagentStop" : "Stop", event.sessionID, {
+    const results = await run(children.has(session.id) ? "SubagentStop" : "Stop", event.sessionID, {
       background_tasks: event.background,
       session_crons: [],
     })
@@ -842,6 +871,7 @@ export async function registerPackageHooks(
       runtime.dispose()
       configResults.clear()
       batches.clear()
+      children.clear()
       monitors.clear()
       releasePermissionRequest()
       events.abort()

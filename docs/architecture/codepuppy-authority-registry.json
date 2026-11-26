@@ -2305,7 +2305,7 @@
     },
     {
       "id": "plugin-hook-lifecycle",
-      "decision": "DESIGN-local-plugin-install v3.1 §4.4/4.12 S-03: the ext runner consumes actual session lifecycle and existing idle/synthetic primitives. Package command SessionStart/UserPromptSubmit, Stop, PreToolUse, PostToolUse, PermissionRequest, UserPromptExpansion, PostToolUseFailure and StopFailure, plus prompt PreToolUse, are active; Stop block/reason continues the same Session via its native idle drain, never a second inference loop. PreToolUse runs between policy deny and confirm/pin; the existing identity owner converts source tool fields. Final input, live generation and service digest bind a same-call decision in the existing policy authority; ask wins over allow and native hard deny remains authoritative. Prompt handlers use the existing stateless generate.text without tools and preserve native approval for ok=true. A rejected tool records its native error before the awaited context barrier ends the turn when continueOnBlock=false. Other lifecycle domains are registered only as their consumers land.",
+      "decision": "DESIGN-local-plugin-install v3.1 §4.4/4.12 S-03: the ext runner consumes actual session lifecycle and existing idle/synthetic primitives. Package command SessionStart/UserPromptSubmit, Stop, PreToolUse, PostToolUse, PermissionRequest, UserPromptExpansion, PostToolUseFailure and StopFailure, plus prompt PreToolUse, are active; Stop block/reason continues the same Session via its native idle drain, never a second inference loop. PreToolUse runs between policy deny and confirm/pin; the existing identity owner converts source tool fields. Final input, live generation and service digest bind a same-call decision in the existing policy authority; ask wins over allow and native hard deny remains authoritative. Prompt handlers use the existing stateless generate.text without tools and preserve native approval for ok=true. A rejected tool records its native error before the awaited context barrier ends the turn when continueOnBlock=false. Other lifecycle domains are registered only as their consumers land. S-03 subagent phases use the native subagent tool progress barrier to bind the real child before its first prompt; source agent identity maps from the existing installed entry. Start context enters the child; Stop uses separate actual parent/child transcripts and child-only synthetic continuation. An ordinary session parentID alone is not evidence of subagent execution.",
       "adr": [
         "ADR-029",
         "ADR-047"
@@ -2360,9 +2360,18 @@
         {
           "file": "packages/ext/src/plugin-host.test.ts",
           "name": "package SessionStart hooks run before the first model request and follow bundle activity"
+        },
+        {
+          "file": "packages/ext/src/plugin-host.test.ts",
+          "name": "subagent hooks bind real child identity before its first model and continue only that child"
+        },
+        {
+          "file": "packages/ext/src/plugin-host.test.ts",
+          "name": "a normal session with a parent does not fabricate subagent lifecycle events"
         }
       ]
     },
+
     {
       "id": "plugin-hook-config-change",
       "decision": "DESIGN-local-plugin-install v3.1 §4.12/6 S-04 plus orchestrator ruling 2026-11-27: await the same Location runtime before publishing changed settings or skill revisions, including the skill watcher and config.updated rescan. Rejection keeps the previous effective view without rewriting disk; policy_settings cannot be blocked. Rejected revisions reuse one occurrence and active handler result; disabling its package releases the rejection.",

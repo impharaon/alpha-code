@@ -126,3 +126,9 @@ test("site download keeps yt-dlp cache inside the trusted persistent root",async
  const args=videoDownloadArgs("https://example.invalid/video",{ytdlp:"wheel",ejs:"ejs",node:"node",ffmpeg:"ffmpeg",directory:"output",proxy:"http://proxy.invalid",cacheRoot:root})
  expect(args.slice(args.indexOf("--cache-dir"),args.indexOf("--cache-dir")+2)).toEqual(["--cache-dir",path.join(root,"yt-dlp")])
 })
+
+test("site download prefers a codec supported by the pinned software decoder",async()=>{
+ const {videoDownloadArgs}=await import("../../resources/video-mcp/download")
+ const args=videoDownloadArgs("https://example.invalid/video",{ytdlp:"wheel",ejs:"ejs",node:"node",ffmpeg:"ffmpeg",directory:"output",proxy:"http://proxy.invalid",cacheRoot:root})
+ expect(args.slice(args.indexOf("-S"),args.indexOf("-S")+2)).toEqual(["-S","vcodec:h264"])
+})

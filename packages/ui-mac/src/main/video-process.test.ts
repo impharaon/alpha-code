@@ -29,3 +29,10 @@ test("component cancellation remains typed and does not leave an output or a run
   expect((await readdir(root)).includes("cancelled.bin")).toBe(false)
   expect(mediaFailure(Object.assign(new Error("write failed"), { code: "ENOSPC" }))).toMatchObject({ code: "disk_full", action: "Free disk space and retry." })
 })
+
+test("an unavailable media decoder reports unsupported format and a conversion action",async()=>{
+ // Exact diagnostic from pinned FFmpeg 9.1 libavcodec/av1dec.c:716-719 (ENOSYS path), not an invented probe payload.
+ const diagnostic="Your platform doesn't support hardware accelerated AV1 decoding.\n"
+ const error=await runComponent(process.execPath,["--eval",`process.stderr.write(${JSON.stringify(diagnostic)});process.exitCode=1`],{signal:new AbortController().signal}).catch(value=>value)
+ expect(mediaFailure(error)).toMatchObject({code:"format_unsupported",action:expect.stringContaining("convert")})
+})

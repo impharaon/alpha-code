@@ -30,6 +30,9 @@
 const EXACT = new Set([
   // POSIX/system basics the server, node, git and package managers need
   "PATH",
+  "GOENV",
+  "GOPATH",
+  "GOBIN",
   "HOME",
   "USER",
   "LOGNAME",

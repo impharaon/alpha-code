@@ -21,6 +21,6 @@ declare module "virtual:opencode-server" {
   export function assertCodePuppyBootstrap(): void
   export function startEngine(
     options: import("./engine-server-options").EngineServerOptions,
-    hooks: { onDispatch?: (dispatch: (request: Request) => Promise<Response>) => void; projectTrust: (directory: string) => boolean; packageManagerEnvironment: Readonly<Record<string, string>> },
+    hooks: { onDispatch?: (dispatch: (request: Request) => Promise<Response>) => void; projectTrust: (directory: string) => boolean; packageManagerEnvironment: Readonly<Record<string, string>>; refreshPackageManagerEnvironment?: () => Promise<Readonly<Record<string, string>>> },
   ): Promise<{ url: string; dispatch: (request: Request) => Promise<Response>; close: () => Promise<void> }>
 }

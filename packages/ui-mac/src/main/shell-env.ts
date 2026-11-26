@@ -1,6 +1,6 @@
-import { spawnSync } from "node:child_process"
+import { execFile, spawnSync } from "node:child_process"
 import { userInfo } from "node:os"
-import { basename } from "node:path"
+import { basename, delimiter, isAbsolute, join } from "node:path"
 import type { EngineRoots } from "./process-fence-profile"
 
 export type ShellProbeFenceContext = {
@@ -26,6 +26,29 @@ const TIMEOUT = 5_000
 type Probe = { type: "Loaded"; value: Record<string, string> } | { type: "Timeout" } | { type: "Unavailable" }
 type ShellEnvLogger = {
   log: (message: string) => void
+}
+
+export type GoInstallTarget = { directory: string; configured: boolean }
+
+/** Native configuration resolution, inside the same tested fence and original command environment. */
+export async function queryGoInstallTarget(context: ShellProbeFenceContext, cwd: string, log: (reason: string) => void, signal?: AbortSignal): Promise<GoInstallTarget | null> {
+  const query = (args: string[]) => new Promise<string>((resolve, reject) => {
+    execFile("/usr/bin/sandbox-exec", ["-p", context.profile, "/bin/sh", "-c", 'exec go "$@"', "go", ...args], {
+      cwd, env: { ...context.env, GOTOOLCHAIN: "local", GOTELEMETRY: "off" }, timeout: TIMEOUT, signal, windowsHide: true,
+    }, (error, output) => error ? reject(error) : resolve(output))
+  })
+  try {
+    const native: unknown = JSON.parse(await query(["env", "-json", "GOPATH"]))
+    const changed: unknown = JSON.parse(await query(["env", "-changed", "-json", "GOBIN"]))
+    if (!native || typeof native !== "object" || !("GOPATH" in native) || typeof native.GOPATH !== "string" || !changed || typeof changed !== "object" || Array.isArray(changed)) throw new Error("invalid result")
+    const configured = "GOBIN" in changed
+    const directory = configured ? changed.GOBIN : join(native.GOPATH.split(delimiter)[0] || "", "bin")
+    if (typeof directory !== "string" || !isAbsolute(directory) || (!configured && !isAbsolute(native.GOPATH.split(delimiter)[0] || ""))) throw new Error("invalid directory")
+    return { directory, configured }
+  } catch {
+    log("Go install directory query unavailable")
+    return null
+  }
 }
 
 export function resolveUserShell(envShell: string | undefined, loginShell: string | null | undefined) {

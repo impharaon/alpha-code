@@ -30,6 +30,7 @@ const entry = path.join(uiMac, "engine", "engine-embed.ts")
 const v1Migration = path.resolve(uiMac, "..", "core", "src", "database", "v1-migration.bun.ts")
 const bunSqliteShim = path.join(uiMac, "engine", "bun-sqlite-shim.ts")
 const packageManagerAdapters = [
+  { specifier: "@opencode/core/pty", original: path.resolve(uiMac, "../core/src/pty.ts"), adapter: path.join(uiMac, "engine/package-manager-pty-service.ts") },
   { specifier: "@opencode/util/cross-spawn-spawner", original: path.resolve(uiMac, "../util/src/cross-spawn-spawner.ts"), adapter: path.join(uiMac, "engine/package-manager-spawner.ts") },
   { specifier: "@opencode/util/npm-config", original: path.resolve(uiMac, "../util/src/npm-config.ts"), adapter: path.join(uiMac, "engine/package-manager-npm-config.ts") },
 ]

@@ -2946,3 +2946,45 @@ packageIt.live("the original Claude Security guard receives the source agent ide
     await context.tool.transform(editor => editor.add({ name: "shell", description: "Native shell execution boundary probe", options: { codemode: false }, input: ShellTool.Input, execute: async () => { observed.executions++; return { content: "shell reached" } } }))
   } })
 })
+
+for (const handled of [true, false]) packageIt.live(`package elicitation ${handled ? "answers before native input" : "modifies the real user result"} through the actual stdio transport`, () => packageJourney(Effect.gen(function* () {
+  const { Mcp } = yield* Effect.promise(() => import("../../core/src/mcp"))
+  const { Form } = yield* Effect.promise(() => import("../../core/src/form"))
+  const { ConfigMCP } = yield* Effect.promise(() => import("../../schema/src/config/mcp"))
+  const capture = yield* Effect.promise(() => captureStandardFixture("claude:dash0"))
+  const hooks = JSON.parse(new TextDecoder().decode(yield* Effect.promise(() => capture.readFile("claude/hooks.json"))))
+  // The fixed dash0 groups supply the real event format; only the executable is an observing handler.
+  for (const event of ["Elicitation", "ElicitationResult"]) for (const group of hooks.hooks[event]) {
+    group.matcher = "^r17-elicitation$"
+    for (const handler of group.hooks) {
+      handler.command = process.execPath
+      handler.args = ["-e", "const fs=require('node:fs');const input=await Bun.stdin.json();fs.appendFileSync('elicitation-events.jsonl',JSON.stringify(input)+'\\n');console.log(JSON.stringify({hookSpecificOutput:{hookEventName:input.hook_event_name,...(" + handled + "||input.hook_event_name==='ElicitationResult'?{action:'accept',content:{answer:'package result'}}:{})}}))"]
+    }
+  }
+  const sample = yield* invocationSample("claude:dash0", { "claude/hooks.json": JSON.stringify({ hooks: { Elicitation: hooks.hooks.Elicitation, ElicitationResult: hooks.hooks.ElicitationResult } }) })
+  const membership = JSON.parse(readFileSync(join(sample.root, "skills-enabled.json"), "utf8"))
+  writeFileSync(join(sample.root, "skills-enabled.json"), JSON.stringify({ ...membership, keys: [...membership.keys, sample.key] }))
+  yield* invocationNativeServices
+  const ext = yield* activateExtUntilFinished
+  const sessions = yield* Sessions.Service
+  const location = yield* Location.Service
+  const session = yield* sessions.create({ location: { directory: location.directory }, title: "Elicitation owner", agent: "build", model: { providerID: "test", id: "picked" } } as never)
+  const mcp = yield* Mcp.Service
+  const forms = yield* Form.Service
+  yield* mcp.add("r17-elicitation", new ConfigMCP.Local({ type: "local", protocol: "legacy", command: [process.execPath, join(import.meta.dir, "../../core/test/fixture/codepuppy-mcp-startup-stdio.ts")] }))
+  yield* mcp.awaitStartup()
+  const call = yield* mcp.callTool({ server: "r17-elicitation", name: "elicit", sessionID: session.id }).pipe(Effect.forkScoped)
+  if (!handled) {
+    yield* ext.finish(forms.list().pipe(Effect.map(list => list.length === 1)))
+    const form = (yield* forms.list())[0]!
+    expect(form.sessionID).toBe(session.id)
+    yield* forms.reply({ id: form.id, answer: { answer: "native response" } })
+  }
+  expect(JSON.stringify(yield* Fiber.join(call).pipe(Effect.timeout("3 seconds")))).toContain("package result")
+  expect(yield* forms.list()).toHaveLength(0)
+  const rows = readFileSync(join(location.directory, "elicitation-events.jsonl"), "utf8").trim().split("\n").map(line => JSON.parse(line))
+  expect(rows.map(row => row.hook_event_name)).toEqual(handled ? ["Elicitation"] : ["Elicitation", "ElicitationResult"])
+  expect(rows.every(row => row.session_id === session.id && row.mcp_server_name === "r17-elicitation")).toBe(true)
+  expect(rows[0]).toMatchObject({ mode: "form", message: "SDK fixture input", requested_schema: { type: "object", properties: { answer: { type: "string" } }, required: ["answer"] } })
+  if (!handled) expect(rows[1]).toMatchObject({ action: "accept", content: { answer: "native response" } })
+})))

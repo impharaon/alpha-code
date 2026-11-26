@@ -205,4 +205,51 @@ U/E 各运行 `bun typecheck`，仅处理本片造成的问题；若包已有适
 
 ## 切片二：全部批准通放与系统代理
 
-本轮仅保留交付边界，后续 PLAN 再展开。AC-08 的真引擎/真围栏三条及去档位判断对照、AC-13 的系统代理证明仍为整票必需证据。AC-13 按设计 §4.7、§10：日常从 `resolveEgressRoutes` 注入路由并走真实上游握手；另由编排器安排**一次**真实机器已设本地测试系统代理的真引擎/真围栏验收，连接仅经它可达的目标，保留测试代理连接记录，并对照无系统代理。日常注入不计作系统配置读取已验证。本片不启动 Electron、不改本机系统代理；缺少那次实机记录时，最终 AC-13 不能记为通过。
+- 依据：#1757 r6；[规格 v2 / AC-08、AC-13](spec.md)，[冻结设计 §4.2、§4.5、§4.7、§4.8、§5、§10](design.md) @ `4948d952f3`（tldts 补丁版裁决已随切片一合入）。代码基线 `cd8649b31a`，切片一已经合入。
+- 核对：r6 明确授权先提交本节，再在同轮实施；如出现未决设计问题则只交 PLAN-READY。实机系统代理证据由编排器另行安排，本轮只做路由注入，不改本机设置、不启动应用或 Electron。
+
+### 改动
+
+路径 U 为 `packages/ui-mac/`，E 为 `packages/ext/`。
+
+| 文件 | 改什么 |
+| --- | --- |
+| U `src/main/network-egress-grants.ts` 及已有测试 | N7 的数字目标归一与唯一公网地址判据，消费 IANA 2025-10-09 原表及 fake-IP 例外；旧卡片准入保持既有合同。 |
+| U `src/main/network-egress-upstream.ts`、`.test.ts`（新） | N7 路由解码、system Session 查询、异步原始隧道；目标 lookup 固定地址、公网检查、HTTP(S)/SOCKS 握手、取消及失败分层。 |
+| U `src/main/network-egress-proxy.ts` 及已有测试 | 消费 N7 就绪合同，串联政策判定、路由查询后授权复核、期限与隧道字节流；逐次政策事件关联连接 ID、拒非公网与自身代理循环。 |
+| U `src/main/network-egress-approval.ts` 及已有测试 | 从 N2 完整非空快照读取可信档位；空/不完整 pending 恢复时重新判定；N5 记录接入现有 settings revision 与持久化状态。 |
+| U `src/main/network-egress-passes.ts`、`.test.ts`（新），`egress-grant-records.ts`，`index.ts` | N5 环境隔离的 main-only 追加/读取绑定、严格完整行解码、按 ID 去重和设置聚合；复用既有状态根和日志出口。 |
+| U `src/shared/network-egress-wire.ts` | 补 N5 的 EgressPass 纯类型，已有 settings summary 合同不变。 |
+| U `src/renderer/codepuppy-ui/settings-network-egress.tsx`、已有 `network-egress-card.test.ts`，`src/renderer/i18n/{zh,en}.ts` | 在已批准的联网清单里复用行样式展示首次/最近政策放行与次数、记录写入失败；沿用设置订阅。 |
+| U `src/main/network-egress.engine.cases.ts`、`test-component/network-egress-engine-peer.ts`（如需），已有 `engine-cases` scenario 宿主 | 在既有真引擎/真围栏夹具内增加通放、混合档、私网拒绝与注入系统代理路由；只跑新用例，不重跑 45 秒臂。 |
+| U 已有代理消费者测试：`network-egress-fence.test.ts`、`process-fence-{engine,wiring}.test.ts`、`net-failure-real-stack.test.ts`、`relay-wiring.cases.ts`、`endpoint-route.engine.cases.ts`、`test-component/official-connectors.cases.ts` | 同调用链机械同步原同步 dial 为 N7 异步就绪合同；不改变这些用例原判据。Electron 宿主不在本轮运行。 |
+| `scripts/gate-files.tsv`，U 已有写点/登记/披露测试 | 仅按实际用例数和受托方同步登记，不运行完整登记步骤或 gate。新 main-only 写者不能进入 sidecar 闭包。 |
+
+### 顺序
+
+1. **公网判据与异步上游。** 实现 grants/N7 和代理接线，一起同步受影响的 dial 消费者。先跑新增用例，再完整跑 grants、upstream、proxy 三文件各一次；保持原失败层和 head/背压/静默行为。
+2. **通放决定与记录。** 一起接全 allow 快照、pending 恢复、N5 真实磁盘绑定及设置投影，完整跑 approval、passes、proxy 相关文件。记录失败不阻断已获准拨号。
+3. **设置与真实入口证明。** 增补既有 renderer 测试和 scenario 用例；窄跑新的设置用例，再完整跑 `network-egress-card.test.ts`。一次运行新增真引擎/真围栏用例（按 `-t '通放与混合档|通放拒绝非公网|系统路由注入'`），包含 AC-08 的三条情形和 AC-13 日常代理记录；不重跑旧 45 秒臂。对照在隔离临时副本运行同一判据：去掉全 allow 判断时通放用例出现卡片而红；绕过注入路由时代理记录/目标响应判据红；去掉地址过滤时非公网判据红。每臂只运行所覆盖的新用例一次，保留命令、输出和退出码。
+4. **一次较宽相关集及登记。** 以 rg 查消费变动导出的测试和枚举项，运行 activity、IPC、derived、registry、disclosure、write-sites、gate-file-registry、shared wire；E 的 network-egress/context-injection（若 N6 消费没有改动，不重跑其它 E 宿主）。分别运行受影响的 relay/endpoint/official-connectors 具名 cases，不运行整个 engine-cases 宿主。U `bun typecheck`；locale 独立进程；旧名扫描在每次提交前运行。只同步实际计数，禁止完整 suite/bin/check/gate。
+
+### 风险
+
+- 旧 dial 在多个真实夹具里使用，漏同步会导致其它用例把 TCP 连接误当隧道就绪；通过类型检查、rg 消费者清单及具名调用链测试捕获。
+- DNS 重绑定、短数字与混合地址集：公网判据只在 grants 一处；lookup 测试用 Node 对 localhost 的实际返回结构，生产隧道使用检查过的地址，代理握手核对收到固定 IP。
+- 活动在异步检查中变化、路由等待期间撤销：按 revision 验证档位快照，在真正拨号前复核授权；测试控制这些异步边界，不能从旧快照放宽。
+- 握手提前回 200、额外字节丢失和取消后迟到拨号：真实本地协议 peer 延后应答、带尾字节，并核对无后续连接。JSONL 的半行和写失败分别验证，不把 I/O 失败变成网络拒绝。
+- 预计四个实现单元、约 90 分钟；若规模/时间翻倍按执行规则返回。AC-13 实机验收不计为本轮已证明。
+
+### 证明
+
+| AC | 测试/证据 | 缺少行为为什么会失败 |
+| --- | --- | --- |
+| AC-08 | `network-egress.engine.cases.ts`「通放与混合档」：真引擎与真围栏运行命令，独占 allow 无卡、真实目标响应及日志/settings 计数；再加 ask 的真实活动后同目标出卡。隔离副本去掉全 allow 判断。 | 无档位旁路时独占 allow 等待卡片，响应和 policy-pass 均缺失；误用缓存全局授权时混合档没有卡。 |
+| AC-08 | 同文件「通放拒绝非公网」，真实工具连接短写/私网；grants 表覆盖 IANA 最长前缀、mapped/IPv6/fake-IP；upstream 真实 CONNECT peer 核对 DNS 混合返回被拒、零上游连接与固定目标地址，去掉过滤对照红。 | 目标准入或 lookup 被删，实际握手可达私网、出现政策放行；误拒 fake-IP 会使正例失败。 |
+| AC-08 | `network-egress-passes.test.ts`「逐次落盘与设置聚合」及 renderer 真实设置「通放记录展示」；唯一 ID、重启重读、半行、I/O 失败。 | 漏写一次、错误去重或无订阅投影时实际 JSONL 行数、first/last/count 或 DOM 不符。 |
+| AC-13 | `network-egress-upstream.test.ts` 的真实 HTTP(S)/SOCKS peer、显式 DIRECT/失败后备/取消；`network-egress.engine.cases.ts`「系统路由注入」用真引擎/真围栏及注入的本地测试上游代理，核对代理记录与目标响应，绕过路由对照红。 | 路由被丢弃、未完成握手就回 200、代理未收到 CONNECT、取消后仍拨号，均在实际入口红。 |
+| AC-13 | 编排器另安排：实机设测试系统代理 → 真引擎/真围栏连接仅经该代理可达的目标；保留代理记录，并对照无系统代理。 | 日常注入不能证明 Chromium 读取系统设置；缺实机命令和记录时该部分仍未验证。 |
+
+### 偏离记录
+
+暂无。基线相关三文件为 `bun test --max-concurrency 2 src/main/network-egress-grants.test.ts src/main/network-egress-approval.test.ts src/main/network-egress-proxy.test.ts`：36 pass / 0 fail（日志 `/tmp/egress-s2-baseline.log`）。

@@ -240,3 +240,20 @@ test("masking failure drops previous and current dynamic key names", async () =>
   expect(JSON.stringify(terminal).includes(key)).toBe(false)
   expect(terminal.content).toEqual([{ type: "text", text: ProtectedFiles.MASKING_FAILED_TEXT }])
 })
+
+test("permission causes retain session rejection and masked feedback", async () => {
+  const { Permission } = await import("../../core/src/permission")
+  const { toSessionError } = await import("../../core/src/session/to-session-error")
+  const { mask, values: [value] } = await setup()
+  for (const cause of [
+    new Permission.BlockedError({ rules: [{ action: "read", resource: "*", effect: "deny" }], permission: "read", resources: [".env"], reason: `denied ${value}` }),
+    new Permission.CorrectedError({ feedback: `retry ${value}` }),
+  ]) {
+    const safe = await mask.error({ call, tool: "read", error: new Tool.Error({ message: `wrapper ${value}`, error: new Tool.Error({ message: "inner", error: cause }) }) })
+    const error = toSessionError(safe)
+    expect(error.type).toBe("permission.rejected")
+    expect(error.message.includes(value)).toBe(false)
+    expect(error.message.includes(ProtectedFiles.REDACTED)).toBe(true)
+    expect(JSON.stringify(safe).includes(value)).toBe(false)
+  }
+})

@@ -1022,10 +1022,8 @@ itWithPermission.live("权威 · 项目 agent 的权限(0.1.26 同意后生效):
     const { exit, text, rules } = yield* readerEdits(true)
     expect(rules).toEqual(expect.arrayContaining([{ action: "edit", resource: "*", effect: "deny" }, { action: "shell", resource: "*", effect: "deny" }]))
     expect(Exit.isFailure(exit)).toBe(true)
-    // The configured edit deny still wins; only the public Tool.Error survives output masking.
-    const error = Exit.isFailure(exit) ? Cause.squash(exit.cause) : undefined
-    expect(error).toMatchObject({ _tag: "Tool.Error", metadata: { codepuppyDisplay: { identity: { name: "edit" } } } })
-    expect((error as { error?: unknown }).error).toBeUndefined()
+    expect(JSON.stringify(exit)).toContain('"_tag":"Permission.BlockedError"')
+    expect(JSON.stringify(exit)).toContain('{"action":"edit","resource":"*","effect":"deny"}')
     expect(text).toBe("hello\n")
   }),
 )
@@ -1047,9 +1045,8 @@ itWithPermission.live("权威 · 项目 agent 的 tools(#1693 AC-01):已同意�
     const { exit, text, rules } = yield* readerEdits(true, TOOLS_ONLY_READER)
     expect(rules).toEqual(expect.arrayContaining([{ action: "edit", resource: "*", effect: "deny" }]))
     expect(Exit.isFailure(exit)).toBe(true)
-    const error = Exit.isFailure(exit) ? Cause.squash(exit.cause) : undefined
-    expect(error).toMatchObject({ _tag: "Tool.Error", metadata: { codepuppyDisplay: { identity: { name: "edit" } } } })
-    expect((error as { error?: unknown }).error).toBeUndefined()
+    expect(JSON.stringify(exit)).toContain('"_tag":"Permission.BlockedError"')
+    expect(JSON.stringify(exit)).toContain('{"action":"edit","resource":"*","effect":"deny"}')
     expect(text).toBe("hello\n")
   }),
 )

@@ -3655,7 +3655,9 @@ for (const entry of ["command", "attached skill"] as const) packageIt.live(`canc
   const commands = yield* Command.Service
   const command = sample.hostNames["command:commands/feature-dev.md"]!
   yield* ext.finish(commands.list().pipe(Effect.map(items => items.some(item => item.name === command))))
-  const skills = yield* (yield* Skill.Service).list()
+  const skillRegistry = yield* Skill.Service
+  yield* ext.finish(skillRegistry.list().pipe(Effect.map(items => items.some(item => item.name === sample.hostNames["skill:skills/temporal-developer/SKILL.md"]))))
+  const skills = yield* skillRegistry.list()
   const attached = skills.find(item => item.name === sample.hostNames["skill:skills/temporal-developer/SKILL.md"])!
   const location = yield* Location.Service
   const sessions = yield* Sessions.Service

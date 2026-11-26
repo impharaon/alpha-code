@@ -68,7 +68,7 @@ function bootOrderViolations(source: string): string[] {
     "runNamingMigrationDbStep",
     "runKeychainRenameStep",
     "initCodePuppyEnvironment",
-    "prepareShellProbeFence",
+    "startupShellProbeFence",
     "preferAppEnv",
   ]
   for (const name of order) if (at(name) < 0) out.push(`${name} is not called inside main`)

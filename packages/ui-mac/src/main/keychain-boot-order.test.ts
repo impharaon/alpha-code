@@ -184,7 +184,7 @@ function migrationOrderViolations(source: string): string[] {
   const rename = at("runKeychainRenameStep")
   for (const before of ["app.requestSingleInstanceLock", "app.setName", "runNamingMigrationDbStep"])
     if (at(before) >= rename) out.push(`钥匙串改名步必须在 ${before} 之后`)
-  if (at("prepareShellProbeFence") <= rename) out.push("钥匙串改名步必须在受围栏探针之前")
+  if (at("startupShellProbeFence") <= rename) out.push("钥匙串改名步必须在受围栏探针之前")
   if (rename >= firstYield) out.push("钥匙串改名步必须在第一个 yield* 之前(ready 前后 Chromium 就会按新名查钥匙串)")
   for (const ref of references.filter((r) => r.pos < rename && BEFORE_RENAME_FORBIDDEN.has(r.text)))
     out.push(`改名步之前引用了 ${ref.text}(index.ts:${lineOf(ref.pos)})`)

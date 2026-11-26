@@ -44,7 +44,7 @@ type Whisper = {
 }
 
 export function chunkLanguage(speech: readonly {start:number;end:number}[], start:number,end:number, identify:()=>string): string | undefined {
-  return identify()
+  return speech.some(span=>span.end > start && span.start < end) ? identify() : undefined
 }
 
 async function recognize() {
@@ -157,9 +157,9 @@ async function recognize() {
       const countBefore = parts.length
       const block = new Float32Array(Math.max(1600, end - start))
       block.set(samples.subarray(start, end))
-      const stream = lid.createStream()
-      stream.acceptWaveform({ samples: block, sampleRate: SAMPLE_RATE })
       const language = chunkLanguage(speech,start,end,() => {
+        const stream = lid.createStream()
+        stream.acceptWaveform({samples:block,sampleRate:SAMPLE_RATE})
         try {
           const code = new Intl.Locale(lid.compute(stream).replaceAll("_", "-")).baseName
           if (code !== "und") return code
@@ -178,7 +178,7 @@ async function recognize() {
       })
       const offset = Math.round((start / SAMPLE_RATE) * 1000) + input.audio.offsetMs
       const tail = Math.round((end / SAMPLE_RATE) * 1000) + input.audio.offsetMs
-      if (["zh", "en", "ja", "ko", "yue"].includes(language.split("-")[0]!)) {
+      if (!language || ["zh", "en", "ja", "ko", "yue"].includes(language.split("-")[0]!)) {
         const speechStream = recognizer.createStream()
         speechStream.acceptWaveform({ samples: block, sampleRate: SAMPLE_RATE })
         recognizer.decode(speechStream)
@@ -189,7 +189,7 @@ async function recognize() {
             result.tokens,
             result.timestamps.map((time) => Math.min(tail, Math.max(0, offset + Math.round(time * 1000)))),
             tail,
-            language,
+            language ?? (result.lang || "und"),
           ).filter((part) => part.endMs > part.startMs),
         )
       } else {

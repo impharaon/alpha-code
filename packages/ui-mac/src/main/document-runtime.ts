@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from "node:crypto"
-import { cp, mkdir, mkdtemp, readFile, realpath, rename, stat, writeFile } from "node:fs/promises"
+import { cp, mkdir, mkdtemp, readFile, realpath, readdir, rm, rename, stat, writeFile } from "node:fs/promises"
 import { execFile } from "node:child_process"
 import { promisify } from "node:util"
 import { isAbsolute, join, relative, sep } from "node:path"
@@ -46,6 +46,12 @@ export function createDocumentRuntime(input: {
     state = next
     sequence++
     for (const listener of listeners) listener(state, sequence)
+  }
+  const discardCandidate = async () => {
+    if (!candidate || candidate === destination) return
+    const path = candidate
+    candidate = undefined
+    await rm(path, { recursive: true, force: true })
   }
   const fail = (error: unknown) => publish({ phase: "failed", failure: { kind: "unknown", detail: error instanceof Error ? error.message : String(error) } })
   const dispatch = () => {
@@ -96,9 +102,11 @@ export function createDocumentRuntime(input: {
         if (attempt.cancelled || disposed || !registrations.has(key(registration.location))) return
         publish({ phase: "ready", version: receipt.version, executable: executable(destination, input.platform) })
       } catch (error) {
+        await discardCandidate()
         if (!attempt.cancelled && !disposed) fail(error)
       } finally {
         clearTimeout(cancelTimer); clearTimeout(deadline)
+        if (disposed || (attempt.cancelled && requests.size === 0)) { await discardCandidate(); preparation = undefined }
         if (active === attempt) active = undefined
         if (attempt.cancelled && !disposed) dispatch()
       }
@@ -106,6 +114,8 @@ export function createDocumentRuntime(input: {
   }
   const prepare = async () => {
     try {
+      await mkdir(root, { recursive: true })
+      for (const entry of await readdir(root, { withFileTypes: true })) if (entry.name.startsWith("libreoffice-candidate-")) await rm(join(root, entry.name), { recursive: true, force: true })
       const delivery = await input.ensureFile(selected.id, controller.signal, (received, total) => publish({ phase: "preparing", stage: "download", received, total }))
       if (disposed) return
       if (!delivery.result.ok) {
@@ -118,13 +128,14 @@ export function createDocumentRuntime(input: {
       if (prior?.pinId === selected.id && prior.pinSha256 === selected.sha256) candidate = await realpath(destination)
       if (!candidate) {
         const staging = await mkdtemp(join(root, "libreoffice-candidate-"))
+        candidate = staging
         await (input.extract ?? extractDocumentRuntime)({ archive: delivery.result.path, destination: staging, platform: input.platform, python: input.python, resources: input.resources, signal: controller.signal })
         candidate = await realpath(staging)
       }
-      if (disposed) return
+      if (disposed) { await discardCandidate(); return }
       publish({ phase: "preparing", stage: "verify" })
       dispatch()
-    } catch (error) { if (!disposed) fail(error) }
+    } catch (error) { await discardCandidate(); if (!disposed) fail(error) }
   }
   return {
     retry() {
@@ -170,6 +181,7 @@ export function createDocumentRuntime(input: {
       registrations.clear(); requests.clear(); listeners.clear()
       if (active) { active.cancelled = true; active.abort.abort(); await active.settled }
       await preparation
+      await discardCandidate()
     },
   }
 }

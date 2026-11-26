@@ -40,16 +40,17 @@ export const videoRecipes = [
     entry: "ggml-large-v3-turbo-q5_0.bin",
     required: ["ggml-large-v3-turbo-q5_0.bin"],
   },
-  ...["darwin-arm64", "win32-x64"].map((target) => ({
-    id: `ffmpeg/${target}/9.1-openh264-2.7.0`,
+  ...pins.files.filter((pin) => pin.family === "ffmpeg").map((pin) => ({
+    id: pin.id,
     archive: "tar.gz",
     entry: "ffmpeg",
     required: [
       "ffmpeg",
-      `ffmpeg/bin/ffmpeg${target === "win32-x64" ? ".exe" : ""}`,
-      `ffmpeg/bin/ffprobe${target === "win32-x64" ? ".exe" : ""}`,
+      `ffmpeg/bin/ffmpeg${pin.target === "win32-x64" ? ".exe" : ""}`,
+      `ffmpeg/bin/ffprobe${pin.target === "win32-x64" ? ".exe" : ""}`,
       "ffmpeg/licenses/LGPL-2.1.txt",
       "ffmpeg/licenses/OpenH264.txt",
+      "ffmpeg/licenses/dav1d.txt",
     ],
   })),
   ...["darwin-arm64", "win32-x64"].map((target) => ({

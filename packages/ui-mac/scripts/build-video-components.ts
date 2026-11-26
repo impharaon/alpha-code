@@ -15,7 +15,10 @@ export async function buildVideoComponents(target: VideoTarget, root: string, ou
   const tools = await videoBuildTools(root, target)
   const sources = path.join(root, target === "darwin-arm64" ? "component-sources" : "codec-win-sources")
   const openh264 = await expandVideoBuildSource(root, "openh264", sources)
+  const dav1d = await expandVideoBuildSource(root, "dav1d", sources)
   const ffmpeg = await expandVideoBuildSource(root, "ffmpeg", sources)
+  const version = `${lock.sources.ffmpeg.root.slice("ffmpeg-".length)}-${lock.sources.openh264.root}-${lock.sources.dav1d.root}`
+  const assetName = `video-ffmpeg-${version}-${target}`
   const prefix = path.join(root, target === "darwin-arm64" ? "codec-prefix" : "codec-win-prefix")
   const stage = path.join(root, target === "darwin-arm64" ? "codec-stage" : "codec-win-stage")
   const pkgconfDirectory = path.join(root, "pkgconf-tool")
@@ -26,11 +29,48 @@ export async function buildVideoComponents(target: VideoTarget, root: string, ou
     await runVideoBuild(["make", "-j2"], source)
     await runVideoBuild(["make", "install"], source)
   }
+  const python = Bun.which("python3")
+  if (!python) throw new Error("Video codec build requires Python 3 for the locked Meson/Ninja sources")
+  const hostSources = path.join(root, "host-sources")
+  const meson = await expandVideoBuildSource(root, "meson", hostSources)
+  const ninja = await expandVideoBuildSource(root, "ninja", hostSources)
+  const ninjaBuild = path.join(root, "ninja-host-build")
+  const ninjaName = process.platform === "win32" ? "ninja.exe" : "ninja"
+  if (!(await stat(path.join(ninjaBuild, ninjaName)).catch(() => undefined))) {
+    await runVideoBuild([tools.cmake, "-S", ninja, "-B", ninjaBuild, "-G", "Unix Makefiles", "-DCMAKE_BUILD_TYPE=Release", "-DBUILD_TESTING=OFF"], root)
+    await runVideoBuild([tools.cmake, "--build", ninjaBuild, "--parallel", "2"], root)
+  }
+  const nasm = target === "win32-x64" ? await expandVideoBuildSource(root, "nasm", hostSources) : undefined
+  const nasmName = process.platform === "win32" ? "nasm.exe" : "nasm"
+  if (nasm && !(await stat(path.join(nasm, nasmName)).catch(() => undefined))) {
+    await runVideoBuild(["./configure"], nasm, tools.env)
+    await runVideoBuild(["make", "-j2", "nasm"], nasm, tools.env)
+  }
   const env = {
     ...tools.env,
-    PATH: [path.dirname(pkgconf), tools.env.PATH].join(path.delimiter),
+    PATH: [ninjaBuild, nasm, path.dirname(pkgconf), tools.env.PATH].filter(Boolean).join(path.delimiter),
     PKG_CONFIG_LIBDIR: path.join(prefix, "lib/pkgconfig"),
   }
+  const dav1dOptions = [
+    "--buildtype=release", "--default-library=static", "--libdir=lib", "--wrap-mode=nodownload",
+    "-Denable_tools=false", "-Denable_tests=false", "-Denable_examples=false", "-Denable_docs=false",
+    ...(target === "darwin-arm64" ? ["-Dc_args=-mmacosx-version-min=12.0", "-Dc_link_args=-mmacosx-version-min=12.0"] : []),
+  ]
+  const crossFile = path.join(root, "dav1d-win.ini")
+  const cross = [
+    "[binaries]", "c = 'x86_64-w64-mingw32-clang'", "ar = 'llvm-ar'", "strip = 'llvm-strip'",
+    "[host_machine]", "system = 'windows'", "cpu_family = 'x86_64'", "cpu = 'x86_64'", "endian = 'little'",
+    "[properties]", "needs_exe_wrapper = true", "",
+  ].join("\n")
+  if (target === "win32-x64") await writeFile(crossFile, cross)
+  const dav1dBuild = path.join(root, `dav1d-build-${target}`)
+  await runVideoBuild([
+    python, path.join(meson, "meson.py"), "setup", dav1dBuild, dav1d, `--prefix=${prefix}`,
+    ...dav1dOptions, ...(target === "win32-x64" ? ["--cross-file", crossFile] : []),
+    ...((await stat(path.join(dav1dBuild, "build.ninja")).catch(() => undefined)) ? ["--reconfigure"] : []),
+  ], root, env)
+  await runVideoBuild([path.join(ninjaBuild, ninjaName), "-C", dav1dBuild, "-j2"], root, env)
+  await runVideoBuild([python, path.join(meson, "meson.py"), "install", "-C", dav1dBuild, "--no-rebuild"], root, env)
   const buildFlags =
     target === "darwin-arm64"
       ? ["OS=darwin", "ARCH=arm64", "CFLAGS=-mmacosx-version-min=12.0", "CXXFLAGS=-mmacosx-version-min=12.0"]
@@ -54,6 +94,7 @@ export async function buildVideoComponents(target: VideoTarget, root: string, ou
     "--disable-nonfree",
     "--disable-autodetect",
     "--enable-libopenh264",
+    "--enable-libdav1d",
     "--enable-static",
     "--disable-shared",
     "--disable-doc",
@@ -93,21 +134,23 @@ export async function buildVideoComponents(target: VideoTarget, root: string, ou
   await mkdir(path.join(rootDirectory, "licenses"), { recursive: true })
   await cp(path.join(ffmpeg, "COPYING.LGPLv2.1"), path.join(rootDirectory, "licenses/LGPL-2.1.txt"))
   await cp(path.join(openh264, "LICENSE"), path.join(rootDirectory, "licenses/OpenH264.txt"))
+  await cp(path.join(dav1d, "COPYING"), path.join(rootDirectory, "licenses/dav1d.txt"))
   await writeFile(
     path.join(rootDirectory, "SOURCE.json"),
     JSON.stringify(
       {
-        sources: { ffmpeg: lock.sources.ffmpeg, openh264: lock.sources.openh264 },
+        sources: Object.fromEntries((["ffmpeg", "openh264", "dav1d", "meson", "ninja", "nasm"] as const).map(role => [role, lock.sources[role]])),
         configure: [...flags, ...targetFlags],
+        dav1dBuild: { options: dav1dOptions, cross: target === "win32-x64" ? cross : null },
         openh264Build: [
           "make",
           "-j2",
           ...buildFlags,
-          "PREFIX=<source-root>/codec-prefix",
+          `PREFIX=<source-root>/${prefixName}`,
           "libopenh264.a",
           "install-static",
         ],
-        sourceAsset: `video-ffmpeg-9.1-openh264-2.7.0-${target}-source.tar.gz`,
+        sourceAsset: `${assetName}-source.tar.gz`,
       },
       null,
       2,
@@ -117,7 +160,7 @@ export async function buildVideoComponents(target: VideoTarget, root: string, ou
   // not another 70 MB fetched merely to answer a user's first local question.
   const sourceStage = path.join(root, `codec-source-release-${target}`)
   await mkdir(sourceStage, { recursive: true })
-  for (const role of ["ffmpeg", "openh264"] as const)
+  for (const role of ["ffmpeg", "openh264", "dav1d", "meson", "ninja", "nasm"] as const)
     await cp(await videoBuildSource(root, role), path.join(sourceStage, lock.sources[role].filename))
   await cp(path.join(rootDirectory, "SOURCE.json"), path.join(sourceStage, "SOURCE.json"))
   await cp(
@@ -128,12 +171,21 @@ export async function buildVideoComponents(target: VideoTarget, root: string, ou
   const replay = [
     "#!/usr/bin/env bash",
     "set -euo pipefail",
-    "# Requires make, tar and pkgconf (or pkg-config); Windows cross build also needs the locked llvm-mingw toolchain on PATH.",
+    "# Requires Python 3, CMake, a host C/C++ compiler, make, tar and pkgconf; Windows cross build also needs the locked llvm-mingw toolchain on PATH.",
     'cd "$(dirname "$0")"',
     `mkdir -p ${target === "darwin-arm64" ? "component-sources" : "codec-win-sources"}`,
     `tar -xf ${quote(lock.sources.ffmpeg.filename)} -C ${target === "darwin-arm64" ? "component-sources" : "codec-win-sources"}`,
     `tar -xf ${quote(lock.sources.openh264.filename)} -C ${target === "darwin-arm64" ? "component-sources" : "codec-win-sources"}`,
+    ...(["dav1d", "meson", "ninja", "nasm"] as const).map(role => `tar -xf ${quote(lock.sources[role].filename)}`),
     'source_root="$PWD"',
+    `cmake -S ${quote(lock.sources.ninja.root)} -B ninja-host-build -G 'Unix Makefiles' -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF`,
+    "cmake --build ninja-host-build --parallel 2",
+    ...(target === "win32-x64" ? [`(cd ${quote(lock.sources.nasm.root)} && ./configure && make -j2 nasm)`] : []),
+    `export PATH="$source_root/ninja-host-build:$source_root/${lock.sources.nasm.root}:$PATH"`,
+    ...(target === "win32-x64" ? ["cat > dav1d-win.ini <<'CROSS'", cross.trimEnd(), "CROSS"] : []),
+    `python3 ${quote(`${lock.sources.meson.root}/meson.py`)} setup dav1d-build ${quote(lock.sources.dav1d.root)} --prefix="$source_root/${prefixName}" ${dav1dOptions.map(quote).join(" ")}${target === "win32-x64" ? " --cross-file dav1d-win.ini" : ""}`,
+    `ninja -C dav1d-build -j2`,
+    `python3 ${quote(`${lock.sources.meson.root}/meson.py`)} install -C dav1d-build --no-rebuild`,
     `cd ${target === "darwin-arm64" ? "component-sources" : "codec-win-sources"}/${lock.sources.openh264.root}`,
     `make -j2 ${buildFlags.map(quote).join(" ")} PREFIX="$source_root/${prefixName}" libopenh264.a install-static`,
     `cd ../${lock.sources.ffmpeg.root}`,
@@ -145,7 +197,7 @@ export async function buildVideoComponents(target: VideoTarget, root: string, ou
   ].join("\n")
   await writeFile(path.join(sourceStage, "BUILD.sh"), replay, { mode: 0o755 })
   await mkdir(output, { recursive: true })
-  const archive = path.join(output, `video-ffmpeg-9.1-openh264-2.7.0-${target}.tar.gz`)
+  const archive = path.join(output, `${assetName}.tar.gz`)
   await runVideoBuild([Bun.which("tar") ?? "tar", "-czf", archive, "-C", delivery, "ffmpeg"], root, {
     ...process.env,
     COPYFILE_DISABLE: "1",
@@ -156,10 +208,10 @@ export async function buildVideoComponents(target: VideoTarget, root: string, ou
     COPYFILE_DISABLE: "1",
   })
   const pin = {
-    id: `ffmpeg/${target}/9.1-openh264-2.7.0`,
+    id: `ffmpeg/${target}/${version}`,
     family: "ffmpeg",
     target,
-    version: "9.1-openh264-2.7.0",
+    version,
     originUrl: `https://github.com/impharaon/alpha-code/releases/download/v0.2.8/${path.basename(archive)}`,
     bytes: (await stat(archive)).size,
     sha256: await fileDigest(archive),

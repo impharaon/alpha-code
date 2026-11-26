@@ -581,8 +581,8 @@ test("R12 A4 identical package bytes update the same identity when the requested
  expect(readdirSync(a)).toEqual([]);expect(readdirSync(b)).toEqual([])
 }))
 
-test("R12 A5 command and agent entries run while pending hooks retain whole package content", () => installerHarness(async h => {
-  for (const [name, kinds] of [["explanatory-output-style", ["hook"]], ["pr-review-toolkit", []]] as const) {
+test("R12 A5 command agent and connected package hooks retain whole package content", () => installerHarness(async h => {
+  for (const [name, kinds] of [["explanatory-output-style", []], ["pr-review-toolkit", []]] as const) {
     const result = await h.install(h.request(await h.candidate(name), "r12_unsupported_" + name))
     expect(result).toMatchObject({ ok: true })
     if (!result.ok) throw Error("expected content installation")

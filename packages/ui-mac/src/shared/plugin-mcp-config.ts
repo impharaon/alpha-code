@@ -1,3 +1,4 @@
+import { Schema, Option } from "effect"
 import { pluginDataDirectory, storedPluginOption } from "./installed-plugin-settings"
 import { renderPluginText, pluginOptionEnvironmentName, type Entry, type Text, type PackageTextBindings } from "./host-extension-package-contract/plugin-package"
 import type { McpConfigLeafV1 } from "./plugin-install"
@@ -30,16 +31,18 @@ export function pluginMcpConfig(entry: Extract<Entry, { kind: "mcp" }>, bindings
   }
 }
 
-export function bindPluginMcp(input: {
+type PluginProcessSource = {
   description: import("./host-extension-package-contract/plugin-package").PluginPackage
-  entry: Extract<Entry, { kind: "mcp" }>
   settings: import("./installed-plugin-settings").InstalledPluginSettingsV1
   pluginRoot: string
   projectDir: string
   resolveEnvironment(name: string): string | undefined
   resolveOptionSecret(reference: string): string | undefined
   resolveSecret(id: string): string | undefined
-}): McpConfigLeafV1 {
+}
+
+export function pluginProcessConfig(input: PluginProcessSource) {
+  const secretValues = new Set<string>()
   const values = new Map<string, string | number | boolean>()
   const option = (key: string) => {
     if (values.has(key)) return values.get(key)
@@ -48,19 +51,64 @@ export function bindPluginMcp(input: {
     const stored = storedPluginOption(input.settings, key) === undefined ? definition.default : storedPluginOption(input.settings, key)
     const reference = typeof stored === "object" ? input.settings.secretRefs[stored.secret] : undefined
     const encoded = reference && input.resolveOptionSecret(reference)
-    const value: unknown = typeof stored === "object" ? encoded === undefined ? undefined : JSON.parse(encoded) : stored
+    const decoded = encoded === undefined ? undefined : Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Unknown))(encoded)
+    if (decoded && Option.isNone(decoded)) throw new PluginMcpBindingError("missing-config", key)
+    const value: unknown = typeof stored === "object" ? decoded && Option.isSome(decoded) ? decoded.value : undefined : stored
     if (value === undefined) {
       if (definition.required) throw new PluginMcpBindingError("missing-config", key)
       return
     }
     if (typeof value !== definition.type || typeof value === "number" && !Number.isFinite(value)) throw new PluginMcpBindingError("missing-config", key)
+    if (definition.sensitive && String(value)) secretValues.add(String(value))
     values.set(key, value as string | number | boolean)
     return value as string | number | boolean
   }
-  const config = pluginMcpConfig(input.entry, { pluginRoot: input.pluginRoot, projectDir: input.projectDir,
+  const bindings: PackageTextBindings = { pluginRoot: input.pluginRoot, projectDir: input.projectDir,
     pluginData: pluginDataDirectory(input.settings.dataHome, input.settings.packageId), resolveOption: option,
-    resolveEnvironment: input.resolveEnvironment, resolveSecret: input.resolveSecret,
-  })
+    resolveEnvironment: input.resolveEnvironment, resolveSecret: id => {
+      const value = input.resolveSecret(id)
+      if (value) secretValues.add(value)
+      return value
+    },
+  }
+  const environment = () => {
+    // Only consumed required options can stop an entry. Other unset options simply have no environment export.
+    const names = new Map<string, string[]>()
+    for (const key of Object.keys(input.description.options ?? {})) {
+      const name = pluginOptionEnvironmentName(key)
+      names.set(name, [...(names.get(name) ?? []), key])
+    }
+    const environment: Record<string, string> = { CLAUDE_PLUGIN_ROOT: input.pluginRoot, CLAUDE_PLUGIN_DATA: pluginDataDirectory(input.settings.dataHome, input.settings.packageId) }
+    for (const [name, keys] of names) {
+      if (keys.length !== 1) continue
+      const key = keys[0]!
+      const definition = input.description.options![key]!
+      const stored = storedPluginOption(input.settings, key) === undefined ? definition.default : storedPluginOption(input.settings, key)
+      if (stored === undefined) continue
+      const value = option(key)
+      if (value !== undefined) environment[name] = String(value)
+    }
+    return environment
+  }
+  const render = (text: Text): string => {
+    for (const part of text) {
+      if (typeof part === "string") continue
+      if ("environment" in part && bindings.resolveEnvironment(part.environment.name) === undefined) {
+        if (part.environment.default) render(part.environment.default)
+        else throw new PluginMcpBindingError("dependency-missing", part.environment.name)
+      }
+      if ("option" in part && bindings.resolveOption(part.option) === undefined) throw new PluginMcpBindingError("missing-config", part.option)
+      if ("secret" in part && bindings.resolveSecret(part.secret) === undefined) throw new PluginMcpBindingError("missing-config", part.secret)
+      if ("binding" in part && bindings[part.binding] === undefined) throw new PluginMcpBindingError("dependency-missing", part.binding)
+    }
+    return renderPluginText(text, bindings)
+  }
+  return { bindings, environment, render, secretValues }
+}
+
+export function bindPluginMcp(input: PluginProcessSource & { entry: Extract<Entry, { kind: "mcp" }> }): McpConfigLeafV1 {
+  const process = pluginProcessConfig(input)
+  const config = pluginMcpConfig(input.entry, process.bindings)
   if (config.type !== "local") return config
   const version = input.settings.mcpVersions[input.entry.id]
   if (input.entry.transport === "stdio" && input.entry.floatingVersion && version !== undefined && version.length > 0) {
@@ -69,21 +117,5 @@ export function bindPluginMcp(input: {
     const name = npm ? token.replace(/(?<!^)@[^@/]*$/, "") : token.split("==")[0]!
     config.command[commandIndex] = name + (npm ? "@" : "==") + version
   }
-  // Only consumed required options can stop an entry. Other unset options simply have no environment export.
-  const names = new Map<string, string[]>()
-  for (const key of Object.keys(input.description.options ?? {})) {
-    const name = pluginOptionEnvironmentName(key)
-    names.set(name, [...(names.get(name) ?? []), key])
-  }
-  const environment: Record<string, string> = { CLAUDE_PLUGIN_ROOT: input.pluginRoot, CLAUDE_PLUGIN_DATA: pluginDataDirectory(input.settings.dataHome, input.settings.packageId) }
-  for (const [name, keys] of names) {
-    if (keys.length !== 1) continue
-    const key = keys[0]!
-    const definition = input.description.options![key]!
-    const stored = storedPluginOption(input.settings, key) === undefined ? definition.default : storedPluginOption(input.settings, key)
-    if (stored === undefined) continue
-    const value = option(key)
-    if (value !== undefined) environment[name] = String(value)
-  }
-  return { ...config, environment: { ...environment, ...config.environment } }
+  return { ...config, environment: { ...process.environment(), ...config.environment } }
 }

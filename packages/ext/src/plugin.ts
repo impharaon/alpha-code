@@ -1,3 +1,4 @@
+import { registerPackageHooks } from "./plugin-package-hooks"
 import { registerPackageInvocations } from "./plugin-package-invocation"
 import { aliasPluginMcpTools } from "./plugin-package-tools"
 import { existsSync, readFileSync, readdirSync } from "node:fs"
@@ -171,6 +172,7 @@ export const CodePuppyExt: Plugin.Plugin = {
 
       // `#1419`(REQ-228):看不了图的模型 —— 图片送云端识图,模型可按编号 / 路径追问。登记簿按本 Location 建
       // (#223 R7 的纪律);能力真源是引擎目录里的模型(modelFacts);转写正文跨重启缓存在插件存储里。
+      cleanups.push(await registerPackageHooks(context, { root: bootstrap.paths.globalRoot, projectRoot: () => projectRootFor(directory)?.directory, log: error }))
       const packageInvocations = await registerPackageInvocations(context, { root: bootstrap.paths.globalRoot, projectRoot: () => projectRootFor(directory)?.directory, policy, log: error })
       cleanups.push(() => packageInvocations.dispose())
       const vision = createCloudVisionHooks({

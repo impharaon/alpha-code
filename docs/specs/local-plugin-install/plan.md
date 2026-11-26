@@ -876,3 +876,37 @@ B5：7749386aed 独立回归先红 0 pass / 1 fail（`/tmp/plugin-standard-r9-B5
 S-01 补口：orchestrator ruling r9（Claude Opus 5.5，2026-11-27）接受原 r8 接缝，core 注册同一 Location renderer 的 bind-only shell target；输入为 source/boundValue parts，输出 executable/argv/env，不执行。ada9b9f7be 独立红测 core/port 各 0 pass / 1 fail（`/tmp/plugin-standard-r9-S01{,-port}-red.log`）；原 renderer 注册者和两个端口在同一槽释放，ext 不复制绑定器。新 reverse API `bindPackageShellCommand` 只交接当前 shell 的绑定结果，由原 AppProcess 保持 stdin/超时/取消/streams/围栏归属。既有 S-01 registry 同提交记录决定和具名 proof；gate-files 精确 core 条数 13，port 原单用例合并验证生命周期，不增重复 runtime build。r8 共同接缝关闭，下一步实施片 5 运行消费者。
 
 S-01 补口完成：core 原行为文件 **13 pass / 0 fail**、plugin 端口原文件 **1 pass / 0 fail**（`/tmp/plugin-standard-r9-S01{,-port}-green.log`）；真实 marker 在 bind 后不存在、由 AppProcess 执行后才出现，带注入语法/空格的值逐字返回。core `bun typecheck` 修正测试路径为既有 AbsolutePath brand 后 exit 0（2,059 files，`/tmp/plugin-standard-r9-core-types-final.log`），plugin `bun typecheck` exit 0（326 files，`/tmp/plugin-standard-r9-plugin-types.log`）。这不是进程/handler 运行 AC 完成，仅关闭 r8 的 binding 边界。
+
+### r9 片 5 进程与会话阶段增量
+
+片 5 本轮只推进到可运行的基础边界，**不是整片 DONE**。bc85b46202 的新 process 模块回归先红 0 pass / 2 fail；75fd305188 的真实 SessionStart 旅程先红 0 pass / 1 fail（`/tmp/plugin-standard-r9-{process,hook-start}-red.log`）。`plugin-package-process.ts` 使用原 AppProcess 的 stdin/timeout/signal/stream，exec argv 与 shell source 分开，后者只调用 S-01。OPTION/default/secret/DATA 抽到现有 `plugin-mcp-config.ts` 的唯一 process config，MCP 保留原绑定路径和远程项不导出无关环境的行为，没有复制一套选项解析。敏感 argv 使用原 Redacted，控制 JSON 在私有端解码后才脱敏文字/日志，monitor 行与 stderr 仍脱敏；56bc2a2180 的真实 learning JSON 反例先红 0 pass / 1 fail（secret 恰为 SessionStart 时原输出错误地改坏 hookEventName，`/tmp/plugin-standard-r9-process-control-red.log`）。
+
+`plugin-package-hooks.ts` 作为 L0 消费者接到真实 awaited prompt/context，当前支持 package scope 的 command SessionStart/UserPromptSubmit；不在安装或启用时启动。真实会话历史投影到 0700 目录/0600 JSONL，包根/项目作用域仍读唯一允许集；进程、上下文与当前 tree/settings/会话 lease 绑定，关闭/换代/配置变化收回旧资源，异步回投也检查 lease。源 matcher/if 复用工具规则 parser；source order 在各阶段内保持，SessionStart 的贡献先于 UserPromptSubmit。这里只证明本节明确列举的行为，不将其余 hook 阶段、agent/skill 作用域、prompt handler、权限决定、Stop/StopFailure、监视触发/通知、扩展事件或 S-04…07 标完成。
+
+实际 Source readiness 由新增私有 `shared/plugin-package-runtime.ts` 单点投影，两个安装入口与运行端共用；仅已接通的上述阶段不再标 kind-not-supported-yet。bundle 仍无组件行，其他事件/monitor 保留具体未运行注释。install-from-source 的既有 R12 精确 hook 断言按此已定 D4 行为改为 connected；保留 graph/record 数与其他断言。context callback 精确计数 5→6，仍验证共用 assembler 恰一次；wrapper 与库存由原 generator 同步，不改预算/分类/门。gate-files 仅将实际改变文件的已有计数同步为 core 13、plugin-host 66、context-injection 45。
+
+必要同链文件：共享 process config 是 MCP 与新进程共同的配置权威；私有 readiness 列表保证主进程注释与实际消费者一致；CONTRACT/modules 记录真实支持边界。`plugin-setup-order.cases.ts` 的事件 mock 原来永远不结束且忽略 signal，新增 await 清理后宿主 1 fail / 子例超时（`/tmp/plugin-standard-r9-ext-wider.log`）。2c704aeeba 只让 mock 遵守原 AbortSignal 合同，不改断言/延长 timeout；原宿主完整 1 pass（内部 2 pass），`/tmp/plugin-standard-r9-setup-green.log`。没有新增 engine takeover；S-01 增量已在 507735a2f6 同提交登记。
+
+S-01 实际类型补口供设计镜像：PreparedShellCommand 只取 PreparedInstruction.parts；BoundShellCommand 为 `{executable:string, argv:readonly string[], env:Record<string,string>}`；`bindPackageShellCommand(location,input)` 返回该结果。原 registerPackageInstructionRenderer 增加必需的第三个 bind 回调，与 instruction 回调共享同一 Location 槽及释放。没有旧版兼容分支/执行器副本。
+
+一次性实际样本（测试临时追加到既有 plugin-host 文件，运行后 scoped git restore，未加入套件）：包内 `bun test --max-concurrency 2 src/plugin-host.test.ts -t "temporary real sample probe"` **2 pass / 0 fail / 11 assertions**，`/tmp/plugin-standard-r9-real-probes.log`。Hookify 保留原脚本，仅以 observer exec wrapper 捕获实际 stdin 与 JSONL；第二次提交含正确 session_id/cwd/prompt，转录含真实首轮 user/assistant 及父 UUID，文件/目录 0600/0700，原 Python 脚本 exit 0。Ralph 使用原 command 的 fenced setup，直接由共享 renderer 执行原 setup-ralph-loop.sh，临时项目 state 含 max_iterations=2、DONE 与 literal test prompt；没有借模型再调用 Bash 来掩盖 B1。
+
+| 实样 | 本轮实际执行 | 未完成/未验证 |
+| --- | --- | --- |
+| learning-output-style | 原 SessionStart script → 首个模型请求；bundle 关闭后的新会话无该贡献，永久旅程通过 | 其余无独立事件 |
+| hookify | 原 UserPromptSubmit Python，真实 stdin/transcript，exit 0 | Pre/PostToolUse、Stop 尚未接线 |
+| ralph-loop | 原 fenced command setup 写真实 state | Stop 循环尚未接线 |
+| code-modernization / claude-security / Langfuse / dash0 / Stripe / PayPal / Convex | 继承 r8 声明/整树证据 | 本轮未做完整 runtime 旅程；不能称完整可用 |
+
+截至本增量的相关文件集合 **407 pass / 0 fail**，重跑不累加：
+
+- Core：原 changed behaviour 文件 13 pass，加 `bun test --max-concurrency 2 test/config/command.test.ts test/command.test.ts` 35 pass；Plugin 原 port 文件 1 pass。日志 `/tmp/plugin-standard-r9-{S01-green,core-wider,S01-port-green}.log`。
+- Ext：`bun test --max-concurrency 2 src/plugin-host.test.ts src/plugin-package-process.test.ts src/context-injection.test.ts` **114 pass**（`/tmp/plugin-standard-r9-hooks-files-complete.log`）；registry 文件 5 pass（wider 原输出中的同一文件），setup 宿主修夹具后 1 pass，内部子例不双计。
+- UI：install-from-source 文件 45 pass（`/tmp/plugin-standard-r9-install-green.log`）；一次较宽集合七文件 **193 pass**（`/tmp/plugin-standard-r9-ui-wider.log`）：converter/artifact/envelope、package-mcp-activation、connector-credential-read、plugin-package-accounts、package-admission。未把此前重复的 30 条再累加。
+- core/plugin/ui-mac/ext 包内 bun typecheck 均 exit 0；最后 UI/Ext 为 `/tmp/plugin-standard-r9-{ui,ext}-types-complete.log`。根无测试，未跑整包/整层、bin/check/gate run、容量或测量。两项实样 probe 不计入 407。
+
+### r9 未完成范围（交接，不作为通过）
+
+B1/B2/B5 与 S-01 bind-only 已完成；片 5 尚需完成并给证据：调用/工具事件与 scoped hooks、PreToolUse/PermissionRequest 当次 allow/updatedInput、Post/Failure/Stop 与 async/rewake 完整旅程、prompt handler、monitor 的实际触发/通知和生命期、FileChanged/CLAUDE_ENV_FILE、真实 leave/notification、ConfigChange/InstructionsLoaded/Compact/Elicitation 及 PostToolBatch。基础层中已写的相关分支不等于这些 AC 通过。
+
+按 r9 指定顺序，其余 A1–A9（包括 A9 的四项）及 B3/B4/B6/B7/B8 **尚未实施**，没有为它们写或运行红测；A1 的 engine case / gate slot 未执行，不声称冷启动已修复。下一步继续片 5 运行链，再执行这些已接受修正；无需重新裁决 S-01。外仓 consumer pin/vendor 完全未改，交编排器统一 checkpoint；三条 core 旧模型断言未改/未复跑。已核 Codex（GPT-6）；无新增设计决定或 OPTIONAL。

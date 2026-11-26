@@ -1,5 +1,5 @@
 export type { Sha256, RelPath, Json, Source, Provider, TreeNode, Capture, Text, ToolRule, ModelHint, ArgumentSyntax, SkillDisplay, McpToolDependency, Invocation, SecretNeed, LoginNeed, HookEvent, Hook, Entry, Diagnostic, PluginPackage, MarketplaceEntry } from "./plugin-package";
-import type { RelPath, Json, Source, Capture, Text, Entry, Diagnostic, PluginPackage, MarketplaceEntry } from "./plugin-package";
+import type { RelPath, Json, Source, Capture, Text, ToolRule, Entry, Diagnostic, PluginPackage, MarketplaceEntry } from "./plugin-package";
 export declare class CaptureError extends Error {
     readonly code: "invalid-path" | "duplicate-path" | "invalid-node" | "read-failed" | "digest-mismatch";
     readonly path: string;
@@ -26,6 +26,7 @@ export declare function convertMcpServerDefinition(server: Json, source: Source)
     package: PluginPackage;
     privateCredentials: ReadonlyMap<string, Uint8Array>;
 };
+export declare function pluginToolRules(value: unknown, invalid: () => void): ToolRule[];
 /** Materialize only the installed copy; discovery and frontmatter field meanings remain converter-owned. */
 export declare function renderInstalledSkill(entry: Extract<Entry, {
     kind: "skill";

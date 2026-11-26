@@ -89,4 +89,7 @@ S-01 的 `@opencode/plugin/codepuppy-package-runtime` 只持有同进程、按 L
 `packages/ext/src/plugin-package-invocation.ts` 将已安装包的 command/agent/skill 接到原 command、skill 与 subagent 执行器，沿唯一 PackageAllowSetV3 检查分项和项目范围。调用期工具规则由既有 policy 绑定，下一用户输入/idle 清除；paths 用实际文件工具完成事件，preload 与 memory 在子会话上下文绑定，模型建议/effort 从原模型目录解析。指令模板只经 S-01 的 core renderer，源 shell 规则匹配复用纯 ShellScan，未新增执行循环或模板解释器。
 
 
-共享 converter 同时归一化 package/skill/agent hooks 与 session monitor 声明；`plugin-package.ts`、profile schema 和生成 ESM 保持同一形状。纯 `plugin-hook-events.ts` 持有事件名及五项无宿主时机原因，renderer 复用它展示逐项原因。该转换层不启动进程；S-01 的 bind-only shell 端口现与指令渲染共用 core 绑定函数，返回当前 executable/argv/每次调用的 env，值不进入命令源码；hook/monitor 的运行消费者仍待接入。PackageAllowSetV3 的 bundle 根使用既有 root/effect/claim 算法表达整包活动与项目范围，不显示为组件行。
+共享 converter 同时归一化 package/skill/agent hooks 与 session monitor 声明；`plugin-package.ts`、profile schema 和生成 ESM 保持同一形状。纯 `plugin-hook-events.ts` 持有事件名及五项无宿主时机原因，renderer 复用它展示逐项原因。该转换层不启动进程；S-01 的 bind-only shell 端口现与指令渲染共用 core 绑定函数，返回当前 executable/argv/每次调用的 env，值不进入命令源码；ext 的包进程消费者在同一运行边界接入。PackageAllowSetV3 的 bundle 根使用既有 root/effect/claim 算法表达整包活动与项目范围，不显示为组件行。
+
+
+`packages/ext/src/plugin-package-process.ts` 消费 S-01 bind-only 结果与既有 AppProcess；`shared/plugin-mcp-config.ts` 的同一 process config 持有 OPTION/default/secret/DATA 绑定，MCP 与包进程复用。hook 的会话资源由 `plugin-package-hooks.ts` 管理，当前接通 package command 的 SessionStart/UserPromptSubmit awaited 阶段，按真实历史生成私有 JSONL；包/配置/代际与会话生命周期收回进程和迟到上下文。`shared/plugin-package-runtime.ts` 是桌面连接状态投影的唯一列表，安装结果不把尚未接通的事件或 monitor 当已运行。

@@ -428,5 +428,9 @@ package/skill/agent scope, timeout and failure policy. Command hooks retain
 optional argv and async/rewake fields; prompt hooks retain model hints and
 continue-on-block. Monitor declarations retain their command, description and
 always/skill trigger. `plugin-hook-events.ts` owns the event vocabulary and the
-five specific unavailable-trigger reasons. These normalized definitions do not
-claim that the desktop hook/monitor runtime has been connected.
+five specific unavailable-trigger reasons. Normalized definitions alone do not
+establish runtime activity. The desktop's
+capability projection connects package command hooks at the awaited SessionStart
+and UserPromptSubmit phases; other hook scopes/events and monitor declarations
+retain their entry-specific not-running annotation. Installing content does not
+execute these hooks.

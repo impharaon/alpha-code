@@ -461,7 +461,7 @@ function credentialText(value: string, context: CredentialContext): Text {
 }
 
 function invocation(data: Record<string, unknown>, syntax: ArgumentSyntax, path: string, diagnostics: Diagnostic[]): Invocation {
-  const rules = (field: string) => toolRules(data[field], () => diagnostics.push({ path, field, code: "invalid-definition", message: "Tool rule has unbalanced syntax" }))
+  const rules = (field: string) => pluginToolRules(data[field], () => diagnostics.push({ path, field, code: "invalid-definition", message: "Tool rule has unbalanced syntax" }))
   const effort = ["low", "medium", "high", "xhigh", "max"].find(value => data.effort === value) as Invocation["effort"]
   const memory = ["user", "project", "local"].find(value => data.memory === value) as Invocation["memory"]
   return {
@@ -478,7 +478,7 @@ function invocation(data: Record<string, unknown>, syntax: ArgumentSyntax, path:
   }
 }
 
-function toolRules(value: unknown, invalid: () => void): ToolRule[] {
+export function pluginToolRules(value: unknown, invalid: () => void): ToolRule[] {
   const result: ToolRule[] = []
   for (const source of typeof value === "string" ? [value] : Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : []) {
     let start = 0

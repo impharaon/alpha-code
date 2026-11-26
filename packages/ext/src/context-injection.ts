@@ -232,6 +232,7 @@ const IDENTITY_CAPS_DOMAIN: Record<keyof Required<CodePuppyCapabilities>, true> 
 export const IDENTITY_FRAGMENT_ID = "instruction.codepuppy-identity"
 export const BEHAVIOR_FRAGMENT_ID = "instruction.codepuppy-behavior"
 export const PACKAGE_TOOL_DEPENDENCY_ID = "package.tool-dependency"
+export const PACKAGE_HOOK_CONTEXT_ID = "package.hook-context"
 export const PACKAGE_MEMORY_ID = "package.agent-memory"
 export const PACKAGE_PARTIAL_ID = "package.partial-task"
 
@@ -568,6 +569,7 @@ function rebrandFragments(): RebrandFragment[] {
 /** 登记簿本体。顺序 = 库存打印顺序(按 kind 再按 id 排序在 inventory() 里做,这里只求全)。 */
 export const CONTEXT_INJECTIONS: readonly ContextInjection[] = Object.freeze([
   defineWrapper({ id: PACKAGE_TOOL_DEPENDENCY_ID, sink: "system", template: "Unavailable declared tools for {label}:\n{body}", maxBytes: CAP_DESCRIPTION }),
+  defineWrapper({ id: PACKAGE_HOOK_CONTEXT_ID, sink: "system", template: "Package hook context: {label}\n{body}", maxBytes: CAP_DESCRIPTION }),
   defineWrapper({ id: PACKAGE_MEMORY_ID, sink: "system", template: "Agent memory file: {label}\nUse the existing file tools and permissions to read and update durable notes there.\n{body}", maxBytes: CAP_DESCRIPTION }),
   defineTemplate({ id: PACKAGE_PARTIAL_ID, sink: "tool-output", template: "Partial task: {name}. Continue the child session for remaining work.", maxBytes: CAP_DESCRIPTION }),
   // ── codepuppy-prompts.ts:config hook set-if-absent 接管 ─────────────────────────

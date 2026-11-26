@@ -1,3 +1,4 @@
+import { pluginEntryRuntimeAvailable } from "../shared/plugin-package-runtime"
 import { preparePluginSettings } from "./plugin-package-config"
 import { buildPluginPackageTxItems, pluginHostName, pluginComponentId, pluginMcpConfig, needsPluginFiles } from "./plugin-package-install"
 import { convertCreatedPlugin } from "./created-plugin"
@@ -162,7 +163,7 @@ export function createSourceInstaller(deps: Dependencies) {
         .toSorted((left, right) => (left.kind + left.sourcePath).localeCompare(right.kind + right.sourcePath))
         .flatMap((entry) => {
           if (entry.kind !== "mcp" && entry.kind !== "skill" && !(wholePackage && (entry.kind === "command" || entry.kind === "agent"))) {
-            notRunning.push({ kind: entry.kind, sourceName: entry.sourceName, reason: "kind-not-supported-yet" })
+            if (!wholePackage || !pluginEntryRuntimeAvailable(entry)) notRunning.push({ kind: entry.kind, sourceName: entry.sourceName, reason: "kind-not-supported-yet" })
             return []
           }
           if (

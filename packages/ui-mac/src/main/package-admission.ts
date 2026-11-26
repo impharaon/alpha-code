@@ -1,3 +1,4 @@
+import { pluginEntryRuntimeAvailable } from "../shared/plugin-package-runtime"
 import { pluginInstructionDefinition } from "../shared/host-extension-package-contract/plugin-conversion.mjs"
 import { pluginOptionAuthorization, pluginVersionAuthorization, savePluginOptions, preparePluginSettings, installedPluginDescription } from "./plugin-package-config"
 import { buildPluginPackageTxItems, pluginHostName, pluginComponentId, pluginMcpConfig } from "./plugin-package-install"
@@ -1035,7 +1036,7 @@ async function resolvePreparedPackage(
       const notRunning: PackageNotRunningV1[] = []
       const runnable = payload.description.entries.filter((entry): entry is Extract<Entry, { kind: "skill" | "mcp" | "command" | "agent" }> => {
         if (entry.kind === "skill" || entry.kind === "mcp" || entry.kind === "command" || entry.kind === "agent") return true
-        notRunning.push({ kind: entry.kind, sourceName: entry.sourceName, reason: "kind-not-supported-yet" })
+        if (!pluginEntryRuntimeAvailable(entry)) notRunning.push({ kind: entry.kind, sourceName: entry.sourceName, reason: "kind-not-supported-yet" })
         return false
       })
       const previous = before && installedPluginDescription(deps.root(), before)

@@ -236,3 +236,9 @@ test("package hook source names and fields use the verified tool identity", () =
   const mcp = toolFacts({ id: "policy_paid_action", name: "paid_action", options: { namespace: "policy" }, ...mcpToolMark("policy", "paid_action") }, input)
   expect(packageToolCall(mcp, { account: "fixture" }, { "mcp::source-server": "policy" }, "claude")).toEqual({ name: "mcp__source-server__paid_action", input: { account: "fixture" } })
 })
+
+
+test("Claude hook file paths resolve in the native tool call Location", () => {
+  const facts = toolFacts({ id: "write", name: "write" }, base({ early: new Set(["write"]) }))
+  expect(packageToolCall(facts, { path: "src/payment.ts", content: "fixture" }, {}, "claude", "/project").input).toEqual({ file_path: "/project/src/payment.ts", content: "fixture" })
+})

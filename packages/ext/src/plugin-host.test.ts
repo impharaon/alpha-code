@@ -2389,7 +2389,7 @@ packageIt.live("the real security expansion activates its skill hook only for th
   const decoder = new TextDecoder()
   const hooks = JSON.parse(decoder.decode(yield* Effect.promise(() => capture.readFile("hooks/hooks.json"))))
   for (const group of hooks.hooks.UserPromptExpansion) for (const handler of group.hooks)
-    if (handler.command.endsWith(" turn")) handler.command = 'CLAUDE_CONFIG_DIR="${CLAUDE_PLUGIN_DATA}" ' + handler.command
+    if (handler.command.includes(" turn")) handler.command = 'CLAUDE_CONFIG_DIR="${CLAUDE_PLUGIN_DATA}" ' + handler.command
   const skill = decoder.decode(yield* Effect.promise(() => capture.readFile("skills/threat-model/SKILL.md")))
   // Route source-owned Claude config state into the test package DATA; scripts remain original.
   const sample = yield* invocationSample("claude:claude-security", { "hooks/hooks.json": JSON.stringify(hooks), "skills/threat-model/SKILL.md": skill.replace('command: sh ', 'command: CLAUDE_CONFIG_DIR="${CLAUDE_PLUGIN_DATA}" sh ') })
@@ -2414,4 +2414,29 @@ packageIt.live("the real security expansion activates its skill hook only for th
   yield* sessions.prompt({ sessionID: parent.id, text: "Write an ordinary file" })
   yield* sessions.wait(parent.id)
   expect(readFileSync(join(location.directory, "unrelated.ts"), "utf8")).toBe("ordinary next turn")
+})))
+
+
+packageIt.live("a real Ralph Stop continuation retains invocation permissions until the task ends", () => packageJourney(Effect.gen(function* () {
+  const capture = yield* Effect.promise(() => captureStandardFixture("claude:ralph-loop"))
+  const source = new TextDecoder().decode(yield* Effect.promise(() => capture.readFile("commands/ralph-loop.md")))
+  const sample = yield* invocationSample("claude:ralph-loop", { "commands/ralph-loop.md": source.replace("\n---\n", "\ndisallowed-tools: [Write]\n---\n") })
+  const membership = JSON.parse(readFileSync(join(sample.root, "skills-enabled.json"), "utf8"))
+  writeFileSync(join(sample.root, "skills-enabled.json"), JSON.stringify({ ...membership, keys: [...membership.keys, sample.key] }))
+  yield* invocationNativeServices
+  const ext = yield* activateExtUntilFinished
+  const commands = yield* Command.Service
+  const name = sample.hostNames["command:commands/ralph-loop.md"]!
+  yield* ext.finish(commands.list().pipe(Effect.map(list => list.some(item => item.name === name))))
+  const location = yield* Location.Service
+  const sessions = yield* Sessions.Service
+  const parent = yield* sessions.create({ location: { directory: location.directory }, title: "Ralph scope lifetime", agent: "build", model: { providerID: "test", id: "picked" } } as never)
+  const llm = yield* TestLLM.Test
+  yield* llm.push(TestLLM.text("Work remains", "ralph-scope-working"), TestLLM.toolCall("call_ralph_scope_write", "write", { path: "ralph-scope.txt", content: "must remain denied" }), TestLLM.text("<promise>DONE</promise>", "ralph-scope-complete"))
+  yield* commands.execute({ name, invocation: { sessionID: parent.id, prompt: { text: 'Keep working --completion-promise DONE --max-iterations 3' }, delivery: "queue" } })
+  yield* sessions.wait(parent.id)
+  expect(yield* Effect.promise(() => Bun.file(join(location.directory, "ralph-scope.txt")).exists())).toBe(false)
+  const snapshot = yield* (yield* Tool.Service).snapshot()
+  yield* snapshot.execute({ sessionID: parent.id, agent: "build" as never, messageID: "msg_ralph_after" as never, call: { type: "tool-call", name: "write", id: "call_ralph_after", input: { path: "ralph-scope.txt", content: "after task" } } })
+  expect(readFileSync(join(location.directory, "ralph-scope.txt"), "utf8")).toBe("after task")
 })))

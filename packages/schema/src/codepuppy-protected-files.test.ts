@@ -72,7 +72,7 @@ test("published protected file families", () => {
     ["/fixture/home/.gnupg/private-keys-v1.d/test.key", "opaque", "encrypted-store"],
     ["/fixture/home/.gnupg/secring.gpg", "opaque", "encrypted-store"],
     ["/fixture/home/Library/Keychains/login.keychain-db", "opaque", "encrypted-store"],
-    ["/fixture/home/export.keychain", "opaque", "encrypted-store"],
+    ["/fixture/home/Library/Keychains/export.keychain", "opaque", "encrypted-store"],
     ["/fixture/home/Library/Application Support/Google/Chrome/Local State", "json", "chromium-state"],
     ["/fixture/home/Library/Application Support/Chromium/Profile 1/Login Data-wal", "sqlite", "chromium-logins"],
     ["/fixture/home/Library/Application Support/Microsoft Edge/Default/Cookies-shm", "sqlite", "chromium-cookies"],

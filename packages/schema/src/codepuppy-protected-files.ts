@@ -273,7 +273,7 @@ export function match(input: { path: string; roots: ProtectedRoots }): Protected
   const api = input.roots.platform === "win32" ? path.win32 : path.posix
   const item = locatedRules(input.roots).find((item) => {
     const relative = api.relative(item.root, file).replaceAll(api.sep, "/")
-    if (relative === ".." || relative.startsWith("../") || api.isAbsolute(relative)) return false
+    if (!relative || relative === ".." || relative.startsWith("../") || api.isAbsolute(relative)) return false
     if (item.exclude?.some((pattern) => glob(relative, pattern, input.roots.platform))) return false
     return item.include.some((pattern) => glob(relative, pattern, input.roots.platform))
   })

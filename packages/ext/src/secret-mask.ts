@@ -67,7 +67,6 @@ export function createSecretMask(roots: ProtectedFiles.ProtectedRoots) {
     }
   }
   const hiddenMetadata = (state?: CallState): Tool.Metadata => ({
-    ...Object.fromEntries(Object.keys(state?.published ?? {}).map((key) => [key, null])),
     output: ProtectedFiles.MASKING_FAILED_TEXT,
     ...(state?.kind === "execute" ? { toolCalls: [] } : {}),
     ...(state?.published?.[DISPLAY_KEY] === undefined ? {} : { [DISPLAY_KEY]: state.published[DISPLAY_KEY] }),
@@ -190,7 +189,6 @@ export function createSecretMask(roots: ProtectedFiles.ProtectedRoots) {
         if (state) state.failed = true
         return {
           ...hiddenMetadata(state),
-          ...Object.fromEntries(Object.keys(input.update).map((key) => [key, null])),
           output: ProtectedFiles.MASKING_FAILED_TEXT,
         }
       }

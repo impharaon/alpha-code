@@ -501,3 +501,46 @@ r9 真实删除回归 green：仅把 ext 本功能的分类改为实际插件 `_
 偏离/集成边界：新增 `ui-mac/shared/document-check-records.ts` 是 main/ext 对归属、覆盖与当前源/页摘要核对的单一权威，避免复制同一判定；新增 `main/document-checks.ts` 的记录不是 Session 队列，重试仅在既有 runtime ready/桥重挂时交同一 notificationID 给现有 synthetic。main host 的私有 composition 参数收敛为 documentRuntimeRoot，内部组合已有 callbacks，不修改公共 DocumentHost 或引擎 API。实际 Session 错误入口只据本轮真宿主事实更正，未归因 owner；同链新 import 为 ui 测试消费 core 的窄错误构造器，不进生产依赖。没有改 protected ADR、其它规格、另一仓、下载/发布/部署或生产引擎路径。当前 LO 下的新完整 OfficeExcel.recalculate 原子提交、之前取消的 Word 目录标题 rerun、正式 #1760 wiring、许可发行/relay、Windows/退出/出网及默认模型真实改稿仍归既有集成与片 8，未以组件 PASS 冒充 AC 全部完成。
 
 最终文档核对：14 个相对链接 PASS；从 canonical alpha profile 派生仅覆盖当前 checkout 的临时 profile（`/tmp/alpha-1761-r9/profile.yml`，未改仓库配置）运行 check-docs-contract，当前 plan findings=0，输出 `worktree-docs-contract.json`。全仓既有 69 errors/253 warnings 与此前相同，不扩修；最初直接 canonical profile 指向主 checkout 的结果未作为本 worktree 证明。`affected-tests --list` exit 2，原因仍为本旧基线缺 `.gate-tests`（`affected.scope`），无 PR scope line，ship 合并已有该文件的 origin/alpha 后处理，不改 gate 或全量兜底。已核 Codex / GPT-6；执行约 10:27–10:55 UTC，约 28 分钟，未倍增；所有前台命令完成后返回，hooksPath 保持 `.githooks`。
+
+## 切片七：默认制作入口、旧 writer 消费者与目录集成
+
+- 依据：[spec v1](spec.md) @ `31cd182e09`，AC-01..05、09、11、12、14 的入口/消费者部分；[design](design.md) @ `7ef8b89b30` §4.1/4.8、R12、§8/§10；Issue #1761。片 1–6 由调度方独立审查，本片仅在其上切换必要消费者，不处理未返回的审查发现。
+- 核对：r10 `Phase: IMPLEMENT` 授权本节计划后无设计待决即同轮实施；Codex / GPT-6 核对实际调用链，未见新增设计问题。首个实施提交填入本计划 commit；不冒称调度方另行审查本节。
+
+### 改动
+
+| 文件 | 改什么 |
+| --- | --- |
+| `packages/ui-mac/resources/factory-skills/office-docs/SKILL.md`、`factory-skills/cloud-capabilities/SKILL.md` | 总入口改为七个固定技能的短路由；默认制作/编辑直接用随包环境与原权限面，用户模板优先；六种成品、自检/一轮修正/pending 补查、已授权 OfficeExcel 操作；不要求启用 MCP 或再问一次执行确认。cloud-capabilities 原文档行只指向此入口，不留“创建一律用 MCP”的旧指令 |
+| `packages/ui-mac/resources/office-mcp/server.py`、生成的 `tools.json` | 从工具声明/dispatch 删除四 writer 及其私有不可达实现/常量/import，保留三个 reader、增强 Excel reader 与四操作；不留 alias 或扩大 JSON writer；运行原 gen-office-mcp-tools 生成声明 |
+| `packages/ui-mac/scripts/build-office-runtime.ts` | 构建烟测先用同一随包 Python 文档库/OfficeExcel 生成真实样本，再经原生产命令的 stdio reader 读回；不以 import/握手替代读回。样本验证 Python/reader，不假称默认模型制作路线或正式成品质量；不引入 Node 路径或 DocumentAssets 构建循环 |
+| `packages/ui-mac/src/main/office-mcp.test.ts`、`office-mcp-tools-snapshot.test.ts`、`attachment-read-roundtrip.test.ts` | 旧 writer 的正向/版式断言随旧行为替换/删除；保留实际文件生成→reader 读回、路径权限、Excel 操作与错误报告；新增四 writer 不在列表且直接调用 unknown、不写文件；schema drift 改测保留 reader 字段。附件往返只切换样本制作端，暂存/指令/读取/时间线全链不改 |
+| `packages/ui-mac/src/main/codepuppy-sidecar-wiring.test.ts`、`packages/core/test/codepuppy-mcp-runtime.test.ts` | 同步实际声明工具集合/未连接前声明/真实 server.py 消费者；core 只选相关三个用例，不跑同文件计时容量旅程 |
+| `packages/ui-mac/src/main/codepuppy-factory-skill-hygiene.test.ts`、`factory-skills.test.ts` | 删除旧 writer 形状/措辞漂移检查，保留真实发现、来源/许可、空壳与其它云能力断言。文档路由的证据是实际发现和人工逐项核读/制作读回，不再新加正文措辞/标题数量断言 |
+| `packages/ui-mac/test-component/session-rail-artifacts.cases.ts` | 原 Excel writer 正向产物夹具换成持久首方 document receipt，维持本机文件行、缺失提示、点击预览等原用户结果。历史显示/旧 writer 无回执反例与第三方同名政策反例均非正向制作消费者，保留 |
+| 原 `packages/ui-mac/scripts/sync-catalog-snapshot.mjs` 的两个生成输出（仅生产者实际已发布本契约时） | 只运行现有验签同步器消费现有发布；核实际 tools/描述/digest。未交付则记录版本/差异 pending，恢复本次无关生成差异，不手编快照或同步锁，不改 alpha-web |
+
+### 顺序
+
+1. 入口与工具面/构建消费者一并切换：以真实随包库生成样本，替换同模块旧行为测试并重新生成 tools.json；先改变用例，再整文件。入口正文以源文件核读记录六路由、模板优先、环境路径、检查/补查与无额外确认，不把字句断言当成产品质量证据。
+2. 切换附件与 UI 正向夹具、声明枚举；各改变模块整文件一次。已有 artifact receipt/watcher/Read 行为保持原组件责任，仅跑必要消费者。最后 wider 一次：factory 包装/来源、office 声明/sidecar、附件和实际受影响 UI 模块，ext 只跑实际受影响指令消费者；core 三个 named 用例与 ui/ext 的 applicable typecheck。
+3. 运行原目录同步器并只读核对实际发布版本，记录外部依赖；运行 `affected-tests --list`（旧基线缺 .gate-tests 仍仅报原因）、文档链接/契约与 diff 检查，按切片独立提交。removal 只跑被改行为的命名断言，不跑全套、模型/安装包/LO 或计时旅程。
+
+### 风险
+
+- 不能只删 advertised 定义：dispatch/不可达 writer 与烟测/附件输入同步，reader 必须读回真实文件；未知 writer 不得写出任何新文件。工具 manifest 仍由 server.py 生成，server v2 随所有切片共同发布，不伪称中间提交已发布。
+- 构建顺序中 Office Python 先于 DocumentAssets，因此烟测不递归启动资产构建或借测试 fixture 充生产资源；默认用户模板路径仍完全来自 environment/资产锁。
+- 旧目录源/快照是其它仓拥有者的发布实物依赖，不能为让本仓测试绿而手编定义、修改 digest 或放宽守卫；未完成目录集成明确 pending。审查范围 1–6 不混入本片 commits。
+- 本片不证明九次默认模型成品指标、真视觉修复或干净打包平台验收；这些仍归片 8。冻结 gate 不改，实际测试条数如因删除旧行为而减少，回执交调度方处理其门控拥有面。
+
+### 证明
+
+| AC | 测试/证据 | 层与运行时机 | 缺少行为为什么会失败 |
+| --- | --- | --- | --- |
+| AC-01..04、12 | 原入口文件逐项核读；真实 dev/packaged 七技能发现与许可；buildOfficeRuntime 制作→四 reader 读回及原有模板/资产身份核对；附件真实往返 | 文件/stdio integration affected PR/nightly；正文证据为命令/人工检视；默认模型成品/模板保真旅程片 8/nightly | 删除制作阶段或 reader、改坏源路径/声明、丢模板/技能/许可都会触发实际文件/读回/发现断言；不以文案宣称 9/10 等数值 |
+| AC-05、09 | 六路由指向现有 render→Read/vision→check 与 pending 先交付/就绪补查；默认脚本不依赖启用 MCP 的入口核读，已有环境/自检组件与来源守卫相关回归 | 入口正文一次性检查；相关组件 affected PR/nightly；真实无安装/修复溢出片 8 | 旧 writer 工具回归重现、无真实样本读回或将旧 writer 产物当 receipt 会使对应检查红；文案不能代证实际模型行为 |
+| AC-11、14 | 真实 Office 工具清单不再 writer、Excel ID 唯一、五 Excel 工具、default-disabled 不变；社区源码许可/七技能许可及目录原同步器实物核读 | stdio/manifest/source 文件 integration affected PR/nightly；目录字节集成依赖生产者 | writer 在列表/dispatch、manifest 跟 server 不一致、出现第二 Excel 或许可缺失会红；发布未就绪不改快照伪造通过 |
+
+### 偏离记录
+
+暂无。开始 2026-11-26 10:56:52 UTC；预计约 45 分钟（不含外部等待）。只追加本片与其证据，不修改前六片实现或冻结决定。

@@ -40,6 +40,7 @@ let main: ReturnType<(typeof import("./ext-ipc"))["registerExtIpcHandlers"]>
 let refreshFailure = ""
 let refreshes = 0
 let refreshEngine: () => Promise<boolean> = async () => false
+let beforeReady: (() => Promise<void>) | undefined
 let locationReloads = 0
 const reloadRequests: ReloadRequestMessage[] = []
 const reloadReports: ReloadReportMessage[] = []
@@ -236,6 +237,7 @@ beforeAll(async () => {
       for (const key of Object.keys(host.content)) Reflect.deleteProperty(host.content, key)
       Object.assign(host.content, next)
       running = await host.start()
+      await beforeReady?.()
       detachSidecar = main.codepuppySidecar.attach(postToSidecar)
       refreshes++
       return true
@@ -564,4 +566,60 @@ test("I-11 R1 #2: a Location built while a failed enable had published 'on' ends
   expect(result).toMatchObject({ ok: false })
   expect(findRecordV2(root, "mcp", name)?.desiredState).toBe("disabled")
   await until(async () => (await statusInLater()) === "disabled", "the window's Location converged off after the failed write")
+}, 120_000)
+
+
+// Real pinned Grafana declarations/options; only its Docker executable is replaced with our local echo process.
+test("cold engine generations bind plugin MCP ROOT options secrets and DATA only after ready", async () => {
+  const { captureStandardFixture } = await import("../../test-fixtures/plugin-helper/fixture")
+  const { convertPluginTree } = await import("../shared/host-extension-package-contract/plugin-conversion.mjs")
+  const { pluginRuntimeIdentity } = await import("./plugin-sources")
+  const { readPackageLedgerStateV1 } = await import("./ext-receipt-v2")
+  const { installedPluginDescription } = await import("./plugin-package-config")
+  const { readMcpLeafStrict } = await import("./ext-config")
+  const { MCP_FIXTURE } = await import("../../test-component/codepuppy-engine")
+  const { pathToFileURL } = await import("node:url")
+  const { publishPluginDataHome } = await import("./plugin-package-data")
+  publishPluginDataHome(sandbox.data)
+  const original = await captureStandardFixture("claude:grafana-mcp")
+  const definition = JSON.parse(new TextDecoder().decode(await original.readFile(".mcp.json")))
+  const output = join(sandbox.root, "cold-plugin-env.json")
+  const capture = await captureStandardFixture("claude:grafana-mcp", {
+    ".mcp.json": JSON.stringify({ ...definition, mcpServers: { grafana: { ...definition.mcpServers.grafana, command: process.execPath, args: ["${CLAUDE_PLUGIN_ROOT}/echo.mjs"] } } }),
+    "echo.mjs": `import {writeFileSync} from 'node:fs';writeFileSync(${JSON.stringify(output)},JSON.stringify({root:process.env.CLAUDE_PLUGIN_ROOT,data:process.env.CLAUDE_PLUGIN_DATA,url:process.env.GRAFANA_URL,token:process.env.GRAFANA_SERVICE_ACCOUNT_TOKEN}));await import(${JSON.stringify(pathToFileURL(MCP_FIXTURE).href)});`,
+  })
+  const converted = await convertPluginTree(capture)
+  main.pluginSources.convertCandidate = async () => ({ ok: true, ...converted, capture, runtimeIdentity: pluginRuntimeIdentity(converted.package) })
+  const installed = await main.installFromSource({ requestId: "cold_grafana", source: { kind: "candidate", candidateId: "captured_grafana" }, effect: { kind: "all-projects" }, via: "chat" })
+  expect(installed).toMatchObject({ ok: true })
+  if (!installed.ok || !("packageId" in installed)) throw Error("Grafana tree not installed")
+  const state = readPackageLedgerStateV1(root)
+  if (!state.ok) throw Error(state.reason)
+  const graph = state.packageGraphs.find(graph => graph.packageId === installed.packageId)!
+  const name = graph.children.find(node => node.kind === "mcp")!.name
+  await until(() => {
+    const current = readPackageLedgerStateV1(root)
+    return current.ok && current.records.some(record => record.name === name && record.desiredState === "enabled")
+  }, "initial package enable committed")
+  expect(await invoke("ext-save-package-secrets", { packageId: graph.packageId, options: { grafana_url: "https://grafana.example.invalid", grafana_service_account_token: TOKEN } })).toMatchObject({ ok: true })
+  await until(async () => await mcpStatus(name) === "connected", "initial bound plugin MCP")
+  const definitionBefore = readMcpLeafStrict(name)
+  expect(definitionBefore).toMatchObject({ ok: true, value: { command: [process.execPath, "${CLAUDE_PLUGIN_ROOT}/echo.mjs"] } })
+  // A new main has no install/reload request in flight. Attaching the freshly ready engine is the only activation trigger.
+  const { registerExtIpcHandlers } = await import("./ext-ipc")
+  detachSidecar?.("cold main")
+  main = registerExtIpcHandlers(host.userData, "dev", async () => ({ url: running!.url, username: "opencode", password: "cp-hub-lifecycle" }), sandbox.home, { stop: async () => { await running?.close() }, refresh: () => refreshEngine() }, async () => undefined)
+  await main.ledgerReady
+  beforeReady = async () => {
+    expect(await mcpStatus(name)).toBe("disabled")
+  }
+  try {
+    await refreshEngine()
+    await until(async () => await mcpStatus(name) === "connected", "cold plugin MCP convergence")
+    const live = installedPluginDescription(root, graph)!
+    expect(JSON.parse(readFileSync(output, "utf8"))).toMatchObject({ root: live.pluginRoot, data: expect.stringContaining("plugin-data"), url: "https://grafana.example.invalid", token: TOKEN })
+    expect(readMcpLeafStrict(name)).toEqual(definitionBefore)
+    expect(JSON.stringify(consoleLines)).not.toContain(TOKEN)
+    expect(await invoke("ext-uninstall-package", graph.packageId)).toMatchObject({ ok: true })
+  } finally { beforeReady = undefined }
 }, 120_000)

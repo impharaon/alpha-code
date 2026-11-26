@@ -1,4 +1,4 @@
-import { Tool } from "../../schema/src/tool"
+import { Error } from "@opencode/plugin/promise/tool"
 import { VIDEO_FRAME_KEY, type VideoFrameReference } from "../../schema/src/codepuppy-video-progress"
 import type { ToolEditor } from "@opencode/plugin/promise/tool"
 import { outputs } from "../../ui-mac/resources/video-mcp/contracts"
@@ -130,7 +130,7 @@ export function createCloudVisionHooks(deps: CloudVisionHookDeps) {
       const stored = await deps.storage.get(STORAGE_PREFIX + key)
       if (typeof stored === "string" && stored !== "") session.transcripts.set(key, stored)
     } catch (error) {
-      deps.error?.(`[@codepuppy/ext] cloud vision: transcript cache unavailable (${error instanceof Error ? error.message : String(error)})`)
+      deps.error?.(`[@codepuppy/ext] cloud vision: transcript cache unavailable (${error instanceof globalThis.Error ? error.message : String(error)})`)
     }
   }
   async function persistTranscript(session: VisionSession, entry: VisionImageEntry, question?: string) {
@@ -138,7 +138,7 @@ export function createCloudVisionHooks(deps: CloudVisionHookDeps) {
     const text = session.transcripts.get(key)
     if (!deps.storage || text === undefined) return
     await deps.storage.set(STORAGE_PREFIX + key, text).catch((error: unknown) => {
-      deps.error?.(`[@codepuppy/ext] cloud vision: transcript not cached (${error instanceof Error ? error.message : String(error)})`)
+      deps.error?.(`[@codepuppy/ext] cloud vision: transcript not cached (${error instanceof globalThis.Error ? error.message : String(error)})`)
     })
   }
 
@@ -245,7 +245,7 @@ export function createCloudVisionHooks(deps: CloudVisionHookDeps) {
           text: toolId && access.ok ? renderTemplate(VISION_SYSTEM_NOTE_ID, { name: toolId }) : contextText(VISION_SYSTEM_NOTE_OFFLINE_ID),
         })
       } catch (error) {
-        deps.error?.(`[@codepuppy/ext] cloud vision (context) failed: ${error instanceof Error ? error.message : String(error)}`)
+        deps.error?.(`[@codepuppy/ext] cloud vision (context) failed: ${error instanceof globalThis.Error ? error.message : String(error)}`)
       }
     },
 
@@ -257,7 +257,7 @@ export function createCloudVisionHooks(deps: CloudVisionHookDeps) {
       if (!args || typeof args !== "object") return
       const ref = args.image
       if (typeof ref !== "string" || ref.trim() === "")
-        throw new Error(`${toolId}: "image" is required — pass an attachment number, a file name, or a path already read with the Read tool`)
+        throw new globalThis.Error(`${toolId}: "image" is required — pass an attachment number, a file name, or a path already read with the Read tool`)
       let image: { base64: string; mime: string }
       if (looksLikeBase64Image(ref)) image = await compressForVision(Buffer.from(ref, "base64"), { maxBytes: VISION_MCP_IMAGE_MAX_BYTES })
       else {
@@ -268,7 +268,7 @@ export function createCloudVisionHooks(deps: CloudVisionHookDeps) {
             .list()
             .map((e) => `${e.number} = ${e.label}${e.path ? ` [${e.path}]` : ""} (sha256 ${e.hash.slice(0, 12)}…)`)
             .join("; ")
-          throw new Error(
+          throw new globalThis.Error(
             `${toolId}: no image in this session matches "${ref}". ` +
               (known ? `Known images: ${known}. ` : "No images have been seen in this session yet. ") +
               "Pass an attachment number, a file name, or a path that was already read with the Read tool; for a file that has not been read yet, call Read on that path first — reading it registers the image here.",
@@ -306,7 +306,7 @@ export function createCloudVisionHooks(deps: CloudVisionHookDeps) {
           await warmTranscript(session, entry, question)
           const outcome = await describeEntry(session, entry, { access: cloudVisionAccess(bootstrap(), readFile), signal: context.signal, fetch: deps.fetch, timeoutMs: deps.timeoutMs, log: deps.error }, question)
           context.signal.throwIfAborted()
-          if (!outcome.ok) throw new Tool.Error({ message: visionFailureBlock(frame.frameId, outcome.kind), metadata: { [VIDEO_FRAME_KEY]: frame } })
+          if (!outcome.ok) throw new Error({ message: visionFailureBlock(frame.frameId, outcome.kind), metadata: { [VIDEO_FRAME_KEY]: frame } })
           await persistTranscript(session, entry, question)
           return { output: { text: outcome.text, model: CLOUD_VISION_MODEL, fallback_used: CLOUD_VISION_FALLBACK_ON_REFUSAL }, metadata: { [VIDEO_FRAME_KEY]: frame } }
         }

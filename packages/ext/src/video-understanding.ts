@@ -5,7 +5,8 @@ import {
   VIDEO_UNDERSTANDING_UNAVAILABLE_ID,
 } from "./context-injection"
 import type { ToolEditor, ToolContext } from "@opencode/plugin/promise/tool"
-import { Tool } from "../../schema/src/tool"
+import type { Tool } from "../../schema/src/tool"
+import { Error } from "@opencode/plugin/promise/tool"
 import { VIDEO_PROGRESS_KEY } from "../../schema/src/codepuppy-video-progress"
 import { unattendedDenialCopy } from "../../schema/src/codepuppy-unattended"
 import { videoUnderstandingResultSchema } from "@codepuppy/contracts-consumer"
@@ -44,8 +45,8 @@ export function videoUnderstandingTransform(deps: {
               )) ?? "none",
             )
           )
-            throw new Tool.Error({ message: unattendedDenialCopy("refused", registered.id) })
-          if (!deps.bridge.available) throw new Tool.Error({ message: contextText(VIDEO_UNDERSTANDING_UNAVAILABLE_ID) })
+            throw new Error({ message: unattendedDenialCopy("refused", registered.id) })
+          if (!deps.bridge.available) throw new Error({ message: contextText(VIDEO_UNDERSTANDING_UNAVAILABLE_ID) })
           const input = inputs.understand.parse(raw)
           const call: VideoCall = {
             directory: deps.directory,
@@ -77,7 +78,7 @@ export function videoUnderstandingTransform(deps: {
           let completed=false
           const reply = (value: Awaited<ReturnType<HubBridge["video"]>>) => {
             if (!value.ok)
-              throw new Tool.Error({
+              throw new Error({
                 message: renderTemplate(VIDEO_UNDERSTANDING_FAILED_ID, {
                   name: "error" in value ? value.error : value.reason,
                 }),
@@ -100,7 +101,7 @@ export function videoUnderstandingTransform(deps: {
               if (current.state.progress) await context.progress({ [VIDEO_PROGRESS_KEY]: current.state.progress })
               if (current.state.result){completed=true;return { output: current.state.result, metadata: { jobIds: current.state.result.jobIds,"codepuppy.video.upload":current.state.upload } }}
               if (current.state.error)
-                throw new Tool.Error({
+                throw new Error({
                   message: renderTemplate(VIDEO_UNDERSTANDING_FAILED_ID, { name: current.state.error }),
                 })
               if (current.state.prepare)

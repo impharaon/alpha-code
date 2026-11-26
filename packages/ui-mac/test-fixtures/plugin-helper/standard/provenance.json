@@ -1,0 +1,1079 @@
+{
+  "archive": {
+    "path": "selection.tar.gz",
+    "sha256": "b1eedcca1cfeef65dcaa0adcd421ff6ce36f61a417ed4a175bd94322ec84ef48"
+  },
+  "samples": [
+    {
+      "name": "codex:supabase",
+      "root": "codex-supabase",
+      "repository": "https://github.com/openai/plugins",
+      "commit": "981b02c0c44058b595f3b4180002c3ae3c806d40",
+      "pluginPath": "plugins/supabase",
+      "ecosystem": "codex",
+      "files": [
+        {
+          "path": ".app.json",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 99,
+          "sha256": "e2dbd66c137fe151f1d9a03a937136763a87f1d53917af8edab1d67b32b76082"
+        },
+        {
+          "path": ".codex-plugin/plugin.json",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1790,
+          "sha256": "05f32853e053507352335bb61de3c3522c5e99d3c50b6f3680aa529153816b9a"
+        },
+        {
+          "path": ".mcp.json",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 116,
+          "sha256": "fa5fdfdb5f9c984a0844e0bd7f743c43122b406a2cdadb9efc1705c2dc5b33d3"
+        },
+        {
+          "path": "skills/supabase/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 11265,
+          "sha256": "1171386737b231610fa42485707272765c3516a9bbc0bd2c6c161a8cee3d7d33"
+        },
+        {
+          "path": "skills/supabase-postgres-best-practices/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 2576,
+          "sha256": "ccd6e4596bd51cf344fe76c464867c541ccc16b6d90ae7a9db449fb17588613b"
+        }
+      ]
+    },
+    {
+      "name": "codex:build-ios-apps",
+      "root": "codex-build-ios-apps",
+      "repository": "https://github.com/openai/plugins",
+      "commit": "981b02c0c44058b595f3b4180002c3ae3c806d40",
+      "pluginPath": "plugins/build-ios-apps",
+      "ecosystem": "codex",
+      "files": [
+        {
+          "path": ".codex-plugin/plugin.json",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1824,
+          "sha256": "86d4a225cb929ab68f00f6258a75daffb02122dd34875dabd349c3474dc35908"
+        },
+        {
+          "path": ".mcp.json",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 242,
+          "sha256": "31ef1307db3e60fb9b2a3612c159ccc9850b5f036c921cf77c7a405f7065ec23"
+        },
+        {
+          "path": "skills/ios-app-intents/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 4613,
+          "sha256": "ecfa87ec1070bccfdfa0d21ee997bbfbfd78edfb1f22da5da9c05ff006e9fa52"
+        },
+        {
+          "path": "skills/ios-debugger-agent/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 2643,
+          "sha256": "bb8ad932ec473cee097c9c8d106051134e9ab6cf9dc85d6a8e62ce80ad24c385"
+        },
+        {
+          "path": "skills/ios-ettrace-performance/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 8832,
+          "sha256": "1888c0b2fc6b7d9f3d54d06333e9628a2c4660b9d9b5ddf3edc37f126c773935"
+        },
+        {
+          "path": "skills/ios-memgraph-leaks/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 3953,
+          "sha256": "f09a1e78c00b342196035f6570723f16e40e34a800d353c7c885d1dab4dc8781"
+        },
+        {
+          "path": "skills/ios-simulator-browser/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 3251,
+          "sha256": "f3f0216323cd7713a73f1bc4beee1b740a7867f20affef331760dd1932a1ec4b"
+        },
+        {
+          "path": "skills/swiftui-liquid-glass/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 3745,
+          "sha256": "8e9ec37d9b6ed146672faf12c88be61d367c280ab6159bfbc7726a122030b78b"
+        },
+        {
+          "path": "skills/swiftui-performance-audit/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 5012,
+          "sha256": "6fc6bd4d49b49ccb2089be706c449f195daa7db2c36d8097d883426488eb4b1a"
+        },
+        {
+          "path": "skills/swiftui-ui-patterns/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 7329,
+          "sha256": "a96f078512c6c679a3504ec20e0eedff4a9be3a06eb9a95107f3556c081bb708"
+        },
+        {
+          "path": "skills/swiftui-view-refactor/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 7882,
+          "sha256": "129cbb511987985ed7bf9e3f20443632a7becdf0c2824ded6b52241cc339243a"
+        }
+      ]
+    },
+    {
+      "name": "claude:supabase",
+      "root": "claude-supabase",
+      "repository": "https://github.com/supabase-community/supabase-plugin",
+      "commit": "2c6d02d4565babe784103ee4d446a93ae9b24151",
+      "pluginPath": "",
+      "ecosystem": "claude",
+      "files": [
+        {
+          "path": ".claude-plugin/plugin.json",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 664,
+          "sha256": "3495098f418bf9f609489be776647c5f6d552549ee77d9d24d0e376beeea92c5"
+        },
+        {
+          "path": ".codex-plugin/plugin.json",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1534,
+          "sha256": "39aa384bde813bb7926552af82f1d013e2ef1d14b861225aeb421732ae14c1d9"
+        },
+        {
+          "path": ".cursor-plugin/plugin.json",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 566,
+          "sha256": "5f506aedd8de488a3bbd1a0844889edccaf55446b781d2e10fcfc17398c1f967"
+        },
+        {
+          "path": ".github/plugin/plugin.json",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 664,
+          "sha256": "75391edccc464ef06f162e357fe1f882020ddf7ad8d475d8da77b454d0ed2406"
+        },
+        {
+          "path": ".grok-plugin/plugin.json",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 660,
+          "sha256": "54581ec80632b0660bfc6a4908c10bcd6c34656b703520af7a17171de81cc244"
+        },
+        {
+          "path": ".kimi-plugin/plugin.json",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1107,
+          "sha256": "b2a420188e8a129fd67399e83276cbd37e358d7860817bb31c960ffc39722bc8"
+        },
+        {
+          "path": ".plugin/plugin.json",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 695,
+          "sha256": "227beeb2791aa42b362274701a7c0d79e4956457838710e834d501f6a8c2b2a5"
+        },
+        {
+          "path": "agents/claude/.mcp.json",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 228,
+          "sha256": "c0e94cfb4f22cc8e4768fa1486e406a376a42e946f2d326992542ccf56081e7c"
+        },
+        {
+          "path": "agents/copilot/.mcp.json",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 231,
+          "sha256": "2b7207e0a951ed3692c8a1307f016365ec32f8f9c67b29ce115f31b3403eb669"
+        },
+        {
+          "path": "agents/cursor/mcp.json",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 185,
+          "sha256": "4d53c67af8b2b988bf48639d481e65059732b58501f63fc88c26166cb9df10d5"
+        },
+        {
+          "path": "agents/grok/mcp.json",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 221,
+          "sha256": "b06b257fd4902ac6e3d71c5b3fffcdccf948300f97c57e7bfef7dc66bd686dc4"
+        },
+        {
+          "path": "agents/open-plugin/.mcp.json",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 221,
+          "sha256": "65d37e047c5305309e97b0aafc81c85a52fd2f056d056026584b62bf6c41258c"
+        },
+        {
+          "path": "skills/supabase/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 14307,
+          "sha256": "697e0e949f97621c6fc1784169eb3ccbf673747d6bb8299a52962d3d84d93dc6"
+        },
+        {
+          "path": "skills/supabase-postgres-best-practices/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 3231,
+          "sha256": "ad65e776f45e761bafc609d3f506c77c1032225aa65e0c4c02f241b8071e5855"
+        }
+      ]
+    },
+    {
+      "name": "claude:cloudinary",
+      "root": "claude-cloudinary",
+      "repository": "https://github.com/cloudinary-devs/cloudinary-plugin",
+      "commit": "86be53409e3fb1c465cd5ff4d1dc937a2860f45c",
+      "pluginPath": "",
+      "ecosystem": "claude",
+      "files": [
+        {
+          "path": ".claude-plugin/plugin.json",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 621,
+          "sha256": "35888d91dc044aeb670180b748f298aa7e340cd8850186a0ab6df25d55a54170"
+        },
+        {
+          "path": ".cursor-plugin/plugin.json",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 542,
+          "sha256": "e720733aedd62271989ec65ba0d054aaa5c75fed31ae32a926bf3fa74ff68e07"
+        },
+        {
+          "path": "mcp.json",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 889,
+          "sha256": "280126658b16677568a97f8be2085d7adcfcea019a8485786bbb396f2bedc61d"
+        },
+        {
+          "path": "plugin.json",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 645,
+          "sha256": "a1a9702ba38a3328d3c2c41db94d86b749b3e2a3f2a1f9eacf062ccd6730f754"
+        },
+        {
+          "path": "skills/claimable-cloud/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 5114,
+          "sha256": "7b5d2ee0f0872a60a8045fb96eef2d680d8be611c9416448d0e78c57be7a1107"
+        },
+        {
+          "path": "skills/cloudinary-docs/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 7277,
+          "sha256": "ca02ae51e4c5b8931ee363a1fbb99e1c8f5a0703d0ca9b1635ef188757658658"
+        },
+        {
+          "path": "skills/cloudinary-transformations/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 30464,
+          "sha256": "4ebcad5d9a924c91f223762605898047759e3b2391ef623586eac670281efa1c"
+        }
+      ]
+    },
+    {
+      "name": "claude:catalyst-by-zoho",
+      "root": "claude-catalyst-by-zoho",
+      "repository": "https://github.com/catalystbyzoho/claude-plugin",
+      "commit": "9670b79d72fe4923cc845ca0414d009ef3684ccb",
+      "pluginPath": "",
+      "ecosystem": "claude",
+      "files": [
+        {
+          "path": ".claude-plugin/plugin.json",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 686,
+          "sha256": "2322b34ca338181d50dd3e180bcd11adbdacfcf09b7fa4a101c1a48a67958b19"
+        },
+        {
+          "path": ".mcp.json",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 382,
+          "sha256": "9e9d65488f4177f3bfcd7e6f25b61e295937a4060375d466e818dc7eb8f2bfa8"
+        },
+        {
+          "path": "skills/catalyst-appsail/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 2546,
+          "sha256": "24f0138f59b88c07896e58cecbb4f985607f75db66f4934f33c6b8fefe0c6a45"
+        },
+        {
+          "path": "skills/catalyst-authentication/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 4080,
+          "sha256": "9e10a8449e2d1906f01189965cf390e51a5c6c7077d052f542b1b1cb548864ae"
+        },
+        {
+          "path": "skills/catalyst-basics/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 5955,
+          "sha256": "6958a69b419f19ab3e89894765b90a470c0aa1b4c08e6aae773c3f65a19e8b0f"
+        },
+        {
+          "path": "skills/catalyst-by-zoho/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 19025,
+          "sha256": "b930a344b680a5016e9dc28e6d1bfc6f5c096d247d907c5d098f531fd81b103e"
+        },
+        {
+          "path": "skills/catalyst-cache/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1832,
+          "sha256": "a22b4a8f7586c0aa24c30fc23a976076c0a0cef0d2e529d549079415af090aab"
+        },
+        {
+          "path": "skills/catalyst-datastore/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 3732,
+          "sha256": "bf6dfaad14cce56fe555f5a4d14abdc5f1bb49e4d869b888f538421e943dfc5c"
+        },
+        {
+          "path": "skills/catalyst-functions/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 6043,
+          "sha256": "3fa7e1fdae9417df36323bc646efef65105e48256f8db386083f786d53856d55"
+        },
+        {
+          "path": "skills/catalyst-nosql/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1821,
+          "sha256": "a45f4ae90ac50052b196511744b6f56a1ae1058920f496857e1584c82ac57bc7"
+        },
+        {
+          "path": "skills/catalyst-pricing/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1465,
+          "sha256": "bf23f476dddde529e2fdeb50e08079adc7db405b0d088a3101e6bab2d8401744"
+        },
+        {
+          "path": "skills/catalyst-sdk/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 2112,
+          "sha256": "08ecf156b2699698c2308fba062ce77b4c8fa1a663da42922030b71fe674c601"
+        },
+        {
+          "path": "skills/catalyst-signals/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 4027,
+          "sha256": "4bffa525ffc2b1c32bea5c27b37847ca632a2a3c4308f7212d2108d15ef830ea"
+        },
+        {
+          "path": "skills/catalyst-slate/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 5019,
+          "sha256": "3bc2a27aa515d02caf4950bb78f4043c7a7e9e15e6609b16e57581d1c8bd8205"
+        },
+        {
+          "path": "skills/catalyst-smartbrowz/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 6344,
+          "sha256": "ed9b0a611ee6d0096653a78f8f376f110b2ab4ec7ebd9939c5b7f5f44c748923"
+        },
+        {
+          "path": "skills/catalyst-stratus/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1641,
+          "sha256": "b61c595ad593835551d136b1893364f1307f0f30b16f5e29fb1b75d976540c38"
+        },
+        {
+          "path": "skills/catalyst-zia/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1735,
+          "sha256": "cffec5f50246512045a97a38f4e67f752da85990df94a323fcaff7588fecce87"
+        },
+        {
+          "path": "skills/catalyst-zoho-mcp/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 4453,
+          "sha256": "a99a8615e972c97a1401297c7046350e169f86643f83261edb2968ee441dd2e9"
+        }
+      ]
+    },
+    {
+      "name": "claude:grafana-mcp",
+      "root": "claude-grafana-mcp",
+      "repository": "https://github.com/grafana/ai-marketplace",
+      "commit": "6c28ba1961d502d82301cbd64d2322e6e960477c",
+      "pluginPath": "plugins/grafana-mcp",
+      "ecosystem": "claude",
+      "files": [
+        {
+          "path": ".claude-plugin/plugin.json",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1119,
+          "sha256": "8b9098c693201a14ca15772b331f7d682386f4b62d10d2c122cf4dc664ad86a0"
+        },
+        {
+          "path": ".cursor-plugin/plugin.json",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 580,
+          "sha256": "52eb93377c31448a461e079fe990bebfa5b86a8b5d957d2aa19220b8771bde7d"
+        },
+        {
+          "path": ".mcp.json",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 463,
+          "sha256": "8243d3d4b87ccb5d2a211fed8d64898bc3756b7f8243319455dc43f49fad9c01"
+        },
+        {
+          "path": "mcp.json",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 439,
+          "sha256": "d16ac7ab18b24ea18d57bd11584a255843ae00ceec5aa10c17505a453d53c1fa"
+        },
+        {
+          "path": "skills/grafana-mcp-tools/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 7373,
+          "sha256": "a2e25518e57f71542d3e3d8271ca089b186e33e096305ea152e4c471d1ed6c6f"
+        }
+      ]
+    },
+    {
+      "name": "claude:langfuse-observability",
+      "root": "claude-langfuse-observability",
+      "repository": "https://github.com/langfuse/claude-observability-plugin",
+      "commit": "b5211009698fdfe79c6bbe90d6901ad255ea65d3",
+      "pluginPath": "",
+      "ecosystem": "claude",
+      "files": [
+        {
+          "path": ".claude-plugin/plugin.json",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 3120,
+          "sha256": "12cf944dcf37aab4c21b0e235f2e5ccd6a867e8e3a36a783eb59c6465f870a9d"
+        }
+      ]
+    },
+    {
+      "name": "claude:rill",
+      "root": "claude-rill",
+      "repository": "https://github.com/rilldata/agent-skills",
+      "commit": "adfce5762be435c026f4731f72e388520cb133cc",
+      "pluginPath": "",
+      "ecosystem": "claude",
+      "files": [
+        {
+          "path": ".claude-plugin/plugin.json",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 192,
+          "sha256": "607841a0ca667b3d439fe86031e01ff25c42577685025a3144736c8c4caf0ca4"
+        },
+        {
+          "path": ".mcp.json",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 119,
+          "sha256": "e20901c1b3606760f479f5c3927146a4f1d6599fe636fb3acc3186209d747b38"
+        },
+        {
+          "path": "skills/rill-analysis/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 5020,
+          "sha256": "c74dbf634b5c4f0c33f892efbe15a9949bad0325e1925389afc0c64ec8f2fa6c"
+        },
+        {
+          "path": "skills/rill-canvas/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 40661,
+          "sha256": "81cde38c9fa21886ead34368966b83db9aa4e087b2d90111bb17cfcb62c9b587"
+        },
+        {
+          "path": "skills/rill-component/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 19688,
+          "sha256": "c74cb25efc9ee4db4e058b96a75507282da39c619a2e339a5872b7db26f63a3a"
+        },
+        {
+          "path": "skills/rill-connector/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 63124,
+          "sha256": "7647e4633e20552d6e843d3a005fe2147039ace3622e856373e775b85a554525"
+        },
+        {
+          "path": "skills/rill-development/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 27743,
+          "sha256": "c0f11c49acd4adcb9ca35cb03d8ff4c2e81e859412a3e1354944255d0be38472"
+        },
+        {
+          "path": "skills/rill-explore/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 11729,
+          "sha256": "a421e226423c0636e27783ba7bcd2af1237a31aff21145723b53f677f7bd0696"
+        },
+        {
+          "path": "skills/rill-metrics-view/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 41735,
+          "sha256": "182559ff8f9c94c8a8d018309128a6e07dfb9d72fa92434a67b44cb6ca04d20f"
+        },
+        {
+          "path": "skills/rill-model/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 53597,
+          "sha256": "b313ba8dc878acadcff75b06061da19dbd88fd651c364467ad221e6afd7971ff"
+        },
+        {
+          "path": "skills/rill-rillyaml/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 22134,
+          "sha256": "0d0989330a6fdb11ee6741b96db703a70fa6052b48731fea51e44efaedd77aaf"
+        },
+        {
+          "path": "skills/rill-theme/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 16897,
+          "sha256": "3c3c79f8ee06bdcaad7e9b45601555aa73ea9776a1de62881fcb93f074fcf889"
+        }
+      ]
+    },
+    {
+      "name": "claude:cockroachdb",
+      "root": "claude-cockroachdb",
+      "repository": "https://github.com/cockroachdb/claude-plugin",
+      "commit": "6c96c6394a61f366e8ec1b7cec2281e97507cbff",
+      "pluginPath": "",
+      "ecosystem": "claude",
+      "files": [
+        {
+          "path": ".claude-plugin/plugin.json",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 3680,
+          "sha256": "01b198e54ba46397f27f4af1c10ddb6d9d1eab4c1506d647cdd64c31217af9bb"
+        },
+        {
+          "path": ".mcp.json",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 909,
+          "sha256": "0d2dfcf70fc737e952e071d03928bd7daee4f787f5f42fe45953df60272c4b1b"
+        },
+        {
+          "path": "skills/cockroachdb-application-development/benchmarking-transaction-patterns/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 10769,
+          "sha256": "3a65c731c1e470c6bc960064eaa8ff095b31fc473a55a4111769fac4af0bba04"
+        },
+        {
+          "path": "skills/cockroachdb-application-development/designing-application-transactions/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 22958,
+          "sha256": "cab9641fca14e55b73250193bf3b7f6cd728ed13f9517998b50d72c3f760bcf2"
+        },
+        {
+          "path": "skills/cockroachdb-application-development/designing-multi-region-applications/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 14970,
+          "sha256": "9f6ef7d95cfde8f014fc7a874d4f7afa43d0ea73936e5bdc2644c527b346c542"
+        },
+        {
+          "path": "skills/cockroachdb-observability-and-diagnostics/analyzing-range-distribution/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 15265,
+          "sha256": "cf58bb3662586e83a9dd214a6d888ee20dfe34374fbeb35ac9342fa35f988462"
+        },
+        {
+          "path": "skills/cockroachdb-observability-and-diagnostics/analyzing-schema-change-storage-risk/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 7448,
+          "sha256": "4c759b95833a22342b4bf8617092667b568a5af9864cb2d025e8f71211f922dc"
+        },
+        {
+          "path": "skills/cockroachdb-observability-and-diagnostics/auditing-table-statistics/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 19956,
+          "sha256": "d7ced9e9f0e2d0e45182680de18b0ef0bb2ee7314f901e3fa5917b742a4ad93b"
+        },
+        {
+          "path": "skills/cockroachdb-observability-and-diagnostics/monitoring-background-jobs/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 16299,
+          "sha256": "a3e32bf82a140b387e9d9854e6329a6c9e3627e06ebcc38e250f3ab1546f5dbf"
+        },
+        {
+          "path": "skills/cockroachdb-observability-and-diagnostics/profiling-statement-fingerprints/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 16375,
+          "sha256": "1deb919f77c5d297e95fb91c97200b35a23982c1a2198f808979aa44c7ed11e5"
+        },
+        {
+          "path": "skills/cockroachdb-observability-and-diagnostics/profiling-transaction-fingerprints/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 20417,
+          "sha256": "d1c2effea35e8e99877d6d5c23adcbcabe6212c9adcd24b3a56f94b4f6fae69d"
+        },
+        {
+          "path": "skills/cockroachdb-observability-and-diagnostics/triaging-live-sql-activity/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 14106,
+          "sha256": "7aff882278b0eb5382477cbb96514e68ecf220f3c549b78e590dd319a3754c4c"
+        },
+        {
+          "path": "skills/cockroachdb-onboarding-and-migrations/molt-fetch/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 4960,
+          "sha256": "d5e3630a1eaa5701a611b668bb03e52d5567f610c3f8db4af8f1f7028ba84aaf"
+        },
+        {
+          "path": "skills/cockroachdb-onboarding-and-migrations/molt-replicator/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 6828,
+          "sha256": "36d6bd17c9fd2aae1a842b3ccfb8f88cacf61d4993beedd687908dd2c4e09521"
+        },
+        {
+          "path": "skills/cockroachdb-onboarding-and-migrations/molt-verify/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 5130,
+          "sha256": "3d419fe0dfda8468b99fc675051aaf926d83154842575a77d073c5e2270754ef"
+        },
+        {
+          "path": "skills/cockroachdb-onboarding-and-migrations/setting-up-local-cluster/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 6875,
+          "sha256": "f6edf97837570af609af4b8c3b47840a918debc50dda719e643c5d78e7f840f9"
+        },
+        {
+          "path": "skills/cockroachdb-operations-and-lifecycle/managing-certificates-and-encryption/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 9697,
+          "sha256": "ff846271ca25a1629f100374738965d2860bf7f04ffe4c3ec63dc366fd2d1a87"
+        },
+        {
+          "path": "skills/cockroachdb-operations-and-lifecycle/managing-cluster-capacity/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 14474,
+          "sha256": "fa02cbde2b83ca08acaa5b43d65b1cfa6550425a8fbc0e2af0bf76107b1eacca"
+        },
+        {
+          "path": "skills/cockroachdb-operations-and-lifecycle/managing-cluster-settings/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 11521,
+          "sha256": "5d9493a264750f4839a1383143f4c8e607e8691c50bccaeee119454218ca4fca"
+        },
+        {
+          "path": "skills/cockroachdb-operations-and-lifecycle/performing-cluster-maintenance/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 14994,
+          "sha256": "172aab0d9cbdc5312ac8e657812d51b9550dc9807c5c7136be8ef7ccf924a352"
+        },
+        {
+          "path": "skills/cockroachdb-operations-and-lifecycle/provisioning-cluster-for-production/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 12306,
+          "sha256": "42b2ad18642ab23194473f98543bd19060efec814fa32688aed841c142ac2e5a"
+        },
+        {
+          "path": "skills/cockroachdb-operations-and-lifecycle/reviewing-cluster-health/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 14754,
+          "sha256": "d4e445a8a56b4a285ae0e0a1c9cff842ffaf344f900992766f2fcf1a46f3ddac"
+        },
+        {
+          "path": "skills/cockroachdb-operations-and-lifecycle/upgrading-cluster-version/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 11792,
+          "sha256": "6f3e10275b004f4a94b4891fd5132554c5c4b9be4a6c455f598a98b089127268"
+        },
+        {
+          "path": "skills/cockroachdb-query-and-schema-design/cockroachdb-sql/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 4971,
+          "sha256": "ea60d3ccdb9c5bea008b5a977ce5fc0bcd0d36b869494fa3472ce464311e7f53"
+        },
+        {
+          "path": "skills/cockroachdb-security-and-governance/auditing-cis-benchmark/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 12970,
+          "sha256": "77c9de6566609ebab2e44888321708d401a01252368f737498eb62ed4ee767c9"
+        },
+        {
+          "path": "skills/cockroachdb-security-and-governance/auditing-cloud-cluster-security/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 25222,
+          "sha256": "88f460c3dc41cfe76a94b29a855773842e30710d720743e4078af27ea36d474d"
+        },
+        {
+          "path": "skills/cockroachdb-security-and-governance/configuring-audit-logging/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 6776,
+          "sha256": "0230fd515a94dc620cf0b136d6f8ce840aeac4c278a853fb380c3d38a7d86971"
+        },
+        {
+          "path": "skills/cockroachdb-security-and-governance/configuring-ip-allowlists/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 6371,
+          "sha256": "a9b39833349b71620b1ef8dc7a2995d9ca7b38ac1ba0c00c708035bd976e75c2"
+        },
+        {
+          "path": "skills/cockroachdb-security-and-governance/configuring-log-export/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 9636,
+          "sha256": "62889fdd67f13b7f8d8e42b1c3c2632ced02f4a1c2b1df6cc4b8edc7362549d7"
+        },
+        {
+          "path": "skills/cockroachdb-security-and-governance/configuring-private-connectivity/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 13856,
+          "sha256": "523ee33d3a100a3793e0d38bd5f8c66cf69185079255a087fce56c5a04b02d37"
+        },
+        {
+          "path": "skills/cockroachdb-security-and-governance/configuring-sso-and-scim/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 24463,
+          "sha256": "d343f2a9e8a24d1a9bedfbb219e4c932348f3f4cab2101c22321aca0f70d701a"
+        },
+        {
+          "path": "skills/cockroachdb-security-and-governance/enabling-cmek-encryption/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 7793,
+          "sha256": "2fa0503da4c80ed7445e9daef8602e6cc4cfd7d661bc3e93daa77480acf11e83"
+        },
+        {
+          "path": "skills/cockroachdb-security-and-governance/enforcing-password-policies/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 8565,
+          "sha256": "74a4159cd3fb60b61190087a19f1a6ad4563e0512c722b56619f702f0673c062"
+        },
+        {
+          "path": "skills/cockroachdb-security-and-governance/hardening-user-privileges/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 8992,
+          "sha256": "9680a57258f3bfa2e7d3125ceaab2ffe7c4fa475d4227df441039180205e8fb7"
+        },
+        {
+          "path": "skills/cockroachdb-security-and-governance/managing-tls-certificates/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 11092,
+          "sha256": "2b3d865cfafc0e8b193d56755b04034edb910335c36e066a7ec0f627d46e6ec2"
+        },
+        {
+          "path": "skills/cockroachdb-security-and-governance/preparing-compliance-documentation/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 10448,
+          "sha256": "abe1a36319903fefa71af010a665f68c4c4f1df109a53745ab6f469626e13190"
+        }
+      ]
+    },
+    {
+      "name": "claude:codspeed",
+      "root": "claude-codspeed",
+      "repository": "https://github.com/CodSpeedHQ/codspeed",
+      "commit": "59cfc90540bb3717d8acf4ad03f7b5531c8e1a3d",
+      "pluginPath": "",
+      "ecosystem": "claude",
+      "files": [
+        {
+          "path": ".claude-plugin/plugin.json",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 535,
+          "sha256": "8799243b4becb2543b4e5d694ffa89c795ee0ae5596830b5aefba313131e6cc7"
+        },
+        {
+          "path": ".cursor-plugin/plugin.json",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 447,
+          "sha256": "64fbc279b58b5b1447eee201a297552338c154a4c75cd092c208eaf79f0bbd88"
+        },
+        {
+          "path": ".mcp.json",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 93,
+          "sha256": "d70c6624e60b3a69a28aa02dab5d6e1c6a52b0ee21681dfef7551ee83896de66"
+        },
+        {
+          "path": "skills/codspeed-optimize/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 11959,
+          "sha256": "01023deaa74cbf87532801da8de0ad92dd15d11536edd6160977d5f9297036c6"
+        },
+        {
+          "path": "skills/codspeed-setup-harness/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 9738,
+          "sha256": "a0058960f0441ba8c551ceb7e092c5bd985e52353f986dabaf6dfe91950915aa"
+        }
+      ]
+    },
+    {
+      "name": "claude:mintlify",
+      "root": "claude-mintlify",
+      "repository": "https://github.com/mintlify/mintlify-claude-plugin",
+      "commit": "c1c1700d405dc375c2d90a1d4f8b283e6422b7ec",
+      "pluginPath": "",
+      "ecosystem": "claude",
+      "files": [
+        {
+          "path": ".claude-plugin/plugin.json",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 25,
+          "sha256": "6d5f10d44c10743a1addc08deda42296da48017d23c6dc06258c4c4fa17035dc"
+        },
+        {
+          "path": ".mcp.json",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 217,
+          "sha256": "89009d8abf56dd13fb82d992f771036366c1b592be52f74c8090918503f87e81"
+        },
+        {
+          "path": "skills/mintlify/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 29180,
+          "sha256": "68f918bbd98b64c83229d1b5c44915c8a61cb0ceb5a93e95341531f4ceacfb3b"
+        }
+      ]
+    },
+    {
+      "name": "claude:sap-hana-cli",
+      "root": "claude-sap-hana-cli",
+      "repository": "https://github.com/SAP-samples/hana-cli-claude-plugin",
+      "commit": "abadd0aba32792b6378ed784e9f6d3e5b25dfc2a",
+      "pluginPath": "",
+      "ecosystem": "claude",
+      "files": [
+        {
+          "path": ".claude-plugin/plugin.json",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 747,
+          "sha256": "77b343acd3853e0b9b832d9a8dbd8f73ab4999811f94afb3f13cff4e02a89dc3"
+        },
+        {
+          "path": ".mcp.json",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 99,
+          "sha256": "6581ed82196f7f1b818a509d70b8839d8ecc94147267686e3f9428d8050097bf"
+        }
+      ]
+    },
+    {
+      "name": "claude:logfire",
+      "root": "claude-logfire",
+      "repository": "https://github.com/pydantic/skills",
+      "commit": "238d97102650c1caa51f35027aee13c469c59542",
+      "pluginPath": "plugins/logfire",
+      "ecosystem": "claude",
+      "files": [
+        {
+          "path": ".claude-plugin/plugin.json",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 270,
+          "sha256": "350cc535afe337ae3aa3012c725adece8161d10beb0d0523974c39f68e6a7afb"
+        },
+        {
+          "path": ".codex-plugin/mcp.json",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 122,
+          "sha256": "24f9bfd9634f528faba31fbfa698e0acfbf5a6fc3c5a2a84b940be59ffc23c16"
+        },
+        {
+          "path": ".codex-plugin/plugin.json",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1562,
+          "sha256": "d7854c8a16f70d8341cb031e88d24acbff8cd95c1fa5be2a3e2851dd3542a832"
+        },
+        {
+          "path": ".cursor-plugin/plugin.json",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 846,
+          "sha256": "9896be67006c55ca5a288cb271c50f71da190cb9ee650ba47e12ca37b6dcc523"
+        },
+        {
+          "path": ".mcp.json",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 142,
+          "sha256": "dabed1c53a57fb3328b91c0a399604bf185d57de73f67cb59cac3a170570406d"
+        },
+        {
+          "path": "mcp.json",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 277,
+          "sha256": "29d48a4cf28d617431b8013331af3f487a8bd4da985d4442ec9c219bee073c7c"
+        },
+        {
+          "path": "skills/logfire-evals/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 14254,
+          "sha256": "fc3724e110df276e3b992a1f5a5530409d49671cb3d90ce0bb3893780bb2e68d"
+        },
+        {
+          "path": "skills/logfire-infrastructure/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 7230,
+          "sha256": "52ce8af977b9616d3223a127ae73e4f02b423b8400ce0971c5cc78dd975742f9"
+        },
+        {
+          "path": "skills/logfire-instrumentation/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 24374,
+          "sha256": "f368c327d003e4348e7114bdadc2d5d2e361560e27f5445fae2334a6fba6b3bb"
+        },
+        {
+          "path": "skills/logfire-query/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 9010,
+          "sha256": "d7b0b513bf0ab3e1abc483af1f4cf951056f20bb8c2604c4d6f460be81baa4a3"
+        },
+        {
+          "path": "skills/logfire-setup/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 6108,
+          "sha256": "793b96c6e066784afe7e0436330e7ca5645b6c2fc6f3f342011501c7682a22c6"
+        },
+        {
+          "path": "skills/logfire-ui/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 11596,
+          "sha256": "c2a10afd95ebd1c1efe87fa551858cb280da9a7d76a8bf28fd7577525d381d06"
+        }
+      ]
+    },
+    {
+      "name": "claude:project-artifact",
+      "root": "claude-project-artifact",
+      "repository": "https://github.com/anthropics/claude-plugins-official",
+      "commit": "0fbfda5a91f4adc311daca25acc99132f40f0b6e",
+      "pluginPath": "plugins/project-artifact",
+      "ecosystem": "claude",
+      "files": [
+        {
+          "path": ".claude-plugin/plugin.json",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 784,
+          "sha256": "d695cb3444282368eea77028e515bea52883b7353764379fa3162f52e6f5accf"
+        },
+        {
+          "path": "skills/project-artifact/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 20425,
+          "sha256": "34e13249dba8a066f33c5f723dbb7b9cb6174b80cc490dd866fbfd1736f0577f"
+        }
+      ]
+    }
+  ]
+}

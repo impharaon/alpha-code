@@ -2,7 +2,7 @@ import { expect, test } from "bun:test"
 import { realpathSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join, relative, sep } from "node:path"
-import { captureFixture, digest, fixtureRoot } from "../../../test-fixtures/plugin-helper/fixture"
+import { captureStandardFixture, captureFixture, digest, fixtureRoot } from "../../../test-fixtures/plugin-helper/fixture"
 import provenance from "../../../test-fixtures/plugin-helper/provenance.json"
 import codex from "../../../test-fixtures/plugin-helper/codex/provenance.json"
 import registry from "../../../test-fixtures/plugin-helper/registry/provenance.json"
@@ -356,4 +356,29 @@ test("standalone converter check detects drift in both committed runtime and dec
       await writeFile(join(root, file), original)
     }
   } finally { await rm(root, { recursive: true, force: true }) }
+})
+
+
+test("chosen provider and portable MCP retain the real standard definitions", async () => {
+  const convert = (await converter()).convertPluginTree
+  const supabase = await convert(await captureStandardFixture("claude:supabase"))
+  expect(supabase.package.provider).toBe("claude-code")
+  expect(supabase.package.entries.filter(entry => entry.kind === "mcp")).toContainEqual(expect.objectContaining({ sourceName: "supabase", sourcePath: "agents/claude/.mcp.json" }))
+  for (const [name, count] of [["claude:cloudinary", 5], ["claude:catalyst-by-zoho", 1]] as const) {
+    const result = await convert(await captureStandardFixture(name))
+    expect(result.package.entries.filter(entry => entry.kind === "mcp" && entry.transport === "http")).toHaveLength(count)
+  }
+})
+
+test("typed options and environment defaults preserve real source meaning", async () => {
+  const convert = (await converter()).convertPluginTree
+  const grafana = await convert(await captureStandardFixture("claude:grafana-mcp"))
+  expect(grafana.package).toMatchObject({ options: { grafana_url: { type: "string", required: true, sensitive: false }, grafana_service_account_token: { type: "string", required: true, sensitive: true } } })
+  expect(grafana.privateCredentials.size).toBe(0)
+  expect(grafana.package.entries.find(entry => entry.kind === "mcp")).toMatchObject({ environment: { GRAFANA_URL: [{ option: "grafana_url" }], GRAFANA_SERVICE_ACCOUNT_TOKEN: [{ option: "grafana_service_account_token" }] } })
+  const langfuse = await convert(await captureStandardFixture("claude:langfuse-observability"))
+  expect(langfuse.package).toMatchObject({ options: { CC_LANGFUSE_DEBUG: { default: false }, CC_LANGFUSE_MAX_CHARS: { default: 20000 }, LANGFUSE_BASE_URL: { default: "https://cloud.langfuse.com" } } })
+  const logfire = await convert(await captureStandardFixture("claude:logfire"))
+  expect(logfire.package.entries.find(entry => entry.kind === "mcp")).toMatchObject({ url: [{ environment: { name: "LOGFIRE_MCP_URL", default: ["https://logfire-us.pydantic.dev/mcp"] } }] })
+  expect(logfire.package.secrets).toEqual([])
 })

@@ -3,7 +3,7 @@ import { expect, spyOn, test } from "bun:test"
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { captureFixture, captureWholeFixture, fixtureRoot } from "../../test-fixtures/plugin-helper/fixture"
+import { captureFixture, captureWholeFixture, captureStandardFixture, fixtureRoot } from "../../test-fixtures/plugin-helper/fixture"
 import { convertPluginTree } from "../shared/host-extension-package-contract/plugin-conversion.mjs"
 import { buildSkillTxItems } from "./ext-package-tx-builders"
 import { promotePayloadToCas, setPackageStateV1, removeInstallGrants } from "./ext-install-planner"
@@ -658,3 +658,41 @@ test("review AC11 local marketplace folder installs only the selected real plugi
   expect(h.reloads).toEqual([])
   expect(state.records.some(record => ["github", "playwright", "frontend-design"].includes(record.name))).toBe(false)
 }))
+
+
+test("folder and Git use the whole plugin tree", () => installerHarness(async h => {
+  const capture = await captureWholeFixture("plugin-dev", path => path.endsWith("/SKILL.md") || path === ".claude-plugin/plugin.json" || path === "README.md")
+  for (const kind of ["folder", "git"] as const) {
+    const source = { ...capture, source: { ...capture.source, kind, locator: kind + "-real-plugin-dev" } }
+    const converted = await convertPluginTree(source)
+    h.sources.convertCandidate = async () => ({ ok: true, ...converted, capture: source, runtimeIdentity: undefined })
+    const outcome = await h.install(h.request(kind + "_plugin_dev", kind + "_whole_tree"))
+    expect(outcome.ok && outcome.installed.filter(entry => entry.kind === "skill")).toHaveLength(7)
+    const state = readPackageLedgerStateV1(h.root)
+    if (!state.ok) throw Error(state.reason)
+    const graph = state.packageGraphs.find(graph => graph.packageId === (outcome.ok && outcome.packageId))!
+    expect(graph.root.kind).toBe("bundle")
+    expect(readFileSync(join(resolveLiveGenerationDir(h.root, graph.pluginTree!.storeKey)!, "tree/README.md"))).toEqual(Buffer.from(await source.readFile("README.md")))
+  }
+}))
+
+test("source component names preserve logical identity across kind case and definition relocation", async () => {
+  const { pluginHostName, pluginComponentId } = await import("./plugin-package-install")
+  const converted = await convertPluginTree(await captureStandardFixture("codex:supabase"))
+  const entries = converted.package.entries.filter(entry => entry.sourceName === "supabase")
+  expect(entries.map(entry => entry.kind).sort()).toEqual(["mcp", "skill"])
+  const names = entries.map(entry => pluginHostName(entry, "codex:supabase", new Set(), () => true))
+  expect(new Set(names).size).toBe(2)
+  for (const [i, entry] of entries.entries()) {
+    expect(names[i]).toMatch(/^[a-z0-9][a-z0-9_-]*-[a-f0-9]{10}$/)
+    expect(pluginComponentId("codex:supabase", entry)).toBe("user:" + names[i])
+  }
+  const codspeed = await convertPluginTree(await captureStandardFixture("claude:codspeed"))
+  const entry = codspeed.package.entries.find(entry => entry.kind === "mcp")!
+  const first = pluginHostName(entry, "claude:codspeed", new Set(), () => true)
+  expect(first).toBe(first.toLowerCase())
+  expect(first.length).toBeLessThanOrEqual(24)
+  const moved = { ...entry, sourcePath: "mcp.json", id: "mcp:mcp.json#" + entry.sourceName }
+  expect(pluginHostName(moved, "claude:codspeed", new Set(), () => true)).toBe(first)
+  expect(pluginComponentId("claude:codspeed", moved)).toBe(pluginComponentId("claude:codspeed", entry))
+})

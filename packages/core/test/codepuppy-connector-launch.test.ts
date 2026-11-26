@@ -49,6 +49,7 @@ import { McpClient } from "@opencode/core/mcp/client"
 import { McpConnection } from "@opencode/core/mcp/connection"
 import { START_CONCURRENCY, startPermits } from "@opencode/core/mcp/codepuppy-startup"
 import { ConfigMCP } from "@opencode/schema/config/mcp"
+import { readConnectorSource } from "@opencode/core/mcp/codepuppy-connector-content"
 
 // Integration layer: the real client/stdio/Location executes the prepared entry. The own
 // stdio fixture reports the current business inputs; no npm/uv resolver or registry is involved.
@@ -1699,4 +1700,18 @@ test("npm call binding keeps shell syntax and current business values out of the
   const receipt = readFileSync(path.join(input.prefix, "ready.json"), "utf8")
   expect(receipt).not.toContain("business-value")
   expect(receipt).not.toContain("OWN_CALL_VALUE")
+})
+
+// Component layer: real local source bytes from the r8 setuptools/uv probe.
+test("Python source identity excludes dotenv business credentials", async () => {
+  const input = npmSourceFixture()
+  const capture = JSON.parse(readFileSync(new URL("./fixture/uv-requirements.json", import.meta.url), "utf8")) as { sourceFiles: Record<string, string> }
+  const source = path.join(input.root, "source")
+  mkdirSync(source)
+  writeFileSync(path.join(source, "module.py"), capture.sourceFiles["src/owned_editable/__init__.py"]!)
+  writeFileSync(path.join(source, ".env"), "OWN_BUSINESS_KEY=first-current-value\n")
+  const read = () => Effect.runPromise(Effect.scoped(readConnectorSource({ ...input, cwd: input.root, sources: [{ path: source, manager: "python" }] })).pipe(Effect.provide(hostEnvironmentLayer)))
+  const before = await read()
+  writeFileSync(path.join(source, ".env"), "OWN_BUSINESS_KEY=rotated-current-value\n")
+  expect(await read()).toEqual(before)
 })

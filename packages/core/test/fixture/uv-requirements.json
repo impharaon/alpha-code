@@ -1,0 +1,85 @@
+{
+  "root": "/private/tmp/connector-r8-content-ExEBDe",
+  "declaration": {
+    "command": [
+      "pip",
+      "--business",
+      "/private/tmp/connector-r8-content-ExEBDe"
+    ],
+    "from": "Pip[read]>=26.0; python_version >= \"3.12\"",
+    "with": [
+      "named[feature] @ git+https://own:owned-fake-secret@git.invalid/project.git@main#subdirectory=src"
+    ],
+    "withEditable": [],
+    "environmentFiles": [],
+    "noEnvironmentFiles": false,
+    "fields": {
+      "command": "Some(\n        [\n            \"pip\",\n            \"--business\",\n            \"/private/tmp/connector-r8-content-ExEBDe\",\n        ],\n    )",
+      "from": "Some(\n        \"Pip[read]>=26.0; python_version >= \\\"3.12\\\"\",\n    )",
+      "with": "[\n        \"named[feature] @ git+https://own:owned-fake-secret@git.invalid/project.git@main#subdirectory=src\",\n    ]",
+      "with_requirements": "[\n        Local(\n            \"/private/tmp/connector-r8-content-ExEBDe/requirements.txt\",\n        ),\n    ]",
+      "with_editable": "[]",
+      "constraints": "[]",
+      "overrides": "[]",
+      "build_constraints": "[]",
+      "isolated": "false",
+      "show_resolution": "false",
+      "lfs": "Disabled",
+      "python": "Some(\n        \"/private/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/connector-managed-python-samUql/userdata/package-managers/uv/python/cpython-3.12.16-macos-aarch64-none/bin/python3.12\",\n    )",
+      "python_platform": "None",
+      "install_mirrors": "PythonInstallMirrors {\n        python_install_mirror: None,\n        pypy_install_mirror: None,\n        graalpy_install_mirror: None,\n        pyodide_install_mirror: None,\n        python_downloads_json_url: None,\n    }",
+      "refresh": "None(\n        Timestamp(\n            SystemTime {\n                tv_sec: 1795729945,\n                tv_nsec: 360077000,\n            },\n        ),\n    )",
+      "options": "ResolverInstallerOptions {\n        indexes: IndexOptions {\n            index: None,\n            proxy_index: None,\n            index_url: None,\n            extra_index_url: None,\n            no_index: None,\n            find_links: None,\n        },\n        index_strategy: None,\n        keyring_provider: None,\n        resolution: None,\n        prerelease: None,\n        prerelease_package: None,\n        fork_strategy: None,\n        dependency_metadata: None,\n        config_settings: None,\n        config_settings_package: None,\n        require_build_hashes: None,\n        build_isolation: None,\n        extra_build_dependencies: None,\n        extra_build_variables: None,\n        exclude_newer: None,\n        exclude_newer_package: None,\n        link_mode: None,\n        torch_backend: None,\n        compile_bytecode: None,\n        no_sources: None,\n        no_sources_package: None,\n        upgrade: None,\n        reinstall: None,\n        no_build: None,\n        no_build_package: None,\n        no_binary: None,\n        no_binary_package: None,\n    }",
+      "settings": "ResolverInstallerSettings {\n        resolver: ResolverSettings {\n            build_options: BuildOptions {\n                no_binary: None,\n                no_build: None,\n            },\n            config_setting: ConfigSettings(\n                {},\n            ),\n            config_settings_package: PackageConfigSettings(\n                {},\n            ),\n            dependency_metadata: DependencyMetadata(\n                {},\n            ),\n            exclude_newer: ExcludeNewer {\n                global: None,\n                package: ExcludeNewerPackage(\n                    {},\n                ),\n            },\n            fork_strategy: RequiresPython,\n            index_locations: IndexLocations {\n                indexes: [],\n                flat_index: [],\n                no_index: false,\n            },\n            index_strategy: FirstIndex,\n            keyring_provider: Disabled,\n            link_mode: Clone,\n            build_hash_checking: Verify,\n            build_isolation: Isolate,\n            extra_build_dependencies: ExtraBuildDependencies(\n                {},\n            ),\n            extra_build_variables: ExtraBuildVariables(\n                {},\n            ),\n            prerelease: Prerelease {\n                global: IfNecessary,\n                package: PrereleasePackage(\n                    {},\n                ),\n            },\n            resolution: Highest,\n            sources: None,\n            torch_backend: None,\n            cuda_driver_version: None,\n            amd_gpu_architecture: None,\n            upgrade: Upgrade {\n                strategy: None,\n                constraints: {},\n            },\n        },\n        compile_bytecode: false,\n        reinstall: None,\n    }",
+      "env_file": "[]",
+      "no_env_file": "false"
+    }
+  },
+  "replies": [
+    {
+      "input": "{\"requirement\":\"Pip[read]>=26.0; python_version >= \\\"3.12\\\"\"}",
+      "output": "{\"name\": \"pip\", \"extras\": [\"read\"], \"version\": \">=26.0\", \"url\": null, \"marker\": \"python_version >= \\\"3.12\\\"\"}\n"
+    },
+    {
+      "input": "{\"requirement\":\"named[feature] @ git+https://own:owned-fake-secret@git.invalid/project.git@main#subdirectory=src\"}",
+      "output": "{\"name\": \"named\", \"extras\": [\"feature\"], \"version\": \"*\", \"url\": \"git+https://own:owned-fake-secret@git.invalid/project.git@main#subdirectory=src\", \"marker\": null}\n"
+    },
+    {
+      "input": "{\"content\":\"-r nested.txt\\n-e ./source\\n--index-url https://own:owned-fake-secret@packages.invalid/simple?token=owned-first\\n\"}",
+      "output": "[{\"requirement\": \"\", \"editables\": [], \"requirements\": [\"nested.txt\"], \"constraints\": [], \"index\": null, \"extraIndexes\": [], \"links\": [], \"noIndex\": false, \"requireHashes\": false, \"hashes\": null, \"noBinary\": [], \"onlyBinary\": []}, {\"requirement\": \"\", \"editables\": [\"./source\"], \"requirements\": [], \"constraints\": [], \"index\": null, \"extraIndexes\": [], \"links\": [], \"noIndex\": false, \"requireHashes\": false, \"hashes\": null, \"noBinary\": [], \"onlyBinary\": []}, {\"requirement\": \"\", \"editables\": [], \"requirements\": [], \"constraints\": [], \"index\": \"https://own:owned-fake-secret@packages.invalid/simple?token=owned-first\", \"extraIndexes\": [], \"links\": [], \"noIndex\": false, \"requireHashes\": false, \"hashes\": null, \"noBinary\": [], \"onlyBinary\": []}]\n"
+    },
+    {
+      "input": "{\"content\":\"packaging==24.0; python_version >= \\\"3.10\\\"\\n-c constraints.txt\\n\"}",
+      "output": "[{\"requirement\": \"packaging==24.0; python_version >= \\\"3.10\\\"\", \"editables\": [], \"requirements\": [], \"constraints\": [], \"index\": null, \"extraIndexes\": [], \"links\": [], \"noIndex\": false, \"requireHashes\": false, \"hashes\": null, \"noBinary\": [], \"onlyBinary\": []}, {\"requirement\": \"\", \"editables\": [], \"requirements\": [], \"constraints\": [\"constraints.txt\"], \"index\": null, \"extraIndexes\": [], \"links\": [], \"noIndex\": false, \"requireHashes\": false, \"hashes\": null, \"noBinary\": [], \"onlyBinary\": []}]\n"
+    },
+    {
+      "input": "{\"requirement\":\"packaging==24.0; python_version >= \\\"3.10\\\"\"}",
+      "output": "{\"name\": \"packaging\", \"extras\": [], \"version\": \"==24.0\", \"url\": null, \"marker\": \"python_version >= \\\"3.10\\\"\"}\n"
+    },
+    {
+      "input": "{\"content\":\"packaging<25\\n\"}",
+      "output": "[{\"requirement\": \"packaging<25\", \"editables\": [], \"requirements\": [], \"constraints\": [], \"index\": null, \"extraIndexes\": [], \"links\": [], \"noIndex\": false, \"requireHashes\": false, \"hashes\": null, \"noBinary\": [], \"onlyBinary\": []}]\n"
+    },
+    {
+      "input": "{\"requirement\":\"packaging<25\"}",
+      "output": "{\"name\": \"packaging\", \"extras\": [], \"version\": \"<25\", \"url\": null, \"marker\": null}\n"
+    },
+    {
+      "input": "{\"requirement\":\"./source\"}",
+      "output": "{\"source\": \"./source\"}\n"
+    },
+    {
+      "input": "[build-system]\nrequires = [\"setuptools==75.8.0\"]\nbuild-backend = \"setuptools.build_meta\"\n\n[project]\nname = \"owned-editable\"\nversion = \"1.0.0\"\n",
+      "output": "{\"build-system\": {\"requires\": [\"setuptools==75.8.0\"], \"build-backend\": \"setuptools.build_meta\"}, \"project\": {\"name\": \"owned-editable\", \"version\": \"1.0.0\"}}\n"
+    }
+  ],
+  "sourceFiles": {
+    "pyproject.toml": "[build-system]\nrequires = [\"setuptools==75.8.0\"]\nbuild-backend = \"setuptools.build_meta\"\n\n[project]\nname = \"owned-editable\"\nversion = \"1.0.0\"\n",
+    "src/owned_editable/__init__.py": "VALUE = \"owned editable source\"\n"
+  },
+  "requirementsFiles": {
+    "requirements.txt": "-r nested.txt\n-e ./source\n--index-url https://own:owned-fake-secret@packages.invalid/simple?token=owned-first\n",
+    "nested.txt": "packaging==24.0; python_version >= \"3.10\"\n-c constraints.txt\n",
+    "constraints.txt": "packaging<25\n"
+  }
+}

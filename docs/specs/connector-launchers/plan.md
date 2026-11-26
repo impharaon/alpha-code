@@ -700,3 +700,5 @@ core `bun typecheck` →exit0、2069 files/2 projects（`/tmp/connector-r7-core-
 - #1759：沿 r7 的冻结接口与生产组装表，只读复核分支；不复制 R1/R2 或把候选位置当绑定结果。未决设计分叉才返回 PLAN-READY，其余本轮直接实现。
 
 r8 执行目录红例：真实 pinned `uv tool run --help` 的 `-C, --config-setting`，现有 readUvLaunchEnvironment 把它复制为根目录选项。新增既有文件的 CLI 边界组件例（应用自有元数据协议，不伪造 uv 输出），`bun test test/codepuppy-connector-launch.test.ts -t 'uv execution environment keeps' --max-concurrency=2` →exit1，0 PASS/1 FAIL（`/tmp/connector-r8-uv-directory-red.log`）。先提交该例，再修复，只允许真实 --directory 进入该元数据读取命令。
+
+r8 源秘密红例：Python 本地源遍历把 .env 字节纳入内容身份，业务密钥轮换会改变 key。以 r8 真实 setuptools 包的模块字节与应用自有 dotenv 输入新增组件回归，`bun test test/codepuppy-connector-launch.test.ts -t 'Python source identity excludes' --max-concurrency=2` →exit1 /0 PASS /1 FAIL（`/tmp/connector-r8-python-secret-red.log`）。来源字节与 parser 协议夹具 uv-requirements.json 是真实 pinned Python/uv 探针输出，含 source 文件及明确的假凭据；不新增运行时依赖。修复前先提交该例。

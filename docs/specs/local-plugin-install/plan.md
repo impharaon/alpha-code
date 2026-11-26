@@ -717,3 +717,97 @@ AC-06 Ralph 原件一次性 `/tmp/plugin-standard-r6-ralph.log` **1 pass / 0 fai
 偏离/必要同链文件：上下文库存快照与现有 context-injection.test.ts 是新挂点的机械同步；现有 package-admission.test.ts 补签名入口真实准入/启停证据；测试 harness 采用真实 LocationServiceMap/SDK 生命周期，并只把模型换离线、MCP 连临时本地真实 SDK。两个 memory mode case 属 integration 层、受影响 PR＋nightly，imports/字面路径与既有 plugin-host 同依赖，不扩大每个 PR 的全局集。MAX_STEPS_PROMPT 仅消费 core 的既有纯常量，实际 steps 及执行循环仍全归 core；无需新端口。一次误从根发起的 Bun 测试命令被根 guard 拒绝，未计入结果，其后均指定包目录。
 
 遗留去向：origin/alpha 的三条模型优先级旧断言 → 编排器处理；docs-contract/缺 selector manifest → 继承指定基线交编排器；真实 SaaS、工具链、扫描质量 → integration acceptance；alpha-web 共享 converter/pin → 外仓后续集成。没有独立发现的 ARCH 问题或 OPTIONAL。所有本车道前台命令结束，hooksPath 保持 .githooks；只 commit，不 push/PR/merge。
+
+## 片 5 · #1776：hooks、扩展事件与会话监视
+
+- 依据：[Story #1776](https://github.com/impharaon/alpha-code/issues/1776)；spec v5 @7278c10 的 AC-11/15、AC-03 hook 当次 allow、AC-13/14 其余运行入口、AC-20 hook OPTION、AC-22/23/24、AC-25 hook DATA 与生命周期、AC-30；[design v3.1 @8389b0f](https://github.com/impharaon/alpha-work/blob/8389b0f/docs/specs/local-plugin-install/design.md) §4.1/4.4/4.10/4.12/4.15、§5/6 S-03…S-08、§8/10。r5 arguments 与 r6 command/agent allow-set 的编排裁决继续有效，不因设计文字尚未镜像而撤回已接通行为。
+- 核对：r7 Phase: IMPLEMENT；Claude Opus 5.5（orchestrator）授权先 rebase，再计划并实施本片；若计划揭示未定合同则返回 PLAN-READY。片 4/3 通过 821be82013 的收据继承，以下只核对新基线的差异。当前本片停在下述 R5-ROOT 接缝，未写片 5 运行代码。
+- r7 起于 2026-11-26 18:42（UTC+08:00）；本片实施预计 8–12 小时、约 30–40 个手写生产/合同文件、3,500–5,500 行（测试/生成物另计）。每组 AC 核对实际范围/耗时，达到两倍停止线返回，不扩大到其他仓或门。
+- 集成顺序仍为 4→3→5→7→8→9→6。本片不实现 LSP（片 7，AC-21）、style/default（片 8，AC-28/29）、source.command/link（片 9，AC-31）或原生引用/最终 UI（片 6，AC-02/08/09/13/15 的其余部分）；W 仅继承共享 converter/pin 的外仓依赖，不在此修改。
+
+### r7 新基线与已完成验证
+
+1. fetch 后 origin/alpha 固定为 `1db6a3bbf5963e8a58e57719e2a441a55da21b21`（#1762 squash）。按指定 `git rebase --onto origin/alpha c4f213f461 feat/1776-plugin-standard` 重放 42 个 #1776 提交，全部保留；原 821be82013 对应新 `3c41fa7a90`。`git range-diff c4f213f461..821be82013 origin/alpha..3c41fa7a90` 的 38 项补丁相同，4 项只因下列机械合并改变上下文；证据 `/tmp/plugin-standard-r7-range-diff.txt`。
+2. 冲突仅四文件：server.ts 两次顶部新增 import 取并集；network-egress-proxy.test.ts 末尾分别追加的对话 CONNECT 与 plugin capability 用例都保留；context-injection-inventory.snapshot.txt 用合并后的唯一登记簿 generator 重建（仅总计冲突）；context-injection.test.ts 保留联网 notice 与 package idle 两项测试，实际 context 回调数量由 alpha 的 3 加本片前序的 2 得到 5，并保留共用 assembler 的同一对象/恰一次断言。没有取舍双方行为或变更 #1762 的 re-vendor/登记。
+3. bun.lock 由 alpha 增量改变，`bun install --frozen-lockfile` 成功，2 packages installed；随后 core.hooksPath 复核为 `.githooks`，工作区干净。没有启动应用、Electron 或窗口。
+4. 同 r6 的 25 UI＋8 Ext＋3 Core＋1 Plugin 文件/集合各重跑一次：UI **734 pass**、Ext **265 pass**、Core **43 pass**、Plugin **1 pass**，均 0 fail，合计 **1,043**，对照原 1,042 的 +1 来自 alpha 新增的联网 notice 登记测试。完整命令沿 r6 同组收据，日志 `/tmp/plugin-standard-r7-post-rebase-{ui,ext,core,plugin}.log`。
+5. 另补片 4 改动行为：UI sources/truth/proxy/messages/write-channel 五文件 **103 pass**；proxy 具名 `plugin loopback HTTP requires|plugin CONNECT capabilities|真实 CONNECT 经 main` **3 pass**；Core 具名 `plugin local MCP uses its private proxy|explicit SSE opens|absent and explicit HTTP` **3 pass**，未跑该文件的容量/计时 case；Schema mcp 文件 **3 pass**；server 的 FakeChild/Electron mock 文件 **52 pass**，实际未启动 Electron；两个相关 renderer 子进程宿主 **2 pass**（内部 details 14、dialog 7），official 的 `desktop SQLite package without a DSN` **1 pass**。额外合计 **167 pass**，宿主与内部子用例不双计，日志同 `/tmp/plugin-standard-r7-post-rebase-*.log`。
+6. renderer dialog 宿主初次 **1 pass / 1 fail**，错误仅预期 5 而实际 7（其 7 条子用例全部绿）：alpha 新 5 条加 S4 的 typed options/version 两条。`94b7c81d1f` 只把该行精确 pass 数同步到 7，未删用例/放宽结果检查；重跑该行 **1 pass / 0 fail**（`/tmp/plugin-standard-r7-dialog-host-green.log`）。这是现有组件宿主计数同步，不改 gate 脚本/manifest/门的标准。其他片 4/3 行为没有修改。
+7. rebase 原样的 `affected-tests --list` 为 **affected tests: 358 of 689 test files**（`/tmp/plugin-standard-r7-affected{,-scope}.txt`）；同步 dialog 宿主后最终为 **affected tests: 359 of 689 test files**（`/tmp/plugin-standard-r7-affected-final{,-scope}.txt`），多选的是本轮直接改变的宿主文件。下表三条旧断言所在文件在两份列表均未选中，未改它们；相对 r6 固定 origin/alpha@5c896630ab 的该文件 diff 为零。
+
+| 原已复验失败的精确测试名 | 文件与实际断言 | 本分支 PR gate 选择 |
+| --- | --- | --- |
+| `runs native JSON in the background without switching the parent` | `packages/core/test/config/command-subagent.test.ts:79` 的表驱动用例，`:92` 仍期待 model=override | 否，最终 359 项列表无该文件；当前 core runner roots 只纳管 codepuppy-* 与具名 plan/mcp/oauth 文件 |
+| `runs subagent mode by default in the background without switching the parent` | 同文件 `:79/:92`，仍期待 model=child | 否，同上 |
+| `subagent: false overrides subagent mode and the legacy alias` | 同文件 `:112/:116`，仍期待切父会话后 model=child | 否，同上 |
+
+r6 在临时 detached origin/alpha@5c896630ab 的具名复验为同名 **0 pass / 3 fail**，worktree 已移除；r7 不重复该基线运行、不改断言或引擎模型优先级。它们不是本次 1,043 绿集合的成员，也不把 selector 未选当作修复。
+
+### 当前代码与 R5-ROOT 冻结接缝
+
+**SEAM-CHANGE-NEEDED: PackageAllowSetV3 的 bundle 根活动投影。** main 唯一生产者 `packages/ui-mac/src/main/ext-receipt-v2.ts:621` 只保留 skill/mcp/command/agent，bundle 根在计算启停/项目 effect 前就被过滤。唯一共享解码/判定 `packages/ext/src/package-scope.ts:5–35` 的 scoped.kind 也只有这四种。`packages/ext/src/plugin-package-skills.ts:27–39` 的 live metadata 枚举只证明内容存在，不带活动状态；不能把 current.json 存在当已开启，不能从“某个技能仍开着”反推包根允许，更不能在 ext 另读账本建立第二开关权威。
+
+按原派发冻结的片 2 文件及 r6“只扩 command/agent、无其他 DTO 变化”裁决，本轮尚未获得 bundle 域增量。片 5 的纯 hook 包（实际 learning-output-style、Langfuse）或无其他运行成员的监视包必须能随根开关/项目范围登记、撤销及取消。没有此值，AC-11/13/14/15/20/25/30 共享的运行条件不能正确表达；先写一个常开 runner 或伪造 skill key 都违反已定合同。
+
+一次性 temp 探针（真实 receipt/graph 写者，非另造 provider 格式）：`bun /tmp/plugin-standard-r7-root-scope-probe.ts` exit 0；同一 bundle-only graph 分别 global enabled、global disabled、project enabled 时，三次输出逐字同为 `{v:3,keys:[],scoped:[],mcp:[]}`（`/tmp/plugin-standard-r7-root-scope-probe.json`）。另从固定 Langfuse capture 读回当前归一化条目为零，符合片 4 留给本片的 hook 解析缺口；该 probe 不声称 hook 已接通、不运行插件代码，也不读取用户账本/凭据。
+
+**提交给编排器的最小问题/建议**：是否将既有 keys/scoped kind 的域增加 `bundle`，由同一 root/effect/claim 算法投影已启用整树根（含没有可运行子项的包），ext 以已有 bundle store key/根身份消费？建议只增这个域，保持 v3 形状、事务/写者和已有四种子项判定不变；skill/agent 的局部 hooks 再叠加实际 Invocation 活跃期。无需给每个 hook/monitor 新建账本 kind、第二注册表或公开 DTO。若设计要独立分项开关，则请给出指定的权威投影合同，不能由本车道改用 native plugin/skill 记录冒充。待该接缝裁决，以下步骤才开始实施。
+
+### 改动（裁决后的文件边界）
+
+| 文件 | 本片改动；不另立权威 |
+| --- | --- |
+| `packages/ext/src/package-scope.ts`、`packages/ui-mac/src/main/ext-receipt-v2.ts` 与原测试 | **仅待 R5-ROOT 裁决的域增量**；消费已有根/范围/effect/claim，不改账本、事务顺序或迁移 |
+| `packages/ui-mac/src/shared/host-extension-package-contract/{plugin-package,model,schema,plugin-conversion}.ts`、原 decoder/envelope 与 generator/产物 | 对齐 §4.1 Hook/Monitor；在同一 parser 接 manifest/default/custom 与 skill/agent frontmatter，扩事件/作用域/prompt/exec-form，保留 source order；未知协议及五项无时机给具体诊断 |
+| `packages/ui-mac/src/main/{plugin-package-install,install-from-source,package-admission}.ts`、对应已有测试 | 同整树保存声明及真实 notRunning；事件 connected 只来自已接通能力，沿既有内容/默认开启的事务返回分界，不在 install/preview 注册或执行；不新建 hook receipt kind |
+| 新 `packages/ext/src/plugin-package-hooks.ts`、新 `plugin-package-process.ts`、新 `plugin-package-transcript.ts` 及各模块同名测试 | 一个 Location runner；hook/monitor 共用真实进程与取消资源表、已知秘密脱敏/OPTION/ROOT/DATA、原消息的本机 transcript 投影；不是第二会话真源、第二 shell 模板解析器或另一模型循环 |
+| 新 `packages/ext/src/plugin-package-monitors.ts` 及同名测试；既有 `plugin-package-invocation.ts`、`plugin.ts` | 沿同一真实会话/skill invoke 的挂点启动相应 monitor，按行通知与停止；skill/agent scoped hooks 与现有 Invocation 生命周期同清理，包/Location 取消共用资源归属 |
+| `packages/ext/src/policy/{index,gate,identity}.ts` 与原测试 | 在唯一 policy 中接 hook 的当次输入/代/服务定义绑定决定，更新输入后重判，普通 ask 与合法 allow、硬 deny、安装询问和出网约束的现有归属保持 |
+| `packages/plugin/src/codepuppy-package-runtime.ts` 与原 port 测试 | 只加冻结 §6 PackageRuntimeHandlers 的既定符号及 Location/dispose，同一 bundle 槽；保留已裁决 S-01 arguments，不改公共 SessionHooks/RPC |
+| `packages/core/src/config.ts`；`config/plugin/instruction.ts`、`session/instruction-state.ts`、`session/instructions.ts`；`session/compaction.ts` | 分别 S-04/05/06 的实际阶段/来源元数据/await 窄调用及既有模块测试；算法、预算、重试与项目信任仍归原引擎 |
+| `packages/core/src/mcp/{index,client,connection}.ts` 及既有 `codepuppy-mcp-runtime.test.ts`/相关 MCP 测试 | S-07 的实际 elicitation/request/result 归属；stdio 共享现有连接/进程，远程仅在真正会话使用且匹配 handler 时会话化，沿原 OAuth/Form/定义权威 |
+| main 现有 `codepuppy-sidecar-messages.ts`、`hub-view.ts`、`server.ts`；renderer 当前会话 leave/通知生产者及其原测试 | 只连接 S-03 已定 PackageSessionMessage/reply 与真实通知/离场动作；在释放前 await；不新增 UI、伪事件、计时器或包可调用的事件入口 |
+| `docs/architecture/codepuppy-authority-registry.json`、ADR-047 及原 takeover allowlist 的具名登记；`docs/architecture/modules.md` | S-03…S-07 的批准范围/阶梯理由随对应实现同提交登记；S-08 仅 L0，不接管 runner/step.ts；只登记精确候选，不改 gate 逻辑或测试选择标准 |
+| `packages/ext/src/context-injection.ts`、其 snapshot/原测试，既有 `plugin-host.test.ts` 与 pinned fixture/provenance | 登记宿主自有错误/上下文包裹文案；供应方正文不改写为宿主文案。标准样本固定归档；相关测试/真实一次性回放分别归位 |
+
+### 顺序
+
+1. **先裁决 R5-ROOT**，在两个唯一生产/消费文件原测试补 hook-only/global/project/off/remove 的红臂，再做最小域增量。与片 3/4 公共 helper、key/代/claim 的相关文件一次收口；不先搭建绕过允许集的运行器。
+2. 共享库 Hook/Monitor 形状、解析与诊断：先用报告固定 learning-output-style/hookify/ralph-loop/code-modernization/claude-security/Langfuse、dash0/stripe/paypal/convex 原件补最低层红测，再同步同一 model/schema/strict decoders、SDK 消费和生成物。无效一项不吞其他合法项。此步只定义，不启动。
+3. 先接 command hook runner、transcript、真实生命周期与源工具映射；在 policy 中完成 PreToolUse/PermissionRequest 的当次决定与 updatedInput 重判。安装内容仍不执行；启用只登记。每个阶段先具名回归，普通 ask/hard deny/下一次调用、取消晚结果均有反臂。prompt 分支接原无工具 generate、结构化结果和事件原语，不等 LSP/style。
+4. 分别落 S-04 ConfigChange、S-05 InstructionsLoaded、S-06 Compact、S-07 Elicitation；每个 engine 增量与其 ADR/registry/精确登记同提交，先在原模块测试看到真实阶段和元数据再接 runner；不可取得的字段不伪造。S-08 只从 awaited context/idle 聚合实际 assistantMessageID 工具终态，不修改 engine 批次端口。
+5. 同一进程归属表接 monitor 与文件 watcher、OPTION/DATA/CLAUDE_ENV_FILE；main 真实 leave/notification 通道接入 runner，取消所有会话/包资源并核对代/活跃期后再投递，保持项目共享数据归属。每个功能完成时对应行为文件完整一次，不混入容量/计时/scenario。
+6. 一次性临时整树旅程覆盖 spec 列举的 command/prompt hook、dash0 扩展事件与 Convex monitor 的相关真实时机；对照臂使用原样本可观测动作证明不是空观测。SaaS、付费模型质量、外部工具链无法验证时给实际结果，不冒称完整可用。最后一次相关 import/mock/枚举消费者集、适用 package type/lint、generator、文档及 affected-tests --list；不运行 gate/全包/全项目。
+
+### 风险
+
+- R5-ROOT 是共同前置冻结合同缺失，阻断的是包活动归属，不是产品范围/视觉选择；不得靠子项残余状态、读 ledger 或新确认绕过。
+- S-05/06 为 §10 已论证的新接管候选，只有该精确增量可登记；若读取实际阶段发现给不出冻结输入，返回对应 seam，不伪造 config/指令/compact 元数据。S-08 不升级接管，stdio 不因 handler 兴趣扩进程。
+- 并发 handler 结果、updatedInput、prompt no-decision、异步回投与关闭/换代存在真实竞态；测试直接观察原执行器/模型请求/进程与会话消息，不只断言转换 JSON。批次水位从已存在历史建立，源 event identity 去重，不建持久脚本重放账本。
+- command hook 的 source shell、exec argv、选项秘密及 env 的绑定必须用指定单一权威；若现成 API 不能表达 stdin/取消或正确的单词绑定，先给具体输入/最小合同缺口，不复制 shell 解释器或泄露秘密。
+- 源 code-modernization 本来有 YAML 未细分错误，实样运行仅报告实际合法入口；不借机修复外部仓。五项无时机沿冻结逐项原因，其他缺失不能假称 unavailable-trigger 来减 AC。
+
+### 证明（拟实施；不是本轮已通过）
+
+| AC / 行为 | 具名测试/证据落点 | 层与运行时机 | 删除行为为什么会失败 |
+| --- | --- | --- | --- |
+| AC-11/15、13/14 hook 安装/作用域 | 原 converter/install/admission/receipt tests；`plugin-host.test.ts`：`package hooks activate after installation and stop with their package`、`global package hooks preserve project plugin trust` | fast＋integration，受影响 PR/nightly；整包从预览到移除一次性临时回放 | 安装前动作、关闭后投递、项目脚本误启动或丢 global provenance 会在真实 marker/原工具/入口处变红 |
+| AC-03、11 当次决定与源 I/O | 原 `policy/register-policy.test.ts`：`hook allow binds the final call without overriding hard deny`；新 runner 模块测试 command 输出/并发；原 plugin-host 真实工具 case | fast＋integration，受影响 PR/nightly | 普通 ask 永久抹掉、updatedInput 复用旧 allow、源工具字段错误、拒绝未阻止原工具或 transcript 空壳都会失去对照 |
+| AC-11 Stop/async/transcript | 新 transcript/process 模块测试真实投影/进程；plugin-host 的原 idle/synthetic 上增加具名 case；Ralph/hookify 原脚本只在临时目录一次性执行 | fast 的输出归并＋integration 的本地进程/会话；完整脚本旅程一次性 | 真实最后 assistant/工具结果丢失、异步错会话、Stop 另起循环或关闭后回投都会在真实消息/进程处失败 |
+| AC-20/25 OPTION/DATA | 既有 settings/账户/安装测试继承；新 process 模块：`package processes receive typed options and stable data without publishing secrets` | integration，受影响 PR/nightly；Langfuse/claude-security 原命令只换可观察标记的一次性 probe | false/number/default 消失、秘密进公开树或日志、换代丢数据、关包误删/移除删别包可直接观察 |
+| AC-22 事件与无时机 | 原 converter 新参数化 source event case；各 S-04/05/06/07 原 core 测试和 runtime port 生命周期；plugin-host 子助手/leave/file/notification case | fast＋integration，受影响 PR/nightly；dash0 真实24项副本逐时机一次性回放 | 只改枚举、重复事件、错误 source/summary/会话归属、五项伪 connected 会在字段/实际顺序/次数处失败 |
+| AC-23 PostToolBatch | 新 runner/原 plugin-host：`tool batches complete once before the next model request or idle` | integration，受影响 PR/nightly；Stripe 原脚本采样必中一次性 | 并行工具漏项、失败漏批、空批次触发、context/idle 双发或首轮模型未见上下文会失败 |
+| AC-24 prompt | 新 runner prompt 分支与原 policy/plugin-host：`prompt success leaves approval unchanged and refusal follows the source event` | fast＋integration，受影响 PR/nightly；PayPal 原提示/拒绝变体一次性离线受控模型旅程 | ok:true 偷发 allow、拒绝未阻止 Edit、坏 JSON 当决定、Read 不匹配仍生成模型请求会失败 |
+| AC-30 monitor | 新 monitor 模块与原 plugin-host：`skill monitors send lines to their session and stop on leave or disable` | integration 的有限本地进程/事件，受影响 PR/nightly；Convex 五项原配置只换标记命令一次性 | 安装先启动、design 启 quickstart、错会话行、残余行丢失、关闭/leave 后进程/通知仍在会失败 |
+| 跨 bundle/Location/取消 | 原 `codepuppy-package-runtime.test.ts` 及各 core 原模块测试；main messages 与 renderer 原动作测试 | fast＋integration，受影响 PR/nightly | 两 bundle 槽不同、Location 串用、释放前没 await 或外部声明能伪造宿主动作会失败 |
+
+新永久测试按模块而非工单命名：新模块才新建同名测试文件；实际 imports/字面 fixture 路径使 PR selector 可追踪。完整实样、测量、scale/capacity/时机场景不加入日常 PR 集，既有场景只在 brief 指定的具名运行或 nightly。新增任何案例不改 gate manifest/runner/全局 setup；若 selected scope 意外 all tests，先处理选择原因而非跑全量。
+
+### 偏离记录与本轮收据
+
+r7 仅完成获授权 rebase、片 4/3 相关复验与本节计划；机械 dialog 宿主计数单独提交 94b7c81d1f。R5-ROOT 是计划核对发现的冻结域缺失，遵照 r7“未定设计问题则 PLAN-READY”停点，不将未实现的片 5 写成通过，不扩大到后续片。没有修改片 2 生产者/解码、engine、gate、其他仓；未运行插件源码/真实凭据/付费服务来绕过接缝。
+
+已核：Codex（GPT-6）；rebase 后实际基线 1db6a3bbf5、片 4/3 原已定合同及 spec v5/design v3.1＋r5/r6 裁决；片 4/3 复验通过，本片 PLAN-READY / R5-ROOT 待编排裁决。遗留去向：bundle allow-set 域 fix now 交编排器；三条旧模型断言不改、由编排器处理；其余真实 SaaS/工具链与外仓 pin 继承既有集成验收。OPTIONAL：无。
+
+
+r7 收口静态证据（2026-11-26 18:56，约 14 分钟）：UI/Ext 包内 bun typecheck 均 exit 0（`/tmp/plugin-standard-r7-typecheck-{ui,ext}.log`）；plan 8 条相对链接通过，git diff --check exit 0。单仓 docs-contract（changed-since=origin/alpha）为 71 errors / 250 warnings，71 errors 仍属接受的基线，未修两条旧 unknown-id，也未拓展治理（`/tmp/plugin-standard-r7-docs.json`）。本片计划范围外只改已说明的精确计数一行；无 S5 生产代码、gate/selector 改动、push/PR/merge。hooksPath=.githooks，所有本车道前台命令均结束。

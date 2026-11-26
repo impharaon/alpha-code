@@ -429,6 +429,7 @@ status.
 | `SPEC-timeline-artifact-links` | [specs/timeline-artifact-links/spec.md](specs/timeline-artifact-links/spec.md) | 对话中的本地产物可以直接打开右栏预览，保留历史条款、有效裁决和交付证据边界。 | approved |
 | `SPEC-tool-card-provenance` | [specs/tool-card-provenance/spec.md](specs/tool-card-provenance/spec.md) | 工具卡按真实来源展示调用并保护敏感字段，保留历史条款、有效裁决和交付证据边界。 | approved |
 | `SPEC-tool-inventory-identity` | [specs/tool-inventory-identity/spec.md](specs/tool-inventory-identity/spec.md) | 工具清单和授权身份随实际来源变化，保留历史条款、有效裁决和交付证据边界。 | approved |
+| `DESIGN-tool-network-egress` | [specs/tool-network-egress/design.md](specs/tool-network-egress/design.md) | 共享策略代理按运行工具集合投递对话卡片，由 main 判定档位、保管站点授权与放行记录，并按系统代理建立上游隧道。 | draft |
 | `SPEC-tool-network-egress` | [specs/tool-network-egress/spec.md](specs/tool-network-egress/spec.md) | 本机工具只连接获准的网络目的地，保留历史条款、有效裁决和交付证据边界。 | approved |
 | `SPEC-tool-permission-policy` | [specs/tool-permission-policy/spec.md](specs/tool-permission-policy/spec.md) | 用户可按来源、服务和工具设置停用、询问或允许，保留历史条款、有效裁决和交付证据边界。 | approved |
 | `SPEC-tool-policy-settings` | [specs/tool-policy-settings/spec.md](specs/tool-policy-settings/spec.md) | 用户在设置里管理并保存工具权限，保留历史条款、有效裁决和交付证据边界。 | approved |

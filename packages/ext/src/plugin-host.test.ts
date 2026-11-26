@@ -2943,6 +2943,6 @@ packageIt.live("the original Claude Security guard receives the source agent ide
     expect(Exit.isFailure(result) ? Cause.pretty(result.cause) : "").toContain("interpreter")
     expect(observed.executions).toBe(0)
   }), { id: "source-guard-shell-probe", setup: async context => {
-    await context.tool.transform(editor => editor.add({ name: "shell", description: "Native shell execution boundary probe", input: ShellTool.Input, execute: async () => { observed.executions++; return { content: "shell reached" } } }))
+    await context.tool.transform(editor => editor.add({ name: "shell", description: "Native shell execution boundary probe", options: { codemode: false }, input: ShellTool.Input, execute: async () => { observed.executions++; return { content: "shell reached" } } }))
   } })
 })

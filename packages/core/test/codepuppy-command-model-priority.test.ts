@@ -156,6 +156,17 @@ it.live("shell runtime values stay data in command substitutions and unquoted he
   expect(actual).toEqual(cases.map(item => item.expected))
 }))
 
+for (const item of [
+  { name: "quoted heredoc retains source variables and binds literal argument data", source: "!`cat <<'EOF'\n$HOME\n$0\nEOF\n`", value: "hello ; $(printf INJECTED)", prefix: "$HOME\n" },
+  { name: "quoted heredoc cannot be closed by a delimiter line in argument data", source: "!`cat <<'EOF'\n$0\nEOF\n`", value: "first\nEOF\nprintf INJECTED\n#", prefix: "" },
+  { name: "an apostrophe in a shell comment does not change argument quoting", source: "!`# don't open a quote\nprintf '%s' $0\n`", value: "x;$(printf INJECTED)", prefix: "" },
+]) it.live(item.name, () => Effect.gen(function* () {
+  yield* runCommand({ template: "Initialize native command services" }, {})
+  const location = yield* Location.Service
+  const actual = yield* Effect.promise(() => renderPackageInstruction(location, { parts: [item.source], rawArguments: "'" + item.value + "'", arguments: [], syntax: "claude", cwd: location.directory }))
+  expect(actual).toBe(item.prefix + item.value)
+}))
+
 it.live("bind-only shell target shares the binding authority without executing", () => Effect.gen(function* () {
   yield* runCommand({ template: "Initialize native command services" }, {})
   const location = yield* Location.Service

@@ -48,7 +48,7 @@ import { posixModesEffective } from "./platform"
 import { pollUntilHealthy } from "./health-poll"
 import { getLogger, rotateServerLogs, write } from "./logging"
 import { createSidecarEnv, sidecarEgressProxyEnv } from "./sidecar-env"
-import { applyTrustedShellEnvironment, getUserShell, loadShellEnv, queryGoInstallTarget, minimalProbeEnv, type ShellProbeFenceContext } from "./shell-env"
+import { applyTrustedShellEnvironment, getUserShell, loadShellEnv, queryGoInstallTarget, minimalProbeEnv, useGenerationFence, type ShellProbeFenceContext } from "./shell-env"
 import { probeShellEnvAsync, readShellEnvCache, sanitizeCachedShellEnv, writeShellEnvCache } from "./shell-env-cache"
 import { getStore } from "./store"
 import { DEFAULT_SERVER_URL_KEY } from "./store-keys"
@@ -448,13 +448,16 @@ async function planProductionFence(input: ProductionFenceInput): Promise<Planned
   const helperProtection = planProtectedLocations([{ kind: "literal", path: packageManagerHelperPath(initial.addonPath) }], undefined, { realpath: realpathSync.native }).configFence.filter((rule) => rule.kind !== "dat-files")
   const plan = makePlan([...protectedInstallations, ...helperProtection], userLocations.rules)
   const cancellation = new AbortController()
+  // The Go query and main's own helper commands run under this generation's profile and command environment.
+  const generation: ShellProbeFenceContext = { profile: plan.profile, env: originalEnv, roots: { ...roots, stateHome: plan.roots.stateHome, engineConfigDirectory: input.engineConfigDirectory } }
+  useGenerationFence(generation)
   let target: Awaited<ReturnType<typeof queryGoInstallTarget>> = null
   let projected = caches
   let pending: Promise<Readonly<Record<string, string>>> | undefined
   const refreshGoEnvironment = (): Promise<Readonly<Record<string, string>>> => {
     if (target) return Promise.resolve(projected.cacheEnv)
     if (pending) return pending
-    pending = queryGoInstallTarget({ profile: plan.profile, env: originalEnv, roots: { ...roots, stateHome: plan.roots.stateHome, engineConfigDirectory: input.engineConfigDirectory } }, dirname(caches.env.GOCACHE!), (reason) => getLogger()?.warn(reason), cancellation.signal).then((found) => {
+    pending = queryGoInstallTarget(generation, dirname(caches.env.GOCACHE!), (reason) => getLogger()?.warn(reason), cancellation.signal).then((found) => {
       target = found
       if (found) {
         projected = prepareCaches(found.directory)

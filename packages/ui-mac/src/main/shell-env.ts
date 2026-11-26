@@ -1,4 +1,5 @@
 import { execFile, spawnSync } from "node:child_process"
+import { accessSync, constants, statSync } from "node:fs"
 import { userInfo } from "node:os"
 import { basename, delimiter, isAbsolute, join } from "node:path"
 import type { EngineRoots } from "./process-fence-profile"
@@ -30,10 +31,43 @@ type ShellEnvLogger = {
 
 export type GoInstallTarget = { directory: string; configured: boolean }
 
+// Any PATH lookup happens inside the fence, so a program planted in a fence-writable directory runs fenced.
+function fencedArgs(context: ShellProbeFenceContext, command: string, args: readonly string[]) {
+  return ["-p", context.profile, "/bin/sh", "-c", 'exec "$0" "$@"', command, ...args]
+}
+
+/** First executable regular file named `name` on an absolute PATH entry. Nothing is executed. */
+export function commandOnPath(name: string, path: string | undefined): string | undefined {
+  for (const entry of (path ?? "").split(delimiter)) {
+    if (!isAbsolute(entry)) continue
+    const candidate = join(entry, name)
+    try {
+      accessSync(candidate, constants.X_OK)
+      if (statSync(candidate).isFile()) return candidate
+    } catch { /* not on this entry */ }
+  }
+}
+
+let generationFence: ShellProbeFenceContext | undefined
+/** The latest planned generation's profile and command environment; main's own helper commands run under it. */
+export function useGenerationFence(context: ShellProbeFenceContext) {
+  generationFence = context
+}
+
+/**
+ * A main-side helper command (tool version, git diff). On darwin it runs only under the generation fence; before any
+ * plan there is no fence to run under, so it is refused (undefined). Other platforms have no fence and run it as is.
+ */
+export function underGenerationFence(command: string, args: readonly string[]): { file: string; args: string[]; env?: Record<string, string> } | undefined {
+  if (process.platform !== "darwin") return { file: command, args: [...args] }
+  if (!generationFence) return undefined
+  return { file: "/usr/bin/sandbox-exec", args: fencedArgs(generationFence, command, args), env: { ...generationFence.env } }
+}
+
 /** Native configuration resolution, inside the same tested fence and original command environment. */
 export async function queryGoInstallTarget(context: ShellProbeFenceContext, cwd: string, log: (reason: string) => void, signal?: AbortSignal): Promise<GoInstallTarget | null> {
   const query = (args: string[]) => new Promise<string>((resolve, reject) => {
-    execFile("/usr/bin/sandbox-exec", ["-p", context.profile, "/bin/sh", "-c", 'exec go "$@"', "go", ...args], {
+    execFile("/usr/bin/sandbox-exec", fencedArgs(context, "go", args), {
       cwd, env: { ...context.env, GOTOOLCHAIN: "local", GOTELEMETRY: "off" }, timeout: TIMEOUT, signal, windowsHide: true,
     }, (error, output) => error ? reject(error) : resolve(output))
   })

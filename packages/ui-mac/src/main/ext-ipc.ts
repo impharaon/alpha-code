@@ -15,6 +15,7 @@ import * as fs from "node:fs"
 import { homedir } from "node:os"
 import * as path from "node:path"
 import { toolProbe } from "./platform"
+import { commandOnPath } from "./shell-env"
 import { extensionsGranted, hasExtensionsDecision, listProjectExecutables } from "./codepuppy-ext-trust"
 import { readProjectPrefs, writeProjectPrefs } from "./codepuppy-workdir"
 import { projectTrustIdentity, readProjectTrustEntry } from "./project-trust-truth"
@@ -108,6 +109,11 @@ function checkRuntime(tool: string): Promise<{ ok: boolean }> {
       return
     }
     const probe = toolProbe()
+    // posix: a `which` found on a fence-writable PATH directory would run outside the fence; look it up without running anything.
+    if (probe.cmd === "which") {
+      resolve({ ok: commandOnPath(tool, probe.probePath) !== undefined })
+      return
+    }
     execFile(probe.cmd, [tool], { env: { ...process.env, PATH: probe.probePath } }, (err, stdout) => {
       resolve({ ok: !err && Boolean(stdout && stdout.trim()) })
     })

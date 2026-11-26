@@ -1,10 +1,12 @@
 import { expect, test } from "bun:test"
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync, statSync, writeFileSync } from "node:fs"
+import { execFileSync } from "node:child_process"
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from "node:fs"
 import { join, resolve } from "node:path"
-import { applyTrustedShellEnvironment, loadShellEnv, queryGoInstallTarget, type ShellProbeFenceContext } from "./shell-env"
+import { applyTrustedShellEnvironment, commandOnPath, loadShellEnv, queryGoInstallTarget, underGenerationFence, useGenerationFence, type ShellProbeFenceContext } from "./shell-env"
 import { probeShellEnvAsync } from "./shell-env-cache"
 import { planProcessFence } from "./process-fence-plan"
 import { trialCompileProfile } from "./process-fence-compile"
+import { officialNodeCommand } from "./official-connector-recipes"
 
 test.skipIf(process.platform !== "darwin")("fenced shell probes: interactive and login fallback cannot write outside or redirect trusted roots", async () => {
   const base = resolve(import.meta.dir, "../../node_modules/.cache")
@@ -86,4 +88,32 @@ fi
     const cancellation = new AbortController(); cancellation.abort()
     expect(await queryGoInstallTarget(context, project, () => {}, cancellation.signal)).toBeNull()
   } finally { rmSync(root, { recursive: true, force: true }) }
+})
+
+// Integration layer: actual Seatbelt. Programs planted first on PATH (a fence-writable bin) must never run outside the fence.
+test.skipIf(process.platform !== "darwin")("main helper commands find PATH tools without running them and run them only under the generation fence", async () => {
+  const base = resolve(import.meta.dir, "../../node_modules/.cache")
+  const root = realpathSync(mkdtempSync(join(base, "main-helper-")))
+  const home = join(root, "home"), project = join(root, "project"), state = join(root, "state"), userData = join(root, "userData"), planted = join(root, "planted")
+  for (const dir of [home, project, state, userData, planted]) mkdirSync(dir)
+  const escaped = join(root, "escaped"), originalPath = process.env.PATH
+  const plant = (name: string, output: string) => { writeFileSync(join(planted, name), `#!/bin/sh\nprintf '${name} ' >> '${escaped}' 2>/dev/null\nprintf '%s\\n' "${output}"\n`); chmodSync(join(planted, name), 0o755) }
+  plant("which", `${planted}/$1`); plant("node", "v22.5.0"); plant("npx", ""); plant("git", "diff --git a/x b/x")
+  try {
+    process.env.PATH = `${planted}:/usr/bin:/bin`
+    expect(commandOnPath("which", process.env.PATH)).toBe(join(planted, "which"))
+    // No generation planned yet: nothing to run under, so the helper command is refused rather than run as main.
+    expect(underGenerationFence("git", ["diff"])).toBeUndefined()
+    expect(() => officialNodeCommand()).toThrow()
+    const plan = planProcessFence({ userDataPath: userData, sidecarEnv: { HOME: home },
+      addon: { packaged: false, resourcesPath: "/unused", moduleDir: resolve(import.meta.dir, "../../out/main"), exists: existsSync }, egressProxyPort: 4443, carriedWorkspaces: [], engineConfigDirectory: join(home, ".config/opencode"), homebrewFence: [], credentialStores: [],
+    }, { homeDir: () => home, codepuppyGlobalRoot: () => join(state, "env/dev"), appStateRoot: () => state, realpath: realpathSync.native, defaultWorkspace: () => project, readWorkspaces: () => [], isDirectory: (p) => statSync(p).isDirectory(), mkdirp: (p) => void mkdirSync(p, { recursive: true }), compile: trialCompileProfile, log: () => {} })
+    useGenerationFence({ profile: plan.profile, roots: { ...plan.roots, engineConfigDirectory: join(home, ".config/opencode") }, env: { HOME: home, PATH: process.env.PATH } })
+    expect(officialNodeCommand().slice(0, 2)).toEqual([join(planted, "node"), join(planted, "npx")])
+    expect(existsSync(escaped) ? readFileSync(escaped, "utf8") : "").toBe("")
+    const git = underGenerationFence("git", ["diff", "HEAD"])!
+    expect(git.file).toBe("/usr/bin/sandbox-exec")
+    expect(execFileSync(git.file, git.args, { cwd: project, env: git.env, encoding: "utf8" })).toBe("diff --git a/x b/x\n")
+    expect(existsSync(escaped) ? readFileSync(escaped, "utf8") : "").toBe("")
+  } finally { process.env.PATH = originalPath; rmSync(root, { recursive: true, force: true }) }
 })

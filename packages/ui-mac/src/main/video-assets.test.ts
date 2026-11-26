@@ -142,3 +142,14 @@ test("SDK nested preparation stays associated with the original call and propaga
     await server.close()
   }
 })
+
+test("OSD script names resolve to existing pins or the default OCR family",async()=>{
+ for(const [script,suffix] of [["Korean","script-Hangul"],["Hiragana","script-Japanese"],["Katakana","script-Japanese"],["Common",undefined]]){
+  const ids:string[]=[]
+  const runtime=await createVideoRuntime(invocation,{signal:new AbortController().signal,meta:{"codepuppy/pinned-files.call":"call","codepuppy/pinned-files.deadline":Date.now()+60000},ensure:async requested=>{ids.push(...requested);return {ok:false,error:"network"}}})
+  await runtime.component({kind:"ocr-model",script:script!}).catch(()=>{})
+  expect(ids.length).toBeGreaterThan(0)
+  if(suffix)expect(ids.every(id=>id.endsWith('/'+suffix))).toBe(true)
+  else expect(ids.some(id=>id.includes("script-"))).toBe(false)
+ }
+})

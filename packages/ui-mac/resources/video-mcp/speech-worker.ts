@@ -1,5 +1,5 @@
 import { createRequire } from "node:module"
-import { readFile } from "node:fs/promises"
+import { open } from "node:fs/promises"
 import { parentPort, workerData } from "node:worker_threads"
 import { composeSegments, coverAudio, SAMPLE_RATE, timedText, type TimedText, type SpeakerSpan } from "./audio"
 import type { PreparedComponent } from "./runtime"
@@ -43,6 +43,22 @@ type Whisper = {
   }>
 }
 
+/** The PCM cache is ours; bounded reads avoid readFile's whole-Buffer size limit. */
+export async function readAudioSamples(file:string,count:number){
+  const samples=new Float32Array(count)
+  const handle=await open(file,"r")
+  try{
+    let offset=0
+    while(offset < samples.byteLength){
+      const block=Buffer.from(samples.buffer,offset,Math.min(65536,samples.byteLength-offset))
+      const {bytesRead}=await handle.read(block,0,block.byteLength,offset)
+      if(!bytesRead)throw new Error("The decoded audio cache is incomplete")
+      offset+=bytesRead
+    }
+    return samples
+  }finally{await handle.close()}
+}
+
 export function chunkLanguage(speech: readonly {start:number;end:number}[], start:number,end:number, identify:()=>string): string | undefined {
   return speech.some(span=>span.end > start && span.start < end) ? identify() : undefined
 }
@@ -59,8 +75,7 @@ async function recognize() {
   const component = (name: string) => input.components[name]!.path
   const require = createRequire(import.meta.url)
   const sherpa = require("sherpa-onnx-node") as Sherpa
-  const raw = await readFile(input.audio.file)
-  const samples = new Float32Array(raw.buffer, raw.byteOffset, raw.byteLength / 4)
+  const samples = await readAudioSamples(input.audio.file,input.audio.samples)
   const vad = new sherpa.Vad(
     {
       sileroVad: {

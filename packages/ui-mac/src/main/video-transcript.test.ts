@@ -1,5 +1,5 @@
 import { afterAll, expect, test } from "bun:test"
-import { mkdtemp, rm } from "node:fs/promises"
+import { mkdtemp, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import path from "node:path"
 import { cachePath, publish } from "../../resources/video-mcp/cache"
@@ -32,4 +32,14 @@ test("worker routes speechless covered chunks through SenseVoice without calling
  expect(calls).toBe(0)
  expect(chunkLanguage([{start:15999,end:17000}],0,16000,identify)).toBe("fr")
  expect(calls).toBe(1)
+})
+
+
+test("worker reads the complete PCM cache across bounded file reads",async()=>{
+ const {readAudioSamples}=await import("../../resources/video-mcp/speech-worker")
+ // Our own Float32 PCM cache format, with deterministic sample values across a read boundary.
+ const samples=Float32Array.from({length:17000},(_,index)=>index/17000)
+ const file=path.join(root,"cache.f32")
+ await writeFile(file,new Uint8Array(samples.buffer))
+ expect(await readAudioSamples(file,samples.length)).toEqual(samples)
 })

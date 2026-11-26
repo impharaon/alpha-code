@@ -36,6 +36,7 @@ import { makeLocationNode } from "@opencode/util/effect/app-node"
 import { testEffect } from "./lib/effect"
 import { permissionLayer } from "./lib/permission"
 import { globalProjectNode } from "./lib/project"
+import { registerPackageRuntime, type PackageRuntimeHandlers } from "@opencode/plugin/codepuppy-package-runtime"
 import { executeTool, registerToolPlugin } from "./lib/tool"
 
 const readToolNode = makeLocationNode({
@@ -131,6 +132,30 @@ const seedSynthetic = (sessionID: Session.ID, paths: string[]) =>
   })
 
 describe("SessionInstructions", () => {
+  it.live("notifies package hooks only for admitted Claude sources and dedups actual nested loads", () =>
+    Effect.gen(function* () {
+      const location = yield* Location.Service
+      const sessions = yield* Session.Service
+      const session = yield* sessions.create({ location: Location.Ref.make({ directory: location.directory }) })
+      const filePath = path.join(location.directory, "CLAUDE.md")
+      const nativePath = path.join(location.directory, "AGENTS.md")
+      yield* Effect.promise(() => fs.writeFile(filePath, "Claude nested instructions"))
+      yield* Effect.promise(() => fs.writeFile(nativePath, "Native instructions"))
+      const calls: Array<Parameters<PackageRuntimeHandlers["instructionsLoaded"]>[0] & { admitted: boolean }> = []
+      const runtime = registerPackageRuntime(location, {
+        hasElicitationHandlers: () => false, beforeConfigChange: async () => ({ apply: true }),
+        instructionsLoaded: async input => { calls.push({ ...input, admitted: JSON.stringify(await Effect.runPromise(sessions.context(session.id))).includes("Claude nested instructions") }) },
+        beforeCompaction: async () => ({ proceed: true }), afterCompaction: async () => {},
+        beforeElicitation: async () => ({ handled: false }), afterElicitationResult: async input => input.answer,
+      })
+      yield* Effect.addFinalizer(() => Effect.sync(() => runtime.dispose()))
+      const loader = yield* SessionInstructions.Service
+      yield* loader.load({ sessionID: session.id, paths: [filePath, nativePath] })
+      yield* loader.load({ sessionID: session.id, paths: [filePath, nativePath] })
+      expect(calls).toEqual([expect.objectContaining({ sessionID: session.id, filePath, memoryType: "Project", loadReason: "nested_traversal", admitted: true })])
+    }),
+  )
+
   it.live("injects AGENTS.md files above a read, excludes the Location root, and dedups across reads", () =>
     Effect.gen(function* () {
       const location = yield* Location.Service

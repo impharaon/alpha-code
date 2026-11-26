@@ -61,6 +61,13 @@ test("video binary transport preserves control bytes and streams the real file, 
     expect(updates.at(-1)).toBe(bytes.length)
     expect(videoFits(clip, { ...model, upload_media_bytes_exclusive: bytes.length })).toBe(false)
     expect(videoFits(clip,{...model,inline_media_bytes_exclusive:bytes.length})).toBe(false)
+    let mediaPulled=false
+    const sent=await dispatchVideoUpload({...input,progress:n=>{if(n === bytes.length)expect(mediaPulled).toBe(true)},fetch:async(_url,request)=>{
+      const reader=(request!.body as ReadableStream<Uint8Array>).getReader()
+      for(;;){const value=await reader.read();if(value.done)break;if(value.value.length === bytes.length)mediaPulled=true}
+      return Response.json(accepted)
+    }})
+    expect(sent).toEqual(accepted)
     mode = "size"
     expect(await dispatchVideoUpload(input)).toEqual({ error: "video_input_exceeds_upstream" })
     controller.abort()

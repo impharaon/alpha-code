@@ -116,7 +116,12 @@ export function declaredListedTools(
   pythonEnvironment?: DocumentPythonEnvironment,
   launchers?: LauncherEnvironment,
 ): DeclaredTool[] | undefined {
-  const tools = declaredFirstPartyTools(name, entry, manifestPath, readFile, pythonEnvironment, launchers)?.tools.flatMap((tool): DeclaredTool[] => {
+  return listedFirstPartyTools(declaredFirstPartyTools(name, entry, manifestPath, readFile, pythonEnvironment, launchers))
+}
+
+/** One projection for eager declarations and the managed client's live-list comparison. */
+export function listedFirstPartyTools(declared: DeclaredFirstParty | undefined): DeclaredTool[] | undefined {
+  const tools = declared?.tools.flatMap((tool): DeclaredTool[] => {
     if (!record(tool) || typeof tool.name !== "string" || tool.name === "" || !record(tool.inputSchema)) return []
     return [
       {

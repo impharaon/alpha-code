@@ -10,7 +10,7 @@ import type {
 } from "@opencode/util/codepuppy-connector-launch"
 import type { PinnedFileId } from "@opencode/util/codepuppy-pinned-files"
 import { isRecord } from "@opencode/util/record"
-import { listsDeclaration } from "./codepuppy-first-party-mcp.js"
+import { listedFirstPartyTools, listsDeclaration } from "./codepuppy-first-party-mcp.js"
 
 const CALL = "codepuppy/pinned-files.call"
 const DEADLINE = "codepuppy/pinned-files.deadline"
@@ -84,18 +84,7 @@ export function registerPinnedFilesHandler(
   const lifetime = new AbortController()
   let matched = false
   let refuted = false
-  const tools = managed.declaration.tools.flatMap((tool) =>
-    isRecord(tool) && typeof tool.name === "string" && isRecord(tool.inputSchema)
-      ? [
-          {
-            name: tool.name,
-            inputSchema: { ...tool.inputSchema, type: "object" as const },
-            ...(typeof tool.description === "string" ? { description: tool.description } : {}),
-            ...(isRecord(tool.outputSchema) ? { outputSchema: tool.outputSchema } : {}),
-          },
-        ]
-      : [],
-  )
+  const tools = listedFirstPartyTools(managed.declaration) ?? []
   client.setRequestHandler("codepuppy/pinned-files.ensure", { params, result }, async (input, ctx) => {
     const meta = ctx.mcpReq._meta
     const token = meta?.[CALL]

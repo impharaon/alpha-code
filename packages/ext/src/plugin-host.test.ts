@@ -2639,3 +2639,26 @@ packageIt.live("Convex skill monitors start once per session and stop without la
   expect(started()).toHaveLength(2)
   expect(JSON.stringify(yield* sessions.context(session.id))).not.toContain("LATE_SOURCE_LINE")
 })))
+
+packageIt.live("a first-input Convex skill invocation arms only its matching monitors", () => packageJourney(Effect.gen(function* () {
+  const capture = yield* Effect.promise(() => captureStandardFixture("claude:convex"))
+  const monitors = JSON.parse(new TextDecoder().decode(yield* Effect.promise(() => capture.readFile("monitors/monitors.json")))) as { name: string; command: string }[]
+  for (const monitor of monitors) monitor.command = 'printf "%s\\n" ' + monitor.name + ' >> "${CLAUDE_PROJECT_DIR}/first-input-monitors"'
+  const sample = yield* invocationSample("claude:convex", { "monitors/monitors.json": JSON.stringify(monitors), "hooks/hooks.json": null })
+  const membership = JSON.parse(readFileSync(join(sample.root, "skills-enabled.json"), "utf8"))
+  writeFileSync(join(sample.root, "skills-enabled.json"), JSON.stringify({ ...membership, keys: [...membership.keys, sample.key] }))
+  yield* invocationNativeServices
+  const ext = yield* activateExtUntilFinished
+  const commands = yield* Command.Service
+  const design = sample.description.entries.find(entry => entry.kind === "skill" && entry.sourceName === "design")!
+  const command = sample.hostNames[design.id]!
+  yield* ext.finish(commands.list().pipe(Effect.map(items => items.some(item => item.name === command))))
+  const sessions = yield* Sessions.Service
+  const location = yield* Location.Service
+  const session = yield* sessions.create({ location: { directory: location.directory }, title: "First input invokes a skill", agent: "build", model: { providerID: "test", id: "picked" } } as never)
+  yield* (yield* TestLLM.Test).always(TestLLM.text("Design started", "first-design"))
+  yield* commands.execute({ name: command, invocation: { sessionID: session.id, prompt: { text: "Design as the first input" }, delivery: "queue" } })
+  yield* sessions.wait(session.id)
+  for (let waited = 0; waited < 1000 && !(yield* Effect.promise(() => Bun.file(join(location.directory, "first-input-monitors")).exists())); waited += 10) yield* Effect.sleep("10 millis")
+  expect(readFileSync(join(location.directory, "first-input-monitors"), "utf8").trim().split("\n").sort()).toEqual(["convex-occ-insights", "convex-runtime-errors"])
+})))

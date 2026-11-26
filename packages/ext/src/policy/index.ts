@@ -281,7 +281,7 @@ export async function registerPolicy(context: Plugin.Context, unattended: Unatte
       const rules = invocationRules(event.sessionID, sourceFacts, undefined, event.resources)
       const bound = event.source?.type === "tool" ? packageHooks.get(toolCallKey({ sessionID: event.sessionID, messageID: event.source.messageID, id: event.source.id })) : undefined
       const facts = bound && await factsFor(bound.call.tool)
-      const hook = bound?.phase === "confirmed" && facts ? packageHook(bound.call, facts) : undefined
+      const hook = bound?.phase === "confirmed" && facts && (facts.permission === event.action || canonicalToolIdentity(facts.identity) === event.action) ? packageHook(bound.call, facts) : undefined
       if (rules.some(rule => rule.effect === "deny")) event.effect = "deny"
       else if (event.effect === "ask" && (packageCallAllows(canonicalToolIdentity(sourceFacts.identity), rules) || hook !== undefined)) event.effect = "allow"
     }
@@ -348,11 +348,11 @@ export async function registerPolicy(context: Plugin.Context, unattended: Unatte
           const decision = await decide(deps, event)
           const facts = decision.facts
           const install = facts.identity.source === "plugin" ? hubInstallAsk(event, facts.authority.kind === "codepuppy-bundled", installSubject) : undefined
+          const hook = packageHook(event, facts)
           // BR-10: the verified install tool asks from its own call (`askInstall`), once it has recorded what it installs.
           if (install?.subject) installAsks.set(toolCallKey(event), { decision, call: { tool: event.tool, sessionID: event.sessionID, agent: event.agent, messageID: event.messageID, id: event.id, input: event.input }, install })
           else await confirm(deps, decision, event, install)
           if (install && !install.subject) installAsks.set(toolCallKey(event), "asked")
-          const hook = packageHook(event, decision.facts)
           if (hook) {
             const final = await decide(deps, event)
             if (packageHook(event, final.facts) !== hook) {

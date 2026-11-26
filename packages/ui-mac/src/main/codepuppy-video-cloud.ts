@@ -564,6 +564,15 @@ export function createMainVideoService(deps: {
     return current
   }
   return {
+    async disconnect() {
+      for(const [key,current] of work){
+        current.requests.clear()
+        current.controller.abort()
+        const record=current.record
+        if(record){record.cancelled=true;await writeJson(fileOf(rootOf(),key),record)}
+        await Promise.all((record?.attempts ?? []).filter(a=>a.jobId && a.state === "running").map(a=>deps.cancel(a.jobId!)))
+      }
+    },
     async start(call: VideoCall, request: VideoCloudRequest, referencePath:string) {
       if(!path.isAbsolute(referencePath))throw new Error("video_request_invalid")
       const root = rootOf(),
@@ -605,9 +614,8 @@ export function createMainVideoService(deps: {
       const requestId = randomUUID()
       await writeJson(pointerOf(root, requestId), { key, call, tenant: identity.tenantId } satisfies RequestPointer)
       if (work.get(key)?.state.result || work.get(key)?.state.error) work.delete(key)
-      const current = ensureWork(root, key, call)
-      current.requests.add(requestId)
-      return { requestId, state: current.state }
+      // Only the existing first query acknowledges receipt and joins this call.
+      return { requestId, state: {} }
     },
     async query(requestId: string, call: VideoCall) {
       const { root, pointer } = await owner(requestId, call)

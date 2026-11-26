@@ -270,6 +270,7 @@ test("video cancellation leaves another subscriber running and cancels the last 
     other = { ...call, callID: "second" },
     second = await service.start(other, request, h.referencePath)
   await state(service, first.requestId, call, (s) => s.progress?.phase === "understanding")
+  await service.query(second.requestId,other)
   await service.cancel(first.requestId, call)
   expect(h.cancelled).toEqual([])
   expect((await service.query(first.requestId, call)).state.error).toBe("cancelled")
@@ -342,6 +343,7 @@ test.each([false,true])("video cancel only recovers fully sent unknown admission
   }
   const service = createMainVideoService(h.deps),
     started = await service.start(call, await h.prepared(), h.referencePath)
+  await service.query(started.requestId,call)
   for (let i = 0; !h.requests.length && i < 100; i++) await Bun.sleep(1)
   await service.cancel(started.requestId, call)
   const file = path.join(root, "cloud", (await readdir(path.join(root, "cloud")))[0]!)
@@ -368,6 +370,7 @@ test.each([false,true])("video cancel only recovers fully sent unknown admission
 test("video privacy-card cancellation never dispatches media",async()=>{
  const h=await harness("/project/.ssh/speech.mp4"),service=createMainVideoService(h.deps)
  const started=await service.start(call,await h.prepared(), h.referencePath)
+ await service.query(started.requestId,call)
  for(let i=0;!h.deps.upload.videoPreviews(1).length && i<1000;i++)await Bun.sleep(1)
  const preview=h.deps.upload.videoPreviews(1)[0]
  expect(preview).toBeDefined()
@@ -391,7 +394,8 @@ test("video network retry reuses the same in-process consent without a second pr
  h.deps.dispatch=async input=>{if(!h.requests.length){h.requests.push(input);await input.progress(input.clip.bytes);return {error:"network"}}return normal(input)}
  const service=createMainVideoService(h.deps),started=await service.start(call,await h.prepared(), h.referencePath)
  try{
-  for(let i=0;!h.deps.upload.videoPreviews(1).length&&i<1000;i++)await Bun.sleep(1)
+  await service.query(started.requestId,call)
+ for(let i=0;!h.deps.upload.videoPreviews(1).length&&i<1000;i++)await Bun.sleep(1)
   const preview=h.deps.upload.videoPreviews(1)[0]!
   await h.deps.upload.confirm(1,preview.requestId)
   for(let i=0;h.requests.length<2&&!h.deps.upload.videoPreviews(1).length&&i<1000;i++)await Bun.sleep(1)
@@ -406,6 +410,7 @@ test("video network retry reuses the same in-process consent without a second pr
 test("video sensitivity follows the verified admitted reference even after a nonsensitive alias was opened",async()=>{
  const h=await harness(),service=createMainVideoService(h.deps)
  const started=await service.start(call,await h.prepared(),"/project/.ssh/speech.mp4")
+ await service.query(started.requestId,call)
  for(let i=0;!h.deps.upload.videoPreviews(1).length&&i<100;i++)await Bun.sleep(1)
  try{expect(h.deps.upload.videoPreviews(1)).toHaveLength(1);expect(h.requests).toHaveLength(0)}finally{await service.cancel(started.requestId,call)}
 })

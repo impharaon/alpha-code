@@ -113,6 +113,10 @@ test("verified understand wraps preparation and returns the final cloud result w
     ),
   ).rejects.toThrow("stopped")
   expect(cancelled).toBe(true)
+  cancelled=false
+  bridge.video=async raw=>{if(raw.action === "cancel")cancelled=true;return {type:"codepuppy.video.understand.reply",id:1,ok:true,requestId:"failed-query",state:{error:"network"}}}
+  await expect(tool.execute({source:{kind:"path",path:"speech.mp4"},question:input.question},{...context,signal:new AbortController().signal})).rejects.toThrow("network")
+  expect(cancelled).toBe(true)
 })
 test("video bridge uses the original correlated request channel and rejects malformed full results", async () => {
   let listener: ((event: { data: unknown }) => void) | undefined

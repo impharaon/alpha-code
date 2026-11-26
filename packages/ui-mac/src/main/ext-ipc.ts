@@ -1,7 +1,7 @@
 import { verifyVideoCall } from "./codepuppy-video-call"
 import { videoCacheRoot } from "./codepuppy-video-environment"
 import { engineClient } from "./engine-client"
-import { handleVideoCloudRequest } from "./cloud-ipc"
+import { handleVideoCloudRequest,videoCloudService } from "./cloud-ipc"
 import type { ProjectConfigView } from "@opencode/schema/codepuppy-project-config"
 import { projectExecutableRows } from "./codepuppy-ext-trust"
 import { isCloudMcpWithheld } from "./codepuppy-config-injection"
@@ -1520,6 +1520,7 @@ export function registerExtIpcHandlers(
   })
   ipcMain.handle(HUB_READ_CHANNELS.hubRequest, (_event: IpcMainInvokeEvent, requestId: unknown) => isHubRequestId(requestId) ? hubRequests.get(requestId) : null)
   const codepuppySidecarHost: CodePuppySidecarHost = createCodePuppySidecarHost({
+    videoDisconnected:()=>videoCloudService.disconnect(),
     video: async request=>{
       const referencePath=request.action === "start" || request.action === "prepare" ? await verifyVideoCall(request,engineClient(await awaitServer()),videoCacheRoot()) : undefined
       return handleVideoCloudRequest(request,referencePath)

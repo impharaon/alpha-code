@@ -501,6 +501,7 @@ export type CodePuppySidecarHost = {
 
 export function createCodePuppySidecarHost(deps: {
   video?: (request: VideoBridgeRequest) => Promise<VideoBridgeReply>
+  videoDisconnected?:()=>Promise<void>
   view: HubViewService
   requests: HubRequestStages
   installName(ref: HubInstallRequest["ref"]): string | undefined
@@ -510,6 +511,7 @@ export function createCodePuppySidecarHost(deps: {
   reloads: ReloadCoordinator
   log: (line: string) => void
 }): CodePuppySidecarHost {
+  let videoConnection: object | undefined
   const reply = (post: (message: CodePuppySidecarOutbound) => void, message: CodePuppySidecarOutbound) => {
     try {
       post(message)
@@ -565,11 +567,14 @@ export function createCodePuppySidecarHost(deps: {
       return true
     },
     attach(post) {
+      const connection={}
+      videoConnection=connection
       const detachUnattended = unattendedRuns.attach(post)
       const detachReloads = deps.reloads.attach(post)
       return (reason) => {
         detachUnattended(reason)
         detachReloads(reason)
+        if(videoConnection === connection){videoConnection=undefined;void deps.videoDisconnected?.().catch(error=>deps.log(`video disconnect: ${String(error)}`))}
       }
     },
   }

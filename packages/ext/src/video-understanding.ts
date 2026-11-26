@@ -74,6 +74,7 @@ export function videoUnderstandingTransform(deps: {
             }
           }
           let requestId: string | undefined
+          let completed=false
           const reply = (value: Awaited<ReturnType<HubBridge["video"]>>) => {
             if (!value.ok)
               throw new Tool.Error({
@@ -97,8 +98,7 @@ export function videoUnderstandingTransform(deps: {
             for (;;) {
               context.signal.throwIfAborted()
               if (current.state.progress) await context.progress({ [VIDEO_PROGRESS_KEY]: current.state.progress })
-              if (current.state.result)
-                return { output: current.state.result, metadata: { jobIds: current.state.result.jobIds } }
+              if (current.state.result){completed=true;return { output: current.state.result, metadata: { jobIds: current.state.result.jobIds } }}
               if (current.state.error)
                 throw new Tool.Error({
                   message: renderTemplate(VIDEO_UNDERSTANDING_FAILED_ID, { name: current.state.error }),
@@ -117,7 +117,7 @@ export function videoUnderstandingTransform(deps: {
             }
           } finally {
             context.signal.removeEventListener("abort", cancel)
-            if (context.signal.aborted && requestId) await deps.bridge.video({ action: "cancel", call, requestId })
+            if (!completed && requestId) await deps.bridge.video({ action: "cancel", call, requestId })
           }
         }
         Object.defineProperty(next, wrapped, { value: true })

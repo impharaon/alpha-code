@@ -136,7 +136,7 @@ export function createSecretMask(roots: ProtectedFiles.ProtectedRoots) {
               : input.result.content === undefined
                 ? undefined
                 : await Promise.all(input.result.content.map(content)),
-          metadata: metadata({ ...state?.last, ...input.result.metadata }),
+          metadata: metadata(input.result.metadata),
         }
         await finishProgress(state, false)
         return result

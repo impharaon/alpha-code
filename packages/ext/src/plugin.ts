@@ -116,7 +116,7 @@ export const CodePuppyExt: Plugin.Plugin = {
     const { hubBridge, reloads } = processState()
     const registration = {}
     reloads.register(directory, registration)
-    const cleanups: Array<() => Promise<void> | void> = [() => reloads.unregister(directory, registration)]
+    const cleanups: Array<() => Promise<void> | void> = [policy.dispose, () => reloads.unregister(directory, registration)]
     const cleanup = async () => {
       for (const run of cleanups.splice(0).reverse()) {
         try {

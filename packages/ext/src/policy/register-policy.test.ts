@@ -49,6 +49,10 @@ import { attachDirectoryDisplay } from "./display"
 import { projectPluginContext, trackMcpNamespaces } from "../plugin-fanout"
 import { createToolPolicyStore, defaultPolicyBaseDir } from "./resolver"
 import { canonicalJsonDigest, savePolicyDocument } from "./store"
+import { randomUUID } from "node:crypto"
+import type { ToolContext } from "@opencode/plugin/promise/tool"
+import { ProtectedFiles } from "../../../schema/src/codepuppy-protected-files"
+import { createLLMEventPublisher } from "../../../core/src/session/runner/publish-llm-event"
 
 const { Effect, Exit, Cause } = E
 isolate()
@@ -138,6 +142,7 @@ const setup = (options: Setup = {}) =>
         await ctx.tool.transform((editor: any) => editor.add(tool(ALIAS_PROBE, "probe")))
         await options.inside?.(ctx)
         await policy?.seal()
+        return () => policy?.dispose()
       }),
       // McpTool registers discovered tools after plugin activation (packages/core/src/tool/mcp.ts); Code Mode by default.
       // This plugin stands in for the MCP layer, so it carries the layer's own mark (slice E2; `E2` below runs the real one).
@@ -1652,6 +1657,119 @@ describe("E2: only the MCP layer's own tools carry an MCP identity", () => {
       ].map((tool) => ({ ...tool, description: tool.name, inputSchema: { type: "object", properties: {} }, codemode: false })),
     ),
   )
+})
+
+describe("secret result boundaries", () => {
+  const source = (directory: string, value: string) => {
+    fs.mkdirSync(directory, { recursive: true })
+    // Assignment grammar from the official Node dotenv fixture; only the RHS is generated.
+    fs.writeFileSync(path.join(directory, ".env"), `KEY=${JSON.stringify(value)}\n`)
+  }
+
+  it.live("masking begins after pin and children keep the outer call", () => Effect.gen(function* () {
+    const location = yield* Location.Service
+    const value = randomUUID()
+    source(location.directory, value)
+    const bad = path.join(location.directory, "credentials.json")
+    fs.writeFileSync(bad, "{")
+    const observed: boolean[] = []
+    const pinned: boolean[] = []
+    const { session } = yield* setup({ records: NEUTRAL, inside: async (ctx) => {
+      await ctx.tool.transform((editor: import("@opencode/plugin/promise/tool").ToolEditor) => {
+        editor.add({ name: "mask_child", description: "fixture", input: { type: "object", properties: { note: { type: "string" } } }, output: { type: "object", properties: { value: { type: "string" } }, required: ["value"] }, execute: async (input: { note?: string }) => {
+          observed.push(input.note === value)
+          fs.rmSync(bad, { force: true })
+          return { output: { value }, content: value }
+        } })
+      })
+      await ctx.tool.hook("execute.after", (event: { tool: string; status: string; result: { metadata?: Record<string, unknown> } }) => {
+        if (event.tool === "mask_child" && event.status === "completed") event.result.metadata = { late: value }
+      })
+    }, after: promisePlugin("observe-mask-pin", async (ctx) => {
+      await ctx.tool.hook("execute.before", (event) => { if (event.tool === "mask_child") pinned.push(Object.isFrozen(event.input)) })
+    }) })
+    const exit = yield* call(session.id, "execute", { code: 'const rows = await Promise.all([tools.mask_child({note:"a"}), tools.mask_child({note:"b"})]); return await tools.mask_child({note:rows[0].value})' })
+    expect(Exit.isSuccess(exit)).toBe(true)
+    expect(observed).toEqual([false, false, false])
+    expect(pinned).toEqual([true, true, true])
+    expect((exit as { value: { content: unknown } }).value.content).toEqual([{ type: "text", text: ProtectedFiles.MASKING_FAILED_TEXT }])
+    // The root's initial failure survived every child; no child inherited that failure or cleared the root.
+    expect(JSON.stringify(exit).includes(value)).toBe(false)
+  }))
+
+  it.live("declined approval leaves no masking transaction", () => Effect.gen(function* () {
+    const location = yield* Location.Service
+    source(location.directory, randomUUID())
+    const bad = path.join(location.directory, "credentials.json")
+    fs.writeFileSync(bad, "{")
+    const { session } = yield* setup({ records: NEUTRAL, rules: [ALLOW_ALL, { action: "builtin::execute", resource: "*", effect: "ask" }] })
+    const permission = yield* Permission.Service
+    const invoke = () => callRaw(session.id, "execute", { code: 'return "ordinary output"' })
+    const declined = yield* Effect.forkChild(invoke())
+    const [first] = yield* pending
+    expect(first?.action).toBe("builtin::execute")
+    yield* permission.reply({ requestID: first!.id, reply: "reject" })
+    yield* E.Fiber.await(declined)
+    fs.rmSync(bad)
+    const allowed = yield* Effect.forkChild(invoke())
+    const [second] = yield* pending
+    yield* permission.reply({ requestID: second!.id, reply: "once" })
+    const exit = yield* E.Fiber.join(allowed)
+    expect(Exit.isSuccess(exit)).toBe(true)
+    expect(JSON.stringify(exit).includes(ProtectedFiles.MASKING_FAILED_TEXT)).toBe(false)
+  }))
+
+  it.live("progress and preview are masked before publication", () => Effect.gen(function* () {
+    const location = yield* Location.Service
+    const value = randomUUID(); source(location.directory, value)
+    const { session } = yield* setup({ records: NEUTRAL, rules: [ALLOW_ALL, { action: "mask-preview", resource: "*", effect: "ask" }], inside: async (ctx) => {
+      await ctx.tool.transform((editor: import("@opencode/plugin/promise/tool").ToolEditor) => editor.add({
+        name: "mask_visible", description: "fixture", options: { codemode: false }, input: { type: "object", properties: {} },
+        execute: async (_input: unknown, context: ToolContext) => {
+          await context.progress({ output: value })
+          await ctx.permission.assert({ sessionID: context.sessionID, agent: context.agent, action: "mask-preview", resources: ["fixture"], metadata: { diff: value, files: [{ before: value }] }, source: { type: "tool", id: context.id, messageID: context.messageID } })
+          return { content: value }
+        },
+      }))
+    } })
+    const fiber = yield* Effect.forkChild(call(session.id, "mask_visible"))
+    const [request] = yield* pending
+    expect(request?.action).toBe("mask-preview")
+    expect(JSON.stringify(request?.metadata).includes(value)).toBe(false)
+    expect(progress.some((row) => row.output === ProtectedFiles.REDACTED)).toBe(true)
+    expect(JSON.stringify(progress).includes(value)).toBe(false)
+    yield* (yield* Permission.Service).reply({ requestID: request!.id, reply: "once" })
+    const exit = yield* E.Fiber.join(fiber)
+    expect(Exit.isSuccess(exit)).toBe(true)
+    expect(JSON.stringify(exit).includes(value)).toBe(false)
+  }))
+
+  for (const window of ["masking-failure", "new-key"] as const) it.live(`terminal failure cannot revive the last progress (${window})`, () => Effect.gen(function* () {
+    const location = yield* Location.Service
+    const value = randomUUID(); source(location.directory, window === "new-key" ? "base-fixture-value" : value)
+    const { session } = yield* setup({ records: NEUTRAL, inside: async (ctx) => {
+      await ctx.tool.transform((editor: import("@opencode/plugin/promise/tool").ToolEditor) => editor.add({ name: "mask_failure", description: "fixture", options: { codemode: false }, input: { type: "object", properties: {} }, execute: async (_input: unknown, context: ToolContext) => {
+        await context.progress(window === "new-key" ? { [value]: "public" } : { output: `prefix:${value}`, detail: value })
+        if (window === "new-key") source(location.directory, value)
+        else fs.writeFileSync(path.join(location.directory, "credentials.json"), "{")
+        throw new SchemaTool.Error({ message: window === "new-key" ? "failed" : value, error: { cause: value } })
+      } }))
+    } })
+    const published: { type: string; data: unknown }[] = []
+    const publisher = createLLMEventPublisher({ publish: (definition, data) => Effect.sync(() => {
+      published.push({ type: definition.type, data }); return { id: "evt_fixture", type: definition.type, data } as never
+    }) }, { sessionID: session.id, agent: "build" as never, model: { id: "model" as never, providerID: "test" as never }, providerMetadataKey: "test", started: 0, assistantMessageID: "msg_mask" as never })
+    yield* publisher.publish({ type: "tool-call", id: "mask-call", name: "mask_failure", input: {} } as never)
+    const snapshot = yield* (yield* Tool.Service).snapshot([ALLOW_ALL])
+    const exit = yield* snapshot.execute({ sessionID: session.id, agent: "build", messageID: "msg_mask", call: { type: "tool-call", id: "mask-call", name: "mask_failure", input: {} }, progress: (update: Record<string, unknown>) => publisher.progress("mask-call", update) } as never).pipe(Effect.exit)
+    const error = failure(exit)!
+    yield* publisher.failTool("mask-call", { type: "tool.execution", message: error.message! }, error.metadata)
+    const terminal = published.find((event) => event.type === "session.tool.failed")!
+    expect(terminal).toBeDefined()
+    expect(JSON.stringify(terminal).includes(value)).toBe(false)
+    expect(JSON.stringify(terminal).includes("prefix:")).toBe(false)
+    if (window === "masking-failure") expect(JSON.stringify(terminal)).toContain(ProtectedFiles.MASKING_FAILED_TEXT)
+  }))
 })
 
 void Agent

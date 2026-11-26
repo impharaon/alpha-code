@@ -37,8 +37,11 @@ import type { ToolDisplaySnapshotV1 } from "../../../schema/src/tool-identity"
 import { isCodePuppyPolicyRequest } from "../../../schema/src/codepuppy-tool-policy"
 import type { HubBridge, HubInstallSubject } from "../hub-bridge"
 import { denyHubMutationForAutomation, hubInstallAsk } from "../hub-tools"
+import { createSecretMask } from "../secret-mask"
+import type { ProtectedFiles } from "../../../schema/src/codepuppy-protected-files"
 
 export interface PolicyRegistration {
+  readonly dispose: () => void
   /** Last statement of the extension's `setup`: registers the parts that must see every earlier registration. */
   readonly seal: () => Promise<void>
   /**
@@ -74,6 +77,17 @@ export function policyWorkspace(location: Plugin.Context["location"]): string {
  */
 export async function registerPolicy(context: Plugin.Context, unattended: UnattendedState, installSubject: HubBridge["installSubject"], toolPolicy?: ToolPolicyWriter): Promise<PolicyRegistration> {
   const env = process.env
+  const home = os.homedir()
+  const secrets = createSecretMask({
+    platform: process.platform === "win32" ? "win32" : "darwin",
+    project: String(context.location.project.id) === "global" ? context.location.directory : context.location.project.directory,
+    directory: context.location.directory,
+    home,
+    appData: process.platform === "win32" ? env.APPDATA ?? path.join(home, "AppData", "Roaming") : path.join(home, "Library", "Application Support"),
+    localAppData: process.platform === "win32" ? env.LOCALAPPDATA ?? path.join(home, "AppData", "Local") : path.join(home, "Library"),
+    // Node supplies strings; Schema reads only its published path-variable keys.
+    pathVariables: env as ProtectedFiles.ProtectedRoots["pathVariables"],
+  })
   // `#1698`:随包清单与 Office 清单的路径、云 MCP 定义、账户分区来自 sidecar 发布的启动文档(冻结,一代不变)
   const bootstrap = codepuppyBootstrap()
   const store = createToolPolicyStore({
@@ -230,6 +244,7 @@ export async function registerPolicy(context: Plugin.Context, unattended: Unatte
   }) as never)
 
   return {
+    dispose: secrets.dispose,
     askInstall: async (call) => {
       const key = installCallKey(call)
       const prepared = installAsks.get(key)
@@ -260,6 +275,7 @@ export async function registerPolicy(context: Plugin.Context, unattended: Unatte
           displays.set(event.id, displaySnapshot(decision.facts))
           pin(event)
           if (event.tool === CODE_MODE_TOOL && await profile(event.sessionID, event.agent) !== undefined) codeModeDenials.set(event.id, undefined)
+          await secrets.begin({ call: event, kind: event.tool === CODE_MODE_TOOL ? "execute" : "tool" })
         } catch (error) {
           displays.delete(event.id)
           installAsks.delete(installCallKey(event))
@@ -267,10 +283,11 @@ export async function registerPolicy(context: Plugin.Context, unattended: Unatte
         }
       })
 
-      await context.tool.transform((editor) =>
-        wrapForDisplay(editor as never, (callID) => displays.get(callID)),
-      )
-      await context.tool.hook("execute.after", (event) => {
+      await context.tool.transform((editor) => {
+        wrapForDisplay(editor as never, (callID) => displays.get(callID))
+        secrets.wrap(editor)
+      })
+      await context.tool.hook("execute.after", async (event) => {
         if (event.tool === CODE_MODE_TOOL) {
           attachUnattendedDenial(event as never, codeModeDenials.get(event.id))
           codeModeDenials.delete(event.id)
@@ -279,8 +296,17 @@ export async function registerPolicy(context: Plugin.Context, unattended: Unatte
         attachWriteDenied(event as never, context.location.directory)
         attachDirectoryDisplay(event as never)
         attachTerminal(event as never, displays.get(event.id))
+        if (event.status === "completed") event.result = await secrets.result({ call: event, tool: event.tool, result: event.result })
+        else event.error = await secrets.error({ call: event, tool: event.tool, error: event.error })
         displays.delete(event.id)
         installAsks.delete(installCallKey(event))
+      })
+
+      await context.permission.hook("evaluate", async (event) => {
+        if (!event.metadata) return
+        const safe = await secrets.preview(event.metadata)
+        for (const key of Object.keys(event.metadata)) delete event.metadata[key]
+        Object.assign(event.metadata, safe)
       })
 
       await catalog.refresh()

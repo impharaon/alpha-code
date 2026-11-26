@@ -2172,3 +2172,30 @@ packageIt.live("a path-activated package skill renders once until the next user 
   yield* sessions.wait(parent.id)
   expect(readFileSync(join(location.directory, "path-render-count"), "utf8")).toBe("xx")
 })))
+
+packageIt.live("the real ralph-loop Stop hook continues the same task and stops at its completion promise", () => packageJourney(Effect.gen(function* () {
+  const sample = yield* invocationSample("claude:ralph-loop")
+  const membership = JSON.parse(readFileSync(join(sample.root, "skills-enabled.json"), "utf8"))
+  writeFileSync(join(sample.root, "skills-enabled.json"), JSON.stringify({ ...membership, keys: [...membership.keys, sample.key] }))
+  yield* invocationNativeServices
+  const ext = yield* activateExtUntilFinished
+  const commands = yield* Command.Service
+  const name = sample.hostNames["command:commands/ralph-loop.md"]!
+  yield* ext.finish(commands.list().pipe(Effect.map(list => list.some(item => item.name === name))))
+  const location = yield* Location.Service
+  const sessions = yield* Sessions.Service
+  const parent = yield* sessions.create({ location: { directory: location.directory }, title: "Ralph same task", agent: "build", model: { providerID: "test", id: "picked" } } as never)
+  const llm = yield* TestLLM.Test
+  yield* llm.push(TestLLM.text("Work remains", "ralph-working"), TestLLM.text("<promise>DONE</promise>", "ralph-complete"))
+  yield* commands.execute({ name, invocation: { sessionID: parent.id, prompt: { text: 'Keep working --completion-promise DONE --max-iterations 3' }, delivery: "queue" } })
+  yield* sessions.wait(parent.id)
+  expect(yield* llm.requests()).toHaveLength(2)
+  expect(JSON.stringify(yield* sessions.context(parent.id))).toContain("Keep working")
+  expect((yield* sessions.list({ parentID: parent.id })).data).toHaveLength(0)
+  const { existsSync } = yield* Effect.promise(() => import("node:fs"))
+  expect(existsSync(join(location.directory, ".claude/ralph-loop.local.md"))).toBe(false)
+  yield* llm.push(TestLLM.text("Ordinary task finished", "ralph-ordinary"))
+  yield* sessions.prompt({ sessionID: parent.id, text: "An ordinary task" })
+  yield* sessions.wait(parent.id)
+  expect(yield* llm.requests()).toHaveLength(3)
+})))

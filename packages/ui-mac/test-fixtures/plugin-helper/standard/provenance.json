@@ -1,7 +1,7 @@
 {
   "archive": {
     "path": "selection.tar.gz",
-    "sha256": "48b8e757268b2c88cb14492d9562c4b0dcd3ea0073d562af2b675bc21d2b59b0"
+    "sha256": "0780bf0818b171e27a0cee862007314854c800a3cb6e9144e18d04989f6b4b3d"
   },
   "samples": [
     {
@@ -481,23 +481,6 @@
           "mode": 420,
           "bytes": 7373,
           "sha256": "a2e25518e57f71542d3e3d8271ca089b186e33e096305ea152e4c471d1ed6c6f"
-        }
-      ]
-    },
-    {
-      "name": "claude:langfuse-observability",
-      "root": "claude-langfuse-observability",
-      "repository": "https://github.com/langfuse/claude-observability-plugin",
-      "commit": "b5211009698fdfe79c6bbe90d6901ad255ea65d3",
-      "pluginPath": "",
-      "ecosystem": "claude",
-      "files": [
-        {
-          "path": ".claude-plugin/plugin.json",
-          "kind": "file",
-          "mode": 420,
-          "bytes": 3120,
-          "sha256": "12cf944dcf37aab4c21b0e235f2e5ccd6a867e8e3a36a783eb59c6465f870a9d"
         }
       ]
     },
@@ -10074,6 +10057,485 @@
           "mode": 420,
           "bytes": 9357,
           "sha256": "dc7186bcb0f731ddbcfe9e3518cd97c13e3b1e920cb19dac13cf346769622d88"
+        }
+      ]
+    },
+    {
+      "name": "claude:langfuse-observability",
+      "root": "claude-langfuse-observability",
+      "repository": "https://github.com/langfuse/claude-observability-plugin",
+      "commit": "b5211009698fdfe79c6bbe90d6901ad255ea65d3",
+      "pluginPath": "",
+      "ecosystem": "claude",
+      "files": [
+        {
+          "path": ".claude-plugin/marketplace.json",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 625,
+          "sha256": "7abe034db80259296837c66799f956e60da42e59f80fe6987d2876c90bd30af0"
+        },
+        {
+          "path": ".claude-plugin/plugin.json",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 3120,
+          "sha256": "12cf944dcf37aab4c21b0e235f2e5ccd6a867e8e3a36a783eb59c6465f870a9d"
+        },
+        {
+          "path": ".github/workflows/ci.yml",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1923,
+          "sha256": "5f7b561df2932d82e8f6b193f1ff20724f2ba3f01033ac4bda6fa361bccc909b"
+        },
+        {
+          "path": ".github/workflows/release.yml",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1436,
+          "sha256": "3ead51b795d1488a983fa09b67a7eeabf5f03f20fde640d8a5887336176eb5c8"
+        },
+        {
+          "path": ".github/workflows/zizmor.yml",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 956,
+          "sha256": "cd5f6717265c44f56526f9e185b17ff53787c3d51e810c713d7a245d2c89c641"
+        },
+        {
+          "path": ".gitignore",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 13,
+          "sha256": "32dae3052f331ee34d628ef535709b301259a45df7c7522c4d35dcf49873f00b"
+        },
+        {
+          "path": "LICENSE",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1070,
+          "sha256": "c516c4e125d1c11a13637602a8e0b88c1453b07b209277b4db1fe3e3e3c380fa"
+        },
+        {
+          "path": "README.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 11907,
+          "sha256": "e83e4c8950aacc707ac89917a13062699615070c3f042a7b6e1517a8f7805dc2"
+        },
+        {
+          "path": "hooks/hooks.json",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 696,
+          "sha256": "2160981011baab8b42fd5cb6ed1bafbb6cd5927e3b9d6fd4b7f187a11795c2e8"
+        },
+        {
+          "path": "hooks/langfuse_hook.py",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 147680,
+          "sha256": "154da1e6c2cca4a5e215a9ca987135f89abe22f74f58cd97365561526e0f4a89"
+        },
+        {
+          "path": "pyproject.toml",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 272,
+          "sha256": "6e30a734682c7f681cc98a43bbc8ebd92152120e2abc57a81c388b232853ad7a"
+        },
+        {
+          "path": "tests/conftest.py",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 8155,
+          "sha256": "050c8a0dc0b43ebe19f974bb8890f61514f7eadb5a22324c0798052366b6a4c6"
+        },
+        {
+          "path": "tests/fixtures/transcripts/async_agent_completed/transcript/subagents/agent-agent-complete.jsonl",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1257,
+          "sha256": "f574c5b6005704637dd206fbafa23a741dbf37c83dc4381791f81fa1eeef36fc"
+        },
+        {
+          "path": "tests/fixtures/transcripts/async_agent_completed/transcript/subagents/agent-agent-complete.meta.json",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 113,
+          "sha256": "6e5fee50ee5a775f03a4cafeb3b9b3d90dfa587fc7f99bfd776535761eed457b"
+        },
+        {
+          "path": "tests/fixtures/transcripts/async_agent_completed/transcript.jsonl",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 4113,
+          "sha256": "fea7de2133128d6797f88b951a324c4b02eb8e44777bc6fa770277407effd44b"
+        },
+        {
+          "path": "tests/fixtures/transcripts/async_agent_deferred/transcript/subagents/agent-agent-deferred.jsonl",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 552,
+          "sha256": "7f6ed25c6e2e60228949af8f1e290525228a64bc7673850caa75ed61153c2501"
+        },
+        {
+          "path": "tests/fixtures/transcripts/async_agent_deferred/transcript/subagents/agent-agent-deferred.meta.json",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 112,
+          "sha256": "8f35456a076e50578f27961d799a6fcfb86e77d502af38de3e98bf36a555f018"
+        },
+        {
+          "path": "tests/fixtures/transcripts/async_agent_deferred/transcript.jsonl",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 2341,
+          "sha256": "f39c01d2f1f09b04a00764fe9631b78fb8cd4d088de588a938ca3280327dc964"
+        },
+        {
+          "path": "tests/fixtures/transcripts/human_wait_question/transcript.jsonl",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1486,
+          "sha256": "2d7203c5079d6be269a11c36d4b2a44f903ae09562fc8942f7ea3331f8327a10"
+        },
+        {
+          "path": "tests/fixtures/transcripts/nested_subagents/transcript/subagents/agent-inner-agent.jsonl",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 513,
+          "sha256": "d282af06eccd5542ea040de70211ab312199e07c6533f4f473a0159face4057b"
+        },
+        {
+          "path": "tests/fixtures/transcripts/nested_subagents/transcript/subagents/agent-inner-agent.meta.json",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 110,
+          "sha256": "f83341e5c0ca5e8fe821526a7b0b9a1f897bb21d3d41bca6b43ae3ca77a0de06"
+        },
+        {
+          "path": "tests/fixtures/transcripts/nested_subagents/transcript/subagents/agent-outer-agent.jsonl",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1466,
+          "sha256": "9ffa507def665ff6addeba6d94760feea2142847aaa06c70b4513360bc421568"
+        },
+        {
+          "path": "tests/fixtures/transcripts/nested_subagents/transcript/subagents/agent-outer-agent.meta.json",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 107,
+          "sha256": "9c1c78810e812e66b9f7c80d2ffbc3e20b333ee710651167d35cd1cbaa10ddd0"
+        },
+        {
+          "path": "tests/fixtures/transcripts/nested_subagents/transcript.jsonl",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 2387,
+          "sha256": "67c99bd94ea32d7a59a3e938406ab78a65f66295e3a8ce7aa609f41e95aa99f7"
+        },
+        {
+          "path": "tests/fixtures/transcripts/observation_levels/transcript.jsonl",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 3371,
+          "sha256": "e21427b315c1661c5b48146265983aca57bedd3b69defca3f5714e826318533b"
+        },
+        {
+          "path": "tests/fixtures/transcripts/simple_turn/transcript.jsonl",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 823,
+          "sha256": "35cda9e9c77034081a99c5f69747573f7476ba2a099c84e1f743b3dd2d71c7e4"
+        },
+        {
+          "path": "tests/fixtures/transcripts/task_notification_task_id_fallback/transcript/subagents/agent-task-fallback.jsonl",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 587,
+          "sha256": "324dbdb102f82706e204143e5e2b153778ebf7556a51dc7d9d46440cefeeaee9"
+        },
+        {
+          "path": "tests/fixtures/transcripts/task_notification_task_id_fallback/transcript/subagents/agent-task-fallback.meta.json",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 112,
+          "sha256": "cdcb0c4b2526b1f4a531ef70030527d8e4188af5ca78647dccbf8b8adc9b1bdc"
+        },
+        {
+          "path": "tests/fixtures/transcripts/task_notification_task_id_fallback/transcript.jsonl",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 2245,
+          "sha256": "6056de50e8e1d0086d86bf6dd299a43302a65cbad2a18f6e63ab36394abc551b"
+        },
+        {
+          "path": "tests/fixtures/transcripts/tool_turn/transcript.jsonl",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1006,
+          "sha256": "a9b8c97179e37c1e119ecc5011df52547e4f76b1d0221bfca395c6852e84ed5a"
+        },
+        {
+          "path": "tests/fixtures/transcripts/workflow_subagents/transcript/subagents/workflows/wf_test001/agent-r1.jsonl",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 2407,
+          "sha256": "606be7b30dca9ca785b4ed292642062ae9fe68d356e3ad717872c5f1da553809"
+        },
+        {
+          "path": "tests/fixtures/transcripts/workflow_subagents/transcript/subagents/workflows/wf_test001/agent-r1.meta.json",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 49,
+          "sha256": "9e282bb0224d052eee9a4788b298ec9107f647bd8eca89a3af2f9780c69492a8"
+        },
+        {
+          "path": "tests/fixtures/transcripts/workflow_subagents/transcript/subagents/workflows/wf_test001/agent-r2.jsonl",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 4892,
+          "sha256": "a13869f55d3792b7c68ad09758f5dd3dad3bffc2a33db1644161d8b0d83952f3"
+        },
+        {
+          "path": "tests/fixtures/transcripts/workflow_subagents/transcript/subagents/workflows/wf_test001/agent-r2.meta.json",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 49,
+          "sha256": "9e282bb0224d052eee9a4788b298ec9107f647bd8eca89a3af2f9780c69492a8"
+        },
+        {
+          "path": "tests/fixtures/transcripts/workflow_subagents/transcript/subagents/workflows/wf_test001/journal.jsonl",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 662,
+          "sha256": "ad4bbe6588bb16ea05b565e6453ff9bee0cd4b6e15117fc0000ca7ebcea71d6c"
+        },
+        {
+          "path": "tests/fixtures/transcripts/workflow_subagents/transcript.jsonl",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 6544,
+          "sha256": "74f47b0662987f683121944eb8aff5ccd223771df91218c25a97a3c05d54da9e"
+        },
+        {
+          "path": "tests/integration/test_deterministic_trace_ids.py",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 8883,
+          "sha256": "964a58fbaf9082a81549e61280f0fe700e94a688de00fe75243114005723d8b1"
+        },
+        {
+          "path": "tests/integration/test_emit_new_turns_from_transcript.py",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 12692,
+          "sha256": "ebf18fefe16d957833d2a5253e3dbd30b707617cb9947f7ec303d4bb11ed0293"
+        },
+        {
+          "path": "tests/integration/test_emit_turn_observations.py",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 5158,
+          "sha256": "b8896e709d6f3e47b011808c2a6554930242d1ab3c18005c37b9984b8488e43a"
+        },
+        {
+          "path": "tests/integration/test_forked_session_history.py",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 9426,
+          "sha256": "fde5e618a13098c49b0243f45cf8166d43c22a4f3cab59992dd0ef966affd82d"
+        },
+        {
+          "path": "tests/integration/test_generation_history.py",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 19062,
+          "sha256": "aa14cb74953618e625aad8d699aee0323b94757598b6b4c52cbfc60bd4f3df15"
+        },
+        {
+          "path": "tests/integration/test_observation_levels.py",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 9188,
+          "sha256": "4368f5ae98bdb11cec8025b93c9b627a297d1c27498ca6cf5249f744e894a307"
+        },
+        {
+          "path": "tests/integration/test_parent_trace_attachment.py",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 7116,
+          "sha256": "4eeba18e049e21b5cca06d80baa70a826d5b5fa938e406803714918f3921b245"
+        },
+        {
+          "path": "tests/integration/test_state_lock_contention.py",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 8111,
+          "sha256": "c87bc554b6d2950f6f5957cd245ae76a62eec0903f702fd2b32567979f4b85c1"
+        },
+        {
+          "path": "tests/integration/test_workflow_subagent_emission.py",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 29433,
+          "sha256": "472ab19d75f6e51685a52986b58c106ad36b5e84b91dece6edaf77aa54428aa3"
+        },
+        {
+          "path": "tests/unit/test_async_agent_deferral.py",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 32859,
+          "sha256": "370f20e2673e1cdd2e121f23d8dcd742a7ee7d3ed657a6707ff4a44ba3243680"
+        },
+        {
+          "path": "tests/unit/test_config_precedence.py",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 7369,
+          "sha256": "da2966c222aa1abf8959bb651d9879cc554dc56ea110f7964639c577e8d4a9f1"
+        },
+        {
+          "path": "tests/unit/test_config_visibility.py",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 4963,
+          "sha256": "aae5e29174f02cdb981cb27bf86f4406826e42badcde7234504e990e4d478677"
+        },
+        {
+          "path": "tests/unit/test_emission_gate.py",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1135,
+          "sha256": "9062d178d29637faf9ffee0a66dbe8fc730c2fb4fd0dc441cc578b973d87019f"
+        },
+        {
+          "path": "tests/unit/test_hook_payload.py",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 2057,
+          "sha256": "9959fa76e9cfd41a04adfbf5d604b78c8a95126cb882c510f79d6c6ad924b7ff"
+        },
+        {
+          "path": "tests/unit/test_image_capture.py",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 9812,
+          "sha256": "20106bc0856a317ef8a2f864fe37642ce42f6ed171714a13b744777e3568b371"
+        },
+        {
+          "path": "tests/unit/test_import_failure.py",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1309,
+          "sha256": "ee0c4a147e023b20269d5bebdc62bba609b26d9ef18df5d581850fdaeedee44c"
+        },
+        {
+          "path": "tests/unit/test_langfuse_payload_builders.py",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 8142,
+          "sha256": "695f38219a0855c8931f3491720b5f9dd18acedb5cd6cb987f2cc3328447f513"
+        },
+        {
+          "path": "tests/unit/test_operator_tags.py",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 5483,
+          "sha256": "51121c12d377c78a3b8d35f64f9904a4d8cffb6d7a647d818d2bdc5ff5beef0a"
+        },
+        {
+          "path": "tests/unit/test_parent_trace_context.py",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 5620,
+          "sha256": "a456fd55f8de09eb0c892e3e4c3616151fa60c79b9c8a8b03470d2d779ad1ebe"
+        },
+        {
+          "path": "tests/unit/test_remote_parent.py",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 2422,
+          "sha256": "35877557b87d124971021d5a886257c4ed4518d8f9a4498260c4fab913d6a6de"
+        },
+        {
+          "path": "tests/unit/test_skill_tags.py",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 6047,
+          "sha256": "4b010f5e5a3f22c859c40a5f4b5f4209b88d6b2a25a5d9bf4615133dfd64ac9a"
+        },
+        {
+          "path": "tests/unit/test_state_dir.py",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 7596,
+          "sha256": "8fad4aed12164ac2d4db04f20fe9a22173b00800a44fe1618030e8882a88370f"
+        },
+        {
+          "path": "tests/unit/test_subagent_discovery.py",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 20720,
+          "sha256": "b77f72c9bb4e70a23c57abae8070c79fbd91c879ffee99c7a7e121ef7978fc12"
+        },
+        {
+          "path": "tests/unit/test_subagent_observations.py",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1151,
+          "sha256": "d651d98d1088aad5a86bee907545acdefc22d77df3144815e0af8438d2d7c68a"
+        },
+        {
+          "path": "tests/unit/test_task_notifications.py",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 3630,
+          "sha256": "f6df2222f6f366e50619bdc13405c6ce8ec1f4cb9b6660c28825525d6503b1b4"
+        },
+        {
+          "path": "tests/unit/test_thinking_capture.py",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 5646,
+          "sha256": "dedb35ce84ca8e159a86edc1532f1a571107a17eeb40f3aa39887463fc58cd43"
+        },
+        {
+          "path": "tests/unit/test_timestamps.py",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 569,
+          "sha256": "518ae63b34bd935c9ad2c71baead5215035e69cb23e21c26fbe4a2a0703bac04"
+        },
+        {
+          "path": "tests/unit/test_trace_id_derivation.py",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1506,
+          "sha256": "3332320da35d6dd9ae3770b175c5fd3135fae40734cdadea21c1164a64ee3c20"
+        },
+        {
+          "path": "tests/unit/test_transcript_reader.py",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 4298,
+          "sha256": "bb6632907fc46eccb277b2feb0a6e44d5b41abd05573cfceab2f015ddf480f3d"
+        },
+        {
+          "path": "tests/unit/test_turn_assembly.py",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 3027,
+          "sha256": "b432e6eb0e604e5a8595680a8ab37eec10ed7bac788d94c3dff8ccc01f6dff08"
+        },
+        {
+          "path": "uv.lock",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 21311,
+          "sha256": "8345a8b586c341e2872b0c61009c7f0d56759fb6001b875ae5d7b2aad00a4b30"
         }
       ]
     }

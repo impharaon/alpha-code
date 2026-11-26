@@ -1126,97 +1126,337 @@
                     "const": "hook"
                   },
                   "hook": {
-                    "type": "object",
-                    "additionalProperties": false,
-                    "required": [
-                      "event",
-                      "command",
-                      "timeoutSeconds",
-                      "async",
-                      "asyncRewake",
-                      "onFailure",
-                      "order",
-                      "scope"
-                    ],
-                    "properties": {
-                      "event": {
-                        "enum": [
-                          "SessionStart",
-                          "UserPromptSubmit",
-                          "UserPromptExpansion",
-                          "PreToolUse",
-                          "PostToolUse",
-                          "PostToolUseFailure",
-                          "Stop",
-                          "StopFailure",
-                          "PermissionRequest"
-                        ]
-                      },
-                      "matcher": {
-                        "type": "string"
-                      },
-                      "if": {
-                        "type": "string"
-                      },
-                      "command": {
-                        "$ref": "#/$defs/Text"
-                      },
-                      "timeoutSeconds": {
-                        "type": "number",
-                        "minimum": 0
-                      },
-                      "async": {
-                        "type": "boolean"
-                      },
-                      "asyncRewake": {
-                        "type": "boolean"
-                      },
-                      "onFailure": {
-                        "enum": [
-                          "continue",
-                          "block"
-                        ]
-                      },
-                      "order": {
-                        "type": "integer",
-                        "minimum": 0
-                      },
-                      "scope": {
-                        "oneOf": [
-                          {
-                            "type": "object",
-                            "additionalProperties": false,
-                            "required": [
-                              "kind"
-                            ],
-                            "properties": {
-                              "kind": {
-                                "const": "package"
+                    "oneOf": [
+                      {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "type",
+                          "event",
+                          "timeoutSeconds",
+                          "onFailure",
+                          "order",
+                          "scope",
+                          "command",
+                          "async",
+                          "asyncRewake"
+                        ],
+                        "properties": {
+                          "event": {
+                            "enum": [
+                              "SessionStart",
+                              "UserPromptSubmit",
+                              "UserPromptExpansion",
+                              "PreToolUse",
+                              "PostToolUse",
+                              "PostToolUseFailure",
+                              "Stop",
+                              "StopFailure",
+                              "PermissionRequest",
+                              "SessionEnd",
+                              "Notification",
+                              "PermissionDenied",
+                              "FileChanged",
+                              "CwdChanged",
+                              "ConfigChange",
+                              "InstructionsLoaded",
+                              "SubagentStart",
+                              "SubagentStop",
+                              "TaskCreated",
+                              "TaskCompleted",
+                              "TeammateIdle",
+                              "PreCompact",
+                              "PostCompact",
+                              "Elicitation",
+                              "ElicitationResult",
+                              "PostToolBatch"
+                            ]
+                          },
+                          "matcher": {
+                            "type": "string"
+                          },
+                          "if": {
+                            "type": "string"
+                          },
+                          "timeoutSeconds": {
+                            "type": "number",
+                            "exclusiveMinimum": 0
+                          },
+                          "onFailure": {
+                            "enum": [
+                              "continue",
+                              "block"
+                            ]
+                          },
+                          "order": {
+                            "type": "integer",
+                            "minimum": 0
+                          },
+                          "scope": {
+                            "oneOf": [
+                              {
+                                "type": "object",
+                                "additionalProperties": false,
+                                "required": [
+                                  "kind"
+                                ],
+                                "properties": {
+                                  "kind": {
+                                    "const": "package"
+                                  }
+                                }
+                              },
+                              {
+                                "type": "object",
+                                "additionalProperties": false,
+                                "required": [
+                                  "kind",
+                                  "entryId"
+                                ],
+                                "properties": {
+                                  "kind": {
+                                    "enum": [
+                                      "skill",
+                                      "agent"
+                                    ]
+                                  },
+                                  "entryId": {
+                                    "type": "string"
+                                  }
+                                }
                               }
+                            ]
+                          },
+                          "type": {
+                            "const": "command"
+                          },
+                          "command": {
+                            "$ref": "#/$defs/Text"
+                          },
+                          "args": {
+                            "type": "array",
+                            "items": {
+                              "$ref": "#/$defs/Text"
                             }
                           },
-                          {
-                            "type": "object",
-                            "additionalProperties": false,
-                            "required": [
-                              "kind",
-                              "entryId"
-                            ],
-                            "properties": {
-                              "kind": {
-                                "enum": [
-                                  "skill",
-                                  "agent"
-                                ]
-                              },
-                              "entryId": {
-                                "type": "string"
-                              }
-                            }
+                          "async": {
+                            "type": "boolean"
+                          },
+                          "asyncRewake": {
+                            "type": "boolean"
                           }
-                        ]
+                        }
+                      },
+                      {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "type",
+                          "event",
+                          "timeoutSeconds",
+                          "onFailure",
+                          "order",
+                          "scope",
+                          "prompt",
+                          "continueOnBlock"
+                        ],
+                        "properties": {
+                          "event": {
+                            "enum": [
+                              "SessionStart",
+                              "UserPromptSubmit",
+                              "UserPromptExpansion",
+                              "PreToolUse",
+                              "PostToolUse",
+                              "PostToolUseFailure",
+                              "Stop",
+                              "StopFailure",
+                              "PermissionRequest",
+                              "SessionEnd",
+                              "Notification",
+                              "PermissionDenied",
+                              "FileChanged",
+                              "CwdChanged",
+                              "ConfigChange",
+                              "InstructionsLoaded",
+                              "SubagentStart",
+                              "SubagentStop",
+                              "TaskCreated",
+                              "TaskCompleted",
+                              "TeammateIdle",
+                              "PreCompact",
+                              "PostCompact",
+                              "Elicitation",
+                              "ElicitationResult",
+                              "PostToolBatch"
+                            ]
+                          },
+                          "matcher": {
+                            "type": "string"
+                          },
+                          "if": {
+                            "type": "string"
+                          },
+                          "timeoutSeconds": {
+                            "type": "number",
+                            "exclusiveMinimum": 0
+                          },
+                          "onFailure": {
+                            "enum": [
+                              "continue",
+                              "block"
+                            ]
+                          },
+                          "order": {
+                            "type": "integer",
+                            "minimum": 0
+                          },
+                          "scope": {
+                            "oneOf": [
+                              {
+                                "type": "object",
+                                "additionalProperties": false,
+                                "required": [
+                                  "kind"
+                                ],
+                                "properties": {
+                                  "kind": {
+                                    "const": "package"
+                                  }
+                                }
+                              },
+                              {
+                                "type": "object",
+                                "additionalProperties": false,
+                                "required": [
+                                  "kind",
+                                  "entryId"
+                                ],
+                                "properties": {
+                                  "kind": {
+                                    "enum": [
+                                      "skill",
+                                      "agent"
+                                    ]
+                                  },
+                                  "entryId": {
+                                    "type": "string"
+                                  }
+                                }
+                              }
+                            ]
+                          },
+                          "type": {
+                            "const": "prompt"
+                          },
+                          "prompt": {
+                            "$ref": "#/$defs/Text"
+                          },
+                          "model": {
+                            "oneOf": [
+                              {
+                                "type": "object",
+                                "additionalProperties": false,
+                                "required": [
+                                  "alias"
+                                ],
+                                "properties": {
+                                  "alias": {
+                                    "type": "string"
+                                  }
+                                }
+                              },
+                              {
+                                "type": "object",
+                                "additionalProperties": false,
+                                "required": [
+                                  "providerID",
+                                  "modelID"
+                                ],
+                                "properties": {
+                                  "providerID": {
+                                    "type": "string"
+                                  },
+                                  "modelID": {
+                                    "type": "string"
+                                  }
+                                }
+                              }
+                            ]
+                          },
+                          "continueOnBlock": {
+                            "type": "boolean"
+                          }
+                        }
                       }
-                    }
+                    ]
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "kind",
+                  "id",
+                  "sourcePath",
+                  "sourceName",
+                  "command",
+                  "description",
+                  "when"
+                ],
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "sourcePath": {
+                    "type": "string",
+                    "minLength": 1,
+                    "pattern": "^(?!/)(?![A-Za-z]:)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*\\\\)(?!.*\\u0000)[^/]+(?:/[^/]+)*$"
+                  },
+                  "sourceName": {
+                    "type": "string"
+                  },
+                  "kind": {
+                    "const": "monitor"
+                  },
+                  "command": {
+                    "$ref": "#/$defs/Text"
+                  },
+                  "description": {
+                    "type": "string"
+                  },
+                  "when": {
+                    "oneOf": [
+                      {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "kind"
+                        ],
+                        "properties": {
+                          "kind": {
+                            "const": "always"
+                          }
+                        }
+                      },
+                      {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "kind",
+                          "sourceName"
+                        ],
+                        "properties": {
+                          "kind": {
+                            "const": "skill"
+                          },
+                          "sourceName": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    ]
                   }
                 }
               }
@@ -1290,7 +1530,10 @@
                   "invalid-definition",
                   "missing-entry",
                   "unresolved-app-id",
-                  "native-js-plugin"
+                  "native-js-plugin",
+                  "unavailable-trigger",
+                  "unsupported-host-capability",
+                  "unsupported-setting"
                 ]
               },
               "sourceName": {

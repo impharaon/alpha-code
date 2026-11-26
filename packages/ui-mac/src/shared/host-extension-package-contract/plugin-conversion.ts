@@ -1,10 +1,11 @@
-import { pluginRelativePath, pluginText, pluginOptionEnvironmentName, pluginTreeDigest } from "./plugin-package"
+import { UNAVAILABLE_PLUGIN_HOOKS } from "./plugin-hook-events"
+import { PLUGIN_HOOK_EVENTS, pluginRelativePath, pluginText, pluginOptionEnvironmentName, pluginTreeDigest } from "./plugin-package"
 import { createHash } from "node:crypto"
 import { parse, type ParseError } from "jsonc-parser/lib/esm/main.js"
 import { ConfigMarkdown } from "@opencode/core/config/markdown"
 
 export type { Sha256, RelPath, Json, Source, Provider, TreeNode, Capture, Text, ToolRule, ModelHint, ArgumentSyntax, SkillDisplay, McpToolDependency, Invocation, SecretNeed, LoginNeed, HookEvent, Hook, Entry, Diagnostic, PluginPackage, MarketplaceEntry } from "./plugin-package"
-import type { Sha256, RelPath, Json, Source, TreeNode, Capture, Text, ToolRule, Invocation, McpToolDependency, SkillDisplay, ArgumentSyntax, SecretNeed, LoginNeed, HookEvent, Entry, Diagnostic, PluginPackage, MarketplaceEntry } from "./plugin-package"
+import type { Sha256, RelPath, Json, Source, TreeNode, Capture, Text, ToolRule, Invocation, McpToolDependency, SkillDisplay, ArgumentSyntax, SecretNeed, LoginNeed, HookEvent, Hook, Entry, Diagnostic, PluginPackage, MarketplaceEntry } from "./plugin-package"
 
 export class CaptureError extends Error {
   constructor(readonly code: "invalid-path" | "duplicate-path" | "invalid-node" | "read-failed" | "digest-mismatch", readonly path: string) {
@@ -102,6 +103,7 @@ export async function convertPluginTree(input: Capture): Promise<{ package: Plug
     }
   }
   const entries: Entry[] = []
+  const scopedHooks: { path: string; value: unknown; scope: Hook["scope"] }[] = []
   const dependencyDefinitions: { name: string; path: string; pointer: string; value: unknown }[] = []
   const roots = opencode ? ["skills", "skill", ".opencode/skills", ".opencode/skill"] : ["skills", ...manifests.flatMap(item => declaredPaths(item.value?.skills, item.path, "skills", diagnostics))]
   const loose = !manifest && !opencode ? [...files.keys()].filter(path => /^[^/]+\/SKILL\.md$/.test(path)) : []
@@ -131,6 +133,7 @@ export async function convertPluginTree(input: Capture): Promise<{ package: Plug
       if (source.startsWith("icon_") && !pluginRelativePath(value.replace(/^\.\//, ""))) { diagnostics.push({ path: sidecarPath, field: "interface/" + source, code: "invalid-definition", message: "Skill icon must be relative to its skill directory" }); continue }
       display[target] = source.startsWith("icon_") ? value.replace(/^\.\//, "") : value
     }
+    if (data.hooks !== undefined) scopedHooks.push({ path, value: data.hooks, scope: { kind: "skill", entryId: "skill:" + path } })
     entries.push({ kind: "skill", id: "skill:" + path, sourcePath: path, sourceName: name, directory, instruction: pluginText(instruction), invocation: invocation({ ...data, allow_implicit_invocation: data.allow_implicit_invocation === false || policy.allow_implicit_invocation === false ? false : true }, opencode ? "opencode" : codex ? "literal" : "claude", path, diagnostics), display, dependencies, mcpDependencies: [...new Set([...dependencies.map(item => item.value), ...(object(data.dependencies) ? strings(data.dependencies.mcp) : [])])] })
   }
   const definitions: { name: string; path: string; pointer: string; value: unknown }[] = []
@@ -173,27 +176,70 @@ export async function convertPluginTree(input: Capture): Promise<{ package: Plug
     const parsed = ConfigMarkdown.parseOption(instruction)
     if (!parsed) { diagnostics.push({ path, code: "invalid-definition", message: "Markdown definition is invalid" }); continue }
     const kind = match[1]!.startsWith("agent") ? "agent" : "command"
+    if (kind === "agent" && parsed.data.hooks !== undefined) scopedHooks.push({ path, value: parsed.data.hooks, scope: { kind, entryId: kind + ":" + path } })
     entries.push({ kind, id: kind + ":" + path, sourcePath: path, sourceName: match[2]!, instruction: pluginText(instruction), invocation: invocation(parsed.data, opencode ? "opencode" : codex ? "codex" : "claude", path, diagnostics) })
   }
-  if (!opencode && files.has("hooks/hooks.json")) {
-    const path = "hooks/hooks.json"
-    const document = json(path)
-    const events: HookEvent[] = ["SessionStart", "UserPromptSubmit", "UserPromptExpansion", "PreToolUse", "PostToolUse", "PostToolUseFailure", "Stop", "StopFailure", "PermissionRequest"]
-    if (object(document?.hooks)) for (const [name, groups] of Object.entries(document.hooks)) {
-      const event = events.find(event => event === name)
+  const hookFiles = new Set<string>()
+  let hookOrder = 0
+  const addHooks = (path: string, value: unknown, scope: Hook["scope"]): void => {
+    if (typeof value === "string") {
+      const file = value.replace(/^\.\//, "")
+      if (!pluginRelativePath(file)) { diagnostics.push({ path, code: "invalid-definition", message: "Hook file must be package-relative" }); return }
+      const key = JSON.stringify([file, scope])
+      if (hookFiles.has(key)) return
+      hookFiles.add(key)
+      addHooks(file, json(file), scope)
+      return
+    }
+    if (Array.isArray(value)) { for (const item of value) addHooks(path, item, scope); return }
+    if (!object(value)) { diagnostics.push({ path, code: "invalid-definition", message: "Hook definition must be an object" }); return }
+    if (value.modules !== undefined) diagnostics.push({ path, code: "unsupported-host-capability", message: "In-process Claude hook modules require the Claude UI host" })
+    const events = object(value.hooks) ? value.hooks : value
+    for (const [name, groups] of Object.entries(events)) {
+      if (name === "modules" || name === "description") continue
+      const event = PLUGIN_HOOK_EVENTS.find(event => event === name)
       if (!event || !Array.isArray(groups)) { diagnostics.push({ path, sourceName: name, code: "invalid-definition", message: "Hook event definition is invalid" }); continue }
       for (const [groupIndex, group] of groups.entries()) {
         if (!object(group) || !Array.isArray(group.hooks)) { diagnostics.push({ path, sourceName: name, code: "invalid-definition", message: "Hook group is invalid" }); continue }
-        for (const [index, hook] of group.hooks.entries()) {
-          if (!object(hook) || hook.type !== "command" || typeof hook.command !== "string") { diagnostics.push({ path, sourceName: name, code: "invalid-definition", message: "Hook command is unsupported" }); continue }
-          entries.push({ kind: "hook", id: "hook:" + path + "#" + event + "/" + groupIndex + "/" + index, sourcePath: path, sourceName: event, hook: {
-            event, ...(typeof group.matcher === "string" ? { matcher: group.matcher } : {}), ...(typeof hook.if === "string" ? { if: hook.if } : {}),
-            command: pluginText(hook.command), timeoutSeconds: typeof hook.timeout === "number" ? hook.timeout : event === "UserPromptSubmit" ? 30 : 600,
-            async: hook.async === true, asyncRewake: hook.asyncRewake === true, onFailure: hook.onFailure === "block" ? "block" : "continue", order: index, scope: { kind: "package" },
-          } })
+        for (const [index, handler] of group.hooks.entries()) {
+          const invalid = (message: string) => diagnostics.push({ path, sourceName: name, code: "invalid-definition", message })
+          if (!object(handler) || !["command", "prompt"].includes(String(handler.type))) { diagnostics.push({ path, sourceName: name, code: "unsupported-host-capability", message: "Hook handler protocol is unsupported" }); continue }
+          if (handler.timeout !== undefined && (typeof handler.timeout !== "number" || !Number.isFinite(handler.timeout) || handler.timeout <= 0)) { invalid("Hook timeout must be positive"); continue }
+          const base = { event, ...(typeof group.matcher === "string" ? { matcher: group.matcher } : {}), ...(typeof handler.if === "string" ? { if: handler.if } : {}), timeoutSeconds: typeof handler.timeout === "number" ? handler.timeout : handler.type === "prompt" ? 30 : 600, onFailure: handler.onFailure === "block" ? "block" as const : "continue" as const, order: hookOrder++, scope }
+          const id = "hook:" + path + "#" + (scope.kind === "package" ? "" : scope.entryId + "/") + event + "/" + groupIndex + "/" + index
+          if (handler.type === "command") {
+            if (typeof handler.command !== "string" || handler.args !== undefined && (!Array.isArray(handler.args) || !handler.args.every(arg => typeof arg === "string"))) { invalid("Hook command or arguments are invalid"); continue }
+            entries.push({ kind: "hook", id, sourcePath: path, sourceName: event, hook: { ...base, type: "command", command: pluginText(handler.command), ...(Array.isArray(handler.args) ? { args: handler.args.map(arg => pluginText(String(arg))) } : {}), async: handler.async === true, asyncRewake: handler.asyncRewake === true } })
+          }
+          if (handler.type === "prompt") {
+            if (!["PreToolUse", "PermissionRequest", "PostToolUse", "PostToolUseFailure", "PostToolBatch", "UserPromptSubmit", "UserPromptExpansion", "Stop", "SubagentStop", "PermissionDenied", "TaskCreated", "TaskCompleted", "TeammateIdle"].includes(event)) { diagnostics.push({ path, sourceName: name, code: "unsupported-host-capability", message: "Prompt hooks have no source protocol for this event" }); continue }
+            if (typeof handler.prompt !== "string") { invalid("Hook prompt is missing"); continue }
+            entries.push({ kind: "hook", id, sourcePath: path, sourceName: event, hook: { ...base, type: "prompt", prompt: pluginText(handler.prompt), ...(sourceModel(handler.model) ? { model: sourceModel(handler.model) } : {}), continueOnBlock: handler.continueOnBlock === true } })
+          }
+          if (Object.hasOwn(UNAVAILABLE_PLUGIN_HOOKS, event)) diagnostics.push({ path, sourceName: name, code: "unavailable-trigger", message: UNAVAILABLE_PLUGIN_HOOKS[event as keyof typeof UNAVAILABLE_PLUGIN_HOOKS] })
         }
       }
     }
+  }
+  if (!opencode) {
+    if (files.has("hooks/hooks.json")) addHooks("hooks/hooks.json", "hooks/hooks.json", { kind: "package" })
+    for (const item of manifests) if (item.value?.hooks !== undefined) addHooks(item.path, item.value.hooks, { kind: "package" })
+    for (const source of scopedHooks) addHooks(source.path, source.value, source.scope)
+    const monitorSources = manifests.flatMap(item => object(item.value?.experimental) && item.value.experimental.monitors !== undefined ? [{ path: item.path, value: item.value.experimental.monitors }] : [])
+    if (!monitorSources.length && files.has("monitors/monitors.json")) monitorSources.push({ path: "monitors/monitors.json", value: "monitors/monitors.json" })
+    const monitors = new Map<string, Extract<Entry, { kind: "monitor" }>>()
+    for (const source of monitorSources) {
+      const path = typeof source.value === "string" ? source.value.replace(/^\.\//, "") : source.path
+      if (!pluginRelativePath(path)) { diagnostics.push({ path: source.path, code: "invalid-definition", message: "Monitor file must be package-relative" }); continue }
+      if (typeof source.value === "string" && !files.has(path)) { diagnostics.push({ path, code: "missing-entry", message: "Declared monitor file is missing" }); continue }
+      const values: unknown = typeof source.value === "string" ? (() => { try { return parseJson(files.get(path)!, false) } catch { return undefined } })() : source.value
+      if (!Array.isArray(values)) { diagnostics.push({ path, code: "invalid-definition", message: "Monitor definition must be an array" }); continue }
+      for (const value of values) {
+        if (!object(value) || typeof value.name !== "string" || !value.name || typeof value.description !== "string" || typeof value.command !== "string" || value.when !== undefined && value.when !== "always" && (typeof value.when !== "string" || !/^on-skill-invoke:.+/.test(value.when))) { diagnostics.push({ path, code: "invalid-definition", message: "Monitor name, command, description or trigger is invalid" }); continue }
+        monitors.set(value.name, { kind: "monitor", id: "monitor:" + path + "#" + value.name, sourcePath: path, sourceName: value.name, command: pluginText(value.command), description: value.description, when: typeof value.when === "string" && value.when.startsWith("on-skill-invoke:") ? { kind: "skill", sourceName: value.when.slice("on-skill-invoke:".length) } : { kind: "always" } })
+      }
+    }
+    entries.push(...monitors.values())
   }
   definitions.push(...dependencyDefinitions.filter(item => !definitions.some(existing => existing.name === item.name)))
   const unique = [...new Map(definitions.map((definition) => [definition.path + "#" + definition.pointer, definition])).values()]
@@ -422,7 +468,7 @@ function invocation(data: Record<string, unknown>, syntax: ArgumentSyntax, path:
     fork: data.context === "fork", userInvocable: data["user-invocable"] !== false, implicitInvocation: data["disable-model-invocation"] !== true && data.allow_implicit_invocation !== false,
     allowedTools: rules("allowed-tools"), deniedTools: rules("disallowed-tools"),
     ...(data.tools === undefined ? {} : { availableTools: rules("tools") }),
-    ...(typeof data.model === "string" && data.model !== "inherit" ? { model: data.model.includes("/") ? { providerID: data.model.slice(0, data.model.indexOf("/")), modelID: data.model.slice(data.model.indexOf("/") + 1) } : { alias: data.model } } : {}),
+    ...(sourceModel(data.model) ? { model: sourceModel(data.model) } : {}),
     ...(typeof data.agent === "string" ? { agent: data.agent } : {}),
     ...(typeof data["argument-hint"] === "string" ? { argumentHint: data["argument-hint"] } : {}),
     arguments: strings(data.arguments), argumentSyntax: syntax, paths: strings(data.paths), preloadSkills: strings(data.skills),
@@ -515,4 +561,9 @@ export function renderInstalledSkill(entry: Extract<Entry, { kind: "skill" }>, b
     return start + dependencies + end
   })
   return new TextEncoder().encode(rendered)
+}
+
+function sourceModel(value: unknown): import("./plugin-package").ModelHint | undefined {
+  if (typeof value !== "string" || value === "inherit") return
+  return value.includes("/") ? { providerID: value.slice(0, value.indexOf("/")), modelID: value.slice(value.indexOf("/") + 1) } : { alias: value }
 }

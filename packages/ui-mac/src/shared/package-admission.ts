@@ -1,3 +1,5 @@
+import type { PackageNotRunningV1 } from "./plugin-install"
+export type { NotRunningReasonV1, PackageNotRunningV1 } from "./plugin-install"
 import type { CapabilityDiffWire } from "./ext-capability-authorization"
 
 import type {
@@ -27,14 +29,6 @@ export type PackageSourceV1 =
   | { kind: "created" }
   | { kind: "local-folder" }
 
-export type NotRunningReasonV1 =
-  | "kind-not-supported-yet"
-  | "needs-plugin-files"
-  | "unresolved-app-id"
-  | "native-js-plugin"
-  | "invalid-definition"
-  | "missing-entry"
-export type PackageNotRunningV1 = { kind: string; sourceName: string; reason: NotRunningReasonV1 }
 
 /** Installed package account view: declarations and presence/status only, never secret references. */
 export type PackageOptionValuesV1 = Record<string, string | number | boolean>

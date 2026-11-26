@@ -3,7 +3,7 @@ export type EffectScopeV1 = { kind: "all-projects" } | { kind: "project"; direct
 export type CreatedPluginDraftV1 = { searchId: string; name: string; description: string; files: { path: string; text: string }[] }
 export type InstallSourceRefV1 = { kind: "catalog"; catalogId: string } | { kind: "candidate"; candidateId: string } | { kind: "folder" } | { kind: "created"; draft: CreatedPluginDraftV1 }
 export type InstallRequestV1 = { requestId: string; source: InstallSourceRefV1; effect: EffectScopeV1; via: "hub" | "chat" }
-export type NotRunningReasonV1 = "kind-not-supported-yet" | "needs-plugin-files" | "unresolved-app-id" | "native-js-plugin" | "invalid-definition" | "missing-entry"
+export type NotRunningReasonV1 = "kind-not-supported-yet" | "needs-plugin-files" | "unresolved-app-id" | "native-js-plugin" | "invalid-definition" | "missing-entry" | "unavailable-trigger" | "unsupported-host-capability" | "unsupported-setting"
 export type PackageNotRunningV1 = { kind: string; sourceName: string; reason: NotRunningReasonV1 }
 export type McpConfigLeafV1 =
   | { type: "local"; command: string[]; environment?: Record<string, string>; cwd?: string; timeout?: number; timeouts?: McpTimeouts; forwardEnvironment?: EnvironmentForward[] }
@@ -30,7 +30,7 @@ export type InstallOutcomeV1 =
   | { ok: false; code: "nothing-runnable"; detail: string; notRunning: PackageNotRunningV1[] }
   | { ok: false; code: "unknown-id" | "source-unreachable" | "source-changed" | "invalid-draft" | "not-searched" | "transaction-failed"; detail: string }
 
-const REASONS = new Set<string>(["kind-not-supported-yet", "needs-plugin-files", "unresolved-app-id", "native-js-plugin", "invalid-definition", "missing-entry"])
+const REASONS = new Set<string>(["kind-not-supported-yet", "needs-plugin-files", "unresolved-app-id", "native-js-plugin", "invalid-definition", "missing-entry", "unavailable-trigger", "unsupported-host-capability", "unsupported-setting"])
 
 /** The graph decoder calls this before accepting annotations; no files, values or engine handles cross it. */
 export function validPackageGraphAnnotations(input: PackageGraphAnnotationsV1 | Record<string, unknown>): boolean {

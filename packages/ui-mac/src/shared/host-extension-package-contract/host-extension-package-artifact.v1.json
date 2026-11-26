@@ -1,11 +1,11 @@
 {
   "artifactPath": "packages/ui-mac/src/shared/host-extension-package-contract",
-  "artifactSha256": "682c2da1d414e8618b1797f636c2359182403d94f6ff8d9c0ce32ee83a17408a",
+  "artifactSha256": "9f888f47b5ea890215d694b260067095d55d59925850be3df7133da482a948d7",
   "files": [
     {
-      "bytes": 22668,
+      "bytes": 23231,
       "path": "CONTRACT.md",
-      "sha256": "21c5abb71b7a4245a07a91709c01a44db698d0dd59dbf3263317ebff70cf370e"
+      "sha256": "2ac9aed107e6ad38af96f081ff37a06c2211f64e7a4e61cee5cbccd7283b0353"
     },
     {
       "bytes": 7251,
@@ -18,14 +18,19 @@
       "sha256": "2e50222a6af86ce4e415f63019067d452aa2d5e2cf61c5013f021a3d0ed2a11e"
     },
     {
-      "bytes": 23567,
+      "bytes": 24559,
       "path": "plugin-package.ts",
-      "sha256": "0fec55978d085b5134a644d6d591187c3769ecf59aa70b7ee6151c7075d4755d"
+      "sha256": "a653a8e8ec5dd5809fca61ea3d08260b6e4b915263e839aa0ff675c66a251ede"
     },
     {
-      "bytes": 89757,
+      "bytes": 884,
+      "path": "plugin-hook-events.ts",
+      "sha256": "48a0219dd28692f659d85471a8457491ec602efc56501181ee825944479c44dc"
+    },
+    {
+      "bytes": 93989,
       "path": "plugin-conversion.mjs",
-      "sha256": "b231d9f19353e7907ca4e61ddf4edc0e2eef0a14d16c5a53e76b929a05c89180"
+      "sha256": "4af84699e88868fd8326a5b3b5cf68ec38259a791ad46e1dfe326ffba640be36"
     },
     {
       "bytes": 1962,
@@ -33,9 +38,9 @@
       "sha256": "d48781fd1739e2ce79d91685b53ce77ecedc10b9667254f677ec5806bf46f57e"
     },
     {
-      "bytes": 21158,
+      "bytes": 21185,
       "path": "generate-artifact.ts",
-      "sha256": "3ed54b1822e364b51b711fbd8ef1eb79be8f42ab563e25a6d2e218ae64bcb955"
+      "sha256": "b90cd80d6cdba726c0b4e1d0fdfb460157e6f15565e1b1e395b7cd85b51f8bce"
     },
     {
       "bytes": 2737,
@@ -68,9 +73,9 @@
       "sha256": "4f78b77c5fd575a64cd3ffd5ac0422c47f38b84c15a3a6942b3b30a1d6be9d81"
     },
     {
-      "bytes": 47152,
+      "bytes": 57008,
       "path": "profiles/plugin-package.v1.schema.json",
-      "sha256": "637d269e97d203eebcffe7c2e800ff15f5a532f5f34fd50ef0980c197ef256d8"
+      "sha256": "d174a233d442ba4bed26cb384ef27d7468dedabeff676d8cb07492320dc5372b"
     },
     {
       "bytes": 1550,

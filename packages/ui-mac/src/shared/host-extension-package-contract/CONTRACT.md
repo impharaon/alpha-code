@@ -407,8 +407,9 @@ limits and payload/asset byte caps do not constrain this aggregate description
 or its blobs. The envelope header and network timeout checks still apply. Package paths never become public URL paths.
 
 The root maps to the existing `bundle` ledger kind and owns one tree generation;
-skills refer to their real directories in that tree. Commands, agents and hooks
-can be retained as package content without claiming their runtime is connected.
+skills refer to their real directories in that tree. Commands and agents carry
+Invocation metadata for the host runtime; content retention alone does not
+establish that a runtime entry is active.
 
 Standard plugin definitions use the frozen plugin installation design v3
 contracts (§4.8/4.10/4.13). Source provider selection precedes discovery; root
@@ -420,3 +421,12 @@ MCP names use their original server key, independent of the definition file.
 The desktop allocates host identities once and persists the same mapping in
 its package declarations. Portable HTTP aliases normalize to HTTP; explicit SSE
 remains SSE. Forwarded environment declarations contain names and source only.
+
+
+Hook declarations normalize to a command/prompt union with source order,
+package/skill/agent scope, timeout and failure policy. Command hooks retain
+optional argv and async/rewake fields; prompt hooks retain model hints and
+continue-on-block. Monitor declarations retain their command, description and
+always/skill trigger. `plugin-hook-events.ts` owns the event vocabulary and the
+five specific unavailable-trigger reasons. These normalized definitions do not
+claim that the desktop hook/monitor runtime has been connected.

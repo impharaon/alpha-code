@@ -17,6 +17,7 @@ export const HOST_EXTENSION_PACKAGE_ARTIFACT_FILES = [
   "codepuppy-package-envelope-v1.schema.json",
   "decoder.ts",
   "plugin-package.ts",
+  "plugin-hook-events.ts",
   "plugin-conversion.mjs",
   "plugin-conversion.d.mts",
   "generate-artifact.ts",

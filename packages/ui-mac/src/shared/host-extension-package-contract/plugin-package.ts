@@ -1,3 +1,5 @@
+import { PLUGIN_HOOK_EVENTS } from "./plugin-hook-events"
+export { PLUGIN_HOOK_EVENTS } from "./plugin-hook-events"
 // Default import lets browser consumers prune the unused backend digest validator.
 import crypto from "node:crypto"
 import type { PackagePayloadRefV1 } from "./decoder"
@@ -73,28 +75,19 @@ export type LoginNeed = {
     authorizationServerUrl?: string
   }
 }
-export type HookEvent =
-  | "SessionStart"
-  | "UserPromptSubmit"
-  | "UserPromptExpansion"
-  | "PreToolUse"
-  | "PostToolUse"
-  | "PostToolUseFailure"
-  | "Stop"
-  | "StopFailure"
-  | "PermissionRequest"
+export type HookEvent = typeof PLUGIN_HOOK_EVENTS[number]
 export type Hook = {
   event: HookEvent
   matcher?: string
   if?: string
-  command: Text
   timeoutSeconds: number
-  async: boolean
-  asyncRewake: boolean
   onFailure: "continue" | "block"
   order: number
   scope: { kind: "package" } | { kind: "skill" | "agent"; entryId: string }
-}
+} & (
+  | { type: "command"; command: Text; args?: Text[]; async: boolean; asyncRewake: boolean }
+  | { type: "prompt"; prompt: Text; model?: ModelHint; continueOnBlock: boolean }
+)
 type EntryBase = { id: string; sourcePath: RelPath; sourceName: string }
 export type Entry = EntryBase &
   (
@@ -129,11 +122,12 @@ export type Entry = EntryBase &
         oauth?: false | LoginNeed
       }
     | { kind: "hook"; hook: Hook }
+    | { kind: "monitor"; command: Text; description: string; when: { kind: "always" } | { kind: "skill"; sourceName: string } }
   )
 export type Diagnostic = {
   path: RelPath
   field?: string
-  code: "invalid-definition" | "missing-entry" | "unresolved-app-id" | "native-js-plugin"
+  code: "invalid-definition" | "missing-entry" | "unresolved-app-id" | "native-js-plugin" | "unavailable-trigger" | "unsupported-host-capability" | "unsupported-setting"
   sourceName?: string
   message: string
 }
@@ -332,7 +326,7 @@ export function validPluginPackage(value: unknown): value is PluginPackage {
         optionalString(item.field) &&
         optionalString(item.sourceName) &&
         typeof item.message === "string" &&
-        ["invalid-definition", "missing-entry", "unresolved-app-id", "native-js-plugin"].includes(String(item.code)),
+        ["invalid-definition", "missing-entry", "unresolved-app-id", "native-js-plugin", "unavailable-trigger", "unsupported-host-capability", "unsupported-setting"].includes(String(item.code)),
     )
   )
 }
@@ -420,48 +414,16 @@ function validEntry(value: unknown): value is Entry {
               optionalString(value.oauth.oauth.authorizationServerUrl)))))
     )
   }
+  if (value.kind === "monitor") return keys(value, [...base, "command", "description", "when"]) && text(value.command) && typeof value.description === "string" && object(value.when) && (value.when.kind === "always" && keys(value.when, ["kind"]) || value.when.kind === "skill" && keys(value.when, ["kind", "sourceName"]) && typeof value.when.sourceName === "string")
   if (value.kind !== "hook" || !keys(value, [...base, "hook"]) || !object(value.hook)) return false
   const hook = value.hook
-  return (
-    keys(hook, [
-      "event",
-      "matcher",
-      "if",
-      "command",
-      "timeoutSeconds",
-      "async",
-      "asyncRewake",
-      "onFailure",
-      "order",
-      "scope",
-    ]) &&
-    [
-      "SessionStart",
-      "UserPromptSubmit",
-      "UserPromptExpansion",
-      "PreToolUse",
-      "PostToolUse",
-      "PostToolUseFailure",
-      "Stop",
-      "StopFailure",
-      "PermissionRequest",
-    ].includes(String(hook.event)) &&
-    optionalString(hook.matcher) &&
-    optionalString(hook.if) &&
-    text(hook.command) &&
-    typeof hook.timeoutSeconds === "number" &&
-    Number.isFinite(hook.timeoutSeconds) &&
-    hook.timeoutSeconds >= 0 &&
-    typeof hook.async === "boolean" &&
-    typeof hook.asyncRewake === "boolean" &&
-    (hook.onFailure === "continue" || hook.onFailure === "block") &&
-    Number.isSafeInteger(hook.order) &&
-    object(hook.scope) &&
-    ((hook.scope.kind === "package" && keys(hook.scope, ["kind"])) ||
-      (["skill", "agent"].includes(String(hook.scope.kind)) &&
-        keys(hook.scope, ["kind", "entryId"]) &&
-        typeof hook.scope.entryId === "string"))
-  )
+  return keys(hook, ["event", "matcher", "if", "type", "command", "args", "prompt", "model", "continueOnBlock", "timeoutSeconds", "async", "asyncRewake", "onFailure", "order", "scope"]) &&
+    (PLUGIN_HOOK_EVENTS as readonly string[]).includes(String(hook.event)) && optionalString(hook.matcher) && optionalString(hook.if) &&
+    typeof hook.timeoutSeconds === "number" && Number.isFinite(hook.timeoutSeconds) && hook.timeoutSeconds > 0 &&
+    (hook.onFailure === "continue" || hook.onFailure === "block") && Number.isSafeInteger(hook.order) && Number(hook.order) >= 0 &&
+    object(hook.scope) && (hook.scope.kind === "package" && keys(hook.scope, ["kind"]) || ["skill", "agent"].includes(String(hook.scope.kind)) && keys(hook.scope, ["kind", "entryId"]) && typeof hook.scope.entryId === "string") &&
+    (hook.type === "command" && text(hook.command) && (hook.args === undefined || Array.isArray(hook.args) && hook.args.every(text)) && typeof hook.async === "boolean" && typeof hook.asyncRewake === "boolean" && hook.prompt === undefined && hook.model === undefined && hook.continueOnBlock === undefined ||
+     hook.type === "prompt" && text(hook.prompt) && (hook.model === undefined || modelHint(hook.model)) && typeof hook.continueOnBlock === "boolean" && hook.command === undefined && hook.args === undefined && hook.async === undefined && hook.asyncRewake === undefined)
 }
 function invocation(value: unknown): boolean {
   if (
@@ -492,12 +454,7 @@ function invocation(value: unknown): boolean {
   return (
     optionalString(value.argumentHint) &&
     optionalString(value.agent) &&
-    (value.model === undefined ||
-      (object(value.model) &&
-        ((keys(value.model, ["alias"]) && typeof value.model.alias === "string") ||
-          (keys(value.model, ["providerID", "modelID"]) &&
-            typeof value.model.providerID === "string" &&
-            typeof value.model.modelID === "string")))) &&
+    (value.model === undefined || modelHint(value.model)) &&
     typeof value.fork === "boolean" &&
     typeof value.userInvocable === "boolean" &&
     typeof value.implicitInvocation === "boolean" &&
@@ -560,3 +517,5 @@ export function pluginText(value: string): Text {
 export function pluginPathBinding(value: string): "pluginRoot" | "skillDir" | "projectDir" | "pluginData" | undefined {
   return value === "CLAUDE_PLUGIN_ROOT" || value === "PLUGIN_ROOT" ? "pluginRoot" : value === "CLAUDE_SKILL_DIR" ? "skillDir" : value === "CLAUDE_PROJECT_DIR" ? "projectDir" : value === "CLAUDE_PLUGIN_DATA" || value === "PLUGIN_DATA" ? "pluginData" : undefined
 }
+
+function modelHint(value: unknown): value is ModelHint { return object(value) && (keys(value, ["alias"]) && typeof value.alias === "string" || keys(value, ["providerID", "modelID"]) && typeof value.providerID === "string" && typeof value.modelID === "string") }

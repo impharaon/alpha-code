@@ -814,3 +814,40 @@ r7 收口静态证据（2026-11-26 18:56，约 14 分钟）：UI/Ext 包内 bun 
 
 
 r8 orchestrator ruling 2026-11-27（Claude Opus 5.5）：接受 R5-ROOT，bundle 与 r6 command/agent 同属允许集域扩展；同原 root/effect/claim 算法，无新字段、UI 行或事务合同。设计 §10 镜像由编排器处理。新红测先独立提交，global enabled/disabled/project-enabled 与 scoped 解码两文件各 0 pass / 1 fail；原有精确 keys/scoped 断言随新根成员同步，旧“非投影”样本改用 cloud，不放宽比较。
+
+### r8 已完成边界与 S-01 绑定接缝（2026-11-26）
+
+r8 从 18:58（UTC+08:00）继续 IMPLEMENT。R5-ROOT 已由 0d7703948c 红测、eae36414a9 实现并登记，`a bundle-only package projects enabled disabled and project-enabled root membership` 与 `bundle root membership decodes without enabling its same-named instructions` 覆盖 global enabled、disabled、project-enabled 及 kind 隔离。原 receipt 文件 71 pass、scope 文件 40 pass。安装消费者两条旧精确 scoped 断言补上 bundle 根，原项目目录和 MCP 全局 disabled 断言保留。
+
+共享转换步骤由 cb77b1f354 的真实声明红测（0 pass / 1 fail）推进：command/prompt union、exec argv、package/skill/agent scope、事件名、源顺序、五项无时机原因、monitor 的 always/skill 触发进入同一严格模型/schema。4761803747 的 Convex 双 manifest 受控变体先红（预期 6，实际 5），修正后保留次要来源独有项、同名主来源覆盖。pure `plugin-hook-events.ts` 为事件元数据唯一来源，生成 artifact 由 19 增至 20 文件；renderer 只复用现有 notRunning 展示逐项原因，没有 bundle 行或新交互。此步不报 connected、不启动 hook/monitor。
+
+**SEAM-CHANGE-NEEDED: S-01 的安全 shell command 绑定结果。** 当前冻结 `PreparedInstruction` 仅含 parts/syntax/rawArguments/arguments/cwd，renderer 返回指令字符串（`packages/plugin/src/codepuppy-package-runtime.ts:5`）。core 的同一 renderer 在 `config/plugin/command.ts:260` 仅对静态 shell 节点引用 boundValue；普通文本直接插入。`:287–292` 的 shell 节点则立即调用 AppProcess.run，并固定 stdin=ignore，返回 stdout，不给 ext 安全绑定后的待执行 command。D13 的 hook stdin、timeout、取消与 monitor 流式归属不能由这个返回值表达；不能复制 quote/parser 到 ext、先执行再包装或把绑定值当 source。
+
+一次性 core 探针在原 command 测试中运行后已恢复（`/tmp/plugin-standard-r8-shell-port-probe.log`，1 pass / 2 assertions）：source `printf '<%s>' ` 加 boundValue `two words; $(printf SHOULD_STAY_DATA)` 以 literal 渲染时返回未引用命令字符串；静态 Claude shell 节点则安全执行，返回 `<two words; $(printf SHOULD_STAY_DATA)>`。这只执行本车道 printf，不运行外部插件/凭据。现有 AppProcess 已有 stdin、AbortSignal、timeout 和进程组清理，不缺另一套 OS 执行器；缺口只在 source/value 安全绑定与当前 ShellSelect 的结果交接。
+
+提交给编排器的最小增量：让 core 同一 renderer 提供**仅绑定、不执行**的 shell command 目标，输入保留原 source/boundValue 节点，输出当前 shell 的 executable/argv；ext 再消费现有 AppProcess 的 stdin/env/timeout/cancel/stream。请裁定该 typed target/反向端口的精确合同并登记 S-01 增量；本轮没有自行增加冻结签名或 engine takeover。该共同边界阻断第 3–5 步进程及运行接线，不能把转换通过视作整片 DONE。
+
+实样一次性 artifact 检查：`bun /tmp/plugin-standard-r8-contract-probe.ts` exit 0，以下十包的 normalized description 同时通过 `validPluginPackage` 与现有 Ajv2020 profile schema；只检查归一化，不执行样本源码。完整捕获来自兼容报告固定 commit，新增八包及 Langfuse 完整树字节/模式记入同一 provenance/archive；此前 Langfuse fixture 只有入口控制文件，本轮扩到同 commit 的 67 文件。
+
+| 实样 | 归一化 hooks / monitors | 运行结论 |
+| --- | --- | --- |
+| learning-output-style | 1 / 0 | 未接 runtime |
+| hookify | 4 / 0 | 未接 runtime |
+| ralph-loop | 1 / 0 | Stop 循环未执行 |
+| code-modernization | 6 / 0 | 原 commands/modernize.md 无效 YAML、Claude UI modules 各保留诊断 |
+| claude-security | 9 / 0（含 skill scope 1） | Claude UI modules 诊断；hook 未执行 |
+| Langfuse | 2 / 0 | Stop/SessionEnd 未执行 |
+| dash0 | 24 / 0 | 五项 unavailable-trigger 有具体原因，其余尚未接时机 |
+| Stripe | 7 / 0 | exec argv/PostToolBatch 未运行 |
+| PayPal | 1 prompt / 0 | 拒绝决定未运行 |
+| Convex | 4 / 5 | design 2、quickstart 3，仅保留触发声明 |
+
+AC 证据范围：AC-11/15 的解析与包作用域、AC-22 的解析/五项原因、AC-23 的 exec 声明、AC-24 prompt 声明、AC-30 monitor 声明已具名测试；这些 AC 的运行行为与 AC-03/13/14/20/25 的进程行为均未完成。继承片 3/4 的 accepted 收据，不重复声称其运行证据覆盖 hooks。
+
+当前相关文件绿集合：UI 四个 converter/artifact/envelope/presentation 文件 164 pass（`/tmp/plugin-standard-r8-conversion-final-2.log`）；main 八个具名相关文件 229 pass（原 related-ui 227 pass/2 fail 的 install 文件经精确 bundle 同步后完整 45 pass，未重跑其余未改七文件）；Ext scope/host/registry/transforms 四文件 129 pass（`/tmp/plugin-standard-r8-related-ext.log`），合计 **522 pass / 0 fail**，不累加重跑。UI 包内 `bun typecheck` exit 0；converter/artifact --check 均 exit 0（20 files）。未运行全包/全层、bin/check、gate run 或 timing/scale。
+
+同链文件偏离：计划的 model.ts/schema.ts 实际权威为现有 `plugin-package.ts`/profile JSON；新增纯事件模块随唯一 generator 清单发布。`shared/plugin-install.ts` 的原因域与 `package-admission.ts` 共享类型、renderer/i18n 及现有 presentation test 为同一诊断输出必要消费者；install-from-source.test.ts 为 bundle 新行为精确同步。没有新依赖/配置/公开 DTO 字段。剩余 runtime 模块没有先造空壳。
+
+遗留去向：`packages/codepuppy-contracts-consumer/src/extension-package-artifact.test.ts:120` 的 live host ↔ alpha-web 已发布副本一致性为 **6 pass / 1 fail**（`/tmp/plugin-standard-r8-consumer.log`）；r7 accepted artifact 文件 SHA256=2be185a9426e76cb0ed52172ee2c59d9ed0875fdaca2f2ed3ba637a70b2afc9c，vendor 文件 SHA256=2d3b783ece9c7d59c465b2108b80202aea78941aa1ec21f75e894a61ef218a97，r8 前已不相同。交编排器已指定 alpha-web 发布/re-vendor，保留断言/真实 pin，不在本仓伪造外仓发布物。三条 core 旧断言与 docs 基线继承，不重新调查。已核 Codex（GPT-6）；OPTIONAL 无。
+
+本次共享转换提交前：单仓 docs-contract（实际 worktree，changed-since=origin/alpha）71 errors / 250 warnings，与 r7 相同；两条已接受 plan unknown-id 未改。日志 `/tmp/plugin-standard-r8-docs-final.json`。git diff --check exit 0；所有生成物检查与 UI typecheck 通过。

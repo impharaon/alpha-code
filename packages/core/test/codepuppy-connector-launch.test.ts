@@ -1836,3 +1836,19 @@ test("preparation failures retry only concrete transport and temporary HTTP evid
     expect(classifyStartFailure(undefined, { type: "local" }, { preparation: { stderr } }).failure?.kind).toBe(kind)
   }
 })
+
+// Integration layer, affected PR/nightly. Isolate the process-global Host; the real
+// preparation transaction uses npm Config/content/capture/binding and Location IO.
+async function preparationTransaction(scenario: string) {
+  const input = npmSourceFixture()
+  const child = Bun.spawn([process.execPath, new URL("./fixture/connector-preparation.ts", import.meta.url).pathname, JSON.stringify({ root: input.root, scenario, launchers: input.launchers, version: input.version, source: path.join(input.prefix, "node_modules/semver") })], { stdout: "pipe", stderr: "pipe" })
+  const [code, stdout, stderr] = await Promise.all([child.exited, new Response(child.stdout).text(), new Response(child.stderr).text()])
+  expect({ code, stderr }).toEqual({ code: 0, stderr: "" })
+  return JSON.parse(stdout) as { cached?: boolean; merged?: boolean; cancelled?: boolean; recovered?: boolean; installCount: number; downloads: number; pythonInstalls: number; failure?: { kind: string; host?: string; port?: number }; progress: Record<string, number>; begun: string[]; ended: string[] }
+}
+
+test("connector preparation repairs missing Python and a damaged standard library", async () => {
+  for (const scenario of ["damaged-python", "damaged-stdlib"]) {
+    expect(await preparationTransaction(scenario)).toMatchObject({ cached: true, pythonInstalls: 1, downloads: 1, installCount: 1 })
+  }
+})

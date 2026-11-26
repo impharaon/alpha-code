@@ -771,3 +771,5 @@ prepareConnectorLaunch 的 frozen 输入/返回现已定义并组合：先依赖
 - 风险：Host进程内仅发布一次，常驻测试用独立子进程避免污染其它模块；外部格式沿真实samples，受控故障只发生在应用自有进程/Host边界。私有来源的认证不写key/ready；缓存不跨权限凭据复用未授权内容。取消必须在锁释放前结束子进程，并保证晚到progress/结果不重新spawn。
 - 证明：AC-02/04/05→真实UV全prepare及Python缺损恢复；AC-06→总入口各等待者阶段/字节/真实活动；AC-07→一次瞬时恢复、确定故障不重试、egress精确identity/目标；AC-08→失败原文沿既有诊断生产；AC-10→有效ready快路径和远端源离线重启。组件/集成层只运行受影响命名例，阶段结束完整本文件一次，最终相关消费者一次；移除对应行为应使命名证据失败。
 - #1759接口与待接生产点沿r8准确表，最终只读复核；不复制位置/最终绑定authority。偏离随实现提交记录。
+
+r9 Python红先：真实 pinned uv 在移走已安装解释器的可执行文件后，`gate slot -- bun /tmp/connector-r5-npm-proof/python-damage-r9.ts` exit0，但 stdout收据为 install exit0 / `Python 3.12.16 is already installed` / restored=false（`/tmp/connector-r9-python-damage-real.log`）；探针finally已恢复自己移走的文件。新增既有测试 `connector preparation repairs missing Python and a damaged standard library`，真实Location/总入口、受控Python安装边界重放此事实，命名运行0 PASS/1 FAIL（`/tmp/connector-r9-python-red.log`），未修改产品代码。fixture/connector-preparation.ts为进程隔离Host及确定故障/真实子进程生命周期装配，输入是本模块自有契约和已有真实npm样本，不手写npm/UV输出格式。一次写fixture命令cwd误设core而路径仍含packages/core，写入未发生；随后在worktree根正确写入并运行命名例。

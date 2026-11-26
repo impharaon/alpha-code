@@ -234,8 +234,8 @@ describe("#681 生产 wiring:models-catalog IPC 经真实目录 decoder(`#1556` 
     expect(after.pricingBasisModelId).toBe("deepseek-v4-flash")
     expect(after.liveSync.status).toBe("live")
     const rows = new Map(after.platformModels.map((model) => [model.id, model]))
-    expect(rows.size).toBe(12)
-    expect(rows.get("claude-fable-5")!.pricing).toEqual({ input: 71.4, output: 178.6 })
+    expect(rows.size).toBe(17)
+    expect(rows.get("claude-fable-5.2")!.pricing).toEqual({ input: 26.7, output: 33.3 })
     expect(rows.get("deepseek-v4-flash")!.pricing).toEqual({ input: 1, output: 1 })
     // 双倍数没有被折叠成一个 scalar。
     expect(after.platformModels.some((m) => m.pricing!.input !== m.pricing!.output)).toBe(true)
@@ -292,9 +292,9 @@ describe("#681 生产 wiring:models-catalog IPC 经真实目录 decoder(`#1556` 
 
     const catalog = invokeCatalog()
     expect(catalog.pricingBasisModelId).toBe("deepseek-v4-flash")
-    expect(catalog.platformModels.find((m) => m.id === "claude-sonnet-5")!.pricing).toEqual({
-      input: 21.4,
-      output: 53.6,
+    expect(catalog.platformModels.find((m) => m.id === "claude-sonnet-5.5")!.pricing).toEqual({
+      input: 6.7,
+      output: 8.3,
     })
   })
 })
@@ -304,7 +304,7 @@ describe("#681 反分叉:sidecar 引擎配置与 IPC 投影是同一份投影", 
     stubFetch(catalogV3())
     await refreshThenFork()
     expect(engineModelIds()).toEqual(invokeCatalog().platformModels.map((m) => m.id))
-    expect(engineModelIds().length).toBe(12)
+    expect(engineModelIds().length).toBe(17)
   })
 
   test("退化态「合法但空的响应」:两侧仍逐项相等(`#1556`:两侧同为空,不回退随包清单)", async () => {
@@ -329,7 +329,7 @@ describe("#681 反分叉:sidecar 引擎配置与 IPC 投影是同一份投影", 
     const models = (buildCodePuppyModelConfig(userData, PLATFORM)!.provider.codepuppy as any).models
     expect(Object.values(models).every((m: any) => m.pricing === undefined)).toBe(true)
     // 但 variants 仍随投影下发(REQ-029 不能被本次切换弄丢)。
-    expect(models["claude-opus-4.8"].variants["高"]).toEqual({ reasoning: { effort: "high" } })
+    expect(models["claude-opus-5.5"].variants["高"]).toEqual({ reasoning: { effort: "high" } })
   })
 })
 
@@ -415,9 +415,9 @@ describe("#1500 真实 HTTP 超时的后台补试与状态仲裁", () => {
     expect(requests).toEqual(["GET", "GET"])
     expect(invokeCatalog().liveSync.status).toBe("live")
     expect(invokeCatalog().pricingBasisModelId).toBe("deepseek-v4-flash")
-    expect(invokeCatalog().platformModels.find((model) => model.id === "claude-fable-5")?.pricing).toEqual({
-      input: 71.4,
-      output: 178.6,
+    expect(invokeCatalog().platformModels.find((model) => model.id === "claude-fable-5.2")?.pricing).toEqual({
+      input: 26.7,
+      output: 33.3,
     })
     expect(invokeRefreshHealth()).toBeNull()
     expect(lastPush()).toBeNull()
@@ -479,7 +479,7 @@ describe("#1500 真实 HTTP 超时的后台补试与状态仲裁", () => {
     await waitFor(() => answered === requests.length)
     expect(requests).toEqual(["GET", "GET"])
     expect(readFileSync(liveAllowlistPath(userData)).equals(bytes)).toBe(true)
-    expect(invokeCatalog().platformModels).toHaveLength(12)
+    expect(invokeCatalog().platformModels).toHaveLength(17)
     expect(invokeCatalog().byokProviders).toEqual(byok)
     expect(byok.length).toBeGreaterThan(0)
     expect(byok.every((provider) => provider.models.length > 0)).toBe(true)

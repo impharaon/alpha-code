@@ -101,7 +101,9 @@ export type LedgerPageV1 = { schema_version: 1; transactions: LedgerEntryV1[] }
 // `#1556` / platform#559: V3 adds the required `display` (name / brand / capabilities, owned by the
 // gateway registry) and drops `byok_providers`.
 export type ModelVariants = Record<string, { reasoningEffort?: string; reasoning?: Record<string, unknown>; thinking?: Record<string, unknown> }>
-export type ModelBrandV1 = "anthropic" | "openai" | "deepseek" | "zhipu" | "qwen" | "moonshot" | "minimax"
+// #1754: the vendor is an open string (1–64 chars, `^[a-z0-9][a-z0-9-]*$`, enforced by the schema); the
+// desktop only owns which vendors get a dedicated icon (ui-mac model-picker-core `BRAND_ICONS`).
+export type ModelBrandV1 = string
 export type ModelCatalogV3 = {
   schema_version: 3
   object: "list"

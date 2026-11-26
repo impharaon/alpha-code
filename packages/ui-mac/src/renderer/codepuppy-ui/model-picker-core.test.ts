@@ -13,9 +13,12 @@ import {
   pricingStatusText,
   withModelVariant,
 } from "./model-picker-core"
-import { V3_PRODUCER_CATALOG } from "../../../test-component/effective-catalog.fixture"
-
-import { effectiveCatalogFixture } from "../../../test-component/effective-catalog.fixture"
+import { projectPlatformModels } from "../../main/codepuppy-live-allowlist"
+import {
+  effectiveCatalogFixture,
+  v3Snapshot,
+  V3_PRODUCER_CATALOG,
+} from "../../../test-component/effective-catalog.fixture"
 
 // `#1556`:已应用目录 = 上游 V3 producer 快照(平台段)+ 随包首启引导(BYOK 段),经生产投影装配。
 const catalog = effectiveCatalogFixture()
@@ -73,7 +76,7 @@ describe("已应用目录 → picker 两组", () => {
     expect(platform.filter((row) => row.reasoning).map((row) => row.model.id)).toEqual(
       catalog.platformModels.filter((model) => model.reasoning).map((model) => model.id),
     )
-    expect(platform.find((row) => row.model.id === "glm-5.2")?.reasoning).toBe(true)
+    expect(platform.find((row) => row.model.id === "glm-5.3")?.reasoning).toBe(true)
     const deepseek = actual.filter((row) => row.model.providerID === byokEngineId("deepseek"))
     expect(deepseek.find((row) => row.model.id === "deepseek-v4-pro")?.reasoning).toBe(true)
     expect(deepseek.find((row) => row.model.id === "deepseek-flash")?.reasoning).toBe(false)
@@ -85,7 +88,7 @@ describe("已应用目录 → picker 两组", () => {
     const byok = actual.filter((row) => row.group === "byok")
 
     expect(platform.map((row) => row.model.id)).toEqual(catalog.platformModels.map((model) => model.id))
-    expect(platform.find((row) => row.model.id === "claude-opus-4.8")?.model.variants).toEqual(["低", "中", "高"])
+    expect(platform.find((row) => row.model.id === "claude-opus-5.5")?.model.variants).toEqual(["低", "中", "高"])
     expect(byok.filter((row) => row.model.providerID === byokEngineId("deepseek")).map((row) => row.model.id)).toEqual(
       catalog.byokProviders.find((provider) => provider.id === "deepseek")?.models ?? [],
     )
@@ -96,9 +99,9 @@ describe("已应用目录 → picker 两组", () => {
 
   test("disabled/deprecated 与需 KEY 都按真实状态禁用或引导", () => {
     const disabled = rows({
-      models: platformModels.map((model) => (model.id === "claude-opus-4.8" ? { ...model, enabled: false } : model)),
+      models: platformModels.map((model) => (model.id === "claude-opus-5.5" ? { ...model, enabled: false } : model)),
     })
-    expect(disabled.find((row) => row.model.id === "claude-opus-4.8")?.availability).toBe("unavailable")
+    expect(disabled.find((row) => row.model.id === "claude-opus-5.5")?.availability).toBe("unavailable")
 
     const loggedOut = rows({ accountState: "out", keyStatus: {} })
     expect(loggedOut.filter((row) => row.group === "platform")).toEqual([])
@@ -230,9 +233,9 @@ describe("BYOK 行的推理档位只从 BYOK 目录派生(#1266 / #1267 / `#1556
 
 describe("Model.Ref 统一与 session 真值投影", () => {
   test("上游 session ref 覆盖 UI 旧投影，variant 与 id/providerID 不拆成两份", () => {
-    const upstream = { providerID: "codepuppy", id: "claude-opus-4.8", variant: "高" }
+    const upstream = { providerID: "codepuppy", id: "claude-opus-5.5", variant: "高" }
     const projected = composerModelFromRef(upstream, catalog)
-    expect(projected).toMatchObject({ ...upstream, name: "Claude Opus 4.8", variants: ["低", "中", "高"] })
+    expect(projected).toMatchObject({ ...upstream, name: "Claude Opus 5.5", variants: ["低", "中", "高"] })
     expect(modelRefOf(projected)).toEqual(upstream)
     expect(withModelVariant(projected, "低")).toMatchObject({
       id: upstream.id,
@@ -336,16 +339,14 @@ describe("BYOK 可选择性脱离登录 / 平台 / 引擎清单(#595)", () => {
 // ── REQ-127 #679:计价倍数是平台的,选择器只呈现,不发明 ─────────────────────────────────────
 // 删掉的是本地那套写死档位(标准/高级/旗舰 → ×1/×3/×8)。它同时错两次:①对已收录的模型给的是
 // 一个与真实倍数无关的数;②对平台刚上线、本地还没收录的模型一律合成最便宜的一档。真实差距是
-// claude-fable-5 的 输入 71.4× / 输出 178.6×,而它当时显示「标准 ×1」。
+// claude-fable 的 输入 71.4× / 输出 178.6×(当时的 claude-fable-5),而它当时显示「标准 ×1」;现役清单里同一行是 claude-fable-5.2,倍数取自 producer fixture。
 describe("#679 平台计价二态:要么两个真倍数,要么明说不可用", () => {
   /** 带远端 pair 的目录:一个本地收录的模型 + 一个本地快照根本没听说过的模型。 */
   const priced = {
     ...catalog,
     pricingBasisModelId: "deepseek-v4-flash",
     platformModels: [
-      ...catalog.platformModels.map((model) =>
-        model.id === "claude-fable-5" ? { ...model, pricing: { input: 71.4, output: 178.6 } } : model,
-      ),
+      ...catalog.platformModels,
       { id: "future-model-9", name: "future-model-9", pricing: { input: 2.5, output: 7.5 } },
       { id: "unit-model", name: "Unit", pricing: { input: 1, output: 1 } },
     ],
@@ -363,8 +364,8 @@ describe("#679 平台计价二态:要么两个真倍数,要么明说不可用", 
     pricedRows(over).find((row) => row.group === "platform" && row.model.id === id)!
 
   test("平台行原样带上双倍数,且行上不留任何本地档位字段", () => {
-    const fable = rowOf("claude-fable-5")
-    expect(fable.pricing).toEqual({ input: 71.4, output: 178.6 })
+    const fable = rowOf("claude-fable-5.2")
+    expect(fable.pricing).toEqual({ input: 26.7, output: 33.3 })
     // 本地快照没收录的线上模型:pair 照样是平台原值,**不合成、不 1×**。
     expect(rowOf("future-model-9").pricing).toEqual({ input: 2.5, output: 7.5 })
     // 结构级:行上不能再冒出任何档位轴 —— 有的话下一次就会有人拿它算价。
@@ -375,16 +376,16 @@ describe("#679 平台计价二态:要么两个真倍数,要么明说不可用", 
   })
 
   test("文案是两个倍数、两种语言都是,而且 1 渲染成 1.0(不折叠、不省略)", () => {
-    const fable = rowOf("claude-fable-5")
+    const fable = rowOf("claude-fable-5.2")
     const unit = rowOf("unit-model")
     try {
       setLocale("zh")
-      expect(pricingStatusText(fable)).toBe("输入 71.4× · 输出 178.6×")
+      expect(pricingStatusText(fable)).toBe("输入 26.7× · 输出 33.3×")
       // 折叠成单一 scalar 对至少一侧必然错 —— 两个数必须都在。
-      expect(pricingStatusText(fable)).toContain("178.6")
+      expect(pricingStatusText(fable)).toContain("33.3")
       expect(pricingStatusText(unit)).toBe("输入 1.0× · 输出 1.0×")
       setLocale("en")
-      expect(pricingStatusText(fable)).toBe("In 71.4× · Out 178.6×")
+      expect(pricingStatusText(fable)).toBe("In 26.7× · Out 33.3×")
       expect(pricingStatusText(unit)).toBe("In 1.0× · Out 1.0×")
     } finally {
       setLocale("zh")
@@ -448,7 +449,7 @@ describe("#679 平台计价二态:要么两个真倍数,要么明说不可用", 
         expect(row.reason, `${accountState} ${row.model.id}`).toBeTruthy()
         expect(pricingStatusText(row), `${accountState} ${row.model.id}`).not.toBeNull()
       }
-      expect(pricingStatusText(platform.find((row) => row.model.id === "claude-fable-5")!)).toContain("178.6")
+      expect(pricingStatusText(platform.find((row) => row.model.id === "claude-fable-5.2")!)).toContain("33.3")
     }
     // 引擎侧的失败态同理。
     for (const listState of ["loading", "recovering", "failed"] as const) {
@@ -464,16 +465,16 @@ describe("#679 平台计价二态:要么两个真倍数,要么明说不可用", 
 // alpha-code#1558(方案 req236 §2.6 / I7):行首图标按模型真实品牌出图。
 describe("品牌图标:品牌从目录来,经固定映射落到现有图标集(#1558)", () => {
   test("AC1 平台行品牌取已应用快照的 display.brand,不取路由腿 provider:经 openrouter 路由的 qwen 行仍是 qwen", () => {
-    const qwenRoute = V3_PRODUCER_CATALOG.data.find((row) => row.id === "qwen3.7-max")!
+    const qwenRoute = V3_PRODUCER_CATALOG.data.find((row) => row.id === "qwen4-max")!
     expect(qwenRoute.provider).toBe("openrouter") // 前提:上游 fixture 里这一行确实经 OpenRouter 路由
     const platform = rows().filter((row) => row.group === "platform")
     expect(platform.map((row) => [row.model.id, row.brand])).toEqual(
       V3_PRODUCER_CATALOG.data.map((row) => [row.id, row.display.brand]),
     )
-    const qwen = platform.find((row) => row.model.id === "qwen3.7-max")!
+    const qwen = platform.find((row) => row.model.id === "qwen4-max")!
     expect(qwen.brand).toBe("qwen")
     expect(brandIconId(qwen.brand)).toBe("alibaba")
-    expect(brandIconId(platform.find((row) => row.model.id === "claude-opus-4.8")!.brand)).toBe("anthropic")
+    expect(brandIconId(platform.find((row) => row.model.id === "claude-opus-5.5")!.brand)).toBe("anthropic")
   })
 
   test("AC2 BYOK 行品牌取 BYOK 目录 provider 的 brand(可选行、需 KEY 行、KEY 状态未知行同源)", () => {
@@ -509,7 +510,7 @@ describe("品牌图标:品牌从目录来,经固定映射落到现有图标集(#
     }
   })
 
-  test("AC3 品牌 → 图标是固定七项映射,全部落在上游图标集里;表外品牌(即使图标集里恰好有同名图形)回落通用图形", () => {
+  test("AC3 品牌 → 图标是固定八项映射,全部落在上游图标集里;表外品牌(即使图标集里恰好有同名图形)回落通用图形", () => {
     const table = {
       anthropic: "anthropic",
       openai: "openai",
@@ -518,24 +519,51 @@ describe("品牌图标:品牌从目录来,经固定映射落到现有图标集(#
       qwen: "alibaba",
       moonshot: "moonshotai",
       minimax: "minimax",
+      google: "google",
     }
     for (const [brand, icon] of Object.entries(table)) {
       expect(brandIconId(brand), brand).toBe(icon)
       expect(iconNames as readonly string[], icon).toContain(icon) // 不新增图形资源:只用已有 sprite id
     }
     expect(iconNames as readonly string[]).toContain("synthetic")
-    expect(iconNames as readonly string[]).toContain("google")
-    for (const outside of ["google", "openrouter", "zhipuai", "alibaba", "constructor", "", undefined]) {
+    expect(iconNames as readonly string[]).toContain("openrouter")
+    for (const outside of ["some-new-vendor", "openrouter", "zhipuai", "alibaba", "constructor", "", undefined]) {
       expect(brandIconId(outside), String(outside)).toBe("synthetic")
     }
   })
 
+  // 厂商是开放字符串。picker 实际渲染的投影(projectPlatformModels → buildModelPickerRows)
+  // 对含 `google` 与表外新厂商的目录,行品牌原样保留,图标分别是 Google 的与通用的。
+  test("含 google 与表外新厂商的平台目录:行品牌原样保留,google 出 Google 图标、新厂商出通用图形", () => {
+    const base = v3Snapshot()
+    const models = base.models.map((model, index) => ({
+      ...model,
+      display: { ...model.display, brand: index === 0 ? "google" : index === 1 ? "some-new-vendor" : model.display.brand },
+    }))
+    const platformModels = projectPlatformModels({ ...base, models })
+    const open = { ...catalog, platformModels }
+    const actual = buildModelPickerRows({
+      catalog: open,
+      models: platformModels.map((model) => info(catalog.platformProvider.id, model.id)),
+      listState: "ready",
+      keyStatusState: "ready",
+      keyStatus: keys,
+      accountState: "member",
+      sessionScoped: false,
+      query: "",
+    }).filter((row) => row.group === "platform")
+    expect(actual.map((row) => row.brand).slice(0, 2)).toEqual(["google", "some-new-vendor"])
+    expect(brandIconId(actual[0]!.brand)).toBe("google")
+    expect(brandIconId(actual[1]!.brand)).toBe("synthetic")
+    expect(modelBrandOf({ providerID: catalog.platformProvider.id, id: platformModels[0]!.id }, open)).toBe("google")
+  })
+
   test("AC4 模型按钮的品牌与行同源:平台 / 直连 BYOK 取目录品牌,自定义节点 / 未选 / 目录未到为中性", () => {
-    expect(modelBrandOf({ providerID: catalog.platformProvider.id, id: "qwen3.7-max" }, catalog)).toBe("qwen")
+    expect(modelBrandOf({ providerID: catalog.platformProvider.id, id: "qwen4-max" }, catalog)).toBe("qwen")
     expect(modelBrandOf({ providerID: byokEngineId("zhipuai"), id: "glm-5.2" }, catalog)).toBe("zhipu")
     expect(modelBrandOf({ providerID: "office-gateway", id: "qwen2.5-72b-instruct" }, catalog)).toBeUndefined()
     expect(modelBrandOf({ providerID: "zhipuai", id: "glm-5.2" }, catalog)).toBeUndefined()
     expect(modelBrandOf(null, catalog)).toBeUndefined()
-    expect(modelBrandOf({ providerID: catalog.platformProvider.id, id: "qwen3.7-max" }, null)).toBeUndefined()
+    expect(modelBrandOf({ providerID: catalog.platformProvider.id, id: "qwen4-max" }, null)).toBeUndefined()
   })
 })

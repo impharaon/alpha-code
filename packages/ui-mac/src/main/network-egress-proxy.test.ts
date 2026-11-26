@@ -1,3 +1,4 @@
+import { testEgressDial } from "../../test-component/egress-upstream-fixture"
 // REQ-137 (`#1336`) · AC2 全部 + AC1 策略半场 —— 真代理(生产 startEgressPolicyProxy)+ 真 TCP 靶站。
 //
 // 正臂:授权目的地经 CONNECT 建隧道,字节双向到达,名字由代理这一侧解析(`localhost` → 靶站)。
@@ -124,7 +125,7 @@ beforeEach(() => {
 
 async function startProxy(opts: Omit<Parameters<typeof startEgressPolicyProxy>[0], "log"> = {}): Promise<{ proxy: EgressProxyHandle; logs: EgressLogRecord[] }> {
   const logs: EgressLogRecord[] = []
-  const proxy = await startEgressPolicyProxy({ ...opts, log: (r) => logs.push(r) })
+  const proxy = await startEgressPolicyProxy({ resolveEgressRoutes: async () => [{ kind: "direct" }], ...opts, log: (r) => logs.push(r) })
   cleanups.push(proxy.close)
   return { proxy, logs }
 }
@@ -203,12 +204,12 @@ describe("AC1 策略半场:授权目的地经隧道转发", () => {
   test("默认 authorize 就是注册表:不传 authorize 时 github.com:443(登记在案)走到拨号,同 host 别的端口走不到", async () => {
     const dialed: string[] = []
     const { proxy, logs } = await startProxy({
-      dial: (h, p) => {
+      dial: testEgressDial((h, p) => {
         dialed.push(`${h}:${p}`)
         const s = new net.Socket()
         queueMicrotask(() => s.destroy(Object.assign(new Error("fixture"), { code: "ECONNREFUSED" })))
         return s
-      },
+      }),
     })
     const registered = await rawRequest(proxy.port, "CONNECT github.com:443 HTTP/1.1\r\nHost: github.com:443\r\n\r\n")
     const unregistered = await rawRequest(proxy.port, "CONNECT github.com:22 HTTP/1.1\r\nHost: github.com:22\r\n\r\n")
@@ -235,10 +236,10 @@ describe("AC2 反向用例:未登记目的地必须被拒且可观察(生产注�
   test("未登记的公网名 ⇒ 403,且**一次 DNS / 拨号都不发**(拒绝先于解析)", async () => {
     const dialed: string[] = []
     const { proxy, logs } = await startProxy({
-      dial: (h, p) => {
+      dial: testEgressDial((h, p) => {
         dialed.push(`${h}:${p}`)
         return new net.Socket()
-      },
+      }),
     })
     const res = await rawRequest(proxy.port, "CONNECT ac1336-unregistered.invalid:443 HTTP/1.1\r\nHost: ac1336-unregistered.invalid:443\r\n\r\n")
     expect(res.status).toBe(403)
@@ -282,10 +283,10 @@ describe("其它失败形态各自可辨,且都不转发", () => {
         asked.push(`${h}:${p}`)
         return true
       },
-      dial: (h, p) => {
+      dial: testEgressDial((h, p) => {
         dialed.push(`${h}:${p}`)
         return new net.Socket()
-      },
+      }),
     })
     for (const authority of ["registry.npmjs.org", "registry.npmjs.org:99999", "registry.npmjs.org:443/path"]) {
       const res = await rawRequest(proxy.port, `CONNECT ${authority} HTTP/1.1\r\nHost: ${authority}\r\n\r\n`)
@@ -322,7 +323,7 @@ describe("其它失败形态各自可辨,且都不转发", () => {
   })
 
   test("登记了但黑洞(拨号既不通也不拒)⇒ 在 dialTimeoutMs 内以 504 ETIMEDOUT 收尾,不挂到客户端超时", async () => {
-    const { proxy, logs } = await startProxy({ authorize: () => true, dialTimeoutMs: 50, dial: () => new net.Socket() })
+    const { proxy, logs } = await startProxy({ authorize: () => true, dialTimeoutMs: 50, dial: testEgressDial(() => new net.Socket()) })
     const res = await rawRequest(proxy.port, "CONNECT blackhole.example:443 HTTP/1.1\r\nHost: blackhole.example:443\r\n\r\n")
     expect(res.status).toBe(504)
     expect(logs[0]).toMatchObject({ verdict: "deny", reason: "dial-failed", status: 504, detail: "ETIMEDOUT" })
@@ -344,11 +345,11 @@ describe("拒绝正文的消费端契约(生产者 ↔ 渲染层识别器)", () 
 
     const unreachable = await startProxy({
       authorize: () => true,
-      dial: () => {
+      dial: testEgressDial(() => {
         const s = new net.Socket()
         queueMicrotask(() => s.destroy(Object.assign(new Error("fixture"), { code: "ECONNREFUSED" })))
         return s
-      },
+      }),
     })
     const dialRes = await rawRequest(unreachable.proxy.port, "CONNECT ac1382-consumer.invalid:8443 HTTP/1.1\r\nHost: ac1382-consumer.invalid:8443\r\n\r\n")
     expect(dialRes.status).toBe(502)
@@ -482,7 +483,7 @@ describe("`#1572` AC2 静默隧道兜底(tlsSilentMs = 50 ms)", () => {
     const { proxy, logs } = await startProxy({
       authorize: () => true,
       // 本机拿不到真的 fake-IP 上游;拨到 loopback 靶站,只把对端地址读成 TUN 会给的那种(方案 §1.5(b) 实测值)。
-      dial: (_h, p) => Object.defineProperty(net.connect(p, "127.0.0.1"), "remoteAddress", { value: "198.18.12.180" }),
+      dial: testEgressDial((_h, p) => Object.defineProperty(net.connect(p, "127.0.0.1"), "remoteAddress", { value: "198.18.12.180" })),
     })
     const { socket } = await connectThrough(proxy.port, `nx-req236-probe.example.com:${upstream.port}`)
     socket.destroy()
@@ -495,7 +496,7 @@ describe("生命周期", () => {
   test("close():关掉监听、切断在途隧道;之后再连该端口被拒", async () => {
     const target = await withTarget()
     const logs: EgressLogRecord[] = []
-    const proxy = await startEgressPolicyProxy({ log: (r) => logs.push(r), authorize: () => true })
+    const proxy = await startEgressPolicyProxy({ resolveEgressRoutes: async () => [{ kind: "direct" }], log: (r) => logs.push(r), authorize: () => true })
     const { status, socket } = await connectThrough(proxy.port, `127.0.0.1:${target.port}`)
     expect(status).toBe(200)
     const clientClosed = new Promise<void>((resolve) => socket.once("close", () => resolve()))
@@ -536,10 +537,10 @@ describe("`#1412` 未登记目的地的出口:问用户", () => {
     const asked: string[] = []
     const { proxy, logs } = await startProxy({
       authorize: () => false,
-      dial: (h, p) => {
+      dial: testEgressDial((h, p) => {
         dialed.push(`${h}:${p}`)
         return net.connect(p, h)
-      },
+      }),
       requestGrant: async (h, p) => {
         asked.push(`${h}:${p}`)
         return "user-denied"
@@ -586,10 +587,10 @@ describe("`#1412` 未登记目的地的出口:问用户", () => {
     let approved = false
     const { proxy } = await startProxy({
       authorize: (h, p) => approved && `${h}:${p}` === `127.0.0.1:${target.port}`,
-      dial: (h, p) => {
+      dial: testEgressDial((h, p) => {
         dialed.push(`${h}:${p}`)
         return net.connect(p, h)
-      },
+      }),
       requestGrant: () =>
         new Promise((resolve) => {
           asks += 1
@@ -636,7 +637,7 @@ test("真实 CONNECT 经 main 对话决定后收到靶站字节，拨号前授�
   })
   const service = createNetworkEgressApproval({ available: true, activity, store: { read: () => ({ ok: true, absent: true, sites: [] }), write: () => {} }, log: () => {} })
   let dialed = 0
-  const { proxy } = await startProxy({ authorize: service.authorized, requestGrant: service.request, dial: (_host, port) => { dialed++; return net.connect(port, "127.0.0.1") } })
+  const { proxy } = await startProxy({ authorize: service.authorized, requestGrant: service.request, dial: testEgressDial((_host, port) => { dialed++; return net.connect(port, "127.0.0.1") }) })
   const card = new Promise<EgressApproval>((resolve) => service.api.subscribe(() => {
     void service.api.listApprovals({ session: { generation: 1, sessionID: "ses_a", directory: "/project" } }).then((result) => { if (result.ok && result.value[0]) resolve(result.value[0]) })
   }))
@@ -652,6 +653,32 @@ test("真实 CONNECT 经 main 对话决定后收到靶站字节，拨号前授�
     expect(await echoed).toBe("echo:conversation-approved")
     connected.socket.destroy()
   } finally { service.close() }
-  const revoked = await startProxy({ authorize: () => false, requestGrant: async () => "granted", dial: () => { throw new Error("revoked destination must not dial") } })
+  const revoked = await startProxy({ authorize: () => false, requestGrant: async () => "granted", dial: testEgressDial(() => { throw new Error("revoked destination must not dial") }) })
   expect((await rawRequest(revoked.proxy.port, "CONNECT a.example.com:443 HTTP/1.1\r\nHost: a.example.com:443\r\n\r\n")).body).toContain("conversation approval is unavailable")
+})
+test("系统路由等待后复核撤销；拨号期限覆盖查询，迟到结果不再建连", async () => {
+  let authorized = true
+  let release!: (routes: [{ kind: "direct" }]) => void
+  let queried!: () => void
+  const query = new Promise<void>((resolve) => { queried = resolve })
+  let dialed = 0
+  const f = await startProxy({ authorize: () => authorized, resolveEgressRoutes: () => { queried(); return new Promise((resolve) => { release = resolve }) }, dial: testEgressDial(() => { dialed++; throw new Error("must not dial") }) })
+  const pending = rawRequest(f.proxy.port, "CONNECT example.com:443 HTTP/1.1\r\nHost: example.com:443\r\n\r\n")
+  await query; authorized = false; release([{ kind: "direct" }])
+  expect((await pending).status).toBe(403)
+  expect(dialed).toBe(0)
+  let late!: (routes: [{ kind: "direct" }]) => void
+  const timed = await startProxy({ authorize: () => true, dialTimeoutMs: 30, resolveEgressRoutes: () => new Promise((resolve) => { late = resolve }), dial: testEgressDial(() => { dialed++; throw new Error("late dial") }) })
+  expect((await rawRequest(timed.proxy.port, "CONNECT example.com:443 HTTP/1.1\r\nHost: example.com:443\r\n\r\n")).status).toBe(504)
+  late([{ kind: "direct" }]); await tick()
+  expect(dialed).toBe(0)
+})
+
+test("系统代理指回策略端口时不递归，也不擅自追加直连", async () => {
+  let handle: EgressProxyHandle
+  let dialed = 0
+  const f = await startProxy({ authorize: () => true, resolveEgressRoutes: async () => [{ kind: "http", host: "127.1", port: handle.port }], dial: testEgressDial(() => { dialed++; throw new Error("loop") }) })
+  handle = f.proxy
+  const response = await rawRequest(handle.port, "CONNECT example.com:443 HTTP/1.1\r\nHost: example.com:443\r\n\r\n")
+  expect(response.status).toBe(502); expect(response.body).toContain("EPROXYLOOP"); expect(dialed).toBe(0)
 })

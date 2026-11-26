@@ -1,5 +1,5 @@
 import { afterEach, expect, describe, test } from "bun:test"
-import { admitUserEgressGrant, configureEgressGrantApproval, isUserGrantedEgressDestination, requestUserEgressGrant, __resetEgressGrantsForTests } from "./network-egress-grants"
+import { admitEgressPass, isNonPublicEgressAddress, admitUserEgressGrant, configureEgressGrantApproval, isUserGrantedEgressDestination, requestUserEgressGrant, __resetEgressGrantsForTests } from "./network-egress-grants"
 
 afterEach(__resetEgressGrantsForTests)
 
@@ -48,4 +48,15 @@ test("授权并集消费 main 服务，没有通路时不可自行批准", async
   expect(isUserGrantedEgressDestination("b.example.com", 443)).toBe(false)
   expect(await requestUserEgressGrant("other.example.com", 443)).toBe("user-denied")
   expect(seen).toEqual(["other.example.com:443"])
+})
+
+
+test("通放专用的数字归一与 IANA 最长前缀保留公网、mapped 和 fake-IP 例外", () => {
+  // IANA XML snapshots dated 2025-10-09; numeric inputs from design §2's WHATWG probe.
+  for (const host of ["127.1", "0x7f.1", "2130706433", "10.1", "169.254.43518", "0300.0250.1.1", "192.0.2.1"]) expect(admitEgressPass({ host, port: 443 }), host).toBeUndefined()
+  for (const address of ["0.0.0.0", "192.0.0.8", "192.0.0.170", "192.88.99.2", "198.51.100.1", "203.0.113.1", "224.0.0.1", "::", "::1", "::ffff:127.0.0.1", "fc00::1", "fe80::1", "ff02::1", "100:0:0:1::1", "2001:2::1", "2001:db8::1", "3fff::1", "5f00::1", "invalid"]) expect(isNonPublicEgressAddress(address), address).toBe(true)
+  for (const address of ["8.8.8.8", "192.0.0.9", "192.0.0.10", "192.31.196.1", "198.18.0.0", "198.19.255.255", "::ffff:198.18.1.1", "::ffff:8.8.8.8", "64:ff9b::808:808", "2001:1::1", "2001:3::1", "2001:20::1", "2001:4860:4860::8888"]) expect(isNonPublicEgressAddress(address), address).toBe(false)
+  expect(admitEgressPass({ host: "198.18.0.1", port: 443 })).toEqual({ host: "198.18.0.1", port: 443 })
+  expect(admitEgressPass({ host: "example.com", port: 80 })).toEqual({ host: "example.com", port: 80 })
+  expect(admitUserEgressGrant("127.1", 443)).toBeDefined() // Frozen card-path semantics.
 })

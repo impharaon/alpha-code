@@ -206,7 +206,7 @@ U/E 各运行 `bun typecheck`，仅处理本片造成的问题；若包已有适
 ## 切片二：全部批准通放与系统代理
 
 - 依据：#1757 r6；[规格 v2 / AC-08、AC-13](spec.md)，[冻结设计 §4.2、§4.5、§4.7、§4.8、§5、§10](design.md) @ `4948d952f3`（tldts 补丁版裁决已随切片一合入）。代码基线 `cd8649b31a`，切片一已经合入。
-- 核对：r6 明确授权先提交本节，再在同轮实施；如出现未决设计问题则只交 PLAN-READY。实机系统代理证据由编排器另行安排，本轮只做路由注入，不改本机设置、不启动应用或 Electron。
+- 核对：计划 `ba413f12a3`；r6 明确授权先提交本节，再在同轮实施；如出现未决设计问题则只交 PLAN-READY。实机系统代理证据由编排器另行安排，本轮只做路由注入，不改本机设置、不启动应用或 Electron。
 
 ### 改动
 
@@ -253,3 +253,8 @@ U/E 各运行 `bun typecheck`，仅处理本片造成的问题；若包已有适
 ### 偏离记录
 
 暂无。基线相关三文件为 `bun test --max-concurrency 2 src/main/network-egress-grants.test.ts src/main/network-egress-approval.test.ts src/main/network-egress-proxy.test.ts`：36 pass / 0 fail（日志 `/tmp/egress-s2-baseline.log`）。
+
+
+切片二步骤 1（2026-11-26）：N7 已接到真实代理，测试夹具同步异步就绪合同；新增 `test-component/egress-upstream-fixture.ts` 是初始清单之外的同调用链测试文件，为九个已有 TCP peer 复用 connect-event → Promise 就绪适配，只供测试，不参与 allow-all 判据。N7 的协议测试使用真实生产请求，HTTP/HTTPS 由 Node server 解析；SOCKS peer 按 RFC 1928 与 SOCKS4 回复；HTTPS 证书由本次 openssl 生成、仅子进程加入 CA；Electron system Session 在隔离子进程验证 API 接线，没有启动 Electron。
+
+U `bun test --max-concurrency 2 src/main/network-egress-grants.test.ts src/main/network-egress-upstream.test.ts src/main/network-egress-proxy.test.ts`：38 pass / 0 fail（`/tmp/egress-s2-step1.log`）；其中原代理 24 条先单独通过，新增两条路由撤销/迟到/循环边界窄跑 2 pass。U `bun typecheck` 退出 0。旧名扫描最初误从根目录执行被根守卫拒绝，从 U 重跑为 10 pass；不计错误命令为通过。文档检查基线 69 errors / 253 warnings，沿用既有问题，不扩修。

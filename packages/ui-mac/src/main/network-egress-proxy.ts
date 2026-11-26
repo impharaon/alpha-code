@@ -46,6 +46,7 @@ import { classifyNetFailure, EGRESS_DIAL_FAILURE_STATUS } from "@opencode/schema
 import { egressDenialLine, egressDenialDescription, type EgressDenialDetail } from "../shared/egress-denial"
 import { isEgressAuthorizedForSidecar } from "./network-egress-derived"
 import { requestUserEgressGrant, type EgressGrantOutcome } from "./network-egress-grants"
+import { dialEgressUpstream, resolveEgressRoutes } from "./network-egress-upstream"
 
 // 拒绝正文的格式住在 `shared/egress-denial.ts`,因为 `#1382` 起它**有读者**了(renderer 的
 // 时间线要据此说「是这台电脑上的网络策略拦的」)。写的人和读的人共用同一个拼串函数,
@@ -118,7 +119,8 @@ export type EgressProxyDeps = {
   /** 默认 = 静态表 ∪ 本代派生的动态半场。**只有测试**该传这个 —— 生产传别的东西就等于绕开 AC2。 */
   authorize?: (host: string, port: number) => boolean
   /** 默认 = `net.connect({ host, port })`(DNS 在本进程)。测试用它做零拨号断言。 */
-  dial?: (host: string, port: number) => net.Socket
+  dial?: typeof dialEgressUpstream
+  resolveEgressRoutes?: typeof resolveEgressRoutes
   /**
    * `#1412` —— 未登记目的地的**唯一出口**:问用户。默认 = network-egress-grants.ts 的编排,
    * 而它在**没有接上询问通道时恒答 `not-asked`** ⇒ 不接线的行为与本票之前逐字相同(403 unregistered,零额外记录)。
@@ -169,11 +171,6 @@ export function parseConnectAuthority(authority: string | undefined): { host: st
   const port = Number(portPart)
   if (port < 1 || port > 65535) return undefined
   return { host: hostPart, port }
-}
-
-function defaultDial(host: string, port: number): net.Socket {
-  // autoSelectFamily(Happy Eyeballs):`localhost` 在 macOS 上先解到 ::1;靶站只听 v4 时不能停在第一个地址。
-  return net.connect({ host, port, autoSelectFamily: true })
 }
 
 function denialBody(reason: EgressDenyReason, authority: string, detail?: string): string {
@@ -228,7 +225,8 @@ function writeDenial(socket: net.Socket, status: number, body: string): void {
 export async function startEgressPolicyProxy(deps: EgressProxyDeps): Promise<EgressProxyHandle> {
   const authorize = deps.authorize ?? isEgressAuthorizedForSidecar
   const requestGrant = deps.requestGrant ?? requestUserEgressGrant
-  const dial = deps.dial ?? defaultDial
+  const dial = deps.dial ?? dialEgressUpstream
+  const resolveRoutes = deps.resolveEgressRoutes ?? resolveEgressRoutes
   const dialTimeoutMs = deps.dialTimeoutMs ?? 10_000
   const tlsSilentMs = deps.tlsSilentMs ?? 15_000
   const log = deps.log
@@ -291,15 +289,31 @@ export async function startEgressPolicyProxy(deps: EgressProxyDeps): Promise<Egr
     )
     return
 
-    function openTunnel(parsed: { host: string; port: number }): void {
-      const upstream = dial(parsed.host, parsed.port)
-      track(upstream)
+    async function openTunnel(parsed: { host: string; port: number }): Promise<void> {
+      const controller = new AbortController()
       let settled = false
-      const timer = setTimeout(() => {
-        if (!settled) upstream.destroy(Object.assign(new Error("dial timeout"), { code: "ETIMEDOUT" }))
-      }, dialTimeoutMs)
-
-      upstream.once("connect", () => {
+      const fail = (err: NodeJS.ErrnoException) => {
+        if (settled) return
+        settled = true
+        deny(err.code === "ENONPUBLIC" ? 403 : dialFailureStatus(err), err.code === "ENONPUBLIC" ? "unregistered" : "dial-failed", parsed, err.code === "ENONPUBLIC" ? "non-public" : err.code ?? err.message)
+      }
+      const timer = setTimeout(() => controller.abort(Object.assign(new Error("dial timeout"), { code: "ETIMEDOUT" })), dialTimeoutMs)
+      controller.signal.addEventListener("abort", () => fail(controller.signal.reason), { once: true })
+      clientSocket.once("close", () => { if (!settled) { settled = true; controller.abort() } })
+      try {
+        const routes = await resolveRoutes(parsed, controller.signal)
+        controller.signal.throwIfAborted()
+        if (!authorize(parsed.host, parsed.port)) { settled = true; deny(403, "unregistered", parsed, "approval-unavailable"); return }
+        const address = server.address()
+        const filtered = routes.filter((route) => {
+          if (route.kind === "direct" || !address || typeof address === "string" || route.port !== address.port) return true
+          const host = route.host.toLowerCase()
+          return host !== "localhost" && host !== "::1" && !/^127\./.test(new URL(`http://${host}/`).hostname)
+        })
+        if (!filtered.length && routes.length) throw Object.assign(new Error("proxy loop"), { code: "EPROXYLOOP" })
+        const { socket: upstream } = await dial(parsed, filtered, { kind: "existing-authorization" }, controller.signal)
+        if (settled || controller.signal.aborted || clientSocket.destroyed) { upstream.destroy(); return }
+        track(upstream)
         settled = true
         clearTimeout(timer)
         const remote = upstream.remoteAddress
@@ -363,20 +377,9 @@ export async function startEgressPolicyProxy(deps: EgressProxyDeps): Promise<Egr
         }
         clientSocket.once("close", onClose)
         upstream.once("close", onClose)
-      })
-      upstream.once("error", (err: NodeJS.ErrnoException) => {
-        if (settled) return clientSocket.destroy()
-        settled = true
-        clearTimeout(timer)
-        deny(dialFailureStatus(err), "dial-failed", parsed, err.code ?? err.message)
-      })
-      clientSocket.once("close", () => {
-        if (!settled) {
-          settled = true
-          clearTimeout(timer)
-          upstream.destroy()
-        }
-      })
+        upstream.on("error", () => clientSocket.destroy())
+      } catch (error) { fail(error as NodeJS.ErrnoException) }
+      finally { clearTimeout(timer) }
     }
   })
 

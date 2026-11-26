@@ -1,4 +1,5 @@
 // Address admission stays shared by remembered and temporary user grants. Approval ownership lives in main's conversation service.
+import { BlockList, isIP } from "node:net"
 import { isEgressHostShape, isLoopbackHost } from "./network-egress-registry"
 import type { Destination } from "../shared/network-egress-wire"
 import type { EgressDenialDetail } from "../shared/egress-denial"
@@ -88,4 +89,98 @@ export function requestUserEgressGrant(host: string, port: number, signal?: Abor
 
 export function __resetEgressGrantsForTests(): void {
   authority = undefined
+}
+
+// IANA special-purpose registries, updated 2025-10-09 (IPv4 + IPv6 XML).
+// https://www.iana.org/assignments/iana-ipv4-special-registry/iana-ipv4-special-registry.xml
+// https://www.iana.org/assignments/iana-ipv6-special-registry/iana-ipv6-special-registry.xml
+// Longest prefix wins, including the registry's more-specific globally reachable exceptions.
+const egressAddressRules = [
+  ["0.0.0.0/8", true],
+  ["0.0.0.0/32", true],
+  ["10.0.0.0/8", true],
+  ["100.64.0.0/10", true],
+  ["127.0.0.0/8", true],
+  ["169.254.0.0/16", true],
+  ["172.16.0.0/12", true],
+  ["192.0.0.0/24", true],
+  ["192.0.0.0/29", true],
+  ["192.0.0.8/32", true],
+  ["192.0.0.9/32", false],
+  ["192.0.0.10/32", false],
+  ["192.0.0.170/32", true],
+  ["192.0.0.171/32", true],
+  ["192.0.2.0/24", true],
+  ["192.31.196.0/24", false],
+  ["192.52.193.0/24", false],
+  ["192.88.99.0/24", false],
+  ["192.88.99.2/32", true],
+  ["192.168.0.0/16", true],
+  ["192.175.48.0/24", false],
+  ["198.18.0.0/15", true],
+  ["198.51.100.0/24", true],
+  ["203.0.113.0/24", true],
+  ["240.0.0.0/4", true],
+  ["255.255.255.255/32", true],
+  ["::1/128", true],
+  ["::/128", true],
+  ["::ffff:0:0/96", true],
+  ["64:ff9b::/96", false],
+  ["64:ff9b:1::/48", true],
+  ["100::/64", true],
+  ["100:0:0:1::/64", true],
+  ["2001::/23", true],
+  ["2001::/32", false],
+  ["2001:1::1/128", false],
+  ["2001:1::2/128", false],
+  ["2001:1::3/128", false],
+  ["2001:2::/48", true],
+  ["2001:3::/32", false],
+  ["2001:4:112::/48", false],
+  ["2001:10::/28", false],
+  ["2001:20::/28", false],
+  ["2001:30::/28", false],
+  ["2001:db8::/32", true],
+  ["2002::/16", false],
+  ["2620:4f:8000::/48", false],
+  ["3fff::/20", true],
+  ["5f00::/16", true],
+  ["fc00::/7", true],
+  ["fe80::/10", true],
+  ["224.0.0.0/4", true],
+  ["::/3", true],
+  ["4000::/2", true],
+  ["8000::/1", true],
+] as const
+const addressRules = egressAddressRules.map(([prefix, denied]) => {
+  const [address, length] = prefix.split("/")
+  const block = new BlockList()
+  block.addSubnet(address!, Number(length), isIP(address!) === 4 ? "ipv4" : "ipv6")
+  return { block, family: isIP(address!), length: Number(length), denied }
+}).sort((a, b) => b.length - a.length)
+
+export function isNonPublicEgressAddress(address: string): boolean {
+  const family = isIP(address)
+  if (!family) return true
+  if (family === 6 && address.includes("%")) return true
+  if (family === 6) {
+    const normalized = new URL(`http://[${address}]/`).hostname.slice(1, -1)
+    if (normalized.startsWith("::ffff:")) {
+      const words = normalized.slice(7).split(":").map((part) => parseInt(part, 16))
+      if (words.length === 2) return isNonPublicEgressAddress([words[0]! >> 8, words[0]! & 255, words[1]! >> 8, words[1]! & 255].join("."))
+    }
+  }
+  if (family === 4 && /^198\.(18|19)\./.test(address)) return false
+  if (family === 4 && isNonPublicV4Literal(address)) return true
+  return addressRules.find((rule) => rule.family === family && rule.block.check(address, family === 4 ? "ipv4" : "ipv6"))?.denied ?? false
+}
+
+export function admitEgressPass(target: Destination): Destination | undefined {
+  const admitted = admitUserEgressGrant(target.host, target.port)
+  if (!admitted) return
+  try {
+    const host = new URL(`http://${admitted.host}/`).hostname
+    if (isIP(host) && isNonPublicEgressAddress(host)) return
+    return { host, port: admitted.port }
+  } catch { return undefined }
 }

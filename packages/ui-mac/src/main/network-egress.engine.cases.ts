@@ -1,3 +1,4 @@
+import { testEgressDial } from "../../test-component/egress-upstream-fixture"
 // Scenario only: real engine, real ext lifecycle, production proxy and native fence. No Electron/window.
 // Model fixture uses HTTPS through the same CONNECT port, so the production network profile is unmodified.
 import { afterAll, beforeAll, expect, test } from "bun:test"
@@ -140,7 +141,7 @@ beforeAll(async () => {
   expect(generated.exitCode, generated.stderr.toString()).toBe(0)
   target = Bun.serve({ hostname: "127.0.0.1", port: 0, fetch: () => new Response("egress-target-ok") })
   tls = Bun.serve({ hostname: "127.0.0.1", port: 0, tls: { key: readFileSync(key), cert: readFileSync(cert) }, fetch: async (request) => nativeFetch(`${model.baseURL.replace(/\/v1$/, "")}${new URL(request.url).pathname}`, { method: request.method, headers: request.headers, body: await request.arrayBuffer() }) })
-  proxy = await startEgressPolicyProxy({ log: (record) => logs.push(record), authorize: (host, port) => host === "model.egress.test" || service?.authorized(host, port) === true, requestGrant: (host, port, signal) => { connects.push(host); return service.request(host, port, signal) }, dial: (host) => connect(host === "model.egress.test" ? tls.port! : target.port!, "127.0.0.1") })
+  proxy = await startEgressPolicyProxy({ resolveEgressRoutes: async () => [{ kind: "direct" }], log: (record) => logs.push(record), authorize: (host, port) => host === "model.egress.test" || service?.authorized(host, port) === true, requestGrant: (host, port, signal) => { connects.push(host); return service.request(host, port, signal) }, dial: testEgressDial((host) => connect(host === "model.egress.test" ? tls.port! : target.port!, "127.0.0.1")) })
   let prepare!: () => void
   const preparation = new Promise<void>((resolve) => { prepare = resolve })
   let ready!: (connection: { url: string; authorization: string }) => void

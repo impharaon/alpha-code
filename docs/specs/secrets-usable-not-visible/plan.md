@@ -665,3 +665,52 @@ gate slot -- bun test --max-concurrency 2 --timeout 90000 ./src/main/unattended-
 完整命令输出位于 `/tmp/secrets-r11-{related,registry-green,host,install,inventory,ext-typecheck,ui-typecheck,build,lint,affected}.log`；计数探针与合并标识分别为 `/tmp/secrets-r11-counts.json`、`/tmp/secrets-r11-receipt.json`。本次 plan.md 文档合同检查与 `git diff --check` 通过。
 
 偏离：除三处冲突外，仅对新宿主、自动合入登记册的两个证明名称、表中本票测试数做必要同步；库存按生成器重生，无手工改生成内容。旧 r10 selector 缺输入由本次 alpha 自带声明解决，当前 scope 正常；无未解冲突、新 ARCH/OPTIONAL 项。遗留去向：none；提交后的发布仍由编排器负责。
+
+## r12 ship 所报八个新失败的归类与修复
+
+依据：r12 IMPLEMENT；编排器已确认所列四文件在 alpha `b0a9d0298d` 通过。本轮从已有合并 HEAD `d6d46c2012` 开始，未 fetch/merge/rebase。spec v4、design v3.3、SC-01/SC-02 不变；已核 Codex / GPT-6。开始 2026-11-26 12:52:08 UTC，检查完成 13:16 UTC，约 24 分钟，包含多次本机 slot 排队。文档影响为本计划的执行证据。
+
+四文件先分别在 ui-mac 用**完全相同的形式**复现：`gate slot -- bun test --max-concurrency 2 --timeout 90000 <file>`。每次只运行点名文件，四次均 exit 1，合计 99 PASS / 8 FAIL；未把这些失败归入 known-fails。
+
+| 编排器所报测试 | 归类 | 原因与最小纠正（原断言保留） |
+| --- | --- | --- |
+| fixture-identity：每个夹具记下的引擎身份等于当前树 | c | 17 份样本仍记旧 Core/Plugin/Schema tree；用原采样器全量重采这 17 份样本，身份 guard 不变 |
+| process-fence-write-sites：未登记的写盘调用点 = 0 | c | secret-mask 的 staging open/unlink 与 secret-spool 的 file open/unlink 漏登记；原生成器给出签名，四处全部落在既有 W4 |
+| PermissionDialog：high 标题后恰有一个标签 | b | 测试还使用旧 ClassifyInput，补齐 design §4.1 必填的 protectedRoots；档位/位置/无说明句断言不变 |
+| PermissionDialog：low 标题后恰有一个标签 | b | 同上；没有把 unknown 改成期望值来放行 |
+| PermissionDialog：medium 标题后恰有一个标签 | b | 同上；没有改分类器的风险档位 |
+| PermissionDialog：极高风险 + 数据外发说明句 | b + a | 补 roots 后仍 high/network-egress，确认共享 probe 漏认 `$HOME/.aws/credentials`；修 Schema probe，保留 critical/exfiltration 及中英说明句断言 |
+| PermissionDialog：读屏名称 = 标题 + 档位 | b | roots 缺席原先让标签变为 unknown；只改夹具供数，原 aria-labelledby/高风险名称断言不变 |
+| permission-risk：真分类器四档与外发 | b + a | 同时受 roots 供数与 HOME probe 两因影响；四档、仅 critical + exfiltration 才有 reason 的断言全部保留 |
+
+b 的依据是 design §4.1 的明确接口变更：classifyPermissionRequest 新增必填 protectedRoots，permission/patterns/always/metadata 与结果维持旧契约；roots 来自可信宿主事实，没有分类器内部默认值。UI 两文件补的是固定的测试 Location 事实，不从审批 metadata 派生根。a 的依据是同节“其余规则与风险档位不变”：现有 curl 上传样本不能降成普通联网。没有改变产品审批卡、RiskTag、读屏或原因行的呈现代码。
+
+### 红例、提交与生成物
+
+- `7e65eb1a73`：用 `bun packages/ui-mac/scripts/process-fence-write-sites.ts --write` 发现四条 TODO（生成器按约定 exit 1），逐条填 W4。Core `shell.ts` 的 capture outputDir 位于 `<XDG_DATA_HOME>/opencode/shell/<project>`，safe staging/AES-GCM spool 都与之同目录；不增加可写根。保留原登记簿的人工注释，新增解释注释。随后 `--check` exit 0：64 条唯一登记与 67 个调用点一致。
+- `21b7a1e41f`：两份 UI 测试补必填 roots。首轮复核由 Dialog 76 PASS / 5 FAIL 变为 80 PASS / 1 FAIL；permission-risk 仍 4 PASS / 1 FAIL，剩余两红明确为 HOME 凭据路径被判成 high/network-egress，未将其当作夹具可接受变化。
+- `8c33372a7d`：在既有 Schema `one published rule reaches all rule consumers` 表例加入当前批准卡真实 curl 命令，覆盖 `$HOME`/`${HOME}` 和 darwin/win32 根；未修复代码上 0 PASS / 1 FAIL（probe 返回空）。
+- `8fd5c1d1e6`：只在同一发布权威的词法 probe 中，去除既有 assignment/upload 前缀后，以可信 roots.home 展开开头 HOME/括号 HOME，再调用原 match；不执行插值，不改真实文件路径 normalize，不恢复第二张凭据正则表。Schema 原文件 7 PASS / 604 expect，现有 Ext risk 文件 23 PASS。
+- `f9fd7667d3`：`gate slot -- bun packages/ui-mac/test-fixtures/engine-adapter-sampler/sample.ts` exit 0，采样器自行隔离 HOME/XDG、项目与 mock 服务，没有 app/Electron/窗口。最终 17 份 JSON 的 `_source` 为 `8fd5c1d1e6`，每个 `_engine.packages` tree 均逐项等于当前 HEAD。没有手工改身份或样本载荷。
+- 一次先行重采（21b7a1e41f）与其消费者 162 PASS 已完成；之后发现 HOME 回归并提交 Schema 变化，按身份契约必须在新 tree 上重新采样，因此第二次采样及最终消费者验证有明确的新输入原因。先行绿证不冒充最终 tree 的证据，不因失败盲目重跑。
+
+### 最终逐文件与直接相关验证
+
+下列前四行均在全部代码修复后，分别以前述单文件 slot 命令完成，**每次 exit 0**。Schema 改动使前一组夹具身份失效后，身份文件与消费者重新以最终样本验证；没有重跑其它宿主、整层或整套测试。
+
+| 文件（ui-mac cwd） | 初始复现 PASS / FAIL | 最终 PASS / FAIL |
+| --- | --- | --- |
+| `src/engine-adapter/fixture-identity.test.ts` | 4 / 1 | **5 / 0** |
+| `src/main/process-fence-write-sites.test.ts` | 15 / 1 | **16 / 0** |
+| `src/renderer/codepuppy-ui/PermissionDialog.test.ts` | 76 / 5 | **81 / 0**，657 expect |
+| `src/renderer/codepuppy-ui/permission-risk.test.ts` | 4 / 1 | **5 / 0**，40 expect |
+
+一次最终 wider-related：ui-mac 中 `gate slot -- bun test --max-concurrency 2 --timeout 90000` 后显式列出这 14 个 fixtures 的直接读取测试：engine-adapter 下的 command-reply、contract-cases、event-projection、failure-code、file-watcher、passthrough-reads、permission-reply、permission-shape、projection-parity、staged-attachment、todo-route、tool-display、tool-shapes、turn-diffs.test.ts；exit 0 / **162 PASS**。用 literal import 搜索确定集合，未把只在结构扫描中排除 fixtures 目录的 boundary.test.ts 算成消费者。加上 Schema 的 `bun test --max-concurrency 2 src/codepuppy-protected-files.test.ts`（7 PASS）和 Ext 的同形式 `src/policy/risk.test.ts`（23 PASS），本轮最终 **299 个不同用例 PASS**。
+
+- `bun typecheck`：ui-mac exit 0；schema exit 0 / 144 files。Schema 两个改动文件 scoped oxlint exit 0 / 0 warnings / 0 errors。
+- 手动对 UI 两测试的 scoped oxlint exit 1：PermissionDialog.test.ts:78、100 两处 Reflect.deleteProperty 命中限制；一次 `git show origin/alpha:<该文件>` 确认这两个原有调用同样存在，非新增行。未调查/修复此范围外事项，未放宽 lint，交编排器独立处置。
+- 指定 NUL 步骤 `bash -c 'source scripts/docs-gates.sh; docs_gate_nul'` 在修复前、最终样本后均 exit 0：5761 个扫描文件零 NUL，跳过 1318 个已登记二进制、4 个非文本条目与 11248 个上游原样文件。现有允许机制是 assert-no-nul-bytes.py 的 BINARY_SUFFIXES/EXCLUDED_PREFIXES；本轮未复现待豁免文件，因此未新增豁免、未禁用检查。
+- 最终代码/样本提交后 `affected-tests --list` exit 0：**`affected tests: 155 of 714 test files`**。只列出；未运行 gate run/bin/check/整套或整层。
+- 证据：`/tmp/secrets-r12-{fixture-identity,write-sites,permission-dialog,permission-risk}-red.log`；最终 `/tmp/secrets-r12-{fixture-identity,write-sites,permission-dialog,permission-risk}-final.log`；`sample-final.log`、`fixture-consumers-final.log`、`probe-{red,green}.log`、`risk-classifier.log`、`ledger-{generate,check}.log`、`nul-final.log`、`affected.log` 均带同一 secrets-r12 前缀。聚合事实 `/tmp/secrets-r12-receipt.json`；本次 plan.md 文档合同与 git diff --check 通过。
+
+偏离：必要的同调用链改动是 Schema probe 与其原测试；另外 17 个文件均为原生成器产生的夹具，不能只改 hash 欺骗身份 guard。UI 没有删/弱化测试或修改呈现规则；测试条数不变，无需改 gate-files 计数。本轮未改 known-fails.tsv、.gate-tests、检测规则/阈值/地板、冻结设计、依赖或其它仓库，无 push/PR/merge/rebase。遗留去向：八个指定失败全部消除；原有两处 Reflect lint 交编排器独立处理。ARCH/OPTIONAL：无新增项。

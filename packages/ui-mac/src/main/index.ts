@@ -72,6 +72,7 @@ import {
 } from "./server"
 import { applyPlatformCredentialsHot } from "./codepuppy-secret-files"
 import { setupAutoUpdater, showUpdaterDialog } from "./updater"
+import { revealWindow, windowClose } from "./window-close"
 import {
   createMainWindow,
   productWindows,
@@ -694,10 +695,7 @@ const main = Effect.gen(function* () {
       logger.log("deep link received via second-instance", { urls: urls.map(redactDeepLink) })
       deepLinks.ingest(argv)
     }
-    if (mainWindow) {
-      mainWindow.show()
-      mainWindow.focus()
-    }
+    revealWindow(productWindows())
   })
 
   app.on("open-url", (event: Event, url: string) => {
@@ -707,15 +705,15 @@ const main = Effect.gen(function* () {
     // Bring the app to the foreground. The auth callback arrives while the browser is focused;
     // unlike "second-instance", "open-url" does NOT auto-activate the app, so login would otherwise
     // complete silently in the background. steal:true overrides macOS focus-stealing prevention.
-    if (mainWindow) {
-      if (mainWindow.isMinimized()) mainWindow.restore()
-      mainWindow.show()
-      mainWindow.focus()
-    }
+    revealWindow(productWindows())
     app.focus({ steal: true })
   })
 
+  // #1753:macOS 点程序坞图标 ⇒ 把(关窗时隐藏的)同一个窗口带回来。
+  app.on("activate", () => revealWindow(productWindows()))
+
   app.on("before-quit", () => {
+    windowClose.markQuitting() // #1753:退出期的关窗不再被拦成"隐藏"
     quittingApp = true // B5:退出期的 sidecar exit 不触发自愈
     if (selfHealTimer) clearTimeout(selfHealTimer)
     void stopSidecars()

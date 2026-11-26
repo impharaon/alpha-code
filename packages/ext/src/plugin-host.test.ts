@@ -2559,3 +2559,38 @@ packageIt.live("PostToolBatch groups native terminal calls before the next reque
   yield* sessions.wait(session.id)
   expect(events()).toHaveLength(1)
 })))
+
+packageIt.live("package compact hooks block before a summary and observe the actual committed summary", () => packageJourney(Effect.gen(function* () {
+  const capture = yield* Effect.promise(() => captureStandardFixture("claude:dash0"))
+  const hooks = JSON.parse(new TextDecoder().decode(yield* Effect.promise(() => capture.readFile("claude/hooks.json"))))
+  for (const event of ["PreCompact", "PostCompact"]) for (const group of hooks.hooks[event]) for (const handler of group.hooks) {
+    handler.command = process.execPath
+    handler.args = ["-e", "const fs=require('node:fs');const input=await Bun.stdin.json();fs.appendFileSync('compact-hook-events.jsonl',JSON.stringify(input)+'\\n');if(input.hook_event_name==='PreCompact'&&!fs.existsSync('permit-compaction'))console.log(JSON.stringify({decision:'block',reason:'fixture preserves full context'}));if(input.hook_event_name==='PostCompact')console.log(JSON.stringify({continue:false,stopReason:'notification cannot undo compaction'}))"]
+  }
+  const sample = yield* invocationSample("claude:dash0", { "claude/hooks.json": JSON.stringify({ hooks: { PreCompact: hooks.hooks.PreCompact, PostCompact: hooks.hooks.PostCompact } }) })
+  const membership = JSON.parse(readFileSync(join(sample.root, "skills-enabled.json"), "utf8"))
+  writeFileSync(join(sample.root, "skills-enabled.json"), JSON.stringify({ ...membership, keys: [...membership.keys, sample.key] }))
+  yield* invocationNativeServices
+  yield* activateExtUntilFinished
+  const location = yield* Location.Service
+  const sessions = yield* Sessions.Service
+  const session = yield* sessions.create({ location: { directory: location.directory }, title: "Real compaction hooks", agent: "build", model: { providerID: "test", id: "picked" } } as never)
+  const llm = yield* TestLLM.Test
+  yield* llm.push(TestLLM.text("An ordinary answer", "before-compaction"))
+  yield* sessions.prompt({ sessionID: session.id, text: "Preserve our current work" })
+  yield* sessions.wait(session.id)
+  yield* sessions.compact({ sessionID: session.id })
+  yield* sessions.wait(session.id)
+  const events = () => readFileSync(join(location.directory, "compact-hook-events.jsonl"), "utf8").trim().split("\n").map(line => JSON.parse(line))
+  expect(events()).toHaveLength(1)
+  expect(events()[0]).toMatchObject({ hook_event_name: "PreCompact", trigger: "manual", custom_instructions: null })
+  expect(yield* llm.requests()).toHaveLength(1)
+  expect(JSON.stringify(yield* sessions.context(session.id))).toContain("fixture preserves full context")
+  writeFileSync(join(location.directory, "permit-compaction"), "yes")
+  yield* llm.push(TestLLM.text("## Objective\nPreserved actual work", "actual-compaction-summary"))
+  yield* sessions.compact({ sessionID: session.id })
+  yield* sessions.wait(session.id)
+  expect(events().map(event => event.hook_event_name)).toEqual(["PreCompact", "PreCompact", "PostCompact"])
+  expect(events()[2]).toMatchObject({ trigger: "manual", compact_summary: expect.stringContaining("Preserved actual work") })
+  expect((yield* sessions.context(session.id)).some(message => message.type === "compaction" && message.status === "completed")).toBe(true)
+})))

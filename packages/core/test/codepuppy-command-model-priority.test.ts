@@ -113,11 +113,13 @@ it.live("untrusted project fenced shell stays source and records deferred execut
 /** Runs one configured command through the production plugin and Command service; records what it asked the session to do. */
 const runCommand = (command: Record<string, unknown>, session: { model?: typeof PICKED }, document?: Document) =>
   Effect.gen(function* () {
+    const location = yield* Location.Service
     const commands = yield* Command.Service
     const switched: unknown[] = []
     const prompts: string[] = []
     yield* ConfigCommandPlugin.Plugin.effect(
       host({
+        location: new Location.Info(location),
         command: { list: () => Effect.die("unused"), transform: commands.transform, reload: commands.reload },
         agent: {
           get: () => Effect.succeed({ data: { model: AGENT_MODEL, mode: "primary" } } as never),

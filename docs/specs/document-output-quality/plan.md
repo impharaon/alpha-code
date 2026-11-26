@@ -746,3 +746,5 @@ r14 Python 安装 target green：相同 snapshot 不再删除模块，新增 ino
 r14 security（a+c）：document-chromium 的离屏 BrowserWindow 显式 webviewTag:false；原安全闸仍扫全树、拒绝 true/标签，创建点名单只增加该真实文件（§4.4/R4 Chromium 输出）。原文件 red-2.log 为 7 PASS/1 FAIL；具名 target 已排 shared slot，最终全文件一次复验。
 
 r14 OOXML（a）：red-9.log 两条闸均点名 shared/workspace-file.ts。将原 documentContainerKind 实现原样迁入现有 shared/ooxml.ts 解压权威，并从原 workspace-file 路径转出；没有第二套 ZIP owner、增加 preview 大小限制或改声明/返回值，保持 §4.4/R4 的独立容器身份语义。
+
+r14 写盘登记（c）：red-7.log 仅两处新签名。先运行原 --write 生成器，再保留原登记簿全部理由注释，将 document-render 的 mkdir(job)/writeFile(render.json) 归 W1+X1：job 在经宿主与 realpath 核验的所属 Location/.document-output 下。无新增可写根、无 TODO；不改变权限守卫。

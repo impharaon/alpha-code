@@ -1,3 +1,4 @@
+import videoSchema from "../vendor/alpha-platform-video-understanding/v1/video-understanding.schema.json"
 import Ajv2020 from "ajv/dist/2020.js"
 import addFormats from "ajv-formats"
 import artifactDescriptorSchema from "../vendor/alpha-platform/contracts/v1/artifact-descriptor.schema.json"
@@ -25,9 +26,14 @@ function buildValidators() {
   addFormats(ajv)
   ajv.addSchema(artifactDescriptorSchema)
   ajv.addSchema(wireSchema)
+  ajv.addSchema(videoSchema)
   ajv.addSchema(modelCatalogV3Schema)
   ajv.addSchema(byokCatalogV1Schema)
   return {
+    VideoUnderstandingInputV1: ajv.compile({ $ref: "video-understanding.schema.json#/$defs/VideoUnderstandingInputV1" }),
+    VideoModelsV1: ajv.compile({ $ref: "video-understanding.schema.json#/$defs/VideoModelsV1" }),
+    VideoUnderstandingResultV1: ajv.compile({ $ref: "video-understanding.schema.json#/$defs/VideoUnderstandingResultV1" }),
+    VideoJobResultV1: ajv.compile({ $ref: "video-understanding.schema.json#/$defs/VideoJobResultV1" }),
     TokenClaimsV1: ajv.compile({ $ref: "alpha-wire-contracts.schema.json#/$defs/TokenClaimsV1" }),
     UploadManifestV1: ajv.compile({ $ref: "alpha-wire-contracts.schema.json#/$defs/UploadManifestV1" }),
     LedgerPageV1: ajv.compile({ $ref: "alpha-wire-contracts.schema.json#/$defs/LedgerPageV1" }),
@@ -89,6 +95,10 @@ export function decodeContract<Name extends ContractName>(
       received_version: receivedVersion(value, "schema_version"),
       reason: "schema-validation",
     })
+  }
+  if (contract.startsWith("Video") && value && typeof value === "object" && "source_range" in value) {
+    const range = value.source_range as {start_ms: number; end_ms: number}
+    if (range.end_ms <= range.start_ms) throw new ContractIncompatibleError({ surface, received_version: 1, reason: "schema-validation" })
   }
   return value as ContractValues[Name]
 }
@@ -202,3 +212,7 @@ function uploadManifestInvariants(value: unknown) {
     new Set(manifest.files.map((file) => file.path)).size === manifest.files.length
   )
 }
+
+
+export const VIDEO_MODEL_KEYS = videoSchema.$defs.VideoUnderstandingInputV1.properties.model.enum as ["gemini"]
+export const videoUnderstandingResultSchema = videoSchema.$defs.VideoUnderstandingResultV1

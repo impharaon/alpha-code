@@ -37,6 +37,7 @@ const ENUMERATED_MEMBERS = [
   "codepuppy-cloud-jobs.ts",
   "codepuppy-cloud-schedules.ts",
   "codepuppy-platform-models.ts",
+  "codepuppy-video-transport.ts", // #1775: video upload failures use the existing platform error authority
 ]
 
 /** 递归枚举 src/main 生产源(测试与用例文件被 tsconfig 排除在 typecheck 外,也不在本闸辖区)。 */

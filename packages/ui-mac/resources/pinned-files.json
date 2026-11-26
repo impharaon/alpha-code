@@ -1,0 +1,495 @@
+{
+  "schemaVersion": 1,
+  "files": [
+    {
+      "id": "speech-model/any/whisper-tiny-lid",
+      "family": "speech-model",
+      "target": "any",
+      "version": "tiny-int8",
+      "originUrl": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-whisper-tiny.tar.bz2",
+      "sha256": "c46116994e539aa165266d96b325252728429c12535eb9d8b6a2b10f129e66b1",
+      "bytes": 116204861,
+      "provenanceUrl": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-whisper-tiny.tar.bz2"
+    },
+    {
+      "id": "speech-model/any/silero-vad",
+      "family": "speech-model",
+      "target": "any",
+      "version": "silero-vad",
+      "originUrl": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/silero_vad.onnx",
+      "sha256": "9e2449e1087496d8d4caba907f23e0bd3f78d91fa552479bb9c23ac09cbb1fd6",
+      "bytes": 643854,
+      "provenanceUrl": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/silero_vad.onnx"
+    },
+    {
+      "id": "speech-model/any/sensevoice-2024-07-17-int8",
+      "family": "speech-model",
+      "target": "any",
+      "version": "2024-07-17",
+      "originUrl": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-int8-2024-07-17.tar.bz2",
+      "sha256": "7d1efa2138a65b0b488df37f8b89e3d91a60676e416f515b952358d83dfd347e",
+      "bytes": 163002883,
+      "provenanceUrl": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-int8-2024-07-17.tar.bz2"
+    },
+    {
+      "id": "speech-model/any/pyannote-segmentation-3-0",
+      "family": "speech-model",
+      "target": "any",
+      "version": "3.0",
+      "originUrl": "https://github.com/k2-fsa/sherpa-onnx/releases/download/speaker-segmentation-models/sherpa-onnx-pyannote-segmentation-3-0.tar.bz2",
+      "sha256": "24615ee884c897d9d2ba09bb4d30da6bb1b15e685065962db5b02e76e4996488",
+      "bytes": 6958444,
+      "provenanceUrl": "https://github.com/k2-fsa/sherpa-onnx/releases/download/speaker-segmentation-models/sherpa-onnx-pyannote-segmentation-3-0.tar.bz2"
+    },
+    {
+      "id": "speech-model/any/3dspeaker-eres2net-base",
+      "family": "speech-model",
+      "target": "any",
+      "version": "eres2net-base-16k",
+      "originUrl": "https://github.com/k2-fsa/sherpa-onnx/releases/download/speaker-recongition-models/3dspeaker_speech_eres2net_base_sv_zh-cn_3dspeaker_16k.onnx",
+      "sha256": "f1ee61be04000b50392a63442e5dd9feaea7e81dddd494d3647cf1c3d88a1498",
+      "bytes": 39593762,
+      "provenanceUrl": "https://github.com/k2-fsa/sherpa-onnx/releases/download/speaker-recongition-models/3dspeaker_speech_eres2net_base_sv_zh-cn_3dspeaker_16k.onnx"
+    },
+    {
+      "id": "speech-model/any/whisper-turbo-q5",
+      "family": "speech-model",
+      "target": "any",
+      "version": "large-v3-turbo-q5_0",
+      "originUrl": "https://github.com/impharaon/alpha-code/releases/download/v0.2.8/video-whisper-large-v3-turbo-q5_0.bin",
+      "sha256": "394221709cd5ad1f40c46e6031ca61bce88931e6e088c188294c6d5a55ffa7e2",
+      "bytes": 574041195,
+      "provenanceUrl": "https://huggingface.co/ggerganov/whisper.cpp/resolve/5359861c739e955e79d9a303bcbc70fb988958b1/ggml-large-v3-turbo-q5_0.bin"
+    },
+    {
+      "id": "ocr-model/win32-x64/chi_sim-4.1.0",
+      "family": "ocr-model",
+      "target": "win32-x64",
+      "version": "4.1.0",
+      "originUrl": "https://github.com/impharaon/alpha-code/releases/download/v0.2.8/video-tessdata-fast-4.1.0-chi_sim.traineddata",
+      "sha256": "a5fcb6f0db1e1d6d8522f39db4e848f05984669172e584e8d76b6b3141e1f730",
+      "bytes": 2469156,
+      "provenanceUrl": "https://raw.githubusercontent.com/tesseract-ocr/tessdata_fast/65727574dfcd264acbb0c3e07860e4e9e9b22185/chi_sim.traineddata"
+    },
+    {
+      "id": "ocr-model/win32-x64/chi_tra-4.1.0",
+      "family": "ocr-model",
+      "target": "win32-x64",
+      "version": "4.1.0",
+      "originUrl": "https://github.com/impharaon/alpha-code/releases/download/v0.2.8/video-tessdata-fast-4.1.0-chi_tra.traineddata",
+      "sha256": "529c5b5797d64b126065cd55f2bb4c7fd7b15790798091b1ff259941a829330b",
+      "bytes": 2366642,
+      "provenanceUrl": "https://raw.githubusercontent.com/tesseract-ocr/tessdata_fast/65727574dfcd264acbb0c3e07860e4e9e9b22185/chi_tra.traineddata"
+    },
+    {
+      "id": "ocr-model/win32-x64/eng-4.1.0",
+      "family": "ocr-model",
+      "target": "win32-x64",
+      "version": "4.1.0",
+      "originUrl": "https://github.com/impharaon/alpha-code/releases/download/v0.2.8/video-tessdata-fast-4.1.0-eng.traineddata",
+      "sha256": "7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2",
+      "bytes": 4113088,
+      "provenanceUrl": "https://raw.githubusercontent.com/tesseract-ocr/tessdata_fast/65727574dfcd264acbb0c3e07860e4e9e9b22185/eng.traineddata"
+    },
+    {
+      "id": "ocr-model/win32-x64/osd-4.1.0",
+      "family": "ocr-model",
+      "target": "win32-x64",
+      "version": "4.1.0",
+      "originUrl": "https://github.com/impharaon/alpha-code/releases/download/v0.2.8/video-tessdata-fast-4.1.0-osd.traineddata",
+      "sha256": "9cf5d576fcc47564f11265841e5ca839001e7e6f38ff7f7aacf46d15a96b00ff",
+      "bytes": 10562727,
+      "provenanceUrl": "https://raw.githubusercontent.com/tesseract-ocr/tessdata_fast/65727574dfcd264acbb0c3e07860e4e9e9b22185/osd.traineddata"
+    },
+    {
+      "id": "ocr-model/win32-x64/script-Arabic",
+      "family": "ocr-model",
+      "target": "win32-x64",
+      "version": "4.1.0",
+      "originUrl": "https://github.com/impharaon/alpha-code/releases/download/v0.2.8/video-tessdata-fast-4.1.0-script-Arabic.traineddata",
+      "sha256": "47c262ac4e843c024df87ffa1363b77a821a843c069c71ef7650f4d2ecfea1e8",
+      "bytes": 9311038,
+      "provenanceUrl": "https://raw.githubusercontent.com/tesseract-ocr/tessdata_fast/65727574dfcd264acbb0c3e07860e4e9e9b22185/script/Arabic.traineddata"
+    },
+    {
+      "id": "ocr-model/win32-x64/script-Armenian",
+      "family": "ocr-model",
+      "target": "win32-x64",
+      "version": "4.1.0",
+      "originUrl": "https://github.com/impharaon/alpha-code/releases/download/v0.2.8/video-tessdata-fast-4.1.0-script-Armenian.traineddata",
+      "sha256": "e94e3cfcb79dc6bc24b819ce01340b690f2aabe4c5ac295545ae1bca5d7472f4",
+      "bytes": 7879909,
+      "provenanceUrl": "https://raw.githubusercontent.com/tesseract-ocr/tessdata_fast/65727574dfcd264acbb0c3e07860e4e9e9b22185/script/Armenian.traineddata"
+    },
+    {
+      "id": "ocr-model/win32-x64/script-Bengali",
+      "family": "ocr-model",
+      "target": "win32-x64",
+      "version": "4.1.0",
+      "originUrl": "https://github.com/impharaon/alpha-code/releases/download/v0.2.8/video-tessdata-fast-4.1.0-script-Bengali.traineddata",
+      "sha256": "d04c2064bd0ffcd18488c4048d40d88ab056185f3462c2337b52f9e6c51158e5",
+      "bytes": 5712242,
+      "provenanceUrl": "https://raw.githubusercontent.com/tesseract-ocr/tessdata_fast/65727574dfcd264acbb0c3e07860e4e9e9b22185/script/Bengali.traineddata"
+    },
+    {
+      "id": "ocr-model/win32-x64/script-Canadian_Aboriginal",
+      "family": "ocr-model",
+      "target": "win32-x64",
+      "version": "4.1.0",
+      "originUrl": "https://github.com/impharaon/alpha-code/releases/download/v0.2.8/video-tessdata-fast-4.1.0-script-Canadian_Aboriginal.traineddata",
+      "sha256": "ec11e31e65541a2040982ee8a08514278f850127908df71553f0958cd02609f8",
+      "bytes": 7180795,
+      "provenanceUrl": "https://raw.githubusercontent.com/tesseract-ocr/tessdata_fast/65727574dfcd264acbb0c3e07860e4e9e9b22185/script/Canadian_Aboriginal.traineddata"
+    },
+    {
+      "id": "ocr-model/win32-x64/script-Cherokee",
+      "family": "ocr-model",
+      "target": "win32-x64",
+      "version": "4.1.0",
+      "originUrl": "https://github.com/impharaon/alpha-code/releases/download/v0.2.8/video-tessdata-fast-4.1.0-script-Cherokee.traineddata",
+      "sha256": "76df30145426bde13c7ab07a2cb9a27b415a7d703472424801b35c3c3da3aab7",
+      "bytes": 4231619,
+      "provenanceUrl": "https://raw.githubusercontent.com/tesseract-ocr/tessdata_fast/65727574dfcd264acbb0c3e07860e4e9e9b22185/script/Cherokee.traineddata"
+    },
+    {
+      "id": "ocr-model/win32-x64/script-Cyrillic",
+      "family": "ocr-model",
+      "target": "win32-x64",
+      "version": "4.1.0",
+      "originUrl": "https://github.com/impharaon/alpha-code/releases/download/v0.2.8/video-tessdata-fast-4.1.0-script-Cyrillic.traineddata",
+      "sha256": "a80325ebb1c7aa2dca5002ec05b15052a51dcb2e9e65373c264a3df7ac284358",
+      "bytes": 29252466,
+      "provenanceUrl": "https://raw.githubusercontent.com/tesseract-ocr/tessdata_fast/65727574dfcd264acbb0c3e07860e4e9e9b22185/script/Cyrillic.traineddata"
+    },
+    {
+      "id": "ocr-model/win32-x64/script-Devanagari",
+      "family": "ocr-model",
+      "target": "win32-x64",
+      "version": "4.1.0",
+      "originUrl": "https://github.com/impharaon/alpha-code/releases/download/v0.2.8/video-tessdata-fast-4.1.0-script-Devanagari.traineddata",
+      "sha256": "3bbb87c1de2a6a2ef0a97dc041e6eea2723a1c22d638f5e38157a5cd441c12b7",
+      "bytes": 17943870,
+      "provenanceUrl": "https://raw.githubusercontent.com/tesseract-ocr/tessdata_fast/65727574dfcd264acbb0c3e07860e4e9e9b22185/script/Devanagari.traineddata"
+    },
+    {
+      "id": "ocr-model/win32-x64/script-Ethiopic",
+      "family": "ocr-model",
+      "target": "win32-x64",
+      "version": "4.1.0",
+      "originUrl": "https://github.com/impharaon/alpha-code/releases/download/v0.2.8/video-tessdata-fast-4.1.0-script-Ethiopic.traineddata",
+      "sha256": "4856c53285f9dd28dd130228316cdd506a5172505c99f367d63d84e6467c15f4",
+      "bytes": 9074416,
+      "provenanceUrl": "https://raw.githubusercontent.com/tesseract-ocr/tessdata_fast/65727574dfcd264acbb0c3e07860e4e9e9b22185/script/Ethiopic.traineddata"
+    },
+    {
+      "id": "ocr-model/win32-x64/script-Fraktur",
+      "family": "ocr-model",
+      "target": "win32-x64",
+      "version": "4.1.0",
+      "originUrl": "https://github.com/impharaon/alpha-code/releases/download/v0.2.8/video-tessdata-fast-4.1.0-script-Fraktur.traineddata",
+      "sha256": "ac985c3020e42986f8a19e07f1c1b501d47ed7d8e96de69f685bb907aa8db55c",
+      "bytes": 10915632,
+      "provenanceUrl": "https://raw.githubusercontent.com/tesseract-ocr/tessdata_fast/65727574dfcd264acbb0c3e07860e4e9e9b22185/script/Fraktur.traineddata"
+    },
+    {
+      "id": "ocr-model/win32-x64/script-Georgian",
+      "family": "ocr-model",
+      "target": "win32-x64",
+      "version": "4.1.0",
+      "originUrl": "https://github.com/impharaon/alpha-code/releases/download/v0.2.8/video-tessdata-fast-4.1.0-script-Georgian.traineddata",
+      "sha256": "8da5cc7e2af2c8da04d126ab1f2604904305e548bc3fc20d3c0bae6d519ca013",
+      "bytes": 6949865,
+      "provenanceUrl": "https://raw.githubusercontent.com/tesseract-ocr/tessdata_fast/65727574dfcd264acbb0c3e07860e4e9e9b22185/script/Georgian.traineddata"
+    },
+    {
+      "id": "ocr-model/win32-x64/script-Greek",
+      "family": "ocr-model",
+      "target": "win32-x64",
+      "version": "4.1.0",
+      "originUrl": "https://github.com/impharaon/alpha-code/releases/download/v0.2.8/video-tessdata-fast-4.1.0-script-Greek.traineddata",
+      "sha256": "52e201e4a22336d89ee202b579aca04f15ffd6e5e6af1fe164498f2c7de898e6",
+      "bytes": 3041556,
+      "provenanceUrl": "https://raw.githubusercontent.com/tesseract-ocr/tessdata_fast/65727574dfcd264acbb0c3e07860e4e9e9b22185/script/Greek.traineddata"
+    },
+    {
+      "id": "ocr-model/win32-x64/script-Gujarati",
+      "family": "ocr-model",
+      "target": "win32-x64",
+      "version": "4.1.0",
+      "originUrl": "https://github.com/impharaon/alpha-code/releases/download/v0.2.8/video-tessdata-fast-4.1.0-script-Gujarati.traineddata",
+      "sha256": "94643022c1dc06a6b1a96f7dbc3bcc77f455b38e6843cc115a4c9c460b0b32aa",
+      "bytes": 5017100,
+      "provenanceUrl": "https://raw.githubusercontent.com/tesseract-ocr/tessdata_fast/65727574dfcd264acbb0c3e07860e4e9e9b22185/script/Gujarati.traineddata"
+    },
+    {
+      "id": "ocr-model/win32-x64/script-Gurmukhi",
+      "family": "ocr-model",
+      "target": "win32-x64",
+      "version": "4.1.0",
+      "originUrl": "https://github.com/impharaon/alpha-code/releases/download/v0.2.8/video-tessdata-fast-4.1.0-script-Gurmukhi.traineddata",
+      "sha256": "34c36da0fc59198f009ebbe8646708255fa3ca2553e62645a7b584cbceca8b24",
+      "bytes": 4213597,
+      "provenanceUrl": "https://raw.githubusercontent.com/tesseract-ocr/tessdata_fast/65727574dfcd264acbb0c3e07860e4e9e9b22185/script/Gurmukhi.traineddata"
+    },
+    {
+      "id": "ocr-model/win32-x64/script-HanS",
+      "family": "ocr-model",
+      "target": "win32-x64",
+      "version": "4.1.0",
+      "originUrl": "https://github.com/impharaon/alpha-code/releases/download/v0.2.8/video-tessdata-fast-4.1.0-script-HanS.traineddata",
+      "sha256": "d03c250faaa48015bfde2213f3d7d5bda82bcee93422fceac5906a32073d9152",
+      "bytes": 5972903,
+      "provenanceUrl": "https://raw.githubusercontent.com/tesseract-ocr/tessdata_fast/65727574dfcd264acbb0c3e07860e4e9e9b22185/script/HanS.traineddata"
+    },
+    {
+      "id": "ocr-model/win32-x64/script-HanS_vert",
+      "family": "ocr-model",
+      "target": "win32-x64",
+      "version": "4.1.0",
+      "originUrl": "https://github.com/impharaon/alpha-code/releases/download/v0.2.8/video-tessdata-fast-4.1.0-script-HanS_vert.traineddata",
+      "sha256": "b555a9a60c88e5e27ddd34541d055200c05492d1f184732518a721faf1db979b",
+      "bytes": 5429738,
+      "provenanceUrl": "https://raw.githubusercontent.com/tesseract-ocr/tessdata_fast/65727574dfcd264acbb0c3e07860e4e9e9b22185/script/HanS_vert.traineddata"
+    },
+    {
+      "id": "ocr-model/win32-x64/script-HanT",
+      "family": "ocr-model",
+      "target": "win32-x64",
+      "version": "4.1.0",
+      "originUrl": "https://github.com/impharaon/alpha-code/releases/download/v0.2.8/video-tessdata-fast-4.1.0-script-HanT.traineddata",
+      "sha256": "29588327f0d830b5c112209045d826b9be014138266b20f2b08843aac2730fbb",
+      "bytes": 5448070,
+      "provenanceUrl": "https://raw.githubusercontent.com/tesseract-ocr/tessdata_fast/65727574dfcd264acbb0c3e07860e4e9e9b22185/script/HanT.traineddata"
+    },
+    {
+      "id": "ocr-model/win32-x64/script-HanT_vert",
+      "family": "ocr-model",
+      "target": "win32-x64",
+      "version": "4.1.0",
+      "originUrl": "https://github.com/impharaon/alpha-code/releases/download/v0.2.8/video-tessdata-fast-4.1.0-script-HanT_vert.traineddata",
+      "sha256": "ec4e31daec478e61216b1d9f34e0441fc1fcefacfe4fb28f1ea8bcfcc97ba302",
+      "bytes": 5448267,
+      "provenanceUrl": "https://raw.githubusercontent.com/tesseract-ocr/tessdata_fast/65727574dfcd264acbb0c3e07860e4e9e9b22185/script/HanT_vert.traineddata"
+    },
+    {
+      "id": "ocr-model/win32-x64/script-Hangul",
+      "family": "ocr-model",
+      "target": "win32-x64",
+      "version": "4.1.0",
+      "originUrl": "https://github.com/impharaon/alpha-code/releases/download/v0.2.8/video-tessdata-fast-4.1.0-script-Hangul.traineddata",
+      "sha256": "cae2d12b8cdac6b62643b65915bec347e80970adc55228ca42ac1ec8909b198a",
+      "bytes": 4845849,
+      "provenanceUrl": "https://raw.githubusercontent.com/tesseract-ocr/tessdata_fast/65727574dfcd264acbb0c3e07860e4e9e9b22185/script/Hangul.traineddata"
+    },
+    {
+      "id": "ocr-model/win32-x64/script-Hangul_vert",
+      "family": "ocr-model",
+      "target": "win32-x64",
+      "version": "4.1.0",
+      "originUrl": "https://github.com/impharaon/alpha-code/releases/download/v0.2.8/video-tessdata-fast-4.1.0-script-Hangul_vert.traineddata",
+      "sha256": "8fbbd6366654e043038bbcf78b2b8e031c64c2b65f133593d097edee6c7e2ea8",
+      "bytes": 4725034,
+      "provenanceUrl": "https://raw.githubusercontent.com/tesseract-ocr/tessdata_fast/65727574dfcd264acbb0c3e07860e4e9e9b22185/script/Hangul_vert.traineddata"
+    },
+    {
+      "id": "ocr-model/win32-x64/script-Hebrew",
+      "family": "ocr-model",
+      "target": "win32-x64",
+      "version": "4.1.0",
+      "originUrl": "https://github.com/impharaon/alpha-code/releases/download/v0.2.8/video-tessdata-fast-4.1.0-script-Hebrew.traineddata",
+      "sha256": "4f4f3405404a61e21e5c16316ed5c3052ddb3572a75e0b3dc3fe118b12dea76e",
+      "bytes": 4866337,
+      "provenanceUrl": "https://raw.githubusercontent.com/tesseract-ocr/tessdata_fast/65727574dfcd264acbb0c3e07860e4e9e9b22185/script/Hebrew.traineddata"
+    },
+    {
+      "id": "ocr-model/win32-x64/script-Japanese",
+      "family": "ocr-model",
+      "target": "win32-x64",
+      "version": "4.1.0",
+      "originUrl": "https://github.com/impharaon/alpha-code/releases/download/v0.2.8/video-tessdata-fast-4.1.0-script-Japanese.traineddata",
+      "sha256": "c176cdca0c17e9be97bda854ac91baea90b92e2813b45749ad05e409477ba8b2",
+      "bytes": 5877645,
+      "provenanceUrl": "https://raw.githubusercontent.com/tesseract-ocr/tessdata_fast/65727574dfcd264acbb0c3e07860e4e9e9b22185/script/Japanese.traineddata"
+    },
+    {
+      "id": "ocr-model/win32-x64/script-Japanese_vert",
+      "family": "ocr-model",
+      "target": "win32-x64",
+      "version": "4.1.0",
+      "originUrl": "https://github.com/impharaon/alpha-code/releases/download/v0.2.8/video-tessdata-fast-4.1.0-script-Japanese_vert.traineddata",
+      "sha256": "1d463a4811f3ae174e11b3f87773e07130c1c6aca042f31f7a90c41d939f1538",
+      "bytes": 6445356,
+      "provenanceUrl": "https://raw.githubusercontent.com/tesseract-ocr/tessdata_fast/65727574dfcd264acbb0c3e07860e4e9e9b22185/script/Japanese_vert.traineddata"
+    },
+    {
+      "id": "ocr-model/win32-x64/script-Kannada",
+      "family": "ocr-model",
+      "target": "win32-x64",
+      "version": "4.1.0",
+      "originUrl": "https://github.com/impharaon/alpha-code/releases/download/v0.2.8/video-tessdata-fast-4.1.0-script-Kannada.traineddata",
+      "sha256": "1252172cbbe99d27e5e52009a0e79444d555329b82e0b88d6e1f2a601a1b7d86",
+      "bytes": 6777791,
+      "provenanceUrl": "https://raw.githubusercontent.com/tesseract-ocr/tessdata_fast/65727574dfcd264acbb0c3e07860e4e9e9b22185/script/Kannada.traineddata"
+    },
+    {
+      "id": "ocr-model/win32-x64/script-Khmer",
+      "family": "ocr-model",
+      "target": "win32-x64",
+      "version": "4.1.0",
+      "originUrl": "https://github.com/impharaon/alpha-code/releases/download/v0.2.8/video-tessdata-fast-4.1.0-script-Khmer.traineddata",
+      "sha256": "330366535d1155974af0f99630df3060c9a98c657b1e4b29f458125f1d10e44a",
+      "bytes": 4476365,
+      "provenanceUrl": "https://raw.githubusercontent.com/tesseract-ocr/tessdata_fast/65727574dfcd264acbb0c3e07860e4e9e9b22185/script/Khmer.traineddata"
+    },
+    {
+      "id": "ocr-model/win32-x64/script-Lao",
+      "family": "ocr-model",
+      "target": "win32-x64",
+      "version": "4.1.0",
+      "originUrl": "https://github.com/impharaon/alpha-code/releases/download/v0.2.8/video-tessdata-fast-4.1.0-script-Lao.traineddata",
+      "sha256": "6bdca344c3ed9ecf405e2f8b5eb0af9832c1de7d92af2f4891867549c1d1fb63",
+      "bytes": 10103937,
+      "provenanceUrl": "https://raw.githubusercontent.com/tesseract-ocr/tessdata_fast/65727574dfcd264acbb0c3e07860e4e9e9b22185/script/Lao.traineddata"
+    },
+    {
+      "id": "ocr-model/win32-x64/script-Latin",
+      "family": "ocr-model",
+      "target": "win32-x64",
+      "version": "4.1.0",
+      "originUrl": "https://github.com/impharaon/alpha-code/releases/download/v0.2.8/video-tessdata-fast-4.1.0-script-Latin.traineddata",
+      "sha256": "6dbdaf8ecc6c40f025c2648bf3b3f3fbffe073e1fd2df2047fde2e2b2f020d53",
+      "bytes": 89384811,
+      "provenanceUrl": "https://raw.githubusercontent.com/tesseract-ocr/tessdata_fast/65727574dfcd264acbb0c3e07860e4e9e9b22185/script/Latin.traineddata"
+    },
+    {
+      "id": "ocr-model/win32-x64/script-Malayalam",
+      "family": "ocr-model",
+      "target": "win32-x64",
+      "version": "4.1.0",
+      "originUrl": "https://github.com/impharaon/alpha-code/releases/download/v0.2.8/video-tessdata-fast-4.1.0-script-Malayalam.traineddata",
+      "sha256": "822ad7ed9fb2eba0b0da5c788ed8710eba651d91777fc659ce0d700cfb99be06",
+      "bytes": 9007302,
+      "provenanceUrl": "https://raw.githubusercontent.com/tesseract-ocr/tessdata_fast/65727574dfcd264acbb0c3e07860e4e9e9b22185/script/Malayalam.traineddata"
+    },
+    {
+      "id": "ocr-model/win32-x64/script-Myanmar",
+      "family": "ocr-model",
+      "target": "win32-x64",
+      "version": "4.1.0",
+      "originUrl": "https://github.com/impharaon/alpha-code/releases/download/v0.2.8/video-tessdata-fast-4.1.0-script-Myanmar.traineddata",
+      "sha256": "78f95e6033824b7c197a099e9fdef55e0742146619d822c9b8d81f933f2b27df",
+      "bytes": 7840489,
+      "provenanceUrl": "https://raw.githubusercontent.com/tesseract-ocr/tessdata_fast/65727574dfcd264acbb0c3e07860e4e9e9b22185/script/Myanmar.traineddata"
+    },
+    {
+      "id": "ocr-model/win32-x64/script-Oriya",
+      "family": "ocr-model",
+      "target": "win32-x64",
+      "version": "4.1.0",
+      "originUrl": "https://github.com/impharaon/alpha-code/releases/download/v0.2.8/video-tessdata-fast-4.1.0-script-Oriya.traineddata",
+      "sha256": "39fc17f9e30eee261ac08b2d9d3c82bf28e69cff7c38d0a3aea19f1023410ade",
+      "bytes": 5744929,
+      "provenanceUrl": "https://raw.githubusercontent.com/tesseract-ocr/tessdata_fast/65727574dfcd264acbb0c3e07860e4e9e9b22185/script/Oriya.traineddata"
+    },
+    {
+      "id": "ocr-model/win32-x64/script-Sinhala",
+      "family": "ocr-model",
+      "target": "win32-x64",
+      "version": "4.1.0",
+      "originUrl": "https://github.com/impharaon/alpha-code/releases/download/v0.2.8/video-tessdata-fast-4.1.0-script-Sinhala.traineddata",
+      "sha256": "ce202bfbdc65e677abd76f5349f4765296b3d2b01c87608f49154ad7fa12ec4a",
+      "bytes": 4782577,
+      "provenanceUrl": "https://raw.githubusercontent.com/tesseract-ocr/tessdata_fast/65727574dfcd264acbb0c3e07860e4e9e9b22185/script/Sinhala.traineddata"
+    },
+    {
+      "id": "ocr-model/win32-x64/script-Syriac",
+      "family": "ocr-model",
+      "target": "win32-x64",
+      "version": "4.1.0",
+      "originUrl": "https://github.com/impharaon/alpha-code/releases/download/v0.2.8/video-tessdata-fast-4.1.0-script-Syriac.traineddata",
+      "sha256": "a89964433928a74de707e6fb61df1e933660de19c969f5301e8195e0219ea9bc",
+      "bytes": 5803220,
+      "provenanceUrl": "https://raw.githubusercontent.com/tesseract-ocr/tessdata_fast/65727574dfcd264acbb0c3e07860e4e9e9b22185/script/Syriac.traineddata"
+    },
+    {
+      "id": "ocr-model/win32-x64/script-Tamil",
+      "family": "ocr-model",
+      "target": "win32-x64",
+      "version": "4.1.0",
+      "originUrl": "https://github.com/impharaon/alpha-code/releases/download/v0.2.8/video-tessdata-fast-4.1.0-script-Tamil.traineddata",
+      "sha256": "6857e222c6977986915bd073f669c2cde33039dedde26603ed6be87b0a8d62bb",
+      "bytes": 7089032,
+      "provenanceUrl": "https://raw.githubusercontent.com/tesseract-ocr/tessdata_fast/65727574dfcd264acbb0c3e07860e4e9e9b22185/script/Tamil.traineddata"
+    },
+    {
+      "id": "ocr-model/win32-x64/script-Telugu",
+      "family": "ocr-model",
+      "target": "win32-x64",
+      "version": "4.1.0",
+      "originUrl": "https://github.com/impharaon/alpha-code/releases/download/v0.2.8/video-tessdata-fast-4.1.0-script-Telugu.traineddata",
+      "sha256": "615dd18355098058d77a45ee3bacc5d36aca574880c1b6099011f2aca09f2d1c",
+      "bytes": 6485174,
+      "provenanceUrl": "https://raw.githubusercontent.com/tesseract-ocr/tessdata_fast/65727574dfcd264acbb0c3e07860e4e9e9b22185/script/Telugu.traineddata"
+    },
+    {
+      "id": "ocr-model/win32-x64/script-Thaana",
+      "family": "ocr-model",
+      "target": "win32-x64",
+      "version": "4.1.0",
+      "originUrl": "https://github.com/impharaon/alpha-code/releases/download/v0.2.8/video-tessdata-fast-4.1.0-script-Thaana.traineddata",
+      "sha256": "aae14e808cc783e00fe37af8afa67ff09c8d01b454065b7633e014eb2b5b6e2d",
+      "bytes": 6048323,
+      "provenanceUrl": "https://raw.githubusercontent.com/tesseract-ocr/tessdata_fast/65727574dfcd264acbb0c3e07860e4e9e9b22185/script/Thaana.traineddata"
+    },
+    {
+      "id": "ocr-model/win32-x64/script-Thai",
+      "family": "ocr-model",
+      "target": "win32-x64",
+      "version": "4.1.0",
+      "originUrl": "https://github.com/impharaon/alpha-code/releases/download/v0.2.8/video-tessdata-fast-4.1.0-script-Thai.traineddata",
+      "sha256": "d9e34be94556ddb65fd7e04892ff606e1a5b696d0eb422b5a7efc6859943702d",
+      "bytes": 4249016,
+      "provenanceUrl": "https://raw.githubusercontent.com/tesseract-ocr/tessdata_fast/65727574dfcd264acbb0c3e07860e4e9e9b22185/script/Thai.traineddata"
+    },
+    {
+      "id": "ocr-model/win32-x64/script-Tibetan",
+      "family": "ocr-model",
+      "target": "win32-x64",
+      "version": "4.1.0",
+      "originUrl": "https://github.com/impharaon/alpha-code/releases/download/v0.2.8/video-tessdata-fast-4.1.0-script-Tibetan.traineddata",
+      "sha256": "0c869d52597d5b03eb6f52c5d0c217514e883259ead05765c0329e5a536538ae",
+      "bytes": 5699531,
+      "provenanceUrl": "https://raw.githubusercontent.com/tesseract-ocr/tessdata_fast/65727574dfcd264acbb0c3e07860e4e9e9b22185/script/Tibetan.traineddata"
+    },
+    {
+      "id": "ocr-model/win32-x64/script-Vietnamese",
+      "family": "ocr-model",
+      "target": "win32-x64",
+      "version": "4.1.0",
+      "originUrl": "https://github.com/impharaon/alpha-code/releases/download/v0.2.8/video-tessdata-fast-4.1.0-script-Vietnamese.traineddata",
+      "sha256": "30546eea618459e79761f962391e6879778b026ad7b4459a11664a1b654758bd",
+      "bytes": 1667794,
+      "provenanceUrl": "https://raw.githubusercontent.com/tesseract-ocr/tessdata_fast/65727574dfcd264acbb0c3e07860e4e9e9b22185/script/Vietnamese.traineddata"
+    },
+    {
+      "id": "ffmpeg/darwin-arm64/9.1-openh264-2.7.0",
+      "family": "ffmpeg",
+      "target": "darwin-arm64",
+      "version": "9.1-openh264-2.7.0",
+      "originUrl": "https://github.com/impharaon/alpha-code/releases/download/v0.2.8/video-ffmpeg-9.1-openh264-2.7.0-darwin-arm64.tar.gz",
+      "bytes": 21408316,
+      "sha256": "fa3bb967e71c7bb934924822799d2f633197e6b972430961cbbf8a651bdaf98f",
+      "provenanceUrl": "https://github.com/impharaon/alpha-code/releases/download/v0.2.8/video-ffmpeg-9.1-openh264-2.7.0-darwin-arm64-source.tar.gz"
+    },
+    {
+      "id": "ffmpeg/win32-x64/9.1-openh264-2.7.0",
+      "family": "ffmpeg",
+      "target": "win32-x64",
+      "version": "9.1-openh264-2.7.0",
+      "originUrl": "https://github.com/impharaon/alpha-code/releases/download/v0.2.8/video-ffmpeg-9.1-openh264-2.7.0-win32-x64.tar.gz",
+      "bytes": 22408571,
+      "sha256": "5b42585b521c1e4dd708ec01b2c1f02812c3f254d8cc658ff9989bd314aebffe",
+      "provenanceUrl": "https://github.com/impharaon/alpha-code/releases/download/v0.2.8/video-ffmpeg-9.1-openh264-2.7.0-win32-x64-source.tar.gz"
+    }
+  ]
+}

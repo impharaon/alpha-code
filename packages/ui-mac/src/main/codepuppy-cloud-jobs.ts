@@ -83,15 +83,16 @@ async function authed<T>(
   purpose: RoutePurpose,
   init: { method?: string; body?: unknown; maxAttempts?: number } | undefined,
   decode: (text: string) => T,
+  origin?: string,
 ): Promise<CloudResult<T>> {
   try {
     const token = getAccessToken(purpose)
     if (!token) return { error: "not-authenticated" }
-    if (!cloudBase()) return { error: "no-cloud-endpoint" }
+    if (!(origin ?? cloudBase())) return { error: "no-cloud-endpoint" }
     const body = init?.body !== undefined ? JSON.stringify(init.body) : undefined
     const res = await fetchWithBoundedRetry(
       () =>
-        fetch(`${cloudBase()}${path}`, {
+        fetch(`${origin ?? cloudBase()}${path}`, {
           method: init?.method ?? "GET",
           headers: {
             authorization: `Bearer ${token}`,
@@ -259,3 +260,18 @@ export async function downloadCloudArtifactTo(
   }
   return outcome
 }
+
+
+// Video understanding consumes its validated full result, not a scrubbed public artifact view.
+export const getVideoCloudJobStatus = (jobId: string): Promise<CloudResult<CloudJobStatus>> =>
+  authed(`${CODEPUPPY_PATHS.cloudJobs}/${encodeURIComponent(jobId)}`, "cloud.read", undefined, (text) =>
+    decodeJsonContract("CloudJobStatusV1", text, "cloud-http"),
+  )
+export const getVideoModels = () =>
+  authed(
+    "/v1/tools/video/models",
+    "cloud.read",
+    undefined,
+    (text) => decodeJsonContract("VideoModelsV1", text, "cloud-http"),
+    resolveEndpoints().platform,
+  )

@@ -293,3 +293,21 @@ test.each([{ left: -20, expected: "8px" }, { left: 400, expected: "400px" }, { l
   expect(window.innerWidth).toBe(1024)
   expect(box.style.left).toBe(expected)
 })
+
+test("media cards show known durations, preserve unknown duration and explain source failures", () => {
+  const [attachments, setAttachments] = createSignal<ComposerAttachment[]>([
+    { id: "video", kind: "video", path: "/outside/talk.mp4", name: "talk.mp4", bytes: 1000, size: 1000, durationMs: null },
+  ])
+  const host = mount(() => createComponent(ComposerAttachmentStrip, {
+    get attachments() { return attachments() }, reading: false, imageRoute: "native", onRemove: () => {}, onRetry: () => {},
+  }))
+  expect(host.textContent).toContain("talk.mp4")
+  expect(host.textContent).toContain(zh["codepuppy.attach.routeLocal"])
+  expect(host.textContent).not.toContain("00:00")
+  setAttachments([{ id: "video", kind: "video", path: "/outside/talk.mp4", name: "talk.mp4", bytes: 1000, size: 1000, durationMs: 61_000 }])
+  expect(host.textContent).toContain("01:01")
+  setAttachments([{ id: "video", kind: "video", path: "/outside/talk.mp4", name: "talk.mp4", bytes: 1000, size: 1000, durationMs: 0 }])
+  expect(host.textContent).toContain("00:00")
+  setAttachments([{ id: "failed", kind: "failed", name: "gone.mp4", size: 1, reason: "source_missing" }])
+  expect(host.textContent).toContain(zh["codepuppy.attach.mediaMissing"])
+})

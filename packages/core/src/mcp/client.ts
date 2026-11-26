@@ -1,3 +1,5 @@
+import { withVideoProgress } from "./codepuppy-video-progress.js" // codepuppy(#1775)
+import type { VideoProgress } from "@opencode/schema/codepuppy-video-progress"
 export * as McpClient from "./client.js"
 
 import { readCodePuppyCredential } from "@opencode/util/codepuppy-credentials" // codepuppy(#1562, I-20)
@@ -195,6 +197,7 @@ export interface Connection {
       readonly args?: Record<string, unknown>
       readonly sessionID?: Session.ID
     } & PerRequest,
+    videoProgress?: (update: VideoProgress) => Promise<void>, // codepuppy(#1775): callback is not request data
   ) => Effect.Effect<CallToolResult, Error>
   readonly onClose: (callback: (reason: string) => void) => void
   readonly onSessionExpired: (callback: () => void) => void
@@ -544,10 +547,10 @@ export const connect = Effect.fnUntraced(function* (options: ConnectOptions) {
             { signal: claim(signal, input), timeout: execution },
           ),
         ),
-      callTool: (input) => {
+      callTool: (input, videoProgress) => {
         const call = Effect.tryPromise({
           try: (signal) =>
-            client.callTool(
+            withVideoProgress(signal, videoProgress, (onprogress) => client.callTool(
               {
                 name: input.name,
                 arguments: input.args ?? {},
@@ -558,7 +561,7 @@ export const connect = Effect.fnUntraced(function* (options: ConnectOptions) {
                 timeout: execution,
                 // Only asks for a progress token: progress on the response stream can keep proxies from closing it.
                 // The SDK timeout does not reset on progress; execution is the hard wall.
-                onprogress: () => {},
+                onprogress, // codepuppy(#1775): this request's bound Tool.Context, not initialize
                 // Always passed, even for a tool we haven't listed, so the SDK never falls back to listing
                 // and caching the raw tools itself. Its types are narrower than what it reads (JSON values,
                 // a string `$schema`); ours keep the server's values.
@@ -567,7 +570,7 @@ export const connect = Effect.fnUntraced(function* (options: ConnectOptions) {
                   inputSchema: { type: "object" },
                 }) as CallToolRequestOptions["toolDefinition"],
               },
-            ),
+            )),
           catch: (error) => error,
         })
         // A modern server rejects headers mirrored from a stale definition before running the tool,

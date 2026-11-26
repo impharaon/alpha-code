@@ -66,7 +66,7 @@ export function UploadConsentDialog(props: {
         {(value) => (
           <div class="codepuppy-upl">
             <p class="codepuppy-upl-intro">
-              {t("codepuppy.cloud.consent.introPrefix")} <b>{t("codepuppy.cloud.consent.pipelineReview")}</b>
+              {t("codepuppy.cloud.consent.introPrefix")} <b>{t(value().pipeline === "video-understanding" ? "codepuppy.cloud.consent.pipelineVideo" : "codepuppy.cloud.consent.pipelineReview")}</b>
               {t("codepuppy.cloud.consent.introSuffix")}
             </p>
 
@@ -122,7 +122,7 @@ export function UploadConsentDialog(props: {
               <div class="codepuppy-upl-mrow">
                 <span class="mic">{icon("M2.5 8h8M8 4.5 11.5 8 8 11.5M13.5 3v10")}</span>
                 <span class="k">{t("codepuppy.cloud.consent.purposeLabel")}</span>
-                <span class="v"><b>{t("codepuppy.cloud.consent.pipelineReview")}</b> — {t("codepuppy.cloud.consent.purposeReview")}</span>
+                <span class="v"><b>{t(value().pipeline === "video-understanding" ? "codepuppy.cloud.consent.pipelineVideo" : "codepuppy.cloud.consent.pipelineReview")}</b> — {t(value().pipeline === "video-understanding" ? "codepuppy.cloud.consent.purposeVideo" : "codepuppy.cloud.consent.purposeReview")}</span>
               </div>
               <div class="codepuppy-upl-mrow">
                 <span class="mic">{icon("M3 3.5h10M5 3.5V2h6v1.5M4.5 5.5l.7 8h5.6l.7-8")}</span>

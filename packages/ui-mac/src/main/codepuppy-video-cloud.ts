@@ -59,6 +59,7 @@ type Work = {
   prepared?: () => void
   record?: RecordValue
   promise: Promise<void>
+  writes: Promise<void>
 }
 const sameRange = (a: VideoSourceRange, b: VideoSourceRange) => a.start_ms === b.start_ms && a.end_ms === b.end_ms
 const uploadFacts=(record:RecordValue)=>({file:path.basename(record.referencePath),sourceRange:record.input.source_range,bytes:record.attempts.filter(a=>a.jobId || a.bodyFullySent).reduce((sum,a)=>sum+a.clip.bytes,0)})
@@ -106,6 +107,11 @@ export function createMainVideoService(deps: {
   const pointerOf = (root: string, id: string) => {
     if (!/^[a-f0-9-]{36}$/.test(id)) throw new Error("video_request_invalid")
     return cachePath({ cacheRoot: root }, "cloud-requests", `${id}.json`)
+  }
+  const persistRecord=(current:Work,root:string,key:string,record:RecordValue)=>{
+    const written=current.writes.catch(()=>{}).then(()=>writeJson(fileOf(root,key),record))
+    current.writes=written
+    return written
   }
   const owner = async (requestId: string, call: VideoCall) => {
     const root = rootOf(),
@@ -193,6 +199,7 @@ export function createMainVideoService(deps: {
       requests: new Set(),
       state: {},
       promise: Promise.resolve(),
+      writes: Promise.resolve(),
     }
     work.set(key, current)
     current.promise = Flock.withLock(
@@ -202,7 +209,7 @@ export function createMainVideoService(deps: {
         if (!record) throw new Error("video_request_invalid")
         current.record = record
         const signal = current.controller.signal
-        const persist = () => writeJson(fileOf(root, key), record)
+        const persist = () => persistRecord(current,root,key,record)
         const identity = () => {
           if (deps.identity()?.tenantId !== record.tenant) throw new Error("not-authenticated")
           signal.throwIfAborted()
@@ -571,7 +578,7 @@ export function createMainVideoService(deps: {
         current.requests.clear()
         current.controller.abort()
         const record=current.record
-        if(record){record.cancelled=true;await writeJson(fileOf(rootOf(),key),record)}
+        if(record){record.cancelled=true;await persistRecord(current,rootOf(),key,record)}
         await Promise.all((record?.attempts ?? []).filter(a=>a.jobId && a.state === "running").map(a=>deps.cancel(a.jobId!)))
       }
     },
@@ -640,8 +647,9 @@ export function createMainVideoService(deps: {
       )
         throw new Error("video_request_invalid")
       await checkedClip(root, request)
+      current.controller.signal.throwIfAborted()
       record.clips.push({ range: request.input.source_range, clip: request.clip })
-      await writeJson(fileOf(root, pointer.key), record)
+      await persistRecord(current,root,pointer.key,record)
       current.state = { progress: { phase: "exporting", completed: request.input.source_range.start_ms, unit: "ms" } }
       current.prepared?.()
       current.prepared = undefined
@@ -658,7 +666,7 @@ export function createMainVideoService(deps: {
         const record = current.record ?? (await readJson<RecordValue>(fileOf(root, pointer.key)))
         if (record) {
           record.cancelled = true
-          await writeJson(fileOf(root, pointer.key), record)
+          await persistRecord(current,root,pointer.key,record)
         }
         await Promise.all(
           (record?.attempts ?? []).filter((a) => a.jobId && a.state === "running").map((a) => deps.cancel(a.jobId!)),

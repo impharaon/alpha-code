@@ -2217,6 +2217,10 @@
         {
           "file": "packages/plugin/test/codepuppy-package-runtime.test.ts",
           "name": "instruction renderer follows the Location lifetime across module consumers"
+        },
+        {
+          "file": "packages/core/test/codepuppy-command-model-priority.test.ts",
+          "name": "native argument suffix stays on the native syntax axis"
         }
       ]
     }

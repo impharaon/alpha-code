@@ -260,7 +260,7 @@ function evaluateTemplate(
       const value = (text: string) => node.kind !== "shell" ? text : quote === "'" ? text.replaceAll("'", "'\\''") : quote === '"' ? text.replace(/[\\"$`]/g, character => "\\" + character) : "'" + text.replaceAll("'", "'\\''") + "'"
       return node.parts.map(part => {
         if ("boundValue" in part) return value(part.boundValue)
-        const pattern = /\$(?:ARGUMENTS(?:\[\d+\])?|\d+|[A-Za-z_][A-Za-z_0-9]*)/g
+        const pattern = input.syntax === "claude" ? /\$(?:ARGUMENTS(?:\[\d+\])?|\d+|[A-Za-z_][A-Za-z_0-9]*)/g : /\$(?:ARGUMENTS|[1-9]\d*)/g
         let end = 0
         let rendered = ""
         const source = (text: string) => {

@@ -516,7 +516,7 @@ export const CodePuppyExt: Plugin.Plugin = {
             // Native directory ids may also occupy the managed key; keep their registrations intact.
             const id = editor.get(skill.key) ? skill.key + "/" + skill.entry.id : skill.key
             editor.add({ id: Skill.ID.make(id), name: Skill.Name.make(skill.name), path: AbsolutePath.make(skill.path),
-              ...(typeof skill.entry.display.description === "string" ? { description: skill.entry.display.description } : {}),
+              ...(typeof skill.entry.display.shortDescription === "string" ? { description: skill.entry.display.shortDescription } : {}),
               autoinvoke: skill.entry.invocation.implicitInvocation,
               content: renderPluginText(skill.entry.instruction, { pluginRoot: skill.pluginRoot, skillDir: skill.directory, projectDir: directory, pluginData: skill.pluginData, resolveOption: skill.resolveOption }),
             })

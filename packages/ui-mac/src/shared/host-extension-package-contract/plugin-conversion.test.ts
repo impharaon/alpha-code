@@ -51,6 +51,18 @@ test("invocation fields preserve source controls and provider argument syntax", 
   expect(vercel.entries.find(entry => entry.kind === "command")).toMatchObject({ invocation: { argumentSyntax: "codex" } })
 })
 
+test("YAML false independently disables automatic skill invocation", async () => {
+  const original = await captureStandardFixture("codex:temporal")
+  const source = new TextDecoder().decode(await original.readFile("skills/temporal-cloud-setup/SKILL.md"))
+  // The pinned source actually uses the Claude spelling; remove that redundant declaration.
+  expect(source).toContain("disable-model-invocation: true")
+  const converted = await (await converter()).convertPluginTree(await captureStandardFixture("codex:temporal", {
+    "skills/temporal-cloud-setup/SKILL.md": source.replace(/^disable-model-invocation: true\r?\n/m, ""),
+  }))
+  const entry = converted.package.entries.find(entry => entry.sourceName === "temporal-cloud-setup")
+  expect(entry && "invocation" in entry ? entry.invocation.implicitInvocation : undefined).toBe(false)
+})
+
 test("real third-party sample trees are archive-only and unpacked into temporary storage", async () => {
   const storedRoot = join(import.meta.dir, "../../../test-fixtures/plugin-helper")
   expect(fixtureRoot).not.toBe(storedRoot)

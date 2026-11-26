@@ -109,7 +109,7 @@ export async function convertPluginTree(input: Capture): Promise<{ package: Plug
       if (typeof value.url === "string" && transport !== "stdio") dependencyDefinitions.push({ name: value.value, path: sidecarPath, pointer: "/dependencies/tools", value: { type: transport ?? "http", url: value.url } })
       return [{ type: "mcp", value: value.value, ...(typeof value.description === "string" ? { description: value.description } : {}), ...(transport ? { transport } : {}), ...(typeof value.url === "string" ? { url: pluginText(value.url) } : {}) }]
     }) : []
-    const display: SkillDisplay = {}
+    const display: SkillDisplay = typeof data.description === "string" ? { shortDescription: data.description } : {}
     if (object(yaml.interface)) for (const [source, target] of [["display_name", "displayName"], ["short_description", "shortDescription"], ["icon_small", "iconSmall"], ["icon_large", "iconLarge"], ["brand_color", "brandColor"], ["default_prompt", "defaultPrompt"]] as const) {
       const value = yaml.interface[source]
       if (typeof value !== "string") continue

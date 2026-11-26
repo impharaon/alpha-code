@@ -651,3 +651,35 @@ r3 最终静态检查：schema `bun typecheck` 142 files、core 2,053 files / 2 
 本轮 PLAN 收口（2026-11-26 16:47，Codex / GPT-6）：只读核对固定设计/真实样本/既有入口，约 11 分钟。`python3 scripts/check-doc-links.py docs/specs/local-plugin-install/plan.md` exit 0，8 条相对链接；`git diff --check` exit 0。单仓 docs profile 的 `check-docs-contract --changed-since 88d40cb6df --format json` exit 1，71 errors / 251 warnings，与已接受基线一致（`/tmp/plugin-standard-r4-plan-docs.json`）；按派发不修两条旧 unknown-id。`affected-tests --list` exit 2，缺 `.gate-tests`，无 scope line（`/tmp/plugin-standard-r4-plan-affected.log`）。未运行测试/应用/全量门，hooksPath=`.githooks`。已核依据 spec v5/design v3.1 与 r4；结论 PLAN-READY / Q1 待裁决。下一步由编排器/设计定点补 renderer 参数名输入；其余遗留维持原去向，无额外 OPTIONAL。
 
 片 3 S-01 步骤：`3545ea2f8e` 的红测先报端口缺失（0 pass / 1 fail / 1 error）；实现后 core renderer 新 case 2 pass（10 assertions），对应既有 command 文件 7 pass，plugin 跨 bundle/Location/dispose 1 pass（5 assertions），registry 5 pass。包内 plugin typecheck 326 files exit 0；core 的两个新推断错误在同一行显式 flatMap 域类型消除，包内 typecheck 2,057 files / 2 projects exit 0。源码 AST 在值绑定前构建，S-01.arguments 原样输入；端口、core、registry/ADR 同提交。syntax 轴由现有 conversion generator 从唯一合同生成 `packages/plugin/src/codepuppy-package-syntax.ts`（必要的附加文件），没有手写第二份枚举。
+
+### r5 实施收据与冻结接缝停点
+
+**SEAM-CHANGE-NEEDED: PackageAllowSetV3** — 片 2 的 `packages/ext/src/package-scope.ts:5–35` 是 main/ext 共享且唯一解码的允许集，scoped.kind 及 scopedPackageAllowedHere 只接 skill/mcp；`packages/ui-mac/src/main/ext-receipt-v2.ts:621/632` 的唯一生产者过滤其他 kind、仅给 skill 生成全局 keys。两处属片 2（`git blame` 为 6fe4aeba8d、相关 package-scope 登记为 972650bab6），不在 r1 的 S4-A/B 例外内。本片运行项必须随根开关/项目范围变化；feature-dev 只有 1 command/3 agents，现投影不能承载其活动身份。一次只读 `decodePackageAllowSet` 探针输出 `skill true / mcp true / agent false / command false`（`/tmp/plugin-standard-r5-allowset-probe.log`）。现有 engine command 生效声明虽会在关包时撤下，但不是可供同一 Invocation 权限/作用域消费的 typed membership；ext 另读账本或伪造 skill key 都会绕开指定的唯一投影。
+
+**最小需要**：授权在本分支增量修改上述片 2 两文件，让现有 keys 生产支持全局 command/agent、scoped.kind 与同一判定支持 command/agent，仍由现有 root/effect/claim 算法派生，启停写者和事务顺序不变，不另建状态/迁移。这是冻结片 2 合同的域轴增量，不是需要重新决定 Invocation 设计；S-01.arguments 的 r5 裁决已经实施且不重开。未擅改冻结生产者，尚未接 command/agent 安装/运行与本次调用期权限，不能报告整片 DONE。
+
+| 固定实样 | 实际转换 command / agent / skill / MCP | 本轮读回及运行验收 |
+| --- | --- | --- |
+| feature-dev | 1 / 3 / 0 / 0 | 原声明完整；命令/委派运行待补口 |
+| Codex Vercel | 6 / 3 / 54 / 1 | skill YAML 读回；命令/委派待补口；.app.json 仍是批准排除的 unresolved-app-id |
+| plugin-dev | 1 / 3 / 7 / 0 | 规则与字段完整转换；命令/委派待补口 |
+| Temporal | 0 / 0 / 4 / 0 | 三项 manual-only；独立 YAML false 反臂已红，整包调用旅程未跑 |
+| build-chatgpt-app（openai-developers 整包） | 0 / 0 / 5 / 2 | 真实 YAML 的 MCP dependency/url/transport 保留并生成连接器声明；.app.json 仍单列排除，实际 SaaS 调用未验 |
+| claude-security | 0 / 17 / 6 / 0 | 3 manual-only，源控制/模板保留；助手实际运行待补口 |
+
+一次性读回命令：ui-mac 下 `bun -e` 导入原 fixture/converter，逐一 convert 六个 pinned captures，输出各 kind/manual/diagnostics；结果在 `/tmp/plugin-standard-r5-six-samples.jsonl`，未执行实样脚本/真实 SaaS。此表是转换证据，不把片 4 的既有整树安装验收或静态候选数字充当片 3 运行 PASS。
+
+相关检查（2026-11-26 17:14，Codex / GPT-6，r5 起 16:55 约 19 分钟）：
+
+- UI：一次较宽集合 `bun test src/shared/host-extension-package-contract/{plugin-conversion,host-extension-package-artifact,package-envelope-v1}.test.ts src/main/{install-from-source,plugin-sources,package-child-kind.fast,package-admission}.test.ts` 为 278 pass / 1 fail。唯一新失败为独立 converter 输出目录探针不含新增 SDK 文件；修其路径归属后，改动行为文件完整一次 **38 pass / 0 fail**（其余六文件先前 241 pass）。两个 generator --check exit 0，19-file artifact 校验通过；ui-mac 包内 typecheck exit 0。
+- Core：S-01 文件初步 7 pass；发现 native `$ARGUMENTS[0]` 被 Claude 语法吞掉后，`d9db474def` 单独红测 0 pass / 1 fail，修后完整文件 **8 pass / 0 fail**。较宽相关 `test/config/command.test.ts test/command.test.ts` **35 pass / 0 fail**；包内 typecheck 2,057 files / 2 projects exit 0。
+- Core 基线：`test/config/command-subagent.test.ts:92/116` 三条测试仍期望命令/助手模型覆盖父会话明确模型，与原 l1r-command-model-priority 实现相反。较宽首次 1 pass / 3 fail；按 delivery-ship §3 只做一次具名基线对照，用 `0c08b28836` 的原 command.ts 重跑该文件，仍 **1 pass / 相同 3 fail**（`/tmp/plugin-standard-r5-core-baseline.log`），随后逐字恢复当前实现。交编排器，未改未弱化旧断言。
+- Plugin：新端口生命周期文件 **1 pass / 0 fail**，包内 typecheck 326 files exit 0。Ext：既有实际 SkillEditor 绑定 case **1 pass / 20 assertions**；随后对应宿主行为文件完整一次 **55 pass / 0 fail**；identity/authority-registry 文件 **24 pass / 0 fail**，包内 typecheck exit 0。没有包级 lint script，不跑根级 lint/gate。
+- 六条删除反臂：丢参数名顺序、把 boundValue 变 source、提前插入原始参数、Claude 下标改为 1-based、删括号词法、忽略 YAML false，分别 **0 pass / 1 fail**；恢复后逐字 cmp。初次 YAML 删除反臂仍绿，证明原 case 的冗余 frontmatter 没剥掉（真实字段是 disable-model-invocation）；新增独立 YAML case 剥掉真实字段，反臂转红，恢复后该 case 1 pass。没有修改已提交红测的正确断言。
+- 文档：plan 8 条相对链接通过；docs-contract 71 errors / 251 warnings，继承指定基线，两条旧 unknown-id 未动。`affected-tests --list` exit 2：缺 `.gate-tests`，无 scope line（`/tmp/plugin-standard-r5-affected.log`）；冻结 gate 未改。两次误从根启动 typecheck 的 turbo 均已结束，返回既有 codepuppy-ui 错误，未计 PASS/未调查；后续均指定包目录。
+
+偏离：新增 SDK syntax 生成文件为同一语法轴的必要消费者；`plugin.ts` 的 display.description→shortDescription 为共享严格 SkillDisplay 变更的必要同链消费，frontmatter description 也进入该字段。初步类型检查的两个推断错误和 converter 临时输出目录回归均由本轮修正。没有新增依赖/选项、旧记录兼容、迁移或 engine 文件接管；S-01 登记与实现同提交，后续 native 语法修正同步补具名 proof。计划后续安装/L0 调用/权限/六样本运行旅程尚未实施，因上述冻结接缝停止。
+
+交接：依据 spec v5 / design v3.1 / r5 arguments 裁决；已核 Codex（GPT-6），结论 SEAM-CHANGE-NEEDED，不是整片通过。已定勿重开为片 4 accepted 与 S-01.arguments；下一步编排器授权上述 PackageAllowSetV3 两文件增量后继续本片第 4/5 步。遗留去向：冻结补口 fix now；三条 baseline command-subagent 断言、缺 selector manifest、docs 基线交编排器；真实 SaaS/工具链仍 integration acceptance。OPTIONAL：无。
+
+最终修正提交前再次 `git diff --check` exit 0、plan 相对链接 8 pass，hooksPath=.githooks；所有本车道前台测试/类型/生成器/文档命令均已结束。机器上其他 worktree 的 gate 不由本车道启动/处置；本车道 Bun 测试未启用并行文件。实际非生成生产变更约 7 文件/300 余行，尚未达到计划后续工作，停点由冻结合同触发，非规模/时间超限。

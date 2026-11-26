@@ -21,7 +21,8 @@ const textEncoder = new TextEncoder()
 /** Desktop runtime outputs are checked independently of the published host contract. */
 export async function checkPluginConversion(outputRoot = root): Promise<void> {
   for (const [path, bytes] of await conversionArtifactBytes()) {
-    if (!Buffer.from(await readFile(resolve(outputRoot, path))).equals(bytes))
+    // The SDK syntax file belongs to this checkout, not a standalone runtime-output directory.
+    if (!Buffer.from(await readFile(resolve(path.startsWith("../") ? root : outputRoot, path))).equals(bytes))
       throw new Error(path + " drifted; run generate-plugin-conversion.ts")
   }
 }

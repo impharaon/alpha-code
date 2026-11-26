@@ -7,6 +7,8 @@ import { Schema } from "effect"
 const requirementAttributes = {
   extras: Schema.optional(Schema.Array(Schema.String)),
   alias: Schema.optional(Schema.String),
+  marker: Schema.optional(Schema.String),
+  editable: Schema.optional(Schema.Boolean),
 }
 export const ConnectorRequirement = Schema.Union([
   Schema.Struct({
@@ -25,6 +27,7 @@ export const ConnectorRequirement = Schema.Union([
     kind: Schema.Literal("git"),
     url: Schema.String,
     revision: Schema.String,
+    name: Schema.optional(Schema.String),
     subdirectory: Schema.optional(Schema.String),
     ...requirementAttributes,
   }),
@@ -124,11 +127,14 @@ export function connectorPreparationKey(input: {
               kind: requirement.kind,
               url: nonSecretSourceUrl(requirement.url),
               revision: requirement.revision,
+              name: requirement.name,
               subdirectory: requirement.subdirectory,
             }
           : { kind: requirement.kind, sha256: requirement.sha256, name: requirement.name }),
     ...(requirement.extras?.length ? { extras: [...new Set(requirement.extras)].sort() } : {}),
     ...(requirement.alias ? { alias: requirement.alias } : {}),
+    ...(requirement.marker ? { marker: requirement.marker } : {}),
+    ...(requirement.editable ? { editable: true } : {}),
   }))
   const options = Object.fromEntries(
     Object.entries(input.options)

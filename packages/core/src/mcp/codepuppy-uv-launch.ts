@@ -2,6 +2,8 @@ import { Effect, Schema, Stream } from "effect"
 import { ChildProcess } from "effect/process"
 import type { ConnectorLaunchFailure, LauncherEnvironment } from "@opencode/util/codepuppy-connector-launch"
 import { Environment } from "../environment/index.js"
+import { ConnectorRequirement } from "./codepuppy-connector-key.js"
+import { connectorContentRuntime, connectorSourceProgram } from "./codepuppy-connector-content.js"
 
 /** Preserve uv's parsed options; only the tool-run execution switches differ from tool-install. */
 export function uvToolInstallArguments(input: {
@@ -65,21 +67,15 @@ export function readUvLaunchDeclaration(input: {
 
 /** Install into the caller's per-content UV_TOOL_DIR; preparation never invokes the service command. */
 export function installUvConnector(input: {
-  syntax: "uvx" | "uv"
-  arguments: readonly string[]
-  declaration: ReturnType<typeof parseUvToolSettings>
+  installArguments: readonly string[]
   cwd: string
   environment: Record<string, string>
   launchers: LauncherEnvironment
 }) {
   return Effect.gen(function* () {
-    const arguments_ = yield* Effect.try({
-      try: () => uvToolInstallArguments(input),
-      catch: (): ConnectorLaunchFailure => ({ kind: "unknown", detail: "Invalid parsed uv tool declaration" }),
-    })
     const environment = yield* Environment.Service
     const process = yield* environment.spawner.spawn(
-      ChildProcess.make(input.launchers.uv, arguments_, { cwd: input.cwd, env: input.environment, extendEnv: false }),
+      ChildProcess.make(input.launchers.uv, input.installArguments, { cwd: input.cwd, env: input.environment, extendEnv: false }),
     )
     const [exitCode, stdout, stderr] = yield* Effect.all(
       [process.exitCode, Stream.mkUint8Array(process.stdout), Stream.mkUint8Array(process.stderr)],
@@ -104,8 +100,8 @@ export function readUvLaunchEnvironment(input: Parameters<typeof readUvLaunchDec
     const directories: string[] = []
     for (let index = 0; index < options.length; index++) {
       const option = options[index]!
-      if (option === "--directory" || option === "-C") directories.push(option, options[++index]!)
-      else if (option.startsWith("--directory=") || option.startsWith("-C")) directories.push(option)
+      if (option === "--directory") directories.push(option, options[++index]!)
+      else if (option.startsWith("--directory=")) directories.push(option)
     }
     const environment = yield* Environment.Service
     const process = yield* environment.spawner.spawn(ChildProcess.make(input.launchers.uv, [
@@ -121,6 +117,238 @@ export function readUvLaunchEnvironment(input: Parameters<typeof readUvLaunchDec
     return { cwd: value.cwd, environment: { ...value.environment, ...input.environment } }
   }).pipe(Effect.mapError(uvLaunchFailure))
 }
+
+const uvSourceOptions = [
+  { field: "with_requirements", argument: "--with-requirements", purpose: "dependencies" },
+  { field: "constraints", argument: "--constraints", short: "-c", purpose: "constraints" },
+  { field: "overrides", argument: "--overrides", purpose: "overrides" },
+  { field: "build_constraints", argument: "--build-constraints", short: "-b", purpose: "build-constraints" },
+] as const
+
+const UvContent = Schema.Struct({
+  requirements: Schema.Array(ConnectorRequirement),
+  options: Schema.Record(Schema.String, Schema.Unknown),
+  configuration: Schema.Array(Schema.Struct({
+    purpose: Schema.Literals(["dependencies", "constraints", "overrides", "build-constraints", "source"]),
+    value: Schema.Unknown,
+  })),
+  sourceBindings: Schema.Array(Schema.Struct({ path: Schema.String, sha256: Schema.String, editable: Schema.Boolean })),
+  requirementFiles: Schema.Record(Schema.String, Schema.String),
+  installFiles: Schema.Array(Schema.Struct({ argument: Schema.Literals(uvSourceOptions.map(value => value.argument)), path: Schema.String })),
+  commandName: Schema.NullOr(Schema.String),
+})
+
+/** Parse package standards with the pinned Python's bundled packaging/pip, never a system module. */
+export function normalizeUvPackageDeclaration(input: Parameters<typeof readUvLaunchDeclaration>[0] & {
+  declaration: ReturnType<typeof parseUvToolSettings>
+  python: string
+  temporary: string
+}) {
+  return Effect.gen(function* () {
+    const environment = yield* Environment.Service
+    const execution = yield* readUvLaunchEnvironment(input)
+    const handle = yield* environment.spawner.spawn(ChildProcess.make(input.launchers.node, ["--input-type=commonjs", "-e", uvContentProgram], {
+      cwd: execution.cwd, env: execution.environment, extendEnv: false,
+      stdin: { stream: Stream.succeed(new TextEncoder().encode(JSON.stringify({
+        ...connectorContentRuntime(input.launchers, input.python, input.temporary),
+        declaration: input.declaration,
+        arguments: input.arguments,
+        settings: parseUvResolvedValue(input.declaration.fields.settings!),
+        pythonPlatform: parseUvResolvedValue(input.declaration.fields.python_platform!),
+        sources: Object.fromEntries(uvSourceOptions.map(option => [option.field, parseUvResolvedValue(input.declaration.fields[option.field]!)])),
+        sourceOptions: uvSourceOptions,
+        sourceProgram: connectorSourceProgram,
+        requirementsProgram: uvRequirementProgram,
+      }))), endOnDone: true },
+    }))
+    const [code, stdout, stderr] = yield* Effect.all([handle.exitCode, Stream.mkUint8Array(handle.stdout), Stream.mkUint8Array(handle.stderr)], { concurrency: "unbounded" })
+    if (code !== 0) return yield* Effect.fail({ kind: "unknown", detail: new TextDecoder().decode(stderr) } as const)
+    const value = yield* Schema.decodeUnknownEffect(Schema.fromJsonString(UvContent))(new TextDecoder().decode(stdout))
+    const original = uvToolInstallArguments(input)
+    const options: string[] = []
+    for (let index = 0; index < original.length - 2; index++) {
+      const token = original[index]!
+      const source = uvSourceOptions.find(option => token === option.argument || token.startsWith(option.argument + "=") || "short" in option && token.startsWith(option.short))
+      if (!source) { options.push(token); continue }
+      if (token === source.argument || "short" in source && token === source.short) index++
+    }
+    return { ...value, installArguments: [...options, ...value.installFiles.flatMap(value => [value.argument, value.path]), "--", original.at(-1)!], declaration: { ...input.declaration, commandName: value.commandName } }
+  }).pipe(Effect.mapError(uvLaunchFailure))
+}
+
+const uvRequirementProgram = String.raw`
+import json, pathlib, sys
+# ensurepip is part of the pinned standalone interpreter, including on Windows.
+root = pathlib.Path(sys.base_prefix)
+wheels = list(root.glob('lib/python*/ensurepip/_bundled/pip-*.whl')) + list(root.glob('Lib/ensurepip/_bundled/pip-*.whl'))
+if len(wheels) != 1:
+    raise ValueError('Pinned Python ensurepip wheel is missing')
+sys.path.insert(0, str(wheels[0]))
+from pip._vendor.packaging.requirements import Requirement, InvalidRequirement
+from pip._vendor.packaging.utils import canonicalize_name
+from pip._internal.req.req_file import preprocess, get_line_parser
+data = json.load(sys.stdin)
+def requirement(text):
+    try:
+        value = Requirement(text)
+        return dict(name=canonicalize_name(value.name), extras=sorted(canonicalize_name(extra) for extra in value.extras), version=str(value.specifier) or '*', url=value.url, marker=str(value.marker) if value.marker else None)
+    except InvalidRequirement:
+        # uv also accepts unnamed paths/URLs and the tool-only name@version spelling.
+        return dict(source=text)
+if 'requirement' in data:
+    result = requirement(data['requirement'])
+else:
+    result = []
+    parse = get_line_parser(None)
+    for _, line in preprocess(data['content']):
+        args, options = parse(line)
+        result.append(dict(requirement=args, editables=options.editables, requirements=options.requirements, constraints=options.constraints, index=options.index_url, extraIndexes=options.extra_index_urls, links=options.find_links, noIndex=options.no_index, requireHashes=options.require_hashes, hashes=options.hashes, noBinary=sorted(options.format_control.no_binary), onlyBinary=sorted(options.format_control.only_binary)))
+print(json.dumps(result))
+`
+
+const uvContentProgram = String.raw`
+const fs = require('node:fs')
+const path = require('node:path')
+const crypto = require('node:crypto')
+const { fileURLToPath } = require('node:url')
+const { createRequire } = require('node:module')
+const { spawnSync } = require('node:child_process')
+;(async () => {
+  const input = JSON.parse(fs.readFileSync(0, 'utf8'))
+  const clean = require('node:vm').runInThisContext('(' + input.normalizer + ')')
+  const sanitize = value => clean(value, input.queryPattern)
+  const content = require('node:vm').runInThisContext('(' + input.sourceProgram + ')')(input)
+  const python = data => {
+    const result = spawnSync(input.python, ['-I', '-S', '-c', input.requirementsProgram], { input: JSON.stringify(data), encoding: 'utf8', env: process.env })
+    if (result.status !== 0) throw Error(result.stderr)
+    return JSON.parse(result.stdout)
+  }
+  fs.mkdirSync(input.temporary, { recursive: true, mode: 0o700 })
+  const requirements = []
+  const sourceBindings = []
+  const local = async (reference, editable = false) => {
+    const file = reference.startsWith('file:') ? fileURLToPath(new URL(reference, 'file://' + process.cwd() + '/')) : path.resolve(reference)
+    const sha256 = await content.identify(file, 'python')
+    if (!sourceBindings.some(value => value.path === file && value.editable === editable)) sourceBindings.push({ path: file, sha256, editable })
+    return { kind: 'content', sha256 }
+  }
+  const requirement = async (text, editable = false, implicit = false) => {
+    if (implicit) text = text.replace(/^([^/@\\]+)@([^@]+)$/, (_,name,version) => name + (version === 'latest' ? '' : '==' + version))
+    const parsed = python({ requirement: text })
+    const attributes = { ...(parsed.name ? { name: parsed.name } : {}), ...(parsed.extras?.length ? { extras: parsed.extras } : {}), ...(parsed.marker ? { marker: parsed.marker } : {}), ...(editable ? { editable: true } : {}) }
+    let source = parsed.url || parsed.source
+    if (source && !parsed.url && !fs.existsSync(path.resolve(source))) {
+      const extras = /\[([^\]]+)\]$/.exec(source)
+      if (extras) { attributes.extras = extras[1].split(',').map(value => value.trim().toLowerCase().replace(/[-_.]+/g, '-')).sort(); source = source.slice(0, -extras[0].length) }
+    }
+    if (!source) return { kind: 'registry', name: parsed.name, version: parsed.version, ...attributes }
+    if (/^(?:git\+)?file:/.test(source) || /^(?:\.{1,2}[\\/]|\/|[A-Za-z]:[\\/])/.test(source) || fs.existsSync(path.resolve(source))) {
+      return { ...await local(source.replace(/^git\+/, ''), editable), ...attributes }
+    }
+    if (/^git\+/.test(source)) {
+      const url = new URL(source)
+      const at = url.pathname.lastIndexOf('@')
+      const revision = at < 0 ? '' : url.pathname.slice(at + 1)
+      if (at >= 0) url.pathname = url.pathname.slice(0, at)
+      const subdirectory = new URLSearchParams(url.hash.slice(1)).get('subdirectory')
+      url.hash = ''
+      return { kind: 'git', url: sanitize(url.toString()), revision, ...(subdirectory ? { subdirectory } : {}), ...attributes }
+    }
+    return { kind: 'remote', url: sanitize(source), ...attributes }
+  }
+  const scalar = value => value === null || typeof value !== 'object' ? String(value ?? '') : value.kind === 'tuple' ? value.items.map(scalar).join('') : (() => { throw Error('Invalid uv URL component') })()
+  const url = value => {
+    const f = value.fields
+    const host = scalar(f.host)
+    return scalar(f.scheme) + '://' + (host.includes(':') && !host.startsWith('[') ? '[' + host + ']' : host) + (f.port == null ? '' : ':' + scalar(f.port)) + scalar(f.path) + (f.query == null ? '' : '?' + scalar(f.query)) + (f.fragment == null ? '' : '#' + scalar(f.fragment))
+  }
+  const project = async value => {
+    if (Array.isArray(value)) return Promise.all(value.map(project))
+    if (value === null || typeof value !== 'object') return typeof value === 'string' && /^(?:file:|\.{1,2}[\\/]|\/|[A-Za-z]:[\\/])/.test(value) ? local(value) : value
+    if (value.kind === 'tuple') return value.name === 'Some' || value.name === 'Url' ? project(value.items[0]) : { type: value.name, values: await Promise.all(value.items.map(project)) }
+    if (value.name === 'SafeUrl') { const source = url(value); return source.startsWith('file:') ? local(source) : sanitize(source) }
+    if (value.name === 'VerbatimUrl') return project(value.fields.url)
+    const entries = []
+    for (const [key, item] of Object.entries(value.fields)) if (key !== 'origin' && Object.hasOwn(sanitize({ [key]: null }), key)) entries.push([key, await project(item)])
+    return Object.fromEntries(entries)
+  }
+  const settings = input.settings.fields.resolver
+  const options = await project(settings)
+  options.python_platform = await project(input.pythonPlatform)
+  const files = []
+  const seen = new Map()
+  const requirementFiles = Object.create(null)
+  const rawUrl = reference => {
+    const withoutCredentials = source => { const value = new URL(source); value.username = ''; value.password = ''; return value.href }
+    const candidates = [...input.arguments, ...Object.values(process.env)].flatMap(value => String(value).match(/https?:\/\/[^\s<>"']+/g) || [])
+    return candidates.filter(value => URL.canParse(value)).find(value => withoutCredentials(value) === withoutCredentials(reference)) || reference
+  }
+  const readFile = async reference => {
+    if (!/^https?:/.test(reference)) return fs.readFileSync(reference.startsWith('file:') ? fileURLToPath(reference) : reference, 'utf8')
+    const npmRequire = createRequire(input.npmCli)
+    const target = new URL(rawUrl(reference))
+    const authorization = target.username || target.password ? 'Basic ' + Buffer.from(decodeURIComponent(target.username) + ':' + decodeURIComponent(target.password)).toString('base64') : undefined
+    target.username = ''; target.password = ''
+    const response = await npmRequire('make-fetch-happen')(target.href, { headers: authorization ? { authorization } : {}, proxy: process.env.HTTPS_PROXY || process.env.HTTP_PROXY, noProxy: process.env.NO_PROXY })
+    if (!response.ok) throw Error('Requirement source HTTP ' + response.status)
+    return response.text()
+  }
+  const read = async reference => {
+    const canonical = /^https?:/.test(reference) ? reference : fs.realpathSync(reference.startsWith('file:') ? fileURLToPath(reference) : reference)
+    if (seen.has(canonical)) return seen.get(canonical)
+    const id = files.length
+    const target = path.join(input.temporary, 'requirements-' + id + '.txt')
+    seen.set(canonical, id); files.push(null); requirementFiles[reference] = target
+    const records = python({ content: (await readFile(canonical)).replace(/^(-[rce])=/gm, '$1 ') })
+    const facts = []
+    const lines = []
+    for (const record of records) {
+      const value = {}
+      if (record.requirement) { value.requirement = await requirement(record.requirement); lines.push(record.requirement + Object.entries(record.hashes || {}).flatMap(([algorithm, hashes]) => hashes.map(hash => ' --hash=' + algorithm + ':' + hash)).join('')) }
+      if (record.editables?.length) { value.editables = await Promise.all(record.editables.map(spec => requirement(spec, true))); lines.push(...record.editables.map(spec => '-e ' + spec)) }
+      for (const [field, flag] of [['requirements', '-r'], ['constraints', '-c']]) for (const child of record[field] || []) {
+        const next = /^https?:/.test(canonical) ? new URL(child, canonical).toString() : path.resolve(path.dirname(canonical), child)
+        const edge = await read(next)
+        ;(value[field] ||= []).push({ file: edge }); lines.push(flag + ' ' + JSON.stringify(path.join(input.temporary, 'requirements-' + edge + '.txt')))
+      }
+      for (const [field, flag] of [['index', '--index-url'], ['extraIndexes', '--extra-index-url'], ['links', '--find-links']]) for (const item of typeof record[field] === 'string' ? [record[field]] : record[field] || []) {
+        const source = field === 'links' && !/^[a-z][a-z0-9+.-]*:/.test(item) ? path.resolve(item) : item
+        ;(value[field] ||= []).push(field === 'links' && !/^https?:/.test(source) ? await local(source) : sanitize(source)); lines.push(flag + ' ' + source)
+      }
+      for (const [field, flag] of [['noIndex','--no-index'],['requireHashes','--require-hashes']]) if (record[field]) { value[field] = true; lines.push(flag) }
+      for (const [field, flag] of [['noBinary','--no-binary'],['onlyBinary','--only-binary']]) if (record[field]?.length) { value[field] = record[field]; lines.push(flag + ' ' + record[field].join(',')) }
+      if (Object.keys(record.hashes || {}).length) value.hashes = record.hashes
+      facts.push(value)
+    }
+    files[id] = facts
+    fs.writeFileSync(target, lines.join('\n') + '\n', { mode: 0o600 })
+    return id
+  }
+  const main = await requirement(input.declaration.from || input.declaration.command[0], false, !input.declaration.from)
+  requirements.push(main)
+  for (const source of input.declaration.with) requirements.push(await requirement(source))
+  for (const source of input.declaration.withEditable) requirements.push(await requirement(source, true))
+  const configuration = []
+  const installFiles = []
+  for (const {field,purpose,argument} of input.sourceOptions) for (const source of input.sources[field]) {
+    const reference = source.name === 'Local' ? scalar(source.items[0]) : source.name === 'Remote' ? url(source.items[0]) : '-'
+    if (reference === '-') {
+      // Preparation has a closed input stream; protocol stdin belongs to the later service.
+      // Give uv the same EOF source without consuming the service's initialize message.
+      const target = path.join(input.temporary, 'requirements-stdin.txt')
+      fs.writeFileSync(target, '', { mode: 0o600 }); requirementFiles[reference] = target
+      installFiles.push({ argument, path: target })
+      configuration.push({ purpose, value: [] }); continue
+    }
+    const file = await read(reference)
+    installFiles.push({ argument, path: path.join(input.temporary, 'requirements-' + file + '.txt') })
+    configuration.push({ purpose, value: { file } })
+  }
+  if (files.length) configuration.push({ purpose: 'source', value: files })
+  const commandName = input.declaration.from ? null : main.name ? /^[A-Za-z0-9_.-]+/.exec(input.declaration.command[0])?.[0] || main.name : null
+  process.stdout.write(JSON.stringify({ requirements, options, configuration, sourceBindings, requirementFiles, installFiles, commandName }))
+})().catch(error => { process.stderr.write(String(error.message)); process.exitCode = 1 })
+`
 
 export type UvResolvedValue = string | number | boolean | null | UvResolvedValue[] |
   { kind: "record"; name: string; fields: Record<string, UvResolvedValue> } |

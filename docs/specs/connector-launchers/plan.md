@@ -702,3 +702,19 @@ core `bun typecheck` →exit0、2069 files/2 projects（`/tmp/connector-r7-core-
 r8 执行目录红例：真实 pinned `uv tool run --help` 的 `-C, --config-setting`，现有 readUvLaunchEnvironment 把它复制为根目录选项。新增既有文件的 CLI 边界组件例（应用自有元数据协议，不伪造 uv 输出），`bun test test/codepuppy-connector-launch.test.ts -t 'uv execution environment keeps' --max-concurrency=2` →exit1，0 PASS/1 FAIL（`/tmp/connector-r8-uv-directory-red.log`）。先提交该例，再修复，只允许真实 --directory 进入该元数据读取命令。
 
 r8 源秘密红例：Python 本地源遍历把 .env 字节纳入内容身份，业务密钥轮换会改变 key。以 r8 真实 setuptools 包的模块字节与应用自有 dotenv 输入新增组件回归，`bun test test/codepuppy-connector-launch.test.ts -t 'Python source identity excludes' --max-concurrency=2` →exit1 /0 PASS /1 FAIL（`/tmp/connector-r8-python-secret-red.log`）。来源字节与 parser 协议夹具 uv-requirements.json 是真实 pinned Python/uv 探针输出，含 source 文件及明确的假凭据；不新增运行时依赖。修复前先提交该例。
+
+### r8 包目标内容归一与两项红例修复
+
+normalizeUvPackageDeclaration 在 Location 随包 Node 中复用同一 content/key 秘密 owner，PEP508 与 requirements 行使用钉住 Python ensurepip wheel 内的 packaging/pip（不是系统模块、没有新依赖）；真实 UV resolved settings.resolver 是有效配置输入，SafeUrl 去 userinfo/签名、VerbatimUrl 不取 given/origin，local refs 替换内容事实。处理 marker/extras、Git revision/subdirectory/显式名字、本地 editable 内容、递归 -r/-c 与 constraints/overrides/build-constraints，短 -r= 翻译后仍交官方行解析器。把本次文件内容重写为私有临时 files，正常化结果附 materialized installArguments，安装器仅消费这个 argv，避免重复读取原始远端/约束内容。业务 argv、绝对源目录、业务环境不进 key；UV implicit executable 保留原名字拼写。Python 源跳过 dotenv 业务文件，源字节变化仍改变身份；Node -C 构建配置不再当目录。两条红例断言原样保留并转绿。
+
+新夹具 uv-requirements.json 来自实际 pinned uv0.13.10/Python3.12.16 的调用和 parser stdin/stdout 录制，含实际 setuptools src-layout 源与明确的假凭据；组件测试只在 Python 的应用自有 JSON 边界回放真实包，内容遍历/归一/配置/临时 argv 是真产品代码，不手写 UV Debug 或 PEP508 的另一套解析器。规范化组件例跨 Location/业务值 key 相同；nested constraint、有效 resolver 设置、marker、editable 与 Git name 保持为 key 事实；代码变更失效，隐式同请求保留 Pip 原拼写，短 -r= 等价且服务 argv 不交 installer。
+
+阶段证据：`gate slot -- bun /tmp/connector-r5-npm-proof/uv-content-capture-r8.ts` exit0（`/tmp/connector-r8-uv-content-capture.log`）；core `bun test test/codepuppy-connector-launch.test.ts --max-concurrency=2` →48 PASS /272 assertions（`/tmp/connector-r8-package-file.log`），core bun typecheck exit0/2069 files/2 projects（`/tmp/connector-r8-package-typecheck.log`）。其中整文件最早一次为48/261，随后新增 materialized argv/identity 断言及代码后才运行本次完整文件。一次 cwd 错设根目录的命令被 guard 拒绝且未执行测试，已在 core 更正。
+
+文件偏离：ConnectorRequirement 继续在 key owner 定义，增加 marker/editable 与 Git name 这些需求事实；不改共享 Host/HTTP/Protocol。installUvConnector 私有 helper 的入参改为 installArguments（唯一的已读取文件方案），没有旧签名兼容分支；生产消费/总事务尚未接入。
+
+### r8 解释器目标的实物输入发现与最小适配探针
+
+合法 `uv tool run --offline --no-config --with-editable <source> python -c …` 真正输出3.12.16并导入当前本地源；原 r6 的通用 run→install 转换把 python 当 main package，真实 `uv tool install … python` exit2：`error: Cannot install Python with uv tool install. Did you mean to use uv python install?`。`gate slot -- python3 /tmp/connector-r8-interpreter-seam.py` exit0（正/反断言；`/tmp/connector-r8-interpreter-seam.json` / `.log`）。所以不能据包目标 helper 声称覆盖完整 uvx 语法。
+
+继续验证的最小本地适配已可行：仍用 uv tool install，以同一已钉 Python ensurepip 内的 pip wheel 作内部环境根，原 --with/本地 editable 保留，随后直接执行该持久环境的 Python。`gate slot -- python3 /tmp/connector-r8-builtin-pip.py` exit0，采用冻结 only-managed/manual/3.12.16/build、原 R1 安装根，包安装0、Python执行0、当前 source-b 导入成功；/tmp/connector-r8-builtin-pip.json。没有新增来源、pin、公共端口或用户操作，因此尚不把它报成必须变更冻结接口的 SEAM；解释器请求分类/匹配同一 pin、这个适配的产品实现、可编辑源并行绑定与总准备事务仍未完成。probe 的另一条旧环境复现并不是真围栏/正式包验收。

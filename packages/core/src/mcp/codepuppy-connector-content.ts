@@ -73,7 +73,7 @@ export const connectorSourceProgram = String.raw`
         for (const name of files.sort()) directory[name.split(path.sep).join('/')] = await visit(path.join(canonical, name))
       } else {
         for (const entry of fs.readdirSync(canonical, { withFileTypes: true }).sort((a,b) => a.name.localeCompare(b.name))) {
-          if (['.git', '.hg', '.svn', '__pycache__', '.venv'].includes(entry.name)) continue
+          if (['.git', '.hg', '.svn', '__pycache__', '.venv', '.env'].includes(entry.name) || entry.name.startsWith('.env.')) continue
           directory[entry.name] = await visit(path.join(canonical, entry.name))
         }
       }

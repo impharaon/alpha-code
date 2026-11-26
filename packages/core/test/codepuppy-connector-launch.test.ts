@@ -22,6 +22,7 @@ import {
   uvToolInstallArguments,
   parseUvResolvedValue,
   readUvLaunchEnvironment,
+  normalizeUvPackageDeclaration,
 } from "@opencode/core/mcp/codepuppy-uv-launch"
 import { UV_TOOL_SETTINGS, UV_SERVICE_COMMAND } from "./fixture/uv-tool-settings"
 import { readNpmLaunchDeclaration, normalizeNpmLaunchDeclaration, installNpmConnector } from "@opencode/core/mcp/codepuppy-npm-launch"
@@ -1654,6 +1655,66 @@ test("uv execution environment keeps build config settings out of directory opti
   })).pipe(Effect.provide(layer)))
   expect(commands[0]).toMatchObject({ args: ["--directory", root, "run", "--offline", "--no-config", "--no-project", "--no-env-file", "--", launcherEnvironment(root).node, "--input-type=commonjs", "-e", expect.any(String)] })
   expect(value).toMatchObject({ cwd: root, environment: { OWN_CURRENT: "current" } })
+})
+
+// Component layer: the pinned Python parser's actual r8 replies are replayed at its
+// own JSON boundary; Node's content traversal and config/requirement adapters run unchanged.
+test("uv content facts retain requirements config and editable contents across Location changes", async () => {
+  const capture: {
+    root: string; declaration: ReturnType<typeof parseUvToolSettings>;
+    replies: { input: string; output: string }[];
+    sourceFiles: Record<string, string>; requirementsFiles: Record<string, string>;
+  } = JSON.parse(readFileSync(new URL("./fixture/uv-requirements.json", import.meta.url), "utf8"))
+  const prepare = async (root: string, business: string) => {
+    const input = npmSourceFixture()
+    const declaration: typeof capture.declaration = JSON.parse(JSON.stringify(capture.declaration).replaceAll(capture.root, root))
+    for (const [name, content] of Object.entries({ ...capture.requirementsFiles, ...Object.fromEntries(Object.entries(capture.sourceFiles).map(([file, value]) => ["source/" + file, value])) })) {
+      const file = path.join(root, name); mkdirSync(path.dirname(file), { recursive: true }); writeFileSync(file, content)
+    }
+    const python = path.join(root, "python-parser")
+    writeFileSync(python, '#!/usr/bin/env node\nconst fs=require("node:fs");const input=fs.readFileSync(0,"utf8");const data=' + JSON.stringify(capture.replies) + ';const result=data.find(value=>value.input===input);if(!result)throw Error("Uncaptured Python input");process.stdout.write(result.output)\n', { mode: 0o755 })
+    const layer = Layer.effect(Environment.Service, Effect.gen(function* () {
+      const current = yield* Environment.Service
+      return Environment.Service.of({ ...current, spawner: ChildProcessSpawner.make(command => command._tag === "StandardCommand" && command.command === input.launchers.uv
+        ? current.spawner.spawn(ChildProcess.make(process.execPath, ["-e", "process.stdout.write(JSON.stringify({cwd:process.cwd(),environment:process.env}))"], command.options))
+        : current.spawner.spawn(command)) })
+    })).pipe(Layer.provide(hostEnvironmentLayer))
+    const call = (current = declaration) => Effect.runPromise(Effect.scoped(normalizeUvPackageDeclaration({ ...input, python, temporary: path.join(root, "stage"), cwd: root, environment: { ...input.environment, OWN_BUSINESS_KEY: business }, syntax: "uvx", arguments: ["--offline", "--no-config", "--with-requirements", path.join(root, "requirements.txt"), "--with", current.with[0]!, ...(current.from ? ["--from", current.from] : []), ...current.command], declaration: current })).pipe(Effect.provide(layer)))
+    return { input, declaration, call, value: await call() }
+  }
+  const firstRoot = connectionRoot()
+  const secondRoot = connectionRoot()
+  const first = await prepare(firstRoot, "first-current-value")
+  const second = await prepare(secondRoot, "rotated-current-value")
+  const key = (value: typeof first.value) => connectorPreparationKey({ runner: "uv-tool", launchers: first.input.launchers, ...value })
+  expect(key(first.value)).toBe(key(second.value))
+  expect(first.value.requirements).toEqual([
+    { kind: "registry", name: "pip", version: ">=26.0", extras: ["read"], marker: 'python_version >= "3.12"' },
+    { kind: "git", name: "named", url: "git+https://git.invalid/project.git", revision: "main", subdirectory: "src", extras: ["feature"] },
+  ])
+  expect(first.value.sourceBindings).toMatchObject([{ path: path.join(firstRoot, "source"), editable: true }])
+  const facts = JSON.stringify({ requirements: first.value.requirements, options: first.value.options, configuration: first.value.configuration })
+  for (const value of [firstRoot, "owned-fake-secret", "owned-first", "first-current-value"]) expect(facts).not.toContain(value)
+  expect(facts).toContain('"version":"<25"')
+  expect(first.value.installArguments).toEqual(["tool", "install", "--offline", "--no-config", "--with", first.value.declaration.with[0]!, "--with-requirements", first.value.requirementFiles[path.join(firstRoot, "requirements.txt")]!, "--", first.value.declaration.from!])
+  expect(first.value.installArguments).not.toContain("--business")
+  expect(first.value.options.resolution).toBe("Highest")
+  expect(key({ ...first.value, options: { ...first.value.options, resolution: "Lowest" } })).not.toBe(key(first.value))
+  const main = first.value.requirements[0]!
+  expect(key({ ...first.value, requirements: [{ ...main, marker: 'python_version >= "3.11"' }, ...first.value.requirements.slice(1)] })).not.toBe(key(first.value))
+  expect(key({ ...first.value, requirements: [main, { ...first.value.requirements[1]!, name: "another-project" }] })).not.toBe(key(first.value))
+  const local = { kind: "content" as const, sha256: first.value.sourceBindings[0]!.sha256 }
+  expect(key({ ...first.value, requirements: [local] })).not.toBe(key({ ...first.value, requirements: [{ ...local, editable: true }] }))
+  // Counterfactual own parsed DTO: the package request is implicit, with the same
+  // genuine PEP508 parser input. uv's Target/ToolRequirement preserves this spelling.
+  const implicit = await first.call({ ...first.declaration, from: null, command: [first.declaration.from!, ...first.declaration.command.slice(1)] })
+  expect(implicit.declaration.commandName).toBe("Pip")
+  expect(key(implicit)).toBe(key(first.value))
+  writeFileSync(path.join(firstRoot, "requirements.txt"), capture.requirementsFiles["requirements.txt"]!.replace("-r nested.txt", "-r=nested.txt"))
+  expect(key(await first.call())).toBe(key(first.value))
+  expect(readFileSync(first.value.requirementFiles[path.join(firstRoot, "requirements.txt")]!, "utf8")).toContain("requirements-1.txt")
+  writeFileSync(path.join(firstRoot, "source/src/owned_editable/__init__.py"), "SOURCE_VERSION = 'changed'\n")
+  expect(key(await first.call())).not.toBe(key(first.value))
 })
 
 // Integration layer: our SDK stdio fixture is imported by the ready package entry.

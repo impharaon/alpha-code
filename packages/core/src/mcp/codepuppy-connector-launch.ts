@@ -290,7 +290,7 @@ export function bindConnectorLaunch(input: {
   environment: Record<string, string>
   source:
     | { runner: "npm-exec"; syntax: "npx" | "npm-exec"; arguments: readonly string[]; declaration: Effect.Success<ReturnType<typeof readNpmLaunchDeclaration>> }
-    | { runner: "uv-tool"; syntax: "uvx" | "uv"; arguments: readonly string[]; declaration: ReturnType<typeof parseUvToolSettings> }
+    | { runner: "uv-tool"; syntax: "uvx" | "uv"; arguments: readonly string[]; declaration: ReturnType<typeof parseUvToolSettings> & { commandName: string | null } }
 }): Effect.Effect<PreparedLaunch, ConnectorLaunchFailure, Environment.Service | Scope.Scope> {
   return Effect.gen(function* () {
     const paths = input.launchers.platform === "win32-x64" ? path.win32 : path.posix
@@ -308,7 +308,7 @@ export function bindConnectorLaunch(input: {
       ? source.declaration.selection === "package"
         ? [Object.entries(input.preparation.entries).find(([name, entry]) => name.startsWith(npmEntryPrefixes.bin) && entry === defaultEntry)?.[0].slice(npmEntryPrefixes.bin.length) ?? "", ...source.declaration.arguments.slice(1)]
         : [...source.declaration.arguments]
-      : source.declaration.command.map((argument, index) => index === 0 && source.declaration.from === null ? argument.replace(/@[^@]+$/, "") : argument)
+      : source.declaration.command.map((argument, index) => index === 0 && source.declaration.from === null ? source.declaration.commandName ?? argument : argument)
     if (source.runner === "npm-exec" && source.declaration.selection === "package" && !defaultEntry)
       return yield* Effect.fail({ kind: "unknown", detail: "The prepared package has no default executable" } as const)
     const execution = source.runner === "npm-exec"

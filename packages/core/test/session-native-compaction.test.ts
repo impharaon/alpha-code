@@ -423,3 +423,43 @@ test("retained user budget counts attachments and drops whole oldest messages", 
     SessionCompaction.recentUserMessages([user("x".repeat(63_000 * 4)), { ...newest, text: "new" }], model, 64_000),
   ).toHaveLength(1)
 })
+
+function packageCompactionHandlers(input: Pick<import("@opencode/plugin/codepuppy-package-runtime").PackageRuntimeHandlers, "beforeCompaction" | "afterCompaction">): import("@opencode/plugin/codepuppy-package-runtime").PackageRuntimeHandlers {
+  return { ...input, hasElicitationHandlers: () => false, beforeConfigChange: async () => ({ apply: true }), instructionsLoaded: async () => {}, beforeElicitation: async () => ({ handled: false }), afterElicitationResult: async input => input.answer }
+}
+
+it.live("package compaction hooks veto before provider work and observe only committed windows", () => Effect.gen(function* () {
+  const fixture = yield* setup()
+  yield* fixture.prompt("Preserve this actual user request")
+  const runtime = yield* Effect.promise(() => import("@opencode/plugin/codepuppy-package-runtime"))
+  const seen: { phase: string; occurrenceId: string; summary?: string }[] = []
+  let allow = false
+  const registration = runtime.registerPackageRuntime({ directory: "/project" }, packageCompactionHandlers({
+    beforeCompaction: async input => { seen.push({ phase: "before", occurrenceId: input.occurrenceId }); expect(input).toMatchObject({ sessionID: fixture.sessionID, trigger: "manual", customInstructions: null }); return { proceed: allow, reason: "fixture retains full history" } },
+    afterCompaction: async input => { seen.push({ phase: "after", occurrenceId: input.occurrenceId, ...(input.summary === undefined ? {} : { summary: input.summary }) }); expect((await Effect.runPromise(fixture.load)).messages.some(message => message.type === "compaction" && message.status === "completed")).toBe(true) },
+  }))
+  yield* Effect.addFinalizer(() => Effect.sync(() => registration.dispose()))
+  expect(yield* fixture.compact).toMatchObject({ status: "failed", error: { message: expect.stringContaining("fixture retains full history") } })
+  expect(fixture.state.calls).toBe(0)
+  expect(seen.map(event => event.phase)).toEqual(["before"])
+  allow = true
+  expect(yield* fixture.compact).toEqual({ status: "completed" })
+  expect(fixture.state.calls).toBe(1)
+  expect(seen.map(event => event.phase)).toEqual(["before", "before", "after"])
+  expect(seen[1]!.occurrenceId).toBe(seen[2]!.occurrenceId)
+  expect(seen[0]!.occurrenceId).not.toBe(seen[1]!.occurrenceId)
+  expect(seen[2]).not.toHaveProperty("summary")
+}))
+
+it.live("package compaction rejection skips automatic work and names an overflow failure", () => Effect.gen(function* () {
+  const fixture = yield* setup()
+  yield* fixture.prompt("A user request before automatic compaction")
+  const runtime = yield* Effect.promise(() => import("@opencode/plugin/codepuppy-package-runtime"))
+  const triggers: string[] = []
+  const registration = runtime.registerPackageRuntime({ directory: "/project" }, packageCompactionHandlers({ beforeCompaction: async input => { triggers.push(input.trigger); return { proceed: false, reason: "fixture cannot compact now" } }, afterCompaction: async () => { throw Error("A rejected compaction must not emit PostCompact") } }))
+  yield* Effect.addFinalizer(() => Effect.sync(() => registration.dispose()))
+  expect(yield* fixture.compaction.compact({ reason: "auto", context: yield* fixture.load, estimate: { measured: 200_000, estimated: 200_000 } })).toEqual({ status: "skipped" })
+  expect(yield* fixture.overflow).toMatchObject({ status: "failed", error: { type: "compaction.blocked", message: expect.stringContaining("fixture cannot compact now") } })
+  expect(fixture.state.calls).toBe(0)
+  expect(triggers).toEqual(["auto", "auto"])
+}))

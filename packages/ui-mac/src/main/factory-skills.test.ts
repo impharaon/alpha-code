@@ -255,6 +255,7 @@ describe("document skill assets", () => {
     expect(lock.commit).toBe("e4bb5d960d87126ff3b3a8af1a104b7db67560ba")
     expect(new Set(lock.files.map((file) => file.sourcePath)).size).toBe(lock.files.length)
     const discovered = await engineSkills(reconcileFactorySkills(registered, roots).paths)
+    expect(discovered.filter((entry) => entry.name === "office-docs").map((entry) => entry.file)).toEqual([join(office, "SKILL.md")])
     const notice = readFileSync(join(layout === "packaged" ? res : join(import.meta.dir, "../../resources"), "NOTICE.txt"), "utf8")
     expect(notice).toContain(lock.upstream + "/tree/" + lock.commit + "/skills")
     expect(notice).toContain("factory-skills/office-docs/")
@@ -343,9 +344,6 @@ describe("REQ-233 cloud skill instructions", () => {
   test("AC1 §2.8 routes explicit cloud, local files, formatted creation, images, facts, research and review", () => {
     for (const rule of [
       /用户明确说「用云端」 \| 用云（Word\/Excel\/PPT\/PDF 与网页除外，见下）/,
-      /生成、读、改 Word\/Excel\/PPT\/PDF \| 一律用本机 MCP（按 `office-docs` 技能）；文件写进项目目录、不出本机，无云端费用/,
-      /生成网页 \/ HTML \| 本机直接写 HTML 文件进项目目录（可自带 CSS 与 JS），在文件面板预览；不派发云端，无云端费用/,
-      /生成图片 \| 用云；本机没有图片生成能力/,
       /查一个事实、读一个网页 \| 先用本机搜索\/读取；本机不可用才用 `codepuppy_web_search` \/ `codepuppy_web_fetch`/,
       /多来源深度调研 \| 用云端 `research`，做多轮检索与综合/,
       /代码审查 \| 默认本机 agent；用户要求「联网复核」或「第二意见」时用云/,
@@ -356,7 +354,6 @@ describe("REQ-233 cloud skill instructions", () => {
   // alpha-platform#552 AC3: cloud office-report is retired; Office files are always made locally.
   test("AC3 Office files go to the local tools and explicit review requests select cloud code-review first", () => {
     expect(cloud.content).toContain("云端 Word/Excel/PPT 生成（`office-report`）已停用：不要派发它，用户明确要求云端时也如实说明")
-    expect(cloud.content).toContain("改用本机 `mcp:codepuppy-word`、`mcp:codepuppy-excel`、`mcp:codepuppy-powerpoint`、`mcp:codepuppy-pdf`")
     expect(cloud.content).toContain("选择云端 `code-review`")
     expect(cloud.content).toContain("不先改成本机搜索或本机代码审查")
     expect(office.content.replace(/\s+/g, " ")).toContain(
@@ -435,19 +432,4 @@ describe("REQ-233 cloud skill instructions", () => {
     }
   })
 
-  test("AC2 office-docs creates, reads and edits every office file locally", () => {
-    const text = office.content.replace(/\s+/g, " ")
-    for (const instruction of [
-      "**Create, read or edit Word/Excel/PowerPoint/PDF with Code Puppy's four first-party local stdio MCP connectors below**",
-      "`mcp:codepuppy-word`, `mcp:codepuppy-excel`, `mcp:codepuppy-powerpoint` and `mcp:codepuppy-pdf`",
-      "They write the file straight into the project directory",
-      "the file stays on this machine, with no cloud charge",
-      "also when the user asks for the cloud: say it is no longer offered and do the job with the local tools",
-      "write what the connector supports, say plainly which parts are missing, and offer a local script (below) for those parts with the user's consent",
-      // #1564:运行环境随应用自带 —— 不让模型告诉用户去装 uv 或等第一次下载。
-      "run on a Python runtime and pinned libraries that ship inside Code Puppy",
-    ]) expect(text).toContain(instruction)
-    expect(text).not.toContain("Load `cloud-capabilities`")
-    expect(text).not.toMatch(/`uv`|first run may download/)
-  })
 })

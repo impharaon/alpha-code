@@ -621,8 +621,8 @@ describe("#1565: the shipped Office manifest and server", () => {
 
   testEffect(Layer.empty).effect("the command main writes and the one after the folder substitution both get the declaration", () =>
     Effect.sync(() => {
-      expect(declaredNames(asWritten)).toEqual(["read_docx", "write_docx"])
-      expect(declaredNames(afterExtension)).toEqual(["read_docx", "write_docx"])
+      expect(declaredNames(asWritten)).toEqual(["read_docx"])
+      expect(declaredNames(afterExtension)).toEqual(["read_docx"])
       expect(declaredNames(asWritten.map((token) => (token === "{workspace}" ? "relative/folder" : token)))).toEqual([])
       expect(declaredNames(asWritten.map((token) => (token === "{workspace}" ? `${ROOT}/../elsewhere` : token)))).toEqual([])
       expect(declaredNames([...afterExtension, "--debug"])).toEqual([])
@@ -652,7 +652,7 @@ describe("#1565: the shipped Office manifest and server", () => {
       yield* connected("codepuppy-word")
       const declared = declaredListedTools("codepuppy-word", word(afterExtension), manifest, fs.readFileSync)
       const listed = (yield* (yield* Mcp.Service).tools()).filter((tool: any) => tool.server === "codepuppy-word")
-      expect(listed.map((tool: any) => tool.name)).toEqual(["read_docx", "write_docx"])
+      expect(listed.map((tool: any) => tool.name)).toEqual(["read_docx"])
       expect(listsDeclaration(declared ?? [], listed)).toBe(true)
     }),
   )

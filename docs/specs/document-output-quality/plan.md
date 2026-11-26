@@ -505,7 +505,7 @@ r9 真实删除回归 green：仅把 ext 本功能的分类改为实际插件 `_
 ## 切片七：默认制作入口、旧 writer 消费者与目录集成
 
 - 依据：[spec v1](spec.md) @ `31cd182e09`，AC-01..05、09、11、12、14 的入口/消费者部分；[design](design.md) @ `7ef8b89b30` §4.1/4.8、R12、§8/§10；Issue #1761。片 1–6 由调度方独立审查，本片仅在其上切换必要消费者，不处理未返回的审查发现。
-- 核对：r10 `Phase: IMPLEMENT` 授权本节计划后无设计待决即同轮实施；Codex / GPT-6 核对实际调用链，未见新增设计问题。首个实施提交填入本计划 commit；不冒称调度方另行审查本节。
+- 核对：`f9e0b79b40` · Codex / GPT-6，r10 `Phase: IMPLEMENT` 授权本节计划后无设计待决即同轮实施；核对实际调用链，未见新增设计问题，不冒称调度方另行审查本节。
 
 ### 改动
 
@@ -544,3 +544,25 @@ r9 真实删除回归 green：仅把 ext 本功能的分类改为实际插件 `_
 ### 偏离记录
 
 暂无。开始 2026-11-26 10:56:52 UTC；预计约 45 分钟（不含外部等待）。只追加本片与其证据，不修改前六片实现或冻结决定。
+
+
+r10 实施核对：`f9e0b79b40` · Codex / GPT-6，按本轮 `Phase: IMPLEMENT` 授权同轮计划/实施，未出现新设计问题；首六片审查发现仍等待调度方另轮交回。总入口改为六种成品与主题的短路由，默认随包环境/用户模板优先/同一权限流/逐页检查/至多一轮/pending 先交付再原会话补查；cloud-capabilities 的表格及旧“改用四 MCP”段落同步，不把海报排版与照片/插画生图混为同一入口。真实文件核读材料 `/tmp/alpha-1761-r10/entry-inspection.txt`，不是新增措辞测试。片 1 的七技能/许可与其来源锁不变，根路由为本应用原创，无复制其它技能正文。
+
+server.py 的四 writer、只供它们使用的私有 helpers/常量/import 已删除（17 个保留函数）；四 reader、Excel 五工具及原路径授权/unknown-field 判定保留。`tools.json` 由原 `gen-office-mcp-tools.ts` 重生，server 版本沿本次共同发行的 v2。未知 writer 直接调用也应 unknown，不能写成品。构建脚本新增可复用的样本制作函数，三处消费者（构建、stdio 模块、附件暂存往返）用同一随包库/OfficeExcel 实际生成；默认用户制作仍由七个技能负责，不把 smoke 的 Python 空白样本当作默认模板或质量证明。
+
+首次相关文件集的两个红分别为旧段落残余 `office` 引用/旧 MCP 正向措辞，以及根路由重复 Python import 名被已有 cloud-tool 名清点误认；已保留仍有效的云端退休/复核断言，移除旧 MCP 制作承诺并把模块具体 import 留给原 xlsx 技能单一权威，没有新增工具 allowlist。真实构建读回另捕获移除 writer import 时遗漏 reader 授权仍用 os，红为 `name 'os' is not defined`；symtable 只读核对显示唯一未绑定全局 os，已保留此 import 并重生摘要，未改任何失败断言。共享 slot 正常排队并取得执行，没有取消；恢复后的制作→四 reader/附件两文件 **13 PASS**（`readers-green.log`），真实宿主命令/Python/库/licence 检查仍执行。面板原正向 writer fixture 换成首方 receipt，宿主 **16 PASS**（`panel-green.log`，包含 29 个子进程 Solid+happy-dom 用例）；core 只选三个声明/真实 server 消费者 **3 PASS**（`core-related.log`），未跑计时/容量/引擎全旅程。
+
+目录依赖实物：`bun packages/ui-mac/scripts/sync-catalog-snapshot.mjs` exit 0，实际验签发布版 **2026-11-18.1 / 26 entries**（`catalog-sync.log`）；四条 Office tools/描述仍有原 writer，Excel 仍是旧两工具，尚未包含本票新 server/intake/digest 契约。同步只改 fetchedAt，已用 scoped git restore 恢复本次生成的无关差异，目录与锁均不提交；没有手编快照、修改 alpha-web、发布或上传。交 §8 已列 alpha-web 生产者，发布后再跑同一同步器；本次不同步成功冒称目录字节集成完成。
+
+
+r10 最终证据：恢复后的 wider 一次性命令为 `cd packages/ui-mac && gate slot -- bun test src/main/office-mcp.test.ts src/main/attachment-read-roundtrip.test.ts src/main/office-mcp-tools-snapshot.test.ts src/main/factory-skills.test.ts src/main/codepuppy-factory-skill-hygiene.test.ts src/main/codepuppy-sidecar-wiring.test.ts src/main/office-runtime-lock.test.ts src/main/codepuppy-office-instance.test.ts src/main/codepuppy-skill-packaging-census.test.ts src/renderer/codepuppy-ui/session-rail/artifacts/local-artifacts.test.ts src/renderer/codepuppy-ui/session-rail/artifacts/session-rail-artifacts.test.ts`，**131 PASS / 0 FAIL**（`ui-related-final.log`，没有重复累计已跑 target/子进程）。ext `bun test src/policy/identity.test.ts` **18 PASS**；core `bun test test/codepuppy-mcp-runtime.test.ts -t 'Office declarations bind|the command main writes|the real server.py'` **3 PASS**；共 **152 个唯一宿主用例 PASS / 0 FAIL**。真实 Solid 子进程 29 PASS 是面板宿主断言的一部分，不再加进总数。ui/core 各在包目录 `bun typecheck` exit 0（`ui-types.log`、`core-types.log`）。gate slot 仅运行这些相关文件/有限变体，没有 gate run、bin/check、全层/全套或计时容量旅程；所有排队均等待取得 slot。
+
+新增的 root `office-docs` 稳定名字/真实路径断言落在原 document skill assets 的 dev/packaged 用例，验证引擎确实能发现总入口，不测正文措辞。正文最后核读明确区分本地制作与沿原视觉服务的鉴权/缓存/拒绝/计费，避免将 HTML 自检说成无云视觉费用；没有新确认或模型切换。旧行为替换导致本轮实际文件计数为 office-mcp 11、factory-skills 26、hygiene 19；删除的均为原 writer/额外确认/过期格式能力措辞检查，其它断言保留。`scripts/gate-files.tsv` 为冻结 gate 面，未修改；若旧静态计数需要同步由调度方处理，不放宽阈值或以恢复旧 writer 让门绿。
+
+五个有效 removal arms：writer-advertised（列表重新出现 writer 则 not.toContain 红）、writer-dispatch（恢复可调用入口则 explicit refusal 红）、reader-readback（读回空正文则构建 smoke 报缺 Runtime check）、receipt-panel（跳过持久 document metadata 则真实面板行断言红）、route-discovery（把根技能稳定名字换掉则 dev/packaged 真实发现断言红）。前 3 的行为命令和全部最终日志见 `/tmp/alpha-1761-r10/removal.py`、`removal-*.log`；后 2 的有限 follow-up 记录在 `removal-followup-results.json`。面板首次命令缺 `./` 前缀只报找不到测试文件，该次不算行为 red；修正为实际 cases 路径后只跑命名用例，得到明确 toEqual 失败。没有进程超时、未放松生产守卫，所有变体 finally 原字节恢复；恢复后的 131 文件集合已通过。
+
+AC 对应的贡献与边界：AC-01..04/12 的默认路由、七技能/许可/模板入口实际发现和四格式原生库读回已核；并非默认模型的 9/10、10/11、11/12 指标。AC-05/09 的 render/Read/vision/check、一轮与 pending 补查说明接到现有入口，实际工作流组件沿片 4/6 的证据，正式 #1760 wiring 与真实模型改稿仍待集成/片 8。AC-11 的 Excel 五工具/唯一 ID、保留操作与 reader 已由 stdio/声明/实例用例核对；原始许可与排除文件由现有发现、原 runtime 的逐发行包许可检查证明（AC-14）。目录字节/Excel re-intake/digest 仍归已列 alpha-web 发布依赖，不冒称通过。未重开其它规格或受保护规则；首六片旧文件仅按本节计划切换具名消费者，未混入尚未返回的审查修正，无额外文件偏离。
+
+文档影响仍为入口行为与实施证据：canonical 本节及原两个 runtime skill；16 个相对链接 PASS，alpha profile 派生当前 worktree 的 `check-docs-contract` 本 plan findings=0（`docs-contract.json`），全仓既有 69 errors/253 warnings 不扩修。`affected-tests --list` exit 2：本旧基线缺 `.gate-tests`，无 scope line（`affected.scope`）；按 brief 留 ship 合入已有该文件的 origin/alpha，不改 gate。已核 Codex / GPT-6；工作从 10:56:52 UTC 开始，约 20 分钟（含共享 slot 等待），未倍增。目录发布/正式双平台与模型验收去向不变；未 push/PR/merge、发布或部署，无新 OPTIONAL。
+
+最后一次仅对视觉计费措辞的同步后，`cd packages/ui-mac && bun test src/main/factory-skills.test.ts src/main/codepuppy-factory-skill-hygiene.test.ts` **45 PASS / 0 FAIL**（`instructions-final.log`），不重复加总。最终文档契约输出 `docs-contract-final.json` 的本 plan findings=0；diff 检查 exit 0。所有前台执行/slot 已终结，hooksPath 仍为 `.githooks`，当前变更只含本节具名的 14 个文件（含 plan），目录两个生成输出没有变化。

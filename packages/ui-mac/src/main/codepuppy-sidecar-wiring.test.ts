@@ -202,7 +202,7 @@ test("#1565 / #1698: fork 的启动文档带 paths.officeMcpManifest,引擎据�
     expect(applyMcpWritePolicy(connector.name, server).ok).toBe(true)
     const declared = declaredFirstPartyTools(connector.name, server, manifest, readFileSync) as Array<{ name: string }> | undefined
     const extension = connector.extension.slice(1)
-    expect(declared?.map((tool) => tool.name).sort()).toEqual(connector.format === "excel" ? ["excel_edit", "excel_inspect", "excel_objects", "excel_recalculate", "read_xlsx", "write_xlsx"] : [`read_${extension}`, `write_${extension}`])
+    expect(declared?.map((tool) => tool.name).sort()).toEqual(connector.format === "excel" ? ["excel_edit", "excel_inspect", "excel_objects", "excel_recalculate", "read_xlsx"] : [`read_${extension}`])
   }
   await result.listener.stop()
 })

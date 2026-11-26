@@ -28,7 +28,7 @@ import { homedir, tmpdir } from "node:os"
 import { dirname, join, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 
-import { CODEPUPPY_OFFICE_PYTHON_SLOT, CODEPUPPY_OFFICE_SERVER_SLOT, WORKSPACE_MARKER, codepuppyOfficeInstallCommand } from "../src/shared/office-advisories"
+import { CODEPUPPY_OFFICE_PYTHON_SLOT, CODEPUPPY_OFFICE_SERVER_SLOT, WORKSPACE_MARKER, codepuppyOfficeInstallCommand, type CodePuppyOfficeFormat } from "../src/shared/office-advisories"
 import { OFFICE_RUNTIME_BUILD_DIR, checkOfficeRuntime, machOArchs, resolveTargetArch, type TargetArch } from "./target-arch"
 
 const scriptPath = fileURLToPath(import.meta.url)
@@ -260,11 +260,11 @@ function verify(dir: string, arch: TargetArch, locked: Map<string, unknown>): st
       "print(json.dumps(mods))",
     ].join("\n")
     const modules = JSON.parse(run(python[0]!, [...python.slice(1), "-c", importScript, JSON.stringify([...locked.keys()].sort())], { env, cwd: workspace })) as string[]
+    createOfficeReaderSamples(officePythonPath(dir, process.platform), workspace, ["word", "excel", "powerpoint", "pdf"], env)
     for (const sample of roundTrips(workspace)) {
       const requests = [
         { jsonrpc: "2.0", id: 1, method: "initialize", params: { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "build-office-runtime", version: "1" } } },
         { jsonrpc: "2.0", method: "notifications/initialized" },
-        { jsonrpc: "2.0", id: 2, method: "tools/call", params: { name: sample.write[0], arguments: sample.write[1] } },
         { jsonrpc: "2.0", id: 3, method: "tools/call", params: { name: sample.read[0], arguments: sample.read[1] } },
       ]
       // 生产命令本身(main 模板,三个槽按 main 的方式替换),不是手写的一份近似。
@@ -282,10 +282,9 @@ function verify(dir: string, arch: TargetArch, locked: Map<string, unknown>): st
       const replies = stdout.trim().split("\n").map((line) => JSON.parse(line) as { id?: number; result?: { isError?: boolean; content?: Array<{ text: string }> } })
       const result = (id: number) => {
         const reply = replies.find((candidate) => candidate.id === id)
-        if (!reply?.result || reply.result.isError) throw new Error(`${sample.format} ${id === 2 ? sample.write[0] : sample.read[0]} failed: ${JSON.stringify(reply)}`)
+        if (!reply?.result || reply.result.isError) throw new Error(`${sample.format} ${sample.read[0]} failed: ${JSON.stringify(reply)}`)
         return JSON.parse(reply.result.content?.[0]?.text ?? "null") as Record<string, unknown>
       }
-      result(2)
       const read = JSON.stringify(result(3))
       for (const text of sample.expect) if (!read.includes(text)) throw new Error(`${sample.format} read back ${read} without ${JSON.stringify(text)}`)
     }
@@ -295,13 +294,37 @@ function verify(dir: string, arch: TargetArch, locked: Map<string, unknown>): st
   }
 }
 
-/** 与 office-mcp.test.ts 同形的工具参数;expect = 读回结果里必须出现的写入内容。 */
+/** Real samples for the bundled reader/build probes; authoring remains in the format skills. */
+export function createOfficeReaderSamples(python: string, workspace: string, formats: CodePuppyOfficeFormat[], env: Record<string, string>) {
+  const script = `
+import json,sys
+from pathlib import Path
+root=Path(sys.argv[1]);formats=json.loads(sys.argv[2])
+if 'word' in formats:
+    from docx import Document
+    document=Document();document.add_heading('Runtime check',0);document.add_paragraph('文档工具随包运行');document.save(root/'sample.docx')
+if 'excel' in formats:
+    from openpyxl import Workbook
+    from codepuppy_office import OfficeExcel
+    path=root/'sample.xlsx';book=Workbook();book.active.title='Data';book.create_sheet('Summary');book.save(path)
+    with OfficeExcel.edit(str(path)) as book:
+        for row in [('Region','Amount','Check'),('East','=2*6','=#REF!'),('West',4,None)]:book['Data'].append(row)
+if 'powerpoint' in formats:
+    from pptx import Presentation
+    deck=Presentation();slide=deck.slides.add_slide(deck.slide_layouts[1]);slide.shapes.title.text='Runtime check';slide.placeholders[1].text='Bundled';deck.save(root/'sample.pptx')
+if 'pdf' in formats:
+    from reportlab.pdfgen import canvas
+    document=canvas.Canvas(str(root/'sample.pdf'));document.drawString(54,780,'Runtime check page');document.save()
+`
+  run(python, ["-I", "-B", "-c", script, workspace, JSON.stringify(formats)], { env, cwd: workspace })
+}
+
 function roundTrips(workspace: string) {
   return [
-    { format: "word", write: ["write_docx", { path: join(workspace, "sample.docx"), title: "Runtime check", paragraphs: ["文档工具随包运行"] }], read: ["read_docx", { path: join(workspace, "sample.docx") }], expect: ["Runtime check", "文档工具随包运行"] },
-    { format: "excel", write: ["write_xlsx", { path: join(workspace, "sample.xlsx"), sheets: [{ name: "Data", cells: { A1: "Item", B1: 1564 } }] }], read: ["read_xlsx", { path: join(workspace, "sample.xlsx") }], expect: ['"Item"', "1564"] },
-    { format: "powerpoint", write: ["write_pptx", { path: join(workspace, "sample.pptx"), slides: [{ title: "Runtime check", body: ["Bundled"] }] }], read: ["read_pptx", { path: join(workspace, "sample.pptx") }], expect: ["Runtime check", "Bundled"] },
-    { format: "pdf", write: ["write_pdf", { path: join(workspace, "sample.pdf"), pages: ["Runtime check page"] }], read: ["read_pdf", { path: join(workspace, "sample.pdf") }], expect: ["Runtime check page"] },
+    { format: "word", read: ["read_docx", { path: join(workspace, "sample.docx") }], expect: ["Runtime check", "文档工具随包运行"] },
+    { format: "excel", read: ["read_xlsx", { path: join(workspace, "sample.xlsx") }], expect: ['"East"', "12"] },
+    { format: "powerpoint", read: ["read_pptx", { path: join(workspace, "sample.pptx") }], expect: ["Runtime check", "Bundled"] },
+    { format: "pdf", read: ["read_pdf", { path: join(workspace, "sample.pdf") }], expect: ["Runtime check page"] },
   ] as const
 }
 

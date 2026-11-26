@@ -271,11 +271,12 @@ export async function registerPolicy(context: Plugin.Context, unattended: Unatte
         wrapForDisplay(editor as never, (callID) => displays.get(callID), network ? (tool, call, execute) => network.run(context.location.directory, tool, call, execute) : undefined),
       )
       await context.tool.hook("execute.after", (event) => {
+        const networkNotice = network?.attachResult(event as never)
         if (event.tool === CODE_MODE_TOOL) {
           attachUnattendedDenial(event as never, codeModeDenials.get(event.id))
           codeModeDenials.delete(event.id)
         }
-        attachNetFailure(event as never)
+        if (!networkNotice) attachNetFailure(event as never)
         attachWriteDenied(event as never, context.location.directory)
         attachDirectoryDisplay(event as never)
         attachTerminal(event as never, displays.get(event.id))

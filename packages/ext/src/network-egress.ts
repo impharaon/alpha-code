@@ -1,12 +1,24 @@
 import { randomUUID } from "node:crypto"
+import { Tool } from "../../schema/src/tool"
+import { NETWORK_EGRESS_NOTE } from "./context-injection"
 import type { Plugin } from "@opencode/plugin"
-import { activitySession, networkActivityKey, parseNetworkActivity, type NetworkActivity, type NetworkActivityReply, type NetworkInbound, type NetworkOutbound } from "../../ui-mac/src/shared/network-egress-wire"
+import { activitySession, networkActivityKey, parseNetworkActivity, sessionRefKey, type EgressNotice, type SessionRef, type NetworkActivity, type NetworkActivityReply, type NetworkInbound, type NetworkOutbound } from "../../ui-mac/src/shared/network-egress-wire"
+
+// Core shallow-copies results before execute.after. An invocation-local marker survives that
+// boundary and metadata spreads, without a serializable field or a shared-callID collision.
+const RESULT_NOTICE = Symbol("network.egress.result")
+type ResultNotice = { session: SessionRef; requests: string[]; hadMetadata: boolean }
+type Terminal =
+  | { status: "completed"; result: { content?: unknown; metadata?: Record<string, unknown> } & Record<string, unknown> }
+  | { status: "error"; error: Tool.Error }
 
 export function createNetworkEgress(deps: {
   send(build: (id: number) => NetworkInbound): Promise<NetworkActivityReply | undefined>
   log(line: string): void
 }) {
   const activities = new Map<string, NetworkActivity>()
+  const failures = new WeakMap<Tool.Error, ResultNotice>()
+  const notices = new Map<string, Map<string, EgressNotice>>()
   const endedShells = new Set<string>()
   const locations = new Map<string, AbortController>()
   let generation: number | undefined
@@ -39,10 +51,30 @@ export function createNetworkEgress(deps: {
     }).catch(() => { deps.log("network egress: activity delivery failed"); void synchronize() })
     return queue
   }
+  const consume = (session: SessionRef, requests: string[]) => {
+    const current = notices.get(sessionRefKey(session))
+    requests.forEach((id) => { if (current?.get(id)?.state !== "waiting") current?.delete(id) })
+    if (!current?.size) notices.delete(sessionRefKey(session))
+  }
+  const stamp = (activity: NetworkActivity, value: unknown, failed: boolean) => {
+    const session = activitySession(wireActivity(activity))
+    const requests = [...(notices.get(sessionRefKey(session))?.values() ?? [])]
+      .filter((notice) => notice.activities.some((item) => networkActivityKey(item) === networkActivityKey(wireActivity(activity))))
+      .map((notice) => notice.requestID)
+    if (!requests.length) return value
+    const result = failed ? value instanceof Tool.Error ? value : new Tool.Error({ message: value instanceof Error ? value.message : String(value), error: value }) : value
+    if (!result || typeof result !== "object") return result
+    const original = "metadata" in result ? result.metadata as Record<string, unknown> | undefined : undefined
+    const marker = { session, requests, hadMetadata: original !== undefined }
+    if (result instanceof Tool.Error) { failures.set(result, marker); return result }
+    const metadata = { ...original, [RESULT_NOTICE]: marker }
+    return { ...result, metadata }
+  }
   const shell = (directory: string, sessionID: string, shellID: string) => parseNetworkActivity({ kind: "shell", session: { generation: generation ?? 0, directory, sessionID }, shellID })
   return {
     receive(message: NetworkOutbound) {
       if (message.type === "codepuppy.network.attached") {
+        if (generation !== message.generation) notices.clear()
         generation = message.generation
         // IDs stay stable when attach arrives after an enter was observed.
         const previous = [...activities.values()]
@@ -55,23 +87,66 @@ export function createNetworkEgress(deps: {
         if (message.generation === generation) void synchronize()
         return true
       }
+      if (message.type === "codepuppy.network.notice") {
+        if (message.state === "allowed") {
+          notices.forEach((current) => { current.delete(message.requestID) })
+          return true
+        }
+        message.sessions.filter((session) => session.generation === generation).forEach((session) => {
+          const key = sessionRefKey(session)
+          const current = notices.get(key) ?? new Map<string, EgressNotice>()
+          current.set(message.requestID, message)
+          notices.set(key, current)
+        })
+        return true
+      }
       return false
+    },
+    attachResult(event: Terminal) {
+      const result = event.status === "error" ? event.error : event.result
+      const metadata = result.metadata as (Record<string, unknown> & { [RESULT_NOTICE]?: ResultNotice }) | undefined
+      const marker = event.status === "error" ? failures.get(event.error) : metadata?.[RESULT_NOTICE]
+      if (!marker) return false
+      if (event.status === "error") failures.delete(event.error)
+      if (event.status === "completed") {
+        delete metadata![RESULT_NOTICE]
+        if (!marker.hadMetadata && !Object.keys(metadata!).length) delete event.result.metadata
+      }
+      const requests = marker.requests.filter((id) => notices.get(sessionRefKey(marker.session))?.has(id))
+      if (!requests.length) return false
+      if (event.status === "error") event.error = new Tool.Error({ message: `${event.error.message}\n\n${NETWORK_EGRESS_NOTE}`, ...(event.error.error === undefined ? {} : { error: event.error.error }), ...(event.error.metadata === undefined ? {} : { metadata: event.error.metadata }) })
+      if (event.status === "completed") {
+        const content = event.result.content
+        event.result = { ...event.result, content: Array.isArray(content) ? [...content, { type: "text", text: NETWORK_EGRESS_NOTE }] : typeof content === "string" ? `${content}\n\n${NETWORK_EGRESS_NOTE}` : [{ type: "text", text: NETWORK_EGRESS_NOTE }] }
+      }
+      consume(marker.session, requests)
+      return true
+    },
+    context(directory: string, event: { sessionID: string; system: Array<{ type: "text"; text: string }> }) {
+      if (generation === undefined) return
+      const session = { generation, directory, sessionID: event.sessionID }
+      const current = notices.get(sessionRefKey(session))
+      if (!current?.size) return
+      event.system.push({ type: "text", text: NETWORK_EGRESS_NOTE })
+      consume(session, [...current.keys()])
     },
     async run(directory: string, tool: string, context: Record<string, unknown>, execute: () => Promise<unknown>) {
       const activity = parseNetworkActivity({ kind: "tool", invocationID: randomUUID(), ref: { generation: generation ?? 0, directory, sessionID: context.sessionID, messageID: context.messageID, callID: context.id }, tool })
       if (!activity) return execute()
       await update("enter", activity)
+      const outcome = await Promise.resolve().then(execute).then((value) => ({ ok: true as const, value }), (error: unknown) => ({ ok: false as const, error }))
       try {
-        const result = await execute()
+        const result = outcome.ok ? outcome.value : undefined
         const metadata = result && typeof result === "object" && "metadata" in result ? result.metadata as { status?: unknown; shellID?: unknown } : undefined
         if (metadata?.status === "running" && typeof metadata.shellID === "string") {
           const running = shell(directory, activitySession(activity).sessionID, metadata.shellID)
           if (running && !endedShells.has(metadata.shellID)) await update("enter", running)
         }
-        return result
       } finally {
         await update("leave", activity)
       }
+      if (!outcome.ok) throw stamp(activity, outcome.error, true)
+      return stamp(activity, outcome.value, false)
     },
     watch(context: Plugin.Context) {
       const directory = context.location.directory

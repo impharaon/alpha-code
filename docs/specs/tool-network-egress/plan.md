@@ -128,3 +128,5 @@ U/E 各运行 `bun typecheck`，仅处理本片造成的问题；若包已有适
 ## 切片二：全部批准通放与系统代理
 
 本轮仅保留交付边界，后续 PLAN 再展开。AC-08 的真引擎/真围栏三条及去档位判断对照、AC-13 的系统代理证明仍为整票必需证据。AC-13 按设计 §4.7、§10：日常从 `resolveEgressRoutes` 注入路由并走真实上游握手；另由编排器安排**一次**真实机器已设本地测试系统代理的真引擎/真围栏验收，连接仅经它可达的目标，保留测试代理连接记录，并对照无系统代理。日常注入不计作系统配置读取已验证。本片不启动 Electron、不改本机系统代理；缺少那次实机记录时，最终 AC-13 不能记为通过。
+
+步骤 5 验据：E `bun test --max-concurrency 2 src/network-egress.test.ts src/policy/display.test.ts src/context-injection.test.ts`，退出 0，56 pass / 0 fail；`bun scripts/context-injection-inventory.ts --write` 后 `--check` 退出 0；`bun typecheck` 退出 0。U 提交前 old-name-scan 10 pass / 0 fail。新测试证明 notice 经 leave 屏障进入错误 message/成功 content，保留 cause/metadata、同 callID 的 invocation 隔离、waiting 的后台上下文、allowed 清除、终态消费及换代清理。现有上下文钩子登记数量断言由 2 改为 3（增加按事实注入的 context 回调，原四路共用组装回调仍居末尾），库存机械同步两个固定 ID。迭代中发现 Tool.Error 的 Schema 构造会过滤 metadata 的 Symbol；因此错误关联放在私有 WeakMap，成功结果用不可序列化 Symbol 穿过 Core 的浅拷贝，均不增加公共 metadata 字段。普通 ENOTFOUND 无 notice 时不附保护说明。

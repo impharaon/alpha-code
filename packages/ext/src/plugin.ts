@@ -288,6 +288,9 @@ export const CodePuppyExt: Plugin.Plugin = {
           error(`[@codepuppy/ext] output cap skipped: ${describe(cause)}`)
         }
       }
+      await context.session.hook("context", (event) => {
+        if (bootstrap.network.egressProxy) processState().hubBridge.network.context(context.location.directory, event)
+      })
       for (const name of ["context", "compaction", "generate", "title"] as const) await context.session.hook(name, assembleRequest)
       // REQ-236 `#1562`:平台代理节点的凭据每次请求现读,续期热应用不必重启引擎;读不到就抛,请求不发出。
       // 写在 http.request:2.x 的路由层在 model.request 之后才按 apiKey 写 Authorization(packages/ai/src/route/auth.ts),

@@ -2484,3 +2484,38 @@ packageIt.live("dash0 failure hooks receive actual tool and execution failures w
   expect(events().filter(event => event.session_id === broken.id && event.hook_event_name === "Stop")).toHaveLength(0)
   expect(yield* llm.requests()).toHaveLength(3)
 })))
+
+packageIt.live("ConfigChange uses active package handlers once per revision and releases their rejection on disable", () => packageJourney(Effect.gen(function* () {
+  const capture = yield* Effect.promise(() => captureStandardFixture("claude:dash0"))
+  const hooks = JSON.parse(new TextDecoder().decode(yield* Effect.promise(() => capture.readFile("claude/hooks.json"))))
+  for (const groups of Object.values(hooks.hooks) as { hooks: { command: string; args?: string[] }[] }[][]) for (const group of groups) for (const handler of group.hooks) {
+    handler.command = process.execPath
+    handler.args = ["-e", "const fs=require('node:fs');const input=await Bun.stdin.json();if(input.hook_event_name==='ConfigChange'){fs.appendFileSync('config-hook-events.jsonl',JSON.stringify(input)+'\\n');console.log(JSON.stringify({decision:'block',reason:'fixture keeps the previous configuration'}))}"]
+  }
+  const sample = yield* invocationSample("claude:dash0", { "claude/hooks.json": JSON.stringify(hooks) })
+  const membership = JSON.parse(readFileSync(join(sample.root, "skills-enabled.json"), "utf8"))
+  writeFileSync(join(sample.root, "skills-enabled.json"), JSON.stringify({ ...membership, keys: [...membership.keys, sample.key] }))
+  yield* invocationNativeServices
+  yield* activateExtUntilFinished
+  const location = yield* Location.Service
+  const sessions = yield* Sessions.Service
+  const session = yield* sessions.create({ location: { directory: location.directory }, title: "Config observer", agent: "build", model: { providerID: "test", id: "picked" } } as never)
+  yield* (yield* TestLLM.Test).push(TestLLM.text("Ready", "config-ready"))
+  yield* sessions.prompt({ sessionID: session.id, text: "Observe configuration changes" })
+  yield* sessions.wait(session.id)
+  const runtime = yield* Effect.promise(() => import("@opencode/plugin/codepuppy-package-runtime"))
+  const port = runtime.packageRuntime(location)!
+  expect(port).toBeDefined()
+  const change = { occurrenceId: "revision-a", source: "skills" as const, filePath: join(location.directory, ".opencode/skills/SKILL.md") }
+  const first = yield* Effect.promise(() => port.beforeConfigChange(change))
+  expect(first).toMatchObject({ apply: false, reason: "fixture keeps the previous configuration" })
+  expect(yield* Effect.promise(() => port.beforeConfigChange(change))).toEqual(first)
+  const events = () => readFileSync(join(location.directory, "config-hook-events.jsonl"), "utf8").trim().split("\n").map(line => JSON.parse(line))
+  expect(events()).toHaveLength(1)
+  expect(events()[0]).toMatchObject({ hook_event_name: "ConfigChange", session_id: session.id, source: "skills", file_path: change.filePath })
+  expect(yield* Effect.promise(() => port.beforeConfigChange({ ...change, occurrenceId: "revision-policy", source: "policy_settings" }))).toMatchObject({ apply: true })
+  expect(events()).toHaveLength(2)
+  writeFileSync(join(sample.root, "skills-enabled.json"), JSON.stringify(membership))
+  expect(yield* Effect.promise(() => port.beforeConfigChange(change))).toMatchObject({ apply: true })
+  expect(events()).toHaveLength(2)
+})))

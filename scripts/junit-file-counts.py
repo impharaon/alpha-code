@@ -4,7 +4,7 @@
 Usage: python3 scripts/junit-file-counts.py <report dir>
 
 Reads every `<step>.<layer>.xml` in <report dir> (bun's junit reporter). The step names its workdir: `<package>` or
-`<package>+<group>`, where <package> is the directory under packages/ (scripts/test-layers.sh). Prints one line per test
+`<package>+<group>`, where <package> is the directory under packages/ (the .gate-tests runner command). Prints one line per test
 file: `<workdir>\t<file>\t<pass>\t<fail>\t<skip>`, file relative to the workdir. A file that appears in two reports of
 the same workdir is printed once per report, so the caller can tell "ran twice" from "ran once".
 """

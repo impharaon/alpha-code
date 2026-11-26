@@ -119,12 +119,13 @@ PLAN 起草轮只做文档合同、链接和 diff 检查，并按当轮“commit
 | `packages/ui-mac/resources/office-runtime/requirements-x64.lock` | 移除不再属于发行范围的 Intel Mac 锁及 Office 构建中的引用；不改其它功能使用的通用 x64 架构解析 |
 | `packages/ui-mac/scripts/build-office-runtime.ts` | 扩充现有构建入口的目标选择、归档布局、解释器/stdlib/site-packages 定位、安装/裁剪/校验及 Windows `.pyd` 导入；保留原锁闭包、版本、哈希、实际导入与四格式读回证据。制作阶段新增能力的烟测不依赖未实现的 OfficeExcel，不提前删旧 writer |
 | `packages/ui-mac/resources/document-assets/package.json`、`package-lock.json`（新增） | 仅 docx 9.16.0、pptxgenjs 4.0.1 及其实际 npm 闭包的构建锁；由真实 npm 元数据生成 integrity，不改根工作区依赖或引入在线执行链 |
-| `packages/ui-mac/resources/document-assets/fonts.lock.json`、`build-requirements.lock`（新增） | 官方 noto-cjk 源提交/两套变量 TTF 的路径、原字节摘要与 OFL/版权对应；记录 400/700 实例、FontTools 构建版本/哈希、生成字体摘要及命名说明。值从实际来源和构建取得，不复制设计里的示例值作锁 |
+| `packages/ui-mac/resources/document-assets/fonts.lock.json`、`build-requirements.in`、`build-requirements.lock`（新增） | 官方 noto-cjk 源提交/两套变量 TTF 的路径、原字节摘要与 OFL/版权对应；记录 400/700 实例、FontTools 构建版本/哈希、生成字体摘要及命名说明。值从实际来源和构建取得，不复制设计里的示例值作锁 |
 | `packages/ui-mac/scripts/build-document-assets.ts`（新增） | 构建文档 npm 闭包、静态中文字体和模板，核对分发许可并生成实际资产清单。复用现有构建获取/校验能力和包管理器，新增代码不另实现下载、续传或回退器。产物进入忽略的 `native/document-assets/build/`；锁与生成来源入库，node_modules、字体二进制及构建缓存不入库 |
 | `packages/ui-mac/scripts/build-document-templates.py`（新增） | 用随包 Office 库生成应用原创的中文报告 docx、分析 xlsx、汇报 pptx；分别写实际样式/页设置、数字格式/冻结/打印设置、主题/母版/布局及自定义来源/版本属性。生成后解析原生容器核实，模板不是固定业务内容的最终样例 |
 | `packages/ui-mac/src/main/document-resources.ts`、`document-resources.test.ts`（新增） | 一个资源解析入口从 resourcesRoot、目标和实际资产清单给出 Office Python、nodeModules、skills、fonts、templates 的真实路径/身份；dev 与 packaged 共用。测试真实资源复制、解析和缺文件/摘要错误，不建立第二份 Node 资产表或假 DocumentHost |
 | `packages/ui-mac/scripts/target-arch.ts`、`prebuild.ts`、`packages/ui-mac/electron-builder.config.ts`、`packages/ui-mac/.gitignore` | 在已有构建/包装链中接入文档资产，Office 复制扩到 win32-x64，验证解释器/PDFium 等原生文件的对应目标；保持 Node 签名与归档形态归 #1760。只增本片产物忽略路径，不改 gate |
 | `packages/ui-mac/src/main/office-runtime-lock.test.ts`、`mac-target-arch.test.ts`、`factory-skills.test.ts` | 更新已被新事实替换的五个顶层包/两份 mac 锁/mac-only 复制断言；新增当前模块的闭包、目标和真实资源复制验证。第一片摘要锁仍只拥有技能来源，不把字体/npm 的另一个锁塞进去 |
+| `packages/ui-mac/src/main/fixtures/document-assets/**`、`fixtures/office-python-*.header.bin`、`fixtures/office-python-LICENSE.txt`（新增） | 由实际产物取得的三模板、四份小型真实字体子集、npm 原始元数据/许可和解释器头部；provenance 记录原摘要、子集字符及生成器摘要。只供资源解析/哈希测试，不把头部或小子集计为完整执行/字形覆盖证明 |
 | `packages/ui-mac/resources/NOTICE.txt` 与构建产物的许可目录/来源清单 | 保留实际分发的 npm、Python、PDFium 依赖及 OFL 原文/版权和字体修改说明；署名位置沿既有随包清单，不新增页面。LO 许可材料仍随片 3 的发行资产交付 |
 | `docs/specs/document-output-quality/plan.md` | 填核对回执、实施证据与必要偏离；不改冻结 spec/design 或受保护 ADR-014 |
 
@@ -176,4 +177,14 @@ bun typecheck
 
 ### 偏离记录
 
-暂无。
+2026-11-26 · 新增锁的可重生成输入 `build-requirements.in` 与上述真实小夹具（约 135 KB 加两个 4 KB 解释器头部/PSF 许可）；完整字体仍只进忽略的构建目录。`OFFICE_RUNTIME_BUILD_DIR` 移到纯资源解析拥有者并由原 target-arch 转出，消除本片路径复制。模板容器结构在真实构建脚本中读回核实，常驻测试只验证生产解析/校验，不另加“静态夹具的内容正确”测试。
+
+npm 真实闭包中 `https@1.0.0` 只有 package.json，没有可执行入口；固定官方 Node 26.13.1 的 `require.resolve("https")` 实测返回内置 `https`。构建裁去该无执行内容的元数据目录，锁仍保留完整上游安装图；不带第二份实现。`isarray@1.0.0` 的完整 MIT 条款在其 README，保留原字节并纳入许可验证。没有新增冻结契约或 Node token/路径约定。
+
+实施核验（Codex / GPT-6，2026-11-26）：Python 提交 `78969e73d2`，darwin-arm64 构建 126.3 MB、50 个 Mach-O、17 个顶层模块真实导入与四格式 stdio 写后读回通过；Python 每个发行包的原始许可文件按实际 RECORD 检查。两平台 16 个 wheel 的 METADATA 求值图一致，Windows 官方归档布局/摘要已核，另核 19 个真实 Windows wheel 原生文件为 AMD64 PE；不计作 Windows 执行成功。
+
+文档资产构建 593 个已核摘要的文件、约 78.2 MiB、四字体与三模板。实际 extraResources 复制后的 `documentResources` 核验通过，接收临时解出的固定官方 Node 26.13.1；Word/PPT 原生制作与 reader 读回、Excel 公式保留、ReportLab 中文正文/图片/页眉页脚/ToUnicode 及 PDFium 栅格化通过。一次性驱动/回执为 `/tmp/alpha-1761-slice2/resource-probe.ts`、`packaged-receipt.json`、`node-probe.cjs`、`python-probe.py`；PDF 成品 `/tmp/alpha-1761-slice2/created.pdf` SHA-256 `67d2becb46281e2cecdedf02be012636f3210d65875205d9c5f55320fb5bb1b4`。
+
+六个实际删除臂（字体、模板、OFL、docx 包、PDFium 原生库、解释器）均在同一暂存入口失败，随后恢复；另由 `guards.py` 移除生产摘要、OFL、npm 许可与 PE 目标校验，每项对应常驻测试均变红（exit 1），恢复后再做最终绿色检查。三类 pending 保持：#1760 resolveAssets/v2.1 token 的真实宿主接线与签名、Windows 实机执行、LO 整段字体及默认模型/完整质量验收。
+
+切片二最终相关检查：`bun test src/main/mac-target-arch.test.ts src/main/document-resources.test.ts` 50 PASS；`office-runtime-lock.test.ts` 6 PASS；`factory-skills.test.ts` 27 PASS；`office-mcp.test.ts` 与 `attachment-read-roundtrip.test.ts` 15 PASS；围栏定向用例 1 PASS；旧名扫描 10 PASS；`bun typecheck`、8 个相对链接、diff 检查均通过。文档合同对本文 0 finding，仓级仍为既有 69 errors / 253 warnings。未跑全量、未启动应用/窗口、未付费调用或发布。

@@ -10,9 +10,11 @@ import {
   OFFICE_RUNTIME_BUILD_DIR,
   RIPGREP_BUILD_DIR,
   assertMacTargetArch,
+  checkOfficeRuntime,
   assertPackagedEngineAssets,
   resolveMacTargetArch,
 } from "./scripts/target-arch"
+import { DOCUMENT_ASSET_BUILD_DIR, readDocumentAssets } from "./src/main/document-resources"
 import { assertReleaseSource } from "./scripts/release-source"
 import { isReleaseBuild } from "./scripts/build-identity"
 
@@ -113,6 +115,10 @@ const getBase = (appId: string): Configuration => ({
   // afterPack 核对包里的落点(下方,scripts/target-arch.ts 的 checkPackagedEngineAssets)。
   asarUnpack: [`${ENGINE_ASSETS_DIR}/**`],
   extraResources: [
+    ...(process.platform === "darwin" || process.platform === "win32" ? [
+      { from: `${OFFICE_RUNTIME_BUILD_DIR}/${process.platform === "darwin" ? macTargetArch : "win32-x64"}/`, to: "office-runtime/" },
+      { from: `${DOCUMENT_ASSET_BUILD_DIR}/`, to: "document-assets/" },
+    ] : []),
     // (REQ-076 T1 清理)原有指向 native/ 的条目为上游 desktop 遗留死配置:alpha 无 native/ 目录
     // (mac_window.node/swift-build 未克隆),打包时恒为空 no-op,已删。
     {
@@ -186,14 +192,6 @@ const getBase = (appId: string): Configuration => ({
             to: "codepuppy-fence/",
             filter: ["codepuppy_fence.node"],
           },
-          // #1564:Word/Excel/PowerPoint/PDF 四个文档工具的随包运行时(prebuild 里 scripts/build-office-runtime.ts
-          // 按 resources/office-runtime/ 的两架构 lock 产出,只装目标架构那一份)。落点 <resources>/office-runtime/,
-          // main 模板的命令头就是 <resources>/office-runtime/bin/python3;beforePack 核对它每个 Mach-O 含目标片,
-          // 深签时与其它内嵌二进制同 Team 签名。
-          {
-            from: `${OFFICE_RUNTIME_BUILD_DIR}/${macTargetArch}/`,
-            to: "office-runtime/",
-          },
           // DESIGN-domestic-cloud-connectivity §4.8:搜索工具随包的 ripgrep(prebuild 里 scripts/build-ripgrep.ts 按引擎 binary.ts
           // 钉住的版本与 sha256 取目标架构那一份)。落点 <resources>/ripgrep/rg,server.ts 把这个目录追加到引擎 PATH 末尾;
           // 深签时与其它内嵌二进制同 Team 签名;afterPack 的 checkBundledRipgrep 核对它在、可执行、含目标片。
@@ -243,9 +241,17 @@ const getBase = (appId: string): Configuration => ({
   // #1564:随包 Office 运行时同样在、且每个 Mach-O 都含这一片。
   // 任一不过即抛,宁可不出包,也不出一个终端打不开的包。
   beforePack: async (context) => {
+    if (context.electronPlatformName === "win32") {
+      if (Arch[context.arch] !== "x64") throw new Error("Office Windows packages target win32-x64")
+      const problems = checkOfficeRuntime(path.join(packageDir, OFFICE_RUNTIME_BUILD_DIR, "win32-x64"), "x64", "win32")
+      if (problems.length) throw new Error(problems.join("\n"))
+      readDocumentAssets(path.join(packageDir, DOCUMENT_ASSET_BUILD_DIR))
+      return
+    }
     if (context.electronPlatformName !== "darwin") return
     if (isReleaseBuild(channel, process.env)) assertReleaseSource(packageDir)
     assertMacTargetArch({ packingArch: Arch[context.arch], packageDir })
+    readDocumentAssets(path.join(packageDir, DOCUMENT_ASSET_BUILD_DIR))
   },
   // `#1669`:装包后、签名前核对引擎原生资源在包里的落点 —— 每个都解包、加载点的目标在解包目录里、可执行的带执行位、
   // Mach-O 含目标片。不过即抛:宁可不出包,也不出一个终端打不开的包。

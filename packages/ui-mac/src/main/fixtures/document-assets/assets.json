@@ -1,0 +1,112 @@
+{
+  "schemaVersion": 1,
+  "files": [
+    {
+      "path": "fonts/NotoSansSC-Bold.ttf",
+      "sha256": "58bcb65b54072e5088bb1d97fa5f501ae6ed6f3a622000911ffbecdff652bb2c"
+    },
+    {
+      "path": "fonts/NotoSansSC-Regular.ttf",
+      "sha256": "385c3e7e61300973cf2607cfacd674aadb9e0625c785f03ab4ca992f43df39f4"
+    },
+    {
+      "path": "fonts/NotoSerifSC-Bold.ttf",
+      "sha256": "3bd588ab90bba88c5f65d8180598114feb79d77d57ae97ad6d38c238c870fe73"
+    },
+    {
+      "path": "fonts/NotoSerifSC-Regular.ttf",
+      "sha256": "0e20906b7ad708c7a2e3c7cbad32dd8ecf2f364bb3f8ec03666b06069cd99fb4"
+    },
+    {
+      "path": "licenses/FONT-MODIFICATIONS.txt",
+      "sha256": "807f7093403d518d05a5ecd1d4da1db1d2ce5ccd9c87709f4e4c81c6752061f7"
+    },
+    {
+      "path": "licenses/OFL-NotoSansSC.txt",
+      "sha256": "6a73f9541c2de74158c0e7cf6b0a58ef774f5a780bf191f2d7ec9cc53efe2bf2"
+    },
+    {
+      "path": "licenses/OFL-NotoSerifSC.txt",
+      "sha256": "6a73f9541c2de74158c0e7cf6b0a58ef774f5a780bf191f2d7ec9cc53efe2bf2"
+    },
+    {
+      "path": "licenses/font-sources.json",
+      "sha256": "0b67350b2b9f73f69fe2cb0ae1208508fe5bc8fce4fc7d88fba79425c3d65be4"
+    },
+    {
+      "path": "node_modules/docx/LICENSE",
+      "sha256": "b5b2364c0c95a26b2a2399d7e706a61acac680be1d5b180b00592ee85830bffb"
+    },
+    {
+      "path": "node_modules/docx/package.json",
+      "sha256": "c6baea3f786f468579f238fffcf3bec614e0b5beab2d7cb0fa239d53f9c7996b"
+    },
+    {
+      "path": "node_modules/pptxgenjs/LICENSE",
+      "sha256": "7a2bfe96150786ed1908b8e63f98ebab88875c1e79e28faff6649e0f11f77e52"
+    },
+    {
+      "path": "node_modules/pptxgenjs/package.json",
+      "sha256": "a4fc694898ef6f7da4c5840b799b593a0a74e9e05b7490b2ac5ee144762db477"
+    },
+    {
+      "path": "provenance.json",
+      "sha256": "b74b8a31f0569ff3e71c8c77b76dce3584d9e8a091b58ca5b2275d5c6d0bbe00"
+    },
+    {
+      "path": "templates/chinese-analysis.xlsx",
+      "sha256": "e964f5628b36c26c137ab6c84b88e73f81879bb51aea402cf2777587fef5a396"
+    },
+    {
+      "path": "templates/chinese-presentation.pptx",
+      "sha256": "ea26d2469460b6d96ec98d3da8128b5b1c60206181cfaa70f8acf5a95842d553"
+    },
+    {
+      "path": "templates/chinese-report.docx",
+      "sha256": "b781c29513a915f31f08dfc6c8b804e13d8f0e2642e182edc57993578a6f5eb8"
+    }
+  ],
+  "fonts": [
+    {
+      "path": "fonts/NotoSansSC-Regular.ttf",
+      "family": "Noto Sans SC",
+      "weight": 400,
+      "sha256": "385c3e7e61300973cf2607cfacd674aadb9e0625c785f03ab4ca992f43df39f4"
+    },
+    {
+      "path": "fonts/NotoSansSC-Bold.ttf",
+      "family": "Noto Sans SC",
+      "weight": 700,
+      "sha256": "58bcb65b54072e5088bb1d97fa5f501ae6ed6f3a622000911ffbecdff652bb2c"
+    },
+    {
+      "path": "fonts/NotoSerifSC-Regular.ttf",
+      "family": "Noto Serif SC",
+      "weight": 400,
+      "sha256": "0e20906b7ad708c7a2e3c7cbad32dd8ecf2f364bb3f8ec03666b06069cd99fb4"
+    },
+    {
+      "path": "fonts/NotoSerifSC-Bold.ttf",
+      "family": "Noto Serif SC",
+      "weight": 700,
+      "sha256": "3bd588ab90bba88c5f65d8180598114feb79d77d57ae97ad6d38c238c870fe73"
+    }
+  ],
+  "templates": {
+    "docx": {
+      "path": "templates/chinese-report.docx",
+      "version": "1",
+      "sha256": "b781c29513a915f31f08dfc6c8b804e13d8f0e2642e182edc57993578a6f5eb8"
+    },
+    "xlsx": {
+      "path": "templates/chinese-analysis.xlsx",
+      "version": "1",
+      "sha256": "e964f5628b36c26c137ab6c84b88e73f81879bb51aea402cf2777587fef5a396"
+    },
+    "pptx": {
+      "path": "templates/chinese-presentation.pptx",
+      "version": "1",
+      "sha256": "ea26d2469460b6d96ec98d3da8128b5b1c60206181cfaa70f8acf5a95842d553"
+    }
+  }
+}

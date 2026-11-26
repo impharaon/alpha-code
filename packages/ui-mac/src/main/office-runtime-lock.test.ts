@@ -1,4 +1,4 @@
-// #1564 AC2:随包 Office 运行时的两份架构 lock 覆盖 requirements.in 五个顶层包的**完整**传递依赖闭包,每条带哈希;
+// #1564 AC2:随包 Office 运行时的两平台 lock 覆盖 requirements.in 七个顶层包的**完整**传递依赖闭包,每条带哈希;
 // 运行时本身(python-build-standalone)按 URL + sha256 钉死。
 //
 // 依赖图来自 office-runtime.lock 的 requires —— 那份图不是手写的替身:build-office-runtime.ts 每次全新安装都把它
@@ -41,7 +41,7 @@ describe("document runtime locks", () => {
     test(`requirements-${arch}.lock is the complete hashed closure of requirements.in`, () => {
       const text = read(`requirements-${arch}.lock`)
       expect(lockClosureProblems(requirementsIn, text, lock.requires)).toEqual([])
-      // 闭包实测 11 个发行包(方案 §1.3:五个顶层包只是其中一部分)。
+      // 闭包实测 16 个发行包(方案 §1.3:七个顶层包只是其中一部分)。
       expect(parseRequirementsLock(text).size).toBe(16)
       // 两份 lock 都由 uv pip compile 按各自的目标平台与 Python 3.11 生成(文件头记着命令)。
       expect(text).toContain(`--python-version 3.11 --python-platform ${arch === "arm64" ? "aarch64-apple-darwin" : "x86_64-pc-windows-msvc"} --generate-hashes`)

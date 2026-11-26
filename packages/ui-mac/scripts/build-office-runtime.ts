@@ -222,6 +222,9 @@ function verify(dir: string, arch: TargetArch, locked: Map<string, unknown>): st
       "mods = []",
       "for name in json.loads(sys.argv[1]):",
       "    tops = set()",
+      "    dist = md.distribution(name)",
+      "    licences = [f for f in dist.files or [] if any(word in str(f).lower() for word in ('license', 'licence', 'copying', 'notice'))]",
+      "    if not licences or any(not dist.locate_file(f).is_file() for f in licences): raise SystemExit(f'{name}: missing distribution licence')",
       "    for f in md.distribution(name).files or []:",
       "        head = f.parts[0]",
       "        if head.endswith(('.dist-info', '.data')) or head in ('..', '__pycache__', 'bin'): continue",
@@ -280,10 +283,9 @@ function roundTrips(workspace: string) {
   ] as const
 }
 
-/** 目标架构在本机怎么执行:同架构直接跑;arm64 宿主上的 x64 走 Rosetta。别的组合跑不起来,响亮失败。 */
+/** The Office runtime is built and executed on its supported target host. */
 function interpreter(arch: TargetArch): string[] {
   if (arch === process.arch) return []
-  if (arch === "x64" && process.arch === "arm64") return ["arch", "-x86_64"]
   throw new Error(`cannot execute the ${arch} Office runtime on a ${process.arch} host`)
 }
 

@@ -284,8 +284,9 @@ describe("生产 electron-builder.config.ts 的 beforePack", () => {
       await expect(beforePack({ electronPlatformName: "darwin", arch: Arch[crossArch] })).rejects.toThrow(
         new RegExp(`拒绝打 mac-${crossArch} 包[\\s\\S]*正在打 ${crossArch} 包`),
       )
-      // 非 mac 平台不受影响(win/linux 打包照旧)。
-      await expect(beforePack({ electronPlatformName: "win32", arch: Arch.x64 })).resolves.toBeUndefined()
+      // Windows now validates its Office target; unrelated Linux packaging remains unchanged.
+      await expect(beforePack({ electronPlatformName: "win32", arch: Arch.arm64 })).rejects.toThrow("win32-x64")
+      await expect(beforePack({ electronPlatformName: "linux", arch: Arch.x64 })).resolves.toBeUndefined()
     } finally {
       if (saved === undefined) delete process.env[TARGET_ARCH_ENV]
       else process.env[TARGET_ARCH_ENV] = saved
@@ -322,11 +323,11 @@ describe("#1570 生产 electron-builder.config.ts 拒绝退役的签名变量名
 })
 
 describe("#1564 生产 electron-builder.config.ts 把随包 Office 运行时装进包", () => {
-  test("darwin extraResources:目标架构那一份 → <Resources>/office-runtime/(main 模板的命令头所在);别的平台不带", async () => {
+  test("darwin extraResources:目标架构那一份 → <Resources>/office-runtime/(main 模板的命令头所在);Windows 复制对应目标", async () => {
     const { getConfig } = await import("../../electron-builder.config")
     const entries = (getConfig("prod").extraResources ?? []) as Array<{ from: string; to: string }>
     expect(entries.filter((entry) => entry.to === "office-runtime/")).toEqual(
-      process.platform === "darwin" ? [{ from: `${OFFICE_RUNTIME_BUILD_DIR}/${resolveTargetArch()}/`, to: "office-runtime/" }] : [],
+      process.platform === "darwin" ? [{ from: `${OFFICE_RUNTIME_BUILD_DIR}/${resolveTargetArch()}/`, to: "office-runtime/" }] : process.platform === "win32" ? [{ from: `${OFFICE_RUNTIME_BUILD_DIR}/win32-x64/`, to: "office-runtime/" }] : [],
     )
   })
 })
@@ -505,7 +506,7 @@ describe("#1669 checkPackagedEngineAssets(afterPack 的核对)", () => {
 // DESIGN-domestic-cloud-connectivity §4.8:搜索工具随包带 ripgrep。构建产物 native/ripgrep/build/<arch>/ 经 darwin 的 extraResources
 // 装成 <Resources>/ripgrep/;afterPack 把 <Resources>/ripgrep/rg 当作必需的可执行文件核对(在、带执行位、含目标架构片)。
 describe("§4.8 随包 ripgrep", () => {
-  test("darwin extraResources:目标架构那一份 → <Resources>/ripgrep/;别的平台不带", async () => {
+  test("darwin extraResources:目标架构那一份 → <Resources>/ripgrep/;Windows 复制对应目标", async () => {
     const { getConfig } = await import("../../electron-builder.config")
     const entries = (getConfig("prod").extraResources ?? []) as Array<{ from: string; to: string }>
     expect(entries.filter((entry) => entry.to === "ripgrep/")).toEqual(

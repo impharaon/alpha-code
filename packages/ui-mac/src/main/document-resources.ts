@@ -30,6 +30,20 @@ export function readDocumentAssets(root: string): DocumentAssets {
     if (isAbsolute(inside) || inside === ".." || inside.startsWith(`..${sep}`)) throw new Error(`document asset escaped resources: ${file.path}`)
     if (createHash("sha256").update(readFileSync(actual)).digest("hex") !== file.sha256) throw new Error(`document asset digest mismatch: ${file.path}`)
   }
+  for (const required of ["licenses/OFL-NotoSansSC.txt", "licenses/OFL-NotoSerifSC.txt", "licenses/FONT-MODIFICATIONS.txt", "node_modules/docx/package.json", "node_modules/pptxgenjs/package.json"])
+    if (!value.files.some((file) => file.path === required)) throw new Error(`missing document licence/package: ${required}`)
+  for (const pkg of value.files.filter((file) => /(^|\/)node_modules\/.*\/package\.json$/.test(file.path))) {
+    const directory = pkg.path.slice(0, -"package.json".length)
+    const licence = value.files.some((file) => {
+      if (!file.path.startsWith(directory)) return false
+      const name = file.path.slice(directory.length)
+      if (/^(LICENSE|LICENCE|COPYING|NOTICE)([.\/_-]|$)/i.test(name)) return true
+      if (!/^README([._-]|$)/i.test(name)) return false
+      const text = readFileSync(join(root, file.path), "utf8")
+      return text.includes("Permission is hereby granted") && text.includes('THE SOFTWARE IS PROVIDED "AS IS"')
+    })
+    if (!licence) throw new Error(`missing npm licence: ${directory}`)
+  }
   for (const item of [...value.fonts, ...Object.values(value.templates)])
     if (!value.files.some((file) => file.path === item.path && file.sha256 === item.sha256)) throw new Error(`unlisted document asset: ${item.path}`)
   for (const kind of ["docx", "xlsx", "pptx"] as const)

@@ -20,6 +20,7 @@ import { SessionMessage } from "@opencode/schema/session-message"
 import { Command } from "@opencode/core/command"
 import { Config } from "@opencode/core/config"
 import { ConfigCommandPlugin } from "@opencode/core/config/plugin/command"
+import { renderPackageInstruction } from "@opencode/plugin/codepuppy-package-runtime"
 import { AppNodeBuilder } from "@opencode/core/effect/app-node-builder"
 import { LayerNode } from "@opencode/util/effect/layer-node"
 import { FSUtil } from "@opencode/util/fs-util"
@@ -57,6 +58,28 @@ const decode = Schema.decodeUnknownSync(Info)
 const PICKED = { providerID: "picked", id: "user-choice" }
 const COMMAND_MODEL = { providerID: "cmd", model: "command-choice" }
 const AGENT_MODEL = { providerID: "agent", id: "agent-choice" }
+
+it.live("package instruction renders source nodes before bound values and arguments", () => Effect.gen(function* () {
+  yield* runCommand({ template: "Initialize native command services" }, {})
+  const location = yield* Location.Service
+  const render = (parts: Parameters<typeof renderPackageInstruction>[1]["parts"], rawArguments: string) => Effect.promise(() => renderPackageInstruction(location, { parts, rawArguments, arguments: ["target"], syntax: "claude", cwd: location.directory }))
+  expect(yield* render(["$0 | $1 | $ARGUMENTS[2] | $target | ", { boundValue: "!`printf BOUND_EXECUTED` $0" }], '"first value" second')).toBe('first value | second | $ARGUMENTS[2] | first value | !`printf BOUND_EXECUTED` $0')
+  expect(yield* render(["$ARGUMENTS"], '!`printf ARG_EXECUTED`')).toBe('!`printf ARG_EXECUTED`')
+  expect(yield* render(["!`printf '<%s>' $0`"], "'a b' c")).toBe("<a b>")
+  expect(yield* render(["!`printf '<%s>' \"$0\"`"], "'a$HOME`printf injected`\"b'")).toBe('<a$HOME`printf injected`"b>')
+  expect(yield* render(["!`printf '<%s>' '$0'`"], '"it\'s safe"')).toBe("<it's safe>")
+  expect(yield* render(["!`printf '<%s>' ", { boundValue: "root with ' quote" }, "`"], "")).toBe("<root with ' quote>")
+  expect(yield* render(["$0,$1,$2,$3"], "'' escaped\\ space 'literal\\slash'")).toBe(",escaped space,literal\\slash,$3")
+  expect(yield* render(["No placeholders"], "raw input")).toBe("No placeholders\n\nARGUMENTS: raw input")
+}))
+
+it.live("declared argument names select their ordered values", () => Effect.gen(function* () {
+  yield* runCommand({ template: "Initialize native command services" }, {})
+  const location = yield* Location.Service
+  const render = (names: readonly string[]) => Effect.promise(() => renderPackageInstruction(location, { parts: ["$target/$missing/$2"], rawArguments: "first second", arguments: names, syntax: "claude", cwd: location.directory }))
+  expect(yield* render(["target", "missing"])).toBe("first/second/$2")
+  expect(yield* render(["unused", "target", "missing"])).toBe("second//$2")
+}))
 
 /** Runs one configured command through the production plugin and Command service; records what it asked the session to do. */
 const runCommand = (command: Record<string, unknown>, session: { model?: typeof PICKED }) =>

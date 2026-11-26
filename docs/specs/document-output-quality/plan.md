@@ -616,3 +616,5 @@ A10 green：target FileSets 与 afterPack/copier 在 resources 文件 14 PASS（
 A9 Windows font rewrite red：既有 ext renderer 文件用实际模板/页图和原 profile 生成器，正常 Office render 调用了会修改 runtime 字体的 installer，target 1 FAIL（A9-fonts-red.log，实际 1 次）。下一提交渲染仅建私有 profile；Windows 四字体仍由 main 准备/验证负责，不在并发 render 中重写。
 
 A9 font render green：原 installer 调用反例不改，renderer 文件 6 PASS（A9-fonts-green.log）；字体复制仅留准备器，render 私有 profile 不再修改共享 Windows runtime。
+
+B1 red：既有 document-host 文件保留真实 pending 落盘，重开时改用真实 createDocumentRuntime（仅 ensureFile/extract/固定验证回执受控）。当前启动及订阅未调 query，target exit 1（B1-red.log），先在同步真实方法边界断言失败，不以任意等待制造超时。下一提交仅对 waiting/admitting 所属 Location 发起既有 query。

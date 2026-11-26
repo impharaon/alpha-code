@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, test } from "bun:test"
+import { afterEach, describe, expect, test, spyOn } from "bun:test"
 import { mkdtempSync, readFileSync, realpathSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
@@ -13,6 +13,7 @@ import type {
 import { NotFoundError } from "../../../core/src/session/error"
 import { createDocumentRenderer } from "../../../ext/src/document-render"
 import { subscribeDocumentChecks } from "../../../ext/src/document-check"
+import { createDocumentRuntime } from "./document-runtime"
 import { createDocumentChecks } from "./document-checks"
 import { SessionMessage } from "../../../schema/src/session-message"
 import { createDocumentHost } from "./document-host"
@@ -302,4 +303,28 @@ test("existing main bridge replays an unacknowledged ready check on attach and v
   await until(() => f.saved().state === "admitted")
   await bridge.dispose()
   stored.dispose()
+})
+
+
+test("restored pending checks start the real runtime on startup and Location subscription", async () => {
+  const f = await pendingFixture(); f.main.dispose()
+  const root = join(f.root, "document-runtime")
+  const fs = await import("node:fs/promises")
+  await fs.mkdir(join(root, "checks"), { recursive: true })
+  await fs.copyFile(join(f.options.documentRuntimeRoot, "checks", f.saved().id + ".json"), join(root, "checks", f.saved().id + ".json"))
+  const pin = { id: "libreoffice/darwin-arm64/fixture", family: "libreoffice", target: "darwin-arm64", version: "fixture", sha256: "a".repeat(64), bytes: 1, originUrl: "https://example.org/fixture.dmg", provenanceUrl: "https://example.org/source" } as const
+  let acquired = 0
+  const runtime = createDocumentRuntime({ manifest: { schemaVersion: 1, files: [pin] }, platform: "darwin-arm64", userData: f.root, assets: join(import.meta.dir, "fixtures/document-assets"), resources: join(import.meta.dir, "../../resources"), python: process.execPath, sidecarGeneration: 1, ensureFile: async () => { acquired++; return { result: { ok: true, path: "/controlled/fixture.dmg", via: "cache" } } }, classifyFailure: () => ({ kind: "unknown", detail: "fixture" }), extract: async ({ destination }) => { await fs.mkdir(join(destination, "LibreOffice.app/Contents/MacOS"), { recursive: true }); await fs.writeFile(join(destination, "LibreOffice.app/Contents/MacOS/soffice"), "fixture") } })
+  runtime.subscribeRuntimeVerify(f.caller.location, async (task) => { const pdfPath = join(task.jobRoot, "control.pdf"); const bytes = await fs.readFile(join(import.meta.dir, "fixtures/document-runtime/control.pdf")); await fs.writeFile(pdfPath, bytes); return { ...task, status: "completed", version: pin.version, pdfPath, pdfSha256: (await import("../shared/document-check-records")).documentSha256(bytes), pageCount: 1 } })
+  const query = spyOn(runtime, "query")
+  const host = createDocumentHost({ ...f.options, runtime, documentRuntimeRoot: root })
+  try {
+    expect(query.mock.calls.map((args) => args[0])).toContainEqual(f.caller.location)
+    let admit!: () => void
+    const admitted = new Promise<void>((resolve) => { admit = resolve })
+    host.host.subscribeReady(f.caller.location, async (check) => { admit(); return { status: "admitted", checkId: check.id, notificationID: check.notificationID } })
+    expect(query.mock.calls.length).toBeGreaterThan(1)
+    await admitted
+    expect(acquired).toBe(1)
+  } finally { host.dispose(); await runtime.dispose(); query.mockRestore() }
 })

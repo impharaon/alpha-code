@@ -213,7 +213,7 @@ export async function handlePackageManagerProcess(req: IncomingMessage, res: Ser
           let forceAt: number | undefined
           // Track the group even after its leader exits; grandchildren can ignore TERM and keep pipes open.
           const cleanup = setInterval(() => {
-            const alive = child?.pid !== undefined && groupExists(child.pid)
+            const alive = (stopped !== undefined || closed) && child?.pid !== undefined && groupExists(child.pid)
             if ((stopped || closed) && alive) {
               if (forceAt === undefined) { signalGroup(child!.pid!, "SIGTERM"); forceAt = Date.now() + 3000 }
               if (Date.now() >= forceAt) signalGroup(child!.pid!, "SIGKILL")
@@ -239,11 +239,13 @@ export async function handlePackageManagerProcess(req: IncomingMessage, res: Ser
     child?.stdin?.end()
   } catch { stop("cancelled"); if (!res.headersSent) reject(400, "invalid-request"); else res.destroy() }
 }
+// EPERM means the group still has members the kernel will not signal right now (e.g. mid-exec):
+// the group is alive and the next cleanup tick signals it again.
 function signalGroup(pid: number, signal: NodeJS.Signals) {
-  try { process.kill(-pid, signal) } catch (error) { if ((error as NodeJS.ErrnoException).code !== "ESRCH") throw error }
+  try { process.kill(-pid, signal) } catch (error) { if (!["ESRCH", "EPERM"].includes((error as NodeJS.ErrnoException).code ?? "")) throw error }
 }
 function groupExists(pid: number) {
-  try { process.kill(-pid, 0); return true } catch (error) { if ((error as NodeJS.ErrnoException).code === "ESRCH") return false; throw error }
+  try { process.kill(-pid, 0); return true } catch (error) { if ((error as NodeJS.ErrnoException).code === "ESRCH") return false; if ((error as NodeJS.ErrnoException).code === "EPERM") return true; throw error }
 }
 
 function stdinFrame(value: unknown): value is { type: "stdin"; dataBase64: string } | { type: "stdin-eof" } {

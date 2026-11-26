@@ -743,3 +743,6 @@ PLAN 阶段只提交本文件。下表和命令均为实施安排，不代表已
 
 - r11 输入：按编排者明确授权读取设计 worktree 的 `e154ccd365` v4.5（独立审查并行，不 merge/rebase）；r10 root 身份接缝由该输入关闭。红回归在原节点簿测试里令真实根 bash 绑定后 exec 到 sh，再到严格 helper，旧实现 **1 fail**（126 ≠ 17，`/tmp/fence1759-r11-root-red.log`），独立提交 `089305a611`。本步改原生根启动时间读取/祖先先后，TS 消费 `BoundShellProcess`；原 peer audit pidversion/签名检查保留。场景与对照结果在本节后续补入。
 - r11 本步验证：`gate slot -- bun test --max-concurrency 2 src/main/package-manager-execution.test.ts src/main/package-manager-helper.test.ts` **2 pass / 23 expect**；原红回归未改。helper 既有用例同时断言 peer 错 pidversion 和根错微秒启动时间均为 false；两包中的本次代码只改 ui-mac，`bun typecheck` exit0。无新增永久用例条数，原 gate 文件计数不变。
+
+- r12 输入（接手 r11 中断的 lane，Claude Opus 5.5 实施）：合并版 design v4.5（origin/alpha，`ri_proc_start_abstime` 单调根身份、去掉逐跳先后比较）取代 r11 按送审稿实现的日历时间 + 逐跳先后；r11 的 `88e61e6c92` 由本轮按合并版改正。
+- r12 步骤 A｜进程组存活查询的 EPERM。r11 真实入口 `/tmp/fence1759-r11-full-root.log` 记录 `kill(-pgid,0)` 在流运行中返回 **EPERM**，从 cleanup 定时器抛出、终止 main 模块；r11 红测 `eac0e4fca5` 只注入运行期查询，未提交的修正只把查询推迟到 stop/close 之后。本轮把原测试的注入改为"本次流的前两次组查询"并断言注入都被触达：仅推迟查询的版本在 close 后第一次查询仍抛 EPERM，**0 pass / 1 fail**（`/tmp/fence1759-r12-group-red.log`）；`groupExists` 视 EPERM 为组仍存活、`signalGroup` 容忍 EPERM 后 **1 pass / 3 expect**（`/tmp/fence1759-r12-group-green.log`）。不新增帧、超时或用户步骤。

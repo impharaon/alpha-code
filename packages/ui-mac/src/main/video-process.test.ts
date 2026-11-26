@@ -36,3 +36,11 @@ test("an unavailable media decoder reports unsupported format and a conversion a
  const error=await runComponent(process.execPath,["--eval",`process.stderr.write(${JSON.stringify(diagnostic)});process.exitCode=1`],{signal:new AbortController().signal}).catch(value=>value)
  expect(mediaFailure(error)).toMatchObject({code:"format_unsupported",action:expect.stringContaining("convert")})
 })
+
+test("component stderr progress is delivered while the child is still waiting for its acknowledgement",async()=>{
+ const {writeFile}=await import("node:fs/promises")
+ const ack=path.join(root,"progress.ack"),chunks:string[]=[]
+ const program=`process.stderr.write("scanning");const timer=setInterval(()=>{if(require("node:fs").existsSync(${JSON.stringify(ack)}))clearInterval(timer)},1)`
+ await runComponent(process.execPath,["--eval",program],{signal:AbortSignal.timeout(2000)},undefined,async chunk=>{chunks.push(chunk);await writeFile(ack,"received")})
+ expect(chunks.join("")).toBe("scanning")
+})

@@ -1707,7 +1707,7 @@ const invocationSample = (name: string, changes: Record<string, string | null> =
   for (const node of capture.nodes) if (node.kind === "file") {
     const target = join(live, "tree", node.path)
     mkdirSync(dirname(target), { recursive: true })
-    writeFileSync(target, converted.replacements.get(node.path) ?? (yield* Effect.promise(() => capture.readFile(node.path))))
+    writeFileSync(target, converted.replacements.get(node.path) ?? (yield* Effect.promise(() => capture.readFile(node.path))), { mode: node.mode })
   }
   const hostNames = Object.fromEntries(converted.package.entries.map(entry => [entry.id, entry.kind + "-" + entry.sourceName.replace(/[^a-z0-9-]/gi, "-")]))
   writeFileSync(join(live, "plugin-package.json"), JSON.stringify({ description: converted.package, hostNames }))
@@ -1722,6 +1722,7 @@ const packageJourney = <A, E, R>(program: Effect.Effect<A, E, R>, before?: Plugi
   yield* sdk.register(PluginPromise.fromPromise(providerPlugin("test", "https://test.invalid", "picked")))
   yield* sdk.register(PluginPromise.fromPromise({ id: "package-test-variants", setup: async context => {
     await context.model.transform(editor => editor.update("test", "picked", model => {
+      model.family = "sonnet" as never
       model.variants = ["low", "high"].map(id => ({ id: id as never, name: id, settings: { test: { reasoningEffort: id } } }))
     }))
   } }))
@@ -1763,6 +1764,9 @@ packageIt.live("package agent delegates with its instructions and tool set", () 
   expect(JSON.stringify(request)).toContain("high precision")
   expect(JSON.stringify(request?.tools)).not.toContain('"name":"shell"')
   expect(JSON.stringify(request?.tools)).toContain('"name":"read"')
+  const suggested = yield* sessions.create({ location: { directory: location.directory }, title: "Source model suggestion", agent: "build" } as never)
+  yield* snapshot.execute({ sessionID: suggested.id, agent: "build" as never, messageID: "msg_suggested" as never, call: { type: "tool-call", name: "subagent", id: "call_suggested", input: { agent: target, description: "Suggested model", prompt: "review", background: false } } })
+  expect((yield* sessions.list({ parentID: suggested.id })).data[0]?.model).toMatchObject({ providerID: "test", id: "picked" })
   writeFileSync(join(sample.root, "skills-enabled.json"), JSON.stringify({ v: 3, keys: [], scoped: [], mcp: [] }))
   const denied = yield* snapshot.execute({ sessionID: parent.id, agent: "build" as never, messageID: "msg_package_agent_off" as never, call: { type: "tool-call", name: "subagent", id: "call_package_agent_off", input: { agent: target, description: "Stopped review", prompt: "review", background: false } } }).pipe(Effect.exit)
   expect(Exit.isFailure(denied)).toBe(true)
@@ -1784,6 +1788,7 @@ packageIt.live("package commands invoke the source renderer only after an explic
   const sessions = yield* Sessions.Service
   const location = yield* Location.Service
   const parent = yield* sessions.create({ location: { directory: location.directory }, title: "Package invocation", agent: "build", model: { providerID: "test", id: "picked" } } as never)
+  yield* llm.push(TestLLM.toolCall("call_source_agent", "subagent", { agent: "code-reviewer", description: "Source alias review", prompt: "review", background: false }), TestLLM.text("Child review", "source-child"), TestLLM.text("Parent result", "source-parent"))
   yield* commands.execute({ name: command, invocation: { sessionID: parent.id, prompt: { text: '"!`printf VALUE_EXECUTED`"' }, delivery: "queue" } })
   yield* sessions.wait(parent.id)
   const messages = yield* sessions.context(parent.id)
@@ -1791,6 +1796,10 @@ packageIt.live("package commands invoke the source renderer only after an explic
   expect(text).toContain("RUNTIME_ARG=!`printf VALUE_EXECUTED`")
   expect(text).toContain("SOURCE_EXECUTED")
   expect(text).not.toContain("!`printf SOURCE_EXECUTED`")
+  const children = (yield* sessions.list({ parentID: parent.id })).data
+  expect(children).toHaveLength(1)
+  expect(children[0]?.agent).toBe(sample.hostNames["agent:agents/code-reviewer.md"])
+  expect(JSON.stringify(yield* llm.requests())).toContain("expert code reviewer")
   writeFileSync(join(sample.root, "skills-enabled.json"), JSON.stringify({ v: 3, keys: [], scoped: [], mcp: [] }))
   expect(Exit.isFailure(yield* commands.execute({ name: command, invocation: { sessionID: parent.id, prompt: { text: "after disable" }, delivery: "queue" } }).pipe(Effect.exit))).toBe(true)
 })))
@@ -1799,12 +1808,12 @@ packageIt.live("package invocation applies preload memory effort and native turn
   const capture = yield* Effect.promise(() => captureStandardFixture("claude:plugin-dev"))
   const path = "agents/skill-reviewer.md"
   const source = new TextDecoder().decode(yield* Effect.promise(() => capture.readFile(path)))
-  const sample = yield* invocationSample("claude:plugin-dev", { [path]: source.replace("\n---\n", "\nskills: [plugin-structure]\nmemory: project\nmaxTurns: 1\nbackground: false\neffort: max\n---\n") })
+  const sample = yield* invocationSample("claude:plugin-dev", { [path]: source.replace("\n---\n", "\nskills: [plugin-structure]\nmemory: project\nmaxTurns: 2\nbackground: false\neffort: max\n---\n") })
   yield* invocationNativeServices
   const ext = yield* activateExtUntilFinished
   const agents = yield* Agent.Service
   const target = sample.hostNames["agent:" + path]!
-  yield* ext.finish(agents.get(target as never).pipe(Effect.map(agent => agent?.steps === 1)))
+  yield* ext.finish(agents.get(target as never).pipe(Effect.map(agent => agent?.steps === 2)))
   const location = yield* Location.Service
   const memory = join(location.directory, ".codepuppy", "agent-memory", sample.key, target, "MEMORY.md")
   mkdirSync(dirname(memory), { recursive: true })
@@ -1825,7 +1834,7 @@ packageIt.live("package invocation applies preload memory effort and native turn
   const explicit = yield* snapshot.execute({ sessionID: parent.id, agent: "build" as never, messageID: "msg_explicit_effort" as never, call: { type: "tool-call", name: "subagent", id: "call_explicit_effort", input: { agent: target, description: "Explicit low", prompt: "review", model: "test/picked#low" } } })
   expect(JSON.stringify(explicit)).not.toContain('"partial":true')
   const latest = (yield* llm.requests()).at(-1)!
-  expect(JSON.stringify(latest.providerOptions)).not.toContain("high")
+  expect(JSON.stringify(latest.providerOptions ?? {})).not.toContain("high")
   expect((yield* sessions.list({ parentID: parent.id })).data.some(child => child.model?.variant === "low")).toBe(true)
 })))
 
@@ -1841,6 +1850,8 @@ packageIt.live("package paths activate on real file access while Temporal manual
   yield* ext.finish(commands.list().pipe(Effect.map(list => list.some(item => item.name === manual))))
   const skills = (yield* (yield* Skill.Service).list())
   expect(skills.find(skill => skill.name === manual)?.autoinvoke).toBe(false)
+  const manualSkill = skills.find(skill => skill.name === manual)!
+
   const location = yield* Location.Service
   const file = join(location.directory, "src", "workflow.ts")
   mkdirSync(dirname(file), { recursive: true })
@@ -1849,6 +1860,8 @@ packageIt.live("package paths activate on real file access while Temporal manual
   yield* llm.push(TestLLM.toolCall("call_path_read", "read", { path: file }), TestLLM.text("Read workflow", "path"))
   const sessions = yield* Sessions.Service
   const parent = yield* sessions.create({ location: { directory: location.directory }, title: "Package invocation", agent: "build", model: { providerID: "test", id: "picked" } } as never)
+  const implicit = yield* (yield* Tool.Service).snapshot().pipe(Effect.flatMap(snapshot => snapshot.execute({ sessionID: parent.id, agent: "build" as never, messageID: "msg_implicit" as never, call: { type: "tool-call", name: "skill", id: "call_implicit_manual", input: { id: manualSkill.id } } })), Effect.exit)
+  expect(Exit.isFailure(implicit)).toBe(true)
   yield* sessions.prompt({ sessionID: parent.id, text: "read the source", resume: true })
   yield* sessions.wait(parent.id)
   const requests = yield* llm.requests()
@@ -1922,6 +1935,10 @@ packageIt.live("package YAML dependencies resolve to a real connected MCP tool",
   yield* sessions.wait(parent.id)
   expect(calls).toBe(1)
   expect(JSON.stringify(yield* sessions.context(parent.id))).toContain("called echo")
+  yield* mcp.remove(host)
+  const missing = yield* commands.execute({ name: command, invocation: { sessionID: parent.id, prompt: { text: "missing docs" }, delivery: "queue" } }).pipe(Effect.exit)
+  expect(Exit.isFailure(missing)).toBe(true)
+  expect(JSON.stringify(missing)).toContain("dependency_missing: MCP openaiDeveloperDocs")
   }), { id: "package-test-dependency", setup: async context => {
     await context.mcp.transform(editor => editor.set(host, { type: "remote", url: server.url.href, oauth: false, codemode: false }))
     await context.agent.transform(editor => editor.update("build", agent => agent.permissions.push({ action: "mcp:" + host + ":echo", resource: "*", effect: "ask" })))

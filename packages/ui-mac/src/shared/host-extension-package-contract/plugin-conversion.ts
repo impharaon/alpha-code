@@ -1,5 +1,5 @@
 import { UNAVAILABLE_PLUGIN_HOOKS } from "./plugin-hook-events"
-import { PLUGIN_HOOK_EVENTS, pluginRelativePath, pluginText, pluginOptionEnvironmentName, pluginTreeDigest } from "./plugin-package"
+import { PLUGIN_HOOK_EVENTS, pluginRelativePath, pluginText, renderPluginText, pluginOptionEnvironmentName, pluginTreeDigest } from "./plugin-package"
 import { createHash } from "node:crypto"
 import { parse, type ParseError } from "jsonc-parser/lib/esm/main.js"
 import { ConfigMarkdown } from "@opencode/core/config/markdown"
@@ -429,15 +429,22 @@ function credentialText(value: string, context: CredentialContext): Text {
   const structured = pluginText(value)
   if (structured.some(part => typeof part !== "string")) {
     if (!context.sensitive) return structured
-    const result = structured.map(part => {
-      if (typeof part === "string" || !("environment" in part)) return part
+    const protect = (part: Text[number], label?: string): Text[number] => {
+      if (typeof part === "string") return label && part ? { secret: credentialNeed(label, context, part) } : part
+      if (!("environment" in part)) return part
       const environment = part.environment
       const fallback = environment.default
-      if (fallback && !fallback.every(part => typeof part === "string")) return part
+      if (fallback && !fallback.every(part => typeof part === "string")) return { environment: { ...environment, default: fallback.map((child, index) => protect(child, environment.name + ":" + index)) } }
       const id = credentialNeed(environment.name, context, fallback ? fallback.join("") : undefined)
       return { environment: { ...environment, default: [{ secret: id }] } }
-    })
-    context.replace(result.map(part => typeof part === "string" ? part : "environment" in part ? "{secret:" + ((part.environment.default?.[0] as { secret: string }).secret) + "}" : "option" in part ? "${user_config." + part.option + "}" : "binding" in part ? value : "{secret:" + part.secret + "}").join(""))
+    }
+    const result = structured.map(part => protect(part))
+    const placeholder = (parts: Text): string => parts.map(part => typeof part === "string" ? part
+      : "environment" in part ? "${" + part.environment.name + (part.environment.default ? ":-" + placeholder(part.environment.default) : "") + "}"
+      : "option" in part ? "${user_config." + part.option + "}"
+      : "binding" in part ? renderPluginText([part], { pluginRoot: "${CLAUDE_PLUGIN_ROOT}", projectDir: "${CLAUDE_PROJECT_DIR}" })
+      : "{secret:" + part.secret + "}").join("")
+    context.replace(placeholder(result))
     return result
   }
   if (!context.sensitive || !value || /^\{secret:[^}]+\}$/.test(value)) return structured

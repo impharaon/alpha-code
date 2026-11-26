@@ -503,14 +503,23 @@ function object(value: unknown): value is Record<string, unknown> {
 export function pluginText(value: string, target: "process" | "instruction" = "process"): Text {
   const parts: Text[number][] = []
   let offset = 0
-  for (const match of value.matchAll(/\$\{(user_config\.[^}]+|[A-Za-z_][\w]*(?::-[^}]*)?)\}/g)) {
-    const expression = match[1]!
+  for (const match of value.matchAll(/\$\{/g)) {
+    if (match.index! < offset) continue
+    let depth = 1
+    let end = match.index! + 2
+    for (; end < value.length && depth; end++) {
+      if (value[end] === "$" && value[end + 1] === "{") { depth++; end++ }
+      else if (value[end] === "}") depth--
+    }
+    if (depth) continue
+    const expression = value.slice(match.index! + 2, end - 1)
+    if (!/^(?:user_config\.[^}]+|[A-Za-z_][\w]*(?::-[\s\S]*)?)$/.test(expression)) continue
     const binding = pluginPathBinding(expression)
     if (target === "instruction" && !binding && !expression.startsWith("user_config.")) continue
     const split = expression.indexOf(":-")
     if (match.index! > offset) parts.push(value.slice(offset, match.index))
     parts.push(binding ? { binding } : expression.startsWith("user_config.") ? { option: expression.slice(12) } : { environment: { name: split < 0 ? expression : expression.slice(0, split), ...(split < 0 ? {} : { default: pluginText(expression.slice(split + 2)) }) } })
-    offset = match.index! + match[0].length
+    offset = end
   }
   if (offset < value.length) parts.push(value.slice(offset))
   return parts.length ? parts : [value]

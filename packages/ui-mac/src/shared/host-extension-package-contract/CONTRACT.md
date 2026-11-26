@@ -415,7 +415,9 @@ Standard plugin definitions use the frozen plugin installation design v3
 contracts (§4.8/4.10/4.13). Source provider selection precedes discovery; root
 portable and Claude declarations merge with the selected provider taking
 precedence. `Text` retains environment/default, option, secret and DATA bindings
-until the consuming runtime binds them. Options retain their declared scalar
+until the consuming runtime binds them. Nested defaults keep their environment precedence;
+credential-field default literals are private secret resources, while public tree
+rewrites retain each binding node once. Options retain their declared scalar
 types; sensitive defaults are replaced with package-owned secret references.
 MCP names use their original server key, independent of the definition file.
 The desktop allocates host identities once and persists the same mapping in

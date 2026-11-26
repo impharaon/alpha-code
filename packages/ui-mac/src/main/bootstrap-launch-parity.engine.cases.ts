@@ -61,7 +61,7 @@ mock.module("./codepuppy-keychain-backend", () => ({
 }))
 // dev 下 main 从未入库的 packages/ext/dist 解析 ext 目录(门不保证它在);这里换成沙箱里指向 ext 源码的目录插件。
 mock.module("./codepuppy-ext-plugin", () => ({ EXT_PLUGIN_ENTRY: "server.js", resolveExtPluginPath: () => ({ path: extDir }) }))
-const { preferAppEnv, spawnLocalServer } = await import("./server")
+const { preferAppEnv, spawnLocalServer, resolveShellProbeRoots } = await import("./server")
 const { creditDanglingSweepForSpawn, resetDanglingSweepLatchForTests } = await import("./dangling-sweep-latch")
 const { initCodePuppyEnvironment, resolveCodePuppyGlobalRoot, __resetCodePuppyEnvironmentForTests } = await import("./codepuppy-environment")
 const { acceptCodePuppyBootstrap } = await import("./sidecar-bootstrap-gate")
@@ -155,7 +155,7 @@ async function launch() {
   })
   // boot 时出厂技能对账的结果(index.ts 记下,每次 fork 交给启动文档;`#1698` G3 前是 CODEPUPPY_FACTORY_SKILL_DIRS)
   setFactorySkillDirsForFork([factorySkills])
-  preferAppEnv(userDataPath)
+  preferAppEnv(userDataPath, { profile: "(version 1)(allow default)(deny file-write*)", ...resolveShellProbeRoots({ env: process.env, home: sandbox.home, userDataPath }) })
   resetDanglingSweepLatchForTests()
   creditDanglingSweepForSpawn()
   forkCalls.length = 0

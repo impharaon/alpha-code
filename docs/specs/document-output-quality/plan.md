@@ -192,7 +192,7 @@ npm 真实闭包中 `https@1.0.0` 只有 package.json，没有可执行入口；
 ## 切片三：LibreOffice 准备与固定文件接入
 
 - 依据：[spec v1](spec.md) @ `31cd182e09710b603721c6f44d471b01289dd951`，AC-06、08、09、10、13、14、15 的组件准备部分；[design](design.md) @ `7d1c4fdb55cc388af1fc7069249ec3d449641a60` §4.2/4.3、§4.4 的准备 verify 期限、§5、§6 R3、§8/§10；协调仓 impharaon/alpha-work 国内连接性设计切片四 §4.11/§10 @ `86a58c7bbdaad8b7c689d1c9c2845e3ce16db2a9`；[启动器冻结契约](../connector-launchers/design.md) @ `f7424aa45225a6d02d1958f4b4f72d247f99acc4` 的固定文件、失败事实及生命周期端口。切片二 `78969e73d2`、`351d991411` 已由 Claude Opus 5.5（orchestrator）接受，继承其资源、字体身份和许可回执。
-- 核对：`2520f3de62` · Claude Opus 5.5（orchestrator）· 通过。恢复 brief `Phase: IMPLEMENT` 接受固定文件及 #1760 端口的准备方案；#1760 集成、自有 release/relay、Windows 真执行及真实 LO 渲染仍待验，不增加下载器，不上传、发布或部署。
+- 核对：`2520f3de62` · Claude Opus 5.5（orchestrator）· 通过。恢复 brief `Phase: IMPLEMENT` 接受固定文件及 #1760 端口的准备方案；#1760 集成、自有 release/relay、Windows 真执行及真实 LO 渲染仍待验，不增加下载器，不上传、发布或部署。 r6 消费 `46f8580c95a47e4a03ea128d99b405edd3424e6e` 已合入的设计 §4.9/§10 固定验证任务，原执行接缝已由调度方明确解除；不 merge/rebase 本分支。
 
 本片实现准备器、解包与私有配置、ready 的真实验证条件，以及供后续 DocumentHost 使用的状态；对话卡片/产物回执在片 4、持久补查与 session.synthetic 在片 6 接通。`USER_DATA_LAYOUT` 当前尚无 document-runtime；#1760 的清单/下载/失败端口尚未实现。下面明确区分可独立完成的组件与待集成证据，不把下载缓存、已展开目录或未接通的端口当 ready。
 
@@ -268,3 +268,15 @@ bun typecheck
 2026-11-26 · 本片在执行接缝核对时暂停，尚未修改生产代码；片 4 未启动。`SEAM-CHANGE-NEEDED: DocumentHost / runtime verify`：本节要求固定 `verify_runtime.py` 走 Location 执行面，真实最小转换成功后才发布 ready；冻结 [design §4.3](design.md#43-libreoffice-固定文件准备与状态) 的状态在 verify 阶段不携带可执行任务，§4.8 的 DocumentHost 只有 environment/chromiumRender/defer/recordCheck/subscribeReady（`design.md:357-366`），没有准备器向所属 Location 交付固定 verify 任务及收取完成/取消回执的契约。现有 `packages/plugin/src/promise/shell.ts:15-17` 只提供 hook；实际 `Environment.Service.spawner` 绑定于 Location（`packages/core/src/environment/environment.ts:11-40`）。`ConnectorLaunchHost.ensureFile`/`resolveAssets` 分别返回已验文件/启动器资产，也不承载此任务（`../connector-launchers/design.md:292-299,482`）。这项缺口独立于 #1760 实现和发行实物尚缺，不能以 pending 集成或受控回调成功代证。所需最小补齐：由设计拥有者明确一个固定准备验证任务及其完成/取消回执的执行契约，绑定本代、pin 与所属 Location，并使准备器能据真实结果原子发布 ready；不开放任意模型脚本或 URL 的 main 执行。本次只记录接缝证据，不决定新签名或修改冻结设计；由调度方处置后恢复本片。验证为只读契约/实际 API 核对；没有运行应用、LO、下载、行为测试或 removal arms，不计 AC 通过。
 
 本轮文档证据：`python3 scripts/check-doc-links.py docs/specs/document-output-quality/plan.md` 为 12 links PASS；ui-mac 的 `bun test src/main/old-name-scan.test.ts` 为 10 PASS / 0 FAIL；`git diff --check` 为 exit 0。文档契约检查的本文件 findings 为 0，完整输出 `/tmp/alpha-1761-r5-docs-contract.json`；仓库原有 69 errors / 253 warnings 与片 3 PLAN 回执相同，继续归调度方，不扩修索引/其它文档。本轮只有核对与接缝记录，无实施或 AC 完成声明。
+
+
+2026-11-26 · r6 接缝解除后的实施：新增 `packages/util/src/codepuppy-pinned-files.ts` 与 `codepuppy-connector-launch.ts` 的冻结共享数据定义，供本片从唯一导出消费；没有共享下载、清单解析、分类器或临时宿主实现。#1760 集成时须直接复用这两份声明，不能再复制定义。因 §4.9 新冻结任务，必要增加 `packages/ext/src/document-runtime-verify.ts`、`document-runtime-bridge.ts`，并扩展既有 `hub-bridge.ts/.test.ts` 的同一监听；回调只接本 Location/代的固定脚本任务，重复合并、取消排空，不占重载 handler 或 20 s 查询预算。以上是首版文件表外的必要同调用链文件。主进程/Location 的生产装配留给片 4 的 DocumentHost；#1760 实际入口仍 pending，不以受控组件回调当集成成功。
+
+本片组件已实现 ID-only 获取、共享准备、私有暂存/原子 ready、真实 PDF 路径/摘要和任务身份守卫；mac 只读挂载/原 app 复制与卸载、Windows MSI/CAB 固定脚本、私有字体配置与固定真实转换任务。Windows 脚本只完成语法核对，未取得所选 MSI 表/CAB，不伪造样本；Windows Win32/真实包及正式签名/退出/围栏行为继续 pending。已写 `scripts/build-document-licenses.ts` 的原包许可提取函数，但真实发布 pin/源码材料尚缺，未接 prebuild、未写共享清单、未生成或冒称随包 LO 许可完成；这三项按外部发布依赖续交，不添加下载器或伪 entry。
+
+命令证据：ui-mac 六个相关文件（runtime、fonts、resources、sidecar-messages、naming-migration-wiring、naming-migration）77 PASS；ext `bun test src/hub-bridge.test.ts` 14 PASS；util `bun test src/codepuppy-document.test.ts` 2 PASS。三个包各自 `bun typecheck` exit 0。`bun /tmp/alpha-1761-r6/probe.ts` 经实际公共 CrossSpawnSpawner 和随包 Office Python 调固定脚本，真实 LO 26.8.3.1（发行版 26.8.3）→PDF→PDFium 全页解码，exit 0，1 页，摘要 `900261aaf3d10bd6b4ecb892dbc64ec98409b2b7d2ab1457524d6da69fb99eb1`；回执 `/tmp/alpha-1761-r6/verify-receipt.json`。首次探针暴露 PDFium 5 的 PdfPage 不支持 context manager，修正为 finally/close 后复核通过；私有 XCU/fontconfig 均经 Python ElementTree 实际解析，两个固定 Python 脚本 AST 通过。本探针未运行于正式 app 围栏，也没有验证原始 DMG 摘要/发行下载；不计这些 pending 项通过。
+
+执行偏离：一次误在仓库根运行 `bun typecheck`，触发 turbo 后约 1.7 s 已以 exit 2 结束（自身新类型错误及既有 codepuppy-ui 缺模块错误），没有运行测试；一次根目录 `bun test` 被 do-not-run-tests-from-root 守卫拒绝，exit 1，未运行用例。随后命令均显式限定包目录，只核本片新代码；未调查/修复其它包。该误操作已告知调度方，不记作相关验证 PASS。未运行 bin/check 或 gate。
+
+
+移除臂：`python3 /tmp/alpha-1761-r6/removal.py` 的 pin 摘要、字体替代表、验证身份、PDF 摘要、重复任务合并、打包入口六臂均 exit 1（断言失败）；逐臂原字节恢复，结果 `/tmp/alpha-1761-r6/removal-results.json` 及各 `arm-*.log`。最初两个等待失败状态的反例暴露测试不应只等某一终态，现改为等待 ready/failed 任一终态再严格断言 failed，反例直接变红；中止并排空了原反例进程，未记其超时为通过。返回前 wider：sidecar-wiring 4 PASS、old-name-scan 10 PASS（新增来源注释先触发旧名守卫，改为引用契约名/提交后通过）；本片唯一用例总数 107 PASS，不累加迭代重跑。正式受围栏固定任务、共享端口/原始包许可与 Windows 的 pending 不变。

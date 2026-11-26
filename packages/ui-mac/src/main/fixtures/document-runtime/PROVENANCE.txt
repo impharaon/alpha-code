@@ -1,0 +1,5 @@
+control.pdf is the actual Chinese reportlab/PDFium probe produced in slice 2.
+Source receipt: /tmp/alpha-1761-slice2/packaged-receipt.json and python-probe.py.
+SHA256: 67d2becb46281e2cecdedf02be012636f3210d65875205d9c5f55320fb5bb1b4
+Used only as a real PDF for receipt hash/path guards, never as evidence of LO execution.
+MSI tables/CAB fixtures are pending the selected real Windows release asset; none fabricated.

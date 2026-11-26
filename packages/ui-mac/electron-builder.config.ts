@@ -139,6 +139,7 @@ const getBase = (appId: string): Configuration => ({
       from: "resources/office-mcp/",
       to: "office-mcp/",
     },
+    { from: "resources/document-runtime/", to: "document-runtime/" },
     {
       // REQ-023 T2:官方 agent md 资产(#361 起由 collectBuiltinAgentPayload 收集 → CAS →
       // 事务安装落 ~/.alpha/agents)。

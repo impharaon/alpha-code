@@ -71,3 +71,11 @@ export function documentResources(input: { resourcesRoot: string; packaged: bool
     manifest,
   }
 }
+
+/** Fixed app-owned runtime scripts, projected independently of launcher Node availability. */
+export function documentRuntimeResources(resourcesRoot: string) {
+  return {
+    verify: realpathSync(join(resourcesRoot, "document-runtime", "verify_runtime.py")),
+    extractMsi: realpathSync(join(resourcesRoot, "document-runtime", "extract_msi.py")),
+  }
+}

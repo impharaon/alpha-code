@@ -2,7 +2,7 @@ import { afterEach, describe, expect, test } from "bun:test"
 import { chmodSync, cpSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { DOCUMENT_ASSET_BUILD_DIR, OFFICE_RUNTIME_BUILD_DIR, documentResources, officePythonPath, readDocumentAssets } from "./document-resources"
+import { DOCUMENT_ASSET_BUILD_DIR, OFFICE_RUNTIME_BUILD_DIR, documentResources, documentRuntimeResources, officePythonPath, readDocumentAssets } from "./document-resources"
 import { checkOfficeRuntime } from "../../scripts/target-arch"
 
 const temporary: string[] = []
@@ -11,6 +11,19 @@ afterEach(() => {
 })
 
 describe("document resources", () => {
+  test("fixed runtime scripts survive the production extraResources copy", async () => {
+    const { getConfig } = await import("../../electron-builder.config")
+    const entries = getConfig("prod").extraResources
+    if (!Array.isArray(entries)) throw Error("missing resources")
+    const entry = entries.find((item) => typeof item !== "string" && item.to === "document-runtime/")
+    if (!entry || typeof entry === "string") throw Error("runtime scripts not packaged")
+    const root = mkdtempSync(join(tmpdir(), "document-fixed-scripts-")); temporary.push(root)
+    cpSync(join(import.meta.dir, "../..", entry.from), join(root, entry.to), { recursive: true })
+    const result = documentRuntimeResources(root)
+    expect(readFileSync(result.verify, "utf8")).toContain("pypdfium2.PdfDocument")
+    rmSync(result.verify)
+    expect(() => documentRuntimeResources(root)).toThrow()
+  })
   test.each([false, true])("verified resource projection, packaged=%s, preserves the supplied launcher Node", (packaged) => {
     const input = fixture(packaged)
     const result = documentResources(input)

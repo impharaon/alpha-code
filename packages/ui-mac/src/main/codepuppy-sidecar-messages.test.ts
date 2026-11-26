@@ -281,3 +281,10 @@ test("I-13 tool policy write: requests (save / reset) and replies (ok / ok with 
   ])
     expect(messages.parseToolPolicyWriteReply(bad), JSON.stringify(bad)).toBeUndefined()
 })
+
+import { parseDocumentRuntimeMessage } from "./codepuppy-sidecar-messages"
+test("document runtime notifications validate phase, progress and generation without accepting malformed payloads", () => {
+  const value = { type: "codepuppy.document.runtime.changed", sidecarGeneration: 2, sequence: 3, state: { phase: "preparing", stage: "download", received: 30, total: 100 } }
+  expect(parseDocumentRuntimeMessage(value)).toEqual(value)
+  for (const changed of [{ sidecarGeneration: -1 }, { sequence: 0.5 }, { state: { phase: "ready" } }, { state: { phase: "preparing", stage: "download", received: -1 } }]) expect(parseDocumentRuntimeMessage({ ...value, ...changed })).toBeUndefined()
+})

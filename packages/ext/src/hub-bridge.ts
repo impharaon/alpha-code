@@ -40,6 +40,8 @@ import {
   type ReloadOutcome,
   type ReloadRequestMessage,
   type ReloadScope,
+  parseDocumentRuntimeMessage,
+  type DocumentRuntimeMessage,
 } from "../../ui-mac/src/main/codepuppy-sidecar-messages"
 
 /** Electron utilityProcess 的 `process.parentPort` 里本模块用到的那两样。 */
@@ -66,6 +68,8 @@ export type HubBridge = {
   report(input: { generation: number; scope: ReloadScope; outcome: ReloadOutcome; directories: string[]; error?: string }): void
   /** main → ext 的重载请求交给谁。只能挂一个(调度器);挂上之前到达的请求按序缓存,挂上时补交。 */
   onReloadRequest(handler: (message: ReloadRequestMessage) => void): void
+  onDocumentRuntimeMessage(handler: (message: DocumentRuntimeMessage) => boolean): () => void
+  documentRuntimeReceipt(receipt: Extract<DocumentRuntimeMessage, { type: "codepuppy.document.runtime.verify.receipt" }>): void
   /**
    * SPEC-engine-config-fence BR-03(DESIGN-engine-config-fence §4.5):工具策略文档的写者 —— main 写、写完再回复,走本桥同一个监听、同一个 id 空间
    * 与超时。只在有 parentPort 时有;main 回 error、超时、应答形状不对或发不出去 ⇒ 记一行并抛(存储包成 ToolPolicyWriteError("io"))。
@@ -85,6 +89,8 @@ export function createHubBridge(
   const log = options.log ?? ((line: string) => console.error(line))
   const pending = new Map<number, { settle: (message: unknown) => void; timer: ReturnType<typeof setTimeout> }>()
   const early: ReloadRequestMessage[] = []
+  const documentHandlers = new Set<(message: DocumentRuntimeMessage) => boolean>()
+  const earlyDocument: DocumentRuntimeMessage[] = []
   let reloadHandler: ((message: ReloadRequestMessage) => void) | undefined
   let seq = 0
   const unattended = createUnattendedState()
@@ -104,6 +110,12 @@ export function createHubBridge(
     const message = event?.data
     if (!isCodePuppySidecarMessage(message)) return
     const type = (message as { type: string }).type
+    if (type.startsWith("codepuppy.document.runtime.")) {
+      const parsed = parseDocumentRuntimeMessage(message)
+      if (!parsed) return log("[@codepuppy/ext] dropped malformed document runtime message")
+      if (![...documentHandlers].some((handler) => handler(parsed))) earlyDocument.push(parsed)
+      return
+    }
     if (type === "codepuppy.unattended.live") {
       const parsed = parseUnattendedLive(message)
       if (!parsed) return log(`[@codepuppy/ext] dropped a malformed unattended snapshot`)
@@ -173,6 +185,12 @@ export function createHubBridge(
   return {
     unattended,
     available: !!port,
+    onDocumentRuntimeMessage(handler) {
+      documentHandlers.add(handler)
+      for (const message of earlyDocument.splice(0)) if (!handler(message)) earlyDocument.push(message)
+      return () => { documentHandlers.delete(handler) }
+    },
+    documentRuntimeReceipt(message) { port?.postMessage(message) },
     ...(port
       ? {
           toolPolicy: {

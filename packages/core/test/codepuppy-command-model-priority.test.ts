@@ -110,6 +110,15 @@ it.live("untrusted project fenced shell stays source and records deferred execut
   expect(CodePuppyProjectGate.view(location.directory)?.withheld).toContainEqual(expect.objectContaining({ kind: "command-run", name: "review", fields: ["shell"] }))
 }).pipe(Effect.ensuring(Effect.sync(() => CodePuppyProjectGate.resetForTest()))))
 
+it.live("shell argument lists preserve each parsed word while text retains the raw arguments", () => Effect.gen(function* () {
+  yield* runCommand({ template: "Initialize native command services" }, {})
+  const location = yield* Location.Service
+  const render = (source: string, syntax: "claude" | "opencode") => Effect.promise(() => renderPackageInstruction(location, { parts: [source], rawArguments: '\"first value\" \"x;id\" \"\"', arguments: [], syntax, cwd: location.directory }))
+  expect(yield* render("!`printf '<%s>' $ARGUMENTS`", "claude")).toBe("<first value><x;id><>")
+  expect(yield* render("!`printf '<%s>' $1`", "opencode")).toBe("<first value><x;id><>")
+  expect(yield* render("$ARGUMENTS", "claude")).toBe('\"first value\" \"x;id\" \"\"')
+}))
+
 /** Runs one configured command through the production plugin and Command service; records what it asked the session to do. */
 const runCommand = (command: Record<string, unknown>, session: { model?: typeof PICKED }, document?: Document) =>
   Effect.gen(function* () {

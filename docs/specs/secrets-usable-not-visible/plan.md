@@ -193,7 +193,7 @@ AC-01/05/07 的完整 read/权限/Windows 证明不在②宣告完成。去掉�
 ## ③ 安全读取、env 保值写回与权限例外
 
 - 依据：[规格 v3](spec.md) @ `aa2476b378da663115e6735b991f6cbf2e04b5c6`，BR-01/02/04/05/06/07，AC-01、04（直接读）、05、06（三消费者）、07（路径接线）；[冻结设计](design.md) @ `66313542d35b182ef8fdbd2d4c4597d715149c35` §4.1、§4.2、§4.3/4.3.1、§4.4、§4.6、§4.7、§5、§6、§10；#1758。代码基线为②接线提交 `82e96edcca`；继承①已接受结论与②收据，不重审原决定。r4 仅授权规划③，设计候选 v3.1 / SC-02 仍待 owner 决策，不是本段依据。
-- 核对：待编排器核对本段计划；首次实施提交从续派单 `Phase:` 行填写。
+- 核对：Phase: IMPLEMENT segment ③ — plan `dcaa1fc375` accepted（safe read view、env duplicate-key restore、allow-all 外读例外、shared risk）；Claude Opus 5.5（orchestrator），来源为 r5 续派单。冻结设计增量按 `832ab5a4f4` v3.1 §4.8/§10 消费，SC-02 已批准并在 `1af2389012` 实施；其它决定继承。
 
 只实现上述读取、写回与权限/风险接线，不接 SC-01/SC-02，不宣告 shell、真实 SSH、模型记录和卡片交叉验收已完成。段②已经提供的 roots、envAssignments、resolveProtectedFile、remember、result/error/preview 继续是唯一材料与投影实现；本段不再持有名单、秘密词、档位表或值集合。
 
@@ -247,3 +247,23 @@ AC-01/05/07 的完整 read/权限/Windows 证明不在②宣告完成。去掉�
 暂无。本段为 PLAN，只追加本节并同步计划摘要/导读；未改生产代码、冻结设计、spec 或 SC-02 断言。具体 private helper 的签名与局部实现不在计划重新冻结；若实际改动文件或顺序变化，在对应实施提交同处记录。
 
 本次 PLAN 作者检查：Codex / GPT-6，已对照上述冻结节与当前 read/write/edit/patch、身份、自动化、目录及风险调用点；只读探查，未实施③。Alpha profile 文档检查中本 plan findings 为 0，实际 spec/design 相对链接存在，`git diff --check` exit 0；仓级既有 index.stale 等不宣称通过，按前述去向交编排器。下一步为编排器核对本节后续派实施。
+
+
+### ③ r5 实施收据与接缝返回
+
+- 依据/已核：上述 r5 核对行、规格 v3、设计 v3.1 @ `832ab5a4f4`。Codex / GPT-6 作者自查；SC-02 已完成（`1af2389012`），另以 `ce47277a62` 单独提交红例、`412daeaa33` 修正故障投影保留旧动态键的问题。`packages/core` 下 `bun test --max-concurrency 2 test/tool-registry.test.ts` 为 46 pass / 0 fail / 156 expect；原 Promise/repair 两文件的 19 pass 继承本轮前述检查，新增红例没有更改这些路径。
+- 已完成独立义务：AC-05 的操作例外在 external-directory-rule 唯一权威持有，完整根键和真实 builtin read 事实关联，确认/pin 后建立；普通 read 与 Code Mode child 的区分继续消费 SecretMask 根状态，终态/中断事件/Location 释放清理。能力轴和身份轴风险都必填 secrets.roots，ProtectedFiles.probe 替换旧凭据正则，保留 /etc 系统文件探针；没有放宽写、询问档、只读或自动化。
+- `packages/ext` 下 `bun test --max-concurrency 2 src/external-directory-rule.test.ts src/policy/risk.test.ts src/policy/register-policy.test.ts src/secret-mask.test.ts`，exit 0，**110 pass / 0 fail / 376 expect**。具名证据：`external read exception uses the complete verified root call`、三档 `only fully approved ordinary external reads skip the directory ask`、`protected path risk consumes the location roots`；包含完整键、无来源、假 read、deny、清理、Windows 形态及共享排除。风险旧断言中的相对 `../../.aws/credentials` 改为本 roots 实际发布的 `/Users/me/.aws/credentials`；原 import 白名单增加 Schema 保护模块，继续禁 provider/LLM/网络依赖，不保留旧路径名单。
+- 两个移除臂：旁路 read 来源关联、旁路共享 probe；分别运行上述 external/read-risk 命名用例，各 exit 1 / 0 pass / 1 fail。代码仅临时改写，以暂存版本 scoped git restore 恢复且字节一致。`/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/segment3-independent-arms-wlan7fp1/` 保存两份日志及 report.json。
+- 返回前一次扩大相关集：Ext 的 identity 18、unattended 4、unattended-policy 20、plugin-host 52、engine-transforms 17、plugin-setup-order 1、display 7、inventory 5、session-row-rules 7、tool-policy-rpc 8；Core 的 tool-input-repair-integration 3、session-tool-progress 1、tool-execute 中 `canonical execution|declared outputs|foreign typed failures|interrupted execute sends` 5。各从所属包运行 `bun test --max-concurrency 2 <文件> [-t <上列过滤>]`，共 **148 pass / 0 fail**。因同机有其它 gate，每次最多两个进程，未运行整个包、100 ms 节流时序或分钟场景。精确命令范围及各文件原始日志见 `/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/secrets-r5-related-12bufa43/` 的 report.json 与对应日志。
+- 当前已提交能力的检查：Ext/Core/Plugin 各自 `bun typecheck` exit 0；实际变动 TS 的包内 oxlint 为 0 warnings / 0 errors。安全 read 草稿（下述）类型检查失败不计为本轮通过；它已完整撤回，仅留临时证据。没有把草稿 97 pass 或 UI 29 pass 计入交付证明。
+
+**SEAM-CHANGE-NEEDED：安全 TextPage 分页的无服务依赖入口。** 冻结 §4.4 要求先生成安全文本再沿用原分页，§4.7 明确不导入 Core 服务实现；K2 及派单又禁止复制常量/契约。实际分页函数在 `packages/core/src/tool/read-filesystem.ts:292-335` 为私有 textPage/clampLine，上限在同一服务实现 `:14-20`，没有可供扩展消费的纯分页入口。把 TextPage/常量直接从此模块引入的试作使 Ext `bun typecheck` exit 2，新增依赖闭包报 `packages/core/src/integration.ts:472,513,531,539,784,848,865` 的类型错误；撤回该闭包后同一命令 exit 0。未调查/修改这些旁观模块，也未用动态 import 字符串、类型逃逸、复制分页常量或另一个 parser 绕过边界。
+
+真实 read 试作先确认原输出 codec 的类实例要求：普通对象在真实 read 入口被拒为 `Tool returned an invalid value for its output schema: Expected ReadTool.TextPage`。这点已有合法解法：临时探针用实际 Schema codec 验得 `{plainRejected:true, codecRoundTrip:true}`，因此**不要求为构造器增加接管**；后续包装可用原工具输出 codec 解码 DTO。仍需设计方补齐的最小接缝是：让原 reader 与扩展共用一个不依赖 Core 服务实现的纯文本分页入口，沿用原 offset/limit、行/字节/单行规则；DTO 继续消费既有输出 codec。若设计另有已授权 callable，请给出该入口，勿重审其余决定。任何为此改动的上游文件先归设计/接管边界，不借 SC-02 修改 read-filesystem。
+
+草稿及完整 patch 保存在 `/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/segment3-read-seam-yhtmq5c7/`；codec 探针与 output.log 在 `/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/read-page-seam-proof-a6yrbsx5/`。未读取用户密钥；SSH 样本沿用②生成的 fixture。上述测试/草稿不作为已交付实现。交互 env deny/ask 注入也已撤回，安全 read 未落地前不放松原保护。AC-01、04 的直接读、AC-06 联合、AC-07 读取接线与 env 写回单元尚未完成，待接缝输入补齐后续派；不宣称段③ DONE，不提前写④计划。
+
+偏离：按阻塞处置先完成第三提交单元中独立的目录例外/风险；read/配置注入和第二单元未出货。新增修改 `policy/identity.ts`，只把已有完整根调用键函数提升为遮盖与目录关联共用的权威，避免重复编码；未改身份来源判定。SC-02 的额外红/绿两提交用于新引入的动态键残留缺陷，原红例断言保持未改。文档仅更新本计划、模块权威链接与本计划生成索引行；其它仓级文档基线仍交编排器。当前约 30 分钟（本机 07:00 UTC 开始）；无原时长预估可比较，无新增依赖、迁移或 schema 持久化改动。
+
+收口补充：根 read 关联在同键新根开始时先清旧记录；邻接文件最终 1 pass / 14 expect。SC-02 修正后外层/后置 hook/取消四例再次定向运行，4 pass / 0 fail / 11 expect。文档按 Alpha profile 检查，本 plan findings 为 0；模块地图仍为原 13 个缺失目标，新增三个权威链接均实际存在，README 的原跨仓未知 ID 在改动索引后升为 error，仓级共 71 error / 251 warning，不宣称全仓文档通过。当前交付代码相关用例去重合计 **328 PASS**（Ext 254，Core 74），不含安全 read / UI 草稿。遗留去向：纯分页接缝归设计方；read/env 写回等未完成段归编排器续派；原文档基线归文档治理，无 OPTIONAL 代码。

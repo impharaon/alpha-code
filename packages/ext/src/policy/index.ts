@@ -37,6 +37,7 @@ import type { ToolDisplaySnapshotV1 } from "../../../schema/src/tool-identity"
 import { isCodePuppyPolicyRequest } from "../../../schema/src/codepuppy-tool-policy"
 import type { HubBridge, HubInstallSubject } from "../hub-bridge"
 import { denyHubMutationForAutomation, hubInstallAsk } from "../hub-tools"
+import { createExternalDirectoryRead } from "../external-directory-rule"
 import { createSecretMask } from "../secret-mask"
 import type { ProtectedFiles } from "../../../schema/src/codepuppy-protected-files"
 
@@ -77,6 +78,7 @@ export function policyWorkspace(location: Plugin.Context["location"]): string {
  */
 export async function registerPolicy(context: Plugin.Context, unattended: UnattendedState, installSubject: HubBridge["installSubject"], toolPolicy?: ToolPolicyWriter): Promise<PolicyRegistration> {
   const env = process.env
+  const externalRead = createExternalDirectoryRead()
   const home = os.homedir()
   const secrets = createSecretMask({
     platform: process.platform === "win32" ? "win32" : "darwin",
@@ -155,6 +157,7 @@ export async function registerPolicy(context: Plugin.Context, unattended: Unatte
   }
 
   const deps: GateDeps = {
+    protectedRoots: secrets.roots,
     profile,
     denied,
     store,
@@ -213,6 +216,7 @@ export async function registerPolicy(context: Plugin.Context, unattended: Unatte
       }
       return holdUnattendedDeny(event, selected, event.action, (denial) => denied(event.source?.type === "tool" ? event.source.id : undefined, denial))
     }
+    externalRead.evaluate(event)
     if (isCodePuppyPolicyRequest(event.metadata)) {
       // BR-10: an assistant-initiated install asks in every tier — no allow rule, saved approval or tier skips it.
       if (isInstallAsk(event.metadata) && event.effect !== "deny") event.effect = "ask"
@@ -226,6 +230,7 @@ export async function registerPolicy(context: Plugin.Context, unattended: Unatte
     }
     if (event.effect !== "ask" || !event.metadata) return
     ;(event.metadata as Record<string, unknown>)[RISK_METADATA_KEY] = classifyPermissionRequest({
+      protectedRoots: secrets.roots,
       permission: event.action,
       patterns: [...event.resources],
       always: [],
@@ -246,11 +251,15 @@ export async function registerPolicy(context: Plugin.Context, unattended: Unatte
   const terminalEvents = new AbortController()
   void (async () => {
     for await (const event of context.event.subscribe({ types: ["session.tool.success", "session.tool.failed"], signal: terminalEvents.signal }))
-      secrets.release({ sessionID: event.data.sessionID, messageID: event.data.assistantMessageID, id: event.data.id })
+      {
+        const call = { sessionID: event.data.sessionID, messageID: event.data.assistantMessageID, id: event.data.id }
+        secrets.release(call)
+        externalRead.end(call)
+      }
   })().catch(() => { /* Location disposal aborts the cleanup subscription. */ })
 
   return {
-    dispose: () => { terminalEvents.abort(); secrets.dispose() },
+    dispose: () => { terminalEvents.abort(); externalRead.dispose(); secrets.dispose() },
     askInstall: async (call) => {
       const key = installCallKey(call)
       const prepared = installAsks.get(key)
@@ -282,6 +291,7 @@ export async function registerPolicy(context: Plugin.Context, unattended: Unatte
           pin(event)
           if (event.tool === CODE_MODE_TOOL && await profile(event.sessionID, event.agent) !== undefined) codeModeDenials.set(event.id, undefined)
           await secrets.begin({ call: event, kind: event.tool === CODE_MODE_TOOL ? "execute" : "tool" })
+          if (secrets.isRoot(event, event.tool)) externalRead.begin(event, decision.facts)
         } catch (error) {
           displays.delete(event.id)
           installAsks.delete(installCallKey(event))
@@ -298,18 +308,20 @@ export async function registerPolicy(context: Plugin.Context, unattended: Unatte
         Object.defineProperty(event, "metadata", { value: safe, enumerable: true, configurable: false, writable: false })
       })
       await context.tool.hook("execute.after", async (event) => {
-        if (event.tool === CODE_MODE_TOOL) {
-          attachUnattendedDenial(event as never, codeModeDenials.get(event.id))
-          codeModeDenials.delete(event.id)
-        }
-        attachNetFailure(event as never)
-        attachWriteDenied(event as never, context.location.directory)
-        attachDirectoryDisplay(event as never)
-        attachTerminal(event as never, displays.get(event.id))
-        if (event.status === "completed") event.result = await secrets.result({ call: event, tool: event.tool, result: event.result })
-        else event.error = await secrets.error({ call: event, tool: event.tool, error: event.error })
-        displays.delete(event.id)
-        installAsks.delete(installCallKey(event))
+        try {
+          if (event.tool === CODE_MODE_TOOL) {
+            attachUnattendedDenial(event as never, codeModeDenials.get(event.id))
+            codeModeDenials.delete(event.id)
+          }
+          attachNetFailure(event as never)
+          attachWriteDenied(event as never, context.location.directory)
+          attachDirectoryDisplay(event as never)
+          attachTerminal(event as never, displays.get(event.id))
+          if (event.status === "completed") event.result = await secrets.result({ call: event, tool: event.tool, result: event.result })
+          else event.error = await secrets.error({ call: event, tool: event.tool, error: event.error })
+          displays.delete(event.id)
+          installAsks.delete(installCallKey(event))
+        } finally { externalRead.end(event) }
       })
 
       await context.permission.hook("evaluate", async (event) => {

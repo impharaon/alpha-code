@@ -223,3 +223,6 @@ export function extModulePath(moduleUrl: string): string {
 export function loadBundledTools(moduleUrl: string, manifestPath: string | undefined) {
   return bundledPluginTools({ source: "file", entry: moduleUrl }, manifestPath, readFileSync)
 }
+
+/** Identity of a root invocation, shared by masking and permission association. */
+export const toolCallKey = (call: { sessionID: string; messageID: string; id: string }) => JSON.stringify([call.sessionID, call.messageID, call.id])

@@ -1659,6 +1659,31 @@ describe("E2: only the MCP layer's own tools carry an MCP identity", () => {
   )
 })
 
+describe("ordinary external reads", () => {
+  for (const tier of ["build", "codepuppy-ask", "codepuppy-readonly"] as const) it.live(`only fully approved ordinary external reads skip the directory ask (${tier})`, () => Effect.gen(function* () {
+    const outside = path.join(ROOT, `ordinary-${randomUUID()}.txt`)
+    fs.writeFileSync(outside, "ordinary outside content")
+    const { session } = yield* setup({ internal: [ReadTool.Plugin], records: NEUTRAL, inside: async (ctx) => {
+      await ctx.agent.transform((editor: import("@opencode/plugin/promise/agent").AgentEditor) => {
+        for (const agent of ["build", "codepuppy-ask", "codepuppy-readonly"])
+          editor.update(agent as never, (draft) => { draft.permissions.push(ALLOW_ALL, { action: "external_directory", resource: "*", effect: agent === "codepuppy-readonly" ? "deny" : "ask" }) })
+      })
+    }, rules: [ALLOW_ALL, { action: "external_directory", resource: "*", effect: "ask" }] })
+    const snapshot = yield* (yield* Tool.Service).snapshot([ALLOW_ALL])
+    const execute = snapshot.execute({ sessionID: session.id, agent: tier, messageID: "msg_external", call: { type: "tool-call", id: "read_external", name: "read", input: { path: outside } } } as never).pipe(Effect.exit)
+    const fiber = yield* execute.pipe(Effect.forkChild)
+    if (tier === "codepuppy-ask") {
+      const [request] = yield* pending
+      expect(request?.action).toBe("external_directory")
+      yield* (yield* Permission.Service).reply({ requestID: request!.id, reply: "once" })
+    }
+    const result = yield* E.Fiber.join(fiber)
+    expect(Exit.isSuccess(result)).toBe(tier !== "codepuppy-readonly")
+    if (tier !== "codepuppy-readonly") expect(JSON.stringify(result)).toContain("ordinary outside content")
+    expect(yield* (yield* Permission.Service).list()).toEqual([])
+  }))
+})
+
 describe("secret result boundaries", () => {
   it.live("synthetic execute progress must hide known protected values", () => Effect.gen(function* () {
     const location = yield* Location.Service

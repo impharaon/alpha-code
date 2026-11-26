@@ -4,6 +4,7 @@ import type { ToolEditor, ToolContext } from "@opencode/plugin/promise/tool"
 import { Tool } from "../../schema/src/tool"
 import { ProtectedFiles } from "../../schema/src/codepuppy-protected-files"
 import { stripAnsi } from "../../session-ui/src/tools/ansi"
+import { toolCallKey } from "./policy/identity"
 import { DISPLAY_KEY } from "./policy/display"
 import { createSecretFiles, resolveProtectedFile } from "./secret-files"
 
@@ -15,14 +16,13 @@ type CallState = {
   published?: Tool.Metadata
   publish?: ToolContext["progress"]
 }
-const callKey = (call: MaskCall) => JSON.stringify([call.sessionID, call.messageID, call.id])
 const WRAPPED = Symbol("secret-progress")
 
 export function createSecretMask(roots: ProtectedFiles.ProtectedRoots) {
   const files = createSecretFiles(roots)
   const calls = new Map<string, CallState>()
   const stateOf = (call: MaskCall, tool: string) => {
-    const state = calls.get(callKey(call))
+    const state = calls.get(toolCallKey(call))
     return state?.kind === "execute" && tool !== "execute" ? undefined : state
   }
   const text = (value: string) =>
@@ -113,10 +113,11 @@ export function createSecretMask(roots: ProtectedFiles.ProtectedRoots) {
   }
   const service = {
     roots,
+    isRoot: (call: MaskCall, tool: string) => stateOf(call, tool) !== undefined,
     begin: async (input: { call: MaskCall; kind: "tool" | "execute" }) => {
-      if (calls.get(callKey(input.call))?.kind === "execute") return
+      if (calls.get(toolCallKey(input.call))?.kind === "execute") return
       const state: CallState = { kind: input.kind, failed: false }
-      calls.set(callKey(input.call), state)
+      calls.set(toolCallKey(input.call), state)
       try {
         await files.refresh()
       } catch {
@@ -150,7 +151,7 @@ export function createSecretMask(roots: ProtectedFiles.ProtectedRoots) {
         }
         return { content: [{ type: "text", text: ProtectedFiles.MASKING_FAILED_TEXT }], metadata: safe }
       } finally {
-        if (state) calls.delete(callKey(input.call))
+        if (state) calls.delete(toolCallKey(input.call))
       }
     },
     error: async (input: { call: MaskCall; tool: string; error: Tool.Error }): Promise<Tool.Error> => {
@@ -173,11 +174,11 @@ export function createSecretMask(roots: ProtectedFiles.ProtectedRoots) {
         }
         return new Tool.Error({ message: ProtectedFiles.MASKING_FAILED_TEXT, metadata: hiddenMetadata(state) })
       } finally {
-        if (state) calls.delete(callKey(input.call))
+        if (state) calls.delete(toolCallKey(input.call))
       }
     },
     progress: async (input: { call: MaskCall; update: Tool.Metadata }): Promise<Tool.Metadata> => {
-      const state = calls.get(callKey(input.call))
+      const state = calls.get(toolCallKey(input.call))
       try {
         await files.refresh()
         if (state?.failed) throw new Error("Hidden tool output")
@@ -217,7 +218,7 @@ export function createSecretMask(roots: ProtectedFiles.ProtectedRoots) {
               ...context,
               progress: async (update) => {
                 // Core makes child progress a no-op; it must not overwrite the outer execute snapshot.
-                if (!state && calls.get(callKey(context))?.kind === "execute") return
+                if (!state && calls.get(toolCallKey(context))?.kind === "execute") return
                 // SC-02 masks once at the root publication boundary.
                 await context.progress(update)
               },
@@ -227,7 +228,7 @@ export function createSecretMask(roots: ProtectedFiles.ProtectedRoots) {
           draft.execute = wrapped
         })
     },
-    release: (call: MaskCall) => { calls.delete(callKey(call)) },
+    release: (call: MaskCall) => { calls.delete(toolCallKey(call)) },
     dispose: () => {
       calls.clear()
       files.dispose()

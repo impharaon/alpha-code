@@ -1,5 +1,5 @@
 // REQ-236 §2.2 R2(`#1662` parity,编排器第四轮裁决):「全部批准」(引擎的 build)与「请求审批」(codepuppy-ask)读写工作区外的
-// 目录先问,与 0.1.x 相同 —— 用户自己在 opencode 配置里写的 `external_directory` 规则仍能放宽它,只读档的拒绝放不开。
+// 目录以 ask 为底座；#1758 仅对已核实的全部批准根 read 取消 ask。用户配置仍能放宽底座,只读档的拒绝放不开。
 //
 // v1 的引擎默认 agent 规则是 `external_directory: { "*": "ask", <白名单>: "allow" }`,排在用户配置之前(`origin/alpha` 的
 // `packages/opencode/src/agent/agent.ts`:`merge(defaults, user)`)。OpenCode 2 的 agent 底座是 `"*": "allow"`(`Agent.Info.default`),
@@ -11,13 +11,18 @@
 // 出厂与已启用技能目录(变换每次重跑时现算,技能翻代后不必重新注入)。
 import { realpathSync } from "node:fs"
 import path from "node:path"
+import { AUTOMATION_PROFILES } from "../../schema/src/codepuppy-unattended"
+import type { ToolFacts } from "./policy/identity"
+import { toolCallKey } from "./policy/identity"
+import type { PermissionEvaluation } from "../../plugin/src/effect/permission"
 import { Agent } from "../../schema/src/agent"
 import { Path } from "../../util/src/global"
 import { factorySkillPaths } from "./factory-paths"
 import { skillGenerationLiveDirs } from "./gen-skill-paths"
 
 /** 只这两档追加;只读档与自动化档自己就是 deny,别的 agent 维持引擎原样。 */
-export const EXTERNAL_DIRECTORY_AGENTS = ["build", "codepuppy-ask"] as const
+const FULLY_APPROVED_AGENT = "build"
+export const EXTERNAL_DIRECTORY_AGENTS = [FULLY_APPROVED_AGENT, "codepuppy-ask"] as const
 
 type Rule = { action: string; resource: string; effect: "allow" | "deny" | "ask" }
 
@@ -54,4 +59,22 @@ export function placeAfterBase(id: string, permissions: Rule[], rules: Rule[]): 
   const prefixed = base.every((rule, index) => permissions[index] !== undefined && same(rule, permissions[index]!))
   permissions.splice(prefixed ? base.length : permissions.length, 0, ...rules)
   return prefixed
+}
+
+/** Execution facts, never permission metadata, identify the exceptional read operation. */
+export function createExternalDirectoryRead() {
+  const reads = new Map<string, string>()
+  return {
+    begin: (call: { sessionID: string; messageID: string; id: string; agent: string }, facts: ToolFacts) => {
+      reads.delete(toolCallKey(call))
+      if (facts.identity.source === "builtin" && facts.identity.name === "read" && !Object.hasOwn(AUTOMATION_PROFILES, call.agent))
+        reads.set(toolCallKey(call), call.agent)
+    },
+    evaluate: (event: PermissionEvaluation) => {
+      if (event.action !== "external_directory" || event.effect !== "ask" || event.source?.type !== "tool" || event.agent !== FULLY_APPROVED_AGENT) return
+      if (reads.get(toolCallKey({ sessionID: event.sessionID, messageID: event.source.messageID, id: event.source.id })) === event.agent) event.effect = "allow"
+    },
+    end: (call: { sessionID: string; messageID: string; id: string }) => { reads.delete(toolCallKey(call)) },
+    dispose: () => { reads.clear() },
+  }
 }

@@ -39,7 +39,8 @@ describe("attachmentAbsolutePath", () => {
   test("改 PROJECT_HIDDEN_DIR 的值,附件路径随之改变(拷一份共享模块改常量再装载)", async () => {
     const dir = realpathSync(mkdtempSync(join(tmpdir(), "codepuppy-attpath-")))
     temps.push(dir)
-    for (const file of ["attachment-path.ts", "office-advisories.ts"]) copyFileSync(join(import.meta.dir, file), join(dir, file))
+    // Keep the real advisories owner and its transitive runtime imports; only the hidden-dir constant is replaced.
+    writeFileSync(join(dir, "attachment-path.ts"), readFileSync(join(import.meta.dir, "attachment-path.ts"), "utf8").replace('"./office-advisories"', JSON.stringify(join(import.meta.dir, "office-advisories.ts"))))
     const constant = readFileSync(join(import.meta.dir, "project-hidden-dir.ts"), "utf8")
     expect(constant).toContain(`export const PROJECT_HIDDEN_DIR = "${PROJECT_HIDDEN_DIR}"`)
     writeFileSync(join(dir, "project-hidden-dir.ts"), constant.replace(`"${PROJECT_HIDDEN_DIR}"`, '".probe-hidden"'))

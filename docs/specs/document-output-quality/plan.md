@@ -578,3 +578,5 @@ A1 green：明确根 npm FileSet 并在 afterPack 对 darwin/win32 的真实 Res
 A2 推断确认（一次固定源码读取）：`/tmp/alpha-1761-r11/link-source-confirmation.json` 记录 LibreOffice tag `libreoffice-26.8.3.1` 的 sc/inc/global.hxx、LinkUpdateModes.idl、Writer.xcs 及 SHA-256。Calc enum 为 LM_ALWAYS=0 / LM_NEVER=1；Writer 配置 Writer.xcs:1110-1138 明确 2=Never，因此“Writer 2 可能自动”前提为假，不改为 UNO 常量 0（该常量用于另一个 API）。新增原 fonts 文件中的实际 XML 解析断言要求 Writer=2、Calc=1；target exit 1（A2-red.log），只失败于 Calc 目前为 0。下一提交只改 Calc 到其 never 值，保留 Writer 已正确值。
 
 A2 green：同一 XML 断言未改，Calc Link=1，Writer Link=2；fonts 文件 4 PASS（A2-green.log）。原生字体/替代/宏/更新检查仍保留。
+
+A3 red：既有 runtime 文件新增 explicit action 用例，当前缺 retry，target exit 1（A3-red.log）。要求仅 failed 才重开一次 preparation，preparing/ready 不启动，且没有自动循环。下一提交只补本功能方法；#1760 action 仍为具体未实现接线依赖，不冒称完成。

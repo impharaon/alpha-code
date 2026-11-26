@@ -126,3 +126,24 @@ test("Python projection is live before state notifications and invalidated befor
   expect(JSON.parse(readFileSync(environment.CODEPUPPY_DOCUMENT_HOST, "utf8"))).toMatchObject({ status: "invalidated", reason: "location-disposed", registrationId: "python-registration" })
   expect(() => runtime.pythonEnvironment(f.location)).toThrow("live Location registration")
 })
+
+test("a failed preparation retries only through the explicit action, never in ready or preparing", async () => {
+  const f = fixture()
+  let attempts = 0
+  const runtime = createDocumentRuntime({ ...f.input, ensureFile: async (...args) => ++attempts === 1 ? { result: { ok: false, error: "network" }, failure: { kind: "connect", detail: "fixture interrupted" } } : f.input.ensureFile(...args) })
+  runtimes.push(runtime)
+  expect(typeof runtime.retry).toBe("function")
+  runtime.retry()
+  expect(attempts).toBe(0)
+  runtime.subscribeRuntimeVerify(f.location, f.completed)
+  const failed = until(runtime, (state) => state.phase === "failed")
+  runtime.query(f.location)
+  await failed
+  expect(attempts).toBe(1)
+  const ready = until(runtime, (state) => state.phase === "ready")
+  runtime.retry()
+  await ready
+  expect(attempts).toBe(2)
+  runtime.retry()
+  expect(attempts).toBe(2)
+})

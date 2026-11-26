@@ -116,7 +116,6 @@ const getBase = (appId: string): Configuration => ({
   asarUnpack: [`${ENGINE_ASSETS_DIR}/**`],
   extraResources: [
     ...(process.platform === "darwin" || process.platform === "win32" ? [
-      { from: `${OFFICE_RUNTIME_BUILD_DIR}/${process.platform === "darwin" ? macTargetArch : "win32-x64"}/`, to: "office-runtime/" },
       { from: `${DOCUMENT_ASSET_BUILD_DIR}/`, to: "document-assets/" },
       { from: `${DOCUMENT_ASSET_BUILD_DIR}/node_modules/`, to: "document-assets/node_modules/" },
     ] : []),
@@ -220,6 +219,7 @@ const getBase = (appId: string): Configuration => ({
     ...(shouldSign ? {} : { resetAdHocDarwinSignature: true }),
   },
   mac: {
+    extraResources: [{ from: `${OFFICE_RUNTIME_BUILD_DIR}/${macTargetArch ?? "arm64"}/`, to: "office-runtime/" }],
     artifactName: "codepuppy-${os}-${arch}.${ext}",
     category: "public.app-category.developer-tools",
     icon: `resources/icons/icon.icns`,
@@ -277,6 +277,7 @@ const getBase = (appId: string): Configuration => ({
     schemes: [...DEEP_LINK_SCHEMES],
   },
   win: {
+    extraResources: [{ from: `${OFFICE_RUNTIME_BUILD_DIR}/win32-x64/`, to: "office-runtime/" }],
     icon: `resources/icons/icon.ico`,
     signtoolOptions: {
       sign: signWindows,

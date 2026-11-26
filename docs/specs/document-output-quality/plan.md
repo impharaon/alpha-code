@@ -586,3 +586,5 @@ A3 runtime green：原断言不改，runtime 文件 12 PASS（A3-green.log）。
 A4 red：原 runtime 文件三种真实临时目录场景（extract-failure、verification-failure、dispose/cancel）均留下 stale/current candidate，target 0 PASS/3 FAIL（A4-red.log）。修正将只删除本 runtime 的 unpublished candidate，准备开始清遗留前缀；Location 将验证转给另一活请求者时仍是同一次共享准备，不把候选误删为其它消费者造成失败。
 
 A4 green：runtime 15 PASS（A4-green.log），提取失败、验证失败及退出后的候选均清除，原跨 Location 转交仍通过。清理仅应用私有 candidate 前缀，不删除已发布 destination；无新下载器/用户操作。
+
+A5 red：既有 runtime 文件在真实 rename 边界观察 candidate 的 marker（仍委托原 fs rename，不靠时间等待），当前 marker=null，target exit 1（A5-red.log）。下一提交在候选内完成 marker 并再次检查取消后才 rename；复用已发布目录不重新暴露半份 marker。

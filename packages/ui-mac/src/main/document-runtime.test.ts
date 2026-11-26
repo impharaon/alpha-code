@@ -1,6 +1,6 @@
-import { afterEach, describe, expect, test } from "bun:test"
+import { afterEach, describe, expect, test, spyOn } from "bun:test"
 import { createHash } from "node:crypto"
-import { copyFileSync, cpSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, existsSync, realpathSync, rmSync, writeFileSync } from "node:fs"
+import { copyFileSync, cpSync, mkdirSync, mkdtempSync, readFileSync, promises, readdirSync, existsSync, realpathSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import type { Location } from "../../../schema/src/location"
@@ -167,4 +167,22 @@ test.each(["extract-failure", "verification-failure", "cancel"])("unpublished ca
   if (fault === "cancel") { await started; await runtime.dispose() }
   else { await failed; await runtime.dispose() }
   expect(readdirSync(root).filter((name) => name.startsWith("libreoffice-candidate-"))).toEqual([])
+})
+
+
+test("runtime marker is complete inside the candidate before the real publication rename", async () => {
+  const f = fixture()
+  let marker: unknown = null
+  const rename = promises.rename
+  const observed = spyOn(promises, "rename").mockImplementation(async (from, to) => {
+    if (String(from).includes("libreoffice-candidate-") && String(to).endsWith(pin.version)) marker = existsSync(join(String(from), "document-runtime.json")) ? JSON.parse(readFileSync(join(String(from), "document-runtime.json"), "utf8")) : null
+    return rename(from, to)
+  })
+  try {
+    const runtime = createDocumentRuntime(f.input); runtimes.push(runtime)
+    runtime.subscribeRuntimeVerify(f.location, f.completed)
+    const ready = until(runtime, (state) => state.phase === "ready")
+    runtime.query(f.location); await ready
+    expect(marker).toMatchObject({ pinId: pin.id, pinSha256: pin.sha256, version: pin.version })
+  } finally { observed.mockRestore() }
 })

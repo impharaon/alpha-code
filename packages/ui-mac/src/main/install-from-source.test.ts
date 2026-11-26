@@ -952,3 +952,20 @@ test("connector version metadata never blocks authorization and is refreshed onc
   expect(refreshed.ok && refreshed.items.find(item => item.kind === "mcp-version")).toMatchObject({ value: "2.0.0", suggestion: "2.0.0" })
   expect(requests).toBe(1)
 }))
+
+test("unset plugin MCP environment variables preserve the source and report a named dependency at binding", async () => {
+  const { bindPluginMcp, PluginMcpBindingError } = await import("../shared/plugin-mcp-config")
+  const captured = await captureFixture("external_plugins/github")
+  const source = new TextDecoder().decode(await captured.readFile(".mcp.json"))
+  // Real GitHub connector, with a non-sensitive named URL variable instead of the recorded literal URL.
+  const converted = await convertPluginTree(await captureFixture("external_plugins/github", { ".mcp.json": source.replace("https://api.githubcopilot.com/mcp/", "${PLUGIN_REMOTE_ENDPOINT}") }))
+  const entry = converted.package.entries.find(entry => entry.kind === "mcp")!
+  if (entry.kind !== "mcp" || entry.transport === "stdio") throw Error("Expected the real GitHub remote connector")
+  const input = { description: converted.package, entry, settings: { packageId: "claude:github", dataHome: "/tmp/plugin-data", values: {}, secretRefs: {}, versions: {}, mcpVersions: {} }, pluginRoot: "/tmp/plugin-tree", projectDir: "/tmp/project", resolveEnvironment: () => undefined, resolveSecret: () => undefined, resolveOptionSecret: () => undefined }
+  expect(() => bindPluginMcp(input)).toThrow("dependency-missing: PLUGIN_REMOTE_ENDPOINT")
+  try { bindPluginMcp(input) } catch (error) { expect(error).toBeInstanceOf(PluginMcpBindingError) }
+  expect(entry.url).toEqual([{ environment: { name: "PLUGIN_REMOTE_ENDPOINT" } }])
+  const resolved = bindPluginMcp({ ...input, resolveEnvironment: name => name === "PLUGIN_REMOTE_ENDPOINT" ? "https://example.com/mcp" : name === "GITHUB_PERSONAL_ACCESS_TOKEN" ? "invalid-local-token" : undefined })
+  expect(resolved).toMatchObject({ type: "remote", url: "https://example.com/mcp", headers: { Authorization: "Bearer invalid-local-token" } })
+  expect(() => bindPluginMcp({ ...input, resolveEnvironment: name => name === "PLUGIN_REMOTE_ENDPOINT" ? "https://example.com/mcp" : undefined })).toThrow("dependency-missing: GITHUB_PERSONAL_ACCESS_TOKEN")
+})

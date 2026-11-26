@@ -102,7 +102,7 @@ function RailButton(props: {
         aria-pressed={props.active === undefined ? undefined : props.active}
         onClick={props.onClick}
       >
-        <ShellIcon name={props.icon} size={18} />
+        <ShellIcon name={props.icon} size={24} />
         <Show when={(props.badge ?? 0) > 0}>
           <span class="codepuppy-auto-badge codepuppy-rail-badge">{props.badge}</span>
         </Show>
@@ -128,17 +128,17 @@ export function ShellRail(props: {
 }) {
   return (
     <nav class="codepuppy-rail codepuppy-sidebar-nav" aria-label={t("codepuppy.sidebar.projects")} data-codepuppy-rail-host>
-      <RailButton icon="pen" label={t("codepuppy.sidebar.newChat")} action="new-chat" onClick={props.onNewChat} />
+      <RailButton icon="layers" label={t("codepuppy.sidebar.newChat")} action="new-chat" onClick={props.onNewChat} />
       <RailButton icon="search" label={t("codepuppy.sidebar.searchChats")} action="search" onClick={props.onSearch} />
       <RailButton
-        icon="grid"
+        icon="plug"
         label={t("codepuppy.sidebar.plugins")}
         action="hub"
         onClick={props.onHub}
         active={props.hubActive}
       />
       <RailButton
-        icon="calendar"
+        icon="clock"
         label={t("codepuppy.sidebar.automation")}
         action="automation"
         onClick={props.onAutomation}

@@ -21,6 +21,7 @@ import {
   listTransactionJournals,
   readBundleAuthorizationReceipt,
   readCurrentGeneration,
+  removeOwnedGenerationStoreInLock,
   readQuarantineReceipt,
   recoverExtensionTransactions,
   recoveryClean,
@@ -1141,4 +1142,51 @@ describe("recoveryClean — 迁移等敏感动作的收敛判定", () => {
     expect(recoveryClean({ ok: true, reports: [rep("committed", "resumed-committed")] })).toBe(true)
     expect(recoveryClean({ ok: true, reports: [rep("uninstalled", "none"), rep("committed", "cleaned")] })).toBe(true)
   })
+})
+
+test("plugin tree transaction verifies real modes and links before switching", async () => {
+  const { captureWholeFixture } = await import("../../test-fixtures/plugin-helper/fixture")
+  const { materializePluginTreeFromCas, putCasBlobFromBuffer } = await import("./ext-cas")
+  const capture = await captureWholeFixture("superpowers", file => file === "skills/executing-plans/scripts/task-start" || file === "tests/hermes/__init__.py")
+  const tree = [...capture.nodes, { kind: "symlink" as const, path: "task-start-link", target: "skills/executing-plans/scripts/task-start" }]
+  for (const node of tree) if (node.kind === "file" && node.bytes) expect(putCasBlobFromBuffer(root, Buffer.from(await capture.readFile(node.path)), node.digest.slice(7)).ok).toBe(true)
+  const files = tree.flatMap(node => node.kind === "file" ? [{ path: node.path, sha256: node.digest.slice(7), size: node.bytes, mode: node.mode }] : [])
+  const item = { key: "bundle--real-script", files, tree }
+  const hooks = { populate: (_item: unknown, dir: string) => materializePluginTreeFromCas(root, tree, dir) }
+  expect(await runExtensionTransaction(root, { items: [item] }, hooks)).toMatchObject({ ok: true })
+  const live = resolveLiveGenerationDir(root, item.key)!
+  expect(fs.readlinkSync(path.join(live, "task-start-link"))).toBe("skills/executing-plans/scripts/task-start")
+  const before = readCurrentGeneration(root, item.key)
+  expect(await runExtensionTransaction(root, { items: [item] }, { populate: (_item, dir) => { hooks.populate(_item, dir); fs.chmodSync(path.join(dir, "skills/executing-plans/scripts/task-start"), 0o644) } })).toMatchObject({ ok: false, stage: "verify" })
+  expect(readCurrentGeneration(root, item.key)).toEqual(before)
+})
+
+test("plugin tree removal handles read-only directories without changing link targets", async () => {
+  const { captureWholeFixture } = await import("../../test-fixtures/plugin-helper/fixture")
+  const { materializePluginTreeFromCas, putCasBlobFromBuffer } = await import("./ext-cas")
+  // Real Superpowers template directory/files, pinned in whole/provenance.json; only its mode changes.
+  const capture = await captureWholeFixture("superpowers", file => file.startsWith(".github/ISSUE_TEMPLATE"))
+  const tree = [...capture.nodes.map(node => node.kind === "directory" ? { ...node, mode: 0o555 } : node), { kind: "symlink" as const, path: "unowned-link", target: path.join(root, "unowned") }]
+  const outside = path.join(root, "unowned")
+  fs.mkdirSync(outside)
+  const realFile = capture.nodes.find(node => node.kind === "file")!
+  const bytes = Buffer.from(await capture.readFile(realFile.path))
+  fs.writeFileSync(path.join(outside, "template.md"), bytes)
+  fs.chmodSync(outside, 0o555)
+  for (const node of tree) if (node.kind === "file") expect(putCasBlobFromBuffer(root, Buffer.from(await capture.readFile(node.path)), node.digest.slice(7)).ok).toBe(true)
+  const files = tree.flatMap(node => node.kind === "file" ? [{ path: node.path, sha256: node.digest.slice(7), size: node.bytes, mode: node.mode }] : [])
+  const key = "bundle--read-only-tree"
+  const installed = await runExtensionTransaction(root, { items: [{ key, tree, files }] }, { populate: (_item, dir) => materializePluginTreeFromCas(root, tree, dir), log: noop })
+  expect(installed).toMatchObject({ ok: true })
+  const live = resolveLiveGenerationDir(root, key)!
+  try {
+    expect(fs.statSync(path.join(live, ".github/ISSUE_TEMPLATE")).mode & 0o7777).toBe(0o555)
+    expect(removeOwnedGenerationStoreInLock(root, key)).toMatchObject({ ok: true })
+    expect(fs.existsSync(extensionStorePaths(root, key).store)).toBe(false)
+    expect(fs.statSync(outside).mode & 0o7777).toBe(0o555)
+    expect(fs.readFileSync(path.join(outside, "template.md"))).toEqual(bytes)
+  } finally {
+    if (fs.existsSync(path.join(live, ".github/ISSUE_TEMPLATE"))) fs.chmodSync(path.join(live, ".github/ISSUE_TEMPLATE"), 0o755)
+    fs.chmodSync(outside, 0o755)
+  }
 })

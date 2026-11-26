@@ -2,10 +2,13 @@
 // 经上游真的钩子链 / 工具注册表 / transform 服务判结果。「权威保持」类用例都带反向臂:同一个输入在**不装 ext** 的宿主里
 // 走上游默认,结论必须相反 —— 去掉我们的钩子 ⇒ 这条用例红。
 import { publishTestBootstrap, testCloudMcp, unpublishTestBootstrap, type TestBootstrapInput } from "../../ui-mac/test-component/codepuppy-bootstrap-fixture"
-import { fixtureRoot } from "../../ui-mac/test-fixtures/plugin-helper/fixture"
+import { allInstalledPluginSkills } from "./plugin-package-skills"
+import { skillGenerationLiveDirs } from "./gen-skill-paths"
+import { convertPluginTree } from "../../ui-mac/src/shared/host-extension-package-contract/plugin-conversion.mjs"
+import { fixtureRoot, captureWholeFixture } from "../../ui-mac/test-fixtures/plugin-helper/fixture"
 import { afterEach, beforeAll, expect } from "bun:test"
 import { createHash } from "node:crypto"
-import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs"
+import { cpSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { LoadAPIKeyError } from "@ai-sdk/provider"
@@ -1423,6 +1426,65 @@ it.live("权威 · 网页抓取失败的原因(#1702):Unable to fetch 的失败�
   }),
 )
 
+
+it.live("installed plugin skill bindings stay package-local in the real SkillEditor", () =>
+  Effect.gen(function* () {
+    env({})
+    const root = join(scratch, "codepuppy-state", "env", "dev")
+    const directory = realpathSync((yield* Location.Service).directory)
+    // Two copies of the pinned real S2 tree retain identical source skill directories.
+    // Host names differ exactly as installation collision handling requires.
+    const capture = yield* Effect.promise(() => captureWholeFixture("claude-security"))
+    const converted = yield* Effect.promise(() => convertPluginTree(capture))
+    const entry = converted.package.entries.find(entry => entry.kind === "skill")!
+    for (const name of ["security-one", "security-two"]) {
+      const store = join(root, "ext-store", "bundle--" + name)
+      const live = join(store, "generations", "gen-000001-abcdef")
+      mkdirSync(live, { recursive: true })
+      cpSync(join(fixtureRoot, "whole/claude/plugins/claude-security"), join(live, "tree"), { recursive: true })
+      writeFileSync(join(live, "plugin-package.json"), JSON.stringify({ description: converted.package, hostNames: { [entry.id]: name } }))
+      writeFileSync(join(store, "current.json"), JSON.stringify({ v: 1, generation: "gen-000001-abcdef", txId: "binding-fixture", switchedAt: "2026-11-26T00:00:00Z" }))
+    }
+    const projection = join(root, "skills-enabled.json")
+    writeFileSync(projection, JSON.stringify({ v: 3, keys: ["skill--security-two"], scoped: [{ kind: "skill", name: "security-one", projectPath: directory }], mcp: [] }))
+    yield* activate({ id: "test.native-skill", async setup(context) {
+      await context.skill.transform(editor => {
+        for (const [id, name] of [["claude-security", "native-security"], ["security-one", "native-host-name"], ["skill--security-two", "native-managed-key"]]) {
+          editor.add({ id: id as never, name: name as never, path: join(fixtureRoot, "whole/claude/plugins/claude-security/skills/claude-security/SKILL.md") as never, content: "native skill" })
+        }
+      })
+    } })
+    const ext = yield* activateExtUntilFinished
+    const plugins = yield* Plugins.Service
+    yield* ConfigSkillPlugin.Plugin.effect(yield* PluginHost.make(plugins, ConfigSkillPlugin.Plugin.id)).pipe(
+      Effect.provide(Config.testLayer([configDocument({ skills: skillGenerationLiveDirs(root) })])),
+    )
+    const skills = yield* Skill.Service
+    yield* ext.finish(skills.list().pipe(Effect.map(items => items.filter(skill => skill.name.startsWith("security-")).length === 2)))
+    const registered = (yield* skills.list()).filter(skill => skill.name.startsWith("security-"))
+    expect(registered).toHaveLength(2)
+    expect((yield* skills.list()).find(skill => skill.id === "claude-security")?.name).toBe("native-security")
+    expect((yield* skills.list()).find(skill => skill.id === "security-one")?.name).toBe("native-host-name")
+    expect((yield* skills.list()).find(skill => skill.id === "skill--security-two")?.name).toBe("native-managed-key")
+    for (const skill of registered) {
+      const installed = allInstalledPluginSkills(root).find(item => item.name === skill.name)!
+      expect(skill.path).toBe(installed.path)
+      expect(skill.content).toContain("(" + installed.pluginRoot + "/scripts)")
+      expect(skill.content).toContain("(" + installed.directory + "/jobs/scan-codebase.md)")
+      expect(skill.content).not.toContain("${CLAUDE_")
+      expect(readFileSync(join(installed.directory, "specs/report-spec.md"), "utf8")).toContain("report")
+      expect(readFileSync(join(installed.directory, "role.md"), "utf8").length).toBeGreaterThan(0)
+      const other = allInstalledPluginSkills(root).find(item => item.name !== skill.name)!
+      expect(skill.content).not.toContain(other.pluginRoot)
+    }
+    writeFileSync(projection, JSON.stringify({ v: 3, keys: ["skill--security-two"], scoped: [{ kind: "skill", name: "security-one", projectPath: join(directory, "another-project") }], mcp: [] }))
+    yield* skills.reload()
+    expect((yield* skills.list()).filter(skill => skill.name.startsWith("security-")).map(skill => skill.name)).toEqual(["security-two"])
+    writeFileSync(projection, JSON.stringify({ v: 3, keys: [], scoped: [], mcp: [] }))
+    yield* skills.reload()
+    expect((yield* skills.list()).filter(skill => skill.name.startsWith("security-"))).toEqual([])
+  }),
+)
 
 it.live("scope · parsed managed skills use positive membership before and after the post tail", () =>
   Effect.gen(function* () {

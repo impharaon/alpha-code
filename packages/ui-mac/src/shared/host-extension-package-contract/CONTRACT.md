@@ -387,3 +387,24 @@ runtime file references. Payloads cannot supply secret storage paths, TOML,
 extra arguments or alternate endpoints. Other MCP payloads retain their existing
 behavior. See the [lifecycle contract](../../../../../docs/contracts/extension-package-lifecycle.md)
 for ciphertext, ephemeral projections, rollback and uninstall ownership.
+
+## Whole plugin packages (`#1762`)
+
+`plugin-package@1` carries `{schema, description, blobs}`. The schema token is
+`codepuppy.host-extension-package.payload.plugin-package.v1`; `description` is
+the normalized `PluginPackage` contract. Its authoritative types and validation
+are in `plugin-package.ts`; the converter re-exports those types and remains a
+separately generated desktop module outside this artifact. Normalized contract
+validation does not interpret provider manifests.
+
+The description binds every directory, file mode, symlink target, entry and tree
+digest. Every distinct nonempty file digest has exactly one existing payload
+reference with the same byte count. Empty files need no blob reference. The
+host validates the description and blob correspondence before materialization.
+The legacy skill asset count, Markdown budget and generic payload node/string
+limits and payload/asset byte caps do not constrain this aggregate description
+or its blobs. The envelope header and network timeout checks still apply. Package paths never become public URL paths.
+
+The root maps to the existing `bundle` ledger kind and owns one tree generation;
+skills refer to their real directories in that tree. Commands, agents and hooks
+can be retained as package content without claiming their runtime is connected.

@@ -6,35 +6,10 @@
 // 每次 config 重建(dispose→refresh,安装后触发)都反映最新 generation,current.json 是唯一原子真源。
 // 与出厂技能目录(factory-paths.ts)同一去处(写进 main 合成的显式文件,磁盘上不进用户配置)。
 
-import { readdirSync, readFileSync, statSync } from "node:fs"
+import { readdirSync, readFileSync } from "node:fs"
 import { join } from "node:path"
+import { liveGenerationDir } from "./plugin-package-skills"
 import { decodePackageAllowSet } from "./package-scope"
-
-const GEN_NAME = /^gen-\d{6,}-[a-f0-9]{6,}$/
-const SAFE_KEY = /^skill--[a-zA-Z0-9][a-zA-Z0-9._-]{0,120}$/
-
-function liveGenerationDir(codepuppyRoot: string, key: string): string | null {
-  const store = join(codepuppyRoot, "ext-store", key)
-  let text: string
-  try {
-    text = readFileSync(join(store, "current.json"), "utf8")
-  } catch {
-    return null
-  }
-  let genId: unknown
-  try {
-    genId = (JSON.parse(text) as { generation?: unknown }).generation
-  } catch {
-    return null
-  }
-  if (typeof genId !== "string" || !GEN_NAME.test(genId)) return null
-  const dir = join(store, "generations", genId)
-  try {
-    return statSync(dir).isDirectory() ? dir : null
-  } catch {
-    return null
-  }
-}
 
 /** #395(REQ-104)账本 desiredState 投影门 —— 只注入 main 确证 enabled 的 skill key(允许集,非
  *  禁用集)。Codex r5(步骤5):ext 无法 import ui-mac 的 decodeRecordV2,此前逐字段镜像 decoder
@@ -52,6 +27,8 @@ export function readPackageAllowSet(codepuppyRoot: string) {
   }
   return decodePackageAllowSet(parsed)
 }
+
+const SAFE_KEY = /^skill--[a-zA-Z0-9][a-zA-Z0-9._-]{0,120}$/
 
 function enabledSkillKeys(codepuppyRoot: string): Set<string> | null {
   const allowSet = readPackageAllowSet(codepuppyRoot)

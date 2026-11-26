@@ -112,10 +112,33 @@
           "capabilities": {
             "$ref": "#/$defs/capabilities"
           },
-          "payloadRef": {
-            "$ref": "#/$defs/payloadRef"
+          "payloadRef": {}
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "profileId": {
+                  "const": "plugin-package"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "payloadRef": {
+                  "$ref": "#/$defs/pluginPackagePayloadRef"
+                }
+              }
+            },
+            "else": {
+              "properties": {
+                "payloadRef": {
+                  "$ref": "#/$defs/payloadRef"
+                }
+              }
+            }
           }
-        }
+        ]
       }
     },
     "capabilities": {
@@ -127,17 +150,39 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "brandColor": { "$ref": "#/$defs/listingColor" },
-        "category": { "$ref": "#/$defs/listingSlug" },
-        "defaultPrompt": { "$ref": "#/$defs/listingPromptList" },
-        "developerName": { "$ref": "#/$defs/listingLine" },
-        "logo": { "$ref": "#/$defs/listingUrl" },
-        "logoDark": { "$ref": "#/$defs/listingUrl" },
-        "longDescription": { "$ref": "#/$defs/listingProse" },
-        "privacyPolicyUrl": { "$ref": "#/$defs/listingUrl" },
-        "screenshots": { "$ref": "#/$defs/listingUrlList" },
-        "termsOfServiceUrl": { "$ref": "#/$defs/listingUrl" },
-        "websiteUrl": { "$ref": "#/$defs/listingUrl" }
+        "brandColor": {
+          "$ref": "#/$defs/listingColor"
+        },
+        "category": {
+          "$ref": "#/$defs/listingSlug"
+        },
+        "defaultPrompt": {
+          "$ref": "#/$defs/listingPromptList"
+        },
+        "developerName": {
+          "$ref": "#/$defs/listingLine"
+        },
+        "logo": {
+          "$ref": "#/$defs/listingUrl"
+        },
+        "logoDark": {
+          "$ref": "#/$defs/listingUrl"
+        },
+        "longDescription": {
+          "$ref": "#/$defs/listingProse"
+        },
+        "privacyPolicyUrl": {
+          "$ref": "#/$defs/listingUrl"
+        },
+        "screenshots": {
+          "$ref": "#/$defs/listingUrlList"
+        },
+        "termsOfServiceUrl": {
+          "$ref": "#/$defs/listingUrl"
+        },
+        "websiteUrl": {
+          "$ref": "#/$defs/listingUrl"
+        }
       }
     },
     "listingColor": {
@@ -164,7 +209,9 @@
     "listingPromptList": {
       "type": "array",
       "maxItems": 8,
-      "items": { "$ref": "#/$defs/listingPrompt" }
+      "items": {
+        "$ref": "#/$defs/listingPrompt"
+      }
     },
     "listingSlug": {
       "type": "string",
@@ -182,7 +229,9 @@
     "listingUrlList": {
       "type": "array",
       "maxItems": 8,
-      "items": { "$ref": "#/$defs/listingUrl" }
+      "items": {
+        "$ref": "#/$defs/listingUrl"
+      }
     },
     "capabilities": {
       "type": "array",
@@ -212,6 +261,37 @@
           "type": "integer",
           "minimum": 1,
           "maximum": 1048576
+        },
+        "mediaType": {
+          "type": "string",
+          "pattern": "^application/vnd[.]alpha[.]host-extension-package[.][a-z-]+[.]v1[+]json$",
+          "maxLength": 128
+        },
+        "url": {
+          "type": "string",
+          "pattern": "^https://",
+          "maxLength": 2048
+        }
+      }
+    },
+    "pluginPackagePayloadRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sha256",
+        "bytes",
+        "mediaType",
+        "url"
+      ],
+      "properties": {
+        "sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "bytes": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
         },
         "mediaType": {
           "type": "string",

@@ -1,10 +1,17 @@
 // Line icons of the window chrome and the sidebar, drawn on the frame's 24px grid
 // (docs/design/2026-11-18-ui-refresh/frame.html symbols). Stroke width follows the rendered size so
-// every icon reads ≈1.2px: 12px→2.4, 14px→2.05, 16px→1.8, 18px→1.6 (frame audit #8).
+// small icons read ≈1.2px: 12px→2.4, 14px→2.05, 16px→1.8, 18px→1.6 (frame audit #8).
+// The 24px navigation icons use --a-rail-icon-stroke from the rail stylesheet.
 
 import type { JSX } from "solid-js"
 
 const PATHS = {
+  layers: () => (
+    <>
+      <path d="m10.5 6.5.6-2.2a2.5 2.5 0 0 1 3.1-1.8l5.3 1.4a2.5 2.5 0 0 1 1.8 3.1l-2.1 7.8a2.5 2.5 0 0 1-2.8 1.8" />
+      <rect x="3.5" y="7" width="13" height="14" rx="2.5" transform="rotate(-5 10 14)" />
+    </>
+  ),
   pen: () => (
     <>
       <path d="M12 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-6" />
@@ -17,19 +24,17 @@ const PATHS = {
       <path d="m20 20-4.2-4.2" />
     </>
   ),
-  grid: () => (
+  plug: () => (
     <>
-      <rect x="4" y="4" width="6.5" height="6.5" rx="1.5" />
-      <rect x="13.5" y="4" width="6.5" height="6.5" rx="1.5" />
-      <rect x="4" y="13.5" width="6.5" height="6.5" rx="1.5" />
-      <path d="M16.75 13.5v6.5M13.5 16.75H20" />
+      <path d="M19 17a8.5 8.5 0 1 0-7 3.5" />
+      <path d="m9 8 7 7-2 2a4.95 4.95 0 0 1-7-7Z" />
+      <path d="m10 9 2.5-2.5M14 13l2.5-2.5M8 16l-1.5 1.5a3 3 0 0 0 .8 4.8c3.8 1.8 8.3 1.1 11.2-1.8" />
     </>
   ),
-  calendar: () => (
+  clock: () => (
     <>
-      <rect x="4" y="5.5" width="16" height="14.5" rx="2.5" />
-      <path d="M4 10h16M8.5 3.5v4M15.5 3.5v4" />
-      <path d="m9.5 14.5 1.8 1.8 3.4-3.4" />
+      <circle cx="12" cy="12" r="8.5" />
+      <path d="M12 6.5V12l-3 2.5" />
     </>
   ),
   "panel-left": () => (
@@ -97,7 +102,7 @@ const PATHS = {
 
 export type ShellIconName = keyof typeof PATHS
 
-export function ShellIcon(props: { name: ShellIconName; size?: 12 | 14 | 16 | 18 | 20; class?: string }) {
+export function ShellIcon(props: { name: ShellIconName; size?: 12 | 14 | 16 | 18 | 20 | 24; class?: string }) {
   const size = () => props.size ?? 16
   return (
     <svg

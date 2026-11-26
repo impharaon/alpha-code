@@ -66,8 +66,8 @@ light chrome; the dark tile measures ~16:1 there, so the rule below computes the
 draws nothing. (Against dark chrome the dark tile is low-contrast, as every dark macOS icon is;
 the large white puppy carries the mark at small sizes — see the contact sheet in the PR.)
 
-The source as delivered is 512x512, so the 1024 master is upscaled 1.6x. Drop a larger
-original into this folder as icon.png and re-run; nothing else needs to change.
+The 2026-11-26 owner replacement is a 1024x1024 full-bleed dark tile with a white
+robot puppy. It uses the same finished-tile path without upscaling the source.
 """
 import os
 import shutil
@@ -187,7 +187,7 @@ def render(size: int) -> Image.Image:
     band = Image.new("RGBA", (size, size), INK + (255,))
     band.putalpha(keyline_alpha(size, KEYLINE_PX))
     footprint = out.getchannel("A")
-    out = Image.codepuppy_composite(out, band)
+    out = Image.alpha_composite(out, band)
     # The keyline paints strictly inside the squircle; restoring the pre-composite alpha
     # keeps the silhouette's footprint (and its antialiased fringe) byte-for-byte the shape
     # it already was — the line changes what colour the edge is, never where the edge is.
@@ -198,7 +198,7 @@ def render(size: int) -> Image.Image:
 # 2) Compose the master: art flattened onto its own tile colour (fills the transparent corners
 #    so the squircle, not the art's own rounding, decides the silhouette) → 824 → n=5 squircle.
 flat = Image.new("RGBA", (W, H), TILE + (255,))
-flat.codepuppy_composite(src)
+flat.alpha_composite(src)
 tile = flat.resize((CONTENT, CONTENT), Image.LANCZOS)
 tile.putalpha(squircle_mask(CONTENT))
 master = Image.new("RGBA", (CANVAS, CANVAS), (0, 0, 0, 0))

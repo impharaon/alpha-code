@@ -21,7 +21,7 @@ import askedSample from "./fixtures/permission-asked.json"
 import fixture from "./fixtures/permission-reply.json"
 import { createProjector, type V1Payload } from "./opencode2/events"
 import { createEngineFetch } from "./index"
-import { createReceiptLedger, requestFingerprint } from "./contract/receipts"
+import { prepareDirectoryWriteApproval, createReceiptLedger, requestFingerprint } from "./contract/receipts"
 import { toV1PermissionRequest } from "./opencode2/v1-shapes"
 // 假引擎的规则判定直接用引擎原件(测试进程有 `process`)。
 import { evaluate as engineEvaluate } from "../../../core/src/permission"
@@ -474,4 +474,50 @@ describe("#1662 I-05 「本次会话内允许」:原样发 always,内核记本�
     expect(engine.patches).toEqual([])
     expect(engine.replies).toEqual([])
   })
+})
+
+
+test("directory approval completes after fingerprint validation and before the original allow reply", async () => {
+  const request = toV1PermissionRequest(askedSample.frame.data as never)
+  const ledger = createReceiptLedger(ORIGIN)
+  ledger.show(request)
+  const started = Promise.withResolvers<void>(), grant = Promise.withResolvers<void>()
+  let approved = 0, replied = 0
+  const forget = prepareDirectoryWriteApproval(ORIGIN, request.id, "once", async () => { approved++; started.resolve(); await grant.promise })
+  const engine = { current: async () => request, decide: async () => { replied++; return [request.id] } }
+  const input = { requestID: request.id, decision: "once" as const, decisionID: "human-decision" }
+  try {
+    const pending = ledger.decide(engine, input)
+    await started.promise
+    await new Promise<void>((resolve) => setImmediate(resolve))
+    expect(replied).toBe(0)
+    grant.resolve()
+    expect((await pending).type).toBe("receipt")
+    expect((await ledger.decide(engine, input)).type).toBe("receipt")
+    expect(approved).toBe(1);expect(replied).toBe(1)
+  } finally { forget() }
+  const stale = createReceiptLedger(ORIGIN);stale.show(request)
+  const unexpected = prepareDirectoryWriteApproval(ORIGIN, request.id, "once", async () => { approved++ })
+  try {
+    expect((await stale.decide({ ...engine, current: async () => ({ ...request, patterns: ["changed"] }) }, { ...input, decisionID: "stale" })).type).toBe("conflict")
+    expect(approved).toBe(1)
+    expect((await stale.decide(engine, { ...input, decision: "reject", decisionID: "reject" })).type).toBe("receipt")
+    expect(approved).toBe(1)
+  } finally { unexpected() }
+})
+
+test("directory grant failure produces no allow or receipt and the same decision remains retryable", async () => {
+  const request = toV1PermissionRequest(askedSample.frame.data as never), ledger = createReceiptLedger(ORIGIN)
+  ledger.show(request)
+  let fail = true, replies = 0
+  const forget = prepareDirectoryWriteApproval(ORIGIN, request.id, "once", async () => { if (fail) throw Error("native consume failed") })
+  const engine = { current: async () => request, decide: async () => { replies++; return [request.id] } }
+  const input = { requestID: request.id, decision: "once" as const, decisionID: "retry-human" }
+  try {
+    await expect(ledger.decide(engine, input)).rejects.toThrow("native consume failed")
+    expect(replies).toBe(0)
+    fail = false
+    expect((await ledger.decide(engine, input)).type).toBe("receipt")
+    expect(replies).toBe(1)
+  } finally { forget() }
 })

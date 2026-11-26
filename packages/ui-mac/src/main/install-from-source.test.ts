@@ -969,3 +969,35 @@ test("unset plugin MCP environment variables preserve the source and report a na
   expect(resolved).toMatchObject({ type: "remote", url: "https://example.com/mcp", headers: { Authorization: "Bearer invalid-local-token" } })
   expect(() => bindPluginMcp({ ...input, resolveEnvironment: name => name === "PLUGIN_REMOTE_ENDPOINT" ? "https://example.com/mcp" : undefined })).toThrow("dependency-missing: GITHUB_PERSONAL_ACCESS_TOKEN")
 })
+
+test("a nonlocal plain HTTP plugin connector fails by itself after the whole package installs", () => installerHarness(async h => {
+  const { createManagedMcpConvergence } = await import("./package-mcp-activation")
+  const capture = await captureFixture("external_plugins/context7")
+  const source = new TextDecoder().decode(await capture.readFile(".mcp.json"))
+  const skill = new TextDecoder().decode(await (await captureFixture("plugins/frontend-design")).readFile("skills/frontend-design/SKILL.md"))
+  const variant = await captureFixture("external_plugins/context7", { ".mcp.json": source.replace("https://mcp.context7.com/", "http://mcp.context7.com/"), "skills/frontend-design/SKILL.md": skill })
+  const converted = await convertPluginTree(variant)
+  h.sources.convertCandidate = async () => ({ ok: true, ...converted, capture: variant, runtimeIdentity: undefined })
+  const installed = await h.install(h.request("context7", "plain_http_connector"))
+  expect(installed).toMatchObject({ ok: true })
+  if (!installed.ok) throw Error(installed.detail)
+  expect(installed.installed.some(entry => entry.kind === "skill")).toBe(true)
+  const name = installed.installed.find(entry => entry.kind === "mcp")!.hostName
+  expect(readMcpLeafStrict(name)).toMatchObject({ ok: true, value: { url: "http://mcp.context7.com/mcp?client=claude-code-plugin" } })
+  const requests: string[] = []
+  // This repository's own typed API response shape (protocol/groups/{debug,mcp}); no MCP protocol imitation.
+  const engine = Bun.serve({ port: 0, hostname: "127.0.0.1", fetch(request) {
+    const path = new URL(request.url).pathname
+    requests.push(request.method + " " + path)
+    if (path === "/api/debug/location") return Response.json([])
+    if (path === "/api/mcp") return Response.json({ location: { directory: h.temporary }, data: [] })
+    if (path.endsWith("/disconnect")) return new Response(null, { status: 204 })
+    return new Response(null, { status: 500 })
+  } })
+  try {
+    const converge = createManagedMcpConvergence({ root: () => h.root, directory: () => h.temporary, userDataPath: () => h.temporary, awaitServer: async () => ({ url: engine.url.href, username: null, password: null }) })
+    expect(await converge([name])).toMatchObject([{ name, status: "failed", detail: "only https:// server URLs are supported" }])
+    expect(requests.some(request => request.startsWith("PUT "))).toBe(false)
+    expect(readPackageLedgerStateV1(h.root)).toMatchObject({ ok: true, packageGraphs: [{ packageId: installed.packageId }] })
+  } finally { await engine.stop(true) }
+}))

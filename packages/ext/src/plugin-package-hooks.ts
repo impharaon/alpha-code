@@ -780,7 +780,7 @@ export async function registerPackageHooks(
       return { apply: change.source === "policy_settings" || !blocked, ...(blocked?.text ? { reason: blocked.text } : {}) }
     },
     instructionsLoaded: async event => {
-      await run("InstructionsLoaded", event.sessionID, {
+      void run("InstructionsLoaded", event.sessionID, {
         file_path: event.filePath,
         memory_type: event.memoryType,
         load_reason: event.loadReason,
@@ -789,7 +789,7 @@ export async function registerPackageHooks(
         ...(event.parentFilePath ? { parent_file_path: event.parentFilePath } : {}),
         ...(event.agentId ? { agent_id: event.agentId } : {}),
         ...(event.parentSessionId ? { parent_session_id: event.parentSessionId } : {}),
-      })
+      }).catch(error => input.log("runtime-failed: package InstructionsLoaded: " + String(error)))
     },
     async beforeCompaction(input) {
       const results = await run("PreCompact", input.sessionID, { trigger: input.trigger, custom_instructions: input.customInstructions })

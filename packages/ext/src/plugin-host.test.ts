@@ -2888,7 +2888,7 @@ packageIt.live("InstructionsLoaded runs actual package handlers after admission 
   const membership = JSON.parse(readFileSync(join(sample.root, "skills-enabled.json"), "utf8"))
   writeFileSync(join(sample.root, "skills-enabled.json"), JSON.stringify({ ...membership, keys: [...membership.keys, sample.key] }))
   yield* invocationNativeServices
-  yield* activateExtUntilFinished
+  const ext = yield* activateExtUntilFinished
   const location = yield* Location.Service
   const sessions = yield* Sessions.Service
   const discovery = yield* InstructionDiscovery.Service
@@ -2903,6 +2903,7 @@ packageIt.live("InstructionsLoaded runs actual package handlers after admission 
   yield* sessions.prompt({ sessionID: session.id, text: "Use these instructions" })
   yield* sessions.wait(session.id)
   const log = join(location.directory, "instruction-hook-events.jsonl")
+  yield* ext.finish(Effect.promise(() => Bun.file(log).exists()))
   expect(yield* Effect.promise(() => Bun.file(log).exists())).toBe(true)
   const first = readFileSync(log, "utf8").trim().split("\n").map(line => JSON.parse(line))
   expect(first).toEqual([expect.objectContaining({ hook_event_name: "InstructionsLoaded", session_id: session.id, file_path: filePath, memory_type: "Project", load_reason: "session_start" })])

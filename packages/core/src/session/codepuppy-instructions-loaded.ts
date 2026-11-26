@@ -35,6 +35,10 @@ export const notifyInstructionsLoaded = Effect.fn("CodePuppy.instructionsLoaded"
         loadReason,
         ...(session.parentID ? { parentSessionId: session.parentID, agentId: sessionID } : {}),
       }),
-    ).pipe(Effect.catchCause(cause => Effect.logWarning("package InstructionsLoaded hook failed", { sessionID, file: file.path, cause })))
+    ).pipe(
+      Effect.catchCause(cause => Effect.logWarning("package InstructionsLoaded hook failed", { sessionID, file: file.path, cause })),
+      // Informational delivery outlives admission; the package runner owns process cancellation.
+      Effect.forkDetach({ startImmediately: true }),
+    )
   }
 })

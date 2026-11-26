@@ -86,11 +86,13 @@ describe("InstructionState", () => {
       const sessionID = SessionSchema.ID.make("ses_instruction_package_source")
       const { db, events } = yield* setup(sessionID)
       const discovery = yield* InstructionDiscovery.Service
+      const initialNotification = yield* Deferred.make<void>()
+      const changedNotification = yield* Deferred.make<void>()
       const calls: Array<Parameters<PackageRuntimeHandlers["instructionsLoaded"]>[0] & { committed: number }> = []
       const runtime = registerPackageRuntime({ directory: "/project" }, {
         hasElicitationHandlers: () => false,
         beforeConfigChange: async () => ({ apply: true }),
-        instructionsLoaded: async input => { calls.push({ ...input, committed: (await Effect.runPromise(instructionEvents(db, sessionID))).length }) },
+        instructionsLoaded: async input => { calls.push({ ...input, committed: (await Effect.runPromise(instructionEvents(db, sessionID))).length }); await Effect.runPromise(Deferred.succeed(calls.length === 1 ? initialNotification : changedNotification, undefined)) },
         beforeCompaction: async () => ({ proceed: true }), afterCompaction: async () => {},
         beforeElicitation: async () => ({ handled: false }), afterElicitationResult: async input => input.answer,
       })
@@ -101,9 +103,11 @@ describe("InstructionState", () => {
       })
       yield* InstructionState.prepare(db, events, yield* discovery.load(), sessionID)
       yield* InstructionState.prepare(db, events, yield* discovery.load(), sessionID)
+      yield* Deferred.await(initialNotification)
       expect(calls).toEqual([expect.objectContaining({ sessionID, filePath: "/project/CLAUDE.md", memoryType: "Project", loadReason: "session_start", committed: 1 })])
       yield* discovery.transform(editor => editor.add(new InstructionDiscovery.File({ path: "/project/.claude/rules/style.md", content: "style guidance", source: { sourcePath: "/project/.claude/rules/style.md", scope: "Project" } })))
       yield* InstructionState.prepare(db, events, yield* discovery.load(), sessionID)
+      yield* Deferred.await(changedNotification)
       expect(calls).toHaveLength(2)
       expect(calls[1]).toMatchObject({ sessionID, filePath: "/project/.claude/rules/style.md", memoryType: "Project", loadReason: "nested_traversal", committed: 2 })
       expect(calls[0]!.occurrenceId).not.toBe(calls[1]!.occurrenceId)

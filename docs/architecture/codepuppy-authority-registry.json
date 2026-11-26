@@ -2525,7 +2525,7 @@
     },
     {
       "id": "plugin-hook-instructions",
-      "decision": "DESIGN-local-plugin-install v3.1 §6/10 S-05 plus orchestrator ruling 2026-11-27 r16: optional instruction source provenance (package ID, source path and memory scope) survives the native File constructor, editor and admission codec. Existing files without provenance keep their native behavior. The actual configured-source reader supplies provenance; InstructionState commit and nested SessionInstructions load await the same runtime only after durable admission, once for each changed source value. Direct AGENTS reads have no Claude event; missing include/conditional facts are not fabricated.",
+      "decision": "DESIGN-local-plugin-install v3.1 §6/10 S-05 plus orchestrator ruling 2026-11-27 r16: optional instruction source provenance (package ID, source path and memory scope) survives the native File constructor, editor and admission codec. Existing files without provenance keep their native behavior. The actual configured-source reader supplies provenance; InstructionState commit and nested SessionInstructions load notify the same runtime asynchronously only after durable admission, once for each changed source value. Direct AGENTS reads have no Claude event; missing include/conditional facts are not fabricated.",
       "adr": [
         "ADR-029",
         "ADR-047"
@@ -2542,7 +2542,7 @@
       ],
       "mechanism": {
         "file": "packages/core/src/session/codepuppy-instructions-loaded.ts",
-        "ladder": "Exact L3 S-05 increment accepted in r16: L0 transforms cannot preserve source fields dropped by the native constructor/schema codec. L1/L2 would patch the same native value boundary through an additional source/build synchronization path. One additive optional field in the existing File schema; no shadow provenance registry. The three source/admission boundaries named by frozen S-05 are registered here: rendered context cannot recover origin or pre-publication ordering. Native state/codec and the existing Location slot remain the sole authorities; the helper only forwards admitted facts."
+        "ladder": "Exact L3 S-05 increment accepted in r16: L0 transforms cannot preserve source fields dropped by the native constructor/schema codec. L1/L2 would patch the same native value boundary through an additional source/build synchronization path. One additive optional field in the existing File schema; no shadow provenance registry. The three source/admission boundaries named by frozen S-05 are registered here: rendered context cannot recover origin or pre-publication ordering. Native state/codec and the existing Location slot remain the sole authorities; the helper only forwards admitted facts. R21 B6: independent informational fibers dispatch admitted files without serially awaiting handler completion; the ext callback schedules its existing runner and logs failure. Active package processes still belong to the same runner and are cancelled on its lifetime end."
       },
       "tests": [
         {
@@ -2564,6 +2564,14 @@
         {
           "file": "packages/ext/src/plugin-host.test.ts",
           "name": "InstructionsLoaded runs actual package handlers after admission without replaying native AGENTS"
+        },
+        {
+          "file": "packages/core/test/instruction-state.test.ts",
+          "name": "informational instruction hooks do not hold admission or serialize source notifications"
+        },
+        {
+          "file": "packages/ext/src/plugin-host.test.ts",
+          "name": "a held InstructionsLoaded process cannot delay native prompt admission or the model"
         }
       ]
     },

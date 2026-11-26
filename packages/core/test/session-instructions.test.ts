@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import fs from "fs/promises"
 import path from "path"
-import { DateTime, Effect, Layer } from "effect"
+import { DateTime, Deferred, Effect, Layer } from "effect"
 import { Agent } from "@opencode/core/agent"
 import { AppNodeBuilder } from "@opencode/core/effect/app-node-builder"
 import { LayerNode } from "@opencode/util/effect/layer-node"
@@ -141,10 +141,11 @@ describe("SessionInstructions", () => {
       const nativePath = path.join(location.directory, "AGENTS.md")
       yield* Effect.promise(() => fs.writeFile(filePath, "Claude nested instructions"))
       yield* Effect.promise(() => fs.writeFile(nativePath, "Native instructions"))
+      const notified = yield* Deferred.make<void>()
       const calls: Array<Parameters<PackageRuntimeHandlers["instructionsLoaded"]>[0] & { admitted: boolean }> = []
       const runtime = registerPackageRuntime(location, {
         hasElicitationHandlers: () => false, beforeConfigChange: async () => ({ apply: true }),
-        instructionsLoaded: async input => { calls.push({ ...input, admitted: JSON.stringify(await Effect.runPromise(sessions.context(session.id))).includes("Claude nested instructions") }) },
+        instructionsLoaded: async input => { calls.push({ ...input, admitted: JSON.stringify(await Effect.runPromise(sessions.context(session.id))).includes("Claude nested instructions") }); await Effect.runPromise(Deferred.succeed(notified, undefined)) },
         beforeCompaction: async () => ({ proceed: true }), afterCompaction: async () => {},
         beforeElicitation: async () => ({ handled: false }), afterElicitationResult: async input => input.answer,
       })
@@ -152,6 +153,7 @@ describe("SessionInstructions", () => {
       const loader = yield* SessionInstructions.Service
       yield* loader.load({ sessionID: session.id, paths: [filePath, nativePath] })
       yield* loader.load({ sessionID: session.id, paths: [filePath, nativePath] })
+      yield* Deferred.await(notified)
       expect(calls).toEqual([expect.objectContaining({ sessionID: session.id, filePath, memoryType: "Project", loadReason: "nested_traversal", admitted: true })])
     }),
   )

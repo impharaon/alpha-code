@@ -3,6 +3,7 @@
 // 幂等、绝不动用户内容、同名遮蔽不注入(防引擎双源)、REQ-059 逃生门不拆不改、
 // legacy `~/.opencode/skill/` 直链清理。
 import { afterEach, beforeEach, describe, expect, test } from "bun:test"
+import { createHash } from "node:crypto"
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, readlinkSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
@@ -18,6 +19,7 @@ import { CLOUD_MCP_TOOLS } from "./fixtures/cloud-mcp-tools"
 import { cloudMcpToolId } from "./cloud-web-search"
 import { TOOL_TEXT } from "../../../ext/src/context-injection"
 import { classifySkill } from "./codepuppy-skill-placeholder"
+import documentSkills from "../../resources/factory-skills/office-docs/document-skills.lock.json"
 
 let tmp: string
 let home: string
@@ -231,6 +233,55 @@ async function engineSkills(directories: string[]) {
     }
   return skills
 }
+
+describe("document skill assets", () => {
+  test.each(["dev", "packaged"] as const)("%s resources retain discovery, licences and the pinned inventory", async (layout) => {
+    const dev = factorySkillSources({ packaged: false, resourcesPath: "/ignored", moduleDir: import.meta.dir })
+    if (layout === "packaged") {
+      const { getConfig } = await import("../../electron-builder.config")
+      const resources = getConfig("prod").extraResources
+      if (!Array.isArray(resources)) throw new Error("packaged resources are missing")
+      for (const from of ["resources/factory-skills/", "resources/NOTICE.txt"]) {
+        const entry = resources.find((item) => typeof item !== "string" && item.from === from)
+        if (!entry || typeof entry === "string" || !entry.from || !entry.to) throw new Error(`resource copy missing: ${from}`)
+        expect(entry.filter).toBeUndefined()
+        cpSync(join(import.meta.dir, "../..", entry.from), join(res, entry.to), { recursive: true })
+      }
+    }
+    const registered = layout === "packaged" ? sources : dev
+    const office = registered["office-docs"]!
+    const lock: typeof documentSkills = JSON.parse(readFileSync(join(office, "document-skills.lock.json"), "utf8"))
+    expect(lock.upstream).toBe("https://github.com/anthropics/skills")
+    expect(lock.commit).toBe("e4bb5d960d87126ff3b3a8af1a104b7db67560ba")
+    expect(new Set(lock.files.map((file) => file.sourcePath)).size).toBe(lock.files.length)
+    const discovered = await engineSkills(reconcileFactorySkills(registered, roots).paths)
+    const notice = readFileSync(join(layout === "packaged" ? res : join(import.meta.dir, "../../resources"), "NOTICE.txt"), "utf8")
+    expect(notice).toContain(lock.upstream + "/tree/" + lock.commit + "/skills")
+    expect(notice).toContain("factory-skills/office-docs/")
+    for (const name of ["docx", "xlsx", "pptx", "pdf", "frontend-design", "canvas-design", "theme-factory"]) {
+      const skill = discovered.filter((entry) => entry.name === `codepuppy-document-${name}`)
+      expect(skill, name).toHaveLength(1)
+      expect(skill[0]!.file).toBe(join(office, name, "SKILL.md"))
+      expect(discovered.some((entry) => entry.name === name), name).toBe(false)
+      const licence = lock.files.find((file) => file.path === `${name}/LICENSE.txt`)
+      expect(licence, name).toBeDefined()
+      expect(licence!.sourceSha256).toBe(licence!.sha256)
+      expect(readFileSync(join(office, name, "LICENSE.txt"), "utf8")).toContain("Apache License")
+      expect(notice).toContain(name)
+    }
+    const inventory = [...new Bun.Glob("**/*").scanSync({ cwd: office, onlyFiles: true, dot: true })].sort()
+    expect(inventory.filter((file) => /\.xsd$|(^|\/)canvas-fonts\/|(^|\/)theme-showcase\.pdf$/.test(file))).toEqual([])
+    const shipped = lock.files.flatMap((file) => file.path ? [{ path: file.path, sha256: file.sha256! }] : [])
+    expect(inventory).toEqual(["SKILL.md", "document-skills.lock.json", ...shipped.map((file) => file.path), ...lock.applicationFiles.map((file) => file.path)].sort())
+    for (const file of [...shipped, ...lock.applicationFiles])
+      expect(createHash("sha256").update(readFileSync(join(office, file.path))).digest("hex"), file.path).toBe(file.sha256)
+    for (const file of lock.files) {
+      expect(file.sourceSha256, file.sourcePath).toMatch(/^[0-9a-f]{64}$/)
+      if (!file.path) expect(file.excluded, file.sourcePath).toBeTruthy()
+    }
+    expect(existsSync(roots.codepuppyRoot)).toBe(false)
+  })
+})
 
 describe("#1724 plugin helper factory resources", () => {
   test.each(["dev", "packaged"] as const)("#1724 real %s resources reach engine discovery without ledger writes", async (layout) => {

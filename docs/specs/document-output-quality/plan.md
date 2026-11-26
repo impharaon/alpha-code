@@ -12,7 +12,7 @@ last_reviewed: 2026-11-26
 
 # PLAN-document-output-quality｜文档产出质量实施计划
 
-本计划消费 [spec v1](spec.md) 和 [frozen design](design.md)，实施归属 [#1761](https://github.com/impharaon/alpha-code/issues/1761)。本轮为 PLAN，只细化首片；后续切片在实施前追加各自的文件、顺序、风险与证明。这里的 AC 是切片贡献范围，不表示该片单独完成整条验收。
+本计划消费 [spec v1](spec.md) 和 [frozen design](design.md)，实施归属 [#1761](https://github.com/impharaon/alpha-code/issues/1761)。起草轮为 PLAN，只细化首片；后续切片在实施前追加各自的文件、顺序、风险与证明。这里的 AC 是切片贡献范围，不表示该片单独完成整条验收。
 
 ## 交付切片
 
@@ -92,8 +92,12 @@ bun test src/main/codepuppy-factory-skill-hygiene.test.ts src/main/codepuppy-ski
 | AC-14：Anthropic 许可、署名及排除边界 | 同组资产用例从复制后的资源树读许可证并核对来源记录的实际产出摘要、NOTICE 指向和排除文件缺席；一次性将来源摘要与固定上游 Git blobs 比对，记录命令/输出 | 删除许可/署名、遗漏适配文件或夹入任一被排除标准文件会失败；源摘要与真实固定源不符也会被一次比对发现。LO 等许可及最终安装包清单在对应后续片验 |
 | AC-01..04、14：材料完整且不引入原名冲突 | 一次性检查七份正文及引用资源的实际文件；`python3 scripts/check-doc-links.py` 显式传入新增/修改 Markdown（在仓库根运行），加现有技能 hygiene/census 检查 | 引用缺文件、许可链接悬空或发现路径不可达会报错；语义适配以人工逐份检查记录，不能以标题/词句计数宣称能力通过 |
 
-本 PLAN 自身只做文档合同、链接和 diff 检查；本片的实现测试及 AC-01..15 的运行验收尚未执行。文档影响为 feature execution plan，唯一写入是本文；按本轮“commit only plan.md”的范围不更新生成索引，索引同步交调度方处理。
+PLAN 起草轮只做文档合同、链接和 diff 检查，并按当轮“commit only plan.md”的范围把索引同步交调度方。本次仅实施切片一；AC-01..15 的整条运行/安装包验收仍属后续切片。
+
+切片一实施核验（2026-11-26，Codex / GPT-6）：`factory-skills.test.ts -t "document skill assets"` 为 2 PASS，文件级收尾为 27 PASS；计划列出的 hygiene/census/旧名三个文件合跑 48 PASS；`bun typecheck` exit 0。五项一次性删除/注入反例各令定向两用例变红（exit 1）：缺 docx 技能、缺 docx 许可证、移除新署名、夹入固定源的 `schemas/mce/mc.xsd`、移除生产 `nestedSkillDirs` 注入；逐项恢复后才跑上述最终绿色检查。命令/失败输出在本轮工具回执，临时驱动和日志为 `/tmp/alpha-1761-removal-arms.py` 与 `/tmp/alpha-1761-arm-*.log`，不加入常驻套件。
+
+固定 Git tree 的 282 个 blob 经 `git show e4bb5d960d87126ff3b3a8af1a104b7db67560ba:<sourcePath>` 逐项比对锁中 SHA-256：25 个保留并适配、257 个逐项排除；七份 LICENSE 原字节不变。一次性 `node /tmp/alpha-1761-theme-probe/probe.cjs <repo-root>` 使用实际 PptxGenJS 4.0.1 输出验证主题脚本：12 个色槽及中文/XML转义名称正确，其它 ZIP parts 原样保留，非法主题拒绝且文件摘要不变（3 项通过）；产物 `/tmp/alpha-1761-theme-probe/themed.pptx` SHA-256 `eb4b113ad1763cf1a9c9227ef1f9e4276f88286ff1e980286e86291aae8c0537`。这些检查不代表模型质量或视觉自检已通过。
 
 ### 偏离记录
 
-2026-11-26 · 步骤 1/2 的材料与适配合为首个资产提交，再提交发现/分发验证；避免把原名冲突、安装假设或悬空 helper 引用的原稿暴露给嵌套发现。新增同目录 `WORKFLOW.md` 集中七技能的共用执行指引；保留脚本仅为适配后的 `pptx/scripts/apply_theme.cjs`，其余按实际未使用路径逐文件记录排除。无冻结契约变更。
+2026-11-26 · 步骤 1/2 的材料与适配合为首个资产提交，再提交发现/分发验证；避免把原名冲突、安装假设或悬空 helper 引用的原稿暴露给嵌套发现。新增同目录 `WORKFLOW.md` 集中七技能的共用执行指引；保留脚本仅为适配后的 `pptx/scripts/apply_theme.cjs`，其余按实际未使用路径逐文件记录排除。无冻结契约变更。资产提交 `91aabeab39`。

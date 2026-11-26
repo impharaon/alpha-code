@@ -7,11 +7,17 @@ import { createSecretSpool, type SecretSpool } from "./secret-spool"
 export function createSecretStream(capture: string, id: string, values: () => readonly Uint8Array[], publish: (bytes: Uint8Array) => Promise<void>) {
   const decoder = new TextDecoder()
   let tail = Buffer.alloc(0)
-  let escape: { spool: SecretSpool; lead: string; size: number; accepted: number; states: Set<number>; osc: number; first: boolean } | undefined
+  let escape: { spool?: SecretSpool; stored: number; lead: string; size: number; accepted: number; states: Set<number>; osc: number; first: boolean } | undefined
   let pending: string[] = []
+  let snapshot: readonly Uint8Array[] | undefined
+  let patterns: Buffer[] = []
   const match = async (bytes: Uint8Array, eof = false) => {
     const source = Buffer.concat([tail, bytes])
-    const patterns = values().filter(isUtf8).map((value) => Buffer.from(stripAnsi(new TextDecoder("utf-8", { fatal: true }).decode(value)))).filter((value) => value.length)
+    const current = values()
+    if (current !== snapshot) {
+      snapshot = current
+      patterns = current.filter(isUtf8).map((value) => Buffer.from(stripAnsi(new TextDecoder("utf-8", { fatal: true }).decode(value)))).filter((value) => value.length)
+    }
     const pieces: Uint8Array[] = []
     let cursor = 0
     while (cursor < source.length) {
@@ -40,19 +46,29 @@ export function createSecretStream(capture: string, id: string, values: () => re
   }
   const emit = (text: string) => match(Buffer.from(text))
   const flush = async () => {
-    if (escape && pending.length) await escape.spool.append(Buffer.from(pending.join("")))
+    if (escape && pending.length) {
+      escape.spool ??= await createSecretSpool(capture, id)
+      const bytes = Buffer.from(pending.join(""))
+      await escape.spool.append(bytes)
+      escape.stored += bytes.length
+    }
     pending = []
   }
   const resolve = async (complete = false) => {
-    await flush()
     const prior = escape!
+    const residue = Buffer.from(pending.join(""))
+    pending = []
     escape = undefined
     try {
       if (complete) return
       const skip = prior.accepted || Buffer.byteLength(prior.lead)
       if (!prior.accepted) await emit(stripAnsi(prior.lead))
-      for await (const bytes of prior.spool.read(skip)) await consume(Buffer.from(bytes).toString())
-    } finally { await prior.spool.dispose() }
+      if (prior.spool) for await (const bytes of prior.spool.read(skip)) {
+        await consume(Buffer.from(bytes).toString())
+        await flush()
+      }
+      await consume(residue.subarray(Math.max(0, skip - prior.stored)).toString())
+    } finally { await prior.spool?.dispose() }
   }
   const consume = async (text: string): Promise<void> => {
     let index = 0
@@ -63,7 +79,7 @@ export function createSecretStream(capture: string, id: string, values: () => re
         if (next > index) await emit(stripAnsi(text.slice(index, next)))
         if (next === text.length) break
         const lead = text[next]
-        escape = { spool: await createSecretSpool(capture, id), lead, size: Buffer.byteLength(lead), accepted: 0, states: new Set([0]), osc: 0, first: true }
+        escape = { stored: 0, lead, size: Buffer.byteLength(lead), accepted: 0, states: new Set([0]), osc: 0, first: true }
         pending.push(lead)
         index = next + 1
         continue
@@ -100,15 +116,14 @@ export function createSecretStream(capture: string, id: string, values: () => re
       if (accepts) escape.accepted = escape.size
       if (!states.size && !escape.osc) await resolve()
     }
-    await flush()
   }
   return {
-    push: async (bytes: Uint8Array) => { await consume(decoder.decode(bytes, { stream: true })) },
+    push: async (bytes: Uint8Array) => { await consume(decoder.decode(bytes, { stream: true })); await flush() },
     finish: async () => {
       await consume(decoder.decode())
       while (escape) await resolve()
       await match(new Uint8Array(), true)
     },
-    dispose: async () => { tail.fill(0); tail = Buffer.alloc(0); pending = []; await escape?.spool.dispose(); escape = undefined },
+    dispose: async () => { tail.fill(0); tail = Buffer.alloc(0); pending = []; await escape?.spool?.dispose(); escape = undefined; patterns = []; snapshot = undefined },
   }
 }

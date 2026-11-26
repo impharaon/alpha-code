@@ -2091,3 +2091,34 @@ packageIt.live("hookify writing-rules keeps literal dollar replacement patterns 
   const expected = source.slice(source.indexOf("\n---\n") + 5).trim().replaceAll("${CLAUDE_PLUGIN_ROOT}", join(sample.live, "tree"))
   expect(loaded.content.filter(part => part.type === "text").map(part => part.text).join("\n")).toContain(expected)
 })))
+
+packageIt.live("package delegation asserts sourceless permission only for command entry", () => {
+  const checks: Array<{ source: unknown }> = []
+  return packageJourney(Effect.gen(function* () {
+    const capture = yield* Effect.promise(() => captureStandardFixture("claude:feature-dev"))
+    const source = new TextDecoder().decode(yield* Effect.promise(() => capture.readFile("commands/feature-dev.md")))
+    const sample = yield* invocationSample("claude:feature-dev", { "commands/feature-dev.md": source.replace("\n---\n", "\ncontext: fork\nagent: code-reviewer\nbackground: false\n---\n") })
+    yield* invocationNativeServices
+    const ext = yield* activateExtUntilFinished
+    const command = sample.hostNames["command:commands/feature-dev.md"]!
+    const commands = yield* Command.Service
+    yield* ext.finish(commands.list().pipe(Effect.map(list => list.some(item => item.name === command))))
+    const sessions = yield* Sessions.Service
+    const location = yield* Location.Service
+    const parent = yield* sessions.create({ location: { directory: location.directory }, title: "One delegation check", agent: "build", model: { providerID: "test", id: "picked" } } as never)
+    const llm = yield* TestLLM.Test
+    yield* llm.push(TestLLM.text("Tool child", "tool-child"), TestLLM.text("Command child", "command-child"))
+    const snapshot = yield* (yield* Tool.Service).snapshot()
+    const result = yield* snapshot.execute({ sessionID: parent.id, agent: "build" as never, messageID: "msg_permission_once" as never, call: { type: "tool-call", name: "subagent", id: "call_permission_once", input: { agent: sample.hostNames["agent:agents/code-reviewer.md"]!, description: "Review", prompt: "review", background: false } } })
+    expect(JSON.stringify(result)).toContain("Tool child")
+    expect(checks.filter(check => check.source === undefined)).toHaveLength(0)
+    expect(checks.some(check => check.source !== undefined)).toBe(true)
+    yield* commands.execute({ name: command, invocation: { sessionID: parent.id, prompt: { text: "review" }, delivery: "queue" } })
+    expect(checks.filter(check => check.source === undefined)).toHaveLength(1)
+    expect((yield* sessions.list({ parentID: parent.id })).data).toHaveLength(2)
+  }), { id: "package-test-permission-observer", setup: async context => {
+    await context.permission.hook("evaluate", event => {
+      if (event.action === "subagent") checks.push({ source: event.source })
+    })
+  } })
+})

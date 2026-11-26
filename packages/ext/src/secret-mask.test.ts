@@ -257,3 +257,13 @@ test("permission causes retain session rejection and masked feedback", async () 
     expect(JSON.stringify(safe).includes(value)).toBe(false)
   }
 })
+
+test("permission rejection preserves the engine tool error prototype", async () => {
+  const { Permission } = await import("../../core/src/permission")
+  const { ToolFailure } = await import("../../ai/src/schema/errors")
+  const { mask } = await setup()
+  const cause = new Permission.BlockedError({ rules: [], permission: "read", resources: [".env"] })
+  const original = new ToolFailure({ message: "Unable to read .env", error: cause })
+  const safe = await mask.error({ call, tool: "read", error: original })
+  expect(Object.getPrototypeOf(safe) === Object.getPrototypeOf(original)).toBe(true)
+})

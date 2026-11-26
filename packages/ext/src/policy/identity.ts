@@ -30,7 +30,7 @@ import { fileURLToPath } from "node:url"
 import { governedMcpEvidence, type GovernedCloudMcp } from "../../../plugin/src/alpha-cloud-authority"
 import type { ToolAuthority, ToolIdentity, ToolLocation } from "../../../schema/src/tool-identity"
 import { registeredByMcpLayer } from "../../../schema/src/codepuppy-tool-policy"
-import { declaredFirstPartyTools } from "../../../core/src/mcp/codepuppy-first-party-mcp"
+import { declaredFirstPartyBinding } from "../../../core/src/mcp/codepuppy-first-party-mcp"
 import { bundledPluginTools, type BundledPluginTools } from "./bundled-plugin"
 import { canonicalJsonDigest } from "./store"
 import { mcpBindingDigest, type McpEntry } from "./resolver"
@@ -123,7 +123,7 @@ function mcpAuthority(
   officeMcpManifest: string | undefined,
   pythonEnvironment?: DocumentPythonEnvironment,
   launchers?: LauncherEnvironment,
-): { authority: ToolAuthority; declared?: ReadonlySet<string> } {
+): { authority: ToolAuthority; declared?: ReadonlySet<string>; bindingDigest?: string } {
   const evidence = governedMcpEvidence(name, entry, cloudMcp)
   if (evidence)
     return {
@@ -133,7 +133,8 @@ function mcpAuthority(
         evidenceDigest: `sha256:${createHash("sha256").update(evidence).digest("hex")}`,
       },
     }
-  const declared = declaredFirstPartyTools(name, entry, officeMcpManifest, readFileSync, pythonEnvironment, launchers)
+  const matched = declaredFirstPartyBinding(name, entry, officeMcpManifest, readFileSync, pythonEnvironment, launchers)
+  const declared = matched?.declaration
   if (!declared || entry.type !== "local") return { authority: { kind: "not-asserted" } }
   return {
     authority: {
@@ -141,6 +142,7 @@ function mcpAuthority(
       bindingId: `mcp:${encodeURIComponent(name)}`,
       evidenceDigest: canonicalJsonDigest({ kind: "codepuppy-bundled-mcp", name, command: entry.command, environment: entry.environment ?? {}, cwd: entry.cwd ?? null, tools: declared.tools, declarationSha256: declared.declarationSha256, recipeSha256: declared.recipeSha256 }),
     },
+    ...(matched?.binding ? { bindingDigest: canonicalJsonDigest({ kind: "codepuppy-bundled-mcp-binding", name, ...matched.binding }) } : {}),
     declared: new Set(declared.tools.map((tool) => (tool as { name?: unknown } | null)?.name).filter((tool): tool is string => typeof tool === "string")),
   }
 }
@@ -163,7 +165,7 @@ export function toolFacts(tool: RegisteredTool, input: IdentityInput): ToolFacts
         borrowed = true
         continue
       }
-      const { authority, declared } = mcpAuthority(server, entry, input.cloudMcp, input.officeMcpManifest, input.documentPythonEnvironment, input.launchers)
+      const { authority, declared, bindingDigest } = mcpAuthority(server, entry, input.cloudMcp, input.officeMcpManifest, input.documentPythonEnvironment, input.launchers)
       // slice E (ADR-041): not one of the tools the bundled server's MCP layer registers ⇒ not that server's tool.
       if (declared && !declared.has(tool.name)) {
         borrowed = true
@@ -174,7 +176,7 @@ export function toolFacts(tool: RegisteredTool, input: IdentityInput): ToolFacts
         permission,
         identity: { source: "mcp", origin: server, name: tool.name },
         authority,
-        bindingDigest: mcpBindingDigest(server, entry),
+        bindingDigest: bindingDigest ?? mcpBindingDigest(server, entry),
         location: mcpLocation(entry),
         transport: mcpTransportFact(entry),
       }

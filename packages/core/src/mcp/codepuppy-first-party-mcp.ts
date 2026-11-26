@@ -64,22 +64,24 @@ function isDeclaration(value: unknown): value is BundledFirstPartyDeclaration {
 }
 
 /** Missing launcher context can only attest resource-only native declarations while host composition is pending. */
-export function declaredFirstPartyTools(
+export function declaredFirstPartyBinding(
   _name: string,
   entry: unknown,
   manifestPath: string | undefined,
   readFile: (file: string) => Uint8Array,
   pythonEnvironment?: DocumentPythonEnvironment,
   launchers?: LauncherEnvironment,
-): DeclaredFirstParty | undefined {
+) {
   if (!manifestPath || !record(entry) || entry.type !== "local" || !Array.isArray(entry.command)) return undefined
+  if (!entry.command.every((token: unknown): token is string => typeof token === "string")) return undefined
+  const command = entry.command
   if (entry.environment !== undefined && !stringRecord(entry.environment)) return undefined
   try {
     const manifest: unknown = JSON.parse(new TextDecoder().decode(readFile(manifestPath)))
     if (!record(manifest) || !record(manifest.formats)) return undefined
     const resources = path.dirname(path.dirname(manifestPath))
     for (const [id, declaration] of Object.entries(manifest.formats)) {
-      if (!isDeclaration(declaration) || !matchesCommand(declaration.command, entry.command, resources, launchers, id)) continue
+      if (!isDeclaration(declaration) || !matchesCommand(declaration.command, command, resources, launchers, id)) continue
       // Only the native Office command receives the host's per-Location Python projection.
       const office = declaration.command.includes(`${RESOURCES_SLOT}/office-mcp/server.py`)
       const expectedEnvironment = { ...declaration.environment, ...(office && entry.disabled !== true ? pythonEnvironment : undefined) }
@@ -87,12 +89,27 @@ export function declaredFirstPartyTools(
       if (!Object.entries(declaration.codeSha256).every(([file, digest]) => createHash("sha256").update(readFile(path.join(resources, file))).digest("hex") === digest)) continue
       const recipeSha256 = canonicalJsonDigest({ kind: "codepuppy-pinned-entry-recipe", recipe: declaration.recipe ?? [] }).slice("sha256:".length)
       const declarationSha256 = canonicalJsonDigest({ kind: "codepuppy-bundled-mcp-declaration", command: declaration.command, environment: declaration.environment, cwd: declaration.cwd, codeSha256: declaration.codeSha256, tools: declaration.tools, recipeSha256 }).slice("sha256:".length)
-      return { tools: declaration.tools, ...(declaration.recipe === undefined ? {} : { recipe: declaration.recipe }), declarationSha256, recipeSha256 }
+      const declared: DeclaredFirstParty = { tools: declaration.tools, ...(declaration.recipe === undefined ? {} : { recipe: declaration.recipe }), declarationSha256, recipeSha256 }
+      return {
+        declaration: declared,
+        // Only tokens actually present in this verified template are stable host positions.
+        // Workspace/resource/literal arguments keep their current binding semantics.
+        binding: declaration.command.some((token) => token === NODE_SLOT || token === CACHE_SLOT) ? {
+          command: declaration.command.map((token, index) => token === NODE_SLOT || token === CACHE_SLOT ? token : command[index]!),
+          environment: declaration.environment,
+          cwd: declaration.cwd,
+        } : undefined,
+      }
     }
   } catch {
     // Invalid manifest / unreadable protected code is untrusted, not an application failure.
   }
   return undefined
+}
+
+/** Existing declaration contract; binding facts remain a host-private companion. */
+export function declaredFirstPartyTools(...input: Parameters<typeof declaredFirstPartyBinding>): DeclaredFirstParty | undefined {
+  return declaredFirstPartyBinding(...input)?.declaration
 }
 
 /** A declared definition in the shape `tools/list` produces (packages/core/src/mcp/client.ts `Tool`). */

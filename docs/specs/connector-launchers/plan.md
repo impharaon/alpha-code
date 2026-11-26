@@ -531,3 +531,7 @@ SEAM-CHANGE-NEEDED：首方 Node boot re-anchor / 持久 tool-service binding �
 - 第一项文件：core/mcp/codepuppy-first-party-mcp 的单一声明匹配 owner 输出经核验的绑定命令；保留现有 declaredFirstPartyTools 的冻结形状。ext/policy/identity 消费这些事实形成槽位声明的策略 digest；普通 MCP 的 resolver/store 契约不改。回归放既有 identity.test.ts，以生产 toolFacts + save/load + resolve 在真临时磁盘验证 Node/cache 位置变动后 saved enabled 保留，以及声明 arg/env/cwd 变动和非首方配置仍重绑。按 red-first 单独提交红例，再实现。
 - 后续文件：core/codepuppy-npm-launch、codepuppy-connector-launch 及必要的自有 uv 语法/内容指纹 helper；仍使用随包官方解释器、Location files/spawner 和现有准备收据。按官方语法、非秘密内容 key、真实安装/bin 捕获、prepareConnectorLaunch 组合的顺序推进；已有 controller/Host/root 装配仍等 #1759。
 - 证明：迭代仅命名例；每步本行为文件一次；返回前相关 mock/枚举消费者一次、适用包类型检查、移除臂和 affected-tests --list。大实物仅 gate slot 一次性证据，不运行应用、全门或计时/容量用例。#1759 当前接口提交仍 ef8a1ce8b4441aeeb12cc3a5cc0843ad43c1682f；不复制其 R1/R2。
+
+r6 槽位绑定：红例提交 3ce60e164e（0 PASS / 2 FAIL，`/tmp/connector-r6-binding-red.log`），实现不改红例。core 的 declaredFirstPartyBinding 继续作为同一个严格匹配 owner；旧 declaredFirstPartyTools 委托并仅返回原冻结 DTO。只有声明实际含 host-only 槽时，返回将该两种 token 保留、其它实参不变的 binding facts；ext 的 toolFacts 在核验通过后用命令/声明环境/cwd 算独立 binding digest，authority.evidenceDigest 仍保留原核验事实。第三方与非此槽的现有摘要算法不改，没有记录迁移。
+
+命名红例转绿 2 PASS / 23 assertions，整文件 `packages/ext: bun test src/policy/identity.test.ts --max-concurrency=2` 为 21 PASS / 79 assertions（`/tmp/connector-r6-identity-step.log`）；`bun typecheck` exit 0。真磁盘覆盖 tool/service enabled 的 Node、cache 位置变化，以及声明 arg/env/cwd 与未声明环境/cwd/假 Node 的反向臂。没有使用路径相等启发式还原槽，没有绕过当前 Node 的精确身份核验。

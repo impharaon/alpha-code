@@ -19,6 +19,7 @@ import { SessionInbox } from "@opencode/schema/session-inbox"
 import { SessionMessage } from "@opencode/schema/session-message"
 import { Command } from "@opencode/core/command"
 import { Config } from "@opencode/core/config"
+import { CodePuppyProjectGate } from "@opencode/core/config/codepuppy-project-gate"
 import { ConfigCommandPlugin } from "@opencode/core/config/plugin/command"
 import { renderPackageInstruction } from "@opencode/plugin/codepuppy-package-runtime"
 import { AppNodeBuilder } from "@opencode/core/effect/app-node-builder"
@@ -86,8 +87,31 @@ it.live("declared argument names select their ordered values", () => Effect.gen(
   expect(yield* render(["unused", "target", "missing"])).toBe("second//$2")
 }))
 
+// Fenced shell form from anthropics/claude-plugins-official@0fbfda5a91f4,
+// commands/ralph-loop.md; replace only the setup command with an observable printf.
+it.live("fenced shell source executes before arguments without executing bound fences", () => Effect.gen(function* () {
+  expect((yield* runCommand({ template: "```!\nprintf FENCED_SETUP\n```\n$ARGUMENTS" }, {})).prompts).toEqual(["FENCED_SETUP\ngo"])
+  const location = yield* Location.Service
+  const bound = "```!\nprintf BOUND_SETUP\n```"
+  expect(yield* Effect.promise(() => renderPackageInstruction(location, { parts: [{ boundValue: bound }], rawArguments: "", arguments: [], syntax: "claude", cwd: location.directory }))).toBe(bound)
+}))
+
+it.live("untrusted project fenced shell stays source and records deferred execution", () => Effect.gen(function* () {
+  const location = yield* Location.Service
+  const template = "```!\nprintf UNTRUSTED_SETUP\n```"
+  const filepath = location.directory + "/opencode.json"
+  CodePuppyProjectGate.install({ trusted: () => false })
+  const gate = yield* CodePuppyProjectGate.begin({ directory: location.directory, home: location.directory + "/home" })
+  const raw = { commands: { review: { template } } }
+  gate.document(filepath)!.raw(JSON.stringify(raw), filepath)
+  const document = new Document({ type: "document", path: filepath, info: decode(raw) })
+  yield* gate.finish([document])
+  expect((yield* runCommand({ template }, {}, document)).prompts).toEqual([template + "\n\ngo"])
+  expect(CodePuppyProjectGate.view(location.directory)?.withheld).toContainEqual(expect.objectContaining({ kind: "command-run", name: "review", fields: ["shell"] }))
+}).pipe(Effect.ensuring(Effect.sync(() => CodePuppyProjectGate.resetForTest()))))
+
 /** Runs one configured command through the production plugin and Command service; records what it asked the session to do. */
-const runCommand = (command: Record<string, unknown>, session: { model?: typeof PICKED }) =>
+const runCommand = (command: Record<string, unknown>, session: { model?: typeof PICKED }, document?: Document) =>
   Effect.gen(function* () {
     const commands = yield* Command.Service
     const switched: unknown[] = []
@@ -119,7 +143,7 @@ const runCommand = (command: Record<string, unknown>, session: { model?: typeof 
             }),
         },
       }),
-    ).pipe(Effect.provide(Config.testLayer([new Document({ type: "document", info: decode({ commands: { review: command } }) })])))
+    ).pipe(Effect.provide(Config.testLayer([document ?? new Document({ type: "document", info: decode({ commands: { review: command } }) })])))
     yield* commands.execute({ name: "review", invocation: { sessionID: Session.ID.make("ses_cmd"), prompt: { text: "go" }, delivery: "queue" } })
     return { switched, prompts }
   })

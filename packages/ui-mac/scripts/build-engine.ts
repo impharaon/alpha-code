@@ -23,6 +23,7 @@ import { collectNodeAssets, hashNodeAssets } from "../../cli/script/node-assets"
 import { bundledModelsSnapshot } from "../../core/script/models-snapshot"
 import { projectDirectoryAccessSource } from "../engine/file-access-transform"
 import { transformV1MigrationSource } from "../engine/v1-migration-transform"
+import { packageManagerScannerPlugin } from "./package-manager-build"
 
 const uiMac = path.resolve(import.meta.dirname, "..")
 export const ENGINE_OUT_DIR = path.join(uiMac, "dist-engine")
@@ -57,6 +58,7 @@ const config = mainConfig({
   target,
 })
 config.plugins = [
+  packageManagerScannerPlugin(),
   {
     name: "codepuppy:v1-migration-on-node",
     enforce: "pre" as const,

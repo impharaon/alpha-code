@@ -445,3 +445,4 @@
 2	packages/ui-mac	engine/file-access-transform.test.ts	-	R5 真实 FileAccess 源码执行的目标/读写元数据与精确构建变换锚；不复制服务。
 3	packages/ui-mac	src/main/directory-write-approval.test.ts	-	R4 真盘身份快照、真实 tracker、缺失目标准备、冲突/过期/换代、保护与原生失败重试；原生消费另由场景证明。
 14	packages/ext	src/hub-bridge.test.ts	-	既有 parentPort 请求簿的真实 builder/parser 应答；R6 只读写范围查询复用同一 id 与关闭/失败路径。
+4	packages/ui-mac	engine/package-manager-plan.test.ts	-	#1759 H1/H4:同一真实 scanner 的 source span/分支规划与三方言真实私有输入、重定向及 xtrace/allexport;无包安装。精确条数=实测 4。

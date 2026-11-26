@@ -754,3 +754,5 @@ r14 HTML 预览消费者（b）：red-10.log 的旧 details.url 字面锚已由 
 r14 websearch 消费者（b）：red-8.log 的同步 transform 字面锚与 §4.10/R13 读取 Python projection 所需的 async transform 不符，只更新此锚；云定义安装先于项目合并/首个 return 的顺序断言全保留。
 
 r14 attachment 临时模块（b）：red-11.log 为拷平 office-advisories 后找不到新增 util/document 依赖。测试只想变更 PROJECT_HIDDEN_DIR，故复制的真实 attachment 模块仍 import 实际 advisories owner，只有隐藏目录常量保留本地替换。原路径正反断言不改，避免复制第二套运行时依赖（§4.10/R13 的唯一宿主环境校验）。
+
+r14 旧名登记（c）：red-5.log 唯一 stale 行为 office-docs 的 /code-puppy，片 7 重写根路由后已无此命中，删除该精确失效行；其余 0/new-hit、计数、类别规则均不改。

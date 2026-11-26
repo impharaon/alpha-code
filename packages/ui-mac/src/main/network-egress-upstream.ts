@@ -70,6 +70,10 @@ export async function dialEgressUpstream(target: Destination, routes: UpstreamRo
         const socket = route.kind === "direct" ? await connectSocket(destination, signal, checked)
           : route.kind === "http" || route.kind === "https" ? await httpTunnel(destination, route, signal)
             : await socksTunnel(destination, route, signal)
+        if (signal.aborted) { socket.destroy(); throw signal.reason }
+        const abort = () => socket.destroy()
+        signal.addEventListener("abort", abort, { once: true })
+        socket.once("close", () => signal.removeEventListener("abort", abort))
         return { socket, route }
       } catch (error) {
         signal.throwIfAborted()
@@ -101,7 +105,9 @@ function connectSocket(target: Destination, signal: AbortSignal, checked?: Looku
     socket.once("close", () => signal.removeEventListener("abort", abort))
     socket.on("error", () => {})
     socket.once("error", reject)
-    socket.once("connect", () => { socket.off("error", reject); resolve(socket) })
+    // TCP owns cancellation until connect; the handshake then owns its socket,
+    // and dialEgressUpstream takes over only after the tunnel is ready.
+    socket.once("connect", () => { signal.removeEventListener("abort", abort); socket.off("error", reject); resolve(socket) })
   })
 }
 
@@ -114,9 +120,6 @@ function httpTunnel(target: Destination, route: Exclude<UpstreamRoute, { kind: "
       socket.on("error", () => {})
       if (response.statusCode !== 200) { socket.destroy(); reject(failure(response.statusCode === 407 ? "EPROXYAUTH" : "EPROXYCONNECT")); return }
       if (signal.aborted) { socket.destroy(); reject(signal.reason); return }
-      const abort = () => socket.destroy()
-      signal.addEventListener("abort", abort, { once: true })
-      socket.once("close", () => signal.removeEventListener("abort", abort))
       socket.pause()
       if (head.length) socket.unshift(head)
       resolve(socket)

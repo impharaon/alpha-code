@@ -325,3 +325,5 @@ R1-3：DIRECT 的 TCP lookup 只返回完整已检查集合，保留自动族回
 R1-4：启动时只读取一次完整性/完整字节偏移，追加按单写者内存状态推进；失败后下一次先截断到已知完整偏移，启动读到半行也可恢复，完整坏行仍按 unreadable 保留。设置继续按原投影重读。必要同调用链文件 `egress-grant-records.ts` 补真实 truncate 绑定，复用唯一 JSONL 编码函数；无新路径/配置。`8e9b974999` 两条回归为 0 pass / 2 fail（`/tmp/egress-r8-4-red.log`）；修复后 passes 完整文件 5 pass / 0 fail（`/tmp/egress-r8-4-green.log`）。
 
 R1-6：设置聚合复用 `canonicalEgressHost`，数字短写与点分 IPv4 合并，不改逐次原始记录。红测试单独提交，U `bun test --max-concurrency 2 src/main/network-egress-passes.test.ts -t 设置按规范` 为 0 pass / 1 fail（`/tmp/egress-r8-6-red.log`）；修复后 passes 完整文件 6 pass / 0 fail（`/tmp/egress-r8-6-green.log`），登记为 6。
+
+R1-5：在已有 HTTPS 子进程增加仅 DNS:localhost 证书对 IP 路由的拒绝；增加已完成 SOCKS greeting 后取消的 peer close；名称代理用 spied lookup 的真实 localhost 返回结构证明循环拒绝。测试先单独提交，在原实现 3 pass。取消清理按 TCP 连接、协议握手、就绪 socket 的实际生命周期交接：TCP connect 后解除连接阶段监听，SOCKS catch 销毁握手 socket，N7 就绪出口接管后续取消；不改 N7 公开合同。upstream/proxy 两文件完整运行 38 pass / 0 fail（9 + 29，`/tmp/egress-r8-5-green.log`）。三个接受的移除臂将各只执行一次，结束后恢复源文件。

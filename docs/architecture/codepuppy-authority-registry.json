@@ -2576,6 +2576,10 @@
         {
           "file": "packages/core/test/codepuppy-mcp-runtime.test.ts",
           "name": "stdio native form keeps its request owner through ElicitationResult"
+        },
+        {
+          "file": "packages/core/test/codepuppy-mcp-runtime.test.ts",
+          "name": "withdrawing the matching package handlers releases only owned remote transports on reload"
         }
       ]
     }

@@ -827,6 +827,13 @@ export const layer = (options?: Options) =>
       const reconcileLock = Semaphore.makeUnsafe(1)
       const reconcile = Effect.fnUntraced(function* () {
         const servers = state.get().servers
+        // S-07: package toggles may withdraw a handler while the server definition stays identical.
+        for (const connections of sessionConnections.values()) {
+          for (const [name, owned] of connections) {
+            if (packageRuntime(location)?.hasElicitationHandlers(name)) continue
+            yield* releaseEntrySessions(owned.entry)
+          }
+        }
         if (!booted) {
           booted = true
           const started = yield* Clock.currentTimeMillis

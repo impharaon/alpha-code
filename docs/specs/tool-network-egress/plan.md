@@ -28,7 +28,7 @@ last_reviewed: 2026-11-26
 - 依据：[规格 v2 / AC-07、AC-09 至 AC-12](spec.md) @ `adba35744395860dcb736642d9263b5d29d1e1de`；[冻结设计 §4.1–§4.6、§4.8、§5、§6、§10](design.md) @ `4948d952f353d69764b370f91f595f24d36ee270`（#1763）；#1757 的本次 PLAN brief。继承 §10 的全部 R1 处置，不重开 ARCH-8 或无活动对话时的投递范围。读码基线同该冻结提交。
 - 核对：Phase: IMPLEMENT — 25b6edee4e · Claude Opus 5.5 (orchestrator) · plan accepted for slice one: AC-07, AC-09, AC-10, AC-11, AC-12 each have a named test and a removal/known-bad control that turns red at the real entry point; files stay within the design's N1–N4/N6 surfaces plus the named same-call-chain registrars (main/index.ts, settings.tsx); no frozen decision restated or changed; slice two (AC-08, AC-13) stays a separate plan section.
 
-以下是待实施安排，不是已取得的行为证据。路径缩写 `main/`、`shared/`、`preload/`、`renderer/` 相对于 `packages/ui-mac/src/`，`ui/` 表示 `renderer/codepuppy-ui/`。新文件名是本片的落点安排，其私有辅助函数不升为冻结合同。
+以下为获核对时的实施安排；实际执行证据见偏离记录。路径缩写 `main/`、`shared/`、`preload/`、`renderer/` 相对于 `packages/ui-mac/src/`，`ui/` 表示 `renderer/codepuppy-ui/`。新文件名是本片的落点安排，其私有辅助函数不升为冻结合同。
 
 ### 改动
 
@@ -54,7 +54,7 @@ last_reviewed: 2026-11-26
 | `renderer/i18n/zh.ts`、`renderer/i18n/en.ts` | 为卡片、记住范围、连接到期、存储失败与撤销补产品文案；模型固定说明仍只由 ext 登记。 |
 | 上述模块已有 `*.test.ts`；新模块的同名 `*.test.ts` | 用例按下文证明表和提交单元归属；旧上限/冷却/精确记住/重启撤销断言同次替换，不保留互相矛盾的两套行为。 |
 | `packages/ui-mac/test-component/{session-workspace,new-session-workspace,session-timeline,session-second-send,use-projects}.cases.ts`、`preload-stub.ts` 及各自 runtime/stub | 在现有真实 Solid 宿主覆盖提交绑定、dock 与继续入口；只扩展需要的 preload 边界。 |
-| `main/network-egress.engine.cases.ts`（新）、`main/engine-cases.scenario.test.ts` | 为联网模块增加缺少的真引擎/真围栏 scenario 层；复用已有 engine sandbox、生产配置、真实 ext 与本地模型桩，不另建通用 harness。宿主只新增本模块一行。 |
+| `main/network-egress.engine.cases.ts`（新）、`main/engine-cases.scenario.test.ts`、`test-component/network-egress-engine-peer.ts`（新）、`test-component/codepuppy-engine.ts` | 为联网模块增加缺少的真引擎/真围栏 scenario 层；复用已有 engine sandbox、生产配置、真实 ext 与本地模型桩，不另建通用 harness。宿主只新增本模块一行。模块专用 peer 用进程 IPC 适配既有 parentPort；共享夹具传入实际代理地址，生产 profile 不增例外。 |
 | `scripts/gate-files.tsv`、`scripts/process-fence-write-sites.tsv` | 仅按实际新增宿主/受托 cases、用例数或写点做机械登记；由本片规则允许的同步覆盖，不改 gate 脚本、选测、阈值或预算。新 main 写者若不在 sidecar 闭包，不虚登记为围栏内可写根。 |
 
 **现有入口核对。** `codepuppy-composer.tsx:1835` 已冻结 `submittedPerm`，`:1877` 附近交首页 `startChat`；`use-projects.ts:447` 持有建成的 sessionID，须在此先绑定再发首条；`session-timeline.tsx:275` 有独立继续入口。编辑重发只回填 composer。adapter 的 `routes.ts:356` 与 `core/src/session/shell.ts:13` 是用户 shell 的真实路径，只读消费，不改 Core/Server 或切引擎代次。`plugin.ts:68` 的进程级 bridge 与 `hub-view.ts:501` 的 host 是跨 Location 持有点。
@@ -83,7 +83,7 @@ last_reviewed: 2026-11-26
 
 ### 证明
 
-下列用例名与命令是实施目标，当前尚未创建/执行。`U = packages/ui-mac`，`E = packages/ext`；表内命令均在对应包目录运行。新增用例进入模块测试文件；真实引擎、多步重启和真实计时只进入 `.scenario.test.ts` 所承载的层，日常 PR 不执行这一层。
+下列用例名与命令是实施目标；实际创建/执行结果见偏离记录。`U = packages/ui-mac`，`E = packages/ext`；表内命令均在对应包目录运行。新增用例进入模块测试文件；真实引擎、多步重启和真实计时只进入 `.scenario.test.ts` 所承载的层，日常 PR 不执行这一层。
 
 PSL 样本来源继承设计 §2：2026-11-26 的原始清单 SHA-256 `9015c5fa9b4b4953dbd47b9f7811ed1b3a577aee627f50b202dc9b491250a6c8` 中的 PRIVATE `github.io`、`s3.amazonaws.com` 及 `*.ck` / `!www.ck`；用随包库判定这些真实条目，不编造另一份平台后缀格式。引擎模型请求从现有 `scriptedModel().requests` 捕获；存储 fixture 从生产序列化器产生。
 
@@ -125,8 +125,29 @@ U/E 各运行 `bun typecheck`，仅处理本片造成的问题；若包已有适
 
 步骤 4 检查边界：时间线与 workspace 两文件合跑曾为 25 pass / 1 fail（时间线宿主 5 秒超时）。按失败处理，只对该宿主在隔离副本的冻结基线 `4948d952f3` 比较：初次副本缺少包级 Babel 依赖，补齐同版本包级依赖目录后，基线单文件 12 pass / 0 fail（6.11 s）；当前单文件相同命令 12 pass / 0 fail（5.77 s）。命令为 `bun test --max-concurrency 2 src/renderer/codepuppy-ui/session-timeline/session-timeline.test.ts`；没有放宽阈值或改宿主。合跑超时仍作为运行组合观察交编排器，不声称已修复。一次测试命令曾误从根目录执行并被既有 root guard 拦下（未执行测试）；此后测试均在包目录执行。
 
+
+步骤 5 验据：E `bun test --max-concurrency 2 src/network-egress.test.ts src/policy/display.test.ts src/context-injection.test.ts`，退出 0，56 pass / 0 fail；`bun scripts/context-injection-inventory.ts --write` 后 `--check` 退出 0；`bun typecheck` 退出 0。U 提交前 old-name-scan 10 pass / 0 fail。新测试证明 notice 经 leave 屏障进入错误 message/成功 content，保留 cause/metadata、同 callID 的 invocation 隔离、waiting 的后台上下文、allowed 清除、终态消费及换代清理。现有上下文钩子登记数量断言由 2 改为 3（增加按事实注入的 context 回调，原四路共用组装回调仍居末尾），库存机械同步两个固定 ID。迭代中发现 Tool.Error 的 Schema 构造会过滤 metadata 的 Symbol；因此错误关联放在私有 WeakMap，成功结果用不可序列化 Symbol 穿过 Core 的浅拷贝，均不增加公共 metadata 字段。普通 ENOTFOUND 无 notice 时不附保护说明。
+
+
+步骤 6 验据（2026-11-26 r2）：
+
+| 运行 | 命令（在 U，控制臂在各自隔离副本的 U） | 退出码与输出 |
+| --- | --- | --- |
+| 全部正臂 | `bun test --max-concurrency 2 src/main/engine-cases.scenario.test.ts -t '对话联网批准'` | 首次夹具失败后，仅修复该故障再跑：退出 0，宿主 1 pass / 0 fail / 7 filtered；宿主四个断言核对子进程退出 0、6 pass、0 fail、1 file；51.62 s。包含实际 45 s 无人决定、单/双会话、允许/拒绝、记住/重建/撤销、两种 shell 与后台 context。日志 `/tmp/egress-scenario-positive-repaired.log`。 |
+| 卡片移除 | `bun test --max-concurrency 2 ./src/main/network-egress.engine.cases.ts -t 'AC-07'` | 退出 1，0 pass / 1 fail / 5 filtered，19.21 s；同一 `click` 判据报 `missing conversation decision button`，实际 main 已有 waiting notice，无 DOM 按钮；没有执行到 45 s 臂。main/引擎 PID 2259/2266。日志 `/tmp/egress-control-card-cleanup.log`。 |
+| CF 移除 | `bun test --max-concurrency 2 ./src/main/network-egress.engine.cases.ts -t 'AC-10'` | 退出 1，0 pass / 1 fail / 5 filtered，3.87 s；`protected sites bytes` 的原记录被真实 shell 改成 `CORRUPTED`。仅隔离副本 `renderConfigFence(configFence)` 改为 `renderConfigFence([])`，C1 仍在。main/引擎 PID 1110/1117，实际 profile 4566 B。日志 `/tmp/egress-control-fence.log`。 |
+| 注入移除 | `bun test --max-concurrency 2 ./src/main/network-egress.engine.cases.ts -t 'AC-12'` | 退出 1，0 pass / 1 fail / 5 filtered，2.96 s；`actual model tool result must contain network notice` 变红；main 有 waiting/denied，模型只收到 curl 403 与 exit 22，没有固定说明。main/引擎 PID 1449/1451，实际 profile 9007 B。日志 `/tmp/egress-control-notice.log`。 |
+| 产物/清理补证 | `bun test --max-concurrency 2 ./src/main/network-egress.engine.cases.ts -t 'AC-10|AC-12'` | 退出 0，2 pass / 0 fail / 4 filtered，57 expect，3.57 s；main/引擎 PID 2260/2265，profile 9007 B；生产 CF 下记录原样，模型收到说明。未重跑实际 45 s 臂。日志 `/tmp/egress-scenario-artifact.log`。 |
+
+控制副本由 `/tmp/egress-create-controls.py` 复制当前 U/ext 源码、共享已安装依赖后仅做三处具名移除，位于本机临时 `egress-controls-9anaf53p/{card,fence,notice}`；没有产品开关或永久变异框架。检查了 `node_modules/.cache/egress-outside-{2259,1110,1449,2260}/evidence.json`：分别保留 main/引擎 PID、真实代理事件、N6 事实、模型实际请求及 sites 字节。注入对照有 waiting/denied 且模型没有说明，正臂有说明；CF 对照字节为 CORRUPTED，正臂仍是生产序列化的空站点文档。模型桩也通过同一个 CONNECT 端口，生产围栏的唯一网络出口没有为夹具放宽。
+
+步骤 6 偏离/迭代：增加模块专用 `test-component/network-egress-engine-peer.ts`（真实引擎与 main 服务必须分进程，且不能启动 Electron）；共享 `codepuppy-engine.ts` 仅透传实际 `egressProxy` 给既有 bootstrap，`network-egress-test-runtime.tsx` 导出已有设置组件供同一真引擎撤销臂使用。初次 scenario 的 happy-dom 替换了全局 HTTP Response，Bun 模型桩无法返回它，退出 1；修复夹具恢复原生 fetch/Request/Response/Headers 后上表六臂通过，不计初次崩溃为任何行为证据。初次卡片对照主断言已正确变红，但提前失败后的 permission 轮询遇到 service_stopping（额外 1 error）；夹具现在在停止引擎前收齐在途回合，只复核该对照，最终无额外 error。正臂宿主成功时不转印子输出，原临时产物又会随测试隔离根清理，因此把产物保存移到既有围栏外 cache 根；仅对不含 45 s 的 AC-10/12 补证并实际检查上述 JSON。两次未带 `./` 的 cases 控制命令只得到 Bun 的无匹配提示，未启动用例，不作红臂证据。
+
+返回前较宽相关集：U `bun test --max-concurrency 2 src/main/network-egress-derived.test.ts src/main/network-egress-registry.test.ts src/main/network-egress-disclosure.test.ts src/main/process-fence-write-sites.test.ts src/main/gate-file-registry.test.ts src/renderer/codepuppy-ui/surface-seam-contract.test.ts src/renderer/codepuppy-ui/settings-surface-ratchet.test.ts src/renderer/i18n/locale-regression.test.ts`，退出 0，95 pass / 0 fail；E `bun test --max-concurrency 2 src/plugin-host.test.ts src/plugin-process-singleton.test.ts src/plugin-reload-wiring.test.ts`，退出 0，54 pass / 0 fail。`hub-view.test.ts`、`codepuppy-sidecar-messages.test.ts` 已在步骤 2 全文件跑过且之后未改，不重复。两包 `bun typecheck` 均退出 0；没有适用的包级 lint 命令。scenario 表的 gate-files 下界随实际 7→8 行机械同步，没有改 gate 选测或逻辑。
+
+
+最终检查：U 提交前 `bun test --max-concurrency 2 src/main/old-name-scan.test.ts` 退出 0，10 pass / 0 fail；`python3 scripts/check-doc-links.py docs/specs/tool-network-egress/plan.md docs/specs/tool-network-egress/design.md` 与 `git diff --check`。所属 profile 的 `check-docs-contract --changed-since origin/alpha --format json` 退出 1，为 70 errors / 252 warnings（基线 69 / 253）；逐条比较仅设计文件既有的 `ref.unknown-id: INT-safety is neither a live id nor a retired id` 因本轮获准版本编辑而由 warning 升为 error，没有新增语义问题。既有 docs/README.md 索引、旧链接及 INT-safety 登记问题交编排器，不扩修。r2 从 12:21 至 13:25 +0800 约 64 分钟，覆盖既定六步；未执行全包、全套或 gate。
+
 ## 切片二：全部批准通放与系统代理
 
 本轮仅保留交付边界，后续 PLAN 再展开。AC-08 的真引擎/真围栏三条及去档位判断对照、AC-13 的系统代理证明仍为整票必需证据。AC-13 按设计 §4.7、§10：日常从 `resolveEgressRoutes` 注入路由并走真实上游握手；另由编排器安排**一次**真实机器已设本地测试系统代理的真引擎/真围栏验收，连接仅经它可达的目标，保留测试代理连接记录，并对照无系统代理。日常注入不计作系统配置读取已验证。本片不启动 Electron、不改本机系统代理；缺少那次实机记录时，最终 AC-13 不能记为通过。
-
-步骤 5 验据：E `bun test --max-concurrency 2 src/network-egress.test.ts src/policy/display.test.ts src/context-injection.test.ts`，退出 0，56 pass / 0 fail；`bun scripts/context-injection-inventory.ts --write` 后 `--check` 退出 0；`bun typecheck` 退出 0。U 提交前 old-name-scan 10 pass / 0 fail。新测试证明 notice 经 leave 屏障进入错误 message/成功 content，保留 cause/metadata、同 callID 的 invocation 隔离、waiting 的后台上下文、allowed 清除、终态消费及换代清理。现有上下文钩子登记数量断言由 2 改为 3（增加按事实注入的 context 回调，原四路共用组装回调仍居末尾），库存机械同步两个固定 ID。迭代中发现 Tool.Error 的 Schema 构造会过滤 metadata 的 Symbol；因此错误关联放在私有 WeakMap，成功结果用不可序列化 Symbol 穿过 Core 的浅拷贝，均不增加公共 metadata 字段。普通 ENOTFOUND 无 notice 时不附保护说明。

@@ -424,13 +424,14 @@
       "environment": {},
       "cwd": null,
       "codeSha256": {
-        "video-mcp/server.js": "9f019e3da938fc9a9fcdde925b9585dd2b5508da0dbe5f77cb0d99892586fe90",
+        "video-mcp/server.js": "44e08cf09344e2ec238932543519b46c2713d2ff38e67d6253ffb6be68b31845",
         "video-mcp/speech-worker.js": "26473728b39b2eefe761559460e6cf3fd942a03113a7455302709dde9153e86e",
-        "video-mcp/runtime.json": "028efdb7e3fc279b21b83b62c656533fbac01b0e743d74d35707df619ac50dd1",
-        "video-mcp/build.lock.json": "e3c679d089219386640c1c7adbc517b8a3b934ab4d52639ce8f796f933bcbf61",
+        "video-mcp/runtime.json": "693d90cba5063be84c4265bc4e1c82e9e253aa3bb90f062760a90baebc7d787e",
+        "video-mcp/build.lock.json": "1bf6f0f80560c0f99ff1def0241fef4cd0c76cba12ba43927fcb8b5654f3fa86",
         "video-mcp/helpers/vision": "79cc60fd94abeb3cc8750bb84472667cbfd548b03561570bac1d2ab9bb86c1dc",
-        "video-mcp/licenses.json": "56239280d9929cda4946bde0edd36426794859c22c5aa8778f2e5dfb24a8aaea",
+        "video-mcp/licenses.json": "07875f612b8c93b742ea1b531c713fcbbfdab04197bc6485f7bce4b835918431",
         "video-mcp/licenses/3dspeaker.txt": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
+        "video-mcp/licenses/dav1d.txt": "dd92c3c2247c5651606fc23a5e2d6a1ebc5ace9a3e49cbde0e12f05ad1cb1ee5",
         "video-mcp/licenses/ejs-LICENSE": "b5065838cbac452dfc855ba6e6e031481ad2c68406f70d21ead9321374653e6c",
         "video-mcp/licenses/ffmpeg-LGPL2.1.txt": "246041b6ecf9bc32d718a62c57877c78b5eb397b6467e74ed7ae2626ab189c30",
         "video-mcp/licenses/leptonica.txt": "87829abb5bbb00b55a107365da89e9a33f86c4250169e5a1e5588505be7d5806",
@@ -450,7 +451,7 @@
         "video-mcp/licenses/whisper-cpp.txt": "94f29bbed6a22c35b992c5c6ebf0e7c92f13b836b90f36f461c9cf2f0f1d010d",
         "video-mcp/licenses/whisper-node.txt": "dcf058ad1c7a2eac57e41d3d45baae7b10eb3da71b9fa4c7f899b99e56fe3a7e",
         "video-mcp/licenses/ytdlp-LICENSE": "7e12e5df4bae12cb21581ba157ced20e1986a0508dd10d0e8a4ab9a4cf94e85c",
-        "video-mcp/node_modules/@fugood/node-whisper-darwin-arm64/index.node": "986b94b99d4f0fba5158944da90fe8aa617df4cf4d3e5a88e4d66ae4ad4cda4e",
+        "video-mcp/node_modules/@fugood/node-whisper-darwin-arm64/index.node": "34279414489232c42e8f880f83a3e43f423fa6061e07aa3de6b6885dc3461d1b",
         "video-mcp/node_modules/@fugood/node-whisper-darwin-arm64/package.json": "d3d9e36d2c014c58e3abe5936551508dac9994be56844dbcccf3719f560d56cd",
         "video-mcp/node_modules/@fugood/whisper.node/lib/binding.js": "0132443efbc54234273960667c24fe06e02b23bac289a75f755d05d9b399d325",
         "video-mcp/node_modules/@fugood/whisper.node/lib/binding.ts": "8f17179acb435f75e1db32a82f6ad98dd16cca050910db01911bac40a91a0cb7",
@@ -2087,7 +2088,7 @@
           ]
         },
         {
-          "id": "ffmpeg/darwin-arm64/9.1-openh264-2.7.0",
+          "id": "ffmpeg/darwin-arm64/9.1-openh264-2.7.0-dav1d-1.5.3",
           "archive": "tar.gz",
           "entry": "ffmpeg",
           "required": [
@@ -2095,11 +2096,12 @@
             "ffmpeg/bin/ffmpeg",
             "ffmpeg/bin/ffprobe",
             "ffmpeg/licenses/LGPL-2.1.txt",
-            "ffmpeg/licenses/OpenH264.txt"
+            "ffmpeg/licenses/OpenH264.txt",
+            "ffmpeg/licenses/dav1d.txt"
           ]
         },
         {
-          "id": "ffmpeg/win32-x64/9.1-openh264-2.7.0",
+          "id": "ffmpeg/win32-x64/9.1-openh264-2.7.0-dav1d-1.5.3",
           "archive": "tar.gz",
           "entry": "ffmpeg",
           "required": [
@@ -2107,7 +2109,8 @@
             "ffmpeg/bin/ffmpeg.exe",
             "ffmpeg/bin/ffprobe.exe",
             "ffmpeg/licenses/LGPL-2.1.txt",
-            "ffmpeg/licenses/OpenH264.txt"
+            "ffmpeg/licenses/OpenH264.txt",
+            "ffmpeg/licenses/dav1d.txt"
           ]
         },
         {

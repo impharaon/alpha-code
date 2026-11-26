@@ -1,18 +1,45 @@
 import type { LauncherEnvironment, PackageRunner } from "@opencode/util/codepuppy-connector-launch"
 import { canonicalJsonDigest } from "@opencode/util/codepuppy-hash"
-import { isConnectorSecretQueryParameter } from "./codepuppy-connector-diagnostic.js"
+import { connectorSecretQueryPattern } from "./codepuppy-connector-diagnostic.js"
+import { Schema } from "effect"
 
 /** Facts from the official resolver adapters. Local sources carry content identity, never their host path. */
-export type ConnectorRequirement = (
-  | { kind: "registry"; name: string; version: string }
-  | { kind: "remote"; url: string; name?: string }
-  | { kind: "git"; url: string; revision: string; subdirectory?: string }
-  | { kind: "content"; sha256: string; name?: string }
-) & { extras?: readonly string[]; alias?: string }
+const requirementAttributes = {
+  extras: Schema.optional(Schema.Array(Schema.String)),
+  alias: Schema.optional(Schema.String),
+}
+export const ConnectorRequirement = Schema.Union([
+  Schema.Struct({
+    kind: Schema.Literal("registry"),
+    name: Schema.String,
+    version: Schema.String,
+    ...requirementAttributes,
+  }),
+  Schema.Struct({
+    kind: Schema.Literal("remote"),
+    url: Schema.String,
+    name: Schema.optional(Schema.String),
+    ...requirementAttributes,
+  }),
+  Schema.Struct({
+    kind: Schema.Literal("git"),
+    url: Schema.String,
+    revision: Schema.String,
+    subdirectory: Schema.optional(Schema.String),
+    ...requirementAttributes,
+  }),
+  Schema.Struct({
+    kind: Schema.Literal("content"),
+    sha256: Schema.String,
+    name: Schema.optional(Schema.String),
+    ...requirementAttributes,
+  }),
+])
+export type ConnectorRequirement = typeof ConnectorRequirement.Type
 
-// Only normalized resolution-affecting facts from pinned npm / uv's resolved
-// resolver settings. Cache locations, logging, credentials, argv and workspace IDs are not inputs.
-const npmResolutionOptions = new Set([
+export const connectorNpmResolutionOptions = new Set([
+  // Only normalized resolution-affecting facts from pinned npm / uv's resolved
+  // resolver settings. Cache locations, logging, credentials, argv and workspace IDs are not inputs.
   "registry",
   "tag",
   "defaultTag",
@@ -86,7 +113,7 @@ export function connectorPreparationKey(input: {
     value: unknown
   }[]
 }) {
-  const allowed = input.runner === "npm-exec" ? npmResolutionOptions : uvResolutionOptions
+  const allowed = input.runner === "npm-exec" ? connectorNpmResolutionOptions : uvResolutionOptions
   const requirements = input.requirements.map((requirement) => ({
     ...(requirement.kind === "registry"
       ? { kind: requirement.kind, name: requirement.name, version: requirement.version }
@@ -128,31 +155,41 @@ function canonicalSet<A>(values: readonly A[]) {
     .map(([, value]) => value)
 }
 
-function authenticationField(name: string) {
-  return /(?:^|[:_./-])(?:auth|authorization|token|credential|credentials|password|passwd|secret|username|signature|api[_-]?key|private_key)(?:$|[:_./-])/i.test(
-    name.replace(/([a-z])([A-Z])/g, "$1_$2"),
-  )
+/** Self-contained so the same owner can normalize metadata inside the bundled Node on a Location. */
+export function connectorResolutionContent(input: unknown, queryPattern: string): unknown {
+  const query = new RegExp(`^${queryPattern}$`, "i")
+  const authentication = (name: string) =>
+    /(?:^|[:_./-])(?:auth|authorization|token|credential|credentials|password|passwd|secret|username|signature|api[_-]?key|private_key)(?:$|[:_./-])/i.test(
+      name.replace(/([a-z])([A-Z])/g, "$1_$2"),
+    )
+  const sourceUrl = (source: string) => {
+    const url = new URL(source)
+    if (url.protocol === "file:" || url.protocol === "git+file:")
+      throw Error("Local connector sources need content facts")
+    url.username = ""
+    url.password = ""
+    for (const name of [...url.searchParams.keys()]) if (query.test(name)) url.searchParams.delete(name)
+    url.searchParams.sort()
+    return url.toString()
+  }
+  const content = (value: unknown): unknown => {
+    if (typeof value === "string") return value.replace(/[a-z][a-z0-9+.-]*:\/\/[^\s<>"'`]+/gi, sourceUrl)
+    if (Array.isArray(value)) return value.map(content)
+    if (value === null || typeof value !== "object") return value
+    return Object.fromEntries(
+      Object.entries(value)
+        .filter(([name]) => !authentication(name))
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([name, item]) => [name, content(item)]),
+    )
+  }
+  return content(input)
 }
 
-function nonSecretResolution(value: unknown): unknown {
-  if (typeof value === "string") return value.replace(/[a-z][a-z0-9+.-]*:\/\/[^\s<>"'`]+/gi, nonSecretSourceUrl)
-  if (Array.isArray(value)) return value.map(nonSecretResolution)
-  if (value === null || typeof value !== "object") return value
-  return Object.fromEntries(
-    Object.entries(value)
-      .filter(([name]) => !authenticationField(name))
-      .map(([name, item]) => [name, nonSecretResolution(item)]),
-  )
+function nonSecretResolution(value: unknown) {
+  return connectorResolutionContent(value, connectorSecretQueryPattern)
 }
 
-function nonSecretSourceUrl(source: string) {
-  const url = new URL(source)
-  if (url.protocol === "file:" || url.protocol === "git+file:")
-    throw Error("Local connector sources need content facts")
-  url.username = ""
-  url.password = ""
-  for (const name of [...url.searchParams.keys()])
-    if (isConnectorSecretQueryParameter(name)) url.searchParams.delete(name)
-  url.searchParams.sort()
-  return url.toString()
+function nonSecretSourceUrl(value: string) {
+  return String(nonSecretResolution(value))
 }

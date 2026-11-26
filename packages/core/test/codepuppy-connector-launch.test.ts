@@ -22,7 +22,7 @@ import {
   uvToolInstallArguments,
 } from "@opencode/core/mcp/codepuppy-uv-launch"
 import { UV_TOOL_SETTINGS, UV_SERVICE_COMMAND } from "./fixture/uv-tool-settings"
-import { readNpmLaunchDeclaration } from "@opencode/core/mcp/codepuppy-npm-launch"
+import { readNpmLaunchDeclaration, normalizeNpmLaunchDeclaration, installNpmConnector } from "@opencode/core/mcp/codepuppy-npm-launch"
 import { Deferred, Effect, Fiber, Layer, Logger, Option, PlatformError, References, Stream } from "effect"
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
 import type {
@@ -1528,4 +1528,90 @@ test("npm capture rejects a bin link outside the prepared prefix", async () => {
     ),
   )
   expect(failure).toMatchObject({ kind: "unknown", detail: expect.stringContaining("escaped its prefix") })
+})
+
+// Component layer: official pinned libnpmpack sources plus already-installed real
+// Arborist/Pacote dependencies; input package bytes are the real semver publication.
+function npmSourceFixture() {
+  const input = npmCaptureFixture()
+  const npm = path.dirname(path.dirname(input.launchers.npmCli))
+  const util = createRequire(new URL("../../util/package.json", import.meta.url))
+  const arborist = createRequire(util.resolve("@npmcli/arborist/package.json"))
+  const pacote = createRequire(arborist.resolve("pacote/package.json"))
+  const modules = {
+    "@npmcli/arborist": path.dirname(util.resolve("@npmcli/arborist/package.json")),
+    "@npmcli/run-script": path.dirname(arborist.resolve("@npmcli/run-script/package.json")),
+    pacote: path.dirname(arborist.resolve("pacote/package.json")),
+    "npm-packlist": path.dirname(pacote.resolve("npm-packlist/package.json")),
+    tar: path.dirname(pacote.resolve("tar/package.json")),
+    semver: path.dirname(util.resolve("semver/package.json")),
+  }
+  for (const [name, directory] of Object.entries(modules)) {
+    const target = path.join(npm, "node_modules", name)
+    if (existsSync(target)) continue
+    mkdirSync(path.dirname(target), { recursive: true })
+    symlinkSync(directory, target, "dir")
+  }
+  const sources: Record<string, string> = JSON.parse(gunzipSync(readFileSync(new URL("./fixture/npm-launch/npm-source-helpers.json.gz", import.meta.url))).toString())
+  for (const [file, source] of Object.entries(sources)) {
+    const target = path.join(npm, "node_modules", file)
+    mkdirSync(path.dirname(target), { recursive: true })
+    writeFileSync(target, source)
+  }
+  return { ...input, python: process.execPath, temporary: path.join(input.root, "sources"), environment: { ...input.environment, npm_config_cache: path.join(input.root, "cache") } }
+}
+
+test("npm requirements retain aliases git revisions and remote source identities without execution inputs", async () => {
+  const input = npmSourceFixture()
+  const declaration = await Effect.runPromise(Effect.scoped(normalizeNpmLaunchDeclaration({ ...input, cwd: input.root, syntax: "npx", arguments: [
+    "--package=owned@npm:semver@v7.8.5", "--package=git+https://own:fixture-secret@git.invalid/source.git#main", "--package=https://own:fixture-secret@packages.invalid/source.tgz?token=first", "--call", "own /current-workspace",
+  ] })).pipe(Effect.provide(hostEnvironmentLayer)))
+  expect(declaration.selection).toBe("call")
+  expect(declaration.requirements[0]).toEqual({ kind: "registry", name: "semver", version: "7.8.5", alias: "owned" })
+  expect(declaration.requirements[1]).toMatchObject({ kind: "git", revision: "main" })
+  const key = connectorPreparationKey({ runner: "npm-exec", launchers: input.launchers, requirements: declaration.requirements, options: declaration.resolutionOptions, configuration: declaration.configuration })
+  expect(key).toMatch(/^[a-f0-9]{64}$/)
+  expect(declaration.installSpecs).toHaveLength(3)
+})
+
+test("npm local source fingerprints follow the official packlist and survive project and credential changes", async () => {
+  const inputs = [npmSourceFixture(), npmSourceFixture()]
+  const keys: string[] = []
+  for (const [index, input] of inputs.entries()) {
+    const local = path.join(input.prefix, "node_modules/semver")
+    const manifest = JSON.parse(readFileSync(path.join(local, "package.json"), "utf8"))
+    manifest.publishConfig = { registry: `https://own:credential-${index}@packages.invalid/?token=secret-${index}`, credentialRef: `ref-${index}` }
+    writeFileSync(path.join(local, "package.json"), JSON.stringify(manifest))
+    writeFileSync(path.join(local, ".npmrc"), `//packages.invalid/:_authToken=private-${index}\n`)
+    const result = await Effect.runPromise(Effect.scoped(normalizeNpmLaunchDeclaration({ ...input, cwd: input.root, syntax: "npx", arguments: [local, input.root] })).pipe(Effect.provide(hostEnvironmentLayer)))
+    expect(result.requirements[0]?.kind).toBe("content")
+    expect(result.installSpecs[0]?.startsWith("file:" + input.temporary)).toBe(true)
+    keys.push(connectorPreparationKey({ runner: "npm-exec", launchers: input.launchers, requirements: result.requirements, options: result.resolutionOptions, configuration: result.configuration }))
+  }
+  expect(keys[0]).toBe(keys[1])
+  const input = inputs[0]!
+  const local = path.join(input.prefix, "node_modules/semver")
+  const bin = path.join(local, "bin/semver.js")
+  writeFileSync(bin, readFileSync(bin, "utf8") + "\n// changed owned source\n")
+  const changed = await Effect.runPromise(Effect.scoped(normalizeNpmLaunchDeclaration({ ...input, cwd: input.root, syntax: "npx", arguments: [local] })).pipe(Effect.provide(hostEnvironmentLayer)))
+  expect(connectorPreparationKey({ runner: "npm-exec", launchers: input.launchers, requirements: changed.requirements, options: changed.resolutionOptions, configuration: changed.configuration })).not.toBe(keys[0])
+})
+
+test("npm product installer forwards resolved configuration and owned prefix without the service command", async () => {
+  const input = npmSourceFixture()
+  const npm = path.dirname(path.dirname(input.launchers.npmCli))
+  // Own trace at the CLI-dispatch seam, not an imitation of npm installation output.
+  writeFileSync(path.join(npm, "lib/cli.js"), "module.exports = process => process.stdout.write(JSON.stringify({ arguments: process.argv.slice(2), cache: process.env.npm_config_cache }))\n")
+  const cache = path.join(input.root, "bound-cache")
+  const launchers = { ...input.launchers, packageManagerEnv: { npm_config_cache: cache } }
+  const result = await Effect.runPromise(Effect.scoped(installNpmConnector({ ...input, launchers, cwd: input.root, syntax: "npx", arguments: ["--cache", path.join(input.root, "unbound-cache"), "--registry=https://registry.invalid/", "--package=semver@7.8.5", "--call", "must-not-run"], key: input.key, installSpecs: ["semver@7.8.5"], environment: { ...input.environment, npm_config_cache: cache } })).pipe(Effect.provide(hostEnvironmentLayer)))
+  expect(result.exitCode).toBe(0)
+  const trace = JSON.parse(result.stdout)
+  expect(trace.arguments.slice(0, 1)).toEqual(["install"])
+  expect(trace.arguments).toContain("--registry=https://registry.invalid/")
+  expect(trace.arguments).toContain("--ignore-scripts=true")
+  expect(trace.arguments).toContain(input.prefix)
+  expect(trace.arguments).not.toContain("--cache=" + path.join(input.root, "unbound-cache"))
+  expect(trace.arguments.join(" ")).not.toContain("must-not-run")
+  expect(trace.cache).toBe(cache)
 })

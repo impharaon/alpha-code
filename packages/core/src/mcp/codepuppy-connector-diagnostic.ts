@@ -248,9 +248,9 @@ function commandArguments(command: ChildProcess.Command): string[] {
   return [...commandArguments(command.left), "|", ...commandArguments(command.right)]
 }
 
-const secretQueryParameter =
+export const connectorSecretQueryPattern =
   "(?:x-amz-(?:credential|security-token|signature)|x-goog-(?:credential|signature)|sig|signature|(?:access_token|token|password|passwd|secret|credentials?|username|api[_-]?key|key|auth|authorization)(?:[_-]?(?:ref|version))?)"
-const secretQueryName = new RegExp(`^${secretQueryParameter}$`, "i")
+const secretQueryName = new RegExp(`^${connectorSecretQueryPattern}$`, "i")
 
 /** Shared credential-query classification for diagnostics and non-secret resolution identities. */
 export function isConnectorSecretQueryParameter(name: string) {

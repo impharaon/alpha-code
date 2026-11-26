@@ -633,3 +633,22 @@ readNpmLaunchDeclaration 新增 transient resolutionOptions：向 Config 传入�
 
 ### 偏离记录
 暂无。文件/证明/实际未完成边界随实现提交更新。
+
+
+### r7 已落：npm 完整需求读侧、内容源与产品 install
+
+readNpmLaunchDeclaration 保留原返回字段并增加真实 npa 请求、package/command/call/shell 选择；隐式本地 bin 沿实际 .bin 链接归到包源，别名、git committish/semver/subdir、HTTP源均保留。normalizeNpmLaunchDeclaration 生成同一 ConnectorRequirement schema 的 facts 与只用于安装的原始 spec；包请求顺序作为 dependencies 内容记录保留（不能将重复同名请求排序后丢掉优先级），不包含服务 argv/cwd/身份。ConnectorRequirement schema 与 key 同处一个 owner。
+
+新增 codepuppy-connector-content 的应用自有程序在 Location 的随包 Node 内复用 npm packlist/Arborist、libnpmpack、tar 和钉住 Python 的 tomllib；本地包依照真正 packlist 逐字读取内容，JSON/TOML 结构经同一秘密规则清理并将本地依赖引用替换为内容图，图引用允许环而不加路径盐。npm 目录源制作私有临时 tarball，递归本地依赖改绑到同次 tarball，后续 npm install 得到 prefix 内自足包，临时数据不成为 ready 内容。二进制按字节识别；非 JSON 源文件不强制当 JSON，包内部 files/exports 模式不误当系统绝对路径。
+
+installNpmConnector 在同一 Location 的随包 Node 内加载官方原声明配置，重放已生效非默认配置，再执行真正 npm CLI install --prefix；执行专有 package/call/script-shell 不交 installer，角色三个默认值由 connectorNpmDefaults 一处持有，env 投影与 CLI 均消费它。npm Config.load 自身会改写当前子进程环境，新增组件例抓到了 CLI --cache 覆盖宿主缓存的问题：只按实际 descriptor 的绑定键恢复该进程进入时的值，并从这些键动态映射 Config 项，不复制 R1 的位置表或候选绑定。
+
+组件层新增3例（既有准备测试文件、受影响 PR/nightly）：别名/git/URL需求；真实 semver 源跨项目/凭据更改 key 不变且代码变更失效；在官方 CLI dispatch 边界记录应用自有 trace，检验解析配置、prefix、角色默认、R1 当前缓存与不执行服务。源码夹具 npm-source-helpers.json.gz 包含真正 pinned libnpmpack 的 lib/package.json/LICENSE；其它库复用仓内已安装依赖，正式钉住版本另用实物 probe。没有模拟 npm 安装输出。
+
+命令 packages/core `bun test test/codepuppy-connector-launch.test.ts -t 'npm requirements retain|npm local source fingerprints|npm product installer' --max-concurrency=2` →3 PASS /19 assertions（`/tmp/connector-r7-npm-new.log`）。整文件阶段42 PASS /233 assertions（`/tmp/connector-r7-npm-file.log`）。实物 `gate slot -- bun /tmp/connector-r5-npm-proof/npm-product-r7.ts` 成功由产品 normalize→install→capture 装入 semver7.8.5（`/tmp/connector-r7-npm-product.log`），不同于 r6 由 probe 自己安装。初次 Typecheck 的 Schema API/Effect 条件联合/ExitCode brand 问题均在本轮直接修正；最终收据给出后续类型检查结果。
+
+### r7 源绑定实物发现（尚未宣称快路径完成）
+
+真实 setuptools75.8.0 构建的 src-layout PEP660 editable 包，随包 uv0.13.10 / Python3.12.16 安装成功；来源文件整体从 source-a 改名为 source-b 后，产品内容 fingerprint 前后同为 dbeb9c65cc1d5020c605c63833232725fd07ec9779aa48065b8a5605d925b096，capture/publish/read 仍命中有效包入口收据，但实际 venv Python import 报 ModuleNotFoundError。原文件 __file__ 为 source-a，uv 生成的 editable 绑定保留了这个绝对路径。证据 `gate slot -- bun /tmp/connector-r5-npm-proof/editable-receipt-r7.ts`（`/tmp/connector-r7-editable-receipt.log`、`/tmp/connector-r7-editable-yo35envh/receipt-result.json`）。这是执行绑定必须覆盖的真实缺口，不能仅把当前 cwd/argv 改成 source-b 就当完成，也不能把项目路径塞回内容 key。绑定实现未完成前不声明完整 prepare 或 DONE-INDEPENDENT。
+
+文件偏离：新增 content 程序是 Node/npm/UV 两运行器共享的本地源责任，diagnostic 仅导出既有 URL 名称规则供这个隔离程序消费，key 的规范化函数可自包含序列化，避免另写秘密规则；未加生产依赖/选项/权限表。后续 UV resolved 值解析与环境绑定在既有 uv-launch 同链继续。

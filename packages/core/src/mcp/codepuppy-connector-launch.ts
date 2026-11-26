@@ -9,6 +9,7 @@ import type {
   PackageRunner,
 } from "@opencode/util/codepuppy-connector-launch"
 import { Environment } from "../environment/index.js"
+import { connectorNpmDefaults } from "./codepuppy-npm-launch.js"
 
 export const ConnectorPreparation = Schema.Struct({
   schema: Schema.Literal(1),
@@ -40,7 +41,9 @@ export function connectorRunnerEnvironment(input: {
   const inheritedControls = new Set(["NODE_OPTIONS", "PYTHONHOME", "PYTHONPATH", "VIRTUAL_ENV"].map(keyOf))
   const npm =
     input.runner === "npm-exec"
-      ? { npm_config_prefer_offline: "true", npm_config_ignore_scripts: "true", npm_config_update_notifier: "false" }
+      ? Object.fromEntries(
+          Object.entries(connectorNpmDefaults).map(([key, value]) => ["npm_config_" + key.replaceAll("-", "_"), value]),
+        )
       : {}
   const prefix = paths.join(input.launchers.runtimeRoot, "prepared", input.key)
   const entries = new Map(

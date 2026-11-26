@@ -186,26 +186,24 @@ export function createDocumentRenderer(input: {
           return { status: "pending", checkId: id, artifact: record, runtime: environment.renderState }
         }
         const diagnostics: string[] = []
-        const recalculation =
-          request.kind === "xlsx"
-            ? await runDocumentPython(
-                {
-                  operation: "recalculate",
-                  python: environment.python,
-                  script: input.recalculateScript,
-                  directory: caller.location.directory,
-                  path: source.file.abs,
-                  environment: environment.pythonEnvironment,
-                },
-                combined,
-              )
-            : undefined
-        const calculated: unknown = recalculation ? JSON.parse(recalculation.stdout) : undefined
-        if (
-          request.kind === "xlsx" &&
-          (!recalculation || recalculation.exitCode !== 0 || !isExcelRecalculateResult(calculated))
-        )
-          return failed("conversion", "Excel calculation did not produce a receipt")
+        const calculated = request.kind !== "xlsx" ? undefined : await (async () => {
+          try {
+            const output = await runDocumentPython({
+              operation: "recalculate",
+              python: environment.python,
+              script: input.recalculateScript,
+              directory: caller.location.directory,
+              path: source.file.abs,
+              environment: environment.pythonEnvironment,
+            }, combined)
+            if (output.exitCode !== 0) throw Error(output.stderr || "Excel calculation exited without a receipt")
+            const result: unknown = JSON.parse(output.stdout)
+            if (!isExcelRecalculateResult(result)) throw Error("Excel calculation did not produce a receipt")
+            return result
+          } catch (error) {
+            diagnostics.push("Excel recalculation did not complete: " + String(error))
+          }
+        })()
         if (isExcelRecalculateResult(calculated) && calculated.status !== "recalculated") {
           if (calculated.status === "pending") {
             const artifact = await resolveDocumentArtifact(caller.location.directory, {
@@ -229,10 +227,8 @@ export function createDocumentRenderer(input: {
             })
             return { status: "pending", checkId: id, artifact, runtime: calculated.runtime }
           }
-          return failed(
-            calculated.code === "source-changed" ? "source-changed" : "conversion",
-            String(calculated.detail),
-          )
+          if (calculated.code === "source-changed") return failed("source-changed", calculated.detail)
+          diagnostics.push("Excel recalculation did not complete: " + calculated.detail)
         }
         if (
           isExcelRecalculateResult(calculated) &&
@@ -242,8 +238,8 @@ export function createDocumentRenderer(input: {
             typeof calculated.resultSha256 !== "string")
         )
           return failed("source-changed", "Excel source changed before calculation")
-        const renderedDigest = documentRecord(calculated) ? String(calculated.resultSha256) : digest
-        if (documentRecord(calculated))
+        const renderedDigest = calculated?.status === "recalculated" ? calculated.resultSha256 : digest
+        if (calculated?.status === "recalculated")
           diagnostics.push(
             JSON.stringify({
               recalculationId: calculated.id,

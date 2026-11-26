@@ -654,3 +654,5 @@ B7 cursor red：原 stdio 模块新增以真实工具生成的 Data 游标续读
 B7 cursor green：stdio 原文件 12 PASS（B7-cursor-green.log），未指定 sheet 的续页只回到原游标工作表。cursor 的 sheet 来源/绑定仍由 OfficeExcel 所有，工具 schema 不增字段，tools.json 仅重生 server 摘要。
 
 B7 layout red：既有 renderer 的三个变体（计算失败回执、坏回执、子进程异常）在真实 xlsx 模板/两张实际 PNG 上均提前 failed（B7-layout-red.log，3 FAIL）。首次临时模板名写错已纠正后才取得此行为 red；下一提交保留源版本守卫，让计算不完整成为明确 diagnostic，并继续布局渲染。
+
+B7 layout green：renderer 文件 9 PASS（B7-layout-green.log）。失败/无效回执/进程异常均继续布局并明确计算不完整；成功才写 recalculationId/缓存诊断，pending 流程与源版本变化拒绝仍保留，不把旧缓存冒称重算成功。

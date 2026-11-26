@@ -15,8 +15,10 @@ export async function sendPluginSessionAction(action: Action): Promise<void> {
   await current?.request(action).catch(error => console.warn("runtime-failed: package session action", String(error)))
 }
 
+const hasViewedPluginSessions = () => current !== undefined && viewed.size > 0
+
 export function endViewedPluginSessions(reason: Extract<Action, { action: "leave" }>["reason"]) {
-  if (!current || viewed.size === 0) return
+  if (!hasViewedPluginSessions()) return
   return Promise.all([...new Set(viewed.values())].map(sessionId => sendPluginSessionAction({ sessionId, action: "leave", reason }))).then(() => {})
 }
 
@@ -24,7 +26,7 @@ export function endViewedPluginSessions(reason: Extract<Action, { action: "leave
 export function createPluginSessionQuitHandler(stop: () => Promise<void>, quit: () => void) {
   let settled = false
   return (event: import("./window-close").CloseEventLike) => {
-    if (settled) return
+    if (settled || !hasViewedPluginSessions()) return
     event.preventDefault()
     void stop().finally(() => { settled = true; quit() })
   }

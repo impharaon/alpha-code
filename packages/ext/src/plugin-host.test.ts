@@ -2225,6 +2225,28 @@ packageIt.live("real hookify PreToolUse blocks the matching native write using s
   expect(existsSync(join(location.directory, "credentials.txt"))).toBe(false)
 })))
 
+packageIt.live("hookify match-all group still blocks a matching native write", () => packageJourney(Effect.gen(function* () {
+  const capture = yield* Effect.promise(() => captureStandardFixture("claude:hookify"))
+  const hooks = JSON.parse(new TextDecoder().decode(yield* Effect.promise(() => capture.readFile("hooks/hooks.json"))))
+  for (const group of hooks.hooks.PreToolUse) group.matcher = "*"
+  const sample = yield* invocationSample("claude:hookify", { "hooks/hooks.json": JSON.stringify({ hooks: { PreToolUse: hooks.hooks.PreToolUse } }) })
+  const membership = JSON.parse(readFileSync(join(sample.root, "skills-enabled.json"), "utf8"))
+  writeFileSync(join(sample.root, "skills-enabled.json"), JSON.stringify({ ...membership, keys: [...membership.keys, sample.key] }))
+  yield* invocationNativeServices
+  yield* activateExtUntilFinished
+  const location = yield* Location.Service
+  mkdirSync(join(location.directory, ".claude"), { recursive: true })
+  const rule = new TextDecoder().decode(yield* Effect.promise(() => capture.readFile("examples/sensitive-files-warning.local.md")))
+  writeFileSync(join(location.directory, ".claude/hookify.sensitive.local.md"), rule.replace("action: warn", "action: block"))
+  const sessions = yield* Sessions.Service
+  const session = yield* sessions.create({ location: { directory: location.directory }, title: "Wildcard source matcher", agent: "build", model: { providerID: "test", id: "picked" } } as never)
+  const snapshot = yield* (yield* Tool.Service).snapshot()
+  const blocked = yield* snapshot.execute({ sessionID: session.id, agent: "build" as never, messageID: "msg_wildcard_block" as never, call: { type: "tool-call", name: "write", id: "wildcard_block", input: { path: "credentials.txt", content: "fixture data" } } }).pipe(Effect.exit)
+  expect(Exit.isFailure(blocked)).toBe(true)
+  expect(JSON.stringify(blocked)).toContain("Sensitive file detected")
+  expect(yield* Effect.promise(() => Bun.file(join(location.directory, "credentials.txt")).exists())).toBe(false)
+})))
+
 packageIt.live("the real Convex hook allow is scoped to one call and never overrides a native deny", () => packageJourney(Effect.gen(function* () {
   const sample = yield* invocationSample("claude:convex")
   const membership = JSON.parse(readFileSync(join(sample.root, "skills-enabled.json"), "utf8"))
@@ -3032,7 +3054,7 @@ packageIt.live("the original Claude Security guard receives the source agent ide
   } })
 })
 
-for (const handled of [true, false]) packageIt.live(`package elicitation ${handled ? "answers before native input" : "modifies the real user result"} through the actual stdio transport`, () => packageJourney(Effect.gen(function* () {
+for (const { handled, matcher } of [{ handled: true, matcher: "^r17-elicitation$" }, { handled: false, matcher: "^r17-elicitation$" }, { handled: true, matcher: "*" }]) packageIt.live(`package elicitation ${matcher === "*" ? "match-all answers before native input" : handled ? "answers before native input" : "modifies the real user result"} through the actual stdio transport`, () => packageJourney(Effect.gen(function* () {
   const { Mcp } = yield* Effect.promise(() => import("../../core/src/mcp"))
   const { Form } = yield* Effect.promise(() => import("../../core/src/form"))
   const { ConfigMCP } = yield* Effect.promise(() => import("../../schema/src/config/mcp"))
@@ -3040,7 +3062,7 @@ for (const handled of [true, false]) packageIt.live(`package elicitation ${handl
   const hooks = JSON.parse(new TextDecoder().decode(yield* Effect.promise(() => capture.readFile("claude/hooks.json"))))
   // The fixed dash0 groups supply the real event format; only the executable is an observing handler.
   for (const event of ["Elicitation", "ElicitationResult"]) for (const group of hooks.hooks[event]) {
-    group.matcher = "^r17-elicitation$"
+    group.matcher = matcher
     for (const handler of group.hooks) {
       handler.command = process.execPath
       handler.args = ["-e", "const fs=require('node:fs');const input=await Bun.stdin.json();fs.appendFileSync('elicitation-events.jsonl',JSON.stringify(input)+'\\n');console.log(JSON.stringify({hookSpecificOutput:{hookEventName:input.hook_event_name,...(" + handled + "||input.hook_event_name==='ElicitationResult'?{action:'accept',content:{answer:'package result'}}:{})}}))"]
@@ -3136,6 +3158,56 @@ packageIt.live("leave during a running task preserves its pending decision scope
       { path: join(location.directory, "allowed.txt"), value: "retained" },
     ])
     yield* ext.finish(Effect.promise(async () => !await Bun.file(environment).exists()))
+  }))
+}))
+
+packageIt.live("hook matchers select compaction trigger instruction load reason and SessionEnd reason", () => Effect.gen(function* () {
+  const { processState } = yield* Effect.promise(() => import("./plugin"))
+  const { createHubBridge } = yield* Effect.promise(() => import("./hub-bridge"))
+  const state = processState()
+  const holder = globalThis as { [PROCESS_STATE_KEY]?: typeof state }
+  const sent: unknown[] = []
+  const listeners: Array<(event: { data: unknown }) => void> = []
+  holder[PROCESS_STATE_KEY] = { ...state, hubBridge: createHubBridge({ postMessage: message => { sent.push(message) }, on: (_, listener) => { listeners.push(listener) } }) }
+  yield* Effect.addFinalizer(() => Effect.sync(() => { holder[PROCESS_STATE_KEY] = state }))
+  yield* packageJourney(Effect.gen(function* () {
+    const tree = yield* Effect.promise(() => captureStandardFixture("claude:dash0"))
+    const source = JSON.parse(new TextDecoder().decode(yield* Effect.promise(() => tree.readFile("claude/hooks.json"))))
+    const hooks = Object.fromEntries(["PreCompact", "InstructionsLoaded", "SessionEnd"].map(event => [event, source.hooks[event]]))
+    for (const [event, groups] of Object.entries(hooks) as [string, { matcher: string; hooks: { command: string; args: string[] }[] }[]][]) for (const group of groups) {
+      group.matcher = event === "PreCompact" ? "manual" : event === "InstructionsLoaded" ? "session_start" : "clear"
+      for (const hook of group.hooks) {
+        hook.command = process.execPath
+        hook.args = ["-e", "const fs=require('node:fs');const input=await Bun.stdin.json();fs.appendFileSync('matcher-fields.jsonl',JSON.stringify(input)+'\\n')"]
+      }
+    }
+    const sample = yield* invocationSample("claude:dash0", { "claude/hooks.json": JSON.stringify({ hooks }) })
+    const membership = JSON.parse(readFileSync(join(sample.root, "skills-enabled.json"), "utf8"))
+    writeFileSync(join(sample.root, "skills-enabled.json"), JSON.stringify({ ...membership, keys: [...membership.keys, sample.key] }))
+    yield* invocationNativeServices
+    const ext = yield* activateExtUntilFinished
+    const location = yield* Location.Service
+    const sessions = yield* Sessions.Service
+    const session = yield* sessions.create({ location: { directory: location.directory }, title: "Official matcher fields", agent: "build", model: { providerID: "test", id: "picked" } } as never)
+    yield* sessions.prompt({ sessionID: session.id, text: "Start the real Session" })
+    yield* sessions.wait(session.id)
+    const runtime = yield* Effect.promise(() => import("@opencode/plugin/codepuppy-package-runtime"))
+    const port = runtime.packageRuntime(location)!
+    const log = join(location.directory, "matcher-fields.jsonl")
+    yield* Effect.promise(() => port.beforeCompaction({ sessionID: session.id, trigger: "auto", customInstructions: null }))
+    expect(yield* Effect.promise(() => Bun.file(log).exists())).toBe(false)
+    yield* Effect.promise(() => port.beforeCompaction({ sessionID: session.id, trigger: "manual", customInstructions: null }))
+    yield* Effect.promise(() => port.instructionsLoaded({ sessionID: session.id, occurrenceId: "r21-matcher", filePath: join(location.directory, "CLAUDE.md"), memoryType: "Project", loadReason: "session_start" }))
+    yield* ext.finish(Effect.sync(() => { try { return readFileSync(log, "utf8").trim().split("\n").length === 2 } catch { return false } }))
+    for (const listener of listeners) listener({ data: { type: "codepuppy.plugin.session", id: 2124, sessionId: session.id, action: "leave", reason: "clear" } })
+    yield* ext.finish(Effect.sync(() => sent.some(message => (message as { id?: number }).id === 2124)))
+    yield* ext.finish(Effect.sync(() => { try { return readFileSync(log, "utf8").trim().split("\n").length === 3 } catch { return false } }))
+    const rows = readFileSync(log, "utf8").trim().split("\n").map(line => JSON.parse(line))
+    expect(rows).toEqual(expect.arrayContaining([
+      expect.objectContaining({ hook_event_name: "PreCompact", trigger: "manual" }),
+      expect.objectContaining({ hook_event_name: "InstructionsLoaded", memory_type: "Project", load_reason: "session_start" }),
+      expect.objectContaining({ hook_event_name: "SessionEnd", reason: "clear" }),
+    ]))
   }))
 }))
 

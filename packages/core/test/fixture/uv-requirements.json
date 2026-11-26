@@ -71,6 +71,18 @@
     {
       "input": "[build-system]\nrequires = [\"setuptools==75.8.0\"]\nbuild-backend = \"setuptools.build_meta\"\n\n[project]\nname = \"owned-editable\"\nversion = \"1.0.0\"\n",
       "output": "{\"build-system\": {\"requires\": [\"setuptools==75.8.0\"], \"build-backend\": \"setuptools.build_meta\"}, \"project\": {\"name\": \"owned-editable\", \"version\": \"1.0.0\"}}\n"
+    },
+    {
+      "input": "{\"requirement\":\"Pip[read]>=26.0; python_version >= \\\"3.12\\\"\",\"tool\":true,\"windows\":false}",
+      "output": "{\"name\": \"pip\", \"extras\": [\"read\"], \"version\": \">=26.0\", \"url\": null, \"marker\": \"python_version >= \\\"3.12\\\"\"}\n"
+    },
+    {
+      "input": "{\"requirement\":\"python\",\"tool\":true,\"windows\":false}",
+      "output": "{\"interpreter\": \"python\", \"pipWheel\": \"/private/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/connector-managed-python-samUql/userdata/package-managers/uv/python/cpython-3.12.16-macos-aarch64-none/lib/python3.12/ensurepip/_bundled/pip-26.3-py3-none-any.whl\"}\n"
+    },
+    {
+      "input": "{\"requirement\":\"/tmp/connector-r7-editable-yo35envh/source-b\"}",
+      "output": "{\"source\": \"/tmp/connector-r7-editable-yo35envh/source-b\"}\n"
     }
   ],
   "sourceFiles": {

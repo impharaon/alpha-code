@@ -7,7 +7,7 @@ import { FetchHttpClient } from "effect/http"
 import { Environment } from "../environment/index.js"
 import { KeyedMutex } from "../effect/keyed-mutex.js"
 import type { McpClient } from "./client.js"
-import { createConnectorLaunchAttempt } from "./codepuppy-connector-diagnostic.js"
+import { createConnectorLaunchAttempt, ConnectorPreparationProgress } from "./codepuppy-connector-diagnostic.js"
 import {
   isConnectorLaunchFailure,
   type ConnectorLaunchDiagnostic,
@@ -265,7 +265,7 @@ export function make(input: Input): Connection {
               identity: attempt!.identity,
               runtimeDep: runtimeDep!,
               preparing: attempt!.preparing,
-            })
+            }).pipe(Effect.provideService(ConnectorPreparationProgress, attempt!.preparing))
           : undefined
         yield* attempt?.connecting ?? Effect.void
         return yield* McpClient.connect({

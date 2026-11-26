@@ -718,3 +718,19 @@ normalizeUvPackageDeclaration 在 Location 随包 Node 中复用同一 content/k
 合法 `uv tool run --offline --no-config --with-editable <source> python -c …` 真正输出3.12.16并导入当前本地源；原 r6 的通用 run→install 转换把 python 当 main package，真实 `uv tool install … python` exit2：`error: Cannot install Python with uv tool install. Did you mean to use uv python install?`。`gate slot -- python3 /tmp/connector-r8-interpreter-seam.py` exit0（正/反断言；`/tmp/connector-r8-interpreter-seam.json` / `.log`）。所以不能据包目标 helper 声称覆盖完整 uvx 语法。
 
 继续验证的最小本地适配已可行：仍用 uv tool install，以同一已钉 Python ensurepip 内的 pip wheel 作内部环境根，原 --with/本地 editable 保留，随后直接执行该持久环境的 Python。`gate slot -- python3 /tmp/connector-r8-builtin-pip.py` exit0，采用冻结 only-managed/manual/3.12.16/build、原 R1 安装根，包安装0、Python执行0、当前 source-b 导入成功；/tmp/connector-r8-builtin-pip.json。没有新增来源、pin、公共端口或用户操作，因此尚不把它报成必须变更冻结接口的 SEAM；解释器请求分类/匹配同一 pin、这个适配的产品实现、可编辑源并行绑定与总准备事务仍未完成。probe 的另一条旧环境复现并不是真围栏/正式包验收。
+
+### r8 已落：解释器请求、editable 重绑与完整函数组合
+
+前节所列解释器适配已进入产品：normalizeUvLaunchDeclaration 识别 pinned UV 的 Python/cpython/pypy/graalpy 请求，用同一个 pinned ensurepip 的 pip wheel 作内部持久环境根，uv tool install 的原参数/with/editable 不丢失。解释器请求由真实 uv offline run 选择后比较实际解释器 realpath，Windows 仅在 venv redirector 情形读 pyvenv.cfg 的 home；不执行系统 Python、不下载第二个解释器。原包目标和 Python 目标消费同一 ConnectorRequirement/key owner，新增 interpreter request 是需求事实，不把实际环境目录写入 key。`-C`、dotenv 两条红例已保留。解码应用自有环境协议失败时返回固定错误，不将整个含密钥环境的 Schema issue 展示给用户。
+
+bindUvConnectorSources 读取真实 direct_url/uv receipt；源路径没变直接用原环境。相同内容搬家时，在同 key 的私有 bindings/uuid 下只克隆 uv 子树，以真正 uv pip install --offline --no-deps --reinstall 重绑当前 editable（保留本次构建设置）。回执、入口和 RECORD 只在该副本重锚，Scope 结束清理自己的副本；共享 ready 不改。POSIX 只改脚本 shebang，Windows 保留 pinned UV 的原生 trampoline/ZIP，只更新实际 UV_PYTHON_PATH resource；Windows 路径尚无 Windows 实物执行证据。无需新增 pin、依赖、用户步骤或设计 SEAM。
+
+真实命令 `gate slot -- bun /tmp/connector-r5-npm-proof/uv-binding-product-r8.ts` →exit0（`/tmp/connector-r8-uv-binding-product.log`）：pinned uv/Python，原源搬家，两个 Location 同时绑定各自 source-b/source-c，key 相同、各自 __file__ 正确、共享 ready 不变，Scope 结束两份绑定均删除。初版 pin 检查把 UV 的缓存 venv 目录当作解释器本身，实物例暴露后改为 executable realpath；没有增加拒绝合法请求的规则。
+
+prepareConnectorLaunch 的 frozen 输入/返回现已定义并组合：先依赖/cwd预检、同代 Host/assets、egress acquire/release、R1 descriptor 的已绑定目录、随包 Node 读 Location 继承环境、角色环境、已有 Python receipt 或单一 ensureFile/uv install/find、需求/config key、同 key KeyedMutex、有效 ready 读取、miss install/capture/验证当前入口后原子 publish、当前环境/参数/editable 重绑。Python receipt 校验 pinSet/id、R1 根内路径与文件存在；UV ready 也列出 venv interpreter 必要文件。临时文件、私有绑定、准备子进程都有 Scope 所有权；安装 retry 与锁体先关闭 Scope 再释放锁。每位下载者独立订阅 authority，包安装以 key 合并；同 key listener 转发实际 stderr 活动，下载转发字节进度，attempt 的 Context.Reference 接到已有 connection producer。仅具体 connect/timeout/HTTP429/5xx 自动恢复一次，403/404/解析/完整性/粗 network 均不伪装下载；egress 仅依据当前 identity 且实际错误 URL host/port 匹配的 refused evidence 归因。
+
+完整函数的 NPM 实物：`gate slot -- bun /tmp/connector-r5-npm-proof/prepare-product-r8.ts` 已冷准备并写入一份 Python receipt/ready；探针在 MCP 启动前误把无限协议 stdin 当元数据读完而阻塞，已终止并收完 gate 前台进程，没有冒充冷连接通过。只修探针记录器后，`gate slot -- bun /tmp/connector-r5-npm-proof/prepare-warm-product-r8.ts` →exit0（`/tmp/connector-r8-prepare-warm-product.log`）：新进程中两处 Location，真实 stdio MCP 各连一次；ensureFile=0、installer=0、begin/endEgress 各2，key相同、当前 argv/cwd/key正确，ready 无当前输入。使用 /tmp 探针只读导入 #1759 的真实 R1/R2，不在产品复制或引用其它 worktree。
+
+必要文件偏离：新增 util/codepuppy-command-head.ts 是现有 main/platform 的同一函数/Windows后缀规则原样下沉供 core/main 共用；main/platform/index.ts 与 win32.ts 只 re-export，避免第二份命令识别 authority。startup.ts 同一失败 owner 增加准备期具体事实，diagnostic.ts/connection.ts 仅接同一 attempt 进度；npm-launch.ts 同链解码失败同样禁止把业务环境输出到错误。没有改 fence、HTTP/Protocol、gate、依赖或其它规格。
+
+**本节不是 DONE-INDEPENDENT 收据**：独立事务的 UV 完整 prepare 实物、缺损 managed Python 的自动修复、同 key 合并/取消/失败恢复的总事务命名证据仍须补齐；细项与最终检查在本轮最终收据列明。生产 bootstrap/Host/root/controller/document retry 与正式包验收继续等 #1759；其 HEAD 最后核对仍 ef8a1ce8b4441aeeb12cc3a5cc0843ad43c1682f，R1/R2 names/signatures 沿前表，无复制实现。

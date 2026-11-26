@@ -227,7 +227,7 @@ export function readNpmLaunchEnvironment(input: Parameters<typeof readNpmLaunchD
   return Effect.gen(function* () {
     const result = yield* runNpmLauncher(input, { kind: "environment", arguments: input.serviceArguments, bins: input.packageBins })
     if (result.exitCode !== 0) return yield* Effect.fail({ kind: "unknown", detail: result.stderr } as const)
-    return yield* Schema.decodeUnknownEffect(Schema.fromJsonString(Schema.Struct({ cwd: Schema.String, environment: Schema.Record(Schema.String, Schema.String) })))(result.stdout)
+    return yield* Schema.decodeUnknownEffect(Schema.fromJsonString(Schema.Struct({ cwd: Schema.String, environment: Schema.Record(Schema.String, Schema.String) })))(result.stdout).pipe(Effect.mapError((): ConnectorLaunchFailure => ({ kind: "unknown", detail: "Could not decode npm execution metadata" })))
   }).pipe(Effect.mapError(npmFailure))
 }
 

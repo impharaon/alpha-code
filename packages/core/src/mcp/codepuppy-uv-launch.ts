@@ -111,7 +111,7 @@ export function readUvLaunchEnvironment(input: Parameters<typeof readUvLaunchDec
     ], { cwd: input.cwd, env: input.environment, extendEnv: false }))
     const [code, stdout, stderr] = yield* Effect.all([process.exitCode, Stream.mkUint8Array(process.stdout), Stream.mkUint8Array(process.stderr)], { concurrency: "unbounded" })
     if (code !== 0) return yield* Effect.fail({ kind: "unknown", detail: new TextDecoder().decode(stderr) } as const)
-    const value = yield* Schema.decodeUnknownEffect(Schema.fromJsonString(Schema.Struct({ cwd: Schema.String, environment: Schema.Record(Schema.String, Schema.String) })))(new TextDecoder().decode(stdout))
+    const value = yield* Schema.decodeUnknownEffect(Schema.fromJsonString(Schema.Struct({ cwd: Schema.String, environment: Schema.Record(Schema.String, Schema.String) })))(new TextDecoder().decode(stdout)).pipe(Effect.mapError((): ConnectorLaunchFailure => ({ kind: "unknown", detail: "Could not decode uv execution metadata" })))
     // uv never overwrites an existing variable with an env-file value. Restore
     // the supplied role projection after the metadata probe's own PATH changes.
     return { cwd: value.cwd, environment: { ...value.environment, ...input.environment } }
@@ -125,6 +125,24 @@ const uvSourceOptions = [
   { field: "build_constraints", argument: "--build-constraints", short: "-b", purpose: "build-constraints" },
 ] as const
 
+/** Rebind only editable inputs; installed dependency versions are reused in the private environment. */
+export function uvEditableInstallArguments(input: {
+  installArguments: readonly string[]
+  python: string
+  sources: readonly string[]
+}) {
+  const args: string[] = []
+  for (let index = 0; index < input.installArguments.length - 2; index++) {
+    const token = input.installArguments[index]!
+    if (token === "tool" && input.installArguments[index + 1] === "install") { args.push("pip", "install"); index++; continue }
+    if (["--offline", "--reinstall"].includes(token)) continue
+    const option = ["--with", "--with-editable", "--with-requirements", "--python", "-p"].find(option => token === option || token.startsWith(option + "=") || option === "-p" && token.startsWith(option))
+    if (!option) { args.push(token); continue }
+    if (token === option) index++
+  }
+  return [...args, "--offline", "--no-deps", "--reinstall", "--python", input.python, ...input.sources.flatMap(source => ["--editable", source])]
+}
+
 const UvContent = Schema.Struct({
   requirements: Schema.Array(ConnectorRequirement),
   options: Schema.Record(Schema.String, Schema.Unknown),
@@ -136,10 +154,12 @@ const UvContent = Schema.Struct({
   requirementFiles: Schema.Record(Schema.String, Schema.String),
   installFiles: Schema.Array(Schema.Struct({ argument: Schema.Literals(uvSourceOptions.map(value => value.argument)), path: Schema.String })),
   commandName: Schema.NullOr(Schema.String),
+  runtimeRequest: Schema.NullOr(Schema.String),
+  packageSource: Schema.String,
 })
 
 /** Parse package standards with the pinned Python's bundled packaging/pip, never a system module. */
-export function normalizeUvPackageDeclaration(input: Parameters<typeof readUvLaunchDeclaration>[0] & {
+export function normalizeUvLaunchDeclaration(input: Parameters<typeof readUvLaunchDeclaration>[0] & {
   declaration: ReturnType<typeof parseUvToolSettings>
   python: string
   temporary: string
@@ -153,6 +173,8 @@ export function normalizeUvPackageDeclaration(input: Parameters<typeof readUvLau
         ...connectorContentRuntime(input.launchers, input.python, input.temporary),
         declaration: input.declaration,
         arguments: input.arguments,
+        windows: input.launchers.platform === "win32-x64",
+        sourceCache: input.launchers.environment.XDG_CACHE_HOME,
         settings: parseUvResolvedValue(input.declaration.fields.settings!),
         pythonPlatform: parseUvResolvedValue(input.declaration.fields.python_platform!),
         sources: Object.fromEntries(uvSourceOptions.map(option => [option.field, parseUvResolvedValue(input.declaration.fields[option.field]!)])),
@@ -172,7 +194,31 @@ export function normalizeUvPackageDeclaration(input: Parameters<typeof readUvLau
       if (!source) { options.push(token); continue }
       if (token === source.argument || "short" in source && token === source.short) index++
     }
-    return { ...value, installArguments: [...options, ...value.installFiles.flatMap(value => [value.argument, value.path]), "--", original.at(-1)!], declaration: { ...input.declaration, commandName: value.commandName } }
+    return { ...value, cwd: execution.cwd, installArguments: [...options, ...value.installFiles.flatMap(value => [value.argument, value.path]), "--", value.packageSource], declaration: { ...input.declaration, commandName: value.commandName } }
+  }).pipe(Effect.mapError(uvLaunchFailure))
+}
+
+/** uv validates its own interpreter selector, without a package request or an online Python download. */
+export function checkUvPinnedPythonRequest(input: {
+  launchers: LauncherEnvironment
+  python: string
+  cwd: string
+  environment: Record<string, string>
+  request: { tool: string; python: string | null }
+}) {
+  return Effect.gen(function* () {
+    const environment = yield* Environment.Service
+    const handle = yield* environment.spawner.spawn(ChildProcess.make(input.launchers.uv, [
+      "tool", "run", "--offline", "--no-config", "--from", input.request.tool,
+      ...(input.request.python === null ? [] : ["--python", input.request.python]), "--", input.launchers.node,
+      "--input-type=commonjs", "-e",
+      "const fs=require('node:fs'),path=require('node:path');const scripts=process.env.PATH.split(path.delimiter)[0];const selected=path.join(scripts,process.platform==='win32'?'python.exe':'python');const expected=fs.realpathSync(process.argv[1]);const normalize=value=>process.platform==='win32'?value.toLowerCase():value;let matches=normalize(fs.realpathSync(selected))===normalize(expected);if(!matches&&process.platform==='win32'){const cfg=path.join(path.dirname(scripts),'pyvenv.cfg');const home=fs.existsSync(cfg)&&/^home\\s*=\\s*(.+)$/m.exec(fs.readFileSync(cfg,'utf8'))?.[1].trim();matches=!!home&&normalize(fs.realpathSync(home))===normalize(path.dirname(expected))}process.stdout.write(JSON.stringify(matches))",
+      input.python,
+    ], { cwd: input.cwd, env: input.environment, extendEnv: false }))
+    const [code, stdout, stderr] = yield* Effect.all([handle.exitCode, Stream.mkUint8Array(handle.stdout), Stream.mkUint8Array(handle.stderr)], { concurrency: "unbounded" })
+    if (code !== 0) return yield* Effect.fail({ kind: "unknown", detail: new TextDecoder().decode(stderr) } as const)
+    if (new TextDecoder().decode(stdout).trim() !== "true")
+      return yield* Effect.fail({ kind: "unknown", detail: "The requested interpreter does not match the pinned Python" } as const)
   }).pipe(Effect.mapError(uvLaunchFailure))
 }
 
@@ -186,6 +232,8 @@ if len(wheels) != 1:
 sys.path.insert(0, str(wheels[0]))
 from pip._vendor.packaging.requirements import Requirement, InvalidRequirement
 from pip._vendor.packaging.utils import canonicalize_name
+from pip._vendor.packaging.version import Version, InvalidVersion
+from pip._vendor.packaging.specifiers import SpecifierSet, InvalidSpecifier
 from pip._internal.req.req_file import preprocess, get_line_parser
 data = json.load(sys.stdin)
 def requirement(text):
@@ -195,8 +243,34 @@ def requirement(text):
     except InvalidRequirement:
         # uv also accepts unnamed paths/URLs and the tool-only name@version spelling.
         return dict(source=text)
+def interpreter(text):
+    # uv0.13.10 PythonRequest::try_from_tool_name uses these full implementation
+    # names, and accepts Python version selectors rather than PEP508 package extras.
+    value = text.lower()
+    for prefix in ['python'] + (['pythonw'] if data.get('windows') else []) + ['cpython', 'pypy', 'graalpy']:
+        if not value.startswith(prefix):
+            continue
+        suffix = value[len(prefix):]
+        if not suffix or suffix.startswith('@'):
+            return value
+        if suffix.isspace():
+            continue
+        for candidate in [suffix, suffix.removesuffix('t').removesuffix('d')]:
+            try:
+                Version(candidate)
+                return value
+            except InvalidVersion:
+                pass
+            for expression in [candidate, '==' + candidate]:
+                try:
+                    SpecifierSet(expression)
+                    return value
+                except InvalidSpecifier:
+                    pass
+    return None
 if 'requirement' in data:
-    result = requirement(data['requirement'])
+    target = interpreter(data['requirement']) if data.get('tool') else None
+    result = dict(interpreter=target, pipWheel=str(wheels[0])) if target else requirement(data['requirement'])
 else:
     result = []
     parse = get_line_parser(None)
@@ -232,9 +306,15 @@ const { spawnSync } = require('node:child_process')
     if (!sourceBindings.some(value => value.path === file && value.editable === editable)) sourceBindings.push({ path: file, sha256, editable })
     return { kind: 'content', sha256 }
   }
-  const requirement = async (text, editable = false, implicit = false) => {
-    if (implicit) text = text.replace(/^([^/@\\]+)@([^@]+)$/, (_,name,version) => name + (version === 'latest' ? '' : '==' + version))
-    const parsed = python({ requirement: text })
+  let runtimeRequest = null
+  let packageSource = input.declaration.from || input.declaration.command[0]
+  const requirement = async (text, editable = false, implicit = false, tool = false) => {
+    const target = tool ? python({ requirement: text, tool: true, windows: input.windows }) : null
+    if (tool) {
+      if (target.interpreter) { runtimeRequest = target.interpreter; packageSource = target.pipWheel; return { kind: 'interpreter', request: target.interpreter } }
+    }
+    const expanded = implicit ? text.replace(/^([^/@\\]+)@([^@]+)$/, (_,name,version) => name + (version === 'latest' ? '' : '==' + version)) : text
+    const parsed = target && expanded === text ? target : python({ requirement: expanded })
     const attributes = { ...(parsed.name ? { name: parsed.name } : {}), ...(parsed.extras?.length ? { extras: parsed.extras } : {}), ...(parsed.marker ? { marker: parsed.marker } : {}), ...(editable ? { editable: true } : {}) }
     let source = parsed.url || parsed.source
     if (source && !parsed.url && !fs.existsSync(path.resolve(source))) {
@@ -289,8 +369,8 @@ const { spawnSync } = require('node:child_process')
     const target = new URL(rawUrl(reference))
     const authorization = target.username || target.password ? 'Basic ' + Buffer.from(decodeURIComponent(target.username) + ':' + decodeURIComponent(target.password)).toString('base64') : undefined
     target.username = ''; target.password = ''
-    const response = await npmRequire('make-fetch-happen')(target.href, { headers: authorization ? { authorization } : {}, proxy: process.env.HTTPS_PROXY || process.env.HTTP_PROXY, noProxy: process.env.NO_PROXY })
-    if (!response.ok) throw Error('Requirement source HTTP ' + response.status)
+    const response = await npmRequire('make-fetch-happen')(target.href, { headers: authorization ? { authorization } : {}, proxy: process.env.HTTPS_PROXY || process.env.HTTP_PROXY, noProxy: process.env.NO_PROXY, cachePath: path.join(input.sourceCache, 'connector-requirements'), cache: 'force-cache' })
+    if (!response.ok) throw Error('Requirement source HTTP ' + response.status + ' ' + target.origin)
     return response.text()
   }
   const read = async reference => {
@@ -324,7 +404,7 @@ const { spawnSync } = require('node:child_process')
     fs.writeFileSync(target, lines.join('\n') + '\n', { mode: 0o600 })
     return id
   }
-  const main = await requirement(input.declaration.from || input.declaration.command[0], false, !input.declaration.from)
+  const main = await requirement(input.declaration.from || input.declaration.command[0], false, !input.declaration.from, true)
   requirements.push(main)
   for (const source of input.declaration.with) requirements.push(await requirement(source))
   for (const source of input.declaration.withEditable) requirements.push(await requirement(source, true))
@@ -345,9 +425,9 @@ const { spawnSync } = require('node:child_process')
     configuration.push({ purpose, value: { file } })
   }
   if (files.length) configuration.push({ purpose: 'source', value: files })
-  const commandName = input.declaration.from ? null : main.name ? /^[A-Za-z0-9_.-]+/.exec(input.declaration.command[0])?.[0] || main.name : null
-  process.stdout.write(JSON.stringify({ requirements, options, configuration, sourceBindings, requirementFiles, installFiles, commandName }))
-})().catch(error => { process.stderr.write(String(error.message)); process.exitCode = 1 })
+  const commandName = input.declaration.from ? null : runtimeRequest ? 'python' : main.name ? /^[A-Za-z0-9_.-]+/.exec(input.declaration.command[0])?.[0] || main.name : null
+  process.stdout.write(JSON.stringify({ requirements, options, configuration, sourceBindings, requirementFiles, installFiles, commandName, runtimeRequest, packageSource }))
+})().catch(error => { if(typeof error.code==='string'&&/^[A-Z][A-Z_0-9]+$/.test(error.code))process.stderr.write('Connector source code '+error.code+'\n');process.stderr.write(String(error.message)); process.exitCode = 1 })
 `
 
 export type UvResolvedValue = string | number | boolean | null | UvResolvedValue[] |
@@ -479,6 +559,10 @@ export function parseUvToolSettings(text: string) {
     }
   }
   throw Error("Incomplete uv ToolRunSettings")
+}
+
+export function uvPythonRequest(declaration: ReturnType<typeof parseUvToolSettings>) {
+  return strings(declaration.fields.python!, "scalar").at(0) ?? null
 }
 
 function strings(source: string, shape: "list" | "scalar") {

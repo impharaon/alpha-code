@@ -1,5 +1,5 @@
 import path from "node:path"
-import { Effect, Exit, PlatformError, References, Sink, Stream } from "effect"
+import { Context, Effect, Exit, PlatformError, References, Sink, Stream } from "effect"
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
 import type {
   ConnectorLaunchDiagnostic,
@@ -10,6 +10,11 @@ import type {
 } from "@opencode/util/codepuppy-connector-launch"
 import { KilledBySignal } from "@opencode/util/cross-spawn-spawner"
 import { Environment } from "../environment/index.js"
+
+export const ConnectorPreparationProgress = Context.Reference<(
+  stage: Extract<ConnectorLaunchState, { phase: "preparing" }>["stage"],
+  progress: Extract<ConnectorLaunchState, { phase: "preparing" }>["progress"],
+) => void>("@opencode/Mcp/ConnectorPreparationProgress", { defaultValue: () => () => {} })
 
 /** The connection owns one producer per attempt; root only transports its snapshots and queries. */
 export function createConnectorLaunchAttempt(

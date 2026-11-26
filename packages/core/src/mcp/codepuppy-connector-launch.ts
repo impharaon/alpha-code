@@ -2,17 +2,190 @@ import path from "node:path"
 import { randomUUID } from "node:crypto"
 import { Effect, Option, Schema, Stream } from "effect"
 import { ChildProcess } from "effect/process"
+import { ChildProcessSpawner } from "effect/process"
 import type { Scope } from "effect"
 import type {
   LauncherEnvironment,
   ConnectorLaunchFailure,
   PackageRunner,
   PreparedLaunch,
+  LaunchIdentity,
+  RuntimeDependencyFacts,
 } from "@opencode/util/codepuppy-connector-launch"
-import { isConnectorLaunchFailure } from "@opencode/util/codepuppy-connector-launch"
+import { connectorLaunchHost, isConnectorLaunchFailure } from "@opencode/util/codepuppy-connector-launch"
+import { commandHeadBase } from "@opencode/util/codepuppy-command-head"
+import { canonicalJsonDigest } from "@opencode/util/codepuppy-hash"
 import { Environment } from "../environment/index.js"
-import { connectorNpmDefaults, readNpmLaunchDeclaration, readNpmLaunchEnvironment } from "./codepuppy-npm-launch.js"
-import { parseUvToolSettings, readUvLaunchEnvironment } from "./codepuppy-uv-launch.js"
+import { connectorNpmDefaults, readNpmLaunchDeclaration, readNpmLaunchEnvironment, normalizeNpmLaunchDeclaration, installNpmConnector } from "./codepuppy-npm-launch.js"
+import { parseUvToolSettings, readUvLaunchEnvironment, uvEditableInstallArguments, readUvLaunchDeclaration, normalizeUvLaunchDeclaration, checkUvPinnedPythonRequest, installUvConnector, uvPythonRequest } from "./codepuppy-uv-launch.js"
+import { connectorPreparationKey } from "./codepuppy-connector-key.js"
+import { ConnectorPreparationProgress } from "./codepuppy-connector-diagnostic.js"
+import { classifyStartFailure } from "./codepuppy-startup.js"
+import { KeyedMutex } from "../effect/keyed-mutex.js"
+
+const preparationLocks = KeyedMutex.makeUnsafe<string>()
+const preparationListeners = new Map<string, Set<typeof ConnectorPreparationProgress.Service>>()
+const PreparedPython = Schema.Struct({ schema: Schema.Literal(1), pinSet: Schema.String, id: Schema.String, path: Schema.String })
+
+/** Prepare on this Location before admission to the handshake permits; the caller's Scope owns egress and bindings. */
+export function prepareConnectorLaunch(input: {
+  runner: PackageRunner
+  identity: LaunchIdentity
+  command: readonly [string, ...string[]]
+  cwd: string
+  environment: Record<string, string>
+  runtimeDep: RuntimeDependencyFacts
+}): Effect.Effect<PreparedLaunch, ConnectorLaunchFailure, Environment.Service | Scope.Scope> {
+  return Effect.gen(function* () {
+    if (input.runtimeDep.missing[0]) return yield* Effect.fail({ kind: "dependency", program: input.runtimeDep.missing[0] } as const)
+    const location = yield* Environment.Service
+    const cwd = yield* Environment.typeFollowing(location.files, input.cwd).pipe(Effect.catchTag("Environment.NotFound", () => Effect.succeed(undefined)))
+    if (cwd !== "directory") return yield* Effect.fail({ kind: "workspace", reason: "missing" } as const)
+    const host = yield* Effect.try({ try: connectorLaunchHost, catch: launchFailure })
+    const progress = yield* ConnectorPreparationProgress
+    let active = true
+    let stage: "launcher" | "python" | "packages" = "launcher"
+    let shared: string | undefined
+    const report: typeof progress = (next, value) => { if (active) { stage = next; progress(next, value) } }
+    const activity = () => {
+      const value = { unit: "activity" as const, detail: stage === "python" ? "Preparing pinned Python" : "Preparing connector packages" }
+      if (shared) { for (const listener of preparationListeners.get(shared) ?? []) listener(stage, value); return }
+      report(stage, value)
+    }
+    const spawner = ChildProcessSpawner.make(command => location.spawner.spawn(command).pipe(Effect.map(handle => ({ ...handle, stderr: handle.stderr.pipe(Stream.tap(() => Effect.sync(activity))) }))))
+    const run = (command: ChildProcess.Command) => Effect.gen(function* () {
+      const handle = yield* spawner.spawn(command)
+      const [code, stdout, stderr] = yield* Effect.all([handle.exitCode, Stream.mkUint8Array(handle.stdout), Stream.mkUint8Array(handle.stderr)], { concurrency: "unbounded" })
+      return { exitCode: Number(code), stdout: new TextDecoder().decode(stdout), stderr: new TextDecoder().decode(stderr) }
+    })
+    const failed = (detail: string) => Effect.gen(function* () {
+      const evidence = yield* Effect.tryPromise({ try: () => host.egressEvidence(input.identity), catch: () => undefined }).pipe(Effect.catch(() => Effect.succeed([])))
+      const targets = (detail.match(/https?:\/\/[^\s<>"'`]+/g) ?? []).filter(value => URL.canParse(value)).map(value => new URL(value))
+      const refused = evidence.find(value => value.outcome === "refused" && value.identity.directory === input.identity.directory && value.identity.server === input.identity.server && value.identity.attempt === input.identity.attempt && targets.some(target => target.hostname === value.host && Number(target.port || (target.protocol === "https:" ? 443 : 80)) === value.port))
+      if (refused) return { kind: "egress", host: refused.host, port: refused.port } as const
+      return classifyStartFailure(undefined, { type: "local" }, { preparation: { stderr: detail } }).failure!
+    })
+    const retry = <A>(effect: Effect.Effect<A, ConnectorLaunchFailure, Environment.Service | Scope.Scope>) => effect.pipe(Effect.catch(error => Effect.gen(function* () {
+      const failure = error.kind === "unknown" ? yield* failed(error.detail) : error
+      if (failure.kind !== "download") return yield* Effect.fail(failure)
+      return yield* effect.pipe(Effect.mapError(error => error)).pipe(Effect.catch(error => error.kind === "unknown" ? failed(error.detail).pipe(Effect.flatMap(Effect.fail)) : Effect.fail(error)))
+    })))
+    return yield* Effect.gen(function* () {
+      report("launcher", { unit: "activity", detail: "Verifying bundled launchers" })
+      const launchers = yield* Effect.tryPromise({ try: () => host.resolveAssets(), catch: launchFailure })
+      const platform = launchers.platform === "win32-x64" ? "win32" : "darwin"
+      const head = commandHeadBase(input.command[0], platform)
+      const name = platform === "win32" ? head.toLowerCase() : head
+      if (input.runner === "uv-tool" ? name !== "uv" && name !== "uvx" : name !== "npm" && name !== "npx")
+        return yield* Effect.fail({ kind: "unknown", detail: "Package runner does not match the declared command" } as const)
+      yield* location.files.mkdir(launchers.runtimeRoot)
+      for (const directory of new Set(["TMPDIR", "TMP", "TEMP", "XDG_CACHE_HOME", "XDG_DATA_HOME", "UV_PYTHON_BIN_DIR"].flatMap(key => launchers.environment[key] ? [launchers.environment[key]!] : []))) yield* location.files.mkdir(directory)
+      const egress = yield* Effect.acquireRelease(Effect.tryPromise({ try: () => host.beginEgress(input.identity), catch: launchFailure }), () => Effect.sync(() => host.endEgress(input.identity)))
+      const inherited = yield* run(ChildProcess.make(launchers.node, ["--input-type=commonjs", "-e", "process.stdout.write(JSON.stringify(process.env))"], { cwd: input.cwd, env: { ...launchers.environment, NODE_OPTIONS: "", PYTHONHOME: "", PYTHONPATH: "", VIRTUAL_ENV: "" }, extendEnv: true }))
+      if (inherited.exitCode !== 0) return yield* Effect.fail({ kind: "unknown", detail: inherited.stderr } as const)
+      const base = yield* Schema.decodeUnknownEffect(Schema.fromJsonString(Schema.Record(Schema.String, Schema.String)))(inherited.stdout).pipe(Effect.mapError((): ConnectorLaunchFailure => ({ kind: "unknown", detail: "Could not read the Location environment" })))
+      const environment = (key: string, python?: string) => connectorRunnerEnvironment({ runner: input.runner, launchers, key, python, inherited: base, declared: { ...input.environment, ...egress.proxyEnvironment }, packageBins: [] })
+      const initial = environment("0".repeat(64))
+      if (input.runtimeDep.runtimeDep.includes("git")) {
+        const git = input.runtimeDep.executables.git
+        if (!git) return yield* Effect.fail({ kind: "dependency", program: "git" } as const)
+        const result = yield* run(ChildProcess.make(git, ["-C", input.cwd, "rev-parse", "--is-inside-work-tree"], { cwd: input.cwd, env: { ...initial, LC_ALL: "C" }, extendEnv: false }))
+        if (result.exitCode !== 0) return yield* Effect.fail(/not a git repository/i.test(result.stderr) ? { kind: "workspace", reason: "not-git" } as const : { kind: "unknown", detail: result.stderr } as const)
+      }
+      report("python", { unit: "activity", detail: "Preparing pinned Python" })
+      const pythonReceipt = path.join(launchers.runtimeRoot, "python", canonicalJsonDigest({ pinSet: launchers.pinSet, id: launchers.pythonFileId }).slice("sha256:".length) + ".json")
+      const readPython = () => Effect.gen(function* () {
+        const source = yield* location.files.read(pythonReceipt).pipe(Effect.catchTag("Environment.NotFound", () => Effect.succeed(undefined)))
+        if (!source) return
+        const value = Schema.decodeUnknownOption(Schema.fromJsonString(PreparedPython))(new TextDecoder().decode(source.bytes))
+        if (Option.isNone(value) || value.value.pinSet !== launchers.pinSet || value.value.id !== launchers.pythonFileId) return
+        const root = launchers.packageManagerEnv.UV_PYTHON_INSTALL_DIR
+        if (!root || !path.isAbsolute(value.value.path)) return
+        const relative = path.relative(root, value.value.path)
+        if (relative === ".." || relative.startsWith(".." + path.sep) || path.isAbsolute(relative)) return
+        const kind = yield* Environment.typeFollowing(location.files, value.value.path).pipe(Effect.catchTag("Environment.NotFound", () => Effect.succeed(undefined)))
+        return kind === "file" ? value.value.path : undefined
+      })
+      const cachedPython = yield* readPython()
+      const python = cachedPython ?? (yield* Effect.gen(function* () {
+        const ensure = Effect.tryPromise({ try: signal => host.ensureFile(launchers.pythonFileId, signal, (completed, total) => report("python", { unit: "bytes", completed, ...(total > 0 ? { total } : {}) })), catch: launchFailure }).pipe(Effect.flatMap(delivery => {
+          if (delivery.result.ok) return Effect.succeed(delivery.result.path)
+          if (delivery.result.error === "cancelled") return Effect.interrupt
+          return Effect.fail(classifyStartFailure(undefined, { type: "local" }, { download: delivery }).failure!)
+        }))
+        yield* retry(ensure)
+        return yield* Effect.gen(function* () {
+          const cached = yield* readPython()
+          if (cached) return cached
+          const result = yield* installConnectorPython({ launchers, cwd: input.cwd, environment: initial })
+          if (result.exitCode !== 0) return yield* Effect.fail(yield* failed(result.stderr || result.stdout))
+          const found = yield* run(ChildProcess.make(launchers.uv, ["python", "find", launchers.environment.UV_PYTHON!, "--offline"], { cwd: input.cwd, env: initial, extendEnv: false }))
+          if (found.exitCode !== 0) return yield* Effect.fail(yield* failed(found.stderr))
+          const target = found.stdout.trim()
+          const root = launchers.packageManagerEnv.UV_PYTHON_INSTALL_DIR
+          const relative = root && path.isAbsolute(target) ? path.relative(root, target) : undefined
+          if (relative === undefined || relative === ".." || relative.startsWith(".." + path.sep) || path.isAbsolute(relative))
+            return yield* Effect.fail({ kind: "unknown", detail: "Managed Python resolved outside its bound installation root" } as const)
+          if ((yield* Environment.typeFollowing(location.files, target)) !== "file") return yield* Effect.fail({ kind: "unknown", detail: "Managed Python is missing" } as const)
+          yield* location.files.mkdir(path.dirname(pythonReceipt))
+          const temporary = pythonReceipt + "." + randomUUID() + ".part"
+          yield* location.files.write(temporary, new TextEncoder().encode(JSON.stringify({ schema: 1, pinSet: launchers.pinSet, id: launchers.pythonFileId, path: target }))).pipe(Effect.andThen(location.files.move(temporary, pythonReceipt)), Effect.ensuring(location.files.remove(temporary).pipe(Effect.ignore)))
+          return target
+        }).pipe(Effect.scoped, preparationLocks.withLock(pythonReceipt))
+      }))
+      report("packages", { unit: "activity", detail: "Reading connector requirements" })
+      const temporary = path.join(launchers.runtimeRoot, "tmp", randomUUID())
+      yield* location.files.mkdir(temporary)
+      yield* Effect.addFinalizer(() => location.files.remove(temporary).pipe(Effect.ignore))
+      const args = input.command.slice(1)
+      const source = input.runner === "npm-exec"
+        ? { runner: "npm-exec" as const, syntax: name === "npx" ? "npx" as const : "npm-exec" as const, arguments: args }
+        : { runner: "uv-tool" as const, syntax: name === "uvx" ? "uvx" as const : "uv" as const, arguments: args }
+      const readInput = { launchers, python, temporary, cwd: input.cwd, environment: environment("0".repeat(64)) }
+      const normalized = source.runner === "npm-exec"
+        ? { runner: "npm-exec" as const, value: yield* retry(normalizeNpmLaunchDeclaration({ ...readInput, ...source })) }
+        : { runner: "uv-tool" as const, value: yield* retry(Effect.gen(function* () {
+          const declaration = yield* readUvLaunchDeclaration({ ...readInput, ...source })
+          return yield* normalizeUvLaunchDeclaration({ ...readInput, ...source, declaration })
+        })) }
+      const key = connectorPreparationKey({ runner: input.runner, launchers, requirements: normalized.value.requirements, options: normalized.runner === "npm-exec" ? normalized.value.resolutionOptions : normalized.value.options, configuration: normalized.value.configuration })
+      const current = { ...readInput, environment: environment(key, python) }
+      const declaration = normalized.runner === "npm-exec" ? { runner: "npm-exec" as const, syntax: name === "npx" ? "npx" as const : "npm-exec" as const, arguments: args, declaration: normalized.value } : { runner: "uv-tool" as const, syntax: name === "uvx" ? "uvx" as const : "uv" as const, arguments: args, declaration: normalized.value.declaration }
+      if (normalized.runner === "uv-tool") {
+        const selector = uvPythonRequest(normalized.value.declaration)
+        if (selector !== null && /[/\\]/.test(selector) && path.resolve(normalized.value.cwd, selector) !== python)
+          return yield* Effect.fail({ kind: "unknown", detail: "The requested interpreter does not match the pinned Python" } as const)
+        if (normalized.value.runtimeRequest !== null || selector !== null)
+          yield* checkUvPinnedPythonRequest({ ...current, cwd: normalized.value.cwd, request: { tool: normalized.value.runtimeRequest ?? "python", python: selector } })
+      }
+      const prefix = path.join(launchers.runtimeRoot, "prepared", key)
+      const prepared = yield* Effect.acquireUseRelease(Effect.sync(() => {
+        const listeners = preparationListeners.get(prefix) ?? new Set<typeof progress>(); listeners.add(report); preparationListeners.set(prefix, listeners)
+      }), () => Effect.gen(function* () {
+        const cached = yield* readConnectorPreparation({ runtimeRoot: launchers.runtimeRoot, key, runner: input.runner })
+        if (cached) return cached
+        shared = prefix
+        report("packages", { unit: "activity", detail: "Installing connector packages" })
+        yield* location.files.remove(path.join(prefix, "ready.json")).pipe(Effect.ignore)
+        yield* location.files.remove(path.join(prefix, input.runner === "npm-exec" ? "node_modules" : "uv")).pipe(Effect.ignore)
+        const install = Effect.gen(function* () {
+          const result = normalized.runner === "npm-exec"
+            ? yield* installNpmConnector({ ...current, syntax: name === "npx" ? "npx" : "npm-exec", arguments: args, key, installSpecs: normalized.value.installSpecs })
+            : yield* installUvConnector({ ...current, installArguments: normalized.value.installArguments })
+          if (result.exitCode !== 0) return yield* Effect.fail(yield* failed(result.stderr || result.stdout || "Package installer exited " + result.exitCode))
+        })
+        yield* retry(Effect.scoped(install))
+        const value = input.runner === "npm-exec" ? yield* captureNpmConnectorPreparation({ ...current, key }) : yield* captureUvConnectorPreparation({ ...current, key })
+        yield* bindConnectorLaunch({ ...current, preparation: value, source: declaration })
+        yield* publishConnectorPreparation({ runtimeRoot: launchers.runtimeRoot, preparation: value })
+        return value
+      }).pipe(Effect.scoped, preparationLocks.withLock(prefix)), () => Effect.sync(() => { shared = undefined; const listeners = preparationListeners.get(prefix); listeners?.delete(report); if (!listeners?.size) preparationListeners.delete(prefix) }))
+      const binding = normalized.runner === "uv-tool" ? yield* bindUvConnectorSources({ ...current, preparation: prepared, sources: normalized.value.sourceBindings, installArguments: normalized.value.installArguments }) : prepared
+      return yield* bindConnectorLaunch({ ...current, preparation: binding, source: declaration }).pipe(Effect.ensuring(location.files.remove(temporary).pipe(Effect.ignore)))
+    }).pipe(Effect.provideService(Environment.Service, { ...location, spawner }), Effect.ensuring(Effect.sync(() => { active = false })))
+  }).pipe(Effect.mapError(launchFailure))
+}
+
 
 export const ConnectorPreparation = Schema.Struct({
   schema: Schema.Literal(1),
@@ -235,6 +408,165 @@ export function installConnectorPython(input: {
 
 const npmEntryPrefixes = { package: "package:", bin: "bin:" } as const
 
+/** A moved editable source gets an attempt-owned environment; the shared ready tree never changes. */
+export function bindUvConnectorSources(input: {
+  launchers: LauncherEnvironment
+  python: string
+  cwd: string
+  environment: Record<string, string>
+  preparation: ConnectorPreparation
+  sources: readonly { path: string; editable: boolean }[]
+  installArguments: readonly string[]
+}) {
+  const sources = input.sources.filter(source => source.editable).map(source => source.path)
+  if (!sources.length) return Effect.succeed(input.preparation)
+  return Effect.gen(function* () {
+    const environment = yield* Environment.Service
+    const prefix = path.join(input.launchers.runtimeRoot, "prepared", input.preparation.key)
+    const binding = path.join(prefix, "bindings", randomUUID())
+    yield* Effect.addFinalizer(() => environment.files.remove(binding).pipe(Effect.ignore))
+    const handle = yield* environment.spawner.spawn(ChildProcess.make(input.launchers.node, ["--input-type=commonjs", "-e", uvSourceBindingProgram], {
+      cwd: input.cwd, env: input.environment, extendEnv: false,
+      stdin: { stream: Stream.succeed(new TextEncoder().encode(JSON.stringify({
+        prefix, binding, sources, preparation: input.preparation, python: input.python, uv: input.launchers.uv,
+        installArguments: input.installArguments, argumentsProgram: uvEditableInstallArguments.toString(), metadataProgram: uvBindingMetadataProgram,
+      }))), endOnDone: true },
+    }))
+    const [code, stdout, stderr] = yield* Effect.all([handle.exitCode, Stream.mkUint8Array(handle.stdout), Stream.mkUint8Array(handle.stderr)], { concurrency: "unbounded" })
+    if (code !== 0) return yield* Effect.fail({ kind: "unknown", detail: new TextDecoder().decode(stderr) } as const)
+    const value = yield* Schema.decodeUnknownEffect(Schema.fromJsonString(ConnectorPreparation))(new TextDecoder().decode(stdout))
+    if (!(yield* preparationExists(environment.files, input.launchers.runtimeRoot, value)))
+      return yield* Effect.fail({ kind: "unknown", detail: "Bound editable environment is incomplete" } as const)
+    return value
+  }).pipe(Effect.mapError(launchFailure))
+}
+
+const uvSourceBindingProgram = String.raw`
+const fs = require('node:fs')
+const path = require('node:path')
+const { spawn } = require('node:child_process')
+;(async () => {
+  const input = JSON.parse(fs.readFileSync(0, 'utf8'))
+  const run = (command, args, data) => new Promise((resolve,reject) => {
+    const child = spawn(command,args,{env:process.env,stdio:['pipe','pipe','pipe']})
+    const output = []
+    child.stdout.on('data',chunk=>output.push(chunk));child.stderr.on('data',chunk=>process.stderr.write(chunk))
+    child.once('error',reject);child.once('close',(code,signal)=>code===0?resolve(Buffer.concat(output).toString()):reject(Error('Editable binding command exited '+code+(signal?' ('+signal+')':''))))
+    child.stdin.end(data===undefined?undefined:JSON.stringify(data))
+  })
+  const metadata = data => run(input.python,['-I','-S','-c',input.metadataProgram],data).then(JSON.parse)
+  const existing = await metadata({ operation:'sources',prefix:input.prefix })
+  const normalize = file => process.platform==='win32'?path.resolve(file).toLowerCase():path.resolve(file)
+  const current = new Set(input.sources.map(normalize))
+  const previous = new Set(existing.map(normalize))
+  if (current.size===previous.size && [...current].every(file=>previous.has(file))) { process.stdout.write(JSON.stringify({schema:1,ready:true,...input.preparation}));return }
+  fs.mkdirSync(input.binding,{recursive:true,mode:0o700})
+  fs.cpSync(path.join(input.prefix,'uv'),path.join(input.binding,'uv'),{recursive:true,verbatimSymlinks:true})
+  const args = require('node:vm').runInThisContext('('+input.argumentsProgram+')')
+  const tools = path.join(input.binding,'uv','tools')
+  for (const name of fs.readdirSync(tools)) {
+    const tool=path.join(tools,name)
+    if (!fs.existsSync(path.join(tool,'pyvenv.cfg'))) continue
+    const python=path.join(tool,process.platform==='win32'?'Scripts':'bin',process.platform==='win32'?'python.exe':'python')
+    await run(input.uv,args({installArguments:input.installArguments,python,sources:input.sources}))
+  }
+  await metadata({operation:'scripts',prefix:input.binding,original:input.prefix})
+  const rebase = file => input.binding+file.slice(input.prefix.length)
+  process.stdout.write(JSON.stringify({schema:1,ready:true,...input.preparation,entries:Object.fromEntries(Object.entries(input.preparation.entries).map(([name,file])=>[name,rebase(file)])),required:input.preparation.required.map(rebase)}))
+})().catch(error=>{process.stderr.write(String(error.message)+'\n');process.exitCode=1})
+`
+
+const uvBindingMetadataProgram = String.raw`
+import base64,csv,hashlib,importlib.metadata,json,os,pathlib,sys,tomllib
+data=json.load(sys.stdin)
+base=pathlib.Path(sys.base_prefix)
+wheel=next(iter(list(base.glob('lib/python*/ensurepip/_bundled/pip-*.whl'))+list(base.glob('Lib/ensurepip/_bundled/pip-*.whl'))))
+sys.path.insert(0,str(wheel))
+from pip._internal.utils.urls import url_to_path
+root=pathlib.Path(data['prefix'])
+sources=[]
+for receipt in (root/'uv'/'tools').glob('*/uv-receipt.toml'):
+    tool=receipt.parent
+    sites=list(tool.glob('lib/python*/site-packages'))
+    if (tool/'Lib'/'site-packages').is_dir(): sites.append(tool/'Lib'/'site-packages')
+    distributions=[distribution for site in sites for distribution in importlib.metadata.distributions(path=[str(site)])]
+    if data['operation']=='sources':
+        for distribution in distributions:
+            direct=distribution.read_text('direct_url.json')
+            if direct:
+                value=json.loads(direct)
+                if value.get('dir_info',{}).get('editable'):
+                    sources.append(url_to_path(value['url']))
+        continue
+    scripts=tool/('Scripts' if os.name=='nt' else 'bin')
+    changed=set()
+    before={}
+    if os.name=='nt':
+        # Pinned uv0.13.10's own trampolines keep the interpreter in RT_RCDATA.
+        # Update that resource, preserving native EXEs and the original script ZIP.
+        import ctypes
+        kernel=ctypes.WinDLL('kernel32',use_last_error=True)
+        pointer=ctypes.c_void_p
+        def api(name,args,result):
+            value=getattr(kernel,name);value.argtypes=args;value.restype=result;return value
+        load=api('LoadLibraryExW',[ctypes.c_wchar_p,pointer,ctypes.c_uint32],pointer)
+        find=api('FindResourceW',[pointer,ctypes.c_wchar_p,pointer],pointer)
+        size=api('SizeofResource',[pointer,pointer],ctypes.c_uint32)
+        resource=api('LoadResource',[pointer,pointer],pointer)
+        lock=api('LockResource',[pointer],pointer)
+        free=api('FreeLibrary',[pointer],ctypes.c_int)
+        begin=api('BeginUpdateResourceW',[ctypes.c_wchar_p,ctypes.c_int],pointer)
+        update=api('UpdateResourceW',[pointer,pointer,ctypes.c_wchar_p,ctypes.c_uint16,pointer,ctypes.c_uint32],ctypes.c_int)
+        end=api('EndUpdateResourceW',[pointer,ctypes.c_int],ctypes.c_int)
+        def read(handle,name):
+            entry=find(handle,name,pointer(10))
+            if not entry: return None
+            address=lock(resource(handle,entry))
+            if not address: raise ctypes.WinError(ctypes.get_last_error())
+            return ctypes.string_at(address,size(handle,entry))
+        for target in scripts.glob('*.exe'):
+            handle=load(str(target),None,0x2)
+            if not handle: raise ctypes.WinError(ctypes.get_last_error())
+            try:
+                kind=read(handle,'UV_TRAMPOLINE_KIND')
+                value=read(handle,'UV_PYTHON_PATH') if kind in (bytes([1]),bytes([2])) else None
+            finally: free(handle)
+            if value is None: continue
+            previous=value.decode()
+            if not os.path.normcase(previous).startswith(os.path.normcase(data['original']+os.sep)): continue
+            replacement=(str(root)+previous[len(data['original']):]).encode()
+            before[os.path.abspath(target)]='sha256='+base64.urlsafe_b64encode(hashlib.sha256(target.read_bytes()).digest()).rstrip(b'=').decode()
+            writer=begin(str(target),False)
+            if not writer: raise ctypes.WinError(ctypes.get_last_error())
+            buffer=ctypes.create_string_buffer(replacement)
+            if not update(writer,pointer(10),'UV_PYTHON_PATH',0,buffer,len(replacement)):
+                error=ctypes.WinError(ctypes.get_last_error());end(writer,True);raise error
+            if not end(writer,False): raise ctypes.WinError(ctypes.get_last_error())
+            changed.add(os.path.abspath(target))
+    else:
+        original=data['original'].encode();replacement=str(root).encode()
+        for target in scripts.iterdir():
+            if not target.is_file() or target.is_symlink(): continue
+            value=target.read_bytes()
+            if value.startswith(b'#!') and original in value:
+                before[os.path.abspath(target)]='sha256='+base64.urlsafe_b64encode(hashlib.sha256(value).digest()).rstrip(b'=').decode()
+                target.write_bytes(value.replace(original,replacement));changed.add(os.path.abspath(target))
+    for distribution in distributions:
+        records=[distribution.locate_file(file) for file in distribution.files or [] if file.name=='RECORD']
+        for record in records:
+            with record.open(newline='') as stream: rows=list(csv.reader(stream))
+            for row in rows:
+                target=distribution.locate_file(row[0])
+                if os.path.abspath(target) not in changed or row[1]!=before[os.path.abspath(target)]: continue
+                content=target.read_bytes();row[1]='sha256='+base64.urlsafe_b64encode(hashlib.sha256(content).digest()).rstrip(b'=').decode();row[2]=str(len(content))
+            with record.open('w',newline='') as stream: csv.writer(stream,lineterminator='\n').writerows(rows)
+    previous=data['original'];replacement=str(root);quoted=json.dumps(previous,ensure_ascii=False)[1:-1]
+    text=receipt.read_text()
+    if quoted!=previous: text=text.replace(quoted,json.dumps(replacement,ensure_ascii=False)[1:-1])
+    receipt.write_text(text.replace(previous,replacement))
+print(json.dumps(sources if data['operation']=='sources' else True))
+`
+
 /** Capture actual installed npm manifests and bin links, using the pinned npm's own bin selection. */
 export function captureNpmConnectorPreparation(input: {
   launchers: LauncherEnvironment
@@ -308,7 +640,7 @@ export function bindConnectorLaunch(input: {
       ? source.declaration.selection === "package"
         ? [Object.entries(input.preparation.entries).find(([name, entry]) => name.startsWith(npmEntryPrefixes.bin) && entry === defaultEntry)?.[0].slice(npmEntryPrefixes.bin.length) ?? "", ...source.declaration.arguments.slice(1)]
         : [...source.declaration.arguments]
-      : source.declaration.command.map((argument, index) => index === 0 && source.declaration.from === null ? source.declaration.commandName ?? argument : argument)
+      : source.declaration.command.map((argument, index) => index === 0 && source.declaration.from === null ? source.declaration.commandName ?? input.preparation.required.filter(file => paths.basename(file) === "pyvenv.cfg").map(file => paths.basename(paths.dirname(file)))[0] ?? argument : argument)
     if (source.runner === "npm-exec" && source.declaration.selection === "package" && !defaultEntry)
       return yield* Effect.fail({ kind: "unknown", detail: "The prepared package has no default executable" } as const)
     const execution = source.runner === "npm-exec"
@@ -343,6 +675,13 @@ export function bindConnectorLaunch(input: {
     const files = yield* Environment.Service
     const prefix = yield* files.files.read(entry, { offset: 0, length: 256 })
     const node = /\.[cm]?js$/i.test(entry) || /^#![^\r\n]*\bnode(?:\s|$)/.test(new TextDecoder().decode(prefix.bytes))
+    if (source.runner === "uv-tool" && (/\.pyw?$/i.test(entry) || /^#![^\r\n]*\bpython[\d.w]*(?:\s|$)/i.test(new TextDecoder().decode(prefix.bytes)))) {
+      const cfg = input.preparation.required.find(file => paths.basename(file) === "pyvenv.cfg" && entry.startsWith(paths.dirname(file) + paths.sep))
+      if (cfg) {
+        const interpreter = paths.join(paths.dirname(cfg), input.launchers.platform === "win32-x64" ? "Scripts" : "bin", input.launchers.platform === "win32-x64" ? /\.pyw$/i.test(entry) ? "pythonw.exe" : "python.exe" : "python")
+        return { runner: source.runner, key: input.preparation.key, cwd: execution.cwd, environment, command: [interpreter, entry, ...args] } satisfies PreparedLaunch
+      }
+    }
     return { runner: source.runner, key: input.preparation.key, cwd: execution.cwd, environment, command: node ? [input.launchers.node, entry, ...args] : [entry, ...args] } satisfies PreparedLaunch
   }).pipe(Effect.mapError(launchFailure))
 }
@@ -445,6 +784,10 @@ try:
         receipt = owned(source)
         tool = receipt.parent
         required.update([str(receipt), str(owned(tool / 'pyvenv.cfg'))])
+        interpreter = tool / ('Scripts/python.exe' if sys.platform == 'win32' else 'bin/python')
+        if not interpreter.is_file():
+            raise ValueError('Installed uv interpreter is missing')
+        required.add(str(interpreter))
         sites = list(tool.glob('lib/python*/site-packages'))
         windows = tool / 'Lib' / 'site-packages'
         if windows.is_dir():

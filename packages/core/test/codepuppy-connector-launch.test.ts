@@ -22,7 +22,9 @@ import {
   uvToolInstallArguments,
   parseUvResolvedValue,
   readUvLaunchEnvironment,
-  normalizeUvPackageDeclaration,
+  normalizeUvLaunchDeclaration,
+  checkUvPinnedPythonRequest,
+  uvEditableInstallArguments,
 } from "@opencode/core/mcp/codepuppy-uv-launch"
 import { UV_TOOL_SETTINGS, UV_SERVICE_COMMAND } from "./fixture/uv-tool-settings"
 import { readNpmLaunchDeclaration, normalizeNpmLaunchDeclaration, installNpmConnector } from "@opencode/core/mcp/codepuppy-npm-launch"
@@ -43,12 +45,13 @@ import {
   captureNpmConnectorPreparation,
   preparedNpmEntry,
   bindConnectorLaunch,
+  prepareConnectorLaunch,
 } from "@opencode/core/mcp/codepuppy-connector-launch"
 import { hostEnvironmentLayer, recordingEnvironmentLayer, transformEnvironmentFiles } from "./fixture/environment"
 import { observeConnectorLaunch } from "@opencode/core/mcp/codepuppy-connector-diagnostic"
 import { McpClient } from "@opencode/core/mcp/client"
 import { McpConnection } from "@opencode/core/mcp/connection"
-import { START_CONCURRENCY, startPermits } from "@opencode/core/mcp/codepuppy-startup"
+import { START_CONCURRENCY, startPermits, classifyStartFailure } from "@opencode/core/mcp/codepuppy-startup"
 import { ConfigMCP } from "@opencode/schema/config/mcp"
 import { readConnectorSource } from "@opencode/core/mcp/codepuppy-connector-content"
 
@@ -1679,7 +1682,7 @@ test("uv content facts retain requirements config and editable contents across L
         ? current.spawner.spawn(ChildProcess.make(process.execPath, ["-e", "process.stdout.write(JSON.stringify({cwd:process.cwd(),environment:process.env}))"], command.options))
         : current.spawner.spawn(command)) })
     })).pipe(Layer.provide(hostEnvironmentLayer))
-    const call = (current = declaration) => Effect.runPromise(Effect.scoped(normalizeUvPackageDeclaration({ ...input, python, temporary: path.join(root, "stage"), cwd: root, environment: { ...input.environment, OWN_BUSINESS_KEY: business }, syntax: "uvx", arguments: ["--offline", "--no-config", "--with-requirements", path.join(root, "requirements.txt"), "--with", current.with[0]!, ...(current.from ? ["--from", current.from] : []), ...current.command], declaration: current })).pipe(Effect.provide(layer)))
+    const call = (current = declaration) => Effect.runPromise(Effect.scoped(normalizeUvLaunchDeclaration({ ...input, python, temporary: path.join(root, "stage"), cwd: root, environment: { ...input.environment, OWN_BUSINESS_KEY: business }, syntax: "uvx", arguments: ["--offline", "--no-config", "--with-requirements", path.join(root, "requirements.txt"), ...current.with.flatMap(value => ["--with", value]), ...current.withEditable.flatMap(value => ["--with-editable", value]), ...(current.from ? ["--from", current.from] : []), ...current.command], declaration: current })).pipe(Effect.provide(layer)))
     return { input, declaration, call, value: await call() }
   }
   const firstRoot = connectionRoot()
@@ -1700,9 +1703,10 @@ test("uv content facts retain requirements config and editable contents across L
   expect(first.value.installArguments).not.toContain("--business")
   expect(first.value.options.resolution).toBe("Highest")
   expect(key({ ...first.value, options: { ...first.value.options, resolution: "Lowest" } })).not.toBe(key(first.value))
-  const main = first.value.requirements[0]!
+  const main = first.value.requirements.find(value => value.kind === "registry")!
+  const git = first.value.requirements.find(value => value.kind === "git")!
   expect(key({ ...first.value, requirements: [{ ...main, marker: 'python_version >= "3.11"' }, ...first.value.requirements.slice(1)] })).not.toBe(key(first.value))
-  expect(key({ ...first.value, requirements: [main, { ...first.value.requirements[1]!, name: "another-project" }] })).not.toBe(key(first.value))
+  expect(key({ ...first.value, requirements: [main, { ...git, name: "another-project" }] })).not.toBe(key(first.value))
   const local = { kind: "content" as const, sha256: first.value.sourceBindings[0]!.sha256 }
   expect(key({ ...first.value, requirements: [local] })).not.toBe(key({ ...first.value, requirements: [{ ...local, editable: true }] }))
   // Counterfactual own parsed DTO: the package request is implicit, with the same
@@ -1712,9 +1716,42 @@ test("uv content facts retain requirements config and editable contents across L
   expect(key(implicit)).toBe(key(first.value))
   writeFileSync(path.join(firstRoot, "requirements.txt"), capture.requirementsFiles["requirements.txt"]!.replace("-r nested.txt", "-r=nested.txt"))
   expect(key(await first.call())).toBe(key(first.value))
+  const runtime = await first.call({ ...first.declaration, from: null, command: ["python", "-m", "owned_editable"], with: [], withEditable: ["./source"] })
+  expect(runtime.requirements[0]).toEqual({ kind: "interpreter", request: "python" })
+  expect(runtime.runtimeRequest).toBe("python")
+  expect(runtime.declaration.commandName).toBe("python")
+  expect(runtime.installArguments.at(-1)).toMatch(/ensurepip[\\/]_bundled[\\/]pip-26\.3-py3-none-any\.whl$/)
+  expect(runtime.installArguments.at(-1)).not.toBe("python")
+  expect(uvEditableInstallArguments({ installArguments: first.value.installArguments, python: "/bound/bin/python", sources: [path.join(secondRoot, "source")] })).toEqual(["pip", "install", "--no-config", "--offline", "--no-deps", "--reinstall", "--python", "/bound/bin/python", "--editable", path.join(secondRoot, "source")])
   expect(readFileSync(first.value.requirementFiles[path.join(firstRoot, "requirements.txt")]!, "utf8")).toContain("requirements-1.txt")
   writeFileSync(path.join(firstRoot, "source/src/owned_editable/__init__.py"), "SOURCE_VERSION = 'changed'\n")
   expect(key(await first.call())).not.toBe(key(first.value))
+})
+
+// Integration layer: execute our real metadata JS while substituting only uv's selected PATH.
+test("uv interpreter compatibility checks the selected managed directory without package resolution", async () => {
+  const root = connectionRoot()
+  const pin = path.join(root, "pin/bin")
+  const cache = path.join(root, "uv-cache/bin")
+  const other = path.join(root, "other/bin")
+  mkdirSync(pin, { recursive: true }); mkdirSync(other, { recursive: true }); mkdirSync(cache, { recursive: true })
+  writeFileSync(path.join(pin, "python3.12"), "owned metadata target")
+  writeFileSync(path.join(other, "python"), "another metadata target")
+  symlinkSync(path.join(pin, "python3.12"), path.join(cache, "python"))
+  for (const selected of [cache, other]) {
+    const commands: ChildProcess.Command[] = []
+    const layer = Layer.effect(Environment.Service, Effect.gen(function* () {
+      const current = yield* Environment.Service
+      return Environment.Service.of({ ...current, spawner: ChildProcessSpawner.make(command => {
+        commands.push(command)
+        if (command._tag !== "StandardCommand") throw Error("Expected interpreter probe")
+        return current.spawner.spawn(ChildProcess.make(process.execPath, command.args.slice(command.args.indexOf("--input-type=commonjs")), { ...command.options, env: { PATH: selected + path.delimiter + process.env.PATH } }))
+      }) })
+    })).pipe(Layer.provide(hostEnvironmentLayer))
+    const result = await Effect.runPromise(Effect.scoped(checkUvPinnedPythonRequest({ launchers: launcherEnvironment(root), python: path.join(pin, "python3.12"), cwd: root, environment: {}, request: { tool: "python@3.12", python: null } })).pipe(Effect.result, Effect.provide(layer)))
+    expect(result._tag).toBe(selected === cache ? "Success" : "Failure")
+    expect(commands[0]).toMatchObject({ args: ["tool", "run", "--offline", "--no-config", "--from", "python@3.12", "--", launcherEnvironment(root).node, "--input-type=commonjs", "-e", expect.any(String), path.join(pin, "python3.12")] })
+  }
 })
 
 // Integration layer: our SDK stdio fixture is imported by the ready package entry.
@@ -1775,4 +1812,27 @@ test("Python source identity excludes dotenv business credentials", async () => 
   const before = await read()
   writeFileSync(path.join(source, ".env"), "OWN_BUSINESS_KEY=rotated-current-value\n")
   expect(await read()).toEqual(before)
+})
+
+// Module/Location boundary: dependency facts are authoritative before any launch,
+// and an absent working directory needs no host registration or package preparation.
+test("connector preparation preflights dependencies and the current workspace before the host", async () => {
+  const root = connectionRoot()
+  const spawns: ChildProcess.Command[] = []
+  const input = { runner: "uv-tool" as const, identity: { directory: root, server: "owned", attempt: "preflight" }, command: ["uvx", "owned"] as const, cwd: root, environment: {}, runtimeDep: { runtimeDep: ["git"], executables: {}, missing: ["git"] } }
+  expect(await Effect.runPromise(Effect.scoped(prepareConnectorLaunch(input)).pipe(Effect.flip, Effect.provide(recordingEnvironmentLayer(spawns))))).toEqual({ kind: "dependency", program: "git" })
+  expect(spawns).toEqual([])
+  expect(await Effect.runPromise(Effect.scoped(prepareConnectorLaunch({ ...input, cwd: path.join(root, "absent"), runtimeDep: { runtimeDep: [], executables: {}, missing: [] } })).pipe(Effect.flip, Effect.provide(hostEnvironmentLayer)))).toEqual({ kind: "workspace", reason: "missing" })
+})
+
+// Fast logic over this module's own source-reader failure representation, including
+// concrete transient facts and a negative coarse-network control.
+test("preparation failures retry only concrete transport and temporary HTTP evidence", () => {
+  for (const status of [403, 404, 429, 503, 600]) {
+    const stderr = "Requirement source HTTP " + status + " https://registry.invalid"
+    expect(classifyStartFailure(undefined, { type: "local" }, { preparation: { stderr } }).failure).toEqual({ kind: status === 429 || status === 503 ? "download" : "unknown", detail: stderr })
+  }
+  for (const [stderr, kind] of [["Connector source code ECONNREFUSED\nowned connection failure", "download"], ["Connector source code ETIMEDOUT\nowned timeout", "download"], ["network failed", "unknown"], ["Package resolver conflict", "unknown"]] as const) {
+    expect(classifyStartFailure(undefined, { type: "local" }, { preparation: { stderr } }).failure?.kind).toBe(kind)
+  }
 })

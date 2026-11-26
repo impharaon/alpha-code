@@ -53,10 +53,21 @@ const RECONNECT_CODES = new Set([
 export function classifyStartFailure(
   error: unknown,
   config: { readonly type: string; readonly url?: string; readonly command?: readonly string[] },
-  hints: { readonly timedOut?: boolean; readonly httpStatus?: number; readonly download?: PinnedFileDelivery } = {},
+  hints: { readonly timedOut?: boolean; readonly httpStatus?: number; readonly download?: PinnedFileDelivery; readonly preparation?: { readonly stderr: string } } = {},
   env: Record<string, string | undefined> = process.env,
   egressProxy: string | undefined = tryCodePuppyBootstrap()?.network.egressProxy,
 ): StartFailure {
+  if (hints.preparation) {
+    const detail = hints.preparation.stderr
+    const http = /(?:^Requirement source HTTP (\d{3})(?: https?:\/\/\S+)?\s*$|^npm (?:error|ERR!) code E(\d{3})\s*$|HTTP status (?:client|server) error \((\d{3})\b)/m.exec(detail)
+    const code = /(?:^(?:npm (?:error|ERR!) code|Connector source code) ([A-Z][A-Z_0-9]+)\s*$|\breason: connect ([A-Z][A-Z_0-9]+)\b)/m.exec(detail)
+    const status = http ? Number(http[1] ?? http[2] ?? http[3]) : undefined
+    const errno = code?.[1] ?? code?.[2]
+    const network = classifyNetFailure({ code: errno, status, message: detail }, { via: "other" })
+    const temporary = status !== undefined ? status === 429 || status >= 500 && status < 600
+      : network !== undefined && ["dns", "tcp", "connect-timeout", "timeout"].includes(network.layer) || errno === "ETIMEDOUT" || errno === "ESOCKETTIMEDOUT" || /Failed to (?:fetch|download)[\s\S]*\b(?:operation|request) timed out\b/.test(detail)
+    return { code: "spawn_failed", reconnect: false, failure: { kind: temporary ? "download" : "unknown", detail } }
+  }
   if (hints.download && !hints.download.result.ok) {
     const fact = hints.download.failure
     const temporary = fact?.kind === "connect" || fact?.kind === "timeout" || (fact?.kind === "http" && (fact.status === 429 || fact.status >= 500))

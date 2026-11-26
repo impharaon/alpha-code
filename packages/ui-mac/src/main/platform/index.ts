@@ -10,7 +10,8 @@
 import * as os from "node:os"
 import * as path from "node:path"
 import { POSIX_PROBE_DIRS, POSIX_PROBE_HOME_DIRS, POSIX_SQLITE } from "./darwin"
-import { WIN_EDITOR_CLI, WIN_EXEC_EXTENSIONS } from "./win32"
+import { WIN_EDITOR_CLI } from "./win32"
+export { commandHeadBase } from "@opencode/util/codepuppy-command-head"
 
 export type ToolProbe = { cmd: string; probePath: string }
 
@@ -30,15 +31,6 @@ export function toolProbe(opts: { platform?: NodeJS.Platform; env?: NodeJS.Proce
       ":",
     ),
   }
-}
-
-/**
- * MCP 命令 head 归一(ext-config 白名单比对前置):
- * win32 用反斜杠感知的 basename 并剥 .exe/.cmd/.bat(`npx.cmd` → `npx`);posix 行为一字不变。
- */
-export function commandHeadBase(head: string, platform: NodeJS.Platform = process.platform): string {
-  if (platform === "win32") return path.win32.basename(head).replace(WIN_EXEC_EXTENSIONS, "")
-  return path.basename(head)
 }
 
 /**

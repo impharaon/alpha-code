@@ -11,6 +11,7 @@ const requirementAttributes = {
   editable: Schema.optional(Schema.Boolean),
 }
 export const ConnectorRequirement = Schema.Union([
+  Schema.Struct({ kind: Schema.Literal("interpreter"), request: Schema.String }),
   Schema.Struct({
     kind: Schema.Literal("registry"),
     name: Schema.String,
@@ -118,7 +119,7 @@ export function connectorPreparationKey(input: {
 }) {
   const allowed = input.runner === "npm-exec" ? connectorNpmResolutionOptions : uvResolutionOptions
   const requirements = input.requirements.map((requirement) => ({
-    ...(requirement.kind === "registry"
+    ...(requirement.kind === "interpreter" ? { kind: requirement.kind, request: nonSecretResolution(requirement.request) } : requirement.kind === "registry"
       ? { kind: requirement.kind, name: requirement.name, version: requirement.version }
       : requirement.kind === "remote"
         ? { kind: requirement.kind, url: nonSecretSourceUrl(requirement.url), name: requirement.name }
@@ -131,10 +132,12 @@ export function connectorPreparationKey(input: {
               subdirectory: requirement.subdirectory,
             }
           : { kind: requirement.kind, sha256: requirement.sha256, name: requirement.name }),
-    ...(requirement.extras?.length ? { extras: [...new Set(requirement.extras)].sort() } : {}),
-    ...(requirement.alias ? { alias: requirement.alias } : {}),
-    ...(requirement.marker ? { marker: requirement.marker } : {}),
-    ...(requirement.editable ? { editable: true } : {}),
+    ...(requirement.kind !== "interpreter" ? {
+      ...(requirement.extras?.length ? { extras: [...new Set(requirement.extras)].sort() } : {}),
+      ...(requirement.alias ? { alias: requirement.alias } : {}),
+      ...(requirement.marker ? { marker: requirement.marker } : {}),
+      ...(requirement.editable ? { editable: true } : {}),
+    } : {}),
   }))
   const options = Object.fromEntries(
     Object.entries(input.options)

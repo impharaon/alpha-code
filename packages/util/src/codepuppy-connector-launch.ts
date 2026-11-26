@@ -4,6 +4,14 @@ import type { EnsurePinnedFileResult, PinnedFileId } from "./codepuppy-pinned-fi
 import type { Tool } from "../../schema/src/tool.js"
 
 export type LauncherPlatform = "darwin-arm64" | "win32-x64"
+export type PackageRunner = "uv-tool" | "npm-exec"
+export type PreparedLaunch = {
+  runner: PackageRunner
+  key: string
+  command: [string, ...string[]]
+  cwd: string
+  environment: Record<string, string>
+}
 export type LauncherEnvironment = {
   platform: LauncherPlatform
   pinSet: string

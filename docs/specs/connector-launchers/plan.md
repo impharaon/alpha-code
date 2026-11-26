@@ -377,3 +377,5 @@ r4 诊断 producer：新增 `packages/core/src/mcp/codepuppy-connector-diagnosti
 `bun test test/codepuppy-connector-launch.test.ts` → 13 PASS / 68 assertions（完整输出 `/tmp/connector-r4-launch-final.log`）；`bun typecheck` → exit 0，2060 files / 2 projects。真实进程逐字节拆 stderr，跨换行已知密钥、Authorization、URL 凭据/签名均遮蔽，6KB+ 原文不丢，stdout 未收集进诊断；exit 23、SIGTERM、未 spawn 的 null、管道错误下未换行片段均有证据。实际 McpClient→未修改 McpStdio→装饰后的 Location spawner 证明完整崩溃仍在、stdio 所读字节已遮蔽；连接成功后终止的真实 MCP 子进程仍取得 running/SIGTERM。
 
 测试修正事实：stdio.ts:101 的独立 Effect.runPromise 只携带 Scope，调用方 Logger 无法捕获其 debug 行，不能把空 capture 当“不泄漏”。两种 logger 注入均不改变此事实；未修改 stdio。最终在其实际句柄读取边界完整比对 masked bytes，并独立核验可捕获的 spawn/client 日志；不声称捕获了该独立执行体的全部 logger。此处是当前原始 stdio 的上下文限制，不作为本票去修改它的授权。
+
+r4 准备环境补齐：同一 core 模块增加 connectorRunnerEnvironment，入参的 PackageRunner 保留原声明角色；准备/已准备服务共用随包 uv/Node、已解析 Python 与包 bin 的 PATH 次序，原生声明不进入此函数。只清宿主继承的 NODE_OPTIONS/PYTHON* /VIRTUAL_ENV，显式声明的业务输入仍后绑定；Windows 环境键及 PATH 去重按平台大小写语义处理。npm 三项准备设置与 uv 专用 tools/bin 按冻结表覆盖，HOME/XDG_CONFIG_HOME/registry/私有密钥保留；R1 缓存键不由此处投影，仍等最终 R2。3 个 pure 用例 / 26 assertions 通过（`/tmp/connector-r4-runner-env.log`）。修正上一段诊断计数：完整文件实际为 13 PASS / **67** assertions。

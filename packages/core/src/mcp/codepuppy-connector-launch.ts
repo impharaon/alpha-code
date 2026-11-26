@@ -3,7 +3,11 @@ import { randomUUID } from "node:crypto"
 import { Effect, Option, Schema, Stream } from "effect"
 import { ChildProcess } from "effect/process"
 import type { Scope } from "effect"
-import type { LauncherEnvironment, ConnectorLaunchFailure } from "@opencode/util/codepuppy-connector-launch"
+import type {
+  LauncherEnvironment,
+  ConnectorLaunchFailure,
+  PackageRunner,
+} from "@opencode/util/codepuppy-connector-launch"
 import { Environment } from "../environment/index.js"
 
 const Preparation = Schema.Struct({
@@ -17,6 +21,65 @@ const Preparation = Schema.Struct({
 })
 
 export type ConnectorPreparation = Omit<typeof Preparation.Type, "schema" | "ready">
+
+/** The original runner role survives preparation. Native commands never enter this projection. */
+export function connectorRunnerEnvironment(input: {
+  runner: PackageRunner
+  launchers: LauncherEnvironment
+  key: string
+  inherited: Readonly<Record<string, string>>
+  declared: Readonly<Record<string, string>>
+  packageBins: readonly string[]
+  python?: string
+}) {
+  if (!/^[a-f0-9]{64}$/.test(input.key)) throw new Error("Invalid connector preparation key")
+  const windows = input.launchers.platform === "win32-x64"
+  const paths = windows ? path.win32 : path.posix
+  const delimiter = windows ? ";" : ":"
+  const keyOf = (key: string) => (windows ? key.toLowerCase() : key)
+  const inheritedControls = new Set(["NODE_OPTIONS", "PYTHONHOME", "PYTHONPATH", "VIRTUAL_ENV"].map(keyOf))
+  const npm =
+    input.runner === "npm-exec"
+      ? { npm_config_prefer_offline: "true", npm_config_ignore_scripts: "true", npm_config_update_notifier: "false" }
+      : {}
+  const prefix = paths.join(input.launchers.runtimeRoot, "prepared", input.key)
+  const entries = new Map(
+    [
+      ...Object.entries(input.inherited).filter(([key]) => !inheritedControls.has(keyOf(key))),
+      ...Object.entries(input.declared),
+    ]
+      .filter(([key]) => !Object.keys(npm).includes(key!.toLowerCase()))
+      .map(([key, value]) => [keyOf(key!), [key!, value!] as const]),
+  )
+  const pathValue = (environment: Readonly<Record<string, string>>) => {
+    const value = Object.entries(environment).findLast(([key]) => keyOf(key) === keyOf("PATH"))?.[1]
+    return value === undefined ? [] : value.split(delimiter)
+  }
+  const ordered = [
+    ...input.packageBins,
+    paths.dirname(input.launchers.uv),
+    paths.dirname(input.launchers.node),
+    ...(input.python ? [paths.dirname(input.python)] : []),
+    ...pathValue(input.declared),
+    ...pathValue(input.inherited),
+  ]
+  const bins = new Map<string, string>()
+  for (const bin of ordered) {
+    const key = windows ? bin.replaceAll("/", "\\").toLowerCase() : bin
+    if (!bins.has(key)) bins.set(key, bin)
+  }
+  for (const [key, value] of Object.entries({
+    ...input.launchers.environment,
+    ...npm,
+    ...(input.runner === "uv-tool"
+      ? { UV_TOOL_DIR: paths.join(prefix, "uv", "tools"), UV_TOOL_BIN_DIR: paths.join(prefix, "uv", "bin") }
+      : {}),
+    PATH: [...bins.values()].join(delimiter),
+  }))
+    entries.set(keyOf(key), [key, value])
+  // R1 cache locations are not copied here. R2 projects the bound authority at the actual spawn.
+  return Object.fromEntries(entries.values())
+}
 
 /** Only package facts survive restart. Invocation argv, cwd and credentials are rebound by preparation. */
 export function publishConnectorPreparation(input: { runtimeRoot: string; preparation: ConnectorPreparation }) {

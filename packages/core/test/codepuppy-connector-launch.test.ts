@@ -10,6 +10,7 @@ import {
   installConnectorPython,
   publishConnectorPreparation,
   readConnectorPreparation,
+  connectorRunnerEnvironment,
 } from "@opencode/core/mcp/codepuppy-connector-launch"
 import { hostEnvironmentLayer, recordingEnvironmentLayer, transformEnvironmentFiles } from "./fixture/environment"
 import { observeConnectorLaunch } from "@opencode/core/mcp/codepuppy-connector-diagnostic"
@@ -525,4 +526,35 @@ test("connector diagnostics continue observing a real MCP process after connecti
     ).pipe(Effect.provide(hostEnvironmentLayer)),
   )
   expect(result).toMatchObject({ stage: "running", exitCode: null, signal: "SIGTERM" })
+})
+
+// Pure layer: production-derived LauncherEnvironment, no filesystem probe or process-global mutation.
+for (const runner of ["uv-tool", "npm-exec"] as const)
+  test(`${runner} environment keeps bundled runtimes ahead of old PATH and binds current business inputs`, () => {
+    const fixture = pythonInstallation("absent")
+    const input = { runner, launchers: fixture.input.launchers, key: "d".repeat(64), inherited: { PATH: "/old/bin:/shared/bin", HOME: "/own/home", NODE_OPTIONS: "--require old-host", PYTHONHOME: "/old/python", PYTHONPATH: "/old/modules", VIRTUAL_ENV: "/old/venv", UV_CACHE_DIR: "/r1/cache", XDG_CONFIG_HOME: "/user/config", NPM_CONFIG_IGNORE_SCRIPTS: "false" }, declared: { PATH: "/declared/bin:/shared/bin", PRIVATE_KEY: "current-secret", npm_config_registry: "https://registry.invalid", npm_config_ignore_scripts: "false", NODE_OPTIONS: "--require declared-module" }, packageBins: ["/prepared/bin"], python: "/pinned/python/bin/python3" }
+    const before = structuredClone(input)
+    const env = connectorRunnerEnvironment(input)
+    expect(env.PATH?.split(":")).toEqual(["/prepared/bin", path.dirname(input.launchers.uv), "/pinned/python/bin", "/declared/bin", "/shared/bin", "/old/bin"])
+    expect(env).toMatchObject({ HOME: "/own/home", NODE_OPTIONS: "--require declared-module", PRIVATE_KEY: "current-secret", npm_config_registry: "https://registry.invalid", UV_CACHE_DIR: "/r1/cache", XDG_CONFIG_HOME: "/user/config", UV_PYTHON: "3.12.16" })
+    for (const key of ["PYTHONHOME", "PYTHONPATH", "VIRTUAL_ENV"]) expect(env).not.toHaveProperty(key)
+    if (runner === "uv-tool") expect(env).toMatchObject({ UV_TOOL_DIR: path.join(input.launchers.runtimeRoot, "prepared", input.key, "uv/tools"), UV_TOOL_BIN_DIR: path.join(input.launchers.runtimeRoot, "prepared", input.key, "uv/bin") })
+    if (runner === "npm-exec") {
+      expect(env).toMatchObject({ npm_config_prefer_offline: "true", npm_config_ignore_scripts: "true", npm_config_update_notifier: "false" })
+      expect(env).not.toHaveProperty("NPM_CONFIG_IGNORE_SCRIPTS")
+      expect(env).not.toHaveProperty("UV_TOOL_DIR")
+    }
+    expect(input).toEqual(before)
+    const preparation = connectorRunnerEnvironment({ ...input, declared: {}, packageBins: [], python: undefined })
+    expect(preparation.PATH?.startsWith(path.dirname(input.launchers.uv))).toBe(true)
+    expect(preparation).not.toHaveProperty("NODE_OPTIONS")
+  })
+
+test("Windows runner environment merges case-insensitive keys and PATH without retaining old runtime controls", () => {
+  const f = pythonInstallation("absent")
+  const launchers = { ...f.input.launchers, platform: "win32-x64" as const, runtimeRoot: "C:\\app-data\\connector-runtime", uv: "C:\\app-data\\uv\\uv.exe", node: "C:\\app-data\\node\\node.exe" }
+  const env = connectorRunnerEnvironment({ runner: "npm-exec", launchers, key: "e".repeat(64), inherited: { Path: "C:\\old;C:\\shared", Node_Options: "--require old", pythonpath: "C:\\old-modules", Home: "C:\\own-home", KEY: "old-secret" }, declared: { PATH: "c:\\shared;C:\\declared", key: "current-secret" }, packageBins: ["C:\\prepared\\bin"], python: "C:\\python\\python.exe" })
+  expect(env.PATH).toBe("C:\\prepared\\bin;C:\\app-data\\uv;C:\\app-data\\node;C:\\python;c:\\shared;C:\\declared;C:\\old")
+  expect(env).toMatchObject({ key: "current-secret", Home: "C:\\own-home" })
+  for (const key of ["Path", "KEY", "Node_Options", "pythonpath"]) expect(env).not.toHaveProperty(key)
 })

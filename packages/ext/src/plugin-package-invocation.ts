@@ -413,7 +413,7 @@ export async function registerPackageInvocations(
           const text = await prepared(item, rawArguments)
           bind(frame.sessionID, item, text, "tool")
           const body = selected?.content.trim()
-          const replace = (content: string) => (body ? content.replace(body, text) : text)
+          const replace = (content: string) => (body ? content.replace(body, () => text) : text)
           return {
             ...loaded,
             ...(record(loaded.output) && typeof loaded.output.output === "string"

@@ -506,6 +506,53 @@ D3 代码/实物提交：`9929af424c`、`6bc8ccbf0a`；本收据提交继续包�
 
 r6 允许同轮计划后实施；本节不重作冻结技术决定，不新增界面稿。D3 接缝/发布/真模型/Windows 实测仍 pending；D5 不在本轮。
 
+### r6 D4 实施与返回收据
+
+已核：Codex / GPT-6，按 r6 授权实现自检。计划 `0c5739736e`；实现 `38a22d7d9e`；运行期 callback 独立于请求数据 `a60a5af67a`。`核对` 已在第一实施提交填写。只完成 D4，没有实施 D5、改冻结设计/接缝或新增视觉客户端。
+
+| D4 AC 分工 | 具名证据与结果 | 仍待实物/集成 |
+| --- | --- | --- |
+| AC-04 处理进度 | `local video progress carries full processing facts…` 真 SDK producer；`video progress follows each real SDK request…` 并发 token；`video progress binds the whole current invocation context…` 当前 Effect Context；fast helper 核取消/非法/迟到通知；`verified video progress…` 与 `video progress updates the existing card…` 核真实覆盖时间、无 total 字节、首方来源、终态与 DOM 更新 | #1760 generation/prepare、冷 Node 的真实通知与原调用继续；60 分钟真模型速度/打包产物进度 |
+| AC-07 / AC-14 的帧投影 | `video frame OCR is local for both model capabilities…` 两模型能力/空 OCR/离线均零 HTTP；实际 Message/ToolResultPart、D2 schema、原 JPEG；`video frame vision runs only on demand…` 原 `/v1/tools/vision`、千问/禁 fallback、压缩、同图不同实际时间、相同问题缓存/重建、不同问题再取、402 typed 失败 | 真六页录屏/OCR 数字与模型答案；打包产物断网及完整出网记录。上述零 HTTP 仅证明此投影路径，不冒充全应用断网验收 |
+| AC-16 的本片边界 | SDK typed cold failure、取消后不发布状态与 frame vision 失败沿已有错误合同；坏输入 metadata 不冒充进度/实际帧，第三方同名不获卡片解释/帧登记 | D2/D3 已列的损坏媒体/不支持格式/空间不足真实组件用例仍 pending，不把本片轻测当作三项实测 |
+
+最终相关集按实际 import、MCP 服务 mock、卡片 kind/工具枚举、上下文注入清单和 producer 摘要读方选取；并行命令各用 `--max-concurrency 2`（机器当时存在其它 gate 进程），没有全包测试、bin/check 或 gate run。命令均从对应包执行：
+
+```bash
+# packages/core — 226 PASS / 0 FAIL，10 文件，825 assertions，33.74 秒
+bun test test/codepuppy-video-progress.fast.test.ts test/codepuppy-mcp-tool-collision.test.ts test/codepuppy-mcp-runtime.test.ts test/codepuppy-mcp-tool-generation.test.ts test/mcp.test.ts test/mcp-attach.test.ts test/mcp-instructions.test.ts test/mcp-oauth.test.ts test/codepuppy-command-model-priority.test.ts test/schedule.test.ts --max-concurrency 2 --timeout 30000
+# packages/ui-mac — 209 PASS / 0 FAIL，11 文件，4171 assertions，8.73 秒
+bun test src/main/video-service.test.ts src/main/video-tools.test.ts src/main/office-mcp-tools-snapshot.test.ts src/main/codepuppy-config-injection.test.ts src/main/config-injection-throat.test.ts src/main/old-name-scan.test.ts src/renderer/codepuppy-ui/session-timeline/cards/tool-card-model.test.ts src/renderer/codepuppy-ui/session-timeline/cards/tool-card-provenance-gates.test.ts src/renderer/codepuppy-ui/session-timeline/cards/cards-contract.test.ts src/renderer/codepuppy-ui/session-timeline/process-fold.test.ts src/renderer/codepuppy-ui/session-timeline/session-timeline.test.ts --max-concurrency 2 --timeout 30000
+# packages/ext — 247 PASS / 0 FAIL，9 文件，1369 assertions，9.74 秒
+bun test src/cloud-vision.test.ts src/context-injection.test.ts src/plugin-host.test.ts src/plugin-setup-order.test.ts src/plugin-fanout.test.ts src/policy/register-policy.test.ts src/policy/inventory.test.ts src/project-config.test.ts src/register.test.ts --max-concurrency 2 --timeout 30000
+```
+
+UI 的既有 wrapper 实际运行 `test-component/session-timeline.cases.ts`，子集合 **125 PASS / 0 FAIL，986 assertions**（单独完整验证 6.07 秒），不是只核字符串或跑新例。外层首次默认 5 秒超时及 core 初次参数精确断言的红/修正见偏离记录；最终 source/test 不含未授权上游测试变更。只有 core 调整 callback 位置后重跑该受影响集合，其余已绿集合没有再次重复跑。
+
+`bun typecheck` 在 schema（143 files）、core（2048 files / 2 projects）、ext、ui-mac 各 exit 0。`bun scripts/build-video-mcp.ts` 与 `bun scripts/gen-office-mcp-tools.ts` exit 0；同一 manifest 仅 video `codeSha256` 同步，snapshot 真实临时构建通过，没有重建 native/pins。`bash scripts/north-star-guard.sh` 最终 exit 0；`git diff --check` exit 0。
+
+七个生产删除对照均为具名 expect 断言红、exit 1，逐个恢复自身文件后才跑最终绿集；最终 callback 位置调整后仅重核 SDK/call-context 两臂。临时记录 `/tmp/video-d4-removal-arms.json` 与逐臂日志不充当安装包/真实模型验收：
+
+| 删除臂 | 对应包 / 文件 / `-t` | 红的实际原因 |
+| --- | --- | --- |
+| producer-meta | ui-mac / video-service.test.ts / `local video progress` | 真实 SDK 收不到完整 phase/completed/total/unit |
+| sdk-callback | core / codepuppy-mcp-runtime.test.ts / `video progress` | 两个真实调用的处理数组为空 |
+| invocation-context | core / codepuppy-mcp-tool-collision.test.ts / `video progress` | 本次 Context 未收到更新 |
+| card-count | ui-mac / tool-card-model.test.ts / `verified video progress` | 源覆盖时间变成零，实数断言失败 |
+| automatic-upload | ext / cloud-vision.test.ts / `video frame OCR` | 非视觉模型的视频帧走自动转写，零 HTTP 断言失败 |
+| frame-id | ext / cloud-vision.test.ts / `video frame OCR` | 两个实际时间的 frameId 不再能查到 |
+| frame-time | ext / cloud-vision.test.ts / `video frame vision` | 主动选帧的回显时间变成零 |
+
+单独移除 video 分派的一重 authority 检查未红，因为上层通用 authority 闸仍挡住第三方；未把该无效切除计入七臂，改切实际数字投影证明卡片行为。无断言删除或阈值放宽。
+
+遗留去向（record and continue）：
+
+- `<worktree>/.gate-tests` — `affected-tests --list` exit 2，`No such file or directory`，**未产出 scope line**；与 D3 相同，交 orchestrator/gate owner，不改 frozen gate 或补一个假 selector。
+- 文档 canonical checker `check_repo(worktree, "impharaon/alpha-code", coordination_repo, project.url, "HEAD")`：**69 errors / 253 warnings**，本 plan 0 finding，与 D3 基线相同；modules 的 13 个旧失效包路径交文档治理，本票仅补 schema authority 的模块职责行。
+- #1760 真实 declarer/expander/身份/缓存 argv、generation/preparation/断点换源与原调用继续仍交 #1760；D3 发布/relay、真实模型与完整打包/Windows 测量继承原 pending，不以本片 mock authority 或本机轻测宣称通过。
+
+本轮未启动 app/Electron/window，未真实模型/付费调用、上传/部署、push/PR/merge 或 merge/rebase。OPTIONAL：无。下一片由 orchestrator 续派 D5；D4 没有新设计问题。
+
 ## D5 平台视频理解桌面接线
 
 待本片 PLAN 展开；范围、AC 和依赖见总览，实施依据为视频设计 §4.4/§4.5/§5/§6 D5。平台契约只消费 producer 固定产物，不在桌面定义副本。

@@ -132,7 +132,7 @@ export function createDocumentPythonProjections(input: {
         sequence: 0,
         sidecarGeneration: input.generation,
         registrationId,
-        location,
+        location: { directory: location.directory, ...(location.workspaceID !== undefined ? { workspaceID: location.workspaceID } : {}) },
         status: "active",
         pinId: input.pin.id,
         pinSha256: input.pin.sha256,

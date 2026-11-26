@@ -438,3 +438,5 @@ r8 已完成组件与必要偏离：按 §4.10 追加 `main/document-python.ts`�
 最终文档检查：本节 12 links PASS、`git diff --check` exit 0；alpha profile 文档契约本文件 findings=0（全仓既有 322 findings 不扩修），`/tmp/alpha-1761-r8/docs-contract.json`。工作时间约 09:25–10:20 UTC，包含共享 slot 等待和首次既定 180 s 超时；本轮未启动 app/Electron/任何窗口，未 push/PR/merge、上传、发布或部署。
 
 保存前新增直接接线回归：真实 `Plugin.Context.location` 是 `Location.Info`（`packages/plugin/src/promise/plugin.ts:29`、`packages/schema/src/location.ts:19-25`），含 project；文件契约是 Location.Ref。当前 writer 直接序列化 Info 会被 Python 的严格投影 schema 拒绝。既有 `Python projection...` 用例补真实形状及 Ref-only 断言，target 命令 exit 1，`location-ref-red.log`。先提交该正确断言，再仅在 main 写文件时投影 directory/workspaceID；不修改仍待处置的缓存错误断言。
+
+Location.Ref 回归 green：相同新断言未改，main 文件现在只写 directory/workspaceID；`bun test src/main/document-runtime.test.ts` 11 PASS，`bun typecheck` exit 0，日志 `location-ref-green.log`、`ui-types-location-ref.log`。该修正不影响其余用例计数，仍为 282 PASS/1 个待处置错误码断言 FAIL。

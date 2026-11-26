@@ -17,6 +17,7 @@ export type VideoCloudRequest = {
 export type VideoCall = { directory: string; sessionID: string; agent: string; callID: string; messageID: string }
 export type VideoCloudResult = VideoUnderstandingResultV1 & { jobIds: string[]; cached: boolean }
 export type VideoCloudState = {
+  upload?:{file:string;sourceRange:VideoSourceRange;bytes:number}
   progress?: VideoProgress
   prepare?: VideoSourceRange
   result?: VideoCloudResult

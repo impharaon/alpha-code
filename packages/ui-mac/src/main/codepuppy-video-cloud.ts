@@ -61,6 +61,7 @@ type Work = {
   promise: Promise<void>
 }
 const sameRange = (a: VideoSourceRange, b: VideoSourceRange) => a.start_ms === b.start_ms && a.end_ms === b.end_ms
+const uploadFacts=(record:RecordValue)=>({file:path.basename(record.referencePath),sourceRange:record.input.source_range,bytes:record.attempts.filter(a=>a.jobId || a.bodyFullySent).reduce((sum,a)=>sum+a.clip.bytes,0)})
 const codeOf = (error: unknown) =>
   error instanceof Error && /^[a-z][a-z0-9_-]+$/.test(error.message)
     ? error.message
@@ -231,6 +232,7 @@ export function createMainVideoService(deps: {
         if (record.tenant !== deps.identity()?.tenantId) throw new Error("not-authenticated")
         if (record.result) {
           current.state = {
+            upload:uploadFacts(record),
             result: {
               ...decodeContract(
                 "VideoUnderstandingResultV1",
@@ -544,7 +546,7 @@ export function createMainVideoService(deps: {
           }
           if(answers.every(answer=>answer.model_revision === record.model.revision))record.result=result
           await persist()
-          current.state = { result }
+          current.state = { result,upload:uploadFacts(record) }
         } catch (error) {
           if (signal.aborted || (error instanceof Error && error.message === "cancelled")) {
             record.cancelled = true

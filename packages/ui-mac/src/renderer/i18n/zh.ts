@@ -1,4 +1,5 @@
 export const dict = {
+  "codepuppy.timeline.video.understand": "已上传视频",
   "codepuppy.cloud.consent.pipelineVideo": "视频理解",
   "codepuppy.cloud.consent.purposeVideo": "理解所选视频片段的内容",
   "codepuppy.timeline.video.tool.understand": "理解视频",

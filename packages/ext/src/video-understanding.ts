@@ -98,7 +98,7 @@ export function videoUnderstandingTransform(deps: {
             for (;;) {
               context.signal.throwIfAborted()
               if (current.state.progress) await context.progress({ [VIDEO_PROGRESS_KEY]: current.state.progress })
-              if (current.state.result){completed=true;return { output: current.state.result, metadata: { jobIds: current.state.result.jobIds } }}
+              if (current.state.result){completed=true;return { output: current.state.result, metadata: { jobIds: current.state.result.jobIds,"codepuppy.video.upload":current.state.upload } }}
               if (current.state.error)
                 throw new Tool.Error({
                   message: renderTemplate(VIDEO_UNDERSTANDING_FAILED_ID, { name: current.state.error }),

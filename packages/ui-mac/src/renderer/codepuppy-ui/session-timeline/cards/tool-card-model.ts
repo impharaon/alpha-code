@@ -1525,6 +1525,9 @@ export function videoProgressLineOf(part: ToolPart): { key: string; amount: stri
     const count = (value: number) => update.unit === "ms" ? clock(value) : `${value}${update.unit === "bytes" ? " B" : ""}`
     return { key: `codepuppy.timeline.video.phase.${update.phase}`, amount: count(update.completed) + (update.total === undefined ? "" : ` / ${count(update.total)}`) }
   }
+  const upload=facts["codepuppy.video.upload"] as {file?:unknown;sourceRange?:{start_ms?:unknown;end_ms?:unknown};bytes?:unknown} | undefined
+  if(dispatch.kind === "video" && dispatch.name === "understand" && part.state.status === "completed" && upload && typeof upload.file === "string" && typeof upload.bytes === "number" && Number.isSafeInteger(upload.bytes) && upload.bytes >= 0 && typeof upload.sourceRange?.start_ms === "number" && Number.isSafeInteger(upload.sourceRange.start_ms) && upload.sourceRange.start_ms >= 0 && typeof upload.sourceRange.end_ms === "number" && Number.isSafeInteger(upload.sourceRange.end_ms) && upload.sourceRange.end_ms > upload.sourceRange.start_ms)
+    return {key:"codepuppy.timeline.video.understand",amount:`${boundedBlock(upload.file,TOOL_ITEM_MAX_CHARS,1).text} · ${clock(upload.sourceRange.start_ms)}–${clock(upload.sourceRange.end_ms)} · ${upload.bytes} B`}
   // VIDEO-L1-v2 owns this existing preparation field and its sequence/lifetime.
   const preparation = facts.preparation as { phase?: unknown; receivedBytes?: unknown; totalBytes?: unknown } | undefined
   if (dispatch.kind === "video" && part.state.status === "running" && preparation && ["download", "unpack", "verify"].includes(String(preparation.phase))) {

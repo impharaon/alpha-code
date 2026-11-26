@@ -3,6 +3,37 @@ import { ChildProcess } from "effect/process"
 import type { ConnectorLaunchFailure, LauncherEnvironment } from "@opencode/util/codepuppy-connector-launch"
 import { Environment } from "../environment/index.js"
 
+/** Preserve uv's parsed options; only the tool-run execution switches differ from tool-install. */
+export function uvToolInstallArguments(input: {
+  syntax: "uvx" | "uv"
+  arguments: readonly string[]
+  declaration: ReturnType<typeof parseUvToolSettings>
+}) {
+  const command = input.declaration.command
+  const offset = input.arguments.length - command.length
+  if (offset < 0 || command.some((value, index) => input.arguments[offset + index] !== value))
+    throw Error("uv command does not match the parsed declaration")
+  const original = input.arguments.slice(0, offset)
+  if (original.at(-1) === "--") original.pop()
+  const options: string[] = []
+  for (let index = 0; index < original.length; index++) {
+    const token = original[index]!
+    if (token === "--from" || token === "--env-file") {
+      index++
+      continue
+    }
+    if (/^--(?:from|env-file)=/.test(token) || token === "--isolated" || token === "--no-env-file") continue
+    options.push(token)
+  }
+  const packageSource = input.declaration.from ?? command[0]
+  if (!packageSource) throw Error("uv tool declaration has no package source")
+  if (input.syntax === "uvx") return ["tool", "install", ...options, "--", packageSource]
+  const run = options.findIndex((token, index) => token === "run" && options[index - 1] === "tool")
+  if (run === -1) throw Error("Expected uv tool run declaration")
+  options[run] = "install"
+  return [...options, "--", packageSource]
+}
+
 /** The pinned uv parses every CLI/config option without resolving a package or executing a service. */
 export function readUvLaunchDeclaration(input: {
   syntax: "uvx" | "uv"
@@ -29,14 +60,39 @@ export function readUvLaunchDeclaration(input: {
       try: () => parseUvToolSettings(new TextDecoder().decode(stdout)),
       catch: (error): ConnectorLaunchFailure => ({ kind: "unknown", detail: String(error) }),
     })
-  }).pipe(
-    Effect.mapError(
-      (error): ConnectorLaunchFailure =>
-        typeof error === "object" && error !== null && "kind" in error && error.kind === "unknown" && "detail" in error
-          ? { kind: "unknown", detail: String(error.detail) }
-          : { kind: "unknown", detail: String(error) },
-    ),
-  )
+  }).pipe(Effect.mapError(uvLaunchFailure))
+}
+
+/** Install into the caller's per-content UV_TOOL_DIR; preparation never invokes the service command. */
+export function installUvConnector(input: {
+  syntax: "uvx" | "uv"
+  arguments: readonly string[]
+  declaration: ReturnType<typeof parseUvToolSettings>
+  cwd: string
+  environment: Record<string, string>
+  launchers: LauncherEnvironment
+}) {
+  return Effect.gen(function* () {
+    const arguments_ = yield* Effect.try({
+      try: () => uvToolInstallArguments(input),
+      catch: (): ConnectorLaunchFailure => ({ kind: "unknown", detail: "Invalid parsed uv tool declaration" }),
+    })
+    const environment = yield* Environment.Service
+    const process = yield* environment.spawner.spawn(
+      ChildProcess.make(input.launchers.uv, arguments_, { cwd: input.cwd, env: input.environment, extendEnv: false }),
+    )
+    const [exitCode, stdout, stderr] = yield* Effect.all(
+      [process.exitCode, Stream.mkUint8Array(process.stdout), Stream.mkUint8Array(process.stderr)],
+      { concurrency: "unbounded" },
+    )
+    return { exitCode, stdout: new TextDecoder().decode(stdout), stderr: new TextDecoder().decode(stderr) }
+  }).pipe(Effect.mapError(uvLaunchFailure))
+}
+
+function uvLaunchFailure(error: unknown): ConnectorLaunchFailure {
+  return typeof error === "object" && error !== null && "kind" in error && error.kind === "unknown" && "detail" in error
+    ? { kind: "unknown", detail: String(error.detail) }
+    : { kind: "unknown", detail: String(error) }
 }
 
 /** uv 0.13.10 Debug output is a pinned internal wire format. Keep config transient, never hash the whole text. */

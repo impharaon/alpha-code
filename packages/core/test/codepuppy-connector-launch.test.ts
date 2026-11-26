@@ -15,7 +15,11 @@ import { tmpdir } from "node:os"
 import path from "node:path"
 import { createRequire } from "node:module"
 import { connectorPreparationKey } from "@opencode/core/mcp/codepuppy-connector-key"
-import { parseUvToolSettings, readUvLaunchDeclaration } from "@opencode/core/mcp/codepuppy-uv-launch"
+import {
+  parseUvToolSettings,
+  readUvLaunchDeclaration,
+  uvToolInstallArguments,
+} from "@opencode/core/mcp/codepuppy-uv-launch"
 import { UV_TOOL_SETTINGS, UV_SERVICE_COMMAND } from "./fixture/uv-tool-settings"
 import { readNpmLaunchDeclaration } from "@opencode/core/mcp/codepuppy-npm-launch"
 import { Deferred, Effect, Fiber, Layer, Logger, Option, PlatformError, References, Stream } from "effect"
@@ -1192,6 +1196,65 @@ test("uv settings reject incomplete metadata without echoing the credential-bear
     expect(String(error)).not.toContain("fixture-token")
     expect(String(error)).toContain("uv")
   }
+})
+
+// Module layer: input argv and parsed settings come from the pinned uv probe above.
+test("uv install conversion preserves resolver syntax and separates current service arguments", () => {
+  const declaration = parseUvToolSettings(UV_TOOL_SETTINGS)
+  const resolver = [
+    "--with",
+    "packaging==24.0",
+    "--with-requirements",
+    "requirements.txt",
+    "-c",
+    "constraints.txt",
+    "--overrides=overrides.txt",
+    "--build-constraints",
+    "build.txt",
+    "--with-editable",
+    "editable",
+    "--config-setting",
+    "key=value],}",
+  ]
+  for (const syntax of ["uvx", "uv"] as const) {
+    const prefix = syntax === "uv" ? ["--directory", "project", "tool", "run"] : []
+    const args = [
+      ...prefix,
+      "--from=" + declaration.from,
+      ...resolver,
+      "--isolated",
+      "--env-file",
+      "business.env",
+      "--env-file=other.env",
+      "--no-env-file",
+      "--",
+      ...UV_SERVICE_COMMAND,
+    ]
+    expect(uvToolInstallArguments({ syntax, arguments: args, declaration })).toEqual([
+      ...(syntax === "uv" ? ["--directory", "project", "tool", "install"] : ["tool", "install"]),
+      ...resolver,
+      "--",
+      declaration.from!,
+    ])
+  }
+  // Removing only --from changes the source, while the explicit console command stays execution-only.
+  expect(
+    uvToolInstallArguments({
+      syntax: "uvx",
+      arguments: ["--from", declaration.from!, ...UV_SERVICE_COMMAND],
+      declaration,
+    }),
+  ).toEqual(["tool", "install", "--", declaration.from!])
+  const implicit = { ...declaration, from: null }
+  expect(uvToolInstallArguments({ syntax: "uvx", arguments: UV_SERVICE_COMMAND, declaration: implicit })).toEqual([
+    "tool",
+    "install",
+    "--",
+    UV_SERVICE_COMMAND[0]!,
+  ])
+  expect(() =>
+    uvToolInstallArguments({ syntax: "uvx", arguments: [...UV_SERVICE_COMMAND, "unexpected"], declaration }),
+  ).toThrow("does not match")
 })
 
 // Integration layer: only the binary boundary is substituted with a real process emitting the

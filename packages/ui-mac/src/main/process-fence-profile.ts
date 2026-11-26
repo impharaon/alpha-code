@@ -208,6 +208,7 @@ function regexLiteral(p: string): string {
 }
 
 export type PackageManager = "bun" | "pnpm" | "yarn" | "npm" | "pip" | "uv" | "go" | "cargo"
+export const PACKAGE_MANAGERS_DIRNAME = "package-managers"
 export type PackageManagerPlatform = "darwin" | "linux" | "win32"
 export type PackageManagerLocationInput = {
   platform: PackageManagerPlatform
@@ -225,7 +226,7 @@ export type PackageManagerLocations = {
 /** Candidate locations only: the main planner binds their identities before any rule is applied. */
 export function resolvePackageManagerLocations(input: PackageManagerLocationInput): PackageManagerLocations {
   const path = packageManagerPath(input)
-  const cache = path.join(input.userDataPath, "package-managers")
+  const cache = path.join(input.userDataPath, PACKAGE_MANAGERS_DIRNAME)
   const pnpm = input.platform === "win32" ? path.join(input.localAppData, "pnpm") : input.platform === "darwin" ? path.join(input.home, "Library", "pnpm") : path.join(input.home, ".local", "share", "pnpm")
   const env = {
     BUN_INSTALL_CACHE_DIR: path.join(cache, "bun", "install-cache"),

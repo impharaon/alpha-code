@@ -459,7 +459,7 @@ PLAN 阶段只提交本文件。下表和命令均为实施安排，不代表已
 ## #1759：包管理器缓存与受围栏环境探针（切片二）
 
 - 依据：[spec v5 / BR-07、AC-09](spec.md)（`834e269da977f6b4888c3b7a6a268bfe835d9cf5`）；[冻结设计](design.md)（`d4a849e5247e7a149457a1b03bbcfc70bbbb389f`）v4 §4.1 R1/R2 与 Cargo 读取桥、§4.3.1 R7、§4.4.1 R8、§5、§6、§10 的 U1/U2 及 R1-F6/F7/P0 处置；v5 既定边界继续有效。首片 `a82428f6fb`、`31c0127e07`、`66ce5df7dc` 已由编排者 Claude Opus 5.5 接受，本片直接消费其 resolver、身份真源和七个坏臂收据。读码基线为 `66ce5df7dc`。
-- 核对：待编排者核对；首个 IMPLEMENT 提交从续接 brief 的 `Phase:` 行补入本计划提交及检查方/模型、结论。
+- 核对：Phase: IMPLEMENT — 5e41c6653d · Claude Opus 5.5 (orchestrator) · slice-two plan accepted: cache planning through the slice-one anchors/R7, fenced environment probe with root-drift checks, one spawn-environment projection consumed by Shell/PTY/MCP, the one-time real-tool scenario for eight package managers plus the Cargo bridge and npm load-failure case, and the protection regression; each has a failure reason.
 
 本节为 architecture/decision 类实施计划，本次 PLAN 只追加本节。切片三至五的名称、顺序与 AC 归属沿首片总表；本片接通缓存及启动/派生环境，目录审批、全局安装与用户配置清单的启用仍归各自切片。下述命令和证明均未在本 PLAN 执行。
 

@@ -5,10 +5,10 @@
 
 import { describe, expect, test } from "bun:test"
 import { spawnSync } from "node:child_process"
-import { existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, renameSync, rmSync, statSync, symlinkSync, unlinkSync, writeFileSync } from "node:fs"
+import { existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readlinkSync, realpathSync, renameSync, rmSync, statSync, symlinkSync, unlinkSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join, resolve } from "node:path"
-import { planConfigFence, planProcessFence, planWritableLocations, type PlanProcessFenceDeps, type PlanProcessFenceInput } from "./process-fence-plan"
+import { planConfigFence, planPackageManagerCaches, planProcessFence, planWritableLocations, type PlanProcessFenceDeps, type PlanProcessFenceInput } from "./process-fence-plan"
 import { writableLocationTruthPath } from "./process-fence-workspaces"
 import { SANDBOX_EXEC, trialCompileProfile } from "./process-fence-compile"
 import { processFenceRulesCover, processFenceWriteRules, type ProcessFenceWriteRule } from "./process-fence-profile"
@@ -147,6 +147,72 @@ describe("planWritableLocations", () => {
       expect(existsSync(sourcePath)).toBe(false)
       expect(() => planWritableLocations({ ...input, truthPath: disk.state })).toThrow("writable location truth")
       expect(existsSync(sourcePath)).toBe(false)
+    })
+  })
+})
+
+describe("package manager cache planning", () => {
+  const inputFor = (disk: Parameters<Parameters<typeof withLocationDisk>[0]>[0]) => ({
+    platform: "darwin" as const, home: disk.home, userDataPath: join(disk.root, "userData"), configHome: join(disk.home, ".config"),
+    appData: join(disk.home, "Library", "Application Support"), localAppData: join(disk.home, "Library", "Caches"),
+    truthPath: disk.truthPath, eligibility: disk.eligibility,
+  })
+  test("prepares and binds every cache before exposing one environment projection", () => {
+    withLocationDisk((disk) => {
+      const input = inputFor(disk)
+      mkdirSync(input.userDataPath)
+      const plan = planPackageManagerCaches(input)
+      expect(plan.cacheEnv.GOCACHE).toBe(join(input.userDataPath, "package-managers", "go", "build"))
+      expect(plan.env.PNPM_HOME).toBe(join(disk.home, "Library", "pnpm"))
+      expect(plan.cacheEnv.PNPM_HOME).toBeUndefined()
+      expect(plan.cacheEnv.CARGO_INSTALL_ROOT).toBeUndefined()
+      expect(Object.keys(plan.cacheEnv)).toHaveLength(17)
+      expect(plan.locations.every((entry) => statSync(entry.targetPath).isDirectory())).toBe(true)
+      expect(planPackageManagerCaches(input)).toEqual(plan)
+    })
+  })
+  test("rejects an initial cache-root escape before creating anything outside the data anchor", () => {
+    withLocationDisk((disk) => {
+      const input = inputFor(disk)
+      mkdirSync(input.userDataPath)
+      const outside = join(disk.root, "outside")
+      mkdirSync(outside)
+      symlinkSync(outside, join(input.userDataPath, "package-managers"))
+      expect(() => planPackageManagerCaches(input)).toThrow("application data anchor")
+      expect(existsSync(join(outside, "go"))).toBe(false)
+      expect(existsSync(disk.truthPath)).toBe(false)
+    })
+  })
+  test("a cache child re-point cannot replace its first identity or reach HOME", () => {
+    withLocationDisk((disk) => {
+      const input = inputFor(disk)
+      mkdirSync(input.userDataPath)
+      const plan = planPackageManagerCaches(input)
+      const before = readFileSync(disk.truthPath, "utf8")
+      rmSync(plan.cacheEnv.GOCACHE!, { recursive: true })
+      symlinkSync(disk.home, plan.cacheEnv.GOCACHE!)
+      expect(() => planPackageManagerCaches(input)).toThrow("application data anchor")
+      expect(readFileSync(disk.truthPath, "utf8")).toBe(before)
+    })
+  })
+  test("Cargo bridge links only existing original files and preserves their bytes", () => {
+    for (const names of [[], ["config"], ["config.toml", "credentials.toml"], ["config", "config.toml", "credentials", "credentials.toml"]]) withLocationDisk((disk) => {
+      const input = inputFor(disk)
+      mkdirSync(input.userDataPath)
+      const originals = join(disk.home, ".cargo")
+      mkdirSync(originals)
+      // Own byte markers test the link boundary, not the Cargo configuration format.
+        for (const name of names) writeFileSync(join(originals, name), `fixture-${name}`)
+        const plan = planPackageManagerCaches(input)
+        for (const name of ["config", "config.toml", "credentials", "credentials.toml"].filter((name) => !names.includes(name)))
+          expect(existsSync(join(plan.env.CARGO_HOME!, name))).toBe(false)
+        for (const name of names) {
+          const linked = join(plan.env.CARGO_HOME!, name)
+          expect(lstatSync(linked).isSymbolicLink()).toBe(true)
+          expect(readlinkSync(linked)).toBe(join(originals, name))
+          expect(readFileSync(linked, "utf8")).toBe(`fixture-${name}`)
+          expect(readFileSync(join(originals, name), "utf8")).toBe(`fixture-${name}`)
+        }
     })
   })
 })

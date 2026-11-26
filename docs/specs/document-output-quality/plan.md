@@ -606,3 +606,5 @@ A7 原生材料确认及 red：一次 fontTools TTFont 读取四份随包实际 
 A7 green：NOTICE 保留实际四个 nameID 0 的完整 copyright 文本（包含 Sans 的 RFN 原文），一次性 fontTools 对照 4/4 PASS（A7-green.log），OFL 文件不改。
 
 A6 authority 核对：alpha-work domestic-cloud-connectivity design §4.11.1:573-574 的当前联合有 ocr-model、无 darwin-x64。既有 util 文档文件添加类型层回归，`bun typecheck` 对 OCR ID 和 no-Intel 断言给两个错误（A6-red.log）；不是用手写数组当运行期校验器。下一提交只同步纯数据联合。
+
+A6 green：仅同步 union 到当前权威，无新下载/校验实现；util typecheck exit 0、文档文件 8 PASS（A6-green.log、util-green.log）。red 输出还包含 expect 对静态 false 的衍生类型错误，核心前提仍是 OCR 不被接受与 Intel 仍被接受。

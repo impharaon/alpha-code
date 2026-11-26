@@ -1,7 +1,7 @@
-// Shared fixed-file data contract: domestic-cloud-connectivity §4.11 @ 86a58c7.
+// Shared fixed-file data contract: domestic-cloud-connectivity §4.11.1 (L2 frozen, 2026-11-26).
 // The launcher owns manifest validation, cache paths and acquisition. No downloader lives here.
-export type PinnedFamily = "python" | "libreoffice" | "speech-model" | "ffmpeg"
-export type PinnedTarget = "darwin-arm64" | "darwin-x64" | "win32-x64" | "any"
+export type PinnedFamily = "python" | "libreoffice" | "speech-model" | "ffmpeg" | "ocr-model"
+export type PinnedTarget = "darwin-arm64" | "win32-x64" | "any"
 export type PinnedFileId = `${PinnedFamily}/${PinnedTarget}/${string}`
 export type PinnedFiles = {
   schemaVersion: 1

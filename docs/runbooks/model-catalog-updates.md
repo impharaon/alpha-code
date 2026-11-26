@@ -41,7 +41,9 @@ review_after: 2027-02-23
 
 1. **改 `src/models.config.json`**(模型名只在这里和两份台账里出现):
    - `models.<id>`:`minPlan`(`free` / `member`)、`enabled`、`display`(`name`、`brand`、可选 `reasoning` / `web` / `variants`)、
-     `routes[]`(顺序即优先级:原生在前、OpenRouter 兜底)。
+     `routes[]`(顺序即优先级:原生在前、OpenRouter 兜底)。`brand` 是自由字符串(小写字母、数字、连字符,1 至 64 个字符):
+     平台清单出现新厂商只是改配置,不用发 App;0.2.8 及更早的 App 遇到旧七家以外的厂商会整份拒绝清单,
+     所以含新厂商的清单要等 0.2.9 发布之后才上线。
    - 每条 route:`provider`、`upstreamModel`、`baseURL`、`wire`、`pricing`(`inUsdPerMtok` / `outUsdPerMtok`,可选
      `cacheReadUsdPerMtok`)、`maxOutputTokens`、`contextWindowTokens`、`capabilityProvenance`(`source`、`asOf`、`reviewAfter`、
      `verifiedBy`、`tupleFingerprint`、`outputCapReading`)、`reasoningWire` 与 `reasoningWireUnverified` 二选一。
@@ -125,7 +127,8 @@ review_after: 2027-02-23
 1. 新 BYOK 供应商(新端点 / Key 名 / 协议适配器):加进 `packages/ui-mac/src/main/byok-adapters.ts`(`{ id, compat, baseURL, keyEnv, pico }`),
    同时在 B 发布它的模型。只发目录不发 App,旧 App 会跳过这个 provider。
 2. 新的推理选项键或新的请求协议(超出 `reasoningEffort | reasoning | thinking`、`openai | anthropic` 适配器)。
-3. 新品牌要显示专属图标(数据可先发,图标回落为通用图形)。
+3. 新厂商要显示专属图标(`model-picker-core.ts` 的 `BRAND_ICONS` 要加一行,图形取现有图标集已有的)。厂商本身不需要发 App:
+   0.2.9 起表外厂商回落为通用图形;0.2.8 及更早的 App 则整份拒绝含旧七家以外厂商的清单。
 4. 目录 schema 主版本变化(V3→V4、byok v1→v2)。
 5. 平台模型需要客户端新能力(例如看图要开平台聊天入口的图片通道)。
 6. 换 picker 的**平台默认模型**:`packages/ui-mac/src/main/codepuppy-models.json` 顶层 `defaultPlatformModel`(现为 `deepseek-v4-flash`,裸 model id)。

@@ -42,6 +42,7 @@ const BRAND_ICONS = new Map([
   ["qwen", "alibaba"],
   ["moonshot", "moonshotai"],
   ["minimax", "minimax"],
+  ["google", "google"],
 ])
 export const NEUTRAL_BRAND_ICON = "synthetic"
 

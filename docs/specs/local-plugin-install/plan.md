@@ -1087,3 +1087,6 @@ prompt 步骤（AC-24 / D13）：fab0823720 以固定 PayPal 原 hooks.json 与�
 
 
 D4 决定边界补核：caa4b35fab 在原 register-policy integration 文件增加“同一次工具实现另行 assert 另一已注册权限动作”反例，缺身份匹配时 read ask 被 write 的 hook allow 吞掉，具名 0 pass / 1 fail（`/tmp/plugin-standard-r12-hook-identity-red2.log`）；现在仅原工具自己的 permission/canonical 动作消费已确认决定，其他动作仍询问。最终 pin 前保存并重查原 prepared hook 对象，若此期间其活跃/输入/服务绑定失效，清掉该当次决定重新 confirm。完整原文件 **76 pass / 0 fail**（`/tmp/plugin-standard-r12-policy-complete-final.log`），gate-files 精确同步 76，不改变原生围栏、硬 deny 或其他动作能力。
+
+
+PostToolUse 步骤（D4 / AC-11）：4fdba9a7b3 隔离固定 hookify 原 PostToolUse handler（仅从临时 manifest 撤 PreToolUse，防止前阶段假满足），运行原 posttooluse.py 与原敏感文件 warn 规则；真实模型工具 write 已完成，再一轮模型请求应带警告。具名先 0 pass / 1 fail，后 1 pass / 0 fail（`/tmp/plugin-standard-r12-post-{red,green}.log`）。现在从真正 tool.execute.after completed 取原输入和实际 output/content，源名/字段转换仍在原 identity；handler 错误留在同一个 runner 的 onFailure，未启用的包不会额外解析工具身份。警告只在写后出现且文件已写，不冒充前阶段 deny 或工具回滚。完整 host 原文件 **79 pass / 0 fail**（`/tmp/plugin-standard-r12-post-complete.log`），ext/ui-mac 包内 typecheck 均 exit 0（`/tmp/plugin-standard-r12-{ext,ui}-types.log`）。本步骤仅 command PostToolUse connected，未新增 engine 接管，L0 原登记、gate-files 79 同步。

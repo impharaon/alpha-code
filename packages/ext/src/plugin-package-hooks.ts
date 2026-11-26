@@ -226,7 +226,19 @@ export async function registerPackageHooks(
                 "claude",
               ))
             const eventFields = source
-              ? { ...fields, tool_name: source.name, tool_input: source.input, tool_use_id: call!.id }
+              ? {
+                  ...fields,
+                  tool_name: source.name,
+                  tool_input: source.input,
+                  tool_use_id: call!.id,
+                  ...("tool_response" in fields
+                    ? {
+                        tool_response: (
+                          await input.policy.packageToolCall(call!.tool, fields.tool_response, {}, "claude")
+                        ).input,
+                      }
+                    : {}),
+                }
               : fields
             if (handler.hook.if) {
               const rules = pluginToolRules(handler.hook.if, () => {
@@ -478,6 +490,17 @@ export async function registerPackageHooks(
         decisions.every((item) => active(item.result.installed)),
       )
     const contexts = results.filter((result) => result.text)
+    if (contexts.length)
+      promptContexts.set(event.sessionID, [...(promptContexts.get(event.sessionID) ?? []), ...contexts])
+  })
+  await context.tool.hook("execute.after", async (event) => {
+    if (event.status !== "completed") return
+    const contexts = await run(
+      "PostToolUse",
+      event.sessionID,
+      { tool_response: event.result.output ?? event.result.content },
+      event,
+    )
     if (contexts.length)
       promptContexts.set(event.sessionID, [...(promptContexts.get(event.sessionID) ?? []), ...contexts])
   })

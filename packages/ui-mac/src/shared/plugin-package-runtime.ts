@@ -6,7 +6,7 @@ export function pluginEntryRuntimeAvailable(entry: Entry): boolean {
     entry.kind === "hook" &&
     entry.hook.scope.kind === "package" &&
     ((entry.hook.type === "command" &&
-      ["SessionStart", "UserPromptSubmit", "Stop", "PreToolUse"].includes(entry.hook.event)) ||
+      ["SessionStart", "UserPromptSubmit", "Stop", "PreToolUse", "PostToolUse"].includes(entry.hook.event)) ||
       (entry.hook.type === "prompt" && entry.hook.event === "PreToolUse"))
   )
 }

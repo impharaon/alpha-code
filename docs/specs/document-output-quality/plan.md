@@ -409,3 +409,5 @@ bun typecheck
 2026-11-26 r8 · 09:25:29 UTC 开始。本片原接缝由 `7ef8b89b30` 的 §4.10/R13 解除，读取远端设计，未 merge/rebase。实际 2.3.2 wheel SHA-256 `d0201d55d64d52a4cb1f0be25565631ab803e55dfc2eff286b1bc40a4a0e256c` 提取 160 个 Python 文件及一个实际 JSON 数据文件；MIT、源/产出摘要与改编说明均进入同一资源目录。没有装完整 MCP 发行包或新增 pip 依赖。应用模块经同一个 Office builder 安装到真实 site-packages，`-I` import 与 inspect/edit/schema/排序字面替换、并发源保护/游标版本、缺投影失败的 5 个模块集成用例通过。源码选择器首次遗漏运行期 JSON，已按实际依赖补齐；一次写文件命令工作目录错误，未写入，修正后继续。
 
 必要同链问题已定位：实际 openpyxl+lxml 生成的 workbook 在 sheet 局部声明关系前缀；2.3.2 的 `package.scan.rel_id` 只看根声明，首次添加 slicer 进入 package.apply 时 KeyError。该真实输入的 regression 将先单独提交 red，再补最小局部 namespace 消费修正，不改保存权威、不降为裸 openpyxl.save。当前提交仅为共用模块/来源和已绿子集，R13 投影、LO 实物、对象完整保真仍在本片后续，不宣称整条 AC 通过。
+
+保存回归 red：`cd packages/ui-mac && bun test src/main/office-excel.test.ts -t "saving edited pivot"` exit 1，`package.restore.sheet_parts → scan.rel_id` 返回空关系 ID，KeyError；日志 `/tmp/alpha-1761-r8/preservation-red.log`。fixture 为测试中实际 openpyxl 生成的工作簿，经真实 2.3.2 操作创建 pivot/slicer，Source 使用实际上游模型的 sheet/name；不是手写 OOXML。此提交只加入该回归和证据，下一提交修正解析。

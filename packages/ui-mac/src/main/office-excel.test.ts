@@ -47,6 +47,17 @@ try:OfficeExcel.objects(str(path),'delete_pivot_table',json.dumps({'sheet':'Summ
 except Exception as e:assert 'unknown' in str(e)
 else:raise AssertionError('unknown field accepted')
 `))
+  test("saving edited pivot sources rebuilds from current formulas and retains slicers/sparklines", () => run(`
+with OfficeExcel.edit(str(path)) as w:w['Data']['B2']='=10+2'
+OfficeExcel.objects(str(path),'create_pivot_table',json.dumps({'sheet':'Summary','at':'A1','source':'Data!A1:B3','row_fields':['Region'],'value_fields':[{'field':'Amount'}]}))
+OfficeExcel.objects(str(path),'add_slicer',json.dumps({'sheet':'Summary','target':{'sheet':'Summary','name':'PivotTable1'},'field':'Region','at':'E2'}))
+OfficeExcel.objects(str(path),'add_sparklines',json.dumps({'sheet':'Data','range':'D2:D3','source':'Data!B2:C3'}))
+with OfficeExcel.edit(str(path)) as w:w['Data']['B2']='=20+2'
+assert load_workbook(path)['Summary']['B2'].value==22
+with zipfile.ZipFile(path) as archive:
+ assert any('slicer' in name.lower() for name in archive.namelist())
+ assert b'sparkline' in archive.read('xl/worksheets/sheet1.xml')
+`))
   test("source changes are not overwritten and read cursors bind their workbook version", () => run(`
 try:
  with OfficeExcel.edit(str(path)) as w:

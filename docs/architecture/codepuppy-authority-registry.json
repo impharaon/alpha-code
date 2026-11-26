@@ -2133,7 +2133,7 @@
       },
       "tests": [
         {
-          "file": "packages/core/test/codepuppy-mcp-runtime.test.ts",
+          "file": "packages/ui-mac/src/main/plugin-mcp-proxy.test.ts",
           "name": "plugin local MCP uses its private proxy for HTTP sessions and keeps proxy auth off the server"
         },
         {

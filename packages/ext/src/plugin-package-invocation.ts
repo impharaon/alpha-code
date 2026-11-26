@@ -522,6 +522,8 @@ export async function registerPackageInvocations(
       )
         continue
       if (!item.entry.invocation.paths.some((pattern) => Glob.match(pattern, file))) continue
+      const current = scopes.get(event.sessionID)?.get(item.installed.key + ":" + item.entry.id)
+      if (current && allowed(current.item)) continue
       const text = await prepared(item, "")
       bind(event.sessionID, item, text, "path")
     }

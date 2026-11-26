@@ -332,3 +332,24 @@ UI：`connector-launch-presentation.ts` 为行和 BackgroundProblemWatcher 的�
 不擅自改 uv pin、PATH 次序、#1759、设计正文或给用户增加安装步骤。已完成独立片保留在本分支；PackageRunner 的生产 Python 安装接线先等待该裁定，其余未完成代码仍归本票，不用这条新接缝掩盖为都已实现。
 
 `affected-tests --list`（3a1cbe185b 代码树）：**affected tests: 379 of 741 test files**，exit 0，无全量 fallback；清单 `/tmp/connector-r3-affected.list`。后续只补本文收据，不改变选集输入。已核：Codex / GPT-6，冻结 DESIGN v2.2 / SPEC v1 + r3；遗留去向：上述 Python 后处理裁定交设计拥有者/编排器；R1/R2 生产装配等待 #1759 合入；本票余下准备/离线/诊断/handler 按上节继续。
+
+## 三：r4 Python 安装裁定与持久准备
+
+- 依据：r4 编排器裁定（Claude Opus 5.5，2026-11-27），继续冻结 v1 §4.3/4.4、v2.2；设计 §10 的传播由编排器负责，本文不改设计。
+- 核对：Phase: IMPLEMENT；本段先计划提交，再红例提交，首次实现提交补计划 SHA。Codex / GPT-6。
+- 本轮起始：2026-11-26T16:40:15Z，预计约 90 分钟；不启动应用/窗口，不跑整层/计时测试。
+
+### 文件与顺序
+1. 新增 `packages/core/src/mcp/codepuppy-connector-launch.ts`，作为冻结 prepareConnectorLaunch 所在模块。先落 Python 安装步骤：在当前 Location Environment 的 spawner 上运行绝对 `/usr/bin/xcode-select -p`，核验返回的目录；仅该步骤在缺工具时使用随包目录 PATH。Windows 不进行 Mac 探测。其它阶段保留正常计划 PATH。
+2. 新模块在 `packages/core/test/codepuppy-connector-launch.test.ts` 新增 integration 层用例（模块尚无测试文件）：已有 spawner 是探测结果 seam；系统 PATH 的临时 marker 工具在 absent/missing-path 情形不执行，present 情形执行。真实 uv/Python 原包仍用 gate slot 的一次性探针，不把大运行时加进常驻测试。
+3. 接同模块的两类运行器准备、私有归一与持久收据；必要的官方 npm 解析适配放随包 launcher helper，消费 npm 自己的解析模块，不另列包名单。持久收据单独复用当前 cwd/服务参数/环境，命中不调包解析/安装。增补的文件随实际落置记在本段偏离记录。
+4. 后续按剩余时间完成诊断 producer 与 v2 活跃调用 handler；涉及 root 的已知 #1759 接口继续只消费，不复制位置表。未完成时给出精确可恢复状态，不把 helper 通过称为整包 AC 完成。
+
+### 风险与证明
+- 限制 PATH 只存在于 uv python install；native extensions 源码构建在缺开发工具时仍没有 install-name 修正。裁定接纳 wheels 连接器不受影响，不给用户增加安装步骤，不生成空操作脚本。
+- AC-01：先提交 marker 红例，再实现；去掉限制即 marker 执行而失败。真实 pin + restricted PATH 产出 Python 3.12.16，保持原摘要/离线镜像证据。
+- AC-02/04/05/10 子链：准备命令使用本代随包入口、已有位置环境、真实解析器；本机包/空缓存/真围栏/整包计时不由本片替身证明。
+- 相关集只跑修改用例、模块文件及最终一次调用方；记录 typecheck、移除臂与 affected-tests scope。常驻测试依赖通过静态 import 和自身临时文件可追踪，无全局 gate 输入变更。
+
+### 偏离记录
+暂无。

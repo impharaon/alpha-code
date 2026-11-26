@@ -1,3 +1,4 @@
+import { pluginDataDirectory } from "../shared/installed-plugin-settings"
 import corpus from "../shared/host-extension-package-contract/testvectors/decoder-corpus.v1.json"
 import { captureWholeFixture } from "../../test-fixtures/plugin-helper/fixture"
 import { canonicalArtifactJsonBytesV1 } from "../shared/host-extension-package-contract/generate-artifact"
@@ -44,6 +45,7 @@ function desktopDeps() {
     root: () => root,
     globalRoot: () => root,
     userDataPath: userData,
+    dataHome: () => join(userData, "data"),
     casBaseRoot: () => userData,
     environment: () => "dev" as const,
     installability: { fetchPayload: sample.fetchBytes },
@@ -74,6 +76,7 @@ test("whole plugin profile installs its signed tree and registered skills throug
   if (!state.ok) throw Error(state.reason)
   expect(state.packageGraphs[0]?.children.map(node => node.kind)).toEqual(["skill"])
   expect(state.records.map(record => record.kind)).toEqual(["bundle", "skill"])
+  expect(existsSync(pluginDataDirectory(deps.dataHome(), sample.envelope.prelude.packageId))).toBe(true)
   const live = resolveLiveGenerationDir(root, state.packageGraphs[0]!.pluginTree!.storeKey)!
   expect(readFileSync(join(live, "tree/skills/using-superpowers/SKILL.md"), "utf8")).toContain("superpowers")
   expect(JSON.parse(readFileSync(skillsEnabledPath(root), "utf8")).keys).toContain("skill--using-superpowers-63fb5846cb")
@@ -81,7 +84,7 @@ test("whole plugin profile installs its signed tree and registered skills throug
   expect(JSON.parse(readFileSync(skillsEnabledPath(root), "utf8")).keys).not.toContain("skill--using-superpowers-63fb5846cb")
 })
 
-test("whole plugin profile reports package-dependent MCP entries without installing a broken command", async () => {
+test("whole plugin profile retains package MCP paths for runtime binding", async () => {
   const { installDesktopPackageV1 } = await import("./package-admission")
   const { convertPluginTree } = await import("../shared/host-extension-package-contract/plugin-conversion.mjs")
   const { derivePayloadCapabilitiesV1 } = await import("../shared/host-extension-package-contract/decoder")
@@ -117,11 +120,12 @@ test("whole plugin profile reports package-dependent MCP entries without install
   const state = readPackageLedgerStateV1(root)
   if (!state.ok) throw Error(state.reason)
   const graph = state.packageGraphs[0]!
-  expect(graph.notRunning).toContainEqual({ kind: "mcp", sourceName: "database", reason: "needs-plugin-files" })
-  expect(state.records.some(record => record.kind === "mcp")).toBe(false)
+  expect(graph.notRunning?.some(entry => entry.kind === "mcp")).toBe(false)
+  expect(state.records.some(record => record.kind === "mcp")).toBe(true)
   expect(graph.children.filter(node => node.kind === "skill")).toHaveLength(7)
-  expect(graph.children.some(node => node.kind === "mcp")).toBe(false)
-  expect(existsSync(join(root, "codepuppy.jsonc")) ? parse(readFileSync(join(root, "codepuppy.jsonc"), "utf8")).mcp?.database : undefined).toBeUndefined()
+  expect(graph.children.some(node => node.kind === "mcp")).toBe(true)
+  const mcp = state.records.find(record => record.kind === "mcp")!
+  expect(parse(readFileSync(join(root, "codepuppy.jsonc"), "utf8")).mcp[mcp.name].command).toContain("${CLAUDE_PLUGIN_ROOT}/servers/db-server.js")
   const live = resolveLiveGenerationDir(root, graph.pluginTree!.storeKey)!
   expect(readFileSync(join(live, "tree/.mcp.json"), "utf8")).toContain("${CLAUDE_PLUGIN_ROOT}/servers/db-server.js")
 })

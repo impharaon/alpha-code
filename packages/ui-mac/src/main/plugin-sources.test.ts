@@ -821,3 +821,20 @@ test("a plugin root with its own marketplace remains a plugin candidate", async 
   const converted = await sources.convertCandidate(prepared.candidateId)
   expect(converted.ok && converted.package.entries.some(entry => entry.kind === "mcp" && entry.sourceName === "CodSpeed")).toBe(true)
 })
+
+
+test("a connector version suggestion uses the real npm metadata and remains optional", async () => {
+  const { suggestPluginVersion } = await import("./plugin-sources")
+  const { captureStandardFixture } = await import("../../test-fixtures/plugin-helper/fixture")
+  const { convertPluginTree } = await import("../shared/host-extension-package-contract/plugin-conversion.mjs")
+  const converted = await convertPluginTree(await captureStandardFixture("codex:build-ios-apps"))
+  const original = converted.package.entries.find(entry => entry.kind === "mcp")!
+  if (original.kind !== "mcp" || original.transport !== "stdio") throw Error("XcodeBuildMCP is stdio")
+  // Existing recorded npm /latest response, with provenance in opencode/npm/provenance.json.
+  const metadata = await Bun.file(join(import.meta.dir, "../../test-fixtures/plugin-helper/opencode/npm/metadata.json")).json()
+  const entry = { ...original, floatingVersion: { ...original.floatingVersion!, token: metadata.name + "@latest" } }
+  const urls: string[] = []
+  expect(await suggestPluginVersion(entry, async url => { urls.push(url); return Response.json(metadata) })).toBe(metadata.version)
+  expect(urls).toEqual(["https://registry.npmjs.org/" + encodeURIComponent(metadata.name) + "/latest"])
+  expect(await suggestPluginVersion(entry, async () => new Response("unavailable", { status: 503 }))).toBeUndefined()
+})

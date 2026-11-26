@@ -1,10 +1,10 @@
-import { pluginRelativePath, pluginText, pluginPathBinding, pluginTreeDigest } from "./plugin-package"
+import { pluginRelativePath, pluginText, pluginOptionEnvironmentName, pluginTreeDigest } from "./plugin-package"
 import { createHash } from "node:crypto"
 import { parse, type ParseError } from "jsonc-parser/lib/esm/main.js"
 import { ConfigMarkdown } from "@opencode/core/config/markdown"
 
 export type { Sha256, RelPath, Json, Source, Provider, TreeNode, Capture, Text, ToolRule, ModelHint, Invocation, SecretNeed, LoginNeed, HookEvent, Hook, Entry, Diagnostic, PluginPackage, MarketplaceEntry } from "./plugin-package"
-import type { Sha256, RelPath, Json, Source, Provider, TreeNode, Capture, Text, ToolRule, ModelHint, Invocation, SecretNeed, LoginNeed, HookEvent, Hook, Entry, Diagnostic, PluginPackage, MarketplaceEntry } from "./plugin-package"
+import type { Sha256, RelPath, Json, Source, TreeNode, Capture, Text, ToolRule, Invocation, SecretNeed, LoginNeed, HookEvent, Entry, Diagnostic, PluginPackage, MarketplaceEntry } from "./plugin-package"
 
 export class CaptureError extends Error {
   constructor(readonly code: "invalid-path" | "duplicate-path" | "invalid-node" | "read-failed" | "digest-mismatch", readonly path: string) {
@@ -62,7 +62,7 @@ export async function convertPluginTree(input: Capture): Promise<{ package: Plug
   const secondary = opencode ? undefined : codex ? portable ? claude : undefined : portable
   const manifest = primary || secondary ? { ...secondary, ...primary } : undefined
   const manifests = [{ path: codex ? ".claude-plugin/plugin.json" : "plugin.json", value: secondary }, { path: manifestPath, value: primary }].filter(item => !!item.value)
-  const options: Record<string, import("./plugin-package").PluginOption> = {}
+  const options: Record<string, import("./plugin-package").PluginOption> = Object.create(null)
   const optionNeeds = new Map<string, SecretNeed>()
   const optionCredentials = new Map<string, Uint8Array>()
   const optionChanged = new Set<string>()
@@ -74,6 +74,12 @@ export async function convertPluginTree(input: Capture): Promise<{ package: Plug
     options[key] = { type: value.type as "string" | "number" | "boolean", title: string(value.title) ?? key, description: string(value.description) ?? "", required: value.required === true, sensitive: value.sensitive === true, ...(value.default === undefined ? {} : { default: secret ? { secret } : value.default as string | number | boolean }) }
     if (secret && value.default !== undefined) { replacePointer(documents.get(source.path)!, "/userConfig/" + escapePointer(key) + "/default", "{secret:" + secret + "}"); optionChanged.add(source.path) }
   }
+  const optionEnvironment = new Map<string, string[]>()
+  for (const key of Object.keys(options)) {
+    const name = pluginOptionEnvironmentName(key)
+    optionEnvironment.set(name, [...(optionEnvironment.get(name) ?? []), key])
+  }
+  for (const [name, keys] of optionEnvironment) if (keys.length > 1) diagnostics.push({ path: manifestPath, field: "/userConfig", code: "invalid-definition", message: "Plugin option environment name is ambiguous: " + name })
   if (codex && files.has(".app.json")) {
     const apps = json(".app.json")
     if (object(apps?.apps)) for (const [name, app] of Object.entries(apps.apps)) {

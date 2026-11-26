@@ -382,3 +382,14 @@ test("typed options and environment defaults preserve real source meaning", asyn
   expect(logfire.package.entries.find(entry => entry.kind === "mcp")).toMatchObject({ url: [{ environment: { name: "LOGFIRE_MCP_URL", default: ["https://logfire-us.pydantic.dev/mcp"] } }] })
   expect(logfire.package.secrets).toEqual([])
 })
+
+test("ambiguous exported option names preserve each source key and report the environment name", async () => {
+  const convert = (await converter()).convertPluginTree
+  const original = await captureStandardFixture("claude:langfuse-observability")
+  const manifest = JSON.parse(new TextDecoder().decode(await original.readFile(".claude-plugin/plugin.json")))
+  manifest.userConfig.cc_langfuse_debug = manifest.userConfig.CC_LANGFUSE_DEBUG
+  const converted = await convert(await captureStandardFixture("claude:langfuse-observability", { ".claude-plugin/plugin.json": JSON.stringify(manifest) }))
+  expect(converted.package.options?.CC_LANGFUSE_DEBUG?.default).toBe(false)
+  expect(converted.package.options?.cc_langfuse_debug?.default).toBe(false)
+  expect(converted.package.diagnostics).toContainEqual(expect.objectContaining({ field: "/userConfig", message: "Plugin option environment name is ambiguous: CLAUDE_PLUGIN_OPTION_CC_LANGFUSE_DEBUG" }))
+})

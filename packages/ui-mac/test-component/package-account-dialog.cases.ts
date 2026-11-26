@@ -102,3 +102,39 @@ test("I-15 the official Registry GitHub server's token form links to where GitHu
   expect([packageId, !!link()]).toEqual([packageId, false])
  }
 })
+
+
+test("package service settings preserve false zero empty text and keep sensitive input transient", async () => {
+  const base = { kind: "option" as const, componentId: "bundle:langfuse", serviceName: "langfuse", configured: false, required: false, sensitive: false, description: "Source option description" }
+  const h = mount([
+    { ...base, prerequisiteId: "debug", key: "CC_LANGFUSE_DEBUG", label: "Debug logging", type: "boolean", value: true },
+    { ...base, prerequisiteId: "max", key: "CC_LANGFUSE_MAX_CHARS", label: "Max characters", type: "number", value: 20000 },
+    { ...base, prerequisiteId: "user", key: "LANGFUSE_USER_ID", label: "User ID", type: "string", value: "default user" },
+    { ...base, prerequisiteId: "secret", key: "LANGFUSE_SECRET_KEY", label: "Langfuse Secret Key", type: "string", sensitive: true },
+  ], "debug")
+  await flush()
+  const checkbox = document.querySelector<HTMLInputElement>('input[type="checkbox"]')!
+  checkbox.checked = false; checkbox.dispatchEvent(new Event("change", { bubbles: true }))
+  const number = document.querySelector<HTMLInputElement>('input[type="number"]')!
+  number.value = "0"; number.dispatchEvent(new Event("input", { bubbles: true }))
+  const text = document.querySelector<HTMLInputElement>('input[type="text"]')!
+  text.value = ""; text.dispatchEvent(new Event("input", { bubbles: true }))
+  const secret = document.querySelector<HTMLInputElement>('input[type="password"]')!
+  secret.value = "UI_TRANSIENT_TEST_TOKEN"; secret.dispatchEvent(new Event("input", { bubbles: true }))
+  expect(document.body.innerHTML).not.toContain("UI_TRANSIENT_TEST_TOKEN")
+  expect(document.body.textContent).toContain("Source option description")
+  document.querySelector<HTMLButtonElement>('.a-dialog-footer button')!.click(); await flush()
+  expect(h.writes).toEqual([{ packageId: "main-package", options: { CC_LANGFUSE_DEBUG: false, CC_LANGFUSE_MAX_CHARS: 0, LANGFUSE_USER_ID: "", LANGFUSE_SECRET_KEY: "UI_TRANSIENT_TEST_TOKEN" } }])
+})
+
+test("connector version suggestion is prefilled and clearing it submits the original-command choice", async () => {
+  const h = mount([{ kind: "mcp-version", componentId: "mcp:xcodebuildmcp", prerequisiteId: "version", serviceName: "xcodebuildmcp", label: "xcodebuildmcp", key: "mcp:xcodebuildmcp", token: "xcodebuildmcp@latest", value: "2.0.0", suggestion: "2.0.0" }], "version")
+  await flush()
+  const input = document.querySelector<HTMLInputElement>('input[type="text"]')!
+  expect(input.value).toBe("2.0.0")
+  expect(input.required).toBe(false)
+  expect(document.body.textContent).toContain("留空使用原命令：xcodebuildmcp@latest")
+  input.value = ""; input.dispatchEvent(new Event("input", { bubbles: true }))
+  document.querySelector<HTMLButtonElement>('.a-dialog-footer button')!.click(); await flush()
+  expect(h.writes).toEqual([{ packageId: "main-package", mcpVersions: { "mcp:xcodebuildmcp": "" } }])
+})

@@ -302,7 +302,7 @@ export const CodePuppyExt: Plugin.Plugin = {
           const hostName = installed.hostNames[entry.id]
           return entry.kind === "mcp" && hostName && installed.settings ? [{ hostName, sourceName: entry.sourceName, packageId: installed.settings.packageId }] : []
         }))
-        aliasPluginMcpTools(event.tools, await context.tool.list(), servers)
+        policy.registerModelToolAliases(aliasPluginMcpTools(event.tools, await context.tool.list(), servers))
       })
       // REQ-236 `#1562`:平台代理节点的凭据每次请求现读,续期热应用不必重启引擎;读不到就抛,请求不发出。
       // 写在 http.request:2.x 的路由层在 model.request 之后才按 apiKey 写 Authorization(packages/ai/src/route/auth.ts),

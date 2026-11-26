@@ -39,6 +39,7 @@ import type { HubBridge, HubInstallSubject } from "../hub-bridge"
 import { denyHubMutationForAutomation, hubInstallAsk } from "../hub-tools"
 
 export interface PolicyRegistration {
+  registerModelToolAliases(aliases: ReadonlyMap<string, string>): void
   /** Last statement of the extension's `setup`: registers the parts that must see every earlier registration. */
   readonly seal: () => Promise<void>
   /**
@@ -112,9 +113,10 @@ export async function registerPolicy(context: Plugin.Context, unattended: Unatte
     return tools.map((tool) => toolFacts(tool, input))
   }
 
+  const modelToolAliases = new Map<string, string>()
   const factsFor = async (name: string) => {
     if (name === CODE_MODE_TOOL) return codeModeFacts()
-    return (await allFacts()).find((facts) => facts.technicalId === name)
+    return (await allFacts()).find((facts) => facts.technicalId === (modelToolAliases.get(name) ?? name))
   }
 
   const catalog = createCatalog({
@@ -230,6 +232,7 @@ export async function registerPolicy(context: Plugin.Context, unattended: Unatte
   }) as never)
 
   return {
+    registerModelToolAliases: (aliases: ReadonlyMap<string, string>) => { for (const [alias, original] of aliases) modelToolAliases.set(alias, original) },
     askInstall: async (call) => {
       const key = installCallKey(call)
       const prepared = installAsks.get(key)

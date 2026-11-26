@@ -93,6 +93,8 @@ export const dict = {
   "codepuppy.ext.packageChangeToken": "Replace",
   "codepuppy.ext.packageLogin": "Log in",
   "codepuppy.ext.packageRelogin": "Log in again",
+  "codepuppy.ext.packageVersion": "{{name}} version (optional)",
+  "codepuppy.ext.packageVersionHint": "Leave empty to use the source command: {{token}}.",
   "codepuppy.ext.packageSettingsTitle": "Settings for {{name}}",
   "codepuppy.ext.packageSettingsPurpose": "Configure this package. Changes apply to the services that use these values.",
   "codepuppy.ext.packageConfigure": "Configure",

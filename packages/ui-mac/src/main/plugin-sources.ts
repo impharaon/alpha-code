@@ -753,3 +753,17 @@ function pax(bytes: Uint8Array): Record<string, string> {
   }
   return fields
 }
+
+
+/** A hint from the same metadata authority as source discovery; unavailable metadata never pins a command. */
+export async function suggestPluginVersion(entry: Extract<import("../shared/host-extension-package-contract/plugin-package").Entry, { kind: "mcp" }>, request: (url: string, init?: RequestInit) => Promise<Response> = fetch) {
+  if (entry.transport !== "stdio" || !entry.floatingVersion || entry.command[0]?.[0] !== "npx") return
+  const name = entry.floatingVersion.token.replace(/(?<!^)@[^@/]*$/, "")
+  if (!/^(?:@[a-z0-9._-]+\/)?[a-z0-9._-]+$/i.test(name)) return
+  try {
+    const response = await request(NPM_REGISTRY + "/" + encodeURIComponent(name) + "/latest", { signal: AbortSignal.timeout(PLUGIN_SOURCE_DEADLINE_MS) })
+    if (!response.ok) return
+    const metadata: unknown = await response.json()
+    return metadata && typeof metadata === "object" && "name" in metadata && metadata.name === name && "version" in metadata && typeof metadata.version === "string" ? metadata.version : undefined
+  } catch { return }
+}

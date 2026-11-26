@@ -1,7 +1,9 @@
+import { pluginDataHome, preparePluginData, discardPreparedPluginData } from "./plugin-package-data"
+import { suggestPluginVersion } from "./plugin-sources"
 import { existsSync, lstatSync, readFileSync } from "node:fs"
 import { join } from "node:path"
 import { createHash } from "node:crypto"
-import { INSTALLED_PLUGIN_SETTINGS_FILE, pluginOptionValue, readInstalledPluginSettings, validInstalledPluginSettings, type InstalledPluginSettingsV1 } from "../shared/installed-plugin-settings"
+import { INSTALLED_PLUGIN_SETTINGS_FILE, pluginOptionValue, storedPluginOption, readInstalledPluginSettings, validInstalledPluginSettings, type InstalledPluginSettingsV1 } from "../shared/installed-plugin-settings"
 import { INSTALLED_PLUGIN_PACKAGE_FILE, validInstalledPluginPackage } from "../shared/installed-plugin-package"
 import type { PluginPackage } from "../shared/host-extension-package-contract/plugin-package"
 import type { PackageAuthorizationItemV1 } from "../shared/package-admission"
@@ -23,18 +25,53 @@ export function installedPluginDescription(root: string, graph: PackageGraphV1) 
   } catch { return }
 }
 
+/** Every whole-package source uses this private settings/data preparation, outside immutable content. */
+export function preparePluginSettings(input: { root: string; storeKey: string; packageId: string; server: string; description: PluginPackage; userDataPath: string; dataHome?: () => string; privateCredentials?: ReadonlyMap<string, Uint8Array> }) {
+  const settings: InstalledPluginSettingsV1 = structuredClone(readInstalledPluginSettings(input.root, input.storeKey) ?? { packageId: input.packageId, dataHome: (input.dataHome ?? pluginDataHome)(), values: {}, secretRefs: {}, versions: {}, mcpVersions: {} })
+  const defaults = Object.fromEntries(Object.entries(input.description.options ?? {}).flatMap(([key, option]) => {
+    if (typeof option.default !== "object" || settings.secretRefs[option.default.secret]) return []
+    const bytes = input.privateCredentials?.get(option.default.secret)
+    if (!bytes) return []
+    const value = new TextDecoder().decode(bytes)
+    return [[key, option.type === "string" ? value : JSON.parse(value) as number | boolean]]
+  }))
+  const prepared = preparePluginOptionSecrets({ description: input.description, settings, server: input.server, userDataPath: input.userDataPath, values: defaults })
+  let data: ReturnType<typeof preparePluginData> | undefined
+  return { settings, item: pluginSettingsItem(input.storeKey, settings), prepared,
+    populateData: () => { data ??= preparePluginData(settings.dataHome, input.packageId) },
+    discardData: () => { if (data?.created) discardPreparedPluginData(data.directory) },
+  }
+}
+
 export function pluginOptionAuthorization(root: string, graph: PackageGraphV1): PackageAuthorizationItemV1[] {
   const installed = installedPluginDescription(root, graph)
   const settings = graph.pluginTree && readInstalledPluginSettings(root, graph.pluginTree.storeKey)
   if (!installed || !settings) return []
   return Object.entries(installed.description.options ?? {}).map(([key, option]) => {
-    const value = pluginOptionValue(option, settings.values[key])
+    const value = pluginOptionValue(option, storedPluginOption(settings, key))
     const configured = typeof value === "object" ? !!settings.secretRefs[value.secret] && existsSync(settings.secretRefs[value.secret]!.slice(6, -1)) : value !== undefined
     return { kind: "option", componentId: graph.root.componentId!, prerequisiteId: graph.packageId + "#option:" + key, serviceName: graph.root.name, label: option.title,
       key, type: option.type, description: option.description, required: option.required, sensitive: option.sensitive, configured,
       ...(!option.sensitive && value !== undefined && typeof value !== "object" ? { value } : {}),
     }
   })
+}
+
+export async function pluginVersionAuthorization(root: string, graph: PackageGraphV1, suggestion = suggestPluginVersion): Promise<PackageAuthorizationItemV1[]> {
+  const installed = installedPluginDescription(root, graph)
+  const settings = graph.pluginTree && readInstalledPluginSettings(root, graph.pluginTree.storeKey)
+  if (!installed || !settings) return []
+  return Promise.all(installed.description.entries.flatMap(entry => {
+    const hostName = installed.hostNames[entry.id]
+    const declaration = graph.declarations?.find(item => item.kind === "mcp" && item.hostName === hostName)
+    if (entry.kind !== "mcp" || entry.transport !== "stdio" || !entry.floatingVersion || !declaration) return []
+    return [(async (): Promise<PackageAuthorizationItemV1> => {
+      const suggested = settings.mcpVersions[entry.id] === undefined ? await suggestion(entry) : undefined
+      return { kind: "mcp-version", componentId: declaration.componentId, prerequisiteId: graph.packageId + "#version:" + entry.id, serviceName: hostName, label: entry.sourceName, key: entry.id,
+        token: entry.floatingVersion!.token, value: settings.mcpVersions[entry.id] ?? suggested ?? "", ...(suggested ? { suggestion: suggested } : {}),
+      }
+    })()]
+  }))
 }
 
 /** Uses the same D5 versioned resource/store as connector secrets, owned once by the bundle. */
@@ -46,7 +83,7 @@ export function preparePluginOptionSecrets(input: { description: PluginPackage; 
     if (!need) throw Error("Undeclared sensitive plugin option")
     const ref = mcpSecretVersionedRef(input.userDataPath, input.server, version, need.id)
     input.settings.secretRefs[need.id] = ref
-    input.settings.versions[key] = version
+    input.settings.versions = { ...input.settings.versions, [key]: version }
     return { id: need.id, value: JSON.stringify(value), file: ref.slice(6, -1) }
   })
   return { descriptor: { kind: "mcp-secret-version", store: "codepuppy-mcp-secrets", server: input.server, version }, files: secrets.map(secret => secret.file),
@@ -62,11 +99,19 @@ export function preparePluginOptionSecrets(input: { description: PluginPackage; 
   }
 }
 
-export async function savePluginOptions(graph: PackageGraphV1, options: unknown, deps: PackageAdmissionDeps) {
+export async function savePluginOptions(graph: PackageGraphV1, options: unknown, deps: PackageAdmissionDeps, mcpVersions?: unknown) {
   const installed = installedPluginDescription(deps.root(), graph)
   const before = graph.pluginTree && readInstalledPluginSettings(deps.root(), graph.pluginTree.storeKey)
   if (!installed || !before || !options || typeof options !== "object" || Array.isArray(options)) return { ok: false as const, reason: "invalid plugin settings" }
   const settings = structuredClone(before)
+  if (mcpVersions !== undefined) {
+    if (!mcpVersions || typeof mcpVersions !== "object" || Array.isArray(mcpVersions)) return { ok: false as const, reason: "invalid connector versions" }
+    for (const [id, version] of Object.entries(mcpVersions)) {
+      const entry = installed.description.entries.find(entry => entry.id === id)
+      if (typeof version !== "string" || entry?.kind !== "mcp" || entry.transport !== "stdio" || !entry.floatingVersion) return { ok: false as const, reason: "undeclared connector version" }
+      settings.mcpVersions[id] = version
+    }
+  }
   const sensitive: Record<string, string | number | boolean> = {}
   for (const [key, value] of Object.entries(options)) {
     const option = installed.description.options?.[key]
@@ -75,11 +120,11 @@ export async function savePluginOptions(graph: PackageGraphV1, options: unknown,
     if (option.sensitive) {
       const need = installed.description.secrets.find(need => need.componentId === "$package" && need.label === key)
       if (!need) return { ok: false as const, reason: "invalid plugin option declaration" }
-      settings.values[key] = { secret: need.id }
+      settings.values = { ...settings.values, [key]: { secret: need.id } }
       sensitive[key] = scalar
-    } else settings.values[key] = scalar
+    } else settings.values = { ...settings.values, [key]: scalar }
   }
-  if (!Object.keys(options).length) return { ok: true as const }
+  if (!Object.keys(options).length && mcpVersions === undefined) return { ok: true as const }
   const prepared = preparePluginOptionSecrets({ description: installed.description, settings, server: graph.root.name, userDataPath: deps.userDataPath, values: sensitive, version: deps.secretVersionId?.() })
   const result = await (deps.transaction ?? runExtensionTransaction)(deps.root(), {
     items: [pluginSettingsItem(graph.pluginTree!.storeKey, settings)], prepared: prepared ? [prepared.descriptor] : [],

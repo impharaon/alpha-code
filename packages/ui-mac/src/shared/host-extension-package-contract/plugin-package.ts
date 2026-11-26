@@ -329,6 +329,8 @@ export function validPluginOption(value: unknown): value is PluginOption {
   return object(value) && keys(value, ["type", "title", "description", "required", "sensitive", "default"]) && ["string", "number", "boolean"].includes(String(value.type)) && typeof value.title === "string" && typeof value.description === "string" && typeof value.required === "boolean" && typeof value.sensitive === "boolean" && (value.default === undefined || typeof value.default === value.type && (typeof value.default !== "number" || Number.isFinite(value.default)) || value.sensitive === true && object(value.default) && keys(value.default, ["secret"]) && typeof value.default.secret === "string")
 }
 
+export function pluginOptionEnvironmentName(key: string): string { return "CLAUDE_PLUGIN_OPTION_" + key.toUpperCase() }
+
 export function renderPluginText(text: Text, paths: Pick<PackageTextBindings, "pluginRoot" | "projectDir"> & Partial<PackageTextBindings>): string {
   return text.map(part => {
     if (typeof part === "string") return part

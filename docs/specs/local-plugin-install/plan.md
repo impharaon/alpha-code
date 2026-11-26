@@ -464,3 +464,18 @@ S-09 main→sidecar update 另加生产 fork 消息的 ack 行为用例：`serve
 r2 别名权限补红：真实 core 的 ModelRequest 已验证同一对象别名执行原注册 executor（1 pass）；进一步把原 MCP canonical identity 的停用记录写进既有 policy store，真实 ext 宿主却在 `execute.before` 报 unknown-tool-identity，未读到原规则。恢复 HEAD 的三个别名生产模块后，具名 `long plugin MCP names...` exit 1，0 pass / 1 fail，日志 `/tmp/plugin-standard-r2-alias-policy-red.log`；正确断言要求拒绝消息使用原 MCP identity。先提交该回归，再让同一 awaited context 产出的映射被唯一 policy facts 查询消费，保持实际执行/权限/MCP 身份不变。
 
 必要文件增量：`packages/ext/src/policy/index.ts` 超出初始文件列表，是上述回归的同调用链唯一 factsFor 拥有者；engine 的 execute.before 使用模型别名，不能另造权限 evaluator 或在后置 hook 事后改名。这里只登记本 Location 的已验证 MCP 名字映射并回查现有 allFacts，没有新增权限策略、公开端口或 engine 接管。
+
+r2 设置/身份最终接线：直接来源与已存在的签名 profile admission 共用 `preparePluginSettings`，其 file action、root-owned secret resource、DATA prepare/discard 仅组合既有事务回调；未改树/CAS/账本/事务算法。profile 同样保留 MCP 的包内路径和原 argv，源更新消费既有 metadata hostNames；同步一条旧的 needs-plugin-files 拒收断言。`package-admission.test.ts` 的 profile 两例 2 pass；随 source 两文件完整 68 pass / 0 fail。DataHome 只从各自实际冻结快照注入，测试 harness 明确传临时根。profile 的设置/DATA 属本节已有消费者，不新增安装路径或数据库。
+
+别名权限补红已转绿，真实 ext 宿主＋register-policy 两文件完整 123 pass / 0 fail；core ModelRequest shaping→原 tool snapshot executor 的完整文件 5 pass / 0 fail，原 executor 实际执行一次且返回原结果。最初测试错误地把 core `execute.before.tool` 当成会被还原的名字，实际它仍是模型别名；已在提交正确权限回归前纠正此探针假设，未修改已提交正确断言。policy map 仅由同一个 awaited context 中经过真实 MCP mark 核验的别名生产者登记，factsFor 回查现有 registry/allFacts，不另铸权威或第二份策略。
+
+**PARTIAL / SEAM-CHANGE-NEEDED（AC-13/14 直接入口）**：完整 SAP hana-cli 临时副本增加受控 launcher，仅替换 `.mcp.json` 的 executable、保留源 argv；launcher 与安装树均在临时目录，只收到临时 HOME/PATH/marker 环境，未运行真实 npm 包或读取用户凭据。`bun /tmp/plugin-standard-r2-content-boundary.ts` exit 1：`installOk=true, markerObservedBeforeInstallReturned=true, directControlObserved=true`；结果 `/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/plugin-content-boundary-Il7wsp/result.json`，日志 `/tmp/plugin-standard-r2-content-boundary.log`。初稿错把真实 SAP 裸 map 当 wrapped，未进入行为探针，不算验收结果；正确 probe 的实际启动和直接触发正对照均可观察。
+
+证据边界：`install-from-source.ts` 401–402 仍先 `setPackageStateV1(enabled)` 再等待 activateMcp，`ext-ipc.ts` 的 gated write 外包装同样在返回前等待 activatePackageMcp；`ext-install-planner.ts` 2975–2990 的 frozen state writer 将 logical desiredState 与 enabled config image 一起发布，单删一次 callback 不能保证并行 engine config watcher 不提前启动。现有 S4-A/B 没有开放该内容完成/运行激活接缝，不以异步排队抢时序或新增用户开关绕过。最小所需授权为 main 的 content-complete 与 runtime activation 分离及相应初始投影/admission 契约，保持默认开启、既有开关/权限/后续实际触发语义；交编排器定点开放此 frozen seam，再以同一探针闭合，不自行改片 2 的 state/gate。
+
+遗留基线：`server.test.ts:1021` — OPENCODE_CONFIG_DIR 为 `.` 的旧断言把缺失 `packages/ext/dist/server.js` 的正常警告路径也判作坏值泄漏 — 控制文件组 66 pass / 1 fail，日志 `/tmp/plugin-standard-r2-step-control.log`；新 ack 用例单独 1 pass。已核对失败断言及本地缺少 dist 事实，未找到该症状对应的 local-setup runbook，不重复无因 rerun，不修旧断言或用构建掩盖此观察；交编排器处理构建/测试基线。
+
+
+r2 最终代码核对：别名 executor 用例移入现有 ext `plugin-host.test.ts`，继续调用真实 core ModelRequest/Session/Tool registry；从 core 测试中撤出跨包宿主 helper 的导入，避免把 renderer 项目带入 core 检查。清理转换器同链失效的四个 type import，未修改未触及模块的检查规则。core、ext、ui-mac 各自 `bun typecheck` 均 exit 0；core 为 2,053 files / 2 projects。转换器＋artifact 行为文件最终 45 pass / 0 fail，直接安装文件最终 42 pass / 0 fail。
+
+AC-25 目录正反证据补足：实际包 DATA 为 0700，定义更新后原文件保留，关闭后设置及 DATA 保留；移除只清理本包目录/设置/secret 版本，兄弟包目录和外部 symlink 指向均保留。以上断言在同一个既有 install 文件，不新建场景/票号测试。Ext 最终相关组 `bun test --max-concurrency 2 src/plugin-host.test.ts src/plugin-setup-order.test.ts src/package-scope.test.ts src/policy/register-policy.test.ts src/policy/tool-policy-rpc.test.ts src/policy/unattended-policy.test.ts` exit 0，191 pass / 0 fail。

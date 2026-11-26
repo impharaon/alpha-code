@@ -1,7 +1,7 @@
 import { bindPluginMcpProxy, revokePluginMcpProxy } from "./plugin-mcp-proxy"
 import { canonicalJson, sha256Hex } from "./ext-manifest-v2"
 import { basename, dirname } from "node:path"
-import { bindPluginMcp } from "../shared/plugin-mcp-config"
+import { bindPluginMcp, PluginMcpBindingError } from "../shared/plugin-mcp-config"
 import { readInstalledPluginSettings } from "../shared/installed-plugin-settings"
 import { installedPluginDescription } from "./plugin-package-config"
 import { collectMcpFileRefPaths } from "./codepuppy-mcp-secrets"
@@ -177,7 +177,12 @@ async function applyAt(
       status: server?.status.status ?? "not-loaded",
       ...(server?.status.status === "failed" ? { detail: server.status.error } : {}),
     }
-  } catch {
+  } catch (error) {
+    if (error instanceof PluginMcpBindingError) {
+      revokePluginMcpProxy(name)
+      await client.experimental.mcp.disconnect({ server: name, location }).catch(() => undefined)
+      return { directory: target, name, status: "failed", detail: error.message }
+    }
     return { directory: target, name, status: "unavailable", detail: "Connector could not be applied; installed content is retained" }
   }
 }

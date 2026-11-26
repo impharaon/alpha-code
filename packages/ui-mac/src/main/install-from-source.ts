@@ -1,6 +1,4 @@
-import { pluginDataHome, preparePluginData, discardPreparedPluginData } from "./plugin-package-data"
-import { pluginSettingsItem, preparePluginOptionSecrets } from "./plugin-package-config"
-import { readInstalledPluginSettings } from "../shared/installed-plugin-settings"
+import { preparePluginSettings } from "./plugin-package-config"
 import { buildPluginPackageTxItems, pluginHostName, pluginComponentId, pluginMcpConfig, needsPluginFiles } from "./plugin-package-install"
 import { convertCreatedPlugin } from "./created-plugin"
 import { renderPluginText } from "../shared/host-extension-package-contract/plugin-package"
@@ -178,17 +176,7 @@ export function createSourceInstaller(deps: Dependencies) {
       const skillReceipts: UpsertInput[] = []
       const rootName = "plugin-" + sha256Hex(packageId).slice(0, 24)
       const rootKey = "bundle--" + rootName
-      const existingSettings = readInstalledPluginSettings(deps.globalRoot(), rootKey)
-      const settings = wholePackage ? structuredClone(existingSettings ?? { packageId, dataHome: (deps.dataHome ?? pluginDataHome)(), values: {}, secretRefs: {}, versions: {} }) : undefined
-      const optionDefaults = Object.fromEntries(Object.entries(converted.package.options ?? {}).flatMap(([key, option]) => {
-        if (!settings || typeof option.default !== "object" || settings.secretRefs[option.default.secret]) return []
-        const bytes = converted.privateCredentials.get(option.default.secret)
-        if (!bytes) return []
-        const value = new TextDecoder().decode(bytes)
-        return [[key, option.type === "string" ? value : JSON.parse(value) as number | boolean]]
-      }))
-      const optionPrepared = settings ? preparePluginOptionSecrets({ description: converted.package, settings, server: rootName, userDataPath: deps.userDataPath, values: optionDefaults }) : undefined
-      let preparedData: ReturnType<typeof preparePluginData> | undefined
+      const pluginSettings = wholePackage ? preparePluginSettings({ root: deps.globalRoot(), storeKey: rootKey, packageId, server: rootName, description: converted.package, userDataPath: deps.userDataPath, dataHome: deps.dataHome, privateCredentials: converted.privateCredentials }) : undefined
       const installedNames = new Map(mapped.map(item => [item.entry.id, item.hostName]))
       const declarations: PackageDeclarationV1[] = []
       const nodes: PackageGraphNodeV1[] = []
@@ -304,7 +292,7 @@ export function createSourceInstaller(deps: Dependencies) {
       }) : undefined
       if (rootBuild && !rootBuild.ok) return { ok: false, code: "transaction-failed", detail: rootBuild.reason }
       if (rootBuild?.ok) builds.unshift(rootBuild.build)
-      if (settings && rootBuild?.ok) rootBuild.build.items.push(pluginSettingsItem(rootKey, settings))
+      if (pluginSettings && rootBuild?.ok) rootBuild.build.items.push(pluginSettings.item)
       const graph: PackageGraphV1 = {
         packageId,
         envelopeDigest: converted.package.treeDigest,
@@ -351,7 +339,7 @@ export function createSourceInstaller(deps: Dependencies) {
         claimMutations: planPackageClaimTransferV1(diff.diff),
         childRemovals: departing.map((node) => ({ kind: node.kind, name: node.name })),
       }
-      const prepared = [...builds.flatMap((build) => (build.prepared ? [build.prepared] : [])), ...(optionPrepared ? [optionPrepared] : [])]
+      const prepared = [...builds.flatMap((build) => (build.prepared ? [build.prepared] : [])), ...(pluginSettings?.prepared ? [pluginSettings.prepared] : [])]
       const result = await runExtensionTransaction(
         deps.globalRoot(),
         { items, ...(prepared.length ? { prepared: prepared.map((resource) => resource.descriptor) } : {}) },
@@ -359,7 +347,7 @@ export function createSourceInstaller(deps: Dependencies) {
           populate: (item, directory) => {
             const build = builds.find((build) => build.items.some((candidate) => candidate.key === item.key))
             build?.populate(item, directory)
-            if (settings && !preparedData) preparedData = preparePluginData(settings.dataHome, packageId)
+            pluginSettings?.populateData()
           },
           probe: builds[0]!.probe,
           precondition: () => {
@@ -397,7 +385,7 @@ export function createSourceInstaller(deps: Dependencies) {
         },
       )
       if (!result.ok) {
-        if (preparedData?.created) discardPreparedPluginData(preparedData.directory)
+        pluginSettings?.discardData()
         return { ok: false, code: "transaction-failed", detail: "Package transaction failed at " + result.stage }
       }
       for (const build of builds.filter((build) => build.receipt.kind === "mcp")) {

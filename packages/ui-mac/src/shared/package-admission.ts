@@ -38,9 +38,10 @@ export type PackageNotRunningV1 = { kind: string; sourceName: string; reason: No
 
 /** Installed package account view: declarations and presence/status only, never secret references. */
 export type PackageOptionValuesV1 = Record<string, string | number | boolean>
-export type PackageSettingsIntentV1 = { packageId: string; secrets?: Record<string, string>; options?: PackageOptionValuesV1 }
+export type PackageSettingsIntentV1 = { packageId: string; secrets?: Record<string, string>; options?: PackageOptionValuesV1; mcpVersions?: Record<string, string> }
 
 export type PackageAuthorizationItemV1 =
+  | { kind: "mcp-version"; componentId: string; prerequisiteId: string; serviceName: string; label: string; key: string; token: string; value: string; suggestion?: string }
   | { kind: "option"; componentId: string; prerequisiteId: string; serviceName: string; label: string; key: string; type: "string" | "number" | "boolean"; description: string; required: boolean; sensitive: boolean; configured: boolean; value?: string | number | boolean }
   | { kind: "secret"; componentId: string; prerequisiteId: string; serviceName: string; label: string; saved: boolean }
   | { kind: "mcp-oauth"; componentId: string; prerequisiteId: string; serviceName: string; label: string; authenticated: boolean; status: string }

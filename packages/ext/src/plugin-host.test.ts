@@ -1654,3 +1654,32 @@ it.live("long plugin MCP names are aliased by the awaited context hook without c
   expect(Exit.isFailure(refused)).toBe(true)
   expect(JSON.stringify(refused)).toContain("Code Puppy tool policy denied " + canonical)
 }))
+
+it.effect("long plugin MCP aliases execute the original registered tool after model request shaping", () => Effect.gen(function* () {
+  const { mcpToolMark } = yield* Effect.promise(() => import("../../core/src/tool/codepuppy-mcp-tool-mint"))
+  const { aliasPluginMcpTools } = yield* Effect.promise(() => import("./plugin-package-tools"))
+  const { SessionModelRequest } = yield* Effect.promise(() => import("../../core/src/session/model-request"))
+  const { SessionModelTransport } = yield* Effect.promise(() => import("../../core/src/session/model-transport"))
+  const { SessionRunnerModel } = yield* Effect.promise(() => import("../../core/src/session/runner/model"))
+  const { OpenAIChat } = yield* Effect.promise(() => import("../../ai/src/protocols"))
+  const location = yield* Location.Service
+  const sessions = yield* Sessions.Service
+  const session = yield* sessions.create({ location: { directory: location.directory }, title: "MCP alias executor" })
+  const model = SessionRunnerModel.resolved(OpenAIChat.route.model({ id: "gpt-5.5", provider: "test" }), { capabilities: { tools: true, input: ["text"], output: ["text"] }, cost: [], limit: { context: 200000, output: 32000 } })
+  const transport = SessionModelTransport.Service.of({ bind: () => ({ execute: () => Effect.die("unused WebSocket execution") }), close: () => Effect.void, closeAll: Effect.void })
+  const registry = yield* Tool.Service
+  const hooks = yield* PluginHooks.Service
+  const server = { hostName: "cloudinary-a123456789", sourceName: "Cloudinary", packageId: "claude:cloudinary" }
+  const name = "get_asset_" + "details_".repeat(8)
+  let executions = 0
+  yield* registry.transform(editor => editor.add({ name, description: "asset details", input: { type: "object", properties: {} }, options: { namespace: server.hostName, codemode: false }, ...mcpToolMark(server.hostName, name), execute: () => Effect.sync(() => { executions++; return { content: "original MCP executor" } }) }))
+  const registered = yield* registry.list()
+  yield* hooks.register("session", "context", event => Effect.sync(() => { aliasPluginMcpTools(event.tools, registered, [server]) }))
+  const requests = yield* SessionModelRequest.Service.pipe(Effect.provide(SessionModelRequest.layer), Effect.provideService(SessionModelTransport.Service, transport))
+  const prepared = yield* requests.primary({ session, agent: "build" as never, model, system: [], messages: [], tools: yield* registry.snapshot() })
+  const alias = prepared.request.tools.find(tool => tool.name.startsWith(server.hostName + "_"))!.name
+  expect(alias.length).toBe(64)
+  const result = yield* prepared.executeTool({ sessionID: session.id, agent: "build" as never, messageID: "msg_alias" as never, call: { type: "tool-call", id: "call_alias", name: alias, input: {} } })
+  expect(result.content).toEqual([{ type: "text", text: "original MCP executor" }])
+  expect(executions).toBe(1)
+}))

@@ -281,3 +281,16 @@ test("I-13 tool policy write: requests (save / reset) and replies (ok / ok with 
   ])
     expect(messages.parseToolPolicyWriteReply(bad), JSON.stringify(bad)).toBeUndefined()
 })
+
+test("package option and version states round trip while sensitive values never enter the reply", async () => {
+  const messages = await import("./codepuppy-sidecar-messages")
+  const base = { componentId: "bundle:settings", prerequisiteId: "debug", serviceName: "service", label: "Debug", kind: "option" as const, key: "DEBUG", type: "boolean" as const, description: "Source description", required: false, sensitive: false, configured: true, value: false }
+  const reply = messages.buildPackageAuthorizationReply(7, { ok: true, packageId: "claude:settings", items: [base, { ...base, key: "SECRET", type: "string", sensitive: true, value: "DO_NOT_RETURN_THIS_VALUE" }, { kind: "mcp-version", componentId: "mcp:tool", prerequisiteId: "version", serviceName: "tool", label: "Tool", key: "mcp:tool", token: "tool@latest", value: "2.0.0", suggestion: "2.0.0" }] })
+  expect(messages.parsePackageAuthorizationReply(reply)).toEqual(reply)
+  expect(JSON.stringify(reply)).not.toContain("DO_NOT_RETURN_THIS_VALUE")
+  expect(reply.result).toMatchObject({ items: [{ value: false }, { sensitive: true }, { value: "2.0.0", suggestion: "2.0.0" }] })
+  const invalid = structuredClone(reply)
+  if (!invalid.result.ok) throw Error("expected state")
+  Object.assign(invalid.result.items[1]!, { value: "DO_NOT_RETURN_THIS_VALUE" })
+  expect(messages.parsePackageAuthorizationReply(invalid)).toBeUndefined()
+})

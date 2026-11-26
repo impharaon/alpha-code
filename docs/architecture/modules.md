@@ -75,3 +75,5 @@ review_after: 2027-05-09
 `plugin-package-data.ts` 消费 server 从实际 sidecar 围栏快照发布的 dataHome，创建和清理各包 DATA；更新/关闭保留，整包卸载不跟随目录内符号链接。`src/shared/plugin-mcp-config.ts` 在运行边界绑定规范化 MCP 的 Text/argv、选项和环境，随后消费 ext 的唯一 `projectServerConfig`。`packages/ext/src/plugin-package-tools.ts` 在 awaited context hook 改长 MCP 函数的模型别名，保留定义对象和原执行身份。
 
 本机 MCP 的私有网络绑定由 `packages/ui-mac/src/main/plugin-mcp-proxy.ts` 持有，已安装定义经主进程运行收敛铸造后，只走受控 sidecar 内存消息。既有 `network-egress-proxy.ts` 对绑定端点提供鉴权 HTTP pipe/CONNECT；各绑定单独跟踪和撤销流，不进入通用 host:port 表。`packages/util/src/codepuppy-plugin-mcp.ts` 在单个 MCP 实例提供 per-fetch 代理，保留 `NO_PROXY` 和普通出网权威。精确的 engine Fetch 组合点及会变红的证据见 `codepuppy-authority-registry.json` 的 `plugin-local-mcp`。
+
+`plugin-package-config.ts` 的同一设置/DATA preparation 同时服务直接来源和签名 profile 的现有 admission。可选 MCP 版本沿声明的 floating token 位置绑定；清空恢复源 argv，建议由现有来源模块读取 metadata。模型别名映射同时交回 ext 的唯一 policy facts 查询，原 canonical identity 的停用/询问规则继续生效。

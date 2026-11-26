@@ -92,6 +92,8 @@ export const dict = {
   "codepuppy.ext.packageFillToken": "填写令牌",
   "codepuppy.ext.packageChangeToken": "更换",
   "codepuppy.ext.packageLogin": "登录",
+  "codepuppy.ext.packageVersion": "{{name}} 版本（选填）",
+  "codepuppy.ext.packageVersionHint": "留空使用原命令：{{token}}。",
   "codepuppy.ext.packageSettingsTitle": "{{name}} 设置",
   "codepuppy.ext.packageSettingsPurpose": "配置此包；保存后，对使用这些值的服务生效。",
   "codepuppy.ext.packageConfigure": "配置",

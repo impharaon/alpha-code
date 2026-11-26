@@ -115,6 +115,24 @@ function triggerAndWait<E, R>(trigger: Effect.Effect<void, E, R>) {
 }
 
 describe("InstructionDiscovery", () => {
+  it.live("retains the actual scope of configured Claude sources without labelling direct AGENTS", () =>
+    tmpdirScoped("instruction-source-scope").pipe(Effect.flatMap(tmp => {
+      const project = path.join(tmp.path, "project")
+      const home = path.join(tmp.path, "home")
+      const config = path.join(tmp.path, "config")
+      const paths = [path.join(project, "CLAUDE.md"), path.join(project, "CLAUDE.local.md"), path.join(project, ".claude/rules/style.md"), path.join(home, "CLAUDE.md"), path.join(project, "AGENTS.md")]
+      return Effect.gen(function* () {
+        yield* Effect.promise(async () => {
+          for (const file of paths) { await fs.mkdir(path.dirname(file), { recursive: true }); await fs.writeFile(file, "scope source") }
+        })
+        const discovery = yield* start()
+        const files = yield* discovery.list()
+        expect(Array.isArray(files) ? files.filter(file => file.source).map(file => file.source) : []).toEqual(paths.slice(0, 4).map((file, index) => ({ sourcePath: file, scope: ["Project", "Local", "Project", "User"][index] })))
+        expect(Array.isArray(files) ? files.find(file => file.path === paths[4])?.source : undefined).toBeUndefined()
+      }).pipe(Effect.provide(instructionLayer({ home, config, instructions: paths, locationServiceLayer: Layer.succeed(Location.Service, location(Location.Ref.make({ directory: AbsolutePath.make(project) }))) })))
+    })),
+  )
+
   it.effect("preserves instruction source provenance through editing and admission encoding", () =>
     Effect.gen(function* () {
       const discovery = yield* InstructionDiscovery.Service

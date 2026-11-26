@@ -8,13 +8,13 @@ import { testEgressDial } from "../../test-component/egress-upstream-fixture"
 // 其余:未登记的名字一次 DNS 都不发;非 CONNECT 405;坏 authority 400;登记了但拨不通 502 / 解析不了 503 / 拨号超时 504
 // (与 403 可辨,`#1572`);静默隧道兜底与放行 / 关闭记录的新字段(`#1572` AC2)。
 
-import { afterEach, beforeEach, describe, expect, test } from "bun:test"
+import { afterEach, beforeEach, describe, expect, spyOn, test } from "bun:test"
 import { createNetworkEgressActivity } from "./network-egress-activity"
 import { createNetworkEgressApproval } from "./network-egress-approval"
 import type { EgressApproval, NetworkOutbound } from "../shared/network-egress-wire"
 import * as net from "node:net"
 import { egressPolicyDenialOf } from "../shared/egress-denial"
-import { __resetEgressGrantsForTests } from "./network-egress-grants"
+import { configureEgressGrantApproval, __resetEgressGrantsForTests } from "./network-egress-grants"
 import { EGRESS_DENIED_BODY_PREFIX, parseConnectAuthority, startEgressPolicyProxy, type EgressLogRecord, type EgressProxyHandle } from "./network-egress-proxy"
 
 type Target = { port: number; connections: number; closedSockets: number; close: () => Promise<void> }
@@ -683,4 +683,54 @@ test("系统代理指回策略端口时不递归，也不擅自追加直连", as
     const response = await rawRequest(handle.port, "CONNECT example.com:443 HTTP/1.1\r\nHost: example.com:443\r\n\r\n")
     expect(response.status).toBe(502); expect(response.body, host).toContain("EPROXYLOOP"); expect(dialed).toBe(0)
   }
+})
+
+test("路由查询中全 allow 变为混合档时回到真实对话卡片，决定后同一 CONNECT 成功", async () => {
+  const target = await withTarget()
+  const activity = createNetworkEgressActivity()
+  let ack!: () => void
+  const post = (message: NetworkOutbound) => { if (message.type === "codepuppy.network.activity.reply") ack() }
+  activity.attach(1, post, { session: async () => ({}), shell: async () => true })
+  const session = { generation: 1, sessionID: "ses_a", directory: "/project" }
+  await new Promise<void>((resolve) => {
+    ack = resolve
+    activity.receive({ type: "codepuppy.network.snapshot", id: 1, generation: 1, seq: 1, activities: [{ kind: "tool", invocationID: "tool", ref: { ...session, messageID: "msg_a", callID: "call" }, tool: "shell" }] }, post)
+  })
+  const service = createNetworkEgressApproval({ available: true, activity, store: { read: () => ({ ok: true, absent: true, sites: [] }), write: () => {} }, log: () => {} })
+  cleanups.push(async () => service.close())
+  configureEgressGrantApproval(service)
+  await service.api.setTier({ session, tier: "allow" })
+  const card = new Promise<EgressApproval>((resolve) => service.api.subscribe(() => {
+    void service.api.listApprovals({ session }).then((result) => { if (result.ok && result.value[0]?.state === "pending") resolve(result.value[0]) })
+  }))
+  const f = await startProxy({ authorize: service.authorized, requestGrant: service.request, resolveEgressRoutes: async () => {
+    await service.api.setTier({ session, tier: "ask" })
+    return [{ kind: "direct" }]
+  }, dial: testEgressDial((_host, port) => net.connect(port, "127.0.0.1")) })
+  const response = rawRequest(f.proxy.port, `CONNECT a.example.com:${target.port} HTTP/1.1\r\nHost: a.example.com:${target.port}\r\n\r\n`)
+  const first = await Promise.race([card, response])
+  expect(first).toHaveProperty("requestID")
+  if (!("requestID" in first)) return
+  await service.api.decide({ requestID: first.requestID, decision: "allow-session" })
+  expect((await response).status).toBe(200)
+  expect(f.logs.filter((record) => record.event === "egress.grant")).toMatchObject([{ decision: "granted" }])
+  expect(f.logs.filter((record) => record.event === "egress.policy-pass")).toEqual([])
+})
+
+test("档位重查迟于拨号到期时只记一次 504，不补写 403 或虚假用户批准", async () => {
+  const activity = createNetworkEgressActivity()
+  const service = createNetworkEgressApproval({ available: true, activity, store: { read: () => ({ ok: true, absent: true, sites: [] }), write: () => {} }, log: () => {} })
+  cleanups.push(async () => service.close())
+  configureEgressGrantApproval(service)
+  const basis = { sessions: [{ session: { generation: 1, sessionID: "ses_a", directory: "/project" }, tier: "allow" as const }], tierRevision: 1 }
+  let release!: () => void
+  const blocked = new Promise<void>((resolve) => { release = resolve })
+  const pass = spyOn(service, "pass").mockResolvedValueOnce(basis).mockImplementationOnce(async () => { await blocked; return undefined })
+  const f = await startProxy({ authorize: () => false, dialTimeoutMs: 30 })
+  try {
+    expect((await rawRequest(f.proxy.port, "CONNECT a.example.com:443 HTTP/1.1\r\nHost: a.example.com:443\r\n\r\n")).status).toBe(504)
+    release(); await tick()
+    expect(f.logs.filter((record) => record.event === "egress.connect").map((record) => record.status)).toEqual([504])
+    expect(f.logs.filter((record) => record.event === "egress.grant")).toEqual([])
+  } finally { release(); pass.mockRestore() }
 })

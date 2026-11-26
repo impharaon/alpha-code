@@ -253,3 +253,24 @@ describe("main upload admission and one-shot consent", () => {
     expect(() => assertSafeUploadResult({ status: "cancelled", nested: { manifest: {} } })).toThrow()
   })
 })
+
+test("video uses the same sender and tenant bound consent state and retains the original sensitive path",async()=>{
+  const {createVideoUploadSnapshot}=await import("./codepuppy-upload-manifest")
+  const {fileDigest}=await import("../../resources/video-mcp/cache")
+  const file=join(import.meta.dir,"fixtures/video/platform-sample.mp4")
+  const snapshot=await createVideoUploadSnapshot({directory:"/project",path:file,originalPath:"/project/.ssh/recording.mp4",bytes:await Bun.file(file).size,sha256:await fileDigest(file),mime:"video/mp4"},"tenant-a")
+  let tenant="tenant-a",sent=0
+  const service=createMainUploadService({identity:()=>({tenantId:tenant,accessToken:"test"}),issue:async()=>jwt({schema_version:1,iss:"codepuppy-web",aud:"codepuppy-platform-upload",sub:"tenant-a",token_use:"upload_consent",purpose:"artifact.upload",scope:["artifact.upload"],iat:1,exp:4000000000,jti:"test",manifest_id:snapshot.manifest.manifest_id,manifest_sha256:snapshot.manifestSha256,egress:snapshot.manifest.egress}),dispatch:async()=>{throw new Error("not the text path")},log:()=>{}})
+  const send=async()=>{sent++;return accepted}
+  const result=await service.prepareVideo(42,snapshot,send)
+  expect(result.status).toBe("consent-required");expect(sent).toBe(0)
+  if(result.status !== "consent-required")throw new Error("expected privacy card")
+  expect(result.preview.files[0]?.path).toContain(".ssh/recording.mp4")
+  expect(await service.confirm(7,result.requestId)).toMatchObject({status:"failed",error:"upload-selection-invalid"})
+  const waiting=service.wait(result.requestId,new AbortController().signal)
+  expect(await service.confirm(42,result.requestId)).toMatchObject({status:"sent",privacy:"confirmed"})
+  expect((await waiting).status).toBe("sent");expect(sent).toBe(1)
+  const changed=await service.prepareVideo(42,snapshot,send)
+  if(changed.status !== "consent-required")throw new Error("expected privacy card")
+  tenant="tenant-b";expect(await service.confirm(42,changed.requestId)).toMatchObject({status:"failed",error:"not-authenticated"});expect(sent).toBe(1)
+})

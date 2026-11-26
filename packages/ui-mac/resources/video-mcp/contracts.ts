@@ -1,3 +1,4 @@
+import { VIDEO_MODEL_KEYS } from "@codepuppy/contracts-consumer"
 import { z } from "zod"
 
 export const milliseconds = z.int().nonnegative()
@@ -19,6 +20,7 @@ export type Frame = z.infer<typeof frame>
 export type MediaFailure = z.infer<typeof failure>
 
 export const inputs = {
+  understand: z.strictObject({ source: mediaRef, range: timeRange.optional(), question: z.string().min(1), model: z.enum(VIDEO_MODEL_KEYS).optional() }),
   info: z.strictObject({ source: mediaRef }),
   transcript: z.strictObject({ source: mediaRef, range: timeRange.optional() }),
   frames: z.strictObject({ source: mediaRef, selection: frameSelection }),
@@ -29,7 +31,10 @@ export const inputs = {
   download: z.strictObject({ url: z.url().refine((value) => ["http:", "https:"].includes(new URL(value).protocol), "HTTP video page required") }),
 }
 export type VideoToolName = keyof typeof inputs
+// The MCP executor prepares only; ext replaces this with the final product output.
+export const preparedVideo = z.strictObject({ sourceId: z.string(), sourceRange: timeRange, clip: z.strictObject({relativePath: z.string(), sha256: z.string(), bytes: z.int().nonnegative(), mime: z.string()}), sensitivity: z.strictObject({originalName: z.string(), originalPath: z.string()}) })
 export const outputs = {
+  understand: preparedVideo,
   info: z.strictObject({ sourceId: z.string(), name: z.string(), bytes: z.int().nonnegative(), durationMs: milliseconds, streams: z.array(z.strictObject({ kind: z.enum(["audio", "video", "subtitle"]), codec: z.string(), language: z.string().optional() })), cached: z.strictObject({ transcript: z.boolean(), frames: z.boolean() }) }),
   transcript: z.strictObject({ sourceId: z.string(), range: timeRange, segments: z.array(transcriptSegment), cached: z.boolean() }),
   frames: z.strictObject({ sourceId: z.string(), frames: z.array(frame), cached: z.boolean() }),
@@ -42,6 +47,7 @@ export const outputs = {
 
 export function videoToolDefinitions() {
   const descriptions: Record<VideoToolName, string> = {
+    understand: "Understand video content through the platform, including continuous visual actions. Local preparation is automatic; the host returns the complete answer with original source times.",
     info: "Probe a local video or audio file; paths are resolved in the current Location.",
     transcript: "Read the complete local transcript with source timestamps and speakers. A range filters the result, never audio coverage.",
     frames: "Extract exact, interval or scene frames with source timestamps and local OCR.",

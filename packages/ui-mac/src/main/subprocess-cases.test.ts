@@ -19,7 +19,7 @@ const HOSTS: Host[] = [
   { title: "cloud-ipc broadcast cases run green in an isolated child process", cases: "src/main/cloud-ipc.cases.ts", pass: 13, timeout: 120_000 },
   { title: "#420 云任务终态 → 系统通知的接线(SSE sink 与 cloud-save-run 状态查询两路,取消不通知,同终态只一次)", cases: "src/main/cloud-job-notify.cases.ts", pass: 8, timeout: 120_000 },
   { title: "purpose-keyed platform access token bundle auth flow", cases: "src/main/codepuppy-auth.cases.ts", pass: 64, timeout: 120_000 },
-  { title: "cloud job action-selection cases run green in an isolated child process", cases: "src/main/codepuppy-cloud-jobs.cases.ts", pass: 20, timeout: 120_000 },
+  { title: "cloud job action-selection cases run green in an isolated child process", cases: "src/main/codepuppy-cloud-jobs.cases.ts", pass: 21, timeout: 120_000 },
   { title: "cloud schedule error-surfacing cases run green in an isolated child process", cases: "src/main/codepuppy-cloud-schedules.cases.ts", pass: 7, timeout: 120_000 },
   { title: "effective catalog 失败域隔离 + BYOK 目录主权 + 目录硬切(#595 退出条件 4/5,#681,`#1556` V3)+ ac#962 分类码接线 + `#1556` AC1 空态 / AC9 已下载≠已应用", cases: "src/main/codepuppy-platform-catalog.cases.ts", pass: 16, timeout: 120_000 },
   { title: "token renewal hot-applies credentials without restarting the engine; structural renewals confirm only on their own fork", cases: "src/main/credential-hot-apply.cases.ts", pass: 8, timeout: 120_000 },

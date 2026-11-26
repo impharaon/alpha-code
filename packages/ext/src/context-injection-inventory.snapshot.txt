@@ -48,6 +48,7 @@ tool.codepuppy_register.args.type                         text      tool-arg-des
 tool.codepuppy_register.description                       text      tool-description         793    1024   77%
 tool.codepuppy_reload.args.reason                         text      tool-arg-description      43    1024    4%
 tool.codepuppy_reload.description                         text      tool-description         373    1024   36%
+video.understanding.unavailable                           text      tool-failure              72    1024    7%
 vision.system-note-offline                                text      system                   251    1024   25%
 vision.tool.refused                                       text      vision-block              24    1024    2%
 vision.video-frame-offline                                text      system                   161    1024   16%
@@ -73,6 +74,7 @@ tool-failure.websearch.invalid_response                   template  tool-failure
 tool-failure.websearch.provider_error                     template  tool-failure              64    1024    6%
 tool-failure.websearch.timeout                            template  tool-failure              51    1024    5%
 tool-failure.websearch.transport                          template  tool-failure              51    1024    5%
+video.understanding.failed                                template  tool-failure             102    1024   10%
 vision.failure.credential                                 template  vision-block             108    1024   11%
 vision.failure.image-rejected                             template  vision-block              89    1024    9%
 vision.failure.network                                    template  vision-block              76    1024    7%
@@ -102,7 +104,7 @@ rebrand.identity-kimi                                     rebrand   system      
 rebrand.identity-meta                                     rebrand   system                    84     512   16%
 rebrand.identity-trinity                                  rebrand   system                    97     512   19%
 rebrand.tool-use-meta                                     rebrand   system                    33     512    6%
-fragments: 102; injected bytes: 30500; declared limits total: 165376
+fragments: 104; injected bytes: 30674; declared limits total: 167424
 references (paths / verbs / definitions supplied by others — carry no Code Puppy text, not counted):
   ref.mcp                /mcp               云 MCP server 定义(type / url / oauth / headers.Authorization = {file:} 引用):ext 经 mcp.transform 装(cloud-websearch-kill.ts),项目 MCP 经同一 transform 补缺;ui-mac 主进程直写配置(codepuppy-config-injection.ts / cloud-sidecar-config.ts / mcp-default-deny.ts / ext-disabled-injection.ts);工具表是远端 server 的字
   ref.schema             /$schema           ui-mac 无继承 config 时种下的 JSON Schema URL(codepuppy-config-injection.ts:91)

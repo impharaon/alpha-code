@@ -1,3 +1,4 @@
+import { videoUnderstandingTransform } from "./video-understanding"
 import { existsSync, readFileSync, readdirSync } from "node:fs"
 import { join } from "node:path"
 import { pathToFileURL } from "node:url"
@@ -182,6 +183,22 @@ export const CodePuppyExt: Plugin.Plugin = {
       })
 
       await context.tool.transform((editor) => vision.transform(editor))
+      const videoFacts = await policy.videoToolFacts()
+      await context.tool.transform(
+        videoUnderstandingTransform({
+          directory,
+          bridge: processState().hubBridge,
+          verified: (tool) => {
+            const facts = videoFacts(tool as never)
+            return (
+              facts.identity.source === "mcp" &&
+              facts.identity.origin === "codepuppy-video" &&
+              facts.identity.name === "understand" &&
+              facts.authority.kind === "codepuppy-bundled"
+            )
+          },
+        }),
+      )
 
       // `#1553`(REQ-236 §2.6)/ I11':暂存附件 ⇒ 本次请求里换成读取指令;逐服务状态取本 Location 的 MCP 列表。
       const attachments = createAttachmentReaderHooks({

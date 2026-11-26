@@ -1,3 +1,7 @@
+import { verifyVideoCall } from "./codepuppy-video-call"
+import { videoCacheRoot } from "./codepuppy-video-environment"
+import { engineClient } from "./engine-client"
+import { handleVideoCloudRequest } from "./cloud-ipc"
 import type { ProjectConfigView } from "@opencode/schema/codepuppy-project-config"
 import { projectExecutableRows } from "./codepuppy-ext-trust"
 import { isCloudMcpWithheld } from "./codepuppy-config-injection"
@@ -1516,6 +1520,10 @@ export function registerExtIpcHandlers(
   })
   ipcMain.handle(HUB_READ_CHANNELS.hubRequest, (_event: IpcMainInvokeEvent, requestId: unknown) => isHubRequestId(requestId) ? hubRequests.get(requestId) : null)
   const codepuppySidecarHost: CodePuppySidecarHost = createCodePuppySidecarHost({
+    video: async request=>{
+      if(request.action === "start" || request.action === "prepare")await verifyVideoCall(request,engineClient(await awaitServer()),videoCacheRoot())
+      return handleVideoCloudRequest(request)
+    },
     view: hubView,
     requests: hubRequests,
     installName: ref => ref.kind === "created" ? ref.draft.name : pluginSources.displayNameForId(ref.id)

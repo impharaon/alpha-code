@@ -505,7 +505,7 @@ export type CloudResult<T> = T | { error: string; netLayer?: NetFailureLayer }
 export type CloudAccountStatus = AccountStatusV1
 export type UploadFindingKind = "contact" | "identity" | "credential" | "protected" | "unknown"
 export type UploadPreview = {
-  pipeline: "code-review"
+  pipeline: "code-review" | "video-understanding"
   fileCount: number
   totalBytes: number
   files: Array<{ path: string; sizeBytes: number; sensitive: boolean }>
@@ -1196,6 +1196,7 @@ export type ElectronAPI = {
     dispatch: (envelope: CloudJobEnvelope) => Promise<CloudResult<CloudDispatchResult>>
     /** Main picks, reads, classifies and freezes explicit files. Sensitive scope returns a preview only. */
     upload: (intent: CloudUploadIntent) => Promise<CloudUploadResult>
+    videoUploads: (identity?: {sessionID:string;directory:string}) => Promise<Array<{requestId:string;preview:UploadPreview}>>
     confirmUpload: (requestId: string) => Promise<CloudUploadResult>
     cancelUpload: (requestId: string) => Promise<CloudUploadResult>
     status: (jobId: string) => Promise<CloudResult<CloudJobStatus>>

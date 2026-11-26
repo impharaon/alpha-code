@@ -424,8 +424,8 @@
       "environment": {},
       "cwd": null,
       "codeSha256": {
-        "video-mcp/server.js": "43d93d5a3afb05c847a6c98620033a7e3533591dccb39be2c126484c10665608",
-        "video-mcp/speech-worker.js": "c20d7540754a96d108d187aa587e8981eca13f85e183893f645e462ae167dae8",
+        "video-mcp/server.js": "6b1bb10312da1f1a5d488e4224552191781ba712924ebb422324e2d7f34f7784",
+        "video-mcp/speech-worker.js": "839bb476175cdd9dbb845f6b9b24b120124171b349daa213e00950204a45146c",
         "video-mcp/runtime.json": "fa92a35fa8ebb81755605161bb3927c933c34e922853ce68b8d476470cc3fe71",
         "video-mcp/build.lock.json": "e3c679d089219386640c1c7adbc517b8a3b934ab4d52639ce8f796f933bcbf61",
         "video-mcp/helpers/vision": "a677c365d93289d95b8aa06d2b706c827389076095dba7b404f65edc043c07e1",
@@ -489,6 +489,169 @@
         "video-mcp/wheels/yt_dlp-2026.11.23-py3-none-any.whl": "e9188e0c559905f7ee05acc1ba0b6fb3f310e7565bf6dea5f62b5300e0775e35"
       },
       "tools": [
+        {
+          "name": "understand",
+          "description": "Understand video content through the platform, including continuous visual actions. Local preparation is automatic; the host returns the complete answer with original source times.",
+          "inputSchema": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "type": "object",
+            "properties": {
+              "source": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "kind": {
+                        "type": "string",
+                        "const": "path"
+                      },
+                      "path": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "required": [
+                      "kind",
+                      "path"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "kind": {
+                        "type": "string",
+                        "const": "id"
+                      },
+                      "id": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "required": [
+                      "kind",
+                      "id"
+                    ],
+                    "additionalProperties": false
+                  }
+                ]
+              },
+              "range": {
+                "type": "object",
+                "properties": {
+                  "startMs": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "endMs": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "required": [
+                  "startMs",
+                  "endMs"
+                ],
+                "additionalProperties": false
+              },
+              "question": {
+                "type": "string",
+                "minLength": 1
+              },
+              "model": {
+                "type": "string",
+                "enum": [
+                  "gemini"
+                ]
+              }
+            },
+            "required": [
+              "source",
+              "question"
+            ],
+            "additionalProperties": false
+          },
+          "outputSchema": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "type": "object",
+            "properties": {
+              "sourceId": {
+                "type": "string"
+              },
+              "sourceRange": {
+                "type": "object",
+                "properties": {
+                  "startMs": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "endMs": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "required": [
+                  "startMs",
+                  "endMs"
+                ],
+                "additionalProperties": false
+              },
+              "clip": {
+                "type": "object",
+                "properties": {
+                  "relativePath": {
+                    "type": "string"
+                  },
+                  "sha256": {
+                    "type": "string"
+                  },
+                  "bytes": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "mime": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "relativePath",
+                  "sha256",
+                  "bytes",
+                  "mime"
+                ],
+                "additionalProperties": false
+              },
+              "sensitivity": {
+                "type": "object",
+                "properties": {
+                  "originalName": {
+                    "type": "string"
+                  },
+                  "originalPath": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "originalName",
+                  "originalPath"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "sourceId",
+              "sourceRange",
+              "clip",
+              "sensitivity"
+            ],
+            "additionalProperties": false
+          }
+        },
         {
           "name": "info",
           "description": "Probe a local video or audio file; paths are resolved in the current Location.",

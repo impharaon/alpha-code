@@ -564,14 +564,14 @@ UI 的既有 wrapper 实际运行 `test-component/session-timeline.cases.ts`，�
 
 | 文件（相对本仓） | 改什么 |
 | --- | --- |
-| `packages/codepuppy-contracts-consumer/scripts/vendor-codepuppy-contracts.ts`、独立 `alpha-platform-video-understanding.lock.json` / `vendor/alpha-platform-video-understanding/`（新） | 仿现有 capability-scoped/commitBound pin：视频 schema、producer 正负 fixtures 与必要的运输权威产物一起固定 Git commit/路径/SHA；不推动其它已锁 bundle。具体运输产物待下述接缝回复，不能把私有实现当作新公开 contract |
+| `packages/codepuppy-contracts-consumer/scripts/vendor-codepuppy-contracts.ts`、独立 `alpha-platform-video-understanding.lock.json` / `vendor/alpha-platform-video-understanding/`（新） | 仿现有 capability-scoped/commitBound pin：视频 schema 与 producer 正负 fixtures 固定 Git commit/路径/SHA；不推动其它已锁 bundle。按 r8 消费原投影 bounds，不新增运输 artifact 或复制上游参数 |
 | 该包 `src/decode.ts` / `types.ts` / 既有 `contracts.test.ts` | 四种视频值统一从该 pin 校验，包含 source_range 半开区间、模型默认值/声明、usage 安全整数等语义；导出的类型只是 consumer 投影，不在 ext/main 各写 schema。完整结果文件读出的对象走 decoder，不能错误套用控制信封文本 reader 的容量界 |
 | `packages/ui-mac/resources/video-mcp/contracts.ts` / `tools.ts` / `prepare.ts` / `clip.ts`，既有 `video-service.test.ts` / `video-tools.test.ts` / `video-contracts.fast.test.ts` | 增加 understand 的产品输入/最终输出与内部 prepare 执行结果；内层仅准备完成 clip/来源引用。自动分片继续使用同一受限服务/真实组件和源时间，不让 main 新起 ffmpeg 或从模型参数取得可执行路径。必要的压缩参数按平台实际运输界派生；不加总时长/片长用户帽 |
 | `packages/ext/src/video-understanding.ts`（新）/ `plugin.ts` / 既有 policy facts reader | 用 ToolEditor.update 包住实际已核验的首方 understand；可信 session/agent/callId 从本次 Tool.Context 注入，原 signal/progress 贯穿 prepare 与 bridge。未核验同名工具不获 main 上传入口；CLI 无 parentPort 返回明确原因。内部准备 payload 不作为最终答案返回模型 |
 | `packages/ext/src/hub-bridge.ts`、`packages/ui-mac/src/main/codepuppy-sidecar-messages.ts` / `hub-view.ts` / `ext-ipc.ts`（必要 composition wiring）、既有两端消息/host 测试 | 扩展同一 parentPort 请求簿记与消息族 `codepuppy.video.understand`，先回持久 requestId，查询/订阅/取消关联同一调用；长上传不塞入 20 秒 RPC。main 只接受可信路由和宿主根内该调用已完成的 clip，不接受自填 authority、任意原文件读取或新 L1 业务通道 |
 | `packages/ui-mac/src/main/codepuppy-video-cloud.ts`（新） | main 独占 §5 云请求记录/原子写/同 key 文件锁：读取已有记录后继续原 attempt/job，回执前与回执后的持久化顺序、未知结果的同字节重放、重启重接、分片结果/usage/jobIds 顺序合并、成功缓存及 tenant 隔离；不保存 token/consent。仅在原 job 已确认为失败/无扣费后建立新 attempt。并发订阅合并，取消一订阅不损坏其它订阅 |
 | `packages/ui-mac/src/main/codepuppy-upload.ts` / `codepuppy-upload-manifest.ts` / `cloud-ipc.ts`、既有上传测试 | 扩展原上传状态 authority 的 typed 视频分支，复用 pending/confirm/cancel、当前身份/租户、敏感签发与消费。快照仅用宿主完成记录核过的 bytes/SHA/MIME，来源敏感性取宿主附件事实或已经授权原路径；保留原名/路径标记，不扫描二进制冒充文本，也不把所有视频一概判敏感。不复制另一套隐私状态 |
-| `packages/ui-mac/src/main/codepuppy-cloud-jobs.ts`、必要窄 `codepuppy-video-transport.ts`（新）、既有 cloud jobs cases | 现有发现/认证/错误咽喉下读模型描述、流式 multipart、同控制字节重接、进度/取消；不继承 JSON 派发的 15 秒整体超时。控制字段与文件长度按实际序列化核算；运输精确上游界消费 producer 权威数据，当前缺口不能补常量。状态/取消沿原 job API，产物沿 listCloudArtifacts/downloadCloudArtifactTo/artifact.read，不新增出网 client 或资金写者 |
+| `packages/ui-mac/src/main/codepuppy-cloud-jobs.ts`、必要窄 `codepuppy-video-transport.ts`（新）、既有 cloud jobs cases | 现有发现/认证/错误咽喉下读模型描述、流式 multipart、同控制字节重接、进度/取消；不继承 JSON 派发的 15 秒整体超时。控制字段与文件长度按实际序列化核算；只比较真实媒体字节与 producer 投影的 exclusive bounds，不补 JSON 前后缀常量。状态/取消沿原 job API，产物沿 listCloudArtifacts/downloadCloudArtifactTo/artifact.read，不新增出网 client 或资金写者 |
 | `packages/ui-mac/src/preload/{types,index}.ts`、`src/renderer/index.tsx` 的宿主挂载、既有 `renderer/extensions/upload-consent-dialog.tsx` / 测试与 `i18n/{zh,en}.ts`（必要时） | sender/session 从可信调用恢复；原上传确认卡复用视频目的/范围，普通内容无确认，不开选择文件框。沿原入口公开安全预览和 confirm/cancel，不把 token/manifest 泄露给 renderer。UI 只复用已有批准组件/工具卡，编辑前核 PAGE-MAP 与相应复用依据，不创建新视觉方向 |
 | `packages/ui-mac/src/renderer/codepuppy-ui/session-timeline/cards/tool-card-model.ts` / 既有模型与组件测试 | 将已持久化首方 understand 加到既有视频工具规则；同卡显示上传实际字节、理解进度和所有实际 jobIds 对应结果/账本关联，不把内部准备或截短文本显示为完成。原 D4 metadata authority 不重建 |
 | 对应既有 `codepuppy-upload*.test.ts`、`codepuppy-cloud-jobs.cases.ts`、`codepuppy-sidecar-messages.test.ts` / `hub-view.test.ts`、`ext/src/hub-bridge.test.ts`；新 owner 的 `codepuppy-video-cloud.test.ts` / `codepuppy-video-transport.test.ts` / `ext/src/video-understanding.test.ts` | 在最低可捕捉层验证下表；新文件仅因新 module 尚无测试。跨系统消息用真实 producer bytes，内部请求/持久状态由实际代码产生，禁止编造 ffprobe/平台回执。只跑相关文件与最终真实导入/mock/枚举读方 |
@@ -579,15 +579,15 @@ UI 的既有 wrapper 实际运行 `test-component/session-timeline.cases.ts`，�
 
 ### 顺序
 
-1. 仅提交本计划。先由平台 producer/设计者处置下述精确预算缺口；本轮不选一个新公开字段或在桌面复制私有上游表，不触碰其它仓。修正后按原 vendor producer 同步视频独立 pin/真实 fixture，并在第一实施提交填核对行；先跑该 decoder 的具名正负例。
+1. 计划 `fc44a45f6f` 已提交，r8 已处置预算问题；按原 vendor producer 的 Git-object/lock 规则同步独立 pin/真实 fixture，不触碰其它仓。第一实施提交填核对行；先跑 decoder 的具名正负例。
 2. 内层 understand prepare 与 ext 外层、main 窄桥一起建立；先核已验证身份/完成产物/可信调用归属、进度和取消，再连实际 HTTP。main 的 clip 打开/realpath/长度/SHA 复核与来源敏感判定属于准入，不靠 connector 自报 safety。
 3. 扩原上传 authority 和 binary transport；先持久化原 attempt/envelope/manifest/clip，再派发，先写真实 jobId，再等待。原状态/产物读取返回完整结果；已有记录分别核未知/在途/完成/明确失败/取消，不为了重启刷新键或重传已 ready 字节。
 4. 接运输超界、非 JSON 413 和 provider_timeout 的自动本机压缩/连续分片，范围带原偏移并按顺序合并；确认原作业失败/不扣费后才重试新字节。最后复用原隐私卡/工具卡，不增用户步骤。恢复命中只用完整且摘要正确的 clip/结果。
 5. 每步仅改动用例/行为文件；末尾按 import、服务 mock、工具枚举、manifest/snapshot 与上下文登记读方扩一次相关集、包 typecheck、affected-tests --list、north-star/旧名及文档核对；删除对照恢复后跑绿并提交收据。无付费调用/窗口/完整 gate 或整包测试。真安装包与 Windows 场景留既有验收路径。
 
-### 风险与需处置的唯一设计问题
+### 风险与 r7 历史问题（r8 已处置）
 
-**SEAM-CHANGE-NEEDED：VideoUnderstandingV1 的上游请求精确预算数据。**
+**r7 历史返回：SEAM-CHANGE-NEEDED；已由本节偏离记录中的 r8 裁决结束，不再等待新产物。**
 
 冻结设计 `impharaon/alpha-work:docs/specs/video-understanding/design.md:280` 要求桌面发送前用实际 `prefixBytes + 4*ceil(videoBytes/3) + suffixBytes` 校验。当前固定候选 schema 只公开 `upstream_request_bytes_limit`；没有 prefix/suffix、固定 JSON 开销或可调用的同权威 serializer。opaque revision 不能反推这些字节。实际前后缀由平台私有 `videoUpstreamJsonParts(row, question, mime)` 依赖上游模型/推理参数生成，而这些参数明确不由桌面另定。`upload_media_bytes_exclusive` 的 producer 算式只交集 inline 与 multipart 入站界，不能把它当作已扣除上游 base64/JSON 开销的界。
 
@@ -614,15 +614,19 @@ UI 的既有 wrapper 实际运行 `test-component/session-timeline.cases.ts`，�
 | AC-13 原工具/桥归属 | ext `video-understanding.test.ts` 的 `verified understand wraps preparation and returns the final cloud result`；既有 `hub-bridge.test.ts` / `codepuppy-sidecar-messages.test.ts` / `hub-view.test.ts` 的 video request/query/cancel case | integration，实际 ToolEditor/消息簿记，受影响 PR 与 nightly | 去掉 authority/可信调用关联、把 prepare 冒充答案、长任务占住首个 RPC、错误/取消仍报成功会红 |
 | AC-13 上传与隐私 | `codepuppy-upload.test.ts` / `codepuppy-upload-manifest.test.ts` 的 `video uses the same sender and tenant bound consent state`；`video binary transport preserves control bytes and streams the real file` | integration，本机 server + 真实媒体文件；受影响 PR 与 nightly | 源敏感路径被 clip 名冲掉、跨 sender/tenant 确认、无同意上传敏感内容、任意/变更/逃逸文件、JSON/base64 控制体或伪字节数会红；普通视频确认次数须为零 |
 | AC-09 / AC-13 重启与缓存 | `codepuppy-video-cloud.test.ts` 的 `video resumes a persisted dispatch or job without minting another attempt`、`video successful cache is tenant and model revision scoped` | integration，实际文件记录/锁与新服务实例；受影响 PR 与 nightly | 先派发后落盘、丢响应换键/控制字节、已有 job 重派发、未知结果当失败、换号命中旧答案、失败写成功 cache 均红 |
-| AC-13 自动缩片 | `codepuppy-video-cloud.test.ts` / `codepuppy-video-transport.test.ts` 的 `video size and timeout recovery preserves source coverage and original jobs` | fast 预算/范围算法 + integration 本机 HTTP；受影响 PR 与 nightly | 边界少算 JSON/base64、忽略非 JSON 413、在原 job 未失败时重派、丢偏移/片段/usage/jobIds，或要求用户重发会红 |
+| AC-13 自动缩片 | `codepuppy-video-cloud.test.ts` / `codepuppy-video-transport.test.ts` 的 `video size and timeout recovery preserves source coverage and original jobs` | fast 预算/范围算法 + integration 本机 HTTP；受影响 PR 与 nightly | 错误使用 inclusive 比较或丢平台 size-error 恢复、忽略非 JSON 413、在原 job 未失败时重派、丢偏移/片段/usage/jobIds，或要求用户重发会红 |
 | AC-13 上传显示/取消，AC-16 错误 | 原 upload dialog、tool-card-model 与 session-timeline cases 追加 video 目的、实际上传字节/无 total、继续原卡片、所有在途取消和迟到成功不入 cache | fast 模型 / integration Solid 与 main 调用；受影响 PR 与 nightly | 无上传进度、错误空白、取消只停 UI、失败或内部 prepare 被显示为成功会红。平台失败是否真正零扣费仍由 #621 的 settlement 证明 |
 | AC-14 本机默认与 AC-17 两平台 | 继续 D4 零自动 HTTP；桥/stream 不依赖单平台路径；真实无讲话按钮录屏、本机包 Mac/Windows 的成功/上游失败/未登录/余额不足各次 | 真实场景/收费验收为 nightly 或授权一次性记录；本轮不执行 | 无有效结果/次序/原账本事实或完整产物就不得记通过，不能用 mock 结算代替平台证明 |
 
 样本只使用平台 producer 的 `contracts/v1/fixtures/video-understanding/{input,result,job-inline,job-artifact,models-test-price,input-unknown-model,input-unknown-field,result-negative-usage}.json` 等原字节与来源说明。binary 流/摘要测试候选是平台已有真实 `packages/gateway/test/fixtures/video-understanding/sample.mp4`（1019 B，SHA-256 `c0f31876d4a3763354a8b1979f0b5c48b54f7e700100a7e945841bad932c142a`），provenance 同目录 JSON 记录原 zh_test.mp4 摘要与真实 ffmpeg 命令；取用时与产物同 commit 固定，不编造容器或解码输出。它仅证明真实字节传输，不冒充三按钮动作识别样本或 D3 pinned 编码器实测。
 
-实施后的删除对照至少覆盖：verified wrapper、原字节/attempt 持久化、已有 job 重接、同租户成功缓存、上游精确字节开销、敏感来源沿同 authority、完整 artifact 读取、范围覆盖与取消全部在途 job。逐臂具名 expect 红后恢复，最终只扩相关集。当前为计划阶段，**未运行这些用例、0 新 PASS、0 删除对照**，不继承 D4 的七臂冒充 D5 证据。
+实施后的删除对照至少覆盖：verified wrapper、原字节/attempt 持久化、已有 job 重接、同租户成功缓存、平台 exclusive bounds、敏感来源沿同 authority、完整 artifact 读取、范围覆盖与取消全部在途 job。逐臂具名 expect 红后恢复，最终只扩相关集。当前为计划阶段，**未运行这些用例、0 新 PASS、0 删除对照**，不继承 D4 的七臂冒充 D5 证据。
 
 ### 偏离记录与 r7 计划收据
+
+D5 必要同链文件/局部调整：新增 `codepuppy-video-call.ts` 消费现有 engine-client 的 session/message getter 和已铸 `codepuppyDisplay`，核运行中 call、message/agent/Location、原 question/model 与 D2 原路径索引绑定，防止仅信桥自填 context；`VideoCall.messageID` 来自真实 ToolContext，不是模型参数。新增 `codepuppy-video-environment.ts` 只消费 main 自建 bootstrap 的 `firstPartyCacheRoots.video`，server 接一行，缺 producer 明确未就绪、不自推布局，#1760 集成仍 pending。新增 `renderer/extensions/video-upload-dialog.tsx` 只把既有活动会话身份路由到同一确认卡，未改视觉方向/选择文件流程。`policy.videoToolFacts` 在注册同步 transform 前读取既有 plugin-order fact，再复用原 toolFacts（不复制身份判定）。
+
+D2 prepare 的完成记录原只用 clip SHA 命名，相同字节不同源范围会覆盖；为 D5 的调用归属核验，`prepare.ts` 持有 `preparedVideoPath(sourceId,range,SHA)`，main 消费同一 helper。新增实际同字节两范围用例；没有旧记录迁移/兼容分支。main 的普通 status 公共 scrub 保留不变，新增同一 HTTP authority 的视频状态消费面以读完整 typed result；artifact 沿原 saveCloudRun/list/download/quota/register，再从已完成实物解码完整结果。取消持久化 intent、终止原上传，未知回执沿同一 attempt/control bytes 取回 ID 后调用原 cancel，不 mint 新付费键；返回的 cancelOutcome 保留平台真实终态，迟到结果不入成功缓存。上述恢复是 main 原请求记录的一部分，不另建账本/出网客户端。
 
 **orchestrator ruling 2026-11-27（r8 / Claude Opus 5.5）**：无新 artifact、无职责变更。桌面只按选中模型的 `upload_media_bytes_exclusive` 与 `inline_media_bytes_exclusive` 比较实际媒体字节，不重做上游 JSON prefix/suffix 计数；平台超界错误沿同一本机 shrink/split 恢复。平台拥有 encoder/framing/base64 计数证据。上文 r7 的预算问题与建议仅为已处置历史，不再构成 pending；计划文件表/顺序/证明中“新运输产物”“上游精确开销”相应替换为该公开 bounds 消费及平台 size-error 恢复，无新余量/常量或 DTO。已确认 #621 经 #623 合入平台主线 `2626e2f5f8183a78da438db4654572928862f126`，schema SHA 与 r7/r8 一致；本次固定该合并后继及 9 份 producer fixture，不再用已删除的工作分支。vendor 的 Git-object/lock 生成只对这一个 capability 条目执行同一取字节/哈希过程，其余 pin 不动。
 

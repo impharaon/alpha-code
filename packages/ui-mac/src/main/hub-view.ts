@@ -1,3 +1,4 @@
+import type { VideoBridgeRequest, VideoBridgeReply } from "../shared/video-understanding"
 import type { PackageAuthorizationResultV1 } from "../shared/package-admission"
 import type { InstallOutcomeV1 } from "../shared/plugin-install"
 import type { SourceSearchResultV1 } from "./plugin-sources"
@@ -499,6 +500,7 @@ export type CodePuppySidecarHost = {
 }
 
 export function createCodePuppySidecarHost(deps: {
+  video?: (request: VideoBridgeRequest) => Promise<VideoBridgeReply>
   view: HubViewService
   requests: HubRequestStages
   installName(ref: HubInstallRequest["ref"]): string | undefined
@@ -521,6 +523,11 @@ export function createCodePuppySidecarHost(deps: {
       const inbound = parseCodePuppySidecarInbound(message)
       if (!inbound) {
         deps.log(`alpha sidecar: dropped malformed or unknown message type=${String((message as { type: unknown }).type).slice(0, 80)}`)
+        return true
+      }
+      if(inbound.type === "codepuppy.video.understand") {
+        if(!deps.video){reply(post,{type:"codepuppy.video.understand.reply",id:inbound.id,ok:false,error:"unavailable"});return true}
+        deps.video(inbound).then(value=>reply(post,value),()=>reply(post,{type:"codepuppy.video.understand.reply",id:inbound.id,ok:false,error:"cloud_failed"}))
         return true
       }
       if (inbound.type === "codepuppy.package.authorization.request") {

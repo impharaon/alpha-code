@@ -1,12 +1,13 @@
 import { afterAll, expect, test } from "bun:test"
 import { Client, InMemoryTransport } from "@modelcontextprotocol/client"
-import { mkdtemp, rm } from "node:fs/promises"
+import { mkdtemp, rm, mkdir, copyFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import path from "node:path"
-import { cachePath, publish, writeJson } from "../../resources/video-mcp/cache"
+import { cachePath, publish, writeJson, digest, readPublished } from "../../resources/video-mcp/cache"
 import { callVideoTool } from "../../resources/video-mcp/tools"
 import { createVideoServer } from "../../resources/video-mcp/server"
 import { sourceOf } from "../../resources/video-mcp/source"
+import { preparedVideoPath } from "../../resources/video-mcp/prepare"
 import { transcriptRecipe } from "../../resources/video-mcp/transcript"
 import { fail, type VideoRuntime } from "../../resources/video-mcp/runtime"
 
@@ -97,4 +98,25 @@ test("actual MCP tools replay persistent info, transcript, search and project ex
     await client.close()
     await server.close()
   }
+})
+
+
+test("understand's real MCP executor publishes its local prepared clip without a cloud answer", async () => {
+  const source = await sourceOf({kind:"path",path:path.join(import.meta.dir,"fixtures/video/platform-sample.mp4")},runtime)
+  // Own normalized cache data; media bytes and provenance are the platform's real 25fps one-frame sample.
+  source.info={durationMs:40,startMs:0,audioStartMs:0,videoStartMs:0,streams:[{kind:"video",codec:"mpeg4"}]}
+  await writeJson(cachePath(runtime,"sources",`${source.sourceId}.json`),source)
+  const range={startMs:0,endMs:40}
+  const key=digest(`${runtime.recipe}:${JSON.stringify(range)}:${JSON.stringify({kind:"clip"})}`)
+  const directory=cachePath(runtime,"clips",source.sourceId,key)
+  await mkdir(directory,{recursive:true})
+  const target=path.join(directory,"cached.mp4")
+  await copyFile(source.path!,target)
+  await publish(path.join(directory,"complete.json"),{path:target,mime:"video/mp4",durationMs:40},[target])
+  const actual=await callVideoTool("understand",{source:{kind:"id",id:source.sourceId},question:"Explain the actions"},runtime)
+  expect(actual.isError).not.toBe(true)
+  expect(actual.structuredContent).toMatchObject({sourceId:source.sourceId,sourceRange:range,clip:{bytes:1019,mime:"video/mp4"}})
+  expect(actual.structuredContent).not.toHaveProperty("text")
+  const prepared=actual.structuredContent as {clip:{sha256:string}}
+  expect(await readPublished(preparedVideoPath(root,source.sourceId,range,prepared.clip.sha256))).toEqual(actual.structuredContent)
 })

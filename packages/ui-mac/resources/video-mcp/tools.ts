@@ -1,3 +1,4 @@
+import { prepareVideo } from "./prepare"
 import { readFile, readdir } from "node:fs/promises"
 import path from "node:path"
 import type { CallToolResult } from "@modelcontextprotocol/server"
@@ -54,6 +55,10 @@ export async function callVideoTool(name: string, args: unknown, runtime?: Video
 }
 
 async function execute(tool: VideoToolName, args: unknown, runtime: VideoRuntime) {
+  if (tool === "understand") {
+    const input = inputs.understand.parse(args)
+    return prepareVideo(await sourceOf(input.source, runtime), input.range, runtime)
+  }
   if (tool === "download") return downloadVideo(inputs.download.parse(args).url, runtime)
   if (tool === "info") {
     const input = inputs.info.parse(args)

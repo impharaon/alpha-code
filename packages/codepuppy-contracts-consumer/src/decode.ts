@@ -212,3 +212,7 @@ function uploadManifestInvariants(value: unknown) {
     new Set(manifest.files.map((file) => file.path)).size === manifest.files.length
   )
 }
+
+
+export const VIDEO_MODEL_KEYS = videoSchema.$defs.VideoUnderstandingInputV1.properties.model.enum as ["gemini"]
+export const videoUnderstandingResultSchema = videoSchema.$defs.VideoUnderstandingResultV1

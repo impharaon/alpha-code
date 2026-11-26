@@ -144,7 +144,7 @@ export interface CodePuppyCloudRule {
   links?: boolean
 }
 
-const VIDEO_CARD_TOOLS = new Map(["info", "transcript", "frames", "search", "export", "clip", "gif", "download"].map((name) => [name, `codepuppy.timeline.video.tool.${name}`]))
+const VIDEO_CARD_TOOLS = new Map(["info", "transcript", "frames", "search", "export", "clip", "gif", "download", "understand"].map((name) => [name, `codepuppy.timeline.video.tool.${name}`]))
 
 const CODEPUPPY_CLOUD_RULES = new Map<string, CodePuppyCloudRule>([
   ["web_search", { titleKey: "codepuppy.timeline.cloud.webSearch", targetInput: "query", links: true }],

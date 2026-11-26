@@ -614,3 +614,17 @@ test("A3 main accepts before a slow install finishes and owns the submitted/comm
   expect(requests.get("request_a3")).toMatchObject({ stage: "committed", packageId: "claude:playwright", outcome: { ok: true } })
   expect(changes).toHaveLength(2)
 })
+
+test("video requests use the existing host channel with a correlated durable receipt",async()=>{
+ const w=world("video-host"),seen:unknown[]=[],gate=Promise.withResolvers<import("../shared/video-understanding").VideoBridgeReply>()
+ const host=createCodePuppySidecarHost({video:async request=>{seen.push(request);return gate.promise},installName:()=>undefined,packageAuthorization:async()=>({ok:false,reason:"not installed"}),view:w.service,requests:createHubRequestStages({log:()=>{}}),searchSources:async()=>({searchId:"search",query:"",sources:[],candidates:[]}),install:async()=>({ok:false,code:"unknown-id",detail:"unknown"}),reloads:w.coordinator,log:()=>{}})
+ const postedEvent=Promise.withResolvers<void>()
+ const posted:CodePuppySidecarOutbound[]=[],call={directory:w.projectDir,sessionID:"session",agent:"build",callID:"call",messageID:"message"}
+ expect(host.receive({type:"codepuppy.video.understand",id:5,call,action:"query",requestId:"durable-request"},value=>{posted.push(value);postedEvent.resolve()})).toBe(true)
+ expect(seen).toHaveLength(1);expect(posted).toEqual([])
+ gate.resolve({type:"codepuppy.video.understand.reply",id:5,ok:true,requestId:"durable-request",state:{progress:{phase:"uploading",completed:1019,unit:"bytes"}}})
+ await postedEvent.promise
+ expect(posted[0]).toMatchObject({id:5,requestId:"durable-request",state:{progress:{completed:1019}}})
+ expect(host.receive({type:"codepuppy.video.understand",id:6,call:{...call,authority:"self"},action:"query",requestId:"durable-request"},value=>{posted.push(value)})).toBe(true)
+ expect(seen).toHaveLength(1)
+})

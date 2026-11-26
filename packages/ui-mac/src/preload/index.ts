@@ -318,6 +318,7 @@ const api: ElectronAPI = {
     openBillingPage: (page) => ipcRenderer.invoke("cloud-open-billing-page", page),
     dispatch: (envelope) => ipcRenderer.invoke("cloud-dispatch", envelope),
     upload: (intent) => ipcRenderer.invoke("cloud-upload", intent),
+    videoUploads: (identity) => ipcRenderer.invoke("cloud-video-upload-state",identity),
     confirmUpload: (requestId) => ipcRenderer.invoke("cloud-upload-confirm", requestId),
     cancelUpload: (requestId) => ipcRenderer.invoke("cloud-upload-cancel", requestId),
     status: (jobId) => ipcRenderer.invoke("cloud-status", jobId),

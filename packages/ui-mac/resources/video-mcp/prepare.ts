@@ -1,5 +1,5 @@
 import path from "node:path"
-import { cachePath, fileDigest, publish } from "./cache"
+import { cachePath, digest, fileDigest, publish } from "./cache"
 import { clipMedia } from "./clip"
 import type { TimeRange } from "./contracts"
 import { mediaInfo, requireRange, type Source } from "./source"
@@ -28,6 +28,11 @@ export async function prepareVideo(source: Source, range: TimeRange | undefined,
     clip,
     sensitivity: { originalName: source.name, originalPath: source.path },
   }
-  await publish(cachePath(runtime, "prepared", `${clip.sha256}.json`), completed, [output.path])
+  await publish(preparedVideoPath(runtime.cacheRoot, source.sourceId, selected, clip.sha256), completed, [output.path])
   return completed
+}
+
+
+export function preparedVideoPath(cacheRoot: string, sourceId: string, range: TimeRange, sha256: string) {
+  return cachePath({cacheRoot}, "prepared", `${digest(JSON.stringify([sourceId,range,sha256]))}.json`)
 }

@@ -95,14 +95,14 @@ async function flush() {
   await new Promise((resolve) => setTimeout(resolve, 0))
 }
 
-function mount(options: { busy?: boolean; onCancel?: () => void; onConfirm?: () => void } = {}) {
+function mount(options: { busy?: boolean; onCancel?: () => void; onConfirm?: () => void; preview?: UploadPreview } = {}) {
   const host = document.createElement("div")
   document.body.append(host)
   disposers.push(
     runtime.render(
       () =>
         runtime.createComponent(runtime.UploadConsentDialog, {
-          state: { requestId: "request-1", preview },
+          state: { requestId: "request-1", preview: options.preview ?? preview },
           busy: options.busy ?? false,
           onCancel: options.onCancel ?? (() => {}),
           onConfirm: options.onConfirm ?? (() => {}),
@@ -627,4 +627,16 @@ describe("#1595 AC4 发送框、结果、生效状态与云端错误的文字按
       expect(zh[key]).not.toContain(PROJECT_HIDDEN_DIR)
     }
   })
+})
+
+
+test("video privacy reuses the original card with its actual purpose and inherited source scope", async()=>{
+ mount({preview:{...preview,pipeline:"video-understanding",files:[{path:"project/.ssh/speech.mp4",sizeBytes:1550,sensitive:true}],fileCount:1}})
+ const host=document.body
+ await flush()
+ expect(host.textContent).toContain("视频理解")
+ expect(host.textContent).not.toContain("代码审查")
+ const expand=host.querySelector(".codepuppy-upl-more") as HTMLButtonElement
+ expand.click();await flush()
+ expect(host.textContent).toContain(".ssh/speech.mp4")
 })

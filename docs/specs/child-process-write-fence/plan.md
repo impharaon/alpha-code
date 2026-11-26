@@ -378,7 +378,7 @@ PLAN 阶段只提交本文件。下表和命令均为实施安排，不代表已
 ## #1759：位置权威与固定位置身份真源（首片）
 
 - 依据：[SPEC-child-process-write-fence v5 / AC-09 至 AC-12](spec.md)（`834e269da977f6b4888c3b7a6a268bfe835d9cf5`）；[冻结设计](design.md)（`d4a849e5247e7a149457a1b03bbcfc70bbbb389f`，#1771）的 v4 §4.1–4.3.1、§5、§6、§10 R1 处置，以及 v5 §4、§6、§10 R1 处置；本片实现 R1/R3/R7，消费其余冻结结论。读码基线同该提交；[任务 #1759](https://github.com/impharaon/alpha%2Dcode/issues/1759)。
-- 核对：待编排者核对；首个 IMPLEMENT 提交从续接 brief 的 `Phase:` 行原样补入计划提交、检查方/模型与结论。
+- 核对：Phase: IMPLEMENT — fa7f682c65 · Claude Opus 5.5 (orchestrator) · plan accepted for slice one (R1/R3/R7 location authority and identity truth): each named case can fail at the real entry (pure resolver tables, real-disk R7 binding incl. symlink re-point, real `sandbox-exec` deny-write of the truth file with an unfenced control arm); files stay in process-fence-profile/plan/workspaces and their existing test files; no frozen decision restated; slices 2–5 named with their AC ownership.
 
 文档影响为 architecture/decision，唯一落点为本节。本次 PLAN 只追加本节并提交；下文是实施安排，尚无产品验收结论。前面的历史切片与证据保持原文。
 

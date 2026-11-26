@@ -39,7 +39,7 @@
 // 只用来决定**不**签发,判据偏向判「覆盖」)。
 
 import { statSync } from "node:fs"
-import { dirname, isAbsolute, join, resolve } from "node:path"
+import { dirname, isAbsolute, join, posix, resolve, win32 } from "node:path"
 import { SETTINGS_STORE, UPDATER_STORE } from "./store-keys"
 import { defaultPolicyBaseDir } from "../../../ext/src/policy/resolver"
 import { USER_DATA_LAYOUT } from "./user-data-layout"
@@ -205,6 +205,118 @@ export function assertSeatbeltSafePath(p: string, what: string): string {
 /** HOME(W8)与 userData(CF-7)会进 regex 行。把正则元字符转义掉,免得 `/Users/j.doe` 的 `.` 变成「任意一个字符」。 */
 function regexLiteral(p: string): string {
   return p.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+}
+
+export type PackageManager = "bun" | "pnpm" | "yarn" | "npm" | "pip" | "uv" | "go" | "cargo"
+export type PackageManagerPlatform = "darwin" | "linux" | "win32"
+export type PackageManagerLocationInput = {
+  platform: PackageManagerPlatform
+  home: string
+  userDataPath: string
+  configHome: string
+  appData: string
+  localAppData: string
+}
+export type PackageManagerLocations = {
+  env: Readonly<Record<string, string>>
+  writable: readonly { manager: PackageManager; rule: ProcessFenceWriteRule; purpose: "cache" | "global-install" }[]
+}
+
+/** Candidate locations only: the main planner binds their identities before any rule is applied. */
+export function resolvePackageManagerLocations(input: PackageManagerLocationInput): PackageManagerLocations {
+  const path = packageManagerPath(input)
+  const cache = path.join(input.userDataPath, "package-managers")
+  const pnpm = input.platform === "win32" ? path.join(input.localAppData, "pnpm") : input.platform === "darwin" ? path.join(input.home, "Library", "pnpm") : path.join(input.home, ".local", "share", "pnpm")
+  const env = {
+    BUN_INSTALL_CACHE_DIR: path.join(cache, "bun", "install-cache"),
+    BUN_RUNTIME_TRANSPILER_CACHE_PATH: path.join(cache, "bun", "transpiler-cache"),
+    ...Object.fromEntries(["store", "cache", "state"].flatMap((name) => ["pnpm", "npm"].map((prefix) => [`${prefix}_config_${name}_dir`, path.join(cache, "pnpm", name)]))),
+    PNPM_HOME: pnpm,
+    YARN_CACHE_FOLDER: path.join(cache, "yarn", "cache"),
+    YARN_GLOBAL_FOLDER: path.join(cache, "yarn", "berry"),
+    npm_config_cache: path.join(cache, "npm", "cache"),
+    PIP_CACHE_DIR: path.join(cache, "pip", "cache"),
+    UV_CACHE_DIR: path.join(cache, "uv", "cache"),
+    UV_PYTHON_INSTALL_DIR: path.join(cache, "uv", "python"),
+    GOMODCACHE: path.join(cache, "go", "mod"),
+    GOCACHE: path.join(cache, "go", "build"),
+    CARGO_HOME: path.join(cache, "cargo", "home"),
+    CARGO_INSTALL_ROOT: path.join(input.home, ".cargo"),
+  }
+  const writable: PackageManagerLocations["writable"][number][] = []
+  const add = (manager: PackageManager, purpose: "cache" | "global-install", kind: ProcessFenceWriteRule["kind"], ...values: string[]) => {
+    values.forEach((value) => writable.push({ manager, purpose, rule: { kind, value } }))
+  }
+  add("bun", "cache", "subpath", env.BUN_INSTALL_CACHE_DIR, env.BUN_RUNTIME_TRANSPILER_CACHE_PATH)
+  add("pnpm", "cache", "subpath", ...["store", "cache", "state"].map((name) => path.join(cache, "pnpm", name)))
+  add("yarn", "cache", "subpath", env.YARN_CACHE_FOLDER, env.YARN_GLOBAL_FOLDER)
+  add("npm", "cache", "subpath", env.npm_config_cache)
+  add("pip", "cache", "subpath", env.PIP_CACHE_DIR)
+  add("uv", "cache", "subpath", env.UV_CACHE_DIR, env.UV_PYTHON_INSTALL_DIR)
+  add("go", "cache", "subpath", env.GOMODCACHE, env.GOCACHE)
+  add("cargo", "cache", "subpath", env.CARGO_HOME)
+  add("bun", "global-install", "subpath", path.join(input.home, ".bun", "install", "global"), path.join(input.home, ".bun", "bin"))
+  add("pnpm", "global-install", "subpath", ...["global", "bin", ".tools"].map((name) => path.join(pnpm, name)))
+  // pnpm creates executable shims directly in PNPM_HOME; its recursive store is not an install root.
+  add("pnpm", "global-install", "regex", `^${regexLiteral(pnpm)}${input.platform === "win32" ? "\\\\[^\\\\]+" : "/[^/]+"}$`)
+  add("go", "global-install", "subpath", path.join(input.home, "go", "bin"))
+  add("cargo", "global-install", "subpath", path.join(input.home, ".cargo", "bin"))
+  add("cargo", "global-install", "literal", ...[".crates.toml", ".crates2.json"].map((name) => path.join(input.home, ".cargo", name)))
+  if (input.platform === "win32") {
+    add("npm", "global-install", "subpath", path.join(input.appData, "npm"))
+    add("yarn", "global-install", "subpath", path.join(input.localAppData, "Yarn", "config", "global"), path.join(input.localAppData, "Yarn", "bin"))
+    add("pip", "global-install", "regex", `^${regexLiteral(path.join(input.appData, "Python"))}\\\\Python[^\\\\]+\\\\(site-packages|Scripts)(\\\\.*)?$`)
+    add("uv", "global-install", "subpath", path.join(input.appData, "uv", "tools"), path.join(input.home, ".local", "bin"))
+    return { env, writable }
+  }
+  add("yarn", "global-install", "subpath", path.join(input.home, ".config", "yarn", "global"), path.join(input.home, ".yarn", "bin"))
+  for (const prefix of ["/opt/homebrew", "/usr/local", path.join(input.home, ".npm-global"), path.join(input.home, ".local")]) {
+    add("npm", "global-install", "subpath", path.join(prefix, "lib", "node_modules"), path.join(prefix, "bin"))
+    add("yarn", "global-install", "subpath", path.join(prefix, "bin"))
+  }
+  for (const manager of ["npm", "yarn"] as const) {
+    for (const [root, suffix] of [
+      [path.join(input.home, ".nvm"), "/versions/node/[^/]+"],
+      [path.join(input.configHome, "nvm"), "/versions/node/[^/]+"],
+      ...(input.platform === "darwin" ? [[path.join(input.home, "Library", "Application Support", "fnm"), "/node-versions/[^/]+/installation"]] : []),
+      [path.join(input.home, ".local", "share", "fnm"), "/node-versions/[^/]+/installation"],
+      [path.join(input.home, ".fnm"), "/node-versions/[^/]+/installation"],
+      [path.join(input.home, ".volta"), "/tools/image/node/[^/]+"],
+      [path.join(input.home, ".asdf"), "/installs/nodejs/[^/]+"],
+      [path.join(input.home, ".local", "share", "mise"), "/installs/node/[^/]+"],
+    ]) add(manager, "global-install", "regex", `^${regexLiteral(root!)}${suffix}/(lib/node_modules|bin)(/.*)?$`)
+    add(manager, "global-install", "subpath", ...["tools/image/packages", "tools/user/packages", "tools/user/bins", "tools/shared", "bin", "tmp", "log"].map((suffix) => path.join(input.home, ".volta", suffix)), path.join(input.home, ".asdf", "shims"), path.join(input.home, ".local", "share", "mise", "shims"))
+  }
+  if (input.platform === "darwin") add("pip", "global-install", "subpath", path.join(input.home, "Library", "Python"))
+  add("pip", "global-install", "regex", `^${regexLiteral(path.join(input.home, ".local", "lib"))}/python[^/]+(/.*)?$`)
+  add("pip", "global-install", "subpath", path.join(input.home, ".local", "bin"))
+  add("uv", "global-install", "subpath", path.join(input.home, ".local", "share", "uv", "tools"), path.join(input.home, ".local", "bin"))
+  return { env, writable }
+}
+
+export function userConfigurationLocations(input: PackageManagerLocationInput): readonly ConfigFenceRule[] {
+  const path = packageManagerPath(input)
+  const files = [
+    ...[".gitconfig", ".gitconfig.lock", ".zshenv", ".zprofile", ".zshrc", ".zlogin", ".zlogout", ".bashrc", ".bash_profile", ".bash_login", ".bash_logout", ".profile", ".npmrc", ".yarnrc", ".yarnrc.yml", ".bunfig.toml", ".cargo/config", ".cargo/config.toml"].map((name) => path.join(input.home, name)),
+    path.join(input.configHome, "git", "config"), path.join(input.configHome, "git", "config.lock"),
+  ]
+  if (input.platform === "win32") {
+    files.push(path.join(input.appData, "pip", "pip.ini"), path.join(input.appData, "uv", "uv.toml"), path.join(input.appData, "go", "env"))
+    // Windows shell profiles require the OS-resolved Documents location; Windows is outside this increment.
+    return files.map((file) => ({ kind: "literal", path: file }))
+  }
+  files.push(path.join(input.configHome, "fish", "config.fish"), path.join(input.configHome, "pip", "pip.conf"), path.join(input.home, ".pip", "pip.conf"), path.join(input.configHome, "uv", "uv.toml"))
+  files.push(input.platform === "darwin" ? path.join(input.home, "Library", "Application Support", "go", "env") : path.join(input.configHome, "go", "env"))
+  if (input.platform === "darwin") files.push(path.join(input.home, "Library", "Application Support", "pip", "pip.conf"))
+  return [...files.map((file): ConfigFenceRule => ({ kind: "literal", path: file })), { kind: "subpath", path: path.join(input.configHome, "fish", "conf.d") }]
+}
+
+function packageManagerPath(input: PackageManagerLocationInput) {
+  if (!["darwin", "linux", "win32"].includes(input.platform)) throw new Error("package manager locations: unsupported platform")
+  const path = input.platform === "win32" ? win32 : posix
+  for (const key of ["home", "userDataPath", "configHome", "appData", "localAppData"] as const)
+    if (typeof input[key] !== "string" || !path.isAbsolute(input[key])) throw new Error(`package manager locations: ${key} must be an absolute path`)
+  return path
 }
 
 /**

@@ -24,6 +24,8 @@ import {
   processFenceRulesCover,
   processFenceWriteRules,
   renderProcessFenceProfile,
+  resolvePackageManagerLocations,
+  userConfigurationLocations,
   resolveEngineRoots,
   selectWorkspaceUnion,
   trimUntilCompiles,
@@ -68,6 +70,123 @@ const base: ProcessFenceProfileInput = {
   configFence: CF,
   credentialStores: C1,
 }
+
+const locationInput = {
+  platform: "darwin" as const,
+  home: "/Users/puppy",
+  userDataPath: "/Users/puppy/Library/Application Support/Code Puppy",
+  configHome: "/Users/puppy/.config",
+  appData: "/Users/puppy/Library/Application Support",
+  localAppData: "/Users/puppy/Library/Caches",
+}
+
+describe("package manager locations", () => {
+  test("fixed cache environment is separate from the real global install roots", () => {
+    const cache = `${locationInput.userDataPath}/package-managers`
+    const result = resolvePackageManagerLocations(locationInput)
+    expect(result.env).toEqual({
+      BUN_INSTALL_CACHE_DIR: `${cache}/bun/install-cache`,
+      BUN_RUNTIME_TRANSPILER_CACHE_PATH: `${cache}/bun/transpiler-cache`,
+      pnpm_config_store_dir: `${cache}/pnpm/store`, npm_config_store_dir: `${cache}/pnpm/store`,
+      pnpm_config_cache_dir: `${cache}/pnpm/cache`, npm_config_cache_dir: `${cache}/pnpm/cache`,
+      pnpm_config_state_dir: `${cache}/pnpm/state`, npm_config_state_dir: `${cache}/pnpm/state`,
+      PNPM_HOME: "/Users/puppy/Library/pnpm",
+      YARN_CACHE_FOLDER: `${cache}/yarn/cache`, YARN_GLOBAL_FOLDER: `${cache}/yarn/berry`,
+      npm_config_cache: `${cache}/npm/cache`, PIP_CACHE_DIR: `${cache}/pip/cache`,
+      UV_CACHE_DIR: `${cache}/uv/cache`, UV_PYTHON_INSTALL_DIR: `${cache}/uv/python`,
+      GOMODCACHE: `${cache}/go/mod`, GOCACHE: `${cache}/go/build`,
+      CARGO_HOME: `${cache}/cargo/home`, CARGO_INSTALL_ROOT: "/Users/puppy/.cargo",
+    })
+    expect([...new Set(result.writable.filter((entry) => entry.purpose === "cache").map((entry) => entry.manager))].sort()).toEqual(["bun", "cargo", "go", "npm", "pip", "pnpm", "uv", "yarn"])
+    expect(result.writable.filter((entry) => entry.purpose === "cache").every((entry) => entry.rule.kind === "subpath" && entry.rule.value.startsWith(`${cache}/`))).toBe(true)
+    expect(result.writable.some((entry) => entry.purpose === "global-install" && entry.rule.value.startsWith(cache))).toBe(false)
+  })
+
+  test("global subtrees and exact metadata do not grant the surrounding tool roots", () => {
+    const result = resolvePackageManagerLocations(locationInput)
+    for (const [manager, value] of [
+      ["bun", "/Users/puppy/.bun/install/global"], ["bun", "/Users/puppy/.bun/bin"],
+      ["pnpm", "/Users/puppy/Library/pnpm/global"], ["pnpm", "/Users/puppy/Library/pnpm/bin"], ["pnpm", "/Users/puppy/Library/pnpm/.tools"],
+      ["yarn", "/Users/puppy/.config/yarn/global"], ["yarn", "/Users/puppy/.yarn/bin"],
+      ["npm", "/opt/homebrew/lib/node_modules"], ["npm", "/usr/local/bin"], ["npm", "/Users/puppy/.npm-global/lib/node_modules"],
+      ["pip", "/Users/puppy/Library/Python"], ["pip", "/Users/puppy/.local/bin"],
+      ["uv", "/Users/puppy/.local/share/uv/tools"], ["uv", "/Users/puppy/.local/bin"],
+      ["go", "/Users/puppy/go/bin"], ["cargo", "/Users/puppy/.cargo/bin"],
+    ]) expect(result.writable).toContainEqual({ manager, purpose: "global-install", rule: { kind: "subpath", value } })
+    for (const name of [".crates.toml", ".crates2.json"])
+      expect(result.writable).toContainEqual({ manager: "cargo", purpose: "global-install", rule: { kind: "literal", value: `/Users/puppy/.cargo/${name}` } })
+    for (const value of ["/Users/puppy", "/opt/homebrew", "/usr/local", "/Users/puppy/.local", "/Users/puppy/.cargo", "/Users/puppy/go", "/Users/puppy/Library/pnpm", "/Users/puppy/.rustup"])
+      expect(result.writable.some((entry) => entry.rule.value === value), value).toBe(false)
+  })
+
+  test("pnpm root shims match one node, while stores remain outside the install rules", () => {
+    const rules = resolvePackageManagerLocations(locationInput).writable.filter((entry) => entry.manager === "pnpm" && entry.rule.kind === "regex")
+    expect(rules).toHaveLength(1)
+    const pattern = new RegExp(rules[0]!.rule.value)
+    expect(pattern.test("/Users/puppy/Library/pnpm/semver")).toBe(true)
+    for (const path of ["/Users/puppy/Library/pnpm", "/Users/puppy/Library/pnpm/store/cache", "/Users/puppy/Library/pnpm-other/semver"])
+      expect(pattern.test(path), path).toBe(false)
+  })
+
+  test("npm and Classic Yarn share version-manager templates without opening their roots", () => {
+    const result = resolvePackageManagerLocations(locationInput)
+    for (const manager of ["npm", "yarn"]) {
+      const patterns = result.writable.filter((entry) => entry.manager === manager && entry.rule.kind === "regex").map((entry) => new RegExp(entry.rule.value))
+      for (const root of [
+        "/Users/puppy/.nvm/versions/node/v23.1.0", "/Users/puppy/.config/nvm/versions/node/v99.0.0",
+        "/Users/puppy/Library/Application Support/fnm/node-versions/v23.1.0/installation",
+        "/Users/puppy/.local/share/fnm/node-versions/v99.0.0/installation", "/Users/puppy/.fnm/node-versions/v23.1.0/installation",
+        "/Users/puppy/.volta/tools/image/node/23.1.0", "/Users/puppy/.asdf/installs/nodejs/23.1.0",
+        "/Users/puppy/.local/share/mise/installs/node/23.1.0",
+      ]) {
+        for (const suffix of ["bin/example", "lib/node_modules/example/index.js"])
+          expect(patterns.some((pattern) => pattern.test(`${root}/${suffix}`)), `${manager}: ${root}/${suffix}`).toBe(true)
+        for (const suffix of ["", "/etc/config", "/lib/node_modules-other/package"])
+          expect(patterns.some((pattern) => pattern.test(`${root}${suffix}`)), `${manager}: ${root}${suffix}`).toBe(false)
+      }
+      for (const path of ["tools/image/packages", "tools/user/packages", "tools/user/bins", "tools/shared", "bin", "tmp", "log"])
+        expect(result.writable).toContainEqual({ manager, purpose: "global-install", rule: { kind: "subpath", value: `/Users/puppy/.volta/${path}` } })
+    }
+  })
+
+  test("Linux locations and regex roots use the supplied paths literally", () => {
+    const input = { ...locationInput, platform: "linux" as const, home: "/home/a.b+[c]", configHome: "/settings/a.b+[c]" }
+    const result = resolvePackageManagerLocations(input)
+    expect(result.env.PNPM_HOME).toBe("/home/a.b+[c]/.local/share/pnpm")
+    const patterns = result.writable.filter((entry) => entry.rule.kind === "regex").map((entry) => new RegExp(entry.rule.value))
+    expect(patterns.some((pattern) => pattern.test("/home/a.b+[c]/.nvm/versions/node/v1/bin/tool"))).toBe(true)
+    expect(patterns.some((pattern) => pattern.test("/home/axbcccc/.nvm/versions/node/v1/bin/tool"))).toBe(false)
+    expect(patterns.some((pattern) => pattern.test("/home/a.b+[c]/.local/lib/python3.14/site-packages/a.py"))).toBe(true)
+    expect(patterns.some((pattern) => pattern.test("/home/a.b+[c]/.local/lib/other/a.py"))).toBe(false)
+  })
+
+  test("relative location inputs are rejected before producing any candidates", () => {
+    for (const key of ["home", "userDataPath", "configHome", "appData", "localAppData"])
+      expect(() => resolvePackageManagerLocations({ ...locationInput, [key]: "relative" }), key).toThrow("absolute")
+  })
+})
+
+describe("user configuration locations", () => {
+  test("ordinary files and Git locks are literal; only fish startup scripts have a directory rule", () => {
+    const result = userConfigurationLocations(locationInput)
+    for (const name of [".gitconfig", ".gitconfig.lock", ".zshenv", ".zprofile", ".zshrc", ".zlogin", ".zlogout", ".bashrc", ".bash_profile", ".bash_login", ".bash_logout", ".profile", ".npmrc", ".yarnrc", ".yarnrc.yml", ".bunfig.toml", ".cargo/config", ".cargo/config.toml", ".pip/pip.conf"])
+      expect(result).toContainEqual({ kind: "literal", path: `/Users/puppy/${name}` })
+    for (const name of ["git/config", "git/config.lock", "fish/config.fish", "pip/pip.conf", "uv/uv.toml"])
+      expect(result).toContainEqual({ kind: "literal", path: `/Users/puppy/.config/${name}` })
+    expect(result).toContainEqual({ kind: "literal", path: "/Users/puppy/Library/Application Support/pip/pip.conf" })
+    expect(result).toContainEqual({ kind: "literal", path: "/Users/puppy/Library/Application Support/go/env" })
+    expect(result.filter((rule) => rule.kind !== "literal")).toEqual([{ kind: "subpath", path: "/Users/puppy/.config/fish/conf.d" }])
+    expect(result.every((rule) => rule.kind !== "dat-files")).toBe(true)
+    expect(result.some((rule) => rule.kind !== "dat-files" && /opencode|codepuppy|zsh_sessions|zcompdump/.test(rule.path))).toBe(false)
+  })
+
+  test("Linux uses configHome for Go, and validates the same absolute input contract", () => {
+    const result = userConfigurationLocations({ ...locationInput, platform: "linux" })
+    expect(result).toContainEqual({ kind: "literal", path: "/Users/puppy/.config/go/env" })
+    expect(result.some((rule) => rule.kind !== "dat-files" && rule.path.includes("Library"))).toBe(false)
+    expect(() => userConfigurationLocations({ ...locationInput, configHome: "relative" })).toThrow("absolute")
+  })
+})
 /** 一个受保护位置都没有的形状:只判别的行时用(空清单两块都不渲染)。 */
 const noFence = () => [] as string[]
 

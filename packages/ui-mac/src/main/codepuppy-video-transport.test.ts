@@ -60,6 +60,7 @@ test("video binary transport preserves control bytes and streams the real file, 
     expect(await (received?.get("file") as File).bytes()).toEqual(bytes)
     expect(updates.at(-1)).toBe(bytes.length)
     expect(videoFits(clip, { ...model, upload_media_bytes_exclusive: bytes.length })).toBe(false)
+    expect(videoFits(clip,{...model,inline_media_bytes_exclusive:bytes.length})).toBe(false)
     mode = "size"
     expect(await dispatchVideoUpload(input)).toEqual({ error: "video_input_exceeds_upstream" })
     controller.abort()

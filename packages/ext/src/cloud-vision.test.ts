@@ -452,7 +452,7 @@ describe("video frame projection", () => {
     ] })
     return [Message.tool(ToolResultPart.make({ id: "frames", name: "frames", namespace: "video", result: { type: "content", value: [
       { type: "text", text: JSON.stringify(output) },
-      ...output.frames.map(() => ({ type: "file", mime: "image/jpeg", uri: `data:image/jpeg;base64,${jpeg}` })),
+      ...output.frames.flatMap(frame => [{type:"text",text:JSON.stringify({sourceId:output.sourceId,frameId:frame.id,actualMs:frame.actualMs,ocr:frame.ocr})},{ type: "file", mime: "image/jpeg", uri: `data:image/jpeg;base64,${jpeg}` }]),
     ] } }))]
   }
   const makeHooks = (sees: boolean, storage?: {get(key: string): Promise<unknown>; set(key: string, value: string): Promise<void>}, trusted = true) => createCloudVisionHooks({ directory: root, seesImages: async () => sees, isVideoFrames: async (tool) => trusted && tool === "video_frames", storage })

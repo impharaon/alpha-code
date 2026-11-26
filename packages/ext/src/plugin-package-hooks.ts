@@ -38,6 +38,9 @@ type Contribution = {
 }
 type HookResult = Contribution & { exitCode: number }
 type BatchCall = { tool_use_id: string; tool_name: string; tool_input: unknown; tool_response: unknown; is_error: boolean; error?: string; is_interrupt?: boolean }
+const promptStopsTurn = (event: HookEvent, continueOnBlock: boolean) =>
+  ["UserPromptSubmit", "UserPromptExpansion", "PostToolBatch"].includes(event) ||
+  (["PreToolUse", "PostToolUse"].includes(event) && !continueOnBlock)
 const record = (value: unknown): value is Record<string, unknown> =>
   !!value && typeof value === "object" && !Array.isArray(value)
 
@@ -361,12 +364,7 @@ export async function registerPackageHooks(
                 installed: handler.installed,
                 valid: handler.valid,
                 block: !judgment.ok && event !== "PermissionRequest" && (!stopping || judgment.impossible !== true),
-                stopTurn:
-                  !judgment.ok &&
-                  !stopping &&
-                  event !== "PostToolUseFailure" &&
-                  event !== "PermissionRequest" &&
-                  !handler.hook.continueOnBlock,
+                stopTurn: !judgment.ok && promptStopsTurn(event, handler.hook.continueOnBlock),
                 exitCode: 0,
                 order,
                 text: config.secretValues.size
@@ -448,6 +446,7 @@ export async function registerPackageHooks(
               installed: handler.installed,
               valid: handler.valid,
               block: handler.hook.onFailure === "block",
+              stopTurn: handler.hook.onFailure === "block" && handler.hook.type === "prompt" && promptStopsTurn(event, handler.hook.continueOnBlock),
               exitCode: -1,
               order,
               text: "",
@@ -493,7 +492,7 @@ export async function registerPackageHooks(
     const contributions = results.filter((result): result is NonNullable<typeof result> => !!result && result.valid())
     const blocked = contributions.find((result) => result.block)
     if (blocked?.stopTurn && event !== "StopFailure") stopTurns.set(sessionID, blocked)
-    if (blocked && !["Stop", "SubagentStop", "PostToolUseFailure", "StopFailure", "ConfigChange", "PostToolBatch", "PreCompact", "PostCompact"].includes(event))
+    if (blocked && !["Stop", "SubagentStop", "PostToolUse", "PostToolUseFailure", "StopFailure", "ConfigChange", "PostToolBatch", "PreCompact", "PostCompact"].includes(event))
       throw Error("runtime-failed: package hook blocked " + event + (blocked.text ? ": " + blocked.text : ""))
     return contributions
       .filter((result) => result.text || event === "PreToolUse" || event === "PermissionRequest" || event === "ConfigChange" || event === "PostToolBatch" || event === "PreCompact")
@@ -505,6 +504,7 @@ export async function registerPackageHooks(
         sessionID,
         lifetime,
         block: result.block,
+        stopTurn: result.stopTurn,
         output: "output" in result ? result.output : undefined,
       }))
   }
@@ -736,6 +736,8 @@ export async function registerPackageHooks(
     continuing.delete(event.sessionID)
     const contexts = await drainToolBatches(event.sessionID)
     promptContexts.set(event.sessionID, [...(promptContexts.get(event.sessionID) ?? []), ...contexts])
+    const stopped = contexts.find(result => result.stopTurn && result.valid())
+    if (stopped) throw Error("runtime-failed: package prompt hook stopped this turn: " + stopped.text)
     const blocked = contexts.filter(result => (result.block || result.text) && result.valid())
     if (blocked.length) {
       continued.add(event.sessionID)

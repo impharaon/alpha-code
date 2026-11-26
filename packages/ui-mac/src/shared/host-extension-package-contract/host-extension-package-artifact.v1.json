@@ -1,31 +1,36 @@
 {
   "artifactPath": "packages/ui-mac/src/shared/host-extension-package-contract",
-  "artifactSha256": "0af4d2fbf62755e3510c7dba1ddca381d1b436e2903d47c5261a21ed91873437",
+  "artifactSha256": "1123e4f0837fbe98660aa3e90b47b3323fe117ab57ba9c82657d9e1794a1c245",
   "files": [
     {
-      "bytes": 20455,
+      "bytes": 21770,
       "path": "CONTRACT.md",
-      "sha256": "dea5eeecd9ead5ea98d9f2bf4a595c40cabf584ab27e0cc653a42675ca857e06"
+      "sha256": "502e3e98dc7d47a953e10e7a35513d2fe68003ae3f36197a9ea8ef1f09589684"
     },
     {
-      "bytes": 5726,
+      "bytes": 7251,
       "path": "codepuppy-package-envelope-v1.schema.json",
-      "sha256": "908866b35633401763c88e24ddf9cd193e884b0503a73ad3d6fe2aee3736d0d3"
+      "sha256": "c18373e331755b5b1e328199ca73fc637a70591b18f1c4054f84efd21549122e"
     },
     {
-      "bytes": 71585,
+      "bytes": 73834,
       "path": "decoder.ts",
-      "sha256": "9ba24567222a81881e5be91925bfa175330cb295e50c5e60e9684219e1ebd2f8"
+      "sha256": "2e50222a6af86ce4e415f63019067d452aa2d5e2cf61c5013f021a3d0ed2a11e"
     },
     {
-      "bytes": 20434,
+      "bytes": 17617,
+      "path": "plugin-package.ts",
+      "sha256": "f4cc2875becab93ef023eb2976e914a5ff008be9ade2b8c72ba443538e35462a"
+    },
+    {
+      "bytes": 21102,
       "path": "generate-artifact.ts",
-      "sha256": "b72f493103ce877b5fb55e9af5015e01d587d227c6dc49904bf2c9bd76472d73"
+      "sha256": "97f945380a3808529a56d9d07042a654c4df66cdcef42533554a73289de710d7"
     },
     {
-      "bytes": 2505,
+      "bytes": 2737,
       "path": "host-extension-package.registry.v1.json",
-      "sha256": "d17f4cbbf0bae0fd7acd71e2f792c0b05a25b01f472d63d963ac5cb903493005"
+      "sha256": "309333f962bcc56c647f4af030f326346f39576d565923b1bc7e5290ee639e5b"
     },
     {
       "bytes": 1377,
@@ -53,14 +58,19 @@
       "sha256": "4f78b77c5fd575a64cd3ffd5ac0422c47f38b84c15a3a6942b3b30a1d6be9d81"
     },
     {
+      "bytes": 47942,
+      "path": "profiles/plugin-package.v1.schema.json",
+      "sha256": "945052cfd81068457a4c558bba9f7860a9015d41751a6284da4efd35dc30e7cf"
+    },
+    {
       "bytes": 1550,
       "path": "profiles/skill.v1.schema.json",
       "sha256": "1845eba12abc3c1da7c084307c8e145d36768b15ac249600814932a7c8931195"
     },
     {
-      "bytes": 5461,
+      "bytes": 5500,
       "path": "registry.ts",
-      "sha256": "2329726b063a39d1d0a310f68fc72179114f46b09101f5eaa48c0e1ec2a8dc9a"
+      "sha256": "cb44ea29e6a9aa7b6876dbbdb78fa06c995bd36bbc9efce133ff7decccff2fb5"
     },
     {
       "bytes": 5125,
@@ -68,9 +78,14 @@
       "sha256": "8a316b97066b180fcb3b286e67936137ad3bd5fd0327340f625804383d4c1db0"
     },
     {
-      "bytes": 39357,
+      "bytes": 5138,
+      "path": "testvectors/plugin-package-description.v1.json",
+      "sha256": "d8e54449fd6b886e380d7730a82790a1124b9bb6bd4d29b7e3391bafb89fc4d2"
+    },
+    {
+      "bytes": 47677,
       "path": "testvectors/decoder-corpus.v1.json",
-      "sha256": "e7d1ebb47215073377e4d4876caf56899360ce92fce90d7807d1cf8b2a8dee38"
+      "sha256": "45d2296584cc84a127ff4c4427bd8a2def96c61c0649f755d473a4d73e257604"
     }
   ],
   "schema": "codepuppy.host-extension-package.artifact.v1"

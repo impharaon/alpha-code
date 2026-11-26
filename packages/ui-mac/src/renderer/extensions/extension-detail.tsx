@@ -28,7 +28,7 @@ import { CAPABILITY_LABEL_KEYS, SHELF_CHIP_KEYS, curatedOf, foldDomains, isArchi
 import type { SessionToggleView } from "./ext-session-toggle"
 import type { CurationStatus } from "../../shared/catalog-curation"
 import type { CatalogPackageViewV1 } from "../../shared/catalog-package-view"
-import { installedPackagePresentation, packageComponentPresentation, packagePresentation, packageRetainedReasonKey } from "./ext-package-presentation"
+import { packageComponentEntries, installedPackagePresentation, packageComponentPresentation, packagePresentation, packageRetainedReasonKey } from "./ext-package-presentation"
 import { packageListingListV1, packageListingTextV1 } from "../../shared/host-extension-package-contract/decoder"
 import { PackageAccountDialog } from "./package-account-dialog"
 import { extIpc } from "./ext-ipc"
@@ -228,10 +228,10 @@ export function InstalledPackageDetail(props: {
         <div class="codepuppy-ext-kv-row">
           <span class="k">{t("codepuppy.ext.packageIncludes")}</span>
           <span class="v">
-            {[...new Set(props.pack.components.map((component) => component.kind))]
+            {[...new Set(packageComponentEntries(props.pack.components).map((component) => component.kind))]
               .map((kind) =>
                 t("codepuppy.ext.packageComponentCount", {
-                  count: props.pack.components.filter((component) => component.kind === kind).length,
+                  count: packageComponentEntries(props.pack.components).filter((component) => component.kind === kind).length,
                   kind: typeLabel(kind as InstallReceipt["type"]),
                 }),
               )

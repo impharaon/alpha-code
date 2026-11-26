@@ -75,7 +75,7 @@ import { curatedOf, curationMapOf, curationOf, isArchived, isSessionGrant, split
 import { findSessionGrant, sessionGrantKeyOf, sessionRefusalRoute, sessionToggleView } from "./ext-session-toggle"
 import { curationActivationFacts, type Curation, type CurationStatus } from "../../shared/catalog-curation"
 import type { CatalogPackageViewV1 } from "../../shared/catalog-package-view"
-import { pluginInstallFailureKey, installedPackagePresentation, packageRetainedReasonKey, pluginSourceLabelKey } from "./ext-package-presentation"
+import { packageComponentEntries, pluginInstallFailureKey, installedPackagePresentation, packageRetainedReasonKey, pluginSourceLabelKey } from "./ext-package-presentation"
 import { packageListingTextV1 } from "../../shared/host-extension-package-contract/decoder"
 import { extIpc } from "./ext-ipc"
 import { PROJECT_HIDDEN_DIR } from "../../shared/project-hidden-dir"
@@ -410,7 +410,7 @@ export function ExtensionHub(props: {
     return (
       catalog().packages?.find((view) => view.catalogId === pack.packageId)?.presentation.description ??
       (entry ? catalogDescription(entry) : undefined) ??
-      pack.components.map((component) => typeLabel(component.kind as InstallReceipt["type"])).join(" · ")
+      packageComponentEntries(pack.components).map((component) => typeLabel(component.kind as InstallReceipt["type"])).join(" · ")
     )
   }
   const managedPackage = () => { const state = installedPackages(); return state?.ok ? state.packages.find((pack) => pack.packageId === managedPackageId()) : undefined }

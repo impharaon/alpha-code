@@ -20,21 +20,17 @@
 set -uo pipefail
 cd "$(git rev-parse --show-toplevel)"
 
-# 范围(owner 2026-11-23):`bin/check` = PR 门控,`bin/check --full` = 夜间全量。测试分三层(ADR-0014,规则在
-# scripts/test-layers.sh):PR 门跑 fast + integration,`--full` 再加 scenario;scenario 从不进 PR 门。bun 没有「受影响
-# 测试」的机械选择(无依赖图),所以 PR 门跑这两层的全部文件 —— 上报给 gate 的那一行如实写明。
-# gate 设了 GATE_SCOPE_FILE 时写一行「本次测试跑了什么」;没设就什么都不写。
-test_layers=(fast integration)
-scope="fast + integration tests (no affected selection)"
+# PR 门只跑共享 affected-tests 选中的 fast / integration;--full 包含 scenario。
 full=0
 for arg in "$@"; do
   case "$arg" in
-    --full) full=1; test_layers=(fast integration scenario); scope="all tests (--full: fast + integration + scenario)" ;;
+    --full) full=1 ;;
     *) echo "usage: bin/check [--full]" >&2; exit 2 ;;
   esac
 done
-# 闸门登记簿([6/14])只判本次范围里那几层的文件。
-export CODEPUPPY_TEST_LAYERS="${test_layers[*]}"
+export CODEPUPPY_TEST_FULL="$full"
+unset CODEPUPPY_TEST_FILES
+test_files=""
 
 # [9/14] 的输入(I-06):「新建的 worktree 能不能跑出可信 typecheck」只随这几样变 —— bootstrap 与它的判据脚本、依赖清单与锁、
 # 模块解析配置(任何深度的 tsconfig*.json / bunfig.toml / .npmrc、patches/)、husky,以及判据拿来当探针的东西:围栏 addon 的
@@ -60,9 +56,7 @@ worktree_bootstrap_inputs_changed() {
 bootstrap_probe=1
 if [ "$full" -eq 0 ] && ! worktree_bootstrap_inputs_changed; then
   bootstrap_probe=0
-  scope="$scope; worktree bootstrap probe not run (no bootstrap input changed; nightly runs it)"
 fi
-if [ -n "${GATE_SCOPE_FILE:-}" ]; then printf '%s\n' "$scope" > "$GATE_SCOPE_FILE"; fi
 
 # 每行:<codepuppy-ci job>|<codepuppy-ci step name>|<本地档位>
 # 档位只有三种:MIRRORED(跑同一条命令)、SUPERSET(本地还多验了东西)、
@@ -145,6 +139,7 @@ unverified=0
 # 结果不好看」。把后者塞进前者会让总结行说出一句假话(「没检查」vs「检查了,超了」)。
 warned=0
 
+# 串行 [1]–[3]:短静态守卫按顺序打印诊断,在昂贵的编译/测试前给出树与输入的结论。
 echo "▶ [1/14] north-star guard (zero upstream edits)"
 # `#889`:守卫本体住在 scripts/north-star-guard.sh —— 内联时它一个判据都没有(断言 shell
 # 源码文本按本仓定义是假闸门:守卫被整段注释掉时那种断言照样绿)。真判据 =
@@ -189,6 +184,7 @@ echo "▶ [3/14] no literal NUL bytes in version-controlled files"
 # 函数体在 scripts/docs-gates.sh —— 与 bin/check-light 共用同一份,不各抄一遍。
 docs_gate_nul || fail=1
 
+# 串行 [4]:逐包 typecheck 限制同时常驻的编译器内存,完成后再让测试 worker 占用机器。
 echo "▶ [4/14] typecheck (alpha packages: contracts-consumer + ext + ui-mac + plugin + core + schema)"
 # REQ-027:flag 必须在 `run` 之后 —— `bun --cwd X run Y` 在 bun 1.3.x 打印 usage 后静默退出 0(不执行脚本)。
 # `#1134`:opencode 也在这里。它是上游包,但 alpha 自有的判据文件(ADR-043 谓词:不在 origin/dev
@@ -235,55 +231,190 @@ echo "▶ [5/14] contract lock + unit tests (contracts-consumer + ext + ui-mac +
 # 并行(owner 2026-11-23:门控不许单核;实测 2026-11-23,bun 1.3.14,10 核):`bun test --parallel[=N]` = worker 进程、
 # 隐含 --isolate,汇总行/junit/条数判据与串行同形(bun-test-floor.sh 原样适用)。
 #   · contracts-consumer:--parallel(默认核数),65 条不变,7s → 4s。
-#   · ui-mac:scripts/bun-test-ui-mac.sh 分两组 —— 非引擎文件 `--parallel`、真引擎宿主文件串行(各自过
-#     bun-test-floor.sh 的下界与已知红棘轮)。真引擎用例(起内嵌引擎、15s 级等待)与别的 worker 抢
-#     CPU 会超时变红(实测:10 worker 多出 7 行红;5 worker 在负载 ~14 的整门里仍红 4 个真引擎文件)。
-#   · ext **保持串行**:src/policy 下 10 个测试文件共享 policy-host.cases.ts(顶层 await 加载引擎、
+#   · ui-mac:scripts/bun-test-ui-mac.sh 分三组 —— 非引擎 `--parallel`、浏览器独立 Vite 缓存 `--parallel=5`、
+#     真引擎独占测试组时段 `--parallel=3`(各自过 bun-test-floor.sh 的下界与已知红棘轮)。真引擎用例与别的测试组
+#     抢 CPU 会超时变红(实测:10 worker 多出 7 行红;5 worker 在负载 ~14 的整门里仍红 4 个真引擎文件)。
+#   · ext 普通组**保持串行**:src/policy 下 10 个测试文件共享 policy-host.cases.ts(顶层 await 加载引擎、
 #     设计上跨文件共享同一模块实例),在 --isolate 下导入方先于它初始化完成,报
 #     `Cannot access 'E' before initialization`(单文件 `bun test --isolate` 同样复现)。共享的是模块,不是环境:
 #     每个用它的文件在自己的用例前装上宿主的 HOME / XDG 与启动文档、用例后还原,所以按任何文件顺序都互不干扰。
+#     不导入该宿主的预期红例另组 --parallel=3,按上游文件和 shell 行为拆开等待。
 #   · app 滚动 pin(bun-test-app.sh):整包 2s,没有并行的收益,保持串行。
 #   CI 的同名步骤(codepuppy-ci.yml,已停用)仍是串行命令,故这些步骤的档位不变(MIRRORED = 同一脚本、同一下界、同一已知红清单)。
-# 测试分层(ADR-0014):套件里每个测试文件按文件名恰好落在 fast / integration / scenario 一层;规则与判据在
-# scripts/test-layers.sh(唯一真源),无层或多层的文件逐个点名、本步红。每个工作目录把本次范围的几层(PR 门 fast +
-# integration,--full 加 scenario)放进**一次** bun 调用 —— 分层逐个串着调用会丢并行 —— 跑完按层把 junit 拆成
-# `<step>.<layer>.xml` 写进 $GATE_REPORT_DIR(gate 读它报每层条数、耗时、最慢与超预算的用例;[6/14] 登记簿读它判逐文件条数)。
-# 下界沿用整包地板(contracts-consumer 15 / ext 100),上游包的登记文件只判「真跑了」(≥1)。
-group_tests() { # <step> <工作目录> <下界> [bun test 参数...]
-  local step="$1" w="$2" floor="$3" f layer rc=0 files=() map
-  shift 3
-  map="$(mktemp)"
-  bash scripts/test-layers.sh map "$w" "${test_layers[@]}" > "$map"
-  while IFS=$'\t' read -r f layer; do files+=("./$f"); done < "$map"
-  if [ "${#files[@]}" -gt 0 ]; then
-    CODEPUPPY_JUNIT_FILE="$map.xml" bash scripts/bun-test-floor.sh "$floor" "$w" "$@" "${files[@]}" || rc=1
-    python3 scripts/junit-split-layers.py "$map.xml" "$map" "$GATE_REPORT_DIR" "$step" || rc=1
-  fi
-  rm -f "$map" "$map.xml"
-  return $rc
-}
-# 一处红不跳过后面的包:[6/14] 要从完整的报告里判每个登记文件(此前它自己逐个重跑,前一步红也照样判全)。
+# 选择与层校验只在共享工具;runner 保留包内分组与每层 JUnit 报告。
 unit_tests() {
-  local rc=0 w
-  bash scripts/test-layers.sh check || rc=1
+  local rc=0
+  # 串行先验 vendor 的不可变来源,再跑依赖该快照的测试,使 provenance 失守先于其衍生红例显示。
   bun run --cwd packages/codepuppy-contracts-consumer check:vendor || rc=1
-  group_tests codepuppy-contracts-consumer packages/codepuppy-contracts-consumer 15 --parallel || rc=1
-  group_tests ext packages/ext 100 || rc=1
-  bash scripts/bun-test-ui-mac.sh "${test_layers[@]}" || rc=1
-  # 上游包(packages/core 等)里 Code Puppy 自有的登记文件:只经登记簿进套件,在这里跑一次,[6/14] 从报告判条数。
-  for w in $(bash -c 'source scripts/test-layers.sh && test_layer_register_workdirs'); do
-    group_tests "${w##*/}+gate-files" "$w" 1 --parallel || rc=1
-  done
-  bash scripts/bun-test-app.sh || rc=1
+  if [ "$full" -eq 1 ]; then
+    affected-tests run --full || rc=1
+  else
+    test_files="$GATE_REPORT_DIR/selected-files.txt"
+    affected-tests --list > "$test_files" || return 1
+    affected-tests run || rc=1
+  fi
   return $rc
 }
 # 每次 bun 调用的 junit 都写进 $GATE_REPORT_DIR;gate 没设(本地手跑)就用一个临时目录 —— [6/14] 登记簿从这些报告
 # 读逐文件条数,所以每个测试文件每次门只跑一次(此前登记簿把 ~400 个登记文件逐个重跑一遍,真引擎文件也跑两次)。
+temporary_reports=0
 if [ -z "${GATE_REPORT_DIR:-}" ]; then
   GATE_REPORT_DIR="$(mktemp -d)"
-  trap 'rm -rf "$GATE_REPORT_DIR"' EXIT
+  temporary_reports=1
 fi
 export GATE_REPORT_DIR
+probe_pids=()
+terminate_probe() {
+  local pid="$1" child
+  # probe 函数 → bash 脚本 → bun 可以有多层;只沿本次探针的子进程树从叶子收起。
+  for child in $(pgrep -P "$pid" 2>/dev/null); do terminate_probe "$child"; done
+  pkill -TERM -P "$pid" 2>/dev/null || true
+  kill -TERM "$pid" 2>/dev/null || true
+}
+cleanup() {
+  # 非交互 bash 的后台作业忽略 SIGINT;父进程退出时显式终止每个探针及其直接子进程。
+  for pid in ${probe_pids[@]+"${probe_pids[@]}"}; do
+    terminate_probe "$pid"
+    wait "$pid" 2>/dev/null || true
+  done
+  if [ "$temporary_reports" -eq 1 ]; then
+    rm -f "$GATE_REPORT_DIR"/*
+    rmdir "$GATE_REPORT_DIR"
+  fi
+}
+trap cleanup EXIT
+# [9]/[10]/[11]/[13] 不读测试报告,在独立子进程中与 [5] 重叠;输出留到汇合处逐步整块打印。
+probe_9() {
+  local fail=0 unverified=0
+  echo "▶ [9/14] worktree bootstrap 能力(新建 worktree 自己就能跑出可信 typecheck)(#916)"
+  # 这一步在 codepuppy-ci 里**没有对应**,所以它不进 CI_STEPS(那张表是 CI 步骤的对照表)——
+  # 与第 [10/14] 步同为「只能落在本地」的门,但理由不同:CI 的每个 job 都是一次全新
+  # `actions/checkout` + `bun install`,**结构上不存在 worktree**;这道门守的是本机多 lane
+  # 并行时的那条能力。缺了它的世界长这样(`#916` 票面记录的实证):worktree 里拿不到真
+  # typecheck ⇒ 每条 lane 为了下结论都得去动**共享**主 checkout ⇒ 谁先跑谁量到别人的树。
+  # 那正是 2026-08-02 把一道**真闸门**误诊成「1/5 间歇性 flaky」的同一形态。
+  #
+  # 判据本体在 scripts/assert-worktree-bootstrap.sh —— 它**不**断言「脚本在」「软链在」
+  # 「文件里写着 bun install」(按本仓定义那是假闸门),而是真建 worktree、真跑 typecheck,
+  # 并且**先证明没 bootstrap 的树确实会红**,再用同一个探针判 bootstrap 过的树绿。
+  # 代价:本机空闲实测 211s(2026-11-25,I-08 去掉嵌套自跑与第二遍围栏测试之前 241s;大头是两次 process-fence-wiring:反向 ~55s、新树里冷跑 ~84s);满载的 PR 门里 282s(I-08 之前),所以 PR 门只在
+  # 本分支碰到它的输入时跑(I-06)。
+  # 退出码三档(与第 [10/14] 步同形):0 已验证 / 1 真失守拦住 / 2 本次未验证不拦。
+  # 第 2 档的理由(owner 裁决,`#916` R2):`bun install` **依赖网络**(实测:已装好的树指向
+  # 不可达 registry 也会 `failed to resolve` / exit 1),而这一步在每次碰到它输入的 push 上都跑 ⇒ 不给豁免的话
+  # 网络一抖就拦住 push,理由与本次改动无关 ⇒ 人会 `--no-verify` ⇒ **十道门一起关掉**。
+  # 豁免不许变成万能挡箭牌:判别依据是**独立探一次 registry 可达性**(不解析 bun 的报错措辞),
+  # 拿不准一律倒向「拦住」;而且脚本自己有两条判据钉着它 —— 非网络失败必须仍判 real(`[5/6]`)、
+  # 判别依据必须双向可分且网络档不报绿(`[6/6]`)。
+  # PR 门只在本分支碰到它的输入时跑(I-06,输入表与理由见脚本开头的 WORKTREE_BOOTSTRAP_INPUTS);`--full` 总跑。
+  if [ "$bootstrap_probe" -eq 0 ]; then
+    echo "    · PR 门:本分支没碰 bootstrap 的输入(依赖清单的非版本号改动、锁、模块解析配置、bootstrap 与判据脚本、围栏 addon 探针)—— 本步由 --full(夜间)跑"
+  else
+    bash scripts/assert-worktree-bootstrap.sh
+    worktree_bootstrap_rc=$?
+    case "$worktree_bootstrap_rc" in
+    0) echo "    ✓ worktree bootstrap" ;;
+    2) unverified=1 ;;  # 脚本自己打了「未验证」;不拦 push,但下面的总结行不许再说「全绿」
+    *) echo "    ✗ worktree bootstrap 失守 —— 新建 worktree 仍然只能去共享主 checkout 才能跑真 typecheck"; fail=1 ;;
+    esac
+    unset worktree_bootstrap_rc
+  fi
+  [ "$fail" -eq 0 ] || return 1
+  [ "$unverified" -eq 0 ] || return 2
+}
+
+probe_10() {
+  local fail=0 unverified=0
+  echo "▶ [10/14] required contexts vs GitHub 分支保护真源 (#890)"
+  # 这一步在 codepuppy-ci 里**没有对应**,所以它不进 CI_STEPS(那张表是 CI 步骤的对照表)。
+  # 理由:读分支保护要带令牌,而 codepuppy-ci 触发在 `pull_request` —— fork PR 结构上拿不到
+  # secrets。有鉴权的地方是这台机器,所以这道门只能落在本地。与测试并行,网络往返不占测试 worker。
+  bash scripts/assert-required-contexts.sh
+  required_contexts_rc=$?
+  case "$required_contexts_rc" in
+  0) ;; # 脚本自己打了 ✓
+  2)
+    # 未比对:没装 gh / 没登录 / 令牌无权 / 网络不通。刻意**不**判红 —— 这台机器到
+    # api.github.com 走的代理会间歇失败,让它拦 push 只会逼出 `--no-verify`,那会连带关掉
+    # 上面七道真闸门(本仓已经栽过这个形态)。代价是下面的总结行不许再说「全绿」。
+    unverified=1
+    ;;
+  *) fail=1 ;;
+  esac
+  unset required_contexts_rc
+  [ "$fail" -eq 0 ] || return 1
+  [ "$unverified" -eq 0 ] || return 2
+}
+
+probe_11() {
+  local fail=0 unverified=0
+  echo "▶ [11/14] BYOK 目录 id 上游还在不在 (#1281)"
+  # 这一步在 codepuppy-ci 里**没有对应**(要 provider key,而 CI 结构上没有),与第 [9]/[10] 步同为
+  # 「只能落在本地」的门,故不进 CI_STEPS。
+  #
+  # 它守的是 2026-09-07 靠**人肉网查**才发现的那件事:目录里的 `kimi-k2` 上游 2026-05-25 就停用了、
+  # `moonshot-v1-128k` 2026-08-31 退役、调用返回 404,而它们躺在已发布的 0.1.11 里。带 Moonshot key
+  # 的用户选中它拿到的不是「输出短一点」,是这个模型对他完全用不了 —— 而没有任何东西会发现,
+  # 因为我们从不问上游「这个 id 你还认吗」。
+  #
+  # 退出码三档(与第 [9]/[10] 步同形):0 已验证 / 1 真失守拦住 / 2 本次未验证不拦。
+  # 判据本体在 packages/ui-mac/scripts/verify-byok-catalog.ts,那里记着两条「宁可判未验证也不判红」
+  # 的规则(非 2xx、响应形状不认识)与一条内建正样本自检(合成 id 必须判不在册)。
+  # **部分验证是常态**(不可能持有全部五家 key),它按 **2 档**退出而不是 0 —— 目录 8 个 id 本机
+  # 只验得了 2 个,若按 0 退出,末行会打「✅ all local gates green」,而那句话会把「没检查」读成
+  # 「检查过了」:那正是 `#890` 立三档结局要消灭的形态,也正是 kimi-k2 在目录里躺了三个多月
+  # 没人发现的形态。未验证的 provider 与其每个 id 逐条点名(不点名 = 安慰剂闸,`#92` 栽过一次)。
+  bun packages/ui-mac/scripts/verify-byok-catalog.ts
+  byok_catalog_rc=$?
+  case "$byok_catalog_rc" in
+  0) echo "    ✓ 有 key 的 provider,目录 id 全部在上游在册清单中" ;;
+  2) unverified=1 ;;  # 有 provider 没验成(常态);脚本自己打了「这不是绿」
+  *) echo "    ✗ BYOK 目录失守 —— 上面点名的 id 上游已经没有了,用户选中即报错(处置见 #1281)"; fail=1 ;;
+  esac
+  unset byok_catalog_rc
+  [ "$fail" -eq 0 ] || return 1
+  [ "$unverified" -eq 0 ] || return 2
+}
+
+probe_13() {
+  local fail=0 unverified=0
+  echo "▶ [13/14] north-star 漂移度量(收编面 / 上游漂移 / merge-base 年龄,#1288)"
+  # 这一步在 codepuppy-ci 里**没有对应**(它不判任何东西,不该占一个 required context),与第
+  # [9]/[10]/[11]/[12] 步同为「只落在本地」的那一类,故不进 CI_STEPS。
+  #
+  # 它补的是第 [1/14] 步结构上答不了的两个问题。守卫的基准是 `origin/alpha`(`#889` 的既定裁决,
+  # 本步**不动**它),于是它只回答「**这个 PR 自己**有没有新增偏离」;而
+  #   · 收编白名单里的每一条,守卫都按设计**放行** ⇒ 白名单背后那堆行数对它永远不可见;
+  #   · 「上一次跟上游对齐是多久以前」它连问都没问过。
+  # 后果是那种「每次只多一点点」的债:偏离一点一点长大,而没有任何一次 push 提示过。账在某一次
+  # sync 时一次性付 —— 2026-08 那次积到四周 / 375 个提交,冲突面直接变成一张大票(`#1248`)。
+  #
+  # **只量,不拦**(先量后闸,`#1288` out of scope 明写不新设阈值闸)。退出码两档 + 一档坏:
+  # 0 三个量都量到 / 2 上游镜像取不到 ⇒ **未测量**(不是 0,更不是「零漂移」)/ 1 脚本自己坏了。
+  # 辖区与白名单长度由 `north-star-guard.sh --print-jurisdiction` 给出 —— 本步一个字都不解释,
+  # 抄一份就是 `#637` 那个已经咬过我们一次的形状。
+  # 判据本体:packages/ui-mac/src/main/north-star-drift-metrics.test.ts(起真 git 仓、造已知的
+  # 漂移与已知的年龄,断言三个量各自**跟着树变**;每个量各带一个杀「印写死的数」的控制组)。
+  bash scripts/north-star-drift-metrics.sh
+  drift_metrics_rc=$?
+  case "$drift_metrics_rc" in
+  0) ;; # 脚本自己把三个量打出来了
+  2) unverified=1 ;; # 脚本自己打了「未测量」;不拦 push,但总结行不许再说「全绿」
+  *) echo "    ✗ 漂移度量作废 —— 守卫辖区读不出来或 git diff 算不出来(见上);这不是「零漂移」"; fail=1 ;;
+  esac
+  unset drift_metrics_rc
+  [ "$fail" -eq 0 ] || return 1
+  [ "$unverified" -eq 0 ] || return 2
+}
+
+probe_steps=(9 10 11 13)
+for probe in "${probe_steps[@]}"; do
+  "probe_$probe" > "$GATE_REPORT_DIR/probe-$probe.log" 2>&1 &
+  probe_pids+=("$!")
+done
+# runner 可等这些探针结束;退出码仍由本进程的 wait 收取,不丢失失败/未验证状态。
+export CODEPUPPY_TEST_PROBE_PIDS="${probe_pids[*]}"
+
 if unit_tests; then
   echo "    ✓ tests"
 else
@@ -292,12 +423,13 @@ fi
 
 # `#777`:下面三步此前**本地完全没有**,而 CI 有。缺 [6/14] 尤其贵 —— 登记闸门里
 # llm / core / opencode 那几个只在这一步执行,别的步骤一条都不覆盖它们。(ADR-0014 起它们在 [5/14] 跑一次。)
+# 串行 [6] 依赖 [5] 写完全部 JUnit;不能与测试报告的写入重叠。
 echo "▶ [6/14] assert gate files (逐个点名;整包地板抓不到单个闸门文件消失)"
 # `#1153`:三档结局(与 [2/14]/[9/14]/[10/14] 同形):0 全部适用行已验证 / 1 真失守拦住 /
 # 2 门绿但有条件行的保证本次未验证:平台不适用或签名发布宿主未显式启用时,
 # 自报 0 条,登记簿验证与条件相符。darwin 未开签名开关也会到第 2 档。
-# 判定读 [5/14] 的 junit 报告(--from-reports),不再逐个重跑;本次层范围外(PR 门的 scenario 层)的登记文件不判。
-bash scripts/assert-gate-files.sh --from-reports "$GATE_REPORT_DIR"
+# 判定读 [5/14] 的 junit 报告(--from-reports);PR 还逐个运行未选中但本分支登记行改动的文件,避免条数漂移等到夜间。
+CODEPUPPY_TEST_FILES="$test_files" bash scripts/assert-gate-files.sh --from-reports "$GATE_REPORT_DIR"
 gate_files_rc=$?
 case "$gate_files_rc" in
 0) echo "    ✓ gate files" ;;
@@ -306,6 +438,7 @@ case "$gate_files_rc" in
 esac
 unset gate_files_rc
 
+# 串行 [7]/[8]/[12]/[14]:短静态检查与库存输出顺序打印;后台探针仍在运行,不占测试 worker。
 echo "▶ [7/14] seed assets present (B7)"
 if bash scripts/assert-seed-assets.sh; then
   echo "    ✓ seed assets"
@@ -317,84 +450,6 @@ echo "▶ [8/14] docs gate (relative-link validity in changed Markdown)"
 # CI 只查**这次改动过的** Markdown(detect job 收集)。本地口径同构:相对 origin/alpha 的
 # 提交 delta ∪ 未提交工作树改动,再滤成 *.md。一个都没有 ⇒ 与 CI 一样是 no-op。
 docs_gate_links || fail=1
-
-echo "▶ [9/14] worktree bootstrap 能力(新建 worktree 自己就能跑出可信 typecheck)(#916)"
-# 这一步在 codepuppy-ci 里**没有对应**,所以它不进 CI_STEPS(那张表是 CI 步骤的对照表)——
-# 与第 [10/14] 步同为「只能落在本地」的门,但理由不同:CI 的每个 job 都是一次全新
-# `actions/checkout` + `bun install`,**结构上不存在 worktree**;这道门守的是本机多 lane
-# 并行时的那条能力。缺了它的世界长这样(`#916` 票面记录的实证):worktree 里拿不到真
-# typecheck ⇒ 每条 lane 为了下结论都得去动**共享**主 checkout ⇒ 谁先跑谁量到别人的树。
-# 那正是 2026-08-02 把一道**真闸门**误诊成「1/5 间歇性 flaky」的同一形态。
-#
-# 判据本体在 scripts/assert-worktree-bootstrap.sh —— 它**不**断言「脚本在」「软链在」
-# 「文件里写着 bun install」(按本仓定义那是假闸门),而是真建 worktree、真跑 typecheck,
-# 并且**先证明没 bootstrap 的树确实会红**,再用同一个探针判 bootstrap 过的树绿。
-# 代价:本机空闲实测 211s(2026-11-25,I-08 去掉嵌套自跑与第二遍围栏测试之前 241s;大头是两次 process-fence-wiring:反向 ~55s、新树里冷跑 ~84s);满载的 PR 门里 282s(I-08 之前),所以 PR 门只在
-# 本分支碰到它的输入时跑(I-06)。
-# 退出码三档(与第 [10/14] 步同形):0 已验证 / 1 真失守拦住 / 2 本次未验证不拦。
-# 第 2 档的理由(owner 裁决,`#916` R2):`bun install` **依赖网络**(实测:已装好的树指向
-# 不可达 registry 也会 `failed to resolve` / exit 1),而这一步在每次碰到它输入的 push 上都跑 ⇒ 不给豁免的话
-# 网络一抖就拦住 push,理由与本次改动无关 ⇒ 人会 `--no-verify` ⇒ **十道门一起关掉**。
-# 豁免不许变成万能挡箭牌:判别依据是**独立探一次 registry 可达性**(不解析 bun 的报错措辞),
-# 拿不准一律倒向「拦住」;而且脚本自己有两条判据钉着它 —— 非网络失败必须仍判 real(`[5/6]`)、
-# 判别依据必须双向可分且网络档不报绿(`[6/6]`)。
-# PR 门只在本分支碰到它的输入时跑(I-06,输入表与理由见脚本开头的 WORKTREE_BOOTSTRAP_INPUTS);`--full` 总跑。
-if [ "$bootstrap_probe" -eq 0 ]; then
-  echo "    · PR 门:本分支没碰 bootstrap 的输入(依赖清单的非版本号改动、锁、模块解析配置、bootstrap 与判据脚本、围栏 addon 探针)—— 本步由 --full(夜间)跑"
-else
-  bash scripts/assert-worktree-bootstrap.sh
-  worktree_bootstrap_rc=$?
-  case "$worktree_bootstrap_rc" in
-  0) echo "    ✓ worktree bootstrap" ;;
-  2) unverified=1 ;;  # 脚本自己打了「未验证」;不拦 push,但下面的总结行不许再说「全绿」
-  *) echo "    ✗ worktree bootstrap 失守 —— 新建 worktree 仍然只能去共享主 checkout 才能跑真 typecheck"; fail=1 ;;
-  esac
-  unset worktree_bootstrap_rc
-fi
-
-echo "▶ [10/14] required contexts vs GitHub 分支保护真源 (#890)"
-# 这一步在 codepuppy-ci 里**没有对应**,所以它不进 CI_STEPS(那张表是 CI 步骤的对照表)。
-# 理由:读分支保护要带令牌,而 codepuppy-ci 触发在 `pull_request` —— fork PR 结构上拿不到
-# secrets。有鉴权的地方是这台机器,所以这道门只能落在本地。放最后,因为它是九步真闸门跑完
-# 之后的一次网络往返。
-bash scripts/assert-required-contexts.sh
-required_contexts_rc=$?
-case "$required_contexts_rc" in
-0) ;; # 脚本自己打了 ✓
-2)
-  # 未比对:没装 gh / 没登录 / 令牌无权 / 网络不通。刻意**不**判红 —— 这台机器到
-  # api.github.com 走的代理会间歇失败,让它拦 push 只会逼出 `--no-verify`,那会连带关掉
-  # 上面七道真闸门(本仓已经栽过这个形态)。代价是下面的总结行不许再说「全绿」。
-  unverified=1
-  ;;
-*) fail=1 ;;
-esac
-unset required_contexts_rc
-
-echo "▶ [11/14] BYOK 目录 id 上游还在不在 (#1281)"
-# 这一步在 codepuppy-ci 里**没有对应**(要 provider key,而 CI 结构上没有),与第 [9]/[10] 步同为
-# 「只能落在本地」的门,故不进 CI_STEPS。
-#
-# 它守的是 2026-09-07 靠**人肉网查**才发现的那件事:目录里的 `kimi-k2` 上游 2026-05-25 就停用了、
-# `moonshot-v1-128k` 2026-08-31 退役、调用返回 404,而它们躺在已发布的 0.1.11 里。带 Moonshot key
-# 的用户选中它拿到的不是「输出短一点」,是这个模型对他完全用不了 —— 而没有任何东西会发现,
-# 因为我们从不问上游「这个 id 你还认吗」。
-#
-# 退出码三档(与第 [9]/[10] 步同形):0 已验证 / 1 真失守拦住 / 2 本次未验证不拦。
-# 判据本体在 packages/ui-mac/scripts/verify-byok-catalog.ts,那里记着两条「宁可判未验证也不判红」
-# 的规则(非 2xx、响应形状不认识)与一条内建正样本自检(合成 id 必须判不在册)。
-# **部分验证是常态**(不可能持有全部五家 key),它按 **2 档**退出而不是 0 —— 目录 8 个 id 本机
-# 只验得了 2 个,若按 0 退出,末行会打「✅ all local gates green」,而那句话会把「没检查」读成
-# 「检查过了」:那正是 `#890` 立三档结局要消灭的形态,也正是 kimi-k2 在目录里躺了三个多月
-# 没人发现的形态。未验证的 provider 与其每个 id 逐条点名(不点名 = 安慰剂闸,`#92` 栽过一次)。
-bun packages/ui-mac/scripts/verify-byok-catalog.ts
-byok_catalog_rc=$?
-case "$byok_catalog_rc" in
-0) echo "    ✓ 有 key 的 provider,目录 id 全部在上游在册清单中" ;;
-2) unverified=1 ;;  # 有 provider 没验成(常态);脚本自己打了「这不是绿」
-*) echo "    ✗ BYOK 目录失守 —— 上面点名的 id 上游已经没有了,用户选中即报错(处置见 #1281)"; fail=1 ;;
-esac
-unset byok_catalog_rc
 
 echo "▶ [12/14] alpha 注入模型上下文的库存(REQ-157 #1284/#1296/#1299:ext 四处 + ui-mac 两份 instruction 文件 + ui-mac 三个 agent 的 prompt/description,每段实测字节 / 上限,与快照逐字节比对)"
 # 这一步在 codepuppy-ci 里**没有对应的独立步**(判据本身 —— 快照测试与咽喉测试 —— 已在 `bun test (ext)`
@@ -418,32 +473,6 @@ if bun packages/ext/scripts/context-injection-inventory.ts --check; then
 else
   echo "    ✗ context injection inventory 失守 —— 某段 alpha 注入超过上限,或改了片段没重生快照(见上)"; fail=1
 fi
-
-echo "▶ [13/14] north-star 漂移度量(收编面 / 上游漂移 / merge-base 年龄,#1288)"
-# 这一步在 codepuppy-ci 里**没有对应**(它不判任何东西,不该占一个 required context),与第
-# [9]/[10]/[11]/[12] 步同为「只落在本地」的那一类,故不进 CI_STEPS。
-#
-# 它补的是第 [1/14] 步结构上答不了的两个问题。守卫的基准是 `origin/alpha`(`#889` 的既定裁决,
-# 本步**不动**它),于是它只回答「**这个 PR 自己**有没有新增偏离」;而
-#   · 收编白名单里的每一条,守卫都按设计**放行** ⇒ 白名单背后那堆行数对它永远不可见;
-#   · 「上一次跟上游对齐是多久以前」它连问都没问过。
-# 后果是那种「每次只多一点点」的债:偏离一点一点长大,而没有任何一次 push 提示过。账在某一次
-# sync 时一次性付 —— 2026-08 那次积到四周 / 375 个提交,冲突面直接变成一张大票(`#1248`)。
-#
-# **只量,不拦**(先量后闸,`#1288` out of scope 明写不新设阈值闸)。退出码两档 + 一档坏:
-# 0 三个量都量到 / 2 上游镜像取不到 ⇒ **未测量**(不是 0,更不是「零漂移」)/ 1 脚本自己坏了。
-# 辖区与白名单长度由 `north-star-guard.sh --print-jurisdiction` 给出 —— 本步一个字都不解释,
-# 抄一份就是 `#637` 那个已经咬过我们一次的形状。
-# 判据本体:packages/ui-mac/src/main/north-star-drift-metrics.test.ts(起真 git 仓、造已知的
-# 漂移与已知的年龄,断言三个量各自**跟着树变**;每个量各带一个杀「印写死的数」的控制组)。
-bash scripts/north-star-drift-metrics.sh
-drift_metrics_rc=$?
-case "$drift_metrics_rc" in
-0) ;; # 脚本自己把三个量打出来了
-2) unverified=1 ;; # 脚本自己打了「未测量」;不拦 push,但总结行不许再说「全绿」
-*) echo "    ✗ 漂移度量作废 —— 守卫辖区读不出来或 git diff 算不出来(见上);这不是「零漂移」"; fail=1 ;;
-esac
-unset drift_metrics_rc
 
 echo "▶ [14/14] 模块体积棘轮 + 阈值告警 (#1289)"
 # 这一步在 codepuppy-ci 里**没有对应**(它按裁决不拦,做成 required context 只会是一格永远绿的
@@ -473,6 +502,19 @@ case "$module_size_rc" in
 *) echo "    ✗ 模块体积登记簿/度量作废 —— 登记的路径不存在、行格式非法、数不出行数,或**登记只做了一半**(抬了 tree 行却没改树下那个 file 行,#1435)。逐条点名在上面"; fail=1 ;;
 esac
 unset module_size_rc
+
+# 汇总必须等所有后台探针结束:任何真实失败仍拦门,未验证仍进入第三档,没有静默丢掉的状态。
+for i in "${!probe_steps[@]}"; do
+  probe_rc=0
+  wait "${probe_pids[$i]}" || probe_rc=$?
+  cat "$GATE_REPORT_DIR/probe-${probe_steps[$i]}.log"
+  case "$probe_rc" in
+    0) ;;
+    2) unverified=1 ;;
+    *) fail=1 ;;
+  esac
+done
+probe_pids=()
 
 # ── 覆盖自陈(`#777`)──────────────────────────────────────────────────────────
 # 「和 CI 1:1」以前是散文。现在这张表由脚本自己打出来,并由

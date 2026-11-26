@@ -716,3 +716,13 @@ ui-mac/ext/util/core 包目录各自 `bun typecheck` exit 0，UI 在两个 fixtu
 r12 证明：`cd packages/core && gate slot -- bun test test/codepuppy-mcp-runtime.test.ts` 唯一一次完整测量为 **25 PASS / 0 FAIL**、70 expect（20.58s，`/tmp/alpha-1761-r12/core-count.log`），包含本轮明确准许的时序/容量用例，无第二次执行；core count 24→25。五个 count 最终为 **12 / 19 / 26 / 55 / 25**。机械读回逐字段比较证明 TSV 除五处首列数字外全部字节与本轮前一致，不改 guarantee、委派、路径或阈值逻辑。
 
 r12 核对：Codex / GPT-6；文档影响为既有实施/验证证据与集成归属，未改产品行为、测试断言或 frozen design。16 个相对链接通过，docs contract 本 plan findings=0（全仓既有 69 errors/253 warnings，不扩修），diff 检查通过；`affected-tests --list` 仍 exit 2，旧基线缺 `.gate-tests`，无 scope line，随 ship 合入处理。登记簿只改五个 count 字段，全部本轮工作合成一个提交；无 gate run/bin/check、额外测试重跑、push/PR/merge。
+
+## r13：origin/alpha 集成冲突解决
+
+r13 明确授权 merge（不 rebase）。2026-11-26 11:58 UTC 开始，预计 20 分钟；先 fetch，再将 origin/alpha `b0a9d0298d5da959e281b218c01d33249823a7f5` 合入本分支。三个冲突均为独立增量，可同时保留，没有不兼容行为裁定：
+
+- hub-bridge.ts：同时保留本票 document ready/runtime 分支、早到消息与 session 补查端口，以及 #1757 network parser/receive 分支和返回的 network 状态；按不同消息类型分流，原请求簿记/整包授权读取面不改。
+- context-injection-inventory.snapshot.txt：由 `bun packages/ext/scripts/context-injection-inventory.ts --write` 重生，含 document 工具与两条 network notice，100 fragments / 30546 bytes / 163328 declared limits；没有手编汇总值。
+- gate-files.tsv：保留双方新增/修改及 origin 已声明的退役/拆分记录，332 个活跃登记行；所有单边修改计数取该修改方。唯一双方修改的 plugin-host（共同基线 52、本分支 55、origin 53）单独实测为 56，非取较大值或盲目相加；其它行不重复测量。
+
+bun.lock 随 origin 改变，`bun install --frozen-lockfile` exit 0（2 packages installed），husky 后已恢复并核对 core.hooksPath=.githooks；无额外锁文件变动。相关测试 `cd packages/ext && gate slot -- bun test src/hub-bridge.test.ts src/hub-tools.test.ts src/policy/tool-policy-rpc.test.ts src/network-egress.test.ts src/context-injection.test.ts src/plugin-host.test.ts` 为 **151 PASS / 0 FAIL**。Bun 合并输出无逐文件数量，故为解决唯一仍待测的 count 行，使用 `CODEPUPPY_TEST_COUNT_FILE=/tmp/alpha-1761-r13/plugin-host.count gate slot -- bash scripts/bun-test-floor.sh 0 packages/ext src/plugin-host.test.ts` 单独测得 **56 PASS / 0 FAIL**；该 56 是前述 151 的子集，不重复累计。两包目录各自 bun typecheck（ext / ui-mac）均 exit 0。所有日志在 /tmp/alpha-1761-r13；只运行这些具名消费者，未跑全层/全套、gate run 或 bin/check，没有发布/push/PR/merge 到远端。已核 Codex / GPT-6。

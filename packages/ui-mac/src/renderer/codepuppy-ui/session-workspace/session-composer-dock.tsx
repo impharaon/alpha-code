@@ -1,10 +1,11 @@
+import { SessionNetworkEgressCards } from "../network-egress-card"
 // SessionComposerDock — REQ-125 C7:seam 会话页的 composer 停靠区。
 //
 // 职责:
 // - CodePuppyComposer 以 mode="session" **直挂**(props 传入;零 Portal/零选择器/零收养);
 // - composer 上方停靠区:提问卡(question typed 通道)、任务清单卡(todo typed 通道)等
-//   任务类停靠;**审批呈现统一走独立 Permission surface**(PermissionDialog,owner 裁决
-//   2026-07-25)—— dock 不渲审批卡,只以 PermissionV2 typed feed(fail-closed)驱动
+//   任务类停靠;**引擎工具权限审批呈现统一走独立 Permission surface**(PermissionDialog,owner 裁决
+//   2026-07-25)—— dock 不渲引擎工具权限卡,只以 PermissionV2 typed feed(fail-closed)驱动
 //   composer 的审批挂起提示;
 // - live status / 上下文用量 / 斜杠命令捕获经 ComposerSessionDockApi 注入 composer;
 // - 一切异步结果绑定 serverKey+directory+sessionID(C1 live context 原语,I8)。
@@ -72,7 +73,7 @@ export function SessionComposerDock(props: {
         与 PermissionWatcher 同一 fail-closed 实现 —— 未就绪 = 无审批挂起。
         #668:读面是 **v1 + v2 两条通道的合并**(createPermissionChannelSource,与 Permission
         surface 同一实现)。此前只订 v2,而 ADR-036 之后真正在跑的是 v1 —— 于是 v1 的每一次
-        审批请求既不弹卡也不亮 chip,回合无声挂起。dock 仍**无任何决定提交路径**。 ────────── */
+        审批请求既不弹卡也不亮 chip,回合无声挂起。dock 仍**无引擎权限决定提交路径**。 ────────── */
   const [feed, setFeed] = createSignal<PermissionV2Feed | undefined>(undefined)
   createEffect(
     on(
@@ -117,7 +118,7 @@ export function SessionComposerDock(props: {
 
   // fail-closed:feed 未就绪(缺席/读不到)= 无审批挂起可提示。依赖的不变量与强制手段:
   // ready 仅在「最近一次 list 成功且无新拉取在途」为 true(session-permission-feed 的
-  // Blocker-1 语义,其测试锁定);提示为纯只读投影,dock 无任何放行动作可言。
+  // Blocker-1 语义,其测试锁定);引擎权限提示为纯只读投影；联网批准由独立 main 服务裁决。
   const approvalPending = createMemo(() => {
     const active = feed()
     return !!active?.state.ready && active.state.requests.length > 0
@@ -226,6 +227,7 @@ export function SessionComposerDock(props: {
 
   return (
     <div class="a-swk-dock" data-codepuppy-session-dock>
+      <SessionNetworkEgressCards identity={identity} />
       <Show when={question()} keyed>
         {(request) => (
           <SessionQuestionCard

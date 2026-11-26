@@ -50,7 +50,7 @@
     ],
     "root": {
       "compatibility": {
-        "reportSha256": "48ad6dd5a810034cae7caaf20eb88a982bf0b86fada7fe1056d937535a1878b6",
+        "reportSha256": "8cde3f439eef5b9a333304ab374c85e9505ae2262c94b8c172362b29453b4468",
         "verdict": "compatible"
       },
       "componentId": "cloud:html",

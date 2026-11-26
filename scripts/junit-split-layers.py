@@ -1,13 +1,12 @@
 #!/usr/bin/env python3
 """Split one bun JUnit report into one report per test layer (ADR-0014).
 
-Usage: python3 scripts/junit-split-layers.py <junit.xml> <map.tsv> <out dir> <step>
+Usage: python3 scripts/junit-split-layers.py <junit.xml> <workdir> <out dir> <step>
 
-<map.tsv> is `scripts/test-layers.sh map <workdir> <layer...>` output: `<file>\t<layer>`, the file relative to the
-workdir, as bun writes it in each top-level <testsuite file=...>. Writes `<out dir>/<step>.<layer>.xml` for every layer
-that has files in the report. A report file the map does not name is an error (the layer rule decides every file; a
-file with no layer must not pass silently), and so is a missing or unreadable report.
+The second argument is the package workdir. Report layers come from .gate-tests.
 """
+import fnmatch
+import json
 import pathlib
 import sys
 import xml.etree.ElementTree as ElementTree
@@ -17,12 +16,9 @@ def main() -> int:
     if len(sys.argv) != 5:
         print(__doc__, file=sys.stderr)
         return 2
-    report, mapping, out_dir, step = sys.argv[1:]
-    layer_of = {}
-    for line in pathlib.Path(mapping).read_text().splitlines():
-        if line.strip():
-            path, layer = line.split("\t")
-            layer_of[path.removeprefix("./")] = layer
+    report, workdir, out_dir, step = sys.argv[1:]
+    repo = pathlib.Path(__file__).resolve().parent.parent
+    runners = json.loads((repo / ".gate-tests").read_text())["runners"]
     try:
         root = ElementTree.parse(report).getroot()
     except (ElementTree.ParseError, OSError) as error:
@@ -32,13 +28,18 @@ def main() -> int:
     unmapped = []
     for suite in root.findall("testsuite"):
         name = (suite.get("file") or suite.get("name") or "").removeprefix("./")
-        layer = layer_of.get(name)
+        path = f"{workdir}/{name}"
+        layers = next((runner["layers"] for runner in runners
+                       if path.startswith(runner["root"] + "/") or fnmatch.fnmatchcase(path, runner["root"])), {})
+        layer = next((layer for layer, patterns in layers.items()
+                      if any(fnmatch.fnmatchcase(path, p) for p in patterns if not p.startswith("!"))
+                      and not any(fnmatch.fnmatchcase(path, p[1:]) for p in patterns if p.startswith("!"))), None)
         if layer is None:
             unmapped.append(name)
             continue
         by_layer.setdefault(layer, []).append(suite)
     if unmapped:
-        print(f"::error::junit-split-layers: {step}: files with no layer in the map: {', '.join(unmapped)}", file=sys.stderr)
+        print(f"::error::junit-split-layers: {step}: files with no declared report layer: {', '.join(unmapped)}", file=sys.stderr)
         return 1
     for layer, suites in by_layer.items():
         out = ElementTree.Element("testsuites", {"name": root.get("name") or "bun test"})

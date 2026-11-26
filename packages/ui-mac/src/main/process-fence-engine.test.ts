@@ -74,7 +74,7 @@ describeDarwin("REQ-159 真引擎(OpenCode 2)+ 真 ext 在进程围栏下:三类
   const landed = (dir: string) => readdirSync(dir).sort()
 
   beforeAll(async () => {
-    egressProxy = await startEgressPolicyProxy({
+    egressProxy = await startEgressPolicyProxy({ resolveEgressRoutes: async () => [{ kind: "direct" }],
       log: (r) => void proxyLog.push(r),
       authorize: () => false,
       requestGrant: async () => "not-asked",

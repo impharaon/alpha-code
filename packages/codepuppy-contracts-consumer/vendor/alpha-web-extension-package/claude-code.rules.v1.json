@@ -49,7 +49,7 @@
     "commands": "top-level commands/*.md flat files (or manifest.commands replacement list) → command@1 template leaves (alpha-code#840, #98 B1)",
     "hooksDir": "hooks/hooks.json → blocked",
     "lspFile": ".lsp.json → blocked",
-    "mcp": "manifest.mcpServers inline object or .mcp.json → mcp-local (stdio) / mcp-remote (url)",
+    "mcp": "manifest.mcpServers inline object or .mcp.json (wrapped mcpServers or bare server mapping) → mcp-local (stdio) / mcp-remote (url)",
     "monitorsDir": "monitors/monitors.json → blocked",
     "outputStylesDir": "output-styles/ → blocked",
     "rootSkillMd": "single SKILL.md at plugin root → review-required (layout outside the pinned profile)",
@@ -65,8 +65,8 @@
   "groundTruth": "https://code.claude.com/docs/en/plugins-reference",
   "hostContract": {
     "artifactPath": "packages/ui-mac/src/shared/host-extension-package-contract",
-    "artifactSha256": "0af4d2fbf62755e3510c7dba1ddca381d1b436e2903d47c5261a21ed91873437",
-    "commit": "e77cb02f3f8ecd42969333682fcaa4ceff16f27e",
+    "artifactSha256": "1123e4f0837fbe98660aa3e90b47b3323fe117ab57ba9c82657d9e1794a1c245",
+    "commit": "1db6a3bbf5963e8a58e57719e2a441a55da21b21",
     "repo": "jinjunnn/alpha-code"
   },
   "identity": {
@@ -116,6 +116,7 @@
   },
   "manifestPath": ".claude-plugin/plugin.json",
   "mcp": {
+    "bareMapping": "root .mcp.json accepts a bare server mapping; non-object top-level values are dropped as review-required metadata",
     "malformed": "a known server field with a wrong type (args not an all-string array, headers/env values not strings) is named blocked — never silently filtered into a smaller compatible config",
     "placeholders": {
       "${CLAUDE_PLUGIN_DATA}": "blocked",
@@ -123,8 +124,8 @@
       "${CLAUDE_PROJECT_DIR}": "review-required only as a stdio server arg/env value that is the placeholder itself or the placeholder plus a traversal-free relative suffix (a provable workspace mapping); a suffix containing \"..\", backslashes, or control characters is blocked as workspace traversal; anywhere else blocked",
       "${user_config.*}": "blocked"
     },
-    "remote": "url + headers → behavior.url/headersTemplate; auth always \"none\"",
-    "stdio": "command + args → behavior.command[1..16]; env (plain strings) → behavior.environment; requiredSecrets always []"
+    "remote": "url + headers → behavior.url/headersTemplate with {VAR} + requiredSecrets; without credential headers use existing labelled optional mcp-oauth readiness",
+    "stdio": "command + args → behavior.command[1..16]; literal env → behavior.environment; whole credential references → requiredSecrets targeting the source env key"
   },
   "profile": "claude-code.v1",
   "reservedCommandNames": [
@@ -133,5 +134,5 @@
     "review"
   ],
   "schema": "codepuppy.provider-adapter.claude-code.rules.v1",
-  "templateBytes": "the parsed markdown BODY only — frontmatter is provider configuration, never prompt text, so it is stripped before the template asset is bound; a command file whose frontmatter cannot be parsed by the pinned subset fails closed (blocked, component not emitted), and an empty body after stripping fails closed the same way. skill/agent assets stay verbatim: their frontmatter is what the host's own parsers read at install"
+  "templateBytes": "the parsed markdown BODY only — frontmatter supports scalar fields, multiline flow arrays, block sequences and literal/folded block scalars; single-line bracket-prefixed text falls back to a scalar when it is not a flow array. Provider configuration is stripped before the template asset is bound. Unparseable command frontmatter or an empty body fails closed (blocked, component not emitted). skill/agent assets stay verbatim: their frontmatter is what the host's own parsers read at install"
 }

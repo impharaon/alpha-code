@@ -706,3 +706,4 @@ PLAN 阶段只提交本文件。下表和命令均为实施安排，不代表已
 
 - r8 的 adhoc Mach 前提反例与所有原始/修正记录保留在原场景根 `r8/h4/`，不改写为产品证明；r9 v4.4 以 §4.4 :890–901 / §6 :939 取代此前仅 peer/祖先核验。此计划不再把旧 :789/:836/:875 视为当前 H4 合同。旧文档契约 **70 error/252 warning** 与缺 `.gate-tests` 的基线收据沿 r8，结束时只核相关增量。
 - r9 步骤 1：补充 `src/shared/package-manager-syntax.ts` 作为虚拟 scanner 与 main 类型的同一事实所有者、`scripts/package-manager-build.ts` 供两个构建入口复用；两者是同调用链必需文件，不复制 ShellScan。方言名从原 `ShellSelect.name` 的 POSIX 源码投影，漂移即构建失败，不拉其服务依赖。三方言实测使交付构造先接管道到组、再组内复制描述符；zsh 在直接命令上先求值重定向才接 pipe。closed stdin 用普通 true 实际复制到 8 检测，避免 0→0 被 shell 当作 no-op。
+- r9 步骤 2：原 Core/Plugin 文件只经精确 build adapter 接 H2，Tool.Context 的 session/message/call 来自真实调用；原 create.before 不变。真实 `Shell.create` 函数与生产 Node spawner 的集成证明 prepare→委派→真实 PID、私有 fd、原 Info.command/输出和 finish。主消息/parser/host与适配 **39 pass**，ext 桥 **15 pass**，两包类型 exit 0。此提交先落控制链，plugin 的注册调用与 server 的实际 main 节点簿在步骤 3 一起启用；中间提交没有一个能放行 brew 的不完整端口。

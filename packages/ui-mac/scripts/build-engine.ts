@@ -24,6 +24,7 @@ import { bundledModelsSnapshot } from "../../core/script/models-snapshot"
 import { projectDirectoryAccessSource } from "../engine/file-access-transform"
 import { transformV1MigrationSource } from "../engine/v1-migration-transform"
 import { packageManagerScannerPlugin } from "./package-manager-build"
+import { packageManagerShellSource } from "../engine/package-manager-shell-transform"
 
 const uiMac = path.resolve(import.meta.dirname, "..")
 export const ENGINE_OUT_DIR = path.join(uiMac, "dist-engine")
@@ -73,8 +74,10 @@ config.plugins = [
       if (id === "bun:sqlite") return bunSqliteShim
     },
     transform(code: string, id: string) {
-      const directoryAccess = projectDirectoryAccessSource(code, path.resolve(id))
+      const delegated = packageManagerShellSource(code, path.resolve(id))
+      const directoryAccess = projectDirectoryAccessSource(delegated ?? code, path.resolve(id))
       if (directoryAccess !== undefined) return directoryAccess
+      if (delegated !== undefined) return delegated
       if (path.resolve(id) !== v1Migration) return
       return transformV1MigrationSource(code)
     },

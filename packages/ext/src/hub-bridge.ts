@@ -16,7 +16,11 @@ import { PLUGIN_SOURCE_SEARCH_REPLY_TIMEOUT_MS } from "../../ui-mac/src/shared/p
 
 import { createUnattendedState } from "./policy/unattended"
 import type { ToolPolicyWriter } from "./policy/resolver"
+import type { PackageManagerExecutionLease, PreparedShellExecution, PreparedShellDelegate } from "@opencode/plugin/codepuppy-package-manager"
 import {
+  buildPackageManagerControlRequest,
+  parsePackageManagerControlReply,
+  type PackageManagerControl,
   buildWriteScopeRequest,
   parseWriteScopeReply,
   type WriteScopeRequest,
@@ -58,6 +62,10 @@ export type BridgeFailure = { ok: false; reason: "unavailable" | "timeout" | "er
 export type HubInstallSubject = { readonly name: string; readonly source: PluginSourceIdV1 | "created" }
 
 export type HubBridge = {
+  authorizePackageManagerExecution(input: PreparedShellExecution): Promise<PackageManagerExecutionLease>
+  bindPackageManagerShell(input: { executionID: string; pid: number }): Promise<void>
+  finishPackageManagerExecution(input: { executionID: string }): Promise<void>
+  cancelPackageManagerExecution(input: Omit<Extract<PackageManagerControl, { op: "cancel" }>, "op">): Promise<void>
   readonly unattended: ReturnType<typeof createUnattendedState>
   readWriteScope(request: Pick<WriteScopeRequest, "access" | "targets">): Promise<WriteScopeReply["result"]>
   readonly available: boolean
@@ -175,7 +183,21 @@ export function createHubBridge(
     return result.backup !== undefined ? { backup: result.backup } : {}
   }
 
+  const packageManagerControl = async (request: PackageManagerControl) => {
+    const result = await ask((id) => buildPackageManagerControlRequest(id, request), (message) => parsePackageManagerControlReply(message)?.result)
+    if (!result.ok) throw new Error("the app could not prepare the package-manager execution")
+    return result
+  }
+
   return {
+    authorizePackageManagerExecution: async (input) => {
+      const result = await packageManagerControl({ op: "authorize", input })
+      if (!result.lease) throw new Error("the app did not return the package-manager execution plan")
+      return result.lease
+    },
+    bindPackageManagerShell: async (input) => { await packageManagerControl({ op: "bind", ...input }) },
+    finishPackageManagerExecution: async (input) => { await packageManagerControl({ op: "finish", ...input }) },
+    cancelPackageManagerExecution: async (input) => { await packageManagerControl({ op: "cancel", ...input }) },
     unattended,
     readWriteScope: async (request) => {
       const result = await ask((id) => buildWriteScopeRequest(id, request), (message) => parseWriteScopeReply(message)?.result)
@@ -229,6 +251,20 @@ export function createHubBridge(
       for (const message of early.splice(0)) handler(message)
     },
   }
+}
+
+export async function delegatePackageManagerShell(shell: { delegatePreparedShell(handler: (input: PreparedShellExecution) => Promise<PreparedShellDelegate | undefined>): Promise<void> }, bridge: HubBridge) {
+  await shell.delegatePreparedShell(async (input) => {
+    const lease = await bridge.authorizePackageManagerExecution(input)
+    if (lease.nodes.length === 0) return
+    return {
+      executionSource: lease.executionSource,
+      privateInput: lease.shellPrivateInput,
+      bindProcess: (input) => bridge.bindPackageManagerShell({ executionID: lease.executionID, ...input }),
+      cancel: (reason) => bridge.cancelPackageManagerExecution({ executionID: lease.executionID, reason }),
+      finish: () => bridge.finishPackageManagerExecution({ executionID: lease.executionID }),
+    }
+  })
 }
 
 /** 本引擎进程的 parentPort(Electron utilityProcess);CLI / 测试宿主里没有。 */

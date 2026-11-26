@@ -919,7 +919,7 @@ export async function spawnLocalServer(
       return
     }
     if (receiveToolPolicyWrite(message, { baseDir: toolPolicyBaseDir, post: (reply) => child.postMessage(reply), log: (line) => getLogger()?.warn(line) })) return
-    options.codepuppySidecar?.receive(message, postCodePuppy, readWriteScope)
+    options.codepuppySidecar?.receive(message, postCodePuppy, readWriteScope, async () => ({ ok: false, error: "unavailable" }))
   })
   let detachCodePuppy: ((reason: string) => void) | undefined
   // 实现期修订 1:读不出的条目、软链条目每代只记一次(拉取每次装载都来)

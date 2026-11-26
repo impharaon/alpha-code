@@ -3,6 +3,18 @@ import type { PackageAuthorizationResultV1 } from "../shared/package-admission"
 import { isInstallOutcomeV1, type InstallOutcomeV1, type CreatedPluginDraftV1 } from "../shared/plugin-install"
 import type { SourceSearchResultV1, CandidateV1, SourceStatusV1 } from "./plugin-sources"
 import type { ToolPolicyPartition, ToolPolicyRecord } from "../../../schema/src/codepuppy-tool-policy"
+import type { PackageManagerExecutionLease, PreparedShellExecution } from "@opencode/plugin/codepuppy-package-manager"
+
+export const PACKAGE_MANAGER_CANCEL_REASONS = ["cancelled", "timeout", "engine-disconnected", "app-quitting"] as const
+export type PackageManagerCancelReason = typeof PACKAGE_MANAGER_CANCEL_REASONS[number]
+export type PackageManagerControl =
+  | { op: "authorize"; input: PreparedShellExecution }
+  | { op: "bind"; executionID: string; pid: number }
+  | { op: "finish"; executionID: string }
+  | { op: "cancel"; executionID: string; reason: PackageManagerCancelReason }
+export type PackageManagerControlRequest = { type: "codepuppy.package-manager.request"; id: number; request: PackageManagerControl }
+export type PackageManagerControlReply = { type: "codepuppy.package-manager.reply"; id: number; result: { ok: true; lease?: PackageManagerExecutionLease } | { ok: false; error: "unavailable" } }
+export type PackageManagerControlHandler = (request: PackageManagerControl) => Promise<PackageManagerControlReply["result"]>
 
 // Main ↔ sidecar contract: source lookup, ID-only installation, main-owned progress and reload messages.
 // Shared by ext and ui-mac; no filesystem or Electron dependencies. Build/parse pairs reject malformed payloads.
@@ -148,6 +160,7 @@ export type PackageAuthorizationQuery = { type: "codepuppy.package.authorization
 export type PackageAuthorizationReply = { type: "codepuppy.package.authorization.reply"; id: number; result: PackageAuthorizationResultV1 }
 
 export type CodePuppySidecarInbound =
+  | PackageManagerControlRequest
   | WriteScopeRequest
   | HubViewRequestMessage
   | PackageAuthorizationQuery
@@ -157,6 +170,7 @@ export type CodePuppySidecarInbound =
   | SourcesSearchRequest
   | HubInstallRequest
 export type CodePuppySidecarOutbound =
+  | PackageManagerControlReply
   | WriteScopeReply
   | ReloadRequestMessage
   | PackageAuthorizationReply
@@ -205,6 +219,7 @@ function parseReloadItems(value: unknown): ReloadItem[] | undefined {
 /** main 侧:ext → main 的封闭消息族。别的一律 undefined(含 main → ext 的方向)。 */
 export function parseCodePuppySidecarInbound(value: unknown): CodePuppySidecarInbound | undefined {
   if (!isRecord(value)) return
+  if (value.type === "codepuppy.package-manager.request") return parsePackageManagerControlRequest(value)
   if (value.type === "codepuppy.write-scope.request") return parseWriteScopeRequest(value)
   if (value.type === "codepuppy.package.authorization.request")
     return isId(value.id) && isText(value.packageId) && Object.keys(value).every(key => ["type", "id", "packageId"].includes(key))
@@ -760,4 +775,40 @@ export function buildWriteScopeReply(id: number, result: WriteScopeReply["result
   const reply = parseWriteScopeReply({ type: "codepuppy.write-scope.reply", id, result })
   if (!reply) throw new Error("invalid write scope result")
   return reply
+}
+
+export function buildPackageManagerControlRequest(id: number, request: PackageManagerControl): PackageManagerControlRequest {
+  return { type: "codepuppy.package-manager.request", id, request }
+}
+export function buildPackageManagerControlReply(id: number, result: PackageManagerControlReply["result"]): PackageManagerControlReply {
+  return { type: "codepuppy.package-manager.reply", id, result }
+}
+export function parsePackageManagerControlRequest(value: unknown): PackageManagerControlRequest | undefined {
+  if (!isRecord(value) || value.type !== "codepuppy.package-manager.request" || !isId(value.id) || !closedKeys(value, ["type", "id", "request"]) || !isRecord(value.request)) return
+  const request = value.request
+  if (request.op === "authorize") {
+    const input = request.input
+    const keys = ["shellID", "sessionID", "messageID", "callID", "command", "cwd", "shell"] as const
+    if (!closedKeys(request, ["op", "input"]) || !isRecord(input) || !closedKeys(input, keys) || !keys.every((key) => typeof input[key] === "string") || !keys.filter((key) => key !== "command").every((key) => isText(input[key]))) return
+    return buildPackageManagerControlRequest(value.id, { op: "authorize", input: input as PreparedShellExecution })
+  }
+  if (!isText(request.executionID)) return
+  if (request.op === "bind" && closedKeys(request, ["op", "executionID", "pid"]) && Number.isSafeInteger(request.pid) && typeof request.pid === "number" && request.pid > 0) return buildPackageManagerControlRequest(value.id, { op: "bind", executionID: request.executionID, pid: request.pid })
+  if (request.op === "finish" && closedKeys(request, ["op", "executionID"])) return buildPackageManagerControlRequest(value.id, { op: "finish", executionID: request.executionID })
+  if (request.op === "cancel" && closedKeys(request, ["op", "executionID", "reason"]) && PACKAGE_MANAGER_CANCEL_REASONS.some((reason) => reason === request.reason)) return buildPackageManagerControlRequest(value.id, { op: "cancel", executionID: request.executionID, reason: request.reason as PackageManagerCancelReason })
+}
+export function parsePackageManagerControlReply(value: unknown): PackageManagerControlReply | undefined {
+  if (!isRecord(value) || value.type !== "codepuppy.package-manager.reply" || !isId(value.id) || !closedKeys(value, ["type", "id", "result"]) || !isRecord(value.result)) return
+  const result = value.result
+  if (result.ok === false && result.error === "unavailable" && closedKeys(result, ["ok", "error"])) return buildPackageManagerControlReply(value.id, { ok: false, error: "unavailable" })
+  if (result.ok !== true || !closedKeys(result, result.lease === undefined ? ["ok"] : ["ok", "lease"])) return
+  if (result.lease === undefined) return buildPackageManagerControlReply(value.id, { ok: true })
+  const lease = result.lease
+  if (!isRecord(lease) || !closedKeys(lease, ["executionID", "nodes", "helperService", "executionSource", "shellPrivateInput"]) || !isText(lease.executionID) || typeof lease.executionSource !== "string" || typeof lease.helperService !== "string" || !Array.isArray(lease.nodes) || !lease.nodes.every((node) => isRecord(node) && closedKeys(node, ["nodeID"]) && isText(node.nodeID))) return
+  const input = lease.shellPrivateInput
+  if (!isRecord(input) || !closedKeys(input, ["fd", "data"]) || typeof input.fd !== "number" || !Number.isSafeInteger(input.fd) || input.fd < 3 || input.fd > 9 || !(input.data instanceof Uint8Array)) return
+  return buildPackageManagerControlReply(value.id, { ok: true, lease: lease as PackageManagerExecutionLease })
+}
+function closedKeys(value: Record<string, unknown>, keys: readonly string[]) {
+  return Object.keys(value).length === keys.length && keys.every((key) => Object.hasOwn(value, key))
 }

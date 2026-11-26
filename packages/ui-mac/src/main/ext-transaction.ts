@@ -655,7 +655,7 @@ function validatePlan(root: string, plan: TxPlan): string | null {
   if (!plan || typeof plan !== "object" || !Array.isArray(plan.items)) return "invalid plan"
   if (plan.txId !== undefined && !TX_ID_RE.test(plan.txId)) return `invalid txId: ${plan.txId}`
   if (plan.items.length === 0) return "plan has no items"
-  if (plan.items.length > 64) return "plan exceeds 64 items"
+  if (plan.items.length > 64 && !plan.items.some(item => item && typeof item === "object" && item.tree !== undefined)) return "plan exceeds 64 items"
   // REQ-128 `#706`(基线 §2.9):**只有 root package item 携带 mutation**。两个就意味着一次
   // 事务里有两个 package 真相,提交顺序会决定谁赢 —— 在写盘之前拒,零副作用。
   const mutationCarriers = plan.items.filter((it) => it && typeof it === "object" && it.packageMutation !== undefined)

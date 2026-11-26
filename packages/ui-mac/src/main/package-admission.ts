@@ -1,3 +1,6 @@
+import { buildPluginPackageTxItems, pluginHostName, pluginComponentId, pluginMcpConfig } from "./plugin-package-install"
+import { FACTORY_SKILL_IDS } from "./factory-skills"
+import type { PluginPackage, Entry } from "../shared/host-extension-package-contract/plugin-package"
 import type { PackageEffectV1 } from "../shared/plugin-install"
 import { createPackageDeclarationResolver } from "./package-declarations"
 import { isOfficialConnector } from "./official-connector-recipes"
@@ -231,6 +234,7 @@ type PreparedComponent = {
   agentEntry?: Record<string, unknown>
   /** `#840` command:payload 字段 + template asset 字节合成的引擎叶(builder 只落 config)。 */
   commandEntry?: Record<string, unknown>
+  pluginPackage?: { description: PluginPackage; build: PackageTxBuildV1; names: Map<string, string>; nodes: import("./ext-package-ledger-v3").PackageGraphNodeV1[]; skills: UpsertInput[]; mcps: Extract<Entry, { kind: "mcp" }>[] }
   itemDigest: string
 }
 
@@ -727,6 +731,7 @@ function connectionScope(deps: PackageAdmissionDeps): CodePuppyConnectionStoreSc
 
 function componentOperations(component: PreparedComponent) {
   switch (component.kind) {
+    case "bundle":
     case "skill":
       return ["write-generation", "write-install-record", "write-capability-grant"] as const
     case "agent":
@@ -773,6 +778,14 @@ function packagePlanPreview(prepared: PreparedPackage): PackageAdmissionPreviewV
     })),
     operations: [...componentOperations(component)],
   }))
+  for (const component of prepared.components) {
+    for (const node of component.pluginPackage?.nodes ?? []) installed.push({
+      included: true, componentId: node.componentId, role: "leaf", required: node.required,
+      key: packageChildTxKeyV1(node.kind as "skill" | "mcp", node.name), kind: node.kind as "skill" | "mcp", name: node.name,
+      manifestDigest: `sha256:${component.itemDigest}`, payloadDigest: "sha256:" + component.accepted.component.payloadRef.sha256,
+      capabilities: [], prerequisites: [], operations: node.kind === "skill" ? ["write-install-record", "write-capability-grant"] : ["update-config", "write-install-record", "write-capability-grant"],
+    })
+  }
   const skipped: PackageAdmissionPlanItemV1[] = prepared.skipped.map((entry) => ({
     included: false,
     componentId: entry.componentId,
@@ -854,7 +867,7 @@ async function resolvePreparedPackage(
   const components: PreparedComponent[] = []
   for (const entry of ordered) {
     const component = entry.component
-    const name = component.id.slice(component.id.indexOf(":") + 1)
+    const name = component.profileId === "plugin-package" ? "plugin-" + sha256Hex(facts.envelope.prelude.packageId).slice(0, 24) : component.id.slice(component.id.indexOf(":") + 1)
     // `#809`(基线 §5 第 7 类):kind 只此**一张表**派生。此前这里是 `else → "mcp"` 的兜底三元
     // ⇒ 一个只在合同侧登记、宿主表没跟上的 profile 会被**静默当成 MCP** 装进 `codepuppy.jsonc` 的
     // `mcp` 段,而卸载侧是 fail-closed 的 ⇒ 装得上、卸不掉。未登记 ⇒ 整个组件具名拒绝。
@@ -908,7 +921,7 @@ async function resolvePreparedPackage(
     // 事务 key 只此一处派生(`packageChildTxKeyV1`)—— 卸载时清授权账用的是同一个函数。
     // 两处各写一遍 ternary,偏差只会在「装得上但卸载后 grants.json 还在」时现身。
     const key = packageChildTxKeyV1(kind, name)
-    const fetchAsset = deps.fetchAsset ?? fetchPackageAsset
+    const fetchAsset = deps.fetchAsset ?? ((ref: PackageAssetRefV1) => fetchPackageAsset(ref, component.profileId))
     /** 取一份字节并**逐份**双查(长度 + sha256)。任一不符 ⇒ 整包具名拒绝,零副作用。 */
     const fetchVerified = async (ref: PackageAssetRefV1): Promise<Buffer | undefined> => {
       // 取回失败必须与「成功取回 0 字节」分开:0 字节是合法条目,而它的 sha256 就是空串的
@@ -1003,8 +1016,34 @@ async function resolvePreparedPackage(
       assetFiles = promoted.specs
     }
 
+    let pluginPackage: PreparedComponent["pluginPackage"]
+    if (entry.payload.schema === "codepuppy.host-extension-package.payload.plugin-package.v1") {
+      const payload = entry.payload
+      const packageId = facts.envelope.prelude.packageId
+      const state = readPackageLedgerStateV1(deps.root(), { sideEffectFree: true })
+      if (!state.ok || entry.role !== "root") return { ok: false, reason: "package admission: plugin package root or installation state is invalid", package: view }
+      const before = state.packageGraphs.find(graph => graph.packageId === packageId)
+      const occupied = new Set(state.records.filter(record => !before || ![before.root, ...before.children].some(node => node.kind === record.kind && node.name === record.name)).map(record => record.kind + ":" + record.name))
+      for (const name of FACTORY_SKILL_IDS) occupied.add("skill:" + name)
+      const names = new Map(payload.description.entries.filter(entry => entry.kind === "skill" || entry.kind === "mcp").map(entry => [entry.id, pluginHostName(entry, packageId, occupied, () => true)]))
+      const blobs = new Map<string, Buffer>()
+      for (const ref of payload.blobs) {
+        const bytes = await fetchVerified(ref)
+        if (!bytes) return { ok: false, reason: "package admission: plugin blob integrity failed", package: view }
+        blobs.set(ref.sha256, bytes)
+      }
+      const mcps = payload.description.entries.filter((entry): entry is Extract<Entry, { kind: "mcp" }> => entry.kind === "mcp")
+      const nodes = payload.description.entries.filter(entry => entry.kind === "skill" || entry.kind === "mcp").map(entry => ({ componentId: pluginComponentId(packageId, entry), kind: entry.kind, name: names.get(entry.id)!, required: true, manifestDigest: "sha256:" + component.payloadRef.sha256 }))
+      const base = { environment: deps.environment(), scope: { kind: "global" as const }, origin: "catalog" as const, version: facts.envelope.prelude.version, desiredState: "disabled" as const, installedAt: new Date().toISOString(), payloadDigest: "sha256:" + component.payloadRef.sha256 }
+      const skills = nodes.filter(node => node.kind === "skill").map(node => ({ ...base, id: node.componentId, kind: node.kind, name: node.name }))
+      const built = await buildPluginPackageTxItems({ root: deps.root(), casBaseRoot: deps.casBaseRoot(), key, receipt: { ...base, id: "bundle:" + name, kind: "bundle", name }, description: payload.description, hostNames: names, skillReceipts: skills, readFile: async path => { const node = payload.description.tree.find(node => node.path === path); if (node?.kind !== "file") throw Error("Missing plugin file"); return node.bytes === 0 ? new Uint8Array() : blobs.get(node.digest.slice(7))! } })
+      if (!built.ok) return { ok: false, reason: built.reason, package: view }
+      pluginPackage = { description: built.description, build: built.build, names, nodes, skills, mcps }
+    }
+
     components.push({
       accepted: entry,
+      ...(pluginPackage ? { pluginPackage } : {}),
       key,
       kind,
       name,
@@ -1016,6 +1055,7 @@ async function resolvePreparedPackage(
         canonicalJson({
           component,
           payload: entry.payload,
+          ...(pluginPackage ? { hostNames: [...pluginPackage.names], installedTreeDigest: pluginPackage.description.treeDigest } : {}),
           ...(agentRef ? { asset: { sha256: agentRef.sha256, bytes: agentRef.bytes } } : {}),
           // `#828`:**冗余纵深,不是唯一屏障** —— 如实登记(审计实测:把这块收窄成只取第一条,
           // 3738 条全绿)。真正兜住「换掉一份参考资料 ⇒ itemDigest 必变」的是上面那条
@@ -1129,7 +1169,7 @@ async function executePreparedPackage(
   for (const component of prepared.components) {
     const manifestDigest = `sha256:${component.itemDigest}`
     const receipt: UpsertInput = {
-      id: component.accepted.component.id,
+      id: component.kind === "bundle" ? "bundle:" + component.name : component.accepted.component.id,
       name: component.name,
       kind: component.kind,
       environment: deps.environment(),
@@ -1163,8 +1203,26 @@ async function executePreparedPackage(
     }
     // `#809`:分派**穷举** `PackageChildKindV1`,没有 else —— 表里多一个 kind 而这里没跟上是
     // 编译期红,不是运行期静默走 MCP。四条腿各自路由到一个具名 builder。
+    const pluginMcpBuilds: PackageTxBuildV1[] = []
+    if (component.pluginPackage) {
+      const plugin = component.pluginPackage
+      Object.assign(plugin.build.receipt, receipt)
+      for (const item of plugin.build.items) item.manifestDigest = manifestDigest
+      plugin.build.items[0]!.capabilities = common.capabilities
+      for (const skill of plugin.skills) Object.assign(skill, { desiredState: receipt.desiredState, manifestDigest: receipt.manifestDigest, grantDigest: receipt.grantDigest, installedAt: now })
+      for (const entry of plugin.mcps) {
+        const hostName = plugin.names.get(entry.id)!
+        const needs = plugin.description.secrets.filter(need => need.componentId === entry.id)
+        const leaf = pluginMcpConfig(entry)
+        const mcp = buildMcpTxItems({ root, key: "mcp--" + hostName, name: hostName, receipt: { ...receipt, id: pluginComponentId(prepared.facts.envelope.prelude.packageId, entry), name: hostName, kind: "mcp" }, capabilities: [], manifestDigest, userDataPath: deps.userDataPath, effect: lifecycle.graph.effect, newSecretVersionId: deps.secretVersionId ?? newMcpSecretVersionId, leaf, secretNeeds: needs.map(need => ({ needId: need.id })), secretValues: Object.fromEntries(needs.map(need => [need.id, intent.grants?.secrets?.[component.accepted.component.id + "#" + need.id] ?? ""])) })
+        if (!mcp.ok) return { ok: false, reason: mcp.reason }
+        pluginMcpBuilds.push(mcp.build)
+      }
+    }
     const built = ((): PackageTxBuildV1Result => {
       switch (component.kind) {
+        case "bundle":
+          return component.pluginPackage ? { ok: true, build: component.pluginPackage.build } : { ok: false, reason: "Plugin package tree is missing" }
         case "skill":
           return buildSkillTxItems({
             ...common,
@@ -1206,7 +1264,7 @@ async function executePreparedPackage(
       }
     })()
     if (!built.ok) return { ok: false, reason: `package admission: ${built.reason}` }
-    builds.push({ component, build: built.build, desiredState: receipt.desiredState })
+    builds.push({ component, build: built.build, desiredState: receipt.desiredState }, ...pluginMcpBuilds.map(build => ({ component, build, desiredState: receipt.desiredState })))
   }
 
   const rootManifestDigest = lifecycle.rootManifestDigest
@@ -1288,7 +1346,7 @@ async function executePreparedPackage(
   // 事务返回之后 = 锁已释放。惰性残留在这里清,失败只报不改结果(离场 child 此刻已不可能被加载)。
   const cleanupWarnings: string[] = []
   if (result.ok && activation === "automatic") {
-    const published = publishPackageMcp(builds.filter((entry) => entry.component.kind === "mcp").map((entry) => entry.build))
+    const published = publishPackageMcp(builds.filter((entry) => entry.build.receipt.kind === "mcp").map((entry) => entry.build))
     if (!published.ok) cleanupWarnings.push(published.reason)
   }
   if (result.ok) for (const resource of preparedResources) {
@@ -1481,7 +1539,8 @@ function packageGraphOf(prepared: PreparedPackage, rootManifestDigest: string, e
     ...(prepared.root.kind === "cloud" ? { displayName: prepared.facts.envelope.presentation.displayName } : {}),
     envelopeDigest: `sha256:${prepared.binding.envelopeDigest}`,
     root: { ...graphNodeOf(prepared.root), required: true, manifestDigest: rootManifestDigest },
-    children: prepared.components.slice(1).map(graphNodeOf),
+    children: [...prepared.components.slice(1).map(graphNodeOf), ...(prepared.root.pluginPackage?.nodes ?? [])],
+    ...(prepared.root.pluginPackage ? { pluginTree: { storeKey: prepared.root.key, treeDigest: prepared.root.pluginPackage.description.treeDigest }, source: { kind: "catalog" as const }, notRunning: prepared.root.pluginPackage.description.entries.filter(entry => entry.kind !== "skill" && entry.kind !== "mcp").map(entry => ({ kind: entry.kind, sourceName: entry.sourceName, reason: "kind-not-supported-yet" as const })) } : {}),
   }
   return { ...withoutDigest, installedGraphDigest: computeInstalledGraphDigest(withoutDigest) }
 }
@@ -1519,7 +1578,7 @@ function transactionOutcome(
   result: TxResult,
   prepared: PreparedPackage,
   rootManifestDigest: string,
-  builds: Array<{ component: PreparedComponent; desiredState: "enabled" | "disabled" }>,
+  builds: Array<{ component: PreparedComponent; build: PackageTxBuildV1; desiredState: "enabled" | "disabled" }>,
   connection: ResolvedPackageConnectionV1,
   oauth: ResolvedPackageMcpOauthV1,
   connectionWarning?: string,
@@ -1542,8 +1601,8 @@ function transactionOutcome(
     activateMcp: [
       ...new Set(
         builds
-          .filter((entry) => entry.component.kind === "mcp" && entry.desiredState === "enabled")
-          .map((entry) => entry.component.name),
+          .filter((entry) => entry.build.receipt.kind === "mcp" && entry.desiredState === "enabled")
+          .map((entry) => entry.build.receipt.name),
       ),
     ].sort(),
     ...(rootBuild.component.kind === "mcp" && rootBuild.desiredState === "disabled"
@@ -1600,8 +1659,8 @@ function confirmationMatches(diffs: CapabilityDiff[], confirmed: Record<string, 
  */
 const ASSET_TIMEOUT_MS = 8000
 
-async function fetchPackageAsset(ref: PackageAssetRefV1): Promise<Uint8Array> {
-  if (ref.bytes > HOST_EXTENSION_PACKAGE_LIMITS_V1.maxMarkdownAssetBytes)
+async function fetchPackageAsset(ref: PackageAssetRefV1, profile: import("../shared/host-extension-package-contract/registry").PackageProfileIdV1): Promise<Uint8Array> {
+  if (profile !== "plugin-package" && ref.bytes > HOST_EXTENSION_PACKAGE_LIMITS_V1.maxMarkdownAssetBytes)
     throw new Error("package asset exceeds host limit")
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), ASSET_TIMEOUT_MS)
@@ -1614,7 +1673,7 @@ async function fetchPackageAsset(ref: PackageAssetRefV1): Promise<Uint8Array> {
         throw new Error("package asset redirected outside HTTPS")
     }
     const bytes = new Uint8Array(await response.arrayBuffer())
-    if (bytes.byteLength > HOST_EXTENSION_PACKAGE_LIMITS_V1.maxMarkdownAssetBytes)
+    if (profile !== "plugin-package" && bytes.byteLength > HOST_EXTENSION_PACKAGE_LIMITS_V1.maxMarkdownAssetBytes)
       throw new Error("package asset exceeds host limit")
     return bytes
   } finally {

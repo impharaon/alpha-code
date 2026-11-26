@@ -618,17 +618,21 @@ function enabledPackageAllowSet(records: readonly unknown[], graphs: readonly Pa
   const mcp = new Map<string, boolean>()
   for (const record of valid) {
     if (record.kind === "mcp" && record.scope.kind === "global" && !mcp.has(record.name)) mcp.set(record.name, false)
-    if (record.desiredState !== "enabled" || (record.kind !== "skill" && record.kind !== "mcp")) continue
+    if (record.kind !== "skill" && record.kind !== "mcp") continue
     const owners = graphs.filter((graph) => [graph.root, ...graph.children].some((node) => node.kind === record.kind && node.name === record.name))
     const independent = owners.length === 0 || findClaim(claims, record.kind, record.name)?.owners.some((owner) => {
       const parsed = parseOwnerToken(owner)
       return parsed?.kind === "standalone" || parsed?.kind === "legacy-protected"
     })
-    const allProjects = independent || owners.some((graph) => graph.effect === undefined)
+    const activeOwners = owners.filter(graph => graph.pluginTree
+      ? valid.some(root => root.kind === graph.root.kind && root.name === graph.root.name && root.desiredState === "enabled")
+      : record.desiredState === "enabled")
+    if (!(independent && record.desiredState === "enabled") && activeOwners.length === 0) continue
+    const allProjects = independent && record.desiredState === "enabled" || activeOwners.some((graph) => graph.effect === undefined)
     if (record.kind === "skill" && allProjects) keys.add(`skill--${record.name}`)
     const unavailable = record.kind === "mcp" && officialRuntimeUnavailable.has(record.name)
     if (record.kind === "mcp" && record.scope.kind === "global" && allProjects && !unavailable) mcp.set(record.name, true)
-    for (const graph of owners) {
+    for (const graph of activeOwners) {
       if (!graph.effect || unavailable) continue
       const entry = { kind: record.kind, name: record.name, projectPath: graph.effect.projectPath }
       scoped.set(canonicalJson(entry), entry)

@@ -1,3 +1,7 @@
+import corpus from "../shared/host-extension-package-contract/testvectors/decoder-corpus.v1.json"
+import { captureWholeFixture } from "../../test-fixtures/plugin-helper/fixture"
+import { canonicalArtifactJsonBytesV1 } from "../shared/host-extension-package-contract/generate-artifact"
+import { resolveLiveGenerationDir } from "./ext-transaction"
 import { createHash } from "node:crypto"
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
@@ -48,6 +52,34 @@ function desktopDeps() {
     resolvePackage: async (id: string, version: string) => ({ ...resolveVerifiedPackageV1(sample.catalog, id, version), channel: "cache" as const }),
   }
 }
+
+test("whole plugin profile installs its signed tree and registered skills through catalog admission", async () => {
+  const { installDesktopPackageV1 } = await import("./package-admission")
+  const { setPackageStateV1 } = await import("./ext-install-planner")
+  const sample = corpus.cases.find(sample => sample.name === "plugin-package-real-superpowers-v1")!
+  const payload = sample.components[0]!.payload
+  const bytes = canonicalArtifactJsonBytesV1(payload)
+  const capture = await captureWholeFixture("superpowers")
+  const fetchBytes = async (ref: { sha256: string }) => {
+    if (ref.sha256 === sample.envelope.components[0]!.payloadRef.sha256) return bytes
+    const node = capture.nodes.find(node => node.kind === "file" && node.digest === "sha256:" + ref.sha256)
+    if (!node) throw Error("Unknown signed sample blob")
+    return capture.readFile(node.path)
+  }
+  const catalog = { version: "1", entries: [], packages: [sample.envelope] }
+  const deps = { ...desktopDeps(), loadVerifiedCatalog: async () => ({ source: "remote" as const, catalog, snapshotDigest }), installability: { fetchPayload: fetchBytes }, fetchAsset: fetchBytes, resolvePackage: async (id: string, version: string) => ({ ...resolveVerifiedPackageV1(catalog, id, version), channel: "cache" as const }) }
+  const result = await installDesktopPackageV1(sample.envelope.prelude.packageId, deps)
+  expect(result).toMatchObject({ ok: true, kind: "bundle" })
+  const state = readPackageLedgerStateV1(root)
+  if (!state.ok) throw Error(state.reason)
+  expect(state.packageGraphs[0]?.children.map(node => node.kind)).toEqual(["skill"])
+  expect(state.records.map(record => record.kind)).toEqual(["bundle", "skill"])
+  const live = resolveLiveGenerationDir(root, state.packageGraphs[0]!.pluginTree!.storeKey)!
+  expect(readFileSync(join(live, "tree/skills/using-superpowers/SKILL.md"), "utf8")).toContain("superpowers")
+  expect(JSON.parse(readFileSync(skillsEnabledPath(root), "utf8")).keys).toContain("skill--using-superpowers")
+  expect(await setPackageStateV1({ packageId: sample.envelope.prelude.packageId, state: "disabled" }, deps)).toMatchObject({ ok: true })
+  expect(JSON.parse(readFileSync(skillsEnabledPath(root), "utf8")).keys).not.toContain("skill--using-superpowers")
+})
 
 test("project-only catalog admission commits effect with the graph and keeps persistent MCP disabled", async () => {
   const { installDesktopPackageV1 } = await import("./package-admission")

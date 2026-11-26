@@ -1,12 +1,12 @@
 import { sha256Hex } from "./ext-manifest-v2"
 import { expect, spyOn, test } from "bun:test"
-import { mkdtempSync, rmSync } from "node:fs"
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { captureFixture, captureWholeFixture, fixtureRoot } from "../../test-fixtures/plugin-helper/fixture"
 import { convertPluginTree } from "../shared/host-extension-package-contract/plugin-conversion.mjs"
 import { buildSkillTxItems } from "./ext-package-tx-builders"
-import { promotePayloadToCas, setPackageStateV1 } from "./ext-install-planner"
+import { promotePayloadToCas, setPackageStateV1, removeInstallGrants } from "./ext-install-planner"
 import { computeInstalledGraphDigest, type PackageGraphV1 } from "./ext-package-ledger-v3"
 import { diffPackageGraphsV1, planPackageClaimTransferV1 } from "./ext-package-lifecycle"
 import { commitTransactionLedger } from "./ext-package-ledger-commit"
@@ -77,12 +77,36 @@ test("whole plugin remotion enables real cross-skill references", () => installe
   expect(outcome.ok && outcome.notRunning).toEqual([])
 }))
 
+test("whole plugin removal deletes its owned tree without treating member skills as flat installs", () => installerHarness(async h => {
+  const { uninstallPackageV1 } = await import("./ext-package-uninstall")
+  const capture = await captureWholeFixture("superpowers", path => path === ".claude-plugin/plugin.json" || path === "skills/using-superpowers/SKILL.md")
+  const converted = await convertPluginTree(capture)
+  h.sources.convertCandidate = async () => ({ ok: true, ...converted, capture, runtimeIdentity: undefined })
+  const installed = await h.install(h.request("real_owned_tree", "whole_remove"))
+  if (!installed.ok) throw Error(installed.detail)
+  const before = readPackageLedgerStateV1(h.root)
+  if (!before.ok) throw Error(before.reason)
+  const graph = before.packageGraphs[0]!
+  const store = join(h.root, "ext-store", graph.pluginTree!.storeKey)
+  const flat = join(h.root, "skills/using-superpowers/SKILL.md")
+  mkdirSync(join(h.root, "skills/using-superpowers"), { recursive: true })
+  const bytes = Buffer.from(await capture.readFile("skills/using-superpowers/SKILL.md"))
+  writeFileSync(flat, bytes)
+  const unused = () => { throw Error("No independent component files may be removed") }
+  expect(uninstallPackageV1(installed.packageId, { globalRoot: () => h.root, installers: { removeFsInstall: unused, removeMcpConfig: unused, removeCommandConfig: unused, removeMcpSecretsStrict: unused, releaseCodePuppyConnectionBindings: unused, removePluginPath: unused, removeInstallGrants } })).toMatchObject({ ok: true })
+  expect(existsSync(store)).toBe(false)
+  expect(readFileSync(flat)).toEqual(bytes)
+  const after = readPackageLedgerStateV1(h.root)
+  expect(after.ok && after.records).toEqual([])
+  expect(after.ok && after.packageGraphs).toEqual([])
+}))
+
 test("A2 marketplace context7 commits one real enabled package and durable declarations", () => installerHarness(async (h) => {
   const input = h.request(await h.candidate("context7"))
   const outcome = await h.install(input)
   expect(outcome).toMatchObject({ ok: true, packageId: "claude:context7", source: { kind: "marketplace", ecosystem: "claude" }, installed: [{ kind: "mcp", hostName: "context7", sourceName: "context7" }] })
   const state = readPackageLedgerStateV1(h.root)
-  expect(state.ok && state.records.map((record) => record.desiredState)).toEqual(["enabled"])
+  expect(state.ok && state.records.map((record) => record.desiredState)).toEqual(["enabled", "enabled"])
   expect(state.ok && state.packageGraphs[0]?.declarations?.[0]?.mcp).toMatchObject({ type: "remote", url: "https://mcp.context7.com/mcp?client=claude-code-plugin" })
   expect(readMcpLeafStrict("context7")).toMatchObject({ ok: true, value: { url: "https://mcp.context7.com/mcp?client=claude-code-plugin" } })
   expect(h.activation).toEqual(["claude:context7"])
@@ -200,10 +224,11 @@ test("A2 host-name collision preserves existing content and rewrites only instal
   expect(readFileSync(original, "utf8")).toBe("user owned bytes")
   expect(h.reloads).toEqual([outcome.packageId])
   const { readCurrentGeneration } = await import("./ext-transaction")
-  // Read the real generation written by the existing builder, not a synthetic probe.
-  const current = readCurrentGeneration(h.root, "skill--" + outcome.installed[0]!.hostName)
+  const state = readPackageLedgerStateV1(h.root)
+  if (!state.ok) throw Error(state.reason)
+  const current = readCurrentGeneration(h.root, state.packageGraphs[0]!.pluginTree!.storeKey)
   expect(current).toBeTruthy()
-  expect(readFileSync(join(current!.dir, "SKILL.md"), "utf8")).toContain("name: " + outcome.installed[0]!.hostName)
+  expect(readFileSync(join(current!.dir, "tree/skills/frontend-design/SKILL.md"), "utf8")).toContain("name: " + outcome.installed[0]!.hostName)
 }))
 
 test("A2 zero runnable package maps diagnostics without writing ledger", () => installerHarness(async (h) => {
@@ -371,7 +396,7 @@ test("A2 same pinned source with changed real bytes updates its package instead 
   expect(after.ok && after.packageGraphs).toHaveLength(1)
   expect(after.ok && before.ok && after.packageGraphs[0]!.installedGraphDigest).not.toBe(before.ok && before.packageGraphs[0]!.installedGraphDigest)
   expect(readMcpLeafStrict("context7")).toMatchObject({ ok: true, value: { url: "https://mcp.context7.com/mcp?client=updated-definition" } })
-  expect(after.ok && after.records.map((record) => record.desiredState)).toEqual(["enabled"])
+  expect(after.ok && after.records.map((record) => record.desiredState)).toEqual(["enabled", "enabled"])
 }))
 
 function ownDraft(searchId: string, name = "own-report") {
@@ -462,7 +487,7 @@ test("BC2a pinned marketplace prepares opaque choices and only the selected real
   expect(await h.install(h.request(selected.id, "bc2_selected_context7"))).toMatchObject({ ok: true, packageId: "claude:context7" })
   const state = readPackageLedgerStateV1(h.root)
   expect(state.ok && state.packageGraphs.map(graph => graph.packageId)).toEqual(["claude:context7"])
-  expect(state.ok && state.records.map(record => record.name)).toEqual(["context7"])
+  expect(state.ok && state.records.map(record => record.name)).toEqual([state.ok && state.packageGraphs[0]!.root.name, "context7"])
   expect(h.activation).toEqual(["claude:context7"])
   expect(h.reloads).toEqual([])
 }))
@@ -558,7 +583,7 @@ test("review C5 one real multi-component transaction rolls back a mid-populate f
     ...hooks,
     populate: async (item, directory) => {
       await hooks.populate(item, directory)
-      // The real Figma MCP is a config action staged before this skill generation.
+      // The whole-tree generation is staged before receipt-only skills and MCP config.
       populated++
       throw Error("controlled skill populate failure after MCP staging")
     },
@@ -566,7 +591,7 @@ test("review C5 one real multi-component transaction rolls back a mid-populate f
   try {
     expect(await h.install(h.request(id, "c5_failed"))).toMatchObject({ ok: false, code: "transaction-failed" })
     expect(populated).toBe(1)
-    expect(probe.mock.calls[0]![1].items.map(item => item.action)).toEqual(["config", undefined])
+    expect(probe.mock.calls[0]![1].items.map(item => item.action)).toEqual([undefined, "receipt", "config"])
     expect(probe).toHaveBeenCalledTimes(1)
     const failed = readPackageLedgerStateV1(h.root)
     expect(failed.ok && failed.records).toEqual([])
@@ -578,11 +603,11 @@ test("review C5 one real multi-component transaction rolls back a mid-populate f
   const state = readPackageLedgerStateV1(h.root)
   if (!state.ok || !result.ok) throw Error("real multi-component package not committed")
   expect(state.packageGraphs).toHaveLength(1)
-  expect(state.records).toHaveLength(result.installed.length)
+  expect(state.records).toHaveLength(result.installed.length + 1)
   expect(state.records.length).toBeGreaterThan(1)
   expect(new Set(state.records.map(record => record.transaction?.id)).size).toBe(1)
   expect(state.records[0]!.transaction?.id).toBeTruthy()
-  expect(state.records.map(record => record.kind).sort()).toEqual(["mcp", "skill"])
+  expect(state.records.map(record => record.kind).sort()).toEqual(["bundle", "mcp", "skill"])
 }))
 
 test("review C5 an existing user MCP keeps its name and bytes when a real same-name plugin installs", () => installerHarness(async h => {
@@ -601,8 +626,8 @@ test("review C5 an existing user MCP keeps its name and bytes when a real same-n
   expect(readMcpLeafStrict("context7")).toEqual(before)
   expect(readMcpLeafStrict(result.installed[0]!.hostName)).toMatchObject({ ok: true })
   const state = readPackageLedgerStateV1(h.root)
-  expect(state.ok && state.records.map(record => record.name)).toEqual([result.installed[0]!.hostName])
-  expect(state.ok && state.packageGraphs[0]!.root.name).toBe(result.installed[0]!.hostName)
+  expect(state.ok && state.records.map(record => record.name)).toEqual([state.ok && state.packageGraphs[0]!.root.name, result.installed[0]!.hostName])
+  expect(state.ok && state.packageGraphs[0]!.children[0]!.name).toBe(result.installed[0]!.hostName)
 }))
 
 

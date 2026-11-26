@@ -1,65 +1,10 @@
-import { pluginRelativePath } from "./plugin-package"
+import { pluginRelativePath, pluginText, pluginPathBinding, pluginTreeDigest } from "./plugin-package"
 import { createHash } from "node:crypto"
 import { parse, type ParseError } from "jsonc-parser/lib/esm/main.js"
 import { ConfigMarkdown } from "@opencode/core/config/markdown"
 
-export type Sha256 = `sha256:${string}`
-export type RelPath = string
-export type Json = null | boolean | number | string | Json[] | { [key: string]: Json }
-export type Source = {
-  kind: "folder" | "git" | "listing" | "marketplace" | "mcp-registry" | "npm" | "created"
-  locator: string
-  repository?: string
-  commit?: string
-  pluginPath?: string
-  ecosystem?: "claude" | "codex" | "opencode"
-  entryName?: string
-  serverName?: string
-  version?: string
-  integrity?: string
-}
-export type Provider = "claude-code" | "codex" | "skill" | "mcp-registry" | "opencode"
-export type TreeNode =
-  | { kind: "directory"; path: RelPath; mode: number }
-  | { kind: "file"; path: RelPath; mode: number; bytes: number; digest: Sha256 }
-  | { kind: "symlink"; path: RelPath; target: string }
-export type Capture = { source: Source; nodes: readonly TreeNode[]; readFile(path: RelPath): Promise<Uint8Array> }
-export type Text = readonly (string | { binding: "pluginRoot" | "skillDir" | "projectDir" } | { secret: string })[]
-export type ToolRule = { tool: string; pattern?: string }
-export type ModelHint = { alias: string } | { providerID: string; modelID: string }
-export type Invocation = {
-  argumentHint?: string; model?: ModelHint; agent?: string
-  fork: boolean; userInvocable: boolean; implicitInvocation: boolean
-  allowedTools: ToolRule[]; deniedTools: ToolRule[]; availableTools?: ToolRule[]
-}
-export type SecretNeed = { id: string; componentId: string; label: string; targets: { file: RelPath; pointer: string }[] }
-export type LoginNeed = {
-  id: string; componentId: string; kind: "mcp-oauth"; required: boolean; serviceId: string; serverUrl: string
-  oauth?: { clientId?: string; clientSecret?: Text; scopes?: string[]; resource?: string; authorizationServerUrl?: string }
-}
-export type HookEvent = "SessionStart" | "UserPromptSubmit" | "UserPromptExpansion" | "PreToolUse" | "PostToolUse" | "PostToolUseFailure" | "Stop" | "StopFailure" | "PermissionRequest"
-export type Hook = {
-  event: HookEvent; matcher?: string; if?: string; command: Text; timeoutSeconds: number
-  async: boolean; asyncRewake: boolean; onFailure: "continue" | "block"; order: number
-  scope: { kind: "package" } | { kind: "skill" | "agent"; entryId: string }
-}
-type EntryBase = { id: string; sourcePath: RelPath; sourceName: string }
-export type Entry = EntryBase & (
-  | { kind: "skill"; directory: RelPath; instruction: Text; invocation: Invocation; display: Record<string, Json>; mcpDependencies: string[] }
-  | { kind: "command" | "agent"; instruction: Text; invocation: Invocation }
-  | { kind: "mcp"; transport: "stdio"; command: Text[]; environment: Record<string, Text>; cwd?: Text; timeoutMs?: number; floatingVersion?: { commandIndex: number; token: string } }
-  | { kind: "mcp"; transport: "http" | "sse"; url: Text; headers: Record<string, Text>; timeoutMs?: number; oauth?: false | LoginNeed }
-  | { kind: "hook"; hook: Hook }
-)
-export type Diagnostic = { path: RelPath; field?: string; code: "invalid-definition" | "missing-entry" | "unresolved-app-id" | "native-js-plugin"; sourceName?: string; message: string }
-export type PluginPackage = {
-  schema: "codepuppy.plugin-package.v1"; provider: Provider; name: string; version?: string; description?: string
-  source: Source; tree: TreeNode[]; treeDigest: Sha256; entries: Entry[]; secrets: SecretNeed[]; diagnostics: Diagnostic[]
-}
-export type MarketplaceEntry = {
-  name: string; description: string; category?: string
-  source: { kind: "path"; path: RelPath } | { kind: "git"; url: string; commit?: string; ref?: string; path?: RelPath } | { kind: "unsupported"; detail: string }
-}
+export type { Sha256, RelPath, Json, Source, Provider, TreeNode, Capture, Text, ToolRule, ModelHint, Invocation, SecretNeed, LoginNeed, HookEvent, Hook, Entry, Diagnostic, PluginPackage, MarketplaceEntry } from "./plugin-package"
+import type { Sha256, RelPath, Json, Source, Provider, TreeNode, Capture, Text, ToolRule, ModelHint, Invocation, SecretNeed, LoginNeed, HookEvent, Hook, Entry, Diagnostic, PluginPackage, MarketplaceEntry } from "./plugin-package"
 
 export class CaptureError extends Error {
   constructor(readonly code: "invalid-path" | "duplicate-path" | "invalid-node" | "read-failed" | "digest-mismatch", readonly path: string) {
@@ -128,7 +73,7 @@ export async function convertPluginTree(input: Capture): Promise<{ package: Plug
     const data: Record<string, unknown> = parsed.data
     const directory = path === "SKILL.md" ? "" : path.slice(0, -"/SKILL.md".length)
     const name = string(data.name) ?? directory.split("/").at(-1) ?? input.source.entryName ?? "skill"
-    entries.push({ kind: "skill", id: "skill:" + path, sourcePath: path, sourceName: name, directory, instruction: bindings(instruction), invocation: invocation(data), display: jsonRecord(data), mcpDependencies: object(data.dependencies) ? strings(data.dependencies.mcp) : [] })
+    entries.push({ kind: "skill", id: "skill:" + path, sourcePath: path, sourceName: name, directory, instruction: pluginText(instruction), invocation: invocation(data), display: jsonRecord(data), mcpDependencies: object(data.dependencies) ? strings(data.dependencies.mcp) : [] })
   }
   const definitions: { name: string; path: string; pointer: string; value: unknown }[] = []
   const addServers = (path: string, map: Record<string, unknown>, pointer: string) => {
@@ -171,7 +116,7 @@ export async function convertPluginTree(input: Capture): Promise<{ package: Plug
     const parsed = ConfigMarkdown.parseOption(instruction)
     if (!parsed) { diagnostics.push({ path, code: "invalid-definition", message: "Markdown definition is invalid" }); continue }
     const kind = match[1]!.startsWith("agent") ? "agent" : "command"
-    entries.push({ kind, id: kind + ":" + path, sourcePath: path, sourceName: match[2]!, instruction: bindings(instruction), invocation: invocation(parsed.data) })
+    entries.push({ kind, id: kind + ":" + path, sourcePath: path, sourceName: match[2]!, instruction: pluginText(instruction), invocation: invocation(parsed.data) })
   }
   if (!opencode && files.has("hooks/hooks.json")) {
     const path = "hooks/hooks.json"
@@ -186,7 +131,7 @@ export async function convertPluginTree(input: Capture): Promise<{ package: Plug
           if (!object(hook) || hook.type !== "command" || typeof hook.command !== "string") { diagnostics.push({ path, sourceName: name, code: "invalid-definition", message: "Hook command is unsupported" }); continue }
           entries.push({ kind: "hook", id: "hook:" + path + "#" + event + "/" + groupIndex + "/" + index, sourcePath: path, sourceName: event, hook: {
             event, ...(typeof group.matcher === "string" ? { matcher: group.matcher } : {}), ...(typeof hook.if === "string" ? { if: hook.if } : {}),
-            command: bindings(hook.command), timeoutSeconds: typeof hook.timeout === "number" ? hook.timeout : event === "UserPromptSubmit" ? 30 : 600,
+            command: pluginText(hook.command), timeoutSeconds: typeof hook.timeout === "number" ? hook.timeout : event === "UserPromptSubmit" ? 30 : 600,
             async: hook.async === true, asyncRewake: hook.asyncRewake === true, onFailure: hook.onFailure === "block" ? "block" : "continue", order: index, scope: { kind: "package" },
           } })
         }
@@ -219,7 +164,7 @@ export async function convertPluginTree(input: Capture): Promise<{ package: Plug
       schema: "codepuppy.plugin-package.v1", provider: opencode ? "opencode" : codex ? "codex" : !manifest && files.has("SKILL.md") ? "skill" : "claude-code",
       name: string(manifest?.name) ?? input.source.entryName ?? entries.find((entry) => entry.kind === "skill")?.sourceName ?? input.source.pluginPath?.split("/").at(-1) ?? "plugin",
       ...(typeof (manifest?.version ?? input.source.version) === "string" ? { version: String(manifest?.version ?? input.source.version) } : {}), ...(typeof manifest?.description === "string" ? { description: manifest.description } : {}),
-      source: input.source, tree, treeDigest: sha256(new TextEncoder().encode(canonical(tree.toSorted((a, b) => a.path.localeCompare(b.path))))), entries, secrets: [...needs.values()], diagnostics,
+      source: input.source, tree, treeDigest: pluginTreeDigest(tree), entries, secrets: [...needs.values()], diagnostics,
     },
     replacements, privateCredentials: credentials,
   }
@@ -242,14 +187,14 @@ export function convertMcpServerDefinition(server: Json, source: Source): { pack
     const parts: Text[number][] = []
     let offset = 0
     for (const match of value.matchAll(/\{([^{}]+)\}/g)) {
-      if (match.index > offset) parts.push(...bindings(value.slice(offset, match.index)))
+      if (match.index > offset) parts.push(...pluginText(value.slice(offset, match.index)))
       const variable = field.variables[match[1]!]
       const fallback = object(variable) ? string(variable.value ?? variable.default) : undefined
       parts.push(...(fallback !== undefined ? credentialText(fallback, { ...context, sensitive: object(variable) && variable.isSecret === true }) : [{ secret: credentialNeed(match[1]!, context) }]))
       offset = match.index + match[0].length
     }
     if (!offset) return credentialText(value, context)
-    if (offset < value.length) parts.push(...bindings(value.slice(offset)))
+    if (offset < value.length) parts.push(...pluginText(value.slice(offset)))
     return parts
   }
   if (object(server)) {
@@ -286,7 +231,7 @@ export function convertMcpServerDefinition(server: Json, source: Source): { pack
   return { package: { schema: "codepuppy.plugin-package.v1", provider: "mcp-registry", name: sourceName,
     ...(object(server) && typeof server.version === "string" ? { version: server.version } : {}),
     ...(object(server) && typeof server.description === "string" ? { description: server.description } : {}),
-    source, tree: [], treeDigest: sha256(new TextEncoder().encode(canonical([]))), entries, secrets: [...needs.values()], diagnostics }, privateCredentials: credentials }
+    source, tree: [], treeDigest: pluginTreeDigest([]), entries, secrets: [...needs.values()], diagnostics }, privateCredentials: credentials }
 }
 
 function marketplaceSource(value: unknown): MarketplaceEntry["source"] {
@@ -324,9 +269,9 @@ function mcpEntry(definition: { name: string; path: string; pointer: string; val
     const commandIndex = ["npx", "uvx"].includes(command[0]!) ? command.findIndex((arg, index) => index > 0 && !arg.startsWith("-")) : -1
     const token = command[commandIndex]
     return {
-      ...base, transport: "stdio", command: command.map((part) => bindings(part)),
+      ...base, transport: "stdio", command: command.map((part) => pluginText(part)),
       environment: Object.fromEntries(Object.entries(stringMap(environment) ? environment : {}).map(([key, part]) => [key, text(part, definition.pointer + (value.type === "local" ? "/environment/" : "/env/") + escapePointer(key), /token|secret|password|api[_-]?key/i.test(key))])),
-      ...(typeof value.cwd === "string" ? { cwd: bindings(value.cwd) } : {}),
+      ...(typeof value.cwd === "string" ? { cwd: pluginText(value.cwd) } : {}),
       ...(token && !/@\d/.test(token) ? { floatingVersion: { commandIndex, token } } : {}),
     }
   }
@@ -344,7 +289,7 @@ function mcpEntry(definition: { name: string; path: string; pointer: string; val
       ...(typeof oauth?.authorizationServerUrl === "string" ? { authorizationServerUrl: oauth.authorizationServerUrl } : {}),
     } } : {}),
   }
-  return { ...base, transport: value.type === "sse" ? "sse" : "http", url: bindings(value.url), headers, ...(value.oauth === false ? { oauth: false } : !Object.keys(headers).some((key) => /authorization|token|secret|api[_-]?key|cookie/i.test(key)) || oauth ? { oauth: login } : {}) }
+  return { ...base, transport: value.type === "sse" ? "sse" : "http", url: pluginText(value.url), headers, ...(value.oauth === false ? { oauth: false } : !Object.keys(headers).some((key) => /authorization|token|secret|api[_-]?key|cookie/i.test(key)) || oauth ? { oauth: login } : {}) }
 }
 
 function mcpLogin(componentId: string, serviceId: string, serverUrl: string): LoginNeed {
@@ -368,8 +313,8 @@ function credentialText(value: string, context: CredentialContext): Text {
   let offset = 0
   for (const match of value.matchAll(/\$\{([A-Za-z_][\w]*)(?::-[^}]*)?\}|\$([A-Za-z_][\w]*)|\{([A-Za-z_][\w]*)\}|<([A-Za-z_][\w]*)>|\{env:([A-Za-z_][\w]*)\}/g)) {
     const label = match[1] ?? match[2] ?? match[3] ?? match[4] ?? match[5]!
-    if (bindingName(label) || ["PATH", "HOME", "USER", "TMPDIR"].includes(label)) continue
-    if (match.index > offset) pieces.push(...bindings(value.slice(offset, match.index)))
+    if (pluginPathBinding(label) || ["PATH", "HOME", "USER", "TMPDIR"].includes(label)) continue
+    if (match.index > offset) pieces.push(...pluginText(value.slice(offset, match.index)))
     pieces.push({ secret: need(label) })
     offset = match.index + match[0].length
   }
@@ -379,8 +324,8 @@ function credentialText(value: string, context: CredentialContext): Text {
     context.replace(prefix + "{secret:" + id + "}")
     return [...(prefix ? [prefix] : []), { secret: id }]
   }
-  if (!pieces.length) return bindings(value)
-  if (offset < value.length) pieces.push(...bindings(value.slice(offset)))
+  if (!pieces.length) return pluginText(value)
+  if (offset < value.length) pieces.push(...pluginText(value.slice(offset)))
   context.replace(pieces.map((part) => typeof part === "string" ? part : "secret" in part ? "{secret:" + part.secret + "}" : "$" + "{" + (part.binding === "pluginRoot" ? "CLAUDE_PLUGIN_ROOT" : part.binding === "skillDir" ? "CLAUDE_SKILL_DIR" : "CLAUDE_PROJECT_DIR") + "}").join(""))
   return pieces
 }
@@ -403,18 +348,6 @@ function toolRules(value: unknown): ToolRule[] {
   })
 }
 function strings(value: unknown): string[] { return typeof value === "string" ? value.split(/,\s*|\s+/).filter(Boolean) : Array.isArray(value) ? value.filter((part): part is string => typeof part === "string") : [] }
-function bindings(value: string): Text {
-  const parts: Text[number][] = []
-  let offset = 0
-  for (const match of value.matchAll(/\$\{(CLAUDE_PLUGIN_ROOT|CLAUDE_SKILL_DIR|CLAUDE_PROJECT_DIR)\}/g)) {
-    if (match.index > offset) parts.push(value.slice(offset, match.index))
-    parts.push({ binding: bindingName(match[1]!)! })
-    offset = match.index + match[0].length
-  }
-  if (offset < value.length) parts.push(value.slice(offset))
-  return parts.length ? parts : [value]
-}
-function bindingName(value: string): "pluginRoot" | "skillDir" | "projectDir" | undefined { return value === "CLAUDE_PLUGIN_ROOT" ? "pluginRoot" : value === "CLAUDE_SKILL_DIR" ? "skillDir" : value === "CLAUDE_PROJECT_DIR" ? "projectDir" : undefined }
 function object(value: unknown): value is Record<string, unknown> { return typeof value === "object" && value !== null && !Array.isArray(value) }
 function string(value: unknown): string | undefined { return typeof value === "string" ? value : undefined }
 function stringMap(value: unknown): value is Record<string, string> { return object(value) && Object.values(value).every((part) => typeof part === "string") }
@@ -429,7 +362,6 @@ function parseJson(bytes: Uint8Array, jsonc = false): unknown {
 }
 function jsonRecord(value: Record<string, unknown>): Record<string, Json> { return JSON.parse(JSON.stringify(value)) as Record<string, Json> }
 function sha256(bytes: Uint8Array): Sha256 { return ("sha256:" + createHash("sha256").update(bytes).digest("hex")) as Sha256 }
-function canonical(value: unknown): string { return JSON.stringify(value, (_key, item: unknown) => object(item) ? Object.fromEntries(Object.keys(item).sort().map((key) => [key, item[key]])) : item) }
 function escapePointer(value: string): string { return value.replaceAll("~", "~0").replaceAll("/", "~1") }
 function replacePointer(root: Record<string, unknown>, pointer: string, replacement: string): void {
   const keys = pointer.slice(1).split("/").map((key) => key.replaceAll("~1", "/").replaceAll("~0", "~"))

@@ -186,6 +186,23 @@ U/E 各运行 `bun typecheck`，仅处理本片造成的问题；若包已有适
 
 两包 `bun typecheck` 退出 0；三个发送入口依 r3 同名命令分别 1、1、4 pass，提交前旧名扫描 10 pass，链接 4 条和 diff 检查通过。文档检查仍为 70 errors / 252 warnings，与 r3 逐条比较新增 0、消失 0。临时端口对照最初的 import/mock 路径问题均在 /tmp 内修正，未计为行为红证据；所有产品诊断输出均已撤掉。没有执行 gate、bin/check、整包套件或重复 45 s scenario。
 
+### r5：gate-files 精确计数同步
+
+输入为编排器提供的 `1757-gate-fail2.log`。四项错误都是登记数未随切片一的测试增删同步；仅修改 `scripts/gate-files.tsv` 的第一列，不改测试、委派、精确比较规则、平台条件或 gate 实现。保留 ship 的 merge，不 rebase。
+
+| 登记文件（相对各包） | 原数 → 实测 | 已有变化的依据 |
+| --- | --- | --- |
+| E `src/context-injection.test.ts` | 43 → 44 | 新增 N6 notice 的 system/result 共用登记说明用例。 |
+| U `src/main/network-egress-proxy.test.ts` | 23 → 24 | 新增真实 CONNECT 经对话决定、撤销后复核的用例。 |
+| U `src/main/network-egress-grants.test.ts` | 18 → 5 | 保留四条地址准入，新增消费 main 服务的授权并集用例；原批准编排随步骤 3 转到 `network-egress-approval.test.ts`，v2 已废止的冷却/上限断言一并替换。本轮没有删除测试或降低判定方式。 |
+| U `src/main/egress-grant-truth.test.ts` | 11 → 7 | 保留三条围栏路径判据；旧精确记录测试随步骤 3 替换为三条站点记录/原子写表驱动用例，加一条 main 写端闭包判据。表内仍验证坏记录、坏时间、重复站点及 rename 失败。 |
+
+本轮独立测量：U `bun test --max-concurrency 2 --reporter=junit --reporter-outfile=/tmp/egress-r5-measured/ui-mac.integration.xml src/main/network-egress-grants.test.ts src/main/egress-grant-truth.test.ts src/main/network-egress-proxy.test.ts` 退出 0，36 pass / 0 fail；E `bun test --max-concurrency 2 --reporter=junit --reporter-outfile=/tmp/egress-r5-measured/ext.integration.xml src/context-injection.test.ts` 退出 0，44 pass / 0 fail。`python3 scripts/junit-file-counts.py /tmp/egress-r5-measured` 实读分别为 5、7、24、44，与原 gate 日志的实测一致。原 gate 的 JUnit 已清理；按 r5 明确授权直接运行登记步骤，日志 `/tmp/egress-r5-registry-direct.log`。
+
+登记步骤：`CODEPUPPY_TEST_LAYERS='fast integration' bash scripts/assert-gate-files.sh` 完成，退出 2（脚本既有的非阻断条件未验证档）。实际汇总：`303 个闸门文件在位且真的跑过(条数与登记精确一致);另 1 个条件闸的保证本次未验证`；条件项为 `process-fence-extension-packaged.test.ts`，未设置签名验收条件，自报 0 与标注相符；10 个 scenario 登记在本次范围外。四项修正分别实跑 44、24、5、7 pass，登记簿自身用例 25 pass，提交前旧名扫描 10 pass，均由此命令实际运行且通过。未执行 gate 或 bin/check。
+
+文档影响为本片验证证据更新，落在本节。所属 profile 的 `check-docs-contract --changed-since origin/alpha --format json` 退出 1，仍为 70 errors / 252 warnings，与 r4 的 findings 逐条一致；既有问题继续交编排器。`python3 scripts/check-doc-links.py docs/specs/tool-network-egress/plan.md docs/specs/tool-network-egress/design.md` 通过（8 条链接）；`git diff --check` 通过。
+
 ## 切片二：全部批准通放与系统代理
 
 本轮仅保留交付边界，后续 PLAN 再展开。AC-08 的真引擎/真围栏三条及去档位判断对照、AC-13 的系统代理证明仍为整票必需证据。AC-13 按设计 §4.7、§10：日常从 `resolveEgressRoutes` 注入路由并走真实上游握手；另由编排器安排**一次**真实机器已设本地测试系统代理的真引擎/真围栏验收，连接仅经它可达的目标，保留测试代理连接记录，并对照无系统代理。日常注入不计作系统配置读取已验证。本片不启动 Electron、不改本机系统代理；缺少那次实机记录时，最终 AC-13 不能记为通过。

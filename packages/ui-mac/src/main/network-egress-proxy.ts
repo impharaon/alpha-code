@@ -41,12 +41,14 @@
 // 这样 network-egress-proxy.test.ts 能在 bun 里对真 TCP 靶站跑正反两臂,并证明「换成恒答允许的替身,判据会红」。
 
 import { randomUUID } from "node:crypto"
+import dns from "node:dns/promises"
 import * as http from "node:http"
 import * as net from "node:net"
 import { classifyNetFailure, EGRESS_DIAL_FAILURE_STATUS } from "@opencode/schema/codepuppy-net-failure"
 import { egressDenialLine, egressDenialDescription, type EgressDenialDetail } from "../shared/egress-denial"
 import { isEgressAuthorizedForSidecar } from "./network-egress-derived"
-import { admitUserEgressGrant, currentEgressPass, recordEgressPass, denyEgressPass, type EgressPassBasis, requestUserEgressGrant, type EgressGrantOutcome } from "./network-egress-grants"
+import { canonicalEgressHost, admitUserEgressGrant, currentEgressPass, recordEgressPass, denyEgressPass, type EgressPassBasis, requestUserEgressGrant, type EgressGrantOutcome } from "./network-egress-grants"
+import { isLoopbackHost } from "./network-egress-registry"
 import type { EgressPass } from "../shared/network-egress-wire"
 import { dialEgressUpstream, resolveEgressRoutes } from "./network-egress-upstream"
 
@@ -313,11 +315,13 @@ export async function startEgressPolicyProxy(deps: EgressProxyDeps): Promise<Egr
         if (basis) basis = await currentEgressPass()
         if (!authorize(parsed.host, parsed.port) && !basis) { settled = true; deny(403, "unregistered", parsed, "approval-unavailable"); return }
         const address = server.address()
-        const filtered = routes.filter((route) => {
-          if (route.kind === "direct" || !address || typeof address === "string" || route.port !== address.port) return true
-          const host = route.host.toLowerCase()
-          return host !== "localhost" && host !== "::1" && !/^127\./.test(new URL(`http://${host}/`).hostname)
-        })
+        const filtered = (await Promise.all(routes.map(async (route) => {
+          if (route.kind === "direct" || !address || typeof address === "string" || route.port !== address.port) return route
+          const host = canonicalEgressHost(route.host) ?? route.host
+          if (isLoopbackHost(host)) return
+          const addresses = net.isIP(host) ? [host] : (await dns.lookup(host, { all: true }).catch(() => [])).map((entry) => entry.address)
+          return addresses.some((entry) => isLoopbackHost(canonicalEgressHost(entry) ?? entry)) ? undefined : route
+        }))).filter((route): route is NonNullable<typeof route> => route !== undefined)
         if (!filtered.length && routes.length) throw Object.assign(new Error("proxy loop"), { code: "EPROXYLOOP" })
         const passBasis = basis
         const { socket: upstream } = await dial(parsed, filtered, passBasis ? { kind: "allow-all", onPass: () => {

@@ -266,3 +266,6 @@ U `bun test --max-concurrency 2 src/main/network-egress-approval.test.ts src/mai
 
 
 步骤 2 的后续窄复核在提交 `0c83296409` 后读到 HTTPS 失败（`/tmp/egress-s2-step2-upstream.log`，1 pass / 1 fail）：Bun https.request 会从新设的 CONNECT Host 头推导 SNI，把目标域名用于代理证书校验。显式将 HTTPS 的 servername 绑定路由代理 host（IP 不发域名 SNI），保持目标 authority 为 CONNECT Host。原测试不改，U `bun test --max-concurrency 2 src/main/network-egress-upstream.test.ts` 转为 6 pass / 0 fail（`/tmp/egress-s2-https-green.log`）。如实记录前一提交的验证缺口，未合并或推送。
+
+
+N7 循环边界补正：先以 `cbfedbb99b` 仅提交扩大 IPv6/IPv4-mapped 别名的回归输入，U `bun test --max-concurrency 2 src/main/network-egress-proxy.test.ts -t '系统代理指回'` 为 0 pass / 1 fail（展开式 IPv6 错归 ERR_INVALID_URL，`/tmp/egress-s2-loop-red.log`）。随后把 WHATWG/mapped 归一提到 grants 的内部导出 `canonicalEgressHost`，公网判断与代理循环共用；卡片准入未改。代理自身端口的名称还检查本次 lookup 的 loopback 地址，避免名称别名回指自身。原回归测试未改，grants/proxy 两文件 32 pass / 0 fail（`/tmp/egress-s2-loop-green.log`）；补齐名称解析后代理文件再核对为 26 pass / 0 fail（`/tmp/egress-s2-loop-proxy-final.log`），typecheck 与提交前旧名扫描通过。

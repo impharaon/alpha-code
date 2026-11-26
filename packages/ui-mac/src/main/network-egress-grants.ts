@@ -167,28 +167,29 @@ const addressRules = egressAddressRules.map(([prefix, denied]) => {
   return { block, family: isIP(address!), length: Number(length), denied }
 }).sort((a, b) => b.length - a.length)
 
+export function canonicalEgressHost(host: string): string | undefined {
+  try {
+    const value = new URL(`http://${isIP(host) === 6 ? `[${host}]` : host}/`).hostname.replace(/^\[|\]$/g, "")
+    if (!value.startsWith("::ffff:")) return value
+    const words = value.slice(7).split(":").map((part) => parseInt(part, 16))
+    return [words[0]! >> 8, words[0]! & 255, words[1]! >> 8, words[1]! & 255].join(".")
+  } catch { return undefined }
+}
+
 export function isNonPublicEgressAddress(address: string): boolean {
-  const family = isIP(address)
-  if (!family) return true
-  if (family === 6 && address.includes("%")) return true
-  if (family === 6) {
-    const normalized = new URL(`http://[${address}]/`).hostname.slice(1, -1)
-    if (normalized.startsWith("::ffff:")) {
-      const words = normalized.slice(7).split(":").map((part) => parseInt(part, 16))
-      if (words.length === 2) return isNonPublicEgressAddress([words[0]! >> 8, words[0]! & 255, words[1]! >> 8, words[1]! & 255].join("."))
-    }
-  }
-  if (family === 4 && /^198\.(18|19)\./.test(address)) return false
-  if (family === 4 && isNonPublicV4Literal(address)) return true
-  return addressRules.find((rule) => rule.family === family && rule.block.check(address, family === 4 ? "ipv4" : "ipv6"))?.denied ?? false
+  if (!isIP(address)) return true
+  const host = canonicalEgressHost(address)
+  if (!host) return true
+  const family = isIP(host)
+  if (family === 4 && /^198\.(18|19)\./.test(host)) return false
+  if (family === 4 && isNonPublicV4Literal(host)) return true
+  return addressRules.find((rule) => rule.family === family && rule.block.check(host, family === 4 ? "ipv4" : "ipv6"))?.denied ?? false
 }
 
 export function admitEgressPass(target: Destination): Destination | undefined {
   const admitted = admitUserEgressGrant(target.host, target.port)
   if (!admitted) return
-  try {
-    const host = new URL(`http://${admitted.host}/`).hostname
-    if (isIP(host) && isNonPublicEgressAddress(host)) return
-    return { host, port: admitted.port }
-  } catch { return undefined }
+  const host = canonicalEgressHost(admitted.host)
+  if (!host || (isIP(host) && isNonPublicEgressAddress(host))) return
+  return { host, port: admitted.port }
 }

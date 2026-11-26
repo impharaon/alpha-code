@@ -1383,6 +1383,16 @@ test("connector content keys track resolution contents and platform pins", () =>
   ])
     expect(connectorPreparationKey(changed)).not.toBe(key)
   expect(connectorPreparationKey({ ...input, options: { ...input.options, refresh: "another time" } })).toBe(key)
+  // These names come from the pinned npm 11.20.0 definitions/Arborist. Relative
+  // release age is a semantic input; its derived wall-clock `before` is not.
+  const npm = { ...input, runner: "npm-exec" as const, options: {} }
+  for (const options of [
+    { minReleaseAge: 7 },
+    { minReleaseAgeExclude: ["@own/*"] },
+    { packageLock: false },
+    { lockfileVersion: 2 },
+  ])
+    expect(connectorPreparationKey({ ...npm, options })).not.toBe(connectorPreparationKey(npm))
 })
 
 test("connector content keys canonicalize remote git and local content requirements", () => {
